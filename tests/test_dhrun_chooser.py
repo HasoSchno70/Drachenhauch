@@ -20,7 +20,7 @@ def test_file_arg_does_not_open_chooser(monkeypatch, tmp_path):
     monkeypatch.setattr(dhrun, "_launch_chooser",
                         lambda root: (_ for _ in ()).throw(AssertionError("Chooser darf nicht aufgehen")))
     monkeypatch.setattr(dhrun, "_run_native", lambda abs_path, path: 0)
-    f = tmp_path / "x.gb"
+    f = tmp_path / "x.dh"
     f.write_text('PRINT 1\n', encoding="utf-8")
     # main() macht os.chdir ins Datei-Verzeichnis -> danach wiederherstellen,
     # sonst laufen spaetere subprocess-Tests (z.B. LSP) im falschen CWD.

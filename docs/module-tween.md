@@ -191,9 +191,9 @@ NEXT
 
 ## Komplettes Beispiel
 
-Siehe [examples/26_tween.gb](../examples/26_tween.gb) — zeigt linear, out_bounce, Pause/Resume und Reverse anhand von Konsolen-Output.
+Siehe [examples/26_tween.dh](../examples/26_tween.dh) — zeigt linear, out_bounce, Pause/Resume und Reverse anhand von Konsolen-Output.
 
-Im Spiel ([examples/32_coinquest.gb](../examples/32_coinquest.gb)) werden Tweens für Banner-Slide, Coin-Spawn und Pickup-Pop kombiniert.
+Im Spiel ([examples/32_coinquest.dh](../examples/32_coinquest.dh)) werden Tweens für Banner-Slide, Coin-Spawn und Pickup-Pop kombiniert.
 
 ## Tipps
 

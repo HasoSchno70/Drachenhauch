@@ -1,7 +1,7 @@
 """Tests fuer das save-Modul (persistente Save-Slots, JSON-Backend).
 
 Golden-Tests gegen `dhrt` (Stufe B): GB-Programm mit IMPORT "save"; Datei-I/O
-laeuft im `base=tmp_path`-Verzeichnis (run_gb legt die .gb dort ab, dhrt chdirt
+laeuft im `base=tmp_path`-Verzeichnis (run_gb legt die .dh dort ab, dhrt chdirt
 hin -> relative Save-Pfade landen in tmp_path). Frueher via `call_builtin` gegen
 die Python-Impl (in Phase 8 geloescht).
 """

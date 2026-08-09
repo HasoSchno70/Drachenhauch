@@ -112,7 +112,7 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/37_usb.gb](../examples/37_usb.gb).
+Siehe [examples/37_usb.dh](../examples/37_usb.dh).
 
 ## In der nativen Runtime (dhrt)
 

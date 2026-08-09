@@ -5,7 +5,7 @@ Szene zeigt, was die Laufzeit kann — und dabei auf die Musik reagiert, statt
 bloß daneben zu laufen.
 
 ```
-dhrun.py gbdemo\gbdemo.gb          # oder im Editor F5
+dhrun.py gbdemo\gbdemo.dh          # oder im Editor F5
 ```
 
 Sie **startet im Vollbild**. Gezeichnet wird in 1280×720, die Laufzeit

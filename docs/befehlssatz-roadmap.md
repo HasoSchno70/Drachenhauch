@@ -14,7 +14,7 @@ absichern.
 ## Umsetzungs-Checkliste pro Befehl
 - [ ] Tree-Walker: `@builtin`/`@graphics_builtin` in `drachenhauch/interpreter.py`
       (bzw. passendes `drachenhauch/modules/*.py`).
-- [ ] Native Runtime: `rust/gb_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
+- [ ] Native Runtime: `rust/drachenhauch_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
       ggf. `graphics.rs`/`audio.rs`), danach `rust\build_runtime.py`.
 - [ ] Parity-Snippet in `tests/test_dhrt_parity.py` (TW == dhrt). PRNG-/Uhr-
       basierte Befehle als „erwartet unterschiedlich" behandeln.
@@ -27,7 +27,7 @@ absichern.
 Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
 
 - [x] **`PHYSICS_BROAD_*` nativ** (NEW/ADD/CLEAR/COUNT/QUERY/PAIR_A/PAIR_B/
-      PAIR_COUNT). Uniform-Grid-Broadphase in `rust/gb_runtime/src/physics.rs`
+      PAIR_COUNT). Uniform-Grid-Broadphase in `rust/drachenhauch_runtime/src/physics.rs`
       (portiert aus `gb_native/src/broadphase.rs` — selbe Paare/Reihenfolge),
       `Value::PhysicsBroad`, Dispatch + Validierung (Radius>=0, Paar-Index-
       Bounds) in `builtins.rs`. Parity-Snippet `physics_broad` (bit-identische
@@ -78,7 +78,7 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
 > `dhrt --export`, Editor-Run (`output_console._start_native`) → `dhrt run`,
 > Editor-Export (`main_window._export_active`) → `dhrt --export`. Damit laufen die
 > dhrt-only-Builtins überall (verifiziert: `dhrun.py --native`/`--export` + die
-> exportierte .exe). dhrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
+> exportierte .exe). dhrts Compile-Fehler bekamen das Format `datei.dh:Zeile:`
 > (Editor-klickbar). (Hinweis: der Python-Compiler ist seit Stufe B entfernt —
 > dhrt kompiliert selbst; „beide Pfade" unten sind historisch.)
 
@@ -138,7 +138,7 @@ nativen Runtime; Run-/Export-Pfad läuft über dhrts Rust-Frontend).
 ## Nachtrag „rund machen" (2026-06-06, dhrt-only)
 
 Zweiter Lücken-Sweep gegen die echte Builtin-Liste; alles pur in
-`rust/gb_runtime/src/builtins.rs` (+ Golden-Tests `tests/test_builtins_extra.py`,
+`rust/drachenhauch_runtime/src/builtins.rs` (+ Golden-Tests `tests/test_builtins_extra.py`,
 `builtin_index.json`). Vorher fehlten u.a. `vec2`-Verwandte → siehe Modul `m3d`.
 
 - [x] **Game-Math:** `WRAP(v,lo,hi)`, `PINGPONG(t,len)`, `MOVETOWARD(cur,ziel,maxd)`,

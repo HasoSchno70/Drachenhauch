@@ -18,7 +18,7 @@ oder oben rechts -> "Edit Configurations..." -> "+ Python".
 
 Name:               Pong (oder beliebig)
 Script path:        C:\Programmieren\Python\GameBasic\dhrun.py
-Parameters:         examples/10_pong.gb
+Parameters:         examples/10_pong.dh
 Working directory:  C:\Programmieren\Python\GameBasic
 Python Interpreter: Project Default (.venv)
 
@@ -39,14 +39,14 @@ Du siehst dann die Struktur:
     .venv/                  <- PyCharm verbirgt das oft, ist normal
     examples/
       assets/
-      *.gb
+      *.dh
     drachenhauch/              <- das ist das Python-Paket
       *.py
     dhrun.py
     pyproject.toml
 
 
-4) .gb-DATEIEN MIT SYNTAX-HIGHLIGHTING
+4) .dh-DATEIEN MIT SYNTAX-HIGHLIGHTING
 --------------------------------------
 File -> Settings -> Editor -> File Types
 -> Recognized File Types -> "+"
@@ -148,17 +148,17 @@ STOPSOUND
 PLAYMUSIC
 STOPMUSIC
 
-Unten -> "Registered Patterns" -> "+" -> *.gb hinzufuegen.
+Unten -> "Registered Patterns" -> "+" -> *.dh hinzufuegen.
 
-OK druecken. Jetzt sind .gb-Dateien farbig und tab-getreu hervorgehoben.
+OK druecken. Jetzt sind .dh-Dateien farbig und tab-getreu hervorgehoben.
 
 
 5) STARTEN OHNE PYCHARM
 -----------------------
 Aus jedem Terminal im Projekt-Ordner:
 
-    gb.cmd examples\10_pong.gb           (Windows-CMD/PowerShell)
-    ./gb.sh examples/10_pong.gb          (Git-Bash, WSL)
+    gb.cmd examples\10_pong.dh           (Windows-CMD/PowerShell)
+    ./gb.sh examples/10_pong.dh          (Git-Bash, WSL)
 
 beide nutzen automatisch den .venv-Python und brauchen nichts global.
 
@@ -167,10 +167,10 @@ beide nutzen automatisch den .venv-Python und brauchen nichts global.
 ----------------------------
 Voraussetzung: native VM ist gebaut (dh-build.cmd).
 
-    dh-package examples\10_pong.gb --windowed --onefile
+    dh-package examples\10_pong.dh --windowed --onefile
         -> dist\10_pong.exe (etwa 17 MB, einzelne Datei)
 
-    dh-package examples\17_tilemap.gb --windowed
+    dh-package examples\17_tilemap.dh --windowed
         -> dist\17_tilemap\17_tilemap.exe (Ordner mit allen DLLs,
            etwa 40 MB, schneller Start)
 

@@ -60,16 +60,16 @@ def _write(d: Path, name: str, content: str) -> Path:
 
 
 def test_merge_source_import(tmp_path):
-    _write(tmp_path, "helper.gb",
+    _write(tmp_path, "helper.dh",
            "FUNCTION dbl(n AS INTEGER) AS INTEGER\n  RETURN n * 2\nEND FUNCTION\n")
-    main = _write(tmp_path, "main.gb", 'IMPORT "helper.gb"\nPRINT dbl(21)\n')
+    main = _write(tmp_path, "main.dh", 'IMPORT "helper.dh"\nPRINT dbl(21)\n')
     rc, rs = _rs_merge(main)
     assert rc == 0
     assert rs == _py_merge(main)
 
 
 def test_merge_module_import(tmp_path):
-    main = _write(tmp_path, "main.gb",
+    main = _write(tmp_path, "main.dh",
                   'IMPORT "vec2"\nDIM v AS VEC2\nv = VEC2_NEW(3.0, 4.0)\nPRINT VEC2_LENGTH(v)\n')
     rc, rs = _rs_merge(main)
     assert rc == 0
@@ -77,26 +77,26 @@ def test_merge_module_import(tmp_path):
 
 
 def test_merge_module_import_alias(tmp_path):
-    main = _write(tmp_path, "main.gb", 'IMPORT "json" AS j\nPRINT 1\n')
+    main = _write(tmp_path, "main.dh", 'IMPORT "json" AS j\nPRINT 1\n')
     rc, rs = _rs_merge(main)
     assert rc == 0
     assert rs == _py_merge(main)
 
 
 def test_merge_nested_and_duplicate(tmp_path):
-    _write(tmp_path, "util.gb", "CONST K AS INTEGER = 7\n")
-    _write(tmp_path, "helper.gb", 'IMPORT "util.gb"\nFUNCTION f() AS INTEGER\n  RETURN K\nEND FUNCTION\n')
+    _write(tmp_path, "util.dh", "CONST K AS INTEGER = 7\n")
+    _write(tmp_path, "helper.dh", 'IMPORT "util.dh"\nFUNCTION f() AS INTEGER\n  RETURN K\nEND FUNCTION\n')
     # main importiert helper UND util -- util ist via helper schon gesehen.
-    main = _write(tmp_path, "main.gb",
-                  'IMPORT "helper.gb"\nIMPORT "util.gb"\nPRINT f()\n')
+    main = _write(tmp_path, "main.dh",
+                  'IMPORT "helper.dh"\nIMPORT "util.dh"\nPRINT f()\n')
     rc, rs = _rs_merge(main)
     assert rc == 0
     assert rs == _py_merge(main)
 
 
 def test_merge_trailing_comment_on_import(tmp_path):
-    _write(tmp_path, "helper.gb", "CONST Z AS INTEGER = 1\n")
-    main = _write(tmp_path, "main.gb", "IMPORT \"helper.gb\"   ' lade helfer\nPRINT Z\n")
+    _write(tmp_path, "helper.dh", "CONST Z AS INTEGER = 1\n")
+    main = _write(tmp_path, "main.dh", "IMPORT \"helper.dh\"   ' lade helfer\nPRINT Z\n")
     rc, rs = _rs_merge(main)
     assert rc == 0
     assert rs == _py_merge(main)
@@ -105,18 +105,18 @@ def test_merge_trailing_comment_on_import(tmp_path):
 def test_missing_import_errors_both(tmp_path):
     from drachenhauch.preprocess import process
     from drachenhauch.errors import LexerError
-    main = _write(tmp_path, "main.gb", 'IMPORT "nichtda.gb"\nPRINT 1\n')
+    main = _write(tmp_path, "main.dh", 'IMPORT "nichtda.dh"\nPRINT 1\n')
     rc, _ = _rs_merge(main)
     assert rc != 0
     with pytest.raises(LexerError):
-        process(main.read_text(encoding="utf-8"), main.parent, file_label="main.gb")
+        process(main.read_text(encoding="utf-8"), main.parent, file_label="main.dh")
 
 
 def test_e2e_runsrc_with_imports(tmp_path):
-    _write(tmp_path, "mathlib.gb",
+    _write(tmp_path, "mathlib.dh",
            "FUNCTION sq(n AS INTEGER) AS INTEGER\n  RETURN n * n\nEND FUNCTION\n")
-    main = _write(tmp_path, "main.gb",
-                  'IMPORT "mathlib.gb"\nIMPORT "vec2"\n'
+    main = _write(tmp_path, "main.dh",
+                  'IMPORT "mathlib.dh"\nIMPORT "vec2"\n'
                   'DIM v AS VEC2\nv = VEC2_NEW(6.0, 8.0)\n'
                   'PRINT sq(9)\nPRINT VEC2_LENGTH(v)\n')
     rc, rs = _runsrc(main)
@@ -129,7 +129,7 @@ def test_e2e_runsrc_with_imports(tmp_path):
 def test_e2e_runsrc_module_alias(tmp_path):
     # IMPORT "..." AS x : aliasierte Builtins (J_PARSE->JSON_PARSE) + externe
     # Typen (J_HANDLE / V) muessen in dhrt funktionieren wie im Tree-Walker.
-    main = _write(tmp_path, "main.gb",
+    main = _write(tmp_path, "main.dh",
                   'IMPORT "json" AS j\nIMPORT "vec2" AS v\n'
                   'DIM h AS J_HANDLE\nh = J_PARSE("[10, 20, 30]")\n'
                   'PRINT J_GET_INT(h, "1")\n'

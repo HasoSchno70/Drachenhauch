@@ -56,7 +56,7 @@ def test_triangle_polygon_winding_independent(tmp_path):
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     from PIL import Image
 
-    src = tmp_path / "winding.gb"
+    src = tmp_path / "winding.dh"
     src.write_text(_PROG, encoding="utf-8")
     shot = tmp_path / "winding.png"
     env = dict(os.environ, DHRT_FRAMES="2", DHRT_SCREENSHOT=str(shot))

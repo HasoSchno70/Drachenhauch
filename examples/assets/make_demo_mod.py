@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Erzeugt ein kleines, frei verwendbares ProTracker-MOD (M.K., 4 Kanaele)
-fuer die Modul-Player-Demo examples/115_modplayer.gb.
+fuer die Modul-Player-Demo examples/115_modplayer.dh.
 
 Selbst generiert -> gemeinfrei. Vier Kanaele im Amiga-Stil:
   Kanal 1  BASS    (Square, tief)

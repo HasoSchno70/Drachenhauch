@@ -1,0 +1,35 @@
+' 102_render_target.dh -- Render-Texturen als GB-Handle (Batch 4, dual-path).
+' Ein "Badge" wird einmal pro Frame in ein Off-Screen-Render-Ziel gezeichnet und
+' dann mehrfach (skaliert + getoent) auf den Screen gestempelt.
+
+SCREEN(640, 400, "Render-Targets", 1)
+
+DIM badge AS INTEGER
+badge = RENDERTARGET_NEW(120, 120)
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+
+    CLS(&H101828)
+
+    ' --- Den Badge-Inhalt ins Render-Ziel zeichnen ---
+    RENDERTARGET_BEGIN(badge)
+        CLS(&H1A2438)
+        BOXROUND(4, 4, 115, 115, 18, &H2C3A55)
+        DIM r AS INTEGER
+        r = 28 + INT(8 * SIN(frame * 0.08))
+        CIRCLE(60, 52, r, &HFFD040)
+        CIRCLE(60, 52, r - 8, &HFF8020)
+        TEXT(40, 92, "GB", &HE0ECFF)
+    RENDERTARGET_END()
+
+    ' --- Mehrfach stempeln: original / vergroessert / verkleinert + getoent ---
+    RENDERTARGET_DRAW(badge, 30, 90, 1.0)
+    RENDERTARGET_DRAW(badge, 200, 60, 1.6)
+    RENDERTARGET_DRAW(badge, 470, 110, 0.9, &H80C0FF)
+
+    TEXT(20, 12, "Render-Target: einmal gezeichnet, 3x gestempelt (skaliert/getoent)", &HCCDDEE)
+
+    FLIP()
+NEXT

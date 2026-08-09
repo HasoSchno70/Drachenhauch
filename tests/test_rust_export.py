@@ -1,6 +1,6 @@
-"""Test: `dhrt --export <datei.gb>` -- Selbst-Export einer eigenstaendigen Exe.
+"""Test: `dhrt --export <datei.dh>` -- Selbst-Export einer eigenstaendigen Exe.
 
-dhrt kompiliert den Quelltext selbst (ohne Python) zu `.gbc` und haengt den
+dhrt kompiliert den Quelltext selbst (ohne Python) zu `.dhc` und haengt den
 Payload an eine Kopie der eigenen Runtime-Exe. Die erzeugte Exe muss ohne
 Python laufen und denselben Output wie der Python-Tree-Walker liefern.
 """
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_export_runs_standalone(tmp_path):
-    main = tmp_path / "prog.gb"
+    main = tmp_path / "prog.dh"
     main.write_text(
         "FUNCTION fib(n AS INTEGER) AS INTEGER\n"
         "  IF n < 2 THEN RETURN n\n"

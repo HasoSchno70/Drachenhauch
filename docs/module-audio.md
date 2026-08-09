@@ -145,7 +145,7 @@ AUDIO_MUSIC_PLAY(-1)               ' loopt -- echter Amiga-Sound
 PLAYMUSIC("song.xm", -1, 1.0)
 ```
 
-`AUDIO_FFT` greift auch bei Modulmusik den laufenden Mix ab — ideal fuer reaktive Visualizer. Demo: [examples/115_modplayer.gb](../examples/115_modplayer.gb) (Modul-Player mit Spektrum + Drag&Drop fuers eigene Modul).
+`AUDIO_FFT` greift auch bei Modulmusik den laufenden Mix ab — ideal fuer reaktive Visualizer. Demo: [examples/115_modplayer.dh](../examples/115_modplayer.dh) (Modul-Player mit Spektrum + Drag&Drop fuers eigene Modul).
 
 **Crossfade zwischen Tracks:**
 
@@ -262,7 +262,7 @@ SAMPLE_SET_LOOP(pluck, 2000, 8000)
 SAMPLE_PLAY(pluck, 0, 0.7, 1000)            ' 1 s, Loop-Region gehalten
 ```
 
-Demo: [examples/116_sampler.gb](../examples/116_sampler.gb) — ein Zupf-Sample
+Demo: [examples/116_sampler.dh](../examples/116_sampler.dh) — ein Zupf-Sample
 spielt eine Melodie + Bass ueber die ganze Klaviatur (anklickbar).
 
 > **Sample vs. Modul:** `SAMPLE_*` ist die Live-Primitive, um eigene Samples
@@ -292,7 +292,7 @@ AUDIO_LOFI(TRUE, 8, 0.0)        ' 8-bit, Filter aus (roher Bit-Crush)
 AUDIO_LOFI(FALSE)                ' wieder Hi-Fi
 ```
 
-Demo: in [examples/116_sampler.gb](../examples/116_sampler.gb) mit `L`
+Demo: in [examples/116_sampler.dh](../examples/116_sampler.dh) mit `L`
 umschaltbar (A/B-Vergleich Hi-Fi vs. Paula).
 
 ## Mixer-Busse (SFX-/Musik-Master)
@@ -359,10 +359,10 @@ AUDIO_COMPRESSOR("master", -18, 4, 3)   ' Kompressor auf der Summe
 AUDIO_EQ("music", 100, 6, 1.0)          ' +6 dB Glocke bei 100 Hz
 ```
 
-Demo: [examples/117_audiofx.gb](../examples/117_audiofx.gb) — Filter-Cutoff per
+Demo: [examples/117_audiofx.dh](../examples/117_audiofx.dh) — Filter-Cutoff per
 Maus, Reverb/Delay per Taste, mit Live-Spektrum.
 
-**Gesamt-Showcase:** [examples/118_audio_studio.gb](../examples/118_audio_studio.gb)
+**Gesamt-Showcase:** [examples/118_audio_studio.dh](../examples/118_audio_studio.dh)
 — „Audio-Studio", das die ganze Pipeline auf einen Schirm bringt: Modul-Streaming
 (Musik-Bus) + Sampler-Arpeggio (SFX-Bus), getrennt stummschaltbar, Master-Filter
 per Maus, Reverb/Delay/Distortion/Lo-Fi schaltbar, dauerhafter Mastering-
@@ -448,13 +448,13 @@ END IF
 
 ## Beispiele
 
-[examples/68_audio.gb](../examples/68_audio.gb) demonstriert das volle Modul-API inklusive Tone-Generation, Pan, Music-Queue.
+[examples/68_audio.dh](../examples/68_audio.dh) demonstriert das volle Modul-API inklusive Tone-Generation, Pan, Music-Queue.
 
-[examples/114_chiptune.gb](../examples/114_chiptune.gb) — **4-Kanal-Chiptune-Demo im C64/Amiga-Stil**: ein komplettes Musikstueck ohne Audio-Dateien. Lead (Square + Vibrato via `AUDIO_SFX`, rechts gepannt), Akkord-Arpeggio (links), Square-Bass und Drums (Kick = Sinus-Pitch-Drop, Snare/HiHat = `AUDIO_NOISE`) laufen parallel auf dem Mixer; ein frame-basierter Pattern-Player (wie der dhtracker-Export) spielt alle 125 ms eine Reihe. Dazu VU-Meter pro Kanal, echtes `AUDIO_FFT`-Spektrum und Sinus-Scroller.
+[examples/114_chiptune.dh](../examples/114_chiptune.dh) — **4-Kanal-Chiptune-Demo im C64/Amiga-Stil**: ein komplettes Musikstueck ohne Audio-Dateien. Lead (Square + Vibrato via `AUDIO_SFX`, rechts gepannt), Akkord-Arpeggio (links), Square-Bass und Drums (Kick = Sinus-Pitch-Drop, Snare/HiHat = `AUDIO_NOISE`) laufen parallel auf dem Mixer; ein frame-basierter Pattern-Player (wie der dhtracker-Export) spielt alle 125 ms eine Reihe. Dazu VU-Meter pro Kanal, echtes `AUDIO_FFT`-Spektrum und Sinus-Scroller.
 
-[examples/115_modplayer.gb](../examples/115_modplayer.gb) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
+[examples/115_modplayer.dh](../examples/115_modplayer.dh) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
 
-[examples/116_sampler.gb](../examples/116_sampler.gb) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
+[examples/116_sampler.dh](../examples/116_sampler.dh) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
 
 ## In der nativen Runtime (dhrt)
 

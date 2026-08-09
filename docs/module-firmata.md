@@ -140,4 +140,4 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/147_firmata.gb](../examples/147_firmata.gb).
+Siehe [examples/147_firmata.dh](../examples/147_firmata.dh).

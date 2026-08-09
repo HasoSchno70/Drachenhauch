@@ -32,12 +32,12 @@ def _count_expanded(tree):
 
 
 def test_expand_collapse_all(app, tmp_path):
-    # Ein paar verschachtelte .gb-Dateien anlegen, damit der Baum Tiefe hat.
+    # Ein paar verschachtelte .dh-Dateien anlegen, damit der Baum Tiefe hat.
     (tmp_path / "a").mkdir()
     (tmp_path / "a" / "b").mkdir()
-    (tmp_path / "top.gb").write_text("PRINT 1", encoding="utf-8")
-    (tmp_path / "a" / "mid.gb").write_text("PRINT 2", encoding="utf-8")
-    (tmp_path / "a" / "b" / "deep.gb").write_text("PRINT 3", encoding="utf-8")
+    (tmp_path / "top.dh").write_text("PRINT 1", encoding="utf-8")
+    (tmp_path / "a" / "mid.dh").write_text("PRINT 2", encoding="utf-8")
+    (tmp_path / "a" / "b" / "deep.dh").write_text("PRINT 3", encoding="utf-8")
 
     from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
@@ -76,10 +76,10 @@ def _find_by_key(tree, key):
 
 
 def test_refresh_preserves_expand_state(app, tmp_path):
-    # Verschachtelte .gb-Dateien -> Baum mit Tiefe.
+    # Verschachtelte .dh-Dateien -> Baum mit Tiefe.
     (tmp_path / "a" / "b").mkdir(parents=True)
-    (tmp_path / "a" / "mid.gb").write_text("PRINT 2", encoding="utf-8")
-    (tmp_path / "a" / "b" / "deep.gb").write_text("PRINT 3", encoding="utf-8")
+    (tmp_path / "a" / "mid.dh").write_text("PRINT 2", encoding="utf-8")
+    (tmp_path / "a" / "b" / "deep.dh").write_text("PRINT 3", encoding="utf-8")
 
     from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
@@ -119,7 +119,7 @@ def test_watcher_registers_project_root_and_gb_dirs(app, tmp_path):
     "Aktualisieren" -- externe Aenderungen (anderes Programm, git checkout,
     zweiter Editor-Prozess) blieben bis zum naechsten Klick unsichtbar."""
     (tmp_path / "sub").mkdir()
-    (tmp_path / "sub" / "x.gb").write_text("PRINT 1", encoding="utf-8")
+    (tmp_path / "sub" / "x.dh").write_text("PRINT 1", encoding="utf-8")
 
     from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)

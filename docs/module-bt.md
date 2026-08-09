@@ -121,7 +121,7 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/38_bt.gb](../examples/38_bt.gb).
+Siehe [examples/38_bt.dh](../examples/38_bt.dh).
 
 ## In der nativen Runtime (dhrt)
 

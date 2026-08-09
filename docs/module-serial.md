@@ -90,7 +90,7 @@ Schreib- und Lesefehler nach dem Schließen werfen eine deutliche „Port wurde 
 
 ## Komplettes Beispiel
 
-Siehe [examples/35_serial.gb](../examples/35_serial.gb).
+Siehe [examples/35_serial.dh](../examples/35_serial.dh).
 
 ## In der nativen Runtime (dhrt)
 

@@ -4,7 +4,7 @@ Die Filter (IMAGE_CROP/RESIZE_CANVAS/BLUR/BRIGHTNESS/CONTRAST/GRAYSCALE/
 INVERT/REPLACE_COLOR) und die In-Image-Zeichenops (IMAGE_DRAW_LINE/CIRCLE/
 RECT/TEXT) sind raylib-Engine-Builtins: sie brauchen den GL-Kontext (Image
 <-> Textur) und werden daher nicht via run_gb funktionsgetestet, sondern live
-(examples/122_imgfx.gb). Hier wird geprueft, dass sie im eingefrorenen
+(examples/122_imgfx.dh). Hier wird geprueft, dass sie im eingefrorenen
 dhrt-Index stehen -- sonst warnt der Editor live und der Drift-Test schlaegt
 an, sobald das Beispiel sie nutzt.
 """

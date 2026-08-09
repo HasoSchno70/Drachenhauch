@@ -65,7 +65,7 @@ def _run_example(rel: str) -> str:
     import subprocess
     if _DHRT is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    path = _EXAMPLES / f"{rel}.gb"
+    path = _EXAMPLES / f"{rel}.dh"
     r = subprocess.run([str(_DHRT), "run", str(path)],
                        capture_output=True, text=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, f"dhrt run {rel} Exit {r.returncode}: {r.stderr}"

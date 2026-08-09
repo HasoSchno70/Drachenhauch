@@ -2,7 +2,7 @@
 //!
 //! Port von `drachenhauch/preprocess.py`. Expandiert `IMPORT "<name>"`-Zeilen
 //! rekursiv VOR dem Lexen:
-//!   - Quellcode-IMPORT (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
+//!   - Quellcode-IMPORT (`IMPORT "helper.dh"` / relativer Pfad): Datei lesen,
 //!     rekursiv preprocessen, mit `' === IMPORT ... ===`-Markern inlinen.
 //!   - Built-in-Modul (`IMPORT "json"`): die Zeile wird zu einem Kommentar
 //!     `' === IMPORT MODULE json ===` -- dhrt hat die Modul-Builtins nativ,
@@ -149,12 +149,12 @@ fn is_valid_module_name(name: &str) -> bool {
 }
 
 /// Heuristik wie preprocess._looks_like_module_name: kein Slash/Backslash,
-/// keine `.gb`-Endung, gueltiger Modul-Name.
+/// keine `.dh`-Endung, gueltiger Modul-Name.
 fn looks_like_module_name(rel: &str) -> bool {
     if rel.contains('/') || rel.contains('\\') {
         return false;
     }
-    if rel.to_lowercase().ends_with(".gb") {
+    if rel.to_lowercase().ends_with(".dh") {
         return false;
     }
     is_valid_module_name(rel)

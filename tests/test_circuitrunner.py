@@ -1,6 +1,6 @@
 """Tests fuer die CIRCUIT RUNNER Level-Pipeline (DAT-Konverter + Demo-Bauer).
 
-Deckt das JSON-Levelformat ab, das die .gb-Engine laedt: convert_dat.py
+Deckt das JSON-Levelformat ab, das die .dh-Engine laedt: convert_dat.py
 (echtes Chip's-Challenge-Binformat -> JSON) und make_demo_levels.py
 (ASCII -> JSON). Reine Python-Pipeline, kein dhrt noetig.
 """
@@ -193,11 +193,11 @@ def _run_engine_harness(tmp_path, level, harness):
     assets = _CR / "assets"
     if not (assets / "tiles.png").exists():
         pytest.skip("circuitrunner/assets nicht vorhanden")
-    src = (_CR / "circuitrunner.gb").read_text(encoding="utf-8")
+    src = (_CR / "circuitrunner.dh").read_text(encoding="utf-8")
     head = src.split("WHILE NOT QUITREQUESTED()")[0]
     shutil.copytree(assets, tmp_path / "assets")
     (tmp_path / "synth.json").write_text(json.dumps(level), encoding="utf-8")
-    gb = tmp_path / "harness.gb"
+    gb = tmp_path / "harness.dh"
     gb.write_text(head + harness, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(gb)],
                        capture_output=True, timeout=120)
@@ -216,7 +216,7 @@ def test_monster_move_order_follows_list(tmp_path):
         '    PRINT "M " + STR$(mob_x[kk]) + " " + STR$(mob_y[kk])\n'
         'NEXT\n'
     )
-    assert "SUB reorder_monsters" in (_CR / "circuitrunner.gb").read_text(
+    assert "SUB reorder_monsters" in (_CR / "circuitrunner.dh").read_text(
         encoding="utf-8"), "reorder_monsters fehlt in der Engine"
     out = _run_engine_harness(tmp_path, _make_reorder_level(), harness)
     assert "NMOB=4" in out, out

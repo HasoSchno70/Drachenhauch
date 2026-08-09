@@ -33,8 +33,8 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 
 def _run(tmp_path, quelle: str):
-    (tmp_path / "a.gb").write_text(quelle, encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    (tmp_path / "a.dh").write_text(quelle, encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
                        text=True, encoding="utf-8", timeout=120, cwd=str(tmp_path))
     return r
 

@@ -91,7 +91,7 @@ IMPORT "gui"
 | `GUI_MENU_ITEM(menu, label$)` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED` |
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
 
-Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.gb`](../examples/129_gui_menu.gb).
+Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.dh`](../examples/129_gui_menu.dh).
 
 ### Reiter (Tabs) + Tastatur-Navigation
 
@@ -102,7 +102,7 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
 | `GUI_ACTIVE_TAB(win)` | INTEGER | aktiver Reiter-Index |
 | `GUI_SET_ACTIVE_TAB(win, i)` | — | Reiter umschalten |
 
-Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern (TextInput **und** TextArea) des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.gb`](../examples/131_gui_tabs.gb).
+Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern (TextInput **und** TextArea) des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.dh`](../examples/131_gui_tabs.dh).
 
 ### Modale Dialoge
 
@@ -118,7 +118,7 @@ IF GUI_CONFIRM("Löschen?", "Wirklich alles löschen?") THEN GUI_SET_TEXT(ta, ""
 GUI_MESSAGE("Fertig", "Gespeichert.")
 ```
 
-Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.gb`](../examples/132_gui_textarea.gb).
+Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.dh`](../examples/132_gui_textarea.dh).
 
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 
@@ -693,7 +693,7 @@ errechneten Breiten als eigene Werte — sonst spränge sie beim Loslassen zurü
 geschrieben, nur eine mit Farbe/Art/Bild als Objekt. Beide Formen werden
 gelesen, ältere Dateien laufen unverändert.
 
-> **Zum Anschauen:** [examples/157_gui_tabelle.gb](../examples/157_gui_tabelle.gb)
+> **Zum Anschauen:** [examples/157_gui_tabelle.dh](../examples/157_gui_tabelle.dh)
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
@@ -735,7 +735,7 @@ END IF
 Beim Löschen mehrerer Zeilen: **erst alle Schlüssel einsammeln, dann löschen** —
 während des Löschens verschieben sich die Zeilennummern der Tabelle.
 
-> **Zum Anschauen:** [examples/158_gui_tabelle_sqlite.gb](../examples/158_gui_tabelle_sqlite.gb)
+> **Zum Anschauen:** [examples/158_gui_tabelle_sqlite.dh](../examples/158_gui_tabelle_sqlite.dh)
 > — die gelösten Level aus `pyramid_pusher.db` in der Tabelle: sortieren,
 > filtern, umbenennen (`UPDATE`), löschen (`DELETE` in einer Transaktion).
 > Die Demo arbeitet auf einer **Kopie** (`VACUUM INTO`); die Originaldatei wird
@@ -754,7 +754,7 @@ IF GUI_TABLE_CLICKED(tbl) >= 0 THEN
 END IF
 ```
 
-**Beispiel:** [examples/81_table_select.gb](../examples/81_table_select.gb) zeigt
+**Beispiel:** [examples/81_table_select.dh](../examples/81_table_select.dh) zeigt
 beide Tabellen (Retained `gui` + Immediate `ui`) nebeneinander.
 
 ## Baum (Tree-View)
@@ -763,7 +763,7 @@ beide Tabellen (Retained `gui` + Immediate `ui`) nebeneinander.
 DIM tree AS GUI_WIDGET : tree = GUI_TREE(win, 20, 20, 300, 380)
 DIM proj AS INTEGER : proj = GUI_TREE_ADD(tree, -1, "Mein Spiel")   ' Wurzel
 DIM src  AS INTEGER : src  = GUI_TREE_ADD(tree, proj, "src")        ' Kind von proj
-GUI_TREE_ADD(tree, src, "main.gb")
+GUI_TREE_ADD(tree, src, "main.dh")
 GUI_TREE_EXPAND(tree, proj, TRUE)                                   ' aufgeklappt starten
 
 ' jeden Frame:
@@ -778,7 +778,7 @@ Ein Klick auf das Dreieck links klappt einen Knoten auf/zu (oder per
 `GUI_TREE_EXPAND`), ein Klick auf die Zeile wählt ihn aus. `GUI_TREE_SELECTED`
 liefert die id des gewählten Knotens (`-1` = keiner), `GUI_TREE_LABEL` dessen
 Text. `GUI_ON_CHANGE(tree, …)` feuert bei Auswahländerung. Das Mausrad scrollt
-lange Bäume. Beispiel: [examples/137_gui_tree.gb](../examples/137_gui_tree.gb).
+lange Bäume. Beispiel: [examples/137_gui_tree.dh](../examples/137_gui_tree.dh).
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 
@@ -800,7 +800,7 @@ die Farben, sondern auch die Metriken (`corner_radius`, `title_h`, `pad`, `shado
 — so bekommst du **runde Ecken, einen weichen Fenster-Schatten, eine höhere
 Titelleiste und Häkchen-Checkboxen**. Die klassischen Presets (`dark`/`light`/…)
 setzen die Metriken auf den flachen Default zurück. Komplettes Beispiel mit
-Live-Umschalter: [`examples/128_gui_modern.gb`](../examples/128_gui_modern.gb).
+Live-Umschalter: [`examples/128_gui_modern.dh`](../examples/128_gui_modern.dh).
 
 ### 2. Einzelne Theme-Farben (global)
 
@@ -1063,7 +1063,7 @@ WEND
 ```
 
 Vollständiges Beispiel (Formular `examples/forms/settings.gbform` +
-[examples/105_form_runner.gb](../examples/105_form_runner.gb)): ein
+[examples/105_form_runner.dh](../examples/105_form_runner.dh)): ein
 Einstellungs-Dialog mit TextInput, Checkbox, Slider, Dropdown und zwei Buttons,
 dessen Handler die Control-Werte auslesen. Das `.gbform` lässt sich von Hand
 schreiben **oder** (künftig) von einem visuellen Designer erzeugen — beides
@@ -1071,12 +1071,12 @@ ergibt dieselbe JSON.
 
 ## Vollständiges Beispiel
 
-Siehe [examples/45_gui.gb](../examples/45_gui.gb): Fenster mit Slider (live ins
+Siehe [examples/45_gui.dh](../examples/45_gui.dh): Fenster mit Slider (live ins
 Label gespiegelt), Checkbox, Textfeld und Start-Button — verschiebbar und
 schließbar.
 
 **Alle 22 Widget-Arten in einer Anwendung:**
-[examples/156_gui_alle_widgets.gb](../examples/156_gui_alle_widgets.gb) —
+[examples/156_gui_alle_widgets.dh](../examples/156_gui_alle_widgets.dh) —
 Vollbild, randloses Fenster (die Form *ist* der Bildschirm), Menüleiste,
 Werkzeugleiste, Kontextmenü und drei Reiter. Kein Schaukasten: jedes Widget
 hat eine Aufgabe. Der Baum filtert die Tabelle, eine Tabellenzeile füllt den
@@ -1103,7 +1103,7 @@ Themen umschalten.
 
 ## Plastischer Look: die Glas-Themen
 
-> Zum Anschauen: [examples/155_gui_glas.gb](../examples/155_gui_glas.gb) —
+> Zum Anschauen: [examples/155_gui_glas.dh](../examples/155_gui_glas.dh) —
 > `f` schaltet dort zwischen flach und plastisch um, `g` legt eine eigene
 > Grafik auf die Knöpfe.
 

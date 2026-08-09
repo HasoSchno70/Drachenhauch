@@ -31,7 +31,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 def _debug_session(tmp_path, src, cmds):
     """Schreibt src, fuettert cmds (Liste von dicts) als stdin-Zeilen an
     `dhrt debug`, gibt die stdout-Events (Liste von dicts) zurueck."""
-    f = tmp_path / "d.gb"
+    f = tmp_path / "d.dh"
     f.write_text(src, encoding="utf-8")
     stdin = "".join(json.dumps(c) + "\n" for c in cmds)
     r = subprocess.run([str(_DHRT), "debug", str(f)], input=stdin,

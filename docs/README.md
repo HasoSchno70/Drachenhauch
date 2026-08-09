@@ -69,10 +69,10 @@ INPUT "Wie heisst du?", name
 PRINT "Schoen dich zu sehen, ", name
 ```
 
-Speichern als `hallo.gb`, dann:
+Speichern als `hallo.dh`, dann:
 
 ```
-.venv\Scripts\python.exe dhrun.py hallo.gb
+.venv\Scripts\python.exe dhrun.py hallo.dh
 ```
 
 ## Erstes Spiel

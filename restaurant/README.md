@@ -10,7 +10,7 @@ Schlange, ein Tag. Das beantwortet die einzige Frage, die am Anfang zählt:
 ## Starten
 
 ```bash
-dhrun.py restaurant\restaurant.gb
+dhrun.py restaurant\restaurant.dh
 ```
 
 ## Steuerung
@@ -59,7 +59,7 @@ Wagen als Nebeneinnahme auf Volksfesten.
 
 ## Zahlen zum Drehen
 
-Alles Wichtige steht als `CONST` ganz oben in `restaurant.gb`:
+Alles Wichtige steht als `CONST` ganz oben in `restaurant.dh`:
 Tagesdauer, Kochzeit, Brennzeit, Geduld, Preis, Ausbaupreis. Nach einer
 Balance-Änderung lohnt der Selbsttest — eine Kopie, die sich selbst spielt,
 zeigt in einem Lauf, ob ein Tag noch zu schaffen ist (bei perfektem Spiel:

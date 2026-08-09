@@ -40,9 +40,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _dhrt(source: str) -> str:
-    """Schreibt `source` in eine temp .gb und fuehrt sie via `dhrt --runsrc`
+    """Schreibt `source` in eine temp .dh und fuehrt sie via `dhrt --runsrc`
     (Rust-Frontend: preprocess->lex->parse->compile->VM); stdout mit LF."""
-    fd, tmp = tempfile.mkstemp(suffix=".gb")
+    fd, tmp = tempfile.mkstemp(suffix=".dh")
     os.close(fd)
     Path(tmp).write_text(source, encoding="utf-8")
     try:
@@ -214,7 +214,7 @@ PRINT "done"'''
 def test_function_local_shadows_global_loop_var():
     """Ein funktions-lokales `i` (DIM/FOR) muss einen gleichnamigen Top-Level-
     Global SHADOWEN. Frueher schrieb das Local faelschlich das GLOBAL -> die
-    aufrufende FOR-Schleife brach ab/hing (so hing 64_showcase.gb / Variadic-
+    aufrufende FOR-Schleife brach ab/hing (so hing 64_showcase.dh / Variadic-
     Logger in einer FOR i-Schleife)."""
     src = '''SUB inner()
 DIM i AS INTEGER

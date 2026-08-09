@@ -51,9 +51,9 @@ def _events(tmp_path, name, events):
 
 
 def _run(src, tmp_path, frames=12):
-    (tmp_path / "a.gb").write_text(src, encoding="utf-8")
+    (tmp_path / "a.dh").write_text(src, encoding="utf-8")
     env = dict(os.environ, DHRT_FRAMES=str(frames))
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
                        text=True, encoding="utf-8", env=env, timeout=90, cwd=str(tmp_path))
     r.lines = [ln for ln in (r.stdout or "").splitlines()
                if not ln.startswith(("WARNING:", "INFO:", "TRACE:"))]

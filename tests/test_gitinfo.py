@@ -19,7 +19,7 @@ _PORCELAIN = (
     "committer-time 1700000000\n"
     "committer-tz +0000\n"
     "summary Erste Zeile\n"
-    "filename foo.gb\n"
+    "filename foo.dh\n"
     "\tPRINT 1\n"
     "a1b2c3d4e5f6071829304151617181920a1b2c3d 2 2\n"
     "\tPRINT 2\n"
@@ -27,8 +27,8 @@ _PORCELAIN = (
     "author Not Committed Yet\n"
     "author-time 1700000100\n"
     "author-tz +0000\n"
-    "summary Version of foo.gb\n"
-    "filename foo.gb\n"
+    "summary Version of foo.dh\n"
+    "filename foo.dh\n"
     "\tPRINT 3\n"
 )
 
@@ -66,7 +66,7 @@ def test_parse_porcelain_empty():
 
 
 def test_blame_non_repo(tmp_path):
-    f = tmp_path / "x.gb"
+    f = tmp_path / "x.dh"
     f.write_text("PRINT 1\n", encoding="utf-8")
     res = blame(str(f))
     assert res.ok is False
@@ -74,7 +74,7 @@ def test_blame_non_repo(tmp_path):
 
 
 def test_blame_missing_file(tmp_path):
-    res = blame(str(tmp_path / "nope.gb"))
+    res = blame(str(tmp_path / "nope.dh"))
     assert res.ok is False
 
 
@@ -87,9 +87,9 @@ def test_blame_real_repo(tmp_path):
     run("init")
     run("config", "user.email", "t@t.de")
     run("config", "user.name", "Tester")
-    f = tmp_path / "prog.gb"
+    f = tmp_path / "prog.dh"
     f.write_text("PRINT 1\nPRINT 2\n", encoding="utf-8")
-    run("add", "prog.gb")
+    run("add", "prog.dh")
     run("-c", "commit.gpgsign=false", "commit", "-m", "init prog")
 
     assert is_git_repo(tmp_path) is True
@@ -116,9 +116,9 @@ def test_blame_repo_dir_name_containing_dot(tmp_path):
     run("init")
     run("config", "user.email", "t@t.de")
     run("config", "user.name", "Tester")
-    f = repo_dir / "prog.gb"
+    f = repo_dir / "prog.dh"
     f.write_text("PRINT 1\n", encoding="utf-8")
-    run("add", "prog.gb")
+    run("add", "prog.dh")
     run("-c", "commit.gpgsign=false", "commit", "-m", "init prog")
 
     assert is_git_repo(repo_dir) is True

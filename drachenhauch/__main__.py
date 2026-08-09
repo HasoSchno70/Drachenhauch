@@ -1,4 +1,4 @@
-"""Erlaubt 'py -m drachenhauch <datei.gb>' von ueberall.
+"""Erlaubt 'py -m drachenhauch <datei.dh>' von ueberall.
 
 Stufe B: Der Tree-Walker ist entfernt -- Ausfuehrung laeuft ueber die native
 Runtime `dhrt` (dhrt chdirt selbst ins Datei-Verzeichnis, daher funktionieren
@@ -21,7 +21,7 @@ def main(argv=None):
         mode = args.pop(0)[2:]
 
     if not args:
-        print("Verwendung: py -m drachenhauch [--tokens|--ast] <datei.gb>")
+        print("Verwendung: py -m drachenhauch [--tokens|--ast] <datei.dh>")
         return 1
 
     path = Path(args[0])

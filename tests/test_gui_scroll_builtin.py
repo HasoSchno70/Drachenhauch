@@ -1,5 +1,5 @@
 """GUI_WINDOW_SCROLLABLE: nur Registrierung (Scroll = GL/Maus -> live verifiziert
-ueber examples/130_gui_scroll.gb)."""
+ueber examples/130_gui_scroll.dh)."""
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 

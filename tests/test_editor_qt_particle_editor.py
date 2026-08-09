@@ -93,7 +93,7 @@ def test_runnable_demo_is_valid_gb(editor, tmp_path):
     if dhrt is None:
         pytest.skip("dhrt nicht gebaut")
     demo = editor._build_runnable_demo()
-    f = tmp_path / "demo.gb"
+    f = tmp_path / "demo.dh"
     f.write_text(demo, encoding="utf-8")
     r = subprocess.run([str(dhrt), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)
@@ -115,7 +115,7 @@ def test_export_snippet_is_valid_gb(editor, tmp_path):
     from PySide6.QtWidgets import QPlainTextEdit
     edit = editor._export_dlg.findChild(QPlainTextEdit)
     assert edit is not None
-    f = tmp_path / "snippet.gb"
+    f = tmp_path / "snippet.dh"
     f.write_text(edit.toPlainText(), encoding="utf-8")
     r = subprocess.run([str(dhrt), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)

@@ -1199,14 +1199,14 @@ class AnimEditor(QMainWindow):
         doc.save(str(tmp / "anim.gbanim"))
         runner = doc.generate_runner("anim.gbanim",
                                      title=(self.path.stem if self.path else "dhanim"))
-        (tmp / "run.gb").write_text(runner, encoding="utf-8")
+        (tmp / "run.dh").write_text(runner, encoding="utf-8")
         # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen gleichzeitig
         # startende `dhrt`-Subprozesse aus anderen Editor-Threads (siehe
         # dhrt_locate.dhrt_spawn_semaphore-Kommentar fuer den verifizierten
         # Windows-Crash).
         from .editor_qt.dhrt_locate import dhrt_spawn_semaphore
         with dhrt_spawn_semaphore:
-            subprocess.Popen([str(dhrt), "run", str(tmp / "run.gb")], cwd=str(tmp))
+            subprocess.Popen([str(dhrt), "run", str(tmp / "run.dh")], cwd=str(tmp))
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:

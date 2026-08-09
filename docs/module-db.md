@@ -141,7 +141,7 @@ DB_CLOSE_RESULT(r)
 
 ## Komplettes Beispiel
 
-Siehe [examples/25_db.gb](../examples/25_db.gb) — zeigt CREATE, INSERT mit Binding, mehrere Queries, NULL, Transaktionen mit ROLLBACK/COMMIT, Aggregate.
+Siehe [examples/25_db.dh](../examples/25_db.dh) — zeigt CREATE, INSERT mit Binding, mehrere Queries, NULL, Transaktionen mit ROLLBACK/COMMIT, Aggregate.
 
 ## Best Practices
 

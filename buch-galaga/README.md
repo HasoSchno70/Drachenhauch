@@ -13,11 +13,11 @@ mitgelieferten Pixel-Editor `dhsprites`.
 ## Der Zielstand
 
 Das fertige Spiel liegt als ein laufender Stand in
-[`code/galaga.gb`](code/galaga.gb) — starte es jederzeit, um zu sehen, wohin die
+[`code/galaga.dh`](code/galaga.dh) — starte es jederzeit, um zu sehen, wohin die
 Reise geht:
 
 ```
-.venv\Scripts\python.exe dhrun.py buch-galaga\code\galaga.gb
+.venv\Scripts\python.exe dhrun.py buch-galaga\code\galaga.dh
 ```
 
 Steuerung: **←/→** (oder **A/D**) bewegen, **Leertaste** schießen.

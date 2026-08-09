@@ -13,9 +13,9 @@ module.exports = (H) => {
     H.h2("So liest du eine Fehlermeldung"),
     H.pmix([
       "Ein Laufzeitfehler sieht so aus: ",
-      ['Laufzeitfehler in spiel.gb:42: Variable \'x\' nicht deklariert', true],
+      ['Laufzeitfehler in spiel.dh:42: Variable \'x\' nicht deklariert', true],
       ". Darin steckt alles Wichtige: die Datei (",
-      ['spiel.gb', true],
+      ['spiel.dh', true],
       "), die Zeilennummer (",
       ['42', true],
       ") und die Beschreibung. Springe zuerst zu genau dieser Zeile – dort (oder kurz davor) liegt die Ursache.",

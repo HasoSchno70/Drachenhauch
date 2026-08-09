@@ -227,9 +227,9 @@ NEXT
 
 ## Komplettes Beispiel
 
-- [examples/31_sprite.gb](../examples/31_sprite.gb) — Logik-Test ohne Grafik-Fenster: Animations-Timing, PLAY_ONCE, Velocity, Kollision
-- [examples/143_sprite_visual.gb](../examples/143_sprite_visual.gb) — interaktiv: Held auf Schachbrett, sammelt Goldstücke
-- [examples/32_coinquest.gb](../examples/32_coinquest.gb) — komplettes Spiel mit Sprites, Tween-Pop, Particles
+- [examples/31_sprite.dh](../examples/31_sprite.dh) — Logik-Test ohne Grafik-Fenster: Animations-Timing, PLAY_ONCE, Velocity, Kollision
+- [examples/143_sprite_visual.dh](../examples/143_sprite_visual.dh) — interaktiv: Held auf Schachbrett, sammelt Goldstücke
+- [examples/32_coinquest.dh](../examples/32_coinquest.dh) — komplettes Spiel mit Sprites, Tween-Pop, Particles
 
 ## Tipps
 

@@ -1,11 +1,11 @@
 """GameBasic - Eintrittspunkt fuer den Interpreter.
 
 Verwendung:
-    python dhrun.py <datei.gb>
-    python dhrun.py --tokens <datei.gb>   # nur Tokens ausgeben (Debug)
-    python dhrun.py --ast <datei.gb>      # nur AST ausgeben (Debug)
-    python dhrun.py --native <datei.gb>   # nativ via dhrt-Runtime ausfuehren
-    python dhrun.py --export <datei.gb> [ordner]  # standalone .exe buendeln
+    python dhrun.py <datei.dh>
+    python dhrun.py --tokens <datei.dh>   # nur Tokens ausgeben (Debug)
+    python dhrun.py --ast <datei.dh>      # nur AST ausgeben (Debug)
+    python dhrun.py --native <datei.dh>   # nativ via dhrt-Runtime ausfuehren
+    python dhrun.py --export <datei.dh> [ordner]  # standalone .exe buendeln
 """
 import os
 import sys
@@ -66,20 +66,20 @@ def _print_help_and_examples():
     from drachenhauch import __version__
     print(f"GameBasic v{__version__}")
     print()
-    print("Verwendung:  python dhrun.py [--tokens|--ast] <datei.gb>")
-    print("             gb.cmd                <datei.gb>     (Windows-Launcher mit .venv)")
+    print("Verwendung:  python dhrun.py [--tokens|--ast] <datei.dh>")
+    print("             gb.cmd                <datei.dh>     (Windows-Launcher mit .venv)")
     print()
     project_root = _project_root()
     examples_dir = project_root / "examples"
     if examples_dir.is_dir():
-        files = sorted(p.name for p in examples_dir.glob("*.gb") if not p.name.startswith("_"))
+        files = sorted(p.name for p in examples_dir.glob("*.dh") if not p.name.startswith("_"))
         if files:
             print(f"Beispiele in {examples_dir.name}/:")
             for name in files:
                 print(f"  examples/{name}")
             print()
     print("Tipp:  In PyCharm das Beispiel als 'Parameters' der Run-Konfiguration eintragen,")
-    print("       z.B. 'examples/10_pong.gb'.")
+    print("       z.B. 'examples/10_pong.dh'.")
 
 
 def _launch_editor(project_root, initial_file=None):
@@ -355,7 +355,7 @@ def main(argv):
     # Vor dem chdir/Editor-Pfad behandeln; nimmt optional ein Ausgabeverzeichnis.
     if mode == "export":
         if not args:
-            print("Verwendung: python dhrun.py --export <datei.gb> [ausgabe-ordner]")
+            print("Verwendung: python dhrun.py --export <datei.dh> [ausgabe-ordner]")
             return 1
         return _run_export(Path(args[0]), args[1] if len(args) > 1 else None)
 
@@ -382,7 +382,7 @@ def main(argv):
     # Resolve VOR chdir, damit relative Argumente weiterhin stimmen.
     abs_path = path.resolve()
     source = abs_path.read_text(encoding="utf-8")
-    # Damit LoadImage("assets/...") aus dem Programm relativ zur .gb-Datei
+    # Damit LoadImage("assets/...") aus dem Programm relativ zur .dh-Datei
     # funktioniert, ins Verzeichnis der Quelldatei wechseln.
     os.chdir(abs_path.parent)
 
@@ -442,12 +442,12 @@ def _find_dhrt():
 
 
 def _run_native(abs_path, path):
-    """Fuehrt die `.gb`-Datei mit `dhrt run` aus -- dhrts EIGENES Rust-Frontend
+    """Fuehrt die `.dh`-Datei mit `dhrt run` aus -- dhrts EIGENES Rust-Frontend
     (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr.
 
     So laufen auch dhrt-only-Builtins (die der Python-Compiler nicht kennt). dhrt
     wechselt selbst ins Verzeichnis der Datei (relative Assets) und nutzt den
-    Dateinamen fuer Fehler-Labels (`datei.gb:Zeile`). stdout/stderr + ein etwaiges
+    Dateinamen fuer Fehler-Labels (`datei.dh:Zeile`). stdout/stderr + ein etwaiges
     Grafik-Fenster werden durchgereicht. Rueckgabe = Exit-Code von dhrt
     (bzw. 3 wenn dhrt fehlt)."""
     import subprocess
@@ -467,7 +467,7 @@ def _run_native(abs_path, path):
 
 
 def _run_export(src, out_dir):
-    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe via `dhrt --export` --
+    """Buendelt `src` (.dh) zu einer eigenstaendigen Exe via `dhrt --export` --
     dhrts EIGENER Selbst-Export (kompiliert die Quelle mit dem Rust-Frontend,
     haengt den Payload an eine Kopie der Exe, kopiert `assets/`). KEIN Python-
     Compiler -> auch dhrt-only-Builtins exportieren.

@@ -77,7 +77,7 @@ enum Step {
 /// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
 /// von normalem Aufruf (exec) und Coroutine-Erststart.
 /// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
-/// faellt fuer rohe Listen (z.B. alte .gbc ohne specialize-Pass) zurueck.
+/// faellt fuer rohe Listen (z.B. alte .dhc ohne specialize-Pass) zurueck.
 #[inline]
 /// 1D `ARRAY OF FLOAT`/`INTEGER` -> `Vec<f64>` (Faltungskern, Shader-Arrays).
 /// Auf Modul-Ebene, weil mehrere Dispatch-Bloecke (`try_graphics`, imgfx) sie
@@ -197,7 +197,7 @@ fn expect_coro(v: &Value, fname: &str) -> R<Rc<RefCell<CoroState>>> {
 }
 
 /// Operanden-Stack-Pop mit sauberem Fehler statt Panic. Ein Stack-Underflow
-/// kann nur bei kaputtem/abgeschnittenem `.gbc` (oder einem Compiler-Bug)
+/// kann nur bei kaputtem/abgeschnittenem `.dhc` (oder einem Compiler-Bug)
 /// auftreten -- statt eines Rust-Panics liefert die VM dann eine Meldung.
 #[inline]
 fn vm_pop(stack: &mut Vec<Value>) -> R<Value> {
@@ -1450,7 +1450,7 @@ impl<'p> Vm<'p> {
     }
 
     fn try_coro(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        // Builtin-Namen liegen im .gbc lowercase vor.
+        // Builtin-Namen liegen im .dhc lowercase vor.
         if !name.starts_with("coro_") && name != "__comp_iter" { return Ok(None); }
         // Review-Fund: alle fuenf CORO_*-Arme indizierten `a[0]`/`a[1]` ohne
         // Arity-Pruefung (diese Namen tauchen in keiner Compiler-Arity-Tabelle

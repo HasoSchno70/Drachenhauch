@@ -89,5 +89,5 @@ IF COOLDOWN("hit_sfx", 100) THEN AUDIO_PLAY(hit_sound)
 
 ## Beispiel
 
-[examples/113_timer.gb](../examples/113_timer.gb) — Spawner via
+[examples/113_timer.dh](../examples/113_timer.dh) — Spawner via
 `TIMER_EVERY`, verzoegerte Explosion via `TIMER_AFTER`, Schuss-Cooldown.

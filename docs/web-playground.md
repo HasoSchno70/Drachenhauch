@@ -27,7 +27,7 @@
 >    `emscripten_set_canvas_element_size` und zieht die Groesse in den ersten
 >    acht Bildern nach (raylib setzt sie danach noch einmal selbst).
 >
-> **Assets kommen mit** (2026-08-03). Liegt neben der `.gb` ein `assets/`-Ordner,
+> **Assets kommen mit** (2026-08-03). Liegt neben der `.dh` ein `assets/`-Ordner,
 > packt `build_wasm.py` ihn in eine `dhrt.data` und haengt sie ueber
 > `--preload-file` ins virtuelle Dateisystem -- Programme laden ihre Bilder,
 > Schriften, Shader und Musik danach unter genau demselben Pfad wie auf dem
@@ -156,7 +156,7 @@ Konsolen-Ausgabe daneben.
 > Browser** — animierte Demos im `<canvas>` ohne den Tab einzufrieren (im Browser
 > per Preview verifiziert: bewegtes Sprite + laufender Frame-Zähler). dhrt
 > kompiliert die eingebettete **Quelle** selbst im WASM (kein Pyodide). Die
-> Build-Artefakte (`dhrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored.
+> Build-Artefakte (`dhrt.js`/`.wasm`/`program.dh`/`.dhc`) sind gitignored.
 > **Teilbare Links:** „Link teilen" packt die Quelle in den URL-Hash — wer den
 > Link öffnet, sieht und startet genau dieses Programm.
 
@@ -166,18 +166,18 @@ Konsolen-Ausgabe daneben.
 > (`emcc.exe`/`em++.exe`/`emar.exe` — sonst schmuggelt cc-rs `cmd /c emcc.bat`
 > in die CFLAGS), `BINDGEN_EXTRA_CLANG_ARGS` mit clang-Builtin- + Sysroot-Include
 > (sonst findet bindgen `stdarg.h` nicht), `CMAKE_GENERATOR=Ninja` + cmake/ninja
-> aus den VS-BuildTools auf PATH. So läuft `python rust/build_wasm.py datei.gb`
+> aus den VS-BuildTools auf PATH. So läuft `python rust/build_wasm.py datei.dh`
 > ohne manuelles Env-Setup. emsdk installieren: `git clone …/emsdk`,
 > `python emsdk/emsdk.py install latest` + `… activate latest`,
 > `rustup target add wasm32-unknown-emscripten`.
 
-> **Kein Pyodide mehr nötig (seit Front-End-Port).** Früher musste die `.gb`
-> in Python zu `.gbc` vorkompiliert werden, bevor sie der Browser ausführen
+> **Kein Pyodide mehr nötig (seit Front-End-Port).** Früher musste die `.dh`
+> in Python zu `.dhc` vorkompiliert werden, bevor sie der Browser ausführen
 > konnte — Live-Editieren im Browser hätte Pyodide gebraucht. Jetzt enthält
 > `dhrt` die komplette Front-End-Kette (Preprocess → Lexer → Parser → Compiler,
 > alle Stufen in Rust), also kompiliert die WASM-Runtime die **Quelle direkt im
-> Browser**. Der Build bettet `program.gb` (Quelle) ein; `main.rs` liest
-> `/program.gb` zuerst und kompiliert es selbst, mit `/program.gbc` als Fallback.
+> Browser**. Der Build bettet `program.dh` (Quelle) ein; `main.rs` liest
+> `/program.dh` zuerst und kompiliert es selbst, mit `/program.dhc` als Fallback.
 > Damit ist ein echtes Live-Playground (Quelle tippen → kompilieren → laufen)
 > rein in Rust-WASM möglich — ohne Python/Pyodide im Browser.
 
@@ -185,10 +185,10 @@ Konsolen-Ausgabe daneben.
 
 | Datei | Rolle |
 |---|---|
-| `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/dhrt.{js,wasm}` |
-| `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.gb` aus (Fallback `/program.gbc`) aus dem virtuellen FS |
+| `rust/build_wasm.py` | `.dh` → `web/program.dh` (Quelle, im Browser kompiliert) + `web/program.dhc` (Fallback), dann `cargo`+emscripten-Build → `web/dhrt.{js,wasm}` |
+| `rust/drachenhauch_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.dh` aus (Fallback `/program.dhc`) aus dem virtuellen FS |
 | `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-/Teilen-Button |
-| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.gb`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
+| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.dh`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
 
 ## Bauen
 
@@ -200,10 +200,10 @@ Voraussetzungen:
 Dann:
 
 ```bash
-.venv\Scripts\python.exe rust\build_wasm.py examples\01_hello.gb
+.venv\Scripts\python.exe rust\build_wasm.py examples\01_hello.dh
 ```
 
-Das Skript ist tolerant: fehlt die Toolchain, kompiliert es nur `program.gbc`
+Das Skript ist tolerant: fehlt die Toolchain, kompiliert es nur `program.dhc`
 und druckt den manuellen Build-Befehl. Mit vollständiger Toolchain entstehen
 `web/dhrt.js` + `web/dhrt.wasm`.
 
@@ -216,7 +216,7 @@ py -m http.server -d web 8000
 # -> http://localhost:8000
 ```
 
-Run klicken → `Module.callMain()` startet `dhrt`, das `/program.gbc` ausführt.
+Run klicken → `Module.callMain()` startet `dhrt`, das `/program.dhc` ausführt.
 
 ## Architektur-Hinweis: der Render-Loop (gelöst)
 
@@ -243,8 +243,8 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 ## Stand & Grenzen (verifiziert 2026-06-10)
 
 - **Konsolen-Programme: laufen im Browser ✅.** Quelle tippen → *Ausführen* →
-  korrekte Ausgabe. dhrt kompiliert die `.gb`-Quelle **selbst im WASM**
-  (Front-End-Port) — kein Pyodide, kein vorab kompiliertes `.gbc`.
+  korrekte Ausgabe. dhrt kompiliert die `.dh`-Quelle **selbst im WASM**
+  (Front-End-Port) — kein Pyodide, kein vorab kompiliertes `.dhc`.
 - **Grafik-Programme: laufen im Browser ✅.** Der Render-Loop yieldet pro Frame
   (ASYNCIFY-Yield in `flip()`, siehe oben) → animierte Demos im Canvas, der Tab
   bleibt reaktionsfähig (im Browser per Preview geprüft: bewegtes Objekt +

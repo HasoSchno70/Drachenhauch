@@ -149,12 +149,12 @@ class _PickerDialog(QDialog):
 
 def quick_open(parent: QWidget, project_root: Path,
                on_open: Callable[[Path], None]) -> None:
-    """Sammelt alle .gb-Dateien im Projekt und zeigt einen Fuzzy-Picker.
+    """Sammelt alle .dh-Dateien im Projekt und zeigt einen Fuzzy-Picker.
 
     Aufrufer setzt `on_open(path)` als Callback fuer die Auswahl.
     """
     files = sorted(
-        p for p in project_root.rglob("*.gb")
+        p for p in project_root.rglob("*.dh")
         if not p.name.startswith("_") and ".venv" not in p.parts
     )
     entries: list[PickerEntry] = []

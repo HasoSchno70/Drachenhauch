@@ -68,14 +68,14 @@ def _rs_ast(path: Path):
 
 
 def _rs_ast_src(src: str, tmp_path: Path):
-    f = tmp_path / "snippet.gb"
+    f = tmp_path / "snippet.dh"
     f.write_text(src, encoding="utf-8")
     return _rs_ast(f)
 
 
 def _example_files():
     files = []
-    for f in sorted(_EXAMPLES.glob("*.gb")):
+    for f in sorted(_EXAMPLES.glob("*.dh")):
         try:
             _py_ast(f.read_text(encoding="utf-8"))
         except Exception:

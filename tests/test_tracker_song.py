@@ -33,7 +33,7 @@ def _check_compiles(tmp_path, src):
     leere Fehlerliste). Frueher via Python-Compiler (in Phase 8 geloescht)."""
     if _DHRT is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    fd = tmp_path / "_track.gb"
+    fd = tmp_path / "_track.dh"
     fd.write_text(src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--check", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)

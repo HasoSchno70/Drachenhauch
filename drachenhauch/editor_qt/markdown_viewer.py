@@ -14,7 +14,7 @@ Zusaetzlich:
   * **Suche** (Strg+F) mit Weiter/Zurueck, Wrap-Around und Highlight aller
     Treffer.
 
-Klick auf interne Links (\".gb\"-Anker oder andere .md-Dateien) liefert
+Klick auf interne Links (\".dh\"-Anker oder andere .md-Dateien) liefert
 ein Signal an MainWindow, das den Editor entsprechend wechselt.
 """
 from __future__ import annotations
@@ -403,7 +403,7 @@ class MarkdownViewer(QWidget):
         cand = Path(target)
         if not cand.is_absolute() and self._current_path is not None:
             cand = (self._current_path.parent / target).resolve()
-        if cand.suffix.lower() == ".gb" and cand.exists():
+        if cand.suffix.lower() == ".dh" and cand.exists():
             self.open_gb_file.emit(cand)
             return
         if cand.exists() and cand.suffix.lower() in (".md", ".markdown"):

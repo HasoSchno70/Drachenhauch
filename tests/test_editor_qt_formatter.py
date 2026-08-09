@@ -203,7 +203,7 @@ def test_no_blank_line_already_present_stays_single():
 def test_blank_line_before_section_comment_after_plain_statement():
     """Review-Fund: ein Sektions-Kommentar direkt nach einer DIM-Zeile
     (kein Block-Ende) bekam bisher KEINE Leerzeile -- z.B. genau der Fall
-    aus circuitrunner.gb (DIM x .. ' naechste Sektion .. DIM y)."""
+    aus circuitrunner.dh (DIM x .. ' naechste Sektion .. DIM y)."""
     src = (
         "DIM mob_did AS BOOLEAN\n"
         "' Umsortier-Puffer fuer die naechste Sektion\n"

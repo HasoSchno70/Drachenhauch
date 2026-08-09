@@ -8,7 +8,7 @@ kommt an vier markierte Stellen.
 | Datei | Was |
 |---|---|
 | `drachenhauch_esp32/drachenhauch_esp32.ino` | der Sketch fürs Board |
-| `../examples/159_esp32_bruecke.gb` | das GameBasic-Gegenstück |
+| `../examples/159_esp32_bruecke.dh` | das GameBasic-Gegenstück |
 
 ## Wie es zusammenhängt
 
@@ -67,7 +67,7 @@ mosquitto_pub -h 127.0.0.1 -t esp32/wert   -m "2500"
 mosquitto_sub -h 127.0.0.1 -t esp32/befehl -v
 ```
 
-Starte `examples/159_esp32_bruecke.gb`, schick einen Wert — und sieh zu, wie der
+Starte `examples/159_esp32_bruecke.dh`, schick einen Wert — und sieh zu, wie der
 Befehl zurückkommt. So entwickelst du die GameBasic-Seite fertig, lange bevor
 die Hardware auf dem Tisch liegt.
 

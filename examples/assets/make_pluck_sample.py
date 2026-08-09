@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Erzeugt ein kurzes, frei verwendbares Pluck-/Saiten-Sample (WAV) fuer die
-SAMPLE_PLAY-Demo examples/116_sampler.gb.
+SAMPLE_PLAY-Demo examples/116_sampler.dh.
 
 Karplus-Strong-aehnlicher Zupf-Klang bei ~220 Hz (A3), das in der Demo per
 SAMPLE_PLAY ueber die ganze Klaviatur resampled wird (Amiga/Paula-Prinzip:

@@ -1,4 +1,4 @@
-Musik-Asset fuer examples/85_cybermatic_demo.gb
+Musik-Asset fuer examples/85_cybermatic_demo.dh
 ================================================
 
 Datei:   cybermatic_pulse.ogg

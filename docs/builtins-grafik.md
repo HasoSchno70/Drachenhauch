@@ -82,7 +82,7 @@ SCREEN(MONITOR_WIDTH(m), MONITOR_HEIGHT(m), "Vollbild", 1)
 SET_FULLSCREEN(TRUE)
 ```
 
-Komplettes Beispiel mit allen Monitoren, Live-Fensterposition und Monitor-Wechsel: [`examples/120_monitors.gb`](../examples/120_monitors.gb).
+Komplettes Beispiel mit allen Monitoren, Live-Fensterposition und Monitor-Wechsel: [`examples/120_monitors.dh`](../examples/120_monitors.dh).
 
 ### Transparente Fenster & Desktop-Overlay
 
@@ -120,7 +120,7 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-Beispiele: [`examples/123_overlay.gb`](../examples/123_overlay.gb) (Overlay), [`examples/124_glass_window.gb`](../examples/124_glass_window.gb) (Glas-Fenster), [`examples/125_vortex_overlay.gb`](../examples/125_vortex_overlay.gb) (Wirbel-Overlay), [`examples/126_audio_overlay.gb`](../examples/126_audio_overlay.gb) (klick-durchlässiger Musik-Visualizer via `AUDIO_FFT`).
+Beispiele: [`examples/123_overlay.dh`](../examples/123_overlay.dh) (Overlay), [`examples/124_glass_window.dh`](../examples/124_glass_window.dh) (Glas-Fenster), [`examples/125_vortex_overlay.dh`](../examples/125_vortex_overlay.dh) (Wirbel-Overlay), [`examples/126_audio_overlay.dh`](../examples/126_audio_overlay.dh) (klick-durchlässiger Musik-Visualizer via `AUDIO_FFT`).
 
 > Hinweis: Transparenz wirkt im direkten Render-Pfad. Mit aktivem Post-Processing-Shader (`POSTFX`) wird der Bildschirm deckend präsentiert.
 
@@ -143,7 +143,7 @@ IF pfad <> "" THEN
 END IF
 ```
 
-Komplettes Beispiel: [`examples/127_filedialog.gb`](../examples/127_filedialog.gb).
+Komplettes Beispiel: [`examples/127_filedialog.dh`](../examples/127_filedialog.dh).
 
 ## Zeichnen
 
@@ -256,7 +256,7 @@ TEXT(320 - w \ 2, 100, "GAME OVER", RGB(255, 60, 60))   ' zentriert
 SETFONT(-1)                                             ' zurueck zum Default
 ```
 
-Demo: [examples/87_ttf_fonts.gb](../examples/87_ttf_fonts.gb).
+Demo: [examples/87_ttf_fonts.dh](../examples/87_ttf_fonts.dh).
 
 ## Bilder
 
@@ -332,7 +332,7 @@ DIM hero AS IMAGE
 hero = LOADIMAGE("player")    ' Cache-Hit (Alias)
 ```
 
-Vollständiges Beispiel: [examples/75_preloader.gb](examples/75_preloader.gb).
+Vollständiges Beispiel: [examples/75_preloader.dh](examples/75_preloader.dh).
 
 ## Sprite-Atlas
 
@@ -402,7 +402,7 @@ ATLAS_DRAW_FLIPPED(mario, "walk_a", x, y, flip, FALSE)
 
 Flip erzeugt pro Aufruf ein frisch gespiegeltes Bild. Für viele wiederholte Flips desselben Sprites lohnt es sich, die gespiegelte Variante einmal vorberechnet als IMAGE zu cachen — für einen einzelnen Player-Sprite pro Frame ist der Overhead aber vernachlässigbar.
 
-Vollständiges Beispiel: [examples/76_layers_atlas.gb](examples/76_layers_atlas.gb).
+Vollständiges Beispiel: [examples/76_layers_atlas.dh](examples/76_layers_atlas.dh).
 
 ## Z-Layer-Rendering
 
@@ -444,7 +444,7 @@ WEND
 
 **Camera-Hinweis:** Camera ist global, gilt für alle Layer. Für UI ohne Camera-Effekt (z.B. HUD): vor dem `LAYER("ui")`-Draw `CAMERA_RESET()` rufen (benötigt `IMPORT "camera"`).
 
-**Layer + Atlas kombiniert** (vollständig in [examples/76_layers_atlas.gb](examples/76_layers_atlas.gb)):
+**Layer + Atlas kombiniert** (vollständig in [examples/76_layers_atlas.dh](examples/76_layers_atlas.dh)):
 
 ```basic
 LAYER("bg")

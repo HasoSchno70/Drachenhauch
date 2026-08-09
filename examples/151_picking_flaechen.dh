@@ -1,0 +1,114 @@
+' 151_picking_flaechen.dh -- Picking auf echter Geometrie (native-only, F6)
+'
+' Bisher liess sich der Mausstrahl nur gegen HUELLKOERPER testen (PICK_BOX /
+' PICK_SPHERE) oder gegen ein ganzes Modell. Eine einzelne FLAECHE -- eine
+' Bodenkachel, ein Wandstueck, ein schwebendes Panel -- war nicht adressierbar.
+'
+' PICK_TRI(x1,y1,z1, x2,y2,z2, x3,y3,z3)                 -> Distanz | -1
+' PICK_QUAD(x1,y1,z1, x2,y2,z2, x3,y3,z3, x4,y4,z4)      -> Distanz | -1
+' RAY_HIT_TRI(ox,oy,oz, dx,dy,dz, <3 Punkte>)            -> Distanz | -1
+' RAY_HIT_QUAD(ox,oy,oz, dx,dy,dz, <4 Punkte>)           -> Distanz | -1
+'
+' Die vier Eckpunkte eines Vierecks muessen REIHUM liegen (im Kreis, nicht
+' ueberkreuz) -- sonst pruefen die beiden Teildreiecke die falsche Flaeche.
+' Die Richtung eines RAY_HIT_* muss nicht normalisiert sein, die Distanz kommt
+' trotzdem in Welt-Einheiten zurueck.
+
+IMPORT "g3d"
+
+CONST N = 6                    ' Kachelraster N x N
+CONST TILE = 1.4               ' Kantenlaenge einer Kachel
+
+SCREEN(860, 520, "Picking auf Flaechen", 1)
+
+' Rand des Rasters, damit es um (0,0) zentriert liegt.
+DIM off AS FLOAT
+off = -(N * TILE) / 2.0
+
+' Das schraege Panel (ein Viereck, frei im Raum) und das Warndreieck davor.
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.01
+
+    CLS(&H0B1016)
+    CAMERA3D(0, 7, 9, 0, 0.5, 0, 45)
+
+    ' --- Boden: jede Kachel ist ein eigenes Viereck ---------------------
+    ' Genau das koennte PICK_BOX nicht: es liefert den Treffer gegen einen
+    ' Quader, nicht gegen die tatsaechlich sichtbare Flaeche.
+    DIM getroffen AS INTEGER
+    getroffen = -1
+    DIM naechste AS FLOAT
+    naechste = 999999.0
+
+    DIM ix AS INTEGER
+    DIM iz AS INTEGER
+    FOR iz = 0 TO N - 1
+        FOR ix = 0 TO N - 1
+            DIM x0 AS FLOAT
+            DIM z0 AS FLOAT
+            x0 = off + ix * TILE
+            z0 = off + iz * TILE
+
+            ' Eckpunkte reihum: links-hinten, rechts-hinten, rechts-vorn, links-vorn.
+            DIM d AS FLOAT
+            d = PICK_QUAD(x0, 0.0, z0, x0 + TILE, 0.0, z0, _
+                          x0 + TILE, 0.0, z0 + TILE, x0, 0.0, z0 + TILE)
+            IF d >= 0.0 AND d < naechste THEN
+                naechste = d
+                getroffen = iz * N + ix
+            END IF
+
+            DIM c AS INTEGER
+            c = IIF((ix + iz) MOD 2 = 0, &H1E2A38, &H27384A)
+            IF d >= 0.0 THEN c = &HFFD060
+            PLANE(x0 + TILE / 2.0, 0.0, z0 + TILE / 2.0, TILE * 0.94, TILE * 0.94, c)
+        NEXT
+    NEXT
+
+    ' --- Schraeges Panel: ein Viereck, das kein Huellkoerper abbildet ----
+    DIM py AS FLOAT
+    py = 2.4 + SIN(t * 2.0) * 0.3
+    DIM ax AS FLOAT
+    DIM az AS FLOAT
+    ax = -2.2
+    az = -1.0
+
+    DIM pd AS FLOAT
+    pd = PICK_QUAD(ax, 0.4, az + 1.0, ax + 4.4, 0.4, az + 1.0, _
+                   ax + 4.4, py, az - 1.0, ax, py, az - 1.0)
+    DIM pc AS INTEGER
+    pc = IIF(pd >= 0.0, &HFFD060, &H50C0FF)
+    ' Umriss zeichnen (eine freie Flaeche laesst sich nicht mit PLANE malen).
+    LINE3D(ax, 0.4, az + 1.0, ax + 4.4, 0.4, az + 1.0, pc)
+    LINE3D(ax + 4.4, 0.4, az + 1.0, ax + 4.4, py, az - 1.0, pc)
+    LINE3D(ax + 4.4, py, az - 1.0, ax, py, az - 1.0, pc)
+    LINE3D(ax, py, az - 1.0, ax, 0.4, az + 1.0, pc)
+
+    ' --- Warndreieck: dieselbe Sache mit drei Punkten -------------------
+    DIM tx AS FLOAT
+    tx = 3.0
+    DIM td AS FLOAT
+    td = PICK_TRI(tx - 1.0, 0.3, 1.0, tx + 1.0, 0.3, 1.0, tx, 2.6, 1.0)
+    DIM tc AS INTEGER
+    tc = IIF(td >= 0.0, &HFFD060, &HFF6080)
+    LINE3D(tx - 1.0, 0.3, 1.0, tx + 1.0, 0.3, 1.0, tc)
+    LINE3D(tx + 1.0, 0.3, 1.0, tx, 2.6, 1.0, tc)
+    LINE3D(tx, 2.6, 1.0, tx - 1.0, 0.3, 1.0, tc)
+
+    ' --- HUD ------------------------------------------------------------
+    TEXT(12, 10, "Maus ueber die Flaechen bewegen -- getroffenes leuchtet", &HD0E0F0)
+    IF getroffen >= 0 THEN
+        TEXT(12, 30, f"Kachel {getroffen}   Entfernung {naechste:.2f}", &HFFD060)
+    ELSE
+        TEXT(12, 30, "keine Kachel unter dem Zeiger", &H70808F)
+    END IF
+    IF pd >= 0.0 THEN TEXT(12, 50, f"Panel  {pd:.2f}", &HFFD060)
+    IF td >= 0.0 THEN TEXT(12, 70, f"Dreieck {td:.2f}", &HFFD060)
+
+    FLIP()
+NEXT

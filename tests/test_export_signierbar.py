@@ -4,7 +4,7 @@
 Signieren haengt den Zertifikatsblock ebenfalls ans Dateiende -- danach sind
 die letzten 16 Bytes nicht mehr unsere. Frueher suchte `embedded_gbc()` genau
 dort: das signierte Spiel fand sich selbst nicht mehr und verhielt sich wie
-ein blankes `dhrt` ("Verwendung: ... <datei.gbc>").
+ein blankes `dhrt` ("Verwendung: ... <datei.dhc>").
 
 Andersherum geht es nicht -- erst signieren, dann anhaengen zerstoert die
 Signatur (gemessen: aus `Valid` wird `NotSigned`). Die Reihenfolge muss also
@@ -36,7 +36,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 
 def _exportiere(tmp_path, quelltext):
-    gb = tmp_path / "spiel.gb"
+    gb = tmp_path / "spiel.dh"
     gb.write_text(quelltext, encoding="utf-8")
     res = subprocess.run([str(_DHRT), "--export", str(gb)], cwd=str(tmp_path),
                          capture_output=True, text=True, timeout=180)

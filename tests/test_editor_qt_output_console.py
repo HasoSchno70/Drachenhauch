@@ -27,29 +27,29 @@ def test_link_line_doesnt_match_other_brackets():
 # --- _LINK_FILE_HEADER --------------------------------------------
 
 def test_file_header_simple():
-    m = _LINK_FILE_HEADER.search("Fehler in foo.gb:\n  ...")
+    m = _LINK_FILE_HEADER.search("Fehler in foo.dh:\n  ...")
     assert m is not None
-    assert m.group(1) == "foo.gb"
+    assert m.group(1) == "foo.dh"
 
 
 def test_file_header_with_spaces():
     """Hauptbug: Pfade mit Spaces wurden vorher nicht gematched."""
-    m = _LINK_FILE_HEADER.search("Fehler in mein sprite.gb:\n  ...")
+    m = _LINK_FILE_HEADER.search("Fehler in mein sprite.dh:\n  ...")
     assert m is not None
-    assert m.group(1) == "mein sprite.gb"
+    assert m.group(1) == "mein sprite.dh"
 
 
 def test_file_header_with_subdir():
-    m = _LINK_FILE_HEADER.search("Fehler in subdir/foo.gb:\n  ...")
+    m = _LINK_FILE_HEADER.search("Fehler in subdir/foo.dh:\n  ...")
     assert m is not None
-    assert m.group(1) == "subdir/foo.gb"
+    assert m.group(1) == "subdir/foo.dh"
 
 
 def test_file_header_lazy_stops_at_colon():
     """Bei mehreren `:` im Output darf der Match nicht ueberlaufen."""
-    m = _LINK_FILE_HEADER.search("Fehler in foo.gb:42 weitere:Info")
+    m = _LINK_FILE_HEADER.search("Fehler in foo.dh:42 weitere:Info")
     assert m is not None
-    assert m.group(1) == "foo.gb"
+    assert m.group(1) == "foo.dh"
 
 
 def test_file_header_no_match_without_gb():
@@ -57,38 +57,38 @@ def test_file_header_no_match_without_gb():
 
 
 # --- _LINK_FILE_LINE ----------------------------------------------
-# Strikt `\S+\.gb:\d+` -- Tracebacks ohne Spaces im Pfad. Ein zu
+# Strikt `\S+\.dh:\d+` -- Tracebacks ohne Spaces im Pfad. Ein zu
 # permissiver Regex hier wuerde mehr falsch matchen als richtig.
 
 def test_file_line_simple():
-    m = _LINK_FILE_LINE.search("at foo.gb:42 in stack")
+    m = _LINK_FILE_LINE.search("at foo.dh:42 in stack")
     assert m is not None
-    assert m.group(1) == "foo.gb"
+    assert m.group(1) == "foo.dh"
     assert m.group(2) == "42"
 
 
 def test_file_line_at_line_start():
-    m = _LINK_FILE_LINE.search("script.gb:5: error here")
+    m = _LINK_FILE_LINE.search("script.dh:5: error here")
     assert m is not None
-    assert m.group(1) == "script.gb"
+    assert m.group(1) == "script.dh"
     assert m.group(2) == "5"
 
 
 def test_file_line_with_drive_letter():
-    """Windows-Absolutpfade: `C:\\foo\\bar.gb:42`. `\\S+` matched
-    inklusive `:` und `\\`, der `\\.gb`-Anker stoppt am korrekten Ort."""
-    m = _LINK_FILE_LINE.search(r"C:\foo\bar.gb:42 trace")
+    """Windows-Absolutpfade: `C:\\foo\\bar.dh:42`. `\\S+` matched
+    inklusive `:` und `\\`, der `\\.dh`-Anker stoppt am korrekten Ort."""
+    m = _LINK_FILE_LINE.search(r"C:\foo\bar.dh:42 trace")
     assert m is not None
-    assert m.group(1) == r"C:\foo\bar.gb"
+    assert m.group(1) == r"C:\foo\bar.dh"
     assert m.group(2) == "42"
 
 
 def test_file_line_finds_all_matches():
-    s = "a.gb:1 -> b.gb:2"
+    s = "a.dh:1 -> b.dh:2"
     matches = list(_LINK_FILE_LINE.finditer(s))
     assert len(matches) == 2
-    assert matches[0].group(1) == "a.gb"
-    assert matches[1].group(1) == "b.gb"
+    assert matches[0].group(1) == "a.dh"
+    assert matches[1].group(1) == "b.dh"
 
 
 # --- start_run_auto: dhrt direkt + dhrun.py-Launcher-Fallback -----------
@@ -133,7 +133,7 @@ def test_run_auto_falls_back_when_dhrt_missing(_qapp, tmp_path, monkeypatch):
     con = _console(_qapp, tmp_path)
     # start_run (via dhrun.py) starten wir nicht wirklich -> Stub.
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
-    assert con.start_run_auto(tmp_path / "x.gb") == "py"
+    assert con.start_run_auto(tmp_path / "x.dh") == "py"
     # Hinweis, dass ueber den dhrun.py-Launcher gestartet wurde.
     assert "dhrun.py" in con.text.toPlainText()
 
@@ -144,7 +144,7 @@ def test_run_auto_uses_native_when_available(_qapp, tmp_path, monkeypatch):
     con = _console(_qapp, tmp_path)
     monkeypatch.setattr(con, "_start_native", lambda fp, dhrt: True)
     monkeypatch.setattr(con, "start_run", lambda *a, **k: pytest.fail("kein Fallback erwartet"))
-    assert con.start_run_auto(tmp_path / "x.gb") == "native"
+    assert con.start_run_auto(tmp_path / "x.dh") == "native"
 
 
 def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
@@ -153,7 +153,7 @@ def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
     con = _console(_qapp, tmp_path)
     monkeypatch.setattr(con, "_start_native", lambda fp, dhrt: False)  # Direkt-Start-Fehler
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
-    assert con.start_run_auto(tmp_path / "x.gb") == "py"
+    assert con.start_run_auto(tmp_path / "x.dh") == "py"
     assert "dhrun.py" in con.text.toPlainText()
 
 

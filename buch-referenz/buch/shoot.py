@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Screenshots fuer das Lehrbuch neu aufnehmen -- scharf statt pixelig.
 
-Rendert jede figures/NN_*.gb ueber dhrt mit:
+Rendert jede figures/NN_*.dh ueber dhrt mit:
   DHRT_SCALE=4   -> 4x native Aufloesung (1920x1280; scharfe Formen/Sprites,
                     erfuellt die 300-dpi-Druckpruefung ohne Hoch-Skalieren)
   DHRT_FONT=...  -> echte TTF als Default-Font (scharfe, anti-aliaste Schrift
@@ -40,7 +40,7 @@ FRAMES = {
 
 
 def shoot(base):
-    src = os.path.join(FIG, base + ".gb")
+    src = os.path.join(FIG, base + ".dh")
     if not os.path.exists(src):
         print("  (keine Quelle)", base); return False
     out = os.path.join(IMG, base + ".png")
@@ -58,7 +58,7 @@ def shoot(base):
 
 def main():
     only = set(sys.argv[1:])
-    bases = sorted(b[:-3] for b in os.listdir(FIG) if b.endswith(".gb"))
+    bases = sorted(b[:-3] for b in os.listdir(FIG) if b.endswith(".dh"))
     if only:
         bases = [b for b in bases if b in only]
     n = sum(shoot(b) for b in bases)

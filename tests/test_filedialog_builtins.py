@@ -3,7 +3,7 @@
 FILE_OPEN_DIALOG / FILE_SAVE_DIALOG / FOLDER_DIALOG sind blockierende native
 OS-Dialoge (rfd, ans graphics-Feature gekoppelt) -- kein Funktionstest via
 run_gb moeglich (modaler Dialog, braucht Nutzer-Interaktion). Live verifiziert
-ueber examples/127_filedialog.gb. Hier wird geprueft, dass sie im eingefrorenen
+ueber examples/127_filedialog.dh. Hier wird geprueft, dass sie im eingefrorenen
 dhrt-Index stehen -- sonst warnt der Editor live und der Drift-Test schlaegt an.
 """
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower

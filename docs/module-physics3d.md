@@ -94,4 +94,4 @@ MODEL_MATRIX(meinModell, m, WHITE)
 - **[`physics`](module-physics.md)** — nur stateless Kollisions-/Vektor-Mathe (kein State, keine Schwerkraft).
 - **[`physics2d`](module-physics2d.md)** — das 2D-Pendant (Rapier2D).
 
-Vollständiges Beispiel: [examples/107_physics3d.gb](../examples/107_physics3d.gb).
+Vollständiges Beispiel: [examples/107_physics3d.dh](../examples/107_physics3d.dh).

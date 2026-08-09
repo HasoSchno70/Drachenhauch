@@ -1,0 +1,140 @@
+' 109_prefab_scene.dh -- datengetriebene Szene aus einem Prefab-/Szenen-File.
+'
+' Idee (wie "Prefabs + Scene" in groesseren Engines, hier rein in GameBasic):
+'   * PREFABS = wiederverwendbare Templates (Mesh + Farbe + Groesse), im Code.
+'   * SZENE   = eine JSON-Datei mit INSTANZEN: welches Prefab, wo, wie gedreht.
+' Die Szene laesst sich editieren (assets/scene_demo.json) -> anderes Level,
+' OHNE Code zu aendern. Gerendert via m3d (MAT4_TRS) + MODEL_MATRIX.
+'
+' Native-only (3D). ESC = beenden.
+
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "json"
+
+CONST MAXP = 16
+CONST MAXI = 256
+
+SCREEN(880, 540, "Prefab-/Szenen-Loader", 1)
+SETFPS(60)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H303A4A, 0.8)
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.3, &HFFF0E0)
+DIM lamp AS INTEGER
+lamp = LIGHT_POINT(0, 7, 0, &H80C0FF)
+
+' Zwei Basis-Meshes; Prefabs waehlen eines + Farbe + Achsen-Groesse.
+DIM cube_mesh AS INTEGER
+DIM ball_mesh AS INTEGER
+cube_mesh = MESH_CUBE(1.0, 1.0, 1.0)
+MODEL_LIT(cube_mesh)
+MODEL_PBR(cube_mesh, 0.1, 0.7)
+ball_mesh = MESH_SPHERE(0.5, 22, 22)
+MODEL_LIT(ball_mesh)
+MODEL_PBR(ball_mesh, 0.5, 0.3)
+
+' --- Prefab-Registry (Templates) ---
+DIM pf_name[16] AS STRING
+DIM pf_kind[16] AS INTEGER        ' 0 = Wuerfel-Mesh, 1 = Kugel-Mesh
+DIM pf_color[16] AS INTEGER
+DIM pf_sx[16] AS FLOAT
+DIM pf_sy[16] AS FLOAT
+DIM pf_sz[16] AS FLOAT
+DIM pf_count AS INTEGER
+pf_count = 0
+
+SUB add_prefab(nm AS STRING, kind AS INTEGER, color AS INTEGER, sx AS FLOAT, sy AS FLOAT, sz AS FLOAT)
+    pf_name[pf_count] = nm
+    pf_kind[pf_count] = kind
+    pf_color[pf_count] = color
+    pf_sx[pf_count] = sx
+    pf_sy[pf_count] = sy
+    pf_sz[pf_count] = sz
+    pf_count = pf_count + 1
+END SUB
+
+FUNCTION find_prefab(nm AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO pf_count - 1
+        IF pf_name[i] = nm THEN RETURN i
+    NEXT
+    RETURN 0
+END FUNCTION
+
+add_prefab("floor",  0, &H2A3A4A, 2.0, 0.3, 2.0)
+add_prefab("crate",  0, &HC08040, 1.0, 1.0, 1.0)
+add_prefab("pillar", 0, &H707888, 0.8, 3.0, 0.8)
+add_prefab("ball",   1, &H40C0E0, 1.0, 1.0, 1.0)
+add_prefab("gem",    1, &HE040C0, 0.5, 0.5, 0.5)
+
+' --- Szenen-Instanzen (aus JSON geladen) ---
+DIM in_pf[256] AS INTEGER
+DIM in_x[256] AS FLOAT
+DIM in_y[256] AS FLOAT
+DIM in_z[256] AS FLOAT
+DIM in_ry[256] AS FLOAT
+DIM in_s[256] AS FLOAT
+DIM in_count AS INTEGER
+in_count = 0
+
+SUB load_scene(path AS STRING)
+    DIM doc AS JSON_HANDLE
+    doc = JSON_LOAD(path)
+    DIM n AS INTEGER
+    n = JSON_LEN(doc, "objects")
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM base AS STRING
+        base = "objects." + STR$(i) + "."
+        in_pf[in_count] = find_prefab(JSON_GET_STRING(doc, base + "prefab"))
+        in_x[in_count] = JSON_GET_FLOAT(doc, base + "x")
+        in_y[in_count] = JSON_GET_FLOAT(doc, base + "y")
+        in_z[in_count] = JSON_GET_FLOAT(doc, base + "z")
+        in_ry[in_count] = 0.0
+        IF JSON_HAS(doc, base + "ry") THEN in_ry[in_count] = JSON_GET_FLOAT(doc, base + "ry")
+        in_s[in_count] = 1.0
+        IF JSON_HAS(doc, base + "scale") THEN in_s[in_count] = JSON_GET_FLOAT(doc, base + "scale")
+        in_count = in_count + 1
+    NEXT
+END SUB
+
+load_scene("assets/scene_demo.json")
+
+DIM t AS FLOAT
+t = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+    DIM dt AS FLOAT
+    dt = DELTA()
+    IF dt > 0.05 THEN dt = 0.05
+    t = t + dt * 0.3
+    LIGHT_SET_POS(lamp, COS(t * 2.0) * 5.0, 7.0, SIN(t * 2.0) * 5.0)
+
+    CLS(&H0A0E16)
+    CAMERA3D(SIN(t) * 13.0, 9.0, COS(t) * 13.0,  0.0, 1.5, 0.0,  50.0)
+    GRID3D(20, 1.0)
+
+    ' Jede Instanz aus ihrem Prefab aufbauen + zeichnen.
+    DIM i AS INTEGER
+    FOR i = 0 TO in_count - 1
+        DIM p AS INTEGER
+        p = in_pf[i]
+        DIM sc AS VEC3
+        sc = VEC3_NEW(pf_sx[p] * in_s[i], pf_sy[p] * in_s[i], pf_sz[p] * in_s[i])
+        DIM rot AS QUAT
+        rot = QUAT_FROM_EULER(0.0, in_ry[i] * 0.01745, 0.0)
+        DIM m AS MAT4
+        m = MAT4_TRS(VEC3_NEW(in_x[i], in_y[i], in_z[i]), rot, sc)
+        IF pf_kind[p] = 0 THEN
+            MODEL_MATRIX(cube_mesh, m, pf_color[p])
+        ELSE
+            MODEL_MATRIX(ball_mesh, m, pf_color[p])
+        END IF
+    NEXT
+
+    TEXT(12, 10, "Prefab-/Szenen-Loader: assets/scene_demo.json", WHITE)
+    TEXT(12, 34, f"{in_count} Instanzen aus {pf_count} Prefabs (Datei editierbar)", &H88FFCC)
+    FLIP()
+WEND

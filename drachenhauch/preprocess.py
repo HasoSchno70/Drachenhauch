@@ -31,10 +31,10 @@ _IMPORT_RE = re.compile(
 
 
 def _looks_like_module_name(rel: str) -> bool:
-    """Heuristik: Pfad ohne Slash/Backslash und ohne .gb-Endung -> Modul."""
+    """Heuristik: Pfad ohne Slash/Backslash und ohne .dh-Endung -> Modul."""
     if "/" in rel or "\\" in rel:
         return False
-    if rel.lower().endswith(".gb"):
+    if rel.lower().endswith(".dh"):
         return False
     return _modules.is_valid_module_name(rel)
 
@@ -69,7 +69,7 @@ def process(source: str, base_path: Path | None = None,
         if not target.exists():
             # Fallback: Built-in-Modul wie "json", "db", "ui".
             # Nur wenn der Pfad nach einem Modul-Namen aussieht (kein Slash,
-            # keine .gb-Endung) - sonst wuerde "missing.gb" auch als Modul
+            # keine .dh-Endung) - sonst wuerde "missing.dh" auch als Modul
             # versucht und die Fehlermeldung wuerde irrefuehren.
             # dhrt implementiert die Module nativ -> hier nur am Namen erkennen
             # und zu einem Kommentar machen (kein Python-Impl-Laden mehr).
@@ -89,7 +89,7 @@ def process(source: str, base_path: Path | None = None,
         seen.add(target)
         try:
             # file_label = der IMPORT-Pfad wie geschrieben (`rel`), nicht nur
-            # `target.name`: zwei `util.gb` aus verschiedenen Verzeichnissen
+            # `target.name`: zwei `util.dh` aus verschiedenen Verzeichnissen
             # waren in `origins` sonst nicht unterscheidbar, und die
             # "in <datei>:<zeile>"-Meldung nannte einen mehrdeutigen Namen.
             inner_src, inner_origins = process(content, target.parent, seen,

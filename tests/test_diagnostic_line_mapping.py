@@ -5,7 +5,7 @@ selbst und meldet Diagnosen deshalb in Zeilen der GEMERGTEN Quelle --
 `main.rs::check_main` sagt das ausdruecklich ("der Editor mappt via
 origins zurueck"). Genau diese Haelfte fehlte in `_check_via_dhrt`: die
 Zeilen wurden woertlich uebernommen, wodurch in JEDER Datei mit
-`IMPORT "x.gb"` saemtliche Marker um die Laenge des inlinierten Codes
+`IMPORT "x.dh"` saemtliche Marker um die Laenge des inlinierten Codes
 verrutschten -- im Reproduktionsfall bis hinter das Dateiende.
 
 `_map_back` selbst existierte und war korrekt, wurde aber nur vom
@@ -35,14 +35,14 @@ END FUNCTION
 
 @pytest.fixture
 def proj(tmp_path):
-    (tmp_path / "helper.gb").write_text(HELPER, encoding="utf-8")
+    (tmp_path / "helper.dh").write_text(HELPER, encoding="utf-8")
     return tmp_path
 
 
 def test_error_after_import_maps_to_buffer_line(proj):
     """Der Kern-Regressionsfall: 8 Zeilen werden inliniert, der Fehler steht
     auf Puffer-Zeile 4 -- gemeldet wurde vorher Zeile 14 (hinter EOF)."""
-    buf = ('IMPORT "helper.gb"\n'
+    buf = ('IMPORT "helper.dh"\n'
            'DIM x AS INTEGER\n'
            'x = helper_add(1, 2)\n'
            'x = = 5\n')
@@ -54,7 +54,7 @@ def test_error_after_import_maps_to_buffer_line(proj):
 def test_error_line_never_exceeds_buffer_length(proj):
     """Egal wie viel inliniert wird -- eine Fehlerzeile hinter dem Dateiende
     ist immer falsch und im Editor nicht anzeigbar."""
-    buf = 'IMPORT "helper.gb"\nx = = 1\n'
+    buf = 'IMPORT "helper.dh"\nx = = 1\n'
     n_lines = len(buf.splitlines())
     for p in _check_source(buf, proj):
         assert 1 <= p.line <= n_lines, (
@@ -65,12 +65,12 @@ def test_error_inside_imported_file_pins_to_line_one_and_names_file(tmp_path):
     """Ein Fehler IN der importierten Datei hat keine Entsprechung im Puffer
     des Nutzers -- er wird auf Zeile 1 gepinnt und die Datei in den Text
     gezogen, statt eine unbeteiligte Puffer-Zeile zu markieren."""
-    (tmp_path / "broken.gb").write_text("' a\n' b\nx = = 9\n", encoding="utf-8")
-    probs = [p for p in _check_source('IMPORT "broken.gb"\nPRINT 1\n', tmp_path)
+    (tmp_path / "broken.dh").write_text("' a\n' b\nx = = 9\n", encoding="utf-8")
+    probs = [p for p in _check_source('IMPORT "broken.dh"\nPRINT 1\n', tmp_path)
              if p.severity == "error"]
     assert probs
     assert probs[0].line == 1
-    assert "broken.gb" in probs[0].message
+    assert "broken.dh" in probs[0].message
 
 
 def test_hardware_warning_line_is_not_shifted(proj):
@@ -79,7 +79,7 @@ def test_hardware_warning_line_is_not_shifted(proj):
     werden dagegen aus der ROHEN Quelle berechnet und sind schon
     Puffer-Zeilen. Alles blind zu mappen wuerde genau diese korrekten
     Warnungen kaputtmachen."""
-    buf = 'IMPORT "helper.gb"\nIMPORT "serial"\nPRINT 1\n'
+    buf = 'IMPORT "helper.dh"\nIMPORT "serial"\nPRINT 1\n'
     warns = [p for p in _check_source(buf, proj) if p.severity == "warning"]
     hw = [p for p in warns if "serial" in p.message]
     if not hw:
@@ -101,7 +101,7 @@ def test_no_import_lines_are_unchanged(tmp_path):
 def test_origins_roundtrip_maps_every_buffer_line(proj):
     """Jede Zeile des Nutzer-Puffers muss sich aus der gemergten Quelle
     exakt zurueckgewinnen lassen."""
-    buf = 'PRINT 1\nIMPORT "helper.gb"\nPRINT 2\nPRINT 3\n'
+    buf = 'PRINT 1\nIMPORT "helper.dh"\nPRINT 2\nPRINT 3\n'
     merged, origins = process(buf, proj, file_label="<editor>")
     seen_buffer_lines = set()
     for merged_line in range(1, len(merged.split("\n")) + 1):
@@ -122,23 +122,23 @@ def test_nested_import_error_reports_the_users_own_import_line(tmp_path):
     INNEREN Datei nach oben -- der Editor markierte damit eine voellig
     unbeteiligte Zeile. Die einzige Koordinate, die der Nutzer anfassen
     kann, ist seine eigene IMPORT-Zeile."""
-    (tmp_path / "outer.gb").write_text('\' a\n\' b\nIMPORT "nichtda.gb"\n',
+    (tmp_path / "outer.dh").write_text('\' a\n\' b\nIMPORT "nichtda.dh"\n',
                                        encoding="utf-8")
-    buf = "PRINT 1\nPRINT 2\nPRINT 3\nPRINT 4\nPRINT 5\nIMPORT \"outer.gb\"\n"
+    buf = "PRINT 1\nPRINT 2\nPRINT 3\nPRINT 4\nPRINT 5\nIMPORT \"outer.dh\"\n"
     with pytest.raises(LexerError) as ei:
         process(buf, tmp_path, file_label="<editor>")
     assert ei.value.line == 6, f"erwartet Zeile 6, bekam {ei.value.line}"
-    assert "outer.gb" in str(ei.value)
+    assert "outer.dh" in str(ei.value)
 
 
 def test_origins_distinguish_same_named_files_in_different_dirs(tmp_path):
-    """`origins` trug nur den Dateinamen -- zwei `util.gb` aus verschiedenen
+    """`origins` trug nur den Dateinamen -- zwei `util.dh` aus verschiedenen
     Verzeichnissen waren nicht unterscheidbar."""
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
-    (tmp_path / "a" / "util.gb").write_text("' aus a\n", encoding="utf-8")
-    (tmp_path / "b" / "util.gb").write_text("' aus b\n", encoding="utf-8")
-    buf = 'IMPORT "a/util.gb"\nIMPORT "b/util.gb"\n'
+    (tmp_path / "a" / "util.dh").write_text("' aus a\n", encoding="utf-8")
+    (tmp_path / "b" / "util.dh").write_text("' aus b\n", encoding="utf-8")
+    buf = 'IMPORT "a/util.dh"\nIMPORT "b/util.dh"\n'
     _merged, origins = process(buf, tmp_path, file_label="<editor>")
     labels = {o[0] for o in origins[1:] if o and o[0] != "<editor>"}
     assert len(labels) == 2, f"Labels nicht unterscheidbar: {labels}"

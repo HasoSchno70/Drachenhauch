@@ -223,7 +223,7 @@ solchen Lücken). Betrifft auch andere examples mit `FLT(...)`.
 > raylib-RTs sind ohnehin y-gespiegelt, der Mirror-Fall ist also quasi gratis).
 > Damit gehen echte Boden-Reflexionen: Text einmal in ein (transparent
 > vorgecleartes) Render-Target zeichnen, dann normal + `..., TRUE` gespiegelt
-> darunter stempeln. Genutzt in `examples/119_vortex.gb` (Scroller-Reflexion).
+> darunter stempeln. Genutzt in `examples/119_vortex.dh` (Scroller-Reflexion).
 
 (Historischer Text:) Für einen Boden-Spiegel-Scroller braucht man eine vertikal
 gespiegelte Textkopie. In dhrt gibt es dafür **keinen Weg**: `TEXT` kann nicht

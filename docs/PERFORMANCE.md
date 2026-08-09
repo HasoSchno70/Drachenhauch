@@ -224,11 +224,11 @@ auf einem Sprite-Atlas.
 
 > Nicht mehr lauffähig: `setup.py build_ext` und `dhrun.py --bench` sind mit den
 > Python-Pfaden entfernt. Heute misst man direkt gegen `dhrt`
-> (`dhrt run examples/bench_fib.gb`).
+> (`dhrt run examples/bench_fib.dh`).
 
 ```
 python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)
-python dhrun.py --bench examples/bench_fib.gb                # (entfernt)
+python dhrun.py --bench examples/bench_fib.dh                # (entfernt)
 ```
 
 ## Offene Pfade (mit ehrlicher Cost-Benefit-Einschaetzung)

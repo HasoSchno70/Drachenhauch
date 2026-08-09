@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Laedt ein geriggtes, animiertes 3D-Modell fuer die Skelett-Animations-Demo
-(examples/108_skeletal_anim.gb).
+(examples/108_skeletal_anim.dh).
 
 Die .glb (~mehrere MB) liegt bewusst NICHT im Git-Repo. Dieses Skript holt sie
 einmalig:

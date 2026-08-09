@@ -56,7 +56,7 @@ def test_blockgrenze_zeigt_keinen_akzent_wenn_nicht_gescrollt(tmp_path):
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     from PIL import Image
 
-    src = tmp_path / "kante.gb"
+    src = tmp_path / "kante.dh"
     src.write_text(_PROG, encoding="utf-8")
     shot = tmp_path / "kante.png"
     env = dict(os.environ, DHRT_FRAMES="3", DHRT_SCREENSHOT=str(shot))

@@ -313,7 +313,7 @@ WEND
 - **Per-Zelle-Hintergrund** ist ideal für Statistik-Ampeln (HP grün/gelb/rot mit volltöniger Bg-Farbe), Zebra-Streifen (gerade Zeilen `RGB(30, 34, 52)`, ungerade `-1`) oder Heatmaps. Auf der hovered-Zeile überlagert das Hover-Highlight die Cell-Bgs — der User sieht trotzdem klar wo der Mauszeiger ist.
 - Für **dynamische Updates** (Liste wächst): die Arrays mit Maximalgröße deklarieren und nicht-existente Zeilen mit Leerstrings füllen.
 - **Klick auf Scrollbalken** scrollt nur — die Zeile darunter wird nicht versehentlich „geklickt" weil die Scrollbar als Klickziel die Klick-Erkennung blockiert.
-- **Komplettes Beispiel** mit Per-Zelle-Farben (Gold/Silber/Bronze, Klassen-Farben, HP-Ampel) und Detail-Panel: [examples/43_ui_table.gb](../examples/43_ui_table.gb).
+- **Komplettes Beispiel** mit Per-Zelle-Farben (Gold/Silber/Bronze, Klassen-Farben, HP-Ampel) und Detail-Panel: [examples/43_ui_table.dh](../examples/43_ui_table.dh).
 
 ### Persistente Selektion
 
@@ -353,7 +353,7 @@ END IF
 
 Direkt **nach** dem `UI_TABLE`-Aufruf im selben Frame abfragen.
 
-**Vollständiges Beispiel** mit Selektion, klickbaren Headern (auf-/absteigend) und Detail-Panel: [examples/81_table_select.gb](../examples/81_table_select.gb).
+**Vollständiges Beispiel** mit Selektion, klickbaren Headern (auf-/absteigend) und Detail-Panel: [examples/81_table_select.dh](../examples/81_table_select.dh).
 
 ## Immediate-Mode-Fenster (UI_WINDOW_BEGIN / UI_WINDOW_END)
 
@@ -480,7 +480,7 @@ WHILE NOT QUITREQUESTED() AND NOT beendet
 WEND
 ```
 
-Siehe auch [examples/33_ui.gb](../examples/33_ui.gb) — komplettes lauffähiges Demo.
+Siehe auch [examples/33_ui.dh](../examples/33_ui.dh) — komplettes lauffähiges Demo.
 
 ## Tipps
 
@@ -535,4 +535,4 @@ UI_METRIC_SET("win_title_h", 24)     ' Titelleiste der UI_WINDOW_BEGIN-Fenster
 
 Wenn du eines dieser Features brauchst, in einer späteren Iteration leicht zu ergänzen.
 
-Siehe auch [examples/42_ui_extended.gb](../examples/42_ui_extended.gb) für eine Demo aller neuen Komponenten kombiniert (HP-Bars, Settings-Panel mit Textfeld + Radio + Slider).
+Siehe auch [examples/42_ui_extended.dh](../examples/42_ui_extended.dh) für eine Demo aller neuen Komponenten kombiniert (HP-Bars, Settings-Panel mit Textfeld + Radio + Slider).

@@ -21,7 +21,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 
 def _run(src: str, tmp_path, frames: int = 2):
-    p = tmp_path / "t.gb"
+    p = tmp_path / "t.dh"
     p.write_text(src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", env=dict(os.environ, DHRT_FRAMES=str(frames)),

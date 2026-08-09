@@ -79,7 +79,7 @@ SPRITE_DRAW(hero)
 | `ANIM_FSM_GET_FLOAT/INT/BOOL(fsm, name$)` | Parameter zurücklesen |
 
 Externer Typ `ANIM_FSM` (Referenz-Handle). Implementierung
-`rust/gb_runtime/src/animfsm.rs` (reine Logik, kein Grafik-State), Demo
-[examples/111_anim_fsm.gb](../examples/111_anim_fsm.gb) + Daten
+`rust/drachenhauch_runtime/src/animfsm.rs` (reine Logik, kein Grafik-State), Demo
+[examples/111_anim_fsm.dh](../examples/111_anim_fsm.dh) + Daten
 `examples/assets/hero.gbanim`, Tests `tests/test_animfsm.py`. Editor: **`dhanim`**
 (siehe [docs/anim-editor.md](anim-editor.md)).

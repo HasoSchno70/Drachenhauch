@@ -1,6 +1,6 @@
 """Async-Diagnostik fuer Live-Error-Marker.
 
-Diagnostik laeuft ueber die native Runtime: `dhrt --check datei.gb` liefert die
+Diagnostik laeuft ueber die native Runtime: `dhrt --check datei.dh` liefert die
 gefundenen Probleme (preprocess/lex/parse/compile) als JSON mit Zeile. Damit
 haengt der Editor nicht mehr am Python-Compiler (Stufe B). Faellt dhrt (nicht
 gebaut), greift ein Lexer/Parser-Fallback (nur Syntax) -- der Editor bleibt
@@ -89,9 +89,9 @@ _DIAG_FAILED_MSG = "Diagnose fehlgeschlagen -- moeglicherweise veraltete Fehlera
 
 def _check_via_dhrt(source: str, base_path, dhrt,
                      checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
-    """`dhrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> Liste
+    """`dhrt --check` auf einer temporaeren .dh-Datei. JSON-Diagnose -> Liste
     aller ParseProblems (Errors UND Warnungen). Zeilen sind quell-relativ (bei
-    `IMPORT "datei.gb"`-Inlining moeglw. verschoben).
+    `IMPORT "datei.dh"`-Inlining moeglw. verschoben).
 
     Frueher gab jeder dhrt-Fehler (Crash/Timeout/kaputtes JSON) eine leere
     Liste zurueck -- der Editor zeigte dann "keine Fehler", obwohl der
@@ -104,7 +104,7 @@ def _check_via_dhrt(source: str, base_path, dhrt,
     import tempfile
     base = base_path or Path.cwd()
     tmp_dir = str(base) if Path(base).is_dir() else None
-    fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+    fd, tmp = tempfile.mkstemp(suffix=".dh", dir=tmp_dir)
     os.close(fd)
     proc = None
     try:
@@ -162,7 +162,7 @@ def _origins_for(source: str, base_path) -> list | None:
     GEMERGTEN Zeilen -- `main.rs::check_main` sagt das ausdruecklich
     ("der Editor mappt via origins zurueck"). Genau diese Haelfte fehlte
     hier: die Zeilen wurden woertlich uebernommen, wodurch in JEDER Datei
-    mit `IMPORT "x.gb"` saemtliche Marker um die Laenge des inlinierten
+    mit `IMPORT "x.dh"` saemtliche Marker um die Laenge des inlinierten
     Codes verrutschten -- bis weit hinter das Dateiende. Der Fallback
     `_check_syntax_only` machte es die ganze Zeit richtig.
 

@@ -38,7 +38,7 @@ _PROG = (
 
 
 def _write(tmp_path, src):
-    f = tmp_path / "p.gb"
+    f = tmp_path / "p.dh"
     f.write_text(src, encoding="utf-8")
     return f
 

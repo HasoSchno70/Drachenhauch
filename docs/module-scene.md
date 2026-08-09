@@ -118,4 +118,4 @@ Das Modul registriert keinen GB-sichtbaren Handle-Typ — der Stack lebt im Modu
 ## Siehe auch
 
 - [`save`](module-save.md) — High-Level Save/Load mit JSON-Backend, ergänzt sich gut mit Scene (Highscore-Persistierung, Run-Settings)
-- Vollständiges Beispiel: [`examples/49_pong_scene.gb`](../examples/49_pong_scene.gb) — Pong mit Menu/Playing/GameOver-Scenes
+- Vollständiges Beispiel: [`examples/49_pong_scene.dh`](../examples/49_pong_scene.dh) — Pong mit Menu/Playing/GameOver-Scenes

@@ -36,7 +36,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 def _warnungen(tmp_path, quelle: str):
     """`dhrt --check` laufen lassen und die Warnungstexte liefern."""
-    f = tmp_path / "w.gb"
+    f = tmp_path / "w.dh"
     f.write_text(quelle, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--check", str(f)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)

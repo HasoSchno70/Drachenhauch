@@ -1,0 +1,51 @@
+' 82_3d_intro.dh -- 3D mit dem g3d-Modul (NUR native Runtime: F6 / --native).
+'
+' Zeigt Kamera, Boden-Gitter, gefuellte + Drahtgitter-Koerper, Linien und ein
+' 2D-HUD ueber der Szene. Kamera kreist langsam um den Ursprung.
+'
+' Ausfuehren:  dhrun.py --native examples\82_3d_intro.dh   (oder F6 im Editor)
+' Mit F5 (Tree-Walker) kommt eine klare Meldung: 3D braucht die native Runtime.
+
+IMPORT "g3d"
+
+SCREEN(720, 480, "GameBasic 3D", 1)
+
+DIM t AS FLOAT
+t = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    CLS(&H101822)
+
+    ' Kamera kreist um den Ursprung (Radius 9, Hoehe 6).
+    DIM cx AS FLOAT
+    DIM cz AS FLOAT
+    cx = COS(t) * 9.0
+    cz = SIN(t) * 9.0
+    CAMERA3D(cx, 6.0, cz,  0.0, 1.0, 0.0,  45.0)
+
+    ' Boden-Raster zur Orientierung.
+    GRID3D(20, 1.0)
+
+    ' Gefuellter roter Wuerfel + schwarzes Drahtgitter drumherum.
+    CUBE(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  RED)
+    CUBE_WIRES(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  BLACK)
+
+    ' Blaue Kugel rechts, gruener Zylinder links, gelber Kegel hinten.
+    SPHERE(4.0, 1.0, 0.0,  1.0,  BLUE)
+    SPHERE_WIRES(4.0, 1.0, 0.0,  1.0,  &H103040)
+    CYLINDER(-4.0, 0.0, 0.0,  0.8, 0.8, 2.5,  GREEN)
+    CYLINDER(0.0, 0.0, -4.0,  0.0, 1.0, 2.0,  YELLOW)   ' radius_oben 0 = Kegel
+
+    ' Eine Achsen-Linie (Y) + ein Punkt an der Spitze.
+    LINE3D(0.0, 0.0, 4.0,  0.0, 3.0, 4.0,  WHITE)
+    POINT3D(0.0, 3.0, 4.0,  WHITE)
+
+    ' 2D-HUD liegt ueber der 3D-Szene.
+    TEXT(10, 10, "GameBasic 3D (g3d) -- ESC beendet", WHITE)
+    TEXT(10, 30, "Wuerfel . Kugel . Zylinder . Kegel . Gitter", &H9FB4C8)
+
+    FLIP()
+    SLEEP(16)
+    t = t + 0.02
+WEND

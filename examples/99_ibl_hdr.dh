@@ -1,0 +1,74 @@
+' 99_ibl_hdr.dh -- Echtes HDR-Cubemap-IBL (native-only, F6)
+'
+' LIGHT_ENV_HDR(pfad$ [, intensitaet]) laedt ein equirectangulares .hdr-Panorama
+' und berechnet einmalig die IBL-Maps (Irradiance + Prefilter + BRDF-LUT). Der
+' PBR-Shader spiegelt dann die ECHTE Umgebung (Cubemap) statt der analytischen
+' LIGHT_ENV-Naeherung -- Chrom-Kugeln zeigen die Skybox. Fehlt das .hdr, faellt
+' die Demo auf das analytische LIGHT_ENV zurueck (sichtbar, aber kein Panorama).
+'
+' Asset einmalig holen:  py examples/assets/download_hdri.py
+' (kloofendal_43d_clear, Poly Haven, CC0 -- liegt nicht im Repo)
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "HDR-Cubemap-IBL", 1)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(0, 0)                           ' kein Flat-Ambient -- nur Umgebung
+LIGHT_DIRECTIONAL(-0.4, -0.7, -0.5, &H303030) ' dezente Sonne fuer einen Glanzpunkt
+
+' Echtes HDR-IBL wenn das Panorama vorhanden ist, sonst analytische Naeherung.
+IF FILEEXISTS("assets/ibl_env.hdr") THEN
+    LIGHT_ENV_HDR("assets/ibl_env.hdr", 1.0)
+    SKYBOX(TRUE)                                ' HDR-Umgebung als 3D-Hintergrund
+ELSE
+    LIGHT_ENV(&H6090E0, &H201810, 1.0)
+    PRINT "Kein assets/ibl_env.hdr -- analytisches LIGHT_ENV (download_hdri.py)"
+END IF
+
+DIM COLS AS INTEGER
+COLS = 7
+
+' Eine Reihe Chrom-Metallkugeln, roughness glatt (Spiegel) -> rau (matt).
+DIM spheres[7] AS INTEGER
+DIM c AS INTEGER
+FOR c = 0 TO COLS - 1
+    DIM rough AS FLOAT
+    rough = 0.02 + (c / (COLS - 1)) * 0.9
+    DIM m AS INTEGER
+    m = MESH_SPHERE(0.6, 48, 48)
+    MODEL_LIT(m)
+    MODEL_PBR(m, 1.0, rough)                  ' Vollmetall -> spiegelt die HDR-Umgebung
+    spheres[c] = m
+NEXT
+
+' Ein matter, dielektrischer Boden, der die Umgebung diffus aufnimmt.
+DIM floor AS INTEGER
+floor = MESH_PLANE(20.0, 20.0, 1, 1)
+MODEL_LIT(floor)
+MODEL_PBR(floor, 0.0, 0.85)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.01
+
+    CLS(&H101418)
+    ' Kamera kreist -> die gespiegelte Umgebung wandert ueber die Metalle.
+    CAMERA3D(SIN(t) * 6.0, 1.4, COS(t) * 6.0 + 3.0, 0, 0.4, 0, 45)
+
+    MODEL(floor, 0, -1.1, 0, 1.0, &H707880)
+    FOR c = 0 TO COLS - 1
+        DIM x AS FLOAT
+        x = (c - (COLS - 1) / 2.0) * 1.5
+        MODEL(spheres[c], x, 0.2, 0, 1.0, &HD0D4DC)
+    NEXT
+
+    TEXT(12, 10, "HDR-Cubemap-IBL: Metalle spiegeln die echte Umgebung", WHITE)
+    TEXT(12, 34, "links glatt (Spiegel) .. rechts rau (diffus)", &H88AACC)
+
+    FLIP()
+NEXT

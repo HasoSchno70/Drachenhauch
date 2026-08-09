@@ -89,7 +89,7 @@ will, setzt ihn direkt (`AUDIO_FILTER("sfx", 2000.0)`).
 
 ## Demo und Tests
 
-- `examples/150_audio_modulatoren.gb` — Auto-Wah mit umschaltbarer Wellenform
+- `examples/150_audio_modulatoren.dh` — Auto-Wah mit umschaltbarer Wellenform
   und ein Tweener auf dem Hall, mit Spektrum-Anzeige.
 - `tests/test_audio_modulators.py` — der Kern-Test **misst** über den
   FFT-Abgriff, dass der Höhenanteil des Ausgangs wirklich schwankt (gemessen:

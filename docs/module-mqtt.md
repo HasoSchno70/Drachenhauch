@@ -110,7 +110,7 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/148_mqtt.gb](../examples/148_mqtt.gb) (Round-Trip gegen
+Siehe [examples/148_mqtt.dh](../examples/148_mqtt.dh) (Round-Trip gegen
 einen lokalen Broker — z. B. [Mosquitto](https://mosquitto.org/), Default-Port
 1883, kein Login nötig für einen lokalen Test-Broker).
 
@@ -119,7 +119,7 @@ einen lokalen Broker — z. B. [Mosquitto](https://mosquitto.org/), Default-Port
 [esp32/](../esp32/) enthält ein fertiges Grundgerüst für ESP32/ESP8266
 (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten
 Stellen für eigenen Code, dazu das GameBasic-Gegenstück
-[examples/159_esp32_bruecke.gb](../examples/159_esp32_bruecke.gb).
+[examples/159_esp32_bruecke.dh](../examples/159_esp32_bruecke.dh).
 
 Dort stehen auch die Fallstricke, die man sonst einzeln durchleidet:
 eindeutige Client-Kennung, die 256-Byte-Grenze von PubSubClient, warum

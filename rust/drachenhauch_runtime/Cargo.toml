@@ -2,7 +2,7 @@
 name = "drachenhauch_runtime"
 version = "0.1.0"
 edition = "2021"
-description = "Native Drachenhauch runtime (Rust). Loads .gbc bytecode, executes VM core; optional raylib graphics."
+description = "Native Drachenhauch runtime (Rust). Loads .dhc bytecode, executes VM core; optional raylib graphics."
 
 [[bin]]
 name = "dhrt"

@@ -413,8 +413,8 @@ genauso wie bei `TEXT`.
 
 ## Dateien
 
-- Umsetzung: [`rust/gb_runtime/src/chart.rs`](../rust/gb_runtime/src/chart.rs)
+- Umsetzung: [`rust/drachenhauch_runtime/src/chart.rs`](../rust/drachenhauch_runtime/src/chart.rs)
   (Datenmodell + Zeichnen), Builtins in `builtins.rs`, `CHART_DRAW` in `vm.rs`
-- Demo: [`examples/154_chart.gb`](../examples/154_chart.gb)
+- Demo: [`examples/154_chart.dh`](../examples/154_chart.dh)
 - Tests: [`tests/test_modules_chart.py`](../tests/test_modules_chart.py) +
   Rust-`#[test]`s in `chart.rs`

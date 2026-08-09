@@ -257,7 +257,7 @@ def test_null_groesse_wird_abgelehnt(run_gb):
 
 
 def test_tacho_bringt_seine_reihe_schon_mit(run_gb):
-    """IMPORT "chart" ohne .gb-Endung nimmt immer das eingebaute Modul."""
+    """IMPORT "chart" ohne .dh-Endung nimmt immer das eingebaute Modul."""
     src = HEAD + (
         'c = CHART_NEW("tacho", 0, 0, 10, 10)\n'
         'PRINT CHART_SERIES_COUNT(c)\n'

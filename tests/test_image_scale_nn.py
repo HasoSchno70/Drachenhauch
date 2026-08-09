@@ -27,11 +27,11 @@ Image = pytest.importorskip("PIL.Image", reason="Pillow fuer die Pixel-Pruefung 
 
 
 def _run(src, tmp_path, shot=None, frames=3):
-    (tmp_path / "s.gb").write_text(src, encoding="utf-8")
+    (tmp_path / "s.dh").write_text(src, encoding="utf-8")
     env = dict(os.environ, DHRT_FRAMES=str(frames))
     if shot:
         env["DHRT_SCREENSHOT"] = str(tmp_path / shot)
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "s.gb")], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "s.dh")], capture_output=True,
                        text=True, encoding="utf-8", env=env, timeout=90, cwd=str(tmp_path))
     r.out = [w for ln in (r.stdout or "").splitlines()
              if not ln.startswith(("WARNING:", "INFO:", "TRACE:")) for w in ln.split()]

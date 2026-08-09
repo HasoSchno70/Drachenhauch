@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Laedt das Musik-Asset fuer examples/85_cybermatic_demo.gb.
+"""Laedt das Musik-Asset fuer examples/85_cybermatic_demo.dh.
 
 Die OGG (~15 MB) liegt bewusst NICHT im Git-Repo. Dieses Skript holt sie
 einmalig von OpenGameArt:

@@ -17,7 +17,7 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 
 ## Migrationsplan (inkrementell, nichts wegwerfen)
 
-1. **Bytecode-Format einfrieren/serialisieren** — `.gbc` schreiben (Python) +
+1. **Bytecode-Format einfrieren/serialisieren** — `.dhc` schreiben (Python) +
    lesen (Rust). ✅ *erledigt (Spike)*
 2. **Rust-VM-Kern** — Dispatch-Schleife + Skalar-Ops + Control-Flow. Test:
    Konsolen-Programme, `stdout == Python-VM`. ✅ *erledigt (Spike)*
@@ -30,8 +30,8 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 7. Editor: „Export → native Exe bundeln". ✅ *erledigt (Bytecode + Assets in
    eine standalone `.exe` gebündelt — siehe unten)*
 
-**Dev-Run-Loop** (quer zu den Schritten): `dhrun.py --native <datei.gb>` —
-ein Befehl kompiliert (Python) → `.gbc` → startet `dhrt`. ✅ *erledigt* (siehe
+**Dev-Run-Loop** (quer zu den Schritten): `dhrun.py --native <datei.dh>` —
+ein Befehl kompiliert (Python) → `.dhc` → startet `dhrt`. ✅ *erledigt* (siehe
 unten).
 
 ## Offen / nächste Schritte (Stand 2026-06-01)
@@ -55,7 +55,7 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
   nativ), **Render-Targets** (`RENDERTARGET_NEW`/`BEGIN`/`END`/`DRAW`, dual-path —
   dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die
   RenderTexture gerendert). Sound-Pan existiert bereits (`AUDIO_PAN`). Demos
-  `examples/100_2d_extras.gb`, `101_blend_gentex.gb`, `102_render_target.gb`.
+  `examples/100_2d_extras.dh`, `101_blend_gentex.dh`, `102_render_target.dh`.
 - **Noch offen (klein):** Sound-Aliase (`LoadSoundAlias`, ueberlappende Wiedergabe
   desselben Sounds); Render-Target-Trails (aktuell pro Frame transparent gecleart).
 
@@ -69,7 +69,7 @@ feature-gated (Standard-`.exe` bleibt schlank).
   `tile_collide` (TILE_*, 4 — Box-Sweep-Port), `controller` (CHAR_*, 24 —
   Platformer-Physik). Alle bit-identisch zu den Python-Pfaden verifiziert
   (`tiled`/`tile_collide`/`controller` gegen `examples/levels/level1.json`,
-  `examples/77_tiled_platformer.gb` rendert nativ).
+  `examples/77_tiled_platformer.dh` rendert nativ).
 - **Phase 2 — ERLEDIGT (erweitertes `audio`, `graphics`-Gate):** AUDIO_* (27 —
   Mixer-Lifecycle, Channel-Playback mit Volume/Pan/Pause/Resume/Stop,
   Music-Streaming mit Volume/Position/Queue, Ton-Generierung AUDIO_TONE/
@@ -87,7 +87,7 @@ raylib-Audio hatte eine strukturelle Schwaeche: **Musik-Streaming wurde per
 Frames konnte der Puffer unterlaufen → Knacken.
 
 Das Audio-Backend laeuft daher auf **[Kira](https://crates.io/crates/kira)**
-(cpal) in [`src/audio.rs`](../rust/gb_runtime/src/audio.rs): eigener Audio-
+(cpal) in [`src/audio.rs`](../rust/drachenhauch_runtime/src/audio.rs): eigener Audio-
 Thread, vollstaendig vom Game-Loop entkoppelt (kein Stottern), native Tweens
 fuer Fades/Pan, FFT-Tap als Effect am Main-Track (ersetzt raylibs
 `AttachAudioMixedProcessor`), MOD/XM via reinem Rust-Player (`xmrs`/
@@ -176,7 +176,7 @@ Ersetzt die analytische `LIGHT_ENV`-Näherung durch echte Environment-Maps aus
 einem `.hdr`. Port von raylibs `shaders_basic_pbr` / learnopengl-IBL, rein über
 raylib-rs `ffi`/`rlgl` (wie das Shadow-Mapping). Builtin
 **`LIGHT_ENV_HDR(pfad$ [, intensität])`** (native-only). Pipeline einmalig in
-[`graphics.rs`](../rust/gb_runtime/src/graphics.rs) (`light_env_hdr()`):
+[`graphics.rs`](../rust/drachenhauch_runtime/src/graphics.rs) (`light_env_hdr()`):
 
 1. **`.hdr` laden** — eigener Radiance-RGBE-Dekoder (`load_hdr_rgbe`) → RGBA32F
    2D-Float-Textur via `rlLoadTexture`. (Nötig, weil raylib-sys **ohne**
@@ -198,7 +198,7 @@ Maps liegen als GL-Texturen in `Graphics` (`ibl_irradiance/_prefilter/_brdf`),
 werden in `render_scene` im Draw-Kontext an die Slots 11/12/13 gebunden (Cubemaps
 via `rlEnableTextureCubemap`, BRDF-LUT 2D via `rlEnableTexture`; Material-Maps
 nutzen 0..2, Shadow 10 → kein Clash). Dispatch `"light_env_hdr"` in
-[`vm.rs`](../rust/gb_runtime/src/vm.rs), native-only-Stub in
+[`vm.rs`](../rust/drachenhauch_runtime/src/vm.rs), native-only-Stub in
 [`g3d.py`](../drachenhauch/modules/g3d.py).
 
 **Drei rlgl-Stolpersteine** (für Nachbauten):
@@ -218,7 +218,7 @@ kamerazentriert/unendlich; als erstes im 3D-Pass mit `rlDisableDepthMask` +
 `rlDisableBackfaceCulling`, Modelle zeichnen darüber). Die env-Cubemap wird dafür
 nach der IBL-Generierung aufbewahrt (`ibl_env`). Ohne `LIGHT_ENV_HDR` ein No-Op.
 
-Demo [examples/99_ibl_hdr.gb](../examples/99_ibl_hdr.gb): Reihe Chrom-Metallkugeln
+Demo [examples/99_ibl_hdr.dh](../examples/99_ibl_hdr.dh): Reihe Chrom-Metallkugeln
 (`MODEL_PBR` metalness 1, Roughness-Verlauf) spiegeln das HDRI **vor der als
 Skybox sichtbaren Umgebung**; `FILEEXISTS`-Guard fällt ohne `.hdr` auf
 analytisches `LIGHT_ENV` zurück. **Asset:**
@@ -232,11 +232,11 @@ entfällt (GPU/3D); analytisches `96_ibl` bleibt unverändert.
 Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
 
 ```
-.venv\Scripts\python.exe dhrun.py --native examples\30_shapes.gb
+.venv\Scripts\python.exe dhrun.py --native examples\30_shapes.dh
 ```
 
-Das kompiliert die `.gb`-Datei (Lexer/Parser/Compiler bleiben in Python),
-serialisiert sie in eine **temporäre `.gbc`** und startet `dhrt` im Verzeichnis
+Das kompiliert die `.dh`-Datei (Lexer/Parser/Compiler bleiben in Python),
+serialisiert sie in eine **temporäre `.dhc`** und startet `dhrt` im Verzeichnis
 der Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")`
 stimmen). stdout/stderr und ein etwaiges Grafik-Fenster werden direkt
 durchgereicht; der Exit-Code von `dhrt` wird weitergegeben. Fehlt das Binary,
@@ -248,26 +248,26 @@ Ausführung nativ läuft — kein manuelles `serialize` + `dhrt` mehr.
 **Im Editor:** Der **Run**-Button (F5) ist der einzige Run-Knopf und nutzt
 **primär `dhrt`** (fällt bei nicht gebauter Runtime / Compile- oder Start-Fehler
 automatisch auf den Tree-Walker zurück). Der Editor kompiliert die Datei
-in-process in eine temporäre `.gbc` und startet `dhrt` **direkt** als `QProcess`
+in-process in eine temporäre `.dhc` und startet `dhrt` **direkt** als `QProcess`
 (nicht über `dhrun.py`) — so beendet der `Stop`-Button auch den nativen Prozess
 (kein verwaister dhrt). Output und Laufzeitfehler
-(`datei.gb:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
+(`datei.dh:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
 
 ### Laufzeitfehler mit Zeilennummer
 
 Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** (`stmt.line`
 vom Parser) in ein zu `code` paralleles `lines`-Array (`CompiledFunction.lines`,
-serialisiert als `"lines"` in der `.gbc`). Die Rust-VM merkt sich die Zeile der
+serialisiert als `"lines"` in der `.dhc`). Die Rust-VM merkt sich die Zeile der
 zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei einem propagierenden
 Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `dhrun.py --native`
 reicht den Quell-Dateinamen als 2. Arg an `dhrt` durch, sodass die Meldung lautet:
 
 ```
-Laufzeitfehler in spiel.gb:42: Index 10 ausserhalb [0..2] in Dimension 0
+Laufzeitfehler in spiel.dh:42: Index 10 ausserhalb [0..2] in Dimension 0
 ```
 
 Die Python/Cython-VMs ignorieren `lines` (additives Feld, kein Recompile nötig);
-`dhrt <datei.gbc>` ohne Label nutzt den `.gbc`-Pfad. Zeile `0` (untracked) →
+`dhrt <datei.dhc>` ohne Label nutzt den `.dhc`-Pfad. Zeile `0` (untracked) →
 Meldung ohne Zeilenangabe.
 
 **Compile-Fehler** (vor der Ausführung, in Python) tragen ebenfalls eine Zeile:
@@ -277,7 +277,7 @@ Deklarations-Zeile angereichert (`Compiler._at` + `_stmt`, via
 `[Zeile 4] CompileError: SUB 'foo' bereits deklariert` — im Editor als
 klickbarer Link in die Quelldatei.
 
-## Schritt 1: `.gbc`-Serialisierung
+## Schritt 1: `.dhc`-Serialisierung
 
 [`drachenhauch/serialize.py`](../drachenhauch/serialize.py) wandelt ein vom
 `Compiler` erzeugtes `Module` ([bytecode.py](../drachenhauch/bytecode.py)) in eine
@@ -286,7 +286,7 @@ selbstbeschreibende JSON-Datei. JSON ist für den Spike bewusst gewählt
 
 **CLI:**
 ```
-.venv\Scripts\python.exe -m drachenhauch.serialize [--pretty] <datei.gb> [out.gbc]
+.venv\Scripts\python.exe -m drachenhauch.serialize [--pretty] <datei.dh> [out.dhc]
 ```
 
 > **Wichtig:** `serialize.py` importiert `interpreter.py`, bevor es kompiliert.
@@ -319,13 +319,13 @@ weiß pro Opcode, welche Struktur `arg` hat (Index, Slot, Name, Tupel).
 
 ## Schritt 2: Rust-VM-Kern
 
-Standalone-Crate [`rust/gb_runtime/`](../rust/gb_runtime) (getrennt vom
+Standalone-Crate [`rust/drachenhauch_runtime/`](../rust/drachenhauch_runtime) (getrennt vom
 PyO3-Helper-Crate `rust/gb_native/`). Binary `dhrt`.
 
 ```
-cd rust/gb_runtime
+cd rust/drachenhauch_runtime
 cargo build --release
-target/release/dhrt <datei.gbc>
+target/release/dhrt <datei.dhc>
 ```
 
 **Implementiert:** LOAD_CONST/POP/DUP, Locals (LOAD/STORE/DECLARE), Global-Slots
@@ -380,7 +380,7 @@ verschachtelte normale Calls laufen weiter rekursiv auf dem nativen Stack.
 `CORO_*`-Builtins laufen über `try_coro` (brauchen VM-State); `FOR EACH`/
 Comprehension über eine Coroutine drainen via `__comp_iter`. Verifiziert
 bit-identisch zu allen drei Python-Pfaden inkl. Standalone-`.exe`
-([examples/98_coroutines.gb](../examples/98_coroutines.gb)).
+([examples/98_coroutines.dh](../examples/98_coroutines.dh)).
 
 ### Validierung
 
@@ -423,7 +423,7 @@ Das `wifi`-Feature bleibt vorerst Windows-only (`netsh`-basiert) — auf
 anderen Systemen baut es zwar mit, `WIFI_*`-Builtins scheitern aber zur
 Laufzeit mit einer klaren Fehlermeldung.
 
-### Builtins ([`graphics.rs`](../rust/gb_runtime/src/graphics.rs))
+### Builtins ([`graphics.rs`](../rust/drachenhauch_runtime/src/graphics.rs))
 
 `SCREEN`, `CLS`, `FLIP`, `PLOT`, `LINE`, `BOX` (gefüllt), `RECT` (Umriss),
 `CIRCLE`, `TRIANGLE`/`TRIANGLEOUTLINE`, `ELLIPSE`/`ELLIPSEOUTLINE`, `ARC`,
@@ -461,7 +461,7 @@ mit Python-identischen Werten vorregistriert (`register_default_globals`).
 `dhrt` rendert headless und schreibt einen Screenshot, gesteuert per ENV:
 
 ```
-DHRT_FRAMES=3 DHRT_SCREENSHOT=out.png dhrt programm.gbc
+DHRT_FRAMES=3 DHRT_SCREENSHOT=out.png dhrt programm.dhc
 ```
 
 Nach `DHRT_FRAMES` Frames liefert `QUITREQUESTED()` `true` (Loop endet sauber);
@@ -477,7 +477,7 @@ Bewegung ruckelt. `DHRT_CONTACT` nimmt in festen Abstaenden Bilder auf und
 setzt sie beschriftet als Raster in EINE PNG:
 
 ```
-DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.gb
+DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.dh
 ```
 
 | Variable | Wirkung |
@@ -550,7 +550,7 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
 **Core File-I/O** (kein Modul): `OPENFILE`/`CLOSEFILE`/`READLINE`/`READALL$`/
 `ENDOFFILE`/`WRITELINE`/`WRITE`/`FILEEXISTS` (`Value::File`). Bit-identisch.
 
-- `astar` — A*-Pathfinding (`Value::AStar`, [astar.rs](../rust/gb_runtime/src/astar.rs)
+- `astar` — A*-Pathfinding (`Value::AStar`, [astar.rs](../rust/drachenhauch_runtime/src/astar.rs)
   portiert aus dem PyO3-Helper `gb_native`). `ASTAR_NEW/CLEAR/WIDTH/HEIGHT/SET_WALL/
   SET_PASSABLE/IS_WALL/SET_DIAGONAL/SET_HEURISTIC/SET_DIAGONAL_COST/FIND/PATH_LEN/
   PATH_X/PATH_Y/PATH_COST/CLEAR_PATH`. Bit-identisch inkl. counter-FIFO-Tie-Break.
@@ -565,7 +565,7 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   raylib-`Image` (CPU-Pixel) transformiert + `LoadTextureFromImage`. Texturen
   werden als `Tex { tex, img }` (GPU+CPU) gehalten.
 
-- `ecs` — Entity-Component-System ([ecs.rs](../rust/gb_runtime/src/ecs.rs),
+- `ecs` — Entity-Component-System ([ecs.rs](../rust/drachenhauch_runtime/src/ecs.rs),
   Sparse-Set). `ECS_NEW_WORLD/NEW_ENTITY/DESTROY/ALIVE/COUNT`, `ADD_INT/FLOAT/
   STRING/BOOL/OBJ`, `HAS/REMOVE/GET*/GET_OR_*`, `QUERY/QUERY2/QUERY3` (sortierte
   Intersection), Bulk-Ops `INTEGRATE_FLOAT/INT/SCALE_FLOAT/FILL_*/CLAMP_FLOAT/
@@ -587,16 +587,16 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   (Rueckgabe = geklickte Zeile) + `UI_TABLE_SELECTED`/`SET_SELECTED`/
   `HEADER_CLICK` (Sortier-Hook). State per id in `UiState.tables`; nutzt den
   neuen Clip-Stack + Mausrad. Verifiziert per Screenshot
-  ([examples/43_ui_table.gb](../examples/43_ui_table.gb), Zell-Farben +
+  ([examples/43_ui_table.dh](../examples/43_ui_table.dh), Zell-Farben +
   beide Scrollbars).
 
-**`gui` (Retained-Mode)** — Kern portiert ([gui.rs](../rust/gb_runtime/src/gui.rs)):
+**`gui` (Retained-Mode)** — Kern portiert ([gui.rs](../rust/drachenhauch_runtime/src/gui.rs)):
 Window + Button/Label/Checkbox/Slider/TextInput/Panel, Drag/Z-Order/Fokus/Close,
 programmierbares Theme (`GUI_THEME_SET/GET/PRESET`, `GUI_METRIC_SET/GET`,
 `GUI_SET_COLOR`), Polling (`GUI_CLICKED/CHECKED/VALUE/TEXT`, Setter). Handles =
 INTEGER (Window = Index, Widget = `(win<<20)|idx`); Z-Order über separate
 `z_order`-Liste, damit Handles stabil bleiben. Render per Screenshot verifiziert
-(`examples/45_gui.gb`); Interaktion ist ein 1:1-Port der (getesteten) Python-
+(`examples/45_gui.dh`); Interaktion ist ein 1:1-Port der (getesteten) Python-
 Logik — headless nicht klickbar testbar. **FUNCREF-Callbacks**
 (`GUI_ON_CLICK`/`GUI_ON_CHANGE`) feuern: `update()` sammelt ausgeloeste Handler
 in `pending`, die VM leert die Queue nach `GUI_UPDATE` und ruft sie (parameter-
@@ -609,7 +609,7 @@ Events landen nächsten Frame.
 `GUI_ON_CHANGE` bei Selektionswechsel. Layout aus einer Quelle (`table_geom`).
 Dafür hat die Grafik neu: **Mausrad** (`pop_mouse_wheel`) und einen
 **Clip-Stack** (`push_clip`/`pop_clip` → raylib-Scissor mit Verschnitt). Render
-per Screenshot verifiziert ([examples/84_gui_table.gb](../examples/84_gui_table.gb));
+per Screenshot verifiziert ([examples/84_gui_table.dh](../examples/84_gui_table.dh));
 Rust-Unit-Tests decken Callback-Queueing, Tabellen-Layout (`table_geom`) und
 Press→Selektion ab (`build_runtime.py --test`). *Noch offen:* der Immediate-
 Mode-`UI_TABLE` (separates Modul `ui`).
@@ -652,7 +652,7 @@ bit-identischen Garantie — wie `RND`/`MILLIS`/`tween` nur funktional.
 *Grenze:* `loops` wird nativ (noch) nicht ausgewertet — SFX spielen einmal,
 Musik loopt immer. Lifetime-Trick: das `RaylibAudio`-Gerät wird per `Box::leak`
 zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
-(kein self-referential struct). Demo: [examples/83_audio.gb](../examples/83_audio.gb).
+(kein self-referential struct). Demo: [examples/83_audio.dh](../examples/83_audio.dh).
 
 ## Schritt 6: 3D-Grafik (Modul `g3d`)
 
@@ -690,7 +690,7 @@ also immer über der Szene. Koordinaten sind Welt-Einheiten (kein Screen-Scale),
 Farben `&HRRGGBB`. `cmds3d` wird pro Frame geleert; ohne `CAMERA3D` gilt ein
 Default-Blick (schräg von vorn-oben auf den Ursprung).
 
-Demo: [examples/82_3d_intro.gb](../examples/82_3d_intro.gb) (Würfel, Kugel,
+Demo: [examples/82_3d_intro.dh](../examples/82_3d_intro.dh) (Würfel, Kugel,
 Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
 
 ### 3D-Modelle (geladen + prozedural)
@@ -714,7 +714,7 @@ werden.
 - `MODEL_TEXTURE(m, bild)` — ein via `LOADIMAGE` geladenes Bild als
   Diffuse-/Albedo-Map (`MATERIAL_MAP_ALBEDO`) auf das Modell legen.
 
-**Umsetzung** ([graphics.rs](../rust/gb_runtime/src/graphics.rs)): `models:
+**Umsetzung** ([graphics.rs](../rust/drachenhauch_runtime/src/graphics.rs)): `models:
 Vec<Model>` lebt über die ganze Laufzeit (Handles bleiben gültig). Die Draw-
 Builtins emittieren `Cmd3D::Model`/`ModelEx`/`ModelWires` mit dem Model-**Index**
 (nicht dem Model selbst → `Cmd3D` bleibt `Clone`); der 3D-Pass in `render_scene`
@@ -722,14 +722,14 @@ Builtins emittieren `Cmd3D::Model`/`ModelEx`/`ModelWires` mit dem Model-**Index*
 GenMesh-Meshes werden mit `make_weak()` an `load_model_from_mesh` übergeben (kein
 Doppel-Drop). Handle-Validierung in den Wrappern (`check_model`).
 
-Demo [examples/88_3d_models.gb](../examples/88_3d_models.gb): rotierender Torus,
+Demo [examples/88_3d_models.dh](../examples/88_3d_models.dh): rotierender Torus,
 Knoten (Wireframe) und pulsierende Kugel auf einer Ebene, umkreisende Kamera +
 2D-HUD — rein prozedural, **kein Modell-Asset im Repo nötig**. Per Screenshot
 verifiziert (inkl. `MODEL_TEXTURE` mit `assets/coin.png` auf einem Würfel).
 
 `MESH_HEIGHTMAP` baut aus dem CPU-`Image` (`self.textures[i].img`, bereits für
 imgfx gehalten) via `GenMeshHeightmap` ein Terrain-Mesh. Demo
-[examples/89_heightmap.gb](../examples/89_heightmap.gb): texturiertes, von einer
+[examples/89_heightmap.dh](../examples/89_heightmap.dh): texturiertes, von einer
 Kamera umkreistes Terrain mit Drahtgitter-Overlay (`examples/assets/heightmap.png`,
 ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
 
@@ -765,7 +765,7 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
   Nächstes Objekt = kleinste nicht-negative Distanz. TRI/QUAD treffen die
   **tatsächliche Fläche** statt eines Hüllkörpers: Bodenkacheln, Wandstücke,
   frei im Raum schwebende Panels (Demo
-  [examples/151_picking_flaechen.gb](../examples/151_picking_flaechen.gb)).
+  [examples/151_picking_flaechen.dh](../examples/151_picking_flaechen.dh)).
 - **Projektion in beide Richtungen** (durch die aktuelle 3D-Kamera):
   `WORLD_TO_SCREEN_X(wx,wy,wz)` / `WORLD_TO_SCREEN_Y(wx,wy,wz)` projizieren einen
   3D-Weltpunkt auf Bildschirm-Pixel (z.B. ein 2D-Label über ein 3D-Objekt
@@ -810,7 +810,7 @@ END IF
 `RAY_HIT_*` ist reine Geometrie und deterministisch (verifiziert: Kugel/Box bei
 `(5,0,0)` entlang +X → Distanz `4.0`, senkrechter Strahl → `-1.0`). `PICK_*`
 hängt am Maus-/Fensterzustand (headless: Maus `(0,0)` → alles `-1`). Demo
-[examples/90_billboards_picking.gb](../examples/90_billboards_picking.gb):
+[examples/90_billboards_picking.dh](../examples/90_billboards_picking.dh):
 Coin-Billboards + per Maus selektierbarer Würfel/Kugel. Per Screenshot verifiziert.
 
 ### Kamera-Modi (`UpdateCamera`)
@@ -846,7 +846,7 @@ Geometrie, Fresnel-Schlick) mit Reinhard-Tonemapping + Gamma; analytische Lichte
   Albedo-Farbe an); `roughness` 0 = spiegelnd, 1 = matt. Pro Modell gespeichert
   (`pbr_params`-Map, Default 0 / 0.6) und in `render_scene` als Uniform vor jedem
   Modell-Draw gesetzt — zusammen mit `useNormalMap`. Albedo = `colDiffuse`
-  (MODEL-Tint) × `texture0`. Demo [examples/95_pbr.gb](../examples/95_pbr.gb):
+  (MODEL-Tint) × `texture0`. Demo [examples/95_pbr.dh](../examples/95_pbr.dh):
   Kugel-Gitter Metalness × Roughness (per Screenshot verifiziert).
 - `LIGHT_ENV(himmel, boden, intensität)` — **analytisches Image-Based-Lighting**
   (`intensität` 0 = aus). Die Umgebung ist ein vertikaler Farbgradient
@@ -856,12 +856,12 @@ Geometrie, Fresnel-Schlick) mit Reinhard-Tonemapping + Gamma; analytische Lichte
   roughness-Fresnel. **Kein HDR-Asset, keine Cubemap-Passes** — eine reine
   Shader-Erweiterung. Erst damit wirken Metalle (`metalness` 1) wirklich
   metallisch (sie reflektieren die Umgebung statt dunkel zu bleiben). Demo
-  [examples/96_ibl.gb](../examples/96_ibl.gb): Metall- vs. Dielektrikum-Reihe.
+  [examples/96_ibl.dh](../examples/96_ibl.dh): Metall- vs. Dielektrikum-Reihe.
 - `LIGHT_FOG(farbe, dichte)` — exponentieller Tiefen-Fog für die beleuchteten
   Modelle (`dichte 0` = aus). Ferne Objekte verblassen zur Fog-Farbe; im
   Fragment-Shader `mix(fogColor, finalColor, 1/exp((dist·dichte)²))`. Tipp:
   `CLS(fogColor)` für einen nahtlosen Horizont. Per Screenshot verifiziert
-  (Säulenreihe verschwindet im Dunst, [examples/92_fog.gb](../examples/92_fog.gb)).
+  (Säulenreihe verschwindet im Dunst, [examples/92_fog.dh](../examples/92_fog.dh)).
   *Grenze:* wirkt nur auf `MODEL_LIT`-Modelle (nutzen den Lighting-Shader),
   nicht auf Immediate-Primitive/Grid.
 
@@ -869,7 +869,7 @@ Geometrie, Fresnel-Schlick) mit Reinhard-Tonemapping + Gamma; analytische Lichte
 Position), `ambient` und alle `lights[i].*`-Uniforms werden auf den Shader
 geschrieben. raylib bindet `matModel`/`matNormal`/`mvp` automatisch über die
 Standard-Uniform-Namen; nur `matModel` setzen wir explizit in die `locs`. Demo
-[examples/91_lighting.gb](../examples/91_lighting.gb): Sonne + bewegtes Punktlicht
+[examples/91_lighting.dh](../examples/91_lighting.dh): Sonne + bewegtes Punktlicht
 auf Kugel/Würfel/Torus, orbitale Kamera. Per Screenshot verifiziert (Diffus +
 Specular-Highlights + Lichtkegel des Punktlichts am Boden).
 
@@ -903,7 +903,7 @@ bestehende Lighting-Demos unverändert.
 
 *Caster/Receiver:* `MODEL_LIT`-Modelle (Immediate-Primitive/Grid werfen keine
 Schatten). Ein schattenwerfendes directional Light. Demo
-[examples/93_shadows.gb](../examples/93_shadows.gb): schwebende Kugel/Würfel/Torus
+[examples/93_shadows.dh](../examples/93_shadows.dh): schwebende Kugel/Würfel/Torus
 werfen weiche Schatten auf den Boden (per Screenshot verifiziert).
 
 ### Normal-Mapping
@@ -922,7 +922,7 @@ Shader:
 Normale pro Pixel. Ein `useNormalMap`-Uniform (Default 0) gated das — pro Modell
 in `render_scene` gesetzt (1 nur für Modelle in `normal_mapped`). So bleiben lit
 Modelle ohne Normal-Map **pixelgenau** wie zuvor (keine Abhängigkeit von einer
-Default-Textur). Demo [examples/94_normalmap.gb](../examples/94_normalmap.gb):
+Default-Textur). Demo [examples/94_normalmap.dh](../examples/94_normalmap.dh):
 Platte + Kugel links mit, rechts ohne Normal-Map unter kreisendem Punktlicht —
 links wandern die Wellen-Bumps, rechts bleibt es glatt (per Screenshot
 verifiziert; Normal-Map `examples/assets/normal_waves.png` prozedural generiert).
@@ -952,7 +952,7 @@ identisch auf den Screen *oder* in die RenderTexture — `RaylibDrawHandle` und
 Auf dem Tree-Walker (konsolen-only) werfen die Shader-Builtins "nur in der
 nativen Runtime (dhrt)". Beispiel-Shader (GLSL 330):
 [examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
-`vignette.fs`), Demo [examples/86_postfx_shaders.gb](../examples/86_postfx_shaders.gb)
+`vignette.fs`), Demo [examples/86_postfx_shaders.dh](../examples/86_postfx_shaders.dh)
 (zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
 
 ## TTF-Fonts (`LOADFONT` / `SETFONT` / `TEXT_SPACING`)
@@ -973,7 +973,7 @@ einmal geladene Glyph-Textur). `TEXT_WIDTH` misst in der **aktiven** Schrift
 TTF. `TEXT_BOLD`/`TEXT_ITALIC` sind nativ No-Op (raylib hat keine synthetische
 Variante — dafür eine fette/kursive Font-Datei laden).
 
-**Native Umsetzung** ([graphics.rs](../rust/gb_runtime/src/graphics.rs)): `fonts:
+**Native Umsetzung** ([graphics.rs](../rust/drachenhauch_runtime/src/graphics.rs)): `fonts:
 Vec<Font>` (raylib `load_font_ex`), `active_font` (-1 = Default), `text_spacing`.
 `Cmd::Text` trägt jetzt Font-Index + Spacing; beim Replay zeichnet ein gültiger
 Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. Der Tree-Walker
@@ -981,14 +981,14 @@ Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. Der Tree-Wal
 
 **Bit-Identität gilt nicht** (Renderer/Font-Metriken unterscheiden sich) — wie
 bei der übrigen Grafik nur funktional. Es liegt **kein Font-Asset im Repo**;
-Demo [examples/87_ttf_fonts.gb](../examples/87_ttf_fonts.gb) sucht einen
+Demo [examples/87_ttf_fonts.dh](../examples/87_ttf_fonts.dh) sucht einen
 System-Font (`FILEEXISTS`) und fällt sonst auf den Default-Font zurück. Per
 Screenshot verifiziert (Größen-Skalierung, Spacing, zentrierter Text via
 `TEXT_WIDTH`).
 
 ## Showcase-Demos
 
-[examples/97_pbr_reactor.gb](../examples/97_pbr_reactor.gb) — **„PBR REACTOR"**,
+[examples/97_pbr_reactor.dh](../examples/97_pbr_reactor.dh) — **„PBR REACTOR"**,
 das Fullscreen-Schaustück der **neuen** Grafik-Pipeline: chrom­glänzende
 **PBR**-Kugeln (eine pro FFT-Band, geglättet = sanftes „Atmen") um einen
 rotierenden Chrom-Knoten auf einem spiegelnden Metallboden, mit **Szenenwechsel
@@ -999,9 +999,9 @@ Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
 (`AUDIO_FFT`) zu einem Stereo-Techno-Track. `SET_FULLSCREEN(TRUE)`, Kamera kreist
 mit Bass-Punch. Musik: „Technological Messup" von **josepharaoh99**, **CC0** —
 einmalig holen mit `py examples/assets/download_techno.py` (läuft auch ohne, stumm
-via `FILEEXISTS`-Guard). Nur nativ: `dhrun.py --native examples\97_pbr_reactor.gb`.
+via `FILEEXISTS`-Guard). Nur nativ: `dhrun.py --native examples\97_pbr_reactor.dh`.
 
-[examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in
+[examples/85_cybermatic_demo.dh](../examples/85_cybermatic_demo.dh) bündelt in
 einem 1280×720-Frame, was die native Runtime kann — **audio-reaktiv** (echte
 FFT der laufenden Musik via `AUDIO_FFT`) und mit **Szenen-Wechsel alle 16
 Takte**: `TUNNEL` (zufliegende Wireframe-Ringe) → `RING` (Doppelring + Bass-
@@ -1009,7 +1009,7 @@ Kugel + Säule, Kamera-Punch/Shake) → `PLASMA` (audio-reaktives Würfel-Terrai
 Dazu durchgehend ein 2D-Overlay: FFT-Spektrum (`BOXES`-Bulk, oben+unten),
 Glow-Funken + Cyber-Regen (zwei Partikelsysteme), pulsierender Titel,
 Laufschrift, dezenter Beat-Flash. Nur nativ:
-`dhrun.py --native examples\85_cybermatic_demo.gb` (oder F6).
+`dhrun.py --native examples\85_cybermatic_demo.dh` (oder F6).
 
 Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
 CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
@@ -1021,19 +1021,19 @@ via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.
 Ein GameBasic-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
 Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
 
-**Prinzip (kein Recompile):** Der kompilierte Bytecode (`.gbc`) wird an eine
+**Prinzip (kein Recompile):** Der kompilierte Bytecode (`.dhc`) wird an eine
 Kopie von `dhrt.exe` **angehängt**. `dhrt` erkennt beim Start den Payload und
 führt ihn aus. Das Anhängen von Daten ans Ende einer PE-`.exe` bricht sie nicht
 (gleiches Prinzip wie PyInstaller-onefile) — der PE-Loader ignoriert Trailing-
 Bytes. Layout der **letzten 16 Bytes** der gebundelten Exe:
 
 ```
-[u64 Länge der .gbc-Bytes, little-endian][8 Byte Magic "DHRTPAY1"]
+[u64 Länge der .dhc-Bytes, little-endian][8 Byte Magic "DHRTPAY1"]
 ```
 
-Die `.gbc`-Bytes liegen direkt vor diesem Footer.
+Die `.dhc`-Bytes liegen direkt vor diesem Footer.
 
-**Runtime-Seite** ([main.rs](../rust/gb_runtime/src/main.rs)): `embedded_gbc()`
+**Runtime-Seite** ([main.rs](../rust/drachenhauch_runtime/src/main.rs)): `embedded_gbc()`
 liest die eigene Exe (`current_exe()`), sucht den Magic-Footer **rückwärts** und
 extrahiert den Bytecode.
 
@@ -1054,24 +1054,24 @@ extrahiert den Bytecode.
 > fremden Rechnern. Wer seine Spiele signiert ausliefern will, braucht ein
 > eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `dhrt` ins Exe-Verzeichnis
 (damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den
-eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.gbc`).
+eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.dhc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.
 
 **Export-Seite** ([drachenhauch/export.py](../drachenhauch/export.py)):
-`export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.gbc`,
+`export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.dhc`,
 hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
 Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
 `LOADIMAGE("assets/…")` & Co.).
 
 **Aufruf:**
 ```
-.venv\Scripts\python.exe dhrun.py --export examples\89_heightmap.gb [ausgabe-ordner]
+.venv\Scripts\python.exe dhrun.py --export examples\89_heightmap.dh [ausgabe-ordner]
 ```
 Default-Ausgabe: `<quelle>_dist/`. Im **Editor**: Menü *Ausführen → Export →
 standalone .exe* bzw. **Ctrl+F6** (Toolbar-Button neben Run/Bench) — bündelt die
 aktive Datei und öffnet den Ausgabeordner.
 
-Verifiziert: `89_heightmap.gb` exportiert (~3.7 MB Exe), die Exe **ohne
+Verifiziert: `89_heightmap.dh` exportiert (~3.7 MB Exe), die Exe **ohne
 Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte
 `assets/heightmap.png` und rendert das Terrain (Screenshot). Dev-Modus
 (`--native`, Konsolen-Programme bit-identisch) bleibt unverändert.
@@ -1089,6 +1089,6 @@ existiert) ändert sich nichts. Absolute Pfade werden nicht gebündelt.
 
 **Grenzen:** Nur String-**Literale** werden erkannt (zur Laufzeit
 zusammengesetzte Pfade nicht — dann Assets manuell in den Ausgabeordner kopieren).
-Die `.gbc` ist unkomprimiert eingebettet (JSON); die Exe-Größe entspricht
+Die `.dhc` ist unkomprimiert eingebettet (JSON); die Exe-Größe entspricht
 `dhrt` + Bytecode. Cross-Compiling ist nicht vorgesehen — der Export bündelt das
 `dhrt` der aktuellen Plattform.

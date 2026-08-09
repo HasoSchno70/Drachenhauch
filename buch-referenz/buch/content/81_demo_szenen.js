@@ -162,5 +162,5 @@ module.exports = (H) => [
 
   H.h2("Zum Schluss"),
   H.p("Eine Demo ist die ehrlichste Prüfung für eine Laufzeit: Sie lässt sich nicht durch ein hübsches Standbild bestehen. Alles muss gleichzeitig laufen, ineinandergreifen und auf die Musik hören. Wenn du dieses Kapitel durchgearbeitet hast, kennst du nicht nur die Befehle – du weißt, wie man sie zu etwas zusammensetzt, das mehr ist als die Summe seiner Teile."),
-  H.tip("Nimm sie auseinander", "Der Quelltext der Demo liegt vollständig bei (gbdemo/gbdemo.gb) und ist durchkommentiert – gerade an den Stellen, an denen beim Bauen etwas schiefging. Ändere die Szenengrenzen, tausche das Musikstück, häng eine neunte Szene an. Genau so hat die Demoszene immer funktioniert."),
+  H.tip("Nimm sie auseinander", "Der Quelltext der Demo liegt vollständig bei (gbdemo/gbdemo.dh) und ist durchkommentiert – gerade an den Stellen, an denen beim Bauen etwas schiefging. Ändere die Szenengrenzen, tausche das Musikstück, häng eine neunte Szene an. Genau so hat die Demoszene immer funktioniert."),
 ];

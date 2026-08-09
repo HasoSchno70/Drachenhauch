@@ -179,5 +179,5 @@ Voraussetzung: `numpy` (wird über `pip install numpy` geholt).
 
 ## Komplettes Beispiel
 
-- [examples/140_particles.gb](../examples/140_particles.gb) — Konsolen-Logik-Test mit `RANDOMIZE(42)`
-- [examples/28_particles_visual.gb](../examples/28_particles_visual.gb) — interaktiv, Funken folgen der Maus
+- [examples/140_particles.dh](../examples/140_particles.dh) — Konsolen-Logik-Test mit `RANDOMIZE(42)`
+- [examples/28_particles_visual.dh](../examples/28_particles_visual.dh) — interaktiv, Funken folgen der Maus

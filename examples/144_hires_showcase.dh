@@ -1,0 +1,368 @@
+' ============================================================================
+'  GameBasic HiRes Showcase  --  1600x900, NATIV (scale = 1, kein Stretching)
+' ============================================================================
+'
+'  Zeigt, dass GameBasic eine hohe Aufloesung mit viel bewegter Grafik
+'  fluessig treibt -- ganz ohne GPU-Shader, nur mit den eingebauten
+'  Zeichenbefehlen (die intern in C/SDL laufen) und dem NumPy-vektorisierten
+'  Partikelsystem.
+'
+'  WICHTIG zur Aufloesung:
+'    SCREEN(1600, 900)            <- scale-Parameter weggelassen => scale = 1
+'    => jeder logische Pixel == ein echter Bildschirm-Pixel, KEIN Hochskalieren.
+'    (Die Retro-Demos nutzen z.B. SCREEN(320,200,...,3) und strecken 3-fach.)
+'
+'  Effekte:
+'    - flutender Vollbild-Gradient (Kupfer/Plasma, sinusgetrieben)
+'    - 3D-Starfield mit Perspektive (Bulk-Plot via PLOTS: 1 Aufruf statt N)
+'    - rotierender 3D-Wireframe-Wuerfel mit Glow
+'    - Ring aus umlaufenden Glow-Bobs (3D-projiziert)
+'    - sweepende Partikel-Fontaene (Glow-Modus, additiv, mit Farbverlauf)
+'    - pulsierendes Logo + Sinus-Scroller
+'    - Live-FPS-Anzeige (Beweis fuer die Performance)
+'
+'  Steuerung:  ESC = Ende
+'
+'  Performance: laeuft mit dem Tree-Walker (Editor "Run") fluessig bei
+'  ~40 FPS in 1600x900. Fuer maximale FPS die native Cython-VM nutzen:
+'      .venv\Scripts\python.exe dhrun.py --vm examples\144_hires_showcase.dh
+'  Die Live-FPS-Anzeige oben links zeigt den realen Wert auf deinem Rechner.
+' ============================================================================
+
+IMPORT "particles"
+
+CONST W AS INTEGER = 1600
+CONST H AS INTEGER = 900
+CONST CX AS INTEGER = 800
+CONST CY AS INTEGER = 450
+
+SCREEN(W, H, "GameBasic HiRes Showcase - 1600x900 nativ")
+RANDOMIZE(1337)
+
+' --- Hintergrund-Gradient: horizontale Baender (volle Breite) --------------
+CONST BAND_H AS INTEGER = 10
+CONST N_BANDS AS INTEGER = 90           ' 90 * 10 = 900 = H
+
+' --- 3D-Starfield ----------------------------------------------------------
+CONST N_STARS AS INTEGER = 200
+CONST STAR_DEPTH AS FLOAT = 900.0
+DIM star_x[N_STARS] AS FLOAT
+DIM star_y[N_STARS] AS FLOAT
+DIM star_z[N_STARS] AS FLOAT
+' Projizierte Koordinaten + Farbe -- gesammelt und per PLOTS in EINEM
+' Aufruf gezeichnet (statt N x PLOT).
+DIM star_px[N_STARS] AS INTEGER
+DIM star_py[N_STARS] AS INTEGER
+DIM star_col[N_STARS] AS INTEGER
+
+DIM i AS INTEGER
+FOR i = 0 TO N_STARS - 1
+    star_x[i] = RND() * 1600.0 - 800.0
+    star_y[i] = RND() * 900.0 - 450.0
+    star_z[i] = 1.0 + RND() * STAR_DEPTH
+NEXT
+
+' --- 3D-Wuerfel: 8 Ecken, 12 Kanten ----------------------------------------
+DIM cube_x[8] AS FLOAT
+DIM cube_y[8] AS FLOAT
+DIM cube_z[8] AS FLOAT
+DIM sx[8] AS INTEGER      ' projizierte Bildschirm-Koordinaten
+DIM sy[8] AS INTEGER
+
+' Ecken-Koordinaten (+/-1)
+DIM ci AS INTEGER
+ci = 0
+DIM ex AS INTEGER
+DIM ey AS INTEGER
+DIM ez AS INTEGER
+FOR ex = 0 TO 1
+    FOR ey = 0 TO 1
+        FOR ez = 0 TO 1
+            cube_x[ci] = ex * 2.0 - 1.0
+            cube_y[ci] = ey * 2.0 - 1.0
+            cube_z[ci] = ez * 2.0 - 1.0
+            ci = ci + 1
+        NEXT
+    NEXT
+NEXT
+
+' Kanten als zwei Index-Arrays (12 Kanten)
+DIM edge_a[12] AS INTEGER
+DIM edge_b[12] AS INTEGER
+edge_a[0] = 0 : edge_b[0] = 1
+edge_a[1] = 0 : edge_b[1] = 2
+edge_a[2] = 0 : edge_b[2] = 4
+edge_a[3] = 1 : edge_b[3] = 3
+edge_a[4] = 1 : edge_b[4] = 5
+edge_a[5] = 2 : edge_b[5] = 3
+edge_a[6] = 2 : edge_b[6] = 6
+edge_a[7] = 3 : edge_b[7] = 7
+edge_a[8] = 4 : edge_b[8] = 5
+edge_a[9] = 4 : edge_b[9] = 6
+edge_a[10] = 5 : edge_b[10] = 7
+edge_a[11] = 6 : edge_b[11] = 7
+
+' --- Glow-Bobs (umlaufender 3D-Ring) ---------------------------------------
+CONST N_BOBS AS INTEGER = 26
+
+' --- Partikel-Fontaene -----------------------------------------------------
+DIM ps AS PARTICLE_SYSTEM
+ps = PARTICLE_SYSTEM_NEW(CX, H - 20)
+PARTICLE_SET_VELOCITY(ps, -90.0, 90.0, -380.0, -240.0)   ' kraeftig nach oben
+PARTICLE_SET_GRAVITY(ps, 0.0, 320.0)                     ' faellt zurueck
+PARTICLE_SET_LIFETIME(ps, 900, 1700)
+PARTICLE_SET_SIZE(ps, 3, 7)
+PARTICLE_SET_FADE(ps, TRUE)
+PARTICLE_SET_MODE(ps, "glow")              ' additive Leucht-Blobs statt flacher Kreise
+PARTICLE_SET_COLOR_END(ps, &H200840)       ' verglimmt ins dunkle Violett
+
+' --- Scroller --------------------------------------------------------------
+DIM scroll_msg AS STRING
+scroll_msg = "            GAMEBASIC HIRES SHOWCASE   ---   1600x900 PIXEL, NATIV GERENDERT (SCALE = 1, KEIN STRETCHING)   ---   STARFIELD + 3D-WUERFEL + GLOW-BOBS + TAUSENDE PARTIKEL, ALLES IN REINEM GAMEBASIC   ---   DIE ZEICHENBEFEHLE LAUFEN INTERN IN C/SDL, PARTIKEL SIND NUMPY-VEKTORISIERT   ---   ESC ZUM BEENDEN            "
+CONST SCROLL_ADV AS INTEGER = 19      ' fester Zeichen-Vorschub (30pt bold)
+DIM scroll_x AS FLOAT
+scroll_x = W * 1.0
+
+' --- State -----------------------------------------------------------------
+DIM t AS FLOAT
+t = 0.0
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+DIM fps AS FLOAT
+fps = 60.0
+DIM frame AS INTEGER
+frame = 0
+
+' --- Helfer: Regenbogen-RGB aus Phase -------------------------------------
+FUNCTION rainbow(p AS FLOAT) AS TUPLE
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT(140.0 + SIN(p)         * 115.0)
+    g = INT(140.0 + SIN(p + 2.094) * 115.0)
+    b = INT(140.0 + SIN(p + 4.189) * 115.0)
+    RETURN (CLAMP(r, 0, 255), CLAMP(g, 0, 255), CLAMP(b, 0, 255))
+END FUNCTION
+
+' === Hauptschleife =========================================================
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    ' --- Timing ---
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+    IF dt < 1 THEN dt = 1
+    IF dt > 100 THEN dt = 100
+    t = t + dt * 0.001
+    fps = fps * 0.92 + (1000.0 / dt) * 0.08
+
+    ' --- 1) Flutender Vollbild-Gradient ---------------------------------
+    DIM bnd AS INTEGER
+    FOR bnd = 0 TO N_BANDS - 1
+        DIM yb AS INTEGER
+        yb = bnd * BAND_H
+        DIM ph AS FLOAT
+        ph = bnd * 0.05 + t * 0.8
+        DIM gr AS INTEGER
+        DIM gg AS INTEGER
+        DIM gb AS INTEGER
+        gr = INT(18.0 + SIN(ph)         * 18.0)
+        gg = INT(22.0 + SIN(ph * 0.7 + 1.5) * 22.0)
+        gb = INT(40.0 + SIN(ph * 0.5 + 3.0) * 38.0)
+        BOX(0, yb, W - 1, yb + BAND_H - 1, RGB(CLAMP(gr,0,255), CLAMP(gg,0,255), CLAMP(gb,0,255)))
+    NEXT
+
+    ' --- 2) 3D-Starfield (Bulk-Plot: alle Sterne in EINEM PLOTS-Aufruf) --
+    DIM sb AS INTEGER
+    FOR i = 0 TO N_STARS - 1
+        star_z[i] = star_z[i] - dt * 0.35
+        IF star_z[i] < 1.0 THEN
+            star_x[i] = RND() * 1600.0 - 800.0
+            star_y[i] = RND() * 900.0 - 450.0
+            star_z[i] = STAR_DEPTH
+        END IF
+        star_px[i] = INT(CX + star_x[i] * 600.0 / star_z[i])
+        star_py[i] = INT(CY + star_y[i] * 600.0 / star_z[i])
+        sb = INT(255.0 * (1.0 - star_z[i] / STAR_DEPTH))
+        sb = CLAMP(sb, 40, 255)
+        star_col[i] = RGB(sb, sb, MIN(255, sb + 30))
+    NEXT
+    PLOTS(star_px, star_py, star_col)     ' Out-of-Bounds wird automatisch maskiert
+
+    ' --- 3) Umlaufender Ring aus Glow-Bobs (3D) -------------------------
+    DIM bi AS INTEGER
+    FOR bi = 0 TO N_BOBS - 1
+        DIM ang AS FLOAT
+        ang = (bi / (N_BOBS * 1.0)) * 6.2832 + t * 0.6
+        DIM rx AS FLOAT
+        DIM rz AS FLOAT
+        rx = COS(ang) * 360.0
+        rz = SIN(ang) * 360.0 + 500.0
+        DIM ry AS FLOAT
+        ry = SIN(ang * 3.0 + t) * 90.0
+        DIM bproj AS FLOAT
+        bproj = 600.0 / rz
+        DIM bx AS INTEGER
+        DIM by AS INTEGER
+        bx = INT(CX + rx * bproj)
+        by = INT(CY + ry * bproj)
+        DIM bsz AS INTEGER
+        bsz = INT(10.0 * bproj) + 2
+        DIM br AS INTEGER
+        DIM bg AS INTEGER
+        DIM bb AS INTEGER
+        (br, bg, bb) = rainbow(ang * 1.5 + t * 2.0)
+        CIRCLE(bx, by, bsz, RGB(br \ 3, bg \ 3, bb \ 3))
+        CIRCLE(bx, by, bsz \ 2, RGB(br, bg, bb))
+        CIRCLE(bx, by, 2, RGB(MIN(255, br + 90), MIN(255, bg + 90), MIN(255, bb + 90)))
+    NEXT
+
+    ' --- 4) Rotierender 3D-Wuerfel mit Glow -----------------------------
+    DIM ax AS FLOAT
+    DIM ay AS FLOAT
+    ax = t * 0.7
+    ay = t * 0.9
+    DIM sa_x AS FLOAT
+    DIM ca_x AS FLOAT
+    DIM sa_y AS FLOAT
+    DIM ca_y AS FLOAT
+    sa_x = SIN(ax) : ca_x = COS(ax)
+    sa_y = SIN(ay) : ca_y = COS(ay)
+    DIM v AS INTEGER
+    FOR v = 0 TO 7
+        DIM x0 AS FLOAT
+        DIM y0 AS FLOAT
+        DIM z0 AS FLOAT
+        x0 = cube_x[v] * 200.0
+        y0 = cube_y[v] * 200.0
+        z0 = cube_z[v] * 200.0
+        ' Rotation um Y
+        DIM x1 AS FLOAT
+        DIM z1 AS FLOAT
+        x1 = x0 * ca_y - z0 * sa_y
+        z1 = x0 * sa_y + z0 * ca_y
+        ' Rotation um X
+        DIM y2 AS FLOAT
+        DIM z2 AS FLOAT
+        y2 = y0 * ca_x - z1 * sa_x
+        z2 = y0 * sa_x + z1 * ca_x
+        ' Perspektive
+        DIM cproj AS FLOAT
+        cproj = 700.0 / (z2 + 900.0)
+        sx[v] = INT(CX + x1 * cproj)
+        sy[v] = INT(CY + y2 * cproj)
+    NEXT
+    ' Kanten zeichnen -- Glow (dunkel versetzt) + heller Kern
+    DIM eg AS INTEGER
+    DIM ckr AS INTEGER
+    DIM ckg AS INTEGER
+    DIM ckb AS INTEGER
+    (ckr, ckg, ckb) = rainbow(t * 1.3)
+    FOR eg = 0 TO 11
+        DIM a AS INTEGER
+        DIM bb2 AS INTEGER
+        a = edge_a[eg]
+        bb2 = edge_b[eg]
+        LINE(sx[a] + 1, sy[a] + 1, sx[bb2] + 1, sy[bb2] + 1, RGB(ckr \ 3, ckg \ 3, ckb \ 3))
+        LINE(sx[a] - 1, sy[a] - 1, sx[bb2] - 1, sy[bb2] - 1, RGB(ckr \ 3, ckg \ 3, ckb \ 3))
+        LINE(sx[a], sy[a], sx[bb2], sy[bb2], RGB(ckr, ckg, ckb))
+    NEXT
+    ' Ecken als helle Punkte
+    FOR v = 0 TO 7
+        CIRCLE(sx[v], sy[v], 4, RGB(255, 255, 255))
+    NEXT
+
+    ' --- 5) Partikel-Fontaene (sweept seitlich) -------------------------
+    DIM emit_x AS INTEGER
+    emit_x = INT(CX + SIN(t * 1.1) * 380.0)
+    PARTICLE_SET_POS(ps, emit_x, H - 20)
+    DIM pcr AS INTEGER
+    DIM pcg AS INTEGER
+    DIM pcb AS INTEGER
+    (pcr, pcg, pcb) = rainbow(t * 3.0)
+    PARTICLE_SET_COLOR(ps, RGB(pcr, pcg, pcb))
+    PARTICLE_EMIT(ps, 4)
+    PARTICLE_UPDATE(ps, dt)
+    PARTICLE_DRAW(ps)
+
+    ' --- 6) Pulsierendes Logo (oben) ------------------------------------
+    DIM logo AS STRING
+    logo = "GAMEBASIC"
+    TEXT_SIZE(56)
+    TEXT_BOLD(TRUE)
+    DIM lw AS INTEGER
+    lw = TEXT_WIDTH(logo)
+    DIM lx AS INTEGER
+    lx = CX - lw \ 2
+    DIM ly AS INTEGER
+    ly = 26
+    DIM glw AS INTEGER
+    DIM glg AS INTEGER
+    DIM glb AS INTEGER
+    glw = INT(150.0 + SIN(t * 2.0) * 90.0)
+    glg = INT(200.0 + SIN(t * 2.0 + 1.0) * 50.0)
+    glb = INT(220.0 + SIN(t * 2.0 + 2.0) * 35.0)
+    glw = CLAMP(glw, 0, 255)
+    glg = CLAMP(glg, 0, 255)
+    glb = CLAMP(glb, 0, 255)
+    DIM off AS INTEGER
+    FOR off = 4 TO 1 STEP -1
+        DIM df AS FLOAT
+        df = 1.0 - off * 0.2
+        TEXT(lx - off, ly, logo, RGB(INT(glw*df) \ 2, INT(glg*df) \ 2, INT(glb*df) \ 2))
+        TEXT(lx + off, ly, logo, RGB(INT(glw*df) \ 2, INT(glg*df) \ 2, INT(glb*df) \ 2))
+        TEXT(lx, ly - off, logo, RGB(INT(glw*df) \ 2, INT(glg*df) \ 2, INT(glb*df) \ 2))
+        TEXT(lx, ly + off, logo, RGB(INT(glw*df) \ 2, INT(glg*df) \ 2, INT(glb*df) \ 2))
+    NEXT
+    TEXT(lx, ly, logo, RGB(glw, glg, glb))
+    TEXT_BOLD(FALSE)
+
+    ' --- 7) Sinus-Scroller (unten) --------------------------------------
+    ' Fester Zeichen-Vorschub statt TEXT_WIDTH pro Zeichen, und nur der
+    ' sichtbare Bereich wird gezeichnet -- spart pro Frame Hunderte Calls.
+    TEXT_SIZE(30)
+    TEXT_BOLD(TRUE)
+    DIM first AS INTEGER
+    first = 0
+    IF scroll_x < 0.0 THEN first = INT(-scroll_x / SCROLL_ADV)
+    DIM last AS INTEGER
+    last = first + W \ SCROLL_ADV + 2
+    IF last > LEN(scroll_msg) - 1 THEN last = LEN(scroll_msg) - 1
+    DIM si AS INTEGER
+    DIM ch AS STRING
+    DIM sphase AS FLOAT
+    DIM syy AS INTEGER
+    DIM chx AS INTEGER
+    DIM scr AS INTEGER
+    DIM scg AS INTEGER
+    DIM scb AS INTEGER
+    FOR si = first TO last
+        chx = INT(scroll_x) + si * SCROLL_ADV
+        ch = MID$(scroll_msg, si, 1)
+        sphase = si * 0.28 + t * 4.0
+        syy = H - 70 + INT(SIN(sphase) * 22.0)
+        (scr, scg, scb) = rainbow(sphase)
+        TEXT(chx, syy, ch, RGB(scr, scg, scb))
+    NEXT
+    TEXT_BOLD(FALSE)
+    scroll_x = scroll_x - dt * 0.22
+    IF scroll_x < -1.0 * LEN(scroll_msg) * SCROLL_ADV THEN
+        scroll_x = W * 1.0
+    END IF
+
+    ' --- 8) HUD: FPS + Aufloesung + Counts ------------------------------
+    TEXT_SIZE(20)
+    TEXT_BOLD(TRUE)
+    TEXT(14, 12, "FPS " + STR$(INT(fps)), &H6CFFB0)
+    TEXT_BOLD(FALSE)
+    TEXT_SIZE(16)
+    TEXT(14, 40, "1600 x 900  -  nativ (scale 1)", &H8FD8E0)
+    TEXT(14, 62, STR$(N_STARS) + " Sterne  -  " + STR$(PARTICLE_COUNT(ps)) + " Partikel  -  ESC = Ende", &H7088A0)
+    TEXT_SIZE(20)
+
+    FLIP()
+    SLEEP(3)
+    frame = frame + 1
+WEND

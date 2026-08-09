@@ -139,7 +139,7 @@ wy = CAMERA_S2W_Y(my, mx)
 ```
 
 Komplettes Beispiel inkl. Hand-nachgerechneter Werte:
-[examples/29_camera.gb](../examples/29_camera.gb) (Abschnitt "Rotation").
+[examples/29_camera.dh](../examples/29_camera.dh) (Abschnitt "Rotation").
 
 ## HUD im Screen-Space
 
@@ -255,8 +255,8 @@ WEND
 
 ## Komplettes Beispiel
 
-- [examples/29_camera.gb](../examples/29_camera.gb) — Logik-Test ohne Grafik-Fenster (S2W-Konvertierung, FOLLOW)
-- [examples/141_camera_visual.gb](../examples/141_camera_visual.gb) — interaktiv mit Pfeilen + Zoom
+- [examples/29_camera.dh](../examples/29_camera.dh) — Logik-Test ohne Grafik-Fenster (S2W-Konvertierung, FOLLOW)
+- [examples/141_camera_visual.dh](../examples/141_camera_visual.dh) — interaktiv mit Pfeilen + Zoom
 
 ## Tipp: Camera-Push/Pop fehlt
 

@@ -37,42 +37,42 @@ def tmp_autosave(tmp_path, monkeypatch):
 
 
 def test_slug_for_named_file_is_stable():
-    p = Path("/some/path/foo.gb")
+    p = Path("/some/path/foo.dh")
     s1 = slug_for(p, 0)
     s2 = slug_for(p, 5)  # idx soll fuer benannte Files egal sein
     assert s1 == s2
     assert s1.startswith("saved_")
-    assert s1.endswith(".gb")
+    assert s1.endswith(".dh")
 
 
 def test_slug_for_unnamed_uses_idx():
     s0 = slug_for(None, 0)
     s1 = slug_for(None, 1)
     assert s0 != s1
-    assert s0 == "unnamed_0.gb"
-    assert s1 == "unnamed_1.gb"
+    assert s0 == "unnamed_0.dh"
+    assert s1 == "unnamed_1.dh"
 
 
 def test_manifest_roundtrip_named(tmp_autosave):
     entries = [
         RecoveryEntry(
-            autosave_file="saved_abc123.gb",
-            original_path="/path/to/foo.gb",
-            label="foo.gb",
+            autosave_file="saved_abc123.dh",
+            original_path="/path/to/foo.dh",
+            label="foo.dh",
         ),
     ]
     write_manifest(entries)
     loaded = read_manifest()
     assert len(loaded) == 1
-    assert loaded[0].autosave_file == "saved_abc123.gb"
-    assert loaded[0].original_path == "/path/to/foo.gb"
-    assert loaded[0].label == "foo.gb"
+    assert loaded[0].autosave_file == "saved_abc123.dh"
+    assert loaded[0].original_path == "/path/to/foo.dh"
+    assert loaded[0].label == "foo.dh"
 
 
 def test_manifest_roundtrip_unnamed(tmp_autosave):
     entries = [
         RecoveryEntry(
-            autosave_file="unnamed_0.gb",
+            autosave_file="unnamed_0.dh",
             original_path=None,
             label="(neu)",
         ),
@@ -90,15 +90,15 @@ def test_manifest_overwrite_clears_old(tmp_autosave):
     Manifest-Datei muss komplett ueberschrieben werden -- nicht nur
     angehaengt."""
     write_manifest([
-        RecoveryEntry("saved_a.gb", "/a/foo.gb", "foo.gb"),
-        RecoveryEntry("saved_b.gb", "/b/bar.gb", "bar.gb"),
+        RecoveryEntry("saved_a.dh", "/a/foo.dh", "foo.dh"),
+        RecoveryEntry("saved_b.dh", "/b/bar.dh", "bar.dh"),
     ])
     write_manifest([
-        RecoveryEntry("saved_a.gb", "/a/foo.gb", "foo.gb"),
+        RecoveryEntry("saved_a.dh", "/a/foo.dh", "foo.dh"),
     ])
     loaded = read_manifest()
     assert len(loaded) == 1
-    assert loaded[0].original_path == "/a/foo.gb"
+    assert loaded[0].original_path == "/a/foo.dh"
 
 
 def test_empty_manifest_roundtrip(tmp_autosave):
@@ -113,11 +113,11 @@ def test_read_manifest_skips_invalid_entries(tmp_autosave):
     """Robustheit: defekte Eintraege im Manifest werden uebersprungen,
     nicht die ganze Liste verworfen."""
     raw = [
-        {"autosave_file": "ok.gb", "original_path": None, "label": "ok"},
+        {"autosave_file": "ok.dh", "original_path": None, "label": "ok"},
         {"autosave_file": 123, "label": "bad type"},  # autosave_file int
         "complete junk",
         {"label": "missing autosave_file"},
-        {"autosave_file": "ok2.gb", "original_path": "/p", "label": "ok2"},
+        {"autosave_file": "ok2.dh", "original_path": "/p", "label": "ok2"},
     ]
     (tmp_autosave / "manifest.json").write_text(
         json.dumps(raw), encoding="utf-8"

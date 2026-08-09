@@ -41,7 +41,7 @@ Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen d
 | `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | gefülltes Rechteck ins Image |
 | `IMAGE_DRAW_TEXT(img, x, y, text$, size, color)` | Text (Standard-Font) ins Image |
 
-Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.gb](../examples/122_imgfx.gb).
+Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.dh](../examples/122_imgfx.dh).
 
 Alle Funktionen brauchen die native Grafik-Runtime (`dhrt` mit dem `graphics`-Feature). Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
 
@@ -159,4 +159,4 @@ big = IMAGE_SCALE(mini, 64, 64)
 
 ## Komplettes Beispiel
 
-Siehe [examples/27_imgfx.gb](../examples/27_imgfx.gb) — Konsolen-Demo mit allen Effekten und Verkettung.
+Siehe [examples/27_imgfx.dh](../examples/27_imgfx.dh) — Konsolen-Demo mit allen Effekten und Verkettung.

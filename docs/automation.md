@@ -39,7 +39,7 @@ END IF
 IF KEYHIT(KEY_F10) THEN AUTOMATION_PLAY("aufnahme.txt")
 ```
 
-Vollständige Demo: [examples/153_automation.gb](../examples/153_automation.gb)
+Vollständige Demo: [examples/153_automation.dh](../examples/153_automation.dh)
 (F9 aufnehmen, F10 abspielen; die Spur zeigt, dass die Bahn identisch ist).
 
 ## Was man wissen muss

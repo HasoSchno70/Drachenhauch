@@ -1,5 +1,5 @@
 """Tree-View-Builtins: nur Registrierung. Render/Klick brauchen einen GL-Kontext
-und werden live ueber examples/137_gui_tree.gb abgenommen; das Baum-Modell
+und werden live ueber examples/137_gui_tree.dh abgenommen; das Baum-Modell
 (Hierarchie, Sichtbarkeit, Auswahl) deckt ein Rust-Unit-Test ab."""
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 

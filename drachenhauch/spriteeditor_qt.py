@@ -3167,7 +3167,7 @@ class SpriteEditorWindow(QMainWindow):
                 self.doc.dirty = orig_dirty
                 self._update_title()
 
-        dh_path = tmpdir / "_test.gb"
+        dh_path = tmpdir / "_test.dh"
         dh_path.write_text(
             self._build_test_gb_code(sprite_file.name, n),
             encoding="utf-8",

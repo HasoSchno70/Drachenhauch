@@ -1,0 +1,75 @@
+' 54_tuple.dh -- Tupel-Returns und Destructuring-Assignment.
+'
+' Vorher: Funktion gibt einen Wert zurueck. Wer zwei Werte braucht,
+' schreibt zwei Funktionen oder benutzt BYREF-Parameter.
+'
+' Jetzt: Funktion kann ein Tupel zurueckgeben, Caller destructured.
+' Ergonomisch fuer Vektor-Mathematik, MinMax-Operationen, Sort-Pairs etc.
+
+PRINT "=== Min/Max in einem Aufruf ==="
+
+FUNCTION minmax(a AS INTEGER, b AS INTEGER) AS TUPLE
+    IF a < b THEN
+        RETURN (a, b)
+    ELSE
+        RETURN (b, a)
+    END IF
+END FUNCTION
+
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+(lo, hi) = minmax(7, 3)
+PRINT "minmax(7, 3) =>", lo, hi
+(lo, hi) = minmax(2, 9)
+PRINT "minmax(2, 9) =>", lo, hi
+
+PRINT ""
+PRINT "=== Vektor-Reflexion (zwei Komponenten in einem Call) ==="
+
+FUNCTION reflect(vx AS FLOAT, vy AS FLOAT, nx AS FLOAT, ny AS FLOAT) AS TUPLE
+    DIM dot AS FLOAT
+    dot = vx * nx + vy * ny
+    RETURN (vx - 2.0 * dot * nx, vy - 2.0 * dot * ny)
+END FUNCTION
+
+DIM rx AS FLOAT
+DIM ry AS FLOAT
+(rx, ry) = reflect(3.0, 4.0, 1.0, 0.0)
+PRINT "Reflexion an x-Normale =>", rx, ry
+(rx, ry) = reflect(3.0, 4.0, 0.0, 1.0)
+PRINT "Reflexion an y-Normale =>", rx, ry
+
+PRINT ""
+PRINT "=== Polare in karthesische Koordinaten ==="
+
+FUNCTION polar_to_cart(r AS FLOAT, angle AS FLOAT) AS TUPLE
+    RETURN (r * COS(angle), r * SIN(angle))
+END FUNCTION
+
+DIM cx AS FLOAT
+DIM cy AS FLOAT
+(cx, cy) = polar_to_cart(10.0, 0.0)
+PRINT "polar(10, 0) =>", cx, cy
+(cx, cy) = polar_to_cart(10.0, 1.5707963267)   ' Pi/2
+PRINT "polar(10, Pi/2) =>", cx, cy
+
+PRINT ""
+PRINT "=== Tupel als Wert-Speicher ==="
+
+DIM player AS TUPLE
+player = ("Alice", 100, 25)
+PRINT "Player:", player
+
+' Auseinandernehmen wenn man die Felder braucht
+DIM name AS STRING
+DIM hp AS INTEGER
+DIM xp AS INTEGER
+(name, hp, xp) = player
+PRINT "Name=", name, "  HP=", hp, "  XP=", xp
+
+PRINT ""
+PRINT "=== Verschachtelte Tupel ==="
+
+DIM line AS TUPLE
+line = ((0, 0), (100, 50))
+PRINT "Linie:", line

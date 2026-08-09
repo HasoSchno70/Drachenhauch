@@ -25,7 +25,7 @@ einen Tarball mit `install.sh`.
 ```
 
 Das macht in einem Rutsch:
-1. **dhrt-Runtime** bauen (falls `rust/gb_runtime/target/release/dhrt[.exe]` fehlt;
+1. **dhrt-Runtime** bauen (falls `rust/drachenhauch_runtime/target/release/dhrt[.exe]` fehlt;
    fehlt sie danach immer noch, wird nur gewarnt statt abzubrechen — nützlich, um
    die Paketierung selbst zu testen, ohne die volle Grafik-Toolchain zu brauchen).
 2. **App-Icon** aus `drachenhauch/assets/logo.png` erzeugen (`.ico` Windows, `.icns`
@@ -35,7 +35,7 @@ Das macht in einem Rutsch:
    `dist/GameBasic.app` (macOS).
 4. Plattformspezifische Paketierung:
    - **Windows**: Inno Setup (ISCC) → `installer/output/GameBasic-Setup-<version>.exe`
-     (Beispiele + Lehrbuch + Startmenü + optional PATH/.gb-Dateiverknüpfung).
+     (Beispiele + Lehrbuch + Startmenü + optional PATH/.dh-Dateiverknüpfung).
    - **macOS**: `dhrt` neben die App-Binary legen (`Contents/MacOS/`), `.app` mit
      `hdiutil` in `installer/output/GameBasic-<version>-macOS.dmg` packen.
    - **Linux**: `dhrt` neben die Binary legen, `install.sh` (XDG-Desktop-
@@ -70,7 +70,7 @@ durchlaufen, nicht die volle Runtime.
 
 **Windows** (Inno Setup):
 - Installation nach `C:\Program Files\GameBasic`.
-- **Beispiele** (142 `.gb` + Assets + Showcase-Thumbnails `screenshots/`) nach
+- **Beispiele** (142 `.dh` + Assets + Showcase-Thumbnails `screenshots/`) nach
   `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der `project_root` der
   installierten App (`dhrun._project_root()`), damit der Editor Beispiele **und**
   Showcase-Vorschaubilder findet – und der Ort ist **beschreibbar** (Program Files
@@ -79,11 +79,11 @@ durchlaufen, nicht die volle Runtime.
   Auswahlfenster), Sprite-Editor, Tilemap-Editor, Form-Designer, Audio-Studio,
   Beispiele.
 - Optional (im Setup abwählbar): Desktop-Verknüpfung, **PATH-Eintrag** (`dhrt`
-  und `GameBasic` im Terminal nutzbar), **`.gb`-Dateiverknüpfung** (Doppelklick
+  und `GameBasic` im Terminal nutzbar), **`.dh`-Dateiverknüpfung** (Doppelklick
   öffnet im Editor, Rechtsklick → „Mit GameBasic ausführen").
 
 **macOS** (`.dmg`): `.app` per Drag-and-Drop nach `/Applications` (oder woanders
-hin) ziehen — kein Installations-Skript-Schritt wie bei Inno Setup. `.gb`-Dateien
+hin) ziehen — kein Installations-Skript-Schritt wie bei Inno Setup. `.dh`-Dateien
 im Finder sind über `CFBundleDocumentTypes` mit GameBasic verknüpft. Beispiele
 liegen im Bundle und werden beim **ersten Start** automatisch nach
 `~/Documents/GameBasic/examples` kopiert (`dhrun._seed_examples_if_missing`).
@@ -151,6 +151,6 @@ Installation als auch die Entwicklungsumgebung.
 
 ## Nur die Runtime verteilen?
 Wer nur GameBasic-**Programme** ausführen/weitergeben will, braucht die IDE nicht:
-- `dhrt run datei.gb` führt ein Programm aus.
-- `dhrt --export datei.gb` baut eine **eigenständige Spiel-.exe** (hängt den
+- `dhrt run datei.dh` führt ein Programm aus.
+- `dhrt --export datei.dh` baut eine **eigenständige Spiel-.exe** (hängt den
   kompilierten Payload an eine Kopie von `dhrt`). Dafür ist kein Installer nötig.

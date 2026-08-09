@@ -39,7 +39,7 @@ def _run_in(tmp_path, body):
     relative TILED_LOAD-Pfade die dort gespeicherte JSON finden)."""
     if _DHRT is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    fd = tmp_path / "_t.gb"
+    fd = tmp_path / "_t.dh"
     fd.write_text(body, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
@@ -51,7 +51,7 @@ def _check_compiles(tmp_path, src):
     """`dhrt --check` auf `src`; gibt die Fehler-Diagnosen zurueck (leer = ok)."""
     if _DHRT is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    fd = tmp_path / "_check.gb"
+    fd = tmp_path / "_check.dh"
     fd.write_text(src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--check", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)

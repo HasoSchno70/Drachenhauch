@@ -11,7 +11,7 @@ Features:
 - Find/Replace (Ctrl+F/H), Goto-Line (Ctrl+G), Find-in-Project (Ctrl+Shift+F).
 - Theme-Toggle Dark/Light (Ctrl+T), Settings-Dialog (Ctrl+,).
 - Multi-Cursor via Strg+D, Minimap rechts vom Editor (toggelbar).
-- Drag&Drop von .gb-Dateien, Workspace-Restore beim Start, Auto-Save +
+- Drag&Drop von .dh-Dateien, Workspace-Restore beim Start, Auto-Save +
   Crash-Recovery, Recent-Files, Markdown-Viewer fuer README (F1).
 """
 from __future__ import annotations

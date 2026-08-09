@@ -1,0 +1,119 @@
+' 63_props_comp.dh -- Properties (GET/SET) und List-Comprehensions.
+
+PRINT "=== Properties ==="
+
+CLASS Player
+    DIM _hp AS INTEGER
+    DIM _name AS STRING
+
+    PROPERTY GET hp() AS INTEGER
+        RETURN Self._hp
+    END PROPERTY
+
+    PROPERTY SET hp(value AS INTEGER)
+        ' Clamp auf 0..100
+        IF value < 0 THEN value = 0
+        IF value > 100 THEN value = 100
+        Self._hp = value
+    END PROPERTY
+
+    PROPERTY GET name() AS STRING
+        RETURN Self._name
+    END PROPERTY
+
+    PROPERTY SET name(value AS STRING)
+        Self._name = value.trim().upper()
+    END PROPERTY
+
+    PROPERTY GET status() AS STRING
+        ' Computed Property -- kein Backing-Field
+        IF Self._hp <= 0 THEN RETURN "tot"
+        IF Self._hp <= 30 THEN RETURN "verwundet"
+        RETURN "fit"
+    END PROPERTY
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+p.name = "  Alice  "
+p.hp = 75
+PRINT "Name (autotrim+upper):", p.name
+PRINT "HP (gesund):          ", p.hp, "->", p.status
+p.hp = -50
+PRINT "HP (clamp neg):        ", p.hp, "->", p.status
+p.hp = 200
+PRINT "HP (clamp pos):        ", p.hp, "->", p.status
+p.hp = 25
+PRINT "HP (verwundet):        ", p.hp, "->", p.status
+
+PRINT ""
+PRINT "=== List-Comprehensions ==="
+
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
+
+PRINT "Original:        ", nums
+PRINT "Verdoppelt:      ", [n * 2 FOR n IN nums]
+PRINT "Quadrate:        ", [n * n FOR n IN nums]
+PRINT "Gerade:          ", [n FOR n IN nums WHERE n MOD 2 = 0]
+PRINT "Gerade-Quadrate: ", [n * n FOR n IN nums WHERE n MOD 2 = 0]
+PRINT "ueber 5:         ", [n FOR n IN nums WHERE n > 5]
+
+PRINT ""
+PRINT "=== Comprehensions auf String / Array / Map ==="
+
+' String iteriert ueber chars
+PRINT "Vokale in 'GameBasic': ", [c FOR c IN "GameBasic" WHERE c IN "aeiouAEIOU"]
+
+' Array
+DIM scores[5] AS INTEGER
+scores[0] = 65
+scores[1] = 92
+scores[2] = 71
+scores[3] = 88
+scores[4] = 50
+
+DIM pass_marks AS TUPLE
+pass_marks = [s FOR s IN scores WHERE s >= 70]
+PRINT "Bestanden (>=70):", pass_marks
+
+' Map -- Comprehension iteriert ueber Keys
+DIM stock AS MAP OF INTEGER
+stock.put("apples", 12)
+stock.put("oranges", 0)
+stock.put("bananas", 5)
+stock.put("grapes", 0)
+
+DIM out_of_stock AS TUPLE
+out_of_stock = [k FOR k IN stock WHERE stock.get(k) = 0]
+PRINT "Ausverkauft:", out_of_stock
+
+PRINT ""
+PRINT "=== Comprehension + Properties kombinieren ==="
+
+CLASS Item
+    DIM _name AS STRING
+    DIM _price AS INTEGER
+
+    SUB Init(n AS STRING, p AS INTEGER)
+        Self._name = n
+        Self._price = p
+    END SUB
+
+    PROPERTY GET name() AS STRING
+        RETURN Self._name
+    END PROPERTY
+
+    PROPERTY GET price() AS INTEGER
+        RETURN Self._price
+    END PROPERTY
+END CLASS
+
+DIM cart[3] AS Item
+cart[0] = NEW Item("Brot", 3)
+cart[1] = NEW Item("Kaese", 8)
+cart[2] = NEW Item("Wein", 12)
+
+DIM expensive AS TUPLE
+expensive = [it.name FOR it IN cart WHERE it.price > 5]
+PRINT "Teurer als 5 EUR:", expensive

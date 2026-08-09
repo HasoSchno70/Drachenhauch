@@ -1,0 +1,67 @@
+' 91_lighting.dh -- Beleuchtung + Kamera-Modi (native-only, F6)
+'
+' Beleuchtung (Blinn-Phong, bis zu 4 Lichter):
+'   LIGHT_ENABLE()                      Shader laden/aktivieren
+'   LIGHT_AMBIENT(farbe, intensitaet)   Grundhelligkeit
+'   LIGHT_DIRECTIONAL(dx,dy,dz, farbe)  Sonne (Richtung)        -> idx
+'   LIGHT_POINT(x,y,z, farbe)           Punktlicht              -> idx
+'   LIGHT_SET_POS/COLOR/ENABLED(idx,..) animieren
+'   MODEL_LIT(modell)                   Modell beleuchten lassen
+'
+' Kamera-Modi (raylib UpdateCamera): CAMERA3D(...) einmal setzen, dann pro
+' Frame CAMERA3D_UPDATE(mode). 1=free 2=orbital 3=first_person 4=third_person.
+'   In dhrt-Fenster: ORBITAL dreht automatisch; FREE/FIRST_PERSON = WASD+Maus.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Beleuchtung", 1)
+
+' Beleuchtung einrichten.
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.15)                 ' dezentes Umgebungslicht
+DIM sun AS INTEGER
+DIM lamp AS INTEGER
+sun  = LIGHT_DIRECTIONAL(-0.5, -1.0, -0.3, &HFFF0D0)   ' warmes Sonnenlicht
+lamp = LIGHT_POINT(0, 3, 0, &H40A0FF)                   ' blaues bewegtes Punktlicht
+
+' Modelle einmalig erzeugen und fuer Beleuchtung freischalten.
+DIM ground AS INTEGER
+DIM ball AS INTEGER
+DIM torus AS INTEGER
+DIM box AS INTEGER
+ground = MESH_PLANE(24.0, 24.0, 1, 1)
+ball   = MESH_SPHERE(1.2, 24, 24)
+torus  = MESH_TORUS(0.7, 0.3, 20, 28)
+box    = MESH_CUBE(1.6, 1.6, 1.6)
+MODEL_LIT(ground)
+MODEL_LIT(ball)
+MODEL_LIT(torus)
+MODEL_LIT(box)
+
+' Kamera initial setzen (UpdateCamera bewegt sie danach relativ dazu).
+CAMERA3D(9, 7, 9, 0, 1, 0, 45)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.02
+
+    ' Punktlicht im Kreis ueber der Szene bewegen.
+    LIGHT_SET_POS(lamp, COS(t) * 4.0, 3.0, SIN(t) * 4.0)
+
+    CLS(&H0A0C12)
+    CAMERA3D_UPDATE(2)                  ' ORBITAL: dreht automatisch um das Ziel
+
+    MODEL(ground, 0, 0, 0, 1.0, &H6A7A6A)
+    MODEL(ball,  -2.5, 1.2, 0, 1.0, &HD0D0D8)
+    MODEL(box,    2.5, 0.8, 0, 1.0, &HC08050)
+    MODEL(torus,  0, 1.0, 2.6, 1.0, &H80C0A0)
+
+    TEXT(12, 10, "Beleuchtung: Sonne + bewegtes Punktlicht", WHITE)
+    TEXT(12, 34, "Kamera: ORBITAL (CAMERA3D_UPDATE)", &H88AACC)
+
+    FLIP()
+NEXT

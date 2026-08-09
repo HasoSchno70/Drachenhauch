@@ -35,7 +35,7 @@ _TILES = _ROOT / "circuitrunner" / "assets" / "tiles.png"
 
 
 def _run(src: str, tmp_path: Path, env: dict | None = None) -> str:
-    f = tmp_path / "t.gb"
+    f = tmp_path / "t.dh"
     f.write_text(src, encoding="utf-8")
     e = dict(os.environ)
     if env:

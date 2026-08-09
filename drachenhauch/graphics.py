@@ -133,7 +133,7 @@ def _rgb_tuple(color: int):
 def _native_only(op: str = "Grafik"):
     raise DHRuntimeError(
         f"{op}: Grafik/Audio laeuft nur in der nativen Runtime (dhrt) -- "
-        f"Programme per 'dhrun.py datei.gb' bzw. 'dhrt run datei.gb' starten. "
+        f"Programme per 'dhrun.py datei.dh' bzw. 'dhrt run datei.dh' starten. "
         f"Dieser Python-Stub dient nur dem Editor-Tooling.")
 
 

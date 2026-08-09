@@ -1,5 +1,5 @@
 """TextArea + modale Dialoge: nur Registrierung. Live verifiziert ueber
-examples/132_gui_textarea.gb (Rendering/Maus/Tastatur bzw. native Dialoge)."""
+examples/132_gui_textarea.dh (Rendering/Maus/Tastatur bzw. native Dialoge)."""
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 

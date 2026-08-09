@@ -111,7 +111,7 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
      **Programmfenster nativ resizebar** und die Form füllt es jeden Frame —
      die verankerten Controls fließen dabei mit (Reflow).
    - **GB-Code exportieren:** *Datei → GB-Code exportieren…* schreibt ein
-     **eigenständiges** `.gb`, das das Formular mit den `GUI_*`-Konstruktoren
+     **eigenständiges** `.dh`, das das Formular mit den `GUI_*`-Konstruktoren
      **explizit aufbaut** (`GUI_WINDOW`/`GUI_BUTTON`/… + Setter + `GUI_ON_CLICK`/
      `GUI_ON_CHANGE`) statt `GUI_LOAD` — frei lesbar und weiter editierbar; die
      im Code-Editor hinterlegten Handler-Körper sind als `SUB`s eingewebt.
@@ -273,7 +273,7 @@ Feld — bestehende `.gbform`-Dateien ändern sich also nicht.
 
 > **Achtung bei Änderungen:** `FORM_THEME_COLORS` in
 > `drachenhauch/formdesigner/document.py` ist ein **Nachbau** der Presets aus
-> `rust/gb_runtime/src/gui.rs` — der Designer zeichnet mit Qt und kann die
+> `rust/drachenhauch_runtime/src/gui.rs` — der Designer zeichnet mit Qt und kann die
 > Laufzeit nicht fragen. `tests/test_formdesigner_theme.py` vergleicht beide
 > gegeneinander; wer ein Preset in gui.rs ändert oder hinzufügt, muss die
 > Tabelle nachziehen (der Test sagt genau, welcher Wert abweicht).

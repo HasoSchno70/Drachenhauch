@@ -140,4 +140,4 @@ JSON unterscheidet keinen `1` von `1.0` zuverlässig — `SAVE_GET_INT` akzeptie
 
 - [`scene`](module-scene.md) — Pro-Scene-Daten haben dieselbe API-Form (typsichere Setter/Getter mit `_OR`-Variante), aber leben nur für die Lebensdauer der Scene
 - [`json`](module-json.md) — Low-Level JSON wenn du komplexere verschachtelte Strukturen brauchst
-- Vollständiges Beispiel: [`examples/49_pong_scene.gb`](../examples/49_pong_scene.gb) — Pong mit `pong.save` für persistierten Highscore
+- Vollständiges Beispiel: [`examples/49_pong_scene.dh`](../examples/49_pong_scene.dh) — Pong mit `pong.save` für persistierten Highscore

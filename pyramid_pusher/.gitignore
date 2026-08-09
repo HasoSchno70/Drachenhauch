@@ -4,4 +4,4 @@ pyramid_pusher.db
 pyramid_pusher.save.bak_*
 pyramid_pusher.db.bak_*
 # Schutz-Backup der Spieldatei
-pyramid_pusher.gb.bak
+pyramid_pusher.dh.bak

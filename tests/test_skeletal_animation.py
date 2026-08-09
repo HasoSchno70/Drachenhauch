@@ -3,7 +3,7 @@
 MODEL_ANIMATE_BLEND nutzt raylib-rs 6.0s neue `UpdateModelAnimationEx` (siehe
 graphics.rs `model_animate_blend`) -- blendet zwischen zwei Animationen
 desselben Sets statt hartem Wechsel. Nutzt das vorhandene CC0-Robotermodell
-aus examples/assets/robot.glb (bereits fuer examples/108_skeletal_anim.gb da).
+aus examples/assets/robot.glb (bereits fuer examples/108_skeletal_anim.dh da).
 """
 from pathlib import Path
 

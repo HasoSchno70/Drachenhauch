@@ -168,7 +168,7 @@ def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
         'win = GUI_WINDOW("T", 10, 10, 600, 400)\n'
         + aufbau + "\n" + abfrage + "\n"
     )
-    f = tmp_path / "snip.gb"
+    f = tmp_path / "snip.dh"
     f.write_text(quelle, encoding="utf-8")
     r = subprocess.run([str(dhrt), "--check", str(f)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)

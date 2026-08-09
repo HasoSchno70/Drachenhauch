@@ -114,4 +114,4 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/24_json.gb](../examples/24_json.gb).
+Siehe [examples/24_json.dh](../examples/24_json.dh).

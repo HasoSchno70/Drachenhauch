@@ -1,0 +1,121 @@
+' 115_modplayer.dh -- Amiga-Modul-Player (.mod / .xm)
+'
+' DER eigentliche Amiga-Sound: ProTracker-Module. raylib (und damit dhrt)
+' dekodiert .mod und .xm direkt -- kein Zusatzcode noetig. Ein Modul
+' enthaelt seine eigenen Samples + Pattern-Daten, also klingt es EXAKT wie
+' damals auf dem Amiga (4 Kanaele, Sample-basiert, Paula-Stil).
+'
+'   PLAYMUSIC("song.mod", -1, 1.0)   ' loopt; oder AUDIO_MUSIC_LOAD/_PLAY
+'
+' Diese Demo spielt ein mitgeliefertes, selbst generiertes Modul
+' (assets/demo.mod, gemeinfrei -- Generator: assets/make_demo_mod.py).
+' Du kannst auch ein EIGENES .mod/.xm ins Fenster ziehen (Drag & Drop) --
+' z.B. von modarchive.org. Visualisiert wird mit echtem AUDIO_FFT.
+'
+' SPACE = Pause/Weiter   ESC = Ende
+
+SCREEN(640, 400, "GameBasic Modul-Player (.mod / .xm)", 2)
+SETFPS(60)
+
+DIM songName AS STRING
+songName = "assets/demo.mod"
+
+SUB StartSong(path AS STRING)
+    AUDIO_MUSIC_LOAD(path)
+    AUDIO_MUSIC_PLAY(-1, 0)          ' -1 = endlos loopen
+END SUB
+
+StartSong(songName)
+
+DIM fft[40] AS FLOAT
+DIM peak[40] AS FLOAT          ' nachfallende Spitzen (VU-Optik)
+DIM i AS INTEGER
+FOR i = 0 TO 39
+    peak[i] = 0.0
+NEXT
+
+DIM paused AS BOOLEAN
+paused = FALSE
+DIM spacePrev AS BOOLEAN
+spacePrev = FALSE
+
+DIM t AS FLOAT
+DIM h AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM w AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+
+    ' --- Eigenes Modul per Drag & Drop laden -------------------------
+    IF FILES_DROPPED() > 0 THEN
+        DIM dropped AS STRING
+        dropped = FILE_DROPPED(0)
+        songName = dropped
+        StartSong(dropped)
+    END IF
+
+    ' --- SPACE = Pause / Weiter --------------------------------------
+    DIM spaceNow AS BOOLEAN
+    spaceNow = KEYPRESSED(32)
+    IF spaceNow AND NOT spacePrev THEN
+        IF paused THEN
+            AUDIO_MUSIC_RESUME()
+        ELSE
+            AUDIO_MUSIC_PAUSE()
+        END IF
+        paused = NOT paused
+    END IF
+    spacePrev = spaceNow
+
+    ' --- Zeichnen -----------------------------------------------------
+    CLS(&H0A0818)
+
+    ' Copper-Hintergrund (Amiga-Klassiker)
+    FOR i = 0 TO 1
+        y = 70 + i * 250 + INT(SIN(t * 1.1 + i * 2.0) * 26.0)
+        h = (INT(t * 35.0) + i * 60) MOD 360
+        GRADIENTV(0, y, 639, y + 8, HSV(h, 0.8, 0.4), HSV(h, 0.8, 0.04))
+    NEXT
+
+    ' Titel
+    TEXT_SIZE(24)
+    w = TEXT_WIDTH("AMIGA MODUL-PLAYER")
+    TEXT(320 - w \ 2, 18, "AMIGA MODUL-PLAYER", HSV(INT(t * 80.0) MOD 360, 0.6, 1.0))
+    TEXT_SIZE(12)
+    TEXT(20, 54, "Song: " + songName, &HA0B0D0)
+    TEXT(20, 72, "POS " + STR$(INT(AUDIO_MUSIC_POSITION() * 10.0) / 10.0) + "s   " + IIF(paused, "[PAUSE]", "[PLAY]"), &H7080A0)
+
+    ' --- FFT-Balken (echtes Spektrum der laufenden Modulmusik) -------
+    AUDIO_FFT(fft)
+    FOR i = 0 TO 39
+        IF fft[i] > peak[i] THEN
+            peak[i] = fft[i]
+        ELSE
+            peak[i] = peak[i] - 0.012      ' Spitze faellt langsam
+            IF peak[i] < 0.0 THEN peak[i] = 0.0
+        END IF
+        h = INT(fft[i] * 180.0)
+        IF h > 180 THEN h = 180
+        x = 24 + i * 15
+        ' Balken
+        GRADIENTV(x, 300 - h, x + 11, 300, HSV((i * 7 + INT(t * 40.0)) MOD 360, 0.85, 1.0), HSV((i * 7) MOD 360, 0.85, 0.25))
+        ' Peak-Marke
+        y = 300 - INT(peak[i] * 180.0)
+        BOX(x, y, x + 11, y + 2, WHITE)
+    NEXT
+    RECT(22, 116, 624, 302, &H303048)
+
+    ' Fusszeile / Hinweise
+    TEXT_SIZE(13)
+    TEXT(20, 320, "Ziehe ein eigenes .mod / .xm ins Fenster (z.B. von modarchive.org)", &H90A0C0)
+    TEXT(20, 342, "SPACE = Pause/Weiter     ESC = Ende", &H6878A0)
+    TEXT_SIZE(11)
+    TEXT(20, 372, "raylib dekodiert ProTracker-Module direkt -- echter 4-Kanal-Amiga-Sound, 0 Zusatzcode.", &H586080)
+
+    FLIP()
+WEND
+
+AUDIO_MUSIC_STOP(0)

@@ -52,13 +52,13 @@ dhsprites examples/platformer/hero.gbsprite
 
 ## Demo
 
-`platformer_demo.gb` baut daraus ein kleines Level: Held läuft/springt/duckt sich
+`platformer_demo.dh` baut daraus ein kleines Level: Held läuft/springt/duckt sich
 (Flip), ein Walker patrouilliert und lässt sich per Stomp plattmachen; das
 Level (Boden, Röhre, Brick/?-Block, Wasser, animierte Münzen, Wolken/Busch/
 Hügel) kommt aus dem Master-Atlas `sheet.json`.
 
 ```
-dhrun.py examples/platformer/platformer_demo.gb
+dhrun.py examples/platformer/platformer_demo.dh
 ```
 
 ## Im eigenen Spiel verwenden

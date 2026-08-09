@@ -68,7 +68,7 @@ def test_quick_open_shows_warning_instead_of_crashing(monkeypatch, tmp_path):
     from drachenhauch.editor_qt import palette as P
     from PySide6.QtWidgets import QMessageBox
 
-    (tmp_path / "a.gb").write_text("PRINT 1\n", encoding="utf-8")
+    (tmp_path / "a.dh").write_text("PRINT 1\n", encoding="utf-8")
     _fake_exec_picks_first(monkeypatch)
     warnings = []
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **kw: warnings.append(a))

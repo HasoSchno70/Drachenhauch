@@ -30,7 +30,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 
 def _check(tmp_path, src):
-    f = tmp_path / "c.gb"
+    f = tmp_path / "c.dh"
     f.write_text(src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)
@@ -65,7 +65,7 @@ def test_all_examples_check_clean():
     Default-Build, siehe Hardware-Beispiele 35-38) sind erlaubt -- sie sind
     keine Fehler, sondern ein bewusster Hinweis."""
     bad = []
-    for f in sorted(_EXAMPLES.glob("*.gb")):
+    for f in sorted(_EXAMPLES.glob("*.dh")):
         if "_smoketest" in f.name:
             continue
         r = subprocess.run([str(_DHRT), "--check", str(f)],
@@ -84,7 +84,7 @@ def test_examples_use_no_unknown_builtin():
     wuerde gueltiger Code faelschlich die 'Unbekanntes Builtin'-Warnung kriegen).
     Greift Hand in Hand mit compiler::is_known_builtin (G1, systemisch)."""
     drift = []
-    for f in sorted(_EXAMPLES.rglob("*.gb")):
+    for f in sorted(_EXAMPLES.rglob("*.dh")):
         if "_smoketest" in f.name:
             continue
         r = subprocess.run([str(_DHRT), "--check", str(f)],
@@ -192,7 +192,7 @@ def test_array_gegen_skalar_warnt_lesbar(tmp_path):
 def test_kein_beispiel_loest_die_dim_warnung_aus():
     """Eine neue Warnung, die auf dem eigenen Bestand losgeht, ist Laerm."""
     laut = []
-    for f in sorted(_EXAMPLES.rglob("*.gb")):
+    for f in sorted(_EXAMPLES.rglob("*.dh")):
         r = subprocess.run([str(_DHRT), "--check", str(f)],
                            capture_output=True, text=True, timeout=60)
         for d in json.loads(r.stdout or "[]"):

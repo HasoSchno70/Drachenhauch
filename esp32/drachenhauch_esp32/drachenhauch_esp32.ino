@@ -16,7 +16,7 @@
 //    2. Werkzeuge -> Board -> Boardverwalter -> "esp32" bzw. "esp8266"
 //    3. Werkzeuge -> Bibliotheken verwalten -> "PubSubClient" (Nick O'Leary)
 //
-//  Gegenstueck in GameBasic: examples/159_esp32_bruecke.gb
+//  Gegenstueck in GameBasic: examples/159_esp32_bruecke.dh
 // ===========================================================================
 
 // Laeuft auf ESP32 UND ESP8266. Die Unterschiede stehen alle hier oben, damit

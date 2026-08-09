@@ -1,4 +1,4 @@
-Musik-Asset fuer examples/97_pbr_reactor.gb
+Musik-Asset fuer examples/97_pbr_reactor.dh
 ===========================================
 
 Datei:   techno_messup.ogg

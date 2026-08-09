@@ -1,0 +1,45 @@
+' 100_2d_extras.dh -- 2D-Extras (Batch 1): dicke Linien, runde Rechtecke,
+' Gradienten, Splines. Grafik laeuft nur nativ in dhrt (F6 / --native).
+
+SCREEN(640, 400, "2D-Extras", 1)
+
+' Spline-Stuetzpunkte (eine geschwungene Kurve).
+DIM xs[6] AS INTEGER
+DIM ys[6] AS INTEGER
+xs[0] = 40  : ys[0] = 320
+xs[1] = 140 : ys[1] = 250
+xs[2] = 240 : ys[2] = 360
+xs[3] = 360 : ys[3] = 240
+xs[4] = 480 : ys[4] = 340
+xs[5] = 600 : ys[5] = 270
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+
+    GRADIENTV(0, 0, 639, 399, &H101830, &H301020)      ' Hintergrund-Verlauf
+
+    ' Gradient-Bloecke
+    GRADIENTV(30, 30, 200, 120, &HFF4040, &H401010)
+    GRADIENTH(220, 30, 390, 120, &H40A0FF, &H102040)
+
+    ' Runde Rechtecke: gefuellt + Umriss
+    BOXROUND(420, 30, 600, 120, 24, &H30D080)
+    RECTROUND(420, 30, 600, 120, 24, &HFFFFFF)
+
+    ' Dicke Linien faecherfoermig
+    DIM i AS INTEGER
+    FOR i = 0 TO 8
+        LINEW(120, 200, 30 + i * 30, 150, 1 + i, &HFFCC00)
+    NEXT
+
+    ' Spline durch die Stuetzpunkte
+    SPLINE(xs, ys, &H00FFD0, 3.0)
+    FOR i = 0 TO 5
+        BOXROUND(xs[i] - 4, ys[i] - 4, xs[i] + 4, ys[i] + 4, 3, &HFFFFFF)
+    NEXT
+
+    TEXT(20, 8, "2D-Extras: Gradient / RoundRect / dicke Linien / Spline", &HCCDDEE)
+
+    FLIP()
+NEXT

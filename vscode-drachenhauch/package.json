@@ -1,0 +1,52 @@
+{
+  "name": "drachenhauch",
+  "displayName": "GameBasic",
+  "description": "Sprachunterstuetzung fuer GameBasic (.dh): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
+  "version": "1.0.0",
+  "publisher": "drachenhauch",
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:drachenhauch"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "drachenhauch",
+        "aliases": ["GameBasic", "drachenhauch", "gb"],
+        "extensions": [".dh"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "drachenhauch",
+        "scopeName": "source.drachenhauch",
+        "path": "./syntaxes/drachenhauch.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "GameBasic",
+      "properties": {
+        "drachenhauch.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python-Interpreter, der den GameBasic-Language-Server startet (am besten der .venv-Python des Projekts)."
+        },
+        "drachenhauch.serverModule": {
+          "type": "string",
+          "default": "drachenhauch.lsp",
+          "description": "Python-Modul des Language-Servers (py -m <modul>)."
+        },
+        "drachenhauch.enableLanguageServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Language-Server aktivieren (Diagnostics/Completion/Hover/...). Bei false bleibt nur Syntax-Highlighting."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

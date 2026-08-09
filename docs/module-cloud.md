@@ -92,4 +92,4 @@ kompetitivem Ranking nicht. Details, Konfiguration und Deployment-Hinweise:
 - `NUMFMT$` (core-Builtin, kein IMPORT nötig) — grosse Zahlen lesbar
   formatieren (`1234567` → `"1.23M"`), passt thematisch zu Idle-/
   Incremental-Games mit Cloud-Save + Leaderboard.
-- Demo: [`examples/146_cloud_idle.gb`](../examples/146_cloud_idle.gb).
+- Demo: [`examples/146_cloud_idle.dh`](../examples/146_cloud_idle.dh).

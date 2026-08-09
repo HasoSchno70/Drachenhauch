@@ -6,7 +6,7 @@ SET_WINDOW_MONITOR, WINDOW_X/Y, SET_WINDOW_POS sind raylib-Engine-Builtins
 brauchen daher einen echten Desktop-GL-Kontext; kein Funktionstest via
 run_gb). Hier wird geprueft, dass die Builtins im eingefrorenen dhrt-Index
 stehen -- sonst warnt der Editor live und der Drift-Test schlaegt an, sobald
-ein Beispiel (examples/120_monitors.gb) sie nutzt.
+ein Beispiel (examples/120_monitors.dh) sie nutzt.
 """
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 

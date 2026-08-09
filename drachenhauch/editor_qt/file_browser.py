@@ -4,7 +4,7 @@ Aufbau (von oben nach unten):
   * Sektion "Module" -- alle eingebauten Module (ui, gui, json, physics, ...).
     Klick oeffnet die zugehoerige Doku (docs/module-<name>.md) gerendert im
     Markdown-Viewer; Module ohne Doku sind gedimmt. Tooltip zeigt den IMPORT.
-  * Sektion "Beispiele & Projekt" -- die .gb-Dateien als Ordner-Baum.
+  * Sektion "Beispiele & Projekt" -- die .dh-Dateien als Ordner-Baum.
 
 Restyle: Glyph-Icons pro Eintrag, Ordner mit Datei-Zaehler, groessere Zeilen,
 Sektions-Header zum Ein-/Ausklappen. Doppelklick / Klick auf eine Datei
@@ -103,14 +103,14 @@ def _list_builtin_modules() -> list[str]:
 
 
 class FileBrowser(QWidget):
-    file_activated = Signal(Path)  # Pfad (.gb ODER docs/module-*.md)
+    file_activated = Signal(Path)  # Pfad (.dh ODER docs/module-*.md)
 
     def __init__(self, project_root: Path, parent=None,
                  initial_expanded: set | None = None):
         super().__init__(parent)
         self.project_root = project_root
         self.docs_dir = project_root / "docs"
-        # Mapping path -> Tree-Item, fuer mark_active-Lookup (nur .gb-Files).
+        # Mapping path -> Tree-Item, fuer mark_active-Lookup (nur .dh-Files).
         self._items_by_path: dict[Path, QTreeWidgetItem] = {}
         self._active_path: Path | None = None
         self._sec_modules: QTreeWidgetItem | None = None
@@ -127,7 +127,7 @@ class FileBrowser(QWidget):
         # Programm, git checkout, ein zweiter Editor-Prozess) angelegt/
         # entfernt/umbenannt wurden, blieben bis zum naechsten Klick
         # unsichtbar bzw. als stale Eintrag stehen. `QFileSystemWatcher`
-        # beobachtet Projekt-Root + jedes Verzeichnis mit .gb-Dateien
+        # beobachtet Projekt-Root + jedes Verzeichnis mit .dh-Dateien
         # (Pfad-Liste wird bei jedem refresh() neu gesetzt); ein kurzes
         # Debounce (300ms) buendelt mehrere schnelle Aenderungen (z.B. ein
         # `git checkout`) zu EINEM Re-Scan statt vieler.
@@ -392,7 +392,7 @@ class FileBrowser(QWidget):
 
         files = sorted(
             (
-                p for p in self.project_root.rglob("*.gb")
+                p for p in self.project_root.rglob("*.dh")
                 if not p.name.startswith("_") and ".venv" not in p.parts
             ),
             key=lambda p: (str(p.parent).lower(), p.name.lower()),
@@ -477,9 +477,9 @@ class FileBrowser(QWidget):
                 ex_item.addChild(c)
 
         # Watcher-Pfade an den frischen Baum anpassen: Projekt-Root + jedes
-        # Verzeichnis, das (rekursiv) mindestens eine .gb-Datei enthaelt.
+        # Verzeichnis, das (rekursiv) mindestens eine .dh-Datei enthaelt.
         # Alte Pfade zuerst komplett entfernen (ein Verzeichnis kann seit dem
-        # letzten refresh() keine .gb-Dateien mehr haben oder ganz weg sein).
+        # letzten refresh() keine .dh-Dateien mehr haben oder ganz weg sein).
         old_watched = self._watcher.directories()
         if old_watched:
             self._watcher.removePaths(old_watched)

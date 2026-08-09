@@ -13,8 +13,8 @@ Mirror mit OGG-Direkt-Downloads:
         https://archive.org/details/JuhaniJunkalafiveactionchiptunes
 
 Verwendung in:
-  - examples/65_amiga_demo.gb  (Action-Track als Demoszene-Background)
-  - examples/67_wobbler.gb     (Title-Track als Wobbler-Score)
+  - examples/65_amiga_demo.dh  (Action-Track als Demoszene-Background)
+  - examples/67_wobbler.dh     (Title-Track als Wobbler-Score)
 
 CC0 erlaubt jegliche Verwendung -- inkl. Kommerz, ohne Nennungspflicht.
 Wir crediten den Autor trotzdem als Geste der Anerkennung.

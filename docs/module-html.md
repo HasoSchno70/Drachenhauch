@@ -153,7 +153,7 @@ PRINT "Stars: ", JSON_GET_INT(info, "stargazers_count")
 
 ## Komplettes Beispiel
 
-Siehe [examples/41_html.gb](../examples/41_html.gb).
+Siehe [examples/41_html.dh](../examples/41_html.dh).
 
 ## In der nativen Runtime (dhrt)
 

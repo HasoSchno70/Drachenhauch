@@ -1,0 +1,67 @@
+' 94_normalmap.dh -- Normal-Mapping (native-only, F6)
+'
+' MODEL_TEXTURE_NORMAL(modell, bild) -- eine Normal-Map (via LOADIMAGE) auf ein
+' MODEL_LIT-Modell legen. Die Oberflaeche bekommt feine Beleuchtungs-Details
+' (Bumps), ohne mehr Geometrie -- der Lighting-Shader stoert die Normale pro
+' Pixel ueber eine TBN-Basis (Tangenten erzeugt MODEL_LIT automatisch).
+'
+' Vergleich: linke Platte + linke Kugel MIT Normal-Map, rechts OHNE. Ein
+' kreisendes Punktlicht laesst die Bumps links wandern; rechts bleibt es glatt.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Normal-Mapping", 1)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.12)
+DIM lamp AS INTEGER
+lamp = LIGHT_POINT(0, 4, 4, &HFFFFFF)
+
+DIM nrm AS INTEGER
+nrm = LOADIMAGE("assets/normal_waves.png")
+
+' Vier Modelle: Platten + Kugeln, je links (mit Map) und rechts (ohne).
+DIM plate_l AS INTEGER
+DIM plate_r AS INTEGER
+DIM ball_l AS INTEGER
+DIM ball_r AS INTEGER
+plate_l = MESH_PLANE(5.0, 5.0, 1, 1)
+plate_r = MESH_PLANE(5.0, 5.0, 1, 1)
+ball_l  = MESH_SPHERE(1.3, 32, 32)
+ball_r  = MESH_SPHERE(1.3, 32, 32)
+MODEL_LIT(plate_l)
+MODEL_LIT(plate_r)
+MODEL_LIT(ball_l)
+MODEL_LIT(ball_r)
+' Etwas glaenzender (roughness 0.3) -> Normal-Map-Bumps treten klarer hervor.
+MODEL_PBR(plate_l, 0.0, 0.18)
+MODEL_PBR(plate_r, 0.0, 0.18)
+MODEL_PBR(ball_l, 0.0, 0.18)
+MODEL_PBR(ball_r, 0.0, 0.18)
+MODEL_TEXTURE_NORMAL(plate_l, nrm)     ' nur links die Normal-Map
+MODEL_TEXTURE_NORMAL(ball_l, nrm)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.025
+
+    ' Punktlicht kreist niedrig ueber den Platten -> Bumps wandern.
+    LIGHT_SET_POS(lamp, COS(t) * 4.0, 2.5, SIN(t) * 4.0)
+
+    CLS(&H0A0E14)
+    CAMERA3D(0, 6.5, 7.5, 0, 0.5, 0, 50)
+
+    MODEL(plate_l, -3.0, 0, 0, 1.0, &HB0B0C0)
+    MODEL(plate_r,  3.0, 0, 0, 1.0, &HB0B0C0)
+    MODEL(ball_l,  -3.0, 1.6, 0, 1.0, &HC08060)
+    MODEL(ball_r,   3.0, 1.6, 0, 1.0, &HC08060)
+
+    TEXT(12, 10, "Normal-Mapping: links MIT, rechts OHNE Normal-Map", WHITE)
+    TEXT(12, 34, "kreisendes Punktlicht -> Bumps links wandern", &H88AACC)
+
+    FLIP()
+NEXT

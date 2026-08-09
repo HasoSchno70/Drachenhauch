@@ -1,0 +1,61 @@
+' 45_gui.dh - Retained-Mode-GUI (Modul "gui")
+'
+' Fenster + Widgets als persistente Objekte. Pro Frame: GUI_UPDATE (Maus/
+' Tasten) und GUI_DRAW (zeichnen). Events per Polling (GUI_CLICKED, ...).
+' Das Fenster ist verschiebbar (Titelleiste ziehen) und schliessbar (x).
+
+IMPORT "gui"
+
+SCREEN(480, 360, "GUI-Demo (Retained-Mode)", 2)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Einstellungen", 80, 50, 300, 250)
+GUI_WINDOW_MOVABLE(win, TRUE)
+GUI_WINDOW_CLOSABLE(win, TRUE)
+
+DIM lbl AS GUI_WIDGET
+lbl = GUI_LABEL(win, "Lautstaerke: 50%", 20, 16)
+
+DIM vol AS GUI_WIDGET
+vol = GUI_SLIDER(win, 20, 44, 240, 0.0, 1.0, 0.5)
+
+DIM snd AS GUI_WIDGET
+snd = GUI_CHECKBOX(win, "Sound an", 20, 80, TRUE)
+
+DIM spieler AS GUI_WIDGET
+spieler = GUI_TEXTINPUT(win, 20, 112, 240, 26, "Spielername ...")
+
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(win, "Start", 20, 154, 110, 32)
+
+DIM info AS GUI_WIDGET
+info = GUI_LABEL(win, "Klick auf Start ...", 20, 200)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+
+    CLS(&H101828)
+    GUI_UPDATE()
+
+    ' Slider-Wert live ins Label schreiben
+    DIM pct AS INTEGER
+    pct = INT(GUI_VALUE(vol) * 100.0)
+    GUI_SET_TEXT(lbl, "Lautstaerke: " + STR$(pct) + "%")
+
+    IF GUI_CLICKED(ok) THEN
+        DIM zeile AS STRING
+        zeile = "Start fuer '" + GUI_TEXT(spieler) + "'"
+        IF GUI_CHECKED(snd) THEN
+            zeile = zeile + " - Sound an"
+        ELSE
+            zeile = zeile + " - Sound aus"
+        END IF
+        GUI_SET_TEXT(info, zeile)
+    END IF
+
+    IF GUI_WINDOW_CLOSED(win) THEN BREAK
+
+    GUI_DRAW()
+    FLIP()
+    SLEEP(16)
+WEND

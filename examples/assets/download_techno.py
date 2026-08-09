@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Laedt das Musik-Asset fuer examples/97_pbr_reactor.gb.
+"""Laedt das Musik-Asset fuer examples/97_pbr_reactor.dh.
 
 Die OGG (~3.4 MB) liegt bewusst NICHT im Git-Repo. Dieses Skript holt sie
 einmalig von OpenGameArt:

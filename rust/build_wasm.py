@@ -3,26 +3,26 @@
 **Status: experimentell.** Die native Runtime nutzt raylib (raylib-rs); ein
 funktionierender Web-Build braucht die emscripten-Toolchain (`emcc`) UND den
 Rust-Target `wasm32-unknown-emscripten`. Beides ist in dieser Umgebung nicht
-installiert -> das Skript kompiliert dann nur die `.gbc` und gibt eine
+installiert -> das Skript kompiliert dann nur die `.dhc` und gibt eine
 Anleitung aus, statt zu scheitern.
 
 Seit dem Front-End-Port (Lexer..Compiler in Rust, alle Stufen) kann dhrt die
-`.gb`-QUELLE selbst kompilieren -> der Web-Build bettet jetzt die Quelle
-(`program.gb`) ein und kompiliert im Browser (KEIN Pyodide noetig). Die
-vorab-kompilierte `program.gbc` wird weiter erzeugt und als Fallback
-eingebettet (`main.rs` liest `/program.gb` zuerst, dann `/program.gbc`).
+`.dh`-QUELLE selbst kompilieren -> der Web-Build bettet jetzt die Quelle
+(`program.dh`) ein und kompiliert im Browser (KEIN Pyodide noetig). Die
+vorab-kompilierte `program.dhc` wird weiter erzeugt und als Fallback
+eingebettet (`main.rs` liest `/program.dh` zuerst, dann `/program.dhc`).
 
 Ablauf (mit vollstaendiger Toolchain):
-  1. `<datei.gb>` -> `web/program.gb` (Quelle, kopiert) + `web/program.gbc`
+  1. `<datei.dh>` -> `web/program.dh` (Quelle, kopiert) + `web/program.dhc`
      (Fallback, via Python-Compiler -- nur Build-Zeit, nicht im Browser noetig)
   2. `cargo build --target wasm32-unknown-emscripten --features graphics --release`
      mit emscripten-Linker-Flags (ASYNCIFY fuer den blockierenden VM-Loop,
-     GLFW3 fuer raylib, `--embed-file program.gb@/program.gb` + `.gbc`).
+     GLFW3 fuer raylib, `--embed-file program.dh@/program.dh` + `.dhc`).
   3. `dhrt.js` + `dhrt.wasm` nach `web/` kopieren.
 
 Aufruf:
-  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.gb
-  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.gb web
+  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.dh
+  .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.dh web
 
 Grenzen: siehe docs/web-playground.md (Render-Loop/ASYNCIFY, Audio, Threads).
 """
@@ -136,13 +136,13 @@ def emcc_flags(out_dir: str | Path) -> list:
     aufruft -> relative Pfade wuerden vom file_packager nicht gefunden.
     (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)
 
-    Assets (`assets/` neben der .gb) kommen als PRELOAD dazu, nicht als
+    Assets (`assets/` neben der .dh) kommen als PRELOAD dazu, nicht als
     embed: emscripten legt daraus eine eigene `dhrt.data` an, die der Browser
     nebenher laedt. Eingebettet wuerden die paar Megabyte in die `.wasm`
     wandern und jeden Start ausbremsen.
     """
     out = Path(out_dir).resolve()
-    gb = (out / "program.gb").as_posix()
+    gb = (out / "program.dh").as_posix()
     flags = [
         "-s", "USE_GLFW=3",
         "-s", "ASYNCIFY",
@@ -171,7 +171,7 @@ def emcc_flags(out_dir: str | Path) -> list:
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
         "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print','requestFullscreen']",
         # Quelle einbetten -> dhrt kompiliert sie im Browser selbst (Front-End-
-        # Port, kein Pyodide). Der frühere Python-.gbc-Fallback entfällt (Stufe B:
+        # Port, kein Pyodide). Der frühere Python-.dhc-Fallback entfällt (Stufe B:
         # Python-Compiler/serialize entfernt).
     ]
     # emscripten laesst --embed und --preload NICHT gemeinsam zu. Ohne Assets
@@ -179,10 +179,10 @@ def emcc_flags(out_dir: str | Path) -> list:
     # vorgeladen, damit die paar Megabyte nicht in die .wasm wandern.
     assets = out / "assets"
     if assets.is_dir():
-        flags += ["--preload-file", f"{gb}@/program.gb",
+        flags += ["--preload-file", f"{gb}@/program.dh",
                   "--preload-file", f"{assets.as_posix()}@/assets"]
     else:
-        flags += ["--embed-file", f"{gb}@/program.gb"]
+        flags += ["--embed-file", f"{gb}@/program.dh"]
     return flags
 
 
@@ -218,19 +218,19 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
 
 
 def copy_source(dh_path: str | Path, out_dir: str | Path = WEB) -> Path:
-    """Kopiert die `.gb`-Quelle nach `<out_dir>/program.gb` -- dhrt kompiliert
+    """Kopiert die `.dh`-Quelle nach `<out_dir>/program.dh` -- dhrt kompiliert
     sie im Browser selbst (Front-End-Port). Kein Python im Browser noetig."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    dst = out_dir / "program.gb"
+    dst = out_dir / "program.dh"
     dst.write_text(Path(dh_path).read_text(encoding="utf-8"), encoding="utf-8")
     return dst
 
 
 def copy_assets(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
-    """Uebernimmt ein `assets/`-Verzeichnis NEBEN der `.gb` nach `<out_dir>`.
+    """Uebernimmt ein `assets/`-Verzeichnis NEBEN der `.dh` nach `<out_dir>`.
 
-    Die Laufzeit chdirt im Browser nach `/`, und dort liegt auch `program.gb`
+    Die Laufzeit chdirt im Browser nach `/`, und dort liegt auch `program.dh`
     -- relative Pfade wie `LOADIMAGE("assets/x.png")` treffen damit genau das
     eingebettete Verzeichnis, ohne dass ein Programm etwas anders schreiben
     muss als auf dem Desktop.
@@ -342,7 +342,7 @@ def main(argv=None) -> int:
     argv = argv if argv is not None else sys.argv
     args = argv[1:]
     if not args:
-        print("Verwendung: build_wasm.py <datei.gb> [web-ordner]")
+        print("Verwendung: build_wasm.py <datei.dh> [web-ordner]")
         return 1
     out = args[1] if len(args) > 1 else WEB
     return build(args[0], out)

@@ -207,7 +207,7 @@ Was **nicht** unterstuetzt wird:
 
 ## Beispiel
 
-[examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) zeigt das volle Pattern: Tiled-Level laden, Tile-Layer batchen, Object-Layer fuer Player-Spawn nutzen, Tile-Properties als Collision-Source verwenden.
+[examples/77_tiled_platformer.dh](../examples/77_tiled_platformer.dh) zeigt das volle Pattern: Tiled-Level laden, Tile-Layer batchen, Object-Layer fuer Player-Spawn nutzen, Tile-Properties als Collision-Source verwenden.
 
 Vollstaendiger Workflow inklusive Kollision: siehe [tile_collide-Modul](module-tile-collide.md).
 

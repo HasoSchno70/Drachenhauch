@@ -61,7 +61,7 @@ def test_shader_array_uniform_reaches_the_gpu(tmp_path):
           'DIM st[4] AS FLOAT\n'
           'st[0] = 0.125 : st[1] = 0.125 : st[2] = 0.125 : st[3] = 0.125\n'
           'SHADER_SET_ARRAY(sh, "stufen", st)\nPOSTFX(sh)\n' + _LOOP)
-    r = _run({"a.fs": fs, "a.gb": gb}, "a.gb", tmp_path, shot="a.png")
+    r = _run({"a.fs": fs, "a.dh": gb}, "a.dh", tmp_path, shot="a.png")
     assert r.returncode == 0, r.stderr
     # Summe 0.5 auf Weiss -> ~127. Ohne gesetztes Array waere die Summe 0
     # (schwarz), der Test ist also trennscharf.
@@ -82,7 +82,7 @@ def test_second_sampler_reaches_the_gpu(tmp_path):
           'DIM sh AS INTEGER\nsh = SHADER_LOAD("m.fs")\n'
           'DIM m AS IMAGE\nm = GENTEX_COLOR(64, 64, &H808080)\n'
           'SHADER_SET_TEXTURE(sh, "maske", m)\nPOSTFX(sh)\n' + _LOOP)
-    r = _run({"m.fs": fs, "m.gb": gb}, "m.gb", tmp_path, shot="m.png")
+    r = _run({"m.fs": fs, "m.dh": gb}, "m.dh", tmp_path, shot="m.png")
     assert r.returncode == 0, r.stderr
     assert 120 <= _pixel(tmp_path, "m.png", (60, 45))[0] <= 135
 
@@ -98,7 +98,7 @@ def test_matrix_uniform_reaches_the_gpu(tmp_path):
           'DIM m AS MAT4\n'
           'm = MAT4_TRS(VEC3_NEW(0.5, 0.0, 0.0), QUAT_IDENTITY(), VEC3_NEW(1.0, 1.0, 1.0))\n'
           'SHADER_SET_MATRIX(sh, "probe", m)\nPOSTFX(sh)\n' + _LOOP)
-    r = _run({"t.fs": fs, "t.gb": gb}, "t.gb", tmp_path, shot="t.png")
+    r = _run({"t.fs": fs, "t.dh": gb}, "t.dh", tmp_path, shot="t.png")
     assert r.returncode == 0, r.stderr
     assert 120 <= _pixel(tmp_path, "t.png", (60, 45))[0] <= 135
 
@@ -107,7 +107,7 @@ def test_shader_setters_reject_bad_handles(tmp_path):
     for call in ('SHADER_SET_TEXTURE(99, "x", 0)',
                  'SHADER_SET_ARRAY(99, "x", st)'):
         gb = ('SCREEN(64, 64, "B", 1)\nDIM st[2] AS FLOAT\n' + call + "\n")
-        r = _run({"b.gb": gb}, "b.gb", tmp_path, frames=1)
+        r = _run({"b.dh": gb}, "b.dh", tmp_path, frames=1)
         assert r.returncode != 0, call
         assert "SHADER" in r.stderr
 
@@ -122,7 +122,7 @@ def test_unknown_uniform_name_is_not_an_error(tmp_path):
           'DIM st[2] AS FLOAT\nSHADER_SET_ARRAY(sh, "gibtsnicht", st)\n'
           'DIM i AS IMAGE\ni = GENTEX_COLOR(4, 4, 255)\n'
           'SHADER_SET_TEXTURE(sh, "auchnicht", i)\nPRINT "ok"\n')
-    r = _run({"u.fs": fs, "u.gb": gb}, "u.gb", tmp_path, frames=1)
+    r = _run({"u.fs": fs, "u.dh": gb}, "u.dh", tmp_path, frames=1)
     assert r.returncode == 0, r.stderr
     assert r.out == ["ok"]
 
@@ -130,14 +130,14 @@ def test_unknown_uniform_name_is_not_an_error(tmp_path):
 def test_empty_array_is_rejected(tmp_path):
     gb = ('SCREEN(64, 64, "E", 1)\nDIM sh AS INTEGER\nsh = 0\n'
           'DIM st[0] AS FLOAT\nSHADER_SET_ARRAY(sh, "x", st)\n')
-    r = _run({"e.gb": gb}, "e.gb", tmp_path, frames=1)
+    r = _run({"e.dh": gb}, "e.dh", tmp_path, frames=1)
     assert r.returncode != 0 and "SHADER_SET_ARRAY" in r.stderr
 
 
 # --------------------------------------------------------------- Geometrie
 def _geo(expr_lines, tmp_path):
     gb = 'IMPORT "physics"\n' + "".join(f"PRINT {e}\n" for e in expr_lines)
-    return _run({"g.gb": gb}, "g.gb", tmp_path, frames=1)
+    return _run({"g.dh": gb}, "g.dh", tmp_path, frames=1)
 
 
 def test_line_intersection(tmp_path):
@@ -193,7 +193,7 @@ def test_point_in_polygon(tmp_path):
           'PRINT PHYSICS_POINT_POLY(5.0, 5.0, xs, ys)\n'
           'PRINT PHYSICS_POINT_POLY(15.0, 5.0, xs, ys)\n'
           'PRINT PHYSICS_POINT_POLY(5.0, -1.0, xs, ys)\n')
-    r = _run({"p.gb": gb}, "p.gb", tmp_path, frames=1)
+    r = _run({"p.dh": gb}, "p.dh", tmp_path, frames=1)
     assert r.returncode == 0, r.stderr
     assert r.out == ["TRUE", "FALSE", "FALSE"]
 
@@ -208,7 +208,7 @@ def test_point_in_concave_polygon(tmp_path):
           'xs[4]=4.0 : ys[4]=10.0\nxs[5]=0.0 : ys[5]=10.0\n'
           'PRINT PHYSICS_POINT_POLY(8.0, 8.0, xs, ys)\n'
           'PRINT PHYSICS_POINT_POLY(2.0, 8.0, xs, ys)\n')
-    r = _run({"c.gb": gb}, "c.gb", tmp_path, frames=1)
+    r = _run({"c.dh": gb}, "c.dh", tmp_path, frames=1)
     assert r.returncode == 0, r.stderr
     assert r.out == ["FALSE", "TRUE"]
 
@@ -217,5 +217,5 @@ def test_polygon_argument_errors(tmp_path):
     gb = ('IMPORT "physics"\n'
           'DIM xs[2] AS FLOAT\nDIM ys[2] AS FLOAT\n'
           'PRINT PHYSICS_POINT_POLY(1.0, 1.0, xs, ys)\n')
-    r = _run({"q.gb": gb}, "q.gb", tmp_path, frames=1)
+    r = _run({"q.dh": gb}, "q.dh", tmp_path, frames=1)
     assert r.returncode != 0 and "3 Punkte" in r.stderr

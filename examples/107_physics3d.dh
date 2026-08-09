@@ -1,0 +1,121 @@
+' 107_physics3d.dh -- echte 3D-Starrkoerper-Physik (Rapier3D) -- native-only (F6)
+'
+' Das physics3d-Modul ist ein VOLLER Solver (Schwerkraft, Kollision, Restitution),
+' im Gegensatz zum physics-Modul (nur Kollisions-Helfer). Eine PHYS_WORLD haelt
+' die Pipeline; Koerper werden ueber einen Integer-Index angesprochen.
+'
+'   PHYS3D_NEW() -> PHYS_WORLD
+'   PHYS3D_ADD_BOX(w, x,y,z, hx,hy,hz, dynamic, bounce) -> idx
+'   PHYS3D_ADD_SPHERE(w, x,y,z, r, dynamic, bounce) -> idx
+'   PHYS3D_STEP(w, dt)                 ' eine Simulationsstufe
+'   PHYS3D_BODY_X/Y/Z(w, idx)          ' Position
+'   PHYS3D_BODY_QX/QY/QZ/QW(w, idx)    ' Rotations-Quaternion (-> MAT4_TRS)
+'   PHYS3D_APPLY_IMPULSE / SET_VEL / SET_POS / REMOVE / COUNT / SET_GRAVITY
+'
+' SPACE = neuer Wuerfel/Kugel faellt rein.  ESC = beenden.
+
+IMPORT "g3d"
+IMPORT "m3d"
+IMPORT "physics3d"
+
+CONST MAXB = 200
+SCREEN(900, 560, "physics3d -- Rapier3D", 1)
+SETFPS(60)
+RANDOMIZE(MILLIS())
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H303848, 1.0)
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.35, &HFFE8C8)
+
+DIM ground_vis AS INTEGER
+DIM box_mesh AS INTEGER
+DIM ball_mesh AS INTEGER
+ground_vis = MESH_PLANE(40.0, 40.0, 1, 1)
+MODEL_LIT(ground_vis)
+box_mesh = MESH_CUBE(1.0, 1.0, 1.0)
+MODEL_LIT(box_mesh)
+MODEL_PBR(box_mesh, 0.2, 0.6)
+ball_mesh = MESH_SPHERE(0.5, 20, 20)
+MODEL_LIT(ball_mesh)
+MODEL_PBR(ball_mesh, 0.6, 0.3)
+
+' Physik-Welt + statischer Boden.
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+DIM ground AS INTEGER
+ground = PHYS3D_ADD_BOX(w, 0.0, -0.5, 0.0, 20.0, 0.5, 20.0, 0, 0.2)
+
+' Dynamische Koerper-Buchhaltung.
+DIM bidx[200] AS INTEGER          ' Body-Index in der Welt
+DIM bkind[200] AS INTEGER         ' 0 = Wuerfel, 1 = Kugel
+DIM bcount AS INTEGER
+bcount = 0
+
+SUB drop_body()
+    IF bcount >= MAXB THEN RETURN
+    DIM kind AS INTEGER
+    kind = RANDINT(0, 1)
+    DIM x AS FLOAT
+    DIM z AS FLOAT
+    x = RANDF(-4.0, 4.0)
+    z = RANDF(-4.0, 4.0)
+    DIM id AS INTEGER
+    IF kind = 0 THEN
+        id = PHYS3D_ADD_BOX(w, x, 14.0, z, 0.5, 0.5, 0.5, 1, 0.25)
+    ELSE
+        id = PHYS3D_ADD_SPHERE(w, x, 14.0, z, 0.5, 1, 0.55)
+    END IF
+    bidx[bcount] = id
+    bkind[bcount] = kind
+    bcount = bcount + 1
+END SUB
+
+' Start-Stapel.
+DIM s AS INTEGER
+FOR s = 0 TO 24
+    drop_body()
+NEXT
+
+DIM t AS FLOAT
+t = 0.0
+DIM one AS VEC3
+one = VEC3_NEW(1.0, 1.0, 1.0)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+    IF KEYPRESSED(KEY_SPACE) THEN drop_body()
+
+    DIM dt AS FLOAT
+    dt = DELTA()
+    IF dt > 0.05 THEN dt = 0.05
+    t = t + dt * 0.3
+
+    PHYS3D_STEP(w, dt)
+
+    CLS(&H0A0C12)
+    CAMERA3D(SIN(t) * 26.0, 16.0, COS(t) * 26.0,  0.0, 3.0, 0.0,  50.0)
+    MODEL(ground_vis, 0, 0, 0, 1.0, &H1A2436)
+
+    ' Jeden Koerper an seiner physikalischen Pose zeichnen (Position + Rotation).
+    DIM i AS INTEGER
+    FOR i = 0 TO bcount - 1
+        DIM bi AS INTEGER
+        bi = bidx[i]
+        DIM pos AS VEC3
+        pos = VEC3_NEW(PHYS3D_BODY_X(w, bi), PHYS3D_BODY_Y(w, bi), PHYS3D_BODY_Z(w, bi))
+        DIM rot AS QUAT
+        rot = QUAT_NEW(PHYS3D_BODY_QX(w, bi), PHYS3D_BODY_QY(w, bi),
+                       PHYS3D_BODY_QZ(w, bi), PHYS3D_BODY_QW(w, bi))
+        DIM m AS MAT4
+        m = MAT4_TRS(pos, rot, one)
+        IF bkind[i] = 0 THEN
+            MODEL_MATRIX(box_mesh, m, &H50A0E0)
+        ELSE
+            MODEL_MATRIX(ball_mesh, m, &HE0A050)
+        END IF
+    NEXT
+
+    TEXT(12, 10, "physics3d (Rapier3D): Schwerkraft + Kollision + Bounce", WHITE)
+    TEXT(12, 34, f"koerper {bcount}   SPACE = mehr   fps {FPS()}", &H88AACC)
+    FLIP()
+WEND

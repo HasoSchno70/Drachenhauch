@@ -48,7 +48,7 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Desktop-Verknuepfung anlegen"; GroupDescription: "Zusaetzliche Symbole:"
 Name: "addtopath"; Description: "Installationsordner zum PATH hinzufuegen (dhrt im Terminal nutzbar)"; GroupDescription: "Optionen:"
-Name: "assocgb"; Description: ".gb-Dateien mit GameBasic verknuepfen"; GroupDescription: "Optionen:"
+Name: "assocgb"; Description: ".dh-Dateien mit GameBasic verknuepfen"; GroupDescription: "Optionen:"
 
 [Files]
 ; Komplette eingefrorene IDE (PyInstaller onedir).
@@ -66,7 +66,7 @@ Source: "..\rust\drachenhauch_runtime\target\release\dhrt.exe"; DestDir: "{app}"
 Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
 ; Sketch-Grundgeruest fuer ESP32/ESP8266 -- NEBEN die Beispiele, weil
-; examples\159_esp32_bruecke.gb im Kopfkommentar darauf verweist. Ohne das
+; examples\159_esp32_bruecke.dh im Kopfkommentar darauf verweist. Ohne das
 ; laese der Nutzer dort von einem Gegenstueck, das er nicht hat.
 Source: "..\esp32\*"; DestDir: "{commondocs}\GameBasic\esp32"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
@@ -91,8 +91,8 @@ Name: "{group}\{cm:UninstallProgram,GameBasic}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\GameBasic"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Registry]
-; .gb-Dateiverknuepfung (oeffnet im Editor) -- nur bei aktivem Task.
-Root: HKA; Subkey: "Software\Classes\.gb"; ValueType: string; ValueName: ""; ValueData: "GameBasic.Source"; Tasks: assocgb; Flags: uninsdeletevalue
+; .dh-Dateiverknuepfung (oeffnet im Editor) -- nur bei aktivem Task.
+Root: HKA; Subkey: "Software\Classes\.dh"; ValueType: string; ValueName: ""; ValueData: "GameBasic.Source"; Tasks: assocgb; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\GameBasic.Source"; ValueType: string; ValueName: ""; ValueData: "GameBasic-Quelltext"; Tasks: assocgb; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\GameBasic.Source\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExe},0"; Tasks: assocgb
 Root: HKA; Subkey: "Software\Classes\GameBasic.Source\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExe}"" --editor ""%1"""; Tasks: assocgb

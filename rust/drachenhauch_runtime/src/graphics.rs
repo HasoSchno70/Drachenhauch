@@ -1099,7 +1099,7 @@ impl Graphics {
 
     fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool, transparent: bool) -> Graphics {
         // DHRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
-        // (z.B. fuer scharfe Buch-Screenshots), ohne die .gb-Quelle zu aendern.
+        // (z.B. fuer scharfe Buch-Screenshots), ohne die .dh-Quelle zu aendern.
         let scale = std::env::var("DHRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
         let win_w = width * scale;
@@ -5089,7 +5089,7 @@ fn render_scene<D: RaylibDraw>(
                             // die tatsaechlich uebergebenen Start-/Endpunkte,
                             // obwohl SPLINE laut Doku "Catmull-Rom DURCH Punkte"
                             // verspricht (sichtbar im shipped-Demo
-                            // examples/100_2d_extras.gb: die Kurve endete
+                            // examples/100_2d_extras.dh: die Kurve endete
                             // sichtbar vor den letzten Stuetzpunkt-Markern).
                             // Phantom-Duplikat von erstem/letztem Punkt ist der
                             // uebliche Catmull-Rom-Trick dagegen.

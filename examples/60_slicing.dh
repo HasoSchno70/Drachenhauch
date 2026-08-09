@@ -1,0 +1,58 @@
+' 60_slicing.dh -- Slicing fuer Strings und 1D-Arrays.
+'
+' Statt MID$/SUBSTRING-Built-ins reicht jetzt die Klammer-Notation
+' direkt am Wert. Funktioniert auf STRING und 1D-Array.
+
+PRINT "=== String-Slicing ==="
+DIM s AS STRING
+s = "Hello World"
+PRINT "s          = '" + s + "'"
+PRINT "s[0:5]     = '" + s[0:5] + "'"
+PRINT "s[6:]      = '" + s[6:] + "'"
+PRINT "s[:5]      = '" + s[:5] + "'"
+PRINT "s[:]       = '" + s[:] + "'"
+PRINT "s[2:8]     = '" + s[2:8] + "'"
+
+' Out-of-bounds clamping (kein Fehler).
+PRINT "s[0:1000]  = '" + s[0:1000] + "'"
+
+' Variable Bounds.
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+lo = 6
+hi = 11
+PRINT "s[lo:hi]   = '" + s[lo:hi] + "'"
+
+PRINT ""
+PRINT "=== Array-Slicing -- liefert echte Kopie ==="
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    a[i] = i * 10
+NEXT
+
+DIM b AS ARRAY OF INTEGER
+b = a[1:4]
+PRINT "Original a:"
+FOR i = 0 TO 4
+    PRINT "  a[" + STR$(i) + "] = " + STR$(a[i])
+NEXT
+PRINT "Slice b = a[1:4]:"
+FOR i = 0 TO 2
+    PRINT "  b[" + STR$(i) + "] = " + STR$(b[i])
+NEXT
+
+' Mutation der Quelle aendert den Slice nicht.
+a[2] = 999
+PRINT "Nach a[2] = 999:"
+PRINT "  a[2] =", a[2]
+PRINT "  b[1] =", b[1], "(unveraendert -- echte Kopie)"
+
+PRINT ""
+PRINT "=== Praktisch: erstes Wort extrahieren ==="
+DIM phrase AS STRING
+phrase = "GameBasic rocks heavy"
+DIM space AS INTEGER
+space = INSTR(phrase, " ", 0)
+PRINT "Erstes Wort: '" + phrase[0:space] + "'"
+PRINT "Rest:        '" + phrase[space + 1:] + "'"

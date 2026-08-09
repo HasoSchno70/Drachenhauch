@@ -1,0 +1,69 @@
+' 96_ibl.dh -- Image-Based-Lighting (analytische Umgebung, native-only, F6)
+'
+' LIGHT_ENV(himmel_farbe, boden_farbe, intensitaet) -- die Umgebung ist ein
+' vertikaler Gradient. Metalle (MODEL_PBR metalness=1) spiegeln sie; roughness
+' verwischt die Reflexion. Erst MIT Umgebung wirken Metalle wirklich metallisch
+' (analytische Lichter allein lassen Metall dunkel/flach).
+'
+' Oben: Metall (metalness 1), unten: Dielektrikum (metalness 0).
+' Spalten links->rechts: roughness glatt -> matt.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Image-Based-Lighting", 1)
+
+DIM SKY AS INTEGER
+DIM GROUND AS INTEGER
+SKY = &H6090E0
+GROUND = &H201810
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(0, 0)                         ' kein Flat-Ambient -- nur Umgebung
+LIGHT_ENV(SKY, GROUND, 1.0)                 ' Environment an
+LIGHT_DIRECTIONAL(-0.4, -0.7, -0.5, &H404040)   ' dezente Sonne fuer einen Glanzpunkt
+
+DIM COLS AS INTEGER
+COLS = 7
+
+DIM top[7] AS INTEGER
+DIM bot[7] AS INTEGER
+DIM c AS INTEGER
+FOR c = 0 TO COLS - 1
+    DIM rough AS FLOAT
+    rough = 0.03 + (c / (COLS - 1)) * 0.95
+    DIM a AS INTEGER
+    DIM b AS INTEGER
+    a = MESH_SPHERE(0.55, 32, 32)
+    b = MESH_SPHERE(0.55, 32, 32)
+    MODEL_LIT(a)
+    MODEL_LIT(b)
+    MODEL_PBR(a, 1.0, rough)                ' Metall
+    MODEL_PBR(b, 0.0, rough)                ' Dielektrikum
+    top[c] = a
+    bot[c] = b
+NEXT
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.01
+
+    CLS(GROUND)
+    ' Kamera schwenkt leicht -> Reflexionen wandern ueber die Metalle.
+    CAMERA3D(SIN(t) * 3.0, 0.0, 8.5, 0, 0, 0, 45)
+
+    FOR c = 0 TO COLS - 1
+        DIM x AS FLOAT
+        x = (c - (COLS - 1) / 2.0) * 1.5
+        MODEL(top[c], x, 1.0, 0, 1.0, &HC0C8D0)    ' silbriges Metall
+        MODEL(bot[c], x, -1.0, 0, 1.0, &HC04030)   ' rotes Plastik
+    NEXT
+
+    TEXT(12, 10, "IBL: oben Metall spiegelt Himmel, unten Plastik", WHITE)
+    TEXT(12, 34, "links glatt (Spiegel) .. rechts rau (diffus)", &H88AACC)
+
+    FLIP()
+NEXT

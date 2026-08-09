@@ -1,13 +1,13 @@
-"""End-to-End-Test: `dhrt run <datei.gb>` (Stufe 5, eigenstaendig ohne Python).
+"""End-to-End-Test: `dhrt run <datei.dh>` (Stufe 5, eigenstaendig ohne Python).
 
-Stufe 5 macht dhrt eigenstaendig: `dhrt run datei.gb` preprocesst (IMPORT),
+Stufe 5 macht dhrt eigenstaendig: `dhrt run datei.dh` preprocesst (IMPORT),
 lext, parst, kompiliert und fuehrt aus -- ALLES in Rust, ohne Python. Wie
 `dhrun.py` wird ins Verzeichnis der Datei gewechselt (chdir), damit relative
 Pfade (IMPORT + Laufzeit-Asset/-Datei) stimmen.
 
 Verifikation: stdout von `dhrt run` gegen erwartete Ausgaben. Deckt explizit
 den chdir-Effekt ab (relativer Laufzeit-Datei-Zugriff) und den
-`dhrt <datei.gb>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
+`dhrt <datei.dh>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
 der Vergleichspartner Python-Tree-Walker ist seit Stufe B geloescht.)
 """
 import contextlib
@@ -49,13 +49,13 @@ def _write(d: Path, name: str, content: str) -> Path:
 
 
 def test_run_with_relative_file_and_imports(tmp_path):
-    # lib.gb (Quellcode-IMPORT), vec2 (Modul-IMPORT), data.txt (relativer
+    # lib.dh (Quellcode-IMPORT), vec2 (Modul-IMPORT), data.txt (relativer
     # Laufzeit-Zugriff -- beweist chdir).
-    _write(tmp_path, "lib.gb",
+    _write(tmp_path, "lib.dh",
            "FUNCTION tri(n AS INTEGER) AS INTEGER\n  RETURN n * (n + 1) \\ 2\nEND FUNCTION\n")
     _write(tmp_path, "data.txt", "hallo\nwelt\n")
-    main = _write(tmp_path, "main.gb",
-                  'IMPORT "lib.gb"\nIMPORT "vec2"\n'
+    main = _write(tmp_path, "main.dh",
+                  'IMPORT "lib.dh"\nIMPORT "vec2"\n'
                   'DIM v AS VEC2\nv = VEC2_NEW(3.0, 4.0)\n'
                   'DIM f AS FILE\nf = OpenFile("data.txt", "r")\n'
                   'PRINT ReadLine(f)\nCloseFile(f)\n'
@@ -67,12 +67,12 @@ def test_run_with_relative_file_and_imports(tmp_path):
 
 
 def test_bare_gb_path_autodetect(tmp_path):
-    # `dhrt <datei.gb>` ohne `run` wird wie `run` behandelt (chdir + Quelltext).
+    # `dhrt <datei.dh>` ohne `run` wird wie `run` behandelt (chdir + Quelltext).
     _write(tmp_path, "data.txt", "zeile1\n")
-    main = _write(tmp_path, "prog.gb",
+    main = _write(tmp_path, "prog.dh",
                   'DIM f AS FILE\nf = OpenFile("data.txt", "r")\n'
                   'PRINT ReadLine(f)\nCloseFile(f)\nPRINT 6 * 7\n')
     rc, out = _dhrt([str(main)])
-    assert rc == 0, f"dhrt <datei.gb> Exit {rc}"
+    assert rc == 0, f"dhrt <datei.dh> Exit {rc}"
     # Golden (Stufe B): ReadLine="zeile1", 6*7=42.
     assert out == "zeile1\n42\n"

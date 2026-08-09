@@ -137,7 +137,7 @@ def test_dirlist(run_gb, tmp_path):
     (tmp_path / "b.txt").write_text("x", encoding="utf-8")
     (tmp_path / "a.txt").write_text("y", encoding="utf-8")
     (tmp_path / "sub").mkdir()
-    # listet sortiert; der run_gb-Tempfile (_gbtest_*.gb) liegt auch in base.
+    # listet sortiert; der run_gb-Tempfile (_gbtest_*.dh) liegt auch in base.
     out = run_gb(
         'DIM names AS ARRAY OF STRING\nnames = DIRLIST(".")\n'
         "DIM i AS INTEGER\n"

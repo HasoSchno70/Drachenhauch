@@ -1,0 +1,47 @@
+' 113_timer.dh -- Modul "timer": geplante Aktionen + Cooldowns
+'
+'   TIMER_EVERY(ms, fn)   wiederkehrender FUNCREF-Callback (Spawner)
+'   TIMER_AFTER(ms, fn)   einmalig verzoegert (Explosion, Respawn)
+'   TIMER_UPDATE()        pro Frame -- feuert die faelligen Callbacks
+'   COOLDOWN(id$, ms)     Ratenbegrenzer in einer Zeile (Schussrate)
+'
+' SPACE halten: schiesst maximal alle 250ms (COOLDOWN).
+IMPORT "timer"
+IMPORT "input"
+
+SCREEN(640, 360, "Timer-Demo")
+INPUT_BIND("fire", KEY_SPACE)
+
+DIM meldung AS STRING
+DIM spawns AS INTEGER
+DIM schuesse AS INTEGER
+meldung = "warte auf den ersten Spawn..."
+spawns = 0
+schuesse = 0
+
+SUB spawne()
+    spawns = spawns + 1
+    meldung = "Gegner #" + STR$(spawns) + " gespawnt (alle 1.5s)"
+END SUB
+
+SUB boom()
+    meldung = "BOOM -- TIMER_AFTER nach 5s gefeuert!"
+END SUB
+
+TIMER_EVERY(1500, spawne)
+TIMER_AFTER(5000, boom)
+
+WHILE NOT QUITREQUESTED()
+    INPUT_UPDATE()
+    TIMER_UPDATE()
+
+    IF INPUT_HELD("fire") AND COOLDOWN("schuss", 250) THEN
+        schuesse = schuesse + 1
+    END IF
+
+    CLS(BLACK)
+    TEXT(20, 100, meldung, CYAN)
+    TEXT(20, 150, "SPACE halten -> max. 4 Schuesse/s: " + STR$(schuesse), WHITE)
+    TEXT(20, 200, "aktive Timer: " + STR$(TIMER_COUNT()), YELLOW)
+    FLIP()
+WEND

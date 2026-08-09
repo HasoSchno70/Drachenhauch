@@ -161,5 +161,5 @@ V1: alle angeschlossenen Pads schiessen in dieselbe Action. Wer Spieler-getrennt
 
 ## Beispiel
 
-- [examples/59_input.gb](../examples/59_input.gb) — Tastatur-Pattern mit Multi-Bind, Axis, Edge-Detection.
-- [examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) — Platformer mit Tastatur + Gamepad (Stick + DPad + A-Sprung).
+- [examples/59_input.dh](../examples/59_input.dh) — Tastatur-Pattern mit Multi-Bind, Axis, Edge-Detection.
+- [examples/77_tiled_platformer.dh](../examples/77_tiled_platformer.dh) — Platformer mit Tastatur + Gamepad (Stick + DPad + A-Sprung).

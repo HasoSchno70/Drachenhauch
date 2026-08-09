@@ -265,7 +265,7 @@ module.exports = (H) => [
     [
       'AUDIO_BUS_PAN("music", -0.3)',
     ]),
-  H.note("Weil die Modulatoren auf dem Audio-Thread laufen, bleiben Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps auch dann sauber, wenn die Bildrate einbricht – genau der Unterschied zu einer selbst gebauten Lösung im Game-Loop. Eine vollständige Demo ist examples/150_audio_modulatoren.gb."),
+  H.note("Weil die Modulatoren auf dem Audio-Thread laufen, bleiben Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps auch dann sauber, wenn die Bildrate einbricht – genau der Unterschied zu einer selbst gebauten Lösung im Game-Loop. Eine vollständige Demo ist examples/150_audio_modulatoren.dh."),
 
   H.tip("Spektrum für Visualizer: AUDIO_FFT", "Mit AUDIO_FFT(array) füllst du ein ARRAY OF FLOAT mit den aktuellen Frequenz-Stärken der Gesamtausgabe. Daraus baust du Balken-Visualizer oder lässt Effekte „zur Musik tanzen“. Zusammen mit den Bus-Effekten und den Kira-Streaming-Funktionen deckt das audio-Modul alles ab, was ein Spiel klanglich braucht – von einem einzelnen Piepton bis zum dynamischen Soundtrack."),
 ];

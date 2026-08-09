@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
-_DEMO = _ROOT / "examples" / "158_gui_tabelle_sqlite.gb"
+_DEMO = _ROOT / "examples" / "158_gui_tabelle_sqlite.dh"
 _ORIGINAL = _ROOT / "pyramid_pusher" / "pyramid_pusher.db"
 
 
@@ -83,7 +83,7 @@ def test_kopie_enthaelt_dieselben_daten(tmp_path):
     quelle = tmp_path / "quelle.db"
     shutil.copy(_ORIGINAL, quelle)
     ziel = tmp_path / "kopie.db"
-    prog = tmp_path / "vac.gb"
+    prog = tmp_path / "vac.dh"
     prog.write_text(
         'IMPORT "db"\n'
         'DIM c AS DB_CONN\n'

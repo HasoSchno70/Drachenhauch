@@ -2,7 +2,7 @@
 
 Entity-Component-System mit Sparse-Set-Storage. Pragmatisch fuer Spiele: Entities sind INTEGER-IDs, Components sind benannte typed Werte. Architektur ist auf Iteration ueber Component-Halter optimiert (Cache-freundlich), nicht auf Reflection oder Type-Hierarchien.
 
-Native Implementation in [`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs) (Sparse-Set + Bulk-System-Ops).
+Native Implementation in [`rust/drachenhauch_runtime/src/ecs.rs`](../rust/drachenhauch_runtime/src/ecs.rs) (Sparse-Set + Bulk-System-Ops).
 
 ```basic
 IMPORT "ecs"
@@ -199,7 +199,7 @@ NEXT
 
 Auf der Native-VM laeuft das in ~20 ms — 1000 Bullets × 200 Frames × 8 Systeme = **1.6 Mio Entity-Updates**.
 
-Volles Beispiel: [examples/bench_ecs_systems.gb](../examples/bench_ecs_systems.gb).
+Volles Beispiel: [examples/bench_ecs_systems.dh](../examples/bench_ecs_systems.dh).
 
 ## Storage-Architektur (Sparse-Set)
 
@@ -219,7 +219,7 @@ Die Bulk-Ops nutzen die Sparse-Set-Struktur direkt: sie iterieren ueber den klei
 
 ## Eigene Bulk-Ops hinzufuegen
 
-ECS ist nativ in `dhrt` ([`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs)).
+ECS ist nativ in `dhrt` ([`rust/drachenhauch_runtime/src/ecs.rs`](../rust/drachenhauch_runtime/src/ecs.rs)).
 Eine neue Bulk-Op fuegt man so hinzu:
 
 1. **Methode auf `World`** in `ecs.rs` — iteriert in einer Rust-Loop ueber die

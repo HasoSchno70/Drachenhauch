@@ -95,7 +95,7 @@ Oder ohne Argumente:
 | `F2` | **Symbol umbenennen** — alle Whole-Word-Vorkommen des Identifiers am Cursor |
 | `F11` | **Zen-Mode** — Toolbar/Sidebar/Konsole/Statusbar verstecken, nochmal F11 zurück |
 | `Strg+Shift+W` | **Word-Wrap umschalten** |
-| `Strg+Shift+F` | **Im Projekt suchen** (alle .gb-Dateien) |
+| `Strg+Shift+F` | **Im Projekt suchen** (alle .dh-Dateien) |
 | `Strg+G` | Gehe zu Zeile |
 | `Strg+Tab` / `Strg+PageDown` | **Nächster Tab** (mit Wrap-Around) |
 | `Strg+Shift+Tab` / `Strg+PageUp` | **Vorheriger Tab** (mit Wrap-Around) |
@@ -107,7 +107,7 @@ Oder ohne Argumente:
 | `Shift+F12` | **Find-References** — listet alle Vorkommen in der Konsole (klickbar) |
 | `Strg+Leertaste` | Auto-Vervollständigung manuell auslösen. Beim Tippen öffnet sich das Popup auch automatisch (siehe unten); `↑`/`↓` navigiert, `Enter`/`Tab` committed, `Esc` oder Klick außerhalb schließt |
 | `Strg+Shift+P` | **Befehlspalette** (siehe unten) |
-| `Strg+P` | **Quick-Open** — Fuzzy-Search durch alle `.gb`-Dateien im Projekt |
+| `Strg+P` | **Quick-Open** — Fuzzy-Search durch alle `.dh`-Dateien im Projekt |
 | `Strg+D` | **Nächstes Vorkommen** — selektiert das Wort am Cursor + highlightet alle Vorkommen, weiteres `Strg+D` springt zum nächsten Treffer (mit Wrap) |
 | `Strg+-` | Block falten |
 | `Strg++` | Alles entfalten |
@@ -276,7 +276,7 @@ WIFI         (Windows-only)
 
 ## Breadcrumbs (Scope-Pfad)
 
-Schmale Leiste direkt über dem Editor: zeigt, wo der Cursor gerade steckt — z. B. `game.gb  ›  C Player  ›  ▸ Init`, wenn er in der Methode `Init` der Klasse `Player` steht. Jedes Segment ist anklickbar und springt zur jeweiligen Definitionszeile (Dateiname → Zeile 1). Aktualisiert live beim Tippen und Cursor-Bewegen; auf Top-Level zeigt sie nur den Dateinamen. Gespeist aus demselben Scope-Scanner wie die Outline.
+Schmale Leiste direkt über dem Editor: zeigt, wo der Cursor gerade steckt — z. B. `game.dh  ›  C Player  ›  ▸ Init`, wenn er in der Methode `Init` der Klasse `Player` steht. Jedes Segment ist anklickbar und springt zur jeweiligen Definitionszeile (Dateiname → Zeile 1). Aktualisiert live beim Tippen und Cursor-Bewegen; auf Top-Level zeigt sie nur den Dateinamen. Gespeist aus demselben Scope-Scanner wie die Outline.
 
 ## Outline (Struktur-Sidebar)
 
@@ -362,14 +362,14 @@ Wenn ein Programm einen Fehler wirft, erkennt die Konsole automatisch:
 | Pattern | Sprung |
 |---|---|
 | `[Zeile NN]` | aktuelle Run-Datei, Zeile NN |
-| `Fehler in DATEI.gb:` | DATEI.gb (Zeile 1) |
-| `DATEI.gb:NN` | DATEI.gb, Zeile NN (z.B. nach IMPORT) |
+| `Fehler in DATEI.dh:` | DATEI.dh (Zeile 1) |
+| `DATEI.dh:NN` | DATEI.dh, Zeile NN (z.B. nach IMPORT) |
 
 Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und springt zur Zeile.
 
 ## Run / Stop
 
-- **`Run` (F5)**: führt das Programm über die **native Runtime `dhrt`** aus (startet `dhrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `dhrun.py`-Launcher** (gleicher `dhrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
+- **`Run` (F5)**: führt das Programm über die **native Runtime `dhrt`** aus (startet `dhrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.dh:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `dhrun.py`-Launcher** (gleicher `dhrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
 - **`Stop`** (Shift+F5): bricht den laufenden Prozess ab (für Game-Loops, die nicht von selbst enden).
 
 **Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `dhrt`) bzw. **▶** (über `dhrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
@@ -414,14 +414,14 @@ Lokale, noch nicht committete Zeilen sind als `•••` / *(uncommitted)* ausg
 
 ## Finden & Ersetzen im Projekt
 
-`Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
+`Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.dh`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
 
 Optionen:
 - **Gross/Klein** — case-sensitive matchen
 - **Ganzes Wort** — Treffer nur an Wortgrenzen (`\bfoo\b`)
 - **Regex** — Query als Python-Regex interpretieren; bei Syntaxfehler erscheint ein Hinweis im Status
 
-Treffer-Liste zeigt `pfad/datei.gb:42  code-snippet`. **Doppelklick** öffnet den Treffer.
+Treffer-Liste zeigt `pfad/datei.dh:42  code-snippet`. **Doppelklick** öffnet den Treffer.
 
 **Ersetzen:** Im Feld **Ersetzen durch** den Ersatztext eingeben (leer = löschen) und **Alle ersetzen** klicken. Ein Bestätigungsdialog nennt die Anzahl Vorkommen und betroffener Dateien, bevor geschrieben wird. Die Optionen (Gross/Klein, Ganzes Wort, Regex) gelten auch fürs Ersetzen; im Regex-Modus sind Rückverweise (`\1`, `\g<1>`) im Ersatztext erlaubt, sonst wird er literal eingesetzt. **Offene Tabs werden mit ihren ungespeicherten Änderungen berücksichtigt** — der Ersatz wird auf den Live-Buffer angewendet, auf die Platte geschrieben und der Tab synchron gehalten (kein Datenverlust). Implementierung/Tests: `drachenhauch/editor_qt/find_in_project.py`, `tests/test_find_in_project.py`.
 
@@ -473,13 +473,13 @@ Wenn Pillow oder die Logo-Datei fehlt, startet der Editor unverändert mit dem D
 
 ## Drag-and-Drop
 
-`.gb`-Dateien aus dem Datei-Explorer lassen sich direkt ins Editor-Fenster
+`.dh`-Dateien aus dem Datei-Explorer lassen sich direkt ins Editor-Fenster
 ziehen — pro Datei wird ein Tab geöffnet. Andere Endungen werden ignoriert.
 Funktioniert ohne zusätzliches Paket (Qt-natives `dragEnterEvent`/`dropEvent`).
 
 ## Quick-Open (`Strg+P`)
 
-VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.gb`-Dateien im Projekt. Tippe Teile des Datei-Namens oder Pfads — die Liste filtert live (gleiche Fuzzy-Logik wie die Befehlspalette). Pfeil-Up/Down navigiert, Enter öffnet den gewählten Tab.
+VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.dh`-Dateien im Projekt. Tippe Teile des Datei-Namens oder Pfads — die Liste filtert live (gleiche Fuzzy-Logik wie die Befehlspalette). Pfeil-Up/Down navigiert, Enter öffnet den gewählten Tab.
 
 `.venv/`, `build/`, `dist/`, `__pycache__/` werden ausgespart.
 
@@ -499,7 +499,7 @@ Beim Schließen des Editors werden alle offenen Tabs (mit Pfad) und der aktive T
 
 Reihenfolge beim Start:
 
-1. Wenn `dhrun.py --editor <datei.gb>` mit Pfad-Argument: nur diese Datei wird geöffnet (überschreibt Workspace-Restore).
+1. Wenn `dhrun.py --editor <datei.dh>` mit Pfad-Argument: nur diese Datei wird geöffnet (überschreibt Workspace-Restore).
 2. Sonst: Auto-Save-Recovery — wenn ungesicherte Inhalte aus der vorigen Session vorhanden sind, fragt der Editor, ob sie wiederhergestellt werden sollen (siehe „Auto-Save").
 3. Sonst: Workspace-Restore — alle Tabs aus dem letzten Lauf werden wieder geöffnet.
 4. Sonst: ein leerer Default-Tab.

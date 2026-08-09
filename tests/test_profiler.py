@@ -84,7 +84,7 @@ def test_stop_callback_aborts():
     assert r.stopped is True
     # Sauberer Abbruch (Stop-Signal statt Prozess-Kill): die bis dahin
     # gesammelten Profile-Daten muessen erhalten bleiben -- sonst bliebe die
-    # Auswertung leer (Regression Endlos-Loop/Grafik-Demos wie 99_ibl_hdr.gb).
+    # Auswertung leer (Regression Endlos-Loop/Grafik-Demos wie 99_ibl_hdr.dh).
     assert r.lines, "Stop darf die gesammelten Profile-Daten nicht verwerfen"
     assert any(s.count > 0 for s in r.lines)
 

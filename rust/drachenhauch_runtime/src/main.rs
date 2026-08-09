@@ -1,16 +1,16 @@
 //! `dhrt` -- die native GameBasic-Runtime (und seit Stufe B die EINZIGE).
 //!
-//! Fuehrt `.gb`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
-//! compile -> VM, alles in Rust) oder eine fertige `.gbc`-Datei (JSON-
+//! Fuehrt `.dh`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
+//! compile -> VM, alles in Rust) oder eine fertige `.dhc`-Datei (JSON-
 //! Bytecode, vom eigenen Compiler bzw. via `--export` erzeugt). Korrektheit
 //! sichern die run_gb-Golden-Tests (tests/) -- die fruehere Python-Referenz
 //! (Tree-Walker) ist geloescht.
 //!
-//! Verwendung: dhrt <datei.gbc> [quell-label]
+//! Verwendung: dhrt <datei.dhc> [quell-label]
 //!
-//! Das optionale `quell-label` (z.B. `spiel.gb`) wird nur fuer Laufzeitfehler-
-//! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `dhrun.py
-//! --native` reicht den Namen der `.gb`-Quelldatei durch.
+//! Das optionale `quell-label` (z.B. `spiel.dh`) wird nur fuer Laufzeitfehler-
+//! Meldungen genutzt (`Laufzeitfehler in spiel.dh:Zeile: ...`). `dhrun.py
+//! --native` reicht den Namen der `.dh`-Quelldatei durch.
 
 mod animfsm;
 mod ast;
@@ -71,12 +71,12 @@ use std::io::Write;
 use std::process::ExitCode;
 
 /// Magic am Ende einer gebundelten `.exe`. Layout der letzten 16 Bytes:
-/// `[u64 Laenge der .gbc-Bytes, little-endian][8 Byte Magic]`. Die `.gbc`-Bytes
+/// `[u64 Laenge der .dhc-Bytes, little-endian][8 Byte Magic]`. Die `.dhc`-Bytes
 /// liegen direkt vor diesem Footer. So wird `dhrt` selbst zur Spiel-Exe:
 /// `export.py` haengt `<gbc><laenge><magic>` an eine Kopie von `dhrt.exe`.
 const PAYLOAD_MAGIC: &[u8; 8] = b"DHRTPAY1";
 
-/// Liest eine eingebettete `.gbc` aus der eigenen Exe (Bundle-Modus) -- oder
+/// Liest eine eingebettete `.dhc` aus der eigenen Exe (Bundle-Modus) -- oder
 /// None, wenn kein Payload angehaengt ist (normaler Dev-Modus).
 ///
 /// Sucht die Kennung RUECKWAERTS, statt sie in den letzten 16 Bytes zu
@@ -90,12 +90,12 @@ const PAYLOAD_MAGIC: &[u8; 8] = b"DHRTPAY1";
 /// nicht am Dateiende kleben.
 /// Quelltext oder Bytecode? Entschieden wird das allein an der Endung.
 ///
-/// `.gb` bleibt neben `.dh` gueltig: es ist die Endung aus der GameBasic-Zeit,
+/// `.dh` bleibt neben `.dh` gueltig: es ist die Endung aus der GameBasic-Zeit,
 /// und wer noch ein altes Programm herumliegen hat, soll es starten koennen,
 /// ohne es vorher umbenennen zu muessen. Geschrieben wird ueberall `.dh`.
 fn ist_quelldatei(pfad: &str) -> bool {
     let p = pfad.to_lowercase();
-    p.ends_with(".dh") || p.ends_with(".gb")
+    p.ends_with(".dh") || p.ends_with(".dh")
 }
 
 fn embedded_gbc() -> Option<String> {
@@ -108,7 +108,7 @@ fn embedded_gbc() -> Option<String> {
 fn embedded_gbc_in(data: &[u8]) -> Option<String> {
     if data.len() < 16 { return None; }
     // Von hinten nach vorne. Der letzte Treffer ist der echte Footer: die
-    // .gbc-Nutzlast liegt DAVOR, ein zufaelliges Vorkommen der acht Bytes im
+    // .dhc-Nutzlast liegt DAVOR, ein zufaelliges Vorkommen der acht Bytes im
     // JSON waere also weiter vorne. Trifft ein Kandidat nicht zu (etwa weil
     // die Bytes zufaellig im Signaturblock stehen), wird weiter vorne
     // gesucht, statt aufzugeben.
@@ -132,7 +132,7 @@ fn embedded_gbc_in(data: &[u8]) -> Option<String> {
 }
 
 fn main() -> ExitCode {
-    // Front-End-Debug: `dhrt --tokens <datei.gb>` gibt den Token-Strom als
+    // Front-End-Debug: `dhrt --tokens <datei.dh>` gibt den Token-Strom als
     // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
     {
         // Review-Fund: `std::env::args()` paniked bei nicht-UTF8-Argumenten
@@ -146,7 +146,7 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);
         }
-        // Debug: kompiliert die Quelle und gibt das .gbc-JSON aus (Bytecode-Dump).
+        // Debug: kompiliert die Quelle und gibt das .dhc-JSON aus (Bytecode-Dump).
         if raw.len() >= 3 && raw[1] == "--dumpbc" {
             let src = match std::fs::read_to_string(&raw[2]) {
                 Ok(t) => t,
@@ -174,13 +174,13 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "--runsrc" {
             return runsrc_main(&raw[2]);
         }
-        // Stufe 5: `dhrt run datei.gb` -- eigenstaendiger End-to-End-Lauf
+        // Stufe 5: `dhrt run datei.dh` -- eigenstaendiger End-to-End-Lauf
         // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
         // relative Asset-Pfade). dhrt ist damit ohne Python lauffaehig.
         if raw.len() >= 3 && raw[1] == "run" {
             return run_main(&raw[2]);
         }
-        // Stufe B (Phase 3): `dhrt profile datei.gb` -- instrumentierter Lauf,
+        // Stufe B (Phase 3): `dhrt profile datei.dh` -- instrumentierter Lauf,
         // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
         // Scope via symbols.scan_scopes). Ersetzt den Tree-Walker-Profiler.
         if raw.len() >= 3 && raw[1] == "profile" {
@@ -193,20 +193,20 @@ fn main() -> ExitCode {
                 None => { eprintln!("profile: keine Datei angegeben"); return ExitCode::from(1); }
             }
         }
-        // Stufe B (Phase 3c): `dhrt debug datei.gb` -- interaktiver Debugger ueber
+        // Stufe B (Phase 3c): `dhrt debug datei.dh` -- interaktiver Debugger ueber
         // ein newline-JSON-Protokoll (stdin: Kommandos, stdout: Events). Ersetzt
         // den Tree-Walker-Debugger.
         if raw.len() >= 3 && raw[1] == "debug" {
             return debug_main(&raw[2]);
         }
-        // Selbst-Export: `dhrt --export datei.gb [out_dir]` buendelt das
+        // Selbst-Export: `dhrt --export datei.dh [out_dir]` buendelt das
         // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
         if raw.len() >= 3 && raw[1] == "--export" {
             return export_main(&raw[2], raw.get(3).map(|s| s.as_str()));
         }
     }
 
-    // Bundle-Modus: eingebettete .gbc am Ende der eigenen Exe?
+    // Bundle-Modus: eingebettete .dhc am Ende der eigenen Exe?
     if let Some(text) = embedded_gbc() {
         // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
         // (LOADIMAGE("assets/...")) auch beim Doppelklick von ueberall stimmen.
@@ -229,12 +229,12 @@ fn main() -> ExitCode {
     // stumm bleibt. Siehe web/ + docs/web-playground.md.
     #[cfg(target_os = "emscripten")]
     {
-        for quelle in ["/program.dh", "/program.gb"] {
+        for quelle in ["/program.dh", "/program.dh"] {
             if let Ok(src) = std::fs::read_to_string(quelle) {
                 return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
             }
         }
-        for bytecode in ["/program.dhc", "/program.gbc"] {
+        for bytecode in ["/program.dhc", "/program.dhc"] {
             if let Ok(text) = std::fs::read_to_string(bytecode) {
                 return run_gbc_text(&text, "playground");
             }
@@ -257,7 +257,7 @@ fn main() -> ExitCode {
     if ist_quelldatei(path) {
         return run_main(path);
     }
-    // Optionales Quell-Label fuer Fehlermeldungen; sonst der .gbc-Pfad.
+    // Optionales Quell-Label fuer Fehlermeldungen; sonst der .dhc-Pfad.
     let source_label = args.get(2).cloned().unwrap_or_else(|| path.clone());
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
@@ -269,7 +269,7 @@ fn main() -> ExitCode {
     run_gbc_text(&text, &source_label)
 }
 
-/// `dhrt --tokens <datei.gb>` -- lext die Quelldatei und gibt pro Token eine
+/// `dhrt --tokens <datei.dh>` -- lext die Quelldatei und gibt pro Token eine
 /// JSON-Zeile `[TYP, wert, zeile]` aus (fuer Lexer-Parity gegen Python).
 fn tokens_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -291,7 +291,7 @@ fn tokens_main(path: &str) -> ExitCode {
     }
 }
 
-/// `dhrt --ast <datei.gb>` -- lext + parst und gibt den AST als JSON aus
+/// `dhrt --ast <datei.dh>` -- lext + parst und gibt den AST als JSON aus
 /// (Parser-Parity gegen Python).
 fn ast_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -311,7 +311,7 @@ fn ast_main(path: &str) -> ExitCode {
     }
 }
 
-/// `dhrt --preprocess <datei.gb>` -- expandiert IMPORTs und gibt die gemergte
+/// `dhrt --preprocess <datei.dh>` -- expandiert IMPORTs und gibt die gemergte
 /// Quelle auf stdout aus (Merge-Parity gegen preprocess.process(), Stufe 4).
 fn preprocess_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -335,11 +335,11 @@ fn preprocess_main(path: &str) -> ExitCode {
 
 /// Volle Front-End-Kette in Rust: Preprocess (IMPORT) -> Lexer -> Parser ->
 /// Compiler. `base` = Verzeichnis fuer relative IMPORT-Pfade. Liefert das
-/// `.gbc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
+/// `.dhc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
 /// Geteilt von `--runsrc`, `run` und `--export`.
 fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
     // Fehler-Format `<label>:<zeile>: <msg>` -- so erkennt der Editor (Pattern
-    // `(\S+\.gb):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
+    // `(\S+\.dh):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
     let (source, imports) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
@@ -378,7 +378,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     }
 }
 
-/// `dhrt profile <datei.gb>` -- fuehrt das Programm instrumentiert aus und gibt
+/// `dhrt profile <datei.dh>` -- fuehrt das Programm instrumentiert aus und gibt
 /// einen JSON-Blob `{total_time, output, lines:[{line,count,time}], stopped}` auf
 /// stdout aus. Programm-Output landet im `output`-Feld (kein stdout-Konflikt);
 /// Laufzeitfehler kommen als `error`/`error_line` mit ins JSON. Exit 0 (der Editor
@@ -447,7 +447,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `dhrt debug <datei.gb>` -- interaktiver Debugger. Spricht ein
+/// `dhrt debug <datei.dh>` -- interaktiver Debugger. Spricht ein
 /// newline-delimited JSON-Protokoll: stdin = Kommandos ({"cmd":"continue"|
 /// "step-over"|"step-into"|"step-out"|"stop"|"set-breakpoints"|"eval", ...}),
 /// stdout = Events ({"event":"paused|output|eval-result|eval-error|finished|
@@ -488,7 +488,7 @@ fn debug_main(path: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `dhrt --check <datei.gb>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
+/// `dhrt --check <datei.dh>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
 /// und LSP. Gibt ein JSON-Array `[{line,col,severity,phase,message}]` auf stdout
 /// aus (leer = fehlerfrei). Exit 0 auch bei gefundenen Problemen; nur ein
 /// I/O-Fehler liefert Exit 1. Zeilen beziehen sich auf die GEMERGTE Quelle
@@ -565,7 +565,7 @@ fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str)
     }
 }
 
-/// `dhrt --runsrc <datei.gb>` -- volle Front-End-Kette in Rust, OHNE chdir
+/// `dhrt --runsrc <datei.dh>` -- volle Front-End-Kette in Rust, OHNE chdir
 /// (Dev-/Parity-Einstieg: Output gegen Python-Tree-Walker, Stufe 3/4).
 fn runsrc_main(path: &str) -> ExitCode {
     let raw_source = match std::fs::read_to_string(path) {
@@ -578,7 +578,7 @@ fn runsrc_main(path: &str) -> ExitCode {
     compile_and_run_source(&raw_source, &base, path)
 }
 
-/// `dhrt run <datei.gb>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
+/// `dhrt run <datei.dh>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
 /// Quelltext, ohne Python. Wechselt wie `dhrun.py` ins Verzeichnis der Datei,
 /// damit relative Asset-Pfade (`LOADIMAGE("assets/...")`) stimmen; Label fuer
 /// Laufzeitfehler ist der Dateiname.
@@ -635,9 +635,9 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
-/// `dhrt --export <datei.gb> [out_dir]` -- buendelt das Programm zu einer
+/// `dhrt --export <datei.dh> [out_dir]` -- buendelt das Programm zu einer
 /// eigenstaendigen Exe (Selbst-Export ohne Python): kompiliert Quelltext ->
-/// .gbc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
+/// .dhc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
 /// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
 /// Pendant zu drachenhauch/export.py.
 fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
@@ -651,7 +651,7 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
         Ok(t) => t,
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
-    // 1) Quelltext -> .gbc-JSON (kompakt).
+    // 1) Quelltext -> .dhc-JSON (kompakt).
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.to_string());
     let json = match compile_source(&raw_source, &base, &label) {
@@ -662,10 +662,10 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
     // lautlos zu einem LEEREN Payload werden -- das Bundle wurde trotzdem
     // geschrieben und "Exportiert: ..." gemeldet, obwohl `embedded_gbc()`
     // `len == 0` ablehnt und die ausgelieferte Exe beim Start nur noch
-    // "Verwendung: dhrt <datei.gbc>" ausgibt.
+    // "Verwendung: dhrt <datei.dhc>" ausgibt.
     let gbc_bytes = match serde_json::to_string(&json) {
         Ok(s) => s.into_bytes(),
-        Err(e) => { eprintln!("Kann .gbc nicht serialisieren: {}", e); return ExitCode::from(1); }
+        Err(e) => { eprintln!("Kann .dhc nicht serialisieren: {}", e); return ExitCode::from(1); }
     };
     // 2) Eigene Exe lesen + Payload anhaengen.
     let exe = match std::env::current_exe() {
@@ -800,7 +800,7 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
     count
 }
 
-/// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
+/// Laedt eine `.dhc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
 /// (Datei aus Argumenten) und Bundle-Modus (eingebettet in die Exe).
 fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
     let json: serde_json::Value = match serde_json::from_str(text) {
@@ -813,7 +813,7 @@ fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
     run_program_value(json, source_label)
 }
 
-/// Laedt ein bereits geparstes `.gbc`-JSON-`Value` und fuehrt es aus.
+/// Laedt ein bereits geparstes `.dhc`-JSON-`Value` und fuehrt es aus.
 fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
     let prog = match model::load_program(&json) {
         Ok(p) => p,
@@ -860,12 +860,12 @@ mod tests {
 
     #[test]
     fn quelldatei_erkennt_beide_endungen_und_ignoriert_gross_klein() {
-        for gut in ["spiel.dh", "SPIEL.DH", "a/b/c.Dh", "alt.gb", "ALT.GB"] {
+        for gut in ["spiel.dh", "SPIEL.DH", "a/b/c.Dh", "alt.dh", "ALT.GB"] {
             assert!(ist_quelldatei(gut), "{gut} sollte Quelltext sein");
         }
         // Bytecode und Fremdes duerfen NICHT als Quelle durchgehen -- sonst
         // liefe eine .dhc durch den Compiler statt durch die VM.
-        for schlecht in ["spiel.dhc", "spiel.gbc", "spiel.dhx", "dh", "spiel.txt"] {
+        for schlecht in ["spiel.dhc", "spiel.dhc", "spiel.dhx", "dh", "spiel.txt"] {
             assert!(!ist_quelldatei(schlecht), "{schlecht} ist keine Quelle");
         }
     }

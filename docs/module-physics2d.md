@@ -74,9 +74,9 @@ DRAWIMAGEROT(img, PHYS2D_BODY_X(world, id), PHYS2D_BODY_Y(world, id), _
              DEG(PHYS2D_BODY_ANGLE(world, id)), 2.0)   ' zentriert, 2x skaliert
 ```
 
-Komplettes Beispiel: [examples/145_physics2d_sprites.gb](../examples/145_physics2d_sprites.gb)
+Komplettes Beispiel: [examples/145_physics2d_sprites.dh](../examples/145_physics2d_sprites.dh)
 (purzelnde Sprites). Für reine Vektor-Optik zeichnet
-[examples/112_physics2d.gb](../examples/112_physics2d.gb) Boxen als rotierte
+[examples/112_physics2d.dh](../examples/112_physics2d.dh) Boxen als rotierte
 Linien-Outlines und Kreise mit Spin-Linie.
 
 ## Platformer-Tipp
@@ -89,6 +89,6 @@ vertikale aus der Physik lassen) und Sprung über `PHYS2D_APPLY_IMPULSE(w, id, 0
 für *echte* Dynamik: Stapeln, Werfen, Rollen, Ragdolls, Sandbox.)
 
 Externer Typ `PHYS2D_WORLD`. Implementierung
-`rust/gb_runtime/src/physics2d.rs` (pure-Rust, ungated), Demo
-[examples/112_physics2d.gb](../examples/112_physics2d.gb), Tests
+`rust/drachenhauch_runtime/src/physics2d.rs` (pure-Rust, ungated), Demo
+[examples/112_physics2d.dh](../examples/112_physics2d.dh), Tests
 `tests/test_physics2d.py`.

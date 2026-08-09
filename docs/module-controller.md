@@ -186,7 +186,7 @@ END IF
 
 ## Beispiel
 
-[examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) — voller Platformer mit Controller, Tile-Kollision, Pickups, Tastatur + Gamepad.
+[examples/77_tiled_platformer.dh](../examples/77_tiled_platformer.dh) — voller Platformer mit Controller, Tile-Kollision, Pickups, Tastatur + Gamepad.
 
 ## In der nativen Runtime (dhrt)
 

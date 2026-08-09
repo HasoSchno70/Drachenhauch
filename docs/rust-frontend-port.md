@@ -1,7 +1,7 @@
 # Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
 
 **Ziel (erreicht):** `dhrt` erzeugt jetzt selbst aus Quelltext Bytecode und
-führt ihn aus — `dhrt run datei.gb` ist ein eigenständiger End-to-End-Lauf
+führt ihn aus — `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf
 **ohne Python**. Python bleibt nur noch in den Editoren/Tools (+ als
 Referenz-Tree-Walker). Damit kann auch der [Web-Playground](web-playground.md)
 ein reines Rust-WASM werden (kein Pyodide nötig).
@@ -9,8 +9,8 @@ ein reines Rust-WASM werden (kein Pyodide nötig).
 Die Front-End-Toolchain (`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/
 `preprocess`, ~5.100 Zeilen Python) wurde inkrementell nach Rust portiert —
 **jede Stufe gegen Python verifiziert** (cargo + rustc verfügbar). **Alle 5
-Stufen fertig.** dhrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `dhrt run`
-(bzw. `dhrt datei.gb`) deckt jetzt den vollen Pfad Quelltext → Bytecode → Run ab.
+Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
+(bzw. `dhrt datei.dh`) deckt jetzt den vollen Pfad Quelltext → Bytecode → Run ab.
 
 ## Stufen
 
@@ -20,20 +20,20 @@ Stufen fertig.** dhrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `dhrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
 | 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `dhrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` | Merge-Ergebnis-Gleichheit (`dhrt --preprocess` == `process()`) | ✅ **fertig** |
-| 5. **Verdrahtung** | `dhrt run datei.gb` (+ `.gb`-Auto-Detect) | Output-Parität (dhrt-self-compiled vs Python-TW) | ✅ **fertig** |
+| 5. **Verdrahtung** | `dhrt run datei.dh` (+ `.dh`-Auto-Detect) | Output-Parität (dhrt-self-compiled vs Python-TW) | ✅ **fertig** |
 
 ## Stufe 1 — Lexer (fertig)
 
-- [`rust/gb_runtime/src/lexer.rs`](../rust/gb_runtime/src/lexer.rs): `Tt`
+- [`rust/drachenhauch_runtime/src/lexer.rs`](../rust/drachenhauch_runtime/src/lexer.rs): `Tt`
   (Token-Typen mit exakt den Python-`TokenType.name`-Strings), `Lexer`,
   f-String-Expansion (inkl. Format-Spec `{x:.2f}` → `FORMAT$`), `&H`/`&B`,
   Zeilenfortsetzung (`_`+Newline, implizit in Klammern), lowercase-Idents,
   `$`-Suffix.
-- Debug-Einstieg `dhrt --tokens <datei.gb>` → eine JSON-Zeile `[TYP, wert,
+- Debug-Einstieg `dhrt --tokens <datei.dh>` → eine JSON-Zeile `[TYP, wert,
   zeile]` pro Token (kanonisch, umgeht Python-`repr`-Eigenheiten).
 - Test [`tests/test_rust_lexer_parity.py`](../tests/test_rust_lexer_parity.py):
   parst beide Seiten als JSON und vergleicht strukturell — **137 Fälle grün**
-  (alle `examples/*.gb` + 17 Snippets).
+  (alle `examples/*.dh` + 17 Snippets).
 - Grenzen: Integer-Literale als `i64` (Python: bignum) — für reale Programme
   ausreichend; Spalten (`col`) werden in Stufe 1 nicht verglichen (nur Zeile),
   da f-String-Synthetik-Tokens die Spalte teilen. Kommt mit dem Parser, falls
@@ -41,16 +41,16 @@ Stufen fertig.** dhrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 
 ## Stufe 2 — Parser (fertig)
 
-- [`rust/gb_runtime/src/ast.rs`](../rust/gb_runtime/src/ast.rs): `Node`-Enum
+- [`rust/drachenhauch_runtime/src/ast.rs`](../rust/drachenhauch_runtime/src/ast.rs): `Node`-Enum
   (alle ~50 Knoten aus `ast_nodes.py`) + `Param`/`CaseMatch`, `to_json()`
   emittiert exakt die Dataclass-Feld-Struktur (`{"_": NodeName, ...}`).
-- [`rust/gb_runtime/src/parser.rs`](../rust/gb_runtime/src/parser.rs):
+- [`rust/drachenhauch_runtime/src/parser.rs`](../rust/drachenhauch_runtime/src/parser.rs):
   Recursive-Descent-Port (gleiche Präzedenz + Disambiguierungen: Tupel-Assign-
   Lookahead, `FOR EACH`, `IIF`, Slice-vs-Index, WITH-`.member`, List/Dict/Set-
   Comprehensions, Operator-Overloading, Properties). Debug-Einstieg
-  `dhrt --ast <datei.gb>`.
+  `dhrt --ast <datei.dh>`.
 - Test [`tests/test_rust_parser_parity.py`](../tests/test_rust_parser_parity.py):
-  **96 grün** (alle parsbaren `examples/*.gb` + 41 Snippets).
+  **96 grün** (alle parsbaren `examples/*.dh` + 41 Snippets).
 - Gotchas: (a) `.line` ist in Python KEIN Dataclass-Feld → fällt bei der
   Serialisierung raus → reiner Struktur-Vergleich (Rust trackt `line` in Stufe 2
   nicht). (b) `Param.by_ref` hält in Python das BYREF-**Token** (oder None) statt
@@ -60,8 +60,8 @@ Stufen fertig.** dhrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `dhrt run`
 
 ## Stufe 3 — Compiler (in Arbeit)
 
-[`rust/gb_runtime/src/compiler.rs`](../rust/gb_runtime/src/compiler.rs): AST →
-`.gbc`-JSON. Debug-/Run-Einstieg `dhrt --runsrc <datei.gb>` macht **alles in
+[`rust/drachenhauch_runtime/src/compiler.rs`](../rust/drachenhauch_runtime/src/compiler.rs): AST →
+`.dhc`-JSON. Debug-/Run-Einstieg `dhrt --runsrc <datei.dh>` macht **alles in
 Rust** (lex+parse+compile+run).
 
 **Gate-Entscheidung: Output-Parität statt byte-exaktem Bytecode.** dhrt's VM
@@ -85,7 +85,7 @@ OF`/`MAP OF` → `DECLARE_NAME`), Index-Zugriff/-Zuweisung (`LOAD/STORE_INDEX`),
 Local-Slots (`LOAD/STORE/DECLARE_LOCAL`) jetzt unterstützt. Nicht unterstützte
 Konstrukte liefern `Err("Stufe 3c/3d: ...")` → der Sweep überspringt sie.
 *Bekannte dhrt-Grenze (nicht 3b-spezifisch):* sizeless `DIM x AS ARRAY OF T`
-wird von dhrt nicht leer initialisiert (auch bei Python-kompiliertem `.gbc`).
+wird von dhrt nicht leer initialisiert (auch bei Python-kompiliertem `.dhc`).
 
 **Stufe 3c (fertig):** User-`SUB`/`FUNCTION` — Stub-Phase (Forward-Refs +
 Rekursion), Body-Kompilierung in eigenem Ctx (Params als Locals), `RETURN`/
@@ -121,11 +121,11 @@ DATA-Arrays ab).
 
 ## Stufe 4 — Preprocess / `IMPORT` (fertig)
 
-[`rust/gb_runtime/src/preprocess.rs`](../rust/gb_runtime/src/preprocess.rs):
+[`rust/drachenhauch_runtime/src/preprocess.rs`](../rust/drachenhauch_runtime/src/preprocess.rs):
 Port von `drachenhauch/preprocess.py`. `process(source, base)` expandiert
 `IMPORT`-Zeilen rekursiv **vor dem Lexen** und liefert `(merged_source,
 imported_modules)`:
-- **Quellcode-IMPORT** (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
+- **Quellcode-IMPORT** (`IMPORT "helper.dh"` / relativer Pfad): Datei lesen,
   rekursiv preprocessen, mit den exakten Markern `' === IMPORT … ===` /
   `' === END IMPORT … ===` inlinen. `seen`-Set (kanonisierte Pfade) verhindert
   Doppel-Inkludierung → `' [IMPORT bereits inkludiert: …]`.
@@ -154,13 +154,13 @@ nicht.
 
 ## Stufe 5 — Verdrahtung / `dhrt run` (fertig)
 
-[`src/main.rs`](../rust/gb_runtime/src/main.rs): `dhrt run datei.gb` ist der
+[`src/main.rs`](../rust/drachenhauch_runtime/src/main.rs): `dhrt run datei.dh` ist der
 eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
 in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
 (`set_current_dir`, wie `dhrun.py` `os.chdir(file.parent)`), damit relative
 IMPORT- **und** Laufzeit-Pfade (`OpenFile("data.txt")`, `LOADIMAGE("assets/…")`)
 stimmen, und nutzt den Dateinamen als Label für Laufzeitfehler. Komfort:
-`dhrt datei.gb` (ohne `run`, Endung `.gb`) wird genauso behandelt; `.gbc`-Pfade
+`dhrt datei.dh` (ohne `run`, Endung `.dh`) wird genauso behandelt; `.dhc`-Pfade
 laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
 `compile_and_run_source(source, base, label)` gebündelt (geteilt mit `--runsrc`,
 das **ohne** chdir läuft — Dev-/Parity-Einstieg).
@@ -168,15 +168,15 @@ das **ohne** chdir läuft — Dev-/Parity-Einstieg).
 Gate: stdout von `dhrt run` == Python-Tree-Walker mit demselben chdir
 ([`tests/test_rust_run_parity.py`](../tests/test_rust_run_parity.py), 2 Tests:
 relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
-`dhrt <datei.gb>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
+`dhrt <datei.dh>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
 Damit ist die Toolchain **end-to-end ohne Python** lauffähig — Ziel der
 Portierung erreicht.
 
 ### Anschluss-Features (erledigt)
 
-- **Selbst-Export** `dhrt --export datei.gb [out_dir]`: kompiliert die Quelle
-  selbst → `.gbc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
+- **Selbst-Export** `dhrt --export datei.dh [out_dir]`: kompiliert die Quelle
+  selbst → `.dhc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
   ohne `dhrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
   [`tests/test_rust_export.py`](../tests/test_rust_export.py) (exportiert,
@@ -189,8 +189,8 @@ Portierung erreicht.
   [`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py)
   (`test_e2e_runsrc_module_alias`).
 - **WASM-Quellkompilierung im Browser (gebaut + verifiziert 2026-06-04):** der
-  emscripten-Einstieg in `main.rs` kompiliert `/program.gb` selbst (Fallback
-  `/program.gbc`), `build_wasm.py` bettet die Quelle ein → der Web-Playground
+  emscripten-Einstieg in `main.rs` kompiliert `/program.dh` selbst (Fallback
+  `/program.dhc`), `build_wasm.py` bettet die Quelle ein → der Web-Playground
   braucht **kein Pyodide** mehr. Toolchain installiert (emscripten 6.0.0 +
   Rust-Target); `build_wasm.py` verdrahtet das Windows-emscripten-Env selbst
   (`setup_emscripten_env`: CC/CXX/AR/Linker → `.exe`, bindgen-Includes,
@@ -203,5 +203,5 @@ Portierung erreicht.
 Der Tree-Walker (`interpreter.py`) bleibt die **Referenz** und der Host der
 `@builtin`-Definitionen. Die Rust-Portierung muss bit-identisches Verhalten
 liefern; das schärfste Gate ist in Stufe 3 die **Bytecode-Gleichheit** (produziert
-der Rust-Compiler exakt das `.gbc`, das Python erzeugt, ist Verhaltensgleichheit
+der Rust-Compiler exakt das `.dhc`, das Python erzeugt, ist Verhaltensgleichheit
 garantiert, da dhrt es schon bit-identisch ausführt).

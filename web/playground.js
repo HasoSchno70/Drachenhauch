@@ -2,10 +2,10 @@
 //
 // Ablauf: Der Nutzer tippt GameBasic-Quelltext in die Textarea. "Ausführen"
 // legt die Quelle in sessionStorage ab und lädt die Seite neu -> beim Neuladen
-// schreibt das Harness sie ins virtuelle FS unter /program.gb und ruft main()
+// schreibt das Harness sie ins virtuelle FS unter /program.dh und ruft main()
 // EINMAL auf. dhrt kompiliert die Quelle SELBST im WASM (Lexer..Compiler in
 // Rust, alle Stufen) und führt sie aus -- kein Pyodide, kein vorab kompiliertes
-// .gbc nötig (siehe main.rs, cfg target_os="emscripten": /program.gb hat
+// .dhc nötig (siehe main.rs, cfg target_os="emscripten": /program.dh hat
 // Vorrang). Der Reload garantiert eine FRISCHE Runtime pro Lauf -- ein erneutes
 // main() mit raylib-Init säße sonst auf altem Zustand.
 
@@ -87,10 +87,10 @@
 
   function runEmbedded() {
     setStatus("läuft …");
-    try { window.Module.FS.writeFile("/program.gb", srcEl.value); }
+    try { window.Module.FS.writeFile("/program.dh", srcEl.value); }
     catch (e) { log("FS-Fehler: " + e); }
     try {
-      window.Module.callMain([]);           // liest /program.gb, kompiliert, läuft
+      window.Module.callMain([]);           // liest /program.dh, kompiliert, läuft
       setStatus("fertig");
     } catch (e) {
       if (e && e.name === "ExitStatus") setStatus("fertig (Code " + e.status + ")");
@@ -160,9 +160,9 @@
       knopf.title = b.titel || "Beispiel laden und starten";
       knopf.addEventListener("click", function () {
         if (!b.datei) { srcEl.value = b.src; runBtn.click(); return; }
-        // Aus einer Datei: die Quelle liegt neben der Seite (program.gb wird
+        // Aus einer Datei: die Quelle liegt neben der Seite (program.dh wird
         // vom Build dorthin kopiert). Absichtlich NICHT aus dem virtuellen
-        // Dateisystem gelesen -- dort wird /program.gb vor jedem Lauf mit dem
+        // Dateisystem gelesen -- dort wird /program.dh vor jedem Lauf mit dem
         // Editorinhalt ueberschrieben, man bekaeme also den letzten Lauf.
         setStatus("lade " + b.datei + " …");
         fetch(b.datei + (window.GB_CACHE_BUSTER || ""))
@@ -173,7 +173,7 @@
           .then(function (text) { srcEl.value = text; runBtn.click(); })
           .catch(function (e) {
             setStatus(b.datei + " nicht gefunden — erst bauen: "
-              + "python rust/build_wasm.py <datei.gb>  (" + e.message + ")");
+              + "python rust/build_wasm.py <datei.dh>  (" + e.message + ")");
           });
       });
       halter.appendChild(knopf);
@@ -192,7 +192,7 @@
   setTimeout(function () {
     if (runBtn.disabled) {
       setStatus("dhrt.wasm nicht gefunden — erst bauen: "
-        + "python rust/build_wasm.py <datei.gb>");
+        + "python rust/build_wasm.py <datei.dh>");
     }
   }, 4000);
 })();

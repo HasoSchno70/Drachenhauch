@@ -1,0 +1,81 @@
+' ============================================================
+'  Kapitel 5 - Sternenhimmel mit Parallax und Funkeln
+'  Start:  dhrun.py buch-galaga/code/kap05/sternenhimmel.dh
+' ============================================================
+
+SCREEN(480, 640, "Mein Galaga - Kapitel 5")
+
+' --- Sterne in 3 Tiefen-Ebenen ---
+CONST NSTARS AS INTEGER = 80
+DIM starX[NSTARS]   AS FLOAT        ' Kommazahlen erlauben sanfte Geschwindigkeiten
+DIM starY[NSTARS]   AS FLOAT
+DIM starSpd[NSTARS] AS FLOAT        ' Tempo = Tiefe (langsam = weit weg)
+DIM starBri[NSTARS] AS INTEGER      ' Grund-Helligkeit 0..255
+DIM starPh[NSTARS]  AS FLOAT        ' Phase fuers Funkeln
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDF(0.0, 479.0)
+    starY[i] = RANDF(0.0, 639.0)
+    starPh[i] = RANDF(0.0, 6.28)
+    DIM layer AS INTEGER : layer = i MOD 3
+    IF layer = 0 THEN starSpd[i] = 0.5 : starBri[i] = 80      ' fern, dunkel, langsam
+    IF layer = 1 THEN starSpd[i] = 1.1 : starBri[i] = 150     ' mittel
+    IF layer = 2 THEN starSpd[i] = 2.0 : starBri[i] = 240     ' nah, hell, schnell
+NEXT i
+
+' --- Schiff + Schuesse (aus Kapitel 2 + 4) ---
+DIM shipImg AS IMAGE
+shipImg = LOADIMAGE("../../assets/sprites/player.png")
+DIM shipX AS INTEGER : DIM shipY AS INTEGER
+shipX = 232 : shipY = 560
+
+DIM bulletImg AS IMAGE
+bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")
+CONST NBULLET AS INTEGER = 5
+DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER
+DIM bAlive[NBULLET] AS BOOLEAN
+FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
+
+DIM frame AS INTEGER                 ' Frame-Zaehler fuers Funkeln
+
+WHILE NOT QUITREQUESTED()
+    frame = frame + 1
+    CLS(&H05060F)
+
+    ' --- Sterne: scrollen + funkeln ---
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + starSpd[i]
+        IF starY[i] > 639.0 THEN starY[i] = 0.0 : starX[i] = RANDF(0.0, 479.0)
+        DIM tw AS FLOAT : tw = 0.55 + 0.45 * SIN(frame * 0.08 + starPh[i])
+        DIM v AS INTEGER : v = INT(starBri[i] * tw)
+        PLOT(INT(starX[i]), INT(starY[i]), RGB(v, v, v))
+    NEXT i
+
+    ' --- Schiff bewegen ---
+    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4
+    IF shipX < 0 THEN shipX = 0
+    IF shipX > 464 THEN shipX = 464
+
+    ' --- Feuern ---
+    IF KEYHIT(KEY_SPACE) THEN
+        DIM s AS INTEGER
+        FOR s = 0 TO NBULLET - 1
+            IF NOT bAlive[s] THEN
+                bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4 : BREAK
+            END IF
+        NEXT s
+    END IF
+
+    ' --- Schuesse ---
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 8
+            IF by[i] < -8 THEN bAlive[i] = FALSE
+            DRAWIMAGE(bulletImg, bx[i], by[i])
+        END IF
+    NEXT i
+
+    DRAWIMAGE(shipImg, shipX, shipY)
+    FLIP()
+WEND

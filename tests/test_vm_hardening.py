@@ -1,4 +1,4 @@
-"""VM-Härtung: ein kaputter/abgeschnittener `.gbc` (Stack-Underflow) muss eine
+"""VM-Härtung: ein kaputter/abgeschnittener `.dhc` (Stack-Underflow) muss eine
 saubere Laufzeit-Fehlermeldung liefern statt eines Rust-Panics.
 
 Hintergrund: die VM-Dispatch-Schleife poppte den Operanden-Stack frueher mit
@@ -30,8 +30,8 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 
 def _dump_gbc(tmp_path) -> dict:
-    """Ein valides .gbc-JSON-Skelett (via `dhrt --dumpbc`) holen."""
-    src = tmp_path / "tiny.gb"
+    """Ein valides .dhc-JSON-Skelett (via `dhrt --dumpbc`) holen."""
+    src = tmp_path / "tiny.dh"
     src.write_text("PRINT 1 + 2\n", encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--dumpbc", str(src)],
                        capture_output=True, text=True, encoding="utf-8", timeout=30)
@@ -40,7 +40,7 @@ def _dump_gbc(tmp_path) -> dict:
 
 
 def _run_gbc(tmp_path, data: dict) -> subprocess.CompletedProcess:
-    p = tmp_path / "corrupt.gbc"   # NICHT .gb -> dhrt nimmt den .gbc-Pfad
+    p = tmp_path / "corrupt.dhc"   # NICHT .dh -> dhrt nimmt den .dhc-Pfad
     p.write_text(json.dumps(data), encoding="utf-8")
     return subprocess.run([str(_DHRT), str(p)], capture_output=True,
                           text=True, encoding="utf-8", timeout=30)
@@ -62,7 +62,7 @@ def test_stack_underflow_is_clean_error_not_panic(tmp_path):
 
 
 def test_normal_program_still_runs(tmp_path):
-    # Regressions-Sicherung: ein gueltiges .gbc laeuft unveraendert.
+    # Regressions-Sicherung: ein gueltiges .dhc laeuft unveraendert.
     data = _dump_gbc(tmp_path)
     r = _run_gbc(tmp_path, data)
     assert r.returncode == 0

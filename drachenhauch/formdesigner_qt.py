@@ -2822,13 +2822,13 @@ class FormDesigner(QMainWindow):
     def export_gb_code(self):
         """Aktives Formular als eigenstaendiges GameBasic-Programm (explizite
         GUI_*-Konstruktion, kein GUI_LOAD) speichern."""
-        default = str(self.path.with_suffix(".gb")) if self.path else str(self.project_root)
+        default = str(self.path.with_suffix(".dh")) if self.path else str(self.project_root)
         fn, _ = QFileDialog.getSaveFileName(self, "GB-Code exportieren", default,
-                                            "GameBasic (*.gb)")
+                                            "GameBasic (*.dh)")
         if not fn:
             return
-        if not fn.endswith(".gb"):
-            fn += ".gb"
+        if not fn.endswith(".dh"):
+            fn += ".dh"
         code = self.canvas.doc.generate_gb_code(screen_title=self.canvas.doc.title)
         if not self._write(fn, lambda: Path(fn).write_text(code, encoding="utf-8")):
             return
@@ -2859,7 +2859,7 @@ class FormDesigner(QMainWindow):
         self._stop_run()
         tmp = Path(tempfile.mkdtemp(prefix="gbform_"))
         self._run_dir = tmp
-        gb = tmp / "run.gb"
+        gb = tmp / "run.dh"
         runner = self.canvas.doc.generate_runner("form.gbform",
                                                  screen_title=self.canvas.doc.title)
         if not self._write(str(tmp), lambda: (

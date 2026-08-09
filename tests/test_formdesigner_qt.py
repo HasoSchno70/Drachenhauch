@@ -644,7 +644,7 @@ def test_export_gb_writes_file(tmp_path, monkeypatch):
     win = FormDesigner(tmp_path)
     win.active.doc.add("button", 10, 10).on_click = "go"
     win.active.doc.code["go"] = 'PRINT "go"'
-    out = tmp_path / "out.gb"
+    out = tmp_path / "out.dh"
     monkeypatch.setattr("PySide6.QtWidgets.QFileDialog.getSaveFileName",
                         staticmethod(lambda *a, **k: (str(out), "")))
     win.export_gb_code()
@@ -1097,8 +1097,8 @@ def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeyp
     monkeypatch.setattr(FormDesigner, "_spawn", lambda self, cmd, cwd: proc)
     win.run_form()
     run_dir = win._run_dir
-    assert run_dir is not None and (run_dir / "run.gb").exists()
-    assert (run_dir / "form.gbform").exists()          # neben der .gb, fuer GUI_LOAD
+    assert run_dir is not None and (run_dir / "run.dh").exists()
+    assert (run_dir / "form.gbform").exists()          # neben der .dh, fuer GUI_LOAD
     win.run_form()                                     # zweites F5
     assert proc.killed                                 # alter Prozess beendet
     assert not run_dir.exists()                        # alter Temp-Ordner weg

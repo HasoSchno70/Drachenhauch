@@ -1,4 +1,4 @@
-//! Laden des `.gbc`-Formats (siehe `drachenhauch/serialize.py`) in Rust-Structs.
+//! Laden des `.dhc`-Formats (siehe `drachenhauch/serialize.py`) in Rust-Structs.
 //!
 //! Der const-Pool und die Code-Instruktionen werden beim Laden EINMALIG in
 //! native Rust-Typen dekodiert (kein serde_json zur Laufzeit der Dispatch-
@@ -186,7 +186,7 @@ pub struct Func {
     pub return_type: String,
     pub param_defaults: Vec<Value>,
     /// Pro Parameter: ob er BYREF ist (Copy-In/Copy-Out). Leer = keine BYREF-
-    /// Parameter (alte .gbc / Funktionen ohne BYREF). Nur die direkten
+    /// Parameter (alte .dhc / Funktionen ohne BYREF). Nur die direkten
     /// CALL_USER-Aufrufe (freie Funktionen) werten das aus -- der Compiler kennt
     /// dort die Signatur statisch und emittiert das Write-Back.
     pub param_byref: Vec<bool>,
@@ -204,7 +204,7 @@ pub struct Func {
     pub lines: Vec<u32>,
     /// Debug-Namen pro Local-Slot (parallel zu `local_types`); leer fuer
     /// Compiler-Zwischenwerte. Nur fuer `dhrt debug` (Variablen-Inspektion);
-    /// leer wenn der Compiler keine Namen getrackt hat (alte .gbc).
+    /// leer wenn der Compiler keine Namen getrackt hat (alte .dhc).
     pub local_names: Vec<String>,
 }
 
@@ -296,7 +296,7 @@ fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, 
 // Dekodierung
 // ---------------------------------------------------------------------------
 
-/// Dekodiert einen `.gbc`-Wert (Encoding aus `serialize.py::_enc`).
+/// Dekodiert einen `.dhc`-Wert (Encoding aus `serialize.py::_enc`).
 /// Neutrales Element der Mathe-Typen (MAT4 = Einheitsmatrix, VEC* = Null,
 /// QUAT = Einheits-Quaternion). Alles andere: None -- bleibt NIL.
 pub(crate) fn neutrales_element(t: &str) -> Option<Value> {

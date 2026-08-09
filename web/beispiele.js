@@ -11,11 +11,11 @@
 window.GB_BEISPIELE = [
   {
     // Einziger Eintrag mit `datei` statt `src`: das Programm, mit dem der Build
-    // gemacht wurde (`build_wasm.py <datei.gb>` legt es als program.gb ab).
+    // gemacht wurde (`build_wasm.py <datei.dh>` legt es als program.dh ab).
     // NUR dieses Programm darf Dateien laden -- sein assets/-Ordner ist der,
     // der im Paket steckt.
     name: "▶ Demo",
-    datei: "program.gb",
+    datei: "program.dh",
     titel: "Das Programm laden, mit dem dieser Build gemacht wurde",
   },
   {

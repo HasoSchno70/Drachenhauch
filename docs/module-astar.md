@@ -173,4 +173,4 @@ NEXT y
 ## Siehe auch
 
 - [`physics`](module-physics.md) — Kollisions-Tests + Vektor-Mathe für Pixel-genaue Kollisionen (komplementär: A* operiert auf Tiles, physics auf Punkten)
-- Vollständiges Beispiel: [`examples/51_astar.gb`](../examples/51_astar.gb) — Labyrinth mit ASCII-Pfad-Visualisierung
+- Vollständiges Beispiel: [`examples/51_astar.dh`](../examples/51_astar.dh) — Labyrinth mit ASCII-Pfad-Visualisierung

@@ -44,7 +44,7 @@ AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
           vib_depth, vib_speed, volume[, stereo_width]) -> SOUND
 ```
 
-Der Effekt wird im Spiel selbst synthetisiert — `slide` ist der Pitch-Sweep (Hz/s, negativ = fallend), Attack/Sustain/Decay die Hüllkurve, `vib_depth`/`vib_speed` ein optionales Vibrato. Der optionale `stereo_width` (0…1) macht den Sound **stereo/breiter** (Detune zwischen L/R; bei `noise` dekorreliert). Komplementär zu `AUDIO_TONE` (das nur konstante Töne kann). Läuft über die native Runtime `dhrt`; die Synth-Mathematik ist geteilt — [`drachenhauch/synth.py`](../drachenhauch/synth.py) (Editor-Vorschau) bzw. `rust/gb_runtime/src/audio.rs` (nativ).
+Der Effekt wird im Spiel selbst synthetisiert — `slide` ist der Pitch-Sweep (Hz/s, negativ = fallend), Attack/Sustain/Decay die Hüllkurve, `vib_depth`/`vib_speed` ein optionales Vibrato. Der optionale `stereo_width` (0…1) macht den Sound **stereo/breiter** (Detune zwischen L/R; bei `noise` dekorreliert). Komplementär zu `AUDIO_TONE` (das nur konstante Töne kann). Läuft über die native Runtime `dhrt`; die Synth-Mathematik ist geteilt — [`drachenhauch/synth.py`](../drachenhauch/synth.py) (Editor-Vorschau) bzw. `rust/drachenhauch_runtime/src/audio.rs` (nativ).
 
 **Pan** (Position links/rechts) wird beim Abspielen gesetzt — der Export schreibt dafür `AUDIO_PLAY` + `AUDIO_PAN(ch, left, right)` dazu:
 ```basic

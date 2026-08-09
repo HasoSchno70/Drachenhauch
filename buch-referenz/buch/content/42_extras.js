@@ -145,7 +145,7 @@ module.exports = (H) => [
       'maske = LOADIMAGE("assets/maske.png")',
       'SHADER_SET_TEXTURE(bloom, "maske", maske)',
     ]),
-  H.note("Fertige Beispiel-Shader (CRT, Bloom, Vignette) liegen unter examples/assets/shaders/, eine vollständige Demo ist examples/86_postfx_shaders.gb."),
+  H.note("Fertige Beispiel-Shader (CRT, Bloom, Vignette) liegen unter examples/assets/shaders/, eine vollständige Demo ist examples/86_postfx_shaders.dh."),
 
   H.h2("Eine Fläche, die sich merkt: Schweife"),
   H.p("Normalerweise wird ein Render-Target zu jedem Bild geleert – du zeichnest hinein, stempelst, fertig. Mit behalten = TRUE bleibt der Inhalt dagegen über das Bild hinaus stehen. Damit entsteht Rückkopplung: Was du zeichnest, liegt im nächsten Bild noch da, und was du neu darüber malst, kommt hinzu. Genau so entstehen Leuchtspuren und Schweife."),

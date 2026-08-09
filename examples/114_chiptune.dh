@@ -1,0 +1,251 @@
+' 114_chiptune.dh -- 4-Kanal-Chiptune-Demo im C64/Amiga-Stil
+'
+' Ein komplettes Musikstueck OHNE eine einzige Audio-Datei: alle Sounds
+' werden zur Laufzeit synthetisiert (AUDIO_TONE / AUDIO_SFX / AUDIO_NOISE)
+' und auf 4 "Tracker-Kanaelen" parallel abgespielt -- jeder PLAYSOUND/
+' AUDIO_PLAY laeuft auf einem eigenen Mixer-Channel (Default: 8).
+'
+'   Kanal 1  LEAD   Square-Melodie mit Vibrato (AUDIO_SFX), rechts gepannt
+'   Kanal 2  ARP    schnelles Akkord-Arpeggio (klassischer C64-Trick), links
+'   Kanal 3  BASS   Square-Bass mit Oktav-Sprüngen, Mitte
+'   Kanal 4  DRUMS  Kick (Sinus-Pitch-Drop), Snare + HiHat (Noise), Mitte
+'
+' Der Player ist frame-basiert wie der dhtracker-Export: DELTA() sammelt
+' Millisekunden, alle ROWMS wird die naechste Pattern-Reihe gespielt.
+' Dazu Demoszene-Deko: Copper-Balken, Regenbogen-Titel, VU-Meter pro
+' Kanal, echtes FFT-Spektrum der laufenden Musik und ein Sinus-Scroller.
+'
+' ESC beendet.
+
+IMPORT "audio"
+
+SCREEN(640, 360, "GameBasic Chiptune -- 4 Kanaele", 2)
+SETFPS(60)
+
+' ============================================================
+' Song-Daten: 8 Takte a 16 Reihen (16tel bei 120 BPM = 125 ms)
+' ============================================================
+
+CONST ROWS = 128
+CONST ROWMS = 125.0
+CONST BARS = 8
+
+' Akkordfolge in a-Moll:  A-Teil: Am Am F G   B-Teil: Am G F E
+' Akkord-Index: 0=Am  1=F  2=G  3=E
+DIM barChord[BARS] AS INTEGER
+barChord[0] = 0 : barChord[1] = 0 : barChord[2] = 1 : barChord[3] = 2
+barChord[4] = 0 : barChord[5] = 2 : barChord[6] = 1 : barChord[7] = 3
+
+' Arpeggio-Toene (MIDI) je Akkord: Grundton, Terz, Quinte
+DIM arpTone[12] AS INTEGER
+arpTone[0]  = 57 : arpTone[1]  = 60 : arpTone[2]  = 64    ' Am: A3 C4 E4
+arpTone[3]  = 53 : arpTone[4]  = 57 : arpTone[5]  = 60    ' F:  F3 A3 C4
+arpTone[6]  = 55 : arpTone[7]  = 59 : arpTone[8]  = 62    ' G:  G3 B3 D4
+arpTone[9]  = 52 : arpTone[10] = 56 : arpTone[11] = 59    ' E:  E3 G#3 B3
+
+' Bass-Grundton (MIDI, Oktave 2) je Akkord
+DIM bassRoot[4] AS INTEGER
+bassRoot[0] = 45 : bassRoot[1] = 41 : bassRoot[2] = 43 : bassRoot[3] = 40
+
+' Spuren: 0 = Pause, sonst MIDI-Note. Drums: 1=Kick 2=Snare 3=HiHat
+DIM lead[ROWS] AS INTEGER
+DIM arp[ROWS]  AS INTEGER
+DIM bass[ROWS] AS INTEGER
+DIM drum[ROWS] AS INTEGER
+
+' --- Arp / Bass / Drums werden aus der Akkordfolge generiert -----------
+DIM bar AS INTEGER
+DIM r AS INTEGER
+DIM c AS INTEGER
+DIM g AS INTEGER
+FOR bar = 0 TO BARS - 1
+    c = barChord[bar]
+    FOR r = 0 TO 15
+        g = bar * 16 + r
+        ' Arpeggio: jede Reihe der naechste Akkordton -- 8 Toene/Sekunde
+        arp[g] = arpTone[c * 3 + (r MOD 3)]
+        ' Bass: Grundton auf den Vierteln, Oktave dazwischen, Push auf 10
+        IF r = 0 OR r = 8 OR r = 10 THEN bass[g] = bassRoot[c]
+        IF r = 4 OR r = 12 THEN bass[g] = bassRoot[c] + 12
+        ' Drums: Kick 0/8/10, Snare 4/12, HiHat auf den restlichen 8teln
+        IF r = 0 OR r = 8 OR r = 10 THEN drum[g] = 1
+        IF r = 4 OR r = 12 THEN drum[g] = 2
+        IF r MOD 2 = 0 AND drum[g] = 0 THEN drum[g] = 3
+    NEXT
+NEXT
+
+' --- Lead-Melodie (von Hand gesetzt, eine Note pro Viertel) ------------
+' A-Teil
+lead[0]   = 69 : lead[4]   = 72 : lead[8]   = 76 : lead[12]  = 74   ' Am
+lead[16]  = 72 : lead[20]  = 69 : lead[24]  = 64 : lead[28]  = 67   ' Am
+lead[32]  = 65 : lead[36]  = 69 : lead[40]  = 72 : lead[44]  = 69   ' F
+lead[48]  = 71 : lead[52]  = 67 : lead[56]  = 74 : lead[60]  = 71   ' G
+' B-Teil (Antwort, etwas hoeher)
+lead[64]  = 76 : lead[68]  = 72 : lead[72]  = 69 : lead[76]  = 72   ' Am
+lead[80]  = 74 : lead[84]  = 71 : lead[88]  = 67 : lead[92]  = 71   ' G
+lead[96]  = 72 : lead[100] = 69 : lead[104] = 65 : lead[108] = 69   ' F
+lead[112] = 68 : lead[116] = 71 : lead[120] = 76 : lead[124] = 71   ' E
+
+' ============================================================
+' Noten-Helfer
+' ============================================================
+
+FUNCTION NoteHz(m AS INTEGER) AS FLOAT
+    RETURN 440.0 * 2.0 ^ ((m - 69) / 12.0)
+END FUNCTION
+
+FUNCTION NoteName(m AS INTEGER) AS STRING
+    DIM names AS STRING
+    names = "C-C#D-D#E-F-F#G-G#A-A#B-"
+    RETURN MID$(names, (m MOD 12) * 2, 2).replace("-", "") + STR$(m \ 12 - 1)
+END FUNCTION
+
+' ============================================================
+' Player: alle ROWMS eine Reihe (wie der dhtracker-Export)
+' ============================================================
+
+DIM vu[4] AS FLOAT            ' VU-Pegel je Kanal (Anzeige, klingt nicht)
+DIM lastNote[4] AS STRING
+DIM i AS INTEGER
+FOR i = 0 TO 3
+    lastNote[i] = "---"
+NEXT
+
+SUB PlayRow(rr AS INTEGER)
+    DIM ch AS AUDIO_CHANNEL
+    ' LEAD: Square mit Vibrato + kurzer Huellkurve, rechts
+    IF lead[rr] > 0 THEN
+        ch = AUDIO_PLAY(AUDIO_SFX("square", NoteHz(lead[rr]), 0.0, 8, 240, 160, 5.0, 5.5, 0.30))
+        AUDIO_PAN(ch, 0.35, 0.95)
+        vu[0] = 1.0
+        lastNote[0] = NoteName(lead[rr])
+    END IF
+    ' ARP: kurze Square-Toene, links
+    IF arp[rr] > 0 THEN
+        ch = AUDIO_PLAY(AUDIO_TONE(NoteHz(arp[rr]), 110, "square", 0.13))
+        AUDIO_PAN(ch, 0.95, 0.35)
+        vu[1] = 1.0
+        lastNote[1] = NoteName(arp[rr])
+    END IF
+    ' BASS: Square eine/zwei Oktaven tiefer, Mitte
+    IF bass[rr] > 0 THEN
+        AUDIO_PLAY(AUDIO_TONE(NoteHz(bass[rr] - 12), 210, "square", 0.26))
+        vu[2] = 1.0
+        lastNote[2] = NoteName(bass[rr] - 12)
+    END IF
+    ' DRUMS: Kick = Sinus mit Pitch-Drop, Snare/HiHat = Noise
+    IF drum[rr] = 1 THEN
+        AUDIO_PLAY(AUDIO_SFX("sine", 160.0, -700.0, 2, 50, 90, 0.0, 0.0, 0.85))
+        vu[3] = 1.0
+        lastNote[3] = "KCK"
+    END IF
+    IF drum[rr] = 2 THEN
+        AUDIO_PLAY(AUDIO_NOISE(90, 0.40))
+        vu[3] = 1.0
+        lastNote[3] = "SNR"
+    END IF
+    IF drum[rr] = 3 THEN
+        AUDIO_PLAY(AUDIO_NOISE(25, 0.10))
+        IF vu[3] < 0.4 THEN vu[3] = 0.4
+        lastNote[3] = "HAT"
+    END IF
+END SUB
+
+' ============================================================
+' Hauptschleife: Player treiben + Demoszene-Deko zeichnen
+' ============================================================
+
+DIM row AS INTEGER
+DIM acc AS FLOAT
+row = 0
+acc = 0.0
+
+DIM fft[24] AS FLOAT
+DIM scrollX AS FLOAT
+scrollX = 660.0
+DIM scrollTxt AS STRING
+scrollTxt = "GAMEBASIC CHIPTUNE PLAYER ... 4 KANAELE, 0 SAMPLES, 100% SYNTHESE ... LEAD + ARPEGGIO + BASS + DRUMS WIE DAMALS AUF C64 UND AMIGA ... GRUESSE AN ALLE TRACKER-MUSIKER ... WRAP!      "
+
+DIM t AS FLOAT
+DIM names[4] AS STRING
+names[0] = "LEAD" : names[1] = "ARP " : names[2] = "BASS" : names[3] = "DRUM"
+DIM laneHue[4] AS INTEGER
+laneHue[0] = 200 : laneHue[1] = 130 : laneHue[2] = 40 : laneHue[3] = 330
+
+DIM y AS INTEGER
+DIM w AS INTEGER
+DIM h AS INTEGER
+DIM x AS INTEGER
+DIM hue AS INTEGER
+DIM beatGlow AS FLOAT
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+
+    ' --- Player: faellige Reihen spielen -----------------------------
+    acc = acc + DELTA() * 1000.0
+    WHILE acc >= ROWMS
+        acc = acc - ROWMS
+        PlayRow(row)
+        row = (row + 1) MOD ROWS
+    WEND
+
+    ' --- Hintergrund + Copper-Balken ---------------------------------
+    CLS(&H0A0A1E)
+    FOR i = 0 TO 2
+        y = 60 + i * 90 + INT(SIN(t * 1.3 + i * 2.1) * 34.0)
+        hue = (INT(t * 40.0) + i * 70) MOD 360
+        GRADIENTV(0, y, 639, y + 10, HSV(hue, 0.85, 0.45), HSV(hue, 0.85, 0.05))
+    NEXT
+
+    ' --- Titel (Regenbogen) ------------------------------------------
+    TEXT_SIZE(26)
+    w = TEXT_WIDTH("* GAMEBASIC CHIPTUNE *")
+    TEXT(320 - w \ 2 + 2, 22, "* GAMEBASIC CHIPTUNE *", &H101028)
+    TEXT(320 - w \ 2, 20, "* GAMEBASIC CHIPTUNE *", HSV(INT(t * 120.0) MOD 360, 0.75, 1.0))
+    TEXT_SIZE(12)
+    w = TEXT_WIDTH("120 BPM / 4 KANAELE / SYNTH IN ECHTZEIT / ESC = ENDE")
+    TEXT(320 - w \ 2, 52, "120 BPM / 4 KANAELE / SYNTH IN ECHTZEIT / ESC = ENDE", &H8090B0)
+
+    ' --- Kanal-Lanes mit VU-Metern ------------------------------------
+    TEXT_SIZE(14)
+    FOR i = 0 TO 3
+        y = 92 + i * 44
+        TEXT(28, y, names[i], HSV(laneHue[i], 0.5, 1.0))
+        TEXT(86, y, lastNote[i], WHITE)
+        ' VU-Balken (zerfaellt pro Frame)
+        w = INT(vu[i] * 220.0)
+        BOX(140, y + 2, 140 + w, y + 12, HSV(laneHue[i], 0.8, 0.55 + vu[i] * 0.45))
+        RECT(140, y + 2, 362, y + 12, &H303050)
+        vu[i] = vu[i] * 0.90
+    NEXT
+
+    ' --- Echtes FFT-Spektrum der laufenden Musik ----------------------
+    AUDIO_FFT(fft)
+    FOR i = 0 TO 23
+        h = INT(fft[i] * 120.0)
+        IF h > 120 THEN h = 120
+        x = 400 + i * 9
+        BOX(x, 264 - h, x + 6, 264, HSV((i * 9 + INT(t * 60.0)) MOD 360, 0.7, 0.9))
+    NEXT
+    RECT(398, 142, 618, 265, &H303050)
+    TEXT_SIZE(10)
+    TEXT(402, 130, "FFT-SPEKTRUM (AUDIO_FFT)", &H8090B0)
+
+    ' --- Pattern-Position + Beat-Puls ---------------------------------
+    beatGlow = vu[3]
+    RECT(0, 0, 639, 359, HSV(200, 0.6, 0.25 + beatGlow * 0.6))
+    TEXT_SIZE(12)
+    TEXT(28, 272, "REIHE " + STR$(row) + " / " + STR$(ROWS) + "   TAKT " + STR$(row \ 16 + 1) + " / 8", &H9FB4C8)
+
+    ' --- Sinus-Scroller ------------------------------------------------
+    TEXT_SIZE(18)
+    w = TEXT_WIDTH(scrollTxt)
+    scrollX = scrollX - 130.0 * DELTA()
+    IF scrollX < -w THEN scrollX = 660.0
+    y = 318 + INT(SIN(t * 2.4) * 10.0)
+    TEXT(INT(scrollX), y, scrollTxt, HSV((INT(t * 90.0) + 180) MOD 360, 0.6, 1.0))
+
+    FLIP()
+WEND

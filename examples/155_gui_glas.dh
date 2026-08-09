@@ -1,0 +1,181 @@
+' 155_gui_glas.dh -- Modul "gui": der plastische Glas-Look.
+'
+' Zeigt die Themen "glas_dunkel" und "glas_hell" mit allen Bedienelementen,
+' die davon leben: Kippschalter, Drehregler, runde Transport-Knoepfe,
+' versenkte Eingabefelder und Schieber mit Metallgriff.
+'
+'   LEERTASTE   zwischen hell und dunkel wechseln
+'   f           flach <-> plastisch (zeigt, was Verlauf/Glanz/Fase ausmachen)
+'   g           eigene Grafik (9-Slice) fuer die Knoepfe an/aus
+'   MAUS        alles ist bedienbar -- Regler ziehen, Schalter umlegen
+'
+' Das dritte Fenster zeigt, dass Schriftart und -groesse pro Widget
+' gelten: GUI_SET_FONT / GUI_SET_FONT_SIZE.
+'   ESC         Ende
+
+IMPORT "gui"
+
+SCREEN(980, 770, "GameBasic -- Glas-Oberflaeche")
+
+' Saubere Schrift, falls eine da ist (deutlich besser lesbar als die
+' eingebaute Pixelschrift bei kleinen Groessen).
+DIM fp AS STRING
+DIM schrift AS INTEGER
+schrift = -1
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF schrift < 0 AND FILEEXISTS(fp) THEN schrift = LOADFONT(fp, 32)
+NEXT
+IF schrift >= 0 THEN SETFONT(schrift)
+TEXT_SIZE(16)
+
+' Eine zweite, deutlich andere Schrift -- damit man im dritten Fenster
+' sieht, dass die Wahl wirklich pro Widget gilt.
+DIM schrift2 AS INTEGER
+schrift2 = -1
+FOR EACH fp IN ("C:/Windows/Fonts/georgia.ttf", "C:/Windows/Fonts/times.ttf", "C:/Windows/Fonts/consola.ttf")
+    IF schrift2 < 0 AND FILEEXISTS(fp) THEN schrift2 = LOADFONT(fp, 32)
+NEXT
+
+GUI_THEME_PRESET("glas_dunkel")
+
+' --- Fenster 1: Regler --------------------------------------------------
+DIM w1 AS GUI_WINDOW
+DIM lauf AS GUI_WIDGET
+DIM k_vol AS GUI_WIDGET
+DIM k_hall AS GUI_WIDGET
+DIM k_ton AS GUI_WIDGET
+DIM s_bass AS GUI_WIDGET
+DIM t_musik AS GUI_WIDGET
+DIM t_fx AS GUI_WIDGET
+
+w1 = GUI_WINDOW("Mischpult", 20, 20, 470, 340)
+k_vol = GUI_KNOB(w1, 24, 20, 96, 0.0, 100.0, 72.0)
+k_hall = GUI_KNOB(w1, 140, 20, 96, 0.0, 100.0, 35.0)
+k_ton = GUI_KNOB(w1, 256, 20, 96, 0.0, 100.0, 88.0)
+GUI_LABEL(w1, "Lautst.", 44, 124)
+GUI_LABEL(w1, "Hall", 172, 124)
+GUI_LABEL(w1, "Klang", 282, 124)
+
+t_musik = GUI_TOGGLE(w1, "Musik", 24, 156, TRUE)
+t_fx = GUI_TOGGLE(w1, "Effekte", 24, 194, FALSE)
+s_bass = GUI_SLIDER(w1, 180, 162, 240, 0.0, 1.0, 0.62)
+GUI_SLIDER(w1, 180, 200, 240, 0.0, 1.0, 0.28)
+
+lauf = GUI_PROGRESS(w1, 24, 244, 396, 20)
+
+' --- Fenster 2: Formular + Transport ------------------------------------
+DIM w2 AS GUI_WINDOW
+DIM feld AS GUI_WIDGET
+DIM tb AS GUI_WIDGET
+DIM sinn AS ARRAY OF STRING
+DIM i AS INTEGER
+
+w2 = GUI_WINDOW("Titel", 510, 20, 450, 340)
+feld = GUI_TEXTINPUT(w2, 24, 20, 396, 30, "Suchbegriff ...")
+GUI_CHECKBOX(w2, "Wiederholen", 24, 66, TRUE)
+GUI_CHECKBOX(w2, "Zufall", 24, 94, FALSE)
+GUI_RADIO(w2, "qualitaet", "Normal", 210, 66)
+GUI_RADIO(w2, "qualitaet", "Hoch", 210, 94)
+GUI_LISTBOX(w2, 24, 128, 396, 96, SPLIT("Erster Titel,Zweiter Titel,Dritter Titel,Vierter Titel", ","))
+
+sinn = SPLIT("<<,>,||,>>", ",")
+FOR i = 0 TO 3
+    tb = GUI_BUTTON(w2, sinn[i], 24 + i * 52, 240, 44, 44)
+    GUI_SET_ROUND(tb, TRUE)
+NEXT
+GUI_BUTTON(w2, "Ok", 250, 244, 80, 36)
+GUI_BUTTON(w2, "Abbrechen", 336, 244, 84, 36)
+
+' --- Fenster 3: Schrift je Widget ---------------------------------------
+' Global gilt die per SETFONT gesetzte Schrift. Einzelne Widgets duerfen
+' abweichen -- in der Groesse, in der Schriftart oder in beidem.
+DIM w3 AS GUI_WINDOW
+DIM k AS GUI_WIDGET
+w3 = GUI_WINDOW("Zeichensatz je Widget", 20, 380, 940, 200)
+
+GUI_BUTTON(w3, "Standard", 24, 24, 180, 42)
+
+k = GUI_BUTTON(w3, "Nur groesser", 220, 24, 180, 42)
+GUI_SET_FONT_SIZE(k, 24)          ' aendert NUR die Groesse, nicht die Schrift
+
+k = GUI_BUTTON(w3, "Andere Schrift", 416, 24, 200, 42)
+GUI_SET_FONT(k, schrift2)
+
+k = GUI_BUTTON(w3, "Beides", 632, 24, 180, 42)
+GUI_SET_FONT(k, schrift2)
+GUI_SET_FONT_SIZE(k, 26)
+
+k = GUI_BUTTON(w3, "Sehr langer Text der nicht passt", 24, 84, 180, 42)
+GUI_SET_FONT_SIZE(k, 20)
+
+k = GUI_LABEL(w3, "Auch Beschriftungen: eigene Schrift und Groesse", 220, 94)
+GUI_SET_FONT(k, schrift2)
+GUI_SET_FONT_SIZE(k, 22)
+
+' --- Grafik fuer den 9-Slice-Versuch ------------------------------------
+' Ein Schachbrett zeigt am deutlichsten, dass die Ecken NICHT mitverzerren:
+' aussen bleiben die Felder quadratisch, in der Mitte werden sie gedehnt.
+DIM haut AS IMAGE
+haut = GENTEX_CHECKED(48, 48, 12, 12, 2761781, 4085344)
+
+DIM themen AS ARRAY OF STRING
+DIM t_idx AS INTEGER
+DIM plastisch AS BOOLEAN
+DIM mit_haut AS BOOLEAN
+DIM puls AS FLOAT
+themen = SPLIT("glas_dunkel,glas_hell", ",")
+t_idx = 0
+plastisch = TRUE
+mit_haut = FALSE
+puls = 0.0
+
+SUB stil_setzen()
+    GUI_THEME_PRESET(themen[t_idx])
+    IF NOT plastisch THEN
+        GUI_METRIC_SET("gradient", 0)
+        GUI_METRIC_SET("gloss", 0)
+        GUI_METRIC_SET("bevel", 0)
+    END IF
+    IF mit_haut THEN
+        GUI_SKIN("button", haut, 12)
+    ELSE
+        GUI_SKIN("button", -1)
+    END IF
+END SUB
+
+stil_setzen()
+
+WHILE NOT KEYPRESSED(KEY_ESCAPE)
+    IF KEYHIT(KEY_SPACE) THEN
+        t_idx = (t_idx + 1) MOD 2
+        stil_setzen()
+    END IF
+    IF KEYHIT(ASC("f")) THEN
+        plastisch = NOT plastisch
+        stil_setzen()
+    END IF
+    IF KEYHIT(ASC("g")) THEN
+        mit_haut = NOT mit_haut
+        stil_setzen()
+    END IF
+
+    ' Fortschritt umlaufen lassen, damit man den Verlauf in Bewegung sieht.
+    puls = puls + DELTA() * 0.25
+    IF puls > 1.0 THEN puls = 0.0
+    GUI_SET_VALUE(lauf, puls)
+
+    IF t_idx = 0 THEN CLS(1710618) ELSE CLS(14015709)
+    GUI_UPDATE()
+    GUI_DRAW()
+
+    ' Schriftfarbe zum Thema: auf hellem Grund waere das voreingestellte
+    ' Weiss unlesbar.
+    DIM tf AS INTEGER
+    IF t_idx = 0 THEN tf = 13421772 ELSE tf = 2500134
+    TEXT(24, 600, f"Thema: {themen[t_idx]}   Plastisch: {plastisch}   Eigene Grafik: {mit_haut}", tf)
+    TEXT(24, 624, "LEERTASTE Thema    f flach/plastisch    g eigene Grafik    ESC Ende", tf)
+    TEXT(24, 660, f"Lautstaerke {GUI_VALUE(k_vol):.0f}   Hall {GUI_VALUE(k_hall):.0f}   " + _
+                  f"Klang {GUI_VALUE(k_ton):.0f}   Bass {GUI_VALUE(s_bass):.2f}", tf)
+    TEXT(24, 684, f"Musik: {GUI_CHECKED(t_musik)}   Effekte: {GUI_CHECKED(t_fx)}", tf)
+    FLIP()
+WEND

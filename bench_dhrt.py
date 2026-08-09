@@ -1,10 +1,10 @@
 """Benchmark-Runner fuer die native Runtime dhrt.
 
-Misst die Wandzeit von `dhrt run <datei.gb>` (Prozess inkl. Compile+Startup;
+Misst die Wandzeit von `dhrt run <datei.dh>` (Prozess inkl. Compile+Startup;
 bei grossen Benches dominiert die VM-Schleife). Best-of-N gegen Rauschen.
 
 Nutzung:
-    python bench_dhrt.py [datei.gb ...]          # Default: examples/bench_*.gb
+    python bench_dhrt.py [datei.dh ...]          # Default: examples/bench_*.dh
     python bench_dhrt.py --dhrt pfad\\zu\\dhrt.exe  # andere Exe (A/B-Vergleich)
     python bench_dhrt.py --runs 7                # Wiederholungen (Default 5)
 """
@@ -42,7 +42,7 @@ def bench(dhrt: Path, gb_file: Path, runs: int) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("files", nargs="*", help=".gb-Dateien (Default: examples/bench_*.gb)")
+    ap.add_argument("files", nargs="*", help=".dh-Dateien (Default: examples/bench_*.dh)")
     ap.add_argument("--dhrt", default=None, help="Pfad zur dhrt-Exe")
     ap.add_argument("--runs", type=int, default=5)
     args = ap.parse_args()
@@ -53,7 +53,7 @@ def main() -> int:
         return 1
 
     files = [Path(f) for f in args.files] if args.files else \
-        sorted((ROOT / "examples").glob("bench_*.gb"))
+        sorted((ROOT / "examples").glob("bench_*.dh"))
 
     print(f"dhrt: {dhrt}")
     print(f"{'Bench':32s} {'best-of-' + str(args.runs):>12s}")

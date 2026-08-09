@@ -1,0 +1,32 @@
+' ============================================================
+'  Kapitel 1 - Das erste Fenster mit Sternenhimmel
+'  Start:  dhrun.py buch-galaga/code/kap01/fenster.dh
+' ============================================================
+
+' Ein Fenster oeffnen: Breite, Hoehe, Titel (Hochformat wie ein Arcade-Automat).
+SCREEN(480, 640, "Mein Galaga - Kapitel 1")
+
+' Wir merken uns die Position von vielen Sternen in zwei Listen (Arrays).
+CONST NSTARS AS INTEGER = 60
+DIM starX[NSTARS] AS INTEGER
+DIM starY[NSTARS] AS INTEGER
+
+' Jeden Stern an eine zufaellige Startposition setzen.
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDINT(0, 479)
+    starY[i] = RANDINT(0, 639)
+NEXT i
+
+' Die Spielschleife: laeuft, bis das Fenster geschlossen wird.
+WHILE NOT QUITREQUESTED()
+    CLS(&H05060F)                       ' Bild loeschen (dunkles Weltraum-Blau)
+
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + 2          ' Stern nach unten bewegen
+        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)
+        PLOT(starX[i], starY[i], &HFFFFFF)   ' weissen Punkt zeichnen
+    NEXT i
+
+    FLIP()                               ' fertiges Bild anzeigen
+WEND

@@ -15,7 +15,7 @@ Stiefel und schiebbare Blöcke.
 ## Spielen
 
 ```
-dhrun.py circuitrunner\circuitrunner.gb        # oder im Editor F5
+dhrun.py circuitrunner\circuitrunner.dh        # oder im Editor F5
 ```
 
 Läuft im **randlosen Vollbild**. Im Menü mit den Pfeiltasten ein **Level-Set**
@@ -163,7 +163,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 
 | Datei | Zweck |
 |---|---|
-| `circuitrunner.gb` | die Spiel-Engine (GameBasic) |
+| `circuitrunner.dh` | die Spiel-Engine (GameBasic) |
 | `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.gbsprite` |
 | `convert_dat.py` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
 | `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |
@@ -191,7 +191,7 @@ Aktualisieren: `python circuitrunner/download_sfx.py`.
 CC0 1.0) als OGG in `assets/music/`: Titel-Loop in den Menüs, drei Level-Loops
 die **pro Level rotieren** (`level1..3`, `cur_level MOD 3`) für Abwechslung, und
 ein Ending-Track, wenn alle Level geschafft sind. Mit **M** an/aus, Lautstärke
-`MUS_VOL` in der `.gb`. Fehlt der Ordner, läuft das Spiel still weiter.
+`MUS_VOL` in der `.dh`. Fehlt der Ordner, läuft das Spiel still weiter.
 Aktualisieren: `python circuitrunner/download_music.py`.
 
 **Lautstärke:** im HUD (rechtes Panel) gibt es während des Spiels zwei Slider

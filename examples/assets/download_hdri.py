@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Laedt ein HDR-Environment-Asset fuer das geplante HDR-IBL-Feature
-(examples/99_ibl_hdr.gb, naechste Session -- siehe docs/rust-runtime.md).
+(examples/99_ibl_hdr.dh, naechste Session -- siehe docs/rust-runtime.md).
 
 Die .hdr (~1-2 MB, equirectangular 1k) liegt bewusst NICHT im Git-Repo.
 Dieses Skript holt sie einmalig von Poly Haven:

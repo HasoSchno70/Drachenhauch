@@ -696,7 +696,7 @@ Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
 - Funktioniert auch im Standalone-`.exe`-Export (gleiche `dhrt`-VM).
 
-Vollständiges Beispiel: [examples/98_coroutines.gb](../examples/98_coroutines.gb).
+Vollständiges Beispiel: [examples/98_coroutines.dh](../examples/98_coroutines.dh).
 
 ## Arrays
 
@@ -906,17 +906,17 @@ Die Catch-Variable ist optional (`CATCH` ohne Name), wenn man den Wert nicht bra
 
 ## Import
 
-**Quellcode-Modul** (eine andere `.gb`-Datei einbinden):
+**Quellcode-Modul** (eine andere `.dh`-Datei einbinden):
 
 ```basic
-IMPORT "mathlib.gb"
+IMPORT "mathlib.dh"
 
-PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.gb
+PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
 ```
 
-`IMPORT` ist textuelles Inkludieren — der Code aus `mathlib.gb` wird Teil des aktuellen Programms. Mehrfaches Importieren derselben Datei wird ignoriert (kein Endlos-Cycle).
+`IMPORT` ist textuelles Inkludieren — der Code aus `mathlib.dh` wird Teil des aktuellen Programms. Mehrfaches Importieren derselben Datei wird ignoriert (kein Endlos-Cycle).
 
-**Built-in-Modul:** ohne `.gb`-Endung wird ein internes Modul geladen.
+**Built-in-Modul:** ohne `.dh`-Endung wird ein internes Modul geladen.
 
 ```basic
 IMPORT "json"
@@ -926,7 +926,7 @@ IMPORT "camera"
 
 Liste aller Module: siehe [README](README.md#module).
 
-Die Auflösungs-Reihenfolge: erst wird `<name>.gb` im aktuellen Verzeichnis gesucht; existiert sie nicht, dann `drachenhauch/modules/<name>.py`. So kann ein eigenes `json.gb` Vorrang vor dem Built-in haben.
+Die Auflösungs-Reihenfolge: erst wird `<name>.dh` im aktuellen Verzeichnis gesucht; existiert sie nicht, dann `drachenhauch/modules/<name>.py`. So kann ein eigenes `json.dh` Vorrang vor dem Built-in haben.
 
 ## Kommentare
 

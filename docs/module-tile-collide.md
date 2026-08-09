@@ -132,7 +132,7 @@ Solid-Detection wird beim ersten Aufruf pro Map gecached — kein wiederholtes P
 
 ## Beispiel
 
-[examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) — komplettes Pattern mit Tiled-Map, Atlas, Tile-Layer, Z-Layer, Input-Mapping und separat-Achsen-Sweep.
+[examples/77_tiled_platformer.dh](../examples/77_tiled_platformer.dh) — komplettes Pattern mit Tiled-Map, Atlas, Tile-Layer, Z-Layer, Input-Mapping und separat-Achsen-Sweep.
 
 ## In der nativen Runtime (dhrt)
 

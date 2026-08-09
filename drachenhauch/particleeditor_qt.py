@@ -673,7 +673,7 @@ class ParticleEditor(QMainWindow):
         btn_test.setToolTip("Lauffaehige Demo (Maus = Emitter) im dhrt-Fenster starten")
         btn_test.clicked.connect(self._run_in_drachenhauch)
         row.addWidget(btn_test)
-        btn_save = QPushButton("In .gb speichern...")
+        btn_save = QPushButton("In .dh speichern...")
         btn_save.clicked.connect(lambda: self._save_snippet(code))
         row.addWidget(btn_save)
         btn_copy = QPushButton("In Zwischenablage")
@@ -699,7 +699,7 @@ class ParticleEditor(QMainWindow):
     def _save_snippet(self, code: str) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self, "GB-Code speichern",
-            str(self.project_root / "partikel.gb"), "GameBasic (*.gb)")
+            str(self.project_root / "partikel.dh"), "GameBasic (*.dh)")
         if not path:
             return
         try:
@@ -710,7 +710,7 @@ class ParticleEditor(QMainWindow):
     def _build_runnable_demo(self) -> str:
         """Lauffaehiges Test-Programm (im Gegensatz zum Export-Snippet, dessen
         Game-Loop auskommentiert ist): Fenster + Loop, Emitter folgt der Maus,
-        Klick = Eruption. Mirror von examples/28_particles_visual.gb."""
+        Klick = Eruption. Mirror von examples/28_particles_visual.dh."""
         rate = self.rate.value()
         burst = self._burst_count()
         lines = [
@@ -767,7 +767,7 @@ class ParticleEditor(QMainWindow):
         # Temp-Dir bewusst NICHT loeschen -- der dhrun-Subprozess liest die
         # Datei noch beim Start (OS-Cleanup nach Reboot ist OK).
         tmpdir = Path(tempfile.mkdtemp(prefix="gb_particle_test_"))
-        dh_path = tmpdir / "_test.gb"
+        dh_path = tmpdir / "_test.dh"
         try:
             # Review-Fund: das Schreiben lag zuvor AUSSERHALB des try-Blocks
             # -- ein OSError (voller Datentraeger, keine Schreibrechte etc.)

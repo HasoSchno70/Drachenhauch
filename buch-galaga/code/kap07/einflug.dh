@@ -1,0 +1,141 @@
+' ============================================================
+'  Kapitel 7 - Einflug-Manoever mit Bezier-Kurven
+'  Start:  dhrun.py buch-galaga/code/kap07/einflug.dh
+' ============================================================
+IMPORT "curves"
+
+' --- Ein Gegner, der in einem Bogen einfliegt und dann schwebt ---
+CLASS Bug
+    DIM x AS FLOAT : DIM y AS FLOAT          ' aktuelle Position (jetzt FLOAT)
+    DIM hx AS FLOAT : DIM hy AS FLOAT        ' Heimat in der Formation
+    DIM row AS INTEGER
+    DIM alive AS BOOLEAN
+    DIM inForm AS BOOLEAN                     ' schon angekommen?
+    DIM t AS FLOAT : DIM ts AS FLOAT          ' Fortschritt 0..1 + Tempo
+    DIM delay AS INTEGER                      ' verzoegerter Start (gestaffelt)
+    DIM cx0 AS FLOAT : DIM cy0 AS FLOAT       ' 4 Kontrollpunkte der Bezier-Kurve
+    DIM cx1 AS FLOAT : DIM cy1 AS FLOAT
+    DIM cx2 AS FLOAT : DIM cy2 AS FLOAT
+    DIM cx3 AS FLOAT : DIM cy3 AS FLOAT
+
+    SUB Init(phx AS FLOAT, phy AS FLOAT, prow AS INTEGER, pdelay AS INTEGER)
+        Self.hx = phx : Self.hy = phy : Self.row = prow
+        Self.alive = TRUE : Self.inForm = FALSE
+        Self.t = 0.0 : Self.ts = 0.012 : Self.delay = pdelay
+        ' abwechselnd von links/rechts einfliegen
+        DIM side AS INTEGER : side = IIF(prow MOD 2 = 0, -1, 1)
+        Self.cx0 = phx - side * 180.0 : Self.cy0 = -30.0
+        Self.cx1 = 240.0 + side * 140.0 : Self.cy1 = 120.0
+        Self.cx2 = phx + side * 80.0 : Self.cy2 = 40.0
+        Self.cx3 = phx : Self.cy3 = phy
+        Self.x = Self.cx0 : Self.y = Self.cy0
+    END SUB
+
+    SUB Update(sway AS FLOAT)
+        IF Self.inForm THEN
+            Self.x = Self.hx + sway : Self.y = Self.hy : RETURN
+        END IF
+        IF Self.delay > 0 THEN Self.delay = Self.delay - 1 : RETURN
+        Self.t = Self.t + Self.ts
+        DIM bx AS FLOAT : DIM by AS FLOAT
+        (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), Self.cx0, Self.cy0, _
+            Self.cx1, Self.cy1, Self.cx2, Self.cy2, Self.cx3, Self.cy3)
+        Self.x = bx : Self.y = by
+        IF Self.t >= 1.0 THEN Self.inForm = TRUE
+    END SUB
+END CLASS
+
+SCREEN(480, 640, "Mein Galaga - Kapitel 7")
+
+' --- Sterne ---
+CONST NSTARS AS INTEGER = 80
+DIM starX[NSTARS] AS FLOAT : DIM starY[NSTARS] AS FLOAT
+DIM starSpd[NSTARS] AS FLOAT : DIM starBri[NSTARS] AS INTEGER
+DIM starPh[NSTARS] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDF(0.0, 479.0) : starY[i] = RANDF(0.0, 639.0)
+    starPh[i] = RANDF(0.0, 6.28)
+    DIM layer AS INTEGER : layer = i MOD 3
+    IF layer = 0 THEN starSpd[i] = 0.5 : starBri[i] = 80
+    IF layer = 1 THEN starSpd[i] = 1.1 : starBri[i] = 150
+    IF layer = 2 THEN starSpd[i] = 2.0 : starBri[i] = 240
+NEXT i
+
+' --- Schiff + Schuesse ---
+DIM shipImg AS IMAGE
+shipImg = LOADIMAGE("../../assets/sprites/player.png")
+DIM shipX AS INTEGER : DIM shipY AS INTEGER
+shipX = 232 : shipY = 560
+DIM bulletImg AS IMAGE
+bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")
+CONST NBULLET AS INTEGER = 5
+DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER
+DIM bAlive[NBULLET] AS BOOLEAN
+FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
+
+' --- Gegner ---
+CONST COLS AS INTEGER = 8
+CONST ROWS AS INTEGER = 3
+CONST NBUGS AS INTEGER = 24
+DIM rowImg[ROWS] AS IMAGE
+rowImg[0] = LOADIMAGE("../../assets/sprites/bug0.png")
+rowImg[1] = LOADIMAGE("../../assets/sprites/bug1.png")
+rowImg[2] = LOADIMAGE("../../assets/sprites/bug2.png")
+DIM bugs[NBUGS] AS Bug
+DIM gapX AS INTEGER : gapX = 48
+DIM startX AS INTEGER : startX = (480 - (COLS - 1) * gapX) \ 2 - 8
+FOR i = 0 TO NBUGS - 1
+    DIM col AS INTEGER : col = i MOD COLS
+    DIM rw AS INTEGER  : rw = i \ COLS
+    bugs[i] = NEW Bug(startX + col * gapX, 60.0 + rw * 40.0, rw, i * 4)
+NEXT i
+
+DIM frame AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    frame = frame + 1
+    CLS(&H05060F)
+
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + starSpd[i]
+        IF starY[i] > 639.0 THEN starY[i] = 0.0 : starX[i] = RANDF(0.0, 479.0)
+        DIM tw AS FLOAT : tw = 0.55 + 0.45 * SIN(frame * 0.08 + starPh[i])
+        DIM v AS INTEGER : v = INT(starBri[i] * tw)
+        PLOT(INT(starX[i]), INT(starY[i]), RGB(v, v, v))
+    NEXT i
+
+    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4
+    IF shipX < 0 THEN shipX = 0
+    IF shipX > 464 THEN shipX = 464
+
+    IF KEYHIT(KEY_SPACE) THEN
+        DIM s AS INTEGER
+        FOR s = 0 TO NBULLET - 1
+            IF NOT bAlive[s] THEN
+                bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4 : BREAK
+            END IF
+        NEXT s
+    END IF
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 8
+            IF by[i] < -8 THEN bAlive[i] = FALSE
+            DRAWIMAGE(bulletImg, bx[i], by[i])
+        END IF
+    NEXT i
+
+    ' --- Gegner bewegen (Einflug-Bogen oder Schweben) + zeichnen ---
+    DIM sway AS FLOAT : sway = SIN(frame * 0.04) * 12.0
+    DIM srcX AS INTEGER : srcX = IIF((frame \ 12) MOD 2 = 0, 0, 16)
+    FOR i = 0 TO NBUGS - 1
+        IF bugs[i].alive THEN
+            bugs[i].Update(sway)
+            DRAWIMAGEPART(rowImg[bugs[i].row], srcX, 0, 16, 16, INT(bugs[i].x), INT(bugs[i].y))
+        END IF
+    NEXT i
+
+    DRAWIMAGE(shipImg, shipX, shipY)
+    FLIP()
+WEND

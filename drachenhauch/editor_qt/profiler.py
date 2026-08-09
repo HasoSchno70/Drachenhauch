@@ -9,7 +9,7 @@ Am besten fuer Konsolen-/Logik-Programme. **Naeherung:** Die Zeit pro Zeile
 enthaelt die in aufgerufenem Code (Built-ins/Funktionen) verbrachte Zeit, die
 der aufrufenden Zeile zugeschlagen wird -- aussagekraeftig fuer die *relative*
 Hotpath-Einordnung, nicht als absolute Profiling-Zeit. Zeilen beziehen sich auf
-die Quelle (bei `IMPORT "datei.gb"`-Inlining koennen sie verschoben sein).
+die Quelle (bei `IMPORT "datei.dh"`-Inlining koennen sie verschoben sein).
 """
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
     dhrt fuehrt das Programm instrumentiert aus und liefert pro Zeile Count+Zeit
     als JSON; hier nur noch Aggregation pro Editor-Zeile + Scope. `should_stop`
     bricht den Subprozess ab (fuer Endlos-Loops). Zeilen beziehen sich auf die
-    Quelle; bei `IMPORT "datei.gb"` (Inlining) koennen sie verschoben sein.
+    Quelle; bei `IMPORT "datei.dh"` (Inlining) koennen sie verschoben sein.
     """
     import os
     import subprocess
@@ -96,7 +96,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
 
     base = Path(base_path)
     tmp_dir = str(base) if base.is_dir() else None
-    fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+    fd, tmp = tempfile.mkstemp(suffix=".dh", dir=tmp_dir)
     os.close(fd)
     result = ProfileResult()
     out = ""

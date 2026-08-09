@@ -1,7 +1,7 @@
 """Tests fuer das WASM-Build-Geruest (rust/build_wasm.py) + Web-Harness.
 
 Der eigentliche emscripten-Build ist hier nicht ausfuehrbar; getestet wird,
-dass (a) die Toolchain-Pruefung graceful Bools liefert, (b) program.gbc korrekt
+dass (a) die Toolchain-Pruefung graceful Bools liefert, (b) program.dhc korrekt
 erzeugt wird und vom Loader gelesen werden kann, (c) das Web-Harness die
 erwarteten Haken enthaelt.
 """
@@ -27,30 +27,30 @@ def test_check_toolchain_returns_bools():
     assert all(isinstance(v, bool) for v in info.values())
 
 
-# (Der frühere Test compile_program (.gb -> program.gbc via Python-serialize) ist
+# (Der frühere Test compile_program (.dh -> program.dhc via Python-serialize) ist
 #  entfernt: Stufe B bettet nur noch die Quelle ein, dhrt kompiliert im Browser.)
 
 
 def test_copy_source_embeds_gb(tmp_path):
     bw = _load_build_wasm()
-    gb = tmp_path / "hi.gb"
+    gb = tmp_path / "hi.dh"
     gb.write_text('PRINT "x"\n', encoding="utf-8")
     out = bw.copy_source(gb, tmp_path)
-    assert out.name == "program.gb" and out.exists()
+    assert out.name == "program.dh" and out.exists()
     assert out.read_text(encoding="utf-8") == gb.read_text(encoding="utf-8")
 
 
 def test_build_skips_gracefully_without_toolchain(tmp_path, monkeypatch):
     bw = _load_build_wasm()
-    gb = tmp_path / "hi.gb"
+    gb = tmp_path / "hi.dh"
     gb.write_text("PRINT 1\n", encoding="utf-8")
     # Toolchain als fehlend vortaeuschen -> build() darf nicht scheitern.
     monkeypatch.setattr(bw, "check_toolchain",
                         lambda: {"emcc": False, "cargo": False, "wasm_target": False})
     rc = bw.build(gb, tmp_path)
     assert rc == 0
-    # Quelle wird eingebettet (dhrt kompiliert im Browser; kein Python-.gbc mehr).
-    assert (tmp_path / "program.gb").exists()
+    # Quelle wird eingebettet (dhrt kompiliert im Browser; kein Python-.dhc mehr).
+    assert (tmp_path / "program.dh").exists()
 
 
 def test_web_harness_files_present():
@@ -62,18 +62,18 @@ def test_web_harness_files_present():
     assert (web / "playground.js").exists()
     js = (web / "playground.js").read_text(encoding="utf-8")
     # Live-Editor: schreibt die User-Quelle ins FS, laedt zum Lauf frisch.
-    assert "/program.gb" in js
+    assert "/program.dh" in js
     assert "location.reload" in js
 
 
 def test_main_rs_has_wasm_entry():
-    """main.rs kompiliert im emscripten-Build /program.gb (Quelle, Vorrang)
-    und faellt auf /program.gbc zurueck."""
+    """main.rs kompiliert im emscripten-Build /program.dh (Quelle, Vorrang)
+    und faellt auf /program.dhc zurueck."""
     src = (ROOT / "rust" / "drachenhauch_runtime" / "src" / "main.rs").read_text(
         encoding="utf-8")
     assert 'target_os = "emscripten"' in src
-    assert "/program.gb" in src
-    assert "/program.gbc" in src
+    assert "/program.dh" in src
+    assert "/program.dhc" in src
 
 
 def test_flag_aenderung_erzwingt_neues_linken(tmp_path, monkeypatch):

@@ -134,6 +134,6 @@ CAMERA3D_VIEW(MAT4_LOOKAT(VEC3_NEW(5,5,5), VEC3_ZERO(), VEC3_NEW(0,1,0)))
 - `MODEL_MATRIX` / `MODEL_INSTANCED` / `CAMERA3D_VIEW` / `CAMERA3D_PROJECTION`
   sind **native-only** (dhrt / F6) — sie brauchen die raylib-3D-Pipeline.
 
-Demos: [examples/103_m3d.gb](../examples/103_m3d.gb) (MODEL_MATRIX),
-[examples/104_instancing.gb](../examples/104_instancing.gb) (MODEL_INSTANCED).
+Demos: [examples/103_m3d.dh](../examples/103_m3d.dh) (MODEL_MATRIX),
+[examples/104_instancing.dh](../examples/104_instancing.dh) (MODEL_INSTANCED).
 Tests: [tests/test_m3d.py](../tests/test_m3d.py).

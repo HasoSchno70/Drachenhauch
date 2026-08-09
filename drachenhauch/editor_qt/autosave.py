@@ -8,7 +8,7 @@ Eintraege zur Wiederaufnahme. Nach erfolgreichem Save (oder explizitem
 
 Snapshots ueberschreiben sich pro Tab: ein Tab fuer dieselbe Datei
 benutzt immer denselben Slug (sha1 des Pfads), neue unbenannte Tabs
-nutzen `unnamed_<index>.gb`.
+nutzen `unnamed_<index>.dh`.
 """
 from __future__ import annotations
 
@@ -41,19 +41,19 @@ def slug_for(file_path: Path | None, tab_idx: int) -> str:
 
     - Existierende Datei: sha1 des absoluten Pfads (gleicher Slug bei
       jedem Save -> wir ueberschreiben).
-    - Unbenannter Tab: `unnamed_<idx>.gb`.
+    - Unbenannter Tab: `unnamed_<idx>.dh`.
     """
     if file_path is not None:
         h = hashlib.sha1(str(file_path).encode("utf-8")).hexdigest()[:12]
-        return f"saved_{h}.gb"
-    return f"unnamed_{tab_idx}.gb"
+        return f"saved_{h}.dh"
+    return f"unnamed_{tab_idx}.dh"
 
 
 @dataclass
 class RecoveryEntry:
     autosave_file: str           # Slug-Filename relativ zu autosave_dir()
     original_path: str | None    # Original-Pfad (kann None sein bei "(neu)")
-    label: str                   # Anzeigename ("01_hello.gb" oder "(neu)")
+    label: str                   # Anzeigename ("01_hello.dh" oder "(neu)")
 
     @property
     def autosave_full_path(self) -> Path:

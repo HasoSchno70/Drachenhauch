@@ -1,0 +1,95 @@
+' 138_audio_clock.dh -- Modul "audio": Clock fuer sample-genaues Timing
+'
+'   AUDIO_CLOCK_NEW(ticks_per_second)   neue Uhr (startet pausiert)
+'   AUDIO_CLOCK_START/STOP/PAUSE(clock) Uhr steuern
+'   AUDIO_CLOCK_TICKS/TICKING(clock)    aktueller Tick / laeuft sie noch
+'   AUDIO_CLOCK_SET_SPEED(clock, tps)   Tempo aendern (ohne Reset)
+'   AUDIO_PLAY_AT(sound, clock, ticks)  Sound-Start EXAKT auf einen Tick --
+'                                       getrieben vom Kira-Audio-Thread selbst,
+'                                       kein Jitter durch Frame-Timing/FLIP.
+'
+' Ein simpler Metronom-Click: 4 Takte a 4 Schlaege, Schlag 1 hoeher (Downbeat).
+' Alle 16 Klicks werden SOFORT geplant (nicht erst im Frame-Loop einzeln) --
+' das ist der Punkt: die BASIC-Seite muss dafuer nichts pollen, die Uhr macht
+' das auf dem Audio-Thread selbst.
+IMPORT "audio"
+
+SCREEN(640, 360, "Audio-Clock-Demo")
+
+DIM BPM AS FLOAT
+BPM = 120.0
+
+DIM clk AS AUDIO_CLOCK
+clk = AUDIO_CLOCK_NEW(BPM / 60.0)   ' 1 Tick = 1 Viertelnote
+
+DIM click_hi AS SOUND
+DIM click_lo AS SOUND
+click_hi = AUDIO_TONE(1000, 60, "square", 0.6)   ' Downbeat (Schlag 1)
+click_lo = AUDIO_TONE(600, 50, "square", 0.5)    ' die restlichen Schlaege
+
+DIM BEATS AS INTEGER
+BEATS = 16   ' 4 Takte im 4/4-Takt
+DIM i AS INTEGER
+FOR i = 0 TO BEATS - 1
+    IF i MOD 4 = 0 THEN
+        AUDIO_PLAY_AT(click_hi, clk, i)
+    ELSE
+        AUDIO_PLAY_AT(click_lo, clk, i)
+    END IF
+NEXT
+
+AUDIO_CLOCK_START(clk)
+
+DIM last_tick AS INTEGER
+DIM flash AS FLOAT
+DIM tick AS INTEGER
+DIM beat_in_bar AS INTEGER
+DIM col AS INTEGER
+last_tick = -1
+flash = 0.0
+
+WHILE NOT QUITREQUESTED()
+    tick = AUDIO_CLOCK_TICKS(clk)
+
+    ' Doppeltes Tempo nach Takt 2 -- AUDIO_CLOCK_SET_SPEED aendert die
+    ' Geschwindigkeit, OHNE die Uhr zu resetten (die geplanten Ticks bleiben
+    ' an ihren absoluten Tick-Nummern, laufen also einfach schneller ab).
+    IF tick = 8 THEN AUDIO_CLOCK_SET_SPEED(clk, BPM / 60.0 * 2.0)
+    ' Nach dem letzten geplanten Klick anhalten (Position bleibt erhalten,
+    ' anders als AUDIO_CLOCK_STOP) -- sonst zaehlt die Uhr endlos weiter.
+    IF tick >= BEATS - 1 AND AUDIO_CLOCK_TICKING(clk) THEN AUDIO_CLOCK_PAUSE(clk)
+
+    IF tick <> last_tick THEN
+        last_tick = tick
+        flash = 1.0
+    END IF
+    flash = flash * 0.85   ' Flash klingt pro Frame aus
+
+    CLS(BLACK)
+    beat_in_bar = tick MOD 4
+    IF beat_in_bar = 0 THEN col = RGB(255, 120 + INT(flash * 135), 60) ELSE col = RGB(60, 120 + INT(flash * 135), 255)
+    CIRCLE(320, 160, 40 + INT(flash * 30), col)
+
+    TEXT(20, 20, "Modul audio: AUDIO_CLOCK_* + AUDIO_PLAY_AT", WHITE)
+    TEXT(20, 260, "Tick: " + STR$(tick) + " / " + STR$(BEATS - 1), YELLOW)
+    TEXT(20, 285, "Schlag " + STR$(beat_in_bar + 1) + " von 4  (ab Tick 8: doppeltes Tempo)", YELLOW)
+    IF NOT AUDIO_CLOCK_TICKING(clk) THEN TEXT(20, 310, "Uhr angehalten", GRAY)
+    IF tick >= BEATS - 1 THEN TEXT(20, 335, "fertig -- SPACE fuer neuen Durchlauf, ESC zum Beenden", CYAN)
+
+    IF KEYPRESSED(KEY_SPACE) AND tick >= BEATS - 1 THEN
+        AUDIO_CLOCK_STOP(clk)   ' zurueck auf Tick 0
+        FOR i = 0 TO BEATS - 1
+            IF i MOD 4 = 0 THEN
+                AUDIO_PLAY_AT(click_hi, clk, i)
+            ELSE
+                AUDIO_PLAY_AT(click_lo, clk, i)
+            END IF
+        NEXT
+        AUDIO_CLOCK_SET_SPEED(clk, BPM / 60.0)
+        AUDIO_CLOCK_START(clk)
+    END IF
+
+    FLIP()
+WEND
+
+AUDIO_CLOCK_REMOVE(clk)

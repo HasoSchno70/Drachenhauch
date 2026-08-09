@@ -44,7 +44,7 @@ def _notif(srv, method, params):
 
 
 SRC = "FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM r AS INTEGER\nr = add(1, 2)\n"
-URI = "file:///tmp/test.gb"
+URI = "file:///tmp/test.dh"
 
 
 def _open(srv, text=SRC, uri=URI):
@@ -193,8 +193,8 @@ def test_read_message_returns_none_on_real_eof():
 
 
 def test_uri_to_path():
-    p = uri_to_path("file:///tmp/foo%20bar.gb")
-    assert p.endswith("foo bar.gb")
+    p = uri_to_path("file:///tmp/foo%20bar.dh")
+    assert p.endswith("foo bar.dh")
 
 
 def test_end_to_end_subprocess():

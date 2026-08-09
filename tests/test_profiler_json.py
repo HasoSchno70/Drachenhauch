@@ -3,7 +3,7 @@
 `dhrt profile` liefert das Ergebnis als eine JSON-Zeile, aber raylib schreibt
 seine TraceLogs (WARNING/INFO) ebenfalls auf stdout. `_extract_profile_json`
 muss den JSON-Blob trotzdem zuverlaessig herausziehen -- sonst bleibt die
-Auswertung leer (Regression 99_ibl_hdr.gb: `MESH_SPHERE` loest eine
+Auswertung leer (Regression 99_ibl_hdr.dh: `MESH_SPHERE` loest eine
 raylib-MESH-WARNING aus, die dem JSON vorangestellt wird)."""
 from drachenhauch.editor_qt.profiler import _extract_profile_json
 

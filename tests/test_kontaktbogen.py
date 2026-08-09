@@ -8,7 +8,7 @@ setzt sie beschriftet nebeneinander, damit ein ABLAUF pruefbar wird.
 Gesteuert wird er ueber Umgebungsvariablen wie die vorhandene
 Headless-Verifizierung:
 
-    DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.gb
+    DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.dh
 
 Ohne weitere Angaben verteilt er DHRT_CONTACT_MAX (Standard 12) Bilder
 gleichmaessig ueber DHRT_FRAMES.
@@ -48,9 +48,9 @@ NEXT
 
 
 def _lauf(tmp_path, **env):
-    (tmp_path / "a.gb").write_text(QUELLE, encoding="utf-8")
+    (tmp_path / "a.dh").write_text(QUELLE, encoding="utf-8")
     umg = dict(os.environ, **{k: str(v) for k, v in env.items()})
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
                        text=True, encoding="utf-8", env=umg, timeout=120, cwd=str(tmp_path))
     assert r.returncode == 0, r.stderr
     return tmp_path / "bogen.png"
@@ -104,10 +104,10 @@ def test_kacheln_zeigen_verschiedene_zeitpunkte(tmp_path):
 
 def test_ohne_umgebungsvariable_entsteht_nichts(tmp_path):
     # Rueckwaertskompatibilitaet: wer DHRT_CONTACT nicht setzt, merkt nichts.
-    (tmp_path / "a.gb").write_text(QUELLE, encoding="utf-8")
+    (tmp_path / "a.dh").write_text(QUELLE, encoding="utf-8")
     umg = dict(os.environ, DHRT_FRAMES="20")
     umg.pop("DHRT_CONTACT", None)
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
                        text=True, encoding="utf-8", env=umg, timeout=120, cwd=str(tmp_path))
     assert r.returncode == 0, r.stderr
     assert not (tmp_path / "bogen.png").exists()

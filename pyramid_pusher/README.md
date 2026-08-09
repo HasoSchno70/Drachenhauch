@@ -9,7 +9,7 @@ gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer
 ## Starten
 
 ```
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\pyramid_pusher.gb
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\pyramid_pusher.dh
 ```
 
 …oder im **GameBasic-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
@@ -98,7 +98,7 @@ liefert den Kammer-Titel.
   konvertiert (`levels/_authoring/convert_skinner.py`, Rohdaten unter
   `levels/_authoring/source/`).
 - `03_bonus_demo.xsb` — 4 Demo-Kammern für die Bonus-Mechaniken (Loch/Eis/
-  Schalter+Tür), lösungsgeprüft (`_test_bonus.gb`). Codes: **BILA, DILA, FILA,
+  Schalter+Tür), lösungsgeprüft (`_test_bonus.dh`). Codes: **BILA, DILA, FILA,
   GILA** (per Code-Schloss erreichbar) — oder `CONST DEV_UNLOCK = TRUE` setzen.
 
 ### Eigene oder weitere Sätze hinzufügen
@@ -145,8 +145,8 @@ geprüft, bevor er geschrieben wird:
 ## Tests (headless, ohne Grafik)
 
 ```
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_headless.gb   # Parser + Codes
-.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_logic.gb      # Schieben/Undo/Lösung
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_headless.dh   # Parser + Codes
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_logic.dh      # Schieben/Undo/Lösung
 ```
 
 ## Schatzkarte & Kapitel

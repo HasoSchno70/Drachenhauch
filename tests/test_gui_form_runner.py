@@ -3,7 +3,7 @@ Struktur + Zustaende korrekt rekonstruiert werden. GUI_LOAD ist ein reines
 Builtin (kein SCREEN) -> headless testbar.
 
 Das Feuern der Handler galt hier lange als "braucht Maus/SCREEN, nur in der
-Demo examples/105_form_runner.gb manuell verifiziert" -- und in genau dieser
+Demo examples/105_form_runner.dh manuell verifiziert" -- und in genau dieser
 Luecke sass ein Fehler, der JEDEN vom Form-Designer erzeugten Handler
 unbrauchbar machte. Mit AUTOMATION_PLAY laesst sich ein Klick einspeisen,
 also wird es unten geprueft.
@@ -95,7 +95,7 @@ def _lauf(tmp_path, handler: str):
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _form_mit_knopf(tmp_path, handler)
     _klick_aufnahme(tmp_path, "klick.txt", 70, 34)
-    (tmp_path / "a.gb").write_text(
+    (tmp_path / "a.dh").write_text(
         'IMPORT "gui"\n'
         'SCREEN(200, 120, "T", 1)\n'
         'DIM frm AS GUI_WINDOW\n'
@@ -106,7 +106,7 @@ def _lauf(tmp_path, handler: str):
         'WHILE NOT QUITREQUESTED()\n'
         '    GUI_UPDATE()\n    CLS(0)\n    GUI_DRAW()\n    FLIP()\n'
         'WEND\n', encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", "a.gb"], cwd=str(tmp_path),
+    r = subprocess.run([str(_DHRT), "run", "a.dh"], cwd=str(tmp_path),
                        capture_output=True, text=True, encoding="utf-8",
                        timeout=120, env=dict(os.environ, DHRT_FRAMES="10"))
     zeilen = [ln for ln in (r.stdout or "").splitlines()

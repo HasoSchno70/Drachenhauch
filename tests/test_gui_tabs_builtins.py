@@ -1,5 +1,5 @@
 """Reiter-Builtins (Tabs): nur Registrierung. Live verifiziert ueber
-examples/131_gui_tabs.gb."""
+examples/131_gui_tabs.dh."""
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 

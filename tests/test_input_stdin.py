@@ -32,7 +32,7 @@ pytestmark = pytest.mark.skipif(not _dhrt_available(), reason="native Runtime 'd
 
 
 def _run_with_stdin(source: str, stdin: str, tmp_path: Path) -> tuple[int, str]:
-    src_file = tmp_path / "prog.gb"
+    src_file = tmp_path / "prog.dh"
     src_file.write_text(source, encoding="utf-8")
     venv_py = (_ROOT / ".venv" / "Scripts" / "python.exe"
                if os.name == "nt"

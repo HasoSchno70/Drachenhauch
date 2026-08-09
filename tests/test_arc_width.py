@@ -1,6 +1,6 @@
 """ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]]) -- der optionale
 `width`-Parameter war in docs/builtins-grafik.md dokumentiert (und in
-examples/30_shapes.gb bereits als 8. Argument uebergeben!), aber die
+examples/30_shapes.dh bereits als 8. Argument uebergeben!), aber die
 Implementierung in vm.rs/graphics.rs las nur 7 Argumente und zeichnete immer
 einen 1px-Strich (Cmd::Poly ohne Dicke). Dieser Test rendert headless
 (DHRT_FRAMES + DHRT_SCREENSHOT) einen duennen und einen dicken Bogen und
@@ -45,7 +45,7 @@ def test_arc_width_makes_stroke_thicker(tmp_path):
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     from PIL import Image
 
-    src = tmp_path / "arc_width.gb"
+    src = tmp_path / "arc_width.dh"
     src.write_text(_PROG, encoding="utf-8")
     shot = tmp_path / "arc_width.png"
     env = dict(os.environ, DHRT_FRAMES="2", DHRT_SCREENSHOT=str(shot))

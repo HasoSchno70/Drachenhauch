@@ -2,7 +2,7 @@
 
 GUI_MENU/GUI_CONTEXT/GUI_MENU_ITEM/GUI_MENU_SEPARATOR brauchen einen echten
 GL-Kontext (Maus/Tastatur/Rendering) -> kein Funktionstest via run_gb. Live
-verifiziert ueber examples/129_gui_menu.gb. Hier wird geprueft, dass sie im
+verifiziert ueber examples/129_gui_menu.dh. Hier wird geprueft, dass sie im
 eingefrorenen dhrt-Index stehen (sonst Editor-Warnung + Drift-Test rot).
 """
 from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower

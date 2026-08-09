@@ -120,4 +120,4 @@ PRINT v                     ' Vec2(11.0, 2.0)
 
 ## Beispiel
 
-[examples/58_vec2.gb](../examples/58_vec2.gb) zeigt das volle API inkl. der Operator-Overloads in einer kleinen Demo (Player-Movement, Distanz-Check, Reflektion).
+[examples/58_vec2.dh](../examples/58_vec2.dh) zeigt das volle API inkl. der Operator-Overloads in einer kleinen Demo (Player-Movement, Distanz-Check, Reflektion).

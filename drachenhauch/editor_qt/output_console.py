@@ -1,7 +1,7 @@
 """Output-Konsole + Run-Subprocess (`QProcess`).
 
 Liest stdout des Run-Subprocesses asynchron, faerbt Info-/Error-/User-
-Eingaben farbig und verlinkt `Datei.gb:N` in den Editor (via Signal
+Eingaben farbig und verlinkt `Datei.dh:N` in den Editor (via Signal
 `jump_requested`). Die Eingabezeile leitet User-Input an stdin weiter --
 fuer GB-Programme mit `INPUT`-Statement.
 """
@@ -34,16 +34,21 @@ from .dhrt_locate import find_dhrt as _find_dhrt
 #
 # `_LINK_FILE_HEADER` matched den `Fehler in <datei>:`-Block, den
 # `drachenhauch.__main__` bei einem Top-Level-Fehler ausgibt. Datei-Pfade
-# duerfen hier Spaces enthalten (path.name kann z.B. "mein sprite.gb"
+# duerfen hier Spaces enthalten (path.name kann z.B. "mein sprite.dh"
 # sein), darum `[^\n:]+?` lazy bis zum naechsten `:` statt `\S+`.
 #
-# `_LINK_FILE_LINE` matched freistehende `<datei>.gb:<zeile>`-Vorkommen
+# `_LINK_FILE_LINE` matched freistehende `<datei>.dh:<zeile>`-Vorkommen
 # im Output (z.B. Tracebacks). Hier bleiben wir strict bei `\S+`, weil
 # Tracebacks selten Pfade mit Spaces enthalten -- ein zu offener Regex
 # wuerde mehr falsch klassifizieren als richtig.
+#
+# Beide Endungen: `dhrt` fuehrt eine alte `.gb`-Datei weiterhin aus, und die
+# Fehlermeldung traegt dann deren Namen. Ohne `.gb` hier waere die Zeile in
+# genau dem Fall nicht mehr anklickbar, in dem man sie am dringendsten
+# braucht -- beim Aufmachen eines alten Programms.
 _LINK_LINE = re.compile(r"\[Zeile (\d+)\]")
-_LINK_FILE_HEADER = re.compile(r"Fehler in ([^\n:]+?\.gb):")
-_LINK_FILE_LINE = re.compile(r"(\S+\.gb):(\d+)")
+_LINK_FILE_HEADER = re.compile(r"Fehler in ([^\n:]+?\.(?:dh|gb)):")
+_LINK_FILE_LINE = re.compile(r"(\S+\.(?:dh|gb)):(\d+)")
 
 
 class _LinkableText(QPlainTextEdit):
@@ -94,7 +99,7 @@ class OutputConsole(QWidget):
         self._proc: QProcess | None = None
         self._user_stopped = False
         self._current_run_file: Path | None = None
-        # Temporaere .gbc des aktuellen Native-Runs (nach Finish geloescht).
+        # Temporaere .dhc des aktuellen Native-Runs (nach Finish geloescht).
         self._native_gbc: Path | None = None
 
         layout = QVBoxLayout(self)
@@ -410,8 +415,8 @@ class OutputConsole(QWidget):
 
         dhrt wechselt selbst ins Datei-Verzeichnis (relative Assets) und nutzt den
         Dateinamen fuer Fehler-Labels -- Compile- UND Laufzeitfehler erscheinen als
-        `datei.gb:Zeile`, sodass der Editor sie klickbar macht."""
-        # Vor dem Start setzen, damit der `datei.gb:Zeile`-Link auf diese Datei
+        `datei.dh:Zeile`, sodass der Editor sie klickbar macht."""
+        # Vor dem Start setzen, damit der `datei.dh:Zeile`-Link auf diese Datei
         # springt (gilt auch fuer dhrt-Compile-Fehler).
         self._current_run_file = file_path
         self.append(f"▶ Nativ (dhrt): {file_path.name}\n\n", "info")
@@ -473,7 +478,7 @@ class OutputConsole(QWidget):
         if self._proc is not None:
             self._proc.deleteLater()
         self._proc = None
-        # Temporaere .gbc eines Native-Runs aufraeumen.
+        # Temporaere .dhc eines Native-Runs aufraeumen.
         if self._native_gbc is not None:
             self._native_gbc.unlink(missing_ok=True)
             self._native_gbc = None

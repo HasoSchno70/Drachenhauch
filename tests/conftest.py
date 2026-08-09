@@ -99,16 +99,16 @@ def run_gb():
         if _DHRT is None:
             pytest.skip("native Runtime 'dhrt' nicht gebaut")
         # Temp-Datei im System-Temp-Verzeichnis (NICHT in examples/_ROOT, sonst
-        # fangen die rust-Parity-Sweeps `examples.glob("*.gb")` die Datei).
+        # fangen die rust-Parity-Sweeps `examples.glob("*.dh")` die Datei).
         # dhrt-Module (IMPORT "vec2") sind verzeichnis-unabhaengig; relative
-        # .gb-Datei-Imports sind in run_gb-Tests nicht in Gebrauch.
-        # `base`: wenn gesetzt, die .gb DORT ablegen -- dhrt chdirt ins Datei-
+        # .dh-Datei-Imports sind in run_gb-Tests nicht in Gebrauch.
+        # `base`: wenn gesetzt, die .dh DORT ablegen -- dhrt chdirt ins Datei-
         # Verzeichnis, also finden relative Pfade (TILED_LOAD, LOADIMAGE, ...)
         # Fixture-Dateien, die der Test in `base` abgelegt hat.
         if base is not None:
-            fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_", dir=str(base))
+            fd, tmp = tempfile.mkstemp(suffix=".dh", prefix="_gbtest_", dir=str(base))
         else:
-            fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_")
+            fd, tmp = tempfile.mkstemp(suffix=".dh", prefix="_gbtest_")
         os.close(fd)
         try:
             Path(tmp).write_text(source, encoding="utf-8")

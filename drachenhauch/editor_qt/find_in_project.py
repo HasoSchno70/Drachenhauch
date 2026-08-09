@@ -1,4 +1,4 @@
-"""FindInProject: nicht-modaler Suchen-Dialog ueber alle .gb-Dateien.
+"""FindInProject: nicht-modaler Suchen-Dialog ueber alle .dh-Dateien.
 
 Suche laeuft im Worker-Thread (`QThread`), Treffer trickeln per Signal
 in die Tree-View und sind sofort klickbar. Optionen wie im
@@ -43,9 +43,9 @@ def build_pattern(query: str, *, case_sensitive: bool, whole_word: bool,
 
 
 def iter_gb_files(root: Path):
-    """Alle `.gb`-Dateien unter `root` (gleicher Filter wie die Suche:
+    """Alle `.dh`-Dateien unter `root` (gleicher Filter wie die Suche:
     `.venv` und `_`-Praefix-Dateien ausgenommen)."""
-    for path in sorted(root.rglob("*.gb")):
+    for path in sorted(root.rglob("*.dh")):
         if ".venv" in path.parts or path.name.startswith("_"):
             continue
         yield path
@@ -59,7 +59,7 @@ def replacement_string(repl: str, regex: bool) -> str:
 
 def plan_replacements(root: Path, pattern: "re.Pattern", repl_str: str,
                       text_provider: "Callable[[Path], str | None] | None" = None):
-    """Sammelt die geplanten Ersetzungen ueber alle `.gb`-Dateien.
+    """Sammelt die geplanten Ersetzungen ueber alle `.dh`-Dateien.
 
     `text_provider(path)` liefert optional den (offenen) Live-Text einer Datei
     -- so beruecksichtigt das Ersetzen ungespeicherte Editor-Aenderungen; gibt

@@ -2,7 +2,7 @@
 
 Golden-Tests gegen `dhrt` (Stufe B): der Test schreibt eine Tiled-JSON-Map in
 `tmp_path` und laesst ein GB-Programm sie via TILED_LOAD laden (run_gb mit
-`base=tmp_path` legt die .gb daneben, dhrt chdirt dorthin). Frueher via
+`base=tmp_path` legt die .dh daneben, dhrt chdirt dorthin). Frueher via
 `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import json

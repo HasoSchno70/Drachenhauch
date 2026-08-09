@@ -30,7 +30,7 @@ _NO_DEVICE = "Audio-Geraet konnte nicht initialisiert werden"
 
 
 def _run(src: str, tmp_path, timeout=90):
-    p = tmp_path / "t.gb"
+    p = tmp_path / "t.dh"
     p.write_text('IMPORT "audio"\n' + src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=timeout, cwd=str(tmp_path))
@@ -118,7 +118,7 @@ def test_unknown_waveform_is_rejected(tmp_path):
 def test_negative_frequency_is_rejected_before_touching_the_device(tmp_path):
     # Wertpruefung liegt bewusst VOR der Audio-Initialisierung (wie bei
     # AUDIO_CLOCK_NEW) -- damit auch ohne Geraet pruefbar.
-    p = tmp_path / "n.gb"
+    p = tmp_path / "n.dh"
     p.write_text('IMPORT "audio"\nAUDIO_LFO_NEW("sine", -1.0)\n', encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=60, cwd=str(tmp_path))

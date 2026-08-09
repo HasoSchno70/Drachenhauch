@@ -121,7 +121,7 @@ WIFI_DELETE_PROFILE("AlteSchule_WLAN")  ' Profil entfernen
 
 ## Komplettes Beispiel
 
-Siehe [examples/36_wifi.gb](../examples/36_wifi.gb).
+Siehe [examples/36_wifi.dh](../examples/36_wifi.dh).
 
 ## In der nativen Runtime (dhrt)
 

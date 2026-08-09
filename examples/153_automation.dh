@@ -1,0 +1,109 @@
+' 153_automation.dh -- Eingabe aufzeichnen und abspielen (native-only, F6)
+'
+' raylib schreibt den kompletten Eingabe-Zustand jedes Frames mit (Tasten,
+' Maus, Rad, Gamepad) und kann ihn spaeter wieder einspeisen. Drei Dinge, fuer
+' die man das braucht:
+'   * Demo-/Attract-Modus: das Spiel spielt sich selbst, wenn keiner spielt.
+'   * Fehlerberichte zum Nachspielen: "so bin ich durch die Wand gelaufen".
+'   * Automatische Spieltests: immer derselbe Ablauf, ohne Handarbeit.
+'
+'   AUTOMATION_RECORD(datei$)   Aufnahme starten
+'   AUTOMATION_STOP()           beenden -- schreibt die Datei, liefert die Anzahl
+'   AUTOMATION_PLAY(datei$)     Aufnahme laden und abspielen (Anzahl als Rueckgabe)
+'   AUTOMATION_RECORDING() / AUTOMATION_PLAYING() / AUTOMATION_FRAME() / AUTOMATION_COUNT()
+'
+' Bedienung: Pfeiltasten bewegen den Punkt. F9 nimmt auf (nochmal = stopp),
+' F10 spielt die Aufnahme ab.
+'
+' Zwei Dinge, die man wissen muss:
+'   1) Aufgezeichnet wird die EINGABE, nicht der Spielablauf. Wer Zufall
+'      benutzt, muss ihn mit RANDOMIZE auf denselben Startwert setzen, sonst
+'      laeuft die Wiedergabe auseinander.
+'   2) Die Wiedergabe zaehlt in FRAMES. Mit DELTA()-basierter Bewegung ergibt
+'      dieselbe Aufnahme bei anderer Bildrate eine etwas andere Bahn -- fuer
+'      exakte Wiederholbarkeit pro Frame rechnen (wie hier).
+
+SCREEN(640, 400, "Eingabe aufzeichnen", 1)
+SETFPS(60)
+
+CONST DATEI AS STRING = "aufnahme.txt"
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+x = 320.0
+y = 200.0
+
+' Spur, damit der Unterschied zwischen "selbst gespielt" und "abgespielt"
+' sichtbar wird.
+CONST SPUR AS INTEGER = 240
+DIM sx[SPUR] AS FLOAT
+DIM sy[SPUR] AS FLOAT
+DIM spur_n AS INTEGER
+
+DIM meldung AS STRING
+meldung = "F9 = aufnehmen, F10 = abspielen"
+
+WHILE NOT QUITREQUESTED()
+    ' --- Aufnahme/Wiedergabe steuern ------------------------------------
+    IF KEYHIT(KEY_F9) THEN
+        IF AUTOMATION_RECORDING() THEN
+            meldung = "Aufnahme gespeichert: " + STR$(AUTOMATION_STOP()) + " Ereignisse"
+        ELSE
+            AUTOMATION_RECORD(DATEI)
+            spur_n = 0
+            meldung = "Aufnahme laeuft ... (F9 beendet sie)"
+        END IF
+    END IF
+
+    IF KEYHIT(KEY_F10) AND NOT AUTOMATION_RECORDING() THEN
+        ' Startzustand zuruecksetzen -- sonst spielt die Aufnahme dieselbe
+        ' Eingabe auf einen anderen Anfang und die Bahn passt nicht.
+        x = 320.0
+        y = 200.0
+        spur_n = 0
+        meldung = "Wiedergabe: " + STR$(AUTOMATION_PLAY(DATEI)) + " Ereignisse"
+    END IF
+
+    ' --- Bewegung (pro Frame, nicht pro Sekunde -- siehe Kopf) -----------
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 3.0
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 3.0
+    IF KEYPRESSED(KEY_UP) THEN y = y - 3.0
+    IF KEYPRESSED(KEY_DOWN) THEN y = y + 3.0
+    x = CLAMP(x, 20.0, 620.0)
+    y = CLAMP(y, 90.0, 380.0)
+
+    IF spur_n < SPUR THEN
+        sx[spur_n] = x
+        sy[spur_n] = y
+        spur_n = spur_n + 1
+    END IF
+
+    ' --- Zeichnen ---------------------------------------------------------
+    CLS(&H0B1016)
+
+    DIM i AS INTEGER
+    FOR i = 0 TO spur_n - 1
+        PLOT(INT(sx[i]), INT(sy[i]), &H2A4A60)
+    NEXT
+
+    DIM farbe AS INTEGER
+    farbe = &H68C8FF
+    IF AUTOMATION_RECORDING() THEN farbe = &HFF5060
+    IF AUTOMATION_PLAYING() THEN farbe = &H70FF90
+    CIRCLE(INT(x), INT(y), 10, farbe)
+
+    TEXT(16, 16, "Pfeiltasten bewegen den Punkt", &HD0E0F0)
+    TEXT(16, 38, meldung, &HFFD060)
+
+    IF AUTOMATION_RECORDING() THEN
+        CIRCLE(614, 24, 8, &HFF5060)
+        TEXT(16, 60, "AUFNAHME  " + STR$(AUTOMATION_COUNT()) + " Ereignisse", &HFF5060)
+    ELIF AUTOMATION_PLAYING() THEN
+        TEXT(16, 60, "WIEDERGABE  Frame " + STR$(AUTOMATION_FRAME()) + _
+             " von " + STR$(AUTOMATION_COUNT()) + " Ereignissen", &H70FF90)
+    ELSE
+        TEXT(16, 60, "bereit", &H70808F)
+    END IF
+
+    FLIP()
+WEND

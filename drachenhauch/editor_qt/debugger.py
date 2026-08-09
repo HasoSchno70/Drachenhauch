@@ -1,6 +1,6 @@
 """Debugger fuer GameBasic (Editor) -- ueber die native Runtime `dhrt debug`.
 
-`DebugController` spawnt `dhrt debug datei.gb` und spricht dessen newline-JSON-
+`DebugController` spawnt `dhrt debug datei.dh` und spricht dessen newline-JSON-
 Protokoll: ein Reader-Thread liest stdout-Events (paused/output/finished/error)
 und uebersetzt sie in Qt-Signale; Steuer-Kommandos (continue/step/stop/
 set-breakpoints) gehen als JSON-Zeilen an stdin. Die Pause-Logik (Breakpoints
@@ -8,7 +8,7 @@ inkl. Bedingungen, Step over/into/out, Variablen-Snapshot) liegt in dhrt
 (vm.rs); hier nur noch das Protokoll <-> Qt-Glue.
 
 Die oeffentliche API (Signale + Methoden) ist unveraendert, damit main_window
-nicht angefasst werden muss. Zeilen sind quell-relativ; bei `IMPORT "datei.gb"`-
+nicht angefasst werden muss. Zeilen sind quell-relativ; bei `IMPORT "datei.dh"`-
 Inlining koennen Breakpoint-/Pause-Zeilen verschoben sein.
 """
 from __future__ import annotations
@@ -81,7 +81,7 @@ class DebugController(QObject):
             return False
         base = Path(base_path)
         tmp_dir = str(base) if base.is_dir() else None
-        fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+        fd, tmp = tempfile.mkstemp(suffix=".dh", dir=tmp_dir)
         os.close(fd)
         self._tmp = tmp
         try:

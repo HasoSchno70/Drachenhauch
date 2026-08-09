@@ -532,7 +532,7 @@ def _run_vm(src):
             break
     if dhrt is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    fd, tmp = _tf.mkstemp(suffix=".gb", prefix="_gbtest_")
+    fd, tmp = _tf.mkstemp(suffix=".dh", prefix="_gbtest_")
     _os.close(fd)
     try:
         _P(tmp).write_text(src, encoding="utf-8")

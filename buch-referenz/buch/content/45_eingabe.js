@@ -202,5 +202,5 @@ module.exports = (H) => [
       'END IF',
     ]),
   H.warn("Die Wiedergabe drückt nur dieselben Tasten zur selben Zeit. Damit dasselbe herauskommt, muss der Rest gleich sein: Startzustand zurücksetzen, Zufall mit festem Startwert (RANDOMIZE 12345) festnageln und pro Frame statt pro Sekunde rechnen – die Wiedergabe zählt in Frames, mit DELTA()-basierter Bewegung ergibt dieselbe Aufnahme bei anderer Bildrate eine leicht andere Bahn.", "Aufgezeichnet wird die EINGABE, nicht der Spielablauf"),
-  H.note("Ein Ereignis aus Aufnahme-Frame N wirkt im Programmdurchlauf N+1: eingespeist wird am Ende des FLIP, direkt nachdem die echte Eingabe gelesen wurde. Vollständige Demo: examples/153_automation.gb."),
+  H.note("Ein Ereignis aus Aufnahme-Frame N wirkt im Programmdurchlauf N+1: eingespeist wird am Ende des FLIP, direkt nachdem die echte Eingabe gelesen wurde. Vollständige Demo: examples/153_automation.dh."),
 ];

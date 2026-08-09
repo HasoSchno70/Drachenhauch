@@ -240,7 +240,7 @@ kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
 
 ## Beispiel
 
-[examples/72_net_chat.gb](../examples/72_net_chat.gb) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/test_modules_net.py`) zu finden.
+[examples/72_net_chat.dh](../examples/72_net_chat.dh) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/test_modules_net.py`) zu finden.
 
 ## In der nativen Runtime (dhrt)
 

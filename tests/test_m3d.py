@@ -208,7 +208,7 @@ def test_model_instanced_headless_render(tmp_path):
 
     shot = tmp_path / "instanced.png"
     env = dict(os.environ, DHRT_FRAMES="2", DHRT_SCREENSHOT=str(shot))
-    demo = root / "examples" / "104_instancing.gb"
+    demo = root / "examples" / "104_instancing.dh"
     r = subprocess.run([str(dhrt), "run", str(demo)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60, env=env)
     assert r.returncode == 0, f"dhrt Exit {r.returncode}: {r.stderr}"

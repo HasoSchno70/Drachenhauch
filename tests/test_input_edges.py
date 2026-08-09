@@ -28,7 +28,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 
 def _run(src: str, tmp_path, frames: int = 2) -> str:
-    p = tmp_path / "t.gb"
+    p = tmp_path / "t.dh"
     p.write_text(src, encoding="utf-8")
     env = dict(os.environ, DHRT_FRAMES=str(frames))
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
@@ -38,7 +38,7 @@ def _run(src: str, tmp_path, frames: int = 2) -> str:
 
 
 def _check(src: str, tmp_path) -> list:
-    p = tmp_path / "c.gb"
+    p = tmp_path / "c.dh"
     p.write_text(src, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "--check", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=60)
@@ -90,7 +90,7 @@ def test_mouse_cursor_accepts_known_shapes(tmp_path):
 
 
 def test_mouse_cursor_rejects_unknown_shape(tmp_path):
-    p = tmp_path / "bad.gb"
+    p = tmp_path / "bad.dh"
     p.write_text('SCREEN(64, 64, "T", 1)\nMOUSE_CURSOR("quatsch")\n', encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)
@@ -113,7 +113,7 @@ def test_joystick_any_button_reports_minus_one_when_idle(tmp_path):
 
 
 def test_joystick_edges_reject_an_invalid_pad(tmp_path):
-    p = tmp_path / "j.gb"
+    p = tmp_path / "j.dh"
     p.write_text('SCREEN(64, 64, "T", 1)\nPRINT JOYSTICK_HIT(99, 7)\n', encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)

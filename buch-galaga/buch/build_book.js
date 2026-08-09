@@ -792,7 +792,7 @@ children.push(tip("Frame-Zähler nicht vergessen",
 children.push(h2("Einbauen"));
 children.push(pmix([
   ["Ersetze den einfachen Sternen-Teil aus Kapitel 1 durch diese beiden Blöcke. Schiff und Schüsse aus Kapitel 4 bleiben unverändert. Das vollständige Programm liegt fertig in ", false],
-  ["code/kap05/sternenhimmel.gb", true], [".", false],
+  ["code/kap05/sternenhimmel.dh", true], [".", false],
 ]));
 figure("kap05_sternenhimmel.png", "Ein tieferer Weltraum: Sterne in mehreren Helligkeiten, die funkeln und scrollen.", 300, 400).forEach(e => children.push(e));
 
@@ -888,7 +888,7 @@ children.push(pmix([
 ]));
 children.push(pmix([
   ["Das vollständige Programm (mit Sternen, Schiff und Schüssen) liegt in ", false],
-  ["code/kap06/gegner.gb", true], [".", false],
+  ["code/kap06/gegner.dh", true], [".", false],
 ]));
 figure("kap06_gegner.png", "Die Formation: 3 Reihen, 3 Farben, 24 Gegner – sie schweben und schlagen mit den Flügeln.", 300, 400).forEach(e => children.push(e));
 
@@ -982,7 +982,7 @@ children.push(pmix([
 children.push(pmix([
   ["In der Spielschleife rufst du pro Gegner ", false], ["bugs[i].Update(sway)", true],
   [" auf und zeichnest ihn an ", false], ["INT(bugs[i].x), INT(bugs[i].y)", true],
-  [". Das vollständige Programm liegt in ", false], ["code/kap07/einflug.gb", true], [".", false],
+  [". Das vollständige Programm liegt in ", false], ["code/kap07/einflug.dh", true], [".", false],
 ]));
 figure("kap07_einflug.png", "Einflug: Die obere Reihe steht schon, die nächste strömt im Bogen herein.", 300, 400).forEach(e => children.push(e));
 
@@ -1074,7 +1074,7 @@ children.push(pmix([
   ["Wir probieren bis zu 11-mal einen zufälligen Gegner; der erste passende (lebt und ist in ", false],
   ["FORM", true], [") stürzt los. ", false],
   ["shipX", true], [" übergibt die Spielerposition als Ziel. Das vollständige Programm liegt in ", false],
-  ["code/kap08/sturz.gb", true], [".", false],
+  ["code/kap08/sturz.dh", true], [".", false],
 ]));
 figure("kap08_sturz.png", "Ein Gegner hat sich gelöst und stürzt im Bogen auf das Schiff herab.", 300, 400).forEach(e => children.push(e));
 
@@ -1172,7 +1172,7 @@ children.push(codeBlock([
 children.push(pmix([
   ["", false],
   ["srcXb", true], [" wechselt wie beim Flügelschlag zwischen den zwei Bomben-Frames (Pulsieren). Das vollständige Programm liegt in ", false],
-  ["code/kap09/bomben.gb", true], [".", false],
+  ["code/kap09/bomben.dh", true], [".", false],
 ]));
 figure("kap09_bomben.png", "Ein Gegner stürzt und hat eine Bombe abgeworfen – sie fällt nun nach unten.", 300, 400).forEach(e => children.push(e));
 
@@ -1273,7 +1273,7 @@ children.push(codeBlock([
 children.push(pmix([
   ["Wir rufen ", false], ["NewGame()", true],
   [" einmal vor der Schleife auf – und bei Game Over erneut, sobald Leertaste gedrückt wird. Das vollständige Programm liegt in ", false],
-  ["code/kap10/treffer.gb", true], [".", false],
+  ["code/kap10/treffer.dh", true], [".", false],
 ]));
 figure("kap10_treffer.png", "Ein echtes Spiel: Punkte oben links, Leben oben rechts, ausgedünnte Formation.", 300, 400).forEach(e => children.push(e));
 
@@ -1343,7 +1343,7 @@ children.push(pmix([
   [" hebt den Zoom wieder auf. Den Score setzen wir um ", false],
   ["offx", true],
   [" versetzt, damit er am linken Spielfeldrand sitzt – nicht im schwarzen Rand. Das vollständige Programm liegt in ", false],
-  ["code/kap11/vollbild.gb", true], [".", false],
+  ["code/kap11/vollbild.dh", true], [".", false],
 ]));
 figure("kap11_vollbild.png", "Vollbild: Das Spielfeld ist hochskaliert und zentriert, mit schwarzen Rändern.", 420, 240).forEach(e => children.push(e));
 
@@ -1393,19 +1393,19 @@ children.push(codeBlock([
 children.push(pmix([
   ["In ", false], ["BuildWave", true],
   [" setzen wir die Formation neu auf und machen die Stürze pro Level ein wenig schneller – so steigt die Spannung. Punkte und Leben bleiben erhalten. Das vollständige Programm liegt in ", false],
-  ["code/kap12/politur.gb", true], [".", false],
+  ["code/kap12/politur.dh", true], [".", false],
 ]));
 figure("kap12_politur.png", "Das fertige Grundspiel: Vollbild, Sound, Level, HUD.", 420, 240).forEach(e => children.push(e));
 
 children.push(h2("Als Programm weitergeben (Export)"));
 children.push(p("Ein Spiel, das nur auf deinem eigenen Rechner und nur mit installiertem GameBasic läuft, ist ein bisschen wie ein selbstgebackener Kuchen, den man nicht aus der Küche tragen darf. Damit auch Freunde, Geschwister oder ahnungslose Verwandte dein Werk spielen können – ohne irgendetwas installieren zu müssen – exportierst du es als eigenständiges Programm:"));
 children.push(codeBlock([
-  "dhrt --export  dein-spiel.gb",
+  "dhrt --export  dein-spiel.dh",
 ]));
 children.push(p("Das erzeugt eine startfertige Datei (mit den Bildern und Tönen darin). Doppelklick genügt – kein GameBasic nötig."));
 
 children.push(h2("Wie geht es weiter? (Ausblick)"));
-children.push(p("Du hast jetzt ein komplettes, spielbares Galaga-Grundgerüst gebaut. Im Beispielspiel code/galaga.gb findest du dieselben Bausteine – plus die grossen Extras, die du als Nächstes angehen kannst:"));
+children.push(p("Du hast jetzt ein komplettes, spielbares Galaga-Grundgerüst gebaut. Im Beispielspiel code/galaga.dh findest du dieselben Bausteine – plus die grossen Extras, die du als Nächstes angehen kannst:"));
 children.push(bulletRich("Fangstrahl & Doppeljäger: ", "Ein Boss fängt dein Schiff – befreie es und fliege mit zwei Schiffen."));
 children.push(bulletRich("Bonus-Wellen: ", "Alle paar Level eine Runde nur für Punkte."));
 children.push(bulletRich("Highscore-Liste: ", "Namen eintragen, dauerhaft gespeichert (save-Modul)."));

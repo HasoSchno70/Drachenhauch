@@ -28,8 +28,8 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
 - Quellen fürs Befehlswissen: `drachenhauch/editor_qt/builtin_index.json` (Signaturen),
   `drachenhauch/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
-  `examples/*.gb`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
-- Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.gb`,
+  `examples/*.dh`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
+- Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.dh`,
   PNG nach `buch-referenz/buch/images/`.
 
 ## Gliederung & Fortschritt
@@ -133,7 +133,7 @@ SELECT CASE, Keyword-Member) + Kap 23 (Comprehensions: List `[e FOR v IN s]` +WH
 Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE) + Kap 24 (Fehlerbehandlung:
 TRY/CATCH[e]/END TRY, THROW, wann nutzen + TRYVAL-Hinweis) + Kap 25 (Coroutinen:
 YIELD, CORO_RESUME/DONE/RESULT, FOR EACH, CORO_SEND zweiweg, CORO_CLOSE) + Kap 26
-(Module: eingebaut IMPORT "x" OHNE Endung, eigene Datei IMPORT "x.gb" MIT Endung,
+(Module: eingebaut IMPORT "x" OHNE Endung, eigene Datei IMPORT "x.dh" MIT Endung,
 IMPORT ... AS Alias). **TEIL II KOMPLETT (Kap 10-26).** Danach: ToC-Seitenzahlen-Bug behoben
 (measure() erkennt Überschriften per Schriftgröße ≥15 + monotone Suche) und
 mehrzeilige cmd-Syntax (\n) rendert jetzt als echte Zeilenumbrüche. **Teil III
@@ -156,8 +156,8 @@ WRITEALL/READLINES/APPENDFILE/FILESIZE, FILEEXISTS/COPYFILE/RENAME/DELETEFILE,
 MKDIR/DIREXISTS/DIRLIST, PATHJOIN/BASENAME/DIRNAME). **TEIL III KOMPLETT (Kap 30-38).**
 **Teil IV gestartet (Grafik/Sound/Spiele):** Kap 40 (Das Fenster & Game-Loop: SCREEN/CLS/
 FLIP/QUITREQUESTED-Loop, DELTA, FPS/SETFPS, SCREENWIDTH/HEIGHT) — MIT echtem Screenshot
-(figures/40_fenster.gb → images/40_fenster.png). 130 Seiten, gegen dhrt verifiziert.
-Screenshot-Workflow: figures/NN_*.gb (Quelle) → `DHRT_FRAMES=N DHRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
+(figures/40_fenster.dh → images/40_fenster.png). 130 Seiten, gegen dhrt verifiziert.
+Screenshot-Workflow: figures/NN_*.dh (Quelle) → `DHRT_FRAMES=N DHRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
 (absoluter Pfad nötig, dhrt chdirt ins figures/-Dir!) → H.figure("x.png", caption).
 + Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/ELLIPSE/TRIANGLE/POLYGON/ARC/TEXT/
 TEXTROT) — mit Formen-Übersichts-Screenshot. GOTCHA dokumentiert: gefüllte TRIANGLE/

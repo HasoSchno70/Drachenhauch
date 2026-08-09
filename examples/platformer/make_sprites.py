@@ -647,7 +647,7 @@ def export():
     (OUT / "sheet.json").write_text(json.dumps(
         {"image": "sheet.png", "sprites": sprites}, indent=2), encoding="utf-8")
 
-    # 2b) Standalone-Spieler-Atlas fuer examples/77_tiled_platformer.gb
+    # 2b) Standalone-Spieler-Atlas fuer examples/77_tiled_platformer.dh
     #     (5 Frames: idle/walk_a/walk_b/jump/hit), generisch benannt. Dort ist die
     #     Welt 16er-gerastert -> Frames auf 16x16 herunterskalieren (Nearest).
     PS = 16

@@ -145,4 +145,4 @@ CAMERA_SET(pos[0], pos[1])
 
 ## Beispiel
 
-[examples/74_curves_path.gb](../examples/74_curves_path.gb) zeigt die Kurven-Typen visuell — eine Animation laeuft entlang verschiedener Spline-Typen.
+[examples/74_curves_path.dh](../examples/74_curves_path.dh) zeigt die Kurven-Typen visuell — eine Animation laeuft entlang verschiedener Spline-Typen.

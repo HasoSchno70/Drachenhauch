@@ -1,0 +1,33 @@
+' 46_ui_window.dh - Immediate-Mode-Fenster (Modul "ui", UI_WINDOW_BEGIN/END)
+'
+' Verschiebbares, einklappbares Fenster. Widgets dazwischen sind fenster-
+' relativ. Titelleiste ziehen = verschieben; Pfeil links = ein-/ausklappen.
+
+IMPORT "ui"
+
+SCREEN(480, 360, "UI-Fenster (Immediate-Mode)", 2)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+
+    CLS(RGB(16, 20, 36))
+    UI_LABEL(10, 10, "Titelleiste ziehen - Pfeil klickt ein", RGB(180, 190, 210))
+
+    IF UI_WINDOW_BEGIN("settings", "Einstellungen", 120, 70, 230, 160) THEN
+        DIM snd AS BOOLEAN
+        snd = UI_CHECKBOX("snd", 20, 30, "Sound", TRUE)
+
+        DIM vol AS FLOAT
+        vol = UI_SLIDER("vol", 20, 58, 180, 0.0, 1.0, 0.7)
+        UI_LABEL(20, 82, "Lautstaerke: " + STR$(INT(vol * 100.0)) + "%")
+
+        IF UI_BUTTON("ok", 20, 108, 90, 28, "OK") THEN
+            PRINT "OK - Sound=" + STR$(snd)
+        END IF
+    END IF
+    UI_WINDOW_END()
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

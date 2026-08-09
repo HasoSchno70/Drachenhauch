@@ -873,7 +873,7 @@ class GameBasicEditor(QMainWindow):
         path_str, _ = QFileDialog.getOpenFileName(
             self, "GB-Datei oeffnen",
             str(self.project_root),
-            "GameBasic-Dateien (*.gb);;Alle Dateien (*)",
+            "GameBasic-Dateien (*.dh);;Alle Dateien (*)",
         )
         if path_str:
             self._open_file(Path(path_str))
@@ -918,14 +918,14 @@ class GameBasicEditor(QMainWindow):
             return False
         path_str, _ = QFileDialog.getSaveFileName(
             self, "Speichern unter",
-            str(st.file_path) if st.file_path else str(self.project_root / "neu.gb"),
-            "GameBasic-Dateien (*.gb);;Alle Dateien (*)",
+            str(st.file_path) if st.file_path else str(self.project_root / "neu.dh"),
+            "GameBasic-Dateien (*.dh);;Alle Dateien (*)",
         )
         if not path_str:
             return False
         path = Path(path_str)
-        if path.suffix.lower() != ".gb":
-            path = path.with_suffix(".gb")
+        if path.suffix.lower() != ".dh":
+            path = path.with_suffix(".dh")
         if not self._write_tab(st, path):
             return False
         st.file_path = path
@@ -952,7 +952,7 @@ class GameBasicEditor(QMainWindow):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        name = st.file_path.name if st.file_path else "Unbenannt.gb"
+        name = st.file_path.name if st.file_path else "Unbenannt.dh"
         if has_sel and dlg.selection_only:
             code = cursor.selectedText()
             title = f"{name}  (Auswahl)"
@@ -1073,7 +1073,7 @@ class GameBasicEditor(QMainWindow):
         # Sidebar auf Files schalten und auf den examples-Ordner scrollen.
         self._activate_sidebar("files")
         self.statusBar().showMessage(
-            "Tipp: Doppelklick auf eine .gb-Datei in der Seitenleiste oeffnet sie.",
+            "Tipp: Doppelklick auf eine .dh-Datei in der Seitenleiste oeffnet sie.",
             4000,
         )
 
@@ -1406,7 +1406,7 @@ class GameBasicEditor(QMainWindow):
         Pfad-Strategie: temp-Datei landet im Project-Root, nicht im
         System-Tmp -- so funktionieren `LOADIMAGE("assets/...")`-Pfade
         weiter (dhrun.py macht `os.chdir(file.parent)`). Filename ist
-        eindeutig (`__selection_<pid>.gb`), damit parallele Editoren
+        eindeutig (`__selection_<pid>.dh`), damit parallele Editoren
         sich nicht in die Quere kommen.
 
         Cleanup: nach Process-Finish loeschen wir die Datei. Wenn der
@@ -1422,7 +1422,7 @@ class GameBasicEditor(QMainWindow):
             self.statusBar().showMessage("Nichts selektiert.", 2000)
             return
         import os
-        temp_path = self.project_root / f"__selection_{os.getpid()}.gb"
+        temp_path = self.project_root / f"__selection_{os.getpid()}.dh"
         try:
             temp_path.write_text(snippet, encoding="utf-8")
         except OSError as exc:
@@ -2165,7 +2165,7 @@ class GameBasicEditor(QMainWindow):
     def _rebuild_recent_menu(self) -> None:
         self.menu_recent.clear()
         # Bei doppelten Datei-Namen den uebergeordneten Ordner als Suffix
-        # zeigen, damit sich `pong.gb` und `legacy/pong.gb` unterscheiden.
+        # zeigen, damit sich `pong.dh` und `legacy/pong.dh` unterscheiden.
         paths = [Path(p) for p in self.recent]
         name_counts: dict[str, int] = {}
         for p in paths:
@@ -2284,19 +2284,19 @@ class GameBasicEditor(QMainWindow):
 
     # ----------------------------------------------------- Drag&Drop
     def dragEnterEvent(self, ev: QDragEnterEvent):  # noqa: N802
-        # Akzeptiere wenn die Drop-Daten URL(s) auf .gb-Dateien sind --
+        # Akzeptiere wenn die Drop-Daten URL(s) auf .dh-Dateien sind --
         # andere Files (.png, .pdf, ...) lehnen wir ab, sonst wirkt der
         # Cursor irrefuehrend "akzeptierend".
         md = ev.mimeData()
         if not md.hasUrls():
             return
-        if any(u.toLocalFile().lower().endswith(".gb") for u in md.urls()):
+        if any(u.toLocalFile().lower().endswith(".dh") for u in md.urls()):
             ev.acceptProposedAction()
 
     def dropEvent(self, ev: QDropEvent):  # noqa: N802
         for u in ev.mimeData().urls():
             local = u.toLocalFile()
-            if local.lower().endswith(".gb"):
+            if local.lower().endswith(".dh"):
                 p = Path(local)
                 if p.exists():
                     self._open_file(p)

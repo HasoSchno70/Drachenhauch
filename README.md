@@ -32,7 +32,7 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 ```
 .venv\Scripts\python.exe dhrun.py            # Editor öffnen
-.venv\Scripts\python.exe dhrun.py datei.gb   # Programm direkt ausführen
+.venv\Scripts\python.exe dhrun.py datei.dh   # Programm direkt ausführen
 ```
 
 ## Das Lehrbuch
@@ -68,8 +68,8 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Animations-FSM-Editor](docs/anim-editor.md)** — Knoten-Graph für Animation-State-Machines im Unity-Mecanim-Stil (`dhanim`): States (an Sprite-Anim gebunden) + Parameter + Transitions mit Bedingungen visuell verdrahten, als `.gbanim` speichern, per `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)) nutzen, Live-Vorschau mit F5
 - **[Language Server + VSCode-Extension](docs/lsp.md)** — GameBasic in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline (`py -m drachenhauch.lsp`, `vscode-drachenhauch/`)
 - **[Web-Playground](docs/web-playground.md)** — `dhrt` als WebAssembly im Browser, [Tabelle unten](#web-playground)
-- **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
-- **[ESP32 / ESP8266 anbinden](esp32/README.md)** — fertiges Sketch-Grundgerüst (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten Stellen für eigenen Code; **eine Datei für beide Boards**, übersetzt für ESP32/ESP8266/ESP32-C3/ESP32-S3. Redet über [`mqtt`](docs/module-mqtt.md) mit dem GameBasic-Gegenstück [examples/159_esp32_bruecke.gb](examples/159_esp32_bruecke.gb) — das sich mit `mosquitto_pub` auch **ohne Board** fertig entwickeln lässt
+- **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
+- **[ESP32 / ESP8266 anbinden](esp32/README.md)** — fertiges Sketch-Grundgerüst (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten Stellen für eigenen Code; **eine Datei für beide Boards**, übersetzt für ESP32/ESP8266/ESP32-C3/ESP32-S3. Redet über [`mqtt`](docs/module-mqtt.md) mit dem GameBasic-Gegenstück [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — das sich mit `mosquitto_pub` auch **ohne Board** fertig entwickeln lässt
 
 ### Module
 
@@ -98,8 +98,8 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | Modul | Wofür |
 |---|---|
 | [`physics`](docs/module-physics.md) | reine Kollisionsmathematik: Rechteck/Kreis/Strahl/Strecke/Polygon, kein Zustand |
-| [`physics2d`](docs/module-physics2d.md) | **echte** 2D-Starrkörper (Rapier2D): Schwerkraft, Stapeln, Werfen, Rollen — [Demo](examples/112_physics2d.gb) |
-| [`physics3d`](docs/module-physics3d.md) | dasselbe in 3D (Rapier3D) — [Demo](examples/107_physics3d.gb) |
+| [`physics2d`](docs/module-physics2d.md) | **echte** 2D-Starrkörper (Rapier2D): Schwerkraft, Stapeln, Werfen, Rollen — [Demo](examples/112_physics2d.dh) |
+| [`physics3d`](docs/module-physics3d.md) | dasselbe in 3D (Rapier3D) — [Demo](examples/107_physics3d.dh) |
 | [`vec2`](docs/module-vec2.md) | 2D-Vektor mit überladenen Operatoren, unveränderlich |
 | [`m3d`](docs/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, Quaternionen, Matrizen; GPU-Instancing über `MODEL_INSTANCED` |
 
@@ -116,9 +116,9 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 | Modul | Wofür |
 |---|---|
-| [`gui`](docs/module-gui.md) | 22 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. [Alle Widgets](examples/156_gui_alle_widgets.gb) · [Tabelle](examples/157_gui_tabelle.gb) · [an SQLite](examples/158_gui_tabelle_sqlite.gb) |
+| [`gui`](docs/module-gui.md) | 22 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) |
 | [`ui`](docs/module-ui.md) | dasselbe als Immediate-Mode: kein Aufbau, alles pro Bild neu gezeichnet |
-| [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.gb) |
+| [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.dh) |
 
 **Daten**
 
@@ -198,7 +198,7 @@ Ausführlich in [docs/web-playground.md](docs/web-playground.md).
 | Konsole und Grafik | beides gleichzeitig; der Zeichen-Ablauf gibt pro Bild ab (ASYNCIFY), damit `WHILE … FLIP() … WEND` den Reiter nicht einfriert |
 | Ton | ein eigenes Kira-Backend schiebt den fertigen Mix in OpenAL-Puffer, die emscripten auf WebAudio abbildet; die Warteschlange taktet sich von selbst in Echtzeit. Browser lassen Klang erst nach dem ersten Klick zu |
 | 3D | WebGL 2 — dessen GLSL ES 3.00 ist bis auf den Kopf identisch zum Desktop-GLSL. PBR, HDR-IBL, Skybox, Schatten, Instancing und Post-Effekte sind im Browser nachgewiesen |
-| Dateien | ein `assets/`-Ordner neben der `.gb` kommt als `dhrt.data` mit — Bilder, Schriften und Musik liegen unter denselben Pfaden wie auf dem Desktop |
+| Dateien | ein `assets/`-Ordner neben der `.dh` kommt als `dhrt.data` mit — Bilder, Schriften und Musik liegen unter denselben Pfaden wie auf dem Desktop |
 | Teilbare Links | die Quelle steckt im URL-Anker: Link öffnen heißt sehen **und** starten |
 
 Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
@@ -209,47 +209,47 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 | Datei | Zeigt |
 |---|---|
-| `01_hello.gb` … `09_shapes.gb` | Sprach-Grundlagen |
-| `10_pong.gb`, `22_tetris.gb`, `23_platformer.gb` | komplette Spiele |
-| `24_json.gb` … `33_ui.gb` | jedes Modul mit Demo |
-| `32_coinquest.gb` | Mini-Spiel mit Modulen + SELECT CASE |
-| `49_pong_scene.gb` | Pong, strukturiert mit `scene` + `save` (Highscore) |
-| `50_enum.gb` | ENUM in Compact- und Block-Form |
-| `51_astar.gb` | A*-Pathfinding mit ASCII-Render |
-| `52_named_args.gb` | Named Arguments in SUB/FUNCTION/NEW |
-| `73_ecs_bullets.gb` | ECS mit pro-Entity-Loop (klassisches Pattern) |
-| `75_preloader.gb` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
-| `76_layers_atlas.gb` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |
-| `77_tiled_platformer.gb` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
-| `98_coroutines.gb` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
-| `154_chart.gb` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
-| `156_gui_alle_widgets.gb` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
-| `157_gui_tabelle.gb`, `158_gui_tabelle_sqlite.gb` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
-| `159_esp32_bruecke.gb` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
-| `bench_ecs_movement_v2.gb` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
-| `bench_ecs_systems.gb` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
+| `01_hello.dh` … `09_shapes.dh` | Sprach-Grundlagen |
+| `10_pong.dh`, `22_tetris.dh`, `23_platformer.dh` | komplette Spiele |
+| `24_json.dh` … `33_ui.dh` | jedes Modul mit Demo |
+| `32_coinquest.dh` | Mini-Spiel mit Modulen + SELECT CASE |
+| `49_pong_scene.dh` | Pong, strukturiert mit `scene` + `save` (Highscore) |
+| `50_enum.dh` | ENUM in Compact- und Block-Form |
+| `51_astar.dh` | A*-Pathfinding mit ASCII-Render |
+| `52_named_args.dh` | Named Arguments in SUB/FUNCTION/NEW |
+| `73_ecs_bullets.dh` | ECS mit pro-Entity-Loop (klassisches Pattern) |
+| `75_preloader.dh` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
+| `76_layers_atlas.dh` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |
+| `77_tiled_platformer.dh` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
+| `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
+| `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
+| `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
+| `159_esp32_bruecke.dh` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
+| `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
+| `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 
 ## Architektur
 
-Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM** — **alles in `dhrt`** (Rust). `dhrt run datei.gb` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnt `dhrt run`) + Rust-`#[test]`s.
+Pipeline: **Source → Preprocessor → Lexer → Parser → Compiler → VM** — **alles in `dhrt`** (Rust). `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnt `dhrt run`) + Rust-`#[test]`s.
 
 > **Geschichte:** Früher liefen Programme zusätzlich über einen Python-**Tree-Walker** und zwei Python-**Bytecode-VMs** (Python-VM, Cython-VM), mit „bit-identischem Output" als Garantie. Seit **Stufe B** sind Tree-Walker + Python-Toolchain (interpreter/compiler/vm/serialize) **alle entfernt** — `dhrt` ist die einzige Runtime und kompiliert den Quelltext selbst.
 
-**Native Rust-Runtime (raylib) — die einzige Runtime.** `dhrt` (`rust/gb_runtime/`)
+**Native Rust-Runtime (raylib) — die einzige Runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
 lext, parst, kompiliert und führt den Quelltext selbst aus — ein eigenständiges
 Rust-Frontend, kein Python im Ausführungspfad. Was davon nativ läuft:
 
 | Bereich | Umfang |
 |---|---|
 | Sprache | Skalare, Strings, Arrays, Maps, Tupel, OOP (Klassen/Methoden/Properties/Operatoren), Slicing, Comprehensions, `TRY`/`THROW` und alle puren Built-ins |
-| Coroutinen | `YIELD` über einen Frame-Schnappschuss statt Threads — sicher auf raylibs Hauptthread, von Bauart her vorhersagbar, auch in der eigenständigen `.exe` ([Demo](examples/98_coroutines.gb)) |
+| Coroutinen | `YIELD` über einen Frame-Schnappschuss statt Threads — sicher auf raylibs Hauptthread, von Bauart her vorhersagbar, auch in der eigenständigen `.exe` ([Demo](examples/98_coroutines.dh)) |
 | 2D | Primitive, Text, Bilder, Eingabe; Z-Ebenen, Sprite-Atlas, Render-Ziele, Mischmodi, prozedurale Texturen |
-| 3D | Kamera + Grundkörper ([Demo](examples/82_3d_intro.gb)), Modelle in OBJ/GLTF, prozedurale Netze bis zum Höhenfeld-Gelände, **Skelett-Animation** geriggter GLTF/IQM ([Demo](examples/108_skeletal_anim.gb)), Billboards, Strahl-Treffer und Maus-Auswahl — auch auf echter Fläche statt nur Hüllkörper ([Demo](examples/151_picking_flaechen.gb)) |
-| Beleuchtung | physikalisch (Cook-Torrance), bis 4 Lichter, `MODEL_PBR` für Metall und Rauheit ([Demo](examples/95_pbr.gb)); Eigenleuchten ([Demo](examples/110_emissive_glow.gb)), Schlagschatten mit PCF ([Demo](examples/93_shadows.gb)), Normal-Maps ([Demo](examples/94_normalmap.gb)), Tiefennebel ([Demo](examples/92_fog.gb)) und Umgebungslicht — analytisch ([Demo](examples/96_ibl.gb)) wie als echte HDR-Cubemap ([Demo](examples/99_ibl_hdr.gb)) |
+| 3D | Kamera + Grundkörper ([Demo](examples/82_3d_intro.dh)), Modelle in OBJ/GLTF, prozedurale Netze bis zum Höhenfeld-Gelände, **Skelett-Animation** geriggter GLTF/IQM ([Demo](examples/108_skeletal_anim.dh)), Billboards, Strahl-Treffer und Maus-Auswahl — auch auf echter Fläche statt nur Hüllkörper ([Demo](examples/151_picking_flaechen.dh)) |
+| Beleuchtung | physikalisch (Cook-Torrance), bis 4 Lichter, `MODEL_PBR` für Metall und Rauheit ([Demo](examples/95_pbr.dh)); Eigenleuchten ([Demo](examples/110_emissive_glow.dh)), Schlagschatten mit PCF ([Demo](examples/93_shadows.dh)), Normal-Maps ([Demo](examples/94_normalmap.dh)), Tiefennebel ([Demo](examples/92_fog.dh)) und Umgebungslicht — analytisch ([Demo](examples/96_ibl.dh)) wie als echte HDR-Cubemap ([Demo](examples/99_ibl_hdr.dh)) |
 | Klang | **Kira** auf eigenem Audio-Thread (löste 2026-06-13 raylibs Audio ab): Klänge, Musik, `.mod`/`.xm` über einen reinen Rust-Abspieler |
 | Oberfläche | `gui` mit 22 Widget-Arten (bleibender Zustand, Themen, Ziehen, Z-Reihenfolge, Fokus, FUNCREF-Rückrufe) und `ui` im Immediate-Mode |
-| Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.gb)), Gamepad |
-| Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.gb)) |
+| Bild und Ablauf | Spielschleife (`DELTA`/`FPS`/`SETFPS`), GPU-Shader und Nachbearbeitung (`SHADER_LOAD`/`POSTFX`), TTF-Schriften ([Demo](examples/87_ttf_fonts.dh)), Gamepad |
+| Eingabe aufzeichnen | `AUTOMATION_RECORD`/`PLAY` für Demo-Modus, nachspielbare Fehlerberichte und automatische Spieltests ([Doku](docs/automation.md), [Demo](examples/153_automation.dh)) |
 | Module | **alle** — auch die früher Python-eigenen: `regex`, `tiled`, `tile_collide`, `controller`, das erweiterte `audio`; dazu per Feature `db` (rusqlite), `net`, `mqtt`, `html` (ureq) und die Hardware-Seite `serial`, `firmata`, `usb`, `wifi`, `bt` |
 | Ausliefern | `dhrun.py --export` (oder Strg+F6 im Editor) bündelt Bytecode + `assets/` zu einer eigenständigen `.exe`, die ohne Python läuft |
 
@@ -257,11 +257,11 @@ Damit braucht nur noch der Editor Python. Die schweren Module kommen mit
 `build_runtime.py --hardware` bzw. `--full` dazu — **ein Bau ohne diese Schalter
 lässt sie wieder weg**, was der häufigste Grund dafür ist, dass ein Hardware-Beispiel
 plötzlich nicht mehr läuft. Ein Schaustück, das fast alles davon gleichzeitig zeigt:
-[examples/97_pbr_reactor.gb](examples/97_pbr_reactor.gb) — ein tonreaktiver Ring aus
+[examples/97_pbr_reactor.dh](examples/97_pbr_reactor.dh) — ein tonreaktiver Ring aus
 Chrom-Kugeln mit IBL, Schatten, Bloom und Stereo-Techno. Plan und Stand in
 [docs/rust-runtime.md](docs/rust-runtime.md).
 
-**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.gb` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Wie `dhrun.py` wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.gb` ohne `run` funktioniert genauso; `.gbc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.gb` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.gb` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der GB-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+**Front-End-Portierung nach Rust — abgeschlossen.** Die komplette Toolchain (Lexer → Parser → Compiler → Preprocessor) wurde nach Rust portiert, jede Stufe per Output-Parität gegen den Python-Tree-Walker verifiziert. **`dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf ohne Python:** preprocesst (`IMPORT`-Auflösung von Quelldateien und Built-in-Modulen), lext, parst, kompiliert und führt aus — Skalare/Arithmetik/Kontrollfluss, Arrays/Maps, Funktionen, Klassen/OOP, `SELECT`/`FOR EACH`/Tupel/`WITH`/`TRY`/Slicing/Comprehensions/Coroutinen. Wie `dhrun.py` wird ins Datei-Verzeichnis gewechselt, sodass relative `IMPORT`- und Asset-Pfade stimmen (`dhrt datei.dh` ohne `run` funktioniert genauso; `.dhc`-Dateien laufen weiter den direkten VM-Pfad). Debug-Einstiege `dhrt --tokens`/`--ast`/`--preprocess`/`--runsrc`. **Selbst-Export ohne Python:** `dhrt --export datei.dh` kompiliert die Quelle selbst und bündelt sie zu einer eigenständigen `.exe` (hängt den Bytecode an eine Kopie der Runtime, kopiert `assets/`). Aliasierte Modul-Imports (`IMPORT "json" AS j` → `J_PARSE`, `DIM h AS J_HANDLE`) funktionieren ebenfalls nativ. Damit ist auch der **Web-Playground ein reines Rust-WASM**, das die Quelle im Browser kompiliert (kein Pyodide): `rust/build_wasm.py datei.dh` erzeugt `web/dhrt.{js,wasm}` mit eingebetteter Quelle (emscripten-Toolchain auf Windows wird automatisch verdrahtet). **Konsole und animierte Grafik laufen im Browser** — der GB-Render-Loop yieldet pro Frame via ASYNCIFY (`emscripten_sleep(0)` in `flip()`), sodass `WHILE … FLIP() … WEND` den Tab nicht einfriert; **teilbare Links** packen die Quelle in den URL-Hash. Plan & Stufen in [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
 
 Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 

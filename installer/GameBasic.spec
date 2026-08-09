@@ -91,7 +91,7 @@ if IS_MACOS:
             "CFBundleDisplayName": "GameBasic",
             "CFBundleShortVersionString": "1.0",
             "NSHighResolutionCapable": True,
-            # .gb-Dateien im Finder mit GameBasic verknuepfen (Doppelklick
+            # .dh-Dateien im Finder mit GameBasic verknuepfen (Doppelklick
             # startet den Editor mit der Datei) -- Pendant zur Windows-
             # Registry-Dateiverknuepfung in GameBasic.iss.
             "CFBundleDocumentTypes": [{

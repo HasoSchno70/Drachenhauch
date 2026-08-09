@@ -1,14 +1,14 @@
 # GUI-Module — Design & Plan (für die nächste Session)
 
 > **⚠️ HISTORISCH (Design-Notiz).** Das `gui`-Modul ist inzwischen vollständig
-> umgesetzt und läuft **nativ in `dhrt`** (`rust/gb_runtime/src/gui.rs`) — nicht
+> umgesetzt und läuft **nativ in `dhrt`** (`rust/drachenhauch_runtime/src/gui.rs`) — nicht
 > mehr in `drachenhauch/modules/gui.py`. Erwähnungen von „3 Pfaden"/Tree-Walker/
 > Python-VM unten beschreiben die damalige (entfernte) Architektur. Aktuelle
 > Doku: [module-gui.md](module-gui.md).
 
 > Status: **Phase 1+2 implementiert** (Modul `gui`, Retained-Mode) -- siehe
 > [module-gui.md](module-gui.md), `drachenhauch/modules/gui.py`,
-> Tests `tests/test_modules_gui.py`, Demo `examples/45_gui.gb`.
+> Tests `tests/test_modules_gui.py`, Demo `examples/45_gui.dh`.
 > Verifiziert: TW == Python-VM == Native-VM (bit-identisch).
 > Phase 3 (FUNCREF-Callbacks `GUI_ON_CLICK`) implementiert -- Builtin->Engine-
 > Bruecke `call_funcref` + `gb_call_function` in allen 3 Pfaden, 3-Pfad-
@@ -126,7 +126,7 @@ Später: Dropdown, ListBox, Tabs, RadioGroup, modale Dialoge.
 2. Checkbox, Slider, Panel, TextInput. Drag/Z-Order/Fokus robust.
 3. FUNCREF-Brücke + `GUI_ON_*`-Callbacks (optional obendrauf).
 4. `ui`-Fenster (`UI_WINDOW_BEGIN/END`) als Immediate-Mode-Variante.
-5. Beispiel-Demo `examples/NN_gui.gb` + Tests (Hit-Test/State headless,
+5. Beispiel-Demo `examples/NN_gui.dh` + Tests (Hit-Test/State headless,
    wo möglich `run_all`-tauglich).
 
 ## Test-/Doku-Hinweise

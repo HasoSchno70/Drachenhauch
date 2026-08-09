@@ -1,4 +1,4 @@
-//! Compiler AST -> Bytecode (`.gbc`-JSON) -- Stufe 3 der Front-End-Portierung.
+//! Compiler AST -> Bytecode (`.dhc`-JSON) -- Stufe 3 der Front-End-Portierung.
 //!
 //! **Stufe 3a:** main-only Konsolen-Programme (Skalar-Globals, Arithmetik/
 //! Vergleich/Logik/Bitwise/Unär, PRINT, Builtin-Calls, IF/WHILE/BREAK/
@@ -2564,7 +2564,7 @@ fn node_name(n: &Node) -> &'static str {
     }
 }
 
-/// AST -> `.gbc`-JSON. `external_types` sind die von importierten Modulen
+/// AST -> `.dhc`-JSON. `external_types` sind die von importierten Modulen
 /// registrierten Typ-Namen (lowercase) -- damit `DIM x AS VEC2` & Co. nach
 /// `IMPORT "vec2"` kompilieren. `builtin_aliases` sind `(alias, modul)`-Paare
 /// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus

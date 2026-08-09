@@ -26,13 +26,13 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 
 
 def test_export_bundles_parent_relative_assets(tmp_path):
-    # Projekt: code/game.gb referenziert ../assets/... (eine Ebene hoeher).
+    # Projekt: code/game.dh referenziert ../assets/... (eine Ebene hoeher).
     proj = tmp_path / "proj"
     (proj / "code").mkdir(parents=True)
     (proj / "assets" / "sprites").mkdir(parents=True)
     (proj / "assets" / "sprites" / "hero.png").write_bytes(b"\x89PNG\r\n\x1a\n fake")
     (proj / "assets" / "snd.wav").write_bytes(b"RIFF fake")
-    gb = proj / "code" / "game.gb"
+    gb = proj / "code" / "game.dh"
     gb.write_text(
         'DIM img AS IMAGE\n'
         'img = LOADIMAGE("../assets/sprites/hero.png")\n'
@@ -58,7 +58,7 @@ def test_export_ignores_absolute_and_missing(tmp_path):
     # stoeren und nichts Falsches einsammeln.
     proj = tmp_path / "p2"
     proj.mkdir()
-    gb = proj / "g.gb"
+    gb = proj / "g.dh"
     gb.write_text(
         'PRINT "C:/windows/system32/x.dll"\n'      # absolut -> ignorieren
         'PRINT "../gibtsnicht/foo.png"\n'           # existiert nicht -> ignorieren

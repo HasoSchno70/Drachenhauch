@@ -13,7 +13,7 @@ Aufruf:
 
 Ein anderes Stueck einsetzen: Modul-Nummer von der Detailseite ablesen
 (`modarchive.org/index.php?request=view_by_moduleid&query=<nr>`), unten
-eintragen, Skript laufen lassen, in `gbdemo.gb` `MUSIK` umstellen.
+eintragen, Skript laufen lassen, in `gbdemo.dh` `MUSIK` umstellen.
 """
 from __future__ import annotations
 
