@@ -35,7 +35,8 @@ Das macht in einem Rutsch:
    `dist/Drachenhauch.app` (macOS).
 4. Plattformspezifische Paketierung:
    - **Windows**: Inno Setup (ISCC) → `installer/output/Drachenhauch-Setup-<version>.exe`
-     (Beispiele + Lehrbuch + Startmenü + optional PATH/.dh-Dateiverknüpfung).
+     (Beispiele + Lehrbuch in beiden Sprachen + Startmenü + optional
+     PATH/.dh-Dateiverknüpfung).
    - **macOS**: `dhrt` neben die App-Binary legen (`Contents/MacOS/`), `.app` mit
      `hdiutil` in `installer/output/Drachenhauch-<version>-macOS.dmg` packen.
    - **Linux**: `dhrt` neben die Binary legen, `install.sh` (XDG-Desktop-

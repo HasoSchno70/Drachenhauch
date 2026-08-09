@@ -94,8 +94,12 @@ Source: "..\examples\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
 Source: "..\esp32\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
 ; Lehrbuch (falls gebaut) -- zum Drucken das .docx, zum Lesen am Geraet das .epub.
+; Beide Sprachen: dieselben Kapitelquellen, das englische Handbuch entsteht ueber
+; den Katalog buch-referenz\buch\i18n\en.json.
 Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 ; Lizenz + Drittanbieter-Lizenzhinweise (Pflicht-Beilage fuer MIT/BSD/Apache/LGPL).
 Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
@@ -108,6 +112,7 @@ Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Lehrbuch"; Filename: "{app}\docs\Drachenhauch-Lehrbuch.docx"; Flags: createonlyiffileexists
+Name: "{group}\Handbook (English)"; Filename: "{app}\docs\Drachenhauch-Handbook.docx"; Flags: createonlyiffileexists
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES.txt"
 Name: "{group}\{cm:UninstallProgram,Drachenhauch}"; Filename: "{uninstallexe}"
