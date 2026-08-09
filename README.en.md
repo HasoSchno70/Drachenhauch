@@ -2,6 +2,8 @@
   <img src="drachenhauch/assets/schriftzug.png" alt="Drachenhauch" width="560">
 </p>
 
+<p align="center"><strong>Let your ideas breathe fire.</strong></p>
+
 <p align="center"><em><a href="README.md">Deutsch</a> · English</em></p>
 
 A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust/raylib runtime, which lexes, parses, compiles and executes the source itself (graphics/audio/3D included). Python is now only the editor/tooling layer.
@@ -26,7 +28,7 @@ WEND
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Game-Basic/releases/latest)** — a single installer, about 81 MB, currently version 2026.1.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 81 MB, currently version 2026.1.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 174 examples with their assets, the textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 

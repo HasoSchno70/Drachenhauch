@@ -2,6 +2,8 @@
   <img src="drachenhauch/assets/schriftzug.png" alt="Drachenhauch" width="560">
 </p>
 
+<p align="center"><strong>Feuer frei für deine Ideen.</strong></p>
+
 <p align="center"><em>Deutsch · <a href="README.en.md">English</a></em></p>
 
 Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt (Grafik/Audio/3D inklusive). Python ist nur noch Editor-/Tooling-Schicht.
@@ -26,7 +28,7 @@ WEND
 
 ## Herunterladen
 
-**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Game-Basic/releases/latest)** — ein Installer, rund 81 MB, aktuell Fassung 2026.1.
+**[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 81 MB, aktuell Fassung 2026.1.
 
 Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 174 Beispiele samt Assets, das Lehrbuch als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
