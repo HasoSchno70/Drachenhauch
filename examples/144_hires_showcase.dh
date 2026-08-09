@@ -4,7 +4,7 @@
 '
 '  Zeigt, dass Drachenhauch eine hohe Aufloesung mit viel bewegter Grafik
 '  fluessig treibt -- ganz ohne GPU-Shader, nur mit den eingebauten
-'  Zeichenbefehlen (die intern in C/SDL laufen) und dem NumPy-vektorisierten
+'  Zeichenbefehlen (die in dhrt nativ ueber raylib laufen) und dem
 '  Partikelsystem.
 '
 '  WICHTIG zur Aufloesung:
@@ -23,9 +23,8 @@
 '
 '  Steuerung:  ESC = Ende
 '
-'  Performance: laeuft mit dem Tree-Walker (Editor "Run") fluessig bei
-'  ~40 FPS in 1600x900. Fuer maximale FPS die native Cython-VM nutzen:
-'      .venv\Scripts\python.exe dhrun.py --vm examples\144_hires_showcase.dh
+'  Performance: laeuft in 1600x900 fluessig -- dhrt kompiliert und fuehrt
+'  selbst aus, einen langsameren Pfad zum Vergleichen gibt es nicht mehr.
 '  Die Live-FPS-Anzeige oben links zeigt den realen Wert auf deinem Rechner.
 ' ============================================================================
 
@@ -118,7 +117,7 @@ PARTICLE_SET_COLOR_END(ps, &H200840)       ' verglimmt ins dunkle Violett
 
 ' --- Scroller --------------------------------------------------------------
 DIM scroll_msg AS STRING
-scroll_msg = "            DRACHENHAUCH HIRES SHOWCASE   ---   1600x900 PIXEL, NATIV GERENDERT (SCALE = 1, KEIN STRETCHING)   ---   STARFIELD + 3D-WUERFEL + GLOW-BOBS + TAUSENDE PARTIKEL, ALLES IN REINEM DRACHENHAUCH   ---   DIE ZEICHENBEFEHLE LAUFEN INTERN IN C/SDL, PARTIKEL SIND NUMPY-VEKTORISIERT   ---   ESC ZUM BEENDEN            "
+scroll_msg = "            DRACHENHAUCH HIRES SHOWCASE   ---   1600x900 PIXEL, NATIV GERENDERT (SCALE = 1, KEIN STRETCHING)   ---   STARFIELD + 3D-WUERFEL + GLOW-BOBS + TAUSENDE PARTIKEL, ALLES IN REINEM DRACHENHAUCH   ---   ZEICHENBEFEHLE UND PARTIKEL LAUFEN NATIV IN DHRT   ---   ESC ZUM BEENDEN            "
 CONST SCROLL_ADV AS INTEGER = 19      ' fester Zeichen-Vorschub (30pt bold)
 DIM scroll_x AS FLOAT
 scroll_x = W * 1.0

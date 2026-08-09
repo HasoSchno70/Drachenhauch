@@ -5,7 +5,7 @@
 ' Effekt:  AUS -> CRT -> BLOOM -> VIGNETTE.
 '
 ' Ausfuehren:  dhrun.py --native examples\86_postfx_shaders.dh   (oder F6)
-' Der Tree-Walker (F5) ist konsolen-only -- Shader/Grafik nur nativ in dhrt.
+' Shader brauchen die GPU -- also ein Fenster, das dhrt aufmacht.
 ' ESC beendet.
 
 IMPORT "g3d"

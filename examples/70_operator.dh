@@ -2,7 +2,7 @@
 '
 ' OPERATOR <op> (other AS T) AS T  ... END OPERATOR
 '   wird intern als Methode mit reserviertem Namen registriert
-'   (`__op_add__`, `__op_sub__`, ...). Tree-Walker und beide VMs
+'   (`__op_add__`, `__op_sub__`, ...). Die Runtime
 '   konsultieren sie beim BinaryOp-Dispatch.
 '
 ' Erlaubte Operatoren:  +  -  *  /  MOD  =  <>  <  >  <=  >=

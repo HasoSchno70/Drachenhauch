@@ -357,5 +357,4 @@ FOR i = 0 TO features.length() - 1
 NEXT
 PRINT "  " + line
 PRINT ""
-PRINT "  TW = Tree-Walker, VM = Python-VM, Native = Cython-VM."
-PRINT "  Alle drei Pfade liefern bit-identischen Output. \\o/"
+PRINT "  Alles laeuft in dhrt -- Rust-Frontend und Rust-VM in einem. \\o/"

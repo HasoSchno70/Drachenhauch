@@ -1,12 +1,12 @@
 ' === ORBITAL - Drachenhauch Showcase =====================================
-' Pusht den Tree-Walking-Interpreter ueber den Anschlag und zeigt
-' gleichzeitig wie viel die Sprache draufhat:
+' Treibt die Runtime an den Anschlag und zeigt gleichzeitig, wie viel die
+' Sprache draufhat:
 '
 '   * 100+ Klasseninstanzen (Asteroidenguertel + Planeten + Mond + Komet)
 '   * Vererbung (CLASS Comet EXTENDS Body) mit Override + Polymorphie
 '   * Pro Frame: ~270 COS/SIN-Auswertungen, ~270 CIRCLE-Aufrufe,
 '     ~200 PLOT-Aufrufe fuer den Sternenhimmel, dazu Partikel-System
-'   * IMPORT-Module: particles (vektorisierte NumPy-Trails),
+'   * IMPORT-Module: particles (Trails),
 '     tween (Easing-Animationen), camera (Welt-/Screen-Trafo),
 '     input (Action-basiertes Eingabe-Mapping mit Edge-Detection)
 '   * Sprach-Features: CLASS+EXTENDS, ARRAY OF Klasse, MAP OF STRING,
@@ -273,7 +273,7 @@ MAPPUT(info, "Venus",   "Glutofen unter Schwefelwolken")
 MAPPUT(info, "Erde",    "Blauer Punkt mit eigenem Mond")
 MAPPUT(info, "Mars",    "Rostroter Wuestenplanet")
 MAPPUT(info, "Jupiter", "Gasriese - mit ~100 Asteroiden im Guertel davor")
-MAPPUT(info, "Komet",   "Gast aus den Tiefen - Trail vektorisiert per NumPy")
+MAPPUT(info, "Komet",   "Gast aus den Tiefen - Trail aus dem Partikel-System")
 
 ' Erdmond: Body, dessen Center jeden Frame auf die Erdposition gesetzt wird.
 DIM moon AS Body
@@ -312,8 +312,13 @@ asteroids = [make_asteroid() FOR i IN RANGE(N_ASTEROIDS)]
 
 ' Sterne im Hintergrund. Screen-Space (immer scharf, Camera-unabhaengig).
 ' Drei parallele Arrays werden zu einem Tupel-of-Tupel: (x, y, brightness).
+' Sterne als ANTEIL (0..1) der Flaeche, nicht als feste Pixel: im Vollbild
+' vergroessert dhrt die logische Zeichenflaeche auf den ganzen Bildschirm
+' (aus 640x400 werden auf einem 16:9-Monitor z.B. 853x480), und mit festen
+' Pixelwerten endete der Sternenhimmel mitten im Bild -- der Rest blieb
+' schwarz. Anteile verteilen sich bei JEDEM Umschalten neu.
 FUNCTION make_star() AS TUPLE
-    RETURN (INT(RND() * WIDTH), INT(RND() * HEIGHT), 80 + INT(RND() * 175))
+    RETURN (RND(), RND(), 80 + INT(RND() * 175))
 END FUNCTION
 
 DIM stars AS TUPLE
@@ -329,9 +334,11 @@ sfx_click = LOADSOUND("assets/pickup.wav")
 
 ' --- Sinus-Scroller a la Amiga: bunter Lauftext mit Sinus-Welle ------
 DIM scroll_msg AS STRING
-scroll_msg = "    *** DRACHENHAUCH (c)2026 ba HASOSOFT***    100+ KLASSEN-INSTANZEN, 270 COS/SIN PRO FRAME, NUMPY-PARTIKEL, TWEEN-EASING, KAMERA-FOLLOW    ALLES IM TREE-WALKING-INTERPRETER    *** EIN SINUS-SCROLLER WIE FRUEHER AUF DEM AMIGA ***    PRESS 0..6 TO FOCUS, F FOR FREE-CAM, +/- TO ZOOM    *** ROLL ON ***    "
+' "TREE-WALKING-INTERPRETER" stand hier bis zur Umbenennung -- den gibt es
+' seit Stufe B nicht mehr, das Programm laeuft in dhrt (Rust + raylib).
+scroll_msg = "    *** DRACHENHAUCH (c)2026 by HASOSOFT ***    100+ KLASSEN-INSTANZEN, 270 COS/SIN PRO FRAME, PARTIKEL, TWEEN-EASING, KAMERA-FOLLOW    ALLES NATIV IN DHRT    *** EIN SINUS-SCROLLER WIE FRUEHER AUF DEM AMIGA ***    0..6 FOKUS, F FREIE KAMERA, +/- ZOOM    *** ROLL ON ***    "
 DIM scroll_x AS FLOAT
-scroll_x = WIDTH * 1.0
+scroll_x = SCREENWIDTH() * 1.0
 
 ' --- Camera State ----------------------------------------------------
 DIM focus AS INTEGER       ' 0 = Sonne, 1..6 = Planet[0..5], 7 = Komet
@@ -556,16 +563,21 @@ WHILE NOT QUITREQUESTED()
 
     ' 0) Tiefen-Verlauf als Weltraum-Hintergrund (Screen-Space).
     CAMERA_RESET()
-    GRADIENTV(0, 0, WIDTH - 1, HEIGHT - 1, &H100A24, &H04050C)
+    GRADIENTV(0, 0, SCREENWIDTH() - 1, SCREENHEIGHT() - 1, &H100A24, &H04050C)
 
     ' 1) Sterne im Screen-Space (Camera explizit zurueck)
     FOR i = 0 TO N_STARS - 1
         ' Tupel-Destructuring: jeder Stern liefert seine drei Werte
         ' direkt aus dem Tupel-of-Tupel.
+        DIM fx AS FLOAT
+        DIM fy AS FLOAT
+        DIM base_b AS INTEGER
+        (fx, fy, base_b) = stars[i]
+        ' Anteil -> Pixel, jedes Bild neu: so folgt der Himmel dem Vollbild.
         DIM sx AS INTEGER
         DIM sy AS INTEGER
-        DIM base_b AS INTEGER
-        (sx, sy, base_b) = stars[i]
+        sx = INT(fx * SCREENWIDTH())
+        sy = INT(fy * SCREENHEIGHT())
         ' Smoothes Twinkle via Sinus -- sanftes Atmen statt hartes On/Off.
         ' Rate 0.12 = etwa 1 voller Pulse pro Sekunde bei 60fps.
         DIM phase AS FLOAT
@@ -612,7 +624,7 @@ WHILE NOT QUITREQUESTED()
     smooth_zoom = smooth_zoom + (zoom - smooth_zoom) * zlerp
 
     CAMERA_SET(0.0, 0.0, smooth_zoom)
-    CAMERA_FOLLOW(smooth_x, smooth_y, WIDTH, HEIGHT)
+    CAMERA_FOLLOW(smooth_x, smooth_y, SCREENWIDTH(), SCREENHEIGHT())
 
     ' Bahnen als faint-Ellipsen. Planet-Bahnen sehr dunkel, damit sie
     ' beim Scrollen nicht aufdraengen. Meteor-Bahnen sind weggelassen --
@@ -633,7 +645,7 @@ WHILE NOT QUITREQUESTED()
     DIM scale AS FLOAT
     scale = TWEEN_VALUE(sun_pulse)
     ' Additives Blending laesst die Schichten zu einem weichen Bloom verschmelzen
-    ' (nativ in dhrt; im Tree-Walker wirft BLEND_MODE "nur dhrt").
+    ' (BLEND_MODE braucht ein Fenster -- nativ in dhrt).
     BLEND_MODE("add")
     CIRCLE(0, 0, 52 * scale, &H100A04)        ' weiter Halo-Schein
     CIRCLE(0, 0, 38 * scale, &H1A1009)
@@ -683,8 +695,8 @@ WHILE NOT QUITREQUESTED()
     IF NOT free_mode THEN
         DIM mx AS INTEGER
         DIM my AS INTEGER
-        mx = WIDTH / 2
-        my = HEIGHT / 2
+        mx = SCREENWIDTH() \ 2
+        my = SCREENHEIGHT() \ 2
         LINE(mx - 8, my, mx - 3, my, &H88FFAA)
         LINE(mx + 3, my, mx + 8, my, &H88FFAA)
         LINE(mx, my - 8, mx, my - 3, &H88FFAA)
@@ -699,12 +711,12 @@ WHILE NOT QUITREQUESTED()
     ' SIN(phase), Farben aus drei phasenverschobenen Sinussen (R/G/B).
     DIM band_y AS INTEGER
     DIM band_h AS INTEGER
-    band_y = HEIGHT - 100
+    band_y = SCREENHEIGHT() - 100
     band_h = 38
 
-    BOX(0, band_y, WIDTH - 1, band_y + band_h - 1, &H050810)
-    LINE(0, band_y, WIDTH - 1, band_y, &H1A2A40)
-    LINE(0, band_y + band_h - 1, WIDTH - 1, band_y + band_h - 1, &H1A2A40)
+    BOX(0, band_y, SCREENWIDTH() - 1, band_y + band_h - 1, &H050810)
+    LINE(0, band_y, SCREENWIDTH() - 1, band_y, &H1A2A40)
+    LINE(0, band_y + band_h - 1, SCREENWIDTH() - 1, band_y + band_h - 1, &H1A2A40)
 
     DIM scroll_mid AS INTEGER
     scroll_mid = band_y + band_h / 2
@@ -724,7 +736,7 @@ WHILE NOT QUITREQUESTED()
     cur_x = scroll_x
     FOR si = 0 TO LEN(scroll_msg) - 1
         ch = MID$(scroll_msg, si, 1)
-        IF cur_x > -32 AND cur_x < WIDTH THEN
+        IF cur_x > -32 AND cur_x < SCREENWIDTH() THEN
             phase = (si * 0.30) + (frame_no * 0.06)
             sy = scroll_mid - 11 + INT(SIN(phase) * 10.0)
             ' Drei Phasen-Sinusse + drei Clampings auf einmal -- Tupel-
@@ -742,7 +754,7 @@ WHILE NOT QUITREQUESTED()
         scroll_x -= 2.0
     END IF
     IF scroll_x < -1.0 * LEN(scroll_msg) * 16.0 THEN
-        scroll_x = WIDTH * 1.0
+        scroll_x = SCREENWIDTH() * 1.0
     END IF
 
     ' FPS-Update alle 0.5 s.
@@ -772,7 +784,7 @@ WHILE NOT QUITREQUESTED()
         snd_col = &H88FFAA
     END IF
     DIM rx AS INTEGER
-    rx = WIDTH - 256
+    rx = SCREENWIDTH() - 256
     DIM rvx AS INTEGER
     rvx = DrawCardL(rx, 4, 252, 28, "Stats", &H88FFAA)
     DIM s_fps AS STRING
@@ -789,13 +801,13 @@ WHILE NOT QUITREQUESTED()
         info_text = "freie Kamera - Maus bewegt den Blickpunkt"
     END IF
     DIM ivx AS INTEGER
-    ivx = DrawCardL(4, HEIGHT - 56, WIDTH - 8, 28, "Info", &HBBCCDD)
-    TEXT(ivx, HEIGHT - 56 + 4, info_text, &HCCDDEE)
+    ivx = DrawCardL(4, SCREENHEIGHT() - 56, SCREENWIDTH() - 8, 28, "Info", &HBBCCDD)
+    TEXT(ivx, SCREENHEIGHT() - 56 + 4, info_text, &HCCDDEE)
 
     ' Help-Zeile in eigener Reihe ganz unten (kleiner, damit sie auch mit
     ' dem breiteren TTF-Font in eine Zeile passt). Zoom als kompakter Suffix.
     TEXT_SIZE(13)
-    TEXT(8, HEIGHT - 19, _
+    TEXT(8, SCREENHEIGHT() - 19, _
          "0-6 Fokus  F Frei  +/- Zoom " + FORMAT$(INT(zoom * 100), "%03d") _
          + "%  SPACE Pause  M Sound  F11 Vollbild  ESC Ende", _
          &H7788BB)
@@ -803,7 +815,7 @@ WHILE NOT QUITREQUESTED()
 
     ' Pause-Banner mittig
     IF frozen THEN
-        TEXT(WIDTH / 2 - 30, 46, "[ PAUSE ]", &HFFCC66)
+        TEXT(SCREENWIDTH() \ 2 - 30, 46, "[ PAUSE ]", &HFFCC66)
     END IF
 
     FLIP()

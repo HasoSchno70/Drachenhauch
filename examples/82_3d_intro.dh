@@ -4,7 +4,7 @@
 ' 2D-HUD ueber der Szene. Kamera kreist langsam um den Ursprung.
 '
 ' Ausfuehren:  dhrun.py --native examples\82_3d_intro.dh   (oder F6 im Editor)
-' Mit F5 (Tree-Walker) kommt eine klare Meldung: 3D braucht die native Runtime.
+' 3D braucht ein Fenster -- ohne Grafik kommt eine klare Meldung.
 
 IMPORT "g3d"
 
