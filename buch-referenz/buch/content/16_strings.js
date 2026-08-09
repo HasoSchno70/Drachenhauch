@@ -25,7 +25,7 @@ module.exports = (H) => [
     "Liefert ab der Position start (0-basiert!) bis zu n Zeichen. Lässt du n weg, geht es bis zum Ende des Strings.",
     ['PRINT MID$("Drachenhauch", 4)', 'PRINT MID$("Drachenhauch", 4, 5)'],
     { out: ["Basic", "Basic"] }),
-  H.warn("Anders als manche älteren BASIC-Dialekte zählt Drachenhauch Zeichen-Positionen ab 0, nicht ab 1. Das erste Zeichen von \"Drachenhauch\" (das G) sitzt an Position 0, das B an Position 4. Das gilt auch für INSTR und den Index-Zugriff weiter unten."),
+  H.warn("Anders als manche älteren BASIC-Dialekte zählt Drachenhauch Zeichen-Positionen ab 0, nicht ab 1. Das erste Zeichen von \"Drachenhauch\" (das D) sitzt an Position 0, das erste h an Position 4. Das gilt auch für INSTR und den Index-Zugriff weiter unten."),
 
   H.h2("Einzelne Zeichen mit dem Index"),
   H.p("Du kannst auf ein einzelnes Zeichen direkt über seine Position zugreifen – mit eckigen Klammern, wie bei einem Array. Mit der Doppelpunkt-Schreibweise schneidest du sogar einen ganzen Bereich heraus (das nennt man Slicing)."),
