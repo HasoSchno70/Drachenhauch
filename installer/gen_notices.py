@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """Erzeugt installer/THIRD-PARTY-NOTICES.txt -- die gesammelten Lizenztexte aller
-mit GameBasic ausgelieferten Drittkomponenten (Python + Rust). Tool-frei:
+mit Drachenhauch ausgelieferten Drittkomponenten (Python + Rust). Tool-frei:
 Python ueber importlib.metadata + die .dist-info-Lizenzdateien, Rust ueber das
 in cargo eingebaute `cargo metadata` + die LICENSE-Dateien der Crate-Quellen.
 
@@ -29,7 +29,7 @@ def _canonical(name: str) -> str:
     p = LIC_DIR / name
     return p.read_text(encoding="utf-8") if p.exists() else f"({name} nicht gefunden)"
 
-# Mit der IDE gebuendelte Python-Drittpakete (PyInstaller -> dist/GameBasic).
+# Mit der IDE gebuendelte Python-Drittpakete (PyInstaller -> dist/Drachenhauch).
 PY_PACKAGES = ["PySide6", "PySide6_Essentials", "PySide6_Addons",
                "shiboken6", "numpy", "pillow"]
 # Im ausgelieferten dhrt aktive Cargo-Features (rust/build_runtime.py Standard).
@@ -98,7 +98,7 @@ def python_section() -> str:
 def qt_section() -> str:
     return "\n".join([
         SEP, "Qt (via PySide6) -- LGPL v3", SEP, "",
-        "GameBasic nutzt das Qt-Framework ueber PySide6 unter der GNU Lesser",
+        "Drachenhauch nutzt das Qt-Framework ueber PySide6 unter der GNU Lesser",
         "General Public License, Version 3 (LGPLv3).",
         "",
         "Gemaess LGPLv3 gilt:",
@@ -162,12 +162,12 @@ def rust_section() -> str:
 
 def main():
     parts = [
-        "GameBasic -- Drittanbieter-Lizenzen (THIRD-PARTY NOTICES)",
+        "Drachenhauch -- Drittanbieter-Lizenzen (THIRD-PARTY NOTICES)",
         "",
-        "GameBasic wird mit den unten aufgefuehrten Drittkomponenten ausgeliefert.",
+        "Drachenhauch wird mit den unten aufgefuehrten Drittkomponenten ausgeliefert.",
         "Deren Lizenz- und Copyright-Hinweise sind nachfolgend wiedergegeben, wie",
         "es die jeweiligen Lizenzen (u.a. MIT, BSD, Apache-2.0, Zlib, LGPLv3)",
-        "verlangen. Diese Datei beruehrt NICHT deine Rechte an eigenem GameBasic-",
+        "verlangen. Diese Datei beruehrt NICHT deine Rechte an eigenem Drachenhauch-",
         "Code; sie erfuellt die Weitergabe-Auflagen der Fremdkomponenten.",
         "",
         f"Automatisch erzeugt von installer/gen_notices.py.",

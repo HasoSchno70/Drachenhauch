@@ -1,13 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller-Spec fuer die GameBasic-IDE (onedir, windowed).
+# PyInstaller-Spec fuer die Drachenhauch-IDE (onedir, windowed).
 # Friert dhrun.py samt drachenhauch-Paket, PySide6, numpy und Pillow ein, sodass
-# GameBasic OHNE installiertes Python laeuft. dhrt(.exe) wird NICHT hier
+# Drachenhauch OHNE installiertes Python laeuft. dhrt(.exe) wird NICHT hier
 # gebuendelt -- build_installer.py legt es NACH dem PyInstaller-Lauf neben
 # die eingefrorene Exe (findet _find_dhrt via sys.executable-Verzeichnis,
 # das ist bei einem macOS .app-Bundle Contents/MacOS/).
 #
 # Aufruf ueber installer/build_installer.py (setzt SPECPATH/Pfade); manuell:
-#   .venv\Scripts\pyinstaller installer\GameBasic.spec --noconfirm
+#   .venv\Scripts\pyinstaller installer\Drachenhauch.spec --noconfirm
 import platform
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
@@ -17,9 +17,9 @@ ENTRY = str(ROOT / "dhrun.py")
 IS_WINDOWS = platform.system() == "Windows"
 IS_MACOS = platform.system() == "Darwin"
 if IS_WINDOWS:
-    ICON = ROOT / "installer" / "GameBasic.ico"
+    ICON = ROOT / "installer" / "Drachenhauch.ico"
 elif IS_MACOS:
-    ICON = ROOT / "installer" / "GameBasic.icns"
+    ICON = ROOT / "installer" / "Drachenhauch.icns"
 else:
     ICON = None
 
@@ -33,7 +33,7 @@ if not IS_WINDOWS:
     # unter Windows examples/ separat ins {commondocs}-Verzeichnis kopiert)
     # -- die Beispiele werden hier stattdessen mit ins Bundle gepackt und
     # von dhrun._seed_examples_if_missing() beim allerersten Start in einen
-    # beschreibbaren Ort (~/Documents/GameBasic) kopiert.
+    # beschreibbaren Ort (~/Documents/Drachenhauch) kopiert.
     examples_dir = ROOT / "examples"
     if examples_dir.is_dir():
         datas.append((str(examples_dir), "examples"))
@@ -59,7 +59,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="GameBasic",
+    name="Drachenhauch",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -74,7 +74,7 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="GameBasic",
+    name="Drachenhauch",
 )
 
 if IS_MACOS:
@@ -83,19 +83,19 @@ if IS_MACOS:
     # Info.plist, kein Doppelklick-Start im Finder, kein Dock-Icon).
     app = BUNDLE(
         coll,
-        name="GameBasic.app",
+        name="Drachenhauch.app",
         icon=str(ICON) if ICON is not None and ICON.exists() else None,
         bundle_identifier="de.hansschnorrenberger.drachenhauch",
         info_plist={
-            "CFBundleName": "GameBasic",
-            "CFBundleDisplayName": "GameBasic",
+            "CFBundleName": "Drachenhauch",
+            "CFBundleDisplayName": "Drachenhauch",
             "CFBundleShortVersionString": "1.0",
             "NSHighResolutionCapable": True,
-            # .dh-Dateien im Finder mit GameBasic verknuepfen (Doppelklick
+            # .dh-Dateien im Finder mit Drachenhauch verknuepfen (Doppelklick
             # startet den Editor mit der Datei) -- Pendant zur Windows-
-            # Registry-Dateiverknuepfung in GameBasic.iss.
+            # Registry-Dateiverknuepfung in Drachenhauch.iss.
             "CFBundleDocumentTypes": [{
-                "CFBundleTypeName": "GameBasic-Quelltext",
+                "CFBundleTypeName": "Drachenhauch-Quelltext",
                 "CFBundleTypeExtensions": ["gb"],
                 "CFBundleTypeRole": "Editor",
                 "LSHandlerRank": "Owner",

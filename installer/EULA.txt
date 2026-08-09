@@ -9,7 +9,7 @@ Stand: [JAHR]   Anbieter: [DEIN NAME / FIRMA], [ANSCHRIFT], [E-MAIL]
 
 
 1. GEGENSTAND
-GameBasic ("die Software") ist eine Entwicklungsumgebung samt Laufzeitumgebung
+Drachenhauch ("die Software") ist eine Entwicklungsumgebung samt Laufzeitumgebung
 ("dhrt") zum Erstellen von Programmen und Spielen. Dieser Vertrag wird zwischen
 dir ("Lizenznehmer") und dem Anbieter geschlossen. Durch Installation oder
 Nutzung der Software stimmst du diesem Vertrag zu. Stimmst du nicht zu,
@@ -22,16 +22,16 @@ uebertragbares Recht ein, die Software gemaess dem erworbenen Lizenzmodell
 
 3. DEINE PROGRAMME UND SPIELE GEHOEREN DIR
 Alle Programme, Spiele, Grafiken, Klaenge und sonstigen Inhalte, die du MIT
-GameBasic erstellst, gehoeren ausschliesslich dir. Der Anbieter erhebt darauf
+Drachenhauch erstellst, gehoeren ausschliesslich dir. Der Anbieter erhebt darauf
 keinerlei Rechte und keine Lizenzgebuehren.
 
 4. WEITERGABE DEINER WERKE (RUNTIME-REDISTRIBUTION)
 Du darfst die mit "dhrt --export" erzeugten eigenstaendigen Programme - einschliesslich
-der darin enthaltenen GameBasic-Laufzeitumgebung (dhrt) und der mitgelieferten
+der darin enthaltenen Drachenhauch-Laufzeitumgebung (dhrt) und der mitgelieferten
 Open-Source-Bestandteile - frei weitergeben und auch KOMMERZIELL verkaufen, ohne
 weitere Gebuehren an den Anbieter. Du musst dabei lediglich die Lizenzhinweise der
 enthaltenen Drittkomponenten beachten (siehe THIRD-PARTY-NOTICES.txt; die dort
-genannten Open-Source-Lizenzen erlauben diese Weitergabe). Die GameBasic-
+genannten Open-Source-Lizenzen erlauben diese Weitergabe). Die Drachenhauch-
 ENTWICKLUNGSUMGEBUNG (Editor) selbst darfst du nicht als Teil deiner Werke
 weitergeben.
 
@@ -55,7 +55,7 @@ Updates unterliegen diesem Vertrag, sofern sie nicht mit eigenen Bedingungen
 ausgeliefert werden.
 
 8. DRITTKOMPONENTEN / OPEN SOURCE
-GameBasic enthaelt Open-Source-Software (u.a. Qt/PySide6 unter LGPLv3, raylib,
+Drachenhauch enthaelt Open-Source-Software (u.a. Qt/PySide6 unter LGPLv3, raylib,
 NumPy, Pillow sowie zahlreiche Rust-Crates unter MIT/BSD/Apache-2.0/Zlib/MPL-2.0).
 Diese Bestandteile unterliegen AUSSCHLIESSLICH ihren eigenen Lizenzen; soweit diese
 mit dem vorliegenden Vertrag kollidieren, gehen die jeweiligen Open-Source-Lizenzen
@@ -79,7 +79,7 @@ aus der Verletzung von Leben, Koerper, Gesundheit) bleibt unberuehrt.
 Dieser Vertrag gilt, bis er beendet wird. Er endet automatisch, wenn du gegen
 wesentliche Bestimmungen verstoesst. Bei Beendigung hast du die Nutzung
 einzustellen und die Software zu deinstallieren. Bereits weitergegebene, mit
-GameBasic erstellte Werke (Punkt 3/4) bleiben davon unberuehrt.
+Drachenhauch erstellte Werke (Punkt 3/4) bleiben davon unberuehrt.
 
 12. ANWENDBARES RECHT
 Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des
@@ -90,5 +90,5 @@ unberuehrt.
 13. SCHLUSSBESTIMMUNGEN
 Sollte eine Bestimmung unwirksam sein, bleibt der uebrige Vertrag wirksam.
 
-(c) [JAHR] [DEIN NAME / FIRMA]. Alle Rechte vorbehalten. "GameBasic" und das
-GameBasic-Logo sind Kennzeichen des Anbieters.
+(c) [JAHR] [DEIN NAME / FIRMA]. Alle Rechte vorbehalten. "Drachenhauch" und das
+Drachenhauch-Logo sind Kennzeichen des Anbieters.

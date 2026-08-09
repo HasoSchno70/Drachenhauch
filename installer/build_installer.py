@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Baut die GameBasic-Distribution fuer das aktuelle Betriebssystem.
+"""Baut die Drachenhauch-Distribution fuer das aktuelle Betriebssystem.
 
 Schritte (alle Plattformen):
   1. dhrt-Runtime sicherstellen (rust/build_runtime.py, falls fehlend).
   2. App-Icon aus drachenhauch/assets/logo.png erzeugen (.ico Windows, .icns macOS).
-  3. PyInstaller: dhrun.py + drachenhauch-Paket -> dist/GameBasic[.app]/ (onedir,
+  3. PyInstaller: dhrun.py + drachenhauch-Paket -> dist/Drachenhauch[.app]/ (onedir,
      ohne Python).
   4. Plattformspezifische Paketierung:
-     - Windows: Inno Setup (ISCC) -> installer/output/GameBasic-Setup-<version>.exe
+     - Windows: Inno Setup (ISCC) -> installer/output/Drachenhauch-Setup-<version>.exe
      - macOS:   dhrt neben die App-Binary legen, .app in .dmg packen (hdiutil)
      - Linux:   dhrt neben die App-Binary legen, .tar.gz + install.sh (XDG
                 Desktop-Integration ohne sudo/root)
@@ -49,7 +49,7 @@ def log(msg):
 
 # --------------------------------------------------------------- Code-Signing
 # Inert, solange KEIN Zertifikat konfiguriert ist. Aktivieren ueber Umgebungs-
-# variablen (dann werden GameBasic.exe, dhrt.exe UND der Installer signiert):
+# variablen (dann werden Drachenhauch.exe, dhrt.exe UND der Installer signiert):
 #   GB_SIGN_CERT  = Pfad zur .pfx-Datei  ODER  SHA1-Thumbprint im Windows-Zertspeicher
 #   GB_SIGN_PASS  = Passwort der .pfx    (nur bei .pfx noetig)
 #   GB_SIGN_TS    = RFC3161-Timestamp-URL (Default: DigiCert)
@@ -187,7 +187,7 @@ def make_icon():
         return klein if (klein is not None and kante <= 64) else canvas
 
     if SYSTEM == "Windows":
-        ico = INST / "GameBasic.ico"
+        ico = INST / "Drachenhauch.ico"
         kanten = [256, 128, 64, 48, 32, 16]
         if klein is None:
             canvas.save(ico, sizes=[(k, k) for k in reversed(kanten)])
@@ -195,14 +195,14 @@ def make_icon():
             _schreibe_ico(ico, [(k, fuer(k)) for k in kanten])
         print("Icon:", ico, "(zwei Vorlagen)" if klein is not None else "")
     elif SYSTEM == "Darwin":
-        icns = INST / "GameBasic.icns"
+        icns = INST / "Drachenhauch.icns"
         canvas.save(icns, format="ICNS")
         print("Icon:", icns)
     else:
         # Linux: kein Container-Format noetig, .desktop referenziert direkt
         # ein PNG. 256x256 ist die von der XDG-Icon-Spec bevorzugte Groesse
         # fuer hicolor/256x256/apps/.
-        png = INST / "GameBasic.png"
+        png = INST / "Drachenhauch.png"
         canvas.resize((256, 256)).save(png)
         print("Icon:", png)
 
@@ -218,21 +218,21 @@ def gen_notices():
 def run_pyinstaller():
     log("PyInstaller (eingefrorene IDE)")
     dist = ROOT / "dist"
-    for stale in (dist / "GameBasic", dist / "GameBasic.app"):
+    for stale in (dist / "Drachenhauch", dist / "Drachenhauch.app"):
         if stale.exists():
             shutil.rmtree(stale)
     subprocess.run(
-        [str(PY), "-m", "PyInstaller", str(INST / "GameBasic.spec"),
+        [str(PY), "-m", "PyInstaller", str(INST / "Drachenhauch.spec"),
          "--noconfirm", "--distpath", str(dist),
          "--workpath", str(ROOT / "build" / "pyi")],
         cwd=ROOT, check=True)
     if SYSTEM == "Darwin":
-        app = dist / "GameBasic.app"
+        app = dist / "Drachenhauch.app"
         if not app.exists():
             sys.exit("FEHLER: PyInstaller-Ausgabe (.app) fehlt.")
         print("App:", app)
         return app
-    exe = dist / "GameBasic" / f"GameBasic{EXE_SUFFIX}"
+    exe = dist / "Drachenhauch" / f"Drachenhauch{EXE_SUFFIX}"
     if not exe.exists():
         sys.exit("FEHLER: PyInstaller-Ausgabe fehlt.")
     print("IDE:", exe)
@@ -254,14 +254,14 @@ def find_iscc():
 def run_inno(ver):
     iscc = find_iscc()
     if not iscc:
-        print("\nInno Setup (ISCC.exe) nicht gefunden. dist/GameBasic ist fertig.")
-        print("Installer manuell bauen: ISCC.exe /DAppVersion=%s installer\\GameBasic.iss" % ver)
+        print("\nInno Setup (ISCC.exe) nicht gefunden. dist/Drachenhauch ist fertig.")
+        print("Installer manuell bauen: ISCC.exe /DAppVersion=%s installer\\Drachenhauch.iss" % ver)
         return
     sign(DHRT)           # dhrt.exe signieren, BEVOR Inno sie einpackt
     log("Inno Setup (Installer verpacken)")
-    subprocess.run([iscc, f"/DAppVersion={ver}", str(INST / "GameBasic.iss")],
+    subprocess.run([iscc, f"/DAppVersion={ver}", str(INST / "Drachenhauch.iss")],
                    cwd=INST, check=True)
-    out = INST / "output" / f"GameBasic-Setup-{ver}.exe"
+    out = INST / "output" / f"Drachenhauch-Setup-{ver}.exe"
     if out.exists():
         sign(out)        # zuletzt den fertigen Installer signieren
     print("\nFERTIG ->", out if out.exists() else (INST / "output"))
@@ -287,7 +287,7 @@ def run_macos(app: Path, ver: str):
     log("DMG erzeugen (hdiutil)")
     out_dir = INST / "output"
     out_dir.mkdir(exist_ok=True)
-    dmg = out_dir / f"GameBasic-{ver}-macOS.dmg"
+    dmg = out_dir / f"Drachenhauch-{ver}-macOS.dmg"
     if dmg.exists():
         dmg.unlink()
     hdiutil = shutil.which("hdiutil")
@@ -295,7 +295,7 @@ def run_macos(app: Path, ver: str):
         print("WARNUNG: hdiutil nicht gefunden (kein macOS?) -- .app liegt "
               f"unverpackt unter {app}, kein .dmg erzeugt.")
         return
-    subprocess.run([hdiutil, "create", "-volname", "GameBasic",
+    subprocess.run([hdiutil, "create", "-volname", "Drachenhauch",
                      "-srcfolder", str(app), "-ov", "-format", "UDZO", str(dmg)],
                     check=True)
     print("\nFERTIG ->", dmg)
@@ -303,36 +303,36 @@ def run_macos(app: Path, ver: str):
 
 # ------------------------------------------------------------------- Linux
 _INSTALL_SH = """#!/bin/sh
-# Installiert GameBasic fuer den aktuellen Nutzer (kein root/sudo noetig),
+# Installiert Drachenhauch fuer den aktuellen Nutzer (kein root/sudo noetig),
 # nach der XDG-Basisverzeichnis-Konvention. Zum Deinstallieren die unten
 # genannten Pfade einfach loeschen.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DEST="${HOME}/.local/share/GameBasic"
+DEST="${HOME}/.local/share/Drachenhauch"
 BIN="${HOME}/.local/bin"
 APPS="${HOME}/.local/share/applications"
 ICONS="${HOME}/.local/share/icons/hicolor/256x256/apps"
 
 echo "Installiere nach $DEST ..."
 mkdir -p "$DEST" "$BIN" "$APPS" "$ICONS"
-cp -r "$HERE/GameBasic/." "$DEST/"
-chmod +x "$DEST/GameBasic" 2>/dev/null || true
+cp -r "$HERE/Drachenhauch/." "$DEST/"
+chmod +x "$DEST/Drachenhauch" 2>/dev/null || true
 [ -f "$DEST/dhrt" ] && chmod +x "$DEST/dhrt"
 
 cat > "$BIN/drachenhauch" <<EOF
 #!/bin/sh
-exec "$DEST/GameBasic" "\\$@"
+exec "$DEST/Drachenhauch" "\\$@"
 EOF
 chmod +x "$BIN/drachenhauch"
 
-[ -f "$HERE/GameBasic.png" ] && cp "$HERE/GameBasic.png" "$ICONS/drachenhauch.png"
+[ -f "$HERE/Drachenhauch.png" ] && cp "$HERE/Drachenhauch.png" "$ICONS/drachenhauch.png"
 
 cat > "$APPS/drachenhauch.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=GameBasic
+Name=Drachenhauch
 Comment=BASIC-Dialekt mit Pascal-strikter Typisierung und OOP fuer Spiele
-Exec=$DEST/GameBasic %f
+Exec=$DEST/Drachenhauch %f
 Icon=drachenhauch
 Categories=Development;IDE;
 MimeType=text/x-drachenhauch;
@@ -343,12 +343,12 @@ gtk-update-icon-cache 2>/dev/null || true
 
 echo "Fertig. Falls '$BIN' nicht in deinem PATH ist, fuege es in deiner Shell-rc hinzu:"
 echo "  export PATH=\\"\\$PATH:$BIN\\""
-echo "GameBasic sollte jetzt auch im Anwendungsmenue auftauchen."
+echo "Drachenhauch sollte jetzt auch im Anwendungsmenue auftauchen."
 """
 
 
 def run_linux(exe: Path, ver: str):
-    app_dir = exe.parent  # dist/GameBasic/
+    app_dir = exe.parent  # dist/Drachenhauch/
     if DHRT.exists():
         shutil.copy2(DHRT, app_dir / "dhrt")
         os.chmod(app_dir / "dhrt", 0o755)
@@ -361,10 +361,10 @@ def run_linux(exe: Path, ver: str):
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
-    shutil.copytree(app_dir, stage / "GameBasic")
-    icon = INST / "GameBasic.png"
+    shutil.copytree(app_dir, stage / "Drachenhauch")
+    icon = INST / "Drachenhauch.png"
     if icon.exists():
-        shutil.copy2(icon, stage / "GameBasic.png")
+        shutil.copy2(icon, stage / "Drachenhauch.png")
     for f in ("EULA.txt", "THIRD-PARTY-NOTICES.txt"):
         src = INST / f
         if src.exists():
@@ -373,21 +373,21 @@ def run_linux(exe: Path, ver: str):
     install_sh.write_text(_INSTALL_SH, encoding="utf-8", newline="\n")
     os.chmod(install_sh, 0o755)
 
-    tar_path = out_dir / f"GameBasic-{ver}-linux-x86_64.tar.gz"
+    tar_path = out_dir / f"Drachenhauch-{ver}-linux-x86_64.tar.gz"
     if tar_path.exists():
         tar_path.unlink()
     with tarfile.open(tar_path, "w:gz") as tar:
-        tar.add(stage, arcname="GameBasic-dist")
+        tar.add(stage, arcname="Drachenhauch-dist")
     print("\nFERTIG ->", tar_path)
     print("Installation (kein sudo noetig): tar xzf", tar_path.name,
-          "&& ./GameBasic-dist/install.sh")
+          "&& ./Drachenhauch-dist/install.sh")
 
 
 def main():
     rebuild = "--rebuild-dhrt" in sys.argv
     no_inst = "--no-installer" in sys.argv
     ver = version()
-    print(f"GameBasic {ver} -- Distributions-Build ({SYSTEM})")
+    print(f"Drachenhauch {ver} -- Distributions-Build ({SYSTEM})")
     ensure_dhrt(rebuild)
     make_icon()
     gen_notices()
