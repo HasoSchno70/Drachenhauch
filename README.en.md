@@ -26,6 +26,30 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
+## What it can do
+
+<table>
+<tr>
+<td width="33%" align="center"><a href="examples/99_ibl_hdr.dh"><img src="examples/screenshots/99_ibl_hdr.png" width="260" alt="HDR lighting"></a><br><b>HDR lighting</b><br><sub>metals reflect a real environment</sub></td>
+<td width="33%" align="center"><a href="examples/93_shadows.dh"><img src="examples/screenshots/93_shadows.png" width="260" alt="Shadows"></a><br><b>Shadows</b><br><sub>depth map with soft edges</sub></td>
+<td width="33%" align="center"><a href="examples/104_instancing.dh"><img src="examples/screenshots/104_instancing.png" width="260" alt="GPU instancing"></a><br><b>GPU instancing</b><br><sub>1024 cubes in a single draw call</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/108_skeletal_anim.dh"><img src="examples/screenshots/108_skeletal_anim.png" width="260" alt="Skeletal animation"></a><br><b>Skeletal animation</b><br><sub>rigged GLTF, poses blended</sub></td>
+<td align="center"><a href="examples/119_vortex.dh"><img src="examples/screenshots/119_vortex.png" width="260" alt="Additive blending"></a><br><b>Additive blending</b><br><sub>fullscreen at 60 frames per second</sub></td>
+<td align="center"><a href="examples/65_amiga_demo.dh"><img src="examples/screenshots/65_amiga_demo.png" width="260" alt="Demoscene"></a><br><b>Demoscene</b><br><sub>copper bars and a sine scroller</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/78_particle_catalog.dh"><img src="examples/screenshots/78_particle_catalog.png" width="260" alt="Particles"></a><br><b>Particles</b><br><sub>five render modes, colour ramps</sub></td>
+<td align="center"><a href="examples/154_chart.dh"><img src="examples/screenshots/154_chart.png" width="260" alt="Charts"></a><br><b>Charts</b><br><sub>six kinds, mouse and tooltips included</sub></td>
+<td align="center"><a href="examples/157_gui_tabelle.dh"><img src="examples/screenshots/157_gui_tabelle.png" width="260" alt="User interfaces"></a><br><b>User interfaces</b><br><sub>sortable, filterable data table</sub></td>
+</tr>
+</table>
+
+All nine ship as examples — click an image to jump to its source.
+The IDE shows the same gallery with **21 demos** on its start page, each one
+launchable with a double click.
+
 ## Download
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 84 MB, currently version 2026.2.

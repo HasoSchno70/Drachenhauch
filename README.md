@@ -26,6 +26,30 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
+## Was damit geht
+
+<table>
+<tr>
+<td width="33%" align="center"><a href="examples/99_ibl_hdr.dh"><img src="examples/screenshots/99_ibl_hdr.png" width="260" alt="HDR-Beleuchtung"></a><br><b>HDR-Beleuchtung</b><br><sub>Metalle spiegeln eine echte Umgebung</sub></td>
+<td width="33%" align="center"><a href="examples/93_shadows.dh"><img src="examples/screenshots/93_shadows.png" width="260" alt="Schatten"></a><br><b>Schatten</b><br><sub>Tiefenpuffer mit weichen Kanten</sub></td>
+<td width="33%" align="center"><a href="examples/104_instancing.dh"><img src="examples/screenshots/104_instancing.png" width="260" alt="GPU-Instancing"></a><br><b>GPU-Instancing</b><br><sub>1024 Würfel in einem Draw-Call</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/108_skeletal_anim.dh"><img src="examples/screenshots/108_skeletal_anim.png" width="260" alt="Skelett-Animation"></a><br><b>Skelett-Animation</b><br><sub>geriggtes GLTF, Posen überblendet</sub></td>
+<td align="center"><a href="examples/119_vortex.dh"><img src="examples/screenshots/119_vortex.png" width="260" alt="Additives Blenden"></a><br><b>Additives Blenden</b><br><sub>Vollbild bei 60 Bildern je Sekunde</sub></td>
+<td align="center"><a href="examples/65_amiga_demo.dh"><img src="examples/screenshots/65_amiga_demo.png" width="260" alt="Demoszene"></a><br><b>Demoszene</b><br><sub>Copper-Bars und Sinus-Scroller</sub></td>
+</tr>
+<tr>
+<td align="center"><a href="examples/78_particle_catalog.dh"><img src="examples/screenshots/78_particle_catalog.png" width="260" alt="Partikel"></a><br><b>Partikel</b><br><sub>fünf Render-Modi, Farbverläufe</sub></td>
+<td align="center"><a href="examples/154_chart.dh"><img src="examples/screenshots/154_chart.png" width="260" alt="Diagramme"></a><br><b>Diagramme</b><br><sub>sechs Arten, Maus und Tooltip inklusive</sub></td>
+<td align="center"><a href="examples/157_gui_tabelle.dh"><img src="examples/screenshots/157_gui_tabelle.png" width="260" alt="Oberflächen"></a><br><b>Oberflächen</b><br><sub>sortier- und filterbare Tabelle</sub></td>
+</tr>
+</table>
+
+Alle neun sind mitgelieferte Beispiele — ein Klick aufs Bild führt zum Quelltext.
+Die Entwicklungsumgebung zeigt dieselbe Galerie mit **21 Demos** auf ihrer
+Startseite, jede per Doppelklick startbar.
+
 ## Herunterladen
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 84 MB, aktuell Fassung 2026.2.
