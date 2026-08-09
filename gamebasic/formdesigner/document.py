@@ -433,7 +433,7 @@ class Control:
 # altes Formular ohne Eintrag genauso aussieht wie bisher.
 #
 # ACHTUNG: die Farben unten sind ein NACHBAU der Presets aus
-# `rust/gb_runtime/src/gui.rs` -- der Designer zeichnet mit Qt, kann also
+# `rust/drachenhauch_runtime/src/gui.rs` -- der Designer zeichnet mit Qt, kann also
 # nicht die Laufzeit fragen. `tests/test_formdesigner_theme.py` vergleicht
 # beide gegeneinander, damit sie nicht auseinanderlaufen.
 FORM_THEMES = ("", "glas_dunkel", "glas_hell", "modern_dark", "modern_light",

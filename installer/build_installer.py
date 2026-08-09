@@ -40,7 +40,7 @@ INST = ROOT / "installer"
 PY = Path(sys.executable)
 SYSTEM = platform.system()  # "Windows" | "Darwin" | "Linux"
 EXE_SUFFIX = ".exe" if SYSTEM == "Windows" else ""
-GBRT = ROOT / "rust" / "gb_runtime" / "target" / "release" / f"gbrt{EXE_SUFFIX}"
+GBRT = ROOT / "rust" / "drachenhauch_runtime" / "target" / "release" / f"gbrt{EXE_SUFFIX}"
 
 
 def log(msg):

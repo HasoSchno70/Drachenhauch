@@ -526,7 +526,7 @@ def _run_vm(src):
     exe = "gbrt.exe" if _os.name == "nt" else "gbrt"
     gbrt = None
     for v in ("release", "debug"):
-        p = root / "rust" / "gb_runtime" / "target" / v / exe
+        p = root / "rust" / "drachenhauch_runtime" / "target" / v / exe
         if p.exists():
             gbrt = p
             break

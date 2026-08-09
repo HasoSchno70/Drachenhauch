@@ -20,9 +20,9 @@ _ORIGINAL = _ROOT / "pyramid_pusher" / "pyramid_pusher.db"
 
 def _gbrt():
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    return next((_ROOT / "rust" / "gb_runtime" / "target" / v / exe
+    return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
-                 if (_ROOT / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+                 if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
 def _zustand(pfad):

@@ -38,7 +38,7 @@ _FRAME_MS = 16
 
 # Trail-Laenge im "streak"-Modus (Vorschau UND Laufzeit multiplizieren die
 # Geschwindigkeit mit demselben Faktor) -- muss synchron zu
-# `rust/gb_runtime/src/vm.rs`s `particle_draw` (Zeile mit `* 0.04`) bleiben.
+# `rust/drachenhauch_runtime/src/vm.rs`s `particle_draw` (Zeile mit `* 0.04`) bleiben.
 _STREAK_TRAIL_FACTOR = 0.04
 
 # Burst-Groesse: min. Partikelzahl bzw. Vielfaches der Dauerrate (Burst-
@@ -84,7 +84,7 @@ _FACTORY_PRESETS = {
 
 def _compute_colors(sys: _ParticleSystem):
     """Finale Farben (+ Alpha) pro Partikel -- repliziert `particle_color()` in
-    `rust/gb_runtime/src/vm.rs` (der eigentliche Laufzeit-Pfad; das fruehere
+    `rust/drachenhauch_runtime/src/vm.rs` (der eigentliche Laufzeit-Pfad; das fruehere
     Python-Modul `particles.py`, auf das diese Funktion urspruenglich verwies,
     ist seit Phase 8 entfernt).
 

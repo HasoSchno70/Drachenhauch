@@ -3,7 +3,7 @@
 WICHTIG zum Einordnen: dieser Parser fuehrt NICHTS mehr aus. Seit dem
 Entfernen des Python-Tree-Walkers (Stufe B) ist `gbrt` die einzige
 Laufzeit und bringt sein eigenes Front-End mit
-(`rust/gb_runtime/src/parser.rs`). Was hier entsteht, bedient nur noch
+(`rust/drachenhauch_runtime/src/parser.rs`). Was hier entsteht, bedient nur noch
 die Editor-/Tooling-Schicht: LSP, Live-Error-Check (als FALLBACK, wenn
 `gbrt --check` nicht auffindbar ist), Folding und Formatter. Das Outline
 ist textbasiert (`editor_qt/symbols.py`) und nutzt den AST gar nicht.

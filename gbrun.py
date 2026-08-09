@@ -425,7 +425,7 @@ def _find_gbrt():
     """Sucht das `gbrt`-Binary. Reihenfolge:
     1. Eingefrorene Installation (PyInstaller): neben der Exe bzw. im Bundle
        (_MEIPASS) -- so findet die installierte GameBasic-App ihre Runtime.
-    2. Dev-Baum: rust/gb_runtime/target/{release,debug}/gbrt[.exe]."""
+    2. Dev-Baum: rust/drachenhauch_runtime/target/{release,debug}/gbrt[.exe]."""
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     cands = []
     if getattr(sys, "frozen", False):
@@ -433,7 +433,7 @@ def _find_gbrt():
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
             cands.append(Path(meipass) / exe)
-    base = _project_root() / "rust" / "gb_runtime" / "target"
+    base = _project_root() / "rust" / "drachenhauch_runtime" / "target"
     cands += [base / "release" / exe, base / "debug" / exe]
     for p in cands:
         if p.exists():

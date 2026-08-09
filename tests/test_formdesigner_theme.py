@@ -3,7 +3,7 @@ Entwurfsflaeche.
 
 Der wichtigste Test hier ist `test_farben_stimmen_mit_der_laufzeit_ueberein`:
 Der Designer zeichnet mit Qt und kann die Laufzeit nicht fragen, also ist
-`FORM_THEME_COLORS` ein NACHBAU der Presets aus `rust/gb_runtime/src/gui.rs`.
+`FORM_THEME_COLORS` ein NACHBAU der Presets aus `rust/drachenhauch_runtime/src/gui.rs`.
 Solche Doppelungen laufen still auseinander -- hier wird die Nachbildung
 gegen die echte Laufzeit geprueft, damit ein Entwurf zeigt, was das Formular
 spaeter wirklich tut.

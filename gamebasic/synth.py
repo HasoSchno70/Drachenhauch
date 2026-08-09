@@ -2,7 +2,7 @@
 
 Single-Source fuer den SFX-Generator (`sfxeditor_qt.py`) UND den
 `AUDIO_SFX`-Builtin (`modules/audio.py`). Die native Runtime `gbrt`
-repliziert dieselbe Mathematik in Rust (`rust/gb_runtime/src/audio.rs`),
+repliziert dieselbe Mathematik in Rust (`rust/drachenhauch_runtime/src/audio.rs`),
 damit der Effekt in beiden Pfaden gleich klingt.
 
 `synthesize(...)` liefert ein Float-Array in [-1, 1] mit angewandter

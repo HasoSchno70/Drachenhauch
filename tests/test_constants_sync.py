@@ -3,7 +3,7 @@
 Die Farb- und Tasten-Konstanten existieren zweimal: in
 `gamebasic/graphics.py` (COLORS/KEYS, Editor-/LSP-Tooling) und als
 vorregistrierte Globals der Runtime (`DEFAULT_COLORS`/`DEFAULT_KEYS` in
-`rust/gb_runtime/src/vm.rs`) -- von Hand synchron gehalten, ein Erbe der
+`rust/drachenhauch_runtime/src/vm.rs`) -- von Hand synchron gehalten, ein Erbe der
 pygame-Zeit (die Werte sind SDL-Keycodes und damit Sprach-API).
 
 Dieser Golden-Test laesst gbrt JEDE Python-seitige Konstante PRINTen und

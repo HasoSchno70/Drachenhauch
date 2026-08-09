@@ -22,7 +22,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIG = os.path.join(HERE, "figures")
 IMG = os.path.join(HERE, "images")
-GBRT = os.path.join(HERE, "..", "..", "rust", "gb_runtime", "target", "release", "gbrt.exe")
+GBRT = os.path.join(HERE, "..", "..", "rust", "drachenhauch_runtime", "target", "release", "gbrt.exe")
 FONT = os.environ.get("BUCH_FONT", r"C:\Windows\Fonts\segoeui.ttf")
 SCALE = "4"
 

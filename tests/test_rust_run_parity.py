@@ -22,7 +22,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 
 def _find_gbrt():
-    base = _ROOT / "rust" / "gb_runtime" / "target"
+    base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     for variant in ("release", "debug"):
         p = base / variant / exe

@@ -22,7 +22,7 @@ _CR = Path(__file__).resolve().parent.parent / "circuitrunner"
 def _find_gbrt():
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     for variant in ("release", "debug"):
-        p = _CR.parent / "rust" / "gb_runtime" / "target" / variant / exe
+        p = _CR.parent / "rust" / "drachenhauch_runtime" / "target" / variant / exe
         if p.exists():
             return p
     return None

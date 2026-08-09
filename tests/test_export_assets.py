@@ -15,7 +15,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 def _find_gbrt():
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     for variant in ("release", "debug"):
-        p = _ROOT / "rust" / "gb_runtime" / "target" / variant / exe
+        p = _ROOT / "rust" / "drachenhauch_runtime" / "target" / variant / exe
         if p.exists():
             return p
     return None

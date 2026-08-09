@@ -132,7 +132,7 @@ def mpl_section() -> str:
 
 def rust_section() -> str:
     out = [SEP, "RUST-KOMPONENTEN (native Runtime gbrt)", SEP, ""]
-    crate = ROOT / "rust" / "gb_runtime"
+    crate = ROOT / "rust" / "drachenhauch_runtime"
     try:
         raw = subprocess.run(
             ["cargo", "metadata", "--format-version", "1",
@@ -145,7 +145,7 @@ def rust_section() -> str:
         return "\n".join(out)
     root_id = (data.get("resolve") or {}).get("root")
     pkgs = [p for p in data["packages"] if p.get("id") != root_id
-            and p.get("name") != "gb_runtime"]
+            and p.get("name") != "drachenhauch_runtime"]
     pkgs.sort(key=lambda p: p["name"].lower())
     out.append(f"Die native Runtime gbrt enthaelt {len(pkgs)} Rust-Crates "
                f"(Features: {RUST_FEATURES}):\n")

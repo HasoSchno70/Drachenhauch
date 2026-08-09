@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CRATE = ROOT / "rust" / "gb_runtime"
+CRATE = ROOT / "rust" / "drachenhauch_runtime"
 WEB = ROOT / "web"
 TARGET = "wasm32-unknown-emscripten"
 

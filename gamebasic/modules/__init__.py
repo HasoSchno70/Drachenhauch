@@ -6,7 +6,7 @@ implementiert alle Built-in-Module nativ. Dieses Paket haelt nur noch die
 zu erkennen (und zu einem Kommentar zu machen), sowie der Editor-File-Browser
 zum Anzeigen verfuegbarer Module.
 
-Maßgeblich ist `rust/gb_runtime/src/preprocess.rs` MODULES -- bei neuen Modulen
+Maßgeblich ist `rust/drachenhauch_runtime/src/preprocess.rs` MODULES -- bei neuen Modulen
 hier UND dort ergaenzen (synchron halten).
 """
 from __future__ import annotations

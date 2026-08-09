@@ -17,9 +17,9 @@ import pytest
 def _find_gbrt():
     root = Path(__file__).resolve().parent.parent
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    return next((root / "rust" / "gb_runtime" / "target" / v / exe
+    return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
-                 if (root / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+                 if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
 _GBRT = _find_gbrt()

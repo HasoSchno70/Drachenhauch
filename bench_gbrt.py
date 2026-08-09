@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent
 
 
 def find_gbrt() -> Path | None:
-    base = ROOT / "rust" / "gb_runtime" / "target"
+    base = ROOT / "rust" / "drachenhauch_runtime" / "target"
     for variant in ("release", "debug"):
         p = base / variant / "gbrt.exe"
         if p.exists():

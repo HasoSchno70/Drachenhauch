@@ -69,7 +69,7 @@ def test_web_harness_files_present():
 def test_main_rs_has_wasm_entry():
     """main.rs kompiliert im emscripten-Build /program.gb (Quelle, Vorrang)
     und faellt auf /program.gbc zurueck."""
-    src = (ROOT / "rust" / "gb_runtime" / "src" / "main.rs").read_text(
+    src = (ROOT / "rust" / "drachenhauch_runtime" / "src" / "main.rs").read_text(
         encoding="utf-8")
     assert 'target_os = "emscripten"' in src
     assert "/program.gb" in src

@@ -153,9 +153,9 @@ def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
 
     root = Path(__file__).resolve().parent.parent
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    gbrt = next((root / "rust" / "gb_runtime" / "target" / v / exe
+    gbrt = next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
-                 if (root / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+                 if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
     if gbrt is None:
         pytest.skip("native Runtime 'gbrt' nicht gebaut")
 

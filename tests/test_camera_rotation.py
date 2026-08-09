@@ -1,6 +1,6 @@
 """Golden-Tests fuer die 2D-Kamera-Rotation (CAMERA_SET_ROTATION/CAMERA_ROTATION,
 rotations-bewusstes CAMERA_S2W_X/Y). Reine Positions-Rotation um die
-Bildschirm-Mitte -- siehe rust/gb_runtime/src/graphics.rs (cam_rotation) und
+Bildschirm-Mitte -- siehe rust/drachenhauch_runtime/src/graphics.rs (cam_rotation) und
 docs/module-camera.md.
 """
 

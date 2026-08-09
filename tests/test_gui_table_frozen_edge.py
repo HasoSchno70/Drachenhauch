@@ -20,9 +20,9 @@ import pytest
 def _gbrt():
     root = Path(__file__).resolve().parent.parent
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    return next((root / "rust" / "gb_runtime" / "target" / v / exe
+    return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
-                 if (root / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+                 if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
 # Fenster bei (0,0), Titel 22 -> Inhalt ab y=22. Tabelle bei (0,0) im Inhalt.

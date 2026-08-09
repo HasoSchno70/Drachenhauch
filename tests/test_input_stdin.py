@@ -19,7 +19,7 @@ _GBRUN = _ROOT / "gbrun.py"
 
 def _gbrt_available() -> bool:
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    return any((_ROOT / "rust" / "gb_runtime" / "target" / variant / exe).exists()
+    return any((_ROOT / "rust" / "drachenhauch_runtime" / "target" / variant / exe).exists()
                for variant in ("release", "debug"))
 
 

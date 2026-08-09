@@ -55,7 +55,7 @@ Name: "assocgb"; Description: ".gb-Dateien mit GameBasic verknuepfen"; GroupDesc
 Source: "..\dist\GameBasic\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Native Runtime neben die Exe -- die IDE findet sie (_find_gbrt) und sie liegt
 ; (bei aktivem PATH-Task) fuer das Terminal bereit.
-Source: "..\rust\gb_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\rust\drachenhauch_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Beispielprogramme + Showcase-Thumbnails (screenshots/) in die OEFFENTLICHEN
 ; DOKUMENTE -> `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der
 ; `project_root/examples` der eingefrorenen App (gbrun._project_root): so findet

@@ -69,7 +69,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: rust/gb_runtime
+        working-directory: rust/drachenhauch_runtime
 
     steps:
       - uses: actions/checkout@v4

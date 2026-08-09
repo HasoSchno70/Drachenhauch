@@ -6,7 +6,7 @@ einen echten TCP-Socket.
 
 Die reine Protokoll-Logik (Byte-Layout, Remaining-Length-Encoding,
 Nachrichten-Parsing) wird bereits in Rust getestet
-(rust/gb_runtime/src/mqtt.rs, `cargo test`) -- hier zusaetzlich der
+(rust/drachenhauch_runtime/src/mqtt.rs, `cargo test`) -- hier zusaetzlich der
 End-to-End-Pfad durch die echte VM.
 """
 import socket

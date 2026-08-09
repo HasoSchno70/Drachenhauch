@@ -29,7 +29,7 @@ THUMB_WIDTH = 480
 
 
 def _find_gbrt() -> Path | None:
-    base = ROOT / "rust" / "gb_runtime" / "target"
+    base = ROOT / "rust" / "drachenhauch_runtime" / "target"
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     for variant in ("release", "debug"):
         p = base / variant / exe

@@ -66,7 +66,7 @@ _HANDLE_CURSORS = {
 
 
 # Geteilte Fundstelle statt einer eigenen Kopie: die lokale Variante suchte NUR
-# im Dev-Baum (`rust/gb_runtime/target/...` relativ zu dieser Datei) und kannte
+# im Dev-Baum (`rust/drachenhauch_runtime/target/...` relativ zu dieser Datei) und kannte
 # den PyInstaller-Fall nicht -- in der installierten IDE liegt `gbrt.exe` neben
 # `GameBasic.exe`, F5 meldete dort also "Runtime nicht gebaut: python
 # rust/build_runtime.py", einen Rat, den ein Installer-Nutzer nicht befolgen

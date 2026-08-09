@@ -14,7 +14,7 @@ from .errors import GBRuntimeError
 
 
 # --- Farben (RGB-Hex) -------------------------------------------------
-# COLORS/KEYS sind in der Runtime dupliziert (rust/gb_runtime/src/vm.rs
+# COLORS/KEYS sind in der Runtime dupliziert (rust/drachenhauch_runtime/src/vm.rs
 # DEFAULT_COLORS/DEFAULT_KEYS). Drift-Schutz: tests/test_constants_sync.py.
 COLORS = {
     "black":      0x000000,

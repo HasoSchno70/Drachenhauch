@@ -1,6 +1,6 @@
 """Tests fuer das `firmata`-Modul (direkte Arduino/ESP32-Pin-Steuerung ueber
 StandardFirmata). Die eigentliche Protokoll-Logik (Bit-Packing, Nachrichten-
-Parsing) wird in Rust getestet (rust/gb_runtime/src/firmata.rs, `cargo test`)
+Parsing) wird in Rust getestet (rust/drachenhauch_runtime/src/firmata.rs, `cargo test`)
 -- hier nur Registrierung + IMPORT/Typ-Verdrahtung, analog zu
 test_joystick_rumble_no_gamepad_graceful_error in test_language_extensions.py.
 Kein echtes Arduino noetig (wie bei serial/usb/bt/wifi gibt es dafuer keine

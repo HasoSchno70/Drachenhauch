@@ -4,7 +4,7 @@
 Reihenfolge:
 1. Eingefrorene Installation (PyInstaller): neben `GameBasic.exe` (dorthin legt
    der Inno-Installer `gbrt.exe`) bzw. im Bundle (`_MEIPASS`).
-2. Dev-Baum: `<project_root>/rust/gb_runtime/target/{release,debug}/gbrt[.exe]`
+2. Dev-Baum: `<project_root>/rust/drachenhauch_runtime/target/{release,debug}/gbrt[.exe]`
    bzw. relativ zu diesem Paket (Repo-Wurzel = parents[2]).
 """
 from __future__ import annotations
@@ -55,7 +55,7 @@ def find_gbrt(project_root: Path | None = None) -> Path | None:
     roots.append(Path(__file__).resolve().parents[2])   # Repo-Wurzel (Dev)
     for r in roots:
         for variant in ("release", "debug"):
-            cands.append(r / "rust" / "gb_runtime" / "target" / variant / exe)
+            cands.append(r / "rust" / "drachenhauch_runtime" / "target" / variant / exe)
     for p in cands:
         if p.exists():
             return p

@@ -1,4 +1,4 @@
-"""Baut die native Rust-Runtime `gb_runtime` mit Grafik (raylib).
+"""Baut die native Rust-Runtime `drachenhauch_runtime` mit Grafik (raylib).
 
 raylib kompiliert seine C-Quellen via cmake und braucht libclang fuer die
 FFI-Bindings (bindgen). Dieses Skript stellt die noetige Umgebung her:
@@ -35,7 +35,7 @@ from pathlib import Path
 from shutil import which
 
 HERE = Path(__file__).resolve().parent
-CRATE = HERE / "gb_runtime"
+CRATE = HERE / "drachenhauch_runtime"
 
 
 def _find_cmake_bin_windows() -> str | None:
