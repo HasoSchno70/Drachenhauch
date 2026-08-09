@@ -10,16 +10,44 @@
 // fliessend, das .docx ist auf A4 gesetzt.  Direkt gebaut passt sich das Buch
 // der Schriftgroesse des Lesers an.
 //
-// Aufruf:  node build_epub.js [zielpfad.epub]
-//          (ohne Argument: Drachenhauch-Lehrbuch.epub neben dieser Datei)
+// Aufruf:  node build_epub.js [zielpfad.epub] [--lang en]
+//          (ohne Argument: Drachenhauch-Lehrbuch.epub neben dieser Datei;
+//           mit --lang en: Drachenhauch-Handbook.epub aus i18n/en.json)
 const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
 
 const HERE = __dirname;
 const IMG = path.join(HERE, "images");
-const TITEL = "Drachenhauch – Das Lehrbuch";
 const AUTOR = "Hans Schnorrenberger";
+
+// ---------------------------------------------------------------- Sprache
+const ARGS = process.argv.slice(2);
+const _li = ARGS.indexOf("--lang");
+const LANG = _li >= 0 ? (ARGS[_li + 1] || "de") : "de";
+const FREI = ARGS.filter((_, i) => i !== _li && i !== _li + 1);
+
+// Feste Texte des Renderers -- sie stehen NICHT in den Kapiteln und kommen
+// darum auch nicht durch den Katalog. "Merke"/"Achtung" sind Vorgabewerte
+// von note()/warn(), die der Kapiteltext gar nicht mitgibt.
+const UI = {
+  de: { titel: "Drachenhauch – Das Lehrbuch", untertitel: "Das Lehrbuch",
+        zeile: "Programmieren lernen und alle Befehle verstehen", von: "von",
+        inhalt: "Inhalt", merke: "Merke", achtung: "Achtung",
+        beispiel: "Beispiel", ausgabe: "Ausgabe", datei: "Drachenhauch-Lehrbuch.epub" },
+  en: { titel: "Drachenhauch – The Handbook", untertitel: "The Handbook",
+        zeile: "Learn to program and understand every command", von: "by",
+        inhalt: "Contents", merke: "Remember", achtung: "Careful",
+        beispiel: "Example", ausgabe: "Output", datei: "Drachenhauch-Handbook.epub" },
+}[LANG];
+if (!UI) { console.error(`Unbekannte Sprache: ${LANG} (de|en)`); process.exit(2); }
+
+const TITEL = UI.titel;
+
+// Katalog laden. Fehlt ein Eintrag, bleibt der deutsche Satz stehen -- das
+// Buch baut also auch halb uebersetzt, statt mitten im Kapitel abzubrechen.
+const KATALOG = LANG === "de" ? null
+  : JSON.parse(fs.readFileSync(path.join(HERE, "i18n", `${LANG}.json`), "utf8"));
 // Feste Kennung: bei jedem Bau dieselbe, damit ein Lesegeraet eine neue
 // Fassung als DASSELBE Buch erkennt (Lesezeichen/Fortschritt bleiben).
 // Der Name darin ist Geschichte, kein Etikett: die Kennung darf sich beim
@@ -64,8 +92,8 @@ function _box(art, titel, text) {
 }
 // Reihenfolge wie im .docx: tip(Titel, Text), note/warn(Text, Titel).
 const tip = (titel, text) => _box("tip", titel, text);
-const note = (text, titel = "Merke") => _box("note", titel, text);
-const warn = (text, titel = "Achtung") => _box("warn", titel, text);
+const note = (text, titel = UI.merke) => _box("note", titel, text);
+const warn = (text, titel = UI.achtung) => _box("warn", titel, text);
 
 function codeBlock(lines, opts = {}) {
   const arr = Array.isArray(lines) ? lines : [lines];
@@ -104,8 +132,8 @@ function cmd(name, syntax, desc, codeLines, opts = {}) {
        + `<code>${String(syntax).split("\n").map(esc).join("<br/>")}</code></p>`;
   }
   if (desc) (Array.isArray(desc) ? desc : [desc]).forEach((d) => { s += p(d); });
-  if (codeLines && codeLines.length) s += smallLabel("Beispiel") + codeBlock(codeLines);
-  if (opts.out) s += smallLabel("Ausgabe") + codeBlock(opts.out, { out: true });
+  if (codeLines && codeLines.length) s += smallLabel(UI.beispiel) + codeBlock(codeLines);
+  if (opts.out) s += smallLabel(UI.ausgabe) + codeBlock(opts.out, { out: true });
   if (opts.fig) s += figure(opts.fig, opts.caption || "");
   return s;
 }
@@ -151,6 +179,10 @@ const h2 = (t) => `<h2>${esc(t)}</h2>`;
 const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBlock,
             cmd, table, h1, h2, chapter, part, smallLabel, sig, PageBreak: null };
 
+// Uebersetzendes H -- schiebt jede Zeichenkette durch den Katalog, bevor
+// sie beim Renderer ankommt. Die 75 Kapiteldateien merken davon nichts.
+const HX = KATALOG ? require("./i18n").wrap(H, KATALOG) : H;
+
 // ---------------------------------------------------------------- Inhalt laden
 const contentDir = path.join(HERE, "content");
 const mods = fs.existsSync(contentDir)
@@ -161,13 +193,13 @@ neueDatei("Titel", "titel");
 aktuell.html.push(
   `<div class="titelseite">`,
   `<p class="marke">DRACHENHAUCH</p>`,
-  `<p class="untertitel">Das Lehrbuch</p>`,
-  `<p class="zeile">Programmieren lernen und alle Befehle verstehen</p>`,
-  `<p class="autor">von ${esc(AUTOR)}</p>`,
+  `<p class="untertitel">${esc(UI.untertitel)}</p>`,
+  `<p class="zeile">${esc(UI.zeile)}</p>`,
+  `<p class="autor">${UI.von} ${esc(AUTOR)}</p>`,
   `</div>`);
 
 for (const m of mods) {
-  const blocks = flatten(require(path.join(contentDir, m))(H), []);
+  const blocks = flatten(require(path.join(contentDir, m))(HX), []);
   for (const b of blocks) {
     if (b === null || b === undefined) continue;   // PageBreak hat im EPUB keinen Sinn
     aktuell.html.push(b);
@@ -291,7 +323,7 @@ const seite = (titel, koerper, navAttr = "") =>
 `<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"
-      xml:lang="de" lang="de"${navAttr}>
+      xml:lang="${LANG}" lang="${LANG}"${navAttr}>
 <head><meta charset="utf-8"/><title>${esc(titel)}</title>
 <link rel="stylesheet" type="text/css" href="../styles/buch.css"/></head>
 <body>
@@ -321,8 +353,8 @@ function navXhtml() {
     const klasse = (d.kind === "part") ? ' class="teil"' : "";
     return `<li${klasse}><a href="${d.name}">${esc(d.titel)}</a>${unter}</li>`;
   }).join("\n");
-  return seite("Inhalt",
-    `<nav epub:type="toc" id="toc"><h1>Inhalt</h1>\n<ol>\n${li}\n</ol>\n</nav>`);
+  return seite(UI.inhalt,
+    `<nav epub:type="toc" id="toc"><h1>${UI.inhalt}</h1>\n<ol>\n${li}\n</ol>\n</nav>`);
 }
 
 // NCX zusaetzlich: EPUB-3-Lesegeraete nehmen nav.xhtml, aeltere (Kindle-
@@ -363,12 +395,12 @@ function opf(datum) {
   const spine = dateien.map((d) => `<itemref idref="${d.id}"/>`).join("\n    ");
   return `<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id"
-         xml:lang="de">
+         xml:lang="${LANG}">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:identifier id="pub-id">${UUID}</dc:identifier>
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
-    <dc:language>de</dc:language>
+    <dc:language>${LANG}</dc:language>
     <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
@@ -407,14 +439,16 @@ o.file("content.opf", opf(new Date().toISOString().replace(/\.\d+Z$/, "Z")));
 // Wegwerf-Verzeichnis: die eingecheckte .epub enthaelt einen Zeitstempel
 // (dcterms:modified ist in EPUB 3 Pflicht), ein Neubau am selben Ort machte
 // also bei JEDEM Testlauf 4,8 MB Unterschied im Arbeitsverzeichnis auf.
-const ZIEL = process.argv[2]
-  ? path.resolve(process.argv[2])
-  : path.join(HERE, "Drachenhauch-Lehrbuch.epub");
+const ZIEL = FREI[0] ? path.resolve(FREI[0]) : path.join(HERE, UI.datei);
 zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }).then((buf) => {
   fs.writeFileSync(ZIEL, buf);
   const kap = dateien.filter((d) => d.kind === "chapter").length;
   const teile = dateien.filter((d) => d.kind === "part").length;
-  console.log(`OK -> Drachenhauch-Lehrbuch.epub `
+  console.log(`OK -> ${path.basename(ZIEL)} `
     + `(${teile} Teile, ${kap} Kapitel, ${bilder.size} Bilder, `
     + `${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
+  if (HX.__fehlend && HX.__fehlend.size) {
+    console.log(`   ${HX.__fehlend.size} Texte noch nicht uebersetzt `
+      + `-- sie stehen deutsch im Buch.`);
+  }
 });

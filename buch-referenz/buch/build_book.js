@@ -25,6 +25,26 @@ const C_ACCENT = "1B6CA8";
 const C_CMD = "9A3412";     // Befehlsname (kraeftiges Braun-Orange)
 const C_CAP = "6A6A6A";     // Bildunterschrift grau
 const C_CODEBG = "F4F4F4";  // Code-Hintergrund
+// ---------------------------------------------------------------- Sprache
+// Siehe build_epub.js: dieselbe Katalog-Schicht, damit .docx und .epub in
+// beiden Sprachen aus DERSELBEN Kapitelquelle entstehen.
+const ARGS = process.argv.slice(2);
+const _li = ARGS.indexOf("--lang");
+const LANG = _li >= 0 ? (ARGS[_li + 1] || "de") : "de";
+const UI = {
+  de: { titel: "Drachenhauch \u2013 Das Lehrbuch", untertitel: "Das Lehrbuch",
+        zeile: "Programmieren lernen und alle Befehle verstehen", von: "von",
+        merke: "Merke", achtung: "Achtung", beispiel: "Beispiel",
+        ausgabe: "Ausgabe", datei: "Drachenhauch-Lehrbuch.docx" },
+  en: { titel: "Drachenhauch \u2013 The Handbook", untertitel: "The Handbook",
+        zeile: "Learn to program and understand every command", von: "by",
+        merke: "Remember", achtung: "Careful", beispiel: "Example",
+        ausgabe: "Output", datei: "Drachenhauch-Handbook.docx" },
+}[LANG];
+if (!UI) { console.error(`Unbekannte Sprache: ${LANG} (de|en)`); process.exit(2); }
+const KATALOG = LANG === "de" ? null
+  : JSON.parse(fs.readFileSync(path.join(__dirname, "i18n", `${LANG}.json`), "utf8"));
+
 const C_OUTBG = "EAF4EA";   // Ausgabe-Hintergrund (gruenlich)
 const C_OUTBD = "9AC79A";
 
@@ -99,8 +119,8 @@ function _box(title, text, bg, bd, titleColor) {
 // kurze Titel klein darunter. Das war 2026-08-04 in ALLEN 14 zweiargumentigen
 // warn-Aufrufen des Buches so und ist beim Durchsehen aufgefallen.
 function tip(title, text) { return _box(title, text, "E7F2FA", "9CC8E6", C_ACCENT); }
-function note(text, title = "Merke") { return _box(title, text, "FDF3E0", "E0B96A", "8A5E15"); }
-function warn(text, title = "Achtung") { return _box(title, text, "FBEAEA", "E0A0A0", "B23030"); }
+function note(text, title = UI.merke) { return _box(title, text, "FDF3E0", "E0B96A", "8A5E15"); }
+function warn(text, title = UI.achtung) { return _box(title, text, "FBEAEA", "E0A0A0", "B23030"); }
 
 // ---------------------------------------------------------------- Code
 function codeBlock(lines, opts = {}) {
@@ -183,8 +203,8 @@ function cmd(name, syntax, desc, codeLines, opts = {}) {
     out.push(new Paragraph({ spacing: { after: 120 }, keepNext: true, children: synRuns }));
   }
   if (desc) (Array.isArray(desc) ? desc : [desc]).forEach((d) => out.push(p(d)));
-  if (codeLines && codeLines.length) { out.push(smallLabel("Beispiel")); out.push(codeBlock(codeLines)); }
-  if (opts.out) { out.push(smallLabel("Ausgabe")); out.push(codeBlock(opts.out, { out: true })); }
+  if (codeLines && codeLines.length) { out.push(smallLabel(UI.beispiel)); out.push(codeBlock(codeLines)); }
+  if (opts.out) { out.push(smallLabel(UI.ausgabe)); out.push(codeBlock(opts.out, { out: true })); }
   if (opts.fig) figure(opts.fig, opts.caption || "").forEach((e) => out.push(e));
   return out;
 }
@@ -217,6 +237,9 @@ function h2(t) {
 const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBlock,
             cmd, table, h1, h2, chapter, part, smallLabel, sig, PageBreak };
 
+// Uebersetzendes H -- die 75 Kapiteldateien bleiben unangetastet.
+const HX = KATALOG ? require("./i18n").wrap(H, KATALOG) : H;
+
 // ===================== Inhalt zusammenstellen =====================
 const children = [];
 
@@ -226,11 +249,11 @@ children.push(
   new Paragraph({ alignment: AlignmentType.CENTER,
     children: [new TextRun({ text: "DRACHENHAUCH", bold: true, color: C_TITLE, size: 92 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 140, after: 80 },
-    children: [new TextRun({ text: "Das Lehrbuch", size: 40, color: C_H2, bold: true })] }),
+    children: [new TextRun({ text: UI.untertitel, size: 40, color: C_H2, bold: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 },
-    children: [new TextRun({ text: "Programmieren lernen und alle Befehle verstehen", size: 26, italics: true, color: C_CAP })] }),
+    children: [new TextRun({ text: UI.zeile, size: 26, italics: true, color: C_CAP })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 1800 },
-    children: [new TextRun({ text: "von Hans Schnorrenberger", size: 26, bold: true })] }),
+    children: [new TextRun({ text: `${UI.von} Hans Schnorrenberger`, size: 26, bold: true })] }),
   new Paragraph({ children: [new PageBreak()] }),
 );
 
@@ -242,7 +265,7 @@ const mods = fs.existsSync(contentDir)
   ? fs.readdirSync(contentDir).filter((f) => f.endsWith(".js")).sort() : [];
 function flatten(a, acc) { for (const x of a) Array.isArray(x) ? flatten(x, acc) : acc.push(x); return acc; }
 for (const m of mods) {
-  const blocks = require(path.join(contentDir, m))(H);
+  const blocks = require(path.join(contentDir, m))(HX);
   flatten(blocks, []).forEach((b) => children.push(b));
 }
 
@@ -275,7 +298,7 @@ children.splice(TOC_INSERT_AT, 0, ...tocChildren);
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
-  title: "Drachenhauch – Das Lehrbuch",
+  title: UI.titel,
   styles: {
     default: { document: { run: { font: "Arial", size: 22 } } },
     paragraphStyles: [
@@ -294,13 +317,16 @@ const doc = new Document({
   sections: [{
     properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },  // A4 (210x297mm)
     footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "Drachenhauch – Das Lehrbuch  ·  ", size: 16, color: C_CAP }),
+      children: [new TextRun({ text: `${UI.titel}  \u00b7  `, size: 16, color: C_CAP }),
                  new TextRun({ children: [PageNumber.CURRENT], size: 16, color: C_CAP })] })] }) },
     children,
   }],
 });
 
 Packer.toBuffer(doc).then((buf) => {
-  fs.writeFileSync(path.join(__dirname, "Drachenhauch-Lehrbuch.docx"), buf);
-  console.log(`OK -> Drachenhauch-Lehrbuch.docx (${mods.length} Module, ${tocEntries.length} Ueberschriften)`);
+  fs.writeFileSync(path.join(__dirname, UI.datei), buf);
+  console.log(`OK -> ${UI.datei} (${mods.length} Module, ${tocEntries.length} Ueberschriften)`);
+  if (HX.__fehlend && HX.__fehlend.size) {
+    console.log(`   ${HX.__fehlend.size} Texte noch nicht uebersetzt -- sie stehen deutsch im Buch.`);
+  }
 });
