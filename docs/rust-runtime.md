@@ -1034,8 +1034,25 @@ Bytes. Layout der **letzten 16 Bytes** der gebundelten Exe:
 Die `.gbc`-Bytes liegen direkt vor diesem Footer.
 
 **Runtime-Seite** ([main.rs](../rust/gb_runtime/src/main.rs)): `embedded_gbc()`
-liest die eigene Exe (`current_exe()`), prüft den Magic-Footer und extrahiert den
-Bytecode. Ist ein Payload da (Bundle-Modus), wechselt `gbrt` ins Exe-Verzeichnis
+liest die eigene Exe (`current_exe()`), sucht den Magic-Footer **rückwärts** und
+extrahiert den Bytecode.
+
+> **Warum rückwärts — und was das fürs Signieren heißt.** Der Footer muss nicht
+> am Dateiende kleben. `signtool` (Windows) und `codesign` (macOS) hängen den
+> Zertifikatsblock ebenfalls hinten an; suchte die Runtime nur in den letzten 16
+> Bytes, fände sich ein signiertes Spiel selbst nicht mehr und verhielte sich wie
+> ein blankes `gbrt`. Deshalb gilt die Reihenfolge **erst exportieren, dann
+> signieren** — umgekehrt geht es nicht, denn Anhängen zerstört jede Signatur
+> (gemessen: aus `Valid` wird `NotSigned`). Die Suche läuft vom Dateiende nach
+> vorn und prüft jeden Kandidaten (Längenfeld plausibel? Nutzlast gültiges
+> UTF-8?), damit ein zufälliges Vorkommen der acht Bytes im Signaturblock oder
+> im JSON nicht in die Irre führt. Abgesichert durch Rust-`#[test]`s in `main.rs`
+> und [tests/test_export_signierbar.py](../tests/test_export_signierbar.py).
+>
+> **Signieren kann nur, wer die Datei in der Hand hat.** Ein Zertifikat des
+> GameBasic-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
+> fremden Rechnern. Wer seine Spiele signiert ausliefern will, braucht ein
+> eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `gbrt` ins Exe-Verzeichnis
 (damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den
 eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`gbrt datei.gbc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.

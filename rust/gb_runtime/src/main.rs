@@ -78,15 +78,47 @@ const PAYLOAD_MAGIC: &[u8; 8] = b"GBRTPAY1";
 
 /// Liest eine eingebettete `.gbc` aus der eigenen Exe (Bundle-Modus) -- oder
 /// None, wenn kein Payload angehaengt ist (normaler Dev-Modus).
+///
+/// Sucht die Kennung RUECKWAERTS, statt sie in den letzten 16 Bytes zu
+/// erwarten. Der Grund ist das Signieren: `signtool` (und `codesign` auf
+/// macOS) haengt den Zertifikatsblock ans Dateiende -- danach sind die letzten
+/// 16 Bytes nicht mehr unsere, und ein exportiertes Spiel fand sich selbst
+/// nicht mehr (es verhielt sich wieder wie ein blankes `gbrt`). Andersherum
+/// geht es nicht: erst signieren, dann anhaengen zerstoert jede Signatur --
+/// empirisch geprueft, aus `Valid` wird `NotSigned`. Also muss die Reihenfolge
+/// „exportieren, dann signieren" moeglich sein, und dafuer darf der Footer
+/// nicht am Dateiende kleben.
 fn embedded_gbc() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let data = std::fs::read(&exe).ok()?;
+    embedded_gbc_in(&data)
+}
+
+/// Der reine Teil davon -- ohne Dateizugriff, damit er testbar ist.
+fn embedded_gbc_in(data: &[u8]) -> Option<String> {
     if data.len() < 16 { return None; }
-    let footer = data.len() - 16;
-    if &data[footer + 8..] != PAYLOAD_MAGIC { return None; }
-    let len = u64::from_le_bytes(data[footer..footer + 8].try_into().ok()?) as usize;
-    if len == 0 || len + 16 > data.len() { return None; }
-    String::from_utf8(data[footer - len..footer].to_vec()).ok()
+    // Von hinten nach vorne. Der letzte Treffer ist der echte Footer: die
+    // .gbc-Nutzlast liegt DAVOR, ein zufaelliges Vorkommen der acht Bytes im
+    // JSON waere also weiter vorne. Trifft ein Kandidat nicht zu (etwa weil
+    // die Bytes zufaellig im Signaturblock stehen), wird weiter vorne
+    // gesucht, statt aufzugeben.
+    let mut ende = data.len();
+    while ende >= 16 {
+        let pos = data[..ende].windows(8).rposition(|w| w == PAYLOAD_MAGIC)?;
+        if pos >= 8 {
+            let laengenfeld = pos - 8;
+            let len = u64::from_le_bytes(
+                data[laengenfeld..pos].try_into().ok()?) as usize;
+            if len > 0 && len <= laengenfeld {
+                if let Ok(s) = String::from_utf8(
+                    data[laengenfeld - len..laengenfeld].to_vec()) {
+                    return Some(s);
+                }
+            }
+        }
+        ende = pos;                     // strikt weiter vorne weitersuchen
+    }
+    None
 }
 
 fn main() -> ExitCode {
@@ -804,5 +836,60 @@ fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
             }
             ExitCode::from(2)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{embedded_gbc_in, PAYLOAD_MAGIC};
+
+    /// Baut, was `--export` schreibt: <exe><gbc><laenge><magic>.
+    fn bundle(exe: &[u8], gbc: &str) -> Vec<u8> {
+        let mut v = exe.to_vec();
+        v.extend_from_slice(gbc.as_bytes());
+        v.extend_from_slice(&(gbc.len() as u64).to_le_bytes());
+        v.extend_from_slice(PAYLOAD_MAGIC);
+        v
+    }
+
+    #[test]
+    fn findet_die_nutzlast_am_dateiende() {
+        let b = bundle(b"MZ....exe....", r#"{"main":1}"#);
+        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":1}"#));
+    }
+
+    #[test]
+    fn findet_sie_auch_hinter_einer_signatur() {
+        // Der eigentliche Zweck des Umbaus: signtool haengt den
+        // Zertifikatsblock HINTER unseren Footer.
+        let mut b = bundle(b"MZ....exe....", r#"{"main":2}"#);
+        b.extend_from_slice(&[0u8; 4096]);
+        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":2}"#));
+    }
+
+    #[test]
+    fn ohne_nutzlast_kein_treffer() {
+        assert_eq!(embedded_gbc_in(b"MZ....einfach nur eine exe...."), None);
+        assert_eq!(embedded_gbc_in(b"kurz"), None);          // < 16 Bytes
+    }
+
+    #[test]
+    fn zufaelliges_vorkommen_im_json_verwirrt_nicht() {
+        // Die acht Bytes stehen mitten in der Nutzlast -- der ECHTE Footer
+        // liegt weiter hinten und muss gewinnen.
+        let gbc = format!(r#"{{"s":"{}"}}"#, String::from_utf8_lossy(PAYLOAD_MAGIC));
+        let b = bundle(b"MZ....exe....", &gbc);
+        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(gbc.as_str()));
+    }
+
+    #[test]
+    fn ueberspringt_einen_falschen_treffer_im_signaturblock() {
+        // Kennung im angehaengten Block, aber mit unbrauchbarer Laenge davor:
+        // die Suche darf nicht aufgeben, sondern muss weiter vorne fuendig
+        // werden.
+        let mut b = bundle(b"MZ....exe....", r#"{"main":3}"#);
+        b.extend_from_slice(&u64::MAX.to_le_bytes());   // unmoegliche Laenge
+        b.extend_from_slice(PAYLOAD_MAGIC);
+        assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":3}"#));
     }
 }
