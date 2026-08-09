@@ -2,14 +2,19 @@
 # -*- coding: utf-8 -*-
 """Zwei-Pass-Build des Drachenhauch-Lehrbuchs mit korrekten ToC-Seitenzahlen.
 
-Pass 1:  node build_book.js  -> .docx (ToC noch ohne Zahlen) + toc_titles.json
+Pass 1:  node build_book.js  -> .docx (ToC noch ohne Zahlen) + toc_titles.<lang>.json
          -> LibreOffice rendert PDF -> Seitenzahl je Ueberschrift messen
-         -> toc_pages.json schreiben
+         -> toc_pages.<lang>.json schreiben
 Pass 2:  node build_book.js  -> .docx mit eingetragenen Seitenzahlen
 
-Aufruf:  <venv>\\python.exe make_book.py
+Aufruf:  <venv>\\python.exe make_book.py [--lang de|en]
 (Reines `node build_book.js` nutzt die zuletzt gemessenen Seiten aus
-toc_pages.json.)
+toc_pages.<lang>.json.)
+
+Die Zwei-Pass-Dateien haengen an der SPRACHE: gemessen wird ueber den
+Ueberschriften-Text, deutsche Seitenzahlen sind im englischen Buch also
+wertlos. Ohne diese Trennung blieb das englische Inhaltsverzeichnis ohne
+Seitenzahlen -- mit Fuehrungspunkten, die ins Leere liefen.
 """
 import glob
 import json
@@ -19,10 +24,17 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe"
-DOCX = os.path.join(HERE, "Drachenhauch-Lehrbuch.docx")
-PDF = os.path.join(HERE, "Drachenhauch-Lehrbuch.pdf")
-TITLES = os.path.join(HERE, "toc_titles.json")
-PAGES = os.path.join(HERE, "toc_pages.json")
+_BASIS = {"de": "Drachenhauch-Lehrbuch", "en": "Drachenhauch-Handbook"}
+
+_i = sys.argv.index("--lang") if "--lang" in sys.argv else -1
+LANG = sys.argv[_i + 1] if _i >= 0 and _i + 1 < len(sys.argv) else "de"
+if LANG not in _BASIS:
+    raise SystemExit(f"Unbekannte Sprache: {LANG} (de|en)")
+
+DOCX = os.path.join(HERE, _BASIS[LANG] + ".docx")
+PDF = os.path.join(HERE, _BASIS[LANG] + ".pdf")
+TITLES = os.path.join(HERE, f"toc_titles.{LANG}.json")
+PAGES = os.path.join(HERE, f"toc_pages.{LANG}.json")
 
 # Druckdienste (epubli & Co.) verlangen: KEINE Transparenz + Bilder ~300 dpi.
 # Die dhrt-Screenshots kommen als 480x320-RGBA (Alpha = Transparenz, und bei
@@ -60,7 +72,8 @@ def prepare_images():
 
 
 def build():
-    subprocess.run("node build_book.js", cwd=HERE, shell=True, check=True)
+    subprocess.run(f"node build_book.js --lang {LANG}", cwd=HERE, shell=True,
+                   check=True)
 
 
 # PDF ohne Bild-Aufloesungs-Reduktion exportieren (volle 300+ dpi der Bilder
@@ -127,7 +140,8 @@ def main():
     json.dump(pages, open(PAGES, "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     build()   # Pass 2 mit Seitenzahlen
-    print("ToC-Seiten gemessen:", len(pages), "/", len(titles))
+    print(f"[{LANG}] ToC-Seiten gemessen:", len(pages), "/", len(titles),
+          f"-- Buch hat {max(pages.values(), default=0)}+ Seiten")
 
 
 if __name__ == "__main__":

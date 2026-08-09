@@ -54,7 +54,7 @@ launchable with a double click.
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 84 MB, currently version 2026.2.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 165 examples with their assets, the textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 165 examples with their assets, the German textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
 ## Working from source
 
@@ -65,15 +65,22 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## The textbook
 
-**[Drachenhauch — The Textbook](buch-referenz/buch/)** (German) is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. 414 pages, seven parts, 75 chapters, every code sample verified against `dhrt --check`.
+**[Drachenhauch — The Handbook](buch-referenz/buch/Drachenhauch-Handbook.docx)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 75 chapters, every code sample verified against `dhrt --check`.
+
+| Edition | For printing (A4) | For e-readers |
+|---|---|---|
+| **English** — 408 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub) |
+| **Deutsch** — 414 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub) |
+
+Both languages come out of the **same** chapter sources (`content/NN_*.js`): the renderers are handed an `H` that puts every string through the catalogue `i18n/en.json` first. A second set of English chapter files would have drifted from the German inside a month — this way it cannot. If an entry is missing, the German sentence stays and the book still builds; `node fehlend.js en` counts what is still outstanding.
 
 ```
-node build_book.js                    # -> Drachenhauch-Lehrbuch.docx
-node build_epub.js                    # -> Drachenhauch-Lehrbuch.epub (for e-readers)
-<venv>\python.exe make_book.py        # two-pass build with page numbers in the TOC
+node build_book.js [--lang en]        # -> .docx (A4, for printing)
+node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font size, dark mode)
+<venv>\python.exe make_book.py [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
-Both outputs are fed by the same chapter sources (`content/NN_*.js`) — the `.docx` is typeset for A4 and printing, the `.epub` reflows to the reader's font size and supports dark mode.
+One thing stays German on purpose: the run-time error messages quoted in Appendix D. `dhrt` prints them in German, and an English message in the book would be one the reader never sees.
 
 ## Manual
 

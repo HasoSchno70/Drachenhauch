@@ -54,7 +54,7 @@ Startseite, jede per Doppelklick startbar.
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 84 MB, aktuell Fassung 2026.2.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 165 Beispiele samt Assets, das Lehrbuch als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 165 Beispiele samt Assets, das deutsche Lehrbuch als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -65,15 +65,20 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 ## Das Lehrbuch
 
-**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. 414 Seiten, sieben Teile, 75 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
+**[Drachenhauch — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. Sieben Teile, 75 Kapitel, alle Codebeispiele gegen `dhrt --check` verifiziert.
+
+| Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
+|---|---|---|
+| **Deutsch** — 414 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub) |
+| **English** — 408 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub) |
+
+Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
 ```
-node build_book.js                    # -> Drachenhauch-Lehrbuch.docx
-node build_epub.js                    # -> Drachenhauch-Lehrbuch.epub (fürs Lesegerät)
-<venv>\python.exe make_book.py        # Zwei-Pass-Build mit Seitenzahlen im Inhalt
+node build_book.js [--lang en]        # -> .docx (A4, zum Drucken)
+node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße des Lesers, Nachtmodus)
+<venv>\python.exe make_book.py [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
 ```
-
-Dieselben Kapitelquellen (`content/NN_*.js`) speisen beide Ausgaben — das `.docx` ist auf A4 gesetzt und zum Drucken, das `.epub` fließt in die Schriftgröße des Lesers und kann Nachtmodus.
 
 ## Handbuch
 

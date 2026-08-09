@@ -1,4 +1,4 @@
 node_modules/
 *.pdf
 _*.png
-toc_titles.json
+toc_titles.*.json

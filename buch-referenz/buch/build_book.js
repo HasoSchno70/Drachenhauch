@@ -270,9 +270,17 @@ for (const m of mods) {
 }
 
 // ---------------------------------------------------------------- Inhaltsverzeichnis
-const pages = fs.existsSync(path.join(__dirname, "toc_pages.json"))
-  ? JSON.parse(fs.readFileSync(path.join(__dirname, "toc_pages.json"), "utf-8")) : {};
-fs.writeFileSync(path.join(__dirname, "toc_titles.json"),
+// Die gemessenen Seitenzahlen liegen JE SPRACHE, weil sie ueber den
+// Ueberschriften-TEXT nachgeschlagen werden: `toc_pages.de.json` kennt nur
+// deutsche Titel, im englischen Buch traefe kein einziger. Vorher teilten
+// sich beide eine Datei -- das englische Inhaltsverzeichnis bekam dadurch
+// Fuehrungspunkte, die ins Leere liefen, und ein englischer Bau ueberschrieb
+// nebenbei die Titel-Liste des deutschen Zwei-Pass-Laufs.
+const PAGES_JSON = path.join(__dirname, `toc_pages.${LANG}.json`);
+const TITLES_JSON = path.join(__dirname, `toc_titles.${LANG}.json`);
+const pages = fs.existsSync(PAGES_JSON)
+  ? JSON.parse(fs.readFileSync(PAGES_JSON, "utf-8")) : {};
+fs.writeFileSync(TITLES_JSON,
   JSON.stringify(tocEntries.map((e) => e.title), null, 2));
 
 const tocChildren = [new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 200 },
