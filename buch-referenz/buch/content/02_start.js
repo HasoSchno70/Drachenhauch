@@ -6,7 +6,7 @@ module.exports = (H) => [
   H.p("Drachenhauch besteht aus zwei Teilen: der Laufzeit „dhrt“, die deine Programme ausführt, und einer Sammlung von Editoren, mit denen du Code, Grafik, Musik und mehr erstellst. Auf einem eingerichteten System liegt alles bereit; du startest die Werkzeuge über kurze Befehle in der Eingabeaufforderung."),
 
   H.h2("Der Code-Editor"),
-  H.p("Den Programm-Editor öffnest du mit dem Befehl gb (ohne Argumente erscheint ein kleines Auswahlfenster, in dem du den Code-Editor wählst). Der Editor färbt deinen Code ein, schlägt Befehle vor und zeigt Fehler an, noch bevor du startest. Mit der Taste F5 läuft dein Programm sofort los."),
+  H.p("Den Programm-Editor öffnest du mit dem Befehl dh (ohne Argumente erscheint ein kleines Auswahlfenster, in dem du den Code-Editor wählst). Der Editor färbt deinen Code ein, schlägt Befehle vor und zeigt Fehler an, noch bevor du startest. Mit der Taste F5 läuft dein Programm sofort los."),
   H.bulletRich("Neues Programm: ", "Datei → Neu, dann lostippen."),
   H.bulletRich("Starten: ", "Taste F5 – ein Fenster (oder die Konsole) geht auf und führt dein Programm aus."),
   H.bulletRich("Speichern: ", "Strg+S. Drachenhauch-Programme haben die Endung .dh."),
