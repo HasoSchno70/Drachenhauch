@@ -63,8 +63,15 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 - [x] `gamebasic/` → `drachenhauch/`, `pyproject.toml` (`name`, Skripte)
 - [x] `gbrun.py` → `dhrun.py`, die 13 `gb*.cmd` (+ `gb.sh`) → `dh*`
-- [ ] `editor_qt/`: Fenstertitel, Dateidialoge, `builtin_index.json`-Pfad
-- [ ] `pytest tests/` grün
+- [x] Bezeichner: `GameBasicError` → `DrachenhauchError`, `GBRuntimeError` →
+      `DHRuntimeError`, `GBHighlighter`, `gb_code`, `gb_symbols`, `gb_path`
+- [x] `editor_qt/`: `builtin_index.json`-Pfad überlebt den Paketumzug
+      (1298 Builtins geladen — das war das echte Risiko daran)
+- [~] Fenstertitel und Dateidialoge **nach Phase 3/4 verschoben**: die Titel
+      tragen den Produktnamen, die Dialoge die Dateiendung. Beides jetzt zu
+      ändern hieße, die Anwendung „Drachenhauch" nennen zu lassen, während
+      README, Buch und Doku noch durchgehend „GameBasic" sagen.
+- [x] `pytest tests/` grün (3104), mypy sauber, `dhrun.py` führt aus
 
 ### Phase 3 — Inhalte
 
