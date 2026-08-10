@@ -69,8 +69,8 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 | Ausgabe | Zum Drucken (A4) | Fürs Lesegerät |
 |---|---|---|
-| **Deutsch** — 414 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub) |
-| **English** — 408 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub) |
+| **Deutsch** — 414 Seiten | [Drachenhauch-Lehrbuch.docx](buch-referenz/buch/Drachenhauch-Lehrbuch.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Lehrbuch.epub?raw=1) |
+| **English** — 408 pages | [Drachenhauch-Handbook.docx](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1) | [.epub](buch-referenz/buch/Drachenhauch-Handbook.epub?raw=1) |
 
 Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): die Renderer bekommen ein `H`, das jede Zeichenkette vorher durch den Katalog `i18n/en.json` schickt. Ein zweiter Satz englischer Kapiteldateien wäre binnen eines Monats vom deutschen abgedriftet — so kann er es nicht. Fehlt ein Eintrag, bleibt der deutsche Satz stehen und das Buch baut trotzdem; `node fehlend.js en` zählt, wo noch welche fehlen.
 
