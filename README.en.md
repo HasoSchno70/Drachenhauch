@@ -65,7 +65,7 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## The textbook
 
-**[Drachenhauch — The Handbook](buch-referenz/buch/Drachenhauch-Handbook.docx?raw=1)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 75 chapters, every code sample verified against `dhrt --check`.
+**[Drachenhauch — The Handbook](buch-referenz/buch/)** is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. Seven parts, 75 chapters, every code sample verified against `dhrt --check`.
 
 | Edition | For printing (A4) | For e-readers |
 |---|---|---|
