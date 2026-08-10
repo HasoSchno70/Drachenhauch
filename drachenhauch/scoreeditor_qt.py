@@ -1230,9 +1230,14 @@ class ScoreEditor(QMainWindow):
             return
         dhrun = self.project_root / "dhrun.py"
         try:
-            import subprocess
             import sys
-            subprocess.Popen([sys.executable, str(dhrun), "--tracker", path])
+            # Losgeloest starten: der Tracker ist ein eigener Editor und muss
+            # den Score-Editor ueberleben -- und ohne Konsolenfenster, denn
+            # sys.executable ist im Entwicklungsbaum python.exe und damit
+            # selbst ein Konsolen-Programm.
+            from .editor_qt.vorschau_start import starte_werkzeug
+            if not starte_werkzeug([sys.executable, str(dhrun), "--tracker", path]):
+                raise OSError("Tracker liess sich nicht starten")
         except Exception:
             QMessageBox.information(
                 self, "Exportiert",

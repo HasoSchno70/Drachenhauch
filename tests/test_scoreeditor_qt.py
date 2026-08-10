@@ -798,8 +798,12 @@ def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
                         lambda *a, **k: (str(out_path), ""))
 
     calls = []
+    # Der Tracker wird ueber `starte_werkzeug` (QProcess.startDetached)
+    # gestartet, nicht mehr ueber subprocess.Popen. Ohne diese Anpassung
+    # startete der Test einen ECHTEN Tracker-Editor und lief in den Timeout.
     monkeypatch.setattr(
-        "subprocess.Popen", lambda cmd, **k: calls.append(cmd))
+        "drachenhauch.editor_qt.vorschau_start.starte_werkzeug",
+        lambda cmd, cwd=None: (calls.append(cmd), True)[1])
 
     ed._export_to_tracker()
 

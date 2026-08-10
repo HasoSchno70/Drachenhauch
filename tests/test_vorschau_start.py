@@ -91,3 +91,23 @@ def test_start_ohne_konsolenfenster():
     v = starte_vorschau(None, [sys.executable, "-c", "pass"], None, titel="x")
     assert isinstance(v.proc, QProcess)
     v.proc.waitForFinished(15000)
+
+
+def test_werkzeug_laeuft_losgelaest_weiter(tmp_path):
+    """Ein Werkzeug (z.B. der Tracker) darf mit seinem Starter nicht sterben.
+
+    Ein `QProcess` mit Eltern-Objekt wuerde genau das tun -- sein Destruktor
+    beendet den Prozess. Deshalb `startDetached`. Geprueft wird hier, dass der
+    Start gelingt und der Prozess wirklich vom Starter abgekoppelt ist: der
+    Marker entsteht ERST nach einer kurzen Wartezeit im Kind.
+    """
+    import time
+    from drachenhauch.editor_qt.vorschau_start import starte_werkzeug
+    _app()
+    marke = tmp_path / "gelaufen.txt"
+    code = f"import time; time.sleep(0.6); open(r'{marke}','w').write('da')"
+    assert starte_werkzeug([sys.executable, "-c", code], tmp_path)
+    frist = time.time() + 20
+    while time.time() < frist and not marke.exists():
+        time.sleep(0.1)
+    assert marke.exists(), "das losgeloeste Werkzeug lief nicht zu Ende"

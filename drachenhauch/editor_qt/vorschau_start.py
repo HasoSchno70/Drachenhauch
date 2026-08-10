@@ -88,3 +88,25 @@ def starte_vorschau(parent, befehl, arbeitsverzeichnis=None, titel="Vorschau"):
     """Startet `befehl` (Liste) ohne Konsolenfenster. Liefert eine `Vorschau`."""
     return Vorschau(parent, [Path(befehl[0])] + list(befehl[1:]),
                     arbeitsverzeichnis, titel)
+
+
+def starte_werkzeug(befehl, arbeitsverzeichnis=None) -> bool:
+    """Ein eigenstaendiges WERKZEUG starten (kein Vorschau-Lauf).
+
+    Unterschied zu `starte_vorschau`: der gestartete Editor soll seinen
+    Starter UEBERLEBEN. Ein `QProcess` mit Eltern-Objekt taete das nicht --
+    sein Destruktor beendet den Prozess, das Schliessen des Score-Editors
+    haette also den gerade geoeffneten Tracker mitgerissen.
+
+    `startDetached` loest beides: der Prozess laeuft unabhaengig weiter und
+    bekommt trotzdem kein Konsolenfenster (beides nachgemessen -- das Kind
+    schrieb seine Datei noch 6 s nach dem Ende des Elternprozesses zu Ende,
+    und die Fensterwache sah 0 Konsolen).
+
+    Eine Rueckmeldung bei einem Absturz gibt es hier bewusst nicht: ein
+    eigenstaendiger Editor meldet seine Fehler selbst, und mitzulesen hiesse,
+    ihn wieder an den Starter zu binden.
+    """
+    ok, _pid = QProcess.startDetached(str(befehl[0]), [str(a) for a in befehl[1:]],
+                                      str(arbeitsverzeichnis or ""))
+    return bool(ok)
