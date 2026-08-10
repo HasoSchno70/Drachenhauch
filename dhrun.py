@@ -441,6 +441,48 @@ def _find_dhrt():
     return None
 
 
+def _ohne_konsolenfenster():
+    """`CREATE_NO_WINDOW` -- aber NUR, wenn dieser Prozess selbst keine Konsole hat.
+
+    `dhrt` ist ein Konsolen-Programm. Startet es jemand aus einem Terminal, erbt
+    es dessen Konsole und die PRINT-Ausgaben landen dort: da darf nichts
+    unterdrueckt werden. Startet es dagegen die eingefrorene GUI-Anwendung
+    (`Drachenhauch.exe datei.dh`, PyInstaller mit console=False), gibt es keine
+    Konsole zum Erben -- Windows macht dem Kind eine eigene auf, und die stand
+    als leeres schwarzes Fenster neben dem Spiel.
+
+    Verloren geht dabei nichts, was vorher lesbar gewesen waere: umgeleitete
+    Ausgabe (Pipe, Datei) erbt das Kind weiterhin -- `CREATE_NO_WINDOW`
+    unterdrueckt nur das FENSTER, nicht die Handles. Was allein wegfaellt, ist
+    die Ausgabe eines reinen Konsolenprogramms, das ohne Terminal gestartet
+    wurde -- und die verschwand bisher ohnehin mit dem Fenster, sobald das
+    Programm endete.
+
+    Die Frage "haben wir eine Konsole?" beantwortet `GetConsoleProcessList`,
+    NICHT `GetConsoleWindow`: jedes moderne Terminal (Windows Terminal, die
+    VS-Code-Konsole) haengt an einer PSEUDOkonsole, und die hat keinen
+    Fenstergriff. `GetConsoleWindow` liefert dort dieselbe 0 wie in einer
+    GUI-Anwendung -- danach zu entscheiden haette dem Terminal die Ausgabe
+    abgeschnitten. Gemessen: im Terminal meldet die Liste 4 Prozesse und
+    `GetConsoleWindow` False, unter `pythonw` beides 0.
+    """
+    import subprocess
+
+    if os.name != "nt" or _hat_konsole():
+        return 0                       # Konsole vorhanden -> Kind erbt sie
+    return subprocess.CREATE_NO_WINDOW
+
+
+def _hat_konsole():
+    """Haengt dieser Prozess an einer Konsole? (Windows; sonst immer True.)"""
+    if os.name != "nt":
+        return True
+    import ctypes
+
+    puffer = (ctypes.c_uint32 * 8)()
+    return ctypes.windll.kernel32.GetConsoleProcessList(puffer, 8) > 0
+
+
 def _run_native(abs_path, path):
     """Fuehrt die `.dh`-Datei mit `dhrt run` aus -- dhrts EIGENES Rust-Frontend
     (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr.
@@ -459,7 +501,8 @@ def _run_native(abs_path, path):
         print("(ohne Grafik: rust\\build_runtime.py --no-graphics)")
         return 3
     try:
-        result = subprocess.run([str(dhrt), "run", str(abs_path)])
+        result = subprocess.run([str(dhrt), "run", str(abs_path)],
+                                creationflags=_ohne_konsolenfenster())
     except OSError as e:
         print(f"Konnte dhrt nicht starten: {e}")
         return 3
@@ -488,7 +531,9 @@ def _run_export(src, out_dir):
     if out_dir:
         args.append(str(out_dir))
     try:
-        result = subprocess.run(args)   # dhrt druckt "Exportiert: <pfad>"
+        # dhrt druckt "Exportiert: <pfad>" -- im Terminal sichtbar, aus der
+        # GUI heraus gab es dafuer bisher ein leeres Konsolenfenster.
+        result = subprocess.run(args, creationflags=_ohne_konsolenfenster())
     except OSError as e:
         print(f"Konnte dhrt nicht starten: {e}")
         return 3
