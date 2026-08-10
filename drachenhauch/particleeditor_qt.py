@@ -774,8 +774,12 @@ class ParticleEditor(QMainWindow):
             # entkam als unbehandelter Traceback, waehrend der Popen-Aufruf
             # direkt darunter bereits sauber abgefangen wurde.
             dh_path.write_text(self._build_runnable_demo(), encoding="utf-8")
-            subprocess.Popen([sys.executable, str(dhrun), str(dh_path)],
-                             cwd=str(tmpdir))
+            # QProcess statt Popen -- kein Konsolenfenster, Fehler kommen im
+            # Editor an (siehe editor_qt/vorschau_start.py).
+            from .editor_qt.vorschau_start import starte_vorschau
+            self._vorschau = starte_vorschau(
+                self, [sys.executable, str(dhrun), str(dh_path)], tmpdir,
+                titel="Partikel-Test")
         except Exception as exc:
             QMessageBox.critical(self, "Start fehlgeschlagen", str(exc))
 

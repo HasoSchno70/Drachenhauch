@@ -2841,9 +2841,15 @@ class FormDesigner(QMainWindow):
         blieb pro F5 ein `gbform_*`-Ordner in %TEMP% liegen und die
         dhrt-Fenster sammelten sich an -- sie ueberlebten sogar den Designer."""
         p = getattr(self, "_proc", None)
-        if p is not None and p.poll() is None:
+        if p is not None:
             try:
-                p.terminate()
+                # `Vorschau` (QProcess) kennt stoppen(); die Tests reichen
+                # weiterhin ein Popen-artiges Objekt herein -> beide Formen
+                # bedienen, statt den Test-Doppelgaenger umzubauen.
+                if hasattr(p, "stoppen"):
+                    p.stoppen()
+                elif p.poll() is None:
+                    p.terminate()
             except OSError:
                 pass
         self._proc = None
@@ -2897,9 +2903,14 @@ class FormDesigner(QMainWindow):
 
         Der Semaphor schuetzt die Prozess-ERSTELLUNG gegen gleichzeitig
         startende `dhrt`-Subprozesse aus anderen Editor-Threads (verifizierter
-        Windows-Crash, siehe Kommentar in `dhrt_locate`)."""
+        Windows-Crash, siehe Kommentar in `dhrt_locate`).
+
+        Gestartet wird ueber `QProcess` (siehe editor_qt/vorschau_start.py):
+        kein Konsolenfenster, und ein Absturz der Form landet als Meldung im
+        Designer statt in einem Fenster, das sich sofort wieder schliesst."""
+        from .editor_qt.vorschau_start import starte_vorschau
         with dhrt_spawn_semaphore:
-            return subprocess.Popen(cmd, cwd=cwd)
+            return starte_vorschau(self, cmd, cwd, titel="Form-Vorschau")
 
     def _arm_place(self, item: QListWidgetItem):
         self.canvas.place_kind = item.data(Qt.ItemDataRole.UserRole)

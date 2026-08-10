@@ -3174,7 +3174,13 @@ class SpriteEditorWindow(QMainWindow):
         )
         cmd = [sys.executable, str(dhrun), str(dh_path)]
         try:
-            subprocess.Popen(cmd, cwd=str(tmpdir))
+            # QProcess statt Popen: kein Konsolenfenster (sys.executable ist im
+            # Entwicklungsbaum python.exe, also selbst ein Konsolen-Programm),
+            # und ein Fehler wird hier gemeldet statt in einem Fenster, das
+            # sofort wieder zugeht.
+            from .editor_qt.vorschau_start import starte_vorschau
+            self._vorschau = starte_vorschau(self, cmd, tmpdir,
+                                             titel="Sprite-Test")
         except Exception as exc:
             QMessageBox.critical(self, "Start fehlgeschlagen", str(exc))
             return

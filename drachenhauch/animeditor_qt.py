@@ -1210,8 +1210,14 @@ class AnimEditor(QMainWindow):
         # dhrt_locate.dhrt_spawn_semaphore-Kommentar fuer den verifizierten
         # Windows-Crash).
         from .editor_qt.dhrt_locate import dhrt_spawn_semaphore
+        from .editor_qt.vorschau_start import starte_vorschau
         with dhrt_spawn_semaphore:
-            subprocess.Popen([str(dhrt), "run", str(tmp / "run.dh")], cwd=str(tmp))
+            # QProcess statt Popen: kein Konsolenfenster, und ein Absturz der
+            # Vorschau landet als Meldung im Editor statt in einem Fenster,
+            # das sich sofort wieder schliesst.
+            self._vorschau = starte_vorschau(
+                self, [str(dhrt), "run", str(tmp / "run.dh")], tmp,
+                titel="Animations-Vorschau")
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
