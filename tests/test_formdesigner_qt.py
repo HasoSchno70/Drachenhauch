@@ -339,6 +339,7 @@ def test_form_resize_handle(tmp_path):
     assert cv._form_handle_at(QPointF(*se).toPoint()) == "se"   # Griff-Treffer
     cv._form_resize = "se"                        # Resize-Logik direkt treiben
     cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + 440, PAD + 300),
         QPointF(PAD + 440, PAD + 300), _NB, _L, _NO))
     _mrelease(cv)
     assert cv.doc.w > 360 and cv.doc.h > 260
@@ -354,6 +355,7 @@ def test_form_resize_respects_min(tmp_path):
     cv._select(None)
     cv._form_resize = "e"
     cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + 100, PAD + 130),
         QPointF(PAD + 100, PAD + 130), _NB, _L, _NO))   # ganz klein ziehen
     _mrelease(cv)
     assert cv.doc.w >= 300                       # Min-Breite haelt
@@ -369,16 +371,19 @@ _CTRL = Qt.KeyboardModifier.ControlModifier
 
 def _mpress(cv, cx, cy, ctrl=False):
     cv.mousePressEvent(QMouseEvent(QEvent.Type.MouseButtonPress,
+        QPointF(PAD + cx, PAD + TITLE_H + cy),
         QPointF(PAD + cx, PAD + TITLE_H + cy), _L, _L, _CTRL if ctrl else _NO))
 
 
 def _mmove(cv, cx, cy):
     cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + cx, PAD + TITLE_H + cy),
         QPointF(PAD + cx, PAD + TITLE_H + cy), _NB, _L, _NO))
 
 
 def _mrelease(cv):
     cv.mouseReleaseEvent(QMouseEvent(QEvent.Type.MouseButtonRelease,
+        QPointF(0, 0),
         QPointF(0, 0), _L, _NB, _NO))
 
 
@@ -661,6 +666,7 @@ _R = Qt.MouseButton.RightButton
 def _mhover(cv, cx, cy):
     """Mausbewegung OHNE gedrueckte Taste."""
     cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + cx, PAD + TITLE_H + cy),
         QPointF(PAD + cx, PAD + TITLE_H + cy), _NB, _NB, _NO))
 
 
@@ -738,6 +744,7 @@ def test_right_button_does_not_place_or_band(tmp_path):
     cv = win.canvas
     cv.place_kind = "button"
     cv.mousePressEvent(QMouseEvent(QEvent.Type.MouseButtonPress,
+        QPointF(PAD + 40, PAD + TITLE_H + 40),
         QPointF(PAD + 40, PAD + TITLE_H + 40), _R, _R, _NO))
     assert len(cv.doc.controls) == 0 and cv.place_kind == "button"
     assert not cv._band

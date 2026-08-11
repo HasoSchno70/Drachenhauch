@@ -44,6 +44,18 @@ except ImportError as exc:  # pragma: no cover
         "  .venv\\Scripts\\python.exe -m pip install Pillow"
     ) from exc
 
+
+def _pixel(bild):
+    """Alle Pixel eines Bildes -- ueber die jeweils gueltige Pillow-API.
+
+    `Image.getdata()` ist seit Pillow 12 veraltet (faellt mit 14 weg) und
+    warnte bei jedem Aufruf; der Nachfolger heisst `get_flattened_data()`.
+    Ein harter Wechsel ginge nicht: das Projekt verlangt `Pillow>=10`, und
+    dort gibt es den neuen Namen noch nicht.
+    """
+    neu = getattr(bild, "get_flattened_data", None)
+    return neu() if neu is not None else bild.getdata()
+
 try:
     from PySide6.QtCore import (
         Qt, QPoint, QPointF, QRectF, QSize, QTimer, Signal,
@@ -3805,7 +3817,7 @@ class SpriteEditorWindow(QMainWindow):
             # fehlen bei mehrlagigen Frames Farben aus anderen sichtbaren
             # Ebenen, und Farben einer unsichtbaren/durchsichtigen aktiven
             # Ebene werden faelschlich mitgezaehlt (Review-Fund).
-            for col in f.composite().getdata():
+            for col in _pixel(f.composite()):
                 if col[3] >= 128:
                     # Auf RGB reduzieren (Alpha hier nicht relevant fuer
                     # Palette -- sonst haetten wir oft die selbe Farbe
@@ -3953,7 +3965,7 @@ class SpriteEditorWindow(QMainWindow):
         # Header (deaktiviert, nur als Info)
         mask = self.canvas.get_selection_mask()
         if mask is not None:
-            n_px = sum(1 for v in mask.getdata() if v)
+            n_px = sum(1 for v in _pixel(mask) if v)
             header = QAction(
                 f"Lasso-Auswahl  {n_px} Px  (Box {w}x{h} bei "
                 f"({sel[0]}, {sel[1]}))", self)
@@ -4282,7 +4294,7 @@ class SpriteEditorWindow(QMainWindow):
         opaque_total = 0
         per_frame = []
         for i, f in enumerate(self.doc.frames):
-            colors = Counter(f.composite().getdata())
+            colors = Counter(_pixel(f.composite()))
             all_colors.update(colors)
             opaque = sum(c for col, c in colors.items() if col[3] >= 128)
             opaque_total += opaque

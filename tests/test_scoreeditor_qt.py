@@ -30,10 +30,10 @@ def _click(staff, x, y, button="left"):
     from PySide6.QtCore import Qt, QPointF
     from PySide6.QtGui import QMouseEvent
     btn = Qt.MouseButton.LeftButton if button == "left" else Qt.MouseButton.RightButton
-    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x, y),
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x, y), QPointF(x, y),
                         btn, btn, Qt.KeyboardModifier.NoModifier)
     staff.mousePressEvent(press)
-    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x, y),
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x, y), QPointF(x, y),
                           btn, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
     staff.mouseReleaseEvent(release)
 
@@ -42,15 +42,15 @@ def _drag(staff, x0, y0, x1, y1):
     """Simuliert ein Ziehen: Press an (x0,y0), Move zu (x1,y1), Release."""
     from PySide6.QtCore import Qt, QPointF
     from PySide6.QtGui import QMouseEvent
-    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x0, y0),
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x0, y0), QPointF(x0, y0),
                         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
                         Qt.KeyboardModifier.NoModifier)
     staff.mousePressEvent(press)
-    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x1, y1),
+    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x1, y1), QPointF(x1, y1),
                        Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
                        Qt.KeyboardModifier.NoModifier)
     staff.mouseMoveEvent(move)
-    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x1, y1),
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x1, y1), QPointF(x1, y1),
                           Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
                           Qt.KeyboardModifier.NoModifier)
     staff.mouseReleaseEvent(release)
@@ -59,7 +59,7 @@ def _drag(staff, x0, y0, x1, y1):
 def _move(staff, x, y):
     from PySide6.QtCore import Qt, QPointF
     from PySide6.QtGui import QMouseEvent
-    ev = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x, y),
+    ev = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x, y), QPointF(x, y),
                      Qt.MouseButton.NoButton, Qt.MouseButton.NoButton,
                      Qt.KeyboardModifier.NoModifier)
     staff.mouseMoveEvent(ev)

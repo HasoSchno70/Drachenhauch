@@ -392,19 +392,19 @@ def test_waveform_view_drag_via_mouse_events(tmp_path):
     w.resize(400, 100)
     end_x = w._frame_to_x(1000)
 
-    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(end_x, 50),
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(end_x, 50), QPointF(end_x, 50),
                         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
                         Qt.KeyboardModifier.NoModifier)
     w.mousePressEvent(press)
     assert w._drag == "end"
 
-    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(end_x + 40, 50),
+    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(end_x + 40, 50), QPointF(end_x + 40, 50),
                        Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
                        Qt.KeyboardModifier.NoModifier)
     w.mouseMoveEvent(move)
     assert w.loop_end > 1000
 
-    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(end_x + 40, 50),
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(end_x + 40, 50), QPointF(end_x + 40, 50),
                           Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
                           Qt.KeyboardModifier.NoModifier)
     w.mouseReleaseEvent(release)
