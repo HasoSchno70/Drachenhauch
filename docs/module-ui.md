@@ -49,8 +49,8 @@ WHILE NOT QUITREQUESTED()
         PRINT "Spiel startet!"
     END IF
 
-    DIM sound AS BOOLEAN
-    sound = UI_CHECKBOX("snd", 10, 80, "Sound an", TRUE)
+    DIM ton_an AS BOOLEAN
+    ton_an = UI_CHECKBOX("snd", 10, 80, "Sound an", TRUE)
 
     DIM lautstaerke AS FLOAT
     lautstaerke = UI_SLIDER("vol", 10, 110, 200, 0.0, 1.0, 0.7)
@@ -120,11 +120,11 @@ UI_CHECKBOX(id$, x, y, label$[, default]) -> BOOLEAN
 Toggle-Checkbox mit Label rechts daneben. Der `default`-Wert wird **nur beim ersten Aufruf** dieser ID gesetzt — danach bleibt der vom User getoggelte State erhalten.
 
 ```basic
-DIM sound AS BOOLEAN
-sound = UI_CHECKBOX("snd", 10, 50, "Sound", TRUE)        ' Default beim 1. Frame: TRUE
+DIM ton_an AS BOOLEAN
+ton_an = UI_CHECKBOX("snd", 10, 50, "Sound", TRUE)        ' Default beim 1. Frame: TRUE
 
 ' Pro Frame: aktueller Wert
-IF sound THEN
+IF ton_an THEN
     musik_starten()
 END IF
 ```
@@ -457,8 +457,8 @@ WHILE NOT QUITREQUESTED() AND NOT beendet
     DIM vol AS FLOAT
     vol = UI_SLIDER("vol", 110, 50, 180, 0.0, 1.0, 0.7)
 
-    DIM sound AS BOOLEAN
-    sound = UI_CHECKBOX("snd", 10, 100, "Sound an", TRUE)
+    DIM ton_an AS BOOLEAN
+    ton_an = UI_CHECKBOX("snd", 10, 100, "Sound an", TRUE)
     DIM musik AS BOOLEAN
     musik = UI_CHECKBOX("mus", 10, 120, "Musik an", FALSE)
 

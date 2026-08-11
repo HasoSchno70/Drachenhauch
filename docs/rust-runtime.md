@@ -199,7 +199,7 @@ werden in `render_scene` im Draw-Kontext an die Slots 11/12/13 gebunden (Cubemap
 via `rlEnableTextureCubemap`, BRDF-LUT 2D via `rlEnableTexture`; Material-Maps
 nutzen 0..2, Shadow 10 → kein Clash). Dispatch `"light_env_hdr"` in
 [`vm.rs`](../rust/drachenhauch_runtime/src/vm.rs), native-only-Stub in
-[`g3d.py`](../drachenhauch/modules/g3d.py).
+`g3d.py`.
 
 **Drei rlgl-Stolpersteine** (für Nachbauten):
 - `rlFramebufferAttach` endet mit `glBindFramebuffer(0)` → **nach jedem Attach das
@@ -279,8 +279,8 @@ klickbarer Link in die Quelldatei.
 
 ## Schritt 1: `.dhc`-Serialisierung
 
-[`drachenhauch/serialize.py`](../drachenhauch/serialize.py) wandelt ein vom
-`Compiler` erzeugtes `Module` ([bytecode.py](../drachenhauch/bytecode.py)) in eine
+`drachenhauch/serialize.py` wandelt ein vom
+`Compiler` erzeugtes `Module` (`bytecode.py`) in eine
 selbstbeschreibende JSON-Datei. JSON ist für den Spike bewusst gewählt
 (debuggbar); ein kompaktes Binärformat ist später drop-in möglich.
 
@@ -662,7 +662,7 @@ emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 („… nur in der nativen Runtime … mit F6"). In `dhrt` rendern sie über raylibs
 `begin_mode3D`-API.
 
-**Builtins** ([`g3d.py`](../drachenhauch/modules/g3d.py), Rendering in
+**Builtins** (`g3d.py`, Rendering in
 `graphics.rs`/`vm.rs`):
 - `CAMERA3D(px,py,pz, tx,ty,tz, fovy)` — Perspektiv-Kamera (Up = +Y), pro Frame.
 - `CAMERA_ORBIT(tx,ty,tz, radius, yaw, pitch[, fovy])` — Orbit-Kamera: blickt aus
@@ -1057,7 +1057,7 @@ extrahiert den Bytecode.
 eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.dhc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.
 
-**Export-Seite** ([drachenhauch/export.py](../drachenhauch/export.py)):
+**Export-Seite** (`drachenhauch/export.py`):
 `export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.dhc`,
 hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
 Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für

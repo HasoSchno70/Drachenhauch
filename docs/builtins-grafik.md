@@ -332,7 +332,7 @@ DIM hero AS IMAGE
 hero = LOADIMAGE("player")    ' Cache-Hit (Alias)
 ```
 
-Vollständiges Beispiel: [examples/75_preloader.dh](examples/75_preloader.dh).
+Vollständiges Beispiel: [examples/75_preloader.dh](../examples/75_preloader.dh).
 
 ## Sprite-Atlas
 
@@ -402,7 +402,7 @@ ATLAS_DRAW_FLIPPED(mario, "walk_a", x, y, flip, FALSE)
 
 Flip erzeugt pro Aufruf ein frisch gespiegeltes Bild. Für viele wiederholte Flips desselben Sprites lohnt es sich, die gespiegelte Variante einmal vorberechnet als IMAGE zu cachen — für einen einzelnen Player-Sprite pro Frame ist der Overhead aber vernachlässigbar.
 
-Vollständiges Beispiel: [examples/76_layers_atlas.dh](examples/76_layers_atlas.dh).
+Vollständiges Beispiel: [examples/76_layers_atlas.dh](../examples/76_layers_atlas.dh).
 
 ## Z-Layer-Rendering
 
@@ -444,7 +444,7 @@ WEND
 
 **Camera-Hinweis:** Camera ist global, gilt für alle Layer. Für UI ohne Camera-Effekt (z.B. HUD): vor dem `LAYER("ui")`-Draw `CAMERA_RESET()` rufen (benötigt `IMPORT "camera"`).
 
-**Layer + Atlas kombiniert** (vollständig in [examples/76_layers_atlas.dh](examples/76_layers_atlas.dh)):
+**Layer + Atlas kombiniert** (vollständig in [examples/76_layers_atlas.dh](../examples/76_layers_atlas.dh)):
 
 ```basic
 LAYER("bg")

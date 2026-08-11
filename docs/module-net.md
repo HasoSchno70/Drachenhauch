@@ -70,7 +70,7 @@ WHILE running
 
     ' Alle Clients pollen
     ' ... fuer jeden Client:
-    '   data = NET_RECV(client, 1024)
+    '   nachricht = NET_RECV(client, 1024)
     '   IF LEN(data) > 0 THEN
     '       NET_SEND(client, "Echo: " + data)
     '   END IF
@@ -155,10 +155,10 @@ weitere Pruefung merkt eine Warteschleife also nie, dass die Gegenseite weg
 ist. `NET_IS_CONNECTED(sock)` unterscheidet die beiden Faelle:
 
 ```basic
+DIM nachricht AS STRING
 WHILE NET_IS_CONNECTED(client)
-    DIM data AS STRING
-    data = NET_RECV(client, 1024)
-    IF LEN(data) > 0 THEN ProcessMessage(data)
+    nachricht = NET_RECV(client, 1024)
+    IF LEN(nachricht) > 0 THEN ProcessMessage(nachricht)
     SLEEP(16)
 WEND
 PRINT "Verbindung getrennt"

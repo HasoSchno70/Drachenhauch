@@ -203,25 +203,34 @@ PRINT TRYVAL("oops", -1)              ' -1  (statt 0 bei VAL)
 
 ## Bitwise
 
-Alle nehmen INTEGER, geben INTEGER. Negative Werte wie in Python (Zweierkomplement, beliebig groß).
+Bitweise Rechnung läuft über **Operatoren**, nicht über Funktionen. Alle nehmen
+INTEGER und geben INTEGER; negative Werte wie in Python (Zweierkomplement,
+beliebig groß).
 
-| Funktion | Operator |
+| Operator | in C/Python |
 |---|---|
-| `BITAND(a, b)` | `a & b` |
-| `BITOR(a, b)` | `a \| b` |
-| `BITXOR(a, b)` | `a ^ b` |
-| `BITNOT(a)` | `~a` |
-| `SHL(a, n)` | `a << n` |
-| `SHR(a, n)` | `a >> n` |
+| `a BAND b` | `a & b` |
+| `a BOR b` | `a \| b` |
+| `a BXOR b` | `a ^ b` |
+| `BNOT a` | `~a` |
+| `a SHL n` | `a << n` |
+| `a SHR n` | `a >> n` |
 
 ```basic
 DIM flags AS INTEGER
 flags = 0
-flags = BITOR(flags, SHL(1, 0))     ' Bit 0 setzen
-flags = BITOR(flags, SHL(1, 3))     ' Bit 3 setzen
+flags = flags BOR (1 SHL 0)         ' Bit 0 setzen
+flags = flags BOR (1 SHL 3)         ' Bit 3 setzen
 PRINT "Flags = 0x" + HEX$(flags)    ' "0x9"
-PRINT "Bit 3? ", BITAND(flags, SHL(1, 3)) <> 0  ' TRUE
+PRINT "Bit 3? ", (flags BAND (1 SHL 3)) <> 0  ' TRUE
 ```
+
+Die Klammern um `1 SHL 3` sind nötig: alle binären Bit-Operatoren liegen auf
+**einer** Präzedenzebene und werden von links abgearbeitet, `a BOR 1 SHL 3`
+wäre also `(a BOR 1) SHL 3`.
+
+> Früher gab es dafür die Funktionen `BITAND`/`BITOR`/`BITXOR`/`BITNOT`/`SHL`/
+> `SHR`. Sie sind **entfernt** — mit den Operatoren wären sie doppelt.
 
 ## Arrays
 

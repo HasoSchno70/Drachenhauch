@@ -316,7 +316,7 @@ Nicht interaktiv; Fortschritt via `GUI_SET_VALUE` (0..1, geklemmt).
 ```basic
 DIM sp AS GUI_WIDGET
 sp = GUI_SPINNER(win, 20, 200, 120, 0, 100, 50, 5)   ' min 0, max 100, Start 50, Schritt 5
-GUI_ON_CHANGE(sp, FUNCREF(wert_geaendert))
+GUI_ON_CHANGE(sp, wert_geaendert)                     ' FUNCREF = der nackte Name
 PRINT GUI_VALUE(sp)                                   ' aktueller Wert (FLOAT)
 ```
 

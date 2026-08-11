@@ -65,7 +65,8 @@ Operatoren: `m1 * m2` (Matrix-Produkt), `m * v4` → VEC4, `m * v3` → VEC3
 Transforms, Instanzen mit eigener Pose und Gizmos möglich:
 
 ```basic
-IMPORT "g3d" : IMPORT "m3d"
+IMPORT "g3d"
+IMPORT "m3d"
 DIM box AS INTEGER
 box = MESH_CUBE(1, 1, 1)
 MODEL_LIT(box)
@@ -91,7 +92,8 @@ einzelner `MODEL_MATRIX`-Aufrufe. `mats` ist ein `ARRAY OF MAT4` (oder ein
 Felder — Größenordnungen schneller als ein `MODEL_MATRIX` pro Instanz.
 
 ```basic
-IMPORT "g3d" : IMPORT "m3d"
+IMPORT "g3d"
+IMPORT "m3d"
 DIM box AS INTEGER
 box = MESH_CUBE(0.7, 0.7, 0.7)
 

@@ -10,7 +10,7 @@ IMPORT "tiled"
 
 1. In Tiled das Level bauen (Tilesets, Layer, Object-Layer mit Custom-Properties)
 2. **File → Save As → JSON Map** (Tiled speichert nativ als `.tmx`, kann aber auch direkt JSON schreiben)
-3. Im Spiel: `map = TILED_LOAD("level.json")`
+3. Im Spiel: `m = TILED_LOAD("level.json")`
 4. Layer iterieren, Objekte spawnen, Tile-Properties pruefen
 
 **TMX (XML) wird in v1 nicht unterstuetzt** — saving as JSON ist die einzige Sache, die der Artist anders machen muss als gewohnt.
@@ -165,14 +165,14 @@ names[1] = "stone"     ' GID 2
 ' Pro Frame:
 DIM tx AS INTEGER
 DIM ty AS INTEGER
-FOR ty = 0 TO TILED_HEIGHT(map) - 1
-    FOR tx = 0 TO TILED_WIDTH(map) - 1
+FOR ty = 0 TO TILED_HEIGHT(m) - 1
+    FOR tx = 0 TO TILED_WIDTH(m) - 1
         DIM gid AS INTEGER
-        gid = TILED_TILE_AT(map, 0, tx, ty)    ' 0 = ground-Layer-Index
+        gid = TILED_TILE_AT(m, 0, tx, ty)    ' 0 = ground-Layer-Index
         IF gid > 0 THEN
             BATCH_DRAW(atlas, names[gid - 1],
-                       tx * TILED_TILE_WIDTH(map),
-                       ty * TILED_TILE_HEIGHT(map))
+                       tx * TILED_TILE_WIDTH(m),
+                       ty * TILED_TILE_HEIGHT(m))
         END IF
     NEXT
 NEXT
@@ -185,7 +185,7 @@ Bei grossen Maps (z.B. 100×100) + Camera-Scrolling lohnt es sich, nur den sicht
 DIM first_tx AS INTEGER
 DIM last_tx AS INTEGER
 first_tx = MAX(0, cam_x / TW)
-last_tx  = MIN(TILED_WIDTH(map) - 1, (cam_x + screen_w) / TW + 1)
+last_tx  = MIN(TILED_WIDTH(m) - 1, (cam_x + screen_w) / TW + 1)
 ' ... analog fuer ty ...
 ```
 

@@ -9,6 +9,7 @@ Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausg
 ### Die Sprache
 
 - **[Sprachreferenz](sprache.md)** — Variablen, Typen, Operatoren, Kontrollfluss (IF, SELECT CASE, WHILE, FOR), Funktionen, Klassen, Try/Catch, Imports
+- **[Variablen-Scope](scope.md)** — wo eine Variable gilt: global, in Funktionen, in Methoden — und warum es kein Block-Scoping gibt
 
 ### Eingebaute Befehle
 
@@ -53,11 +54,38 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `tiled` | [Tiled](https://www.mapeditor.org/)-Map-Loader (JSON). Tile-Layer, Object-Layer, Tile- + Object-Properties | [module-tiled.md](module-tiled.md) |
 | `tile_collide` | Box-vs-Tilemap-Kollision: TILE_SWEEP_X/Y mit separat-Achsen-Pattern. Klassischer Platformer | [module-tile-collide.md](module-tile-collide.md) |
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. Klassische "feel-good"-Platformer-Mechanik | [module-controller.md](module-controller.md) |
+| `gui` | Retained-Mode-Oberflächen: Fenster und Widgets als persistente Objekte, 22 Widget-Arten inkl. Tabelle | [module-gui.md](module-gui.md) |
+| `chart` | Diagramme: Kuchen/Donut, Balken, Linie/Fläche, Tacho, Leiste, LED — mit Maus und Tooltip | [module-chart.md](module-chart.md) |
+| `m3d` | 3D-Mathematik: VEC3/VEC4/QUAT/MAT4 für hierarchische Transforms, eigene Kameras, Instancing | [module-m3d.md](module-m3d.md) |
+| `animfsm` | Animations-State-Machine im Mecanim-Stil, datengetrieben aus `.dhanim` | [module-animfsm.md](module-animfsm.md) |
+| `physics2d` | Vollwertiger 2D-Starrkörper-Solver (Rapier2D): Stapeln, Werfen, Rollen | [module-physics2d.md](module-physics2d.md) |
+| `physics3d` | Vollwertiger 3D-Starrkörper-Solver (Rapier3D) | [module-physics3d.md](module-physics3d.md) |
+| `audio` (Modulatoren) | LFO und Tweener auf dem Audio-Thread: Tremolo, Wobble, Filter-Sweeps ohne Nachrechnen pro Frame | [module-audio-modulatoren.md](module-audio-modulatoren.md) |
+| `mqtt` | MQTT-3.1.1-Client — das Pub/Sub-Protokoll der IoT-/Maker-Welt | [module-mqtt.md](module-mqtt.md) |
+| `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
 ### Werkzeug
 
 - **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
 - **[Sprite-Editor (`dhsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
+- **[Tilemap-Editor (`dhtilemap`)](tilemap-editor.md)** — Level bauen, Tiled-JSON lesen und schreiben
+- **[Form-Designer (`dhform`)](form-designer.md)** — Oberflächen zusammenklicken, Xojo-Stil, F5 startet sie
+- **[Partikel-Editor (`dhparticles`)](particle-editor.md)** — Effekte live einstellen, mit Preset-Bibliothek
+- **[Animations-Editor (`dhanim`)](anim-editor.md)** — Zustandsautomat für Sprite-Animationen
+- **[Notenblatt-Editor (`dhscore`)](score-editor.md)** — Noten setzen statt Tracker-Zeilen füllen
+- **[Tracker](tracker.md)** und **[SFX-Generator](sfx-generator.md)** — Musik und Geräusche (beide im Audio Studio)
+- **[Sprachserver + VSCode](lsp.md)** — dieselbe Diagnose in fremden Editoren
+- **[Eingabe aufzeichnen](automation.md)** — Demo-Modus, nachspielbare Fehlerberichte, automatische Spieltests
+- **[Web-Playground](web-playground.md)** — dhrt als WebAssembly, ein Link genügt
+
+### Interna
+
+Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie es ist:
+
+- **[Stolpersteine](stolpersteine.md)** — Reibungspunkte der Sprache, beim Schreiben des Lehrbuchs gesammelt
+- **[Rust-Front-End-Portierung](rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
+- **[Befehlssatz-Roadmap](befehlssatz-roadmap.md)** und **[GUI-Design-Notiz](gui-module-design.md)** — historisch, mit Lesehinweis
+- **[Umbenennung GameBasic → Drachenhauch](umbenennung-drachenhauch.md)** — die Checkliste von 2026-08
 
 ## Erstes Programm
 

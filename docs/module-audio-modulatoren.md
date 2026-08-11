@@ -32,9 +32,9 @@ Damit wandert der Filter-Cutoff des SFX-Busses dauerhaft zwischen 200 und
   `dreieck`, `saegezahn`, `rechteck` gehen auch). Der LFO schwingt zwischen
   `mitte - amplitude` und `mitte + amplitude`; Standard ist Amplitude 1 und
   Mitte 0, also **-1 bis +1**.
-- `AUDIO_LFO_SET(mod [, hz [, amplitude [, mitte]]])` — zur Laufzeit ändern.
+- `AUDIO_LFO_SET(modulator [, hz [, amplitude [, mitte]]])` — zur Laufzeit ändern.
   Weggelassene Werte bleiben unverändert.
-- `AUDIO_LFO_WAVEFORM(mod, wellenform$)`
+- `AUDIO_LFO_WAVEFORM(modulator, wellenform$)`
 
 ## Tweener
 
@@ -46,14 +46,14 @@ AUDIO_TWEENER_TO(hall, 1.0, 1200.0, "inout")   ' in 1,2 s weich aufziehen
 ```
 
 - `AUDIO_TWEENER_NEW([startwert])` → `AUDIO_MOD`
-- `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`
+- `AUDIO_TWEENER_TO(modulator, ziel, dauer_ms [, easing$])`
   Easings wie bei den Fades: `linear`, `in`, `out`, `inout`.
 
 ## Binden und lösen
 
 ```basic
-AUDIO_MODULATE(bus$, ziel$, mod, min, max)
-AUDIO_MOD_REMOVE(mod)
+AUDIO_MODULATE(bus$, ziel$, modulator, min, max)
+AUDIO_MOD_REMOVE(modulator)
 ```
 
 - `bus$`: `sfx`, `music` oder `master`
