@@ -54,7 +54,7 @@ launchable with a double click.
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 85 MB, currently version 2026.5.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 165 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 174 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
 ## Working from source
 
@@ -240,7 +240,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Examples
 
-`examples/` contains 170+ runnable demos, from "Hello World" to a complete mini game:
+`examples/` contains 161 examples plus ten benchmarks, from "Hello World" to a complete mini game:
 
 | File | Shows |
 |---|---|

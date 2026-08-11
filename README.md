@@ -54,7 +54,7 @@ Startseite, jede per Doppelklick startbar.
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 85 MB, aktuell Fassung 2026.5.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 165 Beispiele samt Assets, das Lehrbuch in beiden Sprachen als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 174 Beispiele samt Assets, das Lehrbuch in beiden Sprachen als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -238,7 +238,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 
 ## Beispiele
 
-`examples/` enthält über 170 lauffähige Demos, von "Hallo Welt" bis zum kompletten Mini-Spiel:
+`examples/` enthält 161 Beispiele plus zehn Benchmarks, von "Hallo Welt" bis zum kompletten Mini-Spiel:
 
 | Datei | Zeigt |
 |---|---|
