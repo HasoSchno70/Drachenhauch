@@ -57,6 +57,15 @@ def _find_libclang_dir_windows() -> str | None:
     for c in [r"C:\Program Files\LLVM\bin", r"C:\Program Files (x86)\LLVM\bin"]:
         if (Path(c) / "libclang.dll").exists():
             return c
+    # Wie bei cmake nachfassen, statt nur zwei Verzeichnisse zu raten: wer
+    # LLVM woanders liegen hat (scoop/choco, portable, CI-Image), hat clang
+    # meist im PATH. Ohne diesen Zweig scheitert der Bau dort mit "LLVM
+    # installieren", obwohl es installiert IST.
+    w = which("clang") or which("clang-cl")
+    if w:
+        d = Path(w).parent
+        if (d / "libclang.dll").exists():
+            return str(d)
     return None
 
 

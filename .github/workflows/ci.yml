@@ -43,6 +43,31 @@ jobs:
       - name: Type-check with mypy
         run: mypy
 
+      # OHNE dhrt uebersprang die Suite 1812 von 3096 Tests -- lautlos, per
+      # `pytest.skip("native Runtime 'dhrt' nicht gebaut")` in conftest.py.
+      # Genau die sichern die SPRACHE ab (jeder run_gb-Golden-Test). Was das
+      # kostet, hat die Umbenennung gezeigt: ein kaputter `include_str!`-Pfad
+      # in compiler.rs zerlegte den Rust-Build, und die Tests merkten es
+      # nicht, weil sie die vorgebaute Exe von der Platte nahmen.
+      #
+      # Gebaut wird ueber `rust/build_runtime.py` -- dasselbe Skript, das auch
+      # Entwickler benutzen. Eine zweite Bau-Wahrheit in der CI waere genau
+      # die Sorte Abweichung, die man erst bemerkt, wenn sie auseinanderlaeuft.
+      #
+      # MIT Grafik, nicht ohne: ohne das `graphics`-Feature liefert
+      # `try_graphics` in vm.rs nur `Ok(None)`, SCREEN & Co. gelten dann als
+      # unbekannte Builtins -- die Grafik-Tests wuerden FEHLSCHLAGEN statt zu
+      # ueberspringen.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust-Abhaengigkeiten cachen
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust/drachenhauch_runtime
+
+      - name: dhrt bauen (Runtime fuer die run_gb-Golden-Tests)
+        run: python rust/build_runtime.py
+
       # spriteeditor_qt_canvas/tilemapeditor_qt bleiben aussen vor: fuer sich
       # genommen gruen, loesen sie im vollen kombinierten Lauf sporadisch einen
       # nativen Access-Violation-Crash in Qts C++-Teardown aus (der Prozess
