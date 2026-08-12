@@ -292,6 +292,13 @@ def test_save_highscore_and_password(tmp_path):
     assert (tmp_path / "circuitrunner.save").exists(), list(tmp_path.iterdir())
 
 
+def _zahl(out, marke):
+    """Zahl hinter `marke` aus der dhrt-Ausgabe -- mit der Ausgabe im Fehlerfall."""
+    m = re.search(rf"{marke}\s+(-?\d+)", out)
+    assert m, f"{marke} fehlt in der Ausgabe:\n{out}"
+    return int(m.group(1))
+
+
 def vals_rec(out, n):
     m = re.search(rf"BEST{n}\s+-?\d+\s+REC\s+(\d+)", out)
     return int(m.group(1)) if m else None
@@ -330,9 +337,13 @@ def test_save_timed_bonus(tmp_path):
         'PRINT "BEST3 " + STR$(best_for(0)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
     )
     out = _run_engine_harness(tmp_path, _make_timed_level(), harness)
-    b1 = int(re.search(r"BEST1\s+(-?\d+)", out).group(1))
-    b2 = int(re.search(r"BEST2\s+(-?\d+)", out).group(1))
-    b3 = int(re.search(r"BEST3\s+(-?\d+)", out).group(1))
+    # Ueber `_zahl` statt direkt `.group(1)`: fehlt die Zeile, stuerzte der Test
+    # frueher mit "'NoneType' object has no attribute 'group'" ab -- und man sah
+    # NICHT, was dhrt stattdessen ausgegeben hat (auf einer Maschine ohne
+    # Bildschirm z.B. eine GLFW-Meldung).
+    b1 = _zahl(out, "BEST1")
+    b2 = _zahl(out, "BEST2")
+    b3 = _zahl(out, "BEST3")
     assert 169 <= b1 <= 171, out               # 200 - 30 = 170 uebrig
     assert vals_rec(out, 1) == 1, out
     assert b2 == b1, out                        # 150 uebrig ist schlechter -> ignoriert

@@ -86,7 +86,17 @@ _DHRT = _find_dhrt()
 #      hingen, zu Skips machen.
 # Auf einer Maschine mit Bildschirm ist Stufe 1 wahr und der Haken feuert nie
 # -- ein echter Grafikfehler bleibt dort also ein Fehlschlag.
-_KEIN_FENSTER = "Attempting to create window failed"
+# Eine Meldung reicht nicht: dhrt scheitert auf einer Maschine ohne
+# Bildschirm/Soundkarte je nach Stelle unterschiedlich -- mal als raylib-Panik,
+# mal als GLFW-Warnung, beim Ton als Kira-Fehler. Der erste Anlauf kannte nur
+# die Panik und liess deshalb 10 von 152 Faellen stehen.
+_KEIN_FENSTER = (
+    "Attempting to create window failed",          # raylib-Panik
+    "does not appear to support OpenGL",           # GLFW/WGL auf dem CI-Runner
+    "Failed to initialize Window",
+    "Failed to initialize platform",
+    "NoDefaultOutputDevice",                       # keine Soundkarte
+)
 _fenster_probe: "bool | None" = None
 
 
@@ -104,7 +114,9 @@ def _fenster_moeglich() -> bool:
             try:
                 r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True,
                                    text=True, timeout=60, env=env)
-                _fenster_probe = r.returncode == 0 and _KEIN_FENSTER not in (r.stderr or "")
+                text = (r.stderr or "") + (r.stdout or "")
+                _fenster_probe = (r.returncode == 0
+                                  and not any(s in text for s in _KEIN_FENSTER))
             except (OSError, subprocess.SubprocessError):
                 _fenster_probe = False
     return _fenster_probe
@@ -113,7 +125,7 @@ def _fenster_moeglich() -> bool:
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     bericht = (yield).get_result()
-    if bericht.failed and _KEIN_FENSTER in str(bericht.longrepr or ""):
+    if bericht.failed and any(s in str(bericht.longrepr or "") for s in _KEIN_FENSTER):
         if not _fenster_moeglich():
             bericht.outcome = "skipped"
             bericht.longrepr = (str(item.path), item.location[1],
