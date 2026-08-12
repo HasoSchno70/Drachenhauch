@@ -377,8 +377,8 @@ def test_hint_tile_under_player(tmp_path):
         'PRINT "HINTLEN " + STR$(LEN(lvl_hint))\n'
     )
     out = _run_engine_harness(tmp_path, level, harness)
-    assert int(re.search(r"TAT\s+(\d+)", out).group(1)) == 0x2F, out
-    assert int(re.search(r"HINTLEN\s+(\d+)", out).group(1)) > 0, out
+    assert _zahl(out, "TAT") == 0x2F, out
+    assert _zahl(out, "HINTLEN") > 0, out
 
 
 @pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
