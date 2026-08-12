@@ -67,6 +67,60 @@ def _find_dhrt():
 _DHRT = _find_dhrt()
 
 
+# --------------------------------------------------------------------------
+# Maschinen ohne Bildschirm: Fenster-Tests ueberspringen statt scheitern
+#
+# Seit die CI `dhrt` selbst baut, laufen auch die Grafik-Tests dort -- und
+# fielen mit 152 Fehlschlaegen um: der GitHub-Runner hat keine Grafikkarte,
+# raylib bricht mit "Attempting to create window failed" ab (Exit 101).
+#
+# Eine Liste betroffener Dateien zu pflegen waere falsch: als Merkmal bot sich
+# `SCREEN(` im Quelltext der Testdatei an, aber fuenf der 25 Dateien enthalten
+# es gar nicht -- sie starten BEISPIELE von der Platte, die ihrerseits ein
+# Fenster oeffnen (test_examples, test_circuitrunner, ...). Eine Heuristik auf
+# dem Testtext kann das prinzipiell nicht sehen.
+#
+# Deshalb an der echten Signatur ansetzen, in zwei Stufen:
+#   1. EINMAL pro Lauf pruefen, ob dhrt ueberhaupt ein Fenster oeffnen kann.
+#   2. NUR wenn nicht: Fehlschlaege, die genau an der Fenstererzeugung
+#      hingen, zu Skips machen.
+# Auf einer Maschine mit Bildschirm ist Stufe 1 wahr und der Haken feuert nie
+# -- ein echter Grafikfehler bleibt dort also ein Fehlschlag.
+_KEIN_FENSTER = "Attempting to create window failed"
+_fenster_probe: "bool | None" = None
+
+
+def _fenster_moeglich() -> bool:
+    global _fenster_probe
+    if _fenster_probe is None:
+        _fenster_probe = False
+        if _DHRT is not None:
+            import subprocess
+            import tempfile
+            d = Path(tempfile.mkdtemp(prefix="dhrt_fensterprobe_"))
+            p = d / "probe.dh"
+            p.write_text('SCREEN(64, 48, "Probe", 1)\nFLIP()\n', encoding="utf-8")
+            env = {**os.environ, "DHRT_FRAMES": "1"}
+            try:
+                r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True,
+                                   text=True, timeout=60, env=env)
+                _fenster_probe = r.returncode == 0 and _KEIN_FENSTER not in (r.stderr or "")
+            except (OSError, subprocess.SubprocessError):
+                _fenster_probe = False
+    return _fenster_probe
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    bericht = (yield).get_result()
+    if bericht.failed and _KEIN_FENSTER in str(bericht.longrepr or ""):
+        if not _fenster_moeglich():
+            bericht.outcome = "skipped"
+            bericht.longrepr = (str(item.path), item.location[1],
+                                "Kein Fenster moeglich (Maschine ohne Bildschirm) "
+                                "-- raylib kann keins oeffnen")
+
+
 def _dhrt_err_message(stderr: str) -> str:
     """Bare Fehlermeldung aus dhrt-stderr extrahieren (ohne 'Laufzeitfehler in
     label:line:'-Praefix), damit `pytest.raises(match=...)` die Meldung trifft."""
