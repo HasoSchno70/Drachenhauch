@@ -5118,6 +5118,16 @@ impl<'p> Vm<'p> {
             "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
             "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
+            "audio_music_seek" => {
+                let s = need_f(a, 0, "AUDIO_MUSIC_SEEK")?;
+                // Nicht `s < 0.0` schreiben -- so faellt NAN mit durch.
+                if !(s >= 0.0) {
+                    return Err(format!(
+                        "AUDIO_MUSIC_SEEK: Position muss >= 0 sein (war {})", s));
+                }
+                self.audio_mut()?.music_seek(s)?;
+                Value::Nil
+            }
             "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
             "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
 

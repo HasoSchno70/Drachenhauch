@@ -1920,6 +1920,45 @@ resonance/reverb/distortion", other)),
             None => 0.0,
         }
     }
+    /// Musik an eine Stelle setzen (Sekunden ab Anfang) -- das Gegenstueck zu
+    /// `music_position`, das es bis jetzt nur zum Lesen gab.
+    ///
+    /// Drei Entscheidungen, die nicht selbsterklaerend sind:
+    ///
+    /// **Ohne laufende Musik ein FEHLER**, waehrend `music_pause`/`_resume`
+    /// dort stillschweigend nichts tun. Der Unterschied ist die verlorene
+    /// Absicht: eine Pause auf Nichts hat kein Ziel, ein Sprung schon. Der
+    /// naheliegende Anfaengerfehler ist
+    ///     AUDIO_MUSIC_LOAD("x.ogg") : AUDIO_MUSIC_SEEK(30.0) : AUDIO_MUSIC_PLAY()
+    /// -- den Griff gibt es erst ab PLAY, der Sprung fiele also lautlos unter
+    /// den Tisch und das Stueck begaenne bei 0.
+    ///
+    /// **MOD/XM koennen es nicht.** Ihre Zeitachse sind Pattern, Zeilen und
+    /// Ticks; wie viele SEKUNDEN bis dorthin vergehen, haengt an Tempo- und
+    /// Geschwindigkeitswechseln mitten im Stueck und liesse sich nur durch
+    /// Vorspielen ermitteln. (`xmrsplayer` hat `goto(pattern, zeile, speed)`
+    /// -- das waere ein eigener Befehl in Tracker-Einheiten, kein SEEK.)
+    /// `AUDIO_MUSIC_POSITION` liefert fuer Module trotzdem Sekunden: Mitzaehlen
+    /// kann man sie, Anspringen nicht.
+    ///
+    /// **Hinter dem Ende** wird nicht geprueft -- die Laenge eines Streams
+    /// kennt Kira selbst nicht, ohne ihn zu lesen. Der Sound endet dann
+    /// einfach (bzw. springt bei Endlos-Wiederholung an den Anfang).
+    /// (Dass `sekunden >= 0` ist, prueft der Wrapper in vm.rs -- dort laeuft
+    /// die Pruefung VOR der Audio-Initialisierung und ist damit auch auf einer
+    /// Maschine ohne Soundkarte als Golden-Test nachweisbar.)
+    pub fn music_seek(&mut self, sekunden: f64) -> Result<(), String> {
+        match self.music_handle.as_mut() {
+            #[cfg(not(target_arch = "wasm32"))]
+            Some(MusicHandle::Stream(h)) => { h.seek_to(sekunden); Ok(()) }
+            Some(MusicHandle::Static(h)) => { h.seek_to(sekunden); Ok(()) }
+            Some(MusicHandle::Module(_)) => Err(
+                "AUDIO_MUSIC_SEEK: MOD-/XM-Musik laesst sich nicht auf eine Sekunde \
+                 setzen (ihre Zeitachse sind Pattern und Zeilen)".into()),
+            None => Err(
+                "AUDIO_MUSIC_SEEK: es laeuft keine Musik -- erst AUDIO_MUSIC_PLAY()".into()),
+        }
+    }
     pub fn music_busy(&self) -> bool {
         matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Playing))
     }
