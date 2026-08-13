@@ -308,6 +308,17 @@ Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 
 3090+ tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
 
+**Faster in two passes** (this is how CI runs them):
+
+```
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+.venv\Scripts\python.exe -m pytest tests/ -q -m seriell
+```
+
+The suite barely computes — it spawns `dhrt` processes and waits for them. That is why it scales almost linearly: **10:40 serial against a little over a minute on 16 cores.** The second pass picks up four files that need a resource *exclusively* (input recording, the sound card, measured run times); the reason for each one sits in [tests/conftest.py](tests/conftest.py) next to `_SERIELL`.
+
+**CI** builds `dhrt` itself on every push and runs both passes (Windows, Python 3.12): **a little over 8 minutes** for the whole job — 3 for the Rust build, 2½ for the tests. Without that build the suite used to skip 1812 of 3096 tests there, and nothing said so. On top of that, a `cargo check` on Linux, macOS and Windows proves the Rust core compiles platform-independently.
+
 ## License
 
 Private.

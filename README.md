@@ -306,6 +306,17 @@ Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 
 Über 3090 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `dhrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `dhrt`.
 
+**Schneller in zwei Durchgängen** (so fährt auch die CI):
+
+```
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+.venv\Scripts\python.exe -m pytest tests/ -q -m seriell
+```
+
+Die Suite rechnet kaum — sie startet `dhrt`-Prozesse und wartet auf sie. Deshalb skaliert sie fast linear: **10:40 seriell gegen gut eine Minute auf 16 Kernen.** Der zweite Durchgang holt vier Dateien nach, die ein Betriebsmittel *exklusiv* brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten); Begründung je Datei in [tests/conftest.py](tests/conftest.py) bei `_SERIELL`.
+
+Die **CI** baut `dhrt` bei jedem Push selbst und fährt beide Durchgänge (Windows, Python 3.12): **gut 8 Minuten** für den ganzen Job — 3 für den Rust-Bau, 2½ für die Tests. Ohne den Bau übersprang die Suite dort früher 1812 von 3096 Tests, ohne dass es auffiel. Dazu prüft ein `cargo check` auf Linux, macOS und Windows, dass der Rust-Kern plattformunabhängig kompiliert.
+
 ## Lizenz
 
 Privat.
