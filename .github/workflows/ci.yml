@@ -73,8 +73,23 @@ jobs:
       # nativen Access-Violation-Crash in Qts C++-Teardown aus (der Prozess
       # stirbt, kein fangbarer Test-Fehler). Lokal pruefbar mit
       # `pytest tests/test_spriteeditor_qt_canvas.py tests/test_tilemapeditor_qt.py`.
-      - name: Run tests
-        run: pytest tests/ -q -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
+      # Zwei Durchgaenge. Der erste faehrt parallel (pytest-xdist): die Suite
+      # rechnet kaum, sie startet dhrt-Prozesse und wartet auf sie -- deshalb
+      # skaliert sie fast linear (lokal auf 16 Kernen: 10:40 -> 48 s).
+      #
+      # `--dist loadfile` haelt die Tests einer Datei beim selben Arbeiter.
+      # Nicht aus Aberglaube: Modul-Zustand und die geleakten Qt-Fenster (siehe
+      # conftest.py) sind pro Prozess gedacht, nicht pro Test.
+      #
+      # Der zweite Durchgang holt die vier Dateien nach, die ein Betriebsmittel
+      # exklusiv brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene
+      # Laufzeiten) -- Begruendung je Datei in conftest.py bei `_SERIELL`.
+      # Zusammen decken die beiden Durchgaenge die Suite exakt ab: 3084 + 41.
+      - name: Run tests (parallel)
+        run: pytest tests/ -q -n auto --dist loadfile -m "not seriell" -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
+
+      - name: Run tests (seriell -- exklusive Betriebsmittel)
+        run: pytest tests/ -q -m seriell
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher

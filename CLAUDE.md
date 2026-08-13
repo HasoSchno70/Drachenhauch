@@ -257,6 +257,20 @@ Baut `rust/drachenhauch_runtime/` → `dhrt`. Nötig für Run/Export/Editor-Run 
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
+Das ist der serielle Weg (~10:40). **Schneller in zwei Durchgängen** (~65 s,
+so fährt auch die CI) — die Suite wartet fast nur auf `dhrt`-Prozesse, deshalb
+skaliert sie fast linear:
+```
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+.venv\Scripts\python.exe -m pytest tests/ -q -m seriell
+```
+Der zweite Durchgang holt die vier Dateien nach, die ein Betriebsmittel
+**exklusiv** brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten).
+Welche das sind und warum, steht in `tests/conftest.py` bei `_SERIELL`; dort
+eintragen, wenn ein neuer Test parallel sporadisch umfällt — aber erst, wenn
+das geteilte Betriebsmittel benannt ist, sonst verdeckt der Eintrag nur einen
+echten Fehler.
+
 **Headless prüfen:** `DHRT_FRAMES=n DHRT_SCREENSHOT=p.png dhrt run x.dh` liefert
 EIN Bild (ein Augenblick). Für alles, was sich über die ZEIT falsch verhält
 (zu früh umkippen, stehenbleibende Ränder, ruckelnde Bewegung) stattdessen den
@@ -1859,7 +1873,9 @@ nicht der emscripten-Build).
 
 ```
 .venv\Scripts\python.exe rust\build_runtime.py        # Runtime dhrt (Rust)
-.venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt
+.venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt (seriell)
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+.venv\Scripts\python.exe -m pytest tests/ -q -m seriell   # die 4 exklusiven Dateien
 .venv\Scripts\python.exe dhrun.py examples/<file>.dh  # ausführen (-> dhrt run)
 ```
 

@@ -45,14 +45,52 @@ def _module_uses_qt(path: str) -> bool:
     return hit
 
 
+# --------------------------------------------------------------------------
+# Marker `seriell`: vertraegt keine Nachbarn
+# --------------------------------------------------------------------------
+# Die Suite laeuft parallel (pytest-xdist) -- 10:40 seriell gegen 48 s auf 16
+# Arbeitern, weil fast jeder Test einen dhrt-Prozess startet und auf ihn
+# wartet, statt zu rechnen.
+#
+# Vier Dateien vertragen das nicht, und zwar nicht aus Zufall: sie haengen an
+# etwas, das es auf der Maschine nur EINMAL gibt.
+#
+#   test_automation.py        raylibs AUTOMATION_* schreibt die ECHTE Eingabe
+#                             mit und speist sie wieder ein. Jede fremde
+#                             Mausbewegung landet in der Aufnahme -- auch die
+#                             eines Menschen, der waehrenddessen am Rechner
+#                             sitzt (seriell nachgestellt: fuenf Fehlschlaege
+#                             hintereinander waehrend ich die Maus bewegte,
+#                             danach im Leerlauf wieder gruen).
+#   test_gui_form_runner.py   speist einen Klick ein -- dasselbe Nadeloehr.
+#   test_audio_modulators.py  misst Pegel an der einen Soundkarte.
+#   test_profiler.py          misst LAUFZEITEN; ringen 16 Prozesse um die
+#                             Kerne, kippt die Rangfolge der heissen Zeile.
+#
+# Sie laufen deshalb in einem zweiten, seriellen Durchgang (`-m seriell`,
+# 18 s). Empirisch ermittelt, nicht geraten: ueber acht parallele Laeufe
+# fielen genau diese vier Dateien um, verteilt und jedes Mal andere Tests --
+# das Streumuster ist das Erkennungszeichen fuer geteilte Betriebsmittel.
+_SERIELL = {
+    "test_automation.py",
+    "test_gui_form_runner.py",
+    "test_audio_modulators.py",
+    "test_profiler.py",
+}
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "qt: braucht PySide6 (automatisch gesetzt)")
+    config.addinivalue_line(
+        "markers", "seriell: braucht ein Betriebsmittel exklusiv (automatisch gesetzt)")
 
 
 def pytest_collection_modifyitems(items):
     for item in items:
         if _module_uses_qt(str(item.path)):
             item.add_marker(pytest.mark.qt)
+        if item.path.name in _SERIELL:
+            item.add_marker(pytest.mark.seriell)
 
 
 def _find_dhrt():
