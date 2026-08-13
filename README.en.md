@@ -54,7 +54,7 @@ launchable with a double click.
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 85 MB, currently version 2026.6.
 
-You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 174 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 175 examples with their assets, the textbook in both languages as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
 ## Working from source
 
@@ -145,7 +145,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/builtins-grafik.md) |
 | [`particles`](docs/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
 | [`imgfx`](docs/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
-| [`audio`](docs/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
+| [`audio`](docs/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, seeking through music (`AUDIO_MUSIC_SEEK`), spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
 
 **User interface**
 
@@ -240,7 +240,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Examples
 
-`examples/` contains 161 examples plus ten benchmarks, from "Hello World" to a complete mini game:
+`examples/` contains 162 examples plus ten benchmarks, from "Hello World" to a complete mini game:
 
 | File | Shows |
 |---|---|
@@ -307,7 +307,7 @@ Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 .venv\Scripts\python.exe -m pytest tests/
 ```
 
-3090+ tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
+3130+ tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
 
 **Faster in two passes** (this is how CI runs them):
 
