@@ -146,6 +146,8 @@ AUDIO_MUSIC_SEEK(30.0)             ' ab Sekunde 30 weiter
 
 * **Erst spielen, dann springen.** Vor `AUDIO_MUSIC_PLAY()` gibt es noch nichts zu versetzen; der Aufruf meldet dann einen Fehler, statt stillschweigend nichts zu tun (sonst begänne das Stück wieder bei 0, ohne dass es jemand merkt).
 * **Es wirkt nicht sofort.** Gemessen dauert es ~0,3–0,4 s, bis `AUDIO_MUSIC_POSITION()` die neue Stelle zeigt — so lange spielt der Stream seinen Vorlauf noch zu Ende. Wer direkt nach dem Sprung die Position abfragt, bekommt die alte.
+Demo: [examples/160_musik_seek.dh](../examples/160_musik_seek.dh) — klickbarer Fortschrittsbalken; der rote Strich zeigt die angesprungene Stelle, und man sieht, wie der Balken sie erst einholt.
+
 * **MOD/XM können es nicht** und sagen es auch. Ihre Zeitachse sind Pattern und Zeilen, nicht Sekunden; wie lange bis zu einer Stelle vergeht, hängt an Tempowechseln im Stück selbst. `AUDIO_MUSIC_POSITION()` liefert für Module trotzdem Sekunden — mitzählen geht, anspringen nicht.
 
 **Formate:** `.ogg`, `.mp3`, `.qoa` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden von raylib direkt dekodiert (kein Zusatzcode), klingen also **exakt wie das Original** auf dem Amiga (4+ Kanaele, Sample-basiert). Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:

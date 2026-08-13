@@ -261,6 +261,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `156_gui_alle_widgets.dh` | **all 22 GUI widgets** in one fullscreen application, each with a real job |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professional table** — sort, filter, edit cells; the second one against a real SQLite database |
 | `159_esp32_bruecke.dh` | **connect an ESP32** — receive readings, send commands back (sketch in [esp32/](esp32/)) |
+| `160_musik_seek.dh` | **Jumping through music** (`AUDIO_MUSIC_SEEK`) — clickable progress bar, ±10 s, and the buffered lead a jump has to play out first |
 | `bench_ecs_movement_v2.dh` | ECS bulk API (`ECS_INTEGRATE_FLOAT`) — 40× faster than a per-entity loop |
 | `bench_ecs_systems.dh` | bullet-hell pattern with 8 bulk systems per frame |
 

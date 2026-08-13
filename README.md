@@ -259,6 +259,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
 | `159_esp32_bruecke.dh` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
+| `160_musik_seek.dh` | **Musik anspringen** (`AUDIO_MUSIC_SEEK`) — klickbarer Fortschrittsbalken, ±10 s, und der Vorlauf, den ein Sprung erst leerspielt |
 | `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 

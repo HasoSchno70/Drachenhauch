@@ -1,0 +1,144 @@
+' 160_musik_seek.dh -- Musik an eine Stelle springen (AUDIO_MUSIC_SEEK)
+'
+' AUDIO_MUSIC_POSITION() gab es lange nur zum LESEN. AUDIO_MUSIC_SEEK(sekunden)
+' ist das Gegenstueck: vorspulen, an einen Schleifenpunkt gehen, ein Stueck da
+' fortsetzen, wo der Spielstand aufgehoert hat.
+'
+'   Maus auf den Balken   an diese Stelle springen
+'   Links / Rechts        10 Sekunden zurueck / vor
+'   Leertaste             Pause / weiter  (Springen geht auch in der Pause!)
+'   ESC                   Ende
+'
+' DREI DINGE, DIE MAN VORHER WISSEN WILL -- die Demo zeigt alle drei:
+'
+' 1. ERST SPIELEN, DANN SPRINGEN. Vor AUDIO_MUSIC_PLAY() gibt es noch nichts
+'    zu versetzen; der Aufruf meldet dann einen Fehler, statt stillschweigend
+'    nichts zu tun. Sonst begaenne das Stueck wieder bei 0, ohne dass es
+'    jemand merkt.
+'
+' 2. ES WIRKT NICHT SOFORT. Der rote Strich ist die GEWUENSCHTE Stelle, der
+'    helle Balken die tatsaechliche. Nach einem Sprung laufen sie ~0,3-0,4 s
+'    auseinander -- so lange spielt der Stream seinen Vorlauf noch zu Ende.
+'    Wer direkt nach dem Sprung die Position abfragt, bekommt die alte.
+'
+' 3. MOD/XM KOENNEN ES NICHT. Ihre Zeitachse sind Pattern und Zeilen, nicht
+'    Sekunden. AUDIO_MUSIC_POSITION() liefert fuer Module trotzdem Sekunden:
+'    mitzaehlen geht, anspringen nicht.
+
+IMPORT "audio"
+
+SCREEN(760, 260, "Musik anspringen", 2)
+SETFPS(60)
+
+' Die Laenge muss das Programm selbst wissen -- es gibt keinen Befehl, der
+' die Spieldauer einer Musikdatei liefert (der Stream kennt sie erst, wenn er
+' durch ist). Fuer eine Fortschrittsanzeige also von Hand eintragen.
+CONST LAENGE AS FLOAT = 242.0
+CONST BX AS INTEGER = 40
+CONST BY AS INTEGER = 120
+CONST BB AS INTEGER = 680
+CONST BH AS INTEGER = 26
+
+AUDIO_MUSIC_LOAD("assets/ambient.ogg")
+AUDIO_MUSIC_PLAY(-1, 300)
+
+DIM gewuenscht AS FLOAT      ' zuletzt angesprungene Stelle (der rote Strich)
+DIM wartet AS BOOLEAN        ' Sprung abgesetzt, aber noch nicht zu hoeren
+DIM pause AS BOOLEAN
+gewuenscht = 0.0
+wartet = FALSE
+pause = FALSE
+
+' Sekunden als m:ss
+FUNCTION zeit$(s AS FLOAT) AS STRING
+    DIM ganz AS INTEGER
+    ganz = INT(s)
+    IF ganz < 0 THEN ganz = 0
+    DIM sek AS INTEGER
+    sek = ganz MOD 60
+    RETURN STR$(ganz \ 60) + ":" + IIF(sek < 10, "0", "") + STR$(sek)
+END FUNCTION
+
+' Springen an EINER Stelle, damit der rote Strich nie von der Wahrheit abweicht.
+SUB springe(ziel AS FLOAT)
+    DIM z AS FLOAT
+    z = ziel
+    IF z < 0.0 THEN z = 0.0
+    IF z > LAENGE - 1.0 THEN z = LAENGE - 1.0
+    AUDIO_MUSIC_SEEK(z)
+    gewuenscht = z
+    wartet = TRUE
+END SUB
+
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_ESCAPE) THEN BREAK
+
+    ' --- Eingabe -----------------------------------------------------------
+    IF KEYHIT(KEY_LEFT)  THEN springe(AUDIO_MUSIC_POSITION() - 10.0)
+    IF KEYHIT(KEY_RIGHT) THEN springe(AUDIO_MUSIC_POSITION() + 10.0)
+
+    IF KEYHIT(KEY_SPACE) THEN
+        pause = NOT pause
+        IF pause THEN
+            AUDIO_MUSIC_PAUSE()
+        ELSE
+            AUDIO_MUSIC_RESUME()
+        END IF
+    END IF
+
+    ' Klick auf den Balken -> Anteil * Laenge. Auch in der Pause: der Sprung
+    ' wird gemerkt und ist beim Fortsetzen sofort da.
+    IF MOUSE_HIT(0) THEN
+        IF MOUSEY() >= BY AND MOUSEY() <= BY + BH THEN
+            IF MOUSEX() >= BX AND MOUSEX() <= BX + BB THEN
+                springe((MOUSEX() - BX) / BB * LAENGE)
+            END IF
+        END IF
+    END IF
+
+    ' --- Bild --------------------------------------------------------------
+    CLS(RGB(16, 18, 26))
+
+    DIM pos AS FLOAT
+    pos = AUDIO_MUSIC_POSITION()
+
+    TEXT(BX, 34, "Maus = springen   Links/Rechts = 10 s   Leer = Pause")
+    TEXT(BX, 60, "Position " + zeit$(pos) + " von " + zeit$(LAENGE) + _
+                 IIF(pause, "   [Pause]", ""))
+
+    ' Balken: Rinne, gespielter Anteil, Rahmen
+    BOXROUND(BX, BY, BX + BB, BY + BH, 6, RGB(38, 42, 58))
+    DIM breit AS INTEGER
+    breit = INT(pos / LAENGE * BB)
+    IF breit > 2 THEN BOXROUND(BX, BY, BX + breit, BY + BH, 6, RGB(90, 190, 235))
+    RECTROUND(BX, BY, BX + BB, BY + BH, 6, RGB(70, 78, 100))
+
+    ' Der rote Strich: WOHIN gesprungen wurde. Solange er neben dem Balkenende
+    ' steht, hat der Stream den Sprung noch nicht eingeholt.
+    DIM gx AS INTEGER
+    gx = BX + INT(gewuenscht / LAENGE * BB)
+    LINEW(gx, BY - 8, gx, BY + BH + 8, 2.0, RGB(240, 90, 80))
+
+    ' Der Sprung gilt als eingeholt, sobald die echte Position bei der
+    ' gewuenschten angekommen ist. Nur BIS DAHIN ist die Meldung wahr -- eine
+    ' reine Abstandspruefung stuende sonst dauerhaft da, weil die Musik ja
+    ' weiterlaeuft und sich vom roten Strich entfernt.
+    IF wartet THEN
+        DIM abstand AS FLOAT
+        abstand = pos - gewuenscht
+        IF abstand < 0.0 THEN abstand = -abstand
+        IF abstand <= 0.6 THEN wartet = FALSE
+    END IF
+
+    IF wartet THEN
+        TEXT(BX, BY + BH + 24, "Sprung noch nicht eingeholt (Vorlauf spielt aus)")
+    ELSE
+        TEXT(BX, BY + BH + 24, "roter Strich = zuletzt angesprungene Stelle")
+    END IF
+
+    TEXT(BX, BY + BH + 52, "MOD/XM koennen das nicht -- dort zaehlen Pattern.")
+
+    FLIP()
+WEND
+
+AUDIO_MUSIC_STOP(300)
