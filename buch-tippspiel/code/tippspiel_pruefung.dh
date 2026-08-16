@@ -12,11 +12,24 @@
 '  Start:  dhrun.py buch-tippspiel/code/tippspiel_pruefung.dh
 ' ============================================================
 IMPORT "db"
+IMPORT "json"
 
 DIM fehler AS INTEGER : fehler = 0
 DIM geprueft AS INTEGER : geprueft = 0
 
 SUB pruefe(was AS STRING, ist AS INTEGER, soll AS INTEGER)
+    geprueft = geprueft + 1
+    IF ist = soll THEN
+        PRINT "  ok   "; was; " = "; ist
+    ELSE
+        PRINT "  FEHL "; was; " = "; ist; " (erwartet "; soll; ")"
+        fehler = fehler + 1
+    END IF
+END SUB
+
+' Dasselbe fuer Ja/Nein. Eigene Fassung statt einer Umrechnung: INT() nimmt
+' kein BOOLEAN, und "ist = TRUE" liest sich besser als "ist = 1".
+SUB pruefeJa(was AS STRING, ist AS BOOLEAN, soll AS BOOLEAN)
     geprueft = geprueft + 1
     IF ist = soll THEN
         PRINT "  ok   "; was; " = "; ist
@@ -224,6 +237,79 @@ r = DB_QUERY(db, "SELECT COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + _
 DB_NEXT(r)
 pruefe("Annas Punkte zaehlen ueber beide Spieltage", DB_GET_INT(r, 0), 6)
 DB_CLOSE_RESULT(r)
+
+' ---- Ergebnisse aus der Antwort ------------------------------------------
+' Die Stelle, an der es lautlos falsch wird. matchResults hat ZWEI Eintraege,
+' und der erste ist das Halbzeitergebnis -- Gladbach gegen Leverkusen stand
+' zur Pause 0:2 und endete 2:3. Wer den ersten nimmt, wertet die Saison
+' falsch aus, und zwar plausibel falsch: es stehen ja Zahlen da.
+'
+' Geprueft wird gegen eine Antwort von Hand, nicht gegen das Netz. Eine
+' Pruefung, die eine Verbindung braucht, prueft an schlechten Tagen nichts.
+PRINT ""
+PRINT "=== Ergebnisse aus der Antwort ==="
+
+' Wortgleich mit tippspiel.dh.
+FUNCTION endergebnis(wurzel AS JSON_HANDLE, pfad AS STRING, _
+                     BYREF toreHeim AS INTEGER, BYREF toreGast AS INTEGER) AS BOOLEAN
+    IF NOT JSON_HAS(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+    IF NOT JSON_GET_BOOL(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+
+    DIM m AS INTEGER : m = JSON_LEN(wurzel, pfad + ".matchResults")
+    DIM k AS INTEGER
+    FOR k = 0 TO m - 1
+        DIM rp AS STRING : rp = pfad + ".matchResults." + STR$(k)
+        IF JSON_GET_INT(wurzel, rp + ".resultTypeID") = 2 THEN
+            toreHeim = JSON_GET_INT(wurzel, rp + ".pointsTeam1")
+            toreGast = JSON_GET_INT(wurzel, rp + ".pointsTeam2")
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Einfache Anfuehrungszeichen schreiben sich leichter -- JSON braucht
+' doppelte, also einmal tauschen.
+FUNCTION alsJson(s AS STRING) AS STRING
+    RETURN REPLACE$(s, "'", CHR$(34))
+END FUNCTION
+
+DIM roh AS STRING
+roh = "[" + _
+      "{'matchIsFinished': true, 'matchResults': [" + _
+      "  {'resultTypeID': 1, 'pointsTeam1': 0, 'pointsTeam2': 2}," + _
+      "  {'resultTypeID': 2, 'pointsTeam1': 2, 'pointsTeam2': 3}]}," + _
+      "{'matchIsFinished': false, 'matchResults': [" + _
+      "  {'resultTypeID': 1, 'pointsTeam1': 1, 'pointsTeam2': 0}]}," + _
+      "{'matchIsFinished': true, 'matchResults': []}," + _
+      "{'matchIsFinished': true, 'matchResults': [" + _
+      "  {'resultTypeID': 2, 'pointsTeam1': 0, 'pointsTeam2': 0}," + _
+      "  {'resultTypeID': 1, 'pointsTeam1': 0, 'pointsTeam2': 0}]}" + _
+      "]"
+DIM antwort AS JSON_HANDLE
+antwort = JSON_PARSE(alsJson(roh))
+
+DIM h AS INTEGER : h = -1
+DIM g AS INTEGER : g = -1
+pruefeJa("abgepfiffenes Spiel hat ein Ergebnis", endergebnis(antwort, "0", h, g), TRUE)
+pruefe("  und zwar das Endergebnis, nicht die Halbzeit (Heim)", h, 2)
+pruefe("  Gast", g, 3)
+
+h = -1 : g = -1
+pruefeJa("laufendes Spiel gibt keins her", endergebnis(antwort, "1", h, g), FALSE)
+pruefe("  und ruehrt die Werte nicht an", h, -1)
+
+pruefeJa("abgepfiffen, aber ohne Eintrag", endergebnis(antwort, "2", h, g), FALSE)
+
+' Die Reihenfolge in der Antwort ist nichts, worauf man sich stuetzen darf.
+h = -1 : g = -1
+pruefeJa("Endergebnis zuerst wird auch gefunden", endergebnis(antwort, "3", h, g), TRUE)
+pruefe("  0:0 ist ein Ergebnis, kein fehlendes", h + g, 0)
+
+' Und die Probe aufs Ganze: der Halbzeitstand haette 1 Punkt gegeben, das
+' Endergebnis gibt 3. Genau daran faellt der Fehler NICHT auf.
+pruefe("exakter Tipp auf 2:3 gibt 3", punkte(2, 3, 2, 3), 3)
+pruefe("Tipp auf den Halbzeitstand 0:2 gaebe nur 1", punkte(0, 2, 2, 3), 1)
 
 DB_CLOSE(db)
 

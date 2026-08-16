@@ -13,8 +13,10 @@
 '    * Spieltag waehlen  -> die Liste zeigt die Spiele dieses Spieltags
 '    * Zeile anklicken   -> Tipp der Zeile kommt in die Felder
 '    * Tipp speichern    -> schreibt in die Datenbank (INSERT/UPDATE)
-'    * Ergebnis eintragen-> traegt das Ergebnis der gewaehlten Zeile
-'                           ein und rechnet die Punkte neu
+'    * Aktualisieren     -> holt Spielplan UND Ergebnisse der ganzen
+'                           Saison und rechnet alle Punkte neu
+'    * Ergebnis eintragen-> von Hand, fuer das, was die Liga (noch)
+'                           nicht meldet; rechnet die Punkte des Spiels neu
 '    * Rangliste         -> zweiter Reiter, ueber alle Spieltage
 '    [ESC] Ende
 '
@@ -156,6 +158,17 @@ SUB spielAnlegen(spieltag AS INTEGER, heim AS STRING, gast AS STRING, anstoss AS
                 "  anstoss = excluded.anstoss", spieltag, heim, gast, anstoss)
 END SUB
 
+' Das Ergebnis eines abgerufenen Spiels eintragen. Angesprochen wird es ueber
+' denselben Schluessel wie beim Anlegen -- die Zeile gibt es an dieser Stelle
+' schon. Ein von Hand eingetragenes Ergebnis wird dabei ueberschrieben: was
+' die Liga meldet, gilt.
+SUB ergebnisSetzen(spieltag AS INTEGER, heim AS STRING, gast AS STRING, _
+                   toreHeim AS INTEGER, toreGast AS INTEGER)
+    DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? " + _
+                "WHERE spieltag = ? AND heim = ? AND gast = ?", _
+            toreHeim, toreGast, spieltag, heim, gast)
+END SUB
+
 db = DB_OPEN(DATEI)
 anlegen()
 grunddaten()
@@ -226,9 +239,10 @@ GUI_TABLE_COL_ALIGN(tabelle, 3, "mitte")
 GUI_TABLE_COL_ALIGN(tabelle, 4, "mitte")
 GUI_TABLE_COL_ALIGN(tabelle, 5, "mitte")
 
-' Spielplan holen -- laeuft im Hintergrund, das Fenster bleibt bedienbar.
+' Spielplan und Ergebnisse holen -- laeuft im Hintergrund, das Fenster
+' bleibt bedienbar.
 DIM bHolen AS GUI_WIDGET
-bHolen = GUI_BUTTON(win, "Spielplan holen", 790, 46, 150, 26)
+bHolen = GUI_BUTTON(win, "Aktualisieren", 790, 46, 150, 26)
 GUI_SET_TAB(bHolen, 0)
 
 DIM lblTipp AS GUI_WIDGET
@@ -522,6 +536,41 @@ SUB punkteNeu(spiel AS INTEGER, ergH AS INTEGER, ergA AS INTEGER)
     DB_COMMIT(db)
 END SUB
 
+' Punkte ALLER gewerteten Tipps neu rechnen -- nach einem Ergebnis-Import.
+'
+' Warum alles statt nur der geaenderten Spiele? Nach einem Abruf ist nicht
+' abzusehen, welche Ergebnisse dazukamen und welche berichtigt wurden. Die
+' Regel einmal ueber alles laufen zu lassen ist bei dieser Datenmenge
+' billiger als Buch darueber zu fuehren -- und es kann nichts stehenbleiben.
+'
+' Die Listen wachsen mit (ARRAY OF INTEGER + ARRAY_PUSH) statt fester
+' Groesse: wie viele Tipps zusammenkommen, haengt an der Zahl der Mitspieler.
+SUB punkteAlleNeu()
+    DIM ids AS ARRAY OF INTEGER
+    DIM werte AS ARRAY OF INTEGER
+    ids = []
+    werte = []
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT t.id, t.tipp_heim, t.tipp_gast, " + _
+                     "       s.tore_heim, s.tore_gast " + _
+                     "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+                     "WHERE s.tore_heim IS NOT NULL")
+    WHILE DB_NEXT(r)
+        ARRAY_PUSH(ids, DB_GET_INT(r, 0))
+        ARRAY_PUSH(werte, punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), _
+                                 DB_GET_INT(r, 3), DB_GET_INT(r, 4)))
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    DB_BEGIN(db)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ids) - 1
+        DB_EXEC(db, "UPDATE tipps SET punkte = ? WHERE id = ?", werte[i], ids[i])
+    NEXT
+    DB_COMMIT(db)
+END SUB
+
 ' ---- Spielplan aus dem Netz ----------------------------------------------
 ' Der Abruf laeuft im Hintergrund: HTTP_GET_START gibt sofort eine Nummer
 ' zurueck, die Schleife fragt jedes Bild einmal nach. Mit HTTP_GET stuende
@@ -531,14 +580,42 @@ DIM abruf AS INTEGER : abruf = -1
 
 SUB spielplanHolen()
     IF abruf >= 0 THEN
-        melde("Der Spielplan wird schon geholt.")
+        melde("Es wird schon geholt.")
         RETURN
     END IF
     abruf = HTTP_GET_START(SPIELPLAN_URL)
-    melde("Spielplan wird geholt ...")
+    melde("Spielplan und Ergebnisse werden geholt ...")
 END SUB
 
-' Aus der Antwort die Paarungen und Anstosszeiten uebernehmen.
+' Das ENDERGEBNIS eines Spiels aus der Antwort holen -- nicht das erstbeste.
+'
+' Hier liegt die Falle: matchResults hat zwei Eintraege, und der ERSTE ist
+' das Halbzeitergebnis. Gladbach gegen Leverkusen stand zur Pause 0:2 und
+' endete 2:3. Wer matchResults.0 nimmt, wertet die ganze Saison falsch aus,
+' und zwar plausibel falsch -- es stehen ja Zahlen da.
+' Woran man das Endergebnis erkennt: resultTypeID = 2 (1 ist die Halbzeit).
+'
+' Gewertet wird nur, was abgepfiffen ist. Ein laufendes Spiel hat schon ein
+' matchResults, aber noch kein Ergebnis.
+FUNCTION endergebnis(wurzel AS JSON_HANDLE, pfad AS STRING, _
+                     BYREF toreHeim AS INTEGER, BYREF toreGast AS INTEGER) AS BOOLEAN
+    IF NOT JSON_HAS(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+    IF NOT JSON_GET_BOOL(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+
+    DIM n AS INTEGER : n = JSON_LEN(wurzel, pfad + ".matchResults")
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM rp AS STRING : rp = pfad + ".matchResults." + STR$(k)
+        IF JSON_GET_INT(wurzel, rp + ".resultTypeID") = 2 THEN
+            toreHeim = JSON_GET_INT(wurzel, rp + ".pointsTeam1")
+            toreGast = JSON_GET_INT(wurzel, rp + ".pointsTeam2")
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Aus der Antwort die Paarungen, Anstosszeiten und Ergebnisse uebernehmen.
 SUB spielplanUebernehmen(text AS STRING)
     DIM wurzel AS JSON_HANDLE
     wurzel = JSON_PARSE(text)
@@ -547,6 +624,12 @@ SUB spielplanUebernehmen(text AS STRING)
         melde("Der Spielplan kam leer zurueck.")
         RETURN
     END IF
+
+    ' Wie viele Spiele hatten VORHER ein Ergebnis? Die Differenz danach sagt,
+    ' wie viele dazugekommen sind -- billiger als jedes Spiel einzeln zu
+    ' vergleichen, und fuer die Meldung ist es genau die richtige Zahl.
+    DIM ergVorher AS INTEGER
+    ergVorher = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL")
 
     DB_BEGIN(db)
     DIM i AS INTEGER
@@ -573,20 +656,41 @@ SUB spielplanUebernehmen(text AS STRING)
             uebernommen = uebernommen + 1
             IF tag < tageMin THEN tageMin = tag
             IF tag > tageMax THEN tageMax = tag
+
+            ' Ist das Spiel gelaufen, kommt das Ergebnis gleich mit -- es
+            ' steht in derselben Antwort. Ein zweiter Abruf dafuer waere
+            ' derselbe Abruf.
+            DIM eh AS INTEGER : eh = 0
+            DIM ea AS INTEGER : ea = 0
+            IF endergebnis(wurzel, pfad, eh, ea) THEN
+                ergebnisSetzen(tag, heim, gast, eh, ea)
+            END IF
         END IF
     NEXT
     DB_COMMIT(db)
+
+    ' Erst nach dem COMMIT: punkteAlleNeu fuehrt seine eigene Transaktion,
+    ' und Transaktionen lassen sich nicht schachteln.
+    punkteAlleNeu()
+
+    DIM neueErg AS INTEGER
+    neueErg = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL") - ergVorher
 
     ' Nach einem frischen Spielplan dorthin springen, wo die Arbeit ansteht.
     IF uebernommen > 0 THEN GUI_SET_VALUE(tagWahl, spieltagVorschlag())
     spieleLaden()
     ranglisteLaden()
+
+    DIM meldung AS STRING : meldung = STR$(uebernommen) + " Spiele"
     IF tageMax > tageMin THEN
-        melde(STR$(uebernommen) + " Spiele uebernommen, Spieltag " + _
-              STR$(tageMin) + " bis " + STR$(tageMax) + ".")
-    ELSE
-        melde(STR$(uebernommen) + " Spiele uebernommen.")
+        meldung = meldung + ", Spieltag " + STR$(tageMin) + " bis " + STR$(tageMax)
     END IF
+    IF neueErg = 1 THEN
+        meldung = meldung + ", 1 neues Ergebnis"
+    ELIF neueErg > 1 THEN
+        meldung = meldung + ", " + STR$(neueErg) + " neue Ergebnisse"
+    END IF
+    melde(meldung + ".")
 END SUB
 
 ' Einmal pro Bild nachsehen -- nicht warten.
