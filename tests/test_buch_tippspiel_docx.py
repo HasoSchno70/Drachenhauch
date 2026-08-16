@@ -12,6 +12,7 @@ gehoert nicht in einen Testlauf.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -68,8 +69,13 @@ def test_kein_kapitel_ohne_ueberschrift_im_verzeichnis():
 @pytest.mark.skipif(shutil.which("node") is None, reason="Node nicht installiert")
 @pytest.mark.skipif(not (_BUCH / "node_modules" / "docx").exists(),
                     reason="docx nicht installiert (npm install in buch-tippspiel/buch)")
-def test_build_laeuft_durch():
-    r = subprocess.run(["node", "build_book.js"], cwd=_BUCH,
+def test_build_laeuft_durch(tmp_path):
+    # BUCH_ZIEL_DIR lenkt die Ausgabe ins Temp-Verzeichnis. Ohne das schreibt
+    # der Build das eingecheckte .docx neu -- inhaltlich gleich, aber mit
+    # frischen ZIP-Zeitstempeln, und git meldet es nach jedem Testlauf als
+    # geaendert, obwohl niemand das Buch angefasst hat.
+    umgebung = {**os.environ, "BUCH_ZIEL_DIR": str(tmp_path)}
+    r = subprocess.run(["node", "build_book.js"], cwd=_BUCH, env=umgebung,
                        capture_output=True, timeout=300)
     aus = (r.stdout + r.stderr).decode("utf-8", "replace")
     assert r.returncode == 0, aus
@@ -77,4 +83,4 @@ def test_build_laeuft_durch():
     # Der Build meldet fehlende Bilder als Warnung, statt abzubrechen --
     # hier ist sie ein Fehler.
     assert "Bild fehlt" not in aus, aus
-    assert (_BUCH / "Drachenhauch-Tippspiel.docx").exists()
+    assert (tmp_path / "Drachenhauch-Tippspiel.docx").exists()

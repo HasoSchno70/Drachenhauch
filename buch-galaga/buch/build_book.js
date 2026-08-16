@@ -1,5 +1,6 @@
 // Baut die Einleitung des Drachenhauch-Galaga-Buchs als farbiges, druckbares .docx.
 // Aufruf:  node build_book.js   ->  Drachenhauch-Buch.docx
+// Mit BUCH_ZIEL_DIR=<pfad> landen .docx und toc_titles.json dort statt hier.
 const fs = require("fs");
 const path = require("path");
 const {
@@ -10,6 +11,15 @@ const {
 } = require("docx");
 
 const IMG = path.join(__dirname, "images");
+
+// Wohin geschrieben wird: normalerweise der Buch-Ordner selbst. Ein Testlauf
+// setzt BUCH_ZIEL_DIR auf ein temporaeres Verzeichnis und fasst das
+// eingecheckte .docx damit nicht an -- der Inhalt waere gleich, aber die
+// ZIP-Zeitstempel darin sind neu, und git meldet die Datei danach als geaendert.
+const AUS = process.env.BUCH_ZIEL_DIR
+  ? path.resolve(process.env.BUCH_ZIEL_DIR)
+  : __dirname;
+fs.mkdirSync(AUS, { recursive: true });
 
 // --- Farbpalette ---
 const C_TITLE  = "1B6CA8";   // Blau (Titel/H1)
@@ -1526,7 +1536,7 @@ children.push(new Paragraph({
 let tocPages = {};
 try { tocPages = JSON.parse(fs.readFileSync(path.join(__dirname, "toc_pages.json"), "utf8")); } catch (e) {}
 // Titel in Lese-Reihenfolge fuer den Mess-Schritt (make_book.py) ablegen:
-fs.writeFileSync(path.join(__dirname, "toc_titles.json"),
+fs.writeFileSync(path.join(AUS, "toc_titles.json"),
   JSON.stringify(tocEntries.map(e => e.title), null, 2));
 
 const tocBlock = [
@@ -1585,6 +1595,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buf => {
-  fs.writeFileSync(path.join(__dirname, "Drachenhauch-Buch.docx"), buf);
+  fs.writeFileSync(path.join(AUS, "Drachenhauch-Buch.docx"), buf);
   console.log("OK -> Drachenhauch-Buch.docx");
 });

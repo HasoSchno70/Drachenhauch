@@ -1,5 +1,6 @@
 // Baut das Drachenhauch-Tippspiel-Buch als farbiges, druckbares .docx.
 // Aufruf:  node build_book.js   ->  Drachenhauch-Tippspiel.docx
+// Mit BUCH_ZIEL_DIR=<pfad> landen .docx und toc_titles.json dort statt hier.
 //
 // Aufbau wie beim Galaga-Buch (buch-galaga/buch/build_book.js): dieselben
 // Bausteine, dieselbe Farbwelt -- damit beide Baende zusammen im Regal stehen
@@ -14,6 +15,15 @@ const {
 } = require("docx");
 
 const IMG = path.join(__dirname, "images");
+
+// Wohin geschrieben wird: normalerweise der Buch-Ordner selbst. Der Test setzt
+// BUCH_ZIEL_DIR auf ein temporaeres Verzeichnis, damit ein Testlauf das
+// eingecheckte .docx nicht anfasst -- der Inhalt waere gleich, aber die
+// ZIP-Zeitstempel darin sind neu, und git meldet die Datei danach als geaendert.
+const AUS = process.env.BUCH_ZIEL_DIR
+  ? path.resolve(process.env.BUCH_ZIEL_DIR)
+  : __dirname;
+fs.mkdirSync(AUS, { recursive: true });
 
 // --- Farbpalette (wie im Galaga-Band) ---
 const C_TITLE  = "1B6CA8";   // Blau (Titel/H1)
@@ -1147,7 +1157,7 @@ toc.push(new Paragraph({ children: [new PageBreak()] }));
 children.splice(TOC_INSERT_AT, 0, ...toc);
 
 // Titelliste fuer den Zwei-Pass-Build mitschreiben.
-fs.writeFileSync(path.join(__dirname, "toc_titles.json"),
+fs.writeFileSync(path.join(AUS, "toc_titles.json"),
   JSON.stringify(tocEntries.map(e => e.title), null, 2), "utf8");
 
 // ===================== Dokument =====================
@@ -1198,7 +1208,7 @@ const doc = new Document({
   }],
 });
 
-const ZIEL = path.join(__dirname, "Drachenhauch-Tippspiel.docx");
+const ZIEL = path.join(AUS, "Drachenhauch-Tippspiel.docx");
 Packer.toBuffer(doc).then(buf => {
   fs.writeFileSync(ZIEL, buf);
   const kb = Math.round(buf.length / 1024);
