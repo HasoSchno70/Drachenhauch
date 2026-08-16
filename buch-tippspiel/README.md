@@ -17,28 +17,37 @@ Das fertige Buch liegt als Word-Dokument bereit — 31 Seiten, farbig, druckbar:
 Vorwort, Einleitung und alle 13 Kapitel mit Quelltext, Screenshots und
 Erklärkästen. Wie man es neu erzeugt, steht in [`buch/README.md`](buch/README.md).
 
-## Zwei Wege hinein
+## Der Zielstand des Buchs
 
-**Der Schnitt.** [`code/tippspiel.dh`](code/tippspiel.dh) ist der senkrechte
-Schnitt durch die Anwendung: von der Datenbank bis zum Fenster jede Schicht
-einmal, klein gehalten. Er ist in einem Stück lesbar und zeigt in einer
-Viertelstunde, worum es geht:
-
-```
-dhrun.py buch-tippspiel/code/tippspiel.dh
-```
-
-**Der Zielstand.** Das fertige Programm ist der Stand von Kapitel 12,
-[`code/kap12/politur.dh`](code/kap12) — dasselbe Programm, aber mit allem, was
-die Kapitel unterwegs dazugeben: Anstoßzeiten und Tippschluss, Spielplan aus
-dem Netz, Sicherung und Einspielen, drei Reiter mit Punktediagramm:
+Das fertige Programm des Buchs ist der Stand von Kapitel 12,
+[`code/kap12/politur.dh`](code/kap12) — mit allem, was die Kapitel unterwegs
+dazugeben: Anstoßzeiten und Tippschluss, Spielplan aus dem Netz, Sicherung und
+Einspielen, drei Reiter mit Punktediagramm:
 
 ```
 dhrun.py buch-tippspiel/code/kap12/politur.dh
 ```
 
-Beide legen ihre Datenbank beim ersten Start selbst an (drei Spieler, fünf
-Spiele des 1. Spieltags). **[ESC]** beendet.
+Es legt seine Datenbank beim ersten Start selbst an (drei Spieler, fünf Spiele
+des 1. Spieltags). **[ESC]** beendet.
+
+## Die Anwendung
+
+[`code/tippspiel.dh`](code/tippspiel.dh) ist kein Kapitel, sondern das
+Programm selbst. Es beginnt als senkrechter Schnitt — von der Datenbank bis
+zum Fenster jede Schicht einmal, in einem Stück lesbar — und **wächst über das
+Buch hinaus**. Die Kapitelstände tun das nicht: sie sind gedruckt, samt
+Screenshots, und bleiben stehen.
+
+```
+dhrun.py buch-tippspiel/code/tippspiel.dh
+```
+
+Was es über Kapitel 12 hinaus kann:
+
+| Seit | Was dazukam |
+|---|---|
+| 16.08.2026 | **Alle 34 Spieltage** statt nur des ersten. Spieltagswahl im Kopf der Liste, „x von 9 getippt" daneben; beim Start steht der Spieltag mit dem nächsten Anpfiff da. „Spielplan holen" holt die **ganze Saison** in einem Abruf (306 Spiele, ~250 ms) — welcher Spieltag ein Spiel ist, sagt die Antwort selbst. |
 
 ## Aufbau (13 Kapitel)
 
@@ -97,7 +106,7 @@ trauen.
 
 | Datei | Was es prüft |
 |---|---|
-| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel und Rangliste — 13 Prüfungen, ohne Fenster |
+| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste und die Spieltage — 23 Prüfungen, ohne Fenster |
 | [`code/zeit_pruefung.dh`](code/zeit_pruefung.dh) | Die Datumsrechnungen: Tippschluss, Countdown, Schaltjahre |
 | [`code/abruf_pruefung.dh`](code/abruf_pruefung.dh) | Blockierender gegen nebenläufigen Abruf, mit gemessenen Zahlen |
 | [`code/stolpersteine.dh`](code/stolpersteine.dh) | Messprotokoll: wo Drachenhauch für so eine Anwendung an Grenzen stößt |
