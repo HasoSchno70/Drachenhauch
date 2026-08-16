@@ -10,11 +10,11 @@
 '  weggelassen, was eine echte Anwendung braucht.
 '
 '  Bedienung:
-'    * Spieltag waehlen  -> die Liste zeigt die Spiele dieses Spieltags
+'    * Liga und Spieltag -> die Liste zeigt die Spiele dieses Spieltags
 '    * Zeile anklicken   -> Tipp der Zeile kommt in die Felder
 '    * Tipp speichern    -> schreibt in die Datenbank (INSERT/UPDATE)
-'    * Aktualisieren     -> holt Spielplan UND Ergebnisse der ganzen
-'                           Saison und rechnet alle Punkte neu
+'    * Aktualisieren     -> holt Spielplan UND Ergebnisse beider Ligen
+'                           fuer die ganze Saison, rechnet alle Punkte neu
 '    * Ergebnis eintragen-> von Hand, fuer das, was die Liga (noch)
 '                           nicht meldet; rechnet die Punkte des Spiels neu
 '    * Rangliste         -> zweiter Reiter, ueber alle Spieltage
@@ -32,13 +32,21 @@ CONST DATEI = "tippspiel.db"
 
 ' Getippt wird bis eine Viertelstunde vor Anpfiff.
 CONST TIPPSCHLUSS_VOR = 15 * 60
-' Woher der Spielplan kommt, wenn man ihn holt: die GANZE Saison in einem
-' Abruf. 306 Spiele, 246 KB, keine 200 ms -- 34 einzelne Abrufe waeren
-' langsamer und koennten mittendrin abbrechen. Welcher Spieltag ein Spiel
-' ist, steht in der Antwort (group.groupOrderID).
-CONST SPIELPLAN_URL = "https://api.openligadb.de/getmatchdata/bl1/2026"
-' Eine Bundesliga-Saison hat 34 Spieltage.
+' Woher der Spielplan kommt, wenn man ihn holt: je Liga die GANZE Saison in
+' einem Abruf. 306 Spiele, 246 KB, keine 200 ms -- 34 einzelne Abrufe waeren
+' langsamer und koennten mittendrin abbrechen. Welcher Spieltag und welche
+' Liga ein Spiel ist, steht in der Antwort (group.groupOrderID,
+' leagueShortcut) -- die URL muss man dafuer nicht zurueckrechnen.
+CONST API = "https://api.openligadb.de/getmatchdata/"
+CONST SAISON = "2026"
+' Beide Bundesligen haben 18 Vereine und damit 34 Spieltage.
 CONST MAX_SPIELTAG = 34
+' Die Kuerzel sind die der API und stehen so auch in der Datenbank.
+CONST LIGEN = 2
+DIM ligaKuerzel[LIGEN] AS STRING
+DIM ligaName[LIGEN] AS STRING
+ligaKuerzel[0] = "bl1" : ligaName[0] = "1. Bundesliga"
+ligaKuerzel[1] = "bl2" : ligaName[1] = "2. Bundesliga"
 
 ' ---- Punkteregel ---------------------------------------------------------
 ' Die einzige Stelle, an der die Regel steht. Alles andere fragt hier nach.
@@ -82,7 +90,9 @@ SUB anlegen()
     ' anstoss steht als "JJJJ-MM-TT hh:mm:ss" da: so sortiert SQLite es als
     ' Text richtig, und ZEIT_PARSE macht daraus eine Zahl zum Rechnen.
     DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spiele (" + _
-                "id INTEGER PRIMARY KEY, spieltag INTEGER NOT NULL, " + _
+                "id INTEGER PRIMARY KEY, " + _
+                "liga TEXT NOT NULL DEFAULT 'bl1', " + _
+                "spieltag INTEGER NOT NULL, " + _
                 "heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
                 "anstoss TEXT, " + _
                 "tore_heim INTEGER, tore_gast INTEGER)")
@@ -91,11 +101,23 @@ SUB anlegen()
     IF NOT spalteDa("spiele", "anstoss") THEN
         DB_EXEC(db, "ALTER TABLE spiele ADD COLUMN anstoss TEXT")
     END IF
-    ' Dieselbe Paarung am selben Spieltag gibt es nur einmal. Als Index,
-    ' nicht als Tabellen-Bedingung: so gilt die Regel auch fuer Datenbanken,
-    ' die es schon vorher gab.
+    ' Dasselbe fuer die Liga. Der Vorgabewert fuellt die vorhandenen Zeilen
+    ' gleich mit auf -- bis hierher gab es nur die 1. Bundesliga, also ist
+    ' 'bl1' fuer sie nicht geraten, sondern richtig.
+    IF NOT spalteDa("spiele", "liga") THEN
+        DB_EXEC(db, "ALTER TABLE spiele ADD COLUMN liga TEXT NOT NULL DEFAULT 'bl1'")
+        ' Der alte Index ohne Liga muss weg -- der neue kommt gleich darunter.
+        DB_EXEC(db, "DROP INDEX IF EXISTS idx_spiel")
+    END IF
+    ' Ein Spiel ist eindeutig durch Liga, Spieltag und die beiden Vereine.
+    ' Die Liga muss mit in den Index, auch wenn dieselbe Paarung in beiden
+    ' Ligen praktisch nie vorkommt (ein Verein spielt in genau einer): das
+    ' UPSERT beim Abruf sagt ON CONFLICT(liga, spieltag, heim, gast), und
+    ' dafuer muss es einen Index ueber genau diese vier Spalten geben.
+    ' Als Index, nicht als Tabellen-Bedingung -- so gilt die Regel auch fuer
+    ' Datenbanken, die es schon vorher gab.
     DB_EXEC(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_spiel " + _
-                "ON spiele (spieltag, heim, gast)")
+                "ON spiele (liga, spieltag, heim, gast)")
     DB_EXEC(db, "CREATE TABLE IF NOT EXISTS tipps (" + _
                 "id INTEGER PRIMARY KEY, spieler_id INTEGER NOT NULL, " + _
                 "spiel_id INTEGER NOT NULL, tipp_heim INTEGER NOT NULL, " + _
@@ -141,11 +163,14 @@ SUB grunddaten()
     ' der halbe Schluessel (spieltag, heim, gast): "Bor. Mönchengladbach" und
     ' "Borussia Mönchengladbach" sind fuer die Datenbank zwei Vereine, und
     ' der 1. Spieltag haette nach dem ersten Abruf zehn Spiele statt neun.
-    terminVorgabe("FC Bayern München", "VfB Stuttgart", "2026-08-28 20:30:00")
-    terminVorgabe("Borussia Dortmund", "Hamburger SV", "2026-08-29 18:30:00")
-    terminVorgabe("RB Leipzig", "Borussia Mönchengladbach", "2026-08-29 15:30:00")
-    terminVorgabe("SC Freiburg", "SV Werder Bremen", "2026-08-30 15:30:00")
-    terminVorgabe("1. FC Köln", "TSG Hoffenheim", "2026-08-29 15:30:00")
+    terminVorgabe("bl1", "FC Bayern München", "VfB Stuttgart", "2026-08-28 20:30:00")
+    terminVorgabe("bl1", "Borussia Dortmund", "Hamburger SV", "2026-08-29 18:30:00")
+    terminVorgabe("bl1", "RB Leipzig", "Borussia Mönchengladbach", "2026-08-29 15:30:00")
+    terminVorgabe("bl1", "SC Freiburg", "SV Werder Bremen", "2026-08-30 15:30:00")
+    terminVorgabe("bl1", "1. FC Köln", "TSG Hoffenheim", "2026-08-29 15:30:00")
+    terminVorgabe("bl2", "VfL Bochum", "Hertha BSC", "2026-08-07 20:30:00")
+    terminVorgabe("bl2", "VfL Wolfsburg", "1. FC Kaiserslautern", "2026-08-08 20:30:00")
+    terminVorgabe("bl2", "FC St. Pauli", "SpVgg Greuther Fürth", "2026-08-09 13:30:00")
 
     ' Eine Tippgemeinschaft zum Anschauen -- nicht alle sind drin, sonst
     ' waere sie von der Gesamtwertung nicht zu unterscheiden.
@@ -160,33 +185,34 @@ END SUB
 
 ' Wie spielAnlegen, aber zurueckhaltend: ein vorhandener Termin bleibt
 ' stehen. COALESCE nimmt den alten Wert, wenn es einen gibt.
-SUB terminVorgabe(heim AS STRING, gast AS STRING, anstoss AS STRING)
-    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast, anstoss) " + _
-                "VALUES (1, ?, ?, ?) " + _
-                "ON CONFLICT(spieltag, heim, gast) DO UPDATE SET " + _
+SUB terminVorgabe(liga AS STRING, heim AS STRING, gast AS STRING, anstoss AS STRING)
+    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
+                "VALUES (?, 1, ?, ?, ?) " + _
+                "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
                 "  anstoss = COALESCE(spiele.anstoss, excluded.anstoss)", _
-            heim, gast, anstoss)
+            liga, heim, gast, anstoss)
 END SUB
 
 ' Ein Spiel anlegen oder seinen Anstoss auffrischen. Dieselbe Paarung am
 ' selben Spieltag gibt es nur einmal (UNIQUE) -- ein zweiter Abruf des
 ' Spielplans legt also keine Dubletten an.
-SUB spielAnlegen(spieltag AS INTEGER, heim AS STRING, gast AS STRING, anstoss AS STRING)
-    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast, anstoss) " + _
-                "VALUES (?, ?, ?, ?) " + _
-                "ON CONFLICT(spieltag, heim, gast) DO UPDATE SET " + _
-                "  anstoss = excluded.anstoss", spieltag, heim, gast, anstoss)
+SUB spielAnlegen(liga AS STRING, spieltag AS INTEGER, _
+                 heim AS STRING, gast AS STRING, anstoss AS STRING)
+    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
+                "VALUES (?, ?, ?, ?, ?) " + _
+                "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
+                "  anstoss = excluded.anstoss", liga, spieltag, heim, gast, anstoss)
 END SUB
 
 ' Das Ergebnis eines abgerufenen Spiels eintragen. Angesprochen wird es ueber
 ' denselben Schluessel wie beim Anlegen -- die Zeile gibt es an dieser Stelle
 ' schon. Ein von Hand eingetragenes Ergebnis wird dabei ueberschrieben: was
 ' die Liga meldet, gilt.
-SUB ergebnisSetzen(spieltag AS INTEGER, heim AS STRING, gast AS STRING, _
+SUB ergebnisSetzen(liga AS STRING, spieltag AS INTEGER, heim AS STRING, gast AS STRING, _
                    toreHeim AS INTEGER, toreGast AS INTEGER)
     DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? " + _
-                "WHERE spieltag = ? AND heim = ? AND gast = ?", _
-            toreHeim, toreGast, spieltag, heim, gast)
+                "WHERE liga = ? AND spieltag = ? AND heim = ? AND gast = ?", _
+            toreHeim, toreGast, liga, spieltag, heim, gast)
 END SUB
 
 db = DB_OPEN(DATEI)
@@ -224,23 +250,32 @@ GUI_SET_TAB(lblSpieler, 0)
 DIM spielerWahl AS GUI_WIDGET
 ' Die Auswahl startet leer -- die Namen kommen gleich per GUI_SET_DROPDOWN
 ' aus der Datenbank.
-spielerWahl = GUI_DROPDOWN(win, 90, 46, 200, 26, [])
+spielerWahl = GUI_DROPDOWN(win, 82, 46, 170, 26, [])
 GUI_SET_TAB(spielerWahl, 0)
 
+DIM lblLiga AS GUI_WIDGET
+lblLiga = GUI_LABEL(win, "Liga:", 266, 50)
+GUI_SET_TAB(lblLiga, 0)
+
+DIM ligaWahl AS GUI_WIDGET
+ligaWahl = GUI_DROPDOWN(win, 306, 46, 150, 26, [])
+GUI_SET_TAB(ligaWahl, 0)
+
 DIM lblTag AS GUI_WIDGET
-lblTag = GUI_LABEL(win, "Spieltag:", 320, 50)
+lblTag = GUI_LABEL(win, "Spieltag:", 470, 50)
 GUI_SET_TAB(lblTag, 0)
 
 ' Ein Spinner statt einer Liste mit 34 Eintraegen: man geht meist zum
 ' naechsten oder zum vorigen Spieltag, und beides ist ein Klick.
 DIM tagWahl AS GUI_WIDGET
-tagWahl = GUI_SPINNER(win, 390, 46, 90, 1, MAX_SPIELTAG, 1, 1)
+tagWahl = GUI_SPINNER(win, 540, 46, 84, 1, MAX_SPIELTAG, 1, 1)
 GUI_SET_TAB(tagWahl, 0)
 
-' Bei 34 Spieltagen ist die wichtigste Frage nicht "welche Spiele", sondern
-' "wo fehlt noch ein Tipp?". Deshalb steht die Ausbeute gleich daneben.
+' Bei 34 Spieltagen in zwei Ligen ist die wichtigste Frage nicht "welche
+' Spiele", sondern "wo fehlt noch ein Tipp?". Deshalb steht die Ausbeute
+' gleich daneben.
 DIM lblGetippt AS GUI_WIDGET
-lblGetippt = GUI_LABEL(win, "", 496, 50)
+lblGetippt = GUI_LABEL(win, "", 638, 50)
 GUI_SET_TAB(lblGetippt, 0)
 
 DIM tabelle AS GUI_WIDGET
@@ -459,22 +494,38 @@ FUNCTION aktiverSpieltag() AS INTEGER
     RETURN INT(GUI_VALUE(tagWahl))
 END FUNCTION
 
+' Das Kuerzel der gewaehlten Liga -- 'bl1' oder 'bl2'. Es ist dasselbe, das
+' die API benutzt und das in der Datenbank steht: eine Schreibweise, keine
+' Umrechnungstabelle.
+FUNCTION aktiveLiga() AS STRING
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(ligaWahl)
+    IF i < 0 OR i >= LIGEN THEN RETURN ligaKuerzel[0]
+    RETURN ligaKuerzel[i]
+END FUNCTION
+
 ' Auf welchen Spieltag schaut man beim Start? Auf den, in dem das naechste
 ' Spiel liegt, das noch nicht angepfiffen ist -- dort steht die Arbeit an.
 ' Ist die Saison durch, bleibt der letzte stehen.
 '
 ' Der Vergleich laeuft als Text: anstoss steht als "JJJJ-MM-TT hh:mm:ss"
 ' in der Datenbank, und in dieser Schreibweise sortiert Text wie Zeit.
+' Jede Liga hat ihren eigenen Spielplan -- gefragt ist der Spieltag der
+' Liga, die gerade gewaehlt ist.
 FUNCTION spieltagVorschlag() AS INTEGER
     DIM r AS DB_RESULT
     r = DB_QUERY(db, "SELECT spieltag FROM spiele " + _
-                     "WHERE anstoss IS NOT NULL AND anstoss >= ? " + _
-                     "ORDER BY anstoss LIMIT 1", ZEIT_TEXT$(ZEIT_JETZT()))
+                     "WHERE liga = ? AND anstoss IS NOT NULL AND anstoss >= ? " + _
+                     "ORDER BY anstoss LIMIT 1", aktiveLiga(), ZEIT_TEXT$(ZEIT_JETZT()))
     DIM tag AS INTEGER : tag = 0
     IF DB_NEXT(r) THEN tag = DB_GET_INT(r, 0)
     DB_CLOSE_RESULT(r)
 
-    IF tag = 0 THEN tag = anzahl("SELECT COALESCE(MAX(spieltag), 1) FROM spiele")
+    IF tag = 0 THEN
+        r = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele WHERE liga = ?", _
+                     aktiveLiga())
+        IF DB_NEXT(r) THEN tag = DB_GET_INT(r, 0)
+        DB_CLOSE_RESULT(r)
+    END IF
     IF tag < 1 THEN RETURN 1
     IF tag > MAX_SPIELTAG THEN RETURN MAX_SPIELTAG
     RETURN tag
@@ -514,8 +565,9 @@ SUB spieleLaden()
                      "       t.tipp_heim, t.tipp_gast, t.punkte, s.anstoss " + _
                      "FROM spiele s " + _
                      "LEFT JOIN tipps t ON t.spiel_id = s.id AND t.spieler_id = ? " + _
-                     "WHERE s.spieltag = ? ORDER BY s.anstoss, s.id", _
-                 aktiverSpieler(), aktiverSpieltag())
+                     "WHERE s.liga = ? AND s.spieltag = ? " + _
+                     "ORDER BY s.anstoss, s.id", _
+                 aktiverSpieler(), aktiveLiga(), aktiverSpieltag())
 
     WHILE DB_NEXT(r)
         IF spieleAnzahl >= MAXSPIELE THEN BREAK
@@ -782,15 +834,46 @@ END SUB
 ' zurueck, die Schleife fragt jedes Bild einmal nach. Mit HTTP_GET stuende
 ' das Fenster stattdessen eine Fuenftelsekunde still -- bei schlechter
 ' Verbindung bis zu zehn Sekunden.
-DIM abruf AS INTEGER : abruf = -1
+'
+' Zwei Ligen heissen zwei Abrufe -- und die laufen NEBENEINANDER, nicht
+' nacheinander: zwei gleichzeitig sind zusammen so schnell wie einer.
+DIM abruf[LIGEN] AS INTEGER
+DIM holSpiele AS INTEGER
+DIM holErgVorher AS INTEGER
+
+SUB abrufeLeeren()
+    DIM i AS INTEGER
+    FOR i = 0 TO LIGEN - 1
+        abruf[i] = -1
+    NEXT
+END SUB
+abrufeLeeren()
+
+FUNCTION abrufLaeuft() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LIGEN - 1
+        IF abruf[i] >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
 
 SUB spielplanHolen()
-    IF abruf >= 0 THEN
+    IF abrufLaeuft() THEN
         melde("Es wird schon geholt.")
         RETURN
     END IF
-    abruf = HTTP_GET_START(SPIELPLAN_URL)
-    melde("Spielplan und Ergebnisse werden geholt ...")
+    holSpiele = 0
+    ' Wie viele Spiele hatten VORHER ein Ergebnis? Die Differenz am Ende
+    ' sagt, wie viele dazugekommen sind -- billiger als jedes Spiel einzeln
+    ' zu vergleichen, und fuer die Meldung genau die richtige Zahl. Der Stand
+    ' muss vor dem ERSTEN Abruf genommen werden, nicht vor jedem.
+    holErgVorher = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL")
+
+    DIM i AS INTEGER
+    FOR i = 0 TO LIGEN - 1
+        abruf[i] = HTTP_GET_START(API + ligaKuerzel[i] + "/" + SAISON)
+    NEXT
+    melde("Spielplan und Ergebnisse beider Ligen werden geholt ...")
 END SUB
 
 ' Das ENDERGEBNIS eines Spiels aus der Antwort holen -- nicht das erstbeste.
@@ -822,26 +905,23 @@ FUNCTION endergebnis(wurzel AS JSON_HANDLE, pfad AS STRING, _
 END FUNCTION
 
 ' Aus der Antwort die Paarungen, Anstosszeiten und Ergebnisse uebernehmen.
+' Nur eintragen -- was danach zu tun ist, entscheidet abrufPruefen(), wenn
+' BEIDE Ligen da sind.
 SUB spielplanUebernehmen(text AS STRING)
     DIM wurzel AS JSON_HANDLE
     wurzel = JSON_PARSE(text)
     DIM n AS INTEGER : n = JSON_LEN(wurzel, "")
-    IF n <= 0 THEN
-        melde("Der Spielplan kam leer zurueck.")
-        RETURN
-    END IF
+    IF n <= 0 THEN RETURN
 
-    ' Wie viele Spiele hatten VORHER ein Ergebnis? Die Differenz danach sagt,
-    ' wie viele dazugekommen sind -- billiger als jedes Spiel einzeln zu
-    ' vergleichen, und fuer die Meldung ist es genau die richtige Zahl.
-    DIM ergVorher AS INTEGER
-    ergVorher = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL")
+    ' Zu welcher Liga gehoert diese Antwort? Sie sagt es selbst. Sich zu
+    ' merken, welche Nummer welchen Abruf angestossen hat, waere Buchfuehrung
+    ' ueber etwas, das sowieso mitgeliefert wird -- und sie koennte falsch
+    ' sein, die Antwort nicht.
+    DIM liga AS STRING : liga = JSON_GET_STRING(wurzel, "0.leagueShortcut")
+    IF liga = "" THEN RETURN
 
     DB_BEGIN(db)
     DIM i AS INTEGER
-    DIM uebernommen AS INTEGER : uebernommen = 0
-    DIM tageMin AS INTEGER : tageMin = MAX_SPIELTAG
-    DIM tageMax AS INTEGER : tageMax = 0
     FOR i = 0 TO n - 1
         ' Pfade sind durchgehend Punkte, auch fuer Array-Plaetze:
         ' "0.team1.teamName" ist das Heimteam des ersten Spiels.
@@ -858,10 +938,8 @@ SUB spielplanUebernehmen(text AS STRING)
             DIM roh AS STRING : roh = JSON_GET_STRING(wurzel, pfad + ".matchDateTime")
             DIM termin AS STRING : termin = ""
             IF ZEIT_LESBAR(roh) THEN termin = ZEIT_TEXT$(ZEIT_PARSE(roh))
-            spielAnlegen(tag, heim, gast, termin)
-            uebernommen = uebernommen + 1
-            IF tag < tageMin THEN tageMin = tag
-            IF tag > tageMax THEN tageMax = tag
+            spielAnlegen(liga, tag, heim, gast, termin)
+            holSpiele = holSpiele + 1
 
             ' Ist das Spiel gelaufen, kommt das Ergebnis gleich mit -- es
             ' steht in derselben Antwort. Ein zweiter Abruf dafuer waere
@@ -869,28 +947,29 @@ SUB spielplanUebernehmen(text AS STRING)
             DIM eh AS INTEGER : eh = 0
             DIM ea AS INTEGER : ea = 0
             IF endergebnis(wurzel, pfad, eh, ea) THEN
-                ergebnisSetzen(tag, heim, gast, eh, ea)
+                ergebnisSetzen(liga, tag, heim, gast, eh, ea)
             END IF
         END IF
     NEXT
     DB_COMMIT(db)
+END SUB
 
-    ' Erst nach dem COMMIT: punkteAlleNeu fuehrt seine eigene Transaktion,
-    ' und Transaktionen lassen sich nicht schachteln.
+' Was nach dem letzten Abruf zu tun ist -- einmal, nicht je Liga.
+SUB abrufAbschliessen()
+    ' punkteAlleNeu fuehrt seine eigene Transaktion, deshalb erst hier und
+    ' nicht im Import: Transaktionen lassen sich nicht schachteln.
     punkteAlleNeu()
 
     DIM neueErg AS INTEGER
-    neueErg = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL") - ergVorher
+    neueErg = anzahl("SELECT COUNT(*) FROM spiele WHERE tore_heim IS NOT NULL") - holErgVorher
 
     ' Nach einem frischen Spielplan dorthin springen, wo die Arbeit ansteht.
-    IF uebernommen > 0 THEN GUI_SET_VALUE(tagWahl, spieltagVorschlag())
+    IF holSpiele > 0 THEN GUI_SET_VALUE(tagWahl, spieltagVorschlag())
     spieleLaden()
     ranglisteLaden()
 
-    DIM meldung AS STRING : meldung = STR$(uebernommen) + " Spiele"
-    IF tageMax > tageMin THEN
-        meldung = meldung + ", Spieltag " + STR$(tageMin) + " bis " + STR$(tageMax)
-    END IF
+    DIM meldung AS STRING
+    meldung = STR$(holSpiele) + " Spiele aus beiden Ligen"
     IF neueErg = 1 THEN
         meldung = meldung + ", 1 neues Ergebnis"
     ELIF neueErg > 1 THEN
@@ -899,19 +978,40 @@ SUB spielplanUebernehmen(text AS STRING)
     melde(meldung + ".")
 END SUB
 
-' Einmal pro Bild nachsehen -- nicht warten.
+' Einmal pro Bild nachsehen -- nicht warten. Beide Abrufe werden gefragt;
+' welcher zuerst fertig ist, ist gleichgueltig.
 SUB abrufPruefen()
-    IF abruf < 0 THEN RETURN
-    IF NOT HTTP_READY(abruf) THEN RETURN
+    IF NOT abrufLaeuft() THEN RETURN
 
-    DIM nummer AS INTEGER : nummer = abruf
-    abruf = -1                       ' erst freigeben, dann auswerten
-    TRY
-        spielplanUebernehmen(HTTP_RESULT(nummer))
-    CATCH e
-        melde("Spielplan nicht erreichbar: " + e)
-    END TRY
+    DIM i AS INTEGER
+    DIM angekommen AS BOOLEAN : angekommen = FALSE
+    FOR i = 0 TO LIGEN - 1
+        IF abruf[i] >= 0 AND HTTP_READY(abruf[i]) THEN
+            DIM nummer AS INTEGER : nummer = abruf[i]
+            abruf[i] = -1                ' erst freigeben, dann auswerten
+            angekommen = TRUE
+            TRY
+                spielplanUebernehmen(HTTP_RESULT(nummer))
+            CATCH e
+                melde("Spielplan nicht erreichbar: " + e)
+            END TRY
+        END IF
+    NEXT
+
+    ' Erst wenn keiner mehr aussteht -- sonst rechnete die zweite Liga die
+    ' Punkte der ersten gleich noch einmal nach.
+    IF angekommen AND NOT abrufLaeuft() THEN abrufAbschliessen()
 END SUB
+
+' Die Ligen stehen fest -- sie kommen aus den Konstanten, nicht aus der
+' Datenbank.
+DIM ligaListe[LIGEN] AS STRING
+DIM li AS INTEGER
+FOR li = 0 TO LIGEN - 1
+    ligaListe[li] = ligaName[li]
+NEXT
+GUI_SET_DROPDOWN(ligaWahl, ligaListe)
+GUI_DROPDOWN_SET_SELECTED(ligaWahl, 0)
 
 spielerLaden()
 gruppenLaden()
@@ -921,7 +1021,7 @@ GUI_SET_VALUE(tagWahl, spieltagVorschlag())
 spieleLaden()
 ranglisteLaden()
 meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
-melde("Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
+melde("Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
 ' ---- Hauptschleife -------------------------------------------------------
 DIM letzterSpieler AS INTEGER : letzterSpieler = 0
@@ -930,6 +1030,7 @@ DIM letzteZeile AS INTEGER : letzteZeile = -1
 DIM letzteSekunde AS INTEGER : letzteSekunde = 0
 DIM letzteWertung AS INTEGER : letzteWertung = 0
 DIM letzteGruppe AS INTEGER : letzteGruppe = -1
+DIM letzteLiga AS INTEGER : letzteLiga = GUI_DROPDOWN_SELECTED(ligaWahl)
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
@@ -944,6 +1045,17 @@ WHILE NOT QUITREQUESTED()
         letzteZeile = -1
         spieleLaden()
         melde("Spieler gewechselt.")
+    END IF
+
+    ' Ligawechsel -> anderer Spielplan. Der Spieltag springt mit: die 2. Liga
+    ' war am 7. August schon am 1. Spieltag, die 1. beginnt erst am 28.
+    IF GUI_DROPDOWN_SELECTED(ligaWahl) <> letzteLiga THEN
+        letzteLiga = GUI_DROPDOWN_SELECTED(ligaWahl)
+        letzteZeile = -1
+        GUI_SET_VALUE(tagWahl, spieltagVorschlag())
+        letzterTag = aktiverSpieltag()
+        spieleLaden()
+        melde(ligaName[letzteLiga] + ", " + STR$(letzterTag) + ". Spieltag.")
     END IF
 
     ' Spieltagswechsel -> andere Spiele. Die Zeilennummer merken sich zu
@@ -1056,7 +1168,7 @@ WHILE NOT QUITREQUESTED()
 
     ' Der Countdown laeuft weiter, auch wenn niemand etwas anklickt.
     ' Einmal je Sekunde reicht -- die Anzeige zeigt keine Zehntel.
-    IF zeile >= 0 AND abruf < 0 AND ZEIT_JETZT() <> letzteSekunde THEN
+    IF zeile >= 0 AND NOT abrufLaeuft() AND ZEIT_JETZT() <> letzteSekunde THEN
         letzteSekunde = ZEIT_JETZT()
         melde(GUI_TABLE_GET_CELL(tabelle, zeile, 1) + " gegen " + _
               GUI_TABLE_GET_CELL(tabelle, zeile, 2) + " -- " + restText(zeile))

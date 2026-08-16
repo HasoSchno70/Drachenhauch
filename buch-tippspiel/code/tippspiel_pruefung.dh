@@ -81,12 +81,13 @@ DIM db AS DB_CONN
 db = DB_OPEN(":memory:")
 
 DB_EXEC(db, "CREATE TABLE spieler (id INTEGER PRIMARY KEY, name TEXT)")
-DB_EXEC(db, "CREATE TABLE spiele (id INTEGER PRIMARY KEY, spieltag INTEGER, " + _
+DB_EXEC(db, "CREATE TABLE spiele (id INTEGER PRIMARY KEY, " + _
+            "liga TEXT NOT NULL DEFAULT 'bl1', spieltag INTEGER, " + _
             "heim TEXT, gast TEXT, anstoss TEXT, tore_heim INTEGER, tore_gast INTEGER)")
-' Dieselbe Paarung am selben Spieltag gibt es nur einmal -- wie in
-' tippspiel.dh als Index, damit die Regel auch fuer eine Datenbank gilt,
-' die es schon vorher gab.
-DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (spieltag, heim, gast)")
+' Ein Spiel ist eindeutig durch Liga, Spieltag und die beiden Vereine --
+' wie in tippspiel.dh als Index, damit die Regel auch fuer eine Datenbank
+' gilt, die es schon vorher gab.
+DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (liga, spieltag, heim, gast)")
 DB_EXEC(db, "CREATE TABLE tipps (id INTEGER PRIMARY KEY, spieler_id INTEGER, " + _
             "spiel_id INTEGER, tipp_heim INTEGER, tipp_gast INTEGER, punkte INTEGER, " + _
             "UNIQUE(spieler_id, spiel_id))")
@@ -191,18 +192,23 @@ FUNCTION anzahl(sql AS STRING) AS INTEGER
     RETURN n
 END FUNCTION
 
-' Auf welchen Spieltag schaut man? Auf den mit dem naechsten Anpfiff.
+' Auf welchen Spieltag schaut man? Auf den mit dem naechsten Anpfiff -- in
+' der gewaehlten Liga, denn jede hat ihren eigenen Spielplan.
 ' Die Uhrzeit kommt als Parameter herein, nicht aus ZEIT_JETZT() -- eine
 ' Pruefung, deren Ergebnis vom Kalender abhaengt, prueft nichts.
-FUNCTION spieltagBei(jetzt AS STRING) AS INTEGER
+FUNCTION spieltagBei(liga AS STRING, jetzt AS STRING) AS INTEGER
     DIM q AS DB_RESULT
     q = DB_QUERY(db, "SELECT spieltag FROM spiele " + _
-                     "WHERE anstoss IS NOT NULL AND anstoss >= ? " + _
-                     "ORDER BY anstoss LIMIT 1", jetzt)
+                     "WHERE liga = ? AND anstoss IS NOT NULL AND anstoss >= ? " + _
+                     "ORDER BY anstoss LIMIT 1", liga, jetzt)
     DIM tag AS INTEGER : tag = 0
     IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
     DB_CLOSE_RESULT(q)
-    IF tag = 0 THEN tag = anzahl("SELECT COALESCE(MAX(spieltag), 1) FROM spiele")
+    IF tag = 0 THEN
+        q = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele WHERE liga = ?", liga)
+        IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
+        DB_CLOSE_RESULT(q)
+    END IF
     RETURN tag
 END FUNCTION
 
@@ -216,8 +222,10 @@ pruefe("Spieltag 3 hat 1 Spiel", anzahl("SELECT COUNT(*) FROM spiele WHERE spiel
 
 ' Ein zweiter Abruf desselben Spielplans darf nichts verdoppeln -- dafuer
 ' sorgt der Index, nicht das Programm.
-DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast, anstoss) VALUES (2, ?, ?, ?) " + _
-            "ON CONFLICT(spieltag, heim, gast) DO UPDATE SET anstoss = excluded.anstoss", _
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
+            "VALUES ('bl1', 2, ?, ?, ?) " + _
+            "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
+            "  anstoss = excluded.anstoss", _
         "Leipzig", "Freiburg", "2026-09-04 18:30:00")
 pruefe("zweiter Abruf legt keine Dublette an", _
        anzahl("SELECT COUNT(*) FROM spiele WHERE spieltag = 2"), 2)
@@ -231,10 +239,10 @@ DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast, anstoss) VALUES " + _
 pruefe("dieselbe Paarung am anderen Spieltag ist ein zweites Spiel", _
        anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'Leipzig' AND gast = 'Freiburg'"), 2)
 
-pruefe("vor dem 2. Spieltag zeigt er auf den 2.", spieltagBei("2026-09-01 12:00:00"), 2)
-pruefe("zwischen den Spielen bleibt er beim 2.", spieltagBei("2026-09-04 21:00:00"), 2)
-pruefe("nach dem 2. Spieltag zeigt er auf den 3.", spieltagBei("2026-09-06 00:00:00"), 3)
-pruefe("ist die Saison durch, bleibt der letzte stehen", spieltagBei("2027-12-31 00:00:00"), 20)
+pruefe("vor dem 2. Spieltag zeigt er auf den 2.", spieltagBei("bl1", "2026-09-01 12:00:00"), 2)
+pruefe("zwischen den Spielen bleibt er beim 2.", spieltagBei("bl1", "2026-09-04 21:00:00"), 2)
+pruefe("nach dem 2. Spieltag zeigt er auf den 3.", spieltagBei("bl1", "2026-09-06 00:00:00"), 3)
+pruefe("ist die Saison durch, bleibt der letzte stehen", spieltagBei("bl1", "2027-12-31 00:00:00"), 20)
 
 ' Die Rangliste kennt keine Spieltage -- sie zaehlt die ganze Saison.
 DB_EXEC(db, "UPDATE spiele SET tore_heim = 1, tore_gast = 0 WHERE id = 11")
@@ -417,6 +425,62 @@ pruefe("  die Mitgliederliste geht mit", _
        anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE gruppe_id = 1"), 0)
 pruefe("  die Tipps bleiben", anzahl("SELECT COUNT(*) FROM tipps"), tippsVorher)
 pruefe("  und die Gesamtwertung steht unveraendert da", wertung(0, wer, wieviel), 3)
+
+' ---- Zwei Ligen ----------------------------------------------------------
+' Die 2. Bundesliga ist nicht "mehr vom selben": sie hat ihren eigenen
+' Spielplan und faengt frueher an. Was vorher der Schluessel eines Spiels
+' war (Spieltag + Paarung), ist es jetzt nicht mehr allein.
+PRINT ""
+PRINT "=== Zwei Ligen ==="
+
+DB_EXEC(db, "INSERT INTO spiele (id, liga, spieltag, heim, gast, anstoss) VALUES " + _
+            "(31, 'bl2', 1, 'VfL Bochum', 'Hertha BSC', '2026-08-07 20:30:00'), " + _
+            "(32, 'bl2', 1, 'FC St. Pauli', 'SpVgg Greuther Fürth', '2026-08-09 13:30:00'), " + _
+            "(33, 'bl2', 2, 'Hertha BSC', 'VfL Bochum', '2026-08-15 13:00:00')")
+
+pruefe("die 1. Liga sieht die Spiele der 2. nicht", _
+       anzahl("SELECT COUNT(*) FROM spiele WHERE liga = 'bl1' AND spieltag = 1"), 2)
+pruefe("und umgekehrt", _
+       anzahl("SELECT COUNT(*) FROM spiele WHERE liga = 'bl2' AND spieltag = 1"), 2)
+
+' Jede Liga hat ihren eigenen Kalender -- und das ist keine Kleinigkeit: die
+' 2. Bundesliga faengt drei Wochen frueher an. Dem 1. Spieltag der 1. Liga
+' dafuer die echten Termine geben (bisher stand dort keiner).
+DB_EXEC(db, "UPDATE spiele SET anstoss = '2026-08-28 20:30:00' WHERE id = 1")
+DB_EXEC(db, "UPDATE spiele SET anstoss = '2026-08-29 15:30:00' WHERE id = 2")
+
+' Am 10. August ist die 2. Liga schon beim 2. Spieltag, waehrend die 1. noch
+' gar nicht angefangen hat. Ein gemeinsamer Spieltag waere also falsch.
+pruefe("am 10.08. ist die 2. Liga beim 2. Spieltag", _
+       spieltagBei("bl2", "2026-08-10 00:00:00"), 2)
+pruefe("die 1. Liga steht da noch beim 1.", _
+       spieltagBei("bl1", "2026-08-10 00:00:00"), 1)
+
+' Der Grund, warum die Liga in den Index gehoert: dieselbe Paarung KANN es
+' in beiden geben. Bei echten Bundesliga-Daten kommt das nicht vor -- ein
+' Verein spielt in genau einer Liga -- aber der Schluessel eines Spiels sind
+' nun einmal alle vier Spalten, und das UPSERT beim Abruf nennt sie auch so.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) " + _
+            "VALUES ('bl1', 1, 'VfL Bochum', 'Hertha BSC')")
+pruefe("dieselbe Paarung in der anderen Liga ist ein anderes Spiel", _
+       anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'VfL Bochum' AND gast = 'Hertha BSC'"), 2)
+
+DIM nochmal AS BOOLEAN : nochmal = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) " + _
+                "VALUES ('bl2', 1, 'VfL Bochum', 'Hertha BSC')")
+CATCH e
+    nochmal = FALSE
+END TRY
+pruefeJa("in DERSELBEN Liga aber nicht", nochmal, FALSE)
+
+' Ein Tipp auf ein Zweitliga-Spiel zaehlt in derselben Rangliste. Die
+' Wertung geht ueber den Spieler, nicht ueber die Liga.
+DB_EXEC(db, "UPDATE spiele SET tore_heim = 2, tore_gast = 0 WHERE id = 31")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + _
+            "VALUES (2, 31, 2, 0, 3)")
+pruefe("Bens Zweitliga-Tipp zaehlt in der Gesamtwertung", wertung(0, wer, wieviel), 3)
+pruefeText("  und bringt ihn nicht an Anna vorbei", wer, "Anna")
 
 DB_CLOSE(db)
 

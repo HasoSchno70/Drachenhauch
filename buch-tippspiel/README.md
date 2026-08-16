@@ -50,6 +50,7 @@ Was es über Kapitel 12 hinaus kann:
 | **Alle 34 Spieltage** | Statt nur des ersten. Spieltagswahl im Kopf der Liste, „5 von 9 getippt" daneben; beim Start steht der Spieltag mit dem nächsten Anpfiff da. |
 | **Ergebnisse aus dem Netz** | *Aktualisieren* holt Spielplan **und** Ergebnisse der ganzen Saison in einem Abruf (306 Spiele, ~250 ms) und rechnet alle Punkte neu. Von Hand eintragen geht weiter — für das, was die Liga noch nicht meldet. |
 | **Tippgemeinschaften** | Dritter Reiter *Gruppen*: anlegen, löschen, Spieler aufnehmen und entfernen. Ein Spieler darf in mehreren sein. Auf dem Reiter *Rangliste* wählt man die Wertung — alle Spieler oder eine Gemeinschaft. |
+| **2. Bundesliga** | Ligawahl in der Kopfzeile; jede Liga hat ihren eigenen Spielplan und Kalender (die 2. beginnt drei Wochen früher). *Aktualisieren* holt beide Ligen **nebeneinander** — zwei gleichzeitige Abrufe sind zusammen so schnell wie einer. Getippt wird über beide Ligen in dieselbe Rangliste. Eine vorhandene Datenbank wird beim Start umgebaut, die Tipps darin bleiben. |
 
 ## Aufbau (13 Kapitel)
 
@@ -108,7 +109,7 @@ trauen.
 
 | Datei | Was es prüft |
 |---|---|
-| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste, Spieltage, Ergebnisse aus der Antwort und die Tippgemeinschaften — 49 Prüfungen, ohne Fenster und ohne Netz |
+| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste, Spieltage, Ergebnisse aus der Antwort, Tippgemeinschaften und die zwei Ligen — 57 Prüfungen, ohne Fenster und ohne Netz |
 | [`code/zeit_pruefung.dh`](code/zeit_pruefung.dh) | Die Datumsrechnungen: Tippschluss, Countdown, Schaltjahre |
 | [`code/abruf_pruefung.dh`](code/abruf_pruefung.dh) | Blockierender gegen nebenläufigen Abruf, mit gemessenen Zahlen |
 | [`code/stolpersteine.dh`](code/stolpersteine.dh) | Messprotokoll: wo Drachenhauch für so eine Anwendung an Grenzen stößt |
