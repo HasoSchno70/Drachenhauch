@@ -252,7 +252,7 @@ anlegen()
 grunddaten()
 
 ' ---- Oberflaeche ---------------------------------------------------------
-SCREEN(1000, 640, "Drachenhauch - Tippspiel", 1)
+SCREEN(1180, 720, "Drachenhauch - Tippspiel", 1)
 SETFPS(60)
 
 DIM schrift AS INTEGER : schrift = -1
@@ -268,7 +268,7 @@ DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 
 DIM win AS GUI_WINDOW
-win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 960, 600)
+win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 1140, 660)
 
 DIM reiter AS ARRAY OF STRING
 reiter = SPLIT$("Tipps|Rangliste|Tabelle|Statistik|Gruppen", "|")
@@ -311,13 +311,13 @@ lblGetippt = GUI_LABEL(win, "", 638, 50)
 GUI_SET_TAB(lblGetippt, 0)
 
 DIM tabelle AS GUI_WIDGET
-tabelle = GUI_TABLE(win, 20, 86, 920, 330)
+tabelle = GUI_TABLE(win, 20, 86, 1100, 390)
 GUI_SET_TAB(tabelle, 0)
 DIM kopf AS ARRAY OF STRING
 kopf = SPLIT$("Anstoss|Heim|Gast|Tipp|Ergebnis|Punkte", "|")
 GUI_TABLE_HEADERS(tabelle, kopf)
 DIM breiten AS ARRAY OF INTEGER
-breiten = [150, 240, 240, 90, 100, 90]
+breiten = [170, 300, 300, 100, 110, 100]
 GUI_TABLE_COL_WIDTHS(tabelle, breiten)
 GUI_TABLE_SET(tabelle, "zeilenhoehe", 30)
 GUI_TABLE_SET(tabelle, "kopfhoehe", 28)
@@ -329,55 +329,55 @@ GUI_TABLE_COL_ALIGN(tabelle, 5, "mitte")
 ' Spielplan und Ergebnisse holen -- laeuft im Hintergrund, das Fenster
 ' bleibt bedienbar.
 DIM bHolen AS GUI_WIDGET
-bHolen = GUI_BUTTON(win, "Aktualisieren", 790, 46, 150, 26)
+bHolen = GUI_BUTTON(win, "Aktualisieren", 970, 46, 150, 26)
 GUI_SET_TAB(bHolen, 0)
 
 DIM lblTipp AS GUI_WIDGET
-lblTipp = GUI_LABEL(win, "Tipp:", 20, 436)
+lblTipp = GUI_LABEL(win, "Tipp:", 20, 496)
 GUI_SET_TAB(lblTipp, 0)
 
 DIM tippHeim AS GUI_WIDGET
-tippHeim = GUI_SPINNER(win, 70, 430, 90, 0, 9, 0, 1)
+tippHeim = GUI_SPINNER(win, 70, 490, 90, 0, 9, 0, 1)
 GUI_SET_TAB(tippHeim, 0)
 
 DIM lblDoppel AS GUI_WIDGET
-lblDoppel = GUI_LABEL(win, ":", 170, 436)
+lblDoppel = GUI_LABEL(win, ":", 170, 496)
 GUI_SET_TAB(lblDoppel, 0)
 
 DIM tippGast AS GUI_WIDGET
-tippGast = GUI_SPINNER(win, 186, 430, 90, 0, 9, 0, 1)
+tippGast = GUI_SPINNER(win, 186, 490, 90, 0, 9, 0, 1)
 GUI_SET_TAB(tippGast, 0)
 
 DIM bTipp AS GUI_WIDGET
-bTipp = GUI_BUTTON(win, "Tipp speichern", 292, 430, 150, 30)
+bTipp = GUI_BUTTON(win, "Tipp speichern", 292, 490, 150, 30)
 GUI_SET_TAB(bTipp, 0)
 
 DIM lblErg AS GUI_WIDGET
-lblErg = GUI_LABEL(win, "Ergebnis:", 470, 436)
+lblErg = GUI_LABEL(win, "Ergebnis:", 560, 496)
 GUI_SET_TAB(lblErg, 0)
 
 DIM ergHeim AS GUI_WIDGET
-ergHeim = GUI_SPINNER(win, 545, 430, 90, 0, 9, 0, 1)
+ergHeim = GUI_SPINNER(win, 635, 490, 90, 0, 9, 0, 1)
 GUI_SET_TAB(ergHeim, 0)
 
 DIM lblDoppel2 AS GUI_WIDGET
-lblDoppel2 = GUI_LABEL(win, ":", 645, 436)
+lblDoppel2 = GUI_LABEL(win, ":", 735, 496)
 GUI_SET_TAB(lblDoppel2, 0)
 
 DIM ergGast AS GUI_WIDGET
-ergGast = GUI_SPINNER(win, 661, 430, 90, 0, 9, 0, 1)
+ergGast = GUI_SPINNER(win, 751, 490, 90, 0, 9, 0, 1)
 GUI_SET_TAB(ergGast, 0)
 
 DIM bErg AS GUI_WIDGET
-bErg = GUI_BUTTON(win, "Ergebnis eintragen", 767, 430, 173, 30)
+bErg = GUI_BUTTON(win, "Ergebnis eintragen", 947, 490, 173, 30)
 GUI_SET_TAB(bErg, 0)
 
 DIM stand AS GUI_WIDGET
-stand = GUI_LABEL(win, "", 20, 476)
+stand = GUI_LABEL(win, "", 20, 536)
 GUI_SET_TAB(stand, 0)
 
 DIM hinweis AS GUI_WIDGET
-hinweis = GUI_LABEL(win, "3 Punkte exakt | 2 richtige Differenz | 1 richtige Tendenz", 20, 500)
+hinweis = GUI_LABEL(win, "3 Punkte exakt | 2 richtige Differenz | 1 richtige Tendenz", 20, 560)
 GUI_SET_TAB(hinweis, 0)
 
 ' --- Reiter 2: Rangliste ---
@@ -392,13 +392,13 @@ wertungWahl = GUI_DROPDOWN(win, 90, 50, 260, 26, [])
 GUI_SET_TAB(wertungWahl, 1)
 
 DIM rang AS GUI_WIDGET
-rang = GUI_TABLE(win, 20, 86, 920, 424)
+rang = GUI_TABLE(win, 20, 86, 1100, 484)
 GUI_SET_TAB(rang, 1)
 DIM rangKopf AS ARRAY OF STRING
 rangKopf = SPLIT$("Platz|Spieler|Punkte|Tipps", "|")
 GUI_TABLE_HEADERS(rang, rangKopf)
 DIM rangBreiten AS ARRAY OF INTEGER
-rangBreiten = [100, 500, 150, 150]
+rangBreiten = [100, 640, 170, 170]
 GUI_TABLE_COL_WIDTHS(rang, rangBreiten)
 GUI_TABLE_SET(rang, "zeilenhoehe", 30)
 GUI_TABLE_SET(rang, "kopfhoehe", 28)
@@ -423,13 +423,13 @@ lblTabStand = GUI_LABEL(win, "", 246, 54)
 GUI_SET_TAB(lblTabStand, 2)
 
 DIM tabelleLiga AS GUI_WIDGET
-tabelleLiga = GUI_TABLE(win, 20, 86, 920, 424)
+tabelleLiga = GUI_TABLE(win, 20, 86, 1100, 484)
 GUI_SET_TAB(tabelleLiga, 2)
 DIM tabKopf AS ARRAY OF STRING
 tabKopf = SPLIT$("Platz|Verein|Sp|S|U|N|Tore|Diff|Punkte", "|")
 GUI_TABLE_HEADERS(tabelleLiga, tabKopf)
 DIM tabBreiten AS ARRAY OF INTEGER
-tabBreiten = [60, 330, 60, 55, 55, 55, 110, 75, 85]
+tabBreiten = [70, 450, 70, 60, 60, 60, 130, 85, 95]
 GUI_TABLE_COL_WIDTHS(tabelleLiga, tabBreiten)
 GUI_TABLE_SET(tabelleLiga, "zeilenhoehe", 30)
 GUI_TABLE_SET(tabelleLiga, "kopfhoehe", 28)
@@ -471,13 +471,13 @@ GUI_SET_TAB(lblStatBest, 3)
 DIM statTab AS GUI_WIDGET
 ' 20 Pixel breiter als die Spalten zusammen -- sonst frisst der Rollbalken
 ' die letzte Spalte an.
-statTab = GUI_TABLE(win, 20, 132, 450, 152)
+statTab = GUI_TABLE(win, 20, 132, 520, 152)
 GUI_SET_TAB(statTab, 3)
 DIM statKopf AS ARRAY OF STRING
 statKopf = SPLIT$("Treffer|Anzahl|Anteil|Punkte", "|")
 GUI_TABLE_HEADERS(statTab, statKopf)
 DIM statBreiten AS ARRAY OF INTEGER
-statBreiten = [170, 80, 90, 90]
+statBreiten = [210, 90, 100, 100]
 GUI_TABLE_COL_WIDTHS(statTab, statBreiten)
 GUI_TABLE_SET(statTab, "zeilenhoehe", 30)
 GUI_TABLE_SET(statTab, "kopfhoehe", 28)
@@ -493,7 +493,7 @@ GUI_TABLE_COL_ALIGN(statTab, 3, "rechts")
 ' Auf 450 Pixeln waeren sie 13 Pixel schmal und stiessen aneinander -- das
 ' sieht aus wie eine Flaeche, nicht wie ein Spieltag neben dem anderen.
 DIM verlauf AS CHART
-verlauf = CHART_NEW("balken", 40, 375, 900, 200)
+verlauf = CHART_NEW("balken", 40, 375, 1080, 250)
 CHART_SET(verlauf, "titel", "Punkte je Spieltag")
 CHART_SET(verlauf, "werte", "aussen")
 CHART_SET_NUM(verlauf, "abstand", 6)       ' Luecke in Pixeln
@@ -507,13 +507,13 @@ lblGruppen = GUI_LABEL(win, "Tippgemeinschaften:", 20, 54)
 GUI_SET_TAB(lblGruppen, 4)
 
 DIM gruppenTab AS GUI_WIDGET
-gruppenTab = GUI_TABLE(win, 20, 80, 420, 300)
+gruppenTab = GUI_TABLE(win, 20, 80, 520, 360)
 GUI_SET_TAB(gruppenTab, 4)
 DIM gruppenKopf AS ARRAY OF STRING
 gruppenKopf = SPLIT$("Gemeinschaft|Mitglieder", "|")
 GUI_TABLE_HEADERS(gruppenTab, gruppenKopf)
 DIM gruppenBreiten AS ARRAY OF INTEGER
-gruppenBreiten = [300, 120]
+gruppenBreiten = [380, 140]
 GUI_TABLE_COL_WIDTHS(gruppenTab, gruppenBreiten)
 GUI_TABLE_SET(gruppenTab, "zeilenhoehe", 30)
 GUI_TABLE_SET(gruppenTab, "kopfhoehe", 28)
@@ -521,29 +521,29 @@ GUI_TABLE_SET(gruppenTab, "zebra", 1)
 GUI_TABLE_COL_ALIGN(gruppenTab, 1, "rechts")
 
 DIM neuName AS GUI_WIDGET
-neuName = GUI_TEXTINPUT(win, 20, 392, 280, 28, "Name der Tippgemeinschaft")
+neuName = GUI_TEXTINPUT(win, 20, 452, 370, 28, "Name der Tippgemeinschaft")
 GUI_SET_TAB(neuName, 4)
 
 DIM bNeu AS GUI_WIDGET
-bNeu = GUI_BUTTON(win, "Anlegen", 310, 392, 130, 28)
+bNeu = GUI_BUTTON(win, "Anlegen", 400, 452, 140, 28)
 GUI_SET_TAB(bNeu, 4)
 
 DIM bWeg AS GUI_WIDGET
-bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 430, 190, 28)
+bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 490, 190, 28)
 GUI_SET_TAB(bWeg, 4)
 
 DIM lblMitglieder AS GUI_WIDGET
-lblMitglieder = GUI_LABEL(win, "Mitglieder:", 470, 54)
+lblMitglieder = GUI_LABEL(win, "Mitglieder:", 570, 54)
 GUI_SET_TAB(lblMitglieder, 4)
 
 DIM mitgliedTab AS GUI_WIDGET
-mitgliedTab = GUI_TABLE(win, 470, 80, 470, 300)
+mitgliedTab = GUI_TABLE(win, 570, 80, 550, 360)
 GUI_SET_TAB(mitgliedTab, 4)
 DIM mitgliedKopf AS ARRAY OF STRING
 mitgliedKopf = SPLIT$("Spieler|dabei", "|")
 GUI_TABLE_HEADERS(mitgliedTab, mitgliedKopf)
 DIM mitgliedBreiten AS ARRAY OF INTEGER
-mitgliedBreiten = [330, 140]
+mitgliedBreiten = [390, 140]
 GUI_TABLE_COL_WIDTHS(mitgliedTab, mitgliedBreiten)
 GUI_TABLE_SET(mitgliedTab, "zeilenhoehe", 30)
 GUI_TABLE_SET(mitgliedTab, "kopfhoehe", 28)
@@ -551,12 +551,12 @@ GUI_TABLE_SET(mitgliedTab, "zebra", 1)
 GUI_TABLE_COL_ALIGN(mitgliedTab, 1, "mitte")
 
 DIM bMit AS GUI_WIDGET
-bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 470, 392, 220, 28)
+bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 570, 452, 220, 28)
 GUI_SET_TAB(bMit, 4)
 
 ' Eigene Statuszeile: die vom ersten Reiter ist hier nicht zu sehen.
 DIM gruppenStand AS GUI_WIDGET
-gruppenStand = GUI_LABEL(win, "", 20, 476)
+gruppenStand = GUI_LABEL(win, "", 20, 536)
 GUI_SET_TAB(gruppenStand, 4)
 
 ' ---- Daten im Speicher ---------------------------------------------------
