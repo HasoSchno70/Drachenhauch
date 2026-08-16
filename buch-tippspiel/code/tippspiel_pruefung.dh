@@ -69,14 +69,26 @@ FUNCTION art(tippH AS INTEGER, tippA AS INTEGER, _
     RETURN ART_TENDENZ
 END FUNCTION
 
+CONST REGEL_EXAKT = 3
+CONST REGEL_DIFFERENZ = 2
+CONST REGEL_TENDENZ = 1
+CONST REGEL_DANEBEN = 0
+
+FUNCTION punkteFuer(a AS INTEGER, exakt AS INTEGER, differenz AS INTEGER, _
+                    tendenz AS INTEGER, daneben AS INTEGER) AS INTEGER
+    SELECT CASE a
+        CASE ART_EXAKT     : RETURN exakt
+        CASE ART_DIFFERENZ : RETURN differenz
+        CASE ART_TENDENZ   : RETURN tendenz
+    END SELECT
+    RETURN daneben
+END FUNCTION
+
+' Kurzform fuer die Pruefungen, die mit der Vorgabe rechnen.
 FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
                 ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
-    SELECT CASE art(tippH, tippA, ergH, ergA)
-        CASE ART_EXAKT     : RETURN 3
-        CASE ART_DIFFERENZ : RETURN 2
-        CASE ART_TENDENZ   : RETURN 1
-    END SELECT
-    RETURN 0
+    RETURN punkteFuer(art(tippH, tippA, ergH, ergA), _
+                      REGEL_EXAKT, REGEL_DIFFERENZ, REGEL_TENDENZ, REGEL_DANEBEN)
 END FUNCTION
 
 PRINT "=== Punkteregel ==="
@@ -108,6 +120,10 @@ DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (saison, liga, spieltag, he
 ' Auf welche Saison schauen die Abfragen gerade? Im Programm kommt das aus
 ' dem Spinner, hier aus dieser Zahl -- damit die Pruefungen weiter unten
 ' umschalten koennen, ohne dass jeder Aufruf sie mitschleppen muss.
+DB_EXEC(db, "CREATE TABLE punkteregeln (saison INTEGER PRIMARY KEY, " + _
+            "exakt INTEGER NOT NULL, differenz INTEGER NOT NULL, " + _
+            "tendenz INTEGER NOT NULL, daneben INTEGER NOT NULL)")
+
 DIM pruefSaison AS INTEGER : pruefSaison = 2026
 DB_EXEC(db, "CREATE TABLE tipps (id INTEGER PRIMARY KEY, spieler_id INTEGER, " + _
             "spiel_id INTEGER, tipp_heim INTEGER, tipp_gast INTEGER, punkte INTEGER, " + _
@@ -811,6 +827,106 @@ WEND
 DB_CLOSE_RESULT(qs)
 pruefe("die Tabelle von 2025 kennt nur deren zwei Vereine", v25, 2)
 pruefSaison = 2026
+
+' ---- Punkteregeln --------------------------------------------------------
+' Die Punktzahl je Trefferart steht nicht mehr im Quelltext, sondern je
+' Saison in der Datenbank. Fehlt dort eine Zeile, gilt die Vorgabe.
+'
+' Die Gefahr dabei ist nicht die Rechnung, sondern die Reichweite: eine
+' Neuberechnung laeuft ueber ALLE Saisons. Holte sie sich die Regel aus
+' einer Variablen -- der Saison, die gerade im Fenster steht --, bekaeme das
+' Jahr 2023 nachtraeglich die Regel von 2026. Deshalb sind die vier Werte
+' Parameter, und die Abfrage bringt sie je Zeile mit.
+PRINT ""
+PRINT "=== Punkteregeln ==="
+
+pruefe("mit der Vorgabe gibt exakt 3", _
+       punkteFuer(ART_EXAKT, REGEL_EXAKT, REGEL_DIFFERENZ, REGEL_TENDENZ, REGEL_DANEBEN), 3)
+pruefe("mit einer eigenen Regel gibt exakt 5", punkteFuer(ART_EXAKT, 5, 3, 2, 1), 5)
+pruefe("  Tordifferenz 3", punkteFuer(ART_DIFFERENZ, 5, 3, 2, 1), 3)
+pruefe("  nur Tendenz 2", punkteFuer(ART_TENDENZ, 5, 3, 2, 1), 2)
+pruefe("  und daneben muss nicht 0 sein", punkteFuer(ART_DANEBEN, 5, 3, 2, 1), 1)
+
+' Die Neuberechnung des Programms, wortgleich: jede Zeile bringt die Regel
+' ihrer eigenen Saison mit.
+SUB alleNeuRechnen()
+    DIM ids AS ARRAY OF INTEGER
+    DIM werte AS ARRAY OF INTEGER
+    ids = []
+    werte = []
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT t.id, t.tipp_heim, t.tipp_gast, " + _
+                     "       s.tore_heim, s.tore_gast, " + _
+                     "       COALESCE(r.exakt, " + STR$(REGEL_EXAKT) + "), " + _
+                     "       COALESCE(r.differenz, " + STR$(REGEL_DIFFERENZ) + "), " + _
+                     "       COALESCE(r.tendenz, " + STR$(REGEL_TENDENZ) + "), " + _
+                     "       COALESCE(r.daneben, " + STR$(REGEL_DANEBEN) + ") " + _
+                     "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+                     "LEFT JOIN punkteregeln r ON r.saison = s.saison " + _
+                     "WHERE s.tore_heim IS NOT NULL")
+    WHILE DB_NEXT(q)
+        ARRAY_PUSH(ids, DB_GET_INT(q, 0))
+        ARRAY_PUSH(werte, punkteFuer( _
+            art(DB_GET_INT(q, 1), DB_GET_INT(q, 2), DB_GET_INT(q, 3), DB_GET_INT(q, 4)), _
+            DB_GET_INT(q, 5), DB_GET_INT(q, 6), DB_GET_INT(q, 7), DB_GET_INT(q, 8)))
+    WEND
+    DB_CLOSE_RESULT(q)
+    DB_BEGIN(db)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ids) - 1
+        DB_EXEC(db, "UPDATE tipps SET punkte = ? WHERE id = ?", werte[i], ids[i])
+    NEXT
+    DB_COMMIT(db)
+END SUB
+
+' Ausgangslage: Ben hat 2025 einen exakten Tipp (Falke 4:0) und 2026 einen
+' danebenliegenden auf dasselbe Spiel.
+FUNCTION bensPunkte(saison AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT COALESCE(t.punkte, -1) FROM tipps t " + _
+                     "JOIN spiele s ON s.id = t.spiel_id " + _
+                     "WHERE t.spieler_id = 2 AND s.saison = ? AND s.heim = 'Falke'", saison)
+    DIM v AS INTEGER : v = -1
+    IF DB_NEXT(q) THEN v = DB_GET_INT(q, 0)
+    DB_CLOSE_RESULT(q)
+    RETURN v
+END FUNCTION
+
+alleNeuRechnen()
+pruefe("nach der Vorgabe: Bens exakter Tipp von 2025 gibt 3", bensPunkte(2025), 3)
+pruefe("  sein danebenliegender von 2026 gibt 0", bensPunkte(2026), 0)
+
+' Jetzt bekommt NUR 2026 eine eigene Regel: exakt 5, daneben 1.
+DB_EXEC(db, "INSERT INTO punkteregeln (saison, exakt, differenz, tendenz, daneben) " + _
+            "VALUES (2026, 5, 3, 2, 1)")
+alleNeuRechnen()
+pruefe("2026 rechnet jetzt nach der eigenen Regel: daneben gibt 1", bensPunkte(2026), 1)
+pruefe("2025 bleibt bei der Vorgabe -- der exakte Tipp gibt weiter 3", bensPunkte(2025), 3)
+
+' Und andersherum, damit es nicht am Zufall der Reihenfolge liegt.
+DB_EXEC(db, "INSERT INTO punkteregeln (saison, exakt, differenz, tendenz, daneben) " + _
+            "VALUES (2025, 10, 3, 2, 0)")
+alleNeuRechnen()
+pruefe("nun rechnet 2025 mit 10 fuer exakt", bensPunkte(2025), 10)
+pruefe("  und 2026 unveraendert mit 1 fuer daneben", bensPunkte(2026), 1)
+
+' Regel weg -> wieder Vorgabe. Das ist der Weg zurueck, ohne die Zahlen von
+' Hand wieder eintippen zu muessen.
+DB_EXEC(db, "DELETE FROM punkteregeln WHERE saison = 2025")
+alleNeuRechnen()
+pruefe("ohne eigene Zeile gilt wieder die Vorgabe", bensPunkte(2025), 3)
+pruefe("  und 2026 stoert das nicht", bensPunkte(2026), 1)
+
+' Und der Weg zurueck auch fuer 2026: Regel weg, danebenliegender Tipp
+' wieder 0. Damit ist der Kreis in beiden Jahren geschlossen.
+DB_EXEC(db, "DELETE FROM punkteregeln WHERE saison = 2026")
+alleNeuRechnen()
+pruefe("auch 2026 rechnet ohne eigene Zeile wieder nach der Vorgabe", bensPunkte(2026), 0)
+pruefe("  und 2025 steht weiter bei 3", bensPunkte(2025), 3)
+
+' Alle Zahlen, die bensPunkte liest, kommen aus der GESPEICHERTEN Spalte
+' tipps.punkte -- nicht aus einer Neuberechnung im Lesen. Die Rangliste
+' liest dieselbe Spalte, sieht die neue Regel also nach dem Nachrechnen.
 
 DB_CLOSE(db)
 

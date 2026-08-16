@@ -84,16 +84,39 @@ FUNCTION art(tippH AS INTEGER, tippA AS INTEGER, _
     RETURN ART_TENDENZ
 END FUNCTION
 
-' Und WIE VIEL ist dieser Treffer wert. Heute eins zu eins -- die Zuordnung
-' steht aber an einer Stelle und laesst sich dort aendern.
-FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
-                ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
-    SELECT CASE art(tippH, tippA, ergH, ergA)
-        CASE ART_EXAKT     : RETURN 3
-        CASE ART_DIFFERENZ : RETURN 2
-        CASE ART_TENDENZ   : RETURN 1
+' Was die Vorgabe wert ist. Eine Saison ohne eigene Regel rechnet damit --
+' und das ist auch die Regel, die im Buch steht.
+CONST REGEL_EXAKT = 3
+CONST REGEL_DIFFERENZ = 2
+CONST REGEL_TENDENZ = 1
+CONST REGEL_DANEBEN = 0
+
+' Und WIE VIEL ist dieser Treffer wert. Die vier Werte kommen von aussen
+' herein statt aus dem Quelltext: jede Saison darf ihre eigene Regel haben.
+' Sie werden IMMER mitgereicht und nie nebenbei aus einer Variablen gelesen
+' -- sonst rechnete eine Neuberechnung ueber mehrere Saisons alle mit der
+' Regel derjenigen, die gerade im Fenster steht.
+FUNCTION punkteFuer(a AS INTEGER, exakt AS INTEGER, differenz AS INTEGER, _
+                    tendenz AS INTEGER, daneben AS INTEGER) AS INTEGER
+    SELECT CASE a
+        CASE ART_EXAKT     : RETURN exakt
+        CASE ART_DIFFERENZ : RETURN differenz
+        CASE ART_TENDENZ   : RETURN tendenz
     END SELECT
-    RETURN 0
+    RETURN daneben
+END FUNCTION
+
+' Die Regel der Saison EINES SPIELS, als vier Spalten in der Abfrage. Fehlt
+' die Zeile in punkteregeln, liefert COALESCE die Vorgabe. Die Vorgabewerte
+' stehen als Konstanten oben und werden hier hineingeschrieben, damit es sie
+' nicht zweimal gibt -- einmal im Quelltext und einmal im SQL.
+CONST REGEL_JOIN = "LEFT JOIN punkteregeln r ON r.saison = s.saison "
+
+FUNCTION regelSpalten() AS STRING
+    RETURN "COALESCE(r.exakt, " + STR$(REGEL_EXAKT) + "), " + _
+           "COALESCE(r.differenz, " + STR$(REGEL_DIFFERENZ) + "), " + _
+           "COALESCE(r.tendenz, " + STR$(REGEL_TENDENZ) + "), " + _
+           "COALESCE(r.daneben, " + STR$(REGEL_DANEBEN) + ") "
 END FUNCTION
 
 FUNCTION artName(a AS INTEGER) AS STRING
@@ -180,6 +203,15 @@ SUB anlegen()
     DB_EXEC(db, "CREATE TABLE IF NOT EXISTS gruppen_mitglieder (" + _
                 "gruppe_id INTEGER NOT NULL, spieler_id INTEGER NOT NULL, " + _
                 "PRIMARY KEY (gruppe_id, spieler_id))")
+
+    ' Die Punkteregel je Saison. FEHLT die Zeile, gilt die Vorgabe -- eine
+    ' Saison ohne eigene Regel ist keine Saison ohne Regel. Deshalb steht
+    ' hier auch kein Eintrag fuer die laufende Saison herum, bis jemand
+    ' wirklich etwas aendert.
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS punkteregeln (" + _
+                "saison INTEGER PRIMARY KEY, " + _
+                "exakt INTEGER NOT NULL, differenz INTEGER NOT NULL, " + _
+                "tendenz INTEGER NOT NULL, daneben INTEGER NOT NULL)")
 END SUB
 
 FUNCTION anzahl(sql AS STRING) AS INTEGER
@@ -288,7 +320,7 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 1140, 660)
 
 DIM reiter AS ARRAY OF STRING
-reiter = SPLIT$("Tipps|Rangliste|Tabelle|Statistik|Gruppen", "|")
+reiter = SPLIT$("Tipps|Rangliste|Tabelle|Statistik|Verwaltung", "|")
 GUI_TABS(win, reiter)
 
 ' --- Reiter 1: Tipps ---
@@ -530,13 +562,13 @@ IF schrift >= 0 THEN CHART_SET_NUM(verlauf, "schrift", schrift)
 CHART_SET_NUM(verlauf, "text_groesse", 13)
 CHART_SET_NUM(verlauf, "titel_groesse", 18)
 
-' --- Reiter 5: Gruppen ---
+' --- Reiter 5: Verwaltung ---
 DIM lblGruppen AS GUI_WIDGET
 lblGruppen = GUI_LABEL(win, "Tippgemeinschaften:", 20, 54)
 GUI_SET_TAB(lblGruppen, 4)
 
 DIM gruppenTab AS GUI_WIDGET
-gruppenTab = GUI_TABLE(win, 20, 80, 520, 360)
+gruppenTab = GUI_TABLE(win, 20, 80, 520, 250)
 GUI_SET_TAB(gruppenTab, 4)
 DIM gruppenKopf AS ARRAY OF STRING
 gruppenKopf = SPLIT$("Gemeinschaft|Mitglieder", "|")
@@ -550,15 +582,15 @@ GUI_TABLE_SET(gruppenTab, "zebra", 1)
 GUI_TABLE_COL_ALIGN(gruppenTab, 1, "rechts")
 
 DIM neuName AS GUI_WIDGET
-neuName = GUI_TEXTINPUT(win, 20, 452, 370, 28, "Name der Tippgemeinschaft")
+neuName = GUI_TEXTINPUT(win, 20, 342, 370, 28, "Name der Tippgemeinschaft")
 GUI_SET_TAB(neuName, 4)
 
 DIM bNeu AS GUI_WIDGET
-bNeu = GUI_BUTTON(win, "Anlegen", 400, 452, 140, 28)
+bNeu = GUI_BUTTON(win, "Anlegen", 400, 342, 140, 28)
 GUI_SET_TAB(bNeu, 4)
 
 DIM bWeg AS GUI_WIDGET
-bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 490, 190, 28)
+bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 380, 190, 28)
 GUI_SET_TAB(bWeg, 4)
 
 DIM lblMitglieder AS GUI_WIDGET
@@ -566,7 +598,7 @@ lblMitglieder = GUI_LABEL(win, "Mitglieder:", 570, 54)
 GUI_SET_TAB(lblMitglieder, 4)
 
 DIM mitgliedTab AS GUI_WIDGET
-mitgliedTab = GUI_TABLE(win, 570, 80, 550, 360)
+mitgliedTab = GUI_TABLE(win, 570, 80, 550, 250)
 GUI_SET_TAB(mitgliedTab, 4)
 DIM mitgliedKopf AS ARRAY OF STRING
 mitgliedKopf = SPLIT$("Spieler|dabei", "|")
@@ -580,12 +612,55 @@ GUI_TABLE_SET(mitgliedTab, "zebra", 1)
 GUI_TABLE_COL_ALIGN(mitgliedTab, 1, "mitte")
 
 DIM bMit AS GUI_WIDGET
-bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 570, 452, 220, 28)
+bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 570, 342, 220, 28)
 GUI_SET_TAB(bMit, 4)
+
+' --- Punkteregeln der gewaehlten Saison ---
+DIM lblRegeln AS GUI_WIDGET
+lblRegeln = GUI_LABEL(win, "", 20, 434)
+GUI_SET_TAB(lblRegeln, 4)
+
+DIM lblRegelExakt AS GUI_WIDGET
+lblRegelExakt = GUI_LABEL(win, "exakt getroffen:", 20, 470)
+GUI_SET_TAB(lblRegelExakt, 4)
+DIM regelExakt AS GUI_WIDGET
+regelExakt = GUI_SPINNER(win, 150, 466, 80, 0, 99, REGEL_EXAKT, 1)
+GUI_SET_TAB(regelExakt, 4)
+
+DIM lblRegelDiff AS GUI_WIDGET
+lblRegelDiff = GUI_LABEL(win, "Tordifferenz:", 260, 470)
+GUI_SET_TAB(lblRegelDiff, 4)
+DIM regelDiff AS GUI_WIDGET
+regelDiff = GUI_SPINNER(win, 370, 466, 80, 0, 99, REGEL_DIFFERENZ, 1)
+GUI_SET_TAB(regelDiff, 4)
+
+DIM lblRegelTend AS GUI_WIDGET
+lblRegelTend = GUI_LABEL(win, "nur Tendenz:", 480, 470)
+GUI_SET_TAB(lblRegelTend, 4)
+DIM regelTend AS GUI_WIDGET
+regelTend = GUI_SPINNER(win, 590, 466, 80, 0, 99, REGEL_TENDENZ, 1)
+GUI_SET_TAB(regelTend, 4)
+
+DIM lblRegelDaneben AS GUI_WIDGET
+lblRegelDaneben = GUI_LABEL(win, "daneben:", 700, 470)
+GUI_SET_TAB(lblRegelDaneben, 4)
+DIM regelDaneben AS GUI_WIDGET
+regelDaneben = GUI_SPINNER(win, 780, 466, 80, 0, 99, REGEL_DANEBEN, 1)
+GUI_SET_TAB(regelDaneben, 4)
+
+' Speichern rechnet gleich nach. Eine gespeicherte Regel, nach der noch
+' niemand gewertet wurde, waere eine Regel, die nirgends gilt.
+DIM bRegel AS GUI_WIDGET
+bRegel = GUI_BUTTON(win, "Regel speichern und alle Punkte neu rechnen", 20, 512, 380, 30)
+GUI_SET_TAB(bRegel, 4)
+
+DIM bRegelZurueck AS GUI_WIDGET
+bRegelZurueck = GUI_BUTTON(win, "Auf die Vorgabe zurück", 412, 512, 220, 30)
+GUI_SET_TAB(bRegelZurueck, 4)
 
 ' Eigene Statuszeile: die vom ersten Reiter ist hier nicht zu sehen.
 DIM gruppenStand AS GUI_WIDGET
-gruppenStand = GUI_LABEL(win, "", 20, 536)
+gruppenStand = GUI_LABEL(win, "", 20, 570)
 GUI_SET_TAB(gruppenStand, 4)
 
 ' ---- Daten im Speicher ---------------------------------------------------
@@ -975,8 +1050,9 @@ END FUNCTION
 ' aussteht, ist keine Null -- er zaehlt einfach noch nicht mit.
 ' Der leere Ligafilter ("") heisst beide, wie die 0 bei der Tippgemeinschaft.
 FUNCTION statAbfrage() AS STRING
-    RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + _
-           "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+    RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, " + _
+           "       s.tore_heim, s.tore_gast, " + regelSpalten() + _
+           "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + REGEL_JOIN + _
            "WHERE t.spieler_id = ? AND s.saison = ? AND s.tore_heim IS NOT NULL " + _
            "  AND (? = '' OR s.liga = ?) " + _
            "ORDER BY s.spieltag"
@@ -1013,7 +1089,8 @@ SUB statistikLaden()
         DIM a AS INTEGER
         a = art(DB_GET_INT(r, 1), DB_GET_INT(r, 2), DB_GET_INT(r, 3), DB_GET_INT(r, 4))
         DIM p AS INTEGER
-        p = punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), DB_GET_INT(r, 3), DB_GET_INT(r, 4))
+        p = punkteFuer(a, DB_GET_INT(r, 5), DB_GET_INT(r, 6), _
+                          DB_GET_INT(r, 7), DB_GET_INT(r, 8))
 
         anzahlArt[a] = anzahlArt[a] + 1
         punkteArt[a] = punkteArt[a] + p
@@ -1088,6 +1165,44 @@ SUB statistikLaden()
             " Punkten. Schwächster: der " + STR$(schlechtTag) + ". mit " + _
             STR$(schlechtPkt) + ".")
     END IF
+END SUB
+
+' ---- Punkteregeln --------------------------------------------------------
+' Die Regel der gewaehlten Saison in die vier Felder holen. Gibt es keine
+' eigene, stehen die Vorgabewerte da -- und zwar dieselben, die auch die
+' Abfragen einsetzen.
+SUB regelnLaden()
+    DIM e AS INTEGER : e = REGEL_EXAKT
+    DIM d AS INTEGER : d = REGEL_DIFFERENZ
+    DIM tz AS INTEGER : tz = REGEL_TENDENZ
+    DIM n AS INTEGER : n = REGEL_DANEBEN
+    DIM eigen AS BOOLEAN : eigen = FALSE
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT exakt, differenz, tendenz, daneben " + _
+                     "FROM punkteregeln WHERE saison = ?", aktiveSaison())
+    IF DB_NEXT(r) THEN
+        e = DB_GET_INT(r, 0)
+        d = DB_GET_INT(r, 1)
+        tz = DB_GET_INT(r, 2)
+        n = DB_GET_INT(r, 3)
+        eigen = TRUE
+    END IF
+    DB_CLOSE_RESULT(r)
+
+    GUI_SET_VALUE(regelExakt, e)
+    GUI_SET_VALUE(regelDiff, d)
+    GUI_SET_VALUE(regelTend, tz)
+    GUI_SET_VALUE(regelDaneben, n)
+
+    DIM woher AS STRING : woher = " (Vorgabe)"
+    IF eigen THEN woher = " (eigene Regel)"
+    GUI_SET_TEXT(lblRegeln, "Punkteregel für Saison " + saisonName(aktiveSaison()) + woher + ":")
+
+    ' Die Zeile unter dem Tippen sagt dieselbe Regel noch einmal -- dort,
+    ' wo man sie beim Tippen im Blick hat.
+    GUI_SET_TEXT(hinweis, STR$(e) + " Punkte exakt | " + STR$(d) + " richtige Differenz | " + _
+                 STR$(tz) + " richtige Tendenz | " + STR$(n) + " daneben")
 END SUB
 
 ' ---- Tippgemeinschaften --------------------------------------------------
@@ -1187,7 +1302,12 @@ END SUB
 ' Punkte aller Tipps eines Spiels neu rechnen -- nach jedem Ergebnis.
 SUB punkteNeu(spiel AS INTEGER, ergH AS INTEGER, ergA AS INTEGER)
     DIM r AS DB_RESULT
-    r = DB_QUERY(db, "SELECT id, tipp_heim, tipp_gast FROM tipps WHERE spiel_id = ?", spiel)
+    ' Die Regel kommt aus der Saison DIESES Spiels -- nicht aus der, die
+    ' gerade im Fenster steht.
+    r = DB_QUERY(db, "SELECT t.id, t.tipp_heim, t.tipp_gast, " + regelSpalten() + _
+                     "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+                     REGEL_JOIN + _
+                     "WHERE t.spiel_id = ?", spiel)
 
     CONST MAXT = 200
     DIM ids[MAXT] AS INTEGER
@@ -1196,7 +1316,9 @@ SUB punkteNeu(spiel AS INTEGER, ergH AS INTEGER, ergA AS INTEGER)
     WHILE DB_NEXT(r)
         IF n >= MAXT THEN BREAK
         ids[n] = DB_GET_INT(r, 0)
-        werte[n] = punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), ergH, ergA)
+        werte[n] = punkteFuer(art(DB_GET_INT(r, 1), DB_GET_INT(r, 2), ergH, ergA), _
+                              DB_GET_INT(r, 3), DB_GET_INT(r, 4), _
+                              DB_GET_INT(r, 5), DB_GET_INT(r, 6))
         n = n + 1
     WEND
     DB_CLOSE_RESULT(r)
@@ -1227,14 +1349,20 @@ SUB punkteAlleNeu()
     werte = []
 
     DIM r AS DB_RESULT
+    ' Jede Zeile bringt ihre eigene Regel mit. Das ist der Grund, warum die
+    ' vier Werte Parameter sind und keine Variable irgendwo: hier laufen
+    ' Tipps aus MEHREREN Saisons durch, und jede darf ihre eigene Regel
+    ' haben. Eine Regel aus einer Variablen waere fuer alle dieselbe.
     r = DB_QUERY(db, "SELECT t.id, t.tipp_heim, t.tipp_gast, " + _
-                     "       s.tore_heim, s.tore_gast " + _
+                     "       s.tore_heim, s.tore_gast, " + regelSpalten() + _
                      "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+                     REGEL_JOIN + _
                      "WHERE s.tore_heim IS NOT NULL")
     WHILE DB_NEXT(r)
         ARRAY_PUSH(ids, DB_GET_INT(r, 0))
-        ARRAY_PUSH(werte, punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), _
-                                 DB_GET_INT(r, 3), DB_GET_INT(r, 4)))
+        ARRAY_PUSH(werte, punkteFuer( _
+            art(DB_GET_INT(r, 1), DB_GET_INT(r, 2), DB_GET_INT(r, 3), DB_GET_INT(r, 4)), _
+            DB_GET_INT(r, 5), DB_GET_INT(r, 6), DB_GET_INT(r, 7), DB_GET_INT(r, 8)))
     WEND
     DB_CLOSE_RESULT(r)
 
@@ -1462,6 +1590,7 @@ spieleLaden()
 ranglisteLaden()
 tabelleLadenLiga()
 statistikLaden()
+regelnLaden()
 meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
 melde("Saison " + saisonName(aktiveSaison()) + " -- Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
@@ -1505,6 +1634,8 @@ WHILE NOT QUITREQUESTED()
         ranglisteLaden()
         tabelleLadenLiga()
         statistikLaden()
+        ' Jede Saison hat ihre eigene Regel -- die Felder muessen mit.
+        regelnLaden()
         melde("Saison " + saisonName(letzteSaison) + ", " + _
               STR$(letzterTag) + ". Spieltag.")
     END IF
@@ -1597,6 +1728,37 @@ WHILE NOT QUITREQUESTED()
                 meldeGruppe("'" + wegName + "' gelöscht.")
             END IF
         END IF
+    END IF
+
+    ' --- Punkteregel speichern oder zuruecksetzen ---
+    IF GUI_CLICKED(bRegel) THEN
+        DB_EXEC(db, "INSERT INTO punkteregeln (saison, exakt, differenz, tendenz, daneben) " + _
+                    "VALUES (?, ?, ?, ?, ?) " + _
+                    "ON CONFLICT(saison) DO UPDATE SET " + _
+                    "  exakt = excluded.exakt, differenz = excluded.differenz, " + _
+                    "  tendenz = excluded.tendenz, daneben = excluded.daneben", _
+                aktiveSaison(), INT(GUI_VALUE(regelExakt)), INT(GUI_VALUE(regelDiff)), _
+                INT(GUI_VALUE(regelTend)), INT(GUI_VALUE(regelDaneben)))
+        ' Sofort nachrechnen: eine Regel, nach der noch niemand gewertet
+        ' wurde, gilt nirgends. punkteAlleNeu holt sich je Tipp die Regel
+        ' seiner eigenen Saison -- die anderen Jahre bleiben also stehen.
+        punkteAlleNeu()
+        regelnLaden()
+        ranglisteLaden()
+        statistikLaden()
+        spieleLaden()
+        meldeGruppe("Regel für " + saisonName(aktiveSaison()) + _
+                    " gespeichert, alle Punkte neu gerechnet.")
+    END IF
+
+    IF GUI_CLICKED(bRegelZurueck) THEN
+        DB_EXEC(db, "DELETE FROM punkteregeln WHERE saison = ?", aktiveSaison())
+        punkteAlleNeu()
+        regelnLaden()
+        ranglisteLaden()
+        statistikLaden()
+        spieleLaden()
+        meldeGruppe("Saison " + saisonName(aktiveSaison()) + " rechnet wieder nach der Vorgabe.")
     END IF
 
     IF GUI_CLICKED(bMit) THEN
