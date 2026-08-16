@@ -39,7 +39,12 @@ CONST TIPPSCHLUSS_VOR = 15 * 60
 ' Liga ein Spiel ist, steht in der Antwort (group.groupOrderID,
 ' leagueShortcut) -- die URL muss man dafuer nicht zurueckrechnen.
 CONST API = "https://api.openligadb.de/getmatchdata/"
-CONST SAISON = "2026"
+' Eine Saison heisst nach ihrem Anfangsjahr: 2026 ist die Saison 2026/27.
+' So macht es OpenLigaDB, und so steht sie auch in der Datenbank -- eine
+' Schreibweise, keine Umrechnung.
+CONST SAISON_ERSTE = 2005
+CONST SAISON_LETZTE = 2099
+CONST SAISON_VORGABE = 2026
 ' Beide Bundesligen haben 18 Vereine und damit 34 Spieltage.
 CONST MAX_SPIELTAG = 34
 ' Die Kuerzel sind die der API und stehen so auch in der Datenbank.
@@ -123,6 +128,7 @@ SUB anlegen()
     ' Text richtig, und ZEIT_PARSE macht daraus eine Zahl zum Rechnen.
     DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spiele (" + _
                 "id INTEGER PRIMARY KEY, " + _
+                "saison INTEGER NOT NULL DEFAULT " + STR$(SAISON_VORGABE) + ", " + _
                 "liga TEXT NOT NULL DEFAULT 'bl1', " + _
                 "spieltag INTEGER NOT NULL, " + _
                 "heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
@@ -141,15 +147,23 @@ SUB anlegen()
         ' Der alte Index ohne Liga muss weg -- der neue kommt gleich darunter.
         DB_EXEC(db, "DROP INDEX IF EXISTS idx_spiel")
     END IF
-    ' Ein Spiel ist eindeutig durch Liga, Spieltag und die beiden Vereine.
-    ' Die Liga muss mit in den Index, auch wenn dieselbe Paarung in beiden
-    ' Ligen praktisch nie vorkommt (ein Verein spielt in genau einer): das
-    ' UPSERT beim Abruf sagt ON CONFLICT(liga, spieltag, heim, gast), und
-    ' dafuer muss es einen Index ueber genau diese vier Spalten geben.
-    ' Als Index, nicht als Tabellen-Bedingung -- so gilt die Regel auch fuer
-    ' Datenbanken, die es schon vorher gab.
+    ' Und die Saison. Dieselbe Ueberlegung wie bei der Liga: der Vorgabewert
+    ' fuellt die vorhandenen Zeilen auf, und bis hierher konnte das Programm
+    ' nur die Saison 2026 holen -- fuer sie ist das also nicht geraten.
+    IF NOT spalteDa("spiele", "saison") THEN
+        DB_EXEC(db, "ALTER TABLE spiele ADD COLUMN saison INTEGER NOT NULL DEFAULT " + _
+                    STR$(SAISON_VORGABE))
+        DB_EXEC(db, "DROP INDEX IF EXISTS idx_spiel")
+    END IF
+    ' Ein Spiel ist eindeutig durch Saison, Liga, Spieltag und die beiden
+    ' Vereine. Ohne die Saison im Schluessel waere das Rueckspiel vom letzten
+    ' Jahr dasselbe Spiel wie das von diesem -- und der zweite Abruf wuerde
+    ' die alten Ergebnisse ueberschreiben.
+    ' Der Index muss ueber genau die Spalten gehen, die das UPSERT beim Abruf
+    ' in seinem ON CONFLICT nennt. Als Index, nicht als Tabellen-Bedingung --
+    ' so gilt die Regel auch fuer Datenbanken, die es schon vorher gab.
     DB_EXEC(db, "CREATE UNIQUE INDEX IF NOT EXISTS idx_spiel " + _
-                "ON spiele (liga, spieltag, heim, gast)")
+                "ON spiele (saison, liga, spieltag, heim, gast)")
     DB_EXEC(db, "CREATE TABLE IF NOT EXISTS tipps (" + _
                 "id INTEGER PRIMARY KEY, spieler_id INTEGER NOT NULL, " + _
                 "spiel_id INTEGER NOT NULL, tipp_heim INTEGER NOT NULL, " + _
@@ -218,33 +232,36 @@ END SUB
 ' Wie spielAnlegen, aber zurueckhaltend: ein vorhandener Termin bleibt
 ' stehen. COALESCE nimmt den alten Wert, wenn es einen gibt.
 SUB terminVorgabe(liga AS STRING, heim AS STRING, gast AS STRING, anstoss AS STRING)
-    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
-                "VALUES (?, 1, ?, ?, ?) " + _
-                "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
+    DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, anstoss) " + _
+                "VALUES (?, ?, 1, ?, ?, ?) " + _
+                "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + _
                 "  anstoss = COALESCE(spiele.anstoss, excluded.anstoss)", _
-            liga, heim, gast, anstoss)
+            SAISON_VORGABE, liga, heim, gast, anstoss)
 END SUB
 
 ' Ein Spiel anlegen oder seinen Anstoss auffrischen. Dieselbe Paarung am
 ' selben Spieltag gibt es nur einmal (UNIQUE) -- ein zweiter Abruf des
 ' Spielplans legt also keine Dubletten an.
-SUB spielAnlegen(liga AS STRING, spieltag AS INTEGER, _
+SUB spielAnlegen(saison AS INTEGER, liga AS STRING, spieltag AS INTEGER, _
                  heim AS STRING, gast AS STRING, anstoss AS STRING)
-    DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
-                "VALUES (?, ?, ?, ?, ?) " + _
-                "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
-                "  anstoss = excluded.anstoss", liga, spieltag, heim, gast, anstoss)
+    DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, anstoss) " + _
+                "VALUES (?, ?, ?, ?, ?, ?) " + _
+                "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + _
+                "  anstoss = excluded.anstoss", _
+            saison, liga, spieltag, heim, gast, anstoss)
 END SUB
 
 ' Das Ergebnis eines abgerufenen Spiels eintragen. Angesprochen wird es ueber
 ' denselben Schluessel wie beim Anlegen -- die Zeile gibt es an dieser Stelle
 ' schon. Ein von Hand eingetragenes Ergebnis wird dabei ueberschrieben: was
 ' die Liga meldet, gilt.
-SUB ergebnisSetzen(liga AS STRING, spieltag AS INTEGER, heim AS STRING, gast AS STRING, _
+SUB ergebnisSetzen(saison AS INTEGER, liga AS STRING, spieltag AS INTEGER, _
+                   heim AS STRING, gast AS STRING, _
                    toreHeim AS INTEGER, toreGast AS INTEGER)
     DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? " + _
-                "WHERE liga = ? AND spieltag = ? AND heim = ? AND gast = ?", _
-            toreHeim, toreGast, liga, spieltag, heim, gast)
+                "WHERE saison = ? AND liga = ? AND spieltag = ? " + _
+                "  AND heim = ? AND gast = ?", _
+            toreHeim, toreGast, saison, liga, spieltag, heim, gast)
 END SUB
 
 db = DB_OPEN(DATEI)
@@ -293,21 +310,33 @@ DIM ligaWahl AS GUI_WIDGET
 ligaWahl = GUI_DROPDOWN(win, 306, 46, 150, 26, [])
 GUI_SET_TAB(ligaWahl, 0)
 
+DIM lblSaison AS GUI_WIDGET
+lblSaison = GUI_LABEL(win, "Saison:", 470, 50)
+GUI_SET_TAB(lblSaison, 0)
+
+' Auch die Saison als Spinner, aus demselben Grund wie der Spieltag: man
+' geht ein Jahr zurueck oder vor, und beides ist ein Klick. Eine Liste
+' koennte ausserdem nur zeigen, was schon in der Datenbank steht -- eine
+' Saison, die man erst noch holen will, waere darin nicht zu waehlen.
+DIM saisonWahl AS GUI_WIDGET
+saisonWahl = GUI_SPINNER(win, 528, 46, 104, SAISON_ERSTE, SAISON_LETZTE, SAISON_VORGABE, 1)
+GUI_SET_TAB(saisonWahl, 0)
+
 DIM lblTag AS GUI_WIDGET
-lblTag = GUI_LABEL(win, "Spieltag:", 470, 50)
+lblTag = GUI_LABEL(win, "Spieltag:", 646, 50)
 GUI_SET_TAB(lblTag, 0)
 
 ' Ein Spinner statt einer Liste mit 34 Eintraegen: man geht meist zum
 ' naechsten oder zum vorigen Spieltag, und beides ist ein Klick.
 DIM tagWahl AS GUI_WIDGET
-tagWahl = GUI_SPINNER(win, 540, 46, 84, 1, MAX_SPIELTAG, 1, 1)
+tagWahl = GUI_SPINNER(win, 716, 46, 84, 1, MAX_SPIELTAG, 1, 1)
 GUI_SET_TAB(tagWahl, 0)
 
 ' Bei 34 Spieltagen in zwei Ligen ist die wichtigste Frage nicht "welche
 ' Spiele", sondern "wo fehlt noch ein Tipp?". Deshalb steht die Ausbeute
 ' gleich daneben.
 DIM lblGetippt AS GUI_WIDGET
-lblGetippt = GUI_LABEL(win, "", 638, 50)
+lblGetippt = GUI_LABEL(win, "", 814, 50)
 GUI_SET_TAB(lblGetippt, 0)
 
 DIM tabelle AS GUI_WIDGET
@@ -629,6 +658,38 @@ FUNCTION aktiveLiga() AS STRING
     RETURN ligaKuerzel[i]
 END FUNCTION
 
+FUNCTION aktiveSaison() AS INTEGER
+    RETURN INT(GUI_VALUE(saisonWahl))
+END FUNCTION
+
+' "2026/27" -- nur zum Anzeigen. In der Datenbank steht die 2026.
+FUNCTION saisonName(jahr AS INTEGER) AS STRING
+    RETURN STR$(jahr) + "/" + PADL$(STR$((jahr + 1) MOD 100), 2, "0")
+END FUNCTION
+
+' Welche Saison zeigt das Programm beim Start? Die mit dem naechsten
+' Anpfiff -- dieselbe Ueberlegung wie beim Spieltag, eine Ebene hoeher.
+' Steht nichts mehr an, die zuletzt vorhandene.
+FUNCTION saisonVorschlag() AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT saison FROM spiele " + _
+                     "WHERE anstoss IS NOT NULL AND anstoss >= ? " + _
+                     "ORDER BY anstoss LIMIT 1", ZEIT_TEXT$(ZEIT_JETZT()))
+    DIM jahr AS INTEGER : jahr = 0
+    IF DB_NEXT(r) THEN jahr = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+
+    IF jahr = 0 THEN
+        r = DB_QUERY(db, "SELECT MAX(saison) FROM spiele")
+        IF DB_NEXT(r) THEN
+            IF NOT DB_IS_NULL(r, 0) THEN jahr = DB_GET_INT(r, 0)
+        END IF
+        DB_CLOSE_RESULT(r)
+    END IF
+    IF jahr < SAISON_ERSTE OR jahr > SAISON_LETZTE THEN RETURN SAISON_VORGABE
+    RETURN jahr
+END FUNCTION
+
 ' Auf welchen Spieltag schaut man beim Start? Auf den, in dem das naechste
 ' Spiel liegt, das noch nicht angepfiffen ist -- dort steht die Arbeit an.
 ' Ist die Saison durch, bleibt der letzte stehen.
@@ -640,15 +701,17 @@ END FUNCTION
 FUNCTION spieltagVorschlag() AS INTEGER
     DIM r AS DB_RESULT
     r = DB_QUERY(db, "SELECT spieltag FROM spiele " + _
-                     "WHERE liga = ? AND anstoss IS NOT NULL AND anstoss >= ? " + _
-                     "ORDER BY anstoss LIMIT 1", aktiveLiga(), ZEIT_TEXT$(ZEIT_JETZT()))
+                     "WHERE saison = ? AND liga = ? " + _
+                     "  AND anstoss IS NOT NULL AND anstoss >= ? " + _
+                     "ORDER BY anstoss LIMIT 1", _
+                 aktiveSaison(), aktiveLiga(), ZEIT_TEXT$(ZEIT_JETZT()))
     DIM tag AS INTEGER : tag = 0
     IF DB_NEXT(r) THEN tag = DB_GET_INT(r, 0)
     DB_CLOSE_RESULT(r)
 
     IF tag = 0 THEN
-        r = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele WHERE liga = ?", _
-                     aktiveLiga())
+        r = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele " + _
+                         "WHERE saison = ? AND liga = ?", aktiveSaison(), aktiveLiga())
         IF DB_NEXT(r) THEN tag = DB_GET_INT(r, 0)
         DB_CLOSE_RESULT(r)
     END IF
@@ -695,9 +758,9 @@ SUB spieleLaden()
                      "       t.tipp_heim, t.tipp_gast, t.punkte, s.anstoss " + _
                      "FROM spiele s " + _
                      "LEFT JOIN tipps t ON t.spiel_id = s.id AND t.spieler_id = ? " + _
-                     "WHERE s.liga = ? AND s.spieltag = ? " + _
+                     "WHERE s.saison = ? AND s.liga = ? AND s.spieltag = ? " + _
                      "ORDER BY s.anstoss, s.id", _
-                 aktiverSpieler(), aktiveLiga(), aktiverSpieltag())
+                 aktiverSpieler(), aktiveSaison(), aktiveLiga(), aktiverSpieltag())
 
     WHILE DB_NEXT(r)
         IF spieleAnzahl >= MAXSPIELE THEN BREAK
@@ -786,11 +849,12 @@ SUB ranglisteLaden()
                      "  COUNT(t.id) AS tipps " + _
                      "FROM spieler p " + _
                      "LEFT JOIN tipps t ON t.spieler_id = p.id " + _
-                     "LEFT JOIN spiele s ON s.id = t.spiel_id " + _
+                     "LEFT JOIN spiele s ON s.id = t.spiel_id AND s.saison = ? " + _
                      "WHERE ? = 0 OR EXISTS (SELECT 1 FROM gruppen_mitglieder m " + _
                      "                       WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + _
                      "GROUP BY p.id, p.name " + _
-                     "ORDER BY punkte DESC, p.name", aktiveWertung(), aktiveWertung())
+                     "ORDER BY punkte DESC, p.name", _
+                 aktiveSaison(), aktiveWertung(), aktiveWertung())
     DIM platz AS INTEGER : platz = 1
     WHILE DB_NEXT(r)
         DIM zeile AS ARRAY OF STRING
@@ -815,7 +879,8 @@ END SUB
 ' und "gast": aus welcher Sicht man schaut, steht schon in der Zeile.
 FUNCTION tabellenAbfrage() AS STRING
     RETURN "WITH ligaspiele AS (" + _
-           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele WHERE liga = ?" + _
+           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele" + _
+           "     WHERE saison = ? AND liga = ?" + _
            "), vereine AS (" + _
            "    SELECT heim AS verein FROM ligaspiele" + _
            "    UNION SELECT gast FROM ligaspiele" + _
@@ -851,7 +916,7 @@ SUB tabelleLadenLiga()
     GUI_TABLE_CLEAR(tabelleLiga)
 
     DIM r AS DB_RESULT
-    r = DB_QUERY(db, tabellenAbfrage(), tabellenLiga())
+    r = DB_QUERY(db, tabellenAbfrage(), aktiveSaison(), tabellenLiga())
     DIM platz AS INTEGER : platz = 0
     ' Die Summe der Einsaetze, nicht das Maximum: mitten in einem Spieltag
     ' haben die Vereine verschieden viele Spiele. Jedes Spiel steckt in zwei
@@ -912,7 +977,7 @@ END FUNCTION
 FUNCTION statAbfrage() AS STRING
     RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + _
            "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
-           "WHERE t.spieler_id = ? AND s.tore_heim IS NOT NULL " + _
+           "WHERE t.spieler_id = ? AND s.saison = ? AND s.tore_heim IS NOT NULL " + _
            "  AND (? = '' OR s.liga = ?) " + _
            "ORDER BY s.spieltag"
 END FUNCTION
@@ -939,7 +1004,7 @@ SUB statistikLaden()
     DIM summe AS INTEGER : summe = 0
 
     DIM r AS DB_RESULT
-    r = DB_QUERY(db, statAbfrage(), statSpieler(), statLiga(), statLiga())
+    r = DB_QUERY(db, statAbfrage(), statSpieler(), aktiveSaison(), statLiga(), statLiga())
     WHILE DB_NEXT(r)
         DIM tag AS INTEGER : tag = DB_GET_INT(r, 0)
         ' Die ART aus dem Tipp und dem Ergebnis herleiten, nicht aus der
@@ -1223,9 +1288,10 @@ SUB spielplanHolen()
 
     DIM i AS INTEGER
     FOR i = 0 TO LIGEN - 1
-        abruf[i] = HTTP_GET_START(API + ligaKuerzel[i] + "/" + SAISON)
+        abruf[i] = HTTP_GET_START(API + ligaKuerzel[i] + "/" + STR$(aktiveSaison()))
     NEXT
-    melde("Spielplan und Ergebnisse beider Ligen werden geholt ...")
+    melde("Spielplan und Ergebnisse beider Ligen fuer " + _
+          saisonName(aktiveSaison()) + " werden geholt ...")
 END SUB
 
 ' Das ENDERGEBNIS eines Spiels aus der Antwort holen -- nicht das erstbeste.
@@ -1271,6 +1337,12 @@ SUB spielplanUebernehmen(text AS STRING)
     ' sein, die Antwort nicht.
     DIM liga AS STRING : liga = JSON_GET_STRING(wurzel, "0.leagueShortcut")
     IF liga = "" THEN RETURN
+    ' Dasselbe fuer die Saison -- auch sie steht in der Antwort
+    ' (leagueSeason). Der Abruf muss sich also nicht merken, was er gefragt
+    ' hat, und ein Abruf, der unterwegs die Saison wechselt, kann die Daten
+    ' nicht durcheinanderbringen.
+    DIM saison AS INTEGER : saison = JSON_GET_INT(wurzel, "0.leagueSeason")
+    IF saison < SAISON_ERSTE OR saison > SAISON_LETZTE THEN RETURN
 
     DB_BEGIN(db)
     DIM i AS INTEGER
@@ -1290,7 +1362,7 @@ SUB spielplanUebernehmen(text AS STRING)
             DIM roh AS STRING : roh = JSON_GET_STRING(wurzel, pfad + ".matchDateTime")
             DIM termin AS STRING : termin = ""
             IF ZEIT_LESBAR(roh) THEN termin = ZEIT_TEXT$(ZEIT_PARSE(roh))
-            spielAnlegen(liga, tag, heim, gast, termin)
+            spielAnlegen(saison, liga, tag, heim, gast, termin)
             holSpiele = holSpiele + 1
 
             ' Ist das Spiel gelaufen, kommt das Ergebnis gleich mit -- es
@@ -1299,7 +1371,7 @@ SUB spielplanUebernehmen(text AS STRING)
             DIM eh AS INTEGER : eh = 0
             DIM ea AS INTEGER : ea = 0
             IF endergebnis(wurzel, pfad, eh, ea) THEN
-                ergebnisSetzen(liga, tag, heim, gast, eh, ea)
+                ergebnisSetzen(saison, liga, tag, heim, gast, eh, ea)
             END IF
         END IF
     NEXT
@@ -1323,7 +1395,7 @@ SUB abrufAbschliessen()
     statistikLaden()
 
     DIM meldung AS STRING
-    meldung = STR$(holSpiele) + " Spiele aus beiden Ligen"
+    meldung = STR$(holSpiele) + " Spiele aus beiden Ligen, " + saisonName(aktiveSaison())
     IF neueErg = 1 THEN
         meldung = meldung + ", 1 neues Ergebnis"
     ELIF neueErg > 1 THEN
@@ -1381,14 +1453,17 @@ GUI_DROPDOWN_SET_SELECTED(statLigaWahl, 0)
 spielerLaden()
 gruppenLaden()
 mitgliederLaden()
-' Nicht bei 1 anfangen, sondern dort, wo der naechste Anpfiff liegt.
+' Nicht bei der Vorgabe anfangen, sondern dort, wo der naechste Anpfiff
+' liegt -- erst die Saison, dann darin der Spieltag. Die Reihenfolge ist
+' wichtig: der Spieltagsvorschlag sucht innerhalb der gewaehlten Saison.
+GUI_SET_VALUE(saisonWahl, saisonVorschlag())
 GUI_SET_VALUE(tagWahl, spieltagVorschlag())
 spieleLaden()
 ranglisteLaden()
 tabelleLadenLiga()
 statistikLaden()
 meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
-melde("Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
+melde("Saison " + saisonName(aktiveSaison()) + " -- Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
 ' ---- Hauptschleife -------------------------------------------------------
 DIM letzterSpieler AS INTEGER : letzterSpieler = 0
@@ -1398,6 +1473,7 @@ DIM letzteSekunde AS INTEGER : letzteSekunde = 0
 DIM letzteWertung AS INTEGER : letzteWertung = 0
 DIM letzteGruppe AS INTEGER : letzteGruppe = -1
 DIM letzteLiga AS INTEGER : letzteLiga = GUI_DROPDOWN_SELECTED(ligaWahl)
+DIM letzteSaison AS INTEGER : letzteSaison = aktiveSaison()
 DIM letzteTabLiga AS INTEGER : letzteTabLiga = GUI_DROPDOWN_SELECTED(tabLigaWahl)
 DIM letzterStatSpieler AS INTEGER : letzterStatSpieler = GUI_DROPDOWN_SELECTED(statSpielerWahl)
 DIM letzteStatLiga AS INTEGER : letzteStatLiga = GUI_DROPDOWN_SELECTED(statLigaWahl)
@@ -1415,6 +1491,22 @@ WHILE NOT QUITREQUESTED()
         letzteZeile = -1
         spieleLaden()
         melde("Spieler gewechselt.")
+    END IF
+
+    ' Saisonwechsel -> alles neu. Die Saison steht ueber allem anderen:
+    ' Rangliste, Ligatabelle und Statistik zeigen nur die gewaehlte, sonst
+    ' zaehlte man die Punkte aus fuenf Jahren zusammen.
+    IF aktiveSaison() <> letzteSaison THEN
+        letzteSaison = aktiveSaison()
+        letzteZeile = -1
+        GUI_SET_VALUE(tagWahl, spieltagVorschlag())
+        letzterTag = aktiverSpieltag()
+        spieleLaden()
+        ranglisteLaden()
+        tabelleLadenLiga()
+        statistikLaden()
+        melde("Saison " + saisonName(letzteSaison) + ", " + _
+              STR$(letzterTag) + ". Spieltag.")
     END IF
 
     ' Ligawechsel -> anderer Spielplan. Der Spieltag springt mit: die 2. Liga

@@ -97,12 +97,18 @@ db = DB_OPEN(":memory:")
 
 DB_EXEC(db, "CREATE TABLE spieler (id INTEGER PRIMARY KEY, name TEXT)")
 DB_EXEC(db, "CREATE TABLE spiele (id INTEGER PRIMARY KEY, " + _
+            "saison INTEGER NOT NULL DEFAULT 2026, " + _
             "liga TEXT NOT NULL DEFAULT 'bl1', spieltag INTEGER, " + _
             "heim TEXT, gast TEXT, anstoss TEXT, tore_heim INTEGER, tore_gast INTEGER)")
 ' Ein Spiel ist eindeutig durch Liga, Spieltag und die beiden Vereine --
 ' wie in tippspiel.dh als Index, damit die Regel auch fuer eine Datenbank
 ' gilt, die es schon vorher gab.
-DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (liga, spieltag, heim, gast)")
+DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (saison, liga, spieltag, heim, gast)")
+
+' Auf welche Saison schauen die Abfragen gerade? Im Programm kommt das aus
+' dem Spinner, hier aus dieser Zahl -- damit die Pruefungen weiter unten
+' umschalten koennen, ohne dass jeder Aufruf sie mitschleppen muss.
+DIM pruefSaison AS INTEGER : pruefSaison = 2026
 DB_EXEC(db, "CREATE TABLE tipps (id INTEGER PRIMARY KEY, spieler_id INTEGER, " + _
             "spiel_id INTEGER, tipp_heim INTEGER, tipp_gast INTEGER, punkte INTEGER, " + _
             "UNIQUE(spieler_id, spiel_id))")
@@ -214,13 +220,15 @@ END FUNCTION
 FUNCTION spieltagBei(liga AS STRING, jetzt AS STRING) AS INTEGER
     DIM q AS DB_RESULT
     q = DB_QUERY(db, "SELECT spieltag FROM spiele " + _
-                     "WHERE liga = ? AND anstoss IS NOT NULL AND anstoss >= ? " + _
-                     "ORDER BY anstoss LIMIT 1", liga, jetzt)
+                     "WHERE saison = ? AND liga = ? " + _
+                     "  AND anstoss IS NOT NULL AND anstoss >= ? " + _
+                     "ORDER BY anstoss LIMIT 1", pruefSaison, liga, jetzt)
     DIM tag AS INTEGER : tag = 0
     IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
     DB_CLOSE_RESULT(q)
     IF tag = 0 THEN
-        q = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele WHERE liga = ?", liga)
+        q = DB_QUERY(db, "SELECT COALESCE(MAX(spieltag), 1) FROM spiele " + _
+                         "WHERE saison = ? AND liga = ?", pruefSaison, liga)
         IF DB_NEXT(q) THEN tag = DB_GET_INT(q, 0)
         DB_CLOSE_RESULT(q)
     END IF
@@ -237,9 +245,9 @@ pruefe("Spieltag 3 hat 1 Spiel", anzahl("SELECT COUNT(*) FROM spiele WHERE spiel
 
 ' Ein zweiter Abruf desselben Spielplans darf nichts verdoppeln -- dafuer
 ' sorgt der Index, nicht das Programm.
-DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, anstoss) " + _
-            "VALUES ('bl1', 2, ?, ?, ?) " + _
-            "ON CONFLICT(liga, spieltag, heim, gast) DO UPDATE SET " + _
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, anstoss) " + _
+            "VALUES (2026, 'bl1', 2, ?, ?, ?) " + _
+            "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + _
             "  anstoss = excluded.anstoss", _
         "Leipzig", "Freiburg", "2026-09-04 18:30:00")
 pruefe("zweiter Abruf legt keine Dublette an", _
@@ -369,11 +377,11 @@ FUNCTION wertung(gid AS INTEGER, BYREF erster AS STRING, BYREF punkteErster AS I
                      "                    THEN t.punkte END), 0) AS punkte " + _
                      "FROM spieler p " + _
                      "LEFT JOIN tipps t ON t.spieler_id = p.id " + _
-                     "LEFT JOIN spiele s ON s.id = t.spiel_id " + _
+                     "LEFT JOIN spiele s ON s.id = t.spiel_id AND s.saison = ? " + _
                      "WHERE ? = 0 OR EXISTS (SELECT 1 FROM gruppen_mitglieder m " + _
                      "                       WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + _
                      "GROUP BY p.id, p.name " + _
-                     "ORDER BY punkte DESC, p.name", gid, gid)
+                     "ORDER BY punkte DESC, p.name", pruefSaison, gid, gid)
     erster = ""
     punkteErster = 0
     DIM n AS INTEGER : n = 0
@@ -506,7 +514,8 @@ PRINT "=== Ligatabelle ==="
 
 FUNCTION tabellenAbfrage() AS STRING
     RETURN "WITH ligaspiele AS (" + _
-           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele WHERE liga = ?" + _
+           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele" + _
+           "     WHERE saison = ? AND liga = ?" + _
            "), vereine AS (" + _
            "    SELECT heim AS verein FROM ligaspiele" + _
            "    UNION SELECT gast FROM ligaspiele" + _
@@ -555,7 +564,7 @@ DIM tDiff[MAXV] AS INTEGER
 DIM tPunkte[MAXV] AS INTEGER
 DIM tAnzahl AS INTEGER : tAnzahl = 0
 
-r = DB_QUERY(db, tabellenAbfrage(), "tl")
+r = DB_QUERY(db, tabellenAbfrage(), pruefSaison, "tl")
 WHILE DB_NEXT(r)
     tVerein[tAnzahl] = DB_GET_STRING(r, 0)
     tSp[tAnzahl] = DB_GET_INT(r, 1)
@@ -671,7 +680,7 @@ PRINT "=== Statistik eines Spielers ==="
 FUNCTION statAbfrage() AS STRING
     RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + _
            "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
-           "WHERE t.spieler_id = ? AND s.tore_heim IS NOT NULL " + _
+           "WHERE t.spieler_id = ? AND s.saison = ? AND s.tore_heim IS NOT NULL " + _
            "  AND (? = '' OR s.liga = ?) " + _
            "ORDER BY s.spieltag"
 END FUNCTION
@@ -679,7 +688,7 @@ END FUNCTION
 FUNCTION statZeilen(spieler AS INTEGER, liga AS STRING, _
                     BYREF summe AS INTEGER, BYREF exakt AS INTEGER) AS INTEGER
     DIM q AS DB_RESULT
-    q = DB_QUERY(db, statAbfrage(), spieler, liga, liga)
+    q = DB_QUERY(db, statAbfrage(), spieler, pruefSaison, liga, liga)
     DIM n AS INTEGER : n = 0
     summe = 0
     exakt = 0
@@ -720,6 +729,88 @@ DB_EXEC(db, "UPDATE tipps SET punkte = 99 WHERE spieler_id = 3")
 pruefe("eine falsche Punktespalte aendert die Statistik nicht", _
        statZeilen(3, "", sSumme, sExakt), 2)
 pruefe("  die Punkte kommen aus Tipp und Ergebnis", sSumme, 5)
+
+' Die Spalte wieder richtigstellen. Die RANGLISTE liest sie naemlich sehr
+' wohl -- sie summiert tipps.punkte, statt jeden Tipp neu zu rechnen. Liesse
+' man die 99 stehen, faende der naechste Abschnitt Clara mit 198 Punkten
+' vorn, und man suchte den Fehler dort, wo keiner ist.
+DB_EXEC(db, "UPDATE tipps SET punkte = 2 WHERE spieler_id = 3 AND spiel_id = 11")
+DB_EXEC(db, "UPDATE tipps SET punkte = 3 WHERE spieler_id = 3 AND spiel_id = 31")
+DB_EXEC(db, "UPDATE tipps SET punkte = NULL " + _
+            "WHERE spieler_id = 3 AND spiel_id NOT IN (11, 31)")
+
+' ---- Saisons -------------------------------------------------------------
+' Die Saison steht ueber Liga und Spieltag. Ohne sie im Schluessel waere das
+' Spiel Falke gegen Gams am 1. Spieltag jedes Jahr DASSELBE Spiel -- der
+' Abruf der neuen Saison wuerde die Ergebnisse der alten ueberschreiben, und
+' die Tipps von damals hingen ploetzlich an einem anderen Ergebnis.
+PRINT ""
+PRINT "=== Saisons ==="
+
+' Dieselbe Paarung, dieselbe Liga, derselbe Spieltag -- zwei Jahre.
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + _
+            "VALUES (2025, 'bl1', 1, 'Falke', 'Gams', 4, 0)")
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + _
+            "VALUES (2026, 'bl1', 1, 'Falke', 'Gams', 1, 1)")
+pruefe("dieselbe Paarung in zwei Saisons sind zwei Spiele", _
+       anzahl("SELECT COUNT(*) FROM spiele WHERE heim = 'Falke' AND gast = 'Gams'"), 2)
+
+DIM nochmal2 AS BOOLEAN : nochmal2 = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast) " + _
+                "VALUES (2026, 'bl1', 1, 'Falke', 'Gams')")
+CATCH e
+    nochmal2 = FALSE
+END TRY
+pruefeJa("in DERSELBEN Saison aber nicht", nochmal2, FALSE)
+
+' Der Abruf einer Saison darf die andere nicht anfassen -- genau hier haette
+' es vorher stillschweigend Daten gekostet.
+DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast, tore_heim, tore_gast) " + _
+            "VALUES (2026, 'bl1', 1, 'Falke', 'Gams', 3, 2) " + _
+            "ON CONFLICT(saison, liga, spieltag, heim, gast) DO UPDATE SET " + _
+            "  tore_heim = excluded.tore_heim, tore_gast = excluded.tore_gast")
+pruefe("das Ergebnis von 2025 bleibt stehen", _
+       anzahl("SELECT tore_heim FROM spiele WHERE saison = 2025 AND heim = 'Falke'"), 4)
+pruefe("  das von 2026 wird aufgefrischt", _
+       anzahl("SELECT tore_heim FROM spiele WHERE saison = 2026 AND heim = 'Falke'"), 3)
+
+' Zwei Tipps desselben Spielers auf "dasselbe" Spiel in zwei Saisons: das
+' geht, weil es zwei Spiele sind. Ohne die Saison waere der zweite Tipp als
+' Aenderung des ersten durchgegangen (UNIQUE(spieler_id, spiel_id)).
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + _
+            "SELECT 2, id, 4, 0, 3 FROM spiele WHERE saison = 2025 AND heim = 'Falke'")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + _
+            "SELECT 2, id, 0, 4, 0 FROM spiele WHERE saison = 2026 AND heim = 'Falke'")
+pruefe("Ben hat in beiden Saisons einen Tipp darauf", _
+       anzahl("SELECT COUNT(*) FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+              "WHERE t.spieler_id = 2 AND s.heim = 'Falke'"), 2)
+
+' Und die Wertung zaehlt sie NICHT zusammen -- darum geht es.
+DIM werWer AS STRING
+DIM werPkt AS INTEGER
+
+pruefSaison = 2025
+pruefe("2025 stehen alle Spieler da", wertung(0, werWer, werPkt), 3)
+pruefeText("  aber vorn steht Ben", werWer, "Ben")
+pruefe("  mit 3 Punkten aus seinem einen exakten Tipp", werPkt, 3)
+
+pruefSaison = 2026
+pruefe("2026 stehen weiter alle drei da", wertung(0, werWer, werPkt), 3)
+pruefeText("  und vorn steht unveraendert Anna", werWer, "Anna")
+pruefe("  mit ihren 6 Punkten -- Bens 3 aus 2025 zaehlen hier nicht", werPkt, 6)
+
+' Auch die Ligatabelle sieht nur ihre Saison.
+pruefSaison = 2025
+DIM qs AS DB_RESULT
+qs = DB_QUERY(db, tabellenAbfrage(), pruefSaison, "bl1")
+DIM v25 AS INTEGER : v25 = 0
+WHILE DB_NEXT(qs)
+    v25 = v25 + 1
+WEND
+DB_CLOSE_RESULT(qs)
+pruefe("die Tabelle von 2025 kennt nur deren zwei Vereine", v25, 2)
+pruefSaison = 2026
 
 DB_CLOSE(db)
 
