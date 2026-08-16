@@ -482,6 +482,126 @@ DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punk
 pruefe("Bens Zweitliga-Tipp zaehlt in der Gesamtwertung", wertung(0, wer, wieviel), 3)
 pruefeText("  und bringt ihn nicht an Anna vorbei", wer, "Anna")
 
+' ---- Ligatabelle ---------------------------------------------------------
+' Die Tabelle wird gerechnet, nicht gespeichert -- sie steht schon in den
+' Ergebnissen. Der Kniff: jedes Spiel liefert ZWEI Zeilen, eine je Sicht.
+' Wortgleich mit tippspiel.dh.
+PRINT ""
+PRINT "=== Ligatabelle ==="
+
+FUNCTION tabellenAbfrage() AS STRING
+    RETURN "WITH ligaspiele AS (" + _
+           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele WHERE liga = ?" + _
+           "), vereine AS (" + _
+           "    SELECT heim AS verein FROM ligaspiele" + _
+           "    UNION SELECT gast FROM ligaspiele" + _
+           "), auftritte AS (" + _
+           "    SELECT heim AS verein, tore_heim AS eigene, tore_gast AS fremde" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           "    UNION ALL" + _
+           "    SELECT gast, tore_gast, tore_heim" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           ") " + _
+           "SELECT v.verein, COUNT(a.verein) AS sp, " + _
+           "  COALESCE(SUM(a.eigene > a.fremde), 0) AS s, " + _
+           "  COALESCE(SUM(a.eigene = a.fremde), 0) AS u, " + _
+           "  COALESCE(SUM(a.eigene < a.fremde), 0) AS n, " + _
+           "  COALESCE(SUM(a.eigene), 0) AS tore, " + _
+           "  COALESCE(SUM(a.fremde), 0) AS gegentore, " + _
+           "  COALESCE(SUM(a.eigene) - SUM(a.fremde), 0) AS diff, " + _
+           "  COALESCE(SUM(CASE WHEN a.eigene > a.fremde THEN 3 " + _
+           "                    WHEN a.eigene = a.fremde THEN 1 ELSE 0 END), 0) AS punkte " + _
+           "FROM vereine v LEFT JOIN auftritte a ON a.verein = v.verein " + _
+           "GROUP BY v.verein " + _
+           "ORDER BY punkte DESC, diff DESC, tore DESC, v.verein"
+END FUNCTION
+
+' Eine eigene kleine Liga, damit die vorherigen Pruefungen nicht hineinreden.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast, tore_heim, tore_gast) VALUES " + _
+            "('tl', 1, 'Adler', 'Bieber', 3, 1), " + _
+            "('tl', 1, 'Chamaeleon', 'Dachs', 2, 2), " + _
+            "('tl', 2, 'Bieber', 'Chamaeleon', 0, 1), " + _
+            "('tl', 2, 'Dachs', 'Adler', 1, 1)")
+' Ein Spiel ohne Ergebnis darf nirgends mitzaehlen -- weder als Niederlage
+' noch als 0:0.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) VALUES " + _
+            "('tl', 3, 'Adler', 'Chamaeleon')")
+' Und ein Verein, der noch kein Spiel hatte, gehoert trotzdem in die Tabelle.
+DB_EXEC(db, "INSERT INTO spiele (liga, spieltag, heim, gast) VALUES " + _
+            "('tl', 3, 'Eichhorn', 'Bieber')")
+
+' Die Tabelle einmal einlesen.
+CONST MAXV = 20
+DIM tVerein[MAXV] AS STRING
+DIM tSp[MAXV] AS INTEGER
+DIM tTore[MAXV] AS INTEGER
+DIM tGegen[MAXV] AS INTEGER
+DIM tDiff[MAXV] AS INTEGER
+DIM tPunkte[MAXV] AS INTEGER
+DIM tAnzahl AS INTEGER : tAnzahl = 0
+
+r = DB_QUERY(db, tabellenAbfrage(), "tl")
+WHILE DB_NEXT(r)
+    tVerein[tAnzahl] = DB_GET_STRING(r, 0)
+    tSp[tAnzahl] = DB_GET_INT(r, 1)
+    tTore[tAnzahl] = DB_GET_INT(r, 5)
+    tGegen[tAnzahl] = DB_GET_INT(r, 6)
+    tDiff[tAnzahl] = DB_GET_INT(r, 7)
+    tPunkte[tAnzahl] = DB_GET_INT(r, 8)
+    tAnzahl = tAnzahl + 1
+WEND
+DB_CLOSE_RESULT(r)
+
+PRINT "  Tabelle:"
+DIM ti AS INTEGER
+FOR ti = 0 TO tAnzahl - 1
+    PRINT "    "; ti + 1; ". "; tVerein[ti]; "  "; tSp[ti]; " Sp  "; _
+          tTore[ti]; ":"; tGegen[ti]; "  "; tDiff[ti]; "  "; tPunkte[ti]; " Pkt"
+NEXT
+
+' Adler: 3:1 gewonnen, 1:1 -> 4 Punkte, 4:2, Diff +2
+' Chamaeleon: 2:2, 1:0 gewonnen -> 4 Punkte, 3:2, Diff +1
+' Beide 4 Punkte -- die Tordifferenz entscheidet.
+pruefe("alle Vereine stehen drin, auch der ohne Spiel", tAnzahl, 5)
+pruefeText("Erster ist Adler (4 Punkte, Diff +2)", tVerein[0], "Adler")
+pruefeText("Zweiter ist Chamaeleon (4 Punkte, Diff +1)", tVerein[1], "Chamaeleon")
+pruefe("  Adler hat 4 Punkte", tPunkte[0], 4)
+pruefe("  Chamaeleon auch", tPunkte[1], 4)
+pruefe("  entschieden hat die Tordifferenz", tDiff[0] - tDiff[1], 1)
+
+pruefe("Adler hat zwei Spiele -- das dritte hat kein Ergebnis", tSp[0], 2)
+
+' Eichhorn hat noch nicht gespielt und steht damit auf 0 Punkten, aber auf
+' Tordifferenz 0. Bieber hat zwei Spiele verloren: auch 0 Punkte, aber -3.
+' Der Verein OHNE Spiel steht also ueber dem, der zweimal verloren hat --
+' das ist richtig so und faellt nur auf, wenn man es einmal hinschreibt.
+pruefeText("wer nicht gespielt hat, steht auf Platz 4", tVerein[3], "Eichhorn")
+pruefe("  mit null Spielen", tSp[3], 0)
+pruefe("  und null Punkten (nicht NULL)", tPunkte[3], 0)
+pruefeText("Letzter ist Bieber -- 0 Punkte UND -3 Tore", tVerein[tAnzahl - 1], "Bieber")
+pruefe("  seine Differenz ist schlechter als die von Eichhorn", tDiff[tAnzahl - 1], -3)
+
+' Die Probe, die eine Ligatabelle immer bestehen muss: was die einen
+' schiessen, kassieren die anderen.
+DIM summeTore AS INTEGER : summeTore = 0
+DIM summeGegen AS INTEGER : summeGegen = 0
+DIM summeSp AS INTEGER : summeSp = 0
+FOR ti = 0 TO tAnzahl - 1
+    summeTore = summeTore + tTore[ti]
+    summeGegen = summeGegen + tGegen[ti]
+    summeSp = summeSp + tSp[ti]
+NEXT
+pruefe("Tore und Gegentore gehen auf", summeTore - summeGegen, 0)
+pruefe("vier gewertete Spiele, also acht Einsaetze", summeSp, 8)
+
+' Ein Unentschieden gibt beiden einen Punkt -- zusammen 2 statt 3.
+' Vier Spiele, davon zwei unentschieden: 2*3 + 2*2 = 10.
+DIM summePunkte AS INTEGER : summePunkte = 0
+FOR ti = 0 TO tAnzahl - 1
+    summePunkte = summePunkte + tPunkte[ti]
+NEXT
+pruefe("Punktsumme stimmt (2 Siege a 3, 2 Remis a 2)", summePunkte, 10)
+
 DB_CLOSE(db)
 
 PRINT ""

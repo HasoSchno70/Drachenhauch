@@ -239,7 +239,7 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 960, 600)
 
 DIM reiter AS ARRAY OF STRING
-reiter = SPLIT$("Tipps|Rangliste|Gruppen", "|")
+reiter = SPLIT$("Tipps|Rangliste|Tabelle|Gruppen", "|")
 GUI_TABS(win, reiter)
 
 ' --- Reiter 1: Tipps ---
@@ -375,14 +375,48 @@ GUI_TABLE_COL_ALIGN(rang, 0, "mitte")
 GUI_TABLE_COL_ALIGN(rang, 2, "rechts")
 GUI_TABLE_COL_ALIGN(rang, 3, "rechts")
 
-' --- Reiter 3: Gruppen ---
+' --- Reiter 3: Ligatabelle ---
+' Eine eigene Ligawahl statt der aus dem ersten Reiter: wer auf die Tabelle
+' schaut, will dort umschalten koennen und nicht erst zurueckblaettern.
+DIM lblTabLiga AS GUI_WIDGET
+lblTabLiga = GUI_LABEL(win, "Liga:", 20, 54)
+GUI_SET_TAB(lblTabLiga, 2)
+
+DIM tabLigaWahl AS GUI_WIDGET
+tabLigaWahl = GUI_DROPDOWN(win, 60, 50, 170, 26, [])
+GUI_SET_TAB(tabLigaWahl, 2)
+
+DIM lblTabStand AS GUI_WIDGET
+lblTabStand = GUI_LABEL(win, "", 246, 54)
+GUI_SET_TAB(lblTabStand, 2)
+
+DIM tabelleLiga AS GUI_WIDGET
+tabelleLiga = GUI_TABLE(win, 20, 86, 920, 424)
+GUI_SET_TAB(tabelleLiga, 2)
+DIM tabKopf AS ARRAY OF STRING
+tabKopf = SPLIT$("Platz|Verein|Sp|S|U|N|Tore|Diff|Punkte", "|")
+GUI_TABLE_HEADERS(tabelleLiga, tabKopf)
+DIM tabBreiten AS ARRAY OF INTEGER
+tabBreiten = [60, 330, 60, 55, 55, 55, 110, 75, 85]
+GUI_TABLE_COL_WIDTHS(tabelleLiga, tabBreiten)
+GUI_TABLE_SET(tabelleLiga, "zeilenhoehe", 30)
+GUI_TABLE_SET(tabelleLiga, "kopfhoehe", 28)
+GUI_TABLE_SET(tabelleLiga, "zebra", 1)
+DIM tabSpalte AS INTEGER
+FOR tabSpalte = 2 TO 8
+    GUI_TABLE_COL_ALIGN(tabelleLiga, tabSpalte, "rechts")
+NEXT
+GUI_TABLE_COL_ALIGN(tabelleLiga, 0, "mitte")
+GUI_TABLE_COL_ALIGN(tabelleLiga, 6, "mitte")
+
+' --- Reiter 4: Gruppen ---
 DIM lblGruppen AS GUI_WIDGET
 lblGruppen = GUI_LABEL(win, "Tippgemeinschaften:", 20, 54)
-GUI_SET_TAB(lblGruppen, 2)
+GUI_SET_TAB(lblGruppen, 3)
 
 DIM gruppenTab AS GUI_WIDGET
 gruppenTab = GUI_TABLE(win, 20, 80, 420, 300)
-GUI_SET_TAB(gruppenTab, 2)
+GUI_SET_TAB(gruppenTab, 3)
 DIM gruppenKopf AS ARRAY OF STRING
 gruppenKopf = SPLIT$("Gemeinschaft|Mitglieder", "|")
 GUI_TABLE_HEADERS(gruppenTab, gruppenKopf)
@@ -396,23 +430,23 @@ GUI_TABLE_COL_ALIGN(gruppenTab, 1, "rechts")
 
 DIM neuName AS GUI_WIDGET
 neuName = GUI_TEXTINPUT(win, 20, 392, 280, 28, "Name der Tippgemeinschaft")
-GUI_SET_TAB(neuName, 2)
+GUI_SET_TAB(neuName, 3)
 
 DIM bNeu AS GUI_WIDGET
 bNeu = GUI_BUTTON(win, "Anlegen", 310, 392, 130, 28)
-GUI_SET_TAB(bNeu, 2)
+GUI_SET_TAB(bNeu, 3)
 
 DIM bWeg AS GUI_WIDGET
 bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 430, 190, 28)
-GUI_SET_TAB(bWeg, 2)
+GUI_SET_TAB(bWeg, 3)
 
 DIM lblMitglieder AS GUI_WIDGET
 lblMitglieder = GUI_LABEL(win, "Mitglieder:", 470, 54)
-GUI_SET_TAB(lblMitglieder, 2)
+GUI_SET_TAB(lblMitglieder, 3)
 
 DIM mitgliedTab AS GUI_WIDGET
 mitgliedTab = GUI_TABLE(win, 470, 80, 470, 300)
-GUI_SET_TAB(mitgliedTab, 2)
+GUI_SET_TAB(mitgliedTab, 3)
 DIM mitgliedKopf AS ARRAY OF STRING
 mitgliedKopf = SPLIT$("Spieler|dabei", "|")
 GUI_TABLE_HEADERS(mitgliedTab, mitgliedKopf)
@@ -426,12 +460,12 @@ GUI_TABLE_COL_ALIGN(mitgliedTab, 1, "mitte")
 
 DIM bMit AS GUI_WIDGET
 bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 470, 392, 220, 28)
-GUI_SET_TAB(bMit, 2)
+GUI_SET_TAB(bMit, 3)
 
 ' Eigene Statuszeile: die vom ersten Reiter ist hier nicht zu sehen.
 DIM gruppenStand AS GUI_WIDGET
 gruppenStand = GUI_LABEL(win, "", 20, 476)
-GUI_SET_TAB(gruppenStand, 2)
+GUI_SET_TAB(gruppenStand, 3)
 
 ' ---- Daten im Speicher ---------------------------------------------------
 ' Die Datenbank ist die Wahrheit, die Tabelle nur ihre Ansicht. Deshalb
@@ -671,6 +705,92 @@ SUB ranglisteLaden()
         platz = platz + 1
     WEND
     DB_CLOSE_RESULT(r)
+END SUB
+
+' ---- Ligatabelle ---------------------------------------------------------
+' Die Tabelle wird GERECHNET, nicht gespeichert. Sie steht schon in den
+' Ergebnissen -- eine zweite Tabelle daneben waere eine zweite Wahrheit, die
+' man nach jedem eingetragenen Ergebnis nachziehen muesste. Vergisst man es
+' einmal, zeigt das Programm etwas an, das nicht mehr stimmt.
+'
+' Der Kniff: jedes Spiel liefert ZWEI Zeilen -- eine aus Sicht des
+' Heimvereins, eine aus Sicht des Gastes. Danach ist es eine gewoehnliche
+' Gruppierung. "eigene" und "fremde" heissen die Tore deshalb, nicht "heim"
+' und "gast": aus welcher Sicht man schaut, steht schon in der Zeile.
+FUNCTION tabellenAbfrage() AS STRING
+    RETURN "WITH ligaspiele AS (" + _
+           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele WHERE liga = ?" + _
+           "), vereine AS (" + _
+           "    SELECT heim AS verein FROM ligaspiele" + _
+           "    UNION SELECT gast FROM ligaspiele" + _
+           "), auftritte AS (" + _
+           "    SELECT heim AS verein, tore_heim AS eigene, tore_gast AS fremde" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           "    UNION ALL" + _
+           "    SELECT gast, tore_gast, tore_heim" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           ") " + _
+           "SELECT v.verein, COUNT(a.verein) AS sp, " + _
+           "  COALESCE(SUM(a.eigene > a.fremde), 0) AS s, " + _
+           "  COALESCE(SUM(a.eigene = a.fremde), 0) AS u, " + _
+           "  COALESCE(SUM(a.eigene < a.fremde), 0) AS n, " + _
+           "  COALESCE(SUM(a.eigene), 0) AS tore, " + _
+           "  COALESCE(SUM(a.fremde), 0) AS gegentore, " + _
+           "  COALESCE(SUM(a.eigene) - SUM(a.fremde), 0) AS diff, " + _
+           "  COALESCE(SUM(CASE WHEN a.eigene > a.fremde THEN 3 " + _
+           "                    WHEN a.eigene = a.fremde THEN 1 ELSE 0 END), 0) AS punkte " + _
+           "FROM vereine v LEFT JOIN auftritte a ON a.verein = v.verein " + _
+           "GROUP BY v.verein " + _
+           "ORDER BY punkte DESC, diff DESC, tore DESC, v.verein"
+END FUNCTION
+
+' Welche Liga zeigt der Tabellen-Reiter?
+FUNCTION tabellenLiga() AS STRING
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(tabLigaWahl)
+    IF i < 0 OR i >= LIGEN THEN RETURN ligaKuerzel[0]
+    RETURN ligaKuerzel[i]
+END FUNCTION
+
+SUB tabelleLadenLiga()
+    GUI_TABLE_CLEAR(tabelleLiga)
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, tabellenAbfrage(), tabellenLiga())
+    DIM platz AS INTEGER : platz = 0
+    ' Die Summe der Einsaetze, nicht das Maximum: mitten in einem Spieltag
+    ' haben die Vereine verschieden viele Spiele. Jedes Spiel steckt in zwei
+    ' Einsaetzen, deshalb am Ende halbieren.
+    DIM einsaetze AS INTEGER : einsaetze = 0
+    WHILE DB_NEXT(r)
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(STR$(platz + 1) + "|" + DB_GET_STRING(r, 0) + "|" + _
+                       STR$(DB_GET_INT(r, 1)) + "|" + STR$(DB_GET_INT(r, 2)) + "|" + _
+                       STR$(DB_GET_INT(r, 3)) + "|" + STR$(DB_GET_INT(r, 4)) + "|" + _
+                       STR$(DB_GET_INT(r, 5)) + ":" + STR$(DB_GET_INT(r, 6)) + "|" + _
+                       STR$(DB_GET_INT(r, 7)) + "|" + STR$(DB_GET_INT(r, 8)), "|")
+        GUI_TABLE_ADD_ROW(tabelleLiga, zeile)
+        einsaetze = einsaetze + DB_GET_INT(r, 1)
+        platz = platz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    ' Der Erste in Gold -- wie in der Rangliste. Die letzten drei rot: in
+    ' BEIDEN Ligen sind das die Absteiger bzw. der Relegationsplatz.
+    ' Die Plaetze oben unterscheiden sich dagegen je Liga, die bleiben blass.
+    IF platz > 0 THEN GUI_TABLE_ROW_COLOR(tabelleLiga, 0, &HF4E3A6, -1)
+    DIM i AS INTEGER
+    IF platz >= 6 THEN
+        FOR i = platz - 3 TO platz - 1
+            GUI_TABLE_ROW_COLOR(tabelleLiga, i, &HE07A7A, -1)
+        NEXT
+    END IF
+
+    IF platz = 0 THEN
+        GUI_SET_TEXT(lblTabStand, "keine Spiele -- erst den Spielplan holen")
+    ELSE
+        GUI_SET_TEXT(lblTabStand, STR$(platz) + " Vereine, " + _
+                     STR$(einsaetze \ 2) + " Spiele gewertet")
+    END IF
 END SUB
 
 ' ---- Tippgemeinschaften --------------------------------------------------
@@ -967,6 +1087,7 @@ SUB abrufAbschliessen()
     IF holSpiele > 0 THEN GUI_SET_VALUE(tagWahl, spieltagVorschlag())
     spieleLaden()
     ranglisteLaden()
+    tabelleLadenLiga()
 
     DIM meldung AS STRING
     meldung = STR$(holSpiele) + " Spiele aus beiden Ligen"
@@ -1012,6 +1133,8 @@ FOR li = 0 TO LIGEN - 1
 NEXT
 GUI_SET_DROPDOWN(ligaWahl, ligaListe)
 GUI_DROPDOWN_SET_SELECTED(ligaWahl, 0)
+GUI_SET_DROPDOWN(tabLigaWahl, ligaListe)
+GUI_DROPDOWN_SET_SELECTED(tabLigaWahl, 0)
 
 spielerLaden()
 gruppenLaden()
@@ -1020,6 +1143,7 @@ mitgliederLaden()
 GUI_SET_VALUE(tagWahl, spieltagVorschlag())
 spieleLaden()
 ranglisteLaden()
+tabelleLadenLiga()
 meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
 melde("Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
@@ -1031,6 +1155,7 @@ DIM letzteSekunde AS INTEGER : letzteSekunde = 0
 DIM letzteWertung AS INTEGER : letzteWertung = 0
 DIM letzteGruppe AS INTEGER : letzteGruppe = -1
 DIM letzteLiga AS INTEGER : letzteLiga = GUI_DROPDOWN_SELECTED(ligaWahl)
+DIM letzteTabLiga AS INTEGER : letzteTabLiga = GUI_DROPDOWN_SELECTED(tabLigaWahl)
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
@@ -1071,6 +1196,12 @@ WHILE NOT QUITREQUESTED()
     IF GUI_DROPDOWN_SELECTED(wertungWahl) <> letzteWertung THEN
         letzteWertung = GUI_DROPDOWN_SELECTED(wertungWahl)
         ranglisteLaden()
+    END IF
+
+    ' --- Reiter Tabelle: andere Liga ---
+    IF GUI_DROPDOWN_SELECTED(tabLigaWahl) <> letzteTabLiga THEN
+        letzteTabLiga = GUI_DROPDOWN_SELECTED(tabLigaWahl)
+        tabelleLadenLiga()
     END IF
 
     ' --- Reiter Gruppen ---
@@ -1236,6 +1367,9 @@ WHILE NOT QUITREQUESTED()
                 punkteNeu(spielId[zeile], eh, eg)
                 spieleLaden()
                 ranglisteLaden()
+                ' Ein Ergebnis aendert auch die Ligatabelle -- sie wird
+                ' gerechnet, also reicht ein Neuladen.
+                tabelleLadenLiga()
                 melde("Ergebnis " + STR$(eh) + ":" + STR$(eg) + " eingetragen, Punkte neu gerechnet.")
             END IF
         END IF
