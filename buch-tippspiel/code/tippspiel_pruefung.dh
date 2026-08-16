@@ -39,6 +39,16 @@ SUB pruefeJa(was AS STRING, ist AS BOOLEAN, soll AS BOOLEAN)
     END IF
 END SUB
 
+SUB pruefeText(was AS STRING, ist AS STRING, soll AS STRING)
+    geprueft = geprueft + 1
+    IF ist = soll THEN
+        PRINT "  ok   "; was; " = "; ist
+    ELSE
+        PRINT "  FEHL "; was; " = '"; ist; "' (erwartet '"; soll; "')"
+        fehler = fehler + 1
+    END IF
+END SUB
+
 ' ---- Die Regel (wortgleich mit tippspiel.dh) -----------------------------
 FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
     IF heim > gast THEN RETURN 1
@@ -310,6 +320,103 @@ pruefe("  0:0 ist ein Ergebnis, kein fehlendes", h + g, 0)
 ' Endergebnis gibt 3. Genau daran faellt der Fehler NICHT auf.
 pruefe("exakter Tipp auf 2:3 gibt 3", punkte(2, 3, 2, 3), 3)
 pruefe("Tipp auf den Halbzeitstand 0:2 gaebe nur 1", punkte(0, 2, 2, 3), 1)
+
+' ---- Tippgemeinschaften --------------------------------------------------
+' Das Buero tippt gegen das Buero. Die Rangliste bleibt dieselbe Rechnung --
+' nur der Kreis, ueber den sie geht, ist ein anderer. Genau deshalb steht sie
+' auch im Programm nur einmal da: "? = 0" heisst alle.
+PRINT ""
+PRINT "=== Tippgemeinschaften ==="
+
+DB_EXEC(db, "CREATE TABLE gruppen (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
+DB_EXEC(db, "CREATE TABLE gruppen_mitglieder (gruppe_id INTEGER NOT NULL, " + _
+            "spieler_id INTEGER NOT NULL, PRIMARY KEY (gruppe_id, spieler_id))")
+
+' Clara dazu: Spiel 11 endete 1:0, sie tippt 2:1 -- Tendenz und Differenz
+' stimmen, macht 2 Punkte. Anna hat 6, Ben 0.
+DB_EXEC(db, "INSERT INTO spieler (id, name) VALUES (3, 'Clara')")
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast, punkte) " + _
+            "VALUES (3, 11, 2, 1, 2)")
+
+' Die Rangliste des Programms, wortgleich. gid = 0 heisst: alle Spieler.
+FUNCTION wertung(gid AS INTEGER, BYREF erster AS STRING, BYREF punkteErster AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, "SELECT p.name, " + _
+                     "  COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + _
+                     "                    THEN t.punkte END), 0) AS punkte " + _
+                     "FROM spieler p " + _
+                     "LEFT JOIN tipps t ON t.spieler_id = p.id " + _
+                     "LEFT JOIN spiele s ON s.id = t.spiel_id " + _
+                     "WHERE ? = 0 OR EXISTS (SELECT 1 FROM gruppen_mitglieder m " + _
+                     "                       WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + _
+                     "GROUP BY p.id, p.name " + _
+                     "ORDER BY punkte DESC, p.name", gid, gid)
+    erster = ""
+    punkteErster = 0
+    DIM n AS INTEGER : n = 0
+    WHILE DB_NEXT(q)
+        IF n = 0 THEN
+            erster = DB_GET_STRING(q, 0)
+            punkteErster = DB_GET_INT(q, 1)
+        END IF
+        n = n + 1
+    WEND
+    DB_CLOSE_RESULT(q)
+    RETURN n
+END FUNCTION
+
+DIM wer AS STRING
+DIM wieviel AS INTEGER
+pruefe("ohne Gemeinschaft stehen alle drin", wertung(0, wer, wieviel), 3)
+pruefeText("  und vorn steht Anna", wer, "Anna")
+pruefe("  mit 6 Punkten", wieviel, 6)
+
+DB_EXEC(db, "INSERT INTO gruppen (id, name) VALUES (1, 'Büro'), (2, 'Familie')")
+DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (1,1), (1,3)")
+
+pruefe("das Buero sind zwei", wertung(1, wer, wieviel), 2)
+pruefeText("  vorn steht Anna", wer, "Anna")
+pruefe("  Punkte bleiben dieselben wie in der Gesamtwertung", wieviel, 6)
+
+' Eine leere Gemeinschaft ist leer -- nicht "alle". Der haeufigste Fehler
+' bei so einem Filter: der leere Fall faellt auf den ungefilterten zurueck.
+pruefe("eine Gemeinschaft ohne Mitglieder ist leer", wertung(2, wer, wieviel), 0)
+
+' Ein Spieler darf in mehreren sein -- deshalb eine eigene Tabelle und keine
+' Spalte am Spieler.
+DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (2, 1)")
+pruefe("Anna ist jetzt in zweien", _
+       anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE spieler_id = 1"), 2)
+pruefe("die Familie ist trotzdem nur eine Person", wertung(2, wer, wieviel), 1)
+
+' Zweimal dasselbe Mitglied laesst die Datenbank gar nicht erst zu.
+DIM ging AS BOOLEAN : ging = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) VALUES (1, 1)")
+CATCH e
+    ging = FALSE
+END TRY
+pruefeJa("dasselbe Mitglied zweimal geht nicht", ging, FALSE)
+pruefe("  und hat nichts hinterlassen", _
+       anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE gruppe_id = 1"), 2)
+
+ging = TRUE
+TRY
+    DB_EXEC(db, "INSERT INTO gruppen (name) VALUES ('Büro')")
+CATCH e
+    ging = FALSE
+END TRY
+pruefeJa("denselben Namen zweimal auch nicht", ging, FALSE)
+
+' Loeschen loest die Gemeinschaft auf, nicht die Tipps.
+DIM tippsVorher AS INTEGER : tippsVorher = anzahl("SELECT COUNT(*) FROM tipps")
+DB_EXEC(db, "DELETE FROM gruppen_mitglieder WHERE gruppe_id = 1")
+DB_EXEC(db, "DELETE FROM gruppen WHERE id = 1")
+pruefe("geloescht ist geloescht", anzahl("SELECT COUNT(*) FROM gruppen WHERE id = 1"), 0)
+pruefe("  die Mitgliederliste geht mit", _
+       anzahl("SELECT COUNT(*) FROM gruppen_mitglieder WHERE gruppe_id = 1"), 0)
+pruefe("  die Tipps bleiben", anzahl("SELECT COUNT(*) FROM tipps"), tippsVorher)
+pruefe("  und die Gesamtwertung steht unveraendert da", wertung(0, wer, wieviel), 3)
 
 DB_CLOSE(db)
 

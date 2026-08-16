@@ -101,6 +101,17 @@ SUB anlegen()
                 "spiel_id INTEGER NOT NULL, tipp_heim INTEGER NOT NULL, " + _
                 "tipp_gast INTEGER NOT NULL, punkte INTEGER, " + _
                 "UNIQUE(spieler_id, spiel_id))")
+
+    ' Tippgemeinschaften: das Buero tippt gegen das Buero, die Familie gegen
+    ' die Familie. Ein Spieler kann in mehreren sein -- die Zugehoerigkeit
+    ' steht deshalb in einer eigenen Tabelle und nicht als Spalte am Spieler.
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS gruppen (" + _
+                "id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE)")
+    ' Kein eigener Schluessel: die Zeile IST das Paar. Zweimal dasselbe
+    ' Mitglied laesst die Datenbank damit gar nicht erst zu.
+    DB_EXEC(db, "CREATE TABLE IF NOT EXISTS gruppen_mitglieder (" + _
+                "gruppe_id INTEGER NOT NULL, spieler_id INTEGER NOT NULL, " + _
+                "PRIMARY KEY (gruppe_id, spieler_id))")
 END SUB
 
 FUNCTION anzahl(sql AS STRING) AS INTEGER
@@ -135,6 +146,15 @@ SUB grunddaten()
     terminVorgabe("RB Leipzig", "Borussia Mönchengladbach", "2026-08-29 15:30:00")
     terminVorgabe("SC Freiburg", "SV Werder Bremen", "2026-08-30 15:30:00")
     terminVorgabe("1. FC Köln", "TSG Hoffenheim", "2026-08-29 15:30:00")
+
+    ' Eine Tippgemeinschaft zum Anschauen -- nicht alle sind drin, sonst
+    ' waere sie von der Gesamtwertung nicht zu unterscheiden.
+    IF anzahl("SELECT COUNT(*) FROM gruppen") = 0 THEN
+        DB_EXEC(db, "INSERT INTO gruppen (name) VALUES ('Büro')")
+        DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) " + _
+                    "SELECT g.id, p.id FROM gruppen g, spieler p " + _
+                    "WHERE g.name = 'Büro' AND p.name IN ('Anna', 'Ben')")
+    END IF
     DB_COMMIT(db)
 END SUB
 
@@ -193,7 +213,7 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 960, 600)
 
 DIM reiter AS ARRAY OF STRING
-reiter = SPLIT$("Tipps|Rangliste", "|")
+reiter = SPLIT$("Tipps|Rangliste|Gruppen", "|")
 GUI_TABS(win, reiter)
 
 ' --- Reiter 1: Tipps ---
@@ -294,8 +314,18 @@ hinweis = GUI_LABEL(win, "3 Punkte exakt | 2 richtige Differenz | 1 richtige Ten
 GUI_SET_TAB(hinweis, 0)
 
 ' --- Reiter 2: Rangliste ---
+DIM lblWertung AS GUI_WIDGET
+lblWertung = GUI_LABEL(win, "Wertung:", 20, 54)
+GUI_SET_TAB(lblWertung, 1)
+
+' "Alle Spieler" oder eine Tippgemeinschaft. Die Rangliste ist dieselbe --
+' nur der Kreis, ueber den sie geht, ist ein anderer.
+DIM wertungWahl AS GUI_WIDGET
+wertungWahl = GUI_DROPDOWN(win, 90, 50, 260, 26, [])
+GUI_SET_TAB(wertungWahl, 1)
+
 DIM rang AS GUI_WIDGET
-rang = GUI_TABLE(win, 20, 50, 920, 460)
+rang = GUI_TABLE(win, 20, 86, 920, 424)
 GUI_SET_TAB(rang, 1)
 DIM rangKopf AS ARRAY OF STRING
 rangKopf = SPLIT$("Platz|Spieler|Punkte|Tipps", "|")
@@ -309,6 +339,64 @@ GUI_TABLE_SET(rang, "zebra", 1)
 GUI_TABLE_COL_ALIGN(rang, 0, "mitte")
 GUI_TABLE_COL_ALIGN(rang, 2, "rechts")
 GUI_TABLE_COL_ALIGN(rang, 3, "rechts")
+
+' --- Reiter 3: Gruppen ---
+DIM lblGruppen AS GUI_WIDGET
+lblGruppen = GUI_LABEL(win, "Tippgemeinschaften:", 20, 54)
+GUI_SET_TAB(lblGruppen, 2)
+
+DIM gruppenTab AS GUI_WIDGET
+gruppenTab = GUI_TABLE(win, 20, 80, 420, 300)
+GUI_SET_TAB(gruppenTab, 2)
+DIM gruppenKopf AS ARRAY OF STRING
+gruppenKopf = SPLIT$("Gemeinschaft|Mitglieder", "|")
+GUI_TABLE_HEADERS(gruppenTab, gruppenKopf)
+DIM gruppenBreiten AS ARRAY OF INTEGER
+gruppenBreiten = [300, 120]
+GUI_TABLE_COL_WIDTHS(gruppenTab, gruppenBreiten)
+GUI_TABLE_SET(gruppenTab, "zeilenhoehe", 30)
+GUI_TABLE_SET(gruppenTab, "kopfhoehe", 28)
+GUI_TABLE_SET(gruppenTab, "zebra", 1)
+GUI_TABLE_COL_ALIGN(gruppenTab, 1, "rechts")
+
+DIM neuName AS GUI_WIDGET
+neuName = GUI_TEXTINPUT(win, 20, 392, 280, 28, "Name der Tippgemeinschaft")
+GUI_SET_TAB(neuName, 2)
+
+DIM bNeu AS GUI_WIDGET
+bNeu = GUI_BUTTON(win, "Anlegen", 310, 392, 130, 28)
+GUI_SET_TAB(bNeu, 2)
+
+DIM bWeg AS GUI_WIDGET
+bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 430, 190, 28)
+GUI_SET_TAB(bWeg, 2)
+
+DIM lblMitglieder AS GUI_WIDGET
+lblMitglieder = GUI_LABEL(win, "Mitglieder:", 470, 54)
+GUI_SET_TAB(lblMitglieder, 2)
+
+DIM mitgliedTab AS GUI_WIDGET
+mitgliedTab = GUI_TABLE(win, 470, 80, 470, 300)
+GUI_SET_TAB(mitgliedTab, 2)
+DIM mitgliedKopf AS ARRAY OF STRING
+mitgliedKopf = SPLIT$("Spieler|dabei", "|")
+GUI_TABLE_HEADERS(mitgliedTab, mitgliedKopf)
+DIM mitgliedBreiten AS ARRAY OF INTEGER
+mitgliedBreiten = [330, 140]
+GUI_TABLE_COL_WIDTHS(mitgliedTab, mitgliedBreiten)
+GUI_TABLE_SET(mitgliedTab, "zeilenhoehe", 30)
+GUI_TABLE_SET(mitgliedTab, "kopfhoehe", 28)
+GUI_TABLE_SET(mitgliedTab, "zebra", 1)
+GUI_TABLE_COL_ALIGN(mitgliedTab, 1, "mitte")
+
+DIM bMit AS GUI_WIDGET
+bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 470, 392, 220, 28)
+GUI_SET_TAB(bMit, 2)
+
+' Eigene Statuszeile: die vom ersten Reiter ist hier nicht zu sehen.
+DIM gruppenStand AS GUI_WIDGET
+gruppenStand = GUI_LABEL(win, "", 20, 476)
+GUI_SET_TAB(gruppenStand, 2)
 
 ' ---- Daten im Speicher ---------------------------------------------------
 ' Die Datenbank ist die Wahrheit, die Tabelle nur ihre Ansicht. Deshalb
@@ -346,8 +434,19 @@ CONST MAXSPIELER = 50
 DIM spielerId[MAXSPIELER] AS INTEGER
 DIM spielerAnzahl AS INTEGER
 
+CONST MAXGRUPPEN = 50
+DIM gruppeId[MAXGRUPPEN] AS INTEGER      ' je Zeile der Gruppentabelle
+DIM gruppenAnzahl AS INTEGER
+DIM wertungId[MAXGRUPPEN + 1] AS INTEGER ' je Eintrag der Wertungsauswahl, 0 = alle
+DIM mitgliedId[MAXSPIELER] AS INTEGER    ' je Zeile der Mitgliedertabelle
+DIM mitgliedAnzahl AS INTEGER
+
 SUB melde(text AS STRING)
     GUI_SET_TEXT(stand, text)
+END SUB
+
+SUB meldeGruppe(text AS STRING)
+    GUI_SET_TEXT(gruppenStand, text)
 END SUB
 
 FUNCTION aktiverSpieler() AS INTEGER
@@ -483,11 +582,22 @@ SUB spieleLaden()
     END IF
 END SUB
 
+' Welche Wertung ist gewaehlt? 0 = alle Spieler, sonst die Gruppen-id.
+FUNCTION aktiveWertung() AS INTEGER
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(wertungWahl)
+    IF i < 0 OR i > gruppenAnzahl THEN RETURN 0
+    RETURN wertungId[i]
+END FUNCTION
+
 SUB ranglisteLaden()
     GUI_TABLE_CLEAR(rang)
     DIM r AS DB_RESULT
     ' Gewertet wird nur, was ein Ergebnis hat -- ein Tipp auf ein noch
     ' nicht gespieltes Spiel ist keine Null, er zaehlt einfach nicht.
+    '
+    ' Die Tippgemeinschaft engt nur den Kreis ein, die Rechnung bleibt
+    ' dieselbe: "? = 0" heisst alle. So steht die Rangliste einmal da und
+    ' nicht zweimal -- eine Regel, eine Stelle, auch beim Auswerten.
     r = DB_QUERY(db, "SELECT p.name, " + _
                      "  COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + _
                      "                    THEN t.punkte END), 0) AS punkte, " + _
@@ -495,8 +605,10 @@ SUB ranglisteLaden()
                      "FROM spieler p " + _
                      "LEFT JOIN tipps t ON t.spieler_id = p.id " + _
                      "LEFT JOIN spiele s ON s.id = t.spiel_id " + _
+                     "WHERE ? = 0 OR EXISTS (SELECT 1 FROM gruppen_mitglieder m " + _
+                     "                       WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + _
                      "GROUP BY p.id, p.name " + _
-                     "ORDER BY punkte DESC, p.name")
+                     "ORDER BY punkte DESC, p.name", aktiveWertung(), aktiveWertung())
     DIM platz AS INTEGER : platz = 1
     WHILE DB_NEXT(r)
         DIM zeile AS ARRAY OF STRING
@@ -505,6 +617,100 @@ SUB ranglisteLaden()
         GUI_TABLE_ADD_ROW(rang, zeile)
         IF platz = 1 THEN GUI_TABLE_ROW_COLOR(rang, platz - 1, &HF4E3A6, -1)
         platz = platz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+' ---- Tippgemeinschaften --------------------------------------------------
+' Die Gruppentabelle und die Wertungsauswahl kommen aus derselben Abfrage:
+' beide zeigen dieselbe Liste, nur an zwei Orten.
+SUB gruppenLaden()
+    ' Die angeklickte Zeile ueberlebt das Neuladen -- sonst spraenge die
+    ' Mitgliederliste weg, sobald man jemanden aufnimmt.
+    DIM warZeile AS INTEGER : warZeile = GUI_TABLE_SELECTED(gruppenTab)
+
+    GUI_TABLE_CLEAR(gruppenTab)
+    gruppenAnzahl = 0
+
+    DIM namen[MAXGRUPPEN + 1] AS STRING
+    namen[0] = "Alle Spieler"
+    wertungId[0] = 0
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT g.id, g.name, COUNT(m.spieler_id) " + _
+                     "FROM gruppen g " + _
+                     "LEFT JOIN gruppen_mitglieder m ON m.gruppe_id = g.id " + _
+                     "GROUP BY g.id, g.name ORDER BY g.name")
+    WHILE DB_NEXT(r)
+        IF gruppenAnzahl >= MAXGRUPPEN THEN BREAK
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(DB_GET_STRING(r, 1) + "|" + STR$(DB_GET_INT(r, 2)), "|")
+        GUI_TABLE_ADD_ROW(gruppenTab, zeile)
+        gruppeId[gruppenAnzahl] = DB_GET_INT(r, 0)
+        namen[gruppenAnzahl + 1] = DB_GET_STRING(r, 1)
+        wertungId[gruppenAnzahl + 1] = DB_GET_INT(r, 0)
+        gruppenAnzahl = gruppenAnzahl + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    ' Die Auswahl wieder auf dieselbe Gemeinschaft stellen, wenn es sie noch
+    ' gibt -- sonst spraenge die Wertung bei jedem Umbau auf "Alle Spieler".
+    DIM vorher AS INTEGER : vorher = aktiveWertung()
+    DIM liste[gruppenAnzahl + 1] AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO gruppenAnzahl
+        liste[i] = namen[i]
+    NEXT
+    GUI_SET_DROPDOWN(wertungWahl, liste)
+
+    DIM wieder AS INTEGER : wieder = 0
+    FOR i = 0 TO gruppenAnzahl
+        IF wertungId[i] = vorher THEN wieder = i
+    NEXT
+    GUI_DROPDOWN_SET_SELECTED(wertungWahl, wieder)
+
+    ' Beim ersten Mal die oberste waehlen: sonst steht der halbe Reiter leer
+    ' da und man muss erst raten, dass ein Klick fehlt.
+    IF warZeile < 0 AND gruppenAnzahl > 0 THEN warZeile = 0
+    IF warZeile >= 0 AND warZeile < gruppenAnzahl THEN
+        GUI_TABLE_SET_SELECTED(gruppenTab, warZeile)
+    END IF
+END SUB
+
+' Welche Gemeinschaft ist in der Tabelle angeklickt? 0 = keine.
+FUNCTION gewaehlteGruppe() AS INTEGER
+    DIM z AS INTEGER : z = GUI_TABLE_SELECTED(gruppenTab)
+    IF z < 0 OR z >= gruppenAnzahl THEN RETURN 0
+    RETURN gruppeId[z]
+END FUNCTION
+
+' Alle Spieler, mit Haken bei denen, die dabei sind. Bewusst ALLE und nicht
+' nur die Mitglieder: aufnehmen kann man nur, wen man sieht.
+SUB mitgliederLaden()
+    GUI_TABLE_CLEAR(mitgliedTab)
+    mitgliedAnzahl = 0
+
+    DIM g AS INTEGER : g = gewaehlteGruppe()
+    IF g = 0 THEN
+        GUI_SET_TEXT(lblMitglieder, "Mitglieder: (keine Gemeinschaft gewählt)")
+        RETURN
+    END IF
+    GUI_SET_TEXT(lblMitglieder, "Mitglieder:")
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT p.id, p.name, " + _
+                     "  EXISTS (SELECT 1 FROM gruppen_mitglieder m " + _
+                     "          WHERE m.gruppe_id = ? AND m.spieler_id = p.id) " + _
+                     "FROM spieler p ORDER BY p.name", g)
+    WHILE DB_NEXT(r)
+        IF mitgliedAnzahl >= MAXSPIELER THEN BREAK
+        DIM dabei AS STRING : dabei = ""
+        IF DB_GET_INT(r, 2) = 1 THEN dabei = "ja"
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(DB_GET_STRING(r, 1) + "|" + dabei, "|")
+        GUI_TABLE_ADD_ROW(mitgliedTab, zeile)
+        mitgliedId[mitgliedAnzahl] = DB_GET_INT(r, 0)
+        mitgliedAnzahl = mitgliedAnzahl + 1
     WEND
     DB_CLOSE_RESULT(r)
 END SUB
@@ -708,10 +914,13 @@ SUB abrufPruefen()
 END SUB
 
 spielerLaden()
+gruppenLaden()
+mitgliederLaden()
 ' Nicht bei 1 anfangen, sondern dort, wo der naechste Anpfiff liegt.
 GUI_SET_VALUE(tagWahl, spieltagVorschlag())
 spieleLaden()
 ranglisteLaden()
+meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
 melde("Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
 ' ---- Hauptschleife -------------------------------------------------------
@@ -719,6 +928,8 @@ DIM letzterSpieler AS INTEGER : letzterSpieler = 0
 DIM letzterTag AS INTEGER : letzterTag = aktiverSpieltag()
 DIM letzteZeile AS INTEGER : letzteZeile = -1
 DIM letzteSekunde AS INTEGER : letzteSekunde = 0
+DIM letzteWertung AS INTEGER : letzteWertung = 0
+DIM letzteGruppe AS INTEGER : letzteGruppe = -1
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
@@ -742,6 +953,90 @@ WHILE NOT QUITREQUESTED()
         letzteZeile = -1
         spieleLaden()
         melde(STR$(letzterTag) + ". Spieltag.")
+    END IF
+
+    ' --- Reiter Rangliste: andere Wertung ---
+    IF GUI_DROPDOWN_SELECTED(wertungWahl) <> letzteWertung THEN
+        letzteWertung = GUI_DROPDOWN_SELECTED(wertungWahl)
+        ranglisteLaden()
+    END IF
+
+    ' --- Reiter Gruppen ---
+    ' Andere Gemeinschaft angeklickt -> ihre Mitglieder zeigen
+    IF GUI_TABLE_SELECTED(gruppenTab) <> letzteGruppe THEN
+        letzteGruppe = GUI_TABLE_SELECTED(gruppenTab)
+        mitgliederLaden()
+    END IF
+
+    IF GUI_CLICKED(bNeu) THEN
+        DIM name AS STRING : name = TRIM$(GUI_TEXT(neuName))
+        IF name = "" THEN
+            meldeGruppe("Erst einen Namen eintippen.")
+        ELSE
+            ' Denselben Namen zweimal laesst die Datenbank nicht zu (UNIQUE).
+            ' Statt vorher zu suchen und dann zu entscheiden: hinschreiben
+            ' und den Einwand abfangen -- dazwischen kann nichts passieren.
+            TRY
+                DB_EXEC(db, "INSERT INTO gruppen (name) VALUES (?)", name)
+                GUI_SET_TEXT(neuName, "")
+                gruppenLaden()
+                meldeGruppe("'" + name + "' angelegt.")
+            CATCH e
+                meldeGruppe("'" + name + "' gibt es schon.")
+            END TRY
+        END IF
+    END IF
+
+    IF GUI_CLICKED(bWeg) THEN
+        DIM weg AS INTEGER : weg = gewaehlteGruppe()
+        IF weg = 0 THEN
+            meldeGruppe("Erst eine Gemeinschaft anklicken.")
+        ELSE
+            DIM wegName AS STRING
+            wegName = GUI_TABLE_GET_CELL(gruppenTab, GUI_TABLE_SELECTED(gruppenTab), 0)
+            IF GUI_CONFIRM("Gemeinschaft löschen?", _
+                    "'" + wegName + "' und ihre Mitgliederliste werden gelöscht." + CHR$(10) + _
+                    "Die Tipps der Spieler bleiben.", "janein") THEN
+                DB_BEGIN(db)
+                DB_EXEC(db, "DELETE FROM gruppen_mitglieder WHERE gruppe_id = ?", weg)
+                DB_EXEC(db, "DELETE FROM gruppen WHERE id = ?", weg)
+                DB_COMMIT(db)
+                GUI_TABLE_SET_SELECTED(gruppenTab, -1)
+                letzteGruppe = -1
+                gruppenLaden()
+                mitgliederLaden()
+                ranglisteLaden()
+                meldeGruppe("'" + wegName + "' gelöscht.")
+            END IF
+        END IF
+    END IF
+
+    IF GUI_CLICKED(bMit) THEN
+        DIM gid AS INTEGER : gid = gewaehlteGruppe()
+        DIM mz AS INTEGER : mz = GUI_TABLE_SELECTED(mitgliedTab)
+        IF gid = 0 THEN
+            meldeGruppe("Erst eine Gemeinschaft anklicken.")
+        ELIF mz < 0 OR mz >= mitgliedAnzahl THEN
+            meldeGruppe("Erst einen Spieler anklicken.")
+        ELSE
+            DIM pid AS INTEGER : pid = mitgliedId[mz]
+            DIM pName AS STRING : pName = GUI_TABLE_GET_CELL(mitgliedTab, mz, 0)
+            IF GUI_TABLE_GET_CELL(mitgliedTab, mz, 1) = "ja" THEN
+                DB_EXEC(db, "DELETE FROM gruppen_mitglieder " + _
+                            "WHERE gruppe_id = ? AND spieler_id = ?", gid, pid)
+                meldeGruppe(pName + " ist raus.")
+            ELSE
+                DB_EXEC(db, "INSERT INTO gruppen_mitglieder (gruppe_id, spieler_id) " + _
+                            "VALUES (?, ?)", gid, pid)
+                meldeGruppe(pName + " ist dabei.")
+            END IF
+            ' Die Mitgliederzahl steht in der Gruppentabelle, die Wertung
+            ' haengt daran -- beides muss mit.
+            gruppenLaden()
+            mitgliederLaden()
+            GUI_TABLE_SET_SELECTED(mitgliedTab, mz)
+            ranglisteLaden()
+        END IF
     END IF
 
     ' Zeilenauswahl -> Tipp der Zeile in die Felder holen
