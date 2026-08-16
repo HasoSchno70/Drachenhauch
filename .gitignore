@@ -60,3 +60,9 @@ target/
 # Arbeitskopie der SQLite-Demo (examples/158) -- wird beim Beenden geloescht,
 # bleibt aber liegen, wenn die Demo abstuerzt.
 examples/tabelle_sqlite_arbeitskopie.db
+
+# Tippspiel-Buch: jeder Kapitelstand legt seine SQLite-Datei beim ersten Start
+# selbst an (tippspiel.db, kapNN.db, kapNN_sicherung.db, dazu -wal/-shm).
+# Das sind die Daten des Lesers, nicht der Quelltext des Buchs.
+buch-tippspiel/code/*.db*
+buch-tippspiel/code/kap*/*.db*

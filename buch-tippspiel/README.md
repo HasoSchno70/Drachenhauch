@@ -17,18 +17,28 @@ Das fertige Buch liegt als Word-Dokument bereit — 31 Seiten, farbig, druckbar:
 Vorwort, Einleitung und alle 13 Kapitel mit Quelltext, Screenshots und
 Erklärkästen. Wie man es neu erzeugt, steht in [`buch/README.md`](buch/README.md).
 
-## Der Zielstand
+## Zwei Wege hinein
 
-Das fertige Programm liegt als ein laufender Stand in
-[`code/tippspiel.dh`](code/tippspiel.dh) — starte es jederzeit, um zu sehen,
-wohin die Reise geht:
+**Der Schnitt.** [`code/tippspiel.dh`](code/tippspiel.dh) ist der senkrechte
+Schnitt durch die Anwendung: von der Datenbank bis zum Fenster jede Schicht
+einmal, klein gehalten. Er ist in einem Stück lesbar und zeigt in einer
+Viertelstunde, worum es geht:
 
 ```
 dhrun.py buch-tippspiel/code/tippspiel.dh
 ```
 
-Die Datenbank legt es beim ersten Start selbst an (drei Spieler, fünf Spiele des
-1. Spieltags). **[ESC]** beendet.
+**Der Zielstand.** Das fertige Programm ist der Stand von Kapitel 12,
+[`code/kap12/politur.dh`](code/kap12) — dasselbe Programm, aber mit allem, was
+die Kapitel unterwegs dazugeben: Anstoßzeiten und Tippschluss, Spielplan aus
+dem Netz, Sicherung und Einspielen, drei Reiter mit Punktediagramm:
+
+```
+dhrun.py buch-tippspiel/code/kap12/politur.dh
+```
+
+Beide legen ihre Datenbank beim ersten Start selbst an (drei Spieler, fünf
+Spiele des 1. Spieltags). **[ESC]** beendet.
 
 ## Aufbau (13 Kapitel)
 
@@ -156,17 +166,23 @@ Gemessen, nicht vermutet — Zahlen aus `stolpersteine.dh` vom 16.08.2026.
    **Ja/Nein**. Im Tippspiel fragt „Ergebnis eintragen" nach, wenn schon ein
    Ergebnis dasteht — dabei würden alle Punkte des Spiels neu gerechnet.
 
+7. ~~**Arrays prüfen ihren Elementtyp bei der Zuweisung nicht.**~~
+   **Erledigt.** `DIM a AS ARRAY OF STRING : a = b` ging durch, auch wenn `b`
+   ein `ARRAY OF INTEGER` war — bei einfachen Werten meldete die Runtime das
+   („Erwartet STRING, erhalten INTEGER"), Arrays reichte sie ungeprüft
+   weiter. Der Fehler fiel dadurch erst weit entfernt auf, beim Lesen eines
+   Elements mit dem falschen Typ. Geprüft wird jetzt bei **Variablen,
+   Parametern und Rückgabewerten**. Erlaubt bleibt, was nicht schiefgehen
+   kann: das leere Literal `[]` erbt weiterhin den Zieltyp, ein
+   `ARRAY OF ANY` darf man bewusst einengen, und ein frisches `[1, 2, 3]` an
+   einem `ARRAY OF FLOAT` wird umgebaut statt abgelehnt — ein *vorhandenes*
+   `ARRAY OF INTEGER` dagegen nicht, sein bisheriger Name zeigt ja weiter auf
+   dieselben Zellen. → [docs/sprache.md](../docs/sprache.md#arrays)
+
 ### Offen
 
-Nichts mehr aus dieser Liste. Was beim Weiterschreiben auffiel und noch
-offen ist:
-
-7. **Arrays prüfen ihren Elementtyp bei der Zuweisung nicht.**
-   `DIM a AS ARRAY OF STRING : a = b` geht durch, auch wenn `b` ein
-   `ARRAY OF INTEGER` ist — bei Skalaren meldet die Runtime das
-   („Erwartet STRING, erhalten INTEGER"), bei Arrays nicht. Gefunden beim
-   Schließen von Stolperstein 5, aber ein eigener Fund: er betrifft
-   nicht-leere Arrays und war schon vorher da.
+Nichts. Alle sieben gefundenen Punkte sind geschlossen — was beim
+Weiterschreiben auffällt, kommt hier dazu.
 
 ## Was gut passt
 
