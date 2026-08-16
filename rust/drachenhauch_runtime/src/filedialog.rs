@@ -63,15 +63,25 @@ pub fn message(title: &str, text: &str) {
         .show();
 }
 
-/// Modaler Bestaetigen-Dialog (OK/Abbrechen) -> true bei OK.
-pub fn confirm(title: &str, text: &str) -> bool {
+/// Modaler Bestaetigen-Dialog -> true bei Zustimmung.
+///
+/// `ja_nein = false` beschriftet die Knoepfe mit OK/Abbrechen ("fuehre das
+/// aus"), `true` mit Ja/Nein ("beantworte diese Frage"). Der Unterschied ist
+/// nicht kosmetisch: bei einer Frage wie "Sicherung einspielen?" liest sich
+/// "Abbrechen" als "Dialog schliessen", "Nein" als Antwort.
+pub fn confirm(title: &str, text: &str, ja_nein: bool) -> bool {
+    let buttons = if ja_nein {
+        rfd::MessageButtons::YesNo
+    } else {
+        rfd::MessageButtons::OkCancel
+    };
     matches!(
         rfd::MessageDialog::new()
             .set_title(title)
             .set_description(text)
             .set_level(rfd::MessageLevel::Warning)
-            .set_buttons(rfd::MessageButtons::OkCancel)
+            .set_buttons(buttons)
             .show(),
-        rfd::MessageDialogResult::Ok
+        rfd::MessageDialogResult::Ok | rfd::MessageDialogResult::Yes
     )
 }

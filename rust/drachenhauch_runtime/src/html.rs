@@ -392,3 +392,111 @@ pub fn html_get_attr(s: &str, attr: &str) -> String {
     }
     String::new()
 }
+
+// ===================================================================
+//  Abrufe im Hintergrund (HTTP_GET_START / HTTP_READY / HTTP_RESULT)
+// ===================================================================
+//
+//  `HTTP_GET` haelt das Programm an, bis die Antwort da ist -- gemessen
+//  rund 0,4 s fuer eine mittlere JSON-Antwort, bei schlechter Verbindung
+//  bis zum Timeout von 10 s. In einer Schleife mit 60 Bildern je Sekunde
+//  heisst das: das Fenster steht, keine Maus, keine Taste, kein Neuzeichnen.
+//
+//  Darum hier derselbe Abruf auf einem eigenen Thread. Das Programm startet
+//  ihn, fragt pro Bild einmal nach (`HTTP_READY`) und holt das Ergebnis ab,
+//  wenn es da ist -- dasselbe Muster wie `INPUT_UPDATE`/`TIMER_UPDATE`:
+//  nachsehen statt warten.
+//
+//  Bewusst NUR GET: das deckt "Daten holen" ab, und jede weitere Form
+//  verdoppelt die Zustaende, die ein Programm im Blick behalten muss.
+
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
+
+pub struct Abruf {
+    empfang: Receiver<Result<HttpResult, HttpErr>>,
+    /// Fertiges Ergebnis, bis es abgeholt wird. Der Kanal liefert nur
+    /// EINMAL -- ohne diesen Zwischenspeicher waere `HTTP_READY` ein
+    /// Verbrauch, und ein zweiter Aufruf im selben Bild verloere die
+    /// Antwort.
+    ergebnis: Option<Result<HttpResult, HttpErr>>,
+    url: String,
+}
+
+#[derive(Default)]
+pub struct Abrufe {
+    /// Tombstones -- eine einmal vergebene Nummer bleibt gueltig, auch
+    /// wenn davor stehende Abrufe abgeholt wurden.
+    eintraege: Vec<Option<Abruf>>,
+}
+
+impl Abrufe {
+    /// Startet einen GET im Hintergrund und liefert seine Nummer.
+    pub fn start(&mut self, url: &str) -> i64 {
+        let (sender, empfang) = channel();
+        let ziel = url.to_string();
+        std::thread::spawn(move || {
+            // Das Ergebnis interessiert niemanden mehr, wenn der Empfaenger
+            // weg ist (Abruf abgebrochen) -- `send` scheitert dann still.
+            let _ = sender.send(http_get(&ziel));
+        });
+        self.eintraege.push(Some(Abruf { empfang, ergebnis: None, url: url.to_string() }));
+        (self.eintraege.len() - 1) as i64
+    }
+
+    fn eintrag(&mut self, id: i64) -> Option<&mut Abruf> {
+        if id < 0 { return None; }
+        self.eintraege.get_mut(id as usize)?.as_mut()
+    }
+
+    /// Ist die Antwort da? Fragt nach, ohne zu warten.
+    pub fn fertig(&mut self, id: i64) -> bool {
+        let Some(e) = self.eintrag(id) else { return false; };
+        if e.ergebnis.is_some() { return true; }
+        match e.empfang.try_recv() {
+            Ok(r) => { e.ergebnis = Some(r); true }
+            Err(TryRecvError::Empty) => false,
+            // Thread ist weg, ohne zu senden -- das kann nur ein Absturz im
+            // Abruf-Thread sein. Als Fehler melden statt ewig "noch nicht".
+            Err(TryRecvError::Disconnected) => {
+                let url = e.url.clone();
+                e.ergebnis = Some(Err(HttpErr {
+                    msg: format!("HTTP-Abruf abgebrochen: {}", url),
+                    status: 0,
+                    headers: Vec::new(),
+                }));
+                true
+            }
+        }
+    }
+
+    /// Holt das Ergebnis ab und gibt den Platz frei.
+    ///
+    /// `None` = noch nicht fertig (oder unbekannte Nummer); der Aufrufer
+    /// soll dann weiter `fertig` fragen statt zu blockieren.
+    pub fn abholen(&mut self, id: i64) -> Option<Result<HttpResult, HttpErr>> {
+        if !self.fertig(id) { return None; }
+        let e = self.eintraege.get_mut(id as usize)?.take()?;
+        e.ergebnis
+    }
+
+    /// Abbrechen: der Thread laeuft zu Ende, sein Ergebnis wird verworfen.
+    /// Tolerant gegenueber schon abgeholten Nummern.
+    pub fn abbrechen(&mut self, id: i64) {
+        if id >= 0 {
+            if let Some(platz) = self.eintraege.get_mut(id as usize) { *platz = None; }
+        }
+    }
+
+    /// Wie viele Abrufe noch unterwegs sind (fuer Anzeigen wie "lade ...").
+    pub fn offen(&self) -> i64 {
+        self.eintraege.iter().filter(|e| e.is_some()).count() as i64
+    }
+
+    pub fn url(&self, id: i64) -> String {
+        if id < 0 { return String::new(); }
+        self.eintraege.get(id as usize)
+            .and_then(|e| e.as_ref())
+            .map(|e| e.url.clone())
+            .unwrap_or_default()
+    }
+}

@@ -66,6 +66,7 @@ mod tiled;
 mod timer;
 mod value;
 mod vm;
+mod zeit;
 
 use std::io::Write;
 use std::process::ExitCode;
@@ -139,6 +140,9 @@ fn embedded_gbc_in(data: &[u8]) -> Option<String> {
 }
 
 fn main() -> ExitCode {
+    // MILLIS/TIMER zaehlen ab hier: "seit Programmstart" soll auch dann
+    // stimmen, wenn das Programm erst nach dem Laden von Bildern misst.
+    builtins::uhr_starten();
     // Front-End-Debug: `dhrt --tokens <datei.dh>` gibt den Token-Strom als
     // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
     {

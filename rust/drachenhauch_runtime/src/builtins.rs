@@ -50,6 +50,27 @@ fn seed_from_time() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(0x2545F4914F6CDD1D) | 1
 }
+
+/// Startzeitpunkt des Programms fuer MILLIS/TIMER.
+///
+/// Bewusst `Instant` und nicht die Uhrzeit des Rechners: eine monotone Uhr
+/// laeuft gleichmaessig weiter, auch wenn die Systemzeit springt (Zeitumstellung,
+/// NTP-Korrektur). Sonst koennte eine Zeitmessung mitten im Programm um eine
+/// Stunde springen -- oder negativ werden.
+///
+/// Fuer Datum und Uhrzeit ist `ZEIT_JETZT()` (Modul `zeit`) zustaendig.
+fn programmstart() -> std::time::Instant {
+    use std::sync::OnceLock;
+    static START: OnceLock<std::time::Instant> = OnceLock::new();
+    *START.get_or_init(std::time::Instant::now)
+}
+
+/// Setzt die Uhr fuer MILLIS/TIMER auf jetzt. Einmal beim Programmstart
+/// aufrufen -- sonst begaenne sie erst beim ersten MILLIS-Aufruf, und ein
+/// Programm, das nach dem Laden von Bildern misst, faenge nicht bei 0 an.
+pub fn uhr_starten() { let _ = programmstart(); }
+
+fn seit_start() -> std::time::Duration { programmstart().elapsed() }
 fn next_rand() -> u64 {
     RNG.with(|s| {
         let mut x = s.get();
@@ -66,7 +87,7 @@ fn next_rand() -> u64 {
 /// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert,
 /// also naturgemaess nicht deterministisch testbar.
 #[cfg(windows)]
-fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
+pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     #[repr(C)]
     struct SystemTimeW {
         w_year: u16, w_month: u16, w_day_of_week: u16, w_day: u16,
@@ -84,7 +105,7 @@ fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
 }
 
 #[cfg(not(windows))]
-fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
+pub(crate) fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     use std::time::{SystemTime, UNIX_EPOCH};
     let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
     let days = secs.div_euclid(86_400);
@@ -736,18 +757,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(vals.cells.get(vals.cells.len() - 1))   // Rundungs-Fallback
         }
-        "millis" => {
-            use std::time::{SystemTime, UNIX_EPOCH};
-            let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-            Ok(Value::Int(ms))
-        }
+        "millis" => Ok(Value::Int(seit_start().as_millis() as i64)),
         "timer" => {
-            // Sekunden seit erstem TIMER-Aufruf als FLOAT (MILLIS bleibt
-            // ms-INT). Wichtig u.a. fuer FPS-Messungen: elapsed >= 0.5 s.
-            use std::sync::OnceLock;
-            use std::time::Instant;
-            static TIMER_START: OnceLock<Instant> = OnceLock::new();
-            Ok(Value::Float(TIMER_START.get_or_init(Instant::now).elapsed().as_secs_f64()))
+            // Dieselbe Uhr wie MILLIS, nur in Sekunden als FLOAT -- TIMER() * 1000
+            // und MILLIS() meinen denselben Zeitpunkt. Wichtig u.a. fuer
+            // FPS-Messungen: elapsed >= 0.5 s.
+            Ok(Value::Float(seit_start().as_secs_f64()))
         }
         "time$" | "time" => {
             arity!(0);
@@ -1544,7 +1559,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
-                if arr.element_type != "string" { return err("JOIN$: ARRAY OF STRING noetig".to_string()); }
+                // Ein LEERES Array kann keinen falschen Wert enthalten.
+                if arr.element_type != "string" && arr.cells.len() > 0 {
+                    return err("JOIN$: ARRAY OF STRING noetig".to_string());
+                }
                 let delim = need_str(&a[1], "JOIN$")?;
                 let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
@@ -3528,10 +3546,9 @@ fn tween_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<TweenObj>>, Str
     match v { Value::Tween(t) => Ok(t), _ => Err(format!("{} erwartet TWEEN", fn_)) }
 }
 
-fn now_ms() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
+/// Zeitbasis der Tweens -- dieselbe monotone Uhr wie MILLIS. Mit der
+/// Systemuhr wuerde eine Animation bei einer Zeitumstellung springen.
+fn now_ms() -> i64 { seit_start().as_millis() as i64 }
 
 fn elapsed(t: &TweenObj) -> i64 {
     t.paused_at.unwrap_or_else(|| now_ms() - t.start_ms)

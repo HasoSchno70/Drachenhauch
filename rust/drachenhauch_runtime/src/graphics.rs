@@ -992,6 +992,15 @@ pub struct Graphics {
     // programmweiten text_size bleibt.
     font_sizes: Vec<i32>,
     active_font: i64,
+    /// Ausweich-Font fuer Text mit Umlauten, solange kein eigener Font gesetzt
+    /// ist: die eingebaute raylib-Schrift kennt nur ASCII und zeichnet sonst
+    /// `K?ln`. `None` = kein System-Font gefunden (dann bleibt es beim `?`).
+    ///
+    /// Bewusst NEBEN `fonts` und nicht darin: sonst waere er Handle 0 und
+    /// jedes `LOADFONT` bekaeme eine um eins verschobene Nummer.
+    /// Reiner ASCII-Text geht weiterhin durch die eingebaute Schrift -- so
+    /// sieht jedes bestehende Programm aus wie zuvor.
+    fallback: Option<Font>,
     text_spacing: f32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
@@ -1050,6 +1059,56 @@ pub struct Graphics {
     /// Stapel fuer GFX_PUSH/GFX_POP.
     gfx_stack: Vec<GfxState>,
     scene_rt: Option<RenderTexture2D>,
+}
+
+/// Welche Zeichen in einen geladenen Font gebacken werden: ASCII, der ganze
+/// Latin-1-Bereich (deutsche Umlaute, Akzente franzoesischer und spanischer
+/// Vereinsnamen) und gaengige Typografie/Pfeile. raylib backt ohne diese
+/// Liste nur die 95 ASCII-Glyphen und zeichnet fuer alles andere ein `?`.
+fn zeichensatz() -> String {
+    let mut chars = String::new();
+    for c in 0x20u32..=0x7Eu32 { chars.push(char::from_u32(c).unwrap()); }
+    for c in 0xA0u32..=0xFFu32 { chars.push(char::from_u32(c).unwrap()); }
+    chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
+    chars
+}
+
+/// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
+///
+/// Beim Laden einer Schrift zaehlt raylib nach, wie viele der angeforderten
+/// Zeichen wirklich drin sind, und meldet jedes fehlende als Warnung auf
+/// stdout: "Requested codepoints glyphs found: [209/213]". Eine Pixel-Schrift
+/// ohne französische Akzente ist aber kein Fehler, und stdout gehoert der
+/// Programmausgabe -- ein PRINT-Ergebnis darf nicht zwischen Font-Meldungen
+/// stehen.
+fn ohne_warnungen<T>(f: impl FnOnce() -> T) -> T {
+    use raylib::consts::TraceLogLevel;
+    unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_ERROR as i32); }
+    let r = f();
+    unsafe { raylib::ffi::SetTraceLogLevel(TraceLogLevel::LOG_WARNING as i32); }
+    r
+}
+
+/// Handle des Ausweich-Fonts in einem Zeichen-Befehl. Nicht -1 (eingebaute
+/// Schrift) und kein Index in `fonts`, damit die von LOADFONT vergebenen
+/// Nummern unveraendert bei 0, 1, 2 ... beginnen.
+const FONT_AUSWEICH: i64 = -2;
+
+/// Kandidaten fuer den Ausweich-Font: die eingebaute raylib-Bitmapschrift
+/// kennt nur ASCII, deshalb braucht "Köln" eine echte Schrift vom System.
+/// Der erste vorhandene Pfad gewinnt.
+fn ausweich_schriften() -> &'static [&'static str] {
+    #[cfg(target_os = "windows")]
+    { &["C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/tahoma.ttf"] }
+    #[cfg(target_os = "macos")]
+    { &["/System/Library/Fonts/SFNS.ttf", "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial.ttf"] }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    { &["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf"] }
 }
 
 /// GB-Farbe (0xRRGGBB INTEGER) -> raylib Color.
@@ -1230,6 +1289,7 @@ impl Graphics {
             fonts: Vec::new(),
             font_sizes: Vec::new(),
             active_font: -1,
+            fallback: None,
             text_spacing: 0.0,
             textures: Vec::new(),
             image_cache: HashMap::new(),
@@ -1262,7 +1322,43 @@ impl Graphics {
                 }
             }
         }
+        // Ausweich-Font fuer Umlaute laden, solange kein Default gesetzt wurde.
+        // Einmal beim Fensterstart, nicht beim ersten Umlaut: TEXT_WIDTH muss
+        // dieselbe Schrift messen, die TEXT spaeter zeichnet -- sonst rechnet
+        // ein Layout mit anderen Breiten, als am Ende dastehen.
+        if g.active_font < 0 {
+            let bake = (32 * scale.max(1)).clamp(32, 256);
+            let chars = zeichensatz();
+            for pfad in ausweich_schriften() {
+                if !std::path::Path::new(pfad).exists() { continue; }
+                let rl = &mut g.rl;
+                let thread = &g.thread;
+                if let Ok(f) = ohne_warnungen(|| rl.load_font_ex(thread, pfad, bake, Some(&chars))) {
+                    unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+                    g.fallback = Some(f);
+                }
+                break;
+            }
+        }
         g
+    }
+
+    /// Welcher Font zeichnet diesen Text? Normalerweise der aktive. Steht
+    /// keiner (eingebaute Bitmapschrift) und enthaelt der Text Zeichen
+    /// jenseits von ASCII, springt der Ausweich-Font ein -- als Handle
+    /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
+    fn font_fuer(&self, s: &str) -> i64 {
+        if self.active_font >= 0 { return self.active_font; }
+        if self.fallback.is_some() && !s.is_ascii() { return FONT_AUSWEICH; }
+        -1
+    }
+
+    /// Font zu einem Handle -- inklusive des Ausweich-Fonts, den `fonts`
+    /// nicht enthaelt. `None` = eingebaute Schrift.
+    fn font_von(&self, h: i64) -> Option<&Font> {
+        if h == FONT_AUSWEICH { return self.fallback.as_ref(); }
+        if h < 0 { return None; }
+        self.fonts.get(h as usize)
     }
 
     /// SCREEN nach einem Lazy-Init (oder erneutes SCREEN): das bestehende Fenster
@@ -2676,7 +2772,7 @@ impl Graphics {
         // Position via w2s (inkl. Zoom), aber Font-Groesse bleibt -- wie Python.
         let (x, y) = self.w2s(x, y);
         let sz = self.text_size;
-        let font = self.active_font;
+        let font = self.font_fuer(&s);
         let spacing = self.text_spacing;
         self.emit(Cmd::Text(x, y, s, sz, col(c), font, spacing));
     }
@@ -2688,7 +2784,8 @@ impl Graphics {
     /// durch die Camera (w2s) wie TEXT.
     pub fn text_rot(&mut self, x: i32, y: i32, s: String, angle_deg: f32, scale: f32, c: i64) {
         let (x, y) = self.w2s(x, y);
-        self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), self.active_font,
+        let font = self.font_fuer(&s);
+        self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), font,
                                self.text_spacing, angle_deg, scale.max(0.0001)));
     }
 
@@ -2709,14 +2806,25 @@ impl Graphics {
     /// `font` = -1 -> Default-Font. Fuer per-Widget-Styling (Modul `gui`).
     pub fn text_styled(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32) {
         let (x, y) = self.w2s(x, y);
+        // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
+        // zeigt sonst "K?ln" in der Tabelle.
+        let font = if font < 0 && self.fallback.is_some() && !s.is_ascii() {
+            FONT_AUSWEICH
+        } else { font };
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
 
     /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
+    ///
+    /// Mit erweitertem Zeichensatz: raylib backt sonst nur die 95 ASCII-
+    /// Glyphen, und jedes deutsche Wort mit Umlaut kaeme als "K?ln" heraus.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
-        let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
+        let chars = zeichensatz();
+        let rl = &mut self.rl;
+        let thread = &self.thread;
+        let f = ohne_warnungen(|| rl.load_font_ex(thread, path, size.max(4), Some(&chars)))
             .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
         // Bilinear filtern -> skalierter Text bleibt glatt statt pixelig/jaggy
         // (Default ist Nearest; sichtbar v.a. bei kleiner UI-Schrift).
@@ -2726,16 +2834,13 @@ impl Graphics {
         Ok((self.fonts.len() - 1) as i64)
     }
 
-    /// Wie `load_font`, aber mit erweitertem Zeichensatz (ASCII + Latin-1 +
-    /// gaengige Typografie/Pfeile) statt nur den 95 ASCII-Glyphen. Fuer den
-    /// per `DHRT_FONT` gesetzten Default-Font, damit deutsche Umlaute (ä ö ü ß)
-    /// und Buch-Sonderzeichen („ " … – · → …) gerendert werden.
+    /// Wie `load_font`, aber ohne den Umweg ueber `resolve_asset_path` und mit
+    /// Sentinel-Groesse: fuer den per `DHRT_FONT` gesetzten Default-Font.
     fn load_font_ext(&mut self, path: &str, size: i32) -> Result<i64, String> {
-        let mut chars = String::new();
-        for c in 0x20u32..=0x7Eu32 { chars.push(char::from_u32(c).unwrap()); }
-        for c in 0xA0u32..=0xFFu32 { chars.push(char::from_u32(c).unwrap()); }
-        chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
-        let f = self.rl.load_font_ex(&self.thread, path, size.max(4), Some(&chars))
+        let chars = zeichensatz();
+        let rl = &mut self.rl;
+        let thread = &self.thread;
+        let f = ohne_warnungen(|| rl.load_font_ex(thread, path, size.max(4), Some(&chars)))
             .map_err(|e| format!("DHRT_FONT '{}' nicht ladbar: {}", path, e))?;
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
@@ -2761,10 +2866,10 @@ impl Graphics {
     pub fn set_text_spacing(&mut self, px: i32) { self.text_spacing = px as f32; }
 
     pub fn text_width(&self, s: &str) -> i32 {
-        if self.active_font >= 0 {
-            if let Some(f) = self.fonts.get(self.active_font as usize) {
-                return f.measure_text(s, self.text_size as f32, self.text_spacing).x as i32;
-            }
+        // font_fuer: dieselbe Wahl wie beim Zeichnen, sonst misst ein Layout
+        // die Standardschrift und bekommt am Ende den Ausweich-Font zu sehen.
+        if let Some(f) = self.font_von(self.font_fuer(s)) {
+            return f.measure_text(s, self.text_size as f32, self.text_spacing).x as i32;
         }
         let c = std::ffi::CString::new(s).unwrap_or_default();
         unsafe { raylib::ffi::MeasureText(c.as_ptr(), self.text_size) }
@@ -2789,10 +2894,12 @@ impl Graphics {
 
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
-        if font >= 0 {
-            if let Some(f) = self.fonts.get(font as usize) {
-                return f.measure_text(s, size as f32, self.text_spacing).x as i32;
-            }
+        // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
+        let font = if font < 0 && self.fallback.is_some() && !s.is_ascii() {
+            FONT_AUSWEICH
+        } else { font };
+        if let Some(f) = self.font_von(font) {
+            return f.measure_text(s, size as f32, self.text_spacing).x as i32;
         }
         // -1 (oder ein ungueltiges Handle) = Standardschrift.
         let c = std::ffi::CString::new(s).unwrap_or_default();
@@ -2801,10 +2908,8 @@ impl Graphics {
 
     pub fn text_width_at(&self, s: &str, size: i32) -> i32 {
         let size = size.max(1);
-        if self.active_font >= 0 {
-            if let Some(f) = self.fonts.get(self.active_font as usize) {
-                return f.measure_text(s, size as f32, self.text_spacing).x as i32;
-            }
+        if let Some(f) = self.font_von(self.font_fuer(s)) {
+            return f.measure_text(s, size as f32, self.text_spacing).x as i32;
         }
         let c = std::ffi::CString::new(s).unwrap_or_default();
         unsafe { raylib::ffi::MeasureText(c.as_ptr(), size) }
@@ -4498,11 +4603,12 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         let cam_proj = self.cam3d_proj;
         // Instancing-Shader (ffi::Shader = Copy) fuer den DrawMeshInstanced-Pfad.
         let inst_ffi = self.inst_shader.as_ref().map(|s| *s.as_ref());
-        let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
+        let Graphics { rl, thread, layers, textures, fonts, fallback, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             emissive, loc_emissive,
             scene_rt, shaders, shader_textures, post_shader_idx, render_targets, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
+        let ausweich: Option<&Font> = fallback.as_ref();
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
         let emis_ref: &std::collections::HashMap<usize, (f32, f32, f32, f32)> = emissive;
@@ -4532,7 +4638,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
                 // behaltenen Target blieben die abgeschnittenen Raender stehen
                 // ("die Kurven kleben am rechten Rand"). Hochskaliert wird beim
                 // Stempeln (Cmd::RtDraw rechnet dort mit `s`), nicht hier.
-                render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts,
+                render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
             }
@@ -4547,7 +4653,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, ausweich, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -4570,7 +4676,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -4643,9 +4749,18 @@ fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
 /// `RaylibDraw`). So laeuft derselbe Replay-Code mit und ohne Post-Shader.
 /// `clear = None` laesst den Zielinhalt stehen (behaltene Render-Targets --
 /// Voraussetzung fuer Rueckkopplungs-/Nachzieheffekte).
+/// Font-Handle eines Zeichen-Befehls aufloesen. `None` = eingebaute Schrift.
+/// FONT_AUSWEICH steht fuer den Umlaut-Ausweichfont, der nicht in `fonts` liegt.
+fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: Option<&'a Font>) -> Option<&'a Font> {
+    if h == FONT_AUSWEICH { return ausweich; }
+    if h < 0 { return None; }
+    fonts.get(h as usize)
+}
+
 fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Option<Color>,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
+    ausweich: Option<&Font>,
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
     mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32, i32),
     normal_mapped: &std::collections::HashSet<usize>,
@@ -4935,11 +5050,11 @@ fn render_scene<D: RaylibDraw>(
                         }
                     }
                     Cmd::Text(x, y, txt, sz, col, font, spacing) => {
-                        match fonts.get(*font as usize) {
-                            Some(f) if *font >= 0 => d.draw_text_ex(
+                        match font_zu_handle(*font, fonts, ausweich) {
+                            Some(f) => d.draw_text_ex(
                                 f, txt, Vector2::new((x * s) as f32, (y * s) as f32),
                                 (sz * s) as f32, spacing * s as f32, *col),
-                            _ => d.draw_text(txt, x * s, y * s, sz * s, *col),
+                            None => d.draw_text(txt, x * s, y * s, sz * s, *col),
                         }
                     }
                     Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => {
@@ -4947,8 +5062,8 @@ fn render_scene<D: RaylibDraw>(
                         // (DrawTextPro: origin = halbe Textbox).
                         let fsize = (sz * s) as f32 * scl;
                         let pos = Vector2::new((cx * s) as f32, (cy * s) as f32);
-                        match fonts.get(*font as usize) {
-                            Some(f) if *font >= 0 => {
+                        match font_zu_handle(*font, fonts, ausweich) {
+                            Some(f) => {
                                 let fspacing = spacing * s as f32 * scl;
                                 let m = f.measure_text(txt, fsize, fspacing);
                                 d.draw_text_pro(f, txt, pos, Vector2::new(m.x / 2.0, m.y / 2.0),

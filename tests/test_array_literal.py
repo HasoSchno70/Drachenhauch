@@ -63,9 +63,56 @@ def test_comprehension_still_works(run_gb):
                   "PRINT sq\n") == "(1, 4, 9)\n"
 
 
-def test_empty_array_literal_errors(run_gb):
-    with pytest.raises(DrachenhauchError, match=r"Leeres Array-Literal"):
-        run_gb("DIM a AS ARRAY OF INTEGER\na = []\n")
+# --- Leeres Array-Literal ---------------------------------------------
+#
+# Frueherer Stolperstein: `[]` brach mit "Leeres Array-Literal -- Typ
+# unbekannt" ab. Ein Widget, das seine Daten erst spaeter bekommt, brauchte
+# deshalb einen Platzhalter-Eintrag. Jetzt gibt der Ort den Elementtyp vor,
+# an dem das Literal landet.
+
+def test_leeres_array_literal_ist_erlaubt(run_gb):
+    assert run_gb("DIM a AS ARRAY OF INTEGER\na = []\nPRINT LEN(a)\n") == "0\n"
+
+
+def test_leeres_literal_uebernimmt_den_typ_der_variablen(run_gb):
+    """Sonst waere `a = []` ein stilles Loch in der Typpruefung."""
+    with pytest.raises(DrachenhauchError, match=r"Erwartet STRING"):
+        run_gb('DIM a AS ARRAY OF STRING\n'
+               'a = []\n'
+               'ARRAY_PUSH(a, 42)\n')
+
+
+def test_leeres_literal_als_parameter(run_gb):
+    assert run_gb('SUB zeige(liste AS ARRAY OF STRING)\n'
+                  '    PRINT LEN(liste)\n'
+                  'END SUB\n'
+                  'zeige([])\n') == "0\n"
+
+
+def test_leeres_literal_als_rueckgabewert(run_gb):
+    with pytest.raises(DrachenhauchError, match=r"Erwartet STRING"):
+        run_gb('FUNCTION leer() AS ARRAY OF STRING\n'
+               '    RETURN []\n'
+               'END FUNCTION\n'
+               'DIM x AS ARRAY OF STRING\n'
+               'x = leer()\n'
+               'ARRAY_PUSH(x, 42)\n')
+
+
+def test_ohne_kontext_bleibt_es_any(run_gb):
+    """Ohne typisiertes Ziel nimmt das Array alles auf -- ARRAY OF ANY."""
+    assert run_gb('DIM frei AS ARRAY OF ANY\n'
+                  'frei = []\n'
+                  'ARRAY_PUSH(frei, "Text")\n'
+                  'ARRAY_PUSH(frei, 42)\n'
+                  'PRINT LEN(frei)\n') == "2\n"
+
+
+def test_leeres_array_wird_von_builtins_angenommen(run_gb):
+    """Ein leeres Array kann keinen falschen Wert enthalten -- Builtins, die
+    ARRAY OF STRING erwarten, duerfen es nicht wegen seines Typs ablehnen.
+    Geprueft an JOIN$, das dieselbe Pruefung nutzt wie GUI_DROPDOWN."""
+    assert run_gb('PRINT "[" + JOIN$([], ",") + "]"\n') == "[]\n"
 
 
 # --- Front-End-Paritaet (Python-Parser unterscheidet Literal vs Comp) ----

@@ -678,6 +678,9 @@ pub struct Vm<'p> {
     http_status: i64,
     #[cfg(feature = "http")]
     http_headers: Vec<(String, String)>,
+    // Modul html: Abrufe im Hintergrund (HTTP_GET_START/READY/RESULT).
+    #[cfg(feature = "http")]
+    http_abrufe: crate::html::Abrufe,
     // Modul cloud: Basis-URL/API-Key aus CLOUD_CONFIGURE + letzte Fehlermeldung.
     #[cfg(feature = "http")]
     cloud_base_url: String,
@@ -766,6 +769,8 @@ impl<'p> Vm<'p> {
             cloud_last_error: String::new(),
             #[cfg(feature = "http")]
             http_headers: Vec::new(),
+            #[cfg(feature = "http")]
+            http_abrufe: crate::html::Abrufe::default(),
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
             #[cfg(feature = "serial")]
@@ -2009,6 +2014,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_scene(name, bargs)? { v }
                         else if let Some(v) = self.try_coro(name, bargs)? { v }
                         else if let Some(v) = self.try_timer(name, bargs)? { v }
+                        else if let Some(v) = self.try_zeit(name, bargs)? { v }
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
@@ -2770,6 +2776,35 @@ impl<'p> Vm<'p> {
                     Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
                 }
             }
+            // --- Abrufe im Hintergrund: starten, nachsehen, abholen ---
+            "http_get_start" => {
+                let url = bi_str(a, 0, "HTTP_GET_START")?.to_string();
+                Value::Int(self.http_abrufe.start(&url))
+            }
+            "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?)),
+            "http_result" => {
+                let id = bi_int(a, 0, "HTTP_RESULT")?;
+                match self.http_abrufe.abholen(id) {
+                    Some(Ok(r)) => {
+                        self.http_status = r.status;
+                        self.http_headers = r.headers;
+                        Value::str_rc(&String::from_utf8_lossy(&r.body))
+                    }
+                    Some(Err(e)) => {
+                        if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; }
+                        return Err(e.msg);
+                    }
+                    // Abholen ohne vorheriges HTTP_READY ist der haeufigste
+                    // Anfaengerfehler -- deshalb sagt die Meldung, was fehlt.
+                    None => return Err(format!(
+                        "HTTP_RESULT: Abruf {} ist nicht fertig (oder schon abgeholt) \
+                         -- erst HTTP_READY({}) abfragen", id, id)),
+                }
+            }
+            "http_cancel" => { self.http_abrufe.abbrechen(bi_int(a, 0, "HTTP_CANCEL")?); Value::Nil }
+            "http_pending" => Value::Int(self.http_abrufe.offen()),
+            "http_url$" | "http_url" => Value::str_rc(&self.http_abrufe.url(bi_int(a, 0, "HTTP_URL$")?)),
+
             "http_status" => Value::Int(self.http_status),
             "http_header" => {
                 let n = bi_str(a, 0, "HTTP_HEADER")?.to_lowercase();
@@ -3064,6 +3099,87 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
+    /// Modul `zeit` (zeit.rs): mit Datum und Uhrzeit rechnen.
+    ///
+    /// Der Zeitwert ist eine ganze Zahl: Sekunden seit 1970 in ORTSZEIT --
+    /// so passen `ZEIT_JETZT()` und ein aus der Datenbank gelesener Anstoss
+    /// ohne Zeitzonen-Umrechnung zusammen. Alles hier ist reine Mathematik
+    /// (die Tests dazu stehen in zeit.rs); nur JETZT fragt die Uhr.
+    fn try_zeit(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("zeit_") { return Ok(None); }
+        use crate::zeit;
+
+        fn z_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
+            match a.get(i) {
+                Some(Value::Int(n)) => Ok(*n),
+                Some(Value::Float(f)) => Ok(*f as i64),
+                _ => Err(format!("{}: erwartet einen Zeitwert (INTEGER, Arg {})", fn_, i + 1)),
+            }
+        }
+        fn z_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
+            match a.get(i) {
+                Some(Value::Str(s)) => Ok(s),
+                _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)),
+            }
+        }
+
+        let v = match name {
+            "zeit_jetzt" => {
+                let (j, mo, d, h, mi, s) = crate::builtins::local_datetime();
+                Value::Int(zeit::aus_teilen(j, mo, d, h, mi, s))
+            }
+            "zeit_parse" => {
+                let text = z_str(a, 0, "ZEIT_PARSE")?;
+                match zeit::parse(text) {
+                    Some(t) => Value::Int(t),
+                    // Klartext statt stiller -1: ein unlesbares Datum ist fast
+                    // immer ein Fehler in den Daten, und der faellt sonst erst
+                    // viel spaeter als unsinnige Rechnung auf.
+                    None => return Err(format!(
+                        "ZEIT_PARSE: '{}' ist kein Zeitpunkt -- erwartet \
+                         'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden \
+                         oder nur Datum)", text)),
+                }
+            }
+            // ZEIT_TEXT$ gibt Text, ZEIT_LESBAR fragt nach. Getrennte Namen,
+            // weil "lesbar" sich als beides lesen laesst -- ich habe die
+            // zwei beim Schreiben der ersten Pruefung selbst verwechselt.
+            "zeit_text$" | "zeit_text" =>
+                Value::str_rc(&zeit::format(z_int(a, 0, "ZEIT_TEXT$")?, "")),
+            "zeit_lesbar" => Value::Bool(zeit::parse(z_str(a, 0, "ZEIT_LESBAR")?).is_some()),
+            "zeit_format$" | "zeit_format" => {
+                let t = z_int(a, 0, "ZEIT_FORMAT$")?;
+                let muster = if a.len() > 1 { z_str(a, 1, "ZEIT_FORMAT$")? } else { "" };
+                Value::str_rc(&zeit::format(t, muster))
+            }
+            "zeit_teil" => {
+                let t = z_int(a, 0, "ZEIT_TEIL")?;
+                let was = z_str(a, 1, "ZEIT_TEIL")?;
+                match zeit::teil(t, was) {
+                    Some(n) => Value::Int(n),
+                    None => return Err(format!(
+                        "ZEIT_TEIL: '{}' ist kein Feld -- moeglich sind {}", was, zeit::TEILE)),
+                }
+            }
+            "zeit_aus_teilen" => {
+                Value::Int(zeit::aus_teilen(
+                    z_int(a, 0, "ZEIT_AUS_TEILEN")?, z_int(a, 1, "ZEIT_AUS_TEILEN")?,
+                    z_int(a, 2, "ZEIT_AUS_TEILEN")?,
+                    if a.len() > 3 { z_int(a, 3, "ZEIT_AUS_TEILEN")? } else { 0 },
+                    if a.len() > 4 { z_int(a, 4, "ZEIT_AUS_TEILEN")? } else { 0 },
+                    if a.len() > 5 { z_int(a, 5, "ZEIT_AUS_TEILEN")? } else { 0 }))
+            }
+            "zeit_plus" => Value::Int(
+                z_int(a, 0, "ZEIT_PLUS")?.saturating_add(z_int(a, 1, "ZEIT_PLUS")?)),
+            "zeit_diff" => Value::Int(
+                z_int(a, 0, "ZEIT_DIFF")?.saturating_sub(z_int(a, 1, "ZEIT_DIFF")?)),
+            "zeit_dauer$" | "zeit_dauer" => Value::str_rc(&zeit::dauer(z_int(a, 0, "ZEIT_DAUER$")?)),
+            "zeit_wochentag" => Value::Int(zeit::wochentag(z_int(a, 0, "ZEIT_WOCHENTAG")?)),
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
     /// Kein Grafik-Bezug -- laeuft auch konsolen-only. TIMER_UPDATE feuert
     /// faellige FUNCREF-Callbacks nach dem gleichen Muster wie GUI_UPDATE.
@@ -3202,6 +3318,10 @@ impl<'p> Vm<'p> {
             match a.get(i) {
                 Some(Value::Array(arr)) => {
                     let arr = arr.borrow();
+                    // Ein LEERES Array passt immer: es kann keinen falschen
+                    // Wert enthalten. Sonst braeuchte ein Widget, das seine
+                    // Daten erst spaeter bekommt, einen Platzhalter-Eintrag.
+                    if arr.cells.len() == 0 && arr.dims.len() <= 1 { return Ok(Vec::new()); }
                     if arr.element_type != "string" || arr.dims.len() != 1 {
                         return Err(format!("{}: erwartet 1D ARRAY OF STRING", f));
                     }
@@ -3215,6 +3335,7 @@ impl<'p> Vm<'p> {
             match a.get(i) {
                 Some(Value::Array(arr)) => {
                     let arr = arr.borrow();
+                    if arr.cells.len() == 0 { return Ok(Vec::new()); }
                     if arr.element_type != "string" || arr.dims.len() != 2 {
                         return Err(format!("{}: erwartet 2D ARRAY OF STRING", f));
                     }
@@ -3557,13 +3678,13 @@ impl<'p> Vm<'p> {
         }
         fn str1d(v: &Value, f: &str) -> R<Vec<String>> {
             match v { Value::Array(arr) => { let arr = arr.borrow();
-                if arr.element_type != "string" || arr.dims.len() != 1 { return Err(format!("{}: headers muss 1D ARRAY OF STRING sein", f)); }
+                if arr.cells.len() > 0 && (arr.element_type != "string" || arr.dims.len() != 1) { return Err(format!("{}: headers muss 1D ARRAY OF STRING sein", f)); }
                 Ok(arr.cells.iter().map(|x| match x { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()) }
                 _ => Err(format!("{}: headers muss ARRAY OF STRING sein", f)) }
         }
         fn str2d(v: &Value, ncols: usize, f: &str) -> R<Vec<Vec<String>>> {
             match v { Value::Array(arr) => { let arr = arr.borrow();
-                if arr.element_type != "string" || arr.dims.len() != 2 { return Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)); }
+                if arr.cells.len() > 0 && (arr.element_type != "string" || arr.dims.len() != 2) { return Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)); }
                 let (r, c) = (arr.dims[0] as usize, arr.dims[1] as usize);
                 if c != ncols { return Err(format!("{}: cells hat {} Spalten, headers {}", f, c, ncols)); }
                 Ok((0..r).map(|ri| (0..c).map(|ci| match &arr.cells.get(ri * c + ci) { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()).collect()) }
@@ -4360,7 +4481,17 @@ impl<'p> Vm<'p> {
             }
             #[cfg(feature = "dialogs")]
             "gui_confirm" => {
-                Value::Bool(crate::filedialog::confirm(gs(a, 0, "GUI_CONFIRM")?, gs(a, 1, "GUI_CONFIRM")?))
+                // Drittes Argument: "janein" beschriftet die Knoepfe als Frage
+                // statt als Anweisung. Vorgabe bleibt OK/Abbrechen.
+                let stil = if a.len() > 2 { gs(a, 2, "GUI_CONFIRM")?.to_lowercase() } else { String::new() };
+                let ja_nein = match stil.as_str() {
+                    "" | "ok" | "okabbrechen" => false,
+                    "janein" | "ja/nein" | "janein?" | "frage" => true,
+                    other => return Err(format!(
+                        "GUI_CONFIRM: '{}' ist kein Stil -- moeglich sind \"ok\" (Vorgabe) und \"janein\"", other)),
+                };
+                Value::Bool(crate::filedialog::confirm(
+                    gs(a, 0, "GUI_CONFIRM")?, gs(a, 1, "GUI_CONFIRM")?, ja_nein))
             }
             #[cfg(not(feature = "dialogs"))]
             "file_open_dialog" | "file_save_dialog" | "folder_dialog"
@@ -5683,7 +5814,7 @@ impl<'p> Vm<'p> {
                 let (x,y) = (gi(a,1,"UI_RADIO")? as i32 + self.ui_state.offset_x, gi(a,2,"UI_RADIO")? as i32 + self.ui_state.offset_y);
                 let opts: Vec<String> = match a.get(3) {
                     Some(Value::Array(arr)) => { let arr = arr.borrow();
-                        if arr.element_type != "string" { return Err("UI_RADIO: options muss ARRAY OF STRING sein".into()); }
+                        if arr.element_type != "string" && arr.cells.len() > 0 { return Err("UI_RADIO: options muss ARRAY OF STRING sein".into()); }
                         arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect() }
                     _ => return Err("UI_RADIO: options muss ARRAY OF STRING sein".into()),
                 };
@@ -6546,6 +6677,18 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
         // array:/map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
-        _ => Ok(value),
+        _ => {
+            // Ein leeres Array-Literal `[]` kommt ohne Elementtyp an ("any").
+            // Hier bekommt es den des Ziels -- sonst waere `namen = []` bei
+            // `DIM namen AS ARRAY OF STRING` ein stilles Loch in der
+            // Typpruefung, und ein spaeteres ARRAY_PUSH(namen, 42) ginge durch.
+            if let (Some(elem), Value::Array(a)) = (target.strip_prefix("array:"), &value) {
+                let mut arr = a.borrow_mut();
+                if arr.element_type == "any" && arr.cells.len() == 0 && !elem.is_empty() {
+                    arr.element_type = elem.to_string();
+                }
+            }
+            Ok(value)
+        }
     }
 }

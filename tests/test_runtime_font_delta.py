@@ -94,3 +94,78 @@ def test_delta_fixed_step_headless(tmp_path):
     m = re.search(r"[01]\.\d+", out)
     assert m, out
     assert abs(float(m.group(0)) - (1.0 / 60.0)) < 0.005, out
+
+
+# --- Umlaute im Fenster -----------------------------------------------
+#
+# Frueherer Stolperstein: TEXT(x, y, "Köln") zeichnete "K?ln". Zwei
+# Ursachen, beide behoben:
+#   * LOADFONT backte nur die 95 ASCII-Glyphen,
+#   * die eingebaute Bitmapschrift kennt ueberhaupt nur ASCII.
+# Gemessen wird ueber die Breite: fuer ein fehlendes Glyph zeichnet raylib
+# ein '?', dann sind "äöü" und "???" exakt gleich breit.
+
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
+def test_umlaute_mit_geladenem_font(tmp_path):
+    fp = _FONT.as_posix()
+    src = (
+        'SCREEN(320, 120, "t")\n'
+        'DIM f AS INTEGER\n'
+        f'f = LOADFONT("{fp}", 30)\n'
+        'SETFONT(f)\n'
+        'PRINT TEXT_WIDTH("äöü")\n'
+        'PRINT TEXT_WIDTH("???")\n'
+    )
+    out = _run(src, tmp_path)
+    nums = [int(x) for x in re.findall(r"\d+", out)]
+    assert len(nums) >= 2, out
+    assert nums[0] != nums[1], f"Umlaute wie Fragezeichen breit -- Glyphen fehlen: {out}"
+
+
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
+def test_umlaute_mit_eingebauter_schrift(tmp_path):
+    """Ohne eigenen Font springt der Ausweich-Font ein. Auf einem System
+    ohne die gesuchten Schriften bleibt es beim '?' -- dann sagt der Test
+    nichts aus und wird uebersprungen."""
+    src = (
+        'SCREEN(320, 120, "t")\n'
+        'PRINT TEXT_WIDTH("äöü")\n'
+        'PRINT TEXT_WIDTH("???")\n'
+    )
+    out = _run(src, tmp_path)
+    nums = [int(x) for x in re.findall(r"\d+", out)]
+    assert len(nums) >= 2, out
+    assert nums[0] != nums[1], f"Umlaute wie Fragezeichen breit -- kein Ausweich-Font: {out}"
+
+
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
+def test_reiner_ascii_text_misst_wie_die_eingebaute_schrift(tmp_path):
+    """Der Ausweich-Font darf nur bei Nicht-ASCII greifen: sonst saehe jedes
+    bestehende Programm ploetzlich anders aus. Die Zahlen sind die Metrik der
+    eingebauten Schrift, gemessen bevor es den Ausweich-Font gab: schlaegt der
+    Test fehl, misst die Runtime ASCII-Text auf einem anderen Weg."""
+    src = (
+        'SCREEN(320, 120, "t")\n'
+        'TEXT_SIZE(20)\n'
+        'PRINT TEXT_WIDTH("IIIIIIIIII")\n'
+        'PRINT TEXT_WIDTH("HALLO WELT")\n'
+    )
+    out = _run(src, tmp_path)
+    nums = [int(x) for x in re.findall(r"\d+", out)]
+    assert len(nums) >= 2, out
+    assert (nums[0], nums[1]) == (78, 130), f"ASCII-Metrik hat sich geaendert: {out}"
+
+
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
+def test_font_laden_schreibt_nicht_nach_stdout(tmp_path):
+    """raylib zaehlt beim Laden die gefundenen Glyphen und meldet fehlende
+    als Warnung. stdout gehoert der Programmausgabe."""
+    fp = _FONT.as_posix()
+    src = (
+        'SCREEN(320, 120, "t")\n'
+        'DIM f AS INTEGER\n'
+        f'f = LOADFONT("{fp}", 30)\n'
+        'PRINT "OK"\n'
+    )
+    out = _run(src, tmp_path)
+    assert out.strip() == "OK", out

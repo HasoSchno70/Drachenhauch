@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1299,
+ "count": 1316,
  "builtins": [
   {
    "name": "ABS",
@@ -2441,7 +2441,7 @@
   {
    "name": "GUI_CONFIRM",
    "kind": "graphics",
-   "signature": "GUI_CONFIRM(titel$, text$) AS BOOLEAN",
+   "signature": "GUI_CONFIRM(titel$, text$[, stil$]) AS BOOLEAN",
    "module": "core"
   },
   {
@@ -7795,6 +7795,108 @@
    "kind": "core",
    "signature": "__SET_DEDUP(v)",
    "module": "core"
+  },
+  {
+   "name": "ZEIT_JETZT",
+   "kind": "core",
+   "signature": "ZEIT_JETZT() AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_PARSE",
+   "kind": "core",
+   "signature": "ZEIT_PARSE(text: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_LESBAR",
+   "kind": "core",
+   "signature": "ZEIT_LESBAR(text: STRING) AS BOOLEAN",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_TEXT$",
+   "kind": "core",
+   "signature": "ZEIT_TEXT$(zeit: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_FORMAT$",
+   "kind": "core",
+   "signature": "ZEIT_FORMAT$(zeit: INTEGER, muster: STRING) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_TEIL",
+   "kind": "core",
+   "signature": "ZEIT_TEIL(zeit: INTEGER, feld: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_AUS_TEILEN",
+   "kind": "core",
+   "signature": "ZEIT_AUS_TEILEN(jahr: INTEGER, monat: INTEGER, tag: INTEGER, stunde: INTEGER = 0, minute: INTEGER = 0, sekunde: INTEGER = 0) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_PLUS",
+   "kind": "core",
+   "signature": "ZEIT_PLUS(zeit: INTEGER, sekunden: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_DIFF",
+   "kind": "core",
+   "signature": "ZEIT_DIFF(zeit: INTEGER, frueher: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_DAUER$",
+   "kind": "core",
+   "signature": "ZEIT_DAUER$(sekunden: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_WOCHENTAG",
+   "kind": "core",
+   "signature": "ZEIT_WOCHENTAG(zeit: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "HTTP_GET_START",
+   "kind": "core",
+   "signature": "HTTP_GET_START(url: STRING) AS INTEGER",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_READY",
+   "kind": "core",
+   "signature": "HTTP_READY(abruf: INTEGER) AS BOOLEAN",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_RESULT",
+   "kind": "core",
+   "signature": "HTTP_RESULT(abruf: INTEGER) AS STRING",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_CANCEL",
+   "kind": "core",
+   "signature": "HTTP_CANCEL(abruf: INTEGER)",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_PENDING",
+   "kind": "core",
+   "signature": "HTTP_PENDING() AS INTEGER",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_URL$",
+   "kind": "core",
+   "signature": "HTTP_URL$(abruf: INTEGER) AS STRING",
+   "module": "html"
   }
  ]
 }

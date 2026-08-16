@@ -111,12 +111,24 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
 | `GUI_MESSAGE(titel$, text$)` | — | Info-Box mit OK |
-| `GUI_CONFIRM(titel$, text$)` | BOOLEAN | OK/Abbrechen → `TRUE` bei OK |
+| `GUI_CONFIRM(titel$, text$[, stil$])` | BOOLEAN | Rückfrage → `TRUE` bei Zustimmung |
+
+`stil$` beschriftet die Knöpfe: `"ok"` (Vorgabe) zeigt **OK/Abbrechen**,
+`"janein"` zeigt **Ja/Nein**. Der Unterschied ist nicht kosmetisch — bei einer
+Frage liest sich „Abbrechen" als „Dialog schließen", „Nein" als Antwort.
+Faustregel: Anweisung („Löschen") → `"ok"`, Frage („Wirklich löschen?") → `"janein"`.
 
 ```basic
-IF GUI_CONFIRM("Löschen?", "Wirklich alles löschen?") THEN GUI_SET_TEXT(ta, "")
-GUI_MESSAGE("Fertig", "Gespeichert.")
+IF GUI_CONFIRM("Löschen", "Alle Einträge werden entfernt.") THEN GUI_SET_TEXT(ta, "")
+
+IF GUI_CONFIRM("Sicherung einspielen?", "Alles seitdem geht verloren.", "janein") THEN
+    GUI_MESSAGE("Fertig", "Sicherung eingespielt.")
+END IF
 ```
+
+Beide Dialoge **blockieren**, bis geantwortet wurde — das Fenster dahinter
+zeichnet solange nicht. Für eine Rückfrage ist das richtig: niemand soll
+weiterklicken können, während die Frage offen ist.
 
 Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.dh`](../examples/132_gui_textarea.dh).
 

@@ -1308,9 +1308,13 @@ impl Parser {
             Tt::New => self.new_expr(),
             Tt::Lbracket => {
                 self.pos += 1;
-                // Leeres Array-Literal []: Typ nicht herleitbar -> klarer Hinweis.
+                // Leeres Array-Literal `[]`: erlaubt. Den Elementtyp gibt der
+                // Ort vor, an dem es landet -- eine typisierte Variable, ein
+                // Parameter, ein Rueckgabewert. Ohne solchen Ort bleibt es
+                // ARRAY OF ANY und nimmt beim ersten ARRAY_PUSH Gestalt an.
                 if self.tt(0) == Tt::Rbracket {
-                    return self.err("Leeres Array-Literal [] -- Typ unbekannt; nutze DIM ... AS ARRAY OF T");
+                    self.pos += 1;
+                    return Ok(Node::ArrayLit(Vec::new()));
                 }
                 let first = self.expression()?;
                 // Disambiguierung: `[expr FOR ...]` = List-Comprehension,

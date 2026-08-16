@@ -15,6 +15,12 @@ IMPORT "html"
 | HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (Bytes) |
 | HTTP | `HTTP_STATUS()` | INTEGER (z.B. 200, 404) |
 | HTTP | `HTTP_HEADER(name$)` | STRING |
+| HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |
+| HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |
+| HTTP (Hintergrund) | `HTTP_RESULT(abruf)` | STRING (Response-Body) |
+| HTTP (Hintergrund) | `HTTP_CANCEL(abruf)` | — |
+| HTTP (Hintergrund) | `HTTP_PENDING()` | INTEGER (offene Abrufe) |
+| HTTP (Hintergrund) | `HTTP_URL$(abruf)` | STRING |
 | URL | `URL_ENCODE(s$)` | STRING |
 | URL | `URL_DECODE(s$)` | STRING |
 | HTML | `HTML_TEXT(html$)` | STRING (Tags raus, Entities decodiert) |
@@ -58,6 +64,58 @@ PRINT "Heruntergeladen: ", bytes, " Bytes"
 ```
 
 `HTTP_HEADER(name$)` liefert einen Response-Header der letzten Antwort. Header-Namen sind case-insensitive (`Content-Type` und `content-type` finden dasselbe).
+
+## Abrufe im Hintergrund
+
+`HTTP_GET` hält das ganze Programm an, bis die Antwort da ist. In einem Fenster heißt das: keine Maus, keine Taste, kein Neuzeichnen. Ein mittlerer JSON-Abruf dauert ~200 ms — rund zwölf ausgefallene Bilder, und bei schlechter Verbindung wartet das Fenster bis zum Timeout von 10 Sekunden.
+
+Für alles, was in einer Schleife läuft, gibt es darum denselben Abruf zum Nachsehen statt zum Warten:
+
+| Funktion | Wirkung |
+|---|---|
+| `HTTP_GET_START(url$)` → INTEGER | startet den Abruf im Hintergrund, liefert sofort seine Nummer |
+| `HTTP_READY(abruf)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht) |
+| `HTTP_RESULT(abruf)` → STRING | holt den Body ab und gibt den Platz frei |
+| `HTTP_CANCEL(abruf)` | Abruf verwerfen (unbekannte Nummer = No-Op) |
+| `HTTP_PENDING()` → INTEGER | wie viele Abrufe noch offen sind |
+| `HTTP_URL$(abruf)` → STRING | die URL eines laufenden Abrufs |
+
+Das Muster ist dasselbe wie bei `INPUT_UPDATE()`/`TIMER_UPDATE()`: einmal pro Frame nachsehen.
+
+```basic
+IMPORT "html"
+
+DIM abruf AS INTEGER
+DIM daten AS STRING
+abruf = HTTP_GET_START("https://api.example.com/scores")
+
+SCREEN(400, 120, "Lade")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 24, 32))
+    IF abruf >= 0 AND HTTP_READY(abruf) THEN
+        daten = HTTP_RESULT(abruf)
+        abruf = -1
+    END IF
+    IF daten = "" THEN
+        TEXT(20, 40, "Lade ... (" + STR$(HTTP_PENDING()) + " offen)", RGB(200, 200, 200))
+    ELSE
+        TEXT(20, 40, "Fertig: " + STR$(LEN(daten)) + " Zeichen", RGB(120, 220, 140))
+    END IF
+    FLIP()
+WEND
+```
+
+Nach `HTTP_RESULT` stehen `HTTP_STATUS()` und `HTTP_HEADER()` genau wie nach `HTTP_GET` bereit.
+
+**Details:**
+
+- **Fehler kommen beim Abholen.** Ein 404, ein Timeout oder ein Verbindungsfehler lässt `HTTP_GET_START` durchgehen und wirft erst bei `HTTP_RESULT` — dort, wo das Programm damit umgehen kann (`TRY`/`CATCH` um das Abholen).
+- **`HTTP_READY` darf beliebig oft gefragt werden.** Nach dem ersten `TRUE` bleibt die Antwort liegen, bis sie abgeholt wird. Erst `HTTP_RESULT` verbraucht sie.
+- **`HTTP_RESULT` vor `HTTP_READY`** bricht mit Klartext ab statt zu blockieren — sonst wäre der Vorteil wieder verspielt.
+- **Mehrere Abrufe laufen wirklich gleichzeitig.** Zwei Anfragen zu je 300 ms sind nach ~300 ms fertig, nicht nach 600.
+- **Nummern bleiben stabil** (Tombstones wie bei `timer`): eine abgeholte oder abgebrochene Nummer wird nicht neu vergeben. Ein Programm kann eine alte Nummer also nicht versehentlich auf einen fremden Abruf beziehen.
+- **Abbrechen stoppt den Abruf nicht mitten im Netz** — er läuft zu Ende, sein Ergebnis wird verworfen. Das Programm wartet dabei auf nichts.
+- **Nur GET.** Zum Daten-Holen reicht das, und jede weitere Form verdoppelt die Zustände, die ein Programm im Blick behalten muss. Für POST/Download in einer Schleife: seltener Aufruf an einer Stelle, an der ein kurzer Stillstand nicht stört.
 
 ## URL-Helpers
 
@@ -147,7 +205,7 @@ PRINT "Stars: ", JSON_GET_INT(info, "stargazers_count")
 - **User-Agent**: das Modul setzt einen eigenen User-Agent (`Drachenhauch/0.1 …`). Manche Server blocken Python's Default-`urllib`-UA — der eigene Header umgeht das.
 - **HTTPS**: Zertifikats-Validierung läuft via Python-Default (System-CA-Store). Selbst-signierte Zertifikate werden abgelehnt — keine Bypass-Option im Modul (mit Absicht).
 - **Cookies / Sessions** werden nicht persistent gespeichert — jeder Aufruf ist stateless. Für Login-geschützte APIs lieber Token-basierte Auth via Header einsetzen.
-- **Timeout**: 10 Sekunden hart codiert. Game-Loop sollte HTTP-Calls nicht im Render-Tick machen — friert sonst die UI ein.
+- **Timeout**: 10 Sekunden hart codiert. Ein blockierender HTTP-Call im Render-Tick friert die UI ein — in einer Schleife gehören darum `HTTP_GET_START`/`HTTP_READY`/`HTTP_RESULT` hin (siehe [Abrufe im Hintergrund](#abrufe-im-hintergrund)).
 - **Kein SSRF-Schutz**: `HTTP_GET`/`HTTP_POST`/`HTTP_DOWNLOAD` akzeptieren jede erreichbare URL, inklusive `localhost`/privater IPs/interner Dienste — das Modul filtert das bewusst nicht (Drachenhauch-Programme laufen lokal vertrauenswürdig). Wer fremden/eingebetteten GB-Code ausführt (Multiplayer-Skripte, Mod-Support), sollte das selbst absichern (z.B. URL-Allowlist vor dem Aufruf prüfen) — die Runtime tut es nicht für dich.
 - **`HTTP_DOWNLOAD`** streamt direkt in die Zieldatei (kein voller In-Memory-Puffer vorher) — bei sehr großen Downloads bleibt so nur der Festplattenplatz relevant, nicht der RAM-Verbrauch. Bricht der Transfer mitten im Body ab, wird die unvollständige Datei automatisch gelöscht statt einen abgeschnittenen Rest liegen zu lassen.
 

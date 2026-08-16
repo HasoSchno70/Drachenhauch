@@ -258,6 +258,27 @@ SETFONT(-1)                                             ' zurueck zum Default
 
 Demo: [examples/87_ttf_fonts.dh](../examples/87_ttf_fonts.dh).
 
+### Umlaute und Akzente
+
+`TEXT(x, y, "Köln")` zeichnet **Köln**, nicht `K?ln`. Dafür sorgen zwei Dinge:
+
+- **`LOADFONT` backt einen erweiterten Zeichensatz** — ASCII, den ganzen
+  Latin-1-Bereich (`äöüß`, `éèàç`, `ñ`) und gängige Typografie (`… – „ " · → ×`).
+  Enthält die Schriftdatei ein Zeichen nicht, zeichnet raylib dort ein `?`; eine
+  Pixel-Schrift für ein Retro-Spiel hat oft keine Umlaute.
+- **Ohne eigene Schrift springt ein Ausweich-Font ein.** Die eingebaute
+  raylib-Schrift kennt nur ASCII. Kommt ein Zeichen darüber hinaus vor, zeichnet
+  die Runtime diesen Text mit einer Systemschrift (Windows: Segoe UI, macOS:
+  SF/Helvetica, Linux: DejaVu/Liberation). Reiner ASCII-Text geht weiterhin
+  durch die eingebaute Schrift — bestehende Programme sehen aus wie zuvor.
+
+Findet sich keine Systemschrift, bleibt es beim `?`. Wer ein einheitliches
+Schriftbild will, lädt selbst eine Schrift und setzt sie mit `SETFONT` —
+dann zeichnet alles in derselben.
+
+`TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet: ein zentrierter Text mit
+Umlaut sitzt dort, wo er gemessen wurde.
+
 ## Bilder
 
 | Funktion | Zweck |

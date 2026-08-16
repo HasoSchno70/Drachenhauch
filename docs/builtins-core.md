@@ -402,7 +402,8 @@ PRINT FILESIZE(PATHJOIN("saves/level1", "progress.txt"))
 
 | Funktion | Zweck |
 |---|---|
-| `MILLIS()` → INTEGER | ms seit Programmstart |
+| `MILLIS()` → INTEGER | ms seit Programmstart (Stoppuhr) |
+| `TIMER()` → FLOAT | dieselbe Uhr in Sekunden |
 | `TIME$()` → STRING | aktuelle Uhrzeit `"HH:MM:SS"` |
 | `DATE$()` → STRING | aktuelles Datum `"YYYY-MM-DD"` |
 | `RND()` → FLOAT | Zufallszahl in `[0, 1)` |
@@ -426,6 +427,10 @@ FOR i = 0 TO 100000
     s = s + SIN(i * 0.001)
 NEXT
 PRINT "Zeit: ", MILLIS() - t1, "ms"
+' MILLIS ist eine Stoppuhr ab Programmstart, keine Uhrzeit: sie faengt bei 0
+' an und laeuft gleichmaessig weiter, auch wenn die Systemzeit springt
+' (Zeitumstellung, NTP). Fuer Datum und Uhrzeit ist ZEIT_JETZT() aus dem
+' Modul "zeit" zustaendig, das damit auch rechnen kann.
 
 ' Reproduzierbare Würfel
 RANDOMIZE(42)
