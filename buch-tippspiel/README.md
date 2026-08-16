@@ -52,6 +52,7 @@ Was es über Kapitel 12 hinaus kann:
 | **Tippgemeinschaften** | Dritter Reiter *Gruppen*: anlegen, löschen, Spieler aufnehmen und entfernen. Ein Spieler darf in mehreren sein. Auf dem Reiter *Rangliste* wählt man die Wertung — alle Spieler oder eine Gemeinschaft. |
 | **2. Bundesliga** | Ligawahl in der Kopfzeile; jede Liga hat ihren eigenen Spielplan und Kalender (die 2. beginnt drei Wochen früher). *Aktualisieren* holt beide Ligen **nebeneinander** — zwei gleichzeitige Abrufe sind zusammen so schnell wie einer. Getippt wird über beide Ligen in dieselbe Rangliste. Eine vorhandene Datenbank wird beim Start umgebaut, die Tipps darin bleiben. |
 | **Ligatabelle** | Reiter *Tabelle*, je Liga: Spiele, Siege, Unentschieden, Niederlagen, Tore, Differenz, Punkte. Sie wird **gerechnet, nicht gespeichert** — eine zweite Tabelle wäre eine zweite Wahrheit, die man nach jedem Ergebnis nachziehen müsste. Eine Abfrage über die ganze Saison braucht 1–2 ms. |
+| **Statistik** | Reiter *Statistik*, je Spieler und wahlweise je Liga: Tipps, Punkte, Schnitt, Trefferquote; die vier Trefferarten mit Anteil; bester und schwächster Spieltag; ein Balkendiagramm der Punkte je Spieltag. Gezählt wird die **Art** des Treffers, hergeleitet aus Tipp und Ergebnis — nicht aus der gespeicherten Punktzahl. |
 
 ## Aufbau (13 Kapitel)
 
@@ -110,7 +111,7 @@ trauen.
 
 | Datei | Was es prüft |
 |---|---|
-| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste, Spieltage, Ergebnisse aus der Antwort, Tippgemeinschaften, die zwei Ligen und die Ligatabelle — 72 Prüfungen, ohne Fenster und ohne Netz |
+| [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste, Spieltage, Ergebnisse aus der Antwort, Tippgemeinschaften, die zwei Ligen, die Ligatabelle und die Statistik — 89 Prüfungen, ohne Fenster und ohne Netz |
 | [`code/zeit_pruefung.dh`](code/zeit_pruefung.dh) | Die Datumsrechnungen: Tippschluss, Countdown, Schaltjahre |
 | [`code/abruf_pruefung.dh`](code/abruf_pruefung.dh) | Blockierender gegen nebenläufigen Abruf, mit gemessenen Zahlen |
 | [`code/stolpersteine.dh`](code/stolpersteine.dh) | Messprotokoll: wo Drachenhauch für so eine Anwendung an Grenzen stößt |

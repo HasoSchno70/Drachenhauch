@@ -27,6 +27,7 @@ IMPORT "db"
 IMPORT "zeit"
 IMPORT "html"
 IMPORT "json"
+IMPORT "chart"
 
 CONST DATEI = "tippspiel.db"
 
@@ -50,22 +51,53 @@ ligaKuerzel[1] = "bl2" : ligaName[1] = "2. Bundesliga"
 
 ' ---- Punkteregel ---------------------------------------------------------
 ' Die einzige Stelle, an der die Regel steht. Alles andere fragt hier nach.
-'   3 Punkte  exaktes Ergebnis
-'   2 Punkte  richtige Tendenz + richtige Tordifferenz
-'   1 Punkt   richtige Tendenz
-'   0 Punkte  daneben
+'   exakt      das Ergebnis getroffen            3 Punkte
+'   differenz  richtige Tendenz + Tordifferenz   2 Punkte
+'   tendenz    nur die Tendenz                   1 Punkt
+'   daneben    nichts davon                      0 Punkte
+CONST ART_DANEBEN = 0
+CONST ART_TENDENZ = 1
+CONST ART_DIFFERENZ = 2
+CONST ART_EXAKT = 3
+
 FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
     IF heim > gast THEN RETURN 1
     IF heim < gast THEN RETURN -1
     RETURN 0
 END FUNCTION
 
+' WAS fuer ein Treffer war das? Das ist eine andere Frage als "wie viele
+' Punkte gibt das", auch wenn die Antworten hier zufaellig dieselben Zahlen
+' sind. Die Statistik will die Art wissen -- wer sie an der Punktzahl
+' abliest ("3 heisst exakt"), schreibt die heutige Punktetabelle in die
+' Auswertung hinein und merkt es nicht, wenn sie sich aendert.
+FUNCTION art(tippH AS INTEGER, tippA AS INTEGER, _
+             ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    IF tippH = ergH AND tippA = ergA THEN RETURN ART_EXAKT
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN ART_DANEBEN
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN ART_DIFFERENZ
+    RETURN ART_TENDENZ
+END FUNCTION
+
+' Und WIE VIEL ist dieser Treffer wert. Heute eins zu eins -- die Zuordnung
+' steht aber an einer Stelle und laesst sich dort aendern.
 FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
                 ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
-    IF tippH = ergH AND tippA = ergA THEN RETURN 3
-    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN 0
-    IF (tippH - tippA) = (ergH - ergA) THEN RETURN 2
-    RETURN 1
+    SELECT CASE art(tippH, tippA, ergH, ergA)
+        CASE ART_EXAKT     : RETURN 3
+        CASE ART_DIFFERENZ : RETURN 2
+        CASE ART_TENDENZ   : RETURN 1
+    END SELECT
+    RETURN 0
+END FUNCTION
+
+FUNCTION artName(a AS INTEGER) AS STRING
+    SELECT CASE a
+        CASE ART_EXAKT     : RETURN "exakt getroffen"
+        CASE ART_DIFFERENZ : RETURN "Tordifferenz"
+        CASE ART_TENDENZ   : RETURN "nur Tendenz"
+    END SELECT
+    RETURN "daneben"
 END FUNCTION
 
 ' ---- Datenbank -----------------------------------------------------------
@@ -239,7 +271,7 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 960, 600)
 
 DIM reiter AS ARRAY OF STRING
-reiter = SPLIT$("Tipps|Rangliste|Tabelle|Gruppen", "|")
+reiter = SPLIT$("Tipps|Rangliste|Tabelle|Statistik|Gruppen", "|")
 GUI_TABS(win, reiter)
 
 ' --- Reiter 1: Tipps ---
@@ -409,14 +441,74 @@ NEXT
 GUI_TABLE_COL_ALIGN(tabelleLiga, 0, "mitte")
 GUI_TABLE_COL_ALIGN(tabelleLiga, 6, "mitte")
 
-' --- Reiter 4: Gruppen ---
+' --- Reiter 4: Statistik ---
+DIM lblStatSpieler AS GUI_WIDGET
+lblStatSpieler = GUI_LABEL(win, "Spieler:", 20, 54)
+GUI_SET_TAB(lblStatSpieler, 3)
+
+DIM statSpielerWahl AS GUI_WIDGET
+statSpielerWahl = GUI_DROPDOWN(win, 82, 50, 170, 26, [])
+GUI_SET_TAB(statSpielerWahl, 3)
+
+DIM lblStatLiga AS GUI_WIDGET
+lblStatLiga = GUI_LABEL(win, "Liga:", 266, 54)
+GUI_SET_TAB(lblStatLiga, 3)
+
+' Hier steht "Beide Ligen" vorn -- anders als beim Tippen, wo man immer in
+' genau einer Liga unterwegs ist.
+DIM statLigaWahl AS GUI_WIDGET
+statLigaWahl = GUI_DROPDOWN(win, 306, 50, 180, 26, [])
+GUI_SET_TAB(statLigaWahl, 3)
+
+DIM lblStatKopf AS GUI_WIDGET
+lblStatKopf = GUI_LABEL(win, "", 20, 84)
+GUI_SET_TAB(lblStatKopf, 3)
+
+DIM lblStatBest AS GUI_WIDGET
+lblStatBest = GUI_LABEL(win, "", 20, 106)
+GUI_SET_TAB(lblStatBest, 3)
+
+DIM statTab AS GUI_WIDGET
+' 20 Pixel breiter als die Spalten zusammen -- sonst frisst der Rollbalken
+' die letzte Spalte an.
+statTab = GUI_TABLE(win, 20, 132, 450, 152)
+GUI_SET_TAB(statTab, 3)
+DIM statKopf AS ARRAY OF STRING
+statKopf = SPLIT$("Treffer|Anzahl|Anteil|Punkte", "|")
+GUI_TABLE_HEADERS(statTab, statKopf)
+DIM statBreiten AS ARRAY OF INTEGER
+statBreiten = [170, 80, 90, 90]
+GUI_TABLE_COL_WIDTHS(statTab, statBreiten)
+GUI_TABLE_SET(statTab, "zeilenhoehe", 30)
+GUI_TABLE_SET(statTab, "kopfhoehe", 28)
+GUI_TABLE_SET(statTab, "zebra", 1)
+GUI_TABLE_COL_ALIGN(statTab, 1, "rechts")
+GUI_TABLE_COL_ALIGN(statTab, 2, "rechts")
+GUI_TABLE_COL_ALIGN(statTab, 3, "rechts")
+
+' Das Diagramm ist kein Widget der Oberflaeche, sondern etwas, das auf die
+' Leinwand gezeichnet wird -- es steht deshalb nicht in GUI_SET_TAB, sondern
+' wird nur dann gezeichnet, wenn sein Reiter vorn ist.
+' Es steht UNTER der Tabelle und nicht daneben: 34 Balken brauchen Breite.
+' Auf 450 Pixeln waeren sie 13 Pixel schmal und stiessen aneinander -- das
+' sieht aus wie eine Flaeche, nicht wie ein Spieltag neben dem anderen.
+DIM verlauf AS CHART
+verlauf = CHART_NEW("balken", 40, 375, 900, 200)
+CHART_SET(verlauf, "titel", "Punkte je Spieltag")
+CHART_SET(verlauf, "werte", "aussen")
+CHART_SET_NUM(verlauf, "abstand", 6)       ' Luecke in Pixeln
+IF schrift >= 0 THEN CHART_SET_NUM(verlauf, "schrift", schrift)
+CHART_SET_NUM(verlauf, "text_groesse", 13)
+CHART_SET_NUM(verlauf, "titel_groesse", 18)
+
+' --- Reiter 5: Gruppen ---
 DIM lblGruppen AS GUI_WIDGET
 lblGruppen = GUI_LABEL(win, "Tippgemeinschaften:", 20, 54)
-GUI_SET_TAB(lblGruppen, 3)
+GUI_SET_TAB(lblGruppen, 4)
 
 DIM gruppenTab AS GUI_WIDGET
 gruppenTab = GUI_TABLE(win, 20, 80, 420, 300)
-GUI_SET_TAB(gruppenTab, 3)
+GUI_SET_TAB(gruppenTab, 4)
 DIM gruppenKopf AS ARRAY OF STRING
 gruppenKopf = SPLIT$("Gemeinschaft|Mitglieder", "|")
 GUI_TABLE_HEADERS(gruppenTab, gruppenKopf)
@@ -430,23 +522,23 @@ GUI_TABLE_COL_ALIGN(gruppenTab, 1, "rechts")
 
 DIM neuName AS GUI_WIDGET
 neuName = GUI_TEXTINPUT(win, 20, 392, 280, 28, "Name der Tippgemeinschaft")
-GUI_SET_TAB(neuName, 3)
+GUI_SET_TAB(neuName, 4)
 
 DIM bNeu AS GUI_WIDGET
 bNeu = GUI_BUTTON(win, "Anlegen", 310, 392, 130, 28)
-GUI_SET_TAB(bNeu, 3)
+GUI_SET_TAB(bNeu, 4)
 
 DIM bWeg AS GUI_WIDGET
 bWeg = GUI_BUTTON(win, "Gemeinschaft löschen", 20, 430, 190, 28)
-GUI_SET_TAB(bWeg, 3)
+GUI_SET_TAB(bWeg, 4)
 
 DIM lblMitglieder AS GUI_WIDGET
 lblMitglieder = GUI_LABEL(win, "Mitglieder:", 470, 54)
-GUI_SET_TAB(lblMitglieder, 3)
+GUI_SET_TAB(lblMitglieder, 4)
 
 DIM mitgliedTab AS GUI_WIDGET
 mitgliedTab = GUI_TABLE(win, 470, 80, 470, 300)
-GUI_SET_TAB(mitgliedTab, 3)
+GUI_SET_TAB(mitgliedTab, 4)
 DIM mitgliedKopf AS ARRAY OF STRING
 mitgliedKopf = SPLIT$("Spieler|dabei", "|")
 GUI_TABLE_HEADERS(mitgliedTab, mitgliedKopf)
@@ -460,12 +552,12 @@ GUI_TABLE_COL_ALIGN(mitgliedTab, 1, "mitte")
 
 DIM bMit AS GUI_WIDGET
 bMit = GUI_BUTTON(win, "Aufnehmen / Entfernen", 470, 392, 220, 28)
-GUI_SET_TAB(bMit, 3)
+GUI_SET_TAB(bMit, 4)
 
 ' Eigene Statuszeile: die vom ersten Reiter ist hier nicht zu sehen.
 DIM gruppenStand AS GUI_WIDGET
 gruppenStand = GUI_LABEL(win, "", 20, 476)
-GUI_SET_TAB(gruppenStand, 3)
+GUI_SET_TAB(gruppenStand, 4)
 
 ' ---- Daten im Speicher ---------------------------------------------------
 ' Die Datenbank ist die Wahrheit, die Tabelle nur ihre Ansicht. Deshalb
@@ -585,6 +677,10 @@ SUB spielerLaden()
     NEXT
     GUI_SET_DROPDOWN(spielerWahl, liste)
     GUI_DROPDOWN_SET_SELECTED(spielerWahl, 0)
+    ' Dieselbe Liste auf dem Statistik-Reiter, aber mit eigener Auswahl:
+    ' fremde Ausbeute ansehen soll nicht heissen, unter fremdem Namen tippen.
+    GUI_SET_DROPDOWN(statSpielerWahl, liste)
+    GUI_DROPDOWN_SET_SELECTED(statSpielerWahl, 0)
 END SUB
 
 ' Die Spiele des Spieltags mit dem Tipp des gewaehlten Spielers.
@@ -790,6 +886,142 @@ SUB tabelleLadenLiga()
     ELSE
         GUI_SET_TEXT(lblTabStand, STR$(platz) + " Vereine, " + _
                      STR$(einsaetze \ 2) + " Spiele gewertet")
+    END IF
+END SUB
+
+' ---- Statistik -----------------------------------------------------------
+' Welcher Spieler ist auf dem Statistik-Reiter gewaehlt? Eine eigene Auswahl
+' statt der vom Tippen: man will die eigene Ausbeute ansehen, ohne dabei aus
+' Versehen unter fremdem Namen zu tippen.
+FUNCTION statSpieler() AS INTEGER
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(statSpielerWahl)
+    IF i < 0 OR i >= spielerAnzahl THEN RETURN 0
+    RETURN spielerId[i]
+END FUNCTION
+
+' 0 = beide Ligen, sonst der Platz im Ligen-Feld.
+FUNCTION statLiga() AS STRING
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(statLigaWahl)
+    IF i <= 0 OR i > LIGEN THEN RETURN ""
+    RETURN ligaKuerzel[i - 1]
+END FUNCTION
+
+' Gewertet wird, was ein Ergebnis hat. Ein Tipp auf ein Spiel, das noch
+' aussteht, ist keine Null -- er zaehlt einfach noch nicht mit.
+' Der leere Ligafilter ("") heisst beide, wie die 0 bei der Tippgemeinschaft.
+FUNCTION statAbfrage() AS STRING
+    RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + _
+           "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+           "WHERE t.spieler_id = ? AND s.tore_heim IS NOT NULL " + _
+           "  AND (? = '' OR s.liga = ?) " + _
+           "ORDER BY s.spieltag"
+END FUNCTION
+
+SUB statistikLaden()
+    GUI_TABLE_CLEAR(statTab)
+    CHART_CLEAR(verlauf)
+
+    DIM anzahlArt[4] AS INTEGER
+    DIM punkteArt[4] AS INTEGER
+    DIM proSpieltag[MAX_SPIELTAG + 1] AS INTEGER
+    DIM tippsSpieltag[MAX_SPIELTAG + 1] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        anzahlArt[i] = 0
+        punkteArt[i] = 0
+    NEXT
+    FOR i = 0 TO MAX_SPIELTAG
+        proSpieltag[i] = 0
+        tippsSpieltag[i] = 0
+    NEXT
+
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM summe AS INTEGER : summe = 0
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, statAbfrage(), statSpieler(), statLiga(), statLiga())
+    WHILE DB_NEXT(r)
+        DIM tag AS INTEGER : tag = DB_GET_INT(r, 0)
+        ' Die ART aus dem Tipp und dem Ergebnis herleiten, nicht aus der
+        ' gespeicherten Punktzahl. Sonst stuende die Punktetabelle von heute
+        ' in der Auswertung.
+        DIM a AS INTEGER
+        a = art(DB_GET_INT(r, 1), DB_GET_INT(r, 2), DB_GET_INT(r, 3), DB_GET_INT(r, 4))
+        DIM p AS INTEGER
+        p = punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), DB_GET_INT(r, 3), DB_GET_INT(r, 4))
+
+        anzahlArt[a] = anzahlArt[a] + 1
+        punkteArt[a] = punkteArt[a] + p
+        gesamt = gesamt + 1
+        summe = summe + p
+        IF tag >= 1 AND tag <= MAX_SPIELTAG THEN
+            proSpieltag[tag] = proSpieltag[tag] + p
+            tippsSpieltag[tag] = tippsSpieltag[tag] + 1
+        END IF
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    ' Die vier Arten von oben nach unten -- exakt zuerst, daneben zuletzt.
+    DIM stufe AS INTEGER
+    FOR stufe = ART_EXAKT TO ART_DANEBEN STEP -1
+        DIM anteil AS STRING : anteil = "-"
+        IF gesamt > 0 THEN
+            anteil = STR$((anzahlArt[stufe] * 100) \ gesamt) + " %"
+        END IF
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(artName(stufe) + "|" + STR$(anzahlArt[stufe]) + "|" + _
+                       anteil + "|" + STR$(punkteArt[stufe]), "|")
+        GUI_TABLE_ADD_ROW(statTab, zeile)
+    NEXT
+
+    IF gesamt = 0 THEN
+        GUI_SET_TEXT(lblStatKopf, "Noch nichts gewertet -- es fehlen Tipps oder Ergebnisse.")
+        GUI_SET_TEXT(lblStatBest, "")
+        RETURN
+    END IF
+
+    ' Der Schnitt in Hundertstel, ohne Kommarechnung: 61 Punkte aus 42 Tipps
+    ' sind 145 Hundertstel, also 1,45.
+    DIM schnitt AS INTEGER : schnitt = (summe * 100) \ gesamt
+    ' Getroffen hat, wer wenigstens die Tendenz hatte.
+    DIM getroffen AS INTEGER
+    getroffen = anzahlArt[ART_EXAKT] + anzahlArt[ART_DIFFERENZ] + anzahlArt[ART_TENDENZ]
+    GUI_SET_TEXT(lblStatKopf, _
+        STR$(gesamt) + " Tipps gewertet, " + STR$(summe) + " Punkte, " + _
+        "Schnitt " + STR$(schnitt \ 100) + "," + PADL$(STR$(schnitt MOD 100), 2, "0") + _
+        " -- Trefferquote " + STR$((getroffen * 100) \ gesamt) + " %")
+
+    ' Bester und schlechtester Spieltag -- gezaehlt werden nur Spieltage, an
+    ' denen ueberhaupt getippt wurde. Ein Spieltag ohne Tipp ist kein
+    ' schlechter Spieltag, er ist gar keiner.
+    DIM bestTag AS INTEGER : bestTag = 0
+    DIM bestPkt AS INTEGER : bestPkt = -1
+    DIM schlechtTag AS INTEGER : schlechtTag = 0
+    DIM schlechtPkt AS INTEGER : schlechtPkt = -1
+    DIM tage AS INTEGER : tage = 0
+    FOR i = 1 TO MAX_SPIELTAG
+        IF tippsSpieltag[i] > 0 THEN
+            tage = tage + 1
+            IF proSpieltag[i] > bestPkt THEN
+                bestPkt = proSpieltag[i]
+                bestTag = i
+            END IF
+            IF schlechtPkt < 0 OR proSpieltag[i] < schlechtPkt THEN
+                schlechtPkt = proSpieltag[i]
+                schlechtTag = i
+            END IF
+            CHART_ADD(verlauf, STR$(i), proSpieltag[i] * 1.0)
+        END IF
+    NEXT
+
+    IF tage = 1 THEN
+        GUI_SET_TEXT(lblStatBest, "Ein Spieltag gewertet: der " + STR$(bestTag) + _
+                     ". mit " + STR$(bestPkt) + " Punkten.")
+    ELSE
+        GUI_SET_TEXT(lblStatBest, _
+            "Bester Spieltag: der " + STR$(bestTag) + ". mit " + STR$(bestPkt) + _
+            " Punkten. Schwächster: der " + STR$(schlechtTag) + ". mit " + _
+            STR$(schlechtPkt) + ".")
     END IF
 END SUB
 
@@ -1088,6 +1320,7 @@ SUB abrufAbschliessen()
     spieleLaden()
     ranglisteLaden()
     tabelleLadenLiga()
+    statistikLaden()
 
     DIM meldung AS STRING
     meldung = STR$(holSpiele) + " Spiele aus beiden Ligen"
@@ -1136,6 +1369,15 @@ GUI_DROPDOWN_SET_SELECTED(ligaWahl, 0)
 GUI_SET_DROPDOWN(tabLigaWahl, ligaListe)
 GUI_DROPDOWN_SET_SELECTED(tabLigaWahl, 0)
 
+' Die Statistik darf beide Ligen zusammen sehen -- ein Eintrag mehr.
+DIM statLigaListe[LIGEN + 1] AS STRING
+statLigaListe[0] = "Beide Ligen"
+FOR li = 0 TO LIGEN - 1
+    statLigaListe[li + 1] = ligaName[li]
+NEXT
+GUI_SET_DROPDOWN(statLigaWahl, statLigaListe)
+GUI_DROPDOWN_SET_SELECTED(statLigaWahl, 0)
+
 spielerLaden()
 gruppenLaden()
 mitgliederLaden()
@@ -1144,6 +1386,7 @@ GUI_SET_VALUE(tagWahl, spieltagVorschlag())
 spieleLaden()
 ranglisteLaden()
 tabelleLadenLiga()
+statistikLaden()
 meldeGruppe("Gemeinschaft anklicken, dann Spieler aufnehmen oder entfernen.")
 melde("Liga, Spieltag und Spieler waehlen, Zeile anklicken, Tipp eingeben.")
 
@@ -1156,6 +1399,8 @@ DIM letzteWertung AS INTEGER : letzteWertung = 0
 DIM letzteGruppe AS INTEGER : letzteGruppe = -1
 DIM letzteLiga AS INTEGER : letzteLiga = GUI_DROPDOWN_SELECTED(ligaWahl)
 DIM letzteTabLiga AS INTEGER : letzteTabLiga = GUI_DROPDOWN_SELECTED(tabLigaWahl)
+DIM letzterStatSpieler AS INTEGER : letzterStatSpieler = GUI_DROPDOWN_SELECTED(statSpielerWahl)
+DIM letzteStatLiga AS INTEGER : letzteStatLiga = GUI_DROPDOWN_SELECTED(statLigaWahl)
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
@@ -1202,6 +1447,14 @@ WHILE NOT QUITREQUESTED()
     IF GUI_DROPDOWN_SELECTED(tabLigaWahl) <> letzteTabLiga THEN
         letzteTabLiga = GUI_DROPDOWN_SELECTED(tabLigaWahl)
         tabelleLadenLiga()
+    END IF
+
+    ' --- Reiter Statistik: anderer Spieler oder andere Liga ---
+    IF GUI_DROPDOWN_SELECTED(statSpielerWahl) <> letzterStatSpieler OR _
+       GUI_DROPDOWN_SELECTED(statLigaWahl) <> letzteStatLiga THEN
+        letzterStatSpieler = GUI_DROPDOWN_SELECTED(statSpielerWahl)
+        letzteStatLiga = GUI_DROPDOWN_SELECTED(statLigaWahl)
+        statistikLaden()
     END IF
 
     ' --- Reiter Gruppen ---
@@ -1337,6 +1590,7 @@ WHILE NOT QUITREQUESTED()
 
             spieleLaden()
             ranglisteLaden()
+            statistikLaden()
             melde("Tipp gespeichert: " + STR$(th) + ":" + STR$(tg))
         END IF
     END IF
@@ -1367,9 +1621,10 @@ WHILE NOT QUITREQUESTED()
                 punkteNeu(spielId[zeile], eh, eg)
                 spieleLaden()
                 ranglisteLaden()
-                ' Ein Ergebnis aendert auch die Ligatabelle -- sie wird
-                ' gerechnet, also reicht ein Neuladen.
+                ' Ein Ergebnis aendert auch Ligatabelle und Statistik -- beide
+                ' werden gerechnet, also reicht ein Neuladen.
                 tabelleLadenLiga()
+                statistikLaden()
                 melde("Ergebnis " + STR$(eh) + ":" + STR$(eg) + " eingetragen, Punkte neu gerechnet.")
             END IF
         END IF
@@ -1377,6 +1632,9 @@ WHILE NOT QUITREQUESTED()
 
     GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
     GUI_DRAW()
+    ' Das Diagramm liegt ueber der Leinwand, nicht in der Oberflaeche -- also
+    ' selbst dafuer sorgen, dass es nur auf seinem Reiter erscheint.
+    IF GUI_ACTIVE_TAB(win) = 3 THEN CHART_DRAW(verlauf)
     FLIP()
 WEND
 

@@ -50,18 +50,33 @@ SUB pruefeText(was AS STRING, ist AS STRING, soll AS STRING)
 END SUB
 
 ' ---- Die Regel (wortgleich mit tippspiel.dh) -----------------------------
+CONST ART_DANEBEN = 0
+CONST ART_TENDENZ = 1
+CONST ART_DIFFERENZ = 2
+CONST ART_EXAKT = 3
+
 FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
     IF heim > gast THEN RETURN 1
     IF heim < gast THEN RETURN -1
     RETURN 0
 END FUNCTION
 
+FUNCTION art(tippH AS INTEGER, tippA AS INTEGER, _
+             ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    IF tippH = ergH AND tippA = ergA THEN RETURN ART_EXAKT
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN ART_DANEBEN
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN ART_DIFFERENZ
+    RETURN ART_TENDENZ
+END FUNCTION
+
 FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
                 ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
-    IF tippH = ergH AND tippA = ergA THEN RETURN 3
-    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN 0
-    IF (tippH - tippA) = (ergH - ergA) THEN RETURN 2
-    RETURN 1
+    SELECT CASE art(tippH, tippA, ergH, ergA)
+        CASE ART_EXAKT     : RETURN 3
+        CASE ART_DIFFERENZ : RETURN 2
+        CASE ART_TENDENZ   : RETURN 1
+    END SELECT
+    RETURN 0
 END FUNCTION
 
 PRINT "=== Punkteregel ==="
@@ -601,6 +616,110 @@ FOR ti = 0 TO tAnzahl - 1
     summePunkte = summePunkte + tPunkte[ti]
 NEXT
 pruefe("Punktsumme stimmt (2 Siege a 3, 2 Remis a 2)", summePunkte, 10)
+
+' ---- Statistik -----------------------------------------------------------
+' Die Statistik fragt nach der ART eines Treffers, nicht nach seinen Punkten.
+' Heute sind das dieselben Zahlen -- genau deshalb muss man einmal
+' hinschreiben, dass es zwei verschiedene Fragen sind.
+PRINT ""
+PRINT "=== Trefferarten ==="
+
+pruefe("2:1 auf 2:1 ist exakt", art(2, 1, 2, 1), ART_EXAKT)
+pruefe("3:2 auf 2:1 ist die Tordifferenz", art(3, 2, 2, 1), ART_DIFFERENZ)
+pruefe("3:0 auf 2:1 ist nur die Tendenz", art(3, 0, 2, 1), ART_TENDENZ)
+pruefe("1:2 auf 2:1 ist daneben", art(1, 2, 2, 1), ART_DANEBEN)
+
+' Der Sonderfall, der beim Tippen von Unentschieden auffaellt: zwei
+' Unentschieden haben IMMER dieselbe Tordifferenz. 1:1 auf 2:2 kann also
+' nie "nur Tendenz" sein.
+pruefe("1:1 auf 2:2 ist die Tordifferenz, nie nur Tendenz", _
+       art(1, 1, 2, 2), ART_DIFFERENZ)
+pruefe("0:0 auf 0:0 ist exakt", art(0, 0, 0, 0), ART_EXAKT)
+
+' Art und Punkte muessen zusammenpassen -- ueber alle Tipps und Ergebnisse
+' von 0:0 bis 5:5. Wer eine der beiden Funktionen aendert und die andere
+' vergisst, faellt hier auf.
+DIM th AS INTEGER
+DIM tg AS INTEGER
+DIM eh AS INTEGER
+DIM eg AS INTEGER
+DIM schief AS INTEGER : schief = 0
+DIM gezaehlt AS INTEGER : gezaehlt = 0
+FOR th = 0 TO 5
+    FOR tg = 0 TO 5
+        FOR eh = 0 TO 5
+            FOR eg = 0 TO 5
+                gezaehlt = gezaehlt + 1
+                DIM a AS INTEGER : a = art(th, tg, eh, eg)
+                DIM p AS INTEGER : p = punkte(th, tg, eh, eg)
+                DIM soll AS INTEGER : soll = 0
+                IF a = ART_EXAKT THEN soll = 3
+                IF a = ART_DIFFERENZ THEN soll = 2
+                IF a = ART_TENDENZ THEN soll = 1
+                IF p <> soll THEN schief = schief + 1
+            NEXT
+        NEXT
+    NEXT
+NEXT
+pruefe("alle 1296 Paarungen von 0:0 bis 5:5 geprueft", gezaehlt, 1296)
+pruefe("  Art und Punkte passen ueberall zusammen", schief, 0)
+
+PRINT ""
+PRINT "=== Statistik eines Spielers ==="
+
+' Die Abfrage des Programms, wortgleich. Der leere Ligafilter heisst beide.
+FUNCTION statAbfrage() AS STRING
+    RETURN "SELECT s.spieltag, t.tipp_heim, t.tipp_gast, s.tore_heim, s.tore_gast " + _
+           "FROM tipps t JOIN spiele s ON s.id = t.spiel_id " + _
+           "WHERE t.spieler_id = ? AND s.tore_heim IS NOT NULL " + _
+           "  AND (? = '' OR s.liga = ?) " + _
+           "ORDER BY s.spieltag"
+END FUNCTION
+
+FUNCTION statZeilen(spieler AS INTEGER, liga AS STRING, _
+                    BYREF summe AS INTEGER, BYREF exakt AS INTEGER) AS INTEGER
+    DIM q AS DB_RESULT
+    q = DB_QUERY(db, statAbfrage(), spieler, liga, liga)
+    DIM n AS INTEGER : n = 0
+    summe = 0
+    exakt = 0
+    WHILE DB_NEXT(q)
+        n = n + 1
+        summe = summe + punkte(DB_GET_INT(q, 1), DB_GET_INT(q, 2), _
+                               DB_GET_INT(q, 3), DB_GET_INT(q, 4))
+        IF art(DB_GET_INT(q, 1), DB_GET_INT(q, 2), _
+               DB_GET_INT(q, 3), DB_GET_INT(q, 4)) = ART_EXAKT THEN exakt = exakt + 1
+    WEND
+    DB_CLOSE_RESULT(q)
+    RETURN n
+END FUNCTION
+
+' Clara bekommt einen zweiten Tipp -- einen in der 2. Liga, auf ein Spiel
+' mit Ergebnis (id 31, 2:0), exakt getroffen.
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + _
+            "VALUES (3, 31, 2, 0)")
+' Und einen auf ein Spiel OHNE Ergebnis -- der darf nirgends auftauchen.
+DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + _
+            "SELECT 3, id, 1, 1 FROM spiele WHERE liga = 'tl' AND spieltag = 3 LIMIT 1")
+
+DIM sSumme AS INTEGER
+DIM sExakt AS INTEGER
+pruefe("Clara hat zwei gewertete Tipps", statZeilen(3, "", sSumme, sExakt), 2)
+pruefe("  der Tipp auf das Spiel ohne Ergebnis ist nicht dabei", sSumme, 5)
+pruefe("  einer davon exakt (2:0 auf 2:0)", sExakt, 1)
+
+pruefe("nur 1. Liga: einer", statZeilen(3, "bl1", sSumme, sExakt), 1)
+pruefe("  und der bringt 2 Punkte", sSumme, 2)
+pruefe("nur 2. Liga: auch einer", statZeilen(3, "bl2", sSumme, sExakt), 1)
+pruefe("  und der bringt 3", sSumme, 3)
+
+' Die gespeicherte Punktespalte wird dabei nicht gebraucht: die Statistik
+' rechnet aus Tipp und Ergebnis. Zum Beweis eine falsche Zahl hineinschreiben
+' -- die Statistik darf sich davon nicht beirren lassen.
+DB_EXEC(db, "UPDATE tipps SET punkte = 99 WHERE spieler_id = 3")
+pruefe("eine falsche Punktespalte aendert die Statistik nicht", _
+       statZeilen(3, "", sSumme, sExakt), 2)
+pruefe("  die Punkte kommen aus Tipp und Ergebnis", sSumme, 5)
 
 DB_CLOSE(db)
 
