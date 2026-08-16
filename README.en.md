@@ -58,6 +58,16 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## Working from source
 
+One-time setup (Python ≥ 3.12; `.venv/` is gitignored, so a fresh clone does
+not have one):
+
+```
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Then:
+
 ```
 .venv\Scripts\python.exe dhrun.py            # open the editor
 .venv\Scripts\python.exe dhrun.py file.dh    # run a program directly
@@ -307,7 +317,7 @@ Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 .venv\Scripts\python.exe -m pytest tests/
 ```
 
-3130+ tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
+3224 tests — built-ins, every module, language constructs, editor features and example smoke tests. Correctness is guarded by **run_gb golden tests** (`assert run_gb(src) == expected`, spawn `dhrt run`) plus Rust `#[test]`s; they skip cleanly if `dhrt` isn't built.
 
 **Faster in two passes** (this is how CI runs them):
 

@@ -58,6 +58,16 @@ Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entw
 
 ## Aus dem Quelltext arbeiten
 
+Einmalig einrichten (Python ≥ 3.12; `.venv/` ist gitignoriert, ein frischer
+Klon hat es also nicht):
+
+```
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Danach:
+
 ```
 .venv\Scripts\python.exe dhrun.py            # Editor öffnen
 .venv\Scripts\python.exe dhrun.py datei.dh   # Programm direkt ausführen
@@ -305,7 +315,7 @@ Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 .venv\Scripts\python.exe -m pytest tests/
 ```
 
-Über 3130 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `dhrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `dhrt`.
+3224 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `dhrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `dhrt`.
 
 **Schneller in zwei Durchgängen** (so fährt auch die CI):
 
