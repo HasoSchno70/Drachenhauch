@@ -45,7 +45,7 @@ rust/drachenhauch_runtime/         # >>> die Runtime: dhrt (Rust/raylib)
   src/lexer.rs parser.rs compiler.rs vm.rs builtins.rs + <modul>.rs  # alles in Rust
 dhrun.py                 # CLI: Editor-Launcher + run/--native/--export/--tokens/--ast (run -> dhrt)
 examples/*.dh            # Demos
-tests/                   # pytest (1561+): run_gb-Golden gegen dhrt + Rust-#[test]
+tests/                   # pytest (3224): run_gb-Golden gegen dhrt + Rust-#[test]
 ```
 
 ## Architektur-Pipeline
@@ -239,6 +239,18 @@ core-Grafik-Built-ins (`PLOT`, `LINE`, `BOX`, `RECT`, `CIRCLE`, `TEXT`,
 `PARTICLE_DRAW` ruft intern `g.circle()` und folgt der Camera automatisch.
 
 ## Build und Test
+
+**Umgebung:** Jeder Befehl in diesem Abschnitt setzt das venv im
+Repo-Wurzelverzeichnis voraus — das System-Python hat die Abhängigkeiten nicht.
+Ein `python -m pytest tests/` damit bricht beim Sammeln ab
+(`ModuleNotFoundError: numpy`, und ohne `pytest-xdist` gibt es den schnellen
+Weg unten gar nicht). Das sieht nach kaputtem Repo aus, ist aber nur der
+falsche Interpreter. `.venv/` ist gitignoriert, ein frischer Klon hat es also
+nicht — einmalig anlegen (Python ≥ 3.12, siehe `requires-python`):
+```
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
 **Die Runtime `dhrt` bauen** (raylib, der einzige Ausführungspfad):
 ```
@@ -1872,6 +1884,8 @@ nicht der emscripten-Build).
 ## Build und Test
 
 ```
+py -3.12 -m venv .venv                                # einmalig: venv anlegen
+.venv\Scripts\python.exe -m pip install -r requirements.txt   # einmalig: Werkzeuge
 .venv\Scripts\python.exe rust\build_runtime.py        # Runtime dhrt (Rust)
 .venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt (seriell)
 .venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"

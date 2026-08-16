@@ -1,10 +1,26 @@
 # Kern: keine externen Abhaengigkeiten. Grafik/Audio laufen in der nativen
-# Runtime dhrt (Rust/raylib) -- pygame wurde entfernt.
-# Entwicklungswerkzeuge (optional):
-# pytest>=7
-# Editoren (optional, alle PySide6-basiert -- Code/Sprite/Tilemap/SFX/Tracker):
-# PySide6>=6.5                # GUI-Framework
-# Pillow>=10                  # Logo/Icon-Skalierung + Sprite-Editor-Pixel-Manipulation
-# numpy>=1.24                 # Synth-Mathematik (SFX/Tracker) + particles-Logik
-# sounddevice>=0.4            # Audio-Vorschau in SFX-/Tracker-Editor
-# soundfile>=0.12             # OGG/FLAC/WAV-Dekodierung beim Sample-Laden (Tracker)
+# Runtime dhrt (Rust/raylib) -- pygame wurde entfernt. Was hier steht, ist
+# Werkzeug: Testlauf, Editoren, Buch-Build.
+#
+# Einrichtung (Python >= 3.12, siehe CLAUDE.md "Umgebung"):
+#   py -3.12 -m venv .venv
+#   .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+# --- Testlauf ---
+pytest>=7
+pytest-xdist>=3             # -n auto --dist loadfile: 10:40 seriell -> ~65 s
+
+# --- Editoren (alle PySide6-basiert -- Code/Sprite/Tilemap/SFX/Tracker) ---
+# Die Suite prueft die Editoren mit, diese drei braucht sie deshalb auch:
+# PySide6 in 44, Pillow in 15, numpy in 11 Testdateien.
+PySide6>=6.5                # GUI-Framework
+Pillow>=10                  # Logo/Icon-Skalierung + Sprite-Editor-Pixel-Manipulation
+numpy>=1.24                 # Synth-Mathematik (SFX/Tracker) + particles-Logik
+
+# Nur zur Laufzeit der Audio-Editoren, kein Test importiert sie:
+sounddevice>=0.4            # Audio-Vorschau in SFX-/Tracker-Editor
+soundfile>=0.12             # OGG/FLAC/WAV-Dekodierung beim Sample-Laden (Tracker)
+
+# --- Buch-Build (buch-*/buch/make_book.py, Zwei-Pass mit Seitenzahlen) ---
+# Fehlt es, entsteht das Dokument trotzdem -- nur ohne Seitenzahlen im Inhalt.
+PyMuPDF>=1.24               # misst, auf welcher Seite jede Ueberschrift steht
