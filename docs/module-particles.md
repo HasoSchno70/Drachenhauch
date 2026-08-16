@@ -175,7 +175,7 @@ Position, Velocity, Lifetime, Age, Size und Color werden intern als NumPy-Arrays
 
 `PARTICLE_DRAW` berechnet beim Fade-Effekt die per-Partikel-Farben vorab in einer einzigen vektorisierten Operation und zeichnet dann pro Partikel einen Kreis (nativ in `dhrt`).
 
-Voraussetzung: `numpy` (wird über `pip install numpy` geholt).
+Voraussetzung: `numpy` — steht in `requirements.txt`, ist im venv also schon da.
 
 ## Komplettes Beispiel
 

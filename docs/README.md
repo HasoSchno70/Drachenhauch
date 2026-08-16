@@ -104,6 +104,10 @@ Speichern als `hallo.dh`, dann:
 .venv\Scripts\python.exe dhrun.py hallo.dh
 ```
 
+Das venv muss dafür stehen — wie es entsteht, steht im
+[README](../README.md#aus-dem-quelltext-arbeiten). Wer stattdessen das
+System-Python nimmt, bekommt Fehler über fehlende Pakete.
+
 ## Erstes Spiel
 
 Ein minimaler Game-Loop (Grafik läuft in der nativen Runtime dhrt):

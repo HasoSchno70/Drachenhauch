@@ -525,5 +525,5 @@ Drachenhauch-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), 
 ## Bekannte Eigenheiten
 
 - **`step` ist Schlüsselwort** (FOR…STEP) — Variablen anders benennen (`i`, `tick`, `iter`).
-- **`dhrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Installation: `pip install PySide6`.
+- **`dhrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Das Paket steht in `requirements.txt` — fehlt es, wurde meist das System-Python statt `.venv\Scripts\python.exe` erwischt.
 - **Grafik-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess (dhrt) ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Grafik-Fenster beendet das Programm.

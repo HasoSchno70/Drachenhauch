@@ -9,7 +9,7 @@ IMPORT "serial"
 ## Externe Dependency
 
 ```
-pip install pyserial
+.venv\Scripts\python.exe -m pip install pyserial
 ```
 
 Wenn `pyserial` nicht installiert ist, lädt das Modul trotzdem — der erste Aufruf einer `SERIAL_*`-Funktion wirft dann eine klare Meldung mit der `pip`-Anweisung.

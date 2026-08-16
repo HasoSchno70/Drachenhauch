@@ -11,7 +11,7 @@ IMPORT "usb"
 ## Externe Dependency
 
 ```
-pip install hidapi
+.venv\Scripts\python.exe -m pip install hidapi
 ```
 
 ## Übersicht

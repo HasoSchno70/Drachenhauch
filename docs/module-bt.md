@@ -11,7 +11,7 @@ IMPORT "bt"
 ## Externe Dependency
 
 ```
-pip install bleak
+.venv\Scripts\python.exe -m pip install bleak
 ```
 
 Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetooth-Adapter muss aktiv sein.
