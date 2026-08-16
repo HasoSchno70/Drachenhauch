@@ -2,10 +2,10 @@
 '  Was dem Tippspiel in Drachenhauch fehlt -- gemessen
 ' ============================================================
 '  Kein Lehrstueck, sondern ein Messprotokoll: Diese Datei
-'  zeigt an echten Zahlen, wo eine Anwendung dieser Art heute
-'  an Grenzen stoesst.
+'  zeigt an echten Zahlen, wo eine Anwendung dieser Art an
+'  Grenzen stiess -- und was davon inzwischen erledigt ist.
 '
-'  Zwei Punkte von frueher sind inzwischen erledigt und haben
+'  Alle sechs gefundenen Punkte sind geschlossen. Zwei haben
 '  eigene Pruefprogramme:
 '    * blockierendes HTTP  -> abruf_pruefung.dh
 '    * fehlende Datumsrechnung -> zeit_pruefung.dh
@@ -79,13 +79,33 @@ PRINT "    ASCII. Beides ist behoben -- nachzusehen im Fenster von"
 PRINT "    tippspiel.dh, wo die Vereine jetzt richtig dastehen."
 
 PRINT ""
-PRINT "=== 6. Was noch offen ist ==="
-PRINT "    Arrays pruefen ihren Elementtyp bei der Zuweisung nicht:"
+PRINT "=== 6. Elementtyp bei der Zuweisung -- erledigt ==="
 DIM texte AS ARRAY OF STRING
 DIM zahlen AS ARRAY OF INTEGER
 zahlen = [1, 2, 3]
-texte = zahlen
-PRINT "    'DIM texte AS ARRAY OF STRING : texte = zahlen' ging durch --"
-PRINT "    LEN(texte) = "; LEN(texte); ", erster Wert: "; texte[0]
-PRINT "    Bei einfachen Werten meldet die Runtime so etwas ('Erwartet"
-PRINT "    STRING, erhalten INTEGER'), bei Arrays noch nicht."
+TRY
+    texte = zahlen
+    PRINT "    FEHLER: ging durch, LEN(texte) = "; LEN(texte)
+CATCH e
+    PRINT "    "; e
+END TRY
+PRINT "    Frueher ging 'DIM texte AS ARRAY OF STRING : texte = zahlen'"
+PRINT "    still durch: die Runtime prueft den Typ bei einfachen Werten"
+PRINT "    ('Erwartet STRING, erhalten INTEGER'), reichte Arrays aber"
+PRINT "    ungeprueft weiter. Der Fehler fiel dann weit entfernt auf --"
+PRINT "    beim Lesen eines Elements, das den falschen Typ hatte."
+PRINT "    Geprueft wird jetzt bei Variablen, Parametern und Rueckgabe."
+PRINT ""
+PRINT "    Erlaubt bleibt, was nicht schiefgehen kann:"
+DIM leer AS ARRAY OF STRING
+leer = []
+PRINT "      leeres Literal erbt den Zieltyp   -> LEN = "; LEN(leer)
+DIM werte AS ARRAY OF FLOAT
+werte = [1, 2, 3]
+werte[0] = 1.5
+PRINT "      frisches [1,2,3] an ARRAY OF FLOAT -> "; werte[0]; " "; werte[1]
+
+PRINT ""
+PRINT "=== 7. Was noch offen ist ==="
+PRINT "    Nichts aus dieser Liste. Was beim Weiterschreiben auffaellt,"
+PRINT "    kommt hier dazu -- gemessen, nicht vermutet."

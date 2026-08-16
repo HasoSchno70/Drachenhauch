@@ -115,6 +115,94 @@ def test_leeres_array_wird_von_builtins_angenommen(run_gb):
     assert run_gb('PRINT "[" + JOIN$([], ",") + "]"\n') == "[]\n"
 
 
+# --- Elementtyp bei der Zuweisung ---------------------------------------
+#
+# Frueherer Stolperstein: `DIM texte AS ARRAY OF STRING : texte = zahlen`
+# ging still durch, auch wenn `zahlen` ein ARRAY OF INTEGER war -- coerce()
+# reichte alle Referenz-Typen einfach durch. Bei einfachen Werten meldet die
+# Runtime so etwas seit jeher; der Fehler fiel deshalb erst weit entfernt auf,
+# beim Lesen eines Elements mit dem falschen Typ.
+
+def test_falscher_elementtyp_wird_gemeldet(run_gb):
+    with pytest.raises(DrachenhauchError, match=r"Erwartet ARRAY OF STRING, erhalten ARRAY OF INTEGER"):
+        run_gb('DIM zahlen AS ARRAY OF INTEGER\n'
+               'zahlen = [1, 2, 3]\n'
+               'DIM texte AS ARRAY OF STRING\n'
+               'texte = zahlen\n')
+
+
+def test_falscher_elementtyp_als_parameter(run_gb):
+    with pytest.raises(DrachenhauchError, match=r"Parameter: Erwartet ARRAY OF STRING"):
+        run_gb('SUB zeige(liste AS ARRAY OF STRING)\n'
+               '    PRINT LEN(liste)\n'
+               'END SUB\n'
+               'DIM zahlen AS ARRAY OF INTEGER\n'
+               'zahlen = [1, 2]\n'
+               'zeige(zahlen)\n')
+
+
+def test_einfacher_wert_an_array_ziel(run_gb):
+    with pytest.raises(DrachenhauchError, match=r"Erwartet ARRAY OF INTEGER, erhalten INTEGER"):
+        run_gb('DIM a AS ARRAY OF INTEGER\n'
+               'a = 42\n')
+
+
+def test_gleicher_elementtyp_geht_weiterhin(run_gb):
+    assert run_gb('DIM a AS ARRAY OF STRING\n'
+                  'a = SPLIT$("x|y|z", "|")\n'
+                  'DIM b AS ARRAY OF STRING\n'
+                  'b = a\n'
+                  'PRINT LEN(b); b[2]\n') == "3z\n"
+
+
+def test_array_of_any_bleibt_zuweisbar(run_gb):
+    """ARRAY OF ANY kann jeden Wert enthalten -- es einem engeren Ziel zu
+    geben ist eine bewusste Entscheidung, so wie das Auspacken einer Map."""
+    assert run_gb('DIM frei AS ARRAY OF ANY\n'
+                  'frei = []\n'
+                  'ARRAY_PUSH(frei, "Text")\n'
+                  'DIM texte AS ARRAY OF STRING\n'
+                  'texte = frei\n'
+                  'PRINT texte[0]\n') == "Text\n"
+
+
+def test_ganzzahl_literal_an_float_ziel(run_gb):
+    """`[1, 2, 3]` an einem FLOAT-Ziel: die Zellen werden umgebaut, statt die
+    Zuweisung abzulehnen -- sonst waere ein FLOAT-Array ohne Komma-Werte im
+    Literal nicht mehr zu schreiben."""
+    assert run_gb('DIM werte AS ARRAY OF FLOAT\n'
+                  'werte = [1, 2, 3]\n'
+                  'werte[0] = 1.5\n'
+                  'PRINT werte[0]; " "; werte[1]\n') == "1.5 2.0\n"
+
+
+def test_vorhandenes_int_array_wird_nicht_zu_float(run_gb):
+    """Umbauen darf nur ein frisches Literal. Ein vorhandenes ARRAY OF INTEGER
+    wuerde sonst unter der Hand zu FLOAT -- sein bisheriger Name zeigt ja
+    weiter auf dieselben Zellen."""
+    with pytest.raises(DrachenhauchError, match=r"Erwartet ARRAY OF FLOAT, erhalten ARRAY OF INTEGER"):
+        run_gb('DIM ganz AS ARRAY OF INTEGER\n'
+               'ganz = [7, 8]\n'
+               'DIM komma AS ARRAY OF FLOAT\n'
+               'komma = ganz\n')
+
+
+def test_unzugewiesenes_array_bleibt_erlaubt(run_gb):
+    """Ein sizeless ARRAY ist bis zur ersten Zuweisung NIL."""
+    assert run_gb('DIM leer AS ARRAY OF STRING\n'
+                  'PRINT "ok"\n') == "ok\n"
+
+
+def test_rueckgabewert_prueft_den_elementtyp(run_gb):
+    with pytest.raises(DrachenhauchError, match=r"RETURN: Erwartet ARRAY OF STRING"):
+        run_gb('FUNCTION namen() AS ARRAY OF STRING\n'
+               '    DIM zahlen AS ARRAY OF INTEGER\n'
+               '    zahlen = [1, 2]\n'
+               '    RETURN zahlen\n'
+               'END FUNCTION\n'
+               'PRINT LEN(namen())\n')
+
+
 # --- Front-End-Paritaet (Python-Parser unterscheidet Literal vs Comp) ----
 
 def test_python_parser_array_literal_node():

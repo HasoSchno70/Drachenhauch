@@ -6676,19 +6676,70 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             Value::FuncRef(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
-        // array:/map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
-        _ => {
-            // Ein leeres Array-Literal `[]` kommt ohne Elementtyp an ("any").
-            // Hier bekommt es den des Ziels -- sonst waere `namen = []` bei
-            // `DIM namen AS ARRAY OF STRING` ein stilles Loch in der
-            // Typpruefung, und ein spaeteres ARRAY_PUSH(namen, 42) ginge durch.
-            if let (Some(elem), Value::Array(a)) = (target.strip_prefix("array:"), &value) {
-                let mut arr = a.borrow_mut();
-                if arr.element_type == "any" && arr.cells.len() == 0 && !elem.is_empty() {
-                    arr.element_type = elem.to_string();
-                }
-            }
-            Ok(value)
-        }
+        // map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
+        _ => match target.strip_prefix("array:") {
+            Some(elem) => coerce_array(value, elem, ctx),
+            None => Ok(value),
+        },
     }
+}
+
+/// Einen internen Typnamen so schreiben, wie er im Quelltext steht
+/// (`array:integer` -> `ARRAY OF INTEGER`). Gegenstueck zu
+/// `Compiler::typ_klartext` -- die interne Schreibweise sagt einem Nutzer nichts.
+fn typ_lesbar(t: &str) -> String {
+    match t.strip_prefix("array:") {
+        Some(e) => format!("ARRAY OF {}", typ_lesbar(e)),
+        None => t.to_uppercase(),
+    }
+}
+
+/// Zuweisung an ein ARRAY-Ziel pruefen (`DIM a AS ARRAY OF STRING : a = ...`).
+///
+/// Frueher reichte coerce() alle Referenz-Typen einfach durch. Damit ging
+/// `DIM texte AS ARRAY OF STRING : texte = zahlen` still durch, obwohl
+/// `zahlen` ein ARRAY OF INTEGER ist -- bei einfachen Werten meldet die
+/// Runtime so etwas seit jeher ("Erwartet STRING, erhalten INTEGER"), bei
+/// Arrays nicht. Der Fehler fiel dann weit entfernt auf, beim Lesen eines
+/// Elements, das den falschen Typ hatte.
+///
+/// Erlaubt bleibt, was nicht schiefgehen kann:
+///   * NIL -- ein sizeless ARRAY ist bis zur ersten Zuweisung NIL.
+///   * Ein leeres Literal `[]` kommt ohne Elementtyp an ("any") und bekommt
+///     hier den des Ziels.
+///   * Ein ARRAY OF ANY. Es kann jeden Wert enthalten; es einem engeren Ziel
+///     zuzuweisen ist eine bewusste Entscheidung des Programmierers, so wie
+///     das Auspacken einer Map. Erst der Schreibzugriff prueft wieder.
+///   * Ein frisches Ganzzahl-Literal an einem FLOAT-Ziel (siehe unten).
+fn coerce_array(value: Value, elem: &str, ctx: &str) -> R<Value> {
+    if matches!(value, Value::Nil) { return Ok(value); }
+    let ziel = if elem.is_empty() { "ARRAY".to_string() }
+               else { format!("ARRAY OF {}", typ_lesbar(elem)) };
+    let arr = match &value {
+        Value::Array(a) => a,
+        _ => return Err(format!("{}: Erwartet {}, erhalten {}",
+                                ctx, ziel, value.type_name())),
+    };
+    // Ziel ohne Elementtyp (ARRAY OF ANY) nimmt jedes Array.
+    if elem.is_empty() || elem == "any" { return Ok(value); }
+
+    let ist = {
+        let mut a = arr.borrow_mut();
+        if a.element_type == "any" && a.cells.len() == 0 {
+            a.element_type = elem.to_string();
+        // Ein frisches `[1, 2, 3]` an einem FLOAT-Ziel: die Zellen umbauen,
+        // statt die Zuweisung abzulehnen. Nur wenn dieses Array sonst
+        // niemandem gehoert (strong_count == 1, also ein Literal von eben) --
+        // ein vorhandenes ARRAY OF INTEGER darf nicht unter der Hand zu FLOAT
+        // werden, sein bisheriger Name zeigt ja weiter auf dieselben Zellen.
+        } else if a.element_type == "integer" && elem == "float"
+                  && Rc::strong_count(arr) == 1 {
+            let werte: Vec<f64> = a.cells.iter().map(|v| as_f64(&v)).collect();
+            a.cells = Cells::Float(werte);
+            a.element_type = "float".to_string();
+        }
+        a.element_type.clone()
+    };
+    if ist == elem || ist == "any" { return Ok(value); }
+    Err(format!("{}: Erwartet {}, erhalten ARRAY OF {}", ctx, ziel, typ_lesbar(&ist)))
 }

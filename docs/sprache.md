@@ -747,6 +747,31 @@ NEXT
 > dagegen wird still auf die gültigen Grenzen geklemmt: `arr[0:99]` auf ein
 > 3er-Array liefert ohne Fehler 3 Elemente. (Slicing gibt es nur für 1D-Arrays.)
 
+**Der Elementtyp gilt auch bei der Zuweisung.** Ein `ARRAY OF INTEGER` landet
+nicht in einem `ARRAY OF STRING` — bei Variablen, Parametern und Rückgabewerten
+gleichermaßen:
+
+```basic
+DIM zahlen AS ARRAY OF INTEGER
+zahlen = [1, 2, 3]
+DIM texte AS ARRAY OF STRING
+texte = zahlen        ' Fehler: Erwartet ARRAY OF STRING, erhalten ARRAY OF INTEGER
+```
+
+Drei Fälle bleiben ausdrücklich erlaubt:
+
+- Ein **leeres Literal** `[]` hat noch keinen Elementtyp und bekommt den des
+  Ziels — `DIM namen AS ARRAY OF STRING : namen = []` bleibt ein
+  `ARRAY OF STRING`.
+- Ein **`ARRAY OF ANY`** darf man einem engeren Ziel geben. Es kann jeden Wert
+  enthalten; das Einengen ist eine bewusste Entscheidung, der Schreibzugriff
+  prüft danach wieder.
+- Ein **frisches Ganzzahl-Literal** an einem FLOAT-Ziel wird umgebaut:
+  `DIM w AS ARRAY OF FLOAT : w = [1, 2, 3]` ergibt ein echtes FLOAT-Array.
+  Ein **vorhandenes** `ARRAY OF INTEGER` dagegen nicht — sein bisheriger Name
+  zeigt ja weiter auf dieselben Zellen, und die können nicht zugleich INTEGER
+  und FLOAT sein. Wer die Werte als FLOAT braucht, kopiert sie.
+
 ## Maps
 
 Schlüssel sind immer STRINGs, Werte können beliebigen Typ haben.
