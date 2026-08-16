@@ -1,0 +1,157 @@
+' ============================================================
+'  Kapitel 4 - Der Spielplan im Fenster
+'  Start:  dhrun.py buch-tippspiel/code/kap04/spielplan.dh
+' ============================================================
+'  Jetzt kommt das Fenster aus Kapitel 1 mit der Datenbank aus
+'  Kapitel 2 zusammen: eine Tabelle, die zeigt, was in der
+'  Datenbank steht.
+'
+'  Der wichtigste Satz dieses Kapitels:
+'  DIE DATENBANK IST DIE WAHRHEIT, DIE TABELLE IST NUR IHRE
+'  ANSICHT. Deshalb merkt sich jede Zeile die id ihres Spiels --
+'  sonst weiss das Programm bei einem Klick nicht, welches Spiel
+'  gemeint ist.
+' ============================================================
+IMPORT "gui"
+IMPORT "db"
+
+CONST DATEI = "kap04.db"
+
+' ---- Datenbank (wie Kapitel 2) -------------------------------------------
+DIM db AS DB_CONN
+db = DB_OPEN(DATEI)
+
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spiele (" + _
+            "id INTEGER PRIMARY KEY, spieltag INTEGER NOT NULL, " + _
+            "heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
+            "tore_heim INTEGER, tore_gast INTEGER)")
+
+FUNCTION anzahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+
+IF anzahl("SELECT COUNT(*) FROM spiele") = 0 THEN
+    DB_BEGIN(db)
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "FC Bayern München", "VfB Stuttgart")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "Borussia Dortmund", "Hamburger SV")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "RB Leipzig", "Bor. Mönchengladbach")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "SC Freiburg", "SV Werder Bremen")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "1. FC Köln", "TSG Hoffenheim")
+    ' Ein Ergebnis, damit man den Unterschied sieht.
+    DB_EXEC(db, "UPDATE spiele SET tore_heim = 3, tore_gast = 1 WHERE id = 1")
+    DB_COMMIT(db)
+END IF
+
+' ---- Oberflaeche ---------------------------------------------------------
+SCREEN(820, 460, "Tippspiel - Kapitel 4")
+SETFPS(60)
+
+DIM schrift AS INTEGER : schrift = -1
+DIM pfad AS STRING
+FOR EACH pfad IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF schrift < 0 AND FILEEXISTS(pfad) THEN schrift = LOADFONT(pfad, 32)
+NEXT
+IF schrift >= 0 THEN SETFONT(schrift)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Spielplan - 1. Spieltag", 20, 20, 780, 420)
+
+DIM tabelle AS GUI_WIDGET
+tabelle = GUI_TABLE(win, 20, 50, 740, 280)
+DIM kopf AS ARRAY OF STRING
+kopf = SPLIT$("Heim|Gast|Ergebnis", "|")
+GUI_TABLE_HEADERS(tabelle, kopf)
+DIM breiten AS ARRAY OF INTEGER
+breiten = [300, 300, 140]
+GUI_TABLE_COL_WIDTHS(tabelle, breiten)
+GUI_TABLE_SET(tabelle, "zeilenhoehe", 30)
+GUI_TABLE_SET(tabelle, "kopfhoehe", 28)
+GUI_TABLE_SET(tabelle, "zebra", 1)
+GUI_TABLE_COL_ALIGN(tabelle, 2, "mitte")
+
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "Eine Zeile anklicken.", 20, 345)
+
+' ---- Die Bruecke zwischen Tabelle und Datenbank --------------------------
+' Zeile 0 der Tabelle zeigt irgendein Spiel -- welches, weiss nur dieses
+' Array. Ohne es koennte das Programm auf einen Klick nicht antworten.
+CONST MAXSPIELE = 200
+DIM spielId[MAXSPIELE] AS INTEGER
+DIM spieleAnzahl AS INTEGER
+
+SUB spieleLaden()
+    GUI_TABLE_CLEAR(tabelle)
+    spieleAnzahl = 0
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT id, heim, gast, tore_heim, tore_gast " + _
+                     "FROM spiele WHERE spieltag = 1 ORDER BY id")
+    WHILE DB_NEXT(r)
+        IF spieleAnzahl >= MAXSPIELE THEN BREAK
+
+        DIM ergText AS STRING : ergText = "-:-"
+        IF NOT DB_IS_NULL(r, 3) THEN
+            ergText = STR$(DB_GET_INT(r, 3)) + ":" + STR$(DB_GET_INT(r, 4))
+        END IF
+
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(DB_GET_STRING(r, 1) + "|" + DB_GET_STRING(r, 2) + "|" + ergText, "|")
+        GUI_TABLE_ADD_ROW(tabelle, zeile)
+
+        ' Hier wird die Bruecke gebaut: Tabellenzeile -> id in der Datenbank.
+        spielId[spieleAnzahl] = DB_GET_INT(r, 0)
+        spieleAnzahl = spieleAnzahl + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+spieleLaden()
+
+' ---- Hauptschleife -------------------------------------------------------
+DIM letzteZeile AS INTEGER : letzteZeile = -1
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    ' GUI_TABLE_SELECTED liefert die ZEILENNUMMER -- nicht die id. Den Weg
+    ' von der einen zur anderen kennt nur spielId[].
+    DIM zeile AS INTEGER : zeile = GUI_TABLE_SELECTED(tabelle)
+    IF zeile >= 0 AND zeile <> letzteZeile THEN
+        letzteZeile = zeile
+        GUI_SET_TEXT(stand, "Zeile " + STR$(zeile) + " zeigt Spiel Nr. " + _
+                            STR$(spielId[zeile]) + ": " + _
+                            GUI_TABLE_GET_CELL(tabelle, zeile, 0) + " gegen " + _
+                            GUI_TABLE_GET_CELL(tabelle, zeile, 1))
+    END IF
+
+    CLS(&H0F1420)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+DB_CLOSE(db)
+
+' ============================================================
+'  Zum Ausprobieren:
+'   * Auf die Spaltenkoepfe klicken -- die Tabelle sortiert. Die
+'     Zeilennummern bleiben, die Zuordnung stimmt weiter, weil
+'     spieleLaden() Zeile und id gemeinsam gesetzt hat.
+'   * Ein Spiel in der Datenbank aendern (mit dem Programm aus
+'     Kapitel 2) und dieses hier neu starten.
+'   * Was passiert, wenn man spielId[] weglaesst und stattdessen
+'     annimmt "Zeile 0 = Spiel 1"? (Solange nicht sortiert wird,
+'     geht es gut. Genau deshalb ist der Fehler so gemein.)
+' ============================================================

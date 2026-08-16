@@ -1,0 +1,129 @@
+' ============================================================
+'  Kapitel 2 - Wo die Daten wohnen
+'  Start:  dhrun.py buch-tippspiel/code/kap02/daten.dh
+' ============================================================
+'  Noch kein Fenster. Erst muss klar sein, WO die Daten liegen
+'  und WIE sie aussehen -- danach ist die Oberflaeche nur noch
+'  eine Ansicht darauf.
+'
+'  Ein Spiel darf beim Beenden alles vergessen. Eine Anwendung
+'  nicht: die Tipps von gestern muessen morgen noch da sein.
+'  Dafuer gibt es SQLite -- eine ganze Datenbank in einer Datei.
+' ============================================================
+IMPORT "db"
+
+CONST DATEI = "kap02.db"
+
+DIM db AS DB_CONN
+db = DB_OPEN(DATEI)
+' DB_OPEN legt die Datei an, wenn es sie noch nicht gibt.
+' Ab jetzt ist sie die Wahrheit -- nicht irgendeine Variable im Programm.
+
+' ---- Die Tabellen --------------------------------------------------------
+' "IF NOT EXISTS": beim zweiten Start soll das Programm nicht abbrechen,
+' weil es die Tabelle schon gibt.
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spieler (" + _
+            "id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+
+' tore_heim und tore_gast duerfen leer bleiben (NULL) -- ein Spiel, das noch
+' nicht gespielt ist, hat kein Ergebnis. Das ist etwas anderes als 0:0!
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spiele (" + _
+            "id INTEGER PRIMARY KEY, spieltag INTEGER NOT NULL, " + _
+            "heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
+            "tore_heim INTEGER, tore_gast INTEGER)")
+
+' ---- Zaehlen -------------------------------------------------------------
+' Eine kleine Hilfe: SELECT COUNT(*) liefert eine Zahl in einer Zeile.
+FUNCTION anzahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)      ' Ergebnis schliessen -- sonst bleibt es offen
+    RETURN n
+END FUNCTION
+
+' ---- Grunddaten ----------------------------------------------------------
+' Nur beim allerersten Start. Sonst kaeme bei jedem Start alles doppelt.
+IF anzahl("SELECT COUNT(*) FROM spieler") = 0 THEN
+    PRINT "Erster Start -- lege Grunddaten an."
+
+    ' DB_BEGIN/DB_COMMIT: alles dazwischen gilt als EIN Vorgang. Bricht das
+    ' Programm mittendrin ab, ist nichts halb eingetragen.
+    DB_BEGIN(db)
+
+    DIM name AS STRING
+    FOR EACH name IN ("Anna", "Ben", "Clara")
+        ' Das Fragezeichen ist ein Platzhalter: DB_EXEC setzt den Wert selbst
+        ' ein. Niemals den Text zusammenkleben -- ein Name wie O'Brien wuerde
+        ' den Befehl sonst zerreissen.
+        DB_EXEC(db, "INSERT INTO spieler (name) VALUES (?)", name)
+    NEXT
+
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "FC Bayern München", "VfB Stuttgart")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "Borussia Dortmund", "Hamburger SV")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "RB Leipzig", "Bor. Mönchengladbach")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "SC Freiburg", "SV Werder Bremen")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "1. FC Köln", "TSG Hoffenheim")
+
+    DB_COMMIT(db)
+ELSE
+    PRINT "Die Datenbank gibt es schon -- nichts neu angelegt."
+END IF
+
+' ---- Auslesen ------------------------------------------------------------
+PRINT ""
+PRINT "Mitspieler:"
+DIM r AS DB_RESULT
+r = DB_QUERY(db, "SELECT id, name FROM spieler ORDER BY name")
+WHILE DB_NEXT(r)
+    PRINT "  ["; DB_GET_INT(r, 0); "] "; DB_GET_STRING(r, 1)
+WEND
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "Spiele des 1. Spieltags:"
+r = DB_QUERY(db, "SELECT id, heim, gast, tore_heim, tore_gast " + _
+                 "FROM spiele WHERE spieltag = ? ORDER BY id", 1)
+WHILE DB_NEXT(r)
+    ' DB_IS_NULL fragt: steht in dieser Spalte ueberhaupt etwas? Ein Spiel
+    ' ohne Ergebnis hat NULL -- das ist keine Null, sondern "noch nichts".
+    DIM ergebnis AS STRING : ergebnis = "noch nicht gespielt"
+    IF NOT DB_IS_NULL(r, 3) THEN
+        ergebnis = STR$(DB_GET_INT(r, 3)) + ":" + STR$(DB_GET_INT(r, 4))
+    END IF
+    PRINT "  ["; DB_GET_INT(r, 0); "] "; DB_GET_STRING(r, 1); _
+          " - "; DB_GET_STRING(r, 2); "   "; ergebnis
+WEND
+DB_CLOSE_RESULT(r)
+
+' ---- Ein Ergebnis eintragen ---------------------------------------------
+PRINT ""
+PRINT "Trage ein Ergebnis ein (Spiel 1: 3:1) ..."
+DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? WHERE id = ?", 3, 1, 1)
+
+r = DB_QUERY(db, "SELECT heim, gast, tore_heim, tore_gast FROM spiele WHERE id = ?", 1)
+IF DB_NEXT(r) THEN
+    PRINT "  "; DB_GET_STRING(r, 0); " "; DB_GET_INT(r, 2); ":"; _
+          DB_GET_INT(r, 3); " "; DB_GET_STRING(r, 1)
+END IF
+DB_CLOSE_RESULT(r)
+
+DB_CLOSE(db)
+
+PRINT ""
+PRINT "Die Datei "; DATEI; " liegt jetzt neben dem Programm."
+PRINT "Starte das Programm noch einmal: die Daten sind noch da."
+' ============================================================
+'  Zum Ausprobieren:
+'   * Das Programm zweimal starten -- beim zweiten Mal wird nichts
+'     neu angelegt, und das Ergebnis von oben steht noch drin.
+'   * kap02.db loeschen und neu starten: alles faengt von vorn an.
+'   * Einen weiteren Spieler ergaenzen. Was passiert beim naechsten
+'     Start? (Nichts -- die Grunddaten laufen nur einmal.)
+' ============================================================

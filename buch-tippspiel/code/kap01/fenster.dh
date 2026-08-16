@@ -1,0 +1,70 @@
+' ============================================================
+'  Kapitel 1 - Das erste Fenster
+'  Start:  dhrun.py buch-tippspiel/code/kap01/fenster.dh
+' ============================================================
+'  Ein Fenster, ein Titel, ein Knopf, der etwas tut. Mehr nicht
+'  -- aber alles, was jede Anwendung braucht: eine Schleife, die
+'  laeuft, bis jemand sie beendet.
+' ============================================================
+IMPORT "gui"
+
+' Das Fenster des Betriebssystems: Breite, Hoehe, Titel.
+SCREEN(700, 400, "Tippspiel - Kapitel 1")
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+' Die eingebaute Schrift ist eine Pixelschrift -- gut fuer ein Spiel, in einer
+' Anwendung sieht sie nach 1985 aus. Also eine Schrift vom System laden.
+' FILEEXISTS zuerst fragen: auf einem anderen Rechner heisst sie anders, und
+' ein Programm soll daran nicht scheitern.
+DIM schrift AS INTEGER : schrift = -1
+DIM pfad AS STRING
+FOR EACH pfad IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF schrift < 0 AND FILEEXISTS(pfad) THEN schrift = LOADFONT(pfad, 32)
+NEXT
+IF schrift >= 0 THEN SETFONT(schrift)
+TEXT_SIZE(16)       ' geladen wird gross, gezeichnet in Lesegroesse
+
+' Darin ein Fenster der Oberflaeche. Der Unterschied: SCREEN ist die
+' Leinwand, GUI_WINDOW ist ein Rahmen darauf, in dem Bedienelemente sitzen.
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Bundesliga Tippspiel", 20, 20, 660, 360)
+
+DIM titel AS GUI_WIDGET
+titel = GUI_LABEL(win, "Hier entsteht ein Tippspiel.", 20, 50)
+
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "Noch tut der Knopf nicht viel.", 20, 80)
+
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(win, "Druecken", 20, 120, 140, 32)
+
+DIM gedrueckt AS INTEGER : gedrueckt = 0
+
+' ---- Die Hauptschleife ---------------------------------------------------
+' Sie laeuft, bis das Fenster geschlossen oder ESC gedrueckt wird. In jedem
+' Durchlauf passiert dasselbe in derselben Reihenfolge:
+'   1. nachsehen, was der Benutzer getan hat  (GUI_UPDATE)
+'   2. darauf reagieren                        (GUI_CLICKED ...)
+'   3. alles neu zeichnen                      (GUI_DRAW, FLIP)
+' Ein Durchlauf ist ein Bild. Bei 60 Bildern je Sekunde merkt niemand,
+' dass das Fenster in Wahrheit sechzigmal pro Sekunde neu entsteht.
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK        ' 27 = ESC
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(knopf) THEN
+        gedrueckt = gedrueckt + 1
+        GUI_SET_TEXT(stand, "Gedrueckt: " + STR$(gedrueckt) + " mal")
+    END IF
+
+    CLS(&H0F1420)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+' ============================================================
+'  Was hier schon steht, bleibt bis zum letzten Kapitel:
+'  Fenster oeffnen, Schleife, GUI_UPDATE / GUI_DRAW / FLIP.
+'  Alles Weitere wird zwischen diese Zeilen eingebaut.
+' ============================================================

@@ -1,0 +1,10 @@
+{
+  "name": "buch-tippspiel",
+  "version": "1.0.0",
+  "description": "Tippspiel-Buch als .docx",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "docx": "^9.7.1"
+  }
+}

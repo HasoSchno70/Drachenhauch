@@ -1,0 +1,458 @@
+' ============================================================
+'  Kapitel 7 - Die Rangliste
+'  Start:  dhrun.py buch-tippspiel/code/kap07/rangliste.dh
+' ============================================================
+'  Ein Tippspiel ohne Tabelle ist kein Tippspiel. Die Rangliste
+'  bekommt einen eigenen Reiter -- und wird NICHT im Programm
+'  zusammengerechnet, sondern von der Datenbank.
+'
+'  Der Satz, um den sich alles dreht:
+'  GEWERTET WIRD NUR, WAS GESPIELT IST. Ein Tipp auf ein Spiel
+'  ohne Ergebnis ist keine Null -- er zaehlt einfach noch nicht.
+' ============================================================
+IMPORT "gui"
+IMPORT "db"
+
+' ---- Die Regel aus Kapitel 3 --------------------------------------------
+' Unveraendert uebernommen. Sie steht hier einmal und wird von der Anzeige
+' wie von der Neuberechnung gefragt -- eine Regel, eine Stelle.
+FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
+    IF heim > gast THEN RETURN 1
+    IF heim < gast THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
+                ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    IF tippH = ergH AND tippA = ergA THEN RETURN 3
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN 0
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN 2
+    RETURN 1
+END FUNCTION
+
+CONST DATEI = "kap07.db"
+
+DIM db AS DB_CONN
+db = DB_OPEN(DATEI)
+
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spieler (" + _
+            "id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS spiele (" + _
+            "id INTEGER PRIMARY KEY, spieltag INTEGER NOT NULL, " + _
+            "heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
+            "tore_heim INTEGER, tore_gast INTEGER)")
+' UNIQUE(spieler_id, spiel_id): die Datenbank laesst einen zweiten Tipp
+' desselben Spielers auf dasselbe Spiel gar nicht erst zu.
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS tipps (" + _
+            "id INTEGER PRIMARY KEY, spieler_id INTEGER NOT NULL, " + _
+            "spiel_id INTEGER NOT NULL, tipp_heim INTEGER NOT NULL, " + _
+            "tipp_gast INTEGER NOT NULL, punkte INTEGER, " + _
+            "UNIQUE(spieler_id, spiel_id))")
+
+FUNCTION anzahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+
+IF anzahl("SELECT COUNT(*) FROM spieler") = 0 THEN
+    DB_BEGIN(db)
+    DIM name AS STRING
+    FOR EACH name IN ("Anna", "Ben", "Clara")
+        DB_EXEC(db, "INSERT INTO spieler (name) VALUES (?)", name)
+    NEXT
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "FC Bayern München", "VfB Stuttgart")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "Borussia Dortmund", "Hamburger SV")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "RB Leipzig", "Bor. Mönchengladbach")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "SC Freiburg", "SV Werder Bremen")
+    DB_EXEC(db, "INSERT INTO spiele (spieltag, heim, gast) VALUES (1,?,?)", _
+            "1. FC Köln", "TSG Hoffenheim")
+
+    ' Ein paar Tipps und ein Ergebnis, damit beim ersten Start schon etwas
+    ' zu sehen ist: 3 Punkte gruen, 2 gelb, 0 rot.
+    DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (1,1,3,1)")
+    DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (2,1,2,0)")
+    DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (3,1,0,2)")
+    DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) VALUES (1,2,2,1)")
+    DB_EXEC(db, "UPDATE spiele SET tore_heim = 3, tore_gast = 1 WHERE id = 1")
+    DB_COMMIT(db)
+END IF
+
+' ---- Oberflaeche ---------------------------------------------------------
+SCREEN(980, 600, "Tippspiel - Kapitel 7")
+SETFPS(60)
+
+DIM schrift AS INTEGER : schrift = -1
+DIM pfad AS STRING
+FOR EACH pfad IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF schrift < 0 AND FILEEXISTS(pfad) THEN schrift = LOADFONT(pfad, 32)
+NEXT
+IF schrift >= 0 THEN SETFONT(schrift)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Tippspiel - 1. Spieltag", 20, 20, 940, 560)
+
+' Zwei Reiter. Jedes Bedienelement bekommt danach mit GUI_SET_TAB gesagt,
+' auf welche Seite es gehoert -- ohne das stuende alles auf beiden.
+DIM reiter AS ARRAY OF STRING
+reiter = SPLIT$("Tipps|Rangliste", "|")
+GUI_TABS(win, reiter)
+
+DIM lblSpieler AS GUI_WIDGET
+lblSpieler = GUI_LABEL(win, "Spieler:", 20, 85)
+GUI_SET_TAB(lblSpieler, 0)
+
+' Die Auswahl startet leer -- die Namen kommen gleich aus der Datenbank.
+DIM spielerWahl AS GUI_WIDGET
+spielerWahl = GUI_DROPDOWN(win, 90, 80, 200, 26, [])
+GUI_SET_TAB(spielerWahl, 0)
+
+DIM tabelle AS GUI_WIDGET
+tabelle = GUI_TABLE(win, 20, 120, 900, 280)
+GUI_SET_TAB(tabelle, 0)
+DIM kopf AS ARRAY OF STRING
+kopf = SPLIT$("Heim|Gast|Tipp|Ergebnis|Punkte", "|")
+GUI_TABLE_HEADERS(tabelle, kopf)
+DIM breiten AS ARRAY OF INTEGER
+breiten = [290, 290, 100, 110, 100]
+GUI_TABLE_COL_WIDTHS(tabelle, breiten)
+GUI_TABLE_SET(tabelle, "zeilenhoehe", 30)
+GUI_TABLE_SET(tabelle, "kopfhoehe", 28)
+GUI_TABLE_SET(tabelle, "zebra", 1)
+GUI_TABLE_COL_ALIGN(tabelle, 2, "mitte")
+GUI_TABLE_COL_ALIGN(tabelle, 3, "mitte")
+GUI_TABLE_COL_ALIGN(tabelle, 4, "mitte")
+
+DIM lblTipp AS GUI_WIDGET
+lblTipp = GUI_LABEL(win, "Tipp:", 20, 416)
+GUI_SET_TAB(lblTipp, 0)
+' Ein Spinner statt eines Textfeldes: so kann niemand "drei" oder "-1"
+' eingeben. Die Eingabe ist gueltig, bevor sie im Programm ankommt.
+DIM tippHeim AS GUI_WIDGET
+tippHeim = GUI_SPINNER(win, 70, 410, 90, 0, 9, 0, 1)
+GUI_SET_TAB(tippHeim, 0)
+DIM lblDoppel AS GUI_WIDGET
+lblDoppel = GUI_LABEL(win, ":", 170, 416)
+GUI_SET_TAB(lblDoppel, 0)
+DIM tippGast AS GUI_WIDGET
+tippGast = GUI_SPINNER(win, 186, 410, 90, 0, 9, 0, 1)
+GUI_SET_TAB(tippGast, 0)
+
+DIM bTipp AS GUI_WIDGET
+bTipp = GUI_BUTTON(win, "Tipp speichern", 292, 410, 160, 30)
+GUI_SET_TAB(bTipp, 0)
+
+DIM lblErg AS GUI_WIDGET
+lblErg = GUI_LABEL(win, "Ergebnis:", 480, 416)
+GUI_SET_TAB(lblErg, 0)
+DIM ergHeim AS GUI_WIDGET
+ergHeim = GUI_SPINNER(win, 555, 410, 90, 0, 9, 0, 1)
+GUI_SET_TAB(ergHeim, 0)
+DIM lblDoppel2 AS GUI_WIDGET
+lblDoppel2 = GUI_LABEL(win, ":", 655, 416)
+GUI_SET_TAB(lblDoppel2, 0)
+DIM ergGast AS GUI_WIDGET
+ergGast = GUI_SPINNER(win, 671, 410, 90, 0, 9, 0, 1)
+GUI_SET_TAB(ergGast, 0)
+DIM bErg AS GUI_WIDGET
+bErg = GUI_BUTTON(win, "Ergebnis eintragen", 777, 410, 143, 30)
+GUI_SET_TAB(bErg, 0)
+
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "Spieler waehlen, Zeile anklicken, Tipp eingeben.", 20, 455)
+GUI_SET_TAB(stand, 0)
+
+DIM hinweis AS GUI_WIDGET
+hinweis = GUI_LABEL(win, "3 Punkte exakt | 2 richtige Differenz | 1 richtige Tendenz", 20, 482)
+GUI_SET_TAB(hinweis, 0)
+
+' --- Reiter 2: Rangliste ---
+DIM rang AS GUI_WIDGET
+rang = GUI_TABLE(win, 20, 85, 900, 430)
+GUI_SET_TAB(rang, 1)
+DIM rangKopf AS ARRAY OF STRING
+rangKopf = SPLIT$("Platz|Spieler|Punkte|Tipps", "|")
+GUI_TABLE_HEADERS(rang, rangKopf)
+DIM rangBreiten AS ARRAY OF INTEGER
+rangBreiten = [100, 480, 160, 160]
+GUI_TABLE_COL_WIDTHS(rang, rangBreiten)
+GUI_TABLE_SET(rang, "zeilenhoehe", 30)
+GUI_TABLE_SET(rang, "kopfhoehe", 28)
+GUI_TABLE_SET(rang, "zebra", 1)
+GUI_TABLE_COL_ALIGN(rang, 0, "mitte")
+GUI_TABLE_COL_ALIGN(rang, 2, "rechts")
+GUI_TABLE_COL_ALIGN(rang, 3, "rechts")
+
+SUB melde(text AS STRING)
+    GUI_SET_TEXT(stand, text)
+END SUB
+
+' ---- Daten im Speicher ---------------------------------------------------
+CONST MAXSPIELE = 200
+DIM spielId[MAXSPIELE] AS INTEGER
+DIM spieleAnzahl AS INTEGER
+
+CONST MAXSPIELER = 50
+DIM spielerId[MAXSPIELER] AS INTEGER
+DIM spielerAnzahl AS INTEGER
+
+' Welcher Spieler ist gerade gewaehlt? Dieselbe Bruecke wie bei den Spielen:
+' die Auswahl kennt nur Positionen, die Datenbank nur ids.
+FUNCTION aktiverSpieler() AS INTEGER
+    DIM i AS INTEGER : i = GUI_DROPDOWN_SELECTED(spielerWahl)
+    IF i < 0 OR i >= spielerAnzahl THEN RETURN 0
+    RETURN spielerId[i]
+END FUNCTION
+
+SUB spielerLaden()
+    spielerAnzahl = 0
+    DIM namen[MAXSPIELER] AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT id, name FROM spieler ORDER BY name")
+    WHILE DB_NEXT(r)
+        IF spielerAnzahl >= MAXSPIELER THEN BREAK
+        spielerId[spielerAnzahl] = DB_GET_INT(r, 0)
+        namen[spielerAnzahl] = DB_GET_STRING(r, 1)
+        spielerAnzahl = spielerAnzahl + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    DIM liste[spielerAnzahl] AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO spielerAnzahl - 1
+        liste[i] = namen[i]
+    NEXT
+    GUI_SET_DROPDOWN(spielerWahl, liste)
+    GUI_DROPDOWN_SET_SELECTED(spielerWahl, 0)
+END SUB
+
+' LEFT JOIN: alle Spiele, dazu der Tipp des gewaehlten Spielers -- falls es
+' einen gibt. Mit einem gewoehnlichen JOIN fielen die untippten Spiele weg.
+SUB spieleLaden()
+    GUI_TABLE_CLEAR(tabelle)
+    spieleAnzahl = 0
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT s.id, s.heim, s.gast, t.tipp_heim, t.tipp_gast, " + _
+                     "       s.tore_heim, s.tore_gast, t.punkte " + _
+                     "FROM spiele s " + _
+                     "LEFT JOIN tipps t ON t.spiel_id = s.id AND t.spieler_id = ? " + _
+                     "WHERE s.spieltag = 1 ORDER BY s.id", aktiverSpieler())
+    WHILE DB_NEXT(r)
+        IF spieleAnzahl >= MAXSPIELE THEN BREAK
+
+        DIM tippText AS STRING : tippText = "-:-"
+        IF NOT DB_IS_NULL(r, 3) THEN
+            tippText = STR$(DB_GET_INT(r, 3)) + ":" + STR$(DB_GET_INT(r, 4))
+        END IF
+
+        DIM ergText AS STRING : ergText = "-:-"
+        DIM beendet AS BOOLEAN : beendet = NOT DB_IS_NULL(r, 5)
+        IF beendet THEN
+            ergText = STR$(DB_GET_INT(r, 5)) + ":" + STR$(DB_GET_INT(r, 6))
+        END IF
+
+        ' Punkte stehen nur da, wo beides vorliegt: Tipp UND Ergebnis.
+        DIM punkteText AS STRING : punkteText = ""
+        IF beendet AND NOT DB_IS_NULL(r, 7) THEN punkteText = STR$(DB_GET_INT(r, 7))
+
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(DB_GET_STRING(r, 1) + "|" + DB_GET_STRING(r, 2) + "|" + _
+                       tippText + "|" + ergText + "|" + punkteText, "|")
+        GUI_TABLE_ADD_ROW(tabelle, zeile)
+        spielId[spieleAnzahl] = DB_GET_INT(r, 0)
+
+        ' Farbe sagt mehr als eine Zahl: gruen = voller Treffer, gelb = etwas,
+        ' rot = daneben. Man sieht auf einen Blick, wo Punkte liegen.
+        IF punkteText <> "" THEN
+            DIM p AS INTEGER : p = DB_GET_INT(r, 7)
+            IF p >= 3 THEN
+                GUI_TABLE_CELL_COLOR(tabelle, spieleAnzahl, 4, &H7CE38B, -1)
+            ELIF p >= 1 THEN
+                GUI_TABLE_CELL_COLOR(tabelle, spieleAnzahl, 4, &HE8C46A, -1)
+            ELSE
+                GUI_TABLE_CELL_COLOR(tabelle, spieleAnzahl, 4, &HE07A7A, -1)
+            END IF
+        END IF
+
+        spieleAnzahl = spieleAnzahl + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+' ---- Die Rangliste --------------------------------------------------------
+' Das Zusammenrechnen macht die Datenbank, nicht das Programm. Sie kann es
+' besser: ein SELECT statt einer Schleife ueber alle Spieler und alle Tipps.
+SUB ranglisteLaden()
+    GUI_TABLE_CLEAR(rang)
+    DIM r AS DB_RESULT
+    ' Zwei LEFT JOINs, damit auch ein Spieler ohne Tipp in der Liste steht.
+    ' CASE WHEN s.tore_heim IS NOT NULL: gewertet wird nur, was gespielt ist.
+    ' COALESCE(..., 0) macht aus "gar nichts" eine 0 -- fuer die Anzeige.
+    r = DB_QUERY(db, "SELECT p.name, " + _
+                     "  COALESCE(SUM(CASE WHEN s.tore_heim IS NOT NULL " + _
+                     "                    THEN t.punkte END), 0) AS punkte, " + _
+                     "  COUNT(t.id) AS tipps " + _
+                     "FROM spieler p " + _
+                     "LEFT JOIN tipps t ON t.spieler_id = p.id " + _
+                     "LEFT JOIN spiele s ON s.id = t.spiel_id " + _
+                     "GROUP BY p.id, p.name " + _
+                     "ORDER BY punkte DESC, p.name")
+    DIM platz AS INTEGER : platz = 1
+    WHILE DB_NEXT(r)
+        DIM zeile AS ARRAY OF STRING
+        zeile = SPLIT$(STR$(platz) + "|" + DB_GET_STRING(r, 0) + "|" + _
+                       STR$(DB_GET_INT(r, 1)) + "|" + STR$(DB_GET_INT(r, 2)), "|")
+        GUI_TABLE_ADD_ROW(rang, zeile)
+        ' Gold fuer den ersten Platz.
+        IF platz = 1 THEN GUI_TABLE_ROW_COLOR(rang, platz - 1, &HF4E3A6, -1)
+        platz = platz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+' ---- Neu werten ----------------------------------------------------------
+' Ein Ergebnis aendert die Punkte ALLER Tipps auf dieses Spiel -- auch die
+' der anderen Mitspieler. Deshalb rechnet diese Prozedur alle nach.
+SUB punkteNeu(spiel AS INTEGER, ergH AS INTEGER, ergA AS INTEGER)
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT id, tipp_heim, tipp_gast FROM tipps WHERE spiel_id = ?", spiel)
+
+    ' Erst alles einsammeln ...
+    CONST MAXT = 200
+    DIM ids[MAXT] AS INTEGER
+    DIM werte[MAXT] AS INTEGER
+    DIM n AS INTEGER : n = 0
+    WHILE DB_NEXT(r)
+        IF n >= MAXT THEN BREAK
+        ids[n] = DB_GET_INT(r, 0)
+        werte[n] = punkte(DB_GET_INT(r, 1), DB_GET_INT(r, 2), ergH, ergA)
+        n = n + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    ' ... und erst dann schreiben. Waehrend ein Ergebnis-Cursor offen ist,
+    ' schreibt es sich schlecht in dieselbe Tabelle.
+    DB_BEGIN(db)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DB_EXEC(db, "UPDATE tipps SET punkte = ? WHERE id = ?", werte[i], ids[i])
+    NEXT
+    DB_COMMIT(db)
+END SUB
+
+' Die Beispiel-Tipps von oben sind noch ungewertet -- einmal nachrechnen.
+punkteNeu(1, 3, 1)
+
+spielerLaden()
+spieleLaden()
+ranglisteLaden()
+
+' ---- Hauptschleife -------------------------------------------------------
+DIM letzterSpieler AS INTEGER : letzterSpieler = 0
+DIM letzteZeile AS INTEGER : letzteZeile = -1
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    ' Spielerwechsel: dieselbe Tabelle, andere Tipps.
+    IF GUI_DROPDOWN_SELECTED(spielerWahl) <> letzterSpieler THEN
+        letzterSpieler = GUI_DROPDOWN_SELECTED(spielerWahl)
+        spieleLaden()
+        melde("Spieler gewechselt.")
+    END IF
+
+    DIM zeile AS INTEGER : zeile = GUI_TABLE_SELECTED(tabelle)
+    IF zeile >= 0 AND zeile <> letzteZeile THEN
+        letzteZeile = zeile
+        ' Steht schon ein Tipp, kommt er in die Felder -- man aendert ihn,
+        ' statt ihn neu zu erfinden.
+        DIM tippText AS STRING : tippText = GUI_TABLE_GET_CELL(tabelle, zeile, 2)
+        IF tippText <> "-:-" THEN
+            DIM teile AS ARRAY OF STRING
+            teile = SPLIT$(tippText, ":")
+            GUI_SET_VALUE(tippHeim, VAL(teile[0]))
+            GUI_SET_VALUE(tippGast, VAL(teile[1]))
+        END IF
+        melde(GUI_TABLE_GET_CELL(tabelle, zeile, 0) + " gegen " + _
+              GUI_TABLE_GET_CELL(tabelle, zeile, 1))
+    END IF
+
+    IF GUI_CLICKED(bTipp) THEN
+        IF zeile < 0 THEN
+            melde("Erst eine Zeile anklicken.")
+        ELSE
+            DIM th AS INTEGER : th = INT(GUI_VALUE(tippHeim))
+            DIM tg AS INTEGER : tg = INT(GUI_VALUE(tippGast))
+            ' UPSERT: eintragen -- und falls es den Tipp schon gibt, aendern.
+            ' Ein Befehl statt "erst nachsehen, dann INSERT oder UPDATE".
+            DB_EXEC(db, "INSERT INTO tipps (spieler_id, spiel_id, tipp_heim, tipp_gast) " + _
+                        "VALUES (?, ?, ?, ?) " + _
+                        "ON CONFLICT(spieler_id, spiel_id) DO UPDATE SET " + _
+                        "  tipp_heim = excluded.tipp_heim, " + _
+                        "  tipp_gast = excluded.tipp_gast, punkte = NULL", _
+                    aktiverSpieler(), spielId[zeile], th, tg)
+
+            ' Steht das Ergebnis schon, wird der geaenderte Tipp sofort
+            ' gewertet -- sonst stuende eine alte Punktzahl an einem neuen Tipp.
+            DIM r AS DB_RESULT
+            r = DB_QUERY(db, "SELECT tore_heim, tore_gast FROM spiele WHERE id = ?", spielId[zeile])
+            IF DB_NEXT(r) THEN
+                IF NOT DB_IS_NULL(r, 0) THEN
+                    punkteNeu(spielId[zeile], DB_GET_INT(r, 0), DB_GET_INT(r, 1))
+                END IF
+            END IF
+            DB_CLOSE_RESULT(r)
+
+            spieleLaden()
+            ranglisteLaden()
+            melde("Tipp gespeichert: " + STR$(th) + ":" + STR$(tg))
+        END IF
+    END IF
+
+    ' --- Ergebnis eintragen ---
+    IF GUI_CLICKED(bErg) THEN
+        IF zeile < 0 THEN
+            melde("Erst eine Zeile anklicken.")
+        ELSE
+            DIM eh AS INTEGER : eh = INT(GUI_VALUE(ergHeim))
+            DIM eg AS INTEGER : eg = INT(GUI_VALUE(ergGast))
+            DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? WHERE id = ?", _
+                    eh, eg, spielId[zeile])
+            punkteNeu(spielId[zeile], eh, eg)
+            spieleLaden()
+            ranglisteLaden()
+            melde("Ergebnis " + STR$(eh) + ":" + STR$(eg) + " eingetragen, Punkte neu gerechnet.")
+        END IF
+    END IF
+
+    CLS(&H0F1420)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+DB_CLOSE(db)
+
+' ============================================================
+'  Zum Ausprobieren:
+'   * Auf den Reiter "Rangliste" klicken. Anna fuehrt -- ihr Tipp
+'     3:1 war exakt.
+'   * Fuer Clara einen Tipp auf ein Spiel OHNE Ergebnis abgeben:
+'     die Spalte "Tipps" steigt, die Punkte bleiben. Genau das
+'     meint "gewertet wird nur, was gespielt ist".
+'   * Das CASE WHEN aus der Abfrage entfernen und sehen, was
+'     passiert. (Nichts Gutes: ungewertete Tipps zaehlen als 0
+'     und die Rangliste behauptet, jemand haette daneben getippt.)
+'   * ORDER BY punkte DESC umdrehen -- wer haette gern die
+'     Rangliste von hinten?
+' ============================================================

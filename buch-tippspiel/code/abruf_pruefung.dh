@@ -1,0 +1,116 @@
+' ============================================================
+'  Pruefung: Abrufe im Hintergrund (HTTP_GET_START/READY/RESULT)
+' ============================================================
+'  Zeigt schwarz auf weiss, was der Unterschied ist: waehrend
+'  ein Abruf laeuft, zaehlt die Schleife weiter. Genau diese
+'  Schleife ist im Fenster das Neuzeichnen.
+' ============================================================
+IMPORT "html"
+
+DIM fehler AS INTEGER : fehler = 0
+CONST URL AS STRING = "https://api.openligadb.de/getmatchdata/bl1/2026"
+
+PRINT "=== 1. Blockierend (HTTP_GET) ==="
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM antwort AS STRING : antwort = HTTP_GET(URL)
+DIM blockiert AS INTEGER : blockiert = MILLIS() - t0
+PRINT "    "; LEN(antwort); " Zeichen in "; blockiert; " ms -- in dieser Zeit stand alles still."
+
+PRINT ""
+PRINT "=== 2. Im Hintergrund (HTTP_GET_START) ==="
+DIM abruf AS INTEGER
+t0 = MILLIS()
+abruf = HTTP_GET_START(URL)
+PRINT "    HTTP_GET_START kam nach "; MILLIS() - t0; " ms zurueck (Nummer "; abruf; ")."
+
+' Das ist die Schleife, die im Fenster GUI_UPDATE + Neuzeichnen waere.
+DIM runden AS INTEGER : runden = 0
+WHILE NOT HTTP_READY(abruf)
+    runden = runden + 1
+    SLEEP(1)
+WEND
+DIM gesamt AS INTEGER : gesamt = MILLIS() - t0
+DIM antwort2 AS STRING : antwort2 = HTTP_RESULT(abruf)
+
+PRINT "    "; LEN(antwort2); " Zeichen in "; gesamt; " ms"
+PRINT "    Dabei lief die Schleife "; runden; " Mal durch -- so viele Bilder"
+PRINT "    haette das Fenster in derselben Zeit zeichnen koennen."
+PRINT "    Status: "; HTTP_STATUS()
+
+IF runden > 5 THEN
+    PRINT "  ok    Die Schleife lief waehrend des Abrufs weiter"
+ELSE
+    PRINT "  FEHLER Die Schleife stand -- der Abruf blockiert doch"
+    fehler = fehler + 1
+END IF
+
+IF LEN(antwort2) > 1000 THEN
+    PRINT "  ok    Antwort ist angekommen"
+ELSE
+    PRINT "  FEHLER Antwort ist leer oder zu kurz"
+    fehler = fehler + 1
+END IF
+
+PRINT ""
+PRINT "=== 3. Zwei Abrufe gleichzeitig ==="
+DIM a1 AS INTEGER : a1 = HTTP_GET_START("https://api.openligadb.de/getavailableleagues")
+DIM a2 AS INTEGER : a2 = HTTP_GET_START("https://api.openligadb.de/getcurrentgroup/bl1")
+PRINT "    offen: "; HTTP_PENDING()
+t0 = MILLIS()
+WHILE HTTP_PENDING() > 0
+    IF HTTP_READY(a1) AND HTTP_URL$(a1) <> "" THEN
+        PRINT "    fertig: Ligenliste ("; LEN(HTTP_RESULT(a1)); " Zeichen)"
+    END IF
+    IF HTTP_READY(a2) AND HTTP_URL$(a2) <> "" THEN
+        PRINT "    fertig: aktueller Spieltag ("; LEN(HTTP_RESULT(a2)); " Zeichen)"
+    END IF
+    SLEEP(1)
+WEND
+PRINT "    beide nach "; MILLIS() - t0; " ms, offen: "; HTTP_PENDING()
+IF HTTP_PENDING() = 0 THEN
+    PRINT "  ok    Beide Abrufe abgeholt"
+ELSE
+    PRINT "  FEHLER Es sind noch Abrufe offen"
+    fehler = fehler + 1
+END IF
+
+PRINT ""
+PRINT "=== 4. Abbrechen ==="
+DIM a3 AS INTEGER : a3 = HTTP_GET_START(URL)
+HTTP_CANCEL(a3)
+IF HTTP_PENDING() = 0 THEN
+    PRINT "  ok    Abgebrochener Abruf zaehlt nicht mehr"
+ELSE
+    PRINT "  FEHLER Abgebrochener Abruf ist noch offen"
+    fehler = fehler + 1
+END IF
+
+PRINT ""
+PRINT "=== 5. Nummern bleiben gueltig ==="
+' Nach dem Abholen darf eine spaeter vergebene Nummer nicht auf einen
+' alten Platz zeigen -- sonst holt ein Programm die falsche Antwort ab.
+DIM b1 AS INTEGER : b1 = HTTP_GET_START(URL)
+DIM b2 AS INTEGER : b2 = HTTP_GET_START("https://api.openligadb.de/getcurrentgroup/bl2")
+IF b1 <> b2 THEN
+    PRINT "  ok    Verschiedene Nummern ("; b1; " und "; b2; ")"
+ELSE
+    PRINT "  FEHLER Zwei Abrufe mit derselben Nummer"
+    fehler = fehler + 1
+END IF
+WHILE NOT HTTP_READY(b1) : SLEEP(1) : WEND
+DIM x AS STRING : x = HTTP_RESULT(b1)
+DIM b3 AS INTEGER : b3 = HTTP_GET_START("https://api.openligadb.de/getcurrentgroup/bl3")
+IF b3 <> b1 THEN
+    PRINT "  ok    Freigewordene Nummer wird nicht neu vergeben"
+ELSE
+    PRINT "  FEHLER Nummer "; b1; " wurde erneut vergeben"
+    fehler = fehler + 1
+END IF
+HTTP_CANCEL(b2) : HTTP_CANCEL(b3)
+
+PRINT ""
+IF fehler = 0 THEN
+    PRINT "ALLES GRUEN"
+ELSE
+    PRINT fehler; " Pruefung(en) fehlgeschlagen"
+END IF

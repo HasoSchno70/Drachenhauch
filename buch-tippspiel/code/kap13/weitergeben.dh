@@ -1,0 +1,92 @@
+' ============================================================
+'  Kapitel 13 - Weitergeben
+'  Start:  dhrun.py buch-tippspiel/code/kap13/weitergeben.dh
+' ============================================================
+'  Das Programm laeuft. Jetzt soll es bei jemand anderem laufen
+'  -- auf einem Rechner ohne Drachenhauch, ohne Editor, ohne
+'  irgendetwas:
+'
+'      dhrt --export buch-tippspiel/code/tippspiel.dh
+'
+'  Das legt einen Ordner "tippspiel_dist" mit einer .exe an. Die
+'  Runtime steckt darin, das uebersetzte Programm auch, und
+'  referenzierte Dateien werden mitkopiert.
+'
+'  Bleibt die Frage, an der ausgelieferte Programme scheitern:
+'  WO LIEGEN DIE DATEN?
+' ============================================================
+IMPORT "db"
+IMPORT "zeit"
+
+' ---- Die Frage -----------------------------------------------------------
+' DB_OPEN("kap13.db") -- neben welcher Datei landet das?
+'
+' Naheliegende Sorge: im "aktuellen Verzeichnis". Welches das ist, entscheidet
+' dann nicht das Programm, sondern derjenige, der es startet -- Doppelklick,
+' Verknuepfung und Kommandozeile koennen drei verschiedene Ordner meinen. Im
+' schlimmsten Fall entstuende bei jedem Start eine neue leere Datenbank, und
+' der Benutzer meldet: "meine Tipps sind weg".
+'
+' Nachgesehen statt angenommen: Drachenhauch loest relative Pfade RELATIV ZUM
+' PROGRAMM auf, nicht zum Startverzeichnis. Auch bei der exportierten .exe.
+' Die Sorge ist also unbegruendet -- aber nur, weil jemand nachgemessen hat.
+
+DIM db AS DB_CONN
+db = DB_OPEN("kap13.db")
+
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS starts (" + _
+            "id INTEGER PRIMARY KEY, zeitpunkt TEXT NOT NULL)")
+DB_EXEC(db, "INSERT INTO starts (zeitpunkt) VALUES (?)", ZEIT_TEXT$(ZEIT_JETZT()))
+
+PRINT "=== Diese Datenbank liegt neben dem Programm ==="
+DIM r AS DB_RESULT
+r = DB_QUERY(db, "SELECT COUNT(*) FROM starts")
+IF DB_NEXT(r) THEN
+    PRINT "  Starts bisher: "; DB_GET_INT(r, 0)
+END IF
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "  Die letzten Starts:"
+r = DB_QUERY(db, "SELECT zeitpunkt FROM starts ORDER BY id DESC LIMIT 5")
+WHILE DB_NEXT(r)
+    DIM t AS STRING : t = DB_GET_STRING(r, 0)
+    PRINT "    "; ZEIT_FORMAT$(ZEIT_PARSE(t), "WTAG, TT.MM.JJJJ hh:mm:ss"); _
+          "  (vor "; ZEIT_DAUER$(ZEIT_DIFF(ZEIT_JETZT(), ZEIT_PARSE(t))); ")"
+WEND
+DB_CLOSE_RESULT(r)
+DB_CLOSE(db)
+
+PRINT ""
+PRINT "=== Der Weg zur eigenen .exe ==="
+PRINT "  1. dhrt --export buch-tippspiel/code/tippspiel.dh"
+PRINT "  2. Im Ordner tippspiel_dist liegt tippspiel.exe."
+PRINT "  3. Den GANZEN Ordner weitergeben, nicht nur die .exe."
+PRINT ""
+PRINT "  Was der Empfaenger nicht braucht: Drachenhauch, Python,"
+PRINT "  einen Editor. Was er bekommt: ein Fenster, das aufgeht."
+PRINT ""
+PRINT "  Beim allerersten Start legt das Programm seine Datenbank"
+PRINT "  selbst an. Genau dafuer steht seit Kapitel 2 in jedem"
+PRINT "  Stand ein CREATE TABLE IF NOT EXISTS."
+
+PRINT ""
+PRINT "=== Was jetzt noch fehlt, gehoert nicht mehr ins Buch ==="
+PRINT "  * Mehrere Spieltage statt nur dem ersten."
+PRINT "  * Eine Vereins-Tabelle mit ids, damit 'Bor.' und"
+PRINT "    'Borussia' derselbe Verein sind (siehe Kapitel 9)."
+PRINT "  * Ergebnisse automatisch holen statt eintragen."
+PRINT "  * Mehrere Tipprunden in einer Datenbank."
+PRINT "  Jedes davon ist ein Abend Arbeit -- mit allem, was in"
+PRINT "  diesem Buch steht, ist keines davon mehr fremd."
+
+' ============================================================
+'  Zum Ausprobieren:
+'   * Dieses Programm zweimal starten -- der Zaehler steigt.
+'   * Es aus einem ANDEREN Verzeichnis starten, mit vollem Pfad.
+'     Der Zaehler steigt weiter: dieselbe Datenbank, egal von wo.
+'   * Dieses Programm exportieren, die .exe in einen leeren
+'     Ordner kopieren und von woanders starten. Die Datenbank
+'     entsteht neben der .exe -- nicht dort, wo man startet.
+'   * Den Zielstand exportieren und weitergeben. Fertig.
+' ============================================================

@@ -1,0 +1,90 @@
+' ============================================================
+'  Pruefung: Modul "zeit" -- Datumsrechnung
+' ============================================================
+'  Deckt die Rechnungen ab, die das Tippspiel braucht:
+'  Tippschluss (Anstoss minus 15 Minuten), Countdown bis zum
+'  Anpfiff, Spieltag nach Datum, Wochentag fuer die Anzeige.
+' ============================================================
+IMPORT "zeit"
+
+DIM fehler AS INTEGER : fehler = 0
+
+SUB pruefe(name AS STRING, ist AS STRING, soll AS STRING)
+    IF ist = soll THEN
+        PRINT "  ok    "; name
+    ELSE
+        PRINT "  FEHLER "; name; ": ist '"; ist; "' soll '"; soll; "'"
+        fehler = fehler + 1
+    END IF
+END SUB
+
+SUB pruefeZahl(name AS STRING, ist AS INTEGER, soll AS INTEGER)
+    pruefe(name, STR$(ist), STR$(soll))
+END SUB
+
+PRINT "=== Umwandlung Text <-> Sekunden ==="
+DIM anstoss AS INTEGER
+anstoss = ZEIT_PARSE("2026-08-28 20:30:00")
+pruefe("zurueck als Text", ZEIT_TEXT$(anstoss), "2026-08-28 20:30:00")
+pruefe("nur Datum ist Mitternacht", ZEIT_TEXT$(ZEIT_PARSE("2026-08-28")), "2026-08-28 00:00:00")
+pruefe("mit T dazwischen", ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00")), "2026-08-28 20:30:00")
+pruefe("ohne Sekunden", ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30")), "2026-08-28 20:30:00")
+
+PRINT ""
+PRINT "=== Die Rechnungen aus dem Tippspiel ==="
+
+' Tippschluss: 15 Minuten vor Anpfiff
+DIM schluss AS INTEGER : schluss = ZEIT_PLUS(anstoss, -15 * 60)
+pruefe("Tippschluss", ZEIT_TEXT$(schluss), "2026-08-28 20:15:00")
+
+' Ueber Mitternacht hinweg -- die Stelle, an der Handarbeit bricht
+pruefe("ueber Mitternacht", ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-08-28 00:10:00"), -20 * 60)), "2026-08-27 23:50:00")
+
+' Ueber den Monatswechsel
+pruefe("ueber den Monatswechsel", ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-08-31 12:00:00"), 86400)), "2026-09-01 12:00:00")
+
+' Schaltjahr
+pruefe("Schaltjahr 2028", ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2028-02-28 12:00:00"), 86400)), "2028-02-29 12:00:00")
+pruefe("kein Schaltjahr 2026", ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-02-28 12:00:00"), 86400)), "2026-03-01 12:00:00")
+
+' Countdown: noch wie lange bis zum Anpfiff?
+DIM zweiUhrFrueher AS INTEGER : zweiUhrFrueher = ZEIT_PARSE("2026-08-28 18:15:00")
+pruefeZahl("Differenz in Sekunden", ZEIT_DIFF(anstoss, zweiUhrFrueher), 8100)
+pruefe("Differenz lesbar", ZEIT_DAUER$(8100), "2:15 h")
+pruefe("Dauer Sekunden", ZEIT_DAUER$(45), "45 s")
+pruefe("Dauer Minuten", ZEIT_DAUER$(12 * 60), "12 min")
+pruefe("Dauer Tage", ZEIT_DAUER$(3 * 86400), "3 Tage")
+pruefe("Dauer rueckwaerts", ZEIT_DAUER$(-3600), "vor 1:00 h")
+
+PRINT ""
+PRINT "=== Teile lesen und Anzeige ==="
+pruefeZahl("Jahr", ZEIT_TEIL(anstoss, "jahr"), 2026)
+pruefeZahl("Monat", ZEIT_TEIL(anstoss, "monat"), 8)
+pruefeZahl("Tag", ZEIT_TEIL(anstoss, "tag"), 28)
+pruefeZahl("Stunde", ZEIT_TEIL(anstoss, "stunde"), 20)
+pruefeZahl("Minute", ZEIT_TEIL(anstoss, "minute"), 30)
+pruefeZahl("Wochentag (Fr = 5)", ZEIT_WOCHENTAG(anstoss), 5)
+pruefe("Anzeigeformat", ZEIT_FORMAT$(anstoss, "WTAG, TT.MM.JJJJ hh:mm"), "Freitag, 28.08.2026 20:30")
+pruefe("kurzes Format", ZEIT_FORMAT$(anstoss, "WT TT.MM. hh:mm"), "Fr 28.08. 20:30")
+
+PRINT ""
+PRINT "=== Aus Teilen bauen ==="
+pruefe("aus Teilen", ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 8, 28, 20, 30, 0)), "2026-08-28 20:30:00")
+
+PRINT ""
+PRINT "=== Jetzt ==="
+DIM jetzt AS INTEGER : jetzt = ZEIT_JETZT()
+PRINT "  ZEIT_JETZT() = "; jetzt; "  -> "; ZEIT_TEXT$(jetzt)
+IF jetzt > ZEIT_PARSE("2020-01-01") AND jetzt < ZEIT_PARSE("2100-01-01") THEN
+    PRINT "  ok    liegt in einem plausiblen Bereich"
+ELSE
+    PRINT "  FEHLER ZEIT_JETZT() liegt ausserhalb 2020..2100"
+    fehler = fehler + 1
+END IF
+
+PRINT ""
+IF fehler = 0 THEN
+    PRINT "ALLES GRUEN"
+ELSE
+    PRINT fehler; " Pruefung(en) fehlgeschlagen"
+END IF

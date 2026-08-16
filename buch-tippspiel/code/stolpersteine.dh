@@ -1,0 +1,91 @@
+' ============================================================
+'  Was dem Tippspiel in Drachenhauch fehlt -- gemessen
+' ============================================================
+'  Kein Lehrstueck, sondern ein Messprotokoll: Diese Datei
+'  zeigt an echten Zahlen, wo eine Anwendung dieser Art heute
+'  an Grenzen stoesst.
+'
+'  Zwei Punkte von frueher sind inzwischen erledigt und haben
+'  eigene Pruefprogramme:
+'    * blockierendes HTTP  -> abruf_pruefung.dh
+'    * fehlende Datumsrechnung -> zeit_pruefung.dh
+' ============================================================
+IMPORT "html"
+IMPORT "zeit"
+
+PRINT "=== 1. Blockierend gegen nebenlaeufig ==="
+PRINT "    (OpenLigaDB, Spielplan 1. Bundesliga 2026)"
+CONST URL = "https://api.openligadb.de/getmatchdata/bl1/2026"
+
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM antwort AS STRING : antwort = HTTP_GET(URL)
+DIM dauer AS INTEGER : dauer = MILLIS() - t0
+PRINT "    HTTP_GET:       "; LEN(antwort); " Zeichen in "; dauer; " ms"
+PRINT "                    = "; (dauer * 60) \ 1000; " ausgefallene Bilder -- Fenster steht."
+
+DIM h AS INTEGER
+t0 = MILLIS()
+h = HTTP_GET_START(URL)
+DIM runden AS INTEGER : runden = 0
+WHILE NOT HTTP_READY(h)
+    runden = runden + 1
+WEND
+DIM antwort2 AS STRING : antwort2 = HTTP_RESULT(h)
+PRINT "    HTTP_GET_START: "; LEN(antwort2); " Zeichen in "; MILLIS() - t0; " ms"
+PRINT "                    dabei "; runden; " Schleifendurchlaeufe -- Fenster laeuft weiter."
+
+PRINT ""
+PRINT "=== 2. Datum und Zeit ==="
+PRINT "    DATE$()/TIME$() liefern Text: "; DATE$(); " "; TIME$()
+DIM anstoss AS INTEGER : anstoss = ZEIT_PARSE("2026-08-28 20:30:00")
+PRINT "    ZEIT_JETZT()  = "; ZEIT_JETZT(); "  -> "; ZEIT_TEXT$(ZEIT_JETZT())
+PRINT "    Anstoss       = "; ZEIT_FORMAT$(anstoss, "WTAG, TT.MM.JJJJ hh:mm")
+PRINT "    Tippschluss   = "; ZEIT_TEXT$(ZEIT_PLUS(anstoss, -15 * 60))
+PRINT "    bis dahin     = "; ZEIT_DAUER$(ZEIT_DIFF(anstoss, ZEIT_JETZT()))
+PRINT "    Damit ist die frueher fehlende Rechnung da."
+
+PRINT ""
+PRINT "=== 3. MILLIS ist eine Stoppuhr ==="
+PRINT "    MILLIS() kurz nach dem Start: "; MILLIS(); " ms"
+PRINT "    TIMER()  (dieselbe Uhr):      "; TIMER(); " s"
+PRINT "    ZEIT_JETZT() (Wanduhr):       "; ZEIT_JETZT()
+PRINT "    Frueher gab MILLIS() Millisekunden seit 1970 zurueck, obwohl die"
+PRINT "    Doku 'seit Programmstart' sagte. Jetzt stimmt beides ueberein --"
+PRINT "    und die Uhr laeuft monoton, springt also bei einer Zeitumstellung"
+PRINT "    nicht mitten in einer Messung."
+
+PRINT ""
+PRINT "=== 4. Leeres Array-Literal ==="
+DIM namen AS ARRAY OF STRING
+namen = []
+PRINT "    DIM namen AS ARRAY OF STRING : namen = []   -> LEN = "; LEN(namen)
+ARRAY_PUSH(namen, "Anna")
+PRINT "    nach ARRAY_PUSH: "; LEN(namen); " ("; namen[0]; ")"
+TRY
+    ARRAY_PUSH(namen, 42)
+    PRINT "    FEHLER: die Typpruefung ist verloren gegangen"
+CATCH e
+    PRINT "    Typ bleibt erhalten: "; e
+END TRY
+
+PRINT ""
+PRINT "=== 5. Umlaute -- erledigt ==="
+DIM name AS STRING : name = "Borussia M" + CHR$(246) + "nchengladbach"
+PRINT "    "; name
+PRINT "    Zeichen: "; LEN(name); " (mit Umlaut, sonst waeren es 25)"
+PRINT "    Frueher zeichnete das Fenster 'M?nchengladbach': LOADFONT backte"
+PRINT "    nur die 95 ASCII-Glyphen, und die eingebaute Schrift kennt nur"
+PRINT "    ASCII. Beides ist behoben -- nachzusehen im Fenster von"
+PRINT "    tippspiel.dh, wo die Vereine jetzt richtig dastehen."
+
+PRINT ""
+PRINT "=== 6. Was noch offen ist ==="
+PRINT "    Arrays pruefen ihren Elementtyp bei der Zuweisung nicht:"
+DIM texte AS ARRAY OF STRING
+DIM zahlen AS ARRAY OF INTEGER
+zahlen = [1, 2, 3]
+texte = zahlen
+PRINT "    'DIM texte AS ARRAY OF STRING : texte = zahlen' ging durch --"
+PRINT "    LEN(texte) = "; LEN(texte); ", erster Wert: "; texte[0]
+PRINT "    Bei einfachen Werten meldet die Runtime so etwas ('Erwartet"
+PRINT "    STRING, erhalten INTEGER'), bei Arrays noch nicht."

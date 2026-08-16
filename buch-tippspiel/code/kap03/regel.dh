@@ -1,0 +1,112 @@
+' ============================================================
+'  Kapitel 3 - Die Regel
+'  Start:  dhrun.py buch-tippspiel/code/kap03/regel.dh
+' ============================================================
+'  Ein Tippspiel ist im Kern eine einzige Frage: wie viele Punkte
+'  gibt ein Tipp? Diese Frage beantwortet EINE Funktion -- und
+'  zwar bevor es ein Fenster gibt.
+'
+'  Warum zuerst? Weil eine Regel, die in drei Knoepfen steckt,
+'  irgendwann drei verschiedene Antworten gibt.
+' ============================================================
+
+' Die Punkteregel:
+'   3 Punkte  exaktes Ergebnis
+'   2 Punkte  richtige Tendenz + richtige Tordifferenz
+'   1 Punkt   richtige Tendenz
+'   0 Punkte  daneben
+
+' Tendenz: hat Heim gewonnen (1), Gast (-1) oder war es unentschieden (0)?
+FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
+    IF heim > gast THEN RETURN 1
+    IF heim < gast THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
+                ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    ' Die Reihenfolge ist die Regel: erst das Genaueste pruefen.
+    IF tippH = ergH AND tippA = ergA THEN RETURN 3
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN 0
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN 2
+    RETURN 1
+END FUNCTION
+
+' ============================================================
+'  Und jetzt der wichtigere Teil: ein Programm, das sich selbst
+'  prueft.
+'
+'  Eine Regel im Kopf durchzugehen ist muehsam und unzuverlaessig.
+'  Ein Programm, das seine eigene Regel nachrechnet, sagt in einer
+'  Sekunde, ob sie noch stimmt -- auch in einem Jahr, nach dem
+'  naechsten Umbau.
+' ============================================================
+DIM fehler AS INTEGER : fehler = 0
+
+SUB pruefe(was AS STRING, ist AS INTEGER, soll AS INTEGER)
+    IF ist = soll THEN
+        PRINT "  ok     "; was; " = "; ist
+    ELSE
+        PRINT "  FEHLER "; was; ": ist "; ist; ", soll "; soll
+        fehler = fehler + 1
+    END IF
+END SUB
+
+PRINT "=== Die Punkteregel ==="
+pruefe("3:1 getippt, 3:1 gespielt", punkte(3, 1, 3, 1), 3)
+pruefe("2:0 getippt, 3:1 gespielt", punkte(2, 0, 3, 1), 2)
+pruefe("1:0 getippt, 3:1 gespielt", punkte(1, 0, 3, 1), 1)
+pruefe("0:1 getippt, 3:1 gespielt", punkte(0, 1, 3, 1), 0)
+
+PRINT ""
+PRINT "=== Die Faelle, die man gern vergisst ==="
+' Zwei Unentschieden haben IMMER dieselbe Differenz -- naemlich 0. Wer ein
+' Unentschieden tippt und es kommt eins, bekommt also nie 1 Punkt, sondern
+' mindestens 2. Das faellt beim Lesen der Regel nicht auf, beim Nachrechnen
+' schon. (Wem das zu grosszuegig ist, aendert die Regel -- aber bewusst.)
+pruefe("1:1 getippt, 2:2 gespielt", punkte(1, 1, 2, 2), 2)
+pruefe("2:2 getippt, 2:2 gespielt", punkte(2, 2, 2, 2), 3)
+pruefe("0:0 getippt, 3:3 gespielt", punkte(0, 0, 3, 3), 2)
+' Torreiches Spiel, richtige Differenz
+pruefe("4:2 getippt, 5:3 gespielt", punkte(4, 2, 5, 3), 2)
+' Richtige Tendenz, falsche Differenz
+pruefe("1:0 getippt, 4:0 gespielt", punkte(1, 0, 4, 0), 1)
+' Auswaertssieg richtig getippt
+pruefe("0:2 getippt, 1:3 gespielt", punkte(0, 2, 1, 3), 2)
+
+PRINT ""
+PRINT "=== Eine Eigenschaft der Regel ==="
+' Die Regel muss symmetrisch sein: dreht man Heim und Gast bei BEIDEN um,
+' darf sich die Punktzahl nicht aendern. Wer das nicht prueft, merkt einen
+' vertauschten Wert in punkte() womoeglich nie.
+DIM a AS INTEGER : DIM b AS INTEGER : DIM c AS INTEGER : DIM d AS INTEGER
+DIM abweichungen AS INTEGER : abweichungen = 0
+FOR a = 0 TO 4
+    FOR b = 0 TO 4
+        FOR c = 0 TO 4
+            FOR d = 0 TO 4
+                IF punkte(a, b, c, d) <> punkte(b, a, d, c) THEN
+                    abweichungen = abweichungen + 1
+                END IF
+            NEXT
+        NEXT
+    NEXT
+NEXT
+pruefe("Heim/Gast vertauscht aendert nichts (625 Kombinationen)", abweichungen, 0)
+
+PRINT ""
+IF fehler = 0 THEN
+    PRINT "ALLES GRUEN"
+ELSE
+    PRINT fehler; " Pruefung(en) fehlgeschlagen"
+END IF
+
+' ============================================================
+'  Zum Ausprobieren:
+'   * In punkte() die Reihenfolge der beiden mittleren Zeilen
+'     vertauschen. Welche Pruefung schlaegt an?
+'   * Eine eigene Regel bauen (z.B. 4 Punkte fuer ein exaktes
+'     Unentschieden) und die Pruefungen anpassen.
+'   * RETURN 2 zu RETURN 1 machen -- und sehen, wie viele
+'     Pruefungen das merken.
+' ============================================================
