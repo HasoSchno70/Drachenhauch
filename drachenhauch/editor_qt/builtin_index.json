@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1377,
+ "count": 1387,
  "builtins": [
   {
    "name": "ABS",
@@ -199,6 +199,42 @@
    "kind": "core",
    "signature": "ASIN(x: Zahl)",
    "module": "core"
+  },
+  {
+   "name": "ASSERT",
+   "kind": "core",
+   "signature": "ASSERT(bedingung [, meldung])",
+   "module": "dhrt"
+  },
+  {
+   "name": "ASSERT_COLLECT",
+   "kind": "core",
+   "signature": "ASSERT_COLLECT(an)",
+   "module": "dhrt"
+  },
+  {
+   "name": "ASSERT_COUNT",
+   "kind": "core",
+   "signature": "ASSERT_COUNT() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ASSERT_EQ",
+   "kind": "core",
+   "signature": "ASSERT_EQ(ist, soll [, was])",
+   "module": "dhrt"
+  },
+  {
+   "name": "ASSERT_FAILED",
+   "kind": "core",
+   "signature": "ASSERT_FAILED() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ASSERT_REPORT",
+   "kind": "core",
+   "signature": "ASSERT_REPORT() AS INTEGER",
+   "module": "dhrt"
   },
   {
    "name": "ASTAR_CLEAR",
@@ -4381,6 +4417,30 @@
    "kind": "core",
    "signature": "LOG10(x)",
    "module": "core"
+  },
+  {
+   "name": "LOG_DEBUG",
+   "kind": "core",
+   "signature": "LOG_DEBUG(text)",
+   "module": "dhrt"
+  },
+  {
+   "name": "LOG_ERROR",
+   "kind": "core",
+   "signature": "LOG_ERROR(text)",
+   "module": "dhrt"
+  },
+  {
+   "name": "LOG_INFO",
+   "kind": "core",
+   "signature": "LOG_INFO(text)",
+   "module": "dhrt"
+  },
+  {
+   "name": "LOG_WARN",
+   "kind": "core",
+   "signature": "LOG_WARN(text)",
+   "module": "dhrt"
   },
   {
    "name": "LOWER",

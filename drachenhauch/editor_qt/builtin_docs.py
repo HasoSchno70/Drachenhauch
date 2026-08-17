@@ -52,6 +52,26 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # Pruefen und Melden (WP E)
+    "assert": ("ASSERT(bedingung[, meldung])",
+               "Schlaegt fehl, wenn die Bedingung FALSE ist. Verlangt einen BOOLEAN -- "
+               "ASSERT(anzahl) ist ein Fehler, ASSERT(anzahl > 0) ist gemeint. "
+               "Bricht ab, ausser im Sammel-Modus (ASSERT_COLLECT)."),
+    "assert_eq": ("ASSERT_EQ(ist, soll[, was])",
+                  "Wie ASSERT, aber die Meldung zeigt beide Werte. Vergleicht wie der "
+                  "'='-Operator der Sprache (inkl. 1 = 1.0)."),
+    "assert_collect": ("ASSERT_COLLECT(an)",
+                       "Sammel-Modus: Fehlschlaege werden vermerkt statt abzubrechen -- "
+                       "fuer ein Pruefprogramm, das ALLE Fehler zeigen soll. Vorgabe: aus."),
+    "assert_count":  ("ASSERT_COUNT() AS INTEGER", "Wie viele Pruefungen gelaufen sind."),
+    "assert_failed": ("ASSERT_FAILED() AS INTEGER", "Wie viele davon fehlgeschlagen sind."),
+    "assert_report": ("ASSERT_REPORT() AS INTEGER",
+                      "Bilanz nach stdout schreiben und die Zahl der Fehlschlaege liefern. "
+                      "Muster: IF ASSERT_REPORT() > 0 THEN EXIT(1)"),
+    "log_debug": ("LOG_DEBUG(text)", "Meldung nach stderr. Schweigt per Vorgabe (DH_LOG=debug schaltet sie ein)."),
+    "log_info":  ("LOG_INFO(text)",  "Meldung mit Uhrzeit nach stderr. Pegel ueber DH_LOG."),
+    "log_warn":  ("LOG_WARN(text)",  "Warnung mit Uhrzeit nach stderr."),
+    "log_error": ("LOG_ERROR(text)", "Fehlermeldung mit Uhrzeit nach stderr."),
     # Pruefsummen und Identitaet (WP D)
     "sha256$": ("SHA256$(daten) AS STRING",
                 "SHA-256 als Hex. `daten` ist STRING (UTF-8) oder BUFFER. "

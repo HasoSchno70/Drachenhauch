@@ -652,6 +652,17 @@ pub struct Vm<'p> {
     // daraus den Rueckgabewert des Prozesses. Derselbe Flag-statt-Text-Kanal
     // wie bei den beiden Stop-Signalen darueber.
     exit_code: Option<i32>,
+    // WP E -- Pruefen: Zaehler fuer ASSERT/ASSERT_EQ und der Sammel-Modus.
+    // `assert_sammeln = false` (Vorgabe) heisst: eine fehlgeschlagene Pruefung
+    // bricht ab, wie `assert` es ueberall tut. Ein Pruefprogramm schaltet mit
+    // ASSERT_COLLECT(TRUE) um und will dann ALLE Fehler sehen, nicht nur den
+    // ersten.
+    assert_geprueft: i64,
+    assert_fehler: i64,
+    assert_sammeln: bool,
+    // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DH_LOG) gelesen.
+    // None = noch nicht nachgesehen.
+    log_pegel: Option<u8>,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
     // Externes Stop-Signal (Editor-Stop-Button bei `dhrt profile --stoppable`):
@@ -765,6 +776,10 @@ impl<'p> Vm<'p> {
             debug_stop_flag: false,
             profile_stop_flag: false,
             exit_code: None,
+            assert_geprueft: 0,
+            assert_fehler: 0,
+            assert_sammeln: false,
+            log_pegel: None,
             prof: None,
             stop: None,
             dbg: None,
@@ -2049,6 +2064,16 @@ impl<'p> Vm<'p> {
                     // Call); Ergebnis erst nach dem Truncate pushen.
                     // Reihenfolge: array-HOF (FUNCREF-Comparator) -> scene (VM-State)
                     // -> coro (VM-State) -> Grafik -> pure.
+                    // ASSERT braucht die Quell-Zeile fuer seine Meldung. Die
+                    // wird sonst NUR beim Profilieren/Debuggen mitgefuehrt --
+                    // der Normalfall zahlt bewusst nichts pro Instruktion
+                    // (s. `track_lines` oben). Also hier gezielt fuer diese
+                    // eine Familie nachschlagen; das erste Byte zu vergleichen
+                    // haelt die Kosten fuer alle anderen Builtins bei einem
+                    // Byte-Vergleich.
+                    if !track_lines && name.as_bytes().first() == Some(&b'a') && name.starts_with("assert") {
+                        self.cur_line = fn_.lines.get(*ip).copied().unwrap_or(0);
+                    }
                     let v = {
                         let bargs: &[Value] = &stack[split..];
                         if let Some(v) = self.try_array_hof(name, bargs)? { v }
@@ -3335,6 +3360,7 @@ impl<'p> Vm<'p> {
     /// PRINTs kaemen ganz zum Schluss. Darum flusht jeder dieser Befehle den
     /// Puffer zuerst.
     fn try_os(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if let Some(v) = self.try_pruefen(name, a)? { return Ok(Some(v)); }
         if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
         fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
@@ -3404,6 +3430,139 @@ impl<'p> Vm<'p> {
             _ => return Ok(None),
         };
         Ok(Some(v))
+    }
+
+    /// Pruefen und Melden (WP E): ASSERT-Familie und LOG_*.
+    ///
+    /// Braucht VM-Zustand (Zaehler, Sammel-Modus, Quell-Zeile, Ausgabe-Puffer)
+    /// und steht darum hier statt in `builtins.rs`.
+    fn try_pruefen(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("assert") || name.starts_with("log_")) { return Ok(None); }
+        let v = match name {
+            "assert" => {
+                if a.is_empty() || a.len() > 2 {
+                    return Err(format!("ASSERT: erwartet 1..2 Argumente (bedingung [, meldung]), erhalten {}", a.len()));
+                }
+                // Absichtlich streng auf BOOLEAN: `ASSERT(anzahl)` waere sonst
+                // still "wahr, weil nicht null" -- und eine Pruefung, die aus
+                // Versehen immer durchgeht, ist schlimmer als gar keine.
+                let ok = match &a[0] {
+                    Value::Bool(b) => *b,
+                    andere => return Err(format!(
+                        "ASSERT: erwartet BOOLEAN, erhalten {} -- einen Vergleich schreiben, \
+                         z.B. ASSERT(anzahl > 0)", andere.type_name())),
+                };
+                let text = match a.get(1) {
+                    Some(v) => crate::builtins::str_of(v),
+                    None => String::new(),
+                };
+                self.assert_werten(ok, if text.is_empty() { "Bedingung nicht erfuellt".to_string() } else { text })?
+            }
+            "assert_eq" => {
+                if a.len() < 2 || a.len() > 3 {
+                    return Err(format!("ASSERT_EQ: erwartet 2..3 Argumente (ist, soll [, was]), erhalten {}", a.len()));
+                }
+                // Dieselbe Gleichheit wie der `=`-Operator der Sprache --
+                // eine zweite Vorstellung davon, wann zwei Werte gleich sind,
+                // waere die sicherste Art, Vertrauen zu verspielen.
+                let ok = crate::value::value_eq(&a[0], &a[1]);
+                let was = match a.get(2) {
+                    Some(v) => crate::builtins::str_of(v),
+                    None => String::new(),
+                };
+                let meldung = if ok {
+                    was
+                } else {
+                    let kern = format!("erhalten {}, erwartet {}",
+                                       crate::builtins::str_of(&a[0]),
+                                       crate::builtins::str_of(&a[1]));
+                    if was.is_empty() { kern } else { format!("{}: {}", was, kern) }
+                };
+                self.assert_werten(ok, meldung)?
+            }
+            "assert_collect" => {
+                if a.len() != 1 { return Err(format!("ASSERT_COLLECT: erwartet 1 Argument, erhalten {}", a.len())); }
+                self.assert_sammeln = match &a[0] {
+                    Value::Bool(b) => *b,
+                    andere => return Err(format!("ASSERT_COLLECT: erwartet BOOLEAN, erhalten {}", andere.type_name())),
+                };
+                Value::Nil
+            }
+            "assert_count" => { if !a.is_empty() { return Err("ASSERT_COUNT: erwartet 0 Argumente".into()); } Value::Int(self.assert_geprueft) }
+            "assert_failed" => { if !a.is_empty() { return Err("ASSERT_FAILED: erwartet 0 Argumente".into()); } Value::Int(self.assert_fehler) }
+            "assert_report" => {
+                if !a.is_empty() { return Err("ASSERT_REPORT: erwartet 0 Argumente".into()); }
+                // Die Bilanz gehoert zu den Nutzdaten (stdout), nicht zu den
+                // Meldungen: sie ist das Ergebnis des Pruefprogramms.
+                let zeile = if self.assert_fehler == 0 {
+                    format!("ALLES GRUEN -- {} Pruefungen", self.assert_geprueft)
+                } else {
+                    format!("FEHLER: {} von {} Pruefungen", self.assert_fehler, self.assert_geprueft)
+                };
+                self.out.push_str(&zeile);
+                self.out.push('\n');
+                Value::Int(self.assert_fehler)
+            }
+            "log_debug" | "log_info" | "log_warn" | "log_error" => {
+                if a.len() != 1 { return Err(format!("{}: erwartet 1 Argument, erhalten {}", name.to_uppercase(), a.len())); }
+                let stufe = match name { "log_debug" => 0u8, "log_info" => 1, "log_warn" => 2, _ => 3 };
+                if stufe >= self.log_schwelle() {
+                    let (_, _, _, h, mi, s) = crate::builtins::local_datetime();
+                    let marke = match stufe { 0 => "DEBUG", 1 => "INFO", 2 => "WARN", _ => "ERROR" };
+                    let text = crate::builtins::str_of(&a[0]);
+                    self.flush_out();
+                    use std::io::Write;
+                    let se = std::io::stderr();
+                    let mut hd = se.lock();
+                    let _ = writeln!(hd, "{:02}:{:02}:{:02} {:<5} {}", h, mi, s, marke, text);
+                    let _ = hd.flush();
+                }
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    /// Eine Pruefung verbuchen. Im Sammel-Modus wird ein Fehlschlag gemeldet
+    /// und weitergemacht, sonst bricht er ab (mit Datei:Zeile aus dem
+    /// gewohnten Laufzeitfehler-Pfad).
+    fn assert_werten(&mut self, ok: bool, meldung: String) -> R<Value> {
+        self.assert_geprueft += 1;
+        if ok { return Ok(Value::Nil); }
+        self.assert_fehler += 1;
+        if !self.assert_sammeln {
+            return Err(format!("ASSERT fehlgeschlagen: {}", meldung));
+        }
+        // Fehlschlaege gehen nach stderr, damit die Nutzdaten auf stdout
+        // sauber bleiben -- ein Pruefprogramm laesst sich so umleiten.
+        self.flush_out();
+        use std::io::Write;
+        let se = std::io::stderr();
+        let mut h = se.lock();
+        let _ = if self.cur_line != 0 {
+            writeln!(h, "FEHL  Zeile {}: {}", self.cur_line, meldung)
+        } else {
+            writeln!(h, "FEHL  {}", meldung)
+        };
+        let _ = h.flush();
+        Ok(Value::Nil)
+    }
+
+    /// Ab welcher Stufe LOG_* etwas ausgibt. Aus `DH_LOG` (debug/info/warn/
+    /// error/aus), einmal nachgesehen und dann gemerkt. Vorgabe: `info` --
+    /// LOG_DEBUG schweigt also, bis jemand es einschaltet.
+    fn log_schwelle(&mut self) -> u8 {
+        if let Some(p) = self.log_pegel { return p; }
+        let p = match std::env::var("DH_LOG").unwrap_or_default().to_ascii_lowercase().as_str() {
+            "debug" => 0,
+            "warn" => 2,
+            "error" => 3,
+            "aus" | "off" | "none" => 9,
+            _ => 1,          // info (Vorgabe, auch bei unbekanntem Wert)
+        };
+        self.log_pegel = Some(p);
+        p
     }
 
     /// Gepufferte `PRINT`-Ausgabe sofort auf echtes stdout schreiben und den

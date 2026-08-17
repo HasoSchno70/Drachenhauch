@@ -1,0 +1,69 @@
+' 165 -- Ein Programm, das sich selbst prueft (WP E)
+'
+' So sieht ein Pruefprogramm aus: kein Fenster, keine Handarbeit, am Ende eine
+' Bilanz und ein Rueckgabewert, den ein Skript auswerten kann.
+'
+' Geprueft wird hier eine kleine Punkteregel -- stellvertretend fuer das Herz
+' einer Anwendung, das nicht nur dann richtig sein darf, wenn jemand von Hand
+' klickt.
+'
+' Aufruf:  dhrt run 165_pruefen.dh
+'          echo %ERRORLEVEL%      (Windows)  bzw.  echo $?   (Bash)
+
+' Sammeln statt abbrechen: ein Pruefprogramm soll ALLE Fehler zeigen, nicht
+' nur den ersten. Ohne diese Zeile bricht die erste fehlgeschlagene Pruefung
+' ab -- das ist die Vorgabe und fuer eine Vorbedingung mitten im Programm
+' auch die richtige.
+ASSERT_COLLECT(TRUE)
+
+' ---- Das Gepruefte -------------------------------------------------------
+
+FUNCTION tendenz(heim AS INTEGER, gast AS INTEGER) AS INTEGER
+    IF heim > gast THEN RETURN 1
+    IF heim < gast THEN RETURN -1
+    RETURN 0
+END FUNCTION
+
+FUNCTION punkte(tippH AS INTEGER, tippA AS INTEGER, _
+                ergH AS INTEGER, ergA AS INTEGER) AS INTEGER
+    IF tippH = ergH AND tippA = ergA THEN RETURN 4          ' aufs Haar
+    IF tendenz(tippH, tippA) <> tendenz(ergH, ergA) THEN RETURN 0
+    IF (tippH - tippA) = (ergH - ergA) THEN RETURN 3        ' Tordifferenz
+    RETURN 2                                                ' nur die Tendenz
+END FUNCTION
+
+' ---- Die Pruefungen ------------------------------------------------------
+
+LOG_INFO("Punkteregel wird geprueft")
+
+ASSERT_EQ(punkte(2, 1, 2, 1), 4, "exakt getroffen")
+ASSERT_EQ(punkte(3, 1, 2, 0), 3, "gleiche Tordifferenz")
+ASSERT_EQ(punkte(1, 0, 3, 1), 2, "nur die Tendenz")
+ASSERT_EQ(punkte(1, 0, 0, 1), 0, "falsche Tendenz")
+ASSERT_EQ(punkte(0, 0, 0, 0), 4, "torloses Unentschieden ist auch exakt")
+ASSERT_EQ(punkte(1, 1, 2, 2), 3, "Unentschieden, andere Hoehe")
+
+' Auch die Hilfsfunktion selbst -- sie ist der Teil, der leicht kippt.
+ASSERT_EQ(tendenz(1, 0), 1, "Heimsieg")
+ASSERT_EQ(tendenz(0, 1), -1, "Auswaertssieg")
+ASSERT_EQ(tendenz(2, 2), 0, "Unentschieden")
+
+' ASSERT fuer alles, was kein Vergleich zweier Werte ist:
+ASSERT(punkte(9, 0, 9, 0) > punkte(9, 0, 8, 0), "exakt schlaegt ungenau")
+
+' Ein absichtlicher Fehlschlag, damit man sieht, wie er aussieht.
+' Zum Ausprobieren die naechste Zeile auskommentieren -- dann wird alles gruen
+' und der Rueckgabewert 0.
+ASSERT_EQ(punkte(5, 0, 0, 5), 4, "so falsch wie es nur geht")
+
+' ---- Bilanz --------------------------------------------------------------
+' ASSERT_REPORT schreibt die Zusammenfassung nach stdout (sie ist das Ergebnis)
+' und liefert die Zahl der Fehlschlaege zurueck. Die Fehlschlaege selbst
+' stehen auf stderr -- so laesst sich `... > bericht.txt` schreiben, ohne dass
+' sich beides mischt.
+IF ASSERT_REPORT() > 0 THEN
+    LOG_ERROR("Pruefung fehlgeschlagen")
+    EXIT(1)
+END IF
+
+LOG_INFO("alles in Ordnung")

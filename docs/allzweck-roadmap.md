@@ -255,18 +255,53 @@ Prüfsumme, die nur mit sich selbst übereinstimmt, wäre wertlos. Beispiel:
 `examples/164_signatur.dh` (Webhook prüfen, Token würfeln, Datei-Prüfsumme).
 Doku: `docs/builtins-core.md`, Abschnitt „Prüfsummen und Identität".
 
-## WP E — Prüfen und Melden
+## WP E — Prüfen und Melden (✅ ERLEDIGT 2026-08-17)
 
-`buch-tippspiel/code/tippspiel_pruefung.dh` ist ein von Hand geschriebener
-Ersatz für einen Testrahmen. Dass es ihn gibt, ist der beste Beleg, dass er
-fehlt — und er zahlt sich bei jedem weiteren WP hier selbst zurück.
+`buch-tippspiel/code/tippspiel_pruefung.dh` war ein von Hand geschriebener
+Ersatz für einen Testrahmen. Dass es ihn gab, war der beste Beleg, dass er
+fehlte — und er zahlt sich bei jedem weiteren WP hier selbst zurück.
 
-- [ ] `ASSERT(bedingung, meldung$)` und `ASSERT_EQ(ist, soll [, meldung$])` —
-      bei Fehlschlag mit Datei:Zeile abbrechen
-- [ ] Sammel-Modus: alle Prüfungen laufen lassen, am Ende Bilanz + Exit-Code
-      ungleich 0 (braucht `EXIT` aus WP A)
-- [ ] `LOG_INFO/WARN/ERROR(text$)` nach stderr mit Zeitstempel, Pegel über
-      Umgebungsvariable einstellbar (braucht `GETENV$` aus WP A)
+Der Entwurf ist an dieser Datei abgelesen: 119 Aufrufe der Form
+`pruefe(was$, ist, soll)`, in **drei** fast wortgleichen Fassungen nur wegen
+der Typen (`pruefe`/`pruefeJa`/`pruefeText`), am Ende eine von Hand gezählte
+Bilanz — und **kein Rückgabewert**, ein Skript konnte „lief durch" also nicht
+von „hat Fehler gefunden" unterscheiden.
+
+- [x] `ASSERT(bedingung [, meldung$])` und `ASSERT_EQ(ist, soll [, was$])` —
+      bei Fehlschlag mit Datei:Zeile abbrechen. Die Fundstelle kommt aus dem
+      gewohnten Laufzeitfehler-Pfad, kostet also nichts extra.
+- [x] Sammel-Modus (`ASSERT_COLLECT`): alle Prüfungen laufen lassen, am Ende
+      `ASSERT_REPORT()` + Exit-Code über `EXIT` aus WP A. Dazu
+      `ASSERT_COUNT`/`ASSERT_FAILED`.
+- [x] `LOG_DEBUG/INFO/WARN/ERROR(text$)` nach stderr mit Zeitstempel, Pegel
+      über `DH_LOG` (`debug`/`info`/`warn`/`error`/`aus`, Vorgabe `info`).
+
+**Entscheidungen:**
+
+- **`ASSERT` bricht per Vorgabe ab**, Sammeln ist die Ausnahme. Ein Assert, der
+  nach einer verletzten Vorbedingung stillschweigend weiterläuft, ist
+  gefährlicher als einer, der bei der ersten von 119 Prüfungen stehenbleibt —
+  Letzteres ist ärgerlich, Ersteres unbemerkt falsch.
+- **`ASSERT` verlangt einen `BOOLEAN`.** `ASSERT(anzahl)` ist ein Fehler und
+  nicht „wahr, weil nicht null". Eine Prüfung, die aus Versehen immer
+  durchgeht, ist schlimmer als gar keine.
+- **`ASSERT_EQ` vergleicht mit `value_eq`** — derselben Gleichheit wie der
+  `=`-Operator. Eine zweite Vorstellung davon, wann zwei Werte gleich sind,
+  wäre die sicherste Art, Vertrauen in die Prüfungen zu verspielen. Nebenbei
+  ersetzt die eine Funktion die drei handgeschriebenen Typ-Varianten.
+- **Fehlschläge nach stderr, Bilanz nach stdout.** Ein `pruefung > bericht.txt`
+  liefert damit einen sauberen Bericht, ohne die Einzelheiten zu verlieren.
+
+**Umsetzung:** `try_pruefen` in `vm.rs` (braucht Zähler, Modus, Quell-Zeile und
+den Ausgabe-Puffer). Für die Zeilenangabe im Sammel-Modus gibt es einen
+gezielten Nachschlag im `CALL_BUILTIN`-Arm: `cur_line` wird sonst **nur** beim
+Profilieren/Debuggen mitgeführt, weil der Normalfall pro Instruktion nichts
+zahlen soll — der Test auf das erste Byte des Namens hält die Kosten für alle
+anderen Builtins bei einem Byte-Vergleich. `LOG_*` teilt sich `flush_out` mit
+`EPRINT`/`SHELL` aus WP A.
+
+Tests: `tests/test_pruefen.py` (27). Beispiel: `examples/165_pruefen.dh`.
+Doku: `docs/builtins-core.md`, Abschnitt „Prüfen und Melden".
 
 ## WP F — Fehler, die man behandeln kann
 
@@ -360,7 +395,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → E → F → G → H → I** (A bis D sind erledigt, Nächstes ist E)
+**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → F → G → H → I** (A bis E sind erledigt, Nächstes ist F)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

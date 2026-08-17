@@ -14,6 +14,7 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 - [Datei-I/O](#datei-io)
 - [Bytes (BUFFER)](#bytes-buffer)
 - [Betriebssystem](#betriebssystem)
+- [Prüfen und Melden](#prüfen-und-melden)
 - [Zeit & Random](#zeit--random)
 - [Typen & Encoding](#typen--encoding)
 - [Prüfsummen und Identität](#prüfsummen-und-identität)
@@ -606,6 +607,98 @@ in die Nutzdaten.
 > ins Exe-Verzeichnis. Ein Pfad, den der Benutzer als Argument übergibt, ist
 > also relativ zu *seinem* Verzeichnis, nicht zu `CWD$()` — im Zweifel den
 > Benutzer nach einem absoluten Pfad fragen.
+
+## Prüfen und Melden
+
+Damit prüft sich ein Programm selbst — und sagt hinterher, ob es geklappt hat.
+
+| Funktion | Zweck |
+|---|---|
+| `ASSERT(bedingung [, meldung$])` | schlägt fehl, wenn die Bedingung `FALSE` ist |
+| `ASSERT_EQ(ist, soll [, was$])` | dasselbe, die Meldung zeigt **beide** Werte |
+| `ASSERT_COLLECT(an)` | Sammel-Modus ein/aus (Vorgabe: aus) |
+| `ASSERT_COUNT()` → INTEGER | wie viele Prüfungen gelaufen sind |
+| `ASSERT_FAILED()` → INTEGER | wie viele davon fehlgeschlagen sind |
+| `ASSERT_REPORT()` → INTEGER | Bilanz ausgeben, Zahl der Fehlschläge zurückgeben |
+| `LOG_DEBUG/INFO/WARN/ERROR(text)` | Meldung mit Uhrzeit nach **stderr** |
+
+### Zwei Arten zu prüfen
+
+**Vorbedingung im laufenden Programm** — hier soll ein Fehlschlag *abbrechen*.
+Das ist die Vorgabe:
+
+```basic
+ASSERT(spieler_zahl > 0, "ohne Spieler geht es nicht")
+```
+
+Schlägt sie fehl, endet das Programm mit einem Laufzeitfehler samt Datei und
+Zeile — genau wie jeder andere Fehler auch.
+
+**Prüfprogramm** — hier will man *alle* Fehler sehen, nicht nur den ersten.
+Dafür einmal am Anfang den Sammel-Modus einschalten:
+
+```basic
+ASSERT_COLLECT(TRUE)
+
+ASSERT_EQ(punkte(2, 1, 2, 1), 4, "exakt getroffen")
+ASSERT_EQ(punkte(1, 0, 0, 1), 0, "falsche Tendenz")
+ASSERT(tendenz(1, 0) > 0,       "Heimsieg")
+
+IF ASSERT_REPORT() > 0 THEN
+    EXIT(1)
+END IF
+```
+
+Ausgabe bei einem Fehlschlag:
+
+```
+FEHL  Zeile 4: falsche Tendenz: erhalten 2, erwartet 0     <- stderr
+FEHLER: 1 von 3 Pruefungen                                 <- stdout
+```
+
+Der **Rückgabewert** ist der Punkt: erst damit kann ein Skript, ein Makefile
+oder eine CI zwischen „lief durch" und „hat Fehler gefunden" unterscheiden.
+
+**Trennung von stdout und stderr:** die Fehlschläge gehen nach stderr, die
+Bilanz nach stdout. Ein `pruefung > bericht.txt` liefert also einen sauberen
+Bericht, während die Einzelheiten weiter im Terminal stehen.
+
+> **`ASSERT` verlangt einen `BOOLEAN`.** `ASSERT(anzahl)` ist ein Fehler und
+> nicht etwa „wahr, weil nicht null" — eine Prüfung, die aus Versehen immer
+> durchgeht, ist schlimmer als gar keine. Also einen Vergleich schreiben:
+> `ASSERT(anzahl > 0)`.
+
+> **`ASSERT_EQ` vergleicht wie der `=`-Operator** der Sprache, inklusive
+> `1 = 1.0`. Eine zweite Vorstellung davon, wann zwei Werte gleich sind, wäre
+> die sicherste Art, Vertrauen in die Prüfungen zu verspielen.
+
+### Melden
+
+```basic
+LOG_INFO("Saison 2026 geladen")
+LOG_WARN("Kein Netz -- arbeite mit den gespeicherten Daten")
+LOG_ERROR("Datenbank nicht lesbar")
+```
+
+Ausgabe: `20:45:43 INFO  Saison 2026 geladen` — nach **stderr**, damit `PRINT`
+als Nutzdaten durchgereicht werden kann.
+
+Wie viel davon erscheint, steuert die Umgebungsvariable **`DH_LOG`**:
+
+| `DH_LOG` | was erscheint |
+|---|---|
+| `debug` | alles |
+| *(nicht gesetzt)* / `info` | INFO, WARN, ERROR — **Vorgabe** |
+| `warn` | WARN, ERROR |
+| `error` | nur ERROR |
+| `aus` | nichts |
+
+`LOG_DEBUG` schweigt also, bis jemand es einschaltet — Debug-Meldungen können
+im Code stehen bleiben, ohne den Normalbetrieb zuzumüllen:
+
+```bash
+DH_LOG=debug dhrt run werkzeug.dh
+```
 
 ## Zeit & Random
 
