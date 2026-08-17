@@ -139,17 +139,20 @@ Hintergrund; das Fenster bleibt bedienbar.
 
 Neben den Kapiteln liegen Programme, die nichts zeigen, sondern nachrechnen. Sie
 gehören zum Buch: einer Anwendung, die man nicht prüfen kann, kann man nicht
-trauen.
+trauen. Die beiden mit **Netz** laufen nicht in der Testsuite mit — eine Prüfung,
+die eine Verbindung braucht, prüft an schlechten Tagen nichts.
 
 | Datei | Was es prüft |
 |---|---|
 | [`code/tippspiel_pruefung.dh`](code/tippspiel_pruefung.dh) | Punkteregel, Rangliste, Spieltage, Ergebnisse aus der Antwort, Tippgemeinschaften, die zwei Ligen, die Ligatabelle, die Statistik, die Saisons und die Punkteregeln — 116 Prüfungen, ohne Fenster und ohne Netz |
+| [`code/tabellen_pruefung.dh`](code/tabellen_pruefung.dh) | Die gerechnete Ligatabelle **gegen die amtliche** — holt beide Ligen und die Tabelle, die OpenLigaDB selbst führt, und vergleicht jede Zeile: Spiele, S/U/N, Tore, Gegentore, Punkte. 262 Vergleiche. Braucht Netz |
 | [`code/zeit_pruefung.dh`](code/zeit_pruefung.dh) | Die Datumsrechnungen: Tippschluss, Countdown, Schaltjahre |
 | [`code/abruf_pruefung.dh`](code/abruf_pruefung.dh) | Blockierender gegen nebenläufigen Abruf, mit gemessenen Zahlen |
 | [`code/stolpersteine.dh`](code/stolpersteine.dh) | Messprotokoll: wo Drachenhauch für so eine Anwendung an Grenzen stößt |
 
 ```
 dhrun.py buch-tippspiel/code/tippspiel_pruefung.dh
+dhrun.py buch-tippspiel/code/tabellen_pruefung.dh
 dhrun.py buch-tippspiel/code/zeit_pruefung.dh
 dhrun.py buch-tippspiel/code/abruf_pruefung.dh
 dhrun.py buch-tippspiel/code/stolpersteine.dh

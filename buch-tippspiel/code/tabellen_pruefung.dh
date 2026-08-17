@@ -1,0 +1,271 @@
+' ============================================================
+'  Pruefung: die eigene Ligatabelle gegen die amtliche
+' ============================================================
+'  Die Ligatabelle in tippspiel.dh wird gerechnet und nicht
+'  gespeichert. Rechnet sie richtig? Das laesst sich nicht durch
+'  Hinsehen entscheiden -- aber die Liga fuehrt ihre Tabelle
+'  selbst, und OpenLigaDB gibt sie heraus. Also zwei
+'  unabhaengige Wege zu denselben Zahlen: hier die Spiele, dort
+'  die fertige Tabelle. Gehen sie auseinander, rechnet einer
+'  falsch, und man weiss, dass man nachsehen muss.
+'
+'  Dieses Programm braucht das NETZ und laeuft deshalb nicht in
+'  der Testsuite mit -- wie abruf_pruefung.dh. Es braucht keine
+'  vorhandene Datenbank: es holt die Spiele selbst und legt sie
+'  in eine Datenbank im Speicher.
+'
+'  Start:  dhrun.py buch-tippspiel/code/tabellen_pruefung.dh
+' ============================================================
+IMPORT "db"
+IMPORT "html"
+IMPORT "json"
+
+CONST API = "https://api.openligadb.de/"
+CONST SAISON = 2026
+CONST MAX_SPIELTAG = 34
+
+DIM fehler AS INTEGER : fehler = 0
+DIM geprueft AS INTEGER : geprueft = 0
+
+SUB pruefe(was AS STRING, ist AS INTEGER, soll AS INTEGER)
+    geprueft = geprueft + 1
+    IF ist <> soll THEN
+        PRINT "    FEHL "; was; ": "; ist; " statt "; soll
+        fehler = fehler + 1
+    END IF
+END SUB
+
+' ---- Dieselbe Datenbank wie im Programm ----------------------------------
+DIM db AS DB_CONN
+db = DB_OPEN(":memory:")
+DB_EXEC(db, "CREATE TABLE spiele (id INTEGER PRIMARY KEY, " + _
+            "saison INTEGER NOT NULL, liga TEXT NOT NULL, " + _
+            "spieltag INTEGER NOT NULL, heim TEXT NOT NULL, gast TEXT NOT NULL, " + _
+            "tore_heim INTEGER, tore_gast INTEGER)")
+DB_EXEC(db, "CREATE UNIQUE INDEX idx_spiel ON spiele (saison, liga, spieltag, heim, gast)")
+
+' ---- Die Abfrage, wortgleich mit tippspiel.dh -----------------------------
+FUNCTION tabellenAbfrage() AS STRING
+    RETURN "WITH ligaspiele AS (" + _
+           "    SELECT heim, gast, tore_heim, tore_gast FROM spiele" + _
+           "     WHERE saison = ? AND liga = ?" + _
+           "), vereine AS (" + _
+           "    SELECT heim AS verein FROM ligaspiele" + _
+           "    UNION SELECT gast FROM ligaspiele" + _
+           "), auftritte AS (" + _
+           "    SELECT heim AS verein, tore_heim AS eigene, tore_gast AS fremde" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           "    UNION ALL" + _
+           "    SELECT gast, tore_gast, tore_heim" + _
+           "      FROM ligaspiele WHERE tore_heim IS NOT NULL" + _
+           ") " + _
+           "SELECT v.verein, COUNT(a.verein) AS sp, " + _
+           "  COALESCE(SUM(a.eigene > a.fremde), 0) AS s, " + _
+           "  COALESCE(SUM(a.eigene = a.fremde), 0) AS u, " + _
+           "  COALESCE(SUM(a.eigene < a.fremde), 0) AS n, " + _
+           "  COALESCE(SUM(a.eigene), 0) AS tore, " + _
+           "  COALESCE(SUM(a.fremde), 0) AS gegentore, " + _
+           "  COALESCE(SUM(a.eigene) - SUM(a.fremde), 0) AS diff, " + _
+           "  COALESCE(SUM(CASE WHEN a.eigene > a.fremde THEN 3 " + _
+           "                    WHEN a.eigene = a.fremde THEN 1 ELSE 0 END), 0) AS punkte " + _
+           "FROM vereine v LEFT JOIN auftritte a ON a.verein = v.verein " + _
+           "GROUP BY v.verein " + _
+           "ORDER BY punkte DESC, diff DESC, tore DESC, v.verein"
+END FUNCTION
+
+' ---- Das Endergebnis aus der Antwort, wortgleich mit tippspiel.dh ---------
+FUNCTION endergebnis(wurzel AS JSON_HANDLE, pfad AS STRING, _
+                     BYREF toreHeim AS INTEGER, BYREF toreGast AS INTEGER) AS BOOLEAN
+    IF NOT JSON_HAS(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+    IF NOT JSON_GET_BOOL(wurzel, pfad + ".matchIsFinished") THEN RETURN FALSE
+    DIM n AS INTEGER : n = JSON_LEN(wurzel, pfad + ".matchResults")
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM rp AS STRING : rp = pfad + ".matchResults." + STR$(k)
+        IF JSON_GET_INT(wurzel, rp + ".resultTypeID") = 2 THEN
+            toreHeim = JSON_GET_INT(wurzel, rp + ".pointsTeam1")
+            toreGast = JSON_GET_INT(wurzel, rp + ".pointsTeam2")
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Die Spiele einer Liga holen und eintragen. Rueckgabe: wie viele ein
+' Ergebnis haben.
+FUNCTION spieleHolen(liga AS STRING) AS INTEGER
+    DIM roh AS STRING
+    roh = HTTP_GET(API + "getmatchdata/" + liga + "/" + STR$(SAISON))
+    DIM w AS JSON_HANDLE : w = JSON_PARSE(roh)
+    DIM n AS INTEGER : n = JSON_LEN(w, "")
+    DIM mitErgebnis AS INTEGER : mitErgebnis = 0
+
+    DB_BEGIN(db)
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM pfad AS STRING : pfad = STR$(i)
+        DIM heim AS STRING : heim = JSON_GET_STRING(w, pfad + ".team1.teamName")
+        DIM gast AS STRING : gast = JSON_GET_STRING(w, pfad + ".team2.teamName")
+        DIM tag AS INTEGER : tag = JSON_GET_INT(w, pfad + ".group.groupOrderID")
+        IF heim <> "" AND gast <> "" AND tag >= 1 AND tag <= MAX_SPIELTAG THEN
+            DB_EXEC(db, "INSERT INTO spiele (saison, liga, spieltag, heim, gast) " + _
+                        "VALUES (?, ?, ?, ?, ?)", SAISON, liga, tag, heim, gast)
+            DIM eh AS INTEGER : eh = 0
+            DIM ea AS INTEGER : ea = 0
+            IF endergebnis(w, pfad, eh, ea) THEN
+                DB_EXEC(db, "UPDATE spiele SET tore_heim = ?, tore_gast = ? " + _
+                            "WHERE saison = ? AND liga = ? AND spieltag = ? " + _
+                            "  AND heim = ? AND gast = ?", _
+                        eh, ea, SAISON, liga, tag, heim, gast)
+                mitErgebnis = mitErgebnis + 1
+            END IF
+        END IF
+    NEXT
+    DB_COMMIT(db)
+    RETURN mitErgebnis
+END FUNCTION
+
+' ---- Eine Liga pruefen ---------------------------------------------------
+CONST MAXV = 30
+DIM aName[MAXV] AS STRING
+DIM aSp[MAXV] AS INTEGER
+DIM aSieg[MAXV] AS INTEGER
+DIM aRemis[MAXV] AS INTEGER
+DIM aNieder[MAXV] AS INTEGER
+DIM aTore[MAXV] AS INTEGER
+DIM aGegen[MAXV] AS INTEGER
+DIM aPkt[MAXV] AS INTEGER
+DIM aAnzahl AS INTEGER
+
+' Achtung: "aS" als Name geht nicht -- AS ist ein reserviertes Wort, und
+' Gross-/Kleinschreibung zaehlt dabei nicht.
+
+SUB amtlichHolen(liga AS STRING)
+    DIM w AS JSON_HANDLE
+    w = JSON_PARSE(HTTP_GET(API + "getbltable/" + liga + "/" + STR$(SAISON)))
+    aAnzahl = JSON_LEN(w, "")
+    IF aAnzahl > MAXV THEN aAnzahl = MAXV
+    DIM i AS INTEGER
+    FOR i = 0 TO aAnzahl - 1
+        DIM p AS STRING : p = STR$(i)
+        aName[i] = JSON_GET_STRING(w, p + ".teamName")
+        aSp[i] = JSON_GET_INT(w, p + ".matches")
+        aSieg[i] = JSON_GET_INT(w, p + ".won")
+        aRemis[i] = JSON_GET_INT(w, p + ".draw")
+        aNieder[i] = JSON_GET_INT(w, p + ".lost")
+        aTore[i] = JSON_GET_INT(w, p + ".goals")
+        aGegen[i] = JSON_GET_INT(w, p + ".opponentGoals")
+        aPkt[i] = JSON_GET_INT(w, p + ".points")
+    NEXT
+END SUB
+
+FUNCTION amtlichZeile(verein AS STRING) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO aAnzahl - 1
+        IF aName[k] = verein THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB ligaPruefen(liga AS STRING, klarname AS STRING)
+    PRINT ""
+    PRINT "=== "; klarname; " ("; liga; ") ==="
+
+    DIM mitErgebnis AS INTEGER : mitErgebnis = spieleHolen(liga)
+    amtlichHolen(liga)
+    PRINT "  Spiele mit Ergebnis: "; mitErgebnis; " | Vereine amtlich: "; aAnzahl
+
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, tabellenAbfrage(), SAISON, liga)
+    DIM platz AS INTEGER : platz = 0
+    DIM summeSp AS INTEGER : summeSp = 0
+    DIM summeTore AS INTEGER : summeTore = 0
+    DIM summeGegen AS INTEGER : summeGegen = 0
+    DIM summePkt AS INTEGER : summePkt = 0
+    DIM unbekannt AS INTEGER : unbekannt = 0
+
+    WHILE DB_NEXT(r)
+        platz = platz + 1
+        DIM verein AS STRING : verein = DB_GET_STRING(r, 0)
+        DIM sp AS INTEGER : sp = DB_GET_INT(r, 1)
+        DIM sg AS INTEGER : sg = DB_GET_INT(r, 2)
+        DIM un AS INTEGER : un = DB_GET_INT(r, 3)
+        DIM nl AS INTEGER : nl = DB_GET_INT(r, 4)
+        DIM tore AS INTEGER : tore = DB_GET_INT(r, 5)
+        DIM gegen AS INTEGER : gegen = DB_GET_INT(r, 6)
+        DIM pkt AS INTEGER : pkt = DB_GET_INT(r, 8)
+
+        ' Nur die Spitze und das Ende zeigen -- die Mitte prueft mit, ohne
+        ' den Bildschirm zu fuellen.
+        IF platz <= 3 OR platz > aAnzahl - 3 THEN
+            PRINT "  "; PADL$(STR$(platz), 2); ". "; PADR$(verein, 26); " "; _
+                  sp; " Sp  "; sg; "/"; un; "/"; nl; "  "; _
+                  PADL$(STR$(tore) + ":" + STR$(gegen), 6); "  "; _
+                  PADL$(STR$(pkt), 2); " Pkt"
+        END IF
+
+        DIM k AS INTEGER : k = amtlichZeile(verein)
+        IF k < 0 THEN
+            PRINT "      FEHL '"; verein; "' steht nicht in der amtlichen Tabelle"
+            unbekannt = unbekannt + 1
+        ELSE
+            pruefe(verein + " Spiele", sp, aSp[k])
+            pruefe(verein + " Siege", sg, aSieg[k])
+            pruefe(verein + " Unentschieden", un, aRemis[k])
+            pruefe(verein + " Niederlagen", nl, aNieder[k])
+            pruefe(verein + " Tore", tore, aTore[k])
+            pruefe(verein + " Gegentore", gegen, aGegen[k])
+            pruefe(verein + " Punkte", pkt, aPkt[k])
+        END IF
+
+        summeSp = summeSp + sp
+        summeTore = summeTore + tore
+        summeGegen = summeGegen + gegen
+        summePkt = summePkt + pkt
+    WEND
+    DB_CLOSE_RESULT(r)
+
+    ' Die Proben, die unabhaengig von der amtlichen Tabelle aufgehen muessen.
+    pruefe("Anzahl Vereine", platz, aAnzahl)
+    pruefe("keine unbekannten Vereine", unbekannt, 0)
+    ' Jedes gewertete Spiel steckt in zwei Einsaetzen -- einmal je Sicht.
+    pruefe("Einsaetze = 2 x gewertete Spiele", summeSp, mitErgebnis * 2)
+    ' Was die einen schiessen, kassieren die anderen.
+    pruefe("Tore = Gegentore", summeTore - summeGegen, 0)
+    ' Ein entschiedenes Spiel vergibt 3 Punkte, ein Unentschieden 2.
+    DIM remis AS INTEGER : remis = 0
+    r = DB_QUERY(db, "SELECT COUNT(*) FROM spiele WHERE saison = ? AND liga = ? " + _
+                     "AND tore_heim IS NOT NULL AND tore_heim = tore_gast", SAISON, liga)
+    IF DB_NEXT(r) THEN remis = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    pruefe("Punktsumme = 3 je Sieg + 2 je Remis", summePkt, _
+           (mitErgebnis - remis) * 3 + remis * 2)
+
+    PRINT "  Proben: "; summeSp; " Einsaetze, "; summeTore; ":"; summeGegen; " Tore, "; _
+          summePkt; " Punkte bei "; remis; " Unentschieden"
+END SUB
+
+PRINT "=== Saison "; SAISON; "/"; (SAISON + 1) MOD 100; " ==="
+PRINT "  Verglichen wird jede Zeile: Spiele, S/U/N, Tore, Gegentore, Punkte."
+PRINT "  Gemeldet wird nur, was abweicht."
+
+TRY
+    ligaPruefen("bl1", "1. Bundesliga")
+    ligaPruefen("bl2", "2. Bundesliga")
+CATCH e
+    PRINT ""
+    PRINT "  Kein Vergleich moeglich -- OpenLigaDB nicht erreichbar:"
+    PRINT "  "; e
+    fehler = fehler + 1
+END TRY
+
+DB_CLOSE(db)
+
+PRINT ""
+PRINT "============================================"
+IF fehler = 0 THEN
+    PRINT "ALLES GRUEN -- "; geprueft; " Vergleiche"
+ELSE
+    PRINT "FEHLER: "; fehler; " von "; geprueft; " Vergleichen"
+END IF
+PRINT "============================================"
