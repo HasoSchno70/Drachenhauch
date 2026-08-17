@@ -1,0 +1,105 @@
+' 162 -- Eine Binaerdatei wirklich lesen (WP B: der BUFFER-Typ)
+'
+' Liest eine PNG-Datei OHNE Bildbibliothek: Signatur pruefen, Breite und Hoehe
+' aus dem IHDR-Block holen, alle Bloecke auflisten. Dann dasselbe rueckwaerts --
+' ein eigenes kleines Dateiformat schreiben und wieder einlesen.
+'
+' Warum das vorher nicht ging: STRING ist UTF-8-Text. Ein PNG enthaelt Bytes,
+' die in UTF-8 gar nicht vorkommen duerfen -- schon das Einlesen haette die
+' Datei verfaelscht. Und LEN haette Zeichen gezaehlt, nicht Bytes.
+'
+' Aufruf:  dhrt run 162_binaerdatei.dh
+
+CONST PFAD AS STRING = "assets/hero.png"
+' Als CONST, weil sich in einem f-String `{...}` kein Anfuehrungszeichen
+' unterbringen laesst -- `f"{X(a, ""be"")}"` ist ein Parse-Fehler.
+CONST BE AS STRING = "be"
+
+' --- PNG lesen ------------------------------------------------------------
+DIM daten AS BUFFER
+DIM i AS INTEGER
+
+IF NOT FILEEXISTS(PFAD) THEN
+    EPRINT("Nicht gefunden: " + PFAD)
+    EXIT(1)
+END IF
+
+daten = READALL_BYTES(PFAD)
+PRINT f"{PFAD}: {BUFFER_LEN(daten)} Bytes"
+
+' Die PNG-Signatur sind acht feste Bytes. Der Vergleich geht ueber einen
+' zweiten Puffer -- Byte fuer Byte pruefen waere genauso richtig, nur laenger.
+DIM signatur AS BUFFER
+signatur = BUFFER_FROM_HEX("89504e470d0a1a0a")
+IF BUFFER_TO_HEX$(BUFFER_SLICE(daten, 0, 8)) <> BUFFER_TO_HEX$(signatur) THEN
+    EPRINT("Das ist keine PNG-Datei (Signatur passt nicht)")
+    EXIT(1)
+END IF
+PRINT "Signatur stimmt."
+
+' PNG ist BIG-ENDIAN -- die Vorgabe "le" waere hier falsch und lieferte
+' Breite 268435456 statt 16. Genau dafuer gibt es das dritte Argument.
+PRINT f"Breite:  {BUFFER_GET_U32(daten, 16, BE)}"
+PRINT f"Hoehe:   {BUFFER_GET_U32(daten, 20, BE)}"
+PRINT f"Bittiefe: {BUFFER_GET(daten, 24)}"
+
+' --- Bloecke durchlaufen --------------------------------------------------
+' Aufbau je Block: 4 Byte Laenge, 4 Byte Name, Daten, 4 Byte Pruefsumme.
+PRINT ""
+PRINT "Bloecke:"
+DIM pos AS INTEGER
+DIM laenge AS INTEGER
+DIM name AS STRING
+pos = 8
+WHILE pos + 8 <= BUFFER_LEN(daten)
+    laenge = BUFFER_GET_U32(daten, pos, "be")
+    ' Der Blockname sind vier ASCII-Zeichen -- hier ist BUFFER_TO_STRING$
+    ' richtig, weil es an DIESER Stelle wirklich Text ist.
+    name = BUFFER_TO_STRING$(BUFFER_SLICE(daten, pos + 4, pos + 8))
+    PRINT f"  {name}  {laenge} Bytes  (ab {pos})"
+    IF name = "IEND" THEN
+        BREAK
+    END IF
+    pos = pos + 12 + laenge
+WEND
+
+' --- Ein eigenes Format schreiben ----------------------------------------
+' Kopf: Kennung "DHSV", Version (u16), Anzahl Eintraege (u16).
+' Danach je Eintrag: Punktzahl (i32) und Zeit (f32).
+PRINT ""
+DIM kopf AS BUFFER
+kopf = BUFFER_CONCAT(BUFFER_FROM_STRING("DHSV"), BUFFER_NEW(4))
+BUFFER_SET_U16(kopf, 4, 1)          ' Version
+BUFFER_SET_U16(kopf, 6, 3)          ' drei Eintraege
+
+DIM koerper AS BUFFER
+koerper = BUFFER_NEW(3 * 8)
+DIM punkte AS ARRAY OF INTEGER
+DIM zeiten AS ARRAY OF FLOAT
+punkte = [1200, 950, -30]
+zeiten = [12.5, 30.25, 7.0]
+FOR i = 0 TO 2
+    BUFFER_SET_I32(koerper, i * 8, punkte[i])
+    BUFFER_SET_F32(koerper, i * 8 + 4, zeiten[i])
+NEXT
+
+DIM groesse AS INTEGER
+WRITEALL_BYTES("bestenliste.dhsv", BUFFER_CONCAT(kopf, koerper))
+groesse = FILESIZE("bestenliste.dhsv")
+PRINT f"geschrieben: bestenliste.dhsv ({groesse} Bytes)"
+
+' --- und wieder einlesen --------------------------------------------------
+DIM gelesen AS BUFFER
+DIM anzahl AS INTEGER
+gelesen = READALL_BYTES("bestenliste.dhsv")
+IF BUFFER_TO_STRING$(BUFFER_SLICE(gelesen, 0, 4)) <> "DHSV" THEN
+    EPRINT("Fremde Datei -- Kennung passt nicht")
+    EXIT(1)
+END IF
+PRINT f"Version {BUFFER_GET_U16(gelesen, 4)}"
+anzahl = BUFFER_GET_U16(gelesen, 6)
+FOR i = 0 TO anzahl - 1
+    PRINT f"  {BUFFER_GET_I32(gelesen, 8 + i * 8)} Punkte in {BUFFER_GET_F32(gelesen, 12 + i * 8)} s"
+NEXT
+
+DELETEFILE("bestenliste.dhsv")

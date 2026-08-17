@@ -2488,8 +2488,11 @@ fn data_literal(lit: &Node) -> Result<CVal, String> {
 /// Bekannter skalarer Werttyp (= compiler._TYPE_DEFAULTS-Schluessel). Klassen
 /// und (kuenftig) externe Modul-Typen werden separat geprueft.
 fn is_value_type(t: &str) -> bool {
+    // `buffer` steht hier und ist bewusst KEIN Lexer-Keyword (wie
+    // `sprite_atlas`): ein neues Schluesselwort wuerde `DIM buffer AS INTEGER`
+    // in bestehendem Code zum Fehler machen. Als Typname genuegt der Identifier.
     matches!(t, "integer" | "float" | "string" | "boolean"
-        | "image" | "sound" | "sprite_atlas" | "file"
+        | "image" | "sound" | "sprite_atlas" | "file" | "buffer"
         | "tuple" | "funcref" | "coroutine")
 }
 

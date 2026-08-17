@@ -105,27 +105,58 @@ Rückgabewert + stderr, reicht Argumente durch) und `dhrt_pfad` in
 ohne Fenster, mit Argumenten, stderr-Meldungen und Rückgabewerten. Doku:
 `docs/builtins-core.md`, Abschnitt „Betriebssystem".
 
-## WP B — Bytes und Binärdateien
+## WP B — Bytes und Binärdateien (✅ ERLEDIGT 2026-08-17)
 
-Es gibt keinen Byte-Typ. Dateien sind Text (`READALL`/`WRITEALL`/`READLINES`),
-`STRING` ist UTF-8 und taugt darum nicht als Byte-Behälter, `SEEK` fehlt.
-Damit gehen nicht: eigene Dateiformate, Protokolle mitlesen, ZIP/PNG anfassen,
+Es gab keinen Byte-Typ. Dateien waren Text (`READALL`/`WRITEALL`/`READLINES`),
+`STRING` ist UTF-8 und taugt darum nicht als Byte-Behälter, `SEEK` fehlte.
+Damit gingen nicht: eigene Dateiformate, Protokolle mitlesen, ZIP/PNG anfassen,
 Serial-Geräte jenseits von Text, Bilder aus dem Netz weiterverarbeiten.
 
 WP B ist Voraussetzung für WP C (Rumpf als Bytes), WP D (Prüfsummen über
 Dateien) und ZIP in WP J.
 
-- [ ] Externer Typ `BUFFER`: `BUFFER_NEW(groesse)`, `BUFFER_LEN`,
-      `BUFFER_GET/SET(i, byte)`, `BUFFER_SLICE`, `BUFFER_CONCAT`, `BUFFER_FILL`
-- [ ] Umwandlung: `BUFFER_FROM_STRING$`/`BUFFER_TO_STRING$` (UTF-8, mit
-      klarer Ansage bei ungültigen Folgen), `BUFFER_TO_HEX$`, `BASE64_*`
-      auf `BUFFER` erweitern
-- [ ] Datei: `OPENFILE` um `"rb"`/`"wb"`/`"ab"` erweitern, dazu
-      `READ_BYTES(f, n)` → BUFFER, `WRITE_BYTES(f, buf)`, `SEEK(f, pos)`,
-      `TELL(f)`. Alternativ pfadbasiert `READALL_BYTES`/`WRITEALL_BYTES`
-      analog zu den vorhandenen `READALL`/`WRITEALL`.
-- [ ] Zahlen packen: `BUFFER_GET_I16/I32/I64/F32/F64` + Setter, Byte-Reihenfolge
-      als Argument (`"le"`/`"be"`) — nicht raten.
+- [x] **Kern-Typ `BUFFER`** (kein `IMPORT`, wie `FILE`): `BUFFER_NEW`,
+      `BUFFER_LEN`, `BUFFER_GET/SET`, `BUFFER_FILL`, `BUFFER_RESIZE`,
+      `BUFFER_SLICE`, `BUFFER_CONCAT`, `BUFFER_INDEXOF`. Referenz-Typ wie
+      `ARRAY`. Index streng, Slice klemmt — dieselbe Regel wie bei Arrays.
+- [x] Umwandlung: `BUFFER_FROM_STRING`/`BUFFER_TO_STRING$` (**streng**: kaputtes
+      UTF-8 ist ein Fehler, kein stilles Ersatzzeichen), `BUFFER_TO_HEX$`/
+      `BUFFER_FROM_HEX` (Leerzeichen erlaubt), `BUFFER_TO_BASE64$`/
+      `BUFFER_FROM_BASE64` (rohe Bytes, anders als `BASE64_DECODE`).
+- [x] Datei: `READ_BYTES(f, n)` → BUFFER, `WRITE_BYTES(f, buf)`, `SEEK(f, pos)`,
+      `TELL(f)`, pfadbasiert `READALL_BYTES`/`WRITEALL_BYTES`.
+- [x] Zahlen packen: `BUFFER_GET_/SET_` für `I16`/`U16`/`I32`/`U32`/`I64`/`F32`/
+      `F64`, Byte-Reihenfolge als optionales `"le"`/`"be"`.
+
+**Zwei bewusste Abweichungen von der ursprünglichen Planung oben:**
+
+1. **Keine `"rb"`/`"wb"`-Modi.** Rust übersetzt im Textmodus nichts (kein
+   CRLF-Gefummel wie in C) — Drachenhauch-Dateien sind ohnehin byte-genau.
+   Getrennte Modi hätten also einen Unterschied vorgegaukelt, den es nicht
+   gibt. `READ_BYTES`/`WRITE_BYTES`/`SEEK` arbeiten auf denselben Handles wie
+   `READLINE`/`WRITELINE`. Ein Test belegt, dass alle 256 Bytewerte
+   unverändert durch eine Datei gehen. **Was noch fehlt:** ein Modus, der
+   gleichzeitig liest *und* schreibt (`"r+"`) — heute geht Ändern nur über
+   `READALL_BYTES` → Puffer ändern → `WRITEALL_BYTES`.
+2. **Byte-Reihenfolge ist optional mit Vorgabe `"le"`**, nicht Pflicht wie oben
+   geplant. Wer selbst schreibt und wieder liest, benutzt auf beiden Seiten
+   dieselbe Vorgabe und ist immer richtig; die Angabe braucht nur, wer ein
+   fremdes Format bedient (PNG/ZIP/Netz sind big-endian) — und wer das tut,
+   denkt ohnehin darüber nach. Pflicht für alle hätte den häufigen Fall
+   besteuert, um dem seltenen zu helfen.
+   Dazu **`U16`/`U32` zusätzlich** zur geplanten Liste: ohne sie lassen sich
+   PNG-Blocklängen und WAV-Größen nicht lesen, ein `u32` passt nicht in `I32`.
+
+**Umsetzung:** `Value::Buffer(Rc<RefCell<Vec<u8>>>)` in `value.rs`, Builtins in
+`builtins.rs` (alle zustandsfrei), `"buffer"` in `is_value_type` (`compiler.rs`)
+— bewusst **kein Lexer-Keyword**, sonst wäre `DIM buffer AS INTEGER` in
+bestehendem Code plötzlich ein Fehler. `PRINT puffer` zeigt nur die Länge, nicht
+den Inhalt.
+
+Tests: `tests/test_buffer.py` (48). Beispiel: `examples/162_binaerdatei.dh` —
+liest Breite/Höhe und die Blockliste aus einer echten PNG-Datei ohne
+Bildbibliothek und schreibt/liest ein eigenes Binärformat. Doku:
+`docs/builtins-core.md`, Abschnitt „Bytes (BUFFER)".
 
 ## WP C — HTTP für echte Dienste
 
@@ -267,7 +298,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → B → C → D → E → F → G → H → I** (A ist erledigt, Nächstes ist B)
+**~~A~~ → ~~B~~ → C → D → E → F → G → H → I** (A und B sind erledigt, Nächstes ist C)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

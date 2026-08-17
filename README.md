@@ -271,6 +271,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `159_esp32_bruecke.dh` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
 | `160_musik_seek.dh` | **Musik anspringen** (`AUDIO_MUSIC_SEEK`) — klickbarer Fortschrittsbalken, ±10 s, und der Vorlauf, den ein Sprung erst leerspielt |
 | `161_werkzeug.dh` | **Ein Werkzeug statt eines Spiels** — Kommandozeilenargumente, Meldungen nach stderr, Rückgabewert; zählt Zeilen/Wörter/Zeichen wie `wc` |
+| `162_binaerdatei.dh` | **Binärdaten lesen** (`BUFFER`) — Breite/Höhe und Blockliste aus einer echten PNG-Datei, ohne Bildbibliothek; dazu ein eigenes Dateiformat schreiben und einlesen |
 | `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 

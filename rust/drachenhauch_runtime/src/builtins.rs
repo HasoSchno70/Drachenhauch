@@ -6,7 +6,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::{BufRead, Read, Write};
+use std::io::{BufRead, Read, Seek, Write};
 use std::rc::Rc;
 
 use crate::tiled::{TiledLayer, TiledMap, TiledObject};
@@ -2427,6 +2427,299 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&cleaned.join("/")))
         }
 
+        // ===== BUFFER: Bytefolgen (WP B) =====
+        // Referenz-Typ wie ARRAY: BUFFER_SET & Co. veraendern IN PLACE, alles
+        // was "neu" heisst (SLICE/CONCAT) liefert einen eigenen Puffer.
+        "buffer_new" => {
+            arity!(1);
+            let n = need_int(&a[0], "BUFFER_NEW")?;
+            if n < 0 { return err(format!("BUFFER_NEW: Groesse {} ist negativ", n)); }
+            if n > MAX_BUFFER {
+                return err(format!("BUFFER_NEW: Groesse {} ueberschreitet die Obergrenze von {} Bytes", n, MAX_BUFFER));
+            }
+            Ok(neuer_buffer(vec![0u8; n as usize]))
+        }
+        "buffer_len" => { arity!(1); Ok(Value::Int(buf_h(&a[0], "BUFFER_LEN")?.borrow().len() as i64)) }
+        "buffer_get" => {
+            arity!(2);
+            let b = buf_h(&a[0], "BUFFER_GET")?.borrow();
+            let i = buf_bereich(b.len(), need_int(&a[1], "BUFFER_GET")?, 1, "BUFFER_GET")?;
+            Ok(Value::Int(b[i] as i64))
+        }
+        "buffer_set" => {
+            arity!(3);
+            let wert = need_byte(&a[2], "BUFFER_SET")?;
+            let b = buf_h(&a[0], "BUFFER_SET")?;
+            let mut b = b.borrow_mut();
+            let i = buf_bereich(b.len(), need_int(&a[1], "BUFFER_SET")?, 1, "BUFFER_SET")?;
+            b[i] = wert;
+            Ok(Value::Nil)
+        }
+        "buffer_fill" => {
+            arity!(2);
+            let wert = need_byte(&a[1], "BUFFER_FILL")?;
+            buf_h(&a[0], "BUFFER_FILL")?.borrow_mut().fill(wert);
+            Ok(Value::Nil)
+        }
+        "buffer_resize" => {
+            arity!(2);
+            let n = need_int(&a[1], "BUFFER_RESIZE")?;
+            if n < 0 { return err(format!("BUFFER_RESIZE: Groesse {} ist negativ", n)); }
+            if n > MAX_BUFFER {
+                return err(format!("BUFFER_RESIZE: Groesse {} ueberschreitet die Obergrenze von {} Bytes", n, MAX_BUFFER));
+            }
+            // Waechst mit Nullen, schrumpft durch Abschneiden -- wie REDIM.
+            buf_h(&a[0], "BUFFER_RESIZE")?.borrow_mut().resize(n as usize, 0);
+            Ok(Value::Nil)
+        }
+        "buffer_slice" => {
+            arity!(3);
+            let b = buf_h(&a[0], "BUFFER_SLICE")?.borrow();
+            let von = need_int(&a[1], "BUFFER_SLICE")?;
+            let bis = need_int(&a[2], "BUFFER_SLICE")?;
+            // Klemmt statt zu werfen -- genau wie das Array-Slicing `a[i:j]`
+            // (siehe docs/sprache.md: "Index-Zugriff ist streng, Slicing klemmt").
+            let von = von.clamp(0, b.len() as i64) as usize;
+            let bis = bis.clamp(0, b.len() as i64) as usize;
+            Ok(neuer_buffer(if von >= bis { Vec::new() } else { b[von..bis].to_vec() }))
+        }
+        "buffer_concat" => {
+            arity!(2);
+            let x = buf_h(&a[0], "BUFFER_CONCAT")?;
+            let y = buf_h(&a[1], "BUFFER_CONCAT")?;
+            // BUFFER_CONCAT(b, b) waere sonst ein doppeltes borrow() auf
+            // dieselbe RefCell -> Panik statt Ergebnis.
+            let mut out = x.borrow().clone();
+            if Rc::ptr_eq(x, y) {
+                let kopie = out.clone();
+                out.extend_from_slice(&kopie);
+            } else {
+                out.extend_from_slice(&y.borrow());
+            }
+            Ok(neuer_buffer(out))
+        }
+        "buffer_indexof" => {
+            // BUFFER_INDEXOF(heu, nadel [, ab]) -> Position oder -1.
+            if a.len() < 2 || a.len() > 3 { return err(format!("BUFFER_INDEXOF: erwartet 2..3 Argumente, erhalten {}", a.len())); }
+            let heu = buf_h(&a[0], "BUFFER_INDEXOF")?;
+            let nadel = buf_h(&a[1], "BUFFER_INDEXOF")?;
+            let ab = if a.len() == 3 { need_int(&a[2], "BUFFER_INDEXOF")?.max(0) as usize } else { 0 };
+            let h = heu.borrow();
+            let n_eigen;
+            let n: &[u8] = if Rc::ptr_eq(heu, nadel) { n_eigen = h.clone(); &n_eigen } else { n_eigen = nadel.borrow().clone(); &n_eigen };
+            if n.is_empty() || ab >= h.len() || n.len() > h.len() { return Ok(Value::Int(-1)); }
+            let treffer = h[ab..].windows(n.len()).position(|w| w == n);
+            Ok(Value::Int(treffer.map(|p| (p + ab) as i64).unwrap_or(-1)))
+        }
+        // --- BUFFER <-> Text/Hex/Base64 ---
+        "buffer_from_string" => {
+            arity!(1);
+            Ok(neuer_buffer(need_str(&a[0], "BUFFER_FROM_STRING")?.as_bytes().to_vec()))
+        }
+        "buffer_to_string$" | "buffer_to_string" => {
+            arity!(1);
+            let b = buf_h(&a[0], "BUFFER_TO_STRING$")?.borrow();
+            // STRENG, nicht ersetzend: bei Bytes, die kein UTF-8 sind, ist ein
+            // Fehler die ehrliche Antwort. Ein stilles U+FFFD faelschte die
+            // Daten und faellt erst viel spaeter auf (BUFFER_TO_HEX$ nehmen,
+            // wenn es gar kein Text sein soll).
+            match std::str::from_utf8(&b) {
+                Ok(s) => Ok(Value::str_rc(s)),
+                Err(e) => err(format!(
+                    "BUFFER_TO_STRING$: Byte {} ist kein gueltiges UTF-8 -- der Puffer \
+                     enthaelt keinen Text (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)", e.valid_up_to())),
+            }
+        }
+        "buffer_to_hex$" | "buffer_to_hex" => {
+            arity!(1);
+            let b = buf_h(&a[0], "BUFFER_TO_HEX$")?.borrow();
+            let mut s = String::with_capacity(b.len() * 2);
+            for byte in b.iter() { s.push_str(&format!("{:02x}", byte)); }
+            Ok(Value::str_rc(&s))
+        }
+        "buffer_from_hex" => {
+            arity!(1);
+            let s = need_str(&a[0], "BUFFER_FROM_HEX")?;
+            // Leerzeichen duerfen drin stehen -- Hex-Dumps schreibt man
+            // ueblicherweise gruppiert ("de ad be ef").
+            let z: Vec<char> = s.chars().filter(|c| !c.is_whitespace()).collect();
+            if z.len() % 2 != 0 {
+                return err(format!("BUFFER_FROM_HEX: ungerade Zahl von Hex-Ziffern ({})", z.len()));
+            }
+            let mut out = Vec::with_capacity(z.len() / 2);
+            for paar in z.chunks(2) {
+                let hi = paar[0].to_digit(16).ok_or_else(|| format!("BUFFER_FROM_HEX: '{}' ist keine Hex-Ziffer", paar[0]))?;
+                let lo = paar[1].to_digit(16).ok_or_else(|| format!("BUFFER_FROM_HEX: '{}' ist keine Hex-Ziffer", paar[1]))?;
+                out.push((hi * 16 + lo) as u8);
+            }
+            Ok(neuer_buffer(out))
+        }
+        "buffer_to_base64$" | "buffer_to_base64" => {
+            arity!(1);
+            Ok(Value::str_rc(&b64_encode(&buf_h(&a[0], "BUFFER_TO_BASE64$")?.borrow())))
+        }
+        "buffer_from_base64" => {
+            // Anders als BASE64_DECODE (das UTF-8 verlangt) kommen hier rohe
+            // Bytes heraus -- genau dafuer gibt es den Typ.
+            arity!(1);
+            Ok(neuer_buffer(b64_decode(need_str(&a[0], "BUFFER_FROM_BASE64")?)?))
+        }
+        // --- Zahlen packen/lesen ---
+        "buffer_get_i16" | "buffer_get_u16" | "buffer_get_i32" | "buffer_get_u32"
+        | "buffer_get_i64" | "buffer_get_f32" | "buffer_get_f64" => {
+            if a.len() < 2 || a.len() > 3 {
+                return err(format!("{}: erwartet 2..3 Argumente (puffer, position [, \"le\"/\"be\"]), erhalten {}",
+                                   name.to_uppercase(), a.len()));
+            }
+            let anz = name.to_uppercase();
+            let breite = zahl_breite(name);
+            let be = endian_be(a.get(2), &anz)?;
+            let b = buf_h(&a[0], &anz)?.borrow();
+            let p = buf_bereich(b.len(), need_int(&a[1], &anz)?, breite, &anz)?;
+            let roh = &b[p..p + breite];
+            // Bytes in der gewuenschten Reihenfolge einsammeln, dann EINMAL
+            // umwandeln -- so steht die Endianness an genau einer Stelle.
+            let mut le = [0u8; 8];
+            for (i, byte) in roh.iter().enumerate() {
+                le[if be { breite - 1 - i } else { i }] = *byte;
+            }
+            Ok(match name {
+                "buffer_get_i16" => Value::Int(i16::from_le_bytes([le[0], le[1]]) as i64),
+                "buffer_get_u16" => Value::Int(u16::from_le_bytes([le[0], le[1]]) as i64),
+                "buffer_get_i32" => Value::Int(i32::from_le_bytes([le[0], le[1], le[2], le[3]]) as i64),
+                "buffer_get_u32" => Value::Int(u32::from_le_bytes([le[0], le[1], le[2], le[3]]) as i64),
+                "buffer_get_f32" => Value::Float(f32::from_le_bytes([le[0], le[1], le[2], le[3]]) as f64),
+                "buffer_get_i64" => Value::Int(i64::from_le_bytes(le)),
+                _ => Value::Float(f64::from_le_bytes(le)),
+            })
+        }
+        "buffer_set_i16" | "buffer_set_u16" | "buffer_set_i32" | "buffer_set_u32"
+        | "buffer_set_i64" | "buffer_set_f32" | "buffer_set_f64" => {
+            if a.len() < 3 || a.len() > 4 {
+                return err(format!("{}: erwartet 3..4 Argumente (puffer, position, wert [, \"le\"/\"be\"]), erhalten {}",
+                                   name.to_uppercase(), a.len()));
+            }
+            let anz = name.to_uppercase();
+            let breite = zahl_breite(name);
+            let be = endian_be(a.get(3), &anz)?;
+            // Wertebereich pruefen statt still abzuschneiden: eine Zahl, die
+            // nicht hineinpasst, wuerde sonst als voellig andere wieder
+            // herauskommen.
+            let mut le = [0u8; 8];
+            match name {
+                "buffer_set_f32" => le[..4].copy_from_slice(&(need_num(&a[2], &anz)? as f32).to_le_bytes()),
+                "buffer_set_f64" => le.copy_from_slice(&need_num(&a[2], &anz)?.to_le_bytes()),
+                _ => {
+                    let n = need_int(&a[2], &anz)?;
+                    let (lo, hi): (i64, i64) = match name {
+                        "buffer_set_i16" => (i16::MIN as i64, i16::MAX as i64),
+                        "buffer_set_u16" => (0, u16::MAX as i64),
+                        "buffer_set_i32" => (i32::MIN as i64, i32::MAX as i64),
+                        "buffer_set_u32" => (0, u32::MAX as i64),
+                        _ => (i64::MIN, i64::MAX),
+                    };
+                    if n < lo || n > hi {
+                        return err(format!("{}: Wert {} liegt ausserhalb {}..{}", anz, n, lo, hi));
+                    }
+                    le.copy_from_slice(&n.to_le_bytes());
+                }
+            }
+            let b = buf_h(&a[0], &anz)?;
+            let mut b = b.borrow_mut();
+            let p = buf_bereich(b.len(), need_int(&a[1], &anz)?, breite, &anz)?;
+            for i in 0..breite {
+                b[p + i] = le[if be { breite - 1 - i } else { i }];
+            }
+            Ok(Value::Nil)
+        }
+        // --- Binaerdateien ---
+        // KEINE eigenen "rb"/"wb"-Modi: Rust uebersetzt in Textmodus nichts
+        // (kein CRLF-Gefummel wie in C), Dateien sind hier immer byte-genau.
+        // Getrennte Modi wuerden also einen Unterschied vorgaukeln, den es
+        // nicht gibt -- READ_BYTES/WRITE_BYTES/SEEK arbeiten auf denselben
+        // Handles wie READLINE/WRITELINE.
+        "readall_bytes" => {
+            arity!(1);
+            let p = resolve_asset_path(need_str(&a[0], "READALL_BYTES")?);
+            Ok(neuer_buffer(std::fs::read(&p).map_err(|e| format!("READALL_BYTES: {} ({})", e, p))?))
+        }
+        "writeall_bytes" => {
+            arity!(2);
+            let p = need_str(&a[0], "WRITEALL_BYTES")?.to_string();
+            let b = buf_h(&a[1], "WRITEALL_BYTES")?.borrow();
+            std::fs::write(&p, &b[..]).map_err(|e| format!("WRITEALL_BYTES: {} ({})", e, p))?;
+            Ok(Value::Nil)
+        }
+        "read_bytes" => {
+            arity!(2);
+            let n = need_int(&a[1], "READ_BYTES")?;
+            if n < 0 { return err(format!("READ_BYTES: Anzahl {} ist negativ", n)); }
+            if n > MAX_BUFFER {
+                return err(format!("READ_BYTES: Anzahl {} ueberschreitet die Obergrenze von {} Bytes", n, MAX_BUFFER));
+            }
+            let f = file_h(&a[0], "READ_BYTES")?;
+            let mut f = f.borrow_mut();
+            match &mut f.h {
+                FileH::Read(r) => {
+                    // Am Dateiende kommen WENIGER als n Bytes zurueck (bis hin
+                    // zu keinem) -- das ist kein Fehler, sondern die uebliche
+                    // Abbruchbedingung: `WHILE BUFFER_LEN(stueck) > 0`.
+                    let mut out = vec![0u8; n as usize];
+                    let mut gelesen = 0usize;
+                    while gelesen < out.len() {
+                        match r.read(&mut out[gelesen..]) {
+                            Ok(0) => break,
+                            Ok(k) => gelesen += k,
+                            Err(e) => return err(format!("READ_BYTES: {}", e)),
+                        }
+                    }
+                    out.truncate(gelesen);
+                    Ok(neuer_buffer(out))
+                }
+                _ => err("READ_BYTES: Datei wurde nicht im Lese-Modus geoeffnet"),
+            }
+        }
+        "write_bytes" => {
+            arity!(2);
+            let daten = buf_h(&a[1], "WRITE_BYTES")?.borrow().clone();
+            let f = file_h(&a[0], "WRITE_BYTES")?;
+            let mut f = f.borrow_mut();
+            match &mut f.h {
+                FileH::Write(w) => {
+                    w.write_all(&daten).map_err(|e| format!("WRITE_BYTES: {}", e))?;
+                    Ok(Value::Nil)
+                }
+                _ => err("WRITE_BYTES: Datei wurde nicht im Schreib-Modus geoeffnet"),
+            }
+        }
+        "seek" => {
+            arity!(2);
+            let pos = need_int(&a[1], "SEEK")?;
+            if pos < 0 { return err(format!("SEEK: Position {} ist negativ", pos)); }
+            let f = file_h(&a[0], "SEEK")?;
+            let mut f = f.borrow_mut();
+            let r = match &mut f.h {
+                // BufReader::seek verwirft den Lesepuffer selbst -- ein
+                // anschliessendes READLINE liest also wirklich ab `pos`.
+                FileH::Read(r) => r.seek(std::io::SeekFrom::Start(pos as u64)),
+                FileH::Write(w) => w.seek(std::io::SeekFrom::Start(pos as u64)),
+                FileH::Closed => return err("SEEK: Datei ist geschlossen"),
+            };
+            r.map_err(|e| format!("SEEK: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "tell" => {
+            arity!(1);
+            let f = file_h(&a[0], "TELL")?;
+            let mut f = f.borrow_mut();
+            let p = match &mut f.h {
+                FileH::Read(r) => r.stream_position(),
+                FileH::Write(w) => w.stream_position(),
+                FileH::Closed => return err("TELL: Datei ist geschlossen"),
+            };
+            Ok(Value::Int(p.map_err(|e| format!("TELL: {}", e))? as i64))
+        }
+
         // ===== Betriebssystem: Argumente, Umgebung, Arbeitsverzeichnis (WP A) =====
         // EXIT/EPRINT/SHELL brauchen VM-Zustand (Ausgabe-Puffer, Abbruch) und
         // stehen darum in vm.rs `try_os` -- hier nur die zustandsfreien.
@@ -3608,6 +3901,74 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
 
 fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<GbFile>>, String> {
     match v { Value::File(f) => Ok(f), _ => Err(format!("{} erwartet FILE", fn_)) }
+}
+
+// ===== BUFFER-Helfer (WP B) =====
+
+/// Obergrenze fuer BUFFER_NEW/RESIZE. Ohne sie macht ein Tippfehler
+/// (`BUFFER_NEW(1000000000000)`) den ganzen Rechner unbenutzbar, statt eine
+/// Meldung zu geben. 1 GiB ist weit jenseits dessen, was ein GB-Programm
+/// sinnvoll im Speicher haelt, und immer noch eine klare Ansage.
+const MAX_BUFFER: i64 = 1 << 30;
+
+fn buf_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<Vec<u8>>>, String> {
+    match v { Value::Buffer(b) => Ok(b), _ => Err(format!("{} erwartet BUFFER", fn_)) }
+}
+
+fn neuer_buffer(bytes: Vec<u8>) -> Value {
+    Value::Buffer(Rc::new(RefCell::new(bytes)))
+}
+
+/// Ein einzelnes Byte aus einem GB-Wert. 0..255 -- alles andere ist ein Fehler
+/// und wird NICHT stillschweigend beschnitten: `BUFFER_SET(b, i, 256)` als 0
+/// durchgehen zu lassen waere die Art Fehler, die man erst in der Ausgabedatei
+/// bemerkt.
+fn need_byte(v: &Value, fn_: &str) -> Result<u8, String> {
+    let n = need_int(v, fn_)?;
+    if !(0..=255).contains(&n) {
+        return Err(format!("{}: Byte-Wert {} liegt ausserhalb 0..255", fn_, n));
+    }
+    Ok(n as u8)
+}
+
+/// Byte-Reihenfolge aus einem optionalen letzten Argument.
+///
+/// Vorgabe ist **little-endian**. Wer einen Puffer selbst schreibt und wieder
+/// liest, ist damit immer richtig -- egal welche Vorgabe gaelte, solange sie
+/// auf beiden Seiten dieselbe ist. Die Angabe braucht nur, wer ein FREMDES
+/// Format bedient (PNG, ZIP und die meisten Netz-Protokolle sind big-endian),
+/// und wer das tut, denkt ohnehin darueber nach.
+fn endian_be(v: Option<&Value>, fn_: &str) -> Result<bool, String> {
+    match v {
+        None => Ok(false),
+        Some(Value::Str(s)) => match s.to_ascii_lowercase().as_str() {
+            "le" => Ok(false),
+            "be" => Ok(true),
+            other => Err(format!(
+                "{}: Byte-Reihenfolge '{}' unbekannt (erlaubt: \"le\" = little-endian, \
+                 \"be\" = big-endian)", fn_, other)),
+        },
+        Some(_) => Err(format!("{}: Byte-Reihenfolge erwartet STRING (\"le\" oder \"be\")", fn_)),
+    }
+}
+
+/// Prueft, ob `breite` Bytes ab `pos` noch im Puffer liegen, und liefert die
+/// Startposition. Bewusst streng (wie der direkte ARRAY-Index): wer daneben
+/// greift, liest sonst Nullen und merkt den Fehler nie.
+fn buf_bereich(len: usize, pos: i64, breite: usize, fn_: &str) -> Result<usize, String> {
+    if pos < 0 || (pos as i128) + (breite as i128) > len as i128 {
+        return Err(format!(
+            "{}: {} Byte(s) ab Position {} liegen ausserhalb des Puffers (Laenge {})",
+            fn_, breite, pos, len));
+    }
+    Ok(pos as usize)
+}
+
+/// Wie viele Bytes eine Zahlen-Variante belegt (aus dem Builtin-Namen).
+fn zahl_breite(name: &str) -> usize {
+    if name.ends_with("i16") || name.ends_with("u16") { 2 }
+    else if name.ends_with("i32") || name.ends_with("u32") || name.ends_with("f32") { 4 }
+    else { 8 }
 }
 
 fn tween_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<TweenObj>>, String> {

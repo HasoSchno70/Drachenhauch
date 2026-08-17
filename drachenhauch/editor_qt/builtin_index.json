@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1326,
+ "count": 1361,
  "builtins": [
   {
    "name": "ABS",
@@ -943,6 +943,180 @@
    "kind": "core",
    "signature": "BT_WRITE(h: ?, char_uuid: STRING, payload: STRING)",
    "module": "bt"
+  },
+  {
+   "name": "BUFFER_CONCAT",
+   "kind": "core",
+   "signature": "BUFFER_CONCAT(a, b) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_FILL",
+   "kind": "core",
+   "signature": "BUFFER_FILL(puffer, byte)",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_FROM_BASE64",
+   "kind": "core",
+   "signature": "BUFFER_FROM_BASE64(text) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_FROM_HEX",
+   "kind": "core",
+   "signature": "BUFFER_FROM_HEX(hex) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_FROM_STRING",
+   "kind": "core",
+   "signature": "BUFFER_FROM_STRING(text) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET",
+   "kind": "core",
+   "signature": "BUFFER_GET(puffer, position) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_F32",
+   "kind": "core",
+   "signature": "BUFFER_GET_F32(puffer, position [, reihenfolge]) AS FLOAT",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_F64",
+   "kind": "core",
+   "signature": "BUFFER_GET_F64(puffer, position [, reihenfolge]) AS FLOAT",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_I16",
+   "kind": "core",
+   "signature": "BUFFER_GET_I16(puffer, position [, reihenfolge]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_I32",
+   "kind": "core",
+   "signature": "BUFFER_GET_I32(puffer, position [, reihenfolge]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_I64",
+   "kind": "core",
+   "signature": "BUFFER_GET_I64(puffer, position [, reihenfolge]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_U16",
+   "kind": "core",
+   "signature": "BUFFER_GET_U16(puffer, position [, reihenfolge]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_GET_U32",
+   "kind": "core",
+   "signature": "BUFFER_GET_U32(puffer, position [, reihenfolge]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_INDEXOF",
+   "kind": "core",
+   "signature": "BUFFER_INDEXOF(puffer, nadel [, ab]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_LEN",
+   "kind": "core",
+   "signature": "BUFFER_LEN(puffer) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_NEW",
+   "kind": "core",
+   "signature": "BUFFER_NEW(groesse) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_RESIZE",
+   "kind": "core",
+   "signature": "BUFFER_RESIZE(puffer, groesse)",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET",
+   "kind": "core",
+   "signature": "BUFFER_SET(puffer, position, byte)",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_F32",
+   "kind": "core",
+   "signature": "BUFFER_SET_F32(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_F64",
+   "kind": "core",
+   "signature": "BUFFER_SET_F64(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_I16",
+   "kind": "core",
+   "signature": "BUFFER_SET_I16(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_I32",
+   "kind": "core",
+   "signature": "BUFFER_SET_I32(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_I64",
+   "kind": "core",
+   "signature": "BUFFER_SET_I64(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_U16",
+   "kind": "core",
+   "signature": "BUFFER_SET_U16(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SET_U32",
+   "kind": "core",
+   "signature": "BUFFER_SET_U32(puffer, position, wert [, reihenfolge])",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_SLICE",
+   "kind": "core",
+   "signature": "BUFFER_SLICE(puffer, von, bis) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_TO_BASE64$",
+   "kind": "core",
+   "signature": "BUFFER_TO_BASE64$(puffer) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_TO_HEX$",
+   "kind": "core",
+   "signature": "BUFFER_TO_HEX$(puffer) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_TO_STRING$",
+   "kind": "core",
+   "signature": "BUFFER_TO_STRING$(puffer) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "CAMERA3D",
@@ -5679,6 +5853,12 @@
    "module": "core"
   },
   {
+   "name": "READALL_BYTES",
+   "kind": "core",
+   "signature": "READALL_BYTES(pfad) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
    "name": "READLINE",
    "kind": "core",
    "signature": "READLINE(f)",
@@ -5688,6 +5868,12 @@
    "name": "READLINES",
    "kind": "core",
    "signature": "READLINES(pfad) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "READ_BYTES",
+   "kind": "core",
+   "signature": "READ_BYTES(datei, anzahl) AS BUFFER",
    "module": "dhrt"
   },
   {
@@ -6225,6 +6411,12 @@
    "module": "core"
   },
   {
+   "name": "SEEK",
+   "kind": "core",
+   "signature": "SEEK(datei, position)",
+   "module": "dhrt"
+  },
+  {
    "name": "SERIAL_AVAILABLE",
    "kind": "core",
    "signature": "SERIAL_AVAILABLE(h)",
@@ -6679,6 +6871,12 @@
    "kind": "core",
    "signature": "TAN(x: Zahl)",
    "module": "core"
+  },
+  {
+   "name": "TELL",
+   "kind": "core",
+   "signature": "TELL(datei) AS INTEGER",
+   "module": "dhrt"
   },
   {
    "name": "TEXT",
@@ -7869,10 +8067,22 @@
    "module": "dhrt"
   },
   {
+   "name": "WRITEALL_BYTES",
+   "kind": "core",
+   "signature": "WRITEALL_BYTES(pfad, puffer)",
+   "module": "dhrt"
+  },
+  {
    "name": "WRITELINE",
    "kind": "core",
    "signature": "WRITELINE(f, text)",
    "module": "core"
+  },
+  {
+   "name": "WRITE_BYTES",
+   "kind": "core",
+   "signature": "WRITE_BYTES(datei, puffer)",
+   "module": "dhrt"
   },
   {
    "name": "ZEIT_AUS_TEILEN",

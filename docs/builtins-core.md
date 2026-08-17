@@ -12,6 +12,7 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 - [Arrays](#arrays)
 - [Maps](#maps)
 - [Datei-I/O](#datei-io)
+- [Bytes (BUFFER)](#bytes-buffer)
 - [Betriebssystem](#betriebssystem)
 - [Zeit & Random](#zeit--random)
 - [Typen & Encoding](#typen--encoding)
@@ -398,6 +399,131 @@ DIM zeilen AS ARRAY OF STRING
 zeilen = READLINES(PATHJOIN("saves/level1", "progress.txt"))
 PRINT FILESIZE(PATHJOIN("saves/level1", "progress.txt"))
 ```
+
+## Bytes (BUFFER)
+
+`STRING` ist **UTF-8-Text**. Er kann gar nicht jede Bytefolge tragen, und `LEN`
+zählt darin Zeichen, nicht Bytes. Sobald es um *Daten* statt um Text geht —
+eigene Dateiformate, Bilder, Protokolle, Prüfsummen — braucht es einen zweiten
+Typ. Das ist `BUFFER`: eine veränderliche Folge von Bytes.
+
+```basic
+DIM b AS BUFFER
+b = BUFFER_NEW(4)          ' 4 Bytes, alle 0
+BUFFER_SET(b, 0, 222)
+PRINT BUFFER_TO_HEX$(b)    ' de000000
+```
+
+`BUFFER` braucht **kein `IMPORT`** und ist ein **Referenz-Typ** wie `ARRAY`:
+gibt man ihn an eine `SUB`, teilen sich beide Seiten dieselben Bytes.
+
+### Grundlagen
+
+| Funktion | Zweck |
+|---|---|
+| `BUFFER_NEW(groesse)` → BUFFER | neuer Puffer, mit Nullen gefüllt |
+| `BUFFER_LEN(b)` → INTEGER | Länge in **Bytes** |
+| `BUFFER_GET(b, pos)` → INTEGER | Byte 0..255 lesen |
+| `BUFFER_SET(b, pos, byte)` | Byte 0..255 schreiben (verändert in place) |
+| `BUFFER_FILL(b, byte)` | alles mit einem Byte füllen |
+| `BUFFER_RESIZE(b, groesse)` | wächst mit Nullen, schrumpft durch Abschneiden |
+| `BUFFER_SLICE(b, von, bis)` → BUFFER | **Kopie** der Bytes `[von, bis)` |
+| `BUFFER_CONCAT(a, b)` → BUFFER | neuer Puffer aus beiden |
+| `BUFFER_INDEXOF(b, nadel [, ab])` → INTEGER | erste Fundstelle, sonst `-1` |
+
+Wie bei Arrays gilt: **ein Index daneben ist ein Fehler, ein Slice klemmt.**
+`BUFFER_GET(b, 99)` auf einen 4-Byte-Puffer wirft; `BUFFER_SLICE(b, 0, 99)`
+liefert einfach die vorhandenen 4 Bytes.
+
+Ein Byte außerhalb 0..255 ist ebenfalls ein Fehler und wird **nicht** still
+beschnitten — das fiele sonst erst in der fertigen Ausgabedatei auf.
+
+### Text, Hex und Base64
+
+| Funktion | Zweck |
+|---|---|
+| `BUFFER_FROM_STRING(text$)` → BUFFER | Text als UTF-8-Bytes |
+| `BUFFER_TO_STRING$(b)` → STRING | Bytes als UTF-8-Text |
+| `BUFFER_TO_HEX$(b)` / `BUFFER_FROM_HEX(s$)` | Hex-Text (`"deadbeef"`) |
+| `BUFFER_TO_BASE64$(b)` / `BUFFER_FROM_BASE64(s$)` | Base64 |
+
+`BUFFER_TO_STRING$` ist **streng**: sind die Bytes kein gültiges UTF-8, gibt es
+einen Fehler statt stillschweigend ersetzter Zeichen — ein `?` an der falschen
+Stelle fälscht die Daten und fällt erst viel später auf. Für Daten, die gar
+kein Text sein sollen, ist `BUFFER_TO_HEX$` das richtige Werkzeug.
+
+`BUFFER_FROM_HEX` erlaubt Leerzeichen (`"de ad be ef"`), weil Hex-Dumps
+üblicherweise gruppiert geschrieben werden.
+
+`BUFFER_FROM_BASE64` liefert **rohe Bytes** — im Unterschied zu `BASE64_DECODE`,
+das gültiges UTF-8 verlangt und sonst wirft.
+
+### Zahlen packen
+
+| Funktion | Zweck |
+|---|---|
+| `BUFFER_GET_I16/U16/I32/U32/I64(b, pos [, reihenfolge$])` → INTEGER | Ganzzahl lesen |
+| `BUFFER_GET_F32/F64(b, pos [, reihenfolge$])` → FLOAT | Gleitkomma lesen |
+| `BUFFER_SET_I16/U16/I32/U32/I64(b, pos, wert [, reihenfolge$])` | Ganzzahl schreiben |
+| `BUFFER_SET_F32/F64(b, pos, wert [, reihenfolge$])` | Gleitkomma schreiben |
+
+`reihenfolge$` ist `"le"` (little-endian, **Vorgabe**) oder `"be"`
+(big-endian):
+
+```basic
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I32(b, 0, 1000)          ' e8030000
+BUFFER_SET_I32(b, 4, 1000, "be")    ' 000003e8
+PRINT BUFFER_TO_HEX$(b)             ' e8030000000003e8
+```
+
+Wer einen Puffer selbst schreibt und wieder liest, kann die Vorgabe ignorieren
+— beide Seiten benutzen dieselbe. Die Angabe braucht nur, wer ein **fremdes**
+Format bedient: PNG, ZIP und die meisten Netz-Protokolle sind big-endian.
+
+Ein Wert, der nicht in die Breite passt, ist ein Fehler
+(`BUFFER_SET_U16(b, 0, 70000)`). Still abgeschnitten käme eine völlig andere
+Zahl wieder heraus.
+
+### Binärdateien
+
+| Funktion | Zweck |
+|---|---|
+| `READALL_BYTES(pfad$)` → BUFFER | ganze Datei als Bytes |
+| `WRITEALL_BYTES(pfad$, b)` | Bytes in eine Datei (überschreibt) |
+| `READ_BYTES(datei, anzahl)` → BUFFER | bis zu `anzahl` Bytes vom Handle |
+| `WRITE_BYTES(datei, b)` | Bytes ans Handle |
+| `SEEK(datei, position)` | Position setzen (0 = Anfang) |
+| `TELL(datei)` → INTEGER | aktuelle Position |
+
+```basic
+' Stückweise durch eine große Datei, ohne sie ganz in den Speicher zu holen
+DIM f AS FILE
+DIM stueck AS BUFFER
+DIM gesamt AS INTEGER
+f = OPENFILE("gross.bin", "r")
+REPEAT
+    stueck = READ_BYTES(f, 65536)
+    gesamt = gesamt + BUFFER_LEN(stueck)
+UNTIL BUFFER_LEN(stueck) = 0
+CLOSEFILE(f)
+PRINT gesamt
+```
+
+**`READ_BYTES` liefert am Dateiende weniger als angefordert** — bis hin zu
+gar nichts. Das ist kein Fehler, sondern die übliche Abbruchbedingung.
+
+> **Es gibt keine eigenen Binär-Modi `"rb"`/`"wb"`.** Drachenhauch-Dateien sind
+> immer byte-genau: es gibt keine CRLF-Übersetzung und kein Ctrl-Z-als-Dateiende
+> wie in alten BASICs. Getrennte Modi würden einen Unterschied vorgaukeln, den
+> es nicht gibt — `READ_BYTES`/`WRITE_BYTES`/`SEEK` arbeiten auf denselben
+> Handles aus `OPENFILE(pfad, "r"/"w"/"a")` wie `READLINE`/`WRITELINE`.
+>
+> Was es (noch) nicht gibt: einen Modus, der **gleichzeitig** liest und
+> schreibt. Wer eine Datei an einer Stelle ändern will, liest sie mit
+> `READALL_BYTES`, ändert den Puffer und schreibt ihn mit `WRITEALL_BYTES`
+> zurück.
 
 ## Betriebssystem
 

@@ -109,6 +109,7 @@ Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibwe
 | `STRING` | UTF-8-Text | `""` |
 | `BOOLEAN` | `TRUE` oder `FALSE` | `FALSE` |
 | `FILE` | Datei-Handle | `NIL` |
+| `BUFFER` | veränderliche Bytefolge ([Bytes](builtins-core.md#bytes-buffer)) | `NIL` |
 | `IMAGE` | Bild-Handle (nativ dhrt) | `NIL` |
 | `SOUND` | Sound-Handle (nativ dhrt) | `NIL` |
 | `ARRAY OF T` | mehrdim. Array | `NIL` (oder mit Größen-Init: gefüllt) |

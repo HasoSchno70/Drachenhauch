@@ -43,6 +43,11 @@ pub enum Value {
     Sprite(Rc<RefCell<SpriteObj>>),
     /// FILE-Handle (core File-I/O).
     File(Rc<RefCell<GbFile>>),
+    /// BUFFER: veraenderliche Bytefolge (WP B). Referenz-Typ wie ARRAY --
+    /// uebergibt man ihn an eine SUB, teilen sich beide Seiten die Bytes.
+    /// Bewusst KEIN STRING: der ist UTF-8 und kann gar nicht jede Bytefolge
+    /// tragen; `LEN` zaehlte dort ausserdem Zeichen, nicht Bytes.
+    Buffer(Rc<RefCell<Vec<u8>>>),
     /// Modul `tween`: zeitbasierte Interpolation (Referenz-Typ).
     Tween(Rc<RefCell<TweenObj>>),
     /// Modul `json`: geparstes JSON (immutable, read-only).
@@ -548,6 +553,10 @@ impl Value {
                 format!("<SPRITE @({:.0},{:.0}) frame={} anim='{}'>", s.x, s.y, s.current_frame, s.current_anim)
             }
             Value::File(f) => format!("<FILE {}>", f.borrow().path),
+            // Bewusst nur die Laenge, nicht der Inhalt: ein `PRINT puffer`
+            // duerfte sonst megabyteweise Bytes in die Konsole kippen. Wer die
+            // Bytes sehen will, nimmt BUFFER_TO_HEX$.
+            Value::Buffer(b) => format!("<BUFFER {} Bytes>", b.borrow().len()),
             Value::Tween(t) => { let t = t.borrow(); format!("<Tween {}->{} {}ms {} {}>", t.start, t.end, t.duration, t.easing, t.mode) }
             Value::Json(j) => {
                 let s = serde_json::to_string(j.as_ref()).unwrap_or_default();
@@ -622,6 +631,7 @@ impl Value {
             Value::Namespace(_) => "NAMESPACE",
             Value::Sprite(_) => "SPRITE",
             Value::File(_) => "FILE",
+            Value::Buffer(_) => "BUFFER",
             Value::Tween(_) => "TWEEN",
             Value::Json(_) => "JSON_HANDLE",
             Value::Save(_) => "SAVE_HANDLE",
