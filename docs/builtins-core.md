@@ -12,6 +12,7 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 - [Arrays](#arrays)
 - [Maps](#maps)
 - [Datei-I/O](#datei-io)
+- [Betriebssystem](#betriebssystem)
 - [Zeit & Random](#zeit--random)
 - [Typen & Encoding](#typen--encoding)
 - [Spiel-Helfer](#spiel-helfer)
@@ -397,6 +398,87 @@ DIM zeilen AS ARRAY OF STRING
 zeilen = READLINES(PATHJOIN("saves/level1", "progress.txt"))
 PRINT FILESIZE(PATHJOIN("saves/level1", "progress.txt"))
 ```
+
+## Betriebssystem
+
+Damit wird aus einem Programm ein **Werkzeug**: es nimmt Argumente entgegen,
+liest seine Umgebung, ruft andere Programme auf und sagt seinem Aufrufer, ob es
+geklappt hat.
+
+| Funktion | Zweck |
+|---|---|
+| `ARGC()` → INTEGER | Anzahl der Argumente für dieses Programm |
+| `ARG$(n)` → STRING | Argument Nr. `n` (0-basiert); außerhalb → `""` |
+| `GETENV$(name$ [, vorgabe$])` → STRING | Umgebungsvariable lesen |
+| `SETENV(name$, wert$)` | Umgebungsvariable setzen (dieses Programm + seine Kinder) |
+| `CWD$()` → STRING | aktuelles Arbeitsverzeichnis |
+| `CHDIR(pfad$)` | Arbeitsverzeichnis wechseln |
+| `EXIT([code])` | sofort beenden, `code` = Rückgabewert (0..255, Vorgabe 0) |
+| `EPRINT(text)` | Zeile nach **stderr** statt stdout |
+| `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
+| `SHELL_OUT$(programm$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
+
+```basic
+' Ein Werkzeug, das eine Datei erwartet
+DIM pfad AS STRING
+IF ARGC() < 1 THEN
+    EPRINT("Verwendung: zaehle <datei>")
+    EXIT(2)
+END IF
+pfad = ARG$(0)
+IF NOT FILEEXISTS(pfad) THEN
+    EPRINT("Nicht gefunden: " + pfad)
+    EXIT(1)
+END IF
+PRINT LEN(READLINES(pfad))
+```
+
+**Woher die Argumente kommen** — der Unterschied ist wichtig:
+
+| Aufruf | Was das Programm sieht |
+|---|---|
+| `dhrt run werkzeug.dh -- a b` | `a`, `b` |
+| `dhrt run werkzeug.dh a b` | **nichts** |
+| `werkzeug.exe a b` (exportiert) | `a`, `b` |
+
+Beim Start über `dhrt` gehört alles hinter einem alleinstehenden `--` dem
+Programm, alles davor der Runtime. Ohne `--` bekommt das Programm keine
+Argumente. Das ist Absicht: sonst könnte `dhrt` sich keinen eigenen Schalter
+mehr zulegen, ohne bestehende Programme zu brechen. Die **exportierte `.exe`**
+ist selbst das Programm — dort gibt es nichts zu trennen, alle Argumente
+gehören ihr, ohne `--`.
+
+**`EXIT` ist kein Fehler.** Es beendet das Programm sofort und wird von
+`TRY`/`CATCH` **nicht** gefangen — ein `EXIT` mitten in einem `TRY`-Block läuft
+also wirklich hinaus und landet nicht im `CATCH`. Werte außerhalb 0..255 sind
+ein Fehler statt still gekappt zu werden (das Betriebssystem überträgt nur das
+untere Byte, aus `EXIT(256)` würde sonst klammheimlich „alles gut").
+
+**`EPRINT` ist ein Builtin, kein Statement** — also mit Klammern
+(`EPRINT("text")`, nicht `EPRINT "text"` wie bei `PRINT`).
+
+**`SHELL` nimmt die Argumente einzeln**, nicht als eine Kommandozeile:
+
+```basic
+SHELL("git", "commit", "-m", "Nachricht mit Leerzeichen")   ' richtig
+```
+
+So gibt es keine Quoting-Regeln zu lernen, und ein Dateiname mit Leerzeichen
+zerfällt nicht in zwei Argumente. Wer wirklich eine Shell braucht (Pipes,
+Umleitungen), ruft sie ausdrücklich auf — `SHELL("cmd", "/c", "dir | more")` —
+und unterliegt dann deren eigenen Quoting-Regeln.
+
+`SHELL` reicht die Ausgabe des Kindprogramms direkt zur Konsole durch;
+`SHELL_OUT$` sammelt dessen **stdout** ein und liefert es als STRING, während
+sein **stderr** stderr bleibt — sonst mischten sich Fehlermeldungen unbemerkt
+in die Nutzdaten.
+
+> **`CWD$()` ist nicht das Verzeichnis, aus dem du gestartet hast.** `dhrt`
+> wechselt beim Start ins Verzeichnis der `.dh`-Datei (damit
+> `LOADIMAGE("assets/…")` von überall funktioniert), die exportierte `.exe`
+> ins Exe-Verzeichnis. Ein Pfad, den der Benutzer als Argument übergibt, ist
+> also relativ zu *seinem* Verzeichnis, nicht zu `CWD$()` — im Zweifel den
+> Benutzer nach einem absoluten Pfad fragen.
 
 ## Zeit & Random
 

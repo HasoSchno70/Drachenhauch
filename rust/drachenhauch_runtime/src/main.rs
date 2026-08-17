@@ -139,6 +139,24 @@ fn embedded_gbc_in(data: &[u8]) -> Option<String> {
     None
 }
 
+/// WP A: die Argumente, die dem GB-PROGRAMM gehoeren (`ARGC`/`ARG$`), aus der
+/// Runtime-Kommandozeile herausloesen -- alles hinter einem alleinstehenden
+/// `--`.
+///
+/// Ohne `--` bekommt das Programm KEINE Argumente. Das ist Absicht: `dhrt run
+/// spiel.dh --stoppable` soll `--stoppable` an die Runtime richten, nicht ans
+/// Programm, und dhrt darf sich spaeter weitere Schalter zulegen, ohne dass ein
+/// bestehendes Programm sie ploetzlich als seine liest.
+///
+/// **Nicht** fuer den Bundle-Modus (exportierte Exe) -- dort gibt es keine
+/// Runtime-Argumente, also gehoeren alle dem Programm (siehe `main`).
+fn setze_programm_args(raw: &[String]) {
+    builtins::set_programm_args(match raw.iter().position(|s| s == "--") {
+        Some(i) => raw[i + 1..].to_vec(),
+        None => Vec::new(),
+    });
+}
+
 fn main() -> ExitCode {
     // MILLIS/TIMER zaehlen ab hier: "seit Programmstart" soll auch dann
     // stimmen, wenn das Programm erst nach dem Laden von Bildern misst.
@@ -183,12 +201,14 @@ fn main() -> ExitCode {
         }
         // Stufe 3: Quelltext in Rust kompilieren + ausfuehren (Output-Parity).
         if raw.len() >= 3 && raw[1] == "--runsrc" {
+            setze_programm_args(&raw);
             return runsrc_main(&raw[2]);
         }
         // Stufe 5: `dhrt run datei.dh` -- eigenstaendiger End-to-End-Lauf
         // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
         // relative Asset-Pfade). dhrt ist damit ohne Python lauffaehig.
         if raw.len() >= 3 && raw[1] == "run" {
+            setze_programm_args(&raw);
             return run_main(&raw[2]);
         }
         // Stufe B (Phase 3): `dhrt profile datei.dh` -- instrumentierter Lauf,
@@ -199,6 +219,7 @@ fn main() -> ExitCode {
             // belegt -> nur wenn der Aufrufer das will; ein direkter Terminal-Lauf
             // ohne Flag laesst stdin fuer INPUT frei).
             let stoppable = raw[2..].iter().any(|a| a == "--stoppable");
+            setze_programm_args(&raw);
             match raw[2..].iter().find(|a| !a.starts_with("--")) {
                 Some(p) => return profile_main(p, stoppable),
                 None => { eprintln!("profile: keine Datei angegeben"); return ExitCode::from(1); }
@@ -208,6 +229,7 @@ fn main() -> ExitCode {
         // ein newline-JSON-Protokoll (stdin: Kommandos, stdout: Events). Ersetzt
         // den Tree-Walker-Debugger.
         if raw.len() >= 3 && raw[1] == "debug" {
+            setze_programm_args(&raw);
             return debug_main(&raw[2]);
         }
         // Selbst-Export: `dhrt --export datei.dh [out_dir]` buendelt das
@@ -224,6 +246,13 @@ fn main() -> ExitCode {
 
     // Bundle-Modus: eingebettete .dhc am Ende der eigenen Exe?
     if let Some(text) = embedded_gbc() {
+        // WP A: die exportierte Exe IST das Programm -- es gibt keine
+        // Runtime-Argumente, von denen zu trennen waere. Also gehoeren alle
+        // hinter dem Programmnamen ihm, ohne `--`-Konvention (`meins.exe datei.csv`
+        // soll einfach funktionieren). Deshalb steht der Aufruf hier und nicht
+        // gemeinsam mit den `dhrt`-Unterbefehlen weiter oben.
+        builtins::set_programm_args(std::env::args_os().skip(1)
+            .map(|s| s.to_string_lossy().into_owned()).collect());
         // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
         // (LOADIMAGE("assets/...")) auch beim Doppelklick von ueberall stimmen.
         if let Ok(exe) = std::env::current_exe() {
@@ -265,6 +294,9 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
     let path = &args[1];
+    // Hier ist klar: keine eingebettete Exe (Bundle-Zweig oben hat nicht
+    // gegriffen), also ein Runtime-Aufruf -- `--`-Konvention.
+    setze_programm_args(&args);
     // Komfort: `dhrt datei.dh` (ohne `run`) wird wie `dhrt run datei.dh`
     // behandelt -- aus Quelltext, mit chdir. `.dhc` laeuft den VM-Pfad.
     if ist_quelldatei(path) {
@@ -438,6 +470,10 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     }
     let run_res = machine.run();
     let stopped = matches!(&run_res, Err(e) if machine.was_stopped(e));
+    // WP A: `EXIT(code)` ist kein Fehler -- sonst zeigte das Profiler-Panel bei
+    // jedem Programm, das sich selbst beendet, eine rote Meldung. Vor den
+    // take_*-Aufrufen lesen.
+    let selbst_beendet = machine.exit_code().is_some();
     let (total, lines) = machine.take_profile();
     let err_line = machine.error_line();
     let output = machine.take_output();
@@ -451,7 +487,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     // `stopped` (oben, VOR dem `take_output`-Move von `machine`) ist bereits
     // die richtige Antwort -- kein zweiter `was_stopped`-Aufruf noetig.
     if let Err(e) = &run_res {
-        if !stopped {
+        if !stopped && !selbst_beendet {
             blob["error"] = serde_json::json!(e);
             blob["error_line"] = serde_json::json!(err_line);
         }
@@ -494,6 +530,10 @@ fn debug_main(path: &str) -> ExitCode {
         Ok(()) => serde_json::json!({"event": "finished", "reason": "done"}),
         Err(_) if machine.was_debug_stopped() =>
             serde_json::json!({"event": "finished", "reason": "stopped"}),
+        // WP A: `EXIT(code)` ist ein regulaeres Ende, kein Fehler -- der Editor
+        // soll dafuer keinen roten Fehlerbalken zeigen.
+        Err(_) if machine.exit_code().is_some() =>
+            serde_json::json!({"event": "finished", "reason": "done"}),
         Err(e) => serde_json::json!({
             "event": "error", "line": machine.error_line(), "message": e }),
     };
@@ -916,12 +956,20 @@ fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
         Err(e) => {
             // Zeile VOR take_output() lesen (take_output konsumiert die VM).
             let line = machine.error_line();
+            // WP A: `EXIT(code)` wickelt die VM ueber denselben Fehler-Kanal ab
+            // wie die Stop-Signale, ist aber KEIN Fehler -- kein
+            // "Laufzeitfehler" auf stderr, sondern nur der Rueckgabewert.
+            // Ebenfalls vor take_output() lesen.
+            let exit = machine.exit_code();
             // Bei Laufzeitfehler trotzdem bisherige Ausgabe zeigen.
             let out = machine.take_output();
             let stdout = std::io::stdout();
             let mut h = stdout.lock();
             let _ = h.write_all(out.as_bytes());
             let _ = h.flush();
+            if let Some(code) = exit {
+                return ExitCode::from(code as u8);
+            }
             if line != 0 {
                 eprintln!("Laufzeitfehler in {}:{}: {}", source_label, line, e);
             } else {

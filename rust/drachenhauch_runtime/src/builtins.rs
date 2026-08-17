@@ -70,6 +70,23 @@ fn programmstart() -> std::time::Instant {
 /// Programm, das nach dem Laden von Bildern misst, faenge nicht bei 0 an.
 pub fn uhr_starten() { let _ = programmstart(); }
 
+/// Argumente, die dem GB-PROGRAMM gehoeren (nicht der Runtime) -- Quelle fuer
+/// `ARGC()`/`ARG$(n)`.
+///
+/// Wird von `main.rs` genau einmal beim Start gesetzt; wer nie setzt (Tests,
+/// eingebettete Nutzung), bekommt eine leere Liste statt eines Fehlers.
+/// `OnceLock` statt `thread_local`, weil die Argumente prozessweit gelten und
+/// sich nach dem Start nicht mehr aendern.
+static PROGRAMM_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// Einmal beim Start aufrufen. Ein zweiter Aufruf ist wirkungslos (kein Panic) --
+/// so kann ein zweiter Einstiegspunkt sie gefahrlos ebenfalls setzen wollen.
+pub fn set_programm_args(args: Vec<String>) { let _ = PROGRAMM_ARGS.set(args); }
+
+fn programm_args() -> &'static [String] {
+    PROGRAMM_ARGS.get().map(|v| v.as_slice()).unwrap_or(&[])
+}
+
 fn seit_start() -> std::time::Duration { programmstart().elapsed() }
 fn next_rand() -> u64 {
     RNG.with(|s| {
@@ -269,8 +286,9 @@ fn coerce_elem(value: Value, target: &str, ctx: &str) -> R {
     }
 }
 
-/// STR$-Semantik (`_b_str`).
-fn str_of(v: &Value) -> String {
+/// STR$-Semantik (`_b_str`). `pub(crate)`, damit `EPRINT` (vm.rs `try_os`)
+/// seinen Wert genauso stringifiziert wie `PRINT`/`STR$`.
+pub(crate) fn str_of(v: &Value) -> String {
     match v {
         Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
         Value::Int(i) => i.to_string(),
@@ -2407,6 +2425,56 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 if !t.is_empty() { cleaned.push(t.to_string()); }
             }
             Ok(Value::str_rc(&cleaned.join("/")))
+        }
+
+        // ===== Betriebssystem: Argumente, Umgebung, Arbeitsverzeichnis (WP A) =====
+        // EXIT/EPRINT/SHELL brauchen VM-Zustand (Ausgabe-Puffer, Abbruch) und
+        // stehen darum in vm.rs `try_os` -- hier nur die zustandsfreien.
+        "argc" => { arity!(0); Ok(Value::Int(programm_args().len() as i64)) }
+        "arg$" | "arg" => {
+            arity!(1);
+            let i = need_int(&a[0], "ARG$")?;
+            let args = programm_args();
+            // Bewusst KEIN Fehler bei Ueberlauf: Argumente sind Benutzereingabe,
+            // und `IF ARG$(0) = "" THEN` ist die natuerliche Abfrage. Ein
+            // Laufzeitfehler zwaenge jeden Aufruf in ein ARGC()-Geruest.
+            if i < 0 || i as usize >= args.len() { return Ok(Value::str_rc("")); }
+            Ok(Value::str_rc(&args[i as usize]))
+        }
+        "getenv$" | "getenv" => {
+            if a.is_empty() || a.len() > 2 { return err(format!("GETENV$: erwartet 1..2 Argumente, erhalten {}", a.len())); }
+            let name_ = need_str(&a[0], "GETENV$")?;
+            let vorgabe = if a.len() == 2 { need_str(&a[1], "GETENV$")? } else { "" };
+            // `var_os` + lossy: eine Umgebungsvariable mit ungueltigem UTF-8
+            // (unter Unix moeglich) soll nicht den ganzen Lauf abbrechen.
+            Ok(Value::str_rc(&std::env::var_os(name_)
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| vorgabe.to_string())))
+        }
+        "setenv" => {
+            arity!(2);
+            let name_ = need_str(&a[0], "SETENV")?;
+            if name_.is_empty() || name_.contains('=') || name_.contains('\0') {
+                return err(format!("SETENV: ungueltiger Name '{}' (leer, '=' oder Null-Byte)", name_));
+            }
+            let wert = need_str(&a[1], "SETENV")?;
+            if wert.contains('\0') { return err("SETENV: Wert darf kein Null-Byte enthalten"); }
+            // Wirkt nur auf diesen Prozess und seine Kinder (SHELL) -- die
+            // Umgebung des Aufrufers bleibt unberuehrt. Das kann kein Programm
+            // aendern, das ist Sache des Betriebssystems.
+            std::env::set_var(name_, wert);
+            Ok(Value::Nil)
+        }
+        "cwd$" | "cwd" => {
+            arity!(0);
+            let p = std::env::current_dir().map_err(|e| format!("CWD$: {}", e))?;
+            Ok(Value::str_rc(&p.to_string_lossy()))
+        }
+        "chdir" => {
+            arity!(1);
+            let p = need_str(&a[0], "CHDIR")?;
+            std::env::set_current_dir(p).map_err(|e| format!("CHDIR: {} ({})", e, p))?;
+            Ok(Value::Nil)
         }
 
         // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====

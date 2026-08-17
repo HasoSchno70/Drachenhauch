@@ -52,6 +52,33 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # Betriebssystem (WP A): Argumente, Umgebung, Prozesse
+    "argc":      ("ARGC() AS INTEGER", "Anzahl der Argumente, die dem Programm uebergeben wurden."),
+    "arg$":      ("ARG$(nummer) AS STRING",
+                  "Argument Nummer n (0-basiert). Ausserhalb: Leerstring, kein Fehler. "
+                  "Beim Start ueber dhrt: alles hinter '--'; in der exportierten Exe: alle."),
+    "getenv$":   ("GETENV$(name[, vorgabe]) AS STRING",
+                  "Umgebungsvariable lesen. Fehlt sie, kommt die Vorgabe (sonst Leerstring)."),
+    "setenv":    ("SETENV(name, wert)",
+                  "Umgebungsvariable setzen -- gilt fuer dieses Programm und seine "
+                  "Kindprozesse (SHELL), nicht fuer die Konsole des Aufrufers."),
+    "cwd$":      ("CWD$() AS STRING",
+                  "Aktuelles Arbeitsverzeichnis. Achtung: dhrt wechselt beim Start ins "
+                  "Verzeichnis der .dh-Datei (fuer relative Asset-Pfade)."),
+    "chdir":     ("CHDIR(pfad)", "Arbeitsverzeichnis wechseln."),
+    "exit":      ("EXIT([code])",
+                  "Programm sofort beenden, code wird der Rueckgabewert (0..255, "
+                  "Vorgabe 0). Wird von TRY/CATCH NICHT gefangen."),
+    "eprint":    ("EPRINT(text)",
+                  "Zeile nach stderr statt stdout -- fuer Meldungen, die nicht zu den "
+                  "Nutzdaten gehoeren. Anders als PRINT ein Builtin, also mit Klammern."),
+    "shell":     ("SHELL(programm, ...) AS INTEGER",
+                  "Programm starten, auf das Ende warten, Rueckgabewert liefern (-1 = "
+                  "durch Signal beendet). Argumente EINZELN uebergeben, nicht als eine "
+                  "Kommandozeile. Ausgabe geht direkt auf die Konsole."),
+    "shell_out$": ("SHELL_OUT$(programm, ...) AS STRING",
+                   "Wie SHELL, sammelt aber die stdout-Ausgabe ein und liefert sie. "
+                   "stderr des Kindes bleibt stderr."),
     # Grafik
     "screen":   ("SCREEN(w, h[, titel[, skala]])",
                  "Fenster oeffnen. skala>1 macht Pixel groesser (Retro-Look)."),

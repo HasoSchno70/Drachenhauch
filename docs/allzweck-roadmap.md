@@ -47,32 +47,63 @@ Netz, Fenstern, Reitern und Saison-Verwaltung — vollständig in Drachenhauch.
 
 ---
 
-## WP A — Betriebssystem-Anbindung
+## WP A — Betriebssystem-Anbindung (✅ ERLEDIGT 2026-08-17)
 
-**Das ist die größte Lücke.** Verifiziert gegen `builtins.rs`/`vm.rs`: die
-einzigen `std::env::args()` im Quelltext sind die von `dhrt` selbst (`main.rs`).
-Ein Drachenhauch-Programm kann seine eigenen Argumente nicht lesen.
+**Das war die größte Lücke.** Verifiziert gegen `builtins.rs`/`vm.rs`: die
+einzigen `std::env::args()` im Quelltext waren die von `dhrt` selbst
+(`main.rs`). Ein Drachenhauch-Programm konnte seine eigenen Argumente nicht
+lesen.
 
-Folge: eine exportierte `.exe` nimmt keine Argumente entgegen, kann sich in
+Folge: eine exportierte `.exe` nahm keine Argumente entgegen, konnte sich in
 keine Werkzeugkette einreihen, kein anderes Programm aufrufen und ihrem
 Aufrufer nicht sagen, ob es geklappt hat. Genau das ist der Kern von
 „Werkzeug, Skript, Automatisierung".
 
-- [ ] `ARGC()` / `ARG$(n)` — Kommandozeilenargumente des *Programms*, nicht die
-      von `dhrt`. **Stolperstein:** beim Start über `dhrt run datei.dh` müssen
-      die eigenen Argumente von denen der Runtime getrennt werden (Konvention
-      `--`); im Export-Fall gehören alle Argumente dem Programm.
-- [ ] `GETENV$(name$ [, vorgabe$])`, `SETENV(name$, wert$)`
-- [ ] `EXIT(code)` — geordnetes Ende mit Rückgabewert. Ohne das kann kein
-      Aufrufer und kein Testlauf Erfolg von Fehlschlag unterscheiden.
-- [ ] `SHELL(befehl$ [, args])` → Rückgabewert; `SHELL_OUT$(...)` → Ausgabe
-      einsammeln. Bewusst zwei Befehle statt eines mit Schalter — der häufige
-      Fall soll kurz bleiben.
-- [ ] Ausgabe nach stderr (`EPRINT`), damit `PRINT` als Nutzdaten durchgereicht
-      werden kann.
-- [ ] `CWD$()` / `CHDIR(pfad$)`. **Achtung:** `dhrt` wechselt beim Start selbst
-      ins Verzeichnis der `.dh`-Datei (relative Asset-Pfade) — das muss
-      dokumentiert bleiben, sonst überrascht `CWD$()`.
+- [x] `ARGC()` / `ARG$(n)` — Kommandozeilenargumente des *Programms*, nicht die
+      von `dhrt`. Trennung über die Konvention **`--`**: `dhrt run datei.dh --
+      a b` gibt `a b` ans Programm, ohne `--` bekommt es nichts. Im
+      **Bundle-Modus** (exportierte `.exe`) gibt es keine Runtime-Argumente,
+      dort gehören alle dem Programm — ohne `--`. `ARG$` außerhalb liefert
+      einen Leerstring statt eines Fehlers (Argumente sind Benutzereingabe).
+- [x] `GETENV$(name$ [, vorgabe$])`, `SETENV(name$, wert$)` — `SETENV` wirkt auf
+      diesen Prozess **und seine Kinder** (`SHELL`), nicht auf die Konsole des
+      Aufrufers.
+- [x] `EXIT([code])` — geordnetes Ende mit Rückgabewert. Läuft über denselben
+      Sentinel-Kanal wie die beiden Stop-Signale (`vm.rs`), wird darum von
+      `TRY`/`CATCH` **nicht** gefangen; entscheidend ist wie dort das Flag und
+      nicht der Fehlertext, `THROW "__EXIT__"` bleibt ein normaler Fehler.
+      Werte außerhalb 0..255 sind ein Fehler statt still gekappt zu werden.
+- [x] `SHELL(programm$, ...)` → Rückgabewert; `SHELL_OUT$(...)` → stdout
+      einsammeln. Argumente werden **einzeln** übergeben, nicht zu einer
+      Kommandozeile zusammengeklebt — kein Quoting zu lernen, kein zerfallender
+      Dateiname mit Leerzeichen. `SHELL_OUT$` liefert nur stdout; stderr des
+      Kindes bleibt stderr, sonst mischten sich Fehlermeldungen in die
+      Nutzdaten.
+- [x] `EPRINT(text)` — Ausgabe nach stderr, damit `PRINT` als Nutzdaten
+      durchgereicht werden kann. Builtin, also mit Klammern (anders als
+      `PRINT`).
+- [x] `CWD$()` / `CHDIR(pfad$)`. Der Stolperstein ist dokumentiert
+      (`docs/builtins-core.md`): `dhrt` wechselt beim Start ins Verzeichnis der
+      `.dh`-Datei, die `.exe` ins Exe-Verzeichnis — ein relativer Pfad vom
+      Aufrufer ist also **nicht** relativ zu `CWD$()`.
+
+**Umsetzung:** zustandsfrei in `builtins.rs`
+(`ARGC`/`ARG$`/`GETENV$`/`SETENV`/`CWD$`/`CHDIR`), VM-behaftet in `vm.rs`
+`try_os` (`EXIT`/`EPRINT`/`SHELL`/`SHELL_OUT$`). Der gemeinsame Grund für
+`try_os`: **`PRINT` wird gepuffert** und erst am Programmende geschrieben — wer
+daneben auf stderr schreibt oder ein Kindprogramm aufs selbe Terminal lässt,
+sähe die Ausgaben sonst in falscher Reihenfolge. Diese vier flushen den Puffer
+darum zuerst (geteilter Helfer `flush_out`, den sich `flush_and_prompt` für
+`INPUT` jetzt mit ihnen teilt). Argument-Aufteilung in `main.rs`
+(`setze_programm_args`, bewusst an den Stellen, die wirklich ein Programm
+starten — der Bundle-Zweig setzt seine eigenen). Profiler und Debugger melden
+`EXIT` nicht mehr als Fehler.
+
+Tests: `tests/test_os_builtins.py` (28), neue Fixtures `run_gb_roh` (liefert
+Rückgabewert + stderr, reicht Argumente durch) und `dhrt_pfad` in
+`conftest.py`. Beispiel: `examples/161_werkzeug.dh` — ein `wc`-artiges Werkzeug
+ohne Fenster, mit Argumenten, stderr-Meldungen und Rückgabewerten. Doku:
+`docs/builtins-core.md`, Abschnitt „Betriebssystem".
 
 ## WP B — Bytes und Binärdateien
 
@@ -236,7 +267,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**A → B → C → D → E → F → G → H → I**
+**~~A~~ → B → C → D → E → F → G → H → I** (A ist erledigt, Nächstes ist B)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

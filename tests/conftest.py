@@ -242,6 +242,58 @@ def run_gb():
     return _run
 
 
+@pytest.fixture
+def dhrt_pfad():
+    """Pfad zur gebauten nativen Runtime -- fuer Tests, die dhrt selbst
+    aufrufen muessen (eigene Kommandozeile, Umleitung von stdout/stderr in
+    dieselbe Datei, dhrt als Kindprozess von SHELL)."""
+    if _DHRT is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    return str(_DHRT)
+
+
+@pytest.fixture
+def run_gb_roh():
+    """Wie `run_gb`, aber OHNE Fehler-Umsetzung: liefert
+    `(returncode, stdout, stderr)` und akzeptiert Programm-Argumente.
+
+    Fuer WP A (Betriebssystem-Anbindung) noetig, weil dort genau die Dinge
+    geprueft werden, die `run_gb` wegabstrahiert: der Rueckgabewert (`EXIT`),
+    die stderr-Ausgabe (`EPRINT`) und die Argumente hinter `--` (`ARGC`/`ARG$`).
+    `run_gb` wuerde bei `EXIT(3)` eine DHRuntimeError werfen.
+
+        def test_exit(run_gb_roh):
+            code, out, err = run_gb_roh('EXIT(3)')
+            assert code == 3
+    """
+    import subprocess
+    import tempfile
+
+    def _run(source: str, args: list[str] | None = None):
+        if _DHRT is None:
+            pytest.skip("native Runtime 'dhrt' nicht gebaut")
+        fd, tmp = tempfile.mkstemp(suffix=".dh", prefix="_gbtest_")
+        os.close(fd)
+        try:
+            Path(tmp).write_text(source, encoding="utf-8")
+            cmd = [str(_DHRT), "run", tmp]
+            if args:
+                cmd.append("--")
+                cmd.extend(args)
+            r = subprocess.run(cmd, capture_output=True, text=True,
+                               encoding="utf-8", timeout=60)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        return (r.returncode,
+                (r.stdout or "").replace("\r\n", "\n"),
+                (r.stderr or "").replace("\r\n", "\n"))
+
+    return _run
+
+
 # Hinweis: `run_vm`, `run_native` und `run_all` sind seit dem Entfernen der
 # Python-/Cython-Bytecode-VMs **Aliase auf den Tree-Walker**. Es gibt nur noch
 # zwei Ausfuehrungspfade: Tree-Walker (Python, Referenz) und die native Runtime

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1316,
+ "count": 1326,
  "builtins": [
   {
    "name": "ABS",
@@ -109,6 +109,18 @@
    "kind": "graphics",
    "signature": "ARC(6..8 Argumente)",
    "module": "core"
+  },
+  {
+   "name": "ARG$",
+   "kind": "core",
+   "signature": "ARG$(nummer) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "ARGC",
+   "kind": "core",
+   "signature": "ARGC() AS INTEGER",
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_AVG",
@@ -579,12 +591,6 @@
    "module": "audio"
   },
   {
-   "name": "AUDIO_MUSIC_SEEK",
-   "kind": "core",
-   "signature": "AUDIO_MUSIC_SEEK(sekunden: FLOAT)",
-   "module": "audio"
-  },
-  {
    "name": "AUDIO_MUSIC_QUEUE",
    "kind": "core",
    "signature": "AUDIO_MUSIC_QUEUE(path: STRING)",
@@ -594,6 +600,12 @@
    "name": "AUDIO_MUSIC_RESUME",
    "kind": "core",
    "signature": "AUDIO_MUSIC_RESUME()",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_MUSIC_SEEK",
+   "kind": "core",
+   "signature": "AUDIO_MUSIC_SEEK(sekunden: FLOAT)",
    "module": "audio"
   },
   {
@@ -1395,6 +1407,12 @@
    "module": "controller"
   },
   {
+   "name": "CHDIR",
+   "kind": "core",
+   "signature": "CHDIR(pfad)",
+   "module": "dhrt"
+  },
+  {
    "name": "CHOICE",
    "kind": "core",
    "signature": "CHOICE(arr)",
@@ -1639,6 +1657,12 @@
    "kind": "core",
    "signature": "CURVE_SMOOTHSTEP(edge0, edge1, x)",
    "module": "curves"
+  },
+  {
+   "name": "CWD$",
+   "kind": "core",
+   "signature": "CWD$() AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "CYLINDER",
@@ -2067,6 +2091,18 @@
    "module": "dhrt"
   },
   {
+   "name": "EPRINT",
+   "kind": "core",
+   "signature": "EPRINT(text)",
+   "module": "dhrt"
+  },
+  {
+   "name": "EXIT",
+   "kind": "core",
+   "signature": "EXIT(code = 0)",
+   "module": "dhrt"
+  },
+  {
    "name": "EXP",
    "kind": "core",
    "signature": "EXP(x: Zahl)",
@@ -2317,6 +2353,12 @@
    "kind": "graphics",
    "signature": "GESTURE_PINCH_Y() -> FLOAT",
    "module": "core"
+  },
+  {
+   "name": "GETENV$",
+   "kind": "core",
+   "signature": "GETENV$(name, vorgabe = \"\") AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "GETPIXEL",
@@ -3393,6 +3435,12 @@
    "module": "html"
   },
   {
+   "name": "HTTP_CANCEL",
+   "kind": "core",
+   "signature": "HTTP_CANCEL(abruf: INTEGER)",
+   "module": "html"
+  },
+  {
    "name": "HTTP_DOWNLOAD",
    "kind": "core",
    "signature": "HTTP_DOWNLOAD(url: STRING, path: STRING)",
@@ -3405,9 +3453,21 @@
    "module": "html"
   },
   {
+   "name": "HTTP_GET_START",
+   "kind": "core",
+   "signature": "HTTP_GET_START(url: STRING) AS INTEGER",
+   "module": "html"
+  },
+  {
    "name": "HTTP_HEADER",
    "kind": "core",
    "signature": "HTTP_HEADER(name: STRING)",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_PENDING",
+   "kind": "core",
+   "signature": "HTTP_PENDING() AS INTEGER",
    "module": "html"
   },
   {
@@ -3417,9 +3477,27 @@
    "module": "html"
   },
   {
+   "name": "HTTP_READY",
+   "kind": "core",
+   "signature": "HTTP_READY(abruf: INTEGER) AS BOOLEAN",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_RESULT",
+   "kind": "core",
+   "signature": "HTTP_RESULT(abruf: INTEGER) AS STRING",
+   "module": "html"
+  },
+  {
    "name": "HTTP_STATUS",
    "kind": "core",
    "signature": "HTTP_STATUS()",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_URL$",
+   "kind": "core",
+   "signature": "HTTP_URL$(abruf: INTEGER) AS STRING",
    "module": "html"
   },
   {
@@ -6207,6 +6285,12 @@
    "module": "serial"
   },
   {
+   "name": "SETENV",
+   "kind": "core",
+   "signature": "SETENV(name, wert)",
+   "module": "dhrt"
+  },
+  {
    "name": "SETFONT",
    "kind": "graphics",
    "signature": "SETFONT(handle: INTEGER)",
@@ -6307,6 +6391,18 @@
    "kind": "graphics",
    "signature": "SHADOW_TARGET(*args)",
    "module": "g3d"
+  },
+  {
+   "name": "SHELL",
+   "kind": "core",
+   "signature": "SHELL(programm, ...) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_OUT$",
+   "kind": "core",
+   "signature": "SHELL_OUT$(programm, ...) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "SHUFFLE",
@@ -7779,6 +7875,72 @@
    "module": "core"
   },
   {
+   "name": "ZEIT_AUS_TEILEN",
+   "kind": "core",
+   "signature": "ZEIT_AUS_TEILEN(jahr: INTEGER, monat: INTEGER, tag: INTEGER, stunde: INTEGER = 0, minute: INTEGER = 0, sekunde: INTEGER = 0) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_DAUER$",
+   "kind": "core",
+   "signature": "ZEIT_DAUER$(sekunden: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_DIFF",
+   "kind": "core",
+   "signature": "ZEIT_DIFF(zeit: INTEGER, frueher: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_FORMAT$",
+   "kind": "core",
+   "signature": "ZEIT_FORMAT$(zeit: INTEGER, muster: STRING) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_JETZT",
+   "kind": "core",
+   "signature": "ZEIT_JETZT() AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_LESBAR",
+   "kind": "core",
+   "signature": "ZEIT_LESBAR(text: STRING) AS BOOLEAN",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_PARSE",
+   "kind": "core",
+   "signature": "ZEIT_PARSE(text: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_PLUS",
+   "kind": "core",
+   "signature": "ZEIT_PLUS(zeit: INTEGER, sekunden: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_TEIL",
+   "kind": "core",
+   "signature": "ZEIT_TEIL(zeit: INTEGER, feld: STRING) AS INTEGER",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_TEXT$",
+   "kind": "core",
+   "signature": "ZEIT_TEXT$(zeit: INTEGER) AS STRING",
+   "module": "zeit"
+  },
+  {
+   "name": "ZEIT_WOCHENTAG",
+   "kind": "core",
+   "signature": "ZEIT_WOCHENTAG(zeit: INTEGER) AS INTEGER",
+   "module": "zeit"
+  },
+  {
    "name": "__COMP_ITER",
    "kind": "core",
    "signature": "__COMP_ITER(v)",
@@ -7795,108 +7957,6 @@
    "kind": "core",
    "signature": "__SET_DEDUP(v)",
    "module": "core"
-  },
-  {
-   "name": "ZEIT_JETZT",
-   "kind": "core",
-   "signature": "ZEIT_JETZT() AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_PARSE",
-   "kind": "core",
-   "signature": "ZEIT_PARSE(text: STRING) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_LESBAR",
-   "kind": "core",
-   "signature": "ZEIT_LESBAR(text: STRING) AS BOOLEAN",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_TEXT$",
-   "kind": "core",
-   "signature": "ZEIT_TEXT$(zeit: INTEGER) AS STRING",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_FORMAT$",
-   "kind": "core",
-   "signature": "ZEIT_FORMAT$(zeit: INTEGER, muster: STRING) AS STRING",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_TEIL",
-   "kind": "core",
-   "signature": "ZEIT_TEIL(zeit: INTEGER, feld: STRING) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_AUS_TEILEN",
-   "kind": "core",
-   "signature": "ZEIT_AUS_TEILEN(jahr: INTEGER, monat: INTEGER, tag: INTEGER, stunde: INTEGER = 0, minute: INTEGER = 0, sekunde: INTEGER = 0) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_PLUS",
-   "kind": "core",
-   "signature": "ZEIT_PLUS(zeit: INTEGER, sekunden: INTEGER) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_DIFF",
-   "kind": "core",
-   "signature": "ZEIT_DIFF(zeit: INTEGER, frueher: INTEGER) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_DAUER$",
-   "kind": "core",
-   "signature": "ZEIT_DAUER$(sekunden: INTEGER) AS STRING",
-   "module": "zeit"
-  },
-  {
-   "name": "ZEIT_WOCHENTAG",
-   "kind": "core",
-   "signature": "ZEIT_WOCHENTAG(zeit: INTEGER) AS INTEGER",
-   "module": "zeit"
-  },
-  {
-   "name": "HTTP_GET_START",
-   "kind": "core",
-   "signature": "HTTP_GET_START(url: STRING) AS INTEGER",
-   "module": "html"
-  },
-  {
-   "name": "HTTP_READY",
-   "kind": "core",
-   "signature": "HTTP_READY(abruf: INTEGER) AS BOOLEAN",
-   "module": "html"
-  },
-  {
-   "name": "HTTP_RESULT",
-   "kind": "core",
-   "signature": "HTTP_RESULT(abruf: INTEGER) AS STRING",
-   "module": "html"
-  },
-  {
-   "name": "HTTP_CANCEL",
-   "kind": "core",
-   "signature": "HTTP_CANCEL(abruf: INTEGER)",
-   "module": "html"
-  },
-  {
-   "name": "HTTP_PENDING",
-   "kind": "core",
-   "signature": "HTTP_PENDING() AS INTEGER",
-   "module": "html"
-  },
-  {
-   "name": "HTTP_URL$",
-   "kind": "core",
-   "signature": "HTTP_URL$(abruf: INTEGER) AS STRING",
-   "module": "html"
   }
  ]
 }

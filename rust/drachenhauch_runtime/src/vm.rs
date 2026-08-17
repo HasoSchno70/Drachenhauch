@@ -16,6 +16,14 @@ use std::sync::Arc;
 /// `__DEBUG_STOP__` NICHT von TRY/CATCH gefangen werden.
 const PROFILE_STOP: &str = "__PROFILE_STOP__";
 
+/// Sentinel-"Fehler" fuer `EXIT(code)` -- wickelt die Dispatch-Schleife bis
+/// `run()` ab. Wie die beiden Stop-Signale darf er NICHT von TRY/CATCH gefangen
+/// werden: `EXIT` heisst "jetzt Schluss", und ein umschliessendes TRY duerfte
+/// das nicht in ein CATCH umbiegen. Entscheidend ist auch hier das Flag
+/// (`exit_code`), nicht der Text -- `THROW "__EXIT__"` bleibt ein normaler,
+/// fangbarer Fehler.
+const EXIT_REQUEST: &str = "__EXIT__";
+
 /// Obergrenze fuer verschachtelte `exec`/`exec_byref`-Aufrufe (Rekursionstiefe).
 /// `exec` rekursiert ueber den NATIVEN Rust-Stack (exec->run_frame->dispatch->
 /// exec), es gibt kein GB-seitiges Frame-Limit -- ohne diese Grenze crasht eine
@@ -639,6 +647,11 @@ pub struct Vm<'p> {
     // kann sie also nicht mehr faelschen.
     debug_stop_flag: bool,
     profile_stop_flag: bool,
+    // Von `EXIT(code)` gesetzt (WP A). Some(n) heisst: das Programm hat sich
+    // selbst beendet, `run()` gibt EXIT_REQUEST zurueck und main.rs macht
+    // daraus den Rueckgabewert des Prozesses. Derselbe Flag-statt-Text-Kanal
+    // wie bei den beiden Stop-Signalen darueber.
+    exit_code: Option<i32>,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
     // Externes Stop-Signal (Editor-Stop-Button bei `dhrt profile --stoppable`):
@@ -737,6 +750,7 @@ impl<'p> Vm<'p> {
             err_line_set: false,
             debug_stop_flag: false,
             profile_stop_flag: false,
+            exit_code: None,
             prof: None,
             stop: None,
             dbg: None,
@@ -820,11 +834,10 @@ impl<'p> Vm<'p> {
             self.out.push_str(prompt);
             return;
         }
+        self.flush_out();       // geteilt mit EPRINT/SHELL (try_os), siehe dort
         use std::io::Write;
         let so = std::io::stdout();
         let mut h = so.lock();
-        let _ = h.write_all(self.out.as_bytes());
-        self.out.clear();
         let _ = h.write_all(prompt.as_bytes());
         let _ = h.flush();
     }
@@ -853,6 +866,13 @@ impl<'p> Vm<'p> {
     /// im Signature, wird aber nicht mehr fuer die Entscheidung genutzt).
     pub fn was_stopped(&self, _err: &str) -> bool {
         self.profile_stop_flag
+    }
+
+    /// Rueckgabewert aus `EXIT(code)`, falls das Programm sich selbst beendet
+    /// hat. `None` = normales Ende oder echter Fehler. Vor `take_output()`
+    /// lesen -- das konsumiert die VM.
+    pub fn exit_code(&self) -> Option<i32> {
+        self.exit_code
     }
 
     /// Ob `run()` durch den Debugger-Stop-Befehl (oder EOF auf stdin waehrend
@@ -1281,12 +1301,13 @@ impl<'p> Vm<'p> {
         loop {
             match self.dispatch(fn_, locals, stack, ip, try_handlers, self_obj) {
                 Ok(step) => return Ok(step),
-                // Debugger-Abbruch (`stop`) und Profiler-Stop-Signal duerfen
-                // NICHT von TRY/CATCH gefangen werden -- unbedingt durchreichen.
-                // Entscheidend ist das Flag, NICHT der Fehlertext: ein GB-Programm
-                // mit `THROW "__DEBUG_STOP__"` erzeugt zwar denselben String,
-                // setzt aber nie eines der beiden Flags (Review-Fund).
-                Err(e) if self.debug_stop_flag || self.profile_stop_flag => return Err(e),
+                // Debugger-Abbruch (`stop`), Profiler-Stop-Signal und EXIT(code)
+                // duerfen NICHT von TRY/CATCH gefangen werden -- unbedingt
+                // durchreichen. Entscheidend ist das Flag, NICHT der Fehlertext:
+                // ein GB-Programm mit `THROW "__DEBUG_STOP__"` erzeugt zwar
+                // denselben String, setzt aber keines der Flags (Review-Fund).
+                Err(e) if self.debug_stop_flag || self.profile_stop_flag
+                          || self.exit_code.is_some() => return Err(e),
                 Err(e) => {
                     // Quell-Zeile lazy ermitteln: ip zeigt HINTER die
                     // fehlgeschlagene Instruktion. Nur der innerste Frame
@@ -2015,6 +2036,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_coro(name, bargs)? { v }
                         else if let Some(v) = self.try_timer(name, bargs)? { v }
                         else if let Some(v) = self.try_zeit(name, bargs)? { v }
+                        else if let Some(v) = self.try_os(name, bargs)? { v }
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
@@ -3178,6 +3200,102 @@ impl<'p> Vm<'p> {
             _ => return Ok(None),
         };
         Ok(Some(v))
+    }
+
+    /// Betriebssystem-Builtins, die VM-Zustand brauchen (WP A). Die
+    /// zustandsfreien (`ARGC`/`ARG$`/`GETENV$`/`SETENV`/`CWD$`/`CHDIR`) stehen
+    /// in `builtins.rs`.
+    ///
+    /// Gemeinsamer Grund, warum diese vier hier stehen: **`PRINT` wird
+    /// gepuffert** (`self.out`, geschrieben erst am Programmende). Wer daneben
+    /// auf stderr schreibt oder ein Kindprogramm auf dasselbe Terminal laufen
+    /// laesst, saehe die Ausgaben sonst in falscher Reihenfolge -- die eigenen
+    /// PRINTs kaemen ganz zum Schluss. Darum flusht jeder dieser Befehle den
+    /// Puffer zuerst.
+    fn try_os(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
+        fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
+            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+        }
+        let v = match name {
+            "exit" => {
+                if a.len() > 1 { return Err(format!("EXIT: erwartet 0..1 Argument(e), erhalten {}", a.len())); }
+                let code = match a.first() {
+                    None => 0,
+                    Some(Value::Int(n)) => *n,
+                    _ => return Err("EXIT: erwartet INTEGER (Rueckgabewert)".into()),
+                };
+                // Betriebssysteme uebertragen nur das untere Byte eines
+                // Rueckgabewerts. Statt `EXIT(256)` still zu 0 werden zu lassen
+                // -- also aus "Fehler" ein "alles gut" zu machen -- ist das ein
+                // Fehler mit Ansage.
+                if !(0..=255).contains(&code) {
+                    return Err(format!("EXIT: Rueckgabewert {} liegt ausserhalb 0..255", code));
+                }
+                self.exit_code = Some(code as i32);
+                return Err(EXIT_REQUEST.into());
+            }
+            "eprint" => {
+                if a.len() != 1 { return Err(format!("EPRINT: erwartet 1 Argument, erhalten {}", a.len())); }
+                let text = crate::builtins::str_of(&a[0]);
+                self.flush_out();
+                use std::io::Write;
+                let se = std::io::stderr();
+                let mut h = se.lock();
+                let _ = writeln!(h, "{}", text);
+                let _ = h.flush();
+                Value::Nil
+            }
+            "shell" | "shell_out$" | "shell_out" => {
+                let anzeige = if name == "shell" { "SHELL" } else { "SHELL_OUT$" };
+                if a.is_empty() { return Err(format!("{}: erwartet mind. 1 Argument (Programm)", anzeige)); }
+                let prog = o_str(a, 0, anzeige)?.to_string();
+                // Argumente EINZELN statt als eine Kommandozeile -- damit gibt
+                // es keine Quoting-Regeln zu lernen und keine Shell, die aus
+                // einem Dateinamen mit Leerzeichen zwei Argumente macht. Wer
+                // wirklich eine Shell will, ruft sie ausdruecklich auf
+                // (SHELL("cmd", "/c", "dir | more")).
+                let mut rest: Vec<String> = Vec::new();
+                for i in 1..a.len() { rest.push(o_str(a, i, anzeige)?.to_string()); }
+                let mut cmd = std::process::Command::new(&prog);
+                cmd.args(&rest);
+                self.flush_out();
+                if name == "shell" {
+                    // Erbt stdout/stderr -- das Kind schreibt direkt aufs
+                    // Terminal, ohne Umweg ueber unseren Puffer.
+                    let st = cmd.status().map_err(|e| format!("SHELL: '{}' laesst sich nicht starten: {}", prog, e))?;
+                    // Kein Rueckgabewert (Unix: durch ein Signal beendet) ->
+                    // -1. Das ist eindeutig, weil ein echter Rueckgabewert
+                    // immer 0..255 ist.
+                    Value::Int(st.code().map(|c| c as i64).unwrap_or(-1))
+                } else {
+                    let out = cmd.output().map_err(|e| format!("SHELL_OUT$: '{}' laesst sich nicht starten: {}", prog, e))?;
+                    // stderr des Kindes bleibt stderr (durchgereicht), nur
+                    // stdout ist das Ergebnis -- sonst mischten sich
+                    // Fehlermeldungen unbemerkt in die Nutzdaten.
+                    use std::io::Write;
+                    let se = std::io::stderr();
+                    let _ = se.lock().write_all(&out.stderr);
+                    Value::str_rc(&String::from_utf8_lossy(&out.stdout))
+                }
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    /// Gepufferte `PRINT`-Ausgabe sofort auf echtes stdout schreiben und den
+    /// Puffer leeren, damit `take_output()` am Ende nichts doppelt schreibt.
+    /// Unter dem Profiler NICHT -- dort gehoert stdout dem JSON-Blob (gleiche
+    /// Ueberlegung wie in `flush_and_prompt`).
+    fn flush_out(&mut self) {
+        if self.prof.is_some() || self.out.is_empty() { return; }
+        use std::io::Write;
+        let so = std::io::stdout();
+        let mut h = so.lock();
+        let _ = h.write_all(self.out.as_bytes());
+        let _ = h.flush();
+        self.out.clear();
     }
 
     /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
