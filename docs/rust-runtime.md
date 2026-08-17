@@ -1080,6 +1080,34 @@ Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte
 Quelle wie gehabt UND (b) **jede im Quelltext als String-Literal referenzierte
 Datei**, die relativ zur Quelle existiert — auch über `../` (z. B. ein Spiel in
 `code/` mit `LOADIMAGE("../assets/sprites/x.png")` und Assets in `../assets/`).
+
+**Datenbanken sind keine Assets.** Die Literal-Suche kann nicht wissen, *wozu*
+ein Dateiname dasteht: bei `LOADIMAGE("held.png")` ist Mitkopieren richtig, bei
+`DB_OPEN("spiel.db")` falsch — diese Datei legt das Programm selbst an, und sie
+enthält den Datenstand dessen, der exportiert. Der Export überspringt deshalb
+Dateien, die **am Inhalt** als SQLite-Datenbank erkennbar sind (die ersten 16
+Bytes lauten `SQLite format 3\0`) — am Inhalt und nicht an der Endung, weil eine
+Datenbank auch `spielstand.dat` heißen kann und eine `notizen.db` keine sein
+muss. Er sagt beim Export, welche Datei er übersprungen hat.
+
+Wer wirklich eine **vorbereitete** Datenbank ausliefern will (ein Lexikon, eine
+Level-Sammlung), nimmt sie mit `--mit-daten` dazu:
+
+```
+dhrt --export spiel.dh --mit-daten
+```
+
+**Der Ausgabeordner wird geräumt.** Ohne das bliebe vom vorigen Lauf alles
+liegen, was diesmal nicht mehr dazugehört — die `.exe` wird überschrieben, eine
+Datenbank daneben nicht, und sie ginge stillschweigend mit hinaus. Geräumt wird
+nur der vom Export **selbst gewählte** `<quelle>_dist/`, und nur wenn darin eine
+Exe mit unserem Payload-Magic liegt: der Beweis, dass der Ordner von einem
+früheren Export stammt. Ein von Hand angegebener Ausgabeordner bleibt
+unangetastet (mit Hinweis) — dort könnte alles stehen.
+
+**Mit Namen statt als Zahl.** Der Export listet die mitkopierten Dateien auf.
+Vorher stand dort nur „1 referenzierte Asset-Datei(en) mitkopiert" — daran ist
+eine fremde Datenbank im Bundle nicht aufgefallen.
 Solche Pfade werden mit abgestreiftem `../` ins Bundle gelegt (`assets/sprites/x.png`).
 Zur Laufzeit findet `resolve_asset_path` (builtins.rs) die gebündelte Kopie:
 existiert der Original-Pfad nicht, werden führende `../` abgestreift und erneut

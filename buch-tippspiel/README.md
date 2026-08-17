@@ -73,23 +73,18 @@ relative Pfade **relativ zum Programm** auf, nicht zum Startverzeichnis. Die
 sich an, nicht dort, wo man startet. Beim ersten Start entsteht sie von selbst
 — dafür steht seit Kapitel 2 in jedem Stand ein `CREATE TABLE IF NOT EXISTS`.
 
-**Zwei Fallen beim Ausliefern**, beide beim Nachmessen aufgefallen:
-
-1. **Der Export kopiert die eigene Datenbank mit.** `DB_OPEN("tippspiel.db")`
-   sieht für den Export wie ein Dateiverweis aus — liegt beim Exportieren eine
-   `tippspiel.db` daneben, landet sie im `_dist`-Ordner (gemeldet als
-   „1 referenzierte Asset-Datei mitkopiert"). Dann bekommt die Tipprunde die
-   Tipps des Entwicklers. **Vor dem Export löschen.**
-2. **Der `_dist`-Ordner wird nicht geräumt.** Ein zweiter Export überschreibt
-   die `.exe`, lässt aber alles andere liegen — auch eine Datenbank aus dem
-   ersten Versuch. **Ordner vorher wegwerfen.**
-
-Zusammen also:
+Zwei Fallen gab es dabei, beide beim Nachmessen aufgefallen und beide
+inzwischen im Export behoben (Stolperstein 8): er kopierte die eigene
+Datenbank mit — die Tipps des Entwicklers auf dem Weg zur Tipprunde — und
+räumte seinen `_dist`-Ordner nicht. Heute meldet er:
 
 ```
-rm -rf buch-tippspiel/code/tippspiel_dist buch-tippspiel/code/tippspiel.db
-dhrt --export buch-tippspiel/code/tippspiel.dh
+  1 Datenbank(en) NICHT mitkopiert -- das Programm legt sie selbst an:
+    tippspiel.db
+  (mit --mit-daten trotzdem mitnehmen)
 ```
+
+Vorher aufräumen muss man also nicht mehr.
 
 ## Aufbau (13 Kapitel)
 
@@ -230,18 +225,24 @@ Gemessen, nicht vermutet — Zahlen aus `stolpersteine.dh` vom 16.08.2026.
    `ARRAY OF INTEGER` dagegen nicht, sein bisheriger Name zeigt ja weiter auf
    dieselben Zellen. → [docs/sprache.md](../docs/sprache.md#arrays)
 
+8. ~~**Der Export kann Daten nicht von Assets unterscheiden.**~~
+   **Erledigt.** `dhrt --export` kopierte jede Datei mit, deren Name im
+   Quelltext als Zeichenkette steht — auch `DB_OPEN("tippspiel.db")`. Damit
+   wanderten die Tipps des Entwicklers zum Empfänger statt eines leeren
+   Anfangs. Der Export überspringt jetzt, was **am Inhalt** als
+   SQLite-Datenbank erkennbar ist (die ersten 16 Bytes lauten
+   `SQLite format 3\0`) — am Inhalt und nicht an der Endung, weil eine
+   Datenbank auch `spielstand.dat` heißen kann und eine `notizen.db` keine
+   sein muss. Er sagt jetzt auch, **welche** Dateien er mitnimmt, statt nur
+   wie viele; `--mit-daten` nimmt eine vorbereitete Datenbank ausdrücklich
+   doch mit. Und er **räumt** seinen `_dist`-Ordner, aber nur den selbst
+   gewählten und nur wenn darin eine Exe mit unserem Payload liegt.
+   → [docs/rust-runtime.md](../docs/rust-runtime.md#schritt-7-standalone-export-dhrunpy---export--editor)
+
 ### Offen
 
-8. **Der Export kann Daten nicht von Assets unterscheiden.**
-   `dhrt --export` kopiert jede Datei mit, deren Name im Quelltext als
-   Zeichenkette steht — auch `DB_OPEN("tippspiel.db")`. Liegt beim
-   Exportieren eine Datenbank daneben, wandert sie in den `_dist`-Ordner und
-   damit zum Empfänger: fremde Tipps statt eines leeren Anfangs. Für ein Bild
-   ist das Mitkopieren richtig, für eine Datei, die das Programm selbst
-   anlegt, falsch — und von außen sind die beiden nicht zu unterscheiden.
-   Dazu räumt der Export den `_dist`-Ordner nicht, ein zweiter Lauf lässt
-   alles Alte liegen. Beides umgeht man von Hand
-   ([Weitergeben](#weitergeben)), sicher wäre es nicht von Hand.
+Nichts. Alle acht gefundenen Punkte sind geschlossen — was beim
+Weiterschreiben auffällt, kommt hier dazu.
 
 ## Was gut passt
 

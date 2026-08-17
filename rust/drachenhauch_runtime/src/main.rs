@@ -213,7 +213,12 @@ fn main() -> ExitCode {
         // Selbst-Export: `dhrt --export datei.dh [out_dir]` buendelt das
         // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
         if raw.len() >= 3 && raw[1] == "--export" {
-            return export_main(&raw[2], raw.get(3).map(|s| s.as_str()));
+            // `--mit-daten` darf an beliebiger Stelle stehen und ist KEIN
+            // Ausgabeverzeichnis -- sonst landete das Bundle in einem Ordner
+            // namens "--mit-daten".
+            let mit_daten = raw.iter().any(|a| a == "--mit-daten");
+            let out = raw.iter().skip(3).find(|a| !a.starts_with("--")).map(|s| s.as_str());
+            return export_main(&raw[2], out, mit_daten);
         }
     }
 
@@ -648,7 +653,7 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 /// .dhc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
 /// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
 /// Pendant zu drachenhauch/export.py.
-fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
+fn export_main(path: &str, out_dir: Option<&str>, mit_daten: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path)
         .unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf())
@@ -692,13 +697,38 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
         Some(d) => std::path::PathBuf::from(d),
         None => base.join(format!("{}_dist", stem)),
     };
+    let exe_suffix = if exe.extension().map(|e| e == "exe").unwrap_or(false) || cfg!(windows) {
+        ".exe"
+    } else { "" };
+    // Den eigenen `_dist`-Ordner vor dem Schreiben raeumen. Sonst bleibt vom
+    // vorigen Lauf alles liegen, was diesmal nicht mehr dazugehoert -- die
+    // .exe wird ueberschrieben, eine Datenbank daneben nicht, und sie wandert
+    // stillschweigend mit ausgeliefert.
+    //
+    // Nur der VOM EXPORT SELBST gewaehlte Ordner, und nur wenn eine Exe mit
+    // unserem Payload darin liegt: das ist der Beweis, dass er von einem
+    // frueheren Export stammt und niemandem sonst gehoert. Ein von Hand
+    // angegebenes Verzeichnis bleibt unangetastet -- dort koennte alles
+    // stehen.
+    if out_dir.is_none() && out.is_dir() {
+        let alte_exe = out.join(format!("{}{}", stem, exe_suffix));
+        let ist_unser = std::fs::read(&alte_exe)
+            .map(|d| d.len() > 8 && d[d.len() - 8..] == *PAYLOAD_MAGIC)
+            .unwrap_or(false);
+        if ist_unser {
+            if let Err(e) = std::fs::remove_dir_all(&out) {
+                eprintln!("Warnung: '{}' nicht geraeumt: {}", out.display(), e);
+            }
+        } else if alte_exe.exists() {
+            eprintln!("Warnung: '{}' enthaelt eine fremde Datei gleichen Namens und wurde nicht geraeumt.", out.display());
+        }
+    } else if out_dir.is_some() && out.is_dir() {
+        eprintln!("Hinweis: '{}' wird nicht geraeumt (selbst angegeben), Dateien aus frueheren Laeufen bleiben liegen.", out.display());
+    }
     if let Err(e) = std::fs::create_dir_all(&out) {
         eprintln!("Kann Ausgabeverzeichnis '{}' nicht anlegen: {}", out.display(), e);
         return ExitCode::from(1);
     }
-    let exe_suffix = if exe.extension().map(|e| e == "exe").unwrap_or(false) || cfg!(windows) {
-        ".exe"
-    } else { "" };
     let out_exe = out.join(format!("{}{}", stem, exe_suffix));
     if let Err(e) = std::fs::write(&out_exe, &bundle) {
         eprintln!("Kann '{}' nicht schreiben: {}", out_exe.display(), e);
@@ -720,9 +750,17 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
     // auch ueber `../` (z.B. LOADIMAGE("../assets/sprites/x.png")). Sie werden
     // mit abgestreiftem `../` ins Bundle gelegt; zur Laufzeit findet die
     // Pfad-Aufloesung (resolve_asset_path) sie dort wieder.
-    let n = bundle_referenced_assets(&raw_source, &base, &out);
-    if n > 0 {
-        println!("  {} referenzierte Asset-Datei(en) mitkopiert.", n);
+    let bericht = bundle_referenced_assets(&raw_source, &base, &out, mit_daten);
+    // Mit Namen, nicht als Zahl: "1 Datei mitkopiert" sagt nicht, WELCHE --
+    // und genau daran ist eine fremde Datenbank im Bundle nicht aufgefallen.
+    if !bericht.kopiert.is_empty() {
+        println!("  {} referenzierte Datei(en) mitkopiert:", bericht.kopiert.len());
+        for f in &bericht.kopiert { println!("    {}", f); }
+    }
+    if !bericht.uebersprungen.is_empty() {
+        println!("  {} Datenbank(en) NICHT mitkopiert -- das Programm legt sie selbst an:", bericht.uebersprungen.len());
+        for f in &bericht.uebersprungen { println!("    {}", f); }
+        println!("  (mit --mit-daten trotzdem mitnehmen)");
     }
     println!("Exportiert: {}", out_exe.display());
     ExitCode::SUCCESS
@@ -765,9 +803,34 @@ fn string_literals(src: &str) -> Vec<String> {
 /// Kopiert alle im Quelltext als String-Literal referenzierten, relativ zu
 /// `base` existierenden Dateien/Ordner ins Bundle (`out`), mit abgestreiftem
 /// `../`. Liefert die Anzahl kopierter Dateien.
-fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::path::Path) -> usize {
+/// Ist das eine SQLite-Datenbank? Am Inhalt erkannt, nicht am Namen: die
+/// ersten 16 Bytes einer SQLite-Datei sind immer `SQLite format 3\0`.
+///
+/// Warum ueberhaupt: `bundle_referenced_assets` kann nicht wissen, WOZU ein
+/// Dateiname im Quelltext steht. Bei einem Bild ist Mitkopieren richtig, bei
+/// einer Datenbank, die das Programm selbst anlegt, falsch -- sie enthaelt
+/// die Daten des Entwicklers, und die gehen den Empfaenger nichts an. Der
+/// Inhalt verraet den Unterschied dort, wo der Name es nicht tut.
+fn ist_sqlite_datei(pfad: &std::path::Path) -> bool {
+    use std::io::Read;
+    let mut f = match std::fs::File::open(pfad) { Ok(f) => f, Err(_) => return false };
+    let mut kopf = [0u8; 16];
+    match f.read_exact(&mut kopf) {
+        Ok(()) => &kopf == b"SQLite format 3\0",
+        Err(_) => false,
+    }
+}
+
+/// Was der Export mit den referenzierten Dateien gemacht hat.
+struct AssetBericht {
+    kopiert: Vec<String>,
+    uebersprungen: Vec<String>,
+}
+
+fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::path::Path,
+                            mit_daten: bool) -> AssetBericht {
     let mut seen = std::collections::HashSet::new();
-    let mut count = 0usize;
+    let mut bericht = AssetBericht { kopiert: Vec::new(), uebersprungen: Vec::new() };
     for lit in string_literals(source) {
         if lit.is_empty() || lit.len() > 400 { continue; }
         // Review-Fund: "." bzw. ".." sind gaengige String-Literale in GANZ
@@ -797,15 +860,22 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
         }
         let rel = strip_parent_prefix(&lit);
         if rel.is_empty() || !seen.insert(rel.clone()) { continue; }
+        // Eine Datenbank ist kein Asset, sondern der Datenstand dessen, der
+        // exportiert. Wer wirklich eine vorbereitete Datenbank ausliefern
+        // will (ein Lexikon, eine Level-Sammlung), sagt --mit-daten.
+        if !mit_daten && src.is_file() && ist_sqlite_datei(&src) {
+            bericht.uebersprungen.push(rel.clone());
+            continue;
+        }
         let dst = out.join(&rel);
         if src.is_dir() {
-            if copy_dir_recursive(&src, &dst).is_ok() { count += 1; }
+            if copy_dir_recursive(&src, &dst).is_ok() { bericht.kopiert.push(rel.clone()); }
         } else {
             if let Some(p) = dst.parent() { let _ = std::fs::create_dir_all(p); }
-            if std::fs::copy(&src, &dst).is_ok() { count += 1; }
+            if std::fs::copy(&src, &dst).is_ok() { bericht.kopiert.push(rel.clone()); }
         }
     }
-    count
+    bericht
 }
 
 /// Laedt eine `.dhc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
@@ -928,5 +998,68 @@ mod tests {
         b.extend_from_slice(&u64::MAX.to_le_bytes());   // unmoegliche Laenge
         b.extend_from_slice(PAYLOAD_MAGIC);
         assert_eq!(embedded_gbc_in(&b).as_deref(), Some(r#"{"main":3}"#));
+    }
+    // --- Export: Datenbanken sind keine Assets ---------------------------
+    //
+    // bundle_referenced_assets sammelt jede Datei ein, deren Name irgendwo im
+    // Quelltext als Zeichenkette steht. Fuer ein Bild ist das richtig; fuer
+    // eine Datenbank, die das Programm selbst anlegt, wanderte damit der
+    // Datenstand des Entwicklers zum Empfaenger.
+
+    fn temp_ordner(name: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("dhrt_export_test_{name}"));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn sqlite_wird_am_inhalt_erkannt_nicht_am_namen() {
+        let d = temp_ordner("erkennung");
+        // Eine echte SQLite-Datei faengt mit diesen 16 Bytes an.
+        let echt = d.join("daten.irgendwas");
+        std::fs::write(&echt, b"SQLite format 3\0und noch mehr").unwrap();
+        assert!(super::ist_sqlite_datei(&echt),
+                "Endung egal -- der Inhalt entscheidet");
+
+        // Umgekehrt: was .db heisst, muss keine Datenbank sein.
+        let getarnt = d.join("keine.db");
+        std::fs::write(&getarnt, b"nur Text, kein SQLite").unwrap();
+        assert!(!super::ist_sqlite_datei(&getarnt),
+                "der Name allein macht keine Datenbank");
+
+        // Zu kurz zum Erkennen -> keine Datenbank (und kein Absturz).
+        let kurz = d.join("kurz.db");
+        std::fs::write(&kurz, b"SQL").unwrap();
+        assert!(!super::ist_sqlite_datei(&kurz));
+
+        // Was es nicht gibt, ist auch keine.
+        assert!(!super::ist_sqlite_datei(&d.join("gibtsnicht.db")));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn export_ueberspringt_datenbank_nimmt_bild_mit() {
+        let d = temp_ordner("auswahl");
+        let out = d.join("dist");
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(d.join("bild.png"), b"\x89PNG so tun als ob").unwrap();
+        std::fs::write(d.join("spiel.db"), b"SQLite format 3\0xxxx").unwrap();
+        let quelle = "LOADIMAGE(\"bild.png\")\nDB_OPEN(\"spiel.db\")\n";
+
+        let b = super::bundle_referenced_assets(quelle, &d, &out, false);
+        assert_eq!(b.kopiert, vec!["bild.png".to_string()]);
+        assert_eq!(b.uebersprungen, vec!["spiel.db".to_string()]);
+        assert!(out.join("bild.png").exists());
+        assert!(!out.join("spiel.db").exists(), "die Datenbank darf nicht im Bundle liegen");
+
+        // Mit --mit-daten will es der Autor ausdruecklich -- dann kommt sie mit.
+        let out2 = d.join("dist2");
+        std::fs::create_dir_all(&out2).unwrap();
+        let b2 = super::bundle_referenced_assets(quelle, &d, &out2, true);
+        assert!(b2.uebersprungen.is_empty());
+        assert_eq!(b2.kopiert.len(), 2);
+        assert!(out2.join("spiel.db").exists());
+        let _ = std::fs::remove_dir_all(&d);
     }
 }
