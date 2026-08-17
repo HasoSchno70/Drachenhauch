@@ -1,0 +1,82 @@
+' 163 -- Eine echte REST-Schnittstelle bedienen (WP C: HTTP_REQUEST)
+'
+' Zeigt, was mit HTTP_GET/HTTP_POST allein nicht ging: eigene Kopfzeilen
+' (Anmeldung per Token), PUT und DELETE, JSON als Inhaltstyp, und eine
+' Antwort, die aus rohen Bytes besteht.
+'
+' Damit das Beispiel ohne fremden Dienst und ohne Zugangsdaten laeuft, spricht
+' es gegen httpbin.org -- eine oeffentliche Spiegel-Schnittstelle, die
+' zurueckmeldet, was bei ihr ankam. Genau das macht sie hier nuetzlich: man
+' SIEHT, dass die Kopfzeile wirklich rausgegangen ist.
+'
+' Aufruf:  dhrt run 163_rest_api.dh          (braucht eine Internetverbindung)
+
+IMPORT "html"
+IMPORT "json"
+
+CONST BASIS AS STRING = "https://httpbin.org"
+
+DIM antwort AS STRING
+DIM h AS JSON_HANDLE
+DIM kopf AS MAP OF STRING
+
+' Bei einem fremden Dienst lieber grosszuegiger als die Vorgabe von 10 s.
+HTTP_TIMEOUT(30)
+
+' --- 1. Anmeldung, die fuer alle Aufrufe gilt ----------------------------
+' Der haeufigste Fall bei echten Schnittstellen. Einmal setzen statt an jeden
+' einzelnen Aufruf haengen.
+HTTP_SET_HEADER("Authorization", "Bearer beispiel-token-123")
+
+TRY
+    antwort = HTTP_REQUEST("GET", BASIS + "/get")
+CATCH e
+    EPRINT("Kein Netz oder Dienst nicht erreichbar: " + e)
+    EXIT(1)
+END TRY
+
+h = JSON_PARSE(antwort)
+PRINT "1) GET mit dauerhafter Kopfzeile"
+PRINT "   angekommen als: " + JSON_GET_STRING(h, "headers.Authorization")
+PRINT ""
+
+' --- 2. PUT mit JSON ------------------------------------------------------
+' HTTP_REQUEST raet KEINEN Content-Type -- welchen der Rumpf hat, weiss nur
+' der Aufrufer. Also selbst setzen.
+MAPPUT(kopf, "Content-Type", "application/json")
+antwort = HTTP_REQUEST("PUT", BASIS + "/put", "{""name"": ""Anna"", ""punkte"": 42}", kopf)
+h = JSON_PARSE(antwort)
+PRINT "2) PUT mit JSON"
+PRINT "   Typ:   " + JSON_GET_STRING(h, "headers.Content-Type")
+PRINT "   Rumpf: " + JSON_GET_STRING(h, "data")
+PRINT "   Status: " + STR$(HTTP_STATUS())
+PRINT ""
+
+' --- 3. DELETE ------------------------------------------------------------
+antwort = HTTP_REQUEST("DELETE", BASIS + "/delete")
+PRINT "3) DELETE -> Status " + STR$(HTTP_STATUS())
+PRINT ""
+
+' --- 4. Eine Antwort, die kein Text ist ----------------------------------
+' Der Rueckgabewert ist immer Text; nicht dekodierbare Bytes werden dabei
+' ersetzt. Bei einem Bild bliebe davon nichts -- HTTP_BYTES liefert das
+' Original.
+DIM bild AS BUFFER
+antwort = HTTP_REQUEST("GET", BASIS + "/image/png")
+bild = HTTP_BYTES()
+PRINT "4) Bild geholt"
+PRINT "   als Text:  " + STR$(LEN(antwort)) + " Zeichen (verfaelscht)"
+PRINT "   als Bytes: " + STR$(BUFFER_LEN(bild)) + " Bytes (unversehrt)"
+PRINT "   beginnt mit: " + BUFFER_TO_HEX$(BUFFER_SLICE(bild, 0, 8))
+PRINT "   (89504e47... ist die PNG-Signatur -- siehe 162_binaerdatei.dh)"
+
+' --- 5. Abmelden ----------------------------------------------------------
+HTTP_CLEAR_HEADERS()
+antwort = HTTP_REQUEST("GET", BASIS + "/get")
+h = JSON_PARSE(antwort)
+PRINT ""
+' JSON_HAS fragen statt JSON_GET_STRING: die Kopfzeile fehlt dann GANZ, sie
+' ist nicht leer -- ein Lesezugriff auf einen nicht vorhandenen Pfad ist ein
+' Fehler und kein Leerstring.
+PRINT "5) Nach HTTP_CLEAR_HEADERS ist der Token weg: " + _
+      STR$(NOT JSON_HAS(h, "headers.Authorization"))

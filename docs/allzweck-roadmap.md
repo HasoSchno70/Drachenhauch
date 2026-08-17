@@ -158,27 +158,62 @@ liest Breite/Höhe und die Blockliste aus einer echten PNG-Datei ohne
 Bildbibliothek und schreibt/liest ein eigenes Binärformat. Doku:
 `docs/builtins-core.md`, Abschnitt „Bytes (BUFFER)".
 
-## WP C — HTTP für echte Dienste
+## WP C — HTTP für echte Dienste (✅ ERLEDIGT 2026-08-17)
 
-Heute: nur `HTTP_GET(url$)`, `HTTP_POST(url$, body$)`, `HTTP_DOWNLOAD`. **Keine
+Vorher: nur `HTTP_GET(url$)`, `HTTP_POST(url$, body$)`, `HTTP_DOWNLOAD`. **Keine
 eigenen Request-Header**, kein PUT/PATCH/DELETE, Timeout fest bei 10 Sekunden,
-keine Sitzungen. Damit ist praktisch jede angemeldete REST-Schnittstelle außer
+keine Sitzungen. Damit war praktisch jede angemeldete REST-Schnittstelle außer
 Reichweite.
 
-`docs/module-html.md` rät im Abschnitt „Grenzen" selbst zu „Token-basierte Auth
-via Header" — eine API, die es nicht gibt. Das ist der klarste Beleg, dass hier
-etwas fehlt.
+`docs/module-html.md` riet im Abschnitt „Grenzen" selbst zu „Token-basierte Auth
+via Header" — eine API, die es nicht gab. Das war der klarste Beleg, dass hier
+etwas fehlte.
 
-- [ ] `HTTP_REQUEST(methode$, url$, body$, header AS MAP OF STRING)` als *eine*
-      allgemeine Funktion; `HTTP_GET`/`HTTP_POST` bleiben als Kurzform
-- [ ] `HTTP_TIMEOUT(sekunden)`
-- [ ] Rumpf als `BUFFER` senden und empfangen (nach WP B) — heute erzwingt
-      UTF-8-mit-Ersetzung den Umweg über `HTTP_DOWNLOAD` in eine Datei
-- [ ] Hintergrund-Variante (`HTTP_GET_START`-Muster) für alle Methoden, nicht
-      nur GET
-- [ ] Doku nachziehen: `docs/module-html.md` sagt „alles aus der Python-
-      Standardbibliothek" — seit Stufe B ist es Rust; und der Header-Rat in
-      „Grenzen" wird erst mit diesem WP wahr
+- [x] `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` als *eine*
+      allgemeine Funktion; `HTTP_GET`/`HTTP_POST` bleiben als Kurzform.
+      Methode gegen eine feste Liste geprüft (GET/POST/PUT/PATCH/DELETE/HEAD/
+      OPTIONS) — ein `"GTE"` soll als Fehler an seiner Zeile auffallen und
+      nicht als merkwürdige Server-Antwort.
+- [x] `HTTP_TIMEOUT(sekunden)` (1..600).
+- [x] Rumpf als `BUFFER` senden **und** Antwort als `BUFFER` empfangen
+      (`HTTP_BYTES()`, gilt für die letzte Antwort wie `HTTP_STATUS()` —
+      also auch nach `HTTP_GET`, und nach einem Fehler leer).
+- [x] Hintergrund-Variante für alle Methoden: `HTTP_REQUEST_START`.
+      `HTTP_GET_START` bleibt die Kurzform.
+- [x] Doku nachgezogen: „alles aus der Python-Standardbibliothek" korrigiert
+      (es ist Rust/`ureq`), und der Header-Rat in „Grenzen" stimmt jetzt.
+
+**Zwei Zugaben über die Planung hinaus:**
+
+1. **`HTTP_SET_HEADER`/`HTTP_CLEAR_HEADERS`** — eine Kopfzeile, die *alle*
+   folgenden Aufrufe mitschicken. Ohne das müsste die Anmeldung an jeden
+   einzelnen Aufruf gehängt werden, und genau das ist der Fall, um den es bei
+   „Token-Auth" geht. Pro Aufruf übergebene Kopfzeilen gewinnen; gleicher Name
+   ersetzt statt sich zu häufen (sonst gingen beide raus und der Server
+   entschiede).
+2. **Kopfzeilen werden geprüft** (`pruefe_header`): ein CR/LF im Wert wird
+   abgelehnt. Kommt der Wert aus einer Benutzereingabe — bei einem Token oder
+   Dateinamen schnell der Fall — hängte er sonst beliebige weitere Kopfzeilen
+   an die Anfrage (Header-Injection). Das ist eine Lücke, keine Kosmetik.
+
+**Bewusst nicht getan:** `HTTP_REQUEST` rät **keinen** `Content-Type`. Welchen
+Typ ein Rumpf hat, weiß nur der Aufrufer; ein falsch geratenes
+`application/json` wäre schlimmer als gar keines. `HTTP_POST` behält dagegen
+seine alte Formular-Vorgabe — daran hängen bestehende Programme (Test dafür).
+
+**Umsetzung:** `html.rs` hat jetzt genau **einen** Weg, eine Anfrage zu bauen
+(`Anfrage` + `http_request`); die früheren `http_get`/`http_post`-Kurzformen
+dort sind ersatzlos weg, weil die VM ihre Anfrage selbst zusammenstellt (sie
+muss die dauerhaften Kopfzeilen und die Zeitgrenze einsetzen) — zwei Bauwege
+wären genau der Ort, an dem eines von beidem irgendwann fehlt. In `vm.rs`
+ersetzt der geteilte Helfer `http_antwort` den vorher viermal wortgleichen
+Block; mit `HTTP_BYTES` kam eine fünfte Sache dazu, die jeder Pfad tun muss.
+`Abrufe::start` nimmt jetzt eine `Anfrage` statt nur einer URL.
+
+Tests: `tests/test_http_request.py` (33, gegen einen lokalen Spiegel-Server,
+der zurückmeldet was ankam — am Rückgabewert allein sähe man nicht, ob eine
+Kopfzeile rausging). Beispiel: `examples/163_rest_api.dh` gegen httpbin.org.
+Doku: `docs/module-html.md`.
 
 ## WP D — Identität und Prüfsummen
 
@@ -298,7 +333,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → C → D → E → F → G → H → I** (A und B sind erledigt, Nächstes ist C)
+**~~A~~ → ~~B~~ → ~~C~~ → D → E → F → G → H → I** (A, B und C sind erledigt, Nächstes ist D)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

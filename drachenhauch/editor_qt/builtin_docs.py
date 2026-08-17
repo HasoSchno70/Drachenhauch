@@ -52,6 +52,23 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # HTTP fuer echte Dienste (WP C, Modul html)
+    "http_request": ("HTTP_REQUEST(methode, url[, rumpf[, kopfzeilen]]) AS STRING",
+                     "HTTP-Anfrage mit eigener Methode (GET/POST/PUT/PATCH/DELETE/HEAD/"
+                     "OPTIONS), Rumpf (STRING oder BUFFER) und Kopfzeilen (MAP OF STRING). "
+                     "Raet KEINEN Content-Type -- den setzt der Aufrufer."),
+    "http_request_start": ("HTTP_REQUEST_START(methode, url[, rumpf[, kopfzeilen]]) AS INTEGER",
+                           "Wie HTTP_REQUEST, aber im Hintergrund: liefert sofort die "
+                           "Abruf-Nummer fuer HTTP_READY/HTTP_RESULT."),
+    "http_bytes": ("HTTP_BYTES() AS BUFFER",
+                   "Roher Rumpf der letzten Antwort -- ungewandelt, also auch fuer Bilder "
+                   "und andere Binaerdaten brauchbar. Nach einem Fehler leer."),
+    "http_timeout": ("HTTP_TIMEOUT(sekunden)",
+                     "Zeitgrenze fuer folgende Aufrufe (1..600, Vorgabe 10)."),
+    "http_set_header": ("HTTP_SET_HEADER(name, wert)",
+                        "Kopfzeile, die JEDER folgende HTTP-Aufruf mitschickt (z.B. ein "
+                        "Token). Gleicher Name ersetzt; pro Aufruf uebergebene gewinnen."),
+    "http_clear_headers": ("HTTP_CLEAR_HEADERS()", "Alle dauerhaften Kopfzeilen entfernen."),
     # BUFFER -- Bytefolgen (WP B)
     "buffer_new":    ("BUFFER_NEW(groesse) AS BUFFER", "Neuer Puffer, mit Nullen gefuellt."),
     "buffer_len":    ("BUFFER_LEN(puffer) AS INTEGER", "Laenge in BYTES (nicht Zeichen)."),

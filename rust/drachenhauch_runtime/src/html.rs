@@ -77,24 +77,100 @@ fn map_err(e: ureq::Error, url: &str) -> HttpErr {
     }
 }
 
-pub fn http_get(url: &str) -> Result<HttpResult, HttpErr> {
-    ureq::get(url)
-        .set("User-Agent", USER_AGENT)
-        .timeout(Duration::from_secs(TIMEOUT_SECS))
-        .call()
-        .map_err(|e| map_err(e, url))
-        .and_then(finish)
+/// Die HTTP-Methoden, die `HTTP_REQUEST` annimmt (WP C).
+///
+/// Bewusst eine feste Liste statt "alles durchreichen": ein Tippfehler
+/// (`"GTE"`) kaeme sonst als merkwuerdige Server-Antwort zurueck statt als
+/// Fehler an der Stelle, an der er steht.
+pub const METHODEN: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+
+/// Eine vollstaendig beschriebene HTTP-Anfrage (WP C). `http_get`/`http_post`
+/// sind seitdem nur noch Kurzformen davon -- es gibt genau EINEN Weg, wie eine
+/// Anfrage zusammengebaut und abgeschickt wird.
+pub struct Anfrage {
+    pub methode: String,
+    pub url: String,
+    pub body: Vec<u8>,
+    /// Zusaetzliche Kopfzeilen in Reihenfolge. `User-Agent` bzw.
+    /// `Content-Type` hier zu setzen ueberschreibt die Vorgabe.
+    pub header: Vec<(String, String)>,
+    pub timeout: u64,
 }
 
-pub fn http_post(url: &str, body: &str) -> Result<HttpResult, HttpErr> {
-    ureq::post(url)
-        .set("User-Agent", USER_AGENT)
-        .set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
-        .timeout(Duration::from_secs(TIMEOUT_SECS))
-        .send_string(body)
-        .map_err(|e| map_err(e, url))
-        .and_then(finish)
+impl Anfrage {
+    pub fn neu(methode: &str, url: &str) -> Anfrage {
+        Anfrage {
+            methode: methode.to_string(),
+            url: url.to_string(),
+            body: Vec::new(),
+            header: Vec::new(),
+            timeout: TIMEOUT_SECS,
+        }
+    }
 }
+
+/// Prueft eine Kopfzeile, bevor sie ins Protokoll geht.
+///
+/// Der wichtige Teil ist das Verbot von CR/LF im WERT: eine Zeilenschaltung
+/// dort haengt der Anfrage beliebige weitere Kopfzeilen an
+/// (Header-Injection). Kommt der Wert aus einer Benutzereingabe -- und das
+/// tut er bei einem Token oder einem Dateinamen schnell -- ist das eine
+/// Luecke und keine Kosmetik.
+pub fn pruefe_header(name: &str, wert: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("HTTP: leerer Kopfzeilen-Name".to_string());
+    }
+    if !name.bytes().all(|b| b.is_ascii_graphic() && b != b':') {
+        return Err(format!(
+            "HTTP: Kopfzeilen-Name '{}' enthaelt unerlaubte Zeichen \
+             (erlaubt ist sichtbares ASCII ohne ':')", name));
+    }
+    if wert.bytes().any(|b| b == b'\r' || b == b'\n' || b == 0) {
+        return Err(format!(
+            "HTTP: der Wert der Kopfzeile '{}' enthaelt einen Zeilenumbruch -- damit \
+             liessen sich weitere Kopfzeilen einschmuggeln", name));
+    }
+    Ok(())
+}
+
+/// Schickt eine beliebige HTTP-Anfrage ab -- der EINE Weg, alles andere ruft
+/// hier herein.
+pub fn http_request(anfrage: &Anfrage) -> Result<HttpResult, HttpErr> {
+    let m = anfrage.methode.to_ascii_uppercase();
+    if !METHODEN.contains(&m.as_str()) {
+        return Err(HttpErr {
+            msg: format!("HTTP_REQUEST: unbekannte Methode '{}' (erlaubt: {})",
+                         anfrage.methode, METHODEN.join(", ")),
+            status: 0,
+            headers: vec![],
+        });
+    }
+    for (k, v) in &anfrage.header {
+        if let Err(msg) = pruefe_header(k, v) {
+            return Err(HttpErr { msg, status: 0, headers: vec![] });
+        }
+    }
+    let mut r = ureq::request(&m, &anfrage.url)
+        .timeout(Duration::from_secs(anfrage.timeout));
+    // Vorgabe zuerst, damit eine eigene Kopfzeile gleichen Namens sie
+    // ueberschreibt (`ureq::set` ersetzt).
+    r = r.set("User-Agent", USER_AGENT);
+    for (k, v) in &anfrage.header {
+        r = r.set(k, v);
+    }
+    // KEIN geratener Content-Type: welchen Typ ein Rumpf hat, weiss nur der
+    // Aufrufer. Ein falsch geratenes "application/json" waere schlimmer als
+    // gar keines -- es setzte eine Behauptung in die Welt, die der Aufrufer
+    // nicht mehr zurueckziehen kann, ohne sie zu kennen.
+    let antwort = if anfrage.body.is_empty() { r.call() } else { r.send_bytes(&anfrage.body) };
+    antwort.map_err(|e| map_err(e, &anfrage.url)).and_then(finish)
+}
+
+// Fruehere `http_get`/`http_post`-Kurzformen gibt es hier nicht mehr: seit
+// WP C baut die VM ihre Anfrage selbst, weil sie die dauerhaften Kopfzeilen
+// (HTTP_SET_HEADER) und die Zeitgrenze (HTTP_TIMEOUT) einsetzen muss. Zwei
+// Wege, eine Anfrage zu bauen, waeren genau der Ort, an dem eines von beidem
+// irgendwann fehlt.
 
 pub struct HttpDownloadResult {
     pub status: i64,
@@ -430,16 +506,21 @@ pub struct Abrufe {
 }
 
 impl Abrufe {
-    /// Startet einen GET im Hintergrund und liefert seine Nummer.
-    pub fn start(&mut self, url: &str) -> i64 {
+    /// Startet eine beliebige Anfrage im Hintergrund und liefert ihre Nummer.
+    ///
+    /// Seit WP C nimmt der Hintergrund-Pfad dieselbe `Anfrage` wie der
+    /// blockierende -- vorher konnte er nur GET, und ausgerechnet ein POST
+    /// gegen eine langsame API (der Fall, der das Fenster am laengsten
+    /// einfriert) liess sich nicht auslagern.
+    pub fn start(&mut self, anfrage: Anfrage) -> i64 {
         let (sender, empfang) = channel();
-        let ziel = url.to_string();
+        let url = anfrage.url.clone();
         std::thread::spawn(move || {
             // Das Ergebnis interessiert niemanden mehr, wenn der Empfaenger
             // weg ist (Abruf abgebrochen) -- `send` scheitert dann still.
-            let _ = sender.send(http_get(&ziel));
+            let _ = sender.send(http_request(&anfrage));
         });
-        self.eintraege.push(Some(Abruf { empfang, ergebnis: None, url: url.to_string() }));
+        self.eintraege.push(Some(Abruf { empfang, ergebnis: None, url }));
         (self.eintraege.len() - 1) as i64
     }
 

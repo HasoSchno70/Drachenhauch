@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1361,
+ "count": 1367,
  "builtins": [
   {
    "name": "ABS",
@@ -3609,9 +3609,21 @@
    "module": "html"
   },
   {
+   "name": "HTTP_BYTES",
+   "kind": "core",
+   "signature": "HTTP_BYTES() AS BUFFER",
+   "module": "html"
+  },
+  {
    "name": "HTTP_CANCEL",
    "kind": "core",
    "signature": "HTTP_CANCEL(abruf: INTEGER)",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_CLEAR_HEADERS",
+   "kind": "core",
+   "signature": "HTTP_CLEAR_HEADERS()",
    "module": "html"
   },
   {
@@ -3657,15 +3669,39 @@
    "module": "html"
   },
   {
+   "name": "HTTP_REQUEST",
+   "kind": "core",
+   "signature": "HTTP_REQUEST(methode, url [, rumpf [, kopfzeilen]]) AS STRING",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_REQUEST_START",
+   "kind": "core",
+   "signature": "HTTP_REQUEST_START(methode, url [, rumpf [, kopfzeilen]]) AS INTEGER",
+   "module": "html"
+  },
+  {
    "name": "HTTP_RESULT",
    "kind": "core",
    "signature": "HTTP_RESULT(abruf: INTEGER) AS STRING",
    "module": "html"
   },
   {
+   "name": "HTTP_SET_HEADER",
+   "kind": "core",
+   "signature": "HTTP_SET_HEADER(name, wert)",
+   "module": "html"
+  },
+  {
    "name": "HTTP_STATUS",
    "kind": "core",
    "signature": "HTTP_STATUS()",
+   "module": "html"
+  },
+  {
+   "name": "HTTP_TIMEOUT",
+   "kind": "core",
+   "signature": "HTTP_TIMEOUT(sekunden)",
    "module": "html"
   },
   {

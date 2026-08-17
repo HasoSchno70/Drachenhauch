@@ -1,6 +1,7 @@
 # Modul `html`
 
-HTTP-Client + URL-Helpers + HTML-Parser, alles aus der Python-Standardbibliothek — **kein** externer pip-Install nötig.
+HTTP-Client + URL-Helpers + HTML-Parser. Alles nativ in `dhrt` (Rust, HTTP über
+`ureq`) — **kein** pip-Install, kein Python zur Laufzeit.
 
 ```basic
 IMPORT "html"
@@ -10,11 +11,17 @@ IMPORT "html"
 
 | Bereich | Funktion | Rückgabe |
 |---|---|---|
+| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (Antwort-Rumpf) |
 | HTTP | `HTTP_GET(url$)` | STRING (Response-Body) |
 | HTTP | `HTTP_POST(url$, body$)` | STRING |
 | HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (Bytes) |
 | HTTP | `HTTP_STATUS()` | INTEGER (z.B. 200, 404) |
-| HTTP | `HTTP_HEADER(name$)` | STRING |
+| HTTP | `HTTP_HEADER(name$)` | STRING (Kopfzeile der Antwort) |
+| HTTP | `HTTP_BYTES()` | BUFFER (roher Rumpf der letzten Antwort) |
+| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (gilt für alle folgenden Aufrufe) |
+| HTTP | `HTTP_CLEAR_HEADERS()` | — |
+| HTTP | `HTTP_TIMEOUT(sekunden)` | — |
+| HTTP (Hintergrund) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (Abruf-Nummer) |
 | HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |
 | HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |
 | HTTP (Hintergrund) | `HTTP_RESULT(abruf)` | STRING (Response-Body) |
@@ -27,9 +34,93 @@ IMPORT "html"
 | HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |
 | HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |
 
+## HTTP_REQUEST — für alles, was über GET und POST hinausgeht
+
+Echte Schnittstellen wollen mehr als GET und POST: einen Anmelde-Token in einer
+Kopfzeile, ein `PUT` zum Ändern, ein `DELETE` zum Löschen, JSON als Inhaltstyp.
+Dafür gibt es **einen** Befehl:
+
+```basic
+IMPORT "html"
+
+DIM kopf AS MAP OF STRING
+DIM antwort AS STRING
+
+MAPPUT(kopf, "Authorization", "Bearer " + token)
+MAPPUT(kopf, "Content-Type", "application/json")
+
+antwort = HTTP_REQUEST("PUT", "https://api.example.com/dinge/7", _
+                       "{""name"": ""Anna""}", kopf)
+PRINT HTTP_STATUS()
+```
+
+`methode$` ist eine von `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`,
+`OPTIONS` (Groß-/Kleinschreibung egal). Etwas anderes ist ein **Fehler** —
+ein `"GTE"` käme sonst als verwirrende Server-Antwort zurück statt als
+Meldung an der Zeile, in der der Tippfehler steht.
+
+`rumpf` darf ein `STRING` oder ein `BUFFER` sein (siehe
+[Bytes](builtins-core.md#bytes-buffer)) — damit lässt sich auch ein Bild oder
+eine Zip-Datei hochladen. Weglassen oder `""` heißt: kein Rumpf.
+
+`kopfzeilen` ist eine `MAP OF STRING`. Sie überschreibt gleichnamige Vorgaben.
+
+> **`HTTP_REQUEST` rät keinen `Content-Type`.** Welchen Typ ein Rumpf hat, weiß
+> nur der Aufrufer; ein falsch geratenes `application/json` wäre schlimmer als
+> gar keines. Wer JSON schickt, setzt die Kopfzeile also selbst. (`HTTP_POST`
+> behält dagegen seine alte Vorgabe `application/x-www-form-urlencoded` — daran
+> hängen bestehende Programme.)
+
+### Ein Token einmal setzen
+
+Wenn alle Aufrufe dieselbe Anmeldung brauchen, muss die Kopfzeile nicht an
+jeden einzelnen:
+
+```basic
+HTTP_SET_HEADER("Authorization", "Bearer " + token)
+
+PRINT HTTP_REQUEST("GET", basis + "/profil")      ' Token ist dabei
+PRINT HTTP_GET(basis + "/nachrichten")            ' auch hier
+
+HTTP_CLEAR_HEADERS()                              ' wieder abmelden
+```
+
+Das gilt für **alle** folgenden HTTP-Aufrufe des Moduls, auch für `HTTP_GET`
+und die Hintergrund-Varianten. Eine Kopfzeile, die beim einzelnen Aufruf
+mitgegeben wird, gewinnt gegen die dauerhafte. Zweimal derselbe Name ersetzt,
+statt sich zu häufen — sonst gingen beide raus und der Server entschiede.
+
+### Rohe Bytes als Antwort
+
+Der Rückgabewert ist Text: nicht dekodierbare Bytes werden dabei ersetzt. Bei
+einem Bild oder einer Zip-Datei bliebe davon nichts Brauchbares. `HTTP_BYTES()`
+liefert deshalb den **rohen** Rumpf der letzten Antwort:
+
+```basic
+DIM egal AS STRING
+DIM bild AS BUFFER
+egal = HTTP_REQUEST("GET", "https://example.com/logo.png")
+bild = HTTP_BYTES()
+WRITEALL_BYTES("logo.png", bild)
+```
+
+`HTTP_BYTES()` gehört — wie `HTTP_STATUS()` und `HTTP_HEADER()` — zur *letzten*
+Antwort und funktioniert nach jedem HTTP-Aufruf, auch nach `HTTP_GET`. Nach
+einem fehlgeschlagenen Aufruf ist es leer (und nicht etwa noch die vorige
+Antwort). Wer eine große Datei nur speichern will, ist mit `HTTP_DOWNLOAD`
+weiterhin besser bedient — das streamt direkt auf die Platte.
+
+### Zeitgrenze
+
+```basic
+HTTP_TIMEOUT(30)      ' Sekunden, 1..600; Vorgabe ist 10
+```
+
+Gilt für alle folgenden Aufrufe.
+
 ## HTTP-Client
 
-`HTTP_GET` / `HTTP_POST` machen einfache HTTP-Aufrufe und liefern den Response-Body als STRING (UTF-8 mit Replace-Strategie für Nicht-Decodierbares).
+`HTTP_GET` / `HTTP_POST` sind die Kurzformen für den häufigen Fall und liefern den Response-Body als STRING (UTF-8 mit Replace-Strategie für Nicht-Decodierbares).
 
 ```basic
 IMPORT "html"
@@ -73,7 +164,8 @@ Für alles, was in einer Schleife läuft, gibt es darum denselben Abruf zum Nach
 
 | Funktion | Wirkung |
 |---|---|
-| `HTTP_GET_START(url$)` → INTEGER | startet den Abruf im Hintergrund, liefert sofort seine Nummer |
+| `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` → INTEGER | startet **jede** Anfrage im Hintergrund |
+| `HTTP_GET_START(url$)` → INTEGER | Kurzform davon für GET |
 | `HTTP_READY(abruf)` → BOOLEAN | ist die Antwort da? (fragt nach, wartet nicht) |
 | `HTTP_RESULT(abruf)` → STRING | holt den Body ab und gibt den Platz frei |
 | `HTTP_CANCEL(abruf)` | Abruf verwerfen (unbekannte Nummer = No-Op) |
@@ -81,6 +173,11 @@ Für alles, was in einer Schleife läuft, gibt es darum denselben Abruf zum Nach
 | `HTTP_URL$(abruf)` → STRING | die URL eines laufenden Abrufs |
 
 Das Muster ist dasselbe wie bei `INPUT_UPDATE()`/`TIMER_UPDATE()`: einmal pro Frame nachsehen.
+
+`HTTP_RESULT` setzt `HTTP_STATUS()`, `HTTP_HEADER()` und `HTTP_BYTES()` genauso
+wie ein blockierender Aufruf — beim **Abholen**, nicht beim Starten. Bei
+mehreren gleichzeitigen Abrufen gehören diese Werte also immer zu dem, den man
+zuletzt abgeholt hat.
 
 ```basic
 IMPORT "html"
@@ -203,9 +300,10 @@ PRINT "Stars: ", JSON_GET_INT(info, "stargazers_count")
 ## Sicherheits-/Privacy-Hinweise
 
 - **User-Agent**: das Modul setzt einen eigenen User-Agent (`Drachenhauch/0.1 …`). Manche Server blocken Python's Default-`urllib`-UA — der eigene Header umgeht das.
-- **HTTPS**: Zertifikats-Validierung läuft via Python-Default (System-CA-Store). Selbst-signierte Zertifikate werden abgelehnt — keine Bypass-Option im Modul (mit Absicht).
-- **Cookies / Sessions** werden nicht persistent gespeichert — jeder Aufruf ist stateless. Für Login-geschützte APIs lieber Token-basierte Auth via Header einsetzen.
-- **Timeout**: 10 Sekunden hart codiert. Ein blockierender HTTP-Call im Render-Tick friert die UI ein — in einer Schleife gehören darum `HTTP_GET_START`/`HTTP_READY`/`HTTP_RESULT` hin (siehe [Abrufe im Hintergrund](#abrufe-im-hintergrund)).
+- **HTTPS**: Zertifikats-Validierung gegen den System-CA-Store. Selbst-signierte Zertifikate werden abgelehnt — keine Bypass-Option im Modul (mit Absicht).
+- **Cookies / Sessions** werden nicht gespeichert — jeder Aufruf steht für sich. Für angemeldete APIs ist Token-Auth der Weg: `HTTP_SET_HEADER("Authorization", "Bearer …")` einmal setzen, oder die Kopfzeile pro Aufruf an `HTTP_REQUEST` geben.
+- **Kopfzeilen werden geprüft**, bevor sie rausgehen: ein Zeilenumbruch im Wert wird abgelehnt. Sonst ließen sich über einen Wert aus einer Benutzereingabe beliebige weitere Kopfzeilen einschmuggeln (Header-Injection).
+- **Timeout**: 10 Sekunden, änderbar mit `HTTP_TIMEOUT(sekunden)` (1..600). Ein blockierender HTTP-Aufruf im Render-Tick friert die UI trotzdem ein — in einer Schleife gehören darum `HTTP_REQUEST_START`/`HTTP_READY`/`HTTP_RESULT` hin (siehe [Abrufe im Hintergrund](#abrufe-im-hintergrund)).
 - **Kein SSRF-Schutz**: `HTTP_GET`/`HTTP_POST`/`HTTP_DOWNLOAD` akzeptieren jede erreichbare URL, inklusive `localhost`/privater IPs/interner Dienste — das Modul filtert das bewusst nicht (Drachenhauch-Programme laufen lokal vertrauenswürdig). Wer fremden/eingebetteten GB-Code ausführt (Multiplayer-Skripte, Mod-Support), sollte das selbst absichern (z.B. URL-Allowlist vor dem Aufruf prüfen) — die Runtime tut es nicht für dich.
 - **`HTTP_DOWNLOAD`** streamt direkt in die Zieldatei (kein voller In-Memory-Puffer vorher) — bei sehr großen Downloads bleibt so nur der Festplattenplatz relevant, nicht der RAM-Verbrauch. Bricht der Transfer mitten im Body ab, wird die unvollständige Datei automatisch gelöscht statt einen abgeschnittenen Rest liegen zu lassen.
 

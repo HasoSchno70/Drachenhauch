@@ -691,6 +691,20 @@ pub struct Vm<'p> {
     http_status: i64,
     #[cfg(feature = "http")]
     http_headers: Vec<(String, String)>,
+    // Modul html (WP C): der ROHE Rumpf der letzten Antwort, fuer HTTP_BYTES().
+    // Noetig, weil HTTP_GET & Co. den Rumpf verlustbehaftet nach UTF-8 wandeln
+    // -- bei einem Bild oder einer Zip-Datei bliebe davon nichts Brauchbares.
+    #[cfg(feature = "http")]
+    http_body: Vec<u8>,
+    // Modul html (WP C): Kopfzeilen, die JEDER folgende Aufruf mitschickt
+    // (HTTP_SET_HEADER) -- fuer ein Token, das man einmal setzt statt es an
+    // jeden einzelnen Aufruf zu haengen. Pro Aufruf uebergebene Kopfzeilen
+    // gewinnen dagegen.
+    #[cfg(feature = "http")]
+    http_default_header: Vec<(String, String)>,
+    // Modul html (WP C): Zeitgrenze in Sekunden fuer folgende Aufrufe.
+    #[cfg(feature = "http")]
+    http_timeout: u64,
     // Modul html: Abrufe im Hintergrund (HTTP_GET_START/READY/RESULT).
     #[cfg(feature = "http")]
     http_abrufe: crate::html::Abrufe,
@@ -783,6 +797,12 @@ impl<'p> Vm<'p> {
             cloud_last_error: String::new(),
             #[cfg(feature = "http")]
             http_headers: Vec::new(),
+            #[cfg(feature = "http")]
+            http_body: Vec::new(),
+            #[cfg(feature = "http")]
+            http_default_header: Vec::new(),
+            #[cfg(feature = "http")]
+            http_timeout: 10,
             #[cfg(feature = "http")]
             http_abrufe: crate::html::Abrufe::default(),
             #[cfg(feature = "serial")]
@@ -2771,25 +2791,133 @@ impl<'p> Vm<'p> {
         { let _ = (name, a); Ok(None) }
     }
 
+    /// Eine HTTP-Antwort in den VM-Zustand uebernehmen und als STRING liefern.
+    ///
+    /// Frueher stand dieser Block viermal wortgleich in `try_html_impl`. Mit
+    /// `HTTP_BYTES` (WP C) kam eine fuenfte Sache dazu, die JEDER Pfad tun
+    /// muss -- und genau so vergisst man sie in einem davon.
+    #[cfg(feature = "http")]
+    fn http_antwort(&mut self, r: Result<crate::html::HttpResult, crate::html::HttpErr>) -> R<Value> {
+        match r {
+            Ok(r) => {
+                self.http_status = r.status;
+                self.http_headers = r.headers;
+                let text = String::from_utf8_lossy(&r.body).into_owned();
+                self.http_body = r.body;      // roh, fuer HTTP_BYTES()
+                Ok(Value::str_rc(&text))
+            }
+            Err(e) => {
+                if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; }
+                // Sonst gehoerte der Rumpf der VORIGEN Antwort und HTTP_BYTES
+                // lieferte nach einem Fehlschlag alte Daten als neue aus.
+                self.http_body.clear();
+                Err(e.msg)
+            }
+        }
+    }
+
+    /// Baut aus `(methode, url [, rumpf [, kopfzeilen]])` eine Anfrage.
+    /// Gemeinsam fuer HTTP_REQUEST und HTTP_REQUEST_START.
+    #[cfg(feature = "http")]
+    fn http_anfrage(&self, fn_: &str, a: &[Value]) -> R<crate::html::Anfrage> {
+        if a.len() < 2 || a.len() > 4 {
+            return Err(format!(
+                "{}: erwartet 2..4 Argumente (methode, url [, rumpf [, kopfzeilen]]), erhalten {}",
+                fn_, a.len()));
+        }
+        let mut anfrage = crate::html::Anfrage::neu(bi_str(a, 0, fn_)?, bi_str(a, 1, fn_)?);
+        anfrage.timeout = self.http_timeout;
+        // Rumpf: Text ODER Bytes. NIL/weggelassen = kein Rumpf.
+        anfrage.body = match a.get(2) {
+            None | Some(Value::Nil) => Vec::new(),
+            Some(Value::Str(s)) => s.as_bytes().to_vec(),
+            Some(Value::Buffer(b)) => b.borrow().clone(),
+            Some(v) => return Err(format!(
+                "{}: Rumpf erwartet STRING oder BUFFER, erhalten {}", fn_, v.type_name())),
+        };
+        // Erst die dauerhaften Kopfzeilen, dann die des Aufrufs -- gleiche
+        // Namen ueberschreiben, der Aufruf gewinnt also gegen HTTP_SET_HEADER.
+        anfrage.header = self.http_default_header.clone();
+        match a.get(3) {
+            None | Some(Value::Nil) => {}
+            Some(Value::Map(m)) => {
+                for (k, v) in m.borrow().entries.iter() {
+                    match v {
+                        Value::Str(s) => anfrage.header.push((k.clone(), s.to_string())),
+                        andere => return Err(format!(
+                            "{}: Kopfzeile '{}' erwartet STRING, erhalten {}",
+                            fn_, k, andere.type_name())),
+                    }
+                }
+            }
+            Some(v) => return Err(format!(
+                "{}: Kopfzeilen erwarten MAP OF STRING, erhalten {}", fn_, v.type_name())),
+        }
+        Ok(anfrage)
+    }
+
     #[cfg(feature = "http")]
     fn try_html_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         use crate::html;
         let v = match name {
             "http_get" => {
-                let url = bi_str(a, 0, "HTTP_GET")?.to_string();
-                match html::http_get(&url) {
-                    Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::str_rc(&String::from_utf8_lossy(&r.body)) }
-                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
-                }
+                let mut anfrage = html::Anfrage::neu("GET", bi_str(a, 0, "HTTP_GET")?);
+                anfrage.timeout = self.http_timeout;
+                anfrage.header = self.http_default_header.clone();
+                let r = html::http_request(&anfrage);
+                self.http_antwort(r)?
             }
             "http_post" => {
-                let url = bi_str(a, 0, "HTTP_POST")?.to_string();
-                let body = bi_str(a, 1, "HTTP_POST")?.to_string();
-                match html::http_post(&url, &body) {
-                    Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::str_rc(&String::from_utf8_lossy(&r.body)) }
-                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
-                }
+                let mut anfrage = html::Anfrage::neu("POST", bi_str(a, 0, "HTTP_POST")?);
+                anfrage.timeout = self.http_timeout;
+                anfrage.body = bi_str(a, 1, "HTTP_POST")?.as_bytes().to_vec();
+                anfrage.header = self.http_default_header.clone();
+                anfrage.header.push(("Content-Type".to_string(),
+                                     "application/x-www-form-urlencoded; charset=utf-8".to_string()));
+                let r = html::http_request(&anfrage);
+                self.http_antwort(r)?
             }
+            // --- WP C: eine Anfrage, wie sie eine echte API braucht ---
+            "http_request" => {
+                let anfrage = self.http_anfrage("HTTP_REQUEST", a)?;
+                let r = html::http_request(&anfrage);
+                self.http_antwort(r)?
+            }
+            "http_request_start" => {
+                let anfrage = self.http_anfrage("HTTP_REQUEST_START", a)?;
+                Value::Int(self.http_abrufe.start(anfrage))
+            }
+            "http_bytes" => {
+                if !a.is_empty() { return Err(format!("HTTP_BYTES: erwartet 0 Argumente, erhalten {}", a.len())); }
+                Value::Buffer(Rc::new(RefCell::new(self.http_body.clone())))
+            }
+            "http_timeout" => {
+                let s = bi_int(a, 0, "HTTP_TIMEOUT")?;
+                // Obergrenze, damit ein vertipptes HTTP_TIMEOUT(600000) das
+                // Programm nicht faktisch fuer immer haengen laesst.
+                if !(1..=600).contains(&s) {
+                    return Err(format!("HTTP_TIMEOUT: {} Sekunden liegen ausserhalb 1..600", s));
+                }
+                self.http_timeout = s as u64;
+                Value::Nil
+            }
+            "http_set_header" => {
+                let k = bi_str(a, 0, "HTTP_SET_HEADER")?.to_string();
+                let v = bi_str(a, 1, "HTTP_SET_HEADER")?.to_string();
+                // Sofort pruefen statt erst beim naechsten Aufruf: der Fehler
+                // gehoert an die Zeile, in der die Kopfzeile gesetzt wird.
+                html::pruefe_header(&k, &v)?;
+                // Gleicher Name ersetzt -- zweimal denselben Namen zu schicken
+                // waere sonst das Ergebnis, und welcher gilt, entschiede der
+                // Server.
+                if let Some(e) = self.http_default_header.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(&k)) {
+                    e.1 = v;
+                } else {
+                    self.http_default_header.push((k, v));
+                }
+                Value::Nil
+            }
+            "http_clear_headers" => { self.http_default_header.clear(); Value::Nil }
             "http_download" => {
                 let url = bi_str(a, 0, "HTTP_DOWNLOAD")?.to_string();
                 let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
@@ -2800,22 +2928,16 @@ impl<'p> Vm<'p> {
             }
             // --- Abrufe im Hintergrund: starten, nachsehen, abholen ---
             "http_get_start" => {
-                let url = bi_str(a, 0, "HTTP_GET_START")?.to_string();
-                Value::Int(self.http_abrufe.start(&url))
+                let mut anfrage = html::Anfrage::neu("GET", bi_str(a, 0, "HTTP_GET_START")?);
+                anfrage.timeout = self.http_timeout;
+                anfrage.header = self.http_default_header.clone();
+                Value::Int(self.http_abrufe.start(anfrage))
             }
             "http_ready" => Value::Bool(self.http_abrufe.fertig(bi_int(a, 0, "HTTP_READY")?)),
             "http_result" => {
                 let id = bi_int(a, 0, "HTTP_RESULT")?;
                 match self.http_abrufe.abholen(id) {
-                    Some(Ok(r)) => {
-                        self.http_status = r.status;
-                        self.http_headers = r.headers;
-                        Value::str_rc(&String::from_utf8_lossy(&r.body))
-                    }
-                    Some(Err(e)) => {
-                        if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; }
-                        return Err(e.msg);
-                    }
+                    Some(r) => self.http_antwort(r)?,
                     // Abholen ohne vorheriges HTTP_READY ist der haeufigste
                     // Anfaengerfehler -- deshalb sagt die Meldung, was fehlt.
                     None => return Err(format!(
