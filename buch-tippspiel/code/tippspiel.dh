@@ -296,9 +296,36 @@ SUB ergebnisSetzen(saison AS INTEGER, liga AS STRING, spieltag AS INTEGER, _
             toreHeim, toreGast, saison, liga, spieltag, heim, gast)
 END SUB
 
-db = DB_OPEN(DATEI)
-anlegen()
-grunddaten()
+' Bis hierher lief das Programm immer aus einem Ordner, in den man schreiben
+' darf. Weitergegeben ist das nicht mehr sicher -- und der haeufigste Fall
+' ist, dass der Empfaenger die .exe im noch GEPACKTEN Ordner doppelklickt:
+' Windows oeffnet ZIP-Ordner nur lesbar, DB_OPEN scheitert.
+'
+' Ohne diesen Fang passiert dann das Schlimmste, was einem weitergegebenen
+' Programm passieren kann: die Meldung geht auf die Konsole, und beim
+' Doppelklick gibt es keine. Der Empfaenger klickt, es tut sich nichts, und
+' niemand kann sagen warum. Also erst ein Fenster mit einem Satz, den man
+' versteht -- dann darf es abbrechen.
+'
+' Auch anlegen() steht im TRY: eine Datenbank kann sich OEFFNEN lassen und
+' erst beim CREATE TABLE auffallen, dass sie schreibgeschuetzt ist.
+TRY
+    db = DB_OPEN(DATEI)
+    anlegen()
+    grunddaten()
+CATCH e
+    GUI_MESSAGE("Tippspiel kann nicht starten", _
+        "Die Datenbank " + DATEI + " lässt sich nicht anlegen oder öffnen." + _
+        CHR$(10) + CHR$(10) + _
+        "Fast immer liegt das daran, dass das Programm aus einem Ordner läuft, " + _
+        "in den nicht geschrieben werden darf -- zum Beispiel direkt aus einem " + _
+        "ZIP-Archiv. Den Ordner erst auspacken, dann starten." + _
+        CHR$(10) + CHR$(10) + _
+        "Meldung der Datenbank: " + e)
+    ' Ohne Datenbank hat das Programm nichts zu zeigen. Der Text steht schon
+    ' im Fenster; das Weiterwerfen beendet nur noch.
+    THROW "Datenbank nicht verfuegbar: " + e
+END TRY
 
 ' ---- Oberflaeche ---------------------------------------------------------
 SCREEN(1180, 720, "Drachenhauch - Tippspiel", 1)

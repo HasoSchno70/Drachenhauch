@@ -66,3 +66,5 @@ examples/tabelle_sqlite_arbeitskopie.db
 # Das sind die Daten des Lesers, nicht der Quelltext des Buchs.
 buch-tippspiel/code/*.db*
 buch-tippspiel/code/kap*/*.db*
+# Der Export legt den Ordner mit der .exe an -- Bauergebnis, kein Quelltext.
+buch-tippspiel/code/*_dist/

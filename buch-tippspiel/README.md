@@ -55,6 +55,41 @@ Was es über Kapitel 12 hinaus kann:
 | **Statistik** | Reiter *Statistik*, je Spieler und wahlweise je Liga: Tipps, Punkte, Schnitt, Trefferquote; die vier Trefferarten mit Anteil; bester und schwächster Spieltag; ein Balkendiagramm der Punkte je Spieltag. Gezählt wird die **Art** des Treffers, hergeleitet aus Tipp und Ergebnis — nicht aus der gespeicherten Punktzahl. |
 | **Punkteregeln** | Was ein Treffer wert ist, steht nicht mehr im Quelltext, sondern **je Saison** in der Datenbank — vier Zahlen für exakt / Tordifferenz / Tendenz / daneben, einstellbar auf dem Reiter *Verwaltung*. Speichern rechnet gleich alle Punkte neu. Eine Saison ohne eigene Regel rechnet nach der Vorgabe (3/2/1/0); der Weg zurück ist ein Knopf. |
 | **Saisons** | Saisonwahl in der Kopfzeile; sie steht über Liga und Spieltag, und Rangliste, Ligatabelle und Statistik zeigen nur die gewählte. Mehrere Saisons stehen nebeneinander in derselben Datenbank — ohne die Saison im Schlüssel wäre dieselbe Paarung am selben Spieltag jedes Jahr dasselbe Spiel, und der nächste Abruf überschriebe die alten Ergebnisse. Die Tippgemeinschaften bleiben bewusst saisonübergreifend: das Büro tippt auch nächstes Jahr noch zusammen. |
+| **Weitergeben** | Als eine `.exe` von 14,9 MB — der Empfänger braucht kein Drachenhauch, kein Python, keinen Editor. Wenn die Datenbank sich nicht anlegen lässt (der Ordner ist noch gepackt), steht ein **Fenster mit einem Satz** da statt einer Meldung auf einer Konsole, die es beim Doppelklick nicht gibt. Rezept unten. |
+
+## Weitergeben
+
+```
+dhrt --export buch-tippspiel/code/tippspiel.dh
+```
+
+Das legt `code/tippspiel_dist/tippspiel.exe` an — **14,9 MB**, die Runtime steckt
+darin. Den ganzen Ordner weitergeben, der Empfänger packt ihn aus und
+doppelklickt.
+
+**Wo die Daten liegen**, nachgemessen und nicht angenommen: Drachenhauch löst
+relative Pfade **relativ zum Programm** auf, nicht zum Startverzeichnis. Die
+`.exe` aus einem anderen Ordner heraus gestartet legt `tippspiel.db` neben
+sich an, nicht dort, wo man startet. Beim ersten Start entsteht sie von selbst
+— dafür steht seit Kapitel 2 in jedem Stand ein `CREATE TABLE IF NOT EXISTS`.
+
+**Zwei Fallen beim Ausliefern**, beide beim Nachmessen aufgefallen:
+
+1. **Der Export kopiert die eigene Datenbank mit.** `DB_OPEN("tippspiel.db")`
+   sieht für den Export wie ein Dateiverweis aus — liegt beim Exportieren eine
+   `tippspiel.db` daneben, landet sie im `_dist`-Ordner (gemeldet als
+   „1 referenzierte Asset-Datei mitkopiert"). Dann bekommt die Tipprunde die
+   Tipps des Entwicklers. **Vor dem Export löschen.**
+2. **Der `_dist`-Ordner wird nicht geräumt.** Ein zweiter Export überschreibt
+   die `.exe`, lässt aber alles andere liegen — auch eine Datenbank aus dem
+   ersten Versuch. **Ordner vorher wegwerfen.**
+
+Zusammen also:
+
+```
+rm -rf buch-tippspiel/code/tippspiel_dist buch-tippspiel/code/tippspiel.db
+dhrt --export buch-tippspiel/code/tippspiel.dh
+```
 
 ## Aufbau (13 Kapitel)
 
@@ -197,8 +232,16 @@ Gemessen, nicht vermutet — Zahlen aus `stolpersteine.dh` vom 16.08.2026.
 
 ### Offen
 
-Nichts. Alle sieben gefundenen Punkte sind geschlossen — was beim
-Weiterschreiben auffällt, kommt hier dazu.
+8. **Der Export kann Daten nicht von Assets unterscheiden.**
+   `dhrt --export` kopiert jede Datei mit, deren Name im Quelltext als
+   Zeichenkette steht — auch `DB_OPEN("tippspiel.db")`. Liegt beim
+   Exportieren eine Datenbank daneben, wandert sie in den `_dist`-Ordner und
+   damit zum Empfänger: fremde Tipps statt eines leeren Anfangs. Für ein Bild
+   ist das Mitkopieren richtig, für eine Datei, die das Programm selbst
+   anlegt, falsch — und von außen sind die beiden nicht zu unterscheiden.
+   Dazu räumt der Export den `_dist`-Ordner nicht, ein zweiter Lauf lässt
+   alles Alte liegen. Beides umgeht man von Hand
+   ([Weitergeben](#weitergeben)), sicher wäre es nicht von Hand.
 
 ## Was gut passt
 
