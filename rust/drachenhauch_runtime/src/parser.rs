@@ -458,25 +458,41 @@ impl Parser {
     fn try_stmt(&mut self) -> R<Node> {
         self.expect(Tt::Try, "")?;
         self.consume_terminator()?;
-        let body = self.block_until(&[Tt::Catch, Tt::End], "CATCH oder END TRY erwartet")?;
+        let body = self.block_until(&[Tt::Catch, Tt::Finally, Tt::End],
+                                    "CATCH, FINALLY oder END TRY erwartet")?;
         let mut catch_var = String::new();
         let mut catch_block = Vec::new();
-        if self.matches(Tt::Catch) {
+        let has_catch = self.matches(Tt::Catch);
+        if has_catch {
             if self.check(Tt::Ident) { catch_var = sval(self.peek(0)); self.pos += 1; }
             self.consume_terminator()?;
-            catch_block = self.block_until(&[Tt::End], "END TRY erwartet")?;
+            catch_block = self.block_until(&[Tt::Finally, Tt::End],
+                                           "FINALLY oder END TRY erwartet")?;
+        }
+        let mut finally_block = Vec::new();
+        if self.matches(Tt::Finally) {
+            self.consume_terminator()?;
+            finally_block = self.block_until(&[Tt::End], "END TRY erwartet")?;
         }
         self.expect(Tt::End, "")?;
         self.expect(Tt::Try, "Erwartet TRY nach END")?;
         self.consume_terminator()?;
-        Ok(Node::Try { body, catch_var, catch_block })
+        Ok(Node::Try { body, catch_var, catch_block, has_catch, finally_block })
     }
 
     fn throw_stmt(&mut self) -> R<Node> {
         self.expect(Tt::Throw, "")?;
-        let value = self.expression()?;
+        let erst = self.expression()?;
+        // `THROW meldung` oder `THROW code, meldung`. Bei zwei Werten ist der
+        // ERSTE der Code -- so steht die Einordnung vorn, wie bei einer
+        // Fehlernummer ueblich.
+        if self.matches(Tt::Comma) {
+            let meldung = self.expression()?;
+            self.consume_terminator()?;
+            return Ok(Node::Throw { value: Box::new(meldung), code: Some(Box::new(erst)) });
+        }
         self.consume_terminator()?;
-        Ok(Node::Throw { value: Box::new(value) })
+        Ok(Node::Throw { value: Box::new(erst), code: None })
     }
 
     // ------------------------------------------------------ Typen
@@ -768,7 +784,17 @@ impl Parser {
             }
             Tt::Break => { self.pos += 1; Ok(Node::Break) }
             Tt::Continue => { self.pos += 1; Ok(Node::Continue) }
-            Tt::Throw => { self.pos += 1; let v = self.expression()?; Ok(Node::Throw { value: Box::new(v) }) }
+            // Einzeiler-Form (`IF ... THEN THROW ...`) -- nimmt den Code
+            // genauso wie die Block-Form, sonst gaebe es zwei Wahrheiten.
+            Tt::Throw => {
+                self.pos += 1;
+                let erst = self.expression()?;
+                if self.matches(Tt::Comma) {
+                    let meldung = self.expression()?;
+                    return Ok(Node::Throw { value: Box::new(meldung), code: Some(Box::new(erst)) });
+                }
+                Ok(Node::Throw { value: Box::new(erst), code: None })
+            }
             _ => {
                 let e = self.expression()?;
                 // Review-Fund (Sicherheitsnetz): jede Lvalue-Form, die trotz

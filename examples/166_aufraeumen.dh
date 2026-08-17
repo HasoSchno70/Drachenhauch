@@ -1,0 +1,87 @@
+' 166 -- Aufraeumen und entscheiden (WP F: FINALLY, ERROR_CODE$)
+'
+' Zwei Dinge, die vorher fehlten:
+'   1. FINALLY -- laeuft IMMER, egal wie man den TRY-Block verlaesst.
+'   2. Ein Fehler-Code -- damit ein CATCH entscheiden kann, ohne
+'      Meldungstexte zu vergleichen.
+'
+' Aufruf:  dhrt run 166_aufraeumen.dh
+
+CONST ARBEITSDATEI AS STRING = "arbeit.tmp"
+
+' ---- 1. Eine Datei, die auf jeden Fall geschlossen wird -----------------
+
+FUNCTION zeilenZaehlen(pfad AS STRING) AS INTEGER
+    DIM f AS FILE
+    DIM n AS INTEGER
+    n = 0
+    IF NOT FILEEXISTS(pfad) THEN
+        ' Ein Code VOR der Meldung -- darauf reagiert der Aufrufer.
+        THROW "NICHT_DA", "Datei nicht gefunden: " + pfad
+    END IF
+    f = OPENFILE(pfad, "r")
+    TRY
+        WHILE NOT ENDOFFILE(f)
+            READLINE(f)
+            n = n + 1
+        WEND
+        RETURN n            ' <- verlaesst den TRY-Block, FINALLY laeuft trotzdem
+    FINALLY
+        CLOSEFILE(f)
+        LOG_DEBUG("Datei geschlossen: " + pfad)
+    END TRY
+END FUNCTION
+
+WRITEALL(ARBEITSDATEI, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei" + CHR$(10))
+
+PRINT "1) Erfolgreich"
+PRINT "   Zeilen: " + STR$(zeilenZaehlen(ARBEITSDATEI))
+PRINT ""
+
+' ---- 2. Der Code entscheidet, nicht der Meldungstext -------------------
+
+SUB versuche(pfad AS STRING)
+    TRY
+        PRINT "   " + pfad + " hat " + STR$(zeilenZaehlen(pfad)) + " Zeilen"
+    CATCH e
+        SELECT CASE ERROR_CODE$()
+            CASE "NICHT_DA"
+                PRINT "   " + pfad + ": nicht da -- ueberspringe"
+            CASE ELSE
+                ' Kein Code = eingebauter Laufzeitfehler. Den will man sehen,
+                ' samt Zeile.
+                PRINT "   " + pfad + ": unerwartet in Zeile " + _
+                      STR$(ERROR_LINE()) + " -- " + e
+        END SELECT
+    END TRY
+END SUB
+
+PRINT "2) Mit Fehlern umgehen"
+versuche(ARBEITSDATEI)
+versuche("gibt_es_nicht.txt")
+PRINT ""
+
+' ---- 3. FINALLY ohne CATCH: aufraeumen, aber nicht entscheiden ---------
+' Das ist der haeufigste Fall. Aufraeumen will man immer -- entscheiden nur
+' an einer Stelle, und die liegt meist weiter oben.
+
+SUB heikel()
+    DIM sperre AS STRING
+    sperre = "gesperrt"
+    TRY
+        THROW "RECHNEN", "etwas ging schief"
+    FINALLY
+        ' Kein CATCH: der Fehler laeuft nach dem Aufraeumen weiter nach aussen.
+        sperre = "frei"
+        PRINT "   Sperre wieder " + sperre
+    END TRY
+END SUB
+
+PRINT "3) Aufraeumen ohne zu fangen"
+TRY
+    heikel()
+CATCH e
+    PRINT "   oben gefangen (" + ERROR_CODE$() + "): " + e
+END TRY
+
+DELETEFILE(ARBEITSDATEI)

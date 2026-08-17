@@ -93,7 +93,25 @@ mod oc {
     pub const DECLARE_GLOBAL_SLOT: i64 = 113;
     pub const DECLARE_GLOBAL_CONST_SLOT: i64 = 114;
     pub const BUILD_ARRAY: i64 = 117;
+    /// FINALLY (WP F): wirft den Fehler weiter, der oben auf dem Stack liegt.
+    /// Der Fehler-Zweig eines FINALLY braucht KEINEN eigenen Handler-Opcode --
+    /// er benutzt denselben TRY_BEGIN/TRY_END wie CATCH, nur mit anderem Ziel.
+    pub const FIN_END: i64 = 118;
     pub const HALT: i64 = 99;
+}
+
+/// Ein offener TRY-Block waehrend des Uebersetzens (WP F).
+///
+/// Wer den Block vorzeitig verlaesst (`RETURN`, `BREAK`, `CONTINUE`), muss
+/// genau das hier abarbeiten: erst die Handler entfernen, dann den
+/// FINALLY-Block ausfuehren -- und das fuer jedes umschliessende TRY, von
+/// innen nach aussen. Ohne diese Buchfuehrung liefe ein `RETURN` mitten im
+/// TRY am FINALLY vorbei, und genau dafuer schreibt man es hin.
+struct TryRahmen {
+    /// Wie viele Handler dieses TRY auf den Stapel gelegt hat (1 oder 2).
+    handler: usize,
+    /// Der FINALLY-Block; leer, wenn es keinen gibt.
+    finally_block: Vec<Node>,
 }
 
 /// Konstanter Wert im Pool -- wird wie `serialize._enc` kodiert.
@@ -144,11 +162,13 @@ struct Ctx {
     lines: Vec<u32>,
     cur_line: u32,
     consts: Vec<Value>,
-    // Jeder Eintrag: (Patch-IPs, try_depth bei Schleifen-Eintritt). BREAK/
-    // CONTINUE muessen pro dazwischenliegendem TRY ein TRY_END emittieren.
-    break_patches: Vec<(Vec<usize>, i64)>,
-    continue_patches: Vec<(Vec<usize>, i64)>,
-    try_depth: i64,
+    // Jeder Eintrag: (Patch-IPs, Tiefe von `try_stack` bei Schleifen-Eintritt).
+    // BREAK/CONTINUE muessen jedes dazwischenliegende TRY abraeumen -- seine
+    // Handler entfernen UND seinen FINALLY-Block ausfuehren.
+    break_patches: Vec<(Vec<usize>, usize)>,
+    continue_patches: Vec<(Vec<usize>, usize)>,
+    /// Die gerade offenen TRY-Bloecke, von aussen nach innen (WP F).
+    try_stack: Vec<TryRahmen>,
     local_slots: HashMap<String, usize>,
     local_types: Vec<String>,
     local_defaults: Vec<CVal>,
@@ -165,7 +185,7 @@ impl Ctx {
     fn new() -> Self {
         Ctx { code: vec![], lines: vec![], cur_line: 0,
               consts: vec![], break_patches: vec![], continue_patches: vec![],
-              try_depth: 0,
+              try_stack: vec![],
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               dim_types: HashMap::new(),
               is_main: true, is_sub: true, current_class: None }
@@ -610,13 +630,19 @@ impl Compiler {
                         if self.ctx.is_sub {
                             return Err("SUB darf RETURN nicht mit Wert verwenden".into());
                         }
+                        // Rueckgabewert VOR dem Abraeumen berechnen: der
+                        // FINALLY-Block laeuft danach, darf den Wert aber
+                        // nicht mehr aendern -- `RETURN x` liefert x, auch
+                        // wenn FINALLY x hinterher hochzaehlt.
                         self.expr(v)?;
+                        self.try_abraeumen(0)?;
                         self.ctx.emit(oc::RETURN, Value::Null);
                     }
                     None => {
                         if !self.ctx.is_sub {
                             return Err("FUNCTION braucht einen Wert bei RETURN".into());
                         }
+                        self.try_abraeumen(0)?;
                         self.ctx.emit(oc::RETURN_VOID, Value::Null);
                     }
                 }
@@ -651,11 +677,23 @@ impl Compiler {
                 self.stmt_select(subject, cases, else_block),
             Node::ForEach { var, iterable, body } => self.stmt_foreach(var, iterable, body),
             Node::Repeat { body, condition } => self.stmt_repeat(body, condition),
-            Node::Try { body, catch_var, catch_block } =>
-                self.stmt_try(body, catch_var, catch_block),
-            Node::Throw { value } => {
-                self.expr(value)?;
-                self.ctx.emit(oc::THROW, Value::Null);
+            Node::Try { body, catch_var, catch_block, has_catch, finally_block } =>
+                self.stmt_try(body, catch_var, catch_block, *has_catch, finally_block),
+            Node::Throw { value, code } => {
+                // Reihenfolge auf dem Stack: erst der Code (falls da), dann
+                // die Meldung -- die VM nimmt sie in dieser Reihenfolge
+                // wieder herunter.
+                match code {
+                    Some(c) => {
+                        self.expr(c)?;
+                        self.expr(value)?;
+                        self.ctx.emit(oc::THROW, json!(2));
+                    }
+                    None => {
+                        self.expr(value)?;
+                        self.ctx.emit(oc::THROW, Value::Null);
+                    }
+                }
                 Ok(())
             }
             Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
@@ -1137,7 +1175,7 @@ impl Compiler {
     }
 
     fn break_continue_enter(&mut self) {
-        let d = self.ctx.try_depth;
+        let d = self.ctx.try_stack.len();
         self.ctx.break_patches.push((vec![], d));
         self.ctx.continue_patches.push((vec![], d));
     }
@@ -1146,7 +1184,7 @@ impl Compiler {
             Some((_, d)) => *d,
             None => return Err("BREAK ausserhalb einer Schleife".into()),
         };
-        for _ in 0..(self.ctx.try_depth - loop_depth) { self.ctx.emit(oc::TRY_END, Value::Null); }
+        self.try_abraeumen(loop_depth)?;
         let ip = self.ctx.emit(oc::JUMP, Value::Null);
         self.ctx.break_patches.last_mut().unwrap().0.push(ip);
         Ok(())
@@ -1156,7 +1194,7 @@ impl Compiler {
             Some((_, d)) => *d,
             None => return Err("CONTINUE ausserhalb einer Schleife".into()),
         };
-        for _ in 0..(self.ctx.try_depth - loop_depth) { self.ctx.emit(oc::TRY_END, Value::Null); }
+        self.try_abraeumen(loop_depth)?;
         let ip = self.ctx.emit(oc::JUMP, Value::Null);
         self.ctx.continue_patches.last_mut().unwrap().0.push(ip);
         Ok(())
@@ -1767,34 +1805,113 @@ impl Compiler {
     }
 
     /// TRY body CATCH [e] catch_block END TRY.
-    fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node]) -> CR {
-        let catch_jmp = self.ctx.emit(oc::TRY_BEGIN, Value::Null);
-        self.ctx.try_depth += 1;
+    /// TRY / CATCH / FINALLY.
+    ///
+    /// Erzeugtes Muster (FINALLY steht ZWEIMAL im Code -- einmal fuer den
+    /// normalen Weg, einmal fuer den Fehler-Weg). Das ist Absicht: die
+    /// Alternative waere ein Ruecksprung-Mechanismus, und der kostet zur
+    /// LAUFZEIT etwas, waehrend die Verdopplung nur Platz kostet -- und zwar
+    /// nur fuer den FINALLY-Block selbst.
+    ///
+    /// ```text
+    ///     TRY_BEGIN -> Ferr        ; faengt alles, was aus Rumpf UND CATCH faellt
+    ///     TRY_BEGIN -> C           ; nur wenn es ein CATCH gibt
+    ///     <rumpf>
+    ///     TRY_END                  ; CATCH-Handler weg
+    ///     JUMP -> Fnorm
+    /// C:  <catch>                  ; Fehlerwert liegt auf dem Stack
+    /// Fnorm:
+    ///     TRY_END                  ; FINALLY-Handler weg
+    ///     <finally>
+    ///     JUMP -> Ende
+    /// Ferr:                        ; hierher wirft der Abwickler, Fehler auf dem Stack
+    ///     <finally>
+    ///     FIN_END                  ; und weiter damit nach aussen
+    /// Ende:
+    /// ```
+    ///
+    /// Der Fehler-Zweig braucht keinen eigenen Handler-Typ: der Abwickler in
+    /// `vm.rs` tut fuer CATCH und FINALLY dasselbe (Stack zurechtstutzen,
+    /// Fehlerwert auflegen, springen) -- nur der Code am Sprungziel ist ein
+    /// anderer.
+    fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node],
+                has_catch: bool, finally_block: &[Node]) -> CR {
+        let hat_finally = !finally_block.is_empty();
+        let fin_jmp = if hat_finally { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
+        // Ohne CATCH gibt es keinen zweiten Handler. Ausnahme: das alte
+        // `TRY ... END TRY` ganz ohne beides schluckt Fehler -- das war schon
+        // immer so und bleibt so, sonst braeche bestehender Code.
+        let braucht_catch_handler = has_catch || !hat_finally;
+        let catch_jmp = if braucht_catch_handler { Some(self.ctx.emit(oc::TRY_BEGIN, Value::Null)) } else { None };
+
+        self.ctx.try_stack.push(TryRahmen {
+            handler: (hat_finally as usize) + (braucht_catch_handler as usize),
+            finally_block: finally_block.to_vec(),
+        });
         for st in body { self.stmt(st)?; }
-        self.ctx.try_depth -= 1;
-        self.ctx.emit(oc::TRY_END, Value::Null);
+        self.ctx.try_stack.pop();
+
+        if braucht_catch_handler { self.ctx.emit(oc::TRY_END, Value::Null); }
         let end_jmp = self.ctx.emit(oc::JUMP, Value::Null);
-        // Catch-Branch: der (String-)Exception-Wert liegt oben auf dem Stack.
-        let ct = self.ctx.here();
-        self.ctx.patch(catch_jmp, ct);
-        if !catch_var.is_empty() {
-            if self.ctx.is_main {
-                if !self.ctx.local_slots.contains_key(catch_var) {
-                    let name_idx = self.ctx.add_const(json!(catch_var));
-                    let type_idx = self.ctx.add_const(json!("string"));
-                    let default_idx = self.ctx.add_const(json!(""));
-                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+
+        if let Some(cj) = catch_jmp {
+            // Catch-Zweig: der (String-)Fehlerwert liegt oben auf dem Stack.
+            let ct = self.ctx.here();
+            self.ctx.patch(cj, ct);
+            if !catch_var.is_empty() {
+                if self.ctx.is_main {
+                    if !self.ctx.local_slots.contains_key(catch_var) {
+                        let name_idx = self.ctx.add_const(json!(catch_var));
+                        let type_idx = self.ctx.add_const(json!("string"));
+                        let default_idx = self.ctx.add_const(json!(""));
+                        self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                    }
+                } else if !self.ctx.local_slots.contains_key(catch_var) {
+                    self.ctx.declare_local(catch_var, "string");
                 }
-            } else if !self.ctx.local_slots.contains_key(catch_var) {
-                self.ctx.declare_local(catch_var, "string");
+                self.store_var(catch_var);
+            } else {
+                self.ctx.emit(oc::POP, Value::Null);
             }
-            self.store_var(catch_var);
-        } else {
-            self.ctx.emit(oc::POP, Value::Null);
+            for st in catch_block { self.stmt(st)?; }
         }
-        for st in catch_block { self.stmt(st)?; }
-        let e = self.ctx.here();
-        self.ctx.patch(end_jmp, e);
+
+        // Fnorm -- hier laeuft alles zusammen, was OHNE Fehler hierher kam.
+        let fnorm = self.ctx.here();
+        self.ctx.patch(end_jmp, fnorm);
+        if let Some(fj) = fin_jmp {
+            self.ctx.emit(oc::TRY_END, Value::Null);        // FINALLY-Handler weg
+            for st in finally_block { self.stmt(st)?; }
+            let ueber_ferr = self.ctx.emit(oc::JUMP, Value::Null);
+            let ferr = self.ctx.here();
+            self.ctx.patch(fj, ferr);
+            for st in finally_block { self.stmt(st)?; }
+            self.ctx.emit(oc::FIN_END, Value::Null);
+            let ende = self.ctx.here();
+            self.ctx.patch(ueber_ferr, ende);
+        }
+        Ok(())
+    }
+
+    /// Vor einem vorzeitigen Verlassen (`RETURN`/`BREAK`/`CONTINUE`) alle
+    /// TRY-Bloecke bis `bis_tiefe` abraeumen -- von innen nach aussen: erst
+    /// die Handler entfernen, dann den FINALLY-Block ausfuehren.
+    ///
+    /// Die Reihenfolge ist wichtig: waere der FINALLY-Block noch von seinem
+    /// eigenen Handler geschuetzt, liefe ein Fehler DARIN im Kreis.
+    fn try_abraeumen(&mut self, bis_tiefe: usize) -> CR {
+        let mut i = self.ctx.try_stack.len();
+        while i > bis_tiefe {
+            i -= 1;
+            // Der Block muss herauskopiert werden -- `self.stmt` leiht `self`
+            // veraenderlich aus, und dann liegt `try_stack` nicht mehr frei.
+            let (handler, fin) = {
+                let r = &self.ctx.try_stack[i];
+                (r.handler, r.finally_block.clone())
+            };
+            for _ in 0..handler { self.ctx.emit(oc::TRY_END, Value::Null); }
+            for st in &fin { self.stmt(st)?; }
+        }
         Ok(())
     }
 
@@ -2366,7 +2483,7 @@ fn body_has_yield(stmts: &[Node]) -> bool {
     }
     fn ns(s: &Node) -> bool {
         match unwrap_stmt(s) {
-            Node::ExprStmt { expr } | Node::Throw { value: expr } => ny(expr),
+            Node::ExprStmt { expr } | Node::Throw { value: expr, .. } => ny(expr),
             Node::Assign { value, .. } | Node::Const { value, .. } => ny(value),
             Node::Return(Some(v)) => ny(v),
             Node::If { then_block, elseif_branches, else_block, .. } =>

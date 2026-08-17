@@ -235,11 +235,17 @@ class Try(Stmt):
     body: list
     catch_var: str   # "" wenn kein Name angegeben
     catch_block: list
+    # has_catch unterscheidet "CATCH ohne Namen" von "gar kein CATCH" --
+    # beides laesst catch_var leer, die Faelle verhalten sich aber
+    # entgegengesetzt (fangen vs. durchreichen).
+    has_catch: bool = False
+    finally_block: list = field(default_factory=list)
 
 
 @dataclass
 class Throw(Stmt):
     value: Expr
+    code: Expr = None      # `THROW code, meldung` -- sonst None
 
 
 @dataclass

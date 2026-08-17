@@ -55,6 +55,7 @@ class TokenType(Enum):
     TRY = auto()
     CATCH = auto()
     THROW = auto()
+    FINALLY = auto()
     IMPORT = auto()
     SELECT = auto()
     CASE = auto()
@@ -182,6 +183,7 @@ KEYWORDS = {
     "try": TokenType.TRY,
     "catch": TokenType.CATCH,
     "throw": TokenType.THROW,
+    "finally": TokenType.FINALLY,
     "import": TokenType.IMPORT,
     "select": TokenType.SELECT,
     "case": TokenType.CASE,

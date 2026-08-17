@@ -111,8 +111,14 @@ pub enum Node {
     Restore,
     IndexAssign { target: Box<Node>, indices: Vec<Node>, value: Box<Node> },
     TupleAssign { targets: Vec<Node>, value: Box<Node> },
-    Try { body: Vec<Node>, catch_var: String, catch_block: Vec<Node> },
-    Throw { value: Box<Node> },
+    /// `has_catch` unterscheidet `CATCH` ohne Variable von "gar kein CATCH" --
+    /// beides liesse sonst `catch_var` leer, und die beiden Faelle verhalten
+    /// sich bei einem Fehler entgegengesetzt (fangen vs. durchreichen).
+    Try { body: Vec<Node>, catch_var: String, catch_block: Vec<Node>,
+          has_catch: bool, finally_block: Vec<Node> },
+    /// `THROW meldung` oder `THROW code, meldung` -- der Code laesst ein CATCH
+    /// entscheiden, ohne Meldungstexte vergleichen zu muessen.
+    Throw { value: Box<Node>, code: Option<Box<Node>> },
     Assign { name: String, value: Box<Node> },
     Print { items: Vec<Node>, seps: Vec<String>, newline: bool },
     Input { prompt: Option<Box<Node>>, target: String },
@@ -219,10 +225,14 @@ impl Node {
                 ("value", value.to_json())]),
             TupleAssign { targets, value } => obj("TupleAssign", vec![
                 ("targets", vecj(targets)), ("value", value.to_json())]),
-            Try { body, catch_var, catch_block } => obj("Try", vec![
+            Try { body, catch_var, catch_block, has_catch, finally_block } => obj("Try", vec![
                 ("body", vecj(body)), ("catch_var", json!(catch_var)),
-                ("catch_block", vecj(catch_block))]),
-            Throw { value } => obj("Throw", vec![("value", value.to_json())]),
+                ("catch_block", vecj(catch_block)),
+                ("has_catch", json!(has_catch)),
+                ("finally_block", vecj(finally_block))]),
+            Throw { value, code } => obj("Throw", vec![
+                ("value", value.to_json()),
+                ("code", match code { Some(c) => c.to_json(), None => json!(null) })]),
             Assign { name, value } => obj("Assign", vec![
                 ("name", json!(name)), ("value", value.to_json())]),
             Print { items, seps, newline } => obj("Print", vec![

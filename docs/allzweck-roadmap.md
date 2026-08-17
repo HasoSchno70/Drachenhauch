@@ -303,19 +303,60 @@ anderen Builtins bei einem Byte-Vergleich. `LOG_*` teilt sich `flush_out` mit
 Tests: `tests/test_pruefen.py` (27). Beispiel: `examples/165_pruefen.dh`.
 Doku: `docs/builtins-core.md`, Abschnitt „Prüfen und Melden".
 
-## WP F — Fehler, die man behandeln kann
+## WP F — Fehler, die man behandeln kann (✅ ERLEDIGT 2026-08-17)
 
-`THROW` nimmt nur einen STRING, `CATCH` bekommt nur diesen String. Kein
-`FINALLY` (verifiziert: im Lexer nicht vorhanden), kein Fehler-Code, keine
-Fundstelle. Für Programme, die Aufräumen garantieren müssen — Datei schließen,
-Transaktion zurückrollen, Gerät freigeben — ist das mühsam und fehleranfällig.
+`THROW` nahm nur einen STRING, `CATCH` bekam nur diesen String. Kein
+`FINALLY`, kein Fehler-Code, keine Fundstelle. Für Programme, die Aufräumen
+garantieren müssen — Datei schließen, Transaktion zurückrollen, Gerät
+freigeben — war das mühsam und fehleranfällig.
 
-- [ ] `FINALLY`-Zweig in `TRY`
-- [ ] Fundstelle im `CATCH`: `ERROR_LINE()`, `ERROR_FILE$()`, wenn machbar ein
-      Aufruf-Pfad `ERROR_TRACE$()`
-- [ ] Fehler-Code neben der Meldung: `THROW code$, meldung$` plus
+- [x] `FINALLY`-Zweig in `TRY`. Läuft bei **allen** Auswegen: sauberer
+      Durchlauf, gefangener Fehler, weitergereichter Fehler, Fehler im `CATCH`,
+      `RETURN`, `BREAK`, `CONTINUE`. Verschachtelt von innen nach außen.
+- [x] Fundstelle im `CATCH`: `ERROR_LINE()`.
+- [x] Fehler-Code neben der Meldung: `THROW code$, meldung$` plus
       `ERROR_CODE$()` — damit ein `CATCH` entscheiden kann, statt Meldungstexte
-      zu vergleichen
+      zu vergleichen. Eingebaute Laufzeitfehler haben `""`.
+
+**Nicht umgesetzt** (aus der Planung gestrichen, mit Grund):
+
+- **`ERROR_FILE$()`** — `IMPORT` fügt textuell zu *einer* Quelle zusammen, es
+  gibt zur Laufzeit also nur eine Datei. Der Rückgabewert wäre immer derselbe.
+- **`ERROR_TRACE$()`** (Aufruf-Pfad) — dafür müsste die VM bei jedem Aufruf
+  eine Rahmen-Kette mitführen. Das kostet im Normalfall, in dem niemand einen
+  Trace will. Stand oben schon als „wenn machbar".
+
+**Der Entwurf in einem Satz:** der Fehler-Zweig eines `FINALLY` braucht
+**keinen eigenen Handler-Typ** — der Abwickler in `vm.rs` tut für `CATCH` und
+`FINALLY` genau dasselbe (Stack zurechtstutzen, Fehlerwert auflegen, springen),
+nur das Sprungziel ist ein anderes. Damit kam WP F mit **einem** neuen Opcode
+aus (`FIN_END` = Fehler weiterwerfen); der Rest ist erzeugter Code.
+
+Der `FINALLY`-Block steht zweimal im Bytecode (normaler Weg / Fehler-Weg).
+Das ist Absicht: die Alternative wäre ein Rücksprung-Mechanismus, und der
+kostet zur *Laufzeit* etwas, während die Verdopplung nur Platz kostet.
+
+**Der Teil, der wirklich Sorgfalt brauchte,** ist `RETURN`/`BREAK`/`CONTINUE`
+aus dem `TRY` heraus. Ein `FINALLY`, das beim normalen Durchlauf läuft, bei
+`RETURN` aber übersprungen wird, wäre schlimmer als keines — man verließe sich
+darauf. Dafür führt der Compiler jetzt einen `try_stack` (`TryRahmen`) statt
+eines bloßen Zählers und räumt vor jedem vorzeitigen Ausgang von innen nach
+außen ab: erst die Handler entfernen, dann den `FINALLY`-Block einsetzen. Der
+Rückgabewert wird **vor** dem Abräumen berechnet, damit `FINALLY` ihn nicht
+mehr ändern kann.
+
+**Ein Fehler, den erst der eigene Test fand:** `FIN_END` warf den Fehler als
+*frischen* Fehler weiter — damit setzte die VM `ERROR_LINE` auf das Ende des
+`FINALLY`-Blocks und leerte `ERROR_CODE$`. Ein `FINALLY` dazwischen löschte
+also genau die Angaben, wegen derer man sie abfragt. Behoben über ein
+`rethrow`-Flag, das die Fehlerbeobachtung überspringt.
+
+Mitgezogen: der **Python-Parser** (`drachenhauch/parser.py`, `ast_nodes.py`,
+`tokens.py`) — er dient dem Editor/LSP, und `test_rust_parser_parity.py`
+vergleicht beide ASTs Feld für Feld.
+
+Tests: `tests/test_finally.py` (25). Beispiel: `examples/166_aufraeumen.dh`.
+Doku: `docs/sprache.md`, Abschnitt „Try / Catch / Throw".
 
 ## WP G — Vererbung rund machen
 
@@ -395,7 +436,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → F → G → H → I** (A bis E sind erledigt, Nächstes ist F)
+**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → G → H → I** (A bis F sind erledigt, Nächstes ist G)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

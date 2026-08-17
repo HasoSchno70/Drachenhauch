@@ -930,6 +930,71 @@ END TRY
 
 Die Catch-Variable ist optional (`CATCH` ohne Name), wenn man den Wert nicht braucht.
 
+### FINALLY — aufräumen, egal wie man herauskommt
+
+Ein `FINALLY`-Zweig läuft **immer**: nach einem sauberen Durchlauf, nach einem
+gefangenen Fehler, bei einem Fehler, der weitergereicht wird — und auch, wenn
+der Block per `RETURN`, `BREAK` oder `CONTINUE` verlassen wird.
+
+```basic
+DIM f AS FILE
+f = OPENFILE("daten.txt", "r")
+TRY
+    verarbeite(READALL$(f))
+CATCH e
+    PRINT "Fehler: " + e
+FINALLY
+    CLOSEFILE(f)        ' passiert in JEDEM Fall
+END TRY
+```
+
+`CATCH` und `FINALLY` sind einzeln optional, aber mindestens eines muss da
+sein. **`TRY ... FINALLY ... END TRY` ohne `CATCH` fängt nichts** — es räumt
+nur auf, und der Fehler läuft danach weiter nach außen. Das ist meistens genau
+das Gewollte: aufräumen will man immer, entscheiden nur an einer Stelle.
+
+Bei ineinander liegenden `TRY`-Blöcken laufen die `FINALLY`-Zweige von innen
+nach außen.
+
+> **Der Rückgabewert wird vor dem `FINALLY` berechnet.** `RETURN x` liefert das
+> `x` von diesem Augenblick — was der `FINALLY`-Zweig danach mit der Variablen
+> anstellt, ändert den zurückgegebenen Wert nicht mehr.
+
+> **`TRY ... END TRY` ganz ohne `CATCH` und ohne `FINALLY`** verschluckt einen
+> Fehler stillschweigend. Das war schon immer so und bleibt so — aber es ist
+> selten das, was man will.
+
+### Fehler-Code: entscheiden, ohne Texte zu vergleichen
+
+`THROW` nimmt wahlweise einen Code vor der Meldung. Der Code ist das, worauf
+man reagiert; die Meldung ist das, was man dem Benutzer zeigt:
+
+```basic
+THROW "NETZ", "Server antwortet nicht"
+```
+
+Im `CATCH` liefert `ERROR_CODE$()` den Code und `ERROR_LINE()` die Zeile, in
+der der Fehler entstand:
+
+```basic
+TRY
+    hole_daten()
+CATCH e
+    SELECT CASE ERROR_CODE$()
+        CASE "NETZ"
+            PRINT "Später nochmal versuchen"
+        CASE "DATEI"
+            PRINT "Vorgabe benutzen"
+        CASE ELSE
+            PRINT f"Unerwartet in Zeile {ERROR_LINE()}: {e}"
+    END SELECT
+END TRY
+```
+
+Ein eingebauter Laufzeitfehler (Division durch null, Index außerhalb, …) hat
+den Code `""` — nur ein `THROW` mit zwei Werten setzt einen. Beide Angaben
+überstehen ein dazwischenliegendes `FINALLY`.
+
 ## Import
 
 **Quellcode-Modul** (eine andere `.dh`-Datei einbinden):

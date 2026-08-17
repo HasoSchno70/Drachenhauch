@@ -52,6 +52,12 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # Fehler-Angaben (WP F) -- im CATCH-Zweig gedacht
+    "error_line": ("ERROR_LINE() AS INTEGER",
+                   "Zeile, in der der zuletzt gefangene Fehler entstand (0 = keiner)."),
+    "error_code$": ("ERROR_CODE$() AS STRING",
+                    "Code des zuletzt gefangenen Fehlers -- gesetzt von "
+                    "`THROW code, meldung`. Eingebaute Laufzeitfehler haben \"\"."),
     # Pruefen und Melden (WP E)
     "assert": ("ASSERT(bedingung[, meldung])",
                "Schlaegt fehl, wenn die Bedingung FALSE ist. Verlangt einen BOOLEAN -- "

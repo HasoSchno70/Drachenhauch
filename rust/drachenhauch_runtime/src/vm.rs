@@ -657,6 +657,18 @@ pub struct Vm<'p> {
     // bricht ab, wie `assert` es ueberall tut. Ein Pruefprogramm schaltet mit
     // ASSERT_COLLECT(TRUE) um und will dann ALLE Fehler sehen, nicht nur den
     // ersten.
+    // WP F -- Angaben zum zuletzt aufgetretenen Fehler, fuer ERROR_LINE() und
+    // ERROR_CODE$() im CATCH-Zweig.
+    error_line: u32,
+    error_code: String,
+    // Nur zwischen einem THROW und dem Augenblick, in dem run_frame den Fehler
+    // zum ersten Mal sieht, gesetzt -- daran erkennt die VM, dass der Code aus
+    // genau diesem THROW stammt und nicht von einem frueheren.
+    throw_code: String,
+    throw_active: bool,
+    /// Von FIN_END gesetzt: der naechste Fehler ist ein WEITERgeworfener und
+    /// bringt seine Angaben (Zeile, Code) schon mit.
+    rethrow: bool,
     assert_geprueft: i64,
     assert_fehler: i64,
     assert_sammeln: bool,
@@ -776,6 +788,11 @@ impl<'p> Vm<'p> {
             debug_stop_flag: false,
             profile_stop_flag: false,
             exit_code: None,
+            error_line: 0,
+            error_code: String::new(),
+            throw_code: String::new(),
+            throw_active: false,
+            rethrow: false,
             assert_geprueft: 0,
             assert_fehler: 0,
             assert_sammeln: false,
@@ -1348,11 +1365,29 @@ impl<'p> Vm<'p> {
                     // fehlgeschlagene Instruktion. Nur der innerste Frame
                     // (Fehler-Ursprung) setzt sie; aeussere Frames sehen das
                     // Flag und lassen die innerste Zeile stehen.
-                    if !self.err_line_set {
+                    if self.rethrow {
+                        // Von FIN_END weitergeworfen: alle Angaben gehoeren
+                        // weiterhin der urspruenglichen Fehlerstelle, hier ist
+                        // also NICHTS zu aktualisieren.
+                        self.rethrow = false;
+                        self.err_line_set = true;
+                    } else if !self.err_line_set {
                         if let Some(&ln) = fn_.lines.get(ip.saturating_sub(1)) {
                             if ln != 0 { self.cur_line = ln; }
                         }
                         self.err_line_set = true;
+                        // WP F: Hier -- und nur hier -- sieht die VM einen
+                        // FRISCHEN Fehler. Also der richtige Ort, um Fundstelle
+                        // und Code fuer ERROR_LINE()/ERROR_CODE$() festzuhalten.
+                        // Ein Fehler, der nicht von THROW kam, loescht den Code;
+                        // sonst klebte er von einem frueheren THROW noch an.
+                        self.error_line = self.cur_line;
+                        self.error_code = if self.throw_active {
+                            std::mem::take(&mut self.throw_code)
+                        } else {
+                            String::new()
+                        };
+                        self.throw_active = false;
                     }
                     match try_handlers.pop() {
                         Some((target, depth)) => {
@@ -2409,9 +2444,42 @@ impl<'p> Vm<'p> {
                 // --- Exceptions ---
                 op::TRY_BEGIN => try_handlers.push((arg.as_usize(), stack.len())),
                 op::TRY_END => { try_handlers.pop(); }
+                // Ende des FINALLY-Blocks auf dem FEHLER-Weg (WP F): der
+                // Fehler, der uns hierher gebracht hat, liegt oben auf dem
+                // Stack und geht jetzt weiter nach aussen. Auf dem normalen
+                // Weg wird dieser Opcode nie erreicht -- dort steht eine
+                // zweite Kopie des Blocks ohne ihn (siehe compiler::stmt_try).
+                op::FIN_END => {
+                    let v = vm_pop(stack)?;
+                    let msg = match v { Value::Str(s) => s.to_string(), other => other.fmt() };
+                    // Das ist ein WEITERwerfen, kein neuer Fehler: Fundstelle
+                    // und Code beschreiben weiterhin die urspruengliche
+                    // Stelle. Ohne dieses Flag saehe run_frame einen frischen
+                    // Fehler, wuerde ERROR_LINE auf das Ende des
+                    // FINALLY-Blocks setzen und ERROR_CODE$ leeren -- ein
+                    // FINALLY dazwischen loeschte also die Angaben, wegen
+                    // derer man sie ueberhaupt abfragt.
+                    self.rethrow = true;
+                    return Err(msg);
+                }
                 op::THROW => {
                     let v = vm_pop(stack)?;
                     let msg = match v { Value::Str(s) => s.to_string(), other => other.fmt() };
+                    // Mit Code (`THROW code, meldung`) liegt der Code darunter.
+                    // `matches!` statt `as_i64()`: die einstellige Form gibt
+                    // gar kein Argument mit (Arg::Null), und `as_i64()` wuerde
+                    // darauf panisch abbrechen statt "kein Code" zu bedeuten.
+                    self.throw_code = if matches!(arg, crate::model::Arg::Int(2)) {
+                        let c = vm_pop(stack)?;
+                        match c { Value::Str(s) => s.to_string(), other => other.fmt() }
+                    } else {
+                        String::new()
+                    };
+                    // Markiert genau diesen einen Fehler als "von THROW". Die
+                    // Auswertung passiert im innersten run_frame, das den
+                    // Fehler als erstes sieht -- dazwischen kann kein anderer
+                    // entstehen (siehe dort).
+                    self.throw_active = true;
                     return Err(msg);
                 }
 
@@ -3437,8 +3505,20 @@ impl<'p> Vm<'p> {
     /// Braucht VM-Zustand (Zaehler, Sammel-Modus, Quell-Zeile, Ausgabe-Puffer)
     /// und steht darum hier statt in `builtins.rs`.
     fn try_pruefen(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        if !(name.starts_with("assert") || name.starts_with("log_")) { return Ok(None); }
+        if !(name.starts_with("assert") || name.starts_with("log_") || name.starts_with("error_")) {
+            return Ok(None);
+        }
         let v = match name {
+            // WP F -- Angaben zum zuletzt aufgetretenen Fehler. Im CATCH-Zweig
+            // gedacht; ausserhalb liefern sie den letzten Stand (0 bzw. "").
+            "error_line" => {
+                if !a.is_empty() { return Err("ERROR_LINE: erwartet 0 Argumente".into()); }
+                Value::Int(self.error_line as i64)
+            }
+            "error_code$" | "error_code" => {
+                if !a.is_empty() { return Err("ERROR_CODE$: erwartet 0 Argumente".into()); }
+                Value::str_rc(&self.error_code)
+            }
             "assert" => {
                 if a.is_empty() || a.len() > 2 {
                     return Err(format!("ASSERT: erwartet 1..2 Argumente (bedingung [, meldung]), erhalten {}", a.len()));

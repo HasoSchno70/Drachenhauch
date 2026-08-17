@@ -674,34 +674,53 @@ class Parser:
         try_tok = self._expect(TokenType.TRY)
         self._consume_terminator()
         body: list = []
-        while not self._check(TokenType.CATCH) and not self._check(TokenType.END):
+        while not (self._check(TokenType.CATCH) or self._check(TokenType.FINALLY)
+                   or self._check(TokenType.END)):
             if self._at_end():
-                raise ParseError("CATCH oder END TRY erwartet",
+                raise ParseError("CATCH, FINALLY oder END TRY erwartet",
                                  try_tok.line, try_tok.col)
             body.append(self._statement())
         catch_var = ""
         catch_block: list = []
-        if self._match(TokenType.CATCH):
+        # bool(...): _match liefert das TOKEN, nicht True/False -- und
+        # has_catch landet als Feld im AST, das gegen den Rust-Parser
+        # verglichen wird (dort ist es ein echtes bool).
+        has_catch = bool(self._match(TokenType.CATCH))
+        if has_catch:
             # Optional: Name fuer die Exception-Variable
             if self._check(TokenType.IDENT):
                 catch_var = self._peek().value
                 self.pos += 1
             self._consume_terminator()
+            while not (self._check(TokenType.FINALLY) or self._check(TokenType.END)):
+                if self._at_end():
+                    raise ParseError("FINALLY oder END TRY erwartet",
+                                     try_tok.line, try_tok.col)
+                catch_block.append(self._statement())
+        finally_block: list = []
+        if self._match(TokenType.FINALLY):
+            self._consume_terminator()
             while not self._check(TokenType.END):
                 if self._at_end():
                     raise ParseError("END TRY erwartet",
                                      try_tok.line, try_tok.col)
-                catch_block.append(self._statement())
+                finally_block.append(self._statement())
         self._expect(TokenType.END)
         self._expect(TokenType.TRY, "Erwartet TRY nach END")
         self._consume_terminator()
-        return Try(body, catch_var, catch_block)
+        return Try(body, catch_var, catch_block, has_catch, finally_block)
 
     def _throw_stmt(self):
         self._expect(TokenType.THROW)
-        value = self._expression()
+        erst = self._expression()
+        # `THROW meldung` oder `THROW code, meldung` -- bei zwei Werten ist der
+        # ERSTE der Code.
+        if self._match(TokenType.COMMA):
+            meldung = self._expression()
+            self._consume_terminator()
+            return Throw(meldung, erst)
         self._consume_terminator()
-        return Throw(value)
+        return Throw(erst)
 
     def _parse_type(self) -> str:
         """Parst Primitivtyp, ARRAY OF <type>, MAP OF [STRING TO] <type>,
@@ -1026,8 +1045,10 @@ class Parser:
             return Continue()
         if t == TokenType.THROW:
             self.pos += 1
-            value = self._expression()
-            return Throw(value)
+            erst = self._expression()
+            if self._match(TokenType.COMMA):
+                return Throw(self._expression(), erst)
+            return Throw(erst)
         # Fallback
         expr = self._expression()
         # Sicherheitsnetz: ein Top-Level `=` ist fast immer eine gemeinte
