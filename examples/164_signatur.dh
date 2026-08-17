@@ -1,0 +1,102 @@
+' 164 -- Signaturen, Tokens und Pruefsummen (WP D)
+'
+' Zeigt die drei Faelle, fuer die CRC32 und HASH nicht reichen:
+'   1. Einen Webhook pruefen -- kam die Nachricht wirklich von dem Dienst?
+'   2. Einen Zugangs-Token wuerfeln, den niemand vorhersagen kann.
+'   3. Eine heruntergeladene Datei gegen ihre Pruefsumme halten.
+'
+' Alles ohne Netz und ohne Fenster -- das Beispiel spielt beide Seiten selbst.
+'
+' Aufruf:  dhrt run 164_signatur.dh
+
+CONST GEHEIMNIS AS STRING = "gemeinsames-geheimnis-42"
+
+' --- 1. Einen Webhook pruefen --------------------------------------------
+' So laeuft es bei GitHub, Stripe, Shopify und vielen anderen: der Dienst
+' schickt die Nutzlast und in einer Kopfzeile ihre HMAC-Signatur. Wer das
+' Geheimnis kennt, kann nachrechnen -- wer es nicht kennt, kann die Signatur
+' nicht erzeugen.
+
+DIM nutzlast AS STRING
+DIM signatur AS STRING
+DIM erwartet AS STRING
+
+nutzlast = "{""ereignis"": ""zahlung"", ""betrag"": 1999}"
+
+' Diese Zeile stuende beim echten Dienst; hier spielen wir ihn selbst.
+signatur = HMAC_SHA256$(GEHEIMNIS, nutzlast)
+
+PRINT "1) Webhook"
+PRINT "   Nutzlast:  " + nutzlast
+PRINT "   Signatur:  " + signatur
+
+erwartet = HMAC_SHA256$(GEHEIMNIS, nutzlast)
+' SECURE_EQUALS und nicht "=": ein gewoehnlicher Vergleich bricht beim ersten
+' ungleichen Zeichen ab, und aus der Zeit laesst sich die Signatur Zeichen
+' fuer Zeichen erraten.
+IF SECURE_EQUALS(erwartet, signatur) THEN
+    PRINT "   -> echt"
+ELSE
+    PRINT "   -> gefaelscht"
+END IF
+
+' Und jetzt dieselbe Nachricht, unterwegs veraendert:
+DIM manipuliert AS STRING
+manipuliert = "{""ereignis"": ""zahlung"", ""betrag"": 199900}"
+IF SECURE_EQUALS(HMAC_SHA256$(GEHEIMNIS, manipuliert), signatur) THEN
+    PRINT "   -> veraenderte Nachricht faelschlich akzeptiert (waere schlimm)"
+ELSE
+    PRINT "   -> veraenderte Nachricht abgewiesen"
+END IF
+PRINT ""
+
+' --- 2. Ein Token, das niemand erraet ------------------------------------
+' RND waere hier falsch: es haengt an RANDOMIZE, dieselbe Saat liefert
+' dieselbe Folge. Fuer ein Wuerfelspiel richtig, fuer einen Schluessel nicht.
+DIM token AS STRING
+DIM salz AS STRING
+token = BUFFER_TO_HEX$(RANDOM_BYTES(32))
+salz = BUFFER_TO_HEX$(RANDOM_BYTES(16))
+
+PRINT "2) Zufall, der kein Spiel ist"
+PRINT "   Token:   " + token
+PRINT "   Salz:    " + salz
+PRINT "   Sitzung: " + UUID4$()
+PRINT ""
+
+' Beweis, dass RANDOMIZE hier nichts ausrichtet:
+DIM a AS STRING
+DIM b AS STRING
+RANDOMIZE(1)
+a = BUFFER_TO_HEX$(RANDOM_BYTES(8))
+RANDOMIZE(1)
+b = BUFFER_TO_HEX$(RANDOM_BYTES(8))
+PRINT "   Zweimal nach RANDOMIZE(1): " + a
+PRINT "                              " + b
+PRINT "   gleich? " + STR$(a = b) + "  (muss FALSE sein)"
+PRINT ""
+
+' --- 3. Eine Datei gegen ihre Pruefsumme halten --------------------------
+' Der uebliche Weg bei Downloads: der Anbieter veroeffentlicht die Pruefsumme,
+' man rechnet sie nach. SHA256_FILE$ liest blockweise -- auch eine Datei von
+' mehreren Gigabyte passt nicht in den Speicher, wohl aber durch diesen Puffer.
+DIM inhalt AS BUFFER
+DIM i AS INTEGER
+inhalt = BUFFER_NEW(300000)
+FOR i = 0 TO BUFFER_LEN(inhalt) - 1
+    BUFFER_SET(inhalt, i, i MOD 256)
+NEXT
+WRITEALL_BYTES("probe.bin", inhalt)
+
+PRINT "3) Datei-Pruefsumme"
+PRINT "   Groesse: " + STR$(FILESIZE("probe.bin")) + " Bytes"
+PRINT "   SHA-256: " + SHA256_FILE$("probe.bin")
+PRINT "   ueber den Inhalt gerechnet ergibt dasselbe: " + _
+      STR$(SHA256_FILE$("probe.bin") = SHA256$(READALL_BYTES("probe.bin")))
+
+' Ein einziges veraendertes Byte -- und die Pruefsumme ist eine voellig andere.
+BUFFER_SET(inhalt, 0, 99)
+WRITEALL_BYTES("probe.bin", inhalt)
+PRINT "   nach EINEM geaenderten Byte: " + SHA256_FILE$("probe.bin")
+
+DELETEFILE("probe.bin")

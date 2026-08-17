@@ -2427,6 +2427,84 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&cleaned.join("/")))
         }
 
+        // ===== Pruefsummen und Identitaet (WP D) =====
+        // CRC32/HASH (weiter oben) sind zum WIEDERERKENNEN da -- sie sagen
+        // "vermutlich dieselben Daten". Die hier sind fuer Faelle, in denen
+        // jemand die Antwort faelschen KOENNTE: Signaturen, Tokens, Belege.
+        "sha256$" | "sha256" | "sha1$" | "sha1" | "md5$" | "md5" => {
+            arity!(1);
+            let anz = name.to_uppercase();
+            let daten = need_daten(&a[0], &anz)?;
+            // Der Digest-Trait kommt ueber sha2 herein -- `digest` selbst ist nur
+    // transitiv da und steht darum nicht als eigener Name zur Verfuegung.
+    use sha2::Digest;
+            Ok(Value::str_rc(&match name.trim_end_matches('$') {
+                "sha256" => hex_string(&sha2::Sha256::digest(&daten)),
+                "sha1" => hex_string(&sha1::Sha1::digest(&daten)),
+                _ => hex_string(&md5::Md5::digest(&daten)),
+            }))
+        }
+        "sha256_file$" | "sha256_file" | "sha1_file$" | "sha1_file" | "md5_file$" | "md5_file" => {
+            arity!(1);
+            let anz = name.to_uppercase();
+            let pfad = need_str(&a[0], &anz)?;
+            let algo = name.trim_end_matches('$').trim_end_matches("_file");
+            Ok(Value::str_rc(&datei_hash(pfad, algo, &anz)?))
+        }
+        "hmac_sha256$" | "hmac_sha256" => {
+            // HMAC_SHA256$(schluessel, daten) -- der Standard fuer signierte
+            // Web-Aufrufe (Webhooks, S3, viele APIs).
+            arity!(2);
+            use hmac::Mac;
+            let schluessel = need_daten(&a[0], "HMAC_SHA256$")?;
+            let daten = need_daten(&a[1], "HMAC_SHA256$")?;
+            // `new_from_slice` scheitert bei HMAC nie (jede Schluessellaenge
+            // ist zulaessig, zu lange werden gehasht) -- der Fehlerzweig ist
+            // trotzdem ausgeschrieben statt unwrap().
+            let mut m = <hmac::Hmac<sha2::Sha256> as hmac::Mac>::new_from_slice(&schluessel)
+                .map_err(|e| format!("HMAC_SHA256$: Schluessel nicht verwendbar: {}", e))?;
+            m.update(&daten);
+            Ok(Value::str_rc(&hex_string(&m.finalize().into_bytes())))
+        }
+        "secure_equals" => {
+            // Zwei Pruefsummen in KONSTANTER Zeit vergleichen.
+            //
+            // Ein gewoehnliches `=` bricht beim ersten ungleichen Zeichen ab.
+            // Wer eine Signatur raten will, misst die Zeit und hat sie nach
+            // wenigen hundert Versuchen Zeichen fuer Zeichen -- genau der
+            // Fall, fuer den HMAC_SHA256$ da ist. Darum dieser Vergleich.
+            arity!(2);
+            let x = need_daten(&a[0], "SECURE_EQUALS")?;
+            let y = need_daten(&a[1], "SECURE_EQUALS")?;
+            // Ungleiche Laenge ist ohnehin nicht geheim (sie steht dem
+            // Angreifer frei zur Verfuegung); alles andere wird vollstaendig
+            // durchlaufen.
+            if x.len() != y.len() { return Ok(Value::Bool(false)); }
+            let mut diff = 0u8;
+            for i in 0..x.len() { diff |= x[i] ^ y[i]; }
+            Ok(Value::Bool(diff == 0))
+        }
+        "uuid4$" | "uuid4" => {
+            arity!(0);
+            Ok(Value::str_rc(&uuid::Uuid::new_v4().to_string()))
+        }
+        "random_bytes" => {
+            arity!(1);
+            let n = need_int(&a[0], "RANDOM_BYTES")?;
+            if n < 0 { return err(format!("RANDOM_BYTES: Anzahl {} ist negativ", n)); }
+            if n > MAX_BUFFER {
+                return err(format!("RANDOM_BYTES: Anzahl {} ueberschreitet die Obergrenze von {} Bytes", n, MAX_BUFFER));
+            }
+            let mut out = vec![0u8; n as usize];
+            // Aus der Quelle des BETRIEBSSYSTEMS, ausdruecklich NICHT aus dem
+            // RND-Generator dieser Datei: der ist gesaet und vorhersagbar
+            // (RANDOMIZE(1) liefert zweimal dieselbe Folge). Fuer ein
+            // Wuerfelspiel richtig, fuer ein Passwort ein Fehler.
+            getrandom::getrandom(&mut out)
+                .map_err(|e| format!("RANDOM_BYTES: Zufallsquelle des Systems nicht verfuegbar: {}", e))?;
+            Ok(neuer_buffer(out))
+        }
+
         // ===== BUFFER: Bytefolgen (WP B) =====
         // Referenz-Typ wie ARRAY: BUFFER_SET & Co. veraendern IN PLACE, alles
         // was "neu" heisst (SLICE/CONCAT) liefert einen eigenen Puffer.
@@ -3962,6 +4040,56 @@ fn buf_bereich(len: usize, pos: i64, breite: usize, fn_: &str) -> Result<usize, 
             fn_, breite, pos, len));
     }
     Ok(pos as usize)
+}
+
+// ===== Pruefsummen und Identitaet (WP D) =====
+
+/// Daten fuer eine Pruefsumme: STRING (als UTF-8-Bytes) ODER BUFFER.
+///
+/// Beides zuzulassen ist hier kein Komfort, sondern noetig: eine Signatur
+/// bildet man ueber die Bytes, die tatsaechlich uebertragen werden, und die
+/// liegen bei einem Datei-Upload nun mal als BUFFER vor.
+fn need_daten(v: &Value, fn_: &str) -> Result<Vec<u8>, String> {
+    match v {
+        Value::Str(s) => Ok(s.as_bytes().to_vec()),
+        Value::Buffer(b) => Ok(b.borrow().clone()),
+        andere => Err(format!("{}: erwartet STRING oder BUFFER, erhalten {}", fn_, andere.type_name())),
+    }
+}
+
+fn hex_string(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes { s.push_str(&format!("{:02x}", b)); }
+    s
+}
+
+/// Pruefsumme einer Datei, ohne sie ganz in den Speicher zu holen.
+/// Blockweise -- eine 4-GB-Datei ueber READALL_BYTES zu hashen waere die
+/// naheliegende, aber unbrauchbare Alternative.
+fn datei_hash(pfad: &str, algo: &str, fn_: &str) -> Result<String, String> {
+    // Der Digest-Trait kommt ueber sha2 herein -- `digest` selbst ist nur
+    // transitiv da und steht darum nicht als eigener Name zur Verfuegung.
+    use sha2::Digest;
+    let datei = std::fs::File::open(resolve_asset_path(pfad))
+        .map_err(|e| format!("{}: {} ({})", fn_, e, pfad))?;
+    let mut leser = std::io::BufReader::new(datei);
+    let mut block = vec![0u8; 64 * 1024];
+    macro_rules! lauf {
+        ($h:ty) => {{
+            let mut h = <$h>::new();
+            loop {
+                let n = leser.read(&mut block).map_err(|e| format!("{}: {}", fn_, e))?;
+                if n == 0 { break; }
+                h.update(&block[..n]);
+            }
+            hex_string(&h.finalize())
+        }};
+    }
+    Ok(match algo {
+        "sha256" => lauf!(sha2::Sha256),
+        "sha1" => lauf!(sha1::Sha1),
+        _ => lauf!(md5::Md5),
+    })
 }
 
 /// Wie viele Bytes eine Zahlen-Variante belegt (aus dem Builtin-Namen).

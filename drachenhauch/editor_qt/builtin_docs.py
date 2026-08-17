@@ -52,6 +52,31 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # Pruefsummen und Identitaet (WP D)
+    "sha256$": ("SHA256$(daten) AS STRING",
+                "SHA-256 als Hex. `daten` ist STRING (UTF-8) oder BUFFER. "
+                "Fuer alles, wo jemand die Antwort faelschen koennte -- anders als "
+                "CRC32/HASH, die nur zum Wiedererkennen taugen."),
+    "sha1$":   ("SHA1$(daten) AS STRING",
+                "SHA-1 als Hex. Fuer Vertraeglichkeit mit Bestehendem (git, alte APIs) "
+                "-- fuer neue Sicherheitsentscheidungen SHA256$ nehmen."),
+    "md5$":    ("MD5$(daten) AS STRING",
+                "MD5 als Hex. NUR fuer Vertraeglichkeit (ETags, alte Pruefsummen-Listen) "
+                "-- gilt als gebrochen, nichts Sicherheitsrelevantes darauf stuetzen."),
+    "sha256_file$": ("SHA256_FILE$(pfad) AS STRING",
+                     "SHA-256 einer Datei, blockweise gelesen -- auch bei mehreren GB."),
+    "sha1_file$":   ("SHA1_FILE$(pfad) AS STRING", "SHA-1 einer Datei, blockweise gelesen."),
+    "md5_file$":    ("MD5_FILE$(pfad) AS STRING", "MD5 einer Datei, blockweise gelesen."),
+    "hmac_sha256$": ("HMAC_SHA256$(schluessel, daten) AS STRING",
+                     "Signatur mit geheimem Schluessel (Webhooks, signierte API-Aufrufe). "
+                     "Ergebnis mit SECURE_EQUALS vergleichen, nicht mit '='."),
+    "secure_equals": ("SECURE_EQUALS(a, b) AS BOOLEAN",
+                      "Vergleich in konstanter Zeit. '=' bricht beim ersten Unterschied ab; "
+                      "wer eine Signatur raten will, misst die Zeit und hat sie zeichenweise."),
+    "uuid4$":  ("UUID4$() AS STRING", "Zufaellige eindeutige Kennung (Version 4)."),
+    "random_bytes": ("RANDOM_BYTES(anzahl) AS BUFFER",
+                     "Zufallsbytes aus der Quelle des Betriebssystems -- fuer Tokens, "
+                     "Schluessel, Salz. NICHT von RANDOMIZE beeinflussbar (anders als RND)."),
     # HTTP fuer echte Dienste (WP C, Modul html)
     "http_request": ("HTTP_REQUEST(methode, url[, rumpf[, kopfzeilen]]) AS STRING",
                      "HTTP-Anfrage mit eigener Methode (GET/POST/PUT/PATCH/DELETE/HEAD/"

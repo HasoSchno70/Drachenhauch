@@ -215,18 +215,45 @@ der zurückmeldet was ankam — am Rückgabewert allein sähe man nicht, ob eine
 Kopfzeile rausging). Beispiel: `examples/163_rest_api.dh` gegen httpbin.org.
 Doku: `docs/module-html.md`.
 
-## WP D — Identität und Prüfsummen
+## WP D — Identität und Prüfsummen (✅ ERLEDIGT 2026-08-17)
 
-Vorhanden sind `CRC32`, `HASH` (FNV-1a) und Base64 — Prüfsummen fürs
-Wiedererkennen, nichts für Vertrauen. Es fehlt alles, was eine Anmeldung, eine
+Vorhanden waren `CRC32`, `HASH` (FNV-1a) und Base64 — Prüfsummen fürs
+Wiedererkennen, nichts für Vertrauen. Es fehlte alles, was eine Anmeldung, eine
 Signatur oder eine stabile eindeutige Nummer braucht.
 
-- [ ] `SHA256$`, `SHA1$`, `MD5$` — je über STRING und über BUFFER
-- [ ] `HMAC_SHA256$(schluessel, daten)` — Web-APIs, Webhooks
-- [ ] `UUID4$()`
-- [ ] `RANDOM_BYTES(n)` → BUFFER, aus der Betriebssystem-Quelle (**nicht** aus
+- [x] `SHA256$`, `SHA1$`, `MD5$` — je über STRING und über BUFFER
+- [x] `HMAC_SHA256$(schluessel, daten)` — Web-APIs, Webhooks
+- [x] `UUID4$()`
+- [x] `RANDOM_BYTES(n)` → BUFFER, aus der Betriebssystem-Quelle (**nicht** aus
       dem Spiel-PRNG — der ist gesät und vorhersagbar, das ist hier ein Fehler
-      und kein Detail)
+      und kein Detail). Ein Test hält genau das fest: nach `RANDOMIZE(1)`
+      wiederholt sich `RND`, `RANDOM_BYTES` aber nicht.
+
+**Zwei Zugaben über die Planung hinaus:**
+
+1. **`SECURE_EQUALS(a, b)`** — Vergleich in konstanter Zeit. Ein gewöhnliches
+   `=` bricht beim ersten ungleichen Zeichen ab; wer eine Signatur raten will,
+   misst die Zeit und hat sie zeichenweise. Ohne diesen Vergleich wäre
+   `HMAC_SHA256$` genau an der Stelle stumpf, für die es da ist — die
+   naheliegende Benutzung wäre die falsche.
+2. **`SHA256_FILE$`/`SHA1_FILE$`/`MD5_FILE$`** — blockweise über eine Datei.
+   Die Alternative wäre `SHA256$(READALL_BYTES(...))`, und das scheitert genau
+   dort, wo man eine Dateiprüfsumme braucht: bei großen Dateien.
+
+**Umsetzung:** RustCrypto-Crates (`sha2`, `sha1`, `md-5`, `hmac`) plus `uuid`
+und `getrandom` — bewusst **keine Handarbeit**: eine selbstgeschriebene
+Hash-Funktion ist die Art Code, die auf den ersten Blick stimmt und in einem
+Randfall still etwas anderes liefert, und hier hängt eine Signaturprüfung
+daran. `sha1`, `digest`, `uuid` und `getrandom` lagen ohnehin schon transitiv
+in der Lockfile (über `ureq`/`rustls`). Alles **ungated** — ein
+Konsolenprogramm, das eine Prüfsumme bildet, soll nicht das `http`-Feature
+brauchen.
+
+Tests: `tests/test_krypto.py` (33), gegen die Vektoren aus den Normen
+(FIPS 180-4, RFC 1321, RFC 4231) bzw. gegen Pythons `hashlib`/`hmac` — eine
+Prüfsumme, die nur mit sich selbst übereinstimmt, wäre wertlos. Beispiel:
+`examples/164_signatur.dh` (Webhook prüfen, Token würfeln, Datei-Prüfsumme).
+Doku: `docs/builtins-core.md`, Abschnitt „Prüfsummen und Identität".
 
 ## WP E — Prüfen und Melden
 
@@ -333,7 +360,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → ~~C~~ → D → E → F → G → H → I** (A, B und C sind erledigt, Nächstes ist D)
+**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → E → F → G → H → I** (A bis D sind erledigt, Nächstes ist E)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

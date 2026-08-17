@@ -16,6 +16,7 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 - [Betriebssystem](#betriebssystem)
 - [Zeit & Random](#zeit--random)
 - [Typen & Encoding](#typen--encoding)
+- [Prüfsummen und Identität](#prüfsummen-und-identität)
 - [Spiel-Helfer](#spiel-helfer)
 
 ## Ausgabe (PRINT)
@@ -665,6 +666,74 @@ PRINT BASE64_ENCODE("Hi!")              ' "SGkh"
 PRINT BASE64_DECODE("SGkh")             ' "Hi!"
 PRINT CRC32("hello")                    ' 907060870
 ```
+
+## Prüfsummen und Identität
+
+`CRC32` und `HASH` oben sind zum **Wiedererkennen** da — sie sagen „vermutlich
+dieselben Daten". Sobald jemand die Antwort *fälschen* könnte, reichen sie
+nicht: Signaturen, Tokens, Belege, Passwort-Ableitungen brauchen etwas
+anderes.
+
+| Funktion | Zweck |
+|---|---|
+| `SHA256$(daten)` → STRING | SHA-256 als Hex (64 Zeichen) |
+| `SHA1$(daten)` → STRING | SHA-1 — nur für Verträglichkeit mit Bestehendem |
+| `MD5$(daten)` → STRING | MD5 — nur für Verträglichkeit |
+| `SHA256_FILE$(pfad$)`, `SHA1_FILE$`, `MD5_FILE$` → STRING | dasselbe für eine Datei, blockweise gelesen |
+| `HMAC_SHA256$(schluessel, daten)` → STRING | Signatur mit geheimem Schlüssel |
+| `SECURE_EQUALS(a, b)` → BOOLEAN | Vergleich in konstanter Zeit |
+| `UUID4$()` → STRING | zufällige eindeutige Kennung |
+| `RANDOM_BYTES(anzahl)` → BUFFER | Zufallsbytes vom Betriebssystem |
+
+`daten` und `schluessel` dürfen `STRING` (dann die UTF-8-Bytes) oder `BUFFER`
+sein — eine Signatur bildet man über die Bytes, die wirklich übertragen werden,
+und die liegen bei einem Datei-Upload als `BUFFER` vor.
+
+```basic
+PRINT SHA256$("abc")
+' ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+PRINT SHA256_FILE$("grosses_archiv.zip")   ' liest blockweise, egal wie groß
+```
+
+### Eine Signatur prüfen
+
+Der Fall, für den das alles da ist — ein Dienst schickt Daten und eine
+Signatur, das Programm rechnet nach:
+
+```basic
+DIM erwartet AS STRING
+erwartet = HMAC_SHA256$(geheimnis, nutzlast)
+
+IF SECURE_EQUALS(erwartet, signatur_aus_der_kopfzeile) THEN
+    PRINT "echt"
+ELSE
+    PRINT "gefälscht oder verändert"
+END IF
+```
+
+> **`SECURE_EQUALS` statt `=`.** Ein gewöhnlicher Vergleich bricht beim ersten
+> ungleichen Zeichen ab. Wer eine Signatur erraten will, misst die Zeit und hat
+> sie nach ein paar hundert Versuchen Zeichen für Zeichen. `SECURE_EQUALS`
+> läuft immer vollständig durch. Das ist genau bei dem Vergleich wichtig, für
+> den `HMAC_SHA256$` überhaupt existiert.
+
+### Zufall, der kein Spiel ist
+
+```basic
+DIM token AS STRING
+token = BUFFER_TO_HEX$(RANDOM_BYTES(32))
+```
+
+> **`RANDOM_BYTES` ist nicht `RND`.** `RND` hängt an `RANDOMIZE`: dieselbe Saat
+> liefert dieselbe Folge. Für ein Würfelspiel ist das richtig und sogar
+> erwünscht (reproduzierbare Level) — für ein Passwort, einen Sitzungs-Schlüssel
+> oder ein Salz wäre es ein Fehler. `RANDOM_BYTES` kommt aus der Zufallsquelle
+> des Betriebssystems und lässt sich von `RANDOMIZE` nicht beeindrucken.
+
+> **`MD5$` und `SHA1$` gelten als gebrochen.** Sie stehen hier, weil man sie
+> zum Mitspielen braucht — ETags, alte Prüfsummen-Listen, git-Objektnamen. Für
+> eine *eigene* Sicherheitsentscheidung ist `SHA256$` die Antwort.
 
 ## Spiel-Helfer
 

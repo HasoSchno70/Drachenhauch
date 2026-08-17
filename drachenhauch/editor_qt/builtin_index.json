@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1367,
+ "count": 1377,
  "builtins": [
   {
    "name": "ABS",
@@ -3585,6 +3585,12 @@
    "module": "core"
   },
   {
+   "name": "HMAC_SHA256$",
+   "kind": "core",
+   "signature": "HMAC_SHA256$(schluessel, daten) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "HSV",
    "kind": "core",
    "signature": "HSV(h: Zahl, s: Zahl, v: Zahl)",
@@ -4567,6 +4573,18 @@
    "kind": "core",
    "signature": "MAX(1+ Argumente)",
    "module": "core"
+  },
+  {
+   "name": "MD5$",
+   "kind": "core",
+   "signature": "MD5$(daten) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "MD5_FILE$",
+   "kind": "core",
+   "signature": "MD5_FILE$(pfad) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "MESH_CUBE",
@@ -5841,6 +5859,12 @@
    "module": "core"
   },
   {
+   "name": "RANDOM_BYTES",
+   "kind": "core",
+   "signature": "RANDOM_BYTES(anzahl) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
    "name": "RANGE",
    "kind": "core",
    "signature": "RANGE(1..3 Argumente)",
@@ -6447,6 +6471,12 @@
    "module": "core"
   },
   {
+   "name": "SECURE_EQUALS",
+   "kind": "core",
+   "signature": "SECURE_EQUALS(a, b) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
    "name": "SEEK",
    "kind": "core",
    "signature": "SEEK(datei, position)",
@@ -6558,6 +6588,30 @@
    "name": "SGN",
    "kind": "core",
    "signature": "SGN(zahl) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHA1$",
+   "kind": "core",
+   "signature": "SHA1$(daten) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHA1_FILE$",
+   "kind": "core",
+   "signature": "SHA1_FILE$(pfad) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHA256$",
+   "kind": "core",
+   "signature": "SHA256$(daten) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHA256_FILE$",
+   "kind": "core",
+   "signature": "SHA256_FILE$(pfad) AS STRING",
    "module": "dhrt"
   },
   {
@@ -7615,6 +7669,12 @@
    "kind": "core",
    "signature": "USB_WRITE(h: ?, data: STRING)",
    "module": "usb"
+  },
+  {
+   "name": "UUID4$",
+   "kind": "core",
+   "signature": "UUID4$() AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "VAL",

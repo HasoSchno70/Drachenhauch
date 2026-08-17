@@ -26,6 +26,23 @@ miniz_oxide = "0.8"
 rapier3d = "0.22"
 # physics2d-Modul (PHYS2D_*): echte 2D-Starrkoerper-Physik. Ebenfalls pure-Rust.
 rapier2d = "0.22"
+# Pruefsummen und Identitaet (WP D: SHA256$/SHA1$/MD5$/HMAC_SHA256$/UUID4$/
+# RANDOM_BYTES). Alles RustCrypto bzw. pure-Rust, keine C-Toolchain -> ungated:
+# ein Konsolenprogramm, das eine Pruefsumme bildet, soll nicht ausgerechnet das
+# http-Feature brauchen. `sha1`, `digest`, `uuid` und `getrandom` lagen ohnehin
+# schon transitiv in der Lockfile (ueber ureq/rustls); `sha2`/`hmac`/`md-5`
+# gehoeren derselben Familie an und teilen sich deren `digest`-Traits.
+#
+# BEWUSST Crates statt Handarbeit: eine Hash-Funktion selbst zu schreiben ist
+# die Art Code, die auf den ersten Blick stimmt und in einem Randfall still
+# etwas anderes liefert -- und hier haengt eine Signaturpruefung daran. Die
+# Testvektoren aus den Normen laufen trotzdem als Golden-Tests mit.
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+uuid = { version = "1", features = ["v4"] }
+getrandom = "0.2"
 # Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).
