@@ -15,12 +15,25 @@
 '  in eine Datenbank im Speicher.
 '
 '  Start:  dhrun.py buch-tippspiel/code/tabellen_pruefung.dh
+'
+'  CONST SAISON steuert, welches Jahr verglichen wird -- eine
+'  abgeschlossene Saison prueft den vollen Fall (2 x 306 Spiele),
+'  die laufende den Stand von heute.
 ' ============================================================
 IMPORT "db"
 IMPORT "html"
 IMPORT "json"
 
 CONST API = "https://api.openligadb.de/"
+' Welche Saison verglichen wird. Auf die laufende gestellt prueft es den
+' Stand von heute -- eine Liga, die noch nicht angefangen hat, steht dabei
+' mit achtzehn Nullzeilen da, und auch das muss stimmen.
+'
+' Zum Prueben des VOLLEN Falls eine abgeschlossene Saison eintragen, etwa
+' 2024: dann laufen 2 x 306 Spiele durch und die Tabelle muss bis auf den
+' letzten Platz mit der Abschlusstabelle uebereinstimmen. Genau dafuer ist
+' hier eine Konstante und kein Aufrufargument -- die Sprache kennt keines,
+' und das Aendern einer Zeile tut es auch.
 CONST SAISON = 2026
 CONST MAX_SPIELTAG = 34
 
