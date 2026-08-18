@@ -294,34 +294,35 @@ def run_gb_roh():
     return _run
 
 
-# Hinweis: `run_vm`, `run_native` und `run_all` sind seit dem Entfernen der
-# Python-/Cython-Bytecode-VMs **Aliase auf den Tree-Walker**. Es gibt nur noch
-# zwei Ausfuehrungspfade: Tree-Walker (Python, Referenz) und die native Runtime
-# `dhrt` (Rust, Produktion). Die Compiler-/Bytecode-Abdeckung gegen `dhrt`
-# liefert der dedizierte Paritaets-Sweep in `test_dhrt_parity.py`. Die Aliase
-# bleiben, damit die ~550 bestehenden Tests unveraendert weiterlaufen.
+# Hinweis: `run_vm`, `run_native` und `run_all` sind **Aliase auf `run_gb`**,
+# also auf `dhrt run`. Die Namen stammen aus der Zeit mit mehreren
+# Ausfuehrungspfaden (Tree-Walker, Python-VM, Cython-VM); die sind alle
+# entfernt, `dhrt` ist die einzige Runtime. Die Aliase bleiben, damit die ~550
+# bestehenden Tests unveraendert weiterlaufen -- ein neuer Test nimmt besser
+# gleich `run_gb`.
 
 @pytest.fixture
 def run_vm(run_gb):
-    """Alias auf den Tree-Walker (frueher Python-VM -- entfernt)."""
+    """Alias auf `run_gb` (dhrt). Der Name meinte frueher die Python-VM."""
     return run_gb
 
 
 @pytest.fixture
 def run_native(run_gb):
-    """Alias auf den Tree-Walker (frueher Cython-VM -- entfernt)."""
+    """Alias auf `run_gb` (dhrt). Der Name meinte frueher die Cython-VM."""
     return run_gb
 
 
 @pytest.fixture
 def run_all(run_gb):
-    """Alias auf den Tree-Walker (frueher 3-Pfad-Bit-Identitaet). Die
-    Identitaet gegen die native Runtime prueft `test_dhrt_parity.py`.
+    """Alias auf `run_gb` (dhrt). Der Name meinte frueher die Bit-Identitaet
+    ueber alle drei Pfade -- es gibt nur noch einen.
 
         def test_x(run_all):
-            assert run_all('PRINT 1 + 2') == "3\\n"
+            assert run_all('PRINT 1 + 2') == "3\n"
     """
     return run_gb
+
 
 
 # Die fruehere `call_builtin`-Fixture (rief Python-Builtin-Impls direkt via

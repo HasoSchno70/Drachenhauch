@@ -204,21 +204,24 @@ Builtin-API wichtiger als jede VM-Optimierung*.
 
 ## Empfehlungen
 
-**Default fuer Production: `dhrun.py --vm`** (Native-VM). 2.6–14×
-schneller als der Tree-Walker.
-
-**Tree-Walker fuer Entwicklung.** Schnelle Iteration, bessere
-Stack-Traces, kein Compile-Step.
-
-**Python-VM** ist primaer Reference-Implementation fuer den Cython-
-Port. Wer das `.pyd` nicht baut, kriegt mit der Python-VM ein
-funktionales Aequivalent (ohne Geschwindigkeitsvorteil).
+> Die Wahl zwischen Ausfuehrungspfaden gibt es nicht mehr — `dhrt` ist die
+> einzige Runtime, und `dhrun.py` kennt nur noch `--tokens`, `--ast`,
+> `--native` und `--export`. Von den drei Rats-Punkten, die hier standen
+> (Native-VM fuer Production, Tree-Walker fuer Entwicklung, Python-VM als
+> Referenz), ist damit keiner mehr anwendbar. Was bleibt, ist die Lehre, die
+> nicht an einem Pfad hing:
 
 **Game-Pattern: Bulk-Ops bevorzugen.** Statt pro-Entity-Loops in BASIC
 mit ECS_GET/ADD: `ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT` etc. Statt
 einzelner `DRAWIMAGE`-Calls fuer Tiles: `DRAWTILEMAP` bzw. die Massen-
 Builtins (`PLOTS`/`BOXES`/`CIRCLES`/`LINES`). **Nicht** `BATCH_DRAW`/`BATCH_FLUSH`
 auf einem Sprite-Atlas.
+
+Die Zahl dahinter steht oben: `bench_ecs_movement` braucht 215 ms,
+dieselbe Arbeit per `ECS_INTEGRATE_FLOAT` 5 ms. Wenn der Hot-Path ueber
+Builtin-Aufrufe geht, ist die Wahl der Builtin-API wichtiger als jede
+VM-Optimierung — das galt fuer alle drei alten Pfade und gilt fuer `dhrt`
+genauso.
 
 ## Reproduktion (historisch)
 
@@ -231,7 +234,11 @@ python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)
 python dhrun.py --bench examples/bench_fib.dh                # (entfernt)
 ```
 
-## Offene Pfade (mit ehrlicher Cost-Benefit-Einschaetzung)
+## Offene Pfade (historisch, mit ehrlicher Cost-Benefit-Einschaetzung)
+
+> Diese Ideen zielten auf die Cython-/Python-VM und sind mit ihnen
+> hinfaellig. Sie stehen hier, weil die Einschaetzungen fuer `dhrt`
+> teilweise weiter taugen (Frame-Pool, Builtin-Pre-Resolution).
 
 | Idee | Erwartung | Aufwand | Kommentar |
 |---|---|---|---|

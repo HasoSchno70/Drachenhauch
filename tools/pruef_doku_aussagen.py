@@ -14,7 +14,7 @@ die Stellen, an denen eine Doku am ehesten luegt, stehen woanders: in
 Tabellen ("| `AUDIO_INIT(freq)` | Mixer neu starten |") und in Fliesstext
 ("38 Module").
 
-Drei Kategorien lassen sich hier mechanisch pruefen:
+Vier Kategorien lassen sich hier mechanisch pruefen:
 
 1. BEFEHLSNAMEN. Jeder Name der Form `NAME(` in einem Inline-Code-Abschnitt
    muss ein Builtin sein, das es wirklich gibt. Ein Tippfehler oder ein
@@ -188,9 +188,65 @@ def konstanten(ordner: Path) -> list:
              "stehen aber in keiner Doku-Datei")]
 
 
+# Pfade, die es nicht (mehr) gibt und die trotzdem stehen bleiben duerfen.
+# Jeder Eintrag braucht einen Grund -- sonst ist es kein Abstellgleis, sondern
+# eine Doku, die auf Dateien zeigt, die niemand findet.
+GEDULDETE_PFADE = {
+    "drachenhauch/interpreter.py": "Tree-Walker, mit Stufe B entfernt -- nur in historischen Notizen",
+    "drachenhauch/serialize.py": "Python-Bytecode-Serializer, mit Stufe B entfernt",
+    "drachenhauch/vm.py": "Python-Bytecode-VM, mit Stufe B entfernt",
+    "drachenhauch/export.py": "Python-Export, von dhrts Bundler abgeloest",
+    "drachenhauch/modules/gui.py": "Modul-Implementierung, in Rust reimplementiert",
+    "drachenhauch/modules/ui.py": "Modul-Implementierung, in Rust reimplementiert",
+    "tests/test_modules_gui.py": "Test der entfernten Python-Module",
+    "tests/test_rust_compiler_parity.py": "Paritaets-Test gegen den entfernten Python-Compiler",
+    "gb_native/src/broadphase.rs": "PyO3-Helfer-Crate, nach physics.rs portiert und entfernt",
+    "drachenhauch/modules/x.py": "Platzhalter in einer Anleitung, kein echter Pfad",
+    "examples/NN_gui.dh": "Platzhalter (NN = laufende Nummer), kein echter Pfad",
+    "/program.dh": "virtueller Pfad im WASM-Dateisystem des Web-Playgrounds",
+    "web/program.dh": "virtueller Pfad im WASM-Dateisystem des Web-Playgrounds",
+}
+
+
+def pfade(ordner: Path) -> list:
+    """4. PFADVERWEISE. `drachenhauch/interpreter.py` in einer Anleitung.
+
+    Der Tree-Walker ist seit Stufe B entfernt -- die Umsetzungs-Checkliste in
+    `befehlssatz-roadmap.md` schickte trotzdem noch jeden, der ein Builtin
+    baut, als ERSTEN Schritt in `drachenhauch/interpreter.py`. Ein Verweis auf
+    eine Datei, die es nicht gibt, kostet den Leser die Zeit, bis er es
+    merkt -- und laesst ihn zweifeln, ob der Rest stimmt.
+
+    Geprueft wird jeder Inline-Code-Verweis, der wie ein Pfad aussieht
+    (enthaelt `/`, endet auf .py/.rs/.dh/.json/.toml). Repo-relativ ODER als
+    Suffix irgendwo im Baum -- `src/vm.rs` meint das Crate-Unterverzeichnis
+    und ist gueltig. Bekannte Leichen stehen in GEDULDETE_PFADE.
+    """
+    alle = set()
+    for p in WURZEL.rglob("*"):
+        if p.is_file() and "target" not in p.parts and "__pycache__" not in p.parts:
+            alle.add(p.relative_to(WURZEL).as_posix())
+    muster = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|rs|dh|json|toml))`")
+
+    def lebt(r: str) -> bool:
+        r = r.lstrip("/")
+        return any(a == r or a.endswith("/" + r) for a in alle)
+
+    funde = []
+    for datei in sorted(ordner.glob("*.md")):
+        for nr, zeile in enumerate(datei.read_text(encoding="utf-8").splitlines(), 1):
+            for m in muster.finditer(zeile):
+                r = m.group(1)
+                if "/" not in r or lebt(r) or r in GEDULDETE_PFADE:
+                    continue
+                funde.append((f"docs/{datei.name}", nr, r,
+                              "Pfad existiert nicht -- entfernt, umbenannt oder vertippt"))
+    return funde
+
+
 def main():
     funde = (pruefe_namen(WURZEL / "docs") + zaehlungen()
-             + konstanten(WURZEL / "docs"))
+             + konstanten(WURZEL / "docs") + pfade(WURZEL / "docs"))
     print(f"Doku-Aussagen geprueft -- {len(funde)} Befund(e)")
     for datei, zeile, was, msg in funde:
         print(f"\n  {datei}:{zeile}")

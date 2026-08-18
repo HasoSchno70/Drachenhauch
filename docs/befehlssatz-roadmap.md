@@ -12,19 +12,24 @@ geänderte Befehl muss nativ in `dhrt` laufen** — per run_gb-Golden-Test
 absichern.
 
 ## Umsetzungs-Checkliste pro Befehl
-- [ ] Tree-Walker: `@builtin`/`@graphics_builtin` in `drachenhauch/interpreter.py`
-      (bzw. passendes `drachenhauch/modules/*.py`).
-- [ ] Native Runtime: `rust/drachenhauch_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
-      ggf. `graphics.rs`/`audio.rs`), danach `rust\build_runtime.py`.
-- [ ] Parity-Snippet in `tests/test_dhrt_parity.py` (TW == dhrt). PRNG-/Uhr-
-      basierte Befehle als „erwartet unterschiedlich" behandeln.
-- [ ] Doku: `builtin_docs.py` (Hover) + `vscode-drachenhauch/build_grammar.py` neu
-      generieren; README/CLAUDE bei Bedarf.
+- [ ] Runtime: `rust/drachenhauch_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
+      ggf. `graphics.rs`/`audio.rs`).
+- [ ] Eintrag in `drachenhauch/editor_qt/builtin_index.json` (Arity-Pruefung
+      und „Unbekanntes Builtin"-Warnung) — die Datei wird per `include_str!`
+      **einkompiliert**, danach also `rust\build_runtime.py` laufen lassen,
+      sonst warnt der Compiler weiter ueber ein Builtin, das laengst
+      eingetragen ist.
+- [ ] Golden-Test in `tests/` ueber die `run_gb`-Fixture (kein Parity-Test
+      mehr — es gibt nur noch einen Pfad, gegen den man vergleichen koennte).
+- [ ] Doku: `drachenhauch/editor_qt/builtin_docs.py` (Hover) +
+      `vscode-drachenhauch/build_grammar.py` neu generieren; `docs/` und
+      README-Tabelle bei Bedarf.
 
 ---
 
 ## WP0 — Native Fallstricke (zuerst — Bugs, kein Komfort)
-Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
+Lief im Editor (Tree-Walker), crashte oder divergierte im exportierten
+Spiel (dhrt) — die Fallstrick-Klasse, die mit dem zweiten Pfad verschwand:
 
 - [x] **`PHYSICS_BROAD_*` nativ** (NEW/ADD/CLEAR/COUNT/QUERY/PAIR_A/PAIR_B/
       PAIR_COUNT). Uniform-Grid-Broadphase in `rust/drachenhauch_runtime/src/physics.rs`
@@ -48,10 +53,11 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
         abhaengig → fuer praezise Bindings `IMPORT "input"`). Ungueltiger Joystick-INDEX
         wirft wie der TW (Sub-Index liefert 0/false).
       - `SCROLL`: dhrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
-        persistenter Framebuffer) → graceful No-Op, **Tree-Walker-only**
-        (Kommentar in `vm.rs`).
+        persistenter Framebuffer) → graceful No-Op. Seit dem Wegfall des
+        Tree-Walkers wirkt `SCROLL` damit **nirgends** mehr: `vm.rs` prueft
+        die beiden Argumente und liefert `Nil`.
 - [x] **Float-Koordinaten angleichen.** Befund: schon konsistent. Im
-      Tree-Walker ist `_check_int` ein Alias auf `_check_intish`
+      Tree-Walker war `_check_int` ein Alias auf `_check_intish`
       (`interpreter.py:3541`, seit dem Initial-Commit) → die Zeichenprimitive
       (LINE/BOX/RECT/CIRCLE/PLOT/GRADIENT*) akzeptieren Floats und trunkieren
       sie, genau wie dhrts `gi()`. Die Audit-Annahme „TW lehnt `LINE(10.5,…)`

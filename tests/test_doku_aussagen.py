@@ -64,3 +64,24 @@ def test_tasten_konstanten_stehen_in_der_doku():
     funde = m.konstanten(WURZEL / "docs")
     assert not funde, "\n".join(
         f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+
+
+def test_pfadverweise_zeigen_auf_existierende_dateien():
+    """`drachenhauch/interpreter.py` in einer Umsetzungs-Checkliste.
+
+    Der Tree-Walker ist seit Stufe B entfernt, die Checkliste in
+    befehlssatz-roadmap.md schickte trotzdem jeden, der ein Builtin baut, als
+    ERSTEN Schritt in diese Datei. Solche Verweise verrotten leise -- niemand
+    klickt eine Doku systematisch durch.
+    """
+    m = _pruefer()
+    funde = m.pfade(WURZEL / "docs")
+    assert not funde, "\n".join(
+        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+
+
+def test_geduldete_pfade_sind_begruendet():
+    """Wie GEDULDET: die Ausnahmeliste braucht Gruende, keine Eintraege."""
+    m = _pruefer()
+    for pfad, grund in m.GEDULDETE_PFADE.items():
+        assert len(grund) > 20, f"{pfad}: Grund zu duenn ({grund!r})"

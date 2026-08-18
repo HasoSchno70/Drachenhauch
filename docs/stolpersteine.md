@@ -205,16 +205,17 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 > dhrt-BAU-Zeit eingebettet → nach Index-Änderung dhrt neu bauen. Weitere Tests:
 > `test_unknown_builtin_warns` / `test_known_builtin_no_warning`.
 
-`FLT(x)` (z. B. `FLT(MOUSEX())`, in mehreren examples genutzt) läuft im Python-
-Tree-Walker, wirft in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT' im
-Rust-Kern noch nicht verfuegbar". **`dhrt --check` meldet es NICHT** — der Compile
-ist grün, der Fehler kommt erst beim Lauf. Workaround in GB: `x * 1.0`.
-**Zwei Probleme:** (1) Builtin-Parität Tree-Walker ↔ dhrt; (2) die Live-Diagnostik
-(`--check`) fängt „nur-im-Tree-Walker"-Builtins nicht ab → böse Laufzeit-
-Überraschung trotz grüner Editor-Anzeige. **Vorschlag:** `FLT` in dhrt nachrüsten
-(triviale Coercion) **und/oder** `--check` so erweitern, dass es Aufrufe von
-Builtins meldet, die nicht im dhrt-Builtin-Index stehen (fängt künftig ALLE
-solchen Lücken). Betrifft auch andere examples mit `FLT(...)`.
+**Ursprünglicher Bericht (2026, zwei Pfade):** `FLT(x)` — z. B.
+`FLT(MOUSEX())`, in mehreren examples genutzt — lief im damaligen Python-
+Tree-Walker, warf in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT'
+im Rust-Kern noch nicht verfuegbar". `dhrt --check` meldete es nicht: der
+Compile war grün, der Fehler kam erst beim Lauf. Workaround damals: `x * 1.0`.
+
+Von den beiden Problemen ist das erste — Builtin-Parität zwischen zwei Pfaden —
+mit dem Tree-Walker verschwunden. Das zweite hat es überlebt und war das
+wichtigere: eine Diagnostik, die Aufrufe unbekannter Builtins durchwinkt, ist
+auch mit nur einer Runtime gefährlich, weil sie den Fehler vom Compile in den
+Lauf verschiebt. Genau das behebt Teil 2 oben.
 
 ### G2. Kein vertikales Spiegeln von Text / Render-Targets — ✅ BEHOBEN (RT-Flip)
 > `RENDERTARGET_DRAW(rt, x, y[, scale[, tint[, flip_v]]])` hat jetzt ein optionales

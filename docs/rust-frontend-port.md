@@ -2,8 +2,9 @@
 
 **Ziel (erreicht):** `dhrt` erzeugt jetzt selbst aus Quelltext Bytecode und
 führt ihn aus — `dhrt run datei.dh` ist ein eigenständiger End-to-End-Lauf
-**ohne Python**. Python bleibt nur noch in den Editoren/Tools (+ als
-Referenz-Tree-Walker). Damit kann auch der [Web-Playground](web-playground.md)
+**ohne Python**. Python bleibt nur noch in den Editoren/Tools; der
+Referenz-Tree-Walker, gegen den hier verglichen wurde, ist inzwischen
+entfernt (siehe [Prinzip](#prinzip-waehrend-der-portierung) am Ende). Damit kann auch der [Web-Playground](web-playground.md)
 ein reines Rust-WASM werden (kein Pyodide nötig).
 
 Die Front-End-Toolchain (`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/
@@ -199,10 +200,15 @@ Portierung erreicht.
   Python-Tree-Walker (aus eingebetteter Quelle). Details:
   [docs/web-playground.md](web-playground.md).
 
-## Prinzip
+## Prinzip (waehrend der Portierung)
 
-Der Tree-Walker (`interpreter.py`) bleibt die **Referenz** und der Host der
-`@builtin`-Definitionen. Die Rust-Portierung muss bit-identisches Verhalten
-liefern; das schärfste Gate ist in Stufe 3 die **Bytecode-Gleichheit** (produziert
-der Rust-Compiler exakt das `.dhc`, das Python erzeugt, ist Verhaltensgleichheit
-garantiert, da dhrt es schon bit-identisch ausführt).
+Der Tree-Walker (`interpreter.py`) **war** die Referenz und der Host der
+`@builtin`-Definitionen: die Rust-Portierung musste bit-identisches Verhalten
+liefern, und das schaerfste Gate war in Stufe 3 die **Bytecode-Gleichheit**
+(produzierte der Rust-Compiler exakt das `.dhc`, das Python erzeugte, war
+Verhaltensgleichheit garantiert, weil `dhrt` es schon bit-identisch ausfuehrte).
+
+Dieses Geruest ist mit dem Ziel weggefallen. Es gibt keinen zweiten Pfad mehr,
+gegen den sich vergleichen liesse — `dhrt` ist die einzige Runtime, und
+Korrektheit sichern heute **run_gb-Golden-Tests** und Rust-`#[test]`s. Wer
+oben „bit-identisch" liest, liest ein Protokoll, keine laufende Zusage.

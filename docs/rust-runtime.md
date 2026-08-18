@@ -9,11 +9,12 @@
 > `#[test]`s. Die „bit-identisch"-Stellen unten sind also historische
 > Port-Verifikations-Notizen, kein aktueller Mehr-Pfad-Zustand.
 
-Ein vierter Ausführungspfad neben Tree-Walker, Python-VM und Cython-VM: eine
-**native Rust-Runtime**, die denselben Bytecode ausführt und (später) Grafik
-über **raylib** rendert. Die Python-Toolchain (Lexer → Parser → Compiler)
-bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
-`Module`s.
+Das Ziel war zunächst bescheiden: ein **vierter** Ausführungspfad neben
+Tree-Walker, Python-VM und Cython-VM — eine **native Rust-Runtime**, die
+denselben Bytecode ausführt und (später) Grafik über **raylib** rendert. Die
+Python-Toolchain (Lexer → Parser → Compiler) sollte unverändert bleiben, Rust
+nur die Ausführung des kompilierten `Module`s übernehmen. Am Ende blieb von
+den vier Pfaden genau einer übrig, und der bringt sein Frontend selbst mit.
 
 ## Migrationsplan (inkrementell, nichts wegwerfen)
 
@@ -669,11 +670,10 @@ Demo: [examples/83_audio.dh](../examples/83_audio.dh).
 
 ## Schritt 6: 3D-Grafik (Modul `g3d`)
 
-3D ist **native-only**: raylib hat eine echte 3D-Pipeline, der Tree-Walker nicht. Das
-Modul `g3d` registriert die Builtins (damit der Compiler `CALL_BUILTIN`
-emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
-(„… nur in der nativen Runtime … mit F6"). In `dhrt` rendern sie über raylibs
-`begin_mode3D`-API.
+3D setzt raylibs Pipeline voraus. Das Modul `g3d` registriert die Builtins
+(damit der Compiler `CALL_BUILTIN` emittiert); gerendert wird über raylibs
+`begin_mode3D`-API. Ohne Grafik-Feature gebaut (`--no-graphics`), liefern sie
+den „nicht verfügbar“-Fehler wie die übrigen Grafik-Builtins.
 
 **Builtins** (`g3d.py`, Rendering in
 `graphics.rs`/`vm.rs`):
@@ -962,8 +962,7 @@ identisch auf den Screen *oder* in die RenderTexture — `RaylibDrawHandle` und
 `RaylibTextureMode` implementieren beide `RaylibDraw`. Shader-Handles liegen in
 `Graphics.shaders`, der aktive Index in `post_shader_idx`.
 
-Auf dem Tree-Walker (konsolen-only) werfen die Shader-Builtins "nur in der
-nativen Runtime (dhrt)". Beispiel-Shader (GLSL 330):
+Beispiel-Shader (GLSL 330):
 [examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
 `vignette.fs`), Demo [examples/86_postfx_shaders.dh](../examples/86_postfx_shaders.dh)
 (zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
@@ -971,7 +970,7 @@ nativen Runtime (dhrt)". Beispiel-Shader (GLSL 330):
 ## TTF-Fonts (`LOADFONT` / `SETFONT` / `TEXT_SPACING`)
 
 Eigene TrueType-/OpenType-Schriften statt nur des eingebauten Default-Fonts.
-**Core-Builtins, kein `IMPORT` nötig** — nativ in dhrt (Tree-Walker konsolen-only):
+**Core-Builtins, kein `IMPORT` nötig:**
 
 - `LOADFONT(pfad$, groesse) -> FONT` — lädt eine TTF/OTF in der Basis-Größe
   `groesse` (Glyph-Auflösung) und liefert ein **FONT-Handle (INTEGER)**.
@@ -989,8 +988,7 @@ Variante — dafür eine fette/kursive Font-Datei laden).
 **Native Umsetzung** ([graphics.rs](../rust/drachenhauch_runtime/src/graphics.rs)): `fonts:
 Vec<Font>` (raylib `load_font_ex`), `active_font` (-1 = Default), `text_spacing`.
 `Cmd::Text` trägt jetzt Font-Index + Spacing; beim Replay zeichnet ein gültiger
-Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. Der Tree-Walker
-([graphics.py](../drachenhauch/graphics.py)) ist konsolen-only und rendert keinen Text.
+Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`.
 
 **Bit-Identität gilt nicht** (Renderer/Font-Metriken unterscheiden sich) — wie
 bei der übrigen Grafik nur funktional. Es liegt **kein Font-Asset im Repo**;
