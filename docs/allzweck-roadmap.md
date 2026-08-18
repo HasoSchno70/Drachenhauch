@@ -453,6 +453,11 @@ Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 
 ## WP I — Namensräume und Module (der große Brocken)
 
+> **Entwurf liegt vor: [entwurf-namensraeume.md](entwurf-namensraeume.md).**
+> Dort steht der Befund mit Messungen, ein Vorschlag für Syntax und
+> Semantik, ein Bauweg ohne VM-Änderung, ein Stufenplan und die vier
+> Fragen, die noch zu entscheiden sind.
+
 `IMPORT "datei.dh"` ist textuelles Inkludieren in einen flachen globalen
 Namensraum, in dem bereits **1316 Builtins** liegen. `IMPORT ... AS alias` ist
 kein Namensraum, sondern Präfix-Kopieren, und funktioniert nur, wenn der
