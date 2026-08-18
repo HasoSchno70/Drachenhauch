@@ -441,6 +441,10 @@ class ClassDecl(Stmt):
     # Block einen Eintrag hier ein und ergaenzt parallel die Methoden-
     # Liste mit der internen Repraesentation (`__get_name`/`__set_name`).
     properties: list = field(default_factory=list)
+    # Namen der Methoden, die diese Klasse nur ANKUENDIGT (ABSTRACT). Sie
+    # stehen zusaetzlich als leere Methode in `methods`, damit ein Aufruf
+    # aufloest; wer die Klasse instanziieren will, muss sie ausfuellen.
+    abstracts: list = field(default_factory=list)
 
 
 @dataclass

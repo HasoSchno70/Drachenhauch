@@ -138,8 +138,12 @@ pub enum Node {
     FunctionDecl { name: String, params: Vec<Param>, return_type: String, body: Vec<Node> },
     Return(Option<Box<Node>>),
     PropertyDecl { name: String, kind: String, func: Box<Node> },
+    /// `abstracts` = Namen der Methoden, die diese Klasse nur ANKUENDIGT.
+    /// Sie stehen zusaetzlich als leere Methode in `methods`, damit ein Aufruf
+    /// aufloest; wer die Klasse instanziieren will, muss sie ausfuellen.
     ClassDecl { name: String, parent: Option<String>, fields: Vec<Node>, methods: Vec<Node>,
-                is_struct: bool, statics: Vec<Node>, properties: Vec<Node> },
+                is_struct: bool, statics: Vec<Node>, properties: Vec<Node>,
+                abstracts: Vec<String> },
     MemberAssign { target: Box<Node>, name: String, value: Box<Node> },
     With { var_name: String, target: Box<Node>, body: Vec<Node> },
     Program { statements: Vec<Node> },
@@ -287,13 +291,13 @@ impl Node {
             Return(v) => obj("Return", vec![("value", bopt(v))]),
             PropertyDecl { name, kind, func } => obj("PropertyDecl", vec![
                 ("name", json!(name)), ("kind", json!(kind)), ("func", func.to_json())]),
-            ClassDecl { name, parent, fields, methods, is_struct, statics, properties } =>
+            ClassDecl { name, parent, fields, methods, is_struct, statics, properties, abstracts } =>
                 obj("ClassDecl", vec![
                     ("name", json!(name)),
                     ("parent", match parent { Some(p) => json!(p), None => Value::Null }),
                     ("fields", vecj(fields)), ("methods", vecj(methods)),
                     ("is_struct", json!(is_struct)), ("statics", vecj(statics)),
-                    ("properties", vecj(properties))]),
+                    ("properties", vecj(properties)), ("abstracts", json!(abstracts))]),
             MemberAssign { target, name, value } => obj("MemberAssign", vec![
                 ("target", target.to_json()), ("name", json!(name)), ("value", value.to_json())]),
             With { var_name, target, body } => obj("With", vec![

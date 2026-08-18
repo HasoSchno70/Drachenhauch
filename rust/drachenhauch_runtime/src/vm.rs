@@ -2210,6 +2210,29 @@ impl<'p> Vm<'p> {
                     }
                 }
 
+                // `SUPER.Methode(...)` (WP G). Fast wie CALL_METHOD -- nur
+                // beginnt die Suche bei der im Bytecode stehenden Klasse
+                // (der Elternklasse der Aufrufstelle) statt bei der Klasse
+                // des Objekts. Sonst fande sie die ueberschreibende Methode
+                // wieder und riefe sich selbst, bis der Stapel voll ist.
+                op::CALL_SUPER => {
+                    let l = arg.list();
+                    let start_class = l[0].str();
+                    let method = l[1].str();
+                    let argc = l[2].as_usize();
+                    let split = stack.len() - argc;
+                    let margs = stack.split_off(split);
+                    let obj = vm_pop(stack)?;
+                    let m = self.resolve_method(start_class, method).ok_or_else(|| format!(
+                        "SUPER.{}: Methode existiert nicht in {}", method, start_class))?;
+                    if m.is_coroutine {
+                        stack.push(make_coro(m, margs, Some(obj)));
+                    } else {
+                        let ret = self.exec(m, margs, Some(obj))?;
+                        if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                    }
+                }
+
                 // --- OOP ---
                 op::NEW_INSTANCE => {
                     let l = arg.list();

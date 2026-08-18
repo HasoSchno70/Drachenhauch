@@ -358,17 +358,50 @@ vergleicht beide ASTs Feld für Feld.
 Tests: `tests/test_finally.py` (25). Beispiel: `examples/166_aufraeumen.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Try / Catch / Throw".
 
-## WP G — Vererbung rund machen
+## WP G — Vererbung rund machen (✅ ERLEDIGT 2026-08-17)
 
-`EXTENDS` gibt es, die Methodensuche läuft die Elternkette hoch
-(`compiler.rs`). Aber es gibt **kein `SUPER`** — die überschriebene
-Elternmethode ist nicht mehr erreichbar. In `docs/sprache.md` steht das
-Ergebnis wörtlich im Beispiel: „Eigene Init, ruft super.Init nicht automatisch
-auf" und dann drei Zeilen abgeschriebene Zuweisungen.
+`EXTENDS` gab es, die Methodensuche lief die Elternkette hoch. Aber es gab
+**kein `SUPER`** — die überschriebene Elternmethode war nicht mehr erreichbar.
+In `docs/sprache.md` stand das Ergebnis wörtlich im Beispiel: „Eigene Init,
+ruft super.Init nicht automatisch auf" und dann drei Zeilen abgeschriebene
+Zuweisungen. Genau dieses Beispiel ist jetzt ersetzt.
 
-- [ ] `SUPER.Methode(...)` innerhalb einer Methode
-- [ ] `ABSTRACT`-Methoden (deklariert, ohne Rumpf; `NEW` auf die Klasse ist ein
-      Fehler) — der kleine Bruder von Interfaces, ohne neues Typ-Konzept
+- [x] `SUPER.Methode(...)` innerhalb einer Methode
+- [x] `ABSTRACT`-Methoden (angekündigt, ohne Rumpf; `NEW` auf eine Klasse mit
+      offener Ankündigung ist ein Fehler) — der kleine Bruder von Interfaces,
+      ohne neues Typ-Konzept
+
+**Beide sind bewusst KEINE neuen Schlüsselwörter.** `SUPER` ist ein Identifier
+mit Sonderbehandlung (genau wie `Self` es schon war), `ABSTRACT` wird über eine
+Vorausschau im `CLASS`-Rumpf erkannt (`abstract` + `SUB`/`FUNCTION`). Ein neues
+reserviertes Wort hätte `DIM abstract AS …` in bestehendem Code zum Fehler
+gemacht — die Liste der reservierten Wörter ist in `docs/sprache.md` bereits
+als Stolperstein dokumentiert, sie soll nicht ohne Not wachsen. Zwei Tests
+halten fest, dass beide Namen weiter als Variablen taugen.
+
+**Der Kern von `SUPER`:** ein eigener Opcode `CALL_SUPER`, der sich von
+`CALL_METHOD` nur darin unterscheidet, **wo die Suche beginnt** — bei der
+Elternklasse *der Stelle im Quelltext* (fest im Bytecode) statt bei der Klasse
+des Objekts. Über `CALL_METHOD` fände sie wieder die überschreibende Methode,
+also sich selbst, bis der Stapel voll ist. Weil der Startpunkt statisch ist,
+funktioniert es auch über drei Ebenen und über Zwischenklassen hinweg, die
+nichts überschreiben (Tests für beides).
+
+**`ABSTRACT` prüft beim Übersetzen, nicht zur Laufzeit.** Der Compiler kennt
+alle Klassen — es gibt keinen Grund, damit bis zum Programmstart zu warten.
+`offene_abstracts()` läuft die Vererbung von der Klasse nach oben: was eine
+abgeleitete Klasse ausfüllt, gilt weiter oben als erledigt. Die Meldung nennt
+alle offenen Namen auf einmal. Eine angekündigte Methode steht trotzdem als
+leere Methode in der Klasse, damit ein Aufruf auflöst — so kann die Basisklasse
+mit Methoden arbeiten, die es bei ihr noch gar nicht gibt (`Zeige()` ruft
+`Flaeche()`).
+
+Mitgezogen: der **Python-Parser** (`parser.py`, `ast_nodes.py`) —
+`test_rust_parser_parity.py` vergleicht beide ASTs Feld für Feld, `ClassDecl`
+hat jetzt in beiden ein `abstracts`.
+
+Tests: `tests/test_vererbung.py` (20). Beispiel: `examples/167_vererbung.dh`.
+Doku: `docs/sprache.md`, Abschnitt „Klassen und Strukturen".
 
 ## WP H — Nebenläufigkeit
 
@@ -436,7 +469,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → G → H → I** (A bis F sind erledigt, Nächstes ist G)
+**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → ~~G~~ → H → I** (A bis G sind erledigt, Nächstes ist H)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

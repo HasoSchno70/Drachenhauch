@@ -92,6 +92,7 @@ pub mod op {
     pub const UNPACK_TUPLE: u16 = 69;
     pub const BUILD_ARRAY: u16 = 117;   // Array-Literal [a, b, c]
     pub const FIN_END: u16 = 118;       // FINALLY: gestapelten Fehler weiterwerfen
+    pub const CALL_SUPER: u16 = 119;    // SUPER.Methode(): Suche bei der Elternklasse beginnen
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;

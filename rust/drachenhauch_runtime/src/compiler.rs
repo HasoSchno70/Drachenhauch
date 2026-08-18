@@ -97,6 +97,11 @@ mod oc {
     /// Der Fehler-Zweig eines FINALLY braucht KEINEN eigenen Handler-Opcode --
     /// er benutzt denselben TRY_BEGIN/TRY_END wie CATCH, nur mit anderem Ziel.
     pub const FIN_END: i64 = 118;
+    /// `SUPER.Methode(...)` (WP G): wie CALL_METHOD, aber die Suche beginnt
+    /// bei einer FEST eingebauten Klasse (der Elternklasse der Stelle im
+    /// Quelltext) statt bei der Klasse des Objekts -- sonst fände sie wieder
+    /// die ueberschreibende Methode und riefe sich selbst.
+    pub const CALL_SUPER: i64 = 119;
     pub const HALT: i64 = 99;
 }
 
@@ -280,6 +285,9 @@ struct ClassInfo {
     fields: Vec<FieldInfo>,
     method_sigs: HashMap<String, FnSig>,
     property_set: Vec<String>,         // lowercase
+    /// Methoden, die diese Klasse nur ANKUENDIGT (WP G). Eine Klasse, in der
+    /// noch eine davon offen ist, laesst sich nicht mit NEW erzeugen.
+    abstracts: std::collections::HashSet<String>,
     compiled: Vec<(String, Value)>,    // method-name -> func-json
 }
 
@@ -845,9 +853,49 @@ impl Compiler {
         Ok(())
     }
 
+    /// Welche angekuendigten Methoden sind bei `class_name` noch offen? (WP G)
+    ///
+    /// Von der Klasse nach oben durch die Vererbung: was eine abgeleitete
+    /// Klasse ausfuellt, gilt weiter oben als erledigt. Darum erst sammeln,
+    /// was auf dem Weg schon ausgefuellt wurde, und nur was dann noch als
+    /// blosse Ankuendigung auftaucht, fehlt wirklich.
+    fn offene_abstracts(&self, class_name: &str) -> Vec<String> {
+        let mut ausgefuellt: std::collections::HashSet<String> = Default::default();
+        let mut fehlend: Vec<String> = Vec::new();
+        let mut cur = Some(class_name.to_string());
+        while let Some(cn) = cur {
+            let Some(ci) = self.classes.get(&cn) else { break };
+            for m in ci.method_sigs.keys() {
+                if ci.abstracts.contains(m) {
+                    if !ausgefuellt.contains(m) && !fehlend.contains(m) {
+                        fehlend.push(m.clone());
+                    }
+                } else {
+                    ausgefuellt.insert(m.clone());
+                }
+            }
+            cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+        }
+        fehlend.sort();
+        fehlend
+    }
+
     fn expr_new(&mut self, class_name: &str, args: &Option<Vec<Node>>) -> CR {
         if !self.classes.contains_key(class_name) {
             return Err(format!("Klasse '{}' nicht gefunden", class_name));
+        }
+        // Schon beim Uebersetzen, nicht erst zur Laufzeit: der Compiler kennt
+        // alle Klassen, also gibt es keinen Grund, damit bis zum Programmstart
+        // zu warten.
+        let offen = self.offene_abstracts(class_name);
+        if !offen.is_empty() {
+            return Err(format!(
+                concat!("NEW {}: die Klasse kuendigt {} an, ohne sie auszufuellen ({}). ",
+                       "Entweder eine Unterklasse nehmen, die sie ausschreibt, oder ",
+                       "die Methode in {} mit einem Rumpf versehen."),
+                class_name,
+                if offen.len() == 1 { "eine Methode" } else { "Methoden" },
+                offen.join(", "), class_name));
         }
         let args = match args {
             // Review-Fund: `NEW Klasse` (ohne Klammern) emittierte hier den
@@ -1421,6 +1469,30 @@ impl Compiler {
         if let Node::MemberAccess { target, name } = callee {
             if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
                 return Err(format!("{}: Named-Args nur bei SUB/FUNCTION/NEW", name));
+            }
+            // `SUPER.Methode(...)` (WP G): wie ein Methodenaufruf auf Self,
+            // aber die Suche beginnt bei der ELTERNklasse. Ueber CALL_METHOD
+            // faende sie wieder die ueberschreibende Methode -- also sich
+            // selbst, endlos.
+            if matches!(&**target, Node::Identifier(n) if n == "super") {
+                let Some(cn) = self.ctx.current_class.clone() else {
+                    return Err("SUPER geht nur in einer Methode".into());
+                };
+                let eltern = self.classes.get(&cn).map(|c| c.parent_name.clone()).unwrap_or_default();
+                if eltern.is_empty() {
+                    return Err(format!(
+                        "SUPER.{}: Klasse {} hat keine Elternklasse (kein EXTENDS)",
+                        name, cn));
+                }
+                if !self.resolve_method(&eltern, name) {
+                    return Err(format!(
+                        "SUPER.{}: {} und ihre Elternklassen haben keine Methode '{}'",
+                        name, eltern, name));
+                }
+                self.ctx.emit(oc::LOAD_SELF, Value::Null);
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_SUPER, json!([eltern, name, args.len()]));
+                return Ok(());
             }
             self.expr(target)?;
             for a in args { self.expr(a)?; }
@@ -2112,9 +2184,9 @@ impl Compiler {
 
     // ---------------------------------------------------- Klassen
     fn register_class(&mut self, decl: &Node) -> Result<(), String> {
-        let (name, parent, fields, methods, is_struct, properties) = match decl {
-            Node::ClassDecl { name, parent, fields, methods, is_struct, properties, .. } =>
-                (name, parent, fields, methods, *is_struct, properties),
+        let (name, parent, fields, methods, is_struct, properties, abstracts) = match decl {
+            Node::ClassDecl { name, parent, fields, methods, is_struct, properties, abstracts, .. } =>
+                (name, parent, fields, methods, *is_struct, properties, abstracts),
             _ => unreachable!(),
         };
         if self.classes.contains_key(name) {
@@ -2170,6 +2242,7 @@ impl Compiler {
             fields: field_infos,
             method_sigs,
             property_set,
+            abstracts: abstracts.iter().cloned().collect(),
             compiled: vec![],
         });
         Ok(())

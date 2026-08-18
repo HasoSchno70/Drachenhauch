@@ -1468,6 +1468,7 @@ class Parser:
         methods = []
         statics: list = []
         properties: list = []
+        abstracts: list = []
         while not self._check(TokenType.END):
             if self._at_end():
                 raise ParseError("END CLASS erwartet, Programmende erreicht",
@@ -1475,7 +1476,17 @@ class Parser:
             if self._check(TokenType.NEWLINE):
                 self.pos += 1
                 continue
-            if self._check(TokenType.STATIC):
+            # ABSTRACT ist bewusst KEIN Schluesselwort, sondern ein Identifier
+            # mit Vorausschau -- ein neues reserviertes Wort wuerde
+            # `DIM abstract AS ...` in bestehendem Code zum Fehler machen.
+            if (self._check(TokenType.IDENT)
+                    and self._peek().value == "abstract"
+                    and self._peek(1).type in (TokenType.SUB, TokenType.FUNCTION)):
+                self.pos += 1
+                decl, mname = self._abstract_decl()
+                abstracts.append(mname)
+                methods.append(decl)
+            elif self._check(TokenType.STATIC):
                 self.pos += 1
                 if not self._check(TokenType.CONST):
                     tok = self._peek()
@@ -1509,7 +1520,28 @@ class Parser:
         self._expect(TokenType.CLASS, "Erwartet CLASS nach END")
         self._consume_terminator()
         return ClassDecl(name_tok.value, parent, fields, methods,
-                         statics=statics, properties=properties)
+                         statics=statics, properties=properties,
+                         abstracts=abstracts)
+
+    def _abstract_decl(self):
+        """`ABSTRACT SUB Name(...)` / `ABSTRACT FUNCTION Name(...) AS Typ`.
+
+        Nur der Kopf -- kein Rumpf, kein END. Erzeugt trotzdem eine leere
+        Methode, damit ein Aufruf aufloest; dass die Klasse so nicht
+        instanziierbar ist, faengt der Compiler bei NEW ab.
+        """
+        if self._match(TokenType.SUB):
+            name = self._expect(TokenType.IDENT, "Erwartet SUB-Name nach ABSTRACT").value
+            params = self._params()
+            self._consume_terminator()
+            return SubDecl(name, params, []), name
+        self._expect(TokenType.FUNCTION)
+        name = self._expect(TokenType.IDENT, "Erwartet FUNCTION-Name nach ABSTRACT").value
+        params = self._params()
+        self._expect(TokenType.AS, "Erwartet AS <Rueckgabetyp> nach Parameterliste")
+        return_type = self._parse_type()
+        self._consume_terminator()
+        return FunctionDecl(name, params, return_type, []), name
 
     def _struct_decl(self):
         struct_tok = self._expect(TokenType.STRUCT)

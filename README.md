@@ -276,6 +276,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `164_signatur.dh` | **Signaturen und Tokens** (`HMAC_SHA256$`, `RANDOM_BYTES`) — einen Webhook prüfen, einen Schlüssel würfeln, eine Datei-Prüfsumme nachrechnen |
 | `165_pruefen.dh` | **Ein Programm, das sich selbst prüft** (`ASSERT_EQ`) — Sammel-Modus, Bilanz und ein Rückgabewert, den ein Skript auswerten kann |
 | `166_aufraeumen.dh` | **Aufräumen und entscheiden** (`FINALLY`, `ERROR_CODE$`) — eine Datei, die auf jeden Fall geschlossen wird; ein `CATCH`, das am Code entscheidet statt am Meldungstext |
+| `167_vererbung.dh` | **Vererbung ohne Wiederholung** (`SUPER`, `ABSTRACT`) — eine Basisklasse rechnet mit Methoden, die erst ihre Unterklassen schreiben |
 | `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 

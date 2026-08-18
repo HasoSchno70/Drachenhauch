@@ -875,14 +875,58 @@ CLASS Hero EXTENDS Player
     DIM weapon AS STRING
 
     SUB Init(start_x AS FLOAT, start_y AS FLOAT, w AS STRING)
-        ' Eigene Init, ruft super.Init nicht automatisch auf:
-        x = start_x                ' direkt auf Eltern-Felder
-        y = start_y
-        hp = 150
+        SUPER.Init(start_x, start_y)   ' die Init der Elternklasse
+        hp = 150                       ' und danach das Eigene
         weapon = w
     END SUB
 END CLASS
 ```
+
+**`SUPER.Methode(...)`** ruft die Fassung der **Elternklasse** — auch dann,
+wenn die eigene Klasse sie überschreibt:
+
+```basic
+CLASS Hero EXTENDS Player
+    FUNCTION Beschreibung() AS STRING
+        RETURN SUPER.Beschreibung() + " mit " + weapon
+    END FUNCTION
+END CLASS
+```
+
+Die Suche beginnt bei der Elternklasse *der Stelle im Quelltext*, nicht bei der
+Klasse des Objekts. Deshalb funktioniert es auch über mehrere Ebenen: jede
+Ebene fragt ihre eigene Elternklasse, statt sich im Kreis selbst aufzurufen.
+Überspringt eine Zwischenklasse die Methode, wird weiter oben gesucht.
+
+`SUPER` ist **kein** reserviertes Wort — eine Variable dieses Namens bleibt
+erlaubt.
+
+**`ABSTRACT`: eine Methode ankündigen, ohne sie zu schreiben**
+
+```basic
+CLASS Form
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    ABSTRACT SUB Zeichne()
+
+    FUNCTION Zeige() AS STRING          ' darf sie trotzdem benutzen
+        RETURN "Flaeche: " + STR$(Flaeche())
+    END FUNCTION
+END CLASS
+```
+
+Eine angekündigte Methode hat keinen Rumpf und kein `END SUB`/`END FUNCTION`.
+Wer eine Klasse mit noch offenen Ankündigungen mit `NEW` erzeugen will, bekommt
+einen **Fehler beim Übersetzen** — nicht erst zur Laufzeit:
+
+```
+NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne).
+```
+
+So lässt sich eine Basisklasse schreiben, die mit Methoden arbeitet, die es bei
+ihr noch gar nicht gibt — `Zeige()` oben ruft `Flaeche()`, und zur Laufzeit
+landet das bei der Unterklasse, die sie ausgefüllt hat.
+
+`ABSTRACT` ist ebenfalls kein reserviertes Wort.
 
 **STRUCT** ist ein leichtgewichtiges Daten-Klassen-Substitut, das automatisch instanziert wird (kein `NEW` nötig):
 

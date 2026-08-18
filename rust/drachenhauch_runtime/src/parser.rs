@@ -1079,10 +1079,20 @@ impl Parser {
         let mut methods = Vec::new();
         let mut statics = Vec::new();
         let mut properties = Vec::new();
+        let mut abstracts: Vec<String> = Vec::new();
         while !self.check(Tt::End) {
             if self.at_end() { return self.err("END CLASS erwartet, Programmende erreicht"); }
             if self.check(Tt::Newline) { self.pos += 1; continue; }
-            if self.check(Tt::Static) {
+            // ABSTRACT ist bewusst KEIN Schluesselwort, sondern ein Identifier
+            // mit Vorausschau -- ein neues reserviertes Wort wuerde `DIM
+            // abstract AS ...` in bestehendem Code zum Fehler machen.
+            if self.check(Tt::Ident) && sval(self.peek(0)) == "abstract"
+                && matches!(self.tt(1), Tt::Sub | Tt::Function) {
+                self.pos += 1;
+                let (decl, name) = self.abstract_decl()?;
+                abstracts.push(name);
+                methods.push(decl);
+            } else if self.check(Tt::Static) {
                 self.pos += 1;
                 if !self.check(Tt::Const) { return self.err("Erwartet CONST nach STATIC im CLASS-Body"); }
                 statics.push(self.const_stmt()?);
@@ -1105,7 +1115,31 @@ impl Parser {
         self.expect(Tt::End, "")?;
         self.expect(Tt::Class, "Erwartet CLASS nach END")?;
         self.consume_terminator()?;
-        Ok(Node::ClassDecl { name, parent, fields, methods, is_struct: false, statics, properties })
+        Ok(Node::ClassDecl { name, parent, fields, methods, is_struct: false, statics,
+                             properties, abstracts })
+    }
+
+    /// `ABSTRACT SUB Name(...)` / `ABSTRACT FUNCTION Name(...) AS Typ` --
+    /// nur der Kopf, kein Rumpf und kein END.
+    ///
+    /// Erzeugt trotzdem eine (leere) Methode: so loest ein Aufruf auf und die
+    /// Signatur steht fuer Named-Args bereit. Dass die Klasse so nicht
+    /// benutzbar ist, faengt der Compiler bei NEW ab -- schon beim Uebersetzen,
+    /// nicht erst zur Laufzeit.
+    fn abstract_decl(&mut self) -> R<(Node, String)> {
+        if self.matches(Tt::Sub) {
+            let name = sval(&self.expect(Tt::Ident, "Erwartet SUB-Name nach ABSTRACT")?);
+            let params = self.params()?;
+            self.consume_terminator()?;
+            return Ok((Node::SubDecl { name: name.clone(), params, body: vec![] }, name));
+        }
+        self.expect(Tt::Function, "")?;
+        let name = sval(&self.expect(Tt::Ident, "Erwartet FUNCTION-Name nach ABSTRACT")?);
+        let params = self.params()?;
+        self.expect(Tt::As, "Erwartet AS <Rueckgabetyp> nach Parameterliste")?;
+        let return_type = self.parse_type()?;
+        self.consume_terminator()?;
+        Ok((Node::FunctionDecl { name: name.clone(), params, return_type, body: vec![] }, name))
     }
 
     fn struct_decl(&mut self) -> R<Node> {
@@ -1123,7 +1157,8 @@ impl Parser {
         self.expect(Tt::Struct, "Erwartet STRUCT nach END")?;
         self.consume_terminator()?;
         Ok(Node::ClassDecl { name, parent: None, fields, methods: vec![],
-                             is_struct: true, statics: vec![], properties: vec![] })
+                             is_struct: true, statics: vec![], properties: vec![],
+                             abstracts: vec![] })
     }
 
     fn new_expr(&mut self) -> R<Node> {

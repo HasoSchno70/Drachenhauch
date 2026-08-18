@@ -1,0 +1,115 @@
+' 167 -- Vererbung, die sich nicht wiederholt (WP G: SUPER, ABSTRACT)
+'
+' Zwei Dinge, die vorher fehlten:
+'   1. SUPER.Methode() -- die Fassung der Elternklasse aufrufen, statt sie
+'      abzuschreiben.
+'   2. ABSTRACT -- eine Methode ankuendigen, die erst die Unterklasse
+'      ausschreibt. Wer die Klasse trotzdem erzeugen will, merkt es beim
+'      UEBERSETZEN.
+'
+' Aufruf:  dhrt run 167_vererbung.dh
+
+' ---- Die Basis: kuendigt an, was sie selbst nicht wissen kann -----------
+
+CLASS Form
+    DIM name AS STRING
+
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+
+    ' Kein Rumpf, kein END FUNCTION -- nur die Ankuendigung.
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    ABSTRACT FUNCTION Umfang() AS FLOAT
+
+    ' ... und benutzt sie trotzdem. Zur Laufzeit landet der Aufruf bei der
+    ' Unterklasse, die sie ausgefuellt hat.
+    FUNCTION Zeige() AS STRING
+        RETURN PADR$(name, 12) + "Flaeche " + NUMFMT$(Flaeche(), 2) + _
+               "   Umfang " + NUMFMT$(Umfang(), 2)
+    END FUNCTION
+END CLASS
+
+' ---- Zwei Formen, die sie ausfuellen -----------------------------------
+
+CLASS Rechteck EXTENDS Form
+    DIM b AS FLOAT
+    DIM h AS FLOAT
+
+    SUB Init(breite AS FLOAT, hoehe AS FLOAT)
+        SUPER.Init("Rechteck")      ' statt name = "Rechteck" abzuschreiben
+        b = breite
+        h = hoehe
+    END SUB
+
+    FUNCTION Flaeche() AS FLOAT
+        RETURN b * h
+    END FUNCTION
+
+    FUNCTION Umfang() AS FLOAT
+        RETURN 2.0 * (b + h)
+    END FUNCTION
+END CLASS
+
+CLASS Kreis EXTENDS Form
+    DIM r AS FLOAT
+
+    SUB Init(radius AS FLOAT)
+        SUPER.Init("Kreis")
+        r = radius
+    END SUB
+
+    FUNCTION Flaeche() AS FLOAT
+        RETURN PI * r * r
+    END FUNCTION
+
+    FUNCTION Umfang() AS FLOAT
+        RETURN 2.0 * PI * r
+    END FUNCTION
+END CLASS
+
+' ---- Eine dritte Ebene: SUPER reicht weiter durch ----------------------
+' Das Quadrat ist ein Rechteck mit gleichen Seiten. Es schreibt weder Init
+' noch Flaeche neu -- es ruft jeweils die Fassung darueber.
+
+CLASS Quadrat EXTENDS Rechteck
+    SUB Init(seite AS FLOAT)
+        SUPER.Init(seite, seite)
+        name = "Quadrat"
+    END SUB
+
+    FUNCTION Zeige() AS STRING
+        ' Die Zeile der Basisklasse, plus ein Zusatz.
+        RETURN SUPER.Zeige() + "   (gleichseitig)"
+    END FUNCTION
+END CLASS
+
+' ---- Alle zusammen ------------------------------------------------------
+
+DIM formen[3] AS Form
+DIM i AS INTEGER
+DIM gesamt AS FLOAT
+
+formen[0] = NEW Rechteck(3.0, 4.0)
+formen[1] = NEW Kreis(2.0)
+formen[2] = NEW Quadrat(5.0)
+
+FOR i = 0 TO 2
+    PRINT formen[i].Zeige()
+    gesamt = gesamt + formen[i].Flaeche()
+NEXT
+PRINT ""
+PRINT "Gesamtflaeche: " + NUMFMT$(gesamt, 2)
+
+' ---- Was NICHT geht ----------------------------------------------------
+' Die naechste Zeile waere ein Fehler schon beim Uebersetzen -- Form kuendigt
+' Flaeche und Umfang nur an:
+'
+'     DIM f AS Form
+'     f = NEW Form("irgendwas")
+'
+'   -> NEW form: die Klasse kuendigt Methoden an, ohne sie auszufuellen
+'      (flaeche, umfang).
+'
+' Genau darum geht es: der Fehler faellt beim Schreiben auf, nicht beim
+' Ausfuehren.
