@@ -10,12 +10,15 @@ IMPORT "audio"
 
 ## Mixer-Lifecycle
 
-Der Audio-Mixer initialisiert sich automatisch beim ersten Sound-Call mit Defaults (44100 Hz, 16-bit, Stereo, 512-buffer). Wer das Audio-Format anpassen will:
+Das Audio-System startet automatisch beim ersten Sound-Aufruf. Die Abtastrate
+bestimmt dabei das **Ausgabegeraet** -- seit dem Wechsel auf [Kira](https://github.com/tesselode/kira)
+(2026-06-13, davor raylib-Audio) gibt es kein festes Format mehr, das ein
+Programm einstellen koennte.
 
 | Funktion | Wirkung |
 |---|---|
-| `AUDIO_INIT([freq[, channels[, buffer]]])` | Mixer neu starten (z.B. mit 48000 Hz oder Mono) |
-| `AUDIO_SET_NUM_CHANNELS(n)` | Anzahl Mixer-Channels (Default: 8, hoch fuer Bullet-Hell) |
+| `AUDIO_INIT([...])` | stellt sicher, dass das Audio-System laeuft. **Nimmt Argumente entgegen und ignoriert sie** -- sie stammen aus der Mixer-Zeit und sind nur der Vertraeglichkeit halber geduldet |
+| `AUDIO_SET_NUM_CHANNELS(n)` | Anzahl gleichzeitiger Kanaele (Vorgabe **16**, hoch fuer Bullet-Hell) |
 | `AUDIO_NUM_CHANNELS()` → INTEGER | aktuelle Channel-Anzahl |
 | `AUDIO_BUSY_CHANNELS()` → INTEGER | wie viele Channels gerade spielen |
 

@@ -31,7 +31,7 @@ IMPORT "physics"
 - **Kreise** sind `(cx, cy, r)` — Center und Radius.
 - **Strahlen** sind `(rx, ry, dx, dy)` — Origin und **Richtungsvektor mit Länge**. `dx`/`dy` sind nicht normalisiert; die Länge bestimmt die Maximaldistanz, `t = 1` ist das Strahlen-Ende.
 - **Normalen** für `REFLECT_*` müssen **nicht** vorab normalisiert sein — die Funktion macht das intern.
-- **Multi-Return** ist in GB nicht möglich, deshalb haben Vektor-Operationen mit X/Y-Output zwei separate Funktionen.
+- **Vektor-Operationen mit X/Y-Ausgabe haben zwei separate Funktionen** (`PHYSICS_NORM_X`/`PHYSICS_NORM_Y`). Das ist eine Entwurfsentscheidung, keine Not: Drachenhauch kann Mehrfach-Rückgabe sehr wohl, über [`BYREF`](sprache.md#byref-parameter-multi-return). Zwei pure Funktionen lassen sich aber direkt in einen Ausdruck schreiben, während `BYREF` zwei vorher deklarierte Variablen braucht.
 
 ## Beispiel: Ball prallt von einer Wand ab
 
