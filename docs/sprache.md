@@ -1083,4 +1083,4 @@ Mehrzeilige Kommentare gibt es nicht — jede Zeile braucht eigenes `'`.
 | `TRUE` / `FALSE` | bool | Boolesche Literale |
 | `NIL` | — | leerer Referenz-Wert |
 
-Plus alle Farb-Konstanten (`BLACK`, `WHITE`, `RED`, `GREEN`, `BLUE`, `YELLOW`, `CYAN`, `MAGENTA`, `ORANGE`, `PURPLE`, `BROWN`, `PINK`, `DARKRED`, `DARKGREEN`, `DARKBLUE`, `GRAY`, `LIGHTGRAY`, `DARKGRAY`) und Tasten-Konstanten (`KEY_ESCAPE`, `KEY_RETURN`, `KEY_SPACE`, `KEY_LEFT/RIGHT/UP/DOWN`, `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9`).
+Plus alle Farb-Konstanten (`BLACK`, `WHITE`, `RED`, `GREEN`, `BLUE`, `YELLOW`, `CYAN`, `MAGENTA`, `ORANGE`, `PURPLE`, `BROWN`, `PINK`, `DARKRED`, `DARKGREEN`, `DARKBLUE`, `GRAY`, `LIGHTGRAY`, `DARKGRAY`) und Tasten-Konstanten (`KEY_ESCAPE`, `KEY_RETURN`, `KEY_SPACE`, `KEY_LEFT/RIGHT/UP/DOWN`, `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9`, `KEY_F1` bis `KEY_F12`, Modifier, Navigationsblock und Ziffernblock — vollstaendige Tabelle in [builtins-grafik.md](builtins-grafik.md#eingabe-tastatur-und-maus)).

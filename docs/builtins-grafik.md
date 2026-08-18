@@ -309,7 +309,7 @@ WEND
 
 Für animierte Sprites mit Frame-Logik siehe [Sprite-Modul](module-sprite.md). Für Effekte wie Skalieren, Rotieren, Tinten siehe [imgfx-Modul](module-imgfx.md).
 
-**Asset-Cache:** `LOADIMAGE` und `LOADSOUND` cachen ihre Ergebnisse automatisch. Mehrfache Aufrufe mit demselben (oder gleichbedeutendem) Pfad liefern dieselbe Surface zurück, ohne Disk-IO. Cache-Schlüssel sind sowohl der rohe Pfad als auch der normalisierte Absolut-Pfad, sodass verschiedene Schreibweisen (`"x.png"`, `"./x.png"`, absolut) denselben Eintrag treffen.
+**Asset-Cache:** `LOADIMAGE` und `LOADSOUND` cachen ihre Ergebnisse automatisch. Mehrfache Aufrufe mit demselben (oder gleichbedeutendem) Pfad liefern dasselbe Bild zurück, ohne Disk-IO. Cache-Schlüssel sind sowohl der rohe Pfad als auch der normalisierte Absolut-Pfad, sodass verschiedene Schreibweisen (`"x.png"`, `"./x.png"`, absolut) denselben Eintrag treffen.
 
 ## Asset-Preloader
 
@@ -388,7 +388,7 @@ Rects sind `[x, y, w, h]` (Pixel im Atlas). Image-Pfad relativ zum Manifest.
 DIM atlas AS SPRITE_ATLAS
 atlas = ATLAS_LOAD("assets/tiles_atlas.json")
 
-' Pro Frame: 600 Tiles in einer Queue sammeln, dann EINMAL rendern.
+' Pro Frame 600 Tiles -- jeder Aufruf zeichnet sofort (siehe Hinweis unten).
 FOR row = 0 TO 19
     FOR col = 0 TO 29
         BATCH_DRAW(atlas, "tile_grass", col * 16, row * 16)
@@ -396,11 +396,6 @@ FOR row = 0 TO 19
 NEXT
 BATCH_FLUSH()   ' No-Op -- gezeichnet wurde schon oben, Zeile fuer Zeile
 ```
-
-**Auto-Flush** an wichtigen Punkten — die Queue wird automatisch geleert vor:
-- `FLIP()` (sonst geht die Queue verloren)
-- `LAYER(...)` (damit der Batch zum richtigen Layer geht)
-- `ATLAS_DRAW(...)` (Direct-Call wahrt Reihenfolge)
 
 > **Kein echtes Bündeln.** In `dhrt` ist `BATCH_DRAW` derselbe Aufruf wie `ATLAS_DRAW`
 > (ein Zweig im Dispatch), und `BATCH_FLUSH()` tut gar nichts. Die Runtime arbeitet als
@@ -427,14 +422,21 @@ Vollständiges Beispiel: [examples/76_layers_atlas.dh](../examples/76_layers_atl
 
 ## Z-Layer-Rendering
 
-Z-Layer geben dir explizite Render-Reihenfolge: Hintergrund → Sprites → UI, ohne dass du die Draw-Reihenfolge im Code akribisch verwalten musst. Jeder Layer ist eine off-screen Surface mit explizitem z-Wert. `FLIP` composiert alle Layer in z-Order (niedrigstes z = hinten, höchstes z = vorne) auf den Main-Buffer und blittet zum Screen.
+Z-Layer geben dir explizite Render-Reihenfolge: Hintergrund → Sprites → UI, ohne dass du die Draw-Reihenfolge im Code akribisch verwalten musst.
+
+Ein Layer ist eine **Befehlsliste** mit einem z-Wert — kein Bildspeicher. Jeder
+Zeichenaufruf hängt einen Eintrag an die gerade aktive Liste; `FLIP` sortiert die
+Listen nach z (niedrigstes = hinten) und spielt sie in dieser Reihenfolge ab.
+Das ist dasselbe Aufzeichnungs-Modell wie bei
+[`BATCH_DRAW`](#sprite-atlas) — es gibt keine Zwischenbilder, die man auslesen
+oder einzeln überblenden könnte.
 
 | Funktion | Zweck |
 |---|---|
 | `LAYER_DEFINE(name$, z)` | Layer mit explizitem z registrieren (re-define aktualisiert nur z) |
 | `LAYER(name$)` | aktiven Draw-Target auf Layer umschalten (auto-Define wenn neu) |
 | `LAYER_END()` | zurück zum Main-Buffer (optional, FLIP macht's auch) |
-| `LAYER_CLEAR(name$)` | Layer manuell leeren (selten, FLIP cleart alle Layer nach dem Composite) |
+| `LAYER_CLEAR(name$)` | Liste eines Layers manuell leeren (selten, `FLIP` leert ohnehin alle) |
 
 **Klassisches Game-Loop-Pattern:**
 
@@ -455,11 +457,14 @@ WHILE NOT QUITREQUESTED()
     LAYER("ui")
     TEXT(10, 10, "Score: " + STR$(score))
 
-    FLIP()    ' composiert in z-Order, cleart Layer fuer naechsten Frame
+    FLIP()    ' spielt die Ebenen in z-Order ab und leert sie danach
 WEND
 ```
 
-**Layer-Surfaces** sind SRCALPHA (transparent außer wo gezeichnet wird). Pro Frame werden sie nach dem Composite gecleared — du musst sie nicht selbst leeren. Wenn ein Layer einen opaken Hintergrund haben soll (z.B. der bg-Layer): einfach `CLS(...)` als ersten Draw-Call auf dem Layer.
+**Nach jedem `FLIP` sind die Listen leer** — du musst sie nicht selbst leeren. Wo
+ein Layer nichts gezeichnet hat, bleibt schlicht sichtbar, was darunter liegt.
+Wenn ein Layer einen deckenden Hintergrund haben soll (z.B. der bg-Layer):
+`CLS(...)` als ersten Zeichenaufruf auf dem Layer.
 
 **Backwards-Compat:** Code ohne `LAYER_*`-Calls läuft unverändert direkt auf den Main-Buffer.
 
@@ -472,8 +477,8 @@ LAYER("bg")
 FOR each tile:
     BATCH_DRAW(atlas, "tile_grass", x, y)
 NEXT
-BATCH_FLUSH()     ' No-Op; die Tiles liegen laengst auf dem bg-Layer
-LAYER("ui")       ' BATCH wuerde auto-flushen, aber ist hier schon leer
+BATCH_FLUSH()     ' No-Op; die Tiles haengen laengst an der bg-Liste
+LAYER("ui")       ' schaltet nur die aktive Liste um -- nichts geht verloren
 TEXT(10, 10, "Score: " + STR$(score))
 FLIP()
 ```
@@ -562,7 +567,22 @@ IF KEYPRESSED(KEY_ESCAPE) THEN
 END IF
 ```
 
-Verfügbare Konstanten: `KEY_ESCAPE`, `KEY_RETURN`/`KEY_ENTER`, `KEY_SPACE`, `KEY_TAB`, `KEY_BACKSPACE`, `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN`, `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9`.
+Verfügbare Konstanten:
+
+| Gruppe | Konstanten |
+|---|---|
+| Sondertasten | `KEY_ESCAPE`, `KEY_RETURN`/`KEY_ENTER`, `KEY_SPACE`, `KEY_TAB`, `KEY_BACKSPACE` |
+| Pfeile | `KEY_LEFT`, `KEY_RIGHT`, `KEY_UP`, `KEY_DOWN` |
+| Buchstaben/Ziffern | `KEY_A` bis `KEY_Z`, `KEY_0` bis `KEY_9` |
+| Funktionstasten | `KEY_F1` bis `KEY_F12` |
+| Modifier | `KEY_LSHIFT`, `KEY_RSHIFT`, `KEY_LCTRL`, `KEY_RCTRL`, `KEY_LALT`, `KEY_RALT`, `KEY_LSUPER`, `KEY_RSUPER`, `KEY_CAPSLOCK` |
+| Navigation | `KEY_INSERT`, `KEY_DELETE`, `KEY_HOME`, `KEY_END`, `KEY_PAGEUP`, `KEY_PAGEDOWN` |
+| Ziffernblock | `KEY_KP0` bis `KEY_KP9`, `KEY_KP_ENTER`, `KEY_KP_PLUS`, `KEY_KP_MINUS`, `KEY_KP_MULTIPLY`, `KEY_KP_DIVIDE`, `KEY_KP_PERIOD` |
+
+Der Ziffernblock hat eigene Codes — eine Spielsteuerung darf ihn getrennt von
+der oberen Ziffernreihe belegen. Gamepad-Codes (`JOY_BUTTON_A`, `JOY_DPAD_UP`
+und Verwandte) stehen in [module-input.md](module-input.md).
+
 
 ```basic
 SCREEN(320, 240, "Maus-Demo", 2)

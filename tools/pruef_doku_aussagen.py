@@ -14,7 +14,7 @@ die Stellen, an denen eine Doku am ehesten luegt, stehen woanders: in
 Tabellen ("| `AUDIO_INIT(freq)` | Mixer neu starten |") und in Fliesstext
 ("38 Module").
 
-Zwei Kategorien lassen sich hier mechanisch pruefen:
+Drei Kategorien lassen sich hier mechanisch pruefen:
 
 1. BEFEHLSNAMEN. Jeder Name der Form `NAME(` in einem Inline-Code-Abschnitt
    muss ein Builtin sein, das es wirklich gibt. Ein Tippfehler oder ein
@@ -37,17 +37,20 @@ Genau dort sassen ALLE bisher gefundenen Fehler. Dieser Pruefer ersetzt das
 Nachmessen nicht, er raeumt nur die Kategorien ab, die sich automatisieren
 lassen.
 
-WIE MAN VON HAND SUCHT (aus vier Durchgaengen)
-----------------------------------------------
+WIE MAN VON HAND SUCHT (aus fuenf Durchgaengen)
+-----------------------------------------------
 1. ZUERST NACH SELBSTWIDERSPRUECHEN. Eine Doku, die eine Migration hinter
    sich hat, wurde meist abschnittsweise nachgezogen -- die richtige Fassung
-   steht dann schon woanders in DERSELBEN Datei. Beide Migrations-Fehler,
+   steht dann schon woanders in DERSELBEN Datei. Alle drei Migrations-Fehler,
    die dieses Projekt hatte, waren von der Art:
-     module-net.md   Zeile 3 "Python-stdlib-Sockets" <-> letzter Abschnitt
-                     "reine std::net, keine zusaetzliche Crate"
-     module-audio.md Zeile 156 "von raylib direkt dekodiert" <-> Zeile 485
-                     "eigener Kira-Custom-Sound, der xmrs pollt"
-   Ein Abgleich der Datei mit sich selbst haette beide gefunden.
+     module-net.md      Zeile 3 "Python-stdlib-Sockets" <-> letzter Abschnitt
+                        "reine std::net, keine zusaetzliche Crate"
+     module-audio.md    Zeile 156 "von raylib direkt dekodiert" <-> Zeile 485
+                        "eigener Kira-Custom-Sound, der xmrs pollt"
+     builtins-grafik.md Abschnitt Z-Layer "jeder Layer ist eine off-screen
+                        Surface, FLIP blittet" <-> Abschnitt Sprite-Atlas
+                        "Aufzeichnungs-Modell, jeder Befehl haengt ein Cmd an"
+   Ein Abgleich der Datei mit sich selbst haette alle drei gefunden.
 
 2. TESTS SIND KEIN BELEG. Fuer NET_SET_TIMEOUT gab es einen Test -- er rief
    die Funktion mit 0, 100 und -1 auf und prueft, dass nichts abstuerzt.
@@ -147,8 +150,47 @@ def zaehlungen() -> list:
     return funde
 
 
+def konstanten(ordner: Path) -> list:
+    """3. KONSTANTEN. Jede eingebaute Tasten-Konstante muss in `docs/` stehen.
+
+    Gefunden beim Durchgang durch `builtins-grafik.md`: die Datei fuehrte eine
+    Liste "Verfuegbare Konstanten" -- und die war um 21 Eintraege zu kurz
+    (`KEY_F1` bis `KEY_F12` und saemtliche Modifier fehlten). Eine Liste, die
+    sich als vollstaendig ausgibt und es nicht ist, kostet mehr als gar keine:
+    wer `KEY_F5` sucht, nicht findet und daraus schliesst, es gebe die Taste
+    nicht, baut sich einen Umweg um ein Loch, das keines ist.
+
+    Bereichsschreibweisen ("`KEY_A` bis `KEY_Z`") gelten als Abdeckung -- die
+    Doku soll 26 Buchstaben nicht einzeln aufzaehlen muessen.
+    """
+    quelle = (WURZEL / "rust" / "drachenhauch_runtime" / "src" / "vm.rs").read_text(encoding="utf-8")
+    stelle = re.search(r"const DEFAULT_KEYS[^=]*=\s*&\[(.*?)\n\];", quelle, re.S)
+    if not stelle:
+        return [("rust/.../vm.rs", 0, "DEFAULT_KEYS",
+                 "Tabelle nicht mehr gefunden -- diese Pruefung laeuft ins Leere")]
+    keys = {k.upper() for k in re.findall(r'"(key_[a-z0-9_]+)"', stelle.group(1))}
+    doku = "\n".join(d.read_text(encoding="utf-8") for d in sorted(ordner.glob("*.md")))
+    bereiche = [(r"KEY_[A-Z]$", "`KEY_A` bis `KEY_Z`"),
+                (r"KEY_[0-9]$", "`KEY_0` bis `KEY_9`"),
+                (r"KEY_F\d+$", "`KEY_F1` bis `KEY_F12`"),
+                (r"KEY_KP\d$", "`KEY_KP0` bis `KEY_KP9`")]
+
+    def fehlt(k: str) -> bool:
+        if k in doku:
+            return False
+        return not any(re.match(m, k) and t in doku for m, t in bereiche)
+
+    offen = sorted(k for k in keys if fehlt(k))
+    if not offen:
+        return []
+    return [("docs/*.md", 0, ", ".join(offen),
+             f"{len(offen)} Tasten-Konstante(n) gibt es in der Runtime, "
+             "stehen aber in keiner Doku-Datei")]
+
+
 def main():
-    funde = pruefe_namen(WURZEL / "docs") + zaehlungen()
+    funde = (pruefe_namen(WURZEL / "docs") + zaehlungen()
+             + konstanten(WURZEL / "docs"))
     print(f"Doku-Aussagen geprueft -- {len(funde)} Befund(e)")
     for datei, zeile, was, msg in funde:
         print(f"\n  {datei}:{zeile}")

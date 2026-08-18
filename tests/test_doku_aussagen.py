@@ -49,3 +49,18 @@ def test_geduldete_namen_sind_begruendet():
     m = _pruefer()
     for name, grund in m.GEDULDET.items():
         assert len(grund) > 20, f"{name}: Grund zu duenn ({grund!r})"
+
+
+def test_tasten_konstanten_stehen_in_der_doku():
+    """Jede Konstante aus DEFAULT_KEYS muss in docs/ auffindbar sein.
+
+    Die Liste in `builtins-grafik.md` gab sich als vollstaendig aus und war
+    es nie: erst fehlten `KEY_F1`..`KEY_F12` und die Modifier, nach der
+    ersten Korrektur immer noch Navigationsblock und Ziffernblock. Von Hand
+    aufzaehlen ist offensichtlich die falsche Methode -- darum zaehlt das
+    jetzt die Runtime selbst gegen.
+    """
+    m = _pruefer()
+    funde = m.konstanten(WURZEL / "docs")
+    assert not funde, "\n".join(
+        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
