@@ -153,7 +153,7 @@ Demo: [examples/160_musik_seek.dh](../examples/160_musik_seek.dh) — klickbarer
 
 * **MOD/XM können es nicht** und sagen es auch. Ihre Zeitachse sind Pattern und Zeilen, nicht Sekunden; wie lange bis zu einer Stelle vergeht, hängt an Tempowechseln im Stück selbst. `AUDIO_MUSIC_POSITION()` liefert für Module trotzdem Sekunden — mitzählen geht, anspringen nicht.
 
-**Formate:** `.ogg`, `.mp3`, `.qoa` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden von raylib direkt dekodiert (kein Zusatzcode), klingen also **exakt wie das Original** auf dem Amiga (4+ Kanaele, Sample-basiert). Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:
+**Formate:** `.ogg`, `.mp3`, `.qoa` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden in **Echtzeit gestreamt**: ein eigener Kira-Sound (`ModuleSound` in `audio.rs`) treibt den reinen Rust-Player [`xmrs`/`xmrsplayer`](https://crates.io/crates/xmrs) auf dem Audio-Thread -- 4+ Kanaele, Sample-basiert, mit exaktem Endlos-Loopen. (Bis 2026-06-13 uebernahm das raylib; seit dem Wechsel auf Kira laeuft es ueber den eigenen Player.) Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:
 
 ```basic
 AUDIO_MUSIC_LOAD("song.mod")

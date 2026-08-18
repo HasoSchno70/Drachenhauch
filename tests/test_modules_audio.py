@@ -524,3 +524,77 @@ def test_music_seek_auf_modul_sagt_es_klar(run_gb, tmp_path):
     ])
     out = run_gb(src, base=tmp_path)
     assert "MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen" in out
+
+
+# --- Zusagen aus docs/module-audio.md, die vorher kein Test festhielt ------
+#
+# Beim Nachmessen der Doku fiel auf: die Vorgabewerte und die
+# loops-Semantik standen zwar beschrieben, aber nichts pinnte sie fest. Genau
+# so konnte der Mixer-Abschnitt jahrelang eine Kanal-Vorgabe von 8 behaupten,
+# waehrend es 16 sind.
+
+def test_unloadsound_zaehler_und_tombstone(run_gb):
+    """UNLOADSOUND gibt frei, der Handle bleibt gueltig (Tombstone) und ein
+    erneutes PLAYSOUND darauf meldet sich im Klartext."""
+    out = run_gb('IMPORT "audio"\n'
+                 'DIM t AS SOUND\nDIM v AS SOUND\n'
+                 't = AUDIO_TONE(440, 30, "square", 0.3)\n'
+                 'PRINT AUDIO_SOUND_COUNT()\n'
+                 'UNLOADSOUND(t)\n'
+                 'PRINT AUDIO_SOUND_COUNT()\n'
+                 'TRY\n'
+                 '    PLAYSOUND(t)\n'
+                 '    PRINT "kein Fehler"\n'
+                 'CATCH e\n'
+                 '    PRINT e\n'
+                 'END TRY\n'
+                 'v = AUDIO_TONE(880, 30, "sine", 0.3)\n'
+                 'PRINT STR$(v) = STR$(t)\n')
+    zeilen = [z for z in out.splitlines() if z.strip()]
+    assert zeilen[0] == "1" and zeilen[1] == "0"
+    assert "freigegeben" in zeilen[2], zeilen
+    assert zeilen[3] == "FALSE", "Handle wurde recycelt -- Tombstone kaputt"
+
+
+def test_lautstaerke_ist_linear_und_wird_geklemmt(run_gb):
+    """Die Doku sagt '0..1' und (im Anhang) dass Kira intern in Dezibel
+    rechnet -- nach aussen muss es linear bleiben, und Werte darueber werden
+    geklemmt statt zu werfen."""
+    out = run_gb('IMPORT "audio"\n'
+                 'DIM t AS SOUND\nDIM ch AS AUDIO_CHANNEL\n'
+                 't = AUDIO_TONE(440, 50, "sine", 0.3)\n'
+                 'ch = AUDIO_PLAY(t, -1, 1.0)\n'
+                 'AUDIO_VOLUME(ch, 0.25)\n'
+                 'PRINT AUDIO_GET_VOLUME(ch)\n'
+                 'AUDIO_VOLUME(ch, 5.0)\n'
+                 'PRINT AUDIO_GET_VOLUME(ch)\n'
+                 'AUDIO_STOP(ch)\n')
+    assert [z for z in out.split() if z] == ["0.25", "1.0"]
+
+
+def test_loops_semantik(run_gb):
+    """`0` spielt einmal, `-1` endlos -- gemessen an einem 60-ms-Ton."""
+    out = run_gb('IMPORT "audio"\n'
+                 'DIM t AS SOUND\nDIM ch AS AUDIO_CHANNEL\n'
+                 't = AUDIO_TONE(440, 60, "sine", 0.2)\n'
+                 'ch = AUDIO_PLAY(t, 0, 0.2)\n'
+                 'SLEEP(250)\n'
+                 'PRINT AUDIO_IS_PLAYING(ch)\n'
+                 'ch = AUDIO_PLAY(t, -1, 0.2)\n'
+                 'SLEEP(250)\n'
+                 'PRINT AUDIO_IS_PLAYING(ch)\n'
+                 'AUDIO_STOP(ch)\n')
+    assert [z for z in out.split() if z] == ["FALSE", "TRUE"]
+
+
+def test_music_seek_ohne_play_meldet_sich(run_gb):
+    """Doku: 'der Aufruf meldet dann einen Fehler, statt stillschweigend
+    nichts zu tun' -- sonst begaenne das Stueck unbemerkt wieder bei 0."""
+    out = run_gb('IMPORT "audio"\n'
+                 'TRY\n'
+                 '    AUDIO_MUSIC_SEEK(10.0)\n'
+                 '    PRINT "kein Fehler"\n'
+                 'CATCH e\n'
+                 '    PRINT e\n'
+                 'END TRY\n')
+    assert "keine Musik" in out, out
