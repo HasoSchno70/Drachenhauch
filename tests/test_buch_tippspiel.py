@@ -97,6 +97,11 @@ def test_pruefprogramm_ist_gruen(rel, tmp_path):
     r = _lauf(_CODE / rel, tmp_path, None)
     aus = r.stdout.decode("utf-8", "replace")
     assert "ALLES GRUEN" in aus, aus
+    # Seit der Umstellung auf ASSERT_* (WP E) endet ein Pruefprogramm mit
+    # einem Rueckgabewert -- vorher war er IMMER 0, egal was herauskam. Nur
+    # den Text zu pruefen wuerde die eigentliche Zusage wieder verlieren.
+    assert r.returncode == 0, (r.returncode, aus,
+                               r.stderr.decode("utf-8", "replace"))
 
 
 @pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
