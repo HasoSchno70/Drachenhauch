@@ -78,7 +78,9 @@ feature-gated (Standard-`.exe` bleibt schlank).
   AUDIO_CHANNEL = INTEGER-Handles; raylib hat keine eigenstaendigen Mixer-Channels, daher
   steuert ein „Channel" die Wiedergabe genau seines Sounds (Volume per Handle
   getrackt, da raylib keinen Getter hat). Fade/loops=N werden vereinfacht
-  (raylib kann das nicht direkt).
+  (raylib kann das nicht direkt). *(Stand 2026-06-01, also vor dem
+  Backend-Wechsel: seit dem 13.06. laeuft Audio auf Kira, und dort sind
+  Fades native Tweens und `loops=N` in der `AUDIO_*`-Familie umgesetzt.)*
 
 ### Audio-Backend: Kira (cpal) — loeste 2026-06-13 raylib-Audio ab
 
@@ -235,23 +237,25 @@ Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
 .venv\Scripts\python.exe dhrun.py --native examples\30_shapes.dh
 ```
 
-Das kompiliert die `.dh`-Datei (Lexer/Parser/Compiler bleiben in Python),
-serialisiert sie in eine **temporäre `.dhc`** und startet `dhrt` im Verzeichnis
-der Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")`
-stimmen). stdout/stderr und ein etwaiges Grafik-Fenster werden direkt
-durchgereicht; der Exit-Code von `dhrt` wird weitergegeben. Fehlt das Binary,
+Das startet `dhrt run` auf der `.dh`-Datei — **kein Python-Compile, keine
+`.dhc`**: `dhrt` bringt sein eigenes Frontend mit (preprocess → lex → parse →
+compile → VM, alles in Rust), und genau darum laufen hier auch Builtins, die
+der Python-Compiler gar nicht kennt. Gestartet wird im Verzeichnis der
+Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")` stimmen);
+stdout/stderr und ein etwaiges Grafik-Fenster werden direkt durchgereicht, der
+Exit-Code von `dhrt` wird weitergegeben (`3`, wenn das Binary fehlt). Fehlt es,
 verweist die Meldung auf `rust\build_runtime.py`.
 
-So bleibt Python die Toolchain (und später nur noch der Editor), während die
-Ausführung nativ läuft — kein manuelles `serialize` + `dhrt` mehr.
+Python ist damit weder Toolchain noch Runtime — nur noch Editor und Werkzeug.
 
-**Im Editor:** Der **Run**-Button (F5) ist der einzige Run-Knopf und nutzt
-**primär `dhrt`** (fällt bei nicht gebauter Runtime / Compile- oder Start-Fehler
-automatisch auf den Tree-Walker zurück). Der Editor kompiliert die Datei
-in-process in eine temporäre `.dhc` und startet `dhrt` **direkt** als `QProcess`
-(nicht über `dhrun.py`) — so beendet der `Stop`-Button auch den nativen Prozess
-(kein verwaister dhrt). Output und Laufzeitfehler
-(`datei.dh:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
+**Im Editor:** Der **Run**-Button (F5) ist der einzige Run-Knopf und ruft
+ebenfalls `dhrt run` — primär direkt als `QProcess` (so beendet der
+`Stop`-Button auch den nativen Prozess, kein verwaister dhrt), bei
+Startproblemen über den `dhrun.py`-Launcher, der dasselbe Binary startet.
+Einen Rückfall auf den Tree-Walker gibt es nicht — den Tree-Walker selbst
+gibt es nicht mehr.
+Output und Laufzeitfehler (`datei.dh:Zeile`, klickbar) landen in derselben
+Konsole.
 
 ### Laufzeitfehler mit Zeilennummer
 
@@ -629,30 +633,39 @@ Python-only — die **Core-Audio-Builtins** sind aber nativ (siehe unten).
 
 ## Audio (Core: SFX + Stream-Musik)
 
-Native Audio über raylib (Modul `audio.rs`, feature-gated wie die Grafik —
-raylib bundelt den Mixer mit). **Core-Builtins, kein `IMPORT` nötig:**
+Native Audio über **Kira/cpal** (Modul `audio.rs`, feature-gated wie die
+Grafik — mit `--features graphics`). Wie das Backend arbeitet, steht oben unter
+[Audio-Backend: Kira](#audio-backend-kira-cpal--loeste-2026-06-13-raylib-audio-ab);
+hier nur die Builtins. **Core-Builtins, kein `IMPORT` nötig:**
 - `LOADSOUND(pfad$) -> SOUND` (Handle = INTEGER-Index), `PLAYSOUND(sound[,
   loops, lautstaerke])`, `STOPSOUND(sound)`.
 - `PLAYMUSIC(pfad$[, loops, lautstaerke])`, `STOPMUSIC()` — ein Stream
-  gleichzeitig; `dhrt` ruft `update_stream` pro `FLIP` (sonst stockt die
-  Wiedergabe). Musik loopt (raylib-Default).
+  gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop:
+  einen `update_stream`-Aufruf pro `FLIP` gibt es **nicht** (genau der Punkt,
+  an dem raylib-Audio knackte). Musik loopt endlos — `play_music` reicht
+  `loops = -1` weiter, was in Kira eine `loop_region(0.0..)` wird.
 
 **Audio-Reaktivität (FFT):** `AUDIO_FFT(bands)` füllt ein `ARRAY OF FLOAT` mit
 B logarithmisch verteilten Frequenzband-Pegeln (0..1) des **aktuell hörbaren**
-Audios. Dafür hängt `Audio::new` via `AttachAudioMixedProcessor` einen
-`extern "C"`-Callback an die gesamte raylib-Audio-Pipeline; der schiebt das
-gemischte Mono-Signal in einen globalen Ringpuffer (`try_lock`, Audio-Thread
-blockiert nie). `fft_bands` fenstert (Hann), rechnet eine eigene Radix-2-FFT
-(1024), bündelt log-spaced, normalisiert per Auto-Gain und glättet per
-Peak-Hold. (`AUDIO_FFT` ist nativ; ohne Mix-Tap füllt es Nullen.) So tanzen
-Spektrum **und** Geometrie der Demo wirklich zur Musik.
+Audios. Dafür hängt `Audio::new` einen Kira-`Effect` (`FftTapEffect`) an den
+**Main-Track**; sein `process` läuft auf dem Audio-Thread und schiebt das
+gemischte Mono-Signal in einen globalen Ringpuffer (`try_lock`, der
+Audio-Thread blockiert nie). `fft_bands` fenstert (Hann), rechnet eine eigene
+Radix-2-FFT (`FFT_N = 1024`), bündelt log-spaced, normalisiert per Auto-Gain
+und glättet per Peak-Hold. (`AUDIO_FFT` ist nativ; ohne Mix-Tap füllt es
+Nullen.) So tanzen Spektrum **und** Geometrie der Demo wirklich zur Musik.
 
-WAV/OGG/MP3/FLAC je nach raylib-Build. Audio gehoert **nicht** zur
-bit-identischen Garantie — wie `RND`/`MILLIS`/`tween` nur funktional.
-*Grenze:* `loops` wird nativ (noch) nicht ausgewertet — SFX spielen einmal,
-Musik loopt immer. Lifetime-Trick: das `RaylibAudio`-Gerät wird per `Box::leak`
-zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
-(kein self-referential struct). Demo: [examples/83_audio.dh](../examples/83_audio.dh).
+WAV/OGG/MP3/FLAC — dekodiert von **symphonia** (über Kira: `bundle-flac`,
+`bundle-mp3`, `codec-pcm`, `codec-vorbis`, `format-ogg`, `format-riff`), dazu
+MOD/XM über `xmrs`. Der Satz hängt also am Crate, nicht am Build-Flag. Audio
+gehoert **nicht** zur bit-identischen Garantie — wie `RND`/`MILLIS`/`tween` nur
+funktional.
+
+*Grenze:* Die beiden **Alt-Builtins** werten `loops` nicht aus — `PLAYSOUND`
+spielt einmal, `PLAYMUSIC` loopt immer, das dritte Argument wird verworfen. Wer
+endliche Wiederholungen braucht, nimmt die `AUDIO_*`-Familie: `AUDIO_PLAY`
+reicht `loops` bis zu `start_slot` durch und zählt sie herunter.
+Demo: [examples/83_audio.dh](../examples/83_audio.dh).
 
 ## Schritt 6: 3D-Grafik (Modul `g3d`)
 
