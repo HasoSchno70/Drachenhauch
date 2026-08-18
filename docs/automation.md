@@ -82,6 +82,18 @@ END IF
 laufenden Aufnahme grundsätzlich nichts ab; `AUTOMATION_PLAY` meldet das als
 Fehler, statt es still zu schlucken.
 
+**Eine Aufnahme ist nie ganz leer.** raylib schreibt jede Änderung der
+Mausposition mit — und das Fenster geht dort auf, wo der Zeiger gerade steht.
+Schon der erste Frame enthält darum meist zwei Ereignisse
+(`INPUT_MOUSE_POSITION` + `INPUT_TOUCH_POSITION`), obwohl niemand etwas
+gedrückt hat. Wer eine Aufnahme auf „genau N Ereignisse" prüft, prüft in
+Wirklichkeit den Mausstand des Rechners.
+
+**`AUTOMATION_PLAY` gibt eine raylib-Warnung aus** — `AUTOMATION: [datei]
+Issue reading line to buffer`, bei *jeder* Datei, auch bei einer fehlerfreien.
+raylib liest bis zum Dateiende und beschwert sich über den letzten Leseversuch.
+Kosmetik, kein Fehler: der Rückgabewert stimmt trotzdem.
+
 **Das Dateiformat ist raylibs Textformat** (eine Zeile je Ereignis:
 `e <frame> <typ> <p0> <p1> <p2> <p3>`). Es lässt sich mit einem Texteditor
 ansehen und auch von Hand schreiben — praktisch für Testabläufe, die man nicht

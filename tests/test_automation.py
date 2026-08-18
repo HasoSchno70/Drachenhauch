@@ -60,7 +60,21 @@ def _run(src, tmp_path, frames=12):
     return r
 
 
-_HEAD = 'SCREEN(160, 120, "Auto", 1)\n'
+# Das Fenster wird aus dem Bild geschoben, BEVOR irgendetwas aufgezeichnet
+# oder abgespielt wird.
+#
+# Grund: raylib schreibt jede Aenderung der Mausposition mit und liefert sie
+# auch an ein laufendes Programm -- und ein Fenster geht dort auf, wo der
+# Zeiger gerade steht. Liegt er darin, enthaelt schon der erste Frame zwei
+# Ereignisse (INPUT_MOUSE_POSITION + INPUT_TOUCH_POSITION), und eine
+# eingespeiste Position wird von der echten ueberschrieben. Drei Tests dieser
+# Datei haben dadurch gelegentlich versagt -- je nachdem, wo die Maus des
+# Rechners gerade lag.
+#
+# Gemessen: Fenster 1600x1000 (deckt den Zeiger sicher ab) ohne Verschieben
+# 2 Ereignisse in 3 von 3 Laeufen, mit Verschieben 0 in 3 von 3.
+_HEAD = ('SCREEN(160, 120, "Auto", 1)\n'
+         'SET_WINDOW_POS(-3000, -3000)\n')
 
 
 # ------------------------------------------------------------- Wiedergabe
@@ -141,6 +155,9 @@ def test_far_away_events_wait_instead_of_being_skipped(tmp_path):
     r = _run(gb, tmp_path)
     assert r.returncode == 0, r.stderr
     assert r.lines == ["10,10", "TRUE"]
+    # Die zweite Zusage ausdruecklich, weil sie den Namen des Tests traegt:
+    # das Ereignis bei Frame 900 darf weder vorgezogen noch verworfen werden.
+    assert r.lines[0] != "99,88", "Ereignis aus Frame 900 wurde vorgezogen"
 
 
 def test_injected_keys_do_not_count_as_user_input(tmp_path):
@@ -177,22 +194,40 @@ def test_recording_writes_a_readable_file(tmp_path):
     assert r.returncode == 0, r.stderr
     assert r.lines[0] == "TRUE" and r.lines[2] == "FALSE"
     out = (tmp_path / "out.txt").read_text(encoding="utf-8")
-    # Ohne echte Eingabe steht nichts drin -- aber die Datei muss das Format
-    # haben, das AUTOMATION_PLAY wieder liest.
-    assert "c 0" in out
-    assert int(r.lines[1]) == 0
+    # Die Datei muss das Format haben, das AUTOMATION_PLAY wieder liest -- und
+    # ihre Kopfzeile muss zu dem passen, was AUTOMATION_STOP gemeldet hat.
+    #
+    # NICHT auf "c 0" pruefen: raylib schreibt die Mausposition mit, sobald sie
+    # sich aendert, und das Fenster geht dort auf, wo der Zeiger gerade steht.
+    # Liegt er im Fensterbereich, stehen zwei Ereignisse drin
+    # (INPUT_MOUSE_POSITION + INPUT_TOUCH_POSITION), sonst keins -- der Test
+    # hing damit am Mausstand des Rechners, auf dem er lief.
+    assert f"c {r.lines[1]}" in out, (r.lines[1], out[:400])
+    assert int(r.lines[1]) >= 0
 
 
 def test_recorded_file_can_be_played_back(tmp_path):
+    """Aufnehmen -> stoppen -> abspielen liefert dieselbe Ereigniszahl zurueck.
+
+    Geprueft wird die BEZIEHUNG, nicht eine feste Zahl: wie viele Ereignisse
+    in zwei Frames anfallen, haengt davon ab, ob der Mauszeiger gerade ueber
+    dem Testfenster steht -- raylib schreibt jede Positionsaenderung mit, und
+    das Fenster geht dort auf, wo der Zeiger nun mal ist. Frueher stand hier
+    `== ["0", "FALSE"]`; der Test flackerte damit je nach Mausstand des
+    Rechners, auf dem er lief.
+    """
     gb = (_HEAD + 'AUTOMATION_RECORD("rt.txt")\n'
           'FLIP()\nFLIP()\n'
-          'AUTOMATION_STOP()\n'
+          'PRINT AUTOMATION_STOP()\n'
           'PRINT AUTOMATION_PLAY("rt.txt")\n'
           'PRINT AUTOMATION_PLAYING()\n')
     r = _run(gb, tmp_path)
     assert r.returncode == 0, r.stderr
-    # Leere Aufnahme -> 0 Ereignisse, entsprechend laeuft auch keine Wiedergabe.
-    assert r.lines == ["0", "FALSE"]
+    aufgenommen, abgespielt, laeuft = r.lines[0], r.lines[1], r.lines[2]
+    assert abgespielt == aufgenommen, \
+        (r.lines, "Wiedergabe meldet eine andere Zahl als die Aufnahme")
+    # Eine Wiedergabe laeuft genau dann, wenn es ueberhaupt etwas abzuspielen gab.
+    assert laeuft == ("TRUE" if int(aufgenommen) > 0 else "FALSE"), r.lines
 
 
 # ----------------------------------------------------------------- Fehler
