@@ -376,7 +376,9 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 
 ## Debugger
 
-Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt und Variablen-Inspektion. Er läuft auf dem Python-Interpreter (Referenz-Pfad) — die native Runtime `dhrt` hat keinen Debug-Kanal. Am besten für Konsolen-/Logik-Programme geeignet.
+Der Editor hat einen Debugger mit Breakpoints, Einzelschritt und Variablen-Inspektion. Er läuft über die **native Runtime**: der Editor startet `dhrt debug datei.dh` und spricht dessen zeilenweises JSON-Protokoll — stdin trägt die Kommandos (`continue`, `step-over`, …), stdout die Ereignisse (`paused`, `output`, `finished`). Die Pause-Logik selbst sitzt in `dhrt` (`vm.rs`), der Editor macht nur das Qt-Glue (`editor_qt/debugger.py`).
+
+Damit läuft im Debugger **dasselbe** Programm wie beim normalen Start — inklusive Grafik, Ton und aller Module.
 
 **Bedienung:**
 
@@ -395,7 +397,11 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 **Conditional Breakpoints:** Per **Rechtsklick** im Gutter-Band lässt sich pro Breakpoint ein Drachenhauch-Ausdruck als Bedingung hinterlegen (z. B. `i > 100` oder `hp <= 0 AND NOT dead`). Der Debugger hält dort nur an, wenn der Ausdruck im aktuellen Kontext **wahr** ist — ideal, um in einer Schleife erst beim n-ten Durchlauf zu stoppen. Bedingte Breakpoints werden als **hohler Ring** dargestellt (unbedingte als gefüllter Punkt). Eine leere Eingabe macht den Breakpoint wieder unbedingt. Ein nicht parsebarer oder zur Laufzeit fehlerhafter Ausdruck hält fail-open an (mit Hinweis in der Konsole), damit kein Breakpoint stillschweigend verschluckt wird.
 
-**Grenzen:** `INPUT` liefert im Debugger EOF (kein Hängen). Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem. Während einer Debug-Sitzung sind Run/Bench deaktiviert.
+**Grenzen:**
+
+- **`INPUT` geht im Debugger nicht.** Während einer Sitzung gehört stdin dem Kommando-Protokoll — `INPUT` bekommt darum eine **leere Zeile** statt einer Eingabe. Bei einem `STRING`-Ziel ist das ein Leerstring, bei `INTEGER`/`FLOAT` ein Typfehler an der `INPUT`-Zeile (`Eingabe '' passt nicht zu INTEGER`). Der Prompt erscheint normal in der Konsole.
+- Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem.
+- Während einer Debug-Sitzung sind Run/Bench deaktiviert.
 
 ## Profiler
 

@@ -896,10 +896,12 @@ impl<'p> Vm<'p> {
     /// (sonst erscheint der Prompt erst nach der Eingabe) und `self.out` leeren,
     /// damit der finale take_output() nichts doppelt schreibt.
     fn flush_and_prompt(&mut self, prompt: &str) {
-        // Unter dem Profiler gibt es keine interaktive Konsole -> Prompt in den
-        // Output-Puffer (landet im JSON-`output`-Feld), damit stdout sauber fuer
-        // den JSON-Blob bleibt (sonst klebt das prompt-Praefix am JSON).
-        if self.prof.is_some() {
+        // Unter dem Profiler UND unter dem Debugger gehoert stdout nicht dem
+        // Programm, sondern dem JSON (Profiler: ein Blob am Ende; Debugger: ein
+        // Ereignis je Zeile). Der Prompt geht darum in den Output-Puffer, der
+        // ohnehin als `output`-Ereignis bzw. im `output`-Feld herauskommt --
+        // sonst klebt er mitten im JSON und macht es unlesbar.
+        if self.prof.is_some() || self.dbg.is_some() {
             self.out.push_str(prompt);
             return;
         }
@@ -956,7 +958,11 @@ impl<'p> Vm<'p> {
     /// "" (wie der frueher genutzte DEVNULL-stdin), statt zu blockieren oder mit
     /// dem Stop-Reader um die Eingabe zu konkurrieren.
     fn read_input_line(&self) -> String {
-        if self.stop.is_some() {
+        // Kein interaktives stdin, wenn es jemand anderem gehoert: beim
+        // Profiler dem Stop-Kanal, beim Debugger dem Kommando-Protokoll. Ohne
+        // diese Sperre stahl ein INPUT dem Debugger eine Kommandozeile und
+        // die Sitzung lief aus dem Tritt.
+        if self.stop.is_some() || self.dbg.is_some() {
             return String::new();
         }
         read_input_line()

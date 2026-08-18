@@ -92,3 +92,46 @@ def test_step_over_advances_lines(tmp_path):
     ])
     lines = [e["line"] for e in evs if e["event"] == "paused"]
     assert lines[:3] == [1, 2, 3]
+
+
+def test_input_zerstoert_das_protokoll_nicht(tmp_path):
+    """Waehrend einer Debug-Sitzung gehoert stdin dem Kommando-Protokoll und
+    stdout den Ereignissen.
+
+    Gefunden beim Korrigieren von `docs/editor.md`: INPUT schrieb seinen
+    Prompt ROH auf stdout (mitten ins JSON) und las dann von stdin -- stahl
+    dem Debugger also eine Kommandozeile. Die Sitzung lief danach aus dem
+    Tritt. Jetzt geht der Prompt als `output`-Ereignis raus und INPUT
+    bekommt eine leere Zeile.
+    """
+    src = ('DIM n AS INTEGER\n'
+           'PRINT "vorher"\n'
+           'INPUT "Zahl: ", n\n'
+           'PRINT "nachher"\n')
+    evs = _debug_session(tmp_path, src, [
+        {"cmd": "continue"},
+        {"cmd": "continue"},
+        {"cmd": "continue"},
+    ])
+    # Schon dass _debug_session nicht wirft, ist die halbe Zusage: jede
+    # stdout-Zeile liess sich als JSON lesen.
+    texte = [e.get("text", "") for e in evs if e.get("event") == "output"]
+    assert "vorher\n" in texte, evs
+    assert any("Zahl: " in t for t in texte), evs
+    # Leere Eingabe bei einem INTEGER-Ziel -> sauberer Fehler an der
+    # INPUT-Zeile, nicht ein Haenger oder ein verschlucktes Kommando.
+    fehler = [e for e in evs if e.get("event") == "error"]
+    assert fehler and fehler[0]["line"] == 3, evs
+
+
+def test_input_auf_string_liefert_leerstring(tmp_path):
+    src = ('DIM s AS STRING\n'
+           'INPUT "Name: ", s\n'
+           'PRINT "[" + s + "]"\n')
+    evs = _debug_session(tmp_path, src, [
+        {"cmd": "continue"},
+        {"cmd": "continue"},
+    ])
+    texte = "".join(e.get("text", "") for e in evs if e.get("event") == "output")
+    assert "[]" in texte, evs
+    assert not [e for e in evs if e.get("event") == "error"], evs

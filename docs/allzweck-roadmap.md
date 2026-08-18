@@ -495,10 +495,16 @@ als Ausgangspunkt:
 - [ ] Ein `SET`-Typ **oder** MAP mit INTEGER-Schlüssel. Heute sind Map-Schlüssel
       immer STRING; die Set-Comprehension liefert ersatzweise ein
       dedupliziertes TUPLE (steht so in CLAUDE.md) — brauchbar, aber O(n)
-- [ ] `docs/editor.md` (Abschnitt „Debugger") behauptet, der Debugger laufe auf
-      dem Python-Tree-Walker. Der ist seit Stufe B entfernt; der Debugger läuft
-      längst über `dhrt debug` (`editor_qt/debugger.py`). Reiner Doku-Fehler,
-      aber einer, der beim Lesen abschreckt
+- [x] `docs/editor.md` (Abschnitt „Debugger") behauptete, der Debugger laufe auf
+      dem Python-Tree-Walker. Der ist seit Stufe B entfernt; er läuft längst über
+      `dhrt debug`. **Korrigiert 2026-08-17** — und beim Nachmessen der einen
+      Aussage („`INPUT` liefert im Debugger EOF") kam ein echter Fehler heraus:
+      `INPUT` schrieb seinen Prompt **roh auf stdout**, also mitten in den
+      JSON-Protokollstrom, und las dann von **stdin**, also aus dem
+      Kommando-Kanal des Debuggers. Eine Debug-Sitzung mit `INPUT` lief danach
+      aus dem Tritt. Beide Wächter deckten nur den Profiler ab, nicht den
+      Debugger (`flush_and_prompt`, `read_input_line` in `vm.rs`). Behoben,
+      zwei Tests in `tests/test_dhrt_debug.py` halten es fest
 
 ## Plattform
 
