@@ -223,7 +223,7 @@ DIM url AS STRING
 url = "https://api.example.com/search?q=" + q
 ```
 
-`URL_DECODE` macht das Gegenteil — `%XX`-Sequenzen werden zu Zeichen, `+` bleibt `+`. Beide Funktionen sind stdlib-`urllib.parse`-konform.
+`URL_DECODE` macht das Gegenteil — `%XX`-Sequenzen werden zu Zeichen, `+` bleibt `+`. Beide sind in Rust geschrieben, liefern aber dasselbe wie Pythons `urllib.parse.quote`/`unquote` (nachgemessen, nicht bloss beabsichtigt).
 
 ## HTML-Parser
 

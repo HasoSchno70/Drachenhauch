@@ -184,3 +184,45 @@ def test_udp_last_from_empty_initially(run_gb):
     out = _lines(run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(0)\n'
                         'PRINT "[" + NET_UDP_LAST_FROM(s) + "]"\nNET_UDP_CLOSE(s)\n'))
     assert out == ["[]"]
+
+
+def _verbundenes_paar() -> str:
+    """GB-Vorspann: Listener + verbundener Client + angenommener Server-Socket."""
+    return ('IMPORT "net"\n'
+            'DIM l AS NET_LISTENER\nDIM c AS NET_SOCKET\nDIM s AS NET_SOCKET\n'
+            'l = NET_TCP_LISTEN(0)\n'
+            'c = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(l))\n'
+            'WHILE IS_NIL(s)\n    s = NET_TCP_ACCEPT(l)\nWEND\n')
+
+
+def test_set_timeout_null_ist_non_blocking(run_gb):
+    """`NET_SET_TIMEOUT(sock, 0)` stellt NON-BLOCKING her, nicht blockierend.
+
+    Die Doku behauptete jahrelang das Gegenteil ("ms = 0 setzt
+    vollblockierendes Lesen"), und der vorhandene Test prueft nur, dass der
+    Aufruf nicht abstuerzt -- deshalb fiel es nie auf. Hier steht jetzt die
+    Bedeutung selbst.
+    """
+    out = _lines(run_gb(_verbundenes_paar() +
+                        'DIM t0 AS INTEGER\nDIM r AS STRING\n'
+                        'NET_SET_TIMEOUT(c, 0)\n'
+                        't0 = MILLIS()\n'
+                        'r = NET_RECV(c, 64)\n'
+                        'PRINT MILLIS() - t0 < 100\n'
+                        'PRINT r = ""\n'
+                        'NET_CLOSE(c)\nNET_CLOSE(s)\nNET_CLOSE_LISTENER(l)\n'))
+    assert out == ["TRUE", "TRUE"]
+
+
+def test_set_timeout_positiv_wartet_und_wirft_nicht(run_gb):
+    """`ms > 0` wartet hoechstens so lange -- und ein abgelaufener Timeout ist
+    KEIN Fehler, sondern ein Leerstring (die Doku versprach eine Exception)."""
+    out = _lines(run_gb(_verbundenes_paar() +
+                        'DIM t0 AS INTEGER\nDIM r AS STRING\n'
+                        'NET_SET_TIMEOUT(c, 300)\n'
+                        't0 = MILLIS()\n'
+                        'r = NET_RECV(c, 64)\n'
+                        'PRINT MILLIS() - t0 >= 250\n'
+                        'PRINT r = ""\n'
+                        'NET_CLOSE(c)\nNET_CLOSE(s)\nNET_CLOSE_LISTENER(l)\n'))
+    assert out == ["TRUE", "TRUE"]

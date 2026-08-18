@@ -1,6 +1,6 @@
 # Modul `net`
 
-TCP- und UDP-Netzwerk via Python-stdlib-Sockets. Cross-Platform, **non-blocking** als Default — passt zu Game-Loops, in denen jeder Frame in <16 ms zurueckkehren muss. Encoding ist immer UTF-8.
+TCP- und UDP-Netzwerk, nativ in `dhrt` ueber Rusts `std::net` (keine zusaetzliche Crate). Cross-Platform, **non-blocking** als Default — passt zu Game-Loops, in denen jeder Frame in <16 ms zurueckkehren muss. Encoding ist immer UTF-8.
 
 ```basic
 IMPORT "net"
@@ -21,7 +21,7 @@ IMPORT "net"
 | `NET_PEER_ADDR(sock)` | STRING | Remote-IP |
 | `NET_PEER_PORT(sock)` | INTEGER | Remote-Port |
 | `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE sobald die Gegenseite geschlossen hat oder ein Recv/Send fehlgeschlagen ist |
-| `NET_SET_TIMEOUT(sock, ms)` | — | 0 = blocking, sonst Timeout |
+| `NET_SET_TIMEOUT(sock, ms)` | — | `0` = non-blocking (Vorgabe), `> 0` = Timeout in ms, `< 0` = vollblockierend |
 | `NET_CLOSE(sock)` | — | Socket schliessen |
 | `NET_CLOSE_LISTENER(lst)` | — | Listener schliessen |
 
@@ -35,7 +35,7 @@ IMPORT "net"
 | `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes |
 | `NET_UDP_RECV(sock, max_bytes)` | STRING | leer wenn nichts da |
 | `NET_UDP_LAST_FROM(sock)` | STRING `"host:port"` | Absender des letzten RECV (leer vor dem ersten RECV) |
-| `NET_UDP_SET_TIMEOUT(sock, ms)` | — | 0 = blocking |
+| `NET_UDP_SET_TIMEOUT(sock, ms)` | — | wie oben: `0` = non-blocking, `> 0` = Timeout, `< 0` = vollblockierend |
 | `NET_UDP_CLOSE(sock)` | — | Socket schliessen |
 
 ## Konzept
@@ -138,14 +138,29 @@ WEND
 
 Default: alle Sockets sind non-blocking. RECV/ACCEPT liefern sofort leer/NIL wenn nichts da ist.
 
-Wer **blockierend** lesen will (z.B. weil man weiss, dass jetzt Antwort kommen MUSS): `NET_SET_TIMEOUT(sock, ms)` mit `ms > 0` setzt einen Timeout. `ms = 0` setzt vollblockierendes Lesen — RECV wartet auf Daten. Vorsicht in Game-Loops: friert den Frame ein.
+`NET_SET_TIMEOUT(sock, ms)` kennt **drei** Faelle — und `0` ist nicht der,
+den man vermutet:
+
+| `ms` | Wirkung |
+|---|---|
+| `0` | **non-blocking** — das ist die Vorgabe; RECV kehrt sofort zurueck |
+| `> 0` | Timeout: RECV wartet hoechstens so lange |
+| `< 0` | vollblockierend: RECV wartet, bis Daten kommen. Friert den Frame ein |
 
 ```basic
-NET_SET_TIMEOUT(sock, 2000)         ' 2s Timeout
+NET_SET_TIMEOUT(sock, 2000)         ' hoechstens 2s warten
 DIM answer AS STRING
 answer = NET_RECV(sock, 1024)
-' Wirft DHRuntimeError nach 2s wenn nichts kommt
+IF answer = "" THEN
+    PRINT "nichts gekommen"         ' Timeout ist KEIN Fehler
+END IF
 ```
+
+> **Ein Timeout wirft nicht.** Er liefert einen Leerstring — genau wie
+> „gerade nichts da" im non-blocking Betrieb. Wer die beiden Faelle
+> unterscheiden muss, misst die Zeit oder fragt `NET_IS_CONNECTED`.
+> (Gemessen: `NET_SET_TIMEOUT(s, 400)` kehrt nach 403 ms mit `""` zurueck,
+> ohne Fehler.)
 
 ## Verbindungsabbruch erkennen
 
