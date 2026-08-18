@@ -33,9 +33,31 @@ WAS HIER NICHT GEHT
 -------------------
 Verhaltensaussagen ("Default-Timeout 10 Sekunden", "laeuft auf dem
 Tree-Walker") lassen sich nicht mechanisch pruefen -- die muss man messen.
-Genau dort sassen die bisher gefundenen Fehler. Dieser Pruefer ersetzt das
+Genau dort sassen ALLE bisher gefundenen Fehler. Dieser Pruefer ersetzt das
 Nachmessen nicht, er raeumt nur die Kategorien ab, die sich automatisieren
 lassen.
+
+WIE MAN VON HAND SUCHT (aus vier Durchgaengen)
+----------------------------------------------
+1. ZUERST NACH SELBSTWIDERSPRUECHEN. Eine Doku, die eine Migration hinter
+   sich hat, wurde meist abschnittsweise nachgezogen -- die richtige Fassung
+   steht dann schon woanders in DERSELBEN Datei. Beide Migrations-Fehler,
+   die dieses Projekt hatte, waren von der Art:
+     module-net.md   Zeile 3 "Python-stdlib-Sockets" <-> letzter Abschnitt
+                     "reine std::net, keine zusaetzliche Crate"
+     module-audio.md Zeile 156 "von raylib direkt dekodiert" <-> Zeile 485
+                     "eigener Kira-Custom-Sound, der xmrs pollt"
+   Ein Abgleich der Datei mit sich selbst haette beide gefunden.
+
+2. TESTS SIND KEIN BELEG. Fuer NET_SET_TIMEOUT gab es einen Test -- er rief
+   die Funktion mit 0, 100 und -1 auf und prueft, dass nichts abstuerzt.
+   Die Doku beschrieb die Bedeutung von "0" trotzdem genau verkehrt herum.
+   Wer eine Aussage prueft, muss sie AUSFUEHREN, nicht nachsehen, ob es
+   einen Test gibt.
+
+3. NEGATIV-AUSSAGEN ALTERN AM SCHNELLSTEN. "X ist nicht moeglich" wird
+   falsch, sobald jemand X baut -- und niemand sucht dann die Doku ab.
+   (grep -i nach "nicht moeglich", "gibt es nicht", "kann nicht")
 """
 import json
 import re
