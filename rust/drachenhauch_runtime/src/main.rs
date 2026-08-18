@@ -33,6 +33,8 @@ mod cloud;
 #[cfg(feature = "db")]
 mod db;
 mod ecs;
+// Hintergrund-Auftraege (WP H) -- ungated: SHELL_START braucht kein http.
+mod hintergrund;
 #[cfg(feature = "http")]
 mod html;
 #[cfg(feature = "net")]

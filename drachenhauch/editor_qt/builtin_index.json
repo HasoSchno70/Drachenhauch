@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1389,
+ "count": 1401,
  "builtins": [
   {
    "name": "ABS",
@@ -1986,6 +1986,36 @@
    "name": "DB_QUERY",
    "kind": "core",
    "signature": "DB_QUERY(2+ Argumente)",
+   "module": "db"
+  },
+  {
+   "name": "DB_QUERY_CANCEL",
+   "kind": "core",
+   "signature": "DB_QUERY_CANCEL(auftrag)",
+   "module": "db"
+  },
+  {
+   "name": "DB_QUERY_PENDING",
+   "kind": "core",
+   "signature": "DB_QUERY_PENDING() AS INTEGER",
+   "module": "db"
+  },
+  {
+   "name": "DB_QUERY_READY",
+   "kind": "core",
+   "signature": "DB_QUERY_READY(auftrag) AS BOOLEAN",
+   "module": "db"
+  },
+  {
+   "name": "DB_QUERY_RESULT",
+   "kind": "core",
+   "signature": "DB_QUERY_RESULT(auftrag) AS DB_RESULT",
+   "module": "db"
+  },
+  {
+   "name": "DB_QUERY_START",
+   "kind": "core",
+   "signature": "DB_QUERY_START(datei, sql, ...) AS INTEGER",
    "module": "db"
   },
   {
@@ -6753,9 +6783,51 @@
    "module": "dhrt"
   },
   {
+   "name": "SHELL_CANCEL",
+   "kind": "core",
+   "signature": "SHELL_CANCEL(auftrag)",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_CODE",
+   "kind": "core",
+   "signature": "SHELL_CODE() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_ERR$",
+   "kind": "core",
+   "signature": "SHELL_ERR$() AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "SHELL_OUT$",
    "kind": "core",
    "signature": "SHELL_OUT$(programm, ...) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_PENDING",
+   "kind": "core",
+   "signature": "SHELL_PENDING() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_READY",
+   "kind": "core",
+   "signature": "SHELL_READY(auftrag) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_RESULT$",
+   "kind": "core",
+   "signature": "SHELL_RESULT$(auftrag) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "SHELL_START",
+   "kind": "core",
+   "signature": "SHELL_START(programm, ...) AS INTEGER",
    "module": "dhrt"
   },
   {

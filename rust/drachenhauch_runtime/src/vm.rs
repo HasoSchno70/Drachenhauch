@@ -672,6 +672,13 @@ pub struct Vm<'p> {
     assert_geprueft: i64,
     assert_fehler: i64,
     assert_sammeln: bool,
+    // WP H -- Kindprozesse im Hintergrund. `shell_letztes` haelt Code und
+    // stderr des zuletzt abgeholten Auftrags, damit SHELL_CODE()/SHELL_ERR$()
+    // sie lesen koennen, ohne dass SHELL_RESULT$ drei Werte auf einmal
+    // liefern muesste -- dasselbe Muster wie HTTP_STATUS()/HTTP_HEADER().
+    shell_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::ShellErgebnis, String>>,
+    shell_letzter_code: i64,
+    shell_letzter_fehler: String,
     // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DH_LOG) gelesen.
     // None = noch nicht nachgesehen.
     log_pegel: Option<u8>,
@@ -699,6 +706,11 @@ pub struct Vm<'p> {
     db_conns: Vec<Option<rusqlite::Connection>>,
     #[cfg(feature = "db")]
     db_results: Vec<crate::db::DbResult>,
+    // WP H: Abfragen, die im Hintergrund laufen. Eigene Verbindung je Auftrag
+    // (siehe try_hintergrund) -- die des Programms kann waehrenddessen
+    // weiterbenutzt werden.
+    #[cfg(feature = "db")]
+    db_auftraege: crate::hintergrund::Auftraege<Result<crate::db::DbResult, String>>,
     // Modul net: TCP-Listener/-Sockets + UDP-Sockets, INTEGER-Handles.
     #[cfg(feature = "net")]
     tcp_listeners: Vec<Option<(std::net::TcpListener, i64)>>,
@@ -796,6 +808,9 @@ impl<'p> Vm<'p> {
             assert_geprueft: 0,
             assert_fehler: 0,
             assert_sammeln: false,
+            shell_auftraege: Default::default(),
+            shell_letzter_code: 0,
+            shell_letzter_fehler: String::new(),
             log_pegel: None,
             prof: None,
             stop: None,
@@ -811,6 +826,8 @@ impl<'p> Vm<'p> {
             db_conns: Vec::new(),
             #[cfg(feature = "db")]
             db_results: Vec::new(),
+            #[cfg(feature = "db")]
+            db_auftraege: Default::default(),
             #[cfg(feature = "net")]
             tcp_listeners: Vec::new(),
             #[cfg(feature = "net")]
@@ -2117,6 +2134,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_timer(name, bargs)? { v }
                         else if let Some(v) = self.try_zeit(name, bargs)? { v }
                         else if let Some(v) = self.try_os(name, bargs)? { v }
+                        else if let Some(v) = self.try_hintergrund(name, bargs)? { v }
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
@@ -3518,6 +3536,102 @@ impl<'p> Vm<'p> {
                     Value::str_rc(&String::from_utf8_lossy(&out.stdout))
                 }
             }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    /// Hintergrund-Auftraege (WP H): SHELL_START und DB_QUERY_START.
+    ///
+    /// Dasselbe Muster wie `HTTP_GET_START` -- starten, pro Bild nachsehen,
+    /// abholen. Was hier laeuft, ist immer reine Rust-Arbeit ohne VM; warum
+    /// kein GB-Code im Hintergrund laufen kann, steht in `hintergrund.rs`.
+    fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("shell_") || name.starts_with("db_query_")) { return Ok(None); }
+        let v = match name {
+            "shell_start" => {
+                if a.is_empty() { return Err("SHELL_START: erwartet mind. 1 Argument (Programm)".into()); }
+                let prog = bi_str(a, 0, "SHELL_START")?.to_string();
+                let mut rest: Vec<String> = Vec::new();
+                for i in 1..a.len() { rest.push(bi_str(a, i, "SHELL_START")?.to_string()); }
+                Value::Int(self.shell_auftraege.start(&prog.clone(),
+                    move || crate::hintergrund::shell_arbeit(prog, rest)))
+            }
+            "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?)?),
+            "shell_result$" | "shell_result" => {
+                let id = bi_int(a, 0, "SHELL_RESULT$")?;
+                match self.shell_auftraege.abholen(id)? {
+                    Some(Ok(e)) => {
+                        self.shell_letzter_code = e.code;
+                        self.shell_letzter_fehler = e.stderr;
+                        Value::str_rc(&e.stdout)
+                    }
+                    Some(Err(msg)) => {
+                        self.shell_letzter_code = -1;
+                        self.shell_letzter_fehler = msg.clone();
+                        return Err(msg);
+                    }
+                    // Abholen ohne vorheriges SHELL_READY ist der haeufigste
+                    // Anfaengerfehler -- die Meldung sagt, was fehlt.
+                    None => return Err(format!(
+                        "SHELL_RESULT$: Auftrag {} ist nicht fertig (oder schon abgeholt)                          -- erst SHELL_READY({}) abfragen", id, id)),
+                }
+            }
+            "shell_code" => {
+                if !a.is_empty() { return Err("SHELL_CODE: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+                Value::Int(self.shell_letzter_code)
+            }
+            "shell_err$" | "shell_err" => {
+                if !a.is_empty() { return Err("SHELL_ERR$: erwartet 0 Argumente (gilt fuer den zuletzt abgeholten Auftrag)".into()); }
+                Value::str_rc(&self.shell_letzter_fehler)
+            }
+            "shell_cancel" => { self.shell_auftraege.abbrechen(bi_int(a, 0, "SHELL_CANCEL")?); Value::Nil }
+            "shell_pending" => Value::Int(self.shell_auftraege.offen()),
+            _ => return self.try_hintergrund_db(name, a),
+        };
+        Ok(Some(v))
+    }
+
+    #[cfg(not(feature = "db"))]
+    fn try_hintergrund_db(&mut self, _name: &str, _a: &[Value]) -> R<Option<Value>> { Ok(None) }
+
+    /// Abfragen im Hintergrund (WP H).
+    ///
+    /// Der Auftrag oeffnet eine EIGENE Verbindung zur Datei, statt die des
+    /// Programms mitzunehmen: eine `rusqlite::Connection` ist `Send`, aber
+    /// nicht `Sync` -- sie mitzugeben hiesse, sie dem Hauptthread wegzunehmen,
+    /// und der soll ja weiterarbeiten koennen. Preis dafuer: der Auftrag sieht
+    /// nur, was schon festgeschrieben ist, nicht die offene Transaktion des
+    /// Programms. Steht so in der Doku.
+    #[cfg(feature = "db")]
+    fn try_hintergrund_db(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        let v = match name {
+            "db_query_start" => {
+                let datei = bi_str(a, 0, "DB_QUERY_START")?.to_string();
+                let sql = bi_str(a, 1, "DB_QUERY_START")?.to_string();
+                let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY_START")?;
+                let kurz = sql.chars().take(40).collect::<String>();
+                Value::Int(self.db_auftraege.start(&kurz, move || {
+                    let conn = rusqlite::Connection::open(&datei)
+                        .map_err(|e| format!("DB_QUERY_START: {} ({})", e, datei))?;
+                    crate::db::query(&conn, &sql, &params)
+                }))
+            }
+            "db_query_ready" => Value::Bool(self.db_auftraege.fertig(bi_int(a, 0, "DB_QUERY_READY")?)?),
+            "db_query_result" => {
+                let id = bi_int(a, 0, "DB_QUERY_RESULT")?;
+                match self.db_auftraege.abholen(id)? {
+                    Some(Ok(res)) => {
+                        self.db_results.push(res);
+                        Value::Int((self.db_results.len() - 1) as i64)
+                    }
+                    Some(Err(msg)) => return Err(msg),
+                    None => return Err(format!(
+                        "DB_QUERY_RESULT: Auftrag {} ist nicht fertig (oder schon abgeholt)                          -- erst DB_QUERY_READY({}) abfragen", id, id)),
+                }
+            }
+            "db_query_cancel" => { self.db_auftraege.abbrechen(bi_int(a, 0, "DB_QUERY_CANCEL")?); Value::Nil }
+            "db_query_pending" => Value::Int(self.db_auftraege.offen()),
             _ => return Ok(None),
         };
         Ok(Some(v))

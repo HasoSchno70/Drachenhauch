@@ -1,0 +1,100 @@
+' 168 -- Arbeiten lassen, ohne stehenzubleiben (WP H)
+'
+' Eine grosse SQL-Abfrage und ein Kindprozess laufen im Hintergrund, waehrend
+' die Hauptschleife weiterzaehlt. Genau das ging vorher nicht: DB_QUERY und
+' SHELL hielten das ganze Programm an -- in einem Fenster heisst das keine
+' Maus, keine Taste, kein Neuzeichnen.
+'
+' Das Muster ist immer dasselbe, auch bei HTTP_GET_START:
+'     nummer = ..._START(...)      ' anstossen
+'     WHILE NOT ..._READY(nummer)  ' pro Bild einmal nachsehen
+'         ...                      ' weiterarbeiten
+'     WEND
+'     ergebnis = ..._RESULT(nummer)
+'
+' Aufruf:  dhrt run 168_hintergrund.dh
+
+IMPORT "db"
+
+CONST DATEI AS STRING = "hintergrund_probe.db"
+CONST ZEILEN AS INTEGER = 60000
+
+' ---- Eine Datenbank, die gross genug ist, um Zeit zu kosten -------------
+DIM c AS DB_CONN
+DIM i AS INTEGER
+
+IF FILEEXISTS(DATEI) THEN
+    DELETEFILE(DATEI)
+END IF
+
+c = DB_OPEN(DATEI)
+DB_EXEC(c, "CREATE TABLE messwerte (id INTEGER, wert REAL, text TEXT)")
+DB_BEGIN(c)
+FOR i = 1 TO ZEILEN
+    DB_EXEC(c, "INSERT INTO messwerte VALUES (?, ?, ?)", i, i * 1.5, "Messung " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+PRINT STR$(ZEILEN) + " Zeilen angelegt."
+PRINT ""
+
+' ---- Beides anstossen ---------------------------------------------------
+DIM abfrage AS INTEGER
+DIM prozess AS INTEGER
+
+abfrage = DB_QUERY_START(DATEI, _
+    "SELECT id, wert, text FROM messwerte WHERE id % ? = 0 ORDER BY wert DESC", 3)
+prozess = SHELL_START("cmd", "/c", "ping -n 2 127.0.0.1 > nul")
+
+PRINT "Beides laeuft: " + STR$(DB_QUERY_PENDING()) + " Abfrage, " + _
+      STR$(SHELL_PENDING()) + " Prozess"
+
+' ---- ... und weiterarbeiten --------------------------------------------
+' In einem Fenster staende hier CLS/zeichnen/FLIP. Ohne Fenster zaehlen wir
+' einfach mit, um zu zeigen, dass die Schleife wirklich durchlaeuft.
+DIM runden AS INTEGER
+DIM abfrage_fertig AS BOOLEAN
+DIM prozess_fertig AS BOOLEAN
+DIM treffer AS INTEGER
+DIM erg AS INTEGER
+
+WHILE NOT (abfrage_fertig AND prozess_fertig)
+    runden = runden + 1
+    ' In einem Fenster uebernaehme FLIP() das Warten auf das naechste Bild.
+    ' Ohne Fenster muss SLEEP her -- eine Schleife, die nur nachfragt, frisst
+    ' sonst einen ganzen Prozessorkern fuer nichts.
+    SLEEP(1)
+
+    IF NOT abfrage_fertig AND DB_QUERY_READY(abfrage) THEN
+        erg = DB_QUERY_RESULT(abfrage)
+        WHILE DB_NEXT(erg)
+            treffer = treffer + 1
+        WEND
+        DB_CLOSE_RESULT(erg)
+        abfrage_fertig = TRUE
+        PRINT "  Abfrage fertig nach " + STR$(runden) + " Runden: " + _
+              STR$(treffer) + " Zeilen"
+    END IF
+
+    IF NOT prozess_fertig AND SHELL_READY(prozess) THEN
+        ' Der Rueckgabewert und stderr gehoeren zum ZULETZT abgeholten
+        ' Auftrag -- wie HTTP_STATUS() zur zuletzt geholten Antwort.
+        DIM ausgabe AS STRING
+        ausgabe = SHELL_RESULT$(prozess)
+        prozess_fertig = TRUE
+        PRINT "  Prozess fertig nach " + STR$(runden) + " Runden, Code " + _
+              STR$(SHELL_CODE())
+    END IF
+WEND
+
+PRINT ""
+PRINT "Hauptschleife lief " + STR$(runden) + " mal durch, waehrend beides arbeitete."
+PRINT "Offen: " + STR$(DB_QUERY_PENDING()) + " / " + STR$(SHELL_PENDING())
+
+' ---- Was dabei zu wissen ist -------------------------------------------
+' Der Auftrag oeffnet eine EIGENE Verbindung zur Datei. Er sieht darum nur,
+' was schon festgeschrieben ist -- eine offene Transaktion des Programms
+' nicht. Fuer Lesen im Hintergrund ist das genau richtig; wer im selben
+' Atemzug schreiben und lesen will, nimmt das gewohnte DB_QUERY.
+
+DELETEFILE(DATEI)

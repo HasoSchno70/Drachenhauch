@@ -403,22 +403,53 @@ hat jetzt in beiden ein `abstracts`.
 Tests: `tests/test_vererbung.py` (20). Beispiel: `examples/167_vererbung.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Klassen und Strukturen".
 
-## WP H — Nebenläufigkeit
+## WP H — Nebenläufigkeit (teilweise erledigt 2026-08-17)
 
-Coroutines sind kooperativ und frame-getrieben. Nur HTTP hat einen
-Hintergrund-Pfad (`HTTP_GET_START`/`READY`/`RESULT`); `db`, `net` und `serial`
-nicht. Ein langer SQL-Lauf friert das Fenster ein.
+Coroutines sind kooperativ und frame-getrieben. Nur HTTP hatte einen
+Hintergrund-Pfad (`HTTP_GET_START`/`READY`/`RESULT`); ein langer SQL-Lauf fror
+das Fenster ein.
 
 **Randbedingung, die den Entwurf bestimmt:** raylib will den Hauptthread, und
 die VM ist nicht threadsicher. Ein Arbeitsthread darf darum weder zeichnen noch
 VM-Zustand anfassen.
 
-- [ ] Kurzfristig, billig: das `HTTP_GET_START`-Muster auf `db` (lange
-      Abfragen) und `net` übertragen — dasselbe Polling wie `INPUT_UPDATE`
-- [ ] Mittelfristig: `TASK_START(fnref, arg)` → ID, `TASK_READY(id)`,
-      `TASK_RESULT(id)`. Aufgabe = **reine** Funktion, Argumente und Ergebnis
-      werden **kopiert** übergeben. Keine geteilten Arrays, keine Objekte, kein
-      Zeichnen im Task — das ist die Beschränkung, die den Rest sicher macht
+- [x] Das `HTTP_GET_START`-Muster verallgemeinert: `hintergrund.rs` hält den
+      Auftrags-Speicher **einmal** (Tombstone-Vec, `start`/`fertig`/`abholen`/
+      `abbrechen`/`offen`), statt ihn ein drittes Mal nachzubauen.
+- [x] **`DB_QUERY_START`/`READY`/`RESULT`/`CANCEL`/`PENDING`** — Abfragen im
+      Hintergrund.
+- [x] **`SHELL_START`/`READY`/`RESULT$`/`CANCEL`/`PENDING`** plus
+      `SHELL_CODE()`/`SHELL_ERR$()` (ohne Argument, für den zuletzt abgeholten
+      Auftrag — wie `HTTP_STATUS()`). War nicht geplant, gehört aber genau
+      hierher: `SHELL` aus WP A blockiert bis zum Ende des Kindprogramms.
+- [n] **`net` brauchte nichts.** Gemessen statt angenommen: die Sockets sind
+      laut `docs/module-net.md` **non-blocking by default**, `NET_RECV`/`ACCEPT`
+      kehren sofort zurück. Nur `NET_TCP_CONNECT` blockiert einmalig, und das
+      mit einem festen 5-Sekunden-Deckel. Die Zeile oben war falsch.
+- [ ] **`TASK_START(fnref, arg)` — NICHT umgesetzt, und zwar mit Grund.**
+
+**Warum GB-Code nicht im Hintergrund laufen kann.** `Value` hält Zeichenketten,
+Arrays, Maps und Objekte durchgehend in `Rc` (28 Stellen in `value.rs`), und
+`Func` hält `Vec<Value>` als Parameter-Vorgaben — `Program` ist damit weder
+`Send` noch `Sync`. Eine GB-Funktion in einem Thread auszuführen hieße also,
+`Value` (und mit ihm `Func`/`Program`) auf `Arc` umzustellen. Das verteuert
+**jede** Zeichenketten- und Array-Operation in **jedem** einthreadigen
+Programm, um einem seltenen Fall zu helfen.
+
+Es gäbe einen Umweg — dem Arbeitsthread das Programm-JSON mitgeben, damit er
+sich seine eigene VM baut. Der hat aber eine unangenehme Kante: eine frische VM
+hat **keine initialisierten Globals**, und eine `CONST` auf oberster Ebene ist
+ein Global. Eine „reine" Funktion, die eine Konstante benutzt, sähe dort einen
+Vorgabewert. Das ist keine Beschränkung, die man nebenbei einführt.
+
+Beides ist eine eigene Entscheidung, keine Fleißarbeit — darum bleibt der Punkt
+offen und ehrlich als offen markiert.
+
+Tests: `tests/test_hintergrund.py` (17), darunter der Beleg, dass ein Auftrag
+die offene Transaktion des Programms **nicht** sieht (eigene Verbindung).
+Beispiel: `examples/168_hintergrund.dh` — Abfrage und Prozess laufen, die
+Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
+`docs/builtins-core.md`.
 
 ## WP I — Namensräume und Module (der große Brocken)
 
@@ -469,7 +500,7 @@ mindestens Linux fällig.
 
 ## Empfohlene Reihenfolge
 
-**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → ~~G~~ → H → I** (A bis G sind erledigt, Nächstes ist H)
+**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → ~~G~~ → H → I** (A bis G erledigt, H teilweise — der `TASK_*`-Teil braucht eine eigene Entscheidung, siehe dort)
 
 Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
 machen, pro Aufwand":

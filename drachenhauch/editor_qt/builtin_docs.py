@@ -52,6 +52,28 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
     "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
     "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
+    # Hintergrund-Auftraege (WP H) -- starten, pro Bild nachsehen, abholen
+    "db_query_start": ("DB_QUERY_START(datei, sql, ...) AS INTEGER",
+                       "Abfrage im Hintergrund starten, liefert sofort die Auftragsnummer. "
+                       "Oeffnet eine EIGENE Verbindung zur Datei -- sieht darum nur, was "
+                       "schon festgeschrieben ist, nicht die offene Transaktion des Programms."),
+    "db_query_ready":  ("DB_QUERY_READY(auftrag) AS BOOLEAN", "Ist das Ergebnis da? Fragt nach, wartet nicht."),
+    "db_query_result": ("DB_QUERY_RESULT(auftrag) AS DB_RESULT",
+                        "Ergebnis abholen und den Platz freigeben. Ein Fehler aus dem Auftrag "
+                        "(kaputtes SQL, fehlende Tabelle) wird HIER geworfen."),
+    "db_query_cancel": ("DB_QUERY_CANCEL(auftrag)", "Auftrag verwerfen (unbekannte Nummer = wirkungslos)."),
+    "db_query_pending": ("DB_QUERY_PENDING() AS INTEGER", "Wie viele Abfragen noch offen sind."),
+    "shell_start":   ("SHELL_START(programm, ...) AS INTEGER",
+                      "Programm im Hintergrund starten, liefert sofort die Auftragsnummer. "
+                      "Argumente einzeln, wie bei SHELL."),
+    "shell_ready":   ("SHELL_READY(auftrag) AS BOOLEAN", "Ist der Prozess fertig? Fragt nach, wartet nicht."),
+    "shell_result$": ("SHELL_RESULT$(auftrag) AS STRING",
+                      "stdout abholen und den Platz freigeben. Danach liefern SHELL_CODE() "
+                      "und SHELL_ERR$() die uebrigen Angaben dieses Auftrags."),
+    "shell_code":    ("SHELL_CODE() AS INTEGER", "Rueckgabewert des zuletzt abgeholten Auftrags."),
+    "shell_err$":    ("SHELL_ERR$() AS STRING", "stderr des zuletzt abgeholten Auftrags."),
+    "shell_cancel":  ("SHELL_CANCEL(auftrag)", "Auftrag verwerfen; der Prozess laeuft zu Ende."),
+    "shell_pending": ("SHELL_PENDING() AS INTEGER", "Wie viele Prozesse noch offen sind."),
     # Fehler-Angaben (WP F) -- im CATCH-Zweig gedacht
     "error_line": ("ERROR_LINE() AS INTEGER",
                    "Zeile, in der der zuletzt gefangene Fehler entstand (0 = keiner)."),

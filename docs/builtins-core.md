@@ -601,6 +601,39 @@ und unterliegt dann deren eigenen Quoting-Regeln.
 sein **stderr** stderr bleibt — sonst mischten sich Fehlermeldungen unbemerkt
 in die Nutzdaten.
 
+### Ein Programm im Hintergrund
+
+`SHELL` und `SHELL_OUT$` warten, bis das Kindprogramm fertig ist. Dauert das
+länger als ein Bild, steht alles still. Dafür gibt es dieselbe Sache zum
+Nachsehen:
+
+| Funktion | Wirkung |
+|---|---|
+| `SHELL_START(programm$, ...)` → INTEGER | startet im Hintergrund, liefert die Auftragsnummer |
+| `SHELL_READY(auftrag)` → BOOLEAN | ist der Prozess fertig? |
+| `SHELL_RESULT$(auftrag)` → STRING | stdout abholen, Platz freigeben |
+| `SHELL_CODE()` → INTEGER | Rückgabewert des **zuletzt abgeholten** Auftrags |
+| `SHELL_ERR$()` → STRING | dessen stderr |
+| `SHELL_CANCEL(auftrag)`, `SHELL_PENDING()` | verwerfen / zählen |
+
+```basic
+DIM auftrag AS INTEGER
+DIM ausgabe AS STRING
+auftrag = SHELL_START("git", "log", "--oneline")
+
+WHILE NOT SHELL_READY(auftrag)
+    ' ... hier weiterarbeiten, zeichnen, auf Tasten hören ...
+    SLEEP(1)
+WEND
+ausgabe = SHELL_RESULT$(auftrag)
+PRINT SHELL_CODE()
+```
+
+`SHELL_CODE()` und `SHELL_ERR$()` nehmen **kein** Argument: sie gehören zum
+zuletzt abgeholten Auftrag — dasselbe Muster wie `HTTP_STATUS()` zur zuletzt
+geholten Antwort. Ein Programm, das gar nicht erst startet, meldet sich beim
+**Abholen**, nicht beim Starten.
+
 > **`CWD$()` ist nicht das Verzeichnis, aus dem du gestartet hast.** `dhrt`
 > wechselt beim Start ins Verzeichnis der `.dh`-Datei (damit
 > `LOADIMAGE("assets/…")` von überall funktioniert), die exportierte `.exe`

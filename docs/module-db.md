@@ -157,3 +157,50 @@ Siehe [examples/25_db.dh](../examples/25_db.dh) — zeigt CREATE, INSERT mit Bin
 ## In der nativen Runtime (dhrt)
 
 `db` laeuft nativ mit dem Cargo-Feature `db` (SQLite via `rusqlite`, gebuendelt — kein System-SQLite noetig). Bit-identisch zu den Python-Pfaden fuer Standard-SQL (CRUD, `?`-Binding, Transaktionen, typisierte Getter). `DB_QUERY` laedt die Zeilen eager in den Speicher; `DB_CLOSE_RESULT` gibt sie wieder frei. Bauen: `python rust/build_runtime.py` (Feature `db` ist im Standard-Dev-Build bereits dabei). Fehlt das Feature, meldet der Builtin „nicht verfuegbar“.
+
+
+## Abfragen im Hintergrund
+
+`DB_QUERY` hält das ganze Programm an, bis die Antwort da ist. Bei einer großen
+Tabelle heißt das in einem Fenster: keine Maus, keine Taste, kein Neuzeichnen.
+
+Für alles, was in einer Schleife läuft, gibt es dieselbe Abfrage zum Nachsehen
+statt zum Warten — dasselbe Muster wie `HTTP_GET_START`:
+
+| Funktion | Wirkung |
+|---|---|
+| `DB_QUERY_START(datei$, sql$ [, params…])` → INTEGER | startet im Hintergrund, liefert sofort die Auftragsnummer |
+| `DB_QUERY_READY(auftrag)` → BOOLEAN | ist das Ergebnis da? (fragt nach, wartet nicht) |
+| `DB_QUERY_RESULT(auftrag)` → DB_RESULT | Ergebnis abholen und den Platz freigeben |
+| `DB_QUERY_CANCEL(auftrag)` | verwerfen (unbekannte Nummer = wirkungslos) |
+| `DB_QUERY_PENDING()` → INTEGER | wie viele Abfragen noch offen sind |
+
+```basic
+DIM auftrag AS INTEGER
+DIM erg AS INTEGER
+auftrag = DB_QUERY_START("spiel.db", "SELECT * FROM bestenliste ORDER BY punkte DESC")
+
+WHILE NOT QUITREQUESTED()
+    CLS()
+    IF auftrag >= 0 AND DB_QUERY_READY(auftrag) THEN
+        erg = DB_QUERY_RESULT(auftrag)
+        auftrag = -1
+    END IF
+    ' ... zeichnen ...
+    FLIP()
+WEND
+```
+
+> **Der Auftrag öffnet eine eigene Verbindung zur Datei** — die des Programms
+> kann währenddessen weiterbenutzt werden. Der Preis dafür: der Auftrag sieht
+> nur, was schon **festgeschrieben** ist, nicht die offene Transaktion des
+> Programms. Für Lesen im Hintergrund ist das genau richtig; wer im selben
+> Atemzug schreibt und liest, nimmt das gewohnte `DB_QUERY`.
+>
+> Der Grund ist technisch: eine SQLite-Verbindung darf zwar den Thread
+> wechseln, aber nicht auf zweien gleichzeitig benutzt werden. Sie dem Auftrag
+> mitzugeben hieße, sie dem Hauptthread wegzunehmen.
+
+**Fehler kommen beim Abholen.** Kaputtes SQL oder eine fehlende Tabelle lässt
+`DB_QUERY_START` durchgehen und wirft erst bei `DB_QUERY_RESULT` — dort, wo das
+Programm damit umgehen kann (`TRY`/`CATCH` um das Abholen).
