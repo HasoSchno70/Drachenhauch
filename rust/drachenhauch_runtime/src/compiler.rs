@@ -299,6 +299,14 @@ pub struct Compiler {
     global_consts: std::collections::HashSet<String>,
     global_vars: std::collections::HashSet<String>,
     fn_sigs: HashMap<String, FnSig>,
+    /// Wo eine freie SUB/FUNCTION deklariert wurde (gemergte Zeile) -- damit
+    /// eine Kollision BEIDE Stellen nennen kann (WP I.4).
+    fn_lines: HashMap<String, u32>,
+    class_lines: HashMap<String, u32>,
+    /// Zeilen-Herkunft der gemergten Quelle + Name der Hauptdatei, um in
+    /// Meldungen auf eine ANDERE Stelle zu verweisen (`mathe.dh:5`).
+    herkunft: Vec<crate::preprocess::Herkunft>,
+    haupt: String,
     compiled_fns: Vec<(String, Value)>,
     classes: HashMap<String, ClassInfo>,
     struct_names: std::collections::HashSet<String>,
@@ -482,7 +490,10 @@ impl Compiler {
         Compiler { global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
-                   fn_sigs: HashMap::new(), compiled_fns: vec![],
+                   fn_sigs: HashMap::new(), fn_lines: HashMap::new(),
+                   class_lines: HashMap::new(),
+                   herkunft: vec![], haupt: String::new(),
+                   compiled_fns: vec![],
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
                    external_types, builtin_aliases,
@@ -764,9 +775,11 @@ impl Compiler {
                 let (alt, alt_zeile) = (alt.clone(), *alt_zeile);
                 let wo = if self.ctx.is_main { "Das Hauptprogramm kennt" }
                          else { "Diese Funktion kennt" };
+                // Vor dem mutable borrow von `self.warnings` berechnen.
+                let alt_stelle = self.wo(alt_zeile);
                 self.warnings.push((zeile, format!(
-                    "'{}' wurde in Zeile {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.",
-                    name, alt_zeile, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo)));
+                    "'{}' wurde in {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.",
+                    name, alt_stelle, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo)));
             }
             Some(_) => {}
             None => { self.ctx.dim_types.insert(klein, (eff_type.to_string(), zeile)); }
@@ -1249,6 +1262,12 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- Variablen
+    /// Eine gemergte Zeile als `datei:zeile` -- fuer Verweise auf eine ANDERE
+    /// Stelle im Meldungstext. Ohne IMPORT ist das schlicht `haupt:zeile`.
+    fn wo(&self, zeile: u32) -> String {
+        crate::preprocess::stelle(&self.herkunft, zeile, &self.haupt)
+    }
+
     /// Ist `name` ein Feld der aktuellen Klasse (inkl. geerbter)?
     fn is_field(&self, name: &str) -> bool {
         let mut cur = self.ctx.current_class.as_deref();
@@ -2172,26 +2191,41 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- User-Funktionen
-    fn register_stub(&mut self, decl: &Node) -> Result<(), String> {
+    fn register_stub(&mut self, decl: &Node, zeile: u32) -> Result<(), String> {
         let (name, _, _, _, _) = fn_parts(decl);
         if self.fn_sigs.contains_key(name) {
-            return Err(format!("'{}' bereits deklariert", name));
+            // WP I.4: BEIDE Stellen nennen. Wer zwei fremde Bibliotheken
+            // einbindet, wusste vorher nicht einmal, welche der beiden den
+            // Namen schon belegt.
+            self.err_line = zeile;
+            let erste = self.fn_lines.get(name).copied().unwrap_or(0);
+            return Err(match erste {
+                0 => format!("'{}' ist schon deklariert", name),
+                z => format!("'{}' ist schon in {} deklariert -- eines von beiden umbenennen", name, self.wo(z)),
+            });
         }
         let sig = make_sig(decl)?;
         self.fn_sigs.insert(name.to_string(), sig);
+        self.fn_lines.insert(name.to_string(), zeile);
         Ok(())
     }
 
     // ---------------------------------------------------- Klassen
-    fn register_class(&mut self, decl: &Node) -> Result<(), String> {
+    fn register_class(&mut self, decl: &Node, zeile: u32) -> Result<(), String> {
         let (name, parent, fields, methods, is_struct, properties, abstracts) = match decl {
             Node::ClassDecl { name, parent, fields, methods, is_struct, properties, abstracts, .. } =>
                 (name, parent, fields, methods, *is_struct, properties, abstracts),
             _ => unreachable!(),
         };
         if self.classes.contains_key(name) {
-            return Err(format!("Klasse '{}' bereits deklariert", name));
+            self.err_line = zeile;
+            let erste = self.class_lines.get(name).copied().unwrap_or(0);
+            return Err(match erste {
+                0 => format!("Klasse '{}' ist schon deklariert", name),
+                z => format!("Klasse '{}' ist schon in {} deklariert -- eine von beiden umbenennen", name, self.wo(z)),
+            });
         }
+        self.class_lines.insert(name.to_string(), zeile);
         let mut field_infos = Vec::new();
         for f in fields {
             if let Node::Dim { name: fname, type_name, array_dims } = f {
@@ -2706,6 +2740,11 @@ fn unknown_dim_type_msg(type_name: &str) -> String {
 /// Statement-Zeilen-Wrapper auspacken (Stufe B). Stellen, die Statements per
 /// Variante introspizieren (Hoisting, DATA-Sammlung, Top-Level-Split), rufen das
 /// vor dem Match -- `stmt()` selbst packt separat aus und merkt sich die Zeile.
+/// Die Quell-Zeile eines Top-Level-Statements (0 = unbekannt).
+fn stmt_line(n: &Node) -> u32 {
+    if let Node::Stmt { line, .. } = n { *line } else { 0 }
+}
+
 fn unwrap_stmt(n: &Node) -> &Node {
     match n {
         Node::Stmt { body, .. } => body,
@@ -2763,30 +2802,36 @@ fn node_name(n: &Node) -> &'static str {
 /// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
-                      builtin_aliases: &[(String, String)])
+                      builtin_aliases: &[(String, String)],
+                      herkunft: &[crate::preprocess::Herkunft], haupt: &str)
     -> Result<(Value, Vec<(u32, String)>), (u32, String)> {
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err((0, "Erwartet Program-Knoten".into())),
     };
     // Funktionen / Klassen / Hauptprogramm trennen.
-    let mut fn_decls: Vec<&Node> = vec![];
-    let mut cls_decls: Vec<&Node> = vec![];
+    // (Deklaration, gemergte Zeile) -- die Zeile braucht die Kollisions-
+    // Meldung, um BEIDE Stellen nennen zu koennen (WP I.4).
+    let mut fn_decls: Vec<(&Node, u32)> = vec![];
+    let mut cls_decls: Vec<(&Node, u32)> = vec![];
     let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
         // Top-Level-Decls sind in Stmt gewrappt -> fuer fn/cls den inneren Knoten
         // ablegen (downstream matcht Node::FunctionDecl/ClassDecl direkt). Main-
         // Statements bleiben GEWRAPPT, damit stmt() die Quell-Zeile setzt.
         match unwrap_stmt(s) {
-            Node::SubDecl { .. } | Node::FunctionDecl { .. } => fn_decls.push(unwrap_stmt(s)),
-            Node::ClassDecl { .. } => cls_decls.push(unwrap_stmt(s)),
+            Node::SubDecl { .. } | Node::FunctionDecl { .. } =>
+                fn_decls.push((unwrap_stmt(s), stmt_line(s))),
+            Node::ClassDecl { .. } => cls_decls.push((unwrap_stmt(s), stmt_line(s))),
             _ => main_stmts.push(s),
         }
     }
     let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
     let mut c = Compiler::new(external_types.clone(), builtin_aliases.to_vec());
+    c.herkunft = herkunft.to_vec();
+    c.haupt = haupt.to_string();
     // Struct-Namen vor dem Slot-Pre-Pass kennen (Structs bekommen keinen Slot).
-    for cd in &cls_decls {
+    for (cd, _) in &cls_decls {
         if let Node::ClassDecl { name, is_struct: true, .. } = cd {
             c.struct_names.insert(name.clone());
         }
@@ -2798,7 +2843,7 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
     let outcome: Result<(), String> = (|| {
         c.collect_globals(&main_owned)?;
         // Klassen-Statics bekommen einen Slot.
-        for cd in &cls_decls {
+        for (cd, _) in &cls_decls {
             if let Node::ClassDecl { name, statics, .. } = cd {
                 if !statics.is_empty() {
                     // Review-Fund: alloc_slot() macht bei einer Kollision
@@ -2818,7 +2863,7 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
             }
         }
         // Phase 1: Klassen registrieren (Felder/Methoden-Sigs/Properties).
-        for cd in &cls_decls { c.register_class(cd)?; }
+        for (cd, line) in &cls_decls { c.register_class(cd, *line)?; }
         // Review-Fund: zyklische Vererbung (CLASS A EXTENDS B / CLASS B EXTENDS
         // A) wurde bisher klaglos akzeptiert und liess die MRO-Walker zur
         // Laufzeit (resolve_method/is_property/allocate_instance in vm.rs) in
@@ -2865,12 +2910,12 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
             }
         }
         // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
-        for d in &fn_decls { c.register_stub(d)?; }
-        for d in &fn_decls { c.compile_function(d)?; }
+        for (d, line) in &fn_decls { c.register_stub(d, *line)?; }
+        for (d, _) in &fn_decls { c.compile_function(d)?; }
         // Phase 4: Methoden kompilieren.
-        for cd in &cls_decls { c.compile_class_methods(cd)?; }
+        for (cd, _) in &cls_decls { c.compile_class_methods(cd)?; }
         // Phase 5: Hauptprogramm (Klassen-Statics zuerst hoisten).
-        for cd in &cls_decls { c.emit_class_statics(cd)?; }
+        for (cd, _) in &cls_decls { c.emit_class_statics(cd)?; }
         for s in &main_owned { c.stmt(s)?; }
         c.ctx.emit(oc::HALT, Value::Null);
         collect_data(stmts, &mut data)?;

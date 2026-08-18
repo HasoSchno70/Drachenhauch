@@ -457,6 +457,13 @@ Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 > Dort steht der Befund mit Messungen, ein Vorschlag für Syntax und
 > Semantik, ein Bauweg ohne VM-Änderung, ein Stufenplan und die vier
 > Fragen, die noch zu entscheiden sind.
+>
+> **Stufe I.4 ist gebaut (2026-08-17):** Namenskollisionen nennen jetzt
+> **beide** Dateien und Zeilen, und alle Meldungen der Übersetzungs-Phasen
+> zeigen auf die Datei, die der Nutzer vor sich hat — statt in die gemergte
+> Quelle. Dafür liefert `preprocess` eine Zeilen-Herkunftstabelle mit, die
+> zugleich Schritt 1 des Bauwegs für I.1 ist. Tests:
+> `tests/test_import_meldungen.py` (9).
 
 `IMPORT "datei.dh"` ist textuelles Inkludieren in einen flachen globalen
 Namensraum, in dem bereits **1316 Builtins** liegen. `IMPORT ... AS alias` ist

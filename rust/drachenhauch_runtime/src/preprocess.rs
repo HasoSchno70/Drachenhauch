@@ -227,21 +227,56 @@ pub fn missing_hardware_imports_with_lines(source: &str) -> Vec<(usize, &'static
 /// wobei `imports` die Built-in-Modul-IMPORTs als `(modul_lc, alias_lc?)`
 /// enthaelt -- Basis fuer `compile_env` (externe Typen + Builtin-Aliase).
 /// `base` ist das Verzeichnis fuer relative IMPORT-Pfade.
+/// Woher eine Zeile der gemergten Quelle stammt (WP I.4).
+///
+/// `IMPORT` fuegt Text ein -- danach zeigt jede Zeilennummer in die GEMERGTE
+/// Quelle, nicht in die Datei, die der Nutzer vor sich hat. Eine Datei mit
+/// zwei Zeilen bekam so eine Meldung "datei.dh:6". Diese Tabelle rechnet
+/// zurueck: ein Eintrag je Zeile der gemergten Quelle.
+///
+/// Der Editor baute sich dasselbe bisher selbst zusammen
+/// (`editor_qt/error_check.py::_origins_for`); hier entsteht es an der Stelle,
+/// die es ohnehin weiss.
+#[derive(Clone)]
+pub struct Herkunft {
+    /// Wie im IMPORT geschrieben (`"mathe.dh"`); leer = die Hauptdatei selbst.
+    pub datei: String,
+    /// Zeile INNERHALB dieser Datei, 1-basiert.
+    pub zeile: u32,
+}
+
+/// Die Herkunft einer gemergten Zeile (1-basiert) als `datei:zeile`.
+///
+/// `haupt` ist der Name, unter dem die Hauptdatei gemeldet wird -- ueblicherweise
+/// dasselbe Label, das ohnehin vor der Meldung steht.
+pub fn stelle(tabelle: &[Herkunft], zeile: u32, haupt: &str) -> String {
+    match tabelle.get(zeile.saturating_sub(1) as usize) {
+        Some(h) if !h.datei.is_empty() => format!("{}:{}", h.datei, h.zeile),
+        Some(h) => format!("{}:{}", haupt, h.zeile),
+        // Ausserhalb der Tabelle (sollte nicht vorkommen): lieber die rohe
+        // Zahl zeigen als gar nichts.
+        None => format!("{}:{}", haupt, zeile),
+    }
+}
+
 pub fn process(source: &str, base: &Path)
-    -> Result<(String, Vec<(String, Option<String>)>), PreprocessError> {
+    -> Result<(String, Vec<(String, Option<String>)>, Vec<Herkunft>), PreprocessError> {
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut out: Vec<String> = Vec::new();
     let mut imports: Vec<(String, Option<String>)> = Vec::new();
-    process_inner(source, base, &mut seen, &mut out, &mut imports)?;
-    Ok((out.join("\n"), imports))
+    let mut herkunft: Vec<Herkunft> = Vec::new();
+    process_inner(source, base, "", &mut seen, &mut out, &mut imports, &mut herkunft)?;
+    Ok((out.join("\n"), imports, herkunft))
 }
 
 fn process_inner(
     source: &str,
     base: &Path,
+    datei: &str,
     seen: &mut HashSet<PathBuf>,
     out: &mut Vec<String>,
     imports: &mut Vec<(String, Option<String>)>,
+    herkunft: &mut Vec<Herkunft>,
 ) -> Result<(), PreprocessError> {
     for (idx0, raw_line) in source.split('\n').enumerate() {
         let line_idx = idx0 + 1;
@@ -253,6 +288,7 @@ fn process_inner(
             Some(c) => c,
             None => {
                 out.push(raw.to_string());
+                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
                 continue;
             }
         };
@@ -270,6 +306,7 @@ fn process_inner(
 
         if exists && seen.contains(&canon) {
             out.push(format!("' [IMPORT bereits inkludiert: {}]", rel));
+            herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
             continue;
         }
 
@@ -282,6 +319,7 @@ fn process_inner(
                     None => String::new(),
                 };
                 out.push(format!("' === IMPORT MODULE {}{} ===", rel, tag));
+                herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
                 let low = rel.to_lowercase();
                 let alias_lc = alias.as_ref().map(|a| a.to_lowercase());
                 let entry = (low, alias_lc);
@@ -306,6 +344,9 @@ fn process_inner(
         })?;
         seen.insert(canon.clone());
         out.push(format!("' === IMPORT {} ===", rel));
+        // Marker-Zeilen zeigen auf die IMPORT-Zeile selbst -- das ist die
+        // einzige Koordinate, die der Nutzer in SEINER Datei anfassen kann.
+        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
         let inner_base = canon.parent().unwrap_or(base).to_path_buf();
         // Ein IMPORT-Fehler TIEFER in der Kette trug bisher die Zeile der
         // INNEREN Datei unveraendert nach oben -- der Editor markierte damit
@@ -313,12 +354,13 @@ fn process_inner(
         // Koordinate, die der Nutzer anfassen kann, ist SEINE IMPORT-Zeile;
         // die innere Position gehoert in den Meldungstext (gleiche Behandlung
         // wie in drachenhauch/preprocess.py).
-        process_inner(&content, &inner_base, seen, out, imports)
+        process_inner(&content, &inner_base, &rel, seen, out, imports, herkunft)
             .map_err(|e| PreprocessError {
                 line: line_idx,
                 msg: format!("in {}: (Zeile {}) {}", rel, e.line, e.msg),
             })?;
         out.push(format!("' === END IMPORT {} ===", rel));
+        herkunft.push(Herkunft { datei: datei.to_string(), zeile: line_idx as u32 });
     }
     Ok(())
 }

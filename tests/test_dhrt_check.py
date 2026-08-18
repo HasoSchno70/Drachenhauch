@@ -146,7 +146,10 @@ def test_zweites_dim_mit_anderem_typ_warnt(tmp_path):
     assert len(w) == 1, w
     m = w[0]["message"]
     assert "INTEGER" in m and "FLOAT" in m
-    assert "Zeile 1" in m, m            # zeigt auf die ERSTE Deklaration ...
+    # Seit WP I.4 nennt die Meldung die Stelle als `datei:zeile` statt als
+    # blosse "Zeile N" -- bei IMPORT zeigte die nackte Zahl in die GEMERGTE
+    # Quelle und damit oft auf eine unbeteiligte Zeile.
+    assert ":1" in m, m                 # zeigt auf die ERSTE Deklaration ...
     assert w[0]["line"] == 2            # ... und steht bei der zweiten
 
 

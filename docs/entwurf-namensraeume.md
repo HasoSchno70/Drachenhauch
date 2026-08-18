@@ -4,6 +4,12 @@
 > Entscheiden da. WP I ist der einzige Punkt der [Allzweck-Roadmap](allzweck-roadmap.md),
 > der auf **bestehenden** Code zurückwirkt — deshalb erst der Entwurf, dann
 > Code.
+>
+> Die Beispiele stehen bewusst als ```` ```text ```` und nicht als
+> ```` ```basic ````: sie zeigen **vorgeschlagene** Syntax, die es noch
+> nicht gibt. `tools/pruef_docs.py` prüft alle `basic`-Blöcke in `docs/`
+> gegen den echten Compiler — und soll hier zu Recht anschlagen, wenn
+> jemand sie für gültig hält.
 
 ## 1. Der Befund
 
@@ -16,7 +22,7 @@ hängt und nicht an Eindrücken:
 
 **(a) Zwei Bibliotheken mit gleichem Namen gehen nicht zusammen.**
 
-```basic
+```text
 ' a.dh und b.dh haben beide FUNCTION Hilf()
 IMPORT "a.dh"
 IMPORT "b.dh"
@@ -28,9 +34,13 @@ m.dh: Compile-Fehler: 'hilf' bereits deklariert
 Der Fehler ist da — gut. Aber er nennt **keine Zeile** und **keine der beiden
 Dateien**. Wer zwei fremde Bibliotheken benutzt, weiß nicht, welche.
 
+> ✅ **Behoben in I.4.** Die Meldung lautet jetzt
+> `b.dh:1: Compile-Fehler: 'hilf' ist schon in a.dh:1 deklariert -- eines von
+> beiden umbenennen`.
+
 **(b) Ein Modul sieht die Variablen des Hauptprogramms.**
 
-```basic
+```text
 ' c.dh:  FUNCTION Liest() AS INTEGER : RETURN geheim : END FUNCTION
 DIM geheim AS INTEGER
 geheim = 42
@@ -48,7 +58,7 @@ von dem er nichts weiß.
 
 **(d) Zeilennummern zeigen in die gemergte Quelle.** Ein Zweizeiler:
 
-```basic
+```text
 IMPORT "d.dh"
 DIM zaehler AS STRING
 ```
@@ -59,6 +69,12 @@ m3.dh:6: Warnung: 'zaehler' wurde in Zeile 2 schon als INTEGER angelegt …
 Zeile 6 in einer Datei mit zwei Zeilen. Der Editor rechnet das über die
 `origins`-Tabelle zurück (`editor_qt/error_check.py`), `dhrt` auf der
 Kommandozeile nicht.
+
+> ✅ **Behoben in I.4.** `preprocess` liefert die Herkunftstabelle jetzt selbst
+> mit; alle Meldungen der Übersetzungs-Phasen (Lexer, Parser, Compiler,
+> Warnungen) zeigen auf Datei und Zeile, die der Nutzer vor sich hat:
+> `m3.dh:2: Warnung: 'zaehler' wurde in d.dh:1 schon als INTEGER angelegt …`.
+> Damit ist zugleich **Schritt 1 des Bauwegs** aus Abschnitt 4 erledigt.
 
 **Was daraus folgt:** unterhalb von ein paar tausend Zeilen fällt nichts davon
 auf. Darüber ist es die Hauptbremse — und eine Bibliothek von jemand anderem
@@ -83,7 +99,7 @@ Diese vier Punkte bestimmen den Entwurf mehr als alles andere:
 
 ### 3.1 Syntax
 
-```basic
+```text
 IMPORT "mathe.dh"              ' wie bisher: alles wird eingemischt
 IMPORT "mathe.dh" AS mathe     ' NEU: erreichbar als mathe.<Name>
 ```
@@ -94,7 +110,7 @@ Namensräume will, schreibt sie hin.
 
 In der Datei selbst regelt `PRIVATE`, was nach außen sichtbar ist:
 
-```basic
+```text
 ' mathe.dh
 CONST DEG2RAD AS FLOAT = 0.017453292519943295
 
@@ -107,7 +123,7 @@ PRIVATE FUNCTION quadrat(x AS FLOAT) AS FLOAT     ' nur innerhalb von mathe.dh
 END FUNCTION
 ```
 
-```basic
+```text
 ' Hauptprogramm
 IMPORT "mathe.dh" AS mathe
 
@@ -193,11 +209,15 @@ Meldungen.
 | **I.1** | `IMPORT … AS` für `SUB`/`FUNCTION`/`CONST`/`DIM` auf Top-Level, plus `PRIVATE`. Klassen/Enums/Structs aus einem Namensraum: klarer Fehler „noch nicht erreichbar". | gering — nichts Bestehendes ändert sich |
 | **I.2** | Klassen und Structs: `DIM p AS mathe.Punkt`, `NEW mathe.Punkt(...)`. Berührt die Typauflösung (`is_value_type`, `unknown_dim_type_msg`). | mittel |
 | **I.3** | Enums: `mathe.Farbe.ROT` — zwei Punkte hintereinander. Braucht eine Entscheidung, ob das lesbar genug ist. | mittel |
-| **I.4** | Bessere Fehlermeldungen für den Bestand: „'hilf' bereits deklariert" nennt **beide** Dateien und Zeilen (behebt Messung (a), unabhängig vom Rest). | gering |
+| **I.4** | ✅ **erledigt** — Kollisionen nennen **beide** Dateien und Zeilen, und alle Meldungen der Übersetzungs-Phasen zeigen auf die Datei des Nutzers (behebt (a) und (d)). Brachte nebenbei Schritt 1 des Bauwegs mit: die Herkunftstabelle. | gering |
 
-**Vorschlag: I.4 zuerst, dann I.1.** I.4 ist klein, hilft sofort auch ohne
-Namensräume und ist genau die Meldung, die man beim Bauen von I.1 dauernd
-sehen wird.
+**I.4 ist gebaut** (2026-08-17) — klein, hilft sofort auch ohne Namensräume,
+und es ist genau die Meldung, die man beim Bauen von I.1 dauernd sehen wird.
+Schritt 1 des Bauwegs (die Herkunftstabelle aus `preprocess`) fiel dabei als
+Nebenprodukt an und steht für I.1 bereit.
+
+**Nächster Schritt wäre I.1** — dafür sind vorher die Fragen in Abschnitt 6 zu
+entscheiden.
 
 ## 6. Was noch zu entscheiden ist
 

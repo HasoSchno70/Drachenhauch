@@ -369,7 +369,7 @@ fn preprocess_main(path: &str) -> ExitCode {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     match preprocess::process(&source, &base) {
-        Ok((merged, _mods)) => {
+        Ok((merged, _mods, _herkunft)) => {
             let stdout = std::io::stdout();
             let mut h = stdout.lock();
             let _ = h.write_all(merged.as_bytes());
@@ -387,10 +387,14 @@ fn preprocess_main(path: &str) -> ExitCode {
 fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
     // Fehler-Format `<label>:<zeile>: <msg>` -- so erkennt der Editor (Pattern
     // `(\S+\.dh):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
-    let (source, imports) = match preprocess::process(raw_source, base) {
+    let (source, imports, herkunft) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
     };
+    // WP I.4: alle Meldungen der Uebersetzungs-Phasen zeigen auf die Datei und
+    // Zeile, die der Nutzer VOR SICH HAT -- nicht auf die gemergte Quelle.
+    // Ohne IMPORT ist beides dasselbe, mit IMPORT war es bisher irrefuehrend.
+    let wo = |zeile: u32| preprocess::stelle(&herkunft, zeile, label);
     let (ext_types, aliases) = preprocess::compile_env(&imports);
     // E1: Hardware-Module (serial/usb/bt/wifi) sind zwar importierbar, fehlen aber
     // im Default-Build. Frueh (beim IMPORT) warnen statt erst beim ersten Aufruf --
@@ -401,24 +405,24 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     }
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
-        Err(e) => { eprintln!("{}:{}: Lexer-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}: Lexer-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     let ast = match parser::Parser::new(toks).parse() {
         Ok(a) => a,
-        Err(e) => { eprintln!("{}:{}: Parse-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}: Parse-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
         Ok((j, warns)) => {
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
             for (line, msg) in warns {
-                eprintln!("{}:{}: Warnung: {}", label, line, msg);
+                eprintln!("{}: Warnung: {}", wo(line), msg);
             }
             Ok(j)
         }
         Err((line, msg)) => {
-            if line > 0 { eprintln!("{}:{}: Compile-Fehler: {}", label, line, msg); }
+            if line > 0 { eprintln!("{}: Compile-Fehler: {}", wo(line), msg); }
             else { eprintln!("{}: Compile-Fehler: {}", label, msg); }
             Err(ExitCode::from(3))
         }
@@ -556,7 +560,12 @@ fn check_main(path: &str) -> ExitCode {
     let base = std::path::Path::new(path).parent()
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let diags = check_source(&raw_source, &base);
+    // Der Dateiname als Label -- sonst rendert ein Verweis auf die
+    // Hauptdatei im Meldungstext als nacktes ":5".
+    let label = std::path::Path::new(path).file_name()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string());
+    let diags = check_source(&raw_source, &base, &label);
     println!("{}", serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into()));
     ExitCode::SUCCESS
 }
@@ -565,8 +574,8 @@ fn check_main(path: &str) -> ExitCode {
 /// MVP: bricht bei der ersten Fehlerstelle ab und liefert genau eine Diagnose
 /// (wie error_check.py einen ParseProblem liefert). Leeres Array = fehlerfrei.
 /// Compiler-Fehler tragen heute keine Zeile -> `line: 0` (spaetere Verfeinerung).
-fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Value> {
-    let (source, imports) = match preprocess::process(raw_source, base) {
+fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
+    let (source, imports, herkunft) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => return vec![serde_json::json!({
             "line": e.line, "col": 0, "severity": "error",
@@ -585,7 +594,7 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
             "line": e.line, "col": e.col, "severity": "error",
             "phase": "parse", "message": e.msg })],
     };
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
         // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
         // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
