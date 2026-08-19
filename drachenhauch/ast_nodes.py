@@ -245,7 +245,7 @@ class Try(Stmt):
 @dataclass
 class Throw(Stmt):
     value: Expr
-    code: Expr = None      # `THROW code, meldung` -- sonst None
+    code: Optional[Expr] = None   # `THROW code, meldung` -- sonst None
 
 
 @dataclass
