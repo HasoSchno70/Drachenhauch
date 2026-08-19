@@ -888,6 +888,37 @@ impl<'p> Vm<'p> {
         Ok(())
     }
 
+    /// EINE Funktion aufrufen, ohne das Hauptprogramm zu fahren (WP H,
+    /// `dhrt call`).
+    ///
+    /// Grundlage fuer `TASK_START`: ein Auftrag laeuft als eigener Prozess,
+    /// damit GB-Code nicht ueber eine Thread-Grenze muss (`Value` haelt
+    /// ueberall `Rc`, `Program` ist weder Send noch Sync -- siehe
+    /// docs/entwurf-task-start.md).
+    ///
+    /// DAS HAUPTPROGRAMM LAEUFT BEWUSST NICHT MIT. Damit sind auch die
+    /// Globals nicht gesetzt -- und eine `CONST` auf oberster Ebene IST ein
+    /// Global. Das ist keine Panne, sondern die Zusage: ein Auftrag sieht
+    /// keine Globals, er bekommt mit, was er braucht. Dieselbe Grenze wie bei
+    /// einem mit `AS` importierten Modul (WP I.1).
+    pub fn call_named(&mut self, name: &str, args: Vec<Value>) -> R<Value> {
+        let low = name.to_lowercase();
+        let idx = match self.prog.fn_index.get(&low) {
+            Some(i) => *i,
+            None => {
+                let mut bekannt: Vec<&str> =
+                    self.prog.fn_index.keys().map(|k| k.as_str()).collect();
+                bekannt.sort();
+                return Err(format!(
+                    "Funktion '{}' gibt es nicht. Bekannt: {}",
+                    name,
+                    if bekannt.is_empty() { "keine".to_string() }
+                    else { bekannt.join(", ") }));
+            }
+        };
+        self.exec(&self.prog.functions[idx], args, None)
+    }
+
     pub fn take_output(self) -> String {
         self.out
     }

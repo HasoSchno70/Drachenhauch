@@ -107,7 +107,42 @@ in `dhrt` (`dhrt call <datei> <funktion> <arg>`), Index-Einträge, Tests, Doku.
 Grob ein halber Tag — deutlich weniger als A oder B, weil nichts an `Value`
 oder an der VM angefasst wird.
 
-## 5. Zu entscheiden
+## 5. Stand: Schritt 1 gebaut (2026-08-19)
+
+`dhrt call <datei> <funktion> [arg]` steht. Er führt **eine** Funktion aus und
+lässt das Hauptprogramm stehen; die Antwort ist eine JSON-Zeile, wie bei
+`--check`, `profile` und `debug` — der Aufrufer ist eine Maschine.
+
+```text
+> dhrt call c.dh Doppelt 21
+{"ok":true,"ergebnis":42,"ausgabe":""}
+```
+
+`ausgabe` trägt, was die Funktion selbst gedruckt hat — getrennt vom Ergebnis,
+damit der Aufrufer nichts auseinanderfieseln muss. Ein Argument, das wie eine
+Zahl aussieht, wird eine.
+
+**Ein Befund, der das Risiko entschärft.** Weg B stand unter dem Vorbehalt,
+eine frische VM liefere für ein Global still einen *Vorgabewert* — eine
+Funktion mit `CONST` hätte dann heimlich falsch gerechnet. Nachgemessen ist es
+besser: der Zugriff **meldet sich**.
+
+```text
+> dhrt call c.dh SiehtGlobal
+{"ok":false,"fehler":"Global-Slot leer"}
+```
+
+Damit ist der Fall laut statt leise, und das war das eigentliche Risiko an der
+Prozess- wie an der Thread-Variante. *(Die Meldung selbst ist noch
+Maschinensprache — „Global-Slot leer" sagt einem GB-Autor nichts. Sie gehört
+verbessert, bevor `TASK_START` obendrauf kommt.)*
+
+Neun Golden-Tests in `tests/test_dhrt_call.py`.
+
+**Als Nächstes:** die fünf `TASK_*`-Builtins an `Auftraege<T>` — Kindprozess
+starten, Nummer vergeben, Ergebnis einsammeln.
+
+## 6. Zu entscheiden
 
 1. **Ist die Prozessgrenze als Zusage recht?** *„Ein Auftrag sieht keine
    Globals"* ist eine echte Einschränkung. Sie macht Aufträge aber auch

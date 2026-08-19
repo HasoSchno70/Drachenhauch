@@ -216,6 +216,16 @@ fn main() -> ExitCode {
             setze_programm_args(&raw);
             return run_main(&raw[2]);
         }
+        // `dhrt call <datei.dh> <funktion> [argument]` -- EINE Funktion
+        // ausfuehren, ohne das Hauptprogramm zu fahren. Grundlage fuer
+        // TASK_START (Auftrag als eigener Prozess statt als Thread, weil
+        // `Program` weder Send noch Sync ist). Ausgabe ist EINE JSON-Zeile,
+        // wie bei --check/profile/debug -- der Aufrufer ist eine Maschine.
+        if raw.len() >= 4 && raw[1] == "call" {
+            setze_programm_args(&raw);
+            let arg = raw.get(4).cloned();
+            return call_main(&raw[2], &raw[3], arg);
+        }
         // Stufe B (Phase 3): `dhrt profile datei.dh` -- instrumentierter Lauf,
         // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
         // Scope via symbols.scan_scopes). Ersetzt den Tree-Walker-Profiler.
@@ -680,6 +690,66 @@ fn run_main(path: &str) -> ExitCode {
     // Ins Datei-Verzeichnis wechseln (wie dhrun.py os.chdir(file.parent)).
     let _ = std::env::set_current_dir(&base);
     compile_and_run_source(&raw_source, &base, &label)
+}
+
+/// `dhrt call <datei> <funktion> [arg]`.
+fn call_main(path: &str, fn_name: &str, arg: Option<String>) -> ExitCode {
+    let abs = std::fs::canonicalize(path).map(strip_extended_prefix)
+        .unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let base = abs.parent().map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string());
+    let raw_source = match std::fs::read_to_string(&abs) {
+        Ok(t) => t,
+        Err(e) => { return call_fehler(&format!("Kann {} nicht lesen: {}", path, e)); }
+    };
+    let _ = std::env::set_current_dir(&base);
+    match compile_source(&raw_source, &base, &label) {
+        Ok(json) => call_program_value(json, fn_name, arg),
+        Err(code) => code,
+    }
+}
+
+/// Fehler als JSON-Zeile -- der Aufrufer soll nicht stderr parsen muessen.
+fn call_fehler(msg: &str) -> ExitCode {
+    println!("{}", serde_json::json!({"ok": false, "fehler": msg}));
+    ExitCode::from(1)
+}
+
+fn call_program_value(json: serde_json::Value, fn_name: &str,
+                      arg: Option<String>) -> ExitCode {
+    let prog = match model::load_program(&json) {
+        Ok(p) => p,
+        Err(e) => return call_fehler(&format!("Lade-Fehler: {}", e)),
+    };
+    // Ein String-Argument, das wie eine Zahl aussieht, wird zur Zahl -- sonst
+    // muesste jede Auftragsfunktion ihr Argument selbst umwandeln, und der
+    // haeufigste Fall (eine Kennung, ein Zaehler) waere der unbequemste.
+    let args: Vec<value::Value> = match arg {
+        None => Vec::new(),
+        Some(a) => vec![match a.parse::<i64>() {
+            Ok(i) => value::Value::Int(i),
+            Err(_) => value::Value::str_rc(&a),
+        }],
+    };
+    let mut machine = vm::Vm::new(&prog);
+    match machine.call_named(fn_name, args) {
+        Ok(wert) => {
+            let ergebnis = match &wert {
+                value::Value::Int(i) => serde_json::json!(i),
+                value::Value::Float(f) => serde_json::json!(f),
+                value::Value::Bool(b) => serde_json::json!(b),
+                value::Value::Nil => serde_json::Value::Null,
+                andere => serde_json::json!(builtins::str_of(andere)),
+            };
+            let out = machine.take_output();
+            println!("{}", serde_json::json!({
+                "ok": true, "ergebnis": ergebnis, "ausgabe": out}));
+            ExitCode::SUCCESS
+        }
+        Err(e) => call_fehler(&e),
+    }
 }
 
 /// Entfernt den Windows-Extended-Length-Prefix (`\\?\` bzw. `\\?\UNC\`) von
