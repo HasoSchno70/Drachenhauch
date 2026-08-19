@@ -168,7 +168,7 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `REPEAT$(s, n)` | s n-mal aneinanderhängen |
 | `SPACE$(n)` | n Leerzeichen |
 | `HEX$(n)` | INT als Hex-String |
-| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Mask folgt Python's `%`-Operator (`%d`, `%s`, `%.2f`, `%05X`, …) |
+| `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Sechs Spezifizierer: `%d`/`%i`, `%f`, `%x`, `%X`, `%s` — dazu `%%` für ein wörtliches Prozentzeichen. Breite, Nullen und Genauigkeit wie gewohnt (`%05d`, `%-6d`, `%.2f`). Alles andere meldet „unbekannter Spezifizierer“ |
 
 Erweiterungen *(nur native Runtime)*:
 
