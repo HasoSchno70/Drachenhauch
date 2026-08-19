@@ -96,20 +96,44 @@ fn sammeln(
     prog: &Node,
     herkunft: &[Herkunft],
     datei_alias: &HashMap<String, String>,
-) -> HashMap<String, Modul> {
+    privat: &[(u32, String)],
+) -> (HashMap<String, Modul>, HashSet<String>) {
     let mut module: HashMap<String, Modul> = HashMap::new();
+    // Top-Level-Namen der HAUPTDATEI (datei == ""). Ein Namensraum darf sie
+    // nicht sehen -- das ist der eigentliche Gewinn von `AS` und die einzige
+    // Stelle, an der sich durch das Anfuegen von `AS` Verhalten aendert.
+    let mut haupt: HashSet<String> = HashSet::new();
     let stmts = match prog {
         Node::Program { statements } => statements,
-        _ => return module,
+        _ => return (module, haupt),
     };
     for s in stmts {
         let (zeile, body) = match s {
             Node::Stmt { line, body } => (*line, body.as_ref()),
             other => (0, other),
         };
-        let alias = match datei_alias.get(datei_von(herkunft, zeile)) {
+        let datei = datei_von(herkunft, zeile);
+        let alias = match datei_alias.get(datei) {
             Some(a) => a.clone(),
-            None => continue,
+            None => {
+                if datei.is_empty() {
+                    match body {
+                        Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
+                        | Node::Dim { name, .. } | Node::Const { name, .. } => {
+                            haupt.insert(name.to_lowercase());
+                        }
+                        Node::MultiDim { dims } => {
+                            for d in dims {
+                                if let Node::Dim { name, .. } = d {
+                                    haupt.insert(name.to_lowercase());
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                continue;
+            }
         };
         let eintrag = module.entry(alias).or_default();
         match body {
@@ -132,7 +156,16 @@ fn sammeln(
             _ => {}
         }
     }
-    module
+    // PRIVATE-Namen nachtragen. Sie werden trotzdem umbenannt -- privat heisst
+    // unsichtbar von aussen, nicht unbenannt.
+    for (zeile, name) in privat {
+        if let Some(alias) = datei_alias.get(datei_von(herkunft, *zeile)) {
+            if let Some(m) = module.get_mut(alias) {
+                m.privat.insert(name.clone());
+            }
+        }
+    }
+    (module, haupt)
 }
 
 /// Lokale Namen einer Funktion: Parameter und alles, was ihr Rumpf deklariert.
@@ -188,6 +221,7 @@ struct Lauf<'a> {
     herkunft: &'a [Herkunft],
     datei_alias: &'a HashMap<String, String>,
     module: &'a HashMap<String, Modul>,
+    haupt: &'a HashSet<String>,
     /// Namensraum der gerade bearbeiteten Zeile (None = Hauptprogramm oder
     /// eine importierte Datei ohne `AS`).
     hier: Option<String>,
@@ -213,6 +247,21 @@ impl<'a> Lauf<'a> {
     fn namen(&mut self, name: &mut String) {
         if let Some(neu) = self.eigen(name) {
             *name = neu;
+            return;
+        }
+        // Entscheidung 3 aus dem Entwurf: ein Namensraum sieht die Globals des
+        // Hauptprogramms NICHT. Ohne diese Pruefung wuerde der Name still auf
+        // das Global des Aufrufers zeigen -- die Datei liefe je nach
+        // Hauptprogramm anders, und niemand saehe warum.
+        if self.hier.is_some() {
+            let low = name.to_lowercase();
+            if !self.lokal.contains(&low) && self.haupt.contains(&low) {
+                self.fehler.get_or_insert((self.zeile, format!(
+                    concat!("{} kommt aus dem Hauptprogramm. Eine mit AS importierte Datei ",
+                            "sieht dessen Globals nicht -- reiche den Wert als Parameter ",
+                            "herein oder deklariere ihn in der Datei selbst."),
+                    name)));
+            }
         }
     }
 
@@ -444,16 +493,18 @@ pub fn anwenden(
     prog: &mut Node,
     herkunft: &[Herkunft],
     namensraeume: &[(String, String)],
+    privat: &[(u32, String)],
 ) -> Result<(), (u32, String)> {
     if namensraeume.is_empty() {
         return Ok(());
     }
     let datei_alias: HashMap<String, String> = namensraeume.iter().cloned().collect();
-    let module = sammeln(prog, herkunft, &datei_alias);
+    let (module, haupt) = sammeln(prog, herkunft, &datei_alias, privat);
     let mut l = Lauf {
         herkunft,
         datei_alias: &datei_alias,
         module: &module,
+        haupt: &haupt,
         hier: None,
         lokal: HashSet::new(),
         fehler: None,

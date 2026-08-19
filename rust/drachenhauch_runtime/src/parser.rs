@@ -57,13 +57,19 @@ pub struct Parser {
     enum_names: HashSet<String>,
     with_counter: usize,
     with_stack: Vec<String>,
+    /// WP I.1: Namen, die mit `PRIVATE` deklariert wurden (Zeile, lowercase).
+    /// Steht neben dem Baum statt darin -- siehe `private_decl`.
+    privat: Vec<(u32, String)>,
 }
 
 impl Parser {
     pub fn new(toks: Vec<Token>) -> Self {
         Parser { toks, pos: 0, enum_names: HashSet::new(),
-                 with_counter: 0, with_stack: Vec::new() }
+                 with_counter: 0, with_stack: Vec::new(), privat: Vec::new() }
     }
+
+    /// Die `PRIVATE`-Namen dieses Laufs. Erst nach `parse()` gefuellt.
+    pub fn private_namen(&self) -> &[(u32, String)] { &self.privat }
 
     fn peek(&self, off: usize) -> &Token {
         let i = self.pos + off;
@@ -131,8 +137,40 @@ impl Parser {
         Ok(Node::Stmt { line, body: Box::new(body) })
     }
 
+    /// `PRIVATE` VOR einer Deklaration: der Name wird nur im Namensraum
+    /// versteckt, sonst aendert sich nichts.
+    ///
+    /// Bewusst KEIN AST-Feld. Der Rust- und der Python-Parser werden Feld fuer
+    /// Feld gegeneinander geprueft (`test_rust_parser_parity.py`); ein neues
+    /// Feld an vier Knotenarten waere in beiden Baeumen nachzuziehen. Der Name
+    /// wandert stattdessen in eine Liste neben dem Baum -- die einzige Stelle,
+    /// die ihn braucht, ist `namensraum.rs`.
+    fn private_decl(&mut self) -> R<Node> {
+        let zeile = self.peek(0).line as u32;
+        self.expect(Tt::Private, "PRIVATE")?;
+        let knoten = self.statement_inner()?;
+        let name = match &knoten {
+            Node::FunctionDecl { name, .. } | Node::SubDecl { name, .. }
+            | Node::Dim { name, .. } | Node::Const { name, .. } => Some(name.clone()),
+            Node::MultiDim { dims } => {
+                for d in dims {
+                    if let Node::Dim { name, .. } = d {
+                        self.privat.push((zeile, name.to_lowercase()));
+                    }
+                }
+                None
+            }
+            _ => return self.err("PRIVATE steht vor SUB, FUNCTION, DIM oder CONST"),
+        };
+        if let Some(n) = name {
+            self.privat.push((zeile, n.to_lowercase()));
+        }
+        Ok(knoten)
+    }
+
     fn statement_inner(&mut self) -> R<Node> {
         match self.tt(0) {
+            Tt::Private => self.private_decl(),
             Tt::Dim => self.dim(),
             Tt::Print => self.print_stmt(),
             Tt::Input => self.input_stmt(),

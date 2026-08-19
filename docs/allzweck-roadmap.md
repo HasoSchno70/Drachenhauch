@@ -451,12 +451,15 @@ Beispiel: `examples/168_hintergrund.dh` — Abfrage und Prozess laufen, die
 Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 `docs/builtins-core.md`.
 
-## WP I — Namensräume und Module (der große Brocken)
+## WP I — Namensräume und Module (I.1 + I.4 ✅ ERLEDIGT 2026-08-19)
 
 > **Entwurf liegt vor: [entwurf-namensraeume.md](entwurf-namensraeume.md).**
 > Dort steht der Befund mit Messungen, ein Vorschlag für Syntax und
 > Semantik, ein Bauweg ohne VM-Änderung, ein Stufenplan und die vier
-> Fragen, die noch zu entscheiden sind.
+> Fragen, die zu entscheiden waren — **alle vier beantwortet**, siehe
+> Abschnitt 6 dort. Gebaut sind **I.1** (`IMPORT "x.dh" AS x`, `PRIVATE`,
+> Abschottung gegen die Globals des Hauptprogramms) und **I.4**
+> (Meldungen mit Datei und Zeile). Offen: I.2 (Typen), I.3 (ENUMs).
 >
 > **Stufe I.4 ist gebaut (2026-08-17):** Namenskollisionen nennen jetzt
 > **beide** Dateien und Zeilen, und alle Meldungen der Übersetzungs-Phasen

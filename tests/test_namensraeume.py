@@ -154,3 +154,88 @@ def test_ohne_as_bleibt_alles_flach(dhrt_pfad, tmp_path):
         "main.dh": 'IMPORT "mathe.dh"\nPRINT Quadrat(4)\nPRINT FAKTOR\n',
     })
     assert out.split() == ["16", "10"], (out, err)
+
+
+# --- PRIVATE -------------------------------------------------------------
+
+PRIV = (
+    "PRIVATE CONST GEHEIM AS INTEGER = 42\n"
+    "\n"
+    "PRIVATE FUNCTION Intern(x AS INTEGER) AS INTEGER\n"
+    "    RETURN x + GEHEIM\n"
+    "END FUNCTION\n"
+    "\n"
+    "FUNCTION Offen(x AS INTEGER) AS INTEGER\n"
+    "    RETURN Intern(x)\n"
+    "END FUNCTION\n"
+)
+
+
+def test_private_ist_innen_nutzbar(dhrt_pfad, tmp_path):
+    """Privat heisst unsichtbar von aussen, nicht unbenutzbar: `Offen` ruft
+    `Intern` und liest `GEHEIM`."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "p.dh": PRIV,
+        "main.dh": 'IMPORT "p.dh" AS p\nPRINT p.Offen(1)\n',
+    })
+    assert out.strip() == "43", (out, err)
+
+
+def test_private_ist_von_aussen_gesperrt(dhrt_pfad, tmp_path):
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "p.dh": PRIV,
+        "main.dh": 'IMPORT "p.dh" AS p\nPRINT p.Intern(1)\n',
+    })
+    assert "ist PRIVATE" in err, err
+
+
+def test_private_ohne_namensraum_stoert_nicht(dhrt_pfad, tmp_path):
+    """`PRIVATE` in einer Datei ohne `AS` ist ein wirkungsloser Marker --
+    es darf kein Fehler und keine Verhaltensaenderung daraus werden."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "main.dh": ("PRIVATE FUNCTION F() AS INTEGER\n"
+                    "    RETURN 5\n"
+                    "END FUNCTION\n"
+                    "PRINT F()\n"),
+    })
+    assert out.strip() == "5", (out, err)
+
+
+def test_private_vor_etwas_anderem_meldet(dhrt_pfad, tmp_path):
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "main.dh": "PRIVATE PRINT 1\n",
+    })
+    assert "PRIVATE steht vor" in err, err
+
+
+# --- Abschottung gegen die Globals des Hauptprogramms --------------------
+
+GLOBAL_LESER = ("FUNCTION LiestGlobal() AS INTEGER\n"
+                "    RETURN punkte\n"
+                "END FUNCTION\n")
+
+
+def test_namensraum_sieht_globals_des_hauptprogramms_nicht(dhrt_pfad, tmp_path):
+    """Der eigentliche Gewinn von `AS`: die Datei haengt nicht mehr davon ab,
+    welche Globals das Hauptprogramm zufaellig hat."""
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "g.dh": GLOBAL_LESER,
+        "main.dh": ('IMPORT "g.dh" AS g\n'
+                    "DIM punkte AS INTEGER\n"
+                    "punkte = 5\n"
+                    "PRINT g.LiestGlobal()\n"),
+    })
+    assert "kommt aus dem Hauptprogramm" in err, err
+    assert "g.dh:2" in err, err
+
+
+def test_ohne_as_bleibt_der_globale_zugriff_erlaubt(dhrt_pfad, tmp_path):
+    """Gegenprobe und Bestandsschutz: dieselbe Datei ohne `AS` laeuft wie eh."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "g.dh": GLOBAL_LESER,
+        "main.dh": ('IMPORT "g.dh"\n'
+                    "DIM punkte AS INTEGER\n"
+                    "punkte = 5\n"
+                    "PRINT LiestGlobal()\n"),
+    })
+    assert out.strip() == "5", (out, err)

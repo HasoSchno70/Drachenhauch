@@ -1051,6 +1051,65 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
 
 `IMPORT` ist textuelles Inkludieren — der Code aus `mathlib.dh` wird Teil des aktuellen Programms. Mehrfaches Importieren derselben Datei wird ignoriert (kein Endlos-Cycle).
 
+### Namensraum: `IMPORT "datei.dh" AS name`
+
+Ohne `AS` landen alle Namen der importierten Datei im selben flachen Raum wie
+dein eigener Code — zwei Bibliotheken mit je einer Funktion `Init` lassen sich
+so nicht zusammen benutzen. Mit `AS` bekommt die Datei einen eigenen Raum:
+
+```basic
+IMPORT "mathe.dh" AS mathe
+
+PRINT mathe.Quadrat(5)      ' 25
+PRINT mathe.FAKTOR          ' eine CONST aus mathe.dh
+```
+
+Innerhalb von `mathe.dh` ändert sich nichts: dort heisst `Quadrat` weiterhin
+`Quadrat`, auch wenn eine andere Funktion derselben Datei sie aufruft.
+
+**Ein Namensraum sieht die Globals deines Hauptprogramms nicht.** Das ist der
+eigentliche Gewinn — die Datei hängt nicht mehr davon ab, welche Variablen du
+zufällig oben deklariert hast:
+
+```basic
+' g.dh
+FUNCTION LiestGlobal() AS INTEGER
+    RETURN punkte          ' Fehler, wenn g.dh mit AS importiert wird
+END FUNCTION
+```
+
+Reiche den Wert als Parameter herein oder deklariere ihn in der Datei selbst.
+Ohne `AS` bleibt der alte, flache Zugriff erlaubt — bestehende Programme
+ändern sich nicht.
+
+**`PRIVATE`** versteckt einen Namen im Namensraum. Öffentlich ist die Vorgabe:
+
+```basic
+' p.dh
+PRIVATE CONST GEHEIM AS INTEGER = 42
+
+PRIVATE FUNCTION Intern(x AS INTEGER) AS INTEGER
+    RETURN x + GEHEIM
+END FUNCTION
+
+FUNCTION Offen(x AS INTEGER) AS INTEGER
+    RETURN Intern(x)       ' innen erlaubt
+END FUNCTION
+```
+
+`p.Offen(1)` liefert `43`; `p.Intern(1)` meldet, dass der Name PRIVATE ist.
+`PRIVATE` steht vor `SUB`, `FUNCTION`, `DIM` oder `CONST`. In einer Datei ohne
+`AS` ist es ein wirkungsloser Marker.
+
+**Noch nicht dabei:** Klassen, Structs und ENUMs aus einem Namensraum
+(`mathe.Punkt`). Der Zugriff meldet das ausdrücklich, statt zu behaupten, den
+Namen gebe es nicht. Wer den Typ braucht, importiert die Datei zusätzlich ohne
+`AS` — dann steht er flach zur Verfügung.
+
+**Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
+j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien
+gilt der Punkt, wie oben.
+
 **Built-in-Modul:** ohne `.dh`-Endung wird ein internes Modul geladen.
 
 ```basic

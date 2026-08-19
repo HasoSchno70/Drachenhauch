@@ -219,9 +219,24 @@ Nebenprodukt an und steht für I.1 bereit.
 **Nächster Schritt wäre I.1** — dafür sind vorher die Fragen in Abschnitt 6 zu
 entscheiden.
 
-## 6. Was noch zu entscheiden ist
+## 6. Was zu entscheiden war — entschieden am 2026-08-19
 
-Diese Fragen sind nicht technisch, sondern Geschmack — und deine:
+Alle vier Fragen sind beantwortet, jeweils wie vorgeschlagen:
+
+1. **Alias erzwingen oder ableiten?** → beim ausdrücklichen `AS` bleiben, kein
+   zweites Schlüsselwort.
+2. **`PRIVATE` oder umgekehrt `EXPORT`?** → `PRIVATE`, öffentlich bleibt die
+   Vorgabe. Bestehende Dateien ändern ihre Bedeutung damit nicht.
+3. **Sieht ein Modul mit `AS` die Globals des Hauptprogramms?** → nein. Umgesetzt
+   als Fehler mit Verweis auf den Parameter-Weg; ohne `AS` bleibt der flache
+   Zugriff erlaubt.
+4. **Wie tief?** → I.1 + I.4. Klassen und ENUMs bleiben flach; `alias.Typ`
+   bekommt eine eigene Meldung, die auf I.2 verweist.
+
+**I.1 ist damit gebaut** (2026-08-19, `namensraum.rs`, 16 Golden-Tests). Offen
+bleiben I.2 (Typen) und I.3 (ENUMs) — beide erst, wenn sie jemand braucht.
+
+Der ursprüngliche Wortlaut der Fragen, als Protokoll:
 
 1. **Alias erzwingen oder ableiten?** `IMPORT "mathe.dh" AS mathe` ist doppelt
    gemoppelt. Alternative: `IMPORT NAMESPACE "mathe.dh"` leitet den Alias aus

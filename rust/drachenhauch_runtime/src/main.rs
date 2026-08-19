@@ -408,14 +408,15 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         Ok(t) => t,
         Err(e) => { eprintln!("{}: Lexer-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
-    let mut ast = match parser::Parser::new(toks).parse() {
+    let mut p = parser::Parser::new(toks);
+    let mut ast = match p.parse() {
         Ok(a) => a,
         Err(e) => { eprintln!("{}: Parse-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     // WP I.1: `IMPORT "x.dh" AS x` -- Top-Level-Namen der Datei bekommen ein
     // Praefix, `x.Name` an der Aufrufstelle wird darauf abgebildet. Ohne ein
     // solches IMPORT kehrt der Durchgang sofort zurueck.
-    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume) {
+    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume, p.private_namen()) {
         eprintln!("{}: Namensraum-Fehler: {}", wo(zeile), msg);
         return Err(ExitCode::from(3));
     }
@@ -597,7 +598,8 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
             "line": e.line, "col": e.col, "severity": "error",
             "phase": "lex", "message": e.msg })],
     };
-    let mut ast = match parser::Parser::new(toks).parse() {
+    let mut p = parser::Parser::new(toks);
+    let mut ast = match p.parse() {
         Ok(a) => a,
         Err(e) => return vec![serde_json::json!({
             "line": e.line, "col": e.col, "severity": "error",
@@ -605,7 +607,7 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
     };
     // WP I.1: derselbe Durchgang wie im Run-Pfad -- sonst zeigt der Editor
     // gruen, und erst der Lauf meldet den Namensraum-Fehler.
-    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume) {
+    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume, p.private_namen()) {
         return vec![serde_json::json!({
             "line": zeile, "col": 1, "severity": "error",
             "phase": "namensraum", "message": msg })];

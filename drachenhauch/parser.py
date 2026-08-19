@@ -167,6 +167,15 @@ class Parser:
     def _statement_inner(self):
         tok = self._peek()
         t = tok.type
+        if t == TokenType.PRIVATE:
+            # WP I.1: `PRIVATE` versteckt einen Namen im Namensraum. Fuer den
+            # Baum ist es ein reiner Marker -- dhrt fuehrt die Liste der
+            # privaten Namen NEBEN dem AST (parser.rs::private_namen), damit
+            # beide Parser denselben Baum liefern und die Parity haelt. Der
+            # Python-Parser bedient nur noch Editor und LSP; ihm genuegt es,
+            # das Wort zu ueberspringen statt daran zu scheitern.
+            self._match(TokenType.PRIVATE)
+            return self._statement_inner()
         if t == TokenType.DIM:
             return self._dim()
         if t == TokenType.PRINT:

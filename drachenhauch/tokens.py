@@ -43,6 +43,7 @@ class TokenType(Enum):
     NOT = auto()
     MOD = auto()
     CONST = auto()
+    PRIVATE = auto()
     BREAK = auto()
     CONTINUE = auto()
     IMAGE = auto()
@@ -171,6 +172,7 @@ KEYWORDS = {
     "not": TokenType.NOT,
     "mod": TokenType.MOD,
     "const": TokenType.CONST,
+    "private": TokenType.PRIVATE,
     "break": TokenType.BREAK,
     "continue": TokenType.CONTINUE,
     "image": TokenType.IMAGE,
