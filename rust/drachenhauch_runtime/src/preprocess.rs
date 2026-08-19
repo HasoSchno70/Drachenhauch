@@ -259,14 +259,22 @@ pub fn stelle(tabelle: &[Herkunft], zeile: u32, haupt: &str) -> String {
     }
 }
 
+/// Vierter Rueckgabewert (WP I.1): `(datei, alias)` je `IMPORT "x.dh" AS x`.
+/// Bis hierher wurde der Alias bei QUELLDATEIEN stillschweigend verworfen --
+/// der Regex kannte `AS` laengst, aber nur die eingebauten Module werteten
+/// ihn aus. Der Umbenennungs-Durchgang in `namensraum.rs` verbindet ihn
+/// ueber die Herkunftstabelle mit den gemergten Zeilen.
 pub fn process(source: &str, base: &Path)
-    -> Result<(String, Vec<(String, Option<String>)>, Vec<Herkunft>), PreprocessError> {
+    -> Result<(String, Vec<(String, Option<String>)>, Vec<Herkunft>,
+               Vec<(String, String)>), PreprocessError> {
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut out: Vec<String> = Vec::new();
     let mut imports: Vec<(String, Option<String>)> = Vec::new();
     let mut herkunft: Vec<Herkunft> = Vec::new();
-    process_inner(source, base, "", &mut seen, &mut out, &mut imports, &mut herkunft)?;
-    Ok((out.join("\n"), imports, herkunft))
+    let mut namensraeume: Vec<(String, String)> = Vec::new();
+    process_inner(source, base, "", &mut seen, &mut out, &mut imports,
+                  &mut herkunft, &mut namensraeume)?;
+    Ok((out.join("\n"), imports, herkunft, namensraeume))
 }
 
 fn process_inner(
@@ -277,6 +285,7 @@ fn process_inner(
     out: &mut Vec<String>,
     imports: &mut Vec<(String, Option<String>)>,
     herkunft: &mut Vec<Herkunft>,
+    namensraeume: &mut Vec<(String, String)>,
 ) -> Result<(), PreprocessError> {
     for (idx0, raw_line) in source.split('\n').enumerate() {
         let line_idx = idx0 + 1;
@@ -343,6 +352,12 @@ fn process_inner(
             msg: format!("IMPORT: Lesefehler bei {}: {}", rel, e),
         })?;
         seen.insert(canon.clone());
+        // WP I.1: `AS` an einer QUELLDATEI eroeffnet einen Namensraum -- und
+        // zwar nur fuer die genannte Datei selbst. Was SIE ihrerseits
+        // importiert, behaelt seinen eigenen Dateinamen und bleibt flach.
+        if let Some(a) = &alias {
+            namensraeume.push((rel.clone(), a.to_lowercase()));
+        }
         out.push(format!("' === IMPORT {} ===", rel));
         // Marker-Zeilen zeigen auf die IMPORT-Zeile selbst -- das ist die
         // einzige Koordinate, die der Nutzer in SEINER Datei anfassen kann.
@@ -354,7 +369,8 @@ fn process_inner(
         // Koordinate, die der Nutzer anfassen kann, ist SEINE IMPORT-Zeile;
         // die innere Position gehoert in den Meldungstext (gleiche Behandlung
         // wie in drachenhauch/preprocess.py).
-        process_inner(&content, &inner_base, &rel, seen, out, imports, herkunft)
+        process_inner(&content, &inner_base, &rel, seen, out, imports, herkunft,
+                      namensraeume)
             .map_err(|e| PreprocessError {
                 line: line_idx,
                 msg: format!("in {}: (Zeile {}) {}", rel, e.line, e.msg),

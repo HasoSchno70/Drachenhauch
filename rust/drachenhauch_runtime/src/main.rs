@@ -14,6 +14,7 @@
 
 mod animfsm;
 mod ast;
+mod namensraum;
 mod astar;
 // Audio-Backend (Kira/cpal, src/audio.rs) -- mit `graphics` eingebunden
 // (raylib bleibt fuer Fenster/Input).
@@ -369,7 +370,7 @@ fn preprocess_main(path: &str) -> ExitCode {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
     match preprocess::process(&source, &base) {
-        Ok((merged, _mods, _herkunft)) => {
+        Ok((merged, _mods, _herkunft, _ns)) => {
             let stdout = std::io::stdout();
             let mut h = stdout.lock();
             let _ = h.write_all(merged.as_bytes());
@@ -387,7 +388,7 @@ fn preprocess_main(path: &str) -> ExitCode {
 fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
     // Fehler-Format `<label>:<zeile>: <msg>` -- so erkennt der Editor (Pattern
     // `(\S+\.dh):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
-    let (source, imports, herkunft) = match preprocess::process(raw_source, base) {
+    let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
     };
@@ -407,21 +408,29 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         Ok(t) => t,
         Err(e) => { eprintln!("{}: Lexer-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
-    let ast = match parser::Parser::new(toks).parse() {
+    let mut ast = match parser::Parser::new(toks).parse() {
         Ok(a) => a,
         Err(e) => { eprintln!("{}: Parse-Fehler ({}): {}", wo(e.line as u32), e.col, e.msg); return Err(ExitCode::from(2)); }
     };
+    // WP I.1: `IMPORT "x.dh" AS x` -- Top-Level-Namen der Datei bekommen ein
+    // Praefix, `x.Name` an der Aufrufstelle wird darauf abgebildet. Ohne ein
+    // solches IMPORT kehrt der Durchgang sofort zurueck.
+    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume) {
+        eprintln!("{}: Namensraum-Fehler: {}", wo(zeile), msg);
+        return Err(ExitCode::from(3));
+    }
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
         Ok((j, warns)) => {
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
             // beim Aufruf fehl.
             for (line, msg) in warns {
-                eprintln!("{}: Warnung: {}", wo(line), msg);
+                eprintln!("{}: Warnung: {}", wo(line), namensraum::lesbar_text(&msg));
             }
             Ok(j)
         }
         Err((line, msg)) => {
+            let msg = namensraum::lesbar_text(&msg);
             if line > 0 { eprintln!("{}: Compile-Fehler: {}", wo(line), msg); }
             else { eprintln!("{}: Compile-Fehler: {}", label, msg); }
             Err(ExitCode::from(3))
@@ -575,7 +584,7 @@ fn check_main(path: &str) -> ExitCode {
 /// (wie error_check.py einen ParseProblem liefert). Leeres Array = fehlerfrei.
 /// Compiler-Fehler tragen heute keine Zeile -> `line: 0` (spaetere Verfeinerung).
 fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<serde_json::Value> {
-    let (source, imports, herkunft) = match preprocess::process(raw_source, base) {
+    let (source, imports, herkunft, namensraeume) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => return vec![serde_json::json!({
             "line": e.line, "col": 0, "severity": "error",
@@ -588,12 +597,19 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
             "line": e.line, "col": e.col, "severity": "error",
             "phase": "lex", "message": e.msg })],
     };
-    let ast = match parser::Parser::new(toks).parse() {
+    let mut ast = match parser::Parser::new(toks).parse() {
         Ok(a) => a,
         Err(e) => return vec![serde_json::json!({
             "line": e.line, "col": e.col, "severity": "error",
             "phase": "parse", "message": e.msg })],
     };
+    // WP I.1: derselbe Durchgang wie im Run-Pfad -- sonst zeigt der Editor
+    // gruen, und erst der Lauf meldet den Namensraum-Fehler.
+    if let Err((zeile, msg)) = namensraum::anwenden(&mut ast, &herkunft, &namensraeume) {
+        return vec![serde_json::json!({
+            "line": zeile, "col": 1, "severity": "error",
+            "phase": "namensraum", "message": msg })];
+    }
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
         // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
         // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
