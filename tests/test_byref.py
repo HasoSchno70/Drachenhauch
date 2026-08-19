@@ -145,30 +145,6 @@ a = 1
 b = 2
 foo(a + b)
 ''')
-
-
-# --- Parser-Validierung ---------------------------------------------
-
-def test_byref_with_default_is_parser_error():
-    """BYREF und Default-Wert schliessen sich aus."""
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.errors import ParseError
-    src = '''
-SUB foo(BYREF x AS INTEGER = 5)
-END SUB
-'''
-    with pytest.raises(ParseError):
-        Parser(Lexer(src).tokenize()).parse()
-
-
-# (Der frühere Test, dass der Python-Compiler BYREF ablehnt, ist entfernt:
-#  dhrt unterstützt BYREF jetzt nativ, und der Python-Compiler wird in Phase 8
-#  gelöscht.)
-
-
-# --- Default-Parameter (Sanity-Tests, da der Cython-Bug gefixt wurde) -
-
 def test_default_param_treewalker(run_gb):
     out = run_gb('''
 FUNCTION greet(name AS STRING, prefix AS STRING = "Hi, ") AS STRING

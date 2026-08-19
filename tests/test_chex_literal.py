@@ -33,28 +33,3 @@ def test_hex_in_const(run_gb):
 def test_zero_and_float_unaffected(run_gb):
     # 0 und 0.5 duerfen NICHT als Hex/Binaer fehlgedeutet werden
     assert run_gb("PRINT 0\nPRINT 0.5\n") == "0\n0.5\n"
-
-
-# --- Front-End-Paritaet (Python-Lexer kennt die Literale ebenfalls) ------
-
-def _first_number(src: str):
-    toks = [t for t in Lexer(src).tokenize() if t.type == TokenType.NUMBER]
-    assert toks, "kein NUMBER-Token"
-    return toks[0].value
-
-
-def test_python_lexer_hex():
-    assert _first_number("x = 0xFF\n") == 255
-
-
-def test_python_lexer_binary():
-    assert _first_number("x = 0b1010\n") == 10
-
-
-def test_python_lexer_uppercase():
-    assert _first_number("x = 0XCAFE\n") == 51966
-
-
-def test_python_lexer_zero_fallback():
-    # "0" alleine bleibt Dezimal-0 (kein Hex-/Binaer-Fehlgriff)
-    assert _first_number("x = 0\n") == 0

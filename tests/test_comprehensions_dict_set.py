@@ -138,20 +138,3 @@ def test_parser_empty_brace_block_fails(run_gb):
     from drachenhauch.errors import ParseError
     with pytest.raises(ParseError):
         run_gb('PRINT {}\n')
-
-
-def test_parser_dict_or_set_disambiguation():
-    """`{x FOR ...}` -> SetComp; `{x: y FOR ...}` -> DictComp."""
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.ast_nodes import SetComp, DictComp
-
-    set_src = "DIM s AS TUPLE\ns = {x FOR x IN (1, 2, 3)}\n"
-    set_ast = Parser(Lexer(set_src).tokenize()).parse()
-    set_assign = set_ast.statements[1]
-    assert isinstance(set_assign.value, SetComp)
-
-    dict_src = 'DIM m AS MAP OF INTEGER\nm = {STR$(x): x FOR x IN (1, 2, 3)}\n'
-    dict_ast = Parser(Lexer(dict_src).tokenize()).parse()
-    dict_assign = dict_ast.statements[1]
-    assert isinstance(dict_assign.value, DictComp)

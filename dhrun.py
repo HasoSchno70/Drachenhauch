@@ -11,8 +11,6 @@ import os
 import sys
 from pathlib import Path
 
-from drachenhauch.lexer import Lexer
-from drachenhauch.parser import Parser
 from drachenhauch.errors import DrachenhauchError
 
 
@@ -392,35 +390,16 @@ def main(argv):
     if mode in ("run", "native"):
         return _run_native(abs_path, path)
 
-    # --- Debug: --tokens / --ast (Python-Lexer/-Parser, fuer Dev/Parity) ---
-    from drachenhauch.preprocess import process as _preprocess
-    source, origins = _preprocess(source, abs_path.parent, file_label=path.name)
-
-    try:
-        tokens = Lexer(source).tokenize()
-        if mode == "tokens":
-            for tok in tokens:
-                print(tok)
-            return 0
-        ast = Parser(tokens).parse()
-        if mode == "ast":
-            _print_ast(ast)
-            return 0
-        return 0
-    except DrachenhauchError as e:
-        # Origin der Fehler-Zeile (falls in einer eingebundenen Datei)
-        origin = None
-        if 1 <= e.line < len(origins) and origins[e.line] is not None:
-            origin = origins[e.line]
-        print(f"Fehler in {path.name}:")
-        if origin and origin[0] != path.name:
-            print(f"  {type(e).__name__}: {e.message}")
-            print(f"  -> {origin[0]}:{origin[1]} (via IMPORT in {path.name})")
-        else:
-            print(f"  {e}")
-        return 2
-
-
+    # --- Debug: --tokens / --ast reicht dhrt durch (Schritt 3) ---
+    # Der Python-Parser ist entfernt; dhrt kann beides selbst und ist
+    # ohnehin das Frontend, das zaehlt.
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        print("Native Runtime 'dhrt' nicht gefunden. Einmalig bauen mit:")
+        print(r"  .venv\Scripts\python.exe rust\build_runtime.py")
+        return 3
+    import subprocess
+    return subprocess.call([str(dhrt), "--" + mode, str(abs_path)])
 def _find_dhrt():
     """Sucht das `dhrt`-Binary. Reihenfolge:
     1. Eingefrorene Installation (PyInstaller): neben der Exe bzw. im Bundle

@@ -1,3 +1,4 @@
+import pathlib
 """Headless-Tests fuer das Datenmodell + Code-Gen des `dhanim`-Editors.
 
 Modell-Operationen (add/rename/remove State, Transitions, Params), JSON-
@@ -228,14 +229,38 @@ def test_editor_output_loads_in_runtime(run_gb, tmp_path):
 
 # ----------------------------------------------------------------- Codegen
 def _parses(src: str):
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.preprocess import process
-    merged = process(src)
-    if isinstance(merged, tuple):
-        merged = merged[0]
-    return Parser(Lexer(merged).tokenize()).parse()
+    """Prueft, dass ERZEUGTER .dh-Code gueltig ist -- ueber `dhrt --check`.
 
+    Frueher lief das durch den Python-Parser. `dhrt --check` ist der bessere
+    Pruefer: er nimmt den Compiler mit und meldet damit auch unbekannte
+    Builtins und falsche Argumentzahlen, nicht nur Syntax. (Siehe
+    docs/entwurf-python-parser-entfernen.md, Abschnitt 3 A.)
+    """
+    import json
+    import os
+    import subprocess
+    import tempfile
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from conftest import _DHRT
+    if _DHRT is None:
+        import pytest
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    fd, tmp = tempfile.mkstemp(suffix=".dh")
+    os.close(fd)
+    try:
+        pathlib.Path(tmp).write_text(src, encoding="utf-8")
+        r = subprocess.run([str(_DHRT), "--check", tmp],
+                           capture_output=True, text=True, encoding="utf-8",
+                           timeout=60)
+        roh = (r.stdout or "").strip()
+        probleme = json.loads(roh) if roh else []
+        fehler = [p for p in probleme if p.get("severity", "error") == "error"]
+        assert not fehler, "erzeugter Code ist nicht gueltig: " + json.dumps(
+            fehler, ensure_ascii=False)
+    finally:
+        os.unlink(tmp)
+    return True
 
 def test_generated_runner_parses():
     doc = _sample_doc()

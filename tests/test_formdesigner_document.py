@@ -1,3 +1,4 @@
+import pathlib
 """Tests fuer das Qt-freie Form-Designer-Modell: .dhform-Roundtrip, Laden in der
 nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
@@ -485,15 +486,39 @@ def test_generate_runner_uses_stored_code():
 
 
 # --------------------------------------------------------------- GB-Code-Export
-def _parses(src):
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.preprocess import process
-    merged = process(src)
-    if isinstance(merged, tuple):
-        merged = merged[0]
-    return Parser(Lexer(merged).tokenize()).parse()
+def _parses(src: str):
+    """Prueft, dass ERZEUGTER .dh-Code gueltig ist -- ueber `dhrt --check`.
 
+    Frueher lief das durch den Python-Parser. `dhrt --check` ist der bessere
+    Pruefer: er nimmt den Compiler mit und meldet damit auch unbekannte
+    Builtins und falsche Argumentzahlen, nicht nur Syntax. (Siehe
+    docs/entwurf-python-parser-entfernen.md, Abschnitt 3 A.)
+    """
+    import json
+    import os
+    import subprocess
+    import tempfile
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from conftest import _DHRT
+    if _DHRT is None:
+        import pytest
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    fd, tmp = tempfile.mkstemp(suffix=".dh")
+    os.close(fd)
+    try:
+        pathlib.Path(tmp).write_text(src, encoding="utf-8")
+        r = subprocess.run([str(_DHRT), "--check", tmp],
+                           capture_output=True, text=True, encoding="utf-8",
+                           timeout=60)
+        roh = (r.stdout or "").strip()
+        probleme = json.loads(roh) if roh else []
+        fehler = [p for p in probleme if p.get("severity", "error") == "error"]
+        assert not fehler, "erzeugter Code ist nicht gueltig: " + json.dumps(
+            fehler, ensure_ascii=False)
+    finally:
+        os.unlink(tmp)
+    return True
 
 def test_gb_export_explicit_construction_parses():
     doc = FormDoc(title="Login", w=320, h=220)
@@ -540,8 +565,6 @@ def test_gb_export_runs_in_runtime(run_gb, tmp_path):
 
 # --------------------------------------------------------------- Codegen
 def test_generated_runner_parses():
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
     from drachenhauch.preprocess import process
 
     doc = FormDoc(title="App")
@@ -550,12 +573,8 @@ def test_generated_runner_parses():
     src = doc.generate_runner("forms/app.dhform", screen_title="App")
     assert 'GUI_LOAD("forms/app.dhform")' in src
     assert "SUB on_save()" in src and "SUB on_vol()" in src
-    # Muss sauber durch Preprocess + Lexer + Parser laufen.
-    merged = process(src)
-    if isinstance(merged, tuple):
-        merged = merged[0]
-    prog = Parser(Lexer(merged).tokenize()).parse()
-    assert prog is not None
+    # Muss sauber durch dhrt --check laufen (Syntax UND Compiler).
+    _parses(src)
 
 
 def test_runner_form_fills_os_window():

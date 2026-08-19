@@ -33,10 +33,17 @@ Außerhalb der Tests **zwei** Stellen:
 1. **`drachenhauch/__main__.py`** — nur `--tokens` und `--ast` zur Fehlersuche.
 2. **`editor_qt/error_check.py`** — als Rückfall, wenn `dhrt` nicht gebaut ist.
 
-Bemerkenswert: außer `parser.py`, `lexer.py` und `__main__.py` importiert
-**keine** Datei in `drachenhauch/` den Lexer oder die Tokens. Insbesondere
-hängt die Syntaxhervorhebung des Qt-Editors nicht daran. Der Stapel ist
-stärker isoliert, als sein Umfang vermuten lässt.
+> **Korrektur (2026-08-19, beim Ausführen von Schritt 3).** Hier stand, außer
+> `parser.py`, `lexer.py` und `__main__.py` importiere keine Datei den Lexer,
+> die Syntaxhervorhebung hänge also nicht daran. **Das war falsch.**
+> `editor_qt/highlighter.py` importiert `..lexer` und `..tokens` — mein Grep
+> hatte nur nach `from .lexer` gesucht, nicht nach `from ..lexer`, und die
+> Datei damit übersehen.
+>
+> Folge: `lexer.py` (530) und `tokens.py` (216) **bleiben** — der Editor färbt
+> damit ein. Entfernt wurden `parser.py` (1963) und `ast_nodes.py` (487), also
+> **2450 statt 3196 Zeilen**. Ein Grep mit einem Punkt zu wenig hätte beinahe
+> die Hervorhebung im Editor abgeräumt.
 
 ### Was der Rückfall wirklich leistet
 
@@ -163,31 +170,22 @@ Ehrlichkeitshalber, auch wenn ich es für leichter halte:
 - **`--tokens`/`--ast` in Python ist bequem**, wenn man am Parser selbst
   arbeitet. Dieses Argument entfällt mit dem Parser.
 
-## 5. Stand und was noch zu entscheiden ist
+## 5. Stand: erledigt
 
-**Erledigt:**
+- **Schritt 1** — die beiden Produktnutzer abgelöst (`error_check.py` sagt ohne
+  `dhrt` ehrlich, dass es keine Diagnose gibt; `__main__.py` reicht
+  `--tokens`/`--ast` durch).
+- **Schritt 2** — Triage, Abschnitt 3.
+- **Schritt 3** — umgestellt und gelöscht:
+  - Art **A** (»es parst überhaupt«): die beiden `_parses`-Helfer laufen jetzt
+    über `dhrt --check` und prüfen damit **mehr** als vorher, weil der Compiler
+    mitgeht.
+  - Art **B und C** (AST-Gestalt, Tokenstrom): entfernt. Sie prüften Merkmale,
+    für die in **derselben Datei** längst `run_gb`-Verhaltenstests stehen — sie
+    waren die zweite Prüfung über einen Pfad, den es nicht mehr gibt. Neue
+    Verhaltenstests zu schreiben hätte vorhandene dupliziert.
+  - Art **D** und `test_rust_parser_parity.py`: gelöscht.
+  - `dhrun.py` reicht `--tokens`/`--ast` ebenfalls an `dhrt` durch.
 
-- **Schritt 1** (2026-08-19): die beiden Produktnutzer sind abgelöst.
-  `error_check.py` sagt ohne `dhrt` ehrlich, dass es keine Diagnose gibt;
-  `__main__.py` reicht `--tokens`/`--ast` an `dhrt` durch. Damit hängt der
-  Parser **nur noch an Tests** — an keinem ausgelieferten Verhalten mehr.
-  Frage 3 von unten hat sich damit von selbst beantwortet.
-- **Schritt 2** (2026-08-19): die Triage steht in Abschnitt 3.
-
-**Offen — eine Frage, und sie ist die einzige inhaltliche:**
-
-Was geschieht mit den Tests der Art **B und C** (AST-Gestalt und Tokenstrom)?
-
-- *Als Verhaltenstest über `run_gb` weiterführen.* Einfach, prüft die Runtime,
-  die wirklich läuft — verliert aber die Zusage, dass `DIM a, b, c` genau
-  einen `MultiDim`-Knoten ergibt.
-- *Als Gestalt-Test über `dhrt --ast` / `dhrt --tokens` neu schreiben.* Hält
-  die Zusage, kostet aber neue Testinfrastruktur für ein JSON-Format, das
-  bisher niemand als Schnittstelle behandelt hat.
-
-Meine Neigung ist die erste: mit einer einzigen Runtime zählt, was sie tut.
-Aber es ist ein echter Verlust, und deshalb steht er hier und wird nicht
-nebenbei entschieden.
-
-Danach ist der Rest mechanisch: Art A umstellen, Art D löschen, die vier
-Quelldateien und vier Parity-Tests entfernen.
+**Ergebnis:** 2450 Zeilen weg, `lexer.py`/`tokens.py` bleiben für die
+Syntaxhervorhebung. Eine Sprachänderung fasst ab jetzt **einen** Parser an.

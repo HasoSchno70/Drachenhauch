@@ -50,7 +50,7 @@ Stufen fertig.** dhrt führt `.dhc` weiterhin direkt aus (VM-Pfad); `dhrt run`
   Lookahead, `FOR EACH`, `IIF`, Slice-vs-Index, WITH-`.member`, List/Dict/Set-
   Comprehensions, Operator-Overloading, Properties). Debug-Einstieg
   `dhrt --ast <datei.dh>`.
-- Test [`tests/test_rust_parser_parity.py`](../tests/test_rust_parser_parity.py):
+- Test ``tests/test_rust_parser_parity.py``:
   **96 grün** (alle parsbaren `examples/*.dh` + 41 Snippets).
 - Gotchas: (a) `.line` ist in Python KEIN Dataclass-Feld → fällt bei der
   Serialisierung raus → reiner Struktur-Vergleich (Rust trackt `line` in Stufe 2

@@ -5,10 +5,6 @@ deklariert"), obwohl Doku/Beispiele `<> NIL` und `IS_NIL(NIL)` nutzten.
 Jetzt ist NIL ein Keyword-Literal (Wert = der leere/uninitialisierte Wert).
 """
 import pytest
-from drachenhauch.lexer import Lexer
-from drachenhauch.parser import Parser
-from drachenhauch.tokens import TokenType
-from drachenhauch.ast_nodes import NilLit
 
 
 # --- Laufzeit-Semantik (dhrt) -------------------------------------------
@@ -56,31 +52,3 @@ def test_db_bind_nil_stores_null(run_gb):
            'DB_CLOSE_RESULT(r)\n'
            'DB_CLOSE(con)\n')
     assert run_gb(src) == "TRUE\n"
-
-
-# --- Front-End-Paritaet (Python-Lexer/-Parser kennen NIL ebenfalls) -----
-
-def test_python_lexer_recognizes_nil_keyword():
-    toks = Lexer("PRINT NIL\n").tokenize()
-    assert any(t.type == TokenType.NIL for t in toks)
-
-
-def test_python_parser_produces_nillit():
-    prog = Parser(Lexer("DIM o AS Foo\no = NIL\n").tokenize()).parse()
-    # irgendwo im AST steht ein NilLit (die Zuweisung o = NIL)
-    found = []
-
-    def walk(n):
-        if isinstance(n, NilLit):
-            found.append(n)
-        for attr in vars(n).values() if hasattr(n, "__dict__") else []:
-            if isinstance(attr, list):
-                for e in attr:
-                    if hasattr(e, "__dict__"):
-                        walk(e)
-            elif hasattr(attr, "__dict__"):
-                walk(attr)
-
-    for stmt in prog.statements:
-        walk(stmt)
-    assert found, "kein NilLit im Python-AST gefunden"

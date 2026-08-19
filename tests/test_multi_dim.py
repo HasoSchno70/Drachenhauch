@@ -102,30 +102,3 @@ def test_multi_dim_each_var_initialized_to_default(run_gb):
         "PRINT c\n"
     )
     assert run_gb(src) == "0\n0\n0\n"
-
-
-def test_multi_dim_parser_error_still_requires_as():
-    """Ohne AS am Ende soll's weiterhin einen Parser-Fehler geben."""
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.errors import ParseError
-    src = "DIM a, b, c\n"
-    with pytest.raises(ParseError):
-        Parser(Lexer(src).tokenize()).parse()
-
-
-def test_multi_dim_ast_shape():
-    """Verifiziere AST-Struktur: Single -> Dim, Multi -> MultiDim."""
-    from drachenhauch.lexer import Lexer
-    from drachenhauch.parser import Parser
-    from drachenhauch.ast_nodes import Dim, MultiDim
-    single = Parser(Lexer("DIM x AS INTEGER\n").tokenize()).parse()
-    assert isinstance(single.statements[0], Dim)
-    multi = Parser(Lexer("DIM a, b, c AS INTEGER\n").tokenize()).parse()
-    md = multi.statements[0]
-    assert isinstance(md, MultiDim)
-    assert len(md.dims) == 3
-    names = [d.name for d in md.dims]
-    assert names == ["a", "b", "c"]
-    types = [d.type_name for d in md.dims]
-    assert types == ["integer", "integer", "integer"]

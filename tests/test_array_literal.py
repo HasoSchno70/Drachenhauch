@@ -6,9 +6,6 @@ der Parser: FOR nach dem ersten Ausdruck = Comprehension, sonst Array-Literal.
 """
 import pytest
 from drachenhauch.errors import DrachenhauchError
-from drachenhauch.lexer import Lexer
-from drachenhauch.parser import Parser
-from drachenhauch.ast_nodes import ArrayLit, ListComp
 
 
 def test_int_array_literal(run_gb):
@@ -201,16 +198,3 @@ def test_rueckgabewert_prueft_den_elementtyp(run_gb):
                '    RETURN zahlen\n'
                'END FUNCTION\n'
                'PRINT LEN(namen())\n')
-
-
-# --- Front-End-Paritaet (Python-Parser unterscheidet Literal vs Comp) ----
-
-def test_python_parser_array_literal_node():
-    prog = Parser(Lexer("a = [1, 2, 3]\n").tokenize()).parse()
-    assert isinstance(prog.statements[0].value, ArrayLit)
-    assert len(prog.statements[0].value.elements) == 3
-
-
-def test_python_parser_comprehension_node():
-    prog = Parser(Lexer("a = [x FOR x IN nums]\n").tokenize()).parse()
-    assert isinstance(prog.statements[0].value, ListComp)

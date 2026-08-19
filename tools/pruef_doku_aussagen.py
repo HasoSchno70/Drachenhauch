@@ -193,6 +193,9 @@ def konstanten(ordner: Path) -> list:
 # eine Doku, die auf Dateien zeigt, die niemand findet.
 GEDULDETE_PFADE = {
     "drachenhauch/interpreter.py": "Tree-Walker, mit Stufe B entfernt -- nur in historischen Notizen",
+    "drachenhauch/parser.py": "Python-Parser, 2026-08-19 entfernt (Stufe C) -- nur noch im Entwurf genannt",
+    "drachenhauch/ast_nodes.py": "AST-Knoten des Python-Parsers, mit ihm entfernt",
+    "tests/test_rust_parser_parity.py": "Parity gegen den entfernten Python-Parser",
     "drachenhauch/serialize.py": "Python-Bytecode-Serializer, mit Stufe B entfernt",
     "drachenhauch/vm.py": "Python-Bytecode-VM, mit Stufe B entfernt",
     "drachenhauch/export.py": "Python-Export, von dhrts Bundler abgeloest",
