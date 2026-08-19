@@ -3,14 +3,11 @@
 Stufe B: Der Tree-Walker ist entfernt -- Ausfuehrung laeuft ueber die native
 Runtime `dhrt` (dhrt chdirt selbst ins Datei-Verzeichnis, daher funktionieren
 relative Asset-Pfade jetzt auch hier). `--tokens`/`--ast` nutzen den behaltenen
-Python-Lexer/-Parser (Dev/Parity).
+die native Runtime `dhrt` -- Python parst hier nichts mehr.
 """
 import sys
 from pathlib import Path
 
-from .lexer import Lexer
-from .parser import Parser
-from .errors import DrachenhauchError
 
 
 def main(argv=None):
@@ -34,26 +31,18 @@ def main(argv=None):
         from dhrun import _run_native  # type: ignore
         return _run_native(path.resolve(), path)
 
-    # --- Debug: --tokens / --ast ueber den Python-Lexer/-Parser ---
-    source = path.read_text(encoding="utf-8")
-    from .preprocess import process as _preprocess
-    source, _origins = _preprocess(source, path.parent, file_label=path.name)
-    try:
-        tokens = Lexer(source).tokenize()
-        if mode == "tokens":
-            for tok in tokens:
-                print(tok)
-            return 0
-        ast = Parser(tokens).parse()
-        if mode == "ast":
-            from dhrun import _print_ast  # type: ignore
-            _print_ast(ast)
-            return 0
-        return 0
-    except DrachenhauchError as e:
-        print(f"Fehler in {path.name}:")
-        print(f"  {e}")
-        return 2
+    # --- Debug: --tokens / --ast reicht dhrt durch ---
+    # Frueher lief das ueber den Python-Lexer/-Parser. `dhrt` kann beides
+    # selbst (main.rs), und es ist ohnehin das Frontend, das wirklich zaehlt --
+    # ein zweites, das leicht abweicht, half beim Suchen eher nicht.
+    from dhrun import _find_dhrt  # type: ignore
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        print("Native Runtime 'dhrt' nicht gefunden. Einmalig bauen mit:")
+        print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
+        return 3
+    import subprocess
+    return subprocess.call([str(dhrt), "--" + mode, str(path)])
 
 
 if __name__ == "__main__":

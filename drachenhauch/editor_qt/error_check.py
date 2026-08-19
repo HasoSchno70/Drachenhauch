@@ -67,8 +67,9 @@ def _check_source(source: str, base_path: Path | None,
                    checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
     """Liefert ALLE Diagnostik-Probleme (leer = sauber). Bevorzugt `dhrt --check`
     (volle preprocess/lex/parse/compile-Diagnostik mit Zeile, inkl. Warnungen);
-    faellt dhrt, nur Syntax (Lexer/Parser) ohne den Python-Compiler -- dieser
-    Fallback findet nur das erste Syntaxproblem. `checker` (optional) registriert
+    fehlt dhrt, gibt es
+    eine Warnung mit Bau-Hinweis statt halber Diagnostik (siehe
+    `_keine_diagnose`). `checker` (optional) registriert
     den laufenden dhrt-Subprozess, damit ein neuerer `check()`-Aufruf ihn
     abbrechen kann (siehe LiveErrorChecker.check)."""
     from .dhrt_locate import dhrt_spawn_semaphore
@@ -80,8 +81,7 @@ def _check_source(source: str, base_path: Path | None,
         dhrt = _find_dhrt()
         if dhrt is not None:
             return _check_via_dhrt(source, base_path, dhrt, checker)
-    one = _check_syntax_only(source, base_path)
-    return [one] if one is not None else []
+    return [_keine_diagnose()]
 
 
 _DIAG_FAILED_MSG = "Diagnose fehlgeschlagen -- moeglicherweise veraltete Fehleranzeige"
@@ -183,37 +183,25 @@ def _origins_for(source: str, base_path) -> list | None:
         return None
 
 
-def _check_syntax_only(source: str, base_path: Path | None) -> Optional[ParseProblem]:
-    """Fallback ohne dhrt: Preprocess + Lex + Parse (nur Syntax, kein Compiler)."""
-    try:
-        from ..lexer import Lexer
-        from ..parser import Parser
-        from ..preprocess import process as _preprocess
-        from ..errors import LexerError, ParseError
-    except Exception as exc:
-        return ParseProblem(line=1, message=f"Import-Fehler: {exc}")
+def _keine_diagnose() -> ParseProblem:
+    """Ohne `dhrt` gibt es keine Diagnostik mehr -- und das wird gesagt.
 
-    try:
-        merged, origins = _preprocess(
-            source, base_path or Path.cwd(), file_label="<editor>")
-    except LexerError as exc:
-        return ParseProblem(line=getattr(exc, "line", 1) or 1,
-                            message=f"IMPORT: {exc}", phase="preprocess")
-    except Exception as exc:
-        return ParseProblem(line=1,
-                            message=f"Preprocess: {type(exc).__name__}: {exc}",
-                            phase="preprocess")
-    try:
-        Parser(Lexer(merged).tokenize()).parse()
-    except (LexerError, ParseError) as exc:
-        merged_line = getattr(exc, "line", 1) or 1
-        line, msg = _map_back(origins, merged_line, str(exc))
-        return ParseProblem(line=line, message=msg, phase="parse")
-    except Exception as exc:
-        return ParseProblem(line=1,
-                            message=f"{type(exc).__name__}: {exc}", phase="parse")
-    return None
+    Frueher stand hier ein Ersatz-Pruefer ueber den Python-Parser. Er lief nur,
+    wenn `dhrt` gar nicht gefunden wurde, lieferte genau EIN Problem (das erste
+    Syntaxproblem) und kannte keinen Compiler -- also keine unbekannten
+    Builtins, keine Arity-Pruefung, keine Namensraum-Meldungen. In genau dieser
+    Lage kann der Nutzer sein Programm ohnehin nicht starten; der Run-Knopf
+    sagt dort dasselbe. Fuer diese halbe Auskunft hing ein zweiter Parser im
+    Repo, der bei jeder Sprachaenderung mitgepflegt werden musste.
 
+    Siehe docs/entwurf-python-parser-entfernen.md.
+    """
+    return ParseProblem(
+        line=1,
+        message=("Diagnose nicht verfuegbar: native Runtime 'dhrt' nicht gefunden. "
+                 "Einmalig bauen mit: rust\\build_runtime.py"),
+        severity="warning",
+        phase="setup")
 
 def _map_back(origins, merged_line: int, message: str) -> tuple[int, str]:
     """Konvertiert merged-Line -> User-Buffer-Line ueber `origins`.

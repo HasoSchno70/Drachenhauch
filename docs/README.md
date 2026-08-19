@@ -86,7 +86,8 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Stolpersteine](stolpersteine.md)** — Reibungspunkte der Sprache, beim Schreiben des Lehrbuchs gesammelt
 - **Doku-Prüfer** — `tools/pruef_docs.py` schickt jeden `basic`-Block durch den Compiler, `tools/pruef_doku_aussagen.py` prüft Befehlsnamen in Tabellen/Fließtext und die Zählungen im README. Beide hängen an der Testsuite
 - **[Rust-Front-End-Portierung](rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
-- **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap, zum Lesen und Entscheiden (noch nichts gebaut)
+- **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
+- **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
 - **[Allzweck-Roadmap](allzweck-roadmap.md)** — was fehlt, damit man damit *alles* schreiben kann und nicht nur Spiele (aktuell, Audit 2026-08)
 - **[Befehlssatz-Roadmap](befehlssatz-roadmap.md)** und **[GUI-Design-Notiz](gui-module-design.md)** — historisch, mit Lesehinweis
 - **[Umbenennung GameBasic → Drachenhauch](umbenennung-drachenhauch.md)** — die Checkliste von 2026-08
