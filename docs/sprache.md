@@ -1101,10 +1101,22 @@ END FUNCTION
 `PRIVATE` steht vor `SUB`, `FUNCTION`, `DIM` oder `CONST`. In einer Datei ohne
 `AS` ist es ein wirkungsloser Marker.
 
-**Noch nicht dabei:** Klassen, Structs und ENUMs aus einem Namensraum
-(`mathe.Punkt`). Der Zugriff meldet das ausdrücklich, statt zu behaupten, den
-Namen gebe es nicht. Wer den Typ braucht, importiert die Datei zusätzlich ohne
-`AS` — dann steht er flach zur Verfügung.
+**Noch nicht dabei:** Klassen, Structs und ENUMs lassen sich nicht über den
+Namensraum **benennen** — `DIM p AS mathe.Punkt` und `NEW mathe.Punkt()` gehen
+noch nicht. Der Zugriff meldet das ausdrücklich, statt zu behaupten, den Namen
+gebe es nicht.
+
+Eine Funktion der Datei, die so einen Wert **liefert**, funktioniert dagegen
+schon heute — inklusive Feldzugriff auf das Ergebnis:
+
+```basic
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.NeuerPunkt(3, 4).x      ' 3
+```
+
+Damit kommt man ohne den Typnamen aus. Wer ihn wirklich selbst hinschreiben
+muss, importiert die Datei zusätzlich ohne `AS`; dann steht er flach zur
+Verfügung.
 
 **Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
 j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien

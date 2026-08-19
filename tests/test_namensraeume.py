@@ -110,8 +110,10 @@ def test_klasse_im_namensraum_meldet_klar(dhrt_pfad, tmp_path):
         "k.dh": "CLASS Punkt\n    DIM x AS INTEGER\nEND CLASS\n",
         "main.dh": 'IMPORT "k.dh" AS k\nDIM p AS INTEGER\np = k.Punkt\n',
     })
-    assert "noch nicht erreichbar" in err, err
     assert "WP I.2" in err, err
+    # Die Meldung muss den Weg nennen, der HEUTE funktioniert -- nicht nur
+    # den schwereren Ausweg ueber einen zweiten, flachen IMPORT.
+    assert "LIEFERT" in err, err
 
 
 def test_interner_name_leckt_nicht_in_meldungen(dhrt_pfad, tmp_path):
@@ -239,3 +241,26 @@ def test_ohne_as_bleibt_der_globale_zugriff_erlaubt(dhrt_pfad, tmp_path):
                     "PRINT LiestGlobal()\n"),
     })
     assert out.strip() == "5", (out, err)
+
+
+def test_funktion_darf_einen_modul_typ_liefern(dhrt_pfad, tmp_path):
+    """Gemessen beim Zuschnitt von I.2: den Typ BENENNEN geht nicht, ihn
+    zurueckgeben schon -- samt Feldzugriff auf das Ergebnis.
+
+    Damit kommt man ohne `DIM ... AS k.Punkt` aus, und genau darauf zeigt die
+    Meldung jetzt. Vorher verwies sie nur auf den schwereren Ausweg, die Datei
+    zusaetzlich flach zu importieren -- was den Namensraum wieder aufhebt.
+    """
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": ("CLASS Punkt\n"
+                 "    DIM x AS INTEGER\n"
+                 "END CLASS\n"
+                 "FUNCTION Neu(a AS INTEGER) AS Punkt\n"
+                 "    DIM p AS Punkt\n"
+                 "    p = NEW Punkt()\n"
+                 "    p.x = a\n"
+                 "    RETURN p\n"
+                 "END FUNCTION\n"),
+        "main.dh": 'IMPORT "k.dh" AS k\nPRINT k.Neu(3).x\n',
+    })
+    assert out.strip() == "3", (out, err)

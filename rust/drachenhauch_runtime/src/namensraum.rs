@@ -276,10 +276,13 @@ impl<'a> Lauf<'a> {
         let m = self.module.get(&alias)?;
         if m.typen.contains(&low) {
             self.fehler.get_or_insert((self.zeile, format!(
-                "{}.{} ist eine Klasse oder ein ENUM. Typen aus einem Namensraum \
-                 sind noch nicht erreichbar (WP I.2) -- importiere die Datei \
-                 zusaetzlich ohne AS, dann steht der Typ flach zur Verfuegung.",
-                alias, name)));
+                concat!("{}.{} ist eine Klasse oder ein ENUM -- die lassen sich noch ",
+                            "nicht ueber den Namensraum BENENNEN (WP I.2). Eine Funktion ",
+                            "der Datei, die so einen Wert LIEFERT, geht aber schon: ",
+                            "`{}.ErzeugePunkt(...)` und danach `.feld` darauf. Wer den ",
+                            "Typ wirklich selbst hinschreiben muss, importiert die Datei ",
+                            "zusaetzlich ohne AS -- dann steht er flach zur Verfuegung."),
+                    alias, name, alias)));
             return None;
         }
         if !m.namen.contains(&low) {
