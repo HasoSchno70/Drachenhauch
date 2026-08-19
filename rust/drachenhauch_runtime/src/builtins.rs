@@ -415,6 +415,17 @@ fn csv_aus_array(v: &Value, fn_: &str) -> Result<Vec<Vec<String>>, String> {
     }
 }
 
+/// 1D-ARRAY OF STRING -> `Vec<String>` (Dateilisten, Eintragsnamen).
+fn str_array(v: &Value, fn_: &str) -> Result<Vec<String>, String> {
+    match v {
+        Value::Array(a) => {
+            let arr = a.borrow();
+            Ok((0..arr.cells.len()).map(|i| str_of(&arr.cells.get(i))).collect())
+        }
+        _ => Err(format!("{}: erwartet ein ARRAY OF STRING", fn_)),
+    }
+}
+
 fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
@@ -2484,6 +2495,59 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&cleaned.join("/")))
         }
 
+
+
+        // ===== ZIP (WP J) =====
+        // Beim Entpacken geht jeder Eintragsname durch eine Zip-Slip-Pruefung
+        // (siehe zipdatei.rs) -- ein Archiv darf `../../autoexec.bat` heissen.
+        "zip_list" => {
+            arity!(1);
+            let pfad = need_str(&a[0], "ZIP_LIST")?;
+            Ok(new_str_array(crate::zipdatei::liste(std::path::Path::new(pfad))?))
+        }
+        "zip_read" => {
+            arity!(2);
+            let pfad = need_str(&a[0], "ZIP_READ")?;
+            let name = need_str(&a[1], "ZIP_READ")?;
+            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
+            Ok(Value::Buffer(Rc::new(RefCell::new(daten))))
+        }
+        "zip_read$" => {
+            arity!(2);
+            let pfad = need_str(&a[0], "ZIP_READ$")?;
+            let name = need_str(&a[1], "ZIP_READ$")?;
+            let daten = crate::zipdatei::lies(std::path::Path::new(pfad), name)?;
+            Ok(Value::str_rc(&String::from_utf8_lossy(&daten)))
+        }
+        "zip_extract" => {
+            arity!(2);
+            let pfad = need_str(&a[0], "ZIP_EXTRACT")?;
+            let ziel = need_str(&a[1], "ZIP_EXTRACT")?;
+            Ok(Value::Int(crate::zipdatei::entpacke(
+                std::path::Path::new(pfad), std::path::Path::new(ziel))?))
+        }
+        "zip_create" => {
+            arity!(2);
+            let pfad = need_str(&a[0], "ZIP_CREATE")?;
+            let dateien = str_array(&a[1], "ZIP_CREATE")?;
+            Ok(Value::Int(crate::zipdatei::packe(std::path::Path::new(pfad), &dateien)?))
+        }
+        "zip_write" => {
+            arity!(3);
+            let pfad = need_str(&a[0], "ZIP_WRITE")?;
+            let namen = str_array(&a[1], "ZIP_WRITE")?;
+            let inhalte = str_array(&a[2], "ZIP_WRITE")?;
+            if namen.len() != inhalte.len() {
+                return err(format!(
+                    "ZIP_WRITE: {} Namen, aber {} Inhalte -- die Arrays muessen \
+                     gleich lang sein", namen.len(), inhalte.len()));
+            }
+            let paare: Vec<(String, Vec<u8>)> = namen.into_iter()
+                .zip(inhalte.into_iter().map(|s| s.into_bytes()))
+                .collect();
+            Ok(Value::Int(crate::zipdatei::packe_daten(
+                std::path::Path::new(pfad), &paare)?))
+        }
 
         // ===== CSV (WP J) =====
         // Der haeufigste Datenaustausch ueberhaupt -- und bis hierher

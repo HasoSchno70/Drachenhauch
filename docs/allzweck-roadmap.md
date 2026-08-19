@@ -499,7 +499,12 @@ als Ausgangspunkt:
       den Import abzubrechen). Zeilen ungleicher Länge werden auf die breiteste
       aufgefüllt. Neun Rust-`#[test]`s für die Zerlegung, zehn Golden-Tests für
       den Weg durch die Sprache, [examples/169_csv.dh](../examples/169_csv.dh)
-- [ ] ZIP lesen/schreiben (nach WP B) — Sicherungen, Belegsammlungen, Export
+- [x] **ZIP lesen/schreiben** (2026-08-19): `ZIP_LIST`/`ZIP_READ`/`ZIP_READ$`/
+      `ZIP_EXTRACT`/`ZIP_CREATE`/`ZIP_WRITE`. Beim Entpacken geht jeder
+      Eintragsname durch eine Zip-Slip-Prüfung — ein Archiv darf
+      `../../autoexec.bat` heißen, und solche Einträge werden übersprungen
+      statt geschrieben. Drei Rust-`#[test]`s für die Namensprüfung, neun
+      Golden-Tests, davon zwei mit einem echten bösartigen Archiv
 - [x] **MAP beschleunigt** (2026-08-19) — der Punkt war falsch zugeschnitten.
       Nachgemessen war nicht nur der TUPLE-Behelf O(n), sondern `GbMap` selbst:
       ein `Vec` mit linearer Suche. 20 000 Einträge kosteten 224 ms zum Füllen

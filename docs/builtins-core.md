@@ -346,6 +346,50 @@ FUNCTION fib(n AS INTEGER) AS INTEGER
 END FUNCTION
 ```
 
+## ZIP
+
+Sicherungen, Belegsammlungen, Export — der übliche Weg, mehrere Dateien als
+eine weiterzugeben.
+
+| Funktion | Zweck |
+|---|---|
+| `ZIP_LIST(archiv$)` → ARRAY OF STRING | Namen aller Einträge |
+| `ZIP_READ$(archiv$, name$)` → STRING | einen Eintrag als Text |
+| `ZIP_READ(archiv$, name$)` → BUFFER | einen Eintrag als Bytes |
+| `ZIP_EXTRACT(archiv$, ordner$)` → INTEGER | alles entpacken, liefert die Zahl der Dateien |
+| `ZIP_CREATE(archiv$, dateien)` → INTEGER | Archiv aus einer Liste von Dateipfaden |
+| `ZIP_WRITE(archiv$, namen, inhalte)` → INTEGER | Archiv aus Namen und Texten, ohne Umweg über Dateien |
+
+```basic
+DIM namen AS ARRAY OF STRING
+DIM inhalte AS ARRAY OF STRING
+DIM drin AS ARRAY OF STRING
+
+namen = SPLIT$("brief.txt|unter/notiz.txt", "|")
+inhalte = SPLIT$("Hallo Welt|zweite Datei", "|")
+ZIP_WRITE("sicherung.zip", namen, inhalte)
+
+drin = ZIP_LIST("sicherung.zip")
+PRINT JOIN$(drin, ", ")
+PRINT ZIP_EXTRACT("sicherung.zip", "entpackt")
+```
+
+**Beim Entpacken wird geprüft, wohin geschrieben wird.** Ein Archiv darf
+Einträge wie `../../autoexec.bat` oder `C:/Windows/x.dll` enthalten; wer den
+Namen aus dem Archiv einfach an den Zielordner hängt, schreibt damit
+außerhalb davon — der Angreifer wählt die Datei, du entpackst sie. Solche
+Einträge werden **übersprungen**, nicht geschrieben. `ZIP_EXTRACT` liefert die
+Zahl der wirklich entstandenen Dateien zurück, damit ein Unterschied zur
+Länge von `ZIP_LIST` auffällt.
+
+**`ZIP_CREATE` speichert nur den Dateinamen**, nicht den Pfad, unter dem die
+Datei lag — sonst trägt ein Archiv die Verzeichnisstruktur des Rechners nach
+außen, auf dem es entstanden ist. Wer eine Ordnerstruktur *im* Archiv haben
+will, nimmt `ZIP_WRITE` und gibt die Namen selbst an (`unter/notiz.txt`).
+
+Komprimiert wird mit Deflate. `ZIP_WRITE` und `ZIP_CREATE` legen das Archiv
+jeweils **neu** an; ein Anhängen an ein bestehendes Archiv gibt es nicht.
+
 ## CSV
 
 Der häufigste Datenaustausch überhaupt — und mit `SPLIT$` nicht richtig zu

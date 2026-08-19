@@ -8421,6 +8421,42 @@
    "module": "zeit"
   },
   {
+   "name": "ZIP_CREATE",
+   "kind": "core",
+   "signature": "ZIP_CREATE(archiv$, dateien) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ZIP_EXTRACT",
+   "kind": "core",
+   "signature": "ZIP_EXTRACT(archiv$, ordner$) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ZIP_LIST",
+   "kind": "core",
+   "signature": "ZIP_LIST(archiv$) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "ZIP_READ",
+   "kind": "core",
+   "signature": "ZIP_READ(archiv$, name$) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
+   "name": "ZIP_READ$",
+   "kind": "core",
+   "signature": "ZIP_READ$(archiv$, name$) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "ZIP_WRITE",
+   "kind": "core",
+   "signature": "ZIP_WRITE(archiv$, namen, inhalte) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
    "name": "__COMP_ITER",
    "kind": "core",
    "signature": "__COMP_ITER(v)",
