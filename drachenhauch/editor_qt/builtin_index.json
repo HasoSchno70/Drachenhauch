@@ -1803,6 +1803,36 @@
    "module": "core"
   },
   {
+   "name": "CSV_FORMAT$",
+   "kind": "core",
+   "signature": "CSV_FORMAT$(tabelle[, trenner$]) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CSV_LOAD",
+   "kind": "core",
+   "signature": "CSV_LOAD(pfad$[, trenner$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CSV_PARSE",
+   "kind": "core",
+   "signature": "CSV_PARSE(text$[, trenner$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CSV_ROW$",
+   "kind": "core",
+   "signature": "CSV_ROW$(felder[, trenner$]) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CSV_SAVE",
+   "kind": "core",
+   "signature": "CSV_SAVE(pfad$, tabelle[, trenner$])",
+   "module": "dhrt"
+  },
+  {
    "name": "CUBE",
    "kind": "graphics",
    "signature": "CUBE(*args)",

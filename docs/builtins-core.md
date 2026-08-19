@@ -346,6 +346,54 @@ FUNCTION fib(n AS INTEGER) AS INTEGER
 END FUNCTION
 ```
 
+## CSV
+
+Der häufigste Datenaustausch überhaupt — und mit `SPLIT$` nicht richtig zu
+machen. Sobald ein Feld das Trennzeichen enthält, liefert `SPLIT$` zu viele
+Felder und sagt nichts davon:
+
+```text
+Mueller;"Berlin; Mitte";42      SPLIT$(";") -> vier Felder statt drei
+```
+
+| Funktion | Zweck |
+|---|---|
+| `CSV_PARSE(text$[, trenner$])` → ARRAY OF STRING | Text zerlegen, 2D (Zeilen × Spalten) |
+| `CSV_LOAD(pfad$[, trenner$])` → ARRAY OF STRING | Datei lesen, 2D |
+| `CSV_FORMAT$(tabelle[, trenner$])` → STRING | 2D-Array als CSV-Text |
+| `CSV_SAVE(pfad$, tabelle[, trenner$])` | 2D-Array in eine Datei |
+| `CSV_ROW$(felder[, trenner$])` → STRING | eine einzelne Zeile aus 1D-Array |
+
+```basic
+DIM t AS ARRAY OF STRING
+t = CSV_LOAD("kunden.csv", ";")
+
+PRINT DIMSIZE(t, 0)     ' Zeilen
+PRINT DIMSIZE(t, 1)     ' Spalten
+PRINT t[1, 2]           ' zweite Zeile, dritte Spalte
+```
+
+**Trennzeichen:** ohne zweites Argument ein Komma. Excel schreibt im deutschen
+Gebietsschema `;` — dann `CSV_LOAD(pfad$, ";")`. Es muss genau **ein** Zeichen
+sein; alles andere meldet einen Fehler, statt stillschweigend das erste zu
+nehmen.
+
+**Anführungszeichen** nach RFC 4180: ein Feld darf Trennzeichen, Zeilenumbrüche
+und Anführungszeichen enthalten, wenn es in `"` steht; ein `"` im Feld wird
+verdoppelt. Beim Schreiben setzt Drachenhauch Anführungszeichen **nur, wo sie
+nötig sind** — unnötige machen die Datei unleserlich und den Diff größer.
+
+**Ungleich lange Zeilen** werden auf die *breiteste* aufgefüllt (mit
+Leerstrings), weil ein GB-Array rechteckig sein muss. Abschneiden würde Daten
+wegwerfen, ohne es zu sagen.
+
+**Kaputte Dateien** brechen den Import nicht ab: eine fehlende
+Schluss-Anführung liest bis zum Dateiende. `\r\n` und `\n` gelten
+gleichermaßen als Zeilenende, ein BOM am Dateianfang wird abgeschnitten (sonst
+hieße die erste Spalte für immer `﻿Name`).
+
+Beispiel: [examples/169_csv.dh](../examples/169_csv.dh).
+
 ## Datei-I/O
 
 | Funktion | Zweck |

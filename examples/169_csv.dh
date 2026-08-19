@@ -1,0 +1,48 @@
+' 169_csv.dh -- CSV lesen und schreiben (WP J)
+'
+' Der Grund fuer diese Builtins steht in Zeile 12: ein Feld, das das
+' Trennzeichen enthaelt. SPLIT$(";") liefert dort vier Felder statt drei --
+' und meldet es nicht, sondern rechnet stillschweigend falsch weiter.
+
+DIM tabelle AS ARRAY OF STRING
+DIM zurueck AS ARRAY OF STRING
+DIM kopf AS ARRAY OF STRING
+DIM r AS INTEGER
+DIM c AS INTEGER
+DIM zeile AS STRING
+DIM quelle AS STRING
+
+quelle = "Name;Ort;Punkte" + CHR$(10)
+quelle = quelle + "Mueller;" + CHR$(34) + "Berlin; Mitte" + CHR$(34) + ";42" + CHR$(10)
+quelle = quelle + "Schmidt;Hamburg;17" + CHR$(10)
+
+tabelle = CSV_PARSE(quelle, ";")
+
+PRINT "Zeilen: " + STR$(DIMSIZE(tabelle, 0)) + ", Spalten: " + STR$(DIMSIZE(tabelle, 1))
+PRINT ""
+
+FOR r = 0 TO DIMSIZE(tabelle, 0) - 1
+    zeile = ""
+    FOR c = 0 TO DIMSIZE(tabelle, 1) - 1
+        zeile = zeile + PADR$(tabelle[r, c], 16)
+    NEXT
+    PRINT zeile
+NEXT
+
+PRINT ""
+PRINT "Das Semikolon im Ort ist erhalten: [" + tabelle[1, 1] + "]"
+PRINT ""
+
+' --- Schreiben: Anfuehrungszeichen setzt CSV_ROW$ nur, wo noetig ---
+kopf = SPLIT$("Name|Ort|Notiz mit ; drin", "|")
+PRINT "Eine Zeile: " + CSV_ROW$(kopf, ";")
+PRINT ""
+
+' --- Rundreise ueber eine Datei ---
+CSV_SAVE("csv_beispiel.csv", tabelle, ";")
+zurueck = CSV_LOAD("csv_beispiel.csv", ";")
+PRINT "Nach dem Speichern und Laden wieder da: [" + zurueck[1, 1] + "]"
+DELETEFILE("csv_beispiel.csv")
+
+PRINT ""
+PRINT "Ohne zweites Argument ist das Trennzeichen ein Komma."

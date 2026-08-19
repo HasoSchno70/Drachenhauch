@@ -369,6 +369,52 @@ fn translate_repl(s: &str) -> String {
     out
 }
 
+/// Zeilen unterschiedlicher Laenge in ein 2D-ARRAY OF STRING giessen.
+///
+/// CSV-Zeilen duerfen verschieden lang sein, ein GB-Array muss rechteckig
+/// sein. Aufgefuellt wird mit Leerstrings auf die BREITESTE Zeile -- abzu-
+/// schneiden hiesse, Daten stillschweigend wegzuwerfen.
+fn csv_tabelle(zeilen: Vec<Vec<String>>) -> Value {
+    let rows = zeilen.len() as i64;
+    let cols = zeilen.iter().map(|z| z.len()).max().unwrap_or(0) as i64;
+    let mut arr = GbArray::new("string".to_string(), vec![rows.max(0), cols.max(0)],
+                               || Value::str_rc(""));
+    for (r, zeile) in zeilen.iter().enumerate() {
+        for (c, feld) in zeile.iter().enumerate() {
+            arr.cells.set(r * cols as usize + c, Value::str_rc(feld));
+        }
+    }
+    Value::Array(Rc::new(RefCell::new(arr)))
+}
+
+/// Ein 1D- oder 2D-ARRAY OF STRING als Zeilenliste lesen.
+///
+/// 1D gilt als EINE Zeile -- so kann `CSV_ROW$` dieselbe Pruefung benutzen wie
+/// `CSV_SAVE`, und wer eine einzelne Zeile schreiben will, muss kein
+/// 1xN-Array bauen.
+fn csv_aus_array(v: &Value, fn_: &str) -> Result<Vec<Vec<String>>, String> {
+    let arr = match v {
+        Value::Array(a) => a.borrow(),
+        _ => return Err(format!("{}: erwartet ein ARRAY OF STRING", fn_)),
+    };
+    let text = |x: Value| -> String {
+        match x {
+            Value::Str(s) => s.to_string(),
+            andere => str_of(&andere),
+        }
+    };
+    match arr.dims.len() {
+        1 => Ok(vec![(0..arr.cells.len()).map(|i| text(arr.cells.get(i))).collect()]),
+        2 => {
+            let cols = arr.dims[1].max(0) as usize;
+            Ok((0..arr.dims[0].max(0) as usize)
+                .map(|r| (0..cols).map(|c| text(arr.cells.get(r * cols + c))).collect())
+                .collect())
+        }
+        n => Err(format!("{}: erwartet ein 1D- oder 2D-ARRAY, bekommen {}D", fn_, n)),
+    }
+}
+
 fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
@@ -638,6 +684,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         ($n:expr) => {
             if a.len() != $n {
                 let base = format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len());
+                return err(match builtin_signature(name) {
+                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
+                    None => base,
+                });
+            }
+        };
+        // Spanne, fuer Builtins mit optionalen Argumenten.
+        ($lo:expr, $hi:expr) => {
+            if a.len() < $lo || a.len() > $hi {
+                let base = format!("{}: erwartet {} bis {} Argument(e), erhalten {}",
+                                   name.to_uppercase(), $lo, $hi, a.len());
                 return err(match builtin_signature(name) {
                     Some(sig) => format!("{} -- Aufruf: {}", base, sig),
                     None => base,
@@ -2425,6 +2482,61 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 if !t.is_empty() { cleaned.push(t.to_string()); }
             }
             Ok(Value::str_rc(&cleaned.join("/")))
+        }
+
+
+        // ===== CSV (WP J) =====
+        // Der haeufigste Datenaustausch ueberhaupt -- und bis hierher
+        // Handarbeit mit SPLIT$, die bei der ersten Zelle mit Trennzeichen
+        // darin falsche Ergebnisse liefert, ohne es zu melden.
+        "csv_parse" => {
+            arity!(1, 2);
+            let text = need_str(&a[0], "CSV_PARSE")?;
+            let t = crate::csv::trenner_aus(
+                if a.len() > 1 { Some(need_str(&a[1], "CSV_PARSE")?) } else { None },
+                "CSV_PARSE")?;
+            Ok(csv_tabelle(crate::csv::lesen(text, t)))
+        }
+        "csv_load" => {
+            arity!(1, 2);
+            let pfad = need_str(&a[0], "CSV_LOAD")?;
+            let t = crate::csv::trenner_aus(
+                if a.len() > 1 { Some(need_str(&a[1], "CSV_LOAD")?) } else { None },
+                "CSV_LOAD")?;
+            let text = std::fs::read_to_string(pfad)
+                .map_err(|e| format!("CSV_LOAD: {}: {}", pfad, e))?;
+            // BOM abschneiden -- Excel schreibt ihn, und sonst heisst die
+            // erste Spalte fuer immer "\u{feff}Name".
+            let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+            Ok(csv_tabelle(crate::csv::lesen(text, t)))
+        }
+        "csv_format$" | "csv_format" => {
+            arity!(1, 2);
+            let t = crate::csv::trenner_aus(
+                if a.len() > 1 { Some(need_str(&a[1], "CSV_FORMAT$")?) } else { None },
+                "CSV_FORMAT$")?;
+            let zeilen = csv_aus_array(&a[0], "CSV_FORMAT$")?;
+            Ok(Value::str_rc(&crate::csv::schreiben(&zeilen, t)))
+        }
+        "csv_save" => {
+            arity!(2, 3);
+            let pfad = need_str(&a[0], "CSV_SAVE")?;
+            let t = crate::csv::trenner_aus(
+                if a.len() > 2 { Some(need_str(&a[2], "CSV_SAVE")?) } else { None },
+                "CSV_SAVE")?;
+            let zeilen = csv_aus_array(&a[1], "CSV_SAVE")?;
+            std::fs::write(pfad, crate::csv::schreiben(&zeilen, t))
+                .map_err(|e| format!("CSV_SAVE: {}: {}", pfad, e))?;
+            Ok(Value::Nil)
+        }
+        "csv_row$" | "csv_row" => {
+            arity!(1, 2);
+            let t = crate::csv::trenner_aus(
+                if a.len() > 1 { Some(need_str(&a[1], "CSV_ROW$")?) } else { None },
+                "CSV_ROW$")?;
+            let zeilen = csv_aus_array(&a[0], "CSV_ROW$")?;
+            let felder: Vec<String> = zeilen.into_iter().flatten().collect();
+            Ok(Value::str_rc(&crate::csv::zeile_schreiben(&felder, t)))
         }
 
         // ===== Pruefsummen und Identitaet (WP D) =====

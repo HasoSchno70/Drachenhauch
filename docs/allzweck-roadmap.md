@@ -492,8 +492,13 @@ als Ausgangspunkt:
 
 ## WP J — Kleinkram mit Wirkung
 
-- [ ] CSV lesen/schreiben, mit Anführungszeichen und Trennzeichen korrekt — der
-      häufigste Datenaustausch überhaupt, heute Handarbeit mit `SPLIT$`
+- [x] **CSV lesen/schreiben** (2026-08-19): `CSV_PARSE`/`CSV_LOAD`/
+      `CSV_FORMAT$`/`CSV_SAVE`/`CSV_ROW$`. RFC 4180 mit frei wählbarem
+      Trennzeichen, `\r\n` und `\n`, BOM-Abschnitt und einer Toleranz für
+      kaputte Dateien (fehlende Schluss-Anführung liest bis zum Ende, statt
+      den Import abzubrechen). Zeilen ungleicher Länge werden auf die breiteste
+      aufgefüllt. Neun Rust-`#[test]`s für die Zerlegung, zehn Golden-Tests für
+      den Weg durch die Sprache, [examples/169_csv.dh](../examples/169_csv.dh)
 - [ ] ZIP lesen/schreiben (nach WP B) — Sicherungen, Belegsammlungen, Export
 - [ ] Ein `SET`-Typ **oder** MAP mit INTEGER-Schlüssel. Heute sind Map-Schlüssel
       immer STRING; die Set-Comprehension liefert ersatzweise ein

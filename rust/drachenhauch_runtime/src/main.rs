@@ -25,6 +25,7 @@ mod audio;
 #[cfg(all(feature = "graphics", target_os = "emscripten"))]
 mod web_audio;
 mod chart;
+mod csv;
 mod builtins;
 mod compiler;
 mod parser;
