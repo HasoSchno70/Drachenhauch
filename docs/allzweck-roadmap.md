@@ -500,9 +500,18 @@ als Ausgangspunkt:
       aufgefüllt. Neun Rust-`#[test]`s für die Zerlegung, zehn Golden-Tests für
       den Weg durch die Sprache, [examples/169_csv.dh](../examples/169_csv.dh)
 - [ ] ZIP lesen/schreiben (nach WP B) — Sicherungen, Belegsammlungen, Export
-- [ ] Ein `SET`-Typ **oder** MAP mit INTEGER-Schlüssel. Heute sind Map-Schlüssel
-      immer STRING; die Set-Comprehension liefert ersatzweise ein
-      dedupliziertes TUPLE (steht so in CLAUDE.md) — brauchbar, aber O(n)
+- [x] **MAP beschleunigt** (2026-08-19) — der Punkt war falsch zugeschnitten.
+      Nachgemessen war nicht nur der TUPLE-Behelf O(n), sondern `GbMap` selbst:
+      ein `Vec` mit linearer Suche. 20 000 Einträge kosteten 224 ms zum Füllen
+      und 187 ms zum Lesen; mit einem Hash-Index daneben sind es 8 bzw. 7 ms,
+      und das Wachstum ist linear statt quadratisch. Das half jedem
+      bestehenden Programm, während ein `SET` auf der alten Grundlage genauso
+      langsam gewesen wäre
+- [ ] Ein eigener `SET`-Typ **oder** MAP mit INTEGER-Schlüssel — die Frage
+      stellt sich nach der Beschleunigung neu. Der Geschwindigkeitsgrund ist
+      weg; es bleibt die Frage, ob `SET` als eigener Typ die Absicht besser
+      ausdrückt, und ob INTEGER-Schlüssel das Sparen der `STR$()`-Umwege wert
+      sind
 - [x] `docs/editor.md` (Abschnitt „Debugger") behauptete, der Debugger laufe auf
       dem Python-Tree-Walker. Der ist seit Stufe B entfernt; er läuft längst über
       `dhrt debug`. **Korrigiert 2026-08-17** — und beim Nachmessen der einen

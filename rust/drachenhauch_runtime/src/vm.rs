@@ -2981,7 +2981,7 @@ impl<'p> Vm<'p> {
         match a.get(3) {
             None | Some(Value::Nil) => {}
             Some(Value::Map(m)) => {
-                for (k, v) in m.borrow().entries.iter() {
+                for (k, v) in m.borrow().entries().iter() {
                     match v {
                         Value::Str(s) => anfrage.header.push((k.clone(), s.to_string())),
                         andere => return Err(format!(

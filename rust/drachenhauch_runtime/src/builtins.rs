@@ -883,7 +883,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 Value::Map(m) => {
                     let m = m.borrow();
-                    Ok(Value::Tuple(Rc::new(m.entries.iter().map(|(k, _)| Value::str_rc(k)).collect())))
+                    Ok(Value::Tuple(Rc::new(m.entries().iter().map(|(k, _)| Value::str_rc(k)).collect())))
                 }
                 v => err(format!("Comprehension: nicht iterierbar ({})", v.type_name())),
             }
@@ -1324,25 +1324,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "mapsize" => {
             arity!(1);
-            if let Value::Map(m) = &a[0] { Ok(Value::Int(m.borrow().entries.len() as i64)) }
+            if let Value::Map(m) = &a[0] { Ok(Value::Int(m.borrow().len() as i64)) }
             else { err("MAPSIZE erwartet MAP".to_string()) }
         }
         "mapkeys" => {
             arity!(1);
             if let Value::Map(m) = &a[0] {
-                Ok(new_str_array(m.borrow().entries.iter().map(|(k, _)| k.clone()).collect()))
+                Ok(new_str_array(m.borrow().entries().iter().map(|(k, _)| k.clone()).collect()))
             } else { err("MAPKEYS erwartet MAP".to_string()) }
         }
         "mapclear" => {
             arity!(1);
-            if let Value::Map(m) = &a[0] { m.borrow_mut().entries.clear(); Ok(Value::Nil) }
+            if let Value::Map(m) = &a[0] { m.borrow_mut().clear(); Ok(Value::Nil) }
             else { err("MAPCLEAR erwartet MAP".to_string()) }
         }
         "mapvalues" => {
             arity!(1);
             if let Value::Map(m) = &a[0] {
                 let m = m.borrow();
-                let vals: Vec<Value> = m.entries.iter().map(|(_, v)| v.clone()).collect();
+                let vals: Vec<Value> = m.entries().iter().map(|(_, v)| v.clone()).collect();
                 let n = vals.len() as i64;
                 let mut arr = GbArray::new(m.value_type.clone(), vec![n], || type_default(&m.value_type));
                 for (i, v) in vals.into_iter().enumerate() { arr.cells.set(i, v); }
@@ -1353,7 +1353,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             if let Value::Map(m) = &a[0] {
                 let m = m.borrow();
-                let items: Vec<Value> = m.entries.iter()
+                let items: Vec<Value> = m.entries().iter()
                     .map(|(k, v)| Value::Tuple(Rc::new(vec![Value::str_rc(k), v.clone()]))).collect();
                 let n = items.len() as i64;
                 let mut arr = GbArray::new("tuple".to_string(), vec![n], || Value::Tuple(Rc::new(vec![])));
