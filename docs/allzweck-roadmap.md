@@ -529,6 +529,16 @@ als Ausgangspunkt:
       Debugger (`flush_and_prompt`, `read_input_line` in `vm.rs`). Behoben,
       zwei Tests in `tests/test_dhrt_debug.py` halten es fest
 
+## Python-Parser entfernen (Entwurf liegt vor)
+
+> **[entwurf-python-parser-entfernen.md](entwurf-python-parser-entfernen.md).**
+> Beim Ausführen ist Python längst nicht beteiligt — ein zweiter Parser lebt
+> aber weiter und kostet bei jeder Sprachänderung Doppelarbeit (zuletzt bei
+> `PRIVATE` und den punktierten Typnamen). Gemessen: 3196 Zeilen, zwei echte
+> Nutzer, und der Editor-Rückfall greift nur, wenn `dhrt` gar nicht gebaut ist
+> — also wenn ohnehin nichts läuft. Die Arbeit steckt nicht im Löschen,
+> sondern darin, 11 Testdateien vorher zu triagieren.
+
 ## Plattform
 
 Die CI baut und testet nur unter Windows; für Linux und macOS läuft lediglich
