@@ -99,8 +99,6 @@ class OutputConsole(QWidget):
         self._proc: QProcess | None = None
         self._user_stopped = False
         self._current_run_file: Path | None = None
-        # Temporaere .dhc des aktuellen Native-Runs (nach Finish geloescht).
-        self._native_gbc: Path | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -421,7 +419,6 @@ class OutputConsole(QWidget):
         self._current_run_file = file_path
         self.append(f"▶ Nativ (dhrt): {file_path.name}\n\n", "info")
         self._user_stopped = False
-        self._native_gbc = None
 
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
@@ -478,10 +475,6 @@ class OutputConsole(QWidget):
         if self._proc is not None:
             self._proc.deleteLater()
         self._proc = None
-        # Temporaere .dhc eines Native-Runs aufraeumen.
-        if self._native_gbc is not None:
-            self._native_gbc.unlink(missing_ok=True)
-            self._native_gbc = None
         self.input_entry.setEnabled(False)
         self.input_entry.setPlaceholderText("(kein Programm aktiv)")
         self.input_entry.clear()
