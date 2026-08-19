@@ -426,7 +426,13 @@ VM-Zustand anfassen.
       laut `docs/module-net.md` **non-blocking by default**, `NET_RECV`/`ACCEPT`
       kehren sofort zurück. Nur `NET_TCP_CONNECT` blockiert einmalig, und das
       mit einem festen 5-Sekunden-Deckel. Die Zeile oben war falsch.
-- [ ] **`TASK_START(fnref, arg)` — NICHT umgesetzt, und zwar mit Grund.**
+- [ ] **`TASK_START(fnref, arg)` — noch nicht umgesetzt. Entwurf liegt vor:**
+      [entwurf-task-start.md](entwurf-task-start.md). Er stellt den beiden
+      unten beschriebenen Wegen einen dritten gegenüber: ein eigener
+      `dhrt`-Prozess statt eines Threads. Damit verschwindet das
+      `Send`/`Sync`-Problem ganz, ohne eine Zeile an `Value` — gemessener
+      Preis: 12,3 ms Prozessstart im Median. Drei Fragen sind zu
+      entscheiden (Abschnitt 5).
 
 **Warum GB-Code nicht im Hintergrund laufen kann.** `Value` hält Zeichenketten,
 Arrays, Maps und Objekte durchgehend in `Rc` (28 Stellen in `value.rs`), und
