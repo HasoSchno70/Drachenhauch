@@ -537,7 +537,9 @@ als Ausgangspunkt:
 > `PRIVATE` und den punktierten Typnamen). Gemessen: 3196 Zeilen, zwei echte
 > Nutzer, und der Editor-Rückfall greift nur, wenn `dhrt` gar nicht gebaut ist
 > — also wenn ohnehin nichts läuft. Die Arbeit steckt nicht im Löschen,
-> sondern darin, 11 Testdateien vorher zu triagieren.
+> sondern darin, 11 Testdateien vorher zu triagieren. **Triage erledigt**
+> (Abschnitt 3): es sind ~20 Einzelstellen, nicht 2639 Zeilen — meine erste
+> Schätzung nach Dateigröße lag um eine Größenordnung daneben.
 
 ## Plattform
 

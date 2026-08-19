@@ -62,7 +62,7 @@ mit: `rust\build_runtime.py`"*.
 |---|---|
 | Code | 3196 Zeilen |
 | Parity-Tests | 4 Dateien, 458 Zeilen |
-| weitere betroffene Tests | 11 Dateien, 2639 Zeilen (siehe unten) |
+| weitere betroffene Tests | 11 Dateien, aber nur ~20 Einzelstellen (Abschnitt 3) |
 | laufend | **Doppelarbeit bei jeder Sprachänderung** |
 
 Der letzte Punkt ist der eigentliche. `tests/test_rust_parser_parity.py`
@@ -85,37 +85,71 @@ Die beiden Nutzer werden ersetzt:
   `rust\build_runtime.py`"*. Das ist dieselbe Auskunft, die der Run-Knopf in
   derselben Lage schon gibt.
 
-## 3. Die eigentliche Arbeit: die 11 Testdateien
+## 3. Die Triage der 11 Testdateien (durchgeführt 2026-08-19)
 
-Nicht der Löschbefehl ist der Aufwand, sondern diese Dateien (2639 Zeilen):
+**Meine erste Schätzung war um eine Größenordnung zu hoch.** Ich hatte den
+Aufwand nach Dateigröße bemessen — 2639 Zeilen — und das war falsch. Die
+Dateien benutzen `run_gb` längst und fassen den Parser nur an wenigen Stellen
+an:
 
-```text
-test_animeditor_document.py     test_multi_dim.py
-test_array_literal.py           test_nil_literal.py
-test_byref.py                   test_parser_with_lvalue.py
-test_chex_literal.py            test_user_operator.py
-test_comprehensions_dict_set.py test_formdesigner_document.py
-test_lexer_edge_cases.py
-```
+| Datei | Zeilen | Parser-Stellen | `run_gb`-Stellen |
+|---|---|---|---|
+| `test_formdesigner_document.py` | 881 | 2 | 26 |
+| `test_user_operator.py` | 307 | 1 | 25 |
+| `test_animeditor_document.py` | 282 | 1 | 4 |
+| `test_parser_with_lvalue.py` | 221 | 1 | **0** |
+| `test_array_literal.py` | 216 | 3 | 46 |
+| `test_byref.py` | 203 | 1 | 22 |
+| `test_comprehensions_dict_set.py` | 157 | 3 | 24 |
+| `test_multi_dim.py` | 131 | 4 | 8 |
+| `test_lexer_edge_cases.py` | 95 | 4 | **0** |
+| `test_nil_literal.py` | 86 | 3 | 10 |
+| `test_chex_literal.py` | 60 | 1 | 12 |
 
-Sie zerfallen in zwei Gruppen, und die Trennung ist **vor** dem Löschen zu
-machen:
+Zu tun sind also **rund 20 einzelne Stellen**, nicht 2639 Zeilen. Sie zerfallen
+in vier Arten, und nur eine davon ist heikel:
 
-- **Sprach-Tests**, die zufällig über den Python-Parser gehen (`test_byref`,
-  `test_multi_dim`, `test_nil_literal`, `test_array_literal`,
-  `test_comprehensions_dict_set`, `test_user_operator`, `test_chex_literal`).
-  Sie prüfen echtes Sprachverhalten und gehören auf die `run_gb`-Fixture
-  umgezogen — dann prüfen sie sogar mehr als vorher, nämlich die Runtime, die
-  wirklich läuft.
-- **Parser-Tests**, die die Python-Innereien prüfen (`test_parser_with_lvalue`,
-  `test_lexer_edge_cases`). Sie verschwinden mit ihrem Gegenstand.
-- **Unklar**, weil sie Editor-Dokumente prüfen und den Parser nur nebenbei
-  benutzen: `test_animeditor_document`, `test_formdesigner_document`. Erst
-  ansehen.
+### A. „Es parst überhaupt" — ersetzbar, verliert nichts
 
-**Wer umzieht statt wegwirft, gewinnt Abdeckung.** Wer pauschal löscht,
-verliert sie. Das ist der Grund, warum dieser Schnitt ein eigenes Paket ist
-und kein Nachmittag.
+`test_byref.py:162`, `test_multi_dim.py:114`, `test_animeditor_document.py:237`,
+`test_formdesigner_document.py:495` und `:557`.
+
+Sie rufen den Parser und prüfen nur, dass keine Ausnahme fliegt — bei den
+beiden Editor-Dokumenten, dass **erzeugter** `.dh`-Code gültig ist. Das kann
+`dhrt --check` besser: es prüft zusätzlich den Compiler.
+
+### B. AST-Gestalt — hier steckt die Entscheidung
+
+`test_multi_dim.py:122-124` (`Dim`/`MultiDim`), `test_nil_literal.py:69`
+(`NilLit`), `test_array_literal.py:209/215` (`ArrayLit`/`ListComp`),
+`test_comprehensions_dict_set.py:150/155` (`SetComp`/`DictComp`),
+`test_user_operator.py:19`.
+
+Sie prüfen die **Form des Python-AST** — dass `DIM a, b, c` einen
+`MultiDim`-Knoten ergibt, nicht bloß dass es funktioniert. Beim Umzug auf
+`run_gb` wird daraus ein Verhaltenstest. Das ist **kein gleichwertiger
+Ersatz**, aber vermutlich der richtige: mit einer einzigen Runtime zählt, was
+sie tut, nicht wie ein Baum aussieht, den niemand mehr ausführt. Wer die Form
+wirklich festhalten will, hat `dhrt --ast`.
+
+### C. Token-Ebene
+
+`test_nil_literal.py:64`, `test_chex_literal.py:41` — Behauptungen über den
+Tokenstrom. Gleiche Überlegung wie B; `dhrt --tokens` gibt es.
+
+### D. Verschwinden mit ihrem Gegenstand
+
+`test_parser_with_lvalue.py` (221 Zeilen) und `test_lexer_edge_cases.py`
+(95 Zeilen) benutzen **kein** `run_gb` — sie prüfen ausschließlich
+Python-Innereien und haben ohne sie keinen Gegenstand mehr.
+
+### Reihenfolge
+
+1. **A** umstellen (5 Stellen, mechanisch, kein Verlust).
+2. **B und C** entscheiden: als Verhaltenstest über `run_gb` weiterführen, oder
+   als Gestalt-Test über `dhrt --ast`/`--tokens` neu schreiben. Erst danach
+   anfassen.
+3. **D** löschen — zusammen mit dem Parser, nicht vorher.
 
 ## 4. Was dagegen spricht
 
@@ -129,12 +163,31 @@ Ehrlichkeitshalber, auch wenn ich es für leichter halte:
 - **`--tokens`/`--ast` in Python ist bequem**, wenn man am Parser selbst
   arbeitet. Dieses Argument entfällt mit dem Parser.
 
-## 5. Zu entscheiden
+## 5. Stand und was noch zu entscheiden ist
 
-1. **Schneiden oder behalten?** Die Zahlen oben sind der Stand; die Neigung
-   ist schneiden.
-2. **Falls schneiden: die 11 Testdateien zuerst triagieren** (Abschnitt 3) und
-   die Sprach-Tests auf `run_gb` umziehen — als eigener Commit *vor* dem
-   Löschen, damit die Abdeckung nie unter den heutigen Stand fällt.
-3. **`__main__.py` ganz aufgeben** oder als dünnen Vorspann vor
-   `dhrt --tokens`/`--ast` behalten?
+**Erledigt:**
+
+- **Schritt 1** (2026-08-19): die beiden Produktnutzer sind abgelöst.
+  `error_check.py` sagt ohne `dhrt` ehrlich, dass es keine Diagnose gibt;
+  `__main__.py` reicht `--tokens`/`--ast` an `dhrt` durch. Damit hängt der
+  Parser **nur noch an Tests** — an keinem ausgelieferten Verhalten mehr.
+  Frage 3 von unten hat sich damit von selbst beantwortet.
+- **Schritt 2** (2026-08-19): die Triage steht in Abschnitt 3.
+
+**Offen — eine Frage, und sie ist die einzige inhaltliche:**
+
+Was geschieht mit den Tests der Art **B und C** (AST-Gestalt und Tokenstrom)?
+
+- *Als Verhaltenstest über `run_gb` weiterführen.* Einfach, prüft die Runtime,
+  die wirklich läuft — verliert aber die Zusage, dass `DIM a, b, c` genau
+  einen `MultiDim`-Knoten ergibt.
+- *Als Gestalt-Test über `dhrt --ast` / `dhrt --tokens` neu schreiben.* Hält
+  die Zusage, kostet aber neue Testinfrastruktur für ein JSON-Format, das
+  bisher niemand als Schnittstelle behandelt hat.
+
+Meine Neigung ist die erste: mit einer einzigen Runtime zählt, was sie tut.
+Aber es ist ein echter Verlust, und deshalb steht er hier und wird nicht
+nebenbei entschieden.
+
+Danach ist der Rest mechanisch: Art A umstellen, Art D löschen, die vier
+Quelldateien und vier Parity-Tests entfernen.
