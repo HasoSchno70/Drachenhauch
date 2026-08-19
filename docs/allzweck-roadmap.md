@@ -513,11 +513,14 @@ als Ausgangspunkt:
       und das Wachstum ist linear statt quadratisch. Das half jedem
       bestehenden Programm, während ein `SET` auf der alten Grundlage genauso
       langsam gewesen wäre
-- [ ] Ein eigener `SET`-Typ **oder** MAP mit INTEGER-Schlüssel — die Frage
-      stellt sich nach der Beschleunigung neu. Der Geschwindigkeitsgrund ist
-      weg; es bleibt die Frage, ob `SET` als eigener Typ die Absicht besser
-      ausdrückt, und ob INTEGER-Schlüssel das Sparen der `STR$()`-Umwege wert
-      sind
+- [ ] Mengen — **Entwurf liegt vor**:
+      [entwurf-set-builtins.md](entwurf-set-builtins.md). Nachgemessen kostet
+      der `STR$()`-Umweg 0,35 µs beim Einfügen und 0,20 µs beim Prüfen (je
+      20 000 Operationen, Umwandlung eingerechnet) — das Geschwindigkeits-
+      argument ist damit ganz weg. Übrig bleibt Lesbarkeit, und dafür schlägt
+      der Entwurf sechs Builtins über der vorhandenen MAP vor statt eines
+      neuen Kerntyps: ~60 Zeilen gegen ein Paket in der Größe von WP I.1.
+      Drei Fragen sind zu entscheiden (Abschnitt 4)
 - [x] `docs/editor.md` (Abschnitt „Debugger") behauptete, der Debugger laufe auf
       dem Python-Tree-Walker. Der ist seit Stufe B entfernt; er läuft längst über
       `dhrt debug`. **Korrigiert 2026-08-17** — und beim Nachmessen der einen
