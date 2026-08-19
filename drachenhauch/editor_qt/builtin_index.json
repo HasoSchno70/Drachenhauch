@@ -6699,10 +6699,46 @@
    "module": "core"
   },
   {
+   "name": "SET_ADD",
+   "kind": "core",
+   "signature": "SET_ADD(menge, wert)",
+   "module": "dhrt"
+  },
+  {
+   "name": "SET_CLEAR",
+   "kind": "core",
+   "signature": "SET_CLEAR(menge)",
+   "module": "dhrt"
+  },
+  {
    "name": "SET_FULLSCREEN",
    "kind": "graphics",
    "signature": "SET_FULLSCREEN(fs: BOOLEAN)",
    "module": "core"
+  },
+  {
+   "name": "SET_HAS",
+   "kind": "core",
+   "signature": "SET_HAS(menge, wert) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "SET_ITEMS",
+   "kind": "core",
+   "signature": "SET_ITEMS(menge) AS ARRAY",
+   "module": "dhrt"
+  },
+  {
+   "name": "SET_REMOVE",
+   "kind": "core",
+   "signature": "SET_REMOVE(menge, wert) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "SET_SIZE",
+   "kind": "core",
+   "signature": "SET_SIZE(menge) AS INTEGER",
+   "module": "dhrt"
   },
   {
    "name": "SET_WINDOW_MONITOR",

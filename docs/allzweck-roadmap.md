@@ -513,14 +513,14 @@ als Ausgangspunkt:
       und das Wachstum ist linear statt quadratisch. Das half jedem
       bestehenden Programm, während ein `SET` auf der alten Grundlage genauso
       langsam gewesen wäre
-- [ ] Mengen — **Entwurf liegt vor**:
-      [entwurf-set-builtins.md](entwurf-set-builtins.md). Nachgemessen kostet
-      der `STR$()`-Umweg 0,35 µs beim Einfügen und 0,20 µs beim Prüfen (je
-      20 000 Operationen, Umwandlung eingerechnet) — das Geschwindigkeits-
-      argument ist damit ganz weg. Übrig bleibt Lesbarkeit, und dafür schlägt
-      der Entwurf sechs Builtins über der vorhandenen MAP vor statt eines
-      neuen Kerntyps: ~60 Zeilen gegen ein Paket in der Größe von WP I.1.
-      Drei Fragen sind zu entscheiden (Abschnitt 4)
+- [x] **Mengen** (2026-08-19): `SET_ADD`/`SET_HAS`/`SET_REMOVE`/`SET_SIZE`/
+      `SET_ITEMS`/`SET_CLEAR` über einer `MAP OF INTEGER` — kein eigener Typ.
+      Nachgemessen kostete der `STR$()`-Umweg nur 0,35 µs je Aufnahme, das
+      Geschwindigkeitsargument war also weg; es ging um Lesbarkeit. Eine Menge
+      führt eine Elementart (INTEGER **oder** STRING), weil `5` und `"5"` sonst
+      auf denselben Schlüssel fielen und die Menge still ein Element statt
+      zwei hätte. Entwurf mit den Alternativen:
+      [entwurf-set-builtins.md](entwurf-set-builtins.md); 12 Golden-Tests
 - [x] `docs/editor.md` (Abschnitt „Debugger") behauptete, der Debugger laufe auf
       dem Python-Tree-Walker. Der ist seit Stufe B entfernt; er läuft längst über
       `dhrt debug`. **Korrigiert 2026-08-17** — und beim Nachmessen der einen

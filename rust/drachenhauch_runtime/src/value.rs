@@ -493,11 +493,38 @@ pub struct GbMap {
     pub value_type: String,
     eintraege: Vec<(String, Value)>,
     index: HashMap<String, usize>,
+    /// Elementart, wenn die Map als MENGE benutzt wird (`SET_*`): `'i'` oder
+    /// `'s'`, gesetzt von der ersten Aufnahme.
+    ///
+    /// Schluessel sind immer Zeichenketten -- ohne diese Merkung fielen
+    /// `SET_ADD(m, 5)` und `SET_ADD(m, "5")` auf denselben Eintrag, und die
+    /// Menge haette danach ein Element statt zwei. Statt das hinzunehmen legt
+    /// die erste Aufnahme die Art fest; jede spaetere Abweichung meldet einen
+    /// Fehler. Nebenbei weiss `SET_ITEMS` dadurch, ob es Zahlen oder Texte
+    /// zurueckgeben muss.
+    set_art: Option<char>,
 }
 
 impl GbMap {
     pub fn new(value_type: String) -> Self {
-        GbMap { value_type, eintraege: Vec::new(), index: HashMap::new() }
+        GbMap { value_type, eintraege: Vec::new(), index: HashMap::new(),
+                set_art: None }
+    }
+
+    /// Elementart der Menge (None = noch leer bzw. nie als Menge benutzt).
+    pub fn set_art(&self) -> Option<char> { self.set_art }
+
+    /// Elementart festlegen oder pruefen. Fehler, wenn sie schon anders ist.
+    pub fn set_art_pruefen(&mut self, art: char, fn_: &str) -> Result<(), String> {
+        match self.set_art {
+            None => { self.set_art = Some(art); Ok(()) }
+            Some(a) if a == art => Ok(()),
+            Some(a) => Err(format!(
+                "{}: diese Menge enthaelt {}, hier kam {}. Eine Menge fuehrt \
+                 eine Elementart -- die erste Aufnahme legt sie fest.",
+                fn_, if a == 'i' { "Zahlen" } else { "Texte" },
+                if art == 'i' { "eine Zahl" } else { "ein Text" })),
+        }
     }
 
     /// Eintraege in Einfuege-Reihenfolge, nur lesend.
@@ -540,6 +567,9 @@ impl GbMap {
     pub fn clear(&mut self) {
         self.eintraege.clear();
         self.index.clear();
+        // Mit dem letzten Element geht auch die Elementart -- sonst koennte
+        // eine geleerte Menge nie die Art wechseln.
+        self.set_art = None;
     }
 }
 

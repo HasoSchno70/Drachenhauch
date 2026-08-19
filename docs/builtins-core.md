@@ -390,6 +390,56 @@ will, nimmt `ZIP_WRITE` und gibt die Namen selbst an (`unter/notiz.txt`).
 Komprimiert wird mit Deflate. `ZIP_WRITE` und `ZIP_CREATE` legen das Archiv
 jeweils **neu** an; ein Anhängen an ein bestehendes Archiv gibt es nicht.
 
+## Mengen
+
+Eine Menge ist eine `MAP OF INTEGER`, deren Werte niemanden interessieren —
+kein eigener Typ. Die Befehle nehmen dir den `STR$()`-Umweg und den
+Dummy-Wert ab:
+
+```basic
+DIM gesehen AS MAP OF INTEGER
+
+SET_ADD(gesehen, id)
+IF SET_HAS(gesehen, id) THEN PRINT "kenne ich schon"
+PRINT SET_SIZE(gesehen)
+```
+
+| Funktion | Zweck |
+|---|---|
+| `SET_ADD(menge, wert)` | aufnehmen; schon drin = kein Effekt |
+| `SET_HAS(menge, wert)` → BOOLEAN | Zugehörigkeit |
+| `SET_REMOVE(menge, wert)` → BOOLEAN | entfernen; `TRUE` wenn es drin war |
+| `SET_SIZE(menge)` → INTEGER | Anzahl |
+| `SET_ITEMS(menge)` → ARRAY | Elemente in Aufnahme-Reihenfolge |
+| `SET_CLEAR(menge)` | leeren |
+
+**Eine Menge führt eine Elementart.** Elemente dürfen `INTEGER` **oder**
+`STRING` sein, aber nicht gemischt — die erste Aufnahme legt die Art fest,
+jede spätere Abweichung meldet einen Fehler:
+
+```basic
+SET_ADD(m, 5)
+SET_ADD(m, "5")     ' Fehler: diese Menge enthält Zahlen
+```
+
+Das ist Absicht. Intern sind Schlüssel immer Zeichenketten; ohne diese Regel
+fielen `5` und `"5"` auf denselben Eintrag, und die Menge hätte danach ein
+Element statt zwei — still und ohne Hinweis. Auch `SET_HAS` prüft die Art:
+`SET_HAS(zahlen, "5")` ist ein Tippfehler, keine Frage, und stumm `FALSE` zu
+liefern wäre die unfreundlichste Antwort darauf.
+
+Dadurch weiß `SET_ITEMS` auch, was es zurückgeben muss: `ARRAY OF INTEGER`
+bei einer Zahlen-Menge, `ARRAY OF STRING` bei einer Text-Menge. Nach
+`SET_CLEAR` ist die Art wieder offen.
+
+**Die Reihenfolge ist zugesagt**, nicht zufällig: `SET_ITEMS` liefert die
+Elemente so, wie sie aufgenommen wurden. Damit sind Ausgaben reproduzierbar.
+
+Weil eine Menge eine MAP bleibt, funktionieren `MAPSIZE`, `MAPKEYS` und die
+übrigen Map-Befehle weiterhin darauf — nützlich zum Nachsehen, aber `MAPPUT`
+mit einem eigenen Wert umgeht die Elementart-Prüfung. Wer eine Menge will,
+bleibt bei den `SET_`-Befehlen.
+
 ## CSV
 
 Der häufigste Datenaustausch überhaupt — und mit `SPLIT$` nicht richtig zu

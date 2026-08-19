@@ -2497,6 +2497,70 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
 
 
+
+        // ===== Mengen (WP J) =====
+        // Kein eigener Typ, sondern sechs Befehle ueber einer MAP OF INTEGER,
+        // deren Werte niemanden interessieren. Gemessen kostet der
+        // STR$()-Umweg, den man sonst von Hand geht, 0,35 us je Aufnahme --
+        // es ging hier nie um Tempo, sondern darum, dass
+        // `MAPPUT(m, STR$(x), 1)` die Absicht verdeckt.
+        // Siehe docs/entwurf-set-builtins.md.
+        "set_add" | "set_has" | "set_remove" => {
+            arity!(2);
+            let anz = name.to_uppercase();
+            let m = match &a[0] {
+                Value::Map(m) => m,
+                _ => return err(format!("{}: erwartet eine MAP OF INTEGER als Menge", anz)),
+            };
+            let (art, key) = match &a[1] {
+                Value::Int(i) => ('i', i.to_string()),
+                Value::Str(s) => ('s', s.to_string()),
+                andere => return err(format!(
+                    "{}: Elemente sind INTEGER oder STRING, nicht {}",
+                    anz, andere.type_name())),
+            };
+            let mut m = m.borrow_mut();
+            // Auch beim Nachfragen pruefen: `SET_HAS(zahlen, "5")` ist ein
+            // Tippfehler, keine Frage -- und stumm FALSE zu liefern waere die
+            // unfreundlichste Antwort darauf.
+            m.set_art_pruefen(art, &anz)?;
+            match name {
+                "set_add" => { m.put(key, Value::Int(1)); Ok(Value::Nil) }
+                "set_has" => Ok(Value::Bool(m.get(&key).is_some())),
+                _ => Ok(Value::Bool(m.remove(&key))),
+            }
+        }
+        "set_size" => {
+            arity!(1);
+            match &a[0] {
+                Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
+                _ => err("SET_SIZE: erwartet eine MAP OF INTEGER als Menge"),
+            }
+        }
+        "set_clear" => {
+            arity!(1);
+            match &a[0] {
+                Value::Map(m) => { m.borrow_mut().clear(); Ok(Value::Nil) }
+                _ => err("SET_CLEAR: erwartet eine MAP OF INTEGER als Menge"),
+            }
+        }
+        "set_items" => {
+            arity!(1);
+            let m = match &a[0] {
+                Value::Map(m) => m.borrow(),
+                _ => return err("SET_ITEMS: erwartet eine MAP OF INTEGER als Menge"),
+            };
+            // Aufnahme-Reihenfolge ist zugesagt, nicht zufaellig: `eintraege`
+            // haelt sie, und ein Test haelt die Zusage fest.
+            let schluessel: Vec<String> = m.entries().iter().map(|(k, _)| k.clone()).collect();
+            if m.set_art() == Some('i') {
+                Ok(new_int_array(schluessel.iter()
+                    .map(|k| k.parse::<i64>().unwrap_or(0)).collect()))
+            } else {
+                Ok(new_str_array(schluessel))
+            }
+        }
+
         // ===== ZIP (WP J) =====
         // Beim Entpacken geht jeder Eintragsname durch eine Zip-Slip-Pruefung
         // (siehe zipdatei.rs) -- ein Archiv darf `../../autoexec.bat` heissen.
