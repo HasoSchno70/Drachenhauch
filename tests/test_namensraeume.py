@@ -12,6 +12,8 @@ Debugger bleiben unberuehrt.
 """
 import subprocess
 
+NL = chr(10)
+
 
 def _lauf(dhrt_pfad, tmp_path, dateien: dict, haupt="main.dh"):
     """Schreibt die Dateien und laesst `haupt` laufen. Liefert (stdout, stderr)."""
@@ -103,18 +105,18 @@ def test_unbekannter_name_im_namensraum(dhrt_pfad, tmp_path):
     assert "main.dh:2" in err, err
 
 
-def test_klasse_im_namensraum_meldet_klar(dhrt_pfad, tmp_path):
-    """I.1 kann noch keine Typen -- die Meldung muss das SAGEN, nicht bloss
-    behaupten, den Namen gebe es nicht."""
+def test_klassenname_allein_im_ausdruck_meldet(dhrt_pfad, tmp_path):
+    """Seit I.2 ist `k.Punkt` als TYP gueltig. In Ausdrucks-Position bleibt er
+    sinnlos -- gemeint ist fast immer `NEW k.Punkt()`, und genau darauf soll
+    die Meldung zeigen."""
     _, err = _lauf(dhrt_pfad, tmp_path, {
-        "k.dh": "CLASS Punkt\n    DIM x AS INTEGER\nEND CLASS\n",
-        "main.dh": 'IMPORT "k.dh" AS k\nDIM p AS INTEGER\np = k.Punkt\n',
+        "k.dh": "CLASS Punkt" + NL + "    DIM x AS INTEGER" + NL + "END CLASS" + NL,
+        "main.dh": 'IMPORT "k.dh" AS k' + NL + "DIM n AS INTEGER" + NL + "n = k.Punkt" + NL,
     })
-    assert "WP I.2" in err, err
-    # Die Meldung muss den Weg nennen, der HEUTE funktioniert -- nicht nur
-    # den schwereren Ausweg ueber einen zweiten, flachen IMPORT.
-    assert "LIEFERT" in err, err
-
+    assert "ist eine Klasse" in err, err
+    # Der Lexer schreibt Bezeichner klein -- die Meldung kennt die
+    # urspruengliche Schreibweise gar nicht.
+    assert "new k.punkt" in err.lower(), err
 
 def test_interner_name_leckt_nicht_in_meldungen(dhrt_pfad, tmp_path):
     """Der Nutzer darf `mathe@quadrat` nie zu sehen bekommen -- er hat den
@@ -264,3 +266,91 @@ def test_funktion_darf_einen_modul_typ_liefern(dhrt_pfad, tmp_path):
         "main.dh": 'IMPORT "k.dh" AS k\nPRINT k.Neu(3).x\n',
     })
     assert out.strip() == "3", (out, err)
+
+
+# --- WP I.2: Typen aus dem Namensraum ------------------------------------
+
+KLASSE = ("CLASS Punkt\n"
+          "    DIM x AS INTEGER\n"
+          "    DIM y AS INTEGER\n"
+          "END CLASS\n"
+          "FUNCTION Neu(a AS INTEGER) AS Punkt\n"
+          "    DIM p AS Punkt\n"
+          "    p = NEW Punkt()\n"
+          "    p.x = a\n"
+          "    RETURN p\n"
+          "END FUNCTION\n")
+
+
+def test_dim_as_qualifizierter_typ(dhrt_pfad, tmp_path):
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": KLASSE,
+        "main.dh": ('IMPORT "k.dh" AS k\n'
+                    "DIM p AS k.Punkt\n"
+                    "p = NEW k.Punkt()\n"
+                    "p.x = 7\n"
+                    "PRINT p.x\n"),
+    })
+    assert out.strip() == "7", (out, err)
+
+
+def test_gleiche_klasse_in_beiden_dateien(dhrt_pfad, tmp_path):
+    """Der Zweck der Uebung: zwei Klassen `Punkt`, nebeneinander."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": KLASSE,
+        "main.dh": ('IMPORT "k.dh" AS k\n'
+                    "CLASS Punkt\n"
+                    "    DIM x AS INTEGER\n"
+                    "END CLASS\n"
+                    "DIM a AS Punkt\n"
+                    "DIM b AS k.Punkt\n"
+                    "a = NEW Punkt()\n"
+                    "b = NEW k.Punkt()\n"
+                    "a.x = 1\n"
+                    "b.x = 2\n"
+                    'PRINT STR$(a.x) + "," + STR$(b.x)\n'),
+    })
+    assert out.strip() == "1,2", (out, err)
+
+
+def test_modul_nutzt_die_eigene_klasse_unqualifiziert(dhrt_pfad, tmp_path):
+    """Innerhalb der Datei bleibt `Punkt` schlicht `Punkt` -- auch als Typ,
+    als Rueckgabetyp und hinter `NEW`."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": KLASSE,
+        "main.dh": 'IMPORT "k.dh" AS k\nPRINT k.Neu(5).x\n',
+    })
+    assert out.strip() == "5", (out, err)
+
+
+def test_array_of_qualifiziertem_typ(dhrt_pfad, tmp_path):
+    """`array:` und `map:` koennen den Typnamen schachteln -- der Aufloeser
+    muss durch das Praefix hindurchgreifen."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": KLASSE,
+        "main.dh": ('IMPORT "k.dh" AS k\n'
+                    "DIM feld AS ARRAY OF k.Punkt\n"
+                    "DIM p AS k.Punkt\n"
+                    "p = NEW k.Punkt()\n"
+                    "p.x = 9\n"
+                    "PRINT p.x\n"),
+    })
+    assert out.strip() == "9", (out, err)
+
+
+def test_unbekannte_klasse_meldet_klar(dhrt_pfad, tmp_path):
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "k.dh": KLASSE,
+        "main.dh": 'IMPORT "k.dh" AS k\nDIM p AS k.Gibtsnicht\n',
+    })
+    assert "kennt keine Klasse" in err, err
+
+
+def test_enum_meldet_und_verweist_auf_i3(dhrt_pfad, tmp_path):
+    """ENUMs sind noch nicht dran -- die Meldung muss das SAGEN, statt zu
+    behaupten, den Namen gebe es nicht."""
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": "ENUM Farbe\n    ROT\n    BLAU\nEND ENUM\n",
+        "main.dh": 'IMPORT "e.dh" AS e\nDIM f AS e.Farbe\n',
+    })
+    assert "WP I.3" in err, err

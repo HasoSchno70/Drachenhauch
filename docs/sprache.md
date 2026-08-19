@@ -1101,22 +1101,24 @@ END FUNCTION
 `PRIVATE` steht vor `SUB`, `FUNCTION`, `DIM` oder `CONST`. In einer Datei ohne
 `AS` ist es ein wirkungsloser Marker.
 
-**Noch nicht dabei:** Klassen, Structs und ENUMs lassen sich nicht über den
-Namensraum **benennen** — `DIM p AS mathe.Punkt` und `NEW mathe.Punkt()` gehen
-noch nicht. Der Zugriff meldet das ausdrücklich, statt zu behaupten, den Namen
-gebe es nicht.
-
-Eine Funktion der Datei, die so einen Wert **liefert**, funktioniert dagegen
-schon heute — inklusive Feldzugriff auf das Ergebnis:
+**Klassen und Structs** gehen ebenfalls über den Namensraum — als Typ und
+hinter `NEW`:
 
 ```basic
 IMPORT "mathe.dh" AS mathe
-PRINT mathe.NeuerPunkt(3, 4).x      ' 3
+
+DIM p AS mathe.Punkt
+p = NEW mathe.Punkt()
+p.x = 7
 ```
 
-Damit kommt man ohne den Typnamen aus. Wer ihn wirklich selbst hinschreiben
-muss, importiert die Datei zusätzlich ohne `AS`; dann steht er flach zur
-Verfügung.
+Damit dürfen beide Dateien eine Klasse `Punkt` haben. `ARRAY OF mathe.Punkt`
+und `MAP OF mathe.Punkt` funktionieren ebenso. Innerhalb von `mathe.dh` heisst
+die Klasse weiterhin schlicht `Punkt`.
+
+**Noch nicht dabei: ENUMs.** `DIM f AS mathe.Farbe` meldet einen Fehler, der
+auf diese Lücke hinweist. Wer ein ENUM aus der Datei braucht, importiert sie
+zusätzlich ohne `AS`; dann steht es flach zur Verfügung.
 
 **Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
 j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien

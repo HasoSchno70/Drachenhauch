@@ -85,10 +85,12 @@ struct Modul {
     /// erreichbar. Umbenannt wird trotzdem -- privat heisst unsichtbar, nicht
     /// unbenannt.
     privat: HashSet<String>,
-    /// Klassen/Enums/Structs. In I.1 NICHT namensraumfaehig; sie stehen hier
-    /// nur, damit `mathe.Punkt` eine praezise Meldung bekommt statt
-    /// "kennt keinen Namen".
-    typen: HashSet<String>,
+    /// Klassen und Structs. Seit I.2 namensraumfaehig: `DIM p AS mathe.Punkt`
+    /// und `NEW mathe.Punkt()`.
+    klassen: HashSet<String>,
+    /// ENUMs. Noch nicht namensraumfaehig (I.3) -- sie stehen hier, damit
+    /// `mathe.Farbe` eine praezise Meldung bekommt statt "kennt keinen Namen".
+    enums: HashSet<String>,
 }
 
 /// Alle Top-Level-Deklarationen je Alias einsammeln.
@@ -150,9 +152,8 @@ fn sammeln(
                     }
                 }
             }
-            Node::ClassDecl { name, .. } | Node::EnumDecl { name, .. } => {
-                eintrag.typen.insert(name.to_lowercase());
-            }
+            Node::ClassDecl { name, .. } => { eintrag.klassen.insert(name.to_lowercase()); }
+            Node::EnumDecl { name, .. } => { eintrag.enums.insert(name.to_lowercase()); }
             _ => {}
         }
     }
@@ -244,6 +245,51 @@ impl<'a> Lauf<'a> {
         if m.namen.contains(&low) { Some(intern(alias, &low)) } else { None }
     }
 
+    /// Einen TYPNAMEN aufloesen (WP I.2).
+    ///
+    /// Drei Faelle, und `array:`/`map:` koennen sie beliebig tief schachteln
+    /// (`ARRAY OF mathe.Punkt` kommt als `array:mathe.Punkt` herein):
+    ///   - `alias.Klasse` von aussen  -> interner Name,
+    ///   - eigene Klasse im Modul     -> interner Name,
+    ///   - alles andere               -> unveraendert (INTEGER, STRING, ...).
+    fn typ(&mut self, name: &mut String) {
+        for praefix in ["array:", "map:"] {
+            if let Some(rest) = name.strip_prefix(praefix) {
+                let mut inner = rest.to_string();
+                self.typ(&mut inner);
+                *name = format!("{}{}", praefix, inner);
+                return;
+            }
+        }
+        if let Some((alias_teil, typ_teil)) = name.split_once('.') {
+            let alias = alias_teil.to_lowercase();
+            let low = typ_teil.to_lowercase();
+            if !self.datei_alias.values().any(|a| *a == alias) {
+                return;             // kein Namensraum -- der Compiler meldet es
+            }
+            match self.module.get(&alias) {
+                Some(m) if m.klassen.contains(&low) => *name = intern(&alias, &low),
+                Some(m) if m.enums.contains(&low) => {
+                    self.fehler.get_or_insert((self.zeile, format!(
+                        "{}.{} ist ein ENUM -- ENUMs lassen sich noch nicht als Typ \
+                         ueber den Namensraum benennen (WP I.3).", alias_teil, typ_teil)));
+                }
+                _ => {
+                    self.fehler.get_or_insert((self.zeile, format!(
+                        "{} kennt keine Klasse {}.", alias_teil, typ_teil)));
+                }
+            }
+            return;
+        }
+        // Unqualifiziert INNERHALB des Moduls: die eigene Klasse mitziehen.
+        if let Some(alias) = self.hier.clone() {
+            let low = name.to_lowercase();
+            if self.module.get(&alias).map(|m| m.klassen.contains(&low)).unwrap_or(false) {
+                *name = intern(&alias, &low);
+            }
+        }
+    }
+
     fn namen(&mut self, name: &mut String) {
         if let Some(neu) = self.eigen(name) {
             *name = neu;
@@ -274,7 +320,15 @@ impl<'a> Lauf<'a> {
         }
         let low = name.to_lowercase();
         let m = self.module.get(&alias)?;
-        if m.typen.contains(&low) {
+        if m.klassen.contains(&low) {
+            // In AUSDRUCKS-Position ist ein blosser Klassenname trotzdem nichts
+            // Sinnvolles -- gemeint ist fast immer `NEW alias.Klasse()`.
+            self.fehler.get_or_insert((self.zeile, format!(
+                "{}.{} ist eine Klasse. Zum Erzeugen `NEW {}.{}(...)`, als Typ \
+                 `DIM x AS {}.{}`.", alias, name, alias, name, alias, name)));
+            return None;
+        }
+        if m.enums.contains(&low) {
             self.fehler.get_or_insert((self.zeile, format!(
                 concat!("{}.{} ist eine Klasse oder ein ENUM -- die lassen sich noch ",
                             "nicht ueber den Namensraum BENENNEN (WP I.2). Eine Funktion ",
@@ -355,20 +409,28 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         // --- Namen, die zum Modul gehoeren koennen ------------------------
         Identifier(name) => l.namen(name),
         Assign { name, value } => { l.namen(name); knoten(l, value); }
-        Dim { name, array_dims, .. } => {
+        Dim { name, type_name, array_dims } => {
             l.namen(name);
+            l.typ(type_name);
             if let Some(ds) = array_dims { for d in ds { knoten(l, d); } }
         }
-        Const { name, value, .. } => { l.namen(name); knoten(l, value); }
+        Const { name, type_name, value } => {
+            l.namen(name);
+            if let Some(t) = type_name { l.typ(t); }
+            knoten(l, value);
+        }
         MultiDim { dims } => { for d in dims { knoten(l, d); } }
 
-        FunctionDecl { name, params, body, .. } => {
+        FunctionDecl { name, params, return_type, body } => {
             l.namen(name);
+            l.typ(return_type);
+            for p in params.iter_mut() { l.typ(&mut p.type_name); }
             let ps = params.clone();
             mit_lokalen(l, &ps, body);
         }
         SubDecl { name, params, body } => {
             l.namen(name);
+            for p in params.iter_mut() { l.typ(&mut p.type_name); }
             let ps = params.clone();
             mit_lokalen(l, &ps, body);
         }
@@ -400,7 +462,10 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         ArrayLit(items) => { for i in items { knoten(l, i); } }
         TupleLit { elements } => { for e in elements { knoten(l, e); } }
         NamedArg { value, .. } => knoten(l, value),
-        New { args: Some(args), .. } => { for a in args { knoten(l, a); } }
+        New { class_name, args } => {
+            l.typ(class_name);
+            if let Some(args) = args { for a in args { knoten(l, a); } }
+        }
         IndexAccess { target, indices } => {
             knoten(l, target); for i in indices { knoten(l, i); }
         }
@@ -481,7 +546,26 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         // angefasst, damit Felder und Methoden sich nicht mit Modulnamen
         // vermischen. Ein Zugriff `alias.Klasse` bekommt in `qualifiziert`
         // eine eigene Meldung.
-        ClassDecl { .. } | EnumDecl { .. } => {}
+        ClassDecl { name, parent, fields, methods, properties, .. } => {
+            if let Some(alias) = l.hier.clone() {
+                let low = name.to_lowercase();
+                if l.module.get(&alias).map(|m| m.klassen.contains(&low)).unwrap_or(false) {
+                    *name = intern(&alias, &low);
+                }
+            }
+            if let Some(pa) = parent { l.typ(pa); }
+            // Felder: nur die Typen, nicht die Feldnamen -- die gehoeren der
+            // Klasse und haben mit dem Modul-Namensraum nichts zu tun.
+            for f in fields.iter_mut() {
+                if let Dim { type_name, .. } = f { l.typ(type_name); }
+                if let Stmt { body, .. } = f {
+                    if let Dim { type_name, .. } = body.as_mut() { l.typ(type_name); }
+                }
+            }
+            for m in methods.iter_mut() { knoten(l, m); }
+            for pr in properties.iter_mut() { knoten(l, pr); }
+        }
+        EnumDecl { .. } => {}
         _ => {}
     }
 }

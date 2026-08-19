@@ -559,6 +559,16 @@ impl Parser {
         if t == Tt::Ident {
             let v = sval(self.peek(0));
             self.pos += 1;
+            // WP I.2: qualifizierter Typname `DIM p AS mathe.Punkt`. Der Parser
+            // weiss nichts von Namensraeumen -- er reicht den Punkt-Namen
+            // unveraendert weiter, `namensraum.rs` bildet ihn ab. Passt kein
+            // Alias, meldet der Compiler wie gehabt einen unbekannten Typ.
+            if self.tt(0) == Tt::Dot && self.tt(1) == Tt::Ident {
+                self.pos += 1;
+                let teil = sval(self.peek(0));
+                self.pos += 1;
+                return Ok(format!("{}.{}", v, teil));
+            }
             if self.enum_names.contains(&v.to_lowercase()) { return Ok("integer".into()); }
             return Ok(v);
         }
@@ -1201,7 +1211,14 @@ impl Parser {
 
     fn new_expr(&mut self) -> R<Node> {
         self.expect(Tt::New, "")?;
-        let name = sval(&self.expect(Tt::Ident, "Erwartet Klassenname nach NEW")?);
+        let mut name = sval(&self.expect(Tt::Ident, "Erwartet Klassenname nach NEW")?);
+        // WP I.2: `NEW mathe.Punkt()` -- wie bei `parse_type` bleibt der
+        // Punkt-Name stehen, `namensraum.rs` bildet ihn ab.
+        if self.tt(0) == Tt::Dot && self.tt(1) == Tt::Ident {
+            self.pos += 1;
+            name = format!("{}.{}", name, sval(self.peek(0)));
+            self.pos += 1;
+        }
         let mut args = None;
         if self.matches(Tt::Lparen) {
             args = Some(self.call_args()?);

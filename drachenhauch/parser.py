@@ -763,6 +763,16 @@ class Parser:
             # und VM keinen besonderen Typ-Mechanismus brauchen. Member-Werte
             # sind sowieso Integer.
             type_name = str(type_tok.value)
+            # WP I.2: qualifizierter Typname `DIM p AS mathe.Punkt`. Der Parser
+            # weiss nichts von Namensraeumen und reicht den Punkt-Namen weiter;
+            # dhrt bildet ihn in namensraum.rs ab. Hier muss er nur durchgehen,
+            # sonst zeigt der Editor einen Fehler, den es nicht gibt.
+            if (self._peek().type == TokenType.DOT
+                    and self._peek(1).type == TokenType.IDENT):
+                self.pos += 1
+                teil = str(self._peek().value)
+                self.pos += 1
+                return type_name + "." + teil
             if type_name.lower() in self._enum_names:
                 return "integer"
             return type_name
@@ -1582,11 +1592,18 @@ class Parser:
     def _new_expr(self):
         self._expect(TokenType.NEW)
         name_tok = self._expect(TokenType.IDENT, "Erwartet Klassenname nach NEW")
+        klassenname = str(name_tok.value)
+        # WP I.2: `NEW mathe.Punkt()` -- wie beim Typnamen nur durchreichen.
+        if (self._peek().type == TokenType.DOT
+                and self._peek(1).type == TokenType.IDENT):
+            self.pos += 1
+            klassenname = klassenname + "." + str(self._peek().value)
+            self.pos += 1
         args = None
         if self._match(TokenType.LPAREN):
             args = self._call_args()
             self._expect(TokenType.RPAREN)
-        return New(name_tok.value, args)
+        return New(klassenname, args)
 
     # ---- Ausdruecke --------------------------------------------------
     # Jede Verschachtelungsebene kostet ~12 Stack-Frames durch die feste
