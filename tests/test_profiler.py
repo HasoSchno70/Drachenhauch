@@ -29,21 +29,34 @@ def test_basic_counts_and_output():
 
 
 def test_hot_line_ranks_first():
+    """Die teuerste Zeile muss vorne stehen -- und dafuer muss es sie geben.
+
+    Frueher stand hier `x = x + 1` in einer FOR-Schleife. Gemessen: Zeile 5
+    0,3 ms, Zeile 4 (das FOR selbst) 0,2 ms -- beide laufen ja gleich oft, und
+    der Abstand betrug 0,1 ms bei unter einer Millisekunde Gesamtlaufzeit.
+    Unter `-n auto` kippte die Reihenfolge deshalb gelegentlich, und der Test
+    galt als flackernd. Er war es nicht: er hatte schlicht keine heisse Zeile,
+    ueber deren Rang sich etwas aussagen liesse.
+
+    Jetzt macht der Schleifenrumpf echte Arbeit (drei Umwandlungen, zwei
+    Verkettungen). Gemessener Abstand zur naechsten Zeile: Faktor ~14 statt
+    ~1,5. Der Abstand wird mitgeprueft -- erodiert er, faellt das auf, statt
+    sich als Flackern zu tarnen.
+    """
+    Q = chr(34)
     src = (
         "DIM i AS INTEGER\n"
-        "DIM x AS INTEGER\n"
-        "x = 0\n"
-        "FOR i = 1 TO 5000\n"
-        "    x = x + 1\n"
+        "DIM s AS STRING\n"
+        "FOR i = 1 TO 3000\n"
+        "    s = UPPER$(STR$(i)) + " + Q + "-" + Q + " + LOWER$(STR$(i * 7))\n"
         "NEXT\n"
     )
     r = run_profile(src, ".")
-    # Zeitlich teuerste Zeile ist die Schleifen-Innenzeile.
-    assert r.lines[0].line == 5
-    # ~5000 Durchlaeufe; bei zeilenbasiertem Profiling kann die letzte Schleife
-    # (als letztes Statement) die Body-Zeile einmal extra zaehlen -> >= 5000.
-    assert r.lines[0].count >= 5000
-
+    assert r.lines[0].line == 4
+    assert r.lines[0].count >= 3000
+    # Vorsprung, nicht Zufall: mindestens dreifach vor der naechsten Zeile.
+    assert r.lines[0].time > 3 * r.lines[1].time, [
+        (l.line, l.time) for l in r.lines[:3]]
 
 def test_function_aggregation_and_calls():
     src = (
