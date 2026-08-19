@@ -1116,9 +1116,17 @@ Damit dürfen beide Dateien eine Klasse `Punkt` haben. `ARRAY OF mathe.Punkt`
 und `MAP OF mathe.Punkt` funktionieren ebenso. Innerhalb von `mathe.dh` heisst
 die Klasse weiterhin schlicht `Punkt`.
 
-**Noch nicht dabei: ENUMs.** `DIM f AS mathe.Farbe` meldet einen Fehler, der
-auf diese Lücke hinweist. Wer ein ENUM aus der Datei braucht, importiert sie
-zusätzlich ohne `AS`; dann steht es flach zur Verfügung.
+**ENUMs** ebenso — mit zwei Punkten hintereinander:
+
+```basic
+IMPORT "mathe.dh" AS mathe
+
+DIM f AS mathe.Farbe
+f = mathe.Farbe.ROT
+```
+
+Als Typ ist ein ENUM ein `INTEGER`, wie ein flaches ENUM auch. Damit können
+beide Dateien ein `Farbe` haben, ohne sich in die Quere zu kommen.
 
 **Nicht zu verwechseln** mit `AS` an einem eingebauten Modul: `IMPORT "json" AS
 j` ersetzt dort das Präfix (`J_PARSE` statt `JSON_PARSE`). Für `.dh`-Dateien

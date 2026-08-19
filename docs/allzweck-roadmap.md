@@ -451,7 +451,7 @@ Beispiel: `examples/168_hintergrund.dh` — Abfrage und Prozess laufen, die
 Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 `docs/builtins-core.md`.
 
-## WP I — Namensräume und Module (I.1, I.2, I.4 ✅ ERLEDIGT 2026-08-19)
+## WP I — Namensräume und Module (✅ VOLLSTÄNDIG ERLEDIGT 2026-08-19)
 
 > **Entwurf liegt vor: [entwurf-namensraeume.md](entwurf-namensraeume.md).**
 > Dort steht der Befund mit Messungen, ein Vorschlag für Syntax und

@@ -88,8 +88,10 @@ struct Modul {
     /// Klassen und Structs. Seit I.2 namensraumfaehig: `DIM p AS mathe.Punkt`
     /// und `NEW mathe.Punkt()`.
     klassen: HashSet<String>,
-    /// ENUMs. Noch nicht namensraumfaehig (I.3) -- sie stehen hier, damit
-    /// `mathe.Farbe` eine praezise Meldung bekommt statt "kennt keinen Namen".
+    /// ENUMs. Seit I.3 namensraumfaehig: `mathe.Farbe.ROT` -- zwei Punkte
+    /// hintereinander. Der Compiler sieht davon nichts Neues: der innere Teil
+    /// wird zu einem gewoehnlichen Bezeichner (`mathe@farbe`), der aeussere
+    /// bleibt der Member-Zugriff, den er von flachen ENUMs schon kennt.
     enums: HashSet<String>,
 }
 
@@ -242,7 +244,15 @@ impl<'a> Lauf<'a> {
             return None;
         }
         let m = self.module.get(alias)?;
-        if m.namen.contains(&low) { Some(intern(alias, &low)) } else { None }
+        // Auch die eigenen ENUMs: `Farbe.ROT` INNERHALB der Datei muss auf den
+        // umbenannten ENUM zeigen, sonst sucht die VM eine Variable `farbe`.
+        // (Klassen brauchen das nicht -- die stehen an Typ-Positionen und
+        // laufen ueber `typ`.)
+        if m.namen.contains(&low) || m.enums.contains(&low) {
+            Some(intern(alias, &low))
+        } else {
+            None
+        }
     }
 
     /// Einen TYPNAMEN aufloesen (WP I.2).
@@ -269,11 +279,9 @@ impl<'a> Lauf<'a> {
             }
             match self.module.get(&alias) {
                 Some(m) if m.klassen.contains(&low) => *name = intern(&alias, &low),
-                Some(m) if m.enums.contains(&low) => {
-                    self.fehler.get_or_insert((self.zeile, format!(
-                        "{}.{} ist ein ENUM -- ENUMs lassen sich noch nicht als Typ \
-                         ueber den Namensraum benennen (WP I.3).", alias_teil, typ_teil)));
-                }
+                // Ein ENUM ist als TYP ein INTEGER -- genau wie ein flaches
+                // ENUM, das der Parser schon beim Lesen zu "integer" macht.
+                Some(m) if m.enums.contains(&low) => *name = "integer".to_string(),
                 _ => {
                     self.fehler.get_or_insert((self.zeile, format!(
                         "{} kennt keine Klasse {}.", alias_teil, typ_teil)));
@@ -329,15 +337,10 @@ impl<'a> Lauf<'a> {
             return None;
         }
         if m.enums.contains(&low) {
-            self.fehler.get_or_insert((self.zeile, format!(
-                concat!("{}.{} ist eine Klasse oder ein ENUM -- die lassen sich noch ",
-                            "nicht ueber den Namensraum BENENNEN (WP I.2). Eine Funktion ",
-                            "der Datei, die so einen Wert LIEFERT, geht aber schon: ",
-                            "`{}.ErzeugePunkt(...)` und danach `.feld` darauf. Wer den ",
-                            "Typ wirklich selbst hinschreiben muss, importiert die Datei ",
-                            "zusaetzlich ohne AS -- dann steht er flach zur Verfuegung."),
-                    alias, name, alias)));
-            return None;
+            // I.3: `mathe.Farbe` wird zum Bezeichner `mathe@farbe`. Der
+            // Member-Zugriff darauf (`.ROT`) liegt eine Ebene darueber und
+            // funktioniert danach wie bei jedem flachen ENUM.
+            return Some(intern(&alias, &low));
         }
         if !m.namen.contains(&low) {
             self.fehler.get_or_insert((self.zeile, format!(
@@ -565,7 +568,14 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
             for m in methods.iter_mut() { knoten(l, m); }
             for pr in properties.iter_mut() { knoten(l, pr); }
         }
-        EnumDecl { .. } => {}
+        EnumDecl { name, .. } => {
+            if let Some(alias) = l.hier.clone() {
+                let low = name.to_lowercase();
+                if l.module.get(&alias).map(|m| m.enums.contains(&low)).unwrap_or(false) {
+                    *name = intern(&alias, &low);
+                }
+            }
+        }
         _ => {}
     }
 }

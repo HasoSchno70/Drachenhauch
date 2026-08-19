@@ -13,6 +13,7 @@ Debugger bleiben unberuehrt.
 import subprocess
 
 NL = chr(10)
+Q = chr(34)
 
 
 def _lauf(dhrt_pfad, tmp_path, dateien: dict, haupt="main.dh"):
@@ -346,11 +347,69 @@ def test_unbekannte_klasse_meldet_klar(dhrt_pfad, tmp_path):
     assert "kennt keine Klasse" in err, err
 
 
-def test_enum_meldet_und_verweist_auf_i3(dhrt_pfad, tmp_path):
-    """ENUMs sind noch nicht dran -- die Meldung muss das SAGEN, statt zu
-    behaupten, den Namen gebe es nicht."""
-    _, err = _lauf(dhrt_pfad, tmp_path, {
-        "e.dh": "ENUM Farbe\n    ROT\n    BLAU\nEND ENUM\n",
-        "main.dh": 'IMPORT "e.dh" AS e\nDIM f AS e.Farbe\n',
+# --- WP I.3: ENUMs aus dem Namensraum ------------------------------------
+
+ENUM_DATEI = ("ENUM Farbe" + NL +
+              "    ROT" + NL +
+              "    GRUEN" + NL +
+              "    BLAU" + NL +
+              "END ENUM" + NL +
+              "FUNCTION Name$(f AS Farbe) AS STRING" + NL +
+              "    IF f = Farbe.ROT THEN RETURN " + Q + "rot" + Q + NL +
+              "    IF f = Farbe.GRUEN THEN RETURN " + Q + "gruen" + Q + NL +
+              "    RETURN " + Q + "blau" + Q + NL +
+              "END FUNCTION" + NL)
+
+
+def test_enum_member_ueber_den_namensraum(dhrt_pfad, tmp_path):
+    """`e.Farbe.BLAU` -- zwei Punkte hintereinander."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": ENUM_DATEI,
+        "main.dh": 'IMPORT "e.dh" AS e\nPRINT e.Farbe.BLAU\n',
     })
-    assert "WP I.3" in err, err
+    assert out.strip() == "2", (out, err)
+
+
+def test_enum_als_typ(dhrt_pfad, tmp_path):
+    """Ein ENUM ist als Typ ein INTEGER -- wie ein flaches ENUM auch."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": ENUM_DATEI,
+        "main.dh": ('IMPORT "e.dh" AS e\n'
+                    "DIM f AS e.Farbe\n"
+                    "f = e.Farbe.GRUEN\n"
+                    "PRINT f\n"),
+    })
+    assert out.strip() == "1", (out, err)
+
+
+def test_modul_nutzt_sein_enum_unqualifiziert(dhrt_pfad, tmp_path):
+    """Der Fall, der beim Bauen zuerst brach: `Farbe.ROT` INNERHALB der Datei
+    zeigte nach dem Umbenennen ins Leere, und die VM suchte eine Variable
+    namens `farbe`."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": ENUM_DATEI,
+        "main.dh": 'IMPORT "e.dh" AS e\nPRINT e.Name$(e.Farbe.ROT)\n',
+    })
+    assert out.strip() == "rot", (out, err)
+
+
+def test_gleiches_enum_in_beiden_dateien(dhrt_pfad, tmp_path):
+    """Der Zweck: zwei ENUMs `Farbe` mit verschiedener Bedeutung."""
+    out, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": ENUM_DATEI,
+        "main.dh": ('IMPORT "e.dh" AS e\n'
+                    "ENUM Farbe\n"
+                    "    BLAU\n"
+                    "    ROT\n"
+                    "END ENUM\n"
+                    'PRINT STR$(Farbe.ROT) + "," + STR$(e.Farbe.ROT)\n'),
+    })
+    assert out.strip() == "1,0", (out, err)
+
+
+def test_unbekanntes_enum_meldet(dhrt_pfad, tmp_path):
+    _, err = _lauf(dhrt_pfad, tmp_path, {
+        "e.dh": ENUM_DATEI,
+        "main.dh": 'IMPORT "e.dh" AS e\nDIM f AS e.Gibtsnicht\n',
+    })
+    assert "kennt keine Klasse" in err, err
