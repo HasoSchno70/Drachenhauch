@@ -955,21 +955,18 @@ Gleiche Regeln wie `GUI_ON_CLICK`: parameterloser Handler, am Ende von
 `GUI_UPDATE()` aufgerufen, `NIL` entfernt ihn. Nur für `slider`, `textinput`
 und `checkbox` zulässig (sonst Fehler).
 
-## Booleans drucken
+## Booleans
 
-`GUI_CLICKED`/`GUI_CHECKED`/`GUI_HOVERED` liefern echte BOOLEANs und
-funktionieren direkt in Bedingungen (`IF GUI_CLICKED(b) THEN ...`). Möchtest du
-einen solchen Wert mit `PRINT` als `TRUE`/`FALSE` ausgeben, weise ihn vorher
-einer `BOOLEAN`-Variablen zu — wie bei jedem Modul-Built-in:
+`GUI_CLICKED`/`GUI_CHECKED`/`GUI_HOVERED` liefern echte BOOLEANs — sie
+funktionieren in Bedingungen (`IF GUI_CLICKED(b) THEN ...`) und lassen sich
+direkt drucken:
 
 ```basic
 DIM r AS BOOLEAN
 r = GUI_CHECKED(snd)
-PRINT r            ' TRUE / FALSE
+PRINT r                   ' TRUE / FALSE
+PRINT GUI_CHECKED(snd)    ' dasselbe
 ```
-
-(`PRINT GUI_CHECKED(snd)` direkt gibt den Python-Wahrheitswert aus, da der
-Rückgabetyp eines Built-ins beim PRINT nicht statisch bekannt ist.)
 
 ## GUI_RESET
 
