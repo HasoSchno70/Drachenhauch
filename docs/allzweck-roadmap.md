@@ -550,13 +550,27 @@ als Ausgangspunkt:
 >
 > Eine Sprachänderung fasst seither **einen** Parser an.
 
-## Plattform
+## Plattform (✅ Linux erledigt 2026-08-20)
 
-Die CI baut und testet nur unter Windows; für Linux und macOS läuft lediglich
-`cargo check` (README.md). `wifi` ist ohnehin Windows-only. Solange
-Drachenhauch Spiele exportiert, ist das vertretbar. Sobald es Werkzeuge bauen
-soll, die anderswo laufen sollen, wird ein echter Build- und Testlauf auf
-mindestens Linux fällig.
+Hier stand: *„Die CI baut und testet nur unter Windows; sobald Drachenhauch
+Werkzeuge bauen soll, die anderswo laufen, wird ein echter Build- und
+Testlauf auf mindestens Linux fällig."* Seit die README genau das verspricht,
+ist er fällig geworden — und da.
+
+Der Job `linux-test` baut `dhrt` **ohne Grafik** (`default = []`, also kein
+raylib) und braucht damit weder X11 noch GL. **2204 Tests** laufen dort durch:
+die Sprache selbst, Dateien, Netz, Datenbank, CSV, ZIP, Mengen, Namensräume,
+Hintergrund-Aufträge. Übersprungen wird, was Pixel, Fenster, Audio-Pegel oder
+Eingabe prüft, dazu die Qt-Editortests (der Editor ist eine
+Windows-Anwendung).
+
+**Er hat sich beim ersten Lauf bezahlt gemacht:** die Zip-Slip-Prüfung in
+`ZIP_EXTRACT` ließ `C:/Windows/...` durch, weil das *nur auf Windows* ein
+absoluter Pfad ist — auf Linux ist `C:` ein Ordnername. Unter Windows war die
+Lücke unsichtbar.
+
+**Offen bleibt macOS.** Dort läuft weiterhin nur `cargo check`. Derselbe Kniff
+würde funktionieren; es fehlt bloß der Job. `wifi` ist ohnehin Windows-only.
 
 ---
 
