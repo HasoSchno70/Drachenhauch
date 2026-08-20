@@ -50,6 +50,25 @@ All nine ship as examples — click an image to jump to its source.
 The IDE shows the same gallery with **21 demos** on its start page, each one
 launchable with a double click.
 
+### And everything else
+
+Drachenhauch started as a games BASIC. These days you also write the things
+that happen *next to* the game with it — tools, reports, small services:
+
+| | |
+|---|---|
+| **Operating system** | files and folders, environment variables, `SHELL`, exit codes, arguments — a `.dh` script is a fully-fledged command-line program |
+| **Network** | `HTTP_GET`/`POST` with headers and JSON, TLS, plus `SHA256$`, `HMAC_SHA256$` and `UUID4$` for authenticated services |
+| **Data** | SQLite, CSV per RFC 4180, ZIP, JSON, regex, `BUFFER` for binary files |
+| **Larger programs** | namespaces (`IMPORT "math.dh" AS math`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` with error codes, inheritance with `SUPER` and `ABSTRACT`, `ASSERT_EQ` |
+| **In the background** | HTTP, database, external programs and **your own functions** (`TASK_START`) — the main loop keeps running |
+
+None of it needs a window. A Drachenhauch program can be a console
+application, a cron job or a game — same language.
+
+Details in the [manual](docs/README.md); how it got there is in the
+[general-purpose roadmap](docs/allzweck-roadmap.md) (German).
+
 ## Download
 
 **[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 85 MB, currently version 2026.7.

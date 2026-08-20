@@ -50,6 +50,26 @@ Alle neun sind mitgelieferte Beispiele — ein Klick aufs Bild führt zum Quellt
 Die Entwicklungsumgebung zeigt dieselbe Galerie mit **21 Demos** auf ihrer
 Startseite, jede per Doppelklick startbar.
 
+### Und außerdem: alles andere
+
+Drachenhauch fing als Spiele-BASIC an. Inzwischen schreibt man damit auch die
+Dinge, die *neben* dem Spiel anfallen — Werkzeuge, Auswertungen, kleine
+Dienste:
+
+| | |
+|---|---|
+| **Betriebssystem** | Dateien und Ordner, Umgebungsvariablen, `SHELL`, Exit-Codes, Argumente — ein `.dh`-Skript ist ein vollwertiges Kommandozeilen-Programm |
+| **Netz** | `HTTP_GET`/`POST` mit Kopfzeilen und JSON, TLS, dazu `SHA256$`, `HMAC_SHA256$` und `UUID4$` für angemeldete Dienste |
+| **Daten** | SQLite, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
+| **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, `ASSERT_EQ` |
+| **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
+
+Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine
+Konsolenanwendung sein, ein Cron-Job oder ein Spiel — dieselbe Sprache.
+
+Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
+[Allzweck-Roadmap](docs/allzweck-roadmap.md).
+
 ## Herunterladen
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 85 MB, aktuell Fassung 2026.7.
