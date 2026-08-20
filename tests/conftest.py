@@ -38,7 +38,15 @@ def _module_uses_qt(path: str) -> bool:
     hit = _QT_SOURCE_CACHE.get(path)
     if hit is None:
         try:
-            hit = "PySide6" in Path(path).read_text(encoding="utf-8", errors="replace")
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+            # "PySide6" allein reicht nicht: drei Dateien importieren Qt nur
+            # MITTELBAR (`from drachenhauch.editor_qt.highlighter import ...`)
+            # und nennen es selbst nie. Auf einem Runner ohne X11 sterben sie
+            # trotzdem beim Import an libEGL -- gefunden vom Linux-Job, der
+            # nach der ersten Runde noch drei von zwoelf Fehlern uebrig hatte.
+            hit = ("PySide6" in text or "editor_qt" in text
+                   or "_qt import" in text or "formdesigner" in text
+                   or "spriteeditor" in text)
         except OSError:
             hit = False
         _QT_SOURCE_CACHE[path] = hit
