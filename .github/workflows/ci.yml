@@ -26,6 +26,24 @@ jobs:
     # Qt-Editoren headless testen (kein Display auf den Runnern).
     env:
       QT_QPA_PLATFORM: offscreen
+      # Fettes LTO (`lto = true` in Cargo.toml) optimiert beim Linken das ganze
+      # Programm neu und parallelisiert dabei kaum -- auf einem Runner mit
+      # wenigen Kernen ist das der teuerste einzelne Schritt. Gemessen lokal auf
+      # 16 Kernen, inkrementell nach einer Aenderung an vm.rs:
+      #   fat  79 s     thin  54 s
+      # Hier zaehlt ein KORREKTES Binary, kein maximal optimiertes -- getestet
+      # wird Verhalten, nicht Geschwindigkeit. `thin` optimiert weiter ueber
+      # Crate-Grenzen, kostet aber einen Bruchteil.
+      #
+      # Bewusst als Umgebungsvariable statt als Profil im Cargo.toml: das
+      # ausgelieferte Binary (package.yml) behaelt fettes LTO, und niemand muss
+      # daran denken.
+      #
+      # EHRLICH DAZU: das hier getestete Binary ist damit nicht bitgleich mit dem
+      # ausgelieferten. Ein Fehler, der NUR bei fettem LTO auftraete, faende
+      # dieser Lauf nicht. Das waere ein Compiler-Fehler und entsprechend selten;
+      # der Handel ist bewusst.
+      CARGO_PROFILE_RELEASE_LTO: thin
 
     steps:
       - uses: actions/checkout@v7
@@ -126,6 +144,9 @@ jobs:
     env:
       QT_QPA_PLATFORM: offscreen
       DHRT_OHNE_GRAFIK: "1"
+      # Wie im Windows-Job: fettes LTO ist der teuerste Schritt und fuer einen
+      # Testlauf unnoetig. Begruendung dort.
+      CARGO_PROFILE_RELEASE_LTO: thin
 
     steps:
       - uses: actions/checkout@v7
