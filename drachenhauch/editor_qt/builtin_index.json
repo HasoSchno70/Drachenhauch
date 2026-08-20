@@ -7199,7 +7199,7 @@
   {
    "name": "TASK_START",
    "kind": "core",
-   "signature": "TASK_START(funktion[, argument]) AS INTEGER",
+   "signature": "TASK_START(funktion, ...) AS INTEGER",
    "module": "dhrt"
   },
   {

@@ -432,7 +432,8 @@ VM-Zustand anfassen.
       `Send`/`Sync`-Problem ganz, ohne eine Zeile an `Value`. Die
       Prozessgrenze ist zugleich die Zusage — ein Auftrag sieht keine Globals,
       er bekommt mit, was er braucht. Preis: ~12 ms je Start.
-      `TASK_START`/`READY`/`RESULT$`/`CANCEL`/`PENDING`, 13 Golden-Tests
+      `TASK_START`/`READY`/`RESULT$`/`CANCEL`/`PENDING` mit beliebig vielen
+      Argumenten, 18 Golden-Tests
 
 **Warum GB-Code nicht im Hintergrund laufen kann.** `Value` hält Zeichenketten,
 Arrays, Maps und Objekte durchgehend in `Rc` (28 Stellen in `value.rs`), und

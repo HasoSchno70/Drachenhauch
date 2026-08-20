@@ -419,7 +419,7 @@ Konsolenprogramm gehört ein `SLEEP(10)` hinein.
 
 | Funktion | Zweck |
 |---|---|
-| `TASK_START(funktion[, argument])` → INTEGER | starten, liefert die Auftragsnummer |
+| `TASK_START(funktion[, arg1, arg2, …])` → INTEGER | starten, liefert die Auftragsnummer |
 | `TASK_READY(auftrag)` → BOOLEAN | ist das Ergebnis da? |
 | `TASK_RESULT$(auftrag)` → STRING | Ergebnis abholen (**einmal**) |
 | `TASK_CANCEL(auftrag)` | Ergebnis verwerfen |
@@ -446,9 +446,11 @@ wenn es passiert. Dieselbe Grenze gilt für ein mit `AS` importiertes Modul —
 und dort wie hier ist sie der eigentliche Gewinn: die Funktion hängt nicht mehr
 davon ab, was zufällig oben im Programm steht.
 
-**2. Argument und Ergebnis sind Zahl oder Text.** Ein Objekt oder ein
-Array-Handle geht nicht über eine Prozessgrenze. Wer mehr braucht, reicht JSON
-durch. Das Ergebnis kommt immer als STRING zurück; für eine Zahl also
+**2. Argumente und Ergebnis sind Zahl, Text oder BOOLEAN.** Du darfst
+beliebig viele übergeben — `TASK_START(Zeichne, 3, "rot", TRUE)` —, aber ein
+Objekt oder ein Array-Handle geht nicht über eine Prozessgrenze. Wer mehr
+braucht, reicht JSON durch. Ein Text mit Leerzeichen bleibt **ein** Argument.
+Das Ergebnis kommt immer als STRING zurück; für eine Zahl also
 `VAL(TASK_RESULT$(a))`.
 
 **3. Ein Start kostet rund 12 ms.** Für „rechne nebenher, während die Schleife

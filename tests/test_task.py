@@ -15,6 +15,8 @@ import subprocess
 
 import pytest
 
+Q = chr(34)      # Anfuehrungszeichen im GB-Quelltext
+
 
 # Der Auftrag muss nicht LANGE rechnen -- allein der Prozessstart kostet rund
 # 12 ms, und darauf warten die Tests. Eine grosse Schleife hier hiesse nur,
@@ -216,3 +218,77 @@ def test_pending_zaehlt_das_UNABGEHOLTE_nicht_das_laufende(dhrt_pfad, tmp_path):
     zeilen = out.split("\n")
     assert zeilen[0] == "1", (out, err)     # fertig, aber nicht abgeholt
     assert zeilen[2] == "0", (out, err)     # erst das Abholen gibt frei
+
+
+# --- Mehrere Argumente ----------------------------------------------------
+
+MEHR = (
+    "FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER\n"
+    "    RETURN a + b + c\n"
+    "END FUNCTION\n"
+    "FUNCTION Satz(wer AS STRING, wie AS STRING) AS STRING\n"
+    "    RETURN wer + " + Q + " ist " + Q + " + wie\n"
+    "END FUNCTION\n"
+)
+
+
+def test_drei_zahlen(dhrt_pfad, tmp_path):
+    out, err = _lauf(dhrt_pfad, tmp_path, MEHR +
+                     "DIM a AS INTEGER\n"
+                     "a = TASK_START(Summe, 1, 2, 3)\n"
+                     "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
+                     "WEND\n"
+                     "PRINT TASK_RESULT$(a)\n")
+    assert out.strip() == "6", (out, err)
+
+
+def test_text_mit_leerzeichen_bleibt_EIN_argument(dhrt_pfad, tmp_path):
+    """Die Argumente gehen als eigene Kommandozeilen-Worte an `dhrt call` --
+    also weder getrennt noch zusammengeklebt. Ein Text mit Leerzeichen waere
+    genau die Stelle, an der eine schludrige Uebergabe auffliegt."""
+    out, err = _lauf(dhrt_pfad, tmp_path, MEHR +
+                     "DIM a AS INTEGER\n"
+                     "a = TASK_START(Satz, " + Q + "der Text mit Leerzeichen" + Q +
+                     ", " + Q + "heil" + Q + ")\n"
+                     "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
+                     "WEND\n"
+                     "PRINT TASK_RESULT$(a)\n")
+    assert out.strip() == "der Text mit Leerzeichen ist heil", (out, err)
+
+
+def test_ohne_argument_geht_weiterhin(dhrt_pfad, tmp_path):
+    out, err = _lauf(dhrt_pfad, tmp_path,
+                     "FUNCTION Nix() AS INTEGER\n"
+                     "    RETURN 7\n"
+                     "END FUNCTION\n"
+                     "DIM a AS INTEGER\n"
+                     "a = TASK_START(Nix)\n"
+                     "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
+                     "WEND\n"
+                     "PRINT TASK_RESULT$(a)\n")
+    assert out.strip() == "7", (out, err)
+
+
+def test_zu_wenige_argumente_melden_sich(dhrt_pfad, tmp_path):
+    """Die Stelligkeit prueft der Auftrag selbst, im Kindprozess -- die
+    Meldung muss trotzdem beim Aufrufer ankommen."""
+    _, err = _lauf(dhrt_pfad, tmp_path, MEHR +
+                   "DIM a AS INTEGER\n"
+                   "a = TASK_START(Summe, 1)\n"
+                   "WHILE NOT TASK_READY(a)\n"
+                   "    SLEEP(2)\n"
+                   "WEND\n"
+                   "PRINT TASK_RESULT$(a)\n")
+    assert err.strip() != "", "zu wenige Argumente muessen sich melden"
+
+
+def test_untragbares_argument_nennt_die_stelle(dhrt_pfad, tmp_path):
+    _, err = _lauf(dhrt_pfad, tmp_path, MEHR +
+                   "DIM feld AS ARRAY OF INTEGER\n"
+                   "DIM a AS INTEGER\n"
+                   "a = TASK_START(Summe, 1, feld, 3)\n")
+    assert "Prozessgrenze" in err, err
+    assert "Argument 2" in err, err

@@ -223,8 +223,7 @@ fn main() -> ExitCode {
         // wie bei --check/profile/debug -- der Aufrufer ist eine Maschine.
         if raw.len() >= 4 && raw[1] == "call" {
             setze_programm_args(&raw);
-            let arg = raw.get(4).cloned();
-            return call_main(&raw[2], &raw[3], arg);
+            return call_main(&raw[2], &raw[3], raw[4..].to_vec());
         }
         // Stufe B (Phase 3): `dhrt profile datei.dh` -- instrumentierter Lauf,
         // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
@@ -696,7 +695,7 @@ fn run_main(path: &str) -> ExitCode {
 }
 
 /// `dhrt call <datei> <funktion> [arg]`.
-fn call_main(path: &str, fn_name: &str, arg: Option<String>) -> ExitCode {
+fn call_main(path: &str, fn_name: &str, args: Vec<String>) -> ExitCode {
     let abs = std::fs::canonicalize(path).map(strip_extended_prefix)
         .unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf())
@@ -710,7 +709,7 @@ fn call_main(path: &str, fn_name: &str, arg: Option<String>) -> ExitCode {
     let _ = std::env::set_current_dir(&base);
     builtins::set_quelldatei(label.clone());
     match compile_source(&raw_source, &base, &label) {
-        Ok(json) => call_program_value(json, fn_name, arg),
+        Ok(json) => call_program_value(json, fn_name, args),
         Err(code) => code,
     }
 }
@@ -722,7 +721,7 @@ fn call_fehler(msg: &str) -> ExitCode {
 }
 
 fn call_program_value(json: serde_json::Value, fn_name: &str,
-                      arg: Option<String>) -> ExitCode {
+                      args: Vec<String>) -> ExitCode {
     let prog = match model::load_program(&json) {
         Ok(p) => p,
         Err(e) => return call_fehler(&format!("Lade-Fehler: {}", e)),
@@ -730,13 +729,17 @@ fn call_program_value(json: serde_json::Value, fn_name: &str,
     // Ein String-Argument, das wie eine Zahl aussieht, wird zur Zahl -- sonst
     // muesste jede Auftragsfunktion ihr Argument selbst umwandeln, und der
     // haeufigste Fall (eine Kennung, ein Zaehler) waere der unbequemste.
-    let args: Vec<value::Value> = match arg {
-        None => Vec::new(),
-        Some(a) => vec![match a.parse::<i64>() {
+    let args: Vec<value::Value> = args.iter().map(|a| {
+        match a.parse::<i64>() {
             Ok(i) => value::Value::Int(i),
-            Err(_) => value::Value::str_rc(&a),
-        }],
-    };
+            Err(_) => match a.parse::<f64>() {
+                // Nur mit Punkt: "1e5" oder "inf" waeren als Zahl gemeint
+                // ueberraschend, und ein Text bleibt lieber ein Text.
+                Ok(f) if a.contains('.') => value::Value::Float(f),
+                _ => value::Value::str_rc(a),
+            },
+        }
+    }).collect();
     let mut machine = vm::Vm::new(&prog);
     match machine.call_named(fn_name, args) {
         Ok(wert) => {

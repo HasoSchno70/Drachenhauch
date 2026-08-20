@@ -138,10 +138,10 @@ pub struct TaskErgebnis {
 ///
 /// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
 pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
-                   arg: Option<String>) -> Result<TaskErgebnis, String> {
+                   args: Vec<String>) -> Result<TaskErgebnis, String> {
     let mut cmd = std::process::Command::new(&exe);
     cmd.arg("call").arg(&datei).arg(&funktion);
-    if let Some(a) = arg { cmd.arg(a); }
+    for a in &args { cmd.arg(a); }
     let out = cmd.output().map_err(|e| format!(
         "TASK_START: '{}' laesst sich nicht starten: {}", exe.display(), e))?;
 

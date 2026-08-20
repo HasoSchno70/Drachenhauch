@@ -3651,18 +3651,27 @@ impl<'p> Vm<'p> {
                 };
                 let exe = std::env::current_exe().map_err(|e| format!(
                     "TASK_START: eigenen Programmpfad nicht gefunden: {}", e))?;
-                let arg = match a.get(1) {
-                    None => None,
-                    Some(Value::Int(i)) => Some(i.to_string()),
-                    Some(Value::Str(s)) => Some(s.to_string()),
-                    Some(andere) => return Err(format!(
-                        "TASK_START: das Argument geht ueber eine Prozessgrenze \
-                         und muss INTEGER oder STRING sein, nicht {}. Fuer mehr \
-                         reich JSON durch.", andere.type_name())),
-                };
+                // Beliebig viele Argumente -- sie gehen als eigene
+                // Kommandozeilen-Worte an `dhrt call`, werden also weder
+                // getrennt noch zusammengeklebt. Ein Text mit Leerzeichen
+                // bleibt damit EIN Argument.
+                let mut args: Vec<String> = Vec::new();
+                for (i, wert) in a.iter().enumerate().skip(1) {
+                    args.push(match wert {
+                        Value::Int(n) => n.to_string(),
+                        Value::Str(s) => s.to_string(),
+                        Value::Bool(b) => if *b { "TRUE".into() } else { "FALSE".into() },
+                        Value::Float(f) => f.to_string(),
+                        andere => return Err(format!(
+                            "TASK_START: Argument {} geht ueber eine Prozessgrenze \
+                             und muss eine Zahl, ein Text oder BOOLEAN sein, nicht \
+                             {}. Fuer alles andere reich JSON durch.",
+                            i, andere.type_name())),
+                    });
+                }
                 let was = funktion.clone();
                 Value::Int(self.task_auftraege.start(&was,
-                    move || crate::hintergrund::task_arbeit(exe, datei, funktion, arg)))
+                    move || crate::hintergrund::task_arbeit(exe, datei, funktion, args)))
             }
             "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?)?),
             // Einmal abholbar, wie bei SHELL_RESULT$: `abholen` nimmt das

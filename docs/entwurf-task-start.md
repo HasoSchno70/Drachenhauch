@@ -175,6 +175,10 @@ Die drei Fragen von 2026-08-19 sind entschieden: die Prozessgrenze **ist** die
 Zusage, Zahl und Zeichenkette genügen (für mehr reicht man JSON durch), und
 `dhrt call` ist ein eigener Einstiegspunkt geworden.
 
-Offen bleibt nur noch eine Bequemlichkeit: **mehrere Argumente**. Heute nimmt
-`TASK_START` genau eines. Wer zwei braucht, packt sie in einen String oder in
-JSON. Ob das reicht, zeigt der Gebrauch.
+**Mehrere Argumente** sind seit 2026-08-20 dabei: `TASK_START(Summe, 1, 2, 3)`.
+Sie gehen als eigene Kommandozeilen-Worte an `dhrt call`, werden also weder
+getrennt noch zusammengeklebt — ein Text mit Leerzeichen bleibt ein Argument.
+Zahl, Text und BOOLEAN tragen; alles andere meldet sich **mit der Nummer des
+Arguments**, damit man bei fünfen weiß, welches gemeint ist.
+
+Damit ist der Entwurf abgearbeitet.
