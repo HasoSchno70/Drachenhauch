@@ -689,6 +689,9 @@ fn run_main(path: &str) -> ExitCode {
     };
     // Ins Datei-Verzeichnis wechseln (wie dhrun.py os.chdir(file.parent)).
     let _ = std::env::set_current_dir(&base);
+    // TASK_START braucht den eigenen Dateinamen, um `dhrt call` darauf zu
+    // starten. Nach dem chdir genuegt der blosse Name.
+    builtins::set_quelldatei(label.clone());
     compile_and_run_source(&raw_source, &base, &label)
 }
 
@@ -705,6 +708,7 @@ fn call_main(path: &str, fn_name: &str, arg: Option<String>) -> ExitCode {
         Err(e) => { return call_fehler(&format!("Kann {} nicht lesen: {}", path, e)); }
     };
     let _ = std::env::set_current_dir(&base);
+    builtins::set_quelldatei(label.clone());
     match compile_source(&raw_source, &base, &label) {
         Ok(json) => call_program_value(json, fn_name, arg),
         Err(code) => code,

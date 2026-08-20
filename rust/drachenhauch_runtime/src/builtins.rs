@@ -83,6 +83,18 @@ static PROGRAMM_ARGS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::ne
 /// so kann ein zweiter Einstiegspunkt sie gefahrlos ebenfalls setzen wollen.
 pub fn set_programm_args(args: Vec<String>) { let _ = PROGRAMM_ARGS.set(args); }
 
+/// Die .dh-Datei, die gerade laeuft.
+///
+/// `TASK_START` startet einen Kindprozess `dhrt call <datei> <funktion>` --
+/// dafuer muss das Programm wissen, aus welcher Datei es selbst stammt. Die
+/// Programm-Argumente (oben) helfen nicht: sie enthalten nur, was nach `--`
+/// steht.
+static QUELLDATEI: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+pub fn set_quelldatei(pfad: String) { let _ = QUELLDATEI.set(pfad); }
+
+pub fn quelldatei() -> Option<&'static String> { QUELLDATEI.get() }
+
 fn programm_args() -> &'static [String] {
     PROGRAMM_ARGS.get().map(|v| v.as_slice()).unwrap_or(&[])
 }

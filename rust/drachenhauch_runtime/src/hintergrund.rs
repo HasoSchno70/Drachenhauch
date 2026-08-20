@@ -87,6 +87,12 @@ impl<T: Send + 'static> Auftraege<T> {
     }
 
     /// Wie viele Auftraege noch offen sind (fuer Anzeigen wie "lade ...").
+    ///
+    /// ACHTUNG, das ist NICHT "wie viele rechnen noch": gezaehlt wird,
+    /// was noch nicht ABGEHOLT ist. Ein fertiger, aber nicht abgeholter
+    /// Auftrag zaehlt mit. Wer `WHILE PENDING() > 0` schreibt und erst
+    /// danach abholen will, wartet ewig -- gefragt wird pro Auftrag mit
+    /// `fertig`.
     pub fn offen(&self) -> i64 {
         self.eintraege.iter().filter(|e| e.is_some()).count() as i64
     }
@@ -110,5 +116,55 @@ pub fn shell_arbeit(prog: String, args: Vec<String>) -> Result<ShellErgebnis, St
         code: out.status.code().map(|c| c as i64).unwrap_or(-1),
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    })
+}
+
+/// Ergebnis eines Auftrags (`TASK_*`).
+pub struct TaskErgebnis {
+    /// Der Rueckgabewert der Funktion, als Text.
+    pub ergebnis: String,
+    /// Was die Funktion selbst gedruckt hat -- getrennt, damit der Aufrufer
+    /// nicht Ergebnis und Ausgabe auseinanderfieseln muss.
+    pub ausgabe: String,
+}
+
+/// Eine GB-Funktion in einem EIGENEN dhrt-Prozess ausfuehren.
+///
+/// Warum ein Prozess und kein Thread: `Value` haelt ueberall `Rc`, `Program`
+/// ist damit weder `Send` noch `Sync` und laesst sich nicht ueber eine
+/// Thread-Grenze reichen. Ein Prozess teilt keinen Speicher -- damit
+/// verschwindet das Problem, ohne eine Zeile an `Value` zu aendern. Der Preis
+/// sind gemessene ~12 ms Prozessstart. Siehe docs/entwurf-task-start.md.
+///
+/// Laeuft ohne VM, also auf einem Auftrags-Thread wie `shell_arbeit`.
+pub fn task_arbeit(exe: std::path::PathBuf, datei: String, funktion: String,
+                   arg: Option<String>) -> Result<TaskErgebnis, String> {
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.arg("call").arg(&datei).arg(&funktion);
+    if let Some(a) = arg { cmd.arg(a); }
+    let out = cmd.output().map_err(|e| format!(
+        "TASK_START: '{}' laesst sich nicht starten: {}", exe.display(), e))?;
+
+    let roh = String::from_utf8_lossy(&out.stdout);
+    // `dhrt call` antwortet mit genau einer JSON-Zeile -- auch im Fehlerfall.
+    // Die letzte nehmen, falls doch etwas davor landet.
+    let zeile = roh.lines().rev().find(|z| !z.trim().is_empty()).unwrap_or("");
+    let v: serde_json::Value = serde_json::from_str(zeile).map_err(|_| {
+        let err = String::from_utf8_lossy(&out.stderr);
+        format!("TASK_START: unverstaendliche Antwort des Auftrags: {}",
+                if err.trim().is_empty() { zeile.to_string() } else { err.into_owned() })
+    })?;
+    if v.get("ok").and_then(|b| b.as_bool()) != Some(true) {
+        return Err(format!("TASK: {}", v.get("fehler")
+            .and_then(|f| f.as_str()).unwrap_or("unbekannter Fehler")));
+    }
+    let ergebnis = match v.get("ergebnis") {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Null) | None => String::new(),
+        Some(andere) => andere.to_string(),
+    };
+    Ok(TaskErgebnis {
+        ergebnis,
+        ausgabe: v.get("ausgabe").and_then(|s| s.as_str()).unwrap_or("").to_string(),
     })
 }

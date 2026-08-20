@@ -677,6 +677,8 @@ pub struct Vm<'p> {
     // sie lesen koennen, ohne dass SHELL_RESULT$ drei Werte auf einmal
     // liefern muesste -- dasselbe Muster wie HTTP_STATUS()/HTTP_HEADER().
     shell_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::ShellErgebnis, String>>,
+    /// Auftraege, die eine EIGENE GB-Funktion ausfuehren (`TASK_*`).
+    task_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::TaskErgebnis, String>>,
     shell_letzter_code: i64,
     shell_letzter_fehler: String,
     // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DH_LOG) gelesen.
@@ -823,6 +825,7 @@ impl<'p> Vm<'p> {
             assert_fehler: 0,
             assert_sammeln: false,
             shell_auftraege: Default::default(),
+            task_auftraege: Default::default(),
             shell_letzter_code: 0,
             shell_letzter_fehler: String::new(),
             log_pegel: None,
@@ -3592,13 +3595,16 @@ impl<'p> Vm<'p> {
         Ok(Some(v))
     }
 
-    /// Hintergrund-Auftraege (WP H): SHELL_START und DB_QUERY_START.
+    /// Hintergrund-Auftraege (WP H): SHELL_START, DB_QUERY_START und TASK_START.
     ///
-    /// Dasselbe Muster wie `HTTP_GET_START` -- starten, pro Bild nachsehen,
-    /// abholen. Was hier laeuft, ist immer reine Rust-Arbeit ohne VM; warum
-    /// kein GB-Code im Hintergrund laufen kann, steht in `hintergrund.rs`.
+    /// Dasselbe Muster ueberall -- starten, pro Bild nachsehen, abholen.
+    /// `shell_`/`db_query_` laufen als reine Rust-Arbeit ohne VM. `task_`
+    /// fuehrt dagegen GB-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
+    /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
+    /// `Program` damit weder Send noch Sync ist.
     fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        if !(name.starts_with("shell_") || name.starts_with("db_query_")) { return Ok(None); }
+        if !(name.starts_with("shell_") || name.starts_with("db_query_")
+             || name.starts_with("task_")) { return Ok(None); }
         let v = match name {
             "shell_start" => {
                 if a.is_empty() { return Err("SHELL_START: erwartet mind. 1 Argument (Programm)".into()); }
@@ -3608,6 +3614,65 @@ impl<'p> Vm<'p> {
                 Value::Int(self.shell_auftraege.start(&prog.clone(),
                     move || crate::hintergrund::shell_arbeit(prog, rest)))
             }
+            // ===== Auftraege mit eigener GB-Funktion (WP H, Weg C) =====
+            // Der Auftrag laeuft als eigener dhrt-Prozess, nicht als Thread:
+            // `Value` haelt ueberall `Rc`, `Program` ist weder Send noch Sync.
+            // Die Grenze ist zugleich die Zusage -- ein Auftrag sieht KEINE
+            // Globals des Hauptprogramms, auch keine CONST. Er bekommt mit,
+            // was er braucht. Siehe docs/entwurf-task-start.md.
+            "task_start" => {
+                if a.is_empty() {
+                    return Err("TASK_START: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)".into());
+                }
+                let funktion = match &a[0] {
+                    Value::FuncRef(n) => n.to_string(),
+                    Value::Str(s) => s.to_string(),
+                    andere => return Err(format!(
+                        "TASK_START: erwartet eine Funktion als erstes Argument, \
+                         bekommen {}. Schreib den Namen ohne Klammern: \
+                         TASK_START(Rechne, 42)", andere.type_name())),
+                };
+                let datei = match crate::builtins::quelldatei() {
+                    Some(d) => d.clone(),
+                    None => return Err(
+                        "TASK_START: die laufende Datei ist unbekannt -- \
+                         Auftraege gibt es nur bei `dhrt run <datei.dh>`".into()),
+                };
+                let exe = std::env::current_exe().map_err(|e| format!(
+                    "TASK_START: eigenen Programmpfad nicht gefunden: {}", e))?;
+                let arg = match a.get(1) {
+                    None => None,
+                    Some(Value::Int(i)) => Some(i.to_string()),
+                    Some(Value::Str(s)) => Some(s.to_string()),
+                    Some(andere) => return Err(format!(
+                        "TASK_START: das Argument geht ueber eine Prozessgrenze \
+                         und muss INTEGER oder STRING sein, nicht {}. Fuer mehr \
+                         reich JSON durch.", andere.type_name())),
+                };
+                let was = funktion.clone();
+                Value::Int(self.task_auftraege.start(&was,
+                    move || crate::hintergrund::task_arbeit(exe, datei, funktion, arg)))
+            }
+            "task_ready" => Value::Bool(self.task_auftraege.fertig(bi_int(a, 0, "TASK_READY")?)?),
+            // Einmal abholbar, wie bei SHELL_RESULT$: `abholen` nimmt das
+            // Ergebnis aus der Verwaltung. Darum gibt es KEIN zweites
+            // TASK_OUTPUT$ daneben -- zwei Abholer wuerden sich gegenseitig
+            // das Ergebnis wegnehmen, je nachdem wer zuerst fragt. Was der
+            // Auftrag gedruckt hat, geht damit verloren: ein Auftrag rechnet,
+            // er redet nicht.
+            "task_result$" | "task_result" => {
+                let id = bi_int(a, 0, "TASK_RESULT$")?;
+                match self.task_auftraege.abholen(id)? {
+                    Some(Ok(e)) => Value::str_rc(&e.ergebnis),
+                    Some(Err(e)) => return Err(e),
+                    None => return Err(format!(
+                        "TASK_RESULT$: Auftrag {} ist noch nicht fertig -- erst \
+                         TASK_READY({}) fragen", id, id)),
+                }
+            }
+            "task_cancel" => { self.task_auftraege.abbrechen(bi_int(a, 0, "TASK_CANCEL")?); Value::Nil }
+            "task_pending" => Value::Int(self.task_auftraege.offen()),
+
             "shell_ready" => Value::Bool(self.shell_auftraege.fertig(bi_int(a, 0, "SHELL_READY")?)?),
             "shell_result$" | "shell_result" => {
                 let id = bi_int(a, 0, "SHELL_RESULT$")?;

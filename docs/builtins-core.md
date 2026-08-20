@@ -390,6 +390,75 @@ will, nimmt `ZIP_WRITE` und gibt die Namen selbst an (`unter/notiz.txt`).
 Komprimiert wird mit Deflate. `ZIP_WRITE` und `ZIP_CREATE` legen das Archiv
 jeweils **neu** an; ein Anhängen an ein bestehendes Archiv gibt es nicht.
 
+## Aufträge: eigene Funktionen im Hintergrund
+
+`TASK_START` lässt **deine eigene** Funktion nebenher rechnen, während die
+Hauptschleife weiterläuft:
+
+```basic
+DIM auftrag AS INTEGER
+auftrag = TASK_START(BerechneKarte, 4242)
+
+WHILE NOT TASK_READY(auftrag)
+    ' Spiel läuft weiter, Bild für Bild
+WEND
+
+PRINT TASK_RESULT$(auftrag)
+```
+
+| Funktion | Zweck |
+|---|---|
+| `TASK_START(funktion[, argument])` → INTEGER | starten, liefert die Auftragsnummer |
+| `TASK_READY(auftrag)` → BOOLEAN | ist das Ergebnis da? |
+| `TASK_RESULT$(auftrag)` → STRING | Ergebnis abholen (**einmal**) |
+| `TASK_CANCEL(auftrag)` | Ergebnis verwerfen |
+| `TASK_PENDING()` → INTEGER | Aufträge, die noch nicht abgeholt sind |
+
+Die Funktion schreibst du **ohne Klammern** hin: `TASK_START(BerechneKarte, 42)`.
+
+**Ein Auftrag läuft als eigener Prozess** — nicht als Thread. Daraus folgen
+drei Dinge, die man kennen muss:
+
+**1. Ein Auftrag sieht deine Globals nicht.** Auch keine `CONST` auf oberster
+Ebene. Das Hauptprogramm läuft im Auftragsprozess nämlich gar nicht:
+
+```basic
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Nutzt() AS INTEGER
+    RETURN FAKTOR        ' Fehler, wenn als Auftrag gestartet
+END FUNCTION
+```
+
+Gib der Funktion als Parameter mit, was sie braucht. Die Meldung erklärt das,
+wenn es passiert. Dieselbe Grenze gilt für ein mit `AS` importiertes Modul —
+und dort wie hier ist sie der eigentliche Gewinn: die Funktion hängt nicht mehr
+davon ab, was zufällig oben im Programm steht.
+
+**2. Argument und Ergebnis sind Zahl oder Text.** Ein Objekt oder ein
+Array-Handle geht nicht über eine Prozessgrenze. Wer mehr braucht, reicht JSON
+durch. Das Ergebnis kommt immer als STRING zurück; für eine Zahl also
+`VAL(TASK_RESULT$(a))`.
+
+**3. Ein Start kostet rund 12 ms.** Für „rechne nebenher, während die Schleife
+sich dreht" fällt das nicht auf. Für tausend kleine Aufträge pro Sekunde ist es
+der falsche Befehl — dann rechne im Hauptprogramm.
+
+**`TASK_PENDING` zählt, was noch nicht abgeholt ist** — nicht, was noch rechnet.
+Ein fertiger, aber nicht abgeholter Auftrag zählt mit. Deshalb ist
+
+```basic
+WHILE TASK_PENDING() > 0      ' wartet ewig, wenn danach erst abgeholt wird
+WEND
+```
+
+falsch: gefragt wird pro Auftrag mit `TASK_READY`. Dasselbe gilt für
+`SHELL_PENDING` und `DB_QUERY_PENDING`.
+
+Was der Auftrag selbst mit `PRINT` ausgibt, kommt **nicht** zurück — ein
+Auftrag rechnet, er redet nicht. Beispiel:
+[examples/170_task.dh](../examples/170_task.dh).
+
 ## Mengen
 
 Eine Menge ist eine `MAP OF INTEGER`, deren Werte niemanden interessieren —

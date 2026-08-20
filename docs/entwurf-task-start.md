@@ -148,18 +148,29 @@ Variable kann sie nicht nennen — `Program` führt keine Namen für Globals, nu
 
 Neun Golden-Tests in `tests/test_dhrt_call.py`.
 
-**Als Nächstes:** die fünf `TASK_*`-Builtins an `Auftraege<T>` — Kindprozess
-starten, Nummer vergeben, Ergebnis einsammeln.
+**Die fünf `TASK_*`-Builtins stehen** (2026-08-19). Der Auftrag läuft als
+eigener `dhrt call`-Prozess; gemessen am Beispiel dreht sich die Hauptschleife
+unterdessen 1 909 664 mal weiter. 13 Golden-Tests, `examples/170_task.dh`,
+Abschnitt in `builtins-core.md`.
 
-## 6. Zu entscheiden
+**Zwei Dinge sind beim Bauen anders entschieden worden als hier skizziert:**
 
-1. **Ist die Prozessgrenze als Zusage recht?** *„Ein Auftrag sieht keine
-   Globals"* ist eine echte Einschränkung. Sie macht Aufträge aber auch
-   berechenbar — und sie ist dieselbe Entscheidung wie bei WP I.1.
-2. **Genügen Zahl und Zeichenkette** als Argument und Ergebnis, oder soll
-   `TASK_START` von vornherein JSON durchreichen?
-3. **Braucht es einen neuen `dhrt`-Einstiegspunkt** (`dhrt call …`) oder soll
-   das Kind schlicht die Datei laufen lassen, mit dem Funktionsaufruf als
-   angehängter Zeile? Letzteres spart einen Unterbefehl, führt aber das
-   Hauptprogramm mit aus — und das ist fast nie gewollt.
-   *Neigung: eigener Einstiegspunkt.*
+1. **Kein `TASK_OUTPUT$`.** Ich hatte es zunächst gebaut — bis auffiel, dass
+   `abholen` das Ergebnis aus der Verwaltung *nimmt*. Zwei Abholer hätten sich
+   gegenseitig das Ergebnis weggenommen, je nachdem wer zuerst fragt. Was ein
+   Auftrag druckt, kommt also nicht zurück: er rechnet, er redet nicht.
+2. **`TASK_PENDING` zählt das Unabgeholte, nicht das Laufende.** Das erbt es
+   von `Auftraege<T>` und teilt es mit `SHELL_PENDING` und `DB_QUERY_PENDING`.
+   Wer `WHILE TASK_PENDING() > 0` schreibt und erst danach abholen will, wartet
+   ewig — ich bin beim Testschreiben selbst hineingelaufen. Steht jetzt im
+   Quelltext, in der Doku und in einem eigenen Test.
+
+## 6. Was offen bleibt
+
+Die drei Fragen von 2026-08-19 sind entschieden: die Prozessgrenze **ist** die
+Zusage, Zahl und Zeichenkette genügen (für mehr reicht man JSON durch), und
+`dhrt call` ist ein eigener Einstiegspunkt geworden.
+
+Offen bleibt nur noch eine Bequemlichkeit: **mehrere Argumente**. Heute nimmt
+`TASK_START` genau eines. Wer zwei braucht, packt sie in einen String oder in
+JSON. Ob das reicht, zeigt der Gebrauch.

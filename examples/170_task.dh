@@ -1,0 +1,48 @@
+' 170_task.dh -- eine eigene Funktion im Hintergrund rechnen lassen (WP H)
+'
+' TASK_START startet die Funktion als EIGENEN dhrt-Prozess. Die Hauptschleife
+' laeuft dabei ungebremst weiter -- das Programm zaehlt hier mit, wie oft.
+'
+' Weil es ein eigener Prozess ist, sieht der Auftrag KEINE Globals des
+' Hauptprogramms, auch keine CONST. Er bekommt mit, was er braucht: hier die
+' Zahl 21. Siehe die zweite Funktion unten.
+
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM summe AS INTEGER
+    summe = 0
+    FOR i = 1 TO 2000000
+        summe = summe + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION WillDasGlobal() AS INTEGER
+    ' Laeuft im Hauptprogramm, aber NICHT als Auftrag -- dort ist FAKTOR nicht
+    ' gesetzt, weil das Hauptprogramm im Auftragsprozess gar nicht laeuft.
+    RETURN FAKTOR
+END FUNCTION
+
+DIM auftrag AS INTEGER
+DIM runden AS INTEGER
+
+PRINT "Auftrag starten ..."
+auftrag = TASK_START(Langsam, 21)
+PRINT "offene Auftraege: " + STR$(TASK_PENDING())
+PRINT ""
+
+runden = 0
+WHILE NOT TASK_READY(auftrag)
+    runden = runden + 1
+WEND
+
+PRINT "Ergebnis:  " + TASK_RESULT$(auftrag)
+PRINT "Die Hauptschleife drehte sich unterdessen " + STR$(runden) + " mal."
+PRINT ""
+
+' --- dasselbe direkt aufgerufen: hier IST das Global gesetzt ---
+PRINT "im Hauptprogramm gilt FAKTOR = " + STR$(WillDasGlobal())
+PRINT "als Auftrag gestartet wuerde dieselbe Funktion sich beschweren --"
+PRINT "sie haengt an einem Global, und das ist ueber die Prozessgrenze nicht da."

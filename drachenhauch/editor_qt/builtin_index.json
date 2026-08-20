@@ -7173,6 +7173,36 @@
    "module": "core"
   },
   {
+   "name": "TASK_CANCEL",
+   "kind": "core",
+   "signature": "TASK_CANCEL(auftrag)",
+   "module": "dhrt"
+  },
+  {
+   "name": "TASK_PENDING",
+   "kind": "core",
+   "signature": "TASK_PENDING() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "TASK_READY",
+   "kind": "core",
+   "signature": "TASK_READY(auftrag) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "TASK_RESULT$",
+   "kind": "core",
+   "signature": "TASK_RESULT$(auftrag) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "TASK_START",
+   "kind": "core",
+   "signature": "TASK_START(funktion[, argument]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
    "name": "TELL",
    "kind": "core",
    "signature": "TELL(datei) AS INTEGER",
