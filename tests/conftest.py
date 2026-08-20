@@ -135,6 +135,41 @@ _BRAUCHT_GRAFIK = {
 }
 
 
+def _qt_laeuft() -> bool:
+    """Laesst sich PySide6 hier ueberhaupt LADEN?
+
+    Auf einem Linux-Runner ohne X11-Pakete nicht: `import PySide6.QtWidgets`
+    stirbt an `libEGL.so.1`. Und zwar beim EINSAMMELN der Tests, also bevor
+    ein Marker greifen koennte -- `-m "not qt"` filtert erst, nachdem das
+    Modul importiert wurde. Der erste Linux-CI-Lauf endete deshalb mit 12
+    Sammel-Fehlern, obwohl die Qt-Tests laengst abgewaehlt waren.
+
+    Einmal probieren, Ergebnis merken.
+    """
+    global _QT_OK
+    if _QT_OK is None:
+        try:
+            import PySide6.QtWidgets  # noqa: F401
+            _QT_OK = True
+        except Exception:
+            _QT_OK = False
+    return _QT_OK
+
+
+_QT_OK = None
+
+
+def pytest_ignore_collect(collection_path, config):
+    """Qt-Testdateien gar nicht erst einsammeln, wenn Qt nicht laedt.
+
+    Greift VOR dem Import und damit frueh genug. Wo Qt laeuft (Windows, jeder
+    Entwicklerrechner) aendert sich nichts.
+    """
+    if _module_uses_qt(str(collection_path)) and not _qt_laeuft():
+        return True
+    return None
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "qt: braucht PySide6 (automatisch gesetzt)")
     config.addinivalue_line(
