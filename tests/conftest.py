@@ -148,6 +148,13 @@ def _qt_laeuft() -> bool:
     """
     global _QT_OK
     if _QT_OK is None:
+        # Auf Windows ist Qt da -- der Editor IST eine Windows-Anwendung, und
+        # alle Qt-Tests laufen dort. Den Import zu versuchen kostet in JEDEM
+        # xdist-Arbeiter Zeit und bringt nichts; die Frage stellt sich nur
+        # dort, wo Qt fehlen KANN.
+        if os.name == "nt":
+            _QT_OK = True
+            return True
         try:
             import PySide6.QtWidgets  # noqa: F401
             _QT_OK = True
