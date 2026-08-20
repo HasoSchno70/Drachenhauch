@@ -5,6 +5,18 @@ GB-Programm, das Server+Client im selben Prozess ueber Loopback (127.0.0.1,
 Port 0) verbindet. nil-Check via `IS_NIL()`-Builtin (nicht `IS NIL` -- das ist
 gar kein Parser-Konstrukt, weder TW noch dhrt; nur die Doku behauptet es).
 Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
+
+Warteschleifen mit SLEEP
+------------------------
+Die Tests fragen `NET_TCP_ACCEPT`/`NET_RECV` in einer Schleife nach, weil die
+Sockets nicht blockieren. Diese Schleifen liefen bis 2026-08-20 OHNE Pause --
+50 Durchgaenge in Mikrosekunden. Unter Linux und Windows kamen die Daten auf
+Loopback trotzdem rechtzeitig an, auf macOS nicht: `test_tcp_full_roundtrip`
+fiel dort beim ersten CI-Lauf um, weil `NET_RECV` fuenfzigmal leer lieferte.
+Ein `SLEEP(2)` je Durchgang macht aus 50 Mikrosekunden 100 Millisekunden
+Geduld. Das ist kein Zugestaendnis an macOS, sondern die Behebung einer
+Wettlaufbedingung, die auf den anderen Systemen nur zufaellig gewann.
+
 """
 import pytest
 
@@ -40,7 +52,7 @@ def test_tcp_full_roundtrip(run_gb):
         'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
         "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
         "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
-        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\n    SLEEP(2)\nNEXT\n"
         "PRINT IS_NIL(srv)\n"
         'PRINT NET_SEND(client, "hallo")\n'
         'DIM got AS STRING\nFOR i = 1 TO 50\n    got = NET_RECV(srv, 1024)\n'
@@ -91,7 +103,7 @@ def test_tcp_is_connected_false_after_peer_closes(run_gb):
         'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
         "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
         "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
-        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\n    SLEEP(2)\nNEXT\n"
         "NET_CLOSE(srv)\n"
         "DIM waited AS INTEGER\nDIM dummy AS STRING\nwaited = 0\n"
         "WHILE NET_IS_CONNECTED(client) AND waited < 2000\n"
@@ -125,7 +137,7 @@ def test_tcp_recv_reassembles_multibyte_char_split_across_reads(run_gb):
         'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
         "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
         "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
-        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\n    SLEEP(2)\nNEXT\n"
         'DIM msg AS STRING\nmsg = "a" + CHR$(228) + CHR$(246) + CHR$(252) + "b"\n'
         "NET_SEND(client, msg)\n"
         'DIM result AS STRING\nresult = ""\nDIM chunk AS STRING\n'
@@ -156,7 +168,7 @@ def test_udp_send_recv(run_gb):
         "DIM cl AS NET_UDP\ncl = NET_UDP_OPEN()\n"
         'PRINT NET_UDP_SEND(cl, "127.0.0.1", NET_UDP_PORT(srv), "ping")\n'
         'DIM got AS STRING\nDIM i AS INTEGER\n'
-        'FOR i = 1 TO 50\n    got = NET_UDP_RECV(srv, 1024)\n    IF got <> "" THEN BREAK\nNEXT\n'
+        'FOR i = 1 TO 50\n    got = NET_UDP_RECV(srv, 1024)\n    IF got <> "" THEN BREAK\n    SLEEP(2)\nNEXT\n'
         "PRINT got\n"
         'DIM last AS STRING\nlast = NET_UDP_LAST_FROM(srv)\n'
         'PRINT LEFT$(last, 10)\n'
