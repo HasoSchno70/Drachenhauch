@@ -91,14 +91,19 @@ jobs:
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
 
-  # Cross-Platform-Migration Phase 3: auf Linux nicht nur BAUEN, sondern
-  # TESTEN.
+  # Cross-Platform-Migration Phase 3: auf Linux UND macOS nicht nur BAUEN,
+  # sondern TESTEN.
   #
-  # Bis hierher lief die Suite ausschliesslich unter Windows; Linux und macOS
-  # bekamen `cargo check` (Job unten). Das war vertretbar, solange
+  # Bis 2026-08-20 lief die Suite ausschliesslich unter Windows; Linux und
+  # macOS bekamen `cargo check` (Job unten). Das war vertretbar, solange
   # Drachenhauch Spiele exportierte. Seit es auch Kommandozeilen-Werkzeuge,
   # Cron-Jobs und Dienste schreiben soll, ist es das nicht mehr -- die laufen
   # erfahrungsgemaess woanders.
+  #
+  # Linux kam zuerst und hat sich sofort bezahlt gemacht: die Zip-Slip-
+  # Pruefung liess `C:/Windows/...` durch, weil das NUR auf Windows ein
+  # absoluter Pfad ist. macOS folgt derselben Vorlage -- ein drittes System
+  # kostet hier nur eine Zeile Matrix und faengt genau solche Annahmen.
   #
   # Der Kniff: `dhrt` OHNE Grafik bauen (`default = []`, also kein raylib).
   # Damit braucht der Runner weder X11 noch GL noch einen virtuellen
@@ -112,8 +117,12 @@ jobs:
   # aendert sich nichts -- der Windows-Lauf oben sieht einen fehlenden
   # Grafik-Builtin weiterhin als Fehler, sonst versteckt diese Bequemlichkeit
   # eines Tages eine echte Luecke.
-  linux-test:
-    runs-on: ubuntu-latest
+  posix-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     env:
       QT_QPA_PLATFORM: offscreen
       DHRT_OHNE_GRAFIK: "1"

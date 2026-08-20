@@ -550,7 +550,7 @@ als Ausgangspunkt:
 >
 > Eine Sprachänderung fasst seither **einen** Parser an.
 
-## Plattform (✅ Linux erledigt 2026-08-20)
+## Plattform (✅ ERLEDIGT 2026-08-20)
 
 Hier stand: *„Die CI baut und testet nur unter Windows; sobald Drachenhauch
 Werkzeuge bauen soll, die anderswo laufen, wird ein echter Build- und
@@ -569,8 +569,10 @@ Windows-Anwendung).
 absoluter Pfad ist — auf Linux ist `C:` ein Ordnername. Unter Windows war die
 Lücke unsichtbar.
 
-**Offen bleibt macOS.** Dort läuft weiterhin nur `cargo check`. Derselbe Kniff
-würde funktionieren; es fehlt bloß der Job. `wifi` ist ohnehin Windows-only.
+**macOS folgt derselben Vorlage** (2026-08-20): aus `linux-test` wurde eine
+Matrix `posix-test` über `ubuntu-latest` und `macos-latest`. Ein drittes
+System kostet hier eine Zeile — und fängt genau die Annahmen, die man auf dem
+eigenen Rechner nicht sieht. `wifi` bleibt Windows-only.
 
 ---
 

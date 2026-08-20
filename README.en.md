@@ -347,7 +347,7 @@ Architecture details and extension notes in [CLAUDE.md](CLAUDE.md) (German).
 
 The suite barely computes — it spawns `dhrt` processes and waits for them. That is why it scales almost linearly: **10:40 serial against a little over a minute on 16 cores.** The second pass picks up four files that need a resource *exclusively* (input recording, the sound card, measured run times); the reason for each one sits in [tests/conftest.py](tests/conftest.py) next to `_SERIELL`.
 
-**CI** builds `dhrt` itself on every push and runs both passes (Windows, Python 3.12): **a little over 8 minutes** for the whole job — 3 for the Rust build, 2½ for the tests. Without that build the suite used to skip 1812 of 3096 tests there, and nothing said so. A second job **tests on Linux**: `dhrt` is built there without graphics (no raylib, so no X11 needed) and 2204 tests run — the language itself, files, network, database, CSV, ZIP, sets, namespaces, background tasks. On top of that, a `cargo check` on Linux, macOS and Windows proves the Rust core compiles platform-independently.
+**CI** builds `dhrt` itself on every push and runs both passes (Windows, Python 3.12): **a little over 8 minutes** for the whole job — 3 for the Rust build, 2½ for the tests. Without that build the suite used to skip 1812 of 3096 tests there, and nothing said so. A second job **tests on Linux and macOS**: `dhrt` is built there without graphics (no raylib, so no X11 needed) and some 2200 tests run — the language itself, files, network, database, CSV, ZIP, sets, namespaces, background tasks. On top of that, a `cargo check` on Linux, macOS and Windows proves the Rust core compiles platform-independently.
 
 ## License
 
