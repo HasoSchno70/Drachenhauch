@@ -129,13 +129,22 @@ besser: der Zugriff **meldet sich**.
 
 ```text
 > dhrt call c.dh SiehtGlobal
-{"ok":false,"fehler":"Global-Slot leer"}
+{"ok":false,"fehler":"Zugriff auf eine globale Variable, die noch nicht
+ gesetzt ist. Laeuft das hier als Auftrag (dhrt call / TASK_START)? Dann ist
+ das erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global
+ gesetzt -- auch keine CONST auf oberster Ebene. Gib der Funktion als
+ Parameter mit, was sie braucht."}
 ```
 
 Damit ist der Fall laut statt leise, und das war das eigentliche Risiko an der
-Prozess- wie an der Thread-Variante. *(Die Meldung selbst ist noch
-Maschinensprache — „Global-Slot leer" sagt einem GB-Autor nichts. Sie gehört
-verbessert, bevor `TASK_START` obendrauf kommt.)*
+Prozess- wie an der Thread-Variante.
+
+Die Meldung hieß zunächst nur „Global-Slot leer" — Maschinensprache, die einem
+Drachenhauch-Autor nichts sagt. Sie ist ausgeschrieben, **bevor** `TASK_START`
+obendrauf kommt: es ist die erste Meldung, die ein Auftrag-Autor je zu sehen
+bekommt, und sie muss die Zusage erklären statt sie zu verschweigen. Die
+Variable kann sie nicht nennen — `Program` führt keine Namen für Globals, nur
+`n_globals`.
 
 Neun Golden-Tests in `tests/test_dhrt_call.py`.
 

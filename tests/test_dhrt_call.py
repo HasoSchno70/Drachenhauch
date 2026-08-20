@@ -98,7 +98,10 @@ def test_globals_sind_nicht_gesetzt_und_das_MELDET_sich(dhrt_pfad, tmp_path):
     """
     a = _call(dhrt_pfad, tmp_path, "SiehtGlobal")
     assert a["ok"] is False
-    assert a["fehler"], a
+    # Und die Meldung erklaert die LAGE, statt "Global-Slot leer" zu sagen --
+    # das ist die erste Meldung, die ein Auftrag-Autor je zu sehen bekommt.
+    assert "Hauptprogramm laeuft dabei NICHT" in a["fehler"], a
+    assert "Parameter" in a["fehler"], a
 
 
 def test_unbekannte_funktion_nennt_die_bekannten(dhrt_pfad, tmp_path):

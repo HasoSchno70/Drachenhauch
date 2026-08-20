@@ -763,6 +763,20 @@ pub struct Vm<'p> {
 
 type R<T> = Result<T, String>;
 
+/// Zugriff auf ein Global, das noch nicht gesetzt ist.
+///
+/// Im gewoehnlichen Lauf heisst das: gelesen, bevor das `DIM` an der Reihe
+/// war. Bei `dhrt call` heisst es etwas anderes und Haeufigeres -- dort laeuft
+/// das Hauptprogramm gar nicht, also ist KEIN Global gesetzt, auch keine
+/// `CONST`. Das ist die Zusage der Auftragsgrenze, und wer sie zum ersten Mal
+/// trifft, soll sie hier erklaert bekommen statt "Global-Slot leer" zu lesen.
+const GLOBAL_UNGESETZT: &str = concat!(
+    "Zugriff auf eine globale Variable, die noch nicht gesetzt ist. ",
+    "Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das ",
+    "erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global ",
+    "gesetzt -- auch keine CONST auf oberster Ebene. Gib der Funktion als ",
+    "Parameter mit, was sie braucht.");
+
 impl<'p> Vm<'p> {
     /// Maus fuer ui-Widgets: liefert Off-Screen-Koordinaten, wenn die aktuelle
     /// Fenster-Ebene keinen Input besitzt (von einem anderen Fenster ueberdeckt).
@@ -1785,7 +1799,7 @@ impl<'p> Vm<'p> {
                             // Generisch: ADD + Store-Coerce + Vergleich -- wie
                             // die ehemalige Opcode-Folge.
                             let cur = if var_global {
-                                let s = self.global_slots[var_idx].as_ref().ok_or("Global-Slot leer")?;
+                                let s = self.global_slots[var_idx].as_ref().ok_or(GLOBAL_UNGESETZT)?;
                                 s.borrow().value.clone()
                             } else { locals[var_idx].clone() };
                             let stepv = if step_is_slot { locals[step_idx].clone() } else { constants[step_idx].clone() };
@@ -1810,7 +1824,7 @@ impl<'p> Vm<'p> {
 
                 // --- Slot-Globals ---
                 op::LOAD_GLOBAL_SLOT => {
-                    let s = self.global_slots[arg.as_usize()].as_ref().ok_or("Global-Slot leer")?;
+                    let s = self.global_slots[arg.as_usize()].as_ref().ok_or(GLOBAL_UNGESETZT)?;
                     stack.push(s.borrow().value.clone());
                 }
                 op::STORE_GLOBAL_SLOT => {
