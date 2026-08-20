@@ -79,10 +79,56 @@ _SERIELL = {
 }
 
 
+# Marker `grafik`: braucht einen dhrt MIT raylib
+# --------------------------------------------------------------------------
+# `dhrt` laesst sich ohne Grafik bauen (`default = []`), und nur so kann CI auf
+# Linux und macOS ueberhaupt TESTEN statt bloss `cargo check` zu fahren -- ein
+# Grafik-Build braucht dort X11/GL und einen virtuellen Bildschirm.
+#
+# Gemessen mit dem grafikfreien Build: 2970 Tests laufen durch (2963 parallel
+# + 7 seriell), 416 werden uebersprungen. Davon melden 188 einen fehlenden
+# Grafik-Builtin -- die faengt `_ueberspringen_ohne_grafik` einzeln ab, damit
+# gemischte Dateien nicht ganz herausfallen. Diese 22 Dateien scheitern
+# anders: sie pruefen Pixel, Fenster, Audio-Pegel oder Eingabe und haben ohne
+# Grafik keinen Gegenstand. Empirisch ermittelt, nicht geraten -- die drei
+# seriellen darunter fehlten im ersten Anlauf, weil ich nur den parallelen
+# Durchgang gemessen hatte.
+#
+# Uebersprungen wird NUR, wenn `DHRT_OHNE_GRAFIK=1` gesetzt ist. Ohne die
+# Variable aendert sich nichts: der Windows-Lauf und jeder lokale Lauf sehen
+# diese Tests wie bisher.
+_BRAUCHT_GRAFIK = {
+    "test_arc_width.py",
+    "test_audio_modulators.py",
+    "test_automation.py",
+    "test_beispiel_sqlite_tabelle.py",
+    "test_buch_tippspiel.py",
+    "test_circuitrunner.py",
+    "test_examples.py",
+    "test_gfx_push_pop.py",
+    "test_gui_form_runner.py",
+    "test_gui_table_frozen_edge.py",
+    "test_image_scale_nn.py",
+    "test_image_text_extras.py",
+    "test_input_edges.py",
+    "test_input_polish.py",
+    "test_kontaktbogen.py",
+    "test_m3d.py",
+    "test_modules_audio.py",
+    "test_picking_geometry.py",
+    "test_runtime_font_delta.py",
+    "test_shader_uniforms_geometry.py",
+    "test_triangle_winding.py",
+    "test_window_and_compress.py",
+}
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "qt: braucht PySide6 (automatisch gesetzt)")
     config.addinivalue_line(
         "markers", "seriell: braucht ein Betriebsmittel exklusiv (automatisch gesetzt)")
+    config.addinivalue_line(
+        "markers", "grafik: braucht einen dhrt mit raylib (automatisch gesetzt)")
 
 
 def pytest_collection_modifyitems(items):
@@ -91,6 +137,11 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.qt)
         if item.path.name in _SERIELL:
             item.add_marker(pytest.mark.seriell)
+        if item.path.name in _BRAUCHT_GRAFIK:
+            item.add_marker(pytest.mark.grafik)
+            if os.environ.get("DHRT_OHNE_GRAFIK"):
+                item.add_marker(pytest.mark.skip(
+                    reason="braucht einen dhrt mit raylib (DHRT_OHNE_GRAFIK gesetzt)"))
 
 
 def _find_dhrt():
@@ -184,6 +235,27 @@ def _dhrt_err_message(stderr: str) -> str:
     return m.group(1).strip() if m else s
 
 
+def _ueberspringen_ohne_grafik(stderr: str) -> None:
+    """In einem Build OHNE Grafik einen Grafik-Test ueberspringen statt ihn
+    fehlschlagen zu lassen.
+
+    Wozu: `dhrt` laesst sich ohne raylib bauen (`default = []`), und nur so
+    kann CI auf Linux und macOS UEBERHAUPT testen -- ein Grafik-Build braucht
+    dort X11/GL und einen virtuellen Bildschirm. Gemessen laufen mit dem
+    grafikfreien Build 2970 der 3386 Tests durch; die uebrigen haengen an
+    SCREEN, GUI, Sprites, Audio oder Eingabe.
+
+    NUR AUF ANFORDERUNG, per Umgebungsvariable `DHRT_OHNE_GRAFIK=1`. Ohne sie
+    aendert sich nichts -- der Windows-Lauf und jeder lokale Lauf sollen einen
+    fehlenden Grafik-Builtin weiterhin als Fehler sehen, sonst versteckt diese
+    Bequemlichkeit eines Tages eine echte Luecke.
+    """
+    if not os.environ.get("DHRT_OHNE_GRAFIK"):
+        return
+    if "im Rust-Kern noch nicht verfuegbar" in stderr:
+        pytest.skip("Build ohne Grafik: " + stderr.strip().splitlines()[-1][:120])
+
+
 @pytest.fixture
 def run_gb():
     """Fuehrt einen GB-Quelltext ueber die native Runtime (`dhrt run`) aus und
@@ -228,6 +300,7 @@ def run_gb():
         if r.returncode != 0:
             stderr = r.stderr or ""
             msg = _dhrt_err_message(stderr)
+            _ueberspringen_ohne_grafik(stderr)
             # Phasen-passenden Fehlertyp werfen, damit pytest.raises(ParseError/
             # LexerError/...) wie bisher trifft. dhrt unterscheidet keine
             # TYP-Fehler von anderen Laufzeitfehlern -> die kommen als
