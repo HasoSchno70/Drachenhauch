@@ -97,6 +97,18 @@ _SERIELL = {
 # Uebersprungen wird NUR, wenn `DHRT_OHNE_GRAFIK=1` gesetzt ist. Ohne die
 # Variable aendert sich nichts: der Windows-Lauf und jeder lokale Lauf sehen
 # diese Tests wie bisher.
+# Zwei Dateien pruefen Windows-Eigenheiten und haben anderswo keinen
+# Gegenstand -- gefunden beim ersten Linux-Lauf:
+#   test_formdesigner_document  normalisiert `forms\\a.dhform` zu `forms/a...`.
+#                               Auf Linux ist `\\` kein Trenner, sondern ein
+#                               gueltiges Zeichen im Dateinamen.
+#   test_export_signierbar      buendelt eine .exe und fasst dabei Dateirechte
+#                               an, die es unter POSIX so nicht gibt.
+_NUR_WINDOWS = {
+    "test_formdesigner_document.py",
+    "test_export_signierbar.py",
+}
+
 _BRAUCHT_GRAFIK = {
     "test_arc_width.py",
     "test_audio_modulators.py",
@@ -137,6 +149,9 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.qt)
         if item.path.name in _SERIELL:
             item.add_marker(pytest.mark.seriell)
+        if item.path.name in _NUR_WINDOWS and os.name != "nt":
+            item.add_marker(pytest.mark.skip(
+                reason="prueft Windows-Eigenheiten (Pfad-Trenner, .exe-Buendel)"))
         if item.path.name in _BRAUCHT_GRAFIK:
             item.add_marker(pytest.mark.grafik)
             if os.environ.get("DHRT_OHNE_GRAFIK"):

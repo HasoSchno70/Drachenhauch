@@ -33,7 +33,20 @@ fn sicherer_name(ziel: &Path, name: &str) -> Option<PathBuf> {
     let roh = PathBuf::from(&name);
     for teil in roh.components() {
         match teil {
-            Component::Normal(t) => pfad.push(t),
+            Component::Normal(t) => {
+                // `C:/Windows/...` ist NUR auf Windows ein absoluter Pfad.
+                // Auf Linux ist `C:` ein ganz gewoehnlicher Ordnername, und
+                // die Pruefung liess ihn durch -- entdeckt vom Linux-Job beim
+                // allerersten Lauf. Ausgebrochen waere damit nichts (der Pfad
+                // bleibt unter `ziel`), aber ein Archiv mit Laufwerksbuchstabe
+                // ist auf jedem System verdaechtig, und ein Ordner namens
+                // "C:" ist auf keinem gewollt. Also ueberall ablehnen.
+                let n = t.to_string_lossy();
+                let laufwerk = n.len() == 2 && n.ends_with(':')
+                    && n.chars().next().map(|c| c.is_ascii_alphabetic()).unwrap_or(false);
+                if laufwerk { return None; }
+                pfad.push(t);
+            }
             // Alles andere ist ein Ausbruchsversuch oder sinnlos.
             _ => return None,
         }
@@ -156,16 +169,19 @@ mod tests {
 
     #[test]
     fn ausbruchsversuche_werden_abgelehnt() {
-        let ziel = Path::new("C:/tmp/ziel");
+        // `C:/...` ist bewusst dabei: auf Windows ein absoluter Pfad, auf
+        // Linux ein Ordner namens "C:" -- abgelehnt wird es auf beiden.
+        let ziel = Path::new("/tmp/ziel");
         for boese in ["../raus.txt", "../../raus.txt", "/etc/passwd",
-                      "C:/Windows/system32/x.dll", "a/../../raus.txt", ""] {
+                      "C:/Windows/system32/x.dll", "a/../../raus.txt", "",
+                      "D:/daten.txt", "unter/C:/x.txt"] {
             assert!(sicherer_name(ziel, boese).is_none(), "durchgelassen: {}", boese);
         }
     }
 
     #[test]
     fn gewoehnliche_namen_gehen_durch() {
-        let ziel = Path::new("C:/tmp/ziel");
+        let ziel = Path::new("/tmp/ziel");
         assert_eq!(sicherer_name(ziel, "a.txt"), Some(ziel.join("a.txt")));
         assert_eq!(sicherer_name(ziel, "unter/b.txt"),
                    Some(ziel.join("unter").join("b.txt")));
@@ -175,7 +191,7 @@ mod tests {
     fn rueckwaertsschraegstrich_gilt_als_trenner() {
         // Kommt vor, obwohl die Spezifikation nur `/` erlaubt -- und `..\x`
         // muss genauso abgelehnt werden wie `../x`.
-        let ziel = Path::new("C:/tmp/ziel");
+        let ziel = Path::new("/tmp/ziel");
         assert_eq!(sicherer_name(ziel, "unter\\b.txt"),
                    Some(ziel.join("unter").join("b.txt")));
         assert!(sicherer_name(ziel, "..\\raus.txt").is_none());

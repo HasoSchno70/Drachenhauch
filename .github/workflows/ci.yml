@@ -144,11 +144,16 @@ jobs:
         working-directory: rust/drachenhauch_runtime
         run: cargo build --release --locked --features "db net http"
 
-      - name: Run tests (parallel, ohne Grafik)
-        run: pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+      # `not qt`: die Editor-Tests brauchen PySide6 mit libEGL/X11 auf dem
+      # Runner. Diesen Job interessiert die SPRACHE, nicht der Qt-Editor --
+      # der ist eine Windows-Desktop-Anwendung und wird oben getestet. Ein
+      # Haufen X11-Pakete nur fuers headless-Starten von Dialogen waere der
+      # falsche Handel.
+      - name: Run tests (parallel, ohne Grafik, ohne Qt)
+        run: pytest tests/ -q -n auto --dist loadfile -m "not seriell and not qt"
 
       - name: Run tests (seriell)
-        run: pytest tests/ -q -m seriell
+        run: pytest tests/ -q -m "seriell and not qt"
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher

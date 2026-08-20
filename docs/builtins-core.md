@@ -378,7 +378,9 @@ PRINT ZIP_EXTRACT("sicherung.zip", "entpackt")
 Einträge wie `../../autoexec.bat` oder `C:/Windows/x.dll` enthalten; wer den
 Namen aus dem Archiv einfach an den Zielordner hängt, schreibt damit
 außerhalb davon — der Angreifer wählt die Datei, du entpackst sie. Solche
-Einträge werden **übersprungen**, nicht geschrieben. `ZIP_EXTRACT` liefert die
+Einträge werden **übersprungen**, nicht geschrieben — auch ein
+Laufwerksbuchstabe wie `C:` gilt auf **jedem** System als Ausbruchsversuch,
+nicht nur auf Windows (auf Linux wäre `C:` sonst schlicht ein Ordnername). `ZIP_EXTRACT` liefert die
 Zahl der wirklich entstandenen Dateien zurück, damit ein Unterschied zur
 Länge von `ZIP_LIST` auffällt.
 
