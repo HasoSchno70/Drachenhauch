@@ -33,9 +33,13 @@ auftrag = TASK_START(Langsam, 21)
 PRINT "offene Auftraege: " + STR$(TASK_PENDING())
 PRINT ""
 
+' Ohne SLEEP dreht diese Schleife auf 100 % eines Kerns -- und nimmt dem
+' Auftrag daneben die Rechenzeit weg. In einem Spiel bremst FLIP() sie
+' ohnehin; hier zaehlen wir nur mit und schlafen dazwischen.
 runden = 0
 WHILE NOT TASK_READY(auftrag)
     runden = runden + 1
+    SLEEP(1)
 WEND
 
 PRINT "Ergebnis:  " + TASK_RESULT$(auftrag)

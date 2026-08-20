@@ -102,7 +102,7 @@ jobs:
   #
   # Der Kniff: `dhrt` OHNE Grafik bauen (`default = []`, also kein raylib).
   # Damit braucht der Runner weder X11 noch GL noch einen virtuellen
-  # Bildschirm. Gemessen kommen so 2963 Tests durch und 382 werden
+  # Bildschirm. Gemessen kommen so 2978 Tests durch und 367 werden
   # uebersprungen -- die Sprache selbst, Dateien, Netz, Datenbank, CSV, ZIP,
   # Mengen, Namensraeume und Hintergrund-Auftraege sind vollstaendig dabei.
   # Uebersprungen wird, was Pixel, Fenster, Audio-Pegel oder Eingabe prueft

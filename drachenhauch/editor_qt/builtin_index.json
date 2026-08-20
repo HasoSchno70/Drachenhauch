@@ -6922,7 +6922,7 @@
   },
   {
    "name": "SLEEP",
-   "kind": "graphics",
+   "kind": "core",
    "signature": "SLEEP(ms: Zahl)",
    "module": "core"
   },

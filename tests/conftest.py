@@ -85,8 +85,8 @@ _SERIELL = {
 # Linux und macOS ueberhaupt TESTEN statt bloss `cargo check` zu fahren -- ein
 # Grafik-Build braucht dort X11/GL und einen virtuellen Bildschirm.
 #
-# Gemessen mit dem grafikfreien Build: 2970 Tests laufen durch (2963 parallel
-# + 7 seriell), 416 werden uebersprungen. Davon melden 188 einen fehlenden
+# Gemessen mit dem grafikfreien Build: 2985 Tests laufen durch (2978 parallel
+# + 7 seriell), 401 werden uebersprungen. Davon melden 188 einen fehlenden
 # Grafik-Builtin -- die faengt `_ueberspringen_ohne_grafik` einzeln ab, damit
 # gemischte Dateien nicht ganz herausfallen. Diese 22 Dateien scheitern
 # anders: sie pruefen Pixel, Fenster, Audio-Pegel oder Eingabe und haben ohne
@@ -242,7 +242,7 @@ def _ueberspringen_ohne_grafik(stderr: str) -> None:
     Wozu: `dhrt` laesst sich ohne raylib bauen (`default = []`), und nur so
     kann CI auf Linux und macOS UEBERHAUPT testen -- ein Grafik-Build braucht
     dort X11/GL und einen virtuellen Bildschirm. Gemessen laufen mit dem
-    grafikfreien Build 2970 der 3386 Tests durch; die uebrigen haengen an
+    grafikfreien Build 2985 der 3386 Tests durch; die uebrigen haengen an
     SCREEN, GUI, Sprites, Audio oder Eingabe.
 
     NUR AUF ANFORDERUNG, per Umgebungsvariable `DHRT_OHNE_GRAFIK=1`. Ohne sie

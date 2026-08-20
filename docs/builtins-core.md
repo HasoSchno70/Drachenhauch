@@ -400,11 +400,20 @@ DIM auftrag AS INTEGER
 auftrag = TASK_START(BerechneKarte, 4242)
 
 WHILE NOT TASK_READY(auftrag)
-    ' Spiel läuft weiter, Bild für Bild
+    ' im Spiel: hier steht ohnehin FLIP(), das bremst schon
+    ' in einem Konsolenprogramm: SLEEP(10), sonst dreht die
+    ' Schleife auf 100 % eines Kerns
+    SLEEP(10)
 WEND
 
 PRINT TASK_RESULT$(auftrag)
 ```
+
+**Warte nicht ohne Pause.** `TASK_READY` fragt nur nach und kehrt sofort
+zurück — eine Schleife darum herum läuft also so schnell, wie der Rechner
+kann, und verbrennt einen Kern, während der Auftrag daneben rechnen soll. In
+einem Spiel bremst `FLIP()` die Schleife ohnehin auf die Bildrate. In einem
+Konsolenprogramm gehört ein `SLEEP(10)` hinein.
 
 | Funktion | Zweck |
 |---|---|

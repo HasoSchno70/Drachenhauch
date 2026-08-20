@@ -3524,6 +3524,17 @@ impl<'p> Vm<'p> {
     /// Puffer zuerst.
     fn try_os(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if let Some(v) = self.try_pruefen(name, a)? { return Ok(Some(v)); }
+        // SLEEP hat nichts mit Grafik zu tun -- `std::thread::sleep`, sonst
+        // nichts. Es sass trotzdem in `try_graphics` und war damit in einem
+        // Build ohne raylib nicht verfuegbar. Aufgefallen beim Linux-CI-Job:
+        // ein Konsolenprogramm, das auf einen Hintergrund-Auftrag wartet,
+        // braucht genau das, um sich zu bremsen -- ohne SLEEP dreht die
+        // Warteschleife auf 100% eines Kerns.
+        if name == "sleep" {
+            let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            return Ok(Some(Value::Nil));
+        }
         if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
         fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
@@ -5133,11 +5144,6 @@ impl<'p> Vm<'p> {
             // raylib-Default-Font hat keine Bold/Italic-Variante -> No-Op
             // (visuelle Abweichung, Programm laeuft). Arg wird ignoriert.
             "text_bold" | "text_italic" => Value::Nil,
-            "sleep" => {
-                let ms = gi(a, 0, "SLEEP")?.max(0) as u64;
-                std::thread::sleep(std::time::Duration::from_millis(ms));
-                Value::Nil
-            }
             "set_fullscreen" => { g!().set_fullscreen(gb(a, 0)); Value::Nil }
             "mouse_visible" => { g!().mouse_visible(gb(a, 0)); Value::Nil }
             "mouse_lock" => { g!().mouse_lock(gb(a, 0)); Value::Nil }

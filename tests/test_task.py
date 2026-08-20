@@ -16,12 +16,16 @@ import subprocess
 import pytest
 
 
+# Der Auftrag muss nicht LANGE rechnen -- allein der Prozessstart kostet rund
+# 12 ms, und darauf warten die Tests. Eine grosse Schleife hier hiesse nur,
+# auf einem schwachen Rechner (CI: zwei Kerne) beide Seiten gegeneinander
+# rechnen zu lassen, waehrend die Warteschleife einen Kern verbrennt.
 LANGSAM = (
     "FUNCTION Langsam(x AS INTEGER) AS INTEGER\n"
     "    DIM i AS INTEGER\n"
     "    DIM s AS INTEGER\n"
     "    s = 0\n"
-    "    FOR i = 1 TO 400000\n"
+    "    FOR i = 1 TO 2000\n"
     "        s = s + i MOD 7\n"
     "    NEXT\n"
     "    RETURN x * 2\n"
@@ -49,6 +53,7 @@ def test_auftrag_rechnet_und_liefert(dhrt_pfad, tmp_path):
                      "DIM a AS INTEGER\n"
                      "a = TASK_START(Langsam, 21)\n"
                      "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      "PRINT TASK_RESULT$(a)\n")
     assert out.strip() == "42", (out, err)
@@ -74,6 +79,7 @@ def test_pending_zaehlt(dhrt_pfad, tmp_path):
                      "a = TASK_START(Langsam, 1)\n"
                      "PRINT TASK_PENDING()\n"
                      "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      'PRINT TASK_RESULT$(a)\n'
                      "PRINT TASK_PENDING()\n")
@@ -87,6 +93,7 @@ def test_text_als_argument_und_ergebnis(dhrt_pfad, tmp_path):
                      "DIM a AS INTEGER\n"
                      'a = TASK_START(Gruss, "welt")\n'
                      "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      "PRINT TASK_RESULT$(a)\n")
     assert out.strip() == "hallo welt", (out, err)
@@ -102,6 +109,7 @@ def test_auftrag_sieht_die_globals_NICHT(dhrt_pfad, tmp_path):
                    "DIM a AS INTEGER\n"
                    "a = TASK_START(Nutzt)\n"
                    "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                    "WEND\n"
                    "PRINT TASK_RESULT$(a)\n")
     assert "Hauptprogramm laeuft dabei NICHT" in err, err
@@ -112,6 +120,7 @@ def test_unbekannte_funktion_meldet(dhrt_pfad, tmp_path):
                    "DIM a AS INTEGER\n"
                    'a = TASK_START("Gibtsnicht", 1)\n'
                    "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                    "WEND\n"
                    "PRINT TASK_RESULT$(a)\n")
     assert "gibt es nicht" in err, err
@@ -135,6 +144,7 @@ def test_ergebnis_ist_nur_einmal_abholbar(dhrt_pfad, tmp_path):
                    "DIM a AS INTEGER\n"
                    "a = TASK_START(Langsam, 1)\n"
                    "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                    "WEND\n"
                    "PRINT TASK_RESULT$(a)\n"
                    "PRINT TASK_RESULT$(a)\n")
@@ -175,8 +185,10 @@ def test_mehrere_auftraege_nebeneinander(dhrt_pfad, tmp_path):
                      "b = TASK_START(Langsam, 2)\n"
                      "PRINT TASK_PENDING()\n"
                      "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      "WHILE NOT TASK_READY(b)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      'PRINT TASK_RESULT$(a) + "," + TASK_RESULT$(b)\n')
     zeilen = out.split("\n")
@@ -196,6 +208,7 @@ def test_pending_zaehlt_das_UNABGEHOLTE_nicht_das_laufende(dhrt_pfad, tmp_path):
                      "DIM a AS INTEGER\n"
                      "a = TASK_START(Langsam, 1)\n"
                      "WHILE NOT TASK_READY(a)\n"
+                     "    SLEEP(2)\n"
                      "WEND\n"
                      "PRINT TASK_PENDING()\n"
                      "PRINT TASK_RESULT$(a)\n"

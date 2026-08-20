@@ -33,6 +33,10 @@ auftrag = TASK_START(BerechneWeltkarte, 4242)
 IF TASK_READY(auftrag) THEN PRINT TASK_RESULT$(auftrag)
 ```
 
+*(Nachtrag: eine Warteschleife um `TASK_READY` braucht ein `SLEEP` — sonst
+verbrennt sie einen Kern, den der Auftrag selbst gebrauchen könnte. Das fiel
+erst auf, als CI dadurch von 8 auf 18 Minuten kletterte.)*
+
 ## 2. Warum es bisher nicht geht
 
 `Value` hält Zeichenketten, Arrays, Maps und Objekte durchgehend in `Rc`
