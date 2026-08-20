@@ -403,7 +403,7 @@ hat jetzt in beiden ein `abstracts`.
 Tests: `tests/test_vererbung.py` (20). Beispiel: `examples/167_vererbung.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Klassen und Strukturen".
 
-## WP H — Nebenläufigkeit (teilweise erledigt 2026-08-17)
+## WP H — Nebenläufigkeit (✅ ERLEDIGT — Hintergrund-Aufträge 2026-08-17, `TASK_*` 2026-08-19)
 
 Coroutines sind kooperativ und frame-getrieben. Nur HTTP hatte einen
 Hintergrund-Pfad (`HTTP_GET_START`/`READY`/`RESULT`); ein langer SQL-Lauf fror
@@ -538,17 +538,17 @@ als Ausgangspunkt:
       Debugger (`flush_and_prompt`, `read_input_line` in `vm.rs`). Behoben,
       zwei Tests in `tests/test_dhrt_debug.py` halten es fest
 
-## Python-Parser entfernen (Entwurf liegt vor)
+## Python-Parser entfernt (✅ ERLEDIGT 2026-08-19)
 
 > **[entwurf-python-parser-entfernen.md](entwurf-python-parser-entfernen.md).**
-> Beim Ausführen ist Python längst nicht beteiligt — ein zweiter Parser lebt
-> aber weiter und kostet bei jeder Sprachänderung Doppelarbeit (zuletzt bei
-> `PRIVATE` und den punktierten Typnamen). Gemessen: 3196 Zeilen, zwei echte
-> Nutzer, und der Editor-Rückfall greift nur, wenn `dhrt` gar nicht gebaut ist
-> — also wenn ohnehin nichts läuft. Die Arbeit steckt nicht im Löschen,
-> sondern darin, 11 Testdateien vorher zu triagieren. **Triage erledigt**
-> (Abschnitt 3): es sind ~20 Einzelstellen, nicht 2639 Zeilen — meine erste
-> Schätzung nach Dateigröße lag um eine Größenordnung daneben.
+> Beim Ausführen war Python längst nicht mehr beteiligt — ein zweiter Parser
+> lebte aber weiter und kostete bei jeder Sprachänderung Doppelarbeit (zuletzt
+> bei `PRIVATE` und den punktierten Typnamen). Entfernt sind **2450 Zeilen**
+> (`parser.py`, `ast_nodes.py`) plus vier Parity-Testdateien; `lexer.py` und
+> `tokens.py` bleiben, weil die Syntaxhervorhebung des Editors sie braucht —
+> das stand im Entwurf zunächst falsch und ist dort richtiggestellt.
+>
+> Eine Sprachänderung fasst seither **einen** Parser an.
 
 ## Plattform
 
@@ -560,23 +560,27 @@ mindestens Linux fällig.
 
 ---
 
-## Empfohlene Reihenfolge
+## Die Reihenfolge, rückblickend
 
-**~~A~~ → ~~B~~ → ~~C~~ → ~~D~~ → ~~E~~ → ~~F~~ → ~~G~~ → H → I** (A bis G erledigt, H teilweise — der `TASK_*`-Teil braucht eine eigene Entscheidung, siehe dort)
+**A → B → C → D → E → F → G → H → I → J**, und so ist es auch gelaufen
+(2026-08-17 bis 19). Die Begründung war durchgehend „wie viele neue Programme
+macht das möglich, pro Aufwand":
 
-Die Begründung ist durchgehend „wie viele neue Programme wird das möglich
-machen, pro Aufwand":
+- **A** war klein und machte aus Drachenhauch schlagartig eine Skriptsprache.
+  Ohne A blieb jedes Programm eine Insel — der eine Punkt, an dem
+  „Tausendsassa" konkret scheiterte.
+- **B** war die Voraussetzung für C, D und ZIP.
+- **C** und **D** öffneten zusammen die Welt der angemeldeten Web-Dienste.
+- **E** zahlte sich ab dann bei jedem weiteren Schritt selbst zurück.
+- **F** und **G** waren Bequemlichkeit für großen Code, kein Türöffner.
+- **H** wurde dringend, sobald Programme länger laufen als ein Frame.
+- **I** kam zuletzt, weil es als einziges den Bestand anfasste — und ging
+  trotzdem ohne eine Änderung an VM, Bytecode oder Debugger durch.
 
-- **A** ist klein und macht aus Drachenhauch schlagartig eine Skriptsprache.
-  Ohne A bleibt jedes Programm eine Insel — das ist der eine Punkt, an dem
-  „Tausendsassa" heute konkret scheitert.
-- **B** ist die Voraussetzung für C, D und ZIP.
-- **C** und **D** sind je ein überschaubarer Brocken und öffnen zusammen die
-  gesamte Welt der angemeldeten Web-Dienste.
-- **E** zahlt sich ab dann bei jedem weiteren Schritt selbst zurück.
-- **F** und **G** sind Bequemlichkeit für großen Code, kein Türöffner.
-- **H** wird erst dringend, wenn Programme länger laufen als ein Frame.
-- **I** zuletzt, weil es als einziges den Bestand anfasst.
+Was sich unterwegs als falsch erwies, steht in den vier Entwürfen: bei den
+Mengen fiel der Grund weg, bevor gebaut wurde; beim Parser-Schnitt war die
+Schätzung zehnfach zu hoch; bei `TASK_START` lag ein dritter Weg die ganze
+Zeit da, und zwei Entwurfsdetails hielten dem Bauen nicht stand.
 
 ## Bewusst nicht auf der Liste
 
