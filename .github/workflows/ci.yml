@@ -103,8 +103,20 @@ jobs:
       # exklusiv brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene
       # Laufzeiten) -- Begruendung je Datei in conftest.py bei `_SERIELL`.
       # Zusammen decken die beiden Durchgaenge die Suite exakt ab: 3084 + 41.
+      # `--max-worker-restart=0`: stirbt ein Arbeiter NATIV weg (Access
+      # Violation in Qts C++-Teardown -- siehe den Hinweis zu
+      # spriteeditor_qt_canvas oben), dann bricht pytest sofort ab, statt auf
+      # ihn zu warten.
+      #
+      # Gemessen am 2026-08-20: ein solcher Absturz in
+      # test_editor_qt_debugger.py liess den Lauf 31 MINUTEN haengen -- 3135
+      # Tests waren durch, einer abgestuerzt, und xdist wartete auf einen
+      # Prozess, den es nicht mehr gab. Ohne Abbruch sieht das von aussen aus
+      # wie ein Haenger und kostet den halben Vormittag.
+      #
+      # Das behebt den Absturz NICHT. Es macht ihn sichtbar statt laehmend.
       - name: Run tests (parallel)
-        run: pytest tests/ -q -n auto --dist loadfile -m "not seriell" -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
+        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell" -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
 
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
@@ -180,7 +192,7 @@ jobs:
       # Haufen X11-Pakete nur fuers headless-Starten von Dialogen waere der
       # falsche Handel.
       - name: Run tests (parallel, ohne Grafik, ohne Qt)
-        run: pytest tests/ -q -n auto --dist loadfile -m "not seriell and not qt"
+        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
 
       - name: Run tests (seriell)
         run: pytest tests/ -q -m "seriell and not qt"
