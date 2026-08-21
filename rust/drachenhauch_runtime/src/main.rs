@@ -197,7 +197,7 @@ fn main() -> ExitCode {
         // bei Diagnosen -- so unterscheidet der Editor "Probleme gefunden" von
         // "Tool-Fehler" (I/O -> Exit 1). Ersetzt die Python-Compiler-Pruefung.
         if raw.len() >= 3 && raw[1] == "--check" {
-            return check_main(&raw[2]);
+            return check_main(&raw[2..]);
         }
         // Stufe 4: IMPORT-Preprocessor -- gibt die gemergte Quelle aus
         // (Merge-Parity gegen preprocess.process()).
@@ -573,21 +573,53 @@ fn debug_main(path: &str) -> ExitCode {
 /// aus (leer = fehlerfrei). Exit 0 auch bei gefundenen Problemen; nur ein
 /// I/O-Fehler liefert Exit 1. Zeilen beziehen sich auf die GEMERGTE Quelle
 /// (nach IMPORT-Expansion) -- der Editor mappt via origins zurueck.
-fn check_main(path: &str) -> ExitCode {
-    let raw_source = match std::fs::read_to_string(path) {
-        Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
-    };
-    let base = std::path::Path::new(path).parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    // Der Dateiname als Label -- sonst rendert ein Verweis auf die
-    // Hauptdatei im Meldungstext als nacktes ":5".
-    let label = std::path::Path::new(path).file_name()
-        .map(|s| s.to_string_lossy().into_owned())
-        .unwrap_or_else(|| path.to_string());
-    let diags = check_source(&raw_source, &base, &label);
-    println!("{}", serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into()));
+/// `dhrt --check <datei> [datei ...]`
+///
+/// EINE Datei: die Antwort ist das Diagnose-Array wie eh und je -- der Editor
+/// (`error_check.py`) haengt daran, und das bleibt so.
+///
+/// MEHRERE Dateien: eine JSON-Zeile je Datei, `{"datei": ..., "probleme": [...]}`.
+/// Der Grund ist gemessen: die Tests riefen `--check` einzeln fuer jede der
+/// 185 Beispieldateien auf, dreimal ueber verschiedene Tests -- 555
+/// Prozessstarts, und auf CI der teuerste Testblock ueberhaupt (32 s von
+/// 232 s). Ein Aufruf statt 185 spart die Startzeit, nicht die Arbeit.
+///
+/// Nuetzlich ist es auch ausserhalb der Tests: der Editor koennte ein ganzes
+/// Projekt in einem Rutsch pruefen, statt Datei fuer Datei einen Prozess zu
+/// starten.
+fn check_main(pfade: &[String]) -> ExitCode {
+    let einzeln = pfade.len() == 1;
+    for pfad in pfade {
+        let raw_source = match std::fs::read_to_string(pfad) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Kann '{}' nicht lesen: {}", pfad, e);
+                if einzeln { return ExitCode::from(1); }
+                // Bei mehreren nicht abbrechen: eine unlesbare Datei soll die
+                // 184 anderen nicht um ihre Diagnose bringen.
+                println!("{}", serde_json::json!({
+                    "datei": pfad,
+                    "probleme": [{"line": 1, "col": 1, "severity": "error",
+                                  "phase": "datei",
+                                  "message": format!("nicht lesbar: {}", e)}]}));
+                continue;
+            }
+        };
+        let base = std::path::Path::new(pfad).parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        // Der Dateiname als Label -- sonst rendert ein Verweis auf die
+        // Hauptdatei im Meldungstext als nacktes ":5".
+        let label = std::path::Path::new(pfad).file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| pfad.to_string());
+        let diags = check_source(&raw_source, &base, &label);
+        if einzeln {
+            println!("{}", serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into()));
+        } else {
+            println!("{}", serde_json::json!({"datei": pfad, "probleme": diags}));
+        }
+    }
     ExitCode::SUCCESS
 }
 

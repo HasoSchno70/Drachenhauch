@@ -59,21 +59,58 @@ def test_compile_error_return_outside_function_has_line(tmp_path):
     assert d and d[0]["phase"] == "compile" and d[0]["line"] == 2
 
 
+def _check_viele(dateien):
+    """`dhrt --check` EINMAL fuer alle Dateien -- statt einmal je Datei.
+
+    Gemessen: die drei Sweeps unten riefen `--check` fuer jede der 185
+    Beispieldateien einzeln auf, macht 555 Prozessstarts. Auf CI waren das
+    32 s von 232 s Testzeit, und weil `--dist loadfile` die Tests einer Datei
+    beim selben Arbeiter haelt, lagen sie alle auf demselben kritischen Pfad.
+
+    Bei mehreren Dateien antwortet dhrt mit einer JSON-Zeile je Datei. Liefert
+    {Dateiname: [Diagnosen]}.
+    """
+    if not dateien:
+        return {}
+    # In Stuecken: Windows begrenzt die Kommandozeile auf rund 32 000 Zeichen.
+    # Hier passen 189 Pfade zwar hinein, aber das haengt an der Laenge des
+    # Projektpfads -- unter einem tieferen Ordner faellt es sonst um.
+    zeilen = []
+    stueck, laenge = [], 0
+    for f in dateien:
+        t = str(f)
+        if stueck and laenge + len(t) + 3 > 24000:
+            r = subprocess.run([str(_DHRT), "--check"] + stueck,
+                               capture_output=True, text=True, timeout=300)
+            zeilen.extend((r.stdout or "").splitlines())
+            stueck, laenge = [], 0
+        stueck.append(t)
+        laenge += len(t) + 3
+    if stueck:
+        r = subprocess.run([str(_DHRT), "--check"] + stueck,
+                           capture_output=True, text=True, timeout=300)
+        zeilen.extend((r.stdout or "").splitlines())
+
+    raus = {}
+    for zeile in zeilen:
+        zeile = zeile.strip()
+        if not zeile:
+            continue
+        eintrag = json.loads(zeile)
+        raus[Path(eintrag["datei"]).name] = eintrag["probleme"]
+    return raus
+
+
 def test_all_examples_check_clean():
     """Kein Fehlalarm: jedes gueltige Beispiel meldet keine *Errors*
     (Null-False-Positive). Warnungen (z.B. fehlendes Hardware-Modul im
     Default-Build, siehe Hardware-Beispiele 35-38) sind erlaubt -- sie sind
     keine Fehler, sondern ein bewusster Hinweis."""
-    bad = []
-    for f in sorted(_EXAMPLES.glob("*.dh")):
-        if "_smoketest" in f.name:
-            continue
-        r = subprocess.run([str(_DHRT), "--check", str(f)],
-                           capture_output=True, text=True, timeout=30)
-        diags = json.loads(r.stdout or "[]")
-        errors = [d for d in diags if d.get("severity") != "warning"]
-        if errors:
-            bad.append((f.name, errors))
+    dateien = [f for f in sorted(_EXAMPLES.glob("*.dh"))
+               if "_smoketest" not in f.name]
+    bad = [(name, [d for d in diags if d.get("severity") != "warning"])
+           for name, diags in _check_viele(dateien).items()
+           if any(d.get("severity") != "warning" for d in diags)]
     assert not bad, f"Fehlalarme bei gueltigem Code: {bad}"
 
 
@@ -83,16 +120,11 @@ def test_examples_use_no_unknown_builtin():
     aber nicht im Index ergaenzt wurde (-> der Index bleibt vollstaendig, sonst
     wuerde gueltiger Code faelschlich die 'Unbekanntes Builtin'-Warnung kriegen).
     Greift Hand in Hand mit compiler::is_known_builtin (G1, systemisch)."""
-    drift = []
-    for f in sorted(_EXAMPLES.rglob("*.dh")):
-        if "_smoketest" in f.name:
-            continue
-        r = subprocess.run([str(_DHRT), "--check", str(f)],
-                           capture_output=True, text=True, timeout=30)
-        diags = json.loads(r.stdout or "[]")
-        for d in diags:
-            if "Unbekanntes Builtin" in d.get("message", ""):
-                drift.append((f.name, d.get("line"), d.get("message")))
+    dateien = [f for f in sorted(_EXAMPLES.rglob("*.dh"))
+               if "_smoketest" not in f.name]
+    drift = [(name, d.get("line"), d.get("message"))
+             for name, diags in _check_viele(dateien).items()
+             for d in diags if "Unbekanntes Builtin" in d.get("message", "")]
     assert not drift, (
         "Beispiele nutzen Builtins, die dhrt nicht (im builtin_index.json) "
         f"kennt -> Index ergaenzen: {drift}")
@@ -194,11 +226,44 @@ def test_array_gegen_skalar_warnt_lesbar(tmp_path):
 
 def test_kein_beispiel_loest_die_dim_warnung_aus():
     """Eine neue Warnung, die auf dem eigenen Bestand losgeht, ist Laerm."""
-    laut = []
-    for f in sorted(_EXAMPLES.rglob("*.dh")):
-        r = subprocess.run([str(_DHRT), "--check", str(f)],
-                           capture_output=True, text=True, timeout=60)
-        for d in json.loads(r.stdout or "[]"):
-            if d.get("severity") == "warning" and "schon als" in d.get("message", ""):
-                laut.append(f"{f.name}:{d.get('line')}")
+    laut = [f"{name}:{d.get('line')}"
+            for name, diags in _check_viele(sorted(_EXAMPLES.rglob("*.dh"))).items()
+            for d in diags
+            if d.get("severity") == "warning" and "schon als" in d.get("message", "")]
     assert laut == [], laut
+
+
+def test_check_mit_einer_datei_bleibt_ein_array(tmp_path):
+    """Rueckwaertskompatibel: der Editor (`error_check.py`) erwartet bei EINER
+    Datei genau das Diagnose-Array, kein Objekt. Das bleibt so."""
+    f = tmp_path / "a.dh"
+    f.write_text("PRINT 1\n", encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "--check", str(f)],
+                       capture_output=True, text=True, timeout=60)
+    assert json.loads(r.stdout.strip()) == []
+
+
+def test_check_mit_mehreren_dateien_nennt_die_datei(tmp_path):
+    """Bei mehreren: eine JSON-Zeile je Datei, mit Namen -- sonst waere nicht
+    zuzuordnen, welcher Fehler woher kommt."""
+    gut = tmp_path / "gut.dh"
+    gut.write_text("PRINT 1\n", encoding="utf-8")
+    schlecht = tmp_path / "schlecht.dh"
+    schlecht.write_text("DIM x AS\n", encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "--check", str(gut), str(schlecht)],
+                       capture_output=True, text=True, timeout=60)
+    zeilen = [json.loads(z) for z in r.stdout.splitlines() if z.strip()]
+    nach_name = {Path(e["datei"]).name: e["probleme"] for e in zeilen}
+    assert nach_name["gut.dh"] == []
+    assert nach_name["schlecht.dh"], "der Parse-Fehler muss gemeldet werden"
+
+
+def test_check_bricht_bei_einer_unlesbaren_datei_nicht_ab(tmp_path):
+    """Eine fehlende Datei darf die anderen nicht um ihre Diagnose bringen."""
+    gut = tmp_path / "gut.dh"
+    gut.write_text("PRINT 1\n", encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "--check", str(tmp_path / "weg.dh"), str(gut)],
+                       capture_output=True, text=True, timeout=60)
+    namen = {Path(json.loads(z)["datei"]).name
+             for z in r.stdout.splitlines() if z.strip()}
+    assert namen == {"weg.dh", "gut.dh"}, namen
