@@ -83,7 +83,11 @@ def process(source: str, base_path: Path | None = None,
                 line_idx, 1,
             )
         try:
-            content = target.read_text(encoding="utf-8")
+            # utf-8-sig: schneidet ein fuehrendes BOM ab, falls eines da
+            # ist, und verhaelt sich sonst wie utf-8. Windows-Editoren
+            # schreiben es gern; dhrt nimmt es in preprocess.rs ebenso
+            # weg, und beide sollen dieselbe Datei gleich sehen.
+            content = target.read_text(encoding="utf-8-sig")
         except OSError as exc:
             raise LexerError(f"IMPORT: Lesefehler bei {rel}: {exc}", line_idx, 1)
         seen.add(target)

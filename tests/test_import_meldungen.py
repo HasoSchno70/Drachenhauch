@@ -110,3 +110,33 @@ def test_mehrere_module_werden_richtig_zugeordnet(dhrt_pfad, tmp_path):
     assert "e1.dh:1" in err, err
     assert "e2.dh:2" in err, err
     assert "main.dh:3" in err, err
+
+
+# --- BOM ------------------------------------------------------------------
+
+def test_bom_in_der_hauptdatei_stoert_nicht(dhrt_pfad, tmp_path):
+    r"""Windows-Editoren schreiben UTF-8 gern mit Byte-Reihenfolge-Markierung.
+
+    Der Lexer meldete dafuer "Unbekanntes Zeichen: '\u{feff}'" in Zeile 1 --
+    die schlimmste Sorte Fehler: das Zeichen ist unsichtbar, die Meldung sagt
+    einem Menschen nichts, und die Datei sieht im Editor voellig richtig aus.
+    Gefunden beim Testen des Installers, weil PowerShell beim Schreiben der
+    Probedatei von sich aus ein BOM setzte.
+    """
+    import subprocess
+    (tmp_path / "main.dh").write_bytes(b"\xef\xbb\xbfPRINT 42\n")
+    r = subprocess.run([dhrt_pfad, "run", str(tmp_path / "main.dh")],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert (r.stdout or "").strip() == "42", (r.stdout, r.stderr)
+
+
+def test_bom_in_einer_importierten_datei_stoert_nicht(dhrt_pfad, tmp_path):
+    """Auch das Modul darf eins haben -- sonst faellt es beim Zusammenfuegen
+    mitten in den gemergten Text."""
+    import subprocess
+    (tmp_path / "m.dh").write_bytes(
+        b"\xef\xbb\xbfFUNCTION F() AS INTEGER\n    RETURN 5\nEND FUNCTION\n")
+    (tmp_path / "main.dh").write_text('IMPORT "m.dh"\nPRINT F()\n', encoding="utf-8")
+    r = subprocess.run([dhrt_pfad, "run", str(tmp_path / "main.dh")],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert (r.stdout or "").strip() == "5", (r.stdout, r.stderr)

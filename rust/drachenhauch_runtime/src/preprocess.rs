@@ -259,6 +259,21 @@ pub fn stelle(tabelle: &[Herkunft], zeile: u32, haupt: &str) -> String {
     }
 }
 
+/// Ein fuehrendes BOM abschneiden.
+///
+/// Windows-Editoren schreiben UTF-8 gern mit Byte-Reihenfolge-Markierung --
+/// Notepad und PowerShells `Set-Content -Encoding utf8` tun es von sich aus.
+/// Fuer den Lexer war das bisher ein Zeichen wie jedes andere, und er meldete
+/// "Unbekanntes Zeichen: '\u{feff}'" in Zeile 1. Die schlimmste Sorte Fehler:
+/// das Zeichen ist UNSICHTBAR, die Meldung sagt einem Menschen nichts, und die
+/// Datei sieht im Editor vollkommen richtig aus.
+///
+/// Ein BOM ist keine Programmzeile, sondern eine Kodierungs-Notiz. Es wird
+/// hier weggenommen -- bei der Hauptdatei wie bei jeder importierten.
+fn ohne_bom(text: &str) -> &str {
+    text.strip_prefix('\u{feff}').unwrap_or(text)
+}
+
 /// Vierter Rueckgabewert (WP I.1): `(datei, alias)` je `IMPORT "x.dh" AS x`.
 /// Bis hierher wurde der Alias bei QUELLDATEIEN stillschweigend verworfen --
 /// der Regex kannte `AS` laengst, aber nur die eingebauten Module werteten
@@ -272,7 +287,7 @@ pub fn process(source: &str, base: &Path)
     let mut imports: Vec<(String, Option<String>)> = Vec::new();
     let mut herkunft: Vec<Herkunft> = Vec::new();
     let mut namensraeume: Vec<(String, String)> = Vec::new();
-    process_inner(source, base, "", &mut seen, &mut out, &mut imports,
+    process_inner(ohne_bom(source), base, "", &mut seen, &mut out, &mut imports,
                   &mut herkunft, &mut namensraeume)?;
     Ok((out.join("\n"), imports, herkunft, namensraeume))
 }
@@ -369,8 +384,8 @@ fn process_inner(
         // Koordinate, die der Nutzer anfassen kann, ist SEINE IMPORT-Zeile;
         // die innere Position gehoert in den Meldungstext (gleiche Behandlung
         // wie in drachenhauch/preprocess.py).
-        process_inner(&content, &inner_base, &rel, seen, out, imports, herkunft,
-                      namensraeume)
+        process_inner(ohne_bom(&content), &inner_base, &rel, seen, out, imports,
+                      herkunft, namensraeume)
             .map_err(|e| PreprocessError {
                 line: line_idx,
                 msg: format!("in {}: (Zeile {}) {}", rel, e.line, e.msg),
