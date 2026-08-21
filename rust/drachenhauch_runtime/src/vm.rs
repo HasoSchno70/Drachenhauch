@@ -3710,7 +3710,7 @@ impl<'p> Vm<'p> {
                     // Abholen ohne vorheriges SHELL_READY ist der haeufigste
                     // Anfaengerfehler -- die Meldung sagt, was fehlt.
                     None => return Err(format!(
-                        "SHELL_RESULT$: Auftrag {} ist nicht fertig (oder schon abgeholt)                          -- erst SHELL_READY({}) abfragen", id, id)),
+                        "SHELL_RESULT$: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst SHELL_READY({}) abfragen", id, id)),
                 }
             }
             "shell_code" => {
@@ -3763,7 +3763,7 @@ impl<'p> Vm<'p> {
                     }
                     Some(Err(msg)) => return Err(msg),
                     None => return Err(format!(
-                        "DB_QUERY_RESULT: Auftrag {} ist nicht fertig (oder schon abgeholt)                          -- erst DB_QUERY_READY({}) abfragen", id, id)),
+                        "DB_QUERY_RESULT: Auftrag {} ist nicht fertig (oder schon abgeholt) -- erst DB_QUERY_READY({}) abfragen", id, id)),
                 }
             }
             "db_query_cancel" => { self.db_auftraege.abbrechen(bi_int(a, 0, "DB_QUERY_CANCEL")?); Value::Nil }
@@ -5244,7 +5244,7 @@ impl<'p> Vm<'p> {
             "file_open_dialog" | "file_save_dialog" | "folder_dialog"
             | "gui_message" | "gui_confirm" => {
                 return Err(format!(
-                    "{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es                      nur auf dem Desktop (Feature `dialogs`), nicht im Browser.",
+                    "{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es nur auf dem Desktop (Feature `dialogs`), nicht im Browser.",
                     name.to_uppercase()));
             }
 

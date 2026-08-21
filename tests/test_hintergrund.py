@@ -87,12 +87,28 @@ def test_mehrere_auftraege_gleichzeitig(run_gb, tmp_path):
     assert out.split() == ["2", "10", "100"]
 
 
-def test_abholen_ohne_ready_sagt_was_fehlt(run_gb, tmp_path):
+def test_abholen_ohne_ergebnis_sagt_was_fehlt(run_gb, tmp_path):
+    """Zweimal abholen -- beim zweiten Mal ist nichts mehr da.
+
+    Frueher stand hier "abholen, OHNE vorher READY zu fragen". Das war ein
+    Wettlauf: die Pruefung ging nur auf, solange die Abfrage noch LIEF. Unter
+    Linux war ein SELECT ueber zehn Zeilen schneller fertig als der naechste
+    Bytecode-Befehl, und der Test fiel um (CI-Lauf 32510397485); Windows
+    gewann das Rennen bloss zufaellig.
+
+    Beide Wege landen an derselben Stelle: `abholen` gibt None zurueck, und
+    die VM macht daraus diese Meldung. Ueber das zweite Abholen ist sie ohne
+    jede Zeitannahme zu erreichen. Den Zweig "laeuft noch" deckt test_task.py
+    ab -- ein Task laeuft in einem Kindprozess, da genuegt schon dessen Start,
+    damit er sicher noch nicht fertig ist.
+    """
     _db_bauen(tmp_path / "d.db", 10)
     with pytest.raises(DHRuntimeError, match="erst DB_QUERY_READY"):
         run_gb('IMPORT "db"\n'
                'DIM a AS INTEGER\n'
                'a = DB_QUERY_START("d.db", "SELECT a FROM zahlen")\n'
+               'WHILE NOT DB_QUERY_READY(a)\n    SLEEP(1)\nWEND\n'
+               'PRINT DB_QUERY_RESULT(a)\n'
                'PRINT DB_QUERY_RESULT(a)', base=tmp_path)
 
 
