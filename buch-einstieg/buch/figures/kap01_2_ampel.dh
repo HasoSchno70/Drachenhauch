@@ -1,0 +1,10 @@
+' Bildquelle -- Zeichenbefehle wie code/kap01/2_ampel.dh, in einer Schleife.
+SCREEN(640, 400, "Ampel")
+DIM i AS INTEGER
+FOR i = 1 TO 12
+    CLS(RGB(30, 30, 30))
+    CIRCLE(320, 110, 50, RGB(255, 0, 0))
+    CIRCLE(320, 210, 50, RGB(255, 200, 0))
+    CIRCLE(320, 310, 50, RGB(0, 200, 0))
+    FLIP()
+NEXT

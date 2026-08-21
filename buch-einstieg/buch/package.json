@@ -1,0 +1,10 @@
+{
+  "name": "buch-einstieg",
+  "version": "1.0.0",
+  "description": "Drachenhauch - Der Einstieg, als .docx und .epub",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "docx": "^9.7.1"
+  }
+}

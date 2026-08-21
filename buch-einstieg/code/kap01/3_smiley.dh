@@ -1,0 +1,18 @@
+' Kapitel 1 -- ein Gesicht aus Kreisen und Linien.
+
+SCREEN(640, 400, "Hallo!")
+CLS(RGB(30, 60, 120))
+
+CIRCLE(320, 200, 130, RGB(255, 210, 60))   ' Kopf
+CIRCLE(275, 165, 18, RGB(40, 40, 40))      ' linkes Auge
+CIRCLE(365, 165, 18, RGB(40, 40, 40))      ' rechtes Auge
+
+' Der Mund: viele kurze Striche auf einem Bogen
+DIM i AS INTEGER
+FOR i = -60 TO 60
+    PLOT(320 + i, 290 - (i * i) / 90, RGB(40, 40, 40))
+    PLOT(320 + i, 291 - (i * i) / 90, RGB(40, 40, 40))
+NEXT
+
+FLIP()
+SLEEP(4000)

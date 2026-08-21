@@ -1,0 +1,15 @@
+' Bildquelle -- Zeichenbefehle wie code/kap01/3_smiley.dh, in einer Schleife.
+SCREEN(640, 400, "Hallo!")
+DIM i AS INTEGER
+DIM n AS INTEGER
+FOR n = 1 TO 12
+    CLS(RGB(30, 60, 120))
+    CIRCLE(320, 200, 130, RGB(255, 210, 60))
+    CIRCLE(275, 165, 18, RGB(40, 40, 40))
+    CIRCLE(365, 165, 18, RGB(40, 40, 40))
+    FOR i = -60 TO 60
+        PLOT(320 + i, 290 - (i * i) / 90, RGB(40, 40, 40))
+        PLOT(320 + i, 291 - (i * i) / 90, RGB(40, 40, 40))
+    NEXT
+    FLIP()
+NEXT

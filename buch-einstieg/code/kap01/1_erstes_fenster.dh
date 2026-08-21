@@ -1,0 +1,8 @@
+' Kapitel 1 -- das allererste Programm.
+' Ein Fenster, ein Kreis, drei Sekunden.
+
+SCREEN(640, 400, "Mein erstes Fenster")
+CLS(RGB(15, 20, 40))
+CIRCLE(320, 200, 90, RGB(255, 200, 40))
+FLIP()
+SLEEP(3000)

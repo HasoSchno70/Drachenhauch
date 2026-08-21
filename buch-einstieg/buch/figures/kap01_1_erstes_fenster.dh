@@ -1,0 +1,10 @@
+' Bildquelle fuer Kapitel 1. Dieselben Zeichenbefehle wie
+' code/kap01/1_erstes_fenster.dh -- nur in einer Schleife, weil der
+' Screenshot beim LETZTEN Frame faellt und ein einzelner FLIP zu frueh kommt.
+SCREEN(640, 400, "Mein erstes Fenster")
+DIM i AS INTEGER
+FOR i = 1 TO 12
+    CLS(RGB(15, 20, 40))
+    CIRCLE(320, 200, 90, RGB(255, 200, 40))
+    FLIP()
+NEXT
