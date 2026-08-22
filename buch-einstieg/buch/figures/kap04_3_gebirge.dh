@@ -1,0 +1,15 @@
+' Kapitel 4 -- Zufall und Sinus ergeben eine Landschaft.
+
+SCREEN(640, 400, "Gebirge")
+
+DIM x AS INTEGER
+DIM hoehe AS FLOAT
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    CLS(RGB(20, 30, 60))
+    FOR x = 0 TO 639
+        hoehe = 230 + SIN(RAD(x)) * 45 + RANDINT(-7, 7)
+        BOX(x, hoehe, x + 1, 399, RGB(45, 115, 70))
+    NEXT
+    FLIP()
+NEXT

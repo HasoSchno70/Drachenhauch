@@ -6,11 +6,15 @@ CLS(RGB(10, 10, 20))
 DIM i AS INTEGER
 DIM winkel AS FLOAT
 DIM weite AS FLOAT
+DIM sx AS FLOAT
+DIM sy AS FLOAT
 
 FOR i = 0 TO 720
     winkel = RAD(i)
     weite = i / 4
-    CIRCLE(320 + COS(winkel) * weite, 200 + SIN(winkel) * weite, 3, RGB(255, i \ 3, 60))
+    sx = 320 + COS(winkel) * weite
+    sy = 200 + SIN(winkel) * weite
+    CIRCLE(sx, sy, 3, RGB(255, i \ 3, 60))
 NEXT
 
 FLIP()

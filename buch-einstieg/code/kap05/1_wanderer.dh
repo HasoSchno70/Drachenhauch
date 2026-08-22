@@ -1,0 +1,13 @@
+' Kapitel 5 -- der erste Punkt, der sich bewegt.
+
+SCREEN(640, 400, "Wanderer")
+
+DIM x AS INTEGER
+x = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    CIRCLE(x, 200, 25, RGB(255, 200, 40))
+    FLIP()
+    x = (x + 3) MOD 640
+WEND

@@ -26,11 +26,19 @@ const DHRT = process.argv[2] || path.join(HERE, "..", "..", "rust",
 const bloecke = [];      // {datei, nr, zeilen}
 let aktuelleDatei = "";
 
+// Hoechstlaenge einer Codezeile im Abdruck. Gemessen, nicht geschaetzt: Eine
+// Zeile mit 81 Zeichen lief im gesetzten PDF aus dem grauen Kasten heraus, und
+// das folgende NEXT rutschte dadurch an den Rand -- in einem Buch zum Abtippen
+// ist das schlimmer als ein Schoenheitsfehler. 72 laesst Luft.
+const MAX_SPALTEN = 72;
+const zuLang = [];
+
 function merke(lines, opts = {}) {
   // `out: true` ist eine AUSGABE, kein Quelltext -- die durch den Compiler zu
   // schicken wuerde nur Rauschen erzeugen.
   if (opts.out) return "";
   const arr = Array.isArray(lines) ? lines : [lines];
+  arr.forEach((l) => { if (l.length > MAX_SPALTEN) zuLang.push([aktuelleDatei, l]); });
   if (arr.length) bloecke.push({ datei: aktuelleDatei, nr: bloecke.length, zeilen: arr });
   return "";
 }
@@ -113,4 +121,10 @@ for (const b of bloecke) {
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`\n${bloecke.length} Codebloecke gefunden: ${geprueft} geprueft, `
   + `${uebersprungen} uebersprungen (kein Drachenhauch), ${befunde} mit Befund.`);
+if (zuLang.length) {
+  console.log(`
+${zuLang.length} Codezeile(n) laenger als ${MAX_SPALTEN} Zeichen --`
+    + " sie laufen im gesetzten Buch aus dem Kasten:");
+  for (const [d, l] of zuLang) console.log(`  ${String(l.length).padStart(3)}  ${d}  ${l.slice(0, 60)}`);
+}
 process.exit(befunde ? 1 : 0);

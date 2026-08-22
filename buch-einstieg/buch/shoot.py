@@ -20,6 +20,7 @@ den 300-dpi-Druck.
 Aufruf:  <venv>\python.exe shoot.py [nur_diese_basename ...]
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -33,12 +34,36 @@ SCALE = "3"
 FRAMES_VORGABE = 12
 
 # Mehr Frames, wo sich etwas entwickeln muss (Animation, Physik, Partikel).
-FRAMES = {}
+FRAMES = {
+    "kap05_1_wanderer": 60, "kap05_2_fallender_ball": 46,
+    "kap05_3_spur": 38, "kap05_4_regen": 40, "kap05_5_monde": 70,
+}
+
+
+def quelle_finden(name):
+    """Erst figures/, dann das Kapitelprogramm selbst.
+
+    Ab Kapitel 5 haben die Programme eine eigene Schleife und laufen so
+    lange, bis man sie beendet -- die lassen sich unveraendert aufnehmen,
+    und eine zweite Quelle waere nur eine zweite Wahrheit. Nur die
+    linearen Programme der ersten Kapitel brauchen die Schleifenfassung
+    unter figures/, weil ein einzelner FLIP fuer die Aufnahme zu frueh
+    kommt. Aus `kap05_1_wanderer` wird `../code/kap05/1_wanderer.dh`.
+    """
+    eigen = os.path.join(FIG, name + ".dh")
+    if os.path.exists(eigen):
+        return eigen
+    m = re.match(r"(kap\d+)_(.+)$", name)
+    if m:
+        p = os.path.join(HIER, "..", "code", m.group(1), m.group(2) + ".dh")
+        if os.path.exists(p):
+            return p
+    return None
 
 
 def aufnehmen(name):
-    quelle = os.path.join(FIG, name + ".dh")
-    if not os.path.exists(quelle):
+    quelle = quelle_finden(name)
+    if quelle is None:
         print("  (keine Quelle)", name)
         return False
     ziel = os.path.join(IMG, name + ".png")
@@ -59,7 +84,20 @@ def aufnehmen(name):
 
 def main(argv):
     os.makedirs(IMG, exist_ok=True)
-    namen = argv or sorted(f[:-3] for f in os.listdir(FIG) if f.endswith(".dh"))
+    if argv:
+        namen = argv
+    else:
+        namen = {f[:-3] for f in os.listdir(FIG) if f.endswith(".dh")}
+        code = os.path.join(HIER, "..", "code")
+        for kap in sorted(os.listdir(code)):
+            for f in sorted(os.listdir(os.path.join(code, kap))):
+                if f.endswith(".dh") and f"{kap}_{f[:-3]}" not in namen:
+                    # Nur Programme mit eigener Schleife: die linearen haben
+                    # ihre Schleifenfassung schon unter figures/.
+                    text = open(os.path.join(code, kap, f), encoding="utf-8").read()
+                    if "WHILE" in text.upper():
+                        namen.add(f"{kap}_{f[:-3]}")
+        namen = sorted(namen)
     gut = sum(1 for n in namen if aufnehmen(n))
     print(f"{gut}/{len(namen)} Bilder")
     return 0 if gut == len(namen) else 1

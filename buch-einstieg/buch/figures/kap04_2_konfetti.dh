@@ -1,0 +1,25 @@
+' Kapitel 4 -- 200 bunte Schnipsel.
+
+SCREEN(640, 400, "Konfetti")
+
+DIM i AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM gross AS INTEGER
+DIM rot AS INTEGER
+DIM gruen AS INTEGER
+DIM blau AS INTEGER
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    CLS(RGB(250, 250, 250))
+    FOR i = 1 TO 200
+        x = RANDINT(0, 620)
+        y = RANDINT(0, 380)
+        gross = RANDINT(6, 18)
+        rot = RANDINT(60, 255)
+    gruen = RANDINT(60, 255)
+    blau = RANDINT(60, 255)
+    BOX(x, y, x + gross, y + gross, RGB(rot, gruen, blau))
+    NEXT
+    FLIP()
+NEXT

@@ -1,0 +1,31 @@
+' Kapitel 5 -- drei Monde, drei Geschwindigkeiten.
+
+SCREEN(640, 400, "Monde")
+
+DIM winkel AS FLOAT
+DIM mx AS FLOAT
+DIM my AS FLOAT
+winkel = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(10, 12, 28))
+    ' Die Bahnen mitmalen -- sonst sieht man auf einem Standbild nicht,
+    ' dass die Monde auf Kreisen laufen.
+    CIRCLEOUTLINE(320, 200, 90, RGB(40, 45, 70))
+    CIRCLEOUTLINE(320, 200, 140, RGB(40, 45, 70))
+    CIRCLEOUTLINE(320, 200, 185, RGB(40, 45, 70))
+    CIRCLE(320, 200, 40, RGB(255, 200, 60))
+
+    mx = 320 + COS(winkel) * 90
+    my = 200 + SIN(winkel) * 90
+    CIRCLE(mx, my, 12, RGB(120, 200, 255))
+    mx = 320 + COS(winkel * 0.6) * 140
+    my = 200 + SIN(winkel * 0.6) * 140
+    CIRCLE(mx, my, 9, RGB(255, 130, 160))
+    mx = 320 + COS(winkel * 0.35) * 185
+    my = 200 + SIN(winkel * 0.35) * 185
+    CIRCLE(mx, my, 6, RGB(180, 255, 190))
+
+    FLIP()
+    winkel = winkel + 0.04
+WEND

@@ -31,9 +31,7 @@ module.exports = (H) => [
 
   H.pmix([["NEXT", true], " markiert das Ende. Alles zwischen ", ["FOR", true], " und ", ["NEXT", true], " ist das, was wiederholt wird. Man rückt diese Zeilen um vier Leerzeichen ein — Drachenhauch ist das gleichgültig, deinen Augen nicht. Halte dich daran, von Anfang an."]),
 
-  H.p("Die Malzeile in der Mitte lohnt es, in Teile zu zerlegen:"),
-
-  H.p("Erst die Form, die Farbe lassen wir einen Moment beiseite:"),
+  H.p("Die Malzeile in der Mitte lohnt es, in Teile zu zerlegen. Erst die Form — die Farbe lassen wir einen Moment beiseite:"),
 
   H.code(["LINE(x, 0, x, 399, RGB(255, 40, 40))"]),
 
@@ -89,11 +87,15 @@ module.exports = (H) => [
     "DIM i AS INTEGER",
     "DIM winkel AS FLOAT",
     "DIM weite AS FLOAT",
+    "DIM sx AS FLOAT",
+    "DIM sy AS FLOAT",
     "",
     "FOR i = 0 TO 720",
     "    winkel = RAD(i)",
     "    weite = i / 4",
-    "    CIRCLE(320 + COS(winkel) * weite, 200 + SIN(winkel) * weite, 3, RGB(255, i \\ 3, 60))",
+    "    sx = 320 + COS(winkel) * weite",
+    "    sy = 200 + SIN(winkel) * weite",
+    "    CIRCLE(sx, sy, 3, RGB(255, i \\ 3, 60))",
     "NEXT",
     "",
     "FLIP()",
@@ -109,7 +111,7 @@ module.exports = (H) => [
 
   H.pmix(["Beide arbeiten mit einem Winkel, den sie in einem eigenen Maß erwarten, nicht in Grad. ", ["RAD(i)", true], " rechnet Grad in dieses Maß um; mehr musst du darüber vorerst nicht wissen. ", ["i", true], " läuft von 0 bis 720, also zweimal rundherum."]),
 
-  H.pmix([["320 + COS(winkel) * weite", true], " heißt demnach: geh in die Mitte des Fensters und von dort so weit nach rechts, wie der Zeiger gerade zeigt — mal die Länge des Zeigers. Und ", ["weite = i / 4", true], " macht den Zeiger bei jedem Schritt ein winziges Stück länger. Ein Zeiger, der sich dreht und dabei wächst, malt eine Spirale."]),
+  H.pmix([["sx = 320 + COS(winkel) * weite", true], " heißt demnach: geh in die Mitte des Fensters und von dort so weit nach rechts, wie der Zeiger gerade zeigt — mal die Länge des Zeigers. Und ", ["weite = i / 4", true], " macht den Zeiger bei jedem Schritt ein winziges Stück länger. Ein Zeiger, der sich dreht und dabei wächst, malt eine Spirale."]),
 
   H.tip("Drei Zahlen zum Drehen", "Ändere die 720 in 2160 — drei Umdrehungen. Ändere weite = i / 4 in i / 12, und die Spirale wird eng. Schreib statt der 3 im CIRCLE eine 8, und aus der dünnen Linie wird ein dickes Band. Jede dieser Änderungen ist ein Zeichen und ändert das ganze Bild."),
 

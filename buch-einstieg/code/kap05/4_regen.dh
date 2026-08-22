@@ -1,0 +1,21 @@
+' Kapitel 5 -- 80 Tropfen aus einer Schleife in der Schleife.
+
+SCREEN(640, 400, "Regen")
+
+DIM bild AS INTEGER
+DIM i AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+bild = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(20, 25, 45))
+    FOR i = 0 TO 79
+        x = (i * 97) MOD 640
+        y = (i * 53 + bild * 7) MOD 440 - 40
+        LINE(x, y, x - 2, y + 14, RGB(150, 190, 255))
+        LINE(x + 1, y, x - 1, y + 14, RGB(150, 190, 255))
+    NEXT
+    FLIP()
+    bild = bild + 1
+WEND

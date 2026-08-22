@@ -1,0 +1,17 @@
+' Kapitel 4 -- 300 Sterne, jedes Mal anders.
+
+SCREEN(640, 400, "Sternenhimmel")
+
+DIM i AS INTEGER
+DIM hell AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    CLS(RGB(5, 5, 20))
+    FOR i = 1 TO 300
+        hell = RANDINT(60, 255)
+        CIRCLE(RANDINT(0, 639), RANDINT(0, 399), RANDINT(1, 2), RGB(hell, hell, 255))
+    NEXT
+    FLIP()
+NEXT

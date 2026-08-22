@@ -1,0 +1,17 @@
+' Kapitel 5 -- ein Ball faellt und wird dabei schneller.
+
+SCREEN(640, 400, "Fallender Ball")
+
+DIM y AS FLOAT
+DIM tempo AS FLOAT
+y = 40
+tempo = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    CIRCLE(320, y, 22, RGB(255, 90, 60))
+    FLIP()
+
+    tempo = tempo + 0.35
+    y = y + tempo
+WEND

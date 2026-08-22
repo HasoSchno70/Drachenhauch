@@ -29,9 +29,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — wachsendes Gesicht, zwei Gesichter, Mitte, Farbmischer
 - [x] 03 Einmal schreiben, tausendmal malen · `FOR NEXT`
       — Farbverlauf, Tunnel, Spirale, Schachbrett
-- [ ] 04 Der Zufall · `RND RANDOMIZE`
+- [x] 04 Der Zufall · `RND RANDOMIZE`
       — Sternenhimmel, Konfetti, zufällige Landschaft
-- [ ] 05 Bewegung · die Spielschleife, `WHILE WEND`
+- [x] 05 Bewegung · die Spielschleife, `WHILE WEND`
       — fallender Ball, Regen, kreisende Monde
 - [ ] 06 Entscheiden · `IF THEN ELSE`
       — abprallender Ball, Farbwechsel bei Berührung

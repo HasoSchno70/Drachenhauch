@@ -1,0 +1,27 @@
+' Kapitel 5 -- alle Stationen des Falls auf einmal.
+' Die Abstaende werden nach unten hin groesser: der Ball wird schneller.
+' Der Zug ist hier staerker als im Programm davor (0.9 statt 0.35),
+' damit der ganze Bogen ins Bild passt.
+
+SCREEN(640, 400, "Spur")
+
+DIM n AS INTEGER
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM tempo AS FLOAT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+
+    x = 50
+    y = 30
+    tempo = 0
+    FOR n = 0 TO 24
+        CIRCLE(x, y, 12, RGB(255, 90, 60))
+        tempo = tempo + 0.9
+        y = y + tempo
+        x = x + 22
+    NEXT
+
+    FLIP()
+WEND
