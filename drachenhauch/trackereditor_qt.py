@@ -892,7 +892,7 @@ class TrackerEditor(QMainWindow):
         import copy as _copy
         self.undo = SnapshotUndo(
             lambda: _copy.deepcopy(self.song.to_dict()), self._restore_song,
-            debounce_ms=1)
+            debounce_ms=1, parent=self)
         self.undo.changed.connect(self._update_undo_buttons)
         self.undo.changed.connect(self._mark_dirty)
         self.btn_undo.clicked.connect(self.undo.undo)

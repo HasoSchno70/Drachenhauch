@@ -302,7 +302,7 @@ class ParticleEditor(QMainWindow):
 
         # Undo/Redo ueber Snapshots aller Parameter-Widgets.
         self.undo = SnapshotUndo(self._capture_state, self._apply_state,
-                                 debounce_ms=250)
+                                 debounce_ms=250, parent=self)
         self.undo.changed.connect(self._update_undo_buttons)
         self.btn_undo.clicked.connect(self.undo.undo)
         self.btn_redo.clicked.connect(self.undo.redo)
