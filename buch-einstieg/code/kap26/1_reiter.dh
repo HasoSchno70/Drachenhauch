@@ -1,0 +1,59 @@
+' Kapitel 26 -- Reiter, Gruppen und mitwachsende Bedienelemente.
+
+IMPORT "gui"
+
+SCREEN(640, 400, "Einstellungen")
+
+DIM fenster AS GUI_WINDOW
+DIM reiter[3] AS STRING
+DIM name AS GUI_WIDGET
+DIM ton AS GUI_WIDGET
+DIM lautstaerke AS GUI_WIDGET
+DIM gruppe AS GUI_WIDGET
+DIM leicht AS GUI_WIDGET
+DIM mittel AS GUI_WIDGET
+DIM schwer AS GUI_WIDGET
+DIM fertig AS GUI_WIDGET
+DIM stand AS GUI_WIDGET
+
+reiter[0] = "Allgemein"
+reiter[1] = "Spiel"
+reiter[2] = "Ueber"
+
+fenster = GUI_WINDOW("Einstellungen", 40, 24, 520, 350)
+GUI_WINDOW_RESIZABLE(fenster, TRUE)
+GUI_TABS(fenster, reiter)
+
+' --- Reiter 0: Allgemein ---
+name = GUI_TEXTINPUT(fenster, 24, 66, 300, 30, "dein Name")
+GUI_SET_TAB(name, 0)
+ton = GUI_CHECKBOX(fenster, "Ton an", 24, 112, TRUE)
+GUI_SET_TAB(ton, 0)
+lautstaerke = GUI_SLIDER(fenster, 24, 150, 300, 0, 100, 70)
+GUI_SET_TAB(lautstaerke, 0)
+
+' --- Reiter 1: Spiel ---
+gruppe = GUI_GROUPBOX(fenster, 24, 60, 300, 130, "Schwierigkeit")
+GUI_SET_TAB(gruppe, 1)
+leicht = GUI_CHECKBOX(fenster, "leicht", 44, 90, FALSE)
+GUI_SET_TAB(leicht, 1)
+mittel = GUI_CHECKBOX(fenster, "mittel", 44, 122, TRUE)
+GUI_SET_TAB(mittel, 1)
+schwer = GUI_CHECKBOX(fenster, "schwer", 44, 154, FALSE)
+GUI_SET_TAB(schwer, 1)
+
+' --- auf allen Reitern ---
+fertig = GUI_BUTTON(fenster, "Fertig", 24, 262, 140, 34)
+GUI_SET_ANCHOR(fertig, "lb")
+stand = GUI_LABEL(fenster, "Reiter 0", 300, 272)
+GUI_SET_ANCHOR(stand, "lb")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    GUI_SET_TEXT(stand, "Reiter " + STR$(GUI_ACTIVE_TAB(fenster)))
+
+    GUI_DRAW()
+    FLIP()
+WEND

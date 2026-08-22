@@ -1,0 +1,98 @@
+' Kapitel 27 -- dieselbe Verwaltung, aber die Daten liegen
+' in einer Datenbank und ueberleben den Neustart.
+
+IMPORT "gui"
+IMPORT "db"
+
+SCREEN(640, 400, "Vokabeln")
+
+DIM con AS DB_CONN
+DIM erg AS DB_RESULT
+DIM fenster AS GUI_WINDOW
+DIM feld_de AS GUI_WIDGET
+DIM feld_en AS GUI_WIDGET
+DIM dazu AS GUI_WIDGET
+DIM weg AS GUI_WIDGET
+DIM liste AS GUI_WIDGET
+DIM stand AS GUI_WIDGET
+DIM zeilen[0] AS STRING
+DIM nummern[0] AS INTEGER
+DIM de AS STRING
+DIM en AS STRING
+DIM nummer AS INTEGER
+DIM neu_laden AS BOOLEAN
+DIM sql AS STRING
+
+con = DB_OPEN("vokabeln.db")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS vokabeln (" + _
+             "id INTEGER PRIMARY KEY, de TEXT, en TEXT)")
+
+' Beim allerersten Start ein paar Vokabeln anlegen -- sonst steht man
+' vor einer leeren Liste und weiss nicht, was hineingehoert.
+erg = DB_QUERY(con, "SELECT COUNT(*) FROM vokabeln")
+DB_NEXT(erg)
+IF DB_GET_INT(erg, 0) = 0 THEN
+    sql = "INSERT INTO vokabeln (de, en) VALUES (?, ?)"
+    DB_EXEC(con, sql, "Haus", "house")
+    DB_EXEC(con, sql, "Baum", "tree")
+    DB_EXEC(con, sql, "Katze", "cat")
+    DB_EXEC(con, sql, "Drache", "dragon")
+END IF
+DB_CLOSE_RESULT(erg)
+
+fenster = GUI_WINDOW("Vokabeln", 40, 30, 540, 320)
+feld_de = GUI_TEXTINPUT(fenster, 20, 36, 180, 30, "deutsch")
+feld_en = GUI_TEXTINPUT(fenster, 210, 36, 180, 30, "englisch")
+dazu = GUI_BUTTON(fenster, "Hinzufuegen", 400, 36, 120, 30)
+liste = GUI_LISTBOX(fenster, 20, 82, 370, 180, zeilen)
+weg = GUI_BUTTON(fenster, "Loeschen", 400, 82, 120, 30)
+stand = GUI_LABEL(fenster, "", 400, 130)
+neu_laden = TRUE
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu_laden THEN
+        neu_laden = FALSE
+        REDIM(zeilen, 0)
+        REDIM(nummern, 0)
+        sql = "SELECT id, de, en FROM vokabeln ORDER BY de"
+        erg = DB_QUERY(con, sql)
+        WHILE DB_NEXT(erg)
+            ARRAY_PUSH(nummern, DB_GET_INT(erg, 0))
+            ARRAY_PUSH(zeilen, DB_GET_STRING(erg, 1) + "  ->  " + _
+                               DB_GET_STRING(erg, 2))
+        WEND
+        DB_CLOSE_RESULT(erg)
+        GUI_SET_LISTBOX(liste, zeilen)
+        GUI_SET_TEXT(stand, STR$(LEN(zeilen)) + " Vokabeln")
+    END IF
+
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(dazu) THEN
+        de = TRIM$(GUI_TEXT(feld_de))
+        en = TRIM$(GUI_TEXT(feld_en))
+        IF de <> "" AND en <> "" THEN
+            sql = "INSERT INTO vokabeln (de, en) VALUES (?, ?)"
+            DB_EXEC(con, sql, de, en)
+            GUI_SET_TEXT(feld_de, "")
+            GUI_SET_TEXT(feld_en, "")
+            neu_laden = TRUE
+        END IF
+    END IF
+
+    IF GUI_CLICKED(weg) THEN
+        nummer = GUI_LISTBOX_SELECTED(liste)
+        IF nummer >= 0 THEN
+            sql = "DELETE FROM vokabeln WHERE id = ?"
+            DB_EXEC(con, sql, nummern[nummer])
+            neu_laden = TRUE
+        END IF
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND
+
+DB_CLOSE(con)

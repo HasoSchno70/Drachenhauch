@@ -1,0 +1,56 @@
+' Kapitel 25 -- eingeben, hinzufuegen, auswaehlen, loeschen.
+' Die Grundform fast jeder Verwaltung -- und des Vokabeltrainers.
+
+IMPORT "gui"
+
+SCREEN(640, 400, "Liste")
+
+DIM fenster AS GUI_WINDOW
+DIM feld AS GUI_WIDGET
+DIM dazu AS GUI_WIDGET
+DIM weg AS GUI_WIDGET
+DIM liste AS GUI_WIDGET
+DIM hinweis AS GUI_WIDGET
+DIM eintraege[0] AS STRING
+DIM was AS STRING
+DIM nummer AS INTEGER
+
+' Ein paar Eintraege zum Anfangen -- sonst ist die Liste beim
+' ersten Start leer und man sieht nicht, wofuer sie da ist.
+ARRAY_PUSH(eintraege, "Milch")
+ARRAY_PUSH(eintraege, "Brot")
+ARRAY_PUSH(eintraege, "Aepfel")
+
+fenster = GUI_WINDOW("Einkaufszettel", 60, 40, 500, 300)
+feld = GUI_TEXTINPUT(fenster, 20, 36, 280, 30, "was fehlt?")
+dazu = GUI_BUTTON(fenster, "Hinzufuegen", 310, 36, 150, 30)
+liste = GUI_LISTBOX(fenster, 20, 84, 280, 150, eintraege)
+weg = GUI_BUTTON(fenster, "Loeschen", 310, 84, 150, 30)
+hinweis = GUI_LABEL(fenster, "0 Eintraege", 310, 130)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(dazu) THEN
+        was = TRIM$(GUI_TEXT(feld))
+        IF was <> "" THEN
+            ARRAY_PUSH(eintraege, was)
+            GUI_SET_LISTBOX(liste, eintraege)
+            GUI_SET_TEXT(feld, "")
+        END IF
+    END IF
+
+    IF GUI_CLICKED(weg) THEN
+        nummer = GUI_LISTBOX_SELECTED(liste)
+        IF nummer >= 0 THEN
+            ARRAY_REMOVE_AT(eintraege, nummer)
+            GUI_SET_LISTBOX(liste, eintraege)
+        END IF
+    END IF
+
+    GUI_SET_TEXT(hinweis, STR$(LEN(eintraege)) + " Eintraege")
+
+    GUI_DRAW()
+    FLIP()
+WEND

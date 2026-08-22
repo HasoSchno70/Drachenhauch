@@ -1,0 +1,40 @@
+' Kapitel 24 -- Schieber und Schalter steuern etwas Sichtbares.
+
+IMPORT "gui"
+
+SCREEN(640, 400, "Schieber")
+
+DIM fenster AS GUI_WINDOW
+DIM rot AS GUI_WIDGET
+DIM gruen AS GUI_WIDGET
+DIM blau AS GUI_WIDGET
+DIM rahmen AS GUI_WIDGET
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+
+fenster = GUI_WINDOW("Farbmischer", 20, 20, 300, 230)
+GUI_LABEL(fenster, "rot", 20, 34)
+rot = GUI_SLIDER(fenster, 90, 34, 170, 0, 255, 200)
+GUI_LABEL(fenster, "gruen", 20, 74)
+gruen = GUI_SLIDER(fenster, 90, 74, 170, 0, 255, 120)
+GUI_LABEL(fenster, "blau", 20, 114)
+blau = GUI_SLIDER(fenster, 90, 114, 170, 0, 255, 60)
+rahmen = GUI_CHECKBOX(fenster, "mit Rahmen", 20, 154, TRUE)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    r = INT(GUI_VALUE(rot))
+    g = INT(GUI_VALUE(gruen))
+    b = INT(GUI_VALUE(blau))
+
+    BOX(360, 60, 600, 300, RGB(r, g, b))
+    IF GUI_CHECKED(rahmen) THEN
+        RECT(356, 56, 604, 304, RGB(240, 240, 250))
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND

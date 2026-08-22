@@ -1,0 +1,33 @@
+' Kapitel 25 -- ein Auswahlfeld bestimmt, was gemalt wird.
+
+IMPORT "gui"
+
+SCREEN(640, 400, "Auswahl")
+
+DIM fenster AS GUI_WINDOW
+DIM wahl AS GUI_WIDGET
+DIM formen[3] AS STRING
+DIM was AS INTEGER
+DIM farbe AS INTEGER
+
+formen[0] = "Kreis"
+formen[1] = "Quadrat"
+formen[2] = "Ring"
+
+fenster = GUI_WINDOW("Form waehlen", 30, 40, 260, 160)
+GUI_LABEL(fenster, "Form:", 20, 40)
+wahl = GUI_DROPDOWN(fenster, 90, 36, 140, 28, formen)
+farbe = RGB(110, 190, 245)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    was = GUI_DROPDOWN_SELECTED(wahl)
+    IF was = 0 THEN CIRCLE(450, 200, 90, farbe)
+    IF was = 1 THEN BOX(360, 110, 540, 290, farbe)
+    IF was = 2 THEN CIRCLEOUTLINE(450, 200, 90, farbe)
+
+    GUI_DRAW()
+    FLIP()
+WEND

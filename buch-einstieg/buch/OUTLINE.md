@@ -78,10 +78,10 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ## Teil V — Fenster mit Knöpfen
 
-- [ ] 24 Der erste Knopf · `GUI_BUTTON GUI_CLICKED`
-- [ ] 25 Eingeben und auswählen · Textfeld, Liste, Auswahlfeld
-- [ ] 26 Ordnung im Fenster · Layout, Reiter, Gruppen
-- [ ] 27 Daten, die bleiben · Datenbank statt Datei
+- [x] 24 Der erste Knopf · `GUI_BUTTON GUI_CLICKED`
+- [x] 25 Eingeben und auswählen · Textfeld, Liste, Auswahlfeld
+- [x] 26 Ordnung im Fenster · Layout, Reiter, Gruppen
+- [x] 27 Daten, die bleiben · Datenbank statt Datei
 
 ## Teil VI — Abschlussprojekt
 

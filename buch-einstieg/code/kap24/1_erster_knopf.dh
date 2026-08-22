@@ -1,0 +1,28 @@
+' Kapitel 24 -- ein Fenster mit einem Knopf.
+
+IMPORT "gui"
+
+SCREEN(640, 400, "Der erste Knopf")
+
+DIM fenster AS GUI_WINDOW
+DIM knopf AS GUI_WIDGET
+DIM anzeige AS GUI_WIDGET
+DIM zaehler AS INTEGER
+
+fenster = GUI_WINDOW("Zaehler", 120, 90, 400, 200)
+anzeige = GUI_LABEL(fenster, "noch nicht gedrueckt", 24, 40)
+knopf = GUI_BUTTON(fenster, "Druecken", 24, 90, 150, 36)
+zaehler = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(knopf) THEN
+        zaehler = zaehler + 1
+        GUI_SET_TEXT(anzeige, "gedrueckt: " + STR$(zaehler))
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND
