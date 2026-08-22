@@ -1,0 +1,39 @@
+' Kapitel 13 -- eine Funktion, die etwas ausrechnet und zurueckgibt.
+' Pfeiltasten bewegen den Punkt. Was nah ist, leuchtet.
+
+FUNCTION abstand(x1 AS FLOAT, y1 AS FLOAT, _
+                 x2 AS FLOAT, y2 AS FLOAT) AS FLOAT
+    RETURN SQR((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+END FUNCTION
+
+SCREEN(640, 400, "Naehe")
+
+DIM px AS FLOAT
+DIM py AS FLOAT
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+DIM d AS FLOAT
+DIM h AS INTEGER
+px = 320
+py = 200
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 16, 30))
+
+    FOR sy = 0 TO 9
+        FOR sx = 0 TO 15
+            d = abstand(px, py, sx * 40 + 20, sy * 40 + 20)
+            h = INT(255 - d)
+            IF h < 30 THEN h = 30
+            CIRCLE(sx * 40 + 20, sy * 40 + 20, 12, RGB(h, h \ 2, 40))
+        NEXT
+    NEXT
+
+    CIRCLE(px, py, 8, RGB(120, 220, 255))
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN px = px - 5
+    IF KEYPRESSED(KEY_RIGHT) THEN px = px + 5
+    IF KEYPRESSED(KEY_UP) THEN py = py - 5
+    IF KEYPRESSED(KEY_DOWN) THEN py = py + 5
+WEND

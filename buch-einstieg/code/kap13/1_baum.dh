@@ -1,0 +1,17 @@
+' Kapitel 13 -- ein eigener Befehl, der einen Baum malt.
+
+SUB baum(x AS INTEGER, y AS INTEGER, groesse AS INTEGER)
+    DIM halb AS FLOAT
+    halb = groesse / 10
+    BOX(x - halb, y - groesse, x + halb, y, RGB(95, 65, 45))
+    CIRCLE(x, y - groesse, groesse / 2, RGB(55, 145, 75))
+END SUB
+
+SCREEN(640, 400, "Ein Baum")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(150, 200, 235))
+    BOX(0, 340, 639, 399, RGB(90, 150, 80))
+    baum(320, 340, 140)
+    FLIP()
+WEND

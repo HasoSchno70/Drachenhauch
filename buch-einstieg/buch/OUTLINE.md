@@ -55,9 +55,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ## Teil III — Ordnung schaffen
 
-- [ ] 13 Eigene Befehle · `SUB FUNCTION`
+- [x] 13 Eigene Befehle · `SUB FUNCTION`
       — ein Baum, ein Wald aus einer Zeile
-- [ ] 14 Arrays, was noch drinsteckt · `FOR EACH`, Arrays von Text, sortieren
+- [x] 14 Arrays, was noch drinsteckt · `FOR EACH`, Arrays von Text, sortieren
       — 500 Funken, Wellenlinie. Das Nötigste steht schon in Kapitel 9.
 - [ ] 15 Nachschlagen · Maps
       — Farbnamen, Punktestände

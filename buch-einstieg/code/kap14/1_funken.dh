@@ -1,0 +1,41 @@
+' Kapitel 14 -- fuenfhundert Funken aus fuenf Arrays.
+
+SCREEN(640, 400, "Funken")
+
+DIM px[500] AS FLOAT
+DIM py[500] AS FLOAT
+DIM vx[500] AS FLOAT
+DIM vy[500] AS FLOAT
+DIM leben[500] AS INTEGER
+DIM i AS INTEGER
+DIM h AS INTEGER
+
+FOR i = 0 TO 499
+    leben[i] = RANDINT(0, 90)
+NEXT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(10, 12, 24))
+
+    FOR i = 0 TO 499
+        leben[i] = leben[i] - 1
+
+        IF leben[i] <= 0 THEN
+            px[i] = 320
+            py[i] = 380
+            vx[i] = RANDINT(-40, 40) / 10.0
+            vy[i] = RANDINT(-95, -55) / 10.0
+            leben[i] = RANDINT(60, 110)
+        END IF
+
+        vy[i] = vy[i] + 0.11
+        px[i] = px[i] + vx[i]
+        py[i] = py[i] + vy[i]
+
+        h = leben[i] * 2
+        IF h > 255 THEN h = 255
+        CIRCLE(px[i], py[i], 2, RGB(255, h, 40))
+    NEXT
+
+    FLIP()
+WEND

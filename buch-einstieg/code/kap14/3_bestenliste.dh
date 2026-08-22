@@ -1,0 +1,55 @@
+' Kapitel 14 -- eine Liste, die waechst, sich sortiert
+' und sich selbst auswertet.
+' Leertaste wuerfelt zwoelf neue Werte.
+
+SCREEN(640, 400, "Bestenliste")
+
+DIM punkte[0] AS INTEGER
+DIM i AS INTEGER
+DIM hoch AS INTEGER
+DIM mittel AS FLOAT
+DIM x AS INTEGER
+DIM h AS INTEGER
+DIM neu AS BOOLEAN
+DIM schrift AS INTEGER
+DIM balken AS INTEGER
+DIM linie AS INTEGER
+
+neu = TRUE
+schrift = RGB(200, 210, 230)
+balken = RGB(90, 170, 240)
+linie = RGB(255, 180, 60)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu THEN
+        neu = FALSE
+        REDIM(punkte, 0)
+        FOR i = 1 TO 12
+            ARRAY_PUSH(punkte, RANDINT(10, 100))
+        NEXT
+        SORT(punkte)
+        REVERSE(punkte)
+        hoch = ARRAY_MAX(punkte)
+        mittel = ARRAY_AVG(punkte)
+    END IF
+
+    CLS(RGB(18, 22, 38))
+
+    FOR i = 0 TO LEN(punkte) - 1
+        x = 30 + i * 48
+        h = punkte[i] * 260 \ hoch
+        BOX(x, 330 - h, x + 36, 330, balken)
+        TEXT(x + 4, 340, STR$(punkte[i]), schrift)
+    NEXT
+
+    h = INT(mittel) * 260 \ hoch
+    LINE(20, 330 - h, 619, 330 - h, linie)
+
+    TEXT(20, 30, "Hoechster: " + STR$(hoch), schrift)
+    TEXT(20, 60, "Mittel: " + STR$(INT(mittel)), linie)
+    TEXT(20, 370, "Leertaste wuerfelt neu", schrift)
+    FLIP()
+
+    IF KEYHIT(KEY_SPACE) THEN neu = TRUE
+WEND

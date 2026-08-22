@@ -1,0 +1,91 @@
+' Kapitel 14 -- Conways Spiel des Lebens auf einem Feld aus 2432 Zellen.
+' R wuerfelt neu, ESC beendet.
+
+SCREEN(640, 400, "Das Spiel des Lebens")
+
+DIM feld[64, 38] AS INTEGER
+DIM neu[64, 38] AS INTEGER
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+DIM dx AS INTEGER
+DIM dy AS INTEGER
+DIM nx AS INTEGER
+DIM ny AS INTEGER
+DIM nachbarn AS INTEGER
+DIM takt AS INTEGER
+DIM runde AS INTEGER
+DIM wuerfeln AS BOOLEAN
+DIM schrift AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM lebend AS INTEGER
+
+wuerfeln = TRUE
+takt = 0
+runde = 0
+schrift = RGB(120, 160, 130)
+lebend = RGB(90, 220, 130)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF wuerfeln THEN
+        wuerfeln = FALSE
+        runde = 0
+        FOR sy = 0 TO 37
+            FOR sx = 0 TO 63
+                feld[sx, sy] = 0
+                IF RANDINT(0, 4) = 0 THEN feld[sx, sy] = 1
+            NEXT
+        NEXT
+    END IF
+
+    CLS(RGB(10, 16, 12))
+    FOR sy = 0 TO 37
+        FOR sx = 0 TO 63
+            IF feld[sx, sy] = 1 THEN
+                px = sx * 10
+                py = sy * 10
+                BOX(px, py, px + 8, py + 8, lebend)
+            END IF
+        NEXT
+    NEXT
+    BOX(0, 380, 639, 399, RGB(16, 24, 19))
+    TEXT(10, 383, "Runde: " + STR$(runde) + "  R wuerfelt", schrift)
+    FLIP()
+
+    IF KEYHIT(KEY_R) THEN wuerfeln = TRUE
+
+    takt = takt + 1
+    IF takt >= 6 THEN
+        takt = 0
+        runde = runde + 1
+
+        FOR sy = 0 TO 37
+            FOR sx = 0 TO 63
+                nachbarn = 0
+                FOR dy = -1 TO 1
+                    FOR dx = -1 TO 1
+                        IF dx <> 0 OR dy <> 0 THEN
+                            nx = (sx + dx + 64) MOD 64
+                            ny = (sy + dy + 38) MOD 38
+                            nachbarn = nachbarn + feld[nx, ny]
+                        END IF
+                    NEXT
+                NEXT
+
+                neu[sx, sy] = 0
+                IF feld[sx, sy] = 1 THEN
+                    IF nachbarn = 2 OR nachbarn = 3 THEN neu[sx, sy] = 1
+                ELSE
+                    IF nachbarn = 3 THEN neu[sx, sy] = 1
+                END IF
+            NEXT
+        NEXT
+
+        FOR sy = 0 TO 37
+            FOR sx = 0 TO 63
+                feld[sx, sy] = neu[sx, sy]
+            NEXT
+        NEXT
+    END IF
+WEND
