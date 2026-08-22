@@ -63,10 +63,18 @@ Namen.
 node pruef_codebloecke.js
 ```
 
-Schickt **jeden abgedruckten Codeblock** durch `dhrt --check`. Bei einem
-Anfängerbuch ist das keine Kür: Ein Tippfehler im Abdruck fällt sonst erst dem
-auf, der ihn abtippt — und der weiß noch nicht, dass nicht er den Fehler
-gemacht hat.
+Schickt **jeden abgedruckten Codeblock** durch `dhrt --check` und meldet
+zusätzlich jede Zeile über **72 Zeichen**. Bei einem Anfängerbuch ist beides
+keine Kür: Ein Tippfehler im Abdruck fällt sonst erst dem auf, der ihn
+abtippt — und der weiß noch nicht, dass nicht er den Fehler gemacht hat.
+
+Die 72 sind gemessen: Eine Zeile mit 81 Zeichen lief im gesetzten PDF aus dem
+grauen Kasten heraus, und das folgende `NEXT` rutschte dadurch an den Rand.
+
+`--check` allein reicht allerdings nicht — es prüft den Text, nicht die Werte.
+`RGB(x * 255 / 640, ...)` geht anstandslos durch und bricht erst beim Laufen ab
+(„RGB erwartet INTEGER, erhalten FLOAT"). Deshalb wird jedes Grafikprogramm
+zusätzlich wirklich ausgeführt, nämlich beim Aufnehmen der Bilder.
 
 ## Die Bilder
 
@@ -76,10 +84,15 @@ Die Bildquellen liegen in `buch/figures/*.dh`, aufgenommen mit
 <venv>\python.exe shoot.py
 ```
 
-Sie enthalten dieselben Zeichenbefehle wie die Kapitelprogramme in `code/`, nur
-in einer kurzen Schleife: Der Screenshot fällt beim **letzten** Frame, und die
-Programme der ersten Teile zeichnen nur einmal — ein einzelner `FLIP` kommt zu
-früh, das Bild würde schwarz.
+Das gilt aber nur für die **linearen** Programme der ersten Kapitel: Der
+Screenshot fällt beim **letzten** Frame, und wer nur einmal zeichnet und dann
+mit `SLEEP` wartet, bekommt ein schwarzes Bild. Deren Figurenquelle enthält
+dieselben Zeichenbefehle in einer kurzen Schleife.
+
+Ab Kapitel 5 haben die Programme eine eigene Spielschleife und laufen, bis man
+sie beendet — die nimmt `shoot.py` **unverändert** aus `code/kapNN/` auf: Aus
+`kap05_1_wanderer` wird `../code/kap05/1_wanderer.dh`. Keine zweite Quelle,
+keine zweite Wahrheit.
 
 Aufgenommen wird mit `DHRT_SCALE=3`, also 1920×1200 aus einem 640×400-Fenster.
 Mehr geht nicht: Mit Skalierung 4 wäre das Fenster 2560×1600 und damit höher
