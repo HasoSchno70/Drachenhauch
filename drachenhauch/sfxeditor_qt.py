@@ -292,7 +292,8 @@ class SfxGenerator(QMainWindow):
         self._play()
 
         # Undo/Redo: Snapshot der Parameter (self._params <-> _apply_params).
-        self.undo = SnapshotUndo(self._params, self._apply_params, debounce_ms=250)
+        self.undo = SnapshotUndo(self._params, self._apply_params, debounce_ms=250,
+                                 parent=self)
         self.undo.changed.connect(self._update_undo_buttons)
         self.btn_undo.clicked.connect(self.undo.undo)
         self.btn_redo.clicked.connect(self.undo.redo)

@@ -13,6 +13,25 @@ Slider-Drag oder das gleichzeitige Setzen mehrerer Felder durch ein Preset)
 werden zu EINEM Undo-Schritt zusammengefasst. Beim `restore()` wird das
 Aufzeichnen unterdrueckt, damit das programmatische Zuruecksetzen der Widgets
 keinen neuen Schritt erzeugt.
+
+**`parent=` IMMER mitgeben** -- das Fenster, dem die Historie gehoert:
+
+    self.undo = SnapshotUndo(self._capture, self._apply, parent=self)
+
+Ohne Elternteil haengt dieses QObject (und damit sein Entprell-Zeitgeber) in
+KEINEM Objektbaum. Zwei Folgen, beide gemessen:
+
+* Im Test-Prozess sieht die Aufraeum-Fixture (`tests/conftest.py`) den
+  Zeitgeber nicht -- sie sucht ab den Top-Level-Fenstern nach unten. Ueber acht
+  Editor-Testdateien blieben so 2111 Mal scharfe Zeitgeber beim Start eines
+  FREMDEN Tests stehen; dessen `processEvents()` liess sie dann auf einem
+  laengst verlassenen Fenster feuern (Zuendfunke des sporadischen
+  Access-Violation-Absturzes der CI, 2026-08-22).
+* In der Anwendung ueberlebt die Historie das Fenster, an dem sie haengt: ein
+  faelliger `_commit` ruft `capture()` auf einem Editor, der gerade abgebaut
+  wird.
+
+Absicherung: `tests/test_qt_altlasten_zeitgeber.py`.
 """
 from __future__ import annotations
 

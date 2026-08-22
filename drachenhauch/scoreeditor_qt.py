@@ -685,7 +685,7 @@ class ScoreEditor(QMainWindow):
         import copy as _copy
         self.undo = SnapshotUndo(
             lambda: _copy.deepcopy(self.doc.to_dict()), self._restore_score,
-            debounce_ms=1)
+            debounce_ms=1, parent=self)
         self.undo.changed.connect(self._update_undo_buttons)
         self.btn_undo.clicked.connect(self.undo.undo)
         self.btn_redo.clicked.connect(self.undo.redo)

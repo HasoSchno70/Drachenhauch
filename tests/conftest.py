@@ -534,7 +534,20 @@ def run_all(run_gb):
 # unschoen, aber harmlos -- toedlich war ausschliesslich das Feuern.
 
 def _disarm_leftover_qt_widgets() -> None:
-    """Timer/Watcher aller uebrig gebliebenen Top-Level-Widgets stilllegen."""
+    """Timer/Watcher aller uebrig gebliebenen Top-Level-Widgets stilllegen.
+
+    STRUKTURELLE GRENZE, die man kennen muss: gesucht wird ab den Top-Level-
+    FENSTERN nach unten (`findChildren`). Ein Zeitgeber, dessen Besitzer in
+    keinem Fensterbaum haengt (elternloses QObject), ist auf diesem Weg
+    unsichtbar und bleibt scharf -- er feuert dann im naechsten `processEvents()`
+    einer FREMDEN Testdatei. Genau daran hing der sporadische CI-Absturz
+    (2026-08-22, `SnapshotUndo` war elternlos, 2111 Sichtungen ueber acht
+    Editor-Testdateien).
+
+    Die Gegenseite ist deshalb Besitzverhaeltnis statt Suchtiefe: wer ein
+    QObject mit Zeitgeber anlegt, gibt ihm sein Fenster als Elternteil mit.
+    Abgesichert in `tests/test_qt_altlasten_zeitgeber.py`.
+    """
     qtwidgets = sys.modules.get("PySide6.QtWidgets")
     if qtwidgets is None:
         return                      # Nicht-Qt-Test: nichts zu tun, nichts zu zahlen
@@ -638,6 +651,17 @@ def quiesce_qt() -> int:
     # selbst erzeugt.
     qtcore.QCoreApplication.removePostedEvents(None)
     return stopped
+
+
+@pytest.fixture
+def qt_altlasten_entschaerfen():
+    """Gibt die Entschaerf-Routine der autouse-Fixture zum direkten Aufruf.
+
+    Fuer `test_qt_altlasten_zeitgeber.py`, das genau diese Routine prueft:
+    sieht sie den Entprell-Zeitgeber eines Editors, oder laeuft er danach
+    weiter und feuert in den naechsten Test hinein?
+    """
+    return _disarm_leftover_qt_widgets
 
 
 @pytest.fixture
