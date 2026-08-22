@@ -48,10 +48,10 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ## Teil II — Klang
 
-- [ ] 10 Der erste Ton · `AUDIO_TONE PLAYSOUND`
+- [x] 10 Der erste Ton · `AUDIO_TONE PLAYSOUND`
       — Tonleiter, Melodie, Sirene
-- [ ] 11 Klang zum Bild · Treffer, Laser, Schritte
-- [ ] 12 **Projekt: ein kleines Instrument** — Tasten spielen Töne
+- [x] 11 Klang zum Bild · Treffer, Laser, Schritte
+- [x] 12 **Projekt: ein kleines Instrument** — Tasten spielen Töne
 
 ## Teil III — Ordnung schaffen
 

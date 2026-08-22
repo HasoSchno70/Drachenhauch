@@ -40,7 +40,7 @@ FRAMES = {
     # Ampel: Bild 75 faellt in Phase 1 -- rot UND gelb, man sieht,
     # dass gleich etwas passiert. Ein Standbild mit nur einer Lampe
     # saehe aus wie die feste Ampel aus Kapitel 1.
-    "kap08_3_ball": 44, "kap09_snake": 90, "kap08_pong": 300,
+    "kap08_3_ball": 44, "kap09_snake": 90, "kap10_3_sirene": 720, "kap11_1_treffer": 40, "kap11_2_laser": 20, "kap11_3_pong_mit_ton": 300, "kap12_instrument": 20, "kap08_pong": 300,
     "kap06_1_abpraller": 50, "kap06_3_kasten": 55, "kap06_5_ampel": 75,
 }
 

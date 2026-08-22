@@ -1,0 +1,30 @@
+' Kapitel 10 -- Alle meine Entchen, die ersten beiden Zeilen.
+
+DIM noten[11] AS INTEGER
+DIM dauer[11] AS INTEGER
+DIM i AS INTEGER
+DIM ton AS SOUND
+
+noten[0] = 262
+noten[1] = 294
+noten[2] = 330
+noten[3] = 349
+noten[4] = 392
+noten[5] = 392
+noten[6] = 440
+noten[7] = 440
+noten[8] = 440
+noten[9] = 440
+noten[10] = 392
+
+FOR i = 0 TO 9
+    dauer[i] = 300
+NEXT
+dauer[5] = 600
+dauer[10] = 600
+
+FOR i = 0 TO 10
+    ton = AUDIO_TONE(noten[i], dauer[i] - 40)
+    PLAYSOUND(ton)
+    SLEEP(dauer[i])
+NEXT

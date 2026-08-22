@@ -1,0 +1,109 @@
+' Kapitel 12 -- ein kleines Instrument.
+' Spielen: A S D F G H J K
+' Klangform: 1 sine, 2 square, 3 saw, 4 triangle
+' Oktave: Pfeil hoch und runter. ESC beendet.
+
+SCREEN(640, 400, "Instrument")
+
+DIM tasten[8] AS INTEGER
+DIM grund[8] AS INTEGER
+DIM klang[8] AS SOUND
+DIM schild[8] AS STRING
+DIM i AS INTEGER
+DIM form AS STRING
+DIM oktave AS FLOAT
+DIM bauen AS BOOLEAN
+DIM lx AS INTEGER
+DIM farbe AS INTEGER
+DIM hell AS INTEGER
+DIM dunkel AS INTEGER
+DIM schrift AS INTEGER
+
+tasten[0] = KEY_A
+tasten[1] = KEY_S
+tasten[2] = KEY_D
+tasten[3] = KEY_F
+tasten[4] = KEY_G
+tasten[5] = KEY_H
+tasten[6] = KEY_J
+tasten[7] = KEY_K
+
+grund[0] = 262
+grund[1] = 294
+grund[2] = 330
+grund[3] = 349
+grund[4] = 392
+grund[5] = 440
+grund[6] = 494
+grund[7] = 523
+
+schild[0] = "A"
+schild[1] = "S"
+schild[2] = "D"
+schild[3] = "F"
+schild[4] = "G"
+schild[5] = "H"
+schild[6] = "J"
+schild[7] = "K"
+
+form = "sine"
+oktave = 1.0
+bauen = TRUE
+hell = RGB(255, 220, 120)
+dunkel = RGB(235, 235, 228)
+schrift = RGB(180, 190, 210)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF bauen THEN
+        bauen = FALSE
+        FOR i = 0 TO 7
+            klang[i] = AUDIO_TONE(grund[i] * oktave, 500, form, 0.4)
+        NEXT
+    END IF
+
+    CLS(RGB(24, 28, 44))
+
+    FOR i = 0 TO 7
+        lx = 24 + i * 74
+        farbe = dunkel
+        IF KEYPRESSED(tasten[i]) THEN farbe = hell
+        BOX(lx, 120, lx + 66, 300, farbe)
+        TEXT(lx + 26, 268, schild[i], RGB(60, 60, 70))
+    NEXT
+
+    TEXT(24, 40, "Klangform: " + form, schrift)
+    TEXT(24, 70, "Oktave: " + STR$(oktave), schrift)
+    TEXT(24, 340, "A S D F G H J K spielen, 1-4 Klangform", schrift)
+    FLIP()
+
+    FOR i = 0 TO 7
+        IF KEYHIT(tasten[i]) THEN PLAYSOUND(klang[i])
+    NEXT
+
+    IF KEYHIT(KEY_1) THEN
+        form = "sine"
+        bauen = TRUE
+    END IF
+    IF KEYHIT(KEY_2) THEN
+        form = "square"
+        bauen = TRUE
+    END IF
+    IF KEYHIT(KEY_3) THEN
+        form = "saw"
+        bauen = TRUE
+    END IF
+    IF KEYHIT(KEY_4) THEN
+        form = "triangle"
+        bauen = TRUE
+    END IF
+
+    IF KEYHIT(KEY_UP) AND oktave < 4 THEN
+        oktave = oktave * 2
+        bauen = TRUE
+    END IF
+    IF KEYHIT(KEY_DOWN) AND oktave > 0.3 THEN
+        oktave = oktave / 2
+        bauen = TRUE
+    END IF
+WEND

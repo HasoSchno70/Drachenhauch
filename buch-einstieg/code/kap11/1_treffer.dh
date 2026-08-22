@@ -1,0 +1,37 @@
+' Kapitel 11 -- der Ball aus Kapitel 6, jetzt hoerbar.
+
+SCREEN(640, 400, "Treffer")
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM dx AS FLOAT
+DIM dy AS FLOAT
+DIM wand AS SOUND
+DIM decke AS SOUND
+
+x = 320
+y = 200
+dx = 4
+dy = 3
+
+wand = AUDIO_TONE(660, 60, "square", 0.4)
+decke = AUDIO_TONE(330, 70, "square", 0.4)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    CIRCLE(x, y, 18, RGB(120, 220, 255))
+    FLIP()
+
+    x = x + dx
+    y = y + dy
+
+    IF x < 18 OR x > 621 THEN
+        dx = -dx
+        PLAYSOUND(wand)
+    END IF
+
+    IF y < 18 OR y > 381 THEN
+        dy = -dy
+        PLAYSOUND(decke)
+    END IF
+WEND

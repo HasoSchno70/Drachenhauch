@@ -1,0 +1,43 @@
+' Kapitel 10 -- eine Sirene, deren Tonhoehe man sehen kann.
+' Die Kurve zeigt die letzten 640 Werte -- sie ruecken nach wie
+' die Glieder der Schlange aus Kapitel 9.
+
+SCREEN(640, 400, "Sirene")
+
+DIM verlauf[640] AS INTEGER
+DIM n AS INTEGER
+DIM i AS INTEGER
+DIM hz AS FLOAT
+DIM ton AS SOUND
+DIM schrift AS INTEGER
+n = 0
+schrift = RGB(190, 200, 225)
+
+FOR i = 0 TO 639
+    verlauf[i] = 500
+NEXT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    hz = 500 + SIN(RAD(n * 2)) * 300
+
+    FOR i = 0 TO 638
+        verlauf[i] = verlauf[i + 1]
+    NEXT
+    verlauf[639] = INT(hz)
+
+    CLS(RGB(15, 20, 40))
+    FOR i = 0 TO 639
+        PLOT(i, 360 - (verlauf[i] - 200) / 3, RGB(255, 170, 50))
+        PLOT(i, 361 - (verlauf[i] - 200) / 3, RGB(255, 170, 50))
+    NEXT
+    BOX(0, 372, 639, 399, RGB(30, 38, 62))
+    TEXT(240, 378, "Frequenz: " + STR$(INT(hz)) + " Hz", schrift)
+    FLIP()
+
+    IF n MOD 14 = 0 THEN
+        ton = AUDIO_TONE(hz, 260)
+        PLAYSOUND(ton)
+    END IF
+
+    n = n + 1
+WEND

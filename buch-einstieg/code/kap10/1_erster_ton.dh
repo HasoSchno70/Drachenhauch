@@ -1,0 +1,6 @@
+' Kapitel 10 -- der allererste Ton. Kein Fenster noetig.
+
+DIM piep AS SOUND
+piep = AUDIO_TONE(440, 400)
+PLAYSOUND(piep)
+SLEEP(600)

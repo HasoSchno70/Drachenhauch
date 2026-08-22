@@ -1,0 +1,61 @@
+' Kapitel 11 -- schiessen, treffen, hoeren.
+' Pfeile bewegen, Leertaste schiesst.
+
+SCREEN(640, 400, "Laser")
+
+DIM x AS FLOAT
+DIM sx AS FLOAT
+DIM sy AS FLOAT
+DIM fliegt AS BOOLEAN
+DIM zx AS INTEGER
+DIM zy AS INTEGER
+DIM punkte AS INTEGER
+DIM laser AS SOUND
+DIM knall AS SOUND
+DIM schrift AS INTEGER
+
+x = 320
+fliegt = FALSE
+zx = 200
+zy = 80
+punkte = 0
+laser = AUDIO_TONE(900, 70, "square", 0.35)
+knall = AUDIO_NOISE(260, 0.5)
+schrift = RGB(150, 160, 190)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    BOX(zx - 30, zy - 12, zx + 30, zy + 12, RGB(240, 120, 90))
+    BOX(x - 22, 358, x + 22, 374, RGB(120, 220, 255))
+    BOX(x - 6, 348, x + 6, 358, RGB(120, 220, 255))
+    IF fliegt THEN CIRCLE(sx, sy, 5, RGB(255, 220, 80))
+    TEXT(14, 12, "Treffer: " + STR$(punkte), schrift)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 5
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 5
+    IF x < 22 THEN x = 22
+    IF x > 617 THEN x = 617
+
+    IF KEYHIT(KEY_SPACE) AND NOT fliegt THEN
+        fliegt = TRUE
+        sx = x
+        sy = 344
+        PLAYSOUND(laser)
+    END IF
+
+    IF fliegt THEN
+        sy = sy - 8
+        IF sy < 0 THEN fliegt = FALSE
+    END IF
+
+    IF fliegt AND sy < zy + 12 AND sy > zy - 12 THEN
+        IF sx > zx - 30 AND sx < zx + 30 THEN
+            fliegt = FALSE
+            punkte = punkte + 1
+            PLAYSOUND(knall)
+            zx = RANDINT(60, 580)
+            zy = RANDINT(50, 160)
+        END IF
+    END IF
+WEND
