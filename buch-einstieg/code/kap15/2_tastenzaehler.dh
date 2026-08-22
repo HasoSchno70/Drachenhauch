@@ -1,0 +1,50 @@
+' Kapitel 15 -- zaehlen, ohne vorher zu wissen was.
+' Druecke Tasten. Jede bekommt einen Balken.
+
+SCREEN(640, 400, "Tastenzaehler")
+
+DIM zaehler AS MAP OF INTEGER
+DIM namen AS ARRAY OF STRING
+DIM code AS INTEGER
+DIM name AS STRING
+DIM i AS INTEGER
+DIM x AS INTEGER
+DIM h AS INTEGER
+DIM hoch AS INTEGER
+DIM wert AS INTEGER
+DIM schrift AS INTEGER
+DIM balken AS INTEGER
+schrift = RGB(200, 210, 230)
+balken = RGB(110, 200, 140)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+
+    namen = MAPKEYS(zaehler)
+    SORT(namen)
+
+    hoch = 1
+    FOR i = 0 TO LEN(namen) - 1
+        wert = MAPGET(zaehler, namen[i])
+        IF wert > hoch THEN hoch = wert
+    NEXT
+
+    FOR i = 0 TO LEN(namen) - 1
+        x = 30 + i * 46
+        IF x < 600 THEN
+            h = MAPGET(zaehler, namen[i]) * 240 \ hoch
+            BOX(x, 320 - h, x + 34, 320, balken)
+            TEXT(x + 2, 330, namen[i], schrift)
+        END IF
+    NEXT
+
+    TEXT(30, 30, "Tastenarten: " + STR$(MAPSIZE(zaehler)), schrift)
+    TEXT(30, 370, "Druecke Tasten. ESC beendet.", schrift)
+    FLIP()
+
+    code = KEY_ANY_HIT()
+    IF code >= 0 THEN
+        name = KEY_NAME$(code)
+        MAPPUT(zaehler, name, MAPGETOR(zaehler, name, 0) + 1)
+    END IF
+WEND

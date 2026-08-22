@@ -1,0 +1,62 @@
+' Kapitel 16 -- ein Sonnensystem. Jeder Planet weiss selbst,
+' wie gross er ist, wie weit aussen und wie schnell.
+
+CLASS Planet
+    DIM abstand AS FLOAT
+    DIM tempo AS FLOAT
+    DIM winkel AS FLOAT
+    DIM groesse AS INTEGER
+    DIM farbe AS INTEGER
+
+    SUB Init(a AS FLOAT, t AS FLOAT, g AS INTEGER, f AS INTEGER)
+        abstand = a
+        tempo = t
+        groesse = g
+        farbe = f
+        winkel = 0
+    END SUB
+
+    SUB Schritt()
+        winkel = winkel + tempo
+    END SUB
+
+    SUB Bahn()
+        CIRCLEOUTLINE(320, 200, abstand, RGB(38, 44, 66))
+    END SUB
+
+    SUB Malen()
+        DIM px AS FLOAT
+        DIM py AS FLOAT
+        px = 320 + COS(winkel) * abstand
+        py = 200 + SIN(winkel) * abstand
+        CIRCLE(px, py, groesse, farbe)
+    END SUB
+END CLASS
+
+SCREEN(640, 400, "Sonnensystem")
+
+DIM planeten[5] AS Planet
+DIM i AS INTEGER
+
+planeten[0] = NEW Planet(45.0, 0.062, 5, RGB(190, 170, 150))
+planeten[1] = NEW Planet(75.0, 0.041, 8, RGB(230, 190, 120))
+planeten[2] = NEW Planet(108.0, 0.030, 9, RGB(90, 170, 240))
+planeten[3] = NEW Planet(140.0, 0.023, 7, RGB(220, 110, 80))
+planeten[4] = NEW Planet(180.0, 0.013, 16, RGB(210, 180, 130))
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(8, 10, 22))
+
+    FOR i = 0 TO 4
+        planeten[i].Bahn()
+    NEXT
+
+    CIRCLE(320, 200, 26, RGB(255, 210, 70))
+
+    FOR i = 0 TO 4
+        planeten[i].Schritt()
+        planeten[i].Malen()
+    NEXT
+
+    FLIP()
+WEND

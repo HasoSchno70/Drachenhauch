@@ -59,19 +59,36 @@ const norm = (text) => (Array.isArray(text) ? text : text.replace(/\r/g, "").spl
   .map((z) => z.trimEnd())
   .filter((z) => z.trim() !== "" && !z.trim().startsWith("'"));
 
+// Kommt der Block als zusammenhaengender Abschnitt in der Datei vor?
+// Ein Kapitel druckt nicht nur ganze Programme ab, sondern auch laengere
+// Ausschnitte -- eine Klassendefinition etwa. Verlangt wird trotzdem
+// WORTWOERTLICHE Uebereinstimmung: nur eben mit einem Stueck der Datei
+// statt mit der ganzen. Damit bleibt die Zusage erhalten -- was im Buch
+// steht, steht auch in der Datei -- ohne dass ein Ausschnitt faelschlich
+// als Abweichung gilt.
+function findeAb(A, B) {
+  for (let start = 0; start + A.length <= B.length; start++) {
+    let gleich = true;
+    for (let n = 0; n < A.length; n++) if (A[n] !== B[start + n]) { gleich = false; break; }
+    if (gleich) return start;
+  }
+  return -1;
+}
+
 let abweichungen = 0;
 for (const b of bloecke) {
   const A = norm(b.zeilen);
-  let treffer = null, bester = null, besteZahl = Infinity;
+  let treffer = null, ganz = false, bester = null, besteZahl = Infinity;
   for (const d of dateien) {
     const B = norm(d.inhalt);
     let ungleich = 0;
     for (let n = 0; n < Math.max(A.length, B.length); n++) if (A[n] !== B[n]) ungleich++;
-    if (ungleich === 0) { treffer = d; break; }
+    const ab = findeAb(A, B);
+    if (ab >= 0) { treffer = d; ganz = (A.length === B.length); break; }
     if (ungleich < besteZahl) { besteZahl = ungleich; bester = { d, B }; }
   }
   if (treffer) {
-    console.log(`  ok  ${b.datei}  =  code/${treffer.pfad.replace(/\\/g, "/")}`);
+    console.log(`  ok  ${b.datei}  ${ganz ? "=" : "in"}  code/${treffer.pfad.replace(/\\/g, "/")}`);
     continue;
   }
   abweichungen++;
@@ -87,5 +104,5 @@ for (const b of bloecke) {
   }
 }
 
-console.log(`\n${bloecke.length} Gesamtprogramme geprueft, ${abweichungen} weichen ab.`);
+console.log(`\n${bloecke.length} Abdrucke geprueft, ${abweichungen} weichen ab.`);
 process.exit(abweichungen ? 1 : 0);

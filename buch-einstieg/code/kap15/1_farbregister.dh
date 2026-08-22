@@ -1,0 +1,33 @@
+' Kapitel 15 -- ein Register: Name nachschlagen, Farbe bekommen.
+
+SCREEN(640, 400, "Farbregister")
+
+DIM farben AS MAP OF INTEGER
+DIM namen AS ARRAY OF STRING
+DIM i AS INTEGER
+DIM y AS INTEGER
+DIM schrift AS INTEGER
+schrift = RGB(210, 218, 235)
+
+MAPPUT(farben, "Feuer", RGB(240, 90, 50))
+MAPPUT(farben, "Gras", RGB(80, 180, 90))
+MAPPUT(farben, "Himmel", RGB(90, 170, 240))
+MAPPUT(farben, "Sand", RGB(230, 205, 140))
+MAPPUT(farben, "Pflaume", RGB(150, 90, 190))
+MAPPUT(farben, "Nebel", RGB(170, 175, 185))
+
+namen = MAPKEYS(farben)
+SORT(namen)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(20, 24, 40))
+    TEXT(40, 30, "Eintraege: " + STR$(MAPSIZE(farben)), schrift)
+
+    FOR i = 0 TO LEN(namen) - 1
+        y = 70 + i * 50
+        BOX(40, y, 160, y + 36, MAPGET(farben, namen[i]))
+        TEXT(180, y + 8, namen[i], schrift)
+    NEXT
+
+    FLIP()
+WEND

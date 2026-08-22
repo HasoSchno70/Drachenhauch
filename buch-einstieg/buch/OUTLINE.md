@@ -59,9 +59,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — ein Baum, ein Wald aus einer Zeile
 - [x] 14 Arrays, was noch drinsteckt · `FOR EACH`, Arrays von Text, sortieren
       — 500 Funken, Wellenlinie. Das Nötigste steht schon in Kapitel 9.
-- [ ] 15 Nachschlagen · Maps
+- [x] 15 Nachschlagen · Maps
       — Farbnamen, Punktestände
-- [ ] 16 Dinge mit Eigenschaften · Klassen
+- [x] 16 Dinge mit Eigenschaften · Klassen
       — Partikel, Planeten
 - [ ] 17 Text · `LEFT$ MID$ LEN INSTR`
       — Laufschrift, Schreibmaschine
