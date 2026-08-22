@@ -63,9 +63,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — Farbnamen, Punktestände
 - [x] 16 Dinge mit Eigenschaften · Klassen
       — Partikel, Planeten
-- [ ] 17 Text · `LEFT$ MID$ LEN INSTR`
+- [x] 17 Text · `LEFT$ MID$ LEN INSTR`
       — Laufschrift, Schreibmaschine
-- [ ] 18 Was bleiben soll · Dateien lesen und schreiben
+- [x] 18 Was bleiben soll · Dateien lesen und schreiben
       — Highscore, der den Neustart überlebt
 
 ## Teil IV — Sprites und Bewegung

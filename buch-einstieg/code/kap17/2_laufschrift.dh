@@ -1,0 +1,32 @@
+' Kapitel 17 -- eine Laufschrift aus einem einzigen Text.
+
+SCREEN(640, 400, "Laufschrift")
+
+DIM spruch AS STRING
+DIM doppelt AS STRING
+DIM start AS INTEGER
+DIM takt AS INTEGER
+DIM fenster AS INTEGER
+DIM schrift AS INTEGER
+
+spruch = "DRACHENHAUCH  ***  PROGRAMMIEREN LERNEN VON NULL AN  ***  "
+doppelt = spruch + spruch
+start = 0
+takt = 0
+fenster = 34
+schrift = RGB(120, 230, 150)
+
+TEXT_SIZE(30)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(10, 16, 12))
+    BOX(0, 170, 639, 230, RGB(18, 30, 22))
+    TEXT(20, 188, MID$(doppelt, start, fenster), schrift)
+    FLIP()
+
+    takt = takt + 1
+    IF takt MOD 5 = 0 THEN
+        start = start + 1
+        IF start >= LEN(spruch) THEN start = 0
+    END IF
+WEND

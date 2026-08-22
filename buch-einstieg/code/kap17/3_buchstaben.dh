@@ -1,0 +1,53 @@
+' Kapitel 17 -- welcher Buchstabe kommt wie oft vor?
+' Verbindet den Text aus diesem Kapitel mit der Map aus Kapitel 15.
+
+SCREEN(640, 400, "Buchstaben zaehlen")
+
+DIM satz AS STRING
+DIM zaehler AS MAP OF INTEGER
+DIM zeichen AS ARRAY OF STRING
+DIM i AS INTEGER
+DIM c AS STRING
+DIM x AS INTEGER
+DIM h AS INTEGER
+DIM hoch AS INTEGER
+DIM wert AS INTEGER
+DIM schrift AS INTEGER
+DIM balken AS INTEGER
+
+satz = UPPER$("Programmieren lernen von null an mit Drachen")
+schrift = RGB(205, 215, 235)
+balken = RGB(120, 190, 240)
+
+FOR i = 0 TO LEN(satz) - 1
+    c = MID$(satz, i, 1)
+    IF c <> " " THEN
+        MAPPUT(zaehler, c, MAPGETOR(zaehler, c, 0) + 1)
+    END IF
+NEXT
+
+zeichen = MAPKEYS(zaehler)
+SORT(zeichen)
+
+hoch = 1
+FOR i = 0 TO LEN(zeichen) - 1
+    wert = MAPGET(zaehler, zeichen[i])
+    IF wert > hoch THEN hoch = wert
+NEXT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+    TEXT(20, 24, satz, schrift)
+    TEXT(20, 52, "Buchstabenarten: " + STR$(MAPSIZE(zaehler)), schrift)
+
+    FOR i = 0 TO LEN(zeichen) - 1
+        x = 24 + i * 30
+        wert = MAPGET(zaehler, zeichen[i])
+        h = wert * 220 \ hoch
+        BOX(x, 330 - h, x + 22, 330, balken)
+        TEXT(x + 5, 340, zeichen[i], schrift)
+        TEXT(x + 5, 364, STR$(wert), schrift)
+    NEXT
+
+    FLIP()
+WEND

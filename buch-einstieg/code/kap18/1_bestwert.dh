@@ -1,0 +1,47 @@
+' Kapitel 18 -- ein Bestwert, der den Neustart ueberlebt.
+' Leertaste wuerfelt. Beenden, neu starten -- der Bestwert ist noch da.
+
+SCREEN(640, 400, "Bestwert")
+
+DIM wurf AS INTEGER
+DIM best AS INTEGER
+DIM zeilen AS ARRAY OF STRING
+DIM aus AS FILE
+DIM schrift AS INTEGER
+DIM gross AS INTEGER
+DIM gold AS INTEGER
+
+schrift = RGB(200, 210, 230)
+gold = RGB(255, 200, 70)
+wurf = 0
+best = 0
+
+' Beim Start nachsehen, ob es schon einen Bestwert gibt.
+IF FILEEXISTS("bestwert.txt") THEN
+    zeilen = READLINES("bestwert.txt")
+    IF LEN(zeilen) > 0 THEN best = VAL(zeilen[0])
+END IF
+
+TEXT_SIZE(56)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+    TEXT(60, 120, "Wurf:", schrift)
+    TEXT(300, 120, STR$(wurf), schrift)
+    TEXT(60, 210, "Bestwert:", gold)
+    TEXT(400, 210, STR$(best), gold)
+    TEXT_SIZE(22)
+    TEXT(60, 330, "Leertaste wuerfelt. ESC beendet.", schrift)
+    TEXT_SIZE(56)
+    FLIP()
+
+    IF KEYHIT(KEY_SPACE) THEN
+        wurf = RANDINT(1, 1000)
+        IF wurf > best THEN
+            best = wurf
+            aus = OPENFILE("bestwert.txt", "w")
+            WRITELINE(aus, STR$(best))
+            CLOSEFILE(aus)
+        END IF
+    END IF
+WEND

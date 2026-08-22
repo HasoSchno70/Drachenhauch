@@ -1,0 +1,34 @@
+' Kapitel 17 -- Text, der sich selbst tippt.
+
+SCREEN(640, 400, "Schreibmaschine")
+
+DIM satz AS STRING
+DIM sichtbar AS INTEGER
+DIM takt AS INTEGER
+DIM schrift AS INTEGER
+DIM cursor AS INTEGER
+
+satz = "Es war einmal ein Programm, das sich selbst schrieb."
+sichtbar = 0
+takt = 0
+schrift = RGB(210, 220, 240)
+cursor = RGB(255, 200, 80)
+
+TEXT_SIZE(26)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+    TEXT(40, 180, LEFT$(satz, sichtbar), schrift)
+
+    IF (takt \ 20) MOD 2 = 0 THEN
+        BOX(40 + TEXT_WIDTH(LEFT$(satz, sichtbar)), 180, _
+            46 + TEXT_WIDTH(LEFT$(satz, sichtbar)), 206, cursor)
+    END IF
+
+    FLIP()
+
+    takt = takt + 1
+    IF takt MOD 4 = 0 AND sichtbar < LEN(satz) THEN
+        sichtbar = sichtbar + 1
+    END IF
+WEND

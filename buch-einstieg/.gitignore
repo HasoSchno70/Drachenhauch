@@ -1,0 +1,5 @@
+# Datendateien, die die Programme aus Kapitel 18 selbst anlegen.
+# Sie entstehen beim Aufnehmen der Bilder neben dem Programm --
+# ein relativer Dateiname zeigt auf das Verzeichnis des Programms.
+code/kap18/bestwert.txt
+code/kap18/vokabeln.txt

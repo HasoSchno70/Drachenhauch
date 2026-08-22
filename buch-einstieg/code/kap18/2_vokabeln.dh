@@ -1,0 +1,41 @@
+' Kapitel 18 -- eine Vokabelliste aus einer Datei.
+' Legt die Datei beim ersten Start selbst an.
+
+SCREEN(640, 400, "Vokabeln")
+
+DIM zeilen AS ARRAY OF STRING
+DIM teile AS ARRAY OF STRING
+DIM i AS INTEGER
+DIM y AS INTEGER
+DIM aus AS FILE
+DIM schrift AS INTEGER
+DIM zweit AS INTEGER
+
+schrift = RGB(205, 215, 235)
+zweit = RGB(140, 200, 160)
+
+IF NOT FILEEXISTS("vokabeln.txt") THEN
+    aus = OPENFILE("vokabeln.txt", "w")
+    WRITELINE(aus, "Haus;house")
+    WRITELINE(aus, "Baum;tree")
+    WRITELINE(aus, "Katze;cat")
+    WRITELINE(aus, "Fenster;window")
+    WRITELINE(aus, "Drache;dragon")
+    CLOSEFILE(aus)
+END IF
+
+zeilen = READLINES("vokabeln.txt")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+    TEXT(40, 30, "Vokabeln: " + STR$(LEN(zeilen)), schrift)
+
+    FOR i = 0 TO LEN(zeilen) - 1
+        teile = SPLIT$(zeilen[i], ";")
+        y = 80 + i * 50
+        TEXT(60, y, teile[0], schrift)
+        TEXT(300, y, teile[1], zweit)
+    NEXT
+
+    FLIP()
+WEND
