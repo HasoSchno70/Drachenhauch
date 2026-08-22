@@ -103,6 +103,41 @@ _SERIELL = {
 os.environ.setdefault("DH_OHNE_AUDIO", "1")
 
 
+# Qt-Testdateien laufen NICHT im gemeinsamen Lauf mit
+# --------------------------------------------------------------------------
+# Sie lassen ihre Fenster stehen -- sie schliessen sie nie, und zerstoeren
+# laesst sich das nicht (Begruendung weiter unten bei
+# `_disarm_leftover_qt_widgets`). In EINEM pytest-Prozess sammeln sich diese
+# Altlasten ueber ALLE Dateien an, die derselbe xdist-Arbeiter abbekommt.
+#
+# Gemessen am 2026-08-22, je Datei in einem frischen Prozess gezaehlt:
+#
+#     2284 uebrig gebliebene Top-Level-Fenster ueber alle 81 Qt-Dateien
+#     davon 2078 (91 %) in 16 Dateien; Spitze: test_formdesigner_qt 644,
+#     test_scoreeditor_qt 335, test_tracker_editor_instruments 232
+#
+# Jede Operation, die ueber ALLE Fenster des Prozesses laeuft, fasst diese
+# Altlasten FREMDER Dateien an -- `app.processEvents()` genauso wie
+# `QApplication.setStyleSheet()` (globales Repolish, das der Editor beim
+# Theme-Wechsel in seinem Konstruktor ausloest). Genau dort starb der
+# CI-Arbeiter sporadisch mit "Windows fatal exception: access violation", im
+# Lauf 32588891599 sogar im ERSTEN processEvents() einer Datei -- da war noch
+# nichts Eigenes im Prozess.
+#
+# Deshalb faehrt der gemeinsame Lauf `-m "not qt"`, und die Qt-Dateien laufen
+# je in einem EIGENEN Prozess (`python tools/qt_tests_einzeln.py`, gemessen
+# 21,7 s fuer alle 82 Dateien mit vier gleichzeitig). Einzeln ist jede von
+# ihnen gruen -- was fehlte, war die Trennung.
+#
+# Gemessen, warum nicht anders:
+#   * Fenster am Datei-Ende zerstoeren -> Absturz in `sendPostedEvents`
+#     (DeferredDelete). Die Editor-Widgets haben echte Zerstoerungs-
+#     Reihenfolge-Fehler; diese Datei entschaerft sie deshalb nur.
+#   * Nur die 16 schwersten Dateien herausnehmen -> von 3 Abstuerzen in 10
+#     Laeufen auf 1 in 10. Weniger Altlast hilft, aber ein Rest genuegt.
+#   * `pytest --forked` -> gibt es auf Windows nicht.
+
+
 # Marker `grafik`: braucht einen dhrt MIT raylib
 # --------------------------------------------------------------------------
 # `dhrt` laesst sich ohne Grafik bauen (`default = []`), und nur so kann CI auf
@@ -667,6 +702,49 @@ def quiesce_qt() -> int:
     # selbst erzeugt.
     qtcore.QCoreApplication.removePostedEvents(None)
     return stopped
+
+
+# Hartes Prozessende fuer die Einzel-Laeufe
+# --------------------------------------------------------------------------
+# `tools/qt_tests_einzeln.py` startet je Datei einen eigenen Prozess und prueft
+# dessen Rueckgabewert -- zum ersten Mal ueberhaupt, denn xdist sieht ihn nie
+# an. Dabei kam heraus: manche Qt-Dateien beenden sich mit
+# STATUS_HEAP_CORRUPTION (0xC0000374), NACHDEM alle Tests gruen durch sind.
+# Gemessen am 2026-08-22 an test_sfxeditor.py: 4 von 4 Laeufen, auch mit
+# stillgelegtem sounddevice -- es ist Qts Abbau der 14 stehen gelassenen
+# Editor-Fenster beim Prozessende, dieselbe Zerstoerungs-Reihenfolge-Schwaeche,
+# die weiter unten bei `_disarm_leftover_qt_widgets` beschrieben ist. EIN
+# Fenster allein wird sauber abgebaut (verifiziert), erst der Stapel kippt.
+#
+# `DH_TEST_HARTES_ENDE=1` beendet den Prozess deshalb per `os._exit()`, sobald
+# das Ergebnis feststeht: nach dem letzten Test, nach der Zusammenfassung. Was
+# uebersprungen wird, ist ausschliesslich der Abbau eines Prozesses, der
+# ohnehin endet -- kein Test, keine Zusicherung, keine Ausgabe.
+#
+# EHRLICH DAZU: das behebt den Abbau-Fehler nicht, es haelt ihn aus dem Weg.
+# Der Fehler trifft die Anwendung nicht in derselben Form -- dort schliesst ein
+# Mensch ein Fenster nach dem anderen, und das ist nachweislich sauber.
+_ENDE_STATUS = 0
+
+
+def pytest_sessionfinish(session, exitstatus):
+    global _ENDE_STATUS
+    _ENDE_STATUS = int(exitstatus)
+
+
+def pytest_unconfigure(config):
+    # NICHT in `pytest_sessionfinish`: der Terminal-Reporter schreibt seine
+    # Zusammenfassung ("5 passed in 1.16s") dort als Hook-Wrapper, also NACH
+    # allen gewoehnlichen Implementierungen -- ein `os._exit` von dort
+    # verschluckt sie (ausprobiert). `pytest_unconfigure` laeuft ganz zum
+    # Schluss, wenn alles geschrieben ist.
+    if not os.environ.get("DH_TEST_HARTES_ENDE"):
+        return
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return                      # ein Arbeiter muss sein Ergebnis noch melden
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_ENDE_STATUS)
 
 
 @pytest.fixture
