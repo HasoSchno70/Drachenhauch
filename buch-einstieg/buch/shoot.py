@@ -37,6 +37,10 @@ FRAMES_VORGABE = 12
 FRAMES = {
     "kap05_1_wanderer": 60, "kap05_2_fallender_ball": 46,
     "kap05_3_spur": 38, "kap05_4_regen": 40, "kap05_5_monde": 70,
+    # Ampel: Bild 75 faellt in Phase 1 -- rot UND gelb, man sieht,
+    # dass gleich etwas passiert. Ein Standbild mit nur einer Lampe
+    # saehe aus wie die feste Ampel aus Kapitel 1.
+    "kap06_1_abpraller": 50, "kap06_3_kasten": 55, "kap06_5_ampel": 75,
 }
 
 

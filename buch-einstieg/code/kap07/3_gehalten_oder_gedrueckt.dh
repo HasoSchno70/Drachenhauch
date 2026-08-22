@@ -1,0 +1,19 @@
+' Kapitel 7 -- zwei Zaehler, ein Unterschied.
+
+SCREEN(640, 400, "Gehalten oder gedrueckt")
+
+DIM gehalten AS INTEGER
+DIM gedrueckt AS INTEGER
+gehalten = 0
+gedrueckt = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(20, 24, 40))
+    TEXT(60, 70, "Halte die Leertaste gedrueckt.", RGB(200, 210, 230))
+    TEXT(60, 170, "KEYPRESSED: " + STR$(gehalten), RGB(255, 180, 60))
+    TEXT(60, 220, "KEYHIT:     " + STR$(gedrueckt), RGB(120, 220, 255))
+    FLIP()
+
+    IF KEYPRESSED(KEY_SPACE) THEN gehalten = gehalten + 1
+    IF KEYHIT(KEY_SPACE) THEN gedrueckt = gedrueckt + 1
+WEND

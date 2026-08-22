@@ -1,0 +1,24 @@
+' Kapitel 6 -- der Ball prallt von allen vier Waenden ab.
+
+SCREEN(640, 400, "Im Kasten")
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM dx AS FLOAT
+DIM dy AS FLOAT
+x = 320
+y = 200
+dx = 4
+dy = 3
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    CIRCLE(x, y, 18, RGB(120, 220, 255))
+    FLIP()
+
+    x = x + dx
+    y = y + dy
+
+    IF x < 18 OR x > 621 THEN dx = -dx
+    IF y < 18 OR y > 381 THEN dy = -dy
+WEND

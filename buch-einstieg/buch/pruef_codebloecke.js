@@ -104,11 +104,17 @@ for (const b of bloecke) {
   // von denen keiner echt war. Was ein Leser wirklich abtippt und was
   // deshalb stimmen MUSS, ist die Syntax.
   diag = diag.filter((d) => d.phase === "parse" || d.phase === "lex");
-  // Ein Ausschnitt endet oft mitten in einem Block ("IF ... THEN" als
-  // gezeigte Zeile, ohne END IF). Der Parser meldet das ERST hinter der
-  // letzten Zeile -- genau daran ist ein abgeschnittenes Beispiel von einem
-  // Tippfehler zu unterscheiden, der immer INNERHALB des Blocks sitzt.
-  diag = diag.filter((d) => d.line <= b.zeilen.length);
+  // ACHTUNG: Das Referenzbuch verwirft hier Befunde HINTER der letzten Zeile
+  // -- dort meldet der Parser abgeschnittene Ausschnitte ("IF ... THEN" ohne
+  // END IF). Fuer ein Nachschlagewerk voller Fragmente ist das richtig.
+  //
+  // Dieses Buch druckt VOLLSTAENDIGE Programme zum Abtippen ab, und genau
+  // dort meldet der Parser das Fehlen: ein vergessenes WEND kommt als
+  // "WEND erwartet, Programmende erreicht" in Zeile n+1. Mit der Regel des
+  // Referenzbuchs rutschte im Kapitel 7 ein Programm ohne WEND durch --
+  // gefunden beim Nachlesen, nicht vom Werkzeug. Also bleibt der Befund
+  // stehen. Ein bewusst gekuerzter Ausschnitt muss dafuer vollstaendig
+  // sein: lieber eine Zeile mehr abdrucken als eine Pruefung weniger.
   if (!diag.length) continue;
   befunde++;
   console.log(`\n--- ${b.datei}  Block ${b.nr}`);

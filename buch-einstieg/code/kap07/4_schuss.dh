@@ -1,0 +1,37 @@
+' Kapitel 7 -- ein Schiff, ein Schuss.
+
+SCREEN(640, 400, "Schuss")
+
+DIM x AS FLOAT
+DIM sx AS FLOAT
+DIM sy AS FLOAT
+DIM fliegt AS BOOLEAN
+DIM hinweis AS INTEGER
+x = 320
+fliegt = FALSE
+hinweis = RGB(140, 150, 180)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    BOX(x - 22, 358, x + 22, 374, RGB(120, 220, 255))
+    BOX(x - 6, 348, x + 6, 358, RGB(120, 220, 255))
+    IF fliegt THEN CIRCLE(sx, sy, 5, RGB(255, 220, 80))
+    TEXT(14, 12, "Pfeile bewegen, Leertaste schiesst", hinweis)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 5
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 5
+    IF x < 22 THEN x = 22
+    IF x > 617 THEN x = 617
+
+    IF KEYHIT(KEY_SPACE) AND NOT fliegt THEN
+        fliegt = TRUE
+        sx = x
+        sy = 344
+    END IF
+
+    IF fliegt THEN
+        sy = sy - 8
+        IF sy < 0 THEN fliegt = FALSE
+    END IF
+WEND

@@ -1,0 +1,24 @@
+' Kapitel 6 -- eine Entscheidung je Feld.
+
+SCREEN(640, 400, "Schachbrett")
+
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM lx AS INTEGER
+DIM ly AS INTEGER
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    CLS(RGB(30, 30, 30))
+    FOR y = 0 TO 7
+        FOR x = 0 TO 9
+            lx = x * 64
+            ly = y * 50
+            IF (x + y) MOD 2 = 0 THEN
+                BOX(lx, ly, lx + 63, ly + 49, RGB(240, 235, 220))
+            ELSE
+                BOX(lx, ly, lx + 63, ly + 49, RGB(90, 60, 45))
+            END IF
+        NEXT
+    NEXT
+    FLIP()
+NEXT

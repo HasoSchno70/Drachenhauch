@@ -1,0 +1,23 @@
+' Kapitel 6 -- der Ball prallt vom Boden ab.
+
+SCREEN(640, 400, "Abpraller")
+
+DIM y AS FLOAT
+DIM tempo AS FLOAT
+y = 40
+tempo = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    BOX(0, 380, 639, 399, RGB(60, 70, 100))
+    CIRCLE(320, y, 20, RGB(255, 90, 60))
+    FLIP()
+
+    tempo = tempo + 0.35
+    y = y + tempo
+
+    IF y > 360 THEN
+        y = 360
+        tempo = -tempo * 0.9
+    END IF
+WEND

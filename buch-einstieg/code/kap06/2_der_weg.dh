@@ -1,0 +1,29 @@
+' Kapitel 6 -- der ganze Weg des Balls auf einmal.
+
+SCREEN(640, 400, "Der Weg")
+
+DIM n AS INTEGER
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM tempo AS FLOAT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    BOX(0, 378, 639, 399, RGB(60, 70, 100))
+
+    x = 20
+    y = 30
+    tempo = 0
+    FOR n = 0 TO 200
+        CIRCLE(x, y, 5, RGB(255, 90, 60))
+        tempo = tempo + 0.5
+        y = y + tempo
+        x = x + 3
+        IF y > 370 THEN
+            y = 370
+            tempo = -tempo * 0.75
+        END IF
+    NEXT
+
+    FLIP()
+WEND

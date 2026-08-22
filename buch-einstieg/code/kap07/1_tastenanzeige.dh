@@ -1,0 +1,34 @@
+' Kapitel 7 -- vier Lampen zeigen, welche Taste gerade gehalten wird.
+
+SCREEN(640, 400, "Tastenanzeige")
+
+DIM aus AS INTEGER
+DIM an AS INTEGER
+DIM f AS INTEGER
+DIM hinweis AS INTEGER
+aus = RGB(62, 70, 98)
+an = RGB(255, 200, 40)
+hinweis = RGB(150, 160, 190)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(18, 22, 38))
+
+    f = aus
+    IF KEYPRESSED(KEY_UP) THEN f = an
+    BOX(280, 120, 360, 180, f)
+
+    f = aus
+    IF KEYPRESSED(KEY_LEFT) THEN f = an
+    BOX(190, 200, 270, 260, f)
+
+    f = aus
+    IF KEYPRESSED(KEY_DOWN) THEN f = an
+    BOX(280, 200, 360, 260, f)
+
+    f = aus
+    IF KEYPRESSED(KEY_RIGHT) THEN f = an
+    BOX(370, 200, 450, 260, f)
+
+    TEXT(190, 300, "Halte die Pfeiltasten gedrueckt.", hinweis)
+    FLIP()
+WEND

@@ -33,9 +33,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — Sternenhimmel, Konfetti, zufällige Landschaft
 - [x] 05 Bewegung · die Spielschleife, `WHILE WEND`
       — fallender Ball, Regen, kreisende Monde
-- [ ] 06 Entscheiden · `IF THEN ELSE`
+- [x] 06 Entscheiden · `IF THEN ELSE`
       — abprallender Ball, Farbwechsel bei Berührung
-- [ ] 07 Die Tastatur · `KEYDOWN KEYPRESSED`
+- [x] 07 Die Tastatur · `KEYDOWN KEYPRESSED`
       — du steuerst ein Raumschiff
 - [ ] 08 **Projekt: Pong** für zwei Spieler
 

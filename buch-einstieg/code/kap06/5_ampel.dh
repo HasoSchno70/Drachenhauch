@@ -1,0 +1,35 @@
+' Kapitel 6 -- eine Ampel, die wirklich schaltet.
+
+SCREEN(640, 400, "Ampel")
+
+DIM bild AS INTEGER
+DIM phase AS INTEGER
+DIM aus AS INTEGER
+bild = 0
+aus = RGB(45, 45, 45)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(25, 25, 25))
+    phase = (bild \ 60) MOD 4
+
+    IF phase = 0 THEN
+        CIRCLE(320, 110, 50, RGB(255, 0, 0))
+        CIRCLE(320, 210, 50, aus)
+        CIRCLE(320, 310, 50, aus)
+    ELSEIF phase = 1 THEN
+        CIRCLE(320, 110, 50, RGB(255, 0, 0))
+        CIRCLE(320, 210, 50, RGB(255, 200, 0))
+        CIRCLE(320, 310, 50, aus)
+    ELSEIF phase = 2 THEN
+        CIRCLE(320, 110, 50, aus)
+        CIRCLE(320, 210, 50, aus)
+        CIRCLE(320, 310, 50, RGB(0, 220, 0))
+    ELSE
+        CIRCLE(320, 110, 50, aus)
+        CIRCLE(320, 210, 50, RGB(255, 200, 0))
+        CIRCLE(320, 310, 50, aus)
+    END IF
+
+    FLIP()
+    bild = bild + 1
+WEND

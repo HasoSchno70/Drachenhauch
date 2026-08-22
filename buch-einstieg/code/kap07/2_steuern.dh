@@ -1,0 +1,27 @@
+' Kapitel 7 -- du bewegst den Punkt.
+
+SCREEN(640, 400, "Steuern")
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM hinweis AS INTEGER
+x = 320
+y = 200
+hinweis = RGB(140, 150, 180)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    CIRCLE(x, y, 20, RGB(120, 220, 255))
+    TEXT(14, 12, "Pfeiltasten bewegen, ESC beendet", hinweis)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 4
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 4
+    IF KEYPRESSED(KEY_UP) THEN y = y - 4
+    IF KEYPRESSED(KEY_DOWN) THEN y = y + 4
+
+    IF x < 20 THEN x = 20
+    IF x > 619 THEN x = 619
+    IF y < 20 THEN y = 20
+    IF y > 379 THEN y = 379
+WEND

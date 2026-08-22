@@ -544,7 +544,10 @@ PLAYSOUND(coin_snd)
 
 | Funktion | Zweck |
 |---|---|
-| `KEYPRESSED(code)` → BOOLEAN | TRUE solange die Taste mit SDL-Code `code` gehalten wird |
+| `KEYPRESSED(code)` → BOOLEAN | TRUE **solange** die Taste mit SDL-Code `code` gehalten wird — jedes Frame erneut. Für Bewegen/Lenken. |
+| `KEYHIT(code)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Taste heruntergeht. Für Schießen, Springen, Umschalten. |
+| `KEYRELEASED(code)` → BOOLEAN | TRUE in dem Frame, in dem die Taste losgelassen wird — etwa „aufladen und beim Loslassen feuern“ |
+| `KEYREPEAT(code)` → BOOLEAN | wie `KEYHIT`, feuert beim Halten aber zusätzlich mit der System-Tastenwiederholung. Für Textcursor und Mengen-Eingabe. |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |
 | `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt — **`0`=links, `1`=rechts, `2`=mitte** (raylib-Reihenfolge: rechts vor mitte!) |
 | `MOUSEWHEEL()` → INTEGER | Mausrad-Delta seit dem letzten Aufruf (+ hoch / − runter / 0) |
