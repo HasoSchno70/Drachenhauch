@@ -1,0 +1,12 @@
+' Kapitel 3 -- 640 Linien, eine Schleife.
+
+SCREEN(640, 400, "Farbverlauf")
+
+DIM x AS INTEGER
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    FOR x = 0 TO 639
+        LINE(x, 0, x, 399, RGB(x * 255 \ 640, 40, 255 - x * 255 \ 640))
+    NEXT
+    FLIP()
+NEXT

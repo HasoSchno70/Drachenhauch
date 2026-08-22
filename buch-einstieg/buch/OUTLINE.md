@@ -27,7 +27,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — Sonne, Ampel, Smiley
 - [x] 02 Zahlen mit Namen · `DIM` Zuweisung Rechnen `BOX TEXT STR$`
       — wachsendes Gesicht, zwei Gesichter, Mitte, Farbmischer
-- [ ] 03 Einmal schreiben, tausendmal malen · `FOR NEXT`
+- [x] 03 Einmal schreiben, tausendmal malen · `FOR NEXT`
       — Farbverlauf, Tunnel, Spirale, Schachbrett
 - [ ] 04 Der Zufall · `RND RANDOMIZE`
       — Sternenhimmel, Konfetti, zufällige Landschaft

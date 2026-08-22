@@ -1,0 +1,12 @@
+' Kapitel 3 -- rueckwaerts zaehlen ergibt Tiefe.
+
+SCREEN(640, 400, "Tunnel")
+CLS(RGB(0, 0, 0))
+
+DIM r AS INTEGER
+FOR r = 200 TO 4 STEP -6
+    CIRCLEOUTLINE(320, 200, r, RGB(255, 255 - r, 40))
+NEXT
+
+FLIP()
+SLEEP(3000)

@@ -1,0 +1,17 @@
+' Kapitel 3 -- Sinus und Kosinus malen eine Spirale.
+
+SCREEN(640, 400, "Spirale")
+CLS(RGB(10, 10, 20))
+
+DIM i AS INTEGER
+DIM winkel AS FLOAT
+DIM weite AS FLOAT
+
+FOR i = 0 TO 720
+    winkel = RAD(i)
+    weite = i / 4
+    CIRCLE(320 + COS(winkel) * weite, 200 + SIN(winkel) * weite, 3, RGB(255, i \ 3, 60))
+NEXT
+
+FLIP()
+SLEEP(4000)

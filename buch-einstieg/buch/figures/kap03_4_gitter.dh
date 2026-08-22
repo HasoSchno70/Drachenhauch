@@ -1,0 +1,16 @@
+' Kapitel 3 -- eine Schleife in einer Schleife.
+
+SCREEN(640, 400, "Gitter")
+
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM _bild AS INTEGER
+FOR _bild = 1 TO 12
+    CLS(RGB(20, 20, 30))
+    FOR y = 0 TO 7
+        FOR x = 0 TO 9
+            CIRCLE(40 + x * 62, 30 + y * 48, 22, RGB(x * 25, y * 32, 200))
+        NEXT
+    NEXT
+    FLIP()
+NEXT
