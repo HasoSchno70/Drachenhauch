@@ -87,6 +87,22 @@ _SERIELL = {
 }
 
 
+# Kein Ton waehrend der Testsuite
+# --------------------------------------------------------------------------
+# Gemessen am 2026-08-22: laeuft eine sounddevice-Wiedergabe noch, waehrend ein
+# Testprozess endet, stirbt er mit STATUS_HEAP_CORRUPTION (0xC0000374) --
+# reproduzierbar in test_editor_qt_preset_bar.py (der SfxGenerator spielt beim
+# Oeffnen einmal an, zwei Fenster plus ein weiteres Widget genuegen). Mit
+# stillgelegtem `sd.play` 3 von 3 Laeufen sauber, mit Ton 3 von 3 kaputt; der
+# Rueckgabewert des Prozesses faellt sonst NIEMANDEM auf, weil xdist ihn nicht
+# prueft. Details in `drachenhauch/sfxeditor_qt.play`.
+#
+# Es geht dabei nichts an Zusicherung verloren: kein Test hoert hin. Was die
+# Klangerzeugung selbst prueft (`synthesize`, `save_wav`, der Mixer), rechnet
+# auf Arrays und braucht kein Geraet.
+os.environ.setdefault("DH_OHNE_AUDIO", "1")
+
+
 # Marker `grafik`: braucht einen dhrt MIT raylib
 # --------------------------------------------------------------------------
 # `dhrt` laesst sich ohne Grafik bauen (`default = []`), und nur so kann CI auf

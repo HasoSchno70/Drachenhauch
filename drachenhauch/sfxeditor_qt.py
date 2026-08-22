@@ -11,6 +11,7 @@ Ergebnis wird als WAV-Asset exportiert.
 """
 from __future__ import annotations
 
+import os
 import wave
 from pathlib import Path
 
@@ -100,7 +101,29 @@ def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE,
 def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
     """Spielt die Samples ueber sounddevice (best effort -- ohne Audio-Geraet
     oder ohne installiertes sounddevice still). Mono ODER Stereo `(n, 2)`.
-    sounddevice nimmt die float32-Arrays direkt (keine int16-Konvertierung noetig)."""
+    sounddevice nimmt die float32-Arrays direkt (keine int16-Konvertierung noetig).
+
+    `DH_OHNE_AUDIO=1` schaltet die Wiedergabe ab -- die Testsuite setzt das
+    (tests/conftest.py). Grund, gemessen am 2026-08-22: laeuft eine Wiedergabe
+    noch, waehrend der Prozess endet, stirbt er mit STATUS_HEAP_CORRUPTION
+    (0xC0000374). Reproduzierbar in tests/test_editor_qt_preset_bar.py -- zwei
+    SfxGenerator-Fenster plus ein weiteres Widget genuegen (der Konstruktor
+    spielt beim Oeffnen einmal an). Mit stillgelegtem `sd.play` 3 von 3 Laeufen
+    sauber, mit echter Wiedergabe 3 von 3 kaputt.
+
+    Was NICHT reicht (alles gemessen): `sd.stop()` beim Programmende,
+    `sd.stop()` vor jedem `play()`, zusaetzlich den Strom aus
+    `sd._last_callback` schliessen -- je 1 von 4/5 Laeufen sauber. Die
+    Beschaedigung passiert also schon WAEHREND der Wiedergabe, nicht erst beim
+    Aufraeumen; ob sie auffliegt, entscheidet die Belegung des Heaps. Das liegt
+    unterhalb von uns (PortAudio), deshalb hier nur der Schalter -- und dort,
+    wo es zaehlt (die Editoren in der Hand eines Menschen), bleibt Ton an.
+
+    Auf den CI-Runnern gibt es ohnehin kein Audio-Geraet; dieser Schalter
+    macht die LOKALEN Laeufe deterministisch.
+    """
+    if os.environ.get("DH_OHNE_AUDIO"):
+        return
     try:
         import sounddevice as sd
         arr = np.ascontiguousarray(
