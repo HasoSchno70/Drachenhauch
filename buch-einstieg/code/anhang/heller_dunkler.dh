@@ -1,0 +1,40 @@
+' Anhang A -- eine Farbe heller und dunkler machen.
+' Dunkler: mit einem Anteil unter 100 multiplizieren.
+' Heller: den Abstand zu 255 verkleinern.
+
+DIM r AS INTEGER
+DIM g AS INTEGER
+DIM b AS INTEGER
+DIM p AS INTEGER
+DIM i AS INTEGER
+DIM x AS INTEGER
+
+r = 90
+g = 170
+b = 240
+
+SCREEN(640, 400, "Heller und dunkler")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    TEXT(20, 24, "dunkler -- Anteil von 100 bis 20", RGB(200, 210, 230))
+    FOR i = 0 TO 4
+        p = 100 - i * 20
+        x = 20 + i * 122
+        BOX(x, 56, x + 108, 150, RGB(r * p \ 100, g * p \ 100, _
+                                     b * p \ 100))
+        TEXT(x + 4, 158, STR$(p) + " %", RGB(150, 165, 190))
+    NEXT
+
+    TEXT(20, 214, "heller -- Abstand zu 255 verkleinern", _
+         RGB(200, 210, 230))
+    FOR i = 0 TO 4
+        p = i * 20
+        x = 20 + i * 122
+        BOX(x, 246, x + 108, 340, RGB(r + (255 - r) * p \ 100, _
+                                      g + (255 - g) * p \ 100, _
+                                      b + (255 - b) * p \ 100))
+        TEXT(x + 4, 348, STR$(p) + " %", RGB(150, 165, 190))
+    NEXT
+    FLIP()
+WEND

@@ -98,6 +98,8 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ## Anhang
 
-- [ ] A Farben zum Nachschlagen
-- [ ] B Die Befehle dieses Buchs auf einen Blick
-- [ ] C Wie es weitergeht — die anderen drei Bände
+- [x] A Farben zum Nachschlagen · achtzehn Farben, heller/dunkler rechnen,
+      `&H` neben `RGB` — die Tafel zeichnet sich aus ihren eigenen Zahlen
+- [x] B Die Befehle dieses Buchs · **baut sich beim Bauen aus `code/kapNN/`**;
+      Name und frühestes Kapitel kommen aus dem Code, nur der Halbsatz von Hand
+- [x] C Wie es weitergeht — Lehrbuch, Galaga, Tippspiel, die Werkzeuge

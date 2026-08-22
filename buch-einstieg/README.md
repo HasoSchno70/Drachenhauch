@@ -47,6 +47,7 @@ Levenshtein-Abstand.
 | IV | Sprites — selbst malen, Animation, Kollision | ein eigenes **Arcade-Spiel** |
 | V | Fenster mit Knöpfen — GUI, Eingabefelder, Layout, Speichern | eine echte Oberfläche |
 | VI | Der Vokabeltrainer — Datenmodell, HTTP, Karteikasten, vier Fragearten, eigene Listen | der **Vokabeltrainer** samt `--export` |
+| Anhang | Farben, alle Befehle des Buchs, wie es weitergeht | Nachschlagewerk |
 
 ## Das Buch bauen
 
@@ -92,6 +93,20 @@ abtippt und danach in die Datei sieht, zweifelt dann an sich statt am Buch.
 („RGB erwartet INTEGER, erhalten FLOAT"). Deshalb wird jedes Grafikprogramm
 zusätzlich wirklich ausgeführt, nämlich beim Aufnehmen der Bilder.
 
+## Anhang B schreibt sich selbst
+
+`buch/content/35_anhang_b_befehle.js` pflegt keine Befehlsliste, sondern liest
+beim Bauen die Programme unter `code/kapNN/` und zieht Namen und frühestes
+Kapitel daraus. Aus der Hand kommt nur der erklärende Halbsatz je Befehl.
+
+Der Grund ist derselbe wie bei allen anderen Prüfungen hier: Eine von Hand
+gepflegte Liste wäre beim ersten neuen Kapitel veraltet gewesen, und niemand
+hätte es gemerkt. Steht ein Befehl im Code, aber nicht in der Erklärungsliste,
+landet er sichtbar unter „Noch ohne Beschreibung“ — im gedruckten Buch, wo man
+ihn nicht übersehen kann.
+
+Stand jetzt: **113 Befehle aus 85 Programmen**, keiner ohne Beschreibung.
+
 ## Die Bilder
 
 Die Bildquellen liegen in `buch/figures/*.dh`, aufgenommen mit
@@ -108,7 +123,8 @@ dieselben Zeichenbefehle in einer kurzen Schleife.
 Ab Kapitel 5 haben die Programme eine eigene Spielschleife und laufen, bis man
 sie beendet — die nimmt `shoot.py` **unverändert** aus `code/kapNN/` auf: Aus
 `kap05_1_wanderer` wird `../code/kap05/1_wanderer.dh`. Keine zweite Quelle,
-keine zweite Wahrheit.
+keine zweite Wahrheit. Der Ordner `code/anhang/` wird genauso behandelt: aus
+`anhang_farben` wird `../code/anhang/farben.dh`.
 
 Aufgenommen wird mit `DHRT_SCALE=3`, also 1920×1200 aus einem 640×400-Fenster.
 Mehr geht nicht: Mit Skalierung 4 wäre das Fenster 2560×1600 und damit höher

@@ -63,7 +63,9 @@ def quelle_finden(name):
     eigen = os.path.join(FIG, name + ".dh")
     if os.path.exists(eigen):
         return eigen
-    m = re.match(r"(kap\d+)_(.+)$", name)
+    # `anhang` steht neben den kapNN-Ordnern: die Anhaenge haben keine
+    # Kapitelnummer, ihre Programme aber dieselbe Behandlung verdient.
+    m = re.match(r"(kap\d+|anhang)_(.+)$", name)
     if m:
         p = os.path.join(HIER, "..", "code", m.group(1), m.group(2) + ".dh")
         if os.path.exists(p):

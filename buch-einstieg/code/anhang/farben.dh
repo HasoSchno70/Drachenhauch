@@ -1,0 +1,56 @@
+' Anhang A -- die Farbtafel. Sie zeichnet sich aus denselben Zahlen,
+' die im Buch danebenstehen: eine Tabelle, zwei Schleifen, fertig.
+
+CONST ANZAHL = 18
+
+DIM namen[ANZAHL] AS STRING
+DIM rot[ANZAHL] AS INTEGER
+DIM gruen[ANZAHL] AS INTEGER
+DIM blau[ANZAHL] AS INTEGER
+DIM i AS INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+
+SUB farbe(nr AS INTEGER, name AS STRING, r AS INTEGER, _
+          g AS INTEGER, b AS INTEGER, namen AS ARRAY OF STRING, _
+          rot AS ARRAY OF INTEGER, gruen AS ARRAY OF INTEGER, _
+          blau AS ARRAY OF INTEGER)
+    namen[nr] = name
+    rot[nr] = r
+    gruen[nr] = g
+    blau[nr] = b
+END SUB
+
+SCREEN(640, 400, "Farben zum Nachschlagen")
+
+farbe(0, "weiss", 255, 255, 255, namen, rot, gruen, blau)
+farbe(1, "hellgrau", 200, 205, 215, namen, rot, gruen, blau)
+farbe(2, "grau", 140, 150, 180, namen, rot, gruen, blau)
+farbe(3, "dunkelgrau", 60, 70, 95, namen, rot, gruen, blau)
+farbe(4, "schwarz", 0, 0, 0, namen, rot, gruen, blau)
+farbe(5, "nachtblau", 28, 32, 50, namen, rot, gruen, blau)
+farbe(6, "rot", 255, 60, 60, namen, rot, gruen, blau)
+farbe(7, "orange", 255, 150, 40, namen, rot, gruen, blau)
+farbe(8, "gelb", 255, 210, 70, namen, rot, gruen, blau)
+farbe(9, "gruen", 90, 210, 120, namen, rot, gruen, blau)
+farbe(10, "tuerkis", 80, 220, 200, namen, rot, gruen, blau)
+farbe(11, "hellblau", 120, 220, 255, namen, rot, gruen, blau)
+farbe(12, "blau", 90, 170, 240, namen, rot, gruen, blau)
+farbe(13, "dunkelblau", 30, 60, 120, namen, rot, gruen, blau)
+farbe(14, "violett", 170, 120, 240, namen, rot, gruen, blau)
+farbe(15, "pink", 255, 110, 190, namen, rot, gruen, blau)
+farbe(16, "braun", 150, 100, 60, namen, rot, gruen, blau)
+farbe(17, "sand", 230, 200, 150, namen, rot, gruen, blau)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    FOR i = 0 TO ANZAHL - 1
+        x = 20 + (i \ 9) * 310
+        y = 22 + (i MOD 9) * 42
+        BOX(x, y, x + 54, y + 30, RGB(rot[i], gruen[i], blau[i]))
+        TEXT(x + 64, y - 2, namen[i], RGB(230, 235, 245))
+        TEXT(x + 64, y + 16, STR$(rot[i]) + ", " + STR$(gruen[i]) + _
+             ", " + STR$(blau[i]), RGB(150, 165, 190))
+    NEXT
+    FLIP()
+WEND
