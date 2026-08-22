@@ -3,7 +3,7 @@ module.exports = (H) => [
 
   H.p("Jetzt wird zusammengesetzt. Der Karteikasten aus Kapitel 30 sucht aus, die Fragearten aus Kapitel 31 fragen, die Verwaltung aus Kapitel 32 liefert die Vokabeln, und das Netz aus Kapitel 29 füllt sie."),
 
-  H.pmix(["Das fertige Programm steht als ", ["code/kap33/trainer.dh", true], " neben dem Buch. Es hat 614 Zeilen — und darin ist kein einziger Befehl, den du nicht kennst. Deshalb steht es hier nicht ganz abgedruckt; stattdessen die Stellen, an denen die Teile aneinandergefügt werden."]),
+  H.pmix(["Das fertige Programm steht als ", ["code/kap33/trainer.dh", true], " neben dem Buch. Es hat 640 Zeilen — und darin ist kein einziger Befehl, den du nicht kennst. Deshalb steht es hier nicht ganz abgedruckt; stattdessen die Stellen, an denen die Teile aneinandergefügt werden."]),
 
   H.figure("kap33_trainer.png", "Der allererste Start: Die Vokabel wird gezeigt, nicht abgefragt. Was danach kommt, entscheidet der Karteikasten.", 440, 300),
 

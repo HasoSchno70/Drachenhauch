@@ -81,6 +81,12 @@ FUNCTION schrift_holen(groesse AS INTEGER) AS INTEGER
     RETURN -1
 END FUNCTION
 
+FUNCTION mehrzahl(n AS INTEGER, eins AS STRING, _
+                  viele AS STRING) AS STRING
+    IF n = 1 THEN RETURN STR$(n) + " " + eins
+    RETURN STR$(n) + " " + viele
+END FUNCTION
+
 SUB tabellen_anlegen(con AS DB_CONN)
     DB_EXEC(con, "CREATE TABLE IF NOT EXISTS listen (" + _
                  "id INTEGER PRIMARY KEY, name TEXT, sprache TEXT)")
@@ -359,8 +365,10 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
             DB_CLOSE_RESULT(erg)
         END IF
         GUI_SET_LISTBOX(w_box, zeilen)
-        GUI_SET_TEXT(w_stand, STR$(LEN(zeilen)) + " Vokabeln, " + _
-                              STR$(LEN(listen_name)) + " Listen")
+        GUI_SET_TEXT(w_stand, mehrzahl(LEN(zeilen), "Vokabel", _
+                              "Vokabeln") + " in " + _
+                              mehrzahl(LEN(listen_name), _
+                              "Liste", "Listen"))
 
         FOR i = 1 TO 5
             GUI_SET_VALUE(w_balken[i], 0.0)
@@ -384,7 +392,7 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
             d = DB_GET_INT(erg, 1)
         END IF
         DB_CLOSE_RESULT(erg)
-        txt = STR$(i + d) + " Antworten"
+        txt = mehrzahl(i + d, "Antwort", "Antworten")
         IF i + d > 0 THEN
             txt = txt + ", " + STR$(INT(i * 100.0 / (i + d))) + _
                   "% richtig"

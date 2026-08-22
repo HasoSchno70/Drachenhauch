@@ -70,10 +70,12 @@ module.exports = (H) => [
 
   H.p("Und damit zum wichtigsten Satz dieses Kapitels: Ein Abruf über das Netz geht schief. Nicht immer, aber oft genug, dass ein Programm damit rechnen muss. Das WLAN ist weg, der Rechner am anderen Ende antwortet nicht, die Datei ist umbenannt worden."),
 
-  H.pmix(["Passiert das, bricht ", ["HTTP_GET", true], " das Programm ab — nachgemessen mit einer Adresse, die es (noch) nicht gab:"]),
+  H.pmix(["Passiert das, bricht ", ["HTTP_GET", true], " das Programm ab — nachgemessen mit einer Adresse, in der ein Buchstabe fehlte (", ["katalo.txt", true], " statt ", ["katalog.txt", true], "):"]),
 
   H.code([
-    "Laufzeitfehler in x.dh:4: HTTP 404 Not Found - https://raw.git...",
+    "Laufzeitfehler in typo.dh:5: HTTP 404 Not Found -",
+    "https://raw.githubusercontent.com/HasoSchno70/Drachenhauch/main/",
+    "buch-einstieg/vokabellisten/katalo.txt",
   ], { out: true }),
 
   H.p("Dagegen gibt es ein Mittel, und es ist so grundlegend, dass fast jede Programmiersprache es kennt:"),
@@ -137,7 +139,9 @@ module.exports = (H) => [
     "WEND",
   ]),
 
-  H.figure("kap29_1_aus_dem_netz.png", "Text, der eben noch auf einem Rechner in einem anderen Land lag.", 440, 280),
+  H.figure("kap29_1_aus_dem_netz.png", "Text, der eine Zehntelsekunde vorher noch auf einem Rechner in einem anderen Land lag.", 440, 280),
+
+  H.tip("Nachgemessen", "Alle vier Dateien am Tag dieses Kapitels abgerufen: katalog.txt Status 200 mit 236 Zeichen, englisch_grund.txt 799, franzoesisch_grund.txt 841, spanisch_grund.txt 827. Die Tilde in „el año“ und der Zirkumflex in „la fenêtre“ kamen unverändert an. Und ein Detail nebenbei: Auf der Platte ist katalog.txt 237 Bytes groß, LEN meldet aber 236 Zeichen. Der Unterschied ist das „ö“ in „Französisch“ — es braucht zwei Bytes und ist trotzdem ein Zeichen."),
 
   H.pmix([["HTTP_TIMEOUT(8)", true], " sagt, wie lange das Programm auf eine Antwort wartet, bevor es aufgibt: acht Sekunden. Ohne diese Zeile wären es zehn. Wer je vor einem Programm gesessen hat, das minutenlang nichts tut, weiß, warum man diese Zahl klein hält."]),
 

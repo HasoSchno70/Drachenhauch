@@ -80,6 +80,42 @@ module.exports = (H) => [
 
   H.warn("Diese Zahl ist der Grund, warum jedes Programm, das viele Zeilen auf einmal schreibt, eine Transaktion braucht. Es ist auch der Grund, warum man sie NICHT um die ganze Programmlaufzeit legt: Solange sie offen ist, hat noch niemand etwas davon, und ein Absturz nimmt alles mit. Um einen Ladevorgang: ja. Um eine Spielschleife: nein.", "Wann eine Transaktion hingehört"),
 
+  H.h2("Der freundliche erste Start"),
+
+  H.p("Beim allerersten Aufruf ist die Datenbank leer, und ein leeres Fenster sagt niemandem, wofür es gut ist. Also legt das Programm dann selbst eine Liste an — aus der Textdatei, die neben ihm liegt:"),
+
+  H.code([
+    "' Beim allerersten Start eine Liste anlegen -- ein leeres Fenster",
+    "' sagt niemandem, wofuer es gut ist.",
+    'erg = DB_QUERY(con, "SELECT COUNT(*) FROM listen")',
+    "DB_NEXT(erg)",
+    "i = DB_GET_INT(erg, 0)",
+    "DB_CLOSE_RESULT(erg)",
+    'IF i = 0 AND FILEEXISTS("englisch_grund.txt") THEN',
+    '    zeilen = READLINES("englisch_grund.txt")',
+    '    text_einlesen(con, liste_anlegen(con, kopfzeile(zeilen, "name"), _',
+    '                  kopfzeile(zeilen, "sprache")), zeilen)',
+    "END IF",
+  ]),
+
+  H.pmix(["Derselbe Handgriff wie in Kapitel 27, nur eine Stufe größer: Damals waren es vier Vokabeln im Quelltext, hier ist es eine ganze Liste aus einer Datei. Die Bedingung ", ["i = 0", true], " sorgt dafür, dass es genau einmal passiert — beim zweiten Start ist die Tabelle nicht mehr leer."]),
+
+  H.pmix(["Das ", ["FILEEXISTS", true], " daneben ist die zweite Hälfte: Fehlt die Datei, passiert eben nichts. Ein Programm, das beim Start abbricht, weil eine Beigabe fehlt, ist schlechter als eines, das ohne sie auskommt."]),
+
+  H.h2("Eine Vokabel, zwei Vokabeln"),
+
+  H.p("Ganz unten steht, wie viel drin ist — und dabei fällt eine Kleinigkeit auf, über die fast jedes Programm stolpert:"),
+
+  H.code([
+    "FUNCTION mehrzahl(n AS INTEGER, eins AS STRING, _",
+    "                  viele AS STRING) AS STRING",
+    '    IF n = 1 THEN RETURN STR$(n) + " " + eins',
+    '    RETURN STR$(n) + " " + viele',
+    "END FUNCTION",
+  ]),
+
+  H.p("„1 Listen“ steht in erstaunlich vielen Programmen, und es liest sich jedes Mal wie ein Fehler — was es ja auch ist. Fünf Zeilen räumen ihn aus, ein für alle Mal und für jedes Wort."),
+
   H.h2("Ein Auswahlfeld, das sich ändert"),
 
   H.p("Wenn eine Liste dazukommt, muss sie im Auswahlfeld auftauchen. Auch dafür gilt der Satz aus Kapitel 25: Das Array ist die Wahrheit, das Bedienelement zeigt es nur an."),
@@ -132,7 +168,7 @@ module.exports = (H) => [
 
   H.h2("Das ganze Programm"),
 
-  H.pmix(["Es steht als ", ["code/kap32/verwalten.dh", true], " neben dem Buch, und es ist länger als alles bisher — aber nichts darin ist neu. Reiter aus Kapitel 26, Datenbank aus Kapitel 27, Netz aus Kapitel 29, Textzerlegung ebenfalls aus 29. Der einzige neue Befehl ist ", ["DB_BEGIN", true], "."]),
+  H.pmix(["Es steht als ", ["code/kap32/verwalten.dh", true], " neben dem Buch — 293 Zeilen, länger als alles bisher, aber nichts darin ist neu. Reiter aus Kapitel 26, Datenbank aus Kapitel 27, Netz aus Kapitel 29, Textzerlegung ebenfalls aus 29. Der einzige neue Befehl ist ", ["DB_BEGIN", true], "."]),
 
   H.p("Genau das ist der Punkt, an dem ein Buch wie dieses aufhört, Neues zu bringen: Ab hier baut man aus dem, was man hat."),
 
