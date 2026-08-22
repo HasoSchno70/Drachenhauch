@@ -83,13 +83,18 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 26 Ordnung im Fenster · Layout, Reiter, Gruppen
 - [x] 27 Daten, die bleiben · Datenbank statt Datei
 
-## Teil VI — Abschlussprojekt
+## Teil VI — Der Vokabeltrainer
 
-- [ ] 28 Der Vokabeltrainer: Idee und Aufbau
-- [ ] 29 Vokabeln anlegen und speichern
-- [ ] 30 Abfragen — und merken, was schwerfällt (Karteikasten)
-- [ ] 31 Fortschritt zeigen, Klang, letzter Schliff
-- [ ] 32 Weitergeben · `dhrt --export`
+- [x] 28 Der Bauplan · drei Tabellen, `PRAGMA table_info`
+      — die Datenbank zeichnet sich selbst
+- [x] 29 Vokabeln aus dem Netz · `IMPORT "html"`, `HTTP_GET`, `SPLIT$`,
+      `TRY`/`CATCH`, Hintergrundabruf — Katalog und Liste von GitHub
+- [x] 30 Der Karteikasten · Leitner-Fächer, `ORDER BY faellig, fach,
+      RANDOM()` — das Bild, das zeigt, warum Würfeln nichts taugt
+- [x] 31 Vier Arten zu fragen · Multiple Choice, Tippen mit
+      Tippfehler-Toleranz (Levenshtein), Paare zuordnen
+- [x] 32 Eigene Listen · anlegen, füllen, holen — Verwaltung mit Reitern
+- [x] 33 **Der Trainer** — alles zusammen, `dhrt --export`
 
 ## Anhang
 

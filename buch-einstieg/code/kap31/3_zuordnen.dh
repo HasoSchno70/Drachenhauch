@@ -1,0 +1,135 @@
+' Kapitel 31 -- Lernmuster drei: sechs Paare zusammenklicken.
+' Links anklicken, dann rechts. Passt es, bleibt es gruen stehen.
+
+SUB liste_lesen(datei AS STRING, links AS ARRAY OF STRING, _
+                rechts AS ARRAY OF STRING)
+    DIM roh AS STRING
+    DIM z AS STRING
+    DIM t AS ARRAY OF STRING
+    FOR EACH roh IN READLINES(datei)
+        z = TRIM$(roh)
+        IF z <> "" AND LEFT$(z, 1) <> "#" THEN
+            t = SPLIT$(z, ";")
+            IF LEN(t) >= 2 THEN
+                ARRAY_PUSH(links, TRIM$(t[0]))
+                ARRAY_PUSH(rechts, TRIM$(t[1]))
+            END IF
+        END IF
+    NEXT
+END SUB
+
+CONST PAARE = 6
+
+SCREEN(640, 400, "Zuordnen")
+
+DIM de[0] AS STRING
+DIM fremd[0] AS STRING
+DIM zeigt[PAARE] AS INTEGER
+DIM misch[PAARE] AS INTEGER
+DIM erledigt[PAARE] AS BOOLEAN
+DIM gewaehlt AS INTEGER
+DIM patzer AS INTEGER
+DIM offen AS INTEGER
+DIM blinken AS INTEGER
+DIM neu AS BOOLEAN
+DIM gedrueckt AS BOOLEAN
+DIM vorher AS BOOLEAN
+DIM klick AS SOUND
+DIM brumm AS SOUND
+DIM i AS INTEGER
+DIM k AS INTEGER
+DIM j AS INTEGER
+DIM mx AS INTEGER
+DIM my AS INTEGER
+
+liste_lesen("englisch_grund.txt", de, fremd)
+klick = AUDIO_TONE(880, 80, "square", 0.3)
+brumm = AUDIO_TONE(160, 160, "saw", 0.3)
+neu = TRUE
+gewaehlt = -1
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu THEN
+        neu = FALSE
+        gewaehlt = -1
+        FOR i = 0 TO PAARE - 1
+            zeigt[i] = -1
+            erledigt[i] = FALSE
+            misch[i] = i
+        NEXT
+        i = 0
+        WHILE i < PAARE
+            k = INT(RND() * LEN(de))
+            IF ARRAY_INDEXOF(zeigt, k) < 0 THEN
+                zeigt[i] = k
+                i = i + 1
+            END IF
+        WEND
+        FOR i = PAARE - 1 TO 1 STEP -1
+            j = INT(RND() * (i + 1))
+            k = misch[i]
+            misch[i] = misch[j]
+            misch[j] = k
+        NEXT
+    END IF
+
+    vorher = gedrueckt
+    gedrueckt = MOUSEBUTTON(0)
+    mx = MOUSEX()
+    my = MOUSEY()
+
+    IF gedrueckt AND NOT vorher THEN
+        i = (my - 60) \ 52
+        IF my >= 60 AND i >= 0 AND i < PAARE THEN
+            IF mx >= 20 AND mx <= 300 AND NOT erledigt[i] THEN
+                gewaehlt = i
+                PLAYSOUND(klick)
+            END IF
+            IF mx >= 340 AND mx <= 620 AND gewaehlt >= 0 THEN
+                IF misch[i] = gewaehlt THEN
+                    erledigt[gewaehlt] = TRUE
+                    PLAYSOUND(klick)
+                ELSE
+                    patzer = patzer + 1
+                    blinken = 20
+                    PLAYSOUND(brumm)
+                END IF
+                gewaehlt = -1
+            END IF
+        END IF
+    END IF
+
+    IF blinken > 0 THEN blinken = blinken - 1
+
+    offen = 0
+    FOR i = 0 TO PAARE - 1
+        IF NOT erledigt[i] THEN offen = offen + 1
+    NEXT
+    IF offen = 0 THEN neu = TRUE
+
+    CLS(RGB(28, 32, 50))
+    FOR i = 0 TO PAARE - 1
+        IF erledigt[i] THEN
+            BOX(20, 60 + i * 52, 300, 100 + i * 52, RGB(40, 110, 65))
+        ELSEIF gewaehlt = i THEN
+            BOX(20, 60 + i * 52, 300, 100 + i * 52, RGB(60, 90, 150))
+        ELSE
+            BOX(20, 60 + i * 52, 300, 100 + i * 52, RGB(46, 54, 78))
+        END IF
+        TEXT(34, 72 + i * 52, de[zeigt[i]], RGB(240, 240, 250))
+
+        k = misch[i]
+        IF erledigt[k] THEN
+            BOX(340, 60 + i * 52, 620, 100 + i * 52, RGB(40, 110, 65))
+        ELSEIF blinken > 0 THEN
+            BOX(340, 60 + i * 52, 620, 100 + i * 52, RGB(120, 45, 55))
+        ELSE
+            BOX(340, 60 + i * 52, 620, 100 + i * 52, RGB(46, 54, 78))
+        END IF
+        TEXT(354, 72 + i * 52, fremd[zeigt[k]], RGB(240, 240, 250))
+    NEXT
+    TEXT(20, 24, "Klick links, dann rechts. Patzer: " + STR$(patzer), _
+         RGB(150, 165, 190))
+    FLIP()
+WEND

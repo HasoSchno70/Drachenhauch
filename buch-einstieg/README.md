@@ -26,10 +26,16 @@ kann.
 
 ## Das Abschlussprojekt
 
-Ein **Vokabeltrainer** mit richtigem Fenster, Knöpfen und Eingabefeldern: legt
-Vokabeln an, fragt ab, merkt sich, was schwerfällt, und zeigt den Fortschritt.
-Etwas, das man weitergeben kann — und das genau die Bausteine braucht, die die
-Kapitel davor eingeführt haben.
+Ein **Vokabeltrainer** mit richtigem Fenster, Knöpfen und Eingabefeldern. Er
+holt seine Listen **aus dem Internet** (die drei unter `vokabellisten/` liegen
+im selben Repo), kann **mehrere Sprachen**, nimmt **eigene Listen** entgegen und
+fragt **nicht stumpf zufällig** ab: Ein Karteikasten nach Leitner entscheidet,
+was drankommt, und das Fach entscheidet, **wie** gefragt wird — vorstellen,
+Multiple Choice in beiden Richtungen, tippen in beiden Richtungen. Getippte
+Antworten dürfen einen Tippfehler haben; gemessen wird mit dem
+Levenshtein-Abstand.
+
+`dhrt --export` macht daraus eine einzelne `.exe`, die man weitergeben kann.
 
 ## Aufbau
 
@@ -40,7 +46,7 @@ Kapitel davor eingeführt haben.
 | III | Ordnung — Funktionen, Maps, Klassen, Text, Dateien | 500 Partikel, ein Highscore, der bleibt |
 | IV | Sprites — selbst malen, Animation, Kollision | ein eigenes **Arcade-Spiel** |
 | V | Fenster mit Knöpfen — GUI, Eingabefelder, Layout, Speichern | eine echte Oberfläche |
-| VI | Abschlussprojekt | der **Vokabeltrainer** |
+| VI | Der Vokabeltrainer — Datenmodell, HTTP, Karteikasten, vier Fragearten, eigene Listen | der **Vokabeltrainer** samt `--export` |
 
 ## Das Buch bauen
 
@@ -109,3 +115,22 @@ Mehr geht nicht: Mit Skalierung 4 wäre das Fenster 2560×1600 und damit höher
 als der Bildschirm; Windows schiebt es dann weg, und die Aufnahme bekommt oben
 179 schwarze Zeilen. 1920 Breite ist zugleich das Maß des Referenzbuchs und
 reicht für den 300-dpi-Druck.
+
+## Die Vokabellisten
+
+`vokabellisten/` enthält den Grundwortschatz für Englisch, Französisch und
+Spanisch sowie einen `katalog.txt`, der sagt, welche Listen es gibt. Format:
+
+```
+# name: Englisch Grundwortschatz
+# sprache: Englisch
+Haus;house
+```
+
+Der Trainer lädt sie über ihre `raw.githubusercontent.com`-Adresse. Das ist
+Absicht: Eine fremde Übersetzungs-Schnittstelle wäre morgen vielleicht
+kostenpflichtig oder abgeschaltet, und dann stünde in einem gedruckten Buch
+eine Adresse, die ins Leere führt. Die Listen liegen dort, wo das Buch liegt.
+
+Geht das Netz nicht, greifen alle Programme auf die Datei neben sich zurück —
+und **sagen es auch** im Fenster.

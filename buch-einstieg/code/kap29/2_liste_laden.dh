@@ -1,0 +1,101 @@
+' Kapitel 29 -- eine Vokabelliste aus dem Netz laden, ohne dass
+' das Fenster dabei stehenbleibt.
+
+IMPORT "gui"
+IMPORT "html"
+
+SUB spalten_lesen(zeilen AS ARRAY OF STRING, _
+                  links AS ARRAY OF STRING, _
+                  rechts AS ARRAY OF STRING)
+    DIM roh AS STRING
+    DIM z AS STRING
+    DIM t AS ARRAY OF STRING
+    FOR EACH roh IN zeilen
+        z = TRIM$(roh)
+        IF z <> "" AND LEFT$(z, 1) <> "#" THEN
+            t = SPLIT$(z, ";")
+            IF LEN(t) >= 2 THEN
+                ARRAY_PUSH(links, TRIM$(t[0]))
+                ARRAY_PUSH(rechts, TRIM$(t[1]))
+            END IF
+        END IF
+    NEXT
+END SUB
+
+SCREEN(640, 400, "Vokabeln aus dem Netz")
+
+DIM basis AS STRING
+DIM dateien[0] AS STRING
+DIM namen[0] AS STRING
+DIM de[0] AS STRING
+DIM fremd[0] AS STRING
+DIM zeilen[0] AS STRING
+DIM fenster AS GUI_WINDOW
+DIM wahl AS GUI_WIDGET
+DIM laden AS GUI_WIDGET
+DIM liste AS GUI_WIDGET
+DIM stand AS GUI_WIDGET
+DIM abruf AS INTEGER
+DIM punkte AS INTEGER
+DIM i AS INTEGER
+
+basis = "https://raw.githubusercontent.com/HasoSchno70/" + _
+        "Drachenhauch/main/buch-einstieg/vokabellisten/"
+HTTP_TIMEOUT(8)
+
+TRY
+    spalten_lesen(SPLIT$(HTTP_GET(basis + "katalog.txt"), CHR$(10)), _
+                  dateien, namen)
+CATCH e
+    spalten_lesen(READLINES("katalog.txt"), dateien, namen)
+END TRY
+
+fenster = GUI_WINDOW("Vokabeln holen", 40, 30, 540, 320)
+wahl = GUI_DROPDOWN(fenster, 20, 36, 300, 28, namen)
+laden = GUI_BUTTON(fenster, "Laden", 340, 36, 160, 28)
+liste = GUI_LISTBOX(fenster, 20, 80, 480, 180, zeilen)
+stand = GUI_LABEL(fenster, "", 20, 272)
+
+' Gleich beim Start die erste Liste holen -- ein leeres Fenster
+' sagt niemandem, wofuer es gut ist.
+abruf = HTTP_GET_START(basis + dateien[0])
+punkte = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(laden) AND abruf < 0 THEN
+        i = GUI_DROPDOWN_SELECTED(wahl)
+        abruf = HTTP_GET_START(basis + dateien[i])
+        punkte = 0
+    END IF
+
+    IF abruf >= 0 THEN
+        punkte = punkte + 1
+        GUI_SET_TEXT(stand, "hole" + REPEAT$(".", punkte \ 10 + 1))
+        IF HTTP_READY(abruf) THEN
+            REDIM(de, 0)
+            REDIM(fremd, 0)
+            REDIM(zeilen, 0)
+            TRY
+                spalten_lesen(SPLIT$(HTTP_RESULT(abruf), CHR$(10)), _
+                              de, fremd)
+                GUI_SET_TEXT(stand, "aus dem Netz")
+            CATCH e
+                i = GUI_DROPDOWN_SELECTED(wahl)
+                spalten_lesen(READLINES(dateien[i]), de, fremd)
+                GUI_SET_TEXT(stand, "von der Platte, Netz sagte " + _
+                                    STR$(HTTP_STATUS()))
+            END TRY
+            FOR i = 0 TO LEN(de) - 1
+                ARRAY_PUSH(zeilen, de[i] + "   ->   " + fremd[i])
+            NEXT
+            GUI_SET_LISTBOX(liste, zeilen)
+            abruf = -1
+        END IF
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND

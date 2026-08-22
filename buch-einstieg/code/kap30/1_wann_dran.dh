@@ -1,0 +1,83 @@
+' Kapitel 30 -- wann kommt welche Vokabel dran?
+' Oben: rein zufaellig gewuerfelt. Unten: der Karteikasten.
+' Jede Reihe ist eine Vokabel, jede Spalte eine Runde.
+
+CONST WOERTER = 20
+CONST RUNDEN = 40
+CONST PRO_RUNDE = 5
+
+DIM koennen[WOERTER] AS FLOAT
+DIM fach[WOERTER] AS INTEGER
+DIM faellig[WOERTER] AS INTEGER
+DIM warte[6] AS INTEGER
+DIM zufall[RUNDEN * PRO_RUNDE] AS INTEGER
+DIM kasten[RUNDEN * PRO_RUNDE] AS INTEGER
+DIM stufe[RUNDEN * PRO_RUNDE] AS INTEGER
+DIM r AS INTEGER
+DIM k AS INTEGER
+DIM i AS INTEGER
+DIM best AS INTEGER
+DIM n AS INTEGER
+
+RANDOMIZE(7)
+warte[1] = 1
+warte[2] = 2
+warte[3] = 4
+warte[4] = 8
+warte[5] = 16
+
+FOR i = 0 TO WOERTER - 1
+    koennen[i] = 0.15 + i * 0.04
+    fach[i] = 1
+    faellig[i] = 0
+NEXT
+
+' Oben: einfach wuerfeln, ohne Gedaechtnis.
+FOR r = 0 TO RUNDEN - 1
+    FOR k = 0 TO PRO_RUNDE - 1
+        zufall[r * PRO_RUNDE + k] = INT(RND() * WOERTER)
+    NEXT
+NEXT
+
+' Unten: das Wort, das am laengsten ueberfaellig ist, zuerst.
+FOR r = 0 TO RUNDEN - 1
+    FOR k = 0 TO PRO_RUNDE - 1
+        best = -1
+        FOR i = 0 TO WOERTER - 1
+            IF faellig[i] <= r THEN
+                IF best < 0 OR faellig[i] < faellig[best] THEN best = i
+            END IF
+        NEXT
+        n = r * PRO_RUNDE + k
+        kasten[n] = best
+        IF best >= 0 THEN
+            stufe[n] = fach[best]
+            IF RND() < koennen[best] THEN
+                IF fach[best] < 5 THEN fach[best] = fach[best] + 1
+            ELSE
+                fach[best] = 1
+            END IF
+            faellig[best] = r + warte[fach[best]]
+        END IF
+    NEXT
+NEXT
+
+SCREEN(640, 400, "Wann kommt was dran?")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    TEXT(20, 12, "gewuerfelt", RGB(230, 140, 140))
+    TEXT(20, 202, "Karteikasten", RGB(140, 220, 160))
+    FOR n = 0 TO RUNDEN * PRO_RUNDE - 1
+        r = n \ PRO_RUNDE
+        i = zufall[n]
+        BOX(20 + r * 15, 40 + i * 7, 32 + r * 15, 45 + i * 7, _
+            RGB(230, 140, 140))
+        i = kasten[n]
+        IF i >= 0 THEN
+            BOX(20 + r * 15, 230 + i * 7, 32 + r * 15, 235 + i * 7, _
+                RGB(40 + stufe[n] * 40, 230 - stufe[n] * 20, 170))
+        END IF
+    NEXT
+    FLIP()
+WEND

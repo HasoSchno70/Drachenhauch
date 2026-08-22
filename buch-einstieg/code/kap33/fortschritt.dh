@@ -1,0 +1,42 @@
+' Kapitel 33 -- ein zweites, winziges Programm an derselben Datenbank.
+' Es lernt nichts ab und aendert nichts. Es sieht nur nach.
+
+IMPORT "db"
+
+SCREEN(640, 400, "Fortschritt")
+
+DIM con AS DB_CONN
+DIM erg AS DB_RESULT
+DIM inhalt[6] AS INTEGER
+DIM gesamt AS INTEGER
+DIM breite AS INTEGER
+DIM i AS INTEGER
+
+con = DB_OPEN("trainer.db")
+erg = DB_QUERY(con, "SELECT fach, COUNT(*) FROM vokabeln GROUP BY fach")
+WHILE DB_NEXT(erg)
+    inhalt[DB_GET_INT(erg, 0)] = DB_GET_INT(erg, 1)
+    gesamt = gesamt + DB_GET_INT(erg, 1)
+WEND
+DB_CLOSE_RESULT(erg)
+DB_CLOSE(con)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    TEXT(20, 20, STR$(gesamt) + " Vokabeln in trainer.db", _
+         RGB(150, 165, 190))
+    FOR i = 1 TO 5
+        TEXT(20, 76 + (i - 1) * 56, "Fach " + STR$(i), _
+             RGB(150, 165, 190))
+        breite = 0
+        IF gesamt > 0 THEN breite = inhalt[i] * 480 \ gesamt
+        IF inhalt[i] > 0 THEN
+            BOX(120, 72 + (i - 1) * 56, 124 + breite, _
+                104 + (i - 1) * 56, _
+                RGB(70 - i * 6, 90 + i * 26, 150 - i * 8))
+        END IF
+        TEXT(132 + breite, 80 + (i - 1) * 56, STR$(inhalt[i]), _
+             RGB(230, 230, 240))
+    NEXT
+    FLIP()
+WEND

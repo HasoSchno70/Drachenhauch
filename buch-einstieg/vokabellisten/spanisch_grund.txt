@@ -1,0 +1,54 @@
+# name: Spanisch Grundwortschatz
+# sprache: Spanisch
+# Zeilen mit # sind Anmerkungen. Sonst: deutsch;fremdsprache
+Haus;la casa
+Baum;el árbol
+Katze;el gato
+Hund;el perro
+Wasser;el agua
+Brot;el pan
+Fenster;la ventana
+Tür;la puerta
+Buch;el libro
+Tisch;la mesa
+Stuhl;la silla
+Straße;la calle
+Stadt;la ciudad
+Land;el país
+Freund;el amigo
+Familie;la familia
+Kind;el niño
+Mutter;la madre
+Vater;el padre
+Schule;la escuela
+Arbeit;el trabajo
+Zeit;el tiempo
+Jahr;el año
+Tag;el día
+Nacht;la noche
+Sonne;el sol
+Mond;la luna
+Himmel;el cielo
+Berg;la montaña
+Fluss;el río
+Meer;el mar
+Wald;el bosque
+Blume;la flor
+Vogel;el pájaro
+Fisch;el pez
+Pferd;el caballo
+gehen;ir
+kommen;venir
+sehen;ver
+hören;oír
+sprechen;hablar
+essen;comer
+trinken;beber
+lesen;leer
+schreiben;escribir
+groß;grande
+klein;pequeño
+alt;viejo
+neu;nuevo
+gut;bueno
+schlecht;malo

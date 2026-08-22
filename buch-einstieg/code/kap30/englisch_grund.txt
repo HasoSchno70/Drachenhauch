@@ -1,0 +1,59 @@
+# name: Englisch Grundwortschatz
+# sprache: Englisch
+# Zeilen mit # sind Anmerkungen. Sonst: deutsch;fremdsprache
+Haus;house
+Baum;tree
+Katze;cat
+Hund;dog
+Wasser;water
+Brot;bread
+Fenster;window
+Tür;door
+Buch;book
+Tisch;table
+Stuhl;chair
+Straße;street
+Stadt;city
+Land;country
+Freund;friend
+Familie;family
+Kind;child
+Mutter;mother
+Vater;father
+Schule;school
+Arbeit;work
+Zeit;time
+Jahr;year
+Tag;day
+Nacht;night
+Morgen;morning
+Abend;evening
+Sonne;sun
+Mond;moon
+Himmel;sky
+Berg;mountain
+Fluss;river
+Meer;sea
+Wald;forest
+Blume;flower
+Vogel;bird
+Fisch;fish
+Pferd;horse
+gehen;to go
+kommen;to come
+sehen;to see
+hören;to hear
+sprechen;to speak
+essen;to eat
+trinken;to drink
+schlafen;to sleep
+lesen;to read
+schreiben;to write
+groß;big
+klein;small
+alt;old
+neu;new
+gut;good
+schlecht;bad
+schnell;fast
+langsam;slow

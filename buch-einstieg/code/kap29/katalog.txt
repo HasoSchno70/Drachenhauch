@@ -1,0 +1,5 @@
+# Verzeichnis der Vokabellisten dieses Buchs.
+# Zeilen mit # sind Anmerkungen. Sonst: datei;name
+englisch_grund.txt;Englisch Grundwortschatz
+franzoesisch_grund.txt;Französisch Grundwortschatz
+spanisch_grund.txt;Spanisch Grundwortschatz

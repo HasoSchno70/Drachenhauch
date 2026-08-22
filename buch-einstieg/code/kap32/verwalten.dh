@@ -1,0 +1,273 @@
+' Kapitel 32 -- eigene Listen anlegen, fuellen und aus dem Netz holen.
+
+IMPORT "gui"
+IMPORT "db"
+IMPORT "html"
+
+SUB tabellen_anlegen(con AS DB_CONN)
+    DB_EXEC(con, "CREATE TABLE IF NOT EXISTS listen (" + _
+                 "id INTEGER PRIMARY KEY, name TEXT, sprache TEXT)")
+    DB_EXEC(con, "CREATE TABLE IF NOT EXISTS vokabeln (" + _
+                 "id INTEGER PRIMARY KEY, liste INTEGER, de TEXT, " + _
+                 "fremd TEXT, fach INTEGER DEFAULT 1, " + _
+                 "faellig INTEGER DEFAULT 0)")
+END SUB
+
+FUNCTION liste_anlegen(con AS DB_CONN, name AS STRING, _
+                       sprache AS STRING) AS INTEGER
+    DIM erg AS DB_RESULT
+    DIM id AS INTEGER
+    erg = DB_QUERY(con, "SELECT id FROM listen WHERE name = ?", name)
+    IF DB_NEXT(erg) THEN
+        id = DB_GET_INT(erg, 0)
+        DB_CLOSE_RESULT(erg)
+        RETURN id
+    END IF
+    DB_CLOSE_RESULT(erg)
+    DB_EXEC(con, "INSERT INTO listen (name, sprache) VALUES (?, ?)", _
+            name, sprache)
+    erg = DB_QUERY(con, "SELECT last_insert_rowid()")
+    DB_NEXT(erg)
+    id = DB_GET_INT(erg, 0)
+    DB_CLOSE_RESULT(erg)
+    RETURN id
+END FUNCTION
+
+SUB text_einlesen(con AS DB_CONN, liste AS INTEGER, _
+                  zeilen AS ARRAY OF STRING)
+    DIM roh AS STRING
+    DIM z AS STRING
+    DIM t AS ARRAY OF STRING
+    DB_BEGIN(con)
+    FOR EACH roh IN zeilen
+        z = TRIM$(roh)
+        IF z <> "" AND LEFT$(z, 1) <> "#" THEN
+            t = SPLIT$(z, ";")
+            IF LEN(t) >= 2 THEN
+                DB_EXEC(con, "INSERT INTO vokabeln (liste, de, " + _
+                             "fremd) VALUES (?, ?, ?)", liste, _
+                        TRIM$(t[0]), TRIM$(t[1]))
+            END IF
+        END IF
+    NEXT
+    DB_COMMIT(con)
+END SUB
+
+FUNCTION kopfzeile(zeilen AS ARRAY OF STRING, feld AS STRING) AS STRING
+    DIM roh AS STRING
+    DIM marke AS STRING
+    marke = "# " + feld + ":"
+    FOR EACH roh IN zeilen
+        IF LEFT$(TRIM$(roh), LEN(marke)) = marke THEN
+            RETURN TRIM$(MID$(TRIM$(roh), LEN(marke)))
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SCREEN(640, 400, "Vokabeln verwalten")
+
+DIM con AS DB_CONN
+DIM erg AS DB_RESULT
+DIM fenster AS GUI_WINDOW
+DIM reiter[2] AS STRING
+DIM w_liste AS GUI_WIDGET
+DIM w_name AS GUI_WIDGET
+DIM w_neu AS GUI_WIDGET
+DIM w_de AS GUI_WIDGET
+DIM w_fremd AS GUI_WIDGET
+DIM w_dazu AS GUI_WIDGET
+DIM w_weg AS GUI_WIDGET
+DIM w_box AS GUI_WIDGET
+DIM w_stand AS GUI_WIDGET
+DIM w_katalog AS GUI_WIDGET
+DIM w_holen AS GUI_WIDGET
+DIM w_netz AS GUI_WIDGET
+DIM listen_id[0] AS INTEGER
+DIM listen_name[0] AS STRING
+DIM vok_id[0] AS INTEGER
+DIM zeilen[0] AS STRING
+DIM dateien[0] AS STRING
+DIM namen[0] AS STRING
+DIM teile AS ARRAY OF STRING
+DIM basis AS STRING
+DIM abruf AS INTEGER
+DIM aktuell AS INTEGER
+DIM neu_listen AS BOOLEAN
+DIM neu_vokabeln AS BOOLEAN
+DIM txt AS STRING
+DIM i AS INTEGER
+
+basis = "https://raw.githubusercontent.com/HasoSchno70/" + _
+        "Drachenhauch/main/buch-einstieg/vokabellisten/"
+HTTP_TIMEOUT(8)
+
+con = DB_OPEN("trainer.db")
+tabellen_anlegen(con)
+
+TRY
+    zeilen = SPLIT$(HTTP_GET(basis + "katalog.txt"), CHR$(10))
+CATCH e
+    zeilen = READLINES("katalog.txt")
+END TRY
+FOR EACH txt IN zeilen
+    IF TRIM$(txt) <> "" AND LEFT$(TRIM$(txt), 1) <> "#" THEN
+        teile = SPLIT$(TRIM$(txt), ";")
+        IF LEN(teile) >= 2 THEN
+            ARRAY_PUSH(dateien, TRIM$(teile[0]))
+            ARRAY_PUSH(namen, TRIM$(teile[1]))
+        END IF
+    END IF
+NEXT
+
+reiter[0] = "Vokabeln"
+reiter[1] = "Aus dem Netz"
+
+fenster = GUI_WINDOW("Verwalten", 20, 16, 600, 368)
+GUI_TABS(fenster, reiter)
+
+w_liste = GUI_DROPDOWN(fenster, 16, 42, 250, 28, listen_name)
+w_name = GUI_TEXTINPUT(fenster, 276, 42, 180, 28, "neue Liste")
+w_neu = GUI_BUTTON(fenster, "Anlegen", 466, 42, 110, 28)
+w_de = GUI_TEXTINPUT(fenster, 16, 82, 180, 28, "deutsch")
+w_fremd = GUI_TEXTINPUT(fenster, 206, 82, 180, 28, "fremd")
+w_dazu = GUI_BUTTON(fenster, "Dazu", 396, 82, 84, 28)
+w_weg = GUI_BUTTON(fenster, "Weg", 490, 82, 86, 28)
+w_box = GUI_LISTBOX(fenster, 16, 122, 560, 150, zeilen)
+w_stand = GUI_LABEL(fenster, "", 16, 284)
+GUI_SET_TAB(w_liste, 0)
+GUI_SET_TAB(w_name, 0)
+GUI_SET_TAB(w_neu, 0)
+GUI_SET_TAB(w_de, 0)
+GUI_SET_TAB(w_fremd, 0)
+GUI_SET_TAB(w_dazu, 0)
+GUI_SET_TAB(w_weg, 0)
+GUI_SET_TAB(w_box, 0)
+GUI_SET_TAB(w_stand, 0)
+
+w_katalog = GUI_DROPDOWN(fenster, 16, 42, 380, 28, namen)
+w_holen = GUI_BUTTON(fenster, "Holen", 406, 42, 170, 28)
+w_netz = GUI_LABEL(fenster, "Die Listen liegen im Netz.", 16, 96)
+GUI_SET_TAB(w_katalog, 1)
+GUI_SET_TAB(w_holen, 1)
+GUI_SET_TAB(w_netz, 1)
+
+abruf = -1
+aktuell = -1
+neu_listen = TRUE
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu_listen THEN
+        neu_listen = FALSE
+        REDIM(listen_id, 0)
+        REDIM(listen_name, 0)
+        erg = DB_QUERY(con, "SELECT id, name FROM listen ORDER BY name")
+        WHILE DB_NEXT(erg)
+            ARRAY_PUSH(listen_id, DB_GET_INT(erg, 0))
+            ARRAY_PUSH(listen_name, DB_GET_STRING(erg, 1))
+        WEND
+        DB_CLOSE_RESULT(erg)
+        GUI_SET_DROPDOWN(w_liste, listen_name)
+        aktuell = -1
+        IF LEN(listen_id) > 0 THEN
+            i = GUI_DROPDOWN_SELECTED(w_liste)
+            IF i < 0 OR i >= LEN(listen_id) THEN
+                i = 0
+                GUI_DROPDOWN_SET_SELECTED(w_liste, 0)
+            END IF
+            aktuell = listen_id[i]
+        END IF
+        neu_vokabeln = TRUE
+    END IF
+
+    IF neu_vokabeln THEN
+        neu_vokabeln = FALSE
+        REDIM(vok_id, 0)
+        REDIM(zeilen, 0)
+        IF aktuell >= 0 THEN
+            erg = DB_QUERY(con, "SELECT id, de, fremd FROM " + _
+                                "vokabeln WHERE liste = ? " + _
+                                "ORDER BY de", aktuell)
+            WHILE DB_NEXT(erg)
+                ARRAY_PUSH(vok_id, DB_GET_INT(erg, 0))
+                ARRAY_PUSH(zeilen, DB_GET_STRING(erg, 1) + _
+                                   "   ->   " + DB_GET_STRING(erg, 2))
+            WEND
+            DB_CLOSE_RESULT(erg)
+        END IF
+        GUI_SET_LISTBOX(w_box, zeilen)
+        GUI_SET_TEXT(w_stand, STR$(LEN(zeilen)) + " Vokabeln, " + _
+                              STR$(LEN(listen_name)) + " Listen")
+    END IF
+
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    i = GUI_DROPDOWN_SELECTED(w_liste)
+    IF i >= 0 AND i < LEN(listen_id) AND listen_id[i] <> aktuell THEN
+        aktuell = listen_id[i]
+        neu_vokabeln = TRUE
+    END IF
+
+    IF GUI_CLICKED(w_neu) THEN
+        txt = TRIM$(GUI_TEXT(w_name))
+        IF txt <> "" THEN
+            liste_anlegen(con, txt, "eigene")
+            GUI_SET_TEXT(w_name, "")
+            neu_listen = TRUE
+        END IF
+    END IF
+
+    IF GUI_CLICKED(w_dazu) AND aktuell >= 0 THEN
+        txt = TRIM$(GUI_TEXT(w_de))
+        IF txt <> "" AND TRIM$(GUI_TEXT(w_fremd)) <> "" THEN
+            DB_EXEC(con, "INSERT INTO vokabeln (liste, de, fremd) " + _
+                         "VALUES (?, ?, ?)", aktuell, txt, _
+                    TRIM$(GUI_TEXT(w_fremd)))
+            GUI_SET_TEXT(w_de, "")
+            GUI_SET_TEXT(w_fremd, "")
+            neu_vokabeln = TRUE
+        END IF
+    END IF
+
+    IF GUI_CLICKED(w_weg) THEN
+        i = GUI_LISTBOX_SELECTED(w_box)
+        IF i >= 0 AND i < LEN(vok_id) THEN
+            DB_EXEC(con, "DELETE FROM vokabeln WHERE id = ?", vok_id[i])
+            neu_vokabeln = TRUE
+        END IF
+    END IF
+
+    IF GUI_CLICKED(w_holen) AND abruf < 0 THEN
+        i = GUI_DROPDOWN_SELECTED(w_katalog)
+        IF i >= 0 THEN
+            abruf = HTTP_GET_START(basis + dateien[i])
+            GUI_SET_TEXT(w_netz, "hole " + dateien[i] + " ...")
+        END IF
+    END IF
+
+    IF abruf >= 0 AND HTTP_READY(abruf) THEN
+        i = GUI_DROPDOWN_SELECTED(w_katalog)
+        TRY
+            zeilen = SPLIT$(HTTP_RESULT(abruf), CHR$(10))
+            GUI_SET_TEXT(w_netz, "aus dem Netz: " + namen[i])
+        CATCH e
+            zeilen = READLINES(dateien[i])
+            GUI_SET_TEXT(w_netz, "von der Platte, Netz sagte " + _
+                                 STR$(HTTP_STATUS()))
+        END TRY
+        txt = kopfzeile(zeilen, "name")
+        IF txt = "" THEN txt = namen[i]
+        text_einlesen(con, liste_anlegen(con, txt, _
+                      kopfzeile(zeilen, "sprache")), zeilen)
+        abruf = -1
+        neu_listen = TRUE
+        GUI_SET_ACTIVE_TAB(fenster, 0)
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND
+
+DB_CLOSE(con)

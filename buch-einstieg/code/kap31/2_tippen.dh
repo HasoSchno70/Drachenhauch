@@ -1,0 +1,147 @@
+' Kapitel 31 -- Lernmuster zwei: die Antwort eintippen.
+' Es verzeiht Gross- und Kleinschreibung, Artikel und einen Tippfehler.
+
+IMPORT "gui"
+
+FUNCTION ohne_artikel(s AS STRING) AS STRING
+    DIM t AS STRING
+    DIM a AS STRING
+    t = TRIM$(LOWER$(s))
+    FOR EACH a IN SPLIT$("to |the |a |an |la |le |les |l'|" + _
+                         "el |los |las |der |die |das ", "|")
+        IF LEFT$(t, LEN(a)) = a THEN RETURN TRIM$(MID$(t, LEN(a)))
+    NEXT
+    RETURN t
+END FUNCTION
+
+FUNCTION abstand(a AS STRING, b AS STRING) AS INTEGER
+    DIM zeile[0] AS INTEGER
+    DIM n AS INTEGER
+    DIM m AS INTEGER
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM kosten AS INTEGER
+    DIM oben AS INTEGER
+    DIM schraeg AS INTEGER
+    n = LEN(a)
+    m = LEN(b)
+    REDIM(zeile, m + 1)
+    FOR j = 0 TO m
+        zeile[j] = j
+    NEXT
+    FOR i = 1 TO n
+        schraeg = zeile[0]
+        zeile[0] = i
+        FOR j = 1 TO m
+            oben = zeile[j]
+            kosten = 1
+            IF MID$(a, i - 1, 1) = MID$(b, j - 1, 1) THEN kosten = 0
+            zeile[j] = MIN(MIN(oben + 1, zeile[j - 1] + 1), _
+                           schraeg + kosten)
+            schraeg = oben
+        NEXT
+    NEXT
+    RETURN zeile[m]
+END FUNCTION
+
+SUB liste_lesen(datei AS STRING, links AS ARRAY OF STRING, _
+                rechts AS ARRAY OF STRING)
+    DIM roh AS STRING
+    DIM z AS STRING
+    DIM t AS ARRAY OF STRING
+    FOR EACH roh IN READLINES(datei)
+        z = TRIM$(roh)
+        IF z <> "" AND LEFT$(z, 1) <> "#" THEN
+            t = SPLIT$(z, ";")
+            IF LEN(t) >= 2 THEN
+                ARRAY_PUSH(links, TRIM$(t[0]))
+                ARRAY_PUSH(rechts, TRIM$(t[1]))
+            END IF
+        END IF
+    NEXT
+END SUB
+
+SCREEN(640, 400, "Tippen")
+
+DIM de[0] AS STRING
+DIM fremd[0] AS STRING
+DIM fenster AS GUI_WINDOW
+DIM frage AS GUI_WIDGET
+DIM feld AS GUI_WIDGET
+DIM pruefen AS GUI_WIDGET
+DIM urteil AS GUI_WIDGET
+DIM stand AS GUI_WIDGET
+DIM dran AS INTEGER
+DIM d AS INTEGER
+DIM treffer AS INTEGER
+DIM gesamt AS INTEGER
+DIM eingabe AS STRING
+DIM soll AS STRING
+DIM neue_frage AS BOOLEAN
+DIM warten AS INTEGER
+DIM jubel AS SOUND
+DIM brumm AS SOUND
+
+liste_lesen("englisch_grund.txt", de, fremd)
+jubel = AUDIO_TONE(880, 90, "square", 0.35)
+brumm = AUDIO_TONE(160, 180, "saw", 0.35)
+
+fenster = GUI_WINDOW("Tippen", 40, 40, 560, 300)
+frage = GUI_LABEL(fenster, "", 24, 44)
+feld = GUI_TEXTINPUT(fenster, 24, 84, 380, 32, "Antwort")
+pruefen = GUI_BUTTON(fenster, "Pruefen", 420, 84, 110, 32)
+urteil = GUI_LABEL(fenster, "", 24, 140)
+stand = GUI_LABEL(fenster, "0 von 0", 24, 236)
+neue_frage = TRUE
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neue_frage THEN
+        neue_frage = FALSE
+        dran = INT(RND() * LEN(de))
+        GUI_SET_TEXT(frage, "Was heisst " + de[dran] + "?")
+        GUI_SET_TEXT(feld, "")
+        GUI_SET_TEXT(urteil, "")
+    END IF
+
+    IF warten > 0 THEN
+        warten = warten - 1
+        IF warten = 0 THEN neue_frage = TRUE
+    END IF
+
+    CLS(RGB(28, 32, 50))
+    GUI_UPDATE()
+
+    IF warten = 0 AND (GUI_CLICKED(pruefen) OR _
+                       KEYPRESSED(KEY_ENTER)) THEN
+        eingabe = ohne_artikel(GUI_TEXT(feld))
+        soll = ohne_artikel(fremd[dran])
+        IF eingabe = "" THEN
+            GUI_SET_TEXT(urteil, "(nichts eingetippt)")
+        ELSE
+            gesamt = gesamt + 1
+            d = abstand(eingabe, soll)
+            IF d = 0 THEN
+                treffer = treffer + 1
+                PLAYSOUND(jubel)
+                GUI_SET_TEXT(urteil, "richtig: " + fremd[dran])
+                warten = 90
+            ELSEIF d = 1 THEN
+                treffer = treffer + 1
+                PLAYSOUND(jubel)
+                GUI_SET_TEXT(urteil, "fast -- es heisst " + _
+                                     fremd[dran])
+                warten = 90
+            ELSE
+                PLAYSOUND(brumm)
+                GUI_SET_TEXT(urteil, "nein, es heisst " + _
+                                     fremd[dran])
+                warten = 120
+            END IF
+            GUI_SET_TEXT(stand, STR$(treffer) + " von " + STR$(gesamt))
+        END IF
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND

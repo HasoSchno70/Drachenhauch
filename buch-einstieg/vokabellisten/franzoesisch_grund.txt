@@ -1,0 +1,54 @@
+# name: Französisch Grundwortschatz
+# sprache: Französisch
+# Zeilen mit # sind Anmerkungen. Sonst: deutsch;fremdsprache
+Haus;la maison
+Baum;l'arbre
+Katze;le chat
+Hund;le chien
+Wasser;l'eau
+Brot;le pain
+Fenster;la fenêtre
+Tür;la porte
+Buch;le livre
+Tisch;la table
+Stuhl;la chaise
+Straße;la rue
+Stadt;la ville
+Land;le pays
+Freund;l'ami
+Familie;la famille
+Kind;l'enfant
+Mutter;la mère
+Vater;le père
+Schule;l'école
+Arbeit;le travail
+Zeit;le temps
+Jahr;l'année
+Tag;le jour
+Nacht;la nuit
+Sonne;le soleil
+Mond;la lune
+Himmel;le ciel
+Berg;la montagne
+Fluss;la rivière
+Meer;la mer
+Wald;la forêt
+Blume;la fleur
+Vogel;l'oiseau
+Fisch;le poisson
+Pferd;le cheval
+gehen;aller
+kommen;venir
+sehen;voir
+hören;entendre
+sprechen;parler
+essen;manger
+trinken;boire
+lesen;lire
+schreiben;écrire
+groß;grand
+klein;petit
+alt;vieux
+neu;nouveau
+gut;bon
+schlecht;mauvais

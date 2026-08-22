@@ -1,0 +1,37 @@
+' Kapitel 29 -- den Katalog aus dem Internet holen und anzeigen.
+' Geht das Netz nicht, nimmt das Programm die Datei von der Platte.
+
+IMPORT "html"
+
+SCREEN(640, 400, "Aus dem Netz")
+
+DIM basis AS STRING
+DIM quelle AS STRING
+DIM zeilen AS ARRAY OF STRING
+DIM z AS STRING
+DIM y AS INTEGER
+
+basis = "https://raw.githubusercontent.com/HasoSchno70/" + _
+        "Drachenhauch/main/buch-einstieg/vokabellisten/"
+
+HTTP_TIMEOUT(8)
+TRY
+    zeilen = SPLIT$(HTTP_GET(basis + "katalog.txt"), CHR$(10))
+    quelle = "aus dem Netz, Status " + STR$(HTTP_STATUS())
+CATCH e
+    zeilen = READLINES("katalog.txt")
+    quelle = "von der Platte, weil das Netz " + _
+             STR$(HTTP_STATUS()) + " sagte"
+END TRY
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    TEXT(20, 20, quelle, RGB(120, 220, 140))
+    TEXT(20, 44, STR$(LEN(zeilen)) + " Zeilen", RGB(150, 165, 190))
+    y = 84
+    FOR EACH z IN zeilen
+        TEXT(20, y, z, RGB(200, 210, 230))
+        y = y + 22
+    NEXT
+    FLIP()
+WEND

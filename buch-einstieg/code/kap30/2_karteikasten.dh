@@ -1,0 +1,148 @@
+' Kapitel 30 -- der Karteikasten als kleines Programm.
+' Leertaste deckt auf, J und N sagen, ob du es wusstest.
+
+IMPORT "db"
+
+CONST WARTE1 = 2
+CONST WARTE2 = 6
+CONST WARTE3 = 15
+CONST WARTE4 = 40
+CONST WARTE5 = 100
+
+FUNCTION wartezeit(f AS INTEGER) AS INTEGER
+    IF f <= 1 THEN RETURN WARTE1
+    IF f = 2 THEN RETURN WARTE2
+    IF f = 3 THEN RETURN WARTE3
+    IF f = 4 THEN RETURN WARTE4
+    RETURN WARTE5
+END FUNCTION
+
+SCREEN(640, 400, "Karteikasten")
+
+DIM con AS DB_CONN
+DIM erg AS DB_RESULT
+DIM zeilen AS ARRAY OF STRING
+DIM t AS ARRAY OF STRING
+DIM z AS STRING
+DIM roh AS STRING
+DIM id AS INTEGER
+DIM frage AS STRING
+DIM antwort AS STRING
+DIM fach AS INTEGER
+DIM runde AS INTEGER
+DIM aufgedeckt AS BOOLEAN
+DIM neues_wort AS BOOLEAN
+DIM inhalt[6] AS INTEGER
+DIM i AS INTEGER
+
+con = DB_OPEN("kasten.db")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS vokabeln (" + _
+             "id INTEGER PRIMARY KEY, de TEXT, fremd TEXT, " + _
+             "fach INTEGER DEFAULT 1, faellig INTEGER DEFAULT 0)")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS stand (" + _
+             "schluessel TEXT PRIMARY KEY, wert INTEGER)")
+
+erg = DB_QUERY(con, "SELECT COUNT(*) FROM vokabeln")
+DB_NEXT(erg)
+i = DB_GET_INT(erg, 0)
+DB_CLOSE_RESULT(erg)
+
+IF i = 0 THEN
+    zeilen = READLINES("englisch_grund.txt")
+    FOR EACH roh IN zeilen
+        z = TRIM$(roh)
+        IF z <> "" AND LEFT$(z, 1) <> "#" THEN
+            t = SPLIT$(z, ";")
+            IF LEN(t) >= 2 THEN
+                DB_EXEC(con, "INSERT INTO vokabeln (de, fremd) " + _
+                             "VALUES (?, ?)", TRIM$(t[0]), TRIM$(t[1]))
+            END IF
+        END IF
+    NEXT
+    DB_EXEC(con, "INSERT OR IGNORE INTO stand VALUES ('runde', 0)")
+END IF
+
+erg = DB_QUERY(con, "SELECT wert FROM stand WHERE schluessel='runde'")
+IF DB_NEXT(erg) THEN runde = DB_GET_INT(erg, 0)
+DB_CLOSE_RESULT(erg)
+neues_wort = TRUE
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neues_wort THEN
+        neues_wort = FALSE
+        aufgedeckt = FALSE
+        id = -1
+        erg = DB_QUERY(con, "SELECT id, de, fremd, fach FROM " + _
+                            "vokabeln WHERE faellig <= ? ORDER BY " + _
+                            "faellig, fach, RANDOM() LIMIT 1", runde)
+        IF DB_NEXT(erg) THEN
+            id = DB_GET_INT(erg, 0)
+            frage = DB_GET_STRING(erg, 1)
+            antwort = DB_GET_STRING(erg, 2)
+            fach = DB_GET_INT(erg, 3)
+        END IF
+        DB_CLOSE_RESULT(erg)
+
+        FOR i = 1 TO 5
+            inhalt[i] = 0
+        NEXT
+        erg = DB_QUERY(con, "SELECT fach, COUNT(*) FROM vokabeln " + _
+                            "GROUP BY fach")
+        WHILE DB_NEXT(erg)
+            inhalt[DB_GET_INT(erg, 0)] = DB_GET_INT(erg, 1)
+        WEND
+        DB_CLOSE_RESULT(erg)
+    END IF
+
+    IF id >= 0 THEN
+        IF NOT aufgedeckt AND KEYPRESSED(KEY_SPACE) THEN
+            aufgedeckt = TRUE
+        END IF
+        IF aufgedeckt AND (KEYPRESSED(KEY_J) OR KEYPRESSED(KEY_N)) THEN
+            IF KEYPRESSED(KEY_J) THEN
+                IF fach < 5 THEN fach = fach + 1
+            ELSE
+                fach = 1
+            END IF
+            runde = runde + 1
+            DB_EXEC(con, "UPDATE vokabeln SET fach = ?, " + _
+                         "faellig = ? WHERE id = ?", fach, _
+                         runde + wartezeit(fach), id)
+            DB_EXEC(con, "UPDATE stand SET wert = ? " + _
+                         "WHERE schluessel = 'runde'", runde)
+            neues_wort = TRUE
+        END IF
+    END IF
+
+    CLS(RGB(28, 32, 50))
+    TEXT(20, 20, "Runde " + STR$(runde), RGB(120, 135, 165))
+
+    IF id < 0 THEN
+        TEXT(20, 120, "Alles wiederholt. Komm spaeter zurueck.", _
+             RGB(140, 220, 160))
+    ELSE
+        TEXT(20, 90, frage, RGB(240, 240, 250))
+        IF aufgedeckt THEN
+            TEXT(20, 140, antwort, RGB(140, 220, 160))
+            TEXT(20, 190, "J = wusste ich    N = nicht", _
+                 RGB(150, 165, 190))
+        ELSE
+            TEXT(20, 140, "?", RGB(90, 105, 135))
+            TEXT(20, 190, "Leertaste deckt auf", RGB(150, 165, 190))
+        END IF
+    END IF
+
+    FOR i = 1 TO 5
+        BOX(20 + (i - 1) * 120, 300, 120 + (i - 1) * 120, _
+            340, RGB(70 - i * 6, 90 + i * 26, 150 - i * 8))
+        TEXT(32 + (i - 1) * 120, 260, "Fach " + STR$(i), _
+             RGB(150, 165, 190))
+        TEXT(32 + (i - 1) * 120, 310, STR$(inhalt[i]), _
+             RGB(240, 240, 250))
+    NEXT
+
+    FLIP()
+WEND
+
+DB_CLOSE(con)

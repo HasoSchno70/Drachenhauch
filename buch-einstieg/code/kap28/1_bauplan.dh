@@ -1,0 +1,51 @@
+' Kapitel 28 -- der Bauplan des Trainers. Das Programm legt die drei
+' Tabellen an und zeichnet danach, was die Datenbank ueber sich sagt.
+
+IMPORT "db"
+
+SCREEN(640, 400, "Bauplan")
+
+DIM con AS DB_CONN
+DIM erg AS DB_RESULT
+DIM tabellen[0] AS STRING
+DIM t AS STRING
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM i AS INTEGER
+
+con = DB_OPEN("trainer.db")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS listen (" + _
+             "id INTEGER PRIMARY KEY, name TEXT, sprache TEXT)")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS vokabeln (" + _
+             "id INTEGER PRIMARY KEY, liste INTEGER, de TEXT, " + _
+             "fremd TEXT, fach INTEGER, faellig INTEGER, " + _
+             "richtig INTEGER, falsch INTEGER)")
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS stand (" + _
+             "schluessel TEXT PRIMARY KEY, wert INTEGER)")
+
+erg = DB_QUERY(con, "SELECT name FROM sqlite_master " + _
+                    "WHERE type = 'table' ORDER BY name")
+WHILE DB_NEXT(erg)
+    ARRAY_PUSH(tabellen, DB_GET_STRING(erg, 0))
+WEND
+DB_CLOSE_RESULT(erg)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(28, 32, 50))
+    x = 20
+    FOR EACH t IN tabellen
+        BOX(x, 30, x + 190, 60, RGB(60, 90, 150))
+        TEXT(x + 12, 38, t, RGB(240, 240, 250))
+        y = 76
+        erg = DB_QUERY(con, "PRAGMA table_info(" + t + ")")
+        WHILE DB_NEXT(erg)
+            TEXT(x + 12, y, DB_GET_STRING(erg, 1), RGB(170, 190, 220))
+            y = y + 22
+        WEND
+        DB_CLOSE_RESULT(erg)
+        x = x + 205
+    NEXT
+    FLIP()
+WEND
+
+DB_CLOSE(con)
