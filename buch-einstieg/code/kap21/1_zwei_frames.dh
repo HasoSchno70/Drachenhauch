@@ -1,0 +1,24 @@
+' Kapitel 21 -- zwei Bilder, abwechselnd gezeigt.
+
+SCREEN(640, 400, "Zwei Frames")
+
+DIM gegner AS IMAGE
+DIM bild AS INTEGER
+DIM feld AS INTEGER
+DIM schrift AS INTEGER
+
+gegner = LOADIMAGE("gegner.png")
+bild = 0
+schrift = RGB(150, 165, 190)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 14, 30))
+
+    feld = (bild \ 15) MOD 2
+    DRAWIMAGEPART(gegner, feld * 32, 0, 32, 32, 304, 184)
+
+    TEXT(240, 280, "gezeigtes Feld: " + STR$(feld), schrift)
+    FLIP()
+
+    bild = bild + 1
+WEND

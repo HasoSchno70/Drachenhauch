@@ -1,0 +1,30 @@
+' Kapitel 19 -- das Schiff aus Kapitel 7, jetzt mit Bild.
+
+SCREEN(640, 400, "Schiff")
+
+DIM schiff AS IMAGE
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM hinweis AS INTEGER
+
+schiff = LOADIMAGE("schiff.png")
+x = 304
+y = 320
+hinweis = RGB(140, 150, 180)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    DRAWIMAGE(schiff, x, y)
+    TEXT(14, 12, "Pfeiltasten bewegen", hinweis)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 4
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 4
+    IF KEYPRESSED(KEY_UP) THEN y = y - 4
+    IF KEYPRESSED(KEY_DOWN) THEN y = y + 4
+
+    IF x < 0 THEN x = 0
+    IF x > 608 THEN x = 608
+    IF y < 0 THEN y = 0
+    IF y > 368 THEN y = 368
+WEND

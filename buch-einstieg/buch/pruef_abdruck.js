@@ -55,22 +55,41 @@ for (const kap of fs.readdirSync(codeDir)) {
 }
 
 // ------------------------------------------------------------------ Vergleich
+// Gemeinsame Grundeinrueckung abziehen. Ein Kapitel druckt Ausschnitte oft
+// buendig ab, obwohl sie in der Datei in einer Schleife stehen und dort vier
+// Leerzeichen eingerueckt sind. Die RELATIVE Einrueckung muss trotzdem
+// stimmen -- sie traegt in einem Anfaengerbuch Bedeutung, und ein Block mit
+// verrutschter Verschachtelung soll auffallen.
+//
+// Wichtig: ausgerueckt wird das VERGLICHENE FENSTER, nicht die ganze Datei.
+// Eine Datei hat fast immer Zeilen ganz links; ihr Mindestmass ist deshalb
+// null, und ein eingerueckter Ausschnitt daraus passte sonst nie.
+function ausruecken(zeilen) {
+  if (!zeilen.length) return zeilen;
+  const tiefen = zeilen.map((z) => z.length - z.trimStart().length);
+  const min = Math.min(...tiefen);
+  return min ? zeilen.map((z) => z.slice(min)) : zeilen;
+}
+
 const norm = (text) => (Array.isArray(text) ? text : text.replace(/\r/g, "").split("\n"))
   .map((z) => z.trimEnd())
   .filter((z) => z.trim() !== "" && !z.trim().startsWith("'"));
+
+function gleich(a, b) {
+  if (a.length !== b.length) return false;
+  for (let n = 0; n < a.length; n++) if (a[n] !== b[n]) return false;
+  return true;
+}
 
 // Kommt der Block als zusammenhaengender Abschnitt in der Datei vor?
 // Ein Kapitel druckt nicht nur ganze Programme ab, sondern auch laengere
 // Ausschnitte -- eine Klassendefinition etwa. Verlangt wird trotzdem
 // WORTWOERTLICHE Uebereinstimmung: nur eben mit einem Stueck der Datei
-// statt mit der ganzen. Damit bleibt die Zusage erhalten -- was im Buch
-// steht, steht auch in der Datei -- ohne dass ein Ausschnitt faelschlich
-// als Abweichung gilt.
+// statt mit der ganzen.
 function findeAb(A, B) {
+  const a = ausruecken(A);
   for (let start = 0; start + A.length <= B.length; start++) {
-    let gleich = true;
-    for (let n = 0; n < A.length; n++) if (A[n] !== B[start + n]) { gleich = false; break; }
-    if (gleich) return start;
+    if (gleich(a, ausruecken(B.slice(start, start + A.length)))) return start;
   }
   return -1;
 }

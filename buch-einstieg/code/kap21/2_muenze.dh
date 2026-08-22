@@ -1,0 +1,31 @@
+' Kapitel 21 -- vier Bilder ergeben eine Drehung.
+
+SCREEN(640, 400, "Muenze")
+
+DIM muenze AS IMAGE
+DIM bild AS INTEGER
+DIM feld AS INTEGER
+DIM i AS INTEGER
+DIM schrift AS INTEGER
+
+muenze = LOADIMAGE("muenze.png")
+bild = 0
+schrift = RGB(150, 165, 190)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(20, 24, 42))
+
+    feld = (bild \ 8) MOD 4
+    DRAWIMAGEPART(muenze, feld * 32, 0, 32, 32, 304, 120)
+
+    ' Alle vier Felder darunter, damit man den Streifen sieht.
+    FOR i = 0 TO 3
+        DRAWIMAGEPART(muenze, i * 32, 0, 32, 32, 240 + i * 48, 260)
+    NEXT
+    BOX(238 + feld * 48, 296, 272 + feld * 48, 299, RGB(255, 200, 70))
+
+    TEXT(210, 330, "oben laeuft, unten liegt der Streifen", schrift)
+    FLIP()
+
+    bild = bild + 1
+WEND

@@ -1,0 +1,12 @@
+' Kapitel 19 -- ein Bild laden und zeigen.
+
+SCREEN(640, 400, "Ein Bild")
+
+DIM schiff AS IMAGE
+schiff = LOADIMAGE("schiff.png")
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(15, 20, 40))
+    DRAWIMAGE(schiff, 304, 184)
+    FLIP()
+WEND

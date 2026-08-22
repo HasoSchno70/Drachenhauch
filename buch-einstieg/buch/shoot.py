@@ -40,7 +40,7 @@ FRAMES = {
     # Ampel: Bild 75 faellt in Phase 1 -- rot UND gelb, man sieht,
     # dass gleich etwas passiert. Ein Standbild mit nur einer Lampe
     # saehe aus wie die feste Ampel aus Kapitel 1.
-    "kap08_3_ball": 44, "kap09_snake": 90, "kap10_3_sirene": 720, "kap11_1_treffer": 40, "kap11_2_laser": 20, "kap11_3_pong_mit_ton": 300, "kap12_instrument": 20, "kap13_1_baum": 12, "kap13_2_wald": 12, "kap13_3_naehe": 12, "kap13_4_pong_kuerzer": 300, "kap14_1_funken": 120, "kap14_2_leben": 180, "kap14_3_bestenliste": 12, "kap15_1_farbregister": 12, "kap15_2_tastenzaehler": 12, "kap16_1_funken_klasse": 120, "kap16_2_planeten": 200, "kap17_1_schreibmaschine": 130, "kap17_2_laufschrift": 60, "kap17_3_buchstaben": 12, "kap18_1_bestwert": 12, "kap18_2_vokabeln": 12, "kap08_pong": 300,
+    "kap08_3_ball": 44, "kap09_snake": 90, "kap10_3_sirene": 720, "kap11_1_treffer": 40, "kap11_2_laser": 20, "kap11_3_pong_mit_ton": 300, "kap12_instrument": 20, "kap13_1_baum": 12, "kap13_2_wald": 12, "kap13_3_naehe": 12, "kap13_4_pong_kuerzer": 300, "kap14_1_funken": 120, "kap14_2_leben": 180, "kap14_3_bestenliste": 12, "kap15_1_farbregister": 12, "kap15_2_tastenzaehler": 12, "kap16_1_funken_klasse": 120, "kap16_2_planeten": 200, "kap17_1_schreibmaschine": 130, "kap17_2_laufschrift": 60, "kap17_3_buchstaben": 12, "kap18_1_bestwert": 12, "kap19_1_bild_zeigen": 12, "kap19_2_schiff_steuern": 12, "kap19_3_flotte": 30, "kap21_1_zwei_frames": 20, "kap21_2_muenze": 5, "kap21_3_flotte_lebt": 30, "kap22_1_rechtecke": 12, "kap22_2_einsammeln": 12, "kap23_arcade": 90, "kap18_2_vokabeln": 12, "kap08_pong": 300,
     "kap06_1_abpraller": 50, "kap06_3_kasten": 55, "kap06_5_ampel": 75,
 }
 

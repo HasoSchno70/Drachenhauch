@@ -1,0 +1,163 @@
+' Kapitel 23 -- das Arcade-Spiel.
+' Pfeiltasten bewegen, Leertaste schiesst, R startet neu, ESC beendet.
+
+FUNCTION ueberlappt(ax AS FLOAT, ay AS FLOAT, _
+                    ab AS FLOAT, ah AS FLOAT, _
+                    bx AS FLOAT, by AS FLOAT, _
+                    bb AS FLOAT, bh AS FLOAT) AS BOOLEAN
+    IF ax + ab < bx THEN RETURN FALSE
+    IF bx + bb < ax THEN RETURN FALSE
+    IF ay + ah < by THEN RETURN FALSE
+    IF by + bh < ay THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+SCREEN(640, 400, "Arcade")
+
+DIM schiff AS IMAGE
+DIM gegner AS IMAGE
+
+DIM gx[15] AS FLOAT
+DIM gy[15] AS FLOAT
+DIM lebt[15] AS BOOLEAN
+
+DIM x AS FLOAT
+DIM sx AS FLOAT
+DIM sy AS FLOAT
+DIM fliegt AS BOOLEAN
+DIM richtung AS FLOAT
+DIM punkte AS INTEGER
+DIM uebrig AS INTEGER
+DIM lage AS STRING
+DIM bild AS INTEGER
+DIM feld AS INTEGER
+DIM i AS INTEGER
+DIM sp AS INTEGER
+DIM ze AS INTEGER
+DIM neu AS BOOLEAN
+DIM tiefster AS FLOAT
+DIM linkeste AS FLOAT
+DIM rechteste AS FLOAT
+
+DIM laser AS SOUND
+DIM knall AS SOUND
+DIM ende AS SOUND
+DIM schrift AS INTEGER
+
+schiff = LOADIMAGE("schiff.png")
+gegner = LOADIMAGE("gegner.png")
+laser = AUDIO_TONE(900, 70, "square", 0.3)
+knall = AUDIO_NOISE(220, 0.45)
+ende = AUDIO_TONE(140, 400, "saw", 0.4)
+schrift = RGB(200, 212, 235)
+neu = TRUE
+
+TEXT_SIZE(22)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu THEN
+        neu = FALSE
+        x = 304
+        fliegt = FALSE
+        richtung = 0.7
+        punkte = 0
+        bild = 0
+        lage = "laeuft"
+        FOR ze = 0 TO 2
+            FOR sp = 0 TO 4
+                i = ze * 5 + sp
+                gx[i] = 70 + sp * 100
+                gy[i] = 40 + ze * 60
+                lebt[i] = TRUE
+            NEXT
+        NEXT
+    END IF
+
+    CLS(RGB(10, 13, 28))
+    feld = (bild \ 20) MOD 2
+
+    FOR i = 0 TO 14
+        IF lebt[i] THEN
+            DRAWIMAGEPART(gegner, feld * 32, 0, 32, 32, gx[i], gy[i])
+        END IF
+    NEXT
+
+    DRAWIMAGE(schiff, x, 350)
+    IF fliegt THEN BOX(sx, sy, sx + 4, sy + 12, RGB(255, 225, 90))
+
+    TEXT(16, 14, "Punkte: " + STR$(punkte), schrift)
+    IF lage <> "laeuft" THEN
+        TEXT(250, 190, lage + " -- R fuer neu", RGB(255, 210, 90))
+    END IF
+    FLIP()
+
+    IF KEYHIT(KEY_R) THEN neu = TRUE
+    IF lage <> "laeuft" THEN
+        bild = bild + 1
+        CONTINUE
+    END IF
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 5
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 5
+    IF x < 0 THEN x = 0
+    IF x > 608 THEN x = 608
+
+    IF KEYHIT(KEY_SPACE) AND NOT fliegt THEN
+        fliegt = TRUE
+        sx = x + 14
+        sy = 344
+        PLAYSOUND(laser)
+    END IF
+
+    IF fliegt THEN
+        sy = sy - 9
+        IF sy < -12 THEN fliegt = FALSE
+    END IF
+
+    ' Erst schauen, wie weit die Formation reicht, DANN umkehren --
+    ' sonst dreht sie bei zwei Gegnern am Rand zweimal und steht still.
+    uebrig = 0
+    tiefster = 0
+    linkeste = 9999
+    rechteste = -9999
+    FOR i = 0 TO 14
+        IF lebt[i] THEN
+            uebrig = uebrig + 1
+            IF gy[i] > tiefster THEN tiefster = gy[i]
+            IF gx[i] < linkeste THEN linkeste = gx[i]
+            IF gx[i] > rechteste THEN rechteste = gx[i]
+        END IF
+    NEXT
+
+    IF linkeste < 4 OR rechteste > 604 THEN
+        richtung = -richtung
+        FOR i = 0 TO 14
+            gy[i] = gy[i] + 16
+        NEXT
+    END IF
+
+    FOR i = 0 TO 14
+        IF lebt[i] THEN gx[i] = gx[i] + richtung
+    NEXT
+
+    FOR i = 0 TO 14
+        IF lebt[i] AND fliegt THEN
+            IF ueberlappt(sx, sy, 4, 12, _
+                          gx[i] + 4, gy[i] + 6, 24, 20) THEN
+                lebt[i] = FALSE
+                fliegt = FALSE
+                punkte = punkte + 10
+                PLAYSOUND(knall)
+            END IF
+        END IF
+    NEXT
+
+    IF uebrig = 0 THEN lage = "Geschafft"
+    IF tiefster > 310 THEN
+        lage = "Verloren"
+        PLAYSOUND(ende)
+    END IF
+
+    bild = bild + 1
+WEND

@@ -1,0 +1,28 @@
+' Kapitel 19 -- ein Bild, vierundzwanzig Gegner.
+' Der Streifen enthaelt zwei Felder; hier nehmen wir nur das erste.
+
+SCREEN(640, 400, "Flotte")
+
+DIM gegner AS IMAGE
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+DIM n AS INTEGER
+DIM schwung AS FLOAT
+
+gegner = LOADIMAGE("gegner.png")
+n = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 14, 30))
+    schwung = SIN(RAD(n * 2)) * 30
+
+    FOR sy = 0 TO 3
+        FOR sx = 0 TO 5
+            DRAWIMAGEPART(gegner, 0, 0, 32, 32, _
+                          60 + sx * 90 + schwung, 40 + sy * 70)
+        NEXT
+    NEXT
+
+    FLIP()
+    n = n + 1
+WEND

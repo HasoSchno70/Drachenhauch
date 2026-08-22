@@ -1,0 +1,30 @@
+' Kapitel 21 -- die Flotte aus Kapitel 19, jetzt in Bewegung.
+
+SCREEN(640, 400, "Lebende Flotte")
+
+DIM gegner AS IMAGE
+DIM sx AS INTEGER
+DIM sy AS INTEGER
+DIM bild AS INTEGER
+DIM feld AS INTEGER
+DIM schwung AS FLOAT
+
+gegner = LOADIMAGE("gegner.png")
+bild = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 14, 30))
+
+    schwung = SIN(RAD(bild * 2)) * 30
+    feld = (bild \ 18) MOD 2
+
+    FOR sy = 0 TO 3
+        FOR sx = 0 TO 5
+            DRAWIMAGEPART(gegner, feld * 32, 0, 32, 32, _
+                          60 + sx * 90 + schwung, 40 + sy * 70)
+        NEXT
+    NEXT
+
+    FLIP()
+    bild = bild + 1
+WEND

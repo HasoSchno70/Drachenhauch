@@ -1,0 +1,78 @@
+' Kapitel 22 -- ein kleines Spiel: Muenzen einsammeln.
+' Pfeiltasten bewegen das Schiff.
+
+FUNCTION ueberlappt(ax AS FLOAT, ay AS FLOAT, _
+                    ab AS FLOAT, ah AS FLOAT, _
+                    bx AS FLOAT, by AS FLOAT, _
+                    bb AS FLOAT, bh AS FLOAT) AS BOOLEAN
+    IF ax + ab < bx THEN RETURN FALSE
+    IF bx + bb < ax THEN RETURN FALSE
+    IF ay + ah < by THEN RETURN FALSE
+    IF by + bh < ay THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+SCREEN(640, 400, "Einsammeln")
+
+DIM schiff AS IMAGE
+DIM muenze AS IMAGE
+DIM mx[6] AS INTEGER
+DIM my[6] AS INTEGER
+DIM da[6] AS BOOLEAN
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM i AS INTEGER
+DIM bild AS INTEGER
+DIM feld AS INTEGER
+DIM punkte AS INTEGER
+DIM schrift AS INTEGER
+
+schiff = LOADIMAGE("schiff.png")
+muenze = LOADIMAGE("muenze.png")
+x = 304
+y = 320
+punkte = 0
+bild = 0
+schrift = RGB(200, 210, 230)
+
+FOR i = 0 TO 5
+    mx[i] = RANDINT(20, 580)
+    my[i] = RANDINT(20, 260)
+    da[i] = TRUE
+NEXT
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(14, 18, 34))
+    feld = (bild \ 8) MOD 4
+
+    FOR i = 0 TO 5
+        IF da[i] THEN
+            DRAWIMAGEPART(muenze, feld * 32, 0, 32, 32, mx[i], my[i])
+        END IF
+    NEXT
+
+    DRAWIMAGE(schiff, x, y)
+    TEXT(20, 20, "Muenzen: " + STR$(punkte), schrift)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 5
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 5
+    IF KEYPRESSED(KEY_UP) THEN y = y - 5
+    IF KEYPRESSED(KEY_DOWN) THEN y = y + 5
+    IF x < 0 THEN x = 0
+    IF x > 608 THEN x = 608
+    IF y < 0 THEN y = 0
+    IF y > 368 THEN y = 368
+
+    FOR i = 0 TO 5
+        IF da[i] THEN
+            IF ueberlappt(x + 6, y + 6, 20, 20, _
+                          mx[i] + 6, my[i] + 6, 20, 20) THEN
+                da[i] = FALSE
+                punkte = punkte + 1
+            END IF
+        END IF
+    NEXT
+
+    bild = bild + 1
+WEND

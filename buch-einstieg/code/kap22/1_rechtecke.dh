@@ -1,0 +1,54 @@
+' Kapitel 22 -- beruehren sich zwei Rechtecke?
+' Pfeiltasten bewegen das blaue. Bei Beruehrung leuchtet beides rot.
+
+FUNCTION ueberlappt(ax AS FLOAT, ay AS FLOAT, _
+                    ab AS FLOAT, ah AS FLOAT, _
+                    bx AS FLOAT, by AS FLOAT, _
+                    bb AS FLOAT, bh AS FLOAT) AS BOOLEAN
+    IF ax + ab < bx THEN RETURN FALSE
+    IF bx + bb < ax THEN RETURN FALSE
+    IF ay + ah < by THEN RETURN FALSE
+    IF by + bh < ay THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+SCREEN(640, 400, "Beruehrung")
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM treffer AS BOOLEAN
+DIM blau AS INTEGER
+DIM grau AS INTEGER
+DIM rot AS INTEGER
+DIM schrift AS INTEGER
+DIM f1 AS INTEGER
+DIM f2 AS INTEGER
+
+x = 60
+y = 60
+blau = RGB(90, 170, 240)
+grau = RGB(150, 158, 175)
+rot = RGB(240, 90, 80)
+schrift = RGB(190, 200, 220)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    treffer = ueberlappt(x, y, 80, 60, 300, 180, 120, 90)
+
+    f1 = blau
+    f2 = grau
+    IF treffer THEN
+        f1 = rot
+        f2 = rot
+    END IF
+
+    CLS(RGB(18, 22, 38))
+    BOX(300, 180, 420, 270, f2)
+    BOX(x, y, x + 80, y + 60, f1)
+    TEXT(20, 350, "Pfeiltasten bewegen das obere Rechteck", schrift)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) THEN x = x - 4
+    IF KEYPRESSED(KEY_RIGHT) THEN x = x + 4
+    IF KEYPRESSED(KEY_UP) THEN y = y - 4
+    IF KEYPRESSED(KEY_DOWN) THEN y = y + 4
+WEND

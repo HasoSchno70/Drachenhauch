@@ -70,26 +70,26 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ## Teil IV — Sprites und Bewegung
 
-- [ ] 18 Bilder laden · `LOADIMAGE DRAWIMAGE`
-- [ ] 19 Selbst malen · der Pixel-Editor `dhsprites`
-- [ ] 20 Animation · Frames, Zustände
-- [ ] 21 Zusammenstoß · Kollisionsprüfung
-- [ ] 22 **Projekt: ein Arcade-Spiel** mit eigenen Figuren
+- [x] 19 Bilder laden · `LOADIMAGE DRAWIMAGE`
+- [x] 20 Selbst malen · der Pixel-Editor `dhsprites`
+- [x] 21 Animation · Frames, Zustände
+- [x] 22 Zusammenstoß · Kollisionsprüfung
+- [x] 23 **Projekt: ein Arcade-Spiel** mit eigenen Figuren
 
 ## Teil V — Fenster mit Knöpfen
 
-- [ ] 23 Der erste Knopf · `GUI_BUTTON GUI_CLICKED`
-- [ ] 24 Eingeben und auswählen · Textfeld, Liste, Auswahlfeld
-- [ ] 25 Ordnung im Fenster · Layout, Reiter, Gruppen
-- [ ] 26 Daten, die bleiben · Datenbank statt Datei
+- [ ] 24 Der erste Knopf · `GUI_BUTTON GUI_CLICKED`
+- [ ] 25 Eingeben und auswählen · Textfeld, Liste, Auswahlfeld
+- [ ] 26 Ordnung im Fenster · Layout, Reiter, Gruppen
+- [ ] 27 Daten, die bleiben · Datenbank statt Datei
 
 ## Teil VI — Abschlussprojekt
 
-- [ ] 27 Der Vokabeltrainer: Idee und Aufbau
-- [ ] 28 Vokabeln anlegen und speichern
-- [ ] 29 Abfragen — und merken, was schwerfällt (Karteikasten)
-- [ ] 30 Fortschritt zeigen, Klang, letzter Schliff
-- [ ] 31 Weitergeben · `dhrt --export`
+- [ ] 28 Der Vokabeltrainer: Idee und Aufbau
+- [ ] 29 Vokabeln anlegen und speichern
+- [ ] 30 Abfragen — und merken, was schwerfällt (Karteikasten)
+- [ ] 31 Fortschritt zeigen, Klang, letzter Schliff
+- [ ] 32 Weitergeben · `dhrt --export`
 
 ## Anhang
 
