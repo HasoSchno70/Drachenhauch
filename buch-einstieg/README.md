@@ -13,8 +13,8 @@ Reihenfolge: erst die Konsole, dann die Grammatik, Grafik ab Teil IV.
 Dieses Buch geht den umgekehrten Weg. **Das allererste Programm ist fünf Zeilen
 lang und öffnet ein Fenster mit einer leuchtenden Sonne.** Verstanden wird
 hinterher. Nach jedem Kapitel steht etwas auf dem Bildschirm, das man jemandem
-zeigen möchte — ein Sternenhimmel, ein hüpfender Ball, Pong, ein Instrument zum
-Draufspielen, ein Feuerwerk aus fünfhundert Funken.
+zeigen möchte — ein Sternenhimmel, ein hüpfender Ball, Pong, Snake, ein
+Instrument zum Draufspielen, ein Feuerwerk aus fünfhundert Funken.
 
 Beide Bände beschreiben dieselbe Sprache und widersprechen sich nicht. Wer hier
 durch ist, schlägt dort nach.
@@ -35,9 +35,9 @@ Kapitel davor eingeführt haben.
 
 | Teil | Worum es geht | Was am Ende steht |
 |---|---|---|
-| I | Bilder aus Zahlen — Fenster, Variablen, Schleifen, Zufall, Verzweigungen, Tastatur | Sternenhimmel, hüpfender Ball, **Pong** |
+| I | Bilder aus Zahlen — Fenster, Variablen, Schleifen, Zufall, Verzweigungen, Tastatur, Arrays | Sternenhimmel, hüpfender Ball, **Pong**, **Snake** |
 | II | Klang | ein kleines **Instrument** |
-| III | Ordnung — Funktionen, Arrays, Maps, Klassen, Text, Dateien | 500 Partikel, ein Highscore, der bleibt |
+| III | Ordnung — Funktionen, Maps, Klassen, Text, Dateien | 500 Partikel, ein Highscore, der bleibt |
 | IV | Sprites — selbst malen, Animation, Kollision | ein eigenes **Arcade-Spiel** |
 | V | Fenster mit Knöpfen — GUI, Eingabefelder, Layout, Speichern | eine echte Oberfläche |
 | VI | Abschlussprojekt | der **Vokabeltrainer** |
@@ -71,7 +71,17 @@ abtippt — und der weiß noch nicht, dass nicht er den Fehler gemacht hat.
 Die 72 sind gemessen: Eine Zeile mit 81 Zeichen lief im gesetzten PDF aus dem
 grauen Kasten heraus, und das folgende `NEXT` rutschte dadurch an den Rand.
 
-`--check` allein reicht allerdings nicht — es prüft den Text, nicht die Werte.
+```
+node pruef_abdruck.js
+```
+
+Hält jedes abgedruckte **Gesamtprogramm** gegen die Datei unter `code/kapNN/`.
+Der Blockprüfer garantiert nur, dass der Abdruck *läuft* — nicht, dass er
+*dasselbe* ist wie die mitgelieferte Datei. Beim Schreiben von Kapitel 9 wichen
+beide an 15 Stellen voneinander ab; beides lief, beides war richtig, aber wer
+abtippt und danach in die Datei sieht, zweifelt dann an sich statt am Buch.
+
+`--check` allein reicht ebenfalls nicht — es prüft den Text, nicht die Werte.
 `RGB(x * 255 / 640, ...)` geht anstandslos durch und bricht erst beim Laufen ab
 („RGB erwartet INTEGER, erhalten FLOAT"). Deshalb wird jedes Grafikprogramm
 zusätzlich wirklich ausgeführt, nämlich beim Aufnehmen der Bilder.

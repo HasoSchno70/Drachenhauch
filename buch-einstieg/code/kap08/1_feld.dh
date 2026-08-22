@@ -1,0 +1,20 @@
+' Kapitel 8, Stufe 1 -- das Spielfeld.
+
+SCREEN(640, 400, "Pong")
+
+DIM i AS INTEGER
+DIM weiss AS INTEGER
+weiss = RGB(230, 235, 245)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 16, 30))
+
+    FOR i = 0 TO 380 STEP 24
+        BOX(318, i, 322, i + 12, RGB(60, 70, 95))
+    NEXT
+
+    BOX(30, 160, 42, 240, weiss)
+    BOX(598, 160, 610, 240, weiss)
+
+    FLIP()
+WEND

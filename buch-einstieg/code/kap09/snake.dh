@@ -1,0 +1,115 @@
+' Kapitel 9 -- Snake.
+' Steuerung: Pfeiltasten. ESC beendet, R startet neu.
+
+SCREEN(640, 400, "Snake")
+
+DIM sx[400] AS INTEGER          ' Spalte jedes Gliedes
+DIM sy[400] AS INTEGER          ' Zeile jedes Gliedes
+DIM laenge AS INTEGER
+DIM dx AS INTEGER
+DIM dy AS INTEGER
+DIM fx AS INTEGER
+DIM fy AS INTEGER
+DIM takt AS INTEGER
+DIM tot AS BOOLEAN
+DIM i AS INTEGER
+DIM neu AS BOOLEAN
+DIM g AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM warnfarbe AS INTEGER
+
+neu = TRUE
+warnfarbe = RGB(255, 220, 120)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+
+    IF neu THEN
+        neu = FALSE
+        tot = FALSE
+        laenge = 6
+        dx = 1
+        dy = 0
+        takt = 0
+        FOR i = 0 TO laenge - 1
+            sx[i] = 10 - i
+            sy[i] = 10
+        NEXT
+        fx = RANDINT(0, 31)
+        fy = RANDINT(0, 18)
+    END IF
+
+    CLS(RGB(14, 20, 16))
+
+    ' Das Gitter andeuten: 32 Spalten, 19 Zeilen, je 20 Punkte.
+    FOR g = 0 TO 31
+        LINE(g * 20, 0, g * 20, 379, RGB(22, 32, 26))
+    NEXT
+    FOR g = 0 TO 18
+        LINE(0, g * 20, 639, g * 20, RGB(22, 32, 26))
+    NEXT
+    BOX(0, 380, 639, 399, RGB(20, 28, 23))
+
+    px = fx * 20
+    py = fy * 20
+    BOX(px + 3, py + 3, px + 16, py + 16, RGB(240, 90, 70))
+
+    FOR i = 0 TO laenge - 1
+        px = sx[i] * 20
+        py = sy[i] * 20
+        IF i = 0 THEN
+            BOX(px + 1, py + 1, px + 18, py + 18, RGB(180, 255, 140))
+        ELSE
+            BOX(px + 2, py + 2, px + 17, py + 17, RGB(80, 190, 110))
+        END IF
+    NEXT
+
+    TEXT(10, 383, "Laenge: " + STR$(laenge), RGB(140, 170, 150))
+    IF tot THEN TEXT(230, 180, "Vorbei -- R fuer neu", warnfarbe)
+    FLIP()
+
+    IF KEYPRESSED(KEY_LEFT) AND dx = 0 THEN
+        dx = -1
+        dy = 0
+    END IF
+    IF KEYPRESSED(KEY_RIGHT) AND dx = 0 THEN
+        dx = 1
+        dy = 0
+    END IF
+    IF KEYPRESSED(KEY_UP) AND dy = 0 THEN
+        dx = 0
+        dy = -1
+    END IF
+    IF KEYPRESSED(KEY_DOWN) AND dy = 0 THEN
+        dx = 0
+        dy = 1
+    END IF
+    IF KEYHIT(KEY_R) THEN neu = TRUE
+
+    IF NOT tot THEN
+        takt = takt + 1
+        IF takt >= 8 THEN
+            takt = 0
+
+            FOR i = laenge - 1 TO 1 STEP -1
+                sx[i] = sx[i - 1]
+                sy[i] = sy[i - 1]
+            NEXT
+            sx[0] = sx[0] + dx
+            sy[0] = sy[0] + dy
+
+            IF sx[0] < 0 OR sx[0] > 31 THEN tot = TRUE
+            IF sy[0] < 0 OR sy[0] > 18 THEN tot = TRUE
+
+            FOR i = 1 TO laenge - 1
+                IF sx[i] = sx[0] AND sy[i] = sy[0] THEN tot = TRUE
+            NEXT
+
+            IF sx[0] = fx AND sy[0] = fy THEN
+                laenge = laenge + 1
+                fx = RANDINT(0, 31)
+                fy = RANDINT(0, 18)
+            END IF
+        END IF
+    END IF
+WEND

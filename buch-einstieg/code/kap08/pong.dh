@@ -1,0 +1,83 @@
+' Kapitel 8 -- Pong, fertig.
+' Linker Spieler: W und S. Rechter Spieler: Pfeil hoch und runter.
+
+SCREEN(640, 400, "Pong")
+
+DIM i AS INTEGER
+DIM weiss AS INTEGER
+DIM links AS FLOAT
+DIM rechts AS FLOAT
+DIM bx AS FLOAT
+DIM by AS FLOAT
+DIM dx AS FLOAT
+DIM dy AS FLOAT
+DIM punkte_links AS INTEGER
+DIM punkte_rechts AS INTEGER
+weiss = RGB(230, 235, 245)
+links = 160
+rechts = 160
+bx = 320
+by = 200
+dx = 5
+dy = 3
+punkte_links = 0
+punkte_rechts = 0
+TEXT_SIZE(40)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(RGB(12, 16, 30))
+
+    FOR i = 0 TO 380 STEP 24
+        BOX(318, i, 322, i + 12, RGB(60, 70, 95))
+    NEXT
+
+    BOX(30, links, 42, links + 80, weiss)
+    BOX(598, rechts, 610, rechts + 80, weiss)
+    CIRCLE(bx, by, 9, RGB(255, 210, 70))
+
+    TEXT(250, 24, STR$(punkte_links), weiss)
+    TEXT(370, 24, STR$(punkte_rechts), weiss)
+    FLIP()
+
+    IF KEYPRESSED(KEY_W) THEN links = links - 6
+    IF KEYPRESSED(KEY_S) THEN links = links + 6
+    IF KEYPRESSED(KEY_UP) THEN rechts = rechts - 6
+    IF KEYPRESSED(KEY_DOWN) THEN rechts = rechts + 6
+
+    IF links < 0 THEN links = 0
+    IF links > 320 THEN links = 320
+    IF rechts < 0 THEN rechts = 0
+    IF rechts > 320 THEN rechts = 320
+
+    bx = bx + dx
+    by = by + dy
+    IF by < 9 OR by > 390 THEN dy = -dy
+
+    IF bx - 9 < 42 AND bx - 9 > 30 THEN
+        IF by > links AND by < links + 80 THEN
+            bx = 51
+            dx = -dx
+        END IF
+    END IF
+
+    IF bx + 9 > 598 AND bx + 9 < 610 THEN
+        IF by > rechts AND by < rechts + 80 THEN
+            bx = 589
+            dx = -dx
+        END IF
+    END IF
+
+    IF bx < -20 THEN
+        punkte_rechts = punkte_rechts + 1
+        bx = 320
+        by = 200
+        dx = 5
+    END IF
+
+    IF bx > 660 THEN
+        punkte_links = punkte_links + 1
+        bx = 320
+        by = 200
+        dx = -5
+    END IF
+WEND

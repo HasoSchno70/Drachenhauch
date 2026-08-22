@@ -17,6 +17,12 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
   stehen im echten Wortlaut; jeder Codeblock geht durch `dhrt --check`; jedes
   Bild wird angesehen, bevor es bleibt. Beim Schreiben von Kapitel 1 und 2 hat
   genau das drei falsche Aussagen und zwei falsche Bilder gefunden.
+- **Kein Kapitel bringt einen Befehl, den es nicht braucht.** Arrays kommen
+  in Kapitel 9, weil eine Schlange ohne sie nicht zu bauen ist — nicht, weil
+  sie im Lehrplan an der Reihe wären.
+- **Der Abdruck IST die Datei.** `pruef_abdruck.js` haelt jedes vollstaendige
+  Programm im Buch gegen `code/kapNN/`. Wer abtippt und danach in die
+  mitgelieferte Datei sieht, soll dasselbe vorfinden.
 - **Am Kapitelende Aufgaben**, die zum Verändern einladen, nicht zum Abfragen.
 - **Fehlerküche**: jedes Kapitel endet mit einer Tabelle „Was du siehst / was
   meistens dahintersteckt".
@@ -37,28 +43,29 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — abprallender Ball, Farbwechsel bei Berührung
 - [x] 07 Die Tastatur · `KEYDOWN KEYPRESSED`
       — du steuerst ein Raumschiff
-- [ ] 08 **Projekt: Pong** für zwei Spieler
+- [x] 08 **Projekt: Pong** für zwei Spieler
+- [x] 09 **Projekt: Snake** · Arrays, weil eine Schlange sie erzwingt
 
 ## Teil II — Klang
 
-- [ ] 09 Der erste Ton · `AUDIO_TONE PLAYSOUND`
+- [ ] 10 Der erste Ton · `AUDIO_TONE PLAYSOUND`
       — Tonleiter, Melodie, Sirene
-- [ ] 10 Klang zum Bild · Treffer, Laser, Schritte
-- [ ] 11 **Projekt: ein kleines Instrument** — Tasten spielen Töne
+- [ ] 11 Klang zum Bild · Treffer, Laser, Schritte
+- [ ] 12 **Projekt: ein kleines Instrument** — Tasten spielen Töne
 
 ## Teil III — Ordnung schaffen
 
-- [ ] 12 Eigene Befehle · `SUB FUNCTION`
+- [ ] 13 Eigene Befehle · `SUB FUNCTION`
       — ein Baum, ein Wald aus einer Zeile
-- [ ] 13 Viele auf einmal · Arrays
-      — 500 Funken, Wellenlinie
-- [ ] 14 Nachschlagen · Maps
+- [ ] 14 Arrays, was noch drinsteckt · `FOR EACH`, Arrays von Text, sortieren
+      — 500 Funken, Wellenlinie. Das Nötigste steht schon in Kapitel 9.
+- [ ] 15 Nachschlagen · Maps
       — Farbnamen, Punktestände
-- [ ] 15 Dinge mit Eigenschaften · Klassen
+- [ ] 16 Dinge mit Eigenschaften · Klassen
       — Partikel, Planeten
-- [ ] 16 Text · `LEFT$ MID$ LEN INSTR`
+- [ ] 17 Text · `LEFT$ MID$ LEN INSTR`
       — Laufschrift, Schreibmaschine
-- [ ] 17 Was bleiben soll · Dateien lesen und schreiben
+- [ ] 18 Was bleiben soll · Dateien lesen und schreiben
       — Highscore, der den Neustart überlebt
 
 ## Teil IV — Sprites und Bewegung
