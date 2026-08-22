@@ -1,0 +1,17 @@
+' Bildquelle -- Zeichenbefehle wie code/kap02/4_farbmischer.dh.
+DIM rot AS INTEGER
+DIM gruen AS INTEGER
+DIM blau AS INTEGER
+DIM n AS INTEGER
+rot = 255
+gruen = 120
+blau = 30
+SCREEN(640, 400, "Farbmischer")
+FOR n = 1 TO 12
+    CLS(RGB(25, 25, 25))
+    BOX(60, 80, 360, 320, RGB(rot, gruen, blau))
+    TEXT(410, 140, "rot   = " + STR$(rot), RGB(255, 120, 120))
+    TEXT(410, 180, "gruen = " + STR$(gruen), RGB(120, 255, 120))
+    TEXT(410, 220, "blau  = " + STR$(blau), RGB(120, 160, 255))
+    FLIP()
+NEXT

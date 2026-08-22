@@ -128,10 +128,13 @@ module.exports = (H) => [
   H.table([
     ["Das Fenster bleibt schwarz", "FLIP vergessen — oder es steht vor den Malbefehlen statt danach."],
     ["Das Fenster blitzt nur kurz auf", "SLEEP am Ende vergessen. Das Programm ist fertig und schließt sich."],
-    ["Unerwartetes Zeichen, Erwartet Klammer", "Eine Klammer fehlt, oder eine steht zu viel. Zähl sie in der genannten Zeile nach."],
-    ["Unbekannter Befehl", "Tippfehler im Namen. Groß- und Kleinschreibung ist egal, die Buchstaben nicht."],
+    [{ text: "Parse-Fehler: Erwartet Rparen", mono: true }, "Eine schließende Klammer fehlt. Rparen ist Fachjargon für „right paren“, also die runde Klammer zu."],
+    [{ text: "Lexer-Fehler: Zeilenumbruch im String nicht erlaubt", mono: true }, "Ein Anführungszeichen fehlt. Der Text läuft bis zum Zeilenende weiter, und dort ist Schluss."],
+    [{ text: "Unbekanntes Builtin 'CIRLCE'", mono: true }, "Tippfehler im Befehlsnamen. Groß- und Kleinschreibung ist egal, die Buchstaben nicht."],
     ["Es passiert gar nichts", "Datei gespeichert? Der Editor startet, was auf der Platte steht, nicht was auf dem Schirm steht."],
-  ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3400, 5626] }),
+  ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3800, 5226] }),
+
+  H.p("Die Meldungen sehen sperrig aus, und die englischen Brocken darin machen es nicht besser. Aber sie sind verlässlich: Sie nennen immer die Zeile, und sie lügen nie. Lies sie von vorne — Dateiname, Doppelpunkt, Zeilennummer, dann die Sache selbst."),
 
   H.h2("Aufgaben"),
 

@@ -1,0 +1,13 @@
+' Bildquelle -- Zeichenbefehle wie code/kap02/3_mitte.dh.
+DIM breite AS INTEGER
+DIM hoehe AS INTEGER
+DIM n AS INTEGER
+breite = 640
+hoehe = 400
+SCREEN(breite, hoehe, "Immer in der Mitte")
+FOR n = 1 TO 12
+    CLS(RGB(20, 25, 45))
+    CIRCLE(breite / 2, hoehe / 2, hoehe / 3, RGB(255, 120, 60))
+    BOX(0, hoehe / 2 - 2, breite - 1, hoehe / 2 + 2, RGB(255, 255, 255))
+    FLIP()
+NEXT

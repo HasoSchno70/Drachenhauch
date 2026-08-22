@@ -1,0 +1,21 @@
+' Bildquelle -- Zeichenbefehle wie code/kap02/2_zwei_gesichter.dh.
+DIM mx AS INTEGER
+DIM my AS INTEGER
+DIM r AS INTEGER
+DIM n AS INTEGER
+SCREEN(640, 400, "Zwei aus einem Rezept")
+FOR n = 1 TO 12
+    CLS(RGB(30, 60, 120))
+    mx = 180
+    my = 200
+    r = 110
+    CIRCLE(mx, my, r, RGB(255, 210, 60))
+    CIRCLE(mx - r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    CIRCLE(mx + r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    mx = 460
+    r = 60
+    CIRCLE(mx, my, r, RGB(120, 220, 255))
+    CIRCLE(mx - r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    CIRCLE(mx + r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    FLIP()
+NEXT

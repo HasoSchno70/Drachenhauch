@@ -1,0 +1,18 @@
+' Kapitel 2 -- ein Gesicht, das nur aus drei Zahlen besteht.
+' Aendere r und sieh zu, wie alles mitwaechst.
+
+DIM mx AS INTEGER
+DIM my AS INTEGER
+DIM r AS INTEGER
+
+mx = 320
+my = 200
+r = 130
+
+SCREEN(640, 400, "Ein Gesicht aus Zahlen")
+CLS(RGB(30, 60, 120))
+CIRCLE(mx, my, r, RGB(255, 210, 60))
+CIRCLE(mx - r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+CIRCLE(mx + r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+FLIP()
+SLEEP(3000)

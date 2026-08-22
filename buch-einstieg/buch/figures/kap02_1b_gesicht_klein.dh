@@ -1,0 +1,16 @@
+' Bildquelle -- dasselbe Programm, nur r = 60. Zeigt, was EINE Zahl bewirkt.
+DIM mx AS INTEGER
+DIM my AS INTEGER
+DIM r AS INTEGER
+DIM n AS INTEGER
+mx = 320
+my = 200
+r = 60
+SCREEN(640, 400, "Ein Gesicht aus Zahlen")
+FOR n = 1 TO 12
+    CLS(RGB(30, 60, 120))
+    CIRCLE(mx, my, r, RGB(255, 210, 60))
+    CIRCLE(mx - r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    CIRCLE(mx + r / 3, my - r / 4, r / 7, RGB(40, 40, 40))
+    FLIP()
+NEXT
