@@ -86,37 +86,46 @@ jobs:
       - name: dhrt bauen (Runtime fuer die run_gb-Golden-Tests)
         run: python rust/build_runtime.py
 
-      # spriteeditor_qt_canvas/tilemapeditor_qt bleiben aussen vor: fuer sich
-      # genommen gruen, loesen sie im vollen kombinierten Lauf sporadisch einen
-      # nativen Access-Violation-Crash in Qts C++-Teardown aus (der Prozess
-      # stirbt, kein fangbarer Test-Fehler). Lokal pruefbar mit
-      # `pytest tests/test_spriteeditor_qt_canvas.py tests/test_tilemapeditor_qt.py`.
-      # Zwei Durchgaenge. Der erste faehrt parallel (pytest-xdist): die Suite
-      # rechnet kaum, sie startet dhrt-Prozesse und wartet auf sie -- deshalb
-      # skaliert sie fast linear (lokal auf 16 Kernen: 10:40 -> 48 s).
+      # DREI Durchgaenge, die zusammen die Suite exakt einmal abdecken.
       #
-      # `--dist loadfile` haelt die Tests einer Datei beim selben Arbeiter.
-      # Nicht aus Aberglaube: Modul-Zustand und die geleakten Qt-Fenster (siehe
-      # conftest.py) sind pro Prozess gedacht, nicht pro Test.
+      # 1. parallel (pytest-xdist): die Suite rechnet kaum, sie startet
+      #    dhrt-Prozesse und wartet auf sie -- deshalb skaliert sie fast linear
+      #    (lokal auf 16 Kernen: 10:40 -> 48 s). `--dist loadfile` haelt die
+      #    Tests einer Datei beim selben Arbeiter; Modul-Zustand und die
+      #    geleakten Qt-Fenster (siehe conftest.py) sind pro Prozess gedacht,
+      #    nicht pro Test.
       #
-      # Der zweite Durchgang holt die vier Dateien nach, die ein Betriebsmittel
-      # exklusiv brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene
-      # Laufzeiten) -- Begruendung je Datei in conftest.py bei `_SERIELL`.
-      # Zusammen decken die beiden Durchgaenge die Suite exakt ab: 3084 + 41.
-      # `--max-worker-restart=0`: stirbt ein Arbeiter NATIV weg (Access
-      # Violation in Qts C++-Teardown -- siehe den Hinweis zu
-      # spriteeditor_qt_canvas oben), dann bricht pytest sofort ab, statt auf
-      # ihn zu warten.
+      # 2. die Qt-Editoren, JE DATEI EIN EIGENER PROZESS (gemessen 21,7 s fuer
+      #    alle 82 Dateien, vier gleichzeitig -- der gemeinsame Durchgang wird
+      #    um denselben Betrag kuerzer). Sie lassen ihre Fenster stehen (2284
+      #    ueber alle Dateien, gemessen 2026-08-22), und jede Operation, die
+      #    ueber alle Fenster des Prozesses laeuft -- `processEvents()` wie
+      #    `QApplication.setStyleSheet()` --, fasst dann die Altlasten FREMDER
+      #    Dateien an. Genau daran starb der Arbeiter sporadisch mit "Windows
+      #    fatal exception: access violation", zuletzt im ERSTEN
+      #    processEvents() einer Datei. Begruendung + Messungen in conftest.py,
+      #    Werkzeug in tools/qt_tests_einzeln.py (dasselbe Kommando lokal).
       #
-      # Gemessen am 2026-08-20: ein solcher Absturz in
-      # test_editor_qt_debugger.py liess den Lauf 31 MINUTEN haengen -- 3135
-      # Tests waren durch, einer abgestuerzt, und xdist wartete auf einen
-      # Prozess, den es nicht mehr gab. Ohne Abbruch sieht das von aussen aus
-      # wie ein Haenger und kostet den halben Vormittag.
+      #    Nebenbei geschlossen: spriteeditor_qt_canvas und tilemapeditor_qt
+      #    standen frueher als `-k "not ..."` im parallelen Durchgang und
+      #    liefen dadurch in der CI GAR NICHT -- der serielle Durchgang holte
+      #    sie nicht nach. Jetzt laufen sie in Durchgang 2 mit.
       #
-      # Das behebt den Absturz NICHT. Es macht ihn sichtbar statt laehmend.
+      # 3. die vier Dateien, die ein Betriebsmittel exklusiv brauchen
+      #    (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten) --
+      #    Begruendung je Datei in conftest.py bei `_SERIELL`.
+      #
+      # `--max-worker-restart=0`: stirbt ein Arbeiter NATIV weg, bricht pytest
+      # sofort ab, statt auf ihn zu warten. Gemessen am 2026-08-20: ein solcher
+      # Absturz liess den Lauf 31 MINUTEN haengen -- 3135 Tests waren durch,
+      # einer abgestuerzt, und xdist wartete auf einen Prozess, den es nicht
+      # mehr gab. Bleibt als Netz stehen, auch wenn Durchgang 2 dem Absturz
+      # die Grundlage nimmt.
       - name: Run tests (parallel)
-        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell" -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
+        run: pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
+
+      - name: Run tests (Qt-Editoren -- je Datei ein Prozess)
+        run: python tools/qt_tests_einzeln.py
 
       - name: Run tests (seriell -- exklusive Betriebsmittel)
         run: pytest tests/ -q -m seriell
