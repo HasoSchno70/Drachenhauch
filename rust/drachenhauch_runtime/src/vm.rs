@@ -731,6 +731,10 @@ pub struct Vm<'p> {
     /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
     /// Server schon gestoppt wurde).
     httpd_server: Vec<Option<crate::httpd::Server>>,
+    /// Modul `pdf` -- offene Dokumente. Sie halten alle Seiten im
+    /// Speicher, bis PDF_SAVE sie schreibt; ein Bericht mit hundert
+    /// Seiten ist trotzdem nur ein paar hundert Kilobyte Text.
+    pdf_dok: Vec<Option<crate::pdf::Dokument>>,
     // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
     #[cfg(feature = "http")]
     http_status: i64,
@@ -863,6 +867,7 @@ impl<'p> Vm<'p> {
             #[cfg(feature = "net")]
             mqtt_clients: Vec::new(),
             httpd_server: Vec::new(),
+            pdf_dok: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
             #[cfg(feature = "http")]
@@ -2243,6 +2248,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
                         else if let Some(v) = self.try_httpd(name, bargs)? { v }
+                        else if let Some(v) = self.try_pdf(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2969,6 +2975,131 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul mqtt (baut auf std::net auf, Feature `net`)
     // ===================================================================
+    /// Modul `pdf` -- druckfertige Seiten schreiben.
+    ///
+    /// In vm.rs, weil ein offenes Dokument VM-Zustand ist (wie die
+    /// Webserver daneben).
+    fn try_pdf(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("pdf_") { return Ok(None); }
+        use crate::pdf;
+        let v = match name {
+            "pdf_new" => {
+                let art = match a.first() { Some(Value::Str(s)) => s.to_string(), _ => "a4".to_string() };
+                let quer = match a.get(1) {
+                    None => false,
+                    Some(Value::Str(s)) => {
+                        let l = s.to_lowercase();
+                        match l.as_str() {
+                            "quer" | "querformat" | "landscape" => true,
+                            "hoch" | "hochformat" | "portrait" | "" => false,
+                            _ => return Err(format!(
+                                "PDF_NEW: '{}' kenne ich nicht -- \"hoch\" oder \"quer\"", s)),
+                        }
+                    }
+                    Some(_) => return Err("PDF_NEW: 2. Argument ist \"hoch\" oder \"quer\"".to_string()),
+                };
+                let (b, h) = pdf::seitenmass(&art, quer).ok_or_else(|| format!(
+                    "PDF_NEW: Seitengroesse '{}' kenne ich nicht -- a3, a4, a5, a6, letter, legal", art))?;
+                self.pdf_dok.push(Some(pdf::Dokument::neu(b, h)));
+                Value::Int((self.pdf_dok.len() - 1) as i64)
+            }
+            "pdf_page" => { let i = bi_int(a, 0, "PDF_PAGE")?; self.pdf_d(i)?.neue_seite(); Value::Nil }
+            "pdf_page_count" => { let i = bi_int(a, 0, "PDF_PAGE_COUNT")?; Value::Int(self.pdf_d(i)?.seiten.len() as i64) }
+            "pdf_page_width" => { let i = bi_int(a, 0, "PDF_PAGE_WIDTH")?; Value::Float(self.pdf_d(i)?.breite_mm) }
+            "pdf_page_height" => { let i = bi_int(a, 0, "PDF_PAGE_HEIGHT")?; Value::Float(self.pdf_d(i)?.hoehe_mm) }
+            "pdf_title" => {
+                let i = bi_int(a, 0, "PDF_TITLE")?;
+                let t = bi_str(a, 1, "PDF_TITLE")?.to_string();
+                self.pdf_d(i)?.titel = t; Value::Nil
+            }
+            "pdf_font" => {
+                let i = bi_int(a, 0, "PDF_FONT")?;
+                let name = bi_str(a, 1, "PDF_FONT")?.to_string();
+                let gr = bi_num(a, 2, "PDF_FONT")?;
+                let idx = pdf::schrift_index(&name).ok_or_else(|| format!(
+                    "PDF_FONT: Schrift '{}' gibt es nicht. Ohne Einbetten stehen die \
+                     vierzehn Standardschriften zur Verfuegung: {}", name, pdf::schriftnamen()))?;
+                if gr <= 0.0 { return Err(format!("PDF_FONT: Schriftgroesse {} ist nicht positiv", gr)); }
+                self.pdf_d(i)?.setze_schrift(idx, gr);
+                Value::Nil
+            }
+            "pdf_color" => {
+                let i = bi_int(a, 0, "PDF_COLOR")?;
+                let c = bi_int(a, 1, "PDF_COLOR")?;
+                // Wie ueberall in Drachenhauch: 0xRRGGBB.
+                let (r, g, b) = (((c >> 16) & 255) as f64 / 255.0,
+                                 ((c >> 8) & 255) as f64 / 255.0,
+                                 (c & 255) as f64 / 255.0);
+                self.pdf_d(i)?.setze_farbe(r, g, b);
+                Value::Nil
+            }
+            "pdf_line_width" => {
+                let i = bi_int(a, 0, "PDF_LINE_WIDTH")?;
+                let mm = bi_num(a, 1, "PDF_LINE_WIDTH")?;
+                self.pdf_d(i)?.setze_strich(mm.max(0.0));
+                Value::Nil
+            }
+            "pdf_text" => {
+                let i = bi_int(a, 0, "PDF_TEXT")?;
+                let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
+                let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
+                self.pdf_d(i)?.text(x, y, &t)?;
+                Value::Nil
+            }
+            "pdf_text_width" => {
+                let i = bi_int(a, 0, "PDF_TEXT_WIDTH")?;
+                let t = bi_str(a, 1, "PDF_TEXT_WIDTH")?.to_string();
+                let d = self.pdf_d(i)?;
+                let (schrift, groesse) = (d.schrift_index(), d.groesse_pt);
+                match pdf::zeichenbreite(schrift, groesse, &t) {
+                    Some(b) => Value::Float(b),
+                    // Lieber keine Antwort als eine erfundene: fuer Helvetica
+                    // und Times liegen die Schriftmasse nicht vor, und eine
+                    // geschaetzte Breite verschiebt eine Rechnungsspalte
+                    // still um zwei Millimeter.
+                    None => return Err(
+                        "PDF_TEXT_WIDTH: geht nur bei einer dicktengleichen Schrift (courier...). \
+                         Fuer Helvetica und Times liegen die Schriftmasse nicht vor -- eine \
+                         geschaetzte Breite waere schlimmer als keine.".to_string()),
+                }
+            }
+            "pdf_line" => {
+                let i = bi_int(a, 0, "PDF_LINE")?;
+                let (x1, y1) = (bi_num(a, 1, "PDF_LINE")?, bi_num(a, 2, "PDF_LINE")?);
+                let (x2, y2) = (bi_num(a, 3, "PDF_LINE")?, bi_num(a, 4, "PDF_LINE")?);
+                self.pdf_d(i)?.linie(x1, y1, x2, y2);
+                Value::Nil
+            }
+            "pdf_rect" | "pdf_rect_fill" => {
+                let fn_ = if name == "pdf_rect" { "PDF_RECT" } else { "PDF_RECT_FILL" };
+                let i = bi_int(a, 0, fn_)?;
+                let (x, y) = (bi_num(a, 1, fn_)?, bi_num(a, 2, fn_)?);
+                let (b, h) = (bi_num(a, 3, fn_)?, bi_num(a, 4, fn_)?);
+                self.pdf_d(i)?.rechteck(x, y, b, h, name == "pdf_rect_fill");
+                Value::Nil
+            }
+            "pdf_save" => {
+                let i = bi_int(a, 0, "PDF_SAVE")?;
+                let pfad = bi_str(a, 1, "PDF_SAVE")?.to_string();
+                let bytes = self.pdf_d(i)?.bauen();
+                std::fs::write(&pfad, &bytes)
+                    .map_err(|e| format!("PDF_SAVE: {}: {}", pfad, e))?;
+                Value::Nil
+            }
+            "pdf_close" => {
+                let i = bi_int(a, 0, "PDF_CLOSE")? as usize;
+                if let Some(slot) = self.pdf_dok.get_mut(i) { *slot = None; }
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn pdf_d(&mut self, idx: i64) -> R<&mut crate::pdf::Dokument> {
+        Self::handle_get_mut(&mut self.pdf_dok, idx, "PDF", "ungueltiges/geschlossenes PDF-Handle")
+    }
+
     /// Modul `httpd` -- ein kleiner Webserver im Takt der Hauptschleife.
     ///
     /// Steht in vm.rs und nicht in builtins.rs, weil die laufenden Server

@@ -29,6 +29,7 @@ mod csv;
 mod kodierung;
 mod ini;
 mod xml;
+mod pdf;
 mod httpd;
 mod zipdatei;
 mod builtins;

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1473,
+ "count": 1489,
  "builtins": [
   {
    "name": "ABS",
@@ -5581,6 +5581,102 @@
    "kind": "core",
    "signature": "PATHJOIN(a, b, ...) AS STRING",
    "module": "dhrt"
+  },
+  {
+   "name": "PDF_CLOSE",
+   "kind": "core",
+   "signature": "PDF_CLOSE(p: PDF)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_COLOR",
+   "kind": "core",
+   "signature": "PDF_COLOR(p: PDF, farbe: INTEGER)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_FONT",
+   "kind": "core",
+   "signature": "PDF_FONT(p: PDF, schrift$, groesse_pt)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_LINE",
+   "kind": "core",
+   "signature": "PDF_LINE(p: PDF, x1, y1, x2, y2)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_LINE_WIDTH",
+   "kind": "core",
+   "signature": "PDF_LINE_WIDTH(p: PDF, mm)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_NEW",
+   "kind": "core",
+   "signature": "PDF_NEW([groesse$ [, ausrichtung$]]) AS PDF",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PAGE",
+   "kind": "core",
+   "signature": "PDF_PAGE(p: PDF)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PAGE_COUNT",
+   "kind": "core",
+   "signature": "PDF_PAGE_COUNT(p: PDF) AS INTEGER",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PAGE_HEIGHT",
+   "kind": "core",
+   "signature": "PDF_PAGE_HEIGHT(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PAGE_WIDTH",
+   "kind": "core",
+   "signature": "PDF_PAGE_WIDTH(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_RECT",
+   "kind": "core",
+   "signature": "PDF_RECT(p: PDF, x, y, breite, hoehe)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_RECT_FILL",
+   "kind": "core",
+   "signature": "PDF_RECT_FILL(p: PDF, x, y, breite, hoehe)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_SAVE",
+   "kind": "core",
+   "signature": "PDF_SAVE(p: PDF, pfad$)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_TEXT",
+   "kind": "core",
+   "signature": "PDF_TEXT(p: PDF, x_mm, y_mm, text$)",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_TEXT_WIDTH",
+   "kind": "core",
+   "signature": "PDF_TEXT_WIDTH(p: PDF, text$) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_TITLE",
+   "kind": "core",
+   "signature": "PDF_TITLE(p: PDF, titel$)",
+   "module": "pdf"
   },
   {
    "name": "PHYS2D_ADD_BOX",

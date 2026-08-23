@@ -1,0 +1,144 @@
+' 176 -- Eine Rechnung als PDF
+'
+' Fuer kaufmaennische Software ist das fast immer die erste Forderung nach
+' "speichern": Rechnung, Lieferschein, Bericht, Etikett. Bis zum pdf-Modul
+' endete der Weg beim Bildschirm oder bei einer Textdatei.
+'
+' Gerechnet wird in MILLIMETERN, von der OBEREN Kante -- so wie man eine
+' Seite auch beschreibt ("25 mm vom Rand"). Nur die Schriftgroesse bleibt in
+' Punkten, weil sie jeder so kennt.
+'
+' Aufruf:  dhrt run 176_rechnung_pdf.dh
+' Ergebnis: rechnung.pdf im selben Ordner.
+
+IMPORT "pdf"
+
+CONST RAND AS FLOAT = 20.0
+CONST RECHTS AS FLOAT = 190.0
+CONST GRAU AS INTEGER = &H666666
+CONST LINIE AS INTEGER = &HBBBBBB
+
+DIM p AS PDF
+DIM y AS FLOAT
+DIM i AS INTEGER
+DIM summe AS FLOAT
+DIM mwst AS FLOAT
+
+' --- Die Posten -----------------------------------------------------------
+DIM was AS ARRAY OF STRING
+DIM menge AS ARRAY OF INTEGER
+DIM preis AS ARRAY OF FLOAT
+was   = ["Schraube M4 verzinkt", "Mutter M4", "Unterlegscheibe", "Beratung (Stunde)"]
+menge = [100, 100, 200, 2]
+preis = [0.12, 0.08, 0.05, 85.0]
+
+p = PDF_NEW("a4")
+PDF_TITLE(p, "Rechnung 4711")
+
+' --- Kopf -----------------------------------------------------------------
+PDF_FONT(p, "helvetica-fett", 20)
+PDF_TEXT(p, RAND, 20, "Schrauben & Muttern GmbH")
+PDF_FONT(p, "helvetica", 9)
+PDF_COLOR(p, GRAU)
+PDF_TEXT(p, RAND, 30, "Industriestrasse 4  .  50667 Koeln  .  Tel. 0221 123456")
+PDF_COLOR(p, &H000000)
+
+PDF_LINE_WIDTH(p, 0.6)
+PDF_LINE(p, RAND, 36, RECHTS, 36)
+
+' --- Anschrift + Rechnungsdaten ------------------------------------------
+PDF_FONT(p, "helvetica", 11)
+PDF_TEXT(p, RAND, 55, "Muster Maschinenbau AG")
+PDF_TEXT(p, RAND, 61, "Frau Anna Beispiel")
+PDF_TEXT(p, RAND, 67, "Hauptstrasse 1")
+PDF_TEXT(p, RAND, 73, "12345 Musterstadt")
+
+PDF_FONT(p, "helvetica", 9)
+PDF_COLOR(p, GRAU)
+PDF_TEXT(p, 130, 55, "Rechnungsnummer")
+PDF_TEXT(p, 130, 62, "Datum")
+PDF_TEXT(p, 130, 69, "Kundennummer")
+PDF_COLOR(p, &H000000)
+PDF_FONT(p, "helvetica", 10)
+PDF_TEXT(p, 165, 55, "4711")
+PDF_TEXT(p, 165, 62, "23.08.2026")
+PDF_TEXT(p, 165, 69, "K-42")
+
+PDF_FONT(p, "helvetica-fett", 14)
+PDF_TEXT(p, RAND, 95, "Rechnung")
+
+' --- Die Tabelle ----------------------------------------------------------
+'
+' Zahlen rechtsbuendig zu setzen braucht die Breite des Textes -- und die
+' laesst sich nur bei einer dicktengleichen Schrift ausrechnen (siehe
+' docs/module-pdf.md). Deshalb steht die Beschriftung in Helvetica und die
+' ZAHLENSPALTE in Courier: dort stimmt PDF_TEXT_WIDTH auf den Punkt.
+SUB Rechtsbuendig(p AS PDF, x AS FLOAT, y AS FLOAT, text AS STRING)
+    PDF_TEXT(p, x - PDF_TEXT_WIDTH(p, text), y, text)
+END SUB
+
+y = 110
+PDF_COLOR(p, &HEEEEEE)
+PDF_RECT_FILL(p, RAND, y - 5, RECHTS - RAND, 8)
+PDF_COLOR(p, &H000000)
+PDF_FONT(p, "helvetica-fett", 9)
+PDF_TEXT(p, RAND + 2, y, "Bezeichnung")
+PDF_TEXT(p, 118, y, "Menge")
+PDF_TEXT(p, 140, y, "Einzelpreis")
+PDF_TEXT(p, 172, y, "Betrag")
+
+y = y + 10
+summe = 0.0
+FOR i = 0 TO LEN(was) - 1
+    PDF_FONT(p, "helvetica", 10)
+    PDF_TEXT(p, RAND + 2, y, was[i])
+    PDF_FONT(p, "courier", 10)
+    Rechtsbuendig(p, 133, y, STR$(menge[i]))
+    Rechtsbuendig(p, 163, y, FORMAT$(preis[i], "%.2f"))
+    Rechtsbuendig(p, RECHTS - 2, y, FORMAT$(menge[i] * preis[i], "%.2f"))
+    summe = summe + menge[i] * preis[i]
+
+    PDF_COLOR(p, LINIE)
+    PDF_LINE_WIDTH(p, 0.2)
+    ' Die Y-Angabe ist die OBERKANTE der Zeile -- eine 10-pt-Zeile ist
+    ' gut 3,5 mm hoch, die Trennlinie gehoert also darunter und nicht
+    ' mittendurch.
+    PDF_LINE(p, RAND, y + 5, RECHTS, y + 5)
+    PDF_COLOR(p, &H000000)
+    y = y + 9
+NEXT
+
+' --- Summen ---------------------------------------------------------------
+mwst = summe * 0.19
+y = y + 4
+PDF_FONT(p, "helvetica", 10)
+PDF_TEXT(p, 140, y, "Zwischensumme")
+PDF_FONT(p, "courier", 10)
+Rechtsbuendig(p, RECHTS - 2, y, FORMAT$(summe, "%.2f"))
+
+y = y + 7
+PDF_FONT(p, "helvetica", 10)
+PDF_TEXT(p, 140, y, "19 % MwSt.")
+PDF_FONT(p, "courier", 10)
+Rechtsbuendig(p, RECHTS - 2, y, FORMAT$(mwst, "%.2f"))
+
+y = y + 5
+PDF_LINE_WIDTH(p, 0.6)
+PDF_LINE(p, 138, y, RECHTS, y)
+y = y + 6
+PDF_FONT(p, "helvetica-fett", 11)
+PDF_TEXT(p, 140, y, "Gesamt")
+PDF_FONT(p, "courier-fett", 11)
+Rechtsbuendig(p, RECHTS - 2, y, FORMAT$(summe + mwst, "%.2f") + " EUR")
+
+' --- Fusszeile ------------------------------------------------------------
+PDF_FONT(p, "helvetica", 8)
+PDF_COLOR(p, GRAU)
+PDF_TEXT(p, RAND, 275, "Zahlbar innerhalb von 14 Tagen ohne Abzug.")
+PDF_TEXT(p, RAND, 281, "Schrauben & Muttern GmbH  .  Amtsgericht Koeln HRB 12345  .  USt-IdNr. DE123456789")
+
+PDF_SAVE(p, "rechnung.pdf")
+PDF_CLOSE(p)
+
+PRINT "rechnung.pdf geschrieben (" + STR$(FILESIZE("rechnung.pdf")) + " Bytes)."
+PRINT "Summe: " + FORMAT$(summe + mwst, "%.2f") + " EUR"
