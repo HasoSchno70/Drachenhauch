@@ -144,9 +144,26 @@ Vorschlag, klein gehalten: `JSON_NEW_OBJECT`/`JSON_NEW_ARRAY`,
 `JSON_APPEND_*`, `JSON_SET_JSON` zum Verschachteln. Dazu die naheliegende
 Bequemlichkeit: `JSON_FROM_MAP`.
 
-## 3 — Fremde Textkodierung
+## 3 — Fremde Textkodierung — ✅ ERLEDIGT 2026-08-23
 
-Eine Datei, die nicht UTF-8 ist, ist heute unlesbar:
+> **Gebaut** (`4ad6beb`): `READLINES`, `WRITEALL`, `APPENDFILE`, `CSV_LOAD`,
+> `CSV_SAVE` und `OPENFILE` (von dort aus `READLINE`/`READALL$`/`WRITE`/
+> `WRITELINE`, also auch der Weg für große Dateien) nehmen als letztes
+> Argument `"utf8"` (Vorgabe), `"cp1252"` oder `"latin1"`. 52 Tests, davon 32
+> die cp1252-Tabelle Byte für Byte gegen **Pythons** Codec — eine
+> handgeschriebene Tabelle, die nur mit sich selbst übereinstimmt, wäre
+> wertlos.
+>
+> Die Fehlermeldung nennt jetzt Datei, Zeile, das störende Byte und den
+> Ausweg. **Lesen** kann in cp1252/latin1 nie fehlschlagen (die fünf
+> unbelegten Bytes zeigen auf sich selbst, wie in jedem Browser);
+> **Schreiben** eines Zeichens, das es dort nicht gibt, ist dagegen ein
+> Fehler und kein stilles `?`.
+>
+> Offen bleibt **UTF-16** (Excels „Unicode Text"): BOM-Erkennung, zwei
+> Byte-Reihenfolgen, Ersatzpaare — eine eigene Entscheidung.
+
+Eine Datei, die nicht UTF-8 war, war unlesbar:
 
 ```
 READLINES("latin.txt")   -> stream did not contain valid UTF-8
@@ -307,7 +324,8 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   Zeilen) eingebaute Fehler werden alle gefunden.
 - **2, 3, 4** sind zusammen „Daten rein und raus". Sie öffnen die Klasse
   Programme, die Daten von woanders holt, umformt und weitergibt — das ist der
-  Großteil dessen, was Leute „Software" nennen. **2 ist erledigt** (23.08.2026).
+  Großteil dessen, was Leute „Software" nennen. **2 und 3 sind erledigt**
+  (23.08.2026).
 - **6** ist billig und wirkt nach außen: `--version`, ein Test-Läufer, ein
   Formatierer sind die Zeichen, an denen jemand erkennt, ob eine Sprache zum
   Arbeiten taugt.
