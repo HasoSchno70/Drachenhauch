@@ -88,6 +88,30 @@ def test_rgb_out_of_range_raises(run_gb):
         run_gb("PRINT RGB(300, 0, 0)\n")
 
 
+def test_rgb_nimmt_kommazahlen_und_rundet(run_gb):
+    """RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
+
+    Bis 2026-08-23 waren sie die einzigen Ausreisser unter den Zeichen-
+    Befehlen: CIRCLE, BOX, LINE, PLOT, TEXT und SETFPS nehmen alle eine
+    Kommazahl -- ausgerechnet die Farbe nicht, obwohl sie am haeufigsten
+    ausgerechnet wird. `x * 255 / 640` fuer einen Verlauf brach ab, und
+    `dhrt --check` konnte nicht warnen (der Fehler haengt am WERT, nicht
+    am Text). Im Einsteigerbuch fiel genau das fuenfmal an.
+    """
+    assert _p(run_gb, "RGB(12.7, 0, 0)") == [str(13 << 16)]      # kaufmaennisch
+    assert _p(run_gb, "RGB(12.2, 0, 0)") == [str(12 << 16)]
+    assert _p(run_gb, "RGBA(0, 0, 0, 200.6)") == [str(201 << 24)]
+    # Der Anlassfall: ein Verlauf, ausgerechnet aus einer Division.
+    assert run_gb("DIM x AS INTEGER\nx = 320\n"
+                  "PRINT RGB(x * 255 / 640, 0, 0)\n").strip() == str(128 << 16)
+
+
+def test_rgb_bereich_gilt_auch_gerundet(run_gb):
+    """Gerundet heisst nicht geklemmt -- 255.6 wird 256 und ist zu gross."""
+    with pytest.raises(DHRuntimeError, match="0..255"):
+        run_gb("PRINT RGB(255.6, 0, 0)\n")
+
+
 # --- Type-Errors ---------------------------------------------------
 
 def test_sin_string_raises(run_gb):

@@ -118,7 +118,7 @@ module.exports = (H) => [
     ["Es ist nichts zu sehen", "GUI_DRAW fehlt — oder es steht vor dem CLS und wird gleich wieder übermalt."],
     ["Der Zähler springt um mehrere", "GUI_CLICKED wird mehrfach je Bild abgefragt. Einmal fragen, Ergebnis merken."],
     ["Die Oberfläche wird immer wieder neu gebaut", "GUI_WINDOW oder GUI_BUTTON stehen in der Schleife. Sie gehören davor."],
-    [{ text: "RGB erwartet INTEGER", mono: true }, "GUI_VALUE liefert eine Kommazahl. INT darum herum."],
+    [{ text: "FLOAT … passt nicht verlustfrei in INTEGER", mono: true }, "GUI_VALUE liefert eine Kommazahl und landet in einer INTEGER-Variablen. INT() darum herum. Direkt in RGB ist es erlaubt, es rundet."],
   ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3600, 5426] }),
 
   H.h2("Aufgaben"),

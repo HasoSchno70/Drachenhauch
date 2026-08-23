@@ -48,7 +48,7 @@ PRINT x                 ' schließt an
 | `ABS(v)` | Absolutbetrag. |
 | `CHR$(n)` → STRING | Unicode-Codepoint zu 1-Zeichen-String. `CHR$(65)` = `"A"`. |
 | `ASC(s$)` → INTEGER | Codepoint des ersten Zeichens. `ASC("Anna")` = 65. |
-| `RGB(r, g, b)` → INTEGER | 3 INTs (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. |
+| `RGB(r, g, b)` → INTEGER | 3 Zahlen (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. Kommazahlen werden **gerundet** (`x * 255 / 640` geht also) -- geklemmt wird nicht, 255.6 ist weiterhin zu gross. |
 | `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
 
 ```basic

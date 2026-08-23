@@ -45,7 +45,7 @@ module.exports = (H) => [
 
   H.pmix(["Diese Zahl ist der Rotanteil. Der Blauanteil ist ", ["255 -", true], " dieselbe Zahl, läuft also genau andersherum: links 255, rechts 0. Wo viel Rot ist, ist wenig Blau. Der Grünanteil bleibt fest bei 40 und gibt dem Ganzen einen dunklen Grundton."]),
 
-  H.warn("Hier steht der Rückwärts-Schrägstrich, nicht der normale. Das ist kein Schönheitsfehler: RGB besteht auf ganzen Zahlen. Mit x * 255 / 640 kommt 43,7 heraus, und das Programm bricht ab mit „RGB erwartet INTEGER, erhalten FLOAT“. Bemerkenswert ist, WANN es abbricht — erst beim Laufen. Die Prüfung im Editor sagt vorher nichts, weil sich der Fehler nicht am Text erkennen lässt, sondern nur am Wert. Genau das ist mir beim Schreiben dieses Kapitels passiert.", "RGB will ganze Zahlen"),
+  H.warn("Hier steht der Rückwärts-Schrägstrich, nicht der normale. RGB käme inzwischen auch mit dem normalen zurecht — es rundet eine Kommazahl selbst. Der Rückwärts-Schrägstrich sagt aber, was gemeint ist: aus 43,7 wird 43, abgeschnitten und nicht gerundet. Wichtiger ist die Lehre dahinter, und die gilt weiter: Schreib einmal n = 7 / 2, wenn n als INTEGER angesagt ist. Das Programm bricht beim LAUFEN ab („FLOAT 3.5 passt nicht verlustfrei in INTEGER“), und die Prüfung im Editor hat vorher geschwiegen — sie sieht den Text, nicht den Wert. Genau diese Sorte Fehler ist mir beim Schreiben dieses Kapitels mehrfach passiert.", "Ganze Zahlen und Kommazahlen"),
 
   H.tip("Der wichtigste Versuch dieses Kapitels", "Ändere die 639 in eine 200 und starte neu. Ändere sie in 5. Dann schreib statt FOR x = 0 TO 639 einmal FOR x = 0 TO 639 STEP 20 — und du siehst auf einen Schlag, was die Schleife eigentlich tut, weil plötzlich Lücken zwischen den Strichen sind."),
 
@@ -149,7 +149,7 @@ module.exports = (H) => [
   H.h2("Was in einer Schleife gerne schiefgeht"),
 
   H.table([
-    [{ text: "RGB erwartet INTEGER, erhalten FLOAT", mono: true }, "Irgendwo steht ein / statt eines \\. Der Schrägstrich liefert Kommazahlen, RGB will ganze."],
+    [{ text: "FLOAT … passt nicht verlustfrei in INTEGER", mono: true }, "Eine Rechnung mit / landet in einer Variablen, die als INTEGER angesagt ist. Für ganzzahlige Division \\ nehmen, sonst INT() oder ROUND() darum."],
     [{ text: "Erwartet NEXT", mono: true }, "Ein NEXT fehlt, oder es steht an der falschen Stelle."],
     ["Nichts erscheint, das Programm hängt", "Eine Schleife, die ihr Ziel nie erreicht — etwa FOR r = 200 TO 4 ohne das negative STEP. Sie beginnt bei 200, das ist schon größer als 4, also läuft sie kein einziges Mal."],
     ["Nur ein einziger Kreis ist da", "Alle Durchgänge malen an dieselbe Stelle: In der Malzeile fehlt die Zählvariable."],
