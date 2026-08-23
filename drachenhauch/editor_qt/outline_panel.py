@@ -21,7 +21,9 @@ class OutlinePanel(QWidget):
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
-        self._items: list[tuple[str, str, int, int]] = []  # (kind, name, line, indent)
+        # Fuenf Felder, nicht vier: `_scan` liefert `params` mit, und `_render`
+        # entpackt es auch -- die Angabe hier war stehen geblieben.
+        self._items: list[tuple[str, str, int, int, str]] = []
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

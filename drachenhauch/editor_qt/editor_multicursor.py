@@ -7,13 +7,34 @@ gerendert in `_refresh_extra_selections` des Hauptmoduls.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtGui import QTextCursor
 
+# Ein Mixin ruft Methoden seines WIRTS (`CodeEditor` -> `QPlainTextEdit`), die
+# es selbst nicht hat. Zur Laufzeit ist das in Ordnung -- die Klasse existiert
+# nie allein --, fuer eine Typpruefung aber unsichtbar: sie sah 22 Aufrufe ins
+# Leere (`"MultiCursorMixin" has no attribute "textCursor"`). Die Basis nur
+# WAEHREND DER PRUEFUNG auf den Wirt zu setzen macht sie sichtbar; zur Laufzeit
+# bleibt es `object`, also genau das, was vorher dastand.
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPlainTextEdit
+    _Wirt = QPlainTextEdit
+else:
+    _Wirt = object
 
-class MultiCursorMixin:
+
+class MultiCursorMixin(_Wirt):
     """Strg+D-Erweiterung der primaeren Selektion + Multi-Edit-Support."""
 
-    # `_secondary` wird im CodeEditor-__init__ als [] initialisiert.
+    # `_secondary` wird im CodeEditor-__init__ als [] initialisiert -- hier nur
+    # angesagt (ohne Wert, also ohne Wirkung zur Laufzeit), damit die Pruefung
+    # den Typ kennt, statt ihn im Mixin zu erraten.
+    _secondary: list[tuple[int, int]]
+
+    if TYPE_CHECKING:
+        # Liegt im Hauptmodul (`code_editor.py`), nicht im Wirt-Widget.
+        def _refresh_extra_selections(self) -> None: ...
 
     def add_next_occurrence(self) -> None:
         """Strg+D: erweitert die Multi-Selektion um das naechste Vorkommen

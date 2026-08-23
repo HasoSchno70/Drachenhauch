@@ -48,10 +48,19 @@ include = ["drachenhauch*"]
 exclude = ["tests*", "examples*"]
 
 [tool.mypy]
-# Statische Typpruefung fuer den Qt-freien Kern (Interpreter, Runtime,
-# Sprache sowie die Tracker-/Synth-/Tilemap-Modelle). Die PySide6-Editoren
-# (*_qt.py, editor_qt/, spriteeditor/) sind ausgeklammert: die Qt-Stubs sind
-# unvollstaendig und wuerden nur Rauschen erzeugen. Scope spaeter erweiterbar.
+# Statische Typpruefung fuer den Qt-freien Kern PLUS das Editor-Paket
+# `editor_qt/` (seit 2026-08-23; 51 Dateien, 15.479 Zeilen).
+#
+# Die Ausklammerung der Editoren stammte aus der Zeit, als die Qt-Stubs
+# unvollstaendig waren. Nachgemessen: es waren 110 Meldungen, und die Haelfte
+# davon EIN Muster (Mixins, deren Wirtsklasse die Pruefung nicht kannte).
+# Uebrig blieben echte Funde -- eine Instanz, die `QWidget.scroll()`
+# ueberschrieb; eine Tupel-Angabe, die ein Feld zu wenig hatte; ein Schreiben
+# auf `proc.stdin`, das bei None ein AttributeError geworden waere, den das
+# umgebende `except` NICHT faengt.
+#
+# Weiter ausgeklammert: die grossen Einzel-Editoren (*_qt.py) und
+# `spriteeditor/`. Die kommen als naechstes dran, wenn es sich lohnt.
 # `python_version` deckt sich seit 2026-08-01 mit `requires-python` (beides
 # 3.12). Gesetzt wurde es urspruenglich aus einem anderen Grund, der weiter
 # gilt: neuere numpy-Stubs (numpy>=1.24 ohne Obergrenze) nutzen inzwischen das
@@ -61,5 +70,5 @@ exclude = ["tests*", "examples*"]
 python_version = "3.12"
 ignore_missing_imports = true
 follow_imports = "silent"
-exclude = '(_qt\.py$|/editor_qt/|/spriteeditor/)'
+exclude = '(_qt\.py$|/spriteeditor/)'
 files = ["drachenhauch"]

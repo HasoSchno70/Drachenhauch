@@ -28,7 +28,7 @@ class BlameLine:
 class BlameResult:
     ok: bool = False
     error: str = ""
-    lines: list = None   # list[BlameLine]
+    lines: list | None = None   # list[BlameLine]
 
     def __post_init__(self):
         if self.lines is None:
@@ -58,7 +58,8 @@ def parse_porcelain(text: str) -> list[BlameLine]:
     eines Hashes -> Metadaten pro Hash cachen."""
     meta: dict[str, dict] = {}
     out: list[BlameLine] = []
-    cur_sha = None
+    cur_sha = ""          # der zuletzt gelesene Hash; vor der ersten
+                          # Inhaltszeile hat git ihn immer geliefert
     cur_final = 0
     expect_content = False
     for raw in text.split("\n"):

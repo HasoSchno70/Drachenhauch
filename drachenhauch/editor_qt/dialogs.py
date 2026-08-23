@@ -47,11 +47,11 @@ class FindReplaceDialog(QDialog):
 
         if with_replace:
             layout.addWidget(QLabel("Ersetzen:"), 1, 0)
-            self.replace_entry = QLineEdit()
+            self.replace_entry: QLineEdit | None = QLineEdit()
             layout.addWidget(self.replace_entry, 1, 1, 1, 3)
             opt_row = 2
         else:
-            self.replace_entry = None
+            self.replace_entry = None   # ohne Ersetzen-Zeile gibt es kein Feld
             opt_row = 1
 
         opts_row = QHBoxLayout()

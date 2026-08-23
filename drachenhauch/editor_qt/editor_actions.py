@@ -14,14 +14,31 @@ Funktionen sind aber alle nicht-zerstoerend bei leerem Buffer.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtGui import QTextCursor
 
 
 INDENT_SPACES = 4
 
 
-class EditorActionsMixin:
+# Ein Mixin ruft Methoden seines WIRTS (`CodeEditor` -> `QPlainTextEdit`), die
+# es selbst nicht hat -- zur Laufzeit richtig, fuer eine Typpruefung unsichtbar.
+# Die Basis nur WAEHREND DER PRUEFUNG auf den Wirt setzen macht sie sichtbar;
+# zur Laufzeit bleibt es `object`, also genau das, was vorher dastand.
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPlainTextEdit
+    _Wirt = QPlainTextEdit
+else:
+    _Wirt = object
+
+
+class EditorActionsMixin(_Wirt):
     """Indent + Comment-Toggle + Move-Line + Duplicate-Line."""
+
+    if TYPE_CHECKING:
+        # Liegt im Hauptmodul (`code_editor.py`), nicht im Wirt-Widget.
+        def _shift_line_markers(self, remap: dict) -> None: ...
 
     # ----------------------------------------------- Indent / Outdent
     def _insert_indent(self, cursor: QTextCursor | None = None) -> None:

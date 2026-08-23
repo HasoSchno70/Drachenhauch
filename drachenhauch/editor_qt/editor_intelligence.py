@@ -7,6 +7,8 @@ auf `self`.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from PySide6.QtGui import QTextCursor
 
 
@@ -28,7 +30,18 @@ OUTDENT_PREFIXES = (
 )
 
 
-class EditorIntelligenceMixin:
+# Ein Mixin ruft Methoden seines WIRTS (`CodeEditor` -> `QPlainTextEdit`), die
+# es selbst nicht hat -- zur Laufzeit richtig, fuer eine Typpruefung unsichtbar.
+# Die Basis nur WAEHREND DER PRUEFUNG auf den Wirt setzen macht sie sichtbar;
+# zur Laufzeit bleibt es `object`, also genau das, was vorher dastand.
+if TYPE_CHECKING:
+    from PySide6.QtWidgets import QPlainTextEdit
+    _Wirt = QPlainTextEdit
+else:
+    _Wirt = object
+
+
+class EditorIntelligenceMixin(_Wirt):
     """Auto-Pair + Outdent-Trigger + Bracket-Match + Word-Highlight + Symbol-Helpers."""
 
     # ----------------------------------------------- Auto-Pair
@@ -141,7 +154,9 @@ class EditorIntelligenceMixin:
         if direction > 0:
             closer = BRACKET_PAIRS.get(opener)
         else:
-            opener, closer = BRACKET_REVERSE.get(opener), opener
+            # `opener` wird hier absichtlich zu `str | None` -- die Pruefung
+            # direkt darunter faengt das ab.
+            opener, closer = BRACKET_REVERSE.get(opener), opener  # type: ignore[assignment]
         if closer is None or opener is None:
             return None
         depth = 0

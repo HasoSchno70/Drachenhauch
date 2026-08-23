@@ -102,6 +102,22 @@ def _list_builtin_modules() -> list[str]:
         return []
 
 
+def _kinder(item: QTreeWidgetItem) -> list[QTreeWidgetItem]:
+    """Die Kinder eines Knotens als Liste.
+
+    `QTreeWidgetItem.child(i)` ist mit `QTreeWidgetItem | None` angegeben --
+    ausserhalb des gueltigen Bereichs liefert Qt None. Innerhalb von
+    `range(childCount())` kann das nicht passieren; statt an fuenf Stellen
+    dieselbe Pruefung zu wiederholen, steht sie hier einmal.
+    """
+    kinder = []
+    for i in range(item.childCount()):
+        k = item.child(i)
+        if k is not None:
+            kinder.append(k)
+    return kinder
+
+
 class FileBrowser(QWidget):
     file_activated = Signal(Path)  # Pfad (.dh ODER docs/module-*.md)
 
@@ -219,8 +235,7 @@ class FileBrowser(QWidget):
         keys: set = set()
 
         def walk(item: QTreeWidgetItem) -> None:
-            for i in range(item.childCount()):
-                ch = item.child(i)
+            for ch in _kinder(item):
                 if ch.isExpanded():
                     k = self._expand_key(ch)
                     if k is not None:
@@ -234,8 +249,7 @@ class FileBrowser(QWidget):
         """Klappt genau die Knoten wieder auf, deren Schluessel in `keys` ist
         (alle anderen bleiben zugeklappt -- so bleibt der Nutzer-Zustand erhalten)."""
         def walk(item: QTreeWidgetItem) -> None:
-            for i in range(item.childCount()):
-                ch = item.child(i)
+            for ch in _kinder(item):
                 k = self._expand_key(ch)
                 if k is not None and k in keys:
                     ch.setExpanded(True)
@@ -467,7 +481,8 @@ class FileBrowser(QWidget):
         ex_item = dir_items.get(examples_dir)
         if ex_item is not None:
             ordered = sorted(
-                (ex_item.takeChild(0) for _ in range(ex_item.childCount())),
+                (k for k in (ex_item.takeChild(0)
+                             for _ in range(ex_item.childCount())) if k is not None),
                 key=lambda c: _EXAMPLE_CATEGORY_ORDER.index(
                     c.data(0, Qt.ItemDataRole.UserRole)[1])
                 if c.data(0, Qt.ItemDataRole.UserRole)[0] == "catgroup"
@@ -533,8 +548,8 @@ class FileBrowser(QWidget):
             else:
                 self_match = q in (item.text(0) or "").lower()
             child_match = False
-            for i in range(item.childCount()):
-                if visit(item.child(i)):
+            for ch in _kinder(item):
+                if visit(ch):
                     child_match = True
             visible = self_match or child_match
             item.setHidden(not visible)
@@ -543,8 +558,8 @@ class FileBrowser(QWidget):
             return visible
 
         root = self.tree.invisibleRootItem()
-        for i in range(root.childCount()):
-            visit(root.child(i))
+        for ch in _kinder(root):
+            visit(ch)
         if not q:
             self.tree.collapseAll()
             if self._sec_modules is not None:

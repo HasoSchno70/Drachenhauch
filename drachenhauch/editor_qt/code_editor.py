@@ -23,7 +23,8 @@ from PySide6.QtGui import (
     QColor, QFont, QPainter, QPen, QTextCursor, QTextFormat,
 )
 from PySide6.QtWidgets import (
-    QCompleter, QInputDialog, QPlainTextEdit, QTextEdit, QToolTip, QWidget,
+    QAbstractItemView, QCompleter, QInputDialog, QPlainTextEdit, QTextEdit,
+    QToolTip, QWidget,
 )
 
 from .builtin_docs import get_doc
@@ -452,7 +453,7 @@ class CodeEditor(
     def set_auto_complete(self, enabled: bool) -> None:
         self._auto_complete_enabled = bool(enabled)
         if not enabled:
-            self._completer.popup().hide()
+            self._popup().hide()
 
     # ----------------------------------- Find / Replace API
     def find_all(self, query: str, *, case_sensitive: bool, whole_word: bool,
@@ -1171,6 +1172,18 @@ class CodeEditor(
 
 
     # ------------------------------------------------- Completer
+    def _popup(self) -> QAbstractItemView:
+        """Das Completer-Popup.
+
+        `QCompleter.popup()` ist mit `| None` angegeben, legt beim ersten
+        Aufruf aber selbst eine Liste an -- None kaeme nur ohne Completer vor,
+        und den setzt `_setup_completer` im Konstruktor. Ein Helfer statt
+        sechsmal derselbe Umweg.
+        """
+        popup = self._completer.popup()
+        assert popup is not None
+        return popup
+
     def _setup_completer(self) -> None:
         # Statische Vorschlaege (Keywords/Builtins/Konstanten/Snippets) einmal
         # cachen; lokale Buffer-Symbole kommen on-demand dazu (revisions-gecacht).
@@ -1210,7 +1223,7 @@ class CodeEditor(
         if not self._auto_complete_enabled:
             return
         if len(prefix) < 2:
-            self._completer.popup().hide()
+            self._popup().hide()
             return
         self._show_completer(prefix)
 
@@ -1236,7 +1249,7 @@ class CodeEditor(
     def _show_completer(self, prefix: str) -> None:
         self._rebuild_completion_pool()
         self._completer.setCompletionPrefix(prefix)
-        popup = self._completer.popup()
+        popup = self._popup()
         popup.setCurrentIndex(self._completer.completionModel().index(0, 0))
         cr = self.cursorRect()
         cr.setWidth(
@@ -1258,7 +1271,7 @@ class CodeEditor(
             find_active_call, render_signature_html,
         )
         # Completer-Popup hat Vorrang -- nicht ueberlagern.
-        if self._completer.popup().isVisible():
+        if self._popup().isVisible():
             self._sig_popup.hide()
             return
         cur = self.textCursor()
@@ -1322,7 +1335,7 @@ class CodeEditor(
             self._sig_popup.hide()
         # Wenn das Completer-Popup sichtbar ist: Enter/Tab -> Auswahl uebernehmen,
         # Esc -> ausblenden, Up/Down -> Popup-Navigation (default-Forward).
-        if self._completer.popup().isVisible():
+        if self._popup().isVisible():
             if event.key() in (
                 Qt.Key.Key_Enter, Qt.Key.Key_Return, Qt.Key.Key_Tab,
                 Qt.Key.Key_Up, Qt.Key.Key_Down,
@@ -1330,7 +1343,7 @@ class CodeEditor(
                 event.ignore()
                 return
             if event.key() == Qt.Key.Key_Escape:
-                self._completer.popup().hide()
+                self._popup().hide()
                 return
 
         key = event.key()
