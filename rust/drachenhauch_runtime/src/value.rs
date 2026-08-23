@@ -57,6 +57,10 @@ pub enum Value {
     /// eine Folge des fehlenden Schreibwegs, keine Entscheidung ueber die
     /// Wertsemantik.
     Json(Rc<RefCell<serde_json::Value>>),
+    /// Modul `xml`: ein Knoten des geparsten Baums. NUR LESEND, deshalb
+    /// ohne RefCell -- ein `XML_FIND` gibt einen Teilbaum weiter, indem
+    /// es den Rc klont; kopiert wird dabei nichts.
+    Xml(Rc<crate::xml::Knoten>),
     /// Modul `save`: Save-Container (Version + geordnete Daten).
     Save(Rc<RefCell<SaveHandle>>),
     /// Modul `astar`: Pathfinding-Grid (Referenz-Typ).
@@ -662,6 +666,9 @@ impl Value {
             // Bytes sehen will, nimmt BUFFER_TO_HEX$.
             Value::Buffer(b) => format!("<BUFFER {} Bytes>", b.borrow().len()),
             Value::Tween(t) => { let t = t.borrow(); format!("<Tween {}->{} {}ms {} {}>", t.start, t.end, t.duration, t.easing, t.mode) }
+            // Wie bei BUFFER und JSON: eine kurze Kennzeichnung, nicht
+            // der ganze Baum -- `PRINT knoten` soll eine Zeile bleiben.
+            Value::Xml(k) => format!("<{} mit {} Kind(ern)>", k.name, k.anzahl_kinder()),
             Value::Json(j) => {
                 let s = serde_json::to_string(&*j.borrow()).unwrap_or_default();
                 // Review-Fund: `&s[..37]` ist ein BYTE-Slice -- bei einem
@@ -738,6 +745,7 @@ impl Value {
             Value::Buffer(_) => "BUFFER",
             Value::Tween(_) => "TWEEN",
             Value::Json(_) => "JSON_HANDLE",
+            Value::Xml(_) => "XML_HANDLE",
             Value::Save(_) => "SAVE_HANDLE",
             Value::AStar(_) => "ASTAR_GRID",
             Value::Particles(_) => "PARTICLE_SYSTEM",
@@ -802,6 +810,7 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         (Value::File(x), Value::File(y)) => Rc::ptr_eq(x, y),
         (Value::Tween(x), Value::Tween(y)) => Rc::ptr_eq(x, y),
         (Value::Json(x), Value::Json(y)) => Rc::ptr_eq(x, y),
+        (Value::Xml(x), Value::Xml(y)) => Rc::ptr_eq(x, y),
         (Value::Save(x), Value::Save(y)) => Rc::ptr_eq(x, y),
         (Value::AStar(x), Value::AStar(y)) => Rc::ptr_eq(x, y),
         (Value::Particles(x), Value::Particles(y)) => Rc::ptr_eq(x, y),

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1460,
+ "count": 1473,
  "builtins": [
   {
    "name": "ABS",
@@ -8641,6 +8641,84 @@
    "kind": "core",
    "signature": "WRITE_BYTES(datei, puffer)",
    "module": "dhrt"
+  },
+  {
+   "name": "XML_AT",
+   "kind": "core",
+   "signature": "XML_AT(k: XML_HANDLE, pfad$, i: INTEGER) AS XML_HANDLE",
+   "module": "xml"
+  },
+  {
+   "name": "XML_ATTR$",
+   "kind": "core",
+   "signature": "XML_ATTR$(k: XML_HANDLE, name$ [, vorgabe$]) AS STRING",
+   "module": "xml"
+  },
+  {
+   "name": "XML_ATTR_NAMES",
+   "kind": "core",
+   "signature": "XML_ATTR_NAMES(k: XML_HANDLE) AS ARRAY OF STRING",
+   "module": "xml"
+  },
+  {
+   "name": "XML_CHILD",
+   "kind": "core",
+   "signature": "XML_CHILD(k: XML_HANDLE, i: INTEGER) AS XML_HANDLE",
+   "module": "xml"
+  },
+  {
+   "name": "XML_CHILD_COUNT",
+   "kind": "core",
+   "signature": "XML_CHILD_COUNT(k: XML_HANDLE) AS INTEGER",
+   "module": "xml"
+  },
+  {
+   "name": "XML_COUNT",
+   "kind": "core",
+   "signature": "XML_COUNT(k: XML_HANDLE, pfad$) AS INTEGER",
+   "module": "xml"
+  },
+  {
+   "name": "XML_ESCAPE$",
+   "kind": "core",
+   "signature": "XML_ESCAPE$(text$) AS STRING",
+   "module": "xml"
+  },
+  {
+   "name": "XML_FIND",
+   "kind": "core",
+   "signature": "XML_FIND(k: XML_HANDLE, pfad$) AS XML_HANDLE",
+   "module": "xml"
+  },
+  {
+   "name": "XML_HAS",
+   "kind": "core",
+   "signature": "XML_HAS(k: XML_HANDLE, pfad$) AS BOOLEAN",
+   "module": "xml"
+  },
+  {
+   "name": "XML_LOAD",
+   "kind": "core",
+   "signature": "XML_LOAD(pfad$ [, kodierung$]) AS XML_HANDLE",
+   "module": "xml"
+  },
+  {
+   "name": "XML_NAME$",
+   "kind": "core",
+   "signature": "XML_NAME$(k: XML_HANDLE) AS STRING",
+   "module": "xml"
+  },
+  {
+   "name": "XML_PARSE",
+   "kind": "core",
+   "signature": "XML_PARSE(text$) AS XML_HANDLE",
+   "module": "xml"
+  },
+  {
+   "name": "XML_TEXT$",
+   "kind": "core",
+   "signature": "XML_TEXT$(k: XML_HANDLE [, pfad$]) AS STRING",
+   "module": "xml"
   },
   {
    "name": "ZEIT_AUS_TEILEN",

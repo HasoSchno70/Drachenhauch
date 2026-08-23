@@ -3241,6 +3241,101 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tween_reverse" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_REVERSE")?.borrow_mut(); let s = t.start; t.start = t.end; t.end = s; t.start_ms = now_ms(); t.paused_at = None; Ok(Value::Nil) }
         "tween_easings" => { arity!(0); Ok(Value::str_rc("in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine")) }
 
+        // ===== Modul: xml =====
+        //
+        // Nur LESEND: ein XML-Baum, den ein GB-Programm selbst baut, ist die
+        // Ausnahme -- wer eine Datei schreiben muss, klebt sie mit
+        // XML_ESCAPE$ zusammen. (Bei JSON war das Schreiben die eigentliche
+        // Luecke, hier ist es das Lesen.)
+        "xml_parse" => {
+            arity!(1);
+            let text = need_str(&a[0], "XML_PARSE")?;
+            match crate::xml::lesen(text) {
+                Ok(k) => Ok(Value::Xml(k)),
+                Err(e) => err(format!("XML_PARSE: Zeile {}: {}", e.zeile, e.was)),
+            }
+        }
+        "xml_load" => {
+            arity!(1, 2);
+            let pfad = need_str(&a[0], "XML_LOAD")?;
+            let kod = if a.len() > 1 { Some(need_str(&a[1], "XML_LOAD")?) } else { None };
+            let text = text_lesen(pfad, kod, "XML_LOAD")?;
+            match crate::xml::lesen(&text) {
+                Ok(k) => Ok(Value::Xml(k)),
+                Err(e) => err(format!("XML_LOAD: {}: Zeile {}: {}", pfad, e.zeile, e.was)),
+            }
+        }
+        "xml_escape$" | "xml_escape" => {
+            arity!(1);
+            Ok(Value::str_rc(&crate::xml::entity_zu(need_str(&a[0], "XML_ESCAPE$")?)))
+        }
+        "xml_name$" | "xml_name" => { arity!(1); Ok(Value::str_rc(&xml_h(&a[0], "XML_NAME$")?.name)) }
+        "xml_text$" | "xml_text" => {
+            arity!(1, 2);
+            let k = xml_h(&a[0], "XML_TEXT$")?;
+            let ziel = match a.get(1) {
+                None => k.clone(),
+                Some(v) => xml_folge(k, need_str(v, "XML_TEXT$")?, "XML_TEXT$")?,
+            };
+            // Der TIEFE Text: `<p>Hallo <b>du</b></p>` soll "Hallo du"
+            // liefern, nicht "Hallo ". Wer nur den eigenen will, hat mit
+            // XML_CHILD den genauen Knoten.
+            Ok(Value::str_rc(ziel.text_tief().trim()))
+        }
+        "xml_attr$" | "xml_attr" => {
+            arity!(2, 3);
+            let k = xml_h(&a[0], "XML_ATTR$")?;
+            let name = need_str(&a[1], "XML_ATTR$")?;
+            let vorgabe = match a.get(2) { Some(v) => need_str(v, "XML_ATTR$")?, None => "" };
+            // Fehlendes Attribut -> Vorgabe, kein Fehler: eine fremde Datei
+            // laesst weg, was sie nicht braucht, und das ist der Normalfall.
+            Ok(Value::str_rc(k.attr(name).unwrap_or(vorgabe)))
+        }
+        "xml_has" => {
+            arity!(2);
+            let k = xml_h(&a[0], "XML_HAS")?;
+            Ok(Value::Bool(crate::xml::folge(k, need_str(&a[1], "XML_HAS")?).is_some()))
+        }
+        "xml_find" => {
+            arity!(2);
+            let k = xml_h(&a[0], "XML_FIND")?;
+            let p = need_str(&a[1], "XML_FIND")?;
+            Ok(Value::Xml(xml_folge(k, p, "XML_FIND")?))
+        }
+        "xml_count" => {
+            arity!(2);
+            let k = xml_h(&a[0], "XML_COUNT")?;
+            Ok(Value::Int(crate::xml::alle(k, need_str(&a[1], "XML_COUNT")?).len() as i64))
+        }
+        "xml_at" => {
+            arity!(3);
+            let k = xml_h(&a[0], "XML_AT")?;
+            let p = need_str(&a[1], "XML_AT")?;
+            let i = need_int(&a[2], "XML_AT")?;
+            let treffer = crate::xml::alle(k, p);
+            if i < 0 || i as usize >= treffer.len() {
+                return err(format!("XML_AT: '{}' gibt es {}-mal, gefragt war Nummer {}",
+                                   p, treffer.len(), i));
+            }
+            Ok(Value::Xml(treffer[i as usize].clone()))
+        }
+        "xml_child_count" => { arity!(1); Ok(Value::Int(xml_h(&a[0], "XML_CHILD_COUNT")?.anzahl_kinder() as i64)) }
+        "xml_child" => {
+            arity!(2);
+            let k = xml_h(&a[0], "XML_CHILD")?;
+            let i = need_int(&a[1], "XML_CHILD")?;
+            let kinder: Vec<_> = k.kinder().cloned().collect();
+            if i < 0 || i as usize >= kinder.len() {
+                return err(format!("XML_CHILD: Index {} ausserhalb (0..{})", i, kinder.len()));
+            }
+            Ok(Value::Xml(kinder[i as usize].clone()))
+        }
+        "xml_attr_names" => {
+            arity!(1);
+            let k = xml_h(&a[0], "XML_ATTR_NAMES")?;
+            Ok(new_str_array(k.attribute.iter().map(|(n, _)| n.clone()).collect()))
+        }
+
         // ===== Modul: ini =====
         //
         // Eine INI-Datei IST hier eine `MAP OF STRING` mit Punkt-Schluesseln
@@ -4572,6 +4667,19 @@ fn baum_lesen(wurzel: &std::path::Path, unter: &str, muster: Option<&str>,
         }
     }
     Ok(())
+}
+
+fn xml_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<crate::xml::Knoten>, String> {
+    match v { Value::Xml(k) => Ok(k),
+              _ => Err(format!("{} erwartet ein XML_HANDLE (aus XML_PARSE/XML_LOAD/XML_FIND)", fn_)) }
+}
+
+/// Einem Pfad folgen -- mit einer Meldung, die den Pfad nennt.
+fn xml_folge(k: &std::rc::Rc<crate::xml::Knoten>, pfad: &str, fn_: &str)
+    -> Result<std::rc::Rc<crate::xml::Knoten>, String>
+{
+    crate::xml::folge(k, pfad).ok_or_else(|| format!(
+        "{}: '{}' gibt es unter <{}> nicht -- mit XML_HAS vorher fragen", fn_, pfad, k.name))
 }
 
 /// Paare aus `ini::lesen` in eine `MAP OF STRING` umsetzen.

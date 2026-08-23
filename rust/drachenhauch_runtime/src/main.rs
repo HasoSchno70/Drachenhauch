@@ -28,6 +28,7 @@ mod chart;
 mod csv;
 mod kodierung;
 mod ini;
+mod xml;
 mod httpd;
 mod zipdatei;
 mod builtins;

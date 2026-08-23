@@ -1,0 +1,97 @@
+' 175 -- XML lesen: Daten aus einem fremden System
+'
+' Der Fall ist fast immer derselbe: eine Datei kommt von woanders -- eine
+' Rechnung, eine Ausfuhrliste, eine GPX-Spur, die Antwort einer aelteren
+' Web-Schnittstelle. Ohne Leser war jede dieser Quellen ausser Reichweite.
+'
+' Aufruf:  dhrt run 175_xml.dh
+
+IMPORT "xml"
+
+' --- Eine Datei, wie sie ein Warenwirtschaftssystem ausspuckt --------------
+DIM quelle AS STRING
+quelle = "<?xml version=""1.0"" encoding=""utf-8""?>" + CHR$(10)
+quelle = quelle + "<!-- erzeugt am 23.08.2026 -->" + CHR$(10)
+quelle = quelle + "<rechnung nr=""4711"" datum=""2026-08-23"">" + CHR$(10)
+quelle = quelle + "  <kunde kundennr=""K-42"">" + CHR$(10)
+quelle = quelle + "    <name>Schrauben &amp; Muttern GmbH</name>" + CHR$(10)
+quelle = quelle + "    <ort>Koeln</ort>" + CHR$(10)
+quelle = quelle + "  </kunde>" + CHR$(10)
+quelle = quelle + "  <posten>" + CHR$(10)
+quelle = quelle + "    <p menge=""100"" einzeln=""0.12"">Schraube M4</p>" + CHR$(10)
+quelle = quelle + "    <p menge=""100"" einzeln=""0.08"">Mutter M4</p>" + CHR$(10)
+quelle = quelle + "    <p menge=""200"" einzeln=""0.05"">Unterlegscheibe</p>" + CHR$(10)
+quelle = quelle + "  </posten>" + CHR$(10)
+quelle = quelle + "</rechnung>" + CHR$(10)
+
+WRITEALL("rechnung.xml", quelle)
+
+' --- Lesen ----------------------------------------------------------------
+DIM d AS XML_HANDLE
+d = XML_LOAD("rechnung.xml")
+
+PRINT "Rechnung " + XML_ATTR$(d, "nr") + " vom " + XML_ATTR$(d, "datum")
+PRINT "Kunde:    " + XML_TEXT$(d, "kunde/name")
+PRINT "Ort:      " + XML_TEXT$(d, "kunde/ort")
+PRINT "Kundennr: " + XML_ATTR$(XML_FIND(d, "kunde"), "kundennr")
+PRINT ""
+
+' Mehrfach vorkommende Elemente: zaehlen und einzeln holen. XML_FIND naehme
+' hier immer den ERSTEN -- ein Pfad, der raet, waere der sicherste Weg, beim
+' zweiten Datensatz etwas anderes zu bekommen.
+DIM i AS INTEGER
+DIM p AS XML_HANDLE
+DIM menge AS INTEGER
+DIM einzeln AS FLOAT
+DIM summe AS FLOAT
+
+summe = 0.0
+PRINT "Posten:"
+FOR i = 0 TO XML_COUNT(d, "posten/p") - 1
+    p = XML_AT(d, "posten/p", i)
+    menge = VAL(XML_ATTR$(p, "menge"))
+    einzeln = VAL(XML_ATTR$(p, "einzeln"))
+    summe = summe + menge * einzeln
+    PRINT "  " + PADR$(XML_TEXT$(p), 18) + PADL$(STR$(menge), 5) + _
+          " x " + FORMAT$(einzeln, "%.2f") + " = " + _
+          PADL$(FORMAT$(menge * einzeln, "%.2f"), 8)
+NEXT
+PRINT "  " + PADR$("Summe", 18) + PADL$(FORMAT$(summe, "%.2f"), 20)
+PRINT ""
+
+' --- Was fehlt, ist kein Fehler -------------------------------------------
+'
+' Ein fehlendes ATTRIBUT liefert die Vorgabe: eine fremde Datei laesst weg,
+' was sie nicht braucht. Ein fehlender PFAD ist dagegen ein Fehler -- deshalb
+' erst XML_HAS fragen.
+PRINT "Waehrung (nicht angegeben): " + XML_ATTR$(d, "waehrung", "EUR")
+IF XML_HAS(d, "anschrift") THEN
+    PRINT "Anschrift: " + XML_TEXT$(d, "anschrift")
+ELSE
+    PRINT "Eine Anschrift steht nicht in der Datei."
+END IF
+PRINT ""
+
+' --- Einen unbekannten Baum durchlaufen -----------------------------------
+PRINT "Was steht alles direkt unter <rechnung>?"
+FOR i = 0 TO XML_CHILD_COUNT(d) - 1
+    PRINT "  <" + XML_NAME$(XML_CHILD(d, i)) + ">"
+NEXT
+PRINT ""
+
+' --- Und wenn man doch einmal XML SCHREIBEN muss --------------------------
+'
+' Das Modul liest nur. Fuer den seltenen Schreib-Fall gibt es XML_ESCAPE$ --
+' es ersetzt genau die fuenf Zeichen, an denen von Hand gebautes XML bricht.
+DIM name AS STRING
+name = "Schrauben & Muttern <GmbH>"
+PRINT "Ohne Schutz (kaputt):  <name>" + name + "</name>"
+PRINT "Mit XML_ESCAPE$:       <name>" + XML_ESCAPE$(name) + "</name>"
+
+' Gegenprobe: was durch XML_ESCAPE$ ging, kommt beim Lesen unveraendert
+' zurueck.
+DIM zurueck AS XML_HANDLE
+zurueck = XML_PARSE("<name>" + XML_ESCAPE$(name) + "</name>")
+PRINT "Wieder gelesen:        " + XML_TEXT$(zurueck)
+
+DELETEFILE("rechnung.xml")
