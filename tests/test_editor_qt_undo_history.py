@@ -17,7 +17,7 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
 def _qapp():
     try:
         from PySide6.QtWidgets import QApplication
-    except Exception:  # pragma: no cover - PySide6 fehlt
+    except ImportError:  # pragma: no cover - PySide6 fehlt
         pytest.skip("PySide6 nicht verfuegbar")
     app = QApplication.instance() or QApplication([])
     yield app
@@ -114,8 +114,10 @@ from pathlib import Path  # noqa: E402
 def _editor(_qapp, factory):
     try:
         return factory(Path("."))
-    except Exception as exc:  # pragma: no cover - Audio/Display fehlt
-        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    except ImportError as exc:  # pragma: no cover -- Zusatzpaket fehlt
+        # ENG halten: ein breites `except` machte aus jedem kaputten
+        # Editor einen gruenen Uebersprung statt eines roten Tests.
+        pytest.skip(f"Zusatzpaket fehlt: {exc}")
 
 
 def test_particle_editor_undo_redo(_qapp):

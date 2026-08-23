@@ -107,7 +107,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 def _qapp():
     try:
         from PySide6.QtWidgets import QApplication
-    except Exception:  # pragma: no cover - PySide6 fehlt
+    except ImportError:  # pragma: no cover - PySide6 fehlt
         pytest.skip("PySide6 nicht verfuegbar")
     app = QApplication.instance() or QApplication([])
     yield app

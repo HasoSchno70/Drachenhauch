@@ -347,7 +347,7 @@ def test_multi_tileset_editor_load_select(tmp_path, monkeypatch):
     try:
         from PySide6.QtWidgets import QApplication
         from drachenhauch.tilemapeditor_qt import TileMapEditor
-    except Exception:
+    except ImportError:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
     doc = _build_multi(tmp_path)
@@ -562,7 +562,7 @@ def test_editor_select_copy_paste(tmp_path, monkeypatch):
     try:
         from PySide6.QtWidgets import QApplication
         from drachenhauch.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
-    except Exception:
+    except ImportError:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
     ed = TileMapEditor(tmp_path)
@@ -590,7 +590,7 @@ def test_editor_select_cut_and_delete(tmp_path, monkeypatch):
     try:
         from PySide6.QtWidgets import QApplication
         from drachenhauch.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
-    except Exception:
+    except ImportError:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
     ed = TileMapEditor(tmp_path)
@@ -611,7 +611,7 @@ def test_editor_object_layer_undo_redo(tmp_path, monkeypatch):
     try:
         from PySide6.QtWidgets import QApplication
         from drachenhauch.tilemapeditor_qt import TileMapEditor
-    except Exception:
+    except ImportError:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
     ed = TileMapEditor(tmp_path)
