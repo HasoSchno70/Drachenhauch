@@ -246,12 +246,33 @@ dem `IMPORT "zeitraum.dh"` gefunden wird. Alles Weitere (Herunterladen,
 Versionen, Abhängigkeiten) kann darauf aufbauen — oder auch nie kommen, ohne
 dass es weh tut.
 
-## 6 — Die Werkzeugkette um die Sprache
+## 6 — Die Werkzeugkette um die Sprache — ✅ ERLEDIGT 2026-08-23
 
-`dhrt` kann: `run`, `call`, `profile`, `debug`, `--check`, `--export`, dazu die
-Entwickler-Einstiege `--tokens`/`--ast`/`--dumpbc`/`--preprocess`/`--runsrc`.
+> **Alle vier gebaut** (`0fd814f`, `a0b3a93`), beschrieben in der neuen Seite
+> `docs/werkzeuge.md`:
+>
+> * **`dhrt --version`** (und `--help`) — die Fassung *und* die eingebauten
+>   Bestandteile, denn ein Bau ohne `--hardware` lässt Module weg, ohne dass
+>   man es dem Binary ansieht.
+> * **`dhrt test`** — `*_pruefung.dh` suchen, jede Datei als eigener Prozess,
+>   Rückgabewert 0 nur wenn alles durchlief.
+> * **`dhrt fmt`** — Schlüsselwörter groß (verlustfrei, die Vorgabe),
+>   `--einruecken` auf Verlangen.
+> * **`dhrun.py --doku`** — Referenz aus Signatur + Kommentarblock.
+>
+> **Der Formatierer hat unterwegs seine Voreinstellung getauscht**, und der
+> Grund kam aus der Bestandsmessung: als Einrücker war er in 26 der
+> Beispieldateien anderer Meinung als der Hausstil. Drei Runden später waren
+> es null — aber die letzten Funde waren *keine* Fehler mehr, sondern von
+> Hand gesetzte Gliederung, die die Sprache nicht kennt (eine eingerückte
+> `RENDERTARGET_BEGIN`-Gruppe, ein ausgerichteter Kommentar). Daraus wurde
+> die Regel: verlustfrei per Vorgabe, Einrücken nur auf ausdrückliche
+> Anforderung.
 
-Was fehlt:
+`dhrt` konnte: `run`, `call`, `profile`, `debug`, `--check`, `--export`, dazu
+die Entwickler-Einstiege `--tokens`/`--ast`/`--dumpbc`/`--preprocess`/`--runsrc`.
+
+Was fehlte:
 
 - **`dhrt --version`** — gibt es schlicht nicht (die Antwort ist *„Kann
   '--version' nicht lesen"*, weil der Name für eine Datei gehalten wird). Eine
@@ -346,7 +367,9 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   (23.08.2026) — damit ist der ganze Block „Daten rein und raus" zu.
 - **6** ist billig und wirkt nach außen: `--version`, ein Test-Läufer, ein
   Formatierer sind die Zeichen, an denen jemand erkennt, ob eine Sprache zum
-  Arbeiten taugt.
+  Arbeiten taugt. **Erledigt am 23.08.2026** — und billig war es auch, mit
+  einer Ausnahme: der Formatierer kostete drei Runden gegen den Bestand, bis
+  klar war, dass er per Vorgabe *weniger* tun muss.
 - **5** ist die Voraussetzung dafür, dass andere etwas beitragen können —
   wichtig, aber wirkungslos, solange 1 bis 4 offen sind.
 - **7** ist Fleißarbeit und lässt sich nach Bedarf abrufen. Der erste Griff
