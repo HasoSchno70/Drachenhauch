@@ -2492,16 +2492,88 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- Datei/Verzeichnis (WP3, pfadbasiert -- kein FILE-Handle) ---
         "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
         "dirlist" => {
-            arity!(1);
+            arity!(1, 2);
             let path = need_str(&a[0], "DIRLIST")?;
-            let rd = std::fs::read_dir(path).map_err(|e| format!("DIRLIST: {}", e))?;
-            let mut names: Vec<String> = Vec::new();
-            for entry in rd {
-                let entry = entry.map_err(|e| format!("DIRLIST: {}", e))?;
-                names.push(entry.file_name().to_string_lossy().into_owned());
+            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST")?) } else { None };
+            Ok(new_str_array(verzeichnis_lesen(path, muster, "DIRLIST")?))
+        }
+        "dirlist_rec" => {
+            // Rekursiv -- liefert DATEIEN (keine Ordner) als Pfade relativ
+            // zum Startordner, immer mit `/` getrennt.
+            arity!(1, 2);
+            let path = need_str(&a[0], "DIRLIST_REC")?;
+            let muster = if a.len() > 1 { Some(need_str(&a[1], "DIRLIST_REC")?) } else { None };
+            let mut raus: Vec<String> = Vec::new();
+            baum_lesen(std::path::Path::new(path), "", muster, &mut raus, "DIRLIST_REC")?;
+            Ok(new_str_array(raus))
+        }
+        "rmdir" => {
+            // RMDIR(pfad$ [, mit_inhalt]) -- ohne das zweite Argument nur ein
+            // LEERES Verzeichnis. Ein Aufruf, der versehentlich einen ganzen
+            // Baum loescht, ist der teuerste Tippfehler, den ein Dateibefehl
+            // anrichten kann; das Mitloeschen muss man deshalb hinschreiben.
+            arity!(1, 2);
+            let path = need_str(&a[0], "RMDIR")?;
+            let alles = match a.get(1) {
+                None => false,
+                Some(Value::Bool(b)) => *b,
+                Some(_) => return err("RMDIR: 2. Argument muss BOOLEAN sein (Inhalt mitloeschen?)"),
+            };
+            let r = if alles { std::fs::remove_dir_all(path) } else { std::fs::remove_dir(path) };
+            r.map_err(|e| {
+                if !alles && std::path::Path::new(path).is_dir() {
+                    format!("RMDIR: {}: {} -- fuer ein Verzeichnis MIT Inhalt: RMDIR(pfad, TRUE)", path, e)
+                } else {
+                    format!("RMDIR: {}: {}", path, e)
+                }
+            })?;
+            Ok(Value::Nil)
+        }
+        "filetime" => {
+            // Wann wurde die Datei zuletzt geaendert? Sekunden seit 1970 --
+            // dieselbe Zeitrechnung wie das Modul `zeit`, damit sich
+            // ZEIT_DIFF(FILETIME(f), ZEIT_JETZT()) rechnen laesst.
+            arity!(1);
+            let path = need_str(&a[0], "FILETIME")?;
+            let md = std::fs::metadata(resolve_asset_path(path))
+                .map_err(|e| format!("FILETIME: {}: {}", path, e))?;
+            let m = md.modified().map_err(|e| format!("FILETIME: {}: {}", path, e))?;
+            let utc = m.duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                // Vor 1970 geaenderte Dateien gibt es (falsch gestellte Uhr) --
+                // dann der negative Abstand statt eines Fehlers.
+                .unwrap_or_else(|e| -(e.duration().as_secs() as i64));
+            Ok(Value::Int(utc + ortszeit_versatz()))
+        }
+        "tempdir$" | "tempdir" => {
+            arity!(0);
+            Ok(Value::str_rc(&std::env::temp_dir().to_string_lossy()))
+        }
+        "tempfile$" | "tempfile" => {
+            // TEMPFILE$([praefix$ [, endung$]]) -- ein noch nicht vergebener
+            // Name im Temp-Ordner. Die Datei wird LEER ANGELEGT: sonst
+            // koennte zwischen "Name ausgedacht" und "Datei geschrieben" ein
+            // zweiter Lauf denselben Namen bekommen.
+            arity!(0, 2);
+            let praefix = match a.first() { Some(v) => need_str(v, "TEMPFILE$")?, None => "dh" };
+            let endung = match a.get(1) { Some(v) => need_str(v, "TEMPFILE$")?, None => ".tmp" };
+            let ordner = std::env::temp_dir();
+            for _ in 0..64 {
+                let mut roh = [0u8; 8];
+                if getrandom::getrandom(&mut roh).is_err() { return err("TEMPFILE$: keine Zufallsquelle"); }
+                let name = format!("{}{}{}", praefix,
+                                   roh.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+                                   endung);
+                let p = ordner.join(&name);
+                // create_new: legt an ODER schlaegt fehl, wenn es die Datei
+                // schon gibt -- als eine Handlung, ohne Luecke dazwischen.
+                match std::fs::OpenOptions::new().write(true).create_new(true).open(&p) {
+                    Ok(_) => return Ok(Value::str_rc(&p.to_string_lossy())),
+                    Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                    Err(e) => return err(format!("TEMPFILE$: {}: {}", p.display(), e)),
+                }
             }
-            names.sort();   // OS-Reihenfolge ist undefiniert -> deterministisch sortieren
-            Ok(new_str_array(names))
+            err("TEMPFILE$: 64-mal keinen freien Namen gefunden")
         }
         "mkdir" => {
             arity!(1);
@@ -4366,6 +4438,111 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
     Some(cur)
 }
 
+/// Wie weit geht die Uhr dieses Rechners der Weltzeit voraus (in Sekunden)?
+///
+/// Gebraucht fuer `FILETIME`: das Dateisystem liefert die Aenderungszeit in
+/// Weltzeit, das Modul `zeit` (und `ZEIT_JETZT`) rechnet in Ortszeit. Ohne
+/// diese Umrechnung waere `ZEIT_DIFF(FILETIME(f), ZEIT_JETZT())` um den
+/// Zeitzonenversatz daneben -- und genau diese Rechnung ist der Grund, warum
+/// es FILETIME gibt ("wie alt ist die Datei?").
+///
+/// Auf Volle Minuten gerundet: echte Zeitzonen sind Vielfache von 15 Minuten,
+/// und die beiden Uhrenabfragen darunter liegen Sekundenbruchteile
+/// auseinander -- ohne das Runden erschiene diese Luecke als Versatz.
+fn ortszeit_versatz() -> i64 {
+    let (j, mo, d, h, mi, s) = local_datetime();
+    let lokal = crate::zeit::aus_teilen(j, mo, d, h, mi, s);
+    let utc = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|x| x.as_secs() as i64)
+        .unwrap_or(0);
+    ((lokal - utc) as f64 / 60.0).round() as i64 * 60
+}
+
+/// Passt `name` auf das Muster? Erlaubt sind `*` (beliebig viele Zeichen,
+/// auch keine) und `?` (genau eines).
+///
+/// **Immer ohne Ruecksicht auf Gross-/Kleinschreibung.** Windows unterscheidet
+/// bei Dateinamen nicht, Linux schon -- waere das Muster hier
+/// plattformabhaengig, liefe dasselbe Programm auf zwei Rechnern
+/// unterschiedlich. Und die Sprache selbst ignoriert Gross-/Kleinschreibung
+/// ohnehin ueberall sonst.
+///
+/// Iterativ mit Rueckfallpunkt statt Rekursion: `*` in einem langen Namen
+/// laesst eine naive rekursive Fassung exponentiell laufen
+/// (`aaaaaaaaaaaaaaaaaaaa` gegen `*a*a*a*a*a*a*a*b`).
+pub fn passt_muster(name: &str, muster: &str) -> bool {
+    let n: Vec<char> = name.to_lowercase().chars().collect();
+    let m: Vec<char> = muster.to_lowercase().chars().collect();
+    let (mut i, mut j) = (0usize, 0usize);
+    // Wo im Muster stand der letzte Stern, und wo im Namen wurde er zuletzt
+    // angesetzt? Damit kann ein Fehlschlag ihn ein Zeichen weiterschieben.
+    let (mut stern, mut merk) = (usize::MAX, 0usize);
+    while i < n.len() {
+        if j < m.len() && (m[j] == '?' || m[j] == n[i]) {
+            i += 1; j += 1;
+        } else if j < m.len() && m[j] == '*' {
+            stern = j; merk = i; j += 1;
+        } else if stern != usize::MAX {
+            j = stern + 1; merk += 1; i = merk;
+        } else {
+            return false;
+        }
+    }
+    while j < m.len() && m[j] == '*' { j += 1; }
+    j == m.len()
+}
+
+/// Die Eintraege eines Verzeichnisses, sortiert und ggf. gefiltert.
+fn verzeichnis_lesen(pfad: &str, muster: Option<&str>, fn_: &str)
+    -> Result<Vec<String>, String>
+{
+    let rd = std::fs::read_dir(pfad).map_err(|e| format!("{}: {}: {}", fn_, pfad, e))?;
+    let mut namen: Vec<String> = Vec::new();
+    for e in rd {
+        let e = e.map_err(|e| format!("{}: {}", fn_, e))?;
+        let name = e.file_name().to_string_lossy().into_owned();
+        if muster.map(|m| passt_muster(&name, m)).unwrap_or(true) {
+            namen.push(name);
+        }
+    }
+    namen.sort();   // OS-Reihenfolge ist undefiniert -> deterministisch sortieren
+    Ok(namen)
+}
+
+/// Rekursiv alle DATEIEN unterhalb von `wurzel` sammeln, als Pfade relativ
+/// zu ihr.
+///
+/// Immer mit `/` als Trenner, auch unter Windows: ein Programm, das die Liste
+/// weiterverarbeitet oder speichert, soll auf beiden Systemen dieselben
+/// Zeichenketten sehen. `PATHJOIN` macht es genauso.
+fn baum_lesen(wurzel: &std::path::Path, unter: &str, muster: Option<&str>,
+              raus: &mut Vec<String>, fn_: &str) -> Result<(), String>
+{
+    let hier = if unter.is_empty() { wurzel.to_path_buf() } else { wurzel.join(unter) };
+    let rd = std::fs::read_dir(&hier)
+        .map_err(|e| format!("{}: {}: {}", fn_, hier.display(), e))?;
+    let mut eintraege: Vec<(String, bool)> = Vec::new();
+    for e in rd {
+        let e = e.map_err(|e| format!("{}: {}", fn_, e))?;
+        let name = e.file_name().to_string_lossy().into_owned();
+        let ist_ordner = e.path().is_dir();
+        eintraege.push((name, ist_ordner));
+    }
+    eintraege.sort();
+    for (name, ist_ordner) in eintraege {
+        let rel = if unter.is_empty() { name.clone() } else { format!("{}/{}", unter, name) };
+        if ist_ordner {
+            baum_lesen(wurzel, &rel, muster, raus, fn_)?;
+        } else if muster.map(|m| passt_muster(&name, m)).unwrap_or(true) {
+            // Das Muster gilt fuer den DATEINAMEN, nicht den ganzen Pfad --
+            // `*.csv` soll auch tief unten treffen.
+            raus.push(rel);
+        }
+    }
+    Ok(())
+}
+
 /// Eine Textdatei lesen -- mit der angegebenen Kodierung, sonst UTF-8.
 ///
 /// Ein fuehrendes BOM faellt immer weg: Excel schreibt es, und sonst hiesse
@@ -5131,4 +5308,48 @@ pub fn is_graphics_builtin(name: &str) -> bool {
         | "playsound" | "keypressed" | "keydown" | "mousex" | "mousey" | "mousebutton"
         | "quitrequested" | "sleep" | "imagewidth" | "imageheight" | "color" | "fill"
     )
+}
+
+#[cfg(test)]
+mod muster_tests {
+    use super::passt_muster;
+
+    #[test]
+    fn stern_und_fragezeichen() {
+        assert!(passt_muster("a.csv", "*.csv"));
+        assert!(passt_muster("lang.name.csv", "*.csv"));
+        assert!(!passt_muster("a.txt", "*.csv"));
+        assert!(passt_muster("a.csv", "?.csv"));
+        assert!(!passt_muster("ab.csv", "?.csv"));
+        assert!(passt_muster("alles", "*"));
+        assert!(passt_muster("", "*"));
+        assert!(passt_muster("genau", "genau"));
+    }
+
+    #[test]
+    fn ohne_ruecksicht_auf_gross_klein() {
+        // Windows unterscheidet bei Dateinamen nicht, Linux schon -- waere
+        // das hier plattformabhaengig, liefe dasselbe Programm auf zwei
+        // Rechnern unterschiedlich.
+        assert!(passt_muster("Bild.PNG", "*.png"));
+        assert!(passt_muster("bild.png", "*.PNG"));
+    }
+
+    #[test]
+    fn mehrere_sterne() {
+        assert!(passt_muster("lang.name.csv", "*a*a*"));
+        assert!(passt_muster("abc", "*b*"));
+        assert!(!passt_muster("abc", "*d*"));
+        assert!(passt_muster("abc", "a*c"));
+        assert!(passt_muster("ac", "a*c"));
+    }
+
+    #[test]
+    fn viele_sterne_laufen_nicht_davon() {
+        // Eine naive rekursive Fassung braucht hier exponentiell lange.
+        // Der Rueckfallpunkt macht daraus lineares Zuruecksetzen; wenn
+        // dieser Test in Millisekunden durchlaeuft, stimmt das.
+        let name = "a".repeat(40);
+        assert!(!passt_muster(&name, "*a*a*a*a*a*a*a*a*b"));
+    }
 }

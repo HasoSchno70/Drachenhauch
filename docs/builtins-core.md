@@ -570,6 +570,50 @@ hieße die erste Spalte für immer `﻿Name`).
 
 Beispiel: [examples/169_csv.dh](../examples/169_csv.dh).
 
+### Suchen, aufräumen, zwischenlagern
+
+**Namensmuster** kennen `*` (beliebig viele Zeichen) und `?` (genau eines) —
+und ignorieren **immer** Groß-/Kleinschreibung. Windows unterscheidet bei
+Dateinamen nicht, Linux schon; wäre das hier plattformabhängig, liefe dasselbe
+Programm auf zwei Rechnern unterschiedlich.
+
+```basic
+DIM tabellen AS ARRAY OF STRING
+tabellen = DIRLIST("daten", "*.csv")          ' nur dieser Ordner
+tabellen = DIRLIST_REC("daten", "*.csv")      ' auch alle Unterordner
+```
+
+`DIRLIST_REC` liefert **nur Dateien** (Ordner sind keine Nutzlast) als Pfade
+relativ zum Startordner, immer mit `/` getrennt — auch unter Windows, damit
+eine gespeicherte Liste auf beiden Systemen gleich aussieht. Das Muster gilt
+dabei für den Dateinamen, nicht für den ganzen Pfad.
+
+**`RMDIR` löscht ohne zweites Argument nur ein LEERES Verzeichnis.** Ein
+Aufruf, der versehentlich einen ganzen Baum wegräumt, ist der teuerste
+Tippfehler, den ein Dateibefehl anrichten kann — das Mitlöschen muss man
+hinschreiben:
+
+```basic
+RMDIR("bau")              ' Fehler, wenn noch etwas drin ist (und sagt es)
+RMDIR("bau", TRUE)        ' mit allem, was drin liegt
+```
+
+**`FILETIME`** zählt in derselben Zeitrechnung wie das Modul
+[`zeit`](module-zeit.md) — Sekunden seit 1970 in Ortszeit. Genau deshalb geht
+die Frage, um die es geht:
+
+```basic
+IMPORT "zeit"
+IF ZEIT_JETZT() - FILETIME("sicherung.zip") > 86400 THEN
+    PRINT "Die Sicherung ist älter als ein Tag."
+END IF
+```
+
+**`TEMPFILE$` legt die Datei sofort leer an**, statt nur einen Namen
+auszudenken: sonst könnte zwischen „Name ausgedacht" und „Datei geschrieben"
+ein zweiter Lauf denselben Namen bekommen. Aufräumen bleibt Sache des
+Programms (`DELETEFILE`).
+
 ## Textkodierung
 
 Drachenhauch liest und schreibt Textdateien in **UTF-8**. Das ist die richtige
@@ -650,7 +694,12 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
-| `DIRLIST(pfad$)` → ARRAY OF STRING | Eintragsnamen (sortiert) |
+| `DIRLIST(pfad$[, muster$])` → ARRAY OF STRING | Eintragsnamen (sortiert), optional gefiltert |
+| `DIRLIST_REC(pfad$[, muster$])` → ARRAY OF STRING | wie oben, aber rekursiv — nur Dateien, Pfade relativ mit `/` |
+| `RMDIR(pfad$[, mit_inhalt])` | Verzeichnis löschen (leer; mit `TRUE` samt Inhalt) |
+| `FILETIME(pfad$)` → INTEGER | zuletzt geändert, Sekunden wie im Modul `zeit` |
+| `TEMPDIR$()` → STRING | das Temp-Verzeichnis des Systems |
+| `TEMPFILE$([praefix$[, endung$]])` → STRING | freier Name im Temp-Verzeichnis, **leer angelegt** |
 | `MKDIR(pfad$)` | Verzeichnis anlegen (inkl. Eltern) |
 | `COPYFILE(src$, dst$)` | Datei kopieren |
 | `APPENDFILE(pfad$, text$[, kodierung$])` | Text ans Ende hängen (legt die Datei an) |

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1439,
+ "count": 1444,
  "builtins": [
   {
    "name": "ABS",
@@ -2099,7 +2099,13 @@
   {
    "name": "DIRLIST",
    "kind": "core",
-   "signature": "DIRLIST(pfad) AS ARRAY OF STRING",
+   "signature": "DIRLIST(pfad [, muster$]) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "DIRLIST_REC",
+   "kind": "core",
+   "signature": "DIRLIST_REC(pfad$ [, muster$]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -2419,6 +2425,12 @@
    "kind": "graphics",
    "signature": "FILES_DROPPED(*args)",
    "module": "core"
+  },
+  {
+   "name": "FILETIME",
+   "kind": "core",
+   "signature": "FILETIME(pfad$) AS INTEGER",
+   "module": "dhrt"
   },
   {
    "name": "FILE_DROPPED",
@@ -6321,6 +6333,12 @@
    "module": "core"
   },
   {
+   "name": "RMDIR",
+   "kind": "core",
+   "signature": "RMDIR(pfad$ [, mit_inhalt])",
+   "module": "dhrt"
+  },
+  {
    "name": "RND",
    "kind": "core",
    "signature": "RND(0..1 Argumente)",
@@ -7302,6 +7320,18 @@
    "name": "TELL",
    "kind": "core",
    "signature": "TELL(datei) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "TEMPDIR$",
+   "kind": "core",
+   "signature": "TEMPDIR$() AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "TEMPFILE$",
+   "kind": "core",
+   "signature": "TEMPFILE$([praefix$ [, endung$]]) AS STRING",
    "module": "dhrt"
   },
   {
