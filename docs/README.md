@@ -67,7 +67,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 
 ### Werkzeug
 
-- **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`
+- **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrun.py --doku` (Referenz aus dem Quelltext)
 - **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
 - **[Sprite-Editor (`dhsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
 - **[Tilemap-Editor (`dhtilemap`)](tilemap-editor.md)** — Level bauen, Tiled-JSON lesen und schreiben

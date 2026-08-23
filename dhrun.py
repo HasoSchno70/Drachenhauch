@@ -228,6 +228,38 @@ def main(argv):
     args = argv[1:]
     mode = "run"
 
+    # --- Referenz aus dem Quelltext erzeugen ---
+    #
+    # Steht hier und nicht in `dhrt`: der Rust-Lexer wirft Kommentare weg,
+    # der Python-Lexer behaelt die Zeilen -- und ohne die Kommentare waere
+    # eine "Doku" nur eine Liste von Signaturen.
+    if args and args[0] in ("--doku", "--doc"):
+        args = args[1:]
+        ziel = None
+        if "-o" in args:
+            i = args.index("-o")
+            if i + 1 >= len(args):
+                print("--doku: nach -o fehlt der Dateiname")
+                return 2
+            ziel = Path(args[i + 1])
+            args = args[:i] + args[i + 2:]
+        quellen = [Path(a) for a in args if not a.startswith("-")]
+        if not quellen:
+            print("Verwendung: dhrun.py --doku <datei.dh ...> [-o referenz.md]")
+            return 2
+        fehlend = [p for p in quellen if not p.is_file()]
+        if fehlend:
+            print("--doku: gibt es nicht: " + ", ".join(str(p) for p in fehlend))
+            return 2
+        from drachenhauch.doku import erzeuge
+        text = erzeuge(quellen)
+        if ziel is None:
+            print(text)
+        else:
+            ziel.write_text(text, encoding="utf-8")
+            print(f"geschrieben: {ziel}")
+        return 0
+
     # --- Editor explizit per Flag ---
     if args and args[0] in ("--editor", "-e"):
         args = args[1:]

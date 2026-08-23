@@ -301,3 +301,67 @@ def test_der_bestand_ist_sauber():
     dateien = [str(p) for p in (_ROOT / "examples").rglob("*.dh")]
     code, out, _ = _lauf("fmt", "--pruefen", *dateien)
     assert code == 0, out
+
+
+# ------------------------------------------------------ Referenz erzeugen
+def _doku(quelle: str, tmp_path):
+    """`dhrun.py --doku` auf eine Datei anwenden und die Markdown-Seite
+    zurueckgeben."""
+    import sys
+    f = tmp_path / "mathe.dh"
+    f.write_text(quelle, encoding="utf-8")
+    venv = _ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    py = str(venv) if venv.exists() else sys.executable
+    r = subprocess.run([py, str(_ROOT / "dhrun.py"), "--doku", str(f)],
+                       capture_output=True, text=True, encoding="utf-8",
+                       cwd=str(_ROOT), timeout=60)
+    assert r.returncode == 0, r.stderr
+    return r.stdout
+
+
+BIB = '''\' Kleine Sammlung fuer Streckenrechnung.
+
+\' Der groesste erlaubte Abstand.
+CONST GRENZE AS FLOAT = 1000.0
+
+\' Abstand zweier Punkte in der Ebene.
+\' Liefert immer einen positiven Wert.
+FUNCTION Distanz(x1 AS FLOAT, y1 AS FLOAT) AS FLOAT
+    RETURN x1 + y1
+END FUNCTION
+
+\' Nur fuer den internen Gebrauch.
+PRIVATE SUB pruefe(wert AS FLOAT)
+    PRINT wert
+END SUB
+'''
+
+
+def test_doku_nimmt_signatur_und_kommentar(tmp_path):
+    md = _doku(BIB, tmp_path)
+    assert "FUNCTION Distanz(x1 AS FLOAT, y1 AS FLOAT) AS FLOAT" in md
+    assert "Abstand zweier Punkte in der Ebene." in md
+    assert "Liefert immer einen positiven Wert." in md
+
+
+def test_doku_beschreibt_die_datei_aus_ihrem_kopf(tmp_path):
+    md = _doku(BIB, tmp_path)
+    assert "Kleine Sammlung fuer Streckenrechnung." in md
+
+
+def test_doku_laesst_privates_weg(tmp_path):
+    """`PRIVATE` gehoert dem Modul -- eine Referenz, die es auffuehrt,
+    verspricht etwas, das beim naechsten Umbau verschwindet."""
+    md = _doku(BIB, tmp_path)
+    assert "pruefe" not in md
+
+
+def test_doku_ohne_datei_meldet_sich(tmp_path):
+    import sys
+    venv = _ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    py = str(venv) if venv.exists() else sys.executable
+    r = subprocess.run([py, str(_ROOT / "dhrun.py"), "--doku"],
+                       capture_output=True, text=True, encoding="utf-8",
+                       cwd=str(_ROOT), timeout=60)
+    assert r.returncode == 2
+    assert "Verwendung" in r.stdout

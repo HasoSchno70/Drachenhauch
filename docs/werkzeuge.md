@@ -126,6 +126,41 @@ dabei gedacht.
 herumzurücken hilft niemandem; der Aufruf meldet es und lässt die Datei in
 Ruhe.
 
+## `dhrun.py --doku` — Referenz aus dem Quelltext
+
+Wer eine eigene Bibliothek schreibt (`zeitraum.dh`, `tabellen.dh`), soll sie
+nicht ein zweites Mal von Hand beschreiben müssen — eine handgepflegte
+Referenz driftet ab dem ersten Tag.
+
+```bash
+dhrun.py --doku mathe.dh                     # nach stdout
+dhrun.py --doku lib/*.dh -o docs/referenz.md # in eine Datei
+```
+
+Genommen wird die **Signatur** und der **Kommentarblock direkt darüber** —
+dieselbe Quelle, aus der auch der Hover im Editor kommt
+(`editor_qt/symbols.py`); es gibt keine zweite Vorstellung davon, was eine
+Signatur ist. Ein Kommentarblock ganz am Dateianfang beschreibt die Datei
+selbst.
+
+```basic
+' Abstand zweier Punkte in der Ebene.
+' Liefert immer einen positiven Wert.
+FUNCTION Distanz(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT) AS FLOAT
+    RETURN SQR((x2 - x1) ^ 2 + (y2 - y1) ^ 2)
+END FUNCTION
+```
+
+wird zu einem Abschnitt mit Signatur und beiden Sätzen.
+
+**`PRIVATE` bleibt draußen.** Es gehört dem Modul; eine Referenz, die es
+auflistet, verspricht etwas, das beim nächsten Umbau verschwindet.
+
+**Warum `dhrun.py` und nicht `dhrt`:** der Rust-Lexer wirft Kommentare weg
+(er braucht sie nicht), der Python-Lexer behält die Zeilen. Eine Doku ohne
+Kommentare wäre eine Liste von Signaturen — und die kann man auch selbst
+lesen.
+
 ## `dhrt --check` — übersetzen ohne auszuführen
 
 ```bash
