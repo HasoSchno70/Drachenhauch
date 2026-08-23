@@ -13,6 +13,10 @@ Werkzeug drumherum.
 **Alles unten ist gegen die gebaute Runtime nachgemessen, nicht aus der Doku
 abgeschrieben.**
 
+> **Stand 2026-08-23: sieben von acht Punkten sind gebaut** (1–6 und die
+> Entscheidungen unter 8). Offen ist nur noch **7** — die Bibliothekslücken,
+> die sich einzeln und nach Bedarf schließen lassen.
+
 ## Der Befund in drei Sätzen
 
 1. **Der Übersetzer prüft weniger, als die Sprache verspricht.** Drachenhauch
@@ -225,9 +229,22 @@ hält.
 Alternativ `OPENFILE("-", "r")`, damit die vorhandenen Datei-Builtins gelten —
 das wäre die kleinere Fläche.
 
-## 5 — Bibliotheken teilen (Ökosystem)
+## 5 — Bibliotheken teilen (Ökosystem) — ✅ ERLEDIGT 2026-08-23
 
-`IMPORT "x.dh"` löst **ausschließlich relativ zur importierenden Datei** auf
+> **Gebaut** (`84b8cc2`): gesucht wird jetzt (1) neben der importierenden
+> Datei, (2) in jedem Ordner aus `DH_PATH`, (3) in
+> `<Benutzerordner>/.drachenhauch/bibliothek`. Die eigene Kopie gewinnt
+> immer; die Fehlermeldung nennt alle durchsuchten Orte. 13 Tests,
+> beschrieben in `docs/sprache.md` („Wo gesucht wird").
+>
+> **Die Paketverwaltung bleibt bewusst aus** — genau wie unten vorgeschlagen.
+> Ordner 3 ist der Platz, an dem sie später ablegen würde.
+>
+> **Ein Test hat den ersten Entwurf gerettet:** eine Datei namens `json` im
+> Suchpfad verdeckte `IMPORT "json"` — in *jedem* Programm auf dem Rechner.
+> Ein bekannter Modulname geht jetzt gar nicht erst in die Suche.
+
+`IMPORT "x.dh"` löste **ausschließlich relativ zur importierenden Datei** auf
 (`preprocess.rs`: `base.join(rel)`). Es gibt keinen Suchpfad, keinen
 Bibliotheksordner, keine Version, keine Paketverwaltung.
 
@@ -371,7 +388,8 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   einer Ausnahme: der Formatierer kostete drei Runden gegen den Bestand, bis
   klar war, dass er per Vorgabe *weniger* tun muss.
 - **5** ist die Voraussetzung dafür, dass andere etwas beitragen können —
-  wichtig, aber wirkungslos, solange 1 bis 4 offen sind.
+  wichtig, aber wirkungslos, solange 1 bis 4 offen sind. **Erledigt am
+  23.08.2026**, nachdem 1 bis 4 und 6 standen.
 - **7** ist Fleißarbeit und lässt sich nach Bedarf abrufen. Der erste Griff
   daraus wäre PDF (kaufmännisch) oder der HTTP-Server (Bastler), je nachdem,
   wen man zuerst gewinnen will.
