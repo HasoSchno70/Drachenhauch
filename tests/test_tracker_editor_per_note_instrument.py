@@ -20,8 +20,10 @@ def _editor():
     try:
         from drachenhauch.trackereditor_qt import TrackerEditor
         return TrackerEditor(Path("."))
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    except ImportError as exc:  # pragma: no cover -- Zusatzpaket fehlt
+        # ENG halten: ein breites `except` machte aus jedem kaputten
+        # Editor einen gruenen Uebersprung statt eines roten Tests.
+        pytest.skip(f"Zusatzpaket fehlt: {exc}")
 
 
 def _select(ed, c, r):

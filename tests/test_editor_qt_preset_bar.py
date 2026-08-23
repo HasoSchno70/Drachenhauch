@@ -51,8 +51,10 @@ def test_particle_editor_has_factory_presets(_qapp):
     try:
         from drachenhauch.particleeditor_qt import ParticleEditor, _FACTORY_PRESETS
         ed = ParticleEditor(Path("."))
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    except ImportError as exc:  # pragma: no cover -- Zusatzpaket fehlt
+        # ENG halten: ein breites `except` machte aus jedem kaputten
+        # Editor einen gruenen Uebersprung statt eines roten Tests.
+        pytest.skip(f"Zusatzpaket fehlt: {exc}")
     # Werks-Presets sind in der Bibliothek
     for name in _FACTORY_PRESETS:
         assert name in ed.presets.names()
@@ -66,8 +68,10 @@ def test_sfx_editor_has_preset_bar(_qapp):
     try:
         from drachenhauch.sfxeditor_qt import SfxGenerator
         ed = SfxGenerator(Path("."))
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    except ImportError as exc:  # pragma: no cover -- Zusatzpaket fehlt
+        # ENG halten: ein breites `except` machte aus jedem kaputten
+        # Editor einen gruenen Uebersprung statt eines roten Tests.
+        pytest.skip(f"Zusatzpaket fehlt: {exc}")
     assert hasattr(ed, "preset_bar")
     # Roundtrip ueber _params/_apply_params (das, was der Bar nutzt)
     p = ed._params()
@@ -80,8 +84,10 @@ def test_sfx_editor_has_factory_presets(_qapp):
     try:
         from drachenhauch.sfxeditor_qt import SfxGenerator, _FACTORY_PRESETS
         ed = SfxGenerator(Path("."))
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    except ImportError as exc:  # pragma: no cover -- Zusatzpaket fehlt
+        # ENG halten: ein breites `except` machte aus jedem kaputten
+        # Editor einen gruenen Uebersprung statt eines roten Tests.
+        pytest.skip(f"Zusatzpaket fehlt: {exc}")
     # Werks-Presets sind -- wie beim Partikel-Editor -- in EINER Bibliothek
     # mit den User-Presets vereint (keine separate Sidebar mehr).
     for name in _FACTORY_PRESETS:

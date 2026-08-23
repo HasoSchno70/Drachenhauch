@@ -164,7 +164,7 @@ def test_dialog_replace_all_writes_disk(tmp_path, monkeypatch):
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
         from drachenhauch.editor_qt.find_in_project import FindInProjectDialog
-    except Exception:
+    except ImportError:
         import pytest
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
