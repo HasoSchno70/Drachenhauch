@@ -200,7 +200,7 @@ class DebugController(QObject):
             self._got_terminal = True
             self._mode = "idle"
             reason = {"done": "fertig", "stopped": "abgebrochen"}.get(
-                ev.get("reason"), "fertig")
+                ev.get("reason") or "", "fertig")
             self._safe_emit(self.finished, reason)
         elif kind == "error":
             self._got_terminal = True

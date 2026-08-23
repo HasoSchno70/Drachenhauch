@@ -118,7 +118,7 @@ class Minimap(QWidget):
 
         def color_for(key: str | None) -> QColor:
             if key not in col_cache:
-                qc = QColor(c.get(CLASS_COLOR_KEY.get(key, ""), c["fg"]))
+                qc = QColor(c.get(CLASS_COLOR_KEY.get(key or "", ""), c["fg"]))
                 qc.setAlpha(225)
                 col_cache[key] = qc
             return col_cache[key]

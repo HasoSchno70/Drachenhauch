@@ -83,6 +83,8 @@ class Breadcrumbs(QWidget):
     def _clear_layout(self) -> None:
         while self._lay.count():
             item = self._lay.takeAt(0)
+            if item is None:            # laut Qt moeglich, hier nie: count() > 0
+                continue
             w = item.widget()
             if w is not None:
                 w.deleteLater()

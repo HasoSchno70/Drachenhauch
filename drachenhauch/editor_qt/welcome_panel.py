@@ -100,13 +100,15 @@ class WelcomePanel(QWidget):
         # Gesamtes Panel scrollbar machen -- die Showcase-Galerie braucht Platz.
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
-        root.addWidget(self.scroll)
+        # NICHT `scroll` nennen: das ueberschreibt `QWidget.scroll(dx, dy)`
+        # auf der Instanz -- die geerbte Methode ist danach unerreichbar.
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        root.addWidget(self._scroll)
 
         content = QWidget()
-        self.scroll.setWidget(content)
+        self._scroll.setWidget(content)
         outer = QVBoxLayout(content)
         outer.setContentsMargins(60, 40, 60, 40)
         outer.setSpacing(18)

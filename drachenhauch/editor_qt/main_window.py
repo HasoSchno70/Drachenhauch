@@ -11,7 +11,16 @@ Features:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    # Nur fuer die Typpruefung -- zur Laufzeit werden diese Module dort
+    # geladen, wo sie gebraucht werden (spaeter Import haelt den Start des
+    # Editors kurz), und ein Import hier oben wuerde das zunichte machen.
+    from PySide6.QtWidgets import QDockWidget
+    from .code_editor import CodeEditor
+    from .markdown_viewer import MarkdownViewer
+    from .profiler import ProfileResult
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import (
@@ -69,6 +78,13 @@ class _ClickableLabel(QLabel):
 
 
 class DrachenhauchEditor(QMainWindow):
+    # Nur angesagt, ohne Wert -- zur Laufzeit entsteht hier nichts. Beide Felder
+    # werden erst spaeter belegt (und zwischendurch wieder auf None gesetzt);
+    # ohne Ansage hielt die Pruefung sie fuer "immer None" und sah jede spaetere
+    # Benutzung als Fehler.
+    _debug_editor: "CodeEditor | None"
+    _md_viewer: "MarkdownViewer | None"
+
     def __init__(self, project_root: Path, initial_file: Path | None = None):
         super().__init__()
         self.project_root = project_root.resolve()
@@ -162,12 +178,14 @@ class DrachenhauchEditor(QMainWindow):
             pil = branding._smart_square_crop(pil)
             icon = QIcon()
             for size in (16, 24, 32, 48, 64, 128, 256):
-                scaled = pil.resize((size, size), Image.LANCZOS)
+                scaled = pil.resize((size, size), Image.Resampling.LANCZOS)
                 qimg = ImageQt(scaled).copy()
                 icon.addPixmap(QPixmap.fromImage(qimg))
             self.setWindowIcon(icon)
             from PySide6.QtWidgets import QApplication
-            QApplication.instance().setWindowIcon(icon)
+            app = QApplication.instance()
+            if isinstance(app, QApplication):
+                app.setWindowIcon(icon)
         except Exception:
             # Branding ist optional -- ohne Logo startet der Editor weiter.
             pass
@@ -190,7 +208,7 @@ class DrachenhauchEditor(QMainWindow):
             target_h = 22
             ratio = target_h / pil.size[1]
             target_w = max(1, int(pil.size[0] * ratio))
-            scaled = pil.resize((target_w, target_h), Image.LANCZOS)
+            scaled = pil.resize((target_w, target_h), Image.Resampling.LANCZOS)
             qimg = ImageQt(scaled).copy()
             self._menubar_logo_pixmap = QPixmap.fromImage(qimg)
             # Label als Member halten -- ohne harte Referenz wuerde Qt's
@@ -781,10 +799,11 @@ class DrachenhauchEditor(QMainWindow):
         if problem is None:
             self.statusBar().clearMessage()
             return
+        # Felder VOR dem Vergleich lesen: `a is b` weicht den oben schon
+        # eingegrenzten Typ von `problem` wieder zu `... | None` auf.
+        zeile, meldung = problem.line, problem.message
         if st.editor.current_error() is problem:
-            self.statusBar().showMessage(
-                f"Zeile {problem.line}: {problem.message}", 0,
-            )
+            self.statusBar().showMessage(f"Zeile {zeile}: {meldung}", 0)
 
     def _fold_at_cursor(self) -> None:
         st = self.tabs.active
@@ -1546,7 +1565,7 @@ class DrachenhauchEditor(QMainWindow):
         self.statusBar().showMessage("Profiler: läuft ...")
         self.profiler.start(st.editor.get_text(), base)
 
-    def _on_profile_finished(self, result: object) -> None:
+    def _on_profile_finished(self, result: ProfileResult) -> None:
         if result.output:
             self.console.append(result.output)
         self.profile_panel.show_result(result)
@@ -1657,7 +1676,7 @@ class DrachenhauchEditor(QMainWindow):
             return
         self.problems_panel.set_problems(problems)
 
-    def _on_breakpoints_changed(self, editor) -> None:
+    def _on_breakpoints_changed(self, editor: "CodeEditor") -> None:
         # Nur relevant, wenn dieser Editor gerade debuggt wird -- dann live an
         # den Controller weiterreichen.
         if self.debugger.is_active() and editor is self._debug_editor:
@@ -1688,7 +1707,7 @@ class DrachenhauchEditor(QMainWindow):
         self.variables_panel.set_status("läuft ...")
         self.statusBar().showMessage("Debug: läuft ...")
 
-    def _on_debug_paused(self, editor_line: int, frames: object) -> None:
+    def _on_debug_paused(self, editor_line: int, frames: dict) -> None:
         self._set_debug_controls(active=True, paused=True)
         self.variables_panel.update_frames(frames)
         self.variables_panel.set_status(f"angehalten @ Zeile {editor_line}")
@@ -1826,7 +1845,9 @@ class DrachenhauchEditor(QMainWindow):
 
     def _apply_app_stylesheet(self) -> None:
         from PySide6.QtWidgets import QApplication
-        QApplication.instance().setStyleSheet(global_qss())
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            app.setStyleSheet(global_qss())
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()
@@ -2027,7 +2048,7 @@ class DrachenhauchEditor(QMainWindow):
 
     def _show_command_palette(self) -> None:
         # Sammlung aller registrierten Aktionen + zusaetzliche Befehle.
-        commands: list[tuple[str, str, callable]] = []
+        commands: list[tuple[str, str, Callable]] = []
         for act in self._all_palette_actions():
             sc = act.shortcut().toString() if act.shortcut() else ""
             commands.append((act.text().replace("&", ""), sc, act.trigger))

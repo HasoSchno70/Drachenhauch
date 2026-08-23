@@ -450,7 +450,7 @@ class OutputConsole(QWidget):
     def _on_stdout(self) -> None:
         if self._proc is None:
             return
-        data = bytes(self._proc.readAllStandardOutput())
+        data = bytes(self._proc.readAllStandardOutput().data())
         text = data.decode("utf-8", errors="replace")
         if text:
             self.append(text)
@@ -459,7 +459,7 @@ class OutputConsole(QWidget):
         # Restliches stdout abholen -- `finished` kann vor dem letzten
         # `readyReadStandardOutput` feuern.
         if self._proc is not None:
-            data = bytes(self._proc.readAllStandardOutput())
+            data = bytes(self._proc.readAllStandardOutput().data())
             if data:
                 self.append(data.decode("utf-8", errors="replace"))
         if self._user_stopped:

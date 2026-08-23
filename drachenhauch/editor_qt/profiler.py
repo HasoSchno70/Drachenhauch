@@ -146,8 +146,12 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
                     requested_stop = True
                     result.stopped = True
                     try:
-                        proc.stdin.write("stop\n")      # sauberer Abbruch
-                        proc.stdin.flush()
+                        if proc.stdin is not None:
+                            # Ohne diese Pruefung waere es ein
+                            # AttributeError -- und den faengt das
+                            # `except` unten NICHT.
+                            proc.stdin.write("stop\n")   # sauberer Abbruch
+                            proc.stdin.flush()
                     except (OSError, ValueError):
                         pass
                     try:

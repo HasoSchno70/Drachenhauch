@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QKeyEvent
@@ -26,7 +26,7 @@ from .theme import COLORS
 class PickerEntry:
     label: str               # Sichtbarer Text
     detail: str = ""         # Sekundaer-Info, halbtransparent rechts
-    user_data: object = None # beliebiger Wert -> Activation-Callback
+    user_data: Any = None    # beliebiger Wert -> Activation-Callback
 
 
 class _PickerDialog(QDialog):
