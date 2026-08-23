@@ -417,3 +417,110 @@ END SUB
 log("INFO", 5, TRUE, "x")
 """)
     assert not any("Parameter" in m for m in w), w
+
+
+# ------------------------------------- Mitglied, das es bei der Klasse nicht gibt
+#
+# Der Tippfehler im Feldnamen. Die Kunst liegt hier nicht im Finden, sondern im
+# SCHWEIGEN: eine als Basisklasse angesagte Variable darf zur Laufzeit eine
+# abgeleitete halten, und dann ist der Zugriff auf deren eigenes Mitglied
+# richtig. Eine Pruefung, die das anstreicht, wuerde genau den Code melden,
+# fuer den es Vererbung gibt.
+
+def test_tippfehler_im_feldnamen_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM anzahl AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+PRINT p.anzhal
+""")
+    assert any("kein Mitglied 'anzhal'" in m for m in w), w
+    assert any("Meintest du 'anzahl'?" in m for m in w), w
+
+
+def test_unbekannte_methode_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    SUB tu()
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+p.gibtsNicht()
+""")
+    assert any("kein Mitglied 'gibtsnicht'" in m for m in w), w
+
+
+def test_kindmethode_ueber_basistyp_bleibt_still(tmp_path):
+    """Der Fall, um den es geht: `t` ist als Tier angesagt, haelt aber einen
+    Hund -- `t.belle()` ist gueltig und muss still bleiben."""
+    w = _warnungen(tmp_path, """
+CLASS Tier
+    SUB laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    SUB belle()
+        PRINT "wau"
+    END SUB
+END CLASS
+DIM t AS Tier
+t = NEW Hund()
+t.belle()
+""")
+    assert not any("kein Mitglied" in m for m in w), w
+
+
+def test_geerbtes_feld_bleibt_still(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS Basis
+    DIM hp AS INTEGER
+END CLASS
+CLASS Kind EXTENDS Basis
+END CLASS
+DIM k AS Kind
+k = NEW Kind()
+PRINT k.hp
+""")
+    assert not any("kein Mitglied" in m for m in w), w
+
+
+def test_property_zaehlt_als_mitglied(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM _h AS INTEGER
+    PROPERTY GET hp() AS INTEGER
+        RETURN Self._h
+    END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+PRINT p.hp
+""")
+    assert not any("kein Mitglied" in m for m in w), w
+
+
+def test_container_methoden_bleiben_still(tmp_path):
+    """STRING/MAP/ARRAY haben ihre eigene Methoden-Tabelle, keine Klasse."""
+    w = _warnungen(tmp_path, """
+DIM s AS STRING
+s = "abc"
+PRINT s.upper()
+DIM m AS MAP OF INTEGER
+PRINT m.size()
+""")
+    assert not any("kein Mitglied" in m for m in w), w
+
+
+def test_schreibender_zugriff_wird_auch_geprueft(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM anzahl AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.anzhal = 5
+""")
+    assert any("kein Mitglied 'anzhal'" in m for m in w), w

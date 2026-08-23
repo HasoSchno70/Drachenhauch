@@ -910,6 +910,66 @@ impl Compiler {
         if t.is_empty() || t == "any" { None } else { Some(t) }
     }
 
+    /// Stammt `kind` von `basis` ab (oder ist es dieselbe Klasse)?
+    fn stammt_ab(&self, kind: &str, basis: &str) -> bool {
+        let mut cur = Some(kind.to_string());
+        let mut gesehen = 0;
+        while let Some(cn) = cur {
+            if cn == basis { return true; }
+            // Zyklen sind an anderer Stelle ein Fehler; hier trotzdem eine
+            // Reissleine, damit eine Pruefung nie haengt.
+            gesehen += 1;
+            if gesehen > 64 { return false; }
+            cur = match self.classes.get(&cn) {
+                Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.clone()),
+                _ => None,
+            };
+        }
+        false
+    }
+
+    /// Hat `klasse` selbst (oder eine Vorfahrin) dieses Mitglied?
+    fn hat_mitglied(&self, klasse: &str, name: &str) -> bool {
+        self.feld_typ(klasse, name).is_some()
+            || self.ist_property(klasse, name)
+            || self.resolve_method(klasse, name)
+    }
+
+    /// Kann `objekt.name` ueberhaupt jemals aufgehen, wenn `objekt` als
+    /// `klasse` angesagt ist?
+    ///
+    /// Geerbte Mitglieder deckt `hat_mitglied` ab (die Suche laeuft nach
+    /// oben). Der zweite Teil ist der wichtige: eine als Basisklasse angesagte
+    /// Variable darf zur Laufzeit eine ABGELEITETE halten --
+    ///
+    ///     DIM t AS Tier
+    ///     t = NEW Hund()
+    ///     t.belle()          ' gibt es nur bei Hund, und ist trotzdem richtig
+    ///
+    /// -- deshalb zaehlt jede Klasse mit, die von `klasse` abstammt. Ohne das
+    /// wuerde die Pruefung genau den Code anstreichen, fuer den es Vererbung
+    /// gibt.
+    fn mitglied_moeglich(&self, klasse: &str, name: &str) -> bool {
+        if self.hat_mitglied(klasse, name) { return true; }
+        self.classes.keys().any(|k| self.stammt_ab(k, klasse) && self.hat_mitglied(k, name))
+    }
+
+    /// Alle Mitglieder, die bei `klasse` (samt Vorfahren und Erbinnen) in Frage
+    /// kaemen -- Grundlage fuer den "meintest du"-Hinweis.
+    fn bekannte_mitglieder(&self, klasse: &str) -> Vec<String> {
+        let mut raus: Vec<String> = Vec::new();
+        for (k, _) in self.classes.iter() {
+            if !(self.stammt_ab(klasse, k) || self.stammt_ab(k, klasse)) { continue; }
+            let Some(ci) = self.classes.get(k) else { continue };
+            raus.extend(ci.fields.iter().map(|f| f.name.clone()));
+            raus.extend(ci.method_sigs.keys().cloned());
+            raus.extend(ci.property_set.iter().cloned());
+        }
+        raus.sort();
+        raus.dedup();
+        raus
+    }
+
     /// Ist `name` bei `class_name` (oder weiter oben) eine PROPERTY?
     fn ist_property(&self, class_name: &str, name: &str) -> bool {
         let klein = name.to_lowercase();
@@ -1013,6 +1073,65 @@ impl Compiler {
         self.warn_typ_zuweisung(&ziel_typ, ziel, wert);
     }
 
+    /// Warnt, wenn `objekt.name` bei keiner in Frage kommenden Klasse
+    /// existiert -- der klassische Tippfehler im Feldnamen.
+    ///
+    /// Bewusst nur eine Warnung, obwohl der Aufruf zur Laufzeit sicher
+    /// abbricht: die Herleitung des Empfaenger-Typs ist neu, und ein Irrtum
+    /// darin soll kein Programm unuebersetzbar machen.
+    fn warn_unbekanntes_mitglied(&mut self, target: &Node, name: &str, ist_aufruf: bool) {
+        let Some(klasse) = self.statischer_typ(target) else { return };
+        // Nur echte Klassen/Structs -- STRING/ARRAY/MAP haben ihre eigene
+        // Methoden-Tabelle, Modul-Typen ihre eigenen Builtins.
+        if !self.classes.contains_key(&klasse) { return; }
+        if self.mitglied_moeglich(&klasse, name) { return; }
+        let was = if ist_aufruf { "Diese Methode" } else { "Dieses Feld" };
+        let hinweis = match Self::naechster_name(name, &self.bekannte_mitglieder(&klasse)) {
+            Some(v) => format!(" Meintest du '{}'?", v),
+            None => String::new(),
+        };
+        let zeile = self.ctx.cur_line;
+        self.warnings.push((zeile, format!(
+            "{} hat kein Mitglied '{}' -- weder {} selbst noch eine ihrer Eltern- oder Kindklassen. {} gibt es nicht, der Zugriff bricht beim Laufen ab.{}",
+            Self::typ_klartext(&klasse), name, Self::typ_klartext(&klasse), was, hinweis)));
+    }
+
+    /// Der aehnlichste aus `kandidaten` -- oder None, wenn keiner nah genug
+    /// ist. Ein Vorschlag, der danebenliegt, ist schlimmer als keiner, deshalb
+    /// waechst die Schwelle mit der Namenslaenge. Ab vier Zeichen sind es
+    /// zwei: der haeufigste Tippfehler ist ein Dreher (`scroe` statt `score`),
+    /// und der kostet in dieser Rechnung bereits zwei Schritte.
+    fn naechster_name(gesucht: &str, kandidaten: &[String]) -> Option<String> {
+        let schwelle = match gesucht.chars().count() {
+            0..=3 => 1,
+            4..=8 => 2,
+            _ => 3,
+        };
+        kandidaten.iter()
+            .map(|k| (Self::abstand(gesucht, k), k))
+            .filter(|(d, _)| *d <= schwelle)
+            .min_by_key(|(d, _)| *d)
+            .map(|(_, k)| k.clone())
+    }
+
+    /// Levenshtein-Abstand (Zeichen, nicht Bytes -- Umlaute in Namen sind
+    /// erlaubt).
+    fn abstand(a: &str, b: &str) -> usize {
+        let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+        let mut zeile: Vec<usize> = (0..=b.len()).collect();
+        for (i, ca) in a.iter().enumerate() {
+            let mut vorher = zeile[0];
+            zeile[0] = i + 1;
+            for (j, cb) in b.iter().enumerate() {
+                let kosten = if ca == cb { 0 } else { 1 };
+                let neu = (zeile[j] + 1).min(zeile[j + 1] + 1).min(vorher + kosten);
+                vorher = zeile[j + 1];
+                zeile[j + 1] = neu;
+            }
+        }
+        zeile[b.len()]
+    }
+
     /// Argumenttypen an einer AUFRUFstelle pruefen.
     ///
     /// Die Laufzeit wandelt jedes Argument auf den angesagten Parametertyp um
@@ -1065,6 +1184,7 @@ impl Compiler {
     /// PROPERTYs bleiben aussen vor: dort laeuft der Wert durch einen Setter,
     /// dessen Parameter-Typ etwas anderes sein darf als das Feld dahinter.
     fn pruefe_feld_zuweisung(&mut self, target: &Node, feld: &str, wert: &Node) {
+        self.warn_unbekanntes_mitglied(target, feld, false);
         let Some(klasse) = self.statischer_typ(target) else { return };
         if self.ist_property(&klasse, feld) { return; }
         let Some(ziel_typ) = self.feld_typ(&klasse, feld) else { return };
@@ -1689,6 +1809,7 @@ impl Compiler {
                 Ok(())
             }
             Node::MemberAccess { target, name } => {
+                self.warn_unbekanntes_mitglied(target, name, false);
                 self.expr(target)?;
                 let idx = self.ctx.add_const(json!(name));
                 self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
@@ -1826,6 +1947,7 @@ impl Compiler {
                 self.ctx.emit(oc::CALL_SUPER, json!([eltern, name, args.len()]));
                 return Ok(());
             }
+            self.warn_unbekanntes_mitglied(target, name, true);
             if let Some(klasse) = self.statischer_typ(target) {
                 if let Some(sig) = self.find_method_sig(&klasse, name) {
                     let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&klasse), name), sig, args);
