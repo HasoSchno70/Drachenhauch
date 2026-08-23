@@ -17,6 +17,15 @@ Ein `SLEEP(2)` je Durchgang macht aus 50 Mikrosekunden 100 Millisekunden
 Geduld. Das ist kein Zugestaendnis an macOS, sondern die Behebung einer
 Wettlaufbedingung, die auf den anderen Systemen nur zufaellig gewann.
 
+Nachtrag 2026-08-23: zwei EMPFANGS-Schleifen waren dabei uebersehen worden und
+liefen weiter ohne Pause -- `test_tcp_recv_reassembles_multibyte_char_split_across_reads`
+fiel deshalb auf macOS um (`['FALSE', 'FALSE']` statt `['TRUE', 'FALSE']`: die
+Schleife war durch, bevor alle acht Bytes da waren, das Ergebnis also nur
+abgeschnitten -- nicht kaputt kodiert). Beide warten jetzt. Die Umlaut-Schleife
+zaehlt zusaetzlich mit, statt stur 100-mal zu lesen: sie bricht ab, sobald die
+erwartete Zeichenzahl da ist, und schlaeft nur, wenn wirklich nichts kam. Damit
+ist sie im Normalfall SCHNELLER als vorher und wartet trotzdem bis 400 ms.
+
 """
 import pytest
 
@@ -56,7 +65,7 @@ def test_tcp_full_roundtrip(run_gb):
         "PRINT IS_NIL(srv)\n"
         'PRINT NET_SEND(client, "hallo")\n'
         'DIM got AS STRING\nFOR i = 1 TO 50\n    got = NET_RECV(srv, 1024)\n'
-        '    IF got <> "" THEN BREAK\nNEXT\nPRINT got\n'
+        '    IF got <> "" THEN BREAK\n    SLEEP(2)\nNEXT\nPRINT got\n'
         "NET_CLOSE(client)\nNET_CLOSE(srv)\nNET_CLOSE_LISTENER(l)\n"))
     assert out == ["FALSE", "5", "hallo"]
 
@@ -141,7 +150,8 @@ def test_tcp_recv_reassembles_multibyte_char_split_across_reads(run_gb):
         'DIM msg AS STRING\nmsg = "a" + CHR$(228) + CHR$(246) + CHR$(252) + "b"\n'
         "NET_SEND(client, msg)\n"
         'DIM result AS STRING\nresult = ""\nDIM chunk AS STRING\n'
-        "FOR i = 1 TO 100\n    chunk = NET_RECV(srv, 1)\n    result = result + chunk\nNEXT\n"
+        "FOR i = 1 TO 200\n    chunk = NET_RECV(srv, 1)\n    result = result + chunk\n"
+        '    IF LEN(result) = LEN(msg) THEN BREAK\n    IF chunk = "" THEN SLEEP(2)\nNEXT\n'
         "PRINT result = msg\n"
         "PRINT (CHR$(65533) IN result)\n"
         "NET_CLOSE(client)\nNET_CLOSE(srv)\nNET_CLOSE_LISTENER(l)\n"))
