@@ -331,3 +331,89 @@ def test_meldung_blockiert_die_uebersetzung_nicht(tmp_path):
                        text=True, encoding="utf-8", timeout=60)
     assert "davor" in r.stdout, (r.stdout, r.stderr)
     assert "Erwartet STRING" in (r.stdout + r.stderr), (r.stdout, r.stderr)
+
+
+# ------------------------------------------------- Argumenttyp am Aufruf
+#
+# Dieselbe Regel wie bei einer Zuweisung: die Laufzeit wandelt jedes Argument
+# auf den angesagten Parametertyp um ("Parameter: Erwartet INTEGER, erhalten
+# STRING"). Der Unterschied ist der Ort -- bisher fiel es erst auf, wenn der
+# Aufruf auch wirklich ausgefuehrt wurde.
+
+def test_falscher_argumenttyp_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+FUNCTION f(a AS INTEGER) AS INTEGER
+    RETURN a
+END FUNCTION
+DIM s AS STRING
+s = "x"
+PRINT f(s)
+""")
+    assert any("Parameter 'a'" in m and "erhalten STRING" in m for m in w), w
+
+
+def test_falscher_typ_bei_named_arg_warnt(tmp_path):
+    """Named-Args werden ueber den Namen zugeordnet, nicht ueber die Stelle."""
+    w = _warnungen(tmp_path, """
+SUB zeichne(text AS STRING, x AS INTEGER)
+    PRINT text
+END SUB
+zeichne(x: 1, text: 5)
+""")
+    assert any("Parameter 'text'" in m for m in w), w
+
+
+def test_methode_wird_geprueft(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    SUB setze(n AS STRING)
+        PRINT n
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+p.setze(42)
+""")
+    assert any("P.setze" in m and "Parameter 'n'" in m for m in w), w
+
+
+def test_implizite_methode_wird_geprueft(tmp_path):
+    """`b(42)` ohne `Self.` innerhalb derselben Klasse."""
+    w = _warnungen(tmp_path, """
+CLASS P
+    SUB a()
+        b(42)
+    END SUB
+    SUB b(n AS STRING)
+        PRINT n
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+""")
+    assert any("P.b" in m and "Parameter 'n'" in m for m in w), w
+
+
+def test_richtige_aufrufe_bleiben_still(tmp_path):
+    """INTEGER an einen FLOAT-Parameter ist gueltig (und haeufig)."""
+    w = _warnungen(tmp_path, """
+FUNCTION f(a AS INTEGER, b AS FLOAT) AS FLOAT
+    RETURN a + b
+END FUNCTION
+DIM i AS INTEGER
+i = 2
+PRINT f(i, 1.5)
+PRINT f(3, 4)
+""")
+    assert not any("Parameter" in m for m in w), w
+
+
+def test_variadischer_rest_wird_nicht_geprueft(tmp_path):
+    """Der Sammel-Parameter bekommt ein TUPLE, nicht den Typ der Einzelwerte."""
+    w = _warnungen(tmp_path, """
+SUB log(stufe AS STRING, ...rest)
+    PRINT stufe
+END SUB
+log("INFO", 5, TRUE, "x")
+""")
+    assert not any("Parameter" in m for m in w), w

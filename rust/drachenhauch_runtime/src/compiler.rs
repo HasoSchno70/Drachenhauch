@@ -268,6 +268,11 @@ struct FnSig {
     /// Pro Parameter: ob BYREF (Copy-In/Copy-Out). Der Aufruf-Pfad emittiert
     /// dann lvalue-Capture + Post-Call-Write-Back.
     param_byref: Vec<bool>,
+    /// Pro Parameter der angesagte Typ -- Grundlage der statischen Pruefung an
+    /// der AUFRUFstelle. Die Laufzeit wandelt jedes Argument darauf um
+    /// ("Parameter: Erwartet INTEGER, erhalten STRING"), es gilt also dieselbe
+    /// Regel wie bei einer Zuweisung.
+    param_types: Vec<String>,
     is_variadic: bool,
     return_type: String,
     is_coroutine: bool,
@@ -1006,6 +1011,51 @@ impl Compiler {
         let Some(ziel_typ) = self.angesagter_typ(ziel) else { return };
         self.warn_komma_an_ganzzahl(&ziel_typ, ziel, wert);
         self.warn_typ_zuweisung(&ziel_typ, ziel, wert);
+    }
+
+    /// Argumenttypen an einer AUFRUFstelle pruefen.
+    ///
+    /// Die Laufzeit wandelt jedes Argument auf den angesagten Parametertyp um
+    /// ("Parameter: Erwartet INTEGER, erhalten STRING") -- es gilt also
+    /// dieselbe Regel wie bei einer Zuweisung, und dieselben Luecken
+    /// (Referenz-Typen reicht coerce() durch, FLOAT->INTEGER ist wertabhaengig
+    /// und bleibt der Kommazahl-Warnung ueberlassen).
+    ///
+    /// `wo` ist der Name, wie er in der Meldung stehen soll -- bei einer
+    /// Methode also `Klasse.Methode`, damit klar ist, welche gemeint ist.
+    /// Liefert die Meldungen, statt sie selbst abzulegen: der Aufrufer haelt
+    /// die Signatur aus `self.fn_sigs`/`method_sigs` in der Hand, und die ist
+    /// eine Ausleihe von `self` -- `self.warnings` liesse sich daneben nicht
+    /// veraendern.
+    fn arg_warnungen(&self, wo: &str, sig: &FnSig, args: &[Node]) -> Vec<(u32, String)> {
+        let mut raus = Vec::new();
+        // Der variadische Sammel-Parameter bekommt ein TUPLE, nicht den Typ
+        // der Einzelwerte -- alles ab seiner Position bleibt aussen vor.
+        let grenze = if sig.is_variadic { sig.n_params.saturating_sub(1) }
+                     else { sig.n_params };
+        for (i, a) in args.iter().enumerate() {
+            let (idx, wert) = match a {
+                Node::NamedArg { name, value } => {
+                    match sig.param_names.iter().position(|p| *p == name.to_lowercase()) {
+                        Some(j) => (j, value.as_ref()),
+                        None => continue,     // meldet resolve_args_with_sig als Fehler
+                    }
+                }
+                _ => (i, a),
+            };
+            if idx >= grenze { continue; }
+            let Some(ziel_typ) = sig.param_types.get(idx) else { continue };
+            if ziel_typ.is_empty() || ziel_typ == "any" { continue; }
+            let Some(quelle) = self.statischer_typ(wert) else { continue };
+            if !Self::passt_nie(&quelle, ziel_typ) { continue; }
+            let pname = sig.param_names.get(idx).cloned().unwrap_or_default();
+            raus.push((self.ctx.cur_line, format!(
+                "{}: Parameter '{}' ist als {} angesagt, hier steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
+                wo, pname, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
+                ziel_typ.to_uppercase(), quelle.to_uppercase(),
+                Self::typ_hinweis(&quelle, ziel_typ))));
+        }
+        raus
     }
 
     /// Dasselbe fuer `objekt.feld = wert`. Auch hier wandelt die Laufzeit den
@@ -1776,6 +1826,12 @@ impl Compiler {
                 self.ctx.emit(oc::CALL_SUPER, json!([eltern, name, args.len()]));
                 return Ok(());
             }
+            if let Some(klasse) = self.statischer_typ(target) {
+                if let Some(sig) = self.find_method_sig(&klasse, name) {
+                    let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&klasse), name), sig, args);
+                    self.warnings.extend(ws);
+                }
+            }
             self.expr(target)?;
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
@@ -1811,6 +1867,10 @@ impl Compiler {
                 if has_named {
                     return Err(format!("{}: Named-Args bei Methoden-Call nicht unterstuetzt", name));
                 }
+                if let Some(sig) = self.find_method_sig(&cn, &name) {
+                    let ws = self.arg_warnungen(&format!("{}.{}", Self::typ_klartext(&cn), name), sig, args);
+                    self.warnings.extend(ws);
+                }
                 self.ctx.emit(oc::LOAD_SELF, Value::Null);
                 for a in args { self.expr(a)?; }
                 self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
@@ -1828,6 +1888,8 @@ impl Compiler {
         }
         // User-Funktion (Variable gleichen Namens verschattet sie).
         if self.fn_sigs.contains_key(&name) && !is_local && !is_global {
+            let ws = self.arg_warnungen(&name, &self.fn_sigs[&name], args);
+            self.warnings.extend(ws);
             let byref = self.fn_sigs[&name].param_byref.clone();
             if self.fn_sigs[&name].is_variadic {
                 if has_named { return Err(format!("{}: keine Named-Args bei variadic", name)); }
@@ -2793,6 +2855,7 @@ fn make_sig(decl: &Node) -> Result<FnSig, String> {
         param_defaults,
         param_default_is_expr,
         param_byref: params.iter().map(|p| p.by_ref).collect(),
+        param_types: params.iter().map(|p| p.type_name.clone()).collect(),
         is_variadic,
         return_type: if is_sub { String::new() } else { return_type.to_string() },
         is_coroutine,
