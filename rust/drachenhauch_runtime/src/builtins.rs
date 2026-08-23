@@ -2373,11 +2373,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "appendfile" => {
-            // APPENDFILE(pfad$, text$) -- Text ans Dateiende haengen (legt sie an).
-            arity!(2);
-            let mut f = std::fs::OpenOptions::new().append(true).create(true)
-                .open(need_str(&a[0], "APPENDFILE")?).map_err(|e| format!("APPENDFILE: {}", e))?;
-            f.write_all(need_str(&a[1], "APPENDFILE")?.as_bytes()).map_err(|e| format!("APPENDFILE: {}", e))?;
+            // APPENDFILE(pfad$, text$ [, kodierung$]) -- Text ans Dateiende
+            // haengen (legt sie an).
+            arity!(2, 3);
+            let kod = if a.len() > 2 { Some(need_str(&a[2], "APPENDFILE")?) } else { None };
+            text_schreiben(need_str(&a[0], "APPENDFILE")?, need_str(&a[1], "APPENDFILE")?,
+                           kod, "APPENDFILE", true)?;
             Ok(Value::Nil)
         }
         "basename" => {
@@ -2395,16 +2396,20 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&dir))
         }
         "openfile" => {
-            arity!(2);
+            arity!(2, 3);
             let path = need_str(&a[0], "OPENFILE")?.to_string();
             let mode = need_str(&a[1], "OPENFILE")?;
+            let kod = match a.len() > 2 {
+                true => crate::kodierung::aus_name(need_str(&a[2], "OPENFILE")?, "OPENFILE")?,
+                false => crate::kodierung::Kodierung::Utf8,
+            };
             let h = match mode {
                 "r" => FileH::Read(std::io::BufReader::new(std::fs::File::open(resolve_asset_path(&path)).map_err(|e| format!("OPENFILE: {}", e))?)),
                 "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
             };
-            Ok(Value::File(Rc::new(RefCell::new(GbFile { path, h }))))
+            Ok(Value::File(Rc::new(RefCell::new(GbFile { path, h, kod, am_anfang: true }))))
         }
         "closefile" => {
             arity!(1);
@@ -2416,11 +2421,22 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let f = file_h(&a[0], "READLINE")?;
             let mut f = f.borrow_mut();
+            let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
+            f.am_anfang = false;
             match &mut f.h {
                 FileH::Read(r) => {
-                    let mut line = String::new();
-                    r.read_line(&mut line).map_err(|e| format!("READLINE: {}", e))?;
-                    while line.ends_with('\n') || line.ends_with('\r') { line.pop(); }
+                    // Bewusst byteweise bis zum Zeilenende statt read_line:
+                    // read_line kann nur UTF-8, und seine Fehlermeldung waere
+                    // wieder das nackte "stream did not contain valid UTF-8".
+                    // Bei allen drei Kodierungen ist 0x0A ausserdem eindeutig
+                    // ein Zeilenende (Ein-Byte-Kodierungen bzw. UTF-8, wo
+                    // Folgebytes immer >= 0x80 sind) -- das Trennen VOR dem
+                    // Dekodieren zerschneidet also nie ein Zeichen.
+                    let mut roh: Vec<u8> = Vec::new();
+                    r.read_until(b'\n', &mut roh).map_err(|e| format!("READLINE: {}", e))?;
+                    while roh.last() == Some(&b'\n') || roh.last() == Some(&b'\r') { roh.pop(); }
+                    let line = crate::kodierung::dekodieren(&roh, kod, "READLINE", &pfad)?;
+                    let line = if anfang { crate::kodierung::ohne_bom(line) } else { line };
                     Ok(Value::str_rc(&line))
                 }
                 _ => err("READLINE: Datei wurde nicht im Lese-Modus geoeffnet"),
@@ -2430,8 +2446,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let f = file_h(&a[0], "READALL$")?;
             let mut f = f.borrow_mut();
+            let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
+            f.am_anfang = false;
             match &mut f.h {
-                FileH::Read(r) => { let mut s = String::new(); r.read_to_string(&mut s).map_err(|e| format!("READALL$: {}", e))?; Ok(Value::str_rc(&s)) }
+                FileH::Read(r) => {
+                    let mut roh: Vec<u8> = Vec::new();
+                    r.read_to_end(&mut roh).map_err(|e| format!("READALL$: {}", e))?;
+                    let s = crate::kodierung::dekodieren(&roh, kod, "READALL$", &pfad)?;
+                    let s = if anfang { crate::kodierung::ohne_bom(s) } else { s };
+                    Ok(Value::str_rc(&s))
+                }
                 _ => err("READALL$: Datei wurde nicht im Lese-Modus geoeffnet"),
             }
         }
@@ -2449,10 +2473,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let text = need_str(&a[1], "WRITE")?.to_string();
             let f = file_h(&a[0], "WRITE")?;
             let mut f = f.borrow_mut();
+            let kod = f.kod;
             match &mut f.h {
                 FileH::Write(w) => {
                     let payload = if name == "writeline" { format!("{}\n", text) } else { text };
-                    w.write_all(payload.as_bytes()).map_err(|e| format!("WRITE: {}", e))?;
+                    let bytes = crate::kodierung::kodieren(&payload, kod, "WRITE")?;
+                    w.write_all(&bytes).map_err(|e| format!("WRITE: {}", e))?;
                     Ok(Value::Nil)
                 }
                 _ => err("WRITE: Datei wurde nicht im Schreib-Modus geoeffnet"),
@@ -2488,13 +2514,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "writeall" => {
-            arity!(2);
-            std::fs::write(need_str(&a[0], "WRITEALL")?, need_str(&a[1], "WRITEALL")?).map_err(|e| format!("WRITEALL: {}", e))?;
+            arity!(2, 3);
+            let kod = if a.len() > 2 { Some(need_str(&a[2], "WRITEALL")?) } else { None };
+            text_schreiben(need_str(&a[0], "WRITEALL")?, need_str(&a[1], "WRITEALL")?,
+                           kod, "WRITEALL", false)?;
             Ok(Value::Nil)
         }
         "readlines" => {
-            arity!(1);
-            let text = std::fs::read_to_string(resolve_asset_path(need_str(&a[0], "READLINES")?)).map_err(|e| format!("READLINES: {}", e))?;
+            arity!(1, 2);
+            let pfad = need_str(&a[0], "READLINES")?;
+            let kod = if a.len() > 1 { Some(need_str(&a[1], "READLINES")?) } else { None };
+            let text = text_lesen(pfad, kod, "READLINES")?;
             Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
         }
         "filesize" => {
@@ -2647,17 +2677,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(csv_tabelle(crate::csv::lesen(text, t)))
         }
         "csv_load" => {
-            arity!(1, 2);
+            arity!(1, 3);
             let pfad = need_str(&a[0], "CSV_LOAD")?;
             let t = crate::csv::trenner_aus(
                 if a.len() > 1 { Some(need_str(&a[1], "CSV_LOAD")?) } else { None },
                 "CSV_LOAD")?;
-            let text = std::fs::read_to_string(pfad)
-                .map_err(|e| format!("CSV_LOAD: {}: {}", pfad, e))?;
-            // BOM abschneiden -- Excel schreibt ihn, und sonst heisst die
-            // erste Spalte fuer immer "\u{feff}Name".
-            let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
-            Ok(csv_tabelle(crate::csv::lesen(text, t)))
+            // Genau hier faellt es am haeufigsten auf: eine aus Excel
+            // exportierte CSV ist auf einem deutschen Windows cp1252.
+            // (Das BOM-Abschneiden steckt jetzt in text_lesen -- es gilt fuer
+            // jeden Textleser, denn dieselbe Datei liest man mal so, mal so.)
+            let kod = if a.len() > 2 { Some(need_str(&a[2], "CSV_LOAD")?) } else { None };
+            let text = text_lesen(pfad, kod, "CSV_LOAD")?;
+            Ok(csv_tabelle(crate::csv::lesen(&text, t)))
         }
         "csv_format$" | "csv_format" => {
             arity!(1, 2);
@@ -2668,14 +2699,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&crate::csv::schreiben(&zeilen, t)))
         }
         "csv_save" => {
-            arity!(2, 3);
+            arity!(2, 4);
             let pfad = need_str(&a[0], "CSV_SAVE")?;
             let t = crate::csv::trenner_aus(
                 if a.len() > 2 { Some(need_str(&a[2], "CSV_SAVE")?) } else { None },
                 "CSV_SAVE")?;
+            let kod = if a.len() > 3 { Some(need_str(&a[3], "CSV_SAVE")?) } else { None };
             let zeilen = csv_aus_array(&a[1], "CSV_SAVE")?;
-            std::fs::write(pfad, crate::csv::schreiben(&zeilen, t))
-                .map_err(|e| format!("CSV_SAVE: {}: {}", pfad, e))?;
+            text_schreiben(pfad, &crate::csv::schreiben(&zeilen, t), kod, "CSV_SAVE", false)?;
             Ok(Value::Nil)
         }
         "csv_row$" | "csv_row" => {
@@ -4326,6 +4357,38 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
         }
     }
     Some(cur)
+}
+
+/// Eine Textdatei lesen -- mit der angegebenen Kodierung, sonst UTF-8.
+///
+/// Ein fuehrendes BOM faellt immer weg: Excel schreibt es, und sonst hiesse
+/// die erste Spalte fuer immer BOM+"Name".
+fn text_lesen(pfad: &str, kodierung: Option<&str>, fn_: &str) -> Result<String, String> {
+    let k = match kodierung {
+        Some(n) => crate::kodierung::aus_name(n, fn_)?,
+        None => crate::kodierung::Kodierung::Utf8,
+    };
+    let bytes = std::fs::read(resolve_asset_path(pfad))
+        .map_err(|e| format!("{}: {}: {}", fn_, pfad, e))?;
+    Ok(crate::kodierung::ohne_bom(crate::kodierung::dekodieren(&bytes, k, fn_, pfad)?))
+}
+
+/// Text in eine Datei schreiben -- mit der angegebenen Kodierung, sonst UTF-8.
+fn text_schreiben(pfad: &str, text: &str, kodierung: Option<&str>, fn_: &str,
+                  anhaengen: bool) -> Result<(), String> {
+    let k = match kodierung {
+        Some(n) => crate::kodierung::aus_name(n, fn_)?,
+        None => crate::kodierung::Kodierung::Utf8,
+    };
+    let bytes = crate::kodierung::kodieren(text, k, fn_)?;
+    if anhaengen {
+        use std::io::Write;
+        let mut f = std::fs::OpenOptions::new().append(true).create(true).open(pfad)
+            .map_err(|e| format!("{}: {}: {}", fn_, pfad, e))?;
+        f.write_all(&bytes).map_err(|e| format!("{}: {}: {}", fn_, pfad, e))
+    } else {
+        std::fs::write(pfad, &bytes).map_err(|e| format!("{}: {}: {}", fn_, pfad, e))
+    }
 }
 
 /// Ein JSON-Handle aus einem serde-Wert bauen.

@@ -46,3 +46,35 @@ DELETEFILE("csv_beispiel.csv")
 
 PRINT ""
 PRINT "Ohne zweites Argument ist das Trennzeichen ein Komma."
+
+' --- Eine Datei, die NICHT UTF-8 ist (der Excel-Fall) --------------------
+'
+' Excel schreibt auf einem deutschen Windows beim Export als "CSV
+' (Trennzeichen-getrennt)" die alte Windows-Kodierung cp1252. Sobald ein
+' Umlaut darin vorkommt, ist die Datei kein gueltiges UTF-8 -- ohne Angabe
+' bricht das Lesen ab, und die Meldung sagt genau das, samt Ausweg.
+'
+' Die Beispiele in diesem Verzeichnis kommen ohne Umlaute im Quelltext aus;
+' das "ue" bauen wir deshalb ueber seine Nummer: CHR$(252) ist "ue".
+DIM ue AS STRING
+ue = CHR$(252)
+
+DIM alt AS ARRAY OF STRING
+alt = CSV_PARSE("Name;Ort" + CHR$(10) + "M" + ue + "ller;Koeln", ";")
+CSV_SAVE("alt_windows.csv", alt, ";", "cp1252")
+PRINT ""
+PRINT "Geschrieben als cp1252: " + STR$(FILESIZE("alt_windows.csv")) + " Bytes"
+
+DIM gelesen AS ARRAY OF STRING
+gelesen = CSV_LOAD("alt_windows.csv", ";", "cp1252")
+PRINT "Wieder gelesen: " + gelesen[1, 0] + " aus " + gelesen[1, 1]
+
+' Ohne die Angabe ist es ein Fehler -- mit einer Meldung, die den Weg zeigt.
+TRY
+    DIM ohne AS ARRAY OF STRING
+    ohne = CSV_LOAD("alt_windows.csv", ";")
+CATCH meldung
+    PRINT "Ohne Kodierungsangabe:"
+    PRINT "  " + meldung
+END TRY
+DELETEFILE("alt_windows.csv")

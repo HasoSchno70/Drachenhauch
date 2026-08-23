@@ -535,9 +535,9 @@ Mueller;"Berlin; Mitte";42      SPLIT$(";") -> vier Felder statt drei
 | Funktion | Zweck |
 |---|---|
 | `CSV_PARSE(text$[, trenner$])` → ARRAY OF STRING | Text zerlegen, 2D (Zeilen × Spalten) |
-| `CSV_LOAD(pfad$[, trenner$])` → ARRAY OF STRING | Datei lesen, 2D |
+| `CSV_LOAD(pfad$[, trenner$[, kodierung$]])` → ARRAY OF STRING | Datei lesen, 2D |
 | `CSV_FORMAT$(tabelle[, trenner$])` → STRING | 2D-Array als CSV-Text |
-| `CSV_SAVE(pfad$, tabelle[, trenner$])` | 2D-Array in eine Datei |
+| `CSV_SAVE(pfad$, tabelle[, trenner$[, kodierung$]])` | 2D-Array in eine Datei |
 | `CSV_ROW$(felder[, trenner$])` → STRING | eine einzelne Zeile aus 1D-Array |
 
 ```basic
@@ -570,11 +570,69 @@ hieße die erste Spalte für immer `﻿Name`).
 
 Beispiel: [examples/169_csv.dh](../examples/169_csv.dh).
 
+## Textkodierung
+
+Drachenhauch liest und schreibt Textdateien in **UTF-8**. Das ist die richtige
+Vorgabe — nur schreibt Excel auf einem deutschen Windows beim Export als „CSV
+(Trennzeichen-getrennt)" eben **Windows-1252**, und eine solche Datei war
+früher gar nicht lesbar:
+
+```text
+READLINES("kunden.csv")  ->  stream did not contain valid UTF-8
+```
+
+Alle Textleser und -schreiber nehmen deshalb als **letztes Argument** eine
+Kodierung entgegen:
+
+```basic
+DIM t AS ARRAY OF STRING
+t = CSV_LOAD("kunden.csv", ";", "cp1252")     ' aus Excel
+t = READLINES("alt.txt", "latin1")
+
+WRITEALL("fuer_excel.csv", inhalt, "cp1252")  ' damit Excel es wieder mag
+
+' Zeilenweise (fuer grosse Dateien) gehoert die Angabe ans OPENFILE:
+DIM f AS FILE
+f = OPENFILE("gross.csv", "r", "cp1252")
+```
+
+| Name | auch geschrieben als |
+|---|---|
+| `utf8` (Vorgabe) | `utf-8` |
+| `cp1252` | `windows-1252`, `ansi` |
+| `latin1` | `iso-8859-1` |
+
+Groß-/Kleinschreibung, Bindestriche und Leerzeichen sind egal — wer eine
+Kodierung angibt, hat sie meist irgendwo abgeschrieben.
+
+**Fünf Dinge, die man wissen sollte:**
+
+1. **Ohne Angabe bleibt alles wie bisher** (UTF-8). Kein bestehendes Programm
+   ändert sein Verhalten.
+2. **Die Fehlermeldung nennt jetzt den Ausweg** — Datei, Zeile, das störende
+   Byte und den Hinweis auf `cp1252`. Vorher war es ein durchgereichter
+   Rust-Text, der weder sagte, was los ist, noch was man tun kann.
+3. **`latin1` kann nie scheitern** (jedes Byte ist ein Zeichen), `cp1252` auch
+   nicht — die fünf Byte-Werte, die Windows-1252 offiziell nicht belegt,
+   werden auf ihren eigenen Codepunkt abgebildet, so wie es jeder Browser tut.
+   Wer eine alte Datei einliest, will sie lesen und nicht an einem
+   Steuerzeichen scheitern.
+4. **Beim SCHREIBEN ist ein fehlendes Zeichen ein Fehler**, kein `?`. `latin1`
+   kennt kein Euro-Zeichen; eine Rechnung, in der daraus unbemerkt ein
+   Fragezeichen wird, ist schlimmer als eine, die gar nicht erst entsteht.
+   (`cp1252` hat das Euro-Zeichen — genau dafür gibt es beide.)
+5. **Ein BOM am Dateianfang fällt immer weg**, in jedem Textleser. Sonst hieße
+   die erste Spalte für immer `﻿Name`.
+
+**Nicht dabei: UTF-16.** Das schreibt Excel bei „Unicode Text (*.txt)". Es
+braucht BOM-Erkennung, zwei Byte-Reihenfolgen und Ersatzpaare — eine eigene
+Entscheidung, kein Nachtrag zu dieser.
+
 ## Datei-I/O
 
 | Funktion | Zweck |
 |---|---|
-| `OPENFILE(pfad$, modus$)` → FILE | Modi: `"r"` lesen, `"w"` neu schreiben, `"a"` anhängen |
+| `OPENFILE(pfad$, modus$[, kodierung$])` → FILE | Modi: `"r"` lesen, `"w"` neu schreiben, `"a"` anhängen |
 | `CLOSEFILE(f)` | schließt |
 | `READLINE(f)` → STRING | nächste Zeile (ohne `\n`) |
 | `READALL$(f)` → STRING | Rest komplett lesen |
@@ -587,15 +645,15 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 
 | Funktion | Zweck |
 |---|---|
-| `WRITEALL(pfad$, text$)` | Text komplett schreiben (überschreibt/erzeugt) |
-| `READLINES(pfad$)` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
+| `WRITEALL(pfad$, text$[, kodierung$])` | Text komplett schreiben (überschreibt/erzeugt) |
+| `READLINES(pfad$[, kodierung$])` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
 | `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
 | `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
 | `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(pfad$)` → ARRAY OF STRING | Eintragsnamen (sortiert) |
 | `MKDIR(pfad$)` | Verzeichnis anlegen (inkl. Eltern) |
 | `COPYFILE(src$, dst$)` | Datei kopieren |
-| `APPENDFILE(pfad$, text$)` | Text ans Ende hängen (legt die Datei an) |
+| `APPENDFILE(pfad$, text$[, kodierung$])` | Text ans Ende hängen (legt die Datei an) |
 | `PATHJOIN(a$, b$, …)` → STRING | Pfadteile mit `/` verbinden |
 | `BASENAME(pfad$)` → STRING | letzter Pfad-Bestandteil (Datei-/Ordnername) |
 | `DIRNAME(pfad$)` → STRING | Verzeichnis-Anteil (ohne letzten Bestandteil) |

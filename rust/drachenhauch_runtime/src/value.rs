@@ -188,6 +188,13 @@ pub enum FileH {
 pub struct GbFile {
     pub path: String,
     pub h: FileH,
+    /// Kodierung dieser Datei (aus `OPENFILE(pfad, modus, kodierung)`; ohne
+    /// Angabe UTF-8). Gilt fuer READLINE/READALL$/WRITE/WRITELINE.
+    pub kod: crate::kodierung::Kodierung,
+    /// Wurde aus dieser Datei schon gelesen? Nur beim ALLERERSTEN Lesen darf
+    /// ein BOM wegfallen -- taeten wir es bei jeder Zeile, verschwaende
+    /// mitten im Text ein echtes (wenn auch seltenes) Zeichen.
+    pub am_anfang: bool,
 }
 
 pub struct TweenObj {

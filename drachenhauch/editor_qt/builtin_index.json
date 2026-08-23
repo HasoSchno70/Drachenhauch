@@ -95,7 +95,7 @@
   {
    "name": "APPENDFILE",
    "kind": "core",
-   "signature": "APPENDFILE(p: STRING, text: STRING)",
+   "signature": "APPENDFILE(p: STRING, text: STRING [, kodierung$])",
    "module": "core"
   },
   {
@@ -1811,7 +1811,7 @@
   {
    "name": "CSV_LOAD",
    "kind": "core",
-   "signature": "CSV_LOAD(pfad$[, trenner$]) AS ARRAY OF STRING",
+   "signature": "CSV_LOAD(pfad$[, trenner$[, kodierung$]]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -1829,7 +1829,7 @@
   {
    "name": "CSV_SAVE",
    "kind": "core",
-   "signature": "CSV_SAVE(pfad$, tabelle[, trenner$])",
+   "signature": "CSV_SAVE(pfad$, tabelle[, trenner$[, kodierung$]])",
    "module": "dhrt"
   },
   {
@@ -5345,7 +5345,7 @@
   {
    "name": "OPENFILE",
    "kind": "core",
-   "signature": "OPENFILE(path: STRING, mode: STRING)",
+   "signature": "OPENFILE(path: STRING, mode: STRING [, kodierung$])",
    "module": "core"
   },
   {
@@ -6149,7 +6149,7 @@
   {
    "name": "READLINES",
    "kind": "core",
-   "signature": "READLINES(pfad) AS ARRAY OF STRING",
+   "signature": "READLINES(pfad [, kodierung$]) AS ARRAY OF STRING",
    "module": "dhrt"
   },
   {
@@ -8489,7 +8489,7 @@
   {
    "name": "WRITEALL",
    "kind": "core",
-   "signature": "WRITEALL(pfad, text)",
+   "signature": "WRITEALL(pfad, text [, kodierung$])",
    "module": "dhrt"
   },
   {
