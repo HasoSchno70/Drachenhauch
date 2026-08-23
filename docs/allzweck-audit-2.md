@@ -102,9 +102,26 @@ einer fehlenden Meldung), `PROPERTY` (dort entscheidet der Setter) und die
 Element-Typen von Arrays (`coerce_array` baut ein frisches Zahlen-Literal noch
 um, das ist statisch nicht sauber zu trennen).
 
-## 2 — JSON kann nur gelesen, nicht geschrieben werden
+## 2 — JSON kann nur gelesen, nicht geschrieben werden — ✅ ERLEDIGT 2026-08-23
 
-`JSON_PARSE`/`LOAD`/`GET_*`/`HAS`/`LEN`/`TYPE`/`STRINGIFY`/`PRETTY` — das ist
+> **Gebaut** (`72fbc26`): 15 Builtins — `JSON_NEW_OBJECT`/`NEW_ARRAY`,
+> `JSON_SET_*` (STRING/INT/FLOAT/BOOL/NULL/JSON), `JSON_APPEND_*`,
+> `JSON_REMOVE` und als Zugabe `JSON_KEYS` (ein Objekt ließ sich vorher gar
+> nicht durchlaufen: `JSON_LEN` zählte die Schlüssel, herankommen konnte man
+> an sie nicht). 26 Tests, Beispiel `examples/171_json_bauen.dh`, die sechs
+> Regeln stehen in `docs/module-json.md`.
+>
+> Ein Handle ist dafür ein **Referenz-Typ** geworden (wie MAP/ARRAY/BUFFER) —
+> ein geparstes Dokument ist damit genauso veränderbar wie ein gebautes, was
+> den häufigsten Fall abdeckt: Antwort einlesen, ein Feld ergänzen,
+> zurückschicken.
+>
+> Die unangenehmste Frage beim Bauen war nicht das Setzen, sondern
+> **`"posten.0"` auf einem frischen Dokument**: Array oder Objekt mit dem
+> Schlüssel `"0"`? Beides ist gültiges JSON, und die falsche Wahl fällt erst
+> dem Empfänger auf. Statt zu raten nennt die Meldung den Weg zum Array.
+
+`JSON_PARSE`/`LOAD`/`GET_*`/`HAS`/`LEN`/`TYPE`/`STRINGIFY`/`PRETTY` — das war
 der ganze Satz. Es gibt **kein `JSON_NEW`, kein `JSON_SET`, kein `JSON_ADD`**,
 und `JSON_STRINGIFY` nimmt ausschließlich ein Handle aus `JSON_PARSE`:
 
@@ -290,7 +307,7 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   Zeilen) eingebaute Fehler werden alle gefunden.
 - **2, 3, 4** sind zusammen „Daten rein und raus". Sie öffnen die Klasse
   Programme, die Daten von woanders holt, umformt und weitergibt — das ist der
-  Großteil dessen, was Leute „Software" nennen.
+  Großteil dessen, was Leute „Software" nennen. **2 ist erledigt** (23.08.2026).
 - **6** ist billig und wirkt nach außen: `--version`, ein Test-Läufer, ein
   Formatierer sind die Zeichen, an denen jemand erkennt, ob eine Sprache zum
   Arbeiten taugt.
