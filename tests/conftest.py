@@ -458,27 +458,42 @@ def run_gb_roh():
     import subprocess
     import tempfile
 
-    def _run(source: str, args: list[str] | None = None):
+    def _run(source: str, args: list[str] | None = None,
+             eingabe: str | bytes | None = None):
+        """`eingabe` geht als Standardeingabe hinein (fuer `STDIN()`).
+        `bytes` schaltet auf den Binaermodus -- eine cp1252- oder rohe
+        Byte-Eingabe laesst sich sonst gar nicht stellen."""
         if _DHRT is None:
             pytest.skip("native Runtime 'dhrt' nicht gebaut")
         fd, tmp = tempfile.mkstemp(suffix=".dh", prefix="_gbtest_")
         os.close(fd)
+        binaer = isinstance(eingabe, bytes)
         try:
             Path(tmp).write_text(source, encoding="utf-8")
             cmd = [str(_DHRT), "run", tmp]
             if args:
                 cmd.append("--")
                 cmd.extend(args)
-            r = subprocess.run(cmd, capture_output=True, text=True,
-                               encoding="utf-8", timeout=60)
+            if binaer:
+                r = subprocess.run(cmd, capture_output=True, input=eingabe,
+                                   timeout=60)
+            else:
+                r = subprocess.run(cmd, capture_output=True, text=True,
+                                   encoding="utf-8", input=eingabe, timeout=60)
         finally:
             try:
                 os.unlink(tmp)
             except OSError:
                 pass
-        return (r.returncode,
-                (r.stdout or "").replace("\r\n", "\n"),
-                (r.stderr or "").replace("\r\n", "\n"))
+
+        def _txt(x):
+            if x is None:
+                return ""
+            if isinstance(x, bytes):
+                x = x.decode("utf-8", "replace")
+            return x.replace("\r\n", "\n")
+
+        return r.returncode, _txt(r.stdout), _txt(r.stderr)
 
     return _run
 

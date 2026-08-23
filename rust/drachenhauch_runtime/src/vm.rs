@@ -647,6 +647,10 @@ pub struct Vm<'p> {
     // kann sie also nicht mehr faelschen.
     debug_stop_flag: bool,
     profile_stop_flag: bool,
+    /// Das eine FILE-Handle der Standardeingabe (`STDIN()`), sobald es zum
+    /// ersten Mal geholt wurde. Siehe `stdin_handle` -- zwei Handles waeren
+    /// zwei Puffer auf derselben Leitung.
+    stdin_datei: Option<Value>,
     // Von `EXIT(code)` gesetzt (WP A). Some(n) heisst: das Programm hat sich
     // selbst beendet, `run()` gibt EXIT_REQUEST zurueck und main.rs macht
     // daraus den Rueckgabewert des Prozesses. Derselbe Flag-statt-Text-Kanal
@@ -814,6 +818,7 @@ impl<'p> Vm<'p> {
             cur_line: 0,
             err_line_set: false,
             debug_stop_flag: false,
+            stdin_datei: None,
             profile_stop_flag: false,
             exit_code: None,
             error_line: 0,
@@ -1014,6 +1019,46 @@ impl<'p> Vm<'p> {
             return String::new();
         }
         read_input_line()
+    }
+
+    /// Das FILE-Handle der Standardeingabe -- IMMER dasselbe.
+    ///
+    /// Zwei eigene Handles waeren zwei Lesepuffer auf derselben Leitung: das
+    /// eine liest voraus, dem anderen fehlen die Zeilen. Deshalb liefert
+    /// `STDIN()` bei jedem Aufruf dasselbe Handle, und eine zweite Angabe
+    /// einer ANDEREN Kodierung ist ein Fehler statt einer stillen Wirkungslosigkeit.
+    ///
+    /// `stdin().lock()` teilt sich seinen Puffer mit dem `read_line` in
+    /// `read_input_line` (Rusts Stdin-Sperre ist wiedereintrittsfaehig und
+    /// haengt an EINEM prozessweiten Puffer) -- INPUT und STDIN() lassen sich
+    /// also im selben Programm mischen, ohne dass Zeilen verloren gehen.
+    fn stdin_handle(&mut self, kod: crate::kodierung::Kodierung) -> R<Value> {
+        if let Some(h) = &self.stdin_datei {
+            if let Value::File(f) = h {
+                let alt = f.borrow().kod;
+                if alt != kod {
+                    return Err(format!(
+                        "STDIN: die Standardeingabe wurde in diesem Programm schon mit einer anderen Kodierung geoeffnet -- es gibt nur EIN Handle dafuer (sonst laesen zwei Puffer an derselben Leitung)"));
+                }
+            }
+            return Ok(h.clone());
+        }
+        // Gehoert stdin jemand anderem (Stop-Kanal/Debugger), einen leeren
+        // Strom geben: die uebliche Schleife laeuft dann null mal, statt dem
+        // Protokoll eine Zeile wegzunehmen.
+        let strom: Box<dyn std::io::BufRead> = if self.stop.is_some() || self.dbg.is_some() {
+            Box::new(std::io::empty())
+        } else {
+            Box::new(std::io::stdin().lock())
+        };
+        let h = Value::File(Rc::new(RefCell::new(crate::value::GbFile {
+            path: "<Standardeingabe>".to_string(),
+            h: crate::value::FileH::Strom(strom),
+            kod,
+            am_anfang: true,
+        })));
+        self.stdin_datei = Some(h.clone());
+        Ok(h)
     }
 
     /// Profiler-Ergebnis abholen: Gesamtzeit + pro Zeile (count, time_secs).
@@ -3534,6 +3579,23 @@ impl<'p> Vm<'p> {
             let ms = bi_int(a, 0, "SLEEP")?.max(0) as u64;
             std::thread::sleep(std::time::Duration::from_millis(ms));
             return Ok(Some(Value::Nil));
+        }
+        // STDIN() -- die Standardeingabe als FILE-Handle. Steht hier und nicht
+        // in builtins.rs, weil es dieselbe Sperre braucht wie INPUT: unter
+        // `dhrt profile --stoppable` und unter `dhrt debug` gehoert stdin dem
+        // Stop-Kanal bzw. dem Kommando-Protokoll. Ein Programm, das dort liest,
+        // wuerde dem Debugger eine Kommandozeile stehlen -- es bekommt darum
+        // einen Strom, der sofort zu Ende ist (wie INPUT dort "" liefert).
+        if name == "stdin" {
+            if a.len() > 1 {
+                return Err(format!("STDIN: erwartet 0..1 Argument(e), erhalten {}", a.len()));
+            }
+            let kod = match a.first() {
+                None => crate::kodierung::Kodierung::Utf8,
+                Some(Value::Str(s)) => crate::kodierung::aus_name(s, "STDIN")?,
+                Some(_) => return Err("STDIN: erwartet STRING (Kodierung)".to_string()),
+            };
+            return Ok(Some(self.stdin_handle(kod)?));
         }
         if !matches!(name, "exit" | "eprint" | "shell" | "shell_out$" | "shell_out") { return Ok(None); }
         fn o_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {

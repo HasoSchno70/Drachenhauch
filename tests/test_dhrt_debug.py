@@ -135,3 +135,34 @@ def test_input_auf_string_liefert_leerstring(tmp_path):
     texte = "".join(e.get("text", "") for e in evs if e.get("event") == "output")
     assert "[]" in texte, evs
     assert not [e for e in evs if e.get("event") == "error"], evs
+
+
+def test_stdin_handle_stiehlt_dem_debugger_nichts(tmp_path):
+    """Dieselbe Sperre wie bei INPUT, jetzt fuer `STDIN()` (Punkt 4 des
+    Allzweck-Audits).
+
+    Waehrend einer Debug-Sitzung gehoert stdin dem Kommando-Protokoll. Ein
+    Programm, das dort liest, wuerde dem Debugger eine Kommandozeile
+    wegnehmen -- es bekommt darum einen Strom, der sofort zu Ende ist. Die
+    uebliche Filter-Schleife laeuft dann null mal, statt die Sitzung aus dem
+    Tritt zu bringen.
+    """
+    src = ('DIM f AS FILE\n'
+           'DIM z AS STRING\n'
+           'PRINT "vorher"\n'
+           'f = STDIN()\n'
+           'WHILE NOT ENDOFFILE(f)\n'
+           '    z = READLINE(f)\n'
+           '    PRINT "gelesen: " + z\n'
+           'WEND\n'
+           'PRINT "nachher"\n')
+    evs = _debug_session(tmp_path, src, [
+        {"cmd": "continue"},
+        {"cmd": "continue"},
+        {"cmd": "continue"},
+    ])
+    texte = "".join(e.get("text", "") for e in evs if e.get("event") == "output")
+    assert "vorher" in texte, evs
+    assert "nachher" in texte, evs
+    assert "gelesen:" not in texte, evs
+    assert not [e for e in evs if e.get("event") == "error"], evs

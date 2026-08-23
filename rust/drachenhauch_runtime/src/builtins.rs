@@ -2423,8 +2423,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let mut f = f.borrow_mut();
             let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
             f.am_anfang = false;
-            match &mut f.h {
-                FileH::Read(r) => {
+            match f.leser() {
+                Some(r) => {
                     // Bewusst byteweise bis zum Zeilenende statt read_line:
                     // read_line kann nur UTF-8, und seine Fehlermeldung waere
                     // wieder das nackte "stream did not contain valid UTF-8".
@@ -2439,7 +2439,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     let line = if anfang { crate::kodierung::ohne_bom(line) } else { line };
                     Ok(Value::str_rc(&line))
                 }
-                _ => err("READLINE: Datei wurde nicht im Lese-Modus geoeffnet"),
+                None => err("READLINE: Datei wurde nicht im Lese-Modus geoeffnet"),
             }
         }
         "readall$" | "readall" => {
@@ -2448,24 +2448,29 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let mut f = f.borrow_mut();
             let (kod, anfang, pfad) = (f.kod, f.am_anfang, f.path.clone());
             f.am_anfang = false;
-            match &mut f.h {
-                FileH::Read(r) => {
+            match f.leser() {
+                Some(r) => {
                     let mut roh: Vec<u8> = Vec::new();
                     r.read_to_end(&mut roh).map_err(|e| format!("READALL$: {}", e))?;
                     let s = crate::kodierung::dekodieren(&roh, kod, "READALL$", &pfad)?;
                     let s = if anfang { crate::kodierung::ohne_bom(s) } else { s };
                     Ok(Value::str_rc(&s))
                 }
-                _ => err("READALL$: Datei wurde nicht im Lese-Modus geoeffnet"),
+                None => err("READALL$: Datei wurde nicht im Lese-Modus geoeffnet"),
             }
         }
         "endoffile" => {
             arity!(1);
             let f = file_h(&a[0], "ENDOFFILE")?;
             let mut f = f.borrow_mut();
-            match &mut f.h {
-                FileH::Read(r) => Ok(Value::Bool(r.fill_buf().map_err(|e| format!("ENDOFFILE: {}", e))?.is_empty())),
-                _ => err("ENDOFFILE erwartet Lese-FILE"),
+            match f.leser() {
+                // fill_buf blockiert an einer Pipe, bis entweder Daten da sind
+                // oder die Gegenseite schliesst -- genau das ist die Frage
+                // "ist noch etwas da?", und genau deshalb funktioniert die
+                // Schleife `WHILE NOT ENDOFFILE(f)` auch an der
+                // Standardeingabe.
+                Some(r) => Ok(Value::Bool(r.fill_buf().map_err(|e| format!("ENDOFFILE: {}", e))?.is_empty())),
+                None => err("ENDOFFILE erwartet Lese-FILE"),
             }
         }
         "writeline" | "write" => {
@@ -3029,8 +3034,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             let f = file_h(&a[0], "READ_BYTES")?;
             let mut f = f.borrow_mut();
-            match &mut f.h {
-                FileH::Read(r) => {
+            match f.leser() {
+                Some(r) => {
                     // Am Dateiende kommen WENIGER als n Bytes zurueck (bis hin
                     // zu keinem) -- das ist kein Fehler, sondern die uebliche
                     // Abbruchbedingung: `WHILE BUFFER_LEN(stueck) > 0`.
@@ -3073,6 +3078,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 // anschliessendes READLINE liest also wirklich ab `pos`.
                 FileH::Read(r) => r.seek(std::io::SeekFrom::Start(pos as u64)),
                 FileH::Write(w) => w.seek(std::io::SeekFrom::Start(pos as u64)),
+                FileH::Strom(_) => return err("SEEK: die Standardeingabe laesst sich nicht zurueckspulen -- was gelesen ist, ist gelesen"),
                 FileH::Closed => return err("SEEK: Datei ist geschlossen"),
             };
             r.map_err(|e| format!("SEEK: {}", e))?;
@@ -3085,6 +3091,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let p = match &mut f.h {
                 FileH::Read(r) => r.stream_position(),
                 FileH::Write(w) => w.stream_position(),
+                FileH::Strom(_) => return err("TELL: die Standardeingabe kennt keine Position"),
                 FileH::Closed => return err("TELL: Datei ist geschlossen"),
             };
             Ok(Value::Int(p.map_err(|e| format!("TELL: {}", e))? as i64))

@@ -1,0 +1,90 @@
+' 172 -- Ein Filter in einer Kette
+'
+' Das Gegenstueck zu 161_werkzeug.dh: dort kamen die Daten als ARGUMENT,
+' hier kommen sie auch aus der STANDARDEINGABE. Genau so machen es `wc`,
+' `grep` und `sort`: mit Dateinamen arbeiten sie auf Dateien, ohne welche
+' lesen sie das, was ihnen gereicht wird.
+'
+' Aufruf:
+'   dhrt run 172_filter.dh -- Muster datei.txt
+'   dir | dhrt run 172_filter.dh -- Muster
+'
+' Als exportierte .exe entfaellt das `--`:
+'   dhrt --export 172_filter.dh
+'   dir | 172_filter.exe Muster
+'
+' Rueckgabewert wie bei grep: 0 = etwas gefunden, 1 = nichts gefunden,
+' 2 = falsch aufgerufen. Damit laesst sich das Werkzeug in einem Skript
+' abfragen, ohne seine Ausgabe zu lesen.
+
+CONST NICHTS_GEFUNDEN AS INTEGER = 1
+CONST FALSCH_AUFGERUFEN AS INTEGER = 2
+
+DIM muster AS STRING
+DIM dateien AS ARRAY OF STRING
+DIM i AS INTEGER
+DIM treffer AS INTEGER
+
+dateien = []
+FOR i = 0 TO ARGC() - 1
+    IF i = 0 THEN
+        muster = ARG$(i)
+    ELSE
+        ARRAY_PUSH(dateien, ARG$(i))
+    END IF
+NEXT
+
+IF muster = "" THEN
+    ' Hinweise gehoeren nach stderr: so bleibt stdout die reine Nutzlast,
+    ' auch wenn jemand `... > treffer.txt` schreibt.
+    EPRINT("Verwendung: 172_filter <muster> [datei ...]")
+    EPRINT("Ohne Datei wird die Standardeingabe gelesen.")
+    EXIT(FALSCH_AUFGERUFEN)
+END IF
+
+' --- Eine Zeile pruefen und ggf. ausgeben ---------------------------------
+FUNCTION pruefe(zeile AS STRING, muster AS STRING) AS INTEGER
+    IF INSTR(LOWER$(zeile), LOWER$(muster)) >= 0 THEN
+        PRINT zeile
+        RETURN 1
+    END IF
+    RETURN 0
+END FUNCTION
+
+treffer = 0
+
+IF LEN(dateien) = 0 THEN
+    ' --- Kein Dateiname: die Standardeingabe lesen -----------------------
+    '
+    ' STDIN() liefert ein ganz normales FILE-Handle -- READLINE und
+    ' ENDOFFILE sind dieselben wie bei einer Datei. Deshalb steht der
+    ' Schleifenrumpf hier nur EINMAL im Programm.
+    DIM f AS FILE
+    DIM z AS STRING
+    f = STDIN()
+    WHILE NOT ENDOFFILE(f)
+        z = READLINE(f)
+        treffer = treffer + pruefe(z, muster)
+    WEND
+ELSE
+    ' --- Dateien auf der Kommandozeile ------------------------------------
+    DIM d AS INTEGER
+    DIM zeilen AS ARRAY OF STRING
+    DIM k AS INTEGER
+    FOR d = 0 TO LEN(dateien) - 1
+        IF NOT FILEEXISTS(dateien[d]) THEN
+            EPRINT("Nicht gefunden: " + dateien[d])
+        ELSE
+            zeilen = READLINES(dateien[d])
+            FOR k = 0 TO LEN(zeilen) - 1
+                treffer = treffer + pruefe(zeilen[k], muster)
+            NEXT
+        END IF
+    NEXT
+END IF
+
+' Die Bilanz nach stderr -- sie ist ein Hinweis, keine Nutzlast.
+EPRINT(STR$(treffer) + " Treffer")
+IF treffer = 0 THEN
+    EXIT(NICHTS_GEFUNDEN)
+END IF

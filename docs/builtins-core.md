@@ -827,6 +827,7 @@ geklappt hat.
 | `EPRINT(text)` | Zeile nach **stderr** statt stdout |
 | `SHELL(programm$, ...)` → INTEGER | Programm starten, warten, Rückgabewert |
 | `SHELL_OUT$(programm$, ...)` → STRING | wie `SHELL`, sammelt aber die Ausgabe ein |
+| `STDIN([kodierung$])` → FILE | die Standardeingabe als Datei-Handle |
 
 ```basic
 ' Ein Werkzeug, das eine Datei erwartet
@@ -866,6 +867,46 @@ untere Byte, aus `EXIT(256)` würde sonst klammheimlich „alles gut").
 
 **`EPRINT` ist ein Builtin, kein Statement** — also mit Klammern
 (`EPRINT("text")`, nicht `EPRINT "text"` wie bei `PRINT`).
+
+### Die Standardeingabe: `dir | meinwerkzeug | sort`
+
+`ARG$` liest, was dem Programm *gegeben* wird. `STDIN()` liest, was ihm
+*gereicht* wird — und liefert dafür kein neues Lese-Vokabular, sondern ein
+ganz normales **FILE-Handle**:
+
+```basic
+DIM f AS FILE
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT UPPER$(z)
+WEND
+```
+
+`READLINE`, `READALL$`, `ENDOFFILE` und `READ_BYTES` gelten also unverändert,
+und die Kodierung aus dem Abschnitt oben ebenfalls: `STDIN("cp1252")`.
+
+**Es gibt genau EIN Handle.** Jeder Aufruf von `STDIN()` liefert dasselbe —
+zwei wären zwei Lesepuffer auf derselben Leitung: das eine liest voraus, dem
+anderen fehlen die Zeilen. Eine zweite Angabe mit einer *anderen* Kodierung ist
+darum ein Fehler und nicht still wirkungslos.
+
+**`INPUT` und `STDIN()` lassen sich mischen.** Beide hängen am selben Puffer,
+es geht also keine Zeile verloren, wenn ein Programm erst etwas erfragt und
+dann den Rest durchreicht.
+
+**`SEEK` und `TELL` gehen hier nicht** — eine Pipe lässt sich nicht
+zurückspulen, und beide sagen das auch, statt es zu versuchen.
+
+**`INPUT` bleibt das Werkzeug für den Menschen.** Es druckt seinen Prompt (das
+braucht die Editor-Konsole) und liefert am Ende der Eingabe endlos
+Leerstrings — es kann das Ende nicht melden. Wer einen Datenstrom verarbeitet,
+nimmt `STDIN()`; dort ist `ENDOFFILE` die Abbruchbedingung.
+
+Ein vollständiges Werkzeug, das *beides* kann — Dateien als Argumente **oder**
+die Standardeingabe, so wie `wc` und `grep` es tun — steht in
+[examples/172_filter.dh](../examples/172_filter.dh).
 
 **`SHELL` nimmt die Argumente einzeln**, nicht als eine Kommandozeile:
 

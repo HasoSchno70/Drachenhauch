@@ -182,7 +182,27 @@ impl SaveHandle {
 pub enum FileH {
     Read(std::io::BufReader<std::fs::File>),
     Write(std::fs::File),
+    /// Ein Lesestrom, der KEINE Datei ist -- heute die Standardeingabe
+    /// (`STDIN()`). Eigene Variante statt `Read`, weil hier `Seek` fehlt:
+    /// eine Pipe laesst sich nicht zurueckspulen, und `SEEK`/`TELL` sollen
+    /// das auch sagen statt es zu versuchen.
+    Strom(Box<dyn std::io::BufRead>),
     Closed,
+}
+
+impl GbFile {
+    /// Der Lesestrom dieses Handles -- egal ob Datei oder Standardeingabe.
+    ///
+    /// Ohne diesen Helfer braeuchte jeder Leser (READLINE, READALL$,
+    /// ENDOFFILE, READ_BYTES) zwei fast gleiche Zweige, und der naechste
+    /// Stromtyp braechte einen dritten. `None` heisst: nicht zum Lesen offen.
+    pub fn leser(&mut self) -> Option<&mut dyn std::io::BufRead> {
+        match &mut self.h {
+            FileH::Read(r) => Some(r),
+            FileH::Strom(r) => Some(r.as_mut()),
+            _ => None,
+        }
+    }
 }
 
 pub struct GbFile {
