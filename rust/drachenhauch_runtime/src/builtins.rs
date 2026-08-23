@@ -3241,6 +3241,37 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "tween_reverse" => { arity!(1); let mut t = tween_h(&a[0], "TWEEN_REVERSE")?.borrow_mut(); let s = t.start; t.start = t.end; t.end = s; t.start_ms = now_ms(); t.paused_at = None; Ok(Value::Nil) }
         "tween_easings" => { arity!(0); Ok(Value::str_rc("in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine")) }
 
+        // ===== Modul: ini =====
+        //
+        // Eine INI-Datei IST hier eine `MAP OF STRING` mit Punkt-Schluesseln
+        // (`[fenster] breite=1280` -> `"fenster.breite"`). Damit braucht das
+        // Modul kein eigenes Handle und keine zwei Dutzend Getter: MAPGETOR,
+        // MAPPUT, MAPKEYS und VAL koennen das alles schon.
+        "ini_parse" => {
+            arity!(1);
+            let text = need_str(&a[0], "INI_PARSE")?;
+            Ok(ini_map(crate::ini::lesen(text)))
+        }
+        "ini_load" => {
+            arity!(1, 2);
+            let pfad = need_str(&a[0], "INI_LOAD")?;
+            let kod = if a.len() > 1 { Some(need_str(&a[1], "INI_LOAD")?) } else { None };
+            let text = text_lesen(pfad, kod, "INI_LOAD")?;
+            Ok(ini_map(crate::ini::lesen(&text)))
+        }
+        "ini_text$" | "ini_text" => {
+            arity!(1);
+            Ok(Value::str_rc(&crate::ini::schreiben(&ini_paare(&a[0], "INI_TEXT$")?)))
+        }
+        "ini_save" => {
+            arity!(2, 3);
+            let pfad = need_str(&a[0], "INI_SAVE")?;
+            let kod = if a.len() > 2 { Some(need_str(&a[2], "INI_SAVE")?) } else { None };
+            let text = crate::ini::schreiben(&ini_paare(&a[1], "INI_SAVE")?);
+            text_schreiben(pfad, &text, kod, "INI_SAVE", false)?;
+            Ok(Value::Nil)
+        }
+
         // ===== Modul: json =====
         "json_parse" => {
             arity!(1);
@@ -4541,6 +4572,31 @@ fn baum_lesen(wurzel: &std::path::Path, unter: &str, muster: Option<&str>,
         }
     }
     Ok(())
+}
+
+/// Paare aus `ini::lesen` in eine `MAP OF STRING` umsetzen.
+fn ini_map(paare: Vec<(String, String)>) -> Value {
+    let mut m = GbMap::new("string".to_string());
+    for (k, v) in paare { m.put(k, Value::str_rc(&v)); }
+    Value::Map(Rc::new(RefCell::new(m)))
+}
+
+/// Und zurueck -- in der Reihenfolge, in der die Eintraege in der Map stehen.
+///
+/// Werte anderer Art (eine `MAP OF INTEGER`) werden mit `fmt`
+/// geschrieben, statt abgelehnt zu werden: eine INI-Datei kennt ohnehin nur
+/// Text, und wer seine Zahlen in einer Zahlen-Map haelt, soll sie speichern
+/// koennen.
+fn ini_paare(v: &Value, fn_: &str) -> Result<Vec<(String, String)>, String> {
+    let Value::Map(m) = v else {
+        return Err(format!("{} erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)", fn_));
+    };
+    Ok(m.borrow().entries().iter()
+        .map(|(k, w)| (k.clone(), match w {
+            Value::Str(s) => s.to_string(),
+            andere => andere.fmt(),
+        }))
+        .collect())
 }
 
 /// Eine Textdatei lesen -- mit der angegebenen Kodierung, sonst UTF-8.

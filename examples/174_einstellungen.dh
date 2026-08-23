@@ -1,0 +1,71 @@
+' 174 -- Einstellungen, die ein Mensch bearbeiten kann
+'
+' Das Muster fuer jede Anwendung, die sich etwas merken soll: beim Start
+' lesen, beim Beenden schreiben -- und dazwischen darf jemand die Datei mit
+' einem Texteditor aufmachen, ohne etwas kaputt zu machen.
+'
+' Eine INI-Datei IST hier eine MAP OF STRING mit Punkt-Schluesseln:
+' `[fenster] breite=1280` wird zu `"fenster.breite"`. Deshalb braucht das
+' Modul nur vier Befehle -- MAPGETOR, MAPPUT und VAL koennen den Rest schon.
+'
+' Aufruf:  dhrt run 174_einstellungen.dh
+
+IMPORT "ini"
+
+CONST DATEI AS STRING = "einstellungen.ini"
+
+DIM cfg AS MAP OF STRING
+DIM breite AS INTEGER
+DIM hoehe AS INTEGER
+DIM titel AS STRING
+DIM laut AS FLOAT
+DIM starts AS INTEGER
+
+' --- Lesen ----------------------------------------------------------------
+'
+' Beim ersten Start gibt es die Datei noch nicht -- das ist kein Fehler,
+' sondern der Normalfall. INI_PARSE("") liefert eine leere Map.
+IF FILEEXISTS(DATEI) THEN
+    cfg = INI_LOAD(DATEI)
+    PRINT "Einstellungen gelesen (" + STR$(MAPSIZE(cfg)) + " Eintraege)."
+ELSE
+    cfg = INI_PARSE("")
+    PRINT "Noch keine Einstellungen -- ich nehme die Vorgaben."
+END IF
+
+' MAPGETOR gibt die Vorgabe zurueck, wenn der Schluessel fehlt. Genau das
+' braucht eine Einstellungsdatei: ein spaeter dazugekommener Schluessel darf
+' ein altes Programm nicht stoeren, und umgekehrt.
+breite = VAL(MAPGETOR(cfg, "fenster.breite", "1280"))
+hoehe  = VAL(MAPGETOR(cfg, "fenster.hoehe",  "720"))
+titel  = MAPGETOR(cfg, "fenster.titel", "Mein Spiel")
+laut   = VAL(MAPGETOR(cfg, "ton.laut", "0.8"))
+starts = VAL(MAPGETOR(cfg, "zaehler.starts", "0"))
+
+PRINT ""
+PRINT "  Fenster: " + STR$(breite) + "x" + STR$(hoehe) + "  (" + titel + ")"
+PRINT "  Ton:     " + FORMAT$(laut, "%.2f")
+PRINT "  Starts:  " + STR$(starts)
+
+' --- Aendern --------------------------------------------------------------
+starts = starts + 1
+MAPPUT(cfg, "zaehler.starts", STR$(starts))
+' Auch die Vorgaben zurueckschreiben: so steht beim naechsten Oeffnen der
+' Datei alles drin, was sich einstellen laesst -- niemand muss raten.
+MAPPUT(cfg, "fenster.breite", STR$(breite))
+MAPPUT(cfg, "fenster.hoehe", STR$(hoehe))
+MAPPUT(cfg, "fenster.titel", titel)
+MAPPUT(cfg, "ton.laut", FORMAT$(laut, "%.2f"))
+
+' --- Schreiben ------------------------------------------------------------
+INI_SAVE(DATEI, cfg)
+PRINT ""
+PRINT "So sieht die Datei jetzt aus:"
+PRINT "----------------------------------------"
+PRINT INI_TEXT$(cfg)
+PRINT "----------------------------------------"
+PRINT "Das war Start Nummer " + STR$(starts) + " -- noch einmal starten zaehlt weiter."
+
+' Fuer dieses Beispiel wieder aufraeumen; ein echtes Programm liesse die
+' Datei natuerlich stehen.
+DELETEFILE(DATEI)

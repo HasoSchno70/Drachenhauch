@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1456,
+ "count": 1460,
  "builtins": [
   {
    "name": "ABS",
@@ -4069,6 +4069,30 @@
    "kind": "core",
    "signature": "IMAGE_TINT(img: ?, color: INTEGER)",
    "module": "imgfx"
+  },
+  {
+   "name": "INI_LOAD",
+   "kind": "core",
+   "signature": "INI_LOAD(pfad$ [, kodierung$]) AS MAP OF STRING",
+   "module": "ini"
+  },
+  {
+   "name": "INI_PARSE",
+   "kind": "core",
+   "signature": "INI_PARSE(text$) AS MAP OF STRING",
+   "module": "ini"
+  },
+  {
+   "name": "INI_SAVE",
+   "kind": "core",
+   "signature": "INI_SAVE(pfad$, m: MAP [, kodierung$])",
+   "module": "ini"
+  },
+  {
+   "name": "INI_TEXT$",
+   "kind": "core",
+   "signature": "INI_TEXT$(m: MAP) AS STRING",
+   "module": "ini"
   },
   {
    "name": "INKEY$",

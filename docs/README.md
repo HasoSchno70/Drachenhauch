@@ -64,6 +64,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `audio` (Modulatoren) | LFO und Tweener auf dem Audio-Thread: Tremolo, Wobble, Filter-Sweeps ohne Nachrechnen pro Frame | [module-audio-modulatoren.md](module-audio-modulatoren.md) |
 | `mqtt` | MQTT-3.1.1-Client — das Pub/Sub-Protokoll der IoT-/Maker-Welt | [module-mqtt.md](module-mqtt.md) |
 | `httpd` | Ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz | [module-httpd.md](module-httpd.md) |
+| `ini` | Einstellungsdateien, die ein Mensch bearbeiten kann — eine INI-Datei ist eine MAP | [module-ini.md](module-ini.md) |
 | `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
 ### Werkzeug
