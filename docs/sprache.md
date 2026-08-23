@@ -1093,6 +1093,34 @@ PRINT Distance(0.0, 0.0, 3.0, 4.0)    ' 5.0 - aus mathlib.dh
 
 `IMPORT` ist textuelles Inkludieren — der Code aus `mathlib.dh` wird Teil des aktuellen Programms. Mehrfaches Importieren derselben Datei wird ignoriert (kein Endlos-Cycle).
 
+### Wo gesucht wird
+
+1. **Neben der importierenden Datei.** Die eigene Kopie eines Projekts
+   gewinnt immer — wer eine Datei danebenlegt, will genau die.
+2. **Jeder Ordner aus `DH_PATH`**, in der angegebenen Reihenfolge (wie
+   `PATH` und `PYTHONPATH`; Trenner ist `;` unter Windows, sonst `:`).
+3. **`<Benutzerordner>/.drachenhauch/bibliothek`** — der Ort für Dinge, die
+   auf diesem Rechner allen Projekten zur Verfügung stehen sollen. Er
+   entsteht nicht von selbst; wer ihn anlegt, hat ihn gemeint.
+
+```bash
+set DH_PATH=D:\dh-bibliothek          &:: Windows
+export DH_PATH=~/dh-bibliothek         # macOS/Linux
+```
+
+Wird die Datei nirgends gefunden, nennt die Meldung **alle** durchsuchten
+Orte — sonst rät man, warum sie fehlt.
+
+**Eingebaute Module bleiben eingebaut.** `IMPORT "json"` nimmt immer das
+Modul, auch wenn irgendwo im Suchpfad eine Datei namens `json` liegt. Ohne
+diese Ausnahme könnte eine einzelne Datei in einem geteilten Ordner das
+Verhalten *jedes* Programms auf dem Rechner ändern.
+
+Die Suche gilt für den ganzen Weg: eine Bibliothek darf ihrerseits
+importieren, und zwar relativ zu **sich** — nicht zum Hauptprogramm.
+`AS`-Namensräume, `PRIVATE` und Klassen (siehe unten) funktionieren aus dem
+Suchpfad genauso wie von nebenan.
+
 ### Namensraum: `IMPORT "datei.dh" AS name`
 
 Ohne `AS` landen alle Namen der importierten Datei im selben flachen Raum wie

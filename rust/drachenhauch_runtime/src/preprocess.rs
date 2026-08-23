@@ -193,6 +193,39 @@ pub fn hardware_missing_msg(module: &str) -> String {
         module)
 }
 
+/// Wo nach einer importierten Quelldatei gesucht wird, wenn sie nicht neben
+/// der importierenden liegt.
+///
+/// **Reihenfolge und Begruendung:**
+/// 1. neben der importierenden Datei (steht nicht hier, sondern beim
+///    Aufrufer) -- die eigene Kopie eines Projekts gewinnt IMMER. Wer eine
+///    Datei danebenlegt, will genau die, und keine, die irgendwo auf dem
+///    Rechner liegt und sich unbemerkt aendert.
+/// 2. `DH_PATH` -- wie `PYTHONPATH`, mehrere Ordner mit dem Trenner des
+///    Betriebssystems (`;` unter Windows, sonst `:`). Getrennt wird mit
+///    `std::env::split_paths`, nicht von Hand: unter Windows ist der
+///    Doppelpunkt in `C:\lib` sonst ein Trenner.
+/// 3. `<Benutzerordner>/.drachenhauch/bibliothek` -- der Ort, an dem eine
+///    Paketverwaltung spaeter ablegen wuerde. Er existiert nicht von selbst;
+///    wer ihn anlegt, hat ihn gemeint.
+///
+/// Eine Datei NEBEN der Runtime waere der naheliegende vierte Ort und fehlt
+/// mit Absicht: der Editor loest dieselben IMPORTs in Python noch einmal auf
+/// (fuer die Zeilen-Herkunft), und der weiss nicht, wo die Exe liegt. Zwei
+/// Antworten auf "wo liegt die Bibliothek" waeren schlimmer als eine, die
+/// einen Ort weniger kennt.
+pub fn bibliothekspfade() -> Vec<std::path::PathBuf> {
+    let mut raus: Vec<std::path::PathBuf> = Vec::new();
+    if let Some(p) = std::env::var_os("DH_PATH") {
+        raus.extend(std::env::split_paths(&p).filter(|p| !p.as_os_str().is_empty()));
+    }
+    let heim = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
+    if let Some(h) = heim {
+        raus.push(std::path::Path::new(&h).join(".drachenhauch").join("bibliothek"));
+    }
+    raus
+}
+
 /// Aus den importierten Modulen die Hardware-Module heraussuchen, die in diesem
 /// Build fehlen (importierbar, aber jeder Aufruf wuerde zur Laufzeit scheitern).
 /// Basis fuer eine Warnung schon beim IMPORT statt erst beim ersten Aufruf.
@@ -318,7 +351,23 @@ fn process_inner(
         };
         let rel = caps.get(1).unwrap().as_str().to_string();
         let alias = caps.get(2).map(|m| m.as_str().to_string());
-        let joined = base.join(&rel);
+        // Erst neben der importierenden Datei, dann die Bibliothekspfade.
+        //
+        // AUSSER bei einem eingebauten Modul: `IMPORT "json"` nimmt IMMER das
+        // eingebaute (so steht es in CLAUDE.md und der Sprachdoku). Ohne diese
+        // Ausnahme wuerde eine Datei namens `json` irgendwo im Suchpfad es
+        // verdecken -- und zwar in JEDEM Programm auf diesem Rechner, ohne
+        // dass jemand danach gefragt hat.
+        let ist_builtin = looks_like_module_name(&rel) && is_known_module(&rel);
+        let mut joined = base.join(&rel);
+        let mut gesucht: Vec<String> = vec![joined.display().to_string()];
+        if !joined.is_file() && !ist_builtin {
+            for lib in bibliothekspfade() {
+                let kandidat = lib.join(&rel);
+                gesucht.push(kandidat.display().to_string());
+                if kandidat.is_file() { joined = kandidat; break; }
+            }
+        }
         let exists = joined.exists();
         // Resolve (wie Python `.resolve()`) fuer den seen-Schluessel -- nur
         // sinnvoll, wenn die Datei existiert.
@@ -357,7 +406,7 @@ fn process_inner(
                 msg: format!(
                     "IMPORT: Datei nicht gefunden: {} (gesucht: {})",
                     rel,
-                    joined.display()
+                    gesucht.join(", ")
                 ),
             });
         }

@@ -11,6 +11,7 @@ sich den globalen Namensraum. Sinnvoll fuer Hilfsbibliotheken.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -28,6 +29,28 @@ _IMPORT_RE = re.compile(
     r'(?:\'.*)?$',
     re.IGNORECASE,
 )
+
+
+def bibliothekspfade() -> list[Path]:
+    """Wo nach einer importierten Quelldatei gesucht wird, wenn sie nicht
+    neben der importierenden liegt.
+
+    **Muss Zeile fuer Zeile dasselbe tun wie `bibliothekspfade()` in
+    `rust/drachenhauch_runtime/src/preprocess.rs`** -- diese Funktion hier
+    dient dem Editor (Zeilen-Herkunft fuer Fehlermeldungen), die dort dem
+    Ausfuehren. Woerde eine von beiden einen Ordner mehr kennen, zeigte der
+    Editor Fehler in Programmen, die laufen. `tests/test_bibliothek.py`
+    haelt beide zusammen.
+
+    Reihenfolge: `DH_PATH` (mit dem Trenner des Betriebssystems), dann
+    `<Benutzerordner>/.drachenhauch/bibliothek`. Der Ordner NEBEN der
+    importierenden Datei kommt davor und steht beim Aufrufer.
+    """
+    raus: list[Path] = []
+    roh = os.environ.get("DH_PATH", "")
+    raus.extend(Path(t) for t in roh.split(os.pathsep) if t)
+    raus.append(Path.home() / ".drachenhauch" / "bibliothek")
+    return raus
 
 
 def _looks_like_module_name(rel: str) -> bool:
@@ -61,7 +84,22 @@ def process(source: str, base_path: Path | None = None,
             continue
         rel = m.group(1)
         alias = m.group(2)  # None wenn `AS <alias>` nicht angegeben
+        # Erst neben der importierenden Datei, dann die Bibliothekspfade.
+        #
+        # AUSSER bei einem eingebauten Modul: `IMPORT "json"` nimmt IMMER das
+        # eingebaute. Ohne diese Ausnahme wuerde eine Datei namens `json`
+        # irgendwo im Suchpfad es verdecken -- in JEDEM Programm auf diesem
+        # Rechner, ohne dass jemand danach gefragt hat.
+        ist_builtin = _looks_like_module_name(rel) and _modules.is_known_module(rel)
         target = (base_path / rel).resolve()
+        gesucht = [str(target)]
+        if not target.is_file() and not ist_builtin:
+            for lib in bibliothekspfade():
+                kandidat = (lib / rel).resolve()
+                gesucht.append(str(kandidat))
+                if kandidat.is_file():
+                    target = kandidat
+                    break
         if target in seen:
             out_lines.append(f"' [IMPORT bereits inkludiert: {rel}]")
             origins.append((file_label, line_idx))
@@ -79,7 +117,8 @@ def process(source: str, base_path: Path | None = None,
                 origins.append((file_label, line_idx))
                 continue
             raise LexerError(
-                f"IMPORT: Datei nicht gefunden: {rel} (gesucht: {target})",
+                f"IMPORT: Datei nicht gefunden: {rel} "
+                f"(gesucht: {', '.join(gesucht)})",
                 line_idx, 1,
             )
         try:
