@@ -32,7 +32,7 @@ CLASS Paddle
 
     SUB Init(startX AS INTEGER)
         x = startX
-        y = HEIGHT / 2 - PADDLE_H / 2
+        y = HEIGHT \ 2 - PADDLE_H \ 2
         score = 0
     END SUB
 
@@ -54,8 +54,8 @@ CLASS Ball
     DIM dy AS INTEGER
 
     SUB Reset(richtung AS INTEGER)
-        x = WIDTH / 2
-        y = HEIGHT / 2
+        x = WIDTH \ 2
+        y = HEIGHT \ 2
         dx = richtung * BALL_SPD
         dy = BALL_SPD
     END SUB

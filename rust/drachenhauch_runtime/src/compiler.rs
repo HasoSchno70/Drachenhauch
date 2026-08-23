@@ -322,6 +322,11 @@ pub struct Compiler {
     /// zweite ENUM-Deklaration desselben Namens ist idempotent (identische
     /// Member) oder ein Fehler (abweichende Member).
     enum_decls: HashMap<String, Vec<(String, i64)>>,
+    /// Angesagter Typ je globaler Variable (Name klein). Aus `collect_globals`,
+    /// also gefuellt BEVOR Phase 2/3 die Funktionsruempfe uebersetzt -- ohne
+    /// das saehe eine Funktion die Typen der Globals nicht (`ctx.dim_types`
+    /// gilt immer nur fuer den gerade offenen Geltungsbereich).
+    global_types: HashMap<String, String>,
     ctx: Ctx,
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
@@ -497,13 +502,69 @@ impl Compiler {
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
                    external_types, builtin_aliases,
-                   enum_decls: HashMap::new(), ctx: Ctx::new(), err_line: 0,
+                   enum_decls: HashMap::new(), global_types: HashMap::new(),
+                   ctx: Ctx::new(), err_line: 0,
                    warnings: vec![] }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
     fn is_known_value_type(&self, t: &str) -> bool {
         is_value_type(t) || self.external_types.contains(t)
+    }
+
+    /// Angesagten Typ einer globalen Variable merken (aus `collect_globals`).
+    ///
+    /// Zwei Deklarationen mit VERSCHIEDENEM Typ hinterlassen bewusst einen
+    /// leeren Eintrag = "weiss ich nicht": welche zur Laufzeit gewinnt, haengt
+    /// am Ablauf, und darauf darf keine Meldung gestuetzt werden. Dass der
+    /// Name doppelt vergeben ist, meldet `warn_dim_typ_wechsel` ohnehin.
+    fn merke_global_typ(&mut self, name: &str, type_name: &str,
+                        array_dims: &Option<Vec<Node>>) {
+        let eff = if array_dims.is_some() { format!("array:{}", type_name) }
+                  else { type_name.to_string() };
+        match self.global_types.get(&name.to_lowercase()) {
+            Some(alt) if *alt != eff => {
+                self.global_types.insert(name.to_lowercase(), String::new());
+            }
+            Some(_) => {}
+            None => { self.global_types.insert(name.to_lowercase(), eff); }
+        }
+    }
+
+    /// Der angesagte Typ, den ein NAME an dieser Stelle hat -- in genau der
+    /// Reihenfolge, in der ihn auch `load_var`/`store_var` aufloesen (lokaler
+    /// Slot, dann Feld der eigenen Klasse, dann global). Eine andere
+    /// Reihenfolge waere der sicherste Weg, beim Verdecken das Falsche zu
+    /// melden.
+    ///
+    /// `None` heisst "weiss ich nicht" -- darauf wird nie eine Meldung
+    /// gestuetzt.
+    fn angesagter_typ(&self, name: &str) -> Option<String> {
+        let t = if let Some(&slot) = self.ctx.local_slots.get(name) {
+            self.ctx.local_types.get(slot).cloned()
+        } else if name == "self" {
+            self.ctx.current_class.clone()
+        } else if self.is_field(name) {
+            self.feld_typ(self.ctx.current_class.as_deref()?, name)
+        } else {
+            self.global_types.get(&name.to_lowercase()).cloned()
+        }?;
+        // "" / "any" sind keine Aussage.
+        if t.is_empty() || t == "any" { None } else { Some(t) }
+    }
+
+    /// Typ eines Feldes entlang der Vererbung.
+    fn feld_typ(&self, class_name: &str, feld: &str) -> Option<String> {
+        let mut cur = Some(class_name.to_string());
+        while let Some(cn) = cur {
+            let ci = self.classes.get(&cn)?;
+            if let Some(f) = ci.fields.iter().find(|f| f.name == feld) {
+                return Some(if f.array_dims.is_empty() { f.type_name.clone() }
+                            else { format!("array:{}", f.type_name) });
+            }
+            cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+        }
+        None
     }
 
     /// Bildet einen aliasierten Builtin-Namen auf den kanonischen zurueck
@@ -566,23 +627,29 @@ impl Compiler {
             match unwrap_stmt(s) {
                 Node::Dim { name, type_name, array_dims } => {
                     self.global_vars.insert(name.clone());
+                    self.merke_global_typ(name, type_name, array_dims);
                     if self.is_slot_dim(type_name, array_dims) { self.alloc_slot(name); }
                 }
                 Node::MultiDim { dims } => {
                     for d in dims {
                         if let Node::Dim { name, type_name, array_dims } = d {
                             self.global_vars.insert(name.clone());
+                            self.merke_global_typ(name, type_name, array_dims);
                             if self.is_slot_dim(type_name, array_dims) { self.alloc_slot(name); }
                         }
                     }
                 }
-                Node::Const { name, .. } => {
+                Node::Const { name, type_name, .. } => {
                     self.global_vars.insert(name.clone());
                     self.global_consts.insert(name.to_lowercase());
+                    if let Some(t) = type_name {
+                        self.merke_global_typ(name, t, &None);
+                    }
                     self.alloc_slot(name);
                 }
                 Node::For { var, .. } => {
                     self.global_vars.insert(var.clone());
+                    self.merke_global_typ(var, "integer", &None);
                     self.alloc_slot(var);
                 }
                 Node::EnumDecl { name, .. } => {
@@ -615,7 +682,7 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
-                self.warn_komma_an_ganzzahl(name, value);
+                self.pruefe_zuweisung(name, value);
                 self.expr(value)?;
                 self.store_var(name);
                 Ok(())
@@ -676,6 +743,7 @@ impl Compiler {
                 Ok(())
             }
             Node::MemberAssign { target, name, value } => {
+                self.pruefe_feld_zuweisung(target, name, value);
                 self.expr(target)?;
                 self.expr(value)?;
                 let idx = self.ctx.add_const(json!(name));
@@ -771,30 +839,82 @@ impl Compiler {
     /// Der statische Typ eines Ausdrucks -- nur wo er ZWEIFELSFREI feststeht.
     ///
     /// Absichtlich lueckenhaft: `None` heisst "weiss ich nicht", und darauf
-    /// wird nie eine Meldung gestuetzt. Erfasst sind die Faelle, die in echtem
-    /// Code zum Stolpern fuehren -- ein Komma-Literal, eine als FLOAT
-    /// angesagte Variable, und jede Division mit `/` (die liefert IMMER eine
-    /// Kommazahl; fuer ganzzahlig gibt es `\`).
-    fn statischer_typ(&self, n: &Node) -> Option<&'static str> {
-        match n {
-            Node::NumberLit(NumV::Float(_)) => Some("float"),
-            Node::NumberLit(NumV::Int(_)) => Some("int"),
-            Node::Identifier(name) => match self.ctx.dim_types.get(&name.to_lowercase()) {
-                Some((t, _)) if t == "float" => Some("float"),
-                Some((t, _)) if t == "integer" => Some("int"),
-                _ => None,
+    /// wird nie eine Meldung gestuetzt. Lieber ein Fehler bleibt unentdeckt,
+    /// als dass ein laufendes Programm angestrichen wird -- eine Pruefung, die
+    /// falschen Alarm gibt, wird abgeschaltet und findet dann gar nichts mehr.
+    ///
+    /// Bewusst NICHT erfasst: Builtin-Aufrufe. Ihre Rueckgabetypen stehen nur
+    /// in `builtin_index.json`, und der wird von Hand gepflegt -- ein
+    /// veralteter Eintrag dort wuerde hier zu einer falschen Meldung, statt
+    /// wie bei der Argumentzahl bloss zu einer fehlenden.
+    fn statischer_typ(&self, n: &Node) -> Option<String> {
+        let t = match n {
+            Node::NumberLit(NumV::Float(_)) => "float".to_string(),
+            Node::NumberLit(NumV::Int(_)) => "integer".to_string(),
+            Node::StringLit(_) => "string".to_string(),
+            Node::BoolLit(_) => "boolean".to_string(),
+            Node::TupleLit { .. } => "tuple".to_string(),
+            // Comprehensions liefern ein TUPLE (Liste/Menge) bzw. eine MAP.
+            Node::ListComp { .. } | Node::SetComp { .. } => "tuple".to_string(),
+            Node::New { class_name, .. } => class_name.clone(),
+            Node::Identifier(name) => self.angesagter_typ(name)?,
+            Node::MemberAccess { target, name } => {
+                let ziel = self.statischer_typ(target)?;
+                // Nur echte Felder -- eine PROPERTY laeuft durch User-Code,
+                // ihren Typ verspricht der Getter, nicht das Feld dahinter.
+                if self.ist_property(&ziel, name) { return None; }
+                self.feld_typ(&ziel, name)?
+            }
+            Node::UnaryOp { op, operand } => match op.as_str() {
+                "not" => "boolean".to_string(),
+                "bnot" => "integer".to_string(),
+                "-" | "+" => {
+                    let t = self.statischer_typ(operand)?;
+                    if t == "integer" || t == "float" { t } else { return None; }
+                }
+                _ => return None,
             },
             Node::BinaryOp { op, left, right } => match op.as_str() {
-                "/" => Some("float"),
-                "\\" | "mod" => Some("int"),
+                "=" | "<>" | "<" | ">" | "<=" | ">=" | "and" | "or" | "in" =>
+                    "boolean".to_string(),
+                "band" | "bor" | "bxor" | "shl" | "shr" => "integer".to_string(),
+                // `/` liefert IMMER eine Kommazahl; fuer ganzzahlig gibt es `\`.
+                "/" => "float".to_string(),
+                "\\" | "mod" => "integer".to_string(),
                 "+" | "-" | "*" | "^" => {
                     let (l, r) = (self.statischer_typ(left)?, self.statischer_typ(right)?);
-                    Some(if l == "float" || r == "float" { "float" } else { "int" })
+                    let zahl = |t: &str| t == "integer" || t == "float";
+                    match op.as_str() {
+                        // `"ab" + "cd"` und `"-" * 40` sind beide gueltig und
+                        // liefern einen STRING.
+                        "+" if l == "string" && r == "string" => "string".to_string(),
+                        "*" if (l == "string" && r == "integer")
+                            || (l == "integer" && r == "string") => "string".to_string(),
+                        _ if zahl(&l) && zahl(&r) =>
+                            if l == "float" || r == "float" { "float".to_string() }
+                            else { "integer".to_string() },
+                        // Alles Weitere kann eine ueberladene OPERATOR-Methode
+                        // sein -- deren Rueckgabetyp steht hier nicht fest.
+                        _ => return None,
+                    }
                 }
-                _ => None,
+                _ => return None,
             },
-            _ => None,
+            _ => return None,
+        };
+        if t.is_empty() || t == "any" { None } else { Some(t) }
+    }
+
+    /// Ist `name` bei `class_name` (oder weiter oben) eine PROPERTY?
+    fn ist_property(&self, class_name: &str, name: &str) -> bool {
+        let klein = name.to_lowercase();
+        let mut cur = Some(class_name.to_string());
+        while let Some(cn) = cur {
+            let Some(ci) = self.classes.get(&cn) else { return false };
+            if ci.property_set.contains(&klein) { return true; }
+            cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
         }
+        false
     }
 
     /// Warnt, wenn eine Kommazahl an eine ganzzahlige Variable geht.
@@ -809,13 +929,9 @@ impl Compiler {
     /// angefallen, und `--check` hat jedes Mal geschwiegen -- die Pruefung sah
     /// den Text, der Fehler hing am Wert. Fuer die entscheidbaren Faelle muss
     /// sie nicht schweigen.
-    fn warn_komma_an_ganzzahl(&mut self, ziel: &str, wert: &Node) {
-        if self.ctx.dim_types.get(&ziel.to_lowercase()).map(|(t, _)| t.as_str()) != Some("integer") {
-            return;
-        }
-        if self.statischer_typ(wert) != Some("float") {
-            return;
-        }
+    fn warn_komma_an_ganzzahl(&mut self, ziel_typ: &str, ziel: &str, wert: &Node) {
+        if ziel_typ != "integer" { return; }
+        if self.statischer_typ(wert).as_deref() != Some("float") { return; }
         let hinweis = match wert {
             Node::BinaryOp { op, .. } if op == "/" =>
                 " Fuer ganzzahlige Division `\\` statt `/` nehmen.",
@@ -824,6 +940,94 @@ impl Compiler {
         let zeile = self.ctx.cur_line;
         self.warnings.push((zeile, format!(
             "'{}' ist als INTEGER angesagt, rechts steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}", ziel, hinweis)));
+    }
+
+    /// Kann ein Wert vom Typ `quelle` NIEMALS in ein Ziel vom Typ `ziel`?
+    ///
+    /// Das ist genau die Regel aus `coerce()` in vm.rs, nur statisch gelesen --
+    /// beide muessen dasselbe sagen, sonst warnt der Compiler vor Code, der
+    /// laeuft (oder schweigt zu Code, der abbricht):
+    ///
+    ///   * INTEGER/FLOAT nehmen nur Zahlen (FLOAT->INTEGER ist WERTabhaengig
+    ///     und laeuft ueber `warn_komma_an_ganzzahl`, nicht hier).
+    ///   * STRING/BOOLEAN/TUPLE/FUNCREF nehmen ausschliesslich ihresgleichen.
+    ///   * Alles Uebrige (Klassen, MAP, ARRAY, Modul-Typen) reicht die Laufzeit
+    ///     durch -- dort waere eine Meldung "bricht ab" schlicht unwahr.
+    ///     ARRAY hat zwar eine eigene Pruefung (`coerce_array`), die aber ein
+    ///     frisches Zahlen-Literal an ein FLOAT-Ziel noch umbaut; das ist
+    ///     statisch nicht sauber zu trennen und bleibt darum aussen vor.
+    fn passt_nie(quelle: &str, ziel: &str) -> bool {
+        let zahl = |t: &str| t == "integer" || t == "float";
+        match ziel {
+            "integer" | "float" => !zahl(quelle),
+            "string" | "boolean" | "tuple" | "funcref" => quelle != ziel,
+            _ => false,
+        }
+    }
+
+    /// Ein Hinweis, der zum Paar passt -- eine Meldung ohne Ausweg ist halb so
+    /// viel wert wie eine mit.
+    fn typ_hinweis(quelle: &str, ziel: &str) -> &'static str {
+        match (quelle, ziel) {
+            (q, "string") if q == "integer" || q == "float" =>
+                " Mit STR$() in Text umwandeln.",
+            ("string", z) if z == "integer" || z == "float" =>
+                " Mit VAL() in eine Zahl umwandeln.",
+            (_, "boolean") =>
+                " Ein Vergleich wie `x > 0` liefert einen BOOLEAN.",
+            ("boolean", z) if z == "integer" || z == "float" =>
+                " BOOLEAN ist in Drachenhauch keine Zahl -- mit IIF(b, 1, 0) umwandeln.",
+            _ => "",
+        }
+    }
+
+    /// Warnt, wenn an dieser Zuweisung ein Typ steht, den das Ziel nie annimmt.
+    ///
+    /// Anders als die Kommazahl-Warnung ist das nicht wertabhaengig: `s = 5`
+    /// bei `DIM s AS STRING` bricht ab, sobald die Zeile laeuft -- immer.
+    /// Trotzdem zunaechst eine WARNUNG und kein Fehler, denn das Risiko liegt
+    /// hier nicht in der Regel, sondern in der Herleitung: `statischer_typ` ist
+    /// neu. Ein Fehler wuerde einen Herleitungs-Irrtum zu einem Programm
+    /// machen, das sich nicht mehr uebersetzen laesst.
+    fn warn_typ_zuweisung(&mut self, ziel_typ: &str, ziel: &str, wert: &Node) {
+        let Some(quelle) = self.statischer_typ(wert) else { return };
+        if !Self::passt_nie(&quelle, ziel_typ) { return; }
+        let zeile = self.ctx.cur_line;
+        self.warnings.push((zeile, format!(
+            "'{}' ist als {} angesagt, rechts steht {}. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
+            ziel, Self::typ_klartext(ziel_typ), Self::typ_klartext(&quelle),
+            ziel_typ.to_uppercase(), quelle.to_uppercase(),
+            Self::typ_hinweis(&quelle, ziel_typ))));
+    }
+
+    /// Beide Zuweisungs-Pruefungen an einer Stelle -- sie schliessen einander
+    /// aus (FLOAT an INTEGER ist wertabhaengig, alles andere nicht).
+    fn pruefe_zuweisung(&mut self, ziel: &str, wert: &Node) {
+        let Some(ziel_typ) = self.angesagter_typ(ziel) else { return };
+        self.warn_komma_an_ganzzahl(&ziel_typ, ziel, wert);
+        self.warn_typ_zuweisung(&ziel_typ, ziel, wert);
+    }
+
+    /// Dasselbe fuer `objekt.feld = wert`. Auch hier wandelt die Laufzeit den
+    /// Wert auf den angesagten Feldtyp um ("Zuweisung an p.name: Erwartet
+    /// STRING, erhalten INTEGER"), die Regel ist also dieselbe.
+    ///
+    /// PROPERTYs bleiben aussen vor: dort laeuft der Wert durch einen Setter,
+    /// dessen Parameter-Typ etwas anderes sein darf als das Feld dahinter.
+    fn pruefe_feld_zuweisung(&mut self, target: &Node, feld: &str, wert: &Node) {
+        let Some(klasse) = self.statischer_typ(target) else { return };
+        if self.ist_property(&klasse, feld) { return; }
+        let Some(ziel_typ) = self.feld_typ(&klasse, feld) else { return };
+        if ziel_typ.is_empty() || ziel_typ == "any" { return; }
+        let name = match target {
+            // `Self` schreibt der Lexer klein -- in der Meldung soll der Name
+            // so dastehen, wie er im Quelltext steht.
+            Node::Identifier(o) if o == "self" => format!("Self.{}", feld),
+            Node::Identifier(o) => format!("{}.{}", o, feld),
+            _ => feld.to_string(),
+        };
+        self.warn_komma_an_ganzzahl(&ziel_typ, &name, wert);
+        self.warn_typ_zuweisung(&ziel_typ, &name, wert);
     }
 
     fn warn_dim_typ_wechsel(&mut self, name: &str, eff_type: &str) {

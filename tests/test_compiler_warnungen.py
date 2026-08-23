@@ -178,3 +178,156 @@ def test_warnung_blockiert_nicht(tmp_path):
     r = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     assert r.stdout.strip() == "3", (r.stdout, r.stderr)
+
+
+# ------------------------------------------- Typ, den das Ziel nie annimmt
+#
+# Anders als die Kommazahl-Warnung ist das NICHT wertabhaengig: `s = 5` bei
+# `DIM s AS STRING` bricht ab, sobald die Zeile laeuft -- immer. Gemeldet wird
+# trotzdem als Warnung, weil das Risiko nicht in der Regel liegt, sondern in
+# der Herleitung des Typs; die ist neu.
+
+def test_zahl_an_text_warnt(tmp_path):
+    w = _warnungen(tmp_path, "DIM s AS STRING\ns = 5\n")
+    assert any("als STRING angesagt" in m and "INTEGER" in m for m in w), w
+    assert any("STR$()" in m for m in w), w
+
+
+def test_text_an_zahl_warnt(tmp_path):
+    w = _warnungen(tmp_path, 'DIM i AS INTEGER\ni = "text"\n')
+    assert any("als INTEGER angesagt" in m and "VAL()" in m for m in w), w
+
+
+def test_boolean_an_zahl_warnt(tmp_path):
+    """BOOLEAN ist in Drachenhauch keine Zahl -- die Laufzeit lehnt es ab."""
+    w = _warnungen(tmp_path, "DIM b AS BOOLEAN\nb = TRUE\nDIM i AS INTEGER\ni = b\n")
+    assert any("erhalten BOOLEAN" in m for m in w), w
+
+
+def test_vergleich_an_text_warnt(tmp_path):
+    """Ein Vergleich liefert BOOLEAN -- auch ohne Variable dazwischen."""
+    w = _warnungen(tmp_path, "DIM i AS INTEGER\nDIM s AS STRING\ns = i > 3\n")
+    assert any("als STRING angesagt" in m and "BOOLEAN" in m for m in w), w
+
+
+def test_richtige_zuweisungen_schweigen(tmp_path):
+    """Alles hier ist gueltig -- inklusive der beiden STRING-Operatoren."""
+    w = _warnungen(tmp_path, """
+DIM s AS STRING
+DIM i AS INTEGER
+DIM f AS FLOAT
+DIM b AS BOOLEAN
+i = 3
+f = i * 2
+s = "a" + "b"
+s = "-" * 40
+b = i > 3
+b = NOT b
+""")
+    assert not any("bricht beim Laufen ab" in m for m in w), w
+
+
+def test_parametertyp_wird_erkannt(tmp_path):
+    """Der Typ eines Parameters steht in der Signatur -- ohne DIM davor."""
+    w = _warnungen(tmp_path, """
+FUNCTION f(a AS INTEGER) AS INTEGER
+    DIM s AS STRING
+    s = a
+    RETURN a
+END FUNCTION
+PRINT f(1)
+""")
+    assert any("als STRING angesagt" in m for m in w), w
+
+
+def test_globaler_typ_gilt_auch_in_der_funktion(tmp_path):
+    """Funktionen werden VOR dem Hauptprogramm uebersetzt -- die Typen der
+    Globals muessen trotzdem schon feststehen."""
+    w = _warnungen(tmp_path, """
+DIM titel AS STRING
+
+SUB setze()
+    titel = 42
+END SUB
+
+setze()
+""")
+    assert any("'titel'" in m and "als STRING angesagt" in m for m in w), w
+
+
+def test_feld_ueber_objekt_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM name AS STRING
+END CLASS
+DIM p AS P
+p = NEW P()
+p.name = 5
+""")
+    assert any("'p.name'" in m for m in w), w
+
+
+def test_eigenes_feld_in_der_methode_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM name AS STRING
+    SUB Init()
+        Self.name = 5
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+""")
+    assert any("'Self.name'" in m for m in w), w
+
+
+def test_property_bleibt_still(tmp_path):
+    """Ein Setter darf einen anderen Typ nehmen als das Feld dahinter."""
+    w = _warnungen(tmp_path, """
+CLASS P
+    DIM _hp AS STRING
+    PROPERTY GET hp() AS INTEGER
+        RETURN VAL(Self._hp)
+    END PROPERTY
+    PROPERTY SET hp(v AS INTEGER)
+        Self._hp = STR$(v)
+    END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+""")
+    assert not any("bricht beim Laufen ab" in m for m in w), w
+
+
+def test_referenztypen_bleiben_still(tmp_path):
+    """Klassen/MAP reicht die Laufzeit durch -- eine Meldung 'bricht ab' waere
+    schlicht unwahr, egal wie sinnvoll die Zuweisung ist."""
+    w = _warnungen(tmp_path, """
+CLASS A
+    DIM x AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+END CLASS
+DIM a AS A
+a = NEW B()
+""")
+    assert not any("bricht beim Laufen ab" in m for m in w), w
+
+
+def test_unbekannter_typ_bleibt_still(tmp_path):
+    """Rueckgabetypen von Builtins werden bewusst nicht hergeleitet -- lieber
+    ein Fund weniger als ein falscher Alarm."""
+    w = _warnungen(tmp_path, 'DIM i AS INTEGER\ni = LEN("abc")\n')
+    assert not any("bricht beim Laufen ab" in m for m in w), w
+
+
+def test_meldung_blockiert_die_uebersetzung_nicht(tmp_path):
+    """Es bleibt eine Warnung: alles vor der schlechten Zeile laeuft."""
+    f = tmp_path / "lauf.dh"
+    f.write_text('PRINT "davor"\nDIM s AS STRING\ns = 5\n', encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert "davor" in r.stdout, (r.stdout, r.stderr)
+    assert "Erwartet STRING" in (r.stdout + r.stderr), (r.stdout, r.stderr)

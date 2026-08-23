@@ -137,7 +137,10 @@ Nachgestellt mit `printf 'a\nb\n' | dhrt run p5.dh`: Ausgabe
 Damit ist `dir | meinwerkzeug | sort` nicht schreibbar — die klassische
 Bauform eines Werkzeugs.
 
-Vorschlag: `STDIN_LINE$()`, `STDIN_EOF()`, `STDIN_ALL$()`, `STDIN_BYTES()`.
+Vorschlag: `STDIN_LINE$`, `STDIN_EOF`, `STDIN_ALL$`, `STDIN_BYTES` — hier
+bewusst ohne Klammern geschrieben, weil es sie noch nicht gibt und die
+Doku-Prüfung jeden Namen mit angehängter Klammer gegen die echten Builtins
+hält.
 Alternativ `OPENFILE("-", "r")`, damit die vorhandenen Datei-Builtins gelten —
 das wäre die kleinere Fläche.
 
