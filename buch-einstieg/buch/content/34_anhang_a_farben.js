@@ -49,7 +49,7 @@ module.exports = (H) => [
 
   H.figure("anhang_heller_dunkler.png", "Dieselbe Farbe, zehnmal. Oben mit Anteil, unten mit Abstand zu 255.", 440, 280),
 
-  H.pmix(["Der ", ["\\", true], " ist die ganzzahlige Division aus Kapitel 2, und er steht hier nicht aus Bequemlichkeit da: ", ["RGB", true], " will ganze Zahlen. Mit ", ["/", true], " käme eine Kommazahl heraus und das Programm bräche ab mit „RGB erwartet INTEGER, erhalten FLOAT“."]),
+  H.pmix(["Der ", ["\\", true], " ist die ganzzahlige Division aus Kapitel 2. Mit ", ["/", true], " käme eine Kommazahl heraus — ", ["RGB", true], " nimmt die inzwischen an und rundet sie. Der Unterschied ist einer der Absicht: abschneiden oder runden."]),
 
   H.h2("Was RGB wirklich tut"),
 
@@ -77,7 +77,7 @@ module.exports = (H) => [
   H.h2("Wenn etwas nicht geht"),
 
   H.table([
-    [{ text: "RGB erwartet INTEGER, erhalten FLOAT", mono: true }, "Eine Rechnung mit / statt \\ , oder eine FLOAT-Variable. INT() darum herum."],
+    [{ text: "RGB-Werte muessen 0..255 sein", mono: true }, "Ein Anteil ist zu groß geworden. Rechne die Endwerte einmal von Hand aus — gerundet wird, aber nicht geklemmt."],
     ["Die Farbe stimmt nicht", "Ein Wert über 255. Rechne die Endwerte einmal von Hand aus."],
     ["Es wird gar nichts gezeichnet", "Die Farbe ist der Hintergrund. Oder es fehlt FLIP()."],
     ["Alles sieht grau aus", "Die drei Werte liegen zu nah beieinander. Farbe entsteht aus dem Unterschied."],

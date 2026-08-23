@@ -181,7 +181,7 @@ module.exports = (H) => [
   H.table([
     ["Alle Sterne sitzen an derselben Stelle", "Der Zufallsaufruf steht vor der Schleife statt darin. Er wird dann einmal gewürfelt und danach immer derselbe Wert benutzt."],
     ["Das Bild ist bei jedem Start gleich", "Irgendwo steht noch ein RANDOMIZE mit fester Zahl. Zeile löschen."],
-    [{ text: "RGB erwartet INTEGER, erhalten FLOAT", mono: true }, "RND() oder RANDF liefern Kommazahlen. Für Farben RANDINT nehmen."],
+    [{ text: "FLOAT … passt nicht verlustfrei in INTEGER", mono: true }, "RND() und RANDF liefern Kommazahlen. In einer INTEGER-Variablen bricht das ab — RANDINT nehmen oder INT() darum. In RGB selbst ist es inzwischen erlaubt, es rundet."],
     ["Etwas wird am Rand abgeschnitten", "Die Obergrenze ist zu hoch angesetzt: Sie muss die Größe des gemalten Dings berücksichtigen."],
     ["Die Sterne haben einen Farbstich", "Derselbe Zufallsaufruf steht zweimal in einer Zeile und wird zweimal gewürfelt. In einen Karton legen und den benutzen."],
   ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3600, 5426] }),

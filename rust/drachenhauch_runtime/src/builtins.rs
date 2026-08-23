@@ -996,8 +996,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "upper$" | "upper" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "UPPER$")?.to_uppercase())) }
         "lower$" | "lower" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "LOWER$")?.to_lowercase())) }
         "rgb" => {
+            // Gerundet statt streng: `RGB` war der einzige Ausreisser unter den
+            // Zeichen-Befehlen. CIRCLE/BOX/LINE/PLOT/TEXT/SETFPS nehmen alle
+            // eine Kommazahl an -- ausgerechnet die Farbe nicht, obwohl sie am
+            // haeufigsten ausgerechnet wird (`x * 255 / 640` fuer einen
+            // Verlauf; eine Division liefert IMMER FLOAT). `dhrt --check` kann
+            // davor nicht warnen, weil der Fehler am WERT haengt, nicht am
+            // Text -- im Einsteigerbuch fiel er deshalb fuenfmal an.
             arity!(3);
-            let (r, g, b) = (need_int(&a[0], "RGB")?, need_int(&a[1], "RGB")?, need_int(&a[2], "RGB")?);
+            let (r, g, b) = (need_int_gerundet(&a[0], "RGB")?, need_int_gerundet(&a[1], "RGB")?,
+                             need_int_gerundet(&a[2], "RGB")?);
             for v in [r, g, b] { if v < 0 || v > 255 { return err("RGB-Werte muessen 0..255 sein".to_string()); } }
             Ok(Value::Int((r << 16) | (g << 8) | b))
         }
@@ -1009,8 +1017,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // -> wird auf 1 angehoben (praktisch unsichtbar; fuer ganz
             // transparent einfach nicht zeichnen).
             arity!(4);
-            let (r, g, b, al) = (need_int(&a[0], "RGBA")?, need_int(&a[1], "RGBA")?,
-                                 need_int(&a[2], "RGBA")?, need_int(&a[3], "RGBA")?);
+            // Gerundet wie bei RGB -- Begruendung dort.
+            let (r, g, b, al) = (need_int_gerundet(&a[0], "RGBA")?, need_int_gerundet(&a[1], "RGBA")?,
+                                 need_int_gerundet(&a[2], "RGBA")?, need_int_gerundet(&a[3], "RGBA")?);
             for v in [r, g, b, al] { if v < 0 || v > 255 { return err("RGBA-Werte muessen 0..255 sein".to_string()); } }
             let al = if al == 0 { 1 } else { al };
             Ok(Value::Int((al << 24) | (r << 16) | (g << 8) | b))
