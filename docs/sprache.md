@@ -7,6 +7,7 @@ Drachenhauch ist BASIC mit Pascal-strikter Typisierung. Wer schon mal QBasic, GW
 - [Variablen und Konstanten](#variablen-und-konstanten)
 - [Zahlen-Literale](#zahlen-literale)
 - [Datentypen](#datentypen)
+- [Was der Übersetzer prüft](#was-der-übersetzer-prüft)
 - [ENUM](#enum)
 - [Compound-Assignment](#compound-assignment)
 - [String-Interpolation (f-Strings)](#string-interpolation-f-strings)
@@ -127,6 +128,47 @@ IF IS_NIL(bild) THEN
     bild = LOADIMAGE("hero.png")
 END IF
 ```
+
+## Was der Übersetzer prüft
+
+Die Typen gelten nicht erst beim Laufen. `dhrt --check` (im Editor die gelbe
+Schlängellinie, bei `dhrt run` eine Zeile auf stderr) meldet vorher, was am
+Text entscheidbar ist — an **allen vier Stellen**, an denen die Laufzeit einen
+Wert auf einen angesagten Typ umwandelt:
+
+```basic
+DIM s AS STRING
+s = 5                       ' Zuweisung
+f(s)                        ' Argument, bei FUNCTION f(a AS INTEGER)
+p.anzhal                    ' Mitglied, das die Klasse nicht hat
+RETURN "text"               ' in einer FUNCTION ... AS INTEGER
+```
+
+Dazu zwei Fälle, die keine Umwandlung betreffen, aber genauso sicher
+schiefgehen:
+
+* **Kommazahl an eine ganzzahlige Variable** (`n = 7 / 2`) — hier ist die
+  Laufzeit-Regel wertabhängig (`n = f * 2.0` geht bei `f = 1.5` gut und bei
+  `f = 1.6` schief), gemeldet wird die Zeile trotzdem.
+* **Eine typisierte FUNCTION ohne jedes `RETURN`** — sie liefert still `NIL`,
+  und `NIL` ist kein `INTEGER`.
+
+**Alles davon ist eine Warnung, kein Fehler.** Das Programm lässt sich
+übersetzen und läuft. Der Grund ist Ehrlichkeit: der Übersetzer leitet den Typ
+eines Ausdrucks nur her, wo er zweifelsfrei feststeht, und wo er ihn nicht
+kennt, sagt er nichts. Ein Irrtum in dieser Herleitung soll kein laufendes
+Programm abweisen.
+
+**Wo er bewusst schweigt** — damit keine Meldung falschen Alarm gibt:
+
+* **Rückgabewerte von Built-ins** werden nicht hergeleitet.
+* **Klassen, MAP und ARRAY** reicht die Laufzeit bei einer Zuweisung durch;
+  eine Meldung „bricht ab" wäre dort schlicht unwahr.
+* **`PROPERTY`** — dort entscheidet der Setter, nicht das Feld dahinter.
+* **Ein Mitglied, das eine ABGELEITETE Klasse hat.** `DIM t AS Tier : t = NEW
+  Hund() : t.belle()` ist gültig und bleibt still.
+* **Ob jeder Zweig ein `RETURN` erreicht.** Gemeldet wird nur, wo es gar keines
+  gibt.
 
 ## ENUM
 

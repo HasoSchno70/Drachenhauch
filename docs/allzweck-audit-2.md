@@ -27,20 +27,35 @@ abgeschrieben.**
 
 ---
 
-## 1 — Statische Typprüfung (größte Lücke)
+## 1 — Statische Typprüfung (größte Lücke) — ✅ ERLEDIGT 2026-08-23
+
+> **Gebaut.** `--check` meldet jetzt alle sechs Zeilen der Tabelle unten. Vier
+> Commits (`4117a83` Zuweisung, `8472f9c` Argument, `ac1a7f8` Mitglied,
+> `881431a` Rückgabe), 26 neue Tests, und vor jedem Schritt der Bestand
+> gemessen: alle 365 `.dh`-Dateien im Repo durch `--check`, **keine einzige
+> neue Meldung** außer drei echten Blindgängern in `49_pong_scene.dh`
+> (`y = HEIGHT / 2 - PADDLE_H / 2` — läuft nur, weil 240 und 40 gerade sind).
+> Beschrieben in `docs/sprache.md`, Abschnitt „Was der Übersetzer prüft".
+>
+> **Warnungen, keine Fehler** — und der Grund ist ein anderer als bei der
+> Kommazahl-Warnung von `3e9211d`: dort ist die Regel selbst wertabhängig,
+> hier ist sie eindeutig, aber die **Herleitung** des Ausdruckstyps ist neu.
+> Ein Irrtum darin soll kein laufendes Programm unübersetzbar machen. Wenn
+> sich das über ein paar Fassungen als still erweist, ist die Verschärfung zu
+> `error` ein Einzeiler.
 
 Die Typen sind da: `DIM x AS INTEGER`, Signaturen mit Typen, Klassen mit
-Feldern. Zur Laufzeit werden sie hart durchgesetzt. Beim Übersetzen fällt
+Feldern. Zur Laufzeit werden sie hart durchgesetzt. Beim Übersetzen fiel
 davon fast nichts auf.
 
-Was `dhrt --check` heute **findet**: fehlende und zu viele Argumente,
+Was `dhrt --check` **vorher fand**: fehlende und zu viele Argumente,
 unbekannte Builtins, eine Kommazahl an eine ganzzahlige Variable (seit
 `3e9211d`).
 
-Was es **nicht** findet — jedes davon nachgemessen, jedes bricht erst zur
+Was es **nicht fand** — jedes davon nachgemessen, jedes bricht erst zur
 Laufzeit ab, und nur dann, wenn die Zeile auch wirklich ausgeführt wird:
 
-| Quelltext | `--check` | zur Laufzeit |
+| Quelltext | `--check` vorher | zur Laufzeit |
 |---|---|---|
 | `DIM s AS STRING : s = 5` | *nichts* | `Zuweisung an global: Erwartet STRING, erhalten INTEGER` |
 | `DIM i AS INTEGER : i = "text"` | *nichts* | `Erwartet INTEGER, erhalten STRING` |
@@ -53,25 +68,39 @@ Die letzte Zeile ist die unangenehmste: eine Funktion, die `AS INTEGER`
 verspricht, darf keinen NIL zurückgeben. Das ist ein Loch im Typsystem selbst,
 kein fehlender Hinweis.
 
-**Warum das der wichtigste Punkt ist.** Bei einem Spiel läuft jeder Pfad
+**Warum das der wichtigste Punkt war.** Bei einem Spiel läuft jeder Pfad
 innerhalb von Minuten einmal. Bei Software läuft der Zweig „Rechnung stornieren
 mit Teilzahlung" vielleicht das erste Mal beim Kunden. Ein Tippfehler in einem
-Feldnamen geht heute durch Übersetzung, Start und Test hindurch und schlägt
-dort zu. Genau davor soll eine streng getypte Sprache schützen — das ist ihr
-ganzer Handel: Strenge beim Schreiben gegen Ruhe im Betrieb. Die Hälfte davon
-wird gerade nicht eingelöst.
+Feldnamen ging durch Übersetzung, Start und Test hindurch und schlug dort zu.
+Genau davor soll eine streng getypte Sprache schützen — das ist ihr ganzer
+Handel: Strenge beim Schreiben gegen Ruhe im Betrieb.
 
-**Die Maschinerie steht schon.** Der Compiler kennt die Typen der Globals, der
-Locals, der Parameter und der Klassenfelder — er benutzt sie bereits für
-spezialisierte Opcodes und für die Kommazahl-Warnung. Es geht um ein
-Ausdruckstyp-Urteil an den vier Stellen Zuweisung, Argumentbindung,
-Feld-/Methodenzugriff und Rückgabe. Konservativ bleiben, wo der Typ nicht
-sicher bestimmbar ist (unbekannt heißt: kein Fund), sonst reißt es bestehenden
-Code auf.
+**Die Maschinerie stand schon.** Der Compiler kannte die Typen der Globals, der
+Locals, der Parameter und der Klassenfelder — er benutzte sie bereits für
+spezialisierte Opcodes und für die Kommazahl-Warnung. Gebraucht wurde ein
+Ausdruckstyp-Urteil (`statischer_typ`) an den vier Stellen Zuweisung,
+Argumentbindung, Feld-/Methodenzugriff und Rückgabe. Konservativ bleiben, wo
+der Typ nicht sicher feststeht — `None` heißt „weiß ich nicht", und darauf
+stützt sich keine Meldung.
 
-Ein Zwischenschritt, der ohne Risiko geht: **erst als `warning` melden**, so
-wie es die Kommazahl-Warnung schon macht. Der Editor zeigt es an, kein
-bestehendes Programm hört auf zu laufen.
+**Was beim Bauen die eigentliche Arbeit war, ist nicht das Finden, sondern das
+Schweigen.** Drei Stellen hätten fast richtigen Code angestrichen:
+
+* **Polymorphie.** `DIM t AS Tier : t = NEW Hund() : t.belle()` ist gültig,
+  obwohl `Tier` kein `belle` hat. Deshalb zählen bei der Mitglieds-Prüfung
+  auch alle Klassen mit, die von der angesagten *abstammen*.
+* **Referenz-Typen.** `coerce()` reicht Klassen, MAP und ARRAY durch — eine
+  Meldung „bricht ab" wäre dort unwahr, so unsinnig die Zuweisung auch sein
+  mag.
+* **`RETURN` in Zweigen.** Eine Pfad-Analyse („wird das Ende erreicht?") ist
+  bei IF/SELECT/Schleifen schnell falsch beantwortet. Gemeldet wird nur, wo es
+  gar kein `RETURN` gibt — dieser Fall ist ohne Zweifel falsch.
+
+Dazu die drei bewussten Lücken: Rückgabetypen von Builtins (der Index ist
+handgepflegt, ein veralteter Eintrag wäre hier ein falscher Alarm statt bloß
+einer fehlenden Meldung), `PROPERTY` (dort entscheidet der Setter) und die
+Element-Typen von Arrays (`coerce_array` baut ein frisches Zahlen-Literal noch
+um, das ist statisch nicht sauber zu trennen).
 
 ## 2 — JSON kann nur gelesen, nicht geschrieben werden
 
@@ -255,7 +284,10 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
 
 - **1 (Typprüfung)** zuerst, weil es als einziges *jedes* bestehende und
   künftige Programm besser macht, ohne dass jemand etwas dazulernen muss. Und
-  weil es das Versprechen einlöst, mit dem die Sprache antritt.
+  weil es das Versprechen einlöst, mit dem die Sprache antritt. **Erledigt am
+  23.08.2026** — der Bestand blieb dabei still, was den Verdacht wert war und
+  gegengeprüft wurde: in das größte echte Programm (`buch-tippspiel`, 1922
+  Zeilen) eingebaute Fehler werden alle gefunden.
 - **2, 3, 4** sind zusammen „Daten rein und raus". Sie öffnen die Klasse
   Programme, die Daten von woanders holt, umformt und weitergibt — das ist der
   Großteil dessen, was Leute „Software" nennen.
