@@ -615,6 +615,7 @@ impl Compiler {
             Node::Const { name, type_name, value } =>
                 self.stmt_const(name, type_name.as_deref(), value),
             Node::Assign { name, value } => {
+                self.warn_komma_an_ganzzahl(name, value);
                 self.expr(value)?;
                 self.store_var(name);
                 Ok(())
@@ -767,6 +768,64 @@ impl Compiler {
     ///
     /// Bewusst nur eine WARNUNG: dasselbe DIM mehrfach mit GLEICHEM Typ ist
     /// gaengig (DIM im Schleifenkoerper) und bleibt still.
+    /// Der statische Typ eines Ausdrucks -- nur wo er ZWEIFELSFREI feststeht.
+    ///
+    /// Absichtlich lueckenhaft: `None` heisst "weiss ich nicht", und darauf
+    /// wird nie eine Meldung gestuetzt. Erfasst sind die Faelle, die in echtem
+    /// Code zum Stolpern fuehren -- ein Komma-Literal, eine als FLOAT
+    /// angesagte Variable, und jede Division mit `/` (die liefert IMMER eine
+    /// Kommazahl; fuer ganzzahlig gibt es `\`).
+    fn statischer_typ(&self, n: &Node) -> Option<&'static str> {
+        match n {
+            Node::NumberLit(NumV::Float(_)) => Some("float"),
+            Node::NumberLit(NumV::Int(_)) => Some("int"),
+            Node::Identifier(name) => match self.ctx.dim_types.get(&name.to_lowercase()) {
+                Some((t, _)) if t == "float" => Some("float"),
+                Some((t, _)) if t == "integer" => Some("int"),
+                _ => None,
+            },
+            Node::BinaryOp { op, left, right } => match op.as_str() {
+                "/" => Some("float"),
+                "\\" | "mod" => Some("int"),
+                "+" | "-" | "*" | "^" => {
+                    let (l, r) = (self.statischer_typ(left)?, self.statischer_typ(right)?);
+                    Some(if l == "float" || r == "float" { "float" } else { "int" })
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Warnt, wenn eine Kommazahl an eine ganzzahlige Variable geht.
+    ///
+    /// Zur Laufzeit ist die Regel WERTbasiert ("passt verlustfrei?"), deshalb
+    /// laeuft `n = f * 2.0` bei f = 1.5 anstandslos durch und bricht bei
+    /// f = 1.6 ab. Statisch entscheidbar ist das nicht -- eine Warnung ist
+    /// darum das staerkste, was hier ehrlich geht; ein Fehler wuerde
+    /// funktionierende Programme abweisen.
+    ///
+    /// Der Anlass: im Einsteigerbuch ist genau dieser Abbruch fuenfmal
+    /// angefallen, und `--check` hat jedes Mal geschwiegen -- die Pruefung sah
+    /// den Text, der Fehler hing am Wert. Fuer die entscheidbaren Faelle muss
+    /// sie nicht schweigen.
+    fn warn_komma_an_ganzzahl(&mut self, ziel: &str, wert: &Node) {
+        if self.ctx.dim_types.get(&ziel.to_lowercase()).map(|(t, _)| t.as_str()) != Some("integer") {
+            return;
+        }
+        if self.statischer_typ(wert) != Some("float") {
+            return;
+        }
+        let hinweis = match wert {
+            Node::BinaryOp { op, .. } if op == "/" =>
+                " Fuer ganzzahlige Division `\\` statt `/` nehmen.",
+            _ => " Mit INT() abschneiden oder ROUND() runden.",
+        };
+        let zeile = self.ctx.cur_line;
+        self.warnings.push((zeile, format!(
+            "'{}' ist als INTEGER angesagt, rechts steht eine Kommazahl. Das bricht beim Laufen ab, sobald der Wert nicht ganzzahlig ist ('passt nicht verlustfrei in INTEGER').{}", ziel, hinweis)));
+    }
+
     fn warn_dim_typ_wechsel(&mut self, name: &str, eff_type: &str) {
         let klein = name.to_lowercase();
         let zeile = self.ctx.cur_line;

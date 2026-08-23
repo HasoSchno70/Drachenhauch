@@ -719,7 +719,7 @@ WHILE NOT QUITREQUESTED()
     LINE(0, band_y + band_h - 1, SCREENWIDTH() - 1, band_y + band_h - 1, &H1A2A40)
 
     DIM scroll_mid AS INTEGER
-    scroll_mid = band_y + band_h / 2
+    scroll_mid = band_y + band_h \ 2
 
     TEXT_SIZE(22)
     TEXT_BOLD(TRUE)

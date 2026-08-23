@@ -124,3 +124,57 @@ END SUB
 nutzt()
 """)
     assert not any("verdeckt" in m for m in w), w
+
+
+# ------------------------------------------- Kommazahl an ganzzahlige Variable
+#
+# Die Laufzeit-Regel ist WERTbasiert ("passt verlustfrei?"): `n = f * 2.0`
+# laeuft bei f = 1.5 durch und bricht bei f = 1.6 ab. Statisch entscheidbar ist
+# das nicht -- deshalb WARNT der Compiler nur, statt abzuweisen. Anlass: im
+# Einsteigerbuch ist genau dieser Abbruch fuenfmal angefallen, und `--check`
+# hat jedes Mal geschwiegen.
+
+def test_division_an_ganzzahl_warnt(tmp_path):
+    w = _warnungen(tmp_path, "DIM n AS INTEGER" + chr(10) + "n = 7 / 2" + chr(10))
+    assert any("als INTEGER angesagt" in m for m in w), w
+    # Der Hinweis nennt bei einer Division den ganzzahligen Operator.
+    assert any(chr(92) in m for m in w), w
+
+
+def test_komma_literal_an_ganzzahl_warnt(tmp_path):
+    w = _warnungen(tmp_path, "DIM n AS INTEGER" + chr(10) + "n = 3.5" + chr(10))
+    assert any("als INTEGER angesagt" in m and "INT()" in m for m in w), w
+
+
+def test_float_variable_an_ganzzahl_warnt(tmp_path):
+    w = _warnungen(tmp_path, "DIM f AS FLOAT" + chr(10) + "f = 1.5" + chr(10)
+                   + "DIM n AS INTEGER" + chr(10) + "n = f" + chr(10))
+    assert any("als INTEGER angesagt" in m for m in w), w
+
+
+def test_ganzzahlige_division_warnt_nicht(tmp_path):
+    """Der empfohlene Weg darf nicht selbst angemeckert werden."""
+    w = _warnungen(tmp_path, "DIM n AS INTEGER" + chr(10) + "n = 7 " + chr(92) + " 2" + chr(10))
+    assert not any("als INTEGER angesagt" in m for m in w), w
+
+
+def test_ganzzahl_rechnung_warnt_nicht(tmp_path):
+    w = _warnungen(tmp_path, "DIM i AS INTEGER" + chr(10) + "i = 2" + chr(10)
+                   + "DIM n AS INTEGER" + chr(10) + "n = i * 2 + 3" + chr(10))
+    assert not any("als INTEGER angesagt" in m for m in w), w
+
+
+def test_kommazahl_an_kommazahl_warnt_nicht(tmp_path):
+    w = _warnungen(tmp_path, "DIM f AS FLOAT" + chr(10) + "f = 7 / 2" + chr(10))
+    assert not any("als INTEGER angesagt" in m for m in w), w
+
+
+def test_warnung_blockiert_nicht(tmp_path):
+    """Es bleibt eine Warnung: das Programm laeuft, solange der Wert passt."""
+    f = tmp_path / "lauf.dh"
+    f.write_text("DIM g AS FLOAT" + chr(10) + "g = 1.5" + chr(10)
+                 + "DIM n AS INTEGER" + chr(10) + "n = g * 2.0" + chr(10)
+                 + "PRINT n" + chr(10), encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "3", (r.stdout, r.stderr)

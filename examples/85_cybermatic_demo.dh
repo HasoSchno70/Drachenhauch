@@ -248,7 +248,7 @@ WHILE NOT QUITREQUESTED()
 
     ' FFT-Spektrum, oben + unten gespiegelt.
     DIM bw AS INTEGER
-    bw = W / NB
+    bw = W \ NB
     DIM i AS INTEGER
     FOR i = 0 TO NB - 1
         DIM bh AS INTEGER
