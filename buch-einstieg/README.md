@@ -89,11 +89,10 @@ beide an 15 Stellen voneinander ab; beides lief, beides war richtig, aber wer
 abtippt und danach in die Datei sieht, zweifelt dann an sich statt am Buch.
 
 `--check` allein reicht ebenfalls nicht — es prüft den Text, nicht die Werte.
-`n = 7 / 2` mit `n` als INTEGER geht anstandslos durch und bricht erst beim
-Laufen ab („FLOAT 3.5 passt nicht verlustfrei in INTEGER"). Deshalb wird jedes
-Grafikprogramm zusätzlich wirklich ausgeführt, nämlich beim Aufnehmen der
-Bilder. (Das frühere Beispiel dieser Stelle, `RGB(x * 255 / 640, ...)`, taugt
-seit dem 2026-08-23 nicht mehr dafür: RGB rundet Kommazahlen inzwischen selbst.)
+Seit dem 2026-08-23 warnt es immerhin bei den Fällen, die am Text erkennbar
+sind (`n = 7 / 2` mit `n` als INTEGER). Wertabhängig bleibt der Rest: ob
+`n = f * 2.0` gutgeht, entscheidet f. Deshalb wird jedes Grafikprogramm
+zusätzlich wirklich ausgeführt, nämlich beim Aufnehmen der Bilder.
 
 ## Anhang B schreibt sich selbst
 

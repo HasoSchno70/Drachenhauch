@@ -71,7 +71,7 @@ WHILE NOT QUITREQUESTED()
     start_x = -INT(off_far) MOD mtn_w - mtn_w
     x = start_x
     WHILE x < WIDTH + mtn_w
-        peak_x = x + mtn_w / 2
+        peak_x = x + mtn_w \ 2
         DIM yy AS INTEGER
         FOR yy = mtn_peak_y TO mtn_base_y
             DIM tprog AS FLOAT

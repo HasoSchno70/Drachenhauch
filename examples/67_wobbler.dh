@@ -56,8 +56,8 @@ DIM t AS FLOAT
 t = 0.0
 DIM cx AS INTEGER
 DIM cy AS INTEGER
-cx = WIDTH / 2
-cy = HEIGHT / 2
+cx = WIDTH \ 2
+cy = HEIGHT \ 2
 DIM y AS INTEGER
 DIM offset AS INTEGER
 DIM amp AS FLOAT
@@ -111,8 +111,8 @@ WHILE NOT QUITREQUESTED()
     amp = 18 + SIN(t * 0.3) * 8
     DIM lx AS INTEGER
     DIM ly AS INTEGER
-    lx = cx - lw / 2
-    ly = cy - lh / 2
+    lx = cx - lw \ 2
+    ly = cy - lh \ 2
     FOR y = 0 TO lh - 1
         offset = INT(SIN(t + y * freq) * amp)
         DRAWIMAGEPART(logo, 0, y, lw, 1, lx + offset, ly + y)
