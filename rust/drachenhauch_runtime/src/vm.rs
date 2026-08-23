@@ -727,6 +727,10 @@ pub struct Vm<'p> {
     // Modul mqtt: baut auf std::net auf wie net, eigener Handle-Typ.
     #[cfg(feature = "net")]
     mqtt_clients: Vec<Option<crate::mqtt::Client>>,
+    /// Modul `httpd` -- laufende Webserver (Tombstone-Vec wie ueberall:
+    /// eine vergebene Nummer bleibt gueltig, auch wenn ein frueherer
+    /// Server schon gestoppt wurde).
+    httpd_server: Vec<Option<crate::httpd::Server>>,
     // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
     #[cfg(feature = "http")]
     http_status: i64,
@@ -858,6 +862,7 @@ impl<'p> Vm<'p> {
             udp_socks: Vec::new(),
             #[cfg(feature = "net")]
             mqtt_clients: Vec::new(),
+            httpd_server: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
             #[cfg(feature = "http")]
@@ -2237,6 +2242,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
+                        else if let Some(v) = self.try_httpd(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2963,6 +2969,141 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul mqtt (baut auf std::net auf, Feature `net`)
     // ===================================================================
+    /// Modul `httpd` -- ein kleiner Webserver im Takt der Hauptschleife.
+    ///
+    /// Steht in vm.rs und nicht in builtins.rs, weil die laufenden Server
+    /// VM-Zustand sind (wie die MQTT-Verbindungen daneben).
+    fn try_httpd(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("httpd_") { return Ok(None); }
+        #[cfg(feature = "net")]
+        { return self.try_httpd_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a);
+          Err("httpd: dieser dhrt-Build hat das Netz-Feature nicht (neu bauen mit python rust/build_runtime.py)".to_string()) }
+    }
+
+    #[cfg(feature = "net")]
+    fn httpd_srv(&mut self, idx: i64) -> R<&mut crate::httpd::Server> {
+        Self::handle_get_mut(&mut self.httpd_server, idx, "HTTPD",
+                             "ungueltiges/gestopptes HTTPD-Handle")
+    }
+
+    #[cfg(feature = "net")]
+    fn try_httpd_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::httpd;
+        let v = match name {
+            "httpd_start" => {
+                let port = bi_int(a, 0, "HTTPD_START")?;
+                let bind = match a.get(1) { Some(Value::Str(s)) => s.to_string(), _ => String::new() };
+                let s = httpd::starten(port, &bind)?;
+                self.httpd_server.push(Some(s));
+                Value::Int((self.httpd_server.len() - 1) as i64)
+            }
+            "httpd_stop" => {
+                let i = bi_int(a, 0, "HTTPD_STOP")? as usize;
+                if let Some(slot) = self.httpd_server.get_mut(i) { *slot = None; }
+                Value::Nil
+            }
+            "httpd_port" => { let i = bi_int(a, 0, "HTTPD_PORT")?; Value::Int(self.httpd_srv(i)?.port) }
+            "httpd_accept" => {
+                let i = bi_int(a, 0, "HTTPD_ACCEPT")?;
+                Value::Bool(httpd::annehmen(self.httpd_srv(i)?)?)
+            }
+            "httpd_method$" | "httpd_method" => {
+                let i = bi_int(a, 0, "HTTPD_METHOD$")?;
+                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_METHOD$")?.methode.clone())
+            }
+            "httpd_path$" | "httpd_path" => {
+                let i = bi_int(a, 0, "HTTPD_PATH$")?;
+                Value::str_rc(&Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_PATH$")?.pfad.clone())
+            }
+            "httpd_body$" | "httpd_body" => {
+                let i = bi_int(a, 0, "HTTPD_BODY$")?;
+                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_BODY$")?;
+                Value::str_rc(&String::from_utf8_lossy(&r.rumpf))
+            }
+            "httpd_query$" | "httpd_query" => {
+                let i = bi_int(a, 0, "HTTPD_QUERY$")?;
+                let k = bi_str(a, 1, "HTTPD_QUERY$")?.to_lowercase();
+                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_QUERY$")?;
+                // Nicht vorhanden -> Leerstring, kein Fehler: was in einer
+                // Adresse steht, ist Benutzereingabe (wie ARG$).
+                Value::str_rc(r.abfrage.iter().find(|(n, _)| n.to_lowercase() == k)
+                               .map(|(_, v)| v.as_str()).unwrap_or(""))
+            }
+            "httpd_header$" | "httpd_header" => {
+                let i = bi_int(a, 0, "HTTPD_HEADER$")?;
+                let k = bi_str(a, 1, "HTTPD_HEADER$")?.to_lowercase();
+                let r = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_HEADER$")?;
+                Value::str_rc(r.kopfzeilen.iter().find(|(n, _)| *n == k)
+                               .map(|(_, v)| v.as_str()).unwrap_or(""))
+            }
+            "httpd_send" => {
+                let i = bi_int(a, 0, "HTTPD_SEND")?;
+                let code = bi_int(a, 1, "HTTPD_SEND")?;
+                let typ = bi_str(a, 2, "HTTPD_SEND")?.to_string();
+                let inhalt = bi_str(a, 3, "HTTPD_SEND")?.to_string();
+                httpd::antworten(self.httpd_srv(i)?, code, &typ, inhalt.as_bytes())?;
+                Value::Nil
+            }
+            "httpd_send_file" => {
+                let i = bi_int(a, 0, "HTTPD_SEND_FILE")?;
+                let code = bi_int(a, 1, "HTTPD_SEND_FILE")?;
+                let pfad = bi_str(a, 2, "HTTPD_SEND_FILE")?.to_string();
+                let inhalt = std::fs::read(&pfad)
+                    .map_err(|e| format!("HTTPD_SEND_FILE: {}: {}", pfad, e))?;
+                let typ = httpd::typ_aus_endung(&pfad);
+                httpd::antworten(self.httpd_srv(i)?, code, typ, &inhalt)?;
+                Value::Nil
+            }
+            "httpd_send_dir" => {
+                // Der SICHERE Weg, Dateien auszuliefern: der angefragte Pfad
+                // wird selbst im Ordner aufgeloest, samt Pruefung gegen
+                // `..`. Die naheliegende Handarbeit
+                // (`HTTPD_SEND_FILE(s, 200, "web" + HTTPD_PATH$(s))`) laesst
+                // sich mit `/../../geheim` aus dem Ordner herausfuehren --
+                // dieselbe Lehre wie bei der Zip-Slip-Pruefung.
+                let i = bi_int(a, 0, "HTTPD_SEND_DIR")?;
+                let ordner = bi_str(a, 1, "HTTPD_SEND_DIR")?.to_string();
+                let start = match a.get(2) { Some(Value::Str(s)) => s.to_string(), _ => "index.html".to_string() };
+                let pfad = Self::httpd_anfrage(self.httpd_srv(i)?, "HTTPD_SEND_DIR")?.pfad.clone();
+                let wurzel = std::path::Path::new(&ordner);
+                let ziel = match httpd::sicher_verbinden(wurzel, &pfad) {
+                    Some(z) => if z.is_dir() { z.join(&start) } else { z },
+                    None => {
+                        httpd::antworten(self.httpd_srv(i)?, 403, "text/plain; charset=utf-8",
+                                         b"403 -- Pfad nicht erlaubt")?;
+                        return Ok(Some(Value::Bool(false)));
+                    }
+                };
+                match std::fs::read(&ziel) {
+                    Ok(inhalt) => {
+                        let typ = httpd::typ_aus_endung(&ziel.to_string_lossy());
+                        httpd::antworten(self.httpd_srv(i)?, 200, typ, &inhalt)?;
+                        Value::Bool(true)
+                    }
+                    Err(_) => {
+                        // Kein Fehler, sondern ein 404 -- eine fehlende Datei
+                        // ist der Alltag eines Servers und darf das Programm
+                        // nicht anhalten. Der Rueckgabewert sagt es trotzdem.
+                        httpd::antworten(self.httpd_srv(i)?, 404, "text/plain; charset=utf-8",
+                                         b"404 -- nicht gefunden")?;
+                        Value::Bool(false)
+                    }
+                }
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    /// Die gerade offene Anfrage -- oder ein Hinweis, dass keine anliegt.
+    #[cfg(feature = "net")]
+    fn httpd_anfrage<'x>(s: &'x crate::httpd::Server, fn_: &str) -> R<&'x crate::httpd::Anfrage> {
+        s.offen.as_ref().map(|(_, a)| a)
+            .ok_or_else(|| format!("{}: es liegt keine Anfrage an -- erst HTTPD_ACCEPT abfragen", fn_))
+    }
+
     fn try_mqtt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("mqtt_")) { return Ok(None); }
         #[cfg(feature = "net")]

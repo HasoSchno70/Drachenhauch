@@ -1,0 +1,94 @@
+' 173 -- Eine kleine Weboberflaeche fuer die eigene Steuerung
+'
+' Der Fall, fuer den es das Modul `httpd` gibt: ein Programm, das etwas
+' steuert oder misst, bekommt eine Bedienseite im Heimnetz. Mit `mqtt`,
+' `firmata` und `serial` an Bord fehlte dafuer genau dieser eine Baustein.
+'
+' Hier wird eine Heizung nachgespielt: Solltemperatur anzeigen, per Klick
+' aendern, und die Messwerte als JSON herausgeben (damit sich etwas anderes
+' daran haengen kann).
+'
+' Aufruf:  dhrt run 173_webserver.dh
+' Dann im Browser:  http://127.0.0.1:8080/
+'
+' Beenden mit Strg+C.
+
+IMPORT "httpd"
+IMPORT "json"
+
+CONST PORT AS INTEGER = 8080
+
+DIM s AS HTTPD
+DIM soll AS FLOAT
+DIM ist AS FLOAT
+DIM anfragen AS INTEGER
+
+soll = 21.0
+ist = 19.4
+anfragen = 0
+
+s = HTTPD_START(PORT)
+' EPRINT statt PRINT: die Ausgabe von PRINT wird gepuffert und erschiene erst
+' am Programmende -- diese Zeile soll aber SOFORT dastehen.
+EPRINT("Laeuft auf http://127.0.0.1:" + STR$(HTTPD_PORT(s)) + "/  (Strg+C beendet)")
+
+' --- Die Seite, einmal zusammengebaut ------------------------------------
+FUNCTION Seite(soll AS FLOAT, ist AS FLOAT, anfragen AS INTEGER) AS STRING
+    DIM h AS STRING
+    h = "<!doctype html><html><head><meta charset=""utf-8"">"
+    h = h + "<title>Heizung</title></head><body>"
+    h = h + "<h1>Heizung</h1>"
+    h = h + "<p>Ist: <b>" + FORMAT$(ist, "%.1f") + " Grad</b></p>"
+    h = h + "<p>Soll: <b>" + FORMAT$(soll, "%.1f") + " Grad</b></p>"
+    h = h + "<p><a href=""/setzen?grad=" + FORMAT$(soll - 0.5, "%.1f") + """>kaelter (-0,5)</a>"
+    h = h + " &nbsp; <a href=""/setzen?grad=" + FORMAT$(soll + 0.5, "%.1f") + """>waermer (+0,5)</a></p>"
+    h = h + "<p><a href=""/werte.json"">Werte als JSON</a></p>"
+    h = h + "<p><small>" + STR$(anfragen) + " Anfragen bisher</small></p>"
+    h = h + "</body></html>"
+    RETURN h
+END FUNCTION
+
+' --- Die Messwerte als JSON ----------------------------------------------
+FUNCTION Werte(soll AS FLOAT, ist AS FLOAT) AS STRING
+    DIM d AS JSON_HANDLE
+    d = JSON_NEW_OBJECT()
+    ' Auf eine Nachkommastelle runden: eine FLOAT-Summe traegt Rauschen
+    ' mit sich (0.1 + 0.2 ist nicht genau 0.3), und das gehoert nicht in
+    ' eine Schnittstelle, die jemand anders liest.
+    JSON_SET_FLOAT(d, "soll", ROUND(soll * 10.0) / 10.0)
+    JSON_SET_FLOAT(d, "ist", ROUND(ist * 10.0) / 10.0)
+    JSON_SET_BOOL(d, "heizt", ist < soll)
+    RETURN JSON_STRINGIFY(d)
+END FUNCTION
+
+' --- Die Schleife ---------------------------------------------------------
+'
+' HTTPD_ACCEPT kehrt SOFORT zurueck, wenn niemand anklopft -- die Schleife
+' darf also nebenher alles andere tun (messen, zeichnen, Ventil stellen).
+WHILE TRUE
+    IF HTTPD_ACCEPT(s) THEN
+        anfragen = anfragen + 1
+        SELECT CASE HTTPD_PATH$(s)
+            CASE "/setzen"
+                ' Was in einer Adresse steht, ist Benutzereingabe: VAL()
+                ' liefert bei Unsinn 0, und der Bereich wird geklemmt.
+                soll = CLAMP(VAL(HTTPD_QUERY$(s, "grad")), 5.0, 30.0)
+                EPRINT("Soll jetzt " + FORMAT$(soll, "%.1f"))
+                ' 302 zurueck auf die Startseite -- so steht im Browser
+                ' danach nicht die Setz-Adresse.
+                HTTPD_SEND(s, 302, "text/html; charset=utf-8", _
+                           "<a href=""/"">zurueck</a>")
+            CASE "/werte.json"
+                HTTPD_SEND(s, 200, "application/json; charset=utf-8", Werte(soll, ist))
+            CASE "/"
+                HTTPD_SEND(s, 200, "text/html; charset=utf-8", Seite(soll, ist, anfragen))
+            CASE ELSE
+                HTTPD_SEND(s, 404, "text/plain; charset=utf-8", "gibt es hier nicht")
+        END SELECT
+    END IF
+
+    ' Nebenher: die Ist-Temperatur zieht langsam zur Soll-Temperatur.
+    IF ist < soll THEN ist = ist + 0.01
+    IF ist > soll THEN ist = ist - 0.01
+    SLEEP(10)
+WEND

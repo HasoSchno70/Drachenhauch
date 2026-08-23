@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1444,
+ "count": 1456,
  "builtins": [
   {
    "name": "ABS",
@@ -3733,6 +3733,78 @@
    "kind": "core",
    "signature": "HTML_TEXT(s: STRING)",
    "module": "html"
+  },
+  {
+   "name": "HTTPD_ACCEPT",
+   "kind": "core",
+   "signature": "HTTPD_ACCEPT(s: HTTPD) AS BOOLEAN",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_BODY$",
+   "kind": "core",
+   "signature": "HTTPD_BODY$(s: HTTPD) AS STRING",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_HEADER$",
+   "kind": "core",
+   "signature": "HTTPD_HEADER$(s: HTTPD, name$) AS STRING",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_METHOD$",
+   "kind": "core",
+   "signature": "HTTPD_METHOD$(s: HTTPD) AS STRING",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_PATH$",
+   "kind": "core",
+   "signature": "HTTPD_PATH$(s: HTTPD) AS STRING",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_PORT",
+   "kind": "core",
+   "signature": "HTTPD_PORT(s: HTTPD) AS INTEGER",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_QUERY$",
+   "kind": "core",
+   "signature": "HTTPD_QUERY$(s: HTTPD, name$) AS STRING",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_SEND",
+   "kind": "core",
+   "signature": "HTTPD_SEND(s: HTTPD, code: INTEGER, typ$, inhalt$)",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_SEND_DIR",
+   "kind": "core",
+   "signature": "HTTPD_SEND_DIR(s: HTTPD, ordner$ [, start$]) AS BOOLEAN",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_SEND_FILE",
+   "kind": "core",
+   "signature": "HTTPD_SEND_FILE(s: HTTPD, code: INTEGER, pfad$)",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_START",
+   "kind": "core",
+   "signature": "HTTPD_START(port: INTEGER [, bind$]) AS HTTPD",
+   "module": "httpd"
+  },
+  {
+   "name": "HTTPD_STOP",
+   "kind": "core",
+   "signature": "HTTPD_STOP(s: HTTPD)",
+   "module": "httpd"
   },
   {
    "name": "HTTP_BYTES",

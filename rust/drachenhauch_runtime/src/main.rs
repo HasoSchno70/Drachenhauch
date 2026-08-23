@@ -27,6 +27,7 @@ mod web_audio;
 mod chart;
 mod csv;
 mod kodierung;
+mod httpd;
 mod zipdatei;
 mod builtins;
 mod compiler;

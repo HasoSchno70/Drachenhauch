@@ -74,7 +74,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 85 MB, aktuell Fassung 2026.8.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 187 Beispiele samt Assets, das Lehrbuch in beiden Sprachen als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 188 Beispiele samt Assets, das Lehrbuch in beiden Sprachen als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -118,7 +118,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **Module** — 39 Stück, [Tabelle unten](#module)
+- **Module** — 40 Stück, [Tabelle unten](#module)
 - **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Split-View** (Strg+\\), **Debugger** (Breakpoints inkl. **bedingter** Breakpoints/Step/Variablen), **Profiler** (Hotpath pro Zeile/Funktion), **Git-Blame**-Panel, Welcome-Showcase (Demo-Galerie mit Screenshots)
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`dhsprites`): Multi-Frame, **Ebenen** (Sichtbarkeit/Deckkraft/Merge-Down, `.dhsprite` v5), Animation, Atlas-Export, **Export-Skalierung** (1x–8x, Nearest-Neighbor), **Lasso-Auswahl** (echte Pixel-Maske) + Rechteck-Auswahl, Onion-Skin (Deckkraft/Reichweite einstellbar), Tile-Preview
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`dhparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, **Preset-Bibliothek** (Werks- + eigene Presets), GB-Code-Export
@@ -136,7 +136,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 ### Module
 
-39 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+40 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
 [docs/](docs/README.md#module).
 
 **Spiel-Bausteine**

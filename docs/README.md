@@ -63,6 +63,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `physics3d` | Vollwertiger 3D-Starrkörper-Solver (Rapier3D) | [module-physics3d.md](module-physics3d.md) |
 | `audio` (Modulatoren) | LFO und Tweener auf dem Audio-Thread: Tremolo, Wobble, Filter-Sweeps ohne Nachrechnen pro Frame | [module-audio-modulatoren.md](module-audio-modulatoren.md) |
 | `mqtt` | MQTT-3.1.1-Client — das Pub/Sub-Protokoll der IoT-/Maker-Welt | [module-mqtt.md](module-mqtt.md) |
+| `httpd` | Ein kleiner Webserver im Takt der Hauptschleife — Bedienoberfläche im Heimnetz | [module-httpd.md](module-httpd.md) |
 | `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
 ### Werkzeug
