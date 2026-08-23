@@ -182,10 +182,28 @@ Vorschlag: optionaler Kodierungs-Parameter bei `READLINES`, `READALL`,
 `WRITEALL`, `CSV_LOAD`, `CSV_SAVE` — `"utf8"` (Vorgabe), `"cp1252"`,
 `"latin1"`. Und die Fehlermeldung soll den Parameter nennen.
 
-## 4 — Standardeingabe: Filterprogramme lassen sich nicht schreiben
+## 4 — Standardeingabe: Filterprogramme lassen sich nicht schreiben — ✅ ERLEDIGT 2026-08-23
+
+> **Gebaut** (`2e8c28d`): `STDIN([kodierung$])` liefert die Standardeingabe als
+> ganz normales **FILE-Handle** — `READLINE`, `READALL$`, `ENDOFFILE` und
+> `READ_BYTES` gelten damit unverändert, die Kodierung aus Punkt 3 ebenfalls.
+> Das ist besser als beide hier vorgeschlagenen Wege: auffindbarer als die
+> magische Zeichenkette `"-"` und ohne die vier `STDIN_*`-Doppelgänger, die
+> dieselbe EOF- und Kodierungslogik ein zweites Mal gebraucht hätten.
+>
+> **`INPUT` blieb unangetastet.** Der Vorwurf oben (es druckt seinen Prompt
+> nach stdout) hat sich beim Nachsehen als *notwendig* erwiesen: die
+> Editor-Konsole pipet stdin, und ein Test hält seit jeher fest, dass der
+> Prompt trotzdem sichtbar sein muss. Ihn an ein Terminal zu koppeln hätte
+> also genau die Konsole kaputtgemacht, für die er da ist. Aus dem Mangel
+> wurde damit eine Arbeitsteilung: `INPUT` fragt einen Menschen, `STDIN()`
+> verarbeitet einen Strom.
+>
+> 15 Tests, Beispiel `examples/172_filter.dh` (Dateien **oder**
+> Standardeingabe, wie `wc` und `grep`).
 
 WP A hat „Werkzeug in einer Kette" ausdrücklich zum Ziel erklärt. Der halbe
-Weg fehlt noch: ein Programm kann lesen, was ihm als *Argument* gegeben wird,
+Weg fehlte: ein Programm kann lesen, was ihm als *Argument* gegeben wird,
 aber nicht, was ihm *gereicht* wird.
 
 - Es gibt kein stdin-Handle: `ENDOFFILE(0)` → `erwartet FILE`.
@@ -324,8 +342,8 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   Zeilen) eingebaute Fehler werden alle gefunden.
 - **2, 3, 4** sind zusammen „Daten rein und raus". Sie öffnen die Klasse
   Programme, die Daten von woanders holt, umformt und weitergibt — das ist der
-  Großteil dessen, was Leute „Software" nennen. **2 und 3 sind erledigt**
-  (23.08.2026).
+  Großteil dessen, was Leute „Software" nennen. **2, 3 und 4 sind erledigt**
+  (23.08.2026) — damit ist der ganze Block „Daten rein und raus" zu.
 - **6** ist billig und wirkt nach außen: `--version`, ein Test-Läufer, ein
   Formatierer sind die Zeichen, an denen jemand erkennt, ob eine Sprache zum
   Arbeiten taugt.
