@@ -524,3 +524,104 @@ p = NEW P()
 p.anzhal = 5
 """)
     assert any("kein Mitglied 'anzhal'" in m for m in w), w
+
+
+# ------------------------------------------------------ Rueckgabewert
+#
+# Der dritte Ort, an dem dieselbe Coercion-Regel gilt. Dazu der Fall, der ein
+# Loch im Typsystem selbst ist: eine als INTEGER angesagte FUNCTION ohne
+# RETURN liefert still NIL -- und NIL ist kein INTEGER.
+
+def test_falscher_rueckgabetyp_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+FUNCTION f() AS INTEGER
+    RETURN "text"
+END FUNCTION
+PRINT f()
+""")
+    assert any("hinter RETURN" in m and "erhalten STRING" in m for m in w), w
+
+
+def test_fehlendes_return_warnt(tmp_path):
+    w = _warnungen(tmp_path, """
+FUNCTION f(a AS INTEGER) AS INTEGER
+    PRINT a
+END FUNCTION
+PRINT f(1)
+""")
+    assert any("kein einziges RETURN" in m and "NIL" in m for m in w), w
+
+
+def test_return_in_einem_zweig_reicht(tmp_path):
+    """Keine Pfad-Analyse: wo es ueberhaupt ein RETURN gibt, wird geschwiegen.
+    Wer hier falsch urteilt, meldet richtigen Code."""
+    for quelle in (
+        """
+FUNCTION f(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN
+        RETURN 1
+    END IF
+    RETURN 0
+END FUNCTION
+PRINT f(1)
+""",
+        """
+FUNCTION g(a AS INTEGER) AS STRING
+    SELECT CASE a
+        CASE 1
+            RETURN "eins"
+        CASE ELSE
+            RETURN "?"
+    END SELECT
+END FUNCTION
+PRINT g(1)
+""",
+    ):
+        w = _warnungen(tmp_path, quelle)
+        assert not any("kein einziges RETURN" in m for m in w), (quelle, w)
+
+
+def test_funktion_die_immer_wirft_bleibt_still(tmp_path):
+    """Sie kommt nie ans Ende und braucht darum kein RETURN."""
+    w = _warnungen(tmp_path, """
+FUNCTION f() AS INTEGER
+    THROW "nicht umgesetzt"
+END FUNCTION
+PRINT 1
+""")
+    assert not any("kein einziges RETURN" in m for m in w), w
+
+
+def test_coroutine_bleibt_still(tmp_path):
+    """Ihr RETURN ist laut Sprachdoku freiwillig."""
+    w = _warnungen(tmp_path, """
+FUNCTION zaehler() AS INTEGER
+    YIELD 1
+    YIELD 2
+END FUNCTION
+DIM c AS COROUTINE
+c = zaehler()
+PRINT CORO_RESUME(c)
+""")
+    assert not any("kein einziges RETURN" in m for m in w), w
+
+
+def test_abstrakte_methode_bleibt_still(tmp_path):
+    """Sie ist absichtlich nur angekuendigt."""
+    w = _warnungen(tmp_path, """
+CLASS Form
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+    SUB zeige()
+        PRINT flaeche()
+    END SUB
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.14
+    END FUNCTION
+END CLASS
+DIM k AS Kreis
+k = NEW Kreis()
+k.zeige()
+""")
+    assert not any("kein einziges RETURN" in m for m in w), w

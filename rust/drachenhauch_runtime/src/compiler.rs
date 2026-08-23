@@ -184,6 +184,10 @@ struct Ctx {
     is_main: bool,
     is_sub: bool,
     current_class: Option<String>,
+    /// Angesagter Rueckgabetyp der Funktion, die gerade uebersetzt wird
+    /// (leer im Hauptprogramm und in jeder SUB). Grundlage der Pruefung an
+    /// jedem RETURN.
+    return_type: String,
 }
 
 impl Ctx {
@@ -193,7 +197,8 @@ impl Ctx {
               try_stack: vec![],
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               dim_types: HashMap::new(),
-              is_main: true, is_sub: true, current_class: None }
+              is_main: true, is_sub: true, current_class: None,
+              return_type: String::new() }
     }
     /// Anonymer Local-Slot fuer Compiler-Zwischenwerte (Comprehensions, WITH,
     /// Tupel-Destructuring). KEIN DECLARE_LOCAL -- der Slot wird beim Frame-
@@ -722,6 +727,7 @@ impl Compiler {
                         if self.ctx.is_sub {
                             return Err("SUB darf RETURN nicht mit Wert verwenden".into());
                         }
+                        self.warn_rueckgabe_typ(v);
                         // Rueckgabewert VOR dem Abraeumen berechnen: der
                         // FINALLY-Block laeuft danach, darf den Wert aber
                         // nicht mehr aendern -- `RETURN x` liefert x, auch
@@ -1130,6 +1136,52 @@ impl Compiler {
             }
         }
         zeile[b.len()]
+    }
+
+    /// Warnt, wenn ein `RETURN` einen Typ liefert, den der angesagte
+    /// Rueckgabetyp nie annimmt.
+    ///
+    /// Die Laufzeit wandelt den Rueckgabewert auf den angesagten Typ um -- es
+    /// ist wieder dieselbe Regel wie bei einer Zuweisung, nur an der dritten
+    /// Stelle, an der sie gilt.
+    fn warn_rueckgabe_typ(&mut self, wert: &Node) {
+        let ziel = self.ctx.return_type.clone();
+        if ziel.is_empty() || ziel == "any" { return; }
+        let Some(quelle) = self.statischer_typ(wert) else { return };
+        if !Self::passt_nie(&quelle, &ziel) { return; }
+        let zeile = self.ctx.cur_line;
+        self.warnings.push((zeile, format!(
+            "Diese Funktion ist als {} angesagt, hier steht {} hinter RETURN. Das bricht beim Laufen ab ('Erwartet {}, erhalten {}').{}",
+            Self::typ_klartext(&ziel), Self::typ_klartext(&quelle),
+            ziel.to_uppercase(), quelle.to_uppercase(),
+            Self::typ_hinweis(&quelle, &ziel))));
+    }
+
+    /// Warnt, wenn eine typisierte FUNCTION ueberhaupt kein `RETURN` mit Wert
+    /// enthaelt.
+    ///
+    /// Sie liefert dann still NIL -- und NIL ist kein INTEGER. Das ist ein Loch
+    /// im Typsystem selbst, kein blosser fehlender Hinweis: der Aufrufer
+    /// bekommt einen Wert, den seine eigene Ansage ausschliesst, und merkt es
+    /// erst weiter unten (oder gar nicht, wenn er ihn nur weiterreicht).
+    ///
+    /// Bewusst KEINE Pfad-Analyse ("kann das Ende erreicht werden?"): ein
+    /// `RETURN` in jedem IF-Zweig ist gueltig, und wer das falsch beurteilt,
+    /// meldet richtigen Code. Gemeldet wird nur, wo es GAR KEIN RETURN gibt --
+    /// dieser Fall ist ohne Zweifel falsch.
+    ///
+    /// Ausgenommen: Coroutinen (ihr RETURN ist laut Sprachdoku freiwillig),
+    /// angekuendigte ABSTRACT-Methoden (die haben absichtlich keinen Rumpf)
+    /// und Ruempfe mit einem THROW -- eine Funktion, die immer wirft, kommt
+    /// nie ans Ende und braucht darum kein RETURN.
+    fn warn_fehlendes_return(&mut self, name: &str, rt: &str, body: &[Node], zeile: u32) {
+        if rt.is_empty() || rt == "any" { return; }
+        if body.is_empty() { return; }
+        if body_has_yield(body) { return; }
+        if any_stmt(body, &|n| matches!(n, Node::Return(Some(_)) | Node::Throw { .. })) { return; }
+        self.warnings.push((zeile, format!(
+            "'{}' ist als {} angesagt, hat aber kein einziges RETURN mit Wert. Die Funktion liefert damit still NIL -- und NIL ist kein {}. Der Fehler faellt erst beim Aufrufer auf.",
+            name, Self::typ_klartext(rt), rt.to_uppercase())));
     }
 
     /// Argumenttypen an einer AUFRUFstelle pruefen.
@@ -2735,11 +2787,17 @@ impl Compiler {
             _ => unreachable!(),
         };
         for m in methods {
-            let (mname, params, body, is_sub, _rt) = fn_parts(m);
+            let (mname, params, body, is_sub, rt) = fn_parts(m);
             let mut ctx = Ctx::new();
             ctx.is_main = false;
             ctx.is_sub = is_sub;
+            ctx.return_type = if is_sub { String::new() } else { rt.to_string() };
             ctx.current_class = Some(cname.clone());
+            if !is_sub && !self.classes[&cname].abstracts.contains(mname) {
+                let zeile = self.class_lines.get(&cname).copied().unwrap_or(0);
+                self.warn_fehlendes_return(&format!("{}.{}", Self::typ_klartext(&cname), mname),
+                                           rt, body, zeile);
+            }
             for p in params {
                 let slot = ctx.local_types.len();
                 ctx.local_slots.insert(p.name.clone(), slot);
@@ -2820,10 +2878,15 @@ impl Compiler {
     }
 
     fn compile_function(&mut self, decl: &Node) -> Result<(), String> {
-        let (name, params, body, is_sub, _rt) = fn_parts(decl);
+        let (name, params, body, is_sub, rt) = fn_parts(decl);
         let mut ctx = Ctx::new();
         ctx.is_main = false;
         ctx.is_sub = is_sub;
+        ctx.return_type = if is_sub { String::new() } else { rt.to_string() };
+        if !is_sub {
+            let zeile = self.fn_lines.get(name).copied().unwrap_or(0);
+            self.warn_fehlendes_return(name, rt, body, zeile);
+        }
         for p in params {
             let slot = ctx.local_types.len();
             ctx.local_slots.insert(p.name.clone(), slot);
@@ -2998,6 +3061,37 @@ fn eval_literal_default(e: &Node) -> Result<CVal, String> {
         },
         _ => Err("Default-Parameter muessen Literale sein (VM-Pfad)".into()),
     }
+}
+
+/// Gibt es irgendwo in diesen Anweisungen -- auch verschachtelt -- eine, auf
+/// die `pred` passt?
+///
+/// Nur ANWEISUNGEN, keine Ausdruecke: gesucht wird nach `RETURN`/`THROW`, und
+/// die koennen in keinem Ausdruck stecken. Der Grund fuer einen eigenen
+/// Durchgang statt einer Erweiterung von `body_has_yield`: der sucht ein
+/// bestimmtes Ding, dieser ein beliebiges.
+fn any_stmt(stmts: &[Node], pred: &dyn Fn(&Node) -> bool) -> bool {
+    stmts.iter().any(|s| {
+        let n = unwrap_stmt(s);
+        if pred(n) { return true; }
+        match n {
+            Node::If { then_block, elseif_branches, else_block, .. } =>
+                any_stmt(then_block, pred)
+                || elseif_branches.iter().any(|(_, b)| any_stmt(b, pred))
+                || any_stmt(else_block, pred),
+            Node::While { body, .. } | Node::For { body, .. }
+            | Node::Repeat { body, .. } | Node::ForEach { body, .. }
+            | Node::With { body, .. } => any_stmt(body, pred),
+            Node::Select { cases, else_block, .. } =>
+                cases.iter().any(|(_, _, blk)| any_stmt(blk, pred))
+                || any_stmt(else_block, pred),
+            // Der FINALLY-Zweig gehoert dazu: ein RETURN darin ist gueltig.
+            Node::Try { body, catch_block, finally_block, .. } =>
+                any_stmt(body, pred) || any_stmt(catch_block, pred)
+                || any_stmt(finally_block, pred),
+            _ => false,
+        }
+    })
 }
 
 fn body_has_yield(stmts: &[Node]) -> bool {
