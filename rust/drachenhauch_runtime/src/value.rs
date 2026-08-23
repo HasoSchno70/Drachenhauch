@@ -50,8 +50,13 @@ pub enum Value {
     Buffer(Rc<RefCell<Vec<u8>>>),
     /// Modul `tween`: zeitbasierte Interpolation (Referenz-Typ).
     Tween(Rc<RefCell<TweenObj>>),
-    /// Modul `json`: geparstes JSON (immutable, read-only).
-    Json(Rc<serde_json::Value>),
+    /// Modul `json`: geparstes JSON. Veraenderbar (`JSON_SET_*`/`JSON_APPEND_*`)
+    /// und darum ein REFERENZ-Typ wie MAP, ARRAY und BUFFER: `b = a` legt
+    /// keine Kopie an, beide Namen zeigen auf dasselbe Dokument. Bis 2026-08
+    /// gab es nur Leser, deshalb stand hier "immutable, read-only" -- das war
+    /// eine Folge des fehlenden Schreibwegs, keine Entscheidung ueber die
+    /// Wertsemantik.
+    Json(Rc<RefCell<serde_json::Value>>),
     /// Modul `save`: Save-Container (Version + geordnete Daten).
     Save(Rc<RefCell<SaveHandle>>),
     /// Modul `astar`: Pathfinding-Grid (Referenz-Typ).
@@ -631,7 +636,7 @@ impl Value {
             Value::Buffer(b) => format!("<BUFFER {} Bytes>", b.borrow().len()),
             Value::Tween(t) => { let t = t.borrow(); format!("<Tween {}->{} {}ms {} {}>", t.start, t.end, t.duration, t.easing, t.mode) }
             Value::Json(j) => {
-                let s = serde_json::to_string(j.as_ref()).unwrap_or_default();
+                let s = serde_json::to_string(&*j.borrow()).unwrap_or_default();
                 // Review-Fund: `&s[..37]` ist ein BYTE-Slice -- bei einem
                 // Mehrbyte-Zeichen (Umlaute etc.) genau an Position 37 paniked
                 // das mit "byte index 37 is not a char boundary" (reproduzierbar

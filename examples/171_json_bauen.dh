@@ -1,0 +1,131 @@
+' 171 -- JSON bauen statt Zeichenketten kleben
+'
+' Bis 2026-08 konnte Drachenhauch JSON nur LESEN. Einen Rumpf fuer eine
+' REST-Schnittstelle musste man aus Zeichenketten zusammensetzen -- und das
+' bricht am ersten Anfuehrungszeichen in einem Namen, an einem Backslash in
+' einem Pfad, an einem Zeilenumbruch in einem Kommentarfeld.
+'
+' Aufruf:  dhrt run 171_json_bauen.dh
+
+IMPORT "json"
+
+' ---------------------------------------------------------------------------
+' 1. Warum es die Builtins gibt
+' ---------------------------------------------------------------------------
+DIM name AS STRING
+name = "Anna " + CHR$(34) + "die Kurze" + CHR$(34)      ' ein Name MIT Zitat
+
+PRINT "Von Hand geklebt (kaputt):"
+PRINT "  {" + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + name + CHR$(34) + "}"
+
+DIM h AS JSON_HANDLE
+h = JSON_NEW_OBJECT()
+JSON_SET_STRING(h, "name", name)
+PRINT "Gebaut (richtig maskiert):"
+PRINT "  " + JSON_STRINGIFY(h)
+PRINT
+
+' ---------------------------------------------------------------------------
+' 2. Ein Rumpf fuer eine REST-Schnittstelle
+' ---------------------------------------------------------------------------
+' Zwischenstufen entstehen von selbst -- "kunde.adresse.ort" ist EIN Aufruf.
+DIM bestellung AS JSON_HANDLE
+bestellung = JSON_NEW_OBJECT()
+JSON_SET_STRING(bestellung, "kunde.name", name)
+JSON_SET_STRING(bestellung, "kunde.adresse.ort", "Koeln")
+JSON_SET_STRING(bestellung, "kunde.adresse.plz", "50667")
+JSON_SET_BOOL(bestellung, "eilig", TRUE)
+
+' Eine Liste von Datensaetzen: Array anlegen, Objekte anhaengen.
+DIM posten AS JSON_HANDLE
+posten = JSON_NEW_ARRAY()
+JSON_SET_JSON(bestellung, "posten", posten)
+
+DIM artikel AS ARRAY OF STRING
+DIM preise AS ARRAY OF FLOAT
+DIM mengen AS ARRAY OF INTEGER
+artikel = ["Schraube M4", "Mutter M4", "Unterlegscheibe"]
+preise = [0.12, 0.08, 0.05]
+mengen = [100, 100, 200]
+
+DIM i AS INTEGER
+DIM zeile AS JSON_HANDLE
+DIM summe AS FLOAT
+summe = 0.0
+FOR i = 0 TO LEN(artikel) - 1
+    zeile = JSON_NEW_OBJECT()
+    JSON_SET_STRING(zeile, "bezeichnung", artikel[i])
+    JSON_SET_INT(zeile, "menge", mengen[i])
+    JSON_SET_FLOAT(zeile, "einzelpreis", preise[i])
+    ' JSON_APPEND_JSON haengt eine KOPIE an -- `zeile` darf danach
+    ' weiterverwendet werden, ohne dass sich das Angehaengte mitaendert.
+    JSON_APPEND_JSON(bestellung, "posten", zeile)
+    summe = summe + preise[i] * mengen[i]
+NEXT
+JSON_SET_FLOAT(bestellung, "summe", summe)
+
+PRINT "So ginge der Rumpf raus:"
+PRINT JSON_PRETTY(bestellung)
+PRINT
+
+' Genau so wuerde man ihn verschicken (hier nur gezeigt, nicht ausgefuehrt):
+'   IMPORT "html"
+'   HTTP_SET_HEADER("Content-Type", "application/json")
+'   PRINT HTTP_REQUEST("POST", "https://example.org/bestellungen", _
+'                      JSON_STRINGIFY(bestellung))
+
+' ---------------------------------------------------------------------------
+' 3. Antwort einlesen, ergaenzen, zurueckschicken
+' ---------------------------------------------------------------------------
+' Ein geparstes Dokument ist genauso veraenderbar wie ein gebautes.
+DIM antwort AS JSON_HANDLE
+antwort = JSON_PARSE("{""nummer"": 4711, ""status"": ""offen""}")
+JSON_SET_STRING(antwort, "status", "bestaetigt")
+JSON_SET_STRING(antwort, "bearbeiter", "Lager 2")
+PRINT "Nach dem Ergaenzen: " + JSON_STRINGIFY(antwort)
+PRINT
+
+' ---------------------------------------------------------------------------
+' 4. Eine Einstellungsdatei schreiben und wieder lesen
+' ---------------------------------------------------------------------------
+DIM cfg AS JSON_HANDLE
+cfg = JSON_NEW_OBJECT()
+JSON_SET_INT(cfg, "fenster.breite", 1280)
+JSON_SET_INT(cfg, "fenster.hoehe", 720)
+JSON_SET_BOOL(cfg, "fenster.vollbild", FALSE)
+JSON_SET_FLOAT(cfg, "ton.lautstaerke", 0.8)
+WRITEALL("einstellungen.json", JSON_PRETTY(cfg))
+
+DIM gelesen AS JSON_HANDLE
+gelesen = JSON_LOAD("einstellungen.json")
+PRINT "Gelesen: " + STR$(JSON_GET_INT(gelesen, "fenster.breite")) + "x" + _
+      STR$(JSON_GET_INT(gelesen, "fenster.hoehe"))
+
+' Ein Objekt durchlaufen -- dafuer gibt es jetzt JSON_KEYS.
+DIM schluessel AS ARRAY OF STRING
+schluessel = JSON_KEYS(gelesen, "fenster")
+FOR i = 0 TO LEN(schluessel) - 1
+    PRINT "  fenster." + schluessel[i] + " ist " + JSON_TYPE(gelesen, "fenster." + schluessel[i])
+NEXT
+DELETEFILE("einstellungen.json")
+PRINT
+
+' ---------------------------------------------------------------------------
+' 5. Die Stolpersteine, einmal vorgefuehrt
+' ---------------------------------------------------------------------------
+' (a) Ein Handle ist eine REFERENZ -- wie MAP und ARRAY.
+DIM eins AS JSON_HANDLE
+DIM zwei AS JSON_HANDLE
+eins = JSON_NEW_OBJECT()
+zwei = eins
+JSON_SET_INT(zwei, "x", 5)
+PRINT "Referenz: eins ist " + JSON_STRINGIFY(eins) + " (zwei wurde geaendert)"
+
+' (b) Ein Zahl-Segment legt kein Array an -- die Meldung sagt, wie es geht.
+TRY
+    DIM leer AS JSON_HANDLE
+    leer = JSON_NEW_OBJECT()
+    JSON_SET_STRING(leer, "liste.0", "geht nicht")
+CATCH meldung
+    PRINT "Erwarteter Fehler: " + meldung
+END TRY

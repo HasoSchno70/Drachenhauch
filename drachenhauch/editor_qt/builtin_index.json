@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1401,
+ "count": 1438,
  "builtins": [
   {
    "name": "ABS",
@@ -4197,6 +4197,36 @@
    "module": "core"
   },
   {
+   "name": "JSON_APPEND_BOOL",
+   "kind": "core",
+   "signature": "JSON_APPEND_BOOL(h: JSON_HANDLE, pfad: STRING, wert: BOOLEAN)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_APPEND_FLOAT",
+   "kind": "core",
+   "signature": "JSON_APPEND_FLOAT(h: JSON_HANDLE, pfad: STRING, wert: FLOAT)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_APPEND_INT",
+   "kind": "core",
+   "signature": "JSON_APPEND_INT(h: JSON_HANDLE, pfad: STRING, wert: INTEGER)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_APPEND_JSON",
+   "kind": "core",
+   "signature": "JSON_APPEND_JSON(h: JSON_HANDLE, pfad: STRING, andere: JSON_HANDLE)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_APPEND_STRING",
+   "kind": "core",
+   "signature": "JSON_APPEND_STRING(h: JSON_HANDLE, pfad: STRING, wert: STRING)",
+   "module": "json"
+  },
+  {
    "name": "JSON_GET_BOOL",
    "kind": "core",
    "signature": "JSON_GET_BOOL(h: ?, path: STRING)",
@@ -4227,6 +4257,12 @@
    "module": "json"
   },
   {
+   "name": "JSON_KEYS",
+   "kind": "core",
+   "signature": "JSON_KEYS(h: JSON_HANDLE, pfad: STRING) AS ARRAY OF STRING",
+   "module": "json"
+  },
+  {
    "name": "JSON_LEN",
    "kind": "core",
    "signature": "JSON_LEN(h: ?, path: STRING)",
@@ -4239,6 +4275,18 @@
    "module": "json"
   },
   {
+   "name": "JSON_NEW_ARRAY",
+   "kind": "core",
+   "signature": "JSON_NEW_ARRAY() AS JSON_HANDLE",
+   "module": "json"
+  },
+  {
+   "name": "JSON_NEW_OBJECT",
+   "kind": "core",
+   "signature": "JSON_NEW_OBJECT() AS JSON_HANDLE",
+   "module": "json"
+  },
+  {
    "name": "JSON_PARSE",
    "kind": "core",
    "signature": "JSON_PARSE(s: STRING)",
@@ -4248,6 +4296,48 @@
    "name": "JSON_PRETTY",
    "kind": "core",
    "signature": "JSON_PRETTY(h)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_REMOVE",
+   "kind": "core",
+   "signature": "JSON_REMOVE(h: JSON_HANDLE, pfad: STRING) AS BOOLEAN",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_BOOL",
+   "kind": "core",
+   "signature": "JSON_SET_BOOL(h: JSON_HANDLE, pfad: STRING, wert: BOOLEAN)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_FLOAT",
+   "kind": "core",
+   "signature": "JSON_SET_FLOAT(h: JSON_HANDLE, pfad: STRING, wert: FLOAT)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_INT",
+   "kind": "core",
+   "signature": "JSON_SET_INT(h: JSON_HANDLE, pfad: STRING, wert: INTEGER)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_JSON",
+   "kind": "core",
+   "signature": "JSON_SET_JSON(h: JSON_HANDLE, pfad: STRING, andere: JSON_HANDLE)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_NULL",
+   "kind": "core",
+   "signature": "JSON_SET_NULL(h: JSON_HANDLE, pfad: STRING)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_SET_STRING",
+   "kind": "core",
+   "signature": "JSON_SET_STRING(h: JSON_HANDLE, pfad: STRING, wert: STRING)",
    "module": "json"
   },
   {

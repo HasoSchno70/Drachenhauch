@@ -3136,41 +3136,41 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let s = need_str(&a[0], "JSON_PARSE")?;
             let v: serde_json::Value = serde_json::from_str(s).map_err(|e| format!("JSON_PARSE: {}", e))?;
-            Ok(Value::Json(Rc::new(v)))
+            Ok(json_wert(v))
         }
         "json_load" => {
             arity!(1);
             let path = need_str(&a[0], "JSON_LOAD")?;
             let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| format!("JSON_LOAD: {}", e))?;
             let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
-            Ok(Value::Json(Rc::new(v)))
+            Ok(json_wert(v))
         }
-        "json_stringify" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string(json_h(&a[0], "JSON_STRINGIFY")?.as_ref()).unwrap_or_default())) }
-        "json_pretty" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string_pretty(json_h(&a[0], "JSON_PRETTY")?.as_ref()).unwrap_or_default())) }
+        "json_stringify" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string(&*json_h(&a[0], "JSON_STRINGIFY")?.borrow()).unwrap_or_default())) }
+        "json_pretty" => { arity!(1); Ok(Value::str_rc(&serde_json::to_string_pretty(&*json_h(&a[0], "JSON_PRETTY")?.borrow()).unwrap_or_default())) }
         "json_get_string" => {
-            arity!(2); let h = json_h(&a[0], "JSON_GET_STRING")?; let v = json_resolve(h, need_str(&a[1], "JSON_GET_STRING")?, "JSON_GET_STRING")?;
+            arity!(2); let h = json_h(&a[0], "JSON_GET_STRING")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_STRING")?, "JSON_GET_STRING")?;
             v.as_str().map(Value::str_rc).ok_or_else(|| format!("JSON_GET_STRING: Pfad '{}' ist kein String", need_str(&a[1], "x").unwrap_or("")))
         }
         "json_get_int" => {
-            arity!(2); let h = json_h(&a[0], "JSON_GET_INT")?; let v = json_resolve(h, need_str(&a[1], "JSON_GET_INT")?, "JSON_GET_INT")?;
+            arity!(2); let h = json_h(&a[0], "JSON_GET_INT")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_INT")?, "JSON_GET_INT")?;
             if let Some(i) = v.as_i64() { Ok(Value::Int(i)) }
             else if let Some(f) = v.as_f64() { if f.fract() == 0.0 { Ok(Value::Int(f as i64)) } else { err("JSON_GET_INT: kein Integer") } }
             else { err("JSON_GET_INT: kein Integer") }
         }
         "json_get_float" => {
-            arity!(2); let h = json_h(&a[0], "JSON_GET_FLOAT")?; let v = json_resolve(h, need_str(&a[1], "JSON_GET_FLOAT")?, "JSON_GET_FLOAT")?;
+            arity!(2); let h = json_h(&a[0], "JSON_GET_FLOAT")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_FLOAT")?, "JSON_GET_FLOAT")?;
             v.as_f64().map(Value::Float).ok_or_else(|| "JSON_GET_FLOAT: keine Zahl".to_string())
         }
         "json_get_bool" => {
-            arity!(2); let h = json_h(&a[0], "JSON_GET_BOOL")?; let v = json_resolve(h, need_str(&a[1], "JSON_GET_BOOL")?, "JSON_GET_BOOL")?;
+            arity!(2); let h = json_h(&a[0], "JSON_GET_BOOL")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_GET_BOOL")?, "JSON_GET_BOOL")?;
             v.as_bool().map(Value::Bool).ok_or_else(|| "JSON_GET_BOOL: kein Boolean".to_string())
         }
         "json_has" => {
-            arity!(2); let h = json_h(&a[0], "JSON_HAS")?;
-            Ok(Value::Bool(json_try_resolve(h, need_str(&a[1], "JSON_HAS")?).is_some()))
+            arity!(2); let h = json_h(&a[0], "JSON_HAS")?.borrow();
+            Ok(Value::Bool(json_try_resolve(&h, need_str(&a[1], "JSON_HAS")?).is_some()))
         }
         "json_len" => {
-            arity!(2); let h = json_h(&a[0], "JSON_LEN")?; let v = json_resolve(h, need_str(&a[1], "JSON_LEN")?, "JSON_LEN")?;
+            arity!(2); let h = json_h(&a[0], "JSON_LEN")?.borrow(); let v = json_resolve(&h, need_str(&a[1], "JSON_LEN")?, "JSON_LEN")?;
             match v {
                 serde_json::Value::Array(a) => Ok(Value::Int(a.len() as i64)),
                 serde_json::Value::Object(o) => Ok(Value::Int(o.len() as i64)),
@@ -3179,8 +3179,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "json_type" => {
-            arity!(2); let h = json_h(&a[0], "JSON_TYPE")?;
-            let t = match json_try_resolve(h, need_str(&a[1], "JSON_TYPE")?) {
+            arity!(2); let h = json_h(&a[0], "JSON_TYPE")?.borrow();
+            let t = match json_try_resolve(&h, need_str(&a[1], "JSON_TYPE")?) {
                 None => "missing",
                 Some(serde_json::Value::Null) => "null",
                 Some(serde_json::Value::Bool(_)) => "boolean",
@@ -3190,6 +3190,96 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Some(serde_json::Value::Object(_)) => "object",
             };
             Ok(Value::str_rc(t))
+        }
+
+        // --- json schreiben ---
+        //
+        // Bis 2026-08 liess sich JSON nur LESEN. Wer eines bauen wollte, klebte
+        // Zeichenketten zusammen -- und brach am ersten Anfuehrungszeichen in
+        // einem Namen. Seit HTTP_REQUEST mit PUT/PATCH kann Drachenhauch jede
+        // angemeldete Schnittstelle anrufen; ihren Rumpf konnte es nicht bauen.
+        "json_new_object" => { arity!(0); Ok(json_wert(serde_json::json!({}))) }
+        "json_new_array" => { arity!(0); Ok(json_wert(serde_json::json!([]))) }
+        "json_set_string" => { arity!(3); let p = need_str(&a[1], "JSON_SET_STRING")?.to_string();
+            let w = need_str(&a[2], "JSON_SET_STRING")?.to_string();
+            json_setze(&a[0], &p, serde_json::Value::String(w), "JSON_SET_STRING") }
+        "json_set_int" => { arity!(3); let p = need_str(&a[1], "JSON_SET_INT")?.to_string();
+            let w = need_int(&a[2], "JSON_SET_INT")?;
+            json_setze(&a[0], &p, serde_json::Value::from(w), "JSON_SET_INT") }
+        "json_set_float" => { arity!(3); let p = need_str(&a[1], "JSON_SET_FLOAT")?.to_string();
+            let w = need_num(&a[2], "JSON_SET_FLOAT")?;
+            json_setze(&a[0], &p, serde_json::json!(w), "JSON_SET_FLOAT") }
+        "json_set_bool" => { arity!(3); let p = need_str(&a[1], "JSON_SET_BOOL")?.to_string();
+            let w = need_bool(&a[2], "JSON_SET_BOOL")?;
+            json_setze(&a[0], &p, serde_json::Value::Bool(w), "JSON_SET_BOOL") }
+        "json_set_null" => { arity!(2); let p = need_str(&a[1], "JSON_SET_NULL")?.to_string();
+            json_setze(&a[0], &p, serde_json::Value::Null, "JSON_SET_NULL") }
+        "json_set_json" => {
+            arity!(3); let p = need_str(&a[1], "JSON_SET_JSON")?.to_string();
+            // Die Quelle ZUERST kopieren und den Borrow beenden: sonst
+            // paniked  bei JSON_SET_JSON(h, "x", h). Eine
+            // KOPIE ist es ohnehin -- ein JSON-Baum kann sich keinen Teilbaum
+            // mit einem anderen teilen, spaetere Aenderungen an der Quelle
+            // schlagen also NICHT durch (steht so in der Doku).
+            let w = json_h(&a[2], "JSON_SET_JSON")?.borrow().clone();
+            json_setze(&a[0], &p, w, "JSON_SET_JSON") }
+        "json_append_string" => { arity!(3); let p = need_str(&a[1], "JSON_APPEND_STRING")?.to_string();
+            let w = need_str(&a[2], "JSON_APPEND_STRING")?.to_string();
+            json_haenge_an(&a[0], &p, serde_json::Value::String(w), "JSON_APPEND_STRING") }
+        "json_append_int" => { arity!(3); let p = need_str(&a[1], "JSON_APPEND_INT")?.to_string();
+            let w = need_int(&a[2], "JSON_APPEND_INT")?;
+            json_haenge_an(&a[0], &p, serde_json::Value::from(w), "JSON_APPEND_INT") }
+        "json_append_float" => { arity!(3); let p = need_str(&a[1], "JSON_APPEND_FLOAT")?.to_string();
+            let w = need_num(&a[2], "JSON_APPEND_FLOAT")?;
+            json_haenge_an(&a[0], &p, serde_json::json!(w), "JSON_APPEND_FLOAT") }
+        "json_append_bool" => { arity!(3); let p = need_str(&a[1], "JSON_APPEND_BOOL")?.to_string();
+            let w = need_bool(&a[2], "JSON_APPEND_BOOL")?;
+            json_haenge_an(&a[0], &p, serde_json::Value::Bool(w), "JSON_APPEND_BOOL") }
+        "json_append_json" => {
+            arity!(3); let p = need_str(&a[1], "JSON_APPEND_JSON")?.to_string();
+            let w = json_h(&a[2], "JSON_APPEND_JSON")?.borrow().clone();
+            json_haenge_an(&a[0], &p, w, "JSON_APPEND_JSON") }
+        "json_remove" => {
+            arity!(2); let p = need_str(&a[1], "JSON_REMOVE")?.to_string();
+            if p.is_empty() { return err("JSON_REMOVE: leerer Pfad -- das Dokument selbst laesst sich nicht entfernen"); }
+            let mut root = json_h(&a[0], "JSON_REMOVE")?.borrow_mut();
+            let (eltern, letztes, _) = json_eltern(&mut root, &p, "JSON_REMOVE")?;
+            match eltern {
+                // shift_remove, NICHT remove: mit dem Feature `preserve_order`
+                // (Cargo.toml) behalten Objekt-Schluessel ihre Einfuege-
+                // Reihenfolge, und `remove` ist dort IndexMaps swap_remove --
+                // es zieht den LETZTEN Schluessel an die frei gewordene
+                // Stelle. Fuer JSON ist die Reihenfolge zwar bedeutungslos,
+                // aber wer einen Rumpf signiert oder zwei Ausgaben
+                // vergleicht, sieht den Unterschied.
+                serde_json::Value::Object(obj) => Ok(Value::Bool(obj.shift_remove(&letztes).is_some())),
+                serde_json::Value::Array(arr) => {
+                    let idx: usize = letztes.parse().map_err(|_| format!(
+                        "JSON_REMOVE: Ziel ist ein Array, '{}' ist kein Index", letztes))?;
+                    if idx < arr.len() { arr.remove(idx); Ok(Value::Bool(true)) }
+                    else { Ok(Value::Bool(false)) }
+                }
+                _ => Ok(Value::Bool(false)),
+            }
+        }
+        "json_keys" => {
+            // Zugabe beim Schreib-Ausbau: JSON_LEN lieferte fuer ein Objekt
+            // schon immer die Anzahl seiner Schluessel -- an die Schluessel
+            // selbst kam man nicht heran, ein Objekt liess sich also nicht
+            // durchlaufen.
+            arity!(2); let h = json_h(&a[0], "JSON_KEYS")?.borrow();
+            let v = json_resolve(&h, need_str(&a[1], "JSON_KEYS")?, "JSON_KEYS")?;
+            match v {
+                serde_json::Value::Object(obj) => {
+                    let keys: Vec<Value> = obj.keys().map(|k| Value::str_rc(k)).collect();
+                    let n = keys.len() as i64;
+                    let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                    for (i, k) in keys.into_iter().enumerate() { arr.cells.set(i, k); }
+                    Ok(Value::Array(Rc::new(RefCell::new(arr))))
+                }
+                andere => Err(format!("JSON_KEYS: '{}' ist {}, kein Objekt",
+                                      need_str(&a[1], "JSON_KEYS")?, json_art(andere))),
+            }
         }
 
         // ===== Modul: save =====
@@ -4182,7 +4272,7 @@ fn val_to_json(v: &Value) -> serde_json::Value {
         Value::Float(f) => serde_json::json!(f),
         Value::Str(s) => serde_json::Value::String(s.to_string()),
         Value::Bool(b) => serde_json::Value::Bool(*b),
-        Value::Json(j) => j.as_ref().clone(),
+        Value::Json(j) => j.borrow().clone(),
         _ => serde_json::Value::Null,
     }
 }
@@ -4195,7 +4285,7 @@ fn json_to_val(j: &serde_json::Value) -> Value {
             if let Some(i) = n.as_i64() { Value::Int(i) } else { Value::Float(n.as_f64().unwrap_or(0.0)) }
         }
         serde_json::Value::String(s) => Value::str_rc(s),
-        other => Value::Json(Rc::new(other.clone())),
+        other => Value::Json(Rc::new(RefCell::new(other.clone()))),
     }
 }
 
@@ -4213,7 +4303,7 @@ fn save_load(path: &str) -> R {
     Ok(Value::Save(Rc::new(RefCell::new(SaveHandle { version, data }))))
 }
 
-fn json_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<serde_json::Value>, String> {
+fn json_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<serde_json::Value>>, String> {
     match v { Value::Json(j) => Ok(j), _ => Err(format!("{} erwartet JSON-Handle (aus JSON_PARSE)", fn_)) }
 }
 
@@ -4236,6 +4326,165 @@ fn json_try_resolve<'a>(root: &'a serde_json::Value, path: &str) -> Option<&'a s
         }
     }
     Some(cur)
+}
+
+/// Ein JSON-Handle aus einem serde-Wert bauen.
+fn json_wert(v: serde_json::Value) -> Value {
+    Value::Json(Rc::new(RefCell::new(v)))
+}
+
+/// Navigiert zum ELTERNknoten des Pfades und liefert ihn zusammen mit dem
+/// letzten Segment -- die Stelle, an die geschrieben wird.
+///
+/// **Fehlende Zwischenstufen entstehen als Objekt.** Ohne das waere
+/// `JSON_SET_STRING(h, "kunde.name", "Anna")` auf einem frischen Dokument
+/// nicht ein Aufruf, sondern drei (Objekt anlegen, einhaengen, setzen) -- und
+/// genau dieser eine Aufruf ist der Grund, warum es die Funktion gibt.
+///
+/// **Ein ZAHL-Segment legt aber nichts an.** `"posten.0"` auf einem leeren
+/// Dokument koennte ein Array meinen oder ein Objekt mit dem Schluessel "0";
+/// beides ist gueltiges JSON, und die falsche Wahl faellt erst dem Empfaenger
+/// auf. Statt zu raten sagt die Meldung, wie ein Array entsteht.
+///
+/// Der dritte Rueckgabewert sagt, ob der Elternknoten in DIESEM Aufruf erst
+/// entstanden ist -- nur dann ist auch ein Zahl-Segment am ENDE zweideutig
+/// (`"posten.0"` haette sonst still ein Objekt mit dem Schluessel "0"
+/// angelegt). Steht das Objekt schon da, ist "0" ein gewollter Schluessel.
+fn json_eltern<'a>(root: &'a mut serde_json::Value, path: &str, fn_: &str)
+    -> Result<(&'a mut serde_json::Value, String, bool), String>
+{
+    let teile: Vec<&str> = path.split('.').collect();
+    let (letztes, zwischen) = teile.split_last().unwrap();   // split immer >= 1
+    let mut cur = root;
+    let mut bisher = String::new();
+    let mut neu_angelegt = false;
+    for seg in zwischen {
+        if !bisher.is_empty() { bisher.push('.'); }
+        bisher.push_str(seg);
+        // Ein NULL an dieser Stelle heisst "da ist nichts" -- daraus darf ein
+        // Objekt werden, ohne dass etwas verloren geht.
+        if cur.is_null() { *cur = serde_json::json!({}); }
+        match cur {
+            serde_json::Value::Object(obj) => {
+                if !obj.contains_key(*seg) {
+                    if seg.parse::<usize>().is_ok() {
+                        return Err(json_zahl_hinweis(fn_, &bisher, seg));
+                    }
+                    obj.insert(seg.to_string(), serde_json::json!({}));
+                    neu_angelegt = true;
+                }
+                cur = obj.get_mut(*seg).unwrap();
+            }
+            serde_json::Value::Array(arr) => {
+                let laenge = arr.len();
+                let idx: usize = seg.parse().map_err(|_| format!(
+                    "{}: '{}' ist ein Array, '{}' ist kein Index", fn_, bisher, seg))?;
+                cur = arr.get_mut(idx).ok_or_else(|| format!(
+                    "{}: Index {} liegt ausserhalb von '{}' (Laenge {})",
+                    fn_, idx, bisher, laenge))?;
+            }
+            _ => return Err(format!(
+                "{}: '{}' ist {} -- da laesst sich nichts hineinschreiben",
+                fn_, bisher, json_art(cur))),
+        }
+    }
+    Ok((cur, letztes.to_string(), neu_angelegt))
+}
+
+/// Die Meldung fuer ein Zahl-Segment, das an einer Stelle steht, die es noch
+/// nicht gibt: dort koennte ein Array gemeint sein oder ein Objekt mit dem
+/// Schluessel "0". Beides ist gueltiges JSON, und die falsche Wahl faellt erst
+/// dem Empfaenger auf -- statt zu raten sagt die Meldung, wie beides geht.
+fn json_zahl_hinweis(fn_: &str, pfad: &str, seg: &str) -> String {
+    // Das Array gehoert an die Stelle OHNE das Zahl-Segment -- bei "posten.0"
+    // also nach "posten". Ein Hinweis, der den falschen Pfad nennt, waere
+    // schlimmer als keiner.
+    let wo = match pfad.rsplit_once('.') {
+        Some((eltern, _)) => format!("JSON_SET_JSON(h, \"{}\", JSON_NEW_ARRAY())", eltern),
+        None => "h = JSON_NEW_ARRAY()".to_string(),
+    };
+    format!("{}: '{}' gibt es noch nicht, und '{}' ist eine Zahl -- meintest du ein Array? Dann zuerst anlegen ({}), danach mit JSON_APPEND_* fuellen. Ein Objekt-Schluessel darf keine reine Zahl sein.",
+            fn_, pfad, seg, wo)
+}
+
+/// Kurzname der JSON-Art fuer Fehlermeldungen.
+fn json_art(v: &serde_json::Value) -> &'static str {
+    match v {
+        serde_json::Value::Null => "NULL",
+        serde_json::Value::Bool(_) => "ein Wahrheitswert",
+        serde_json::Value::Number(_) => "eine Zahl",
+        serde_json::Value::String(_) => "ein Text",
+        // (Alle Formen stehen im Nominativ -- die Meldungen sind darum
+        // durchgehend als "'x' ist <art>" gebaut, nie als "zeigt auf <art>".)
+        serde_json::Value::Array(_) => "ein Array",
+        serde_json::Value::Object(_) => "ein Objekt",
+    }
+}
+
+/// `JSON_SET_*`: Wert an den Pfad schreiben (anlegen oder ersetzen).
+fn json_setze(h: &Value, path: &str, wert: serde_json::Value, fn_: &str) -> R {
+    if path.is_empty() {
+        // Bewusst ein Fehler, obwohl der leere Pfad beim LESEN die Wurzel
+        // meint: hier hiesse er "das ganze Dokument wegwerfen", und ein
+        // versehentlich leerer Pfad (eine Variable, die nichts enthaelt)
+        // duerfte nicht stillschweigend alles loeschen.
+        return Err(format!("{}: leerer Pfad -- das Dokument selbst laesst sich nicht ersetzen", fn_));
+    }
+    let mut root = json_h(h, fn_)?.borrow_mut();
+    let (eltern, letztes, neu) = json_eltern(&mut root, path, fn_)?;
+    if eltern.is_null() { *eltern = serde_json::json!({}); }
+    match eltern {
+        serde_json::Value::Object(obj) => {
+            // Frisch angelegte Zwischenstufe + Zahl als Schluessel: dasselbe
+            // Raten wie in json_eltern, nur eine Ebene tiefer.
+            if neu && letztes.parse::<usize>().is_ok() {
+                return Err(json_zahl_hinweis(fn_, path, &letztes));
+            }
+            obj.insert(letztes, wert);
+        }
+        serde_json::Value::Array(arr) => {
+            let laenge = arr.len();
+            let idx: usize = letztes.parse().map_err(|_| format!(
+                "{}: Ziel ist ein Array, '{}' ist kein Index", fn_, letztes))?;
+            match arr.get_mut(idx) {
+                Some(slot) => *slot = wert,
+                None => return Err(format!(
+                    "{}: Index {} liegt ausserhalb (Laenge {}) -- zum Anhaengen JSON_APPEND_* nehmen",
+                    fn_, idx, laenge)),
+            }
+        }
+        _ => return Err(format!(
+            "{}: '{}' ist {} -- da laesst sich kein Feld setzen", fn_, path, json_art(eltern))),
+    }
+    Ok(Value::Nil)
+}
+
+/// `JSON_APPEND_*`: Wert an das Array am Pfad anhaengen. Leerer Pfad = das
+/// Dokument selbst (dort ist er harmlos -- es geht nichts verloren).
+fn json_haenge_an(h: &Value, path: &str, wert: serde_json::Value, fn_: &str) -> R {
+    let mut root = json_h(h, fn_)?.borrow_mut();
+    let ziel = if path.is_empty() { &mut *root }
+               else {
+                   let (eltern, letztes, _) = json_eltern(&mut root, path, fn_)?;
+                   match eltern {
+                       serde_json::Value::Object(obj) => obj.get_mut(&letztes).ok_or_else(|| format!(
+                           "{}: '{}' gibt es nicht -- ein Array entsteht mit JSON_SET_JSON(..., JSON_NEW_ARRAY())", fn_, path))?,
+                       serde_json::Value::Array(arr) => {
+                           let laenge = arr.len();
+                           let idx: usize = letztes.parse().map_err(|_| format!(
+                               "{}: Ziel ist ein Array, '{}' ist kein Index", fn_, letztes))?;
+                           arr.get_mut(idx).ok_or_else(|| format!(
+                               "{}: Index {} liegt ausserhalb (Laenge {})", fn_, idx, laenge))?
+                       }
+                       _ => return Err(format!(
+                           "{}: '{}' ist {}", fn_, path, json_art(eltern))),
+                   }
+               };
+    match ziel {
+        serde_json::Value::Array(arr) => { arr.push(wert); Ok(Value::Nil) }
+        andere => Err(format!("{}: '{}' ist {}, kein Array", fn_,
+                              if path.is_empty() { "das Dokument" } else { path }, json_art(andere))),
+    }
 }
 
 fn file_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<GbFile>>, String> {

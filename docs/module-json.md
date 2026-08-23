@@ -1,6 +1,6 @@
 # Modul `json`
 
-JSON parsen, lesen, ausgeben. Lädt Datei oder String, lässt dich über Pfad-Notation auf Felder zugreifen.
+JSON parsen, lesen, **bauen** und ausgeben. Lädt Datei oder String, lässt dich über Pfad-Notation auf Felder zugreifen — und seit 2026-08 auch welche setzen.
 
 ```basic
 IMPORT "json"
@@ -21,6 +21,22 @@ IMPORT "json"
 | `JSON_HAS(h, path$)` | BOOLEAN |
 | `JSON_LEN(h, path$)` | INTEGER |
 | `JSON_TYPE(h, path$)` | STRING |
+| `JSON_KEYS(h, path$)` | ARRAY OF STRING |
+
+**Schreiben:**
+
+| Funktion | Wirkung |
+|---|---|
+| `JSON_NEW_OBJECT()` | leeres `{}` → JSON_HANDLE |
+| `JSON_NEW_ARRAY()` | leeres `[]` → JSON_HANDLE |
+| `JSON_SET_STRING(h, pfad$, wert$)` | Feld setzen (anlegen oder ersetzen) |
+| `JSON_SET_INT(h, pfad$, wert)` | " |
+| `JSON_SET_FLOAT(h, pfad$, wert)` | " |
+| `JSON_SET_BOOL(h, pfad$, wert)` | " |
+| `JSON_SET_NULL(h, pfad$)` | " |
+| `JSON_SET_JSON(h, pfad$, andere)` | ganzes Dokument einhängen (**Kopie**) |
+| `JSON_APPEND_STRING/INT/FLOAT/BOOL/JSON(h, pfad$, wert)` | an das Array am Pfad anhängen |
+| `JSON_REMOVE(h, pfad$)` | entfernen → BOOLEAN (war etwas da?) |
 
 ## Pfad-Notation
 
@@ -88,6 +104,81 @@ SELECT CASE JSON_TYPE(j, "user.alter")
 END SELECT
 ```
 
+## JSON bauen
+
+Bis 2026-08 ließ sich JSON nur lesen. Wer eines schreiben wollte, klebte
+Zeichenketten zusammen — und brach am ersten Anführungszeichen in einem Namen.
+Ein Handle ist deshalb **veränderbar**:
+
+```basic
+IMPORT "json"
+
+DIM h AS JSON_HANDLE
+h = JSON_NEW_OBJECT()
+JSON_SET_STRING(h, "name", "Anna")
+JSON_SET_INT(h, "alter", 30)
+JSON_SET_BOOL(h, "aktiv", TRUE)
+
+' Zwischenstufen entstehen von selbst:
+JSON_SET_STRING(h, "adresse.ort", "Koeln")
+
+PRINT JSON_STRINGIFY(h)
+' {"name":"Anna","alter":30,"aktiv":true,"adresse":{"ort":"Koeln"}}
+```
+
+Listen wachsen mit `JSON_APPEND_*`. Der leere Pfad `""` meint dabei das
+Dokument selbst:
+
+```basic
+DIM posten AS JSON_HANDLE
+posten = JSON_NEW_ARRAY()
+JSON_APPEND_STRING(posten, "", "Schraube")
+JSON_APPEND_STRING(posten, "", "Mutter")
+JSON_SET_JSON(h, "posten", posten)
+
+' danach direkt am Ziel weiterfuellen:
+JSON_APPEND_STRING(h, "posten", "Unterlegscheibe")
+```
+
+Und ein Objekt lässt sich jetzt auch durchlaufen — `JSON_LEN` lieferte für ein
+Objekt schon immer die Anzahl seiner Schlüssel, an die Schlüssel selbst kam man
+nicht heran:
+
+```basic
+DIM schluessel AS ARRAY OF STRING
+DIM i AS INTEGER
+schluessel = JSON_KEYS(h, "adresse")
+FOR i = 0 TO LEN(schluessel) - 1
+    PRINT schluessel[i], JSON_GET_STRING(h, "adresse." + schluessel[i])
+NEXT
+```
+
+### Sechs Regeln, die man einmal gelesen haben sollte
+
+1. **Ein Handle ist eine Referenz**, wie MAP und ARRAY. `b = a` legt keine
+   Kopie an — wer `b` ändert, ändert `a`.
+2. **`JSON_SET_JSON` hängt eine KOPIE ein.** Ein JSON-Baum kann sich keinen
+   Teilbaum mit einem anderen teilen; spätere Änderungen an der Quelle
+   schlagen nicht durch.
+3. **Fehlende Zwischenstufen entstehen als Objekt.** Genau deshalb ist
+   `JSON_SET_STRING(h, "kunde.adresse.ort", "Koeln")` ein Aufruf und nicht drei.
+4. **Ein Zahl-Segment legt nichts an.** `"posten.0"` auf einem frischen
+   Dokument könnte ein Array meinen oder ein Objekt mit dem Schlüssel `"0"` —
+   beides ist gültiges JSON, und die falsche Wahl fällt erst dem Empfänger auf.
+   Statt zu raten sagt die Meldung, wie ein Array entsteht. Arrays legt man
+   also mit `JSON_NEW_ARRAY` an und füllt sie mit `JSON_APPEND_*`.
+5. **Der leere Pfad `""` meint beim Schreiben NICHT die Wurzel.** Beim Lesen
+   tut er das; beim Setzen hieße er „das ganze Dokument wegwerfen", und eine
+   versehentlich leere Variable darf das nicht — `JSON_SET_*` lehnt ihn ab.
+   Bei `JSON_APPEND_*` ist er erlaubt (dort geht nichts verloren) und meint das
+   Dokument selbst.
+6. **Die Reihenfolge der Schlüssel bleibt die Einfüge-Reihenfolge**, auch nach
+   `JSON_REMOVE`. Für JSON ist sie bedeutungslos, aber wer einen Rumpf
+   signiert oder zwei Ausgaben vergleicht, sieht den Unterschied.
+
+**Ein Punkt im Schlüsselnamen ist nicht adressierbar** — er trennt die
+Pfad-Segmente. Das gilt beim Lesen wie beim Schreiben.
+
 ## Roundtrip
 
 ```basic
@@ -114,4 +205,6 @@ END TRY
 
 ## Komplettes Beispiel
 
-Siehe [examples/24_json.dh](../examples/24_json.dh).
+Lesen: [examples/24_json.dh](../examples/24_json.dh).
+Bauen (ein REST-Rumpf und eine Konfigurationsdatei):
+[examples/171_json_bauen.dh](../examples/171_json_bauen.dh).
