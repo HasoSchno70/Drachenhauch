@@ -249,7 +249,7 @@ WHILE NOT QUITREQUESTED() AND NOT INPUT_HELD("quit")
 
     ' --- 3) Vector-Bobs (Sinuswelle) --------------------------------
     DIM bo AS INTEGER
-    
+
     FOR bo = 0 TO N_BOBS - 1
         DIM bx AS FLOAT
         DIM by AS FLOAT

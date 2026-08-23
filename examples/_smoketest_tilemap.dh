@@ -35,7 +35,7 @@ frame = 0
 WHILE frame < 30
     Cls(BLACK)
     DrawTilemap(ts, level, TILE_W, TILE_H, 0, 0)
-    DrawImagePart(hero, (frame mod 4) * 16, 0, 16, 16, 32 + frame, 32)
+    DrawImagePart(hero, (frame MOD 4) * 16, 0, 16, 16, 32 + frame, 32)
     Flip()
     frame = frame + 1
 WEND

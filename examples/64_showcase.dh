@@ -246,7 +246,7 @@ NEXT
 DIM origin AS VEC2
 origin = VEC2_ZERO()
 DIM distances AS TUPLE
-distances = [VEC2_DISTANCE(h.pos, origin) FOR h in party]
+distances = [VEC2_DISTANCE(h.pos, origin) FOR h IN party]
 log("MATH", "Distanzen vom Ursprung:", distances)
 
 ' Method-Syntax + Slicing: Spitznamen

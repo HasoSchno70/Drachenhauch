@@ -24,7 +24,7 @@ ELSE
     NEXT
 END IF
 
-print i
+PRINT i
 ' Beispiel zum Oeffnen (VID/PID anpassen):
 ' DIM dev AS USB_HANDLE
 ' dev = USB_OPEN(&H046D, &HC52B)   ' Logitech-Receiver

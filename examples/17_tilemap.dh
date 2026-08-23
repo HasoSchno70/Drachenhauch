@@ -75,7 +75,7 @@ CLASS Hero
             frameTimer = frameTimer + 1
             IF frameTimer >= 6 THEN
                 frameTimer = 0
-                frame = (frame + 1) mod 4
+                frame = (frame + 1) MOD 4
             END IF
         ELSE
             frame = 0

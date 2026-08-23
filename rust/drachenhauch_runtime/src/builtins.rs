@@ -6,7 +6,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::{BufRead, Read, Seek, Write};
+use std::io::{Read, Seek, Write};
 use std::rc::Rc;
 
 use crate::tiled::{TiledLayer, TiledMap, TiledObject};

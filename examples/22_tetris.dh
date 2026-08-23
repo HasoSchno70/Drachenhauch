@@ -185,7 +185,7 @@ END SUB
 
 FUNCTION TryRotate() AS BOOLEAN
     DIM newRot AS INTEGER
-    newRot = (current.rot + 1) mod 4
+    newRot = (current.rot + 1) MOD 4
     IF CanPlace(current.kind, current.x, current.y, newRot) THEN
         current.rot = newRot
         RETURN TRUE
@@ -329,11 +329,11 @@ WHILE NOT QuitRequested() AND NOT INPUT_HELD("quit")
         IF INPUT_PRESSED("hard")   THEN HardDrop()
 
         ' Auto-Repeat fuer links/rechts wenn weiter gehalten
-        IF INPUT_HELD("left")  AND (frame mod 5) = 0 THEN TryMove(-1, 0)
-        IF INPUT_HELD("right") AND (frame mod 5) = 0 THEN TryMove(1, 0)
+        IF INPUT_HELD("left")  AND (frame MOD 5) = 0 THEN TryMove(-1, 0)
+        IF INPUT_HELD("right") AND (frame MOD 5) = 0 THEN TryMove(1, 0)
 
         ' Soft-Drop wenn unten gehalten
-        IF INPUT_HELD("soft") AND (frame mod 2) = 0 THEN
+        IF INPUT_HELD("soft") AND (frame MOD 2) = 0 THEN
             SoftDrop()
             score = score + 1
         END IF

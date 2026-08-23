@@ -30,8 +30,8 @@ WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
     ' --- Bouncender Ball ---
     DIM bx AS INTEGER
     DIM by AS INTEGER
-    bx = 20 + (frame * 3) mod 280
-    by = 150 + ABS((frame mod 80) - 40)
+    bx = 20 + (frame * 3) MOD 280
+    by = 150 + ABS((frame MOD 80) - 40)
     Circle(bx, by, 8, CYAN)
 
     ' --- Beschriftung ---

@@ -163,6 +163,65 @@ fn setze_programm_args(raw: &[String]) {
     });
 }
 
+/// Die Fassung, wie ein Mensch sie nennt: "2026.8" statt "2026.8.0".
+///
+/// Cargo verlangt drei Stellen; die dritte ist hier immer 0 und wuerde nur
+/// verwirren. `tests/test_version.py` haelt Cargo.toml, pyproject.toml und
+/// `drachenhauch/__init__.py` auf demselben Stand.
+fn fassung() -> String {
+    let v = env!("CARGO_PKG_VERSION");
+    v.strip_suffix(".0").unwrap_or(v).to_string()
+}
+
+/// Welche Cargo-Features stecken in DIESEM Binary?
+///
+/// Der Grund fuer diese Zeile: ein Bau ohne `--hardware` laesst `serial`,
+/// `usb`, `bt` und `wifi` weg, ohne dass man es dem Programm ansieht -- und
+/// die Meldung kommt dann erst beim ersten Aufruf, tief im Programm. Wer
+/// `dhrt --version` tippt, soll das in einer Zeile sehen koennen.
+fn eingebaut() -> String {
+    let mut an: Vec<&str> = Vec::new();
+    let mut aus: Vec<&str> = Vec::new();
+    for (name, da) in [
+        ("grafik", cfg!(feature = "graphics")),
+        ("dialoge", cfg!(feature = "dialogs")),
+        ("datenbank", cfg!(feature = "db")),
+        ("netz", cfg!(feature = "net")),
+        ("http", cfg!(feature = "http")),
+        ("seriell", cfg!(feature = "serial")),
+        ("usb", cfg!(feature = "usb")),
+        ("bluetooth", cfg!(feature = "bt")),
+        ("wlan", cfg!(feature = "wifi")),
+    ] {
+        if da { an.push(name) } else { aus.push(name) }
+    }
+    let mut s = format!("dabei: {}", if an.is_empty() { "nichts".to_string() } else { an.join(", ") });
+    if !aus.is_empty() {
+        s.push_str(&format!("\nfehlt: {} (neu bauen mit: python rust/build_runtime.py --hardware)", aus.join(", ")));
+    }
+    s
+}
+
+const HILFE: &str = "\
+dhrt -- die Drachenhauch-Runtime
+
+  dhrt <datei.dh>              Programm ausfuehren (wie `run`)
+  dhrt run <datei.dh> [-- ...] ausfuehren; alles hinter `--` gehoert dem Programm
+  dhrt test [pfad ...]         Pruefprogramme suchen und laufen lassen
+  dhrt fmt <datei ...>         Schluesselwoerter gross schreiben
+                               (--einruecken richtet auch die Einrueckung,
+                                --pruefen schreibt nicht, meldet nur)
+  dhrt --check <datei.dh> ...  nur uebersetzen und Probleme als JSON melden
+  dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln
+  dhrt debug <datei.dh>        Debug-Sitzung (JSON-Protokoll, fuer den Editor)
+  dhrt profile <datei.dh>      Laufzeit je Zeile messen
+  dhrt --version               Fassung und eingebaute Bestandteile
+  dhrt --help                  diese Uebersicht
+
+Entwickler-Einstiege: --tokens, --ast, --dumpbc, --preprocess, --runsrc, call
+
+Handbuch: docs/README.md";
+
 fn main() -> ExitCode {
     // MILLIS/TIMER zaehlen ab hier: "seit Programmstart" soll auch dann
     // stimmen, wenn das Programm erst nach dem Laden von Bildern misst.
@@ -175,6 +234,19 @@ fn main() -> ExitCode {
         // verlustbehaftete Konvertierung crasht dort nie, sondern ersetzt nur
         // ungueltige Bytes.
         let raw: Vec<String> = std::env::args_os().map(|s| s.to_string_lossy().into_owned()).collect();
+        // Bewusst in DIESEM Block (nur wenn keine Exe mit eingebettetem
+        // Programm vorliegt): eine exportierte .exe IST das Programm, ihr
+        // gehoeren alle Argumente -- `meinspiel.exe --version` soll das
+        // Spiel starten und nicht die Runtime ausfragen.
+        if raw.len() >= 2 && matches!(raw[1].as_str(), "--version" | "-V") {
+            println!("dhrt {}", fassung());
+            println!("{}", eingebaut());
+            return ExitCode::SUCCESS;
+        }
+        if raw.len() >= 2 && matches!(raw[1].as_str(), "--help" | "-h" | "/?") {
+            println!("{}", HILFE);
+            return ExitCode::SUCCESS;
+        }
         if raw.len() >= 3 && raw[1] == "--tokens" {
             return tokens_main(&raw[2]);
         }
@@ -213,6 +285,19 @@ fn main() -> ExitCode {
         // Stufe 5: `dhrt run datei.dh` -- eigenstaendiger End-to-End-Lauf
         // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
         // relative Asset-Pfade). dhrt ist damit ohne Python lauffaehig.
+        // `dhrt fmt [--pruefen] <datei ...>` -- Einrueckung richten.
+        if raw.len() >= 2 && raw[1] == "fmt" {
+            let nur_pruefen = raw[2..].iter().any(|a| a == "--pruefen");
+            let einruecken = raw[2..].iter().any(|a| a == "--einruecken");
+            let dateien: Vec<String> = raw[2..].iter()
+                .filter(|a| !a.starts_with("--")).cloned().collect();
+            return fmt_main(&dateien, nur_pruefen, einruecken);
+        }
+        // `dhrt test [pfad ...]` -- Pruefprogramme suchen und laufen lassen.
+        // Ohne Pfad das aktuelle Verzeichnis.
+        if raw.len() >= 2 && raw[1] == "test" {
+            return test_main(&raw[2..]);
+        }
         if raw.len() >= 3 && raw[1] == "run" {
             setze_programm_args(&raw);
             return run_main(&raw[2]);
@@ -327,6 +412,353 @@ fn main() -> ExitCode {
         }
     };
     run_gbc_text(&text, &source_label)
+}
+
+/// Was auf dem Block-Stapel des Formatierers liegt.
+///
+/// `Case` braucht eine eigene Marke, weil `END SELECT` ZWEI Ebenen schliesst:
+/// den Rumpf des letzten CASE und das SELECT selbst. Genau dieser Fall hat
+/// die erste, stapellose Fassung verraten -- sie schrieb die CASE-Zeilen eine
+/// Ebene zu weit links und war damit in 26 Beispieldateien anderer Meinung
+/// als der Hausstil.
+#[derive(PartialEq, Clone, Copy)]
+enum Block { Select, Case, Andere }
+
+/// Ist dieses Token ein Schluesselwort (und nicht Name, Zahl, Text, Zeichen)?
+fn ist_schluesselwort(t: lexer::Tt) -> bool {
+    use lexer::Tt::*;
+    !matches!(t,
+        Number | Str | Ident | Newline | Eof
+        | Plus | Minus | StarT | Slash | Intdiv | Caret | Eq | Neq | Lt | Gt
+        | Leq | Geq | Lparen | Rparen | Lbracket | Rbracket | Lbrace | Rbrace
+        | Comma | Dot | Semicolon | Colon | PlusEq | MinusEq | StarEq | SlashEq
+        | Ellipsis)
+}
+
+/// Schluesselwoerter gross schreiben -- und sonst NICHTS anfassen.
+///
+/// Das ist der Teil eines Formatierers, der **verlustfrei** ist: Drachenhauch
+/// ignoriert Gross-/Kleinschreibung, also schreibt jeder anders (`If x Then`,
+/// `if x then`, `IF x THEN`). Die Ersetzung geschieht an den Token-Positionen
+/// des Lexers, nie am Text -- ein `end` in einer Zeichenkette oder einem
+/// Kommentar bleibt damit unberuehrt.
+///
+/// Gross geschrieben wird das Wort, das DASTEHT (`elif` -> `ELIF`), nicht
+/// sein kanonischer Name (`ELSEIF`): der Formatierer soll die Schreibweise
+/// vereinheitlichen, nicht den Wortschatz.
+fn schluesselwoerter_gross(quelle: &str, toks: &[lexer::Token]) -> Vec<String> {
+    let mut zeilen: Vec<Vec<char>> = quelle.lines().map(|z| z.chars().collect()).collect();
+    for t in toks {
+        if !ist_schluesselwort(t.tt) { continue; }
+        let Some(zeile) = zeilen.get_mut(t.line.saturating_sub(1)) else { continue };
+        let start = t.col.saturating_sub(1);        // col ist 1-basiert
+        // Das Wort an dieser Stelle abgreifen (Buchstaben/Ziffern/Unterstrich)
+        // und in Grossbuchstaben zurueckschreiben. Gleiche Laenge, also
+        // verschiebt sich nichts -- die uebrigen Token behalten ihre Spalte.
+        let mut ende = start;
+        while ende < zeile.len()
+            && (zeile[ende].is_alphanumeric() || zeile[ende] == '_') { ende += 1; }
+        if ende == start { continue; }
+        let wort: String = zeile[start..ende].iter().collect();
+        // GEGENPROBE: steht an dieser Stelle wirklich dieses Schluesselwort?
+        //
+        // Nicht jedes Token sitzt dort, wo sein Text steht: der Lexer loest
+        // einen f-String noch waehrend des Lesens in eine ganze
+        // Token-Folge auf (`("a" + STR$(x))`), und die geerbt alle die
+        // Position des `f`. Ohne diese Probe wurde daraus `F"..."` -- in
+        // 108_skeletal_anim.dh beim ersten Lauf ueber den Bestand
+        // tatsaechlich passiert.
+        if lexer::keyword(&wort.to_lowercase()) != Some(t.tt) { continue; }
+        let gross: Vec<char> = wort.to_uppercase().chars().collect();
+        // Nur ersetzen, wenn die Laenge stimmt: bei Sonderzeichen kann
+        // to_uppercase laenger werden (das deutsche Eszett), und dann waere
+        // jede folgende Spalte in dieser Zeile verschoben. Schluesselwoerter
+        // sind reines ASCII, der Fall kann also nur bei einem Irrtum
+        // auftreten -- dann lieber nichts tun.
+        if gross.len() != ende - start { continue; }
+        zeile[start..ende].copy_from_slice(&gross);
+    }
+    zeilen.into_iter().map(|z| z.into_iter().collect()).collect()
+}
+
+/// Neu einruecken -- nur auf ausdrueckliche Anforderung (`--einruecken`).
+///
+/// **Warum nicht von Haus aus:** der Formatierer kennt nur die Bloecke der
+/// SPRACHE. Eine von Hand eingerueckte Gruppe, die die Sprache nicht kennt --
+/// der Inhalt zwischen `RENDERTARGET_BEGIN` und `RENDERTARGET_END`, ein unter
+/// seinem Vorgaenger ausgerichteter Kommentar -- wird dabei flachgezogen.
+/// Beides ist in `examples/` echt vorgekommen. Ein Werkzeug, das die
+/// Gliederungsabsicht seines Nutzers ueberschreibt, darf das nicht
+/// nebenbei tun.
+fn neu_einruecken(zeilen: &[String], toks: &[lexer::Token], einheit: &str) -> Vec<String> {
+    use lexer::Tt::*;
+    // LOGISCHE Zeilen aus dem Token-Strom bauen: eine Zeile, die per `_`
+    // weitergeht, hat kein NEWLINE dazwischen -- ihre Fortsetzung liegt also
+    // im selben Buendel.
+    //
+    // Bewusst NICHT am Text entschieden ("endet auf `_`"): ein Bezeichner
+    // darf auf `_` enden (`DIM my_var`), und dann waere die naechste Zeile
+    // faelschlich eine Fortsetzung. Der Lexer kennt den Unterschied, weil er
+    // `_` nur direkt vor dem Zeilenende als Fortsetzung liest.
+    struct LZeile { erste: usize, letzte: usize, toks: Vec<lexer::Tt> }
+    let mut logisch: Vec<LZeile> = Vec::new();
+    let mut offen: Option<LZeile> = None;
+    for t in toks {
+        match t.tt {
+            Newline => {
+                if let Some(mut z) = offen.take() { z.letzte = t.line.max(z.letzte); logisch.push(z); }
+            }
+            Eof => {}
+            tt => match &mut offen {
+                Some(z) => { z.letzte = t.line.max(z.letzte); z.toks.push(tt); }
+                None => offen = Some(LZeile { erste: t.line, letzte: t.line, toks: vec![tt] }),
+            },
+        }
+    }
+    if let Some(z) = offen.take() { logisch.push(z); }
+    let mut beginnt: std::collections::HashMap<usize, usize> = Default::default();
+    for (i, z) in logisch.iter().enumerate() { beginnt.insert(z.erste, i); }
+
+    let mut stapel: Vec<Block> = Vec::new();
+    let mut raus: Vec<String> = Vec::new();
+    let mut i = 0usize;
+    while i < zeilen.len() {
+        let nr = i + 1;                      // Zeilennummern sind 1-basiert
+        let inhalt = zeilen[i].trim_end();
+        let Some(&li) = beginnt.get(&nr) else {
+            // Keine Anweisung hier: Leerzeile oder reiner Kommentar. Beide
+            // bleiben, wie sie sind -- ein Kommentar steht oft mit Absicht,
+            // wo er steht.
+            raus.push(inhalt.to_string());
+            i += 1;
+            continue;
+        };
+        let z = &logisch[li];
+        let erstes = z.toks.first().copied();
+
+        // 1. Was schliesst diese Zeile, BEVOR sie selbst gesetzt wird?
+        match erstes {
+            Some(End) if z.toks.len() > 1 => {
+                // Ein alleinstehendes END (Programmende) schliesst nichts.
+                if z.toks.get(1) == Some(&Select) && stapel.last() == Some(&Block::Case) {
+                    stapel.pop();
+                }
+                stapel.pop();
+            }
+            Some(Next) | Some(Wend) | Some(Until) => { stapel.pop(); }
+            Some(Case) => { if stapel.last() == Some(&Block::Case) { stapel.pop(); } }
+            _ => {}
+        }
+
+        // 2. ELSE/ELSEIF/CATCH/FINALLY gehoeren optisch zu ihrem Kopf, stehen
+        //    also eine Ebene weiter links als der Rumpf.
+        let ausruecken = matches!(erstes, Some(Else) | Some(Elseif) | Some(Catch) | Some(Finally));
+        let tiefe = stapel.len().saturating_sub(if ausruecken { 1 } else { 0 });
+        raus.push(format!("{}{}", einheit.repeat(tiefe), inhalt.trim()));
+
+        // Fortsetzungszeilen unveraendert uebernehmen: wer seine Parameter
+        // untereinander ausrichtet, hat sich etwas dabei gedacht.
+        for k in (nr + 1)..=z.letzte.min(zeilen.len()) {
+            raus.push(zeilen[k - 1].trim_end().to_string());
+        }
+
+        // 3. Was oeffnet diese Zeile?
+        match erstes {
+            Some(Select) => stapel.push(Block::Select),
+            Some(Case) => stapel.push(Block::Case),
+            Some(For) | Some(While) | Some(Sub) | Some(Function) | Some(Class)
+            | Some(Struct) | Some(Try) | Some(With) | Some(Repeat)
+            | Some(Property) | Some(Operator) => stapel.push(Block::Andere),
+            // ENUM gibt es in zwei Formen: als Block (mit END ENUM) und
+            // einzeilig (`ENUM State = MENU, PLAYING`). Nur die erste oeffnet
+            // etwas -- das `=` unterscheidet sie.
+            Some(Enum) => {
+                if !z.toks.contains(&Eq) { stapel.push(Block::Andere); }
+            }
+            Some(If) => {
+                // Ein einzeiliges IF (`IF x THEN y = 1`) oeffnet nichts --
+                // erkennbar daran, dass hinter dem THEN noch etwas steht.
+                if let Some(p) = z.toks.iter().position(|t| *t == Then) {
+                    if p + 1 >= z.toks.len() { stapel.push(Block::Andere); }
+                }
+            }
+            _ => {}
+        }
+        i = z.letzte.max(nr);
+    }
+    raus
+}
+
+/// Eine Quelle formatieren.
+///
+/// `None` heisst: die Datei liess sich nicht lexen (Syntaxfehler). Dann wird
+/// nichts geschrieben -- an kaputtem Code herumzuruecken hilft niemandem.
+fn formatiere(quelle: &str, einruecken: bool, einheit: &str) -> Option<String> {
+    let toks = lexer::Lexer::new(quelle).tokenize().ok()?;
+    let mut zeilen = schluesselwoerter_gross(quelle, &toks);
+    if einruecken {
+        zeilen = neu_einruecken(&zeilen, &toks, einheit);
+    }
+    // Leerraum am Zeilenende faellt immer weg -- er ist unsichtbar und
+    // taucht in jedem Diff auf.
+    Some(zeilen.iter().map(|z| z.trim_end()).collect::<Vec<_>>().join("\n"))
+}
+
+/// `dhrt fmt [--pruefen] [--einruecken] <datei ...>`
+fn fmt_main(dateien: &[String], nur_pruefen: bool, einruecken: bool) -> ExitCode {
+    if dateien.is_empty() {
+        eprintln!("Verwendung: dhrt fmt [--pruefen] [--einruecken] <datei.dh ...>");
+        return ExitCode::from(2);
+    }
+    let mut geaendert = 0usize;
+    let mut fehler = 0usize;
+    for d in dateien {
+        let roh = match std::fs::read_to_string(d) {
+            Ok(t) => t,
+            Err(e) => { eprintln!("dhrt fmt: {}: {}", d, e); fehler += 1; continue; }
+        };
+        // Zeilenenden der Datei beibehalten: eine CRLF-Datei soll nicht
+        // allein durch das Formatieren im Diff komplett neu erscheinen.
+        let crlf = roh.contains("\r\n");
+        let endet_mit_umbruch = roh.ends_with('\n');
+        let Some(neu) = formatiere(&roh, einruecken, "    ") else {
+            eprintln!("dhrt fmt: {}: laesst sich nicht lesen (Syntaxfehler?) -- unveraendert gelassen", d);
+            fehler += 1;
+            continue;
+        };
+        let mut neu = neu;
+        if endet_mit_umbruch { neu.push('\n'); }
+        let neu = if crlf { neu.replace('\n', "\r\n") } else { neu };
+        if neu == roh { continue; }
+        geaendert += 1;
+        if nur_pruefen {
+            println!("wuerde sich aendern: {}", d);
+        } else if let Err(e) = std::fs::write(d, &neu) {
+            eprintln!("dhrt fmt: {}: {}", d, e);
+            fehler += 1;
+        } else {
+            println!("gerichtet: {}", d);
+        }
+    }
+    if fehler > 0 { return ExitCode::from(2); }
+    // `--pruefen` ist fuer eine Kette gedacht: "es gibt noch etwas zu tun"
+    // muss sich am Rueckgabewert ablesen lassen.
+    if nur_pruefen && geaendert > 0 { return ExitCode::from(1); }
+    ExitCode::SUCCESS
+}
+
+/// Endung, an der ein Pruefprogramm erkannt wird.
+///
+/// Die Regel ist am Bestand abgelesen, nicht erfunden: `buch-tippspiel/code/`
+/// nennt seine vier Pruefprogramme seit jeher `*_pruefung.dh`. Eine zweite,
+/// englische Schreibweise daneben waere nur eine Quelle fuer "warum laeuft
+/// meine Datei nicht mit".
+const PRUEF_ENDUNG: &str = "_pruefung.dh";
+
+/// Verzeichnisse, in denen nicht gesucht wird.
+///
+/// `target` und `.venv` enthalten fremden Code in Mengen; ohne diese Liste
+/// laeuft ein `dhrt test` im Projektwurzel-Verzeichnis minutenlang durch
+/// Abhaengigkeiten.
+const NICHT_SUCHEN: &[&str] = &["target", ".git", ".venv", "node_modules", "__pycache__"];
+
+/// Pruefprogramme unterhalb von `wurzel` einsammeln (rekursiv, sortiert).
+fn pruefdateien(wurzel: &std::path::Path, raus: &mut Vec<std::path::PathBuf>) {
+    let Ok(rd) = std::fs::read_dir(wurzel) else { return };
+    let mut eintraege: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    eintraege.sort();
+    for p in eintraege {
+        let name = p.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        if p.is_dir() {
+            if !NICHT_SUCHEN.contains(&name.as_str()) && !name.starts_with('.') {
+                pruefdateien(&p, raus);
+            }
+        } else if name.ends_with(PRUEF_ENDUNG) {
+            raus.push(p);
+        }
+    }
+}
+
+/// `dhrt test [pfad ...]` -- die Pruefprogramme laufen lassen und Bilanz ziehen.
+///
+/// Die Bausteine dafuer gibt es seit WP E (`ASSERT`, `ASSERT_COLLECT`,
+/// `ASSERT_REPORT`, Rueckgabewert). Was fehlte, war das Dach: ohne es schreibt
+/// sich jedes Projekt seinen eigenen Laeufer -- so wie `buch-tippspiel` sich
+/// vor WP E sein eigenes `ASSERT` geschrieben hatte.
+///
+/// **Jede Datei laeuft als eigener Prozess.** Derselbe Grund wie bei
+/// `TASK_START`: die Prozessgrenze ist die Zusage. Ein Pruefprogramm, das
+/// abstuerzt, ein Fenster oeffnet oder Globals hinterlaesst, kann dem
+/// naechsten nichts antun. ~12 ms je Start faellt bei einer Pruefung nicht
+/// ins Gewicht.
+///
+/// **Die Standardeingabe des Kindes ist leer.** Ein Pruefprogramm mit einem
+/// vergessenen `INPUT` wuerde sonst auf eine Eingabe warten, die nie kommt,
+/// und der ganze Lauf haengt -- mit leerem stdin bekommt es sofort das Ende.
+fn test_main(pfade: &[String]) -> ExitCode {
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => { eprintln!("dhrt test: eigenen Pfad nicht gefunden: {}", e); return ExitCode::from(2); }
+    };
+    let ziele: Vec<String> = if pfade.is_empty() { vec![".".to_string()] }
+                             else { pfade.to_vec() };
+    let mut dateien: Vec<std::path::PathBuf> = Vec::new();
+    for z in &ziele {
+        let p = std::path::Path::new(z);
+        if p.is_dir() {
+            pruefdateien(p, &mut dateien);
+        } else if p.is_file() {
+            // Eine ausdruecklich genannte Datei laeuft, auch wenn sie nicht
+            // so heisst -- wer sie hinschreibt, meint sie.
+            dateien.push(p.to_path_buf());
+        } else {
+            eprintln!("dhrt test: '{}' gibt es nicht", z);
+            return ExitCode::from(2);
+        }
+    }
+    if dateien.is_empty() {
+        eprintln!("dhrt test: keine Pruefprogramme gefunden (gesucht wird nach *{})",
+                  PRUEF_ENDUNG);
+        // Kein Fehler-Rueckgabewert: "nichts zu tun" ist kein Fehlschlag,
+        // sonst faellt eine Kette ueber ein noch leeres Projekt.
+        return ExitCode::SUCCESS;
+    }
+    let start = std::time::Instant::now();
+    let mut fehler = 0usize;
+    for d in &dateien {
+        let t0 = std::time::Instant::now();
+        let r = std::process::Command::new(&exe)
+            .arg("run").arg(d)
+            .stdin(std::process::Stdio::null())
+            .output();
+        let dauer = t0.elapsed().as_secs_f64();
+        let name = d.display().to_string();
+        match r {
+            Ok(o) if o.status.success() => {
+                println!("  ok      {}  ({:.2}s)", name, dauer);
+            }
+            Ok(o) => {
+                fehler += 1;
+                let code = o.status.code().unwrap_or(-1);
+                println!("  FEHLER  {}  (Rueckgabewert {}, {:.2}s)", name, code, dauer);
+                // Beide Kanaele zeigen: die Bilanz einer Pruefung geht nach
+                // stdout, die einzelnen Fehlschlaege nach stderr (WP E).
+                for (kanal, roh) in [("", &o.stdout), ("", &o.stderr)] {
+                    let text = String::from_utf8_lossy(roh);
+                    for zeile in text.lines() {
+                        println!("          {}{}", kanal, zeile);
+                    }
+                }
+            }
+            Err(e) => {
+                fehler += 1;
+                println!("  FEHLER  {}  (Start fehlgeschlagen: {})", name, e);
+            }
+        }
+    }
+    println!("\n{} Datei(en), {} ok, {} mit Fehlern  ({:.2}s)",
+             dateien.len(), dateien.len() - fehler, fehler, start.elapsed().as_secs_f64());
+    if fehler > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 
 /// `dhrt --tokens <datei.dh>` -- lext die Quelldatei und gibt pro Token eine

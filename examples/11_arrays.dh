@@ -26,7 +26,7 @@ NEXT
 PRINT ""
 PRINT "Erste Zahl 1..20 ohne Rest mod 7 (mit BREAK):"
 FOR i = 1 TO 20
-    IF i mod 7 = 0 THEN
+    IF i MOD 7 = 0 THEN
         PRINT "  Treffer:", i
         BREAK
     END IF
@@ -35,7 +35,7 @@ NEXT
 PRINT ""
 PRINT "Ungerade Zahlen 1..10 (mit CONTINUE):"
 FOR i = 1 TO 10
-    IF i mod 2 = 0 THEN CONTINUE
+    IF i MOD 2 = 0 THEN CONTINUE
     PRINT "  ", i
 NEXT
 
