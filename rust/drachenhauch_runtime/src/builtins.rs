@@ -474,6 +474,140 @@ pub fn new_int_array(items: Vec<i64>) -> Value {
 }
 
 /// Banker's Rounding (Python `round`), Ergebnis als i64.
+
+// ===================== Geld =====================
+//
+// Warum es diese drei Helfer gibt: Fliesskomma und Geld vertragen sich
+// nicht, und der uebliche Rat dagegen ("rechne in ganzen Cent") ist SELBST
+// eine Falle -- der Schritt dorthin lautet `INT(preis * 100)`, und der
+// ergibt fuer 19.99 die Zahl 1998. Denn 19.99 liegt als Fliesskommazahl
+// minimal UNTER 19,99, und INT schneidet ab.
+//
+// Der Kern ist deshalb `dez_runden`: gerundet wird die Zahl, die DASTEHT --
+// also die kuerzeste Dezimaldarstellung, die wieder auf denselben f64
+// zurueckliest (Rusts `{}`) --, nicht ihr binaeres Innenleben. Damit wird
+// aus 2.675 wie erwartet 2,68 und nicht 2,67. Wer stattdessen die exakte
+// Binaerentwicklung rundet (2.67499999999999982...), bekommt formal Recht
+// und praktisch eine Rechnung, die niemand nachvollziehen kann.
+
+/// Eine Zahl auf `n` Nachkommastellen runden, kaufmaennisch (von der Null
+/// weg) und auf der Dezimaldarstellung. Liefert (negativ, Vorkomma,
+/// Nachkomma) -- als Ziffern, damit der Aufrufer daraus eine Zahl ODER
+/// ganze Cent bauen kann, ohne noch einmal mit 100 zu multiplizieren.
+fn dez_runden(x: f64, n: usize) -> Result<(bool, String, String), String> {
+    if !x.is_finite() {
+        return Err("kein endlicher Wert (NAN oder unendlich)".to_string());
+    }
+    let neg = x < 0.0;
+    let s = format!("{}", x.abs());
+    let (ganz, bruch) = match s.split_once('.') {
+        Some((g, b)) => (g.to_string(), b.to_string()),
+        None => (s.clone(), String::new()),
+    };
+    // Rusts Display fuer f64 kennt keine Exponentialschreibweise; die
+    // Pruefung steht trotzdem da, damit ein Sonderfall nicht still
+    // durchrutscht.
+    if ganz.is_empty() || !ganz.bytes().all(|c| c.is_ascii_digit())
+        || !bruch.bytes().all(|c| c.is_ascii_digit()) {
+        return Err(format!("unerwartete Zahlendarstellung {:?}", s));
+    }
+    dez_runden_ziffern(neg, &ganz, &bruch, n)
+}
+
+/// Derselbe Rundungsschritt, aber auf schon zerlegten Ziffern.
+fn dez_runden_ziffern(neg: bool, ganz: &str, bruch: &str, n: usize)
+        -> Result<(bool, String, String), String> {
+    let mut ziffern: Vec<u8> = ganz.bytes().chain(bruch.bytes().take(n)).collect();
+    while ziffern.len() < ganz.len() + n { ziffern.push(b'0'); }
+    let aufrunden = matches!(bruch.as_bytes().get(n), Some(c) if *c >= b'5');
+    let mut vorkomma = ganz.len();
+    if aufrunden {
+        let mut i = ziffern.len();
+        loop {
+            if i == 0 {
+                // Uebertrag ganz nach vorn: 9,99 -> 10,0
+                ziffern.insert(0, b'1');
+                vorkomma += 1;
+                break;
+            }
+            i -= 1;
+            if ziffern[i] == b'9' { ziffern[i] = b'0'; } else { ziffern[i] += 1; break; }
+        }
+    }
+    let text = String::from_utf8(ziffern).map_err(|_| "Zifferfehler".to_string())?;
+    Ok((neg, text[..vorkomma].to_string(), text[vorkomma..].to_string()))
+}
+
+/// Einen geschriebenen Betrag zerlegen: "19,99", "19.99", "1.234,56",
+/// "-1 234,56". Ohne Umweg ueber f64 -- der waere genau die Ungenauigkeit,
+/// die hier vermieden werden soll.
+fn geld_text_teile(roh: &str) -> Result<(bool, String, String), String> {
+    let s: String = roh.chars().filter(|c| !c.is_whitespace() && *c != '\u{a0}').collect();
+    let (neg, s) = match s.strip_prefix('-') {
+        Some(r) => (true, r.to_string()),
+        None => (false, s.strip_prefix('+').unwrap_or(&s).to_string()),
+    };
+    if s.is_empty() { return Err("leerer Betrag".to_string()); }
+
+    let punkte = s.matches('.').count();
+    let kommas = s.matches(',').count();
+    // Welches Zeichen trennt die Nachkommastellen? Wenn beide vorkommen,
+    // das HINTERE; wenn eines mehrfach vorkommt, ist es Tausendertrenner.
+    let dezimal: Option<char> = if punkte > 0 && kommas > 0 {
+        if s.rfind('.') > s.rfind(',') { Some('.') } else { Some(',') }
+    } else if punkte == 1 { Some('.') }
+    else if kommas == 1 { Some(',') }
+    else { None };
+
+    let mut ganz = String::new();
+    let mut bruch = String::new();
+    let mut nach_trenner = false;
+    let trennstelle = dezimal.and_then(|d| s.rfind(d));
+    for (i, c) in s.char_indices() {
+        if Some(i) == trennstelle { nach_trenner = true; continue; }
+        if c == '.' || c == ',' { continue; }          // Tausendertrenner
+        if !c.is_ascii_digit() {
+            return Err(format!("{:?} ist kein Betrag -- erlaubt sind Ziffern, \
+                                ein Vorzeichen und ein Komma (oder Punkt)", roh));
+        }
+        if nach_trenner { bruch.push(c); } else { ganz.push(c); }
+    }
+    if ganz.is_empty() { ganz.push('0'); }
+    Ok((neg, ganz, bruch))
+}
+
+/// Ganze Cent aus zerlegten Ziffern -- mit Ueberlauf-Pruefung, denn eine
+/// stumm umlaufende Summe waere das Schlimmste, was Geld passieren kann.
+fn cent_aus_teilen(neg: bool, ganz: &str, bruch: &str, wer: &str) -> Result<i64, String> {
+    let (_, g, b) = dez_runden_ziffern(neg, ganz, bruch, 2)?;
+    let zahl = format!("{}{}", g.trim_start_matches('0'), b);
+    let zahl = if zahl.is_empty() { "0".to_string() } else { zahl };
+    let wert: i64 = zahl.parse().map_err(|_| format!(
+        "{}: {},{} ist zu gross fuer ganze Cent (INTEGER ist 64-bit)", wer, ganz, bruch))?;
+    Ok(if neg { -wert } else { wert })
+}
+
+/// Cent in deutscher Schreibweise: 1234567 -> "1.234.567" + ",89".
+fn euro_text(cent: i64, symbol: &str) -> String {
+    let neg = cent < 0;
+    let roh = (cent as i128).abs();
+    let ganz = (roh / 100).to_string();
+    let rest = roh % 100;
+    let mut mit_punkten = String::new();
+    for (i, c) in ganz.chars().enumerate() {
+        if i > 0 && (ganz.len() - i) % 3 == 0 { mit_punkten.push('.'); }
+        mit_punkten.push(c);
+    }
+    let mut out = String::new();
+    if neg { out.push('-'); }
+    out.push_str(&format!("{},{:02}", mit_punkten, rest));
+    if !symbol.is_empty() {
+        out.push(' ');
+        out.push_str(symbol);
+    }
+    out
+}
+
 fn round_half_even(x: f64) -> i64 {
     let f = x.floor();
     let diff = x - f;
@@ -1044,6 +1178,66 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Float(s.parse::<f64>().unwrap_or(x)))
             } else {
                 err(format!("ROUND: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()))
+            }
+        }
+        // --- Geld: siehe den Block "Geld" weiter oben ---
+        "cent" => {
+            arity!(1);
+            let (neg, ganz, bruch) = match &a[0] {
+                Value::Str(s) => geld_text_teile(s).map_err(|e| format!("CENT: {}", e))?,
+                v => {
+                    let x = need_num(v, "CENT")?;
+                    dez_runden(x, 4).map_err(|e| format!("CENT: {}", e))?
+                }
+            };
+            Ok(Value::Int(cent_aus_teilen(neg, &ganz, &bruch, "CENT")?))
+        }
+        "euro$" => {
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("EURO$: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+            }
+            // Bewusst KEIN FLOAT: wer EURO$(19.99) schreibt, hat den Punkt
+            // verfehlt, um den es hier geht -- also sagen wir es ihm.
+            let cent = match &a[0] {
+                Value::Int(i) => *i,
+                Value::Float(f) => {
+                    let (neg, g, b) = dez_runden(*f, 4).map_err(|e| format!("EURO$: {}", e))?;
+                    let c = cent_aus_teilen(neg, &g, &b, "EURO$")?;
+                    return err(format!("EURO$: erwartet GANZE CENT, keine Kommazahl -- \
+                                        aus {} macht CENT({}) die Zahl {}", f, f, c));
+                }
+                v => return err(format!("EURO$: erwartet INTEGER, erhalten {}", v.type_name())),
+            };
+            let symbol = match a.get(1) {
+                Some(Value::Str(s)) => s.to_string(),
+                None => "\u{20ac}".to_string(),
+                Some(v) => return err(format!("EURO$: das Symbol muss ein STRING sein, \
+                                               erhalten {}", v.type_name())),
+            };
+            Ok(Value::str_rc(&euro_text(cent, &symbol)))
+        }
+        "round_half_up" => {
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("ROUND_HALF_UP: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+            }
+            let x = need_num(&a[0], "ROUND_HALF_UP")?;
+            let n = if a.len() == 2 {
+                let n = need_int(&a[1], "ROUND_HALF_UP")?;
+                if n < 0 { return err("ROUND_HALF_UP: Nachkommastellen muessen >= 0 sein".to_string()); }
+                if n > 15 { return err("ROUND_HALF_UP: mehr als 15 Nachkommastellen \
+                                        kann eine FLOAT-Zahl nicht halten".to_string()); }
+                n as usize
+            } else { 0 };
+            let (neg, ganz, bruch) = dez_runden(x, n)
+                .map_err(|e| format!("ROUND_HALF_UP: {}", e))?;
+            if a.len() == 1 {
+                let wert: i64 = ganz.parse().map_err(|_| format!(
+                    "ROUND_HALF_UP: {} passt nicht in eine ganze Zahl", x))?;
+                Ok(Value::Int(if neg { -wert } else { wert }))
+            } else {
+                let text = format!("{}{}.{}", if neg { "-" } else { "" }, ganz,
+                                   if bruch.is_empty() { "0" } else { &bruch });
+                Ok(Value::Float(text.parse::<f64>().unwrap_or(x)))
             }
         }
         "log" => {
@@ -5515,5 +5709,91 @@ mod muster_tests {
         // dieser Test in Millisekunden durchlaeuft, stimmt das.
         let name = "a".repeat(40);
         assert!(!passt_muster(&name, "*a*a*a*a*a*a*a*a*b"));
+    }
+}
+
+#[cfg(test)]
+mod geld_tests {
+    use super::{cent_aus_teilen, dez_runden, euro_text, geld_text_teile};
+
+    fn cent(x: f64) -> i64 {
+        let (n, g, b) = dez_runden(x, 4).unwrap();
+        cent_aus_teilen(n, &g, &b, "T").unwrap()
+    }
+
+    #[test]
+    fn der_klassiker_ist_zu() {
+        // `INT(19.99 * 100)` ergibt 1998 -- genau dagegen gibt es CENT.
+        assert_eq!(cent(19.99), 1999);
+        assert_eq!(cent(0.29), 29);
+        assert_eq!(cent(0.1 + 0.2), 30);
+        assert_eq!(cent(-19.99), -1999);
+        assert_eq!(cent(0.0), 0);
+    }
+
+    #[test]
+    fn kaufmaennisch_heisst_von_der_null_weg() {
+        assert_eq!(dez_runden(2.5, 0).unwrap().1, "3");
+        assert_eq!(dez_runden(3.5, 0).unwrap().1, "4");
+        let (neg, g, _) = dez_runden(-2.5, 0).unwrap();
+        assert!(neg && g == "3");
+    }
+
+    #[test]
+    fn gerundet_wird_die_zahl_die_dasteht() {
+        // 2.675 ist als f64 in Wahrheit 2.67499999999999982...; wer die
+        // Binaerentwicklung rundet, bekommt 2,67 und eine Rechnung, die
+        // niemand nachvollziehen kann.
+        let (_, g, b) = dez_runden(2.675, 2).unwrap();
+        assert_eq!((g.as_str(), b.as_str()), ("2", "68"));
+    }
+
+    #[test]
+    fn uebertrag_bis_ganz_nach_vorn() {
+        let (_, g, b) = dez_runden(9.99, 1).unwrap();
+        assert_eq!((g.as_str(), b.as_str()), ("10", "0"));
+        assert_eq!(dez_runden(0.5, 0).unwrap().1, "1");
+        assert_eq!(cent(9.999), 1000);
+    }
+
+    #[test]
+    fn zu_wenig_nachkommastellen_werden_aufgefuellt() {
+        let (_, g, b) = dez_runden(7.0, 2).unwrap();
+        assert_eq!((g.as_str(), b.as_str()), ("7", "00"));
+    }
+
+    #[test]
+    fn geschriebene_betraege() {
+        let f = |s: &str| {
+            let (n, g, b) = geld_text_teile(s).unwrap();
+            cent_aus_teilen(n, &g, &b, "T").unwrap()
+        };
+        assert_eq!(f("19,99"), 1999);
+        assert_eq!(f("19.99"), 1999);
+        assert_eq!(f("-19,99"), -1999);
+        assert_eq!(f(" 1.234,56 "), 123456);   // Punkt = Tausender
+        assert_eq!(f("1,234.56"), 123456);     // englisch herum
+        assert_eq!(f("1.234.567"), 123456700); // mehrfach -> Tausender
+        assert_eq!(f("0,005"), 1);             // rundet von der Null weg
+        assert_eq!(f(",5"), 50);
+        assert!(geld_text_teile("19,99 EUR").is_err());
+        assert!(geld_text_teile("").is_err());
+    }
+
+    #[test]
+    fn anzeige_in_deutscher_schreibweise() {
+        assert_eq!(euro_text(1999, "\u{20ac}"), "19,99 \u{20ac}");
+        assert_eq!(euro_text(123456789, "\u{20ac}"), "1.234.567,89 \u{20ac}");
+        assert_eq!(euro_text(-1999, "\u{20ac}"), "-19,99 \u{20ac}");
+        assert_eq!(euro_text(5, ""), "0,05");
+        assert_eq!(euro_text(0, ""), "0,00");
+        assert_eq!(euro_text(1999, "CHF"), "19,99 CHF");
+        assert_eq!(euro_text(100000, ""), "1.000,00");
+    }
+
+    #[test]
+    fn unendlich_ist_kein_betrag() {
+        assert!(dez_runden(f64::NAN, 2).is_err());
+        assert!(dez_runden(f64::INFINITY, 2).is_err());
     }
 }

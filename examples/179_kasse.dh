@@ -1,0 +1,82 @@
+' 179 -- Mit Geld rechnen (ein Kassenbon)
+'
+' Fliesskomma und Geld vertragen sich nicht -- und der uebliche Rat dagegen
+' ("rechne in ganzen Cent") faellt SELBST in eine Falle:
+'
+'     INT(19.99 * 100)  ist 1998, nicht 1999
+'
+' Denn 19.99 liegt als Fliesskommazahl minimal UNTER 19,99, und INT schneidet
+' ab. Deshalb gibt es CENT (rundet statt abzuschneiden), ROUND_HALF_UP
+' (kaufmaennisch: von der Null weg) und EURO$ (deutsche Anzeige).
+'
+' Aufruf:  dhrt run 179_kasse.dh
+
+CONST MWST AS FLOAT = 0.19
+
+' --- Erst einmal die Falle vorfuehren -------------------------------------
+PRINT "Was schiefgeht, wenn man es naiv macht:"
+PRINT "  0.1 + 0.2        = " + STR$(0.1 + 0.2)
+PRINT "  INT(19.99 * 100) = " + STR$(INT(19.99 * 100)) + "   (ein Cent weg)"
+PRINT "  CENT(19.99)      = " + STR$(CENT(19.99)) + "   (so ist es richtig)"
+PRINT ""
+
+' --- Der Warenkorb --------------------------------------------------------
+DIM ware AS ARRAY OF STRING
+DIM preis AS ARRAY OF FLOAT
+DIM menge AS ARRAY OF INTEGER
+ware  = ["Kaffeebohnen 1kg", "Milch", "Zeitung", "Pfand Flasche"]
+preis = [19.99, 1.29, 3.50, 0.25]
+menge = [3, 6, 1, 6]
+
+DIM i AS INTEGER
+DIM zeile AS INTEGER          ' Cent
+DIM netto AS INTEGER          ' Cent -- IMMER ganze Zahlen
+DIM steuer AS INTEGER
+DIM brutto AS INTEGER
+DIM stueck AS INTEGER
+
+PRINT "KASSENBON"
+PRINT "-------------------------------------------"
+netto = 0
+stueck = 0
+FOR i = 0 TO LEN(ware) - 1
+    ' CENT(...) einmal pro Einzelpreis, dann nur noch ganzzahlig rechnen.
+    zeile = CENT(preis[i]) * menge[i]
+    netto = netto + zeile
+    stueck = stueck + menge[i]
+    PRINT PADR$(ware[i], 22) + PADL$(STR$(menge[i]) + " x", 6) + _
+          PADL$(EURO$(CENT(preis[i]), ""), 9) + PADL$(EURO$(zeile, ""), 10)
+NEXT
+PRINT "-------------------------------------------"
+
+' --- Steuer: hier und nur hier kommt eine Kommazahl ins Spiel -------------
+steuer = ROUND_HALF_UP(netto * MWST)
+brutto = netto + steuer
+
+PRINT PADR$("Netto", 28) + PADL$(EURO$(netto), 15)
+PRINT PADR$("zzgl. " + STR$(INT(MWST * 100)) + "% MwSt", 28) + PADL$(EURO$(steuer), 15)
+PRINT PADR$("SUMME", 28) + PADL$(EURO$(brutto), 15)
+PRINT ""
+PRINT STR$(stueck) + " Artikel, Durchschnitt " + EURO$(brutto \ stueck) + " pro Stueck."
+
+' --- Die Probe: in Cent geht die Rechnung exakt auf -----------------------
+PRINT ""
+IF netto + steuer = brutto THEN
+    PRINT "Probe: Netto + Steuer = Summe, auf den Cent genau."
+END IF
+
+' Und zum Schluss der Grund, warum das kein Haarspalten ist. Dieselbe Summe
+' in FLOAT gerechnet SIEHT richtig aus, druckt sich richtig, und ist sogar
+' gleich der Zahl, die man erwartet -- bis jemand sie in Cent umrechnet.
+DIM float_summe AS FLOAT
+float_summe = 0.0
+FOR i = 0 TO LEN(ware) - 1
+    float_summe = float_summe + preis[i] * menge[i]
+NEXT
+PRINT ""
+PRINT "Dieselbe Summe in FLOAT:  " + STR$(float_summe)
+PRINT "  ist sie gleich 72.71?   " + STR$(float_summe = 72.71)
+PRINT "  in Wahrheit steht da:   " + FORMAT$(float_summe, "%.20f")
+PRINT "  INT(summe * 100)     =  " + STR$(INT(float_summe * 100)) + "   <- ein Cent fehlt"
+PRINT "  CENT(summe)          =  " + STR$(CENT(float_summe))
+PRINT "In Cent gerechnet:        " + STR$(netto)

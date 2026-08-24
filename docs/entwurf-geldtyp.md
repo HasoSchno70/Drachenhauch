@@ -1,5 +1,13 @@
 # Entwurf: Geld in Drachenhauch
 
+> **Stand 24.08.2026: Weg A ist gebaut.** `CENT`, `EURO$` und
+> `ROUND_HALF_UP` gibt es, und der Abschnitt „Mit Geld rechnen" steht in
+> [builtins-core.md](builtins-core.md#mit-geld-rechnen). Der dritte Befehl
+> heißt **nicht** `RUNDE_AUF` wie unten vorgeschlagen: das hätte jeder als
+> „aufrunden" gelesen, also als `CEIL` — und das ist genau die falsche
+> Bedeutung. `ROUND_HALF_UP` steht dafür neben `ROUND`/`FLOOR`/`CEIL`, wo
+> es hingehört. Weg B und Weg C bleiben unentschieden.
+
 *Untersuchung, keine Umsetzung.* Punkt 7 des [Allzweck-Audits](allzweck-audit-2.md)
 brachte Module hervor, mit denen sich kaufmännische Software schreiben lässt —
 Rechnung als PDF, Auswertung als Excel-Mappe, Versand per E-Mail. Damit steht
@@ -57,8 +65,8 @@ Kein neuer Typ. Stattdessen:
 * Ein Abschnitt „Mit Geld rechnen" in [builtins-core.md](builtins-core.md):
   in ganzen Cent rechnen, **`ROUND` statt `INT`** beim Umrechnen, und warum.
 * `ROUND`s Rundungsregel dokumentieren.
-* Drei neue Builtins — **es gibt sie heute nicht**, sie sind hier
-  vorgeschlagen:
+* Drei neue Builtins (**gebaut am 24.08.2026**, Namen wie hier — bis auf
+  den dritten, siehe Kopf):
   * `CENT` — Betrag → INTEGER, also gerundet mal hundert statt
     abgeschnitten, aber unter einem Namen, der sagt, was er tut.
   * `EURO$` — Cent (und wahlweise ein Währungskürzel) → `1.234.567,89 €`
@@ -67,7 +75,7 @@ Kein neuer Typ. Stattdessen:
     N Nachkommastellen.
 
 **Kosten:** ein Nachmittag, drei Builtins, kein Eingriff in Übersetzer oder
-VM. **Nutzen:** die zwei gefährlichen Fallen sind zu, die Anzeige ist da.
+VM. *(Nachgerechnet: hat gestimmt.)* **Nutzen:** die zwei gefährlichen Fallen sind zu, die Anzeige ist da.
 **Bleibt offen:** wer trotzdem `FLOAT` nimmt — und das wird die Mehrheit
 tun, weil `DIM preis AS FLOAT` das Naheliegende ist — bekommt weiterhin
 `0.30000000000000004` und ROUND-Überraschungen. Der Rechner ist richtig, der
@@ -171,20 +179,33 @@ Begründung:
 BASIC-Dialekt bleibt in allen drei Wegen unangetastet; Weg A fügt nicht
 einmal ein Schlüsselwort hinzu.
 
-## Wenn Weg A kommt: die drei Builtins genau
+## Weg A, wie er gebaut wurde
 
 ```basic
-CENT(19.99)                  ' 1999   -- rundet, nicht abschneiden
-CENT("19,99")                ' 1999   -- auch aus Text, Komma erlaubt
-EURO$(1999)                  ' "19,99 €"
-EURO$(123456789)             ' "1.234.567,89 €"
-EURO$(1999, "CHF")           ' "19,99 CHF"
-EURO$(1999, "")              ' "19,99"
-RUNDE_AUF(2.5)               ' 3      -- von der Null weg
-RUNDE_AUF(-2.5)              ' -3
-RUNDE_AUF(2.675, 2)          ' 2.68
+CENT(19.99)                  ' 1999   -- rundet, statt abzuschneiden
+CENT("19,99")                ' 1999   -- auch aus Text
+CENT("1.234,56")             ' 123456 -- mit Tausendertrenner
+EURO$(1999)                  ' 19,99 €
+EURO$(123456789)             ' 1.234.567,89 €
+EURO$(1999, "CHF")           ' 19,99 CHF
+EURO$(1999, "")              ' 19,99
+ROUND_HALF_UP(2.5)           ' 3      -- von der Null weg
+ROUND_HALF_UP(-2.5)          ' -3
+ROUND_HALF_UP(2.675, 2)      ' 2.68
 ```
 
-`RUNDE_AUF` auf zwei Nachkommastellen muss dabei **über die
-Dezimaldarstellung** gehen, nicht über `x * 100`, sonst hat es dieselbe
-Krankheit wie `INT(19.99 * 100)`.
+Gerundet wird dabei **über die Dezimaldarstellung**, nicht über `x * 100`
+— sonst hätte es dieselbe Krankheit wie `INT(19.99 * 100)`. Genauer: über
+die kürzeste Dezimalzahl, die wieder auf denselben `FLOAT` zurückliest,
+also über *die Zahl, die dasteht*. Deshalb wird aus `2.675` erwartungsgemäß
+`2.68` und nicht `2.67`.
+
+`EURO$` nimmt **nur INTEGER**. `EURO$(19.99)` ist ein Fehler, und die
+Meldung nennt gleich die Lösung (*„aus 19.99 macht CENT(19.99) die Zahl
+1999"*) — eine Anzeige, die aus einer Kommazahl stillschweigend „19,99 €"
+macht, würde genau die Rechenweise verschleiern, um die es geht.
+
+Vorführung: [examples/179_kasse.dh](../examples/179_kasse.dh). Der Bon
+endet mit dem Fall, der zeigt, dass das kein Haarspalten ist: eine
+FLOAT-Summe, die richtig aussieht, sich richtig druckt und sogar gleich
+`72.71` ist — und aus der `INT(summe * 100)` trotzdem `7270` macht.

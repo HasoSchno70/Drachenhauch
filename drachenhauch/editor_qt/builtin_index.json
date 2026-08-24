@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1516,
+ "count": 1519,
  "builtins": [
   {
    "name": "ABS",
@@ -1293,6 +1293,12 @@
    "module": "core"
   },
   {
+   "name": "CENT",
+   "kind": "core",
+   "signature": "CENT(betrag) AS INTEGER",
+   "module": "core"
+  },
+  {
    "name": "CHART_ADD",
    "kind": "core",
    "signature": "CHART_ADD(diagramm, name: STRING, wert: FLOAT, farbe: INTEGER = -1) AS INTEGER",
@@ -2383,6 +2389,12 @@
    "kind": "core",
    "signature": "ERROR_LINE() AS INTEGER",
    "module": "dhrt"
+  },
+  {
+   "name": "EURO$",
+   "kind": "core",
+   "signature": "EURO$(cent: INTEGER [, symbol$]) AS STRING",
+   "module": "core"
   },
   {
    "name": "EXIT",
@@ -6540,6 +6552,12 @@
    "name": "ROUND",
    "kind": "core",
    "signature": "ROUND(1..2 Argumente)",
+   "module": "core"
+  },
+  {
+   "name": "ROUND_HALF_UP",
+   "kind": "core",
+   "signature": "ROUND_HALF_UP(x: Zahl [, nachkommastellen])",
    "module": "core"
   },
   {

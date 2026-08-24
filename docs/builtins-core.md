@@ -85,7 +85,8 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `LOG(x[, base])` | Logarithmus, default natürlich |
 | `DEG(rad)`, `RAD(grad)` | Radiant ↔ Grad |
 | `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT-Konvertierung |
-| `ROUND(x, dezimalstellen)` → FLOAT | auf N Nachkommastellen runden |
+| `ROUND(x, dezimalstellen)` → FLOAT | auf N Nachkommastellen runden, **zur geraden Zahl** (siehe unten) |
+| `ROUND_HALF_UP(x[, dezimalstellen])` | kaufmännisch runden: von der Null weg |
 | `MIN(a, b, ...)`, `MAX(a, b, ...)` | variadic |
 | `CLAMP(v, lo, hi)` | beschränkt v auf `[lo, hi]` |
 | `LERP(a, b, t)` | lineare Interpolation a..b (t nicht geklemmt) |
@@ -99,6 +100,108 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `MOVETOWARD(cur, ziel, maxd)` | cur um max. `maxd` Richtung `ziel` bewegen |
 | `SMOOTHSTEP(e0, e1, x)` | weicher 0→1-Übergang (Hermite), geklemmt |
 | `APPROX(a, b[, eps])` → BOOLEAN | `\|a-b\| ≤ eps` (Default `1e-6`) |
+
+### Runden: zwei Regeln, und sie sind nicht dasselbe
+
+`ROUND` rundet die Hälfte **zur geraden Zahl** (*round half to even*, wie
+Python): `ROUND(2.5)` ist `2`, `ROUND(3.5)` ist `4`. Das ist die Regel, die
+über viele Werte hinweg keinen systematischen Drift erzeugt — richtig für
+Messwerte, Grafik und Statistik.
+
+Kaufmännisch wird dagegen **von der Null weg** gerundet: 2,5 → 3, −2,5 → −3.
+Dafür gibt es `ROUND_HALF_UP`. Bei einer einzelnen Zeile fällt der
+Unterschied nicht auf, bei tausend Positionen verschiebt er die Summe.
+
+```basic
+PRINT ROUND(2.5)             ' 2
+PRINT ROUND_HALF_UP(2.5)     ' 3
+PRINT ROUND_HALF_UP(-2.5)    ' -3
+```
+
+**`ROUND_HALF_UP` rundet die Zahl, die dasteht.** `2.675` ist als
+Fließkommazahl in Wahrheit `2.67499999999999982…`; wer diese Binärentwicklung
+rundet, bekommt formal Recht (`ROUND(2.675, 2)` ist `2.67`) und praktisch
+eine Rechnung, die niemand nachvollziehen kann. `ROUND_HALF_UP(2.675, 2)`
+liefert `2.68`.
+
+### Mit Geld rechnen
+
+**Fließkomma und Geld vertragen sich nicht.** Das ist keine Eigenheit von
+Drachenhauch, sondern von Binärbrüchen: 0,1 lässt sich darin so wenig exakt
+schreiben wie 1/3 im Dezimalsystem.
+
+```basic
+PRINT 0.1 + 0.2              ' 0.30000000000000004
+PRINT 0.1 + 0.2 = 0.3        ' FALSE
+```
+
+Die Antwort darauf lautet: **in ganzen Cent rechnen.** Ein `INTEGER` ist
+64 Bit breit und meldet einen Überlauf als Fehler, statt still umzulaufen —
+das reicht für ±92 Billiarden Cent.
+
+Der Weg dorthin hat allerdings eine Falle, und zwar eine, in die der Rat
+selbst fällt:
+
+```basic
+PRINT INT(19.99 * 100)       ' 1998  (!)
+PRINT INT(0.29 * 100)        ' 28    (!)
+```
+
+`19.99` liegt als Fließkommazahl minimal *unter* 19,99, und `INT` schneidet
+ab. Deshalb gibt es **`CENT`**, das rundet statt abzuschneiden — und das
+denselben Dienst auch für geschriebene Beträge tut, etwa aus einer CSV-Datei:
+
+```basic
+PRINT CENT(19.99)            ' 1999
+PRINT CENT(0.29)             ' 29
+PRINT CENT("19,99")          ' 1999
+PRINT CENT("1.234,56")       ' 123456
+```
+
+Bei einem geschriebenen Betrag gilt: kommen **beide** Trennzeichen vor,
+trennt das hintere die Nachkommastellen (`1.234,56` deutsch, `1,234.56`
+englisch — beide ergeben 123456). Kommt ein Zeichen **mehrfach** vor, sind es
+Tausendertrenner (`1.234.567`). Ein einzelnes Trennzeichen trennt die
+Nachkommastellen. Alles andere — Währungskürzel, Buchstaben — ist ein Fehler
+und wird nicht stillschweigend abgeschnitten.
+
+Angezeigt wird mit **`EURO$`**, in deutscher Schreibweise:
+
+```basic
+PRINT EURO$(1999)            ' 19,99 €
+PRINT EURO$(123456789)       ' 1.234.567,89 €
+PRINT EURO$(-1999)           ' -19,99 €
+PRINT EURO$(1999, "CHF")     ' 19,99 CHF
+PRINT EURO$(1999, "")        ' 19,99
+```
+
+`EURO$` nimmt **ganze Cent**, keine Kommazahl. `EURO$(19.99)` ist ein Fehler,
+und die Meldung sagt gleich, was gemeint war — denn eine Anzeige, die aus
+19.99 stillschweigend „19,99 €" macht, würde genau die Rechenweise
+verschleiern, um die es hier geht.
+
+Eine ganze Rechnung sieht dann so aus:
+
+```basic
+DIM preis AS FLOAT
+DIM menge AS INTEGER
+DIM summe AS INTEGER          ' in Cent!
+preis = 19.99
+menge = 3
+summe = CENT(preis) * menge                   ' 5997
+summe = summe + ROUND_HALF_UP(summe * 0.19)   ' Steuer, kaufmännisch gerundet
+PRINT EURO$(summe)                            ' 71,36 €
+```
+
+**Die Regel in einem Satz:** rechnen in `INTEGER`-Cent, umwandeln mit `CENT`,
+runden mit `ROUND_HALF_UP`, anzeigen mit `EURO$` — und `FLOAT` nur dort, wo
+ein Prozentsatz oder ein Faktor im Spiel ist.
+
+**Grenze, offen gesagt:** das ist eine Rechenweise, kein eigener Datentyp. Wer
+`DIM preis AS FLOAT` schreibt und direkt damit summiert, bekommt weiterhin
+`0.30000000000000004` — die Sprache hindert ihn nicht daran. Was ein echter
+Geldtyp kosten würde und warum er trotzdem nicht kommt, steht in
+[Entwurf: Geld](entwurf-geldtyp.md).
 
 **Perlin-Noise** (deterministisch, Wert in ~`[-1, 1]`, gleiche Eingabe → gleicher
 Wert): `NOISE(x)`, `NOISE2(x, y)`, `NOISE3(x, y, z)` und fraktal `FBM(x, y, oktaven)`,

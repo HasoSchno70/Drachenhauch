@@ -340,7 +340,7 @@ Bereiche hat heute einen Vertreter:
   Bord fehlt für „meine Heizungssteuerung hat eine kleine Weboberfläche" genau
   ein Baustein, und es ist der kleinste von allen (`NET_TCP_LISTEN` steht schon
   darunter).
-- 🔍 **Kein Festkomma für Geld.** `0.1 + 0.2` ergibt `0.30000000000000004`. Mit
+- 🔍/✅ **Kein Festkomma für Geld.** `0.1 + 0.2` ergibt `0.30000000000000004`. Mit
   `FORMAT$` sieht man das nicht mehr, aber summiert wird trotzdem falsch. Für
   eine Sprache, in der jemand eine Kasse schreiben soll, ist das eine
   Entscheidung wert (eigener Typ, oder die dokumentierte Regel „in Cent
@@ -373,7 +373,9 @@ gebaut:
 * **[Entwurf: Geld](entwurf-geldtyp.md)** — mit dem Befund, dass der übliche
   Ratschlag („in Cent rechnen") selbst eine Falle ist: `INT(19.99 * 100)`
   ergibt **1998**. Empfehlung: erst Dokumentation und drei Helfer, ein
-  Geldtyp allenfalls als Modul, nicht im Sprachkern.
+  Geldtyp allenfalls als Modul, nicht im Sprachkern. **Weg A ist am
+  24.08.2026 gebaut** (`CENT`, `EURO$`, `ROUND_HALF_UP` plus der Abschnitt
+  „Mit Geld rechnen"); über einen eigenen Typ ist damit nichts entschieden.
 * **[Untersuchung: Datenbank-Treiber](entwurf-datenbanktreiber.md)** — mit
   gemessenen Zahlen (PostgreSQL: 61 Kisten, +1,09 MB, reines Rust, TLS aus
   dem, was schon da ist; MySQL: 90 Kisten, +2,23 MB, TLS nur mit
