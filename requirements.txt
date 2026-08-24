@@ -23,4 +23,12 @@ soundfile>=0.12             # OGG/FLAC/WAV-Dekodierung beim Sample-Laden (Tracke
 
 # --- Buch-Build (buch-*/buch/make_book.py, Zwei-Pass mit Seitenzahlen) ---
 # Fehlt es, entsteht das Dokument trotzdem -- nur ohne Seitenzahlen im Inhalt.
-PyMuPDF>=1.24               # misst, auf welcher Seite jede Ueberschrift steht
+# PyMuPDF liest ausserdem in tests/test_pdf.py gegen, was das Modul `pdf`
+# schreibt -- eine eigene Datei mit dem eigenen Schreiber gegenzulesen sagt
+# nichts darueber, ob ein fremdes Programm sie oeffnet.
+PyMuPDF>=1.24               # misst Seitenzahlen; prueft die PDF-Ausgabe gegen
+
+# --- Nur zum Pruefen (tests/test_xlsx.py) ---
+# Liest gegen, was das Modul `xlsx` schreibt. Ohne einen FREMDEN Leser
+# hiesse "die Datei ist in Ordnung" nur "mein Schreiber ist mit sich einig".
+openpyxl>=3.1

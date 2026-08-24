@@ -30,6 +30,7 @@ mod kodierung;
 mod ini;
 mod xml;
 mod pdf;
+mod xlsx;
 mod httpd;
 mod zipdatei;
 mod builtins;

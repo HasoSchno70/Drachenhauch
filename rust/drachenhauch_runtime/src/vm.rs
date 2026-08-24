@@ -735,6 +735,8 @@ pub struct Vm<'p> {
     /// Speicher, bis PDF_SAVE sie schreibt; ein Bericht mit hundert
     /// Seiten ist trotzdem nur ein paar hundert Kilobyte Text.
     pdf_dok: Vec<Option<crate::pdf::Dokument>>,
+    /// Modul `xlsx` -- offene Mappen (dasselbe Tombstone-Muster).
+    xlsx_mappe: Vec<Option<crate::xlsx::Mappe>>,
     // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
     #[cfg(feature = "http")]
     http_status: i64,
@@ -868,6 +870,7 @@ impl<'p> Vm<'p> {
             mqtt_clients: Vec::new(),
             httpd_server: Vec::new(),
             pdf_dok: Vec::new(),
+            xlsx_mappe: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
             #[cfg(feature = "http")]
@@ -2249,6 +2252,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
                         else if let Some(v) = self.try_httpd(name, bargs)? { v }
                         else if let Some(v) = self.try_pdf(name, bargs)? { v }
+                        else if let Some(v) = self.try_xlsx(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2787,7 +2791,9 @@ impl<'p> Vm<'p> {
         vec.get(idx as usize).and_then(|o| o.as_ref())
             .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
     }
-    #[cfg(any(feature = "db", feature = "net", feature = "serial", feature = "usb", feature = "bt"))]
+    // Ohne Feature-Gate: `pdf` und `xlsx` brauchen denselben Helfer und
+    // haengen an keinem Feature -- ein Konsolenprogramm soll eine Rechnung
+    // schreiben koennen, ohne dass das Netz mit eingebaut ist.
     fn handle_get_mut<'a, T>(vec: &'a mut [Option<T>], idx: i64, modul: &str, was: &str) -> R<&'a mut T> {
         vec.get_mut(idx as usize).and_then(|o| o.as_mut())
             .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
@@ -2975,6 +2981,120 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul mqtt (baut auf std::net auf, Feature `net`)
     // ===================================================================
+    /// Modul `xlsx` -- Auswertungen als Excel-Mappe.
+    fn try_xlsx(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("xlsx_") { return Ok(None); }
+        use crate::xlsx::{self, Wert};
+        let v = match name {
+            "xlsx_new" => {
+                let blatt = match a.first() { Some(Value::Str(s)) => s.to_string(), _ => "Tabelle1".to_string() };
+                let m = xlsx::Mappe::neu(&blatt).map_err(|e| format!("XLSX_NEW: {}", e))?;
+                self.xlsx_mappe.push(Some(m));
+                Value::Int((self.xlsx_mappe.len() - 1) as i64)
+            }
+            "xlsx_sheet" => {
+                let i = bi_int(a, 0, "XLSX_SHEET")?;
+                let n = bi_str(a, 1, "XLSX_SHEET")?.to_string();
+                self.xlsx_m(i)?.blatt_dazu(&n).map_err(|e| format!("XLSX_SHEET: {}", e))?;
+                Value::Nil
+            }
+            "xlsx_sheet_count" => { let i = bi_int(a, 0, "XLSX_SHEET_COUNT")?; Value::Int(self.xlsx_m(i)?.blaetter.len() as i64) }
+            "xlsx_set" => {
+                let (i, z, s) = Self::xlsx_zelle(a, "XLSX_SET")?;
+                let t = bi_str(a, 3, "XLSX_SET")?.to_string();
+                self.xlsx_m(i)?.setze(z, s, Wert::Text(t));
+                Value::Nil
+            }
+            "xlsx_set_num" => {
+                let (i, z, s) = Self::xlsx_zelle(a, "XLSX_SET_NUM")?;
+                let n = bi_num(a, 3, "XLSX_SET_NUM")?;
+                self.xlsx_m(i)?.setze(z, s, Wert::Zahl(n));
+                Value::Nil
+            }
+            "xlsx_set_date" => {
+                let (i, z, s) = Self::xlsx_zelle(a, "XLSX_SET_DATE")?;
+                // Sekunden wie im Modul `zeit` -- so passt FILETIME und
+                // ZEIT_JETZT ohne Umrechnung hinein.
+                let sek = bi_int(a, 3, "XLSX_SET_DATE")?;
+                let muster = match a.get(4) { Some(Value::Str(s)) => s.to_string(),
+                                              _ => "DD.MM.YYYY".to_string() };
+                let m = self.xlsx_m(i)?;
+                m.setze(z, s, Wert::Zahl(xlsx::zeit_zu_excel(sek)));
+                // Ohne Format staende in der Zelle die nackte Tageszahl --
+                // ein Datum ist in Excel eine Zahl MIT Formatierung.
+                m.setze_format(z, s, &muster);
+                Value::Nil
+            }
+            "xlsx_bold" => {
+                let (i, z, s) = Self::xlsx_zelle(a, "XLSX_BOLD")?;
+                let an = match a.get(3) { Some(Value::Bool(b)) => *b, None => true,
+                                          Some(_) => return Err("XLSX_BOLD: 4. Argument muss BOOLEAN sein".into()) };
+                self.xlsx_m(i)?.setze_fett(z, s, an);
+                Value::Nil
+            }
+            "xlsx_bold_row" => {
+                let i = bi_int(a, 0, "XLSX_BOLD_ROW")?;
+                let z = Self::xlsx_index(a, 1, "XLSX_BOLD_ROW", "Zeile")?;
+                let an = match a.get(2) { Some(Value::Bool(b)) => *b, None => true,
+                                          Some(_) => return Err("XLSX_BOLD_ROW: 3. Argument muss BOOLEAN sein".into()) };
+                self.xlsx_m(i)?.setze_zeile_fett(z, an);
+                Value::Nil
+            }
+            "xlsx_format" => {
+                let (i, z, s) = Self::xlsx_zelle(a, "XLSX_FORMAT")?;
+                let f = bi_str(a, 3, "XLSX_FORMAT")?.to_string();
+                self.xlsx_m(i)?.setze_format(z, s, &f);
+                Value::Nil
+            }
+            "xlsx_col_width" => {
+                let i = bi_int(a, 0, "XLSX_COL_WIDTH")?;
+                let s = Self::xlsx_index(a, 1, "XLSX_COL_WIDTH", "Spalte")?;
+                let w = bi_num(a, 2, "XLSX_COL_WIDTH")?;
+                self.xlsx_m(i)?.setze_breite(s, w.max(0.0));
+                Value::Nil
+            }
+            "xlsx_save" => {
+                let i = bi_int(a, 0, "XLSX_SAVE")?;
+                let pfad = bi_str(a, 1, "XLSX_SAVE")?.to_string();
+                let teile = crate::xlsx::teile(self.xlsx_m(i)?);
+                crate::zipdatei::packe_daten(std::path::Path::new(&pfad), &teile)
+                    .map_err(|e| format!("XLSX_SAVE: {}", e))?;
+                Value::Nil
+            }
+            "xlsx_close" => {
+                let i = bi_int(a, 0, "XLSX_CLOSE")? as usize;
+                if let Some(slot) = self.xlsx_mappe.get_mut(i) { *slot = None; }
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    fn xlsx_m(&mut self, idx: i64) -> R<&mut crate::xlsx::Mappe> {
+        Self::handle_get_mut(&mut self.xlsx_mappe, idx, "XLSX", "ungueltiges/geschlossenes XLSX-Handle")
+    }
+
+    /// Zeile und Spalte einer Zelle -- beide 0-basiert wie ueberall in der
+    /// Sprache, auch wenn Excel selbst bei 1 (und bei "A") anfaengt.
+    fn xlsx_zelle(a: &[Value], fn_: &str) -> R<(i64, u32, u32)> {
+        Ok((bi_int(a, 0, fn_)?,
+            Self::xlsx_index(a, 1, fn_, "Zeile")?,
+            Self::xlsx_index(a, 2, fn_, "Spalte")?))
+    }
+
+    fn xlsx_index(a: &[Value], i: usize, fn_: &str, was: &str) -> R<u32> {
+        let n = bi_int(a, i, fn_)?;
+        if n < 0 { return Err(format!("{}: {} {} ist negativ", fn_, was, n)); }
+        // Excels eigene Grenzen: 1 048 576 Zeilen, 16 384 Spalten.
+        let grenze = if was == "Zeile" { 1_048_575 } else { 16_383 };
+        if n > grenze {
+            return Err(format!("{}: {} {} liegt jenseits dessen, was Excel kann (bis {})",
+                               fn_, was, n, grenze));
+        }
+        Ok(n as u32)
+    }
+
     /// Modul `pdf` -- druckfertige Seiten schreiben.
     ///
     /// In vm.rs, weil ein offenes Dokument VM-Zustand ist (wie die

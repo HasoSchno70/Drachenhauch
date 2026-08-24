@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1489,
+ "count": 1501,
  "builtins": [
   {
    "name": "ABS",
@@ -8737,6 +8737,78 @@
    "kind": "core",
    "signature": "WRITE_BYTES(datei, puffer)",
    "module": "dhrt"
+  },
+  {
+   "name": "XLSX_BOLD",
+   "kind": "core",
+   "signature": "XLSX_BOLD(x: XLSX, zeile, spalte [, an])",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_BOLD_ROW",
+   "kind": "core",
+   "signature": "XLSX_BOLD_ROW(x: XLSX, zeile [, an])",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_CLOSE",
+   "kind": "core",
+   "signature": "XLSX_CLOSE(x: XLSX)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_COL_WIDTH",
+   "kind": "core",
+   "signature": "XLSX_COL_WIDTH(x: XLSX, spalte, breite)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_FORMAT",
+   "kind": "core",
+   "signature": "XLSX_FORMAT(x: XLSX, zeile, spalte, muster$)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_NEW",
+   "kind": "core",
+   "signature": "XLSX_NEW([blattname$]) AS XLSX",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SAVE",
+   "kind": "core",
+   "signature": "XLSX_SAVE(x: XLSX, pfad$)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SET",
+   "kind": "core",
+   "signature": "XLSX_SET(x: XLSX, zeile, spalte, text$)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SET_DATE",
+   "kind": "core",
+   "signature": "XLSX_SET_DATE(x: XLSX, zeile, spalte, zeit [, muster$])",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SET_NUM",
+   "kind": "core",
+   "signature": "XLSX_SET_NUM(x: XLSX, zeile, spalte, zahl)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SHEET",
+   "kind": "core",
+   "signature": "XLSX_SHEET(x: XLSX, name$)",
+   "module": "xlsx"
+  },
+  {
+   "name": "XLSX_SHEET_COUNT",
+   "kind": "core",
+   "signature": "XLSX_SHEET_COUNT(x: XLSX) AS INTEGER",
+   "module": "xlsx"
   },
   {
    "name": "XML_AT",

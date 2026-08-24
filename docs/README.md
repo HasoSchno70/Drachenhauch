@@ -67,6 +67,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `ini` | Einstellungsdateien, die ein Mensch bearbeiten kann — eine INI-Datei ist eine MAP | [module-ini.md](module-ini.md) |
 | `xml` | XML lesen — Daten aus fremden Systemen, mit Pfad-Navigation | [module-xml.md](module-xml.md) |
 | `pdf` | Druckfertige Seiten: Rechnung, Lieferschein, Bericht, Etikett | [module-pdf.md](module-pdf.md) |
+| `xlsx` | Auswertungen als Excel-Mappe: Blätter, Kopfzeile, Zahlen- und Datumsformate | [module-xlsx.md](module-xlsx.md) |
 | `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
 ### Werkzeug

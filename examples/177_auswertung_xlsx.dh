@@ -1,0 +1,80 @@
+' 177 -- Eine Auswertung als Excel-Mappe
+'
+' CSV kann Daten weitergeben. Was es nicht kann: mehrere Blaetter, eine fette
+' Kopfzeile, Spaltenbreiten, Zahlen- und Datumsformate -- und Text von Zahl
+' unterscheiden (eine Postleitzahl 01067 wird beim Oeffnen einer CSV zu
+' 1067). Genau das ist der Unterschied zwischen einer Datenliste und einer
+' abgabefertigen Auswertung.
+'
+' Aufruf:  dhrt run 177_auswertung_xlsx.dh
+' Ergebnis: auswertung.xlsx im selben Ordner.
+
+IMPORT "xlsx"
+IMPORT "zeit"
+
+DIM x AS XLSX
+DIM i AS INTEGER
+DIM zeile AS INTEGER
+DIM summe AS FLOAT
+
+' --- Die Daten (kaemen sonst aus der Datenbank) ---------------------------
+DIM kunde AS ARRAY OF STRING
+DIM plz AS ARRAY OF STRING
+DIM betrag AS ARRAY OF FLOAT
+DIM tag AS ARRAY OF STRING
+kunde  = ["Schrauben & Muttern GmbH", "Muster Maschinenbau AG", "Beispiel Handel e.K."]
+plz    = ["50667", "01067", "20095"]
+betrag = [1234.50, 89.90, 4567.25]
+tag    = ["2026-08-03", "2026-08-11", "2026-08-23"]
+
+x = XLSX_NEW("Umsatz")
+
+' --- Kopfzeile ------------------------------------------------------------
+XLSX_SET(x, 0, 0, "Kunde")
+XLSX_SET(x, 0, 1, "PLZ")
+XLSX_SET(x, 0, 2, "Datum")
+XLSX_SET(x, 0, 3, "Betrag")
+XLSX_BOLD_ROW(x, 0)
+
+XLSX_COL_WIDTH(x, 0, 30)
+XLSX_COL_WIDTH(x, 1, 8)
+XLSX_COL_WIDTH(x, 2, 12)
+XLSX_COL_WIDTH(x, 3, 14)
+
+' --- Die Zeilen -----------------------------------------------------------
+summe = 0.0
+FOR i = 0 TO LEN(kunde) - 1
+    zeile = i + 1
+    XLSX_SET(x, zeile, 0, kunde[i])
+    ' Die PLZ bleibt TEXT -- als Zahl verloere sie ihre fuehrende Null.
+    XLSX_SET(x, zeile, 1, plz[i])
+    XLSX_SET_DATE(x, zeile, 2, ZEIT_PARSE(tag[i] + " 00:00:00"))
+    XLSX_SET_NUM(x, zeile, 3, betrag[i])
+    XLSX_FORMAT(x, zeile, 3, "#,##0.00")
+    summe = summe + betrag[i]
+NEXT
+
+' --- Summenzeile ----------------------------------------------------------
+zeile = LEN(kunde) + 2
+XLSX_SET(x, zeile, 2, "Summe")
+XLSX_SET_NUM(x, zeile, 3, summe)
+XLSX_FORMAT(x, zeile, 3, "#,##0.00")
+XLSX_BOLD_ROW(x, zeile)
+
+' --- Ein zweites Blatt mit den Eckdaten -----------------------------------
+XLSX_SHEET(x, "Eckdaten")
+XLSX_SET(x, 0, 0, "Erstellt am")
+XLSX_SET_DATE(x, 0, 1, ZEIT_JETZT(), "DD.MM.YYYY HH:MM")
+XLSX_SET(x, 1, 0, "Datensaetze")
+XLSX_SET_NUM(x, 1, 1, LEN(kunde))
+XLSX_SET(x, 2, 0, "Gesamtumsatz")
+XLSX_SET_NUM(x, 2, 1, summe)
+XLSX_FORMAT(x, 2, 1, "#,##0.00 ""EUR""")
+XLSX_COL_WIDTH(x, 0, 16)
+XLSX_COL_WIDTH(x, 1, 20)
+
+XLSX_SAVE(x, "auswertung.xlsx")
+XLSX_CLOSE(x)
+
+PRINT "auswertung.xlsx geschrieben (" + STR$(FILESIZE("auswertung.xlsx")) + " Bytes)."
+PRINT "Zwei Blaetter, " + STR$(LEN(kunde)) + " Datensaetze, Summe " + FORMAT$(summe, "%.2f") + " EUR."
