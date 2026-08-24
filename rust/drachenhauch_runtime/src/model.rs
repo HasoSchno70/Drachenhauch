@@ -306,6 +306,7 @@ pub(crate) fn neutrales_element(t: &str) -> Option<Value> {
         "mat4" => Some(Value::Mat4(std::rc::Rc::new(crate::builtins::mat4_identity()))),
         "quat" => Some(Value::Quat(0.0, 0.0, 0.0, 1.0)),
         "vec2" => Some(Value::Vec2(0.0, 0.0)),
+        "geld" => Some(Value::Geld(0)),
         "vec3" => Some(Value::Vec3(0.0, 0.0, 0.0)),
         "vec4" => Some(Value::Vec4(0.0, 0.0, 0.0, 0.0)),
         _ => None,

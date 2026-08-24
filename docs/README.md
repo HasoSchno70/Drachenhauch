@@ -69,6 +69,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `pdf` | Druckfertige Seiten: Rechnung, Lieferschein, Bericht, Etikett | [module-pdf.md](module-pdf.md) |
 | `xlsx` | Auswertungen als Excel-Mappe: Blätter, Kopfzeile, Zahlen- und Datumsformate | [module-xlsx.md](module-xlsx.md) |
 | `smtp` | E-Mail verschicken: Text und HTML, Anhänge, STARTTLS/TLS | [module-smtp.md](module-smtp.md) |
+| `geld` | Ein Betrag als eigener Wert: exakt, unvermischbar mit Zahlen, ohne Cent-Schwund | [module-geld.md](module-geld.md) |
 | `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
 ### Entwürfe und Untersuchungen

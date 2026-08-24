@@ -1,0 +1,98 @@
+' 180 -- Der Typ GELD (Rechnung mit Rabatt, Steuer und Ratenzahlung)
+'
+' Beispiel 179 zeigt die Rechenweise: in ganzen Cent rechnen und daran
+' denken. Hier ist es ein TYP -- und der denkt mit: GELD und eine gewoehnliche
+' Zahl lassen sich nicht vermischen, Betraege vergleichen sich exakt, und
+' beim Aufteilen geht kein Cent verloren.
+'
+' Aufruf:  dhrt run 180_geld.dh
+
+IMPORT "geld"
+
+CONST RABATT_SATZ AS FLOAT = 0.10       ' 10 % ab 100 Euro Bestellwert
+CONST MWST AS FLOAT = 0.19
+CONST RATEN_ANZAHL AS INTEGER = 3
+
+DIM ware AS ARRAY OF STRING
+DIM preis AS ARRAY OF STRING       ' als TEXT -- so steht es im Katalog
+DIM menge AS ARRAY OF INTEGER
+ware  = ["Kaffeebohnen 1kg", "Muehle", "Filterpapier"]
+preis = ["19,99", "89,50", "0,29"]
+menge = [3, 1, 11]
+
+DIM netto AS GELD
+DIM zeile AS GELD
+DIM rabatt AS GELD
+DIM steuer AS GELD
+DIM brutto AS GELD
+DIM grenze AS GELD
+DIM i AS INTEGER
+
+netto = GELD_AUS_CENT(0)
+PRINT "RECHNUNG"
+PRINT "--------------------------------------------------"
+FOR i = 0 TO LEN(ware) - 1
+    zeile = GELD_NEU(preis[i]) * menge[i]
+    netto = netto + zeile
+    PRINT PADR$(ware[i], 20) + PADL$(STR$(menge[i]) + " x", 6) + _
+          PADL$(GELD_TEXT$(GELD_NEU(preis[i]), ""), 10) + _
+          PADL$(GELD_TEXT$(zeile, ""), 12)
+NEXT
+PRINT "--------------------------------------------------"
+PRINT PADR$("Zwischensumme", 36) + PADL$(GELD_TEXT$(netto), 14)
+
+' --- Rabatt: Betraege vergleichen sich exakt ------------------------------
+grenze = GELD_NEU("100,00")
+IF netto >= grenze THEN
+    ' GELD_RUNDEN, weil ein Rabatt ausgewiesen wird -- er landet auf der
+    ' Rechnung, also muss er auf den Cent stehen.
+    rabatt = GELD_RUNDEN(netto * RABATT_SATZ)
+    netto = netto - rabatt
+    PRINT PADR$("Rabatt " + STR$(INT(RABATT_SATZ * 100)) + "%", 36) + _
+          PADL$("-" + GELD_TEXT$(rabatt), 14)
+    PRINT PADR$("Netto", 36) + PADL$(GELD_TEXT$(netto), 14)
+END IF
+
+' --- Steuer ---------------------------------------------------------------
+' Ohne GELD_RUNDEN bliebe hier ein Zwischenergebnis mit vier Stellen stehen;
+' PRINT wuerde es auch so zeigen -- das ist Absicht, aber auf einer Rechnung
+' will man den ausgewiesenen Betrag.
+steuer = GELD_RUNDEN(netto * MWST)
+brutto = netto + steuer
+PRINT PADR$("zzgl. " + STR$(INT(MWST * 100)) + "% MwSt", 36) + PADL$(GELD_TEXT$(steuer), 14)
+PRINT PADR$("SUMME", 36) + PADL$(GELD_TEXT$(brutto), 14)
+
+' --- Ratenzahlung: kein Cent darf verloren gehen --------------------------
+PRINT ""
+PRINT "Zahlbar in " + STR$(RATEN_ANZAHL) + " Raten:"
+DIM raten AS ARRAY OF GELD
+DIM probe AS GELD
+raten = GELD_TEILEN(brutto, RATEN_ANZAHL)
+probe = GELD_AUS_CENT(0)
+FOR i = 0 TO RATEN_ANZAHL - 1
+    PRINT "  " + STR$(i + 1) + ". Rate:  " + GELD_TEXT$(raten[i])
+    probe = probe + raten[i]
+NEXT
+IF probe = brutto THEN
+    PRINT "  Probe: die Raten ergeben genau " + GELD_TEXT$(brutto) + "."
+ELSE
+    PRINT "  ACHTUNG: die Raten ergeben " + GELD_TEXT$(probe) + "!"
+END IF
+
+' --- Und das, was der Typ verhindert --------------------------------------
+PRINT ""
+PRINT "Was GELD nicht mit sich machen laesst:"
+TRY
+    PRINT brutto + 1.0
+CATCH e
+    PRINT "  brutto + 1.0  ->  " + e
+END TRY
+
+' Zwischenergebnisse behalten ihre Stellen, bis sie gerundet werden:
+' GELD_TEXT$ weist einen Betrag aus und rundet dafuer auf zwei Stellen.
+' PRINT zeigt dagegen, was wirklich im Wert steht -- ein Zwischenergebnis
+' verschweigt seine Stellen nicht.
+PRINT ""
+PRINT "19% von 0,29 EUR, unveraendert:"
+PRINT "  " + STR$(GELD_NEU("0,29") * MWST)
+PRINT "  als Betrag gerundet: " + GELD_TEXT$(GELD_RUNDEN(GELD_NEU("0,29") * MWST))

@@ -1,12 +1,15 @@
 # Entwurf: Geld in Drachenhauch
 
-> **Stand 24.08.2026: Weg A ist gebaut.** `CENT`, `EURO$` und
+> **Stand 24.08.2026: Weg A und Weg C sind gebaut.** `CENT`, `EURO$` und
 > `ROUND_HALF_UP` gibt es, und der Abschnitt „Mit Geld rechnen" steht in
 > [builtins-core.md](builtins-core.md#mit-geld-rechnen). Der dritte Befehl
 > heißt **nicht** `RUNDE_AUF` wie unten vorgeschlagen: das hätte jeder als
 > „aufrunden" gelesen, also als `CEIL` — und das ist genau die falsche
 > Bedeutung. `ROUND_HALF_UP` steht dafür neben `ROUND`/`FLOOR`/`CEIL`, wo
-> es hingehört. Weg B und Weg C bleiben unentschieden.
+> es hingehört. **Weg C ist als Modul [`geld`](module-geld.md) dazugekommen**
+> — ein eigener Wert mit `+ - * /` und exakten Vergleichen, der sich nicht
+> mit gewöhnlichen Zahlen mischen lässt. Weg B (ein Typ im Sprachkern, mit
+> dem Literal `19.99`) bleibt ungebaut; die Abwägung unten steht unverändert.
 
 *Untersuchung, keine Umsetzung.* Punkt 7 des [Allzweck-Audits](allzweck-audit-2.md)
 brachte Module hervor, mit denen sich kaufmännische Software schreiben lässt —
@@ -153,6 +156,8 @@ PRINT GELD_TEXT$(p * 3)
 ```
 
 **Kosten:** eine `.rs`-Datei, kein Eingriff in Lexer, Parser oder Übersetzer
+*(nachgerechnet: hat gestimmt — `geld.rs` plus je ein Arm in `module_op`,
+`cmp`, `neg` und `coerce`)*
 — dieselbe Schublade wie `vec2` und `m3d`. **Preis:** `DIM p AS GELD`
 braucht ein `IMPORT`, es gibt kein Literal (immer `GELD_NEU`), und der Typ
 bleibt ein Fremdkörper, den die statische Prüfung nur als „externer Typ"

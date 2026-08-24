@@ -463,6 +463,16 @@ fn num_array(v: &Value, fn_: &str) -> Result<Vec<f64>, String> {
     }
 }
 
+/// 1D `ARRAY OF GELD` -- fuer GELD_TEILEN.
+pub fn new_geld_array(items: Vec<i64>) -> Value {
+    let n = items.len() as i64;
+    let mut arr = GbArray::new("geld".to_string(), vec![n], || Value::Geld(0));
+    for (i, v) in items.into_iter().enumerate() {
+        arr.cells.set(i, Value::Geld(v));
+    }
+    Value::Array(Rc::new(RefCell::new(arr)))
+}
+
 /// 1D `ARRAY OF INTEGER` aus einer Zahlenliste (Gegenstueck zu new_str_array).
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
@@ -494,7 +504,7 @@ pub fn new_int_array(items: Vec<i64>) -> Value {
 /// weg) und auf der Dezimaldarstellung. Liefert (negativ, Vorkomma,
 /// Nachkomma) -- als Ziffern, damit der Aufrufer daraus eine Zahl ODER
 /// ganze Cent bauen kann, ohne noch einmal mit 100 zu multiplizieren.
-fn dez_runden(x: f64, n: usize) -> Result<(bool, String, String), String> {
+pub(crate) fn dez_runden(x: f64, n: usize) -> Result<(bool, String, String), String> {
     if !x.is_finite() {
         return Err("kein endlicher Wert (NAN oder unendlich)".to_string());
     }
@@ -515,7 +525,7 @@ fn dez_runden(x: f64, n: usize) -> Result<(bool, String, String), String> {
 }
 
 /// Derselbe Rundungsschritt, aber auf schon zerlegten Ziffern.
-fn dez_runden_ziffern(neg: bool, ganz: &str, bruch: &str, n: usize)
+pub(crate) fn dez_runden_ziffern(neg: bool, ganz: &str, bruch: &str, n: usize)
         -> Result<(bool, String, String), String> {
     let mut ziffern: Vec<u8> = ganz.bytes().chain(bruch.bytes().take(n)).collect();
     while ziffern.len() < ganz.len() + n { ziffern.push(b'0'); }
@@ -541,7 +551,7 @@ fn dez_runden_ziffern(neg: bool, ganz: &str, bruch: &str, n: usize)
 /// Einen geschriebenen Betrag zerlegen: "19,99", "19.99", "1.234,56",
 /// "-1 234,56". Ohne Umweg ueber f64 -- der waere genau die Ungenauigkeit,
 /// die hier vermieden werden soll.
-fn geld_text_teile(roh: &str) -> Result<(bool, String, String), String> {
+pub(crate) fn geld_text_teile(roh: &str) -> Result<(bool, String, String), String> {
     let s: String = roh.chars().filter(|c| !c.is_whitespace() && *c != '\u{a0}').collect();
     let (neg, s) = match s.strip_prefix('-') {
         Some(r) => (true, r.to_string()),
@@ -576,15 +586,36 @@ fn geld_text_teile(roh: &str) -> Result<(bool, String, String), String> {
     Ok((neg, ganz, bruch))
 }
 
-/// Ganze Cent aus zerlegten Ziffern -- mit Ueberlauf-Pruefung, denn eine
-/// stumm umlaufende Summe waere das Schlimmste, was Geld passieren kann.
-fn cent_aus_teilen(neg: bool, ganz: &str, bruch: &str, wer: &str) -> Result<i64, String> {
-    let (_, g, b) = dez_runden_ziffern(neg, ganz, bruch, 2)?;
+/// Zerlegte Ziffern in eine ganze Zahl mit `stellen` Nachkommastellen --
+/// mit Ueberlauf-Pruefung, denn eine stumm umlaufende Summe waere das
+/// Schlimmste, was Geld passieren kann.
+///
+/// `stellen = 2` ergibt ganze Cent (CENT), `stellen = 4` die Hundertstel-Cent
+/// des Moduls `geld`. Eine Quelle fuer beide -- zwei Rundungsregeln im Haus
+/// waeren eine zu viel.
+pub(crate) fn skaliert_aus_teilen(neg: bool, ganz: &str, bruch: &str, stellen: usize,
+                                  wer: &str) -> Result<i64, String> {
+    let (_, g, b) = dez_runden_ziffern(neg, ganz, bruch, stellen)?;
     let zahl = format!("{}{}", g.trim_start_matches('0'), b);
-    let zahl = if zahl.is_empty() { "0".to_string() } else { zahl };
+    let zahl = zahl.trim_start_matches('0');
+    let zahl = if zahl.is_empty() { "0" } else { zahl };
     let wert: i64 = zahl.parse().map_err(|_| format!(
-        "{}: {},{} ist zu gross fuer ganze Cent (INTEGER ist 64-bit)", wer, ganz, bruch))?;
+        "{}: {},{} ist zu gross (INTEGER ist 64-bit)", wer, ganz, bruch))?;
     Ok(if neg { -wert } else { wert })
+}
+
+fn cent_aus_teilen(neg: bool, ganz: &str, bruch: &str, wer: &str) -> Result<i64, String> {
+    skaliert_aus_teilen(neg, ganz, bruch, 2, wer)
+}
+
+/// "1234567" -> "1.234.567" (deutsche Tausendertrennung).
+pub(crate) fn tausender_punkte(ganz: &str) -> String {
+    let mut out = String::with_capacity(ganz.len() + ganz.len() / 3);
+    for (i, c) in ganz.chars().enumerate() {
+        if i > 0 && (ganz.len() - i) % 3 == 0 { out.push('.'); }
+        out.push(c);
+    }
+    out
 }
 
 /// Cent in deutscher Schreibweise: 1234567 -> "1.234.567" + ",89".
@@ -593,11 +624,7 @@ fn euro_text(cent: i64, symbol: &str) -> String {
     let roh = (cent as i128).abs();
     let ganz = (roh / 100).to_string();
     let rest = roh % 100;
-    let mut mit_punkten = String::new();
-    for (i, c) in ganz.chars().enumerate() {
-        if i > 0 && (ganz.len() - i) % 3 == 0 { mit_punkten.push('.'); }
-        mit_punkten.push(c);
-    }
+    let mit_punkten = tausender_punkte(&ganz);
     let mut out = String::new();
     if neg { out.push('-'); }
     out.push_str(&format!("{},{:02}", mit_punkten, rest));

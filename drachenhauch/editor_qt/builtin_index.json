@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1519,
+ "count": 1527,
  "builtins": [
   {
    "name": "ABS",
@@ -2563,6 +2563,54 @@
    "kind": "core",
    "signature": "FRAC(x: Zahl)",
    "module": "core"
+  },
+  {
+   "name": "GELD_ABS",
+   "kind": "core",
+   "signature": "GELD_ABS(g: GELD) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_AUS_CENT",
+   "kind": "core",
+   "signature": "GELD_AUS_CENT(cent: INTEGER) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_CENT",
+   "kind": "core",
+   "signature": "GELD_CENT(g: GELD) AS INTEGER",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_NEU",
+   "kind": "core",
+   "signature": "GELD_NEU(betrag) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_RUNDEN",
+   "kind": "core",
+   "signature": "GELD_RUNDEN(g: GELD [, stellen]) AS GELD",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_TEILEN",
+   "kind": "core",
+   "signature": "GELD_TEILEN(g: GELD, anzahl) AS ARRAY OF GELD",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_TEXT$",
+   "kind": "core",
+   "signature": "GELD_TEXT$(g: GELD [, symbol$]) AS STRING",
+   "module": "geld"
+  },
+  {
+   "name": "GELD_ZAHL",
+   "kind": "core",
+   "signature": "GELD_ZAHL(g: GELD) AS FLOAT",
+   "module": "geld"
   },
   {
    "name": "GENTEX_CELLULAR",

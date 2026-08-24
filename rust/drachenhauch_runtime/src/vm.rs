@@ -2259,6 +2259,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_pdf(name, bargs)? { v }
                         else if let Some(v) = self.try_xlsx(name, bargs)? { v }
                         else if let Some(v) = self.try_smtp(name, bargs)? { v }
+                        else if let Some(v) = self.try_geld(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2987,6 +2988,70 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul mqtt (baut auf std::net auf, Feature `net`)
     // ===================================================================
+    /// Modul `geld` -- ein Betrag als eigener Wert (Weg C des Entwurfs).
+    fn try_geld(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("geld_") { return Ok(None); }
+        use crate::geld;
+        let wert = |v: &Value, fn_: &str| -> R<i64> {
+            match v {
+                Value::Geld(w) => Ok(*w),
+                other => Err(format!("{}: erwartet GELD, erhalten {} -- mit GELD_NEU() \
+                                      einen Betrag daraus machen", fn_, other.type_name())),
+            }
+        };
+        let v = match name {
+            "geld_neu" => {
+                if a.len() != 1 { return Err(format!("GELD_NEU: erwartet 1 Argument, erhalten {}", a.len())); }
+                let w = match &a[0] {
+                    Value::Str(s) => geld::aus_text(s).map_err(|e| format!("GELD_NEU: {}", e))?,
+                    Value::Geld(w) => *w,
+                    v if is_num(v) => geld::aus_zahl(as_f64(v)).map_err(|e| format!("GELD_NEU: {}", e))?,
+                    v => return Err(format!("GELD_NEU: erwartet Text oder Zahl, erhalten {}", v.type_name())),
+                };
+                Value::Geld(w)
+            }
+            "geld_aus_cent" => { Value::Geld(bi_int(a, 0, "GELD_AUS_CENT")?
+                .checked_mul(100).ok_or_else(|| "GELD_AUS_CENT: Betrag zu gross".to_string())?) }
+            "geld_cent" => Value::Int(geld::runden(wert(&a[0], "GELD_CENT")?, 2) / 100),
+            "geld_zahl" => Value::Float(wert(&a[0], "GELD_ZAHL")? as f64 / geld::SKALA as f64),
+            "geld_runden" => {
+                let w = wert(&a[0], "GELD_RUNDEN")?;
+                let stellen = match a.get(1) {
+                    None => 2,
+                    Some(v) => {
+                        let n = bi_int(a, 1, "GELD_RUNDEN")?;
+                        let _ = v;
+                        if !(0..=4).contains(&n) {
+                            return Err("GELD_RUNDEN: 0 bis 4 Nachkommastellen \
+                                        (mehr haelt ein Betrag nicht)".to_string());
+                        }
+                        n as u32
+                    }
+                };
+                Value::Geld(geld::runden(w, stellen))
+            }
+            "geld_text$" => {
+                let w = wert(&a[0], "GELD_TEXT$")?;
+                let symbol = match a.get(1) {
+                    Some(Value::Str(s)) => s.to_string(),
+                    None => "\u{20ac}".to_string(),
+                    Some(v) => return Err(format!("GELD_TEXT$: das Symbol muss ein STRING sein, \
+                                                   erhalten {}", v.type_name())),
+                };
+                Value::str_rc(&geld::text(w, &symbol, 2))
+            }
+            "geld_teilen" => {
+                let w = wert(&a[0], "GELD_TEILEN")?;
+                let n = bi_int(a, 1, "GELD_TEILEN")?;
+                let teile = geld::teilen(w, n)?;
+                crate::builtins::new_geld_array(teile)
+            }
+            "geld_abs" => Value::Geld(wert(&a[0], "GELD_ABS")?.abs()),
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     /// Modul `smtp` -- E-Mail verschicken.
     fn try_smtp(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("smtp_") { return Ok(None); }
@@ -7757,25 +7822,39 @@ fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
         return None;
     }
     let is_mod = |v: &Value| matches!(v,
-        Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..) | Value::Mat4(_));
+        Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..)
+        | Value::Mat4(_) | Value::Geld(_));
     if !is_mod(a) && !is_mod(b) {
         return None;
     }
     let sf = |n: &Value| as_f64(n) as f32;     // Skalar als f32
     Some(match op {
         '+' => match (a, b) {
+            (Value::Geld(x), Value::Geld(y)) => x.checked_add(*y).map(Value::Geld)
+                .ok_or_else(|| int_overflow_msg("+")),
+            (Value::Geld(_), n) | (n, Value::Geld(_)) if is_num(n) => Err(geld_mischt_nicht('+')),
             (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => Ok(Value::Vec2(ax + bx, ay + by)),
             (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => Ok(Value::Vec3(ax + bx, ay + by, az + bz)),
             (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) => Ok(Value::Vec4(ax + bx, ay + by, az + bz, aw + bw)),
             _ => Err("+ : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)".into()),
         },
         '-' => match (a, b) {
+            (Value::Geld(x), Value::Geld(y)) => x.checked_sub(*y).map(Value::Geld)
+                .ok_or_else(|| int_overflow_msg("-")),
+            (Value::Geld(_), n) | (n, Value::Geld(_)) if is_num(n) => Err(geld_mischt_nicht('-')),
             (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => Ok(Value::Vec2(ax - bx, ay - by)),
             (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => Ok(Value::Vec3(ax - bx, ay - by, az - bz)),
             (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) => Ok(Value::Vec4(ax - bx, ay - by, az - bz, aw - bw)),
             _ => Err("- : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)".into()),
         },
         '*' => match (a, b) {
+            // Menge mal Preis, Prozentsatz -- der Faktor darf eine Zahl
+            // sein, gerechnet wird trotzdem ganzzahlig (geld.rs).
+            (Value::Geld(w), n) | (n, Value::Geld(w)) if is_num(n) =>
+                crate::geld::mal(*w, as_f64(n)).map(Value::Geld),
+            (Value::Geld(_), Value::Geld(_)) =>
+                Err("* : GELD mal GELD ergibt keinen Betrag (Euro mal Euro \
+                     waeren Quadrat-Euro). Mit einer Zahl multiplizieren.".into()),
             (Value::Vec2(x, y), n) if is_num(n) => Ok(Value::Vec2(x * as_f64(n), y * as_f64(n))),
             (n, Value::Vec2(x, y)) if is_num(n) => Ok(Value::Vec2(x * as_f64(n), y * as_f64(n))),
             (Value::Vec3(x, y, z), n) if is_num(n) => Ok(Value::Vec3(x * sf(n), y * sf(n), z * sf(n))),
@@ -7798,6 +7877,14 @@ fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
             _ => Err("* : nicht unterstuetzte Operanden (Vektor*Zahl, QUAT*QUAT, MAT4*MAT4/VEC4/VEC3)".into()),
         },
         '/' => match (a, b) {
+            // Betrag durch Betrag ist ein Verhaeltnis, also eine Zahl.
+            (Value::Geld(x), Value::Geld(y)) => {
+                if *y == 0 { Err("Division durch 0".into()) }
+                else { Ok(Value::Float(*x as f64 / *y as f64)) }
+            }
+            (Value::Geld(w), n) if is_num(n) => crate::geld::durch(*w, as_f64(n)).map(Value::Geld),
+            (n, Value::Geld(_)) if is_num(n) =>
+                Err("/ : Zahl durch GELD ergibt keinen Betrag".into()),
             (Value::Vec2(x, y), n) if is_num(n) => {
                 let d = as_f64(n);
                 if d == 0.0 { Err("Division durch 0".into()) } else { Ok(Value::Vec2(x / d, y / d)) }
@@ -7814,6 +7901,13 @@ fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
         },
         _ => return None,
     })
+}
+
+/// Die Meldung, fuer die es den Typ ueberhaupt gibt.
+fn geld_mischt_nicht(op: char) -> String {
+    format!("{} : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau \
+             dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen \
+             oder mit GELD_ZAHL(betrag) bewusst herausgehen.", op)
 }
 
 fn int_overflow_msg(op: &str) -> String {
@@ -7954,12 +8048,18 @@ fn neg(v: Value) -> R<Value> {
     match v {
         Value::Int(i) => i.checked_neg().map(Value::Int).ok_or_else(|| int_overflow_msg("-")),
         Value::Float(f) => Ok(Value::Float(-f)),
+        Value::Geld(w) => w.checked_neg().map(Value::Geld)
+            .ok_or_else(|| int_overflow_msg("-")),
         _ => Err("Unaeres '-' erwartet Zahl".into()),
     }
 }
 
 fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
-    let ord = if is_num(a) && is_num(b) {
+    let ord = if let (Value::Geld(x), Value::Geld(y)) = (a, b) {
+        // Betraege vergleichen sich EXAKT -- das ist einer der Gruende,
+        // warum es den Typ gibt.
+        Some(x.cmp(y))
+    } else if is_num(a) && is_num(b) {
         as_f64(a).partial_cmp(&as_f64(b))
     } else if let (Value::Str(x), Value::Str(y)) = (a, b) {
         Some(x.as_ref().cmp(y.as_ref()))
@@ -8054,6 +8154,16 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "funcref" => match value {
             Value::FuncRef(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
+        },
+        // GELD ist streng, anders als die uebrigen Modul-Typen: eine Zahl
+        // stillschweigend in einer GELD-Variablen abzulegen wuerde genau
+        // die Trennung aufweichen, fuer die es den Typ gibt.
+        "geld" => match value {
+            Value::Geld(_) | Value::Nil => Ok(value),
+            v if is_num(&v) => Err(format!(
+                "{}: Erwartet GELD, erhalten {} -- mit GELD_NEU({}) einen Betrag daraus machen",
+                ctx, v.type_name(), v.fmt())),
+            v => Err(format!("{}: Erwartet GELD, erhalten {}", ctx, v.type_name())),
         },
         // map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
         _ => match target.strip_prefix("array:") {

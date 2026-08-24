@@ -28,6 +28,10 @@ pub enum Value {
     Instance(Rc<RefCell<Instance>>),
     /// Modul `vec2`: immutabler 2D-Vektor (Wert-Semantik wie ein Skalar).
     Vec2(f64, f64),
+    /// Modul `geld`: ein Betrag in Hundertstel-Cent (vier Nachkommastellen).
+    /// Warum ein eigener Wert und nicht einfach INTEGER: so kann die Sprache
+    /// `betrag + 1.0` ablehnen, statt es still zu rechnen.
+    Geld(i64),
     /// Modul `m3d`: immutable 3D-Mathe-Typen. f32 hält `Value` kompakt
     /// (Vec4/Quat = 16 B wie Vec2) und ist render-nativ; GB-FLOAT-Getter casten
     /// zu f64. MAT4 ist geboxt (16 floats wären zu groß inline), column-major
@@ -645,6 +649,7 @@ impl Value {
             }
             Value::Instance(i) => format!("<{}>", i.borrow().class_name),
             Value::Vec2(x, y) => format!("Vec2({}, {})", fmt_float(*x), fmt_float(*y)),
+            Value::Geld(w) => crate::geld::anzeige(*w),
             Value::Vec3(x, y, z) =>
                 format!("Vec3({}, {}, {})", fmt_float(*x as f64), fmt_float(*y as f64), fmt_float(*z as f64)),
             Value::Vec4(x, y, z, w) =>
@@ -735,6 +740,7 @@ impl Value {
             Value::Map(_) => "MAP",
             Value::Instance(_) => "OBJECT",
             Value::Vec2(_, _) => "VEC2",
+            Value::Geld(_) => "GELD",
             Value::Vec3(..) => "VEC3",
             Value::Vec4(..) => "VEC4",
             Value::Quat(..) => "QUAT",
@@ -788,6 +794,7 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
             x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| value_eq(p, q))
         }
         (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => ax == bx && ay == by,
+        (Value::Geld(x), Value::Geld(y)) => x == y,
         (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => ax == bx && ay == by && az == bz,
         (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) =>
             ax == bx && ay == by && az == bz && aw == bw,
