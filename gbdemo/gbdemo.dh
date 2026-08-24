@@ -1002,7 +1002,7 @@ SUB szene_klang()
     DIM e AS INTEGER
     FOR e = 0 TO STUFEN - 1
         DIM px AS INTEGER
-        px = BREITE \ 2 + (e - (STUFEN - 1) / 2.0) * 46
+        px = BREITE \ 2 + ROUND((e - (STUFEN - 1) / 2.0) * 46)
         IF e = stufe THEN
             CIRCLE(px, 226, 9, regenbogen(zeit * 0.8, 1.0))
         ELSE
