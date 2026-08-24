@@ -71,6 +71,18 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `smtp` | E-Mail verschicken: Text und HTML, Anhänge, STARTTLS/TLS | [module-smtp.md](module-smtp.md) |
 | `firmata` | Arduino-/ESP32-Pins direkt steuern, ohne eigenen Sketch | [module-firmata.md](module-firmata.md) |
 
+### Entwürfe und Untersuchungen
+
+Papiere, die etwas **abwägen**, statt etwas zu beschreiben — gemessen,
+entworfen, empfohlen; entschieden ist nichts davon.
+
+- **[Allzweck-Audit 2](allzweck-audit-2.md)** — was einer Sprache fehlt, mit
+  der man Software bauen soll; acht Punkte, abgearbeitet
+- **[Entwurf: Geld](entwurf-geldtyp.md)** — Fließkomma, Cent, ein eigener
+  Typ? Mit dem Befund, dass `INT(19.99 * 100)` **1998** ergibt
+- **[Untersuchung: Datenbank-Treiber](entwurf-datenbanktreiber.md)** — was
+  PostgreSQL und MySQL wirklich kosten würden (Kisten, Bauzeit, Größe, TLS)
+
 ### Werkzeug
 
 - **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrun.py --doku` (Referenz aus dem Quelltext)

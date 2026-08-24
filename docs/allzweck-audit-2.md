@@ -13,9 +13,13 @@ Werkzeug drumherum.
 **Alles unten ist gegen die gebaute Runtime nachgemessen, nicht aus der Doku
 abgeschrieben.**
 
-> **Stand 2026-08-23: sieben von acht Punkten sind gebaut** (1–6 und die
-> Entscheidungen unter 8). Offen ist nur noch **7** — die Bibliothekslücken,
-> die sich einzeln und nach Bedarf schließen lassen.
+> **Stand 2026-08-24: alle acht Punkte sind abgearbeitet.** 1–6 gebaut,
+> die Entscheidungen unter 8 getroffen, und aus **7** sind sieben Module
+> geworden (`httpd`, `ini`, `xml`, `pdf`, `xlsx`, `smtp` plus der
+> Dateisystem-Ausbau). Die zwei Punkte, die dort keine Bibliotheksarbeit
+> waren, sind untersucht statt gebaut: [Geld](entwurf-geldtyp.md) und
+> [Datenbank-Treiber](entwurf-datenbanktreiber.md) — beide mit Messung,
+> Entwurf und Empfehlung, die Entscheidung steht aus.
 
 ## Der Befund in drei Sätzen
 
@@ -314,33 +318,67 @@ Was fehlte:
 Nachgemessen am eingefrorenen Builtin-Index (1401 Einträge) — keiner dieser
 Bereiche hat heute einen Vertreter:
 
-- **Dateisystem unvollständig:** `MKDIR` gibt es, ein Gegenstück zum Löschen
+- ✅ **Dateisystem unvollständig:** `MKDIR` gibt es, ein Gegenstück zum Löschen
   eines Verzeichnisses nicht. Ebenso fehlen Zeitstempel (wann zuletzt geändert
   — die Grundlage jeder Sicherung und jedes „was ist neu"), rekursives
   Auflisten, Namensmuster (`*.csv`), ein Temp-Verzeichnis.
-- **Nur SQLite.** Für eine Anwendung in einem Betrieb liegen die Daten in
+- 🔍 **Nur SQLite.** Für eine Anwendung in einem Betrieb liegen die Daten in
   PostgreSQL, MySQL oder MS SQL. Heute geht das nur über ein fremdes Werkzeug
   per `SHELL`.
-- **Keine Konfigurations-/Austauschformate außer JSON und CSV:** kein INI,
+- ✅ **Keine Konfigurations-/Austauschformate außer JSON und CSV:** kein INI,
   kein XML, kein YAML, kein TOML.
-- **Kein PDF, kein Druck.** Rechnung, Lieferschein, Bericht, Etikett — für
+- ✅ **Kein PDF, kein Druck.** Rechnung, Lieferschein, Bericht, Etikett — für
   kaufmännische Software fast immer die erste Forderung nach „speichern".
   Heute endet der Weg beim Bildschirm oder bei einer Textdatei.
-- **Kein XLSX**, obwohl CSV steht — für Auswertungen, die weitergegeben
+- ✅ **Kein XLSX**, obwohl CSV steht — für Auswertungen, die weitergegeben
   werden, ist das der erwartete Behälter.
-- **Kein E-Mail-Versand** (SMTP). Ein Bericht, der sich selbst verschickt, ist
+- ✅ **Kein E-Mail-Versand** (SMTP). Ein Bericht, der sich selbst verschickt, ist
   bei Werkzeugen die Regel, nicht die Ausnahme.
-- **Kein HTTP-Server.** Die Roadmap hat ihn gestrichen (*„wer wirklich einen
+- ✅ **Kein HTTP-Server.** Die Roadmap hat ihn gestrichen (*„wer wirklich einen
   Dienst braucht, stellt einen fertigen Server davor"*). Das würde ich vor dem
   Bastler-Leitbild neu bewerten: mit `mqtt`, `firmata`, `serial` und `net` an
   Bord fehlt für „meine Heizungssteuerung hat eine kleine Weboberfläche" genau
   ein Baustein, und es ist der kleinste von allen (`NET_TCP_LISTEN` steht schon
   darunter).
-- **Kein Festkomma für Geld.** `0.1 + 0.2` ergibt `0.30000000000000004`. Mit
+- 🔍 **Kein Festkomma für Geld.** `0.1 + 0.2` ergibt `0.30000000000000004`. Mit
   `FORMAT$` sieht man das nicht mehr, aber summiert wird trotzdem falsch. Für
   eine Sprache, in der jemand eine Kasse schreiben soll, ist das eine
   Entscheidung wert (eigener Typ, oder die dokumentierte Regel „in Cent
   rechnen").
+
+
+### Stand 7 (24.08.2026)
+
+Sechs der acht Zeilen sind gebaut, jede mit Doku, Beispiel und Tests:
+
+| | Modul / Ausbau | Doku |
+|---|---|---|
+| Dateisystem | `RMDIR`, Zeitstempel, rekursiv suchen, Namensmuster, Temp-Ordner | [builtins-core.md](builtins-core.md) |
+| Webserver | `httpd` | [module-httpd.md](module-httpd.md) |
+| Einstellungen | `ini` | [module-ini.md](module-ini.md) |
+| Austauschformat | `xml` | [module-xml.md](module-xml.md) |
+| Druck | `pdf` | [module-pdf.md](module-pdf.md) |
+| Auswertung | `xlsx` | [module-xlsx.md](module-xlsx.md) |
+| Versand | `smtp` | [module-smtp.md](module-smtp.md) |
+
+YAML und TOML sind bewusst **nicht** dazugekommen: INI deckt den Fall
+„Einstellungen, die ein Mensch bearbeitet" ab, JSON den Fall „Daten", und
+beide zusammen lassen für YAML/TOML keinen Fall übrig, der die dritte
+Schreibweise rechtfertigt.
+
+Die zwei mit 🔍 markierten Zeilen sind keine Bibliotheksarbeit, sondern
+Entscheidungen. Sie sind **untersucht, gemessen und entworfen**, aber nicht
+gebaut:
+
+* **[Entwurf: Geld](entwurf-geldtyp.md)** — mit dem Befund, dass der übliche
+  Ratschlag („in Cent rechnen") selbst eine Falle ist: `INT(19.99 * 100)`
+  ergibt **1998**. Empfehlung: erst Dokumentation und drei Helfer, ein
+  Geldtyp allenfalls als Modul, nicht im Sprachkern.
+* **[Untersuchung: Datenbank-Treiber](entwurf-datenbanktreiber.md)** — mit
+  gemessenen Zahlen (PostgreSQL: 61 Kisten, +1,09 MB, reines Rust, TLS aus
+  dem, was schon da ist; MySQL: 90 Kisten, +2,23 MB, TLS nur mit
+  C-Übersetzer). Empfehlung: PostgreSQL machbar und billig, aber erst bei
+  konkretem Anlass; MySQL nicht.
 
 ## 8 — Sprachkomfort, bewusst zu entscheiden
 
@@ -392,7 +430,13 @@ Roadmap („wie viele neue Programme macht das möglich, pro Aufwand"):
   23.08.2026**, nachdem 1 bis 4 und 6 standen.
 - **7** ist Fleißarbeit und lässt sich nach Bedarf abrufen. Der erste Griff
   daraus wäre PDF (kaufmännisch) oder der HTTP-Server (Bastler), je nachdem,
-  wen man zuerst gewinnen will.
+  wen man zuerst gewinnen will. **Erledigt am 23./24.08.2026** — und zwar
+  beides, in dieser Reihenfolge: `httpd`, `ini`, `xml`, `pdf`, `xlsx`,
+  `smtp`. Fleißarbeit war es tatsächlich, mit einer Lehre: **jedes dieser
+  Formate musste ein FREMDER Leser gegenlesen** (PyMuPDF, openpyxl, Pythons
+  `email`) — sonst hieße „die Datei ist in Ordnung" nur „mein Schreiber ist
+  mit sich einig", und genau diese Gegenleser haben je einen echten Fehler
+  gefunden.
 
 ## Was ausdrücklich NICHT fehlt
 
