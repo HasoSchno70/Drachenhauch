@@ -32,6 +32,8 @@ mod xml;
 mod pdf;
 mod xlsx;
 mod httpd;
+#[cfg(feature = "smtp")]
+mod smtp;
 mod zipdatei;
 mod builtins;
 mod compiler;

@@ -4402,7 +4402,7 @@ fn fbm3(x: f64, y: f64, z: f64, octaves: i64) -> f64 {
 
 // ===================== Encoding / Hash =====================
 const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-fn b64_encode(data: &[u8]) -> String {
+pub(crate) fn b64_encode(data: &[u8]) -> String {
     let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
@@ -4414,7 +4414,7 @@ fn b64_encode(data: &[u8]) -> String {
     }
     out
 }
-fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
     let val = |c: u8| -> Result<u32, String> {
         match c {
             b'A'..=b'Z' => Ok((c - b'A') as u32),

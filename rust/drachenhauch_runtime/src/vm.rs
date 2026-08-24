@@ -737,6 +737,9 @@ pub struct Vm<'p> {
     pdf_dok: Vec<Option<crate::pdf::Dokument>>,
     /// Modul `xlsx` -- offene Mappen (dasselbe Tombstone-Muster).
     xlsx_mappe: Vec<Option<crate::xlsx::Mappe>>,
+    /// Modul `smtp` -- Nachrichten im Aufbau.
+    #[cfg(feature = "smtp")]
+    smtp_mail: Vec<Option<crate::smtp::Mail>>,
     // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
     #[cfg(feature = "http")]
     http_status: i64,
@@ -871,6 +874,8 @@ impl<'p> Vm<'p> {
             httpd_server: Vec::new(),
             pdf_dok: Vec::new(),
             xlsx_mappe: Vec::new(),
+            #[cfg(feature = "smtp")]
+            smtp_mail: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
             #[cfg(feature = "http")]
@@ -2253,6 +2258,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_httpd(name, bargs)? { v }
                         else if let Some(v) = self.try_pdf(name, bargs)? { v }
                         else if let Some(v) = self.try_xlsx(name, bargs)? { v }
+                        else if let Some(v) = self.try_smtp(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2981,6 +2987,178 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul mqtt (baut auf std::net auf, Feature `net`)
     // ===================================================================
+    /// Modul `smtp` -- E-Mail verschicken.
+    fn try_smtp(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("smtp_") { return Ok(None); }
+        #[cfg(feature = "smtp")]
+        { return self.try_smtp_impl(name, a); }
+        #[allow(unreachable_code)]
+        {
+            let _ = a;
+            Err(format!("{}: diese Fassung von dhrt ist ohne das Feature `smtp` \
+                         gebaut (verschluesselte Verbindungen fehlen dann)",
+                        name.to_uppercase()))
+        }
+    }
+
+    #[cfg(feature = "smtp")]
+    fn smtp_m(&mut self, idx: i64) -> R<&mut crate::smtp::Mail> {
+        Self::handle_get_mut(&mut self.smtp_mail, idx, "SMTP",
+                             "ungueltiges/geschlossenes SMTP-Handle")
+    }
+
+    /// Adresse plus optionaler Anzeigename -- dieselbe Form bei FROM/TO/CC.
+    #[cfg(feature = "smtp")]
+    fn smtp_wer(a: &[Value], fn_: &str) -> R<(String, String)> {
+        let adresse = bi_str(a, 1, fn_)?.trim().to_string();
+        crate::smtp::pruefe_adresse(&adresse, fn_).map_err(|e| format!("{}: {}", fn_, e))?;
+        let name = match a.get(2) {
+            Some(Value::Str(s)) => s.to_string(),
+            None => String::new(),
+            Some(_) => return Err(format!("{}: der Anzeigename muss ein STRING sein", fn_)),
+        };
+        crate::smtp::pruefe_kopfwert(&name, &format!("{}: der Anzeigename", fn_))?;
+        Ok((adresse, name))
+    }
+
+    #[cfg(feature = "smtp")]
+    fn try_smtp_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::smtp::{self, Sicherheit};
+        let v = match name {
+            "smtp_new" => {
+                self.smtp_mail.push(Some(smtp::Mail::neu()));
+                Value::Int((self.smtp_mail.len() - 1) as i64)
+            }
+            "smtp_server" => {
+                let i = bi_int(a, 0, "SMTP_SERVER")?;
+                let host = bi_str(a, 1, "SMTP_SERVER")?.trim().to_string();
+                let port = bi_int(a, 2, "SMTP_SERVER")?;
+                if !(1..=65535).contains(&port) {
+                    return Err(format!("SMTP_SERVER: {} ist keine Portnummer", port));
+                }
+                let sicher = match a.get(3) {
+                    Some(Value::Str(s)) => Sicherheit::aus_name(s)
+                        .map_err(|e| format!("SMTP_SERVER: {}", e))?,
+                    None => Sicherheit::aus_port(port as u16),
+                    Some(_) => return Err("SMTP_SERVER: die Sicherheit muss ein STRING sein \
+                                           (\"starttls\", \"tls\", \"keine\")".into()),
+                };
+                let m = self.smtp_m(i)?;
+                m.host = host;
+                m.port = port as u16;
+                m.sicherheit = sicher;
+                Value::Nil
+            }
+            "smtp_login" => {
+                let i = bi_int(a, 0, "SMTP_LOGIN")?;
+                let b = bi_str(a, 1, "SMTP_LOGIN")?.to_string();
+                let k = bi_str(a, 2, "SMTP_LOGIN")?.to_string();
+                let m = self.smtp_m(i)?;
+                m.benutzer = b;
+                m.kennwort = k;
+                Value::Nil
+            }
+            "smtp_from" => {
+                let i = bi_int(a, 0, "SMTP_FROM")?;
+                let wer = Self::smtp_wer(a, "SMTP_FROM")?;
+                self.smtp_m(i)?.von = wer;
+                Value::Nil
+            }
+            "smtp_to" => {
+                let i = bi_int(a, 0, "SMTP_TO")?;
+                let wer = Self::smtp_wer(a, "SMTP_TO")?;
+                self.smtp_m(i)?.an.push(wer);
+                Value::Nil
+            }
+            "smtp_cc" => {
+                let i = bi_int(a, 0, "SMTP_CC")?;
+                let wer = Self::smtp_wer(a, "SMTP_CC")?;
+                self.smtp_m(i)?.cc.push(wer);
+                Value::Nil
+            }
+            "smtp_bcc" => {
+                let i = bi_int(a, 0, "SMTP_BCC")?;
+                let adresse = bi_str(a, 1, "SMTP_BCC")?.trim().to_string();
+                smtp::pruefe_adresse(&adresse, "SMTP_BCC").map_err(|e| format!("SMTP_BCC: {}", e))?;
+                self.smtp_m(i)?.bcc.push(adresse);
+                Value::Nil
+            }
+            "smtp_subject" => {
+                let i = bi_int(a, 0, "SMTP_SUBJECT")?;
+                let s = bi_str(a, 1, "SMTP_SUBJECT")?.to_string();
+                smtp::pruefe_kopfwert(&s, "SMTP_SUBJECT: der Betreff")?;
+                self.smtp_m(i)?.betreff = s;
+                Value::Nil
+            }
+            "smtp_text" => {
+                let i = bi_int(a, 0, "SMTP_TEXT")?;
+                let s = bi_str(a, 1, "SMTP_TEXT")?.to_string();
+                self.smtp_m(i)?.text = s;
+                Value::Nil
+            }
+            "smtp_html" => {
+                let i = bi_int(a, 0, "SMTP_HTML")?;
+                let s = bi_str(a, 1, "SMTP_HTML")?.to_string();
+                self.smtp_m(i)?.html = s;
+                Value::Nil
+            }
+            "smtp_attach" => {
+                let i = bi_int(a, 0, "SMTP_ATTACH")?;
+                let pfad = bi_str(a, 1, "SMTP_ATTACH")?.to_string();
+                let daten = std::fs::read(&pfad)
+                    .map_err(|e| format!("SMTP_ATTACH: {} ({})", e, pfad))?;
+                let anzeige = match a.get(2) {
+                    Some(Value::Str(s)) => s.to_string(),
+                    None => std::path::Path::new(&pfad).file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| pfad.clone()),
+                    Some(_) => return Err("SMTP_ATTACH: der Anzeigename muss ein STRING sein".into()),
+                };
+                smtp::pruefe_kopfwert(&anzeige, "SMTP_ATTACH: der Dateiname")?;
+                if anzeige.contains('"') {
+                    return Err("SMTP_ATTACH: ein Anfuehrungszeichen im Dateinamen wuerde \
+                                die Kopfzeile zerreissen".into());
+                }
+                // Die Art wird an der Endung erkannt -- dieselbe Tabelle, die
+                // auch der Webserver benutzt, damit es nur EINE gibt.
+                let typ = crate::httpd::typ_aus_endung(&pfad).to_string();
+                self.smtp_m(i)?.anhaenge.push(smtp::Anhang { name: anzeige, typ, daten });
+                Value::Nil
+            }
+            "smtp_timeout" => {
+                let i = bi_int(a, 0, "SMTP_TIMEOUT")?;
+                let ms = bi_int(a, 1, "SMTP_TIMEOUT")?;
+                if ms <= 0 { return Err("SMTP_TIMEOUT: die Frist muss groesser als 0 sein".into()); }
+                self.smtp_m(i)?.frist_ms = ms as u64;
+                Value::Nil
+            }
+            "smtp_message$" => {
+                let i = bi_int(a, 0, "SMTP_MESSAGE$")?;
+                let (datum, zufall) = (smtp::rfc_datum(smtp::jetzt_utc()), smtp::zufallszahl());
+                let m = self.smtp_m(i)?;
+                let n = smtp::nachricht(m, &datum, zufall)
+                    .map_err(|e| format!("SMTP_MESSAGE$: {}", e))?;
+                Value::str_rc(&n)
+            }
+            "smtp_send" => {
+                let i = bi_int(a, 0, "SMTP_SEND")?;
+                let (datum, zufall) = (smtp::rfc_datum(smtp::jetzt_utc()), smtp::zufallszahl());
+                let m = self.smtp_m(i)?;
+                let n = smtp::nachricht(m, &datum, zufall)
+                    .map_err(|e| format!("SMTP_SEND: {}", e))?;
+                smtp::senden(m, &n)?;
+                Value::Nil
+            }
+            "smtp_close" => {
+                let i = bi_int(a, 0, "SMTP_CLOSE")? as usize;
+                if let Some(slot) = self.smtp_mail.get_mut(i) { *slot = None; }
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     /// Modul `xlsx` -- Auswertungen als Excel-Mappe.
     fn try_xlsx(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !name.starts_with("xlsx_") { return Ok(None); }

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1501,
+ "count": 1516,
  "builtins": [
   {
    "name": "ABS",
@@ -7231,6 +7231,96 @@
    "kind": "core",
    "signature": "SMOOTHSTEP(edge0, edge1, x)",
    "module": "core"
+  },
+  {
+   "name": "SMTP_ATTACH",
+   "kind": "core",
+   "signature": "SMTP_ATTACH(m: SMTP, pfad$ [, name$])",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_BCC",
+   "kind": "core",
+   "signature": "SMTP_BCC(m: SMTP, adresse$)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_CC",
+   "kind": "core",
+   "signature": "SMTP_CC(m: SMTP, adresse$ [, name$])",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_CLOSE",
+   "kind": "core",
+   "signature": "SMTP_CLOSE(m: SMTP)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_FROM",
+   "kind": "core",
+   "signature": "SMTP_FROM(m: SMTP, adresse$ [, name$])",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_HTML",
+   "kind": "core",
+   "signature": "SMTP_HTML(m: SMTP, html$)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_LOGIN",
+   "kind": "core",
+   "signature": "SMTP_LOGIN(m: SMTP, benutzer$, kennwort$)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_MESSAGE$",
+   "kind": "core",
+   "signature": "SMTP_MESSAGE$(m: SMTP) -> STRING",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_NEW",
+   "kind": "core",
+   "signature": "SMTP_NEW() -> SMTP",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_SEND",
+   "kind": "core",
+   "signature": "SMTP_SEND(m: SMTP)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_SERVER",
+   "kind": "core",
+   "signature": "SMTP_SERVER(m: SMTP, host$, port [, sicherheit$])",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_SUBJECT",
+   "kind": "core",
+   "signature": "SMTP_SUBJECT(m: SMTP, betreff$)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_TEXT",
+   "kind": "core",
+   "signature": "SMTP_TEXT(m: SMTP, text$)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_TIMEOUT",
+   "kind": "core",
+   "signature": "SMTP_TIMEOUT(m: SMTP, ms)",
+   "module": "smtp"
+  },
+  {
+   "name": "SMTP_TO",
+   "kind": "core",
+   "signature": "SMTP_TO(m: SMTP, adresse$ [, name$])",
+   "module": "smtp"
   },
   {
    "name": "SORT",

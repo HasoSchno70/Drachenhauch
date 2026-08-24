@@ -139,7 +139,7 @@ def main() -> int:
         # den WASM-Build blockiert -- auf dem Desktop gehoert es aber dazu.
         feats += ["graphics", "dialogs"]
     if "--no-data" not in args:
-        feats += ["db", "net", "http"]
+        feats += ["db", "net", "http", "smtp"]
     if "--hardware" in args:
         feats += ["serial", "usb", "bt", "wifi"]
         if system != "Windows" and "wifi" in feats:

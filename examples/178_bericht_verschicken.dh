@@ -1,0 +1,97 @@
+' 178 -- Bericht bauen und rausschicken
+'
+' Die Kette, die in Bueroprogrammen am haeufigsten verlangt wird: Zahlen
+' zusammenstellen, als Excel-Mappe schreiben, per E-Mail verschicken.
+'
+' DAS PROGRAMM VERSCHICKT NICHTS, solange kein Server eingetragen ist -- es
+' legt die fertige Nachricht als Datei ab (SMTP_MESSAGE$). So laesst sich
+' alles ausprobieren, ohne ein Postfach zu haben. Wer wirklich senden will,
+' traegt unten Server und Zugang ein und setzt SENDEN auf TRUE.
+'
+' Aufruf:  dhrt run 178_bericht_verschicken.dh
+
+IMPORT "xlsx"
+IMPORT "smtp"
+IMPORT "zeit"
+
+CONST SENDEN AS BOOLEAN = FALSE
+CONST SERVER AS STRING = "smtp.beispiel.de"
+CONST PORT AS INTEGER = 587
+CONST BENUTZER AS STRING = "hans@beispiel.de"
+CONST KENNWORT AS STRING = "geheim"
+
+DIM i AS INTEGER
+DIM summe AS FLOAT
+
+' --- 1. Die Auswertung -----------------------------------------------------
+DIM kunde AS ARRAY OF STRING
+DIM betrag AS ARRAY OF FLOAT
+kunde  = ["Schrauben & Muttern GmbH", "Muster Maschinenbau AG", "Beispiel Handel e.K."]
+betrag = [1234.50, 89.90, 4567.25]
+
+DIM x AS XLSX
+x = XLSX_NEW("Umsatz")
+XLSX_SET(x, 0, 0, "Kunde")
+XLSX_SET(x, 0, 1, "Betrag")
+XLSX_BOLD_ROW(x, 0)
+XLSX_COL_WIDTH(x, 0, 30)
+XLSX_COL_WIDTH(x, 1, 14)
+
+summe = 0.0
+FOR i = 0 TO LEN(kunde) - 1
+    XLSX_SET(x, i + 1, 0, kunde[i])
+    XLSX_SET_NUM(x, i + 1, 1, betrag[i])
+    XLSX_FORMAT(x, i + 1, 1, "#,##0.00")
+    summe = summe + betrag[i]
+NEXT
+XLSX_SAVE(x, "monatsbericht.xlsx")
+XLSX_CLOSE(x)
+PRINT "monatsbericht.xlsx geschrieben."
+
+' --- 2. Die Nachricht ------------------------------------------------------
+DIM m AS SMTP
+m = SMTP_NEW()
+
+SMTP_FROM(m, BENUTZER, "Abteilung Zahlen")
+SMTP_TO(m, "chefin@beispiel.de", "Frau Muster")
+SMTP_CC(m, "buchhaltung@beispiel.de")
+SMTP_SUBJECT(m, "Monatsbericht " + ZEIT_FORMAT$(ZEIT_JETZT(), "MM/JJJJ"))
+
+DIM text AS STRING
+text = "Guten Tag," + CHR$(10) + CHR$(10)
+text = text + "anbei der Monatsbericht." + CHR$(10)
+text = text + "Gesamtumsatz: " + FORMAT$(summe, "%.2f") + " EUR aus "
+text = text + STR$(LEN(kunde)) + " Rechnungen." + CHR$(10) + CHR$(10)
+text = text + "Mit freundlichen Gruessen" + CHR$(10) + "Die Buchhaltung"
+SMTP_TEXT(m, text)
+
+' Dieselbe Nachricht zusaetzlich als HTML -- der Leser nimmt, was er kann.
+SMTP_HTML(m, "<p>Guten Tag,</p><p>anbei der Monatsbericht.<br>" + _
+             "Gesamtumsatz: <b>" + FORMAT$(summe, "%.2f") + " EUR</b> aus " + _
+             STR$(LEN(kunde)) + " Rechnungen.</p>" + _
+             "<p>Mit freundlichen Gruessen<br>Die Buchhaltung</p>")
+
+SMTP_ATTACH(m, "monatsbericht.xlsx")
+
+' --- 3. Abschicken -- oder eben nicht --------------------------------------
+IF SENDEN THEN
+    SMTP_SERVER(m, SERVER, PORT)          ' 587 -> STARTTLS
+    SMTP_LOGIN(m, BENUTZER, KENNWORT)
+    TRY
+        SMTP_SEND(m)
+        PRINT "Verschickt an chefin@beispiel.de."
+    CATCH e
+        PRINT "Ging nicht raus: " + e
+    END TRY
+ELSE
+    ' Ohne Postfach: die fertige Nachricht anschauen. Genau diese Zeichen
+    ' gingen sonst ueber die Leitung.
+    DIM f AS FILE
+    f = OPENFILE("nachricht.eml", "w")
+    WRITELINE(f, SMTP_MESSAGE$(m))
+    CLOSEFILE(f)
+    PRINT "nachricht.eml geschrieben (" + STR$(FILESIZE("nachricht.eml")) + " Bytes)."
+    PRINT "Zum wirklichen Verschicken oben SENDEN auf TRUE setzen."
+END IF
+
+SMTP_CLOSE(m)

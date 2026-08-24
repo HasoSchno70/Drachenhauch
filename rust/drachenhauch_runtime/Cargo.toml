@@ -59,6 +59,14 @@ raylib = { version = "6.0", optional = true, features = ["SUPPORT_IMAGE_GENERATI
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 # html-Modul: blockierender HTTP-Client (rustls-TLS fuer https).
 ureq = { version = "2", optional = true }
+# smtp-Modul: E-Mail verschicken. Das Protokoll selbst ist std::net, aber
+# ohne TLS ist es heute unbrauchbar -- jeder Anbieter verlangt STARTTLS oder
+# TLS-von-Anfang-an. rustls und webpki-roots liegen ueber ureq ohnehin schon
+# in der Lockfile; sie kosten hier also nichts Neues im Abhaengigkeitsbaum.
+# `ring` als Krypto-Anbieter (NICHT die Vorgabe aws-lc-rs), weil der eine
+# C-Toolchain mitbraeuchte -- dieselbe Wahl, die ureq schon getroffen hat.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"], optional = true }
+webpki-roots = { version = "0.26", optional = true }
 # Hardware/IoT-Module (Phase 4):
 serialport = { version = "4", optional = true }   # serial
 hidapi = { version = "2", optional = true }        # usb (HID)
@@ -116,12 +124,13 @@ dialogs = ["dep:rfd"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
+smtp = ["dep:rustls", "dep:webpki-roots"]
 serial = ["dep:serialport"]
 usb = ["dep:hidapi"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
 hardware = ["serial", "usb", "wifi", "bt"]
-full = ["graphics", "dialogs", "db", "net", "http", "hardware"]
+full = ["graphics", "dialogs", "db", "net", "http", "smtp", "hardware"]
 
 [profile.release]
 opt-level = 3

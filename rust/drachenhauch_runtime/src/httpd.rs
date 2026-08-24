@@ -218,6 +218,8 @@ pub fn typ_aus_endung(pfad: &str) -> &'static str {
         "wav" => "audio/wav",
         "mp3" => "audio/mpeg",
         "pdf" => "application/pdf",
+        "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "zip" => "application/zip",
         _ => "application/octet-stream",
     }
 }
