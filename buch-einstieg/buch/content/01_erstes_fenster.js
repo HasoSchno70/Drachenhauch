@@ -128,7 +128,7 @@ module.exports = (H) => [
   H.table([
     ["Das Fenster bleibt schwarz", "FLIP vergessen — oder es steht vor den Malbefehlen statt danach."],
     ["Das Fenster blitzt nur kurz auf", "SLEEP am Ende vergessen. Das Programm ist fertig und schließt sich."],
-    [{ text: "Parse-Fehler: Erwartet Rparen", mono: true }, "Eine schließende Klammer fehlt. Rparen ist Fachjargon für „right paren“, also die runde Klammer zu."],
+    [{ text: "Parse-Fehler (1): Erwartet Rparen", mono: true }, "Eine schließende Klammer fehlt. Die Zahl in der Klammer ist die Spalte. Rparen ist Fachjargon für „right paren“, also die runde Klammer zu."],
     [{ text: "Lexer-Fehler: Zeilenumbruch im String nicht erlaubt", mono: true }, "Ein Anführungszeichen fehlt. Der Text läuft bis zum Zeilenende weiter, und dort ist Schluss."],
     [{ text: "Unbekanntes Builtin 'CIRLCE'", mono: true }, "Tippfehler im Befehlsnamen. Groß- und Kleinschreibung ist egal, die Buchstaben nicht."],
     ["Es passiert gar nichts", "Datei gespeichert? Der Editor startet, was auf der Platte steht, nicht was auf dem Schirm steht."],

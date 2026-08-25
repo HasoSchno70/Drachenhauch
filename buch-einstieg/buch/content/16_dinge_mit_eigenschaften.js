@@ -177,7 +177,7 @@ module.exports = (H) => [
     ["Alle Dinge sehen gleich aus", "Init setzt feste Werte statt der Parameter, oder die Parameter werden nicht zugewiesen."],
     ["Das Array bleibt leer", "DIM funken[500] AS Funke legt nur Platz an, keine Funken. Jedes Ding braucht sein eigenes NEW."],
     ["Eine Eigenschaft ändert sich nicht", "Der Parameter heißt genauso wie die Eigenschaft — dann überschreibt sich die Zuweisung selbst."],
-    [{ text: "Unbekannter Name", mono: true }, "Eine Eigenschaft wird von außen ohne Punkt angesprochen. Von außen immer f.x, innen nur x."],
+    [{ text: "Variable 'x' nicht deklariert (DIM fehlt?)", mono: true }, "Eine Eigenschaft wird von außen ohne Punkt angesprochen. Draußen gibt es kein x — von außen immer f.x, innen nur x."],
     [{ text: "Erwartet END CLASS", mono: true }, "Ein Block in der Klasse ist offen geblieben."],
   ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3800, 5226] }),
 

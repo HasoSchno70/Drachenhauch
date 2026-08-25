@@ -119,7 +119,7 @@ module.exports = (H) => [
 
   H.table([
     [{ text: "Unbekannter Typ 'db_conn'", mono: true }, "IMPORT \"db\" fehlt."],
-    [{ text: "no such table", mono: true }, "CREATE TABLE fehlt oder der Name ist verschrieben."],
+    [{ text: "no such table: vokabeln", mono: true }, "CREATE TABLE fehlt oder der Name ist verschrieben."],
     ["Die Liste bleibt leer", "Nach dem Ändern wird nicht neu geladen — der Schalter fehlt."],
     ["Es wird die falsche Zeile gelöscht", "Die Zeilennummer der Liste wurde als id benutzt. Sie sind nicht dasselbe."],
     ["Beim zweiten Start ist alles doppelt", "Die Vorbefüllung prüft nicht, ob schon etwas da ist."],

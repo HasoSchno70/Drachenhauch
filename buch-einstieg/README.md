@@ -88,6 +88,29 @@ Der Blockprüfer garantiert nur, dass der Abdruck *läuft* — nicht, dass er
 beide an 15 Stellen voneinander ab; beides lief, beides war richtig, aber wer
 abtippt und danach in die Datei sieht, zweifelt dann an sich statt am Buch.
 
+```
+node pruef_meldungen.js
+```
+
+Hält jede im Buch **wörtlich zitierte Fehlermeldung** gegen die, die `dhrt`
+tatsächlich ausgibt. Zu jeder Meldungsfamilie steht im Skript ein winziges
+Programm, das sie auslöst — was dabei herauskommt, ist die Wahrheit. Eine von
+Hand gepflegte Liste erwarteter Wortlaute wäre selbst wieder etwas, das
+veralten kann, ohne dass es jemand merkt.
+
+Der Anlass war ein echter Beinahe-Unfall: Am 23.08.2026 nahmen `RGB` und
+`RGBA` plötzlich Kommazahlen an und rundeten sie — und `RGB erwartet INTEGER,
+erhalten FLOAT` stand an fünf Stellen im Buch. Beim ersten Lauf des Skripts
+kamen vier weitere Stellen heraus, darunter eine Meldung (`Unbekannter Name`),
+die es in dieser Form nie gab.
+
+Verglichen wird nach dem Abschleifen der veränderlichen Teile — Dateiname,
+Namen in Hochkommas, Zahlen. Das Buch darf `Index 6 ausserhalb [0..5]`
+schreiben, obwohl gemessen `Index 2 ausserhalb [0..1]` herauskam: Die Form muss
+stimmen, nicht die Beispielzahl. Geprüft wird nur, was das Buch auch als Zitat
+**setzt** — Anführung, mono-Zelle, Ausgabeblock. Die Erklärspalte einer
+Fehlerküche ist eigene Formulierung und wird in Ruhe gelassen.
+
 `--check` allein reicht ebenfalls nicht — es prüft den Text, nicht die Werte.
 Seit dem 2026-08-23 warnt es immerhin bei den Fällen, die am Text erkennbar
 sind (`n = 7 / 2` mit `n` als INTEGER). Wertabhängig bleibt der Rest: ob

@@ -38,7 +38,9 @@ module.exports = (H) => [
 
   H.tip("Nachgemessen", "Dieselbe Datei zweimal geladen: Beim zweiten Mal lieferte liste_anlegen wieder die id 1, und in der Tabelle standen weiterhin drei Listen mit 56, 51 und 51 Vokabeln — nicht sechs Listen. Die Vokabeln selbst kämen allerdings doppelt hinein; wer das verhindern will, findet die passende Aufgabe am Kapitelende."),
 
-  H.pmix([["DB_CLOSE_RESULT", true], " steht hier dreimal, und das ist kein Versehen: Auch der Zweig mit ", ["RETURN", true], " muss aufräumen, bevor er hinausspringt. Ein Ergebnis, das offen bleibt, hält die Tabelle fest — und irgendwann geht ein Schreibzugriff nicht mehr, ohne dass man wüsste, warum."]),
+  H.pmix([["DB_CLOSE_RESULT", true], " steht hier dreimal, und das ist kein Versehen: Auch der Zweig mit ", ["RETURN", true], " muss aufräumen, bevor er hinausspringt. Ein Ergebnis ist ein Stück Arbeitsspeicher, das die Datenbank für dich bereithält; wer es liegen lässt, gibt es nie zurück."]),
+
+  H.tip("Nachgemessen", "Dieses Buch hatte an dieser Stelle zuerst eine dramatischere Begründung stehen: ein offenes Ergebnis halte die Tabelle fest, und irgendwann gehe kein Schreibzugriff mehr. Nachgeprüft stimmt das nicht — 5000 absichtlich offen gelassene Ergebnisse, kein Abbruch, und das INSERT danach lief anstandslos. Aufräumen bleibt richtig, aber aus dem gewöhnlichen Grund: Was man sich geben lässt, gibt man zurück."),
 
   H.h2("Die Kopfzeile lesen"),
 
@@ -180,7 +182,7 @@ module.exports = (H) => [
     ["Das Auswahlfeld bleibt leer", "GUI_SET_DROPDOWN fehlt nach dem Neuladen."],
     ["Beim Wechsel der Liste bleiben die alten Vokabeln stehen", "Der Schalter neu_vokabeln wird nicht gesetzt."],
     ["Das Einlesen dauert Sekunden", "DB_BEGIN und DB_COMMIT fehlen."],
-    [{ text: "database is locked", mono: true }, "Ein DB_RESULT wurde nicht geschlossen — meist in einem Zweig mit RETURN."],
+    [{ text: "database is locked", mono: true }, "Eine zweite Verbindung schreibt, während die erste in einer Transaktion steckt — ein DB_BEGIN ohne DB_COMMIT."],
     ["Die Kopfzeile wird nicht erkannt", "In der Datei steht „#name:“ ohne Leerzeichen, gesucht wird aber „# name:“."],
     ["Neue Liste heißt „“", "Die Prüfung auf leere Eingabe fehlt vor dem Anlegen."],
   ], { headers: ["Was du siehst", "Was meistens dahintersteckt"], widths: [3600, 5426] }),
