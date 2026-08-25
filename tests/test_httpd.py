@@ -11,6 +11,16 @@ einen freien Port waehlen; das Programm meldet ihn mit `EPRINT`, weil `PRINT`
 gepuffert ist und erst am Programmende erscheint -- ein Test, der darauf
 wartet, wartet ewig. So braucht kein Test eine feste Portnummer, und alle
 duerfen parallel laufen.
+
+**Wer diese Zeile abholt, darf nichts verschlucken.** Ein Rohr liefert immer
+das, was gerade darin liegt -- der Lesevorgang, der die PORT=-Zeile holt,
+bringt haeufig schon die naechsten Zeilen mit. Landen die in einem
+Python-seitigen Puffer, sind sie fuer `communicate()` je nach Betriebssystem
+verloren: dessen POSIX-Zweig liest mit `os.read(fd)` direkt aus dem Rohr und
+kommt an den Puffer gar nicht heran, waehrend der Windows-Zweig ueber das
+Dateiobjekt liest und ihn mitnimmt (beides in `subprocess.py`,
+`Popen._communicate`). Deshalb liest hier niemand gepuffert und der Ueberhang
+wird weitergereicht statt weggeworfen -- siehe `_port_zeile`.
 """
 import os
 import subprocess
@@ -42,9 +52,32 @@ KOPF = ('IMPORT "httpd"\n'
         'EPRINT("PORT=" + STR$(HTTPD_PORT(s)))\n')
 
 
+def _port_zeile(p):
+    """Die PORT=-Zeile vom nackten Deskriptor holen -- samt Ueberhang.
+
+    Gelesen wird ungepuffert (`bufsize=0`, also direkt auf dem Deskriptor),
+    damit nichts in einem Puffer haengenbleibt, den `communicate()` auf POSIX
+    nie zu sehen bekaeme. Was ueber die Zeile hinaus mitkam, geht als `rest`
+    an den `Server` und wird in `ende()` wieder vorne angesetzt.
+
+    Gemessen: ohne das verlor der POSIX-Lesepfad die Fehlerzeile in 15 von 15
+    Laeufen, sobald das Programm seine Ausgabe schon geschrieben hatte, bevor
+    der Test zum Lesen kam (ein ausgelasteter CI-Rechner) -- der Test sah dann
+    `''` statt der Meldung.
+    """
+    roh = b""
+    while b"\n" not in roh:
+        haeppchen = os.read(p.stderr.fileno(), 4096)
+        if not haeppchen:                      # Programm beendet, keine Zeile
+            break
+        roh += haeppchen
+    zeile, _, rest = roh.partition(b"\n")
+    return zeile.decode("utf-8", "replace"), rest
+
+
 class Server:
-    def __init__(self, proc, port):
-        self.proc, self.port = proc, port
+    def __init__(self, proc, port, err_rest=b""):
+        self.proc, self.port, self._err_rest = proc, port, err_rest
 
     def hole(self, pfad="/", daten=None, methode=None, timeout=10):
         r = urllib.request.Request(f"http://127.0.0.1:{self.port}{pfad}",
@@ -54,7 +87,8 @@ class Server:
 
     def ende(self, timeout=15):
         aus, err = self.proc.communicate(timeout=timeout)
-        return aus or "", err or ""
+        err = self._err_rest + (err or b"")     # Ueberhang vom Portlesen voran
+        return (aus or b"").decode("utf-8", "replace"), err.decode("utf-8", "replace")
 
 
 @pytest.fixture
@@ -65,11 +99,11 @@ def starte(tmp_path):
         f = tmp_path / "srv.dh"
         f.write_text(KOPF + rumpf, encoding="utf-8")
         p = subprocess.Popen([str(_DHRT), "run", str(f)], stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, encoding="utf-8")
+                             stderr=subprocess.PIPE, bufsize=0)
         laufend.append(p)
-        zeile = p.stderr.readline()
+        zeile, rest = _port_zeile(p)
         assert zeile.startswith("PORT="), f"kein Port gemeldet: {zeile!r}"
-        return Server(p, int(zeile.strip().split("=")[1]))
+        return Server(p, int(zeile.strip().split("=")[1]), rest)
 
     yield _start
     for p in laufend:
