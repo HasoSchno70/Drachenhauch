@@ -190,10 +190,18 @@ jobs:
           workspaces: rust/drachenhauch_runtime
 
       # Ohne `graphics`: kein raylib, kein cmake, keine X11-Header. Mit db/net/
-      # http, weil genau die Bereiche hier zaehlen.
+      # http/smtp, weil genau die Bereiche hier zaehlen.
+      #
+      # `smtp` gehoert dazu, obwohl es hier wie eine Zugabe aussieht: die
+      # Feature-Liste muss den Modulen folgen, die `tests/` abfragt. Fehlt
+      # eines, laeuft dhrt zwar, aber jeder Aufruf des Moduls meldet "ohne das
+      # Feature gebaut" -- 26 Fehler in `tests/test_smtp.py`, die es nur auf
+      # posix gab, weil der Windows-Job ueber `build_runtime.py` baut und das
+      # Skript den ganzen Daten-Tier mitnimmt. Wer hier ein Feature ergaenzt,
+      # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
       - name: dhrt bauen (ohne Grafik)
         working-directory: rust/drachenhauch_runtime
-        run: cargo build --release --locked --features "db net http"
+        run: cargo build --release --locked --features "db net http smtp"
 
       # `not qt`: die Editor-Tests brauchen PySide6 mit libEGL/X11 auf dem
       # Runner. Diesen Job interessiert die SPRACHE, nicht der Qt-Editor --
