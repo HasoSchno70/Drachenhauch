@@ -30,7 +30,7 @@ module.exports = (H) => [
     't = (1, 2, 3)',
     't[0] = 99      \' FEHLER: ein Tupel lässt sich nicht ändern',
   ]),
-  H.code(["Laufzeitfehler: Index-Zuweisung an Nicht-Array (TUPLE)"], { out: true }),
+  H.code(["Laufzeitfehler in tupel.dh:3: Index-Zuweisung an Nicht-Array (TUPLE)"], { out: true }),
   H.note("Genau diese Unveränderlichkeit macht Tupel sicher und übersichtlich: Wenn du ein Tupel irgendwohin weitergibst, kann niemand es dir hinter dem Rücken verändern. Brauchst du eine veränderbare, gleichartige Sammlung, nimm ein Array (Kapitel „Arrays“)."),
 
   H.h2("Zerlegen: Destructuring"),

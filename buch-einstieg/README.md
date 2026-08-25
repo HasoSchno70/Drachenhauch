@@ -89,11 +89,13 @@ beide an 15 Stellen voneinander ab; beides lief, beides war richtig, aber wer
 abtippt und danach in die Datei sieht, zweifelt dann an sich statt am Buch.
 
 ```
-node pruef_meldungen.js
+node ../tools/pruef_meldungen.js
 ```
 
-Hält jede im Buch **wörtlich zitierte Fehlermeldung** gegen die, die `dhrt`
-tatsächlich ausgibt. Zu jeder Meldungsfamilie steht im Skript ein winziges
+Hält jede **wörtlich zitierte Fehlermeldung** gegen die, die `dhrt` tatsächlich
+ausgibt — und zwar in **allen vier Büchern**, deshalb liegt das Skript unter
+`tools/` und nicht hier. Ohne Argument prüft es alle, mit `buch-einstieg` nur
+dieses. Zu jeder Meldungsfamilie steht im Skript ein winziges
 Programm, das sie auslöst — was dabei herauskommt, ist die Wahrheit. Eine von
 Hand gepflegte Liste erwarteter Wortlaute wäre selbst wieder etwas, das
 veralten kann, ohne dass es jemand merkt.
@@ -101,8 +103,14 @@ veralten kann, ohne dass es jemand merkt.
 Der Anlass war ein echter Beinahe-Unfall: Am 23.08.2026 nahmen `RGB` und
 `RGBA` plötzlich Kommazahlen an und rundeten sie — und `RGB erwartet INTEGER,
 erhalten FLOAT` stand an fünf Stellen im Buch. Beim ersten Lauf des Skripts
-kamen vier weitere Stellen heraus, darunter eine Meldung (`Unbekannter Name`),
-die es in dieser Form nie gab.
+kamen fünf weitere Stellen heraus, darunter eine Meldung (`Unbekannter Name`),
+die es in dieser Form nie gab, und im Referenzbuch eine abgedruckte Ausgabe
+ohne Datei und Zeilennummer.
+
+Gefunden werden Zitate in vier Schreibweisen: `„...“`, `{ text: "...", mono:
+true }`, `["...", true]` und `H.code([...], { out: true })`. Die ersten beiden
+allein reichten nicht — das Referenzbuch benutzt vor allem die anderen zwei,
+und ein erster Entwurf fand dort **eine** Meldung statt aller drei.
 
 Verglichen wird nach dem Abschleifen der veränderlichen Teile — Dateiname,
 Namen in Hochkommas, Zahlen. Das Buch darf `Index 6 ausserhalb [0..5]`
