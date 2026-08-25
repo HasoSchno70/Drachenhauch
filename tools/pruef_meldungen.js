@@ -1,5 +1,5 @@
-// Prueft in ALLEN vier Buechern, ob jede woertlich zitierte Fehlermeldung noch
-// so lautet, wie die Laufzeit sie ausgibt.
+// Prueft in allen vier Buechern UND in docs/, ob jede woertlich zitierte
+// Fehlermeldung noch so lautet, wie die Laufzeit sie ausgibt.
 //
 // Warum das noetig ist: Die Buecher haben Pruefer fuer abgedruckten CODE
 // (`dhrt --check`) und, im Einstiegsbuch, fuer abgedruckte PROGRAMME. Die
@@ -26,7 +26,17 @@
 // ausserhalb [0..5]" und mal nur "Index ausserhalb" -- die FORM muss stimmen,
 // nicht die Beispielzahl.
 //
-// Aufruf:  node tools/pruef_meldungen.js [buch-einstieg ...]
+// WAS DIESER PRUEFER NICHT SIEHT -- nachgemessen, nicht vermutet:
+// Er findet ein Zitat nur, wenn darin ein Ankerwort steht. Wer eine Meldung so
+// umschreibt, dass KEIN Ankerwort uebrig bleibt ("Index 5 jenseits von
+// [0..2]"), faellt aus der Pruefung heraus, ohne dass etwas rot wird -- die
+// Gegenprobe dazu ist gelaufen und blieb still. Das ist tragbar, weil der
+// realistische Fall der umgekehrte ist: Die Laufzeit aendert sich, der Text
+// bleibt stehen -- und dann steht das alte Ankerwort noch da. Genau so wurde
+// die RGB-Sache gefunden. Wer die Zahl der Zitate ploetzlich sinken sieht,
+// sollte trotzdem hinsehen; sie steht deshalb in jeder Zeile der Ausgabe.
+//
+// Aufruf:  node tools/pruef_meldungen.js [buch-einstieg|docs ...]
 // Rueckgabe: 0 = alle Zitate gedeckt, 1 = mindestens eines weicht ab,
 //            2 = nicht vollstaendig pruefbar (kein Netz)
 const fs = require("fs");
@@ -75,6 +85,16 @@ const PROVOKATIONEN = [
   { name: "offener Block", zeilen: ["FOR i = 1 TO 3", "    PRINT i"] },
   { name: "Zuweisung an ein Tupel",
     zeilen: ["DIM t AS TUPLE", "t = (1, 2, 3)", "t[0] = 99"] },
+  { name: "Methode gibt es nicht",
+    zeilen: ["CLASS A", "    DIM x AS INTEGER", "END CLASS", "DIM a AS A",
+             "a = NEW A()", "a.gibtsNicht()"] },
+  { name: "falscher Handle-Typ", zeilen: ["PRINT STR$(ENDOFFILE(0))"] },
+  { name: "JSON-Handle erwartet",
+    zeilen: ['IMPORT "json"', "CLASS K", "    DIM x AS INTEGER", "END CLASS",
+             "DIM k AS K", "k = NEW K()", "PRINT JSON_STRINGIFY(k)"] },
+  { name: "fehlgeschlagene Pruefung",
+    zeilen: ["ASSERT_COLLECT(TRUE)",
+             'ASSERT_EQ(3600, 7200, "Sommerzeit")', "ASSERT_REPORT()"] },
   { name: "TUPLE statt ARRAY",
     zeilen: ['IMPORT "gui"', 'SCREEN(320, 200, "x")', "DIM f AS GUI_WINDOW",
              "DIM t AS GUI_WIDGET", 'f = GUI_WINDOW("t", 10, 10, 200, 100)',
@@ -112,9 +132,23 @@ const ANKER = new RegExp([
 function tokens(s) {
   const glatt = s
     .replace(/\\(["'])/g, "$1")                  // Escapes aus dem JS-Text
+    // "Laufzeitfehler in datei.dh:7:" -> "Laufzeitfehler:". Die Fundstelle ist
+    // Beiwerk, und die Doku kuerzt sie in Beispielen weg. Das WORT davor bleibt
+    // stehen -- ein "Compile-Fehler", wo die Laufzeit "Laufzeitfehler" sagt,
+    // faellt weiter auf.
+    .replace(/\s+in\s+\S+\.dh:\d+:/g, ":")
     .replace(/\S+\.dh/g, "*.dh")                 // Datei des Ausloesers
-    .replace(/'[^']*'/g, "'*'")                  // Variablen- und Typnamen
+    // Namen in Hochkommas und Anfuehrungszeichen sind Daten, kein Wortlaut:
+    // aus `fehlt IMPORT "gui"?` und `fehlt IMPORT "vec2"?` wird dasselbe. Der
+    // Preis ist, dass ein falscher Modulname hier nicht auffaellt -- das ist
+    // aber ein Inhaltsfehler, kein Wortlautfehler, und dafuer gibt es die
+    // Codepruefer.
+    .replace(/'[^']*'/g, "'*'")
+    .replace(/"[^"]*"/g, '"*"')
     .replace(/(no such table:\s*)\S+/g, "$1*")   // Tabellenname aus SQLite
+    // "FEHL  Zeile 44: Sommerzeit: erhalten ..." -- die Beschriftung stammt
+    // aus dem ASSERT des Benutzers und ist damit Daten wie der Tabellenname.
+    .replace(/(FEHL\s+Zeile\s+\d+:\s*)[^:]+:/g, "$1*:")
     .replace(/-?[0-9]+(\.[0-9]+)?/g, " ")        // Zahlen fallen ganz weg
     .replace(/…/g, " ")                          // Auslassung im Buch
     .replace(/\s+/g, " ")
@@ -197,6 +231,19 @@ function quellen(buchDir) {
   return fs.existsSync(einzeln) ? [einzeln] : [];
 }
 
+// Absichtlich KEINE aktuellen Wortlaute -- hier steht, was ein Text als
+// Vorschlag oder als Schema hinschreibt. Beides laesst sich nicht ausloesen,
+// weil es die Meldung so (noch) nicht gibt. Eine kurze, benannte Ausnahmeliste
+// ist ehrlicher als eine Heuristik, die eine ganze Sorte stillschweigend
+// verschluckt.
+const KEINE_MELDUNG = [
+  // docs/allzweck-roadmap.md: Schema mit Platzhalter, kein echter Wortlaut.
+  '"NAME: erwartet …"',
+  // docs/stolpersteine.md: ein VORSCHLAG mit Gedankenstrich statt "--".
+  // Der geltende Wortlaut steht dreizehn Zeilen darueber und wird geprueft.
+  'Unbekannter Typ \'vec2\' — fehlt IMPORT "vec2"?',
+];
+
 // Steht diese Zeile in einem H.code([...], { out: true })-Block?
 function istAusgabeblock(zeilen, index) {
   for (let i = index; i < Math.min(zeilen.length, index + 20); i++) {
@@ -206,7 +253,56 @@ function istAusgabeblock(zeilen, index) {
   return false;
 }
 
+// In `docs/` steht der Text als Markdown. Zitiert wird dort in Backticks oder
+// in Anfuehrung. Zwei Sorten Fehltreffer muessen raus:
+//
+//   `u32` passt nicht in `I32`   -- zwischen ZWEI Code-Abschnitten steht
+//                                  Fliesstext, den ein naiver Ausdruck als
+//                                  einen dritten liest. Erkennbar daran, dass
+//                                  er mit Leerzeichen anfaengt oder aufhoert.
+//   assert run_gb(src) == erwartet -- Quelltext, keine Meldung.
+// Dazu kommen abgedruckte AUSGABEN in Codebloecken. Bloecke mit ```basic sind
+// Quelltext -- die prueft tools/pruef_docs.py, und dort ist "erwartet" auch mal
+// ein Variablenname. Alle anderen Bloecke zeigen, was ein Werkzeug ausgibt.
+function zitateAusMarkdown(datei) {
+  const zeilen = fs.readFileSync(datei, "utf8").split("\n");
+  const raus = [];
+  let imBlock = false;
+  let sprache = "";
+  zeilen.forEach((zeile, i) => {
+    const zaun = /^\s*```(.*)$/.exec(zeile);
+    if (zaun) {
+      if (imBlock) { imBlock = false; sprache = ""; }
+      else { imBlock = true; sprache = zaun[1].trim().toLowerCase(); }
+      return;
+    }
+    if (!ANKER.test(zeile)) return;
+    const roh = [];
+    if (imBlock) {
+      if (sprache === "basic") return;
+      // Zwei Randnotizen, die der Text den Ausgabezeilen anhaengt und die
+      // nicht zur Meldung gehoeren: ein "-> " davor und ein "   <- stderr"
+      // dahinter.
+      roh.push(zeile.trim()
+        .replace(/^(->|→)\s*/, "")
+        .replace(/\s{2,}<-\s.*$/, "")
+        .trim());
+    }
+    for (const m of zeile.matchAll(/`([^`\n]{6,160})`/g)) roh.push(m[1]);
+    for (const m of zeile.matchAll(/„([^„“\n]{6,160})“/g)) roh.push(m[1]);
+    for (const s of roh) {
+      if (!ANKER.test(s)) continue;
+      if (s !== s.trim()) continue;              // Fliesstext zwischen Spans
+      if (/==|\bassert\b/.test(s)) continue;     // Quelltext
+      if (KEINE_MELDUNG.includes(s)) continue;
+      raus.push({ datei: path.basename(datei), zeile: i + 1, text: s, tok: tokens(s) });
+    }
+  });
+  return raus;
+}
+
 function zitateAus(datei) {
+  if (datei.endsWith(".md")) return zitateAusMarkdown(datei);
   const zeilen = fs.readFileSync(datei, "utf8").split("\n");
   const raus = [];
   zeilen.forEach((zeile, i) => {
@@ -228,6 +324,7 @@ function zitateAus(datei) {
     }
     for (const s of roh) {
       if (!ANKER.test(s)) continue;
+      if (KEINE_MELDUNG.includes(s)) continue;
       raus.push({ datei: path.basename(datei), zeile: i + 1, text: s, tok: tokens(s) });
     }
   });
@@ -240,9 +337,13 @@ function gemeinsameWorte(a, b) {
   return b.filter((w) => s.has(w)).length;
 }
 
+// Geprueft werden die vier Buecher und `docs/`. Die Doku zitiert dieselben
+// Meldungen und veraltet genauso -- tools/pruef_doku_aussagen.py sagt in
+// seinem eigenen Kopf, dass ihm genau diese Sorte Aussage entgeht.
 const gewuenscht = process.argv.slice(2);
 const buecher = fs.readdirSync(WURZEL)
   .filter((d) => /^buch-/.test(d) && fs.statSync(path.join(WURZEL, d)).isDirectory())
+  .concat(fs.existsSync(path.join(WURZEL, "docs")) ? ["docs"] : [])
   .filter((d) => !gewuenscht.length || gewuenscht.includes(d))
   .sort();
 
@@ -252,7 +353,10 @@ console.log(`${gemessen.length} Meldungen aus ${PROVOKATIONEN.length} Programmen
 let offenGesamt = 0;
 let zitateGesamt = 0;
 for (const buch of buecher) {
-  const dateien = quellen(path.join(WURZEL, buch));
+  const dateien = buch === "docs"
+    ? fs.readdirSync(path.join(WURZEL, "docs")).filter((f) => f.endsWith(".md"))
+        .sort().map((f) => path.join(WURZEL, "docs", f))
+    : quellen(path.join(WURZEL, buch));
   if (!dateien.length) { console.log(`${buch}: keine Textquelle gefunden`); continue; }
   const zitate = dateien.flatMap(zitateAus);
   const offen = zitate.filter((z) => !gemessen.some((g) => stecktIn(z.tok, g.tok)));
@@ -271,7 +375,7 @@ for (const buch of buecher) {
   if (offen.length) console.log("");
 }
 
-console.log(`\n${zitateGesamt} Zitate in ${buecher.length} Buechern: ` +
+console.log(`\n${zitateGesamt} Zitate in ${buecher.length} Quellen: ` +
             `${offenGesamt} ungedeckt.`);
 if (kaputt) console.log(`${kaputt} Provokation(en) loesen nichts mehr aus.`);
 if (netzFehlt) console.log("Ohne Netz nicht vollstaendig pruefbar.");

@@ -93,9 +93,9 @@ node ../tools/pruef_meldungen.js
 ```
 
 Hält jede **wörtlich zitierte Fehlermeldung** gegen die, die `dhrt` tatsächlich
-ausgibt — und zwar in **allen vier Büchern**, deshalb liegt das Skript unter
-`tools/` und nicht hier. Ohne Argument prüft es alle, mit `buch-einstieg` nur
-dieses. Zu jeder Meldungsfamilie steht im Skript ein winziges
+ausgibt — in allen vier Büchern **und in `docs/`**, deshalb liegt das Skript
+unter `tools/` und nicht hier. Ohne Argument prüft es alles, mit
+`buch-einstieg` oder `docs` nur eine Quelle. Zu jeder Meldungsfamilie steht im Skript ein winziges
 Programm, das sie auslöst — was dabei herauskommt, ist die Wahrheit. Eine von
 Hand gepflegte Liste erwarteter Wortlaute wäre selbst wieder etwas, das
 veralten kann, ohne dass es jemand merkt.
@@ -111,6 +111,13 @@ Gefunden werden Zitate in vier Schreibweisen: `„...“`, `{ text: "...", mono:
 true }`, `["...", true]` und `H.code([...], { out: true })`. Die ersten beiden
 allein reichten nicht — das Referenzbuch benutzt vor allem die anderen zwei,
 und ein erster Entwurf fand dort **eine** Meldung statt aller drei.
+
+Es hat eine bekannte Grenze, und die ist nachgemessen: Gefunden wird ein Zitat
+nur, wenn ein Ankerwort darin steht. Wer eine Meldung so umschreibt, dass keines
+übrig bleibt, fällt aus der Prüfung, ohne dass etwas rot wird — die Gegenprobe
+dazu blieb still. Tragbar ist das, weil der realistische Fall der umgekehrte
+ist: Die Laufzeit ändert sich, der Text bleibt stehen, und dann steht das alte
+Ankerwort noch da. Genau so wurde die RGB-Sache gefunden.
 
 Verglichen wird nach dem Abschleifen der veränderlichen Teile — Dateiname,
 Namen in Hochkommas, Zahlen. Das Buch darf `Index 6 ausserhalb [0..5]`
