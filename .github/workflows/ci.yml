@@ -219,7 +219,7 @@ jobs:
   # (Stand 2026-07) lief/baute dhrt ausschliesslich unter Windows, nie in CI
   # verifiziert. Bewusst ohne `graphics` (braucht cmake/ALSA/X11-Wayland-Dev-
   # Header, ein spaeterer Schritt) -- hier zaehlt erstmal, ob VM-Kern +
-  # Daten-Tier (db/net/http) + das wifi-Feature (Phase 3: Linux/macOS-Zweige
+  # Daten-Tier (db/net/http/smtp) + das wifi-Feature (Phase 3: Linux/macOS-Zweige
   # noch UNGETESTET, dieser Job ist ihr erstes echtes Kompilier-Signal)
   # plattformunabhaengig sind. serial/usb/bt bleiben vorerst aussen vor --
   # die brauchen zusaetzliche System-Bibliotheken (libudev/D-Bus) und sind
@@ -242,8 +242,11 @@ jobs:
       - name: cargo check (VM-Kern, ohne Grafik/Daten/Hardware)
         run: cargo check --locked
 
-      - name: cargo check (+ db/net/http)
-        run: cargo check --locked --features "db net http"
+      # Die Feature-Liste folgt dem Daten-Tier aus `feats` in
+      # `rust/build_runtime.py` -- wer dort eines ergaenzt, ergaenzt es hier
+      # mit, sonst kompiliert der neue Modul-Code auf Linux/macOS nie.
+      - name: cargo check (+ db/net/http/smtp)
+        run: cargo check --locked --features "db net http smtp"
 
       - name: cargo check (+ wifi)
         run: cargo check --locked --features "wifi"
