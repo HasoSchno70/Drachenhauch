@@ -388,11 +388,13 @@ Kein Punkt hier ist ein Mangel; alle drei sind Abwägungen, die man einmal
 bewusst treffen und aufschreiben sollte.
 
 - **Keine anonymen Funktionen, keine Closures, keine verschachtelten
-  Funktionen.** `FUNCREF` verlangt immer eine benannte Funktion auf oberster
-  Ebene, und ihr Rumpf sieht nur Parameter und Globals. Für Rückrufe (GUI,
-  `timer`, Vergleichsfunktion beim Sortieren) reicht das; es kostet pro Rückruf
-  eine benannte Funktion an anderer Stelle der Datei. Das passt zu BASIC — ich
-  würde es lassen und die Entscheidung dokumentieren.
+  Funktionen.** `FUNCREF` verlangt eine benannte Funktion, und ihr Rumpf sieht
+  nur Parameter und Globals. Das passt zu BASIC und bleibt so.
+  **Teilweise erledigt (2026-08-26):** was daran wirklich weh tat, war nicht die
+  fehlende Lambda, sondern dass objektorientierter Code sich nicht selbst als
+  Rückruf eintragen konnte. `obj.methode` ist jetzt eine FUNCREF, die ihre
+  Instanz mitträgt (`GUI_ON_CLICK(knopf, spieler.klick)`) — siehe CLAUDE.md,
+  Abschnitt „Function References".
 - **`ANY` gibt es nicht.** Die Roadmap begründet den Verzicht auf Generics
   ausdrücklich mit *„`ARRAY OF ANY` plus Laufzeit-Typprüfung (`TYPEOF`) deckt
   die realen Fälle"* — aber `DIM x AS ANY` ist ein Übersetzungsfehler

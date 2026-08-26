@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use crate::graphics::Graphics;
+use crate::value::Rueckruf;
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -637,13 +638,13 @@ pub struct Widget {
     placeholder: String,
     clicked: bool,
     hovered: bool,
-    on_click: Option<String>,
-    on_change: Option<String>,
+    on_click: Option<Rueckruf>,
+    on_change: Option<Rueckruf>,
     /// Maus betritt / verlaesst das Widget, Fokus kommt / geht.
-    on_hover: Option<String>,
-    on_leave: Option<String>,
-    on_focus: Option<String>,
-    on_blur: Option<String>,
+    on_hover: Option<Rueckruf>,
+    on_leave: Option<Rueckruf>,
+    on_focus: Option<Rueckruf>,
+    on_blur: Option<Rueckruf>,
     /// Hover-Zustand des VORIGEN Bildes -- nur daraus laesst sich die FLANKE
     /// bestimmen. `hovered` allein wuerde jedes Bild feuern, solange die Maus
     /// stehenbleibt.
@@ -806,7 +807,7 @@ pub struct Gui {
     // In diesem Frame ausgeloeste FUNCREF-Callbacks (Namen). Die VM leert die
     // Liste nach GUI_UPDATE und ruft sie auf -- so kann ein Callback nicht
     // mitten im State-Update die GUI re-entrant veraendern.
-    pending: Vec<String>,
+    pending: Vec<Rueckruf>,
     // Tooltip-Dwell: ueber welchem Widget (Fenster, Widget) ruht die Maus und seit
     // welchem frame_count? Mausbewegung/Klick setzt den Timer zurueck; nach
     // TOOLTIP_DELAY ruhenden Frames zeigt draw() den Hilfetext.
@@ -863,7 +864,7 @@ impl Gui {
     }
 
     /// Entnimmt die in diesem Frame ausgeloesten Callback-Namen (FIFO).
-    pub fn take_pending(&mut self) -> Vec<String> { std::mem::take(&mut self.pending) }
+    pub fn take_pending(&mut self) -> Vec<Rueckruf> { std::mem::take(&mut self.pending) }
 
     pub fn reset(&mut self) {
         let theme = default_theme();
@@ -2347,28 +2348,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         Ok(())
     }
-    pub fn on_click(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_click(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_CLICK")?.on_click = func; Ok(())
     }
 
     /// Maus betritt das Widget (einmal je Eintritt, nicht jedes Bild).
-    pub fn on_hover(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_hover(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_HOVER")?.on_hover = func; Ok(())
     }
     /// Maus verlaesst das Widget.
-    pub fn on_leave(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_leave(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_LEAVE")?.on_leave = func; Ok(())
     }
     /// Widget bekommt die Eingabe (Textfeld angeklickt, Tab-Wechsel).
-    pub fn on_focus(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_focus(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_FOCUS")?.on_focus = func; Ok(())
     }
     /// Widget verliert die Eingabe -- der Punkt, an dem man eine Eingabe
     /// pruefen will.
-    pub fn on_blur(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_blur(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_BLUR")?.on_blur = func; Ok(())
     }
-    pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+    pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
         if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
@@ -2648,12 +2649,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             "value": w.value, "min": w.min, "max": w.max,
             "checked": w.checked, "placeholder": w.placeholder, "visible": w.visible,
         });
-        if let Some(f) = &w.on_click { o["on_click"] = serde_json::json!(f); }
-        if let Some(f) = &w.on_hover { o["on_hover"] = serde_json::json!(f); }
-        if let Some(f) = &w.on_leave { o["on_leave"] = serde_json::json!(f); }
-        if let Some(f) = &w.on_focus { o["on_focus"] = serde_json::json!(f); }
-        if let Some(f) = &w.on_blur { o["on_blur"] = serde_json::json!(f); }
-        if let Some(f) = &w.on_change { o["on_change"] = serde_json::json!(f); }
+        // Nur UNGEBUNDENE Handler wandern in die Datei. Eine an eine Instanz
+        // gebundene Methode laesst sich nicht wiederherstellen -- das Objekt
+        // gibt es beim Laden nicht. Ihren blossen Namen zu schreiben waere
+        // eine Luege: er wuerde beim Laden als freie Funktion gedeutet.
+        if let Some(f) = &w.on_click {
+            if !f.ist_gebunden() { o["on_click"] = serde_json::json!(&*f.name); }
+        }
+        if let Some(f) = &w.on_hover {
+            if !f.ist_gebunden() { o["on_hover"] = serde_json::json!(&*f.name); }
+        }
+        if let Some(f) = &w.on_leave {
+            if !f.ist_gebunden() { o["on_leave"] = serde_json::json!(&*f.name); }
+        }
+        if let Some(f) = &w.on_focus {
+            if !f.ist_gebunden() { o["on_focus"] = serde_json::json!(&*f.name); }
+        }
+        if let Some(f) = &w.on_blur {
+            if !f.ist_gebunden() { o["on_blur"] = serde_json::json!(&*f.name); }
+        }
+        if let Some(f) = &w.on_change {
+            if !f.ist_gebunden() { o["on_change"] = serde_json::json!(&*f.name); }
+        }
         if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
         if !w.group.is_empty() { o["group"] = serde_json::json!(w.group); }
         if !w.items.is_empty() { o["items"] = serde_json::json!(w.items); }
@@ -2746,12 +2763,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.checked = wj["checked"].as_bool().unwrap_or(false);
         w.placeholder = wj["placeholder"].as_str().unwrap_or("").to_string();
         w.visible = wj["visible"].as_bool().unwrap_or(true);
-        w.on_click = wj["on_click"].as_str().map(|s| s.to_string());
-        w.on_hover = wj["on_hover"].as_str().map(|s| s.to_string());
-        w.on_leave = wj["on_leave"].as_str().map(|s| s.to_string());
-        w.on_focus = wj["on_focus"].as_str().map(|s| s.to_string());
-        w.on_blur = wj["on_blur"].as_str().map(|s| s.to_string());
-        w.on_change = wj["on_change"].as_str().map(|s| s.to_string());
+        w.on_click = wj["on_click"].as_str().map(Rueckruf::benannt);
+        w.on_hover = wj["on_hover"].as_str().map(Rueckruf::benannt);
+        w.on_leave = wj["on_leave"].as_str().map(Rueckruf::benannt);
+        w.on_focus = wj["on_focus"].as_str().map(Rueckruf::benannt);
+        w.on_blur = wj["on_blur"].as_str().map(Rueckruf::benannt);
+        w.on_change = wj["on_change"].as_str().map(Rueckruf::benannt);
         if let Some(ov) = wj["ov"].as_object() {
             for (k, val) in ov { if let Some(c) = val.as_i64() { w.ov.insert(k.clone(), c); } }
         }
@@ -3419,7 +3436,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let (f_jetzt, f_vorher) = (ist_fokus, w.was_focused);
                 w.was_hovered = h_jetzt;
                 w.was_focused = f_jetzt;
-                let mut feuern: Vec<String> = Vec::new();
+                let mut feuern: Vec<Rueckruf> = Vec::new();
                 if h_jetzt && !h_vorher {
                     if let Some(f) = w.on_hover.clone() { feuern.push(f); }
                 } else if !h_jetzt && h_vorher {
@@ -5338,6 +5355,12 @@ mod tests {
     use super::*;
 
     // Checkbox-Klick (Press-basiert, ohne Graphics) muss togglen UND die
+    /// Nur die Namen der ausgeloesten Rueckrufe -- die Tests hier pruefen
+    /// Reihenfolge und Ausloesung, nicht die Bindung an ein Objekt.
+    fn namen(cbs: Vec<Rueckruf>) -> Vec<String> {
+        cbs.iter().map(|c| c.name.to_string()).collect()
+    }
+
     // Callbacks in der Reihenfolge on_click, on_change in die pending-Queue
     // legen -- identisch zur Python-Referenz (_handle_press).
     #[test]
@@ -5345,11 +5368,11 @@ mod tests {
         let mut g = Gui::new();
         let win = g.new_window("T".into(), 0, 0, 200, 200);
         let cb = g.checkbox(win, "X".into(), 10, 10, false).unwrap();
-        g.on_click(cb, Some("clicked".into())).unwrap();
-        g.on_change(cb, Some("toggled".into())).unwrap();
+        g.on_click(cb, Some(Rueckruf::benannt("clicked"))).unwrap();
+        g.on_change(cb, Some(Rueckruf::benannt("toggled"))).unwrap();
         // abs Checkbox-Rect: (10, 22+10, 16, 16) -> Mitte (18, 40).
         g.handle_press(18, 40);
-        assert_eq!(g.take_pending(), vec!["clicked".to_string(), "toggled".to_string()]);
+        assert_eq!(namen(g.take_pending()), vec!["clicked", "toggled"]);
         assert!(g.checked(cb).unwrap());
         // Zweite Abfrage liefert leere Queue (FIFO geleert).
         assert!(g.take_pending().is_empty());
@@ -5389,11 +5412,11 @@ mod tests {
         let win = g.new_window("T".into(), 0, 0, 300, 200);
         let sp = g.spinner(win, 10, 10, 120, 0.0, 10.0, 5.0, 2.0).unwrap();
         let (wi, i) = Gui::dec_widget(sp);
-        g.on_change(sp, Some("changed".into())).unwrap();
+        g.on_change(sp, Some(Rueckruf::benannt("changed"))).unwrap();
         assert_eq!(g.value(sp).unwrap(), 5.0);
         g.spinner_step(wi, i, 1);                 // +2 -> 7
         assert_eq!(g.value(sp).unwrap(), 7.0);
-        assert_eq!(g.take_pending(), vec!["changed".to_string()]);
+        assert_eq!(namen(g.take_pending()), vec!["changed"]);
         g.spinner_step(wi, i, 5);                 // +10 -> klemmt auf 10
         assert_eq!(g.value(sp).unwrap(), 10.0);
         g.take_pending();                         // Queue leeren
@@ -5412,12 +5435,12 @@ mod tests {
         let win = g.new_window("T".into(), 100, 50, 400, 300);   // Fenster bei (100,50)
         let sp = g.splitter(win, 200, 20, 200, "v".into(), 80, 360).unwrap();
         let (wi, i) = Gui::dec_widget(sp);
-        g.on_change(sp, Some("moved".into())).unwrap();
+        g.on_change(sp, Some(Rueckruf::benannt("moved"))).unwrap();
         assert_eq!(g.value(sp).unwrap(), 200.0);                 // Start-x
         g.split_off = 0;
         g.drag_split(wi, i, 350, 0);                             // x = 350-100-0 = 250
         assert_eq!(g.value(sp).unwrap(), 250.0);
-        assert_eq!(g.take_pending(), vec!["moved".to_string()]);
+        assert_eq!(namen(g.take_pending()), vec!["moved"]);
         g.drag_split(wi, i, 9999, 0);                            // klemmt auf max 360
         assert_eq!(g.value(sp).unwrap(), 360.0);
         g.take_pending();

@@ -23,7 +23,9 @@ IMPORT "timer"
 
 `TIMER_UPDATE()` folgt demselben Muster wie `INPUT_UPDATE()`/`GUI_UPDATE()`:
 ohne den Aufruf am Frame-Anfang passiert nichts. Die Callbacks sind
-parameterlose `SUB`s/`FUNCTION`s als FUNCREF (bare Name).
+parameterlose `SUB`s/`FUNCTION`s als FUNCREF (bare Name) — oder eine
+**Methode auf einer Instanz** (`TIMER_EVERY(500, gegner.zucken)`), dann zeigt
+`Self` im Rumpf auf dieses Objekt.
 
 ```basic
 IMPORT "timer"

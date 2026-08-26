@@ -350,7 +350,7 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `DIMSIZE(arr, n)` → INTEGER | Größe der n-ten Dimension (0-basiert) |
 | `SORT(arr)`, `REVERSE(arr)` | 1D IN PLACE sortieren / umkehren |
 | `SORT(arr, absteigend)` | mit BOOLEAN-Flag absteigend sortieren *(nur native Runtime)* |
-| `SORT(arr, comparator)` | mit FUNCREF-Comparator `cmp(a, b)` → INTEGER (<0/0/>0) sortieren, stabil *(nur native Runtime)* |
+| `SORT(arr, comparator)` | mit FUNCREF-Comparator `cmp(a, b)` → INTEGER (<0/0/>0) sortieren, stabil. Auch eine gebundene Methode (`regel.cmp`) ist erlaubt *(nur native Runtime)* |
 | `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 |
 
 **Aggregate** (1D `ARRAY OF INTEGER`/`FLOAT`) und Helfer:

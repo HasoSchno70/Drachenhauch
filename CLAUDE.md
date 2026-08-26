@@ -474,10 +474,44 @@ FUNCTION twice(g AS FUNCREF, x AS INTEGER) AS INTEGER
 END FUNCTION
 ```
 
-**Closures werden NICHT unterstuetzt** -- der Body sieht nur Parameter und
-Globals/CONST. Wer Closure-Verhalten braucht, uebergibt Werte explizit als
-Parameter. Das gilt konsistent in allen drei Pfaden -- damit bleibt die
-"ALLE IDENTISCH"-Garantie erhalten.
+**Gebundene Methoden** (2026-08-26): `obj.methode` OHNE Klammern ist eine
+FUNCREF, die ihre Instanz mittraegt -- damit koennen die Rueckruf-Schnittstellen
+auf ein Objekt zeigen statt auf eine freie SUB plus globale Variable:
+
+```basic
+DIM f AS FUNCREF
+f = spieler.tick          ' traegt `spieler` mit
+f()                       ' ruft spieler.tick() auf
+GUI_ON_CLICK(knopf, spieler.klick)
+TIMER_EVERY(500, gegner.zucken)
+SORT(zahlen, regel.cmp)
+```
+
+Nach aussen ist das ein ganz normales FUNCREF (`TYPEOF` sagt `FUNCREF`,
+`DIM f AS FUNCREF` nimmt es auf). Details:
+- **Aufgeloest wird beim AUFRUF, nicht beim Binden** -- eine als Elternklasse
+  gehaltene Instanz ruft die Ueberschreibung des Kindes.
+- **Ein Feld gewinnt vor einer gleichnamigen Methode** (sonst haette die
+  Erweiterung bestehenden Code umgedeutet); erst wenn kein Feld passt, wird
+  nach einer Methode gesucht.
+- **Gleichheit** vergleicht Instanz UND Methode; eine gebundene Methode ist nie
+  gleich einer freien Funktion desselben Namens.
+- **`GUI_SAVE`/`GUI_TO_JSON` schreiben einen gebundenen Handler NICHT** in die
+  `.dhform` -- beim Laden gibt es die Instanz nicht, und nur den Namen zu
+  schreiben waere eine Luege (er wuerde als freie Funktion gedeutet).
+- **`TASK_START` lehnt sie ab**: der Auftrag laeuft als eigener Prozess und
+  sieht das Objekt nicht -- das sagt eine eigene Meldung im Klartext.
+- Implementierung: `Value::BoundMethod(Rc<(Empfaenger, Methodenname)>)` in
+  `value.rs`; erzeugt im `LOAD_MEMBER`-Fallback, ausgefuehrt in `CALL_VALUE`
+  (beides `vm.rs`). Was `gui`/`timer` speichern, ist ein `Rueckruf`
+  (`value.rs`): Name **und** optionaler Empfaenger -- der Name muss bleiben,
+  weil `gui.rs` ihn in die `.dhform` schreibt. Gefeuert wird ueber den einen
+  Helfer `Vm::rueckruf_rufen`. Tests: `tests/test_gebundene_methoden.py`
+  (inkl. echtem GUI-Klick per Automation-Wiedergabe).
+
+**Anonyme Funktionen/Closures gibt es NICHT** -- der Body einer FUNCREF sieht
+nur Parameter und Globals/CONST. Wer Zustand braucht, nimmt eine gebundene
+Methode (oben) oder uebergibt die Werte explizit als Parameter.
 
 **Implementierung:**
 - Type-Token `FUNCREF`. AST braucht keinen neuen Node -- bare Identifier

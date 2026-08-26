@@ -12,10 +12,14 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use crate::value::Rueckruf;
+
 struct Entry {
     due: Instant,
     interval_ms: Option<i64>,   // Some(_) = TIMER_EVERY, None = TIMER_AFTER
-    func: String,               // FUNCREF-Name (parameterlos aufgerufen)
+    // Der Rueckruf traegt neben dem Namen ggf. die Instanz, an die er
+    // gebunden ist (`TIMER_EVERY(500, gegner.zucken)`).
+    func: Rueckruf,             // parameterlos aufgerufen
 }
 
 #[derive(Default)]
@@ -25,15 +29,15 @@ pub struct Timers {
 }
 
 impl Timers {
-    pub fn after(&mut self, ms: i64, func: String) -> i64 {
+    pub fn after(&mut self, ms: i64, func: Rueckruf) -> i64 {
         self.add(ms, None, func)
     }
 
-    pub fn every(&mut self, ms: i64, func: String) -> i64 {
+    pub fn every(&mut self, ms: i64, func: Rueckruf) -> i64 {
         self.add(ms, Some(ms), func)
     }
 
-    fn add(&mut self, ms: i64, interval_ms: Option<i64>, func: String) -> i64 {
+    fn add(&mut self, ms: i64, interval_ms: Option<i64>, func: Rueckruf) -> i64 {
         self.entries.push(Some(Entry {
             due: Instant::now() + Duration::from_millis(clamp_ms(ms)),
             interval_ms, func,
@@ -71,11 +75,11 @@ impl Timers {
         self.cooldowns.clear();
     }
 
-    /// Faellige Timer einsammeln (Funktionsnamen in Registrierungs-
+    /// Faellige Timer einsammeln (Rueckrufe in Registrierungs-
     /// Reihenfolge). AFTER-Eintraege raeumen sich weg, EVERY-Eintraege
     /// werden auf jetzt+Intervall gestellt -- ein EVERY feuert pro Update
     /// hoechstens EINMAL (kein Aufhol-Burst nach einem Lag/SLEEP).
-    pub fn take_due(&mut self) -> Vec<String> {
+    pub fn take_due(&mut self) -> Vec<Rueckruf> {
         let now = Instant::now();
         let mut due = Vec::new();
         for slot in &mut self.entries {
@@ -117,13 +121,19 @@ fn clamp_ms(ms: i64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::Timers;
+    use crate::value::Rueckruf;
+
+    /// Diese Tests pruefen Zeitmathematik und Tombstone-Verhalten -- an
+    /// wen ein Rueckruf gebunden ist, spielt hier keine Rolle.
+    fn cb(name: &str) -> Rueckruf { Rueckruf::benannt(name) }
+    fn namen(v: Vec<Rueckruf>) -> Vec<String> { v.iter().map(|c| c.name.to_string()).collect() }
 
     #[test]
     fn after_fires_once_and_clears() {
         let mut t = Timers::default();
-        let id = t.after(0, "f".into());          // ms=0 -> sofort faellig
+        let id = t.after(0, cb("f"));             // ms=0 -> sofort faellig
         assert!(t.active(id));
-        assert_eq!(t.take_due(), vec!["f".to_string()]);
+        assert_eq!(namen(t.take_due()), vec!["f"]);
         assert!(!t.active(id));                   // AFTER raeumt sich weg
         assert!(t.take_due().is_empty());
         assert_eq!(t.count(), 0);
@@ -132,10 +142,10 @@ mod tests {
     #[test]
     fn every_refires_until_cancel_and_ids_stay_stable() {
         let mut t = Timers::default();
-        let a = t.after(60_000, "a".into());      // weit in der Zukunft
-        let e = t.every(0, "e".into());
-        assert_eq!(t.take_due(), vec!["e".to_string()]);
-        assert_eq!(t.take_due(), vec!["e".to_string()]);   // EVERY bleibt
+        let a = t.after(60_000, cb("a"));         // weit in der Zukunft
+        let e = t.every(0, cb("e"));
+        assert_eq!(namen(t.take_due()), vec!["e"]);
+        assert_eq!(namen(t.take_due()), vec!["e"]);        // EVERY bleibt
         t.cancel(e);
         assert!(t.take_due().is_empty());
         assert!(t.active(a));                     // Tombstone: a-ID unberuehrt

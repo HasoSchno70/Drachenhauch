@@ -22,6 +22,16 @@ pub enum Value {
     Str(Rc<str>),
     Tuple(Rc<Vec<Value>>),
     FuncRef(Rc<str>),
+    /// Eine an eine Instanz GEBUNDENE Methode (`f = spieler.tick`).
+    ///
+    /// Nach aussen ist das ein FUNCREF: `type_name()` sagt "FUNCREF", damit
+    /// `DIM f AS FUNCREF` sie aufnimmt und jede Stelle, die einen Rueckruf
+    /// erwartet (GUI_ON_*, TIMER_*, SORT), sie ohne Sonderfall annimmt. Der
+    /// Unterschied liegt nur darin, dass beim Aufruf ein Empfaenger mitkommt.
+    ///
+    /// Der Methodenname liegt kleingeschrieben vor -- so legt der Compiler
+    /// die Methoden-Schluessel ab (`resolve_method` sucht damit).
+    BoundMethod(Rc<(Value, Rc<str>)>),
     CompMarker,
     Array(Rc<RefCell<GbArray>>),
     Map(Rc<RefCell<GbMap>>),
@@ -624,6 +634,46 @@ pub struct FieldVal {
     pub value: Value,
 }
 
+/// Ein gespeicherter Rueckruf, wie ihn `gui` und `timer` fuehren.
+///
+/// Warum nicht einfach ein `Value`: `gui.rs` schreibt den Handler-NAMEN in
+/// die `.dhform`-Datei (der Form-Designer liest ihn dort wieder). Der Name
+/// muss also erhalten bleiben, auch wenn zusaetzlich ein Empfaenger
+/// mitgefuehrt wird. Darum beides nebeneinander statt einem Wert, aus dem
+/// man den Namen erst wieder herauspulen muesste.
+///
+/// `empfaenger = None` ist eine freie Funktion, `Some(instanz)` eine
+/// gebundene Methode.
+#[derive(Clone)]
+pub struct Rueckruf {
+    pub name: Rc<str>,
+    pub empfaenger: Option<Value>,
+}
+
+impl Rueckruf {
+    /// Aus dem Wert bauen, den ein Builtin als Rueckruf-Argument bekommen hat.
+    /// `None`, wenn es weder FUNCREF noch gebundene Methode ist.
+    pub fn aus_wert(v: &Value) -> Option<Rueckruf> {
+        match v {
+            Value::FuncRef(n) => Some(Rueckruf { name: n.clone(), empfaenger: None }),
+            Value::BoundMethod(b) =>
+                Some(Rueckruf { name: b.1.clone(), empfaenger: Some(b.0.clone()) }),
+            _ => None,
+        }
+    }
+
+    /// Nur fuer das Wiederherstellen aus einer Datei (dort steht bloss ein Name).
+    pub fn benannt(name: &str) -> Rueckruf {
+        Rueckruf { name: Rc::from(name), empfaenger: None }
+    }
+
+    /// Ist der Rueckruf an eine Instanz gebunden? Solche lassen sich nicht in
+    /// eine `.dhform` schreiben -- die Instanz gibt es beim Laden nicht.
+    pub fn ist_gebunden(&self) -> bool {
+        self.empfaenger.is_some()
+    }
+}
+
 impl Value {
     pub fn fmt(&self) -> String {
         match self {
@@ -637,6 +687,10 @@ impl Value {
                 format!("({})", inner.join(", "))
             }
             Value::FuncRef(name) => format!("<FUNCREF {}>", name),
+            Value::BoundMethod(b) => match &b.0 {
+                Value::Instance(i) => format!("<FUNCREF {}.{}>", i.borrow().class_name, b.1),
+                other => format!("<FUNCREF {}.{}>", other.type_name(), b.1),
+            },
             Value::CompMarker => "<COMP-MARKER>".to_string(),
             Value::Array(a) => {
                 let a = a.borrow();
@@ -735,6 +789,9 @@ impl Value {
             Value::Str(_) => "STRING",
             Value::Tuple(_) => "TUPLE",
             Value::FuncRef(_) => "FUNCREF",
+            // Bewusst ebenfalls "FUNCREF": eine gebundene Methode ist fuer den
+            // Aufrufer dasselbe Ding wie eine freie Funktion.
+            Value::BoundMethod(_) => "FUNCREF",
             Value::CompMarker => "COMP_MARKER",
             Value::Array(_) => "ARRAY",
             Value::Map(_) => "MAP",
@@ -834,6 +891,14 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         // aus demselben LOAD_FUNCREF stammen. `Rc<str> == Rc<str>` vergleicht
         // ueber Deref bereits den STRING-Inhalt (nicht die Pointer-Adresse).
         (Value::FuncRef(x), Value::FuncRef(y)) => x == y,
+        // Gebundene Methoden sind gleich, wenn Empfaenger UND Methode gleich
+        // sind. Der Empfaenger ist ein Referenz-Typ -- verglichen wird also
+        // dieselbe Instanz, nicht eine mit gleichem Inhalt.
+        (Value::BoundMethod(x), Value::BoundMethod(y)) =>
+            x.1 == y.1 && value_eq(&x.0, &y.0),
+        // Eine gebundene Methode ist NIE gleich einer freien Funktion, auch
+        // wenn die Namen zufaellig uebereinstimmen.
+        (Value::BoundMethod(_), Value::FuncRef(_)) | (Value::FuncRef(_), Value::BoundMethod(_)) => false,
         (Value::CompMarker, Value::CompMarker) => true,
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,

@@ -1095,6 +1095,43 @@ impl<'p> Vm<'p> {
         }
     }
 
+    // ------------------------------------------------------- Rueckrufe
+    /// Einen gespeicherten Rueckruf auf die auszufuehrende Funktion und den
+    /// Empfaenger abbilden.
+    ///
+    /// Aufgeloest wird ERST HIER, nicht beim Registrieren: bei einer
+    /// gebundenen Methode entscheidet die Klasse der Instanz, welche
+    /// Ueberschreibung greift -- und die steht erst zur Aufrufzeit fest.
+    fn rueckruf_aufloesen(&self, cb: &crate::value::Rueckruf, kontext: &str)
+        -> R<(&'p Func, Option<Value>)>
+    {
+        match &cb.empfaenger {
+            Some(obj) => {
+                let cn = match obj {
+                    Value::Instance(rc) => rc.borrow().class_name.clone(),
+                    other => return Err(format!(
+                        "{}: Rueckruf ist an {} gebunden, nicht an ein Objekt",
+                        kontext, other.type_name())),
+                };
+                let f = self.resolve_method(&cn, &cb.name).ok_or_else(||
+                    format!("{}: Methode '{}' existiert nicht in {}", kontext, cb.name, cn))?;
+                Ok((f, Some(obj.clone())))
+            }
+            None => {
+                let f = self.prog.func(cb.name.as_ref()).ok_or_else(||
+                    format!("{}: Funktion '{}' existiert nicht", kontext, cb.name))?;
+                Ok((f, None))
+            }
+        }
+    }
+
+    /// Einen parameterlosen Rueckruf ausfuehren (GUI_UPDATE, TIMER_UPDATE).
+    fn rueckruf_rufen(&mut self, cb: &crate::value::Rueckruf, kontext: &str) -> R<()> {
+        let (f, empf) = self.rueckruf_aufloesen(cb, kontext)?;
+        self.exec(f, Vec::new(), empf)?;
+        Ok(())
+    }
+
     // ---------------------------------------------------------------- OOP
     fn resolve_method(&self, class_name: &str, method: &str) -> Option<&'p Func> {
         // Methoden-Keys liegen lowercase vor (Compiler emittiert lowercase) --
@@ -1632,7 +1669,7 @@ impl<'p> Vm<'p> {
     /// Aktuell nur `SORT(arr, comparator)`. Andere SORT-Formen macht builtins.rs.
     fn try_array_hof(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if name == "sort" && a.len() == 2 {
-            if let Value::FuncRef(_) = &a[1] {
+            if matches!(&a[1], Value::FuncRef(_) | Value::BoundMethod(_)) {
                 return Ok(Some(self.sort_with_comparator(&a[0], &a[1])?));
             }
         }
@@ -1647,21 +1684,18 @@ impl<'p> Vm<'p> {
             Value::Array(x) => x.clone(),
             _ => return Err("SORT erwartet ARRAY".to_string()),
         };
-        let cmp_name = match cmp {
-            Value::FuncRef(n) => n.clone(),
-            _ => return Err("SORT: Comparator muss FUNCREF sein".to_string()),
-        };
+        let cb = crate::value::Rueckruf::aus_wert(cmp)
+            .ok_or_else(|| "SORT: Comparator muss FUNCREF sein".to_string())?;
         if arr.borrow().dims.len() != 1 {
             return Err("SORT: nur 1D-Arrays".to_string());
         }
-        let func: &'p Func = self.prog.func(cmp_name.as_ref())
-            .ok_or_else(|| format!("SORT: Funktion '{}' existiert nicht", cmp_name))?;
+        let (func, empf) = self.rueckruf_aufloesen(&cb, "SORT")?;
         // Werte herausziehen -> kein Array-Borrow waehrend der Comparator laeuft.
         let mut vals: Vec<Value> = arr.borrow().cells.to_values();
         let mut error: Option<String> = None;
         vals.sort_by(|x, y| {
             if error.is_some() { return Ordering::Equal; }
-            match self.exec(func, vec![x.clone(), y.clone()], None) {
+            match self.exec(func, vec![x.clone(), y.clone()], empf.clone()) {
                 Ok(Value::Int(i)) => i.cmp(&0),
                 Ok(Value::Float(f)) => f.partial_cmp(&0.0).unwrap_or(Ordering::Equal),
                 Ok(other) => {
@@ -2308,6 +2342,29 @@ impl<'p> Vm<'p> {
                                 if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
                         }
+                        // Gebundene Methode (`f = spieler.tick`): dieselbe Ausfuehrung
+                        // wie CALL_METHOD, nur dass der Empfaenger aus dem Wert kommt
+                        // statt vom Stack. Die Methode wird ERST JETZT aufgeloest --
+                        // so trifft sie auch, wenn die Instanz inzwischen einer
+                        // abgeleiteten Klasse angehoert.
+                        Value::BoundMethod(b) => {
+                            let (recv, mname) = (&b.0, &b.1);
+                            let cn = match recv {
+                                Value::Instance(rc) => rc.borrow().class_name.clone(),
+                                other => return Err(format!(
+                                    "FUNCREF: '{}' ist an {} gebunden, nicht an ein Objekt",
+                                    mname, other.type_name())),
+                            };
+                            let tgt = self.resolve_method(&cn, mname).ok_or_else(||
+                                format!("FUNCREF: Methode '{}' existiert nicht (mehr) in {}", mname, cn))?;
+                            let recv = recv.clone();
+                            if tgt.is_coroutine {
+                                stack.push(make_coro(tgt, call_args, Some(recv)));
+                            } else {
+                                let ret = self.exec(tgt, call_args, Some(recv))?;
+                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            }
+                        }
                         other => return Err(format!(
                             "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
                              aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: \
@@ -2443,9 +2500,20 @@ impl<'p> Vm<'p> {
                                 let r = self.exec(getter, vec![], Some(obj.clone()))?;
                                 stack.push(r);
                             } else {
-                                let v = rc.borrow().fields.get(name)
-                                    .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?.value.clone();
-                                stack.push(v);
+                                let feld = rc.borrow().fields.get(name).map(|f| f.value.clone());
+                                match feld {
+                                    Some(v) => stack.push(v),
+                                    // Kein Feld -- aber vielleicht eine Methode. `obj.methode`
+                                    // OHNE Klammern ist eine an DIESE Instanz gebundene FUNCREF;
+                                    // mit Klammern laeuft der Aufruf ueber CALL_METHOD und kommt
+                                    // hier gar nicht an.
+                                    None => match self.resolve_method(&cn, name) {
+                                        Some(_) => stack.push(Value::BoundMethod(Rc::new((
+                                            obj.clone(), Rc::from(name.to_lowercase().as_str()))))),
+                                        None => return Err(format!(
+                                            "Feld '{}' existiert nicht in {}", name, cn)),
+                                    },
+                                }
                             }
                         }
                         _ => return Err(format!("Zugriff auf '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
@@ -4333,6 +4401,11 @@ impl<'p> Vm<'p> {
                     return Err("TASK_START: erwartet eine Funktion, z.B. TASK_START(Rechne, 42)".into());
                 }
                 let funktion = match &a[0] {
+                    // Eine gebundene Methode kann hier NICHT durch: der Auftrag
+                    // laeuft als eigener Prozess, die Instanz existiert dort nicht.
+                    Value::BoundMethod(b) => return Err(format!(
+                        "TASK_START: '{}' ist an ein Objekt gebunden. Ein Auftrag laeuft in einem eigenen Prozess und sieht dieses Objekt nicht -- nimm eine freie FUNCTION und gib ihr die Werte als Argumente mit.",
+                        b.1)),
                     Value::FuncRef(n) => n.to_string(),
                     Value::Str(s) => s.to_string(),
                     andere => return Err(format!(
@@ -4640,8 +4713,11 @@ impl<'p> Vm<'p> {
         fn t_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
         }
-        fn t_func(a: &[Value], i: usize, fn_: &str) -> R<String> {
-            match a.get(i) { Some(Value::FuncRef(n)) => Ok(n.to_string()), _ => Err(format!("{}: erwartet FUNCREF (Arg {})", fn_, i + 1)) }
+        fn t_func(a: &[Value], i: usize, fn_: &str) -> R<crate::value::Rueckruf> {
+            match a.get(i).and_then(crate::value::Rueckruf::aus_wert) {
+                Some(cb) => Ok(cb),
+                None => Err(format!("{}: erwartet FUNCREF (Arg {})", fn_, i + 1)),
+            }
         }
         let r = match name {
             "timer_after" => {
@@ -4662,10 +4738,8 @@ impl<'p> Vm<'p> {
                 // Faellige Callbacks NACH dem Einsammeln feuern -- ein Callback
                 // darf selbst Timer registrieren/canceln; neue Eintraege werden
                 // erst beim naechsten Update faellig geprueft.
-                for fname in self.timers.take_due() {
-                    let f = self.prog.func(fname.as_str()).ok_or_else(||
-                        format!("TIMER-Callback: Funktion '{}' existiert nicht", fname))?;
-                    self.exec(f, Vec::new(), None)?;
+                for cb in self.timers.take_due() {
+                    self.rueckruf_rufen(&cb, "TIMER-Callback")?;
                 }
                 Value::Nil
             }
@@ -4755,11 +4829,13 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: erwartet Zahl (Arg {})", f, i + 1)) }
         }
         // FUNCREF-Arg -> Option<Name>; NIL entfernt den Callback.
-        fn gfunc(a: &[Value], i: usize, f: &str) -> R<Option<String>> {
+        fn gfunc(a: &[Value], i: usize, f: &str) -> R<Option<crate::value::Rueckruf>> {
             match a.get(i) {
                 Some(Value::Nil) | None => Ok(None),
-                Some(Value::FuncRef(n)) => Ok(Some(n.to_string())),
-                _ => Err(format!("{}: handler muss FUNCREF sein", f)),
+                Some(v) => match crate::value::Rueckruf::aus_wert(v) {
+                    Some(cb) => Ok(Some(cb)),
+                    None => Err(format!("{}: handler muss FUNCREF sein", f)),
+                },
             }
         }
         // 1D ARRAY OF STRING -> Vec<String>.
@@ -5086,10 +5162,8 @@ impl<'p> Vm<'p> {
                 // Ausgeloeste FUNCREF-Callbacks feuern (parameterlos), nachdem
                 // der State-Update fertig ist -- so kann ein Callback die GUI
                 // sicher veraendern; neu ausgeloeste Events landen naechsten Frame.
-                for fname in self.gui.take_pending() {
-                    let f = self.prog.func(fname.as_str()).ok_or_else(||
-                        format!("GUI-Callback: Funktion '{}' existiert nicht", fname))?;
-                    self.exec(f, Vec::new(), None)?;
+                for cb in self.gui.take_pending() {
+                    self.rueckruf_rufen(&cb, "GUI-Callback")?;
                 }
                 Value::Nil
             }
@@ -8152,7 +8226,7 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             _ => Err(format!("{}: Erwartet TUPLE, erhalten {}", ctx, value.type_name())),
         },
         "funcref" => match value {
-            Value::FuncRef(_) | Value::Nil => Ok(value),
+            Value::FuncRef(_) | Value::BoundMethod(_) | Value::Nil => Ok(value),
             _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
         // GELD ist streng, anders als die uebrigen Modul-Typen: eine Zahl

@@ -922,6 +922,29 @@ GUI_ON_CLICK(ok, on_start)        ' on_start ist eine FUNCREF
 - Der Handler ist **parameterlos** (Zustand fragst du drin per `GUI_CHECKED`/
   `GUI_TEXT`/… ab). Er läuft wie eine normale Funktion — sieht Parameter und
   Globals, aber keine Locals des umgebenden Scopes (FUNCREF-Regel).
+- **Eine Methode geht auch** — `GUI_ON_CLICK(ok, spieler.start)` bindet den
+  Handler an die Instanz `spieler`, und `Self` zeigt darin auf sie. Das ist der
+  Weg, wenn der Handler Zustand braucht: statt einer globalen Variablen plus
+  freier `SUB` trägt der Rückruf sein Objekt selbst mit.
+
+  ```basic
+  CLASS Spiel
+      DIM punkte AS INTEGER
+      SUB start()
+          Self.punkte = 0
+      END SUB
+  END CLASS
+
+  DIM spiel AS Spiel
+  spiel = NEW Spiel()
+  GUI_ON_CLICK(ok, spiel.start)
+  ```
+
+  **Grenze:** ein so gebundener Handler wird von `GUI_SAVE`/`GUI_TO_JSON`
+  **nicht** mitgeschrieben. Beim Laden gäbe es die Instanz nicht, und nur den
+  Methodennamen zu speichern wäre irreführend — er würde als freie Funktion
+  gedeutet. Formulare, die als `.dhform` überleben sollen (Form-Designer),
+  brauchen also weiterhin freie Handler-Funktionen.
 - Funktioniert für **Buttons** (Klick = Press+Release auf dem Knopf) und
   **Checkboxen** (bei jedem Toggle).
 - Die Callbacks werden **am Ende von `GUI_UPDATE()`** aufgerufen (nachdem alle
