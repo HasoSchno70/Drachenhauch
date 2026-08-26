@@ -1425,7 +1425,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Float(fbm3(x, y, z, oct)))
         }
         // --- Laufzeit-Typen ---
-        "typeof" => { arity!(1); Ok(Value::str_rc(a[0].type_name())) }
+        // TYPEOF liefert bei einer Instanz den KLASSENNAMEN, nicht das
+        // pauschale "OBJECT" -- sonst laesst sich einer polymorph gehaltenen
+        // Referenz nicht ansehen, was sie ist. Grossgeschrieben wie alle
+        // anderen Antworten von TYPEOF, damit ein Vergleich nicht davon
+        // abhaengt, wie die Klasse deklariert wurde.
+        "typeof" => {
+            arity!(1);
+            Ok(match &a[0] {
+                Value::Instance(rc) => Value::str_rc(&rc.borrow().class_name.to_uppercase()),
+                v => Value::str_rc(v.type_name()),
+            })
+        }
         "isnum" => { arity!(1); Ok(Value::Bool(is_num(&a[0]))) }
         "isint" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Int(_)))) }
         "isstr" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Str(_)))) }

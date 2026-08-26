@@ -1267,9 +1267,53 @@ impl Parser {
         self.comparison()
     }
 
+    /// Rechte Seite eines `IS`: ein TYPNAME, kein Ausdruck.
+    ///
+    /// Bewusst nicht `parse_type()` -- das wuerde `x IS ARRAY OF INTEGER`
+    /// zulassen, und ein Elementtyp laesst sich zur Laufzeit nicht sinnvoll
+    /// pruefen (ein leeres Array passt zu jedem). `ARRAY`/`MAP` ohne `OF`
+    /// sind erlaubt und fragen nur die Art.
+    fn is_typname(&mut self) -> R<String> {
+        let t = self.tt(0);
+        if let Some(name) = type_token(t) { self.pos += 1; return Ok(name.to_string()); }
+        match t {
+            Tt::Nil => { self.pos += 1; Ok("nil".into()) }
+            Tt::Array => { self.pos += 1; Ok("array".into()) }
+            Tt::Map => { self.pos += 1; Ok("map".into()) }
+            Tt::Ident => {
+                let v = sval(self.peek(0));
+                self.pos += 1;
+                // Qualifiziert wie bei DIM (`x IS mathe.Punkt`).
+                if self.tt(0) == Tt::Dot && self.tt(1) == Tt::Ident {
+                    self.pos += 1;
+                    let teil = sval(self.peek(0));
+                    self.pos += 1;
+                    return Ok(format!("{}.{}", v, teil));
+                }
+                Ok(v)
+            }
+            _ => self.err("IS: Erwartet einen Typnamen, z.B. `x IS Gegner` oder `x IS NIL`"),
+        }
+    }
+
     fn comparison(&mut self) -> R<Node> {
         let mut left = self.bitwise()?;
-        while self.checks(&[Tt::Eq, Tt::Neq, Tt::Lt, Tt::Gt, Tt::Leq, Tt::Geq, Tt::In]) {
+        // `IS` steht auf der Vergleichsebene. Im SELECT verschluckt
+        // `case_match` sein eigenes fuehrendes IS vorher, `CASE IS > 5`
+        // bleibt also unberuehrt.
+        while self.checks(&[Tt::Eq, Tt::Neq, Tt::Lt, Tt::Gt, Tt::Leq, Tt::Geq, Tt::In, Tt::Is]) {
+            if self.tt(0) == Tt::Is {
+                self.pos += 1;
+                // `x IS NOT Gegner` -- die gelaeufige BASIC-Schreibweise;
+                // gleichwertig zu `NOT (x IS Gegner)`.
+                let verneint = self.matches(Tt::Not);
+                let typ = self.is_typname()?;
+                left = Node::IsTyp { wert: Box::new(left), typ };
+                if verneint {
+                    left = Node::UnaryOp { op: "not".into(), operand: Box::new(left) };
+                }
+                continue;
+            }
             let op = match self.tt(0) {
                 Tt::Eq => "=", Tt::Neq => "<>", Tt::Lt => "<", Tt::Gt => ">",
                 Tt::Leq => "<=", Tt::Geq => ">=", Tt::In => "in", _ => unreachable!(),

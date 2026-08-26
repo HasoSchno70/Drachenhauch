@@ -1253,7 +1253,7 @@ NEXT
 
 | Funktion | Zweck |
 |---|---|
-| `TYPEOF(x)` → STRING | Laufzeit-Typname, z.B. `"INTEGER"`, `"STRING"`, `"VEC3"`, `"MAT4"`, `"OBJECT"` |
+| `TYPEOF(x)` → STRING | Laufzeit-Typname, z.B. `"INTEGER"`, `"STRING"`, `"VEC3"`, `"MAT4"`. Bei einer Instanz der **Klassenname** in Grossbuchstaben (`"HUND"`) |
 | `ISNUM(x)`, `ISINT(x)`, `ISSTR(x)`, `ISBOOL(x)` → BOOLEAN | Typ-Prädikate (Bool ist KEINE Zahl) |
 | `BASE64_ENCODE(s$)` → STRING | UTF-8-Text Base64-kodieren |
 | `BASE64_DECODE(s$)` → STRING | Base64 zu UTF-8-Text (wirft bei ungültiger Eingabe) |
@@ -1262,6 +1262,7 @@ NEXT
 
 ```basic
 PRINT TYPEOF(3.0)                       ' FLOAT
+PRINT TYPEOF(NEW Hund())                ' HUND -- nicht "OBJECT"
 PRINT ISINT(5), ISINT(3.0)              ' TRUE FALSE
 PRINT BASE64_ENCODE("Hi!")              ' "SGkh"
 PRINT BASE64_DECODE("SGkh")             ' "Hi!"

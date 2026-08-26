@@ -61,7 +61,8 @@ Dienste:
 | **Betriebssystem** | Dateien und Ordner, Umgebungsvariablen, `SHELL`, Exit-Codes, Argumente — ein `.dh`-Skript ist ein vollwertiges Kommandozeilen-Programm |
 | **Netz** | `HTTP_GET`/`POST` mit Kopfzeilen und JSON, TLS, dazu `SHA256$`, `HMAC_SHA256$` und `UUID4$` für angemeldete Dienste |
 | **Daten** | SQLite, CSV nach RFC 4180, ZIP, JSON, Regex, `BUFFER` für Binärdateien |
-| **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, `ASSERT_EQ` |
+| **Größere Programme** | Namensräume (`IMPORT "mathe.dh" AS mathe`), `PRIVATE`, `TRY`/`CATCH`/`FINALLY` mit Fehler-Codes, Vererbung mit `SUPER` und `ABSTRACT`, Typtest zur Laufzeit (`x IS Hund`, `TYPEOF`), `ASSERT_EQ` |
+| **Objekte als Rückrufe** | `obj.methode` ist eine `FUNCREF`, die ihre Instanz mitträgt — `GUI_ON_CLICK(knopf, spieler.klick)`, `TIMER_EVERY(500, gegner.zucken)`, `SORT(zahlen, regel.cmp)` |
 | **Nebenher** | HTTP, Datenbank, fremde Programme und **eigene Funktionen** im Hintergrund (`TASK_START`) — die Hauptschleife läuft weiter |
 
 Nichts davon braucht ein Fenster. Ein Drachenhauch-Programm kann eine

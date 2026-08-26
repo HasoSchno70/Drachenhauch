@@ -522,6 +522,16 @@ impl Compiler {
         is_value_type(t) || self.external_types.contains(t)
     }
 
+    /// Zulaessige rechte Seite eines `IS` (alles kleingeschrieben).
+    ///
+    /// Neben Klassen und DIM-Typen auch die drei Arten, die `TYPEOF`
+    /// liefern kann, ohne je ein DIM-Typname zu sein: `nil`, `array`, `map`.
+    fn is_typname_bekannt(&self, t: &str) -> bool {
+        self.classes.contains_key(t)
+            || self.is_known_value_type(t)
+            || matches!(t, "nil" | "array" | "map")
+    }
+
     /// Angesagten Typ einer globalen Variable merken (aus `collect_globals`).
     ///
     /// Zwei Deklarationen mit VERSCHIEDENEM Typ hinterlassen bewusst einen
@@ -885,6 +895,7 @@ impl Compiler {
                 }
                 _ => return None,
             },
+            Node::IsTyp { .. } => "boolean".to_string(),
             Node::BinaryOp { op, left, right } => match op.as_str() {
                 "=" | "<>" | "<" | ">" | "<=" | ">=" | "and" | "or" | "in" =>
                     "boolean".to_string(),
@@ -1889,6 +1900,17 @@ impl Compiler {
                 let t = self.ctx.here(); self.ctx.patch(jf, t);
                 self.expr(else_expr)?;
                 let e = self.ctx.here(); self.ctx.patch(jend, e);
+                Ok(())
+            }
+            Node::IsTyp { wert, typ } => {
+                let t = typ.to_lowercase();
+                if !self.is_typname_bekannt(&t) {
+                    return Err(unbekannter_is_typ_msg(typ));
+                }
+                self.expr(wert)?;
+                let c = self.ctx.add_const(json!(t));
+                self.ctx.emit(oc::LOAD_CONST, json!(c));
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__is_typ", 2]));
                 Ok(())
             }
             Node::SliceAccess { target, lo, hi } => {
@@ -3115,6 +3137,7 @@ fn body_has_yield(stmts: &[Node]) -> bool {
             Node::TernaryExpr { cond, then_expr, else_expr } =>
                 ny(cond) || ny(then_expr) || ny(else_expr),
             Node::MemberAccess { target, .. } => ny(target),
+            Node::IsTyp { wert, .. } => ny(wert),
             Node::SliceAccess { target, lo, hi } =>
                 ny(target) || lo.as_deref().map(ny).unwrap_or(false)
                 || hi.as_deref().map(ny).unwrap_or(false),
@@ -3253,6 +3276,20 @@ fn data_literal(lit: &Node) -> Result<CVal, String> {
 
 /// Bekannter skalarer Werttyp (= compiler._TYPE_DEFAULTS-Schluessel). Klassen
 /// und (kuenftig) externe Modul-Typen werden separat geprueft.
+/// Klartext-Fehler fuer `x IS Unbekannt`.
+///
+/// Ohne diese Pruefung waere ein Tippfehler (`x IS Gegnr`) still fuer immer
+/// FALSE -- ein Test, der nie zuschlaegt, faellt niemandem auf.
+fn unbekannter_is_typ_msg(typ: &str) -> String {
+    let mods = crate::preprocess::modules_for_type(&typ.to_lowercase());
+    if mods.is_empty() {
+        format!("IS: unbekannter Typ '{}' (keine Klasse, kein Werttyp)", typ)
+    } else {
+        let list = mods.iter().map(|m| format!("\"{}\"", m)).collect::<Vec<_>>().join(", ");
+        format!("IS: unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})", typ, list)
+    }
+}
+
 fn is_value_type(t: &str) -> bool {
     // `buffer` steht hier und ist bewusst KEIN Lexer-Keyword (wie
     // `sprite_atlas`): ein neues Schluesselwort wuerde `DIM buffer AS INTEGER`
@@ -3333,6 +3370,7 @@ fn node_name(n: &Node) -> &'static str {
         Node::Restore => "Restore", Node::EnumDecl { .. } => "EnumDecl",
         Node::Input { .. } => "Input", Node::New { .. } => "New",
         Node::SliceAccess { .. } => "SliceAccess", Node::Yield(_) => "Yield",
+        Node::IsTyp { .. } => "IsTyp",
         Node::TernaryExpr { .. } => "TernaryExpr", Node::Return(_) => "Return",
         _ => "?",
     }

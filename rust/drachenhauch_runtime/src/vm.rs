@@ -1095,6 +1095,41 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// `wert IS Typname` (der Compiler emittiert `__is_typ(wert, "name")`).
+    ///
+    /// Gehoert hierher und nicht nach `builtins.rs`, weil die Vererbungskette
+    /// nur die VM kennt.
+    fn try_typtest(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if name != "__is_typ" { return Ok(None); }
+        let gesucht = match a.get(1) {
+            Some(Value::Str(s)) => s.to_string(),
+            _ => return Err("IS: interner Fehler -- Typname fehlt".into()),
+        };
+        let wert = a.first().unwrap_or(&Value::Nil);
+        // Eine Klasse schlaegt den Werttyp-Vergleich: `x IS Gegner` fragt nach
+        // der Vererbungskette, nicht nach dem pauschalen "OBJECT".
+        if self.prog.classes.contains_key(&gesucht) {
+            let treffer = match wert {
+                Value::Instance(rc) => {
+                    let mut cur: Option<String> = Some(rc.borrow().class_name.to_string());
+                    let mut ja = false;
+                    while let Some(c) = cur {
+                        if c == gesucht { ja = true; break; }
+                        cur = match self.prog.classes.get(c.as_str()) {
+                            Some(ci) if !ci.parent_name.is_empty() => Some(ci.parent_name.to_string()),
+                            _ => None,
+                        };
+                    }
+                    ja
+                }
+                _ => false,
+            };
+            return Ok(Some(Value::Bool(treffer)));
+        }
+        // Sonst der Werttyp -- deckt `x IS INTEGER`, `x IS NIL`, `x IS VEC2` ab.
+        Ok(Some(Value::Bool(wert.type_name().eq_ignore_ascii_case(&gesucht))))
+    }
+
     // ------------------------------------------------------- Rueckrufe
     /// Einen gespeicherten Rueckruf auf die auszufuehrende Funktion und den
     /// Empfaenger abbilden.
@@ -2279,7 +2314,8 @@ impl<'p> Vm<'p> {
                     }
                     let v = {
                         let bargs: &[Value] = &stack[split..];
-                        if let Some(v) = self.try_array_hof(name, bargs)? { v }
+                        if let Some(v) = self.try_typtest(name, bargs)? { v }
+                        else if let Some(v) = self.try_array_hof(name, bargs)? { v }
                         else if let Some(v) = self.try_scene(name, bargs)? { v }
                         else if let Some(v) = self.try_coro(name, bargs)? { v }
                         else if let Some(v) = self.try_timer(name, bargs)? { v }

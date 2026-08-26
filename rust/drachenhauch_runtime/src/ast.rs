@@ -101,6 +101,13 @@ pub enum Node {
     MemberAccess { target: Box<Node>, name: String },
     IndexAccess { target: Box<Node>, indices: Vec<Node> },
     SliceAccess { target: Box<Node>, lo: Option<Box<Node>>, hi: Option<Box<Node>> },
+    /// `wert IS Typname` -- Laufzeit-Typtest, liefert BOOLEAN.
+    ///
+    /// Der Typname ist ein eigenes Feld und KEIN Ausdruck: er benennt eine
+    /// Klasse oder einen Werttyp, keine Variable. Das ist zugleich der Grund
+    /// fuer den eigenen Knoten -- so kann `namensraum.rs` ihn wie jeden
+    /// anderen Typnamen umschreiben (`x IS mathe.Punkt`).
+    IsTyp { wert: Box<Node>, typ: String },
 
     // --- Anweisungen ---
     Dim { name: String, type_name: String, array_dims: Option<Vec<Node>> },
@@ -212,6 +219,8 @@ impl Node {
                 ("target", target.to_json()), ("indices", vecj(indices))]),
             SliceAccess { target, lo, hi } => obj("SliceAccess", vec![
                 ("target", target.to_json()), ("lo", bopt(lo)), ("hi", bopt(hi))]),
+            IsTyp { wert, typ } => obj("IsTyp", vec![
+                ("wert", wert.to_json()), ("typ", json!(typ))]),
 
             Dim { name, type_name, array_dims } => obj("Dim", vec![
                 ("name", json!(name)), ("type_name", json!(type_name)),

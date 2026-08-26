@@ -309,8 +309,9 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
 - **`run_gb`/`run_vm`/`run_native`/`run_all`-Fixtures** sind alle Aliase auf
   `dhrt run` (conftest); `run_gb(src, base=tmp_path)` legt die .dh in ein
   Verzeichnis, damit relative Fixture-Pfade (TILED_LOAD etc.) gefunden werden.
-- **`IS NIL`/`IS NOT NIL` gibt es NICHT** als Parser-Konstrukt (Doku-Altlast) —
-  nil-Check via `IS_NIL(x)`-Builtin.
+- **`IS NIL`/`IS NOT NIL` gibt es seit 2026-08-26** (vorher stand hier, es gebe
+  sie nicht) — zusammen mit dem allgemeinen Typtest `x IS Typname`, siehe
+  Abschnitt „Laufzeit-Typtest". `IS_NIL(x)` bleibt gleichwertig.
 - **Qt-Tests: nie ungebremst `app.processEvents()` aufrufen.** Die Qt-Testdateien
   lassen ihre Fenster stehen; in EINEM gemeinsamen `pytest tests/`-Prozess
   sammeln sich so tausende QObjects mit hunderten scharfen Timern (u.a.
@@ -451,6 +452,33 @@ interpreter.py / vm.py / vm_native.pyx.
 ein neues VEC2.
 
 **Beispiel:** [examples/58_vec2.dh](examples/58_vec2.dh).
+
+## Laufzeit-Typtest: `IS` + `TYPEOF`
+
+`TYPEOF` liefert bei einer Instanz den **Klassennamen** (gross), nicht mehr
+das pauschale `"OBJECT"`; `x IS Typname` prueft samt Vererbungskette:
+
+```basic
+DIM t AS Tier
+t = NEW Hund()
+PRINT TYPEOF(t)      ' "HUND"
+PRINT t IS Hund      ' TRUE
+PRINT t IS Tier      ' TRUE   -- jede Elternklasse trifft
+PRINT t IS NOT NIL   ' TRUE
+```
+
+- Rechts von `IS` steht ein **Typname, kein Ausdruck**: Klasse, Werttyp,
+  Modultyp, `NIL`, `ARRAY`, `MAP`. Ein unbekannter Name ist ein
+  **Uebersetzungsfehler** -- ein Tippfehler waere sonst still fuer immer FALSE.
+- `NIL` ist keine Instanz: `t IS Tier` ist FALSE, solange `t` NIL ist.
+- **`CASE IS > 5` bleibt unberuehrt** -- dort verschluckt `case_match` sein
+  eigenes fuehrendes `IS`, bevor die Vergleichsebene ueberhaupt drankommt.
+- Umsetzung: eigener AST-Knoten `IsTyp { wert, typ }` (parser.rs) -- der
+  Typname liegt in einem EIGENEN FELD, damit `namensraum.rs` ihn wie jeden
+  anderen Typnamen umschreiben kann (`x IS mathe.Punkt`). Der Compiler prueft
+  den Namen und emittiert `__is_typ(wert, "name")`; die Vererbungskette laeuft
+  `Vm::try_typtest` (vm.rs) ab -- die kennt nur die VM, darum nicht in
+  builtins.rs. Kein neuer Opcode. Tests: `tests/test_typtest.py`.
 
 ## Function References (FUNCREF)
 

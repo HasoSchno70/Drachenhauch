@@ -120,14 +120,46 @@ Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibwe
 
 **Strikte Typisierung:** Eine FLOAT-Variable nimmt keine STRINGs an. Ein FLOAT-zu-INTEGER-Cast verlangt eine ganzzahlige Zahl (`3.0` ja, `3.14` Fehler — nutze dann `INT()`).
 
-**`NIL`:** Klassenreferenzen, Bilder, Sounds und externe Handles sind initial `NIL`. Der nil-Check läuft über das Builtin **`IS_NIL(x)`** (es gibt KEIN `IS NIL`/`IS NOT NIL`-Sprachkonstrukt):
+**`NIL`:** Klassenreferenzen, Bilder, Sounds und externe Handles sind initial `NIL`. Geprüft wird mit `x IS NIL` / `x IS NOT NIL` oder dem gleichwertigen Builtin `IS_NIL(x)`:
 
 ```basic
 DIM bild AS IMAGE
-IF IS_NIL(bild) THEN
+IF bild IS NIL THEN
     bild = LOADIMAGE("hero.png")
 END IF
 ```
+
+## Typtest zur Laufzeit: `IS` und `TYPEOF`
+
+Eine polymorph gehaltene Referenz verrät von sich aus nicht, was in ihr steckt.
+Zwei Wege fragen danach:
+
+```basic
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+t = NEW Hund()
+
+PRINT t IS Hund          ' TRUE
+PRINT t IS Tier          ' TRUE  -- auch jede Elternklasse trifft
+PRINT t IS NOT Tier      ' FALSE -- gleichwertig zu NOT (t IS Tier)
+PRINT TYPEOF(t)          ' "HUND" -- der Klassenname, gross geschrieben
+```
+
+Rechts von `IS` steht ein **Typname**, kein Ausdruck: eine Klasse, ein
+Werttyp (`INTEGER`, `STRING`, …), ein Modultyp (`VEC2`), `NIL`, `ARRAY` oder
+`MAP`. Ein unbekannter Name ist ein **Übersetzungsfehler** — ein Tippfehler
+wäre sonst still für immer `FALSE`, und ein Test, der nie zuschlägt, fällt
+niemandem auf.
+
+`NIL` ist keine Instanz: eine noch nicht belegte `Tier`-Variable ergibt bei
+`t IS Tier` `FALSE` und bei `t IS NIL` `TRUE`.
+
+`SELECT CASE`-Vergleiche (`CASE IS > 5`) sind davon unberührt — dort gehört
+das `IS` zum `CASE`.
 
 ## Was der Übersetzer prüft
 
