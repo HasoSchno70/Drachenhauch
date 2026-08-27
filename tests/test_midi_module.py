@@ -38,12 +38,21 @@ _DHRT = _dhrt()
 
 
 def _hat_midi() -> bool:
-    """Ist das `midi`-Feature in DIESEM Bau drin? Der Bau sagt es selbst."""
+    """Ist das `midi`-Feature in DIESEM Bau drin? Der Bau sagt es selbst.
+
+    NUR die `dabei:`-Zeile lesen. `dhrt --version` nennt darunter auch eine
+    `fehlt:`-Zeile mit denselben Namen -- ein blosses `"midi" in stdout` ist
+    deshalb IMMER wahr und hat genau diesen Test in der Windows-CI
+    fehlschlagen lassen (dort wird ohne --hardware gebaut).
+    """
     if _DHRT is None:
         return False
     r = subprocess.run([str(_DHRT), "--version"], capture_output=True, text=True,
                        encoding="utf-8", timeout=30)
-    return "midi" in (r.stdout or "")
+    for zeile in (r.stdout or "").splitlines():
+        if zeile.startswith("dabei:"):
+            return "midi" in [t.strip() for t in zeile[len("dabei:"):].split(",")]
+    return False
 
 
 # ------------------------------------------------------- Verdrahtung
