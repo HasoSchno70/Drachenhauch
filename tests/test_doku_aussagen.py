@@ -12,7 +12,11 @@ genau die haelt dieser Test ab jetzt fest.
 from __future__ import annotations
 
 import importlib.util
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 WURZEL = Path(__file__).resolve().parents[1]
 
@@ -41,6 +45,49 @@ def test_zaehlungen_stimmen():
     funde = m.zaehlungen()
     assert not funde, "\n".join(
         f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+
+
+def test_beispiel_zaehlung_kommt_aus_der_versionsverwaltung(tmp_path):
+    """Gegen die Zaehlung darf kein Fremdkoerper im Arbeitsverzeichnis stehen.
+
+    Die Zahl kam frueher aus `examples.glob("*.dh")` -- und genau darin lag
+    ein sporadischer Fehlschlag (2026-08-27, etwa jeder fuenfte parallele
+    Lauf, beim Wiederholen gruen). Ursache ist keine Test-Datei: die
+    Live-Diagnose des Editors legt ihre Temp-Datei NEBEN die gepruefte
+    Quelle (`editor_qt/error_check.py:_check_via_dhrt`, ebenso Debugger,
+    Profiler und LSP) -- sie muss dort liegen, damit `IMPORT "x.dh"` und
+    relative Asset-Pfade aufloesen. Wer waehrend des Testlaufs ein Beispiel
+    im Editor offen hat, dem blinkt fuer ~40 ms ein `examples/tmpXXXX.dh`
+    ins Verzeichnis; faellt der glob hinein, meldet der Pruefer
+    "sagt 195, tatsaechlich 196".
+
+    Nachgestellt wird das hier in einem EIGENEN Wegwerf-Repo -- eine
+    Streudatei im echten `examples/` wuerde parallel laufenden Sweeps
+    (`test_rust_lexer_parity`, `test_dhrt_check`) genau denselben Streich
+    spielen.
+    """
+    m = _pruefer()
+    if shutil.which("git") is None:
+        pytest.skip("git nicht installiert -- dann zaehlt die Rueckfallebene")
+
+    def git(*args):
+        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+    repo = tmp_path / "repo"
+    (repo / "examples").mkdir(parents=True)
+    (repo / "examples" / "01_hallo.dh").write_text("PRINT 1\n", encoding="utf-8")
+    (repo / "examples" / "02_welt.dh").write_text("PRINT 2\n", encoding="utf-8")
+    git("init")
+    git("config", "user.email", "t@t.de")
+    git("config", "user.name", "Tester")
+    git("add", "examples")
+    git("-c", "commit.gpgsign=false", "commit", "-m", "zwei Beispiele")
+
+    assert m.beispiele(repo) == (2, "versioniert")
+    # Der Fremdkoerper aus der Live-Diagnose -- unversioniert, also unsichtbar.
+    (repo / "examples" / "tmp9k3x.dh").write_text("PRINT 1\n", encoding="utf-8")
+    assert m.beispiele(repo) == (2, "versioniert")
+    assert len(list((repo / "examples").glob("*.dh"))) == 3   # der glob saehe ihn
 
 
 def test_geduldete_namen_sind_begruendet():

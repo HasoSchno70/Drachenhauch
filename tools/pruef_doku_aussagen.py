@@ -64,6 +64,7 @@ WIE MAN VON HAND SUCHT (aus fuenf Durchgaengen)
 """
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -138,18 +139,56 @@ def pruefe_namen(ordner: Path, nur: set[str] | None = None) -> list:
     return funde
 
 
-def beispiele() -> list:
-    """Die .dh-Dateien in `examples/` -- ohne Temp-Reste der IDE.
+def versionierte_beispiele(wurzel: Path) -> "list[str] | None":
+    """Die Beispiel-Programme laut Versionsverwaltung -- oder None ohne git."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(wurzel), "ls-files", "-z", "--", "examples/*.dh"],
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None                      # kein git im PATH
+    if r.returncode != 0:
+        return None                      # kein Repo (z.B. ausgepacktes Archiv)
+    # Git laesst `*` in einer Pfadangabe AUCH ueber `/` laufen: `examples/*.dh`
+    # faengt `examples/21_modules/main.dh` mit. Gemeint ist nur die obere Ebene.
+    pfade = [x for x in r.stdout.split(chr(0))
+             if x.endswith(".dh") and x.count("/") == 1]
+    return pfade or None
 
-    Fehlerpruefung, Debugger und Profiler legen ihre Arbeitsdatei NEBEN die
-    Quelle (sonst loest `IMPORT "helfer.dh"` nicht auf). Bricht so ein Lauf
-    ab, bleibt sie liegen -- und kippte bisher jede Zaehlung ueber
-    `examples/`. Seit sie ein erkennbares Praefix traegt, laesst sie sich
-    ueberspringen.
+
+def beispiele(wurzel: Path = WURZEL) -> "tuple[int, str]":
+    """Anzahl der Beispiel-Programme -- und woher gezaehlt wurde.
+
+    Gezaehlt wird die VERSIONSVERWALTUNG, nicht das Arbeitsverzeichnis. Der
+    Grund ist gemessen: die Live-Diagnose des Editors legt ihre Temp-Datei
+    NEBEN die gepruefte Quelle (`editor_qt/error_check.py`, genauso Debugger,
+    Profiler und der LSP) -- sie MUSS dort liegen, sonst loesen `IMPORT
+    "x.dh"` und relative Asset-Pfade nicht auf. Wer ein Beispiel im Editor
+    offen hat, dem blinkt bei jeder Pruefung ein `examples/tmpXXXX.dh` fuer
+    etwa 40 ms ins Verzeichnis. Faellt ein `glob("*.dh")` genau dahinein,
+    meldet dieser Pruefer "sagt 195, tatsaechlich 196" und ist beim naechsten
+    Lauf wieder still -- so ist `test_zaehlungen_stimmen` am 2026-08-27
+    sporadisch umgefallen (nachgestellt, nicht vermutet).
+
+    Der Index ist ausserdem die inhaltlich richtige Quelle: die Aussage im
+    README meint, was der Installer ausliefert -- und ausgeliefert wird, was
+    versioniert ist, nicht was gerade im Arbeitsverzeichnis herumliegt. Ein
+    neues Beispiel zaehlt also ab `git add`, nicht ab dem Anlegen.
+
+    OHNE git (Quell-Archiv ohne `.git`, git nicht im PATH) bleibt das
+    Arbeitsverzeichnis als Rueckfallebene -- dort werden die Temp-Reste ueber
+    ihr Praefix uebersprungen. Das ist die schwaechere Absicherung: sie
+    kennt nur die Streudateien, die ein erkennbares Praefix tragen, waehrend
+    der Index gegen JEDE unversionierte Datei hilft. Deshalb ist sie der
+    Rueckfall und nicht der Normalweg.
     """
+    versioniert = versionierte_beispiele(wurzel)
+    if versioniert is not None:
+        return len(versioniert), "versioniert"
     from drachenhauch.editor_qt.tempdateien import PRAEFIX
-    return [p for p in (WURZEL / "examples").glob("*.dh")
-            if not p.name.startswith(PRAEFIX)]
+    uebrig = [x for x in (wurzel / "examples").glob("*.dh")
+              if not x.name.startswith(PRAEFIX)]
+    return len(uebrig), "Arbeitsverzeichnis, kein git"
 
 
 def zaehlungen() -> list:
@@ -158,13 +197,13 @@ def zaehlungen() -> list:
     text = readme.read_text(encoding="utf-8")
     funde = []
 
-    ist_beispiele = len(beispiele())
+    ist_beispiele, woher = beispiele()
     quelle = (WURZEL / "rust" / "drachenhauch_runtime" / "src" / "preprocess.rs").read_text(encoding="utf-8")
     m = re.search(r"const MODULES[^=]*=\s*&\[(.*?)\];", quelle, re.S)
     ist_module = len(re.findall(r'"([a-z_0-9]+)"', m.group(1))) if m else 0
 
     for muster, ist, was in (
-        (r"alle (\d+) Beispiele", ist_beispiele, "Beispiele in examples/"),
+        (r"alle (\d+) Beispiele", ist_beispiele, f"Beispiele in examples/ ({woher})"),
         (r"\*\*Module\*\* — (\d+) Stück", ist_module, "Module in preprocess.rs MODULES"),
         (r"^(\d+) Module, per `IMPORT", ist_module, "Module in preprocess.rs MODULES"),
     ):
