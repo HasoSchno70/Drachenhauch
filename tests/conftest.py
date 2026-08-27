@@ -176,6 +176,7 @@ _BRAUCHT_GRAFIK = {
     "test_buch_tippspiel.py",
     "test_circuitrunner.py",
     "test_examples.py",
+    "test_gebundene_methoden_gui.py",
     "test_gfx_push_pop.py",
     "test_gui_form_runner.py",
     "test_gui_table_frozen_edge.py",
