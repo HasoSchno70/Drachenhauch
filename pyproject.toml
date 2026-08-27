@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "drachenhauch"
-version = "2026.8"
+version = "2026.9"
 description = "Drachenhauch - eine BASIC-artige Sprache fuer die Spieleentwicklung"
 # 3.12 ist das, was tatsaechlich geprueft wird: CI faehrt nur diese Version,
 # der Windows-Installer buendelt sie, mypy prueft gegen sie. Vorher stand hier
