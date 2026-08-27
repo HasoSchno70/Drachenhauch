@@ -189,6 +189,7 @@ _BRAUCHT_GRAFIK = {
     "test_modules_audio.py",
     "test_picking_geometry.py",
     "test_runtime_font_delta.py",
+    "test_scissor.py",
     "test_shader_uniforms_geometry.py",
     "test_triangle_winding.py",
     "test_window_and_compress.py",

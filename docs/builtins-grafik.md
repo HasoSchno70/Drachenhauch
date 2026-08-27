@@ -227,6 +227,36 @@ NEXT
 BLEND_MODE("alpha")          ' zurück zum Normal-Modus
 ```
 
+## Clip-Rechteck (Scissor)
+
+| Funktion | Wirkung |
+|---|---|
+| `SCISSOR(x, y, breite, hoehe)` | Folgende Draws werden auf dieses Rechteck beschnitten |
+| `SCISSOR_END()` | Die oberste Beschränkung zurücknehmen |
+| `SCISSOR_DEPTH()` → INTEGER | Wie viele Clips gerade offen sind |
+
+Das ist ein **Stapel**: ein inneres `SCISSOR` wird mit dem äußeren
+*geschnitten*, es ersetzt es nicht. Die Koordinaten sind Welt-Koordinaten
+und folgen der Kamera wie jeder andere Draw.
+
+```basic
+' Eine scrollbare Liste: nur der Ausschnitt ist zu sehen
+SCISSOR(20, 40, 200, 120)
+FOR i = 0 TO 30
+    TEXT(24, 44 + i * 20 - versatz, "Zeile " + STR$(i))
+NEXT
+SCISSOR_END()
+```
+
+Ein `SCISSOR_END()` ohne offenes `SCISSOR` ist ein **Fehler** — es nähme
+sonst dem umgebenden Code (etwa einem `gui`-Fenster) seine Beschränkung weg,
+und das fiele erst als Zeichnen über den Rand hinaus auf. Ein vergessenes
+`SCISSOR_END()` wirkt dagegen nur bis zum Bildende.
+
+Ohne diesen Befehl blieb für einen begrenzten Zeichenbereich nur der Umweg
+über ein Render-Target (`RENDERTARGET_NEW`/`BEGIN`/`END`/`DRAW`) — also eine
+zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
+
 ## Schrift
 
 | Funktion | Wirkung |

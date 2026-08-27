@@ -5981,6 +5981,27 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "gfx_depth" => Value::Int(g!().gfx_depth()),
+            // --- Clip-Rechteck (Scissor) ---
+            // Die Mechanik lag laengst da (das gui-Modul clippt seine Fenster
+            // damit); herausgefuehrt war sie nie. Es ist ein STAPEL: ein
+            // inneres SCISSOR schneidet mit dem aeusseren, SCISSOR_END nimmt
+            // nur die oberste Ebene zurueck.
+            "scissor" => {
+                let (x, y) = (gi(a, 0, "SCISSOR")?, gi(a, 1, "SCISSOR")?);
+                let (w, h) = (gi(a, 2, "SCISSOR")?, gi(a, 3, "SCISSOR")?);
+                if w < 0 || h < 0 {
+                    return Err("SCISSOR: Breite und Hoehe duerfen nicht negativ sein".into());
+                }
+                g!().push_clip(x as i32, y as i32, w as i32, h as i32);
+                Value::Nil
+            }
+            "scissor_end" => {
+                if !g!().pop_clip() {
+                    return Err("SCISSOR_END: es ist kein Clip offen -- zu jedem SCISSOR_END gehoert ein SCISSOR".into());
+                }
+                Value::Nil
+            }
+            "scissor_depth" => Value::Int(g!().clip_depth()),
             // Dasselbe fuer die Audio-Busse: Effekte, die eine Szene anhaengt,
             // sollen den Rest des Programms nicht mitnehmen.
             "audio_push" => { self.audio_mut()?.audio_push(); Value::Nil }

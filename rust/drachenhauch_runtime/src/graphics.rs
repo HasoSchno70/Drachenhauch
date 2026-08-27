@@ -1058,6 +1058,10 @@ pub struct Graphics {
     post_shader_idx: Option<usize>,
     /// Stapel fuer GFX_PUSH/GFX_POP.
     gfx_stack: Vec<GfxState>,
+    /// Wie viele Clip-Rechtecke gerade offen sind. Wird pro Bild
+    /// zurueckgesetzt -- der Abspieler raeumt unbalancierte Clips ohnehin
+    /// am Bildende weg, der Zaehler muss ihm darin folgen.
+    clip_tiefe: u32,
     scene_rt: Option<RenderTexture2D>,
 }
 
@@ -1211,7 +1215,7 @@ impl Graphics {
             rl, thread, width, height, scale,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
-            post_shader_idx: None, gfx_stack: Vec::new(), scene_rt,
+            post_shader_idx: None, gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -4339,9 +4343,21 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     pub fn push_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
         let (x, y) = self.w2s(x, y);
         let (w, h) = (self.ssize(w), self.ssize(h));
+        self.clip_tiefe += 1;
         self.emit(Cmd::ScissorPush(x, y, w, h));
     }
-    pub fn pop_clip(&mut self) { self.emit(Cmd::ScissorPop); }
+    /// `false`, wenn gar kein Clip offen ist -- der Aufrufer meldet das.
+    /// Ohne diese Pruefung naehme ein zu viel gesetztes SCISSOR_END dem
+    /// umgebenden Code (z.B. einem `gui`-Fenster) seinen Clip weg, und der
+    /// Fehler zeigte sich erst als Zeichnen ueber den Rand hinaus.
+    pub fn pop_clip(&mut self) -> bool {
+        if self.clip_tiefe == 0 { return false; }
+        self.clip_tiefe -= 1;
+        self.emit(Cmd::ScissorPop);
+        true
+    }
+    /// Wie viele Clips gerade offen sind (fuer SCISSOR_DEPTH).
+    pub fn clip_depth(&self) -> i64 { self.clip_tiefe as i64 }
 
     // --- Shader / Post-Processing ---
     /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
@@ -4694,6 +4710,10 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
+        // Der Abspieler schliesst offen gebliebene Clips am Bildende; der
+        // Zaehler muss ihm folgen, sonst schleppte ein vergessenes SCISSOR
+        // seine Tiefe ins naechste Bild und SCISSOR_END traefe dort ins Leere.
+        self.clip_tiefe = 0;
         // Review-Fund: CLAUDE.md/docs dokumentieren "LAYER_END() -- zurueck
         // zum Main-Buffer (optional, FLIP macht's auch)" -- das stimmte
         // bisher nicht: weder `active` (aktive Layer) noch `active_rt`

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1527,
+ "count": 1530,
  "builtins": [
   {
    "name": "ABS",
@@ -6913,6 +6913,24 @@
    "kind": "core",
    "signature": "SCENE_SWITCH(name: STRING)",
    "module": "scene"
+  },
+  {
+   "name": "SCISSOR",
+   "kind": "graphics",
+   "signature": "SCISSOR(x: INTEGER, y: INTEGER, breite: INTEGER, hoehe: INTEGER)",
+   "module": "dhrt"
+  },
+  {
+   "name": "SCISSOR_DEPTH",
+   "kind": "graphics",
+   "signature": "SCISSOR_DEPTH() AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "SCISSOR_END",
+   "kind": "graphics",
+   "signature": "SCISSOR_END()",
+   "module": "dhrt"
   },
   {
    "name": "SCREEN",
