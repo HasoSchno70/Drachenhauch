@@ -121,16 +121,23 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 ### Phase 5 — Auslieferung
 
-- [ ] `installer/GameBasic.iss` → `Drachenhauch.iss`, Anzeigenamen, Startmenü
-- [ ] **`AppId` NICHT ändern.** Sie bleibt die Identität der Installation; mit
+> **Erledigt.** Der Installer heisst `Drachenhauch.iss`, die `AppId` ist
+> unveraendert geblieben, der alte Beispielordner wird in `[InstallDelete]`
+> entfernt, und ausgeliefert wurde unter dem neuen Namen ab `v2026.2`.
+> Die Haken standen nur so lange offen, weil sie niemand nachgetragen hat --
+> inzwischen sind sieben weitere Fassungen darueber hinweggegangen
+> (Stand: `v2026.9`).
+
+- [x] `installer/GameBasic.iss` → `Drachenhauch.iss`, Anzeigenamen, Startmenü
+- [x] **`AppId` NICHT ändern.** Sie bleibt die Identität der Installation; mit
       derselben Id ersetzt der neue Installer die alte Fassung sauber, statt
       zwei Einträge in „Programme entfernen" zu hinterlassen.
-- [ ] **Alten Beispielordner aktiv entfernen.** Wir haben am 2026-08-09 gelernt:
+- [x] **Alten Beispielordner aktiv entfernen.** Wir haben am 2026-08-09 gelernt:
       `uninsneveruninstall` lässt einen umbenannten Ordner für immer liegen. Der
       Juni-Installer hinterließ so `%PUBLIC%\Documents\GameBasic\Beispiele` —
       225 verwaiste Dateien. Also im `[InstallDelete]`-Abschnitt aufräumen.
-- [ ] Neuer Bau, Installation geprüft, Beispiel gestartet
-- [ ] Release `v2026.2` unter dem neuen Namen
+- [x] Neuer Bau, Installation geprüft, Beispiel gestartet
+- [x] Release `v2026.2` unter dem neuen Namen
 
 ---
 

@@ -244,6 +244,19 @@ PRINT Http.UNAUTHORIZED   ' 401
 PRINT Http.NOT_FOUND      ' 404
 ```
 
+**Vom Wert zurück zum Namen** — für Fehlersuche und Speicherstände:
+
+```basic
+ENUM Zustand = MENUE, SPIELT, PAUSE
+PRINT ENUM_NAME(Zustand, 1)        ' "SPIELT"
+PRINT ENUM_NAME(Zustand, 99)       ' "" -- kein Member hat diesen Wert
+```
+
+Der Name kommt in Großbuchstaben zurück (wie bei `TYPEOF`), damit ein
+Vergleich nicht davon abhängt, wie der Member hingeschrieben wurde. Ohne
+Treffer ein leerer String: ein gespeicherter Wert aus einer älteren
+Fassung ist der Normalfall, nicht der Ausnahmefall.
+
 **`DIM x AS State`** ist äquivalent zu `DIM x AS INTEGER` — der Parser löst Enum-Typen zu `INTEGER` auf:
 
 ```basic
@@ -285,6 +298,23 @@ Funktioniert auch auf Array-Elementen und Klassen-Feldern:
 xs[0] += 100
 self.health -= damage
 ```
+
+Für den häufigsten Fall — plus/minus eins — gibt es die Kurzform `++` und
+`--`:
+
+```basic
+i++            ' = i += 1
+i--            ' = i -= 1
+p.treffer++
+zaehler[3]++
+```
+
+Beides ist **nur eine Anweisung, kein Ausdruck**: `j = i++` gibt es nicht.
+Der Unterschied zwischen Präfix- und Postfix-Form ist die häufigste
+Fehlerquelle an diesem Operator — wer keinen Wert liefert, hat sie nicht.
+Und weil `++` kein eigenes Zeichen ist, sondern nur an der
+Anweisungs-Position erkannt wird, bleiben Ausdrücke wie `5 - -3`
+unverändert gültig.
 
 ## String-Interpolation (f-Strings)
 

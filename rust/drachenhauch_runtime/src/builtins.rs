@@ -1437,6 +1437,34 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 v => Value::str_rc(v.type_name()),
             })
         }
+        // ENUM_NAME(Enum, wert) -- der Weg zurueck vom Zahlenwert zum Namen.
+        // Wofuer: Fehlersuche und Speicherstaende. `PRINT zustand` zeigte
+        // bisher nur `2`, und wer den Wert in eine Datei schrieb, konnte ihn
+        // beim Lesen nicht wieder benennen.
+        //
+        // Kein Treffer -> leerer String. Das ist ein Nachschlagen, und ein
+        // Nachschlagen darf danebengehen (wie MAPGETOR); ein gespeicherter
+        // Wert aus einer aelteren Fassung ist der Normalfall, nicht der
+        // Ausnahmefall. Bei mehreren Namen mit demselben Wert gewinnt der
+        // alphabetisch erste -- damit die Antwort wenigstens stabil ist.
+        "enum_name" => {
+            arity!(2);
+            let ns = match &a[0] {
+                Value::Namespace(n) => n.clone(),
+                v => return err(format!(
+                    "ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen {}", v.type_name())),
+            };
+            let gesucht = match &a[1] {
+                Value::Int(i) => *i,
+                v => return err(format!(
+                    "ENUM_NAME: erwartet INTEGER als Wert, bekommen {}", v.type_name())),
+            };
+            let mut treffer: Vec<&String> = ns.members.iter()
+                .filter(|(_, v)| matches!(v, Value::Int(i) if *i == gesucht))
+                .map(|(k, _)| k).collect();
+            treffer.sort();
+            Ok(Value::str_rc(&treffer.first().map(|k| k.to_uppercase()).unwrap_or_default()))
+        }
         "isnum" => { arity!(1); Ok(Value::Bool(is_num(&a[0]))) }
         "isint" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Int(_)))) }
         "isstr" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Str(_)))) }

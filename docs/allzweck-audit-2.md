@@ -387,6 +387,13 @@ gebaut:
 Kein Punkt hier ist ein Mangel; alle drei sind Abwägungen, die man einmal
 bewusst treffen und aufschreiben sollte.
 
+- **Kein `INTERFACE`. Entschieden 2026-08-27: bleibt so.** `ABSTRACT`-Methoden
+  decken den Zweck ab (eine Klasse kündigt an, die Erben füllen aus), und seit
+  `x IS Typname` lässt sich zur Laufzeit auch danach fragen. Was ein Interface
+  zusätzlich könnte, ist *mehrere* Verträge an einer Klasse — dafür bräuchte
+  Drachenhauch Mehrfachvererbung oder ein zweites Typsystem daneben. Das ist
+  keine Bequemlichkeit mehr, sondern eine Grundsatzentscheidung, und für einen
+  BASIC-Dialekt die falsche.
 - **Keine anonymen Funktionen, keine Closures, keine verschachtelten
   Funktionen.** `FUNCREF` verlangt eine benannte Funktion, und ihr Rumpf sieht
   nur Parameter und Globals. Das passt zu BASIC und bleibt so.

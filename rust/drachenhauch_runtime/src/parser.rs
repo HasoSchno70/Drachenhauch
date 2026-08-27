@@ -262,7 +262,20 @@ impl Parser {
             }
             break;
         }
-        is_assign_op(self.tt(i))
+        is_assign_op(self.tt(i)) || self.ist_schritt_op(i)
+    }
+
+    /// Steht an Position `i` ein `++` bzw. `--`, das eine Anweisung
+    /// abschliesst?
+    ///
+    /// BEWUSST kein Lexer-Token: `a + +b` und `a - -b` sind gueltige
+    /// Ausdruecke, und ein `++`-Token wuerde sie umdeuten. Hier wird nur die
+    /// ANWEISUNGS-Position betrachtet, und dort muss direkt danach das
+    /// Zeilenende kommen -- `i++` also, nicht `x = a ++ b`.
+    fn ist_schritt_op(&self, i: usize) -> bool {
+        let doppelt = (self.tt(i) == Tt::Plus && self.tt(i + 1) == Tt::Plus)
+            || (self.tt(i) == Tt::Minus && self.tt(i + 1) == Tt::Minus);
+        doppelt && matches!(self.tt(i + 2), Tt::Newline | Tt::Colon | Tt::Eof)
     }
 
     fn tuple_assign(&mut self) -> R<Node> {
@@ -620,6 +633,26 @@ impl Parser {
                 self.expect(Tt::Rbracket, "Erwartet ']'")?;
                 target = Node::IndexAccess { target: Box::new(target), indices };
             } else { break; }
+        }
+        // `i++` / `i--` -- eine Anweisung, kein Ausdruck. Der Unterschied
+        // zwischen Prae- und Postfix ist die haeufigste Fehlerquelle an
+        // diesem Operator; wer keinen Wert liefert, hat sie nicht.
+        if self.ist_schritt_op(0) {
+            let op = if self.tt(0) == Tt::Plus { "+" } else { "-" };
+            self.pos += 2;
+            // Das Zeilenende NICHT hier verbrauchen -- `assign()` tut das,
+            // und `inline_statement` (IF ... THEN i++) braucht es noch.
+            let eins = Node::NumberLit(crate::ast::NumV::Int(1));
+            let rhs = Node::BinaryOp { op: op.into(), left: Box::new(target.clone()),
+                                      right: Box::new(eins) };
+            return match target {
+                Node::Identifier(name) => Ok(Node::Assign { name, value: Box::new(rhs) }),
+                Node::MemberAccess { target, name } =>
+                    Ok(Node::MemberAssign { target, name, value: Box::new(rhs) }),
+                Node::IndexAccess { target, indices } =>
+                    Ok(Node::IndexAssign { target, indices, value: Box::new(rhs) }),
+                _ => self.err("Ungueltige Linksseite fuer ++/--"),
+            };
         }
         let op_tt = self.tt(0);
         if !is_assign_op(op_tt) {
