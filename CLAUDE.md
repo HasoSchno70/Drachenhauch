@@ -453,6 +453,39 @@ ein neues VEC2.
 
 **Beispiel:** [examples/58_vec2.dh](examples/58_vec2.dh).
 
+## Drei Halbheiten geschlossen: MAP-Literal, `FOR EACH k, v`, `DO ... LOOP`
+
+```basic
+DIM m AS MAP OF INTEGER
+m = {"a": 1, "b": 2}          ' MAP-Literal, Gegenstueck zu [1, 2]
+m = {}                        ' die leere MAP
+
+FOR EACH k, v IN m            ' Schluessel UND Wert
+    PRINT k; "="; v
+NEXT
+
+DO WHILE i < 5 : i = i + 1 : LOOP
+DO : i = i + 1 : LOOP UNTIL i >= 5
+```
+
+- **MAP-Literal**: der Parser trennt am `FOR` -- `{k: v FOR ...}` bleibt die
+  Dict-Comprehension, alles andere ist das Literal. Kompiliert ueber dieselbe
+  Sammelstelle (`__dict_from_pairs`), also KEIN neuer Opcode. `{}` war vorher
+  ein Parser-Fehler und ist jetzt die leere MAP (Test entsprechend gedreht).
+- **`FOR EACH k, v`**: `ForEach` hat ein zweites, optionales Feld `var2`. Bei
+  zwei Variablen schiebt der Compiler den Behaelter durch das interne
+  `__paare` -- eine MAP liefert dann ihre Paare statt der Schluessel, alles
+  andere geht unveraendert durch (ein TUPLE aus 2-Tupeln passt also auch).
+  **Die Einzelvariablen-Form bleibt bei den SCHLUESSELN** -- sie umzudeuten
+  haette bestehenden Code gebrochen.
+- **`DO ... LOOP`**: rein im Parser, ohne AST-Knoten -- Kopfpruefung wird zu
+  `While`, Fusspruefung zu `Repeat`. Damit erben beide BREAK/CONTINUE ohne
+  Zutun. **`do` und `loop` sind KONTEXTUELL** (wie `each`), keine
+  Schluesselwoerter: `DIM dO AS INTEGER` gibt es in `examples/127_filedialog.dh`,
+  und ein neues Keyword haette das gebrochen. `DO` zaehlt nur als Schleife,
+  wenn WHILE/UNTIL/Zeilenende folgt. Bedingung oben UND unten ist ein Fehler.
+- Tests: `tests/test_sprach_symmetrie.py` (18).
+
 ## Laufzeit-Typtest: `IS` + `TYPEOF`
 
 `TYPEOF` liefert bei einer Instanz den **Klassennamen** (gross), nicht mehr

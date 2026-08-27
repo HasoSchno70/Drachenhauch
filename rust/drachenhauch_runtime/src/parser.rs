@@ -195,6 +195,7 @@ impl Parser {
             Tt::Throw => self.throw_stmt(),
             Tt::With => self.with_stmt(),
             Tt::Dot if !self.with_stack.is_empty() => self.dot_assign_in_with(),
+            Tt::Ident if self.ist_do_schleife() => self.do_loop(),
             Tt::Ident if self.is_assignment_lookahead() => self.assign(),
             Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign(),
             _ => {
@@ -883,6 +884,66 @@ impl Parser {
         Ok(Node::Repeat { body, condition: Box::new(cond) })
     }
 
+    /// Faengt `DO` als Schleifen-Anfang -- KONTEXTUELL, kein Schluesselwort.
+    ///
+    /// `do` und `loop` bleiben gewoehnliche Bezeichner (genau wie `each`),
+    /// sonst waere `DIM dO AS INTEGER` in bestehendem Code ploetzlich ein
+    /// Fehler -- `examples/127_filedialog.dh` macht das. Als Schleife zaehlt
+    /// `DO` nur, wenn danach WHILE, UNTIL oder das Zeilenende steht; eine
+    /// Zuweisung (`dO = 0`) oder ein Aufruf hat dort etwas anderes.
+    fn ist_do_schleife(&self) -> bool {
+        if sval(self.peek(0)) != "do" { return false; }
+        matches!(self.tt(1), Tt::While | Tt::Until | Tt::Newline | Tt::Colon)
+    }
+
+    /// Ist das aktuelle Token das abschliessende `LOOP`?
+    fn ist_loop(&self) -> bool {
+        self.check(Tt::Ident) && sval(self.peek(0)) == "loop"
+    }
+
+    /// `DO ... LOOP` in allen fuenf Formen.
+    ///
+    /// Erzeugt KEINEN eigenen Knoten: Kopf-Pruefung wird zu `While`,
+    /// Fuss-Pruefung zu `Repeat`. Damit erben beide Formen ohne weiteres
+    /// Zutun BREAK, CONTINUE und die Sprungmarken-Verwaltung des Compilers.
+    fn do_loop(&mut self) -> R<Node> {
+        self.pos += 1;   // 'do'
+        let kopf = match self.tt(0) {
+            Tt::While => { self.pos += 1; Some((false, self.expression()?)) }
+            Tt::Until => { self.pos += 1; Some((true, self.expression()?)) }
+            _ => None,
+        };
+        self.consume_terminator()?;
+        let mut body = Vec::new();
+        while !self.ist_loop() {
+            if self.at_end() { return self.err("LOOP erwartet, Programmende erreicht"); }
+            body.push(self.statement()?);
+        }
+        self.pos += 1;   // 'loop'
+        let fuss = match self.tt(0) {
+            Tt::While => { self.pos += 1; Some((false, self.expression()?)) }
+            Tt::Until => { self.pos += 1; Some((true, self.expression()?)) }
+            _ => None,
+        };
+        self.consume_terminator()?;
+        if kopf.is_some() && fuss.is_some() {
+            return self.err("DO: die Bedingung gehoert entweder nach oben (DO WHILE/UNTIL) oder nach unten (LOOP WHILE/UNTIL), nicht an beide Stellen");
+        }
+        // `NOT c` fuer die UNTIL-Formen; `While` laeuft solange wahr,
+        // `Repeat` laeuft BIS wahr -- daher die vertauschte Verneinung.
+        fn verneine(n: Node) -> Node {
+            Node::UnaryOp { op: "not".into(), operand: Box::new(n) }
+        }
+        Ok(match (kopf, fuss) {
+            (Some((false, c)), _) => Node::While { condition: Box::new(c), body },
+            (Some((true, c)), _) => Node::While { condition: Box::new(verneine(c)), body },
+            (None, Some((false, c))) => Node::Repeat { body, condition: Box::new(verneine(c)) },
+            (None, Some((true, c))) => Node::Repeat { body, condition: Box::new(c) },
+            // `DO ... LOOP` ohne Bedingung: laeuft, bis BREAK oder RETURN.
+            (None, None) => Node::While { condition: Box::new(Node::BoolLit(true)), body },
+        })
+    }
+
     fn data(&mut self) -> R<Node> {
         self.expect(Tt::Data, "")?;
         let mut values = vec![self.data_literal()?];
@@ -933,6 +994,11 @@ impl Parser {
         if self.check(Tt::Ident) && sval(self.peek(0)) == "each" && self.tt(1) == Tt::Ident {
             self.pos += 1; // 'each'
             let var = sval(&self.expect(Tt::Ident, "Erwartet Iterationsvariable nach FOR EACH")?);
+            // `FOR EACH k, v IN m` -- die Paar-Form. Bei einer MAP laeuft sie
+            // ueber Schluessel UND Wert statt nur ueber die Schluessel.
+            let var2 = if self.matches(Tt::Comma) {
+                Some(sval(&self.expect(Tt::Ident, "Erwartet zweite Iterationsvariable nach dem Komma")?))
+            } else { None };
             self.expect(Tt::In, "Erwartet IN nach FOR EACH <var>")?;
             let iterable = self.expression()?;
             self.consume_terminator()?;
@@ -940,7 +1006,7 @@ impl Parser {
             self.expect(Tt::Next, "")?;
             if self.check(Tt::Ident) { self.pos += 1; }
             self.consume_terminator()?;
-            return Ok(Node::ForEach { var, iterable: Box::new(iterable), body });
+            return Ok(Node::ForEach { var, var2, iterable: Box::new(iterable), body });
         }
         let var = sval(&self.expect(Tt::Ident, "Erwartet Schleifenvariable")?);
         self.expect(Tt::Eq, "")?;
@@ -1498,12 +1564,31 @@ impl Parser {
             }
             Tt::Lbrace => {
                 self.pos += 1;
+                // `{}` ist die leere MAP -- ohne diesen Fall liefe die
+                // Ausdrucks-Zerlegung unten gegen die schliessende Klammer.
+                if self.matches(Tt::Rbrace) {
+                    return Ok(Node::MapLit { paare: Vec::new() });
+                }
                 let first = self.expression()?;
                 if self.matches(Tt::Colon) {
                     let value = self.expression()?;
-                    if !self.matches(Tt::For) {
-                        return self.err("Erwartet FOR in Dict-Comprehension `{key: val FOR var IN ...}`");
+                    // Hier trennen sich MAP-Literal und Dict-Comprehension:
+                    // `{k: v FOR ...}` ist die Comprehension, alles andere
+                    // (Komma oder schliessende Klammer) das Literal.
+                    if !self.check(Tt::For) {
+                        let mut paare = vec![(first, value)];
+                        while self.matches(Tt::Comma) {
+                            // Nachgestelltes Komma vor `}` erlauben.
+                            if self.check(Tt::Rbrace) { break; }
+                            let k = self.expression()?;
+                            self.expect(Tt::Colon, "Erwartet ':' zwischen Schluessel und Wert")?;
+                            let v = self.expression()?;
+                            paare.push((k, v));
+                        }
+                        self.expect(Tt::Rbrace, "Erwartet '}' am Ende des MAP-Literals")?;
+                        return Ok(Node::MapLit { paare });
                     }
+                    self.pos += 1;   // FOR
                     let var = sval(&self.expect(Tt::Ident, "Erwartet Iter-Variablenname nach FOR")?);
                     self.expect(Tt::In, "Erwartet IN nach Iter-Variable")?;
                     let iterable = self.expression()?;

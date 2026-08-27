@@ -464,6 +464,7 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
         }
         ArrayLit(items) => { for i in items { knoten(l, i); } }
         TupleLit { elements } => { for e in elements { knoten(l, e); } }
+        MapLit { paare } => { for (k, v) in paare { knoten(l, k); knoten(l, v); } }
         NamedArg { value, .. } => knoten(l, value),
         // `x IS Gegner`: der Typname wird umgeschrieben wie bei DIM/NEW.
         IsTyp { wert, typ } => { knoten(l, wert); l.typ(typ); }
@@ -529,8 +530,9 @@ fn knoten(l: &mut Lauf, n: &mut Node) {
             if let Some(s) = step { knoten(l, s); }
             for x in body.iter_mut() { knoten(l, x); }
         }
-        ForEach { var, iterable, body } => {
+        ForEach { var, var2, iterable, body } => {
             l.namen(var);
+            if let Some(v) = var2 { l.namen(v); }
             knoten(l, iterable);
             for x in body.iter_mut() { knoten(l, x); }
         }

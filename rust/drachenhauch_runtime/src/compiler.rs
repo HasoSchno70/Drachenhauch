@@ -784,7 +784,7 @@ impl Compiler {
             }
             Node::Select { subject, cases, else_block } =>
                 self.stmt_select(subject, cases, else_block),
-            Node::ForEach { var, iterable, body } => self.stmt_foreach(var, iterable, body),
+            Node::ForEach { var, var2, iterable, body } => self.stmt_foreach(var, var2.as_deref(), iterable, body),
             Node::Repeat { body, condition } => self.stmt_repeat(body, condition),
             Node::Try { body, catch_var, catch_block, has_catch, finally_block } =>
                 self.stmt_try(body, catch_var, catch_block, *has_catch, finally_block),
@@ -1902,6 +1902,18 @@ impl Compiler {
                 let e = self.ctx.here(); self.ctx.patch(jend, e);
                 Ok(())
             }
+            // MAP-Literal: je Paar ein 2-Tupel, dann dieselbe Sammelstelle
+            // wie die Dict-Comprehension. Kein neuer Opcode.
+            Node::MapLit { paare } => {
+                for (k, v) in paare {
+                    self.expr(k)?;
+                    self.expr(v)?;
+                    self.ctx.emit(oc::BUILD_TUPLE, json!(2));
+                }
+                self.ctx.emit(oc::BUILD_TUPLE, json!(paare.len()));
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__dict_from_pairs", 1]));
+                Ok(())
+            }
             Node::IsTyp { wert, typ } => {
                 let t = typ.to_lowercase();
                 if !self.is_typname_bekannt(&t) {
@@ -2345,24 +2357,29 @@ impl Compiler {
 
     /// FOR EACH var IN iterable -- Desugar zu einem Index-Loop ueber
     /// __comp_iter(iterable) (TUPLE), wie compiler._stmt_ForEach.
-    fn stmt_foreach(&mut self, var: &str, iterable: &Node, body: &[Node]) -> CR {
-        if self.ctx.is_main {
-            if !self.ctx.local_slots.contains_key(var) {
-                let name_idx = self.ctx.add_const(json!(var));
-                let type_idx = self.ctx.add_const(json!("any"));
-                let default_idx = self.ctx.add_const(Value::Null);
-                if let Some(&g) = self.global_slots.get(var) {
-                    self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
-                                  json!([g as i64, name_idx, type_idx, default_idx]));
-                } else {
-                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+    fn stmt_foreach(&mut self, var: &str, var2: Option<&str>, iterable: &Node, body: &[Node]) -> CR {
+        for name in [Some(var), var2].into_iter().flatten() {
+            if self.ctx.is_main {
+                if !self.ctx.local_slots.contains_key(name) {
+                    let name_idx = self.ctx.add_const(json!(name));
+                    let type_idx = self.ctx.add_const(json!("any"));
+                    let default_idx = self.ctx.add_const(Value::Null);
+                    if let Some(&g) = self.global_slots.get(name) {
+                        self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                                      json!([g as i64, name_idx, type_idx, default_idx]));
+                    } else {
+                        self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                    }
                 }
+            } else if !self.ctx.local_slots.contains_key(name) {
+                self.ctx.declare_local(name, "any");
             }
-        } else if !self.ctx.local_slots.contains_key(var) {
-            self.ctx.declare_local(var, "any");
         }
         let it_slot = self.ctx.alloc_temp("tuple");
         self.expr(iterable)?;
+        // Paar-Form: eine MAP liefert hier ihre (Schluessel, Wert)-Paare
+        // statt der blossen Schluessel; alles andere geht unveraendert durch.
+        if var2.is_some() { self.ctx.emit(oc::CALL_BUILTIN, json!(["__paare", 1])); }
         self.ctx.emit(oc::CALL_BUILTIN, json!(["__comp_iter", 1]));
         self.ctx.emit(oc::STORE_LOCAL, json!(it_slot));
         let idx_slot = self.ctx.alloc_temp("integer");
@@ -2382,7 +2399,25 @@ impl Compiler {
         self.ctx.emit(oc::LOAD_LOCAL, json!(it_slot));
         self.ctx.emit(oc::LOAD_LOCAL, json!(idx_slot));
         self.ctx.emit(oc::LOAD_INDEX, json!(1));
-        self.store_var(var);
+        match var2 {
+            None => self.store_var(var),
+            Some(zweite) => {
+                // Das Element ist ein 2-Tupel. Ueber einen Zwischenplatz,
+                // damit der Behaelter-Zugriff nicht zweimal laeuft.
+                let paar = self.ctx.alloc_temp("tuple");
+                self.ctx.emit(oc::STORE_LOCAL, json!(paar));
+                let i0 = self.ctx.add_const(json!(0));
+                let i1 = self.ctx.add_const(json!(1));
+                self.ctx.emit(oc::LOAD_LOCAL, json!(paar));
+                self.ctx.emit(oc::LOAD_CONST, json!(i0));
+                self.ctx.emit(oc::LOAD_INDEX, json!(1));
+                self.store_var(var);
+                self.ctx.emit(oc::LOAD_LOCAL, json!(paar));
+                self.ctx.emit(oc::LOAD_CONST, json!(i1));
+                self.ctx.emit(oc::LOAD_INDEX, json!(1));
+                self.store_var(zweite);
+            }
+        }
         for st in body { self.stmt(st)?; }
         let inc_target = self.ctx.here();
         let cont = self.ctx.continue_patches.pop().unwrap().0;
@@ -3142,6 +3177,7 @@ fn body_has_yield(stmts: &[Node]) -> bool {
                 ny(target) || lo.as_deref().map(ny).unwrap_or(false)
                 || hi.as_deref().map(ny).unwrap_or(false),
             Node::ArrayLit(elements) | Node::TupleLit { elements } => elements.iter().any(ny),
+            Node::MapLit { paare } => paare.iter().any(|(k, v)| ny(k) || ny(v)),
             Node::NamedArg { value, .. } => ny(value),
             Node::New { args, .. } => args.as_ref().map(|a| a.iter().any(ny)).unwrap_or(false),
             Node::ListComp { iterable, filter, transform, .. } =>
@@ -3371,6 +3407,7 @@ fn node_name(n: &Node) -> &'static str {
         Node::Input { .. } => "Input", Node::New { .. } => "New",
         Node::SliceAccess { .. } => "SliceAccess", Node::Yield(_) => "Yield",
         Node::IsTyp { .. } => "IsTyp",
+        Node::MapLit { .. } => "MapLit",
         Node::TernaryExpr { .. } => "TernaryExpr", Node::Return(_) => "Return",
         _ => "?",
     }

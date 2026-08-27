@@ -133,8 +133,21 @@ PRINT s
 
 # --- Parser-Edge-Cases ----------------------------------------------
 
-def test_parser_empty_brace_block_fails(run_gb):
-    """`{}` allein ist kein Comprehension -- Parser-Fehler."""
+def test_leere_klammer_ist_die_leere_map(run_gb):
+    """`{}` war frueher ein Parser-Fehler ("kein Comprehension").
+
+    Seit es das MAP-Literal gibt, ist es die LEERE MAP -- das Gegenstueck zu
+    `[]`. Der alte Fehlerfall ist damit bewusst weg, nicht versehentlich:
+    eine leere Klammer soll dasselbe heissen wie ein leeres Literal in jeder
+    anderen Sprache.
+    """
+    quelle = "DIM m AS MAP OF INTEGER" + chr(10) + "m = {}" + chr(10) + "PRINT MAPSIZE(m)" + chr(10)
+    assert run_gb(quelle) == "0" + chr(10)
+
+
+def test_klammer_ohne_doppelpunkt_und_ohne_for_bleibt_ein_fehler(run_gb):
+    """Was WEDER Literal (`k: v`) NOCH Comprehension (`x FOR ...`) ist, muss
+    weiterhin klar abgelehnt werden."""
     from drachenhauch.errors import ParseError
     with pytest.raises(ParseError):
-        run_gb('PRINT {}\n')
+        run_gb("PRINT {1, 2}" + chr(10))

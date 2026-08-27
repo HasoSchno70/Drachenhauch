@@ -95,6 +95,9 @@ pub enum Node {
     DictComp { var: String, iterable: Box<Node>, filter: Option<Box<Node>>, key: Box<Node>, value: Box<Node> },
     SetComp { var: String, iterable: Box<Node>, filter: Option<Box<Node>>, transform: Box<Node> },
     ArrayLit(Vec<Node>),
+    /// MAP-Literal `{"a": 1, "b": 2}` -- das Gegenstueck zu `ArrayLit`.
+    /// Schluessel muessen zur Laufzeit STRING sein (MAP-Konvention).
+    MapLit { paare: Vec<(Node, Node)> },
     TupleLit { elements: Vec<Node> },
     NamedArg { name: String, value: Box<Node> },
     New { class_name: String, args: Option<Vec<Node>> },
@@ -135,7 +138,8 @@ pub enum Node {
              else_block: Vec<Node> },
     While { condition: Box<Node>, body: Vec<Node> },
     For { var: String, start: Box<Node>, end: Box<Node>, step: Option<Box<Node>>, body: Vec<Node> },
-    ForEach { var: String, iterable: Box<Node>, body: Vec<Node> },
+    /// `FOR EACH v IN x` -- mit `var2` die Paar-Form `FOR EACH k, v IN m`.
+    ForEach { var: String, var2: Option<String>, iterable: Box<Node>, body: Vec<Node> },
     Repeat { body: Vec<Node>, condition: Box<Node> },
     Data { values: Vec<Node> },
     Read { targets: Vec<Node> },
@@ -208,6 +212,8 @@ impl Node {
                 ("filter", bopt(filter)), ("transform", transform.to_json())]),
             TupleLit { elements } => obj("TupleLit", vec![("elements", vecj(elements))]),
             ArrayLit(elements) => obj("ArrayLit", vec![("elements", vecj(elements))]),
+            MapLit { paare } => obj("MapLit", vec![("paare", Value::Array(
+                paare.iter().map(|(k, v)| Value::Array(vec![k.to_json(), v.to_json()])).collect()))]),
             NamedArg { name, value } => obj("NamedArg", vec![
                 ("name", json!(name)), ("value", value.to_json())]),
             New { class_name, args } => obj("New", vec![
@@ -276,8 +282,10 @@ impl Node {
             For { var, start, end, step, body } => obj("For", vec![
                 ("var", json!(var)), ("start", start.to_json()), ("end", end.to_json()),
                 ("step", bopt(step)), ("body", vecj(body))]),
-            ForEach { var, iterable, body } => obj("ForEach", vec![
-                ("var", json!(var)), ("iterable", iterable.to_json()), ("body", vecj(body))]),
+            ForEach { var, var2, iterable, body } => obj("ForEach", vec![
+                ("var", json!(var)),
+                ("var2", match var2 { Some(v) => json!(v), None => Value::Null }),
+                ("iterable", iterable.to_json()), ("body", vecj(body))]),
             Repeat { body, condition } => obj("Repeat", vec![
                 ("body", vecj(body)), ("condition", condition.to_json())]),
             Data { values } => obj("Data", vec![("values", vecj(values))]),

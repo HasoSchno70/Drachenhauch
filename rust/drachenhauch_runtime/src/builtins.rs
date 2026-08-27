@@ -1098,7 +1098,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 for p in t.iter() {
                     if let Value::Tuple(kv) = p {
                         if kv.len() == 2 {
-                            let k = need_str(&kv[0], "Dict-Comprehension")?.to_string();
+                            let k = need_str(&kv[0], "MAP-Schluessel")?.to_string();
                             m.put(k, kv[1].clone());
                             continue;
                         }
@@ -1612,6 +1612,15 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 for (i, v) in vals.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
             } else { err("MAPVALUES erwartet MAP".to_string()) }
+        }
+        // `FOR EACH k, v IN x`: der Compiler schiebt den Behaelter hier durch.
+        // Eine MAP liefert ihre PAARE (nicht die Schluessel wie bei einer
+        // Variablen) -- alles andere geht unveraendert weiter, damit auch
+        // ein Tupel/Array aus 2-Tupeln passt.
+        "__paare" => {
+            arity!(1);
+            if matches!(&a[0], Value::Map(_)) { return call_inner("mapitems", a); }
+            Ok(a[0].clone())
         }
         "mapitems" => {
             arity!(1);

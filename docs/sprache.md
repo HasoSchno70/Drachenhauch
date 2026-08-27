@@ -436,7 +436,33 @@ REPEAT
 UNTIL i >= 3            ' "wiederhole BIS i >= 3"
 ```
 
-Faustregel: `WHILE/WEND` wenn die Schleife evtl. gar nicht laufen soll, `REPEAT/UNTIL` wenn der Body in jedem Fall einmal durchlaufen muss (z.B. „Eingabe holen, dann auf Validität prüfen").
+**DO / LOOP** — dieselben zwei Muster, aber die Bedingung darf oben *oder* unten stehen, und sie darf auch ganz fehlen:
+
+```basic
+DO WHILE i < 5          ' Kopfprüfung, wie WHILE/WEND
+    i = i + 1
+LOOP
+
+DO UNTIL i >= 5         ' Kopfprüfung, verneint
+    i = i + 1
+LOOP
+
+DO                      ' Fußprüfung: läuft mindestens einmal
+    i = i + 1
+LOOP WHILE i < 5
+
+DO                      ' Fußprüfung, verneint (= REPEAT/UNTIL)
+    i = i + 1
+LOOP UNTIL i >= 5
+
+DO                      ' endlos — endet mit BREAK oder RETURN
+    IF fertig THEN BREAK
+LOOP
+```
+
+Beides gleichzeitig (`DO WHILE ... LOOP UNTIL ...`) wird beim Übersetzen abgelehnt. `do` und `loop` sind **kontextuell** und bleiben gewöhnliche Bezeichner — `DIM dO AS INTEGER` funktioniert weiterhin.
+
+Faustregel: `WHILE/WEND` wenn die Schleife evtl. gar nicht laufen soll, `REPEAT/UNTIL` wenn der Body in jedem Fall einmal durchlaufen muss (z.B. „Eingabe holen, dann auf Validität prüfen"). `DO/LOOP` kann beides und ist die Form, die aus anderen BASIC-Dialekten vertraut ist.
 
 `STEP 0` ist ein Fehler. Bei negativem `STEP` läuft die Schleife abwärts; Schleife wird nicht ausgeführt wenn `start > end` (oder umgekehrt bei negativem STEP).
 
@@ -454,7 +480,7 @@ FOR i = 1 TO 100
 NEXT
 ```
 
-Funktioniert in `FOR`, `WHILE` und `REPEAT/UNTIL`.
+Funktioniert in `FOR`, `FOR EACH`, `WHILE`, `REPEAT/UNTIL` und `DO/LOOP`.
 
 ## DATA / READ / RESTORE
 
@@ -851,8 +877,40 @@ Drei Fälle bleiben ausdrücklich erlaubt:
 
 Schlüssel sind immer STRINGs, Werte können beliebigen Typ haben.
 
+Eine Map lässt sich als **Literal** hinschreiben — das Gegenstück zum
+Array-Literal `[1, 2, 3]`:
+
 ```basic
 DIM punkte AS MAP OF INTEGER
+punkte = {"Anna": 95, "Bert": 78}
+
+DIM leer AS MAP OF STRING
+leer = {}                              ' die leere Map
+```
+
+Schlüssel und Wert sind volle Ausdrücke (`{"x" + STR$(n): n * 10}`), ein
+nachgestelltes Komma ist erlaubt. Nicht zu verwechseln mit der
+Dict-Comprehension `{k: v FOR x IN ...}` — dort steht ein `FOR` in der
+Klammer.
+
+Über eine Map läuft `FOR EACH` in zwei Formen:
+
+```basic
+FOR EACH name IN punkte                ' nur die Schlüssel
+    PRINT name
+NEXT
+
+FOR EACH name, wert IN punkte          ' Schlüssel UND Wert
+    PRINT name; ": "; wert
+NEXT
+```
+
+Die Zwei-Variablen-Form nimmt auch jede andere Folge von Paaren
+(`FOR EACH a, b IN (("x", 9), ("y", 8))`).
+
+Die einzelnen Befehle:
+
+```basic
 MAPPUT(punkte, "Anna", 95)
 MAPPUT(punkte, "Bert", 78)
 
