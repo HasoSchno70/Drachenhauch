@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1531,
+ "count": 1558,
  "builtins": [
   {
    "name": "ABS",
@@ -5035,6 +5035,168 @@
    "kind": "core",
    "signature": "MID$(2..3 Argumente)",
    "module": "core"
+  },
+  {
+   "name": "MIDI_CC",
+   "kind": "module",
+   "signature": "MIDI_CC(h, kanal: INTEGER, nr: INTEGER, wert: INTEGER)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CC_NUMBER",
+   "kind": "module",
+   "signature": "MIDI_CC_NUMBER(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CC_VALUE",
+   "kind": "module",
+   "signature": "MIDI_CC_VALUE(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_CHANNEL",
+   "kind": "module",
+   "signature": "MIDI_CHANNEL(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_DATA1",
+   "kind": "module",
+   "signature": "MIDI_DATA1(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_DATA2",
+   "kind": "module",
+   "signature": "MIDI_DATA2(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IN_CLOSE",
+   "kind": "module",
+   "signature": "MIDI_IN_CLOSE(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IN_COUNT",
+   "kind": "module",
+   "signature": "MIDI_IN_COUNT() AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IN_NAME$",
+   "kind": "module",
+   "signature": "MIDI_IN_NAME$(i: INTEGER) AS STRING",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IN_OPEN",
+   "kind": "module",
+   "signature": "MIDI_IN_OPEN(i: INTEGER) AS MIDI_IN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IS_CC",
+   "kind": "module",
+   "signature": "MIDI_IS_CC(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IS_NOTE_OFF",
+   "kind": "module",
+   "signature": "MIDI_IS_NOTE_OFF(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_IS_NOTE_ON",
+   "kind": "module",
+   "signature": "MIDI_IS_NOTE_ON(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NEXT",
+   "kind": "module",
+   "signature": "MIDI_NEXT(h) AS BOOLEAN",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NOTE",
+   "kind": "module",
+   "signature": "MIDI_NOTE(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NOTE_FREQ",
+   "kind": "module",
+   "signature": "MIDI_NOTE_FREQ(note: INTEGER) AS FLOAT",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NOTE_NAME$",
+   "kind": "module",
+   "signature": "MIDI_NOTE_NAME$(note: INTEGER) AS STRING",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NOTE_OFF",
+   "kind": "module",
+   "signature": "MIDI_NOTE_OFF(h, kanal: INTEGER, note: INTEGER)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_NOTE_ON",
+   "kind": "module",
+   "signature": "MIDI_NOTE_ON(h, kanal: INTEGER, note: INTEGER, anschlag: INTEGER)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_OUT_CLOSE",
+   "kind": "module",
+   "signature": "MIDI_OUT_CLOSE(h)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_OUT_COUNT",
+   "kind": "module",
+   "signature": "MIDI_OUT_COUNT() AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_OUT_NAME$",
+   "kind": "module",
+   "signature": "MIDI_OUT_NAME$(i: INTEGER) AS STRING",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_OUT_OPEN",
+   "kind": "module",
+   "signature": "MIDI_OUT_OPEN(i: INTEGER) AS MIDI_OUT",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_PENDING",
+   "kind": "module",
+   "signature": "MIDI_PENDING(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_SEND",
+   "kind": "module",
+   "signature": "MIDI_SEND(h, status: INTEGER, d1: INTEGER, d2: INTEGER)",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_STATUS",
+   "kind": "module",
+   "signature": "MIDI_STATUS(h) AS INTEGER",
+   "module": "midi"
+  },
+  {
+   "name": "MIDI_VELOCITY",
+   "kind": "module",
+   "signature": "MIDI_VELOCITY(h) AS INTEGER",
+   "module": "midi"
   },
   {
    "name": "MILLIS",

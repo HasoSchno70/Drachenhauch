@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 87 MB, aktuell Fassung 2026.9.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 195 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 196 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -119,7 +119,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (dhrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **Module** — 46 Stück, [Tabelle unten](#module)
+- **Module** — 47 Stück, [Tabelle unten](#module)
 - **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Split-View** (Strg+\\), **Debugger** (Breakpoints inkl. **bedingter** Breakpoints/Step/Variablen), **Profiler** (Hotpath pro Zeile/Funktion), **Git-Blame**-Panel, Welcome-Showcase (Demo-Galerie mit Screenshots)
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`dhsprites`): Multi-Frame, **Ebenen** (Sichtbarkeit/Deckkraft/Merge-Down, `.dhsprite` v5), Animation, Atlas-Export, **Export-Skalierung** (1x–8x, Nearest-Neighbor), **Lasso-Auswahl** (echte Pixel-Maske) + Rechteck-Auswahl, Onion-Skin (Deckkraft/Reichweite einstellbar), Tile-Preview
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`dhparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, **Preset-Bibliothek** (Werks- + eigene Presets), GB-Code-Export
@@ -137,7 +137,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 ### Module
 
-46 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+47 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
 [docs/](docs/README.md#module).
 
 **Spiel-Bausteine**
@@ -217,6 +217,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins direkt schalten, ohne eigenen Sketch |
 | [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle |
 | [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
+| [`midi`](docs/module-midi.md) | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken |
 | [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scannen, verbinden, Charakteristiken lesen/schreiben |
 | [`wifi`](docs/module-wifi.md) | Netze suchen, verbinden, Signalstärke |
 
@@ -311,6 +312,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `166_aufraeumen.dh` | **Aufräumen und entscheiden** (`FINALLY`, `ERROR_CODE$`) — eine Datei, die auf jeden Fall geschlossen wird; ein `CATCH`, das am Code entscheidet statt am Meldungstext |
 | `167_vererbung.dh` | **Vererbung ohne Wiederholung** (`SUPER`, `ABSTRACT`) — eine Basisklasse rechnet mit Methoden, die erst ihre Unterklassen schreiben |
 | `168_hintergrund.dh` | **Arbeiten lassen ohne stehenzubleiben** (`DB_QUERY_START`, `SHELL_START`) — große Abfrage und Kindprozess laufen, die Hauptschleife dreht sich weiter |
+| `181_midi.dh` | **MIDI-Klaviatur** — was auf einem angeschlossenen Keyboard gespielt wird, leuchtet auf; ein Mausklick schickt die Note zurück an den Synthesizer |
 | `bench_ecs_movement_v2.dh` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.dh` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 

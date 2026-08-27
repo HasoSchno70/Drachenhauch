@@ -56,6 +56,10 @@ mod mqtt;
 mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
+// midi.rs ist NICHT gegatet: die beiden Umrechner darin (Notenname,
+// Frequenz) brauchen kein Geraet und sollen in jedem Bau stehen. Nur der
+// Geraeteteil in der Datei haengt am Feature.
+mod midi;
 #[cfg(feature = "serial")]
 mod serial;
 #[cfg(feature = "serial")]
@@ -200,6 +204,7 @@ fn eingebaut() -> String {
         ("usb", cfg!(feature = "usb")),
         ("bluetooth", cfg!(feature = "bt")),
         ("wlan", cfg!(feature = "wifi")),
+        ("midi", cfg!(feature = "midi")),
     ] {
         if da { an.push(name) } else { aus.push(name) }
     }

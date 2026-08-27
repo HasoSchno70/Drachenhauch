@@ -15,7 +15,7 @@ Aufruf:
     .venv\\Scripts\\python.exe rust\\build_runtime.py            # release, mit Grafik
     .venv\\Scripts\\python.exe rust\\build_runtime.py --no-graphics
     .venv\\Scripts\\python.exe rust\\build_runtime.py --debug
-    .venv\\Scripts\\python.exe rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi
+    .venv\\Scripts\\python.exe rust\\build_runtime.py --hardware  # + serial/usb/bt/wifi/midi
 
 Ohne Grafik (`--no-graphics`) baut der pure VM-Kern ganz ohne C-Toolchain.
 
@@ -141,7 +141,7 @@ def main() -> int:
     if "--no-data" not in args:
         feats += ["db", "net", "http", "smtp"]
     if "--hardware" in args:
-        feats += ["serial", "usb", "bt", "wifi"]
+        feats += ["serial", "usb", "bt", "wifi", "midi"]
         if system != "Windows" and "wifi" in feats:
             print("Hinweis: 'wifi' ist aktuell nur unter Windows funktionsfaehig "
                   "(netsh-basiert) -- WIFI_*-Builtins werfen auf diesem System "

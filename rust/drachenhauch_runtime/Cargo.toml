@@ -70,6 +70,7 @@ webpki-roots = { version = "0.26", optional = true }
 # Hardware/IoT-Module (Phase 4):
 serialport = { version = "4", optional = true }   # serial
 hidapi = { version = "2", optional = true }        # usb (HID)
+midir = { version = "0.11", optional = true }      # midi (WinMM/ALSA/CoreMIDI)
 btleplug = { version = "0.11", optional = true }   # bt (BLE, async)
 tokio = { version = "1", features = ["rt-multi-thread", "time"], optional = true }
 futures = { version = "0.3", optional = true }
@@ -127,9 +128,10 @@ http = ["dep:ureq"]
 smtp = ["dep:rustls", "dep:webpki-roots"]
 serial = ["dep:serialport"]
 usb = ["dep:hidapi"]
+midi = ["dep:midir"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
-hardware = ["serial", "usb", "wifi", "bt"]
+hardware = ["serial", "usb", "wifi", "bt", "midi"]
 full = ["graphics", "dialogs", "db", "net", "http", "smtp", "hardware"]
 
 [profile.release]

@@ -1,0 +1,161 @@
+' 181_midi.dh -- Noten von einem Instrument lesen und welche hinausschicken.
+'
+' Das Fenster zeigt eine Klaviatur. Was auf einem angeschlossenen Keyboard
+' gespielt wird, leuchtet darin auf; ein Klick auf eine Taste schickt die
+' Note umgekehrt an den ersten MIDI-Ausgang.
+'
+' Ohne angeschlossenes Geraet laeuft das Programm trotzdem: unter Windows
+' gibt es immer den eingebauten "Microsoft GS Wavetable Synth" als Ausgang,
+' und die Maus-Klaviatur spielt darauf.
+'
+' Braucht ein dhrt mit --hardware (dhrt --version sagt, ob "midi" dabei ist).
+
+IMPORT "midi"
+
+CONST ERSTE_NOTE AS INTEGER = 48        ' C3
+CONST ANZAHL AS INTEGER = 25            ' zwei Oktaven
+CONST TASTE_B AS INTEGER = 24
+CONST TASTE_H AS INTEGER = 120
+CONST OBEN AS INTEGER = 150
+
+DIM eingang AS MIDI_IN
+DIM ausgang AS MIDI_OUT
+DIM hat_eingang AS BOOLEAN
+DIM hat_ausgang AS BOOLEAN
+
+IF MIDI_IN_COUNT() > 0 THEN
+    eingang = MIDI_IN_OPEN(0)
+    hat_eingang = TRUE
+END IF
+IF MIDI_OUT_COUNT() > 0 THEN
+    ausgang = MIDI_OUT_OPEN(0)
+    hat_ausgang = TRUE
+END IF
+
+' Welche Note klingt gerade? (Index 0..ANZAHL-1)
+DIM leuchtet[ANZAHL] AS INTEGER
+DIM zuletzt AS STRING
+DIM maus_note AS INTEGER
+maus_note = -1
+
+SCREEN(680, 320, "MIDI-Klaviatur")
+
+' Ist die Note eine schwarze Taste?
+FUNCTION ist_schwarz(note AS INTEGER) AS BOOLEAN
+    DIM r AS INTEGER
+    r = note MOD 12
+    RETURN r = 1 OR r = 3 OR r = 6 OR r = 8 OR r = 10
+END FUNCTION
+
+' Bildschirm-X der Taste i (nur weisse Tasten bekommen eigene Spalten).
+FUNCTION tasten_x(i AS INTEGER) AS INTEGER
+    DIM j AS INTEGER
+    DIM weisse AS INTEGER
+    FOR j = 0 TO i - 1
+        IF NOT ist_schwarz(ERSTE_NOTE + j) THEN weisse = weisse + 1
+    NEXT
+    IF ist_schwarz(ERSTE_NOTE + i) THEN
+        RETURN 20 + weisse * TASTE_B - TASTE_B / 3
+    END IF
+    RETURN 20 + weisse * TASTE_B
+END FUNCTION
+
+WHILE NOT QUITREQUESTED()
+    ' --- Eingehendes abholen. Pro Bild koennen MEHRERE Nachrichten warten
+    '     (ein Akkord sind schon drei) -- darum die innere Schleife.
+    IF hat_eingang THEN
+        WHILE MIDI_NEXT(eingang)
+            DIM idx AS INTEGER
+            idx = MIDI_NOTE(eingang) - ERSTE_NOTE
+            IF MIDI_IS_NOTE_ON(eingang) THEN
+                IF idx >= 0 AND idx < ANZAHL THEN leuchtet[idx] = 1
+                zuletzt = MIDI_NOTE_NAME$(MIDI_NOTE(eingang)) + _
+                          "  Anschlag " + STR$(MIDI_VELOCITY(eingang)) + _
+                          "  Kanal " + STR$(MIDI_CHANNEL(eingang))
+            ELIF MIDI_IS_NOTE_OFF(eingang) THEN
+                ' Achtung: die meisten Instrumente schicken Note-AUS als
+                ' Note-AN mit Anschlag 0. MIDI_IS_NOTE_OFF faengt beides.
+                IF idx >= 0 AND idx < ANZAHL THEN leuchtet[idx] = 0
+            ELIF MIDI_IS_CC(eingang) THEN
+                zuletzt = "Regler " + STR$(MIDI_CC_NUMBER(eingang)) + _
+                          " = " + STR$(MIDI_CC_VALUE(eingang))
+            END IF
+        WEND
+    END IF
+
+    ' --- Maus: gedrueckt halten spielt, loslassen beendet die Note
+    DIM i AS INTEGER
+    IF MOUSE_HIT(0) AND hat_ausgang THEN
+        FOR i = ANZAHL - 1 TO 0 STEP -1      ' schwarze zuerst: sie liegen oben
+            DIM x AS INTEGER
+            DIM h AS INTEGER
+            x = tasten_x(i)
+            h = TASTE_H
+            IF ist_schwarz(ERSTE_NOTE + i) THEN h = TASTE_H * 3 / 5
+            IF MOUSEX() >= x AND MOUSEX() < x + TASTE_B * 2 / 3 AND _
+               MOUSEY() >= OBEN AND MOUSEY() < OBEN + h THEN
+                maus_note = ERSTE_NOTE + i
+                MIDI_NOTE_ON(ausgang, 1, maus_note, 100)
+                leuchtet[i] = 1
+                zuletzt = "gespielt: " + MIDI_NOTE_NAME$(maus_note) + _
+                          "  (" + STR$(MIDI_NOTE_FREQ(maus_note)) + " Hz)"
+                BREAK
+            END IF
+        NEXT
+    END IF
+    IF MOUSE_RELEASED(0) AND maus_note >= 0 AND hat_ausgang THEN
+        MIDI_NOTE_OFF(ausgang, 1, maus_note)
+        leuchtet[maus_note - ERSTE_NOTE] = 0
+        maus_note = -1
+    END IF
+
+    ' --- Zeichnen
+    CLS(RGB(18, 20, 28))
+    TEXT(20, 20, "MIDI-Klaviatur", RGB(230, 235, 245))
+    IF hat_eingang THEN
+        TEXT(20, 48, "Eingang: " + MIDI_IN_NAME$(0), RGB(150, 200, 160))
+    ELSE
+        TEXT(20, 48, "kein MIDI-Eingang -- spiel mit der Maus", RGB(200, 170, 120))
+    END IF
+    IF hat_ausgang THEN
+        TEXT(20, 70, "Ausgang: " + MIDI_OUT_NAME$(0), RGB(150, 200, 160))
+    ELSE
+        TEXT(20, 70, "kein MIDI-Ausgang", RGB(200, 140, 140))
+    END IF
+    TEXT(20, 100, zuletzt, RGB(220, 220, 140))
+
+    ' weisse Tasten zuerst, schwarze darueber
+    DIM durchgang AS INTEGER
+    FOR durchgang = 0 TO 1
+        FOR i = 0 TO ANZAHL - 1
+            DIM schwarz AS BOOLEAN
+            schwarz = ist_schwarz(ERSTE_NOTE + i)
+            IF (durchgang = 0 AND schwarz) OR (durchgang = 1 AND NOT schwarz) THEN CONTINUE
+            DIM tx AS INTEGER
+            DIM th AS INTEGER
+            DIM tb AS INTEGER
+            tx = tasten_x(i)
+            th = TASTE_H
+            tb = TASTE_B - 2
+            IF schwarz THEN
+                th = TASTE_H * 3 / 5
+                tb = TASTE_B * 2 / 3
+            END IF
+            DIM farbe AS INTEGER
+            IF leuchtet[i] = 1 THEN
+                farbe = RGB(255, 190, 60)
+            ELIF schwarz THEN
+                farbe = RGB(30, 32, 40)
+            ELSE
+                farbe = RGB(235, 238, 245)
+            END IF
+            BOX(tx, OBEN, tx + tb, OBEN + th, farbe)
+            RECT(tx, OBEN, tx + tb, OBEN + th, RGB(60, 64, 76))
+        NEXT
+    NEXT
+
+    FLIP()
+WEND
+
+IF hat_eingang THEN MIDI_IN_CLOSE(eingang)
+IF hat_ausgang THEN MIDI_OUT_CLOSE(ausgang)

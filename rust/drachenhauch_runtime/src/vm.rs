@@ -770,6 +770,10 @@ pub struct Vm<'p> {
     #[cfg(feature = "http")]
     cloud_last_error: String,
     // Hardware/IoT-Handles (INTEGER-Index in VM-Vecs).
+    #[cfg(feature = "midi")]
+    midi_ins: Vec<Option<crate::midi::Eingang>>,
+    #[cfg(feature = "midi")]
+    midi_outs: Vec<Option<crate::midi::Ausgang>>,
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
     #[cfg(feature = "serial")]
@@ -894,6 +898,10 @@ impl<'p> Vm<'p> {
             http_timeout: 10,
             #[cfg(feature = "http")]
             http_abrufe: crate::html::Abrufe::default(),
+            #[cfg(feature = "midi")]
+            midi_ins: Vec::new(),
+            #[cfg(feature = "midi")]
+            midi_outs: Vec::new(),
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
             #[cfg(feature = "serial")]
@@ -2324,6 +2332,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_hintergrund(name, bargs)? { v }
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
+                        else if let Some(v) = self.try_midi(name, bargs)? { v }
                         else if let Some(v) = self.try_mqtt(name, bargs)? { v }
                         else if let Some(v) = self.try_httpd(name, bargs)? { v }
                         else if let Some(v) = self.try_pdf(name, bargs)? { v }
@@ -4036,6 +4045,127 @@ impl<'p> Vm<'p> {
     // ===================================================================
     // Modul serial (Feature `serial`)
     // ===================================================================
+    /// Modul `midi` (midi.rs) -- Noten lesen und schicken.
+    ///
+    /// Die beiden Umrechner (`MIDI_NOTE_NAME$`, `MIDI_NOTE_FREQ`) stehen VOR
+    /// dem Feature-Gate: sie brauchen kein Geraet, und wer eine Notenanzeige
+    /// oder einen Ton aus einer Notennummer baut, soll sie in jedem Bau haben.
+    fn try_midi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("midi_") { return Ok(None); }
+        match name {
+            "midi_note_name$" | "midi_note_name" => {
+                let n = bi_int(a, 0, "MIDI_NOTE_NAME$")?;
+                return Ok(Some(Value::str_rc(&crate::midi::note_name(n))));
+            }
+            "midi_note_freq" => {
+                let n = bi_int(a, 0, "MIDI_NOTE_FREQ")?;
+                return Ok(Some(Value::Float(crate::midi::note_freq(n))));
+            }
+            _ => {}
+        }
+        #[cfg(feature = "midi")]
+        { return self.try_midi_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "midi")]
+    fn midi_in(&mut self, idx: i64) -> R<&mut crate::midi::Eingang> {
+        Self::handle_get_mut(&mut self.midi_ins, idx, "MIDI", "ungueltiges/geschlossenes MIDI_IN")
+    }
+    #[cfg(feature = "midi")]
+    fn midi_out(&mut self, idx: i64) -> R<&mut crate::midi::Ausgang> {
+        Self::handle_get_mut(&mut self.midi_outs, idx, "MIDI", "ungueltiges/geschlossenes MIDI_OUT")
+    }
+
+    #[cfg(feature = "midi")]
+    fn try_midi_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::midi;
+        let v = match name {
+            // --- Anschluesse finden ---
+            "midi_in_count" => Value::Int(midi::in_count()?),
+            "midi_out_count" => Value::Int(midi::out_count()?),
+            "midi_in_name$" | "midi_in_name" =>
+                Value::str_rc(&midi::in_name(bi_int(a, 0, "MIDI_IN_NAME$")?)?),
+            "midi_out_name$" | "midi_out_name" =>
+                Value::str_rc(&midi::out_name(bi_int(a, 0, "MIDI_OUT_NAME$")?)?),
+            // --- Oeffnen und schliessen ---
+            "midi_in_open" => {
+                let e = midi::in_open(bi_int(a, 0, "MIDI_IN_OPEN")?)?;
+                self.midi_ins.push(Some(e));
+                Value::Int((self.midi_ins.len() - 1) as i64)
+            }
+            "midi_out_open" => {
+                let o = midi::out_open(bi_int(a, 0, "MIDI_OUT_OPEN")?)?;
+                self.midi_outs.push(Some(o));
+                Value::Int((self.midi_outs.len() - 1) as i64)
+            }
+            "midi_in_close" => {
+                let i = bi_int(a, 0, "MIDI_IN_CLOSE")? as usize;
+                if let Some(s) = self.midi_ins.get_mut(i) { *s = None; }
+                Value::Nil
+            }
+            "midi_out_close" => {
+                let i = bi_int(a, 0, "MIDI_OUT_CLOSE")? as usize;
+                if let Some(s) = self.midi_outs.get_mut(i) { *s = None; }
+                Value::Nil
+            }
+            // --- Empfangen (Cursor-Muster wie db/mqtt) ---
+            "midi_next" => { let i = bi_int(a, 0, "MIDI_NEXT")?; Value::Bool(midi::next(self.midi_in(i)?)) }
+            "midi_pending" => { let i = bi_int(a, 0, "MIDI_PENDING")?; Value::Int(midi::wartend(self.midi_in(i)?)) }
+            "midi_status" => { let i = bi_int(a, 0, "MIDI_STATUS")?; Value::Int(midi::status(self.midi_in(i)?)) }
+            "midi_channel" => { let i = bi_int(a, 0, "MIDI_CHANNEL")?; Value::Int(midi::channel(self.midi_in(i)?)) }
+            "midi_data1" => { let i = bi_int(a, 0, "MIDI_DATA1")?; Value::Int(midi::data1(self.midi_in(i)?)) }
+            "midi_data2" => { let i = bi_int(a, 0, "MIDI_DATA2")?; Value::Int(midi::data2(self.midi_in(i)?)) }
+            "midi_is_note_on" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_ON")?; Value::Bool(midi::is_note_on(self.midi_in(i)?)) }
+            "midi_is_note_off" => { let i = bi_int(a, 0, "MIDI_IS_NOTE_OFF")?; Value::Bool(midi::is_note_off(self.midi_in(i)?)) }
+            "midi_is_cc" => { let i = bi_int(a, 0, "MIDI_IS_CC")?; Value::Bool(midi::is_cc(self.midi_in(i)?)) }
+            // Note/Anschlag und Regler sind nur sprechende Namen fuer data1/data2.
+            "midi_note" => { let i = bi_int(a, 0, "MIDI_NOTE")?; Value::Int(midi::data1(self.midi_in(i)?)) }
+            "midi_velocity" => { let i = bi_int(a, 0, "MIDI_VELOCITY")?; Value::Int(midi::data2(self.midi_in(i)?)) }
+            "midi_cc_number" => { let i = bi_int(a, 0, "MIDI_CC_NUMBER")?; Value::Int(midi::data1(self.midi_in(i)?)) }
+            "midi_cc_value" => { let i = bi_int(a, 0, "MIDI_CC_VALUE")?; Value::Int(midi::data2(self.midi_in(i)?)) }
+            // --- Senden ---
+            "midi_note_on" => {
+                let i = bi_int(a, 0, "MIDI_NOTE_ON")?;
+                let k = midi::kanal_byte(bi_int(a, 1, "MIDI_NOTE_ON")?, "MIDI_NOTE_ON")?;
+                let n = midi::sieben_bit(bi_int(a, 2, "MIDI_NOTE_ON")?, "Note", "MIDI_NOTE_ON")?;
+                let v = midi::sieben_bit(bi_int(a, 3, "MIDI_NOTE_ON")?, "Anschlag", "MIDI_NOTE_ON")?;
+                midi::send(self.midi_out(i)?, &[0x90 | k, n, v])?;
+                Value::Nil
+            }
+            "midi_note_off" => {
+                let i = bi_int(a, 0, "MIDI_NOTE_OFF")?;
+                let k = midi::kanal_byte(bi_int(a, 1, "MIDI_NOTE_OFF")?, "MIDI_NOTE_OFF")?;
+                let n = midi::sieben_bit(bi_int(a, 2, "MIDI_NOTE_OFF")?, "Note", "MIDI_NOTE_OFF")?;
+                midi::send(self.midi_out(i)?, &[0x80 | k, n, 0])?;
+                Value::Nil
+            }
+            "midi_cc" => {
+                let i = bi_int(a, 0, "MIDI_CC")?;
+                let k = midi::kanal_byte(bi_int(a, 1, "MIDI_CC")?, "MIDI_CC")?;
+                let nr = midi::sieben_bit(bi_int(a, 2, "MIDI_CC")?, "Reglernummer", "MIDI_CC")?;
+                let w = midi::sieben_bit(bi_int(a, 3, "MIDI_CC")?, "Reglerwert", "MIDI_CC")?;
+                midi::send(self.midi_out(i)?, &[0xB0 | k, nr, w])?;
+                Value::Nil
+            }
+            // Roher Ausweg fuer alles, wofuer es oben keinen Namen gibt.
+            "midi_send" => {
+                let i = bi_int(a, 0, "MIDI_SEND")?;
+                let st = bi_int(a, 1, "MIDI_SEND")?;
+                if !(0x80..=0xFF).contains(&st) {
+                    return Err(format!("MIDI_SEND: das Statusbyte muss zwischen 128 und 255 liegen, war {}", st));
+                }
+                let d1 = midi::sieben_bit(bi_int(a, 2, "MIDI_SEND")?, "Datenbyte 1", "MIDI_SEND")?;
+                let d2 = midi::sieben_bit(bi_int(a, 3, "MIDI_SEND")?, "Datenbyte 2", "MIDI_SEND")?;
+                midi::send(self.midi_out(i)?, &[st as u8, d1, d2])?;
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_serial(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("serial_")) { return Ok(None); }
         #[cfg(feature = "serial")]
