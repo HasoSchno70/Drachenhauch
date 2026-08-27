@@ -93,13 +93,18 @@ Source: "..\examples\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
 ; laese der Nutzer dort von einem Gegenstueck, das er nicht hat.
 Source: "..\esp32\*"; DestDir: "{commondocs}\Drachenhauch\esp32"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
-; Lehrbuch (falls gebaut) -- zum Drucken das .docx, zum Lesen am Geraet das .epub.
+; Buecher (falls gebaut) -- zum Drucken das .docx, zum Lesen am Geraet das .epub.
 ; Beide Sprachen: dieselben Kapitelquellen, das englische Handbuch entsteht ueber
 ; den Katalog buch-referenz\buch\i18n\en.json.
+; Der Einstieg ist der zweite Band (2026.9) und richtet sich an Menschen ohne
+; jede Programmiererfahrung -- er gehoert mit ins Paket, sonst faende ihn nur,
+; wer ins Git-Repo schaut.
 Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 Source: "..\buch-referenz\buch\Drachenhauch-Lehrbuch.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 Source: "..\buch-referenz\buch\Drachenhauch-Handbook.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 Source: "..\buch-referenz\buch\Drachenhauch-Handbook.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+Source: "..\buch-einstieg\buch\Drachenhauch-Einstieg.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 ; Lizenz + Drittanbieter-Lizenzhinweise (Pflicht-Beilage fuer MIT/BSD/Apache/LGPL).
 Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
@@ -111,6 +116,7 @@ Name: "{group}\Tilemap-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--tile
 Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
+Name: "{group}\Einstieg (fuer Anfaenger)"; Filename: "{app}\docs\Drachenhauch-Einstieg.docx"; Flags: createonlyiffileexists
 Name: "{group}\Lehrbuch"; Filename: "{app}\docs\Drachenhauch-Lehrbuch.docx"; Flags: createonlyiffileexists
 Name: "{group}\Handbook (English)"; Filename: "{app}\docs\Drachenhauch-Handbook.docx"; Flags: createonlyiffileexists
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
