@@ -73,6 +73,23 @@ Type: filesandordirs; Name: "{commondocs}\GameBasic"
 Type: filesandordirs; Name: "{autoprograms}\GameBasic"
 Type: files; Name: "{autodesktop}\GameBasic.lnk"
 
+; --- Veraltete Vorschaubilder der EIGENEN Beispiele ---
+;
+; Der Beispielordner ist `uninsneveruninstall` (siehe oben) -- selbst
+; bearbeitete Beispiele sollen ein Upgrade ueberleben. Sein Unterordner
+; `screenshots` ist dagegen reine ERZEUGUNG (tools/gen_showcase_thumbs.py);
+; dort legt niemand etwas Eigenes ab. Ohne dieses Aufraeumen bleibt jedes
+; umbenannte oder entfallene Vorschaubild beim Nutzer fuer immer liegen --
+; nachgemessen waren es nach wenigen Fassungen schon zwei
+; (34_schneefall.png, 70_hires_showcase.png). Derselbe Mechanismus, der
+; oben 225 verwaiste Dateien hinterlassen hat, nur langsamer.
+;
+; Geloescht wird VOR dem Kopieren, der Ordner wird also gleich wieder mit
+; dem aktuellen Stand gefuellt. Bewusst NUR dieser Unterordner: den ganzen
+; Beispielordner zu leeren wuerde genau das zerstoeren, wofuer
+; `uninsneveruninstall` da ist.
+Type: filesandordirs; Name: "{commondocs}\Drachenhauch\examples\screenshots"
+
 [Files]
 ; Komplette eingefrorene IDE (PyInstaller onedir).
 Source: "..\dist\Drachenhauch\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
