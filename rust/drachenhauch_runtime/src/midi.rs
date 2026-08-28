@@ -139,36 +139,61 @@ pub fn wartend(e: &Eingang) -> i64 {
     e.warteschlange.lock().map(|q| q.len() as i64).unwrap_or(0)
 }
 
-#[cfg(feature = "midi")]
-fn byte(e: &Eingang, i: usize) -> i64 {
-    e.aktuell.as_ref().and_then(|m| m.get(i)).map(|b| *b as i64).unwrap_or(0)
-}
+// --------------------------------------------- Nachrichten entschluesseln
+//
+// BEWUSST ueber rohe Bytes statt ueber `Eingang`: an der Entwicklungsmaschine
+// haengt kein MIDI-Geraet, und am Zielrechner auch keins. Haenge die
+// Entschluesselung am Geraetetyp, ist sie NIRGENDS pruefbar -- so ist sie es
+// ueberall, mit erfundenen Nachrichten (die Rust-`#[test]`s unten). Uebrig
+// bleibt eine Transportschicht, die nur weiterreicht.
+//
+// Eine LEERE Nachricht (noch kein MIDI_NEXT, oder es kam nichts) liefert
+// ueberall 0 bzw. FALSE -- auch beim Kanal, wo `0 + 1 = 1` sonst einen Kanal
+// vortaeuschen wuerde, den es nicht gibt.
 
 /// Statusbyte OHNE Kanal (0x90 = Note an, 0x80 = Note aus, 0xB0 = Regler ...).
-#[cfg(feature = "midi")]
-pub fn status(e: &Eingang) -> i64 { byte(e, 0) & 0xF0 }
-/// Kanal 1..16 (im Protokoll steckt 0..15).
-#[cfg(feature = "midi")]
-pub fn channel(e: &Eingang) -> i64 {
-    if e.aktuell.is_none() { return 0; }
-    (byte(e, 0) & 0x0F) + 1
+pub fn status_von(m: &[u8]) -> i64 {
+    match m.first() { Some(b) => (*b as i64) & 0xF0, None => 0 }
 }
-#[cfg(feature = "midi")]
-pub fn data1(e: &Eingang) -> i64 { byte(e, 1) }
-#[cfg(feature = "midi")]
-pub fn data2(e: &Eingang) -> i64 { byte(e, 2) }
+
+/// Kanal 1..16 -- im Protokoll stehen 0..15. Nach aussen zaehlen wir wie
+/// jedes Geraetedisplay.
+pub fn kanal_von(m: &[u8]) -> i64 {
+    match m.first() { Some(b) => ((*b as i64) & 0x0F) + 1, None => 0 }
+}
+
+pub fn d1_von(m: &[u8]) -> i64 { m.get(1).map(|b| *b as i64).unwrap_or(0) }
+pub fn d2_von(m: &[u8]) -> i64 { m.get(2).map(|b| *b as i64).unwrap_or(0) }
 
 /// **Der Fallstrick des Protokolls:** die meisten Instrumente schicken kein
 /// 0x80, sondern ein Note-AN mit Anschlagstaerke 0. Wer nur auf 0x80 prueft,
 /// bekommt Toene, die nie aufhoeren.
+pub fn ist_note_an(m: &[u8]) -> bool { status_von(m) == 0x90 && d2_von(m) > 0 }
+pub fn ist_note_aus(m: &[u8]) -> bool {
+    status_von(m) == 0x80 || (status_von(m) == 0x90 && d2_von(m) == 0)
+}
+pub fn ist_regler(m: &[u8]) -> bool { status_von(m) == 0xB0 }
+
+// Die duenne Schicht darueber: aus dem Eingang die zuletzt geholte Nachricht
+// nehmen und oben hineingeben. Mehr passiert hier nicht.
 #[cfg(feature = "midi")]
-pub fn is_note_on(e: &Eingang) -> bool { status(e) == 0x90 && data2(e) > 0 }
-#[cfg(feature = "midi")]
-pub fn is_note_off(e: &Eingang) -> bool {
-    status(e) == 0x80 || (status(e) == 0x90 && data2(e) == 0)
+fn nachricht(e: &Eingang) -> &[u8] {
+    e.aktuell.as_deref().unwrap_or(&[])
 }
 #[cfg(feature = "midi")]
-pub fn is_cc(e: &Eingang) -> bool { status(e) == 0xB0 }
+pub fn status(e: &Eingang) -> i64 { status_von(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn channel(e: &Eingang) -> i64 { kanal_von(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn data1(e: &Eingang) -> i64 { d1_von(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn data2(e: &Eingang) -> i64 { d2_von(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn is_note_on(e: &Eingang) -> bool { ist_note_an(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn is_note_off(e: &Eingang) -> bool { ist_note_aus(nachricht(e)) }
+#[cfg(feature = "midi")]
+pub fn is_cc(e: &Eingang) -> bool { ist_regler(nachricht(e)) }
 
 #[cfg(feature = "midi")]
 pub fn send(a: &mut Ausgang, bytes: &[u8]) -> Result<(), String> {
@@ -238,6 +263,79 @@ mod tests {
         // Eine Oktave hoeher ist genau das Doppelte.
         assert!((note_freq(81) - 880.0).abs() < 1e-9);
         assert!((note_freq(57) - 220.0).abs() < 1e-9);
+    }
+
+    // --- Nachrichten entschluesseln (erfundene Bytes, kein Geraet noetig) ---
+
+    #[test]
+    fn note_an_wird_gelesen() {
+        let m = [0x90u8, 60, 100];          // Kanal 1, C4, Anschlag 100
+        assert!(ist_note_an(&m));
+        assert!(!ist_note_aus(&m));
+        assert!(!ist_regler(&m));
+        assert_eq!(status_von(&m), 0x90);
+        assert_eq!(kanal_von(&m), 1);
+        assert_eq!(d1_von(&m), 60);
+        assert_eq!(d2_von(&m), 100);
+    }
+
+    #[test]
+    fn note_aus_kommt_in_zwei_formen() {
+        // Die saubere Form, die kaum ein Instrument benutzt.
+        let echt = [0x80u8, 60, 0];
+        assert!(ist_note_aus(&echt));
+        assert!(!ist_note_an(&echt));
+
+        // Die uebliche: Note AN mit Anschlag 0. Wer nur auf 0x80 prueft,
+        // bekommt Toene, die nie aufhoeren -- genau dafuer ist dieser Test da.
+        let ueblich = [0x90u8, 60, 0];
+        assert!(ist_note_aus(&ueblich));
+        assert!(!ist_note_an(&ueblich));
+    }
+
+    #[test]
+    fn kanaele_zaehlen_ab_eins() {
+        assert_eq!(kanal_von(&[0x90, 60, 100]), 1);    // Protokoll 0
+        assert_eq!(kanal_von(&[0x9F, 60, 100]), 16);   // Protokoll 15
+        assert_eq!(kanal_von(&[0x85, 60, 0]), 6);      // auch bei Note-aus
+        // Der Kanal darf den Status nicht verwaschen.
+        assert_eq!(status_von(&[0x9F, 60, 100]), 0x90);
+    }
+
+    #[test]
+    fn regler_wird_gelesen() {
+        let m = [0xB0u8, 7, 90];           // Regler 7 (Lautstaerke) auf 90
+        assert!(ist_regler(&m));
+        assert!(!ist_note_an(&m));
+        assert!(!ist_note_aus(&m));
+        assert_eq!(d1_von(&m), 7);
+        assert_eq!(d2_von(&m), 90);
+    }
+
+    #[test]
+    fn leere_nachricht_taeuscht_nichts_vor() {
+        // Vor dem ersten MIDI_NEXT, oder wenn nichts angekommen ist.
+        let leer: [u8; 0] = [];
+        assert_eq!(status_von(&leer), 0);
+        assert_eq!(d1_von(&leer), 0);
+        assert_eq!(d2_von(&leer), 0);
+        assert!(!ist_note_an(&leer));
+        assert!(!ist_note_aus(&leer));
+        assert!(!ist_regler(&leer));
+        // Der wichtigste der sechs: `0 & 0x0F + 1` waere 1 und haette einen
+        // Kanal vorgetaeuscht, den es gar nicht gibt.
+        assert_eq!(kanal_von(&leer), 0);
+    }
+
+    #[test]
+    fn zu_kurze_nachricht_gilt_als_note_aus() {
+        // Fehlt das dritte Byte, ist der Anschlag 0 -- und ein Note-AN mit
+        // Anschlag 0 IST ein Note-aus. Lieber ein Ton, der endet, als einer,
+        // der haengenbleibt.
+        let kurz = [0x90u8, 60];
+        assert_eq!(d2_von(&kurz), 0);
+        assert!(ist_note_aus(&kurz));
+        assert!(!ist_note_an(&kurz));
     }
 
     #[test]

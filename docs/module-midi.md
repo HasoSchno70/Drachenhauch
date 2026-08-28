@@ -138,6 +138,23 @@ Die Oktavzählung folgt der verbreiteten Konvention (Note 60 = C4). Manche
 Hersteller nennen dieselbe Note C3 — das ist eine Zählweise, kein Fehler. Und
 Note 71 heißt hier **H**, nicht B.
 
+## Was geprüft ist
+
+An der Entwicklungsmaschine hängt **kein MIDI-Gerät**, und beim Autor auch
+nicht. Das hat den Zuschnitt bestimmt:
+
+* Die **Entschlüsselung** eingehender Nachrichten arbeitet über rohe Bytes,
+  nicht über den Gerätetyp — und ist damit vollständig mit erfundenen
+  Nachrichten prüfbar. Neun Rust-Tests decken Note an, beide Formen von
+  Note aus, Kanäle 1 und 16, Regler, die leere Nachricht und eine zu kurze
+  ab. Diese Tests laufen in **jedem** Bau, auch ohne das Feature.
+* Das **Senden** läuft echt: Windows bringt einen MIDI-Ausgang mit, im Test
+  geht also wirklich ein Dreiklang zum Synthesizer und wieder aus.
+* **Ungeprüft bleibt der Transport** — dass `midir` eine gespielte Note
+  tatsächlich in die Warteschlange legt. Das ist eine dünne Schicht, die nur
+  weiterreicht, aber sie ist eben nicht bewiesen. Rückmeldungen von jemandem
+  mit Instrument sind willkommen.
+
 ## Was es nicht kann
 
 * **Kein SysEx** — weder senden noch empfangen. Gerätespezifische
