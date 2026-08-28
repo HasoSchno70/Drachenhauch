@@ -7,6 +7,8 @@ Kommentar-Fortsetzung und lassen den Rest in Ruhe.
 """
 from __future__ import annotations
 
+from functools import lru_cache
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
     QColor, QFont, QSyntaxHighlighter, QTextCharFormat, QTextDocument,
@@ -48,8 +50,16 @@ _TYPE_KW = {
 }
 
 
-# Bekannte Built-in-Namen (lowercase) -- stark aus dem CTk-Editor uebernommen.
-BUILTIN_NAMES = frozenset({
+# Bekannte Built-in-Namen (lowercase) -- Quelle ist der eingefrorene
+# `builtin_index.json` ueber `dhrt_meta`, dieselbe Liste aus der auch
+# Completion, Hover und das Builtins-Panel schoepfen.
+#
+# Hier stand frueher eine handgepflegte Aufzaehlung ("stark aus dem
+# CTk-Editor uebernommen"). Die deckte zuletzt 72 von 1558 Builtins ab --
+# alles aus `gui`/`chart`/`g3d`/`audio`/`m3d` wurde im Editor wie eine
+# gewoehnliche Variable gefaerbt, also 95 % des Befehlssatzes. Sie lebt
+# als Notnagel weiter, falls der Index fehlt oder kaputt ist.
+_FALLBACK_NAMES = frozenset({
     "str$", "str", "val", "int", "abs", "len", "chr$", "chr", "asc",
     "sqr", "rnd", "upper$", "upper", "lower$", "lower", "rgb", "rgba", "alpha",
     "left$", "left", "right$", "right", "mid$", "mid", "instr",
@@ -64,6 +74,25 @@ BUILTIN_NAMES = frozenset({
     "loadsound", "playsound", "stopsound", "playmusic", "stopmusic",
     "drawtilemap", "millis", "time$",
 })
+
+
+@lru_cache(maxsize=1)
+def builtin_names() -> frozenset[str]:
+    """Lowercase-Namen aller Builtins -- mit UND ohne `$`.
+
+    Der Lexer liefert `STR$(1)` als IDENT `str$` und `STR(1)` als `str`;
+    beide Schreibweisen rufen dasselbe Builtin auf, also muessen auch
+    beide gefaerbt werden. Compiler-Interna (`__COMP_ITER` & Co.) bleiben
+    draussen -- die schreibt niemand von Hand.
+    """
+    try:
+        from .dhrt_meta import builtin_names_lower
+        namen = {n for n in builtin_names_lower() if not n.startswith("__")}
+    except Exception:
+        namen = set()
+    if not namen:
+        return _FALLBACK_NAMES
+    return frozenset(namen | {n.rstrip("$") for n in namen})
 
 
 def classify_token(tok) -> str | None:
@@ -90,7 +119,7 @@ def classify_token(tok) -> str | None:
         return "decl"
     if t == TokenType.IDENT:
         v = tok.value if isinstance(tok.value, str) else ""
-        if v.lower() in BUILTIN_NAMES:
+        if v.lower() in builtin_names():
             return "builtin"
         return "ident"
     # Operatoren / Punctuation -- kein eigenes Format.

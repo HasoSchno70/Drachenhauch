@@ -95,3 +95,58 @@ def test_completer_keywords_include_new_features():
     from drachenhauch.editor_qt.completer import KEYWORDS
     for kw in ("OPERATOR", "YIELD", "COROUTINE", "NIL"):
         assert kw in KEYWORDS, kw
+
+
+# --------------------------------------------------- Builtin-Einfaerbung
+# `classify_token` zog seine Builtin-Namen frueher aus einer handgepflegten
+# Aufzaehlung im Highlighter (72 Namen, "aus dem CTk-Editor uebernommen").
+# Der Befehlssatz ist seither auf ueber 1500 gewachsen -- alles aus `gui`,
+# `chart`, `g3d`, `audio` und `m3d` sah im Editor aus wie eine gewoehnliche
+# Variable. Quelle ist jetzt `dhrt_meta` (builtin_index.json).
+
+from drachenhauch.lexer import Lexer
+from drachenhauch.editor_qt.highlighter import builtin_names, classify_token
+
+
+def _klasse(quelltext: str, wort: str) -> str | None:
+    """Highlight-Klasse des IDENT-Tokens `wort` in `quelltext`."""
+    for tok in Lexer(quelltext).tokenize():
+        if isinstance(tok.value, str) and tok.value.lower() == wort.lower():
+            return classify_token(tok)
+    raise AssertionError(f"{wort!r} nicht im Token-Strom von {quelltext!r}")
+
+
+def test_builtins_der_grossen_module_sind_builtin():
+    """Je ein Vertreter der Module, die die alte Liste komplett uebersah."""
+    for quelle, wort in [
+        ("GUI_DRAW()", "gui_draw"),
+        ("CHART_DRAW(c)", "chart_draw"),
+        ("CUBE(0, 0, 0, 1, 1, 1)", "cube"),
+        ("AUDIO_PLAY(s)", "audio_play"),
+        ("VEC2_NEW(1.0, 2.0)", "vec2_new"),
+        ("PRINT JSON_GET_INT(h, \"a\")", "json_get_int"),
+    ]:
+        assert _klasse(quelle, wort) == "builtin", wort
+
+
+def test_dollar_form_und_kurzform_beide_builtin():
+    """Der Lexer liefert `STR$(1)` als `str$` und `STR(1)` als `str` --
+    beide rufen dasselbe Builtin, beide muessen gefaerbt werden."""
+    assert _klasse("PRINT STR$(1)", "str$") == "builtin"
+    assert _klasse("PRINT STR(1)", "str") == "builtin"
+
+
+def test_eigene_namen_bleiben_ident():
+    assert _klasse("meine_variable = 1", "meine_variable") == "ident"
+    assert _klasse("SUB spieler_zeichnen()", "spieler_zeichnen") == "ident"
+
+
+def test_compiler_interna_sind_keine_builtins():
+    """`__COMP_ITER` & Co. stehen im Index, schreibt aber niemand von Hand."""
+    assert not any(n.startswith("__") for n in builtin_names())
+
+
+def test_liste_deckt_den_ganzen_index_ab():
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
+    fehlend = {n for n in builtin_names_lower() if not n.startswith("__")} - builtin_names()
+    assert not fehlend, f"nicht eingefaerbt: {sorted(fehlend)[:10]}"
