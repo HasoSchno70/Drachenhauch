@@ -1,7 +1,7 @@
 """Auto-Completion-Quelle fuer den Code-Editor.
 
 Liefert eine sortierte Vorschlagsliste aus:
-- Sprach-Schluesselwoertern (DIM, FOR, IF, ...),
+- Sprach-Schluesselwoertern (DIM, FOR, IF, ...; aus `tokens.KEYWORDS`),
 - registrierten Built-ins (BUILTINS / GRAPHICS_BUILTINS),
 - Konstanten (Farben, KEY_*, PI),
 - Snippet-Triggern (Anzeige + Bodyhinweis im Detail-Text).
@@ -11,22 +11,23 @@ Strg+Leertaste oder automatisch ab 2 Zeichen.
 """
 from __future__ import annotations
 
+from ..tokens import KEYWORDS as _KEYWORD_TABELLE
 from .snippets import SNIPPETS
 
 
-KEYWORDS = sorted({
-    "DIM", "AS", "IF", "THEN", "ELSE", "ELSEIF", "ELIF", "END", "WHILE", "WEND",
-    "FOR", "TO", "STEP", "NEXT", "SUB", "FUNCTION", "RETURN", "CLASS",
-    "NEW", "EXTENDS", "STRUCT", "PRINT", "INPUT", "AND", "OR", "NOT",
-    "MOD", "TRUE", "FALSE", "CONST", "BREAK", "CONTINUE", "ARRAY", "OF",
-    "INTEGER", "FLOAT", "STRING", "BOOLEAN", "IMAGE", "SOUND", "FILE",
-    "MAP", "REM", "PI",
-    "TRY", "CATCH", "THROW", "IMPORT", "BYREF",
-    "BAND", "BOR", "BXOR", "BNOT", "SHL", "SHR",
-    "TUPLE", "WITH", "STATIC", "FUNCREF", "IN", "WHERE", "PROPERTY",
-    "ENUM", "SELECT", "CASE", "REPEAT", "UNTIL", "DATA", "READ", "RESTORE",
-    "OPERATOR", "YIELD", "COROUTINE", "NIL",
+# Sprach-Schluesselwoerter -- ABGELEITET aus `tokens.KEYWORDS`, derselben
+# Tabelle, die auch der Lexer benutzt (und die `lexer.rs` in dhrt spiegelt).
+#
+# Hier stand frueher eine handgepflegte Aufzaehlung. Sie war um drei
+# Schluesselwoerter zurueckgeblieben: `IS` (der Laufzeit-Typtest `x IS Hund`
+# / `x IS NOT NIL`), `FINALLY` und `PRIVATE` -- gerade das juengste
+# Sprachfeature schlug der Editor also nicht vor. Abgeleitet kann das nicht
+# mehr passieren.
+_EXTRAS = frozenset({
+    "REM",   # Kommentar-Marker, kein Keyword-Token (der Lexer verschluckt ihn)
+    "PI",    # vorregistrierte Konstante, kein Keyword -- aber tippt man
 })
+KEYWORDS = sorted({k.upper() for k in _KEYWORD_TABELLE} | _EXTRAS)
 
 
 def collect_builtins() -> list[str]:

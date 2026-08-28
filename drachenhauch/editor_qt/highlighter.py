@@ -27,7 +27,7 @@ _CONTROL_KW = {
     TokenType.WHILE, TokenType.WEND, TokenType.FOR, TokenType.TO,
     TokenType.STEP, TokenType.NEXT, TokenType.RETURN,
     TokenType.BREAK, TokenType.CONTINUE, TokenType.END,
-    TokenType.TRY, TokenType.CATCH, TokenType.THROW,
+    TokenType.TRY, TokenType.CATCH, TokenType.THROW, TokenType.FINALLY,
     TokenType.SELECT, TokenType.CASE, TokenType.IS, TokenType.WHERE,
     TokenType.REPEAT, TokenType.UNTIL, TokenType.YIELD,
 }
@@ -42,6 +42,7 @@ _DECL_KW = {
     TokenType.BYREF, TokenType.ENUM, TokenType.WITH, TokenType.STATIC,
     TokenType.FUNCREF, TokenType.IN, TokenType.PROPERTY,
     TokenType.DATA, TokenType.READ, TokenType.RESTORE, TokenType.OPERATOR,
+    TokenType.PRIVATE,
 }
 _TYPE_KW = {
     TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING_TYPE,
