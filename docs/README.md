@@ -111,8 +111,9 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet
 - **[Entwurf: Mengen](entwurf-set-builtins.md)** — der letzte offene WP-J-Punkt, nach dem Nachmessen neu zugeschnitten
 - **[Entwurf: TASK_START](entwurf-task-start.md)** — GB-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
-- **[Release 2026.9](release-2026.9.md)** — was in dieser Fassung neu ist
-- **[Release 2026.8](release-2026.8.md)** — die Fassung davor
+- **[Release 2026.10](release-2026.10.md)** — was in dieser Fassung neu ist
+- **[Release 2026.9](release-2026.9.md)** — die Fassung davor
+- **[Release 2026.8](release-2026.8.md)** — und die davor
 - **[Allzweck-Roadmap](allzweck-roadmap.md)** — was fehlt, damit man damit *alles* schreiben kann und nicht nur Spiele (aktuell, Audit 2026-08)
 - **[Allzweck-Audit, zweite Runde](allzweck-audit-2.md)** — was nach der abgearbeiteten Roadmap noch fehlt, damit man Drachenhauch zum Software-Bauen *wählt* (2026-08-23)
 - **[Befehlssatz-Roadmap](befehlssatz-roadmap.md)** und **[GUI-Design-Notiz](gui-module-design.md)** — historisch, mit Lesehinweis

@@ -3,8 +3,8 @@ name = "drachenhauch_runtime"
 # Dieselbe Fassung wie pyproject.toml und drachenhauch/__init__.py -- `dhrt
 # --version` gibt sie aus, und tests/test_version.py haelt die drei
 # Angaben zusammen. (Cargo verlangt drei Stellen, das Projekt nennt sich
-# "2026.9".)
-version = "2026.9.0"
+# "2026.10".)
+version = "2026.10.0"
 edition = "2021"
 description = "Native Drachenhauch runtime (Rust). Loads .dhc bytecode, executes VM core; optional raylib graphics."
 
