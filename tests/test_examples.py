@@ -33,6 +33,12 @@ _NON_DETERMINISTIC = [
     "18_math",       # TIME$() / 100k SIN-Bench
     "19_maps",       # MILLIS()-Zeitmessung im Output
     "26_tween",      # nutzt MILLIS() in der Demo
+    # Werkzeuge, die normalerweise Argumente bekommen. Sie fuehren sich OHNE
+    # Argumente am eigenen Quelltext vor -- genau das prueft dieser Eintrag:
+    # bis 2026-08-28 druckten sie nur eine Verwendungszeile und endeten mit
+    # Rueckgabewert 2, waren aus dem Editor (F5) also nicht benutzbar.
+    "161_werkzeug",  # zaehlt sich selbst; Ausgabe haengt am eigenen Umfang
+    "172_filter",    # sucht STDIN im eigenen Quelltext
 ]
 
 # Pygame-/Asset-abhaengige (brauchen interaktives Fenster oder Asset-Pfad-Setup).

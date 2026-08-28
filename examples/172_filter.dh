@@ -9,6 +9,11 @@
 '   dhrt run 172_filter.dh -- Muster datei.txt
 '   dir | dhrt run 172_filter.dh -- Muster
 '
+' OHNE Argumente fuehrt es sich am eigenen Quelltext vor (sucht darin nach
+' "STDIN"). Noetig, weil sich einem Programm aus dem Editor heraus (F5) nichts
+' mitgeben laesst -- ein Beispiel, das dann nur eine Verwendungszeile druckt,
+' sieht kaputt aus.
+'
 ' Als exportierte .exe entfaellt das `--`:
 '   dhrt --export 172_filter.dh
 '   dir | 172_filter.exe Muster
@@ -34,12 +39,31 @@ FOR i = 0 TO ARGC() - 1
     END IF
 NEXT
 
+' Hinweise gehoeren nach stderr: so bleibt stdout die reine Nutzlast,
+' auch wenn jemand `... > treffer.txt` schreibt.
+CONST EIGENE_QUELLE AS STRING = "172_filter.dh"
+
 IF muster = "" THEN
-    ' Hinweise gehoeren nach stderr: so bleibt stdout die reine Nutzlast,
-    ' auch wenn jemand `... > treffer.txt` schreibt.
-    EPRINT("Verwendung: 172_filter <muster> [datei ...]")
-    EPRINT("Ohne Datei wird die Standardeingabe gelesen.")
-    EXIT(FALSCH_AUFGERUFEN)
+    IF FILEEXISTS(EIGENE_QUELLE) THEN
+        ' Kein Muster -- also suchen wir uns selbst etwas. dhrt wechselt beim
+        ' Start ins Verzeichnis der .dh-Datei, der Quelltext liegt also hier.
+        muster = "STDIN"
+        ARRAY_PUSH(dateien, EIGENE_QUELLE)
+        EPRINT("Ohne Muster gibt es nichts zu suchen -- hier eine Vorfuehrung:")
+        EPRINT("die Zeilen des eigenen Quelltexts, in denen STDIN vorkommt.")
+        EPRINT("Mit eigenem Muster geht es so:")
+        EPRINT("  dhrt run 172_filter.dh -- <muster> [datei ...]")
+        EPRINT("  dir | dhrt run 172_filter.dh -- <muster>")
+        EPRINT("Aus dem Editor (F5) geht beides nicht: dort laesst sich einem")
+        EPRINT("Programm weder etwas mitgeben noch etwas hineinreichen.")
+        EPRINT("")
+    ELSE
+        ' Als exportierte .exe liegt der Quelltext nicht daneben -- dann ist
+        ' ein Aufruf ohne Muster schlicht falsch, und genau das sagen wir.
+        EPRINT("Verwendung: 172_filter <muster> [datei ...]")
+        EPRINT("Ohne Datei wird die Standardeingabe gelesen.")
+        EXIT(FALSCH_AUFGERUFEN)
+    END IF
 END IF
 
 ' --- Eine Zeile pruefen und ggf. ausgeben ---------------------------------

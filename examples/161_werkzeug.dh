@@ -8,6 +8,11 @@
 '   dhrt run 161_werkzeug.dh -- datei.txt [weitere.txt ...]
 '   dhrt run 161_werkzeug.dh -- --nur-zeilen datei.txt
 '
+' OHNE Argumente fuehrt es sich an seinem eigenen Quelltext vor. Das ist
+' nicht Zierde, sondern noetig: aus dem Editor heraus (F5) laesst sich einem
+' Programm nichts mitgeben, und ein Beispiel, das dann nur eine
+' Verwendungszeile druckt, sieht kaputt aus.
+'
 ' Alles hinter `--` gehoert dem PROGRAMM, alles davor der Runtime. Als
 ' exportierte .exe entfaellt das `--`:
 '   dhrt --export 161_werkzeug.dh
@@ -43,16 +48,41 @@ FOR i = 0 TO ARGC() - 1
     a = ARG$(i)
     IF a = "--nur-zeilen" THEN
         nur_zeilen = TRUE
+    ELIF LEFT$(a, 2) = "--" THEN
+        ' Ohne diesen Zweig wuerde ein Tippfehler in der Option als DATEINAME
+        ' gelesen -- und die Meldung hiesse dann "Nicht gefunden: --nur-zeilne",
+        ' was den Fehler eher versteckt als zeigt.
+        EPRINT("Unbekannte Option: " + a)
+        EXIT(FALSCH_AUFGERUFEN)
     ELSE
         ARRAY_PUSH(dateien, a)
     END IF
 NEXT
 
+' Hinweise gehoeren nach stderr, nicht in die Nutzdaten: so kann jemand
+' `... > ergebnis.txt` schreiben und sieht die Meldung trotzdem.
+CONST EIGENE_QUELLE AS STRING = "161_werkzeug.dh"
+DIM vorfuehrung AS BOOLEAN
+vorfuehrung = FALSE
+
 IF LEN(dateien) = 0 THEN
-    ' Hinweise gehoeren nach stderr, nicht in die Nutzdaten: so kann jemand
-    ' `... > ergebnis.txt` schreiben und sieht die Meldung trotzdem.
-    EPRINT("Verwendung: 161_werkzeug [--nur-zeilen] <datei> [datei ...]")
-    EXIT(FALSCH_AUFGERUFEN)
+    IF FILEEXISTS(EIGENE_QUELLE) THEN
+        ' Nichts zu zaehlen -- also zaehlen wir uns selbst. dhrt wechselt beim
+        ' Start ins Verzeichnis der .dh-Datei, der Quelltext liegt also hier.
+        vorfuehrung = TRUE
+        ARRAY_PUSH(dateien, EIGENE_QUELLE)
+        EPRINT("Ohne Argument gibt es nichts zu zaehlen -- hier eine Vorfuehrung")
+        EPRINT("am eigenen Quelltext. Mit eigenen Dateien geht es so:")
+        EPRINT("  dhrt run 161_werkzeug.dh -- <datei> [datei ...]")
+        EPRINT("Aus dem Editor (F5) geht das nicht: dort laesst sich einem")
+        EPRINT("Programm nichts mitgeben. Dafuer ist die Konsole da.")
+        EPRINT("")
+    ELSE
+        ' Als exportierte .exe liegt der Quelltext nicht daneben -- dann ist
+        ' ein Aufruf ohne Argumente schlicht falsch, und genau das sagen wir.
+        EPRINT("Verwendung: 161_werkzeug [--nur-zeilen] <datei> [datei ...]")
+        EXIT(FALSCH_AUFGERUFEN)
+    END IF
 END IF
 
 ' --- Arbeiten -------------------------------------------------------------
@@ -107,4 +137,9 @@ END IF
 ' Ohne EXIT endet das Programm mit 0 -- also nur im Fehlerfall etwas anderes.
 IF fehlend > 0 THEN
     EXIT(FEHLER)
+END IF
+
+IF vorfuehrung THEN
+    EPRINT("")
+    EPRINT("(Das war der eigene Quelltext. Rueckgabewert 0 -- alles in Ordnung.)")
 END IF
