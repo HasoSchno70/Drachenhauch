@@ -150,10 +150,20 @@ nicht. Das hat den Zuschnitt bestimmt:
   ab. Diese Tests laufen in **jedem** Bau, auch ohne das Feature.
 * Das **Senden** läuft echt: Windows bringt einen MIDI-Ausgang mit, im Test
   geht also wirklich ein Dreiklang zum Synthesizer und wieder aus.
-* **Ungeprüft bleibt der Transport** — dass `midir` eine gespielte Note
-  tatsächlich in die Warteschlange legt. Das ist eine dünne Schicht, die nur
-  weiterreicht, aber sie ist eben nicht bewiesen. Rückmeldungen von jemandem
-  mit Instrument sind willkommen.
+* **Auch der ganze Kreis** — senden, durch das Betriebssystem, wieder
+  empfangen — läuft im Test, sobald ein **virtueller Loopback-Port**
+  vorhanden ist (unter Windows z.B. [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html),
+  über `winget install TobiasErichsen.loopMIDI`). Ein solcher Port erscheint
+  unter demselben Namen als Ein- *und* Ausgang; genau daran erkennen die
+  Tests ihn, und ohne ihn überspringen sie sich. **Ein echtes Keyboard ist
+  dafür nicht nötig.** Damit sind auch die beiden Zusagen oben belegt und
+  nicht mehr nur behauptet: dass ein Note-an mit Anschlag 0 als Note-aus
+  ankommt, und dass die Warteschlange bei 1024 deckelt und die **älteste**
+  wegwirft (1200 gesendet → 1024 warten, die erste überlebende ist die 176.).
+
+Was damit *nicht* geprüft ist: dass ein bestimmtes **Instrument** sich so
+verhält wie das Protokoll es vorsieht. Rückmeldungen von jemandem mit
+Hardware bleiben willkommen.
 
 ## Was es nicht kann
 

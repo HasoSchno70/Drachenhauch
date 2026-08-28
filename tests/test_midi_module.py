@@ -12,9 +12,11 @@ Was hier wie geprueft wird:
 * **Die Geraete-Befehle** haengen am Feature. Der Bau sagt selbst, ob er sie
   hat (`dhrt --version`); je nachdem wird die Auflistung geprueft ODER die
   klare Meldung, dass der Bau sie nicht enthaelt.
-* **Der Notenfluss von einem echten Keyboard** laesst sich hier nicht pruefen
-  -- an dieser Maschine haengt keines. Das bleibt zum Gegenpruefen offen,
-  genau wie bei `serial`/`usb`/`bt`/`firmata`.
+* **Der ganze Kreis** -- senden, durch das Betriebssystem, wieder empfangen --
+  wird geprueft, sobald ein VIRTUELLER Loopback-Port da ist (unter Windows
+  z.B. loopMIDI). Ein solcher Port erscheint unter demselben Namen als Ein-
+  UND Ausgang; genau daran erkennen die Tests ihn. Ohne ihn ueberspringen
+  sie sich. Ein echtes Keyboard braucht es dafuer nicht.
 """
 import os
 import subprocess
@@ -209,3 +211,115 @@ MIDI_OUT_CLOSE(s)
 PRINT "durch"
 """)
     assert out == "durch\n"
+
+
+# ------------------------------------------- der ganze Kreis (Loopback)
+
+def _loopback() -> str:
+    """Name eines Ports, der Ein- UND Ausgang ist -- also eine Schleife.
+
+    Ein virtueller Loopback (loopMIDI o.ae.) erscheint unter demselben Namen
+    auf beiden Seiten; ein echtes Geraet nie. Deshalb ist der Namensvergleich
+    hier kein Behelf, sondern das eigentliche Erkennungsmerkmal.
+    """
+    if not _hat_midi() or _DHRT is None:
+        return ""
+    import tempfile
+    quelle = (
+        'IMPORT "midi"\n'
+        'DIM i AS INTEGER\n'
+        'FOR i = 0 TO MIDI_IN_COUNT() - 1\n'
+        '    DIM j AS INTEGER\n'
+        '    FOR j = 0 TO MIDI_OUT_COUNT() - 1\n'
+        '        IF MIDI_IN_NAME$(i) = MIDI_OUT_NAME$(j) THEN PRINT MIDI_IN_NAME$(i)\n'
+        '    NEXT\n'
+        'NEXT\n')
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "lb.dh"
+        p.write_text(quelle, encoding="utf-8")
+        r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True,
+                           text=True, encoding="utf-8", timeout=30)
+        zeilen = [z for z in (r.stdout or "").splitlines() if z.strip()]
+        return zeilen[0].strip() if zeilen else ""
+
+
+_LOOPBACK = _loopback()
+_ohne_loopback = pytest.mark.skipif(
+    not _LOOPBACK, reason="kein virtueller MIDI-Loopback-Port vorhanden")
+
+
+def _oeffnen(port: str) -> str:
+    """GB-Vorspann, der denselben Port als Ein- und Ausgang oeffnet."""
+    return (
+        'IMPORT "midi"\n'
+        'DIM ein AS MIDI_IN\n'
+        'DIM aus AS MIDI_OUT\n'
+        'DIM i AS INTEGER\n'
+        'FOR i = 0 TO MIDI_IN_COUNT() - 1\n'
+        f'    IF MIDI_IN_NAME$(i) = "{port}" THEN ein = MIDI_IN_OPEN(i)\n'
+        'NEXT\n'
+        'FOR i = 0 TO MIDI_OUT_COUNT() - 1\n'
+        f'    IF MIDI_OUT_NAME$(i) = "{port}" THEN aus = MIDI_OUT_OPEN(i)\n'
+        'NEXT\n')
+
+
+@_ohne_loopback
+def test_gesendetes_kommt_wieder_an(run_gb):
+    """Der Kreis: senden, durch das Betriebssystem, wieder empfangen.
+
+    Das ist der Teil, den die Rust-Tests NICHT abdecken -- sie pruefen die
+    Entschluesselung mit erfundenen Bytes. Hier laeuft eine echte Nachricht
+    durch midir, den Treiber und den Rueckruf-Faden zurueck.
+
+    Die dritte Nachricht ist die wichtigste: ein Note-AN mit Anschlag 0. So
+    schicken die meisten Instrumente ein Note-aus, und hier ist belegt, dass
+    es auch ueber einen echten Transport so ankommt.
+    """
+    out = run_gb(_oeffnen(_LOOPBACK) + """
+MIDI_NOTE_ON(aus, 3, 60, 100)
+MIDI_NOTE_OFF(aus, 3, 60)
+MIDI_NOTE_ON(aus, 1, 64, 0)
+MIDI_CC(aus, 16, 7, 90)
+SLEEP(400)
+DO WHILE MIDI_NEXT(ein)
+    DIM art AS STRING
+    art = "?"
+    IF MIDI_IS_NOTE_ON(ein) THEN art = "an"
+    IF MIDI_IS_NOTE_OFF(ein) THEN art = "aus"
+    IF MIDI_IS_CC(ein) THEN art = "cc"
+    PRINT art; " "; MIDI_CHANNEL(ein); " "; MIDI_DATA1(ein); " "; MIDI_DATA2(ein)
+LOOP
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+""")
+    assert out.splitlines() == [
+        "an 3 60 100",     # Note an, Kanal 3
+        "aus 3 60 0",      # sauberes Note aus
+        "aus 1 64 0",      # Note AN mit Anschlag 0 -- gilt als Note aus
+        "cc 16 7 90",      # Regler, Kanal 16 (hoechster)
+    ]
+
+
+@_ohne_loopback
+def test_puffer_deckelt_und_wirft_das_aelteste_weg(run_gb):
+    """Die Warteschlange fasst 1024 und wirft beim Ueberlauf die AELTESTE weg.
+
+    Beides stand bisher nur in der Doku. 1200 Nachrichten werden geschickt
+    und keine abgeholt; danach muessen genau 1024 warten, und die erste
+    ueberlebende muss die 176. gesendete sein (1200 - 1024) -- bei
+    "juengste faellt weg" waere es die erste.
+    """
+    out = run_gb(_oeffnen(_LOOPBACK) + """
+FOR i = 0 TO 1199
+    MIDI_NOTE_ON(aus, 1, 20 + (i MOD 100), 100)
+NEXT
+SLEEP(1800)
+PRINT MIDI_PENDING(ein)
+IF MIDI_NEXT(ein) THEN PRINT MIDI_NOTE(ein)
+MIDI_IN_CLOSE(ein)
+MIDI_OUT_CLOSE(aus)
+""")
+    zeilen = out.splitlines()
+    assert zeilen[0] == "1024", f"Deckel nicht eingehalten: {zeilen}"
+    assert zeilen[1] == str(20 + (176 % 100)), (
+        f"nicht die aelteste weggefallen: {zeilen}")
