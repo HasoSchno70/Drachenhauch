@@ -6,12 +6,18 @@ Beide Warnungen hier stammen aus echten Stolpersteinen beim Bauen der Demo:
   und ignorieren ueberzaehlige STILL. Ein mitgegebenes Argument tat damit
   einfach nichts, ohne ein Wort. (Kostete in Szene 2 der Demo einen halben
   Nachmittag: die Stueckzahl von PLOTS wurde verschluckt.)
+
+  Fuer die Builtins in `builtins.rs` gilt das NICHT: die pruefen mit `arity!`
+  und brechen ab. Die Warnung sagte trotzdem lange "ueberzaehlige werden
+  ignoriert" und beruhigte damit bei zwei Dritteln der Builtins, obwohl das
+  Programm gleich darauf stehenblieb -- siehe die beiden Tests unten.
 * **Verdeckte Konstante** -- Drachenhauch ignoriert Gross-/Kleinschreibung, eine
   lokale `hoehe` verdeckt also die Konstante `HOEHE`. Der Fehler taucht dann
   weit weg von der Ursache auf.
 
-Beides sind WARNUNGEN, keine Fehler: das Programm laeuft weiter. Geprueft wird
-ueber `dhrt --check`, das die Warnungen als JSON ausgibt.
+Beides sind WARNUNGEN, keine Fehler: der Compiler laesst das Programm laufen.
+Ob es dann auch durchlaeuft, haengt beim Argumentzahl-Fall am Builtin.
+Geprueft wird ueber `dhrt --check`, das die Warnungen als JSON ausgibt.
 """
 import json
 import os
@@ -73,6 +79,24 @@ PRINT MID$("abc", 1)
 PRINT MID$("abc", 1, 2)
 """)
     assert not any("Argument" in m for m in w), w
+
+
+def test_meldung_verspricht_keine_folgenlosigkeit(tmp_path):
+    """Die Warnung sagte frueher "ueberzaehlige werden ignoriert" -- fuer die
+    661 Builtins mit `arity!`-Pruefung ist das schlicht falsch (siehe den
+    Test darunter). Der Compiler kann die beiden Faelle nicht auseinander
+    halten, also sagt die Meldung die Folge nicht mehr voraus."""
+    w = _warnungen(tmp_path, 'PRINT MID$("abc", 1, 2, 99)\n')
+    assert any("MID$" in m and "4 Argumente" in m for m in w), w
+    assert not any("werden ignoriert" in m for m in w), w
+
+
+def test_ueberzaehliges_argument_bricht_bei_geprueften_builtins_ab(run_gb):
+    """Das Gegenstueck zur Meldung: hier laeuft das Programm eben NICHT
+    weiter. `MID$` liegt in `builtins.rs` und prueft seine Argumentzahl."""
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match=r"MID\$: erwartet 2\.\.3 Argumente, erhalten 4"):
+        run_gb('PRINT MID$("abc", 1, 2, 99)')
 
 
 def test_variadische_builtins_werden_nicht_gemeldet(tmp_path):

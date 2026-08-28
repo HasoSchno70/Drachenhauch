@@ -2165,15 +2165,31 @@ impl Compiler {
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.", bname.to_uppercase())));
             }
-            // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst --
-            // zu VIELE bisher nicht: die Grafik-Builtins greifen ihre Argumente
-            // per Index ab und ignorieren den Rest stillschweigend. Ein
-            // mitgegebenes Argument tut dann einfach nichts, ohne ein Wort.
+            // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst.
+            // Zu VIELE geht je nach Builtin unterschiedlich aus, und der
+            // Compiler kann nicht wissen, welcher Fall vorliegt:
+            //
+            //   * die 661 Builtins in `builtins.rs` pruefen mit `arity!` und
+            //     BRECHEN AB ("MID$: erwartet 2..3 Argumente, erhalten 4"),
+            //   * alles was ueber `try_*` in `vm.rs` laeuft (Grafik, gui, db,
+            //     zeit, ...) greift seine Argumente per Index ab und
+            //     IGNORIERT den Rest stillschweigend.
+            //
+            // Die Meldung sagt darum nicht mehr voraus, was passiert -- sie
+            // hat frueher "ueberzaehlige werden ignoriert" versprochen und
+            // damit bei zwei Dritteln der Builtins beruhigt, obwohl das
+            // Programm gleich darauf abbrach. Fuer den Aufrufer ist die
+            // Handlung ohnehin in beiden Faellen dieselbe: weglassen.
+            //
+            // Ein Verhaltensbit im Index waere die genauere Variante -- aber
+            // auch wieder eine von Hand gepflegte Liste neben dem Quelltext.
             else if let Some(&(min, max)) = builtin_arity().get(&bname) {
                 let n = args.len();
                 if n > max {
                     self.warnings.push((self.ctx.cur_line, format!(
-                        "{}: {} Argumente uebergeben, erwartet werden {} -- ueberzaehlige werden ignoriert.",
+                        "{}: {} Argumente uebergeben, erwartet werden {} -- die \
+                         ueberzaehligen weglassen (viele Builtins brechen sonst \
+                         zur Laufzeit ab).",
                         bname.to_uppercase(), n, arity_text(min, max))));
                 } else if n < min {
                     self.warnings.push((self.ctx.cur_line, format!(
