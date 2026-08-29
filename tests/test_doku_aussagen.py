@@ -85,3 +85,60 @@ def test_geduldete_pfade_sind_begruendet():
     m = _pruefer()
     for pfad, grund in m.GEDULDETE_PFADE.items():
         assert len(grund) > 20, f"{pfad}: Grund zu duenn ({grund!r})"
+
+
+# ------------------------------------------------------------- CLAUDE.md
+# CLAUDE.md wird seit dem Sweep am 2026-08-29 mitgeprueft -- aus demselben
+# Grund wie `docs/`, nur mit mehr Gewicht: sie ist die Datei, die als Erstes
+# gelesen wird, wenn jemand sich in diesem Repo zurechtfinden will. Der Sweep
+# fand dort vier tote Markdown-Links (auf den geloeschten Tree-Walker, den
+# Python-Compiler, das Python-ECS und eine geloeschte Testdatei), ein
+# umbenanntes Beispiel und einen Modul-Verweis auf eine Datei, die es seit
+# Stufe B nicht mehr gibt.
+
+def test_claude_md_befehlsnamen_existieren():
+    m = _pruefer()
+    funde = m.pruefe_namen(WURZEL, nur={"CLAUDE.md"})
+    assert not funde, "\n".join(
+        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+
+
+def test_claude_md_pfade_und_links_leben():
+    m = _pruefer()
+    funde = m.pfade(WURZEL, nur={"CLAUDE.md"})
+    assert not funde, "\n".join(
+        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+
+
+def test_markdown_links_werden_ueberhaupt_geprueft(tmp_path):
+    """Regression fuer die Pruefung selbst: sie sah lange nur Inline-Code
+    (`pfad.py`) und uebersah Links -- ausgerechnet die Form, in der die vier
+    toten Verweise in CLAUDE.md standen.
+
+    Mitgeprueft wird gleich, was NICHT anschlagen darf: ein Ordner-Ziel, eine
+    Zeilennummer am Ende und ein Ziel im Netz.
+    """
+    m = _pruefer()
+    (tmp_path / "probe.md").write_text(
+        "[tot](drachenhauch/gibtsnicht.py)\n"
+        "[lebt](rust/build_wasm.py)\n"
+        "[ordner](docs/)\n"
+        "[mit Zeile](drachenhauch/lexer.py:114)\n"
+        "[netz](https://example.invalid/x.py)\n", encoding="utf-8")
+    funde = m.pfade(tmp_path, nur={"probe.md"})
+    assert len(funde) == 1, funde
+    assert "gibtsnicht.py" in funde[0][2]
+
+
+def test_geduldete_pfade_gelten_nicht_fuer_links():
+    """Eine historische Nennung schreibt man als Inline-Code, nicht als Link:
+    ein Link verspricht 'hier kannst du hinspringen'. Genau so standen der
+    geloeschte Tree-Walker und die Parser-Parity in CLAUDE.md -- klickbar."""
+    m = _pruefer()
+    tot = next(iter(m.GEDULDETE_PFADE))
+    from pathlib import Path
+    import tempfile
+    ordner = Path(tempfile.mkdtemp())
+    (ordner / "probe.md").write_text(f"[klick]({tot})\n", encoding="utf-8")
+    assert m.pfade(ordner, nur={"probe.md"}), (
+        f"{tot} ist als Link durchgerutscht, weil es in GEDULDETE_PFADE steht")

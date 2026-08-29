@@ -81,7 +81,7 @@ SOUND ARRAY OF STRUCT FILE MAP TRY CATCH THROW FINALLY IMPORT SELECT CASE IS
 REPEAT UNTIL DATA READ RESTORE BYREF ENUM BAND BOR BXOR BNOT SHL SHR TUPLE
 WITH STATIC FUNCREF IN WHERE PROPERTY OPERATOR YIELD COROUTINE PRINT INPUT
 INTEGER FLOAT STRING BOOLEAN BUFFER PI TAU SELF SUPER ABSTRACT PRIVATE GET SET
-LET REM ANY FUNKTION
+LET REM ANY FUNKTION IIF
 """.split())
 
 # Namen, die absichtlich nicht existieren. Jeder Eintrag braucht einen Grund --
@@ -91,7 +91,20 @@ GEDULDET = {
     "TASK_START":   "allzweck-roadmap.md: WP H, ausdruecklich NICHT umgesetzt",
     "ERROR_FILE$":  "allzweck-roadmap.md: WP F, ausdruecklich gestrichen",
     "ERROR_TRACE$": "allzweck-roadmap.md: WP F, ausdruecklich gestrichen",
+    "NAME":         "CLAUDE.md: Platzhalter in der Builtin-Anleitung (`NAME(a, b [, c])`)",
+    "BITAND":       "CLAUDE.md: als ENTFERNT beschrieben (heute der Operator BAND)",
+    "DECLARE_GLOBAL_SLOT":       "CLAUDE.md: Bytecode-Opcode, kein Builtin",
+    "DECLARE_GLOBAL_CONST_SLOT": "CLAUDE.md: Bytecode-Opcode, kein Builtin",
 }
+
+
+def _md_dateien(ordner: Path, nur: set[str] | None = None) -> list:
+    """Die zu pruefenden .md-Dateien eines Ordners -- mit `nur` nur die
+    genannten. Damit laesst sich CLAUDE.md pruefen, ohne jede andere .md im
+    Repo-Wurzelverzeichnis (README, VERKAUF-CHECKLISTE, ...) mitzunehmen."""
+    if nur is not None:
+        return [ordner / n for n in sorted(nur) if (ordner / n).exists()]
+    return sorted(ordner.glob("*.md"))
 
 
 def bekannte_builtins() -> set:
@@ -101,10 +114,10 @@ def bekannte_builtins() -> set:
     return namen | {n.rstrip("$") for n in namen}
 
 
-def pruefe_namen(ordner: Path) -> list:
+def pruefe_namen(ordner: Path, nur: set[str] | None = None) -> list:
     bekannt = bekannte_builtins()
     funde = []
-    for datei in sorted(ordner.glob("*.md")):
+    for datei in _md_dateien(ordner, nur):
         text = datei.read_text(encoding="utf-8")
         # Codebloecke deckt pruef_docs.py ab -- hier nur Prosa und Tabellen.
         ohne = BLOCK.sub(lambda m: "\n" * m.group(0).count("\n"), text)
@@ -208,10 +221,12 @@ GEDULDETE_PFADE = {
     "examples/NN_gui.dh": "Platzhalter (NN = laufende Nummer), kein echter Pfad",
     "/program.dh": "virtueller Pfad im WASM-Dateisystem des Web-Playgrounds",
     "web/program.dh": "virtueller Pfad im WASM-Dateisystem des Web-Playgrounds",
+    "modules/ecs_py.py": "Python-ECS, mit Stufe B entfernt -- nur in historischen Notizen",
+    "rust/build.py": "Cython/PyO3-Build, mit Stufe B entfernt -- nur in historischen Notizen",
 }
 
 
-def pfade(ordner: Path) -> list:
+def pfade(ordner: Path, nur: set[str] | None = None) -> list:
     """4. PFADVERWEISE. `drachenhauch/interpreter.py` in einer Anleitung.
 
     Der Tree-Walker ist seit Stufe B entfernt -- die Umsetzungs-Checkliste in
@@ -230,26 +245,71 @@ def pfade(ordner: Path) -> list:
         if p.is_file() and "target" not in p.parts and "__pycache__" not in p.parts:
             alle.add(p.relative_to(WURZEL).as_posix())
     muster = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|rs|dh|json|toml))`")
+    # Markdown-Links: `[Text](pfad)` bzw. `[Text](pfad:42)`. Die pruefen sich
+    # nicht von selbst -- im Editor sind sie klickbar, und ein toter Link faellt
+    # erst auf, wenn jemand darauf klickt. In CLAUDE.md waren am 2026-08-29 vier
+    # davon tot (interpreter.py, compiler.py, ecs_py.py, eine Testdatei), alle
+    # auf Dateien, die Stufe B geloescht hatte.
+    link = re.compile(r"\]\(([^)\s]+)\)")
+    verzeichnisse = {d.relative_to(WURZEL).as_posix()
+                     for d in WURZEL.rglob("*")
+                     if d.is_dir() and "target" not in d.parts and "__pycache__" not in d.parts}
 
     def lebt(r: str) -> bool:
         r = r.lstrip("/")
         return any(a == r or a.endswith("/" + r) for a in alle)
 
+    def ziel_lebt(r: str) -> bool:
+        r = r.split("#")[0].rstrip("/")               # Anker, Schraegstrich am Ende
+        r = re.sub(r":\d+$", "", r)                   # `datei.py:114` -> Datei
+        while r.startswith("../"):                    # aus docs/ heraus
+            r = r[3:]
+        # GEDULDETE_PFADE gilt hier BEWUSST NICHT: eine historische Nennung
+        # schreibt man als Inline-Code (`drachenhauch/interpreter.py`), nicht
+        # als Link. Ein Link verspricht "hier kannst du hinspringen" -- und
+        # genau so standen der geloeschte Tree-Walker und die geloeschte
+        # Parser-Parity in CLAUDE.md, klickbar und ins Leere zeigend.
+        return not r or lebt(r) or r in verzeichnisse
+
     funde = []
-    for datei in sorted(ordner.glob("*.md")):
+    for datei in _md_dateien(ordner, nur):
+        # relative_to wirft ausserhalb des Repos (Tests pruefen mit tmp_path)
+        wo = (datei.relative_to(WURZEL).as_posix()
+              if datei.is_relative_to(WURZEL) else datei.name)
         for nr, zeile in enumerate(datei.read_text(encoding="utf-8").splitlines(), 1):
             for m in muster.finditer(zeile):
                 r = m.group(1)
                 if "/" not in r or lebt(r) or r in GEDULDETE_PFADE:
                     continue
-                funde.append((f"docs/{datei.name}", nr, r,
+                funde.append((wo, nr, r,
                               "Pfad existiert nicht -- entfernt, umbenannt oder vertippt"))
+            for m in link.finditer(zeile):
+                r = m.group(1)
+                if r.startswith(("http", "#", "mailto:")) or ziel_lebt(r):
+                    continue
+                funde.append((wo, nr, f"[...]({r})",
+                              "Link zeigt ins Leere -- Ziel entfernt, umbenannt oder vertippt"))
     return funde
 
 
 def main():
+    # CLAUDE.md wird MITGEPRUEFT -- und das aus dem gleichen Grund wie `docs/`,
+    # nur mit mehr Gewicht: sie ist die Datei, die als Erstes gelesen wird, wenn
+    # jemand (oder etwas) sich in diesem Repo zurechtfinden will. Beim Sweep am
+    # 2026-08-29 standen dort vier tote Markdown-Links (auf den geloeschten
+    # Tree-Walker, den Python-Compiler und eine geloeschte Testdatei), ein
+    # umbenanntes Beispiel, eine Test-Zaehlung von 3224 statt ueber 3800, und ein
+    # ganzer Abschnitt, der den Web-Playground als "Geruest, nicht gebaut"
+    # fuehrte -- obwohl der Abschnitt DARUEBER in derselben Datei "gebaut +
+    # verifiziert" sagte. Genau die Sorte Selbstwiderspruch, vor der der
+    # Kopfkommentar dieses Skripts warnt.
+    #
+    # Geprueft wird sie wie eine Doku-Datei; die Bereiche, die es hier nicht
+    # gibt (Zaehlungen im README, Tastenkonstanten), bleiben bei `docs/`.
     funde = (pruefe_namen(WURZEL / "docs") + zaehlungen()
-             + konstanten(WURZEL / "docs") + pfade(WURZEL / "docs"))
+             + konstanten(WURZEL / "docs") + pfade(WURZEL / "docs")
+             + pruefe_namen(WURZEL, nur={"CLAUDE.md"})
+             + pfade(WURZEL, nur={"CLAUDE.md"}))
     print(f"Doku-Aussagen geprueft -- {len(funde)} Befund(e)")
     for datei, zeile, was, msg in funde:
         print(f"\n  {datei}:{zeile}")

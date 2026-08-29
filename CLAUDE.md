@@ -31,8 +31,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 ```
 drachenhauch/             # Python = nur noch Editor-Tooling + Front-End
   __main__.py            # py -m drachenhauch <file> -> ruft `dhrt run`
-  lexer.py / tokens.py   # Tokenisierung (Highlighting/LSP/Dev)
-  parser.py / ast_nodes.py
+  lexer.py / tokens.py   # Tokenisierung (Highlighting/LSP/Dev) -- KEIN Parser mehr
   preprocess.py          # IMPORT-Merge (.dh-Source) + Built-in-Modul-Namen erkennen
   graphics.py            # nur COLORS/KEYS + Kamera-Mathematik (kein Render; pygame raus)
   synth.py               # Synth-Mathematik (von SFX-/Tracker-Editor + dhsfx genutzt)
@@ -45,7 +44,7 @@ rust/drachenhauch_runtime/         # >>> die Runtime: dhrt (Rust/raylib)
   src/lexer.rs parser.rs compiler.rs vm.rs builtins.rs + <modul>.rs  # alles in Rust
 dhrun.py                 # CLI: Editor-Launcher + run/--native/--export/--tokens/--ast (run -> dhrt)
 examples/*.dh            # Demos
-tests/                   # pytest (3224): run_gb-Golden gegen dhrt + Rust-#[test]
+tests/                   # pytest (ueber 3800): run_gb-Golden gegen dhrt + Rust-#[test]
 ```
 
 ## Architektur-Pipeline
@@ -141,8 +140,8 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | `imgfx` | `IMAGE_SCALE/ROTATE/FLIP/TINT/COPY` — immutable, geben neues IMAGE zurück. **`IMAGE_SCALE` glaettet bilinear** (raylib `ImageResize`); fuer Pixelgrafik `IMAGE_SCALE_NN` (Nearest-Neighbour, `ImageResizeNN`) — Demo `examples/152_pixelart_skalierung.dh` | — |
 | `particles` | Emitter mit Velocity/Lifetime/Gravity/Color/Size/Fade. `PARTICLE_EMIT/UPDATE/DRAW`. NumPy-vektorisiert. **Render-Modi** `PARTICLE_SET_MODE` (`circle`/`pixel`/`square`/`streak`/`glow` — `glow` wird in `PARTICLE_DRAW` (vm.rs) aktuell identisch zu `circle` gerendert, kein additives Blending im Recording-Modell; fuer echtes additives Leuchten `BLEND_MODE("add")` um die `PARTICLE_DRAW`-Aufrufe legen) + **Farbverlauf** `PARTICLE_SET_COLOR_END` (Start→End ueber die Lebenszeit, z.B. Feuer gelb→rot). | `PARTICLE_SYSTEM` |
 | `physics` | Pure Functions: AABB-/Circle-Collision, Distance, Reflect, Normalize, Ray-Cast (Box+Circle). Kein State. Auch **3D-Mathematik ohne Physik-Welt**: `PHYSICS_SPHERE_SPHERE(x1,y1,z1,r1, x2,y2,z2,r2)` (Kugel-Naeherung), `PHYSICS_DISTANCE3`; dazu `PHYSICS_POINT_TRI(px,py, ax,ay, bx,by, cx,cy)` (Punkt im Dreieck, baryzentrisch — unabhaengig vom Umlaufsinn). Plus **Broadphase** (`PHYSICS_BROAD_NEW/ADD/QUERY/PAIR_A/PAIR_B`): O(n)-Kollisionspaare fuer viele Kreis-Entities (Uniform-Grid, nativ via `gb_native`). | `PHYSICS_BROAD` |
-| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`ADD_SPHERE(... , dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/test_physics3d.py`. | `PHYS_WORLD` |
-| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/test_physics2d.py`. | `PHYS2D_WORLD` |
+| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`PHYS3D_ADD_SPHERE(..., dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/test_physics3d.py`. | `PHYS_WORLD` |
+| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`PHYS2D_ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/test_physics2d.py`. | `PHYS2D_WORLD` |
 | `camera` | World-Translation+Zoom+**Rotation** für **alle** Drawing-Befehle. `CAMERA_SET/RESET/FOLLOW`, `CAMERA_SET_ROTATION`/`CAMERA_ROTATION`, `CAMERA_S2W_X/Y`. Rotation dreht nur Positionen (um die Bildschirm-Mitte), keine automatische Kontur-Rotation von Formen/Sprites — siehe `docs/module-camera.md`. | — |
 | `sprite` | Animiertes Sheet-basiertes Sprite. Position+Velocity, benannte Animationen mit FPS, `PLAY`/`PLAY_ONCE`, Flip, AABB-Kollision | `SPRITE` |
 | `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.dhanim`-JSON (Editor `dhanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.dh`, Tests `tests/test_animfsm.py`. | `ANIM_FSM` |
@@ -160,7 +159,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
 | `midi` | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken. Feature `midi` (Crate `midir`: WinMM/ALSA/CoreMIDI), also nur in `--hardware`-Bauten -- **ausser** `MIDI_NOTE_NAME$`/`MIDI_NOTE_FREQ`, die nur umrechnen und darum ungegatet in `midi.rs` stehen (samt Rust-`#[test]`s; nur so ist der nuetzlichste Teil auch auf einer Maschine ohne Anschluss pruefbar). Auflisten `MIDI_IN_COUNT/NAME$`, oeffnen `MIDI_IN_OPEN` -> `MIDI_IN`, empfangen ueber das Cursor-Muster von `db`/`mqtt` (`MIDI_NEXT` + `MIDI_NOTE/VELOCITY/CHANNEL/IS_NOTE_ON`), senden `MIDI_NOTE_ON/OFF/CC/SEND`. **Zwei Protokoll-Eigenheiten:** die meisten Instrumente schicken Note-AUS als Note-AN mit Anschlag 0 (`MIDI_IS_NOTE_OFF` faengt beide, sonst enden Toene nie), und Kanaele zaehlen nach aussen 1..16 statt 0..15. Die Entschluesselung eingehender Nachrichten arbeitet ueber ROHE BYTES statt ueber den Geraetetyp (`status_von`/`kanal_von`/`ist_note_aus`/... in midi.rs, die `&Eingang`-Fassungen sind Einzeiler darueber) -- haenge sie am Geraet, ist sie ohne Instrument NIRGENDS pruefbar, so ist sie es ueberall: neun ungegatete Rust-`#[test]`s mit erfundenen Nachrichten decken beide Note-aus-Formen, Kanal 1/16, Regler, leere und zu kurze Nachricht ab. Der Rueckruf laeuft auf midirs eigenem Faden in eine Warteschlange mit **1024** Plaetzen; beim Ueberlauf faellt die AELTESTE weg (wer live spielt, will den aktuellen Anschlag). Uhr/Active-Sensing/SysEx werden weggelassen. **Nicht umgesetzt:** SysEx, MIDI-Uhr/Timecode, `.mid`-Dateien, virtuelle Anschluesse. **Der ganze Kreis ist geprueft** -- Tests, die einen VIRTUELLEN Loopback-Port benutzen (loopMIDI, `winget install TobiasErichsen.loopMIDI`; ein Port unter dem Portnamen als Ein- UND Ausgang, genau daran erkannt, sonst uebersprungen). Damit sind Note-an-mit-Anschlag-0 und der 1024er-Deckel samt aelteste-faellt-weg belegt statt behauptet -- ein Keyboard braucht es dafuer nicht. Doku `docs/module-midi.md`, Demo `examples/181_midi.dh`. | `MIDI_IN`, `MIDI_OUT` |
 | `mqtt` | **MQTT-3.1.1-Client** (das im Maker-/IoT-Bereich dominante Pub/Sub-Protokoll fuer ESP32/IoT-Steuerung) -- direkt gegen die OASIS-Spec via `std::net` implementiert, Feature `net` (bereits im Standard-Build, kein neues Crate). Nur **QoS 0** (kein Packet-ID-Ack-Handshake noetig), kein UNSUBSCRIBE/Will/TLS. `MQTT_CONNECT(host,port,client_id[,keepalive_s[,user[,pass]]])`, `MQTT_PUBLISH(h,topic,payload[,retain])`, `MQTT_SUBSCRIBE`, `MQTT_UPDATE` (Pro-Frame-Polling + automatisches Keepalive-PINGREQ), eingehende Nachrichten ueber Cursor-Muster wie `db` (`MQTT_NEXT_MESSAGE`/`MQTT_MESSAGE_TOPIC`/`MQTT_MESSAGE_PAYLOAD`, analog `DB_NEXT`+`DB_GET_*`). Doku `docs/module-mqtt.md`, Demo `examples/148_mqtt.dh`. | `MQTT_HANDLE` |
-| `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Reine Python-Implementation in `modules/ecs_py.py` (Cython entfernt); Produktions-Performance via `dhrt`. | `ECS_WORLD` |
+| `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Nativ in `rust/drachenhauch_runtime/src/ecs.rs` (die fruehere Python-Fassung `modules/ecs_py.py` ist mit Stufe B entfernt). | `ECS_WORLD` |
 | `html` | HTTP-GET/POST/DOWNLOAD + HTML-Parsing (pure stdlib). `HTTP_GET/POST/DOWNLOAD`, `HTTP_STATUS/HEADER`, `URL_ENCODE/DECODE`, `HTML_TEXT`, `HTML_FIND_ALL`. | — |
 | `bt` | Bluetooth Low Energy (BLE) via `bleak`. Scan, Connect, Service/Characteristic-Listing, Read/Write/Notify auf Characteristics. Externer Dep, IoT/Sensor-Targets. | `BT_HANDLE` |
 | `serial` | RS-232 / USB-COM nativ ueber die Rust-Crate `serialport` (kein `pyserial` noetig). `SERIAL_OPEN/READ/WRITE/READLINE/AVAILABLE/FLUSH/TIMEOUT`. | `SERIAL_HANDLE` |
@@ -201,7 +200,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | Eingabe aufzeichnen/abspielen | `AUTOMATION_RECORD(datei$)` / `AUTOMATION_STOP()` (schreibt die Datei, liefert die Anzahl) / `AUTOMATION_PLAY(datei$)` + `AUTOMATION_RECORDING/PLAYING/FRAME/COUNT` — raylibs Automation-Events (Tasten/Maus/Rad/Gamepad/Touch je Frame). Fuer Demo-/Attract-Modus, nachspielbare Fehlerberichte, automatische Spieltests. Eingespeist wird in `automation_tick()` am **Ende jedes FLIP** (direkt nach dem Einlesen der echten Eingabe -> aufgezeichnete Werte gewinnen; ein Ereignis aus Aufnahme-Frame N wirkt im Durchlauf N+1). Die Liste liegt in einer **Box**, weil `SetAutomationEventList` sich einen rohen Zeiger merkt. Aufnahme und Wiedergabe schliessen sich aus (raylib spielt waehrend einer Aufnahme nichts ab -> klare Fehlermeldung). Aufgezeichnet wird die EINGABE, nicht der Ablauf: Startzustand zuruecksetzen, `RANDOMIZE` festnageln, pro Frame statt pro Sekunde rechnen. **`KEY_ANY_HIT` blendet aus, was die laufende Wiedergabe selbst einspeist** (`auto_injected_keys` in graphics.rs) -- raylib legt eingespeiste Tasten auch in seine "zuletzt gedrueckt"-Warteschlange, ohne den Filter braeche ein Attract-Modus ("Demo endet bei Tastendruck") an seiner eigenen Demo ab; `KEYHIT`/`KEYPRESSED` sehen sie weiterhin, `JOYSTICK_ANY_BUTTON` ist nicht betroffen. Doku `docs/automation.md`, Demo `examples/153_automation.dh`, Tests `tests/test_automation.py` (schreiben die Aufnahmedatei selbst — raylibs Textformat). | — |
 | Maus-Blick + Cursor | `MOUSE_DELTA_X/Y()` (relative Bewegung — bei `MOUSE_LOCK` stehen MOUSEX/MOUSEY still, nur das Delta bewegt sich noch), `MOUSE_SET_POS(x,y)`, `MOUSE_ON_SCREEN()`, `MOUSEWHEEL_X/Y()` (Rad in **beiden** Achsen und als Kommazahl — `MOUSEWHEEL` liefert nur vertikal + ganzzahlig, feine Touchpad-Schritte fielen darin auf 0), `MOUSE_CURSOR(form$)` mit `default`/`ibeam`/`crosshair`/`hand`/`resize_ew`/`resize_ns`/`resize_nwse`/`resize_nesw`/`resize_all`/`not_allowed`. | — |
 | Touch + Gesten | `TOUCH_COUNT()`, `TOUCH_X/Y(i)`, `TOUCH_ID(i)` (stabile Finger-Kennung ueber Frames). `GESTURE$()` liefert einen **Namen** statt einer Zahl: `tap`/`doubletap`/`hold`/`drag`/`swipe_left|right|up|down`/`pinch_in`/`pinch_out` (`""` = keine). Dazu `GESTURE_DRAG_X/Y/ANGLE`, `GESTURE_PINCH_X/Y/ANGLE`, `GESTURE_HOLD_TIME()`. Demo `examples/149_input_edges.dh`. | — |
-| Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. **Natives OS-Fenster** (das SCREEN-Fenster selbst): `WINDOW_RESIZABLE(an)` (vom OS aus groessenveraenderbar), `WINDOW_MIN_SIZE(w,h)`/`WINDOW_MAX_SIZE(w,h)`, `WINDOW_MAXIMIZE/MINIMIZE/RESTORE()`, `WINDOW_RESIZED()->BOOL`; `SCREENWIDTH()`/`SCREENHEIGHT()` liefern die **live**-Groesse (waechst mit dem Fenster). Demo `examples/106_resizable_window.dh`. Nativ in dhrt (raylib). | — |
+| Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. **Natives OS-Fenster** (das SCREEN-Fenster selbst): `WINDOW_RESIZABLE(an)` (vom OS aus groessenveraenderbar), `WINDOW_MIN_SIZE(w,h)`/`WINDOW_MAX_SIZE(w,h)`, `WINDOW_MAXIMIZE/MINIMIZE/RESTORE()`, `WINDOW_RESIZED()->BOOL`; `SCREENWIDTH()`/`SCREENHEIGHT()` liefern die **live**-Groesse (waechst mit dem Fenster). Demo `examples/106_windows.dh`. Nativ in dhrt (raylib). | — |
 | Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Tree-Walker konsolen-only -> wirft "nur dhrt". Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.dh`. | — |
 
 Module mit eigenem Typ registrieren ihn lowercase (`register_type("json_handle", _JSONHandle)`),
@@ -376,11 +375,11 @@ Python-VM und Cython-VM. Folgen davon:
   typisierten `RETURN` zurueck, klappt die Zuweisung an eine typisierte
   Variable -- sonst `FOR EACH` nutzen.
 
-**Implementierung:** `_Coroutine` + `function_has_yield` in
-[interpreter.py](drachenhauch/interpreter.py); Erzeugung in den `CALL_*`-Pfaden
-aller Engines (is_coroutine-Branch), Treiben ueber die `CORO_*`-Builtins.
-Pro-Thread-State (`env`/`call_depth`/`_method_stack`) im Tree-Walker liegt in
-`threading.local`.
+**Implementierung:** in dhrt -- der Compiler markiert eine Funktion mit `YIELD`
+als Coroutine, die VM legt beim YIELD einen Frame-Schnappschuss in einem
+`Value::Coroutine` ab (`vm.rs`), getrieben wird ueber die `CORO_*`-Builtins.
+Der frueher hier beschriebene Thread-Aufbau gehoerte zum Python-Tree-Walker
+und ist mit Stufe B entfallen; die Frame-Schnappschuss-Fassung steht unten.
 
 **Auch nativ (dhrt/Rust, `--native` + Standalone-`.exe`).** Statt Threads nutzt
 die Rust-VM einen **Frame-Snapshot**: `dispatch` liefert `Step::Return | Yield`;
@@ -1539,12 +1538,11 @@ Loop, ohne Python-Dispatch-Overhead pro Entity:
 | `ECS_REMOVE_DEAD(w, name, threshold)` | Entities mit `value <= threshold` zerstoeren |
 | `ECS_COUNT_WITH(w, name)` | O(1) Halter-Zaehlung |
 
-**Implementation:** [drachenhauch/modules/ecs_py.py](drachenhauch/modules/ecs_py.py)
-(reine Python; die frühere Cython-Variante `ecs_native.pyx` wurde entfernt).
-`_World` und `_Component` sind normale Python-Klassen. Sparse-Set-Ops als
-Methoden. Fast-Path-Methoden auf `_World` (`get_float`, `add_float`, ...)
-wickeln `_check_*` + `_get_value` + die Bulk-Loops in einem Call ab. Performance
-für ECS-Hot-Paths liefert die native Runtime `dhrt` (Rust, `src/ecs.rs`).
+**Implementation:** [rust/drachenhauch_runtime/src/ecs.rs](rust/drachenhauch_runtime/src/ecs.rs).
+World und Components liegen als Sparse-Sets vor; die Bulk-Ops laufen dort als
+eine Schleife ueber die ganze Component-Schicht statt als ein Builtin-Aufruf je
+Entity -- daher der Unterschied. Die frueheren Python-/Cython-Fassungen
+(`modules/ecs_py.py`, `ecs_native.pyx`) sind mit Stufe B entfernt.
 
 **Beispiele:** [examples/bench_ecs_movement_v2.dh](examples/bench_ecs_movement_v2.dh)
 (Integrate-only), [examples/bench_ecs_systems.dh](examples/bench_ecs_systems.dh)
@@ -1553,8 +1551,8 @@ für ECS-Hot-Paths liefert die native Runtime `dhrt` (Rust, `src/ecs.rs`).
 **Game-Pattern-Lesson:** Wer ein Spiel-Hot-Path-System hat, das ueber
 viele Entities laeuft, sollte es als Bulk-Op-Builtin schreiben statt
 als pro-Entity-BASIC-Loop. Boilerplate fuer einen neuen Bulk-Builtin:
-Methode auf `_World` in `modules/ecs_py.py` + `@builtin`-Wrapper in `ecs.py` +
-(für Produktion) die entsprechende Logik in `rust/drachenhauch_runtime/src/ecs.rs`.
+die Logik in `rust/drachenhauch_runtime/src/ecs.rs` + Dispatch-Arm in `vm.rs`
+(`try_ecs`) + Eintrag in `editor_qt/builtin_index.json` + run_gb-Golden-Test.
 
 ## Kein Cython mehr, kein `setup.py build_ext`
 
@@ -1617,8 +1615,9 @@ und die Bench-Equivalenz den Tree-Walker nutzen.
 Hit-Check: `obj.cls is cache[0]`. Spart `_resolve_method`-Call und
 Dict-Lookup. Bei `bench_method_dispatch`: **1.34×**.
 
-Cache wird auch im stub-Pfad (Phase 4a) konsistent kopiert
-([compiler.py: stub.caches = compiled.caches](drachenhauch/compiler.py)).
+Cache wird auch im stub-Pfad (Phase 4a) konsistent kopiert. (Beschreibt den
+geloeschten Python-Compiler -- der Rust-Compiler emittiert keine Inline-Caches,
+siehe die Stufe-B-Warnung oben.)
 
 ### Globals-as-Slots
 
@@ -1740,8 +1739,8 @@ Layer-Typ steuert die Canvas-Interaktion; Undo umfasst Tile- UND Objekt-Ops
 `tile_count`/`tileset_image*`/`tile_src_rect`/`tile_properties` + `set_property`)
 zeigen aufs **aktive** Tileset (Palette/Canvas-Code unverändert). Tileset-Combo
 über der Palette wechselt/+/− Tilesets; Pipette schaltet aufs gid-Tileset um.
-**Speichern/Laden = Tiled-JSON** (genau das Format, das `drachenhauch/modules/tiled.py`
-via `TILED_LOAD` liest: **N eingebettete Tilesets** mit eigenen `firstgid`s,
+**Speichern/Laden = Tiled-JSON** (genau das Format, das dhrts `tiled`-Modul
+(`rust/drachenhauch_runtime/src/tiled.rs`) via `TILED_LOAD` liest: **N eingebettete Tilesets** mit eigenen `firstgid`s,
 CSV-Tile-Daten, Per-Tile-Props + `objectgroup` mit Objekten als
 `{name,type,value}`-Props; `TILED_OBJECT_*`/`TILED_TILESET_*` lesen sie). `GB-Code`
 exportiert einen selbstständigen Renderer (`LOADIMAGE` pro Tileset + `TILED_LOAD` +
@@ -1910,12 +1909,11 @@ genauso, `.dhc` läuft weiter den direkten VM-Pfad). Debug-Einstiege
 `dhrt --tokens` / `--ast` / `--preprocess` / `--runsrc` geben Token-Strom bzw.
 AST bzw. gemergte Quelle aus bzw. führen ohne chdir aus (Dev/Parity).
 Parity: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
-(193) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (107)
-+ [`tests/test_rust_preprocess_parity.py`](tests/test_rust_preprocess_parity.py) (8)
-+ [`tests/test_rust_run_parity.py`](tests/test_rust_run_parity.py) (2) = 310.
-**Eine Compiler-Parity-Datei gibt es NICHT** (dieser Absatz nannte lange eine
-mit 71 Tests): sie verglich gegen den Python-Compiler, und der ist mit Stufe B
-gelöscht. Das Compiler-Gate ist stattdessen Output-Parität — siehe unten.
+(215) + [`tests/test_rust_preprocess_parity.py`](tests/test_rust_preprocess_parity.py) (8)
++ [`tests/test_rust_run_parity.py`](tests/test_rust_run_parity.py) (2) = 225.
+**Parser- und Compiler-Parity gibt es NICHT MEHR** (dieser Absatz nannte lange
+beide, mit 107 bzw. 71 Tests): sie verglichen gegen den Python-Parser und
+-Compiler, und die sind mit Stufe B gelöscht. Das Compiler-Gate ist stattdessen Output-Parität — siehe unten.
 Dateien: [`src/lexer.rs`](rust/drachenhauch_runtime/src/lexer.rs),
 [`src/ast.rs`](rust/drachenhauch_runtime/src/ast.rs),
 [`src/parser.rs`](rust/drachenhauch_runtime/src/parser.rs),
@@ -1956,19 +1954,28 @@ ein + verdrahtet das Windows-emscripten-Env automatisch (`setup_emscripten_env`:
 CC/CXX/AR/Linker→`.exe`, bindgen-Includes, Ninja). `node web/dhrt.js` ==
 Tree-Walker verifiziert. Toolchain (emscripten 6.0.0 + wasm-Target) installiert.
 
-## Web-Playground (dhrt → WASM) — experimentell/Gerüst
+## Web-Playground (dhrt → WASM)
 
-`dhrt` als WebAssembly (emscripten) im Browser. **Status: Gerüst, nicht
-gebaut/verifiziert** (kein emscripten/raylib-web in der Dev-Umgebung). Teile:
-[`rust/build_wasm.py`](rust/build_wasm.py) (`.dh`→`web/program.dhc`, dann
-`cargo`+emscripten-Build, tolerant wenn Toolchain fehlt), cfg-gegateter
-WASM-Einstieg in [`rust/drachenhauch_runtime/src/main.rs`](rust/drachenhauch_runtime/src/main.rs)
-(`#[cfg(target_os = "emscripten")]` liest `/program.dhc`), Web-Harness
-[`web/`](web/) (`index.html` + `playground.js`, emscripten-`Module`-Konfig).
-**Kernhürde:** der VM-Render-Loop in `vm.run()` blockiert → Web braucht ASYNCIFY
-(gesetzt) oder Umbau auf `emscripten_set_main_loop`. **Compiler bleibt Python**
-→ Playground führt vorab kompilierte `.dhc` aus; Live-Kompilierung bräuchte
-Pyodide dazu. Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
+`dhrt` als WebAssembly (emscripten) im Browser. **Der Web-Build laeuft** (Stand
+2026-08-03, in `docs/web-playground.md` verifiziert): Konsolen- UND
+Grafik-Programme werden **im Browser kompiliert** und ausgefuehrt. Teile:
+[`rust/build_wasm.py`](rust/build_wasm.py) (bettet `.dh` als `web/program.dh`
+ein, `.dhc` bleibt als Fallback; dazu `cargo`+emscripten-Build, tolerant wenn
+die Toolchain fehlt), cfg-gegateter WASM-Einstieg in
+[`rust/drachenhauch_runtime/src/main.rs`](rust/drachenhauch_runtime/src/main.rs)
+(`#[cfg(target_os = "emscripten")]` liest `/program.dh` zuerst, `/program.dhc`
+als Rueckfall), Web-Harness [`web/`](web/) (`index.html` + `playground.js`),
+Ton ueber ein eigenes Kira-Backend auf OpenAL
+([`src/web_audio.rs`](rust/drachenhauch_runtime/src/web_audio.rs) -- cpal hat
+keinen emscripten-Host mehr).
+
+**Zwei Aussagen, die hier lange falsch standen** (die richtige Fassung stand
+schon in `docs/web-playground.md`): der blockierende Render-Loop in `vm.run()`
+war die *frueher* genannte Kernhuerde -- mit ASYNCIFY laeuft er durch. Und der
+Compiler ist **nicht** Python geblieben: seit dem Rust-Frontend kompiliert der
+Playground die Quelle selbst, **Pyodide braucht es nicht**.
+
+Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
 Tests [`tests/test_build_wasm.py`](tests/test_build_wasm.py) (Geruest/Harness,
 nicht der emscripten-Build).
 
