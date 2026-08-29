@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,8 +50,15 @@ ZIEL = WURZEL / "drachenhauch" / "editor_qt" / "builtin_prosa.json"
 AUS = re.compile(r"^(entwurf-|allzweck-)|roadmap|-design\.md$|^PERFORMANCE\.md$")
 
 NAME = r"([A-Z][A-Z0-9_]*\$?)"
-# | `NAME(...)` | Beschreibung |            (auch dreispaltig: | sig | Typ | Text |)
-TABELLE = re.compile(r"^\|\s*`" + NAME + r"[^`|]*`\s*\|(.+)$")
+# Tabellenzeile: die erste Spalte traegt die Signatur(en), der Rest die
+# Beschreibung. Bewusst grob geschnitten, weil die Doku in der ersten Spalte
+# mehr unterbringt als nur einen Namen:
+#     | `ALPHA(farbe)` → INTEGER | Alpha-Kanal aus einer Farbe lesen |
+#     | `ASTAR_PATH_X(g, idx)` / `ASTAR_PATH_Y(g, idx)` | INTEGER |
+# Ein Muster, das direkt hinter dem schliessenden Backtick ein `|` erwartet,
+# verliert die erste Form komplett -- allein `builtins-core.md` schreibt 122
+# Zeilen so.
+TABELLE = re.compile(r"^\|([^|]*)\|(.+)$")
 # Listenzeile. Der Kopf darf MEHRERE Namen tragen und die Signatur getrennt
 # fuehren -- `rust-runtime.md` schreibt den ganzen 3D-Zweig so:
 #     - `CUBE` / `CUBE_WIRES` `(x,y,z, w,h,d, farbe)` — gefuellter Quader.
@@ -134,13 +142,14 @@ def sammeln() -> dict[str, str]:
     raus: dict[str, str] = {}
     for datei in _quellen():
         for zeile in _zeilen(datei):
-            m = TABELLE.match(zeile)
-            treffer = [m.group(1).upper()] if m else []
+            m = TABELLE.match(zeile) or LISTE.match(zeile)
             if not m:
-                m = LISTE.match(zeile)
-                if m:
-                    treffer = [x.upper() for x in KOPF_NAME.findall(m.group(1))]
-            if not m:
+                continue
+            # Beide Formen fuehren die Namen im ersten Teil -- und beide duerfen
+            # mehrere tragen (`CUBE` / `CUBE_WIRES`), die dann dieselbe
+            # Beschreibung bekommen.
+            treffer = [x.upper() for x in KOPF_NAME.findall(m.group(1))]
+            if not treffer:
                 continue
             text = _saeubern(m.group(2))
             # Zu kurz ist keine Beschreibung, sondern ein Verweis oder eine
@@ -151,7 +160,55 @@ def sammeln() -> dict[str, str]:
                 if name not in namen and name.rstrip("$") not in ohne_dollar:
                     continue
                 raus.setdefault(name, text)
+    # `docs/` hat Vorrang: die Modulreferenz ist die knappe, auf den Befehl
+    # gemuenzte Fassung. Das Buch fuellt nur, was dort fehlt.
+    for name, text in aus_dem_referenzbuch(namen).items():
+        raus.setdefault(name, text)
     return dict(sorted(raus.items()))
+
+
+def aus_dem_referenzbuch(namen: set[str]) -> dict[str, str]:
+    """Kurzbeschreibungen aus `buch-referenz` -- aber nur die eindeutigen.
+
+    Das Referenzhandbuch fuehrt jeden Befehl als `H.cmd(name, signatur,
+    beschreibung, beispiele)`, und diese Texte sind fuer Menschen geschrieben.
+    Viele Eintraege fassen aber MEHRERE Befehle zusammen ("AUDIO_CLOCK_START ·
+    AUDIO_CLOCK_PAUSE · AUDIO_CLOCK_STOP"), und der Text beschreibt dann die
+    Gruppe -- oder nur einen davon. Nachgesehen:
+
+        AUDIO_CLOCK_STOP  ->  "PAUSE haelt die Uhr an ..."      (falscher Befehl)
+        JOYSTICK_HAT_Y    ->  "JOYSTICK_AXIS liefert ..."       (falscher Befehl)
+        SAVE_GET_STRING_OR -> "Mit Ersatzwert lesen bzw."       (halber Satz)
+
+    Darum zaehlen nur Eintraege, die GENAU EINEN Builtin nennen. Das kostet
+    Ausbeute (910 Sammel-Eintraege bleiben liegen), aber eine Beschreibung, die
+    einen anderen Befehl erklaert, ist schlimmer als gar keine -- dieselbe
+    Regel wie bei den Signaturen.
+
+    Ohne Node ist die Quelle nicht lesbar; dann bleibt es bei `docs/`.
+    """
+    exporter = WURZEL / "tools" / "buch_cmd_export.js"
+    if not exporter.exists():
+        return {}
+    try:
+        roh = subprocess.run(["node", str(exporter)], capture_output=True, text=True,
+                             encoding="utf-8", cwd=str(WURZEL), timeout=180)
+        eintraege = json.loads(roh.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
+    ohne_dollar = {n.rstrip("$") for n in namen}
+    raus: dict[str, str] = {}
+    for name, text in eintraege:
+        treffer = [n.upper() for n in re.findall(r"[A-Z][A-Z0-9_]*\$?", name or "")
+                   if n.upper() in namen or n.upper().rstrip("$") in ohne_dollar]
+        if len(treffer) != 1 or not isinstance(text, str):
+            continue
+        # Erster Satz -- ein Tooltip ist kein Absatz.
+        satz = re.split(r"(?<=[.!?])\s", text.strip(), maxsplit=1)[0]
+        satz = _saeubern(satz)
+        if len(satz) >= 8:
+            raus.setdefault(treffer[0], satz)
+    return raus
 
 
 def _json_text(daten: dict[str, str]) -> str:
@@ -163,10 +220,28 @@ def _json_text(daten: dict[str, str]) -> str:
                       indent=1, ensure_ascii=False) + "\n"
 
 
+def _buch_lesbar() -> bool:
+    """Ist die Buch-Quelle erreichbar? (Node vorhanden und Kapitel ladbar.)"""
+    return bool(aus_dem_referenzbuch({"AUDIO_TONE"}) or _node_da())
+
+
+def _node_da() -> bool:
+    try:
+        return subprocess.run(["node", "--version"], capture_output=True,
+                              timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def main() -> int:
     daten = sammeln()
     text = _json_text(daten)
     if "--pruefen" in sys.argv:
+        if not _node_da():
+            # Ohne Node fehlt eine der Quellen -- ein Vergleich wuerde dann
+            # Abweichungen melden, die nur an der Umgebung liegen.
+            print("Node fehlt -- Pruefung uebersprungen (buch-referenz nicht lesbar).")
+            return 0
         alt = ZIEL.read_text(encoding="utf-8") if ZIEL.exists() else ""
         if alt == text:
             print(f"builtin_prosa.json ist aktuell ({len(daten)} Beschreibungen).")
@@ -176,6 +251,8 @@ def main() -> int:
         return 1
     ZIEL.write_text(text, encoding="utf-8")
     print(f"{len(daten)} Beschreibungen -> {ZIEL.relative_to(WURZEL).as_posix()}")
+    if not _buch_lesbar():
+        print("  Hinweis: ohne Node -- die Eintraege aus buch-referenz fehlen.")
     return 0
 
 
