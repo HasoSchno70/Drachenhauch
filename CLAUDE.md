@@ -244,6 +244,31 @@ core-Grafik-Built-ins (`PLOT`, `LINE`, `BOX`, `RECT`, `CIRCLE`, `TEXT`,
 
 `PARTICLE_DRAW` ruft intern `g.circle()` und folgt der Camera automatisch.
 
+## Arbeitsablauf: Branch + Pull Request
+
+Nicht direkt auf `main` pushen. Fuer jede Aenderung ein Zweig, dann ein PR:
+
+```
+git switch -c thema/kurzer-name
+# arbeiten, pro abgeschlossenem Punkt ein Commit
+git push -u origin thema/kurzer-name
+gh pr create --fill        # nutzt .github/pull_request_template.md
+gh pr checks --watch       # die sechs Pflicht-Pruefungen abwarten
+gh pr merge --squash       # oder --merge, je nach Umfang
+```
+
+**Warum das zaehlt:** `main` verlangt sechs Status-Pruefungen (`test (3.12)`,
+`posix-test` und `rust-check` je auf ubuntu/macos/windows). Bei einem direkten
+Push laufen die erst DANACH -- ein roter Bau steht dann schon auf `main`. Genau
+so ist am 2026-08-29 ein macOS-Fehler auf `main` gelandet: ein Linker-Flag, das
+auf Windows und Linux stillschweigend durchging und nur ld64 aufstiess. Im PR
+haette die Pruefung ihn vor dem Merge abgefangen.
+
+**Was die CI faengt, was diese Maschine nicht faengt:** Sie baut ohne Grafik,
+ohne Hardware-Features und auf drei Betriebssystemen. Ein gruener Lauf hier
+sagt darum wenig -- die Entwicklermaschine ist nicht nur reicher, sondern auch
+nachsichtiger (der MSVC-Linker schluckt Optionen, die ld64 ablehnt).
+
 ## Build und Test
 
 **Umgebung:** Jeder Befehl in diesem Abschnitt setzt das venv im
