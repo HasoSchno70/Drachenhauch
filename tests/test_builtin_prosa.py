@@ -22,6 +22,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from drachenhauch.editor_qt.builtin_docs import BUILTIN_DOCS, get_doc
 from drachenhauch.editor_qt.dhrt_meta import builtin_index
 
@@ -33,9 +35,19 @@ def _prosa() -> dict[str, str]:
     return json.loads(PROSA.read_text(encoding="utf-8"))["docs"]
 
 
+def _node_da() -> bool:
+    try:
+        return subprocess.run(["node", "--version"], capture_output=True,
+                              timeout=30).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+@pytest.mark.skipif(not _node_da(), reason="ohne Node ist buch-referenz nicht lesbar")
 def test_datei_passt_zum_stand_von_docs():
-    """Der Generator im Pruefmodus. Wer eine Beschreibung in `docs/` aendert,
-    aendert damit auch den Hover -- die erzeugte Datei muss also mitkommen."""
+    """Der Generator im Pruefmodus. Wer eine Beschreibung in `docs/` oder im
+    Referenzbuch aendert, aendert damit auch den Hover -- die erzeugte Datei
+    muss also mitkommen."""
     r = subprocess.run([sys.executable, str(WURZEL / "tools" / "gen_builtin_prosa.py"),
                         "--pruefen"], capture_output=True, text=True,
                        encoding="utf-8", cwd=str(WURZEL), timeout=120)
@@ -69,10 +81,14 @@ def test_keine_abgeschnittenen_saetze():
     """Ein Satz, der mitten im Wort endet, ist schlimmer als keiner. Gekuerzte
     Texte enden auf ein Auslassungszeichen und sind damit als gekuerzt
     erkennbar -- alles andere darf nicht auf einem Bindewort enden."""
+    # " ein" steht bewusst NICHT dabei: im Deutschen ist es genauso oft die
+    # Partikel eines trennbaren Verbs wie ein Artikel -- "sammelt aber die
+    # Ausgabe ein" (SHELL_OUT$) ist ein vollstaendiger Satz. Der Test meldete
+    # ihn prompt als abgeschnitten.
     offen = {n: t for n, t in _prosa().items()
              if not t.endswith("…")
              and t.rstrip().endswith((",", ":", " und", " oder", " der", " die",
-                                      " das", " ein", " eine", " via", " mit"))}
+                                      " das", " eine", " via", " mit"))}
     assert not offen, list(offen.items())[:5]
 
 
