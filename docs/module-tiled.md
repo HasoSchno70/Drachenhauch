@@ -27,44 +27,44 @@ IMPORT "tiled"
 
 ### Layer
 
-| Funktion | Rueckgabe |
-|---|---|
-| `TILED_LAYER_COUNT(m)` | INTEGER |
-| `TILED_LAYER_NAME(m, idx)` | STRING |
-| `TILED_LAYER_TYPE(m, idx)` | `"tile"`, `"object"`, `"image"` |
-| `TILED_LAYER_INDEX(m, name$)` | INTEGER (-1 wenn nicht da) |
-| `TILED_LAYER_WIDTH(m, idx)` / `..._HEIGHT(m, idx)` | INTEGER (nur Tile-Layer) |
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_LAYER_COUNT(m)` | INTEGER | wie viele Ebenen hat die Karte? |
+| `TILED_LAYER_NAME(m, idx)` | STRING | Name der Ebene (Index ab 0) |
+| `TILED_LAYER_TYPE(m, idx)` | `"tile"`, `"object"`, `"image"` | Art der Ebene |
+| `TILED_LAYER_INDEX(m, name$)` | INTEGER (-1 wenn nicht da) | Ebene ueber ihren Namen finden |
+| `TILED_LAYER_WIDTH(m, idx)` / `..._HEIGHT(m, idx)` | INTEGER (nur Tile-Layer) | Groesse der Ebene in Kacheln |
 
 ### Tile-Daten
 
-| Funktion | Rueckgabe |
-|---|---|
-| `TILED_TILE_AT(m, layer_idx, tx, ty)` | INTEGER (GID, 0 = leer; OOB = 0) |
-| `TILED_TILE_SET(m, layer_idx, tx, ty, gid)` | INTEGER (alte GID). 0 = Tile loeschen. OOB = no-op. |
-| `TILED_TILE_PROP_BOOL(m, gid, key$)` | BOOLEAN (FALSE wenn nicht gesetzt) |
-| `TILED_TILE_PROP_INT(m, gid, key$)` | INTEGER (0 wenn nicht gesetzt) |
-| `TILED_TILE_PROP_FLOAT(m, gid, key$)` | FLOAT |
-| `TILED_TILE_PROP_STRING(m, gid, key$)` | STRING |
-| `TILED_TILE_HAS_PROP(m, gid, key$)` | BOOLEAN |
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_TILE_AT(m, layer_idx, tx, ty)` | INTEGER (GID, 0 = leer; OOB = 0) | welche Kachel liegt an dieser Stelle? |
+| `TILED_TILE_SET(m, layer_idx, tx, ty, gid)` | INTEGER (alte GID). 0 = Tile loeschen. OOB = no-op. | Kachel setzen |
+| `TILED_TILE_PROP_BOOL(m, gid, key$)` | BOOLEAN (FALSE wenn nicht gesetzt) | Eigenschaft der Kachel lesen -- in Tiled je Kachel gepflegt (`solid`, `damage`, ...) |
+| `TILED_TILE_PROP_INT(m, gid, key$)` | INTEGER (0 wenn nicht gesetzt) | Eigenschaft der Kachel als ganze Zahl |
+| `TILED_TILE_PROP_FLOAT(m, gid, key$)` | FLOAT | Eigenschaft der Kachel als Kommazahl |
+| `TILED_TILE_PROP_STRING(m, gid, key$)` | STRING | Eigenschaft der Kachel als Text |
+| `TILED_TILE_HAS_PROP(m, gid, key$)` | BOOLEAN |  |
 
 ### Object-Layer
 
-| Funktion | Rueckgabe |
-|---|---|
-| `TILED_OBJECT_COUNT(m, layer_name$)` | INTEGER |
-| `TILED_OBJECT_NAME(m, layer_name$, idx)` | STRING |
-| `TILED_OBJECT_TYPE(m, layer_name$, idx)` | STRING (Tiled "type" oder "class") |
-| `TILED_OBJECT_X/Y(...)` | FLOAT |
-| `TILED_OBJECT_WIDTH/HEIGHT(...)` | FLOAT |
-| `TILED_OBJECT_PROP_BOOL/INT/FLOAT/STRING(...)` | Custom Property |
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_OBJECT_COUNT(m, layer_name$)` | INTEGER | wie viele Objekte hat diese Objekt-Ebene? |
+| `TILED_OBJECT_NAME(m, layer_name$, idx)` | STRING | Name des Objekts (Index ab 0) |
+| `TILED_OBJECT_TYPE(m, layer_name$, idx)` | STRING (Tiled "type" oder "class") | Typ des Objekts, wie in Tiled eingetragen |
+| `TILED_OBJECT_X/Y(...)` | FLOAT | Position des Objekts in Pixeln |
+| `TILED_OBJECT_WIDTH/HEIGHT(...)` | FLOAT | Groesse des Objekts in Pixeln |
+| `TILED_OBJECT_PROP_BOOL/INT/FLOAT/STRING(...)` | Custom Property |  |
 
 ### Tileset
 
-| Funktion | Rueckgabe |
-|---|---|
-| `TILED_TILESET_COUNT(m)` | INTEGER |
-| `TILED_TILESET_IMAGE(m, idx)` | STRING (absoluter Pfad zum Tileset-Bild) |
-| `TILED_TILESET_FIRSTGID(m, idx)` | INTEGER |
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_TILESET_COUNT(m)` | INTEGER | wie viele Tilesets bringt die Karte mit? |
+| `TILED_TILESET_IMAGE(m, idx)` | STRING (absoluter Pfad zum Tileset-Bild) | Bilddatei des Tilesets |
+| `TILED_TILESET_FIRSTGID(m, idx)` | INTEGER | erste GID dieses Tilesets -- damit ordnet man eine GID ihrem Tileset zu |
 
 ## Konzept: GIDs vs. lokale Tile-IDs
 

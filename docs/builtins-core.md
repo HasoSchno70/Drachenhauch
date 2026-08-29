@@ -594,9 +594,9 @@ PRINT SET_SIZE(gesehen)
 | `SET_ADD(menge, wert)` | aufnehmen; schon drin = kein Effekt |
 | `SET_HAS(menge, wert)` → BOOLEAN | Zugehörigkeit |
 | `SET_REMOVE(menge, wert)` → BOOLEAN | entfernen; `TRUE` wenn es drin war |
-| `SET_SIZE(menge)` → INTEGER | Anzahl |
+| `SET_SIZE(menge)` → INTEGER | Anzahl der Elemente |
 | `SET_ITEMS(menge)` → ARRAY | Elemente in Aufnahme-Reihenfolge |
-| `SET_CLEAR(menge)` | leeren |
+| `SET_CLEAR(menge)` | alle Elemente entfernen |
 
 **Eine Menge führt eine Elementart.** Elemente dürfen `INTEGER` **oder**
 `STRING` sein, aber nicht gemischt — die erste Aufnahme legt die Art fest,

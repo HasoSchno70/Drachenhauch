@@ -16,18 +16,18 @@ Wenn `pyserial` nicht installiert ist, lädt das Modul trotzdem — der erste Au
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `SERIAL_PORTS()` | STRING (komma-getrennte Liste verfügbarer Ports) |
-| `SERIAL_OPEN(port$, baud)` | SERIAL_HANDLE |
-| `SERIAL_CLOSE(handle)` | — |
-| `SERIAL_IS_OPEN(handle)` | BOOLEAN |
-| `SERIAL_WRITE(handle, s$)` | INTEGER (geschriebene Bytes) |
-| `SERIAL_READ(handle, n)` | STRING (bis zu n Bytes, max. 64 MiB) |
-| `SERIAL_READLINE(handle)` | STRING (bis Newline) |
-| `SERIAL_AVAILABLE(handle)` | INTEGER (wartende Bytes im Eingangspuffer) |
-| `SERIAL_FLUSH(handle)` | — (Eingangs- und Ausgangspuffer leeren) |
-| `SERIAL_TIMEOUT(handle, sekunden)` | — (Read-Timeout setzen, Default 1.0 s) |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `SERIAL_PORTS()` | STRING (komma-getrennte Liste verfügbarer Ports) | welche seriellen Anschluesse gibt es? |
+| `SERIAL_OPEN(port$, baud)` | SERIAL_HANDLE | Anschluss oeffnen (`baud` muss zur Gegenstelle passen) |
+| `SERIAL_CLOSE(handle)` | — | Anschluss schliessen |
+| `SERIAL_IS_OPEN(handle)` | BOOLEAN | steht die Verbindung noch? |
+| `SERIAL_WRITE(handle, s$)` | INTEGER (geschriebene Bytes) | Text senden |
+| `SERIAL_READ(handle, n)` | STRING (bis zu n Bytes, max. 64 MiB) | bis zu n Bytes lesen |
+| `SERIAL_READLINE(handle)` | STRING (bis Newline) | eine Zeile lesen -- bis zum Zeilenumbruch oder bis der Timeout greift |
+| `SERIAL_AVAILABLE(handle)` | INTEGER (wartende Bytes im Eingangspuffer) | wie viel liegt bereit? (ohne zu warten) |
+| `SERIAL_FLUSH(handle)` | — (Eingangs- und Ausgangspuffer leeren) | Puffer verwerfen |
+| `SERIAL_TIMEOUT(handle, sekunden)` | — (Read-Timeout setzen, Default 1.0 s) | wie lange ein Lesen hoechstens wartet |
 
 ## Bytes ↔ STRING
 

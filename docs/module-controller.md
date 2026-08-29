@@ -18,15 +18,15 @@ IMPORT "controller"
 
 ### Konstruktor + Lese-Accessor
 
-| Funktion | Rueckgabe |
-|---|---|
-| `CHAR_NEW(x, y, w, h)` | CHAR_CONTROLLER |
-| `CHAR_X(c)` / `CHAR_Y(c)` | FLOAT |
-| `CHAR_W(c)` / `CHAR_H(c)` | FLOAT |
-| `CHAR_VX(c)` / `CHAR_VY(c)` | FLOAT |
-| `CHAR_ON_GROUND(c)` | BOOLEAN |
-| `CHAR_ON_WALL_LEFT(c)` / `..._RIGHT(c)` | BOOLEAN |
-| `CHAR_FACING(c)` | INTEGER (-1 = links, +1 = rechts) |
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `CHAR_NEW(x, y, w, h)` | CHAR_CONTROLLER | Controller anlegen -- (x,y) linke obere Ecke, (w,h) Groesse in Pixeln |
+| `CHAR_X(c)` / `CHAR_Y(c)` | FLOAT | aktuelle Position |
+| `CHAR_W(c)` / `CHAR_H(c)` | FLOAT | Groesse der Kollisionsbox |
+| `CHAR_VX(c)` / `CHAR_VY(c)` | FLOAT | aktuelle Geschwindigkeit je Achse |
+| `CHAR_ON_GROUND(c)` | BOOLEAN | steht die Figur auf festem Boden? |
+| `CHAR_ON_WALL_LEFT(c)` / `..._RIGHT(c)` | BOOLEAN | beruehrt sie links bzw. rechts eine Wand? |
+| `CHAR_FACING(c)` | INTEGER (-1 = links, +1 = rechts) | Blickrichtung -- fuer das Spiegeln des Sprites |
 
 ### Frame-Input + Update
 
@@ -37,16 +37,16 @@ IMPORT "controller"
 
 ### Konfiguration
 
-| Funktion | Default |
-|---|---|
-| `CHAR_SET_MOVE_SPEED(c, speed)` | 2.0 |
-| `CHAR_SET_JUMP_VELOCITY(c, vy)` | 6.0 (immer absolut, intern negiert) |
-| `CHAR_SET_GRAVITY(c, g)` | 0.25 |
-| `CHAR_SET_MAX_FALL(c, max_vy)` | 7.0 |
-| `CHAR_SET_COYOTE_TIME(c, frames)` | 6 |
-| `CHAR_SET_JUMP_BUFFER(c, frames)` | 6 |
-| `CHAR_SET_VARIABLE_JUMP(c, enabled)` | TRUE |
-| `CHAR_SET_VARIABLE_JUMP_CUT(c, factor)` | 0.5 (= Mario) |
+| Funktion | Default | Bedeutung |
+|---|---|---|
+| `CHAR_SET_MOVE_SPEED(c, speed)` | 2.0 | waagerechte Laufgeschwindigkeit (Pixel je Frame) |
+| `CHAR_SET_JUMP_VELOCITY(c, vy)` | 6.0 (immer absolut, intern negiert) | Absprungkraft |
+| `CHAR_SET_GRAVITY(c, g)` | 0.25 | Fallbeschleunigung je Frame |
+| `CHAR_SET_MAX_FALL(c, max_vy)` | 7.0 | hoechste Fallgeschwindigkeit -- ohne die faellt eine Figur durch duenne Boeden |
+| `CHAR_SET_COYOTE_TIME(c, frames)` | 6 | so viele Frames nach dem Verlassen der Kante zaehlt ein Sprung noch |
+| `CHAR_SET_JUMP_BUFFER(c, frames)` | 6 | so viele Frames vor der Landung gedrueckt zaehlt der Sprung schon |
+| `CHAR_SET_VARIABLE_JUMP(c, enabled)` | TRUE | kuerzerer Sprung bei kurzem Tastendruck |
+| `CHAR_SET_VARIABLE_JUMP_CUT(c, factor)` | 0.5 (= Mario) | auf welchen Anteil die Steiggeschwindigkeit beim Loslassen faellt |
 
 ### Manuelle Position/Velocity (selten gebraucht)
 

@@ -108,7 +108,7 @@ vor zehn Sekunden.
 
 | Funktion | Wirkung |
 |---|---|
-| `MIDI_NOTE_ON(h, kanal, note, anschlag)` | Note an |
+| `MIDI_NOTE_ON(h, kanal, note, anschlag)` | Note anschlagen |
 | `MIDI_NOTE_OFF(h, kanal, note)` | Note aus |
 | `MIDI_CC(h, kanal, nr, wert)` | Regler (z.B. 7 = Lautstärke) |
 | `MIDI_SEND(h, status, d1, d2)` | Rohe Nachricht, für alles Übrige |

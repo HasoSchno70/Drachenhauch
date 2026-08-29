@@ -16,17 +16,17 @@ IMPORT "usb"
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `USB_LIST()` | STRING (multi-line `vid:pid|product|manufacturer`) |
-| `USB_OPEN(vid, pid)` | USB_HANDLE |
-| `USB_OPEN_PATH(pfad$)` | USB_HANDLE |
-| `USB_CLOSE(handle)` | — |
-| `USB_WRITE(handle, daten$)` | INTEGER (geschriebene Bytes) |
-| `USB_READ(handle, n, timeout_ms)` | STRING (Bytes als latin-1) |
-| `USB_PRODUCT(handle)` | STRING |
-| `USB_MANUFACTURER(handle)` | STRING |
-| `USB_SERIAL(handle)` | STRING |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `USB_LIST()` | STRING (multi-line `vid:pid|product|manufacturer`) | angeschlossene HID-Geraete auflisten |
+| `USB_OPEN(vid, pid)` | USB_HANDLE | Geraet ueber Hersteller- und Produkt-Kennung oeffnen |
+| `USB_OPEN_PATH(pfad$)` | USB_HANDLE | Geraet ueber seinen Systempfad oeffnen (eindeutig, wenn zwei gleiche stecken) |
+| `USB_CLOSE(handle)` | — | Geraet schliessen |
+| `USB_WRITE(handle, daten$)` | INTEGER (geschriebene Bytes) | Bericht an das Geraet senden |
+| `USB_READ(handle, n, timeout_ms)` | STRING (Bytes als latin-1) | bis zu n Bytes lesen; nach `timeout_ms` kommt zurueck, was da ist |
+| `USB_PRODUCT(handle)` | STRING | Produktname laut Geraet |
+| `USB_MANUFACTURER(handle)` | STRING | Herstellername laut Geraet |
+| `USB_SERIAL(handle)` | STRING | Seriennummer laut Geraet |
 
 ## Bytes ↔ STRING
 

@@ -1,6 +1,6 @@
 # Modul `db`
 
-SQLite-Datenbank: erstellen, einfügen, abfragen, Transaktionen. Nutzt Pythons `sqlite3` (eingebaut, keine Extra-Installation).
+SQLite-Datenbank: erstellen, einfügen, abfragen, Transaktionen. Nativ in dhrt über die Rust-Crate `rusqlite` (mit eingebautem SQLite -- kein System-SQLite nötig, keine Extra-Installation).
 
 ```basic
 IMPORT "db"
@@ -8,23 +8,23 @@ IMPORT "db"
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `DB_OPEN(pfad$)` | DB_CONN |
-| `DB_CLOSE(conn)` | — |
-| `DB_EXEC(conn, sql$, ...)` | INTEGER (rowcount) |
-| `DB_QUERY(conn, sql$, ...)` | DB_RESULT |
-| `DB_NEXT(result)` | BOOLEAN |
-| `DB_GET_STRING(r, idx)` | STRING |
-| `DB_GET_INT(r, idx)` | INTEGER |
-| `DB_GET_FLOAT(r, idx)` | FLOAT |
-| `DB_GET_BOOL(r, idx)` | BOOLEAN |
-| `DB_IS_NULL(r, idx)` | BOOLEAN |
-| `DB_COL_COUNT(r)` | INTEGER |
-| `DB_COL_NAME(r, idx)` | STRING |
-| `DB_CLOSE_RESULT(r)` | — |
-| `DB_LAST_ROWID(conn)` | INTEGER |
-| `DB_BEGIN(conn)`, `DB_COMMIT(conn)`, `DB_ROLLBACK(conn)` | — |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `DB_OPEN(pfad$)` | DB_CONN | Datenbank oeffnen oder anlegen (`":memory:"` = fluechtig, nur im Speicher) |
+| `DB_CLOSE(conn)` | — | Verbindung schliessen |
+| `DB_EXEC(conn, sql$, ...)` | INTEGER (rowcount) | SQL ohne Ergebnismenge (INSERT/UPDATE/DELETE/CREATE); Werte mit `?` binden, liefert die Zahl betroffener Zeilen |
+| `DB_QUERY(conn, sql$, ...)` | DB_RESULT | SELECT ausfuehren und einen Cursor auf das Ergebnis liefern |
+| `DB_NEXT(result)` | BOOLEAN | eine Zeile weiterruecken; FALSE, wenn keine mehr kommt |
+| `DB_GET_STRING(r, idx)` | STRING | Spalte der aktuellen Zeile als Text lesen (Index ab 0) |
+| `DB_GET_INT(r, idx)` | INTEGER | Spalte der aktuellen Zeile als ganze Zahl lesen |
+| `DB_GET_FLOAT(r, idx)` | FLOAT | Spalte der aktuellen Zeile als Kommazahl lesen |
+| `DB_GET_BOOL(r, idx)` | BOOLEAN | Spalte der aktuellen Zeile als Wahrheitswert lesen (0/1 in SQLite) |
+| `DB_IS_NULL(r, idx)` | BOOLEAN | steht in dieser Spalte NULL? |
+| `DB_COL_COUNT(r)` | INTEGER | Anzahl der Spalten im Ergebnis |
+| `DB_COL_NAME(r, idx)` | STRING | Name der Spalte (Index ab 0) |
+| `DB_CLOSE_RESULT(r)` | — | Ergebnis freigeben, wenn man es nicht zu Ende liest |
+| `DB_LAST_ROWID(conn)` | INTEGER | rowid der zuletzt eingefuegten Zeile |
+| `DB_BEGIN(conn)`, `DB_COMMIT(conn)`, `DB_ROLLBACK(conn)` | — | Transaktion beginnen, festschreiben, verwerfen |
 
 ## Verbindung
 

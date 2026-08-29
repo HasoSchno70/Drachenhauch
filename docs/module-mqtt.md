@@ -24,17 +24,17 @@ verwenden ohnehin QoS 0.
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE |
-| `MQTT_DISCONNECT(handle)` | — |
-| `MQTT_IS_CONNECTED(handle)` | BOOLEAN |
-| `MQTT_PUBLISH(handle, topic$, payload$[, retain])` | — |
-| `MQTT_SUBSCRIBE(handle, topic$)` | — |
-| `MQTT_UPDATE(handle)` | — |
-| `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN |
-| `MQTT_MESSAGE_TOPIC(handle)` | STRING |
-| `MQTT_MESSAGE_PAYLOAD(handle)` | STRING |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `MQTT_CONNECT(host$, port, client_id$[, keepalive_s[, user$[, pass$]]])` | MQTT_HANDLE | Verbindung zum Broker aufbauen (`keepalive_s` Vorgabe 60) |
+| `MQTT_DISCONNECT(handle)` | — | Verbindung schliessen |
+| `MQTT_IS_CONNECTED(handle)` | BOOLEAN | steht die Verbindung noch? |
+| `MQTT_PUBLISH(handle, topic$, payload$[, retain])` | — | Nachricht auf ein Topic senden; `retain` laesst der Broker sie fuer spaetere Abonnenten aufheben |
+| `MQTT_SUBSCRIBE(handle, topic$)` | — | Topic abonnieren -- eingehende Nachrichten holt danach `MQTT_UPDATE` ab |
+| `MQTT_UPDATE(handle)` | — | **pro Frame aufrufen**: liest eingegangene Nachrichten ein und haelt die Verbindung mit PINGREQ am Leben |
+| `MQTT_NEXT_MESSAGE(handle)` | BOOLEAN | eine Nachricht weiterruecken; FALSE, wenn die Warteschlange leer ist |
+| `MQTT_MESSAGE_TOPIC(handle)` | STRING | Topic der aktuellen Nachricht |
+| `MQTT_MESSAGE_PAYLOAD(handle)` | STRING | Inhalt der aktuellen Nachricht |
 
 `keepalive_s` (Default 60) ist das MQTT-Keepalive-Intervall in Sekunden —
 `MQTT_UPDATE` sendet automatisch ein PINGREQ, sobald mehr als die Hälfte
