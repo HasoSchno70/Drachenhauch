@@ -485,9 +485,15 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     Some((min, max))
 }
 
-/// "3" bzw. "3 bis 4" -- fuer lesbare Meldungen.
+/// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
+///
+/// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den
+/// mittleren Zweig stand die dann ausgeschrieben in der Meldung:
+/// "erwartet werden 2 bis 18446744073709551615".
 fn arity_text(min: usize, max: usize) -> String {
-    if min == max { format!("{}", min) } else { format!("{} bis {}", min, max) }
+    if min == max { format!("{}", min) }
+    else if max == usize::MAX { format!("mindestens {}", min) }
+    else { format!("{} bis {}", min, max) }
 }
 
 /// Ist `name` ein dhrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und

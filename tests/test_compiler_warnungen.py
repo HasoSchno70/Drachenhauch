@@ -106,6 +106,52 @@ def test_variadische_builtins_werden_nicht_gemeldet(tmp_path):
     assert not any("Argument" in m for m in w), w
 
 
+def test_variadische_signatur_meldet_lesbar(tmp_path):
+    """`...`-Signaturen liefern usize::MAX als Obergrenze. Die stand frueher
+    ausgeschrieben in der Meldung: "erwartet werden 2 bis 18446744073709551615"."""
+    w = _warnungen(tmp_path, 'PRINT PATHJOIN("a")\n')
+    assert any("mindestens 2" in m for m in w), w
+    assert not any("18446744073709551615" in m for m in w), w
+
+
+# ------------------------------------------------------- 3D-Signaturen
+# Der gesamte 3D-Zweig trug bis 2026-08-29 die Signatur `NAME(*args)` -- ein
+# Erbe der Stufe-B-Migration, das die Argumentpruefung fuer 65 Builtins
+# abschaltete (und Hover/Signaturhilfe im Editor gleich mit). Die echten
+# Argumentzahlen standen die ganze Zeit in vm.rs.
+
+def test_falscher_3d_aufruf_wird_gemeldet(tmp_path):
+    w = _warnungen(tmp_path, """
+SCREEN(64, 64)
+CUBE(0, 0, 0, 1, 1, 1)
+LIGHT_POINT(1, 2, 3)
+GENTEX_PERLIN(64, 64)
+""")
+    for name, erwartet in (("CUBE", "7"), ("LIGHT_POINT", "4"), ("GENTEX_PERLIN", "3")):
+        assert any(name in m and erwartet in m for m in w), (name, w)
+
+
+def test_richtiger_3d_aufruf_schweigt(tmp_path):
+    """Gegenprobe -- eine zu enge Signatur waere schlimmer als gar keine:
+    sie erzeugte Falsch-Alarme in fremdem Code."""
+    w = _warnungen(tmp_path, """
+SCREEN(64, 64)
+CAMERA3D(9, 7, 9, 0, 1, 0, 45)
+CUBE(0, 0, 0, 1, 1, 1, &HFF0000)
+SPHERE(0, 2, 0, 0.5, &H00FF00)
+CYLINDER(2, 0, 0, 0.0, 0.5, 1.0, &H0000FF)
+LIGHT_ENABLE()
+LIGHT_POINT(3, 4, 5, &HFFFFFF)
+LIGHT_SET_ENABLED(0)
+LIGHT_SET_ENABLED(0, TRUE)
+SKYBOX()
+SKYBOX(TRUE)
+GENTEX_GRADIENT(64, 64, &H000000, &HFFFFFF)
+GENTEX_GRADIENT(64, 64, &H000000, &HFFFFFF, TRUE)
+""")
+    assert not any("Argument" in m for m in w), w
+
+
 # ---------------------------------------------------- verdeckte Konstante
 def test_lokale_variable_verdeckt_konstante(tmp_path):
     w = _warnungen(tmp_path, """
