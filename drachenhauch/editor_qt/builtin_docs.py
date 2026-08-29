@@ -7,6 +7,11 @@ Format: ``name_lowercase -> (signature, beschreibung)``. Wird von
 from __future__ import annotations
 
 
+import json
+from functools import lru_cache
+from pathlib import Path
+
+
 BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     # Datentypen-Helfer
     "str$":  ("STR$(value) AS STRING", "Wandelt einen Wert in einen STRING."),
@@ -513,6 +518,21 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
 }
 
 
+@lru_cache(maxsize=1)
+def _prosa() -> dict[str, str]:
+    """Kurzbeschreibungen aus `docs/`, erzeugt nach `builtin_prosa.json`.
+
+    Faellt die Datei aus (altes Paket, kaputtes JSON), bleibt es beim Stand
+    von vorher: Hover zeigt dann nur die Signatur. Ein fehlender Zusatz darf
+    den Editor nicht lahmlegen.
+    """
+    try:
+        pfad = Path(__file__).resolve().parent / "builtin_prosa.json"
+        return json.loads(pfad.read_text(encoding="utf-8")).get("docs", {})
+    except Exception:
+        return {}
+
+
 def get_doc(name: str) -> tuple[str, str] | None:
     """Liefert (Signatur, Beschreibung) zu einem Built-in oder None.
 
@@ -527,7 +547,21 @@ def get_doc(name: str) -> tuple[str, str] | None:
     angehaengtem `$`.
     """
     key = name.lower()
-    doc = BUILTIN_DOCS.get(key)
+    doc = BUILTIN_DOCS.get(key) or BUILTIN_DOCS.get(key + "$")
     if doc is not None:
         return doc
-    return BUILTIN_DOCS.get(key + "$")
+    # Zweite Quelle: die Kurzbeschreibungen aus `docs/`, erzeugt von
+    # `tools/gen_builtin_prosa.py`. Die Tabelle oben ist von Hand gepflegt und
+    # deckte 328 von 1558 Builtins ab -- ganze Module standen bei null (gui mit
+    # 161 Befehlen, g3d, m3d, chart, json, sprite, tiled), und der Hover fiel
+    # dort auf die blosse Signatur zurueck. Die Beschreibungen existieren
+    # laengst in den Modul-Dokumenten; sie hier ein zweites Mal zu tippen waere
+    # eine Kopie, die auseinanderlaeuft.
+    #
+    # Vorrang hat die Tabelle oben: ihre Texte sind ausfuehrlicher und auf den
+    # Hover zugeschnitten, die aus `docs/` sind Tabellenzellen und oft knapp.
+    kurz = _prosa().get(name.upper()) or _prosa().get(name.upper() + "$")
+    if kurz is not None:
+        from .dhrt_meta import signature
+        return (signature(name) or name.upper(), kurz)
+    return None

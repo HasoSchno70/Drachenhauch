@@ -87,7 +87,12 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    ins Backend), Fehlermeldung im gewohnten Wortlaut (`"NAME: erwartet …"`).
 2. Für den Editor: `editor_qt/builtin_index.json` ergänzen (Name/kind/Signatur/
    Modul) — Completion/Highlighting/LSP ziehen daraus (`editor_qt/dhrt_meta.py`).
-   Optional Prosa-Doku in `editor_qt/builtin_docs.py`.
+   Die Kurzbeschreibung fuer Hover/Tooltip schreibt man NICHT hier hin,
+   sondern ins passende `docs/module-*.md` (Tabellenzeile
+   ``| `NAME(args)` | was es tut |``); `tools/gen_builtin_prosa.py` sammelt
+   sie nach `editor_qt/builtin_prosa.json` ein, und
+   `tests/test_builtin_prosa.py` haelt beides synchron. `builtin_docs.py`
+   ist fuer ausfuehrlichere Texte da und gewinnt, wo es einen Eintrag hat.
 3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
    **Die Signatur in `builtin_index.json` muss stimmen** — der Compiler leitet
    daraus die erlaubte Argumentzahl ab und warnt bei Abweichung (`dhrt --check`).

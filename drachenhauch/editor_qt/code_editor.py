@@ -1713,13 +1713,11 @@ class CodeEditor(
                     text = sig if not desc else f"{sig}\n\n{desc}"
                     QToolTip.showText(ev.globalPos(), text, self)
                     return True
-                # Review-Fund: BUILTIN_DOCS deckt nur einen Bruchteil der
-                # tatsaechlichen Built-ins ab (~243 von ~1106) -- fuer den
-                # Rest zeigte Hover bisher GAR NICHTS, ohne jeden Hinweis,
-                # obwohl Signature-Help fuer dieselben Namen schon laenger
-                # auf dhrt_meta.signature() zurueckfaellt (_builtin_signature
-                # oben). Wenigstens die Signatur (ohne Beschreibung) ist
-                # besser als eine komplett tote Tooltip.
+                # Letzte Stufe: nur die Signatur. `get_doc` kennt inzwischen
+                # zwei Quellen (die handgepflegte Tabelle und die aus `docs/`
+                # erzeugte `builtin_prosa.json`) und deckt damit rund die
+                # Haelfte des Befehlssatzes ab -- fuer den Rest ist die
+                # Signatur immer noch besser als eine tote Tooltip.
                 sig = self._builtin_signature(word)
                 if sig is not None:
                     QToolTip.showText(ev.globalPos(), sig, self)
