@@ -37,7 +37,7 @@ const EXIT_REQUEST: &str = "__EXIT__";
 /// per Vorgabe 8 MB (RLIMIT_STACK, von Linker-Flags unerreichbar) -- das traegt
 /// ~1250 Ebenen. 1000 laesst davon ein Sechstel Luft.
 ///
-/// Windows und macOS bekommen ihre 64 MB ueber `.cargo/config.toml`; dort waere
+/// Windows und macOS bekommen ihre 64 MB ueber `build.rs`; dort waere
 /// weit mehr moeglich, aber ein plattformabhaengiges Limit waere eine Falle:
 /// Programme liefen auf dem einen Rechner und braechen auf dem anderen ab.
 ///

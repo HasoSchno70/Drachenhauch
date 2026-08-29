@@ -10,8 +10,8 @@ lange auf 3000, einem Wert, den keine Plattform je erreichte:
 
 Gemessen kostet ein Aufrufrahmen ~6,6 KB, gleich fuer freie Funktion, Methode,
 BYREF, FUNCREF und ueberladenen Operator. Windows und macOS bekommen ihre
-64 MB jetzt ueber `rust/drachenhauch_runtime/.cargo/config.toml`; Linux gibt
-dem Hauptthread 8 MB aus RLIMIT_STACK, wohin kein Linker-Flag reicht. Die
+64 MB ueber `rust/drachenhauch_runtime/build.rs`; Linux gibt dem Hauptthread
+8 MB aus RLIMIT_STACK, wohin kein Linker-Flag reicht. Die
 kleinste Plattform bestimmt darum die Grenze -- gepruefte 8 MB tragen ~1250
 Ebenen, MAX_CALL_DEPTH liegt bei 1000.
 
@@ -29,7 +29,7 @@ from drachenhauch.errors import DHRuntimeError
 
 WURZEL = Path(__file__).resolve().parents[1]
 _VM_RS = WURZEL / "rust" / "drachenhauch_runtime" / "src" / "vm.rs"
-_CARGO_CFG = WURZEL / "rust" / "drachenhauch_runtime" / ".cargo" / "config.toml"
+_BUILD_RS = WURZEL / "rust" / "drachenhauch_runtime" / "build.rs"
 
 # Messwerte vom 2026-08-29 (Zwei-Punkte-Messung 1 MB / 8 MB, Windows-Release).
 _BYTES_PRO_RAHMEN = 6625
@@ -99,9 +99,29 @@ def test_grenze_passt_zur_kleinsten_plattform():
         f"anheben (auf Linux geht das nur ueber RLIMIT_STACK), dann den Wert.")
 
 
-def test_cargo_konfiguration_setzt_den_stack():
+def test_build_skript_setzt_den_stack():
     """Windows startet sonst mit 1 MB -- das waren 146 Ebenen."""
-    assert _CARGO_CFG.exists(), "rust/drachenhauch_runtime/.cargo/config.toml fehlt"
-    txt = _CARGO_CFG.read_text(encoding="utf-8")
-    assert "windows-msvc]" in txt and "/STACK:" in txt
-    assert "apple-darwin]" in txt and "stack_size" in txt
+    assert _BUILD_RS.exists(), "rust/drachenhauch_runtime/build.rs fehlt"
+    txt = _BUILD_RS.read_text(encoding="utf-8")
+    assert "/STACK:" in txt and "stack_size" in txt
+
+
+def test_stack_flag_gilt_nur_fuers_binary():
+    """`rustc-link-arg-bins`, NICHT `rustflags`.
+
+    Zuerst stand das Flag als `rustflags` in `.cargo/config.toml` -- und die
+    gelten fuer ALLE Artefakte, auch fuer Proc-Macros der Abhaengigkeiten. Auf
+    macOS ist das ein harter Fehler, weil ld64 die Option nur fuer Programme
+    annimmt; die CI brach beim Linken von `libpaste-*.dylib` ab:
+
+        ld: -stack_size option can only be used when linking a main executable
+
+    Auf Windows fiel es nicht auf (der MSVC-Linker nimmt `/STACK:` auch fuer
+    eine DLL und ignoriert es) -- ein gruener Bau auf der Entwicklermaschine
+    sagte hier also nichts.
+    """
+    txt = _BUILD_RS.read_text(encoding="utf-8")
+    assert "rustc-link-arg-bins" in txt
+    assert not (WURZEL / "rust" / "drachenhauch_runtime" / ".cargo" / "config.toml").exists(), (
+        "die alte .cargo/config.toml ist zurueck -- ihre rustflags treffen auch "
+        "Proc-Macros und brechen den macOS-Bau")
