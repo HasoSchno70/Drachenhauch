@@ -8,20 +8,20 @@ IMPORT "json"
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `JSON_PARSE(s$)` | JSON_HANDLE |
-| `JSON_LOAD(path$)` | JSON_HANDLE |
-| `JSON_STRINGIFY(h)` | STRING (kompakt) |
-| `JSON_PRETTY(h)` | STRING (eingerückt) |
-| `JSON_GET_STRING(h, path$)` | STRING |
-| `JSON_GET_INT(h, path$)` | INTEGER |
-| `JSON_GET_FLOAT(h, path$)` | FLOAT |
-| `JSON_GET_BOOL(h, path$)` | BOOLEAN |
-| `JSON_HAS(h, path$)` | BOOLEAN |
-| `JSON_LEN(h, path$)` | INTEGER |
-| `JSON_TYPE(h, path$)` | STRING |
-| `JSON_KEYS(h, path$)` | ARRAY OF STRING |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `JSON_PARSE(s$)` | JSON_HANDLE | JSON aus einem Text einlesen |
+| `JSON_LOAD(path$)` | JSON_HANDLE | JSON aus einer Datei einlesen |
+| `JSON_STRINGIFY(h)` | STRING (kompakt) | zurueck in Text -- ohne Umbrueche, zum Speichern oder Senden |
+| `JSON_PRETTY(h)` | STRING (eingerückt) | zurueck in Text -- eingerueckt, zum Lesen |
+| `JSON_GET_STRING(h, path$)` | STRING | Wert am Pfad als Text lesen (`"nutzer.name"`, `"posten.0"`) |
+| `JSON_GET_INT(h, path$)` | INTEGER | Wert am Pfad als ganze Zahl lesen |
+| `JSON_GET_FLOAT(h, path$)` | FLOAT | Wert am Pfad als Kommazahl lesen |
+| `JSON_GET_BOOL(h, path$)` | BOOLEAN | Wert am Pfad als Wahrheitswert lesen |
+| `JSON_HAS(h, path$)` | BOOLEAN | gibt es am Pfad ueberhaupt etwas? |
+| `JSON_LEN(h, path$)` | INTEGER | Laenge einer Liste bzw. Zahl der Felder eines Objekts |
+| `JSON_TYPE(h, path$)` | STRING | was steht am Pfad? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
+| `JSON_KEYS(h, path$)` | ARRAY OF STRING | Feldnamen eines Objekts |
 
 **Schreiben:**
 
@@ -30,10 +30,10 @@ IMPORT "json"
 | `JSON_NEW_OBJECT()` | leeres `{}` → JSON_HANDLE |
 | `JSON_NEW_ARRAY()` | leeres `[]` → JSON_HANDLE |
 | `JSON_SET_STRING(h, pfad$, wert$)` | Feld setzen (anlegen oder ersetzen) |
-| `JSON_SET_INT(h, pfad$, wert)` | " |
-| `JSON_SET_FLOAT(h, pfad$, wert)` | " |
-| `JSON_SET_BOOL(h, pfad$, wert)` | " |
-| `JSON_SET_NULL(h, pfad$)` | " |
+| `JSON_SET_INT(h, pfad$, wert)` | Feld als ganze Zahl setzen |
+| `JSON_SET_FLOAT(h, pfad$, wert)` | Feld als Kommazahl setzen |
+| `JSON_SET_BOOL(h, pfad$, wert)` | Feld als Wahrheitswert setzen |
+| `JSON_SET_NULL(h, pfad$)` | Feld auf null setzen |
 | `JSON_SET_JSON(h, pfad$, andere)` | ganzes Dokument einhängen (**Kopie**) |
 | `JSON_APPEND_STRING/INT/FLOAT/BOOL/JSON(h, pfad$, wert)` | an das Array am Pfad anhängen |
 | `JSON_REMOVE(h, pfad$)` | entfernen → BOOLEAN (war etwas da?) |

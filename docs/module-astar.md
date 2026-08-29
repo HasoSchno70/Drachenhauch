@@ -12,16 +12,16 @@ IMPORT "astar"
 |---|---|
 | `ASTAR_NEW(w, h)` | ASTAR_GRID — alles passierbar |
 | `ASTAR_CLEAR(g)` | alle Walls + Pfad löschen |
-| `ASTAR_WIDTH(g)` / `ASTAR_HEIGHT(g)` | INTEGER |
+| `ASTAR_WIDTH(g)` / `ASTAR_HEIGHT(g)` | INTEGER — Groesse des Gitters in Kacheln |
 | `ASTAR_SET_WALL(g, x, y)` | Tile als unpassierbar markieren |
 | `ASTAR_SET_PASSABLE(g, x, y)` | wieder freigeben |
-| `ASTAR_IS_WALL(g, x, y)` | BOOLEAN |
+| `ASTAR_IS_WALL(g, x, y)` | BOOLEAN — ist diese Kachel gesperrt? |
 | `ASTAR_SET_DIAGONAL(g, allow)` | BOOLEAN — Diagonal-Bewegung an/aus |
 | `ASTAR_SET_HEURISTIC(g, name$)` | `"manhattan"` \| `"euclid"` \| `"chebyshev"` |
 | `ASTAR_SET_DIAGONAL_COST(g, cost)` | Default `√2` ≈ 1.414 |
 | `ASTAR_FIND(g, sx, sy, ex, ey)` | BOOLEAN — `TRUE` wenn Pfad gefunden |
 | `ASTAR_PATH_LEN(g)` | INTEGER — `0` wenn kein Pfad |
-| `ASTAR_PATH_X(g, idx)` / `ASTAR_PATH_Y(g, idx)` | INTEGER |
+| `ASTAR_PATH_X(g, idx)` / `ASTAR_PATH_Y(g, idx)` | INTEGER — Kachel-Koordinate des Wegpunkts (0 = Start) |
 | `ASTAR_PATH_COST(g)` | FLOAT — Gesamtkosten |
 | `ASTAR_CLEAR_PATH(g)` | nur Pfad-Daten löschen, Walls bleiben |
 

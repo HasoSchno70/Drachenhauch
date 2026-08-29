@@ -13,14 +13,14 @@ IMPORT "save"
 | `SAVE_NEW()` | SAVE_HANDLE — leerer Save |
 | `SAVE_LOAD(path$)` | SAVE_HANDLE — wirft wenn Datei fehlt |
 | `SAVE_LOAD_OR_NEW(path$)` | SAVE_HANDLE — leer wenn Datei fehlt |
-| `SAVE_EXISTS(path$)` | BOOLEAN |
+| `SAVE_EXISTS(path$)` | BOOLEAN — gibt es die Datei? |
 | `SAVE_WRITE(s, path$)` | nach Datei schreiben |
 | `SAVE_DELETE_FILE(path$)` | idempotent |
 | `SAVE_VERSION(s)` / `SAVE_SET_VERSION(s, n)` | Versionsfeld lesen/schreiben |
-| `SAVE_SET_INT/FLOAT/STRING/BOOL(s, key$, value)` | Setter |
-| `SAVE_GET_INT/FLOAT/STRING/BOOL(s, key$)` | strikt |
+| `SAVE_SET_INT/FLOAT/STRING/BOOL(s, key$, value)` | Setter — Wert unter einem Schluessel ablegen |
+| `SAVE_GET_INT/FLOAT/STRING/BOOL(s, key$)` | strikt — fehlender Schluessel ist ein Fehler |
 | `SAVE_GET_INT_OR(s, key$, default)` (FLOAT/STRING/BOOL analog) | mit Fallback |
-| `SAVE_HAS(s, key$)` | BOOLEAN |
+| `SAVE_HAS(s, key$)` | BOOLEAN — ist der Schluessel belegt? |
 | `SAVE_DELETE(s, key$)` | idempotent |
 | `SAVE_CLEAR(s)` | alle Keys weg, Version bleibt |
 | `SAVE_KEYS(s)` | STRING — sortierte Liste |

@@ -26,18 +26,18 @@ Sensoren, einfache Motoren über PWM) reicht die Pin-I/O-Basis.
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `FIRMATA_PORTS()` | STRING (komma-getrennte Liste verfügbarer Ports, wie `SERIAL_PORTS()`) |
-| `FIRMATA_OPEN(port$, baud)` | FIRMATA_HANDLE |
-| `FIRMATA_CLOSE(handle)` | — |
-| `FIRMATA_IS_OPEN(handle)` | BOOLEAN |
-| `FIRMATA_PIN_MODE(handle, pin, modus)` | — |
-| `FIRMATA_DIGITAL_WRITE(handle, pin, wert)` | — |
-| `FIRMATA_DIGITAL_READ(handle, pin)` | BOOLEAN |
-| `FIRMATA_ANALOG_WRITE(handle, pin, wert)` | — |
-| `FIRMATA_ANALOG_READ(handle, kanal)` | INTEGER (0..16383) |
-| `FIRMATA_UPDATE(handle)` | — |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `FIRMATA_PORTS()` | STRING (komma-getrennte Liste verfügbarer Ports, wie `SERIAL_PORTS()`) | welche seriellen Anschluesse gibt es? |
+| `FIRMATA_OPEN(port$, baud)` | FIRMATA_HANDLE | Verbindung zum Board aufbauen (StandardFirmata muss dort laufen) |
+| `FIRMATA_CLOSE(handle)` | — | Verbindung schliessen |
+| `FIRMATA_IS_OPEN(handle)` | BOOLEAN | steht die Verbindung noch? |
+| `FIRMATA_PIN_MODE(handle, pin, modus)` | — | Betriebsart eines Pins festlegen (Eingang, Ausgang, PWM, Analog) |
+| `FIRMATA_DIGITAL_WRITE(handle, pin, wert)` | — | Pin auf HIGH oder LOW schalten |
+| `FIRMATA_DIGITAL_READ(handle, pin)` | BOOLEAN | gemeldeten Zustand eines Eingangs lesen -- der Wert kommt aus dem letzten `FIRMATA_UPDATE` |
+| `FIRMATA_ANALOG_WRITE(handle, pin, wert)` | — | PWM-Wert ausgeben (0..255), etwa fuer Helligkeit oder Motortempo |
+| `FIRMATA_ANALOG_READ(handle, kanal)` | INTEGER (0..16383) | Analogwert lesen -- Achtung, hier zaehlt der **Kanal** (A0 = 0), nicht die Pin-Nummer |
+| `FIRMATA_UPDATE(handle)` | — | **pro Frame aufrufen**: holt die vom Board gemeldeten Pin-Zustaende ab |
 
 ## Pin-Modi
 

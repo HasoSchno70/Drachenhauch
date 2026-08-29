@@ -8,18 +8,18 @@ IMPORT "tween"
 
 ## Übersicht
 
-| Funktion | Rückgabe |
-|---|---|
-| `TWEEN_NEW(start, end, dauer_ms[, easing$])` | TWEEN (one-shot) |
-| `TWEEN_NEW_LOOP(start, end, dauer_ms[, easing$])` | TWEEN (forever, springt zurück) |
-| `TWEEN_NEW_PINGPONG(start, end, dauer_ms[, easing$])` | TWEEN (forever, hin & zurück) |
-| `TWEEN_VALUE(t)` | FLOAT |
-| `TWEEN_PROGRESS(t)` | FLOAT (0.0 .. 1.0) |
-| `TWEEN_DONE(t)` | BOOLEAN (immer FALSE bei loop/pingpong) |
-| `TWEEN_RESTART(t)` | — |
-| `TWEEN_PAUSE(t)`, `TWEEN_RESUME(t)` | — |
-| `TWEEN_REVERSE(t)` | — |
-| `TWEEN_EASINGS()` | STRING (komma-getrennte Liste) |
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `TWEEN_NEW(start, end, dauer_ms[, easing$])` | TWEEN (one-shot) | Wert einmal von `start` nach `end` fahren |
+| `TWEEN_NEW_LOOP(start, end, dauer_ms[, easing$])` | TWEEN (forever, springt zurück) | wie TWEEN_NEW, springt am Ende zurueck an den Anfang |
+| `TWEEN_NEW_PINGPONG(start, end, dauer_ms[, easing$])` | TWEEN (forever, hin & zurück) | wie TWEEN_NEW, laeuft am Ende rueckwaerts zurueck |
+| `TWEEN_VALUE(t)` | FLOAT | aktueller Wert -- das, was man zeichnet |
+| `TWEEN_PROGRESS(t)` | FLOAT (0.0 .. 1.0) | wie weit ist er? (0 = Anfang, 1 = Ende) |
+| `TWEEN_DONE(t)` | BOOLEAN (immer FALSE bei loop/pingpong) | ist er durch? |
+| `TWEEN_RESTART(t)` | — | wieder von vorn |
+| `TWEEN_PAUSE(t)`, `TWEEN_RESUME(t)` | — | anhalten und weiterlaufen lassen |
+| `TWEEN_REVERSE(t)` | — | Richtung umkehren |
+| `TWEEN_EASINGS()` | STRING (komma-getrennte Liste) | welche Verlaufskurven gibt es? |
 
 ## Konzept
 

@@ -14,13 +14,13 @@ IMPORT "scene"
 | `SCENE_POP()` | Oberste entfernen, vorherige aktiv |
 | `SCENE_SWITCH(name$)` | Stack komplett ersetzen |
 | `SCENE_CURRENT()` | STRING — aktiver Name (`""` wenn leer) |
-| `SCENE_DEPTH()` | INTEGER |
+| `SCENE_DEPTH()` | INTEGER — wie viele Szenen liegen auf dem Stapel? |
 | `SCENE_HAS(name$)` | BOOLEAN — irgendwo im Stack? |
 | `SCENE_RESET()` | Stack komplett leeren |
 | `SCENE_SET_INT/FLOAT/STRING/BOOL(key$, value)` | Daten in der obersten Scene setzen |
 | `SCENE_GET_INT/FLOAT/STRING/BOOL(key$)` | strikt — wirft bei fehlend / falschem Typ |
 | `SCENE_GET_INT_OR(key$, default)` (FLOAT/STRING/BOOL analog) | mit Fallback |
-| `SCENE_HAS_KEY(key$)` | BOOLEAN |
+| `SCENE_HAS_KEY(key$)` | BOOLEAN — ist der Schluessel in der obersten Szene belegt? |
 | `SCENE_DELETE(key$)` | idempotent |
 
 ## Konzept

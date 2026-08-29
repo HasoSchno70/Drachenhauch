@@ -36,7 +36,7 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_LINE_WIDTH(p, mm)` | Strichstärke |
 | `PDF_TEXT(p, x, y, text$)` | Text setzen |
 | `PDF_TEXT_WIDTH(p, text$)` → FLOAT | Breite in mm (siehe unten) |
-| `PDF_LINE(p, x1, y1, x2, y2)` | Linie |
+| `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
 | `PDF_SAVE(p, pfad$)` | schreiben |
 | `PDF_CLOSE(p)` | Speicher freigeben |

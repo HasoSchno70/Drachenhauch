@@ -41,9 +41,9 @@ SMTP_CLOSE(m)
 | `SMTP_LOGIN(m, benutzer$, kennwort$)` | Anmeldung (weglassen = ohne) |
 | `SMTP_FROM(m, adresse$ [, name$])` | Absender |
 | `SMTP_TO(m, adresse$ [, name$])` | Empfänger — mehrfach aufrufbar |
-| `SMTP_CC(m, adresse$ [, name$])` | Kopie |
+| `SMTP_CC(m, adresse$ [, name$])` | Kopie-Empfaenger (CC) |
 | `SMTP_BCC(m, adresse$)` | Blindkopie |
-| `SMTP_SUBJECT(m, betreff$)` | Betreff |
+| `SMTP_SUBJECT(m, betreff$)` | Betreffzeile setzen |
 | `SMTP_TEXT(m, text$)` | Nachricht als reiner Text |
 | `SMTP_HTML(m, html$)` | Nachricht als HTML |
 | `SMTP_ATTACH(m, pfad$ [, name$])` | Datei anhängen — mehrfach aufrufbar |

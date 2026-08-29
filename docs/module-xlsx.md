@@ -38,7 +38,7 @@ den CSV schon deckt.
 | `XLSX_SET(x, zeile, spalte, text$)` | Textzelle |
 | `XLSX_SET_NUM(x, zeile, spalte, zahl)` | Zahlzelle |
 | `XLSX_SET_DATE(x, zeile, spalte, zeit[, muster$])` | Datumszelle |
-| `XLSX_BOLD(x, zeile, spalte[, an])` | fett |
+| `XLSX_BOLD(x, zeile, spalte[, an])` | Zelle fett setzen |
 | `XLSX_BOLD_ROW(x, zeile[, an])` | ganze Zeile fett (die Kopfzeile) |
 | `XLSX_FORMAT(x, zeile, spalte, muster$)` | Zahlenformat |
 | `XLSX_COL_WIDTH(x, spalte, breite)` | Spaltenbreite in Zeichen |
