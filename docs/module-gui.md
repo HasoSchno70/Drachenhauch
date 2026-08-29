@@ -112,6 +112,36 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 |---|---|---|
 | `GUI_MESSAGE(titel$, text$)` | — | Info-Box mit OK |
 | `GUI_CONFIRM(titel$, text$[, stil$])` | BOOLEAN | Rückfrage → `TRUE` bei Zustimmung |
+| `GUI_RADIO(win, group$, text$, x, y)` | GUI_WIDGET | Auswahlknopf; alle mit derselben `group$` schliessen sich gegenseitig aus |
+| `GUI_RADIO_SELECTED(radio)` | INTEGER | welcher der Gruppe ist gewaehlt? (Erstellungsreihenfolge ab 0, `-1` = keiner) |
+| `GUI_DROPDOWN(win, x, y, w, h, items)` | GUI_WIDGET | aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet |
+| `GUI_DROPDOWN_SELECTED(dd)` | INTEGER | Index der Auswahl (`-1` = keine) |
+| `GUI_DROPDOWN_TEXT(dd)` | STRING | Text der Auswahl |
+| `GUI_DROPDOWN_SET_SELECTED(dd, i)` | — | Auswahl vom Programm aus setzen |
+| `GUI_SET_DROPDOWN(dd, items)` | — | Eintraege ersetzen |
+| `GUI_LISTBOX(win, x, y, w, h, items)` | GUI_WIDGET | scrollbare Auswahlliste (Mausrad scrollt) |
+| `GUI_LISTBOX_SELECTED(lb)` | INTEGER | Index der Auswahl (`-1` = keine) |
+| `GUI_LISTBOX_TEXT(lb)` | STRING | Text der Auswahl |
+| `GUI_LISTBOX_SET_SELECTED(lb, i)` | — | Auswahl vom Programm aus setzen |
+| `GUI_SET_LISTBOX(lb, items)` | — | Eintraege ersetzen |
+| `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | Bild oder Symbol im Fenster |
+| `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen |
+| `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, **nach** `GUI_DRAW` |
+| `GUI_CANVAS_X(canvas)` / `GUI_CANVAS_Y(canvas)` | INTEGER | **absolute** Bildschirmposition der Flaeche (wandert mit dem Fenster) |
+| `GUI_CANVAS_W(canvas)` / `GUI_CANVAS_H(canvas)` | INTEGER | Groesse der Flaeche |
+| `GUI_SET_ENABLED(wdg, on)` | — | Widget bedienbar machen oder sperren (gesperrt = ausgegraut, nimmt keine Klicks) |
+| `GUI_ENABLED(wdg)` | BOOLEAN | ist es bedienbar? |
+| `GUI_SET_FONT(wdg, font)` | — | eigene Schrift fuer dieses Widget |
+| `GUI_SET_FONT_SIZE(wdg, px)` | — | eigene Schriftgroesse fuer dieses Widget |
+| `GUI_STYLE_SET(name$, prop$, wert)` | — | benannten Stil festlegen (`bg`, `fg`, `border`, `accent`, `font`, `font_size`) |
+| `GUI_APPLY_STYLE(widget, name$)` | — | einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen |
+| `GUI_GET_Y(wdg)` / `GUI_GET_W(wdg)` / `GUI_GET_H(wdg)` | INTEGER | Lage und Groesse des Widgets im Fenster (Gegenstueck zu `GUI_SET_BOUNDS`) |
+| `GUI_WINDOW_GET_Y(win)` / `GUI_WINDOW_GET_W(win)` / `GUI_WINDOW_GET_H(win)` | INTEGER | Lage und Groesse des Fensters auf dem Bildschirm |
+| `GUI_TABLE_SET(tbl, schluessel$, wert)` | — | Einstellung der Tabelle setzen (`zebra`, `gitter`, `zeilenhoehe`, `filterzeile`, `feste_spalten`, ...) |
+| `GUI_TABLE_GET(tbl, schluessel$)` | FLOAT | eine dieser Einstellungen zurueckreisen |
+| `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | welche Spalte wurde angeklickt? -- fuer Zellen der Art `knopf` |
+| `GUI_TABLE_VIEW_COUNT(tbl)` | INTEGER | wie viele Zeilen sind gerade SICHTBAR? (nach Filtern) |
+| `GUI_TABLE_VIEW_ROW(tbl, i)` | INTEGER | welche **Datenzeile** steht an sichtbarer Stelle `i`? -- Sortieren und Filtern stellen die Daten nicht um |
 
 `stil$` beschriftet die Knöpfe: `"ok"` (Vorgabe) zeigt **OK/Abbrechen**,
 `"janein"` zeigt **Ja/Nein**. Der Unterschied ist nicht kosmetisch — bei einer
