@@ -28,7 +28,22 @@ const EXIT_REQUEST: &str = "__EXIT__";
 /// `exec` rekursiert ueber den NATIVEN Rust-Stack (exec->run_frame->dispatch->
 /// exec), es gibt kein GB-seitiges Frame-Limit -- ohne diese Grenze crasht eine
 /// unendliche Rekursion den ganzen Prozess statt einen fangbaren Fehler zu werfen.
-const MAX_CALL_DEPTH: u32 = 3000;
+///
+/// DER WERT HAENGT AN DER STACKGROESSE, nicht am Geschmack. Gemessen kostet ein
+/// Aufrufrahmen ~6,6 KB (gleich fuer freie Funktion, Methode, BYREF, FUNCREF und
+/// ueberladenen Operator), dazu ~80 KB Grundverbrauch. Die Grenze muss auf JEDER
+/// Plattform vor dem Stack greifen, sonst kommt mal diese Meldung und mal ein
+/// Absturz. Massgeblich ist die kleinste Plattform: Linux gibt dem Hauptthread
+/// per Vorgabe 8 MB (RLIMIT_STACK, von Linker-Flags unerreichbar) -- das traegt
+/// ~1250 Ebenen. 1000 laesst davon ein Sechstel Luft.
+///
+/// Windows und macOS bekommen ihre 64 MB ueber `.cargo/config.toml`; dort waere
+/// weit mehr moeglich, aber ein plattformabhaengiges Limit waere eine Falle:
+/// Programme liefen auf dem einen Rechner und braechen auf dem anderen ab.
+///
+/// Vorher stand hier 3000 -- ein Wert, den keine Plattform je erreichte. Unter
+/// Windows (1 MB Vorgabe) crashte der Prozess bereits bei 147.
+const MAX_CALL_DEPTH: u32 = 1000;
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};

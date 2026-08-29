@@ -761,6 +761,24 @@ FUNCTION fib(n AS INTEGER) AS INTEGER
 END FUNCTION
 ```
 
+**Wie tief?** Bis **1000** verschachtelte Aufrufe. Jeder GB-Aufruf belegt einen
+Rahmen auf dem nativen Stack (~6,6 KB), und die Grenze richtet sich nach der
+knappsten Plattform (Linux gibt dem Hauptthread 8 MB, wohin kein Linker-Flag
+reicht) -- damit ein Programm sich ueberall gleich verhaelt statt auf einem
+Rechner zu laufen und auf dem naechsten abzubrechen.
+
+Wer die Grenze reisst, bekommt einen ganz normalen, mit `TRY`/`CATCH`
+fangbaren Fehler:
+
+```
+Laufzeitfehler in spiel.dh:12: Maximale Aufruftiefe (1000) ueberschritten -- unendliche Rekursion?
+```
+
+Fuer die meisten Aufgaben reicht das weit. Wo es knapp wird -- ein rekursiver
+Flood-Fill deckt so ein Feld bis rund 31x31 Kacheln ab -- schreibt man die
+Rekursion in eine Schleife mit eigener Warteschlange um: statt sich selbst
+aufzurufen, legt man die naechste Aufgabe in ein ARRAY und arbeitet es ab.
+
 ## Coroutines: YIELD
 
 Eine `FUNCTION` oder `SUB`, deren Body ein `YIELD` enthält, ist eine **Coroutine**. Ihr Aufruf führt den Body *nicht* aus, sondern liefert ein `COROUTINE`-Handle, das man schrittweise weitertreibt.
