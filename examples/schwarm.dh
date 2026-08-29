@@ -26,6 +26,7 @@
 '     F                   -> Vollbild    ESC = Ende
 ' ======================================================================
 
+IMPORT "camera"
 IMPORT "g3d"
 
 ' --- Welt (Weltkoordinaten: X rechts, Y oben, Z Tiefe) -----------------

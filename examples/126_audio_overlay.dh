@@ -9,6 +9,8 @@
 '           -- oder im Drachenhauch-Editor den Stop-Knopf, sonst Alt+F4.
 '  CLICKTHROUGH = FALSE setzen, wenn das Overlay den Mausfokus behalten soll.
 ' ============================================================
+IMPORT "audio"
+
 CONST PI2 AS FLOAT = 6.28318530718
 CONST BANDS AS INTEGER = 64          ' Spektral-Baender rundherum
 CONST CLICKTHROUGH AS INTEGER = TRUE

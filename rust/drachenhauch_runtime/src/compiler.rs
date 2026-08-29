@@ -324,6 +324,12 @@ pub struct Compiler {
     /// (z.B. "vec2", "json_handle", aliasiert auch "j_handle"). Aus
     /// preprocess::compile_env.
     external_types: std::collections::HashSet<String>,
+    /// Namen der importierten Built-in-Module (lowercase), aus
+    /// `preprocess::compile_env`. Grundlage fuer die IMPORT-Warnung.
+    importierte_module: std::collections::HashSet<String>,
+    /// Module, fuer die die IMPORT-Warnung schon steht -- eine je Modul, nicht
+    /// eine je Aufruf (sonst stuenden bei 50 AUDIO_-Aufrufen 50 Meldungen).
+    gemeldete_module: std::collections::HashSet<String>,
     /// `(alias, modul)`-Paare aus `IMPORT "<modul>" AS <alias>` -- damit
     /// aliasierte Builtin-Aufrufe (`j_parse`) auf den kanonischen Namen
     /// (`json_parse`) zurueckabgebildet werden, den dhrt nativ kennt.
@@ -485,6 +491,38 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     Some((min, max))
 }
 
+/// Herkunfts-Modul je Builtin (lowercase), aus `builtin_index.json`. `core`
+/// und `dhrt` bedeuten "kein IMPORT noetig" und stehen darum NICHT drin.
+///
+/// Warum das ueberhaupt geprueft wird: dhrt kennt alle Module nativ, ein
+/// `IMPORT "vec2"` wird vom Preprocessor zu einem Kommentar. `VEC2_NEW(...)`
+/// laeuft also auch ohne die Zeile -- fuer Builtins ist der IMPORT technisch
+/// folgenlos. Fuer TYPEN dagegen ist er Pflicht (`DIM v AS VEC2` ohne IMPORT
+/// ist ein Fehler). Diese halbe Durchsetzung ist die eigentliche Falle: das
+/// Lehrbuch und jedes Beispiel schreiben den IMPORT, die Sprache verlangt ihn
+/// aber nur manchmal -- und wer ihn weglaesst, merkt es erst, wenn er spaeter
+/// eine Variable des Modultyps deklariert.
+fn builtin_modul() -> &'static std::collections::HashMap<String, String> {
+    use std::sync::OnceLock;
+    static MAP: OnceLock<std::collections::HashMap<String, String>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let mut m = std::collections::HashMap::new();
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
+                for e in arr {
+                    let (Some(n), Some(modul)) = (e.get("name").and_then(|n| n.as_str()),
+                                                  e.get("module").and_then(|s| s.as_str()))
+                    else { continue };
+                    if modul == "core" || modul == "dhrt" { continue; }
+                    m.insert(n.to_lowercase(), modul.to_lowercase());
+                }
+            }
+        }
+        m
+    })
+}
+
 /// "3", "3 bis 4" bzw. "mindestens 3" -- fuer lesbare Meldungen.
 ///
 /// Variadische Signaturen ("...") liefern `usize::MAX` als Obergrenze. Ohne den
@@ -507,7 +545,8 @@ fn is_known_builtin(name: &str) -> bool {
 
 impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
-           builtin_aliases: Vec<(String, String)>) -> Self {
+           builtin_aliases: Vec<(String, String)>,
+           importierte_module: std::collections::HashSet<String>) -> Self {
         Compiler { global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
@@ -518,6 +557,8 @@ impl Compiler {
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
                    external_types, builtin_aliases,
+                   importierte_module,
+                   gemeldete_module: std::collections::HashSet::new(),
                    enum_decls: HashMap::new(), global_types: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0,
                    warnings: vec![] }
@@ -2203,6 +2244,21 @@ impl Compiler {
                         bname.to_uppercase(), n, arity_text(min, max))));
                 }
             }
+            // Gehoert der Befehl zu einem Modul, das nicht importiert ist?
+            // Eine Meldung je MODUL, nicht je Aufruf.
+            if let Some(modul) = builtin_modul().get(&bname) {
+                if !self.importierte_module.contains(modul)
+                    && !self.gemeldete_module.contains(modul) {
+                    self.gemeldete_module.insert(modul.clone());
+                    self.warnings.push((self.ctx.cur_line, format!(
+                        "{} gehoert zum Modul '{}', aber IMPORT \"{}\" fehlt. \
+                         Das Programm laeuft trotzdem -- dhrt kennt die Module nativ, der \
+                         Preprocessor macht aus der Zeile einen Kommentar. Ohne sie ist \
+                         aber `DIM x AS <Modultyp>` ein Fehler, und man sieht dem \
+                         Quelltext nicht an, worauf er aufbaut.",
+                        bname.to_uppercase(), modul, modul)));
+                }
+            }
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
         }
@@ -3442,6 +3498,7 @@ fn node_name(n: &Node) -> &'static str {
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)],
+                      importierte_module: &std::collections::HashSet<String>,
                       herkunft: &[crate::preprocess::Herkunft], haupt: &str)
     -> Result<(Value, Vec<(u32, String)>), (u32, String)> {
     let stmts = match ast {
@@ -3466,7 +3523,8 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
         }
     }
     let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
-    let mut c = Compiler::new(external_types.clone(), builtin_aliases.to_vec());
+    let mut c = Compiler::new(external_types.clone(), builtin_aliases.to_vec(),
+                              importierte_module.clone());
     c.herkunft = herkunft.to_vec();
     c.haupt = haupt.to_string();
     // Struct-Namen vor dem Slot-Pre-Pass kennen (Structs bekommen keinen Slot).

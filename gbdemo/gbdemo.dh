@@ -26,6 +26,7 @@
 ' ======================================================================
 
 IMPORT "audio"
+IMPORT "camera"
 IMPORT "m3d"
 IMPORT "g3d"
 IMPORT "particles"

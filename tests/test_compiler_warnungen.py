@@ -152,6 +152,67 @@ GENTEX_GRADIENT(64, 64, &H000000, &HFFFFFF, TRUE)
     assert not any("Argument" in m for m in w), w
 
 
+# ------------------------------------------------------- fehlender IMPORT
+# dhrt kennt alle Module nativ; der Preprocessor macht aus `IMPORT "vec2"` einen
+# Kommentar. Fuer BUILTINS ist die Zeile damit folgenlos -- `VEC2_NEW(...)` laeuft
+# auch ohne sie. Fuer TYPEN ist sie Pflicht (`DIM v AS VEC2` ohne IMPORT ist ein
+# Fehler). Diese halbe Durchsetzung ist die Falle: Lehrbuch und Beispiele
+# schreiben den IMPORT, die Sprache verlangt ihn nur manchmal -- und wer ihn
+# weglaesst, merkt es erst, wenn er spaeter eine Variable des Modultyps anlegt.
+
+
+def test_modul_builtin_ohne_import_warnt(tmp_path):
+    w = _warnungen(tmp_path, 'PRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))\n')
+    assert any("VEC2_LENGTH" in m and "vec2" in m for m in w), w
+
+
+def test_mit_import_schweigt(tmp_path):
+    w = _warnungen(tmp_path, 'IMPORT "vec2"\nPRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))\n')
+    assert not any("IMPORT" in m for m in w), w
+
+
+def test_aliasierter_import_schweigt(tmp_path):
+    """`IMPORT "json" AS j` -- der Compiler bildet `J_PARSE` auf `json_parse`
+    zurueck, das Modul gilt als importiert."""
+    w = _warnungen(tmp_path, """
+IMPORT "json" AS j
+DIM h AS J_HANDLE
+h = J_PARSE("[1, 2]")
+PRINT J_GET_INT(h, "0")
+""")
+    assert not any("IMPORT" in m for m in w), w
+
+
+def test_core_builtins_brauchen_keinen_import(tmp_path):
+    w = _warnungen(tmp_path, """
+SCREEN(64, 64)
+PRINT LEN("abc")
+PRINT ABS(-3)
+CLS(0)
+""")
+    assert not any("IMPORT" in m for m in w), w
+
+
+def test_nur_eine_meldung_je_modul(tmp_path):
+    """Sonst stuenden bei 50 AUDIO_-Aufrufen 50 gleichlautende Meldungen."""
+    w = _warnungen(tmp_path, """
+PRINT VEC2_X(VEC2_NEW(1.0, 2.0))
+PRINT VEC2_Y(VEC2_NEW(1.0, 2.0))
+PRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))
+""")
+    assert len([m for m in w if "vec2" in m]) == 1, w
+
+
+def test_import_in_eingebundener_datei_zaehlt(tmp_path):
+    """Der Preprocessor sammelt IMPORTs rekursiv -- steht die Zeile im
+    eingebundenen Helfer, gilt das Modul auch fuer die Hauptdatei."""
+    (tmp_path / "helfer.dh").write_text(
+        'IMPORT "vec2"\n\nFUNCTION laenge(x AS FLOAT, y AS FLOAT) AS FLOAT\n'
+        '  RETURN VEC2_LENGTH(VEC2_NEW(x, y))\nEND FUNCTION\n', encoding="utf-8")
+    w = _warnungen(tmp_path, 'IMPORT "helfer.dh"\nPRINT laenge(3.0, 4.0)\n')
+    assert not any("IMPORT" in m for m in w), w
+
+
 # ---------------------------------------------------- verdeckte Konstante
 def test_lokale_variable_verdeckt_konstante(tmp_path):
     w = _warnungen(tmp_path, """

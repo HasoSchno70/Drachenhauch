@@ -8,6 +8,8 @@
 '  Streifen darunter. GUI_SET_ICON(button, tex) tauscht das Icon.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
+IMPORT "imgfx"
+
 SCREEN(1080, 700, "Drachenhauch - Icon-Buttons", 1)
 SETFPS(60)
 

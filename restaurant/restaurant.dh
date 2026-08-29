@@ -20,6 +20,7 @@
 ' ---------------------------------------------------------------------------
 
 IMPORT "audio"
+IMPORT "camera"
 IMPORT "save"
 
 CONST BREITE AS INTEGER = 960

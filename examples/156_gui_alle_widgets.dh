@@ -20,6 +20,7 @@
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
+IMPORT "imgfx"
 
 SCREEN(1280, 800, "Drachenhauch - alle GUI-Widgets", 1)
 SET_FULLSCREEN(TRUE)

@@ -11,6 +11,8 @@
 ' Maus links/rechts = Filter-Cutoff auf der Musik (links zu = dumpf).
 '   F = Filter an/aus   R = Reverb an/aus   D = Delay an/aus   ESC = Ende
 
+IMPORT "audio"
+
 SCREEN(560, 280, "Echtzeit-Audio-Effekte", 2)
 SETFPS(60)
 

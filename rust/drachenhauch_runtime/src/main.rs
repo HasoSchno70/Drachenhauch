@@ -853,7 +853,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     // Zeile, die der Nutzer VOR SICH HAT -- nicht auf die gemergte Quelle.
     // Ohne IMPORT ist beides dasselbe, mit IMPORT war es bisher irrefuehrend.
     let wo = |zeile: u32| preprocess::stelle(&herkunft, zeile, label);
-    let (ext_types, aliases) = preprocess::compile_env(&imports);
+    let (ext_types, aliases, module) = preprocess::compile_env(&imports);
     // E1: Hardware-Module (serial/usb/bt/wifi) sind zwar importierbar, fehlen aber
     // im Default-Build. Frueh (beim IMPORT) warnen statt erst beim ersten Aufruf --
     // die Meldung ist nicht fatal, der Lauf geht weiter (der eigentliche Aufruf
@@ -877,7 +877,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         eprintln!("{}: Namensraum-Fehler: {}", wo(zeile), msg);
         return Err(ExitCode::from(3));
     }
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         Ok((j, warns)) => {
             // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
             // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
@@ -1080,7 +1080,7 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
             "line": e.line, "col": 0, "severity": "error",
             "phase": "preprocess", "message": e.msg })],
     };
-    let (ext_types, aliases) = preprocess::compile_env(&imports);
+    let (ext_types, aliases, module) = preprocess::compile_env(&imports);
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
         Err(e) => return vec![serde_json::json!({
@@ -1101,7 +1101,7 @@ fn check_source(raw_source: &str, base: &std::path::Path, label: &str) -> Vec<se
             "line": zeile, "col": 1, "severity": "error",
             "phase": "namensraum", "message": msg })];
     }
-    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &herkunft, label) {
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases, &module, &herkunft, label) {
         // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
         // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim

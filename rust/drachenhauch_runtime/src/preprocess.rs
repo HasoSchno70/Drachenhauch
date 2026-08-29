@@ -105,10 +105,19 @@ fn remap_name(name: &str, module: &str, alias: &str) -> Option<String> {
 ///   - `builtin_aliases`: `(alias, modul)`-Paare, mit denen der Compiler
 ///     aliasierte Builtin-Namen (`j_parse` -> `json_parse`) zurueckabbildet.
 /// Alles lowercase (wie der Lexer IDENTs liefert).
+///
+/// Der dritte Rueckgabewert ist die Menge der importierten Modulnamen. Der
+/// Compiler braucht sie, um zu merken, wenn ein Modul-Builtin ohne sein
+/// `IMPORT` benutzt wird -- dhrt kennt die Module nativ, die Zeile ist zur
+/// Laufzeit also folgenlos und faellt darum sonst nie auf.
 pub fn compile_env(imports: &[(String, Option<String>)])
-    -> (HashSet<String>, Vec<(String, String)>) {
+    -> (HashSet<String>, Vec<(String, String)>, HashSet<String>) {
     let mut types = HashSet::new();
     let mut aliases: Vec<(String, String)> = Vec::new();
+    let mut module: HashSet<String> = HashSet::new();
+    for (modul, _) in imports {
+        module.insert(modul.to_lowercase());
+    }
     for (module, alias) in imports {
         let mod_types: &[&str] = MODULE_TYPES.iter()
             .find(|(n, _)| n == module).map(|(_, t)| *t).unwrap_or(&[]);
@@ -126,7 +135,7 @@ pub fn compile_env(imports: &[(String, Option<String>)])
             }
         }
     }
-    (types, aliases)
+    (types, aliases, module)
 }
 
 #[derive(Debug)]
