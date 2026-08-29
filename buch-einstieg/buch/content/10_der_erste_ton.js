@@ -194,6 +194,8 @@ module.exports = (H) => [
 
   H.pmix(["In der Befehlsübersicht und in fremden Programmen steht bei diesen Klangbefehlen oft ein ", ['IMPORT "audio"', true], " obenan. Drachenhauch braucht das nicht — die Klangbefehle sind fest eingebaut, und alle Programme dieses Kapitels laufen ohne. Die Zeile schadet aber auch nichts; wundere dich nur nicht, wenn sie fehlt."]),
 
+  H.pmix(["Startest du ein Programm ohne sie, schreibt Drachenhauch dir eine Erinnerung dazu: ", ["AUDIO_TONE gehoert zum Modul 'audio', aber IMPORT \"audio\" fehlt.", true], " — und dann noch ein paar Zeilen, warum. Das ist ein Hinweis, kein Fehler: dein Programm läuft weiter, und die Programme dieses Kapitels sind mit Absicht ohne die Zeile geschrieben. Wenn dich der Hinweis stört, schreib sie oben dazu, dann ist Ruhe. In Kapitel 24 lernst du den Fall kennen, in dem sie wirklich nötig ist — dort steht auch, warum ausgerechnet dann."]),
+
   H.h2("Wenn etwas nicht geht"),
 
   H.table([
@@ -201,6 +203,7 @@ module.exports = (H) => [
     ["Der Ton bricht ab", "Das SLEEP am Ende fehlt oder ist kürzer als der Ton. PLAYSOUND wartet nicht."],
     ["Alle Töne kommen auf einmal", "Zwischen den PLAYSOUND-Aufrufen fehlt das SLEEP. Sie starten sonst alle im selben Augenblick."],
     [{ text: "passt nicht verlustfrei in INTEGER", mono: true }, "Eine Kommazahl soll in ein ganzzahliges Fach. INT() darum herum."],
+    [{ text: "gehoert zum Modul", mono: true }, "Nur ein Hinweis, kein Fehler — siehe oben, „Eine Zeile, die du oft sehen wirst“. Das Programm läuft."],
     ["Es knackt zwischen den Tönen", "Sollte nicht passieren — erzeugte Töne bekommen automatisch ein kurzes Ein- und Ausblenden. Wenn doch, ist die Dauer sehr kurz gewählt."],
     ["Nach langer Laufzeit wird es langsam", "Bei sehr vielen erzeugten Tönen sammeln sich Klangpuffer an. Erzeug einen Ton EINMAL vor der Schleife statt in jedem Durchgang neu — dazu mehr im nächsten Kapitel."],
   ], { headers: ["Was du hörst", "Was meistens dahintersteckt"], widths: [3600, 5426] }),

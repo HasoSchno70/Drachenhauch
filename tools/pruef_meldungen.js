@@ -65,6 +65,11 @@ const PROVOKATIONEN = [
   { name: "Division durch null",
     zeilen: ["DIM n AS INTEGER", "DIM m AS INTEGER", "m = 0",
              "n = 7 \\ m", "PRINT STR$(n)"] },
+  // Der Builtin-NAME am Anfang wird NICHT abgeschliffen (nur Namen in Hoch-
+  // kommas gelten als Daten) -- die Provokation muss also denselben Befehl
+  // nehmen, den das Buch zitiert. Kapitel 10 des Einstiegsbuchs nimmt AUDIO_TONE.
+  { name: "Modul-Builtin ohne IMPORT",
+    zeilen: ["DIM piep AS SOUND", "piep = AUDIO_TONE(440, 100)"] },
   { name: "Unbekannter Typ (gui)", zeilen: ["DIM w AS GUI_WINDOW"] },
   { name: "Unbekannter Typ (db)", zeilen: ["DIM c AS DB_CONN"] },
   { name: "RGB ausserhalb 0..255", zeilen: ["PRINT STR$(RGB(300, 0, 0))"] },
@@ -122,7 +127,7 @@ const PROVOKATIONEN = [
 // Wortlaut, nicht an dieser Liste.
 const ANKER = new RegExp([
   "erwartet", "nicht deklariert", "ausserhalb", "Unbekannt", "passt nicht",
-  "muessen 0\\.\\.255", "fehlt IMPORT", "Laufzeitfehler", "Parse-Fehler",
+  "muessen 0\\.\\.255", "fehlt IMPORT", "gehoert zum Modul", "Laufzeitfehler", "Parse-Fehler",
   "Lexer-Fehler", "Compile-Fehler", "no such table", "Not Found",
   "nicht verfuegbar", "database is locked", "existiert nicht",
   "Argument\\(e\\)", "Division durch",
