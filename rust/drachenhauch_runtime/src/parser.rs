@@ -278,7 +278,17 @@ impl Parser {
         doppelt && matches!(self.tt(i + 2), Tt::Newline | Tt::Colon | Tt::Eof)
     }
 
+    /// `(a, b) = f()` als ANWEISUNG -- mit Zeilenabschluss.
     fn tuple_assign(&mut self) -> R<Node> {
+        let n = self.tuple_assign_kern()?;
+        self.consume_terminator()?;
+        Ok(n)
+    }
+
+    /// Derselbe Kern OHNE Zeilenabschluss. Im einzeiligen IF gehoert der dem
+    /// IF; verbraucht ihn die Zuweisung, meldet das IF an der Folgezeile
+    /// "Erwartet Zeilenende".
+    fn tuple_assign_kern(&mut self) -> R<Node> {
         self.expect(Tt::Lparen, "")?;
         let mut targets = vec![self.tuple_assign_target()?];
         while self.matches(Tt::Comma) { targets.push(self.tuple_assign_target()?); }
@@ -288,7 +298,6 @@ impl Parser {
         self.expect(Tt::Rparen, "")?;
         self.expect(Tt::Eq, "Erwartet '=' nach Tupel-Zielen")?;
         let value = self.expression()?;
-        self.consume_terminator()?;
         Ok(Node::TupleAssign { targets, value: Box::new(value) })
     }
 
@@ -463,7 +472,15 @@ impl Parser {
         Ok(Node::With { var_name, target: Box::new(target), body })
     }
 
+    /// `.feld = wert` im WITH-Block als ANWEISUNG -- mit Zeilenabschluss.
     fn dot_assign_in_with(&mut self) -> R<Node> {
+        let n = self.dot_assign_in_with_kern()?;
+        self.consume_terminator()?;
+        Ok(n)
+    }
+
+    /// Derselbe Kern OHNE Zeilenabschluss (siehe `tuple_assign_kern`).
+    fn dot_assign_in_with_kern(&mut self) -> R<Node> {
         // Review-Fund: Position merken -- ein `.Method(...)`-STATEMENT (kein
         // `=`/Compound-Op danach, z.B. `.Draw()`) muss zurueckspulen und
         // generisch als Expression-Statement geparst werden (das der
@@ -487,7 +504,6 @@ impl Parser {
         if !is_assign_op(op_tt) {
             self.pos = start;
             let expr = self.expression()?;
-            self.consume_terminator()?;
             return Ok(Node::ExprStmt { expr: Box::new(expr) });
         }
         self.pos += 1;
@@ -496,7 +512,6 @@ impl Parser {
         if let Some(op) = cop {
             rhs = Node::BinaryOp { op: op.into(), left: Box::new(target.clone()), right: Box::new(rhs) };
         }
-        self.consume_terminator()?;
         match target {
             Node::MemberAccess { target, name } =>
                 Ok(Node::MemberAssign { target, name, value: Box::new(rhs) }),
@@ -850,8 +865,9 @@ impl Parser {
             // generischen `_`-Zweig durch: `=` ist dort eine Vergleichs-
             // Operation in expression(), die Zuweisung ging also lautlos als
             // verworfener Vergleichswert verloren.
-            Tt::Dot if !self.with_stack.is_empty() => self.dot_assign_in_with(),
-            Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign(),
+            // Die KERN-Fassungen: den Zeilenabschluss verbraucht `if_stmt`.
+            Tt::Dot if !self.with_stack.is_empty() => self.dot_assign_in_with_kern(),
+            Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign_kern(),
             Tt::Return => {
                 self.pos += 1;
                 // Review-Fund: fehlte ebenfalls Tt::Colon -- `IF done THEN

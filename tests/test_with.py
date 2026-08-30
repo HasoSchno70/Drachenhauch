@@ -180,3 +180,47 @@ PRINT x
     expected = "999\n"
     assert run_gb(src) == expected
     assert run_vm(src) == expected
+
+
+def test_punkt_zuweisung_im_einzeiligen_if(run_gb):
+    """`IF ok THEN .hp = 0` in einem WITH-Block.
+
+    Der Parser hatte den Fall schon vorgesehen, aber die Zuweisung
+    verbrauchte den Zeilenabschluss, den das einzeilige IF danach selbst
+    erwartete -- der Fehler erschien in der FOLGEZEILE und zeigte damit auf
+    die falsche Stelle.
+    """
+    out = run_gb('''
+CLASS P
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+DIM ok AS BOOLEAN
+ok = TRUE
+WITH p
+    IF ok THEN .hp = 0
+END WITH
+PRINT p.hp
+''')
+    assert out.strip() == "0"
+
+
+def test_punkt_zuweisung_haengt_an_der_bedingung(run_gb):
+    """Gegenprobe: bei falscher Bedingung bleibt der Wert stehen."""
+    out = run_gb('''
+CLASS P
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+DIM ok AS BOOLEAN
+ok = FALSE
+WITH p
+    IF ok THEN .hp = 0
+END WITH
+PRINT p.hp
+''')
+    assert out.strip() == "5"

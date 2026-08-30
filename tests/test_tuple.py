@@ -190,3 +190,65 @@ PRINT add2(3, 4)
     expected = "7\n"
     assert run_gb(src) == expected
     assert run_vm(src) == expected
+
+
+# --- Destructuring im einzeiligen IF ----------------------------------------
+#
+# `(a, b) = f()` liess sich zwar an oberster Ebene und im Block-IF schreiben,
+# im EINZEILIGEN IF aber nicht: die Zuweisung verbrauchte den Zeilenabschluss,
+# den das IF danach selbst erwartete -- der Fehler erschien deshalb erst in
+# der FOLGEZEILE ("Erwartet Zeilenende") und zeigte auf die falsche Stelle.
+#
+# Der Parser hatte den Fall schon vorgesehen (eigener Arm in
+# `inline_statement`); uebersehen war nur der doppelte Abschluss. Gefunden
+# beim Messen am Code-Feld, wo genau diese Zeile gebraucht wurde.
+
+_ZWEI = '''
+FUNCTION zwei() AS TUPLE
+    RETURN (7, 8)
+END FUNCTION
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS BOOLEAN
+'''
+
+
+def test_destructuring_im_einzeiligen_if(run_gb):
+    out = run_gb(_ZWEI + '''
+b = TRUE
+IF b THEN (x, y) = zwei()
+PRINT x; " "; y
+''')
+    assert out.strip() == "7 8"
+
+
+def test_destructuring_im_else_zweig(run_gb):
+    out = run_gb(_ZWEI + '''
+b = FALSE
+IF b THEN (x, y) = (1, 2) ELSE (x, y) = (30, 40)
+PRINT x; " "; y
+''')
+    assert out.strip() == "30 40"
+
+
+def test_destructuring_mit_doppelpunkt_verkettet(run_gb):
+    """Der Doppelpunkt trennt Anweisungen -- die Zuweisung darf ihn nicht
+    schon aufgebraucht haben."""
+    out = run_gb(_ZWEI + '''
+b = TRUE
+IF b THEN (x, y) = zwei() : x = x + 100
+PRINT x; " "; y
+''')
+    assert out.strip() == "107 8"
+
+
+def test_destructuring_wird_nicht_ausgefuehrt_wenn_falsch(run_gb):
+    """Gegenprobe: die Zuweisung haengt wirklich an der Bedingung und laeuft
+    nicht einfach immer."""
+    out = run_gb(_ZWEI + '''
+b = FALSE
+x = 5 : y = 6
+IF b THEN (x, y) = zwei()
+PRINT x; " "; y
+''')
+    assert out.strip() == "5 6"
