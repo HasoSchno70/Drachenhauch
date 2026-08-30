@@ -4,8 +4,8 @@ module.exports = (H) => [
   H.figure("56_camera.png", "Eine 800×600-Welt, von der Kamera auf den Spieler (Weltposition 400, 300) zentriert – die HUD-Leiste oben steht fest (ohne Kamera)."),
 
   H.h2("Die Kamera setzen"),
-  H.cmd("CAMERA_SET", 'CAMERA_SET(x, y[, zoom])',
-    "Legt fest, welcher Welt-Punkt (x, y) oben links auf dem Bildschirm landet, und optional einen Zoom (1.0 = normal, 2.0 = doppelt so groß/näher, 0.5 = mehr Welt sichtbar). Ab jetzt sind alle Zeichen-Koordinaten Welt-Koordinaten.",
+  H.cmd("CAMERA_SET", 'CAMERA_SET(x, y[, zoom[, drehung_grad]])',
+    "Legt fest, welcher Welt-Punkt (x, y) oben links auf dem Bildschirm landet, und optional einen Zoom (1.0 = normal, 2.0 = doppelt so groß/näher, 0.5 = mehr Welt sichtbar). Ab jetzt sind alle Zeichen-Koordinaten Welt-Koordinaten. Als viertes Argument nimmt der Befehl dieselbe Drehung wie CAMERA_SET_ROTATION – ein Aufruf statt zwei.",
     [
       'IMPORT "camera"',
       'CAMERA_SET(100.0, 50.0)        \' Welt-Punkt (100,50) -> Bild oben links',
