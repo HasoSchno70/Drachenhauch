@@ -102,7 +102,7 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
 | `GUI_ACTIVE_TAB(win)` | INTEGER | aktiver Reiter-Index |
 | `GUI_SET_ACTIVE_TAB(win, i)` | — | Reiter umschalten |
 
-Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern (TextInput **und** TextArea) des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.dh`](../examples/131_gui_tabs.dh).
+Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen **allen bedienbaren Widgets** des aktiven Fensters — siehe [Bedienung ohne Maus](#bedienung-ohne-maus). Beispiel: [`examples/131_gui_tabs.dh`](../examples/131_gui_tabs.dh).
 
 ### Modale Dialoge
 
@@ -1045,6 +1045,7 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput) |
+| `GUI_FOCUSED()` → GUI_WIDGET | welches Widget hat den Tastatur-Fokus? (`-1` = keins) |
 | `GUI_HIT_TEST(x, y)` → GUI_WIDGET | oberstes Widget am Bildschirmpunkt, oder `-1` (Selektion im Editor) |
 | `GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)` / `GUI_WINDOW_GET_X/Y/W/H(win)` | Fenster bewegen/skalieren/lesen |
 | `GUI_WINDOW_DESTROY(win)` | Fenster + Inhalt entfernen |
@@ -1324,11 +1325,48 @@ Bild, solange der Zustand anhält. Ausgelöst werden sie in `GUI_UPDATE`;
 aufgerufen wird der Handler danach, damit er die Oberfläche nicht mitten im
 Zustands-Update umbauen kann.
 
-**Fokus bekommen nur Widgets, die ihn auch führen** — Textfeld, Textbereich
-und Zahlenfeld (oder programmatisch über `GUI_FOCUS`). Bei einem Knopf würde
-`on_focus` nie von selbst feuern; der Form-Designer bietet es dort deshalb
-gar nicht erst an.
+**Fokus bekommt jedes bedienbare Widget** (seit 2026-08-30 — vorher nur
+Textfeld, Textbereich und Zahlenfeld). `on_focus`/`on_blur` feuern damit auch
+an Knopf, Kästchen, Klappliste und Baum, sobald `TAB` oder ein Klick dort
+landet. Reine Deko (Beschriftung, Panel, Trennlinie, Gruppe, Werkzeugleiste,
+Fortschritt, Bild, Zeichenfläche) bekommt weiterhin keinen Fokus und feuert
+die beiden Flanken nie.
 
 Alle sechs überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
 — das ist der Weg, über den ein im Form-Designer gebautes Formular seine
 Handler bekommt.
+
+## Bedienung ohne Maus
+
+`TAB` / `SHIFT+TAB` wandert durch **alle bedienbaren Widgets** des aktiven
+Fensters, in Anlege-Reihenfolge und nur über sichtbare, eingeschaltete. Reine
+Deko wird übersprungen — sonst müsste man sich durch Beschriftungen
+hindurchtabben. Das fokussierte Widget bekommt einen **Ring in der
+Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
+
+| Taste | Wirkung |
+|---|---|
+| `TAB` / `SHIFT+TAB` | nächstes / vorheriges Widget |
+| `LEERTASTE`, `ENTER` | Knopf auslösen, Kästchen/Schalter umschalten, Radio wählen, Klappliste auf/zu, Baumknoten auf/zuklappen |
+| `←` `→` `↑` `↓` | Regler/Drehknopf verstellen (ein Zwanzigstel des Bereichs je Druck), Trenner verschieben (8 px), Auswahl in Liste/Klappliste/Baum bewegen |
+| `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
+| `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |
+| `ESC` | offene Klappliste schließen |
+
+Welches Widget gerade dran ist, liefert `GUI_FOCUSED()` (`-1` = keins) —
+gedacht für eine Statuszeile oder einen Hilfetext zum aktiven Feld. Setzen
+lässt sich der Fokus mit `GUI_FOCUS(wdg)`.
+
+```basic
+' Hilfetext zum Widget unter dem Fokus
+DIM aktiv AS GUI_WIDGET
+aktiv = GUI_FOCUSED()
+IF aktiv = feldName THEN TEXT(10, 220, "Vor- und Nachname eingeben")
+IF aktiv = knopfOk THEN TEXT(10, 220, "Uebernimmt die Aenderung")
+```
+
+> **Stolperstein:** Benutzt dein Programm `ESC` zum Beenden, prüfe vorher, ob
+> gerade eine Klappliste offen ist oder eine Tabellenzelle bearbeitet wird
+> (`GUI_TABLE_EDITING_ROW < 0`) — sonst beendet die Taste das Programm,
+> während der Benutzer nur ein Popup schließen wollte.
+

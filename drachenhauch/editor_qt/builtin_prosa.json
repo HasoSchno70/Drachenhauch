@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1513,
+ "count": 1514,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -463,6 +463,7 @@
   "GUI_DROPDOWN_TEXT": "STRING — Text der Auswahl",
   "GUI_ENABLED": "BOOLEAN — ist es bedienbar?",
   "GUI_FOCUS": "Tastatur-Fokus setzen (z.B. auf ein TextInput)",
+  "GUI_FOCUSED": "welches Widget hat den Tastatur-Fokus? (-1 = keins)",
   "GUI_FROM_JSON": "aus JSON-String ein Fenster bauen",
   "GUI_GET_H": "INTEGER — Lage und Groesse des Widgets im Fenster (Gegenstueck zu GUI_SET_BOUNDS)",
   "GUI_GET_W": "INTEGER — Lage und Groesse des Widgets im Fenster (Gegenstueck zu GUI_SET_BOUNDS)",

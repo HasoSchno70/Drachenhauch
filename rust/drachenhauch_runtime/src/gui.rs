@@ -28,6 +28,8 @@ const KEY_DOWN: i64 = 1073741905;
 const KEY_HOME: i64 = 1073741898;
 const KEY_END: i64 = 1073741901;
 const KEY_ENTER: i64 = 13;
+const KEY_SPACE: i64 = 32;
+const KEY_ESC: i64 = 27;
 const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
@@ -241,6 +243,23 @@ impl Kind {
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             _ => return None,
         })
+    }
+
+    /// Kann dieses Widget den Tastatur-Fokus bekommen? Genau die Arten, die man
+    /// auch mit der Maus bedient -- reine Deko (Label, Panel, Trennlinie,
+    /// Gruppe, Werkzeugleiste), Anzeigen (Fortschritt, Bild) und die freie
+    /// Zeichenflaeche bleiben aussen vor. EINE Quelle: der Tab-Zyklus, der
+    /// Klick-Fokus und der Fokus-Ring fragen alle hier.
+    fn fokussierbar(self) -> bool {
+        !matches!(self,
+            Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
+            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas)
+    }
+
+    /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
+    /// aktivieren, sie ist ein Zeichen.
+    fn nimmt_text(self) -> bool {
+        matches!(self, Kind::TextInput | Kind::TextArea)
     }
 }
 
@@ -2530,6 +2549,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.bring_to_front(wi);
         Ok(())
     }
+
+    /// Handle des Widgets mit Tastatur-Fokus, oder -1. Gegenstueck zu
+    /// GUI_FOCUS -- ohne Abfrage koennte ein Programm nicht anzeigen, worauf
+    /// die Tastatur gerade wirkt (Hilfetext zum aktiven Feld, Statuszeile).
+    pub fn focused(&self) -> i64 {
+        match self.focus_widget {
+            Some((wi, i)) => {
+                let lebt = self.windows.get(wi)
+                    .and_then(|w| w.widgets.get(i).map(|x| x.alive && w.alive))
+                    .unwrap_or(false);
+                if lebt { Self::enc_widget(wi, i) } else { -1 }
+            }
+            None => -1,
+        }
+    }
     /// Oberstes lebendes+sichtbares Widget am Bildschirmpunkt (Z-Order), oder -1.
     /// Liefert ein Widget-Handle (fuer Selektion im WYSIWYG-Editor).
     pub fn hit_test(&self, mx: i32, my: i32) -> i64 {
@@ -3621,18 +3655,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
                 Kind::Table => self.table_keys(wi, i, g),
-                _ => {}
+                k => self.widget_keys(wi, i, k, g),
             }
         }
-        // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen den
-        // TextInputs des aktiven Fensters (in Anlege-Reihenfolge, nur sichtbare).
+        // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen ALLEN
+        // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
+        // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
+        // Knopf, Kaestchen und Klappliste waren ohne Maus nicht erreichbar.
         if g.key_pressed(KEY_TAB) {
             if let Some(top) = self.focus_window {
                 let n = self.windows[top].widgets.len();
                 let mut idxs: Vec<usize> = Vec::new();
                 for i in 0..n {
                     let w = &self.windows[top].widgets[i];
-                    if matches!(w.kind, Kind::TextInput | Kind::TextArea) && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
+                    if w.kind.fokussierbar() && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
                 }
                 if !idxs.is_empty() {
                     let cur = self.focus_widget.filter(|(w, _)| *w == top).map(|(_, i)| i);
@@ -3643,10 +3679,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         None => 0,
                     };
                     let ni = idxs[next];
+                    self.open_dropdown = None;   // beim Weitertabben nichts offen stehen lassen
                     self.focus_widget = Some((top, ni));
-                    let len = self.windows[top].widgets[ni].text.chars().count() as i32;
-                    let w = &mut self.windows[top].widgets[ni];
-                    w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
+                    // Nur ein Textfeld bekommt Caret + Markierung -- bei einem
+                    // Knopf waeren beide bedeutungslos.
+                    if self.windows[top].widgets[ni].kind.nimmt_text() {
+                        let len = self.windows[top].widgets[ni].text.chars().count() as i32;
+                        let w = &mut self.windows[top].widgets[ni];
+                        w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
+                    }
                 }
             }
         }
@@ -4075,6 +4116,203 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if g.key_pressed(KEY_DOWN) { self.spinner_step(wi, i, -1); }
     }
 
+    /// Wert eines Regler-artigen Widgets setzen (geklemmt) und bei Aenderung
+    /// on_change feuern. Eine Stelle fuer Maus- und Tastatur-Weg.
+    fn set_value_fire(&mut self, wi: usize, i: usize, roh: f64) {
+        let w = &mut self.windows[wi].widgets[i];
+        let nv = roh.clamp(w.min, w.max);
+        if (nv - w.value).abs() > f64::EPSILON {
+            w.value = nv;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Auswahl in Liste/Klappliste um `d` Zeilen bewegen (am Rand stehenbleiben,
+    /// nicht umlaufen -- beim Halten der Taste kreiste man sonst ewig) und bei
+    /// Aenderung on_change feuern.
+    fn liste_bewegen(&mut self, wi: usize, i: usize, d: i32) {
+        let n = self.windows[wi].widgets[i].items.len() as i32;
+        if n == 0 { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        let neu = (w.sel + d).clamp(0, n - 1);
+        if neu != w.sel {
+            w.sel = neu;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Die gewaehlte Zeile einer ListBox in den sichtbaren Bereich scrollen --
+    /// ohne das wandert die Auswahl beim Tippen aus dem Bild heraus.
+    fn liste_sichtbar(&mut self, wi: usize, i: usize) {
+        let h = self.windows[wi].widgets[i].h;
+        let w = &mut self.windows[wi].widgets[i];
+        if w.sel < 0 { return; }
+        let oben = w.sel * DROPDOWN_ITEM_H;
+        let unten = oben + DROPDOWN_ITEM_H;
+        let sicht = w.value as i32;
+        let neu = if oben < sicht { oben }
+                  else if unten > sicht + h { unten - h }
+                  else { sicht };
+        w.value = neu.max(0) as f64;
+    }
+
+    fn tree_setze_offen(&mut self, wi: usize, i: usize, node: i32, offen: bool) {
+        if node < 0 { return; }
+        if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+            if let Some(n) = t.nodes.get_mut(node as usize) { n.expanded = offen; }
+        }
+    }
+
+    /// Baum-Auswahl setzen, on_change feuern, Knoten ins Bild scrollen.
+    fn tree_setze_auswahl(&mut self, wi: usize, i: usize, node: i32) {
+        let geaendert = match self.windows[wi].widgets[i].tree.as_mut() {
+            Some(t) if t.selected != node => { t.selected = node; true }
+            _ => false,
+        };
+        if geaendert {
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+            self.tree_sichtbar(wi, i);
+        }
+    }
+
+    fn tree_sichtbar(&mut self, wi: usize, i: usize) {
+        let h = self.windows[wi].widgets[i].h;
+        if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+            let vis = Self::tree_visible(t);
+            if let Some(p) = vis.iter().position(|&n| n as i32 == t.selected) {
+                let oben = p as i32 * TREE_ROW_H;
+                let unten = oben + TREE_ROW_H;
+                if oben < t.scroll { t.scroll = oben; }
+                else if unten > t.scroll + h { t.scroll = unten - h; }
+                if t.scroll < 0 { t.scroll = 0; }
+            }
+        }
+    }
+
+    /// Tastatur am fokussierten Widget, das KEIN Textfeld ist.
+    ///
+    /// Leertaste/Enter loesen aus (Knopf, Kaestchen, Schalter, Radio), die
+    /// Pfeile verstellen Werte (Regler, Drehknopf, Trenner) bzw. bewegen die
+    /// Auswahl (Liste, Klappliste, Baum). Damit ist jede Art, die man anklicken
+    /// kann, auch ohne Maus bedienbar -- vorher endete die Tastaturbedienung
+    /// bei den Textfeldern, ein Formular liess sich also nicht abschicken, ohne
+    /// zur Maus zu greifen.
+    fn widget_keys(&mut self, wi: usize, i: usize, kind: Kind, g: &mut Graphics) {
+        let ausloesen = g.key_pressed(KEY_SPACE) || g.key_pressed(KEY_ENTER);
+        let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
+        let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
+        match kind {
+            Kind::Button => {
+                if ausloesen {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.clicked = true;
+                    let f = w.on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
+            Kind::Checkbox | Kind::Toggle => {
+                if ausloesen {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.checked = !w.checked;
+                    let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Radio => {
+                if ausloesen && !self.windows[wi].widgets[i].checked {
+                    self.select_radio(wi, i);
+                    let w = &self.windows[wi].widgets[i];
+                    let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Slider | Kind::Knob => {
+                // Ein Zwanzigstel des Bereichs je Druck: von Anschlag zu Anschlag
+                // sind es immer 20 Anschlaege, egal wie gross der Bereich ist.
+                // Pos1/Ende springen an die Enden.
+                let (lo, hi, v) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value) };
+                let schritt = (hi - lo) / 20.0;
+                if rechts || auf { self.set_value_fire(wi, i, v + schritt); }
+                if links || ab { self.set_value_fire(wi, i, v - schritt); }
+                if g.key_pressed(KEY_HOME) { self.set_value_fire(wi, i, lo); }
+                if g.key_pressed(KEY_END) { self.set_value_fire(wi, i, hi); }
+            }
+            Kind::Splitter => {
+                let vert = self.windows[wi].widgets[i].group == "v";
+                let d = if vert { rechts as i32 - links as i32 } else { ab as i32 - auf as i32 } * 8;
+                if d != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    let (lo, hi) = (w.min as i32, w.max as i32);
+                    let cur = if vert { w.x } else { w.y };
+                    let nv = (cur + d).clamp(lo, hi);
+                    if nv != cur {
+                        if vert { w.x = nv; } else { w.y = nv; }
+                        let f = w.on_change.clone();
+                        if let Some(f) = f { self.pending.push(f); }
+                    }
+                }
+            }
+            Kind::Dropdown => {
+                // Zu: Leertaste/Enter/Ab klappt auf. Offen: Pfeile waehlen,
+                // Leertaste/Enter uebernimmt, ESC schliesst.
+                if self.open_dropdown == Some((wi, i)) {
+                    if ausloesen || g.key_pressed(KEY_ESC) { self.open_dropdown = None; }
+                    else {
+                        let d = ab as i32 - auf as i32;
+                        if d != 0 { self.liste_bewegen(wi, i, d); }
+                    }
+                } else if ausloesen || ab {
+                    self.open_dropdown = Some((wi, i));
+                }
+            }
+            Kind::ListBox => {
+                let d = ab as i32 - auf as i32;
+                if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
+            }
+            Kind::Tree => {
+                let (vis, sel, hat_kinder, offen, eltern) = {
+                    let t = match self.windows[wi].widgets[i].tree.as_ref() {
+                        Some(t) => t, None => return,
+                    };
+                    let sel = t.selected;
+                    let (hk, of, pa) = match t.nodes.get(sel.max(0) as usize) {
+                        Some(n) if sel >= 0 => (n.has_children, n.expanded, n.parent),
+                        _ => (false, false, -1),
+                    };
+                    (Self::tree_visible(t), sel, hk, of, pa)
+                };
+                if vis.is_empty() { return; }
+                let pos = vis.iter().position(|&n| n as i32 == sel);
+                let mut ziel: Option<i32> = None;
+                let d = ab as i32 - auf as i32;
+                if d != 0 {
+                    let np = match pos {
+                        Some(p) => (p as i32 + d).clamp(0, vis.len() as i32 - 1) as usize,
+                        None => 0,
+                    };
+                    ziel = Some(vis[np] as i32);
+                } else if rechts {
+                    // Zu -> aufklappen, offen -> ins erste Kind. So kennt man es
+                    // von jedem Dateibaum.
+                    if hat_kinder && !offen { self.tree_setze_offen(wi, i, sel, true); }
+                    else if let Some(p) = pos { if p + 1 < vis.len() { ziel = Some(vis[p + 1] as i32); } }
+                } else if links {
+                    if hat_kinder && offen { self.tree_setze_offen(wi, i, sel, false); }
+                    else if eltern >= 0 { ziel = Some(eltern); }
+                } else if ausloesen && hat_kinder {
+                    self.tree_setze_offen(wi, i, sel, !offen);
+                }
+                if let Some(z) = ziel { self.tree_setze_auswahl(wi, i, z); }
+            }
+            _ => {}
+        }
+    }
+
     /// Zahl ohne ueberfluessige Nachkommastellen (ganze Zahl -> ohne Komma).
     fn fmt_num(v: f64) -> String {
         if (v.fract()).abs() < 1e-9 { format!("{}", v.round() as i64) }
@@ -4196,7 +4434,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
-        match self.windows[win].widgets[i].kind {
+        // Fokus folgt dem Klick -- an EINER Stelle fuer alle Arten, damit ein
+        // spaeteres Tab dort weiterlaeuft, wo die Maus zuletzt war. Deko faengt
+        // keinen Fokus (fokussierbar() ist die eine Quelle).
+        let kind = self.windows[win].widgets[i].kind;
+        self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
+        match kind {
             Kind::Button => self.press_origin = Some((win, i)),
             Kind::Checkbox => {
                 let w = &mut self.windows[win].widgets[i];
@@ -4222,18 +4465,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.split_off = if vert { mx - ax } else { my - ay };
             }
             Kind::Spinner => {
-                self.focus_widget = Some((win, i));
                 let (ax, ay, ww, hh) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 let (up, down, _bx) = Self::spinner_btn_rects(ax, ay, ww, hh);
                 if Self::in_rect(mx, my, up) { self.spinner_step(win, i, 1); }
                 else if Self::in_rect(mx, my, down) { self.spinner_step(win, i, -1); }
             }
-            Kind::TextInput => self.focus_widget = Some((win, i)),
-            Kind::TextArea => self.focus_widget = Some((win, i)),
-            Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
-            Kind::Tree => { self.focus_widget = None; self.tree_press(win, i, mx, my); }
+            Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
+            Kind::Table => self.table_press(win, i, mx, my),
+            Kind::Tree => self.tree_press(win, i, mx, my),
             Kind::Radio => {
-                self.focus_widget = None;
                 let was = self.windows[win].widgets[i].checked;
                 self.select_radio(win, i);
                 if !was {
@@ -4243,9 +4483,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if let Some(f) = och { self.pending.push(f); }
                 }
             }
-            Kind::Dropdown => { self.focus_widget = None; self.open_dropdown = Some((win, i)); }
+            Kind::Dropdown => self.open_dropdown = Some((win, i)),
             Kind::ListBox => {
-                self.focus_widget = None;
                 let ay = self.abs_rect(win, &self.windows[win].widgets[i]).1;
                 let scroll = self.windows[win].widgets[i].value as i32;
                 let row = (my - ay + scroll) / DROPDOWN_ITEM_H;
@@ -4256,7 +4495,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if let Some(f) = f { self.pending.push(f); }
                 }
             }
-            _ => self.focus_widget = None,
+            _ => {}
         }
     }
 
@@ -4860,6 +5099,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
+        }
+        // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
+        // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
+        // verdeckte er Inhalt -- ein Kaestchen ist nur check_size gross, ein
+        // Ring darin waere kaum zu sehen. Ohne sichtbaren Fokus waere die
+        // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
+        if self.focus_widget == Some((wi, idx)) && wdg.kind.fokussierbar() {
+            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, self.th("accent"));
         }
     }
 

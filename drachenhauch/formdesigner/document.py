@@ -67,10 +67,12 @@ EVENTS: dict = {
     "on_blur":   "Blur",
 }
 
-# Zeigen/Verlassen kann jedes anklickbare Control; Fokus bekommen NUR die,
-# die in der Laufzeit `focus_widget` setzen (Textfeld, Textbereich,
-# Zahlenfeld). Ein Ereignis anzubieten, das nie feuert, waere schlimmer als
-# keines: man sucht den Fehler dann im eigenen Programm.
+# Zeigen/Verlassen kann jedes anklickbare Control; Fokus bekommt seit
+# 2026-08-30 JEDES bedienbare (die Laufzeit setzt `focus_widget` nicht mehr
+# nur fuer Textfeld/Textbereich/Zahlenfeld, sondern fuer alles, was man auch
+# anklicken kann -- siehe `Kind::fokussierbar` in gui.rs). Reine Deko und
+# Anzeigen bleiben aussen vor: ein Ereignis anzubieten, das nie feuert, waere
+# schlimmer als keines -- man sucht den Fehler dann im eigenen Programm.
 _ZEIGEN = ("on_hover", "on_leave")
 _FOKUS = ("on_focus", "on_blur")
 
@@ -87,17 +89,17 @@ class PaletteSpec:
 
 
 PALETTE: list[PaletteSpec] = [
-    PaletteSpec("button",    "Button",       100, 28, ("on_click",) + _ZEIGEN, has_text=True),
+    PaletteSpec("button",    "Button",       100, 28, ("on_click",) + _ZEIGEN + _FOKUS, has_text=True),
     PaletteSpec("label",     "Label",         80, 16, (), has_text=True),
-    PaletteSpec("checkbox",  "Checkbox",      16, 16, ("on_click", "on_change") + _ZEIGEN, has_text=True),
-    PaletteSpec("radio",     "RadioButton",   16, 16, ("on_click", "on_change") + _ZEIGEN, has_text=True),
-    PaletteSpec("slider",    "Slider",       160, 14, ("on_change",) + _ZEIGEN),
+    PaletteSpec("checkbox",  "Checkbox",      16, 16, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
+    PaletteSpec("radio",     "RadioButton",   16, 16, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
+    PaletteSpec("slider",    "Slider",       160, 14, ("on_change",) + _ZEIGEN + _FOKUS),
     PaletteSpec("textinput", "TextInput",    180, 26, ("on_change",) + _ZEIGEN + _FOKUS),
-    PaletteSpec("dropdown",  "Dropdown",     160, 24, ("on_change",) + _ZEIGEN, has_items=True),
-    PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",) + _ZEIGEN, has_items=True),
+    PaletteSpec("dropdown",  "Dropdown",     160, 24, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
+    PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
     PaletteSpec("progress",  "ProgressBar",  180, 18, _ZEIGEN),
     PaletteSpec("image",     "Image",         96, 96, _ZEIGEN),
-    PaletteSpec("table",     "Tabelle",      320, 140, ("on_change",) + _ZEIGEN),
+    PaletteSpec("table",     "Tabelle",      320, 140, ("on_change",) + _ZEIGEN + _FOKUS),
     PaletteSpec("canvas",    "Canvas",       200, 150, ()),
     PaletteSpec("panel",     "Panel",        160, 100, (), has_text=True),
     PaletteSpec("groupbox",  "GroupBox",     160, 100, (), has_text=True),
