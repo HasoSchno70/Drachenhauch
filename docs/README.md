@@ -57,6 +57,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. Klassische "feel-good"-Platformer-Mechanik | [module-controller.md](module-controller.md) |
 | `gui` | Retained-Mode-Oberflächen: Fenster und Widgets als persistente Objekte, 22 Widget-Arten inkl. Tabelle | [module-gui.md](module-gui.md) |
 | `chart` | Diagramme: Kuchen/Donut, Balken, Linie/Fläche, Tacho, Leiste, LED — mit Maus und Tooltip | [module-chart.md](module-chart.md) |
+| `g3d` | 3D-Grafik: Formen, geladene und prozedurale Modelle, Skelett-Animation, Licht und Schatten, Anklicken im Raum | [module-g3d.md](module-g3d.md) |
 | `m3d` | 3D-Mathematik: VEC3/VEC4/QUAT/MAT4 für hierarchische Transforms, eigene Kameras, Instancing | [module-m3d.md](module-m3d.md) |
 | `animfsm` | Animations-State-Machine im Mecanim-Stil, datengetrieben aus `.dhanim` | [module-animfsm.md](module-animfsm.md) |
 | `physics2d` | Vollwertiger 2D-Starrkörper-Solver (Rapier2D): Stapeln, Werfen, Rollen | [module-physics2d.md](module-physics2d.md) |
