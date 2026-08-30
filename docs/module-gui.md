@@ -226,7 +226,7 @@ drehen und dabei deinen Layer- und Render-Ziel-Zustand übernehmen.
 | passt zu | Werkzeug, Editor | Spiel, Vollbild-Anwendung |
 
 Demo für alle drei Neuerungen (Tastatur, Maßstab, Dialog):
-[`examples/159_gui_tastatur_massstab.dh`](../examples/159_gui_tastatur_massstab.dh).
+[`examples/182_gui_tastatur_massstab.dh`](../examples/182_gui_tastatur_massstab.dh).
 
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 

@@ -62,7 +62,7 @@ frage = -1                     ' -1 = kein Dialog offen (0 waere das erste Fenst
 DIM meldung AS STRING
 meldung = "TAB wechselt das Widget, Leertaste loest aus."
 
-WHILE NOT KEYPRESSED(KEY_ESCAPE)
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
     CLS(&H101820)
     GUI_UPDATE()
 
