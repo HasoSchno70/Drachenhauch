@@ -1,0 +1,383 @@
+' ============================================================
+'  DRACHENHAUCH -- Partikel-Editor
+' ============================================================
+'  Alle Parameter des `particles`-Moduls live einstellen, mit echter
+'  Vorschau, und das Ergebnis als GB-Code mitnehmen. Das Gegenstueck
+'  zum Qt-Werkzeug `dhparticles` -- hier in Drachenhauch selbst.
+'
+'  Die Vorschau ist KEINE Nachbildung: sie treibt ein echtes
+'  PARTICLE_SYSTEM mit denselben Aufrufen, die auch im Spiel stehen.
+'  Was du siehst, ist was du bekommst.
+'
+'  Bedienung:
+'    Regler ziehen, Werkseinstellung links waehlen.
+'    Alles auch ohne Maus: TAB wechselt, Leertaste loest aus,
+'    Pfeile verstellen Regler.
+'    [ESC] beendet.
+' ============================================================
+IMPORT "gui"
+IMPORT "particles"
+
+' --- Parameter: EINE Reihenfolge fuer Regler und Werkseinstellungen ---
+CONST P_VXMIN  = 0
+CONST P_VXMAX  = 1
+CONST P_VYMIN  = 2
+CONST P_VYMAX  = 3
+CONST P_GX     = 4
+CONST P_GY     = 5
+CONST P_LMIN   = 6
+CONST P_LMAX   = 7
+CONST P_RATE   = 8
+CONST P_SMIN   = 9
+CONST P_SMAX   = 10
+CONST P_R1     = 11
+CONST P_G1     = 12
+CONST P_B1     = 13
+CONST P_R2     = 14
+CONST P_G2     = 15
+CONST P_B2     = 16
+CONST N_PARAM  = 17
+
+DIM regler[N_PARAM] AS GUI_WIDGET
+DIM wertText[N_PARAM] AS GUI_WIDGET
+DIM nachkomma[N_PARAM] AS INTEGER
+DIM letzter[N_PARAM] AS FLOAT
+
+DIM modi AS ARRAY OF STRING
+modi = SPLIT$("circle|pixel|square|streak|glow", "|")
+
+SCREEN(1240, 760, "Drachenhauch - Partikel-Editor", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Partikel-Editor", 10, 10, 1220, 740)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' ============================================================
+'  Links: Vorschau, Bedienung, Werkseinstellungen
+' ============================================================
+DIM flaeche AS GUI_WIDGET
+flaeche = GUI_CANVAS(win, 16, 16, 520, 400)
+
+DIM knopfPause AS GUI_WIDGET
+knopfPause = GUI_BUTTON(win, "Pause", 16, 428, 100, 30)
+DIM knopfLeeren AS GUI_WIDGET
+knopfLeeren = GUI_BUTTON(win, "Leeren", 124, 428, 100, 30)
+DIM knopfSalve AS GUI_WIDGET
+knopfSalve = GUI_BUTTON(win, "Salve", 232, 428, 100, 30)
+GUI_TOOLTIP(knopfSalve, "200 Teilchen auf einmal -- fuer Explosionen")
+DIM folgtMaus AS GUI_WIDGET
+folgtMaus = GUI_CHECKBOX(win, "folgt der Maus", 344, 434)
+
+DIM lblPresets AS GUI_WIDGET
+lblPresets = GUI_LABEL(win, "Werkseinstellungen", 16, 472)
+DIM presetNamen AS ARRAY OF STRING
+presetNamen = SPLIT$("Funken|Rauch|Feuer|Regen|Schnee|Explosion|Zauber|Springbrunnen", "|")
+DIM liste AS GUI_WIDGET
+liste = GUI_LISTBOX(win, 16, 494, 220, 190, presetNamen)
+
+DIM knopfCode AS GUI_WIDGET
+knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 250, 494, 210, 30)
+DIM lblStatus AS GUI_WIDGET
+lblStatus = GUI_LABEL(win, "Bereit.", 250, 534)
+DIM lblZahl AS GUI_WIDGET
+lblZahl = GUI_LABEL(win, "", 250, 556)
+
+' ============================================================
+'  Rechts: die Regler
+' ============================================================
+DIM gBeweg AS GUI_WIDGET
+gBeweg = GUI_GROUPBOX(win, 556, 16, 330, 216, "Bewegung")
+DIM gLeben AS GUI_WIDGET
+gLeben = GUI_GROUPBOX(win, 556, 246, 330, 126, "Lebenszeit (ms) und Ausstoss")
+DIM gAussehen AS GUI_WIDGET
+gAussehen = GUI_GROUPBOX(win, 906, 16, 306, 156, "Aussehen")
+DIM gFarbe1 AS GUI_WIDGET
+gFarbe1 = GUI_GROUPBOX(win, 906, 186, 306, 150, "Farbe am Anfang")
+DIM gFarbe2 AS GUI_WIDGET
+gFarbe2 = GUI_GROUPBOX(win, 906, 350, 306, 180, "Farbe am Ende")
+
+DIM lblModus AS GUI_WIDGET
+lblModus = GUI_LABEL(win, "Darstellung", 918, 46)
+DIM waehlModus AS GUI_WIDGET
+waehlModus = GUI_DROPDOWN(win, 1052, 42, 148, 24, modi)
+DIM schalterFade AS GUI_WIDGET
+schalterFade = GUI_CHECKBOX(win, "am Ende ausblenden", 918, 140, TRUE)
+DIM schalterEnde AS GUI_WIDGET
+schalterEnde = GUI_CHECKBOX(win, "Farbverlauf benutzen", 918, 380)
+
+' Farbfelder -- zeigen, was die drei Regler darunter ergeben.
+DIM feld1 AS GUI_WIDGET
+feld1 = GUI_CANVAS(win, 918, 306, 282, 18)
+DIM feld2 AS GUI_WIDGET
+feld2 = GUI_CANVAS(win, 918, 500, 282, 18)
+
+SUB machRegler(idx AS INTEGER, name AS STRING, x AS INTEGER, y AS INTEGER, _
+               lo AS FLOAT, hi AS FLOAT, vorgabe AS FLOAT, stellen AS INTEGER)
+    DIM l AS GUI_WIDGET
+    l = GUI_LABEL(win, name, x, y + 3)
+    regler[idx] = GUI_SLIDER(win, x + 146, y, 98, lo, hi, vorgabe)
+    wertText[idx] = GUI_LABEL(win, "", x + 252, y + 3)
+    nachkomma[idx] = stellen
+    letzter[idx] = vorgabe
+END SUB
+
+machRegler(P_VXMIN, "Tempo X min", 568, 46,  -400, 400, -60, 0)
+machRegler(P_VXMAX, "Tempo X max", 568, 76,  -400, 400,  60, 0)
+machRegler(P_VYMIN, "Tempo Y min", 568, 106, -400, 400, -140, 0)
+machRegler(P_VYMAX, "Tempo Y max", 568, 136, -400, 400, -40, 0)
+machRegler(P_GX,    "Kraft X", 568, 166, -600, 600, 0, 0)
+machRegler(P_GY,    "Kraft Y", 568, 196, -600, 600, 220, 0)
+
+machRegler(P_LMIN,  "Leben min", 568, 276, 50, 4000, 500, 0)
+machRegler(P_LMAX,  "Leben max", 568, 306, 50, 4000, 1100, 0)
+machRegler(P_RATE,  "je Bild", 568, 336, 0, 60, 6, 0)
+
+machRegler(P_SMIN,  "Groesse min", 918, 76, 1, 40, 2, 0)
+machRegler(P_SMAX,  "Groesse max", 918, 106, 1, 40, 5, 0)
+
+machRegler(P_R1, "Rot", 918, 216, 0, 255, 255, 0)
+machRegler(P_G1, "Gruen", 918, 246, 0, 255, 200, 0)
+machRegler(P_B1, "Blau", 918, 276, 0, 255, 60, 0)
+
+machRegler(P_R2, "Rot", 918, 410, 0, 255, 200, 0)
+machRegler(P_G2, "Gruen", 918, 440, 0, 255, 40, 0)
+machRegler(P_B2, "Blau", 918, 470, 0, 255, 20, 0)
+
+' ============================================================
+'  Werkseinstellungen
+' ============================================================
+DIM presetModus[8] AS STRING
+DIM presetWert[8, N_PARAM] AS FLOAT
+DIM presetFade[8] AS INTEGER
+DIM presetVerlauf[8] AS INTEGER
+
+' Der Reihe nach: vx min/max, vy min/max, gx, gy, leben min/max, rate,
+' groesse min/max, Startfarbe r/g/b, Endfarbe r/g/b.
+SUB setzePreset(i AS INTEGER, modus AS STRING, _
+                vxa AS FLOAT, vxb AS FLOAT, vya AS FLOAT, vyb AS FLOAT, _
+                gx AS FLOAT, gy AS FLOAT, la AS FLOAT, lb AS FLOAT, rate AS FLOAT, _
+                sa AS FLOAT, sb AS FLOAT, _
+                r1 AS FLOAT, g1 AS FLOAT, b1 AS FLOAT, _
+                r2 AS FLOAT, g2 AS FLOAT, b2 AS FLOAT, _
+                fade AS INTEGER, verlauf AS INTEGER)
+    presetModus[i] = modus
+    presetWert[i, P_VXMIN] = vxa : presetWert[i, P_VXMAX] = vxb
+    presetWert[i, P_VYMIN] = vya : presetWert[i, P_VYMAX] = vyb
+    presetWert[i, P_GX] = gx : presetWert[i, P_GY] = gy
+    presetWert[i, P_LMIN] = la : presetWert[i, P_LMAX] = lb
+    presetWert[i, P_RATE] = rate
+    presetWert[i, P_SMIN] = sa : presetWert[i, P_SMAX] = sb
+    presetWert[i, P_R1] = r1 : presetWert[i, P_G1] = g1 : presetWert[i, P_B1] = b1
+    presetWert[i, P_R2] = r2 : presetWert[i, P_G2] = g2 : presetWert[i, P_B2] = b2
+    presetFade[i] = fade
+    presetVerlauf[i] = verlauf
+END SUB
+
+setzePreset(0, "circle", -90, 90, -200, -60,   0, 420,  300,  800,  8,  2,  4, 255, 220,  80, 255,  60,  20, 1, 1)
+setzePreset(1, "circle", -25, 25,  -70, -25,   0, -20, 1400, 2600,  4,  8, 18, 110, 110, 120,  40,  40,  46, 1, 1)
+setzePreset(2, "glow",   -40, 40, -180, -70,   0,-120,  500, 1000, 12,  4, 10, 255, 190,  60, 200,  40,  20, 1, 1)
+setzePreset(3, "streak",  -8,  8,  260,  420,  0, 260,  700, 1100, 14,  1,  2, 140, 180, 230, 140, 180, 230, 0, 0)
+setzePreset(4, "circle", -25, 25,   30,   80,  0,  20, 2600, 4000,  6,  2,  4, 240, 245, 255, 240, 245, 255, 0, 0)
+setzePreset(5, "circle",-260, 260,-260, 260,   0, 200,  400,  900,  0,  2,  6, 255, 230, 140, 200,  30,  10, 1, 1)
+setzePreset(6, "pixel",  -60, 60,  -60,  60,   0, -30,  700, 1500, 16,  1,  3, 180, 120, 255,  60, 200, 255, 1, 1)
+setzePreset(7, "circle", -70, 70, -320, -240,  0, 420, 1000, 1600, 10,  2,  4, 120, 200, 255,  40,  90, 200, 1, 1)
+
+SUB ladePreset(i AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        GUI_SET_VALUE(regler[k], presetWert[i, k])
+    NEXT
+    FOR k = 0 TO LEN(modi) - 1
+        IF modi[k] = presetModus[i] THEN GUI_DROPDOWN_SET_SELECTED(waehlModus, k)
+    NEXT
+    GUI_SET_CHECKED(schalterFade, presetFade[i] = 1)
+    GUI_SET_CHECKED(schalterEnde, presetVerlauf[i] = 1)
+END SUB
+
+' ============================================================
+'  Das Partikelsystem -- das ECHTE, kein Nachbau
+' ============================================================
+DIM sys AS PARTICLE_SYSTEM
+sys = PARTICLE_SYSTEM_NEW(0, 0)
+
+FUNCTION p(idx AS INTEGER) AS FLOAT
+    RETURN GUI_VALUE(regler[idx])
+END FUNCTION
+
+FUNCTION farbe1() AS INTEGER
+    RETURN RGB(INT(p(P_R1)), INT(p(P_G1)), INT(p(P_B1)))
+END FUNCTION
+
+FUNCTION farbe2() AS INTEGER
+    RETURN RGB(INT(p(P_R2)), INT(p(P_G2)), INT(p(P_B2)))
+END FUNCTION
+
+' Alle Regler ins System uebertragen. Wird nur bei Aenderung gerufen.
+SUB uebertrage()
+    PARTICLE_SET_VELOCITY(sys, p(P_VXMIN), p(P_VXMAX), p(P_VYMIN), p(P_VYMAX))
+    PARTICLE_SET_GRAVITY(sys, p(P_GX), p(P_GY))
+    PARTICLE_SET_LIFETIME(sys, INT(p(P_LMIN)), INT(p(P_LMAX)))
+    PARTICLE_SET_SIZE(sys, INT(p(P_SMIN)), INT(p(P_SMAX)))
+    PARTICLE_SET_COLOR(sys, farbe1())
+    PARTICLE_SET_MODE(sys, modi[GUI_DROPDOWN_SELECTED(waehlModus)])
+    PARTICLE_SET_FADE(sys, GUI_CHECKED(schalterFade))
+    ' Kein Verlauf = Endfarbe gleich Startfarbe. Das Modul kennt kein "aus",
+    ' und eine zweite Wahrheit dafuer waere eine Stelle zu viel.
+    IF GUI_CHECKED(schalterEnde) THEN
+        PARTICLE_SET_COLOR_END(sys, farbe2())
+    ELSE
+        PARTICLE_SET_COLOR_END(sys, farbe1())
+    END IF
+END SUB
+
+' Der Aufruf-Block, der dieses System im eigenen Programm erzeugt.
+FUNCTION gbCode$() AS STRING
+    DIM nl AS STRING
+    nl = CHR$(10)
+    DIM z AS STRING
+    z = "DIM sys AS PARTICLE_SYSTEM" + nl
+    z = z + "sys = PARTICLE_SYSTEM_NEW(x, y)" + nl
+    z = z + "PARTICLE_SET_VELOCITY(sys, " + FORMAT$(p(P_VXMIN), "%.0f") + ", " + _
+        FORMAT$(p(P_VXMAX), "%.0f") + ", " + FORMAT$(p(P_VYMIN), "%.0f") + ", " + _
+        FORMAT$(p(P_VYMAX), "%.0f") + ")" + nl
+    z = z + "PARTICLE_SET_GRAVITY(sys, " + FORMAT$(p(P_GX), "%.0f") + ", " + _
+        FORMAT$(p(P_GY), "%.0f") + ")" + nl
+    z = z + "PARTICLE_SET_LIFETIME(sys, " + FORMAT$(p(P_LMIN), "%.0f") + ", " + _
+        FORMAT$(p(P_LMAX), "%.0f") + ")" + nl
+    z = z + "PARTICLE_SET_SIZE(sys, " + FORMAT$(p(P_SMIN), "%.0f") + ", " + _
+        FORMAT$(p(P_SMAX), "%.0f") + ")" + nl
+    z = z + "PARTICLE_SET_COLOR(sys, RGB(" + FORMAT$(p(P_R1), "%.0f") + ", " + _
+        FORMAT$(p(P_G1), "%.0f") + ", " + FORMAT$(p(P_B1), "%.0f") + "))" + nl
+    IF GUI_CHECKED(schalterEnde) THEN
+        z = z + "PARTICLE_SET_COLOR_END(sys, RGB(" + FORMAT$(p(P_R2), "%.0f") + ", " + _
+            FORMAT$(p(P_G2), "%.0f") + ", " + FORMAT$(p(P_B2), "%.0f") + "))" + nl
+    END IF
+    z = z + "PARTICLE_SET_MODE(sys, " + CHR$(34) + modi[GUI_DROPDOWN_SELECTED(waehlModus)] + CHR$(34) + ")" + nl
+    z = z + "PARTICLE_SET_FADE(sys, " + IIF(GUI_CHECKED(schalterFade), "TRUE", "FALSE") + ")" + nl
+    z = z + nl + "' pro Bild:" + nl
+    z = z + "PARTICLE_EMIT(sys, " + FORMAT$(p(P_RATE), "%.0f") + ")" + nl
+    z = z + "PARTICLE_UPDATE(sys, 16)" + nl
+    z = z + "PARTICLE_DRAW(sys)"
+    RETURN z
+END FUNCTION
+
+' ============================================================
+'  Start
+' ============================================================
+GUI_LISTBOX_SET_SELECTED(liste, 0)
+ladePreset(0)
+uebertrage()
+
+DIM letzteWahl AS INTEGER
+letzteWahl = 0
+DIM letzterModus AS INTEGER
+letzterModus = 0
+DIM letztesFade AS BOOLEAN
+letztesFade = GUI_CHECKED(schalterFade)
+DIM letzterVerlauf AS BOOLEAN
+letzterVerlauf = GUI_CHECKED(schalterEnde)
+DIM pausiert AS INTEGER
+pausiert = 0
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(&H0B1119)
+    GUI_UPDATE()
+
+    IF GUI_LISTBOX_SELECTED(liste) <> letzteWahl THEN
+        letzteWahl = GUI_LISTBOX_SELECTED(liste)
+        ladePreset(letzteWahl)
+        PARTICLE_CLEAR(sys)
+    END IF
+
+    ' --- Aenderungen erkennen ---
+    DIM geaendert AS INTEGER
+    geaendert = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        IF GUI_VALUE(regler[k]) <> letzter[k] THEN
+            letzter[k] = GUI_VALUE(regler[k])
+            geaendert = 1
+        END IF
+    NEXT
+    IF GUI_DROPDOWN_SELECTED(waehlModus) <> letzterModus THEN
+        letzterModus = GUI_DROPDOWN_SELECTED(waehlModus)
+        geaendert = 1
+    END IF
+    IF GUI_CHECKED(schalterFade) <> letztesFade THEN
+        letztesFade = GUI_CHECKED(schalterFade)
+        geaendert = 1
+    END IF
+    IF GUI_CHECKED(schalterEnde) <> letzterVerlauf THEN
+        letzterVerlauf = GUI_CHECKED(schalterEnde)
+        geaendert = 1
+    END IF
+    IF geaendert = 1 THEN uebertrage()
+
+    ' --- Bedienung ---
+    IF GUI_CLICKED(knopfPause) THEN
+        pausiert = 1 - pausiert
+        GUI_SET_TEXT(knopfPause, IIF(pausiert = 1, "Weiter", "Pause"))
+    END IF
+    IF GUI_CLICKED(knopfLeeren) THEN PARTICLE_CLEAR(sys)
+    IF GUI_CLICKED(knopfCode) THEN
+        CLIPBOARD_SET(gbCode$())
+        GUI_SET_TEXT(lblStatus, "Aufrufe in der Zwischenablage.")
+    END IF
+
+    ' --- Vorschau ---
+    DIM cx AS INTEGER
+    DIM cy AS INTEGER
+    DIM cw AS INTEGER
+    DIM ch AS INTEGER
+    cx = GUI_CANVAS_X(flaeche)
+    cy = GUI_CANVAS_Y(flaeche)
+    cw = GUI_CANVAS_W(flaeche)
+    ch = GUI_CANVAS_H(flaeche)
+
+    ' Quelle: Mitte der Flaeche, oder unter der Maus wenn gewuenscht.
+    DIM qx AS INTEGER
+    DIM qy AS INTEGER
+    qx = cx + cw / 2
+    qy = cy + ch / 2
+    IF GUI_CHECKED(folgtMaus) THEN
+        IF MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch THEN
+            qx = MOUSEX()
+            qy = MOUSEY()
+        END IF
+    END IF
+    PARTICLE_SET_POS(sys, qx, qy)
+
+    IF pausiert = 0 THEN
+        IF GUI_CLICKED(knopfSalve) THEN PARTICLE_EMIT(sys, 200)
+        PARTICLE_EMIT(sys, INT(p(P_RATE)))
+        PARTICLE_UPDATE(sys, 16)
+    END IF
+
+    GUI_DRAW()
+
+    ' Nach GUI_DRAW, sonst zeichnet das Fenster darueber. SCISSOR haelt die
+    ' Teilchen in der Flaeche -- ohne das fliegen sie ueber die Regler.
+    BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H0E1620)
+    SCISSOR(cx, cy, cw, ch)
+    PARTICLE_DRAW(sys)
+    SCISSOR_END()
+    RECT(cx, cy, cx + cw - 1, cy + ch - 1, &H2E3C50)
+
+    ' Farbfelder
+    BOX(GUI_CANVAS_X(feld1), GUI_CANVAS_Y(feld1), _
+        GUI_CANVAS_X(feld1) + GUI_CANVAS_W(feld1) - 1, _
+        GUI_CANVAS_Y(feld1) + GUI_CANVAS_H(feld1) - 1, farbe1())
+    BOX(GUI_CANVAS_X(feld2), GUI_CANVAS_Y(feld2), _
+        GUI_CANVAS_X(feld2) + GUI_CANVAS_W(feld2) - 1, _
+        GUI_CANVAS_Y(feld2) + GUI_CANVAS_H(feld2) - 1, farbe2())
+
+    ' Zahlen neben den Reglern
+    FOR k = 0 TO N_PARAM - 1
+        GUI_SET_TEXT(wertText[k], FORMAT$(GUI_VALUE(regler[k]), "%." + STR$(nachkomma[k]) + "f"))
+    NEXT
+    GUI_SET_TEXT(lblZahl, STR$(PARTICLE_COUNT(sys)) + " Teilchen")
+
+    FLIP()
+WEND
