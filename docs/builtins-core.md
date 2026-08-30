@@ -50,6 +50,8 @@ PRINT x                 ' schließt an
 | `ASC(s$)` → INTEGER | Codepoint des ersten Zeichens. `ASC("Anna")` = 65. |
 | `RGB(r, g, b)` → INTEGER | 3 Zahlen (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. Kommazahlen werden **gerundet** (`x * 255 / 640` geht also) -- geklemmt wird nicht, 255.6 ist weiterhin zu gross. |
 | `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
+| `NUMFMT$(zahl [, nachkommastellen])` → STRING | grosse Zahlen kurz schreiben (`1.2K`, `3.4M`) — für Punktestände und Idle-Spiele |
+| `ENUM_NAME(enum, wert)` → STRING | zu einem ENUM-Wert seinen Namen zurückgeben — für Anzeige und Fehlersuche |
 
 ```basic
 DIM s AS STRING
@@ -125,6 +127,12 @@ eine Rechnung, die niemand nachvollziehen kann. `ROUND_HALF_UP(2.675, 2)`
 liefert `2.68`.
 
 ### Mit Geld rechnen
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `CENT(betrag)` | INTEGER | einen Betrag in ganze Cent umrechnen — **rundet**, statt abzuschneiden; nimmt auch geschriebene Beträge (`"19,99"`, `"1.234,56"`) |
+| `EURO$(cent [, symbol$])` | STRING | Cent-Betrag in deutscher Schreibweise anzeigen (`1999` wird zu `19,99 €`) |
+
 
 **Fließkomma und Geld vertragen sich nicht.** Das ist keine Eigenheit von
 Drachenhauch, sondern von Binärbrüchen: 0,1 lässt sich darin so wenig exakt
@@ -203,10 +211,20 @@ ein Prozentsatz oder ein Faktor im Spiel ist.
 Geldtyp kosten würde und warum er trotzdem nicht kommt, steht in
 [Entwurf: Geld](entwurf-geldtyp.md).
 
-**Perlin-Noise** (deterministisch, Wert in ~`[-1, 1]`, gleiche Eingabe → gleicher
-Wert): `NOISE(x)`, `NOISE2(x, y)`, `NOISE3(x, y, z)` und fraktal `FBM(x, y, oktaven)`,
-`FBM3(x, y, z, oktaven)`. Für prozedurale Generierung (Terrain, Höhlen, organische
-Bewegung). An ganzzahligen Gitterpunkten ist Perlin definitionsgemäß 0.
+**Perlin-Noise** — deterministisch: dieselbe Eingabe liefert immer denselben
+Wert, ungefähr zwischen `-1` und `1`. Für prozedurale Erzeugung (Gelände, Höhlen,
+organische Bewegung).
+
+| Funktion | Zweck |
+|---|---|
+| `NOISE(x)` → FLOAT | Rauschwert entlang einer Linie — etwa für ein wanderndes Flackern |
+| `NOISE2(x, y)` → FLOAT | Rauschwert auf einer Fläche — Gelände, Wolken, Marmor |
+| `NOISE3(x, y, z)` → FLOAT | Rauschwert im Raum — Höhlen, oder Fläche plus Zeit als dritte Achse |
+| `FBM(x, y, oktaven)` → FLOAT | mehrere Rauschlagen übereinander: grobe Form plus feine Details |
+| `FBM3(x, y, z, oktaven)` → FLOAT | dasselbe im Raum |
+
+An ganzzahligen Gitterpunkten ist Perlin definitionsgemäß 0 — wer `NOISE2(1, 2)`
+abfragt, bekommt darum immer 0 und sollte krumme Werte einsetzen.
 
 ```basic
 PRINT WRAP(370, 0, 360)      ' 10.0
@@ -251,6 +269,16 @@ PRINT RED(&HFF8000)          ' 255
 PRINT HSV(120.0, 1.0, 1.0)   ' 65280 (= &H00FF00, Grün)
 PRINT COLOR_LERP(0, &HFFFFFF, 0.5)  ' 8421504 (= &H808080)
 ```
+
+## Text packen
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `COMPRESS$(text$)` | STRING | Text zusammenpacken (DEFLATE); das Ergebnis ist Base64, weil Zeichenketten hier UTF-8 sind und roher Packer-Ausgang keins wäre |
+| `DECOMPRESS$(gepackt$)` | STRING | wieder auspacken |
+
+Bei Spielstand-artigem Text bringt das ungefähr das Neunfache an Ersparnis. Es
+läuft auch ohne Fenster, also in reinen Konsolenprogrammen.
 
 ## Strings
 
