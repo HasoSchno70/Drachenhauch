@@ -30,6 +30,8 @@ const KEY_END: i64 = 1073741901;
 const KEY_ENTER: i64 = 13;
 const KEY_SPACE: i64 = 32;
 const KEY_ESC: i64 = 27;
+const KEY_PAGEUP: i64 = 1073741899;
+const KEY_PAGEDOWN: i64 = 1073741902;
 const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
@@ -216,6 +218,7 @@ pub enum Kind {
     Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner, Splitter,
     Toggle, Knob,
     Toolbar, Tree,
+    ColorPicker, DatePicker,
 }
 
 impl Kind {
@@ -229,6 +232,7 @@ impl Kind {
             Kind::TextArea => "textarea", Kind::Spinner => "spinner", Kind::Splitter => "splitter",
             Kind::Toolbar => "toolbar", Kind::Tree => "tree",
             Kind::Toggle => "toggle", Kind::Knob => "knob",
+            Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -241,6 +245,7 @@ impl Kind {
             "textarea" => Kind::TextArea, "spinner" => Kind::Spinner, "splitter" => Kind::Splitter,
             "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
+            "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
             _ => return None,
         })
     }
@@ -731,6 +736,16 @@ pub struct Widget {
     aktive_zeile: bool,
     tab_fuegt_ein: bool,
     tabbreite: i32,
+    // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
+    //
+    // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
+    // Grau UNBESTIMMT sind. Wer nur die RGB-Farbe behaelt und beides beim
+    // Zeichnen zurueckrechnet, verliert sie genau dort: der Zeiger springt
+    // beim Herunterziehen auf Schwarz nach links, und beim Hochziehen kommt
+    // Rot statt der Farbe zurueck, die man gewaehlt hatte.
+    hsv: [f32; 3],
+    // Nur DatePicker: Jahr, Monat (1..12), Tag.
+    datum: [i32; 3],
 }
 
 pub struct Window {
@@ -817,6 +832,10 @@ pub struct Gui {
     // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
     // bevor daneben weitergeklickt wird.
     modal: Option<usize>,
+    // Gezogener Farbwaehler: (Fenster, Widget, im Ton-Streifen?). Ohne das
+    // endete jede Farbwahl an der Feldkante -- man zieht beim Suchen einer
+    // Farbe fast immer ueber den Rand hinaus.
+    cp_drag: Option<(usize, usize, bool)>,
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
@@ -906,7 +925,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             windows: Vec::new(), z_order: Vec::new(),
-            focus_window: None, focus_widget: None, modal: None,
+            focus_window: None, focus_widget: None, modal: None, cp_drag: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
@@ -1112,6 +1131,65 @@ impl Gui {
     /// belegen und nicht beenden wollen, waehrend eine Frage offen ist.
     pub fn modal_offen(&self) -> bool { self.modal.is_some() }
 
+    /// Farbwaehler: Saettigungs-/Helligkeitsfeld links, Farbton-Streifen
+    /// rechts. Der gewaehlte Wert kommt mit `GUI_PICKED_COLOR` heraus.
+    pub fn colorpicker(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32)
+                       -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::ColorPicker, x, y, w.max(60), h.max(50));
+        wd.hsv = [30.0, 0.8, 1.0];
+        self.add_widget(win, "GUI_COLORPICKER", wd)
+    }
+
+    /// Datumswaehler: Monatsgitter mit Blaetterpfeilen. Der Wert kommt als
+    /// `YYYY-MM-DD` heraus -- dasselbe Format wie `DATE$()`.
+    pub fn datepicker(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32)
+                      -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::DatePicker, x, y, w.max(140), h.max(120));
+        let (j, m, t, _, _, _) = crate::builtins::local_datetime();
+        wd.datum = [j as i32, m as i32, t as i32];
+        self.add_widget(win, "GUI_DATEPICKER", wd)
+    }
+
+    pub fn picked_color(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_PICKED_COLOR")?;
+        if w.kind != Kind::ColorPicker {
+            return Err("GUI_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER".into());
+        }
+        Ok(crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2]))
+    }
+
+    pub fn set_picked_color(&mut self, h: i64, farbe: i64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_SET_PICKED_COLOR")?;
+        if w.kind != Kind::ColorPicker {
+            return Err("GUI_SET_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER".into());
+        }
+        let (ht, s, v) = crate::farbraum::rgb_zu_hsv(farbe & 0xFF_FFFF);
+        // Bei Grau/Schwarz laesst die Umrechnung den Ton offen -- dann den
+        // bisherigen behalten, sonst springt der Zeiger bei jedem Setzen.
+        let ton = if s <= f32::EPSILON || v <= f32::EPSILON { w.hsv[0] } else { ht };
+        w.hsv = [ton, s, v];
+        Ok(())
+    }
+
+    pub fn date(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_DATE")?;
+        if w.kind != Kind::DatePicker {
+            return Err("GUI_DATE: das Widget ist kein GUI_DATEPICKER".into());
+        }
+        Ok(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]))
+    }
+
+    pub fn set_date(&mut self, h: i64, datum: &str) -> Result<(), String> {
+        let (j, m, t) = crate::kalender::parse(datum).ok_or_else(|| format!(
+            "GUI_SET_DATE: '{}' ist kein Datum -- erwartet JJJJ-MM-TT (wie DATE$())", datum))?;
+        let w = self.wdg_mut(h, "GUI_SET_DATE")?;
+        if w.kind != Kind::DatePicker {
+            return Err("GUI_SET_DATE: das Widget ist kein GUI_DATEPICKER".into());
+        }
+        w.datum = [j, m, t];
+        Ok(())
+    }
+
     /// Farbige Abschnitte eines Textfelds setzen (GUI_TEXTAREA_SPANS).
     ///
     /// `starts`/`laengen` zaehlen ZEICHEN, nicht Bytes -- sonst laege alles
@@ -1163,6 +1241,30 @@ impl Gui {
                  aktive_zeile, tab_fuegt_ein, tabbreite", other)),
         }
         Ok(())
+    }
+
+    /// Aufteilung des Farbwaehlers: (Feld, Ton-Streifen).
+    ///
+    /// EINE Quelle -- Zeichnen und Treffertest fragen beide hier. Getrennt
+    /// gerechnet waere der Zeiger irgendwann neben dem Klick.
+    fn cp_geom(&self, ax: i32, ay: i32, w: i32, h: i32)
+               -> ((i32, i32, i32, i32), (i32, i32, i32, i32)) {
+        let streifen = self.sk(18);
+        let luecke = self.sk(6);
+        let feld_w = (w - streifen - luecke).max(10);
+        ((ax, ay, feld_w, h), (ax + feld_w + luecke, ay, streifen, h))
+    }
+
+    /// Aufteilung des Datumswaehlers: (Kopfhoehe, Zellbreite, Zellhoehe).
+    ///
+    /// Unter dem Kopf steht die Wochentagszeile, darunter SECHS Wochen --
+    /// fest sechs und nicht "so viele wie noetig", damit das Gitter beim
+    /// Blaettern nicht in der Hoehe springt.
+    fn dp_geom(&self, w: i32, h: i32) -> (i32, i32, i32) {
+        let kopf = self.sk(26);
+        let zell_w = (w / 7).max(1);
+        let zell_h = ((h - kopf - self.sk(18)) / 6).max(1);
+        (kopf, zell_w, zell_h)
     }
 
     /// Breite der Nummernspalte (0 = aus).
@@ -1217,6 +1319,7 @@ impl Gui {
             spans: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
+            hsv: [0.0, 1.0, 1.0], datum: [2000, 1, 1],
             step: 1.0,
         }
     }
@@ -2726,6 +2829,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // ein zwischen Press und Release deaktivierter Button loeste
             // beim Loslassen trotzdem noch GUI_ON_CLICK aus.
             if self.press_origin == Some((wi, i)) { self.press_origin = None; }
+            if self.cp_drag.map(|(w, x, _)| (w, x)) == Some((wi, i)) { self.cp_drag = None; }
             if self.active_slider == Some((wi, i)) { self.active_slider = None; }
         if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
             if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
@@ -2800,6 +2904,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if self.active_slider == Some((wi, i)) { self.active_slider = None; }
         if self.active_split == Some((wi, i)) { self.active_split = None; }
         if self.press_origin == Some((wi, i)) { self.press_origin = None; }
+        if self.cp_drag.map(|(w, x, _)| (w, x)) == Some((wi, i)) { self.cp_drag = None; }
         if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
         if self.active_table == Some((wi, i)) { self.active_table = None; }
         if self.table_press.map(|(tw, ti, _)| (tw, ti)) == Some((wi, i)) { self.table_press = None; }
@@ -3003,6 +3108,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if !w.enabled { o["enabled"] = serde_json::json!(false); }
         if w.font != -1 { o["font"] = serde_json::json!(w.font); }
         if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
+        if w.kind == Kind::ColorPicker {
+            o["color_value"] = serde_json::json!(
+                std::format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])));
+        }
+        if w.kind == Kind::DatePicker {
+            o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
+        }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(t) = &w.tbl {
             // Eine schlichte Textzelle wird als STRING geschrieben, nur eine
@@ -3105,6 +3217,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.enabled = wj["enabled"].as_bool().unwrap_or(true);
         w.font = wj["font"].as_i64().unwrap_or(-1);
         w.font_size = wj["font_size"].as_i64().unwrap_or(0) as i32;
+        // Farbe als "#RRGGBB" -- lesbar in der Datei und nicht als Zahl, die
+        // niemand entziffert. Unlesbares wird still uebergangen: eine von Hand
+        // bearbeitete Form soll nicht am Farbfeld scheitern.
+        if let Some(t) = wj["color_value"].as_str() {
+            if let Ok(v) = i64::from_str_radix(t.trim_start_matches('#'), 16) {
+                let (h, sa, va) = crate::farbraum::rgb_zu_hsv(v & 0xFF_FFFF);
+                w.hsv = [h, sa, va];
+            }
+        }
+        if let Some(t) = wj["date"].as_str() {
+            if let Some((j, m, d)) = crate::kalender::parse(t) { w.datum = [j, m, d]; }
+        }
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -3942,6 +4066,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             self.handle_press(mx, my);
             self.dbl_click = false;
         }
+        // Farbwaehler weiterziehen, auch ausserhalb seiner Flaeche.
+        if let Some((cw, ci, _)) = self.cp_drag {
+            if is_down { self.cp_zieh(cw, ci, mx, my); } else { self.cp_drag = None; }
+        }
         // Loslassen -> Button-Klick bestaetigen.
         if just_released {
             if let Some((wi, i)) = self.press_origin {
@@ -4576,6 +4704,83 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if g.key_pressed(KEY_DOWN) { self.spinner_step(wi, i, -1); }
     }
 
+    /// Farbe aus einer Mausposition setzen. `cp_drag` merkt, ob die Geste im
+    /// Feld oder im Ton-Streifen begonnen hat -- sonst springt die Farbe, wenn
+    /// man beim Ziehen ueber die Grenze zwischen beiden kommt.
+    fn cp_zieh(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (feld, streifen) = self.cp_geom(ax, ay, w, h);
+        let im_streifen = self.cp_drag.map(|(_, _, s)| s).unwrap_or(mx >= streifen.0);
+        let alt = self.windows[wi].widgets[i].hsv;
+        {
+            let wd = &mut self.windows[wi].widgets[i];
+            if im_streifen {
+                let t = ((my - streifen.1) as f32 / (streifen.3 - 1).max(1) as f32).clamp(0.0, 1.0);
+                wd.hsv[0] = t * 360.0;
+            } else {
+                let sx = ((mx - feld.0) as f32 / (feld.2 - 1).max(1) as f32).clamp(0.0, 1.0);
+                let sy = ((my - feld.1) as f32 / (feld.3 - 1).max(1) as f32).clamp(0.0, 1.0);
+                wd.hsv[1] = sx;
+                wd.hsv[2] = 1.0 - sy;
+            }
+        }
+        if self.windows[wi].widgets[i].hsv != alt {
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Klick im Datumswaehler: Pfeile blaettern, eine Zelle waehlt den Tag.
+    fn dp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (kopf, zw, zh) = self.dp_geom(w, h);
+        let d = self.windows[wi].widgets[i].datum;
+        let mut neu = d;
+        if my < ay + kopf {
+            // Die Pfeile sitzen in den aeusseren Dritteln des Kopfes -- ein
+            // grosszuegiges Ziel, weil das Zeichen selbst winzig ist.
+            if mx < ax + w / 3 { neu = self.dp_monat(d, -1); }
+            else if mx > ax + w * 2 / 3 { neu = self.dp_monat(d, 1); }
+        } else {
+            let gy = ay + kopf + self.sk(18);
+            if my >= gy {
+                let sp = ((mx - ax) / zw).clamp(0, 6);
+                let ze = (my - gy) / zh;
+                if (0..6).contains(&ze) {
+                    let erster = crate::kalender::wochentag(d[0], d[1], 1);
+                    let nr = ze * 7 + sp - erster + 1;
+                    let im_monat = crate::kalender::tage_im_monat(d[0], d[1]);
+                    // Ein Klick auf einen Nachbarmonats-Tag blaettert dorthin --
+                    // das ist die Erwartung, nicht "passiert nichts".
+                    if nr < 1 {
+                        let (j, m, _) = crate::kalender::plus_monate(d[0], d[1], 1, -1);
+                        let vm = crate::kalender::tage_im_monat(j, m);
+                        neu = [j, m, (vm + nr).clamp(1, vm)];
+                    } else if nr > im_monat {
+                        let (j, m, _) = crate::kalender::plus_monate(d[0], d[1], 1, 1);
+                        let nm = crate::kalender::tage_im_monat(j, m);
+                        neu = [j, m, (nr - im_monat).clamp(1, nm)];
+                    } else {
+                        neu = [d[0], d[1], nr];
+                    }
+                }
+            }
+        }
+        self.dp_setze(wi, i, neu);
+    }
+
+    fn dp_monat(&self, d: [i32; 3], schritte: i32) -> [i32; 3] {
+        let (j, m, t) = crate::kalender::plus_monate(d[0], d[1], d[2], schritte);
+        [j, m, t]
+    }
+
+    fn dp_setze(&mut self, wi: usize, i: usize, neu: [i32; 3]) {
+        if self.windows[wi].widgets[i].datum == neu { return; }
+        self.windows[wi].widgets[i].datum = neu;
+        let f = self.windows[wi].widgets[i].on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+
     /// Wert eines Regler-artigen Widgets setzen (geklemmt) und bei Aenderung
     /// on_change feuern. Eine Stelle fuer Maus- und Tastatur-Weg.
     fn set_value_fire(&mut self, wi: usize, i: usize, roh: f64) {
@@ -4735,6 +4940,36 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::ListBox => {
                 let d = ab as i32 - auf as i32;
                 if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
+            }
+            Kind::ColorPicker => {
+                // Pfeile verstellen Saettigung und Helligkeit, Bild auf/ab den
+                // Farbton -- die dritte Achse braucht eine eigene Taste, und
+                // die Blaettertasten sind dafuer frei.
+                let alt = self.windows[wi].widgets[i].hsv;
+                let schritt = if g.key_shift() { 0.01 } else { 0.04 };
+                let wd = &mut self.windows[wi].widgets[i];
+                if rechts { wd.hsv[1] = (wd.hsv[1] + schritt).min(1.0); }
+                if links { wd.hsv[1] = (wd.hsv[1] - schritt).max(0.0); }
+                if auf { wd.hsv[2] = (wd.hsv[2] + schritt).min(1.0); }
+                if ab { wd.hsv[2] = (wd.hsv[2] - schritt).max(0.0); }
+                if g.key_pressed(KEY_PAGEUP) { wd.hsv[0] = (wd.hsv[0] - 10.0).rem_euclid(360.0); }
+                if g.key_pressed(KEY_PAGEDOWN) { wd.hsv[0] = (wd.hsv[0] + 10.0).rem_euclid(360.0); }
+                if self.windows[wi].widgets[i].hsv != alt {
+                    let f = self.windows[wi].widgets[i].on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
+            Kind::DatePicker => {
+                let d = self.windows[wi].widgets[i].datum;
+                let tage = (rechts as i32 - links as i32) + 7 * (ab as i32 - auf as i32);
+                let mut neu = d;
+                if tage != 0 {
+                    let (j, m, t) = crate::kalender::plus_tage(d[0], d[1], d[2], tage);
+                    neu = [j, m, t];
+                }
+                if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -1); }
+                if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, 1); }
+                self.dp_setze(wi, i, neu);
             }
             Kind::Tree => {
                 let (vis, sel, hat_kinder, offen, eltern) = {
@@ -4937,6 +5172,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if Self::in_rect(mx, my, up) { self.spinner_step(win, i, 1); }
                 else if Self::in_rect(mx, my, down) { self.spinner_step(win, i, -1); }
             }
+            Kind::ColorPicker => {
+                let (fx, fy, fw, fh) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (feld, streifen) = self.cp_geom(fx, fy, fw, fh);
+                let im_streifen = mx >= streifen.0;
+                self.cp_drag = Some((win, i, im_streifen));
+                let _ = (feld, streifen);
+                self.cp_zieh(win, i, mx, my);
+            }
+            Kind::DatePicker => self.dp_press(win, i, mx, my),
             Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
             Kind::Table => self.table_press(win, i, mx, my),
             Kind::Tree => self.tree_press(win, i, mx, my),
@@ -5625,6 +5869,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
+            Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
+            Kind::DatePicker => self.draw_datepicker(g, wdg, ax, ay, w, h),
         }
         // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
         // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
@@ -5682,6 +5928,104 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let px = x + self.wtext_width(g, wdg, &vorspann);
             self.wtext(g, wdg, px, y, z[lauf..bis].iter().collect::<String>(), c);
             lauf = bis;
+        }
+    }
+
+    fn draw_colorpicker(&self, g: &mut Graphics, wdg: &Widget,
+                        ax: i32, ay: i32, w: i32, h: i32) {
+        let (feld, streifen) = self.cp_geom(ax, ay, w, h);
+        let (fx, fy, fw, fh) = feld;
+        let voll = crate::farbraum::hsv_zu_rgb(wdg.hsv[0], 1.0, 1.0);
+        // Saettigung waagerecht (weiss -> voller Ton), Helligkeit senkrecht
+        // (durchsichtig -> schwarz). Zwei Verlaeufe uebereinander statt Pixel
+        // fuer Pixel -- letzteres waere je Bild ein Rechteck pro Punkt.
+        g.gradient_rect(fx, fy, fx + fw - 1, fy + fh - 1, 0xFFFFFF, voll, false);
+        // Alpha steht im obersten Byte, und 0 bedeutet DECKEND (nicht
+        // durchsichtig -- so bleiben die alten 24-bit-Farben deckend). Fuer
+        // "fast unsichtbar" ist darum 1 der kleinste Wert, nicht 0. Mit
+        // 0x000000 als Startfarbe war das Feld schlicht schwarz.
+        g.gradient_rect(fx, fy, fx + fw - 1, fy + fh - 1,
+                        0x01_000000, 0xFF_000000, true);
+        // Ton-Streifen: sechs Abschnitte durch den Regenbogen.
+        let (sx, sy, sw, sh) = streifen;
+        let ecken: [i64; 7] = [0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF,
+                               0x0000FF, 0xFF00FF, 0xFF0000];
+        for i in 0..6 {
+            let y0 = sy + sh * i as i32 / 6;
+            let y1 = sy + sh * (i as i32 + 1) / 6 - 1;
+            if y1 >= y0 { g.gradient_rect(sx, y0, sx + sw - 1, y1, ecken[i], ecken[i + 1], true); }
+        }
+        // Zeiger. Im Feld ein Ring in Gegenfarbe, damit er auf hell UND auf
+        // dunkel sichtbar bleibt -- eine feste Farbe verschwindet immer
+        // irgendwo.
+        let px = fx + (wdg.hsv[1] * (fw - 1) as f32).round() as i32;
+        let py = fy + ((1.0 - wdg.hsv[2]) * (fh - 1) as f32).round() as i32;
+        let ring = if wdg.hsv[2] > 0.6 { 0x000000 } else { 0xFFFFFF };
+        g.circle_outline(px, py, self.sk(5), ring);
+        g.circle_outline(px, py, self.sk(4), ring);
+        let ty = sy + (wdg.hsv[0] / 360.0 * (sh - 1) as f32).round() as i32;
+        g.rect(sx - 2, ty - 2, sx + sw + 1, ty + 2, 0xFFFFFF);
+        g.rect(sx - 1, ty - 1, sx + sw, ty + 1, 0x000000);
+        // Rahmen, und bei Fokus in Akzentfarbe (der Ring liegt aussen, siehe
+        // draw_widget -- hier geht es nur um die Kante des Feldes).
+        self.rahmen(g, wdg, fx, fy, fx + fw - 1, fy + fh - 1);
+        self.rahmen(g, wdg, sx, sy, sx + sw - 1, sy + sh - 1);
+    }
+
+    fn rahmen(&self, g: &mut Graphics, wdg: &Widget, x1: i32, y1: i32, x2: i32, y2: i32) {
+        g.rect(x1, y1, x2, y2, self.wcol(wdg, "border", "widget_border"));
+    }
+
+    fn draw_datepicker(&self, g: &mut Graphics, wdg: &Widget,
+                       ax: i32, ay: i32, w: i32, h: i32) {
+        let (kopf, zw, zh) = self.dp_geom(w, h);
+        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
+                         self.wcol(wdg, "bg", "widget_bg"),
+                         self.wcol(wdg, "border", "widget_border"));
+        let fg = self.txt_col(wdg);
+        let matt = self.th("muted_fg");
+        let (j, m, t) = (wdg.datum[0], wdg.datum[1], wdg.datum[2]);
+        // Kopf: Pfeile aussen, Monat und Jahr mittig.
+        let schrift = self.wsize(g, wdg);
+        let ky = ay + (kopf - schrift).max(0) / 2;
+        self.wtext(g, wdg, ax + self.sk(6), ky, "<".into(), fg);
+        self.wtext(g, wdg, ax + w - self.sk(14), ky, ">".into(), fg);
+        let titel = std::format!("{} {}", crate::kalender::MONATSNAMEN[(m - 1) as usize], j);
+        let tw = self.wtext_width(g, wdg, &titel);
+        self.wtext(g, wdg, ax + (w - tw) / 2, ky, titel, fg);
+        // Wochentage.
+        let wy = ay + kopf;
+        for (i, name) in crate::kalender::WOCHENTAGE.iter().enumerate() {
+            let cx = ax + zw * i as i32;
+            let bw = self.wtext_width(g, wdg, name);
+            self.wtext(g, wdg, cx + (zw - bw) / 2, wy, name.to_string(), matt);
+        }
+        // Gitter. Der Erste steht in der Spalte seines Wochentags; davor und
+        // danach stehen die Nachbarmonate matt -- ein leeres Feld sieht nach
+        // einem Fehler aus.
+        let erster = crate::kalender::wochentag(j, m, 1);
+        let im_monat = crate::kalender::tage_im_monat(j, m);
+        let (vj, vm, _) = crate::kalender::plus_monate(j, m, 1, -1);
+        let im_vormonat = crate::kalender::tage_im_monat(vj, vm);
+        let gy = ay + kopf + self.sk(18);
+        for zelle in 0..42i32 {
+            let (sp, ze) = (zelle % 7, zelle / 7);
+            let cx = ax + zw * sp;
+            let cy = gy + zh * ze;
+            let nr = zelle - erster + 1;
+            let (zahl, aktiv) = if nr < 1 { (im_vormonat + nr, false) }
+                                else if nr > im_monat { (nr - im_monat, false) }
+                                else { (nr, true) };
+            if aktiv && zahl == t {
+                g.box_fill(cx + 1, cy, cx + zw - 2, cy + zh - 2,
+                           self.wcol(wdg, "accent", "accent"));
+            }
+            let txt = zahl.to_string();
+            let bw = self.wtext_width(g, wdg, &txt);
+            let farbe = if !aktiv { matt }
+                        else if zahl == t { self.th("win_bg") }
+                        else { fg };
+            self.wtext(g, wdg, cx + (zw - bw) / 2, cy + (zh - schrift).max(0) / 2, txt, farbe);
         }
     }
 

@@ -50,6 +50,7 @@ _INTERAKTIV = [
     "183_sfx_generator",
     "184_codefeld",
     "185_partikel_editor",
+    "186_farbe_und_datum",
 ]
 
 

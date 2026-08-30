@@ -280,3 +280,101 @@ PRINT "["; GUI_TEXT(ta); "]"
 ''')
     # Nach zwei Zeichen fehlen bis Spalte 4 genau zwei Leerzeichen.
     assert zeilen and zeilen[-1] == "[ab  ]", zeilen
+
+
+# --- Farbwähler und Datumswähler ohne Maus ----------------------------------
+#
+# Beide sind bedienbare Widgets und stehen darum im TAB-Zyklus. Was sie
+# annehmen, muss geprüft werden -- ein Widget, das den Fokus fängt aber auf
+# keine Taste hört, ist eine Sackgasse: man kommt hinein und dann nicht mehr
+# weiter, ohne dass etwas passiert.
+
+RL_PAGEDOWN = 267
+
+
+def test_farbwaehler_pfeil_aendert_die_farbe(tmp_path):
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_LEFT))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF0000)
+GUI_FOCUS(cp)
+DIM vorher AS INTEGER
+vorher = GUI_PICKED_COLOR(cp)
+''' + _SCHLEIFE + '''
+' Pfeil links senkt die Saettigung -- Rot wird heller, nicht dunkler.
+PRINT IIF(GUI_PICKED_COLOR(cp) <> vorher, "geaendert", "unveraendert")
+''')
+    assert zeilen and zeilen[-1] == "geaendert", zeilen
+
+
+def test_farbwaehler_bild_ab_dreht_den_farbton(tmp_path):
+    """Die dritte Achse braucht eine eigene Taste -- die Pfeile sind für
+    Sättigung und Helligkeit belegt."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_PAGEDOWN))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF0000)
+GUI_FOCUS(cp)
+''' + _SCHLEIFE + '''
+' Ton 0 -> 10 Grad: aus reinem Rot wird ein Rotton mit Gruenanteil.
+PRINT IIF(GUI_PICKED_COLOR(cp) <> &HFF0000, "gedreht", "unveraendert")
+''')
+    assert zeilen and zeilen[-1] == "gedreht", zeilen
+
+
+def test_datumswaehler_pfeil_geht_einen_tag_weiter(tmp_path):
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_RIGHT))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+''' + _SCHLEIFE + '''
+PRINT GUI_DATE(dp)
+''')
+    assert zeilen and zeilen[-1] == "2026-08-31", zeilen
+
+
+def test_datumswaehler_ab_geht_eine_woche_weiter(tmp_path):
+    """Auf/ab bewegt sich um eine Woche -- so steht die Marke in derselben
+    Spalte, und das Gitter bleibt lesbar."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_ARR_DOWN))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+''' + _SCHLEIFE + '''
+PRINT GUI_DATE(dp)
+''')
+    assert zeilen and zeilen[-1] == "2026-09-06", zeilen
+
+
+def test_datumswaehler_bild_ab_blaettert_den_monat(tmp_path):
+    """Und klemmt dabei den Tag: der 31. Januar plus ein Monat ist der letzte
+    Februartag, nicht der 3. März."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_PAGEDOWN))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-01-31")
+GUI_FOCUS(dp)
+''' + _SCHLEIFE + '''
+PRINT GUI_DATE(dp)
+''')
+    assert zeilen and zeilen[-1] == "2026-02-28", zeilen
+
+
+def test_beide_stehen_im_tab_zyklus(tmp_path):
+    _ereignisse(tmp_path, "ev.txt", _tipp(1, RL_TAB) + _tipp(4, RL_TAB))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 120, 90)
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 140, 10, 150, 120)
+''' + _SCHLEIFE + '''
+PRINT IIF(GUI_FOCUSED() = dp, "datum", "woanders")
+''')
+    assert zeilen and zeilen[-1] == "datum", zeilen

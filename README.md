@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 87 MB, aktuell Fassung 2026.11.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 200 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 201 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -180,7 +180,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 | Modul | Wofür |
 |---|---|
-| [`gui`](docs/module-gui.md) | 22 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. **Vollstaendig ohne Maus bedienbar** (TAB durch alle Widgets, Fokus-Ring), **`GUI_SCALE`** fuer hochaufloesende Bildschirme und modale Dialoge im eigenen Thema. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tastatur/Massstab/Dialog](examples/182_gui_tastatur_massstab.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) Das mehrzeilige Textfeld ist ein **Code-Feld**: Syntax-Einfaerbung ueber `SYNTAX_SPANS`, Zeilennummern, aktive Zeile, Tabulator. Eigene Schrift fuer die ganze Oberflaeche (`SETFONT`); bei grossen Dateien faerbt `GUI_TEXTAREA_VIEW` nur den sichtbaren Ausschnitt (30.000 Zeilen: 272 ms -> 2,1 ms je Anschlag). |
+| [`gui`](docs/module-gui.md) | 24 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. **Vollstaendig ohne Maus bedienbar** (TAB durch alle Widgets, Fokus-Ring), **`GUI_SCALE`** fuer hochaufloesende Bildschirme und modale Dialoge im eigenen Thema. [Alle Widgets](examples/156_gui_alle_widgets.dh) · [Tastatur/Massstab/Dialog](examples/182_gui_tastatur_massstab.dh) · [Tabelle](examples/157_gui_tabelle.dh) · [an SQLite](examples/158_gui_tabelle_sqlite.dh) Das mehrzeilige Textfeld ist ein **Code-Feld**: Syntax-Einfaerbung ueber `SYNTAX_SPANS`, Zeilennummern, aktive Zeile, Tabulator. Eigene Schrift fuer die ganze Oberflaeche (`SETFONT`); bei grossen Dateien faerbt `GUI_TEXTAREA_VIEW` nur den sichtbaren Ausschnitt (30.000 Zeilen: 272 ms -> 2,1 ms je Anschlag). Dazu **Farbwaehler** und **Datumswaehler**. |
 | [`ui`](docs/module-ui.md) | dasselbe als Immediate-Mode: kein Aufbau, alles pro Bild neu gezeichnet |
 | [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.dh) |
 
@@ -301,6 +301,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
 | `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export |
 | `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
 | `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export; das Gegenstueck zum Qt-Werkzeug `dhsfx` |

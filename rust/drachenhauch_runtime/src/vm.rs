@@ -5243,6 +5243,25 @@ impl<'p> Vm<'p> {
             "gui_kind" => Value::str_rc(self.gui.kind_name(gi(a,0,"GUI_KIND")?)?),
             "gui_focus" => { self.gui.focus(gi(a,0,"GUI_FOCUS")?)?; Value::Nil }
             "gui_focused" => Value::Int(self.gui.focused()),
+            "gui_colorpicker" => Value::Int(self.gui.colorpicker(
+                gi(a,0,"GUI_COLORPICKER")?, gi(a,1,"GUI_COLORPICKER")? as i32,
+                gi(a,2,"GUI_COLORPICKER")? as i32, gi(a,3,"GUI_COLORPICKER")? as i32,
+                gi(a,4,"GUI_COLORPICKER")? as i32)?),
+            "gui_picked_color" => Value::Int(self.gui.picked_color(gi(a,0,"GUI_PICKED_COLOR")?)?),
+            "gui_set_picked_color" => {
+                self.gui.set_picked_color(gi(a,0,"GUI_SET_PICKED_COLOR")?,
+                                          gi(a,1,"GUI_SET_PICKED_COLOR")?)?;
+                Value::Nil
+            }
+            "gui_datepicker" => Value::Int(self.gui.datepicker(
+                gi(a,0,"GUI_DATEPICKER")?, gi(a,1,"GUI_DATEPICKER")? as i32,
+                gi(a,2,"GUI_DATEPICKER")? as i32, gi(a,3,"GUI_DATEPICKER")? as i32,
+                gi(a,4,"GUI_DATEPICKER")? as i32)?),
+            "gui_date" => Value::str_rc(&self.gui.date(gi(a,0,"GUI_DATE")?)?),
+            "gui_set_date" => {
+                self.gui.set_date(gi(a,0,"GUI_SET_DATE")?, &gs(a,1,"GUI_SET_DATE")?)?;
+                Value::Nil
+            }
             "gui_textarea_set" => {
                 self.gui.textarea_set(gi(a, 0, "GUI_TEXTAREA_SET")?,
                                       &gs(a, 1, "GUI_TEXTAREA_SET")?,
