@@ -45,7 +45,7 @@ IMPORT "gui"
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
-| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V) |
+| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als **Code-Feld** einfärbbar — siehe [Code-Feld](#das-textarea-als-code-feld) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
 | `GUI_TREE(win, x, y, w, h)` | GUI_WIDGET | Baum-Ansicht (auf-/zuklappbar, scrollbar) |
 | `GUI_TREE_ADD(tree, parent, label$)` | INT | Knoten anhängen (parent = -1 = Wurzel), liefert Knoten-id |
@@ -1437,6 +1437,73 @@ IF aktiv = knopfOk THEN TEXT(10, 220, "Uebernimmt die Aenderung")
 > gerade eine Klappliste offen ist oder eine Tabellenzelle bearbeitet wird
 > (`GUI_TABLE_EDITING_ROW < 0`) — sonst beendet die Taste das Programm,
 > während der Benutzer nur ein Popup schließen wollte.
+
+## Das `TEXTAREA` als Code-Feld
+
+Ein mehrzeiliges Textfeld wird mit vier Einstellungen und einer Einfärbung zu
+einem brauchbaren Code-Feld.
+
+| Funktion | Wirkung |
+|---|---|
+| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite` |
+| `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
+| `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
+
+```basic
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(win, 12, 12, 650, 300)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+
+' Einfärben -- nach jeder Änderung neu
+DIM starts AS ARRAY OF INTEGER
+DIM laengen AS ARRAY OF INTEGER
+DIM arten AS ARRAY OF STRING
+(starts, laengen, arten) = SYNTAX_SPANS(GUI_TEXT(ta))
+DIM farben[LEN(starts)] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO LEN(starts) - 1
+    farben[i] = &HD8E4F0
+    IF arten[i] = "kommentar" THEN farben[i] = &H6A8A5A
+    IF arten[i] = "text" THEN farben[i] = &HE0A060
+    IF arten[i] = "zahl" THEN farben[i] = &HD07070
+    IF arten[i] = "schluessel" THEN farben[i] = &H2BC4E8
+NEXT
+GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)
+```
+
+**Warum getrennt?** `SYNTAX_SPANS` sagt, *was* ein Stück Text ist —
+`GUI_TEXTAREA_SPANS` sagt, welche *Farbe* es bekommt. Welche Farbe ein
+Kommentar hat, ist eine Frage deines Themas und nicht der Sprache. Und weil
+`GUI_TEXTAREA_SPANS` nur Zahlen entgegennimmt, kannst du damit auch etwas ganz
+anderes einfärben: Suchtreffer, Fehlerstellen, ein Diff.
+
+Die Arten aus `SYNTAX_SPANS`: `kommentar`, `text`, `zahl`, `schluessel`,
+`name`, `operator`. Leerraum bekommt keinen Abschnitt und bleibt in der
+Grundfarbe.
+
+> **Der Hervorheber ist kein Lexer.** Er sieht halb getippten Text (`"abc`
+> ohne schließendes Anführungszeichen, `IF x THE`) und stellt ihn trotzdem
+> dar, statt abzubrechen. Eine offene Zeichenkette endet für ihn am
+> Zeilenende — sonst färbte ein einzelnes Anführungszeichen den Rest der
+> Datei ein. Die Wortliste teilt er sich mit dem echten Lexer, ein neues
+> Schlüsselwort ist also sofort auch hier bekannt.
+
+**`tab_fuegt_ein` ist per Vorgabe AUS.** Sonst käme man in einem Formular aus
+dem Textfeld nicht mehr heraus — `TAB` ist dort die Weiter-Taste (siehe
+[Bedienung ohne Maus](#bedienung-ohne-maus)). Ist der Schalter an, rückt der
+Tabulator bis zur **nächsten Spalte** ein, nicht stur um `tabbreite`
+Zeichen; mitten in der Zeile getippt stünde die Einrückung sonst schief.
+
+> **`GUI_SET_TEXT` löscht die Abschnitte.** Sie gehörten zum alten Text; sie
+> stehen zu lassen färbte den neuen nach den Positionen des alten. Nach jedem
+> `GUI_SET_TEXT` also neu einfärben. Beim **Tippen** hinkt die Einfärbung
+> naturgemäß hinterher, bis dein Programm sie erneuert — Abschnitte, die über
+> das Textende hinausragen, werden beim Zeichnen abgeschnitten und sind
+> unschädlich.
+
+Vollständiges Beispiel: [`examples/184_codefeld.dh`](../examples/184_codefeld.dh).
 
 ## Maßstab (hochauflösende Bildschirme)
 

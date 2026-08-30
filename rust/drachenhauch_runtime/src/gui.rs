@@ -718,6 +718,19 @@ pub struct Widget {
     tooltip: String,
     // Schrittweite (nur Spinner): +/- / Pfeil / Mausrad aendert value um step.
     step: f64,
+    // Farbige Abschnitte (nur TextArea): (start, laenge, farbe) in ZEICHEN,
+    // aufsteigend nach start. Leer = alles in der Grundfarbe. Gesetzt wird das
+    // von aussen (GUI_TEXTAREA_SPANS) -- welche Farbe ein Kommentar hat, ist
+    // eine Frage des Themas, nicht der Laufzeit.
+    spans: Vec<(u32, u32, i64)>,
+    // Nur TextArea: was aus einem Textfeld ein Code-Feld macht.
+    // `scroll` ist dort die erste SICHTBARE ZEILE, `scroll_x` der waagerechte
+    // Versatz in Pixeln -- ohne den waeren lange Zeilen einfach abgeschnitten.
+    scroll_x: i32,
+    zeilennummern: bool,
+    aktive_zeile: bool,
+    tab_fuegt_ein: bool,
+    tabbreite: i32,
 }
 
 pub struct Window {
@@ -1099,6 +1112,72 @@ impl Gui {
     /// belegen und nicht beenden wollen, waehrend eine Frage offen ist.
     pub fn modal_offen(&self) -> bool { self.modal.is_some() }
 
+    /// Farbige Abschnitte eines Textfelds setzen (GUI_TEXTAREA_SPANS).
+    ///
+    /// `starts`/`laengen` zaehlen ZEICHEN, nicht Bytes -- sonst laege alles
+    /// hinter dem ersten Umlaut daneben. Ueberlappende oder unsortierte
+    /// Angaben sind erlaubt; gezeichnet wird der ZULETZT genannte, so kann ein
+    /// Programm eine Grundfaerbung mit Einzelfaellen ueberschreiben.
+    pub fn textarea_spans(&mut self, h: i64, starts: Vec<i64>, laengen: Vec<i64>,
+                          farben: Vec<i64>) -> Result<(), String> {
+        if starts.len() != laengen.len() || starts.len() != farben.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_SPANS: die drei Listen muessen gleich lang sein \
+                 ({} Starts, {} Laengen, {} Farben)",
+                starts.len(), laengen.len(), farben.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SPANS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_SPANS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.spans = starts.iter().zip(&laengen).zip(&farben)
+            .filter(|((_, &l), _)| l > 0)
+            .map(|((&s, &l), &c)| (s.max(0) as u32, l as u32, c))
+            .collect();
+        wd.spans.sort_by_key(|&(s, _, _)| s);
+        Ok(())
+    }
+
+    /// Einstellungen eines Textbereichs (GUI_TEXTAREA_SET).
+    ///
+    /// EIN Setter mit Schluesselwort statt vier Builtins -- dasselbe Muster
+    /// wie bei `chart` und der Tabelle. Ein unbekannter Schluessel zaehlt die
+    /// gueltigen auf, statt still nichts zu tun.
+    pub fn textarea_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SET")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_SET: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        let n = wert as i32;
+        match key.to_lowercase().as_str() {
+            "zeilennummern" => wd.zeilennummern = n != 0,
+            "aktive_zeile" => wd.aktive_zeile = n != 0,
+            // Ohne diesen Schalter waere ein Code-Feld nicht benutzbar: TAB
+            // wechselt sonst das Bedienelement, und man kann nicht einruecken.
+            // Aus per Vorgabe, damit die Tastatur-Navigation ueberall sonst
+            // bleibt, wie sie ist.
+            "tab_fuegt_ein" => wd.tab_fuegt_ein = n != 0,
+            "tabbreite" => wd.tabbreite = n.clamp(1, 16),
+            other => return Err(format!(
+                "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
+                 aktive_zeile, tab_fuegt_ein, tabbreite", other)),
+        }
+        Ok(())
+    }
+
+    /// Breite der Nummernspalte (0 = aus).
+    ///
+    /// EINE Quelle: Zeichnen, Treffertest und Schreibmarke fragen alle hier.
+    /// Die Zeilenzahl kommt von aussen, weil die Aufrufer sie ohnehin schon
+    /// ausgerechnet haben -- sie hier nochmal aus dem Text zu zaehlen waere
+    /// bei einer grossen Datei ein Durchlauf pro Bild und Aufruf.
+    fn ta_gutter(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
+        if !wdg.zeilennummern { return 0; }
+        let stellen = zeilen.max(1).to_string().len();
+        let muster = "9".repeat(stellen.max(2));
+        self.wtext_width(g, wdg, &muster) + self.sk(12)
+    }
+
     fn add_widget(&mut self, win: i64, fn_: &str, mut wdg: Widget) -> Result<i64, String> {
         let wi = win as usize;
         // Massstab VOR dem veraenderlichen Zugriff auf `windows` -- `sk` liest
@@ -1135,6 +1214,9 @@ impl Gui {
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
             tooltip: String::new(),
+            spans: Vec::new(),
+            scroll_x: 0, zeilennummern: false, aktive_zeile: false,
+            tab_fuegt_ein: false, tabbreite: 4,
             step: 1.0,
         }
     }
@@ -2530,6 +2612,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let w = self.wdg_mut(h, "GUI_SET_TEXT")?;
         let n = t.chars().count() as i32;
         w.text = t;
+        // Die Abschnitte gehoerten zum ALTEN Text. Sie stehen zu lassen faerbte
+        // den neuen nach den Positionen des alten -- besser sichtbar farblos
+        // als sichtbar falsch.
+        w.spans.clear();
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
@@ -3916,7 +4002,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
         // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
         // Knopf, Kaestchen und Klappliste waren ohne Maus nicht erreichbar.
-        if g.key_pressed(KEY_TAB) {
+        // Ein Code-Feld verlangt den Tabulator fuer sich (siehe
+        // edit_textarea) -- dann darf er hier NICHT zusaetzlich den Fokus
+        // weiterschalten, sonst tut eine Taste zwei Dinge.
+        let tab_belegt = self.focus_widget
+            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
+            .map(|w| w.kind == Kind::TextArea && w.tab_fuegt_ein)
+            .unwrap_or(false);
+        if g.key_pressed(KEY_TAB) && !tab_belegt {
             if let Some(top) = self.focus_window {
                 let n = self.windows[top].widgets.len();
                 let mut idxs: Vec<usize> = Vec::new();
@@ -4241,7 +4334,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let r = (row as usize).min(starts.len().saturating_sub(1));
             let lstart = starts[r];
             let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
-            let target = mx - (ax + pad);
+            // Dieselbe Rechnung wie beim Zeichnen: hinter der Nummernspalte,
+            // um den waagerechten Versatz verschoben. Liefe der Treffertest
+            // hier auseinander, landete die Schreibmarke neben dem Klick.
+            let gut = self.ta_gutter(g, &self.windows[wi].widgets[i],
+                                     starts.len());
+            let sx = self.windows[wi].widgets[i].scroll_x;
+            let target = mx - (ax + pad + gut - sx);
             let sub: Vec<char> = chars[lstart..lend].to_vec();
             let off = Self::caret_index_at(g, &sub, target, ms) as usize;
             let idx = (lstart + off) as i32;
@@ -4278,6 +4377,25 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
                 caret += ins.len() as i32; anchor = caret;
             }
+        }
+        // Tabulator rueckt ein, statt das Bedienelement zu wechseln --
+        // aber nur, wenn das Feld ausdruecklich danach verlangt hat
+        // (GUI_TEXTAREA_SET "tab_fuegt_ein"). Sonst bliebe man in einem
+        // Formular im Textfeld haengen und kaeme nicht mehr heraus.
+        let tab_ein = self.windows[wi].widgets[i].tab_fuegt_ein;
+        if tab_ein && g.key_pressed(KEY_TAB) {
+            let breite = self.windows[wi].widgets[i].tabbreite.max(1);
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            // Bis zur naechsten Spalte auffuellen, nicht stur `breite`
+            // Leerzeichen: sonst steht die Einrueckung schief, sobald man
+            // mitten in der Zeile tabbt.
+            let st = Self::line_starts(&chars);
+            let zeilen_start = st.iter().rposition(|&s| s as i32 <= caret).map(|r| st[r]).unwrap_or(0);
+            let spalte = caret - zeilen_start as i32;
+            let n = breite - (spalte % breite);
+            for k in 0..n { chars.insert(caret as usize + k as usize, ' '); }
+            caret += n; anchor = caret;
         }
         // Enter = Umbruch (ersetzt evtl. Selektion).
         if g.key_pressed(KEY_ENTER) {
@@ -4343,9 +4461,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let max_scroll = (starts2.len() as i32 - view_lines).max(0);
         scroll = scroll.clamp(0, max_scroll);
 
+        // Waagerecht mitziehen, damit die Schreibmarke im Feld bleibt. Ohne
+        // das endet eine lange Zeile am Rand und man tippt blind weiter --
+        // in einem Code-Feld der haeufigste Fall ueberhaupt.
+        let zeilen_start = starts2[crow.max(0) as usize];
+        let vorspann: String = chars[zeilen_start..(caret as usize).min(chars.len())].iter().collect();
+        let marke_px = self.wtext_width(g, &self.windows[wi].widgets[i], &vorspann);
+        let gut = self.ta_gutter(g, &self.windows[wi].widgets[i], starts2.len());
+        let sicht = (fw - 2 * pad - gut).max(1);
+        let mut sx = self.windows[wi].widgets[i].scroll_x;
+        if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
+        if marke_px - sx < 0 { sx = marke_px; }
+        sx = sx.max(0);
+
         let new_text: String = chars.iter().collect();
         let w = &mut self.windows[wi].widgets[i];
         w.text = new_text; w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
+        w.scroll_x = sx;
         if w.text != before {
             if let Some(f) = w.on_change.clone() { self.pending.push(f); }
         }
@@ -5241,6 +5373,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let starts = Self::line_starts(&chars);
                     let lines: Vec<&str> = wdg.text.split('\n').collect();
                     let view_lines = ((h - 2 * pad) / lh).max(1);
+                    // Linke Kante des TEXTES: hinter der Nummernspalte und um
+                    // den waagerechten Versatz nach links geschoben. Alles,
+                    // was eine Spalte verortet, geht durch diese eine Zahl.
+                    let gutter = self.ta_gutter(g, wdg, starts.len());
+                    let tx0 = ax + pad + gutter - wdg.scroll_x;
+                    if wdg.aktive_zeile {
+                        let crow = starts.iter().rposition(|&s| s as i32 <= wdg.caret).unwrap_or(0) as i32;
+                        let r = crow - scroll;
+                        if r >= 0 && r < view_lines {
+                            let y = ay + pad + r * lh;
+                            g.box_fill(ax + 2 + gutter, y, ax + w - 3, y + lh - 2,
+                                       shade(self.wcol(wdg, "bg", "win_bg"), 10));
+                        }
+                    }
+                    // Text bleibt rechts der Nummernspalte.
+                    g.push_clip(ax + 2 + gutter, ay + 2, (w - 4 - gutter).max(0), (h - 4).max(0));
                     // Selektion-Highlight pro sichtbarer Zeile (halbtransparenter Akzent).
                     let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
                     let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
@@ -5256,8 +5404,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             let a = lo.max(lstart);
                             let b = hi.min(lend);
                             if b < a || (a == b && hi <= lend) { continue; }
-                            let x0 = ax + pad + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
-                            let mut x1 = ax + pad + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
+                            let x0 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
+                            let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
                             if hi > lend { x1 += self.wtext_width(g, wdg, " ").max(self.sk(4)); }   // Auswahl laeuft weiter
                             let y = ay + pad + r * lh;
                             g.box_fill(x0, y, x1, y + lh - 2, selbg);
@@ -5266,7 +5414,31 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     for r in 0..view_lines {
                         let li = scroll + r;
                         if li < 0 || li as usize >= lines.len() { continue; }
-                        self.wtext(g, wdg, ax + pad, ay + pad + r * lh, lines[li as usize].to_string(), fg);
+                        let y = ay + pad + r * lh;
+                        let zeile = lines[li as usize];
+                        if wdg.spans.is_empty() {
+                            self.wtext(g, wdg, tx0, y, zeile.to_string(), fg);
+                        } else {
+                            self.zeile_bunt(g, wdg, tx0, y, zeile,
+                                            starts[li as usize], fg);
+                        }
+                    }
+                    g.pop_clip();
+                    // Nummernspalte: eigener Grund, rechtsbuendige Zahlen,
+                    // Trennlinie. Rechtsbuendig, damit der Text nicht wandert,
+                    // sobald die Datei dreistellig wird.
+                    if gutter > 0 {
+                        g.box_fill(ax + 2, ay + 2, ax + pad + gutter - self.sk(5), ay + h - 3,
+                                   self.wcol(wdg, "bg", "win_bg"));
+                        for r in 0..view_lines {
+                            let li = scroll + r;
+                            if li < 0 || li as usize >= lines.len() { continue; }
+                            let nr = (li + 1).to_string();
+                            let nx = ax + pad + gutter - self.sk(9) - self.wtext_width(g, wdg, &nr);
+                            self.wtext(g, wdg, nx, ay + pad + r * lh, nr, self.th("muted_fg"));
+                        }
+                        let gx = ax + pad + gutter - self.sk(4);
+                        g.line(gx, ay + 2, gx, ay + h - 3, self.wcol(wdg, "border", "widget_border"));
                     }
                 }
                 if focused && self.caret_blink_on() {
@@ -5276,9 +5448,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let lstart = starts[crow];
                     let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
                     let prefix: String = chars[lstart..cend].iter().collect();
-                    let cx = ax + pad + self.wtext_width(g, wdg, &prefix);
+                    let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                             + self.wtext_width(g, wdg, &prefix);
                     let cy = ay + pad + (crow as i32 - scroll) * lh;
-                    if cy >= ay + 2 && cy + lh <= ay + h { g.line(cx, cy, cx, cy + lh - 2, fg); }
+                    // Auch die Schreibmarke bleibt rechts der Nummernspalte --
+                    // sonst blinkte sie beim Scrollen nach rechts in den Zahlen.
+                    if cy >= ay + 2 && cy + lh <= ay + h
+                       && cx >= ax + 2 + self.ta_gutter(g, wdg, starts.len()) {
+                        g.line(cx, cy, cx, cy + lh - 2, fg);
+                    }
                 }
                 g.pop_clip();
             }
@@ -5417,6 +5595,55 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
         if self.focus_widget == Some((wi, idx)) && wdg.kind.fokussierbar() {
             g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, self.th("accent"));
+        }
+    }
+
+    /// Eine Textzeile in Abschnittsfarben zeichnen.
+    ///
+    /// Der Weg fuehrt ueber eine Farbe JE ZEICHEN und erst danach ueber das
+    /// Zusammenfassen gleichfarbiger Laeufe. Direkt ueber die Abschnitte zu
+    /// laufen waere kuerzer, aber dann muesste jeder Sonderfall (Abschnitt
+    /// ragt ueber die Zeile hinaus, zwei ueberlappen sich, dazwischen klafft
+    /// eine Luecke) einzeln bedacht werden -- und genau dort entstehen die
+    /// Fehler, bei denen ein Zeichen die Farbe des Nachbarn bekommt.
+    ///
+    /// `zeilen_start` ist der Zeichen-Index des Zeilenanfangs im GESAMTEN
+    /// Text; die Abschnitte zaehlen von dort.
+    fn zeile_bunt(&self, g: &mut Graphics, wdg: &Widget, x: i32, y: i32,
+                  zeile: &str, zeilen_start: usize, grund: i64) {
+        let z: Vec<char> = zeile.chars().collect();
+        if z.is_empty() { return; }
+        let mut farbe = vec![grund; z.len()];
+        let ende = zeilen_start + z.len();
+        // Die Abschnitte liegen sortiert -- ab dem ersten, der noch in die
+        // Zeile hineinreicht, und nur solange er vor ihrem Ende beginnt.
+        let erster = wdg.spans.partition_point(|&(s, l, _)| (s as usize + l as usize) <= zeilen_start);
+        for &(s, l, c) in &wdg.spans[erster..] {
+            let s = s as usize;
+            if s >= ende { break; }
+            let von = s.max(zeilen_start) - zeilen_start;
+            let bis = ((s + l as usize).min(ende)) - zeilen_start;
+            for f in &mut farbe[von..bis] { *f = c; }
+        }
+        // Gleichfarbige Laeufe zeichnen. Die Position kommt aus der Breite des
+        // VORSPANNS (Zeilenanfang bis hierher), nicht aus der Summe der
+        // bisherigen Laeufe.
+        //
+        // Der Unterschied ist nicht theoretisch: eine Textbreite enthaelt den
+        // Abstand ZWISCHEN den Zeichen, aber keinen hinter dem letzten. Wer
+        // Laufbreiten addiert, verliert an jeder Farbgrenze genau diesen
+        // Abstand, und die Woerter kleben aneinander. Ausserdem rechnen
+        // Schreibmarke und Auswahl schon ueber den Vorspann -- zwei
+        // Konventionen im selben Feld liefen unweigerlich auseinander.
+        let mut lauf = 0usize;
+        while lauf < z.len() {
+            let c = farbe[lauf];
+            let mut bis = lauf + 1;
+            while bis < z.len() && farbe[bis] == c { bis += 1; }
+            let vorspann: String = z[..lauf].iter().collect();
+            let px = x + self.wtext_width(g, wdg, &vorspann);
+            self.wtext(g, wdg, px, y, z[lauf..bis].iter().collect::<String>(), c);
+            lauf = bis;
         }
     }
 
