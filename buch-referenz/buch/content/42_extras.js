@@ -86,7 +86,7 @@ module.exports = (H) => [
 
   H.h2("Zwischen-Zeichenflächen: Render-Targets"),
   H.p("Ein Render-Target ist eine unsichtbare Zeichenfläche im Hintergrund. Du zeichnest etwas einmal hinein und stempelst es danach beliebig oft ins Bild – das spart Arbeit, wenn ein zusammengesetztes Bild (etwa ein Abzeichen oder eine Minimap) mehrmals erscheint oder sich nur selten ändert."),
-  H.cmd("RENDERTARGET_NEW · _BEGIN · _END · _DRAW", "RENDERTARGET_NEW(b, h [, behalten])   RENDERTARGET_BEGIN(rt)   RENDERTARGET_END()   RENDERTARGET_DRAW(rt, x, y[, skala[, tint]])",
+  H.cmd("RENDERTARGET_NEW · _BEGIN · _END · _DRAW", "RENDERTARGET_NEW(b, h [, behalten])   RENDERTARGET_BEGIN(rt)   RENDERTARGET_END()   RENDERTARGET_DRAW(rt, x, y[, skala[, tint[, gespiegelt]]])",
     "RENDERTARGET_NEW legt eine Fläche an. Zwischen _BEGIN und _END landen alle Zeichenbefehle in dieser Fläche statt im Fenster. _DRAW stempelt die fertige Fläche an Position (x, y) ins Bild.",
     [
       'DIM rt AS INTEGER',
@@ -182,4 +182,18 @@ module.exports = (H) => [
   H.tip("Auch für den Ton", "AUDIO_PUSH und AUDIO_POP tun dasselbe für alle Bus-Einstellungen – Lautstärke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ. Mehr dazu im Audio-Kapitel."),
 
   H.tip("Alles nur in dhrt", "Diese Extras (besonders Blend-Modes, GenTex, Render-Targets und Shader) nutzen die Grafikkarte und laufen nur im dhrt-Fenster – wie der ganze Teil IV. In einem reinen Konsolenprogramm gibt es sie nicht."),
+  H.h2("Auf ein Rechteck beschränken"),
+  H.cmd("SCISSOR · SCISSOR_END · SCISSOR_DEPTH", "SCISSOR(x, y, breite, hoehe)   SCISSOR_END()   SCISSOR_DEPTH()",
+    "Beschränkt alles Folgende auf ein Rechteck – für eine scrollbare Liste, ein Minikarten-Fenster, einen Textbereich, der nicht überlaufen soll. SCISSOR_END nimmt die oberste Beschränkung zurück, SCISSOR_DEPTH sagt, wie viele gerade offen sind.",
+    [
+      "DIM i AS INTEGER",
+      "DIM versatz AS INTEGER",
+      "SCISSOR(20, 40, 200, 120)",
+      "FOR i = 0 TO 30",
+      '    TEXT(24, 44 + i * 20 - versatz, "Zeile " + STR$(i))',
+      "NEXT",
+      "SCISSOR_END()",
+    ]),
+  H.note("Das ist ein Stapel: Ein inneres SCISSOR wird mit dem äußeren geschnitten, es ersetzt es nicht. Die Koordinaten sind Welt-Koordinaten und folgen der Kamera wie jeder andere Zeichenbefehl. Ein SCISSOR_END zu viel ist ein Fehler – sonst nähme es dem umgebenden Bereich seine Beschränkung weg.",
+    "Merke"),
 ];

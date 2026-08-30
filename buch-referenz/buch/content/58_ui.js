@@ -58,7 +58,7 @@ module.exports = (H) => [
     'WEND',
   ]),
   H.h2("Fenster, Tabellen und Eingabefelder"),
-  H.cmd("UI_WINDOW_BEGIN · UI_WINDOW_END", 'UI_WINDOW_BEGIN(titel$, x, y, w, h)   UI_WINDOW_END()',
+  H.cmd("UI_WINDOW_BEGIN · UI_WINDOW_END", 'UI_WINDOW_BEGIN(id$, titel$, x, y, w, h)   UI_WINDOW_END()',
     "Fasst die dazwischen erzeugten Bedienelemente in einem Rahmen mit Titel zusammen. Anders als beim gui-Modul entsteht dabei kein bleibendes Fenster – es ist eine reine Gruppierung für diesen Frame.",
     [
       'UI_WINDOW_BEGIN("Optionen", 40, 40, 220, 160)',

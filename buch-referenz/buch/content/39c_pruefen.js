@@ -103,4 +103,5 @@ module.exports = (H) => [
     ]),
   H.warn("RANDOM_BYTES ist nicht RND. RND hängt an RANDOMIZE: Dieselbe Saat liefert dieselbe Folge. Für ein Würfelspiel ist das richtig und sogar erwünscht, weil sich damit ein Level reproduzieren lässt – für ein Kennwort, einen Sitzungsschlüssel oder ein Salz wäre es ein Fehler. RANDOM_BYTES kommt aus der Zufallsquelle des Betriebssystems und lässt sich von RANDOMIZE nicht beeindrucken.",
     "Der Unterschied, der zählt"),
+  H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit, Dateien, Bytes, Prozesse und Prüfungen. In Teil IV geht es um das, wofür Drachenhauch gemacht ist: Grafik, Sound und Spiele."),
 ];

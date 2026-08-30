@@ -139,7 +139,7 @@ module.exports = (H) => [
     [
       'IF JOYSTICK_HIT(0, JOY_BUTTON_A) THEN springe()',
     ]),
-  H.cmd("JOYSTICK_AXIS · JOYSTICK_HAT_X · JOYSTICK_HAT_Y", 'JOYSTICK_AXIS(idx, achse)   JOYSTICK_HAT_X(idx)   JOYSTICK_HAT_Y(idx)',
+  H.cmd("JOYSTICK_AXIS · JOYSTICK_HAT_X · JOYSTICK_HAT_Y", 'JOYSTICK_AXIS(idx, achse)   JOYSTICK_HAT_X(idx, hat)   JOYSTICK_HAT_Y(idx, hat)',
     "JOYSTICK_AXIS liefert eine Analogachse zwischen -1.0 und +1.0 (Achse 0/1 = linker Stick, 2/3 = rechter). HAT_X/HAT_Y geben das Steuerkreuz als -1, 0 oder +1.",
     [
       'px = px + JOYSTICK_AXIS(0, 0) * 4.0',

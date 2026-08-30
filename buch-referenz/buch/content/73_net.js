@@ -9,7 +9,7 @@ module.exports = (H) => [
 
   H.h2("TCP: Server und Client"),
   H.p("Ein TCP-Server lauscht mit NET_TCP_LISTEN auf einem Port. NET_TCP_ACCEPT holt eine wartende Verbindung ab – oder liefert NIL, wenn gerade niemand verbindet (das prüfst du mit IS_NIL). Ein Client baut die Verbindung mit NET_TCP_CONNECT auf. Über die fertige Verbindung schickst du Text mit NET_SEND und liest mit NET_RECV."),
-  H.cmd("NET_TCP_LISTEN · NET_TCP_ACCEPT · NET_LISTENER_PORT", 'NET_TCP_LISTEN(port)   NET_TCP_ACCEPT(lst)   NET_LISTENER_PORT(lst)',
+  H.cmd("NET_TCP_LISTEN · NET_TCP_ACCEPT · NET_LISTENER_PORT", 'NET_TCP_LISTEN(port[, bind_adresse$])   NET_TCP_ACCEPT(lst)   NET_LISTENER_PORT(lst)',
     "LISTEN öffnet einen Server-Socket (Port 0 = das Betriebssystem wählt einen freien, abfragbar mit NET_LISTENER_PORT). ACCEPT gibt eine neue NET_SOCKET-Verbindung zurück – oder NIL, wenn keine wartet (mit IS_NIL(x) oder x <> NIL prüfen).",
     [
       'IMPORT "net"',
@@ -57,7 +57,7 @@ module.exports = (H) => [
 
   H.h2("UDP: schnelle Pakete"),
   H.p("UDP kennt keine feste Verbindung. Ein Socket bindet (NET_UDP_BIND) sich an einen Port zum Empfangen, oder wird mit NET_UDP_OPEN nur zum Senden geöffnet. Jedes Paket adressierst du beim Senden einzeln mit Ziel-Host und -Port. Nach einem Empfang verrät NET_UDP_LAST_FROM, von wem das Paket kam."),
-  H.cmd("NET_UDP_BIND · NET_UDP_OPEN · NET_UDP_PORT", 'NET_UDP_BIND(port)   NET_UDP_OPEN()   NET_UDP_PORT(sock)',
+  H.cmd("NET_UDP_BIND · NET_UDP_OPEN · NET_UDP_PORT", 'NET_UDP_BIND(port[, bind_adresse$])   NET_UDP_OPEN()   NET_UDP_PORT(sock)',
     "BIND bindet einen UDP-Socket an einen Port (0 = freier Port). OPEN erstellt einen Socket nur zum Senden. NET_UDP_PORT liefert den gebundenen Port.",
     [
       'IMPORT "net"',

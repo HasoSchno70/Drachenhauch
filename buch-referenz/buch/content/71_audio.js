@@ -5,7 +5,7 @@ module.exports = (H) => [
 
   H.h2("Kanäle: AUDIO_PLAY und seine Steuerung"),
   H.p("Wenn du einen Sound mit AUDIO_PLAY startest, bekommst du eine Kanal-Nummer (INTEGER) zurück. Über diese Nummer steuerst du genau diese eine laufende Wiedergabe – anhalten, fortsetzen, lauter/leiser, Tonhöhe ändern – während andere Sounds unbeeinflusst weiterlaufen."),
-  H.cmd("AUDIO_PLAY · AUDIO_STOP · AUDIO_IS_PLAYING", 'AUDIO_PLAY(sound [, loops, vol, ...])   AUDIO_STOP(ch)   AUDIO_IS_PLAYING(ch)',
+  H.cmd("AUDIO_PLAY · AUDIO_STOP · AUDIO_IS_PLAYING", 'AUDIO_PLAY(sound [, loops, vol, ...])   AUDIO_STOP(ch[, fade_out_ms[, easing$]])   AUDIO_IS_PLAYING(ch)',
     "AUDIO_PLAY startet einen Sound und liefert seine Kanal-Nummer. AUDIO_STOP beendet diesen Kanal, AUDIO_IS_PLAYING prüft, ob er noch klingt.",
     [
       'IMPORT "audio"',
@@ -32,7 +32,7 @@ module.exports = (H) => [
 
   H.h2("Stereo-Panorama"),
   H.p("Mit dem Panorama legst du fest, ob ein Klang eher links oder rechts kommt – etwa damit ein Gegner von der Seite hörbar ist, aus der er angreift. Die Position reicht von -1 (ganz links) über 0 (Mitte) bis +1 (ganz rechts)."),
-  H.cmd("AUDIO_PAN_POS · AUDIO_PAN_SLIDE · AUDIO_AUTOPAN", 'AUDIO_PAN_POS(ch, p)   AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)   AUDIO_AUTOPAN(ch, periode_s [, tiefe])',
+  H.cmd("AUDIO_PAN_POS · AUDIO_PAN_SLIDE · AUDIO_AUTOPAN", 'AUDIO_PAN_POS(ch, p)   AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms[, easing$])   AUDIO_AUTOPAN(ch, periode_s [, tiefe])',
     "PAN_POS setzt die Position sofort, PAN_SLIDE fährt sie über eine Zeitspanne von „von“ nach „nach“ (vorbeiziehendes Objekt), AUTOPAN lässt den Klang dauerhaft sanft hin- und herwandern.",
     [
       'AUDIO_PAN_POS(ch, -0.5)          \' halb links',
@@ -72,13 +72,22 @@ module.exports = (H) => [
 
   H.h2("Musik steuern"),
   H.p("Über PLAYMUSIC (Kapitel 46) hinaus kannst du laufende Musik fein steuern: pausieren, fortsetzen, mit Ein-/Ausblendung stoppen, die Abspielposition abfragen oder die Tonhöhe verziehen. Auch Tracker-Module (.mod/.xm) werden in Echtzeit gestreamt."),
-  H.cmd("AUDIO_MUSIC_PAUSE/RESUME/STOP · _POSITION", 'AUDIO_MUSIC_PAUSE()   AUDIO_MUSIC_RESUME()   AUDIO_MUSIC_STOP([fade_out_ms])   AUDIO_MUSIC_POSITION()',
+  H.cmd("AUDIO_MUSIC_PAUSE/RESUME/STOP · _POSITION", 'AUDIO_MUSIC_PAUSE()   AUDIO_MUSIC_RESUME()   AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])   AUDIO_MUSIC_POSITION()',
     "Pausiert/setzt die Musik fort, stoppt sie (optional mit Ausblendung in Millisekunden) und liefert mit POSITION die aktuelle Abspielzeit in Sekunden (FLOAT) – z. B. um eine Lichtshow zur Musik zu synchronisieren.",
     [
       'PLAYMUSIC("level1.ogg", -1, 0.7)   \' aus Kap. 46',
       'PRINT AUDIO_MUSIC_POSITION()        \' Sekunden seit Start',
       'AUDIO_MUSIC_STOP(1000)              \' über 1 s ausblenden',
     ]),
+  H.cmd("AUDIO_MUSIC_SEEK", "AUDIO_MUSIC_SEEK(sekunden)",
+    "Springt an eine Stelle im laufenden Stück, gezählt in Sekunden ab Anfang – für einen anklickbaren Fortschrittsbalken oder um beim Testen nicht jedes Mal das Intro anzuhören.",
+    [
+      'AUDIO_MUSIC_LOAD("lied.ogg")',
+      "AUDIO_MUSIC_PLAY()",
+      "AUDIO_MUSIC_SEEK(30.0)              ' ab Sekunde 30 weiter",
+    ]),
+  H.warn("Drei Dinge, die man vorher wissen sollte. Erstens: erst spielen, dann springen – vor AUDIO_MUSIC_PLAY gibt es noch nichts zu versetzen, und der Aufruf meldet das als Fehler, statt stillschweigend nichts zu tun. Zweitens: es wirkt nicht sofort. Gemessen dauert es drei bis vier Zehntelsekunden, bis AUDIO_MUSIC_POSITION die neue Stelle zeigt – so lange spielt der Datenstrom seinen Vorlauf noch zu Ende. Wer direkt nach dem Sprung die Position abfragt, bekommt die alte. Drittens: Tracker-Module können es nicht und sagen es auch – ihre Zeitachse sind Pattern und Zeilen, und wie lange bis zu einer Stelle vergeht, hängt an Tempowechseln im Stück selbst.",
+    "Springen ist kein Schalter"),
   H.cmd("AUDIO_MUSIC_SET_VOLUME · AUDIO_MUSIC_PITCH", 'AUDIO_MUSIC_SET_VOLUME(v)   AUDIO_MUSIC_PITCH(faktor)',
     "Lautstärke (0..1) und Tonhöhe/Tempo der Musik live anpassen – etwa Musik leiser drehen, während eine Stimme spricht, oder sie in Zeitlupe verlangsamen.",
     [

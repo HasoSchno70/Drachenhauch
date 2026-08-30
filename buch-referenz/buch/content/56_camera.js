@@ -24,7 +24,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Bildschirm zurück in die Welt rechnen"),
-  H.cmd("CAMERA_S2W_X · CAMERA_S2W_Y", 'CAMERA_S2W_X(sx)   CAMERA_S2W_Y(sy)',
+  H.cmd("CAMERA_S2W_X · CAMERA_S2W_Y", 'CAMERA_S2W_X(sx[, sy])   CAMERA_S2W_Y(sy[, sx])',
     "Rechnen einen Bildschirm-Pixel zurück in eine Welt-Koordinate – unentbehrlich, um herauszufinden, WO in der Welt der Mauszeiger steht (etwa zum Anklicken eines Objekts).",
     [
       'DIM wx AS FLOAT',
