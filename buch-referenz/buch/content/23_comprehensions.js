@@ -4,7 +4,7 @@ module.exports = (H) => [
   H.p("Der Begriff klingt sperrig, die Idee ist einfach. Lies eine Comprehension wie einen Satz: „Bilde n mal n, für jedes n in zahlen.“ Genau in dieser Reihenfolge steht es auch da."),
 
   H.h2("List-Comprehension"),
-  H.p("Die Grundform steht in eckigen Klammern und besteht aus zwei Teilen: vorne der Ausdruck, der für jedes Element berechnet wird, dahinter das FOR, das die Sammlung durchläuft. Das Ergebnis ist ein Tupel mit allen berechneten Werten (Tupel kennst du aus Kapitel 19 – sie sind unveränderlich)."),
+  H.p("Die Grundform steht in eckigen Klammern und besteht aus zwei Teilen: vorne der Ausdruck, der für jedes Element berechnet wird, dahinter das FOR, das die Sammlung durchläuft. Das Ergebnis ist ein Tupel mit allen berechneten Werten (Tupel kennst du aus Kapitel „Tupel & Destructuring“ – sie sind unveränderlich)."),
   H.cmd("List-Comprehension", "[ ausdruck FOR variable IN sammlung ]",
     "Berechnet den Ausdruck für jedes Element der Sammlung und sammelt die Ergebnisse in einem Tupel. Als Sammlung dienen Tupel, Arrays, die Zeichen eines Strings oder die Schlüssel einer Map.",
     [
@@ -49,7 +49,7 @@ module.exports = (H) => [
   H.code(["(A, B, C)"], { out: true }),
 
   H.h2("Dict-Comprehension: eine Map bauen"),
-  H.p("Mit geschweiften Klammern und einem Doppelpunkt baust du in einem Zug eine ganze Map auf. Vor dem Doppelpunkt steht der Schlüssel, dahinter der Wert – beide werden für jedes Element berechnet. Denk daran: Map-Schlüssel sind immer Strings (Kapitel 18), bei Bedarf also mit STR$ umwandeln."),
+  H.p("Mit geschweiften Klammern und einem Doppelpunkt baust du in einem Zug eine ganze Map auf. Vor dem Doppelpunkt steht der Schlüssel, dahinter der Wert – beide werden für jedes Element berechnet. Denk daran: Map-Schlüssel sind immer Strings (Kapitel „Maps“), bei Bedarf also mit STR$ umwandeln."),
   H.cmd("Dict-Comprehension", "{ schlüssel : wert FOR variable IN sammlung }",
     "Erzeugt eine Map, indem für jedes Element ein Schlüssel-Wert-Paar berechnet wird. Ein WHERE-Filter ist auch hier erlaubt.",
     [

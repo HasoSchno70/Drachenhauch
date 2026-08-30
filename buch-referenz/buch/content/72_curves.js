@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Modul: curves"),
-  H.p("Das curves-Modul rechnet einzelne Punkte auf einer Kurve aus. Während das tween-Modul (Kapitel 52) einen Wert über die Zeit von A nach B animiert, beantwortet curves die Frage „welcher Wert liegt bei Fortschritt t auf dieser Kurve?“. Damit lässt du Objekte weiche Bögen fliegen, Kameras sanft schwenken oder Werte elegant einpendeln. Alle Befehle sind reine Funktionen – kein Zustand, kein Setup."),
+  H.p("Das curves-Modul rechnet einzelne Punkte auf einer Kurve aus. Während das tween-Modul (Kapitel „Modul: tween“) einen Wert über die Zeit von A nach B animiert, beantwortet curves die Frage „welcher Wert liegt bei Fortschritt t auf dieser Kurve?“. Damit lässt du Objekte weiche Bögen fliegen, Kameras sanft schwenken oder Werte elegant einpendeln. Alle Befehle sind reine Funktionen – kein Zustand, kein Setup."),
   H.figure("72_curves.png", "Zwei Kurventypen durch dieselbe Gegend: Die Bezier-Kurve (gelb) wird von ihren Handles nur angezogen, die Catmull-Rom-Kurve (cyan) läuft direkt durch ihre Stützpunkte."),
   H.pmix([
     "Alle Kurven bekommen einen Parameter ",

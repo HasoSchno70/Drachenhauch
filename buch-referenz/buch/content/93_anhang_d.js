@@ -21,7 +21,7 @@ module.exports = (H) => {
       ") und die Beschreibung. Springe zuerst zu genau dieser Zeile – dort (oder kurz davor) liegt die Ursache.",
     ]),
     H.bulletRich("Parse-Fehler", " erscheinen schon BEIM EINLESEN, bevor das Programm startet – meist ein Tippfehler in der Syntax (fehlendes END, falsche Klammer)."),
-    H.bulletRich("Laufzeitfehler", " treten WÄHREND des Laufs auf – etwa ein Zugriff außerhalb eines Arrays. Sie lassen sich mit TRY/CATCH abfangen (Kapitel 24)."),
+    H.bulletRich("Laufzeitfehler", " treten WÄHREND des Laufs auf – etwa ein Zugriff außerhalb eines Arrays. Sie lassen sich mit TRY/CATCH abfangen (Kapitel „Fehlerbehandlung“)."),
 
     H.h2("Häufige Laufzeitfehler"),
     T([
@@ -42,7 +42,7 @@ module.exports = (H) => {
       err("AUDIO_SFX: erwartet STRING",
         "Ein Befehl bekam ein Argument vom falschen Typ (hier eine Zahl statt eines Strings). Vergleiche den Aufruf mit der Signatur in Anhang A."),
       err("Builtin 'WIFI_AVAILABLE' gehoert zum Hardware-Modul 'wifi', das in diesem dhrt-Build fehlt",
-        "Die Hardware-Module (serial/usb/wifi/bt) sind nur im Spezial-Build enthalten. Baue mit: python rust\\build_runtime.py --hardware (siehe Kapitel 76)."),
+        "Die Hardware-Module (serial/usb/wifi/bt) sind nur im Spezial-Build enthalten. Baue mit: python rust\\build_runtime.py --hardware (siehe Kapitel „Hardware: serial, usb, wifi, bt“)."),
     ]),
 
     H.tip("Schritt für Schritt zur Ursache", "Wenn du eine Meldung nicht sofort verstehst: (1) Geh zur genannten Zeile. (2) Lies, welcher Befehl oder welche Variable gemeint ist. (3) Prüfe deren Werte – oft hilft ein zusätzliches PRINT direkt davor, um zu sehen, was wirklich drinsteht. (4) Schlage bei Befehlen die erwarteten Argumente in Anhang A nach. Die meisten Fehler sind nach diesen vier Schritten klar."),

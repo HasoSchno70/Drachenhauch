@@ -31,7 +31,7 @@ module.exports = (H) => {
 
   return [
     H.chapter("Anhang C — Farb-Konstanten"),
-    H.p("Diese Farbnamen sind ohne IMPORT überall verfügbar – du schreibst einfach RED oder ORANGE statt einer Zahl. Jede Konstante entspricht einem RGB-Wert; die Tabelle zeigt die Rot-/Grün-/Blau-Anteile (0–255) und die Hexadezimal-Schreibweise. Eigene Farben mischst du mit RGB(r, g, b) (Kapitel 44)."),
+    H.p("Diese Farbnamen sind ohne IMPORT überall verfügbar – du schreibst einfach RED oder ORANGE statt einer Zahl. Jede Konstante entspricht einem RGB-Wert; die Tabelle zeigt die Rot-/Grün-/Blau-Anteile (0–255) und die Hexadezimal-Schreibweise. Eigene Farben mischst du mit RGB(r, g, b) (Kapitel „Farben“)."),
     H.table(rows, {
       headers: ["Konstante", "R, G, B", "Hex"],
       widths: [3600, 2826, 2600],

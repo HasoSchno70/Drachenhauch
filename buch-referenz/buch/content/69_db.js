@@ -120,7 +120,7 @@ module.exports = (H) => [
     [
       'PRINT DB_GET_FLOAT(res, 2)',
     ]),
-  H.tip("Sauber arbeiten", "Drei Gewohnheiten ersparen viel Ärger: (1) Schema mit „CREATE TABLE IF NOT EXISTS …“ anlegen, dann ist mehrfaches Programm-Starten ungefährlich. (2) Jedes DB_RESULT nach Gebrauch mit DB_CLOSE_RESULT schließen. (3) Werte immer per ? binden, nie in den SQL-String hineinbauen. Für ganz einfache Spielstände (ein paar Zahlen und Strings) ist übrigens das save-Modul aus Kapitel 61 leichtgewichtiger – db lohnt sich, sobald es um Listen, Suchen und Sortieren geht."),
+  H.tip("Sauber arbeiten", "Drei Gewohnheiten ersparen viel Ärger: (1) Schema mit „CREATE TABLE IF NOT EXISTS …“ anlegen, dann ist mehrfaches Programm-Starten ungefährlich. (2) Jedes DB_RESULT nach Gebrauch mit DB_CLOSE_RESULT schließen. (3) Werte immer per ? binden, nie in den SQL-String hineinbauen. Für ganz einfache Spielstände (ein paar Zahlen und Strings) ist übrigens das save-Modul aus Kapitel „Modul: save“ leichtgewichtiger – db lohnt sich, sobald es um Listen, Suchen und Sortieren geht."),
   H.h2("Abfragen im Hintergrund"),
   H.p("Eine Abfrage über eine große Tabelle hält das Programm an, bis sie fertig ist – im Fenster heißt das ein Ruckler oder eine Sekunde Stillstand. Dafür gibt es dieselbe Abfrage zum Nachsehen statt zum Warten, mit demselben Muster wie bei HTTP und TASK."),
   H.cmd("DB_QUERY_START · DB_QUERY_READY · DB_QUERY_RESULT", "DB_QUERY_START(datei$, sql$[, params…])   DB_QUERY_READY(auftrag)   DB_QUERY_RESULT(auftrag)",

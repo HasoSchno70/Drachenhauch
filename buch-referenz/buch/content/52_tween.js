@@ -18,6 +18,8 @@ module.exports = (H) => [
       'bob = TWEEN_NEW_PINGPONG(-4.0, 4.0, 800, "inout_sine")  \' sanftes Wippen',
     ]),
 
+  H.tip("Ein Tween braucht keinen Update-Aufruf", "Er hängt an der Uhr, nicht am Bild: Zwischen zwei Abfragen von TWEEN_VALUE ist er von allein weitergelaufen. Das unterscheidet ihn von timer, input, gui, mqtt und httpd – die brauchen alle einmal je Bild ihr eigenes UPDATE, sonst passiert nichts. Ein TWEEN_UPDATE gibt es deshalb gar nicht."),
+
   H.h2("Den Wert abfragen"),
   H.cmd("TWEEN_VALUE · TWEEN_DONE", 'TWEEN_VALUE(t)   TWEEN_DONE(t)',
     "TWEEN_VALUE liefert den aktuellen Wert (jeden Frame abfragen). TWEEN_DONE ist TRUE, sobald ein einmaliger Tween sein Ende erreicht hat (bei LOOP/PINGPONG immer FALSE).",
