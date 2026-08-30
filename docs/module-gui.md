@@ -1046,6 +1046,8 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput) |
 | `GUI_FOCUSED()` → GUI_WIDGET | welches Widget hat den Tastatur-Fokus? (`-1` = keins) |
+| `GUI_SCALE(faktor)` | Anzeige-Maßstab (0.5–4.0), **vor** dem ersten Fenster |
+| `GUI_SCALE_GET()` → FLOAT | aktueller Maßstab |
 | `GUI_HIT_TEST(x, y)` → GUI_WIDGET | oberstes Widget am Bildschirmpunkt, oder `-1` (Selektion im Editor) |
 | `GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)` / `GUI_WINDOW_GET_X/Y/W/H(win)` | Fenster bewegen/skalieren/lesen |
 | `GUI_WINDOW_DESTROY(win)` | Fenster + Inhalt entfernen |
@@ -1369,4 +1371,48 @@ IF aktiv = knopfOk THEN TEXT(10, 220, "Uebernimmt die Aenderung")
 > gerade eine Klappliste offen ist oder eine Tabellenzelle bearbeitet wird
 > (`GUI_TABLE_EDITING_ROW < 0`) — sonst beendet die Taste das Programm,
 > während der Benutzer nur ein Popup schließen wollte.
+
+## Maßstab (hochauflösende Bildschirme)
+
+Alle Maße im `gui`-Modul sind feste Pixel. Auf einem 4K-Bildschirm mit 200 %
+Skalierung wird eine Oberfläche, die für 1920×1080 gebaut wurde, damit
+halb so groß wie gedacht — lesbar, aber winzig. `GUI_SCALE` löst das:
+
+```basic
+IMPORT "gui"
+GUI_SCALE(WINDOW_DPI_X())      ' 1.0 normal, 2.0 auf HiDPI/Retina
+SCREEN(1600, 1000, "Mein Werkzeug", 1)
+' ... ab hier wie immer, in den gewohnten Zahlen
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Formular", 10, 10, 400, 300)
+```
+
+Der Faktor (0.5 bis 4.0) multipliziert **jede Länge, die in die GUI
+hineingeht**: Fenster- und Widget-Geometrie, Titelleisten- und Zeilenhöhen,
+Innenabstände, Spaltenbreiten und die Schriftgröße. Du rechnest also nichts
+um — dein Layout bleibt in den Zahlen, in denen du es entworfen hast.
+
+**Nach außen bleibt alles logisch.** `GUI_GET_X`, `GUI_WINDOW_GET_W`,
+`GUI_TABLE_GET("zeilenhoehe")` und `GUI_TO_JSON` liefern die Zahlen zurück,
+die du hineingegeben hast; `GUI_SET_BOUNDS` nimmt sie genauso entgegen. Ein
+gespeichertes `.dhform` beschreibt damit weiterhin das **Layout**, nicht die
+Anzeige — sonst würde eine Form bei jedem Öffnen und Speichern um den Faktor
+weiterwachsen.
+
+**Die eine Ausnahme ist `GUI_HIT_TEST(x, y)`** — es beantwortet eine Frage
+über den Bildschirm und nimmt deshalb Bildschirm-Pixel, so wie `MOUSEX()`
+sie liefert. Wer eigene Zeichenbefehle (`TEXT`, `BOX`, …) neben ein Widget
+setzen will, rechnet mit `GUI_SCALE_GET()` um:
+
+```basic
+TEXT(GUI_GET_X(feld) * GUI_SCALE_GET(), y, "Pflichtfeld", ROT)
+```
+
+> **`GUI_SCALE` muss vor dem ersten Fenster kommen.** Danach ist es ein
+> Fehler. Schon angelegte Widgets nachträglich umzurechnen ginge nur
+> näherungsweise — jede Runde brächte neue Rundungsfehler, und eine halb
+> skalierte Oberfläche wäre schlimmer als eine klare Absage. Wer den Maßstab
+> zur Laufzeit umstellen will (Einstellungsdialog), baut die Oberfläche nach
+> `GUI_RESET` neu auf.
+
 

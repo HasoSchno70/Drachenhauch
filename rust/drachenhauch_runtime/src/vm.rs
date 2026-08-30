@@ -5226,6 +5226,8 @@ impl<'p> Vm<'p> {
             "gui_set_round" => { self.gui.set_round(gi(a,0,"GUI_SET_ROUND")?, gbool(a,1,"GUI_SET_ROUND")?)?; Value::Nil }
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
+            "gui_scale" => { self.gui.set_scale(gnum(a,0,"GUI_SCALE")?)?; Value::Nil }
+            "gui_scale_get" => Value::Float(self.gui.get_scale()),
             "gui_reset" => { self.gui.reset(); Value::Nil }
             // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
             "gui_set_bounds" => { self.gui.set_bounds(gi(a,0,"GUI_SET_BOUNDS")?, gi(a,1,"GUI_SET_BOUNDS")? as i32, gi(a,2,"GUI_SET_BOUNDS")? as i32, gi(a,3,"GUI_SET_BOUNDS")? as i32, gi(a,4,"GUI_SET_BOUNDS")? as i32)?; Value::Nil }

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1514,
+ "count": 1516,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -500,6 +500,8 @@
   "GUI_RADIO_SELECTED": "INTEGER — welcher der Gruppe ist gewaehlt? (Erstellungsreihenfolge ab 0, -1 = keiner)",
   "GUI_RESET": "Fenster/Widgets löschen + Theme/Metriken zurücksetzen",
   "GUI_SAVE": "Fenster als JSON-Datei speichern",
+  "GUI_SCALE": "Anzeige-Maßstab (0.5–4.0), vor dem ersten Fenster",
+  "GUI_SCALE_GET": "aktueller Maßstab",
   "GUI_SEPARATOR": "GUI_WIDGET — dekorative Trennlinie (horizontal)",
   "GUI_SET_ACTIVE_TAB": "Reiter umschalten",
   "GUI_SET_ANCHOR": "Anchoring: an welchen Kanten das Widget klebt (Teilmenge von \"lrtb\", Default \"lt\" = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten).",
