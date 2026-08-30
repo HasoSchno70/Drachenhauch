@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1524,
+ "count": 1525,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -578,6 +578,7 @@
   "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als Code-Feld einfärbbar — siehe Code-Feld",
   "GUI_TEXTAREA_SET": "zeilennummern, aktive_zeile, tab_fuegt_ein, tabbreite",
   "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
+  "GUI_TEXTAREA_VIEW": "welcher Ausschnitt ist gerade zu sehen?",
   "GUI_TEXTINPUT": "GUI_WIDGET — einzeiliges Eingabefeld (Caret + Selektion)",
   "GUI_THEME": "Akzentfarbe (RGB) umstellen (Kurzform)",
   "GUI_THEME_GET": "— / INT — einzelne Theme-Farbe setzen/lesen",
