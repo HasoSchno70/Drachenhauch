@@ -57,13 +57,13 @@ module.exports = (H) => [
 
   H.h2("Bequem: ganze Datei auf einmal"),
   H.p("Für viele Fälle brauchst du gar kein Handle. Diese pfadbasierten Befehle erledigen Öffnen, Lesen/Schreiben und Schließen in einem Schritt."),
-  H.cmd("WRITEALL", 'WRITEALL(pfad$, text$)',
+  H.cmd("WRITEALL", 'WRITEALL(pfad$, text$[, kodierung$])',
     "Schreibt den Text komplett in die Datei (erzeugt sie neu bzw. überschreibt sie).",
     [
       'WRITEALL("daten.txt", "score=42")',
       'PRINT FILEEXISTS("daten.txt")',
     ], { out: ["TRUE"] }),
-  H.cmd("READLINES", 'READLINES(pfad$)',
+  H.cmd("READLINES", 'READLINES(pfad$[, kodierung$])',
     "Liest die ganze Datei und liefert ihre Zeilen als ARRAY OF STRING.",
     [
       'WRITEALL("liste.txt", "eins" + CHR$(10) + "zwei")',
@@ -71,7 +71,7 @@ module.exports = (H) => [
       'z = READLINES("liste.txt")',
       'PRINT LEN(z); ": "; z[0]; "/"; z[1]',
     ], { out: ["2: eins/zwei"] }),
-  H.cmd("APPENDFILE", 'APPENDFILE(pfad$, text$)',
+  H.cmd("APPENDFILE", 'APPENDFILE(pfad$, text$[, kodierung$])',
     "Hängt Text ans Ende einer Datei an (legt sie an, falls sie noch nicht existiert).",
     [
       'WRITEALL("log.txt", "Start")',
@@ -110,8 +110,8 @@ module.exports = (H) => [
       'MKDIR("saves")',
       'PRINT DIREXISTS("saves")',
     ], { out: ["TRUE"] }),
-  H.cmd("DIRLIST", 'DIRLIST(pfad$)',
-    "Liefert die Namen der Einträge eines Verzeichnisses als (sortiertes) ARRAY OF STRING.",
+  H.cmd("DIRLIST", 'DIRLIST(pfad$[, muster$])',
+    "Liefert die Namen der Einträge eines Verzeichnisses als (sortiertes) ARRAY OF STRING. Ein Muster wie \"*.txt\" siebt vor",
     [
       'MKDIR("ordner")',
       'WRITEALL("ordner/datei.txt", "x")',

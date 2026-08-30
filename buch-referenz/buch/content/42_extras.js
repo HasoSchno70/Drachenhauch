@@ -67,8 +67,8 @@ module.exports = (H) => [
       'wolken = GENTEX_PERLIN(160, 120, 6.0)',
       'CLS() : DRAWIMAGE(wolken, 0, 0) : FLIP()',
     ]),
-  H.cmd("GENTEX_GRADIENT", "GENTEX_GRADIENT(breite, höhe, farbe1, farbe2, vertikal)",
-    "Erzeugt eine Verlaufstextur von farbe1 nach farbe2 (vertikal = TRUE für senkrecht, FALSE für waagerecht).",
+  H.cmd("GENTEX_GRADIENT", "GENTEX_GRADIENT(breite, höhe, farbe1, farbe2[, vertikal])",
+    "Erzeugt eine Verlaufstextur von farbe1 nach farbe2 (vertikal = TRUE für senkrecht, FALSE für waagerecht; ohne Angabe waagerecht).",
     [
       'DIM himmel AS IMAGE',
       'himmel = GENTEX_GRADIENT(160, 120, RGB(255, 96, 32), RGB(32, 64, 255), TRUE)',

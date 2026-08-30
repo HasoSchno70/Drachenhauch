@@ -7103,7 +7103,7 @@
   {
    "name": "SCREEN",
    "kind": "graphics",
-   "signature": "SCREEN(2..5 Argumente)",
+   "signature": "SCREEN(2..4 Argumente)",
    "module": "core"
   },
   {
