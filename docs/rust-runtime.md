@@ -675,26 +675,8 @@ Demo: [examples/83_audio.dh](../examples/83_audio.dh).
 `begin_mode3D`-API. Ohne Grafik-Feature gebaut (`--no-graphics`), liefern sie
 den „nicht verfügbar“-Fehler wie die übrigen Grafik-Builtins.
 
-**Builtins** (`g3d.py`, Rendering in
-`graphics.rs`/`vm.rs`):
-- `CAMERA3D(px,py,pz, tx,ty,tz, fovy)` — Perspektiv-Kamera (Up = +Y), pro Frame.
-- `CAMERA_ORBIT(tx,ty,tz, radius, yaw, pitch[, fovy])` — Orbit-Kamera: blickt aus
-  `radius` Abstand auf das Ziel `(tx,ty,tz)`, gesteuert über `yaw`/`pitch` in
-  **Grad**. Spart die manuelle Kugelkoordinaten-Trigonometrie
-  (`px = COS(pitch)*SIN(yaw)*r` …). `pitch` wird intern auf `±89.9°` geklemmt
-  (kein Gimbal-Flip am Pol). `fovy` weglassen = aktuelle Brennweite behalten
-  (sonst 45). Ideal für eine maus-/tastengesteuerte Umlauf-Kamera:
-
-  ```basic
-  ' yaw/pitch im Game-Loop aus der Maus aufaddieren, dann:
-  CAMERA_ORBIT(0.0, 1.0, 0.0, 12.0, yaw, pitch)
-  ```
-- `CUBE` / `CUBE_WIRES` `(x,y,z, w,h,d, farbe)` — gefüllter / Drahtgitter-Quader.
-- `SPHERE` / `SPHERE_WIRES` `(x,y,z, r, farbe)`.
-- `CYLINDER(x,y,z, r_oben, r_unten, h, farbe)` — `r_oben=0` ⇒ Kegel.
-- `PLANE(x,y,z, size_x, size_z, farbe)` — XZ-Ebene.
-- `LINE3D(x1,y1,z1, x2,y2,z2, farbe)`, `POINT3D(x,y,z, farbe)`.
-- `GRID3D(linien, abstand)` — Boden-Raster.
+**Die Befehle und ihre Benutzung stehen in [module-g3d.md](module-g3d.md)** —
+hier steht nur, wie sie gebaut sind.
 
 **Render-Modell** (erweitert das 2D-Recording): 3D-Cmds landen in einer eigenen
 Liste `cmds3d`; beim `FLIP` rendert `dhrt` **zuerst** alle 3D-Cmds in einem
@@ -708,24 +690,8 @@ Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
 
 ### 3D-Modelle (geladen + prozedural)
 
-Über die Immediate-Mode-Primitive hinaus gibt es **wiederverwendbare
-Modell-Handles** (INTEGER), die einmal erzeugt und über beliebig viele Frames
-gezeichnet werden — anders als `CUBE`/`SPHERE`, die jeden Frame neu aufgebaut
-werden.
-
-- `LOADMODEL(pfad$) -> MODEL` — lädt OBJ/GLTF/IQM/… via raylib `LoadModel`.
-- **Prozedurale Meshes** (kein Asset nötig) via `GenMesh*` →
-  `LoadModelFromMesh`: `MESH_CUBE(w,h,d)`, `MESH_SPHERE(r, ringe, segmente)`,
-  `MESH_CYLINDER(r, h, segmente)`, `MESH_TORUS(r, dicke, rad_seg, seiten)`,
-  `MESH_KNOT(r, dicke, rad_seg, seiten)`, `MESH_PLANE(w, l, res_x, res_z)`,
-  `MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z)` (Terrain aus einer
-  Graustufen-Image: Helligkeit = Höhe, `groesse_y` skaliert sie).
-  Torus/Knot sind neue Formen ggü. den Immediate-Primitiven.
-- **Zeichnen:** `MODEL(m, x,y,z, scale, farbe)` (`DrawModel`),
-  `MODEL_EX(m, x,y,z, achse_x,achse_y,achse_z, winkel_grad, scale, farbe)`
-  (`DrawModelEx` — Rotation um eine Achse), `MODEL_WIRES(m, x,y,z, scale, farbe)`.
-- `MODEL_TEXTURE(m, bild)` — ein via `LOADIMAGE` geladenes Bild als
-  Diffuse-/Albedo-Map (`MATERIAL_MAP_ALBEDO`) auf das Modell legen.
+Wiederverwendbare Modell-Handles (INTEGER) statt der jeden Frame neu gebauten
+Primitive. Befehle: siehe [module-g3d.md](module-g3d.md#modelle).
 
 **Umsetzung** ([graphics.rs](../rust/drachenhauch_runtime/src/graphics.rs)): `models:
 Vec<Model>` lebt über die ganze Laufzeit (Handles bleiben gültig). Die Draw-
@@ -748,94 +714,21 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
 
 ### Billboards + Ray-Kollision / Picking
 
-- `BILLBOARD(bild, x,y,z, groesse, farbe)` — eine `LOADIMAGE`-Textur im 3D-Raum,
-  die über `DrawBillboard` immer zur Kamera zeigt (Bäume, Sprites, Funken).
-  Eigene `Cmd3D::Billboard` (Textur-Index); der 3D-Pass hat Kamera **und**
-  `textures` zur Hand.
-- **Ray-Kollision** (liefert Distanz vom Ursprung zum Treffer oder `-1`,
-  Trefferpunkt = `ursprung + richtung * distanz`):
-  - `RAY_HIT_BOX(ox,oy,oz, dx,dy,dz, cx,cy,cz, sx,sy,sz)` — AABB (Mittelpunkt c,
-    Vollgröße s) via `GetRayCollisionBox`.
-  - `RAY_HIT_SPHERE(ox,oy,oz, dx,dy,dz, cx,cy,cz, r)` via `GetRayCollisionSphere`.
-  - `RAY_HIT_MODEL(modell, ox,oy,oz, dx,dy,dz, px,py,pz[, scale])` via
-    `GetRayCollisionMesh` über **alle Meshes** des bei `(px,py,pz)` mit
-    `scale` platzierten Modells (Default `scale=1`). Distanz zum nächsten
-    Treffer oder `-1`. So lassen sich auch geladene Meshes (`LOADMODEL`) und
-    Prozedural-Modelle (`MESH_*`) picken, nicht nur Box/Sphere-Proxys.
-  - `RAY_HIT_TRI(ox,oy,oz, dx,dy,dz, x1,y1,z1, x2,y2,z2, x3,y3,z3)` — ein
-    einzelnes **Dreieck** via `GetRayCollisionTriangle` (Möller-Trumbore,
-    **ohne Backface-Culling**: eine Fläche trifft auch von hinten).
-  - `RAY_HIT_QUAD(ox,oy,oz, dx,dy,dz, <4 Punkte à x,y,z>)` — ein **Viereck**
-    (intern zwei Dreiecke). Die vier Punkte müssen **reihum** liegen (im Kreis,
-    nicht über Kreuz), sonst prüfen die Teildreiecke die falsche Fläche.
-  - Die Richtung muss **nicht** normalisiert sein — dhrt normalisiert vor dem
-    Test, sonst käme die Distanz in Vielfachen der Richtungslänge zurück
-    (raylibs Rohverhalten).
-- **Maus-Picking** (Strahl vom Cursor durch die aktuelle 3D-Kamera,
-  `GetScreenToWorldRay` + Treffertest): `PICK_BOX(cx,cy,cz, sx,sy,sz)`,
-  `PICK_SPHERE(cx,cy,cz, r)`, `PICK_MODEL(modell, px,py,pz[, scale])`,
-  `PICK_TRI(<3 Punkte>)`, `PICK_QUAD(<4 Punkte>)` — ideal für Klick-Selektion.
-  Nächstes Objekt = kleinste nicht-negative Distanz. TRI/QUAD treffen die
-  **tatsächliche Fläche** statt eines Hüllkörpers: Bodenkacheln, Wandstücke,
-  frei im Raum schwebende Panels (Demo
-  [examples/151_picking_flaechen.dh](../examples/151_picking_flaechen.dh)).
-- **Projektion in beide Richtungen** (durch die aktuelle 3D-Kamera):
-  `WORLD_TO_SCREEN_X(wx,wy,wz)` / `WORLD_TO_SCREEN_Y(wx,wy,wz)` projizieren einen
-  3D-Weltpunkt auf Bildschirm-Pixel (z.B. ein 2D-Label über ein 3D-Objekt
-  setzen). Umgekehrt liefert `SCREEN_TO_WORLD_DIR_X/Y/Z(sx,sy)` die **Richtung**
-  des Strahls durch einen Screen-Punkt; der **Ursprung** des Strahls ist die
-  Kameraposition (`CAMERA3D_X/Y/Z`). Damit baut man eigene Treffertests, z.B.
-  zusammen mit `RAY_HIT_MODEL`.
+`BILLBOARD` zeichnet über `DrawBillboard` (eigenes `Cmd3D::Billboard` mit
+Textur-Index; der 3D-Pass hat Kamera **und** `textures` zur Hand). Die
+Treffertests bauen auf raylibs `GetRayCollision*` auf; `PICK_*` setzt den
+Mausstrahl (`GetScreenToWorldRay`) davor, `RAY_HIT_*` nimmt ihn vom Aufrufer.
+Die Richtung wird vor dem Test normalisiert — sonst käme die Distanz in
+Vielfachen der Richtungslänge heraus (raylibs Rohverhalten).
 
-```basic
-' Selbst-gebautes Maus-Picking eines Modells:
-DIM ox AS FLOAT
-DIM oy AS FLOAT
-DIM oz AS FLOAT
-ox = CAMERA3D_X() : oy = CAMERA3D_Y() : oz = CAMERA3D_Z()
-DIM dist AS FLOAT
-dist = RAY_HIT_MODEL(held, ox, oy, oz, _
-        SCREEN_TO_WORLD_DIR_X(MOUSEX(), MOUSEY()), _
-        SCREEN_TO_WORLD_DIR_Y(MOUSEX(), MOUSEY()), _
-        SCREEN_TO_WORLD_DIR_Z(MOUSEX(), MOUSEY()), 0.0, 0.0, 0.0)
-IF dist >= 0.0 THEN PRINT "getroffen bei ", dist
-' (oder einfacher: PICK_MODEL(held, 0.0, 0.0, 0.0))
-```
-- **Cursor auf die Boden-Ebene projizieren** (Strahl vom Cursor → waagerechte
-  Ebene bei Welt-Y `ebene_y`): `MOUSE_GROUND_X(ebene_y)` und
-  `MOUSE_GROUND_Z(ebene_y)` liefern die Welt-X/Z des Treffpunkts,
-  `MOUSE_GROUND_HIT(ebene_y)` → BOOLEAN, ob der Strahl die Ebene **vor** der
-  Kamera trifft. Das ist der einfache „Wohin zeigt die Maus in der 3D-Welt?"-
-  Helfer (Einheiten platzieren, Bauen auf dem Grund, Cursor-Marker) — ohne dass
-  man selbst die Strahl-Ebenen-Mathematik aufstellen muss.
-
-```basic
-' Cursor-Marker auf dem Boden (y=0)
-IF MOUSE_GROUND_HIT(0.0) THEN
-    DIM wx AS FLOAT
-    DIM wz AS FLOAT
-    wx = MOUSE_GROUND_X(0.0)
-    wz = MOUSE_GROUND_Z(0.0)
-    MODEL(marker, wx, 0.0, wz, WHITE)
-END IF
-```
-
-`RAY_HIT_*` ist reine Geometrie und deterministisch (verifiziert: Kugel/Box bei
-`(5,0,0)` entlang +X → Distanz `4.0`, senkrechter Strahl → `-1.0`). `PICK_*`
-hängt am Maus-/Fensterzustand (headless: Maus `(0,0)` → alles `-1`). Demo
-[examples/90_billboards_picking.dh](../examples/90_billboards_picking.dh):
-Coin-Billboards + per Maus selektierbarer Würfel/Kugel. Per Screenshot verifiziert.
+Was die Befehle tun und wie man sie benutzt: [module-g3d.md](module-g3d.md#anklicken-und-treffer).
 
 ### Kamera-Modi (`UpdateCamera`)
 
-`cam3d` lebt über Frames hinweg. Statt jeden Frame `CAMERA3D(...)` neu zu setzen,
-kann man die Kamera von raylib bewegen lassen:
-
-- `CAMERA3D(...)` einmal initial setzen, dann pro Frame `CAMERA3D_UPDATE(mode)` —
-  `mode`: `1`=free, `2`=orbital, `3`=first_person, `4`=third_person. raylib liest
-  Tastatur/Maus (WASD + Mouse-Look) bzw. rotiert bei *orbital* automatisch.
-- Getter: `CAMERA3D_X/Y/Z()` (Position) und `CAMERA3D_TARGET_X/Y/Z()` — z. B. für
-  First-Person (Spielerposition = Kamera). Verifiziert (Position/Ziel exakt zurück).
+`cam3d` lebt über Frames hinweg, `CAMERA3D_UPDATE(mode)` reicht sie an raylibs
+`UpdateCamera` weiter (1=free, 2=orbital, 3=first_person, 4=third_person) —
+raylib liest dabei selbst Tastatur und Maus. Die Getter liefern Position und
+Ziel exakt zurück (verifiziert).
 
 ### Beleuchtung (PBR / Cook-Torrance, bis zu 4 Lichter)
 
