@@ -1,0 +1,97 @@
+' ============================================================
+'  DRACHENHAUCH -- Farbwaehler und Datumswaehler
+' ============================================================
+'  Zwei Widgets, die eine Oberflaeche oft braucht und die man sonst
+'  von Hand nachbauen muesste:
+'
+'    GUI_COLORPICKER  Saettigungs-/Helligkeitsfeld plus Ton-Streifen.
+'                     Wert holen mit GUI_PICKED_COLOR.
+'    GUI_DATEPICKER   Monatsgitter mit Blaetterpfeilen. Wert holen mit
+'                     GUI_DATE -- als "JJJJ-MM-TT", genau wie DATE$().
+'
+'  Beide sind auch ohne Maus bedienbar:
+'    Farbe:  Pfeile = Saettigung und Helligkeit, Bild auf/ab = Farbton
+'            (mit Umschalt feiner)
+'    Datum:  Pfeile = Tag und Woche, Bild auf/ab = Monat
+'
+'  [TAB] wechselt das Bedienelement, [ESC] beendet.
+' ============================================================
+IMPORT "gui"
+
+SCREEN(820, 500, "Drachenhauch - Farbe und Datum", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Termin eintragen", 10, 10, 800, 480)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' --- Links: die Farbe ------------------------------------------------
+DIM lblFarbe AS GUI_WIDGET
+lblFarbe = GUI_LABEL(win, "Farbe des Termins", 16, 14)
+DIM waehler AS GUI_WIDGET
+waehler = GUI_COLORPICKER(win, 16, 36, 320, 230)
+GUI_SET_PICKED_COLOR(waehler, &H3FA9F5)
+GUI_TOOLTIP(waehler, "Ziehen im Feld, Ton am Streifen rechts")
+
+DIM probe AS GUI_WIDGET
+probe = GUI_CANVAS(win, 16, 278, 320, 44)
+DIM lblHex AS GUI_WIDGET
+lblHex = GUI_LABEL(win, "", 16, 332)
+
+' --- Rechts: das Datum -----------------------------------------------
+DIM lblDatum AS GUI_WIDGET
+lblDatum = GUI_LABEL(win, "Tag des Termins", 366, 14)
+DIM kalender AS GUI_WIDGET
+kalender = GUI_DATEPICKER(win, 366, 36, 410, 286)
+DIM lblGewaehlt AS GUI_WIDGET
+lblGewaehlt = GUI_LABEL(win, "", 366, 332)
+
+' --- Unten: was dabei herauskommt ------------------------------------
+DIM lblTitel AS GUI_WIDGET
+lblTitel = GUI_LABEL(win, "Bezeichnung", 16, 372)
+DIM feldTitel AS GUI_WIDGET
+feldTitel = GUI_TEXTINPUT(win, 150, 368, 280, 28, "z.B. Zahnarzt")
+DIM knopf AS GUI_WIDGET
+knopf = GUI_BUTTON(win, "Eintragen", 450, 368, 140, 28)
+DIM lblErgebnis AS GUI_WIDGET
+lblErgebnis = GUI_LABEL(win, "Noch nichts eingetragen.", 16, 412)
+
+' Die Liste der Eintraege -- hier reicht ein Text, es geht um die Waehler.
+DIM eintraege AS STRING
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(&H0B1119)
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(knopf) THEN
+        DIM was AS STRING
+        was = GUI_TEXT(feldTitel)
+        IF was = "" THEN was = "(ohne Bezeichnung)"
+        eintraege = GUI_DATE(kalender) + "  " + was
+        GUI_SET_TEXT(lblErgebnis, "Eingetragen: " + eintraege)
+        GUI_SET_TEXT(feldTitel, "")
+    END IF
+
+    GUI_SET_TEXT(lblHex, "Farbe: " + FORMAT$(GUI_PICKED_COLOR(waehler), "#%06X"))
+    GUI_SET_TEXT(lblGewaehlt, "Datum: " + GUI_DATE(kalender))
+
+    GUI_DRAW()
+
+    ' Die Farbprobe nach GUI_DRAW -- sonst zeichnet das Fenster darueber.
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    px = GUI_CANVAS_X(probe)
+    py = GUI_CANVAS_Y(probe)
+    BOX(px, py, px + GUI_CANVAS_W(probe) - 1, py + GUI_CANVAS_H(probe) - 1, _
+        GUI_PICKED_COLOR(waehler))
+    RECT(px, py, px + GUI_CANVAS_W(probe) - 1, py + GUI_CANVAS_H(probe) - 1, &H2E3C50)
+
+    ' Ein Balken in der gewaehlten Farbe -- so sieht man, wozu sie taugt.
+    IF eintraege <> "" THEN
+        BOX(16, 436, 20, 462, GUI_PICKED_COLOR(waehler))
+        TEXT(30, 440, eintraege, &HD8E4F0)
+    END IF
+
+    FLIP()
+WEND

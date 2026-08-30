@@ -1565,6 +1565,67 @@ Der Rest an Kosten (0,2 → 2,1 ms über die drei Größen) ist das Kopieren des
 Textes durch `GUI_TEXT` und `MID$`. Das wächst weiter mit der Datei, ist aber
 billig genug, um nicht aufzufallen.
 
+## Farbwähler und Datumswähler
+
+Zwei Widget-Arten, die eine Oberfläche oft braucht und die man sonst von Hand
+nachbauen müsste.
+
+| Funktion | Wirkung |
+|---|---|
+| `GUI_COLORPICKER(win, x, y, w, h)` → GUI_WIDGET | Sättigungs-/Helligkeitsfeld plus Ton-Streifen |
+| `GUI_PICKED_COLOR(picker)` → INTEGER | gewählte Farbe (`0xRRGGBB`) |
+| `GUI_SET_PICKED_COLOR(picker, farbe)` | Farbe setzen |
+| `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | Monatsgitter mit Blätterpfeilen |
+| `GUI_DATE(picker)` → STRING | gewähltes Datum als `JJJJ-MM-TT` |
+| `GUI_SET_DATE(picker, datum$)` | Datum setzen |
+
+Beide melden Änderungen über `GUI_ON_CHANGE`.
+
+```basic
+DIM waehler AS GUI_WIDGET
+waehler = GUI_COLORPICKER(win, 16, 36, 320, 230)
+GUI_SET_PICKED_COLOR(waehler, &H3FA9F5)
+
+DIM kalender AS GUI_WIDGET
+kalender = GUI_DATEPICKER(win, 366, 36, 410, 286)
+GUI_SET_DATE(kalender, "2026-08-30")
+
+' ... pro Bild:
+BOX(20, 300, 200, 340, GUI_PICKED_COLOR(waehler))
+TEXT(20, 350, "Termin am " + GUI_DATE(kalender), WEISS)
+```
+
+**Das Datumsformat ist `JJJJ-MM-TT`** — dasselbe, das `DATE$()` liefert. Zwei
+Datumsformate im selben System wären eine Stolperfalle. Ein neuer Wähler zeigt
+**heute**; ein leerer Kalender wäre eine unnötige Frage an den Benutzer.
+Unsinn wird abgelehnt, auch der 29. Februar in einem Jahr, das keines ist.
+
+**Ohne Maus:**
+
+| Taste | Farbwähler | Datumswähler |
+|---|---|---|
+| `←` `→` | Sättigung | ein Tag |
+| `↑` `↓` | Helligkeit | eine Woche |
+| `BILD ↑` `BILD ↓` | Farbton | ein Monat |
+| `UMSCHALT` dazu | feinere Schritte | — |
+
+> **Der Farbton wird mitgeführt, nicht zurückgerechnet.** Bei Schwarz ist er
+> unbestimmt (jeder Ton ergibt Schwarz), bei Grau die Sättigung. Ein Wähler,
+> der nur die RGB-Farbe behält, verliert ihn genau dort — der Zeiger springt
+> beim Herunterziehen auf Schwarz nach links, und beim Aufhellen kommt Rot
+> zurück statt der Farbe, die man gewählt hatte. Deshalb speichert das Widget
+> HSV; `GUI_PICKED_COLOR` rechnet erst beim Abruf um.
+
+> **Beim Blättern klemmt der Tag.** Der 31. Januar plus ein Monat ist der
+> letzte Februartag, nicht der 3. März — sonst liefe der Wähler beim
+> Durchblättern langsam nach vorne davon.
+
+Ein Klick auf einen Tag des Nachbarmonats (die matten Zahlen am Rand)
+blättert dorthin. Farbe und Datum überleben `GUI_SAVE`/`GUI_LOAD` — in der
+`.dhform` stehen sie als `"#RRGGBB"` und `"JJJJ-MM-TT"`, also lesbar.
+
+Beispiel: [`examples/186_farbe_und_datum.dh`](../examples/186_farbe_und_datum.dh).
+
 ## Eigene Schrift
 
 Die eingebaute raylib-Schrift muss nicht bleiben. Zwei Zeilen genügen, und

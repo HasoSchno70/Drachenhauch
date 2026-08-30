@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1570,
+ "count": 1576,
  "builtins": [
   {
    "name": "ABS",
@@ -1931,7 +1931,7 @@
   {
    "name": "DATE",
    "kind": "core",
-   "signature": "DATE$()",
+   "signature": "DATE()",
    "module": "core"
   },
   {
@@ -2859,6 +2859,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_COLORPICKER",
+   "kind": "core",
+   "signature": "GUI_COLORPICKER(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CONFIRM",
    "kind": "graphics",
    "signature": "GUI_CONFIRM(titel$, text$[, stil$]) AS BOOLEAN",
@@ -2868,6 +2874,18 @@
    "name": "GUI_CONTEXT",
    "kind": "core",
    "signature": "GUI_CONTEXT(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATE",
+   "kind": "core",
+   "signature": "GUI_DATE(picker)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATEPICKER",
+   "kind": "core",
+   "signature": "GUI_DATEPICKER(win, x, y, w, h)",
    "module": "gui"
   },
   {
@@ -3123,6 +3141,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_PICKED_COLOR",
+   "kind": "core",
+   "signature": "GUI_PICKED_COLOR(picker)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_PROGRESS",
    "kind": "core",
    "signature": "GUI_PROGRESS(win, x, y, w, h)",
@@ -3201,6 +3225,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_DATE",
+   "kind": "core",
+   "signature": "GUI_SET_DATE(picker, datum$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_DROPDOWN",
    "kind": "core",
    "signature": "GUI_SET_DROPDOWN(dd, items)",
@@ -3240,6 +3270,12 @@
    "name": "GUI_SET_LISTBOX",
    "kind": "core",
    "signature": "GUI_SET_LISTBOX(lb, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_PICKED_COLOR",
+   "kind": "core",
+   "signature": "GUI_SET_PICKED_COLOR(picker, farbe)",
    "module": "gui"
   },
   {
