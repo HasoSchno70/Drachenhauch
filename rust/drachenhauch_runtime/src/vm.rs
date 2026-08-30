@@ -5243,6 +5243,35 @@ impl<'p> Vm<'p> {
             "gui_kind" => Value::str_rc(self.gui.kind_name(gi(a,0,"GUI_KIND")?)?),
             "gui_focus" => { self.gui.focus(gi(a,0,"GUI_FOCUS")?)?; Value::Nil }
             "gui_focused" => Value::Int(self.gui.focused()),
+            "gui_textarea_set" => {
+                self.gui.textarea_set(gi(a, 0, "GUI_TEXTAREA_SET")?,
+                                      &gs(a, 1, "GUI_TEXTAREA_SET")?,
+                                      gnum(a, 2, "GUI_TEXTAREA_SET")?)?;
+                Value::Nil
+            }
+            "gui_textarea_spans" => {
+                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+                    match v {
+                        Value::Array(a) => {
+                            let a = a.borrow();
+                            let mut o = Vec::with_capacity(a.cells.len());
+                            for x in a.cells.iter() {
+                                match x {
+                                    Value::Int(i) => o.push(i),
+                                    Value::Float(f) => o.push(f as i64),
+                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                                }
+                            }
+                            Ok(o)
+                        }
+                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                    }
+                }
+                let n = "GUI_TEXTAREA_SPANS";
+                self.gui.textarea_spans(gi(a, 0, n)?, ganze(&a[1], n)?,
+                                        ganze(&a[2], n)?, ganze(&a[3], n)?)?;
+                Value::Nil
+            }
             "gui_set_enabled" => { self.gui.set_enabled(gi(a,0,"GUI_SET_ENABLED")?, gbool(a,1,"GUI_SET_ENABLED")?)?; Value::Nil }
             "gui_enabled" => Value::Bool(self.gui.enabled(gi(a,0,"GUI_ENABLED")?)?),
             "gui_set_font" => { self.gui.set_font(gi(a,0,"GUI_SET_FONT")?, gi(a,1,"GUI_SET_FONT")?)?; Value::Nil }
@@ -5922,6 +5951,22 @@ impl<'p> Vm<'p> {
             "text_line_spacing" => { let n = gi(a,0,"TEXT_LINE_SPACING")?;
                                      g!().text_line_spacing(n); Value::Nil }
             // --- Clipboard + Drag&Drop (Batch 5) ---
+            // Quelltext einfaerben: (starts, laengen, arten) als TUPLE.
+            // Drei Rueckgaben in einem Aufruf, weil sie IMMER zusammengehoeren
+            // -- drei getrennte Aufrufe muessten denselben Text dreimal
+            // abtasten und koennten auseinander laufen.
+            "syntax_spans" => {
+                let src = gs(a, 0, "SYNTAX_SPANS")?.to_string();
+                let sp = crate::syntax::spans(&src);
+                let starts: Vec<i64> = sp.iter().map(|&(s, _, _)| s as i64).collect();
+                let laengen: Vec<i64> = sp.iter().map(|&(_, l, _)| l as i64).collect();
+                let arten: Vec<String> = sp.iter().map(|&(_, _, a)| a.name().to_string()).collect();
+                Value::Tuple(std::rc::Rc::new(vec![
+                    crate::builtins::new_int_array(starts),
+                    crate::builtins::new_int_array(laengen),
+                    crate::builtins::new_string_array(arten),
+                ]))
+            }
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
             "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }
             "files_dropped" => Value::Int(g!().dropped_files().len() as i64),

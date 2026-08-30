@@ -1,0 +1,121 @@
+' ============================================================
+'  DRACHENHAUCH -- Das TEXTAREA als Code-Feld
+' ============================================================
+'  Ein mehrzeiliges Textfeld wird mit vier Einstellungen und einer
+'  Einfaerbung zu einem brauchbaren Code-Feld:
+'
+'    zeilennummern   Nummernspalte links
+'    aktive_zeile    Zeile unter der Schreibmarke hervorheben
+'    tab_fuegt_ein   TAB rueckt ein, statt weiterzuspringen
+'    tabbreite       auf wie viele Spalten
+'
+'  Eingefaerbt wird in zwei Schritten: SYNTAX_SPANS sagt, WAS ein Stueck
+'  Text ist, und GUI_TEXTAREA_SPANS, welche FARBE es bekommt. Getrennt,
+'  weil die Farbe eines Kommentars eine Frage des Themas ist und nicht
+'  der Sprache -- und weil man mit dem zweiten Schritt auch ganz anderes
+'  einfaerben kann: Suchtreffer, Fehlerstellen, ein Diff.
+'
+'  Einfach lostippen. [ESC] beendet.
+' ============================================================
+IMPORT "gui"
+
+SCREEN(820, 520, "Drachenhauch - Code-Feld", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Editor", 10, 10, 800, 500)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(win, 14, 14, 770, 390)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+
+DIM lblHilfe AS GUI_WIDGET
+lblHilfe = GUI_LABEL(win, "Tippen. TAB rueckt ein. Die Einfaerbung folgt.", 14, 418)
+DIM lblZahl AS GUI_WIDGET
+lblZahl = GUI_LABEL(win, "", 14, 440)
+
+' --- Startinhalt ------------------------------------------------------
+DIM nl AS STRING
+nl = CHR$(10)
+DIM start AS STRING
+start = "' Ein kleines Programm" + nl
+start = start + "DIM punkte AS INTEGER" + nl
+start = start + "punkte = 0" + nl + nl
+start = start + "FOR runde = 1 TO 10" + nl
+start = start + "    IF runde MOD 2 = 0 THEN" + nl
+start = start + "        punkte += runde * 3" + nl
+start = start + "    ELSE" + nl
+start = start + "        punkte -= 1        REM Abzug" + nl
+start = start + "    END IF" + nl
+start = start + "    PRINT ""Runde ""; runde; "" -> ""; punkte" + nl
+start = start + "NEXT" + nl + nl
+start = start + "PRINT ""Ergebnis: ""; punkte; "" von ""; &HFF"
+GUI_SET_TEXT(ta, start)
+
+' --- Farben je Art ----------------------------------------------------
+' Aus dem Thema abgeleitet zu haben waere schoener, aber die Farben eines
+' Editors sind Geschmackssache -- darum stehen sie hier offen da.
+CONST F_GRUND      = &HD8E4F0
+CONST F_KOMMENTAR  = &H6A8A5A
+CONST F_TEXT       = &HE0A060
+CONST F_ZAHL       = &HD07070
+CONST F_SCHLUESSEL = &H2BC4E8
+CONST F_OPERATOR   = &H9AA8B8
+
+FUNCTION farbeFuer(art AS STRING) AS INTEGER
+    IF art = "kommentar" THEN RETURN F_KOMMENTAR
+    IF art = "text" THEN RETURN F_TEXT
+    IF art = "zahl" THEN RETURN F_ZAHL
+    IF art = "schluessel" THEN RETURN F_SCHLUESSEL
+    IF art = "operator" THEN RETURN F_OPERATOR
+    RETURN F_GRUND
+END FUNCTION
+
+' Neu einfaerben. Wird nur aufgerufen, wenn sich der Text WIRKLICH
+' geaendert hat -- bei jedem Bild neu zu zerlegen waere Arbeit fuer nichts.
+SUB faerbe()
+    DIM q AS STRING
+    q = GUI_TEXT(ta)
+    DIM starts AS ARRAY OF INTEGER
+    DIM laengen AS ARRAY OF INTEGER
+    DIM arten AS ARRAY OF STRING
+    (starts, laengen, arten) = SYNTAX_SPANS(q)
+    DIM n AS INTEGER
+    n = LEN(starts)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblZahl, "0 Abschnitte")
+        RETURN
+    END IF
+    DIM farben[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        farben[i] = farbeFuer(arten[i])
+    NEXT
+    GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)
+    GUI_SET_TEXT(lblZahl, STR$(n) + " Abschnitte in " + STR$(LEN(q)) + " Zeichen")
+END SUB
+
+faerbe()
+GUI_FOCUS(ta)
+
+DIM letzter AS STRING
+letzter = GUI_TEXT(ta)
+
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(&H0B1119)
+    GUI_UPDATE()
+
+    ' Nur bei echter Aenderung neu zerlegen.
+    IF GUI_TEXT(ta) <> letzter THEN
+        letzter = GUI_TEXT(ta)
+        faerbe()
+    END IF
+
+    GUI_DRAW()
+    FLIP()
+WEND

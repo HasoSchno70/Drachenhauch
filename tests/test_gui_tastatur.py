@@ -225,3 +225,58 @@ b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
 PRINT GUI_FOCUSED()
 """, frames=2)
     assert zeilen and zeilen[-1] == "-1", zeilen
+
+
+# --- Der Tabulator im Code-Feld ---------------------------------------------
+#
+# `GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)` nimmt dem Tabulator seine
+# Navigations-Aufgabe und gibt sie dem Einrücken. Beide Richtungen gehören
+# geprüft: dass er einrückt, wenn das Feld ihn verlangt -- und dass er ohne
+# diesen Schalter weiterhin das Bedienelement wechselt. Ein Schalter, der nur
+# in eine Richtung wirkt, wäre eine Falle.
+
+_CODEFELD = '''
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 260, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 140, 80, 24)
+GUI_FOCUS(ta)
+'''
+
+
+def test_tabulator_rueckt_im_codefeld_ein(tmp_path):
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_TAB))
+    zeilen = _lauf(tmp_path, _KOPF + _CODEFELD + '''
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+''' + _SCHLEIFE + '''
+PRINT "["; GUI_TEXT(ta); "]"
+''')
+    assert zeilen and zeilen[-1] == "[    ]", zeilen
+
+
+def test_tabulator_wechselt_ohne_den_schalter_weiter(tmp_path):
+    """Gegenprobe: ohne `tab_fuegt_ein` bleibt der Tabulator die
+    Navigations-Taste, und das Textfeld bleibt leer."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_TAB))
+    zeilen = _lauf(tmp_path, _KOPF + _CODEFELD + _SCHLEIFE + '''
+PRINT "["; GUI_TEXT(ta); "]"; IIF(GUI_FOCUSED() = b, " knopf", " woanders")
+''')
+    assert zeilen and zeilen[-1] == "[] knopf", zeilen
+
+
+def test_tabulator_fuellt_bis_zur_naechsten_spalte(tmp_path):
+    """Nicht stur vier Leerzeichen: mitten in der Zeile getippt, muss der
+    Tabulator bis zur nächsten Spalte auffüllen -- sonst steht die
+    Einrückung schief."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_TAB))
+    zeilen = _lauf(tmp_path, _KOPF + _CODEFELD + '''
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_SET_TEXT(ta, "ab")
+GUI_FOCUS(ta)
+''' + _SCHLEIFE + '''
+PRINT "["; GUI_TEXT(ta); "]"
+''')
+    # Nach zwei Zeichen fehlen bis Spalte 4 genau zwei Leerzeichen.
+    assert zeilen and zeilen[-1] == "[ab  ]", zeilen

@@ -484,6 +484,16 @@ pub fn new_float_array(items: Vec<f64>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
+/// `ARRAY OF STRING` aus einer Rust-Liste.
+pub fn new_string_array(items: Vec<String>) -> Value {
+    let n = items.len() as i64;
+    let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+    for (i, v) in items.into_iter().enumerate() {
+        arr.cells.set(i, Value::str_rc(&v));
+    }
+    Value::Array(Rc::new(RefCell::new(arr)))
+}
+
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
     let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));

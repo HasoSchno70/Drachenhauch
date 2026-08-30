@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1521,
+ "count": 1524,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -575,7 +575,9 @@
   "GUI_TABLE_VIEW_ROW": "INTEGER — welche Datenzeile steht an sichtbarer Stelle i? -- Sortieren und Filtern stellen die Daten nicht um",
   "GUI_TABS": "Reiter-Leiste anlegen (labels = ARRAY/TUPLE von Strings); aktiver Reiter → 0",
   "GUI_TEXT": "STRING — Text (Label/Button/TextInput)",
-  "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V)",
+  "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als Code-Feld einfärbbar — siehe Code-Feld",
+  "GUI_TEXTAREA_SET": "zeilennummern, aktive_zeile, tab_fuegt_ein, tabbreite",
+  "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
   "GUI_TEXTINPUT": "GUI_WIDGET — einzeiliges Eingabefeld (Caret + Selektion)",
   "GUI_THEME": "Akzentfarbe (RGB) umstellen (Kurzform)",
   "GUI_THEME_GET": "— / INT — einzelne Theme-Farbe setzen/lesen",
@@ -1274,6 +1276,7 @@
   "STDIN": "die Standardeingabe als Datei-Handle",
   "STOPMUSIC": "ein Stream gleichzeitig. Nachgefüllt wird auf dem Audio-Thread, nicht im Game-Loop: einen update_stream-Aufruf pro FLIP gibt es nicht (genau der Punkt, an dem raylib-Audio knackte). Musik loopt endlos — play_music reicht loops = -1 weiter, was in Kira eine loop_region(0.0..) wird.",
   "STR$": "Wert nach String. Bools werden zu \"TRUE\"/\"FALSE\", Floats wie 3.0 zu \"3.0\".",
+  "SYNTAX_SPANS": "Drachenhauch-Quelltext zerlegen",
   "TAN": "Trigonometrie (x in Radiant)",
   "TASK_CANCEL": "Ergebnis verwerfen",
   "TASK_PENDING": "Aufträge, die noch nicht abgeholt sind",

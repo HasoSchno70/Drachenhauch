@@ -53,6 +53,7 @@ mod html;
 mod net;
 #[cfg(feature = "net")]
 mod mqtt;
+mod syntax;
 mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
