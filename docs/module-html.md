@@ -9,30 +9,30 @@ IMPORT "html"
 
 ## Übersicht
 
-| Bereich | Funktion | Rückgabe |
-|---|---|---|
-| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (Antwort-Rumpf) |
-| HTTP | `HTTP_GET(url$)` | STRING (Response-Body) |
-| HTTP | `HTTP_POST(url$, body$)` | STRING |
-| HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (Bytes) |
-| HTTP | `HTTP_STATUS()` | INTEGER (z.B. 200, 404) |
-| HTTP | `HTTP_HEADER(name$)` | STRING (Kopfzeile der Antwort) |
-| HTTP | `HTTP_BYTES()` | BUFFER (roher Rumpf der letzten Antwort) |
-| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (gilt für alle folgenden Aufrufe) |
-| HTTP | `HTTP_CLEAR_HEADERS()` | — |
-| HTTP | `HTTP_TIMEOUT(sekunden)` | — |
-| HTTP (Hintergrund) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (Abruf-Nummer) |
-| HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |
-| HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |
-| HTTP (Hintergrund) | `HTTP_RESULT(abruf)` | STRING (Response-Body) |
-| HTTP (Hintergrund) | `HTTP_CANCEL(abruf)` | — |
-| HTTP (Hintergrund) | `HTTP_PENDING()` | INTEGER (offene Abrufe) |
-| HTTP (Hintergrund) | `HTTP_URL$(abruf)` | STRING |
-| URL | `URL_ENCODE(s$)` | STRING |
-| URL | `URL_DECODE(s$)` | STRING |
-| HTML | `HTML_TEXT(html$)` | STRING (Tags raus, Entities decodiert) |
-| HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |
-| HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |
+| Bereich | Funktion | Rückgabe | Bedeutung |
+|---|---|---|---|
+| HTTP | `HTTP_REQUEST(methode$, url$ [, rumpf [, kopfzeilen]])` | STRING (Antwort-Rumpf) | beliebige HTTP-Methode mit eigenem Rumpf und Kopfzeilen |
+| HTTP | `HTTP_GET(url$)` | STRING (Response-Body) | Seite oder Datei abrufen |
+| HTTP | `HTTP_POST(url$, body$)` | STRING | Daten senden und die Antwort lesen |
+| HTTP | `HTTP_DOWNLOAD(url$, pfad$)` | INTEGER (Bytes) | Datei herunterladen und speichern |
+| HTTP | `HTTP_STATUS()` | INTEGER (z.B. 200, 404) | Status des letzten Abrufs (200 = gut, 404 = nicht da) |
+| HTTP | `HTTP_HEADER(name$)` | STRING (Kopfzeile der Antwort) | eine Kopfzeile der letzten Antwort lesen |
+| HTTP | `HTTP_BYTES()` | BUFFER (roher Rumpf der letzten Antwort) |  |
+| HTTP | `HTTP_SET_HEADER(name$, wert$)` | — (gilt für alle folgenden Aufrufe) |  |
+| HTTP | `HTTP_CLEAR_HEADERS()` | — |  |
+| HTTP | `HTTP_TIMEOUT(sekunden)` | — |  |
+| HTTP (Hintergrund) | `HTTP_REQUEST_START(methode$, url$ [, rumpf [, kopfzeilen]])` | INTEGER (Abruf-Nummer) |  |
+| HTTP (Hintergrund) | `HTTP_GET_START(url$)` | INTEGER (Abruf-Nummer) |  |
+| HTTP (Hintergrund) | `HTTP_READY(abruf)` | BOOLEAN |  |
+| HTTP (Hintergrund) | `HTTP_RESULT(abruf)` | STRING (Response-Body) |  |
+| HTTP (Hintergrund) | `HTTP_CANCEL(abruf)` | — |  |
+| HTTP (Hintergrund) | `HTTP_PENDING()` | INTEGER (offene Abrufe) |  |
+| HTTP (Hintergrund) | `HTTP_URL$(abruf)` | STRING |  |
+| URL | `URL_ENCODE(s$)` | STRING | Text für eine URL sicher machen (Leerzeichen, Umlaute, `&`) |
+| URL | `URL_DECODE(s$)` | STRING | das Gegenstück — kodierten Text zurückwandeln |
+| HTML | `HTML_TEXT(html$)` | STRING (Tags raus, Entities decodiert) |  |
+| HTML | `HTML_FIND_ALL(html$, tag$)` | ARRAY OF STRING |  |
+| HTML | `HTML_GET_ATTR(tag_html$, attr$)` | STRING |  |
 
 ## HTTP_REQUEST — für alles, was über GET und POST hinausgeht
 

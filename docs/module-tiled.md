@@ -33,7 +33,7 @@ IMPORT "tiled"
 | `TILED_LAYER_NAME(m, idx)` | STRING | Name der Ebene (Index ab 0) |
 | `TILED_LAYER_TYPE(m, idx)` | `"tile"`, `"object"`, `"image"` | Art der Ebene |
 | `TILED_LAYER_INDEX(m, name$)` | INTEGER (-1 wenn nicht da) | Ebene ueber ihren Namen finden |
-| `TILED_LAYER_WIDTH(m, idx)` / `..._HEIGHT(m, idx)` | INTEGER (nur Tile-Layer) | Groesse der Ebene in Kacheln |
+| `TILED_LAYER_WIDTH/HEIGHT(m, idx)` | INTEGER (nur Tile-Layer) | Groesse der Ebene in Kacheln |
 
 ### Tile-Daten
 
@@ -65,6 +65,10 @@ IMPORT "tiled"
 | `TILED_TILESET_COUNT(m)` | INTEGER | wie viele Tilesets bringt die Karte mit? |
 | `TILED_TILESET_IMAGE(m, idx)` | STRING (absoluter Pfad zum Tileset-Bild) | Bilddatei des Tilesets |
 | `TILED_TILESET_FIRSTGID(m, idx)` | INTEGER | erste GID dieses Tilesets -- damit ordnet man eine GID ihrem Tileset zu |
+| `TILED_FILL_RECT(m, layer_idx, tx, ty, w, h, gid)` | INTEGER | Rechteck mit einer GID füllen; liefert die Zahl geänderter Kacheln |
+| `TILED_REPLACE(m, layer_idx, from_gid, to_gid)` | INTEGER | jede GID `from_gid` durch `to_gid` ersetzen — Tileset tauschen ohne Schleife |
+| `TILED_COUNT_GID(m, layer_idx, gid)` | INTEGER | wie oft kommt diese GID in der Ebene vor? |
+| `TILED_FLOOD_FILL(m, layer_idx, tx, ty, gid)` | INTEGER | Farbeimer: die zusammenhängende Fläche ab `(tx,ty)` umfärben |
 
 ## Konzept: GIDs vs. lokale Tile-IDs
 

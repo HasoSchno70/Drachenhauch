@@ -24,6 +24,47 @@ IMPORT "physics"
 | `PHYSICS_REFLECT_Y(vx,vy, nx,ny)` | Y-Komponente der Reflektion an Normal `n` | `FLOAT` |
 | `PHYSICS_RAY_BOX(rx,ry, dx,dy, bx,by,bw,bh)` | Strahl-Box-Schnitt, `t ∈ [0..1]` oder `-1` | `FLOAT` |
 | `PHYSICS_RAY_CIRCLE(rx,ry, dx,dy, cx,cy,cr)` | Strahl-Kreis-Schnitt, `t ∈ [0..1]` oder `-1` | `FLOAT` |
+| `PHYSICS_POINT_TRI(px,py, ax,ay, bx,by, cx,cy)` | Punkt im Dreieck (baryzentrisch — der Umlaufsinn der Ecken ist egal) | `BOOLEAN` |
+| `PHYSICS_LINES_HIT(ax,ay,bx,by, cx,cy,dx,dy)` | schneiden sich zwei **Strecken**? (nicht die unendlichen Geraden) | `BOOLEAN` |
+| `PHYSICS_LINES_X(ax,ay,bx,by, cx,cy,dx,dy)` | X des Schnittpunkts — **`NAN`, wenn es keinen gibt**, also erst `PHYSICS_LINES_HIT` fragen | `FLOAT` |
+| `PHYSICS_LINES_Y(ax,ay,bx,by, cx,cy,dx,dy)` | Y des Schnittpunkts (ebenso `NAN`) | `FLOAT` |
+| `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke)` | liegt der Punkt auf der Strecke? `dicke` gibt den erlaubten Abstand — für Klicks auf dünne Linien | `BOOLEAN` |
+| `PHYSICS_CIRCLE_LINE(cx,cy,r, ax,ay, bx,by)` | berührt ein Kreis die Strecke? | `BOOLEAN` |
+| `PHYSICS_POINT_POLY(px, py, xs, ys)` | Punkt im Vieleck (Strahl-Verfahren — funktioniert auch bei konkaven Formen) | `BOOLEAN` |
+| `PHYSICS_DISTANCE3(x1,y1,z1, x2,y2,z2)` | Abstand zweier Punkte im Raum | `FLOAT` |
+| `PHYSICS_SPHERE_SPHERE(x1,y1,z1,r1, x2,y2,z2,r2)` | berühren sich zwei Kugeln? — die Kugel-Näherung reicht für die meisten 3D-Treffer | `BOOLEAN` |
+| `PHYSICS_BROAD_NEW()` | Broadphase anlegen | `PHYSICS_BROAD` |
+| `PHYSICS_BROAD_CLEAR(b)` | alle Einträge verwerfen — pro Frame vor dem neuen Befüllen | — |
+| `PHYSICS_BROAD_ADD(b, x, y, r)` | einen Kreis aufnehmen; liefert seinen Index | `INTEGER` |
+| `PHYSICS_BROAD_COUNT(b)` | wie viele Kreise sind drin? | `INTEGER` |
+| `PHYSICS_BROAD_QUERY(b)` | alle sich überlappenden Paare suchen; liefert deren Anzahl | `INTEGER` |
+| `PHYSICS_BROAD_PAIR_COUNT(b)` | Anzahl der gefundenen Paare (wie der Rückgabewert von `QUERY`) | `INTEGER` |
+| `PHYSICS_BROAD_PAIR_A(b, i)` | erster Kreis des Paars `i` (Index aus `ADD`) | `INTEGER` |
+| `PHYSICS_BROAD_PAIR_B(b, i)` | zweiter Kreis des Paars `i` | `INTEGER` |
+
+### Broadphase: viele Kreise auf einmal
+
+Wer 500 Kugeln gegeneinander prüft, macht mit zwei verschachtelten Schleifen
+125 000 Vergleiche pro Frame. Die Broadphase legt die Kreise in ein Gitter und
+vergleicht nur Nachbarn — das kostet mit der Anzahl linear statt quadratisch.
+Der Ablauf pro Frame:
+
+```basic
+IMPORT "physics"
+PHYSICS_BROAD_CLEAR(b)                      ' 1. leeren
+FOR i = 0 TO n - 1
+    idx = PHYSICS_BROAD_ADD(b, x[i], y[i], r[i])   ' 2. befuellen
+NEXT
+paare = PHYSICS_BROAD_QUERY(b)              ' 3. suchen
+FOR p = 0 TO paare - 1
+    a = PHYSICS_BROAD_PAIR_A(b, p)          ' 4. Paare abholen
+    c = PHYSICS_BROAD_PAIR_B(b, p)
+NEXT
+```
+
+Die zurückgegebenen Zahlen sind die Indizes aus `PHYSICS_BROAD_ADD` — in der
+Reihenfolge, in der man die Kreise hineingelegt hat. Auf die Reihenfolge der
+**Paare** sollte man sich nicht verlassen.
 
 ## Konventionen
 

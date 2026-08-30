@@ -50,9 +50,9 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 | `PHYS2D_ADD_BOX(w, x, y, hw, hh, dynamic, bounce) AS INTEGER` | Rechteck (Halb-Extents), Restitution `bounce` 0..1 |
 | `PHYS2D_ADD_CIRCLE(w, x, y, r, dynamic, bounce) AS INTEGER` | Kreis-Körper |
 | `PHYS2D_STEP(w, dt)` | einen Zeitschritt simulieren (dt in s, intern auf 0.0001..0.05 geklemmt) |
-| `PHYS2D_BODY_X / _Y(w, idx) AS FLOAT` | Position |
+| `PHYS2D_BODY_X/Y(w, idx)` | Position |
 | `PHYS2D_BODY_ANGLE(w, idx) AS FLOAT` | Drehwinkel in Radiant (für Sprite-Rotation) |
-| `PHYS2D_BODY_VX / _VY(w, idx) AS FLOAT` | lineare Geschwindigkeit (z.B. „falle ich?") |
+| `PHYS2D_BODY_VX/VY(w, idx)` | lineare Geschwindigkeit (z.B. „falle ich?") |
 | `PHYS2D_SET_VEL(w, idx, vx, vy)` | Geschwindigkeit setzen |
 | `PHYS2D_APPLY_IMPULSE(w, idx, ix, iy)` | Impuls (z.B. Sprung/Schuss) |
 | `PHYS2D_SET_POS(w, idx, x, y)` | Position teleportieren |

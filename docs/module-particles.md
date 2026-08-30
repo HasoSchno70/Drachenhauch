@@ -23,6 +23,8 @@ IMPORT "particles"
 | `PARTICLE_DRAW(sys)` | zeichnen (camera-aware) |
 | `PARTICLE_COUNT(sys)` → INTEGER | Anzahl lebende Partikel |
 | `PARTICLE_CLEAR(sys)` | alle löschen |
+| `PARTICLE_SET_MODE(sys, modus$)` | Aussehen der Teilchen: `circle`, `pixel`, `square`, `streak` oder `glow` |
+| `PARTICLE_SET_COLOR_END(sys, farbe)` | Farbe am Ende der Lebenszeit — die Teilchen färben sich unterwegs um (Feuer: gelb nach rot) |
 
 ## Defaults
 

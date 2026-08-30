@@ -31,6 +31,7 @@ IMPORT "sprite"
 | `SPRITE_COLLIDES(sp1, sp2)` → BOOLEAN | AABB zweier Sprites |
 | `SPRITE_HIT_BOX(sp, x, y, w, h)` → BOOLEAN | AABB-Test des Sprites gegen ein Rechteck `(x, y, w, h)` |
 | `SPRITE_HIT_POINT(sp, x, y)` → BOOLEAN | liegt der Punkt `(x, y)` im Sprite? (Maus-Klick-Test) |
+| `SPRITE_COLLIDE(a, b)` → BOOLEAN | überlappen sich zwei Sprites? (Rechteck gegen Rechteck) |
 
 ## Sheet-Layout
 
