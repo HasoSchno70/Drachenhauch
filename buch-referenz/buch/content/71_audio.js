@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Modul: audio (fortgeschritten)"),
-  H.p("Kapitel 46 hat die Grundlagen gezeigt: Töne und Sounds laden und abspielen. Das audio-Modul kann aber noch viel mehr. Es ist eine vollständige Audio-Engine (auf Basis von Kira), die auf einem eigenen Thread läuft – dein Game-Loop kann also ruckeln, ohne dass der Klang stottert. Dieses Kapitel zeigt die fortgeschrittenen Werkzeuge: einzelne Kanäle steuern, Stereo-Panorama bewegen, Sounds als Samples in Tonhöhen spielen, und Echtzeit-Effekte wie Hall, Echo oder Filter auf ganze Bus-Gruppen legen."),
+  H.p("Kapitel „Sound“ hat die Grundlagen gezeigt: Töne und Sounds laden und abspielen. Das audio-Modul kann aber noch viel mehr. Es ist eine vollständige Audio-Engine (auf Basis von Kira), die auf einem eigenen Thread läuft – dein Game-Loop kann also ruckeln, ohne dass der Klang stottert. Dieses Kapitel zeigt die fortgeschrittenen Werkzeuge: einzelne Kanäle steuern, Stereo-Panorama bewegen, Sounds als Samples in Tonhöhen spielen, und Echtzeit-Effekte wie Hall, Echo oder Filter auf ganze Bus-Gruppen legen."),
   H.note("Klang lässt sich im Buch nicht abdrucken – probiere die Beispiele am besten selbst aus. Die meisten Befehle hier liefern keine Konsolen-Ausgabe; sie wirken auf das, was du hörst."),
 
   H.h2("Kanäle: AUDIO_PLAY und seine Steuerung"),
@@ -78,7 +78,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Musik steuern"),
-  H.p("Über PLAYMUSIC (Kapitel 46) hinaus kannst du laufende Musik fein steuern: pausieren, fortsetzen, mit Ein-/Ausblendung stoppen, die Abspielposition abfragen oder die Tonhöhe verziehen. Auch Tracker-Module (.mod/.xm) werden in Echtzeit gestreamt."),
+  H.p("Über PLAYMUSIC (Kapitel „Sound“) hinaus kannst du laufende Musik fein steuern: pausieren, fortsetzen, mit Ein-/Ausblendung stoppen, die Abspielposition abfragen oder die Tonhöhe verziehen. Auch Tracker-Module (.mod/.xm) werden in Echtzeit gestreamt."),
   H.cmd("AUDIO_MUSIC_PAUSE/RESUME/STOP · _POSITION", 'AUDIO_MUSIC_PAUSE()   AUDIO_MUSIC_RESUME()   AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])   AUDIO_MUSIC_POSITION()',
     "Pausiert/setzt die Musik fort, stoppt sie (optional mit Ausblendung in Millisekunden) und liefert mit POSITION die aktuelle Abspielzeit in Sekunden (FLOAT) – z. B. um eine Lichtshow zur Musik zu synchronisieren.",
     [
@@ -174,7 +174,7 @@ module.exports = (H) => [
       "AUDIO_POP()                        ' trocken wie vorher",
     ]),
   H.warn("Hast du mit AUDIO_MODULATE einen LFO auf einen Bus-Wert gelegt, den ein AUDIO_POP zurückschreibt, endet die Modulation an dieser Stelle – beide beschreiben denselben Regler, und der letzte gewinnt. Das ist kein Fehler, sondern eine Folge davon, wie die Werte zusammenlaufen; wer die Modulation behalten will, setzt sie nach dem POP neu.", "Eine laufende Modulation wird dabei abgelöst"),
-  H.note("Das Gegenstück für die Grafik heißt GFX_PUSH / GFX_POP und sichert Licht, Nebel, Kamera, Schatten, Schrift und den Post-Effekt – siehe Kapitel 42."),
+  H.note("Das Gegenstück für die Grafik heißt GFX_PUSH / GFX_POP und sichert Licht, Nebel, Kamera, Schatten, Schrift und den Post-Effekt – siehe Kapitel „2D-Extras“."),
 
   H.h2("Sample-genaues Timing: AUDIO_CLOCK"),
   H.p("Eine Uhr, die vom Audio-Thread selbst getrieben wird – nicht von deinem (ungenaueren) Game-Loop. Damit planst du Sounds exakt auf einen musikalischen Takt statt „ungefähr jetzt“. Praktisch für Rhythmusspiele oder Musik-synchronisierte Effekte."),

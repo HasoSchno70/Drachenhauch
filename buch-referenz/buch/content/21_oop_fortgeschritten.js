@@ -159,5 +159,5 @@ module.exports = (H) => [
     { out: ["100", "Drachenhauch"] }),
   H.p("Innerhalb einer Methode der Klasse greifst du genauso zu (Config.MAX_HP). Statische Konstanten sind fest – sie lassen sich zur Laufzeit nicht überschreiben. Brauchst du veränderlichen, geteilten Zustand, nimm stattdessen eine globale Variable."),
 
-  H.tip("Nicht übertreiben", "Vererbung, Properties und Operatoren sind starke Werkzeuge – aber nicht jedes Programm braucht sie. Fang ruhig mit schlichten Klassen aus Feldern und Methoden an (Kapitel 20). Greife zu Vererbung, wenn echte „ist ein“-Beziehungen vorliegen (ein Hund IST ein Tier), zu Properties bei Werten mit Regeln, zu Operatoren nur bei echten Rechen-Typen. Klarheit schlägt Cleverness."),
+  H.tip("Nicht übertreiben", "Vererbung, Properties und Operatoren sind starke Werkzeuge – aber nicht jedes Programm braucht sie. Fang ruhig mit schlichten Klassen aus Feldern und Methoden an (Kapitel „Klassen & Objekte“). Greife zu Vererbung, wenn echte „ist ein“-Beziehungen vorliegen (ein Hund IST ein Tier), zu Properties bei Werten mit Regeln, zu Operatoren nur bei echten Rechen-Typen. Klarheit schlägt Cleverness."),
 ];

@@ -132,5 +132,8 @@ module.exports = (H) => [
   H.code(["120"], { out: true }),
   H.warn("Jede Rekursion braucht einen Abbruchfall, der ohne weiteren Selbstaufruf zurückkehrt – hier n <= 1. Fehlt er, läuft die Funktion immer tiefer, bis das Programm mit einem Fehler abbricht."),
 
+  H.warn("Die Aufruftiefe ist auf 1000 begrenzt. Wer tiefer geht, bekommt „Maximale Aufruftiefe (1000) ueberschritten -- unendliche Rekursion?“ – und der Fehler lässt sich mit TRY/CATCH fangen. Die Zahl ist keine Willkür, sondern die Grenze, die auf allen Betriebssystemen gleich sicher ist. Für einen Abstieg durch einen Baum oder ein Verzeichnis reicht sie bei weitem; wer eine Liste mit hunderttausend Einträgen rekursiv durchgeht, schreibt sie besser als Schleife.",
+    "Wie tief es gehen darf"),
+
   H.tip("Gute Bausteine", "Gib Funktionen sprechende Namen (berechne_schaden statt bs), halte sie kurz und lass jede genau eine Sache tun. Brauchst du eine Funktion an vielen Stellen, lagere sie in eine eigene Datei aus und binde sie mit IMPORT ein – das lernst du im Kapitel „Module importieren“."),
 ];

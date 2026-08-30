@@ -154,5 +154,5 @@ module.exports = (H) => [
       "HTTP_TIMEOUT(30)",
     ]),
 
-  H.tip("APIs liefern meist JSON", "Die meisten modernen Web-Schnittstellen antworten nicht mit HTML, sondern mit JSON. Dann kombinierst du html mit dem json-Modul (Kapitel 68): Die Antwort von HTTP_GET steckst du direkt in JSON_PARSE und liest die Felder mit JSON_GET_*. HTML zerlegen brauchst du nur, wenn du echte Webseiten „abgrasen“ (scrapen) willst."),
+  H.tip("APIs liefern meist JSON", "Die meisten modernen Web-Schnittstellen antworten nicht mit HTML, sondern mit JSON. Dann kombinierst du html mit dem json-Modul (Kapitel „Modul: json“): Die Antwort von HTTP_GET steckst du direkt in JSON_PARSE und liest die Felder mit JSON_GET_*. HTML zerlegen brauchst du nur, wenn du echte Webseiten „abgrasen“ (scrapen) willst."),
 ];

@@ -91,5 +91,5 @@ module.exports = (H) => [
       'IF NOT SCENE_HAS_KEY("startzeit") THEN SCENE_SET_FLOAT("startzeit", GET_TIME())',
       'IF SCENE_HAS("pause") THEN PRINT "Pause liegt im Stapel"',
     ]),
-  H.tip("Push für Overlays, Switch für Wechsel", "Merke: PUSH/POP für etwas, das ÜBER dem Bisherigen liegt und danach zurückkehrt (Pause, Inventar, Dialog). SWITCH für einen echten Wechsel ohne Rückweg (Menü → Spiel → Game Over). Beim Szenenwechsel solltest du auch laufende Timer aufräumen (TIMER_CLEAR, Kapitel „timer“)."),
+  H.tip("Push für Overlays, Switch für Wechsel", "Merke: PUSH/POP für etwas, das ÜBER dem Bisherigen liegt und danach zurückkehrt (Pause, Inventar, Dialog). SWITCH für einen echten Wechsel ohne Rückweg (Menü → Spiel → Game Over). Beim Szenenwechsel solltest du auch laufende Timer aufräumen (TIMER_CLEAR, Kapitel „Modul: timer“)."),
 ];

@@ -1,13 +1,13 @@
 module.exports = (H) => [
   H.chapter("Strings im Detail"),
   H.p("Ein String ist eine Zeichenkette – Text, eingeschlossen in Anführungszeichen. Du hast Strings längst benutzt; hier lernst du sie richtig kennen: ihre Länge messen, Teile herausschneiden, suchen, ersetzen, zerlegen und wieder zusammenbauen. Für fast jede Textaufgabe gibt es einen passenden eingebauten Befehl."),
-  H.note("Viele String-Funktionen tragen ein $ am Namensende (LEFT$, MID$, UPPER$ …). Das ist eine alte BASIC-Tradition und kennzeichnet, dass die Funktion einen String zurückgibt. In Drachenhauch darfst du das $ auch weglassen: UPPER$ und UPPER sind dasselbe."),
+  H.note("Viele String-Funktionen tragen ein $ am Namensende (LEFT$, MID$, UPPER$ …). Das ist eine alte BASIC-Tradition und kennzeichnet, dass die Funktion einen String zurückgibt. Bei zwanzig dieser Befehle darfst du das $ weglassen – UPPER$ und UPPER sind dasselbe. Nur bei zwanzig: welche das sind und warum die Regel nicht allgemein gilt, steht im Kapitel „Zeichenketten-Funktionen“."),
 
   H.h2("Wie lang ist der Text?"),
   H.cmd("LEN", "LEN(s$)",
     "Liefert die Anzahl der Zeichen in einem String. (LEN funktioniert auch für Arrays und liefert dort die Anzahl der Elemente.)",
     ['PRINT LEN("Drachenhauch")', 'PRINT LEN("")'],
-    { out: ["9", "0"] }),
+    { out: ["12", "0"] }),
 
   H.h2("Groß und klein"),
   H.cmd("UPPER$  /  LOWER$", "UPPER$(s$)   LOWER$(s$)",
@@ -20,11 +20,11 @@ module.exports = (H) => [
   H.cmd("LEFT$  /  RIGHT$", "LEFT$(s$, n)   RIGHT$(s$, n)",
     "LEFT$ liefert die ersten n Zeichen, RIGHT$ die letzten n.",
     ['PRINT LEFT$("Drachenhauch", 4)', 'PRINT RIGHT$("Drachenhauch", 5)'],
-    { out: ["Game", "Basic"] }),
+    { out: ["Drac", "hauch"] }),
   H.cmd("MID$", "MID$(s$, start[, n])",
     "Liefert ab der Position start (0-basiert!) bis zu n Zeichen. Lässt du n weg, geht es bis zum Ende des Strings.",
     ['PRINT MID$("Drachenhauch", 4)', 'PRINT MID$("Drachenhauch", 4, 5)'],
-    { out: ["Basic", "Basic"] }),
+    { out: ["henhauch", "henha"] }),
   H.warn("Anders als manche älteren BASIC-Dialekte zählt Drachenhauch Zeichen-Positionen ab 0, nicht ab 1. Das erste Zeichen von \"Drachenhauch\" (das D) sitzt an Position 0, das erste h an Position 4. Das gilt auch für INSTR und den Index-Zugriff weiter unten."),
 
   H.h2("Einzelne Zeichen mit dem Index"),

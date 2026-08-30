@@ -58,6 +58,11 @@ const PROVOKATIONEN = [
   { name: "Variable nicht deklariert", zeilen: ["PRINT mmx"] },
   { name: "Unbekanntes Builtin", zeilen: ["CIRLCE(1, 2, 3)"] },
   { name: "Parse-Fehler", zeilen: ["PRINT (1 + 2"] },
+  { name: "Zu tiefe Rekursion",
+    zeilen: ["FUNCTION tief(n AS INTEGER) AS INTEGER",
+             "    RETURN 1 + tief(n + 1)",
+             "END FUNCTION",
+             "PRINT STR$(tief(0))"] },
   { name: "Lexer-Fehler", zeilen: ['PRINT "offen'] },
   { name: "Index ausserhalb", zeilen: ["DIM a[2] AS INTEGER", "PRINT STR$(a[2])"] },
   { name: "Kommazahl in ganzzahliges Fach",
@@ -130,7 +135,7 @@ const ANKER = new RegExp([
   "muessen 0\\.\\.255", "fehlt IMPORT", "gehoert zum Modul", "Laufzeitfehler", "Parse-Fehler",
   "Lexer-Fehler", "Compile-Fehler", "no such table", "Not Found",
   "nicht verfuegbar", "database is locked", "existiert nicht",
-  "Argument\\(e\\)", "Division durch",
+  "Argument\\(e\\)", "Division durch", "Aufruftiefe",
 ].join("|"));
 
 // Alles abschleifen, was von Fall zu Fall anders lautet.

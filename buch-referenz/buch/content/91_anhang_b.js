@@ -9,7 +9,7 @@ module.exports = (H) => {
 
   return [
     H.chapter("Anhang B — Tastencodes"),
-    H.p("KEYPRESSED(code) und die input-Befehle erwarten einen Tastencode. Statt die Zahlen auswendig zu lernen, nutzt du die benannten Konstanten – sie sind ohne IMPORT überall verfügbar. Diese Tabelle zeigt sie alle samt Zahlenwert. (Mehr dazu in Kapitel 45.)"),
+    H.p("KEYPRESSED(code) und die input-Befehle erwarten einen Tastencode. Statt die Zahlen auswendig zu lernen, nutzt du die benannten Konstanten – sie sind ohne IMPORT überall verfügbar. Diese Tabelle zeigt sie alle samt Zahlenwert. (Mehr dazu in Kapitel „Eingabe“.)"),
 
     H.h2("Sonder- und Steuertasten"),
     T([
@@ -44,7 +44,7 @@ module.exports = (H) => {
     ]),
 
     H.h2("Gamepad (Modul input)"),
-    H.p("Diese Konstanten bindest du mit INPUT_BIND an Aktionen (Kapitel 45). Die negativen Codes kennzeichnen Gamepad-Eingaben gegenüber den Tastatur-Codes."),
+    H.p("Diese Konstanten bindest du mit INPUT_BIND an Aktionen (Kapitel „Eingabe“). Die negativen Codes kennzeichnen Gamepad-Eingaben gegenüber den Tastatur-Codes."),
     T([
       row("JOY_BUTTON_A", -100, "untere Taste (Bestätigen/Springen)"),
       row("JOY_BUTTON_B", -101, "rechte Taste (Abbrechen)"),
@@ -62,6 +62,6 @@ module.exports = (H) => {
       row("JOY_DPAD_RIGHT", -203, "Steuerkreuz rechts"),
     ]),
 
-    H.note("Für die analogen Sticks gibt es keine festen Codes – ihre Achsen liest du mit INPUT_JOY_AXIS(slot, \"left_x\") als Wert zwischen -1 und +1 (siehe Kapitel 45)."),
+    H.note("Für die analogen Sticks gibt es keine festen Codes – ihre Achsen liest du mit INPUT_JOY_AXIS(slot, \"left_x\") als Wert zwischen -1 und +1 (siehe Kapitel „Eingabe“)."),
   ];
 };

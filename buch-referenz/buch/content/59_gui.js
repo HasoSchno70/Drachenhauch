@@ -319,7 +319,7 @@ module.exports = (H) => [
     [
       'GUI_TABLE_COL_ALIGN(tab, 2, "rechts")',
     ]),
-  H.tip("Auswahl und Hover liegen halbdurchsichtig ÜBER den Zellflächen. Eine eigene Zellfarbe verdeckt also nicht mehr, welche Zeile gerade gewählt ist."),
+  H.tip("Die Auswahl bleibt sichtbar", "Auswahl und Hover liegen halbdurchsichtig ÜBER den Zellflächen. Eine eigene Zellfarbe verdeckt also nicht mehr, welche Zeile gerade gewählt ist."),
 
   H.h2("Auswahl, Sortieren, Filtern"),
   H.cmd("GUI_TABLE_SELECTED · GUI_TABLE_CLICKED · GUI_TABLE_CLICKED_COL", 'GUI_TABLE_SELECTED(tab)   GUI_TABLE_CLICKED(tab)   GUI_TABLE_CLICKED_COL(tab)',
@@ -396,7 +396,7 @@ module.exports = (H) => [
       'GUI_TABLE_MOVE_COL(tab, 0, 2)         \' erste Spalte nach hinten',
       'PRINT GUI_TABLE_COL_AT(tab, 0)',
     ]),
-  H.tip("Klick und Zug am Kopf sind dieselbe Geste. Erst beim Loslassen steht fest, was gemeint war: ohne Bewegung wird sortiert, mit Bewegung verschoben."),
+  H.tip("Sortieren und Verschieben teilen sich eine Geste", "Klick und Zug am Kopf sind dieselbe Bewegung. Erst beim Loslassen steht fest, was gemeint war: ohne Bewegung wird sortiert, mit Bewegung verschoben."),
 
   H.h2("Kippschalter und Drehregler"),
   H.p("Zwei Bedienelemente, die aussehen wie an einem Gerät: der Kippschalter statt eines Häkchens, der Drehregler statt eines Schiebers. Beide sind vor allem in den plastischen Glas-Themen zu Hause."),

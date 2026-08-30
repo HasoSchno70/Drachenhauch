@@ -86,5 +86,5 @@ module.exports = (H) => [
 
   H.h2("Wann (und wann nicht) Fehlerbehandlung?"),
   H.p("TRY/CATCH ist mächtig, aber kein Ersatz für gewöhnliche Verzweigungen. Nutze es für Dinge, die WIRKLICH außergewöhnlich sind und die du nicht einfach vorher prüfen kannst – eine fehlende Datei, eine kaputte Benutzereingabe, ein Netzwerkproblem. Für normale Fallunterscheidungen („hat der Spieler genug Gold?“) bleibt ein schlichtes IF die richtige und klarere Wahl."),
-  H.tip("Robuste Eingaben", "Ein klassischer Einsatz: Du liest Text ein und willst eine Zahl daraus machen. Statt mit TRY/CATCH um VAL herumzubauen, ist hier oft TRYVAL(text, ersatz) (Kapitel „Strings“) die einfachere Lösung – es liefert bei ungültiger Eingabe still einen Ersatzwert. Greife zu TRY/CATCH, wenn es kein so bequemes Sicherheitsnetz gibt."),
+  H.tip("Robuste Eingaben", "Ein klassischer Einsatz: Du liest Text ein und willst eine Zahl daraus machen. Statt mit TRY/CATCH um VAL herumzubauen, ist hier oft TRYVAL(text, ersatz) (Kapitel „Strings im Detail“) die einfachere Lösung – es liefert bei ungültiger Eingabe still einen Ersatzwert. Greife zu TRY/CATCH, wenn es kein so bequemes Sicherheitsnetz gibt."),
 ];

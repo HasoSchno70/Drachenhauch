@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Modul: ecs"),
-  H.p("Ein Entity-Component-System (ECS) ist eine andere Art, Spielobjekte zu organisieren. Statt jede Spielfigur als Objekt mit Methoden zu bauen (wie in Kapitel 20), zerlegst du sie in pure Daten und schreibst die Logik getrennt davon. Das klingt erst ungewohnt, ist aber das Modell, mit dem moderne Engines tausende Objekte flüssig bewegen."),
+  H.p("Ein Entity-Component-System (ECS) ist eine andere Art, Spielobjekte zu organisieren. Statt jede Spielfigur als Objekt mit Methoden zu bauen (wie in Kapitel „Klassen & Objekte“), zerlegst du sie in pure Daten und schreibst die Logik getrennt davon. Das klingt erst ungewohnt, ist aber das Modell, mit dem moderne Engines tausende Objekte flüssig bewegen."),
 
   H.h2("Das mentale Modell: Daten statt Objekte"),
   H.pmix([
@@ -145,5 +145,5 @@ module.exports = (H) => [
       'ECS_INTEGRATE_INT(welt, "punkte", "punkte_pro_tick")',
       'ECS_FILL_INT(welt, "getroffen", 0)',
     ]),
-  H.tip("Wann ECS, wann Klassen?", "Für eine Handvoll unterschiedlicher Objekte (Spieler, ein Boss, ein paar Menüs) sind Klassen (Kapitel 20) übersichtlicher. ECS spielt seine Stärke aus, sobald du SEHR VIELE gleichartige Dinge hast – Geschosse, Partikel, Gegnerschwärme. Dann ein Spiel-System als Bulk-Op zu schreiben statt als Klassen-Schleife ist der Unterschied zwischen flüssigen 1000 Objekten und Ruckeln. Beide Stile lassen sich im selben Spiel mischen."),
+  H.tip("Wann ECS, wann Klassen?", "Für eine Handvoll unterschiedlicher Objekte (Spieler, ein Boss, ein paar Menüs) sind Klassen (Kapitel „Klassen & Objekte“) übersichtlicher. ECS spielt seine Stärke aus, sobald du SEHR VIELE gleichartige Dinge hast – Geschosse, Partikel, Gegnerschwärme. Dann ein Spiel-System als Bulk-Op zu schreiben statt als Klassen-Schleife ist der Unterschied zwischen flüssigen 1000 Objekten und Ruckeln. Beide Stile lassen sich im selben Spiel mischen."),
 ];

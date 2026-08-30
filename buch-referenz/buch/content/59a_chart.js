@@ -147,7 +147,7 @@ module.exports = (H) => [
       'CHART_SET_FLAG(c, "glatt", TRUE)      \' weiche Kurve statt Kanten',
       'CHART_SET_FLAG(c, "flaeche", TRUE)    \' Fläche unter der Linie füllen',
     ]),
-  H.tip("„glatt“ und „treppe“ schließen sich aus – setzt du beides, gewinnt die Treppe."),
+  H.tip("Zwei Kurvenformen schließen sich aus", "„glatt“ und „treppe“ vertragen sich nicht – setzt du beides, gewinnt die Treppe."),
 
   H.h2("Themen und Paletten"),
   H.cmd("CHART_THEME", 'CHART_THEME(diagramm, thema$)',
@@ -182,7 +182,7 @@ module.exports = (H) => [
     [
       'CHART_ZONE_CLEAR(t)',
     ]),
-  H.tip("Zonen schlagen den Skalen-Verlauf: wo eine Zone liegt, gilt ihre Farbe."),
+  H.tip("Zonen gewinnen gegen den Verlauf", "Wo eine Farbzone liegt, gilt ihre Farbe – der Skalen-Verlauf kommt nur dort zum Zug, wo keine Zone definiert ist."),
 
   H.h2("Die Maus: Hervorhebung, Sprechblase, Klick"),
   H.p("CHART_DRAW wertet die Maus selbst aus – du brauchst keinen zusätzlichen Aufruf. Was darunter liegt, hebt sich hervor; mit dem Schalter „tooltip“ erscheint eine Sprechblase mit Name und Wert. Abgefragt wird danach:"),
@@ -236,5 +236,5 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
-  H.tip("Alles außer CHART_DRAW rechnet ohne Fenster. Du kannst ein Diagramm also aufbauen und auswerten, bevor überhaupt ein SCREEN existiert."),
+  H.tip("Nur das Zeichnen braucht ein Fenster", "Alles außer CHART_DRAW rechnet ohne Fenster. Du kannst ein Diagramm also aufbauen und auswerten, bevor überhaupt ein SCREEN existiert."),
 ];

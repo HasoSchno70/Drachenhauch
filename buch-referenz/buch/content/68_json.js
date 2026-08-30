@@ -167,5 +167,5 @@ module.exports = (H) => [
   H.note("Der leere Pfad meint beim Schreiben NICHT die Wurzel. Beim Lesen tut er das; beim Setzen hieße er „das ganze Dokument wegwerfen“, und eine versehentlich leere Variable darf das nicht – JSON_SET_* lehnt ihn ab. Bei JSON_APPEND_* ist er erlaubt, dort geht nichts verloren, und meint das Dokument selbst.",
     "Merke"),
 
-  H.tip("Konfigurationsdateien", "Ein typisches Muster: Spiel-Einstellungen in einer settings.json ablegen und beim Start mit JSON_LOAD lesen. Prüfe mit FILEEXISTS, ob die Datei da ist, und fülle sonst Standardwerte – so läuft das Spiel auch beim allerersten Start. Zum dauerhaften Speichern von Spielständen ist das save-Modul (Kapitel 61) bequemer, weil es das Schreiben gleich mit erledigt."),
+  H.tip("Konfigurationsdateien", "Ein typisches Muster: Spiel-Einstellungen in einer settings.json ablegen und beim Start mit JSON_LOAD lesen. Prüfe mit FILEEXISTS, ob die Datei da ist, und fülle sonst Standardwerte – so läuft das Spiel auch beim allerersten Start. Zum dauerhaften Speichern von Spielständen ist das save-Modul (Kapitel „Modul: save“) bequemer, weil es das Schreiben gleich mit erledigt."),
 ];

@@ -58,7 +58,7 @@ module.exports = (H) => [
   H.code(["spielt gerade"], { out: true }),
   H.note("Die Mitglieds-Namen dürfen sogar mit Schlüsselwörtern übereinstimmen (READ, DATA, NEW …). Weil sie immer hinter dem ENUM-Namen und einem Punkt stehen (Befehl.READ), ist eindeutig, dass kein Befehl gemeint ist."),
 
-  H.tip("ENUM oder STATIC CONST?", "Beide ersetzen „magische Zahlen“ durch Namen. Nimm ein ENUM für eine zusammengehörige Gruppe sich gegenseitig ausschließender Möglichkeiten (die Spielzustände, die Himmelsrichtungen). Eine STATIC CONST (Kapitel 21) passt besser für eine einzelne feste Kennzahl, die zu einer bestimmten Klasse gehört."),
+  H.tip("ENUM oder STATIC CONST?", "Beide ersetzen „magische Zahlen“ durch Namen. Nimm ein ENUM für eine zusammengehörige Gruppe sich gegenseitig ausschließender Möglichkeiten (die Spielzustände, die Himmelsrichtungen). Eine STATIC CONST (Kapitel „Vererbung, Properties, Operatoren & Static“) passt besser für eine einzelne feste Kennzahl, die zu einer bestimmten Klasse gehört."),
   H.h2("Vom Wert zurück zum Namen"),
   H.cmd("ENUM_NAME", "ENUM_NAME(enum, wert)",
     "Liefert zu einem Zahlwert den Namen, unter dem er im ENUM steht. Der Weg zurück – für eine Anzeige, ein Protokoll oder die Fehlersuche, wo eine nackte 2 nichts sagt.",
