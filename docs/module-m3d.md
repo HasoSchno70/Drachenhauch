@@ -12,45 +12,99 @@ IMPORT "m3d"
 
 Externe Typen (mit `DIM` nutzbar): `VEC3`, `VEC4`, `QUAT`, `MAT4`.
 
+## Winkel sind im Bogenmaß
+
+Alle Funktionen, die einen Winkel nehmen (`MAT4_ROTATE_*`, `QUAT_FROM_*`,
+`MAT4_PERSPECTIVE`), rechnen im **Bogenmaß**, nicht in Grad — anders als etwa
+`MODEL_EX(..., winkel_grad, ...)` im `g3d`-Modul. Eine Vierteldrehung ist also
+`PI / 2`, nicht `90`:
+
+```basic
+m = MAT4_ROTATE_Y(PI / 2.0)      ' 90 Grad
+m = MAT4_ROTATE_Y(RAD(90.0))     ' dasselbe, wenn man lieber in Grad denkt
+```
+
+`MAT4_ROTATE_Y(90.0)` ist kein Fehler, sondern eine Drehung um 90 **Radiant**
+(≈ 5157 Grad) — das Ergebnis sieht dann einfach falsch aus, ohne dass sich
+jemand beschwert.
+
 ## VEC3
 
-`VEC3_NEW(x,y,z)`, `VEC3_ZERO()`, `VEC3_X/Y/Z(v)`,
-`VEC3_LENGTH(v)`, `VEC3_LENGTH_SQ(v)`, `VEC3_NORMALIZE(v)`,
-`VEC3_DOT(a,b)`, `VEC3_CROSS(a,b)`, `VEC3_DISTANCE(a,b)`,
-`VEC3_LERP(a,b,t)`, `VEC3_NEG(v)`, `VEC3_SCALE(v,s)`, `VEC3_REFLECT(v,n)`,
-`VEC3_TRANSFORM(v,mat)` (als Punkt, w=1), `VEC3_TRANSFORM_DIR(v,mat)` (als
-Richtung, w=0 — ignoriert Translation).
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `VEC3_NEW(x, y, z)` | VEC3 | Vektor aus drei Zahlen |
+| `VEC3_ZERO()` | VEC3 | der Nullvektor |
+| `VEC3_X(v)` / `VEC3_Y(v)` / `VEC3_Z(v)` | FLOAT | einzelne Komponente lesen |
+| `VEC3_LENGTH(v)` | FLOAT | Länge des Vektors |
+| `VEC3_LENGTH_SQ(v)` | FLOAT | Länge zum Quadrat — spart die Wurzel, wenn man nur Längen vergleicht |
+| `VEC3_NORMALIZE(v)` | VEC3 | auf Länge 1 bringen (Richtung behalten) |
+| `VEC3_DOT(a, b)` | FLOAT | Skalarprodukt — 0 bei rechtem Winkel, positiv bei gleicher Richtung |
+| `VEC3_CROSS(a, b)` | VEC3 | Kreuzprodukt — steht senkrecht auf beiden, etwa für Flächennormalen |
+| `VEC3_DISTANCE(a, b)` | FLOAT | Abstand zweier Punkte |
+| `VEC3_LERP(a, b, t)` | VEC3 | geradlinig zwischen beiden interpolieren (`t` 0..1) |
+| `VEC3_NEG(v)` | VEC3 | Gegenrichtung |
+| `VEC3_SCALE(v, s)` | VEC3 | mit einer Zahl multiplizieren |
+| `VEC3_REFLECT(v, n)` | VEC3 | an einer Fläche mit Normale `n` spiegeln — Abprallen |
+| `VEC3_TRANSFORM(v, mat)` | VEC3 | als **Punkt** durch die Matrix schicken (w=1, Verschiebung wirkt) |
+| `VEC3_TRANSFORM_DIR(v, mat)` | VEC3 | als **Richtung** (w=0, Verschiebung wird ignoriert) |
 
 Operatoren: `a + b`, `a - b` (VEC3), `v * s` / `s * v` / `v / s` (Skalar),
 `=` / `<>`.
 
 ## VEC4
 
-`VEC4_NEW(x,y,z,w)`, `VEC4_FROM_VEC3(v,w)`, `VEC4_X/Y/Z/W(v)`,
-`VEC4_DOT(a,b)`, `VEC4_LENGTH(v)`, `VEC4_NORMALIZE(v)`, `VEC4_LERP(a,b,t)`.
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `VEC4_NEW(x, y, z, w)` | VEC4 | Vektor aus vier Zahlen |
+| `VEC4_FROM_VEC3(v, w)` | VEC4 | VEC3 um eine vierte Komponente ergänzen (`w=1` Punkt, `w=0` Richtung) |
+| `VEC4_X(v)` / `VEC4_Y(v)` / `VEC4_Z(v)` / `VEC4_W(v)` | FLOAT | einzelne Komponente lesen |
+| `VEC4_DOT(a, b)` | FLOAT | Skalarprodukt über alle vier Komponenten |
+| `VEC4_LENGTH(v)` | FLOAT | Länge des Vektors |
+| `VEC4_NORMALIZE(v)` | VEC4 | auf Länge 1 bringen |
+| `VEC4_LERP(a, b, t)` | VEC4 | geradlinig interpolieren (`t` 0..1) |
+
 Operatoren wie VEC3 (`+ -`, Skalar `* /`, `=` `<>`).
 
 ## QUAT
 
-Rotation ohne Gimbal-Lock. `QUAT_IDENTITY()`, `QUAT_NEW(x,y,z,w)`,
-`QUAT_X/Y/Z/W(q)`, `QUAT_FROM_AXIS_ANGLE(ax,ay,az,winkel)`,
-`QUAT_FROM_EULER(pitch,yaw,roll)`, `QUAT_MUL(a,b)`, `QUAT_NORMALIZE(q)`,
-`QUAT_CONJUGATE(q)`, `QUAT_SLERP(a,b,t)`, `QUAT_TO_MAT4(q)`,
-`QUAT_ROTATE_VEC3(q,v)`.
+Rotation ohne Gimbal-Lock.
+
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `QUAT_IDENTITY()` | QUAT | keine Drehung |
+| `QUAT_NEW(x, y, z, w)` | QUAT | aus den vier Komponenten — selten nötig, meist nimmt man `QUAT_FROM_*` |
+| `QUAT_X(q)` / `QUAT_Y(q)` / `QUAT_Z(q)` / `QUAT_W(q)` | FLOAT | einzelne Komponente lesen |
+| `QUAT_FROM_AXIS_ANGLE(ax, ay, az, winkel)` | QUAT | Drehung um eine Achse (Winkel im Bogenmaß) |
+| `QUAT_FROM_EULER(pitch, yaw, roll)` | QUAT | Drehung aus den drei Eulerwinkeln (Bogenmaß) |
+| `QUAT_MUL(a, b)` | QUAT | zwei Drehungen hintereinander — erst `b`, dann `a` |
+| `QUAT_NORMALIZE(q)` | QUAT | auf Länge 1 bringen; nach vielen Verkettungen sinnvoll, sonst schleicht sich Skalierung ein |
+| `QUAT_CONJUGATE(q)` | QUAT | die umgekehrte Drehung (bei Einheitslänge = die Inverse) |
+| `QUAT_SLERP(a, b, t)` | QUAT | weich zwischen zwei Drehungen überblenden (`t` 0..1) — das, was Euler nicht kann |
+| `QUAT_TO_MAT4(q)` | MAT4 | als Matrix, etwa für `MODEL_MATRIX` |
+| `QUAT_ROTATE_VEC3(q, v)` | VEC3 | einen Vektor drehen, ohne den Umweg über eine Matrix |
 
 Operator: `a * b` = Komposition (erst b, dann a — wie Matrix-Multiplikation).
 
 ## MAT4 (column-major)
 
-Konstruktoren: `MAT4_IDENTITY()`, `MAT4_TRANSLATE(x,y,z)`, `MAT4_SCALE(x,y,z)`,
-`MAT4_ROTATE_X/Y/Z(winkel)`, `MAT4_ROTATE_AXIS(ax,ay,az,winkel)`,
-`MAT4_FROM_QUAT(q)`, `MAT4_TRS(pos_v3, rot_quat, scale_v3)` (= T·R·S in einem).
-
-Operationen: `MAT4_MUL(a,b)`, `MAT4_INVERT(m)` (wirft bei Determinante 0),
-`MAT4_TRANSPOSE(m)`, `MAT4_LOOKAT(eye,target,up)`,
-`MAT4_PERSPECTIVE(fovy,aspect,near,far)`,
-`MAT4_ORTHO(left,right,bottom,top,near,far)`, `MAT4_GET(m,row,col)` (0..3),
-`MAT4_TRANSFORM_VEC3(m,v)` / `MAT4_TRANSFORM_VEC4(m,v)`.
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `MAT4_IDENTITY()` | MAT4 | verändert nichts — Ausgangspunkt jeder Kette |
+| `MAT4_TRANSLATE(x, y, z)` | MAT4 | verschieben |
+| `MAT4_SCALE(x, y, z)` | MAT4 | skalieren (je Achse) |
+| `MAT4_ROTATE_X(winkel)` / `MAT4_ROTATE_Y(winkel)` / `MAT4_ROTATE_Z(winkel)` | MAT4 | um eine Hauptachse drehen (Bogenmaß) |
+| `MAT4_ROTATE_AXIS(ax, ay, az, winkel)` | MAT4 | um eine beliebige Achse drehen (Bogenmaß) |
+| `MAT4_FROM_QUAT(q)` | MAT4 | Drehung aus einem Quaternion |
+| `MAT4_TRS(pos, rot, scale)` | MAT4 | Verschiebung, Drehung und Skalierung in einem (= T·R·S) — der übliche Weg zu einer Modell-Matrix |
+| `MAT4_MUL(a, b)` | MAT4 | Matrizen verketten — erst `b`, dann `a` |
+| `MAT4_INVERT(m)` | MAT4 | Umkehrung; **wirft bei Determinante 0** (etwa nach `MAT4_SCALE(0, …)`) |
+| `MAT4_TRANSPOSE(m)` | MAT4 | Zeilen und Spalten tauschen |
+| `MAT4_LOOKAT(eye, target, up)` | MAT4 | Blickmatrix: von `eye` auf `target`, `up` gibt oben an |
+| `MAT4_PERSPECTIVE(fovy, aspect, near, far)` | MAT4 | perspektivische Projektion (`fovy` im Bogenmaß) |
+| `MAT4_ORTHO(left, right, bottom, top, near, far)` | MAT4 | parallele Projektion — für Baupläne, Karten, 2D-in-3D |
+| `MAT4_GET(m, row, col)` | FLOAT | einzelnes Element lesen, `row`/`col` je 0..3 |
+| `MAT4_TRANSFORM_VEC3(m, v)` | VEC3 | Punkt durch die Matrix schicken |
+| `MAT4_TRANSFORM_VEC4(m, v)` | VEC4 | Vierervektor durch die Matrix schicken (`w` bleibt erhalten) |
 
 Operatoren: `m1 * m2` (Matrix-Produkt), `m * v4` → VEC4, `m * v3` → VEC3
 (Punkt-Transform), `=` / `<>`.
@@ -117,6 +171,11 @@ Normal-Maps (`MODEL_TEXTURE_NORMAL`) — dafür `MODEL_MATRIX`/`MODEL_LIT` nutze
 `MODEL_TEXTURE` (Diffuse-Map) wirkt, da es die Albedo-Textur des Materials setzt.
 
 ## Custom-Kamera: CAMERA3D_VIEW / CAMERA3D_PROJECTION
+
+| Funktion | Bedeutung |
+|---|---|
+| `CAMERA3D_VIEW(mat)` | eigene Blickmatrix setzen statt der aus `CAMERA3D(...)` gebauten |
+| `CAMERA3D_PROJECTION(mat)` | eigene Projektionsmatrix setzen — etwa parallel statt perspektivisch |
 
 `CAMERA3D_VIEW(mat)` und `CAMERA3D_PROJECTION(mat)` überschreiben die aus
 `CAMERA3D(...)` gebauten View-/Projektions-Matrizen — für Ortho-Ansichten,
