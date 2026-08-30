@@ -43,4 +43,14 @@ module.exports = (H) => [
       'IF INPUT_JOY_COUNT() = 0 THEN TEXT(10, 10, "Kein Gamepad - Tastatur aktiv")',
     ]),
   H.tip("Querverweis", "Die ausführliche Erklärung von INPUT_BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS samt der direkten Tastatur- und Maus-Befehle (KEYPRESSED, MOUSEX/Y, MOUSEBUTTON …) findest du im Kapitel „Eingabe“ (Teil IV)."),
+  H.h2("Analogachsen am Gamepad"),
+  H.cmd("INPUT_JOY_AXIS", "INPUT_JOY_AXIS(pad, achse$)",
+    "Die Stellung einer Analogachse als Wert zwischen -1 und +1, mit eingebautem Totbereich. Die Achse nennst du beim Namen (\"left_x\", \"left_y\", \"right_x\", \"right_y\") statt bei einer Nummer, die von Gerät zu Gerät verschieden sein kann.",
+    [
+      'IMPORT "input"',
+      "DIM dx AS FLOAT",
+      'dx = INPUT_JOY_AXIS(0, "left_x")',
+      "x = x + dx * 200.0 * DELTA()",
+    ]),
+  H.tip("Der Totbereich ist schon drin", "Ein Analogstick liefert auch in Ruhe selten exakt 0 – ohne Totbereich wandert die Figur von allein. JOYSTICK_AXIS gibt den rohen Wert und überlässt dir das Abfangen; INPUT_JOY_AXIS nimmt es dir ab."),
 ];

@@ -96,4 +96,16 @@ module.exports = (H) => [
   H.bullet("Gegner- oder Boss-Muster: „fahre links, warte, schieße dreimal, von vorn.“"),
   H.bullet("Generatoren: erzeuge eine (auch endlose) Folge von Werten auf Abruf."),
   H.tip("Aufräumen", "Eine pausierte Coroutine, die du nicht zu Ende laufen lässt, kannst du mit CORO_CLOSE(c) sauber beenden. Bei kurzen Programmen ist das selten nötig; bei vielen langlebigen Coroutinen ist es guter Stil."),
+  H.h2("Eine Coroutine vorzeitig beenden"),
+  H.cmd("CORO_CLOSE", "CORO_CLOSE(c)",
+    "Baut eine angehaltene Coroutine ab, ohne sie zu Ende laufen zu lassen. Nötig, wenn eine Zwischensequenz abgebrochen wird oder eine Szene endet, während ein Ablauf noch mitten in seinem Warten steckt.",
+    [
+      "DIM c AS COROUTINE",
+      "c = zwischensequenz()",
+      "IF KEYHIT(KEY_ESCAPE) THEN",
+      "    CORO_CLOSE(c)",
+      "END IF",
+    ]),
+  H.note("Eine fertig gelaufene Coroutine braucht kein CORO_CLOSE. Der Befehl ist für den anderen Fall da: für die, die noch auf ihr nächstes CORO_RESUME wartet und es nie bekommen wird.",
+    "Merke"),
 ];

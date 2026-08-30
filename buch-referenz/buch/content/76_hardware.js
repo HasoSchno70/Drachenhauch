@@ -14,7 +14,7 @@ module.exports = (H) => [
       'DIM ard AS SERIAL_HANDLE',
       'ard = SERIAL_OPEN("COM3", 9600)',
     ]),
-  H.cmd("SERIAL_WRITE · SERIAL_READLINE · SERIAL_AVAILABLE", 'SERIAL_WRITE(h, text$)   SERIAL_READLINE(h)   SERIAL_READ(h, n)   SERIAL_AVAILABLE(h)',
+  H.cmd("SERIAL_WRITE · SERIAL_READ · SERIAL_READLINE · SERIAL_AVAILABLE", 'SERIAL_WRITE(h, text$)   SERIAL_READLINE(h)   SERIAL_READ(h, n)   SERIAL_AVAILABLE(h)',
     "WRITE schickt Text (gibt die Byte-Zahl zurück). READLINE liest bis zum Zeilenende, READ bis zu n Bytes. SERIAL_AVAILABLE verrät, wie viele Bytes schon im Eingang warten – so liest du nur, wenn etwas da ist.",
     [
       'IMPORT "serial"',
@@ -29,7 +29,7 @@ module.exports = (H) => [
 
   H.h2("usb – HID-Geräte (Controller, Macro-Pads)"),
   H.p("Über USB-HID sprichst du Eingabegeräte an, die sich als „Human Interface Device“ melden: Macro-Pads, selbstgebaute Controller, Programmer-Boards. Du findest ein Gerät über seine Hersteller-/Produkt-Nummer (VID/PID) und tauschst dann rohe Datenpakete aus."),
-  H.cmd("USB_LIST · USB_OPEN · USB_PRODUCT", 'USB_LIST()   USB_OPEN(vid, pid)   USB_PRODUCT(h)   USB_MANUFACTURER(h)',
+  H.cmd("USB_LIST · USB_OPEN · USB_PRODUCT · USB_MANUFACTURER", 'USB_LIST()   USB_OPEN(vid, pid)   USB_PRODUCT(h)   USB_MANUFACTURER(h)',
     "LIST nennt alle HID-Geräte (mehrzeilig, je Zeile vid:pid|Produkt|Hersteller). OPEN öffnet eines per VID/PID und gibt ein USB_HANDLE zurück; PRODUCT/MANUFACTURER lesen die Klartext-Namen.",
     [
       'IMPORT "usb"',
@@ -63,7 +63,7 @@ module.exports = (H) => [
       '    PRINT WIFI_SCAN()',
       'END IF',
     ]),
-  H.cmd("WIFI_CONNECT · WIFI_DISCONNECT · WIFI_PROFILES", 'WIFI_CONNECT(ssid$, passwort$)   WIFI_DISCONNECT()   WIFI_PROFILES()   WIFI_DELETE_PROFILE(name$)',
+  H.cmd("WIFI_CONNECT · WIFI_DISCONNECT · WIFI_PROFILES · WIFI_DELETE_PROFILE", 'WIFI_CONNECT(ssid$, passwort$)   WIFI_DISCONNECT()   WIFI_PROFILES()   WIFI_DELETE_PROFILE(name$)',
     "CONNECT legt ein Profil an und verbindet, DISCONNECT trennt. PROFILES listet gespeicherte Netze, DELETE_PROFILE entfernt eines.",
     [
       'IMPORT "wifi"',
@@ -72,7 +72,7 @@ module.exports = (H) => [
 
   H.h2("bt – Bluetooth Low Energy (Sensoren)"),
   H.p("Mit bt liest du BLE-Geräte aus: Pulsmesser, Thermometer, Wearables, Maker-Boards mit BLE-Chip. Du scannst nach Geräten, verbindest dich über die Adresse und greifst dann auf „Charakteristiken“ zu – das sind die einzelnen Datenpunkte, die ein Gerät über seine Dienste (Services) anbietet."),
-  H.cmd("BT_SCAN · BT_CONNECT · BT_IS_CONNECTED", 'BT_SCAN(timeout_sek)   BT_CONNECT(addr$)   BT_IS_CONNECTED(h)   BT_DISCONNECT(h)',
+  H.cmd("BT_SCAN · BT_CONNECT · BT_IS_CONNECTED · BT_DISCONNECT", 'BT_SCAN(timeout_sek)   BT_CONNECT(addr$)   BT_IS_CONNECTED(h)   BT_DISCONNECT(h)',
     "SCAN sucht für timeout_sek Sekunden und listet gefundene Geräte (addr|name|rssi). CONNECT verbindet über die Adresse und gibt ein BT_HANDLE zurück; IS_CONNECTED prüft den Zustand.",
     [
       'IMPORT "bt"',

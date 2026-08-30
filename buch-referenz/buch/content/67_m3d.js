@@ -26,7 +26,7 @@ module.exports = (H) => [
       'PRINT VEC3_NEG(VEC3_NEW(1.0, -2.0, 3.0))',
       'PRINT VEC3_SCALE(VEC3_NEW(1.0, 2.0, 3.0), 2.0)',
     ], { out: ["Vec3(0.0, 0.0, 0.0)", "Vec3(-1.0, 2.0, -3.0)", "Vec3(2.0, 4.0, 6.0)"] }),
-  H.cmd("VEC3_DISTANCE · VEC3_LENGTH_SQ · VEC3_LERP", 'VEC3_DISTANCE(a, b)   VEC3_LENGTH_SQ(v)   VEC3_LERP(a, b, t)',
+  H.cmd("VEC3_LENGTH · VEC3_DISTANCE · VEC3_LENGTH_SQ · VEC3_LERP", 'VEC3_LENGTH(v)   VEC3_DISTANCE(a, b)   VEC3_LENGTH_SQ(v)   VEC3_LERP(a, b, t)',
     "DISTANCE ist der Abstand zweier Punkte. LENGTH_SQ liefert die QUADRIERTE Länge – ohne Wurzel und damit schneller; für Vergleiche („wer ist näher?“, „im Umkreis?“) reicht das völlig, du vergleichst dann eben mit dem Quadrat der Reichweite. LERP blendet linear zwischen zwei Punkten (t = 0 … 1).",
     [
       'PRINT VEC3_DISTANCE(VEC3_ZERO(), VEC3_NEW(1.0, 2.0, 2.0))',
@@ -153,4 +153,14 @@ module.exports = (H) => [
   H.warn("Die Grafikkarte bekommt beim Instancing nur die Matrizen mitgeliefert, keine Farben. Die Laufzeit gruppiert deshalb nach Farbe und macht EINEN Zeichenaufruf je VERSCHIEDENER Farbe – bei fünf Farbtönen ist das großartig, bei 400 verschiedenen Farben bist du wieder bei 400 Aufrufen. Wenn jede Instanz anders aussehen soll, ist ein Verlauf im Shader der bessere Weg.", "Viele verschiedene Farben kosten die Ersparnis wieder"),
   H.note("Mit CAMERA3D_VIEW/PROJECTION lassen sich außerdem eigene Kamera-Matrizen setzen – etwa für eine Orthogonal-Ansicht oder ein schiefes Frustum."),
   H.tip("m3d und g3d gehören zusammen", "g3d (voriges Teil-IV-Kapitel) liefert die Bausteine und Primitive, m3d die Mathematik, um sie präzise zu platzieren und zu drehen. Für einfache Szenen reichen die g3d-Befehle wie CUBE/MODEL; sobald du Hierarchien (Bones, Gelenke), eigene Kameras oder viele Instanzen brauchst, kommt m3d ins Spiel."),
+  H.h2("Drehung aus Eulerwinkeln"),
+  H.cmd("QUAT_FROM_EULER", "QUAT_FROM_EULER(pitch, yaw, roll)",
+    "Baut ein Quaternion aus den drei vertrauten Winkeln: Nicken, Gieren, Rollen – jeweils im Bogenmaß. Der bequeme Weg hinein, wenn die Winkel aus einer Steuerung oder einer Datei kommen und man sie nicht als Achse-plus-Winkel vorliegen hat.",
+    [
+      'IMPORT "m3d"',
+      "DIM q AS QUAT",
+      "q = QUAT_FROM_EULER(RAD(0.0), RAD(90.0), RAD(0.0))",
+    ]),
+  H.warn("Eulerwinkel sind bequem zum Eingeben und schlecht zum Rechnen: Zwei nacheinander angewandte Drehungen hängen von der Reihenfolge ab, und bei senkrechtem Nicken fallen zwei Achsen zusammen (der berüchtigte Gimbal Lock). Deshalb ist QUAT_FROM_EULER ein Eingang und kein Arbeitsformat – gerechnet und interpoliert wird mit dem Quaternion.",
+    "Nur als Eingang gedacht"),
 ];

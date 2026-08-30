@@ -18,8 +18,8 @@ module.exports = (H) => [
       'IMPORT "curves"',
       'PRINT CURVE_LERP(100.0, 200.0, 0.3)',
     ], { out: ["130.0"] }),
-  H.cmd("CURVE_SMOOTHSTEP · CURVE_SMOOTHERSTEP", 'CURVE_SMOOTHSTEP(kante0, kante1, x)   CURVE_SMOOTHERSTEP(kante0, kante1, x)',
-    "Normalisiert x auf den Bereich [kante0, kante1] (geclamped auf 0..1) und legt eine S-Kurve darüber. Ideal für weiche Ein-/Ausblendungen.",
+  H.cmd("SMOOTHSTEP · CURVE_SMOOTHSTEP · CURVE_SMOOTHERSTEP", 'SMOOTHSTEP(kante0, kante1, x)   CURVE_SMOOTHSTEP(kante0, kante1, x)   CURVE_SMOOTHERSTEP(kante0, kante1, x)',
+    "Normalisiert x auf den Bereich [kante0, kante1] (geclamped auf 0..1) und legt eine S-Kurve darüber. Ideal für weiche Ein-/Ausblendungen. SMOOTHSTEP und CURVE_SMOOTHSTEP rechnen dasselbe – der Unterschied ist nur, dass der erste ein Kern-Befehl ist und ohne IMPORT auskommt.",
     [
       'IMPORT "curves"',
       'PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 0.3)',

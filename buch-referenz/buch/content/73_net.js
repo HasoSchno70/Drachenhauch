@@ -31,7 +31,7 @@ module.exports = (H) => [
       'DIM antwort AS STRING',
       'antwort = NET_RECV(sock, 1024)   \' leer, wenn noch nichts kam',
     ]),
-  H.cmd("NET_PEER_ADDR · NET_CLOSE · NET_CLOSE_LISTENER", 'NET_PEER_ADDR(sock)   NET_PEER_PORT(sock)   NET_CLOSE(sock)   NET_CLOSE_LISTENER(lst)',
+  H.cmd("NET_PEER_ADDR · NET_PEER_PORT · NET_CLOSE · NET_CLOSE_LISTENER", 'NET_PEER_ADDR(sock)   NET_PEER_PORT(sock)   NET_CLOSE(sock)   NET_CLOSE_LISTENER(lst)',
     "PEER_ADDR/PEER_PORT verraten die Gegenstelle einer Verbindung. NET_CLOSE schließt eine Verbindung, NET_CLOSE_LISTENER den Server-Socket – beides am Ende aufräumen.",
     [
       'PRINT NET_PEER_ADDR(sock); ":"; NET_PEER_PORT(sock)',
@@ -145,4 +145,15 @@ module.exports = (H) => [
       'NET_UDP_CLOSE(sock)',
     ]),
   H.tip("Daten haben keine Grenzen", "TCP ist ein Strom, kein Paket-Versand: Zwei NET_SEND können beim Empfänger als ein NET_RECV ankommen – oder umgekehrt. Wenn du abgegrenzte Nachrichten brauchst, schick die Länge voraus (z. B. vierstellig) oder beende jede Nachricht mit einem Trennzeichen wie Zeilenumbruch und setze sie beim Empfänger wieder zusammen."),
+  H.h2("Wie lange gewartet wird"),
+  H.cmd("NET_SET_TIMEOUT · NET_UDP_SET_TIMEOUT", "NET_SET_TIMEOUT(sock, ms)   NET_UDP_SET_TIMEOUT(sock, ms)",
+    "Legt fest, wie lange ein Lesen auf Daten wartet. Drei Fälle stecken in einer Zahl: 0 heißt gar nicht warten (der Aufruf kehrt sofort zurück, ob etwas da ist oder nicht), eine negative Zahl heißt warten bis etwas kommt, und eine positive Zahl heißt so viele Millisekunden warten.",
+    [
+      'IMPORT "net"',
+      "DIM s AS NET_SOCKET",
+      's = NET_TCP_CONNECT("localhost", 8080)',
+      "NET_SET_TIMEOUT(s, 0)        ' nicht warten -- fuer den Game-Loop",
+    ]),
+  H.warn("Die 0 ist die richtige Wahl in einem Spiel: Sie lässt die Hauptschleife weiterlaufen. Ein blockierendes Lesen mit -1 hält alles an, bis die Gegenstelle sich meldet – und wenn sie das nie tut, für immer. In einem Konsolenprogramm, das ohnehin nur wartet, ist es dagegen das Einfachste.",
+    "Die Zahl entscheidet über das Spielgefühl"),
 ];

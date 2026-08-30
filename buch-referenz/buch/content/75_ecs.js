@@ -59,7 +59,7 @@ module.exports = (H) => [
       'ECS_ADD_STRING(w, p, "name", "Hero")',
       'PRINT ECS_GET_STRING(w, p, "name")',
     ], { out: ["Hero"] }),
-  H.cmd("ECS_GET_* · ECS_GET_OR_* · ECS_HAS · ECS_REMOVE", 'ECS_GET_INT(w, ent, name$)   ECS_GET_OR_INT(w, ent, name$, default)   ECS_HAS(w, ent, name$)   ECS_REMOVE(w, ent, name$)',
+  H.cmd("ECS_GET_INT · ECS_GET_FLOAT · ECS_GET_STRING · ECS_GET_BOOL · ECS_GET_OR_INT · ECS_GET_OR_FLOAT · ECS_HAS · ECS_REMOVE", 'ECS_GET_INT(w, ent, name$)   ECS_GET_OR_INT(w, ent, name$, default)   ECS_HAS(w, ent, name$)   ECS_REMOVE(w, ent, name$)',
     "GET_* liest einen Component (Fehler, wenn die Entity ihn nicht hat). GET_OR_* liefert stattdessen einen Standardwert. ECS_HAS prüft die Existenz, ECS_REMOVE entfernt einen einzelnen Component.",
     [
       'IMPORT "ecs"',
@@ -110,7 +110,7 @@ module.exports = (H) => [
       'ECS_INTEGRATE_FLOAT(w, "px", "vx")   \' px += vx fuer alle',
       'PRINT ECS_GET_FLOAT(w, p, "px")',
     ], { out: ["105.0"] }),
-  H.cmd("ECS_REMOVE_DEAD · ECS_COUNT_WITH · ECS_FILL_*", 'ECS_REMOVE_DEAD(w, name$, grenze)   ECS_COUNT_WITH(w, name$)   ECS_FILL_FLOAT/INT(w, ziel$, wert)',
+  H.cmd("ECS_REMOVE_DEAD · ECS_COUNT_WITH · ECS_FILL_FLOAT · ECS_FILL_INT", 'ECS_REMOVE_DEAD(w, name$, grenze)   ECS_COUNT_WITH(w, name$)   ECS_FILL_FLOAT/INT(w, ziel$, wert)',
     "REMOVE_DEAD zerstört alle Entities, deren Component ≤ grenze ist (z. B. hp ≤ 0). COUNT_WITH zählt die Halter eines Components in konstanter Zeit. FILL setzt alle Werte auf denselben Wert (Reset).",
     [
       'IMPORT "ecs"',
