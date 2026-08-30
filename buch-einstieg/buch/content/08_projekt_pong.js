@@ -128,7 +128,7 @@ module.exports = (H) => [
 
   H.pmix([["dx = -dx", true], " ist der Abprall selbst. Wieder nur ein Minuszeichen."]),
 
-  H.p("Für den rechten Schläger steht dasselbe noch einmal da, mit anderen Zahlen und mit rechts statt links. Zwei fast gleiche Blöcke nebeneinander sind unschön — merk dir das Gefühl. In Kapitel 12 lernst du, wie man daraus einen einzigen Befehl macht, den man zweimal aufruft."),
+  H.p("Für den rechten Schläger steht dasselbe noch einmal da, mit anderen Zahlen und mit rechts statt links. Zwei fast gleiche Blöcke nebeneinander sind unschön — merk dir das Gefühl. In Kapitel 13 lernst du, wie man daraus einen einzigen Befehl macht, den man zweimal aufruft."),
 
   H.warn("Diese Trefferprüfung hat eine Lücke, und die ist berühmt. Der Ball springt fünf Punkte je Bild. Wäre er sehr viel schneller — sagen wir dreißig —, könnte er in einem einzigen Schritt vom Vor-dem-Schläger zum Hinter-dem-Schläger springen, ohne je die Bedingung zu erfüllen. Er fliegt dann glatt durch. Bei fünf Punkten und zwölf Punkten Schlägerbreite kann das nicht passieren; sobald du das Spiel schneller machst, schon. Man nennt das Durchtunneln, und es ist der häufigste Fehler in selbstgebauten Spielen.", "Warum der Ball manchmal durch die Wand geht"),
 

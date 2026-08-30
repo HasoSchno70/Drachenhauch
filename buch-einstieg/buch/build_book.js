@@ -231,7 +231,21 @@ function _heading(text, kind) {
     children: [new TextRun({ text })] });
 }
 function h1(t) { return _heading(t, "h1"); }
-function chapter(t) { return _heading(t, "chapter"); }
+// Die Kapitel werden NUMMERIERT. Das Buch verweist an 134 Stellen auf
+// "Kapitel 12" und aehnliche Zahlen -- ohne gedruckte Nummer zeigen die alle
+// ins Leere, denn im Verzeichnis und in den Ueberschriften stand bis
+// 2026-08-30 nur der Titel. Fuer ein Lehrbuch, das man von vorn nach hinten
+// liest, ist die Nummer die natuerliche Anrede; sie zu drucken ist die
+// kleinere Aenderung, als 134 Saetze auf Titel umzuschreiben.
+//
+// Nicht nummeriert werden das Vorwort und die drei Anhaenge -- die tragen
+// ihre Kennung ("A · …") schon selbst.
+let _kapNr = 0;
+function chapter(t) {
+  const zaehlt = t !== "Vorwort" && !/^[A-Z] · /.test(t);
+  if (zaehlt) _kapNr++;
+  return _heading(zaehlt ? `${_kapNr} · ${t}` : t, "chapter");
+}
 function part(t) { return _heading(t, "part"); }
 function h2(t) {
   return new Paragraph({ heading: HeadingLevel.HEADING_2, keepNext: true, keepLines: true,

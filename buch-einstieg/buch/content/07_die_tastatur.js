@@ -62,7 +62,7 @@ module.exports = (H) => [
 
   H.p("Das ist ein Muster, das dir überall wieder begegnen wird: erst den Normalfall setzen, dann die Ausnahme darüberschreiben. Es ist kürzer und weniger fehleranfällig, als jeden Fall einzeln auszuschreiben."),
 
-  H.tip("Warum vier einzelne Kartons wiederverwendet werden", "f wird viermal benutzt und jedes Mal neu gefüllt. Man könnte auch vier Kartons anlegen — farbe_oben, farbe_links und so fort. Beides ist richtig. Sobald du in Kapitel 12 eigene Befehle schreibst, verschwindet die Wiederholung von selbst."),
+  H.tip("Warum vier einzelne Kartons wiederverwendet werden", "f wird viermal benutzt und jedes Mal neu gefüllt. Man könnte auch vier Kartons anlegen — farbe_oben, farbe_links und so fort. Beides ist richtig. Sobald du in Kapitel 13 eigene Befehle schreibst, verschwindet die Wiederholung von selbst."),
 
   H.h2("Jetzt bewegst du etwas"),
 

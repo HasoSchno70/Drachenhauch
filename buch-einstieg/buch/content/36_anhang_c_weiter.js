@@ -1,7 +1,39 @@
-module.exports = (H) => [
+// Die beiden Zahlen im ersten Absatz werden GERECHNET, nicht hingeschrieben:
+// die eine aus denselben Beispielprogrammen wie Anhang B, die andere aus der
+// lebenden Befehlsliste der Laufzeit. Von Hand gepflegt stand dort bis
+// 2026-08-30 "rund siebenhundertsechzig" -- damals stimmte es, inzwischen
+// sind es mehr als doppelt so viele.
+const fs = require("fs");
+const path = require("path");
+
+function befehleImBuch() {
+  try {
+    return require("./35_anhang_b_befehle.js").anzahlBefehle();
+  } catch (e) {
+    return null;
+  }
+}
+
+function befehleInDrachenhauch() {
+  try {
+    const p = path.join(__dirname, "..", "..", "..", "drachenhauch", "editor_qt", "builtin_index.json");
+    const d = JSON.parse(fs.readFileSync(p, "utf-8"));
+    return (d.builtins || []).filter((e) => e && e.name && !e.name.startsWith("_")).length;
+  } catch (e) {
+    return null;
+  }
+}
+
+module.exports = (H) => {
+  const imBuch = befehleImBuch();
+  const gesamt = befehleInDrachenhauch();
+  const satz = (imBuch && gesamt)
+    ? `Dieses Buch war der Anfang, nicht das Ganze. Es hat dir ${imBuch} Befehle gezeigt — Drachenhauch hat ${gesamt}. Was jetzt kommt, hängt davon ab, wohin du willst.`
+    : "Dieses Buch war der Anfang, nicht das Ganze. Es hat dir einen kleinen Teil der Befehle gezeigt. Was jetzt kommt, hängt davon ab, wohin du willst.";
+  return [
   H.chapter("C · Wie es weitergeht"),
 
-  H.p("Dieses Buch war der Anfang, nicht das Ganze. Es hat dir 113 Befehle gezeigt — Drachenhauch hat rund siebenhundertsechzig. Was jetzt kommt, hängt davon ab, wohin du willst."),
+  H.p(satz),
 
   H.h2("Wenn du nachschlagen willst"),
 
@@ -24,8 +56,8 @@ module.exports = (H) => [
   H.p("Wer den Vokabeltrainer gebaut hat, erkennt fast alles wieder — Reiter, Datenbank, Netzabruf, drei Schichten von Daten bis Anzeige. Nur mit einer Frage mehr, die dort im Mittelpunkt steht: Wo leben die Daten, und wer darf sie ändern?"),
 
   H.table([
-    ["Das Lehrbuch", "nachschlagen", "alle Befehle, die ganze Sprache, 75 Kapitel"],
-    ["Galaga", "ein Spiel", "Arcade-Shooter in 12 Kapiteln, eigene Sprites"],
+    ["Das Lehrbuch", "nachschlagen", "alle Befehle, die ganze Sprache, 84 Kapitel"],
+    ["Galaga", "ein Spiel", "Arcade-Shooter in 13 Kapiteln, eigene Sprites"],
     ["Tippspiel", "eine Anwendung", "Datenbank, Netz, Rangliste in 13 Kapiteln"],
   ], { headers: ["Band", "Wofür", "Was drinsteht"], widths: [2000, 2000, 5026] }),
 
@@ -52,3 +84,4 @@ module.exports = (H) => [
 
   H.p("Viel Vergnügen."),
 ];
+};
