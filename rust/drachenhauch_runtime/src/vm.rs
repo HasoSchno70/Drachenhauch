@@ -5387,6 +5387,15 @@ impl<'p> Vm<'p> {
                 self.gui.draw(g);
                 Value::Nil
             }
+            // Braucht die Zeilenhoehe (also die Schrift) -- darum hier bei
+            // den Grafik-Builtins.
+            "gui_textarea_view" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_VIEW: vor SCREEN aufgerufen")?;
+                let (z0, n, von, len) = self.gui.textarea_view(g, gi(a, 0, "GUI_TEXTAREA_VIEW")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![
+                    Value::Int(z0), Value::Int(n), Value::Int(von), Value::Int(len),
+                ]))
+            }
             // Dialog IM Fenster (eigenes Thema, kein OS-Kasten). Braucht die
             // Bildschirmgroesse (Zentrieren) und die Textbreite (das Fenster
             // passt sich dem Text an) -- darum hier bei den Grafik-Builtins

@@ -1448,6 +1448,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite` |
 | `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
+| `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |
 
 ```basic
 DIM ta AS GUI_WIDGET
@@ -1504,6 +1505,106 @@ Zeichen; mitten in der Zeile getippt stünde die Einrückung sonst schief.
 > unschädlich.
 
 Vollständiges Beispiel: [`examples/184_codefeld.dh`](../examples/184_codefeld.dh).
+
+### Große Dateien: nur einfärben, was man sieht
+
+Den **ganzen** Text bei jedem Tastendruck neu zu zerlegen kostet mit der
+Dateigröße. Gemessen auf einem Arbeitsrechner, je Anschlag:
+
+| Zeilen | Abschnitte | ganze Datei | nur der sichtbare Ausschnitt |
+|---|---|---|---|
+| 3.000 | 16.500 | ~26 ms | **0,2 ms** |
+| 10.000 | 55.000 | ~88 ms | **0,8 ms** |
+| 30.000 | 165.000 | ~272 ms | **2,1 ms** |
+
+Bis etwa 3.000 Zeilen ist der einfache Weg (ganze Datei) völlig in Ordnung —
+ein Anschlag kostet dann rund ein Bild. Darüber wird das Tippen zäh.
+
+Der Grund ist nicht das Zeichnen (das kostet konstant ~0,4 ms, weil nur die
+sichtbaren Zeilen gezeichnet werden) und auch nicht `SYNTAX_SPANS` (2,4 ms bei
+3.000 Zeilen). Es ist die **Schleife im eigenen Programm**, die jede Art auf
+eine Farbe abbildet — bei 16.500 Abschnitten. Schon eine `MAP` statt vier
+`IF`-Vergleichen halbiert sie.
+
+Ganz weg bekommt man sie mit `GUI_TEXTAREA_VIEW`:
+
+```basic
+DIM z0 AS INTEGER
+DIM anz AS INTEGER
+DIM von AS INTEGER
+DIM laenge AS INTEGER
+(z0, anz, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+
+DIM teil AS STRING
+teil = MID$(GUI_TEXT(ta), von, laenge)      ' nur der sichtbare Ausschnitt
+DIM st AS ARRAY OF INTEGER
+DIM ln AS ARRAY OF INTEGER
+DIM ar AS ARRAY OF STRING
+(st, ln, ar) = SYNTAX_SPANS(teil)
+
+DIM fb[LEN(st)] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO LEN(st) - 1
+    st[i] = st[i] + von                     ' Ausschnitt -> ganzer Text
+    fb[i] = MAPGETOR(tabelle, ar[i], &HD8E4F0)
+NEXT
+GUI_TEXTAREA_SPANS(ta, st, ln, fb)
+```
+
+Dann hängen die Kosten nur noch an der **Fenstergröße**, nicht an der Datei.
+Neu einfärben musst du dafür nicht nur beim Tippen, sondern auch beim
+**Scrollen** — `z0` sagt dir, ob sich der Ausschnitt verschoben hat.
+
+> **Warum das nicht nur schneller, sondern auch richtig ist:** Kommentare und
+> Zeichenketten enden in Drachenhauch an der **Zeile**. Ein an Zeilengrenzen
+> geschnittener Ausschnitt kann darum nicht mitten in einem Gebilde anfangen.
+> Bei einer Sprache mit Blockkommentaren wäre genau das die Falle — dort
+> müsste man wissen, in welchem Zustand die erste sichtbare Zeile beginnt.
+
+Der Rest an Kosten (0,2 → 2,1 ms über die drei Größen) ist das Kopieren des
+Textes durch `GUI_TEXT` und `MID$`. Das wächst weiter mit der Datei, ist aber
+billig genug, um nicht aufzufallen.
+
+## Eigene Schrift
+
+Die eingebaute raylib-Schrift muss nicht bleiben. Zwei Zeilen genügen, und
+sie gilt für **alles** — Fenstertitel, Beschriftungen, Knöpfe, Eingabefelder,
+Code-Feld, Zeilennummern:
+
+```basic
+DIM mono AS INTEGER
+mono = LOADFONT("C:/Windows/Fonts/consola.ttf", 18)
+SETFONT(mono)                  ' ab hier zeichnet alles damit
+```
+
+`SETFONT` setzt die **aktive** Schrift, und jedes Widget ohne eigene Schrift
+folgt ihr. Für ein Code-Feld ist eine echte Monospace-Schrift ein spürbarer
+Unterschied.
+
+Feiner steuerbar:
+
+| Funktion | Wirkung |
+|---|---|
+| `SETFONT(font)` | die aktive Schrift — gilt für die ganze Oberfläche |
+| `GUI_SET_FONT(wdg, font)` | eigene Schrift nur für dieses Widget |
+| `GUI_SET_FONT_SIZE(wdg, px)` | eigene Größe nur für dieses Widget |
+| `GUI_STYLE_SET(name$, "font", font)` + `GUI_APPLY_STYLE(wdg, name$)` | eine Schrift für eine ganze Gruppe |
+
+Für **Pixel-Schrift** aus einem PNG gibt es `LOADFONT_IMAGE(bild, trennfarbe,
+erstes_zeichen)`. Die bleibt bewusst ungefiltert (nearest), damit Pixel-Schrift
+pixelig bleibt — anders als `LOADFONT` (TTF), das glättet.
+
+> **Die Größe steckt im Handle, und `SETFONT` übernimmt sie.** `LOADFONT(pfad,
+> 18)` baut den Zeichensatz *für 18 px*; `SETFONT` setzt damit nicht nur die
+> Schriftart, sondern auch die aktive Textgröße auf 18. Wundere dich also
+> nicht, wenn nach `SETFONT` alles größer oder kleiner ist als vorher.
+> Dieselbe Schrift in zwei Größen scharf? Zweimal laden — stark hochskaliert
+> wird eine TTF sonst weich. `GUI_SET_FONT_SIZE` ändert nur, wie groß
+> gezeichnet wird, nicht, wofür der Zeichensatz gebaut wurde.
+
+> **Mit `GUI_SCALE`** (unten) skaliert auch die Schrift mit — du lädst sie also
+> in der logischen Größe und bekommst sie auf einem HiDPI-Schirm größer
+> gezeichnet.
 
 ## Maßstab (hochauflösende Bildschirme)
 

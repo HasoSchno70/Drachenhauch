@@ -4308,6 +4308,44 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
     fn ta_line_h(&self, g: &Graphics) -> i32 { (self.ctext_height(g) + self.sk(5)).max(self.sk(10)) }
 
+    /// Welcher Ausschnitt ist gerade zu sehen? (GUI_TEXTAREA_VIEW)
+    ///
+    /// Liefert `(erste_zeile, zeilen, start_zeichen, laenge_zeichen)` -- die
+    /// ersten beiden in ZEILEN, die letzten beiden in ZEICHEN.
+    ///
+    /// Wozu: Wer eine grosse Datei bei jedem Tastendruck GANZ einfaerbt,
+    /// zahlt mit der Dateigroesse (gemessen: 3000 Zeilen ~26 ms, 30000 Zeilen
+    /// ~270 ms je Anschlag). Mit diesem Ausschnitt faerbt ein Programm nur,
+    /// was man sieht -- und die Kosten haengen nur noch von der Fenstergroesse
+    /// ab. Dass das RICHTIG ist und nicht bloss schneller, liegt an der
+    /// Sprache: Kommentare und Zeichenketten enden in Drachenhauch an der
+    /// Zeile, ein Ausschnitt an Zeilengrenzen kann also nicht in der Mitte
+    /// eines Gebildes anfangen.
+    ///
+    /// Die Zeichen-Angaben zaehlen wie ueberall ZEICHEN, nicht Bytes.
+    pub fn textarea_view(&self, g: &Graphics, h: i64) -> Result<(i64, i64, i64, i64), String> {
+        let wd = self.wdg(h, "GUI_TEXTAREA_VIEW")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_VIEW: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        // Dieselbe Rechnung wie beim Zeichnen (pad = 5, ta_line_h) -- liefe
+        // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
+        // zu sehen ist.
+        let lh = self.ta_line_h(g);
+        let zeilen = ((wd.h - 2 * 5) / lh).max(1);
+        let erste = wd.scroll.clamp(0, (starts.len() as i32 - 1).max(0));
+        let letzte = (erste + zeilen).min(starts.len() as i32);
+        let von = starts[erste as usize];
+        // Bis zum Ende der letzten sichtbaren Zeile -- also bis zum Anfang der
+        // naechsten, ohne deren Umbruch.
+        let bis = if (letzte as usize) < starts.len() {
+            starts[letzte as usize].saturating_sub(1)
+        } else { chars.len() };
+        Ok((erste as i64, zeilen as i64, von as i64, bis.saturating_sub(von) as i64))
+    }
+
     /// Mehrzeiliges Textfeld editieren: Tippen, Enter=Umbruch, Backspace/Delete,
     /// Pfeile (auch hoch/runter), Home/End, Strg+A/C/V/X, Maus-Klick + Ziehen.
     /// Selektion: Maus-Drag, Shift+Navigation, Strg+A. Vertikal scrollend, damit
