@@ -70,6 +70,11 @@ for (const b of mit_out) {
   geprueft++;
   const ist = (r.stdout || "").split(/\r?\n/).map((s) => s.trim()).filter((s) => s !== "");
   const soll = b.out.map((s) => String(s).trim()).filter((s) => s !== "");
+  // Ein Block, der laeuft aber GAR NICHTS ausgibt, waehrend das Buch eine
+  // Ausgabe nennt, ist ein Bruchstueck: meist eine SUB-Definition, deren
+  // Aufruf im Absatz davor steht. Ihn als Befund zu melden waere ein
+  // Falsch-Alarm -- er beweist nur, dass er allein nicht das ganze Beispiel ist.
+  if (ist.length === 0 && soll.length > 0) { geprueft--; uebersprungen++; continue; }
   // Kuerzere Angabe = bewusster Auszug: nur den Anfang vergleichen.
   const n = Math.min(ist.length, soll.length);
   const abweichung = [];

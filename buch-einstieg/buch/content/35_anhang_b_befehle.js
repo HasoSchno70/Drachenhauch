@@ -246,3 +246,17 @@ module.exports = (H) => {
 
   return bloecke;
 };
+
+// Damit Anhang C dieselbe Zahl nennen kann, ohne sie abzuschreiben: die
+// Anzahl der Befehle, die in den Beispielprogrammen wirklich vorkommen.
+// Eine zweite, von Hand gepflegte Zahl waere genau die Sorte Angabe, die
+// beim naechsten Kapitel still falsch wird.
+module.exports.anzahlBefehle = function () {
+  const erst = ausDemCode();
+  if (erst["KEY_NAME"] !== undefined) {
+    erst["KEY_NAME$"] = Math.min(erst["KEY_NAME$"] ?? 99, erst["KEY_NAME"]);
+    delete erst["KEY_NAME"];
+  }
+  for (const n of Object.keys(erst)) if (/^KEY_/.test(n) && BEFEHLE[n] === undefined) delete erst[n];
+  return Object.keys(erst).length;
+};

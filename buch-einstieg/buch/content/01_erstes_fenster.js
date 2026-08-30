@@ -118,8 +118,8 @@ module.exports = (H) => [
   H.p("Hier stehen drei Dinge, die du noch nicht kennst, und du darfst sie getrost überblättern — sie sind die Themen der nächsten Kapitel. Der Vollständigkeit halber:"),
 
   H.bulletRich("Das Hochkomma ", "leitet einen Kommentar ein. Alles dahinter ist Notiz für Menschen; Drachenhauch überliest es."),
-  H.bulletRich("DIM i AS INTEGER ", "kündigt eine Zahl namens i an. Darum geht es in Kapitel 3."),
-  H.bulletRich("FOR ... NEXT ", "wiederholt die Zeilen dazwischen — hier 121 Mal, mit i von -60 bis 60. Das ist Kapitel 4."),
+  H.bulletRich("DIM i AS INTEGER ", "kündigt eine Zahl namens i an. Darum geht es in Kapitel 2."),
+  H.bulletRich("FOR ... NEXT ", "wiederholt die Zeilen dazwischen — hier 121 Mal, mit i von -60 bis 60. Das ist Kapitel 3."),
 
   H.p("Der Mund lohnt einen zweiten Blick. Der Bogen entsteht durch i mal i: in der Mitte, bei i gleich null, ist das Ergebnis null, und der Punkt liegt bei y gleich 290 — also weit unten. An den Rändern, bei i gleich 60, sind es 3600 geteilt durch 90, also 40; der Punkt rutscht auf y gleich 250 und damit nach oben. Deshalb lächelt es. Dreh das Minuszeichen in ein Plus um, und aus dem Lächeln wird ein Trauerkloß. Genau diesen Fehler habe ich beim Schreiben dieses Kapitels gemacht — und ihn erst gesehen, als das Bild fertig war."),
 
