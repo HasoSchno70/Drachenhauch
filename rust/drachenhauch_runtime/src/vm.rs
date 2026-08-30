@@ -6974,6 +6974,20 @@ impl<'p> Vm<'p> {
                     &wf, freq, slide, atk, sus, dec, vd, vs, vol, width,
                     duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res)?)
             }
+            // Am SOUND-Handle, nicht an AUDIO_SFX: so gelten beide fuer jede
+            // Klangquelle (TONE, NOISE, SFX, geladene Datei).
+            "audio_sound_wave" => {
+                let w = self.audio_mut()?.sound_wave(
+                    gi(a, 0, "AUDIO_SOUND_WAVE")?, gi(a, 1, "AUDIO_SOUND_WAVE")?)?;
+                crate::builtins::new_float_array(w)
+            }
+            "audio_save_wav" => {
+                let idx = gi(a, 0, "AUDIO_SAVE_WAV")?;
+                let pfad = gs(a, 1, "AUDIO_SAVE_WAV")?.to_string();
+                let bits = if a.len() > 2 { gi(a, 2, "AUDIO_SAVE_WAV")? } else { 16 };
+                self.audio_mut()?.save_wav(idx, &pfad, bits)?;
+                Value::Nil
+            }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {
                 // AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]]) -- loops=-1 endlos (Default)

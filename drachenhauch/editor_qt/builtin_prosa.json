@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1519,
+ "count": 1521,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -125,10 +125,12 @@
   "AUDIO_RESUME": "wieder weiter",
   "AUDIO_RESUME_ALL": "alle weiter",
   "AUDIO_REVERB": "Hall. mix 0..1 (0 = aus), feedback 0..1 (Nachhall-Laenge, Default 0.9), damping 0..1 (Hoehen-Daempfung, Default 0.1)",
+  "AUDIO_SAVE_WAV": "als WAV-Datei sichern (bits = 16, Vorgabe, oder 8)",
   "AUDIO_SET_NUM_CHANNELS": "Anzahl gleichzeitiger Kanaele (Vorgabe 16, hoch fuer Bullet-Hell)",
   "AUDIO_SET_VOLUME": "AUDIO_VOLUME(ch, v)",
   "AUDIO_SFX": "Erzeugt einen SOUND.",
   "AUDIO_SOUND_COUNT": "Anzahl lebender (nicht freigegebener) Sound-Slots — Diagnose gegen Sound-Lecks",
+  "AUDIO_SOUND_WAVE": "anzahl Punkte der Wellenform, -1..1 — zum Zeichnen",
   "AUDIO_STOP": "Channel stoppen, optional ausfaden",
   "AUDIO_STOP_ALL": "alle stoppen",
   "AUDIO_TONE": "Sine/Square/Saw/Triangle-Ton",

@@ -1594,6 +1594,102 @@ resonance/reverb/distortion", other)),
         Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
+    /// Signierte Spitzenwerte zum Zeichnen einer Wellenform.
+    ///
+    /// Liefert `anzahl` Werte in -1..1: je Abschnitt das Sample mit dem
+    /// GROESSTEN Betrag, mit seinem Vorzeichen. Der blosse Mittelwert waere
+    /// dafuer unbrauchbar -- bei einem Ton mit 44100 Werten auf 600 Punkte
+    /// mittelte er sich gegen null, und die Anzeige zeigte einen Strich.
+    ///
+    /// Am SOUND-Handle statt an AUDIO_SFX: damit zeichnet dieselbe Routine
+    /// auch einen geladenen Klang oder einen Ton aus AUDIO_TONE.
+    pub fn sound_wave(&self, idx: i64, anzahl: i64) -> Result<Vec<f64>, String> {
+        if anzahl < 1 || anzahl > 100_000 {
+            return Err("AUDIO_SOUND_WAVE: anzahl muss zwischen 1 und 100000 liegen".into());
+        }
+        let slot = self.sounds.get(idx as usize)
+            .ok_or_else(|| format!("AUDIO_SOUND_WAVE: ungueltiges SOUND-Handle {}", idx))?;
+        let data = slot.data.as_ref()
+            .ok_or("AUDIO_SOUND_WAVE: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+        let frames = &data.frames;
+        let n = frames.len();
+        if n == 0 { return Ok(vec![0.0; anzahl as usize]); }
+        let anzahl = anzahl as usize;
+        let mut out = Vec::with_capacity(anzahl);
+        for i in 0..anzahl {
+            let von = i * n / anzahl;
+            // Mindestens EIN Sample je Abschnitt: bei anzahl > n waeren die
+            // Grenzen sonst gleich und der Abschnitt leer.
+            let bis = (((i + 1) * n / anzahl).max(von + 1)).min(n);
+            let mut best = 0.0f32;
+            for f in &frames[von..bis] {
+                if f.left.abs() > best.abs() { best = f.left; }
+            }
+            out.push(best as f64);
+        }
+        Ok(out)
+    }
+
+    /// Einen Klang als WAV-Datei sichern (`bits` = 16 signed, Vorgabe, oder
+    /// 8 unsigned -- so schreibt es die WAV-Spezifikation vor, 8 Bit ist
+    /// vorzeichenlos und 16 Bit vorzeichenbehaftet).
+    ///
+    /// Geschrieben werden die Frames, WIE SIE SIND. Die Lautstaerke aus
+    /// AUDIO_SFX steckt bereits darin (`make_data_mono` rechnet sie ein);
+    /// `slot.vol` obendrauf waere sie ein zweites Mal -- gemessen: eine
+    /// Lautstaerke 0.7 landete als 0.49 in der Datei. `slot.vol` ist ausserdem
+    /// die ABSPIEL-Lautstaerke des letzten AUDIO_PLAY, also nichts, was eine
+    /// gespeicherte Datei erben sollte.
+    pub fn save_wav(&self, idx: i64, pfad: &str, bits: i64) -> Result<(), String> {
+        if bits != 8 && bits != 16 {
+            return Err("AUDIO_SAVE_WAV: bits muss 8 oder 16 sein".into());
+        }
+        let slot = self.sounds.get(idx as usize)
+            .ok_or_else(|| format!("AUDIO_SAVE_WAV: ungueltiges SOUND-Handle {}", idx))?;
+        let data = slot.data.as_ref()
+            .ok_or("AUDIO_SAVE_WAV: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+        let sr = data.sample_rate;
+        // Stereo nur, wenn die Kanaele sich unterscheiden -- AUDIO_TONE & Co.
+        // legen denselben Wert auf beide, und eine doppelt so grosse Datei
+        // ohne Gegenwert waere eine Ueberraschung.
+        let stereo = data.frames.iter().any(|f| (f.left - f.right).abs() > 1e-6);
+        let kanaele: u16 = if stereo { 2 } else { 1 };
+        let bytes_pro_wert: u16 = if bits == 8 { 1 } else { 2 };
+        let n_werte = data.frames.len() * kanaele as usize;
+        let daten_bytes = n_werte * bytes_pro_wert as usize;
+
+        let mut buf: Vec<u8> = Vec::with_capacity(44 + daten_bytes);
+        let block_align = kanaele * bytes_pro_wert;
+        let byte_rate = sr * block_align as u32;
+        buf.extend_from_slice(b"RIFF");
+        buf.extend_from_slice(&((36 + daten_bytes) as u32).to_le_bytes());
+        buf.extend_from_slice(b"WAVEfmt ");
+        buf.extend_from_slice(&16u32.to_le_bytes());          // fmt-Laenge
+        buf.extend_from_slice(&1u16.to_le_bytes());           // PCM
+        buf.extend_from_slice(&kanaele.to_le_bytes());
+        buf.extend_from_slice(&sr.to_le_bytes());
+        buf.extend_from_slice(&byte_rate.to_le_bytes());
+        buf.extend_from_slice(&block_align.to_le_bytes());
+        buf.extend_from_slice(&(bits as u16).to_le_bytes());   // bits pro Wert
+        buf.extend_from_slice(b"data");
+        buf.extend_from_slice(&(daten_bytes as u32).to_le_bytes());
+
+        let mut schreibe = |v: f32, buf: &mut Vec<u8>| {
+            let v = v.clamp(-1.0, 1.0);
+            if bits == 8 {
+                buf.push((v * 127.0 + 128.0).round().clamp(0.0, 255.0) as u8);
+            } else {
+                buf.extend_from_slice(&((v * 32767.0).round() as i16).to_le_bytes());
+            }
+        };
+        for f in data.frames.iter() {
+            schreibe(f.left, &mut buf);
+            if stereo { schreibe(f.right, &mut buf); }
+        }
+        std::fs::write(pfad, &buf)
+            .map_err(|e| format!("AUDIO_SAVE_WAV: '{}' liess sich nicht schreiben -- {}", pfad, e))
+    }
+
     // ================= Sampler (SAMPLE_*) =================
     pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
