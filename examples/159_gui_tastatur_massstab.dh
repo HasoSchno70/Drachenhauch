@@ -1,0 +1,109 @@
+' ============================================================
+'  DRACHENHAUCH -- Bedienung ohne Maus, Massstab, Dialog
+' ============================================================
+'  Drei Dinge, die eine Oberflaeche erst alltagstauglich machen:
+'
+'  1. TAB / UMSCHALT+TAB laeuft durch ALLE bedienbaren Widgets.
+'     Leertaste und Enter loesen aus, die Pfeile verstellen Werte.
+'     Das fokussierte Widget traegt einen Ring in der Akzentfarbe.
+'  2. GUI_SCALE passt die ganze Oberflaeche an hochaufloesende
+'     Bildschirme an -- eine Zahl, und alles waechst mit.
+'  3. GUI_DIALOG fragt modal nach, im eigenen Thema statt im
+'     Kasten des Betriebssystems.
+'
+'  Tasten:  [TAB] weiter   [LEERTASTE]/[ENTER] ausloesen
+'           [<] [>] Regler   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+' --- Massstab: auf einem HiDPI-Schirm meldet WINDOW_DPI_X() 2.0 --------
+' GUI_SCALE muss VOR dem ersten Fenster kommen. Hier fest auf 1.0, damit
+' die Demo ueberall gleich aussieht -- im eigenen Programm nimmt man
+' GUI_SCALE(WINDOW_DPI_X()).
+DIM massstab AS FLOAT
+massstab = 1.0
+
+SCREEN(INT(640 * massstab), INT(420 * massstab), "Drachenhauch - Tastatur, Massstab, Dialog", 1)
+SETFPS(60)
+GUI_SCALE(massstab)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Einstellungen", 20, 20, 600, 380)
+
+DIM lblName AS GUI_WIDGET
+lblName = GUI_LABEL(w, "Name", 20, 18)
+DIM feld AS GUI_WIDGET
+feld = GUI_TEXTINPUT(w, 150, 14, 240, 26, "Name ...")
+
+DIM haken AS GUI_WIDGET
+haken = GUI_CHECKBOX(w, "Musik an", 20, 56)
+
+DIM lblLaut AS GUI_WIDGET
+lblLaut = GUI_LABEL(w, "Lautstaerke", 20, 92)
+DIM regler AS GUI_WIDGET
+regler = GUI_SLIDER(w, 150, 92, 240, 0, 100, 60)
+
+DIM lblSchwer AS GUI_WIDGET
+lblSchwer = GUI_LABEL(w, "Schwierigkeit", 20, 128)
+DIM stufen AS ARRAY OF STRING
+stufen = SPLIT$("leicht|normal|schwer", "|")
+DIM klapp AS GUI_WIDGET
+klapp = GUI_DROPDOWN(w, 150, 124, 160, 26, stufen)
+
+DIM speichern AS GUI_WIDGET
+speichern = GUI_BUTTON(w, "Speichern", 20, 170, 130, 30)
+DIM loeschen AS GUI_WIDGET
+loeschen = GUI_BUTTON(w, "Zuruecksetzen", 160, 170, 175, 30)
+
+' --- Zustand ----------------------------------------------------------
+DIM frage AS GUI_WINDOW
+frage = -1                     ' -1 = kein Dialog offen (0 waere das erste Fenster!)
+DIM meldung AS STRING
+meldung = "TAB wechselt das Widget, Leertaste loest aus."
+
+WHILE NOT KEYPRESSED(KEY_ESCAPE)
+    CLS(&H101820)
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(speichern) THEN meldung = "Gespeichert."
+
+    ' Rueckfrage oeffnen -- das Ergebnis kommt spaeter ueber GUI_ANSWER.
+    IF GUI_CLICKED(loeschen) AND frage < 0 THEN
+        frage = GUI_DIALOG("Zuruecksetzen", "Alle Einstellungen verwerfen?", "janein")
+    END IF
+
+    ' Die Antwort gilt genau ein Bild -- wie GUI_CLICKED.
+    IF frage >= 0 THEN
+        IF GUI_ANSWER(frage) = 1 THEN
+            GUI_SET_TEXT(feld, "")
+            GUI_SET_CHECKED(haken, FALSE)
+            GUI_SET_VALUE(regler, 60)
+            GUI_DROPDOWN_SET_SELECTED(klapp, 0)
+            meldung = "Zurueckgesetzt."
+            frage = -1
+        END IF
+        IF GUI_ANSWER(frage) = 2 THEN
+            meldung = "Abgebrochen."
+            frage = -1
+        END IF
+    END IF
+
+    GUI_DRAW()
+
+    ' Hilfezeile: zeigt, worauf die Tastatur gerade wirkt.
+    DIM aktiv AS GUI_WIDGET
+    aktiv = GUI_FOCUSED()
+    DIM hinweis AS STRING
+    hinweis = "kein Widget im Fokus -- einmal TAB druecken"
+    IF aktiv = feld THEN hinweis = "Textfeld: einfach tippen"
+    IF aktiv = haken THEN hinweis = "Kaestchen: Leertaste schaltet um"
+    IF aktiv = regler THEN hinweis = "Regler: Pfeile links/rechts, Pos1/Ende"
+    IF aktiv = klapp THEN hinweis = "Klappliste: Enter klappt auf, Pfeile waehlen"
+    IF aktiv = speichern THEN hinweis = "Knopf: Leertaste oder Enter"
+    IF aktiv = loeschen THEN hinweis = "Knopf: fragt vorher nach"
+
+    TEXT(20, INT(410 * massstab) - 40, meldung, &HFFFFFF)
+    TEXT(20, INT(410 * massstab) - 20, hinweis, &H7A8AA0)
+    FLIP()
+WEND

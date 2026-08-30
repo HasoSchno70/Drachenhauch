@@ -1080,7 +1080,15 @@ impl Gui {
 
     /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
     /// Gilt GENAU EIN BILD -- wie `GUI_CLICKED`.
+    ///
+    /// Ein NEGATIVER Handle ist "gerade kein Dialog" und liefert 0. Ohne
+    /// diesen Ausweg gaebe es keinen freien Wert dafuer: Fenster-Handles
+    /// zaehlen ab 0, und ausgerechnet die 0 ist das ERSTE Fenster des
+    /// Programms -- ein `frage = 0` als "keiner" zeigte also auf das
+    /// Hauptfenster. Merkt man sich den offenen Dialog in einer Variablen,
+    /// setzt man sie auf -1, wenn keiner offen ist.
     pub fn answer(&self, h: i64) -> Result<i64, String> {
+        if h < 0 { return Ok(0); }
         let w = self.windows.get(h as usize)
             .ok_or("GUI_ANSWER: ungueltiges GUI_WINDOW-Handle")?;
         if !w.dlg { return Err("GUI_ANSWER: das Fenster ist kein Dialog (GUI_MESSAGE/GUI_CONFIRM)".into()); }

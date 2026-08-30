@@ -185,17 +185,25 @@ Zeilenzahl an und wird auf dem Bildschirm zentriert.
 
 ```basic
 DIM frage AS GUI_WINDOW
+frage = -1                  ' -1 = gerade keiner offen
 
 ' ... im Spielablauf:
-IF GUI_CLICKED(loeschen) THEN
+IF GUI_CLICKED(loeschen) AND frage < 0 THEN
     frage = GUI_DIALOG("Löschen", "Eintrag wirklich löschen?", "janein")
 END IF
 
 GUI_UPDATE()
-IF frage <> 0 THEN
-    IF GUI_ANSWER(frage) = 1 THEN eintrag_loeschen()
+IF frage >= 0 THEN
+    IF GUI_ANSWER(frage) = 1 THEN eintrag_loeschen() : frage = -1
+    IF GUI_ANSWER(frage) = 2 THEN frage = -1
 END IF
 ```
+
+> **Merk dir den offenen Dialog mit `-1` als „keiner".** Nicht mit `0` —
+> Fenster-Handles zählen ab 0, und ausgerechnet die `0` ist das **erste
+> Fenster deines Programms**. `GUI_ANSWER` auf einen negativen Handle
+> liefert darum `0` („keine Antwort"), damit die Abfrage auch dann
+> durchläuft, wenn gar kein Dialog steht.
 
 **`GUI_DIALOG` blockiert nicht.** Es gibt dir ein Fenster zurück, und die
 Antwort holst du dir mit `GUI_ANSWER` — genau wie einen Klick mit
@@ -216,6 +224,9 @@ drehen und dabei deinen Layer- und Render-Ziel-Zustand übernehmen.
 | Ablauf | blockiert, liefert die Antwort direkt | läuft weiter, Antwort per `GUI_ANSWER` |
 | Web-Build | nein | ja |
 | passt zu | Werkzeug, Editor | Spiel, Vollbild-Anwendung |
+
+Demo für alle drei Neuerungen (Tastatur, Maßstab, Dialog):
+[`examples/159_gui_tastatur_massstab.dh`](../examples/159_gui_tastatur_massstab.dh).
 
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 
