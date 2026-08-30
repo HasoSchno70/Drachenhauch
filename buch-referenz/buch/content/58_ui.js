@@ -65,6 +65,29 @@ module.exports = (H) => [
       'UI_CHECKBOX("snd", "Sound", 56, 76)',
       'UI_WINDOW_END()',
     ]),
+  H.cmd("UI_PROGRESS", "UI_PROGRESS(x, y, w, h, wert, maximum[, vordergrund[, hintergrund]])",
+    "Ein Fortschrittsbalken. Anders als bei GUI_PROGRESS gibst du Wert und Maximum direkt an. Deshalb braucht er als einziges Widget hier keine Kennung: Er merkt sich nichts, was zwischen zwei Bildern wiederzufinden wäre.",
+    [
+      'UI_PROGRESS(20, 20, 200, 16, geladen, gesamt)',
+    ]),
+  H.cmd("UI_RADIO", 'UI_RADIO(id$, x, y, optionen[, vorgabe])',
+    "Eine Gruppe sich gegenseitig ausschließender Schalter aus einem ARRAY OF STRING. Liefert den Index der gewählten Option; die Vorgabe gilt nur beim ersten Bild, danach entscheidet der Benutzer.",
+    [
+      'DIM wahl AS INTEGER',
+      'wahl = UI_RADIO("schwierigkeit", 20, 60, ("leicht", "mittel", "schwer"), 1)',
+    ]),
+  H.cmd("UI_TEXTFIELD", 'UI_TEXTFIELD(id$, x, y, w, h[, platzhalter$])',
+    "Ein Eingabefeld mit Tastatur-Fokus. Liefert bei jedem Bild den aktuellen Inhalt – ein Klick hinein setzt den Fokus, ein Klick daneben nimmt ihn weg.",
+    [
+      'DIM nachricht AS STRING',
+      'nachricht = UI_TEXTFIELD("chat", 20, 100, 240, 24, "Nachricht...")',
+    ]),
+  H.cmd("UI_TABLE", 'UI_TABLE(id$, x, y, w, h, kopfzeilen, zellen[, zellfarben[, spaltenbreiten[, zellhintergruende]]])',
+    "Eine Tabelle mit Kopfzeile aus zwei Arrays: die Spaltenüberschriften und die Zellen. Liefert den Index der angeklickten Zeile, oder -1. Die drei optionalen Arrays färben Text und Hintergrund je Zelle und setzen die Spaltenbreiten.",
+    [
+      'DIM geklickt AS INTEGER',
+      'geklickt = UI_TABLE("scores", 10, 10, 340, 300, kopf, zellen)',
+    ]),
   H.cmd("UI_TABLE_SELECTED · UI_TABLE_SET_SELECTED · UI_TABLE_HEADER_CLICK", 'UI_TABLE_SELECTED(id$)   UI_TABLE_SET_SELECTED(id$, zeile)   UI_TABLE_HEADER_CLICK(id$)',
     "Zu einer mit UI_TABLE gezeichneten Tabelle: welche Zeile ist markiert, Markierung setzen, und wurde auf eine Spaltenüberschrift geklickt (-1 = nein)? Letzteres ist die Grundlage fürs Sortieren per Klick.",
     [
@@ -95,4 +118,17 @@ module.exports = (H) => [
       'UI_RESET()',
     ]),
   H.tip("ui oder gui?", "Das ui-Modul (Immediate-Mode) ist perfekt für schnelle Spiel-Menüs und Debug-Overlays: wenig Code, kein Vorab-Aufbau. Brauchst du dagegen persistente Fenster, die sich verschieben und überlappen lassen (wie auf einem Desktop), nimm das gui-Modul aus dem nächsten Kapitel."),
+  H.h2("Der Abschluss jedes Bildes"),
+  H.cmd("UI_END_FRAME", "UI_END_FRAME()",
+    "Muss einmal je Bild aufgerufen werden, vor FLIP. Erst dort wertet das Modul aus, was der Benutzer getan hat: welcher Knopf gedrückt wurde, welches Feld den Fokus hat, ob der Mauszeiger noch über einem Element steht.",
+    [
+      "WHILE NOT QUITREQUESTED()",
+      "    CLS()",
+      '    IF UI_BUTTON("ok", 10, 10, 80, 24, "OK") THEN PRINT "geklickt"',
+      "    UI_END_FRAME()",
+      "    FLIP()",
+      "WEND",
+    ]),
+  H.warn("Ohne UI_END_FRAME reagiert die Oberfläche gar nicht – die Knöpfe werden gezeichnet, aber kein Klick kommt an. Das ist der häufigste Grund dafür, dass eine Immediate-Mode-Oberfläche tot wirkt.",
+    "Vergessen heißt: nichts geht"),
 ];

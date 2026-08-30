@@ -16,14 +16,14 @@ module.exports = (H) => [
       'PRINT AUDIO_IS_PLAYING(ch)',
       'AUDIO_STOP(ch)',
     ], { out: ["TRUE"] }),
-  H.cmd("AUDIO_PAUSE · AUDIO_RESUME", 'AUDIO_PAUSE(ch)   AUDIO_RESUME(ch)   AUDIO_PAUSE_ALL()   AUDIO_RESUME_ALL()',
+  H.cmd("AUDIO_PAUSE · AUDIO_RESUME · AUDIO_PAUSE_ALL · AUDIO_RESUME_ALL", 'AUDIO_PAUSE(ch)   AUDIO_RESUME(ch)   AUDIO_PAUSE_ALL()   AUDIO_RESUME_ALL()',
     "Hält einen Kanal an, ohne ihn zu beenden, und setzt ihn später an derselben Stelle fort. Die _ALL-Varianten wirken auf alle Kanäle (gut für ein Pause-Menü).",
     [
       'AUDIO_PAUSE(ch)',
       '\' ... Spiel pausiert ...',
       'AUDIO_RESUME(ch)',
     ]),
-  H.cmd("AUDIO_SET_VOLUME · AUDIO_GET_VOLUME · AUDIO_PITCH", 'AUDIO_SET_VOLUME(ch, v)   AUDIO_GET_VOLUME(ch)   AUDIO_PITCH(ch, faktor)',
+  H.cmd("AUDIO_SET_VOLUME · AUDIO_VOLUME · AUDIO_GET_VOLUME · AUDIO_PITCH", 'AUDIO_SET_VOLUME(ch, v)   AUDIO_GET_VOLUME(ch)   AUDIO_PITCH(ch, faktor)',
     "Lautstärke (0..1) eines Kanals setzen/lesen und die Tonhöhe live ändern: faktor 2.0 = eine Oktave höher und doppelt so schnell, 0.5 = eine Oktave tiefer. (AUDIO_VOLUME ist ein Alias für AUDIO_SET_VOLUME.)",
     [
       'AUDIO_SET_VOLUME(ch, 0.6)',
@@ -37,6 +37,13 @@ module.exports = (H) => [
     [
       'AUDIO_PAN_POS(ch, -0.5)          \' halb links',
       'AUDIO_PAN_SLIDE(ch, -1.0, 1.0, 800)  \' zieht von links nach rechts',
+    ]),
+
+  H.cmd("AUDIO_PAN", "AUDIO_PAN(ch, links, rechts)",
+    "Setzt die beiden Seiten getrennt, jede von 0 bis 1. Das ist nicht dasselbe wie AUDIO_PAN_POS: Dort gibst du eine Position zwischen -1 und +1 an und die Lautstärke bleibt gleich; hier bestimmst du beide Kanäle einzeln und kannst damit auch beide zugleich absenken.",
+    [
+      "AUDIO_PAN(ch, 1.0, 0.2)      ' vorwiegend links",
+      "AUDIO_PAN(ch, 0.4, 0.4)      ' mittig und leiser",
     ]),
 
   H.h2("Klang selbst erzeugen: AUDIO_SFX"),

@@ -26,7 +26,7 @@ module.exports = (H) => [
     [
       'DRAWIMAGE(sprite, CHAR_X(held), CHAR_Y(held))',
     ]),
-  H.cmd("CHAR_ON_GROUND · CHAR_ON_WALL_LEFT/RIGHT", 'CHAR_ON_GROUND(c)   CHAR_ON_WALL_LEFT(c)   CHAR_ON_WALL_RIGHT(c)',
+  H.cmd("CHAR_ON_GROUND · CHAR_ON_WALL_LEFT · CHAR_ON_WALL_RIGHT", 'CHAR_ON_GROUND(c)   CHAR_ON_WALL_LEFT(c)   CHAR_ON_WALL_RIGHT(c)',
     "Sagen, ob die Figur gerade auf dem Boden steht bzw. an einer Wand anliegt – nützlich für die Animationswahl (stehen/laufen/fallen) oder für Wandsprünge.",
     [
       'IF CHAR_ON_GROUND(held) THEN \' laufen/stehen-Animation',

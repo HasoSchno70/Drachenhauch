@@ -109,7 +109,7 @@ module.exports = (H) => [
       'kugel = PHYS3D_ADD_SPHERE(w, 0.0, 8.0, 0.0, 1.0, TRUE, 0.5)     \' fällt',
       'PHYS3D_STEP(w, DELTA())',
     ]),
-  H.cmd("PHYS3D_BODY_X / _Y / _Z (+ Quaternion)", 'PHYS3D_BODY_X(w, id)   PHYS3D_BODY_Y(w, id)   PHYS3D_BODY_Z(w, id)   PHYS3D_BODY_QX/_QY/_QZ/_QW(w, id)',
+  H.cmd("PHYS3D_BODY_X · PHYS3D_BODY_Y · PHYS3D_BODY_Z · PHYS3D_BODY_QX · PHYS3D_BODY_QY · PHYS3D_BODY_QZ · PHYS3D_BODY_QW", 'PHYS3D_BODY_X(w, id)   PHYS3D_BODY_Y(w, id)   PHYS3D_BODY_Z(w, id)   PHYS3D_BODY_QX(w, id)   PHYS3D_BODY_QY(w, id)   PHYS3D_BODY_QZ(w, id)   PHYS3D_BODY_QW(w, id)',
     "Lesen die 3D-Position und die Drehung (als Quaternion QX/QY/QZ/QW) eines Körpers. Position und Drehung steckst du in eine Modell-Matrix (Modul m3d) und zeichnest damit dein 3D-Modell an die simulierte Stelle.",
     [
       'DIM y AS FLOAT',
@@ -192,4 +192,27 @@ module.exports = (H) => [
       'NEXT',
     ]),
   H.tip("Welches Physik-Modul?", "Für simple Treffer-Abfragen und selbst gesteuerte Bewegung reicht physics (schnell, vorhersehbar). Soll sich etwas „echt“ anfühlen – fallen, stapeln, abprallen – nimm physics2d bzw. physics3d. Du kannst beides mischen: die Engine für die Welt, physics-Mathe für eigene Sonderfälle."),
+  H.h2("Weitere Tests ohne Physik-Welt"),
+  H.cmd("PHYSICS_POINT_BOX · PHYSICS_BOX_CIRCLE", "PHYSICS_POINT_BOX(px, py, bx, by, bw, bh)   PHYSICS_BOX_CIRCLE(bx, by, bw, bh, cx, cy, cr)",
+    "Liegt ein Punkt in einem Rechteck, und überschneiden sich ein Rechteck und ein Kreis? Der erste ist der Treffertest für einen Mausklick, der zweite die Mischform, die zwischen den reinen Rechteck- und Kreis-Tests fehlte.",
+    [
+      'IMPORT "physics"',
+      "IF PHYSICS_POINT_BOX(MOUSEX(), MOUSEY(), 20, 20, 100, 40) THEN",
+      '    PRINT "Knopf getroffen"',
+      "END IF",
+    ]),
+  H.cmd("PHYSICS_DISTANCE2", "PHYSICS_DISTANCE2(x1, y1, x2, y2)",
+    "Der Abstand zum Quadrat – ohne Wurzel. Zum Vergleichen reicht das: Wer prüft, ob etwas näher als 50 Pixel ist, vergleicht mit 2500 und spart die Wurzel. Bei tausend Gegnern pro Bild ist das messbar.",
+    [
+      "IF PHYSICS_DISTANCE2(x1, y1, x2, y2) < 2500.0 THEN",
+      '    PRINT "naeher als 50 Pixel"',
+      "END IF",
+    ]),
+  H.cmd("PHYSICS_RAY_BOX", "PHYSICS_RAY_BOX(rx, ry, dx, dy, bx, by, bw, bh)",
+    "Schneidet ein Strahl ein Rechteck? Liefert den Anteil der Strecke bis zum Treffer (0 bis 1) oder -1, wenn nichts getroffen wird. Damit prüfst du eine Sichtlinie oder einen Schuss, ohne ihn Schritt für Schritt zu verfolgen.",
+    [
+      "DIM t AS FLOAT",
+      "t = PHYSICS_RAY_BOX(0.0, 0.0, 100.0, 100.0, 40.0, 40.0, 20.0, 20.0)",
+      'IF t >= 0.0 THEN PRINT "Treffer bei "; t',
+    ]),
 ];

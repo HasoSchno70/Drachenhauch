@@ -41,7 +41,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Ereignisse abfragen (Polling)"),
-  H.cmd("GUI_CLICKED · GUI_CHECKED · GUI_VALUE", 'GUI_CLICKED(widget)   GUI_CHECKED(widget)   GUI_VALUE(widget)',
+  H.cmd("GUI_CLICKED · GUI_CHECKED · GUI_VALUE · GUI_TEXT", 'GUI_CLICKED(widget)   GUI_CHECKED(widget)   GUI_TEXT(widget)   GUI_VALUE(widget)',
     "GUI_CLICKED liefert TRUE im Frame, in dem ein Button geklickt wurde. GUI_CHECKED gibt den Zustand einer Checkbox, GUI_VALUE den Wert eines Sliders. Diese Abfragen stehen nach GUI_UPDATE.",
     [
       'IF GUI_CLICKED(start) THEN',
@@ -143,6 +143,13 @@ module.exports = (H) => [
       'split = GUI_SPLITTER(win, 150, 20, 180, "v", 80, 280)',
       'PRINT GUI_VALUE(split)',
     ], { out: ["150.0"] }),
+  H.cmd("GUI_TEXTINPUT", 'GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])',
+    "Ein einzeiliges Eingabefeld mit Schreibmarke und Textauswahl: Markieren mit Umschalt und den Pfeiltasten oder mit der Maus, dazu Strg+A, Strg+C, Strg+V, Strg+X sowie Pos1 und Ende. Der Platzhalter steht blass im leeren Feld und verschwindet beim ersten Zeichen.",
+    [
+      'DIM name AS GUI_WIDGET',
+      'name = GUI_TEXTINPUT(win, 10, 40, 200, 24, "Dein Name")',
+      'PRINT GUI_TEXT(name)',
+    ]),
   H.cmd("GUI_TEXTAREA", 'GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])',
     "Ein mehrzeiliges Eingabefeld (das einzeilige Gegenstück ist GUI_TEXTINPUT). Text lesen/setzen läuft über die allgemeinen GUI_TEXT/GUI_SET_TEXT-Befehle.",
     [
@@ -156,6 +163,21 @@ module.exports = (H) => [
     [
       'GUI_TOOLTIP(sp, "Wert einstellen")',
     ]),
+
+  H.h2("Inhalte vom Programm aus setzen"),
+  H.p("Bis hierher hat das Programm gelesen, was der Benutzer eingegeben hat. Der Weg zurück geht über diese Setzer – wenn ein Formular mit vorhandenen Daten gefüllt wird, wenn eine Liste sich nach einer Suche ändert, oder wenn eine Auswahl aus einem Spielstand wiederhergestellt wird."),
+  H.cmd("GUI_SET_TEXT", 'GUI_SET_TEXT(widget, text$)',
+    "Setzt den Text eines Widgets. Das Gegenstück zu GUI_TEXT, und es gilt für alles, was Text zeigt: Beschriftung, Knopf, Eingabefeld, Textbereich.",
+    [
+      'GUI_SET_TEXT(name, "Anna")',
+    ]),
+  H.cmd("GUI_SET_LISTBOX · GUI_LISTBOX_SET_SELECTED", 'GUI_SET_LISTBOX(lb, eintraege)   GUI_LISTBOX_SET_SELECTED(lb, i)',
+    "Ersetzt die Einträge einer Liste bzw. setzt die Auswahl vom Programm aus. Zusammen sind das eine Liste, die sich zur Laufzeit ändert – etwa Suchergebnisse, die beim Tippen mitlaufen. Beim Austauschen der Einträge bleibt eine vorhandene Auswahl erhalten, solange sie noch im Bereich liegt; sonst rückt sie auf den letzten Eintrag, und bei leerer Liste gibt es keine.",
+    [
+      'GUI_SET_LISTBOX(lvl, ("Wald", "Sumpf"))',
+      'GUI_LISTBOX_SET_SELECTED(lvl, 0)',
+    ]),
+  H.tip("Eine gesetzte Auswahl löst kein Ereignis aus", "GUI_LISTBOX_SET_SELECTED verhält sich nicht wie ein Klick des Benutzers: Ein daran gehängter Rückruf feuert nicht. Das ist Absicht – sonst löste das Wiederherstellen eines Spielstands beim Programmstart die halbe Oberfläche aus."),
 
   H.h2("Werkzeugleiste: Toolbar & Icon-Buttons"),
   H.p("Eine Toolbar ist ein flacher, dekorativer Streifen als Hintergrund für eine Reihe von Icon-Buttons – die Buttons selbst liegen als eigene Widgets darüber."),
@@ -337,7 +359,7 @@ module.exports = (H) => [
       'NEXT',
     ]),
   H.warn("Alle Zeilennummern nach außen sind DATENzeilen. Sortieren und Filtern stellen die Daten nicht um – sie bauen nur eine Ansicht darüber. Eine Zeilennummer, die dein Programm sich gemerkt hat, zeigt also weiter auf denselben Eintrag."),
-  H.cmd("Mehrfach-Auswahl", 'GUI_TABLE_SEL_COUNT(tab)   GUI_TABLE_SEL_ROW(tab, i)   GUI_TABLE_IS_SELECTED(tab, zeile)   GUI_TABLE_SELECT(tab, zeile, an)   GUI_TABLE_CLEAR_SELECTION(tab)',
+  H.cmd("GUI_TABLE_SEL_COUNT · GUI_TABLE_SEL_ROW · GUI_TABLE_IS_SELECTED · GUI_TABLE_SELECT · GUI_TABLE_CLEAR_SELECTION", 'GUI_TABLE_SEL_COUNT(tab)   GUI_TABLE_SEL_ROW(tab, i)   GUI_TABLE_IS_SELECTED(tab, zeile)   GUI_TABLE_SELECT(tab, zeile, an)   GUI_TABLE_CLEAR_SELECTION(tab)',
     "Mit GUI_TABLE_SET(tab, \"mehrfachauswahl\", 1) wählt Strg+Klick eine Zeile dazu oder ab, Umschalt+Klick den ganzen Bereich. Vorhandener Code, der nur GUI_TABLE_SELECTED kennt, läuft unverändert – das bleibt die zuletzt angeklickte Zeile.",
     [
       'GUI_TABLE_SET(tab, "mehrfachauswahl", 1)',

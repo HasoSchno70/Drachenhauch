@@ -87,4 +87,16 @@ module.exports = (H) => [
     ]),
   H.warn("Das ist die häufigste Falle bei den Bulk-Befehlen. Ein fest dimensionierter Puffer – DIM xs[1000], aber nur 200 Sterne im Bild – schleppt seine 800 ungenutzten Plätze mit: Sie stehen alle auf 0 und erscheinen als Klumpen in der linken oberen Ecke. Gib die tatsächliche Anzahl mit, dann bleibt der Rest unberührt.", "Ohne anzahl wird IMMER das ganze Array gezeichnet"),
   H.tip("Wann Bulk?", "Für eine Handvoll Formen sind die normalen Befehle (CIRCLE, BOX …) völlig in Ordnung und lesbarer. Die Bulk-Varianten lohnen sich erst bei vielen hundert oder tausend gleichartigen Formen pro Frame – dann sparen sie spürbar Zeit."),
+  H.h2("Eine Kachelkarte aus einem Array"),
+  H.cmd("DRAWTILEMAP", "DRAWTILEMAP(tileset, karte, kachel_breite, kachel_hoehe, x, y)",
+    "Zeichnet ein zweidimensionales Array von Kachel-Nummern als Karte. Das Tileset ist ein Bild, dessen Kacheln zeilenweise von 0 an durchnummeriert sind; eine -1 im Array lässt die Stelle frei. Intern läuft das als ein einziger Aufruf – deutlich schneller, als jede Kachel selbst zu zeichnen.",
+    [
+      "DIM tiles AS IMAGE",
+      "DIM karte[10, 8] AS INTEGER",
+      'tiles = LOADIMAGE("tileset.png")',
+      "karte[0, 0] = 3",
+      "karte[1, 0] = -1                 ' bleibt frei",
+      "DRAWTILEMAP(tiles, karte, 16, 16, 0, 0)",
+    ]),
+  H.tip("Für richtige Level lohnt sich Tiled", "DRAWTILEMAP zeichnet, was in einem Array steht – woher das kommt, ist ihm gleich. Wer ein Level von Hand im Code aufbaut, ist hiermit fertig. Wer es zeichnen will, nimmt den Karten-Editor und das Modul tiled (Kapitel „Modul: tiled“); es liefert dieselben Arrays."),
 ];

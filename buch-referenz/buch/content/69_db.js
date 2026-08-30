@@ -45,7 +45,7 @@ module.exports = (H) => [
 
   H.h2("Lesen: DB_QUERY und die Ergebnis-Schleife"),
   H.p("Ein SELECT liefert Zeilen – dafür gibt es DB_QUERY. Das Ergebnis ist ein DB_RESULT, eine Art Cursor. Du holst die Zeilen einzeln: DB_NEXT rückt zur nächsten Zeile vor und liefert TRUE, solange es eine gibt. Innerhalb der Schleife liest du die Spalten mit den typisierten DB_GET_*-Befehlen über ihren 0-basierten Index (Spalte 0 = erste Spalte im SELECT)."),
-  H.cmd("DB_QUERY · DB_NEXT · DB_GET_* · DB_CLOSE_RESULT", 'DB_QUERY(conn, sql$ [, ...])   DB_NEXT(r)   DB_GET_STRING/INT/FLOAT/BOOL(r, idx)   DB_CLOSE_RESULT(r)',
+  H.cmd("DB_QUERY · DB_NEXT · DB_GET_STRING · DB_GET_INT · DB_GET_FLOAT · DB_CLOSE_RESULT", 'DB_QUERY(conn, sql$ [, ...])   DB_NEXT(r)   DB_GET_STRING/INT/FLOAT/BOOL(r, idx)   DB_CLOSE_RESULT(r)',
     "DB_QUERY startet die Abfrage, DB_NEXT geht Zeile für Zeile durch (TRUE = es gibt eine Zeile), die DB_GET_*-Befehle lesen die Spalten der aktuellen Zeile. Am Ende gibt DB_CLOSE_RESULT den Cursor frei.",
     [
       'IMPORT "db"',

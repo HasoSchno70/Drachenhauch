@@ -24,7 +24,7 @@ module.exports = (H) => [
 
   H.h2("Daten pro Szene"),
   H.p("Jede Szene hat ihren eigenen Datenspeicher (per Schlüssel-Text). Du legst dort Werte ab, die nur diese Szene betreffen – etwa den Punktestand im „playing“-Zustand. Wichtig: Eine frisch per PUSH oder SWITCH erzeugte Szene startet mit einem LEEREN Speicher; der Speicher einer darunterliegenden Szene bleibt bei PUSH/POP erhalten."),
-  H.cmd("SCENE_SET_INT … · SCENE_GET_INT …", 'SCENE_SET_INT(key$, wert)   SCENE_GET_INT(key$)   (auch FLOAT/STRING/BOOL)',
+  H.cmd("SCENE_SET_INT · SCENE_SET_FLOAT · SCENE_SET_STRING · SCENE_SET_BOOL · SCENE_GET_INT · SCENE_GET_FLOAT · SCENE_GET_STRING · SCENE_GET_BOOL", 'SCENE_SET_INT(key$, wert)   SCENE_GET_INT(key$)   (auch FLOAT/STRING/BOOL)',
     "SET legt einen Wert in der aktuellen Szene ab, GET liest ihn. Es gibt je eine Variante für INT, FLOAT, STRING und BOOL. SCENE_GET_* ist strikt – fehlt der Schlüssel, gibt es einen Fehler.",
     [
       'SCENE_SWITCH("playing")   \' es muss eine Szene aktiv sein',
@@ -33,7 +33,7 @@ module.exports = (H) => [
       'SCENE_SET_INT("score", SCENE_GET_INT("score") + 100)',
       'PRINT SCENE_GET_INT("score")',
     ], { out: ["100"] }),
-  H.cmd("SCENE_GET_INT_OR …", 'SCENE_GET_INT_OR(key$, default)   (auch FLOAT/STRING/BOOL)',
+  H.cmd("SCENE_GET_INT_OR · SCENE_GET_FLOAT_OR · SCENE_GET_STRING_OR · SCENE_GET_BOOL_OR", 'SCENE_GET_INT_OR(key$, default)   (auch FLOAT/STRING/BOOL)',
     "Wie SCENE_GET_*, aber mit Rückfallwert: Fehlt der Schlüssel, kommt default statt eines Fehlers. Praktisch für optionale Werte.",
     [
       'DIM hi AS INTEGER',

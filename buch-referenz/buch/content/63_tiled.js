@@ -46,7 +46,7 @@ module.exports = (H) => [
   ]),
 
   H.h2("Kachel-Eigenschaften"),
-  H.cmd("TILED_TILE_PROP_… · TILED_TILE_HAS_PROP", 'TILED_TILE_PROP_BOOL(m, gid, key$)   (auch INT/FLOAT/STRING)   TILED_TILE_HAS_PROP(m, gid, key$)',
+  H.cmd("TILED_TILE_PROP_BOOL · TILED_TILE_PROP_INT · TILED_TILE_PROP_FLOAT · TILED_TILE_PROP_STRING · TILED_TILE_HAS_PROP", 'TILED_TILE_PROP_BOOL(m, gid, key$)   (auch INT/FLOAT/STRING)   TILED_TILE_HAS_PROP(m, gid, key$)',
     "Lesen eine im Editor gesetzte Eigenschaft einer Kachelart (über ihre GID). So markierst du etwa feste Kacheln mit „solid“ = TRUE oder Münzen mit „pickup“ = TRUE und fragst das im Spiel ab.",
     [
       'IF TILED_TILE_PROP_BOOL(lvl, gid, "solid") THEN',
@@ -56,7 +56,7 @@ module.exports = (H) => [
 
   H.h2("Objekt-Ebenen"),
   H.p("Neben Kacheln können Karten Objekte enthalten – Punkte oder Rechtecke mit Namen, Typ und eigenen Eigenschaften, etwa Spawn-Punkte, Trigger oder Zonen. Sie liegen in Objekt-Ebenen und werden über ihren Ebenennamen abgefragt."),
-  H.cmd("TILED_OBJECT_COUNT · TILED_OBJECT_…", 'TILED_OBJECT_COUNT(m, ebene$)   TILED_OBJECT_X / _Y / _NAME(m, ebene$, idx) …',
+  H.cmd("TILED_OBJECT_COUNT · TILED_OBJECT_X · TILED_OBJECT_Y · TILED_OBJECT_W · TILED_OBJECT_H · TILED_OBJECT_NAME · TILED_OBJECT_TYPE", 'TILED_OBJECT_COUNT(m, ebene$)   TILED_OBJECT_X / _Y / _NAME(m, ebene$, idx) …',
     "TILED_OBJECT_COUNT liefert die Anzahl der Objekte einer Objekt-Ebene; mit den weiteren TILED_OBJECT_-Funktionen liest du Position, Name, Typ und Eigenschaften jedes Objekts aus – etwa um Gegner an den im Editor gesetzten Stellen zu erzeugen.",
     [
       'DIM n AS INTEGER',
@@ -95,7 +95,7 @@ module.exports = (H) => [
       '    END IF',
       'NEXT',
     ]),
-  H.cmd("TILED_OBJECT_PROP_STRING/INT/FLOAT/BOOL", 'TILED_OBJECT_PROP_STRING(m, ebene$, i, name$)   TILED_OBJECT_PROP_INT(...)   TILED_OBJECT_PROP_FLOAT(...)   TILED_OBJECT_PROP_BOOL(...)',
+  H.cmd("TILED_OBJECT_PROP_STRING · TILED_OBJECT_PROP_INT · TILED_OBJECT_PROP_FLOAT · TILED_OBJECT_PROP_BOOL", 'TILED_OBJECT_PROP_STRING(m, ebene$, i, name$)   TILED_OBJECT_PROP_INT(...)   TILED_OBJECT_PROP_FLOAT(...)   TILED_OBJECT_PROP_BOOL(...)',
     "Eigene Eigenschaften eines Objekts, im Editor frei vergeben – etwa wie viel Schaden eine Falle macht oder in welches Level eine Tür führt. So steckt die Spielbalance in der Karte statt im Quelltext.",
     [
       'DIM schaden AS INTEGER',
@@ -121,4 +121,25 @@ module.exports = (H) => [
       'NEXT',
     ]),
   H.tip("Karten erstellen", "Du musst Tiled-Karten nicht von Hand als JSON schreiben: Der mitgelieferte Editor dhtilemap malt Kacheln, verwaltet Ebenen und Eigenschaften und speichert genau das Format, das TILED_LOAD liest. Zum Abprüfen von Boden und Wänden passt das tile_collide-Modul (nächstes Kapitel) perfekt dazu."),
+  H.h2("Ebenen in einem Zug ändern"),
+  H.p("Diese vier Befehle bearbeiten eine ganze Ebene auf einmal, statt in einer Schleife Kachel für Kachel. Das ist nicht nur kürzer, sondern auch deutlich schneller – und es ist die Grundlage, wenn du selbst einen Karten-Editor oder einen Level-Erzeuger baust."),
+  H.cmd("TILED_FILL_RECT", "TILED_FILL_RECT(m, ebene, tx, ty, breite, hoehe, gid)",
+    "Füllt ein Rechteck von Kacheln mit einer GID und liefert die Zahl der geänderten Kacheln.",
+    [
+      'IMPORT "tiled"',
+      "DIM m AS TILED_MAP",
+      'm = TILED_LOAD("level.json")',
+      "PRINT TILED_FILL_RECT(m, 0, 0, 10, 20, 3, 5)",
+    ]),
+  H.cmd("TILED_FLOOD_FILL", "TILED_FLOOD_FILL(m, ebene, tx, ty, gid)",
+    "Der Farbeimer: färbt die zusammenhängende Fläche ab einer Kachel um – dieselbe Geste wie in einem Malprogramm.",
+    [
+      "PRINT TILED_FLOOD_FILL(m, 0, 5, 5, 7)",
+    ]),
+  H.cmd("TILED_REPLACE · TILED_COUNT_GID", "TILED_REPLACE(m, ebene, von_gid, nach_gid)   TILED_COUNT_GID(m, ebene, gid)",
+    "TILED_REPLACE tauscht jedes Vorkommen einer GID gegen eine andere – so wechselst du ein Tileset aus, ohne eine Schleife zu schreiben. TILED_COUNT_GID zählt, wie oft eine GID in der Ebene vorkommt.",
+    [
+      "PRINT TILED_COUNT_GID(m, 0, 3)",
+      "PRINT TILED_REPLACE(m, 0, 3, 9)      ' Gras wird Stein",
+    ]),
 ];

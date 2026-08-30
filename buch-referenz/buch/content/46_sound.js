@@ -71,4 +71,15 @@ module.exports = (H) => [
       'IF neues_level THEN STOPMUSIC() : PLAYMUSIC("musik/level2.ogg")',
     ]),
   H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor dhsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum Drachenhauch-Werkzeugkasten rund um den Sound."),
+  H.h2("Speicher wieder freigeben"),
+  H.cmd("UNLOADSOUND", "UNLOADSOUND(s)",
+    "Hält den Sound an und gibt seinen Puffer frei. Für ein Spiel mit einer Handvoll Geräuschen braucht man das nie – die bleiben geladen und das ist richtig so. Nötig wird es, wenn ein Programm über die Zeit immer neue Klänge erzeugt oder lädt, etwa ein Musikwerkzeug: Dort summieren sich die Puffer sonst auf.",
+    [
+      "DIM s AS SOUND",
+      's = LOADSOUND("treffer.wav")',
+      "PLAYSOUND(s)",
+      "UNLOADSOUND(s)",
+    ]),
+  H.warn("Der Index bleibt danach gültig, aber ein erneutes Abspielen wirft einen Fehler. Das ist Absicht: Ein stiller Fehlschlag wäre ein Geräusch, das ohne Erklärung ausbleibt – und danach sucht man lange.",
+    "Nach dem Freigeben"),
 ];

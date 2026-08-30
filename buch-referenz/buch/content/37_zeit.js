@@ -3,7 +3,7 @@ module.exports = (H) => [
   H.p("Diese Befehle liefern die aktuelle Uhrzeit, das Datum und die seit Programmstart vergangene Zeit – nützlich für Zeitmessungen, Cooldowns oder einen Zeitstempel im Speicherstand. Weil die Werte vom Zeitpunkt der Ausführung abhängen, zeigen die Beispiele statt einer festen Ausgabe einen repräsentativen Wert als Kommentar."),
 
   H.h2("Vergangene Zeit messen"),
-  H.cmd("MILLIS", "MILLIS()",
+  H.cmd("MILLIS · TIMER", "MILLIS()   TIMER()",
     "Liefert die Anzahl der Millisekunden seit dem Programmstart (1000 ms = 1 Sekunde). Die absolute Zahl ist selten interessant – wertvoll ist die Differenz zweier MILLIS-Werte, um eine Dauer zu messen.",
     [
       'DIM start AS INTEGER',
@@ -45,4 +45,6 @@ module.exports = (H) => [
     '\' z. B.:  Gespeichert am: 2026-06-13 14:30:05',
   ]),
   H.tip("Tempo im Spiel", "Für framerate-unabhängige Bewegung im Spielfenster nimmst du nicht MILLIS, sondern DELTA() – die Sekunden seit dem letzten Bild. Das gehört zum Game-Loop und wird in Teil IV („Das Fenster“) behandelt."),
+  H.note("TIMER liefert dieselbe Uhr wie MILLIS, nur in Sekunden als Kommazahl statt in ganzen Millisekunden. Für eine Bewegung, die mit der Zeit läuft, ist das die bequemere Form; für einen Vergleich auf ganze Millisekunden die andere. Beide zählen ab dem Programmstart und haben nichts mit der Uhrzeit zu tun – dafür ist das Modul zeit da.",
+    "Zwei Namen für eine Uhr"),
 ];

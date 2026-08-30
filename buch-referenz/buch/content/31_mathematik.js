@@ -3,7 +3,7 @@ module.exports = (H) => [
   H.p("Drachenhauch bringt eine vollständige Mathe-Bibliothek mit – von einfachen Funktionen wie Betrag und Wurzel bis zu Trigonometrie und praktischen Spiel-Helfern. Alle hier vorgestellten Funktionen sind direkt verfügbar, ohne IMPORT. Winkel werden, wie in der Mathematik üblich, im Bogenmaß (Radiant) angegeben – mit DEG und RAD rechnest du nach Grad um."),
 
   H.h2("Grundfunktionen"),
-  H.cmd("ABS · SQR · POW · HYPOT", "ABS(x)   SQR(x)   POW(b, e)   HYPOT(x, y)",
+  H.cmd("ABS · SQR · SQRT · POW · HYPOT", "ABS(x)   SQR(x)   SQRT(x)   POW(b, e)   HYPOT(x, y)",
     "ABS liefert den Betrag (das Vorzeichen fällt weg), SQR die Quadratwurzel (x ≥ 0), POW die Potenz (b hoch e), HYPOT die Länge der Hypotenuse – also die Wurzel aus x²+y², ohne Überlauf. (SQRT ist ein erlaubter Zweitname für SQR.)",
     [
       'PRINT ABS(-7)',
@@ -20,6 +20,11 @@ module.exports = (H) => [
     { out: ["2.7183", "1.0"] }),
 
   H.h2("Runden"),
+  H.cmd("LOG10", "LOG10(x)",
+    "Der Zehnerlogarithmus – wie viele Stellen eine Zahl hat, in stetiger Form. Nützlich für Skalen, die über viele Größenordnungen laufen: Lautstärke in Dezibel, Erdbebenstärke, eine Achse mit 1, 10, 100, 1000.",
+    [
+      "PRINT LOG10(1000.0)        ' 3",
+    ]),
   H.cmd("FLOOR · CEIL · ROUND", "FLOOR(x)   CEIL(x)   ROUND(x[, stellen])",
     "FLOOR rundet ab (zur nächstkleineren ganzen Zahl), CEIL auf, ROUND kaufmännisch zur nächsten ganzen Zahl. Mit einem zweiten Argument rundet ROUND auf so viele Nachkommastellen.",
     [
@@ -29,6 +34,12 @@ module.exports = (H) => [
     { out: ["3 4 4", "3.14"] }),
 
   H.h2("Vergleichen & Begrenzen"),
+  H.cmd("CLAMP01", "CLAMP01(v)",
+    "Begrenzt einen Wert auf 0 bis 1 – die Kurzform von CLAMP(v, 0.0, 1.0). Genau der Bereich, in dem Lautstärken, Deckkraft und Fortschritte leben, und deshalb häufig genug für einen eigenen Befehl.",
+    [
+      "PRINT CLAMP01(1.7)         ' 1",
+      "PRINT CLAMP01(-0.2)        ' 0",
+    ]),
   H.cmd("MIN · MAX", "MIN(a, b, ...)   MAX(a, b, ...)",
     "Liefern den kleinsten bzw. größten der übergebenen Werte. Du darfst beliebig viele angeben.",
     [
@@ -55,13 +66,19 @@ module.exports = (H) => [
     { out: ["2.5", "50.0"] }),
 
   H.h2("Trigonometrie"),
-  H.cmd("SIN · COS · TAN · ATAN2", "SIN(x)   COS(x)   TAN(x)   ATAN2(y, x)",
+  H.cmd("SIN · COS · TAN · ATAN · ATAN2", "SIN(x)   COS(x)   TAN(x)   ATAN(x)   ATAN2(y, x)",
     "Die Winkelfunktionen erwarten den Winkel im Bogenmaß. ATAN2(y, x) liefert umgekehrt den Winkel (im Bogenmaß) zum Punkt (x, y) – ideal, um die Richtung von einem Punkt zu einem anderen zu bestimmen. (Ebenfalls vorhanden: ASIN, ACOS, ATAN.)",
     [
       'PRINT ROUND(SIN(PI / 2), 4)',
       'PRINT ROUND(DEG(ATAN2(4.0, 3.0)), 1)',
     ],
     { out: ["1.0", "53.1"] }),
+  H.cmd("ASIN · ACOS", "ASIN(x)   ACOS(x)",
+    "Die Umkehrungen von Sinus und Cosinus: Sie liefern zu einem Verhältnis den Winkel im Bogenmaß. Das Argument muss zwischen -1 und 1 liegen – alles andere hat keinen Winkel und ist ein Fehler.",
+    [
+      "PRINT DEG(ACOS(0.0))       ' 90",
+      "PRINT DEG(ASIN(1.0))       ' 90",
+    ]),
   H.cmd("DEG · RAD", "DEG(bogenmaß)   RAD(grad)",
     "Rechnen zwischen den Winkeleinheiten um: DEG wandelt Bogenmaß in Grad, RAD Grad in Bogenmaß. Praktisch, weil man Winkel oft in Grad denkt, die Funktionen aber Bogenmaß brauchen.",
     [
@@ -94,13 +111,38 @@ module.exports = (H) => [
       'PRINT SGN(-12.5)',
       'PRINT FRAC(3.75)',
     ], { out: ["-1", "0.75"] }),
+  H.cmd("ROUND_HALF_UP", 'ROUND_HALF_UP(x[, nachkommastellen])',
+    "Kaufmännisches Runden: von der Null weg. ROUND rundet die 0.5 zur nächsten geraden Zahl (das ist beim Mitteln von vielen Werten genauer); auf einer Rechnung erwartet man dagegen, dass 2,5 zu 3 wird und -2,5 zu -3.",
+    [
+      "PRINT ROUND_HALF_UP(2.5)          ' 3",
+      "PRINT ROUND_HALF_UP(1.005, 2)     ' 1.01",
+    ]),
+  H.cmd("CENT · EURO$", 'CENT(betrag)   EURO$(cent[, symbol$])',
+    "Der schmale Weg, mit Geld zu rechnen: in ganzen Cent. CENT macht aus einem Betrag ganze Cent und rundet dabei kaufmännisch – es nimmt auch geschriebene Beträge in deutscher Schreibweise. EURO$ zeigt Cent wieder als Betrag an.",
+    [
+      'PRINT CENT("19,99")               \' 1999',
+      "PRINT CENT(19.99)                 ' 1999",
+      "PRINT EURO$(1999)",
+    ]),
+  H.warn("In Kommazahlen zu rechnen ist bei Geld ein Fehler, den man erst beim Kassensturz sieht: INT(19.99 * 100) ergibt 1998, nicht 1999 – weil 19,99 in Fließkomma nicht genau darstellbar ist. Deshalb CENT, und deshalb wird darin ganzzahlig gerechnet.",
+    "Der Cent, der verschwindet"),
+  H.tip("Für mehr als das gibt es einen eigenen Typ", "CENT und EURO$ sind eine Rechenweise – man muss daran denken, dass die Zahl Cent bedeutet. Das Modul geld (Kapitel „Module: zeit & geld“) macht daraus einen Typ, der sich nicht mehr versehentlich mit einer gewöhnlichen Zahl mischen lässt."),
   H.cmd("APPROX", 'APPROX(a, b[, epsilon])',
     "Prüft, ob zwei Kommazahlen NAHEZU gleich sind. Das ist bei Kommazahlen fast immer die richtige Frage: 0.1 + 0.2 ergibt intern nicht exakt 0.3, ein Vergleich mit = schlägt also fehl. Ohne epsilon wird eine kleine Standardtoleranz benutzt.",
     [
       'PRINT 0.1 + 0.2 = 0.3',
       'PRINT APPROX(0.1 + 0.2, 0.3)',
     ], { out: ["FALSE", "TRUE"] }),
-  H.cmd("FBM3", 'FBM3(x, y, z, oktaven)',
+  H.cmd("NOISE · NOISE2 · NOISE3", "NOISE(x)   NOISE2(x, y)   NOISE3(x, y, z)",
+    "Perlin-Rauschen in einer, zwei oder drei Dimensionen. Anders als RND ist es deterministisch und stetig: Benachbarte Eingaben liefern benachbarte Werte, deshalb sieht es aus wie Gelände und nicht wie Grieß. Die zweite Fassung ist die für Landschaften und Wolken, die dritte für Höhlen – oder für eine Fläche, die sich über die Zeit verändert, wenn du als dritte Achse die Zeit einsetzt.",
+    [
+      "PRINT NOISE(0.37)",
+      "PRINT NOISE2(0.37, 1.62)",
+      "PRINT NOISE3(0.37, 1.62, MILLIS() / 1000.0)",
+    ]),
+  H.note("An ganzzahligen Gitterpunkten ist Perlin-Rauschen definitionsgemäß 0. Wer NOISE2(1, 2) abfragt, bekommt darum immer 0 und wundert sich – krumme Werte einsetzen.",
+    "Merke"),
+  H.cmd("FBM · FBM3", 'FBM(x, y, oktaven)   FBM3(x, y, z, oktaven)',
     "Dreidimensionales, geschichtetes Rauschen (fractal brownian motion): mehrere Rausch-Ebenen übereinander ergeben natürlicher wirkende Strukturen als eine einzelne. Mit der dritten Achse als Zeit bekommst du Rauschen, das sich langsam verändert – etwa ziehende Wolken.",
     [
       'DIM wolke AS FLOAT',

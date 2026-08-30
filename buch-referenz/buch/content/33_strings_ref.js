@@ -70,6 +70,17 @@ module.exports = (H) => [
     "Hängt s$ n-mal aneinander (gleichbedeutend mit s$ * n).",
     ['PRINT REPEAT$("=*", 5)', 'PRINT "-" * 10'], { out: ["=*=*=*=*=*", "----------"] }),
 
+  H.h2("Das Dollarzeichen ist bei zwanzig Befehlen freiwillig"),
+  H.p("In alten BASIC-Dialekten war das Dollarzeichen Pflicht: Es sagte, dass etwas Text zurückgibt. Drachenhauch führt es der Gewohnheit wegen weiter, verlangt es aber nicht – bei diesen zwanzig Befehlen sind beide Schreibweisen derselbe Befehl:"),
+  H.code([
+    "PRINT MID(\"Drachenhauch\", 0, 6)     ' Drache",
+    "PRINT MID$(\"Drachenhauch\", 0, 6)    ' dasselbe",
+  ]),
+  H.p("Es betrifft CHR$, DATE$, HEX$, JOIN$, LEFT$, LOWER$, MID$, PADL$, PADR$, READALL$, REPLACE$, REVERSE$, RIGHT$, SPACE$, SPLIT$, STR$, TIME$, TRIM$, UPPER$ und ZIP_READ$."),
+  H.warn("Die Regel gilt nicht allgemein. Von den 78 Befehlen mit Dollarzeichen haben nur diese zwanzig eine Zweitform – bei den übrigen 58 gehört das Zeichen zum Namen, und ohne es gibt es den Befehl nicht. FORMAT$ heißt FORMAT$, ERROR_CODE$ heißt ERROR_CODE$.",
+    "Nicht bei allen"),
+  H.tip("Dieses Buch schreibt durchgehend mit Dollarzeichen", "Nicht weil die andere Form schlechter wäre, sondern damit man an der Signatur sieht, dass Text herauskommt. Wer in fremdem Code die kurze Form findet, sucht sie im Befehls-Index unter dem Namen mit Dollarzeichen."),
+
   H.h2("Als Methode und in Ketten"),
   H.p("Die meisten dieser Funktionen lassen sich auch mit dem Punkt als Methode aufrufen und verketten – oft die lesbarste Form:"),
   H.code([
