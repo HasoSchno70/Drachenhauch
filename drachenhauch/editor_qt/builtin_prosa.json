@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1512,
+ "count": 1513,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -637,6 +637,7 @@
   "HTTP_RESULT": "STRING (Response-Body)",
   "HTTP_SET_HEADER": "— (gilt für alle folgenden Aufrufe)",
   "HTTP_STATUS": "INTEGER (z.B. 200, 404) Status des letzten Abrufs (200 = gut, 404 = nicht da)",
+  "HTTP_TIMEOUT": "Die Zeitgrenze für alle folgenden Aufrufe, 1 bis 600 Sekunden.",
   "HTTP_URL$": "die URL eines laufenden Abrufs",
   "HYPOT": "SQR(x*x + y*y) ohne Overflow",
   "IMAGEHEIGHT": "Pixelgröße",

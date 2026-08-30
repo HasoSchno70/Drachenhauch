@@ -35,7 +35,7 @@ module.exports = (H) => [
     '  }',
     '}',
   ]),
-  H.cmd("ATLAS_LOAD · ATLAS_DRAW", 'ATLAS_LOAD(manifest$)   ATLAS_DRAW(atlas, name$, x, y)',
+  H.cmd("ATLAS_LOAD · ATLAS_DRAW", 'ATLAS_LOAD(manifest$)   ATLAS_DRAW(atlas, name$, x, y[, tint])',
     "ATLAS_LOAD lädt das Manifest und liefert einen SPRITE_ATLAS. ATLAS_DRAW zeichnet das benannte Sub-Sprite bei (x, y).",
     [
       'DIM atlas AS SPRITE_ATLAS',
@@ -51,7 +51,7 @@ module.exports = (H) => [
       'blicktLinks = TRUE',
       'ATLAS_DRAW_FLIPPED(atlas, "walk_a", x, y, blicktLinks, FALSE)',
     ]),
-  H.cmd("BATCH_DRAW · BATCH_FLUSH", 'BATCH_DRAW(atlas, name$, x, y)   BATCH_FLUSH()',
+  H.cmd("BATCH_DRAW · BATCH_FLUSH", 'BATCH_DRAW(atlas, name$, x, y[, tint])   BATCH_FLUSH()',
     "Zwei Befehle aus alten Tagen. BATCH_DRAW ist heute nur ein zweiter Name für ATLAS_DRAW, und BATCH_FLUSH tut überhaupt nichts. Du brauchst beide nicht – sie bleiben nur erhalten, damit älterer Code weiterläuft.",
     [
       'DIM r AS INTEGER',

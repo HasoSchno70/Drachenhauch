@@ -2933,7 +2933,7 @@
   {
    "name": "GUI_GROUPBOX",
    "kind": "core",
-   "signature": "GUI_GROUPBOX(win, x, y, w, h, title$)",
+   "signature": "GUI_GROUPBOX(win, x, y, w, h[, titel$])",
    "module": "gui"
   },
   {

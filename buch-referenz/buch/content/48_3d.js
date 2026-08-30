@@ -72,7 +72,7 @@ module.exports = (H) => [
 
   H.h2("Eigene Formen: Meshes und Modelle"),
   H.p("Ein MODEL ist eine wiederverwendbare Form, die einmal erzeugt und dann beliebig oft gezeichnet wird – anders als CUBE oder SPHERE, die bei jedem Aufruf neu aufgebaut werden. Entweder lädst du eine Datei oder lässt eine Form berechnen."),
-  H.cmd("LOADMODEL · MODEL · MODEL_EX · MODEL_WIRES", 'LOADMODEL(pfad$)   MODEL(m, x, y, z[, skala[, tint]])   MODEL_EX(m, x,y,z, ax,ay,az, winkel, skala, tint)   MODEL_WIRES(m, x, y, z[, skala[, tint]])',
+  H.cmd("LOADMODEL · MODEL · MODEL_EX · MODEL_WIRES", 'LOADMODEL(pfad$)   MODEL(m, x, y, z, skala, tint)   MODEL_EX(m, x,y,z, ax,ay,az, winkel, skala, tint)   MODEL_WIRES(m, x, y, z, skala, tint)',
     "LOADMODEL lädt eine OBJ- oder GLTF-Datei. MODEL zeichnet sie an einer Position, MODEL_EX zusätzlich um eine frei wählbare Achse (ax, ay, az) um winkel Grad gedreht – Skalierung und Farbe sind dort Pflichtangaben. MODEL_WIRES zeichnet nur das Drahtgitter (gut zum Fehlersuchen).",
     [
       'DIM baum AS INTEGER',
@@ -143,7 +143,7 @@ module.exports = (H) => [
       'DIM fackel AS INTEGER',
       'fackel = LIGHT_POINT(2.0, 1.5, 0.0, RGB(255, 160, 60))',
     ]),
-  H.cmd("LIGHT_SET_POS · LIGHT_SET_COLOR · LIGHT_SET_ENABLED", 'LIGHT_SET_POS(licht, x, y, z)   LIGHT_SET_COLOR(licht, farbe)   LIGHT_SET_ENABLED(licht, an)',
+  H.cmd("LIGHT_SET_POS · LIGHT_SET_COLOR · LIGHT_SET_ENABLED", 'LIGHT_SET_POS(licht, x, y, z)   LIGHT_SET_COLOR(licht, farbe)   LIGHT_SET_ENABLED(licht[, an])',
     "Ändern ein bestehendes Licht zur Laufzeit – die Fackel wandert mit dem Spieler mit, die Sonne wechselt zum Abendrot, das Licht geht aus.",
     [
       'LIGHT_SET_POS(fackel, px, py + 1.0, pz)',
@@ -160,7 +160,7 @@ module.exports = (H) => [
     [
       'LIGHT_FOG(RGB(12, 16, 24), 0.04)',
     ]),
-  H.cmd("LIGHT_ENV · LIGHT_ENV_HDR · SKYBOX", 'LIGHT_ENV(himmel, boden, staerke)   LIGHT_ENV_HDR(pfad$[, staerke])   SKYBOX(an)',
+  H.cmd("LIGHT_ENV · LIGHT_ENV_HDR · SKYBOX", 'LIGHT_ENV(himmel, boden, staerke)   LIGHT_ENV_HDR(pfad$[, staerke])   SKYBOX([an])',
     "Umgebungslicht: LIGHT_ENV nimmt vereinfacht zwei Farben an (Himmel oben, Boden unten) – Metalle spiegeln sie dann. LIGHT_ENV_HDR lädt stattdessen ein echtes HDR-Panorama und berechnet daraus die Spiegelungen. SKYBOX zeichnet diese Umgebung zusätzlich als sichtbaren Hintergrund.",
     [
       'LIGHT_ENV(RGB(120, 170, 255), RGB(60, 50, 40), 0.6)',

@@ -29,6 +29,10 @@ from drachenhauch.editor_qt.dhrt_meta import builtin_index
 WURZEL = Path(__file__).resolve().parents[1]
 EXPORT = WURZEL / "tools" / "buch_sig_export.js"
 
+# Ein Aufruf: Name, dann die Klammer samt Inhalt (eine Verschachtelungsebene
+# reicht -- tiefer verschachtelt schreibt keine Signatur).
+AUFRUF = re.compile(r"([A-Za-z_$][A-Za-z0-9_$]*)\s*\(([^()]*(?:\([^()]*\))?[^()]*)\)")
+
 
 def _node_da() -> bool:
     try:
@@ -41,11 +45,11 @@ def arity(sig: str) -> tuple[int, int] | None:
     """(min, max) Argumente aus einer Signatur; None = nicht sicher entscheidbar.
 
     Nachgebaut nach `parse_arity` in compiler.rs, plus die Buch-Eigenheit,
-    mehrere Aufrufformen in eine Zeile zu schreiben (`RND()   RND(n)`) -- die
+    mehrere Aufrufformen nebeneinander zu schreiben (`RND()   RND(n)`) -- die
     werden zur Spanne ueber alle Formen zusammengefasst.
     """
     sig = sig.strip().replace("→", "->").split("->")[0].strip()
-    formen = re.findall(r"[A-Za-z_$][A-Za-z0-9_$]*\s*\(([^()]*)\)", sig)
+    formen = [m.group(2) for m in AUFRUF.finditer(sig)]
     if not formen:
         return None
     spannen = []
@@ -54,7 +58,10 @@ def arity(sig: str) -> tuple[int, int] | None:
         if not inner:
             spannen.append((0, 0))
             continue
-        if "*args" in inner or "..." in inner:
+        # "<3 Punkte>" ist die Buch-Kurzform fuer eine Gruppe von Argumenten,
+        # "..." und "*args" heissen beliebig viele -- in allen drei Faellen
+        # laesst sich die Zahl nicht ablesen, und Raten waere ein Falsch-Alarm.
+        if "*args" in inner or "..." in inner or "<" in inner:
             return None  # bewusst offen gelassen
         bereich = re.match(r"\s*(\d+)\s*\.\.\s*(\d+)\s*Argument", inner)
         if bereich:
@@ -74,6 +81,36 @@ def arity(sig: str) -> tuple[int, int] | None:
         opt = len(stuecke) - pflicht + len(re.findall(r"[\[,]\s*[A-Za-z_]", rest))
         spannen.append((pflicht, pflicht + opt))
     return (min(s[0] for s in spannen), max(s[1] for s in spannen))
+
+
+def formen_je_befehl(sig: str, bekannt: set[str]) -> dict[str, str]:
+    """Aus einer Signaturzeile: welcher Befehl steht dort in welcher Form?
+
+    Das Buch fasst verwandte Befehle in EINEM Eintrag zusammen und schreibt
+    ihre Formen nebeneinander:
+
+        H.cmd("TEMPDIR$ / TEMPFILE$",
+              "TEMPDIR$()   TEMPFILE$([praefix$[, endung$]])", ...)
+
+    Ohne diese Zerlegung blieben solche Eintraege ungeprueft -- und genau
+    darin steckte am 2026-08-30 ein Fehler: TEMPFILE$ war mit der Endung als
+    erstem Argument beschrieben, in Wahrheit ist das ein Vorsatz fuer den
+    Namen. Gefunden hat ihn erst ein Lauf gegen dhrt.
+
+    Zwei Faelle, die KEINE Abweichung sind:
+    * Mehrere Formen desselben Befehls (`RANGE(ende)   RANGE(start, ende)`)
+      sind Alternativen -- sie werden zu einer Spanne zusammengefasst.
+    * Ein Name direkt hinter einem Schraegstrich ist die Kurzform einer
+      Familie (`ECS_FILL_FLOAT/INT(...)`); dort steht nicht der ganze Name.
+    """
+    zusammen: dict[str, list[str]] = {}
+    for m in AUFRUF.finditer(sig):
+        if m.start(1) > 0 and sig[m.start(1) - 1] == "/":
+            continue
+        name = m.group(1).upper()
+        if name in bekannt:
+            zusammen.setdefault(name, []).append(f"{m.group(1)}({m.group(2)})")
+    return {n: "   ".join(fs) for n, fs in zusammen.items()}
 
 
 @pytest.fixture(scope="module")
@@ -105,20 +142,34 @@ def test_arity_liest_die_bekannten_formen() -> None:
     assert arity("PLOTS(xs, ys, farbe, ...)") is None
 
 
+def test_zerlegung_trennt_sammel_eintraege() -> None:
+    """Auch der Zerleger braucht eigene Proben -- er entscheidet, was geprueft wird."""
+    bekannt = {"TEMPDIR$", "TEMPFILE$", "RANGE", "ECS_FILL_FLOAT"}
+    z = formen_je_befehl("TEMPDIR$()   TEMPFILE$([praefix$[, endung$]])", bekannt)
+    assert z == {"TEMPDIR$": "TEMPDIR$()", "TEMPFILE$": "TEMPFILE$([praefix$[, endung$]])"}
+    # Alternativen desselben Befehls kommen zusammen und ergeben eine Spanne.
+    assert arity(formen_je_befehl("RANGE(ende)   RANGE(start, ende)", bekannt)["RANGE"]) == (1, 2)
+    # Die Kurzform hinter dem Schraegstrich zaehlt nicht als eigener Befehl.
+    # Eine zusammengezogene Familie wird GAR NICHT geprueft: vor der Klammer
+    # steht nur das letzte Stueck des Namens, und das ist kein Befehl.
+    assert formen_je_befehl("ECS_FILL_FLOAT/INT(w, ziel$, wert)", bekannt) == {}
+
+
 def test_buch_signaturen_passen_zum_index(buch_eintraege: list[dict]) -> None:
     idx = {b["name"].upper(): b for b in builtin_index()}
+    bekannt = set(idx)
     befund = []
     for e in buch_eintraege:
-        name = e["name"].strip().strip("`").split("(")[0].strip().upper()
-        if name not in idx or not e["sig"].strip():
+        if not e["sig"].strip():
             continue
-        im_buch = arity(e["sig"])
-        im_index = arity(idx[name].get("signature", ""))
-        if im_buch is None or im_index is None or im_buch == im_index:
-            continue
-        befund.append(
-            f"{name} ({e['datei']}): Buch {im_buch} -- Index {im_index}\n"
-            f"    Buch : {e['sig'].strip()}\n"
-            f"    Index: {idx[name]['signature']}"
-        )
+        for name, form in formen_je_befehl(e["sig"], bekannt).items():
+            im_buch = arity(form)
+            im_index = arity(idx[name].get("signature", ""))
+            if im_buch is None or im_index is None or im_buch == im_index:
+                continue
+            befund.append(
+                f"{name} ({e['datei']}): Buch {im_buch} -- Index {im_index}\n"
+                f"    Buch : {form.strip()}\n"
+                f"    Index: {idx[name]['signature']}"
+            )
     assert not befund, "Signatur weicht ab:\n" + "\n".join(befund)

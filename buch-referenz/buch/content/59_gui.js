@@ -178,7 +178,7 @@ module.exports = (H) => [
 
   H.h2("Native Dialoge & scrollbare Fenster"),
   H.warn("Beide öffnen einen echten System-Dialog und blockieren, bis der Nutzer reagiert – die folgenden Beispiele zeigen daher die Verwendung ohne Ausgabe-Kasten.", "GUI_CONFIRM/GUI_MESSAGE nicht automatisiert testbar"),
-  H.cmd("GUI_MESSAGE · GUI_CONFIRM", 'GUI_MESSAGE(titel$, text$)   GUI_CONFIRM(titel$, text$) AS BOOLEAN',
+  H.cmd("GUI_MESSAGE · GUI_CONFIRM", 'GUI_MESSAGE(titel$, text$)   GUI_CONFIRM(titel$, text$[, stil$]) AS BOOLEAN',
     "GUI_MESSAGE zeigt einen einfachen Hinweis-Dialog mit OK-Knopf. GUI_CONFIRM fragt Ok/Abbrechen und liefert TRUE/FALSE – z. B. für eine „Wirklich beenden?“-Sicherheitsabfrage.",
     [
       'GUI_MESSAGE("Gespeichert", "Der Spielstand wurde gesichert.")',
@@ -229,7 +229,7 @@ module.exports = (H) => [
 
   H.h2("Tabellen"),
   H.p("Eine Tabelle zeigt Zeilen und Spalten mit fixierter Kopfzeile – für Highscores, ein Inventar, eine Serverliste. Sie kann weit mehr als Text anzeigen: jede Zelle trägt eigene Farben, eine Ausrichtung und eine ART (Text, Bild, Haken, Balken, Knopf). Sortieren, Filtern, Bearbeiten und Mehrfach-Auswahl bringt sie selbst mit."),
-  H.cmd("GUI_TABLE · GUI_TABLE_HEADERS · GUI_TABLE_COL_WIDTHS", 'GUI_TABLE(win, x, y, w, h)   GUI_TABLE_HEADERS(tab, spalten)   GUI_TABLE_COL_WIDTHS(tab, breiten)',
+  H.cmd("GUI_TABLE · GUI_TABLE_HEADERS · GUI_TABLE_COL_WIDTHS", 'GUI_TABLE(win, x, y, w, h[, spalten[, breiten]])   GUI_TABLE_HEADERS(tab, spalten)   GUI_TABLE_COL_WIDTHS(tab, breiten)',
     "GUI_TABLE legt eine leere Tabelle an. GUI_TABLE_HEADERS setzt die Spaltenüberschriften (ARRAY OF STRING), GUI_TABLE_COL_WIDTHS die Spaltenbreiten in Pixeln (ARRAY OF INTEGER). Ohne Breiten teilt die Tabelle gleichmäßig auf.",
     [
       'DIM tab AS GUI_WIDGET',
@@ -561,8 +561,8 @@ module.exports = (H) => [
     [
       'GUI_THEME_PRESET("modern_dark")',
     ]),
-  H.cmd("GUI_THEME_SET · GUI_THEME_GET · GUI_THEME", 'GUI_THEME_SET(rolle$, farbe)   GUI_THEME_GET(rolle$)   GUI_THEME(rolle$, farbe)',
-    "Einzelne Farbrollen ändern – etwa \"accent\" (Hervorhebung), \"win_bg\", \"title_bg\", \"text_fg\", \"widget_bg\", \"widget_border\". GUI_THEME ist der ältere Name für GUI_THEME_SET.",
+  H.cmd("GUI_THEME_SET · GUI_THEME_GET · GUI_THEME", 'GUI_THEME_SET(rolle$, farbe)   GUI_THEME_GET(rolle$)   GUI_THEME(farbe)',
+    "Einzelne Farbrollen ändern – etwa \"accent\" (Hervorhebung), \"win_bg\", \"title_bg\", \"text_fg\", \"widget_bg\", \"widget_border\". GUI_THEME ist kein Kurzname dafür, sondern ein eigener Befehl mit nur einem Argument: Er setzt die Hervorhebungsfarbe.",
     [
       'GUI_THEME_SET("accent", RGB(255, 160, 40))',
       'PRINT HEX$(GUI_THEME_GET("win_bg"))',

@@ -77,7 +77,7 @@ module.exports = (H) => [
 
   H.h2("Sortieren, Umkehren, Suchen"),
   H.p("Für die häufigsten Aufgaben gibt es fertige Befehle. Wichtig: SORT und REVERSE verändern das Array direkt an Ort und Stelle (man sagt „in place“) – sie geben kein neues Array zurück, sondern krempeln das vorhandene um."),
-  H.cmd("SORT  /  REVERSE", "SORT(arr)   REVERSE(arr)",
+  H.cmd("SORT  /  REVERSE", "SORT(arr[, absteigend])   REVERSE(arr)",
     "SORT ordnet ein eindimensionales Array aufsteigend, REVERSE kehrt die Reihenfolge um. Beide wirken direkt auf das übergebene Array. (SORT kann auch absteigend sortieren oder mit einer eigenen Vergleichsfunktion arbeiten – dazu später.)",
     [
       'DIM werte[4] AS INTEGER',

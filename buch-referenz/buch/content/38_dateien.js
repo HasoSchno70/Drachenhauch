@@ -4,7 +4,7 @@ module.exports = (H) => [
   H.note("Jedes Beispiel hier schreibt und liest echte Dateien. Achte beim Ausprobieren darauf, in welchem Ordner dein Programm liegt – dort entstehen die Dateien."),
 
   H.h2("Datei öffnen & schließen"),
-  H.cmd("OPENFILE · CLOSEFILE", 'OPENFILE(pfad$, modus$)   CLOSEFILE(f)',
+  H.cmd("OPENFILE · CLOSEFILE", 'OPENFILE(pfad$, modus$[, kodierung$])   CLOSEFILE(f)',
     "OPENFILE öffnet eine Datei und liefert ein FILE-Handle. Der Modus ist \"r\" (lesen), \"w\" (neu schreiben, überschreibt) oder \"a\" (anhängen). CLOSEFILE schließt sie wieder – wichtig, damit Geschriebenes sicher auf der Platte landet.",
     [
       'DIM f AS FILE',
@@ -171,5 +171,31 @@ module.exports = (H) => [
       'PRINT DECOMPRESS$(klein) = stand',
     ], { out: ["TRUE"] }),
   H.tip("Speicherstände leicht gemacht", "Für echte Spielstände musst du Dateien nicht selbst Zeile für Zeile verwalten: Das save-Modul (Teil V) bietet komfortable Save-Slots mit benannten Werten, und das json-Modul speichert ganze Datenstrukturen. Die rohen Datei-Befehle hier sind die Grundlage darunter."),
-  H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit und Dateien. In Teil IV geht es um das, wofür Drachenhauch gemacht ist: Grafik, Sound und Spiele."),
+  H.h2("Verzeichnisse und temporäre Dateien"),
+  H.cmd("DIRLIST_REC", "DIRLIST_REC(pfad$[, muster$])",
+    "Wie DIRLIST, aber steigt in alle Unterverzeichnisse hinab. Die Pfade kommen vollständig zurück, nicht nur die Dateinamen.",
+    [
+      "DIM alle AS ARRAY OF STRING",
+      'alle = DIRLIST_REC("projekt", "*.dh")',
+      "PRINT LEN(alle)",
+    ]),
+  H.cmd("RMDIR", "RMDIR(pfad$[, mit_inhalt])",
+    "Entfernt ein Verzeichnis. Es muss leer sein – es sei denn, du gibst mit_inhalt als TRUE mit, dann geht alles darin mit weg. Diese zweite Form verlangt eine ausdrückliche Angabe, weil ein vertippter Pfad sonst einen ganzen Baum mitnähme.",
+    [
+      'RMDIR("leerer_ordner")',
+    ]),
+  H.cmd("TEMPDIR$ · TEMPFILE$", "TEMPDIR$()   TEMPFILE$([praefix$[, endung$]])",
+    "Das Verzeichnis für temporäre Dateien und ein noch nicht vergebener Dateiname darin – der erste Wert ist ein Vorsatz für den Namen, der zweite die Endung. Für Zwischenergebnisse, die niemanden überleben sollen – und für den sicheren Weg, eine Datei zu ersetzen: erst neben sie schreiben, dann umbenennen.",
+    [
+      "PRINT TEMPDIR$()",
+      "DIM zwischen AS STRING",
+      'zwischen = TEMPFILE$("export", ".csv")',
+      'WRITEALL(zwischen, "a;b")',
+    ]),
+  H.cmd("FILETIME", "FILETIME(pfad$)",
+    "Wann die Datei zuletzt geändert wurde, in Sekunden – dieselbe Zeitrechnung wie das Modul zeit. Damit lässt sich prüfen, ob eine Quelle neuer ist als ihr Ergebnis.",
+    [
+      'IMPORT "zeit"',
+      'PRINT ZEIT_TEXT$(FILETIME("daten.txt"))',
+    ]),
 ];
