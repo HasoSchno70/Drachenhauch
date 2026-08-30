@@ -102,7 +102,7 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
 | `GUI_ACTIVE_TAB(win)` | INTEGER | aktiver Reiter-Index |
 | `GUI_SET_ACTIVE_TAB(win, i)` | — | Reiter umschalten |
 
-Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern (TextInput **und** TextArea) des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.dh`](../examples/131_gui_tabs.dh).
+Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen **allen bedienbaren Widgets** des aktiven Fensters — siehe [Bedienung ohne Maus](#bedienung-ohne-maus). Beispiel: [`examples/131_gui_tabs.dh`](../examples/131_gui_tabs.dh).
 
 ### Modale Dialoge
 
@@ -161,6 +161,72 @@ zeichnet solange nicht. Für eine Rückfrage ist das richtig: niemand soll
 weiterklicken können, während die Frage offen ist.
 
 Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.dh`](../examples/132_gui_textarea.dh).
+
+#### `GUI_DIALOG` — derselbe Dialog, aber im eigenen Fenster
+
+`GUI_MESSAGE`/`GUI_CONFIRM` öffnen einen **Kasten des Betriebssystems**. Das
+ist die richtige Wahl für ein Werkzeug — er sieht aus wie alles andere auf
+dem Rechner. Für ein Spiel im Vollbild ist er es oft nicht: er sprengt den
+Look, erscheint als eigenes OS-Fenster, und im Web-Build gibt es ihn gar
+nicht (`dialogs`-Feature).
+
+`GUI_DIALOG` ist die Alternative **innerhalb** deines Fensters: dein Thema,
+dein Maßstab, alles hinter ihm wird abgedunkelt und nimmt keine Klicks mehr
+an.
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `GUI_DIALOG(titel$, text$[, stil$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`) |
+| `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, `1` = OK/Ja, `2` = Abbrechen/Nein |
+| `GUI_MODAL()` | BOOLEAN | steht gerade ein Dialog? |
+
+`\n` im Text (`CHR$(10)`) trennt Zeilen; das Fenster passt sich Text und
+Zeilenzahl an und wird auf dem Bildschirm zentriert.
+
+```basic
+DIM frage AS GUI_WINDOW
+frage = -1                  ' -1 = gerade keiner offen
+
+' ... im Spielablauf:
+IF GUI_CLICKED(loeschen) AND frage < 0 THEN
+    frage = GUI_DIALOG("Löschen", "Eintrag wirklich löschen?", "janein")
+END IF
+
+GUI_UPDATE()
+IF frage >= 0 THEN
+    IF GUI_ANSWER(frage) = 1 THEN eintrag_loeschen() : frage = -1
+    IF GUI_ANSWER(frage) = 2 THEN frage = -1
+END IF
+```
+
+> **Merk dir den offenen Dialog mit `-1` als „keiner".** Nicht mit `0` —
+> Fenster-Handles zählen ab 0, und ausgerechnet die `0` ist das **erste
+> Fenster deines Programms**. `GUI_ANSWER` auf einen negativen Handle
+> liefert darum `0` („keine Antwort"), damit die Abfrage auch dann
+> durchläuft, wenn gar kein Dialog steht.
+
+**`GUI_DIALOG` blockiert nicht.** Es gibt dir ein Fenster zurück, und die
+Antwort holst du dir mit `GUI_ANSWER` — genau wie einen Klick mit
+`GUI_CLICKED`. Das ist kein Kompromiss, sondern die Bauweise des Moduls: ein
+blockierender Dialog müsste mitten in deinem Bild eine eigene Zeichenschleife
+drehen und dabei deinen Layer- und Render-Ziel-Zustand übernehmen.
+
+> **Die Antwort gilt genau ein Bild** — wie `GUI_CLICKED`. Eine Antwort ist
+> ein Ereignis, kein Zustand. Wer sie länger braucht, schreibt sie sich in
+> eine Variable. Danach ist das Dialogfenster weg; sein Handle bleibt gültig,
+> `GUI_ANSWER` liefert dann `0`.
+
+**Wann welchen?**
+
+| | `GUI_MESSAGE` / `GUI_CONFIRM` | `GUI_DIALOG` |
+|---|---|---|
+| Aussehen | Kasten des Betriebssystems | dein Thema, dein Maßstab |
+| Ablauf | blockiert, liefert die Antwort direkt | läuft weiter, Antwort per `GUI_ANSWER` |
+| Web-Build | nein | ja |
+| passt zu | Werkzeug, Editor | Spiel, Vollbild-Anwendung |
+
+Demo für alle drei Neuerungen (Tastatur, Maßstab, Dialog):
+[`examples/159_gui_tastatur_massstab.dh`](../examples/159_gui_tastatur_massstab.dh).
 
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 
@@ -1045,6 +1111,9 @@ stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
 | `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
 | `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
 | `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput) |
+| `GUI_FOCUSED()` → GUI_WIDGET | welches Widget hat den Tastatur-Fokus? (`-1` = keins) |
+| `GUI_SCALE(faktor)` | Anzeige-Maßstab (0.5–4.0), **vor** dem ersten Fenster |
+| `GUI_SCALE_GET()` → FLOAT | aktueller Maßstab |
 | `GUI_HIT_TEST(x, y)` → GUI_WIDGET | oberstes Widget am Bildschirmpunkt, oder `-1` (Selektion im Editor) |
 | `GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)` / `GUI_WINDOW_GET_X/Y/W/H(win)` | Fenster bewegen/skalieren/lesen |
 | `GUI_WINDOW_DESTROY(win)` | Fenster + Inhalt entfernen |
@@ -1324,11 +1393,92 @@ Bild, solange der Zustand anhält. Ausgelöst werden sie in `GUI_UPDATE`;
 aufgerufen wird der Handler danach, damit er die Oberfläche nicht mitten im
 Zustands-Update umbauen kann.
 
-**Fokus bekommen nur Widgets, die ihn auch führen** — Textfeld, Textbereich
-und Zahlenfeld (oder programmatisch über `GUI_FOCUS`). Bei einem Knopf würde
-`on_focus` nie von selbst feuern; der Form-Designer bietet es dort deshalb
-gar nicht erst an.
+**Fokus bekommt jedes bedienbare Widget** (seit 2026-08-30 — vorher nur
+Textfeld, Textbereich und Zahlenfeld). `on_focus`/`on_blur` feuern damit auch
+an Knopf, Kästchen, Klappliste und Baum, sobald `TAB` oder ein Klick dort
+landet. Reine Deko (Beschriftung, Panel, Trennlinie, Gruppe, Werkzeugleiste,
+Fortschritt, Bild, Zeichenfläche) bekommt weiterhin keinen Fokus und feuert
+die beiden Flanken nie.
 
 Alle sechs überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
 — das ist der Weg, über den ein im Form-Designer gebautes Formular seine
 Handler bekommt.
+
+## Bedienung ohne Maus
+
+`TAB` / `SHIFT+TAB` wandert durch **alle bedienbaren Widgets** des aktiven
+Fensters, in Anlege-Reihenfolge und nur über sichtbare, eingeschaltete. Reine
+Deko wird übersprungen — sonst müsste man sich durch Beschriftungen
+hindurchtabben. Das fokussierte Widget bekommt einen **Ring in der
+Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
+
+| Taste | Wirkung |
+|---|---|
+| `TAB` / `SHIFT+TAB` | nächstes / vorheriges Widget |
+| `LEERTASTE`, `ENTER` | Knopf auslösen, Kästchen/Schalter umschalten, Radio wählen, Klappliste auf/zu, Baumknoten auf/zuklappen |
+| `←` `→` `↑` `↓` | Regler/Drehknopf verstellen (ein Zwanzigstel des Bereichs je Druck), Trenner verschieben (8 px), Auswahl in Liste/Klappliste/Baum bewegen |
+| `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
+| `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |
+| `ESC` | offene Klappliste schließen |
+
+Welches Widget gerade dran ist, liefert `GUI_FOCUSED()` (`-1` = keins) —
+gedacht für eine Statuszeile oder einen Hilfetext zum aktiven Feld. Setzen
+lässt sich der Fokus mit `GUI_FOCUS(wdg)`.
+
+```basic
+' Hilfetext zum Widget unter dem Fokus
+DIM aktiv AS GUI_WIDGET
+aktiv = GUI_FOCUSED()
+IF aktiv = feldName THEN TEXT(10, 220, "Vor- und Nachname eingeben")
+IF aktiv = knopfOk THEN TEXT(10, 220, "Uebernimmt die Aenderung")
+```
+
+> **Stolperstein:** Benutzt dein Programm `ESC` zum Beenden, prüfe vorher, ob
+> gerade eine Klappliste offen ist oder eine Tabellenzelle bearbeitet wird
+> (`GUI_TABLE_EDITING_ROW < 0`) — sonst beendet die Taste das Programm,
+> während der Benutzer nur ein Popup schließen wollte.
+
+## Maßstab (hochauflösende Bildschirme)
+
+Alle Maße im `gui`-Modul sind feste Pixel. Auf einem 4K-Bildschirm mit 200 %
+Skalierung wird eine Oberfläche, die für 1920×1080 gebaut wurde, damit
+halb so groß wie gedacht — lesbar, aber winzig. `GUI_SCALE` löst das:
+
+```basic
+IMPORT "gui"
+GUI_SCALE(WINDOW_DPI_X())      ' 1.0 normal, 2.0 auf HiDPI/Retina
+SCREEN(1600, 1000, "Mein Werkzeug", 1)
+' ... ab hier wie immer, in den gewohnten Zahlen
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Formular", 10, 10, 400, 300)
+```
+
+Der Faktor (0.5 bis 4.0) multipliziert **jede Länge, die in die GUI
+hineingeht**: Fenster- und Widget-Geometrie, Titelleisten- und Zeilenhöhen,
+Innenabstände, Spaltenbreiten und die Schriftgröße. Du rechnest also nichts
+um — dein Layout bleibt in den Zahlen, in denen du es entworfen hast.
+
+**Nach außen bleibt alles logisch.** `GUI_GET_X`, `GUI_WINDOW_GET_W`,
+`GUI_TABLE_GET("zeilenhoehe")` und `GUI_TO_JSON` liefern die Zahlen zurück,
+die du hineingegeben hast; `GUI_SET_BOUNDS` nimmt sie genauso entgegen. Ein
+gespeichertes `.dhform` beschreibt damit weiterhin das **Layout**, nicht die
+Anzeige — sonst würde eine Form bei jedem Öffnen und Speichern um den Faktor
+weiterwachsen.
+
+**Die eine Ausnahme ist `GUI_HIT_TEST(x, y)`** — es beantwortet eine Frage
+über den Bildschirm und nimmt deshalb Bildschirm-Pixel, so wie `MOUSEX()`
+sie liefert. Wer eigene Zeichenbefehle (`TEXT`, `BOX`, …) neben ein Widget
+setzen will, rechnet mit `GUI_SCALE_GET()` um:
+
+```basic
+TEXT(GUI_GET_X(feld) * GUI_SCALE_GET(), y, "Pflichtfeld", ROT)
+```
+
+> **`GUI_SCALE` muss vor dem ersten Fenster kommen.** Danach ist es ein
+> Fehler. Schon angelegte Widgets nachträglich umzurechnen ginge nur
+> näherungsweise — jede Runde brächte neue Rundungsfehler, und eine halb
+> skalierte Oberfläche wäre schlimmer als eine klare Absage. Wer den Maßstab
+> zur Laufzeit umstellen will (Einstellungsdialog), baut die Oberfläche nach
+> `GUI_RESET` neu auf.
+
+

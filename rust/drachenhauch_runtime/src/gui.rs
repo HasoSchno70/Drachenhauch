@@ -28,6 +28,8 @@ const KEY_DOWN: i64 = 1073741905;
 const KEY_HOME: i64 = 1073741898;
 const KEY_END: i64 = 1073741901;
 const KEY_ENTER: i64 = 13;
+const KEY_SPACE: i64 = 32;
+const KEY_ESC: i64 = 27;
 const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
@@ -242,6 +244,23 @@ impl Kind {
             _ => return None,
         })
     }
+
+    /// Kann dieses Widget den Tastatur-Fokus bekommen? Genau die Arten, die man
+    /// auch mit der Maus bedient -- reine Deko (Label, Panel, Trennlinie,
+    /// Gruppe, Werkzeugleiste), Anzeigen (Fortschritt, Bild) und die freie
+    /// Zeichenflaeche bleiben aussen vor. EINE Quelle: der Tab-Zyklus, der
+    /// Klick-Fokus und der Fokus-Ring fragen alle hier.
+    fn fokussierbar(self) -> bool {
+        !matches!(self,
+            Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
+            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas)
+    }
+
+    /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
+    /// aktivieren, sie ist ein Zeichen.
+    fn nimmt_text(self) -> bool {
+        matches!(self, Kind::TextInput | Kind::TextArea)
+    }
 }
 
 const DROPDOWN_ITEM_H: i32 = 22;
@@ -331,6 +350,10 @@ pub struct TableState {
     row_bg: Vec<i64>,
     row_h: i32,
     header_h: i32,
+    // Hoehe der Filterzeile. Ein FELD und keine Konstante, weil `head_total`
+    // auf TableState sitzt und den Anzeige-Massstab nicht kennt -- gesetzt
+    // wird sie beim Anlegen der Tabelle (wie row_h/header_h).
+    filter_h: i32,
     zebra: bool,
     grid: bool,
     scroll_x: i32, scroll_y: i32,
@@ -430,7 +453,7 @@ impl Default for TableState {
         TableState {
             headers: vec![], rows: vec![], col_widths: None, col_align: vec![],
             row_fg: vec![], row_bg: vec![],
-            row_h: TBL_ROW_H, header_h: TBL_HEADER_H,
+            row_h: TBL_ROW_H, header_h: TBL_HEADER_H, filter_h: TBL_FILTER_H,
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
@@ -473,7 +496,7 @@ impl TableState {
     /// Filterzeile. An EINER Stelle, damit Treffertest und Zeichnen nicht
     /// auseinander laufen.
     fn head_total(&self) -> i32 {
-        self.header_h + if self.filter_row { TBL_FILTER_H } else { 0 }
+        self.header_h + if self.filter_row { self.filter_h } else { 0 }
     }
 
     /// Passt eine Zeile auf alle gesetzten Filter? Teilstring, ohne Ruecksicht
@@ -628,6 +651,15 @@ struct TreeNode {
     has_children: bool,
 }
 
+/// Wie in einem Textfeld gemessen wird: dieselbe Groesse und Schrift, mit
+/// der auch gezeichnet wird. Eine Quelle fuer beides.
+#[derive(Clone, Copy)]
+struct Mass { size: i32, font: i64 }
+
+impl Mass {
+    fn breite(&self, g: &Graphics, s: &str) -> i32 { g.text_width_in(s, self.size, self.font) }
+}
+
 pub struct Widget {
     kind: Kind,
     x: i32, y: i32, w: i32, h: i32,
@@ -703,6 +735,12 @@ pub struct Window {
     base_w: i32, base_h: i32,        // Referenzgroesse fuer Anchoring (Layout-Basis)
     close_clicked: bool,
     alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
+    // Dialog (GUI_MESSAGE/GUI_CONFIRM): `dlg` markiert das Fenster als Dialog,
+    // `answer` traegt die Antwort GENAU EIN BILD lang -- wie `clicked` bei den
+    // Widgets, und aus demselben Grund: eine Antwort ist ein Ereignis, kein
+    // Zustand. Wer sie behalten will, schreibt sie sich in eine Variable.
+    dlg: bool,
+    answer: i32,   // 0 = keine, 1 = OK/Ja, 2 = Abbrechen/Nein
     // Menues: `in_bar=true` erscheint in der Menueleiste, sonst Kontextmenue
     // (per Rechtsklick im Fenster gezeigt).
     menus: Vec<Menu>,
@@ -762,6 +800,10 @@ pub struct Gui {
     z_order: Vec<usize>,         // Zeichen-/Hit-Reihenfolge (umordbar)
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
+    // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
+    // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
+    // bevor daneben weitergeklickt wird.
+    modal: Option<usize>,
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
@@ -814,6 +856,12 @@ pub struct Gui {
     hover_w: Option<(usize, usize)>,
     hover_frame: i64,
     hover_x: i32, hover_y: i32,
+    // Anzeige-Massstab (GUI_SCALE). Multipliziert JEDE Laengenangabe, die in
+    // die GUI hineingeht: Fenster-/Widget-Geometrie beim Anlegen, die
+    // Chrome-Metriken und die Schriftgroesse. Wirkt nur beim ANLEGEN -- was
+    // schon steht, wird nicht nachtraeglich umgerechnet (darum lehnt
+    // `set_scale` einen Wechsel ab, solange Fenster existieren).
+    scale: f64,
 }
 
 const WIDGET_SHIFT: i64 = 20;
@@ -845,7 +893,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             windows: Vec::new(), z_order: Vec::new(),
-            focus_window: None, focus_widget: None,
+            focus_window: None, focus_widget: None, modal: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
@@ -860,6 +908,7 @@ impl Gui {
             styles: HashMap::new(),
             pending: Vec::new(),
             hover_w: None, hover_frame: 0, hover_x: 0, hover_y: 0,
+            scale: 1.0,
         }
     }
 
@@ -869,13 +918,68 @@ impl Gui {
     pub fn reset(&mut self) {
         let theme = default_theme();
         let metrics = default_metrics();
+        let scale = self.scale;
         *self = Gui::new();
         self.theme = theme;
         self.metrics = metrics;
+        self.scale = scale;   // globale Einstellung, wie Thema/Metriken
     }
 
-    fn m(&self, k: &str) -> i32 { *self.metrics.get(k).unwrap_or(&0) }
+    /// Eine Laenge auf den Anzeige-Massstab bringen. Jede feste Pixelzahl im
+    /// Modul laeuft hier durch -- eine einzige Stelle, an der aus 20 px bei
+    /// Massstab 2 vierzig werden. Mindestens 1, sonst verschwaende eine
+    /// Trennlinie bei kleinem Massstab ganz.
+    fn sk(&self, n: i32) -> i32 {
+        if self.scale == 1.0 { return n; }
+        let v = (n as f64 * self.scale).round() as i32;
+        if n > 0 { v.max(1) } else { v }
+    }
+
+    /// Metriken, die PIXEL sind und darum mitskalieren. Der Rest der
+    /// Metrik-Tabelle sind Staerken und Zaehler (`gradient` = Helligkeits-
+    /// Abstand, `gloss` = 0..100, `bevel` = Schalter, `caret_period` =
+    /// Bilder) -- die zu skalieren waere schlicht falsch.
+    const M_PIXEL: [&'static str; 7] = [
+        "title_h", "slider_h", "check_size", "slider_handle_w",
+        "pad", "corner_radius", "shadow",
+    ];
+
+    fn m(&self, k: &str) -> i32 {
+        let roh = self.m_roh(k);
+        if Self::M_PIXEL.contains(&k) { self.sk(roh) } else { roh }
+    }
+    /// Metrik OHNE Massstab. Nur dort richtig, wo der Wert anschliessend noch
+    /// durch `add_widget` laeuft -- der skaliert selbst, und zweimal waere
+    /// zweimal zu viel.
+    fn m_roh(&self, k: &str) -> i32 { *self.metrics.get(k).unwrap_or(&0) }
     fn th(&self, k: &str) -> i64 { *self.theme.get(k).unwrap_or(&0) }
+
+    /// Anzeige-Massstab setzen. Muss VOR dem ersten Fenster kommen: schon
+    /// angelegte Widgets nachtraeglich umzurechnen ginge nur naeherungsweise
+    /// (jede Runde neue Rundungsfehler), und eine halb skalierte Oberflaeche
+    /// waere schlimmer als eine klare Absage.
+    pub fn set_scale(&mut self, f: f64) -> Result<(), String> {
+        if !(0.5..=4.0).contains(&f) {
+            return Err("GUI_SCALE: Faktor muss zwischen 0.5 und 4.0 liegen".into());
+        }
+        if !self.windows.is_empty() {
+            return Err("GUI_SCALE: erst den Massstab setzen, dann Fenster und                         Widgets anlegen (bereits angelegte werden nicht                         umgerechnet)".into());
+        }
+        self.scale = f;
+        Ok(())
+    }
+    pub fn get_scale(&self) -> f64 { self.scale }
+
+    /// Eine Laenge aus dem Massstab zurueckrechnen. Gegenstueck zu `sk`: was
+    /// nach aussen geht (Getter, gespeicherte Form) ist wieder in der Groesse,
+    /// in der das Programm sie hineingegeben hat. Ohne das waere
+    /// `GUI_SET_BOUNDS(w, GUI_GET_X(w) + 10, ...)` bei Massstab 2 ein Sprung
+    /// um das Doppelte, und eine gespeicherte `.dhform` wuechse mit jedem
+    /// Speichern weiter.
+    fn unsk(&self, n: i32) -> i32 {
+        if self.scale == 1.0 { return n; }
+        (n as f64 / self.scale).round() as i32
+    }
 
     // --- Handles ---
     fn enc_widget(win: usize, idx: usize) -> i64 { ((win as i64) << WIDGET_SHIFT) | idx as i64 }
@@ -897,13 +1001,14 @@ impl Gui {
 
     // --- Konstruktion ---
     pub fn new_window(&mut self, title: String, x: i32, y: i32, w: i32, h: i32) -> i64 {
+        let (x, y, w, h) = (self.sk(x), self.sk(y), self.sk(w), self.sk(h));
         let idx = self.windows.len();
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true,
             resizable: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
-            close_clicked: false, alive: true,
+            close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
             tabs: Vec::new(), active_tab: 0,
@@ -913,14 +1018,102 @@ impl Gui {
         idx as i64
     }
 
+    /// Modales Meldungs-/Rueckfragefenster.
+    ///
+    /// `frage = false` gibt einen "OK"-Knopf (Meldung), `true` gibt "Ja"/"Nein"
+    /// (Rueckfrage). Das Fenster wird auf dem Bildschirm zentriert und passt
+    /// sich dem Text an; `\n` im Text trennt Zeilen.
+    ///
+    /// Es ist BEWUSST nicht blockierend. `gui` ist ein Polling-Toolkit -- ein
+    /// blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene
+    /// Zeichenschleife drehen und wuerde dessen Layer-/Render-Ziel-Zustand
+    /// mitten im Frame uebernehmen. Stattdessen liegt die Antwort ein Bild
+    /// lang in `GUI_ANSWER` an, genau wie ein Klick in `GUI_CLICKED`.
+    pub fn dialog(&mut self, g: &Graphics, titel: String, text: String, frage: bool)
+                  -> Result<i64, String> {
+        // In LOGISCHEN Einheiten rechnen -- `new_window`/`add_widget`
+        // skalieren selbst, und zweimal waere zweimal zu viel.
+        let zeilen: Vec<String> = text.split('\n').map(|z| z.to_string()).collect();
+        let zh = self.unsk(self.ctext_height(g)) + 6;
+        let breiteste = zeilen.iter()
+            .map(|z| self.unsk(self.ctext_width(g, z)))
+            .max().unwrap_or(0)
+            .max(self.unsk(self.ctext_width(g, &titel)) + 30);
+        let knopf_reihe = if frage { 2 } else { 1 };
+        let bw = 84;
+        let ww = (breiteste + 40).clamp(220, 560);
+        // Widget-Koordinaten sind RELATIV zum Inhaltsbereich, die Fensterhoehe
+        // ist es nicht -- die Titelleiste kommt oben drauf. Ohne diesen
+        // Zuschlag rutschte die Knopfreihe unter den unteren Rand.
+        let inhalt_h = 14 + zeilen.len() as i32 * zh + 12 + 26 + 12;
+        let wh = self.m_roh("title_h") + inhalt_h;
+        let (sw, sh) = (self.unsk(g.screen_width() as i32), self.unsk(g.screen_height() as i32));
+        let h = self.new_window(titel, (sw - ww) / 2, (sh - wh) / 2, ww, wh);
+        let wi = h as usize;
+        for (i, z) in zeilen.iter().enumerate() {
+            self.label(h, z.clone(), 16, 14 + i as i32 * zh, None)?;
+        }
+        // Knopfreihe unten rechts -- wie in jedem Systemdialog.
+        let by = inhalt_h - 12 - 26;
+        let gesamt = knopf_reihe * bw + (knopf_reihe - 1) * 8;
+        let bx0 = ww - 16 - gesamt;
+        if frage {
+            self.button(h, "Ja".into(), bx0, by, bw, 26)?;
+            self.button(h, "Nein".into(), bx0 + bw + 8, by, bw, 26)?;
+        } else {
+            self.button(h, "OK".into(), bx0, by, bw, 26)?;
+        }
+        {
+            let win = &mut self.windows[wi];
+            win.dlg = true;
+            win.movable = true;
+            win.closable = frage;   // Schliessen = Abbrechen; eine Meldung hat nur OK
+        }
+        self.modal = Some(wi);
+        self.bring_to_front(wi);
+        self.focus_window = Some(wi);
+        // Fokus auf den ersten Knopf: der Dialog soll sofort mit der Tastatur
+        // beantwortbar sein, ohne erst einmal Tab druecken zu muessen.
+        self.focus_widget = Some((wi, self.windows[wi].widgets.len() - knopf_reihe as usize));
+        Ok(h)
+    }
+
+    /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
+    /// Gilt GENAU EIN BILD -- wie `GUI_CLICKED`.
+    ///
+    /// Ein NEGATIVER Handle ist "gerade kein Dialog" und liefert 0. Ohne
+    /// diesen Ausweg gaebe es keinen freien Wert dafuer: Fenster-Handles
+    /// zaehlen ab 0, und ausgerechnet die 0 ist das ERSTE Fenster des
+    /// Programms -- ein `frage = 0` als "keiner" zeigte also auf das
+    /// Hauptfenster. Merkt man sich den offenen Dialog in einer Variablen,
+    /// setzt man sie auf -1, wenn keiner offen ist.
+    pub fn answer(&self, h: i64) -> Result<i64, String> {
+        if h < 0 { return Ok(0); }
+        let w = self.windows.get(h as usize)
+            .ok_or("GUI_ANSWER: ungueltiges GUI_WINDOW-Handle")?;
+        if !w.dlg { return Err("GUI_ANSWER: das Fenster ist kein Dialog (GUI_MESSAGE/GUI_CONFIRM)".into()); }
+        Ok(w.answer as i64)
+    }
+
+    /// Steht gerade ein modaler Dialog? Fuer Programme, die ESC selbst
+    /// belegen und nicht beenden wollen, waehrend eine Frage offen ist.
+    pub fn modal_offen(&self) -> bool { self.modal.is_some() }
+
     fn add_widget(&mut self, win: i64, fn_: &str, mut wdg: Widget) -> Result<i64, String> {
         let wi = win as usize;
+        // Massstab VOR dem veraenderlichen Zugriff auf `windows` -- `sk` liest
+        // `self`, und beides gleichzeitig laesst der Compiler nicht zu.
+        let (sx, sy, sw, sh) = (self.sk(wdg.x), self.sk(wdg.y), self.sk(wdg.w), self.sk(wdg.h));
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
         // `color` wird hier BEWUSST nicht aus dem Thema gefuellt. Frueher wurde
         // die Textfarbe beim Anlegen kopiert und damit eingefroren: wer danach
         // das Thema wechselte, hatte Beschriftungen in der Farbe des alten --
         // im hellen Thema also weisse Schrift auf weissem Grund. -1 heisst
         // "dem Thema folgen" und wird erst beim Zeichnen aufgeloest.
+        // Massstab: hier, weil JEDES Widget durch diesen Trichter laeuft --
+        // auch die aus `GUI_LOAD`/`GUI_FROM_JSON`. Eine im Designer bei
+        // Massstab 1 gebaute Form wird damit einfach groesser gezeichnet.
+        wdg.x = sx; wdg.y = sy; wdg.w = sw; wdg.h = sh;
         wdg.bx = wdg.x; wdg.by = wdg.y; wdg.bw = wdg.w; wdg.bh = wdg.h;  // Anchor-Basis
         let idx = w.widgets.len();
         w.widgets.push(wdg);
@@ -1004,10 +1197,12 @@ impl Gui {
         self.win_mut(h, "GUI_WINDOW_CHROME")?.chrome = f; Ok(())
     }
     pub fn window_min_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
+        let (w, ht) = (self.sk(w), self.sk(ht));
         let win = self.win_mut(h, "GUI_WINDOW_SET_MIN_SIZE")?;
         win.min_w = w.max(0); win.min_h = ht.max(0); Ok(())
     }
     pub fn window_max_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
+        let (w, ht) = (self.sk(w), self.sk(ht));
         let win = self.win_mut(h, "GUI_WINDOW_SET_MAX_SIZE")?;
         win.max_w = w.max(0); win.max_h = ht.max(0); Ok(())
     }
@@ -1042,7 +1237,7 @@ impl Gui {
         Ok(h)
     }
     pub fn checkbox(&mut self, win: i64, label: String, x: i32, y: i32, default: bool) -> Result<i64, String> {
-        let cs = self.m("check_size");
+        let cs = self.m_roh("check_size");
         let mut wd = Self::blank(Kind::Checkbox, x, y, cs, cs); wd.text = label; wd.checked = default;
         self.add_widget(win, "GUI_CHECKBOX", wd)
     }
@@ -1050,7 +1245,7 @@ impl Gui {
     /// `checked`, also lesbar mit GUI_CHECKED und setzbar mit GUI_SET_CHECKED.
     /// `value` fuehrt die Schiebe-Animation (0 = aus, 1 = an).
     pub fn toggle(&mut self, win: i64, label: String, x: i32, y: i32, default: bool) -> Result<i64, String> {
-        let h = self.m("check_size").max(14);
+        let h = self.m_roh("check_size").max(14);
         let mut wd = Self::blank(Kind::Toggle, x, y, h * 2, h);
         wd.text = label;
         wd.checked = default;
@@ -1072,7 +1267,7 @@ impl Gui {
 
     pub fn slider(&mut self, win: i64, x: i32, y: i32, w: i32, mn: f64, mx: f64, default: f64) -> Result<i64, String> {
         if mx <= mn { return Err("GUI_SLIDER: max muss > min sein".into()); }
-        let sh = self.m("slider_h");
+        let sh = self.m_roh("slider_h");
         let mut wd = Self::blank(Kind::Slider, x, y, w, sh);
         wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
         self.add_widget(win, "GUI_SLIDER", wd)
@@ -1082,7 +1277,7 @@ impl Gui {
     pub fn spinner(&mut self, win: i64, x: i32, y: i32, w: i32, mn: f64, mx: f64,
                    default: f64, step: f64) -> Result<i64, String> {
         if mx <= mn { return Err("GUI_SPINNER: max muss > min sein".into()); }
-        let h = (self.m("title_h") + 2).max(26);
+        let h = (self.m_roh("title_h") + 2).max(26);
         let mut wd = Self::blank(Kind::Spinner, x, y, w.max(48), h);
         wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
         wd.step = if step != 0.0 { step.abs() } else { 1.0 };
@@ -1109,7 +1304,7 @@ impl Gui {
                                else { (x, y.clamp(mn, mx), len, THICK) };
         let mut wd = Self::blank(Kind::Splitter, rx, ry, rw, rh);
         wd.group = if vert { "v".into() } else { "h".into() };
-        wd.min = mn as f64; wd.max = mx as f64;
+        wd.min = self.sk(mn) as f64; wd.max = self.sk(mx) as f64;
         self.add_widget(win, "GUI_SPLITTER", wd)
     }
     pub fn panel(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, title: String) -> Result<i64, String> {
@@ -1138,7 +1333,7 @@ impl Gui {
 
     // --- Formular-Widgets (Phase 3): Radio, Dropdown, ProgressBar ---
     pub fn radio(&mut self, win: i64, group: String, label: String, x: i32, y: i32) -> Result<i64, String> {
-        let cs = self.m("check_size");
+        let cs = self.m_roh("check_size");
         let mut wd = Self::blank(Kind::Radio, x, y, cs, cs);
         wd.text = label; wd.group = group;
         self.add_widget(win, "GUI_RADIO", wd)
@@ -1270,7 +1465,15 @@ impl Gui {
     }
     pub fn table(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Table, x, y, w, h);
-        wd.tbl = Some(Box::new(TableState { selected: -1, hover_row: -1, clicked_row: -1, ..Default::default() }));
+        // Zeilen-/Kopf-/Filterhoehe sind Pixel und muessen mit dem Massstab
+        // wachsen. TableState::default() kennt ihn nicht (es ist kein Gui),
+        // darum hier -- an der einen Stelle, an der eine Tabelle entsteht.
+        wd.tbl = Some(Box::new(TableState {
+            selected: -1, hover_row: -1, clicked_row: -1,
+            row_h: self.sk(TBL_ROW_H), header_h: self.sk(TBL_HEADER_H),
+            filter_h: self.sk(TBL_FILTER_H),
+            ..Default::default()
+        }));
         self.add_widget(win, "GUI_TABLE", wd)
     }
     pub fn table_set_headers(&mut self, h: i64, headers: Vec<String>) -> Result<(), String> {
@@ -1305,6 +1508,9 @@ impl Gui {
         Ok(())
     }
     pub fn table_set_col_widths(&mut self, h: i64, widths: Option<Vec<i32>>) -> Result<(), String> {
+        // Spaltenbreiten sind Pixel und muessen mitwachsen -- sonst bliebe die
+        // Tabelle bei Massstab 2 als einziges Element in Originalbreite stehen.
+        let widths = widths.map(|v| v.into_iter().map(|b| self.sk(b)).collect::<Vec<i32>>());
         let t = self.tbl_mut(h, "GUI_TABLE_COL_WIDTHS")?;
         if let Some(ref cw) = widths {
             let n = t.n_cols();
@@ -1471,13 +1677,17 @@ impl Gui {
     /// Ein Setter statt einem Builtin je Schalter -- wie bei `chart`. Ein
     /// unbekannter Schluessel zaehlt die gueltigen auf, statt still nichts zu tun.
     pub fn table_set_opt(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        // Massstab vor dem Zugriff auf die Tabelle merken: `sk` liest `self`,
+        // und `tbl_mut` haelt es bis zum Ende veraenderlich in der Hand.
+        let ms = self.scale;
+        let skal = |v: i32| if ms == 1.0 { v } else { ((v as f64 * ms).round() as i32).max(1) };
         let t = self.tbl_mut(h, "GUI_TABLE_SET")?;
         let n = wert as i32;
         match key.to_lowercase().as_str() {
             // Untergrenze: eine Zeilenhoehe von 0 waere eine Division durch null
             // im Treffertest, eine negative ein Absturz beim Zeichnen.
-            "zeilenhoehe" | "row_height" => t.row_h = n.clamp(8, 400),
-            "kopfhoehe" | "header_height" => t.header_h = n.clamp(0, 200),
+            "zeilenhoehe" | "row_height" => t.row_h = skal(n.clamp(8, 400)),
+            "kopfhoehe" | "header_height" => t.header_h = skal(n.clamp(0, 200)),
             "zebra" => t.zebra = n != 0,
             "gitter" | "grid" => t.grid = n != 0,
             "filterzeile" | "filter_row" => { t.filter_row = n != 0; if n == 0 { t.filter_focus = -1; } }
@@ -1501,10 +1711,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         Ok(())
     }
     pub fn table_get_opt(&self, h: i64, key: &str) -> Result<f64, String> {
+        let ms = self.scale;
+        let entskal = |v: i32| if ms == 1.0 { v } else { (v as f64 / ms).round() as i32 };
         let t = self.tbl_ref(h, "GUI_TABLE_GET")?;
         Ok(match key.to_lowercase().as_str() {
-            "zeilenhoehe" | "row_height" => t.row_h as f64,
-            "kopfhoehe" | "header_height" => t.header_h as f64,
+            "zeilenhoehe" | "row_height" => entskal(t.row_h) as f64,
+            "kopfhoehe" | "header_height" => entskal(t.header_h) as f64,
             "zebra" => if t.zebra { 1.0 } else { 0.0 },
             "gitter" | "grid" => if t.grid { 1.0 } else { 0.0 },
             "filterzeile" | "filter_row" => if t.filter_row { 1.0 } else { 0.0 },
@@ -1746,12 +1958,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn tree_hover(&mut self, wi: usize, idx: usize, my: i32, g: &mut Graphics) {
         let (_ax, ay, _w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let vis = Self::tree_visible(self.windows[wi].widgets[idx].tree.as_ref().unwrap());
-        let max_scroll = (vis.len() as i32 * TREE_ROW_H - (h - 2)).max(0);
+        let zeile_h = self.sk(TREE_ROW_H);   // vor dem mut-Zugriff auf den Baum
+        let max_scroll = (vis.len() as i32 * zeile_h - (h - 2)).max(0);
         let wheel = g.pop_mouse_wheel();
         let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
         t.scroll = t.scroll.clamp(0, max_scroll);
-        if wheel != 0 { t.scroll = (t.scroll - wheel as i32 * TREE_ROW_H).clamp(0, max_scroll); }
-        let row = (my - (ay + 1) + t.scroll) / TREE_ROW_H;
+        if wheel != 0 { t.scroll = (t.scroll - wheel as i32 * zeile_h).clamp(0, max_scroll); }
+        let row = (my - (ay + 1) + t.scroll) / zeile_h;
         t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
     }
 
@@ -1759,13 +1972,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (ax, ay, _w, _h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let t = self.windows[wi].widgets[idx].tree.as_ref().unwrap();
         let vis = Self::tree_visible(t);
-        let row = (my - (ay + 1) + t.scroll) / TREE_ROW_H;
+        let row = (my - (ay + 1) + t.scroll) / self.sk(TREE_ROW_H);
         if row < 0 || row as usize >= vis.len() { return; }
         let ni = vis[row as usize];
         let level = t.nodes[ni].level;
         let has_children = t.nodes[ni].has_children;
-        let toggle_x = ax + 4 + level * TREE_INDENT;
-        let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + TREE_TOGGLE_W;
+        let toggle_x = ax + 4 + level * self.sk(TREE_INDENT);
+        let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + self.sk(TREE_TOGGLE_W);
         if on_toggle {
             let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
             let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
@@ -1801,8 +2014,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let roh: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
-                let avail = ww - TBL_SCROLL_W - 2;
-                let per = if n_cols > 0 { (avail / n_cols as i32).max(TBL_MIN_COL_W) } else { 0 };
+                let avail = ww - self.sk(TBL_SCROLL_W) - 2;
+                let per = if n_cols > 0 { (avail / n_cols as i32).max(self.sk(TBL_MIN_COL_W)) } else { 0 };
                 vec![per; n_cols]
             }
         };
@@ -1814,10 +2027,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let total_w: i32 = col_widths.iter().sum();
         let total_h = n_rows as i32 * row_h;
         let mut need_v = total_h > body_h_raw;
-        let need_h = total_w > body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
-        if need_h && total_h > body_h_raw - TBL_SCROLL_W { need_v = true; }
-        let body_w = body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
-        let body_h = body_h_raw - if need_h { TBL_SCROLL_W } else { 0 };
+        let need_h = total_w > body_w_raw - if need_v { self.sk(TBL_SCROLL_W) } else { 0 };
+        if need_h && total_h > body_h_raw - self.sk(TBL_SCROLL_W) { need_v = true; }
+        let body_w = body_w_raw - if need_v { self.sk(TBL_SCROLL_W) } else { 0 };
+        let body_h = body_h_raw - if need_h { self.sk(TBL_SCROLL_W) } else { 0 };
         let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
             ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths, row_h, header_h,
@@ -1860,8 +2073,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         let gm = self.table_geom(wi, idx);
         if gm.need_v {
-            let sb_x = gm.ax + gm.body_w_raw - TBL_SCROLL_W + 1;
-            if Self::in_rect(mx, my, (sb_x, gm.body_y, TBL_SCROLL_W, gm.body_h)) {
+            let sb_x = gm.ax + gm.body_w_raw - self.sk(TBL_SCROLL_W) + 1;
+            if Self::in_rect(mx, my, (sb_x, gm.body_y, self.sk(TBL_SCROLL_W), gm.body_h)) {
                 let off = Self::handle_height(gm.body_h, gm.body_h, gm.total_h) / 2;
                 { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_v = true; t.drag_off = off; }
                 self.active_table = Some((wi, idx));
@@ -1870,8 +2083,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
         if gm.need_h {
-            let hs_y = gm.ay + gm.h - TBL_SCROLL_W - 1;
-            if Self::in_rect(mx, my, (gm.body_x, hs_y, gm.body_w, TBL_SCROLL_W)) {
+            let hs_y = gm.ay + gm.h - self.sk(TBL_SCROLL_W) - 1;
+            if Self::in_rect(mx, my, (gm.body_x, hs_y, gm.body_w, self.sk(TBL_SCROLL_W))) {
                 let off = Self::handle_height(gm.body_w, gm.body_w, gm.total_w) / 2;
                 { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_h = true; t.drag_off = off; }
                 self.active_table = Some((wi, idx));
@@ -1888,7 +2101,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if my >= gm.ay && my < gm.ay + titel_h {
             // Zuerst pruefen, ob die Maus auf einer SPALTENKANTE liegt --
             // sonst wuerde jeder Griff nach der Kante die Spalte sortieren.
-            let kante = Self::edge_at(&gm, mx);
+            let kante = Self::edge_at(&gm, mx, self.sk(TBL_EDGE_GRAB));
             if kante >= 0 {
                 let breite = gm.col_widths[kante as usize];
                 // `edge_at` liefert eine ANZEIGE-Position, die Breiten haengen
@@ -1927,7 +2140,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             return;
         }
-        if filter_an && my >= gm.ay + titel_h && my < gm.ay + titel_h + TBL_FILTER_H {
+        if filter_an && my >= gm.ay + titel_h && my < gm.ay + titel_h + self.sk(TBL_FILTER_H) {
             let c = Self::col_at(&gm, mx);
             let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
             t.filter_focus = c;
@@ -2029,10 +2242,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Liegt `mx` auf der rechten Kante einer Spalte? Liefert deren Index.
     /// Der Fangbereich ist bewusst breiter als ein Pixel -- eine Kante, die
     /// man auf den Punkt genau treffen muss, findet niemand.
-    fn edge_at(gm: &TGeom, mx: i32) -> i32 {
+    fn edge_at(gm: &TGeom, mx: i32, grab: i32) -> i32 {
         for c in 0..gm.col_widths.len() {
             let rechts = Self::col_x(gm, c) + gm.col_widths[c];
-            if (mx - rechts).abs() <= TBL_EDGE_GRAB { return c as i32; }
+            if (mx - rechts).abs() <= grab { return c as i32; }
         }
         -1
     }
@@ -2096,6 +2309,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     fn table_edit_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let ms = self.mass(g, &self.windows[wi].widgets[i]);
         let ctrl = g.key_ctrl();
         let shift = g.key_shift();
         // Enter/ESC zuerst -- danach ist die Bearbeitung vorbei und alles
@@ -2127,7 +2341,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if maus_an && g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let ziel = mx - (rx + 5) + scroll;
-            let idx = Self::caret_index_at(g, &chars, ziel);
+            let idx = Self::caret_index_at(g, &chars, ziel, ms);
             if !self.was_mouse_down {
                 let drin = rect.map(|r| Self::in_rect(mx, my, r)).unwrap_or(false);
                 if drin { caret = idx; anchor = idx; }
@@ -2140,7 +2354,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
         // Versatz nachfuehren, damit die Schreibmarke im Feld bleibt.
         let vor: String = chars[..caret.clamp(0, chars.len() as i32) as usize].iter().collect();
-        let marke_px = g.text_width(&vor);
+        let marke_px = ms.breite(g, &vor);
         let innen = (rw - 10).max(1);
         let mut scroll = scroll;
         if marke_px - scroll > innen { scroll = marke_px - innen; }
@@ -2193,11 +2407,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
     fn table_drag(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
         let gm = self.table_geom(wi, idx);
+        // Beide Laengen vor dem mut-Zugriff auf die Tabelle.
+        let (zug_min, spalte_min) = (self.sk(HEAD_DRAG_MIN), self.sk(TBL_MIN_COL_W));
         let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
         if let Some((pos, x0, bewegt)) = t.head_drag {
             // Erst ab einer Mindeststrecke gilt es als Zug -- ein Klick
             // wackelt fast immer um ein, zwei Punkte.
-            if !bewegt && (mx - x0).abs() < HEAD_DRAG_MIN { return; }
+            if !bewegt && (mx - x0).abs() < zug_min { return; }
             if !t.reorderable { return; }
             let mut pos = pos;
             t.head_drag = Some((pos, x0, true));
@@ -2218,7 +2434,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if t.drag_col >= 0 {
             let c = t.drag_col as usize;
-            let neu = (t.drag_col_w + (mx - t.drag_col_x)).max(TBL_MIN_COL_W);
+            let neu = (t.drag_col_w + (mx - t.drag_col_x)).max(spalte_min);
             if let Some(cw) = t.col_widths.as_mut() {
                 if c < cw.len() { cw[c] = neu; }
             }
@@ -2475,11 +2691,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     // Basis fuer dynamische UIs und einen WYSIWYG-Editor. Widget-Koordinaten sind
     // fenster-relativ (wie bei der Konstruktion).
     pub fn set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
+        let (x, y, w, ht) = (self.sk(x), self.sk(y), self.sk(w), self.sk(ht));
         let wd = self.wdg_mut(h, "GUI_SET_BOUNDS")?;
         wd.x = x; wd.y = y; wd.w = w.max(0); wd.h = ht.max(0); Ok(())
     }
     pub fn widget_bounds(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
-        let w = self.wdg(h, fn_)?; Ok((w.x, w.y, w.w, w.h))
+        let w = self.wdg(h, fn_)?;
+        Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
     pub fn destroy(&mut self, h: i64) -> Result<(), String> {
         let (wi, i) = Self::dec_widget(h);
@@ -2530,6 +2748,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.bring_to_front(wi);
         Ok(())
     }
+
+    /// Handle des Widgets mit Tastatur-Fokus, oder -1. Gegenstueck zu
+    /// GUI_FOCUS -- ohne Abfrage koennte ein Programm nicht anzeigen, worauf
+    /// die Tastatur gerade wirkt (Hilfetext zum aktiven Feld, Statuszeile).
+    pub fn focused(&self) -> i64 {
+        match self.focus_widget {
+            Some((wi, i)) => {
+                let lebt = self.windows.get(wi)
+                    .and_then(|w| w.widgets.get(i).map(|x| x.alive && w.alive))
+                    .unwrap_or(false);
+                if lebt { Self::enc_widget(wi, i) } else { -1 }
+            }
+            None => -1,
+        }
+    }
     /// Oberstes lebendes+sichtbares Widget am Bildschirmpunkt (Z-Order), oder -1.
     /// Liefert ein Widget-Handle (fuer Selektion im WYSIWYG-Editor).
     pub fn hit_test(&self, mx: i32, my: i32) -> i64 {
@@ -2556,6 +2789,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     // Window-Geometrie / Lifecycle / Enumeration.
     pub fn window_set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
+        let (x, y, w, ht) = (self.sk(x), self.sk(y), self.sk(w), self.sk(ht));
         let win = self.win_mut(h, "GUI_WINDOW_SET_BOUNDS")?;
         let (ow, oh) = (win.w, win.h);
         win.x = x; win.y = y; win.w = w.max(0); win.h = ht.max(0);
@@ -2568,7 +2802,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     pub fn window_bounds(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
         let w = self.windows.get(h as usize)
             .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
-        Ok((w.x, w.y, w.w, w.h))
+        Ok((self.unsk(w.x), self.unsk(w.y), self.unsk(w.w), self.unsk(w.h)))
     }
     /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
     /// darin), egal ob das Fenster gerade zerstoert, unsichtbar gemacht oder
@@ -2641,10 +2875,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     // --- Serialisierung (Layout als JSON; Editor<->Runtime-Kreis) ---
-    fn widget_json(w: &Widget) -> serde_json::Value {
+    /// Ein Widget als JSON. Die Groessen werden in den LOGISCHEN Massstab
+    /// zurueckgerechnet: eine `.dhform` beschreibt das Layout, nicht die
+    /// Anzeige. Sonst waere jede bei Massstab 2 gespeicherte Datei beim
+    /// naechsten Laden doppelt so gross -- und wieder, und wieder.
+    fn widget_json(&self, w: &Widget) -> serde_json::Value {
         let mut o = serde_json::json!({
             "kind": w.kind.as_str(),
-            "x": w.x, "y": w.y, "w": w.w, "h": w.h,
+            "x": self.unsk(w.x), "y": self.unsk(w.y),
+            "w": self.unsk(w.w), "h": self.unsk(w.h),
             "text": w.text, "color": w.color,
             "value": w.value, "min": w.min, "max": w.max,
             "checked": w.checked, "placeholder": w.placeholder, "visible": w.visible,
@@ -2711,8 +2950,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             });
             // Nur schreiben, was vom Standard abweicht -- sonst waere jede
             // gespeicherte Form voller Vorgabewerte.
-            if t.row_h != TBL_ROW_H { tj["row_h"] = serde_json::json!(t.row_h); }
-            if t.header_h != TBL_HEADER_H { tj["header_h"] = serde_json::json!(t.header_h); }
+            if t.row_h != self.sk(TBL_ROW_H) { tj["row_h"] = serde_json::json!(self.unsk(t.row_h)); }
+            if t.header_h != self.sk(TBL_HEADER_H) { tj["header_h"] = serde_json::json!(self.unsk(t.header_h)); }
             if t.zebra { tj["zebra"] = serde_json::json!(true); }
             if !t.grid { tj["grid"] = serde_json::json!(false); }
             if !t.col_align.is_empty() { tj["col_align"] = serde_json::json!(t.col_align); }
@@ -2891,7 +3130,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             .filter(|w| w.alive)
             .ok_or("GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle")?;
         let widgets: Vec<serde_json::Value> =
-            win.widgets.iter().filter(|w| w.alive).map(Self::widget_json).collect();
+            win.widgets.iter().filter(|w| w.alive).map(|w| self.widget_json(w)).collect();
         let menus: Vec<serde_json::Value> = win.menus.iter().map(|m| serde_json::json!({
             "label": m.label, "in_bar": m.in_bar,
             "items": m.items.iter().map(|it| serde_json::json!({
@@ -2899,10 +3138,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             })).collect::<Vec<_>>(),
         })).collect();
         let obj = serde_json::json!({
-            "title": win.title, "x": win.x, "y": win.y, "w": win.w, "h": win.h,
+            "title": win.title,
+            "x": self.unsk(win.x), "y": self.unsk(win.y),
+            "w": self.unsk(win.w), "h": self.unsk(win.h),
             "movable": win.movable, "closable": win.closable, "visible": win.visible,
             "resizable": win.resizable, "chrome": win.chrome,
-            "min_w": win.min_w, "min_h": win.min_h, "max_w": win.max_w, "max_h": win.max_h,
+            "min_w": self.unsk(win.min_w), "min_h": self.unsk(win.min_h),
+            "max_w": self.unsk(win.max_w), "max_h": self.unsk(win.max_h),
             "widgets": widgets,
             "menus": menus, "tabs": win.tabs, "active_tab": win.active_tab,
         });
@@ -2921,11 +3163,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.windows[wi].visible = v["visible"].as_bool().unwrap_or(true);
         self.windows[wi].resizable = v["resizable"].as_bool().unwrap_or(false);
         self.windows[wi].chrome = v["chrome"].as_bool().unwrap_or(true);
-        self.windows[wi].min_w = gi("min_w", 0); self.windows[wi].min_h = gi("min_h", 0);
-        self.windows[wi].max_w = gi("max_w", 0); self.windows[wi].max_h = gi("max_h", 0);
+        self.windows[wi].min_w = self.sk(gi("min_w", 0)); self.windows[wi].min_h = self.sk(gi("min_h", 0));
+        self.windows[wi].max_w = self.sk(gi("max_w", 0)); self.windows[wi].max_h = self.sk(gi("max_h", 0));
         if let Some(arr) = v["widgets"].as_array() {
             for wj in arr {
-                let wdg = Self::widget_from_json(wj)?;
+                let mut wdg = Self::widget_from_json(wj)?;
+                // Dieser Weg geht NICHT durch `add_widget` -- der Massstab muss
+                // hier eigens angewandt werden, sonst laege eine geladene Form
+                // als einzige in Originalgroesse im vergroesserten Fenster.
+                wdg.x = self.sk(wdg.x); wdg.y = self.sk(wdg.y);
+                wdg.w = self.sk(wdg.w); wdg.h = self.sk(wdg.h);
+                wdg.bx = wdg.x; wdg.by = wdg.y; wdg.bw = wdg.w; wdg.bh = wdg.h;
+                if let Some(t) = wdg.tbl.as_mut() {
+                    t.row_h = self.sk(t.row_h); t.header_h = self.sk(t.header_h);
+                    t.filter_h = self.sk(t.filter_h);
+                    if let Some(cw) = t.col_widths.as_mut() {
+                        for b in cw.iter_mut() { *b = self.sk(*b); }
+                    }
+                }
                 self.windows[wi].widgets.push(wdg);
             }
         }
@@ -2992,7 +3247,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     /// Hoehe der Menueleiste dieses Fensters (0, wenn keine Bar-Menues).
     fn menubar_h(&self, win: usize) -> i32 {
-        if self.windows[win].menus.iter().any(|m| m.in_bar) { MENUBAR_H } else { 0 }
+        if self.windows[win].menus.iter().any(|m| m.in_bar) { self.sk(MENUBAR_H) } else { 0 }
     }
     /// Oberkante des Inhaltsbereichs (Titelleiste + Menueleiste + Reiter-Leiste).
     fn content_top(&self, win: usize) -> i32 {
@@ -3014,7 +3269,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let mut x = win.x + pad;
         let mut out = Vec::new();
         for (ti, label) in win.tabs.iter().enumerate() {
-            let wl = g.text_width(label) + pad * 3;
+            let wl = self.ctext_width(g, label) + pad * 3;
             out.push((ti, x, x + wl));
             x += wl + 2;
         }
@@ -3128,7 +3383,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
     /// Schriftgroesse dieses Widgets in Pixeln.
     fn wsize(&self, g: &Graphics, w: &Widget) -> i32 {
-        if w.font_size > 0 { w.font_size } else { g.text_height() }
+        self.sk(if w.font_size > 0 { w.font_size } else { g.text_height() })
     }
 
     /// Breite eines Textes so, wie `wtext` ihn zeichnen WIRD.
@@ -3139,7 +3394,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Weicht das Messen davon ab, sitzt zentrierter Text schief und der
     /// Beschnitt greift an der falschen Stelle.
     fn wtext_width(&self, g: &Graphics, w: &Widget, s: &str) -> i32 {
-        if w.font == -1 && w.font_size == 0 {
+        if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
             g.text_width(s)
         } else {
             g.text_width_in(s, self.wsize(g, w), self.wfont(g, w))
@@ -3157,8 +3412,37 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         font_wahl(w.font, g.active_font())
     }
 
+    /// Text der Fenster-Chrome: Titel, Menueleiste, Reiter, Popup-Eintrag,
+    /// Hilfetext. Anders als `wtext` gehoert er zu keinem Widget, kann also
+    /// keine eigene Schrift haben -- aber er muss mit dem Massstab wachsen.
+    ///
+    /// Messen und Zeichnen laufen bewusst durch DASSELBE Paar (`ctext` /
+    /// `ctext_width`): waehlte das eine die aktive Groesse und das andere die
+    /// skalierte, saessen Menuebreiten und Reiter-Kaesten neben ihrem Text.
+    fn ctext(&self, g: &mut Graphics, x: i32, y: i32, s: String, c: i64) {
+        if self.scale == 1.0 { g.text(x, y, s, c); }
+        else {
+            let (sz, font) = (self.ctext_height(g), g.active_font());
+            g.text_styled(x, y, s, c, font, sz);
+        }
+    }
+    fn ctext_width(&self, g: &Graphics, s: &str) -> i32 {
+        if self.scale == 1.0 { g.text_width(s) }
+        else { g.text_width_in(s, self.ctext_height(g), g.active_font()) }
+    }
+    fn ctext_height(&self, g: &Graphics) -> i32 { self.sk(g.text_height()) }
+
+    /// Groesse + Schrift eines Widgets als Buendel -- genau die, mit der
+    /// `wtext` zeichnet. Die Editier-Helfer sind statisch und kommen an
+    /// `self` nicht heran; ohne dieses Buendel muessten sie mit der aktiven
+    /// Groesse messen, und Schreibmarke wie Auswahl saessen bei Massstab != 1
+    /// neben dem Text.
+    fn mass(&self, g: &Graphics, w: &Widget) -> Mass {
+        Mass { size: self.wsize(g, w), font: self.wfont(g, w) }
+    }
+
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
-        if w.font == -1 && w.font_size == 0 {
+        if w.font == -1 && w.font_size == 0 && self.scale == 1.0 {
             g.text(x, y, s, c);
         } else {
             let (sz, font) = (self.wsize(g, w), self.wfont(g, w));
@@ -3332,8 +3616,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let right_down = g.mouse_button(1);
         let right_just = right_down && !self.was_right_down;
 
-        // Transiente Flags ruecksetzen.
+        // Transiente Flags ruecksetzen -- die Dialog-Antwort gehoert dazu:
+        // sie ist ein Ereignis, kein Zustand (siehe Window::answer).
         for win in self.windows.iter_mut() {
+            win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false;
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
@@ -3345,7 +3631,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
-        let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
+        // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
+        let menu_consumed = if self.modal.is_some() { false }
+                            else { self.menu_input(mx, my, just_pressed, right_just, g) };
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -3559,7 +3847,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let jetzt = g.get_time();
             self.dbl_click = match self.last_click {
                 Some((t0, x0, y0)) =>
-                    jetzt - t0 <= DBL_TIME && (mx - x0).abs() <= DBL_DIST && (my - y0).abs() <= DBL_DIST,
+                    jetzt - t0 <= DBL_TIME && (mx - x0).abs() <= self.sk(DBL_DIST) && (my - y0).abs() <= self.sk(DBL_DIST),
                 None => false,
             };
             // Nach einem erkannten Doppelklick von vorn zaehlen, sonst waere
@@ -3621,18 +3909,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
                 Kind::Table => self.table_keys(wi, i, g),
-                _ => {}
+                k => self.widget_keys(wi, i, k, g),
             }
         }
-        // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen den
-        // TextInputs des aktiven Fensters (in Anlege-Reihenfolge, nur sichtbare).
+        // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen ALLEN
+        // bedienbaren Widgets des aktiven Fensters (Anlege-Reihenfolge, nur
+        // sichtbare + eingeschaltete). Frueher liefen nur die Textfelder mit --
+        // Knopf, Kaestchen und Klappliste waren ohne Maus nicht erreichbar.
         if g.key_pressed(KEY_TAB) {
             if let Some(top) = self.focus_window {
                 let n = self.windows[top].widgets.len();
                 let mut idxs: Vec<usize> = Vec::new();
                 for i in 0..n {
                     let w = &self.windows[top].widgets[i];
-                    if matches!(w.kind, Kind::TextInput | Kind::TextArea) && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
+                    if w.kind.fokussierbar() && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
                 }
                 if !idxs.is_empty() {
                     let cur = self.focus_widget.filter(|(w, _)| *w == top).map(|(_, i)| i);
@@ -3643,16 +3933,54 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         None => 0,
                     };
                     let ni = idxs[next];
+                    self.open_dropdown = None;   // beim Weitertabben nichts offen stehen lassen
                     self.focus_widget = Some((top, ni));
-                    let len = self.windows[top].widgets[ni].text.chars().count() as i32;
-                    let w = &mut self.windows[top].widgets[ni];
-                    w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
+                    // Nur ein Textfeld bekommt Caret + Markierung -- bei einem
+                    // Knopf waeren beide bedeutungslos.
+                    if self.windows[top].widgets[ni].kind.nimmt_text() {
+                        let len = self.windows[top].widgets[ni].text.chars().count() as i32;
+                        let w = &mut self.windows[top].widgets[ni];
+                        w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
+                    }
                 }
             }
         }
+        self.dialog_auswerten();
         self.was_mouse_down = is_down;
         self.was_right_down = right_down;
         self.frame_count += 1;
+    }
+
+    /// Hat der offene Dialog in diesem Bild eine Antwort bekommen? Dann
+    /// Antwort setzen, Fenster abraeumen, Modalitaet aufheben.
+    ///
+    /// Das Fenster wird ZERSTOERT, nicht nur versteckt: sonst sammelten sich
+    /// bei einem Programm, das oft nachfragt, immer mehr tote Dialoge im
+    /// z_order an. Der Handle bleibt als Tombstone gueltig, `GUI_ANSWER`
+    /// liest die Antwort also noch in diesem Bild.
+    fn dialog_auswerten(&mut self) {
+        let wi = match self.modal { Some(wi) => wi, None => return };
+        if !self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
+            self.modal = None;
+            return;
+        }
+        let mut antwort = 0;
+        if self.windows[wi].close_clicked { antwort = 2; }   // Schliessen = Abbrechen
+        for wdg in self.windows[wi].widgets.iter() {
+            if wdg.kind == Kind::Button && wdg.clicked {
+                antwort = match wdg.text.as_str() { "Nein" => 2, _ => 1 };
+            }
+        }
+        if antwort == 0 { return; }
+        self.modal = None;
+        // Wie window_destroy: aus der z-Reihenfolge nehmen und JEDE haengende
+        // Interaktions-Referenz loesen.
+        self.z_order.retain(|&i| i != wi);
+        self.clear_window_interactions(wi);
+        let win = &mut self.windows[wi];
+        win.alive = false;
+        win.visible = false;
+        win.answer = antwort;
     }
 
     // --- Menue-Eingabe + Hit-Tests -----------------------------------------
@@ -3660,7 +3988,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let pad = self.m("pad");
         let mut wmax = 80;
         if let Some(m) = self.windows.get(wi).and_then(|w| w.menus.get(mi)) {
-            for it in &m.items { if !it.separator { wmax = wmax.max(g.text_width(&it.label) + pad * 4); } }
+            for it in &m.items { if !it.separator { wmax = wmax.max(self.ctext_width(g, &it.label) + pad * 4); } }
         }
         wmax
     }
@@ -3669,8 +3997,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let wmax = self.popup_width(g, wi, mi);
         if mx < px || mx >= px + wmax { return None; }
         for (ii, it) in m.items.iter().enumerate() {
-            let iy = py + 2 + ii as i32 * MENU_ITEM_H;
-            if my >= iy && my < iy + MENU_ITEM_H {
+            let iy = py + 2 + ii as i32 * self.sk(MENU_ITEM_H);
+            if my >= iy && my < iy + self.sk(MENU_ITEM_H) {
                 if it.separator || !it.enabled { return None; }
                 return Some(ii);
             }
@@ -3680,7 +4008,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn bar_menu_at(&self, g: &Graphics, wi: usize, mx: i32, my: i32) -> Option<usize> {
         if self.menubar_h(wi) == 0 { return None; }
         let by = self.windows[wi].y + if self.windows[wi].chrome { self.m("title_h") } else { 0 };
-        if my < by || my >= by + MENUBAR_H { return None; }
+        if my < by || my >= by + self.sk(MENUBAR_H) { return None; }
         self.menubar_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1).map(|(mi, _, _)| mi)
     }
     fn fire_menu_item(&mut self, wi: usize, mi: usize, ii: usize) {
@@ -3704,7 +4032,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // 2) Offenes Menueleisten-Dropdown
         if let Some((wi, mi)) = self.open_menu {
             if left_just {
-                let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + MENUBAR_H;
+                let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + self.sk(MENUBAR_H);
                 let py = self.windows[wi].y + toff;
                 if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
                     if let Some(ii) = self.popup_item_at(g, wi, mi, x0, py, mx, my) {
@@ -3745,12 +4073,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
     /// Zeichen-Index, dessen Caret-Position am naechsten an `target_px` liegt
     /// (Pixel ab Textanfang). Misst echte Textbreiten -> funktioniert mit jedem Font.
-    fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32) -> i32 {
+    fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32, ms: Mass) -> i32 {
         if target_px <= 0 { return 0; }
         for n in 1..=chars.len() {
             let prev: String = chars[..n - 1].iter().collect();
             let cur: String = chars[..n].iter().collect();
-            let mid = (g.text_width(&prev) + g.text_width(&cur)) / 2;
+            let mid = (ms.breite(g, &prev) + ms.breite(g, &cur)) / 2;
             if target_px < mid { return (n - 1) as i32; }
         }
         chars.len() as i32
@@ -3761,6 +4089,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// zum Setzen/Aufziehen der Selektion. Caret/Selektion/Scroll werden mit
     /// GEMESSENEN Textbreiten gefuehrt (passt zu jedem Font).
     fn edit_textinput(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let ms = self.mass(g, &self.windows[wi].widgets[i]);
         let before = self.windows[wi].widgets[i].text.clone();
         let (ax, _ay, fw, _fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let mut chars: Vec<char> = before.chars().collect();
@@ -3774,7 +4103,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let target = mx - (ax + 5) + scroll;
-            let idx = Self::caret_index_at(g, &chars, target);
+            let idx = Self::caret_index_at(g, &chars, target, ms);
             if !self.was_mouse_down {
                 let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
                 if Self::in_rect(mx, my, r) { caret = idx; anchor = idx; }
@@ -3786,7 +4115,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
 
         // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
-        let caret_px = g.text_width(&chars[..caret as usize].iter().collect::<String>());
+        let caret_px = ms.breite(g, &chars[..caret as usize].iter().collect::<String>());
         let inner = (fw - 10).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
@@ -3884,13 +4213,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         v
     }
     /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
-    fn ta_line_h(&self, g: &Graphics) -> i32 { (g.text_height() + 5).max(10) }
+    fn ta_line_h(&self, g: &Graphics) -> i32 { (self.ctext_height(g) + self.sk(5)).max(self.sk(10)) }
 
     /// Mehrzeiliges Textfeld editieren: Tippen, Enter=Umbruch, Backspace/Delete,
     /// Pfeile (auch hoch/runter), Home/End, Strg+A/C/V/X, Maus-Klick + Ziehen.
     /// Selektion: Maus-Drag, Shift+Navigation, Strg+A. Vertikal scrollend, damit
     /// das Caret sichtbar bleibt.
     fn edit_textarea(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let ms = self.mass(g, &self.windows[wi].widgets[i]);
         let before = self.windows[wi].widgets[i].text.clone();
         let mut chars: Vec<char> = before.chars().collect();
         let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
@@ -3913,7 +4243,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
             let target = mx - (ax + pad);
             let sub: Vec<char> = chars[lstart..lend].to_vec();
-            let off = Self::caret_index_at(g, &sub, target) as usize;
+            let off = Self::caret_index_at(g, &sub, target, ms) as usize;
             let idx = (lstart + off) as i32;
             if !self.was_mouse_down {
                 if Self::in_rect(mx, my, (ax, ay, fw, fh)) { caret = idx; anchor = idx; }
@@ -4024,9 +4354,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
         let wheel = g.pop_mouse_wheel();
         if wheel == 0 { return; }
+        let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
-        let max_scroll = (w.items.len() as i32 * DROPDOWN_ITEM_H - h).max(0);
-        let nv = (w.value as i32 - wheel as i32 * DROPDOWN_ITEM_H).clamp(0, max_scroll);
+        let max_scroll = (w.items.len() as i32 * zeile_h - h).max(0);
+        let nv = (w.value as i32 - wheel as i32 * zeile_h).clamp(0, max_scroll);
         w.value = nv as f64;
     }
 
@@ -4075,6 +4406,205 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if g.key_pressed(KEY_DOWN) { self.spinner_step(wi, i, -1); }
     }
 
+    /// Wert eines Regler-artigen Widgets setzen (geklemmt) und bei Aenderung
+    /// on_change feuern. Eine Stelle fuer Maus- und Tastatur-Weg.
+    fn set_value_fire(&mut self, wi: usize, i: usize, roh: f64) {
+        let w = &mut self.windows[wi].widgets[i];
+        let nv = roh.clamp(w.min, w.max);
+        if (nv - w.value).abs() > f64::EPSILON {
+            w.value = nv;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Auswahl in Liste/Klappliste um `d` Zeilen bewegen (am Rand stehenbleiben,
+    /// nicht umlaufen -- beim Halten der Taste kreiste man sonst ewig) und bei
+    /// Aenderung on_change feuern.
+    fn liste_bewegen(&mut self, wi: usize, i: usize, d: i32) {
+        let n = self.windows[wi].widgets[i].items.len() as i32;
+        if n == 0 { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        let neu = (w.sel + d).clamp(0, n - 1);
+        if neu != w.sel {
+            w.sel = neu;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Die gewaehlte Zeile einer ListBox in den sichtbaren Bereich scrollen --
+    /// ohne das wandert die Auswahl beim Tippen aus dem Bild heraus.
+    fn liste_sichtbar(&mut self, wi: usize, i: usize) {
+        let h = self.windows[wi].widgets[i].h;
+        let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
+        let w = &mut self.windows[wi].widgets[i];
+        if w.sel < 0 { return; }
+        let oben = w.sel * zeile_h;
+        let unten = oben + zeile_h;
+        let sicht = w.value as i32;
+        let neu = if oben < sicht { oben }
+                  else if unten > sicht + h { unten - h }
+                  else { sicht };
+        w.value = neu.max(0) as f64;
+    }
+
+    fn tree_setze_offen(&mut self, wi: usize, i: usize, node: i32, offen: bool) {
+        if node < 0 { return; }
+        if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+            if let Some(n) = t.nodes.get_mut(node as usize) { n.expanded = offen; }
+        }
+    }
+
+    /// Baum-Auswahl setzen, on_change feuern, Knoten ins Bild scrollen.
+    fn tree_setze_auswahl(&mut self, wi: usize, i: usize, node: i32) {
+        let geaendert = match self.windows[wi].widgets[i].tree.as_mut() {
+            Some(t) if t.selected != node => { t.selected = node; true }
+            _ => false,
+        };
+        if geaendert {
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+            self.tree_sichtbar(wi, i);
+        }
+    }
+
+    fn tree_sichtbar(&mut self, wi: usize, i: usize) {
+        let h = self.windows[wi].widgets[i].h;
+        let zeile_h = self.sk(TREE_ROW_H);   // vor dem mut-Zugriff
+        if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+            let vis = Self::tree_visible(t);
+            if let Some(p) = vis.iter().position(|&n| n as i32 == t.selected) {
+                let oben = p as i32 * zeile_h;
+                let unten = oben + zeile_h;
+                if oben < t.scroll { t.scroll = oben; }
+                else if unten > t.scroll + h { t.scroll = unten - h; }
+                if t.scroll < 0 { t.scroll = 0; }
+            }
+        }
+    }
+
+    /// Tastatur am fokussierten Widget, das KEIN Textfeld ist.
+    ///
+    /// Leertaste/Enter loesen aus (Knopf, Kaestchen, Schalter, Radio), die
+    /// Pfeile verstellen Werte (Regler, Drehknopf, Trenner) bzw. bewegen die
+    /// Auswahl (Liste, Klappliste, Baum). Damit ist jede Art, die man anklicken
+    /// kann, auch ohne Maus bedienbar -- vorher endete die Tastaturbedienung
+    /// bei den Textfeldern, ein Formular liess sich also nicht abschicken, ohne
+    /// zur Maus zu greifen.
+    fn widget_keys(&mut self, wi: usize, i: usize, kind: Kind, g: &mut Graphics) {
+        let ausloesen = g.key_pressed(KEY_SPACE) || g.key_pressed(KEY_ENTER);
+        let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
+        let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
+        match kind {
+            Kind::Button => {
+                if ausloesen {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.clicked = true;
+                    let f = w.on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
+            Kind::Checkbox | Kind::Toggle => {
+                if ausloesen {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.checked = !w.checked;
+                    let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Radio => {
+                if ausloesen && !self.windows[wi].widgets[i].checked {
+                    self.select_radio(wi, i);
+                    let w = &self.windows[wi].widgets[i];
+                    let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Slider | Kind::Knob => {
+                // Ein Zwanzigstel des Bereichs je Druck: von Anschlag zu Anschlag
+                // sind es immer 20 Anschlaege, egal wie gross der Bereich ist.
+                // Pos1/Ende springen an die Enden.
+                let (lo, hi, v) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value) };
+                let schritt = (hi - lo) / 20.0;
+                if rechts || auf { self.set_value_fire(wi, i, v + schritt); }
+                if links || ab { self.set_value_fire(wi, i, v - schritt); }
+                if g.key_pressed(KEY_HOME) { self.set_value_fire(wi, i, lo); }
+                if g.key_pressed(KEY_END) { self.set_value_fire(wi, i, hi); }
+            }
+            Kind::Splitter => {
+                let vert = self.windows[wi].widgets[i].group == "v";
+                let d = if vert { rechts as i32 - links as i32 } else { ab as i32 - auf as i32 } * 8;
+                if d != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    let (lo, hi) = (w.min as i32, w.max as i32);
+                    let cur = if vert { w.x } else { w.y };
+                    let nv = (cur + d).clamp(lo, hi);
+                    if nv != cur {
+                        if vert { w.x = nv; } else { w.y = nv; }
+                        let f = w.on_change.clone();
+                        if let Some(f) = f { self.pending.push(f); }
+                    }
+                }
+            }
+            Kind::Dropdown => {
+                // Zu: Leertaste/Enter/Ab klappt auf. Offen: Pfeile waehlen,
+                // Leertaste/Enter uebernimmt, ESC schliesst.
+                if self.open_dropdown == Some((wi, i)) {
+                    if ausloesen || g.key_pressed(KEY_ESC) { self.open_dropdown = None; }
+                    else {
+                        let d = ab as i32 - auf as i32;
+                        if d != 0 { self.liste_bewegen(wi, i, d); }
+                    }
+                } else if ausloesen || ab {
+                    self.open_dropdown = Some((wi, i));
+                }
+            }
+            Kind::ListBox => {
+                let d = ab as i32 - auf as i32;
+                if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
+            }
+            Kind::Tree => {
+                let (vis, sel, hat_kinder, offen, eltern) = {
+                    let t = match self.windows[wi].widgets[i].tree.as_ref() {
+                        Some(t) => t, None => return,
+                    };
+                    let sel = t.selected;
+                    let (hk, of, pa) = match t.nodes.get(sel.max(0) as usize) {
+                        Some(n) if sel >= 0 => (n.has_children, n.expanded, n.parent),
+                        _ => (false, false, -1),
+                    };
+                    (Self::tree_visible(t), sel, hk, of, pa)
+                };
+                if vis.is_empty() { return; }
+                let pos = vis.iter().position(|&n| n as i32 == sel);
+                let mut ziel: Option<i32> = None;
+                let d = ab as i32 - auf as i32;
+                if d != 0 {
+                    let np = match pos {
+                        Some(p) => (p as i32 + d).clamp(0, vis.len() as i32 - 1) as usize,
+                        None => 0,
+                    };
+                    ziel = Some(vis[np] as i32);
+                } else if rechts {
+                    // Zu -> aufklappen, offen -> ins erste Kind. So kennt man es
+                    // von jedem Dateibaum.
+                    if hat_kinder && !offen { self.tree_setze_offen(wi, i, sel, true); }
+                    else if let Some(p) = pos { if p + 1 < vis.len() { ziel = Some(vis[p + 1] as i32); } }
+                } else if links {
+                    if hat_kinder && offen { self.tree_setze_offen(wi, i, sel, false); }
+                    else if eltern >= 0 { ziel = Some(eltern); }
+                } else if ausloesen && hat_kinder {
+                    self.tree_setze_offen(wi, i, sel, !offen);
+                }
+                if let Some(z) = ziel { self.tree_setze_auswahl(wi, i, z); }
+            }
+            _ => {}
+        }
+    }
+
     /// Zahl ohne ueberfluessige Nachkommastellen (ganze Zahl -> ohne Komma).
     fn fmt_num(v: f64) -> String {
         if (v.fract()).abs() < 1e-9 { format!("{}", v.round() as i64) }
@@ -4102,7 +4632,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn dropdown_popup_rect(&self, wi: usize, idx: usize) -> (i32, i32, i32, i32) {
         let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let n = self.windows[wi].widgets[idx].items.len() as i32;
-        (ax, ay + h, w, n * DROPDOWN_ITEM_H)
+        (ax, ay + h, w, n * self.sk(DROPDOWN_ITEM_H))
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
@@ -4130,7 +4660,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let (px, py, pw, ph) = self.dropdown_popup_rect(dw, di);
                 let (bx, by, bw, bh) = self.abs_rect(dw, &self.windows[dw].widgets[di]);
                 if Self::in_rect(mx, my, (px, py, pw, ph)) {
-                    let item = (my - py) / DROPDOWN_ITEM_H;
+                    let item = (my - py) / self.sk(DROPDOWN_ITEM_H);
                     let n = self.windows[dw].widgets[di].items.len() as i32;
                     if item >= 0 && item < n {
                         let changed = self.windows[dw].widgets[di].sel != item;
@@ -4154,6 +4684,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Some(w) => w,
             None => { self.focus_widget = None; return; }
         };
+        // Modalitaet: steht ein Dialog offen, verschluckt er jeden Klick, der
+        // woanders hingeht. Ohne das waere er nur ein Fenster, das obenauf
+        // liegt -- man koennte daneben weiterarbeiten, und genau das soll eine
+        // Rueckfrage verhindern.
+        if let Some(m) = self.modal { if win != m { return; } }
         self.bring_to_front(win);
         self.focus_window = Some(win);
         let th = self.m("title_h");
@@ -4196,7 +4731,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
-        match self.windows[win].widgets[i].kind {
+        // Fokus folgt dem Klick -- an EINER Stelle fuer alle Arten, damit ein
+        // spaeteres Tab dort weiterlaeuft, wo die Maus zuletzt war. Deko faengt
+        // keinen Fokus (fokussierbar() ist die eine Quelle).
+        let kind = self.windows[win].widgets[i].kind;
+        self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
+        match kind {
             Kind::Button => self.press_origin = Some((win, i)),
             Kind::Checkbox => {
                 let w = &mut self.windows[win].widgets[i];
@@ -4222,18 +4762,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.split_off = if vert { mx - ax } else { my - ay };
             }
             Kind::Spinner => {
-                self.focus_widget = Some((win, i));
                 let (ax, ay, ww, hh) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 let (up, down, _bx) = Self::spinner_btn_rects(ax, ay, ww, hh);
                 if Self::in_rect(mx, my, up) { self.spinner_step(win, i, 1); }
                 else if Self::in_rect(mx, my, down) { self.spinner_step(win, i, -1); }
             }
-            Kind::TextInput => self.focus_widget = Some((win, i)),
-            Kind::TextArea => self.focus_widget = Some((win, i)),
-            Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
-            Kind::Tree => { self.focus_widget = None; self.tree_press(win, i, mx, my); }
+            Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
+            Kind::Table => self.table_press(win, i, mx, my),
+            Kind::Tree => self.tree_press(win, i, mx, my),
             Kind::Radio => {
-                self.focus_widget = None;
                 let was = self.windows[win].widgets[i].checked;
                 self.select_radio(win, i);
                 if !was {
@@ -4243,12 +4780,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if let Some(f) = och { self.pending.push(f); }
                 }
             }
-            Kind::Dropdown => { self.focus_widget = None; self.open_dropdown = Some((win, i)); }
+            Kind::Dropdown => self.open_dropdown = Some((win, i)),
             Kind::ListBox => {
-                self.focus_widget = None;
                 let ay = self.abs_rect(win, &self.windows[win].widgets[i]).1;
                 let scroll = self.windows[win].widgets[i].value as i32;
-                let row = (my - ay + scroll) / DROPDOWN_ITEM_H;
+                let row = (my - ay + scroll) / self.sk(DROPDOWN_ITEM_H);
                 let n = self.windows[win].widgets[i].items.len() as i32;
                 if row >= 0 && row < n && self.windows[win].widgets[i].sel != row {
                     self.windows[win].widgets[i].sel = row;
@@ -4256,13 +4792,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if let Some(f) = f { self.pending.push(f); }
                 }
             }
-            _ => self.focus_widget = None,
+            _ => {}
         }
     }
 
     // --- Draw ---
     pub fn draw(&self, g: &mut Graphics) {
         for &wi in &self.z_order {
+            // Vor dem modalen Dialog alles dahinter abdunkeln. Das ist nicht
+            // Deko: ohne sichtbares Zeichen klickt man in den Hintergrund und
+            // wundert sich, warum nichts passiert.
+            if self.modal == Some(wi) {
+                // 0xAARRGGBB -- Alpha im obersten Byte (0 waere DECKEND).
+                let schleier = (110_i64 << 24) | 0x000000;
+                g.box_fill(0, 0, g.screen_width() as i32, g.screen_height() as i32, schleier);
+            }
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
@@ -4286,9 +4830,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             _ => return,
         };
         let pad = 6;
-        let lh = (g.text_height() + 3).max(12);
+        let lh = (self.ctext_height(g) + self.sk(3)).max(self.sk(12));
         let lines: Vec<&str> = text.split('\n').collect();
-        let tw = lines.iter().map(|l| g.text_width(l)).max().unwrap_or(0);
+        let tw = lines.iter().map(|l| self.ctext_width(g, l)).max().unwrap_or(0);
         let bw = tw + pad * 2;
         let bh = lines.len() as i32 * lh + pad * 2 - 3;
         // Position: rechts-unter dem Cursor, an den Bildschirmrand geklemmt.
@@ -4303,7 +4847,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("widget_bg"), true);
         g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("accent"), false);
         for (r, line) in lines.iter().enumerate() {
-            g.text(bx + pad, by + pad + r as i32 * lh, line.to_string(), self.th("text_fg"));
+            self.ctext(g, bx + pad, by + pad + r as i32 * lh, line.to_string(), self.th("text_fg"));
         }
     }
 
@@ -4315,7 +4859,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let mut out = Vec::new();
         for (mi, m) in win.menus.iter().enumerate() {
             if !m.in_bar { continue; }
-            let wlbl = g.text_width(&m.label) + pad * 2;
+            let wlbl = self.ctext_width(g, &m.label) + pad * 2;
             out.push((mi, x, x + wlbl));
             x += wlbl;
         }
@@ -4327,8 +4871,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let m = match self.windows.get(wi).and_then(|w| w.menus.get(mi)) { Some(m) => m, None => return };
         let pad = self.m("pad");
         let mut wmax = 80;
-        for it in &m.items { if !it.separator { wmax = wmax.max(g.text_width(&it.label) + pad * 4); } }
-        let h = m.items.len() as i32 * MENU_ITEM_H + 4;
+        for it in &m.items { if !it.separator { wmax = wmax.max(self.ctext_width(g, &it.label) + pad * 4); } }
+        let h = m.items.len() as i32 * self.sk(MENU_ITEM_H) + 4;
         let rad = self.m("corner_radius").min(6);
         // Schatten + Hintergrund + Rahmen.
         g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), (0x44i64 << 24) as i64, true);
@@ -4336,15 +4880,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("win_border"), false);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         for (ii, it) in m.items.iter().enumerate() {
-            let iy = py + 2 + ii as i32 * MENU_ITEM_H;
+            let iy = py + 2 + ii as i32 * self.sk(MENU_ITEM_H);
             if it.separator {
-                g.line(px + 6, iy + MENU_ITEM_H / 2, px + wmax - 7, iy + MENU_ITEM_H / 2, self.th("win_border"));
+                g.line(px + 6, iy + self.sk(MENU_ITEM_H) / 2, px + wmax - 7, iy + self.sk(MENU_ITEM_H) / 2, self.th("win_border"));
                 continue;
             }
-            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + MENU_ITEM_H;
-            if hov { g.box_fill(px + 2, iy, px + wmax - 3, iy + MENU_ITEM_H - 1, self.th("title_bg_focus")); }
+            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + self.sk(MENU_ITEM_H);
+            if hov { g.box_fill(px + 2, iy, px + wmax - 3, iy + self.sk(MENU_ITEM_H) - 1, self.th("title_bg_focus")); }
             let fg = if it.enabled { self.th("text_fg") } else { self.th("muted_fg") };
-            g.text(px + pad + 4, iy + (MENU_ITEM_H - 14) / 2, it.label.clone(), fg);
+            let th14 = self.ctext_height(g);
+            self.ctext(g, px + pad + 4, iy + (self.sk(MENU_ITEM_H) - th14) / 2, it.label.clone(), fg);
         }
     }
 
@@ -4385,7 +4930,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.box_fill(x, y, x + w - 1, y + th - 1, title_bg);
                 g.rect(x, y, x + w - 1, y + h - 1, self.th("win_border"));
             }
-            g.text(x + pad, y + (th - 14) / 2, win.title.clone(), self.th("title_fg"));
+            let th14 = self.ctext_height(g);
+            self.ctext(g, x + pad, y + (th - th14) / 2, win.title.clone(), self.th("title_fg"));
             if win.closable {
                 let (cx, cy, cw, ch) = (x + w - th, y, th, th);
                 let m = (th / 3).clamp(5, 9);          // Rand des X (skaliert mit der Titelhoehe)
@@ -4409,7 +4955,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if self.open_menu == Some((wi, mi)) {
                     g.box_fill(x0, by, x1 - 1, by + mboff - 1, self.th("title_bg_focus"));
                 }
-                g.text(x0 + pad, by + (mboff - 14) / 2, win.menus[mi].label.clone(), self.th("title_fg"));
+                let th14 = self.ctext_height(g);
+                self.ctext(g, x0 + pad, by + (mboff - th14) / 2, win.menus[mi].label.clone(), self.th("title_fg"));
             }
         }
         // Reiter-Leiste (unter Titel/Menue), falls Tabs vorhanden.
@@ -4425,7 +4972,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     g.box_fill(x0, by + tboff - 2, x1 - 1, by + tboff - 1, self.th("accent"));  // Akzent-Unterstrich
                 }
                 let fg = if active { self.th("text_fg") } else { self.th("muted_fg") };
-                g.text(x0 + pad, by + (tboff - 14) / 2, win.tabs[ti].clone(), fg);
+                let th14 = self.ctext_height(g);
+                self.ctext(g, x0 + pad, by + (tboff - th14) / 2, win.tabs[ti].clone(), fg);
             }
         }
         let coff = toff + mboff + tboff;   // Inhalts-Oberkante inkl. Menue + Reiter
@@ -4611,7 +5159,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let kx = ax + r + ((w - h) as f64 * mix) as i32;
                 self.knauf(g, kx, ay + r, r - 2, self.griff_farbe(wdg));
                 if !wdg.text.is_empty() {
-                    self.wtext(g, wdg, ax + w + pad, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
+                    self.wtext(g, wdg, ax + w + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, wdg.text.clone(), self.txt_col(wdg));
                 }
             }
             Kind::Knob => {
@@ -4637,7 +5185,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     2.0, self.txt_col(wdg),
                 );
                 if !wdg.text.is_empty() {
-                    let tw = g.text_width(&wdg.text);
+                    let tw = self.wtext_width(g, wdg, &wdg.text);
                     self.wtext(g, wdg, cx - tw / 2, ay + h + 2, wdg.text.clone(), self.txt_col(wdg));
                 }
             }
@@ -4647,7 +5195,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let tx = ax + 5;
-                let ty = ay + (h - 14) / 2;
+                let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
                 let scroll = wdg.scroll;
                 // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
                 g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
@@ -4662,8 +5210,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
                         let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
                         if lo != hi {
-                            let x0 = tx + g.text_width(&chars[..lo as usize].iter().collect::<String>()) - scroll;
-                            let x1 = tx + g.text_width(&chars[..hi as usize].iter().collect::<String>()) - scroll;
+                            let x0 = tx + self.wtext_width(g, wdg, &chars[..lo as usize].iter().collect::<String>()) - scroll;
+                            let x1 = tx + self.wtext_width(g, wdg, &chars[..hi as usize].iter().collect::<String>()) - scroll;
                             g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
                         }
                     }
@@ -4672,7 +5220,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 // Caret (blinkend) an der gemessenen Position.
                 if focused && self.caret_blink_on() {
                     let pre: String = wdg.text.chars().take(wdg.caret.max(0) as usize).collect();
-                    let cx = tx + g.text_width(&pre) - scroll;
+                    let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
                 g.pop_clip();
@@ -4708,9 +5256,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             let a = lo.max(lstart);
                             let b = hi.min(lend);
                             if b < a || (a == b && hi <= lend) { continue; }
-                            let x0 = ax + pad + g.text_width(&chars[lstart as usize..a as usize].iter().collect::<String>());
-                            let mut x1 = ax + pad + g.text_width(&chars[lstart as usize..b as usize].iter().collect::<String>());
-                            if hi > lend { x1 += g.text_width(" ").max(4); }   // Auswahl laeuft weiter
+                            let x0 = ax + pad + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
+                            let mut x1 = ax + pad + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
+                            if hi > lend { x1 += self.wtext_width(g, wdg, " ").max(self.sk(4)); }   // Auswahl laeuft weiter
                             let y = ay + pad + r * lh;
                             g.box_fill(x0, y, x1, y + lh - 2, selbg);
                         }
@@ -4728,7 +5276,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let lstart = starts[crow];
                     let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
                     let prefix: String = chars[lstart..cend].iter().collect();
-                    let cx = ax + pad + g.text_width(&prefix);
+                    let cx = ax + pad + self.wtext_width(g, wdg, &prefix);
                     let cy = ay + pad + (crow as i32 - scroll) * lh;
                     if cy >= ay + 2 && cy + lh <= ay + h { g.line(cx, cy, cx, cy + lh - 2, fg); }
                 }
@@ -4745,7 +5293,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.line(bx, ay + h / 2, ax + w - 1, ay + h / 2, bordc);
                 // Zahlenwert links (auf das Feldinnere geclippt).
                 g.push_clip(ax + 2, ay + 1, (bx - ax - 3).max(0), (h - 2).max(0));
-                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, Self::fmt_num(wdg.value), self.txt_col(wdg));
+                self.wtext(g, wdg, ax + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, Self::fmt_num(wdg.value), self.txt_col(wdg));
                 g.pop_clip();
                 // Hover-Highlight + Pfeil-Dreiecke der beiden Schaltflaechen.
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
@@ -4796,7 +5344,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let fw = (ratio * (w - 2) as f64) as i32;
                 if fw > 0 { g.box_fill(ax + 1, ay + 1, ax + fw, ay + h - 2, acc); }
                 let pct = format!("{}%", (ratio * 100.0).round() as i32);
-                self.wtext(g, wdg, ax + w / 2 - (pct.len() as i32 * 8) / 2, ay + (h - 14) / 2, pct, self.txt_col(wdg));
+                let pctw = self.wtext_width(g, wdg, &pct);
+                self.wtext(g, wdg, ax + w / 2 - pctw / 2, ay + (h - self.wsize(g, wdg)).max(0) / 2, pct, self.txt_col(wdg));
             }
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");
@@ -4806,7 +5355,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
                     wdg.items[wdg.sel as usize].clone()
                 } else { String::new() };
-                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, txt, fg);
+                self.wtext(g, wdg, ax + pad, ay + (h - self.wsize(g, wdg)).max(0) / 2, txt, fg);
                 let (axr, cy) = (ax + w - 14, ay + h / 2);   // ▼
                 g.line(axr, cy - 2, axr + 4, cy + 2, fg);
                 g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
@@ -4820,14 +5369,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
                 g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
                 for (k, it) in wdg.items.iter().enumerate() {
-                    let iy = ay + k as i32 * DROPDOWN_ITEM_H - scroll;
-                    if iy + DROPDOWN_ITEM_H < ay || iy > ay + h { continue; }
+                    let iy = ay + k as i32 * self.sk(DROPDOWN_ITEM_H) - scroll;
+                    if iy + self.sk(DROPDOWN_ITEM_H) < ay || iy > ay + h { continue; }
                     if k as i32 == wdg.sel {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + DROPDOWN_ITEM_H - 1, shade(acc, -110));
-                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + DROPDOWN_ITEM_H {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + DROPDOWN_ITEM_H - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(acc, -110));
+                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + self.sk(DROPDOWN_ITEM_H) {
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
                     }
-                    self.wtext(g, wdg, ax + pad, iy + (DROPDOWN_ITEM_H - 14) / 2, it.clone(), fg);
+                    self.wtext(g, wdg, ax + pad, iy + (self.sk(DROPDOWN_ITEM_H) - self.wsize(g, wdg)).max(0) / 2, it.clone(), fg);
                 }
                 g.pop_clip();
             }
@@ -4861,6 +5410,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
         }
+        // Fokus-Ring: EINE Stelle fuer alle Arten, nach dem Zeichnen und damit
+        // obenauf. Liegt AUSSERHALB der Widget-Flaeche (2 px Luft), sonst
+        // verdeckte er Inhalt -- ein Kaestchen ist nur check_size gross, ein
+        // Ring darin waere kaum zu sehen. Ohne sichtbaren Fokus waere die
+        // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
+        if self.focus_widget == Some((wi, idx)) && wdg.kind.fokussierbar() {
+            g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, self.th("accent"));
+        }
     }
 
     fn draw_tree(&self, g: &mut Graphics, wi: usize, idx: usize) {
@@ -4875,20 +5432,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let scroll = t.scroll;
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         for (r, &ni) in vis.iter().enumerate() {
-            let ry = ay + 1 + r as i32 * TREE_ROW_H - scroll;
-            if ry + TREE_ROW_H < ay || ry > ay + h { continue; }
+            let ry = ay + 1 + r as i32 * self.sk(TREE_ROW_H) - scroll;
+            if ry + self.sk(TREE_ROW_H) < ay || ry > ay + h { continue; }
             let node = &t.nodes[ni];
-            let indent = node.level * TREE_INDENT;
+            let indent = node.level * self.sk(TREE_INDENT);
             if ni as i32 == t.selected {
-                g.box_fill(ax + 1, ry, ax + w - 2, ry + TREE_ROW_H - 1, shade(acc, -110));
+                g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
             } else if ni as i32 == t.hover {
-                g.box_fill(ax + 1, ry, ax + w - 2, ry + TREE_ROW_H - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
+                g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
             }
             // Auf-/Zuklapp-Dreieck (nur bei Kindknoten).
             let tx = ax + 4 + indent;
-            let cy = ry + TREE_ROW_H / 2;
+            let cy = ry + self.sk(TREE_ROW_H) / 2;
             if node.has_children {
-                let cx = tx + TREE_TOGGLE_W / 2;
+                let cx = tx + self.sk(TREE_TOGGLE_W) / 2;
                 if node.expanded {
                     g.line(cx - 4, cy - 2, cx, cy + 2, fg);    // v
                     g.line(cx, cy + 2, cx + 4, cy - 2, fg);
@@ -4897,8 +5454,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     g.line(cx + 2, cy, cx - 2, cy + 4, fg);
                 }
             }
-            let lx = tx + TREE_TOGGLE_W + 2;
-            self.wtext(g, wdg, lx, ry + (TREE_ROW_H - 14) / 2, node.label.clone(), fg);
+            let lx = tx + self.sk(TREE_TOGGLE_W) + 2;
+            self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), fg);
         }
         g.pop_clip();
     }
@@ -4916,14 +5473,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         g.rect(px, py, px + pw - 1, py + ph - 1, border);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
         for (k, it) in wdg.items.iter().enumerate() {
-            let iy = py + k as i32 * DROPDOWN_ITEM_H;
-            let hovered = mx >= px && mx < px + pw && my >= iy && my < iy + DROPDOWN_ITEM_H;
+            let iy = py + k as i32 * self.sk(DROPDOWN_ITEM_H);
+            let hovered = mx >= px && mx < px + pw && my >= iy && my < iy + self.sk(DROPDOWN_ITEM_H);
             if k as i32 == wdg.sel {
-                g.box_fill(px + 1, iy, px + pw - 2, iy + DROPDOWN_ITEM_H - 1, shade(acc, -110));
+                g.box_fill(px + 1, iy, px + pw - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(acc, -110));
             } else if hovered {
-                g.box_fill(px + 1, iy, px + pw - 2, iy + DROPDOWN_ITEM_H - 1, shade(bg, 22));
+                g.box_fill(px + 1, iy, px + pw - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(bg, 22));
             }
-            g.text(px + pad, iy + (DROPDOWN_ITEM_H - 14) / 2, it.clone(), fg);
+            let th14 = self.ctext_height(g);
+            self.ctext(g, px + pad, iy + (self.sk(DROPDOWN_ITEM_H) - th14) / 2, it.clone(), fg);
         }
     }
 
@@ -4952,11 +5510,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
     /// x-Lage von Text in einer Zelle nach Ausrichtung. Getrennt, weil Kopf-
     /// und Datenzellen dieselbe Regel brauchen.
-    fn align_x(links: i32, breite: i32, textbreite: i32, align: i8) -> i32 {
+    fn align_x(links: i32, breite: i32, textbreite: i32, align: i8, pad: i32) -> i32 {
         match align {
             1 => links + (breite - textbreite) / 2,
-            2 => links + breite - textbreite - TBL_PADDING,
-            _ => links + TBL_PADDING,
+            2 => links + breite - textbreite - pad,
+            _ => links + pad,
         }
         .max(links + 2)
     }
@@ -5022,7 +5580,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     // ein langer Titel darueber.
                     let pfeil_platz = if t.sort_col == c as i32 { 14 } else { 0 };
                     let tw = self.wtext_width(g, wdg, &s);
-                    let tx = Self::align_x(cx, cw - pfeil_platz, tw, al);
+                    let tx = Self::align_x(cx, cw - pfeil_platz, tw, al, self.sk(TBL_PADDING));
                     let ty = ay + (titel_h - schrift).max(0) / 2;
                     self.wtext(g, wdg, tx, ty, s, title_fg);
                     if t.sort_col == c as i32 {
@@ -5043,17 +5601,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let cw = gm.col_widths[p];
                     let (kx, kw) = Self::col_clip(&gm, p);
                     if cx + cw > kx && cx < kx + kw {
-                        g.push_clip(kx, fy, kw, TBL_FILTER_H);
+                        g.push_clip(kx, fy, kw, self.sk(TBL_FILTER_H));
                         let fokus = t.filter_focus == c as i32;
-                        self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + TBL_FILTER_H - 3,
+                        self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + self.sk(TBL_FILTER_H) - 3,
                                        self.th("field_bg"),
                                        if fokus { accent } else { self.th("field_border") });
                         let leer = t.filters.get(c).map(|s| s.is_empty()).unwrap_or(true);
                         let s = if leer { "Filter ...".to_string() }
                                 else { t.filters[c].clone() };
                         let farbe = if leer { shade(title_fg, -60) } else { fg };
-                        g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), TBL_FILTER_H - 4);
-                        self.wtext(g, wdg, cx + 6, fy + (TBL_FILTER_H - schrift).max(0) / 2,
+                        g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), self.sk(TBL_FILTER_H) - 4);
+                        self.wtext(g, wdg, cx + 6, fy + (self.sk(TBL_FILTER_H) - schrift).max(0) / 2,
                                    s, farbe);
                         g.pop_clip();
                         g.pop_clip();
@@ -5144,24 +5702,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
         // Senkrechte Bildlaufleiste.
         if gm.need_v {
-            let sb_x = ax + gm.body_w_raw - TBL_SCROLL_W + 1;
+            let sb_x = ax + gm.body_w_raw - self.sk(TBL_SCROLL_W) + 1;
             let track = body_h;
             let handle = Self::handle_height(track, body_h, gm.total_h);
             let ratio = if gm.max_scroll_y > 0 { t.scroll_y as f64 / gm.max_scroll_y as f64 } else { 0.0 };
             let hy = body_y + ((track - handle) as f64 * ratio) as i32;
-            g.box_fill(sb_x, body_y, sb_x + TBL_SCROLL_W - 1, body_y + track - 1, shade(bg, -8));
-            g.box_fill(sb_x + 2, hy, sb_x + TBL_SCROLL_W - 3, hy + handle - 1,
+            g.box_fill(sb_x, body_y, sb_x + self.sk(TBL_SCROLL_W) - 1, body_y + track - 1, shade(bg, -8));
+            g.box_fill(sb_x + 2, hy, sb_x + self.sk(TBL_SCROLL_W) - 3, hy + handle - 1,
                        if t.drag_v { accent } else { border });
         }
         // Waagerechte Bildlaufleiste.
         if gm.need_h {
-            let hs_y = ay + h - TBL_SCROLL_W - 1;
+            let hs_y = ay + h - self.sk(TBL_SCROLL_W) - 1;
             let track = body_w;
             let handle = Self::handle_height(track, body_w, gm.total_w);
             let ratio = if gm.max_scroll_x > 0 { t.scroll_x as f64 / gm.max_scroll_x as f64 } else { 0.0 };
             let hx = body_x + ((track - handle) as f64 * ratio) as i32;
-            g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + TBL_SCROLL_W - 1, shade(bg, -8));
-            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + TBL_SCROLL_W - 3,
+            g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + self.sk(TBL_SCROLL_W) - 1, shade(bg, -8));
+            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + self.sk(TBL_SCROLL_W) - 3,
                        if t.drag_h { accent } else { border });
         }
     }
@@ -5211,7 +5769,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         match cell.kind {
             CellKind::Text => {
                 let tw = self.wtext_width(g, wdg, &cell.text);
-                let tx = Self::align_x(cx, cw, tw, al);
+                let tx = Self::align_x(cx, cw, tw, al, self.sk(TBL_PADDING));
                 self.wtext(g, wdg, tx, cy + (ch - schrift).max(0) / 2, cell.text.clone(), fgc);
             }
             CellKind::Image => {
@@ -5234,7 +5792,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             CellKind::Check => {
                 let b = (ch - 8).clamp(10, 18);
-                let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - TBL_PADDING, _ => cx + TBL_PADDING };
+                let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - self.sk(TBL_PADDING), _ => cx + self.sk(TBL_PADDING) };
                 let by = cy + (ch - b) / 2;
                 g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("field_bg"));
                 g.rect(bx, by, bx + b - 1, by + b - 1, border);

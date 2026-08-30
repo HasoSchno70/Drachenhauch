@@ -71,6 +71,9 @@ def _module_uses_qt(path: str) -> bool:
 #                             hintereinander waehrend ich die Maus bewegte,
 #                             danach im Leerlauf wieder gruen).
 #   test_gui_form_runner.py   speist einen Klick ein -- dasselbe Nadeloehr.
+#   test_gui_tastatur.py      speist TASTEN ein -- dasselbe Nadeloehr, nur von
+#                             der anderen Seite: wer waehrenddessen tippt,
+#                             schiebt seine Anschlaege in die Wiedergabe.
 #   test_audio_modulators.py  misst Pegel an der einen Soundkarte.
 #   test_profiler.py          misst LAUFZEITEN; ringen 16 Prozesse um die
 #                             Kerne, kippt die Rangfolge der heissen Zeile.
@@ -82,6 +85,8 @@ def _module_uses_qt(path: str) -> bool:
 _SERIELL = {
     "test_automation.py",
     "test_gui_form_runner.py",
+    "test_gui_tastatur.py",
+    "test_gui_dialog.py",
     "test_audio_modulators.py",
     "test_profiler.py",
 }
@@ -178,8 +183,10 @@ _BRAUCHT_GRAFIK = {
     "test_examples.py",
     "test_gebundene_methoden_gui.py",
     "test_gfx_push_pop.py",
+    "test_gui_dialog.py",
     "test_gui_form_runner.py",
     "test_gui_table_frozen_edge.py",
+    "test_gui_tastatur.py",
     "test_image_scale_nn.py",
     "test_image_text_extras.py",
     "test_input_edges.py",
