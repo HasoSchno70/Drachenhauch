@@ -162,6 +162,61 @@ weiterklicken können, während die Frage offen ist.
 
 Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.dh`](../examples/132_gui_textarea.dh).
 
+#### `GUI_DIALOG` — derselbe Dialog, aber im eigenen Fenster
+
+`GUI_MESSAGE`/`GUI_CONFIRM` öffnen einen **Kasten des Betriebssystems**. Das
+ist die richtige Wahl für ein Werkzeug — er sieht aus wie alles andere auf
+dem Rechner. Für ein Spiel im Vollbild ist er es oft nicht: er sprengt den
+Look, erscheint als eigenes OS-Fenster, und im Web-Build gibt es ihn gar
+nicht (`dialogs`-Feature).
+
+`GUI_DIALOG` ist die Alternative **innerhalb** deines Fensters: dein Thema,
+dein Maßstab, alles hinter ihm wird abgedunkelt und nimmt keine Klicks mehr
+an.
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `GUI_DIALOG(titel$, text$[, stil$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`) |
+| `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, `1` = OK/Ja, `2` = Abbrechen/Nein |
+| `GUI_MODAL()` | BOOLEAN | steht gerade ein Dialog? |
+
+`\n` im Text (`CHR$(10)`) trennt Zeilen; das Fenster passt sich Text und
+Zeilenzahl an und wird auf dem Bildschirm zentriert.
+
+```basic
+DIM frage AS GUI_WINDOW
+
+' ... im Spielablauf:
+IF GUI_CLICKED(loeschen) THEN
+    frage = GUI_DIALOG("Löschen", "Eintrag wirklich löschen?", "janein")
+END IF
+
+GUI_UPDATE()
+IF frage <> 0 THEN
+    IF GUI_ANSWER(frage) = 1 THEN eintrag_loeschen()
+END IF
+```
+
+**`GUI_DIALOG` blockiert nicht.** Es gibt dir ein Fenster zurück, und die
+Antwort holst du dir mit `GUI_ANSWER` — genau wie einen Klick mit
+`GUI_CLICKED`. Das ist kein Kompromiss, sondern die Bauweise des Moduls: ein
+blockierender Dialog müsste mitten in deinem Bild eine eigene Zeichenschleife
+drehen und dabei deinen Layer- und Render-Ziel-Zustand übernehmen.
+
+> **Die Antwort gilt genau ein Bild** — wie `GUI_CLICKED`. Eine Antwort ist
+> ein Ereignis, kein Zustand. Wer sie länger braucht, schreibt sie sich in
+> eine Variable. Danach ist das Dialogfenster weg; sein Handle bleibt gültig,
+> `GUI_ANSWER` liefert dann `0`.
+
+**Wann welchen?**
+
+| | `GUI_MESSAGE` / `GUI_CONFIRM` | `GUI_DIALOG` |
+|---|---|---|
+| Aussehen | Kasten des Betriebssystems | dein Thema, dein Maßstab |
+| Ablauf | blockiert, liefert die Antwort direkt | läuft weiter, Antwort per `GUI_ANSWER` |
+| Web-Build | nein | ja |
+| passt zu | Werkzeug, Editor | Spiel, Vollbild-Anwendung |
+
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 
 ```basic

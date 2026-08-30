@@ -5228,6 +5228,8 @@ impl<'p> Vm<'p> {
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_scale" => { self.gui.set_scale(gnum(a,0,"GUI_SCALE")?)?; Value::Nil }
             "gui_scale_get" => Value::Float(self.gui.get_scale()),
+            "gui_answer" => Value::Int(self.gui.answer(gi(a,0,"GUI_ANSWER")?)?),
+            "gui_modal" => Value::Bool(self.gui.modal_offen()),
             "gui_reset" => { self.gui.reset(); Value::Nil }
             // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
             "gui_set_bounds" => { self.gui.set_bounds(gi(a,0,"GUI_SET_BOUNDS")?, gi(a,1,"GUI_SET_BOUNDS")? as i32, gi(a,2,"GUI_SET_BOUNDS")? as i32, gi(a,3,"GUI_SET_BOUNDS")? as i32, gi(a,4,"GUI_SET_BOUNDS")? as i32)?; Value::Nil }
@@ -5355,6 +5357,27 @@ impl<'p> Vm<'p> {
                 let g = self.gfx.as_mut().ok_or("GUI_DRAW: vor SCREEN aufgerufen")?;
                 self.gui.draw(g);
                 Value::Nil
+            }
+            // Dialog IM Fenster (eigenes Thema, kein OS-Kasten). Braucht die
+            // Bildschirmgroesse (Zentrieren) und die Textbreite (das Fenster
+            // passt sich dem Text an) -- darum hier bei den Grafik-Builtins
+            // und nicht bei den reinen Konstruktoren.
+            //
+            // NICHT zu verwechseln mit GUI_MESSAGE/GUI_CONFIRM: das sind die
+            // nativen, BLOCKIERENDEN OS-Kaesten (rfd, weiter unten).
+            "gui_dialog" => {
+                let (titel, text) = (gs(a, 0, "GUI_DIALOG")?, gs(a, 1, "GUI_DIALOG")?);
+                let stil = if a.len() > 2 { gs(a, 2, "GUI_DIALOG")?.to_lowercase() } else { String::new() };
+                // Dieselben Stil-Woerter wie GUI_CONFIRM -- zwei Vokabulare
+                // fuer dieselbe Wahl waeren eine Stolperfalle.
+                let frage = match stil.as_str() {
+                    "" | "ok" => false,
+                    "janein" | "ja/nein" | "frage" => true,
+                    other => return Err(format!(
+                        "GUI_DIALOG: '{}' ist kein Stil -- moeglich sind \"ok\" (Vorgabe) und \"janein\"", other)),
+                };
+                let g = self.gfx.as_ref().ok_or("GUI_DIALOG: vor SCREEN aufgerufen")?;
+                Value::Int(self.gui.dialog(g, titel, text, frage)?)
             }
             _ => return Ok(None),
         };

@@ -86,6 +86,7 @@ _SERIELL = {
     "test_automation.py",
     "test_gui_form_runner.py",
     "test_gui_tastatur.py",
+    "test_gui_dialog.py",
     "test_audio_modulators.py",
     "test_profiler.py",
 }
@@ -182,6 +183,7 @@ _BRAUCHT_GRAFIK = {
     "test_examples.py",
     "test_gebundene_methoden_gui.py",
     "test_gfx_push_pop.py",
+    "test_gui_dialog.py",
     "test_gui_form_runner.py",
     "test_gui_table_frozen_edge.py",
     "test_gui_tastatur.py",

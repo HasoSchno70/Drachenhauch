@@ -735,6 +735,12 @@ pub struct Window {
     base_w: i32, base_h: i32,        // Referenzgroesse fuer Anchoring (Layout-Basis)
     close_clicked: bool,
     alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
+    // Dialog (GUI_MESSAGE/GUI_CONFIRM): `dlg` markiert das Fenster als Dialog,
+    // `answer` traegt die Antwort GENAU EIN BILD lang -- wie `clicked` bei den
+    // Widgets, und aus demselben Grund: eine Antwort ist ein Ereignis, kein
+    // Zustand. Wer sie behalten will, schreibt sie sich in eine Variable.
+    dlg: bool,
+    answer: i32,   // 0 = keine, 1 = OK/Ja, 2 = Abbrechen/Nein
     // Menues: `in_bar=true` erscheint in der Menueleiste, sonst Kontextmenue
     // (per Rechtsklick im Fenster gezeigt).
     menus: Vec<Menu>,
@@ -794,6 +800,10 @@ pub struct Gui {
     z_order: Vec<usize>,         // Zeichen-/Hit-Reihenfolge (umordbar)
     focus_window: Option<usize>,
     focus_widget: Option<(usize, usize)>,
+    // Offener modaler Dialog. Solange einer steht, bekommt NUR er Eingaben --
+    // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
+    // bevor daneben weitergeklickt wird.
+    modal: Option<usize>,
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
@@ -883,7 +893,7 @@ impl Gui {
     pub fn new() -> Gui {
         Gui {
             windows: Vec::new(), z_order: Vec::new(),
-            focus_window: None, focus_widget: None,
+            focus_window: None, focus_widget: None, modal: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             skins: HashMap::new(),
@@ -998,7 +1008,7 @@ impl Gui {
             movable: true, closable: false, visible: true,
             resizable: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
-            close_clicked: false, alive: true,
+            close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
             tabs: Vec::new(), active_tab: 0,
@@ -1007,6 +1017,79 @@ impl Gui {
         self.focus_window = Some(idx);
         idx as i64
     }
+
+    /// Modales Meldungs-/Rueckfragefenster.
+    ///
+    /// `frage = false` gibt einen "OK"-Knopf (Meldung), `true` gibt "Ja"/"Nein"
+    /// (Rueckfrage). Das Fenster wird auf dem Bildschirm zentriert und passt
+    /// sich dem Text an; `\n` im Text trennt Zeilen.
+    ///
+    /// Es ist BEWUSST nicht blockierend. `gui` ist ein Polling-Toolkit -- ein
+    /// blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene
+    /// Zeichenschleife drehen und wuerde dessen Layer-/Render-Ziel-Zustand
+    /// mitten im Frame uebernehmen. Stattdessen liegt die Antwort ein Bild
+    /// lang in `GUI_ANSWER` an, genau wie ein Klick in `GUI_CLICKED`.
+    pub fn dialog(&mut self, g: &Graphics, titel: String, text: String, frage: bool)
+                  -> Result<i64, String> {
+        // In LOGISCHEN Einheiten rechnen -- `new_window`/`add_widget`
+        // skalieren selbst, und zweimal waere zweimal zu viel.
+        let zeilen: Vec<String> = text.split('\n').map(|z| z.to_string()).collect();
+        let zh = self.unsk(self.ctext_height(g)) + 6;
+        let breiteste = zeilen.iter()
+            .map(|z| self.unsk(self.ctext_width(g, z)))
+            .max().unwrap_or(0)
+            .max(self.unsk(self.ctext_width(g, &titel)) + 30);
+        let knopf_reihe = if frage { 2 } else { 1 };
+        let bw = 84;
+        let ww = (breiteste + 40).clamp(220, 560);
+        // Widget-Koordinaten sind RELATIV zum Inhaltsbereich, die Fensterhoehe
+        // ist es nicht -- die Titelleiste kommt oben drauf. Ohne diesen
+        // Zuschlag rutschte die Knopfreihe unter den unteren Rand.
+        let inhalt_h = 14 + zeilen.len() as i32 * zh + 12 + 26 + 12;
+        let wh = self.m_roh("title_h") + inhalt_h;
+        let (sw, sh) = (self.unsk(g.screen_width() as i32), self.unsk(g.screen_height() as i32));
+        let h = self.new_window(titel, (sw - ww) / 2, (sh - wh) / 2, ww, wh);
+        let wi = h as usize;
+        for (i, z) in zeilen.iter().enumerate() {
+            self.label(h, z.clone(), 16, 14 + i as i32 * zh, None)?;
+        }
+        // Knopfreihe unten rechts -- wie in jedem Systemdialog.
+        let by = inhalt_h - 12 - 26;
+        let gesamt = knopf_reihe * bw + (knopf_reihe - 1) * 8;
+        let bx0 = ww - 16 - gesamt;
+        if frage {
+            self.button(h, "Ja".into(), bx0, by, bw, 26)?;
+            self.button(h, "Nein".into(), bx0 + bw + 8, by, bw, 26)?;
+        } else {
+            self.button(h, "OK".into(), bx0, by, bw, 26)?;
+        }
+        {
+            let win = &mut self.windows[wi];
+            win.dlg = true;
+            win.movable = true;
+            win.closable = frage;   // Schliessen = Abbrechen; eine Meldung hat nur OK
+        }
+        self.modal = Some(wi);
+        self.bring_to_front(wi);
+        self.focus_window = Some(wi);
+        // Fokus auf den ersten Knopf: der Dialog soll sofort mit der Tastatur
+        // beantwortbar sein, ohne erst einmal Tab druecken zu muessen.
+        self.focus_widget = Some((wi, self.windows[wi].widgets.len() - knopf_reihe as usize));
+        Ok(h)
+    }
+
+    /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
+    /// Gilt GENAU EIN BILD -- wie `GUI_CLICKED`.
+    pub fn answer(&self, h: i64) -> Result<i64, String> {
+        let w = self.windows.get(h as usize)
+            .ok_or("GUI_ANSWER: ungueltiges GUI_WINDOW-Handle")?;
+        if !w.dlg { return Err("GUI_ANSWER: das Fenster ist kein Dialog (GUI_MESSAGE/GUI_CONFIRM)".into()); }
+        Ok(w.answer as i64)
+    }
+
+    /// Steht gerade ein modaler Dialog? Fuer Programme, die ESC selbst
+    /// belegen und nicht beenden wollen, waehrend eine Frage offen ist.
+    pub fn modal_offen(&self) -> bool { self.modal.is_some() }
 
     fn add_widget(&mut self, win: i64, fn_: &str, mut wdg: Widget) -> Result<i64, String> {
         let wi = win as usize;
@@ -3525,8 +3608,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let right_down = g.mouse_button(1);
         let right_just = right_down && !self.was_right_down;
 
-        // Transiente Flags ruecksetzen.
+        // Transiente Flags ruecksetzen -- die Dialog-Antwort gehoert dazu:
+        // sie ist ein Ereignis, kein Zustand (siehe Window::answer).
         for win in self.windows.iter_mut() {
+            win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false;
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
@@ -3538,7 +3623,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
-        let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
+        // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
+        let menu_consumed = if self.modal.is_some() { false }
+                            else { self.menu_input(mx, my, just_pressed, right_just, g) };
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -3850,9 +3937,42 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        self.dialog_auswerten();
         self.was_mouse_down = is_down;
         self.was_right_down = right_down;
         self.frame_count += 1;
+    }
+
+    /// Hat der offene Dialog in diesem Bild eine Antwort bekommen? Dann
+    /// Antwort setzen, Fenster abraeumen, Modalitaet aufheben.
+    ///
+    /// Das Fenster wird ZERSTOERT, nicht nur versteckt: sonst sammelten sich
+    /// bei einem Programm, das oft nachfragt, immer mehr tote Dialoge im
+    /// z_order an. Der Handle bleibt als Tombstone gueltig, `GUI_ANSWER`
+    /// liest die Antwort also noch in diesem Bild.
+    fn dialog_auswerten(&mut self) {
+        let wi = match self.modal { Some(wi) => wi, None => return };
+        if !self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
+            self.modal = None;
+            return;
+        }
+        let mut antwort = 0;
+        if self.windows[wi].close_clicked { antwort = 2; }   // Schliessen = Abbrechen
+        for wdg in self.windows[wi].widgets.iter() {
+            if wdg.kind == Kind::Button && wdg.clicked {
+                antwort = match wdg.text.as_str() { "Nein" => 2, _ => 1 };
+            }
+        }
+        if antwort == 0 { return; }
+        self.modal = None;
+        // Wie window_destroy: aus der z-Reihenfolge nehmen und JEDE haengende
+        // Interaktions-Referenz loesen.
+        self.z_order.retain(|&i| i != wi);
+        self.clear_window_interactions(wi);
+        let win = &mut self.windows[wi];
+        win.alive = false;
+        win.visible = false;
+        win.answer = antwort;
     }
 
     // --- Menue-Eingabe + Hit-Tests -----------------------------------------
@@ -4556,6 +4676,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Some(w) => w,
             None => { self.focus_widget = None; return; }
         };
+        // Modalitaet: steht ein Dialog offen, verschluckt er jeden Klick, der
+        // woanders hingeht. Ohne das waere er nur ein Fenster, das obenauf
+        // liegt -- man koennte daneben weiterarbeiten, und genau das soll eine
+        // Rueckfrage verhindern.
+        if let Some(m) = self.modal { if win != m { return; } }
         self.bring_to_front(win);
         self.focus_window = Some(win);
         let th = self.m("title_h");
@@ -4666,6 +4791,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     // --- Draw ---
     pub fn draw(&self, g: &mut Graphics) {
         for &wi in &self.z_order {
+            // Vor dem modalen Dialog alles dahinter abdunkeln. Das ist nicht
+            // Deko: ohne sichtbares Zeichen klickt man in den Hintergrund und
+            // wundert sich, warum nichts passiert.
+            if self.modal == Some(wi) {
+                // 0xAARRGGBB -- Alpha im obersten Byte (0 waere DECKEND).
+                let schleier = (110_i64 << 24) | 0x000000;
+                g.box_fill(0, 0, g.screen_width() as i32, g.screen_height() as i32, schleier);
+            }
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
         // Kontextmenue ueber ALLEM (nach allen Fenstern).

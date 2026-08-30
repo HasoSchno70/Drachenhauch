@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1516,
+ "count": 1519,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -443,6 +443,7 @@
   "GREEN": "Kanal 0..255 aus &HRRGGBB",
   "GRID3D": "Bodenraster — hilft ungemein beim Einschätzen von Entfernungen",
   "GUI_ACTIVE_TAB": "INTEGER — aktiver Reiter-Index",
+  "GUI_ANSWER": "INTEGER — 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein",
   "GUI_APPLY_STYLE": "einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen",
   "GUI_BUTTON": "GUI_WIDGET — Knopf",
   "GUI_CANVAS": "GUI_WIDGET — freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, nach GUI_DRAW",
@@ -456,6 +457,7 @@
   "GUI_CONFIRM": "BOOLEAN — Rückfrage → TRUE bei Zustimmung",
   "GUI_CONTEXT": "Menü-Handle — Kontextmenü (per Rechtsklick im Fenster)",
   "GUI_DESTROY": "Widget entfernen (Handle wird ungültig, andere bleiben gültig)",
+  "GUI_DIALOG": "GUI_WINDOW — modalen Dialog öffnen (\"ok\" = Vorgabe, \"janein\")",
   "GUI_DRAW": "alle Fenster zeichnen (hinten→vorne)",
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
   "GUI_DROPDOWN_SELECTED": "INTEGER — Index der Auswahl (-1 = keine)",
@@ -488,6 +490,7 @@
   "GUI_MESSAGE": "Info-Box mit OK",
   "GUI_METRIC_GET": "— / INT — Layout-Größe setzen/lesen",
   "GUI_METRIC_SET": "— / INT — Layout-Größe setzen/lesen",
+  "GUI_MODAL": "BOOLEAN — steht gerade ein Dialog?",
   "GUI_ON_BLUR": "verliert sie — der Punkt, an dem man eine Eingabe prüft",
   "GUI_ON_CHANGE": "FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox/Table-Selektion)",
   "GUI_ON_CLICK": "FUNCREF-Callback bei Klick (Button/Checkbox)",
