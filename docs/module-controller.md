@@ -25,7 +25,7 @@ IMPORT "controller"
 | `CHAR_W(c)` / `CHAR_H(c)` | FLOAT | Groesse der Kollisionsbox |
 | `CHAR_VX(c)` / `CHAR_VY(c)` | FLOAT | aktuelle Geschwindigkeit je Achse |
 | `CHAR_ON_GROUND(c)` | BOOLEAN | steht die Figur auf festem Boden? |
-| `CHAR_ON_WALL_LEFT(c)` / `..._RIGHT(c)` | BOOLEAN | beruehrt sie links bzw. rechts eine Wand? |
+| `CHAR_ON_WALL_LEFT(c)` / `CHAR_ON_WALL_RIGHT(c)` | BOOLEAN | beruehrt sie links bzw. rechts eine Wand? |
 | `CHAR_FACING(c)` | INTEGER (-1 = links, +1 = rechts) | Blickrichtung -- fuer das Spiegeln des Sprites |
 
 ### Frame-Input + Update

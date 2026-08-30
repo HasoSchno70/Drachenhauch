@@ -40,6 +40,11 @@ Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen d
 | `IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)` | gefüllter Kreis ins Image |
 | `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | gefülltes Rechteck ins Image |
 | `IMAGE_DRAW_TEXT(img, x, y, text$, size, color)` | Text (Standard-Font) ins Image |
+| `IMAGE_ALPHA_MASK(bild, maske)` | IMAGE — Deckkraft aus einem zweiten Bild übernehmen (weiche Ränder) |
+| `IMAGE_ALPHA_CROP(bild, schwelle)` | IMAGE — durchsichtigen Rand wegschneiden; `schwelle` sagt, ab welcher Deckkraft ein Pixel zählt |
+| `IMAGE_ALPHA_PREMULTIPLY(bild)` | IMAGE — Farbe mit der Deckkraft vorab verrechnen; verhindert dunkle Säume beim Skalieren |
+| `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
+| `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
 
 Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.dh](../examples/122_imgfx.dh).
 

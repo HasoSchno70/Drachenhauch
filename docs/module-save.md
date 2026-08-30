@@ -19,7 +19,7 @@ IMPORT "save"
 | `SAVE_VERSION(s)` / `SAVE_SET_VERSION(s, n)` | Versionsfeld lesen/schreiben |
 | `SAVE_SET_INT/FLOAT/STRING/BOOL(s, key$, value)` | Setter — Wert unter einem Schluessel ablegen |
 | `SAVE_GET_INT/FLOAT/STRING/BOOL(s, key$)` | strikt — fehlender Schluessel ist ein Fehler |
-| `SAVE_GET_INT_OR(s, key$, default)` (FLOAT/STRING/BOOL analog) | mit Fallback |
+| `SAVE_GET_INT_OR/FLOAT_OR/STRING_OR/BOOL_OR(s, key$, default)` | mit Fallback — liefert `default`, wenn der Schluessel fehlt oder den falschen Typ hat |
 | `SAVE_HAS(s, key$)` | BOOLEAN — ist der Schluessel belegt? |
 | `SAVE_DELETE(s, key$)` | idempotent |
 | `SAVE_CLEAR(s)` | alle Keys weg, Version bleibt |

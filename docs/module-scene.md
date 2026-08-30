@@ -19,7 +19,7 @@ IMPORT "scene"
 | `SCENE_RESET()` | Stack komplett leeren |
 | `SCENE_SET_INT/FLOAT/STRING/BOOL(key$, value)` | Daten in der obersten Scene setzen |
 | `SCENE_GET_INT/FLOAT/STRING/BOOL(key$)` | strikt — wirft bei fehlend / falschem Typ |
-| `SCENE_GET_INT_OR(key$, default)` (FLOAT/STRING/BOOL analog) | mit Fallback |
+| `SCENE_GET_INT_OR/FLOAT_OR/STRING_OR/BOOL_OR(key$, default)` | mit Fallback — liefert `default`, wenn der Schluessel fehlt oder den falschen Typ hat |
 | `SCENE_HAS_KEY(key$)` | BOOLEAN — ist der Schluessel in der obersten Szene belegt? |
 | `SCENE_DELETE(key$)` | idempotent |
 

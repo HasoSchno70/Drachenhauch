@@ -59,13 +59,20 @@ NAME = r"([A-Z][A-Z0-9_]*\$?)"
 # verliert die erste Form komplett -- allein `builtins-core.md` schreibt 122
 # Zeilen so.
 TABELLE = re.compile(r"^\|([^|]*)\|(.+)$")
+# Manche Uebersichten stellen eine Rubrik voran -- `module-html.md` schreibt
+# `| HTTP | `HTTP_GET(url$)` | ... |`. Dann steht der Befehl in Spalte ZWEI.
+TABELLE_2 = re.compile(r"^\|[^|]*\|([^|]*)\|(.+)$")
 # Listenzeile. Der Kopf darf MEHRERE Namen tragen und die Signatur getrennt
 # fuehren -- `rust-runtime.md` schreibt den ganzen 3D-Zweig so:
 #     - `CUBE` / `CUBE_WIRES` `(x,y,z, w,h,d, farbe)` — gefuellter Quader.
 # Beide Namen bekommen dann dieselbe Beschreibung. Als Trenner gilt nur der
 # Gedankenstrich oder ein Doppelpunkt: ein schlichtes "-" kommt in Fliesstext
 # zu haeufig vor, um damit Kopf und Beschreibung zu trennen.
-LISTE = re.compile(r"^\s*[-*]\s+((?:`[^`]+`[\s/,]*)+)\s*[—–:]\s*(.+)$")
+# Als Trenner gilt auch der Pfeil: die Modulatoren-Doku schreibt
+#     - `AUDIO_LFO_NEW(...)` → `AUDIO_MOD`
+#       Wellenformen: `sine`, `triangle`, ...
+# also Rueckgabetyp hinter dem Pfeil und die Erklaerung in der Fortsetzung.
+LISTE = re.compile(r"^\s*[-*]\s+((?:`[^`]+`[\s/,]*)+)\s*[—–:→]\s*(.+)$")
 KOPF_NAME = re.compile(r"`\s*" + NAME + r"[^`]*`")
 
 MAX_LAENGE = 400
@@ -77,6 +84,41 @@ def _quellen() -> list[Path]:
     alle = [f for f in sorted(DOCS.glob("*.md")) if not AUS.search(f.name)]
     vorn = [f for f in alle if f.name.startswith(("module-", "builtins-"))]
     return vorn + [f for f in alle if f not in vorn]
+
+
+def _kurzform(kopf: str, namen: set[str]) -> list[str]:
+    """Zusammengezogene Schreibweisen aufloesen.
+
+    Die Doku fasst verwandte Befehle zusammen, statt vier fast gleiche Zeilen zu
+    schreiben:
+
+        `SCENE_SET_INT/FLOAT/STRING/BOOL(key$, value)`
+        `TILED_OBJECT_X/Y(...)`
+
+    Fuer einen Leser ist das gut; ein Sammler sieht nur den ersten Namen. Hier
+    wird das letzte Namensteil gegen die Alternativen hinter den Schraegstrichen
+    getauscht -- und nur uebernommen, was dann WIRKLICH ein Builtin ist. Damit
+    kann die Abkuerzung nichts erfinden.
+    """
+    raus: list[str] = []
+    for gruppe in re.findall(r"`\s*([A-Z][A-Z0-9_]*(?:/[A-Z][A-Z0-9_]*)+)", kopf):
+        teile = gruppe.split("/")
+        basis = teile[0]
+        if "_" not in basis:
+            continue
+        # Wo genau der gemeinsame Teil endet, ist von aussen nicht zu sehen:
+        #   `PHYS3D_BODY_X/Y/Z`          -> Praefix `PHYS3D_BODY`
+        #   `SCENE_GET_INT_OR/FLOAT_OR`  -> Praefix `SCENE_GET`
+        # Darum jeden moeglichen Schnitt probieren und nur behalten, was
+        # danach WIRKLICH ein Builtin ist -- so kann nichts erfunden werden.
+        stuecke = basis.split("_")
+        for weiterer in teile[1:]:
+            for schnitt in range(len(stuecke) - 1, 0, -1):
+                kandidat = "_".join(stuecke[:schnitt]) + "_" + weiterer
+                if kandidat in namen or kandidat.rstrip("$") in namen:
+                    raus.append(kandidat)
+                    break
+    return raus
 
 
 def _saeubern(roh: str) -> str:
@@ -143,12 +185,15 @@ def sammeln() -> dict[str, str]:
     for datei in _quellen():
         for zeile in _zeilen(datei):
             m = TABELLE.match(zeile) or LISTE.match(zeile)
+            if m and not KOPF_NAME.search(m.group(1)):
+                m = TABELLE_2.match(zeile) or m      # Rubrik in Spalte 1
             if not m:
                 continue
             # Beide Formen fuehren die Namen im ersten Teil -- und beide duerfen
             # mehrere tragen (`CUBE` / `CUBE_WIRES`), die dann dieselbe
             # Beschreibung bekommen.
             treffer = [x.upper() for x in KOPF_NAME.findall(m.group(1))]
+            treffer += _kurzform(m.group(1), namen)
             if not treffer:
                 continue
             text = _saeubern(m.group(2))

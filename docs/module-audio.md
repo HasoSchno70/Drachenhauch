@@ -386,6 +386,74 @@ Maus, Reverb/Delay per Taste, mit Live-Spektrum.
 per Maus, Reverb/Delay/Distortion/Lo-Fi schaltbar, dauerhafter Mastering-
 Kompressor + Bass-EQ, Live-Spektrum des fertigen Mix.
 
+## Uhr: Takt für Musik und Rhythmus
+
+Eine Uhr zählt Ticks auf dem **Audio-Thread** — nicht im Spiel-Takt. Damit lassen
+sich Klänge auf den Schlag genau planen, auch wenn die Bildrate einbricht. Das
+ist der Unterschied zum `timer`-Modul, das pro Bild abgearbeitet wird.
+
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `AUDIO_CLOCK_NEW(ticks_pro_sekunde)` | AUDIO_CLOCK | Uhr anlegen — **sie startet angehalten** |
+| `AUDIO_CLOCK_START(clock)` | — | laufen lassen (auch nach `PAUSE` wieder) |
+| `AUDIO_CLOCK_PAUSE(clock)` | — | anhalten; der Tick-Zähler bleibt stehen |
+| `AUDIO_CLOCK_STOP(clock)` | — | anhalten und den Tick-Zähler auf 0 setzen |
+| `AUDIO_CLOCK_TICKING(clock)` | BOOLEAN | läuft sie gerade? |
+| `AUDIO_CLOCK_TICKS(clock)` | INTEGER | wie viele Ticks sind vergangen? |
+| `AUDIO_CLOCK_SET_SPEED(clock, ticks_pro_sekunde)` | — | Tempo im Lauf ändern |
+| `AUDIO_CLOCK_REMOVE(clock)` | — | Uhr abbauen |
+
+Die Umrechnung von BPM macht man selbst — `bpm / 60 * unterteilungen`:
+
+```basic
+IMPORT "audio"
+DIM takt AS AUDIO_CLOCK
+takt = AUDIO_CLOCK_NEW(120.0 / 60.0 * 4.0)   ' 120 BPM in Sechzehnteln
+AUDIO_CLOCK_START(takt)
+AUDIO_PLAY_AT(schlag, takt, 8)               ' klingt beim 8. Tick
+```
+
+`AUDIO_PLAY_AT` plant den Start; ab da kümmert sich der Audio-Thread darum. Es
+gibt **kein** `UPDATE`, das man pro Bild rufen müsste.
+
+## Räumliches Hören: Listener und Emitter
+
+Ein Listener ist das Ohr der Szene (meist die Kamera), ein Emitter eine
+Klangquelle im Raum. Lautstärke und Panning rechnet die Audio-Schicht selbst.
+
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `AUDIO_LISTENER_NEW(x, y, z)` | AUDIO_LISTENER | das Ohr setzen; ungedreht blickt es entlang **-Z** |
+| `AUDIO_LISTENER_SET_POSITION(listener, x, y, z)` | — | Ohr bewegen (etwa der Kamera nach) |
+| `AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` | — | Blickrichtung um die Y-Achse, **in Grad** |
+| `AUDIO_LISTENER_REMOVE(listener)` | — | Listener abbauen |
+| `AUDIO_EMITTER_NEW(listener, x, y, z [, min_dist [, max_dist]])` | AUDIO_EMITTER | Klangquelle im Raum; bis `min_dist` voll laut, ab `max_dist` lautlos |
+| `AUDIO_EMITTER_SET_POSITION(emitter, x, y, z)` | — | Quelle bewegen |
+| `AUDIO_EMITTER_REMOVE(emitter)` | — | Quelle abbauen |
+
+Abgespielt wird mit `AUDIO_PLAY_ON(sound, emitter, ...)`. Der zurückgegebene
+Kanal lässt sich danach wie jeder andere behandeln (`AUDIO_PAUSE`, `AUDIO_STOP`,
+`AUDIO_VOLUME` …).
+
+Die Orientierung ist bewusst auf **Yaw** beschränkt — die Drehung um die
+Hochachse. Das deckt Vogelperspektive und Verfolgerkamera ab, ohne dass man sich
+mit Quaternionen befassen muss.
+
+## Zustand sichern: AUDIO_PUSH / AUDIO_POP
+
+Alle Bus-Einstellungen (Lautstärke, Balance, Filter, Hall, Echo, Verzerrer,
+Kompressor, EQ) hängen global. Eine vergessene Rücknahme fällt erst Szenen
+später auf — dafür gibt es einen Stapel, wie `GFX_PUSH`/`GFX_POP` bei der Grafik.
+
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `AUDIO_PUSH()` | — | alle Bus-Einstellungen auf den Stapel legen |
+| `AUDIO_POP()` | — | sie zurückholen; **ohne vorheriges `PUSH` ist das ein Fehler** |
+| `AUDIO_DEPTH()` | INTEGER | wie tief ist der Stapel gerade? |
+
+Ein `AUDIO_POP` löst dabei eine laufende `AUDIO_MODULATE`-Bindung: es schreibt
+denselben Wert zurück, den der Modulator gerade steuert.
+
 ## Externer Typ
 
 | Typ | Wirkung |

@@ -26,6 +26,12 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
 | `QUITREQUESTED()` → BOOLEAN | TRUE wenn der User das Fenster schliessen will: Fenster-X / Alt+F4 — **und per raylib-Default auch `ESC`**. Wer `ESC` im Spiel selbst nutzen will (Menü/Pause), schaltet das mit `WINDOW_ESC_QUIT(FALSE)` ab |
+| `WINDOW_RESIZABLE(an)` | darf der Nutzer das Fenster ziehen? (Vorgabe: nein) |
+| `WINDOW_MIN_SIZE(w, h)` | kleinste Fenstergröße beim Ziehen |
+| `WINDOW_MAX_SIZE(w, h)` | größte Fenstergröße beim Ziehen |
+| `WINDOW_MAXIMIZE()` | Fenster auf Bildschirmgröße bringen |
+| `WINDOW_MINIMIZE()` | Fenster in die Leiste legen |
+| `WINDOW_RESTORE()` | aus maximiert oder minimiert zurückholen |
 
 Klassischer Game-Loop:
 

@@ -56,8 +56,8 @@ der **Körper-Index** (INTEGER) für alle folgenden Aufrufe.
 
 | Funktion | Rückgabe | Wirkung |
 |---|---|---|
-| `PHYS3D_BODY_X(w, idx)` / `_Y` / `_Z` | FLOAT | aktuelle Position |
-| `PHYS3D_BODY_QX(w, idx)` / `_QY` / `_QZ` / `_QW` | FLOAT | Rotation als **Quaternion** `(x, y, z, w)` |
+| `PHYS3D_BODY_X/Y/Z(w, idx)` | FLOAT | aktuelle Position |
+| `PHYS3D_BODY_QX/QY/QZ/QW(w, idx)` | FLOAT | Rotation als **Quaternion** `(x, y, z, w)` |
 | `PHYS3D_SET_POS(w, idx, x, y, z)` | — | Position hart setzen (teleportieren) |
 | `PHYS3D_SET_VEL(w, idx, vx, vy, vz)` | — | Linear-Geschwindigkeit setzen |
 | `PHYS3D_APPLY_IMPULSE(w, idx, ix, iy, iz)` | — | einmaligen Impuls geben (Sprung, Schuss, Explosion) |
