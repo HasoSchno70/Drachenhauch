@@ -378,3 +378,67 @@ dp = GUI_DATEPICKER(w, 140, 10, 150, 120)
 PRINT IIF(GUI_FOCUSED() = dp, "datum", "woanders")
 ''')
     assert zeilen and zeilen[-1] == "datum", zeilen
+
+
+RL_HOME, RL_END, RL_PAGEUP = 268, 269, 266
+
+
+def test_deckkraft_mit_pos1_und_ende(tmp_path):
+    """Die Pfeile sind für Sättigung und Helligkeit belegt, Bild auf/ab für
+    den Ton -- für die vierte Achse bleiben Pos1 und Ende."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_HOME))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_COLORPICKER_SET(cp, "alpha", 1)
+GUI_SET_PICKED_COLOR(cp, &HFFFF8800)
+GUI_FOCUS(cp)
+''' + _SCHLEIFE + '''
+' Pos1 senkt die Deckkraft um 16: FF -> EF
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+''')
+    assert zeilen and zeilen[-1] == "#EFFF8800", zeilen
+
+
+def test_deckkraft_ohne_streifen_unberuehrt(tmp_path):
+    """Gegenprobe: ohne eingeschalteten Streifen darf die Taste nichts
+    verstellen -- man verstellte sonst etwas Unsichtbares."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_HOME))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF8800)
+GUI_FOCUS(cp)
+''' + _SCHLEIFE + '''
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+''')
+    assert zeilen and zeilen[-1] == "#FF8800", zeilen
+
+
+def test_umschalt_bild_springt_ein_jahr(tmp_path):
+    """Ohne Jahressprung bräuchte man bis 1985 rund fünfhundert Klicks."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_PAGEUP, halten=RL_LSHIFT))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+''' + _SCHLEIFE + '''
+PRINT GUI_DATE(dp)
+''')
+    assert zeilen and zeilen[-1] == "2025-08-30", zeilen
+
+
+def test_grenze_haelt_die_taste_auf(tmp_path):
+    """Eine gesperrte Richtung darf die Marke nicht hinausschieben."""
+    _ereignisse(tmp_path, "ev.txt", _tipp(2, RL_RIGHT))
+    zeilen = _lauf(tmp_path, _KOPF + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-09-25")
+GUI_DATE_RANGE(dp, "2026-09-05", "2026-09-25")
+GUI_FOCUS(dp)
+''' + _SCHLEIFE + '''
+PRINT GUI_DATE(dp)
+''')
+    assert zeilen and zeilen[-1] == "2026-09-25", zeilen

@@ -1205,6 +1205,45 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let al = if al == 0 { 1 } else { al };
             Ok(Value::Int((al << 24) | (r << 16) | (g << 8) | b))
         }
+        // Farbe <-> Text. Es gibt sonst KEINEN Weg von "#FF8800" zu einer
+        // Farbe: `VAL` kennt keine Hexzahlen (`VAL("&HFF8800")` ist 0), und
+        // `&H`-Literale gibt es nur im Quelltext, nicht zur Laufzeit. Ohne
+        // diese beiden kann ein Programm also weder eine Farbe aus einer
+        // Einstellungsdatei lesen noch eine eingetippte uebernehmen.
+        "color_hex$" | "color_hex" => {
+            arity!(1);
+            let c = need_int_gerundet(&a[0], "COLOR_HEX$")?;
+            let a8 = (c >> 24) & 0xFF;
+            // Alpha 0 heisst DECKEND (Rueckwaerts-Kompatibilitaet der
+            // 24-bit-Farben) -- dann gehoert es auch nicht in den Text.
+            Ok(Value::str_rc(&if a8 == 0 {
+                std::format!("#{:06X}", c & 0xFF_FFFF)
+            } else {
+                std::format!("#{:08X}", c & 0xFFFF_FFFFu32 as i64)
+            }))
+        }
+        "color_from_hex" => {
+            arity!(1);
+            let t = need_str(&a[0], "COLOR_FROM_HEX")?;
+            let t = t.trim().trim_start_matches('#').trim_start_matches("0x")
+                     .trim_start_matches("0X").trim_start_matches("&H")
+                     .trim_start_matches("&h");
+            let ziffern: String = t.chars().collect();
+            if !ziffern.chars().all(|c| c.is_ascii_hexdigit()) || ziffern.is_empty() {
+                return err(std::format!(
+                    "COLOR_FROM_HEX: '{}' ist keine Farbe -- erwartet #RGB, #RRGGBB oder #AARRGGBB", t));
+            }
+            // Die Kurzform verdoppelt jede Ziffer, wie im Web: #F80 = #FF8800.
+            let voll = match ziffern.len() {
+                3 => ziffern.chars().flat_map(|c| [c, c]).collect::<String>(),
+                6 | 8 => ziffern.clone(),
+                n => return err(std::format!(
+                    "COLOR_FROM_HEX: '{}' hat {} Stellen -- erlaubt sind 3, 6 oder 8", t, n)),
+            };
+            let v = i64::from_str_radix(&voll, 16)
+                .map_err(|_| std::format!("COLOR_FROM_HEX: '{}' liess sich nicht lesen", t))?;
+            Ok(Value::Int(v))
+        }
         "sin" => { arity!(1); Ok(Value::Float(need_num(&a[0], "SIN")?.sin())) }
         "cos" => { arity!(1); Ok(Value::Float(need_num(&a[0], "COS")?.cos())) }
         "tan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "TAN")?.tan())) }

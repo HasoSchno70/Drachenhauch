@@ -31,8 +31,10 @@ DIM lblFarbe AS GUI_WIDGET
 lblFarbe = GUI_LABEL(win, "Farbe des Termins", 16, 14)
 DIM waehler AS GUI_WIDGET
 waehler = GUI_COLORPICKER(win, 16, 36, 320, 230)
-GUI_SET_PICKED_COLOR(waehler, &H3FA9F5)
-GUI_TOOLTIP(waehler, "Ziehen im Feld, Ton am Streifen rechts")
+' Mit Deckkraft -- der Balken unten wird damit durchscheinend.
+GUI_COLORPICKER_SET(waehler, "alpha", 1)
+GUI_SET_PICKED_COLOR(waehler, &HC03FA9F5)
+GUI_TOOLTIP(waehler, "Ziehen im Feld, Ton und Deckkraft an den Streifen rechts")
 
 DIM probe AS GUI_WIDGET
 probe = GUI_CANVAS(win, 16, 278, 320, 44)
@@ -44,6 +46,11 @@ DIM lblDatum AS GUI_WIDGET
 lblDatum = GUI_LABEL(win, "Tag des Termins", 366, 14)
 DIM kalender AS GUI_WIDGET
 kalender = GUI_DATEPICKER(win, 366, 36, 410, 286)
+' Keine Termine in der Vergangenheit: ab heute, ein Jahr weit.
+' Gesperrte Tage werden matt gezeichnet und nehmen keinen Klick an.
+DIM heute AS STRING
+heute = DATE$()
+GUI_DATE_RANGE(kalender, heute, STR$(VAL(LEFT$(heute, 4)) + 1) + MID$(heute, 4))
 DIM lblGewaehlt AS GUI_WIDGET
 lblGewaehlt = GUI_LABEL(win, "", 366, 332)
 
@@ -73,7 +80,7 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
         GUI_SET_TEXT(feldTitel, "")
     END IF
 
-    GUI_SET_TEXT(lblHex, "Farbe: " + FORMAT$(GUI_PICKED_COLOR(waehler), "#%06X"))
+    GUI_SET_TEXT(lblHex, "Farbe: " + COLOR_HEX$(GUI_PICKED_COLOR(waehler)))
     GUI_SET_TEXT(lblGewaehlt, "Datum: " + GUI_DATE(kalender))
 
     GUI_DRAW()
