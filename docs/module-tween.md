@@ -195,6 +195,39 @@ Siehe [examples/26_tween.dh](../examples/26_tween.dh) — zeigt linear, out_boun
 
 Im Spiel ([examples/32_coinquest.dh](../examples/32_coinquest.dh)) werden Tweens für Banner-Slide, Coin-Spawn und Pickup-Pop kombiniert.
 
+## Es gibt kein `TWEEN_UPDATE`
+
+Das ist Absicht und keine Lücke. `timer`, `input` und `gui` verlangen alle
+einen `..._UPDATE()`-Aufruf pro Bild — `tween` nicht:
+
+```basic
+DIM t AS TWEEN
+t = TWEEN_NEW(0, 100, 500)          ' von 0 nach 100 in 500 ms
+
+WHILE NOT QUITREQUESTED()
+    x = TWEEN_VALUE(t)              ' fertig -- kein Update noetig
+    ...
+WEND
+```
+
+Ein Tween rechnet seinen Wert bei **jedem Abruf** aus der Uhr aus
+(`MILLIS()` seit Programmstart). Er läuft also weiter, ob du ihn abfragst
+oder nicht — und läuft in **echter Zeit**, unabhängig von der Bildrate.
+
+Zwei Folgen, die man kennen sollte:
+
+- **Bricht die Bildrate ein, springt der Tween** statt langsamer zu werden.
+  Für Oberflächen-Animation ist das genau richtig; wer eine Spielmechanik an
+  einen Tween hängt, bekommt bei einem Ruckler einen Sprung.
+- **Ein Tween ist nicht reproduzierbar.** Bei einer aufgezeichneten Eingabe
+  (`AUTOMATION_PLAY`) läuft er nach der Wanduhr weiter und nicht nach den
+  Bildern — zwei Durchläufe sehen also nicht exakt gleich aus. `timer` ist
+  bildgetrieben und damit reproduzierbar; das ist der Unterschied zwischen
+  den beiden Modulen.
+
+Pausieren kannst du trotzdem: `TWEEN_PAUSE` / `TWEEN_RESUME` frieren die
+verstrichene Zeit ein.
+
 ## Tipps
 
 - **Wähle das richtige Easing**: `out_quad` für "sanftes Ankommen", `out_bounce` für "auffälliges Pop", `linear` wenn Konstanz wichtig ist.
