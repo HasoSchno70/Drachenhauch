@@ -32,6 +32,22 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `WINDOW_MAXIMIZE()` | Fenster auf Bildschirmgröße bringen |
 | `WINDOW_MINIMIZE()` | Fenster in die Leiste legen |
 | `WINDOW_RESTORE()` | aus maximiert oder minimiert zurückholen |
+| `SETWINDOWTITLE(titel$)` | Fenstertitel im Lauf ändern — etwa für den Dateinamen oder den Punktestand |
+| `SET_FULLSCREEN(an)` | Vollbild ein- oder ausschalten |
+| `WINDOW_IS_FULLSCREEN()` → BOOLEAN | läuft es gerade im Vollbild? |
+| `WINDOW_FOCUSED()` → BOOLEAN | ist das Fenster im Vordergrund? — damit pausiert man, wenn der Nutzer wegklickt |
+| `WINDOW_MINIMIZED()` / `WINDOW_MAXIMIZED()` / `WINDOW_HIDDEN()` → BOOLEAN | Zustand des Fensters abfragen |
+| `WINDOW_FOCUS()` | das eigene Fenster nach vorne holen |
+| `WINDOW_DPI_X()` / `WINDOW_DPI_Y()` → FLOAT | Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI) — ohne sie weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen |
+| `FPS()` → INTEGER | gemessene Bilder je Sekunde |
+| `SETFPS(n)` | Ziel-Bildrate; `0` = so schnell wie möglich |
+| `FILES_DROPPED()` → INTEGER | wie viele Dateien wurden in diesem Bild ins Fenster gezogen? |
+| `FILE_DROPPED(i)` → STRING | Pfad der `i`-ten davon |
+| `CLIPBOARD_GET()` → STRING | Text aus der Zwischenablage lesen |
+| `CLIPBOARD_SET(text$)` | Text in die Zwischenablage legen |
+| `GFX_PUSH()` | Zeichenzustand sichern: Kamera, Ebenen, Licht, Umgebung, Schatten, 3D-Kamera, Schrift, `POSTFX` |
+| `GFX_POP()` | ihn zurückholen — **ohne vorheriges `PUSH` ein Fehler** |
+| `GFX_DEPTH()` → INTEGER | wie tief ist der Stapel? |
 
 Klassischer Game-Loop:
 
@@ -275,6 +291,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `LOADFONT(pfad$, groesse)` → FONT | TTF/OTF laden → FONT-Handle (INTEGER) |
 | `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
+| `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
 
 `LOADFONT` lädt eine eigene TrueType-/OpenType-Schrift; `TEXT_SIZE` skaliert sie
 anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
@@ -576,6 +593,79 @@ PLAYMUSIC("assets/menu.ogg", -1, 0.7)        ' Endlos, 70% Lautstärke
 PLAYSOUND(coin_snd)
 ```
 
+## Viele Formen auf einmal
+
+Wer tausend Sterne zeichnet, ruft nicht tausendmal `PLOT`. Die Massen-Befehle
+nehmen Arrays und erledigen alles in einem Aufruf — das spart den Aufwand pro
+Befehl, nicht das Zeichnen selbst.
+
+| Funktion | Zweck |
+|---|---|
+| `PLOTS(xs, ys, farbe [, anzahl])` | viele Pixel; `farbe` als Zahl gilt für alle, als ARRAY je Pixel |
+| `BOXES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | viele Rechtecke |
+| `CIRCLES(xs, ys, rs, farbe [, anzahl])` | viele Kreise |
+| `LINES(x1s, y1s, x2s, y2s, farbe [, anzahl])` | viele Linien |
+
+**`anzahl` weglassen heißt „das ganze Array"** — ein fest dimensionierter Puffer
+schleppt seine ungenutzten Plätze also mit ins Bild. Wer nur die ersten `n`
+Einträge belegt hat, muss `n` mitgeben.
+
+## Texturen erzeugen
+
+Bilder ohne Bilddatei — für Hintergründe, Lichter und Muster, die man nicht
+mitliefern will. Alle liefern ein IMAGE, das sich wie ein geladenes zeichnen
+lässt.
+
+| Funktion | Zweck |
+|---|---|
+| `GENTEX_COLOR(breite, hoehe, farbe)` | einfarbige Fläche |
+| `GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2 [, vertikal])` | linearer Verlauf |
+| `GENTEX_GRADIENT_BOX(breite, hoehe, dichte, farbe1, farbe2)` | rechteckiger Verlauf von innen nach außen — Vignetten |
+| `GENTEX_RADIAL(breite, hoehe, innen, aussen [, dichte])` | runder Verlauf von der Mitte nach außen — weiche Lichter und Glows, additiv gezeichnet |
+| `GENTEX_CHECKED(breite, hoehe, feld_x, feld_y, farbe1, farbe2)` | Schachbrett |
+| `GENTEX_PERLIN(breite, hoehe, skala)` | Perlin-Rauschen — Wolken, Gelände, Marmor |
+| `GENTEX_CELLULAR(breite, hoehe, kachel)` | Zellrauschen (Voronoi) — Steinboden, Risse, Schuppen |
+| `GENTEX_NOISE(breite, hoehe, anteil)` | Weißrauschen — Sternenfelder, Filmkorn |
+
+## Render-Ziele
+
+Ein Render-Ziel ist eine Fläche außerhalb des Bildschirms, auf die man zeichnet
+wie auf das Fenster — für Spiegel, Minikarten, Bild-im-Bild oder Nachzieheffekte.
+
+| Funktion | Zweck |
+|---|---|
+| `RENDERTARGET_NEW(breite, hoehe [, behalten])` → INTEGER | Ziel anlegen. `behalten = TRUE` lässt den Inhalt über das Bild hinaus stehen — die Voraussetzung für Schweife |
+| `RENDERTARGET_BEGIN(ziel)` | ab jetzt dorthin zeichnen |
+| `RENDERTARGET_END()` | zurück auf das Fenster |
+| `RENDERTARGET_DRAW(ziel, x, y [, skala [, tint [, gespiegelt]]])` | das Ziel wie ein Bild aufs Fenster stempeln |
+| `RENDERTARGET_CLEAR(ziel [, farbe])` | von Hand leeren — nötig, wenn `behalten` an ist |
+
+Ohne `behalten` wird das Ziel zu Beginn jedes Bildes durchsichtig geleert. Ein
+Schweif entsteht dagegen so: `behalten = TRUE`, und pro Bild ein
+`BLEND_MODE("mult")` mit einer dunkelgrauen Vollbild-`BOX` darüber — das lässt
+Altes verblassen, statt es zu löschen.
+
+Ein Ziel kann sich **nicht selbst** zeichnen; ein `RENDERTARGET_DRAW` innerhalb
+eines anderen Ziels tut nichts.
+
+## Shader und Post-Processing
+
+| Funktion | Zweck |
+|---|---|
+| `SHADER_LOAD(pfad_oder_glsl$)` → INTEGER | Fragment-Shader laden — aus einer Datei oder direkt als Quelltext; `-1` bei Fehler |
+| `POSTFX(shader)` | jedes fertige Bild durch diesen Shader schicken; `-1` schaltet ab |
+| `SHADER_SET(shader, name$, wert)` | eine Zahl an ein `uniform float` geben |
+| `SHADER_SET2(shader, name$, x, y)` | zwei Werte (`vec2`) |
+| `SHADER_SET3(shader, name$, x, y, z)` | drei Werte (`vec3`) |
+| `SHADER_SET_ARRAY(shader, name$, werte)` | ein `uniform float[]` aus einem `ARRAY OF FLOAT` füllen — Lichtpositionen, Verlaufsstufen |
+| `SHADER_SET_MATRIX(shader, name$, mat)` | eine `MAT4` aus [`m3d`](module-m3d.md) übergeben |
+| `SHADER_SET_TEXTURE(shader, name$, bild)` | einen **zweiten** Sampler belegen — Masken, Paletten, Überblendungen |
+
+`SHADER_SET_TEXTURE` wird gemerkt und erst beim Zeichnen gesetzt. Der Grund ist
+eine Eigenheit von raylib: die Zuweisung wirkt auf das *gerade aktive*
+Shader-Programm, außerhalb des Zeichnens landete sie also am falschen — und der
+Sampler bliebe schwarz.
+
 ## Eingabe: Tastatur und Maus
 
 | Funktion | Zweck |
@@ -591,6 +681,17 @@ PLAYSOUND(coin_snd)
 | `MOUSE_LOCK(an)` | Cursor **fangen**: verstecken + im Fenster einsperren (relative Bewegung) — für First-Person-/Kamera-Maussteuerung; `FALSE` gibt frei |
 | `MOUSE_HIDDEN()` → BOOLEAN | ist der Cursor gerade versteckt/gefangen? |
 | `SCREENWIDTH()`, `SCREENHEIGHT()` → INTEGER | logische Fenstergröße (wie an `SCREEN` übergeben); 0 vor `SCREEN` |
+| `MOUSE_HIT(n)` → BOOLEAN | TRUE nur in **dem einen Frame**, in dem die Maustaste heruntergeht |
+| `MOUSE_RELEASED(n)` → BOOLEAN | TRUE in dem Frame, in dem sie losgelassen wird |
+| `MOUSE_DELTA_X()`, `MOUSE_DELTA_Y()` → FLOAT | wie weit sich die Maus seit dem letzten Bild bewegt hat — bei `MOUSE_LOCK` stehen `MOUSEX`/`MOUSEY` still, nur das hier bewegt sich noch |
+| `MOUSEWHEEL_X()`, `MOUSEWHEEL_Y()` → FLOAT | Rad in **beiden** Achsen und als Kommazahl; `MOUSEWHEEL()` kennt nur die senkrechte und rundet — feine Touchpad-Schritte fallen dort auf 0 |
+| `MOUSE_SET_POS(x, y)` | Zeiger an eine Stelle setzen |
+| `MOUSE_ON_SCREEN()` → BOOLEAN | ist der Zeiger überhaupt im Fenster? |
+| `MOUSE_CURSOR(form$)` | Zeigerform: `default`, `ibeam`, `crosshair`, `hand`, `resize_ew`, `resize_ns`, `resize_nwse`, `resize_nesw`, `resize_all`, `not_allowed` |
+| `KEY_ANY_HIT()` → INTEGER | Code der zuletzt gedrückten Taste, `-1` = keine — fuer Belegungsdialoge |
+| `KEY_NAME$(code)` → STRING | Anzeigename einer Taste (`LEER`, `LINKS`, `UMSCHALT`, `F5` …) |
+| `INKEY$()` → STRING | zuletzt getipptes Zeichen oder `""` — wartet **nicht**, für Texteingabe im Spielablauf |
+| `WAITKEY()` → INTEGER | **hält an**, bis eine Taste kommt, und liefert ihren Code (`-1`, wenn das Fenster geschlossen wird) |
 
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:
 
@@ -640,3 +741,54 @@ WHILE NOT QUITREQUESTED()
     SLEEP(16)
 WEND
 ```
+
+## Gamepad
+
+Bis zu vier Geräte, durchnummeriert ab 0. Wie bei der Tastatur gibt es „wird
+gehalten" und „genau jetzt gedrückt".
+
+| Funktion | Zweck |
+|---|---|
+| `JOYSTICK_COUNT()` → INTEGER | wie viele Geräte sind angeschlossen? |
+| `JOYSTICK_NAME(idx)` → STRING | Name des Geräts, wie es sich meldet |
+| `JOYSTICK_BUTTON(idx, btn)` → BOOLEAN | wird der Knopf **gehalten**? |
+| `JOYSTICK_HIT(idx, btn)` → BOOLEAN | genau in diesem Bild gedrückt |
+| `JOYSTICK_RELEASED(idx, btn)` → BOOLEAN | genau in diesem Bild losgelassen |
+| `JOYSTICK_ANY_BUTTON()` → INTEGER | zuletzt gedrückter Knopf, `-1` = keiner — für Belegungsdialoge |
+| `JOYSTICK_AXIS(idx, achse)` → FLOAT | Stellung einer Analogachse, `-1.0` bis `+1.0` |
+| `JOYSTICK_AXIS_COUNT(idx)` → INTEGER | wie viele Achsen hat das Gerät? |
+| `JOYSTICK_HAT_X(idx, hat)` / `JOYSTICK_HAT_Y(idx, hat)` → INTEGER | Steuerkreuz als `-1`, `0` oder `+1` je Achse |
+| `JOYSTICK_RUMBLE(idx, links, rechts, dauer_s)` | Vibration; die beiden Motoren getrennt (je `0.0`–`1.0`) |
+| `JOYSTICK_MAPPINGS(sdl_db$)` → INTEGER | Belegungen aus der SDL-GameControllerDB nachladen — damit werden exotische Geräte richtig zugeordnet |
+
+Für die Knöpfe gibt es Konstanten (`JOY_BUTTON_A` … `JOY_BUTTON_Y`, `JOY_DPAD_*`).
+Wer lieber mit Aktionsnamen statt Nummern arbeitet, nimmt das Modul
+[`input`](module-input.md) — dort heißt es dann `INPUT_BIND("springen", KEY_SPACE,
+JOY_BUTTON_A)`.
+
+Analogachsen liefern selten exakt 0. Ein kleiner Totbereich verhindert, dass die
+Figur von allein wandert:
+
+```basic
+DIM ax AS FLOAT
+ax = JOYSTICK_AXIS(0, 0)
+IF ABS(ax) < 0.15 THEN ax = 0.0
+```
+
+## Touch und Gesten
+
+| Funktion | Zweck |
+|---|---|
+| `TOUCH_COUNT()` → INTEGER | wie viele Finger liegen auf? |
+| `TOUCH_X(i)` / `TOUCH_Y(i)` → FLOAT | Position des `i`-ten Fingers |
+| `TOUCH_ID(i)` → INTEGER | Kennung dieses Fingers — bleibt über Bilder hinweg dieselbe, solange er liegen bleibt |
+| `GESTURE$()` → STRING | erkannte Geste: `tap`, `doubletap`, `hold`, `drag`, `swipe_left`, `swipe_right`, `swipe_up`, `swipe_down`, `pinch_in`, `pinch_out` — `""` wenn keine |
+| `GESTURE_DRAG_X()` / `GESTURE_DRAG_Y()` → FLOAT | Richtung eines Zugs |
+| `GESTURE_DRAG_ANGLE()` → FLOAT | sein Winkel |
+| `GESTURE_PINCH_X()` / `GESTURE_PINCH_Y()` → FLOAT | Abstand beim Auf- und Zuziehen |
+| `GESTURE_PINCH_ANGLE()` → FLOAT | dessen Winkel |
+| `GESTURE_HOLD_TIME()` → FLOAT | wie lange schon gehalten wird (Sekunden) |
+
+`TOUCH_ID` ist der Unterschied zwischen „zwei Finger" und „welcher Finger": Beim
+Ziehen mit mehreren wandert der Index `i`, sobald einer abhebt — die Kennung
+bleibt. Demo: [examples/149_input_edges.dh](../examples/149_input_edges.dh).
