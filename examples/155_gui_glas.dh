@@ -145,7 +145,7 @@ END SUB
 
 stil_setzen()
 
-WHILE NOT KEYPRESSED(KEY_ESCAPE)
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
     IF KEYHIT(KEY_SPACE) THEN
         t_idx = (t_idx + 1) MOD 2
         stil_setzen()

@@ -240,6 +240,48 @@ s = AUDIO_SFX("square", 110, 0, 0, 600, 200, 0, 0, 0.8, _
 PLAYSOUND(s)
 ```
 
+## Einen Klang anschauen und sichern
+
+Zwei Funktionen am **SOUND-Handle** — sie gelten damit für jede Klangquelle
+(`AUDIO_TONE`, `AUDIO_NOISE`, `AUDIO_SFX`, geladene Dateien), nicht nur für
+den Synthesizer.
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_SOUND_WAVE(sound, anzahl)` → ARRAY OF FLOAT | `anzahl` Punkte der Wellenform, `-1..1` — zum Zeichnen |
+| `AUDIO_SAVE_WAV(sound, pfad$[, bits])` | als WAV-Datei sichern (`bits` = 16, Vorgabe, oder 8) |
+
+`AUDIO_SOUND_WAVE` liefert je Abschnitt das Sample mit dem **grössten Betrag**,
+mit seinem Vorzeichen — nicht den Mittelwert. Das ist der ganze Kniff: über
+44100 Werte auf 600 Bildpunkte gemittelt hebt sich eine Schwingung gegen null
+auf, und die Anzeige zeigte einen Strich statt einer Welle.
+
+```basic
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+
+' Wellenform zeichnen
+DIM kurve AS ARRAY OF FLOAT
+kurve = AUDIO_SOUND_WAVE(s, 300)
+DIM i AS INTEGER
+FOR i = 0 TO 298
+    LINE(i, 100 - INT(kurve[i] * 90), i + 1, 100 - INT(kurve[i + 1] * 90), CYAN)
+NEXT
+
+' und als Datei ablegen -- LOADSOUND liest sie direkt wieder
+AUDIO_SAVE_WAV(s, "effekt.wav")
+```
+
+Geschrieben werden die Frames, **wie sie sind**: die Lautstärke aus
+`AUDIO_SFX` steckt bereits darin. Die Abspiel-Lautstärke des letzten
+`AUDIO_PLAY` kommt *nicht* obendrauf — sonst landete ein `volume` von `0.7`
+als `0.49` in der Datei. Mono bleibt einkanalig; erst wenn sich linker und
+rechter Kanal unterscheiden (`stereo_width > 0`), wird die Datei stereo.
+
+> Der **SFX-Generator** in [`examples/183_sfx_generator.dh`](../examples/183_sfx_generator.dh)
+> benutzt beide: er zeichnet die Kurve live und sichert das Ergebnis als WAV.
+> Er ist selbst in Drachenhauch geschrieben — auf dem `gui`-Modul.
+
 ## Sampler (Amiga-Stil): `SAMPLE_*`
 
 Ein geladenes PCM-Sample ueber die **ganze Klaviatur** spielen, indem es

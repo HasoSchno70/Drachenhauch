@@ -1,0 +1,402 @@
+' ============================================================
+'  DRACHENHAUCH -- SFX-Generator
+' ============================================================
+'  Ein vollstaendiges Werkzeug im sfxr-Stil, geschrieben IN Drachenhauch
+'  auf dem eigenen gui-Modul. Das Gegenstueck zum Qt-Werkzeug `dhsfx`.
+'
+'  Bedienung:
+'    Regler ziehen, Werkseinstellung links waehlen, [Abspielen] druecken.
+'    Alles ist auch ohne Maus bedienbar: TAB wechselt das Bedienelement,
+'    Leertaste/Enter loest aus, die Pfeile verstellen Regler.
+'    [ESC] beendet -- ausser wenn gerade eine Rueckfrage offen steht.
+'
+'  Ausgabe:
+'    [WAV sichern]  schreibt eine Datei, die LOADSOUND direkt laedt.
+'    [GB-Code]      legt den fertigen AUDIO_SFX-Aufruf in die
+'                   Zwischenablage -- der Weg vom Klang ins Programm.
+' ============================================================
+IMPORT "gui"
+IMPORT "audio"
+
+' --- Parameter: EINE Reihenfolge fuer Regler, Werkseinstellungen und ---
+' --- den AUDIO_SFX-Aufruf. Zwei Listen waeren zwei Stellen zum Irren. -
+CONST P_FREQ    = 0
+CONST P_SLIDE   = 1
+CONST P_VOL     = 2
+CONST P_ATTACK  = 3
+CONST P_SUSTAIN = 4
+CONST P_DECAY   = 5
+CONST P_DUTY    = 6
+CONST P_PWM_D   = 7
+CONST P_PWM_S   = 8
+CONST P_CUTOFF  = 9
+CONST P_SWEEP   = 10
+CONST P_RES     = 11
+CONST P_VIB_D   = 12
+CONST P_VIB_S   = 13
+CONST P_BREITE  = 14
+CONST P_PAN     = 15
+CONST N_PARAM   = 16
+
+DIM regler[N_PARAM] AS GUI_WIDGET      ' der Schieber
+DIM wertText[N_PARAM] AS GUI_WIDGET    ' die Zahl daneben
+DIM nachkomma[N_PARAM] AS INTEGER      ' wie viele Stellen zeigen?
+DIM einheit[N_PARAM] AS STRING
+DIM letzter[N_PARAM] AS FLOAT          ' Stand des letzten Bildes
+
+DIM wellenformen AS ARRAY OF STRING
+wellenformen = SPLIT$("square|saw|sine|triangle|noise", "|")
+
+SCREEN(1340, 640, "Drachenhauch - SFX-Generator", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("SFX-Generator", 10, 10, 1320, 620)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' ============================================================
+'  Linke Spalte: Anzeige, Transport, Werkseinstellungen, Ausgabe
+' ============================================================
+DIM flaeche AS GUI_WIDGET
+flaeche = GUI_CANVAS(win, 16, 16, 400, 130)
+
+DIM knopfPlay AS GUI_WIDGET
+knopfPlay = GUI_BUTTON(win, "Abspielen", 16, 158, 120, 30)
+DIM knopfZufall AS GUI_WIDGET
+knopfZufall = GUI_BUTTON(win, "Zufall", 144, 158, 100, 30)
+GUI_TOOLTIP(knopfZufall, "Wuerfelt neue Werte um die jetzigen herum")
+DIM autoPlay AS GUI_WIDGET
+autoPlay = GUI_CHECKBOX(win, "Auto-Play", 256, 164, TRUE)
+GUI_TOOLTIP(autoPlay, "Spielt selbst, sobald ein Regler zur Ruhe kommt")
+
+DIM lblPresets AS GUI_WIDGET
+lblPresets = GUI_LABEL(win, "Werkseinstellungen", 16, 200)
+DIM presetNamen AS ARRAY OF STRING
+presetNamen = SPLIT$("Muenze|Laser|Explosion|Powerup|Treffer|Sprung|Blip|Motor", "|")
+DIM liste AS GUI_WIDGET
+liste = GUI_LISTBOX(win, 16, 222, 210, 176, presetNamen)
+
+DIM knopfWav AS GUI_WIDGET
+knopfWav = GUI_BUTTON(win, "WAV sichern ...", 16, 410, 210, 28)
+DIM knopfCode AS GUI_WIDGET
+knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 16, 444, 210, 28)
+DIM knopfBits AS GUI_WIDGET
+knopfBits = GUI_CHECKBOX(win, "8 Bit (Lo-Fi)", 244, 416)
+GUI_TOOLTIP(knopfBits, "Halb so gross, mehr Rauschen -- der Retro-Klang")
+
+DIM lblStatus AS GUI_WIDGET
+lblStatus = GUI_LABEL(win, "Bereit.", 16, 482)
+DIM lblDauer AS GUI_WIDGET
+lblDauer = GUI_LABEL(win, "", 16, 504)
+
+' ============================================================
+'  Rechte Spalte: vier Gruppen mit Reglern
+' ============================================================
+DIM g1 AS GUI_WIDGET
+g1 = GUI_GROUPBOX(win, 460, 16, 420, 156, "Ton")
+DIM lblWave AS GUI_WIDGET
+lblWave = GUI_LABEL(win, "Wellenform", 472, 46)
+DIM waehlWave AS GUI_WIDGET
+waehlWave = GUI_DROPDOWN(win, 624, 42, 130, 24, wellenformen)
+
+DIM g2 AS GUI_WIDGET
+g2 = GUI_GROUPBOX(win, 900, 16, 420, 126, "Huellkurve")
+DIM g3 AS GUI_WIDGET
+g3 = GUI_GROUPBOX(win, 460, 186, 420, 216, "SID / Filter")
+DIM g4 AS GUI_WIDGET
+g4 = GUI_GROUPBOX(win, 900, 156, 420, 156, "Vibrato / Stereo")
+
+' Einen Regler samt Beschriftung und Zahl anlegen.
+' Liefert nichts zurueck -- die Felder liegen unter `idx` in den Arrays,
+' und genau dieser Index ist auch die Stelle im AUDIO_SFX-Aufruf.
+SUB machRegler(idx AS INTEGER, name AS STRING, x AS INTEGER, y AS INTEGER, _
+               lo AS FLOAT, hi AS FLOAT, vorgabe AS FLOAT, _
+               stellen AS INTEGER, mass AS STRING)
+    DIM l AS GUI_WIDGET
+    l = GUI_LABEL(win, name, x, y + 3)
+    regler[idx] = GUI_SLIDER(win, x + 152, y, 130, lo, hi, vorgabe)
+    wertText[idx] = GUI_LABEL(win, "", x + 290, y + 3)
+    nachkomma[idx] = stellen
+    einheit[idx] = mass
+    letzter[idx] = vorgabe
+END SUB
+
+machRegler(P_FREQ,    "Frequenz",    472, 76,   50, 8000,  800, 0, " Hz")
+machRegler(P_SLIDE,   "Pitch-Slide", 472, 106, -8000, 8000,   0, 0, " Hz/s")
+machRegler(P_VOL,     "Lautstaerke", 472, 136,  0.0,  1.0, 0.7, 2, "")
+
+machRegler(P_ATTACK,  "Attack",      912, 46,     0, 2000,   0, 0, " ms")
+machRegler(P_SUSTAIN, "Sustain",     912, 76,     0, 4000,  40, 0, " ms")
+machRegler(P_DECAY,   "Decay",       912, 106,    0, 4000, 150, 0, " ms")
+
+machRegler(P_DUTY,    "Pulsbreite",  472, 216, 0.05, 0.95, 0.5, 2, "")
+machRegler(P_PWM_D,   "PWM-Tiefe",   472, 246,  0.0, 0.45, 0.0, 2, "")
+machRegler(P_PWM_S,   "PWM-Tempo",   472, 276,  0.0, 30.0, 0.0, 1, " Hz")
+machRegler(P_CUTOFF,  "Filter",      472, 306,    0, 12000,  0, 0, " Hz")
+machRegler(P_SWEEP,   "Filter-Fahrt", 472, 336, -12000, 12000, 0, 0, " Hz/s")
+machRegler(P_RES,     "Resonanz",    472, 366,  0.0, 0.95, 0.0, 2, "")
+
+machRegler(P_VIB_D,   "Vib-Tiefe",   912, 186,  0.0,  0.5, 0.0, 2, "")
+machRegler(P_VIB_S,   "Vib-Tempo",   912, 216,    0,   60,   0, 0, " Hz")
+machRegler(P_BREITE,  "Stereo",      912, 246,  0.0,  1.0, 0.0, 2, "")
+machRegler(P_PAN,     "Pan (L..R)",  912, 276, -1.0,  1.0, 0.0, 1, "")
+
+' ============================================================
+'  Werkseinstellungen -- dieselben acht wie im Qt-Werkzeug
+' ============================================================
+DIM presetWave[8] AS STRING
+DIM presetWert[8, N_PARAM] AS FLOAT
+
+SUB setzePreset(i AS INTEGER, wf AS STRING, freq AS FLOAT, slide AS FLOAT, _
+                atk AS FLOAT, sus AS FLOAT, dec AS FLOAT, _
+                vibD AS FLOAT, vibS AS FLOAT)
+    presetWave[i] = wf
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        presetWert[i, k] = 0.0
+    NEXT
+    presetWert[i, P_FREQ] = freq
+    presetWert[i, P_SLIDE] = slide
+    presetWert[i, P_VOL] = 0.7
+    presetWert[i, P_ATTACK] = atk
+    presetWert[i, P_SUSTAIN] = sus
+    presetWert[i, P_DECAY] = dec
+    presetWert[i, P_VIB_D] = vibD
+    presetWert[i, P_VIB_S] = vibS
+    presetWert[i, P_DUTY] = 0.5        ' neutrale Pulsbreite, nicht 0
+END SUB
+
+setzePreset(0, "square", 900,   600,  0, 40, 160, 0.0,  0)
+setzePreset(1, "saw",    1000, -1400, 0, 30, 150, 0.0,  0)
+setzePreset(2, "noise",  120,  -60,   0, 60, 420, 0.0,  0)
+setzePreset(3, "square", 380,   700,  0, 90, 240, 0.15, 18)
+setzePreset(4, "square", 500,  -500,  0, 20, 140, 0.0,  0)
+setzePreset(5, "square", 420,   560,  0, 50, 130, 0.0,  0)
+setzePreset(6, "square", 820,   0,    0, 18, 70,  0.0,  0)
+setzePreset(7, "saw",    90,    0,    0, 600, 200, 0.08, 7)
+
+SUB ladePreset(i AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        GUI_SET_VALUE(regler[k], presetWert[i, k])
+    NEXT
+    FOR k = 0 TO LEN(wellenformen) - 1
+        IF wellenformen[k] = presetWave[i] THEN GUI_DROPDOWN_SET_SELECTED(waehlWave, k)
+    NEXT
+END SUB
+
+' ============================================================
+'  Klang bauen und zeichnen
+' ============================================================
+DIM klang AS SOUND
+klang = -1
+DIM kurve AS ARRAY OF FLOAT
+DIM geaendert AS INTEGER
+DIM ruhig AS INTEGER            ' Bilder ohne Aenderung
+DIM letzteWelle AS INTEGER
+letzteWelle = -1
+
+FUNCTION wf$() AS STRING
+    RETURN wellenformen[GUI_DROPDOWN_SELECTED(waehlWave)]
+END FUNCTION
+
+FUNCTION p(idx AS INTEGER) AS FLOAT
+    RETURN GUI_VALUE(regler[idx])
+END FUNCTION
+
+' Klang neu erzeugen. Der alte wird freigegeben -- bei einem Werkzeug, das
+' pro Reglerbewegung einen neuen baut, waeren das sonst schnell Tausende.
+SUB baueKlang()
+    IF klang >= 0 THEN UNLOADSOUND(klang)
+    klang = AUDIO_SFX(wf$(), p(P_FREQ), p(P_SLIDE), _
+                      INT(p(P_ATTACK)), INT(p(P_SUSTAIN)), INT(p(P_DECAY)), _
+                      p(P_VIB_D), p(P_VIB_S), p(P_VOL), p(P_BREITE), _
+                      p(P_DUTY), p(P_PWM_D), p(P_PWM_S), _
+                      p(P_CUTOFF), p(P_SWEEP), p(P_RES))
+    kurve = AUDIO_SOUND_WAVE(klang, 400)
+    DIM ms AS INTEGER
+    ms = INT(p(P_ATTACK)) + INT(p(P_SUSTAIN)) + INT(p(P_DECAY))
+    GUI_SET_TEXT(lblDauer, "Dauer " + STR$(ms) + " ms  --  " + wf$())
+END SUB
+
+SUB spiele()
+    DIM ch AS AUDIO_CHANNEL
+    ch = AUDIO_PLAY(klang)
+    ' Pan liegt nicht im Klang, sondern am Kanal -- AUDIO_SFX kennt nur die
+    ' Stereo-BREITE. Beides zusammen ergibt die Position im Bild.
+    IF p(P_PAN) <> 0.0 THEN
+        DIM links AS FLOAT
+        DIM rechts AS FLOAT
+        links = 1.0 - MAX(0.0, p(P_PAN))
+        rechts = 1.0 + MIN(0.0, p(P_PAN))
+        AUDIO_PAN(ch, links, rechts)
+    END IF
+END SUB
+
+' Kurve in die Zeichenflaeche malen. LINES zeichnet alle Segmente in EINEM
+' Aufruf statt 400 einzelne Builtin-Aufrufe zu machen.
+SUB zeichneKurve()
+    DIM cx AS INTEGER
+    DIM cy AS INTEGER
+    DIM cw AS INTEGER
+    DIM chh AS INTEGER
+    cx = GUI_CANVAS_X(flaeche)
+    cy = GUI_CANVAS_Y(flaeche)
+    cw = GUI_CANVAS_W(flaeche)
+    chh = GUI_CANVAS_H(flaeche)
+    BOX(cx, cy, cx + cw - 1, cy + chh - 1, &H0E1620)
+    DIM mitte AS INTEGER
+    mitte = cy + INT(chh / 2)
+    LINE(cx, mitte, cx + cw - 1, mitte, &H2E3C50)
+
+    DIM n AS INTEGER
+    n = LEN(kurve)
+    IF n < 2 THEN RETURN
+    DIM x1[n] AS INTEGER
+    DIM y1[n] AS INTEGER
+    DIM x2[n] AS INTEGER
+    DIM y2[n] AS INTEGER
+    DIM i AS INTEGER
+    DIM h AS FLOAT
+    h = (chh / 2) * 0.92
+    DIM uebersteuert AS INTEGER
+    FOR i = 0 TO n - 2
+        x1[i] = cx + INT(i * cw / n)
+        y1[i] = mitte - INT(kurve[i] * h)
+        x2[i] = cx + INT((i + 1) * cw / n)
+        y2[i] = mitte - INT(kurve[i + 1] * h)
+        IF ABS(kurve[i]) >= 0.999 THEN uebersteuert = 1
+    NEXT
+    LINES(x1, y1, x2, y2, &H2BC4E8, n - 1)
+    IF uebersteuert = 1 THEN
+        TEXT(cx + cw - 88, cy + 6, "Clipping", &HEF9F27)
+    END IF
+END SUB
+
+' Der Aufruf, der diesen Klang im eigenen Programm erzeugt.
+FUNCTION gbCode$() AS STRING
+    DIM z AS STRING
+    z = "s = AUDIO_SFX(" + CHR$(34) + wf$() + CHR$(34)
+    z = z + ", " + FORMAT$(p(P_FREQ), "%.0f")
+    z = z + ", " + FORMAT$(p(P_SLIDE), "%.0f")
+    z = z + ", " + FORMAT$(p(P_ATTACK), "%.0f")
+    z = z + ", " + FORMAT$(p(P_SUSTAIN), "%.0f")
+    z = z + ", " + FORMAT$(p(P_DECAY), "%.0f")
+    z = z + ", " + FORMAT$(p(P_VIB_D), "%.2f")
+    z = z + ", " + FORMAT$(p(P_VIB_S), "%.0f")
+    z = z + ", " + FORMAT$(p(P_VOL), "%.2f")
+    z = z + ", " + FORMAT$(p(P_BREITE), "%.2f")
+    z = z + ", " + FORMAT$(p(P_DUTY), "%.2f")
+    z = z + ", " + FORMAT$(p(P_PWM_D), "%.2f")
+    z = z + ", " + FORMAT$(p(P_PWM_S), "%.1f")
+    z = z + ", " + FORMAT$(p(P_CUTOFF), "%.0f")
+    z = z + ", " + FORMAT$(p(P_SWEEP), "%.0f")
+    z = z + ", " + FORMAT$(p(P_RES), "%.2f") + ")"
+    RETURN z
+END FUNCTION
+
+' Um den jetzigen Wert herum wuerfeln, nicht voellig neu: so bleibt der
+' Charakter erhalten und man tastet sich an einen Klang heran.
+SUB wuerfle()
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        IF k <> P_VOL AND k <> P_PAN THEN
+            DIM v AS FLOAT
+            v = GUI_VALUE(regler[k])
+            GUI_SET_VALUE(regler[k], v + (RND() - 0.5) * 0.5 * ABS(v) + (RND() - 0.5) * 4)
+        END IF
+    NEXT
+    GUI_DROPDOWN_SET_SELECTED(waehlWave, INT(RND() * LEN(wellenformen)))
+END SUB
+
+' ============================================================
+'  Start
+' ============================================================
+ladePreset(0)
+GUI_LISTBOX_SET_SELECTED(liste, 0)
+baueKlang()
+
+DIM frage AS GUI_WINDOW
+frage = -1                     ' -1 = keine Rueckfrage offen
+DIM letztePreset AS INTEGER
+letztePreset = 0
+
+WHILE NOT QUITREQUESTED()
+    CLS(&H0B1119)
+    GUI_UPDATE()
+
+    ' --- Werkseinstellung gewaehlt? ---
+    IF GUI_LISTBOX_SELECTED(liste) <> letztePreset THEN
+        letztePreset = GUI_LISTBOX_SELECTED(liste)
+        ladePreset(letztePreset)
+    END IF
+
+    IF GUI_CLICKED(knopfZufall) THEN wuerfle()
+
+    ' --- Hat sich etwas veraendert? ---
+    geaendert = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        IF GUI_VALUE(regler[k]) <> letzter[k] THEN
+            letzter[k] = GUI_VALUE(regler[k])
+            geaendert = 1
+        END IF
+    NEXT
+    IF GUI_DROPDOWN_SELECTED(waehlWave) <> letzteWelle THEN
+        letzteWelle = GUI_DROPDOWN_SELECTED(waehlWave)
+        geaendert = 1
+    END IF
+
+    IF geaendert = 1 THEN
+        baueKlang()
+        ruhig = 0
+    ELSE
+        ruhig = ruhig + 1
+    END IF
+
+    ' Erst spielen, wenn der Regler ZUR RUHE gekommen ist. Bei jedem
+    ' Zwischenwert loszuschiessen ergaebe ein Maschinengewehr aus
+    ' angerissenen Toenen -- unbrauchbar zum Beurteilen.
+    IF ruhig = 6 AND GUI_CHECKED(autoPlay) THEN spiele()
+    IF GUI_CLICKED(knopfPlay) THEN spiele()
+
+    ' --- Ausgabe ---
+    IF GUI_CLICKED(knopfWav) THEN
+        DIM pfad AS STRING
+        pfad = FILE_SAVE_DIALOG("WAV sichern", "effekt.wav", "wav")
+        IF pfad <> "" THEN
+            DIM bits AS INTEGER
+            bits = 16
+            IF GUI_CHECKED(knopfBits) THEN bits = 8
+            AUDIO_SAVE_WAV(klang, pfad, bits)
+            GUI_SET_TEXT(lblStatus, "Gesichert: " + pfad)
+        END IF
+    END IF
+
+    IF GUI_CLICKED(knopfCode) THEN
+        CLIPBOARD_SET(gbCode$())
+        GUI_SET_TEXT(lblStatus, "AUDIO_SFX-Aufruf in der Zwischenablage.")
+    END IF
+
+    ' --- Zahlen neben den Reglern nachfuehren ---
+    FOR k = 0 TO N_PARAM - 1
+        DIM maske AS STRING
+        maske = "%." + STR$(nachkomma[k]) + "f"
+        GUI_SET_TEXT(wertText[k], FORMAT$(GUI_VALUE(regler[k]), maske) + einheit[k])
+    NEXT
+
+    GUI_DRAW()
+    zeichneKurve()          ' NACH GUI_DRAW -- sonst zeichnet das Fenster darueber
+
+    ' ESC beendet -- aber nicht, wenn gerade eine Rueckfrage offen ist.
+    IF KEYHIT(KEY_ESCAPE) AND frage < 0 THEN
+        frage = GUI_DIALOG("Beenden", "SFX-Generator wirklich schliessen?", "janein")
+    END IF
+    IF frage >= 0 THEN
+        IF GUI_ANSWER(frage) = 1 THEN EXIT(0)
+        IF GUI_ANSWER(frage) = 2 THEN frage = -1
+    END IF
+
+    FLIP()
+WEND
