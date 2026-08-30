@@ -26,6 +26,28 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > ausschließlich `dhrt` (`rust/drachenhauch_runtime/src/`: `lexer.rs`/`parser.rs`/
 > `compiler.rs`/`vm.rs`/`builtins.rs`/Modul-`.rs`).
 
+> ## Editoren in Drachenhauch selbst -- zwei Piloten (2026-08-30)
+>
+> Die Frage, ob die Qt-Editoren nach Drachenhauch koennen, ist an zwei Faellen
+> gemessen statt geschaetzt:
+>
+> | Editor | Qt | Drachenhauch | Faktor |
+> |---|---|---|---|
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 400 | 0,77 |
+> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 383 | 0,48 |
+>
+> **Der bessere Faktor beim zweiten ist KEIN Fortschritt, sondern eine
+> Eigenheit des Falls**: der Qt-Partikel-Editor zeichnet seine Vorschau von
+> Hand (`paintEvent`, alle fuenf Darstellungsarten in QPainter), die
+> Drachenhauch-Fassung ruft `PARTICLE_DRAW`. Rund 150 Zeilen Ersparnis kommen
+> allein daher. Wer hochrechnet, muss fragen: wie viel von dem Qt-Code
+> dupliziert etwas, das die Laufzeit schon kann?
+>
+> **Nicht portiert** (in beiden Piloten): Undo/Redo, eigene Presets
+> speichern/laden. Beim Partikel-Editor zusaetzlich der Hintergrund-Waehler.
+> **Fehlt in `gui`**: ein Farbwaehler-Dialog -- der Pilot behilft sich mit drei
+> RGB-Reglern und einem Farbbalken.
+
 ## Verzeichnisstruktur
 
 ```

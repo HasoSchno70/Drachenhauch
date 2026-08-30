@@ -49,6 +49,7 @@ _INTERAKTIV = [
     "182_gui_tastatur_massstab",
     "183_sfx_generator",
     "184_codefeld",
+    "185_partikel_editor",
 ]
 
 
