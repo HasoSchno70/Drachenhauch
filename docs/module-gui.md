@@ -1578,6 +1578,9 @@ nachbauen müsste.
 | `GUI_DATEPICKER(win, x, y, w, h)` → GUI_WIDGET | Monatsgitter mit Blätterpfeilen |
 | `GUI_DATE(picker)` → STRING | gewähltes Datum als `JJJJ-MM-TT` |
 | `GUI_SET_DATE(picker, datum$)` | Datum setzen |
+| `GUI_COLORPICKER_SET(picker, schluessel$, wert)` | `alpha` (0/1) — Deckkraft-Streifen zeigen |
+| `GUI_DATEPICKER_SET(picker, schluessel$, wert)` | `wochenbeginn` (0 = Montag … 6 = Sonntag) |
+| `GUI_DATE_RANGE(picker, von$, bis$)` | erlaubter Bereich (leerer Text = keine Grenze) |
 
 Beide melden Änderungen über `GUI_ON_CHANGE`.
 
@@ -1607,7 +1610,8 @@ Unsinn wird abgelehnt, auch der 29. Februar in einem Jahr, das keines ist.
 | `←` `→` | Sättigung | ein Tag |
 | `↑` `↓` | Helligkeit | eine Woche |
 | `BILD ↑` `BILD ↓` | Farbton | ein Monat |
-| `UMSCHALT` dazu | feinere Schritte | — |
+| `POS1` `ENDE` | Deckkraft (nur mit `alpha`) | — |
+| `UMSCHALT` dazu | feinere Schritte | ein **Jahr** statt ein Monat |
 
 > **Der Farbton wird mitgeführt, nicht zurückgerechnet.** Bei Schwarz ist er
 > unbestimmt (jeder Ton ergibt Schwarz), bei Grau die Sättigung. Ein Wähler,
@@ -1623,6 +1627,64 @@ Unsinn wird abgelehnt, auch der 29. Februar in einem Jahr, das keines ist.
 Ein Klick auf einen Tag des Nachbarmonats (die matten Zahlen am Rand)
 blättert dorthin. Farbe und Datum überleben `GUI_SAVE`/`GUI_LOAD` — in der
 `.dhform` stehen sie als `"#RRGGBB"` und `"JJJJ-MM-TT"`, also lesbar.
+
+### Deckkraft
+
+`GUI_COLORPICKER_SET(picker, "alpha", 1)` blendet einen zweiten Streifen ein.
+`GUI_PICKED_COLOR` liefert dann `0xAARRGGBB` statt `0xRRGGBB`:
+
+```basic
+GUI_COLORPICKER_SET(waehler, "alpha", 1)
+GUI_SET_PICKED_COLOR(waehler, &HC03FA9F5)     ' halb durchscheinendes Blau
+```
+
+Ohne den Schalter bleibt es bei sechs Stellen — Programme, die den Wähler
+schon benutzen, bekommen unverändert das, was sie erwarten.
+
+> **Die Deckkraft geht von 1 bis 255, nicht von 0.** Ein oberstes Byte von `0`
+> liest die Laufzeit als **deckend** — so bleiben die alten 24-Bit-Farben
+> (`&Hrrggbb`) undurchsichtig. Für „praktisch unsichtbar" ist `1` der kleinste
+> Wert; was ganz weg soll, zeichnet man einfach nicht.
+
+Der Streifen liegt auf einem **Schachbrett**: ohne das sähe man dem Verlauf
+nicht an, wo er durchsichtig wird.
+
+### Grenzen und Wochenbeginn
+
+```basic
+' Keine Termine in der Vergangenheit
+GUI_DATE_RANGE(kalender, DATE$(), "")          ' leer = keine Obergrenze
+GUI_DATEPICKER_SET(kalender, "wochenbeginn", 6) ' Woche ab Sonntag
+```
+
+Gesperrte Tage werden **matter** gezeichnet als die des Nachbarmonats (der
+eine ist erreichbar, der andere nicht) und nehmen weder Klick noch Taste an.
+Ein bereits gesetztes Datum außerhalb wird beim Setzen der Grenzen sofort
+hereingezogen — sonst stünde im Feld ein Wert, den der Wähler selbst nicht
+mehr zulässt.
+
+Im Kopf blättern **vier** Bereiche: `‹‹` ein Jahr zurück, `‹` einen Monat
+zurück, `›` und `››` entsprechend vorwärts. Mit der Tastatur ist
+`UMSCHALT`+`BILD ↑`/`BILD ↓` der Jahressprung — ohne ihn bräuchte man bis
+1985 rund fünfhundert Klicks.
+
+### Farbe als Text
+
+Zwei Kern-Builtins (kein `IMPORT` nötig), die es vorher nicht gab:
+
+| Funktion | Wirkung |
+|---|---|
+| `COLOR_HEX$(farbe)` → STRING | `"#RRGGBB"`, mit Deckkraft `"#AARRGGBB"` |
+| `COLOR_FROM_HEX(text$)` → INTEGER | `#RGB`, `#RRGGBB`, `#AARRGGBB` — mit oder ohne `#`, auch `0x`/`&H` |
+
+Ohne sie **kann ein Programm Hex-Text gar nicht in eine Farbe wandeln**:
+`VAL("&HFF8800")` liefert `0`, und `&H`-Literale gibt es nur im Quelltext,
+nicht zur Laufzeit. Damit ließ sich weder eine Farbe aus einer
+Einstellungsdatei lesen noch eine eingetippte übernehmen.
+
+Die Kurzform verdoppelt jede Ziffer wie im Web: `#F80` = `#FF8800`. Ist die
+Deckkraft `0` (also deckend), lässt `COLOR_HEX$` sie weg — sonst stünde vor
+jeder gewöhnlichen Farbe ein sinnloses `00`.
 
 Beispiel: [`examples/186_farbe_und_datum.dh`](../examples/186_farbe_und_datum.dh).
 

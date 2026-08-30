@@ -167,3 +167,159 @@ dp2 = GUI_WINDOW_WIDGET(w2, 1)
 PRINT FORMAT$(GUI_PICKED_COLOR(cp2), "%06X"); " "; GUI_DATE(dp2)
 ''')
     assert out.strip() == "3FA9F5 2024-02-29"
+
+
+# --- Farbe als Text --------------------------------------------------------
+#
+# Es gibt sonst KEINEN Weg von "#FF8800" zu einer Farbe: `VAL` kennt keine
+# Hexzahlen (`VAL("&HFF8800")` ist 0), und `&H`-Literale gibt es nur im
+# Quelltext. Ohne diese beiden kann ein Programm weder eine Farbe aus einer
+# Einstellungsdatei lesen noch eine eingetippte übernehmen.
+
+def test_farbe_als_text_hin_und_zurueck(run_gb):
+    out = run_gb('''
+DIM proben AS ARRAY OF INTEGER
+proben = [&HFF8800, &H000000, &HFFFFFF, &H123456]
+DIM i AS INTEGER
+DIM schief AS INTEGER
+FOR i = 0 TO LEN(proben) - 1
+    IF COLOR_FROM_HEX(COLOR_HEX$(proben[i])) <> proben[i] THEN schief = schief + 1
+NEXT
+PRINT schief; " "; COLOR_HEX$(&HFF8800)
+''')
+    n, text = out.strip().split()
+    assert n == "0" and text == "#FF8800"
+
+
+def test_kurzform_wird_verdoppelt(run_gb):
+    """`#F80` = `#FF8800`, wie im Web."""
+    out = run_gb('PRINT COLOR_HEX$(COLOR_FROM_HEX("#F80"))')
+    assert out.strip() == "#FF8800"
+
+
+def test_hex_akzeptiert_die_ueblichen_schreibweisen(run_gb):
+    out = run_gb('''
+DIM formen AS ARRAY OF STRING
+formen = SPLIT$("#FF8800|FF8800|0xFF8800|&HFF8800", "|")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(formen) - 1
+    IF COLOR_FROM_HEX(formen[i]) <> &HFF8800 THEN PRINT "schief: "; formen[i]
+NEXT
+PRINT "fertig"
+''')
+    assert out.strip() == "fertig"
+
+
+def test_kein_hex_wird_abgelehnt(run_gb):
+    for schlecht in ("rot", "#GG0000", "#FF88", ""):
+        out = run_gb(f'''
+TRY
+    PRINT COLOR_FROM_HEX("{schlecht}")
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+''')
+        assert out.strip() == "abgelehnt", f"'{schlecht}' wurde angenommen"
+
+
+def test_deckkraft_steht_im_text_nur_wenn_sie_gesetzt_ist(run_gb):
+    """Oberstes Byte 0 heisst DECKEND -- dann gehört es auch nicht in den
+    Text, sonst stünde vor jeder gewöhnlichen Farbe ein sinnloses `00`."""
+    out = run_gb('PRINT COLOR_HEX$(&HFF8800); " "; COLOR_HEX$(&H80FF8800)')
+    assert out.strip() == "#FF8800 #80FF8800"
+
+
+# --- Deckkraft im Farbwähler ----------------------------------------------
+
+def test_ohne_alpha_bleibt_es_bei_sechs_stellen(run_gb):
+    """Programme, die den Wähler schon benutzen, bekommen weiterhin
+    `0xRRGGBB` -- der Streifen ist ausdrücklich einzuschalten."""
+    out = run_gb(_FENSTER + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &H80FF8800)
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+''')
+    assert out.strip() == "#FF8800"
+
+
+def test_mit_alpha_kommt_die_deckkraft_mit(run_gb):
+    out = run_gb(_FENSTER + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_COLORPICKER_SET(cp, "alpha", 1)
+GUI_SET_PICKED_COLOR(cp, &H80FF8800)
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+''')
+    assert out.strip() == "#80FF8800"
+
+
+def test_unbekannte_einstellung_wird_abgelehnt(run_gb):
+    out = run_gb(_FENSTER + '''
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+TRY
+    GUI_COLORPICKER_SET(cp, "durchsicht", 1)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+''')
+    assert out.strip() == "abgelehnt"
+
+
+# --- Grenzen im Datumswähler ----------------------------------------------
+
+def test_grenzen_ziehen_ein_datum_herein(run_gb):
+    """Sonst stünde im Feld ein Wert, den der Wähler selbst nicht zulässt."""
+    out = run_gb(_FENSTER + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 220)
+GUI_SET_DATE(dp, "2026-01-01")
+GUI_DATE_RANGE(dp, "2026-09-05", "2026-09-25")
+PRINT GUI_DATE(dp)
+GUI_SET_DATE(dp, "2026-12-31")
+GUI_DATE_RANGE(dp, "2026-09-05", "2026-09-25")
+PRINT GUI_DATE(dp)
+''')
+    assert out.strip().splitlines() == ["2026-09-05", "2026-09-25"]
+
+
+def test_leere_grenze_hebt_sie_auf(run_gb):
+    out = run_gb(_FENSTER + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 220)
+GUI_DATE_RANGE(dp, "2026-09-05", "")
+GUI_SET_DATE(dp, "2030-01-01")
+PRINT GUI_DATE(dp)
+''')
+    assert out.strip() == "2030-01-01"
+
+
+def test_verdrehte_grenzen_werden_abgelehnt(run_gb):
+    out = run_gb(_FENSTER + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 220)
+TRY
+    GUI_DATE_RANGE(dp, "2026-09-25", "2026-09-05")
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+''')
+    assert out.strip() == "abgelehnt"
+
+
+def test_wochenbeginn_wird_angenommen(run_gb):
+    out = run_gb(_FENSTER + '''
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 220)
+GUI_DATEPICKER_SET(dp, "wochenbeginn", 6)
+TRY
+    GUI_DATEPICKER_SET(dp, "wochenanfang", 6)
+    PRINT "angenommen"
+CATCH e
+    PRINT "unbekannter Schluessel abgelehnt"
+END TRY
+''')
+    assert out.strip() == "unbekannter Schluessel abgelehnt"

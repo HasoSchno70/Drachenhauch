@@ -744,8 +744,18 @@ pub struct Widget {
     // beim Herunterziehen auf Schwarz nach links, und beim Hochziehen kommt
     // Rot statt der Farbe zurueck, die man gewaehlt hatte.
     hsv: [f32; 3],
+    // Nur ColorPicker: Deckkraft 1..255, und ob der Streifen dafuer sichtbar
+    // ist. 0 gibt es NICHT -- die Laufzeit liest ein oberstes Byte von 0 als
+    // "deckend" (damit die alten 24-bit-Farben deckend bleiben). Fuer
+    // "praktisch unsichtbar" ist 1 der kleinste Wert.
+    alpha: i32,
+    alpha_an: bool,
     // Nur DatePicker: Jahr, Monat (1..12), Tag.
     datum: [i32; 3],
+    // Grenzen (leer = keine) und erster Tag der Woche (0 = Montag).
+    datum_min: Option<[i32; 3]>,
+    datum_max: Option<[i32; 3]>,
+    wochenbeginn: i32,
 }
 
 pub struct Window {
@@ -832,10 +842,12 @@ pub struct Gui {
     // das ist der ganze Sinn von "modal": die Frage muss beantwortet werden,
     // bevor daneben weitergeklickt wird.
     modal: Option<usize>,
-    // Gezogener Farbwaehler: (Fenster, Widget, im Ton-Streifen?). Ohne das
-    // endete jede Farbwahl an der Feldkante -- man zieht beim Suchen einer
-    // Farbe fast immer ueber den Rand hinaus.
-    cp_drag: Option<(usize, usize, bool)>,
+    // Gezogener Farbwaehler: (Fenster, Widget, Zone). Zone ist 0 = Farbfeld,
+    // 1 = Ton-Streifen, 2 = Deckkraft-Streifen. Gemerkt wird sie, weil man
+    // beim Suchen einer Farbe fast immer ueber den Rand hinauszieht -- ohne
+    // das endete jede Geste an der naechsten Kante, und beim Ueberfahren der
+    // Grenze spraenge die Farbe in die andere Bedeutung.
+    cp_drag: Option<(usize, usize, u8)>,
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
@@ -1155,7 +1167,10 @@ impl Gui {
         if w.kind != Kind::ColorPicker {
             return Err("GUI_PICKED_COLOR: das Widget ist kein GUI_COLORPICKER".into());
         }
-        Ok(crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2]))
+        let rgb = crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2]);
+        // Ohne Alpha-Streifen bleibt es bei 0xRRGGBB -- so, wie es Programme
+        // bisher bekommen haben.
+        Ok(if w.alpha_an { (w.alpha.clamp(1, 255) as i64) << 24 | rgb } else { rgb })
     }
 
     pub fn set_picked_color(&mut self, h: i64, farbe: i64) -> Result<(), String> {
@@ -1168,7 +1183,77 @@ impl Gui {
         // bisherigen behalten, sonst springt der Zeiger bei jedem Setzen.
         let ton = if s <= f32::EPSILON || v <= f32::EPSILON { w.hsv[0] } else { ht };
         w.hsv = [ton, s, v];
+        let a8 = (farbe >> 24) & 0xFF;
+        // Oberstes Byte 0 heisst deckend -- also 255, nicht 0.
+        if w.alpha_an { w.alpha = if a8 == 0 { 255 } else { a8 as i32 }; }
         Ok(())
+    }
+
+    /// Einstellungen des Farbwaehlers (GUI_COLORPICKER_SET).
+    pub fn colorpicker_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_COLORPICKER_SET")?;
+        if w.kind != Kind::ColorPicker {
+            return Err("GUI_COLORPICKER_SET: das Widget ist kein GUI_COLORPICKER".into());
+        }
+        match key.to_lowercase().as_str() {
+            "alpha" | "deckkraft" => w.alpha_an = wert as i32 != 0,
+            other => return Err(std::format!(
+                "GUI_COLORPICKER_SET: '{}' unbekannt -- moeglich ist alpha", other)),
+        }
+        Ok(())
+    }
+
+    /// Einstellungen des Datumswaehlers (GUI_DATEPICKER_SET).
+    pub fn datepicker_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_DATEPICKER_SET")?;
+        if w.kind != Kind::DatePicker {
+            return Err("GUI_DATEPICKER_SET: das Widget ist kein GUI_DATEPICKER".into());
+        }
+        match key.to_lowercase().as_str() {
+            // 0 = Montag ... 6 = Sonntag. In Deutschland beginnt die Woche am
+            // Montag, in den USA am Sonntag -- eine feste Wahl waere fuer die
+            // eine Haelfte der Welt falsch.
+            "wochenbeginn" | "week_start" => w.wochenbeginn = (wert as i32).clamp(0, 6),
+            other => return Err(std::format!(
+                "GUI_DATEPICKER_SET: '{}' unbekannt -- moeglich ist wochenbeginn", other)),
+        }
+        Ok(())
+    }
+
+    /// Erlaubter Bereich des Datumswaehlers (GUI_DATE_RANGE). Ein leerer Text
+    /// hebt die jeweilige Grenze auf.
+    ///
+    /// Ein gesetztes Datum ausserhalb wird sofort hereingezogen -- sonst
+    /// stuende im Feld ein Wert, den der Waehler selbst nicht mehr zulaesst.
+    pub fn date_range(&mut self, h: i64, von: &str, bis: &str) -> Result<(), String> {
+        let lies = |t: &str, was: &str| -> Result<Option<[i32; 3]>, String> {
+            if t.trim().is_empty() { return Ok(None); }
+            crate::kalender::parse(t).map(|(j, m, d)| Some([j, m, d]))
+                .ok_or_else(|| std::format!(
+                    "GUI_DATE_RANGE: {} '{}' ist kein Datum -- erwartet JJJJ-MM-TT", was, t))
+        };
+        let (a, b) = (lies(von, "von")?, lies(bis, "bis")?);
+        if let (Some(x), Some(y)) = (a, b) {
+            if x > y {
+                return Err("GUI_DATE_RANGE: 'von' liegt nach 'bis'".into());
+            }
+        }
+        let w = self.wdg_mut(h, "GUI_DATE_RANGE")?;
+        if w.kind != Kind::DatePicker {
+            return Err("GUI_DATE_RANGE: das Widget ist kein GUI_DATEPICKER".into());
+        }
+        w.datum_min = a;
+        w.datum_max = b;
+        if let Some(x) = a { if w.datum < x { w.datum = x; } }
+        if let Some(y) = b { if w.datum > y { w.datum = y; } }
+        Ok(())
+    }
+
+    /// Liegt das Datum im erlaubten Bereich?
+    fn dp_erlaubt(wd: &Widget, d: [i32; 3]) -> bool {
+        if let Some(x) = wd.datum_min { if d < x { return false; } }
+        if let Some(y) = wd.datum_max { if d > y { return false; } }
+        true
     }
 
     pub fn date(&self, h: i64) -> Result<String, String> {
@@ -1247,12 +1332,17 @@ impl Gui {
     ///
     /// EINE Quelle -- Zeichnen und Treffertest fragen beide hier. Getrennt
     /// gerechnet waere der Zeiger irgendwann neben dem Klick.
-    fn cp_geom(&self, ax: i32, ay: i32, w: i32, h: i32)
-               -> ((i32, i32, i32, i32), (i32, i32, i32, i32)) {
+    fn cp_geom(&self, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32)
+               -> ((i32, i32, i32, i32), (i32, i32, i32, i32), Option<(i32, i32, i32, i32)>) {
         let streifen = self.sk(18);
         let luecke = self.sk(6);
-        let feld_w = (w - streifen - luecke).max(10);
-        ((ax, ay, feld_w, h), (ax + feld_w + luecke, ay, streifen, h))
+        let spalten = if wdg.alpha_an { 2 } else { 1 };
+        let feld_w = (w - spalten * (streifen + luecke)).max(10);
+        let ton = (ax + feld_w + luecke, ay, streifen, h);
+        let deck = if wdg.alpha_an {
+            Some((ton.0 + streifen + luecke, ay, streifen, h))
+        } else { None };
+        ((ax, ay, feld_w, h), ton, deck)
     }
 
     /// Aufteilung des Datumswaehlers: (Kopfhoehe, Zellbreite, Zellhoehe).
@@ -1319,7 +1409,8 @@ impl Gui {
             spans: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
-            hsv: [0.0, 1.0, 1.0], datum: [2000, 1, 1],
+            hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
+            datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
         }
     }
@@ -4709,25 +4800,47 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// man beim Ziehen ueber die Grenze zwischen beiden kommt.
     fn cp_zieh(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
         let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
-        let (feld, streifen) = self.cp_geom(ax, ay, w, h);
-        let im_streifen = self.cp_drag.map(|(_, _, s)| s).unwrap_or(mx >= streifen.0);
-        let alt = self.windows[wi].widgets[i].hsv;
+        let (feld, ton, deck) = {
+            let wd = &self.windows[wi].widgets[i];
+            self.cp_geom(wd, ax, ay, w, h)
+        };
+        let zone = self.cp_drag.map(|(_, _, z)| z)
+            .unwrap_or_else(|| Self::cp_zone(mx, ton, deck));
+        let vorher = (self.windows[wi].widgets[i].hsv, self.windows[wi].widgets[i].alpha);
         {
             let wd = &mut self.windows[wi].widgets[i];
-            if im_streifen {
-                let t = ((my - streifen.1) as f32 / (streifen.3 - 1).max(1) as f32).clamp(0.0, 1.0);
-                wd.hsv[0] = t * 360.0;
-            } else {
-                let sx = ((mx - feld.0) as f32 / (feld.2 - 1).max(1) as f32).clamp(0.0, 1.0);
-                let sy = ((my - feld.1) as f32 / (feld.3 - 1).max(1) as f32).clamp(0.0, 1.0);
-                wd.hsv[1] = sx;
-                wd.hsv[2] = 1.0 - sy;
+            match zone {
+                1 => {
+                    let t = ((my - ton.1) as f32 / (ton.3 - 1).max(1) as f32).clamp(0.0, 1.0);
+                    wd.hsv[0] = t * 360.0;
+                }
+                2 => if let Some(d) = deck {
+                    let t = ((my - d.1) as f32 / (d.3 - 1).max(1) as f32).clamp(0.0, 1.0);
+                    // 1..255, nicht 0..255: ein oberstes Byte von 0 liest die
+                    // Laufzeit als DECKEND.
+                    wd.alpha = 1 + (t * 254.0).round() as i32;
+                },
+                _ => {
+                    let sx = ((mx - feld.0) as f32 / (feld.2 - 1).max(1) as f32).clamp(0.0, 1.0);
+                    let sy = ((my - feld.1) as f32 / (feld.3 - 1).max(1) as f32).clamp(0.0, 1.0);
+                    wd.hsv[1] = sx;
+                    wd.hsv[2] = 1.0 - sy;
+                }
             }
         }
-        if self.windows[wi].widgets[i].hsv != alt {
+        let nachher = (self.windows[wi].widgets[i].hsv, self.windows[wi].widgets[i].alpha);
+        if nachher != vorher {
             let f = self.windows[wi].widgets[i].on_change.clone();
             if let Some(f) = f { self.pending.push(f); }
         }
+    }
+
+    /// In welcher Zone liegt die Maus? Nach der WAAGERECHTEN Lage, weil die
+    /// drei Bereiche nebeneinander liegen.
+    fn cp_zone(mx: i32, ton: (i32, i32, i32, i32),
+               deck: Option<(i32, i32, i32, i32)>) -> u8 {
+        if let Some(d) = deck { if mx >= d.0 { return 2; } }
+        if mx >= ton.0 { 1 } else { 0 }
     }
 
     /// Klick im Datumswaehler: Pfeile blaettern, eine Zelle waehlt den Tag.
@@ -4737,9 +4850,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let d = self.windows[wi].widgets[i].datum;
         let mut neu = d;
         if my < ay + kopf {
-            // Die Pfeile sitzen in den aeusseren Dritteln des Kopfes -- ein
-            // grosszuegiges Ziel, weil das Zeichen selbst winzig ist.
-            if mx < ax + w / 3 { neu = self.dp_monat(d, -1); }
+            // Vier Bereiche, von aussen nach innen: Jahr zurueck, Monat
+            // zurueck, (Titel), Monat vor, Jahr vor. Grosszuegig geschnitten,
+            // weil die Zeichen selbst winzig sind.
+            let rand = self.sk(22);
+            if mx < ax + rand { neu = self.dp_monat(d, -12); }
+            else if mx < ax + w / 3 { neu = self.dp_monat(d, -1); }
+            else if mx > ax + w - rand { neu = self.dp_monat(d, 12); }
             else if mx > ax + w * 2 / 3 { neu = self.dp_monat(d, 1); }
         } else {
             let gy = ay + kopf + self.sk(18);
@@ -4766,7 +4883,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
-        self.dp_setze(wi, i, neu);
+        // Ein gesperrtes Datum wird nicht uebernommen -- ein Klick, der die
+        // Marke auf einen Tag setzt, den der Waehler selbst ausschliesst,
+        // waere eine Luege.
+        if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+            self.dp_setze(wi, i, neu);
+        }
     }
 
     fn dp_monat(&self, d: [i32; 3], schritte: i32) -> [i32; 3] {
@@ -4945,7 +5067,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 // Pfeile verstellen Saettigung und Helligkeit, Bild auf/ab den
                 // Farbton -- die dritte Achse braucht eine eigene Taste, und
                 // die Blaettertasten sind dafuer frei.
-                let alt = self.windows[wi].widgets[i].hsv;
+                let alt = (self.windows[wi].widgets[i].hsv, self.windows[wi].widgets[i].alpha);
                 let schritt = if g.key_shift() { 0.01 } else { 0.04 };
                 let wd = &mut self.windows[wi].widgets[i];
                 if rechts { wd.hsv[1] = (wd.hsv[1] + schritt).min(1.0); }
@@ -4954,7 +5076,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if ab { wd.hsv[2] = (wd.hsv[2] - schritt).max(0.0); }
                 if g.key_pressed(KEY_PAGEUP) { wd.hsv[0] = (wd.hsv[0] - 10.0).rem_euclid(360.0); }
                 if g.key_pressed(KEY_PAGEDOWN) { wd.hsv[0] = (wd.hsv[0] + 10.0).rem_euclid(360.0); }
-                if self.windows[wi].widgets[i].hsv != alt {
+                // Deckkraft mit Pos1/Ende -- nur wenn der Streifen ueberhaupt
+                // da ist, sonst verstellte man etwas Unsichtbares.
+                if wd.alpha_an {
+                    if g.key_pressed(KEY_END) { wd.alpha = (wd.alpha + 16).min(255); }
+                    if g.key_pressed(KEY_HOME) { wd.alpha = (wd.alpha - 16).max(1); }
+                }
+                if (self.windows[wi].widgets[i].hsv, self.windows[wi].widgets[i].alpha) != alt {
                     let f = self.windows[wi].widgets[i].on_change.clone();
                     if let Some(f) = f { self.pending.push(f); }
                 }
@@ -4967,9 +5095,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let (j, m, t) = crate::kalender::plus_tage(d[0], d[1], d[2], tage);
                     neu = [j, m, t];
                 }
-                if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -1); }
-                if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, 1); }
-                self.dp_setze(wi, i, neu);
+                // Mit Umschalt springt es ein JAHR statt einen Monat.
+                let weite = if g.key_shift() { 12 } else { 1 };
+                if g.key_pressed(KEY_PAGEUP) { neu = self.dp_monat(neu, -weite); }
+                if g.key_pressed(KEY_PAGEDOWN) { neu = self.dp_monat(neu, weite); }
+                if Self::dp_erlaubt(&self.windows[wi].widgets[i], neu) {
+                    self.dp_setze(wi, i, neu);
+                }
             }
             Kind::Tree => {
                 let (vis, sel, hat_kinder, offen, eltern) = {
@@ -5174,10 +5306,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             Kind::ColorPicker => {
                 let (fx, fy, fw, fh) = self.abs_rect(win, &self.windows[win].widgets[i]);
-                let (feld, streifen) = self.cp_geom(fx, fy, fw, fh);
-                let im_streifen = mx >= streifen.0;
-                self.cp_drag = Some((win, i, im_streifen));
-                let _ = (feld, streifen);
+                let (_, ton, deck) = {
+                    let wd = &self.windows[win].widgets[i];
+                    self.cp_geom(wd, fx, fy, fw, fh)
+                };
+                self.cp_drag = Some((win, i, Self::cp_zone(mx, ton, deck)));
                 self.cp_zieh(win, i, mx, my);
             }
             Kind::DatePicker => self.dp_press(win, i, mx, my),
@@ -5933,7 +6066,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
     fn draw_colorpicker(&self, g: &mut Graphics, wdg: &Widget,
                         ax: i32, ay: i32, w: i32, h: i32) {
-        let (feld, streifen) = self.cp_geom(ax, ay, w, h);
+        let (feld, streifen, deck) = self.cp_geom(wdg, ax, ay, w, h);
         let (fx, fy, fw, fh) = feld;
         let voll = crate::farbraum::hsv_zu_rgb(wdg.hsv[0], 1.0, 1.0);
         // Saettigung waagerecht (weiss -> voller Ton), Helligkeit senkrecht
@@ -5968,6 +6101,32 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         g.rect(sx - 1, ty - 1, sx + sw, ty + 1, 0x000000);
         // Rahmen, und bei Fokus in Akzentfarbe (der Ring liegt aussen, siehe
         // draw_widget -- hier geht es nur um die Kante des Feldes).
+        // Deckkraft-Streifen: Schachbrett als Untergrund (sonst sieht man
+        // dem Verlauf nicht an, WO er durchsichtig wird), darueber der
+        // Verlauf von unsichtbar nach voll.
+        if let Some((dx, dy, dw, dh)) = deck {
+            let kar = self.sk(5).max(2);
+            let mut y = dy;
+            let mut reihe = 0;
+            while y < dy + dh {
+                let mut x = dx;
+                let mut spalte = 0;
+                while x < dx + dw {
+                    let hell = (reihe + spalte) % 2 == 0;
+                    g.box_fill(x, y, (x + kar - 1).min(dx + dw - 1), (y + kar - 1).min(dy + dh - 1),
+                               if hell { 0xB0B0B0 } else { 0x707070 });
+                    x += kar; spalte += 1;
+                }
+                y += kar; reihe += 1;
+            }
+            let voll_farbe = crate::farbraum::hsv_zu_rgb(wdg.hsv[0], wdg.hsv[1], wdg.hsv[2]);
+            g.gradient_rect(dx, dy, dx + dw - 1, dy + dh - 1,
+                            0x01_000000 | voll_farbe, 0xFF_000000 | voll_farbe, true);
+            let ay2 = dy + ((wdg.alpha.clamp(1, 255) - 1) as f32 / 254.0 * (dh - 1) as f32).round() as i32;
+            g.rect(dx - 2, ay2 - 2, dx + dw + 1, ay2 + 2, 0xFFFFFF);
+            g.rect(dx - 1, ay2 - 1, dx + dw, ay2 + 1, 0x000000);
+            self.rahmen(g, wdg, dx, dy, dx + dw - 1, dy + dh - 1);
+        }
         self.rahmen(g, wdg, fx, fy, fx + fw - 1, fy + fh - 1);
         self.rahmen(g, wdg, sx, sy, sx + sw - 1, sy + sh - 1);
     }
@@ -5988,22 +6147,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Kopf: Pfeile aussen, Monat und Jahr mittig.
         let schrift = self.wsize(g, wdg);
         let ky = ay + (kopf - schrift).max(0) / 2;
-        self.wtext(g, wdg, ax + self.sk(6), ky, "<".into(), fg);
-        self.wtext(g, wdg, ax + w - self.sk(14), ky, ">".into(), fg);
+        // Aussen die Jahres-, innen die Monatspfeile. Ohne Jahressprung
+        // braeuchte man bis 1985 rund fuenfhundert Klicks.
+        self.wtext(g, wdg, ax + self.sk(5), ky, "<<".into(), matt);
+        self.wtext(g, wdg, ax + self.sk(26), ky, "<".into(), fg);
+        self.wtext(g, wdg, ax + w - self.sk(15), ky, ">".into(), fg);
+        self.wtext(g, wdg, ax + w - self.sk(32), ky, ">>".into(), matt);
         let titel = std::format!("{} {}", crate::kalender::MONATSNAMEN[(m - 1) as usize], j);
         let tw = self.wtext_width(g, wdg, &titel);
         self.wtext(g, wdg, ax + (w - tw) / 2, ky, titel, fg);
         // Wochentage.
         let wy = ay + kopf;
-        for (i, name) in crate::kalender::WOCHENTAGE.iter().enumerate() {
-            let cx = ax + zw * i as i32;
+        for i in 0..7i32 {
+            let name = crate::kalender::WOCHENTAGE[((i + wdg.wochenbeginn) % 7) as usize];
+            let cx = ax + zw * i;
             let bw = self.wtext_width(g, wdg, name);
             self.wtext(g, wdg, cx + (zw - bw) / 2, wy, name.to_string(), matt);
         }
         // Gitter. Der Erste steht in der Spalte seines Wochentags; davor und
         // danach stehen die Nachbarmonate matt -- ein leeres Feld sieht nach
         // einem Fehler aus.
-        let erster = crate::kalender::wochentag(j, m, 1);
+        let erster = (crate::kalender::wochentag(j, m, 1) - wdg.wochenbeginn).rem_euclid(7);
         let im_monat = crate::kalender::tage_im_monat(j, m);
         let (vj, vm, _) = crate::kalender::plus_monate(j, m, 1, -1);
         let im_vormonat = crate::kalender::tage_im_monat(vj, vm);
@@ -6022,7 +6186,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             let txt = zahl.to_string();
             let bw = self.wtext_width(g, wdg, &txt);
-            let farbe = if !aktiv { matt }
+            // Ausserhalb der Grenzen: noch matter als ein Nachbarmonatstag,
+            // damit man den Unterschied sieht (der eine ist erreichbar, der
+            // andere gesperrt).
+            let gesperrt = aktiv && !Self::dp_erlaubt(wdg, [j, m, zahl]);
+            let farbe = if gesperrt { shade(matt, -30) }
+                        else if !aktiv { matt }
                         else if zahl == t { self.th("win_bg") }
                         else { fg };
             self.wtext(g, wdg, cx + (zw - bw) / 2, cy + (zh - schrift).max(0) / 2, txt, farbe);
@@ -6721,3 +6890,4 @@ mod tests {
         assert_eq!(g.table_clicked(tbl).unwrap(), 3);
     }
 }
+

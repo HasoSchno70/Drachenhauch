@@ -5258,6 +5258,24 @@ impl<'p> Vm<'p> {
                 gi(a,2,"GUI_DATEPICKER")? as i32, gi(a,3,"GUI_DATEPICKER")? as i32,
                 gi(a,4,"GUI_DATEPICKER")? as i32)?),
             "gui_date" => Value::str_rc(&self.gui.date(gi(a,0,"GUI_DATE")?)?),
+            "gui_colorpicker_set" => {
+                self.gui.colorpicker_set(gi(a,0,"GUI_COLORPICKER_SET")?,
+                                         &gs(a,1,"GUI_COLORPICKER_SET")?,
+                                         gnum(a,2,"GUI_COLORPICKER_SET")?)?;
+                Value::Nil
+            }
+            "gui_datepicker_set" => {
+                self.gui.datepicker_set(gi(a,0,"GUI_DATEPICKER_SET")?,
+                                        &gs(a,1,"GUI_DATEPICKER_SET")?,
+                                        gnum(a,2,"GUI_DATEPICKER_SET")?)?;
+                Value::Nil
+            }
+            "gui_date_range" => {
+                self.gui.date_range(gi(a,0,"GUI_DATE_RANGE")?,
+                                    &gs(a,1,"GUI_DATE_RANGE")?,
+                                    &gs(a,2,"GUI_DATE_RANGE")?)?;
+                Value::Nil
+            }
             "gui_set_date" => {
                 self.gui.set_date(gi(a,0,"GUI_SET_DATE")?, &gs(a,1,"GUI_SET_DATE")?)?;
                 Value::Nil

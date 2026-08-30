@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1576,
+ "count": 1581,
  "builtins": [
   {
    "name": "ABS",
@@ -1743,6 +1743,18 @@
    "module": "core"
   },
   {
+   "name": "COLOR_FROM_HEX",
+   "kind": "core",
+   "signature": "COLOR_FROM_HEX(text$)",
+   "module": "core"
+  },
+  {
+   "name": "COLOR_HEX$",
+   "kind": "core",
+   "signature": "COLOR_HEX$(farbe)",
+   "module": "core"
+  },
+  {
    "name": "COLOR_LERP",
    "kind": "core",
    "signature": "COLOR_LERP(c1: INTEGER, c2: INTEGER, t: Zahl)",
@@ -2865,6 +2877,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_COLORPICKER_SET",
+   "kind": "core",
+   "signature": "GUI_COLORPICKER_SET(picker, schluessel$, wert)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CONFIRM",
    "kind": "graphics",
    "signature": "GUI_CONFIRM(titel$, text$[, stil$]) AS BOOLEAN",
@@ -2886,6 +2904,18 @@
    "name": "GUI_DATEPICKER",
    "kind": "core",
    "signature": "GUI_DATEPICKER(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATEPICKER_SET",
+   "kind": "core",
+   "signature": "GUI_DATEPICKER_SET(picker, schluessel$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DATE_RANGE",
+   "kind": "core",
+   "signature": "GUI_DATE_RANGE(picker, von$, bis$)",
    "module": "gui"
   },
   {
