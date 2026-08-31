@@ -178,3 +178,107 @@ IMAGE_SAVE(b, "raus.bmp")
     im = Image.open(tmp_path / "raus.bmp")
     assert im.format == "BMP"
     assert im.convert("RGB").getpixel((1, 1)) == (0, 255, 0)
+
+
+def test_freigeben_macht_das_handle_unbenutzbar(tmp_path):
+    """Der Sinn von `IMAGE_FREE` ist nicht das Freigeben allein, sondern dass
+    das Handle danach nicht STILL weiterbenutzt werden kann. Der Platz bleibt
+    deshalb stehen und wird nicht neu vergeben."""
+    aus = _run('''
+DIM b AS IMAGE : b = IMAGE_NEW(16, 16, &HFF0000)
+IMAGE_FREE(b)
+TRY
+    PRINT IMAGEWIDTH(b)
+CATCH e
+    PRINT "breite abgelehnt"
+END TRY
+TRY
+    IMAGE_DRAW_RECT(b, 0, 0, 2, 2, &H00FF00)
+CATCH e
+    PRINT "zeichnen abgelehnt"
+END TRY
+TRY
+    DIM k AS IMAGE : k = IMAGE_COPY(b)
+CATCH e
+    PRINT "kopieren abgelehnt"
+END TRY
+''', tmp_path)
+    assert aus == ["breite abgelehnt", "zeichnen abgelehnt", "kopieren abgelehnt"]
+
+
+def test_die_meldung_unterscheidet_freigegeben_von_nie_dagewesen(tmp_path):
+    """Zwei verschiedene Fehler. Wer den einen fuer den anderen haelt, sucht
+    an der falschen Stelle."""
+    aus = _run('''
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_FREE(b)
+TRY
+    IMAGE_FREE(b)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    IMAGE_FREE(9999)
+CATCH e
+    PRINT e
+END TRY
+''', tmp_path)
+    assert "freigegeben" in aus[0]
+    assert "ungueltiges IMAGE-Handle" in aus[1] and "freigegeben" not in aus[1]
+
+
+def test_getpixel_und_getalpha_bleiben_bei_minus_eins(tmp_path):
+    """Beide melden Ungueltiges seit jeher mit -1, nicht mit einem Fehler --
+    dabei bleibt es auch fuer ein freigegebenes Bild."""
+    aus = _run('''
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_FREE(b)
+PRINT GETPIXEL(b, 1, 1); " "; GETALPHA(b, 1, 1)
+''', tmp_path)
+    assert aus[0].split() == ["-1", "-1"]
+
+
+def test_ein_neues_bild_bekommt_nicht_den_freien_platz(tmp_path):
+    """Wuerde der Platz neu vergeben, zeigte ein stehengebliebenes Handle
+    still auf ein FREMDES Bild -- der klassische Fehler nach dem Freigeben."""
+    aus = _run('''
+DIM a AS IMAGE : a = IMAGE_NEW(8, 8, &HFF0000)
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &H00FF00)
+IMAGE_FREE(a)
+DIM c AS IMAGE : c = IMAGE_NEW(8, 8, &H0000FF)
+PRINT (c = a); " "; (c = b)
+''', tmp_path)
+    assert aus[0].split() == ["FALSE", "FALSE"]
+
+
+def test_freigeben_wirft_das_bild_aus_dem_pfad_cache(tmp_path):
+    """`LOADIMAGE` merkt sich Pfad -> Handle. Bliebe der Eintrag stehen,
+    bekaeme der naechste Aufruf fuer denselben Pfad ein freigegebenes Bild --
+    und zwar ohne jeden Hinweis, weil er ja etwas zurueckbekommt."""
+    aus = _run('''
+DIM q AS IMAGE : q = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_SAVE(q, "x.png")
+DIM a AS IMAGE : a = LOADIMAGE("x.png")
+IMAGE_FREE(a)
+DIM b AS IMAGE : b = LOADIMAGE("x.png")
+PRINT IMAGEWIDTH(b); " "; (b = a)
+''', tmp_path)
+    assert aus[0].split() == ["8", "FALSE"]
+
+
+def test_freigeben_gibt_den_speicher_wirklich_frei(tmp_path):
+    """Ohne diese Zusage waere der Befehl nur Buchhaltung. Gemessen wird
+    nicht der Speicher (das kann der Test nicht), sondern dass sich sehr
+    viele Kopien mit Freigabe ueberhaupt durchhalten lassen -- ohne sie
+    belegten 1200 Bilder zu 256x256 rund 300 MB mehr."""
+    aus = _run('''
+DIM b AS IMAGE : b = IMAGE_NEW(256, 256, &HFF0000)
+DIM i AS INTEGER
+DIM h AS IMAGE
+FOR i = 1 TO 1200
+    h = IMAGE_COPY(b)
+    IMAGE_FREE(h)
+NEXT
+PRINT "durch"
+''', tmp_path, frames=40)
+    assert aus == ["durch"]

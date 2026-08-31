@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1550,
+ "count": 1551,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -683,6 +683,7 @@
   "IMAGE_DRAW_RECT": "gefülltes Rechteck ins Image",
   "IMAGE_DRAW_TEXT": "Text (Standard-Font) ins Image",
   "IMAGE_FLIP": "IMAGE (neu, gespiegelt)",
+  "IMAGE_FREE": "das Bild und seine Grafikspeicher-Textur freigeben",
   "IMAGE_GRAYSCALE": "IMAGE (neu, in Graustufen)",
   "IMAGE_INVERT": "IMAGE (neu, Farben invertiert)",
   "IMAGE_NEW": "IMAGE — ein neues Bild; ohne Farbe vollstaendig durchsichtig",
