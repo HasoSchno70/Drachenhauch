@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
 
 from .formdesigner import (
     FormDoc, FormProject, Control, History, PALETTE, palette_spec, GRID, HANDLES,
-    snap, resize_rect, FORM_THEMES, theme_colors, EVENTS,
+    snap, resize_rect, FORM_THEMES, theme_colors, EVENTS, hex_zu_int,
 )
 
 try:
@@ -161,6 +161,182 @@ _PAL_ACCENT = QColor(43, 196, 232)
 _PAL_BORDER = QColor(78, 100, 122)
 
 
+def _preview_neu(qp: QPainter, kind: str, r: QRect, *, fg, muted, accent, border,
+                 face, sunk, title_bg, win_bg, rad: int, grad: float, gloss: float,
+                 text: str = "", value: float = 0.0, mn: float = 0.0, mx: float = 1.0,
+                 checked: bool = False, items=(), farbe: int = 0xE84B4B,
+                 datum: str = "") -> bool:
+    """Vorschau der neun Arten, die der Designer seit 2026-08-31 kennt.
+
+    Liefert False, wenn `kind` nicht dazugehoert -- der Aufrufer zeichnet dann
+    seinen eigenen Rueckfall. EINE Quelle fuer Palettensymbol UND
+    Entwurfsflaeche: zwei Fassungen liefen frueher oder spaeter auseinander.
+    """
+    al = Qt.AlignmentFlag
+    x, y, w, h = r.left(), r.top(), r.width(), r.height()
+    cy = r.center().y()
+
+    def flaeche(rect, farbe_=None, tief=False):
+        _fill_surface(qp, rect, sunk if tief else (farbe_ or face), border,
+                      rad, -grad if tief else grad, 0 if tief else gloss)
+
+    if kind == "textarea":
+        flaeche(r, tief=True)
+        qp.setPen(muted)
+        for i in range(max(1, min(4, (h - 8) // 8))):
+            yy = y + 7 + i * 8
+            if yy > r.bottom() - 4:
+                break
+            qp.drawLine(x + 6, yy, r.right() - (6 if i < 2 else max(8, w // 3)), yy)
+
+    elif kind == "spinner":
+        flaeche(r, tief=True)
+        bx = QRect(r.right() - 14, y + 2, 12, max(4, h - 4))
+        _fill_surface(qp, bx, face, border, max(0, rad - 1), grad, gloss)
+        qp.setPen(fg)
+        qp.drawText(QRect(bx.left(), bx.top(), bx.width(), bx.height() // 2), al.AlignCenter, "▲")
+        qp.drawText(QRect(bx.left(), cy, bx.width(), bx.height() // 2), al.AlignCenter, "▼")
+        qp.drawText(r.adjusted(6, 0, -18, 0), al.AlignVCenter, _zahl(value))
+
+    elif kind == "knob":
+        d = max(8, min(w, h))
+        kr = QRect(x + (w - d) // 2, y + (h - d) // 2, d, d)
+        qp.setPen(QPen(_mix(accent, win_bg, 0.5), 2))
+        qp.setBrush(Qt.BrushStyle.NoBrush)
+        # Skalenbogen: 270 Grad, unten offen -- so hat die Laufzeit den Knopf.
+        qp.drawArc(kr.adjusted(1, 1, -1, -1), -45 * 16, 270 * 16)
+        _fill_surface(qp, kr.adjusted(3, 3, -3, -3), face, border, d, grad, gloss)
+        # Zeiger auf den Anteil zwischen min und max.
+        spanne = (mx - mn) or 1.0
+        t = min(1.0, max(0.0, (value - mn) / spanne))
+        import math
+        winkel = math.radians(135 - t * 270)
+        cx2, cy2 = kr.center().x(), kr.center().y()
+        qp.setPen(QPen(accent, 2))
+        qp.drawLine(cx2, cy2,
+                    int(cx2 + math.cos(winkel) * d * 0.32),
+                    int(cy2 - math.sin(winkel) * d * 0.32))
+
+    elif kind == "toggle":
+        pw = min(w, 34)
+        pill = QRect(x, cy - 8, pw, 16)
+        _fill_surface(qp, pill, _mix(face, accent, 0.55) if checked else sunk,
+                      border, 8, grad, gloss)
+        kx = pill.right() - 13 if checked else pill.left() + 1
+        qp.setBrush(_col(0xE8ECF0) if checked else _mix(face, win_bg, 0.2))
+        qp.setPen(QPen(border, 1))
+        qp.drawEllipse(QRect(kx, pill.top() + 1, 14, 14))
+        if text and w > pw + 8:
+            qp.setPen(fg)
+            qp.drawText(QRect(x + pw + 6, y, w - pw - 6, h), al.AlignVCenter, text)
+
+    elif kind == "tree":
+        flaeche(r, tief=True)
+        qp.setPen(fg)
+        for i, it in enumerate(list(items)[:max(0, (h - 8) // 14)] or ["Knoten"]):
+            yy = y + 4 + i * 14
+            qp.drawText(QRect(x + 6, yy, 8, 12), al.AlignCenter, "▸")
+            qp.drawText(QRect(x + 16, yy, max(4, w - 20), 12), al.AlignVCenter, str(it))
+
+    elif kind == "toolbar":
+        _fill_surface(qp, r, _mix(face, win_bg, 0.25), border, rad, grad, gloss)
+        for i in range(min(3, max(1, (w - 8) // 30))):
+            _fill_surface(qp, QRect(x + 4 + i * 30, y + 3, 26, max(4, h - 6)),
+                          face, border, max(0, rad - 1), grad, gloss)
+
+    elif kind == "splitter":
+        senkrecht = h > w
+        qp.setPen(QPen(border, 2))
+        if senkrecht:
+            qp.drawLine(r.center().x(), y + 2, r.center().x(), r.bottom() - 2)
+        else:
+            qp.drawLine(x + 2, cy, r.right() - 2, cy)
+        # Griff: drei Punkte in der Mitte -- daran erkennt man, dass es ziehbar
+        # ist und nicht bloss eine Linie (Unterschied zum Separator).
+        qp.setBrush(muted); qp.setPen(Qt.PenStyle.NoPen)
+        for k in (-1, 0, 1):
+            if senkrecht:
+                qp.drawEllipse(QRect(r.center().x() - 1, cy + k * 5 - 1, 3, 3))
+            else:
+                qp.drawEllipse(QRect(r.center().x() + k * 5 - 1, cy - 1, 3, 3))
+
+    elif kind == "colorpicker":
+        strip = 12 if w > 40 else 6
+        feld = QRect(x, y, max(4, w - strip - 4), h)
+        g = QLinearGradient(feld.left(), 0, feld.right(), 0)
+        g.setColorAt(0.0, QColor(255, 255, 255)); g.setColorAt(1.0, _col(farbe))
+        qp.setPen(Qt.PenStyle.NoPen); qp.setBrush(g); qp.drawRect(feld)
+        g2 = QLinearGradient(0, feld.top(), 0, feld.bottom())
+        g2.setColorAt(0.0, QColor(0, 0, 0, 0)); g2.setColorAt(1.0, QColor(0, 0, 0, 255))
+        qp.setBrush(g2); qp.drawRect(feld)
+        hs = QRect(r.right() - strip, y, strip, h)
+        gh = QLinearGradient(0, hs.top(), 0, hs.bottom())
+        for i, col in enumerate((0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF,
+                                 0x0000FF, 0xFF00FF, 0xFF0000)):
+            gh.setColorAt(i / 6.0, _col(col))
+        qp.setBrush(gh); qp.drawRect(hs)
+        qp.setPen(QPen(QColor(255, 255, 255), 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawEllipse(QRect(feld.right() - 8, feld.top() + 4, 6, 6))
+
+    elif kind == "datepicker":
+        flaeche(r, tief=True)
+        kopf = QRect(x, y, w, min(16, h))
+        qp.fillRect(kopf, title_bg)
+        qp.setPen(fg)
+        qp.drawText(kopf, al.AlignCenter, _monat_kopf(datum))
+        if h > 34:
+            qp.setPen(muted)
+            sw = max(1, w // 7)
+            for i, t in enumerate(("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")):
+                qp.drawText(QRect(x + i * sw, y + 17, sw, 11), al.AlignCenter, t)
+            zeilen = max(1, min(6, (h - 30) // 12))
+            tag, gewaehlt = 1, _tag_aus(datum)
+            qp.setPen(fg)
+            for zi in range(zeilen):
+                for si in range(7):
+                    zelle = QRect(x + si * sw, y + 29 + zi * 12, sw, 12)
+                    if tag == gewaehlt:
+                        qp.fillRect(zelle.adjusted(1, 0, -1, 0), accent)
+                        qp.setPen(win_bg); qp.drawText(zelle, al.AlignCenter, str(tag))
+                        qp.setPen(fg)
+                    else:
+                        qp.drawText(zelle, al.AlignCenter, str(tag))
+                    tag += 1
+    else:
+        return False
+    return True
+
+
+def _zahl(v: float) -> str:
+    """Kommazahl ohne unnoetige Nullen -- `3` statt `3.0`."""
+    return str(int(v)) if float(v).is_integer() else f"{v:g}"
+
+
+_MONATE = ("Januar", "Februar", "Maerz", "April", "Mai", "Juni", "Juli",
+           "August", "September", "Oktober", "November", "Dezember")
+
+
+def _monat_kopf(datum: str) -> str:
+    """`"2026-08-31"` -> `"August 2026"`. Ohne Datum der laufende Monat --
+    genauso, wie ein frischer Waehler zur Laufzeit HEUTE zeigt."""
+    import datetime
+    try:
+        j, m, _ = (int(t) for t in str(datum).split("-"))
+        if not 1 <= m <= 12:
+            raise ValueError
+    except (ValueError, TypeError):
+        heute = datetime.date.today()
+        j, m = heute.year, heute.month
+    return f"{_MONATE[m - 1]} {j}"
+
+
+def _tag_aus(datum: str) -> int:
+    try:
+        return int(str(datum).split("-")[2])
+    except (ValueError, IndexError, TypeError):
+        return 0
+
+
 def _paint_glyph(qp: QPainter, kind: str, r: QRect, theme: str = "glas_dunkel"):
     """Vorschau eines Controls in `r` -- fuer Palette-Icon + Drag-Bild.
 
@@ -220,12 +396,6 @@ def _paint_glyph(qp: QPainter, kind: str, r: QRect, theme: str = "glas_dunkel"):
         qp.setPen(QPen(accent, 1)); qp.drawLine(r.left() + 6, r.top() + 5, r.left() + 6, r.bottom() - 5)
         qp.setPen(muted)
         qp.drawText(r.adjusted(11, 0, -2, 0), al.AlignVCenter, "Text…")
-    elif kind == "textarea":
-        flaeche(r, tief=True)
-        qp.setPen(muted)
-        for i in range(3):
-            yy = r.top() + 7 + i * 7
-            qp.drawLine(r.left() + 6, yy, r.right() - (6 if i < 2 else 18), yy)
     elif kind == "dropdown":
         flaeche(r)
         qp.setPen(fg)
@@ -275,19 +445,12 @@ def _paint_glyph(qp: QPainter, kind: str, r: QRect, theme: str = "glas_dunkel"):
         qp.setPen(muted); qp.drawText(QRect(r.left() + 9, r.top(), 34, 11), al.AlignLeft, "Gruppe")
     elif kind == "separator":
         qp.setPen(QPen(border, 2)); qp.drawLine(r.left() + 3, cy, r.right() - 3, cy)
-    elif kind == "spinner":
-        flaeche(r, tief=True)
-        bx = QRect(r.right() - 14, r.top() + 2, 12, r.height() - 4)
-        _fill_surface(qp, bx, face, border, max(0, rad - 1), grad, gloss)
-        qp.setPen(fg)
-        qp.drawText(bx, al.AlignCenter, "⌃⌄")
-        qp.drawText(r.adjusted(6, 0, -18, 0), al.AlignVCenter, "0")
-    elif kind == "table":
-        flaeche(r, tief=True)
-        qp.fillRect(QRect(r.left() + 1, r.top() + 1, r.width() - 2, 9), _col(th["title_bg"]))
-        qp.setPen(muted)
-        qp.drawLine(r.center().x(), r.top() + 1, r.center().x(), r.bottom() - 1)
-        qp.drawLine(r.left() + 1, r.top() + 19, r.right() - 1, r.top() + 19)
+    elif _preview_neu(qp, kind, r, fg=fg, muted=muted, accent=accent, border=border,
+                      face=face, sunk=sunk, title_bg=_col(th["title_bg"]),
+                      win_bg=_col(th["win_bg"]), rad=rad, grad=grad, gloss=gloss,
+                      text="An/Aus", value=3, mn=0, mx=10, checked=True,
+                      items=("Ordner", "Datei"), datum=""):
+        pass
     else:
         flaeche(r)
         qp.setPen(fg); qp.drawText(r, al.AlignCenter, kind[:8])
@@ -960,6 +1123,15 @@ class _Canvas(QWidget):
         elif k == "canvas":
             qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
             qp.setPen(_col(th["muted_fg"])); qp.drawText(r, al.AlignCenter, "Canvas")
+        elif _preview_neu(qp, k, r, fg=fg, muted=_col(th["muted_fg"]), accent=accent,
+                          border=border, face=face, sunk=sunk,
+                          title_bg=_col(th["title_bg"]), win_bg=_col(th["win_bg"]),
+                          rad=rad, grad=grad, gloss=th["gloss"],
+                          text=c.text, value=c.value, mn=c.min, mx=c.max,
+                          checked=c.checked, items=c.items,
+                          farbe=hex_zu_int(c.extra.get("color_value")) or 0xE84B4B,
+                          datum=str(c.extra.get("date") or "")):
+            pass
         else:
             _fill_surface(qp, r, face, border, rad, grad, th["gloss"])
             qp.setPen(fg); qp.drawText(r, al.AlignCenter, c.text or k)
@@ -1437,6 +1609,21 @@ class _Inspector(QWidget):
         # derselben leeren Gruppe und schliessen sich nicht gegenseitig aus.
         self.group = QLineEdit(); self.group.setPlaceholderText("z.B. schwierigkeit")
         self.placeholder = QLineEdit()
+        # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
+        # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
+        # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
+        self.orient = QComboBox()
+        self.orient.addItem("waagerecht", "h")
+        self.orient.addItem("senkrecht", "v")
+        # Farbwaehler und Datumswaehler tragen ihren Wert in `extra` -- genau
+        # unter den Schluesseln, die die Laufzeit in die `.dhform` schreibt
+        # (`color_value` / `date`, siehe gui.rs::widget_json). So ueberlebt er
+        # den Rundweg Speichern -> Laden, ohne dass das Modell neue Felder
+        # braucht.
+        self.pick_btn = QPushButton(); self.pick_btn.setFixedHeight(22)
+        self.pick_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pick_btn.clicked.connect(self._pick_startfarbe)
+        self.datum = QLineEdit(); self.datum.setPlaceholderText("JJJJ-MM-TT (leer = heute)")
         self.ssel = QSpinBox(); self.ssel.setRange(-1, 9999)
         self.ssel.setToolTip("Ausgewaehlter Eintrag (-1 = keiner)")
         self.items = QPlainTextEdit(); self.items.setMaximumHeight(90)
@@ -1493,6 +1680,9 @@ class _Inspector(QWidget):
         self._add("Text", self.text)
         self._add("Gruppe", self.group)
         self._add("Platzhalter", self.placeholder)
+        self._add("Richtung", self.orient)
+        self._add("Startfarbe", self.pick_btn)
+        self._add("Startdatum", self.datum)
 
         self._section("Darstellung")
         self._add("Farbe", self.color_btn)
@@ -1532,6 +1722,8 @@ class _Inspector(QWidget):
         self.text.editingFinished.connect(self._apply)
         self.group.editingFinished.connect(self._apply)
         self.placeholder.editingFinished.connect(self._apply)
+        self.datum.editingFinished.connect(self._apply)
+        self.orient.currentIndexChanged.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
         self.t_headers.textChanged.connect(self._apply)
         self.t_widths.editingFinished.connect(self._apply)
@@ -1561,6 +1753,28 @@ class _Inspector(QWidget):
             fg = "#000" if (c.red() + c.green() + c.blue()) > 360 else "#fff"
             self.color_btn.setStyleSheet(
                 f"background:{c.name()}; color:{fg}; border:1px solid #555;")
+
+    def _update_pick_btn(self):
+        """Der Knopf zeigt die Startfarbe des Farbwaehlers."""
+        if self._c is None:
+            return
+        w = hex_zu_int(self._c.extra.get("color_value"))
+        self.pick_btn.setText("(Vorgabe)" if w is None else f"#{w:06X}")
+        c = _col(w if w is not None else 0xE84B4B)
+        fg = "#000" if (c.red() + c.green() + c.blue()) > 360 else "#fff"
+        self.pick_btn.setStyleSheet(f"background:{c.name()}; color:{fg}; border:1px solid #555;")
+
+    def _pick_startfarbe(self):
+        if self._c is None:
+            return
+        alt = hex_zu_int(self._c.extra.get("color_value"))
+        col = QColorDialog.getColor(_col(alt if alt is not None else 0xE84B4B),
+                                    self, "Startfarbe waehlen")
+        if col.isValid():
+            self._c.extra["color_value"] = \
+                f"#{(col.red() << 16) | (col.green() << 8) | col.blue():06X}"
+            self._update_pick_btn()
+            self.changed.emit()
 
     def _pick_color(self):
         if self._c is None:
@@ -1687,14 +1901,20 @@ class _Inspector(QWidget):
         self.enabled.setChecked(c.enabled); self.checked.setChecked(c.checked)
         self.visible.setChecked(c.visible)
         self.sfont.setValue(c.font_size); self._update_color_btn()
+        self.datum.setText(str(c.extra.get("date") or ""))
+        i = self.orient.findData((c.text or "h").lower())
+        self.orient.setCurrentIndex(i if i >= 0 else 0)
+        self._update_pick_btn()
         a = c.anchor or "lt"
         self.a_l.setChecked("l" in a); self.a_r.setChecked("r" in a)
         self.a_t.setChecked("t" in a); self.a_b.setChecked("b" in a)
         has_text = bool(sp and sp.has_text)
         has_items = bool(sp and sp.has_items)
         events = sp.events if sp else ()
-        is_range = c.kind in ("slider", "progress")
-        is_check = c.kind in ("checkbox", "radio")
+        # Zahlenfeld und Drehknopf haben min/max/wert genauso wie der Schieber;
+        # beim Trenner sind min/max die Grenzen, in die er sich schieben laesst.
+        is_range = c.kind in ("slider", "progress", "spinner", "knob", "splitter")
+        is_check = c.kind in ("checkbox", "radio", "toggle")
         for w in (self.name, self.color_btn, self.sfont, self.sx, self.sy,
                   self.sw, self.sh, self._anchor_box, self.enabled, self.visible):
             self._show(w, True)
@@ -1705,7 +1925,15 @@ class _Inspector(QWidget):
         for _w in self._t_felder:
             self._show(_w, ist_tabelle)
         self._show(self.group, c.kind == "radio")
-        self._show(self.placeholder, c.kind == "textinput")
+        self._show(self.placeholder, c.kind in ("textinput", "textarea"))
+        self._show(self.orient, c.kind == "splitter")
+        self._show(self.pick_btn, c.kind == "colorpicker")
+        self._show(self.datum, c.kind == "datepicker")
+        # Der Baum zeigt `items` als oberste Ebene, hat aber keinen
+        # Auswahl-Index im Designer -- welcher Knoten gewaehlt ist, entscheidet
+        # das Programm.
+        if c.kind == "tree":
+            self._show(self.ssel, False)
         # Nur die Ereignisse zeigen, die diese Art wirklich ausloest -- ein
         # angebotenes Ereignis, das nie feuert, laesst einen den Fehler im
         # eigenen Programm suchen.
@@ -1729,6 +1957,18 @@ class _Inspector(QWidget):
             setattr(c, ev, feld.text().strip())
         c.group = self.group.text().strip()
         c.placeholder = self.placeholder.text()
+        if c.kind == "splitter":
+            # Der Trenner hat kein Text-Feld im Inspektor -- `text` traegt bei
+            # ihm die Richtung, die aus dem Auswahlfeld kommt.
+            c.text = self.orient.currentData() or "h"
+        if c.kind == "datepicker":
+            d = self.datum.text().strip()
+            # Leer heisst HEUTE (so legt die Laufzeit einen frischen Waehler
+            # an) -- dann darf gar kein Datum in der Datei stehen.
+            if d:
+                c.extra["date"] = d
+            else:
+                c.extra.pop("date", None)
         self._tabelle_schreiben(c)
         items = [ln for ln in self.items.toPlainText().splitlines() if ln != ""]
         c.items = items

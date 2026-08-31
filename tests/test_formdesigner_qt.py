@@ -1553,3 +1553,83 @@ def test_zahlenfeld_verkraftet_tippfehler(tmp_path):
     assert _Inspector._zahlen("80, abc, 120") == [80, 120]
     assert _Inspector._zahlen("") == []
     assert _Inspector._zahlen("10 20;30") == [10, 20, 30]
+
+
+# ---------------------------------------------------------------------------
+# Die neun Arten, die dem Designer bis 2026-08-31 fehlten
+
+_NEUN = ("textarea", "spinner", "knob", "toggle", "tree", "toolbar",
+         "splitter", "colorpicker", "datepicker")
+
+
+def test_palette_zeigt_alle_arten(tmp_path):
+    from drachenhauch.formdesigner import PALETTE
+    _app()
+    win = FormDesigner(tmp_path)
+    assert win.palette.count() == len(PALETTE) == 24
+    win.close()
+
+
+def test_jede_neue_art_laesst_sich_ablegen_und_zeichnen(tmp_path):
+    """Ablegen, auswaehlen, Entwurfsflaeche zeichnen -- faengt fehlende
+    Zeichen-Zweige und Inspector-Verdrahtung."""
+    from PySide6.QtGui import QPixmap, QPainter
+    _app()
+    win = FormDesigner(tmp_path)
+    for k in _NEUN:
+        c = win.canvas.doc.add(k, 10, 10)
+        win.canvas._select(c)
+        assert win.inspector._c is c, k
+    pm = QPixmap(win.canvas.width() or 600, win.canvas.height() or 400)
+    qp = QPainter(pm)
+    for c in win.canvas.doc.controls:
+        win.canvas._paint_control(qp, c)      # darf nicht werfen
+    qp.end()
+    win.close()
+
+
+def test_inspector_zeigt_die_passenden_felder(tmp_path):
+    """Ein Feld, das zu einer Art nicht gehoert, ist schlimmer als keines --
+    man stellt etwas ein, das nirgends ankommt."""
+    _app()
+    win = FormDesigner(tmp_path)
+    i = win.inspector
+    erwartet = {
+        "spinner":     (i.vmin, i.vmax, i.vval),
+        "knob":        (i.vmin, i.vmax, i.vval),
+        "toggle":      (i.checked, i.text),
+        "textarea":    (i.placeholder,),
+        "splitter":    (i.orient, i.vmin, i.vmax),
+        "colorpicker": (i.pick_btn,),
+        "datepicker":  (i.datum,),
+    }
+    for kind, felder in erwartet.items():
+        win.canvas._select(win.canvas.doc.add(kind, 10, 10))
+        for f in felder:
+            assert f.isVisibleTo(win.inspector), f"{kind}: Feld fehlt"
+    # Gegenprobe: der Knopf hat nichts davon
+    win.canvas._select(win.canvas.doc.add("button", 10, 10))
+    for f in (i.orient, i.pick_btn, i.datum, i.vmin, i.checked):
+        assert not f.isVisibleTo(win.inspector), "Knopf zeigt ein fremdes Feld"
+    win.close()
+
+
+def test_inspector_schreibt_farbe_datum_und_richtung(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    dp = win.canvas.doc.add("datepicker", 10, 10)
+    win.canvas._select(dp)
+    win.inspector.datum.setText("2026-12-24")
+    win.inspector._apply()
+    assert dp.extra["date"] == "2026-12-24"
+    # Leer heisst HEUTE -- dann darf gar kein Datum in der Datei stehen.
+    win.inspector.datum.setText("")
+    win.inspector._apply()
+    assert "date" not in dp.extra
+
+    sp = win.canvas.doc.add("splitter", 10, 60)
+    win.canvas._select(sp)
+    win.inspector.orient.setCurrentIndex(1)          # senkrecht
+    win.inspector._apply()
+    assert sp.text == "v"
+    win.close()

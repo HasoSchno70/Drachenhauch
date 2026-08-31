@@ -28,10 +28,14 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 
 - **Links — Formulare + Controls:** oben der **Formular-Navigator** (alle im
   Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
-  Startformular), darunter die **grafische Palette** aller Widget-Arten (Button,
-  Label, Checkbox, Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar,
-  Image, **Tabelle**, Canvas, Panel, GroupBox, Separator) — jeder Eintrag mit
-  Mini-Vorschau-Icon. Platzieren auf
+  Startformular), darunter die **grafische Palette aller 24 Widget-Arten** der
+  Laufzeit (Button, Label, Checkbox, Radio, Slider, TextInput, TextArea,
+  Zahlenfeld, Drehknopf, Umschalter, Dropdown, ListBox, Baum, ProgressBar,
+  Image, Tabelle, Canvas, Panel, GroupBox, Separator, Trenner,
+  Werkzeugleiste, Farbwähler, Datumswähler) — jeder Eintrag mit
+  Mini-Vorschau-Icon. Ein Test misst die Palette gegen `Kind::from_str` in
+  `gui.rs`: eine Art, die die Laufzeit kann und der Designer nicht, fällt
+  sonst niemandem auf — man vermisst nur etwas, das es gibt. Platzieren auf
   zwei Wegen: **per Drag&Drop** auf die Fläche ziehen, **oder** Eintrag anklicken
   („scharf") und auf die Fläche klicken.
 - **Mitte — Design-Fläche:** das Formular, mit **realistisch gerenderten Controls**
@@ -177,9 +181,10 @@ gb-code}`) mit den Event-Handler-Körpern. Der Designer und ein handgeschriebene
 Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 
 **Felder, die der Designer nicht darstellt, reicht er unverändert durch.** Die
-`gui`-Laufzeit kennt mehr als die Palette anbietet — auf Fenster-Ebene `chrome`,
-`menus`, `tabs`/`active_tab`, pro Widget `table`, `tree`, `tab_page`, `font`,
-und die Widget-Arten `table`/`tree`/`textarea`/`spinner`/`splitter`/`toolbar`.
+`gui`-Laufzeit kennt mehr als der Inspector anbietet — auf Fenster-Ebene
+`chrome`, `menus`, `tabs`/`active_tab`, pro Widget `tab_page` und `font`.
+Bei den *Arten* gibt es diese Lücke seit 2026-08-31 nicht mehr: alle 24 lassen
+sich ablegen, zeichnen und exportieren.
 Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt sich also im
 Designer öffnen und nachjustieren, ohne dass Menüs, Reiter oder Tabellendaten
 verloren gehen; bearbeiten lassen sie sich dort aber nicht (sie werden auf der
@@ -234,13 +239,36 @@ vergleicht sie gegen `GUI_LOAD` desselben `.dhform`** — beide Wege müssen
 dasselbe Formular bauen.
 
 **Zwei Eigenheiten der Konstruktoren**, die der Export ausgleicht:
-`GUI_LABEL`/`CHECKBOX`/`RADIO`/`SLIDER`/`SEPARATOR` berechnen ihre Größe selbst,
-deshalb wird `GUI_SET_BOUNDS` nachgereicht. `GUI_PROGRESS` liegt fest auf
+`GUI_LABEL`/`CHECKBOX`/`RADIO`/`SLIDER`/`SEPARATOR`/`TOGGLE`/`SPLITTER`/
+`SPINNER`/`KNOB` berechnen ihre Größe selbst, deshalb wird `GUI_SET_BOUNDS`
+nachgereicht (`_EIGENE_GROESSE` in `document.py`). `GUI_PROGRESS` liegt fest auf
 `min=0/max=1` und hat keinen Range-Setter, deshalb wird der Wert auf den Anteil
 normiert (optisch identisch — die Laufzeit zeichnet den Balken als
 `(value-min)/(max-min)`). *Restgrenze:* `GUI_SET_BOUNDS` aktualisiert die
 Anchor-Basis der Laufzeit nicht mit — wird ein exportiertes, resizebares Fenster
-gezogen, springen diese fünf Control-Arten auf ihre Konstruktor-Größe zurück.
+gezogen, springen diese Control-Arten auf ihre Konstruktor-Größe zurück.
+
+**Wo die neuen Arten ihre Werte tragen.** Der Designer erfindet dafür keine
+eigenen Felder, sondern benutzt genau die Schlüssel, unter denen die Laufzeit
+sie in die `.dhform` schreibt (`gui.rs::widget_json`) — sonst käme der Wert
+beim nächsten Öffnen nicht zurück:
+
+| Art | Feld | Bedeutung |
+|---|---|---|
+| Farbwähler | `color_value` (`"#RRGGBB"`) | Startfarbe; ohne Angabe die Vorgabe der Laufzeit |
+| Datumswähler | `date` (`"JJJJ-MM-TT"`) | Startdatum; **leer heißt HEUTE** und schreibt gar kein Datum |
+| Trenner | `text` | Richtung `"h"`/`"v"`; `min`/`max` sind die Grenzen |
+| Zahlenfeld, Drehknopf | `min`/`max`/`value` | wie beim Schieber |
+| Baum | `items` ↔ `tree.nodes` | siehe unten |
+
+**Der Baum braucht eine Übersetzung.** Die Laufzeit legt seine Knoten nicht
+unter `items` ab (das bleibt Dropdown und ListBox vorbehalten), sondern unter
+`tree.nodes` mit Elternnummer und Ebene. Der Designer schreibt die Liste aus
+`items` als oberste Ebene dorthin und liest sie beim Öffnen zurück. **Ein
+tieferer Baum wird dabei nicht verflacht:** enthält die Datei Knoten mit
+Eltern, bleibt die Struktur unangetastet und der Designer zeigt nur die
+oberste Ebene. Wer eine von einem Programm gespeicherte Form öffnet, soll sie
+nicht dadurch verlieren, dass der Designer weniger anzeigt als darin steht.
 
 **Multi-Form-Architektur:** Qt-freies `FormProject` (in
 `formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede

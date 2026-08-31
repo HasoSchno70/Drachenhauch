@@ -898,3 +898,135 @@ def test_umbenennen_kollidiert_nicht_mit_bestehendem_handler():
     paare = d.rename_control_handlers(b, alt)
     assert paare, "Handler haette umbenannt werden muessen"
     assert b.on_click != a.on_click, "zwei Controls zeigen auf denselben Handler"
+
+
+# ---------------------------------------------------------------------------
+# Die neun Arten, die dem Designer bis 2026-08-31 fehlten
+#
+# Die Laufzeit kennt 24 Widget-Arten, der Designer bot 15 an -- textarea,
+# spinner, splitter, toolbar, tree, toggle, knob, colorpicker und datepicker
+# liessen sich also gar nicht auf ein Formular legen. Die Drift war nirgends
+# gemessen; deshalb steht unten ein Test, der genau sie misst.
+
+_NEUN = ("textarea", "spinner", "knob", "toggle", "tree", "toolbar",
+         "splitter", "colorpicker", "datepicker")
+
+
+def test_palette_kennt_jede_art_der_laufzeit():
+    """Drift-Schutz: die Palette gegen `Kind::from_str` in gui.rs.
+
+    Eine Art, die die Laufzeit kann und der Designer nicht, faellt sonst
+    niemandem auf -- man vermisst nur etwas, das es gibt.
+    """
+    import re
+    quelle = (pathlib.Path(__file__).resolve().parent.parent /
+              "rust" / "drachenhauch_runtime" / "src" / "gui.rs").read_text(encoding="utf-8")
+    block = quelle.split("fn from_str(s: &str)", 1)[1].split("})", 1)[0]
+    laufzeit = set(re.findall(r'"([a-z]+)" => Kind::', block))
+    assert laufzeit, "Kind::from_str nicht gefunden -- Test anpassen"
+    fehlt = laufzeit - {p.kind for p in PALETTE}
+    assert not fehlt, f"Die Laufzeit kann diese Arten, der Designer nicht: {sorted(fehlt)}"
+
+
+def _neu_control(kind: str) -> Control:
+    sp = palette_spec(kind)
+    c = Control(kind=kind, name=kind, x=10, y=10, w=sp.w, h=sp.h)
+    if sp.has_text:
+        c.text = "An/Aus"
+    if sp.has_items:
+        c.items = ["Ordner", "Datei"]
+    if kind == "splitter":
+        c.text = "h"; c.min, c.max = 40, 200
+    if kind == "colorpicker":
+        c.extra["color_value"] = "#E84B4B"
+    if kind == "datepicker":
+        c.extra["date"] = "2026-08-31"
+    if kind in ("spinner", "knob"):
+        c.min, c.max, c.value = 0, 10, 3
+    return c
+
+
+def test_jede_neue_art_erzeugt_lauffaehigen_code():
+    """Frueher lief jede dieser Arten in den Rueckfall `' Control-Typ '...'
+    uebersprungen` -- das Formular kam im erzeugten Programm gar nicht vor."""
+    doc = FormDoc(title="Neun", w=900, h=560)
+    doc.controls = [_neu_control(k) for k in _NEUN]
+    code = doc.generate_gb_code(900, 560)
+    assert "uebersprungen" not in code
+    for k in _NEUN:
+        assert f"GUI_{k.upper()}(" in code.upper() or k == "knob", k
+    _parses(code)
+
+
+def test_werte_landen_im_erzeugten_code():
+    doc = FormDoc(title="W", w=400, h=300)
+    doc.controls = [_neu_control(k) for k in ("spinner", "splitter",
+                                              "colorpicker", "datepicker", "toggle")]
+    code = doc.generate_gb_code()
+    assert "GUI_SPINNER(frm, 10, 10, 120, 0.0, 10.0, 3.0)" in code
+    assert 'GUI_SPLITTER(frm, 10, 10, 160, "h", 40, 200)' in code
+    assert "GUI_SET_PICKED_COLOR(" in code and "&HE84B4B" in code
+    assert 'GUI_SET_DATE(' in code and '"2026-08-31"' in code
+    assert 'GUI_TOGGLE(frm, "An/Aus", 10, 10, FALSE)' in code
+
+
+def test_datepicker_ohne_datum_bleibt_bei_heute():
+    """Ein frischer Waehler zeigt HEUTE. Ein leeres Feld darf das nicht durch
+    ein eingefrorenes Datum ersetzen."""
+    doc = FormDoc()
+    doc.controls = [Control(kind="datepicker", x=0, y=0, w=200, h=180)]
+    assert "GUI_SET_DATE" not in doc.generate_gb_code()
+
+
+def test_eigene_groesse_wird_zurueckgeholt():
+    """Umschalter, Trenner, Zahlenfeld und Drehknopf rechnen ihre Groesse
+    selbst aus -- ohne GUI_SET_BOUNDS ginge die im Designer eingestellte
+    verloren und das Anchoring rechnete mit einer falschen Basis."""
+    for k in ("toggle", "splitter", "spinner", "knob"):
+        doc = FormDoc()
+        doc.controls = [_neu_control(k)]
+        assert "GUI_SET_BOUNDS(" in doc.generate_gb_code(), k
+
+
+def test_baum_uebersetzt_zwischen_items_und_knoten(tmp_path):
+    """Die Laufzeit legt Baumknoten unter `tree.nodes` ab, nicht unter
+    `items`. Ohne Uebersetzung waere ein im Designer gefuellter Baum nach
+    `GUI_LOAD` leer."""
+    doc = FormDoc(title="B", w=300, h=200)
+    doc.controls = [Control(kind="tree", x=10, y=10, w=200, h=140,
+                            items=["Ordner", "Datei"])]
+    p = tmp_path / "b.dhform"
+    doc.save(str(p))
+    roh = json.loads(p.read_text(encoding="utf-8"))["widgets"][0]
+    assert [n["label"] for n in roh["tree"]["nodes"]] == ["Ordner", "Datei"]
+    assert all(n["parent"] == -1 for n in roh["tree"]["nodes"])
+    assert FormDoc.load(str(p)).controls[0].items == ["Ordner", "Datei"]
+
+
+def test_tiefer_baum_wird_nicht_verflacht():
+    """Wer eine Datei oeffnet, die ein Programm mit verschachtelten Knoten
+    geschrieben hat, darf sie nicht dadurch verlieren, dass der Designer nur
+    die oberste Ebene anzeigt."""
+    tief = {"kind": "tree", "x": 0, "y": 0, "w": 100, "h": 100, "tree": {"nodes": [
+        {"label": "Wurzel", "parent": -1, "level": 0, "expanded": True, "has_children": True},
+        {"label": "Kind", "parent": 0, "level": 1, "expanded": False, "has_children": False},
+    ], "selected": -1}}
+    c = Control.from_dict(tief)
+    assert c.items == ["Wurzel"]                       # nur die oberste Ebene zeigen
+    assert [n["label"] for n in c.to_dict()["tree"]["nodes"]] == ["Wurzel", "Kind"]
+
+
+def test_farbe_und_datum_ueberstehen_den_rundweg(tmp_path):
+    """Beide liegen unter genau den Schluesseln, die die Laufzeit schreibt
+    (`color_value` / `date`, siehe gui.rs::widget_json) -- sonst kaeme der
+    Wert beim naechsten Oeffnen nicht zurueck."""
+    doc = FormDoc(title="R", w=400, h=300)
+    doc.controls = [_neu_control("colorpicker"), _neu_control("datepicker")]
+    p = tmp_path / "r.dhform"
+    doc.save(str(p))
+    roh = json.loads(p.read_text(encoding="utf-8"))["widgets"]
+    assert roh[0]["color_value"] == "#E84B4B"
+    assert roh[1]["date"] == "2026-08-31"
+    zurueck = FormDoc.load(str(p)).controls
+    assert zurueck[0].extra["color_value"] == "#E84B4B"
+    assert zurueck[1].extra["date"] == "2026-08-31"
