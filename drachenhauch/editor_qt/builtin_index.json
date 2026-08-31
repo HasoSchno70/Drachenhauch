@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1581,
+ "count": 1590,
  "builtins": [
   {
    "name": "ABS",
@@ -8061,6 +8061,18 @@
    "module": "core"
   },
   {
+   "name": "TILED_ADD_LAYER",
+   "kind": "core",
+   "signature": "TILED_ADD_LAYER(m, name$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_ADD_TILESET",
+   "kind": "core",
+   "signature": "TILED_ADD_TILESET(m, bild$, kachelzahl)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_COUNT_GID",
    "kind": "core",
    "signature": "TILED_COUNT_GID(m: ?, layer_idx: INTEGER, gid: INTEGER)",
@@ -8109,9 +8121,27 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_LAYER_RENAME",
+   "kind": "core",
+   "signature": "TILED_LAYER_RENAME(m, idx, name$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_LAYER_SET_VISIBLE",
+   "kind": "core",
+   "signature": "TILED_LAYER_SET_VISIBLE(m, idx, an)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_LAYER_TYPE",
    "kind": "core",
    "signature": "TILED_LAYER_TYPE(m: ?, idx: INTEGER)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_LAYER_VISIBLE",
+   "kind": "core",
+   "signature": "TILED_LAYER_VISIBLE(m, idx)",
    "module": "tiled"
   },
   {
@@ -8124,6 +8154,12 @@
    "name": "TILED_LOAD",
    "kind": "core",
    "signature": "TILED_LOAD(path: STRING)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_NEW",
+   "kind": "core",
+   "signature": "TILED_NEW(breite, hoehe, kachel_w, kachel_h)",
    "module": "tiled"
   },
   {
@@ -8193,9 +8229,21 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_REMOVE_LAYER",
+   "kind": "core",
+   "signature": "TILED_REMOVE_LAYER(m, idx)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_REPLACE",
    "kind": "core",
    "signature": "TILED_REPLACE(m: ?, layer_idx: INTEGER, from_gid: INTEGER, to_gid: INTEGER)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_SAVE",
+   "kind": "core",
+   "signature": "TILED_SAVE(m, pfad$)",
    "module": "tiled"
   },
   {
@@ -8214,6 +8262,12 @@
    "name": "TILED_TILESET_IMAGE",
    "kind": "core",
    "signature": "TILED_TILESET_IMAGE(m: ?, idx: INTEGER)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_TILESET_TILES",
+   "kind": "core",
+   "signature": "TILED_TILESET_TILES(m, idx)",
    "module": "tiled"
   },
   {

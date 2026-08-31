@@ -58,6 +58,11 @@ impl PropVal {
 pub struct TiledTileset {
     pub first_gid: i64,
     pub image: String,
+    /// Wie viele Kacheln dieses Tileset hat. Beim Laden aus `tilecount`;
+    /// gebraucht wird sie, um beim ANHAENGEN eines weiteren Tilesets die
+    /// naechste freie GID zu finden -- ueberlappende GID-Bereiche zerstoeren
+    /// stillschweigend die Zuordnung aller Kacheln.
+    pub tile_count: i64,
     /// local_tile_id (gid - first_gid) -> {key: value}
     pub tile_properties: HashMap<i64, HashMap<String, PropVal>>,
 }
@@ -310,6 +315,7 @@ fn parse_tileset(t: &J, base_dir: &Path) -> TiledTileset {
     let mut ts = TiledTileset {
         first_gid: jint(t, "firstgid", 1),
         image: String::new(),
+        tile_count: jint(t, "tilecount", 0),
         tile_properties: HashMap::new(),
     };
     let img = jstr(t, "image", "");
@@ -508,6 +514,203 @@ pub fn load(path: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
         }
     }
     Ok(Rc::new(RefCell::new(m)))
+}
+
+/// Eine leere Karte anlegen (TILED_NEW).
+pub fn neu(w: i64, h: i64, tw: i64, th: i64) -> Result<Rc<RefCell<TiledMap>>, String> {
+    if w < 1 || h < 1 || tw < 1 || th < 1 {
+        return Err("TILED_NEW: Breite, Hoehe und Kachelmasse muessen >= 1 sein".into());
+    }
+    if w * h > 4_000_000 {
+        return Err(std::format!(
+            "TILED_NEW: {}x{} Kacheln sind zu viel (Obergrenze 4 Millionen)", w, h));
+    }
+    Ok(Rc::new(RefCell::new(TiledMap {
+        width: w, height: h, tile_w: tw, tile_h: th,
+        tilesets: Vec::new(), layers: Vec::new(), layer_by_name: HashMap::new(),
+    })))
+}
+
+/// Eine leere Kachel-Ebene anhaengen (TILED_ADD_LAYER) -> Index.
+pub fn ebene_anhaengen(m: &Rc<RefCell<TiledMap>>, name: &str) -> Result<i64, String> {
+    let mut map = m.borrow_mut();
+    if map.layer_by_name.contains_key(name) {
+        return Err(std::format!("TILED_ADD_LAYER: '{}' gibt es schon", name));
+    }
+    let (w, h) = (map.width, map.height);
+    let idx = map.layers.len();
+    map.layers.push(TiledLayer {
+        name: name.to_string(), kind: "tile".into(), width: w, height: h,
+        tiles: vec![0; (w * h) as usize], objects: Vec::new(),
+        image: String::new(), visible: true, opacity: 1.0,
+        obj_by_name: HashMap::new(),
+    });
+    map.layer_by_name.insert(name.to_string(), idx);
+    Ok(idx as i64)
+}
+
+/// Den Namensindex nach einer Umbenennung/Entfernung neu aufbauen.
+///
+/// Er bildet Name -> Position ab; jede Aenderung an der Reihenfolge macht
+/// ihn falsch, und ein falscher Index zeigt stillschweigend auf die
+/// NACHBAR-Ebene statt einen Fehler zu melden.
+fn namen_neu(map: &mut TiledMap) {
+    map.layer_by_name.clear();
+    for (i, l) in map.layers.iter().enumerate() {
+        map.layer_by_name.insert(l.name.clone(), i);
+    }
+}
+
+/// Eine Ebene umbenennen (TILED_LAYER_RENAME).
+pub fn ebene_umbenennen(m: &Rc<RefCell<TiledMap>>, idx: i64, name: &str) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    if idx < 0 || idx as usize >= map.layers.len() {
+        return Err(std::format!("TILED_LAYER_RENAME: Ebene {} gibt es nicht", idx));
+    }
+    if name.is_empty() {
+        return Err("TILED_LAYER_RENAME: der Name darf nicht leer sein".into());
+    }
+    // Der eigene alte Name ist kein Konflikt -- sonst waere ein Umbenennen
+    // auf denselben Namen (aus einem Eingabefeld heraus der Normalfall) ein
+    // Fehler.
+    if let Some(&vorhanden) = map.layer_by_name.get(name) {
+        if vorhanden != idx as usize {
+            return Err(std::format!("TILED_LAYER_RENAME: '{}' gibt es schon", name));
+        }
+    }
+    map.layers[idx as usize].name = name.to_string();
+    namen_neu(&mut map);
+    Ok(())
+}
+
+/// Eine Ebene ein- oder ausblenden (TILED_LAYER_SET_VISIBLE).
+pub fn ebene_sichtbar_setzen(m: &Rc<RefCell<TiledMap>>, idx: i64, an: bool) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    if idx < 0 || idx as usize >= map.layers.len() {
+        return Err(std::format!("TILED_LAYER_SET_VISIBLE: Ebene {} gibt es nicht", idx));
+    }
+    map.layers[idx as usize].visible = an;
+    Ok(())
+}
+
+/// Eine Ebene entfernen (TILED_REMOVE_LAYER).
+pub fn ebene_entfernen(m: &Rc<RefCell<TiledMap>>, idx: i64) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    if idx < 0 || idx as usize >= map.layers.len() {
+        return Err(std::format!("TILED_REMOVE_LAYER: Ebene {} gibt es nicht", idx));
+    }
+    map.layers.remove(idx as usize);
+    namen_neu(&mut map);
+    Ok(())
+}
+
+/// Ein Tileset anhaengen (TILED_ADD_TILESET) -> Index.
+///
+/// Die `firstgid` wird selbst vergeben: erste GID = 1, danach jeweils hinter
+/// dem vorigen Tileset. Sie von Hand setzen zu lassen waere die haeufigste
+/// Fehlerquelle -- ueberlappende Bereiche zerstoeren stillschweigend die
+/// Zuordnung aller Kacheln.
+pub fn tileset_anhaengen(m: &Rc<RefCell<TiledMap>>, bild: &str, kacheln: i64)
+                         -> Result<i64, String> {
+    if kacheln < 1 {
+        return Err("TILED_ADD_TILESET: die Kachelzahl muss >= 1 sein".into());
+    }
+    let mut map = m.borrow_mut();
+    let first = map.tilesets.last().map(|t| t.first_gid + t.tile_count).unwrap_or(1);
+    let idx = map.tilesets.len();
+    map.tilesets.push(TiledTileset {
+        first_gid: first, image: bild.to_string(), tile_count: kacheln,
+        tile_properties: HashMap::new(),
+    });
+    Ok(idx as i64)
+}
+
+/// Die Karte als Tiled-JSON schreiben (TILED_SAVE).
+///
+/// Erzeugt genau die Form, die `load` wieder liest -- eingebettete Tilesets,
+/// CSV-Kacheldaten. Der Rundweg ist getestet; ein Schreiber, den nur der
+/// eigene Leser versteht, waere kein Dateiformat, sondern ein Notizzettel.
+pub fn speichern(m: &Rc<RefCell<TiledMap>>, pfad: &str) -> Result<(), String> {
+    let map = m.borrow();
+    let tilesets: Vec<J> = map.tilesets.iter().map(|t| serde_json::json!({
+        "firstgid": t.first_gid,
+        "image": t.image,
+        "tilecount": t.tile_count,
+        "name": std::path::Path::new(&t.image).file_stem()
+                    .and_then(|s| s.to_str()).unwrap_or("tileset"),
+        "tilewidth": map.tile_w,
+        "tileheight": map.tile_h,
+        // Nur Kacheln MIT Eigenschaften auflisten -- Tiled macht es genauso,
+        // und bei 2000 Kacheln waere alles andere eine unlesbare Datei.
+        "tiles": t.tile_properties.iter().map(|(id, props)| serde_json::json!({
+            "id": id,
+            "properties": props.iter().map(|(k, v)| serde_json::json!({
+                "name": k,
+                "type": match v { PropVal::Bool(_) => "bool", PropVal::Int(_) => "int",
+                                  PropVal::Float(_) => "float", PropVal::Str(_) => "string" },
+                "value": match v {
+                    PropVal::Bool(b) => J::from(*b),
+                    PropVal::Int(i) => J::from(*i),
+                    PropVal::Float(f) => J::from(*f),
+                    PropVal::Str(s) => J::from(s.clone()),
+                },
+            })).collect::<Vec<_>>(),
+        })).collect::<Vec<_>>(),
+    })).collect();
+
+    let layers: Vec<J> = map.layers.iter().enumerate().map(|(i, l)| {
+        let mut o = serde_json::json!({
+            "id": i + 1,
+            "name": l.name,
+            "opacity": l.opacity,
+            "visible": l.visible,
+            "x": 0, "y": 0,
+        });
+        if l.kind == "object" {
+            o["type"] = J::from("objectgroup");
+            o["objects"] = J::from(l.objects.iter().enumerate().map(|(oi, ob)| serde_json::json!({
+                "id": oi + 1, "name": ob.name, "type": ob.type_,
+                "x": ob.x, "y": ob.y, "width": ob.width, "height": ob.height,
+                "visible": true, "rotation": 0,
+                "properties": ob.properties.iter().map(|(k, v)| serde_json::json!({
+                    "name": k,
+                    "type": match v { PropVal::Bool(_) => "bool", PropVal::Int(_) => "int",
+                                      PropVal::Float(_) => "float", PropVal::Str(_) => "string" },
+                    "value": match v {
+                        PropVal::Bool(b) => J::from(*b),
+                        PropVal::Int(i) => J::from(*i),
+                        PropVal::Float(f) => J::from(*f),
+                        PropVal::Str(s) => J::from(s.clone()),
+                    },
+                })).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>());
+        } else {
+            o["type"] = J::from("tilelayer");
+            o["width"] = J::from(l.width);
+            o["height"] = J::from(l.height);
+            o["data"] = J::from(l.tiles.clone());
+        }
+        o
+    }).collect();
+
+    let doc = serde_json::json!({
+        "type": "map",
+        "version": "1.10",
+        "tiledversion": "1.10.2",
+        "orientation": "orthogonal",
+        "renderorder": "right-down",
+        "infinite": false,
+        "width": map.width, "height": map.height,
+        "tilewidth": map.tile_w, "tileheight": map.tile_h,
+        "nextlayerid": map.layers.len() + 1,
+        "nextobjectid": 1,
+        "tilesets": tilesets,
+        "layers": layers,
+    });
+    let text = serde_json::to_string_pretty(&doc)
+        .map_err(|e| std::format!("TILED_SAVE: {}", e))?;
+    std::fs::write(pfad, text)
+        .map_err(|e| std::format!("TILED_SAVE: '{}' liess sich nicht schreiben -- {}", pfad, e))
 }
 
 /// 4-verbundener Flood-Fill (deterministisch; identisch zum Python-Fallback

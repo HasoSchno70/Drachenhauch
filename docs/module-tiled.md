@@ -1,6 +1,8 @@
 # Modul `tiled`
 
-Loader fuer [Tiled](https://www.mapeditor.org/)-Maps im JSON-Format. Tiled ist Industriestandard fuer 2D-Level-Design — fast jeder Indie-2D-Engine-Workflow geht durch Tiled.
+Karten im [Tiled](https://www.mapeditor.org/)-JSON-Format **lesen, aendern, anlegen und schreiben**. Tiled ist Industriestandard fuer 2D-Level-Design — fast jeder Indie-2D-Engine-Workflow geht durch Tiled.
+
+Bis 2026-08-30 war das Modul ein reiner Leser: eine geladene Karte liess sich im Speicher aendern, aber nicht zurueckschreiben, und eine neue gar nicht erst anlegen. Damit war alles, was Karten **baut** statt sie nur zu benutzen — ein Editor, ein Generator, ein Umwandlungswerkzeug — ausgeschlossen. Die Abschnitte [Karten anlegen und speichern](#karten-anlegen-und-speichern) und [Ebenen aendern](#ebenen-aendern) schliessen das.
 
 ```basic
 IMPORT "tiled"
@@ -69,6 +71,64 @@ IMPORT "tiled"
 | `TILED_REPLACE(m, layer_idx, from_gid, to_gid)` | INTEGER | jede GID `from_gid` durch `to_gid` ersetzen — Tileset tauschen ohne Schleife |
 | `TILED_COUNT_GID(m, layer_idx, gid)` | INTEGER | wie oft kommt diese GID in der Ebene vor? |
 | `TILED_FLOOD_FILL(m, layer_idx, tx, ty, gid)` | INTEGER | Farbeimer: die zusammenhängende Fläche ab `(tx,ty)` umfärben |
+
+## Karten anlegen und speichern
+
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_NEW(breite, hoehe, kachel_w, kachel_h)` | TILED_MAP | eine leere Karte anlegen -- ohne Ebene und ohne Tileset |
+| `TILED_ADD_LAYER(m, name$)` | INTEGER (Index) | eine leere Kachel-Ebene anhaengen |
+| `TILED_ADD_TILESET(m, bild$, kachelzahl)` | INTEGER (Index) | ein Tileset anhaengen; die `firstgid` vergibt die Laufzeit selbst |
+| `TILED_TILESET_TILES(m, idx)` | INTEGER | wie viele Kacheln hat dieses Tileset? |
+| `TILED_SAVE(m, pfad$)` | — | die Karte als Tiled-JSON schreiben |
+
+```basic
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(40, 30, 16, 16)
+DIM ts AS INTEGER : ts = TILED_ADD_TILESET(m, "tiles.png", 32)
+DIM boden AS INTEGER : boden = TILED_ADD_LAYER(m, "Boden")
+TILED_FILL_RECT(m, boden, 0, 0, 40, 30, 1)
+TILED_SAVE(m, "level.json")
+```
+
+**Die `firstgid` wird nicht von Hand gesetzt.** Sie ist die erste globale ID des
+Tilesets; das erste bekommt 1, jedes weitere schliesst hinter dem vorigen an.
+Ueberlappende Bereiche waeren die haeufigste und unangenehmste Fehlerquelle --
+sie zerstoeren stillschweigend die Zuordnung **aller** Kacheln, ohne dass
+irgendetwas eine Fehlermeldung gibt. Deshalb braucht `TILED_ADD_TILESET` die
+Kachelzahl: nur damit laesst sich die naechste GID ausrechnen.
+
+**Geschrieben wird echtes Tiled-JSON** — eingebettete Tilesets, `type: "map"`,
+Kacheldaten als Zahlenliste. Nachgeprueft ist das nicht am eigenen Leser, sondern
+an einem **fremden**: `drachenhauch/tilemap/document.py`, dem Datenmodell des
+Qt-Editors `dhtilemap` (`tests/test_tiled_schreiben.py`). Ein Format, das nur sein
+eigener Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig.
+
+**Grenzen:** `TILED_NEW` legt nur orthogonale, endliche Karten an (kein
+isometrisch, kein `infinite`), Objekt-Ebenen lassen sich nicht neu anlegen (nur
+geladene werden mitgeschrieben), und Kachel-Eigenschaften einer selbst gebauten
+Karte lassen sich nicht setzen -- gelesene bleiben beim Speichern erhalten.
+Sehr grosse Karten werden abgelehnt (ueber 4 Millionen Kacheln), damit ein
+Tippfehler in der Groesse nicht den Speicher frisst.
+
+## Ebenen aendern
+
+| Funktion | Rueckgabe | Bedeutung |
+|---|---|---|
+| `TILED_LAYER_RENAME(m, idx, name$)` | — | eine Ebene umbenennen |
+| `TILED_LAYER_VISIBLE(m, idx)` | BOOLEAN | ist die Ebene eingeblendet? |
+| `TILED_LAYER_SET_VISIBLE(m, idx, an)` | — | Ebene ein- oder ausblenden |
+| `TILED_REMOVE_LAYER(m, idx)` | — | eine Ebene entfernen |
+
+Die Sichtbarkeit ist **nicht nur Anzeige** -- Tiled speichert sie in der Datei.
+Ohne `TILED_LAYER_SET_VISIBLE` liess sich eine ausgeblendete Ebene also gar nicht
+so speichern: sie kam beim naechsten Laden sichtbar zurueck.
+
+**Achtung, Indizes verschieben sich.** `TILED_REMOVE_LAYER` rueckt alle Ebenen
+dahinter auf. Wer sich eine Ebenennummer gemerkt hat, muss sie danach neu holen
+(`TILED_LAYER_INDEX(m, name$)`). Der Namensindex wird bei Umbenennen und
+Entfernen mitgefuehrt -- ein alter Name liefert danach -1.
 
 ## Konzept: GIDs vs. lokale Tile-IDs
 
@@ -208,6 +268,14 @@ Was **nicht** unterstuetzt wird:
 | Typ | Wirkung |
 |---|---|
 | `TILED_MAP` | Geladene Tiled-Map. `DIM m AS TILED_MAP` |
+
+## Ein Editor als Beispiel
+
+[`examples/187_tilemap_editor.dh`](../examples/187_tilemap_editor.dh) ist ein
+vollstaendiger Tilemap-Editor in Drachenhauch: Stift/Radierer/Fuellen/Rechteck/
+Pipette/Auswahl, Zwischenablage, Rueckgaengig, Ebenen, Laden und Speichern.
+Er benutzt genau die Befehle dieses Abschnitts und ist der kuerzeste Weg,
+sie im Zusammenspiel zu sehen.
 
 ## Beispiel
 

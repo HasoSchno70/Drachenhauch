@@ -51,6 +51,7 @@ _INTERAKTIV = [
     "184_codefeld",
     "185_partikel_editor",
     "186_farbe_und_datum",
+    "187_tilemap_editor",
 ]
 
 
