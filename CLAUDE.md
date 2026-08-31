@@ -403,6 +403,18 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   hält nur noch `COLORS`/`KEYS` + Kamera-Mathematik fürs Editor-Tooling.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
+- **Vorbelegte Namen als Variable gehen ueberall** (seit 2026-08-31). `DIM red`,
+  `DIM pi`, `DIM key_space` verschatten die eingebaute Konstante -- vorher ging
+  das NUR auf oberster Ebene, in einem `IF`/`WHILE`/`FOR` warf dieselbe Zeile
+  zur Laufzeit "CONST 'red' kann nicht ueberschrieben werden" (und `--check`
+  schwieg). Ursache: `collect_globals` (compiler.rs) lief nur ueber die
+  oberste Anweisungsliste, ein `DIM` im Block bekam keinen Slot und lief ueber
+  den NAMEN -- `DECLARE_NAME` laesst einen vorhandenen Eintrag stehen,
+  `DECLARE_GLOBAL_SLOT` ersetzt ihn. Der Durchlauf steigt jetzt in die Bloecke
+  hinab (`globale_unterbloecke`), NICHT in SUB/FUNCTION/CLASS -- die haben
+  eigene Plaetze. Nebenertrag: die Kollisions-Erkennung sah bis dahin nur
+  Geschwister und liess `CONST Modus` oben + `DIM modus` im Block durch.
+  Doku `docs/stolpersteine.md` H1, Tests `tests/test_name_collision.py`.
 - **Tastencodes: Buchstaben gehen in BEIDER Schreibweise.** `KEY_A`..`KEY_Z`
   (= 97..122, SDL-Zaehlung) ist die klare Form; `ASC("s")` und `ASC("S")`
   meinen seit 2026-08-31 dieselbe Taste. Vorher galten nur die kleinen, und
