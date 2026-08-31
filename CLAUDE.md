@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1096 | 0,15 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1208 | 0,16 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -87,8 +87,15 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Partikel sichern ihre Regler als `.ini` (Schluessel = Beschriftung, also
 > lesbar und von Hand aenderbar; ein unbekannter Schluessel wird UEBERGANGEN
 > statt gemeldet), der Sprite-Editor holt einen Streifen samt Atlas-JSON
-> zurueck (die EBENEN sind dabei weg -- der Streifen ist das
-> zusammengerechnete Bild, das steht so in der Datei), der Tilemap-Editor
+> zurueck (dort sind die EBENEN weg -- der Streifen IST das
+> zusammengerechnete Bild) und hat seit 2026-08-31 ein eigenes Format MIT
+> Ebenen: `.dhsprite` = ein Raster-PNG (Spalten = Einzelbilder, Zeilen =
+> Ebenen) plus eine JSON-Datei daneben (Masse, Ebenennamen, Sichtbarkeit,
+> ueber das json-Modul geschrieben -- Namen sind Nutzertext, die Maskierung
+> will man nicht selbst schreiben). Bewusst NICHT die Pixel als base64 in
+> die JSON wie die Qt-Fassung: ein PNG, das jeder Bildbetrachter oeffnet,
+> ist mehr wert als ein Format, das nur sein Erzeuger ansehen kann. Der
+> Tilemap-Editor
 > konnte es von Anfang an ueber `TILED_LOAD`. Das Sichern kostete die
 > Faktoren: SFX 0,77 -> 0,93, Partikel 0,48 -> 0,58. Alle vier Rundwege sind
 > nachgefahren (malen -> sichern -> zuruecksetzen -> laden -> vergleichen).

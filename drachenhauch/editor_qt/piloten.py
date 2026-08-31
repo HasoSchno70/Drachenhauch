@@ -31,8 +31,8 @@ PILOTEN: list[dict] = [
      "qt": 2428, "dh": 762,
      "kurz": "sechs Werkzeuge, Auswahl mit Zwischenablage, Ebenen, Tiled-JSON"},
     {"datei": "189_sprite_editor.dh", "titel": "Sprite-Editor",
-     "qt": 7379, "dh": 1096,
-     "kurz": "neun Werkzeuge, Ebenen, Einzelbilder, Streifen und Atlas schreiben und lesen"},
+     "qt": 7379, "dh": 1208,
+     "kurz": "neun Werkzeuge, Ebenen, Einzelbilder, eigenes Format mit Ebenen, Streifen + Atlas"},
 ]
 
 
