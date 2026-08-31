@@ -7535,6 +7535,7 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
             "getalpha" => Value::Int(g!().get_alpha(gi(a,0,"GETALPHA")?,
                 gi(a,1,"GETALPHA")? as i32, gi(a,2,"GETALPHA")? as i32)),
             "image_save" => { g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?)?; Value::Nil }
+            "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
             "image_crop" => Value::Int(g!().image_crop(gi(a,0,"IMAGE_CROP")?, gi(a,1,"IMAGE_CROP")? as i32, gi(a,2,"IMAGE_CROP")? as i32, gi(a,3,"IMAGE_CROP")? as i32, gi(a,4,"IMAGE_CROP")? as i32)?),
             "image_resize_canvas" => {
                 let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };

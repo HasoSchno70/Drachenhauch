@@ -128,9 +128,10 @@ DIM pN AS INTEGER : pN = 0
 DIM flutX[MAXPKT] AS INTEGER
 DIM flutY[MAXPKT] AS INTEGER
 
-' Verlauf. Die Plaetze werden EINMAL angelegt und wiederverwendet: ein Bild
-' laesst sich nicht freigeben (es gibt kein IMAGE_FREE), jede Momentaufnahme
-' per IMAGE_COPY waere also ein Leck, das mit jedem Pinselstrich waechst.
+' Verlauf. Die Plaetze werden EINMAL angelegt und wiederverwendet
+' (IMAGE_CLEAR + IMAGE_DRAW_IMAGE statt IMAGE_COPY): eine neue Momentaufnahme
+' je Pinselstrich waere zwar mit IMAGE_FREE wieder wegzubekommen, aber gar
+' nicht erst anzulegen ist billiger als anlegen und freigeben.
 DIM uVor[UNDO_MAX] AS IMAGE
 DIM uNach[UNDO_MAX] AS IMAGE
 DIM uBild[UNDO_MAX] AS INTEGER
@@ -140,6 +141,7 @@ DIM uAnz AS INTEGER : uAnz = 0
 DIM uPos AS INTEGER : uPos = 0
 DIM puffer AS IMAGE
 
+DIM angelegt AS BOOLEAN : angelegt = FALSE
 DIM anpassen AS BOOLEAN : anpassen = TRUE
 DIM schachbrett AS IMAGE
 DIM streifen AS IMAGE                  ' Arbeitsflaeche fuer den Export
@@ -152,6 +154,26 @@ SUB kopiere(ziel AS IMAGE, quelle AS IMAGE)
 END SUB
 
 SUB neuesSprite(b AS INTEGER, h AS INTEGER)
+    ' Beim zweiten Mal zuerst die alten Bilder freigeben -- sonst haengt
+    ' jedes "Neu" einen kompletten Satz Texturen an, den niemand mehr
+    ' erreicht (bei 16x4 Ebenen plus Verlauf sind das ueber 90 Stueck).
+    IF angelegt THEN
+        DIM fi AS INTEGER
+        DIM fk AS INTEGER
+        FOR fi = 0 TO MAXBILD - 1
+            FOR fk = 0 TO MAXEB - 1
+                IMAGE_FREE(ebene[fi, fk])
+            NEXT
+        NEXT
+        FOR fi = 0 TO UNDO_MAX - 1
+            IMAGE_FREE(uVor[fi])
+            IMAGE_FREE(uNach[fi])
+        NEXT
+        IMAGE_FREE(puffer)
+        IMAGE_FREE(streifen)
+        IMAGE_FREE(schachbrett)
+    END IF
+    angelegt = TRUE
     gw = b : gh = h
     anzBild = 1 : anzEb = 1
     aktBild = 0 : aktEb = 0
@@ -622,6 +644,7 @@ WHILE NOT QUITREQUESTED()
             CATCH e
                 meldung = e
             END TRY
+            IMAGE_FREE(eins)             ' nur zum Schreiben gebraucht
         END IF
     END IF
     IF GUI_CLICKED(bBlatt) THEN
@@ -634,6 +657,7 @@ WHILE NOT QUITREQUESTED()
                 ' Ausgabe leere Felder mit.
                 DIM eng AS IMAGE : eng = IMAGE_CROP(streifen, 0, 0, gw * anzBild, gh)
                 IMAGE_SAVE(eng, pb)
+                IMAGE_FREE(eng)          ' nur zum Schreiben gebraucht
                 DIM pj AS STRING : pj = REPLACE$(pb, ".png", ".json")
                 WRITEALL(pj, atlasJson$(BASENAME(pb)))
                 meldung = "Streifen + Atlas: " + pj

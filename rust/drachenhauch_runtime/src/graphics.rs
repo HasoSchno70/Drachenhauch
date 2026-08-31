@@ -1004,6 +1004,10 @@ pub struct Graphics {
     text_spacing: f32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
+    /// Platz je Textur: wurde sie mit IMAGE_FREE freigegeben? Der Platz
+    /// bleibt stehen und wird NICHT neu vergeben -- sonst zeigte ein
+    /// stehengebliebenes Handle spaeter still auf ein fremdes Bild.
+    tex_frei: Vec<bool>,
     atlases: Vec<Atlas>,
     pub frame_count: u64,
     max_frames: Option<u64>,
@@ -1297,6 +1301,7 @@ impl Graphics {
             text_spacing: 0.0,
             textures: Vec::new(),
             image_cache: HashMap::new(),
+            tex_frei: Vec::new(),
             atlases: Vec::new(),
             frame_count: 0,
             max_frames,
@@ -1785,9 +1790,7 @@ impl Graphics {
     /// = Hoehe. size = (Breite, Hoehenskalierung, Tiefe) in Welt-Einheiten.
     pub fn mesh_heightmap(&mut self, tex_idx: i64, sx: f32, sy: f32, sz: f32) -> Result<i64, String> {
         let ti = tex_idx as usize;
-        if tex_idx < 0 || ti >= self.textures.len() {
-            return Err(format!("MESH_HEIGHTMAP: ungueltiges IMAGE-Handle {}", tex_idx));
-        }
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "MESH_HEIGHTMAP")); }
         // Mesh aus dem CPU-Image bauen (haelt danach keinen Borrow auf self).
         let mesh = {
             let img = &self.textures[ti].img;
@@ -1856,9 +1859,7 @@ impl Graphics {
     pub fn model_set_texture(&mut self, model_idx: i64, tex_idx: i64) -> Result<(), String> {
         let mi = self.check_model(model_idx, "MODEL_TEXTURE")?;
         let ti = tex_idx as usize;
-        if tex_idx < 0 || ti >= self.textures.len() {
-            return Err(format!("MODEL_TEXTURE: ungueltiges IMAGE-Handle {}", tex_idx));
-        }
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "MODEL_TEXTURE")); }
         let mats = self.models[mi].materials_mut();
         if mats.is_empty() {
             return Err("MODEL_TEXTURE: Modell hat kein Material".into());
@@ -1873,9 +1874,7 @@ impl Graphics {
     /// Kamera zeigt -- ideal fuer Baeume/Sprites/Funken in 3D.
     pub fn billboard(&mut self, tex_idx: i64, x: f32, y: f32, z: f32, size: f32, col_: i64) -> Result<(), String> {
         let i = tex_idx as usize;
-        if tex_idx < 0 || i >= self.textures.len() {
-            return Err(format!("BILLBOARD: ungueltiges IMAGE-Handle {}", tex_idx));
-        }
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "BILLBOARD")); }
         self.emit3d(Cmd3D::Billboard(i, x, y, z, size, col(col_)));
         Ok(())
     }
@@ -2024,7 +2023,7 @@ impl Graphics {
     }
     /// Pixelfarbe eines geladenen Bildes lesen -> 0xRRGGBB, -1 wenn ungueltig.
     pub fn get_pixel(&mut self, idx: i64, x: i32, y: i32) -> i64 {
-        if idx < 0 || idx as usize >= self.textures.len() { return -1; }
+        if !self.tex_ok(idx) { return -1; }
         let img = &mut self.textures[idx as usize].img;
         if x < 0 || y < 0 || x >= img.width || y >= img.height { return -1; }
         let c = img.get_color(x, y);
@@ -2400,9 +2399,7 @@ impl Graphics {
     pub fn model_set_normal(&mut self, model_idx: i64, tex_idx: i64) -> Result<(), String> {
         let mi = self.check_model(model_idx, "MODEL_TEXTURE_NORMAL")?;
         let ti = tex_idx as usize;
-        if tex_idx < 0 || ti >= self.textures.len() {
-            return Err(format!("MODEL_TEXTURE_NORMAL: ungueltiges IMAGE-Handle {}", tex_idx));
-        }
+        if !self.tex_ok(tex_idx) { return Err(self.tex_fehler(tex_idx, "MODEL_TEXTURE_NORMAL")); }
         // Tangenten erzeugen (TBN-Basis fuer Normal-Mapping). Nur hier noetig --
         // nicht pauschal in MODEL_LIT, das spart die raylib-"vertexCount"-Warnung
         // fuer indizierte Meshes (Plane/Cube/...) ohne Normal-Map.
@@ -2964,6 +2961,7 @@ impl Graphics {
         let img = Image::load_image(path).map_err(|e| format!("LOADIMAGE: {}", e))?;
         let tex = self.rl.load_texture_from_image(&self.thread, &img).map_err(|e| format!("LOADIMAGE: {}", e))?;
         self.textures.push(Tex { tex, img });
+        self.tex_frei.push(false);
         let h = (self.textures.len() - 1) as i64;
         self.image_cache.insert(path.to_string(), h);
         if let Ok(abs) = std::fs::canonicalize(path) {
@@ -2975,11 +2973,57 @@ impl Graphics {
     fn push_tex_from_image(&mut self, img: Image) -> Result<i64, String> {
         let tex = self.rl.load_texture_from_image(&self.thread, &img).map_err(|e| format!("IMAGE: {}", e))?;
         self.textures.push(Tex { tex, img });
+        self.tex_frei.push(false);
         Ok((self.textures.len() - 1) as i64)
     }
 
+    /// Lebt dieses IMAGE-Handle noch?
+    fn tex_ok(&self, idx: i64) -> bool {
+        idx >= 0 && (idx as usize) < self.textures.len() && !self.tex_frei[idx as usize]
+    }
+
+    /// Die passende Meldung zu einem nicht benutzbaren Handle. "Freigegeben"
+    /// und "gab es nie" sind verschiedene Fehler, und wer den einen fuer den
+    /// anderen haelt, sucht an der falschen Stelle.
+    fn tex_fehler(&self, idx: i64, fn_: &str) -> String {
+        if idx >= 0 && (idx as usize) < self.textures.len() && self.tex_frei[idx as usize] {
+            format!("{}: dieses Bild wurde mit IMAGE_FREE freigegeben", fn_)
+        } else {
+            format!("{}: ungueltiges IMAGE-Handle {}", fn_, idx)
+        }
+    }
+
+    /// Ein Bild freigeben (IMAGE_FREE).
+    ///
+    /// Der Platz wird nicht neu vergeben: ein stehengebliebenes Handle soll
+    /// sich melden statt still auf ein fremdes Bild zu zeigen. Zurueck bleibt
+    /// ein 1x1-Platzhalter -- das eigentliche Bild und seine GPU-Textur sind
+    /// weg, sobald das alte `Tex` fallengelassen wird.
+    ///
+    /// **Was das NICHT aufraeumt:** eine Textur, die per MODEL_TEXTURE an ein
+    /// Modell gegeben wurde, lebt dort als reine ID weiter (raylibs
+    /// Texture2D ist ein Struct ohne Zaehlung). Ein solches Modell zeigt
+    /// danach auf eine freigegebene Textur. Dasselbe gilt fuer Bilder, die
+    /// noch in einem Widget oder einem Sprite-Atlas stecken -- die melden
+    /// sich immerhin, weil ihr Zeichenweg das Handle prueft.
+    pub fn image_free(&mut self, idx: i64) -> Result<(), String> {
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_FREE")); }
+        let i = idx as usize;
+        // Aus dem Pfad-Cache werfen: sonst gibt LOADIMAGE fuer denselben Pfad
+        // weiter dieses Handle heraus, und der naechste Aufruf haette ein
+        // freigegebenes Bild in der Hand.
+        self.image_cache.retain(|_, h| *h != idx);
+        let leer = Image::gen_image_color(1, 1, Color::new(0, 0, 0, 0));
+        let tex = self.rl.load_texture_from_image(&self.thread, &leer)
+            .map_err(|e| format!("IMAGE_FREE: {}", e))?;
+        self.textures[i] = Tex { tex, img: leer };
+        self.tex_frei[i] = true;
+        Ok(())
+    }
+
     fn src_image(&self, idx: i64, fn_: &str) -> Result<Image, String> {
-        self.textures.get(idx as usize).map(|t| t.img.clone()).ok_or_else(|| format!("{}: ungueltiges IMAGE-Handle", fn_))
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, fn_)); }
+        Ok(self.textures[idx as usize].img.clone())
     }
 
     // --- imgfx (immutable: liefern neues IMAGE-Handle) ---
@@ -3163,25 +3207,29 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     pub fn image_draw_line(&mut self, idx: i64, x1: i32, y1: i32, x2: i32, y2: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_LINE: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_LINE")); }
+        let t = &mut self.textures[i];
         t.img.draw_line(x1, y1, x2, y2, col(color));
         self.reupload_tex(i)
     }
     pub fn image_draw_circle(&mut self, idx: i64, cx: i32, cy: i32, r: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_CIRCLE: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_CIRCLE")); }
+        let t = &mut self.textures[i];
         t.img.draw_circle(cx, cy, r.max(0), col(color));
         self.reupload_tex(i)
     }
     pub fn image_draw_rect(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_RECT: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_RECT")); }
+        let t = &mut self.textures[i];
         t.img.draw_rectangle(x, y, w.max(0), h.max(0), col(color));
         self.reupload_tex(i)
     }
     pub fn image_draw_text(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_TEXT: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_DRAW_TEXT")); }
+        let t = &mut self.textures[i];
         t.img.draw_text(text, x, y, size.max(1), col(color));
         self.reupload_tex(i)
     }
@@ -3207,7 +3255,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// durchsichtiges Rechteck ein Nichts-Tun -- und Radieren unmoeglich.
     pub fn image_clear(&mut self, idx: i64, r: Option<(i32, i32, i32, i32)>) -> Result<(), String> {
         let i = idx as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_CLEAR: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_CLEAR")); }
+        let t = &mut self.textures[i];
         let (x, y, w, h) = r.unwrap_or((0, 0, t.img.width, t.img.height));
         t.img.draw_rectangle(x, y, w.max(0), h.max(0), Color::new(0, 0, 0, 0));
         self.reupload_tex(i)
@@ -3230,8 +3279,9 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         if sw <= 0 || sh <= 0 {
             return Err("IMAGE_DRAW_IMAGE: Quellbreite und -hoehe muessen > 0 sein".into());
         }
+        if !self.tex_ok(dst) { return Err(self.tex_fehler(dst, "IMAGE_DRAW_IMAGE")); }
         let i = dst as usize;
-        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_IMAGE: ungueltiges IMAGE-Handle")?;
+        let t = &mut self.textures[i];
         t.img.draw(&s,
                    Rectangle::new(sx as f32, sy as f32, sw as f32, sh as f32),
                    Rectangle::new(x as f32, y as f32, sw as f32, sh as f32),
@@ -3246,7 +3296,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// oberstes Byte 0 "deckend". Ein durchsichtiger Punkt kaeme als deckendes
     /// Schwarz zurueck. Deshalb ein eigener Getter statt eines vierten Bytes.
     pub fn get_alpha(&mut self, idx: i64, x: i32, y: i32) -> i64 {
-        if idx < 0 || idx as usize >= self.textures.len() { return -1; }
+        if !self.tex_ok(idx) { return -1; }
         let img = &self.textures[idx as usize].img;
         if x < 0 || y < 0 || x >= img.width || y >= img.height { return -1; }
         img.get_color(x, y).a as i64
@@ -3287,7 +3337,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     pub fn draw_image(&mut self, idx: i64, x: i32, y: i32) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWIMAGE: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGE")); }
         let (dw, dh) = (self.textures[i].tex.width, self.textures[i].tex.height);
         let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (x, y) = self.w2s(x, y);
@@ -3304,7 +3354,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     pub fn draw_image_part(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32, dx: i32, dy: i32) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWIMAGEPART: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEPART")); }
         let (dw, dh) = (self.ssize(sw), self.ssize(sh));
         let (dx, dy) = self.w2s(dx, dy);
         self.emit(Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy, dw, dh));
@@ -3315,7 +3365,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn draw_image_part_ex(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32,
                               dx: i32, dy: i32, dw: i32, dh: i32) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWIMAGEPARTEX: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEPARTEX")); }
         let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (dx, dy) = self.w2s(dx, dy);
         self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh));
@@ -3333,9 +3383,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn nine_slice(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32,
                       rand: i32) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() {
-            return Err("9-Slice: ungueltiges IMAGE-Handle".into());
-        }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "9-Slice")); }
         let (bw, bh) = (self.textures[i].tex.width, self.textures[i].tex.height);
         let r = neun_rand(bw, bh, w, h, rand);
         if r <= 0 {
@@ -3359,7 +3407,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
 
     pub fn draw_image_flipped(&mut self, idx: i64, x: i32, y: i32, fh: bool, fv: bool) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWIMAGEFLIPPED: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEFLIPPED")); }
         let (dw, dh) = (self.textures[i].tex.width, self.textures[i].tex.height);
         let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (x, y) = self.w2s(x, y);
@@ -3373,7 +3421,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn draw_image_rot(&mut self, idx: i64, x: i32, y: i32, angle_deg: f32,
                           scale: f32, tint: Option<i64>) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWIMAGEROT: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWIMAGEROT")); }
         let (x, y) = self.w2s(x, y);
         let c = tint.map(col).unwrap_or(Color::WHITE);
         // `scale` ist der User-Skalierungsfaktor -- cam_zoom hier mit
@@ -3390,7 +3438,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn draw_tilemap(&mut self, idx: i64, values: &[i64], rows: i32, cols: i32,
                         tw: i32, th: i32, sx: i32, sy: i32) -> Result<(), String> {
         let i = idx as usize;
-        if i >= self.textures.len() { return Err("DRAWTILEMAP: ungueltiges IMAGE-Handle".into()); }
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "DRAWTILEMAP")); }
         let tex_w = self.textures[i].tex.width as i32;
         let tiles_per_row = (tex_w / tw.max(1)).max(1);
         for r in 0..rows {
@@ -3408,10 +3456,12 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
 
     pub fn image_width(&self, idx: i64) -> Result<i64, String> {
-        self.textures.get(idx as usize).map(|t| t.tex.width as i64).ok_or_else(|| "IMAGEWIDTH: ungueltiges IMAGE-Handle".into())
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGEWIDTH")); }
+        Ok(self.textures[idx as usize].tex.width as i64)
     }
     pub fn image_height(&self, idx: i64) -> Result<i64, String> {
-        self.textures.get(idx as usize).map(|t| t.tex.height as i64).ok_or_else(|| "IMAGEHEIGHT: ungueltiges IMAGE-Handle".into())
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGEHEIGHT")); }
+        Ok(self.textures[idx as usize].tex.height as i64)
     }
 
     // --- LOAD_ASSETS: Bilder aus JSON-Manifest vorladen (Alias/Pfad-Cache) ---
@@ -3491,7 +3541,8 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                        x: i32, y: i32, flip_x: bool, flip_y: bool,
                        scale_x: f64, scale_y: f64, tint: Option<i64>) -> Result<(), String> {
         let i = tex_idx as usize;
-        let tex_w = self.textures.get(i).map(|t| t.tex.width).ok_or("SPRITE_DRAW: ungueltiges IMAGE-Handle")?;
+        if !self.tex_ok(i as i64) { return Err(self.tex_fehler(i as i64, "SPRITE_DRAW")); }
+        let tex_w = self.textures[i].tex.width;
         let cols = (tex_w / fw).max(1);
         let (gcol, grow) = (frame % cols, frame / cols);
         let (sx, sy) = (gcol * fw, grow * fh);
@@ -4363,7 +4414,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     /// JEDES exportierte Spiel das raylib-Standardsymbol.
     pub fn window_icon(&mut self, img: i64) -> Result<(), String> {
         let t = self.textures.get(img.max(0) as usize)
-            .ok_or("WINDOW_ICON: ungueltiges IMAGE-Handle")?;
+            .ok_or_else(|| self.tex_fehler(img, "WINDOW_ICON"))?;
         // raylib verlangt RGBA8 fuers Icon und ignoriert andere Formate still
         // -> auf einer Kopie konvertieren, das Original bleibt unangetastet.
         let mut copy = t.img.clone();
@@ -4511,7 +4562,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         // ffi::Texture2D ist Copy -- vorher herauskopieren, damit `self.textures`
         // nicht ausgeliehen bleibt, waehrend `self.shaders` veraendert wird.
         let tex: raylib::ffi::Texture2D = *self.textures.get(img.max(0) as usize)
-            .ok_or("SHADER_SET_TEXTURE: ungueltiges IMAGE-Handle")?
+            .ok_or_else(|| self.tex_fehler(img, "SHADER_SET_TEXTURE"))?
             .tex;
         let idx = h as usize;
         let sh = self.shaders.get(idx)

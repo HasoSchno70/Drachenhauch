@@ -61,6 +61,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
 | `IMAGE_SAVE(bild, pfad$)` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`) |
 | `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
+| `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
 
 ```basic
 IMPORT "imgfx"
@@ -95,6 +96,31 @@ eine Zeile ins Protokoll, und das Programm glaubte, es haette gespeichert).
 Ein misslungenes Schreiben — fehlendes Verzeichnis, kein Schreibrecht — meldet
 sich ebenfalls; nachgesehen wird an der Datei selbst, weil die raylib-Bindung
 das Erfolgs-Flag verwirft.
+
+**`IMAGE_FREE` und was danach gilt.** Ein Bild belegt Arbeitsspeicher *und*
+eine Textur im Grafikspeicher; bis 2026-08-31 blieben beide bis zum
+Programmende liegen. Für ein Spiel, das seine Bilder einmal lädt, ist das
+egal — für alles, was laufend welche erzeugt (ein Editor mit
+Rückgängig-Schritten, eine Vorschau, ein Bildbetrachter), war es ein Leck,
+das mit jedem Schritt wuchs. Gemessen an 1200 Kopien zu 256×256:
+**393 MB gegen 91 MB.**
+
+Nach dem Freigeben ist das Handle **nicht wiederverwendbar und wird auch
+nicht neu vergeben**. Jede weitere Benutzung meldet sich im Klartext
+(`… wurde mit IMAGE_FREE freigegeben`) statt still auf ein fremdes Bild zu
+zeigen — das ist der Grund, warum der Platz stehen bleibt. `GETPIXEL` und
+`GETALPHA` bleiben bei ihrer alten Zusage und liefern `-1`.
+
+`LOADIMAGE` merkt sich Pfad → Handle; beim Freigeben wird der Eintrag
+mitgelöscht, ein späteres `LOADIMAGE` desselben Pfades lädt also neu.
+
+**Wovon es nichts weiß:** eine Textur, die per `MODEL_TEXTURE` an ein Modell
+gegangen ist, lebt dort als reine Nummer weiter (raylibs `Texture2D` ist ein
+Struct ohne Zählung) — dieses Modell zeigt danach ins Leere. Bilder in einem
+Widget oder einem Sprite-Atlas melden sich immerhin, weil ihr Zeichenweg das
+Handle prüft. **Nicht anlegen ist billiger als anlegen und freigeben:** wer
+in einer Schleife Momentaufnahmen braucht, legt die Plätze besser einmal an
+und überschreibt sie mit `IMAGE_CLEAR` + `IMAGE_DRAW_IMAGE`.
 
 **Nicht dabei: Bilder ueber die Zwischenablage.** `CLIPBOARD_GET`/`SET` koennen
 nur Text. raylibs `GetClipboardImage` gibt es nur unter Windows, und ein Befehl,
