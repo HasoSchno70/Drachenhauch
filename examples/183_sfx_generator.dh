@@ -14,9 +14,13 @@
 '    [WAV sichern]  schreibt eine Datei, die LOADSOUND direkt laedt.
 '    [GB-Code]      legt den fertigen AUDIO_SFX-Aufruf in die
 '                   Zwischenablage -- der Weg vom Klang ins Programm.
+'    [Sichern]      schreibt alle Regler in eine `.ini` ...
+'    [Laden]        ... und holt sie zurueck. Lesbares Format: die Datei
+'                   laesst sich auch von Hand aendern.
 ' ============================================================
 IMPORT "gui"
 IMPORT "audio"
+IMPORT "ini"
 
 ' --- Parameter: EINE Reihenfolge fuer Regler, Werkseinstellungen und ---
 ' --- den AUDIO_SFX-Aufruf. Zwei Listen waeren zwei Stellen zum Irren. -
@@ -41,6 +45,7 @@ CONST N_PARAM   = 16
 DIM regler[N_PARAM] AS GUI_WIDGET      ' der Schieber
 DIM wertText[N_PARAM] AS GUI_WIDGET    ' die Zahl daneben
 DIM nachkomma[N_PARAM] AS INTEGER      ' wie viele Stellen zeigen?
+DIM parName[N_PARAM] AS STRING         ' Schluessel in der gesicherten Datei
 DIM einheit[N_PARAM] AS STRING
 DIM letzter[N_PARAM] AS FLOAT          ' Stand des letzten Bildes
 
@@ -81,6 +86,12 @@ DIM knopfWav AS GUI_WIDGET
 knopfWav = GUI_BUTTON(win, "WAV sichern ...", 16, 410, 210, 28)
 DIM knopfCode AS GUI_WIDGET
 knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 16, 444, 210, 28)
+DIM knopfSichern AS GUI_WIDGET
+knopfSichern = GUI_BUTTON(win, "Sichern ...", 16, 478, 102, 28)
+GUI_TOOLTIP(knopfSichern, "Alle Regler in eine .ini schreiben")
+DIM knopfLaden AS GUI_WIDGET
+knopfLaden = GUI_BUTTON(win, "Laden ...", 124, 478, 102, 28)
+GUI_TOOLTIP(knopfLaden, "Eine gesicherte Einstellung zurueckholen")
 DIM knopfBits AS GUI_WIDGET
 knopfBits = GUI_CHECKBOX(win, "8 Bit (Lo-Fi)", 244, 416)
 GUI_TOOLTIP(knopfBits, "Halb so gross, mehr Rauschen -- der Retro-Klang")
@@ -118,6 +129,7 @@ SUB machRegler(idx AS INTEGER, name AS STRING, x AS INTEGER, y AS INTEGER, _
     regler[idx] = GUI_SLIDER(win, x + 152, y, 130, lo, hi, vorgabe)
     wertText[idx] = GUI_LABEL(win, "", x + 290, y + 3)
     nachkomma[idx] = stellen
+    parName[idx] = name
     einheit[idx] = mass
     letzter[idx] = vorgabe
 END SUB
@@ -200,6 +212,73 @@ letzteWelle = -1
 FUNCTION wf$() AS STRING
     RETURN wellenformen[GUI_DROPDOWN_SELECTED(waehlWave)]
 END FUNCTION
+
+' ============================================================
+'  Einstellungen sichern und laden
+'
+'  Format: eine schlichte `.ini` -- Schluessel ist die BESCHRIFTUNG des
+'  Reglers. Das macht die Datei lesbar und von Hand aenderbar, was bei einem
+'  Werkzeug fuer Bastler mehr wert ist als ein kompaktes Format. Der Preis:
+'  wer eine Beschriftung umbenennt, macht alte Dateien an dieser Stelle
+'  stumm -- deshalb wird ein unbekannter Schluessel UEBERGANGEN und nicht
+'  als Fehler gemeldet.
+' ============================================================
+SUB einstellungSichern()
+    DIM datei AS STRING
+    datei = FILE_SAVE_DIALOG("Einstellung sichern", "klang.ini", "ini")
+    IF datei <> "" THEN
+        DIM m AS MAP OF STRING
+        MAPPUT(m, "wellenform", wf$())
+        DIM k AS INTEGER
+        FOR k = 0 TO N_PARAM - 1
+            MAPPUT(m, parName[k], STR$(p(k)))
+        NEXT
+        TRY
+            INI_SAVE(datei, m)
+            GUI_SET_TEXT(lblStatus, "Gesichert: " + datei)
+        CATCH e
+            GUI_SET_TEXT(lblStatus, e)
+        END TRY
+    END IF
+END SUB
+
+SUB einstellungLaden()
+    DIM datei AS STRING
+    datei = FILE_OPEN_DIALOG("Einstellung laden", "ini")
+    IF datei <> "" THEN
+        TRY
+            DIM m AS MAP OF STRING
+            m = INI_LOAD(datei)
+            DIM k AS INTEGER
+            DIM gefunden AS INTEGER : gefunden = 0
+            FOR k = 0 TO N_PARAM - 1
+                IF MAPHAS(m, parName[k]) THEN
+                    ' GUI_SET_VALUE klemmt auf den Reglerbereich -- eine von
+                    ' Hand verstellte Datei kann also nichts Unmoegliches
+                    ' erzwingen.
+                    GUI_SET_VALUE(regler[k], VAL(MAPGET(m, parName[k])))
+                    gefunden = gefunden + 1
+                END IF
+            NEXT
+            IF MAPHAS(m, "wellenform") THEN
+                DIM w AS STRING : w = MAPGET(m, "wellenform")
+                FOR k = 0 TO LEN(wellenformen) - 1
+                    IF wellenformen[k] = w THEN GUI_DROPDOWN_SET_SELECTED(waehlWave, k)
+                NEXT
+            END IF
+            ' Der Klang baut sich von selbst neu: die Schleife vergleicht
+            ' jeden Regler mit `letzter[]` -- ein per GUI_SET_VALUE gesetzter
+            ' Wert sieht fuer sie aus wie eine Bewegung von Hand.
+            IF gefunden = 0 THEN
+                GUI_SET_TEXT(lblStatus, "Keine bekannten Regler in " + datei)
+            ELSE
+                GUI_SET_TEXT(lblStatus, STR$(gefunden) + " Regler geladen: " + datei)
+            END IF
+        CATCH e
+            GUI_SET_TEXT(lblStatus, e)
+        END TRY
+    END IF
+END SUB
 
 FUNCTION p(idx AS INTEGER) AS FLOAT
     RETURN GUI_VALUE(regler[idx])
@@ -378,6 +457,9 @@ WHILE NOT QUITREQUESTED()
         CLIPBOARD_SET(gbCode$())
         GUI_SET_TEXT(lblStatus, "AUDIO_SFX-Aufruf in der Zwischenablage.")
     END IF
+
+    IF GUI_CLICKED(knopfSichern) THEN einstellungSichern()
+    IF GUI_CLICKED(knopfLaden) THEN einstellungLaden()
 
     ' --- Zahlen neben den Reglern nachfuehren ---
     FOR k = 0 TO N_PARAM - 1

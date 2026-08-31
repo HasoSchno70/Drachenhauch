@@ -21,13 +21,17 @@
 '    Historie    Strg+Z / Strg+Y, 24 Schritte
 '    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich)
+'    Eingabe     [Oeffnen] holt einen Streifen samt Atlas-JSON zurueck.
+'                Die EBENEN sind dabei weg: der Streifen ist das
+'                zusammengerechnete Bild, jedes Einzelbild kommt also auf
+'                einer Ebene an. Das steht so in der Datei.
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Lasso, Zauberstab, Verschieben-Werkzeug, das native .dhsprite-Format,
-'    animierte GIFs (dafuer fehlt der Laufzeit ein Befehl), Streifen
-'    EINLESEN, .gpl-Paletten, Kachel-Vorschau 3x3, benannte
-'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik.
+'    Lasso, Zauberstab, Verschieben-Werkzeug, das native .dhsprite-Format
+'    (mit Ebenen), animierte GIFs (dafuer fehlt der Laufzeit ein Befehl),
+'    .gpl-Paletten, Kachel-Vorschau 3x3, benannte Animationsbereiche,
+'    Zuschneiden/Groesse aendern, Statistik.
 '
 '  Bedienung:
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
@@ -38,6 +42,7 @@
 ' ============================================================
 IMPORT "gui"
 IMPORT "imgfx"
+IMPORT "json"
 
 CONST MAXG = 128               ' groesste Kantenlaenge eines Sprites
 CONST MAXBILD = 16             ' Einzelbilder
@@ -425,9 +430,11 @@ SUB baueStreifen()
 END SUB
 
 FUNCTION atlasJson$(pngName AS STRING) AS STRING
-    ' Genau die Form, die ATLAS_LOAD liest. Von Hand gebaut: das json-Modul
-    ' kann lesen, aber nichts anlegen -- fuer eine flache Datei wie diese
-    ' ist Text zusammensetzen ohnehin ehrlicher als ein Umweg.
+    ' Genau die Form, die ATLAS_LOAD liest -- und die `streifenLaden` unten
+    ' wieder aufmacht. Von Hand zusammengesetzt: fuer eine so flache Datei
+    ' ist das kuerzer als der Weg ueber JSON_NEW_OBJECT/JSON_SET_*, und die
+    ' Form steht damit an einer Stelle lesbar da. (Frueher stand hier, das
+    ' json-Modul koenne nichts anlegen -- das ist falsch, es kann.)
     DIM s AS STRING
     s = "{" + CHR$(10) + "  " + CHR$(34) + "image" + CHR$(34) + ": " + _
         CHR$(34) + pngName + CHR$(34) + "," + CHR$(10) + _
@@ -441,6 +448,53 @@ FUNCTION atlasJson$(pngName AS STRING) AS STRING
     NEXT
     RETURN s + "  }" + CHR$(10) + "}" + CHR$(10)
 END FUNCTION
+
+' ---------------------------------------------------------------- Laden
+' Einen Streifen samt Atlas-JSON zurueckholen. Die Ebenen sind dabei weg:
+' der Streifen ist das ZUSAMMENGERECHNETE Bild, jedes Einzelbild kommt also
+' auf einer Ebene zurueck. Das ist keine Nachlaessigkeit, sondern steht so
+' in der Datei.
+SUB streifenLaden(pngPfad AS STRING)
+    DIM jsonPfad AS STRING : jsonPfad = REPLACE$(pngPfad, ".png", ".json")
+    IF NOT FILEEXISTS(jsonPfad) THEN
+        meldung = "Kein Atlas daneben: " + jsonPfad
+    ELSE
+        DIM h AS JSON_HANDLE : h = JSON_LOAD(jsonPfad)
+        DIM namen AS ARRAY OF STRING : namen = JSON_KEYS(h, "sprites")
+        IF LEN(namen) = 0 THEN
+            meldung = "Der Atlas nennt keine Bilder."
+        ELSE
+            ' Die Groesse kommt aus dem ERSTEN Eintrag. Ein Streifen mit
+            ' verschieden grossen Feldern ist keiner -- alles andere wird auf
+            ' dieses Mass zugeschnitten.
+            DIM n AS INTEGER : n = MIN(LEN(namen), MAXBILD)
+            DIM bw AS INTEGER : bw = JSON_GET_INT(h, "sprites." + namen[0] + ".2")
+            DIM bh AS INTEGER : bh = JSON_GET_INT(h, "sprites." + namen[0] + ".3")
+            IF bw < 1 OR bh < 1 OR bw > MAXG OR bh > MAXG THEN
+                meldung = "Bildgroesse " + STR$(bw) + "x" + STR$(bh) + " geht nicht."
+            ELSE
+                DIM blatt AS IMAGE : blatt = LOADIMAGE(pngPfad)
+                neuesSprite(bw, bh)
+                anzBild = n
+                DIM i AS INTEGER
+                FOR i = 0 TO n - 1
+                    DIM qx AS INTEGER : qx = JSON_GET_INT(h, "sprites." + namen[i] + ".0")
+                    DIM qy AS INTEGER : qy = JSON_GET_INT(h, "sprites." + namen[i] + ".1")
+                    IMAGE_DRAW_IMAGE(ebene[i, 0], blatt, 0, 0, qx, qy, bw, bh)
+                NEXT
+                ' Das Blatt hat seinen Zweck erfuellt -- ohne Freigabe bliebe
+                ' bei jedem Oeffnen eine Textur liegen.
+                IMAGE_FREE(blatt)
+                aktBild = 0
+                listenAuffrischen()
+                meldung = STR$(n) + " Bilder aus " + BASENAME(pngPfad)
+                IF LEN(namen) > MAXBILD THEN
+                    meldung = meldung + " (von " + STR$(LEN(namen)) + ", Rest passt nicht)"
+                END IF
+            END IF
+        END IF
+    END IF
+END SUB
 
 ' ============================================================ Oberflaeche
 
@@ -457,6 +511,9 @@ GUI_SET_ANCHOR(tb, "lr")
 DIM bNeu AS GUI_WIDGET   : bNeu   = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
 DIM bPng AS GUI_WIDGET   : bPng   = GUI_BUTTON(win, "PNG", 76, 7, 62, 32)
 DIM bBlatt AS GUI_WIDGET : bBlatt = GUI_BUTTON(win, "Streifen + Atlas", 142, 7, 150, 32)
+GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON")
+DIM bOeffnen AS GUI_WIDGET : bOeffnen = GUI_BUTTON(win, "Oeffnen", 296, 7, 84, 32)
+GUI_TOOLTIP(bOeffnen, "Einen Streifen samt Atlas-JSON zurueckholen")
 
 CONST WZ_B = 88
 DIM wzName AS ARRAY OF STRING
@@ -645,6 +702,16 @@ WHILE NOT QUITREQUESTED()
                 meldung = e
             END TRY
             IMAGE_FREE(eins)             ' nur zum Schreiben gebraucht
+        END IF
+    END IF
+    IF GUI_CLICKED(bOeffnen) THEN
+        DIM po AS STRING : po = FILE_OPEN_DIALOG("Streifen oeffnen", "png")
+        IF po <> "" THEN
+            TRY
+                streifenLaden(po)
+            CATCH e
+                meldung = e
+            END TRY
         END IF
     END IF
     IF GUI_CLICKED(bBlatt) THEN
