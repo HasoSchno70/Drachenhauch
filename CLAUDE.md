@@ -26,9 +26,9 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > ausschließlich `dhrt` (`rust/drachenhauch_runtime/src/`: `lexer.rs`/`parser.rs`/
 > `compiler.rs`/`vm.rs`/`builtins.rs`/Modul-`.rs`).
 
-> ## Editoren in Drachenhauch selbst -- drei Piloten (2026-08-30/31)
+> ## Editoren in Drachenhauch selbst -- vier Piloten (2026-08-30/31)
 >
-> Die Frage, ob die Qt-Editoren nach Drachenhauch koennen, ist an drei Faellen
+> Die Frage, ob die Qt-Editoren nach Drachenhauch koennen, ist an vier Faellen
 > gemessen statt geschaetzt:
 >
 > | Editor | Qt | Drachenhauch | Faktor |
@@ -36,6 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 400 | 0,77 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 383 | 0,48 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1005 | 0,14 |
 >
 > **Kein Faktor davon ist ohne seinen Fall zu gebrauchen, und keiner ist ein
 > Fortschritt gegenueber dem vorigen.** Beim Partikel-Editor zeichnet die
@@ -57,10 +58,25 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > `tiled`-Modul lesen und aendern konnte, aber **nicht anlegen und nicht
 > speichern** -- neun Befehle nachgeruestet (siehe `tiled` unten).
 >
-> **Nicht portiert** (in allen drei Piloten): eigene Presets
+> **Der vierte Pilot hat meine eigene Vorhersage widerlegt.** Hier stand,
+> beim Sprite-Editor sei "groesstenteils KEIN Duplikat" dessen, was die
+> Laufzeit kann (Ebenen, Undo, Werkzeuge, Zwischenablage), man solle also
+> NICHT mit 0,5 rechnen. Herausgekommen ist 0,14 -- der BESTE Wert, nicht der
+> schlechteste. Der Grund ist nicht Sprachkraft: die Qt-Fassung ist schlicht
+> eine viel groessere Anwendung (Dialoge, Datei-Browser, `.dhsprite`-Format,
+> GIF, Streifen-Einlesen, .gpl-Paletten, Statistik), und der nicht portierte
+> ANTEIL ist damit der groesste aller vier Faelle -- allein die benennbaren
+> Bloecke sind 1595 der 7379 Zeilen, dazu verstreutes mehr.
+> **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
+> allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
+> Richtung.
+>
+> **Nicht portiert** (in allen vier Piloten): eigene Presets
 > speichern/laden. In den ersten beiden zusaetzlich Undo/Redo -- der dritte
-> hat es (16 Schritte, Ringpuffer, je Schritt der Vorher/Nachher-Stand der
-> betroffenen Ebene).
+> und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
+> betroffenen Ebene; beim Sprite-Editor werden die Plaetze EINMAL angelegt
+> und wiederverwendet, weil es kein `IMAGE_FREE` gibt und jede Aufnahme per
+> `IMAGE_COPY` sonst ein wachsendes Leck waere).
 
 ## Verzeichnisstruktur
 

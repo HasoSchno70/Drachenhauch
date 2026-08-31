@@ -1,0 +1,1005 @@
+' ============================================================
+'  DRACHENHAUCH -- Sprite-Editor (vierter Editor-Pilot)
+' ============================================================
+'  Nachbau des Qt-Werkzeugs `dhsprites` in Drachenhauch selbst.
+'
+'  Der schwerste der vier Faelle -- und der einzige, bei dem vorher
+'  ausdruecklich stand, dass die Faktoren der anderen NICHT gelten: Ebenen,
+'  Rueckgaengig, Werkzeuge und Zwischenablage sind hier groesstenteils KEIN
+'  Duplikat dessen, was die Laufzeit ohnehin kann. Der Tilemap-Editor bekam
+'  das Fuellen als Befehl geschenkt (TILED_FLOOD_FILL); hier steht es unten
+'  als BASIC-Schleife.
+'
+'  Was drin ist:
+'    Werkzeuge   Stift, Radierer, Fuellen, Linie, Rechteck, Ellipse,
+'                Pipette, Auswahl, Spruehen -- Rechteck/Ellipse wahlweise
+'                gefuellt, Pinsel 1..6 px
+'    Bild        mehrere Einzelbilder, Ebenen (global, wie in Aseprite),
+'                Zwiebelhaut, Spiegeln X/Y beim Zeichnen
+'    Farbe       Farbwaehler + 16er-Palette + Pipette
+'    Auswahl     Strg+C/X/V, Entf leert
+'    Historie    Strg+Z / Strg+Y, 24 Schritte
+'    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
+'                ATLAS_LOAD direkt liest -- der Kreis schliesst sich)
+'    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
+'
+'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
+'    Lasso, Zauberstab, Verschieben-Werkzeug, das native .dhsprite-Format,
+'    animierte GIFs (dafuer fehlt der Laufzeit ein Befehl), Streifen
+'    EINLESEN, .gpl-Paletten, Kachel-Vorschau 3x3, benannte
+'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik.
+'
+'  Bedienung:
+'    Maus links  zeichnen        Maus rechts   Ansicht schieben
+'    P E F L R O I S Y           Werkzeuge (Y = Spruehen)
+'    1..6        Palette 1..6    +/-           Pinsel
+'    Strg+Z/Y    zurueck/vor     Strg+C/X/V    Zwischenablage
+'    ESC         Ende
+' ============================================================
+IMPORT "gui"
+IMPORT "imgfx"
+
+CONST MAXG = 128               ' groesste Kantenlaenge eines Sprites
+CONST MAXBILD = 16             ' Einzelbilder
+CONST MAXEB = 4                ' Ebenen
+CONST UNDO_MAX = 24
+CONST MAXPKT = MAXG * MAXG     ' Punkte einer Form
+
+SCREEN(1440, 900, "Drachenhauch - Sprite-Editor", 1)
+SET_FULLSCREEN(TRUE)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 30)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(15)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+' ---------------------------------------------------------------- Zustand
+DIM gw AS INTEGER : gw = 32            ' Sprite-Breite in Pixeln
+DIM gh AS INTEGER : gh = 32
+DIM anzBild AS INTEGER : anzBild = 1
+DIM anzEb AS INTEGER : anzEb = 1
+DIM aktBild AS INTEGER : aktBild = 0
+DIM aktEb AS INTEGER : aktEb = 0
+
+' Ebenen sind GLOBAL (jede gilt fuer alle Einzelbilder) -- so halten es
+' Aseprite und Verwandte. Der Qt-Editor haengt sie an das einzelne Bild;
+' das macht "Ebene ueberall ausblenden" unmoeglich.
+DIM ebene[MAXBILD, MAXEB] AS IMAGE
+DIM ebName[MAXEB] AS STRING
+DIM ebSicht[MAXEB] AS INTEGER
+
+DIM zoom AS INTEGER : zoom = 10
+DIM panX AS INTEGER : panX = 0
+DIM panY AS INTEGER : panY = 0
+
+DIM farbe AS INTEGER : farbe = &HE84B4B
+DIM pinsel AS INTEGER : pinsel = 1
+DIM symX AS BOOLEAN : symX = FALSE
+DIM symY AS BOOLEAN : symY = FALSE
+
+DIM werkzeug AS INTEGER : werkzeug = 0
+CONST WZ_STIFT = 0
+CONST WZ_RADIER = 1
+CONST WZ_FUELL = 2
+CONST WZ_LINIE = 3
+CONST WZ_RECHT = 4
+CONST WZ_ELLIPSE = 5
+CONST WZ_PIPETTE = 6
+CONST WZ_AUSWAHL = 7
+CONST WZ_SPRUEH = 8
+
+DIM zieht AS BOOLEAN : zieht = FALSE
+DIM ankerX AS INTEGER : ankerX = 0
+DIM ankerY AS INTEGER : ankerY = 0
+DIM letztX AS INTEGER : letztX = 0
+DIM letztY AS INTEGER : letztY = 0
+DIM schiebt AS BOOLEAN : schiebt = FALSE
+DIM schiebX AS INTEGER : schiebX = 0
+DIM schiebY AS INTEGER : schiebY = 0
+
+DIM selAn AS BOOLEAN : selAn = FALSE
+DIM selX AS INTEGER : selX = 0
+DIM selY AS INTEGER : selY = 0
+DIM selB AS INTEGER : selB = 0
+DIM selH AS INTEGER : selH = 0
+DIM clipF[MAXPKT] AS INTEGER          ' Farbe je Punkt
+DIM clipA[MAXPKT] AS INTEGER          ' Deckkraft je Punkt
+DIM clipB AS INTEGER : clipB = 0
+DIM clipH AS INTEGER : clipH = 0
+
+DIM meldung AS STRING : meldung = ""
+
+' Formpunkte -- EINE Quelle fuer Vorschau und Uebernahme. Ohne das haette
+' jede Form zwei Fassungen (eine fuer den Bildschirm, eine fuers Bild), und
+' die zeigten frueher oder spaeter Verschiedenes.
+DIM pX[MAXPKT] AS INTEGER
+DIM pY[MAXPKT] AS INTEGER
+DIM pN AS INTEGER : pN = 0
+
+' Flut-Stapel (kein TILED_FLOOD_FILL fuer Bilder -- hier von Hand).
+DIM flutX[MAXPKT] AS INTEGER
+DIM flutY[MAXPKT] AS INTEGER
+
+' Verlauf. Die Plaetze werden EINMAL angelegt und wiederverwendet: ein Bild
+' laesst sich nicht freigeben (es gibt kein IMAGE_FREE), jede Momentaufnahme
+' per IMAGE_COPY waere also ein Leck, das mit jedem Pinselstrich waechst.
+DIM uVor[UNDO_MAX] AS IMAGE
+DIM uNach[UNDO_MAX] AS IMAGE
+DIM uBild[UNDO_MAX] AS INTEGER
+DIM uEbe[UNDO_MAX] AS INTEGER
+DIM uStart AS INTEGER : uStart = 0
+DIM uAnz AS INTEGER : uAnz = 0
+DIM uPos AS INTEGER : uPos = 0
+DIM puffer AS IMAGE
+
+DIM anpassen AS BOOLEAN : anpassen = TRUE
+DIM schachbrett AS IMAGE
+DIM streifen AS IMAGE                  ' Arbeitsflaeche fuer den Export
+
+' ============================================================ Hilfsmittel
+
+SUB kopiere(ziel AS IMAGE, quelle AS IMAGE)
+    IMAGE_CLEAR(ziel)
+    IMAGE_DRAW_IMAGE(ziel, quelle, 0, 0)
+END SUB
+
+SUB neuesSprite(b AS INTEGER, h AS INTEGER)
+    gw = b : gh = h
+    anzBild = 1 : anzEb = 1
+    aktBild = 0 : aktEb = 0
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            ebene[i, k] = IMAGE_NEW(gw, gh)
+        NEXT
+    NEXT
+    FOR k = 0 TO MAXEB - 1
+        ebName[k] = "Ebene " + STR$(k + 1)
+        ebSicht[k] = 1
+    NEXT
+    FOR i = 0 TO UNDO_MAX - 1
+        uVor[i] = IMAGE_NEW(gw, gh)
+        uNach[i] = IMAGE_NEW(gw, gh)
+    NEXT
+    puffer = IMAGE_NEW(gw, gh)
+    streifen = IMAGE_NEW(gw * MAXBILD, gh)
+    uStart = 0 : uAnz = 0 : uPos = 0
+    selAn = FALSE
+    panX = 0 : panY = 0
+    ' Den Zoom kann diese SUB nicht selbst setzen: sie laeuft schon, bevor
+    ' es die Zeichenflaeche gibt (und ihre Groesse aendert sich mit dem
+    ' Fenster). Also nur vormerken -- die Schleife rechnet ihn aus.
+    anpassen = TRUE
+
+    ' Schachbrett als Untergrund -- ohne das ist "durchsichtig" von
+    ' "schwarz" nicht zu unterscheiden.
+    schachbrett = IMAGE_NEW(gw, gh, &H2A3038)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF ((x \ 4) + (y \ 4)) MOD 2 = 0 THEN
+                IMAGE_DRAW_RECT(schachbrett, x, y, 1, 1, &H353C46)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' ---------------------------------------------------------------- Verlauf
+SUB schrittBeginn()
+    kopiere(puffer, ebene[aktBild, aktEb])
+END SUB
+
+SUB schrittEnde()
+    uAnz = uPos
+    IF uAnz = UNDO_MAX THEN
+        uStart = (uStart + 1) MOD UNDO_MAX
+        uAnz = uAnz - 1
+    END IF
+    DIM s AS INTEGER : s = (uStart + uAnz) MOD UNDO_MAX
+    kopiere(uVor[s], puffer)
+    kopiere(uNach[s], ebene[aktBild, aktEb])
+    uBild[s] = aktBild
+    uEbe[s] = aktEb
+    uAnz = uAnz + 1
+    uPos = uAnz
+END SUB
+
+SUB zurueck()
+    IF uPos > 0 THEN
+        uPos = uPos - 1
+        DIM s AS INTEGER : s = (uStart + uPos) MOD UNDO_MAX
+        aktBild = uBild[s] : aktEb = uEbe[s]
+        kopiere(ebene[aktBild, aktEb], uVor[s])
+    END IF
+END SUB
+
+SUB wieder()
+    IF uPos < uAnz THEN
+        DIM s AS INTEGER : s = (uStart + uPos) MOD UNDO_MAX
+        aktBild = uBild[s] : aktEb = uEbe[s]
+        kopiere(ebene[aktBild, aktEb], uNach[s])
+        uPos = uPos + 1
+    END IF
+END SUB
+
+' -------------------------------------------------------------- Zeichnen
+SUB block(x AS INTEGER, y AS INTEGER, c AS INTEGER, weg AS BOOLEAN)
+    IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
+        IF weg THEN
+            IMAGE_CLEAR(ebene[aktBild, aktEb], x, y, pinsel, pinsel)
+        ELSE
+            IMAGE_DRAW_RECT(ebene[aktBild, aktEb], x, y, pinsel, pinsel, c)
+        END IF
+    END IF
+END SUB
+
+SUB punkt(x AS INTEGER, y AS INTEGER, c AS INTEGER, weg AS BOOLEAN)
+    block(x, y, c, weg)
+    ' Gespiegelt wird die ganze Pinselbreite, nicht nur ihr Anfang -- sonst
+    ' sitzt der Spiegelstrich bei dickem Pinsel um pinsel-1 daneben.
+    DIM sx AS INTEGER : sx = gw - x - pinsel
+    DIM sy AS INTEGER : sy = gh - y - pinsel
+    IF symX THEN block(sx, y, c, weg)
+    IF symY THEN block(x, sy, c, weg)
+    IF symX AND symY THEN block(sx, sy, c, weg)
+END SUB
+
+' ------------------------------------------------- Formen (eine Quelle)
+SUB pAdd(x AS INTEGER, y AS INTEGER)
+    IF pN < MAXPKT THEN
+        pX[pN] = x : pY[pN] = y : pN = pN + 1
+    END IF
+END SUB
+
+SUB linie(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    DIM dx AS INTEGER : dx = ABS(x1 - x0)
+    DIM dy AS INTEGER : dy = -ABS(y1 - y0)
+    DIM sx AS INTEGER : sx = IIF(x0 < x1, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y0 < y1, 1, -1)
+    DIM err AS INTEGER : err = dx + dy
+    DIM x AS INTEGER : x = x0
+    DIM y AS INTEGER : y = y0
+    DIM sicher AS INTEGER : sicher = 0
+    WHILE sicher < MAXPKT
+        pAdd(x, y)
+        IF x = x1 AND y = y1 THEN BREAK
+        DIM e2 AS INTEGER : e2 = 2 * err
+        IF e2 >= dy THEN
+            err = err + dy
+            x = x + sx
+        END IF
+        IF e2 <= dx THEN
+            err = err + dx
+            y = y + sy
+        END IF
+        sicher = sicher + 1
+    WEND
+END SUB
+
+SUB formPunkte(art AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, _
+               x1 AS INTEGER, y1 AS INTEGER, gefuellt AS BOOLEAN)
+    pN = 0
+    DIM ax AS INTEGER : ax = MIN(x0, x1)
+    DIM ay AS INTEGER : ay = MIN(y0, y1)
+    DIM bx AS INTEGER : bx = MAX(x0, x1)
+    DIM by AS INTEGER : by = MAX(y0, y1)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    SELECT CASE art
+        CASE WZ_LINIE
+            linie(x0, y0, x1, y1)
+        CASE WZ_RECHT
+            IF gefuellt THEN
+                FOR y = ay TO by
+                    FOR x = ax TO bx
+                        pAdd(x, y)
+                    NEXT
+                NEXT
+            ELSE
+                FOR x = ax TO bx
+                    pAdd(x, ay) : pAdd(x, by)
+                NEXT
+                FOR y = ay TO by
+                    pAdd(ax, y) : pAdd(bx, y)
+                NEXT
+            END IF
+        CASE WZ_ELLIPSE
+            ' Ueber die Zeilen statt ueber den Mittelpunkt-Algorithmus: so
+            ' faellt die gefuellte Fassung ohne zweiten Weg mit ab, und die
+            ' Kante ist bei beiden dieselbe.
+            DIM rx AS FLOAT : rx = (bx - ax) / 2.0
+            DIM ry AS FLOAT : ry = (by - ay) / 2.0
+            DIM cx AS FLOAT : cx = (ax + bx) / 2.0
+            DIM cy AS FLOAT : cy = (ay + by) / 2.0
+            IF rx < 0.5 THEN rx = 0.5
+            IF ry < 0.5 THEN ry = 0.5
+            FOR y = ay TO by
+                DIM t AS FLOAT : t = 1.0 - ((y - cy) * (y - cy)) / (ry * ry)
+                IF t >= 0.0 THEN
+                    DIM d AS INTEGER : d = INT(rx * SQR(t))
+                    DIM lx AS INTEGER : lx = INT(cx - d)
+                    DIM rxi AS INTEGER : rxi = INT(cx + d + 0.5)
+                    IF gefuellt THEN
+                        FOR x = lx TO rxi
+                            pAdd(x, y)
+                        NEXT
+                    ELSE
+                        pAdd(lx, y) : pAdd(rxi, y)
+                    END IF
+                END IF
+            NEXT
+            ' Zeilenweise allein reicht fuer den Umriss NICHT: wo die Kurve
+            ' flach laeuft (oben und unten), springt sie von Zeile zu Zeile
+            ' mehrere Spalten weit und der Umriss bekommt Luecken. Also
+            ' dieselbe Rechnung noch einmal ueber die SPALTEN -- zusammen
+            ' ergeben beide einen geschlossenen Rand. Doppelte Punkte
+            ' schaden nicht, sie werden nur zweimal gesetzt.
+            IF NOT gefuellt THEN
+                FOR x = ax TO bx
+                    DIM t2 AS FLOAT : t2 = 1.0 - ((x - cx) * (x - cx)) / (rx * rx)
+                    IF t2 >= 0.0 THEN
+                        DIM d2 AS INTEGER : d2 = INT(ry * SQR(t2))
+                        pAdd(x, INT(cy - d2))
+                        pAdd(x, INT(cy + d2 + 0.5))
+                    END IF
+                NEXT
+            END IF
+    END SELECT
+END SUB
+
+' ---------------------------------------------------------------- Fuellen
+SUB fluten(sx AS INTEGER, sy AS INTEGER, neu AS INTEGER)
+    DIM bild AS IMAGE : bild = ebene[aktBild, aktEb]
+    DIM zf AS INTEGER : zf = GETPIXEL(bild, sx, sy)
+    DIM za AS INTEGER : za = GETALPHA(bild, sx, sy)
+    ' Farbe UND Deckkraft muessen stimmen. Ohne die Deckkraft laeuft die
+    ' Fuellung ueber leere Punkte, die zufaellig schwarz gespeichert sind.
+    IF zf = neu AND za = 255 THEN
+        meldung = "schon diese Farbe"
+    ELSE
+        DIM n AS INTEGER : n = 1
+        flutX[0] = sx : flutY[0] = sy
+        WHILE n > 0
+            n = n - 1
+            DIM x AS INTEGER : x = flutX[n]
+            DIM y AS INTEGER : y = flutY[n]
+            IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
+                IF GETPIXEL(bild, x, y) = zf AND GETALPHA(bild, x, y) = za THEN
+                    IMAGE_DRAW_RECT(bild, x, y, 1, 1, neu)
+                    IF n + 4 < MAXPKT THEN
+                        flutX[n] = x - 1 : flutY[n] = y : n = n + 1
+                        flutX[n] = x + 1 : flutY[n] = y : n = n + 1
+                        flutX[n] = x : flutY[n] = y - 1 : n = n + 1
+                        flutX[n] = x : flutY[n] = y + 1 : n = n + 1
+                    END IF
+                END IF
+            END IF
+        WEND
+    END IF
+END SUB
+
+' ----------------------------------------------------------- Ausgabe
+SUB baueStreifen()
+    IMAGE_CLEAR(streifen)
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        FOR k = 0 TO anzEb - 1
+            IF ebSicht[k] = 1 THEN
+                IMAGE_DRAW_IMAGE(streifen, ebene[i, k], i * gw, 0)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION atlasJson$(pngName AS STRING) AS STRING
+    ' Genau die Form, die ATLAS_LOAD liest. Von Hand gebaut: das json-Modul
+    ' kann lesen, aber nichts anlegen -- fuer eine flache Datei wie diese
+    ' ist Text zusammensetzen ohnehin ehrlicher als ein Umweg.
+    DIM s AS STRING
+    s = "{" + CHR$(10) + "  " + CHR$(34) + "image" + CHR$(34) + ": " + _
+        CHR$(34) + pngName + CHR$(34) + "," + CHR$(10) + _
+        "  " + CHR$(34) + "sprites" + CHR$(34) + ": {" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        s = s + "    " + CHR$(34) + "bild_" + STR$(i) + CHR$(34) + ": [" + _
+            STR$(i * gw) + ", 0, " + STR$(gw) + ", " + STR$(gh) + "]"
+        IF i < anzBild - 1 THEN s = s + ","
+        s = s + CHR$(10)
+    NEXT
+    RETURN s + "  }" + CHR$(10) + "}" + CHR$(10)
+END FUNCTION
+
+' ============================================================ Oberflaeche
+
+CONST TB_H = 46
+CONST LINKS = 300
+CONST RECHTS = 340
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Sprite", 0, 0, SW, SH)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, SW, TB_H)
+GUI_SET_ANCHOR(tb, "lr")
+
+DIM bNeu AS GUI_WIDGET   : bNeu   = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
+DIM bPng AS GUI_WIDGET   : bPng   = GUI_BUTTON(win, "PNG", 76, 7, 62, 32)
+DIM bBlatt AS GUI_WIDGET : bBlatt = GUI_BUTTON(win, "Streifen + Atlas", 142, 7, 150, 32)
+
+CONST WZ_B = 88
+DIM wzName AS ARRAY OF STRING
+wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Pipette|Auswahl|Spruehen", "|")
+DIM wzKnopf[9] AS GUI_WIDGET
+DIM wx AS INTEGER : wx = 306
+DIM i AS INTEGER
+FOR i = 0 TO 8
+    wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
+    wx = wx + WZ_B + 4
+NEXT
+
+DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", wx + 10, 7, 84, 32)
+DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", wx + 98, 7, 56, 32)
+DIM cbGefuellt AS GUI_WIDGET : cbGefuellt = GUI_CHECKBOX(win, "gefuellt", wx + 164, 15, FALSE)
+DIM cbSymX AS GUI_WIDGET : cbSymX = GUI_CHECKBOX(win, "Spiegel X", wx + 254, 15, FALSE)
+DIM cbSymY AS GUI_WIDGET : cbSymY = GUI_CHECKBOX(win, "Spiegel Y", wx + 358, 15, FALSE)
+DIM cbZwiebel AS GUI_WIDGET : cbZwiebel = GUI_CHECKBOX(win, "Zwiebelhaut", wx + 462, 15, FALSE)
+DIM cbRaster AS GUI_WIDGET : cbRaster = GUI_CHECKBOX(win, "Raster", wx + 580, 15, TRUE)
+
+' ------------------------------------------------------------ links: Farbe
+DIM y AS INTEGER : y = TB_H + 12
+DIM lbl AS GUI_WIDGET
+lbl = GUI_LABEL(win, "Farbe", 12, y) : y = y + 22
+DIM cp AS GUI_WIDGET : cp = GUI_COLORPICKER(win, 12, y, LINKS - 24, 170)
+GUI_SET_PICKED_COLOR(cp, farbe)
+y = y + 182
+
+lbl = GUI_LABEL(win, "Palette   (1..6 waehlen)", 12, y) : y = y + 22
+DIM palY AS INTEGER : palY = y
+DIM palette AS GUI_WIDGET
+palette = GUI_CANVAS(win, 12, y, LINKS - 24, 72)
+y = y + 84
+
+lbl = GUI_LABEL(win, "Pinsel", 12, y)
+DIM spPinsel AS GUI_WIDGET : spPinsel = GUI_SPINNER(win, 90, y - 4, 120, 1, 6, 1)
+
+DIM pal AS ARRAY OF INTEGER
+pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
+       &HB44BE8, &HE87ABF, &H8C6239, &H5A6472, &HF0A868, &H3C8C5A, _
+       &H2E4A78, &HC8C8C8, &H6E2B2B, &H1E2430]
+
+' --------------------------------------------------------- rechts: Bilder
+DIM rx AS INTEGER : rx = SW - RECHTS
+DIM ry AS INTEGER : ry = TB_H + 12
+lbl = GUI_LABEL(win, "Einzelbilder", rx, ry) : ry = ry + 22
+DIM lstBild AS GUI_WIDGET
+lstBild = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 120, SPLIT$("Bild 1", "|"))
+ry = ry + 128
+DIM bBildNeu AS GUI_WIDGET  : bBildNeu  = GUI_BUTTON(win, "Neu", rx, ry, 78, 28)
+DIM bBildKopie AS GUI_WIDGET: bBildKopie= GUI_BUTTON(win, "Kopie", rx + 82, ry, 88, 28)
+DIM bBildWeg AS GUI_WIDGET  : bBildWeg  = GUI_BUTTON(win, "Weg", rx + 174, ry, 70, 28)
+ry = ry + 38
+
+lbl = GUI_LABEL(win, "Ebenen", rx, ry) : ry = ry + 22
+DIM lstEb AS GUI_WIDGET
+lstEb = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 100, SPLIT$("Ebene 1", "|"))
+ry = ry + 108
+DIM bEbNeu AS GUI_WIDGET : bEbNeu = GUI_BUTTON(win, "Neu", rx, ry, 78, 28)
+DIM bEbWeg AS GUI_WIDGET : bEbWeg = GUI_BUTTON(win, "Weg", rx + 82, ry, 70, 28)
+DIM cbEbSicht AS GUI_WIDGET : cbEbSicht = GUI_CHECKBOX(win, "sichtbar", rx + 160, ry + 8, TRUE)
+ry = ry + 40
+
+lbl = GUI_LABEL(win, "Vorschau", rx, ry) : ry = ry + 22
+DIM vorschau AS GUI_WIDGET
+vorschau = GUI_CANVAS(win, rx, ry, RECHTS - 16, 140)
+DIM vorY AS INTEGER : vorY = ry
+ry = ry + 148
+lbl = GUI_LABEL(win, "Tempo", rx, ry + 4)
+DIM slTempo AS GUI_WIDGET : slTempo = GUI_SLIDER(win, rx + 70, ry + 6, 180, 1.0, 24.0, 8.0)
+
+' ------------------------------------------------------------- Zeichenflaeche
+DIM leinwand AS GUI_WIDGET
+leinwand = GUI_CANVAS(win, LINKS, TB_H + 8, SW - LINKS - RECHTS - 12, SH - TB_H - 44)
+GUI_SET_ANCHOR(leinwand, "lrtb")
+
+DIM status AS GUI_WIDGET
+status = GUI_LABEL(win, "", 12, SH - 24)
+GUI_SET_ANCHOR(status, "lb")
+
+' --------------------------------------------------- Fenster "Neues Sprite"
+DIM winNeu AS GUI_WINDOW
+winNeu = GUI_WINDOW("Neues Sprite", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
+lbl = GUI_LABEL(winNeu, "Breite", 16, 16)
+DIM spB AS GUI_WIDGET : spB = GUI_SPINNER(winNeu, 110, 12, 160, 4, MAXG, 32)
+lbl = GUI_LABEL(winNeu, "Hoehe", 16, 52)
+DIM spH AS GUI_WIDGET : spH = GUI_SPINNER(winNeu, 110, 48, 160, 4, MAXG, 32)
+DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 30)
+DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
+GUI_WINDOW_VISIBLE(winNeu, FALSE)
+DIM neuOffen AS BOOLEAN : neuOffen = FALSE
+
+' ============================================================ Listen
+
+SUB listenAuffrischen()
+    DIM namen[MAX(anzBild, 1)] AS STRING
+    DIM k AS INTEGER
+    FOR k = 0 TO anzBild - 1
+        namen[k] = "Bild " + STR$(k + 1)
+    NEXT
+    GUI_SET_LISTBOX(lstBild, namen)
+    GUI_LISTBOX_SET_SELECTED(lstBild, aktBild)
+
+    DIM en[MAX(anzEb, 1)] AS STRING
+    FOR k = 0 TO anzEb - 1
+        en[k] = IIF(ebSicht[k] = 1, "", "(aus)  ") + ebName[k]
+    NEXT
+    GUI_SET_LISTBOX(lstEb, en)
+    GUI_LISTBOX_SET_SELECTED(lstEb, aktEb)
+    GUI_SET_CHECKED(cbEbSicht, ebSicht[aktEb] = 1)
+END SUB
+
+' ============================================================ Hauptschleife
+
+neuesSprite(gw, gh)
+listenAuffrischen()
+
+DIM zeit AS FLOAT : zeit = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_ESCAPE) AND NOT neuOffen THEN BREAK
+    zeit = zeit + DELTA()
+    SW = SCREENWIDTH() : SH = SCREENHEIGHT()
+    GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
+    GUI_UPDATE()
+
+    DIM strg AS BOOLEAN
+    strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+
+    farbe = GUI_PICKED_COLOR(cp)
+    pinsel = INT(GUI_VALUE(spPinsel))
+    symX = GUI_CHECKED(cbSymX)
+    symY = GUI_CHECKED(cbSymY)
+
+    ' ------------------------------------------------------ Werkzeugwahl
+    FOR i = 0 TO 8
+        IF GUI_CLICKED(wzKnopf[i]) THEN werkzeug = i
+        GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
+    NEXT
+    IF NOT neuOffen AND NOT strg THEN
+        IF KEYHIT(KEY_P) THEN werkzeug = WZ_STIFT
+        IF KEYHIT(KEY_E) THEN werkzeug = WZ_RADIER
+        IF KEYHIT(KEY_F) THEN werkzeug = WZ_FUELL
+        IF KEYHIT(KEY_L) THEN werkzeug = WZ_LINIE
+        IF KEYHIT(KEY_R) THEN werkzeug = WZ_RECHT
+        IF KEYHIT(KEY_O) THEN werkzeug = WZ_ELLIPSE
+        IF KEYHIT(KEY_I) THEN werkzeug = WZ_PIPETTE
+        IF KEYHIT(KEY_S) THEN werkzeug = WZ_AUSWAHL
+        IF KEYHIT(KEY_Y) THEN werkzeug = WZ_SPRUEH
+        FOR i = 0 TO 5
+            IF KEYHIT(KEY_1 + i) THEN
+                farbe = pal[i]
+                GUI_SET_PICKED_COLOR(cp, farbe)
+            END IF
+        NEXT
+        IF KEYHIT(43) THEN GUI_SET_VALUE(spPinsel, MIN(6, pinsel + 1))
+        IF KEYHIT(45) THEN GUI_SET_VALUE(spPinsel, MAX(1, pinsel - 1))
+    END IF
+
+    ' ------------------------------------------------------------ Datei
+    IF GUI_CLICKED(bNeu) THEN
+        GUI_WINDOW_VISIBLE(winNeu, TRUE) : neuOffen = TRUE
+    END IF
+    IF GUI_CLICKED(bNeuAb) THEN
+        GUI_WINDOW_VISIBLE(winNeu, FALSE) : neuOffen = FALSE
+    END IF
+    IF GUI_CLICKED(bNeuOk) THEN
+        neuesSprite(INT(GUI_VALUE(spB)), INT(GUI_VALUE(spH)))
+        listenAuffrischen()
+        GUI_WINDOW_VISIBLE(winNeu, FALSE) : neuOffen = FALSE
+    END IF
+    IF GUI_CLICKED(bPng) THEN
+        DIM p AS STRING : p = FILE_SAVE_DIALOG("Bild sichern", "sprite.png", "png")
+        IF p <> "" THEN
+            ' Nur das aktuelle Einzelbild -- ueber den Streifen gebaut und
+            ' wieder ausgeschnitten waere ein Umweg; hier reicht ein Ziel.
+            DIM eins AS IMAGE : eins = IMAGE_NEW(gw, gh)
+            DIM k AS INTEGER
+            FOR k = 0 TO anzEb - 1
+                IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(eins, ebene[aktBild, k], 0, 0)
+            NEXT
+            TRY
+                IMAGE_SAVE(eins, p)
+                meldung = "gesichert: " + p
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bBlatt) THEN
+        DIM pb AS STRING : pb = FILE_SAVE_DIALOG("Streifen sichern", "sprites.png", "png")
+        IF pb <> "" THEN
+            baueStreifen()
+            TRY
+                ' Der Streifen ist so breit wie MAXBILD -- fuer die Datei
+                ' auf die belegten Bilder zuschneiden, sonst schleppt jede
+                ' Ausgabe leere Felder mit.
+                DIM eng AS IMAGE : eng = IMAGE_CROP(streifen, 0, 0, gw * anzBild, gh)
+                IMAGE_SAVE(eng, pb)
+                DIM pj AS STRING : pj = REPLACE$(pb, ".png", ".json")
+                WRITEALL(pj, atlasJson$(BASENAME(pb)))
+                meldung = "Streifen + Atlas: " + pj
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+
+    ' ---------------------------------------------------------- Verlauf
+    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
+    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
+    GUI_SET_ENABLED(bZur, uPos > 0)
+    GUI_SET_ENABLED(bVor, uPos < uAnz)
+
+    ' ------------------------------------------------- Einzelbilder/Ebenen
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBild)
+    IF sel >= 0 AND sel < anzBild AND sel <> aktBild THEN
+        aktBild = sel
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bBildNeu) AND anzBild < MAXBILD THEN
+        anzBild = anzBild + 1
+        aktBild = anzBild - 1
+        DIM k2 AS INTEGER
+        FOR k2 = 0 TO MAXEB - 1
+            IMAGE_CLEAR(ebene[aktBild, k2])
+        NEXT
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bBildKopie) AND anzBild < MAXBILD THEN
+        DIM q AS INTEGER : q = aktBild
+        anzBild = anzBild + 1
+        aktBild = anzBild - 1
+        DIM k3 AS INTEGER
+        FOR k3 = 0 TO MAXEB - 1
+            kopiere(ebene[aktBild, k3], ebene[q, k3])
+        NEXT
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bBildWeg) THEN
+        IF anzBild > 1 THEN
+            DIM j AS INTEGER
+            DIM k4 AS INTEGER
+            FOR j = aktBild TO anzBild - 2
+                FOR k4 = 0 TO MAXEB - 1
+                    kopiere(ebene[j, k4], ebene[j + 1, k4])
+                NEXT
+            NEXT
+            anzBild = anzBild - 1
+            IF aktBild >= anzBild THEN aktBild = anzBild - 1
+            uStart = 0 : uAnz = 0 : uPos = 0
+            listenAuffrischen()
+        ELSE
+            meldung = "Das letzte Bild bleibt."
+        END IF
+    END IF
+
+    DIM selE AS INTEGER : selE = GUI_LISTBOX_SELECTED(lstEb)
+    IF selE >= 0 AND selE < anzEb AND selE <> aktEb THEN
+        aktEb = selE
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bEbNeu) AND anzEb < MAXEB THEN
+        anzEb = anzEb + 1
+        aktEb = anzEb - 1
+        DIM j2 AS INTEGER
+        FOR j2 = 0 TO MAXBILD - 1
+            IMAGE_CLEAR(ebene[j2, aktEb])
+        NEXT
+        ebSicht[aktEb] = 1
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bEbWeg) THEN
+        IF anzEb > 1 THEN
+            DIM j3 AS INTEGER
+            DIM k5 AS INTEGER
+            FOR k5 = aktEb TO anzEb - 2
+                FOR j3 = 0 TO MAXBILD - 1
+                    kopiere(ebene[j3, k5], ebene[j3, k5 + 1])
+                NEXT
+                ebSicht[k5] = ebSicht[k5 + 1]
+            NEXT
+            anzEb = anzEb - 1
+            IF aktEb >= anzEb THEN aktEb = anzEb - 1
+            uStart = 0 : uAnz = 0 : uPos = 0
+            listenAuffrischen()
+        ELSE
+            meldung = "Die letzte Ebene bleibt."
+        END IF
+    END IF
+    IF GUI_CLICKED(cbEbSicht) THEN
+        ebSicht[aktEb] = IIF(GUI_CHECKED(cbEbSicht), 1, 0)
+        listenAuffrischen()
+    END IF
+
+    ' ------------------------------------------------------------- Maus
+    DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(leinwand)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_W(leinwand)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    ' Das Sprite liegt mittig in der Flaeche; panX/panY verschiebt es.
+    DIM ox AS INTEGER : ox = cx + (cw - gw * zoom) \ 2 + panX
+    DIM oy AS INTEGER : oy = cy + (ch - gh * zoom) \ 2 + panY
+    IF anpassen AND cw > 0 AND ch > 0 THEN
+        ' Einpassen mit etwas Luft, damit der Rand sichtbar bleibt.
+        zoom = MAX(1, MIN(32, MIN((cw - 40) \ gw, (ch - 40) \ gh)))
+        ox = cx + (cw - gw * zoom) \ 2
+        oy = cy + (ch - gh * zoom) \ 2
+        anpassen = FALSE
+    END IF
+    DIM ueber AS BOOLEAN
+    ueber = mx >= cx AND mx < cx + cw AND my >= cy AND my < cy + ch AND NOT neuOffen
+    DIM tx AS INTEGER : tx = FLOOR((mx - ox) / zoom)
+    DIM ty AS INTEGER : ty = FLOOR((my - oy) / zoom)
+    DIM drauf AS BOOLEAN
+    drauf = ueber AND tx >= 0 AND tx < gw AND ty >= 0 AND ty < gh
+
+    IF ueber AND MOUSEWHEEL() <> 0 THEN
+        zoom = MAX(1, MIN(32, zoom + SGN(MOUSEWHEEL())))
+    END IF
+    IF ueber AND MOUSE_HIT(1) THEN
+        schiebt = TRUE : schiebX = mx : schiebY = my
+    END IF
+    IF schiebt THEN
+        IF MOUSEBUTTON(1) THEN
+            panX = panX + (mx - schiebX)
+            panY = panY + (my - schiebY)
+            schiebX = mx : schiebY = my
+        ELSE
+            schiebt = FALSE
+        END IF
+    END IF
+
+    ' -------------------------------------------------------- Palette
+    DIM px2 AS INTEGER : px2 = GUI_CANVAS_X(palette)
+    DIM py2 AS INTEGER : py2 = GUI_CANVAS_Y(palette)
+    IF MOUSE_HIT(0) AND NOT neuOffen THEN
+        ' Nicht `pi` nennen -- das ist die eingebaute Kreiszahl, und die
+        ' Kollision meldet sich erst zur LAUFZEIT, nicht beim Uebersetzen.
+        DIM pSp AS INTEGER : pSp = (mx - px2) \ 34
+        DIM pZe AS INTEGER : pZe = (my - py2) \ 34
+        IF mx >= px2 AND my >= py2 AND pSp < 8 AND pZe < 2 THEN
+            farbe = pal[pZe * 8 + pSp]
+            GUI_SET_PICKED_COLOR(cp, farbe)
+        END IF
+    END IF
+
+    ' ------------------------------------------------------- Werkzeuge
+    IF drauf AND MOUSE_HIT(0) THEN
+        zieht = TRUE
+        ankerX = tx : ankerY = ty
+        letztX = tx : letztY = ty
+        SELECT CASE werkzeug
+            CASE WZ_STIFT
+                schrittBeginn() : punkt(tx, ty, farbe, FALSE)
+            CASE WZ_RADIER
+                schrittBeginn() : punkt(tx, ty, 0, TRUE)
+            CASE WZ_SPRUEH
+                schrittBeginn()
+            CASE WZ_FUELL
+                schrittBeginn()
+                fluten(tx, ty, farbe)
+                schrittEnde()
+                zieht = FALSE
+            CASE WZ_LINIE, WZ_RECHT, WZ_ELLIPSE
+                schrittBeginn()
+            CASE WZ_PIPETTE
+                IF GETALPHA(ebene[aktBild, aktEb], tx, ty) > 0 THEN
+                    farbe = GETPIXEL(ebene[aktBild, aktEb], tx, ty)
+                    GUI_SET_PICKED_COLOR(cp, farbe)
+                END IF
+                zieht = FALSE
+            CASE WZ_AUSWAHL
+                selAn = TRUE
+                selX = tx : selY = ty : selB = 1 : selH = 1
+        END SELECT
+    END IF
+
+    IF zieht AND MOUSEBUTTON(0) THEN
+        SELECT CASE werkzeug
+            CASE WZ_STIFT, WZ_RADIER
+                ' Ueber die Linie vom letzten Punkt -- bei schneller Maus
+                ' liegen zwischen zwei Bildern sonst Luecken im Strich.
+                formPunkte(WZ_LINIE, letztX, letztY, tx, ty, FALSE)
+                FOR i = 0 TO pN - 1
+                    punkt(pX[i], pY[i], farbe, werkzeug = WZ_RADIER)
+                NEXT
+                letztX = tx : letztY = ty
+            CASE WZ_SPRUEH
+                FOR i = 0 TO 6
+                    DIM sx2 AS INTEGER : sx2 = tx + RND(7) - 3
+                    DIM sy2 AS INTEGER : sy2 = ty + RND(7) - 3
+                    IF RND(100) < 40 THEN punkt(sx2, sy2, farbe, FALSE)
+                NEXT
+            CASE WZ_AUSWAHL
+                selX = MIN(ankerX, tx) : selY = MIN(ankerY, ty)
+                selB = ABS(tx - ankerX) + 1 : selH = ABS(ty - ankerY) + 1
+        END SELECT
+    END IF
+
+    IF zieht AND NOT MOUSEBUTTON(0) THEN
+        zieht = FALSE
+        SELECT CASE werkzeug
+            CASE WZ_STIFT, WZ_RADIER, WZ_SPRUEH
+                schrittEnde()
+            CASE WZ_LINIE, WZ_RECHT, WZ_ELLIPSE
+                formPunkte(werkzeug, ankerX, ankerY, _
+                           MAX(0, MIN(gw - 1, tx)), MAX(0, MIN(gh - 1, ty)), _
+                           GUI_CHECKED(cbGefuellt))
+                FOR i = 0 TO pN - 1
+                    punkt(pX[i], pY[i], farbe, FALSE)
+                NEXT
+                schrittEnde()
+        END SELECT
+    END IF
+
+    ' ------------------------------------------------------ Zwischenablage
+    IF strg AND NOT neuOffen THEN
+        IF (KEYHIT(KEY_C) OR KEYHIT(KEY_X)) AND selAn THEN
+            clipB = selB : clipH = selH
+            DIM ax2 AS INTEGER
+            DIM ay2 AS INTEGER
+            FOR ay2 = 0 TO selH - 1
+                FOR ax2 = 0 TO selB - 1
+                    clipF[ay2 * clipB + ax2] = GETPIXEL(ebene[aktBild, aktEb], selX + ax2, selY + ay2)
+                    clipA[ay2 * clipB + ax2] = GETALPHA(ebene[aktBild, aktEb], selX + ax2, selY + ay2)
+                NEXT
+            NEXT
+            IF KEYHIT(KEY_X) THEN
+                schrittBeginn()
+                IMAGE_CLEAR(ebene[aktBild, aktEb], selX, selY, selB, selH)
+                schrittEnde()
+            END IF
+        END IF
+        IF KEYHIT(KEY_V) AND clipB > 0 THEN
+            schrittBeginn()
+            DIM zx AS INTEGER : zx = IIF(selAn, selX, 0)
+            DIM zy AS INTEGER : zy = IIF(selAn, selY, 0)
+            DIM ax3 AS INTEGER
+            DIM ay3 AS INTEGER
+            FOR ay3 = 0 TO clipH - 1
+                FOR ax3 = 0 TO clipB - 1
+                    IF zx + ax3 < gw AND zy + ay3 < gh THEN
+                        ' Leere Punkte der Ablage bleiben leer -- ein Ausschnitt
+                        ' soll nicht als schwarzer Klotz landen.
+                        IF clipA[ay3 * clipB + ax3] > 0 THEN
+                            IMAGE_DRAW_RECT(ebene[aktBild, aktEb], zx + ax3, zy + ay3, _
+                                            1, 1, clipF[ay3 * clipB + ax3])
+                        END IF
+                    END IF
+                NEXT
+            NEXT
+            schrittEnde()
+        END IF
+    END IF
+    IF KEYHIT(KEY_DELETE) AND selAn AND NOT neuOffen THEN
+        schrittBeginn()
+        IMAGE_CLEAR(ebene[aktBild, aktEb], selX, selY, selB, selH)
+        schrittEnde()
+    END IF
+
+    ' ============================================================== Bild
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
+    GUI_DRAW()
+
+    ' ------------------------------------------------------------ Palette
+    FOR i = 0 TO 15
+        DIM qx AS INTEGER : qx = px2 + (i MOD 8) * 34
+        DIM qy AS INTEGER : qy = py2 + (i \ 8) * 34
+        BOX(qx, qy, qx + 30, qy + 30, pal[i])
+        IF pal[i] = farbe THEN RECT(qx - 1, qy - 1, qx + 31, qy + 31, &HFFFFFF)
+    NEXT
+
+    ' -------------------------------------------------------- Zeichenflaeche
+    SCISSOR(cx, cy, cw, ch)
+    BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H070A0F)
+    DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom)
+
+    ' Zwiebelhaut: das vorige Bild blass darunter.
+    IF GUI_CHECKED(cbZwiebel) AND aktBild > 0 THEN
+        DIM k6 AS INTEGER
+        FOR k6 = 0 TO anzEb - 1
+            IF ebSicht[k6] = 1 THEN
+                DRAWIMAGEROT(ebene[aktBild - 1, k6], ox + gw * zoom \ 2, oy + gh * zoom \ 2, _
+                             0, zoom, RGBA(255, 255, 255, 70))
+            END IF
+        NEXT
+    END IF
+
+    DIM k7 AS INTEGER
+    FOR k7 = 0 TO anzEb - 1
+        IF ebSicht[k7] = 1 THEN
+            DRAWIMAGEPARTEX(ebene[aktBild, k7], 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom)
+        END IF
+    NEXT
+
+    ' Raster erst, wenn eine Linie noch etwas trennt.
+    IF GUI_CHECKED(cbRaster) AND zoom >= 6 THEN
+        DIM g AS INTEGER
+        FOR g = 0 TO gw
+            LINE(ox + g * zoom, oy, ox + g * zoom, oy + gh * zoom - 1, &H1E2A38)
+        NEXT
+        FOR g = 0 TO gh
+            LINE(ox, oy + g * zoom, ox + gw * zoom - 1, oy + g * zoom, &H1E2A38)
+        NEXT
+    END IF
+    RECT(ox, oy, ox + gw * zoom - 1, oy + gh * zoom - 1, &H33455A)
+
+    ' Vorschau der laufenden Form -- dieselben Punkte, die gleich ins Bild
+    ' geschrieben werden.
+    IF zieht AND drauf THEN
+        IF werkzeug = WZ_LINIE OR werkzeug = WZ_RECHT OR werkzeug = WZ_ELLIPSE THEN
+            formPunkte(werkzeug, ankerX, ankerY, tx, ty, GUI_CHECKED(cbGefuellt))
+            FOR i = 0 TO pN - 1
+                IF pX[i] >= 0 AND pY[i] >= 0 AND pX[i] < gw AND pY[i] < gh THEN
+                    BOX(ox + pX[i] * zoom, oy + pY[i] * zoom, _
+                        ox + pX[i] * zoom + zoom - 1, oy + pY[i] * zoom + zoom - 1, farbe)
+                END IF
+            NEXT
+        END IF
+    END IF
+
+    IF selAn THEN
+        BOX(ox + selX * zoom, oy + selY * zoom, _
+            ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &H302BC4E8)
+        RECT(ox + selX * zoom, oy + selY * zoom, _
+             ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &HE8C44B)
+    END IF
+    IF drauf THEN
+        RECT(ox + tx * zoom, oy + ty * zoom, _
+             ox + (tx + pinsel) * zoom - 1, oy + (ty + pinsel) * zoom - 1, &HFFFFFF)
+    END IF
+    SCISSOR_END()
+
+    ' ---------------------------------------------------------- Vorschau
+    DIM vx AS INTEGER : vx = GUI_CANVAS_X(vorschau)
+    DIM vy AS INTEGER : vy = GUI_CANVAS_Y(vorschau)
+    DIM vw AS INTEGER : vw = GUI_CANVAS_W(vorschau)
+    DIM vh AS INTEGER : vh = GUI_CANVAS_H(vorschau)
+    BOX(vx, vy, vx + vw - 1, vy + vh - 1, &H070A0F)
+    DIM vz AS INTEGER : vz = MAX(1, MIN((vw - 8) \ gw, (vh - 8) \ gh))
+    DIM vox AS INTEGER : vox = vx + (vw - gw * vz) \ 2
+    DIM voy AS INTEGER : voy = vy + (vh - gh * vz) \ 2
+    DIM tempo AS FLOAT : tempo = GUI_VALUE(slTempo)
+    DIM vb AS INTEGER : vb = INT(zeit * tempo) MOD anzBild
+    DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, vox, voy, gw * vz, gh * vz)
+    DIM k8 AS INTEGER
+    FOR k8 = 0 TO anzEb - 1
+        IF ebSicht[k8] = 1 THEN
+            DRAWIMAGEPARTEX(ebene[vb, k8], 0, 0, gw, gh, vox, voy, gw * vz, gh * vz)
+        END IF
+    NEXT
+
+    ' -------------------------------------------------------- Statuszeile
+    DIM info AS STRING
+    info = wzName[werkzeug] + "   " + STR$(gw) + "x" + STR$(gh) + _
+           "   Bild " + STR$(aktBild + 1) + "/" + STR$(anzBild) + _
+           "   " + ebName[aktEb] + "   Pinsel " + STR$(pinsel) + _
+           "   Zoom " + STR$(zoom) + "x   Farbe " + COLOR_HEX$(farbe)
+    IF drauf THEN info = info + "   [" + STR$(tx) + ", " + STR$(ty) + "]"
+    IF selAn THEN info = info + "   Auswahl " + STR$(selB) + "x" + STR$(selH)
+    IF meldung <> "" THEN info = info + "   |   " + meldung
+    GUI_SET_TEXT(status, info)
+
+    FLIP()
+WEND
