@@ -282,3 +282,147 @@ NEXT
 PRINT "durch"
 ''', tmp_path, frames=40)
     assert aus == ["durch"]
+
+
+# ---------------------------------------------------------------------------
+# Animierte GIFs (IMAGE_SAVE_GIF)
+#
+# raylib kann GIFs nur LESEN. Fuer den Sprite-Editor war das die letzte
+# Einbahnstrasse: Einzelbilder erzeugen ja, sie als Bewegung ausgeben nicht.
+# Geschrieben wird ueber die `gif`-Crate -- ein LZW-Kodierer von Hand ist die
+# Art Code, die auf den ersten Blick stimmt und im Randfall still etwas
+# Falsches liefert.
+
+def _gif(tmp_path, name="a.gif"):
+    from PIL import Image
+    return Image.open(tmp_path / name)
+
+
+def test_gif_hat_die_bilder_und_das_tempo(tmp_path):
+    _run('''
+DIM b[3] AS IMAGE
+DIM f AS ARRAY OF INTEGER : f = [&HE84B4B, &H4BE87A, &H2BC4E8]
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8)
+    IMAGE_DRAW_RECT(b[i], i * 2, 1, 2, 6, f[i])
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 8)
+''', tmp_path)
+    im = _gif(tmp_path)
+    assert im.format == "GIF" and im.size == (8, 8)
+    assert im.n_frames == 3
+    # 8 Bilder/s -> 100/8 = 12,5 -> 13 Hundertstel -> 130 ms
+    assert im.info.get("duration") == 130
+    assert im.info.get("loop") == 0, "0 heisst endlos"
+
+
+def test_wenige_farben_bleiben_exakt(tmp_path):
+    """Bei Pixelgrafik wird die Farbtafel EXAKT gebaut. Ein Verfahren, das
+    immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht."""
+    from PIL import ImageSequence
+    _run('''
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HE84B4B)
+b[1] = IMAGE_NEW(4, 4, &H2BC4E8)
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+''', tmp_path)
+    bilder = [f.convert("RGBA").getpixel((1, 1))
+              for f in ImageSequence.Iterator(_gif(tmp_path))]
+    assert bilder == [(232, 75, 75, 255), (43, 196, 232, 255)]
+
+
+def test_durchsichtigkeit_kommt_mit(tmp_path):
+    from PIL import ImageSequence
+    _run('''
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(6, 6)
+IMAGE_DRAW_RECT(b[0], 0, 0, 3, 3, &HFF0000)
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+''', tmp_path)
+    erste = next(ImageSequence.Iterator(_gif(tmp_path))).convert("RGBA")
+    assert erste.getpixel((1, 1)) == (255, 0, 0, 255)
+    assert erste.getpixel((5, 5))[3] == 0, "leere Flaeche muss durchsichtig bleiben"
+
+
+def test_anzahl_begrenzt_ein_festes_feld(tmp_path):
+    """Ein `DIM b[16] AS IMAGE` mit drei belegten Plaetzen ist der Normalfall.
+    Ohne `anzahl` waeren die leeren Plaetze Fehler -- mit ihr gelten nur die
+    vorderen."""
+    _run('''
+DIM b[16] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(4, 4, &HFF0000)
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 10, TRUE, 3)
+''', tmp_path)
+    assert _gif(tmp_path).n_frames == 3
+
+
+def test_leerer_platz_ohne_anzahl_meldet_sich(tmp_path):
+    """... und ohne `anzahl` sagt die Meldung, was zu tun ist."""
+    aus = _run('''
+DIM b[4] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 10)
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+''', tmp_path)
+    assert "anzahl" in aus[0] and "leer" in aus[0]
+
+
+def test_wiederholen_laesst_sich_abschalten(tmp_path):
+    _run('''
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+IMAGE_SAVE_GIF(b, "a.gif", 10, FALSE)
+''', tmp_path)
+    assert _gif(tmp_path).info.get("loop") is None
+
+
+def test_verschieden_grosse_bilder_werden_abgelehnt(tmp_path):
+    """Ein GIF hat EINE Leinwand. Ein abweichendes Bild waere beschnitten
+    oder verschoben -- beides waere stiller Verlust."""
+    aus = _run('''
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+b[1] = IMAGE_NEW(5, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 10)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+''', tmp_path)
+    assert aus[0].strip() == "abgelehnt"
+
+
+def test_unsinniges_tempo_wird_abgelehnt(tmp_path):
+    aus = _run('''
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 0)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+''', tmp_path)
+    assert aus[0].strip() == "abgelehnt"
+
+
+def test_viele_farben_werden_zusammengefasst(tmp_path):
+    """Ueber 255 Farben kann GIF nicht -- dann wird zusammengefasst. Der
+    Zweig darf nicht abstuerzen und muss ein lesbares Bild liefern."""
+    _run('''
+DIM b[1] AS IMAGE
+b[0] = GENTEX_PERLIN(48, 48, 8.0)
+IMAGE_SAVE_GIF(b, "a.gif", 5)
+''', tmp_path)
+    im = _gif(tmp_path)
+    assert im.size == (48, 48)
+    assert len(im.convert("RGB").getcolors(70000)) <= 256

@@ -93,6 +93,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_SAVE(bild, pfad$)` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`) |
 | `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
 | `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
+| `IMAGE_SAVE_GIF(bilder, pfad$ [, fps [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
 
 ```basic
 IMPORT "imgfx"
@@ -152,6 +153,39 @@ Widget oder einem Sprite-Atlas melden sich immerhin, weil ihr Zeichenweg das
 Handle prüft. **Nicht anlegen ist billiger als anlegen und freigeben:** wer
 in einer Schleife Momentaufnahmen braucht, legt die Plätze besser einmal an
 und überschreibt sie mit `IMAGE_CLEAR` + `IMAGE_DRAW_IMAGE`.
+
+**Bewegte GIFs.** `IMAGE_SAVE_GIF` nimmt ein `ARRAY OF IMAGE` (oder ein
+TUPLE) und schreibt daraus eine Animation. `fps` ist die Bildrate (Vorgabe 10),
+`wiederholen` die Endlosschleife (Vorgabe TRUE), `anzahl` sagt, **wie viele
+Plätze des Feldes gelten** — ein `DIM b[16] AS IMAGE` mit drei belegten Plätzen
+ist der Normalfall, und die leeren wären sonst ein Fehler.
+
+```basic
+IMPORT "imgfx"
+DIM b[3] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(16, 16)
+    IMAGE_DRAW_CIRCLE(b[i], 4 + i * 4, 8, 3, &HE84B4B)
+NEXT
+IMAGE_SAVE_GIF(b, "lauf.gif", 8)
+```
+
+**Was GIF nicht kann, und was daraus folgt:**
+
+- **Höchstens 256 Farben je Bild.** Pixelgrafik bleibt fast immer darunter —
+  deshalb wird die Farbtafel *exakt* aus den vorhandenen Farben gebaut, solange
+  es höchstens 255 sind. Erst darüber wird zusammengefasst, und dann verschieben
+  sich Farben. Ein Verfahren, das immer zusammenfasst, hätte schon ein
+  Vier-Farben-Sprite verfälscht.
+- **Durchsichtigkeit nur ganz oder gar nicht.** Ein Punkt ist durchsichtig oder
+  deckend, nichts dazwischen; entschieden wird bei Deckkraft 128. Das Format
+  kennt nichts anderes.
+- **Eine Leinwand für alle Bilder.** Verschieden große Bilder werden abgelehnt
+  statt beschnitten — Beschneiden wäre stiller Verlust.
+- Die Dauer je Bild rechnet GIF in Hundertstelsekunden. Unter 2 legen die
+  meisten Betrachter still ihre eigene fest (meist 10), deshalb wird dort
+  geklemmt: sonst liefe die Ausgabe **langsamer** als verlangt, ohne Hinweis.
 
 **Nicht dabei: Bilder ueber die Zwischenablage.** `CLIPBOARD_GET`/`SET` koennen
 nur Text. raylibs `GetClipboardImage` gibt es nur unter Windows, und ein Befehl,

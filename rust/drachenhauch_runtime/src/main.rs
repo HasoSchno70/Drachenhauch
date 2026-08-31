@@ -31,6 +31,7 @@ mod ini;
 mod xml;
 mod pdf;
 mod xlsx;
+mod gifschreiber;
 mod geld;
 mod httpd;
 #[cfg(feature = "smtp")]

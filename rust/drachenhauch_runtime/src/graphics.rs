@@ -3302,6 +3302,35 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         img.get_color(x, y).a as i64
     }
 
+    /// Mehrere Bilder als animiertes GIF schreiben (IMAGE_SAVE_GIF).
+    ///
+    /// `verzoegerung` in Hundertstelsekunden. Die Bilder werden HIER in
+    /// RGBA umgewandelt -- der Schreiber selbst kennt raylib nicht und ist
+    /// damit fuer sich testbar (siehe gifschreiber.rs).
+    pub fn image_save_gif(&mut self, handles: &[i64], pfad: &str,
+                          verzoegerung: u16, wiederholen: bool) -> Result<(), String> {
+        let mut bilder = Vec::with_capacity(handles.len());
+        for &idx in handles {
+            if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_SAVE_GIF")); }
+            let img = &self.textures[idx as usize].img;
+            let (w, h) = (img.width, img.height);
+            if w <= 0 || h <= 0 || w > u16::MAX as i32 || h > u16::MAX as i32 {
+                return Err(std::format!("IMAGE_SAVE_GIF: Bildgroesse {}x{} geht nicht", w, h));
+            }
+            let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+            for y in 0..h {
+                for x in 0..w {
+                    let c = img.get_color(x, y);
+                    rgba.extend_from_slice(&[c.r, c.g, c.b, c.a]);
+                }
+            }
+            bilder.push(crate::gifschreiber::Bild {
+                breite: w as u16, hoehe: h as u16, rgba,
+            });
+        }
+        crate::gifschreiber::schreiben(pfad, &bilder, verzoegerung, wiederholen)
+    }
+
     /// Ein Bild in eine Datei schreiben (IMAGE_SAVE).
     ///
     /// Das Format bestimmt die Endung. Ton konnte sich seit dem SFX-Editor

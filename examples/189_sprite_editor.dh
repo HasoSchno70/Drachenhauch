@@ -24,7 +24,8 @@
 '                Ebenen) und eine JSON-Datei daneben mit Massen, Namen und
 '                Sichtbarkeit. Beides fuer sich lesbar.
 '    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
-'                ATLAS_LOAD direkt liest -- der Kreis schliesst sich)
+'                ATLAS_LOAD direkt liest -- der Kreis schliesst sich),
+'                bewegtes GIF (Tempo aus dem Vorschau-Regler)
 '    Eingabe     [Oeffnen] nimmt beides: `.dhsprite` mit Ebenen, oder einen
 '                Streifen samt Atlas-JSON. Beim Streifen sind die Ebenen
 '                weg -- er IST das zusammengerechnete Bild. Die Endung
@@ -32,9 +33,9 @@
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Lasso, Zauberstab, Verschieben-Werkzeug, animierte GIFs (dafuer fehlt
-'    der Laufzeit ein Befehl), .gpl-Paletten, Kachel-Vorschau 3x3, benannte
-'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik. Das
+'    Lasso, Zauberstab, Verschieben-Werkzeug, .gpl-Paletten,
+'    Kachel-Vorschau 3x3, benannte Animationsbereiche, Zuschneiden/Groesse
+'    aendern, Statistik. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -469,6 +470,27 @@ FUNCTION rasterPfad$(pfad AS STRING) AS STRING
     RETURN pfad + ".png"
 END FUNCTION
 
+' Alle Einzelbilder als bewegtes GIF. Jedes wird vorher zusammengerechnet --
+' ein GIF kennt keine Ebenen, und "unsichtbar" heisst hier: kommt nicht mit.
+SUB gifSichern(pfad AS STRING, fps AS FLOAT)
+    DIM ausgabe[MAXBILD] AS IMAGE
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        ausgabe[i] = IMAGE_NEW(gw, gh)
+        FOR k = 0 TO anzEb - 1
+            IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(ausgabe[i], ebene[i, k], 0, 0)
+        NEXT
+    NEXT
+    ' `anzahl` sagt, wie viele Plaetze des Feldes gelten -- ohne das kaemen
+    ' die unbenutzten als leere Bilder mit in die Bewegung.
+    IMAGE_SAVE_GIF(ausgabe, pfad, fps, TRUE, anzBild)
+    FOR i = 0 TO anzBild - 1
+        IMAGE_FREE(ausgabe[i])
+    NEXT
+    meldung = STR$(anzBild) + " Bilder mit " + FORMAT$(fps, "%.0f") + "/s: " + BASENAME(pfad)
+END SUB
+
 SUB nativSichern(pfad AS STRING)
     ' Raster aufbauen: Spalte = Einzelbild, Zeile = Ebene.
     DIM raster AS IMAGE : raster = IMAGE_NEW(gw * anzBild, gh * anzEb)
@@ -608,12 +630,14 @@ DIM bPng AS GUI_WIDGET     : bPng     = GUI_BUTTON(win, "PNG", 222, 7, 52, 32)
 GUI_TOOLTIP(bPng, "Nur das aktuelle Einzelbild, zusammengerechnet")
 DIM bBlatt AS GUI_WIDGET   : bBlatt   = GUI_BUTTON(win, "Streifen", 278, 7, 86, 32)
 GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne Ebenen)")
+DIM bGif AS GUI_WIDGET     : bGif     = GUI_BUTTON(win, "GIF", 368, 7, 52, 32)
+GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Vorschau-Regler")
 
 CONST WZ_B = 88
 DIM wzName AS ARRAY OF STRING
 wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Pipette|Auswahl|Spruehen", "|")
 DIM wzKnopf[9] AS GUI_WIDGET
-DIM wx AS INTEGER : wx = 376
+DIM wx AS INTEGER : wx = 432
 DIM i AS INTEGER
 FOR i = 0 TO 8
     wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
@@ -810,6 +834,17 @@ WHILE NOT QUITREQUESTED()
                 ELSE
                     streifenLaden(po)
                 END IF
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bGif) THEN
+        DIM pg AS STRING
+        pg = FILE_SAVE_DIALOG("Bewegtes GIF sichern", "sprite.gif", "gif")
+        IF pg <> "" THEN
+            TRY
+                gifSichern(pg, GUI_VALUE(slTempo))
             CATCH e
                 meldung = e
             END TRY

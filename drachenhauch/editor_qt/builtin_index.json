@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1596,
+ "count": 1597,
  "builtins": [
   {
    "name": "ABS",
@@ -4284,6 +4284,12 @@
    "name": "IMAGE_SAVE",
    "kind": "core",
    "signature": "IMAGE_SAVE(bild, pfad$)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_SAVE_GIF",
+   "kind": "core",
+   "signature": "IMAGE_SAVE_GIF(bilder, pfad$ [, fps [, wiederholen [, anzahl]]])",
    "module": "imgfx"
   },
   {
