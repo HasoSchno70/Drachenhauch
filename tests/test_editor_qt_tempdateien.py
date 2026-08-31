@@ -112,6 +112,15 @@ def test_ide_raeumt_beim_start_auf(tmp_path, monkeypatch):
     QApplication.instance() or QApplication([])
     monkeypatch.setattr(mw, "save_settings", lambda *_a, **_kw: None)
     monkeypatch.setattr(mw, "clear_autosaves", lambda *_a, **_kw: None)
+    # Die Live-Fehlerpruefung stilllegen. Sie startet je Editor-Fenster
+    # `dhrt --check`-Subprozesse in Hintergrund-Faeden; der Testlauf endet
+    # aber per `os._exit()` (DH_TEST_HARTES_ENDE). Trifft das einen Faden
+    # mitten im Prozessstart, stirbt der Prozess unter Windows mit einer
+    # Zugriffsverletzung -- auf dem CI-Rechner hing der ganze Qt-Durchgang
+    # daran und lief in die Zeitgrenze. `_find_dhrt` ist dafuer die
+    # vorgesehene Naht (siehe Kommentar in error_check.py).
+    from drachenhauch.editor_qt import error_check
+    monkeypatch.setattr(error_check, "_find_dhrt", lambda *_a, **_k: None)
 
     (tmp_path / "examples").mkdir()
     rest = tmp_path / "examples" / "_dhtmp_999999_abcd1234.dh"

@@ -81,11 +81,32 @@ def _dateien() -> list[str]:
 def _lauf(datei: str, extra: list[str]) -> tuple[str, int, str]:
     t0 = time.perf_counter()
     umgebung = dict(os.environ, DH_TEST_HARTES_ENDE="1")
-    p = subprocess.run(
-        [sys.executable, "-m", "pytest", str(_ROOT / "tests" / datei), "-q",
-         "-p", "no:cacheprovider", *extra],
-        cwd=_ROOT, capture_output=True, text=True, env=umgebung,
-    )
+    try:
+        p = subprocess.run(
+            [sys.executable, "-m", "pytest", str(_ROOT / "tests" / datei), "-q",
+             "-p", "no:cacheprovider", *extra],
+            cwd=_ROOT, capture_output=True, text=True, env=umgebung,
+            # OHNE Zeitgrenze haengt der GANZE Durchgang, wenn eine Datei
+            # nicht zurueckkommt -- und zwar ohne zu sagen, welche: die
+            # Ausgabe ist gepuffert, `pool.map` liefert der Reihe nach, und
+            # der Job laeuft blind in seine Zeitgrenze. Genau so ist es am
+            # 2026-08-31 zweimal passiert.
+            #
+            # Der Haenger entsteht so: ein Test baut ein Editor-Fenster,
+            # dessen Fehlerpruefung startet `dhrt --check` -- ein ENKEL, der
+            # die hiesigen Pipes erbt. Endet pytest per `os._exit`
+            # (DH_TEST_HARTES_ENDE) waehrend der Enkel noch laeuft, wartet
+            # `capture_output` weiter auf ein Dateiende, das nie kommt.
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired as e:
+        dauer = time.perf_counter() - t0
+        teil = (e.stdout or b"")
+        if isinstance(teil, bytes):
+            teil = teil.decode("utf-8", "replace")
+        return datei, 1, (
+            f"{dauer:5.1f}s  ZEITGRENZE (300 s) -- haengt.\n"
+            f"Bisherige Ausgabe:\n{teil}")
     dauer = time.perf_counter() - t0
     letzte = [z for z in p.stdout.strip().splitlines() if z.strip()]
     kurz = letzte[-1] if letzte else "(keine Ausgabe)"
