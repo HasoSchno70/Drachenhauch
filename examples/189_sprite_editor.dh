@@ -19,19 +19,24 @@
 '    Farbe       Farbwaehler + 16er-Palette + Pipette
 '    Auswahl     Strg+C/X/V, Entf leert
 '    Historie    Strg+Z / Strg+Y, 24 Schritte
+'    Dateien     [Sichern]/[Oeffnen] .dhsprite -- das eigene Format MIT
+'                Ebenen: ein Raster-PNG (Spalten = Einzelbilder, Zeilen =
+'                Ebenen) und eine JSON-Datei daneben mit Massen, Namen und
+'                Sichtbarkeit. Beides fuer sich lesbar.
 '    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich)
-'    Eingabe     [Oeffnen] holt einen Streifen samt Atlas-JSON zurueck.
-'                Die EBENEN sind dabei weg: der Streifen ist das
-'                zusammengerechnete Bild, jedes Einzelbild kommt also auf
-'                einer Ebene an. Das steht so in der Datei.
+'    Eingabe     [Oeffnen] nimmt beides: `.dhsprite` mit Ebenen, oder einen
+'                Streifen samt Atlas-JSON. Beim Streifen sind die Ebenen
+'                weg -- er IST das zusammengerechnete Bild. Die Endung
+'                entscheidet, nicht der Nutzer.
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Lasso, Zauberstab, Verschieben-Werkzeug, das native .dhsprite-Format
-'    (mit Ebenen), animierte GIFs (dafuer fehlt der Laufzeit ein Befehl),
-'    .gpl-Paletten, Kachel-Vorschau 3x3, benannte Animationsbereiche,
-'    Zuschneiden/Groesse aendern, Statistik.
+'    Lasso, Zauberstab, Verschieben-Werkzeug, animierte GIFs (dafuer fehlt
+'    der Laufzeit ein Befehl), .gpl-Paletten, Kachel-Vorschau 3x3, benannte
+'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik. Das
+'    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
+'    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
 '  Bedienung:
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
@@ -450,6 +455,89 @@ FUNCTION atlasJson$(pngName AS STRING) AS STRING
 END FUNCTION
 
 ' ---------------------------------------------------------------- Laden
+' ---------------------------------------------------------------- .dhsprite
+' Das eigene Format: ein RASTER-PNG (Spalten = Einzelbilder, Zeilen =
+' Ebenen) und eine JSON-Datei daneben mit Massen, Ebenennamen und
+' Sichtbarkeit. Der Streifen kann das nicht -- er ist das
+' zusammengerechnete Bild.
+'
+' Warum nicht alles in EINE Datei? Weil ein PNG, das jeder Bildbetrachter
+' oeffnet, mehr wert ist als ein Format, das nur sein Erzeuger ansehen kann.
+' Die Pixel in JSON zu stecken (base64) haette beides verloren: lesbar waere
+' es auch nicht, und schreiben muesste man es Punkt fuer Punkt.
+FUNCTION rasterPfad$(pfad AS STRING) AS STRING
+    RETURN pfad + ".png"
+END FUNCTION
+
+SUB nativSichern(pfad AS STRING)
+    ' Raster aufbauen: Spalte = Einzelbild, Zeile = Ebene.
+    DIM raster AS IMAGE : raster = IMAGE_NEW(gw * anzBild, gh * anzEb)
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        FOR k = 0 TO anzEb - 1
+            IMAGE_DRAW_IMAGE(raster, ebene[i, k], i * gw, k * gh)
+        NEXT
+    NEXT
+    IMAGE_SAVE(raster, rasterPfad$(pfad))
+    IMAGE_FREE(raster)
+
+    ' Die Beschreibung ueber das json-Modul, nicht von Hand: Ebenennamen
+    ' sind Nutzertext, und die Maskierung will man nicht selbst schreiben.
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "format", "dhsprite-gitter-1")
+    JSON_SET_STRING(h, "bild", BASENAME(rasterPfad$(pfad)))
+    JSON_SET_INT(h, "breite", gw)
+    JSON_SET_INT(h, "hoehe", gh)
+    JSON_SET_INT(h, "bilder", anzBild)
+    JSON_SET_JSON(h, "ebenen", JSON_NEW_ARRAY())
+    FOR k = 0 TO anzEb - 1
+        DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+        JSON_SET_STRING(e, "name", ebName[k])
+        JSON_SET_BOOL(e, "sichtbar", ebSicht[k] = 1)
+        JSON_APPEND_JSON(h, "ebenen", e)
+    NEXT
+    WRITEALL(pfad, JSON_PRETTY(h))
+    meldung = STR$(anzBild) + " Bilder x " + STR$(anzEb) + " Ebenen: " + BASENAME(pfad)
+END SUB
+
+SUB nativLaden(pfad AS STRING)
+    DIM h AS JSON_HANDLE : h = JSON_LOAD(pfad)
+    DIM bw AS INTEGER : bw = JSON_GET_INT(h, "breite")
+    DIM bh AS INTEGER : bh = JSON_GET_INT(h, "hoehe")
+    DIM nb AS INTEGER : nb = JSON_GET_INT(h, "bilder")
+    DIM ne AS INTEGER : ne = JSON_LEN(h, "ebenen")
+    IF bw < 1 OR bh < 1 OR bw > MAXG OR bh > MAXG OR nb < 1 OR ne < 1 THEN
+        meldung = "Das ist keine brauchbare .dhsprite-Beschreibung."
+    ELSE
+        ' Der Bildname steht in der Datei, gesucht wird aber NEBEN ihr --
+        ' sonst bricht ein verschobenes Paar auseinander.
+        DIM bild AS STRING : bild = rasterPfad$(pfad)
+        IF NOT FILEEXISTS(bild) THEN
+            meldung = "Das Raster fehlt: " + bild
+        ELSE
+            DIM raster AS IMAGE : raster = LOADIMAGE(bild)
+            neuesSprite(bw, bh)
+            anzBild = MIN(nb, MAXBILD)
+            anzEb = MIN(ne, MAXEB)
+            DIM i AS INTEGER
+            DIM k AS INTEGER
+            FOR k = 0 TO anzEb - 1
+                ebName[k] = JSON_GET_STRING(h, "ebenen." + STR$(k) + ".name")
+                IF ebName[k] = "" THEN ebName[k] = "Ebene " + STR$(k + 1)
+                ebSicht[k] = IIF(JSON_GET_BOOL(h, "ebenen." + STR$(k) + ".sichtbar"), 1, 0)
+                FOR i = 0 TO anzBild - 1
+                    IMAGE_DRAW_IMAGE(ebene[i, k], raster, 0, 0, i * bw, k * bh, bw, bh)
+                NEXT
+            NEXT
+            IMAGE_FREE(raster)
+            aktBild = 0 : aktEb = 0
+            listenAuffrischen()
+            meldung = STR$(anzBild) + " Bilder x " + STR$(anzEb) + " Ebenen aus " + BASENAME(pfad)
+        END IF
+    END IF
+END SUB
+
 ' Einen Streifen samt Atlas-JSON zurueckholen. Die Ebenen sind dabei weg:
 ' der Streifen ist das ZUSAMMENGERECHNETE Bild, jedes Einzelbild kommt also
 ' auf einer Ebene zurueck. Das ist keine Nachlaessigkeit, sondern steht so
@@ -508,18 +596,24 @@ GUI_WINDOW_CHROME(win, FALSE)
 DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, SW, TB_H)
 GUI_SET_ANCHOR(tb, "lr")
 
-DIM bNeu AS GUI_WIDGET   : bNeu   = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
-DIM bPng AS GUI_WIDGET   : bPng   = GUI_BUTTON(win, "PNG", 76, 7, 62, 32)
-DIM bBlatt AS GUI_WIDGET : bBlatt = GUI_BUTTON(win, "Streifen + Atlas", 142, 7, 150, 32)
-GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON")
-DIM bOeffnen AS GUI_WIDGET : bOeffnen = GUI_BUTTON(win, "Oeffnen", 296, 7, 84, 32)
-GUI_TOOLTIP(bOeffnen, "Einen Streifen samt Atlas-JSON zurueckholen")
+' Die Dateiknoepfe. Ihre Breiten sind gerechnet, nicht geraten -- der
+' "Oeffnen"-Knopf lag vorher UNTER dem ersten Werkzeug und war damit gar
+' nicht anklickbar. Das zeigt kein Test, nur das gerenderte Bild.
+DIM bNeu AS GUI_WIDGET     : bNeu     = GUI_BUTTON(win, "Neu", 10, 7, 52, 32)
+DIM bOeffnen AS GUI_WIDGET : bOeffnen = GUI_BUTTON(win, "Oeffnen", 66, 7, 74, 32)
+GUI_TOOLTIP(bOeffnen, "Eigenes Format (.dhsprite, mit Ebenen) ODER einen Streifen + Atlas")
+DIM bSichern AS GUI_WIDGET : bSichern = GUI_BUTTON(win, "Sichern", 144, 7, 74, 32)
+GUI_TOOLTIP(bSichern, "Eigenes Format .dhsprite -- behaelt Ebenen und Namen")
+DIM bPng AS GUI_WIDGET     : bPng     = GUI_BUTTON(win, "PNG", 222, 7, 52, 32)
+GUI_TOOLTIP(bPng, "Nur das aktuelle Einzelbild, zusammengerechnet")
+DIM bBlatt AS GUI_WIDGET   : bBlatt   = GUI_BUTTON(win, "Streifen", 278, 7, 86, 32)
+GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne Ebenen)")
 
 CONST WZ_B = 88
 DIM wzName AS ARRAY OF STRING
 wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Pipette|Auswahl|Spruehen", "|")
 DIM wzKnopf[9] AS GUI_WIDGET
-DIM wx AS INTEGER : wx = 306
+DIM wx AS INTEGER : wx = 376
 DIM i AS INTEGER
 FOR i = 0 TO 8
     wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
@@ -705,10 +799,28 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
     IF GUI_CLICKED(bOeffnen) THEN
-        DIM po AS STRING : po = FILE_OPEN_DIALOG("Streifen oeffnen", "png")
+        DIM po AS STRING
+        po = FILE_OPEN_DIALOG("Oeffnen", "dhsprite,png")
         IF po <> "" THEN
             TRY
-                streifenLaden(po)
+                ' Die Endung entscheidet -- zwei Knoepfe fuer "oeffnen" waeren
+                ' eine Frage, die der Rechner selbst beantworten kann.
+                IF RIGHT$(LOWER$(po), 9) = ".dhsprite" THEN
+                    nativLaden(po)
+                ELSE
+                    streifenLaden(po)
+                END IF
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bSichern) THEN
+        DIM ps AS STRING
+        ps = FILE_SAVE_DIALOG("Sichern", "sprite.dhsprite", "dhsprite")
+        IF ps <> "" THEN
+            TRY
+                nativSichern(ps)
             CATCH e
                 meldung = e
             END TRY
