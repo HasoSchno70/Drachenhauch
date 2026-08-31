@@ -104,7 +104,22 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("panel",     "Panel",        160, 100, (), has_text=True),
     PaletteSpec("groupbox",  "GroupBox",     160, 100, (), has_text=True),
     PaletteSpec("separator", "Separator",    160,  8, ()),
+    PaletteSpec("textarea",  "TextArea",     220, 90, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("spinner",   "Zahlenfeld",   120, 24, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("knob",      "Drehknopf",     48, 48, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("toggle",    "Umschalter",    46, 22, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
+    PaletteSpec("tree",      "Baum",         180, 140, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
+    PaletteSpec("toolbar",   "Werkzeugleiste", 240, 32, ()),
+    PaletteSpec("splitter",  "Trenner",      160,  6, _ZEIGEN),
+    PaletteSpec("colorpicker", "Farbwaehler", 200, 150, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("datepicker", "Datumswaehler", 200, 180, ("on_change",) + _ZEIGEN + _FOKUS),
 ]
+
+# Arten, deren Konstruktor die Groesse SELBST bestimmt -- danach muss
+# `GUI_SET_BOUNDS` die im Designer eingestellte wiederherstellen, sonst geht
+# sie verloren und das Anchoring rechnet mit einer falschen Basis.
+_EIGENE_GROESSE = ("label", "checkbox", "radio", "slider", "separator",
+                   "toggle", "splitter", "spinner", "knob")
 
 _SPEC_BY_KIND = {p.kind: p for p in PALETTE}
 
@@ -114,6 +129,32 @@ def palette_spec(kind: str) -> PaletteSpec | None:
 
 
 # --- GB-Code-Emit-Helfer (fuer generate_gb_code) ----------------------------
+def _knoten_liste(tj) -> list:
+    """Die `nodes`-Liste aus einem `tree`-Feld -- oder eine leere."""
+    if isinstance(tj, dict) and isinstance(tj.get("nodes"), list):
+        return [n for n in tj["nodes"] if isinstance(n, dict)]
+    return []
+
+
+def _baum_knoten(c) -> list | None:
+    """Knoten fuer die Datei -- aus `items` gebaut, ODER die vorhandenen.
+
+    **Ein tieferer Baum wird NICHT ueberschrieben.** Wer eine Datei oeffnet,
+    die ein Programm mit verschachtelten Knoten gespeichert hat, soll sie
+    nicht dadurch verlieren, dass der Designer nur die oberste Ebene anzeigt.
+    Neu gebaut wird nur, wenn alle vorhandenen Knoten auf der obersten Ebene
+    liegen -- dann ist `items` die vollstaendige Wahrheit.
+    """
+    vorhanden = _knoten_liste(c.extra.get("tree"))
+    tief = any(int(n.get("parent", -1)) >= 0 for n in vorhanden)
+    if tief:
+        return None                      # unveraendert durchreichen (via extra)
+    if not c.items:
+        return vorhanden or None
+    return [{"label": str(t), "parent": -1, "level": 0,
+             "expanded": False, "has_children": False} for t in c.items]
+
+
 def _gb_str(s: str) -> str:
     """Drachenhauch-String-Literal: `"` wird zu `""` escaped, Zeilenumbrueche raus."""
     t = str(s).replace("\r", " ").replace("\n", " ").replace('"', '""')
@@ -122,6 +163,16 @@ def _gb_str(s: str) -> str:
 
 def _gb_hex(i: int) -> str:
     return f"&H{int(i) & 0xFFFFFF:06X}"
+
+
+def hex_zu_int(t) -> int | None:
+    """`"#RRGGBB"` (so schreibt die Laufzeit den Farbwert) -> Zahl."""
+    if not isinstance(t, str):
+        return None
+    try:
+        return int(t.lstrip("#"), 16) & 0xFFFFFF
+    except ValueError:
+        return None
 
 
 def _gb_bool(b: bool) -> str:
@@ -381,6 +432,11 @@ class Control:
             d["font_size"] = self.font_size
         if self.anchor and self.anchor != "lt":
             d["anchor"] = self.anchor
+        if self.kind == "tree":
+            knoten = _baum_knoten(self)
+            if knoten is not None:
+                d["tree"] = {"nodes": knoten,
+                             "selected": (self.extra.get("tree") or {}).get("selected", -1)}
         for k, v in self.extra.items():       # unbekannte Laufzeit-Felder zurueckgeben
             # tief kopiert: `to_dict()` liefert auch die Undo-Snapshots -- ein
             # geteiltes `table`/`menus`-Dict wuerde einen alten Snapshot
@@ -401,6 +457,12 @@ class Control:
         items_src = d.get("items")
         items = [x for x in items_src if isinstance(x, str)] \
             if isinstance(items_src, list) else []
+        # Ein von der LAUFZEIT gespeicherter Baum hat kein `items`, sondern
+        # `tree.nodes`. Die oberste Ebene daraus fuellt die Liste, damit der
+        # Designer zeigt, was in der Datei steht.
+        if d.get("kind") == "tree" and not items:
+            items = [str(n.get("label", "")) for n in _knoten_liste(d.get("tree"))
+                     if int(n.get("parent", -1)) < 0]
         extra = {k: v for k, v in d.items() if k not in cls._KNOWN}
         return cls(
             kind=_as_str(d, "kind", "label") or "label",
@@ -1023,6 +1085,54 @@ class FormDoc:
             # Normalfall zur Laufzeit gefuellt (Datei, Datenbank), nicht im
             # Designer abgetippt.
             out.append(f"' {var}: Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
+        elif k == "textarea":
+            out.append(f"{var} = GUI_TEXTAREA(frm, {c.x}, {c.y}, {c.w}, {c.h}, "
+                       f"{_gb_str(c.placeholder)})")
+        elif k == "spinner":
+            # GUI_SPINNER kennt keine Hoehe -- die Zeile darunter holt sie zurueck.
+            out.append(f"{var} = GUI_SPINNER(frm, {c.x}, {c.y}, {c.w}, "
+                       f"{_gb_num(c.min)}, {_gb_num(c.max)}, {_gb_num(c.value)})")
+        elif k == "knob":
+            # Ein Drehknopf ist rund: EIN Mass, keine Breite/Hoehe.
+            out.append(f"{var} = GUI_KNOB(frm, {c.x}, {c.y}, {min(c.w, c.h)}, "
+                       f"{_gb_num(c.min)}, {_gb_num(c.max)}, {_gb_num(c.value)})")
+        elif k == "toggle":
+            out.append(f"{var} = GUI_TOGGLE(frm, {_gb_str(c.text)}, {c.x}, {c.y}, "
+                       f"{_gb_bool(c.checked)})")
+        elif k == "toolbar":
+            out.append(f"{var} = GUI_TOOLBAR(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+        elif k == "splitter":
+            # `text` traegt die Richtung ("h"/"v"), min/max die Grenzen, in die
+            # der Nutzer den Trenner schieben darf.
+            richtung = (c.text or "h").lower()
+            if richtung not in ("h", "v"):
+                richtung = "h"
+            laenge = c.h if richtung == "v" else c.w
+            mn, mx = int(c.min), int(c.max)
+            if mx <= mn:
+                mn, mx = 40, max(80, laenge)
+            out.append(f"{var} = GUI_SPLITTER(frm, {c.x}, {c.y}, {laenge}, "
+                       f"{_gb_str(richtung)}, {mn}, {mx})")
+        elif k == "tree":
+            out.append(f"{var} = GUI_TREE(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            # `items` sind die Knoten der obersten Ebene. Tiefere Baeume baut
+            # das Programm zur Laufzeit -- ein Baum ist Daten, kein Layout.
+            for it in c.items:
+                out.append(f"GUI_TREE_ADD({var}, -1, {_gb_str(it)})")
+            if c.items:
+                out.append(f"' {var}: tiefere Ebenen mit GUI_TREE_ADD({var}, elternIndex, text$)")
+        elif k == "colorpicker":
+            out.append(f"{var} = GUI_COLORPICKER(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            f = hex_zu_int(c.extra.get("color_value"))
+            if f is not None:
+                out.append(f"GUI_SET_PICKED_COLOR({var}, {_gb_hex(f)})")
+        elif k == "datepicker":
+            out.append(f"{var} = GUI_DATEPICKER(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            d = c.extra.get("date")
+            # Ohne Datum zeigt ein frischer Waehler HEUTE -- das ist fast immer
+            # gewollt und darf nicht durch ein eingefrorenes Datum ersetzt werden.
+            if isinstance(d, str) and d:
+                out.append(f"GUI_SET_DATE({var}, {_gb_str(d)})")
         elif k in ("dropdown", "listbox"):
             iv = var + "_items"
             out.append(f"DIM {iv}[{len(c.items)}] AS STRING")   # 1D ARRAY OF STRING
@@ -1036,7 +1146,7 @@ class FormDoc:
         # Textlaenge, Checkbox/Radio aus `check_size`, Slider/Separator aus den
         # Metriken) -- die im Designer eingestellte Groesse ginge sonst verloren
         # und das Anchoring rechnete mit einer falschen Basis.
-        if k in ("label", "checkbox", "radio", "slider", "separator"):
+        if k in _EIGENE_GROESSE:
             out.append(f"GUI_SET_BOUNDS({var}, {c.x}, {c.y}, {c.w}, {c.h})")
         # Nachbearbeitung (nur abweichende Werte)
         if k == "dropdown" and c.sel not in (-1, 0):
