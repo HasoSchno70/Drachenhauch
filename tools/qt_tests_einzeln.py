@@ -78,8 +78,14 @@ def _dateien() -> list[str]:
     return treffer
 
 
+_LAEUFT: set = set()
+_SPERRE = __import__("threading").Lock()
+
+
 def _lauf(datei: str, extra: list[str]) -> tuple[str, int, str]:
     t0 = time.perf_counter()
+    with _SPERRE:
+        _LAEUFT.add(datei)
     umgebung = dict(os.environ, DH_TEST_HARTES_ENDE="1")
     try:
         p = subprocess.run(
@@ -108,6 +114,8 @@ def _lauf(datei: str, extra: list[str]) -> tuple[str, int, str]:
             f"{dauer:5.1f}s  ZEITGRENZE (300 s) -- haengt.\n"
             f"Bisherige Ausgabe:\n{teil}")
     dauer = time.perf_counter() - t0
+    with _SPERRE:
+        _LAEUFT.discard(datei)
     letzte = [z for z in p.stdout.strip().splitlines() if z.strip()]
     kurz = letzte[-1] if letzte else "(keine Ausgabe)"
     return datei, p.returncode, f"{dauer:5.1f}s  {kurz}" if p.returncode == 0 else (
@@ -121,14 +129,28 @@ def main() -> int:
     args, extra = ap.parse_known_args()
 
     dateien = _dateien()
-    print(f"{len(dateien)} Qt-Dateien, je ein eigener Prozess, {args.j} gleichzeitig")
+    print(f"{len(dateien)} Qt-Dateien, je ein eigener Prozess, {args.j} gleichzeitig",
+          flush=True)
     t0 = time.perf_counter()
     fehler = []
-    with ThreadPoolExecutor(max_workers=args.j) as pool:
-        for datei, rc, text in pool.map(lambda d: _lauf(d, extra), dateien):
-            print(f"  {'ok ' if rc == 0 else 'FEHL'} {datei:52s} {text}")
-            if rc != 0:
-                fehler.append(datei)
+    # `flush=True` ueberall: ohne das sammelt Python die Ausgabe (kein
+    # Terminal am anderen Ende) und gibt sie erst beim Beenden aus -- stirbt
+    # der Lauf vorher, sieht man GAR NICHTS. Genau daran haben zwei
+    # CI-Fehlschlaege gekostet.
+    try:
+        with ThreadPoolExecutor(max_workers=args.j) as pool:
+            for datei, rc, text in pool.map(lambda d: _lauf(d, extra), dateien):
+                print(f"  {'ok ' if rc == 0 else 'FEHL'} {datei:52s} {text}", flush=True)
+                if rc != 0:
+                    fehler.append(datei)
+    except KeyboardInterrupt:
+        # Von aussen abgebrochen (auf Windows auch: Ctrl-Break an die
+        # Prozessgruppe). Sagen, was noch lief -- sonst bleibt nur die
+        # Stelle, an der die Ausgabe abriss, und die ist nicht dasselbe.
+        with _SPERRE:
+            offen = sorted(_LAEUFT)
+        print(f"\n  ABGEBROCHEN. Noch in Arbeit: {offen or '(nichts)'}", flush=True)
+        raise
     print(f"\n{len(dateien) - len(fehler)}/{len(dateien)} gruen "
           f"in {time.perf_counter() - t0:.1f}s")
     if fehler:
