@@ -4222,6 +4222,70 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // --- tiled-Modul (TILED_*) ---
         "tiled_load" => { arity!(1); Ok(Value::Tiled(crate::tiled::load(need_str(&a[0], "TILED_LOAD")?)?)) }
+        // Anlegen und Speichern -- ohne die beiden kann ein Programm Karten
+        // nur BENUTZEN, nicht bauen.
+        "tiled_new" => {
+            arity!(4);
+            Ok(Value::Tiled(crate::tiled::neu(
+                need_int(&a[0], "TILED_NEW")?, need_int(&a[1], "TILED_NEW")?,
+                need_int(&a[2], "TILED_NEW")?, need_int(&a[3], "TILED_NEW")?)?))
+        }
+        "tiled_add_layer" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_ADD_LAYER")?;
+            Ok(Value::Int(crate::tiled::ebene_anhaengen(&m, need_str(&a[1], "TILED_ADD_LAYER")?)?))
+        }
+        "tiled_add_tileset" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_ADD_TILESET")?;
+            Ok(Value::Int(crate::tiled::tileset_anhaengen(
+                &m, need_str(&a[1], "TILED_ADD_TILESET")?,
+                need_int(&a[2], "TILED_ADD_TILESET")?)?))
+        }
+        "tiled_layer_rename" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_LAYER_RENAME")?;
+            crate::tiled::ebene_umbenennen(
+                &m, need_int(&a[1], "TILED_LAYER_RENAME")?,
+                need_str(&a[2], "TILED_LAYER_RENAME")?)?;
+            Ok(Value::Nil)
+        }
+        "tiled_layer_set_visible" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_LAYER_SET_VISIBLE")?;
+            crate::tiled::ebene_sichtbar_setzen(
+                &m, need_int(&a[1], "TILED_LAYER_SET_VISIBLE")?,
+                need_flag(&a[2], "TILED_LAYER_SET_VISIBLE")?)?;
+            Ok(Value::Nil)
+        }
+        "tiled_layer_visible" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_VISIBLE")?;
+            let mb = m.borrow();
+            let i = need_int(&a[1], "TILED_LAYER_VISIBLE")?;
+            if i < 0 || i as usize >= mb.layers.len() {
+                return Err(std::format!("TILED_LAYER_VISIBLE: Ebene {} gibt es nicht", i));
+            }
+            Ok(Value::Bool(mb.layers[i as usize].visible))
+        }
+        "tiled_remove_layer" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_REMOVE_LAYER")?;
+            crate::tiled::ebene_entfernen(&m, need_int(&a[1], "TILED_REMOVE_LAYER")?)?;
+            Ok(Value::Nil)
+        }
+        "tiled_save" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_SAVE")?;
+            crate::tiled::speichern(&m, need_str(&a[1], "TILED_SAVE")?)?;
+            Ok(Value::Nil)
+        }
+        "tiled_tileset_tiles" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_TILESET_TILES")?; let mb = m.borrow();
+            let i = need_int(&a[1], "TILED_TILESET_TILES")?;
+            Ok(Value::Int(mb.tilesets.get(i.max(0) as usize).map(|t| t.tile_count).unwrap_or(0)))
+        }
         "tiled_width" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_WIDTH")?.borrow().width)) }
         "tiled_height" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_HEIGHT")?.borrow().height)) }
         "tiled_tile_width" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILE_WIDTH")?.borrow().tile_w)) }

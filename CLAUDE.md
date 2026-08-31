@@ -26,27 +26,41 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > ausschließlich `dhrt` (`rust/drachenhauch_runtime/src/`: `lexer.rs`/`parser.rs`/
 > `compiler.rs`/`vm.rs`/`builtins.rs`/Modul-`.rs`).
 
-> ## Editoren in Drachenhauch selbst -- zwei Piloten (2026-08-30)
+> ## Editoren in Drachenhauch selbst -- drei Piloten (2026-08-30/31)
 >
-> Die Frage, ob die Qt-Editoren nach Drachenhauch koennen, ist an zwei Faellen
+> Die Frage, ob die Qt-Editoren nach Drachenhauch koennen, ist an drei Faellen
 > gemessen statt geschaetzt:
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 400 | 0,77 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 383 | 0,48 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
 >
-> **Der bessere Faktor beim zweiten ist KEIN Fortschritt, sondern eine
-> Eigenheit des Falls**: der Qt-Partikel-Editor zeichnet seine Vorschau von
-> Hand (`paintEvent`, alle fuenf Darstellungsarten in QPainter), die
-> Drachenhauch-Fassung ruft `PARTICLE_DRAW`. Rund 150 Zeilen Ersparnis kommen
-> allein daher. Wer hochrechnet, muss fragen: wie viel von dem Qt-Code
-> dupliziert etwas, das die Laufzeit schon kann?
+> **Kein Faktor davon ist ohne seinen Fall zu gebrauchen, und keiner ist ein
+> Fortschritt gegenueber dem vorigen.** Beim Partikel-Editor zeichnet die
+> Qt-Fassung ihre Vorschau von Hand (`paintEvent`, alle fuenf
+> Darstellungsarten in QPainter), die Drachenhauch-Fassung ruft
+> `PARTICLE_DRAW` -- rund 150 Zeilen Ersparnis kommen allein daher. Beim
+> Tilemap-Editor ist die 0,31 aus einem anderen Grund zu guenstig: rund
+> **620 der 2428 Qt-Zeilen** sind Objekt-Ebenen, mehrere Tilesets,
+> Kachel-Eigenschaften und der GB-Code-Export -- alles nicht portiert.
+> Gegen den vergleichbaren Rest steht es 762 zu ~1800, also **0,42**.
+> Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
+> dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
+> Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
 >
-> **Nicht portiert** (in beiden Piloten): Undo/Redo, eigene Presets
-> speichern/laden. Beim Partikel-Editor zusaetzlich der Hintergrund-Waehler.
-> **Fehlt in `gui`**: ein Farbwaehler-Dialog -- der Pilot behilft sich mit drei
-> RGB-Reglern und einem Farbbalken.
+> **Der dritte Pilot war der erste aus einer anderen Familie**: kein
+> Regler-Editor mit Vorschau, sondern Werkzeuge mit Zugbewegung, eine
+> Auswahl mit Zwischenablage, Rueckgaengig/Wiederholen und ein Dateiformat,
+> das ein FREMDES Programm lesen koennen muss. Dabei kam heraus, dass das
+> `tiled`-Modul lesen und aendern konnte, aber **nicht anlegen und nicht
+> speichern** -- neun Befehle nachgeruestet (siehe `tiled` unten).
+>
+> **Nicht portiert** (in allen drei Piloten): eigene Presets
+> speichern/laden. In den ersten beiden zusaetzlich Undo/Redo -- der dritte
+> hat es (16 Schritte, Ringpuffer, je Schritt der Vorher/Nachher-Stand der
+> betroffenen Ebene).
 
 ## Verzeichnisstruktur
 
@@ -211,7 +225,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | `firmata` | Direkte Arduino/ESP32-**Pin-Steuerung** ueber StandardFirmata (kein eigener Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen). Baut auf derselben `serialport`-Crate wie `serial` auf (Feature `serial`, keine neue Abhaengigkeit). `FIRMATA_PORTS/OPEN/CLOSE/IS_OPEN`, `FIRMATA_PIN_MODE`, `FIRMATA_DIGITAL_WRITE/READ`, `FIRMATA_ANALOG_WRITE/READ`, `FIRMATA_UPDATE` (Pro-Frame-Polling wie `INPUT_UPDATE`/`TIMER_UPDATE`). Nur Pin-I/O -- kein I2C/Servo/OneWire/Stepper/Encoder. **Zwei Nummerierungen** (echte Protokoll-Eigenheit): Schreiben nimmt die rohe digitale Pin-Nummer, `FIRMATA_ANALOG_READ` nimmt den Analog-**Kanal** (A0=0, A1=1, ...) -- nicht dieselbe Zahl fuer denselben physischen Pin. Doku `docs/module-firmata.md`, Demo `examples/147_firmata.dh`. | `FIRMATA_HANDLE` |
 | `usb` | USB-HID via `hidapi`. Maker-Boards, Programmer, Custom-Controller. `USB_LIST/OPEN/READ/WRITE/PRODUCT`. | `USB_HANDLE` |
 | `wifi` | WiFi-Management (Windows-only via `netsh wlan`). `WIFI_SCAN/CONNECT/DISCONNECT/CURRENT/SIGNAL/PROFILES`. | — |
-| `tiled` | Tiled-Map-Loader (JSON-Format, kein TMX). `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`). | `TILED_MAP` |
+| `tiled` | Tiled-Maps (JSON-Format, kein TMX) **lesen, aendern, anlegen und schreiben**. `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill). **Schreiben (2026-08-31, gefunden beim Tilemap-Piloten -- das Modul war bis dahin ein reiner Leser):** `TILED_NEW`, `TILED_ADD_LAYER`, `TILED_ADD_TILESET`, `TILED_TILESET_TILES`, `TILED_SAVE`, dazu `TILED_LAYER_RENAME` / `TILED_LAYER_VISIBLE` / `TILED_LAYER_SET_VISIBLE` / `TILED_REMOVE_LAYER`. **Die `firstgid` vergibt die Laufzeit selbst** (deshalb braucht `TILED_ADD_TILESET` die Kachelzahl) -- sie von Hand setzen zu lassen waere die unangenehmste Fehlerquelle des Formats: ueberlappende Bereiche zerstoeren stillschweigend die Zuordnung ALLER Kacheln, ohne Fehlermeldung. **Die Sichtbarkeit einer Ebene ist nicht nur Anzeige**, Tiled speichert sie -- ohne den Setter liess sich eine ausgeblendete Ebene gar nicht so sichern. Der Namensindex (Name -> Position) wird bei Umbenennen/Entfernen neu aufgebaut, sonst zeigt ein stehengebliebener Eintrag stumm auf die Nachbar-Ebene. **Geprueft wird der Schreiber an einem FREMDEN Leser** (`drachenhauch/tilemap/document.py`, dem Modell des Qt-Editors), nicht am eigenen -- ein Format, das nur sein Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig. Nicht angelegt werden koennen: isometrische/unendliche Karten, neue Objekt-Ebenen, Kachel-Eigenschaften (gelesene bleiben erhalten). Doku `docs/module-tiled.md`, Editor `examples/187_tilemap_editor.dh`, Tests `tests/test_tiled_schreiben.py`. | `TILED_MAP` |
 | `tile_collide` | Box-vs-Tilemap-Kollision. `TILE_SWEEP_X/Y` mit separat-Achsen-Sweep-Pattern. Solid-Detection via `solid`-Property (mit Convention-Fallback). Klassische Platformer-Physik. Sweep nativ via `gb_native.TileCollider` (Solid-Maske einmal gespiegelt+gecacht), sonst Python-`_sweep_axis`. | — |
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. `CHAR_NEW/SET_INPUT/UPDATE`, `CHAR_X/Y/VX/VY`, `CHAR_ON_GROUND/WALL_LEFT/RIGHT`. Konfigurable Move-Speed, Jump-Velocity, Gravity, Coyote/Buffer-Frames, Variable-Jump-Cut. | `CHAR_CONTROLLER` |
 | `g3d` | **3D-Grafik** (`dhrt`, Grafik-Feature — ohne `--no-graphics`-Build). Immediate-Primitive: `CAMERA3D`, `CUBE`/`CUBE_WIRES`, `SPHERE`/`SPHERE_WIRES`, `CYLINDER` (Kegel via r_oben=0), `PLANE`, `LINE3D`, `POINT3D`, `GRID3D`. **3D-Modelle** (wiederverwendbare MODEL-Handles): `LOADMODEL` (OBJ/GLTF), prozedural `MESH_CUBE/SPHERE/CYLINDER/TORUS/KNOT/PLANE` + `MESH_HEIGHTMAP` (Terrain aus Graustufen-Image), zeichnen via `MODEL`/`MODEL_EX` (Achsen-Rotation)/`MODEL_WIRES`, `MODEL_TEXTURE` (Diffuse-Map aus LOADIMAGE). **Skelett-Animation** (geriggte GLTF/IQM): `MODEL_LOAD_ANIMS(pfad$)` -> ANIM_SET (Integer-Handle), `MODEL_ANIM_COUNT/NAME/FRAMES`, `MODEL_ANIMATE(modell, set, anim_idx, frame)` setzt die Pose (frame loopt). Nutzt seit raylib-rs 6.0 dessen RAII-`ModelAnimations`-Collection (`load_model_animations`/`update_model_animation`; Unload automatisch im `Drop` -- loeste den fruehreren rohen-FFI-Workaround ab, der noetig war weil der 5.x-Wrapper die Structs flach kopierte und dann `UnloadModelAnimations` rief -> Use-after-free). **`MODEL_ANIMATE_BLEND(modell, set, anim_a, frame_a, anim_b, frame_b, blend)`** (neu in raylib 6.0 via `UpdateModelAnimationEx`): blendet weich zwischen zwei Animationen desselben Sets (`blend` 0.0=ganz A .. 1.0=ganz B), z.B. fuer Walk->Run-Uebergaenge statt hartem Anim-Wechsel. Demo `examples/108_skeletal_anim.dh` (CC0-Modell via `examples/assets/download_robot.py`). **Billboards** `BILLBOARD` (Textur zeigt zur Kamera) + **Ray-Kollision/Picking** `RAY_HIT_BOX`/`RAY_HIT_SPHERE` (Distanz oder -1) und `PICK_BOX`/`PICK_SPHERE` (Mausstrahl, Klick-Selektion). **Picking auf echter Flaeche** (nicht nur Huellkoerper): `RAY_HIT_TRI(ursprung, richtung, 3 Punkte)`/`RAY_HIT_QUAD(ursprung, richtung, 4 Punkte)` + `PICK_TRI`/`PICK_QUAD` — Bodenkacheln, Wandstuecke, frei schwebende Panels. Ohne Backface-Culling (eine Flaeche trifft auch von hinten); die Vierecks-Punkte muessen **reihum** liegen; die Richtung wird vor dem Test normalisiert (sonst waere die Distanz in Vielfachen der Richtungslaenge, raylibs Rohverhalten). Demo `examples/151_picking_flaechen.dh`. **Beleuchtung** (PBR/Cook-Torrance, bis 4 Lichter): `LIGHT_ENABLE`/`LIGHT_AMBIENT`/`LIGHT_DIRECTIONAL`/`LIGHT_POINT`/`LIGHT_SET_POS/COLOR/ENABLED` + `MODEL_LIT(modell)` + `MODEL_PBR(modell, metalness, roughness)` (eingebetteter GGX-Shader) + `MODEL_EMISSIVE(modell, farbe, staerke)` (Eigenleuchten pro Modell — durchschlaegt den Fog; mit Bloom-`POSTFX` echter Neon-Glow, Demo `examples/110_emissive_glow.dh`) + `LIGHT_FOG(farbe, dichte)` (Tiefen-Fog) + `LIGHT_ENV(himmel, boden, intensitaet)` (analytisches IBL — Metalle spiegeln die Umgebung) + `LIGHT_ENV_HDR(pfad$ [, intensitaet])` (**echtes HDR-Cubemap-IBL**: laedt ein equirect-.hdr, berechnet Irradiance/Prefilter/BRDF-LUT-Maps, `useIBLMaps`-Gate; analytischer `LIGHT_ENV`-Pfad bleibt Fallback) + `SKYBOX(an)` (zeichnet die HDR-Umgebung als sichtbaren 3D-Hintergrund — env-Cubemap auf einen kamerazentrierten Wuerfel, ohne Depth-Write). **Schatten** `SHADOW_ENABLE([res])`/`SHADOW_AREA(groesse,dist)`/`SHADOW_TARGET(x,y,z)` (Shadow-Mapping via Depth-FBO + PCF; erstes directional Light wirft Schatten, MODEL_LIT-Modelle werfen+empfangen). **Normal-Mapping** `MODEL_TEXTURE_NORMAL(modell,bild)` (TBN-basiert, MODEL_LIT erzeugt Tangenten; useNormalMap-Gate -> lit Modelle ohne Map unveraendert). **Kamera-Modi** `CAMERA3D_UPDATE(mode)` (1=free/2=orbital/3=first_person/4=third_person, raylib UpdateCamera) + Getter `CAMERA3D_X/Y/Z`/`CAMERA3D_TARGET_X/Y/Z`. Render via raylib `begin_mode3D` beim FLIP (3D zuerst, 2D-HUD obenauf). Doku `docs/rust-runtime.md` (Schritt 6), Demos `examples/82_3d_intro.dh`, `88_3d_models.dh`, `90_billboards_picking.dh`, `91_lighting.dh`, `92_fog.dh`, `93_shadows.dh`, `94_normalmap.dh`, `95_pbr.dh`, `96_ibl.dh`, `99_ibl_hdr.dh`. | — |
