@@ -10,6 +10,7 @@ Features:
 """
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional
 
@@ -49,6 +50,8 @@ from .icons import icons
 from .markdown_viewer import MarkdownViewer
 from .outline_panel import OutlinePanel
 from .output_console import OutputConsole
+from .piloten import (PILOTEN, pfad as piloten_pfad,
+                      beschreibung as piloten_beschreibung)
 from .palette import command_palette, quick_open
 from .print_listing import PrintOptionsDialog, print_code
 from .settings import (
@@ -417,6 +420,22 @@ class DrachenhauchEditor(QMainWindow):
             "Export/Uebernahme in den Tracker")
         self.act_score_editor.triggered.connect(self._open_score_editor)
 
+        # Die Werkzeuge, die in Drachenhauch selbst geschrieben sind. Eine
+        # Aktion je Pilot (starten) plus eine, die alle Quelltexte oeffnet --
+        # sie zu LESEN ist der halbe Zweck, dafuer sind sie in Drachenhauch.
+        self.act_piloten: list[QAction] = []
+        for _e in PILOTEN:
+            _a = QAction(f"{_e['titel']} (in Drachenhauch) ...", self)
+            _a.setToolTip(piloten_beschreibung(_e))
+            _a.setData(_e["datei"])
+            _a.triggered.connect(partial(self._run_pilot, _e))
+            self.act_piloten.append(_a)
+        self.act_piloten_quelltext = QAction("Quelltexte der Piloten oeffnen", self)
+        self.act_piloten_quelltext.setToolTip(
+            "Oeffnet alle vier als Tabs -- sie sind Drachenhauch-Programme, "
+            "also lesbar und aenderbar")
+        self.act_piloten_quelltext.triggered.connect(self._open_pilot_sources)
+
         # Edit
         self.act_find = QAction(icons.get("find"), "Suchen ...", self)
         self.act_find.setShortcut(QKeySequence.StandardKey.Find)
@@ -648,6 +667,12 @@ class DrachenhauchEditor(QMainWindow):
         m_file.addAction(self.act_tracker_editor)
         m_file.addAction(self.act_score_editor)
         m_file.addAction(self.act_tilemap_editor)
+        m_pilot = m_file.addMenu("Werkzeuge in Drachenhauch")
+        m_pilot.setToolTipsVisible(True)
+        for _a in self.act_piloten:
+            m_pilot.addAction(_a)
+        m_pilot.addSeparator()
+        m_pilot.addAction(self.act_piloten_quelltext)
         m_file.addSeparator()
         m_file.addAction(self.act_close_tab)
         m_file.addAction(self.act_reopen_tab)
@@ -1883,6 +1908,47 @@ class DrachenhauchEditor(QMainWindow):
             f"Konnte {display_name} nicht laden:\n{type(exc).__name__}: {exc}{hint}",
         )
 
+    def _pilot_pfad(self, eintrag: dict):
+        """Pfad des Piloten -- oder None mit einer Meldung, die sagt, WO
+        gesucht wurde. Ein blosses "nicht gefunden" laesst einen raten."""
+        p = piloten_pfad(self.project_root, eintrag)
+        if p.exists():
+            return p
+        QMessageBox.warning(
+            self, "Pilot nicht gefunden",
+            f"{eintrag['titel']} liegt nicht unter:\n{p}\n\n"
+            "Die Piloten sind Beispielprogramme und kommen aus dem "
+            "examples-Ordner.")
+        return None
+
+    def _run_pilot(self, eintrag: dict) -> None:
+        """Startet einen Piloten wie jedes andere Programm (dieselbe Konsole,
+        derselbe Stopp-Knopf) -- er IST ein Drachenhauch-Programm."""
+        p = self._pilot_pfad(eintrag)
+        if p is None:
+            return
+        if self.console.is_running():
+            self.statusBar().showMessage(
+                "Es laeuft schon ein Programm -- erst stoppen.", 3000)
+            return
+        modus = self.console.start_run_auto(p)
+        if modus:
+            self.statusBar().showMessage(f"▶ {eintrag['titel']} (in Drachenhauch): {p.name}")
+
+    def _open_pilot_sources(self) -> None:
+        """Alle vier als Tabs oeffnen."""
+        offen = 0
+        for e in PILOTEN:
+            p = piloten_pfad(self.project_root, e)
+            if p.exists():
+                self._open_file(p)
+                offen += 1
+        if offen:
+            self.statusBar().showMessage(
+                f"{offen} Piloten geoeffnet -- F5 startet den aktiven.", 5000)
+        else:
+            self._pilot_pfad(PILOTEN[0])          # eine Meldung mit dem Pfad
+
     def _open_sprite_editor(self) -> None:
         """Oeffnet den Sprite-Editor als zweites Top-Level-Fenster.
 
@@ -2086,6 +2152,9 @@ class DrachenhauchEditor(QMainWindow):
             self.act_fold, self.act_unfold_all,
             self.act_theme, self.act_show_readme, self.act_about,
             self.act_quick_open, self.act_command_palette,
+            # Die Piloten stehen im Menue drei Ebenen tief -- ueber die
+            # Palette sind sie mit zwei Tastendruecken da.
+            *self.act_piloten, self.act_piloten_quelltext,
         ]
 
     def _show_readme(self) -> None:

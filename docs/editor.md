@@ -125,6 +125,33 @@ Wie in VSCode/Cursor: ein Toplevel mit Eingabefeld + scrollbarer Liste aller ver
 
 In der Palette sind alle Menü-Aktionen plus **alle Doku-Files** zum direkten Aufruf — tippe `doku json` und du landest in einem Klick im JSON-Modul-Doc.
 
+## Werkzeuge in Drachenhauch (`Datei` → Untermenü)
+
+Vier der Begleit-Editoren gibt es ein zweites Mal — als **Drachenhauch-Programm**
+unter `examples/`. Sie sind nicht der Ersatz für die Qt-Fassungen, sondern die
+Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
+
+| Werkzeug | Qt | Drachenhauch |
+|---|---|---|
+| SFX-Generator | 522 | 402 |
+| Partikel-Editor | 802 | 383 |
+| Tilemap-Editor | 2428 | 762 |
+| Sprite-Editor | 7379 | 1029 |
+
+**Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
+Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor sind allein die
+benennbaren nicht portierten Blöcke 1595 der 7379 Qt-Zeilen. Was fehlt, steht im
+Kopfkommentar jedes Piloten.
+
+Jeder Eintrag **startet** das Werkzeug — über dieselbe Konsole und denselben
+Stopp-Knopf wie jedes andere Programm, denn es *ist* eines. Darunter öffnet
+`Quelltexte der Piloten öffnen` alle vier als Tabs: sie zu lesen und zu ändern
+ist der halbe Zweck. Alle Einträge stehen auch in der Befehlspalette.
+
+Die Liste ist eine einzige Quelle (`editor_qt/piloten.py`); ein Test prüft, dass
+jeder Eintrag auf eine existierende Datei zeigt **und dass die Zeilenzahlen
+stimmen** — zwei standen lange falsch in der Doku, ohne dass es auffiel.
+
 ## Auto-Vervollständigung beim Tippen
 
 Sobald du **mindestens 2 Buchstaben** eines Identifiers tippst, öffnet sich das Vorschlags-Popup automatisch — ohne `Strg+Leer`. Es filtert live während du weitertippst.
