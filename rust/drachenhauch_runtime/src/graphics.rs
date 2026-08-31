@@ -3185,6 +3185,103 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         t.img.draw_text(text, x, y, size.max(1), col(color));
         self.reupload_tex(i)
     }
+    /// Ein neues Bild anlegen (IMAGE_NEW). Ohne Farbe: vollstaendig DURCHSICHTIG.
+    ///
+    /// `GENTEX_COLOR` kann das nicht, und zwar aus einem Grund, der sich nicht
+    /// umgehen laesst: die Farbkonvention deutet Alpha 0 als DECKEND (damit
+    /// `&Hrrggbb` und `RGB(r,g,b)` deckend bleiben, siehe `col`). Ein wirklich
+    /// durchsichtiges Bild ist ueber eine FARBE also gar nicht auszudruecken --
+    /// es braucht einen eigenen Weg. Fuer eine leere Ebene ist genau das der
+    /// Normalfall.
+    pub fn image_new(&mut self, w: i32, h: i32, farbe: Option<i64>) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("IMAGE_NEW", w, h)?;
+        let c = match farbe { Some(v) => col(v), None => Color::new(0, 0, 0, 0) };
+        self.push_tex_from_image(Image::gen_image_color(w, h, c))
+    }
+
+    /// Einen Bereich vollstaendig durchsichtig machen (IMAGE_CLEAR) -- der
+    /// Radierer. Ohne Rechteck das ganze Bild.
+    ///
+    /// Geht ueber `draw_rectangle`, weil raylibs `ImageDrawRectangle` die Farbe
+    /// SCHREIBT statt sie einzumischen. Wuerde es mischen, waere ein
+    /// durchsichtiges Rechteck ein Nichts-Tun -- und Radieren unmoeglich.
+    pub fn image_clear(&mut self, idx: i64, r: Option<(i32, i32, i32, i32)>) -> Result<(), String> {
+        let i = idx as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_CLEAR: ungueltiges IMAGE-Handle")?;
+        let (x, y, w, h) = r.unwrap_or((0, 0, t.img.width, t.img.height));
+        t.img.draw_rectangle(x, y, w.max(0), h.max(0), Color::new(0, 0, 0, 0));
+        self.reupload_tex(i)
+    }
+
+    /// Ein Bild in ein anderes zeichnen (IMAGE_DRAW_IMAGE), mit Alpha gemischt.
+    ///
+    /// Damit lassen sich Ebenen zu einem Bild verrechnen und ein kopierter
+    /// Ausschnitt einsetzen -- beides ging vorher gar nicht, weil die
+    /// `IMAGE_DRAW_*`-Familie nur Formen und Text kennt.
+    ///
+    /// Die Quelle wird KOPIERT geholt, bevor das Ziel veraenderlich geliehen
+    /// wird. Nebenbei ist damit `ziel = quelle` erlaubt (ein Bild auf sich
+    /// selbst versetzt zeichnen) statt ein Ausleih-Fehler.
+    pub fn image_draw_image(&mut self, dst: i64, src: i64, x: i32, y: i32,
+                            quelle: Option<(i32, i32, i32, i32)>, tint: i64)
+                            -> Result<(), String> {
+        let s = self.src_image(src, "IMAGE_DRAW_IMAGE")?;
+        let (sx, sy, sw, sh) = quelle.unwrap_or((0, 0, s.width, s.height));
+        if sw <= 0 || sh <= 0 {
+            return Err("IMAGE_DRAW_IMAGE: Quellbreite und -hoehe muessen > 0 sein".into());
+        }
+        let i = dst as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_IMAGE: ungueltiges IMAGE-Handle")?;
+        t.img.draw(&s,
+                   Rectangle::new(sx as f32, sy as f32, sw as f32, sh as f32),
+                   Rectangle::new(x as f32, y as f32, sw as f32, sh as f32),
+                   col(tint));
+        self.reupload_tex(i)
+    }
+
+    /// Deckkraft eines Bildpunkts (GETALPHA), 0..255; -1 ausserhalb.
+    ///
+    /// `GETPIXEL` liefert nur die drei Farbkanaele -- und kann es auch nicht
+    /// anders: der Rueckgabewert ist wieder eine FARBE, und dort bedeutet ein
+    /// oberstes Byte 0 "deckend". Ein durchsichtiger Punkt kaeme als deckendes
+    /// Schwarz zurueck. Deshalb ein eigener Getter statt eines vierten Bytes.
+    pub fn get_alpha(&mut self, idx: i64, x: i32, y: i32) -> i64 {
+        if idx < 0 || idx as usize >= self.textures.len() { return -1; }
+        let img = &self.textures[idx as usize].img;
+        if x < 0 || y < 0 || x >= img.width || y >= img.height { return -1; }
+        img.get_color(x, y).a as i64
+    }
+
+    /// Ein Bild in eine Datei schreiben (IMAGE_SAVE).
+    ///
+    /// Das Format bestimmt die Endung. Ton konnte sich seit dem SFX-Editor
+    /// sichern (`AUDIO_SAVE_WAV`), Bild bis hierher gar nicht -- `SAVESCREENSHOT`
+    /// sichert den BILDSCHIRM, nicht ein Bild.
+    pub fn image_save(&mut self, idx: i64, pfad: &str) -> Result<(), String> {
+        const ENDUNGEN: [&str; 4] = ["png", "bmp", "jpg", "tga"];
+        let endung = std::path::Path::new(pfad).extension()
+            .and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+        if !ENDUNGEN.contains(&endung.as_str()) {
+            return Err(std::format!(
+                "IMAGE_SAVE: '{}' -- die Endung entscheidet ueber das Format, moeglich sind {}",
+                pfad, ENDUNGEN.join(", ")));
+        }
+        // Ob die Datei vorher schon da war, muss VOR dem Schreiben feststehen:
+        // die Bindung wirft raylibs Erfolgs-Flag weg (`export_image` liefert
+        // `()`), es bleibt also nur, hinterher an der Datei nachzusehen -- und
+        // eine stehengebliebene alte Datei sonst als Erfolg zu lesen.
+        let vorher = std::fs::metadata(pfad).ok().map(|m| (m.len(), m.modified().ok()));
+        let img = self.src_image(idx, "IMAGE_SAVE")?;
+        img.export_image(pfad);
+        match std::fs::metadata(pfad) {
+            Ok(m) if m.len() > 0
+                && Some((m.len(), m.modified().ok())) != vorher => Ok(()),
+            _ => Err(std::format!(
+                "IMAGE_SAVE: '{}' liess sich nicht schreiben (Verzeichnis vorhanden? schreibbar?)",
+                pfad)),
+        }
+    }
+
     fn cache_image_alias(&mut self, alias: &str, handle: i64) {
         self.image_cache.insert(alias.to_string(), handle);
     }
