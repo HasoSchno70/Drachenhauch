@@ -33,10 +33,15 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
-> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 400 | 0,77 |
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 402 | 0,77 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 383 | 0,48 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1005 | 0,14 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1029 | 0,14 |
+>
+> Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
+> -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
+> gezaehlt) und 1005 statt 1029 (der Sprite-Editor wuchs mit den
+> `IMAGE_FREE`-Aufrufen). Die Faktoren aendert das nicht.
 >
 > **Kein Faktor davon ist ohne seinen Fall zu gebrauchen, und keiner ist ein
 > Fortschritt gegenueber dem vorigen.** Beim Partikel-Editor zeichnet die
@@ -70,6 +75,12 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
+>
+> **In der IDE erreichbar** (seit 2026-08-31): `Datei` -> `Werkzeuge in
+> Drachenhauch` startet jeden Piloten ueber dieselbe Konsole wie jedes
+> andere Programm, ein Eintrag darunter oeffnet alle vier Quelltexte als
+> Tabs. Einzige Quelle `editor_qt/piloten.py`; ein Test prueft Existenz UND
+> Zeilenzahl (er fand sofort zwei falsche).
 >
 > **Nicht portiert** (in allen vier Piloten): eigene Presets
 > speichern/laden. In den ersten beiden zusaetzlich Undo/Redo -- der dritte
