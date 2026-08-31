@@ -86,6 +86,9 @@ def _lauf(datei: str, extra: list[str]) -> tuple[str, int, str]:
     t0 = time.perf_counter()
     with _SPERRE:
         _LAEUFT.add(datei)
+    # Auch den BEGINN melden. Beim Abbruch von aussen war zweimal "nichts in
+    # Arbeit" -- dann ist die letzte begonnene ohne Abschluss die Spur.
+    print(f"  ..  {datei}", flush=True)
     umgebung = dict(os.environ, DH_TEST_HARTES_ENDE="1")
     try:
         p = subprocess.run(
