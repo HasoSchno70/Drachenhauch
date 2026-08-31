@@ -52,6 +52,7 @@ _INTERAKTIV = [
     "185_partikel_editor",
     "186_farbe_und_datum",
     "187_tilemap_editor",
+    "188_bild_erzeugen",
 ]
 
 

@@ -1,0 +1,156 @@
+' ============================================================
+'  DRACHENHAUCH -- ein Bild HERSTELLEN statt nur anzeigen
+' ============================================================
+'  Ein IMAGE war lange eine Einbahnstrasse: hineinzeichnen ging, aber ein
+'  durchsichtiges anlegen nicht, eins ins andere setzen nicht, radieren
+'  nicht, die Deckkraft lesen nicht -- und speichern schon gar nicht.
+'
+'  Dieses Malprogramm braucht genau die fuenf Befehle, die das schliessen:
+'
+'    IMAGE_NEW(b, h)              eine leere, DURCHSICHTIGE Ebene
+'    IMAGE_CLEAR(bild, x,y,b,h)   der Radierer
+'    IMAGE_DRAW_IMAGE(ziel, ...)  Ebenen zu einem Bild verrechnen
+'    GETALPHA(bild, x, y)         ist dieser Punkt leer?
+'    IMAGE_SAVE(bild, pfad$)      das Ergebnis sichern
+'
+'  Bedienung:
+'    Maus links    malen           Maus rechts   radieren
+'    1..6          Farbe           +/-           Pinselgroesse
+'    E             Ebene wechseln  H             Ebene aus-/einblenden
+'    S             als PNG sichern C             Ebene leeren
+'    ESC           Ende
+' ============================================================
+IMPORT "imgfx"
+
+CONST BW = 96                  ' Bildgroesse in Pixeln
+CONST BH = 72
+CONST ZOOM = 8
+CONST EBENEN = 3
+
+SCREEN(BW * ZOOM + 260, BH * ZOOM + 40, "Drachenhauch - Bild erzeugen", 1)
+SETFPS(60)
+TEXT_SIZE(16)
+
+DIM farben AS ARRAY OF INTEGER
+farben = [&HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, &HB44BE8, &HF0F0F0]
+
+' Jede Ebene ist ein eigenes Bild -- durchsichtig, damit die darunter
+' durchscheinen. Genau das konnte GENTEX_COLOR nicht: eine FARBE mit
+' Deckkraft 0 gilt als DECKEND, ein leeres Bild war darueber nicht zu haben.
+DIM ebene[EBENEN] AS IMAGE
+DIM sichtbar[EBENEN] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO EBENEN - 1
+    ebene[i] = IMAGE_NEW(BW, BH)
+    sichtbar[i] = 1
+NEXT
+
+' Ein Schachbrett als Untergrund -- ohne das sieht man dem Bild nicht an,
+' wo es durchsichtig ist und wo schwarz.
+DIM grund AS IMAGE : grund = IMAGE_NEW(BW, BH, &H303840)
+DIM gx AS INTEGER
+DIM gy AS INTEGER
+FOR gy = 0 TO BH \ 8
+    FOR gx = 0 TO BW \ 8
+        IF (gx + gy) MOD 2 = 0 THEN IMAGE_DRAW_RECT(grund, gx * 8, gy * 8, 8, 8, &H3C4650)
+    NEXT
+NEXT
+
+DIM aktiv AS INTEGER : aktiv = 0
+DIM farbe AS INTEGER : farbe = 0
+DIM pinsel AS INTEGER : pinsel = 2
+DIM meldung AS STRING : meldung = ""
+
+' Das zusammengerechnete Bild -- einmal angelegt, jeden Frame neu befuellt.
+DIM fertig AS IMAGE : fertig = IMAGE_NEW(BW, BH)
+
+SUB zusammensetzen()
+    IMAGE_CLEAR(fertig)
+    DIM k AS INTEGER
+    FOR k = 0 TO EBENEN - 1
+        IF sichtbar[k] = 1 THEN IMAGE_DRAW_IMAGE(fertig, ebene[k], 0, 0)
+    NEXT
+END SUB
+
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_ESCAPE) THEN BREAK
+
+    ' ------------------------------------------------------------ Tasten
+    FOR i = 0 TO 5
+        IF KEYHIT(ASC("1") + i) THEN farbe = i
+    NEXT
+    IF KEYHIT(KEY_E) THEN aktiv = (aktiv + 1) MOD EBENEN
+    IF KEYHIT(KEY_H) THEN sichtbar[aktiv] = 1 - sichtbar[aktiv]
+    IF KEYHIT(KEY_C) THEN
+        IMAGE_CLEAR(ebene[aktiv])
+        meldung = "Ebene " + STR$(aktiv + 1) + " geleert"
+    END IF
+    IF KEYHIT(KEY_KP_PLUS) OR KEYHIT(ASC("+")) THEN pinsel = MIN(8, pinsel + 1)
+    IF KEYHIT(KEY_KP_MINUS) OR KEYHIT(ASC("-")) THEN pinsel = MAX(1, pinsel - 1)
+    IF KEYHIT(KEY_S) THEN
+        zusammensetzen()
+        TRY
+            IMAGE_SAVE(fertig, "malerei.png")
+            meldung = "gesichert als malerei.png"
+        CATCH e
+            meldung = e
+        END TRY
+    END IF
+
+    ' -------------------------------------------------------------- Maus
+    DIM px AS INTEGER : px = (MOUSEX() - 10) \ ZOOM
+    DIM py AS INTEGER : py = (MOUSEY() - 10) \ ZOOM
+    DIM drauf AS BOOLEAN
+    drauf = MOUSEX() >= 10 AND MOUSEY() >= 10 AND px < BW AND py < BH
+
+    IF drauf AND MOUSEBUTTON(0) THEN
+        IMAGE_DRAW_RECT(ebene[aktiv], px, py, pinsel, pinsel, farben[farbe])
+    END IF
+    IF drauf AND MOUSEBUTTON(1) THEN
+        ' Radieren heisst: den Punkt DURCHSICHTIG machen. Eine durchsichtige
+        ' Farbe darueberzumalen taete nichts -- IMAGE_CLEAR schreibt statt
+        ' zu mischen.
+        IMAGE_CLEAR(ebene[aktiv], px, py, pinsel, pinsel)
+    END IF
+
+    ' ============================================================== Bild
+    CLS(&H0C1118)
+    zusammensetzen()
+
+    ' Untergrund, dann das Ergebnis -- beides vergroessert.
+    DRAWIMAGEPARTEX(grund, 0, 0, BW, BH, 10, 10, BW * ZOOM, BH * ZOOM)
+    DRAWIMAGEPARTEX(fertig, 0, 0, BW, BH, 10, 10, BW * ZOOM, BH * ZOOM)
+    RECT(10, 10, 10 + BW * ZOOM - 1, 10 + BH * ZOOM - 1, &H33455A)
+
+    ' ------------------------------------------------------- rechte Spalte
+    DIM rx AS INTEGER : rx = BW * ZOOM + 24
+    TEXT(rx, 12, "Farbe")
+    FOR i = 0 TO 5
+        BOX(rx + i * 34, 32, rx + i * 34 + 28, 60, farben[i])
+        IF i = farbe THEN RECT(rx + i * 34 - 2, 30, rx + i * 34 + 30, 62, &HFFFFFF)
+    NEXT
+
+    TEXT(rx, 78, "Ebenen   E wechselt, H blendet aus")
+    FOR i = 0 TO EBENEN - 1
+        DIM zeile AS STRING
+        zeile = IIF(i = aktiv, ">", " ") + " Ebene " + STR$(i + 1) + _
+                IIF(sichtbar[i] = 1, "", "   (aus)")
+        TEXT(rx, 100 + i * 22, zeile)
+    NEXT
+
+    TEXT(rx, 180, "Pinsel " + STR$(pinsel) + " px   (+/-)")
+
+    ' GETALPHA beantwortet, was GETPIXEL nicht kann: ist der Punkt LEER?
+    ' Ueber eine Farbe waere ein durchsichtiger Punkt von Schwarz nicht zu
+    ' unterscheiden -- Deckkraft 0 bedeutet dort "deckend".
+    IF drauf THEN
+        DIM a AS INTEGER : a = GETALPHA(ebene[aktiv], px, py)
+        TEXT(rx, 210, "[" + STR$(px) + ", " + STR$(py) + "]  Deckkraft " + STR$(a))
+        TEXT(rx, 232, IIF(a = 0, "-- leer --", "-- gemalt --"))
+    END IF
+
+    TEXT(rx, 280, "S sichert als PNG")
+    IF meldung <> "" THEN TEXT(rx, 302, meldung)
+
+    FLIP()
+WEND
