@@ -146,6 +146,16 @@ liegen. In `examples/` kippt so ein Streuner jede Zählung. Deshalb:
   die `tmpXXXXXXXX.dh` aus der Zeit vor dem Präfix. Was man nicht als eigenes
   belegen kann, könnte jemandem gehören.
 
+Der **Testlauf** hinterlässt sie besonders leicht: er beendet seine Prozesse per
+`os._exit()`, das `finally`, das die Datei sonst wegräumt, kommt dort nie dran.
+`conftest.py` räumt deshalb am Laufende auf (`eigene_auch=True` — am Ende eines
+Laufs steht fest, dass die eigenen niemand mehr braucht). Ein einzelner Rest
+bleibt trotzdem möglich, wenn ein Hintergrund-Faden ihn *nach* dem Aufräumen
+anlegt. Er richtet keinen Schaden mehr an: `.gitignore` hält ihn aus Commits,
+die Sweeps über `examples/*.dh` überspringen ihn, und beim nächsten IDE-Start
+verschwindet er. Gemessen an einem vollen Qt-Durchgang: vorher sechs Reste,
+jetzt höchstens einer.
+
 ## Werkzeuge in Drachenhauch (`Datei` → Untermenü)
 
 Vier der Begleit-Editoren gibt es ein zweites Mal — als **Drachenhauch-Programm**

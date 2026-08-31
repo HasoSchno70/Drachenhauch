@@ -126,3 +126,30 @@ def test_ide_raeumt_beim_start_auf(tmp_path, monkeypatch):
     assert not rest.exists()
     assert eigen.exists()
     win.close()
+
+
+def test_eigene_dateien_nur_am_laufende(tmp_path):
+    """`eigene_auch` ist am ENDE eines Laufs richtig und sonst nie.
+
+    Der Testlauf beendet seine Prozesse per `os._exit()` -- das `finally`,
+    das die Datei sonst wegraeumt, kommt dann nicht mehr dran. Gemessen: ein
+    Durchgang ueber alle Qt-Dateien liess sechs Reste in `examples/` zurueck.
+    """
+    p = tmp_path / f"_dhtmp_{os.getpid()}_abcd1234.dh"
+    p.write_text("x", encoding="utf-8")          # frisch UND lebendig
+    assert tempdateien.aufraeumen([tmp_path]) == []
+    assert p.exists()
+    assert tempdateien.aufraeumen([tmp_path], eigene_auch=True) == [p]
+    assert not p.exists()
+
+
+def test_eigene_auch_laesst_fremde_in_ruhe(tmp_path):
+    """Auch am Laufende gilt: nur die eigenen. Eine zweite laufende IDE
+    behaelt ihre."""
+    fremd = tmp_path / "_dhtmp_1_abcd1234.dh"    # PID 1 gilt als lebend/unklar
+    fremd.write_text("x", encoding="utf-8")
+    eigen = tmp_path / f"_dhtmp_{os.getpid()}_ffff0000.dh"
+    eigen.write_text("x", encoding="utf-8")
+    weg = tempdateien.aufraeumen([tmp_path], eigene_auch=True)
+    assert weg == [eigen] or (eigen in weg and fremd not in weg)
+    assert fremd.exists()

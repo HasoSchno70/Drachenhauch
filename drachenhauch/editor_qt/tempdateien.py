@@ -69,8 +69,15 @@ def _laeuft(pid: int) -> bool:
     return True
 
 
-def aufraeumen(verzeichnisse, jetzt: float | None = None) -> list[Path]:
+def aufraeumen(verzeichnisse, jetzt: float | None = None,
+               eigene_auch: bool = False) -> list[Path]:
     """Liegengebliebene Temp-Dateien entfernen. Liefert die geloeschten Pfade.
+
+    `eigene_auch` nimmt die Dateien DIESES Prozesses dazu, ohne Altersgrenze.
+    Das ist am ENDE eines Laufs richtig und sonst nie: dort steht fest, dass
+    sie niemand mehr braucht. Der Testlauf braucht es, weil er seine Prozesse
+    per `os._exit()` beendet -- das `finally`, das sonst aufraeumt, kommt
+    dann nicht mehr dran.
 
     Wirft nie -- ein Aufraeumen darf den Start der IDE nicht verhindern.
     """
@@ -96,13 +103,15 @@ def aufraeumen(verzeichnisse, jetzt: float | None = None) -> list[Path]:
             m = MUSTER.match(p.name)
             if not m:
                 continue
-            try:
-                if jetzt - p.stat().st_mtime < MINDESTALTER_S:
+            eigene = int(m.group(1)) == os.getpid()
+            if not (eigene and eigene_auch):
+                try:
+                    if jetzt - p.stat().st_mtime < MINDESTALTER_S:
+                        continue
+                except OSError:
                     continue
-            except OSError:
-                continue
-            if _laeuft(int(m.group(1))):
-                continue
+                if _laeuft(int(m.group(1))):
+                    continue
             try:
                 p.unlink()
                 weg.append(p)

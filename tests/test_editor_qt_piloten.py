@@ -31,10 +31,21 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path, monkeypatch):
+    """Fenster anlegen UND am Ende schliessen.
+
+    `closeEvent` bricht die laufenden `dhrt --check`-Faeden ab und stoppt die
+    Zeitgeber. Ohne das laufen sie weiter, waehrend pytest den Prozess
+    abbaut -- lokal eine Zugriffsverletzung beim Beenden, auf dem
+    CI-Rechner ein Haenger, der den ganzen Qt-Durchgang in die Zeitgrenze
+    laufen liess. Ein gruener Lauf hier sagt darueber nichts: die Meldung
+    kommt NACH der Testzusammenfassung.
+    """
     from drachenhauch.editor_qt import main_window as mw
     monkeypatch.setattr(mw, "save_settings", lambda *_a, **_kw: None)
     monkeypatch.setattr(mw, "clear_autosaves", lambda *_a, **_kw: None)
-    return mw.DrachenhauchEditor(tmp_path)
+    w = mw.DrachenhauchEditor(tmp_path)
+    yield w
+    w.close()
 
 
 # ----------------------------------------------------------------- Daten
@@ -97,6 +108,9 @@ def test_kein_zweiter_start_waehrend_etwas_laeuft(win, monkeypatch):
     monkeypatch.setattr(win.console, "is_running", lambda: True)
     monkeypatch.setattr(win.console, "start_run_auto",
                         lambda p: pytest.fail("darf nicht starten"))
+    # Beim Schliessen fragt das Fenster die Konsole -- die hier angelogene
+    # "laeuft"-Antwort wuerde sonst einen Stopp ohne Lauf ausloesen.
+    monkeypatch.setattr(win.console, "stop_run", lambda *_a, **_k: None)
     win._run_pilot(PILOTEN[0])
 
 
