@@ -298,7 +298,12 @@ def test_kaputte_datei_wird_nicht_angefasst(tmp_path):
 def test_der_bestand_ist_sauber():
     """Nach dem einmaligen Durchlauf muss jede .dh-Datei des Repos ruhig
     bleiben -- sonst waere die Vorgabe nicht verlustfrei."""
-    dateien = [str(p) for p in (_ROOT / "examples").rglob("*.dh")]
+    # Temp-Reste der IDE ueberspringen: sie liegen absichtlich neben der
+    # Quelle und koennen nach einem Abbruch liegenbleiben -- sie sind nicht
+    # Teil des Bestands (siehe editor_qt/tempdateien.py).
+    from drachenhauch.editor_qt.tempdateien import PRAEFIX
+    dateien = [str(p) for p in (_ROOT / "examples").rglob("*.dh")
+               if not p.name.startswith(PRAEFIX)]
     code, out, _ = _lauf("fmt", "--pruefen", *dateien)
     assert code == 0, out
 

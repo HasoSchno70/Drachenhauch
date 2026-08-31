@@ -125,6 +125,27 @@ Wie in VSCode/Cursor: ein Toplevel mit Eingabefeld + scrollbarer Liste aller ver
 
 In der Palette sind alle Menü-Aktionen plus **alle Doku-Files** zum direkten Aufruf — tippe `doku json` und du landest in einem Klick im JSON-Modul-Doc.
 
+## Temporäre Dateien
+
+Fehlerprüfung, Debugger und Profiler schreiben den Puffer in eine temporäre
+`.dh`-Datei und lassen `dhrt` darauf los. Sie liegt **absichtlich neben der
+Quelle**: `IMPORT "helfer.dh"` löst relativ zum Verzeichnis der Datei auf — im
+Systemverzeichnis meldete der Prüfer Fehler, die es gar nicht gibt.
+
+Der Preis dafür: wird der Lauf abgebrochen (IDE erschlagen, Absturz), bleibt sie
+liegen. In `examples/` kippt so ein Streuner jede Zählung. Deshalb:
+
+- Der Name weist sie aus: `_dhtmp_<prozessnummer>_xxxxxxxx.dh`.
+- Beim Start räumt die IDE auf — aber **nur**, was dieses Muster trägt *und*
+  dessen Prozess nicht mehr läuft. Eine zweite IDE mitten in einer Prüfung oder
+  in einer stundenlangen Debug-Sitzung verliert ihre Datei also nicht; ein
+  Altersvergleich könnte das nicht leisten, weil eine Sitzung beliebig lange
+  dauern darf. Zusätzlich muss die Datei eine Minute alt sein — Prozessnummern
+  werden wiederverwendet.
+- Was sich **nicht** als unser Werk ausweist, wird nie angefasst — auch nicht
+  die `tmpXXXXXXXX.dh` aus der Zeit vor dem Präfix. Was man nicht als eigenes
+  belegen kann, könnte jemandem gehören.
+
 ## Werkzeuge in Drachenhauch (`Datei` → Untermenü)
 
 Vier der Begleit-Editoren gibt es ein zweites Mal — als **Drachenhauch-Programm**

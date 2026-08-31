@@ -47,6 +47,7 @@ from PySide6.QtCore import QObject, Signal
 # Tests patchbar (`monkeypatch.setattr(modul, "_find_dhrt", ...)`), ohne die
 # Wrapper-Funktion + ihren Docstring viermal zu duplizieren.
 from .dhrt_locate import find_dhrt as _find_dhrt
+from . import tempdateien
 
 
 @dataclass
@@ -104,7 +105,10 @@ def _check_via_dhrt(source: str, base_path, dhrt,
     import tempfile
     base = base_path or Path.cwd()
     tmp_dir = str(base) if Path(base).is_dir() else None
-    fd, tmp = tempfile.mkstemp(suffix=".dh", dir=tmp_dir)
+    # Erkennbarer Name (Praefix + Prozessnummer), damit ein beim
+    # Abbruch liegengebliebener Rest beim naechsten Start sicher
+    # entfernt werden kann -- siehe tempdateien.py.
+    fd, tmp = tempdateien.neu(tmp_dir)
     os.close(fd)
     proc = None
     try:

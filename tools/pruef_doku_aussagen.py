@@ -138,13 +138,27 @@ def pruefe_namen(ordner: Path, nur: set[str] | None = None) -> list:
     return funde
 
 
+def beispiele() -> list:
+    """Die .dh-Dateien in `examples/` -- ohne Temp-Reste der IDE.
+
+    Fehlerpruefung, Debugger und Profiler legen ihre Arbeitsdatei NEBEN die
+    Quelle (sonst loest `IMPORT "helfer.dh"` nicht auf). Bricht so ein Lauf
+    ab, bleibt sie liegen -- und kippte bisher jede Zaehlung ueber
+    `examples/`. Seit sie ein erkennbares Praefix traegt, laesst sie sich
+    ueberspringen.
+    """
+    from drachenhauch.editor_qt.tempdateien import PRAEFIX
+    return [p for p in (WURZEL / "examples").glob("*.dh")
+            if not p.name.startswith(PRAEFIX)]
+
+
 def zaehlungen() -> list:
     """Zahlen in README.md gegen die Wirklichkeit."""
     readme = WURZEL / "README.md"
     text = readme.read_text(encoding="utf-8")
     funde = []
 
-    ist_beispiele = len(list((WURZEL / "examples").glob("*.dh")))
+    ist_beispiele = len(beispiele())
     quelle = (WURZEL / "rust" / "drachenhauch_runtime" / "src" / "preprocess.rs").read_text(encoding="utf-8")
     m = re.search(r"const MODULES[^=]*=\s*&\[(.*?)\];", quelle, re.S)
     ist_module = len(re.findall(r'"([a-z_0-9]+)"', m.group(1))) if m else 0

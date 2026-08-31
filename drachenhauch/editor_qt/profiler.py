@@ -23,6 +23,7 @@ from PySide6.QtCore import QObject, Signal
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
 # duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
 from .dhrt_locate import find_dhrt as _find_dhrt
+from . import tempdateien
 
 
 @dataclass
@@ -96,7 +97,10 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
 
     base = Path(base_path)
     tmp_dir = str(base) if base.is_dir() else None
-    fd, tmp = tempfile.mkstemp(suffix=".dh", dir=tmp_dir)
+    # Erkennbarer Name (Praefix + Prozessnummer), damit ein beim
+    # Abbruch liegengebliebener Rest beim naechsten Start sicher
+    # entfernt werden kann -- siehe tempdateien.py.
+    fd, tmp = tempdateien.neu(tmp_dir)
     os.close(fd)
     result = ProfileResult()
     out = ""
