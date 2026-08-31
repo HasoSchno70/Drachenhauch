@@ -33,10 +33,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
-> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 402 | 0,77 |
-> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 383 | 0,48 |
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
+> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1029 | 0,14 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1096 | 0,15 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -82,8 +82,18 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Tabs. Einzige Quelle `editor_qt/piloten.py`; ein Test prueft Existenz UND
 > Zeilenzahl (er fand sofort zwei falsche).
 >
-> **Nicht portiert** (in allen vier Piloten): eigene Presets
-> speichern/laden. In den ersten beiden zusaetzlich Undo/Redo -- der dritte
+> **Jeder Pilot liest seit 2026-08-31 zurueck, was er schreibt** (vorher
+> stand hier "eigene Presets speichern/laden nicht portiert"): SFX und
+> Partikel sichern ihre Regler als `.ini` (Schluessel = Beschriftung, also
+> lesbar und von Hand aenderbar; ein unbekannter Schluessel wird UEBERGANGEN
+> statt gemeldet), der Sprite-Editor holt einen Streifen samt Atlas-JSON
+> zurueck (die EBENEN sind dabei weg -- der Streifen ist das
+> zusammengerechnete Bild, das steht so in der Datei), der Tilemap-Editor
+> konnte es von Anfang an ueber `TILED_LOAD`. Das Sichern kostete die
+> Faktoren: SFX 0,77 -> 0,93, Partikel 0,48 -> 0,58. Alle vier Rundwege sind
+> nachgefahren (malen -> sichern -> zuruecksetzen -> laden -> vergleichen).
+>
+> **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
 > betroffenen Ebene; beim Sprite-Editor werden die Plaetze EINMAL angelegt
 > und wiederverwendet -- `IMAGE_FREE` gibt es seit dem Pilotenbefund zwar,

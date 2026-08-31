@@ -22,17 +22,17 @@ from pathlib import Path
 
 PILOTEN: list[dict] = [
     {"datei": "183_sfx_generator.dh", "titel": "SFX-Generator",
-     "qt": 522, "dh": 402,
-     "kurz": "16 Regler, Wellenform-Anzeige, WAV- und GB-Code-Ausgabe"},
+     "qt": 522, "dh": 484,
+     "kurz": "16 Regler, Wellenform-Anzeige, WAV- und GB-Code-Ausgabe, Einstellungen sichern/laden"},
     {"datei": "185_partikel_editor.dh", "titel": "Partikel-Editor",
-     "qt": 802, "dh": 383,
-     "kurz": "17 Regler, echte Vorschau, GB-Code-Ausgabe"},
+     "qt": 802, "dh": 468,
+     "kurz": "17 Regler, echte Vorschau, GB-Code-Ausgabe, Einstellungen sichern/laden"},
     {"datei": "187_tilemap_editor.dh", "titel": "Tilemap-Editor",
      "qt": 2428, "dh": 762,
      "kurz": "sechs Werkzeuge, Auswahl mit Zwischenablage, Ebenen, Tiled-JSON"},
     {"datei": "189_sprite_editor.dh", "titel": "Sprite-Editor",
-     "qt": 7379, "dh": 1029,
-     "kurz": "neun Werkzeuge, Ebenen, Einzelbilder, Streifen- und Atlas-Ausgabe"},
+     "qt": 7379, "dh": 1096,
+     "kurz": "neun Werkzeuge, Ebenen, Einzelbilder, Streifen und Atlas schreiben und lesen"},
 ]
 
 
