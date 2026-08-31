@@ -241,6 +241,41 @@ Reflexionen/Mirror-Effekte.
 
 ---
 
+## H — Befunde aus den Editor-Piloten (2026-08-31)
+
+### H1. `DIM red` in einem Block scheiterte, oben nicht — ✅ BEHOBEN
+> **Vorbelegte Konstanten liessen sich nur auf oberster Ebene verschatten.**
+> `DIM pi AS INTEGER : pi = 5` lief oben im Programm einwandfrei und warf vier
+> Zeilen tiefer in einem `IF`/`WHILE`/`FOR` den Laufzeitfehler
+> „CONST 'pi' kann nicht ueberschrieben werden".
+>
+> Betroffen war jeder vorbelegte Name: die **18 Farbnamen** (`red`, `green`,
+> `blue`, `white`, `black`, `gray`, `orange`, `pink`, `brown`, `purple`,
+> `cyan`, `magenta`, `yellow`, …), **alle `KEY_*`**, `pi` und `tau` — also
+> genau die Wörter, die ein BASIC für Grafik und Spiele als Variablennamen
+> nahelegt. In einer `SUB` trat es nicht auf (dort gibt es lokale Plätze).
+>
+> Drei Dinge machten es unangenehm: dieselbe Zeile lief oben und scheiterte im
+> Block; **`dhrt --check` schwieg**; und die Meldung zeigte auf die Konstante
+> statt auf den Variablennamen — man sucht den Fehler dort, wo keiner ist.
+>
+> **Ursache:** `collect_globals` (compiler.rs) lief nur über die *oberste*
+> Anweisungsliste. Ein `DIM` im Block bekam deshalb keinen globalen Platz und
+> wurde über seinen NAMEN angelegt — und `DECLARE_NAME` lässt einen schon
+> vorhandenen Eintrag stehen, während `DECLARE_GLOBAL_SLOT` ihn ersetzt.
+> Drachenhauch kennt keine Block-Gültigkeit, ein `DIM` im Block *ist* global;
+> der Durchlauf steigt jetzt in die Blöcke hinab (nicht in SUB/FUNCTION/CLASS
+> — die haben eigene Plätze).
+>
+> **Nebenertrag:** Die Kollisions-Erkennung (E3) sah bis dahin nur
+> Geschwister. `CONST Modus` oben und `DIM modus` in einem `IF` fiel ihr
+> durch — jetzt nicht mehr.
+>
+> Gefunden im Sprite-Editor (`DIM pi` in der Hauptschleife). Tests:
+> `tests/test_name_collision.py`.
+
+---
+
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 
 ### F1. `physics3d` war komplett undokumentiert + toter Link — ✅ BEHOBEN

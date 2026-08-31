@@ -32,7 +32,38 @@ IMPORT "imgfx"
 
 ### In ein Image zeichnen (MUTIEREND — verändert das übergebene IMAGE)
 
-Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen direkt in das Image. Ideal, um zur Ladezeit eine Grafik zusammenzubauen (z. B. leere Leinwand via `GENTEX_COLOR(w, h, farbe)`, dann bemalen). Nach jeder Operation wird die GPU-Textur neu hochgeladen — daher **einmal beim Aufbauen** nutzen, nicht in jedem Frame.
+Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen direkt in das Image. Ideal, um zur Ladezeit eine Grafik zusammenzubauen (z. B. leere Leinwand via `IMAGE_NEW(w, h)`, dann bemalen).
+
+**Jeder dieser Aufrufe lädt die ganze Textur neu hoch** — gemessen **1,16 µs
+pro Aufruf**. Was das heißt, hängt davon ab, wie viele es sind:
+
+| | |
+|---|---|
+| ein Pinselstrich, ein paar Punkte je Bild | belanglos |
+| eine Fläche von 64×64 Punkt für Punkt | 4,7 ms — geht gerade noch in ein Bild |
+| dasselbe bei 256×256 | rund 75 ms — ein sichtbarer Ruckler |
+
+Für ein Malprogramm ist das der Normalfall und in Ordnung; wer *ganze
+Flächen* setzt, nimmt besser `IMAGE_CLEAR`, `IMAGE_DRAW_RECT` mit echter
+Größe oder `IMAGE_DRAW_IMAGE` statt einer Schleife über Einzelpunkte.
+
+**Innerhalb EINES Bildes sieht man nur den Endstand.** Wer dasselbe IMAGE
+zweimal im selben Frame zeichnet und dazwischen ändert, bekommt **beide Male
+den neuen Inhalt** — ein Vorher/Nachher nebeneinander geht so nicht:
+
+```basic
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(16, 16, &HFF0000)
+DRAWIMAGE(b, 10, 10)                      ' zeigt GRUEN, nicht rot
+IMAGE_DRAW_RECT(b, 0, 0, 16, 16, &H00FF00)
+DRAWIMAGE(b, 40, 10)                      ' zeigt gruen
+```
+
+Der Grund ist das Zeichenmodell: ein Zeichenbefehl merkt sich nur, *welche*
+Textur er benutzt, und nachgesehen wird erst beim `FLIP`. Wer zwei Stände
+nebeneinander braucht, braucht zwei Bilder (`IMAGE_COPY`).
+
+
 
 | Funktion | Wirkung |
 |---|---|

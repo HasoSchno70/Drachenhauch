@@ -673,6 +673,16 @@ impl Compiler {
     fn collect_globals(&mut self, stmts: &[Node]) -> CR {
         let mut var_like: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut const_like: HashMap<String, &'static str> = HashMap::new();
+        self.collect_globals_in(stmts, &mut var_like, &mut const_like)
+    }
+
+    /// Der eigentliche Durchlauf. Die beiden Mengen fuer die
+    /// Kollisions-Erkennung werden durchgereicht, damit ein `DIM` in einem
+    /// Block gegen eine CONST WEITER OBEN geprueft wird -- mit je eigenen
+    /// Mengen je Ebene faende der Durchlauf nur Kollisionen unter Geschwistern.
+    fn collect_globals_in(&mut self, stmts: &[Node],
+                          var_like: &mut std::collections::HashSet<String>,
+                          const_like: &mut HashMap<String, &'static str>) -> CR {
         for s in stmts {
             let line = if let Node::Stmt { line, .. } = s { *line } else { 0 };
             // Hilfsausdruck: ein Variablen-Name darf nicht schon CONST/ENUM sein.
@@ -724,6 +734,14 @@ impl Compiler {
                     self.alloc_slot(name);
                 }
                 _ => {}
+            }
+            // In die Bloecke hinein. Drachenhauch kennt keine
+            // Block-Gueltigkeit: ein `DIM` in einem `IF` auf oberster Ebene ist
+            // genauso global wie eines daneben -- es muss also denselben Platz
+            // bekommen, sonst laeuft es ueber den Namen und stolpert ueber
+            // gleichnamige eingebaute Konstanten (`red`, `pi`, `key_space`).
+            for blk in globale_unterbloecke(unwrap_stmt(s)) {
+                self.collect_globals_in(blk, var_like, const_like)?;
             }
         }
         Ok(())
@@ -3447,6 +3465,32 @@ fn unwrap_stmt(n: &Node) -> &Node {
 
 /// Top-Level-Namen eines Statements mit ihrer Art ("var" | "eine CONST" |
 /// "ein ENUM") -- fuer die Namens-Kollisionspruefung in collect_globals.
+/// Die Anweisungslisten INNERHALB einer Anweisung, die noch zum globalen
+/// Gueltigkeitsbereich gehoeren.
+///
+/// SUB/FUNCTION/CLASS sind bewusst NICHT dabei: die machen einen eigenen
+/// Bereich auf, ihre `DIM`s bekommen lokale Plaetze. Wuerden sie hier
+/// mitlaufen, belegte jedes Funktions-Local zusaetzlich einen globalen Platz.
+fn globale_unterbloecke(n: &Node) -> Vec<&Vec<Node>> {
+    match n {
+        Node::If { then_block, elseif_branches, else_block, .. } => {
+            let mut v: Vec<&Vec<Node>> = vec![then_block, else_block];
+            for (_, b) in elseif_branches { v.push(b); }
+            v
+        }
+        Node::Select { cases, else_block, .. } => {
+            let mut v: Vec<&Vec<Node>> = vec![else_block];
+            for (_, _, b) in cases { v.push(b); }
+            v
+        }
+        Node::While { body, .. } | Node::For { body, .. } | Node::ForEach { body, .. }
+        | Node::Repeat { body, .. } | Node::With { body, .. } => vec![body],
+        Node::Try { body, catch_block, finally_block, .. } =>
+            vec![body, catch_block, finally_block],
+        _ => vec![],
+    }
+}
+
 fn collect_global_names(n: &Node) -> Vec<(String, &'static str)> {
     match n {
         Node::Dim { name, .. } => vec![(name.clone(), "var")],
