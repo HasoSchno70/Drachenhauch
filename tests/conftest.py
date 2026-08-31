@@ -772,7 +772,10 @@ def _temp_reste_wegraeumen():
     """
     try:
         from drachenhauch.editor_qt.tempdateien import aufraeumen
-        aufraeumen([_ROOT, _ROOT / "examples"], eigene_auch=True)
+        # `nur_eigene`: 89 Testprozesse raeumen gleichzeitig auf -- keiner
+        # hat mit den Dateien der anderen etwas zu schaffen, und keiner
+        # soll ueber fremde Prozessnummern nachfragen.
+        aufraeumen([_ROOT, _ROOT / "examples"], eigene_auch=True, nur_eigene=True)
     except Exception:
         pass
 

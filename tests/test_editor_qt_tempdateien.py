@@ -162,3 +162,44 @@ def test_eigene_auch_laesst_fremde_in_ruhe(tmp_path):
     weg = tempdateien.aufraeumen([tmp_path], eigene_auch=True)
     assert weg == [eigen] or (eigen in weg and fremd not in weg)
     assert fremd.exists()
+
+
+def test_nur_eigene_fragt_ueber_keine_fremde_nummer(tmp_path, monkeypatch):
+    """Im Testlauf raeumen 89 Prozesse gleichzeitig auf. Keiner darf dabei
+    ueber fremde Prozessnummern nachfragen -- `os.kill(pid, 0)` ist unter
+    Windows keine reine Abfrage, und die Nummern gehoeren uns nicht."""
+    gefragt = []
+    monkeypatch.setattr(tempdateien, "_laeuft",
+                        lambda pid: gefragt.append(pid) or True)
+    fremd = tmp_path / "_dhtmp_424242_abcd1234.dh"
+    fremd.write_text("x", encoding="utf-8")
+    _alt_machen(fremd)
+    eigen = tmp_path / f"_dhtmp_{os.getpid()}_ffff0000.dh"
+    eigen.write_text("x", encoding="utf-8")
+
+    weg = tempdateien.aufraeumen([tmp_path], eigene_auch=True, nur_eigene=True)
+    assert weg == [eigen]
+    assert fremd.exists()
+    assert gefragt == [], f"hat nach fremden Prozessen gefragt: {gefragt}"
+
+
+def test_laeuft_beendet_keinen_prozess(tmp_path):
+    """Die Kernzusage: nachfragen, nicht anfassen.
+
+    `os.kill(pid, 0)` bildet CPython unter Windows auf `TerminateProcess` ab
+    -- nur die beiden Konsolen-Signale gehen einen anderen Weg. Deshalb geht
+    die Abfrage dort ueber `OpenProcess` + `GetExitCodeProcess`.
+    """
+    import subprocess
+    import sys
+    import time
+    kind = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"])
+    try:
+        time.sleep(0.6)
+        assert tempdateien._laeuft(kind.pid) is True
+        time.sleep(0.6)
+        assert kind.poll() is None, "die Abfrage hat den Prozess beendet"
+    finally:
+        kind.kill()
+        kind.wait(timeout=10)
+    assert tempdateien._laeuft(kind.pid) is False

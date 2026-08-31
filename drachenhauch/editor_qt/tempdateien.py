@@ -49,29 +49,61 @@ def neu(verzeichnis) -> tuple[int, str]:
 
 
 def _laeuft(pid: int) -> bool:
-    """Gibt es diesen Prozess noch?
+    """Gibt es diesen Prozess noch? **Im Zweifel `True`** -- lieber eine Datei
+    zu viel liegen lassen als eine fremde loeschen.
 
-    `os.kill(pid, 0)` schickt kein Signal, sondern fragt nur nach -- auch
-    unter Windows (dort ueber OpenProcess). `PermissionError` heisst: es gibt
-    ihn, er gehoert nur jemand anderem. **Im Zweifel `True`**: lieber eine
-    Datei zu viel liegen lassen als eine fremde loeschen.
+    **Nicht ueber `os.kill(pid, 0)`.** Das ist unter Windows keine reine
+    Abfrage: CPython bildet es dort auf `OpenProcess` +
+    `TerminateProcess(handle, sig)` ab; nur `CTRL_C_EVENT`/`CTRL_BREAK_EVENT`
+    gehen einen anderen Weg. Dass es auf einer Maschine nichts beendet hat,
+    ist kein Beleg, dass es das nirgends tut -- und diese Funktion laeuft
+    ueber Prozessnummern, die uns nicht gehoeren.
+
+    `OpenProcess` + `GetExitCodeProcess` kann per Bauart nichts anrichten:
+    ein Zugriffsrecht zum LESEN, und ein Ergebnis. `STILL_ACTIVE` (259) heisst
+    "laeuft noch".
     """
     if pid <= 0:
         return True
-    try:
-        os.kill(pid, 0)
-    except PermissionError:
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)          # POSIX: dort ist Signal 0 wirklich nur eine Frage
+        except PermissionError:
+            return True              # gibt es, gehoert jemand anderem
+        except OSError:
+            return False
+        except Exception:
+            return True
         return True
-    except OSError:
-        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        h = k32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+        if not h:
+            # Kein Zugriff heisst NICHT "gibt es nicht" -- im Zweifel behalten.
+            return ctypes.get_last_error() != 87       # ERROR_INVALID_PARAMETER
+        try:
+            code = wintypes.DWORD()
+            if not k32.GetExitCodeProcess(h, ctypes.byref(code)):
+                return True
+            return code.value == STILL_ACTIVE
+        finally:
+            k32.CloseHandle(h)
     except Exception:
         return True
-    return True
 
 
 def aufraeumen(verzeichnisse, jetzt: float | None = None,
-               eigene_auch: bool = False) -> list[Path]:
+               eigene_auch: bool = False, nur_eigene: bool = False) -> list[Path]:
     """Liegengebliebene Temp-Dateien entfernen. Liefert die geloeschten Pfade.
+
+    `nur_eigene` beschraenkt auf die Dateien DIESES Prozesses -- dann wird
+    ueber keine fremde Prozessnummer nachgefragt. Das ist im Testlauf richtig:
+    dort raeumen 89 Prozesse gleichzeitig auf, und keiner hat etwas mit den
+    Dateien der anderen zu schaffen.
 
     `eigene_auch` nimmt die Dateien DIESES Prozesses dazu, ohne Altersgrenze.
     Das ist am ENDE eines Laufs richtig und sonst nie: dort steht fest, dass
@@ -104,6 +136,8 @@ def aufraeumen(verzeichnisse, jetzt: float | None = None,
             if not m:
                 continue
             eigene = int(m.group(1)) == os.getpid()
+            if nur_eigene and not eigene:
+                continue
             if not (eigene and eigene_auch):
                 try:
                     if jetzt - p.stat().st_mtime < MINDESTALTER_S:
