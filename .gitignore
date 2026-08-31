@@ -68,3 +68,9 @@ buch-tippspiel/code/*.db*
 buch-tippspiel/code/kap*/*.db*
 # Der Export legt den Ordner mit der .exe an -- Bauergebnis, kein Quelltext.
 buch-tippspiel/code/*_dist/
+
+# Arbeitsdateien der IDE (Fehlerpruefung/Debugger/Profiler). Sie liegen
+# ABSICHTLICH neben der Quelle -- sonst loest `IMPORT "helfer.dh"` nicht auf --
+# und bleiben liegen, wenn ein Lauf abbricht. Der Qt-Testlauf beendet seine
+# Prozesse per os._exit(), das `finally`-Aufraeumen laeuft dort also nie.
+_dhtmp_*.dh

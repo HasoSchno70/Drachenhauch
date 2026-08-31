@@ -31,10 +31,30 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path, monkeypatch):
+    """Fenster anlegen UND am Ende schliessen.
+
+    `closeEvent` bricht die laufenden `dhrt --check`-Faeden ab und stoppt die
+    Zeitgeber. Ohne das laufen sie weiter, waehrend pytest den Prozess
+    abbaut -- lokal eine Zugriffsverletzung beim Beenden, auf dem
+    CI-Rechner ein Haenger, der den ganzen Qt-Durchgang in die Zeitgrenze
+    laufen liess. Ein gruener Lauf hier sagt darueber nichts: die Meldung
+    kommt NACH der Testzusammenfassung.
+    """
     from drachenhauch.editor_qt import main_window as mw
     monkeypatch.setattr(mw, "save_settings", lambda *_a, **_kw: None)
     monkeypatch.setattr(mw, "clear_autosaves", lambda *_a, **_kw: None)
-    return mw.DrachenhauchEditor(tmp_path)
+    # Die Live-Fehlerpruefung stilllegen. Sie startet je Editor-Fenster
+    # `dhrt --check`-Subprozesse in Hintergrund-Faeden; der Testlauf endet
+    # aber per `os._exit()` (DH_TEST_HARTES_ENDE). Trifft das einen Faden
+    # mitten im Prozessstart, stirbt der Prozess unter Windows mit einer
+    # Zugriffsverletzung -- auf dem CI-Rechner hing der ganze Qt-Durchgang
+    # daran und lief in die Zeitgrenze. `_find_dhrt` ist dafuer die
+    # vorgesehene Naht (siehe Kommentar in error_check.py).
+    from drachenhauch.editor_qt import error_check
+    monkeypatch.setattr(error_check, "_find_dhrt", lambda *_a, **_k: None)
+    w = mw.DrachenhauchEditor(tmp_path)
+    yield w
+    w.close()
 
 
 # ----------------------------------------------------------------- Daten
@@ -97,6 +117,9 @@ def test_kein_zweiter_start_waehrend_etwas_laeuft(win, monkeypatch):
     monkeypatch.setattr(win.console, "is_running", lambda: True)
     monkeypatch.setattr(win.console, "start_run_auto",
                         lambda p: pytest.fail("darf nicht starten"))
+    # Beim Schliessen fragt das Fenster die Konsole -- die hier angelogene
+    # "laeuft"-Antwort wuerde sonst einen Stopp ohne Lauf ausloesen.
+    monkeypatch.setattr(win.console, "stop_run", lambda *_a, **_k: None)
     win._run_pilot(PILOTEN[0])
 
 

@@ -760,6 +760,26 @@ def pytest_sessionfinish(session, exitstatus):
     _ENDE_STATUS = int(exitstatus)
 
 
+def _temp_reste_wegraeumen():
+    """Arbeitsdateien der IDE nach dem Testlauf entfernen.
+
+    Die Qt-Tests bauen echte Editor-Fenster; deren Fehlerpruefung legt eine
+    `.dh` NEBEN die Quelle (sonst loest `IMPORT "helfer.dh"` nicht auf) und
+    raeumt sie in einem `finally` wieder weg. Das `finally` laeuft hier aber
+    NIE: `DH_TEST_HARTES_ENDE=1` beendet den Prozess per `os._exit()`.
+    Gemessen: ein Durchgang ueber alle Qt-Dateien liess sechs Reste in
+    `examples/` zurueck -- und ein Rest dort kippt jede Zaehlung.
+    """
+    try:
+        from drachenhauch.editor_qt.tempdateien import aufraeumen
+        # `nur_eigene`: 89 Testprozesse raeumen gleichzeitig auf -- keiner
+        # hat mit den Dateien der anderen etwas zu schaffen, und keiner
+        # soll ueber fremde Prozessnummern nachfragen.
+        aufraeumen([_ROOT, _ROOT / "examples"], eigene_auch=True, nur_eigene=True)
+    except Exception:
+        pass
+
+
 def pytest_unconfigure(config):
     # NICHT in `pytest_sessionfinish`: der Terminal-Reporter schreibt seine
     # Zusammenfassung ("5 passed in 1.16s") dort als Hook-Wrapper, also NACH
@@ -770,6 +790,7 @@ def pytest_unconfigure(config):
         return
     if os.environ.get("PYTEST_XDIST_WORKER"):
         return                      # ein Arbeiter muss sein Ergebnis noch melden
+    _temp_reste_wegraeumen()
     sys.stdout.flush()
     sys.stderr.flush()
     os._exit(_ENDE_STATUS)

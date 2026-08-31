@@ -447,6 +447,15 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
 - **`IS NIL`/`IS NOT NIL` gibt es seit 2026-08-26** (vorher stand hier, es gebe
   sie nicht) — zusammen mit dem allgemeinen Typtest `x IS Typname`, siehe
   Abschnitt „Laufzeit-Typtest". `IS_NIL(x)` bleibt gleichwertig.
+- **Temp-`.dh` der IDE liegen NEBEN der Quelle** (Fehlerpruefung, Debugger,
+  Profiler) -- anders loest `IMPORT "helfer.dh"` nicht auf. Sie heissen
+  `_dhtmp_<pid>_xxxxxxxx.dh` und werden beim IDE-Start entfernt, aber NUR
+  wenn ihr Prozess nicht mehr laeuft (eine zweite IDE in einer stundenlangen
+  Debug-Sitzung soll ihre nicht verlieren) und sie mindestens eine Minute alt
+  sind (Prozessnummern werden wiederverwendet). Wer `examples/*.dh` globbt,
+  filtert `tempdateien.PRAEFIX` heraus -- ein Rest kippte sonst die Zaehlung
+  (`tools/pruef_doku_aussagen.py`, `tests/test_dhrt_werkzeuge.py` tun es).
+  Modul `drachenhauch/editor_qt/tempdateien.py`.
 - **Qt-Tests: nie ungebremst `app.processEvents()` aufrufen.** Die Qt-Testdateien
   lassen ihre Fenster stehen; in EINEM gemeinsamen `pytest tests/`-Prozess
   sammeln sich so tausende QObjects mit hunderten scharfen Timern (u.a.

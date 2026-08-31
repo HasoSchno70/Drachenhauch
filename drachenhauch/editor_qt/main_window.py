@@ -50,6 +50,7 @@ from .icons import icons
 from .markdown_viewer import MarkdownViewer
 from .outline_panel import OutlinePanel
 from .output_console import OutputConsole
+from . import tempdateien
 from .piloten import (PILOTEN, pfad as piloten_pfad,
                       beschreibung as piloten_beschreibung)
 from .palette import command_palette, quick_open
@@ -161,8 +162,44 @@ class DrachenhauchEditor(QMainWindow):
 
         self._update_status()
         self._refresh_outline()
+        # Liegengebliebene Temp-Dateien wegraeumen -- verzoegert, damit der
+        # Start davon nicht laenger dauert.
+        QTimer.singleShot(0, self._tempdateien_aufraeumen)
 
     # ----------------------------------------------------- UI-Aufbau
+    def _temp_verzeichnisse(self) -> list[Path]:
+        """Wo eine Temp-Datei liegen kann: neben einer Datei, die jemand
+        geoeffnet hatte.
+
+        Die Fehlerpruefung legt sie ins Verzeichnis der QUELLE (sonst loest
+        `IMPORT "helfer.dh"` nicht auf), es gibt also keinen einen Ort. Der
+        ganze Projektbaum waere zu teuer fuer den Start -- gesucht wird da,
+        wo .dh-Dateien tatsaechlich herkommen: Projektwurzel, `examples/` und
+        die Verzeichnisse der zuletzt geoeffneten Dateien.
+        """
+        orte = [self.project_root, self.project_root / "examples"]
+        for eintrag in self.recent[:RECENT_FILES_MAX]:
+            try:
+                orte.append(Path(eintrag).parent)
+            except (OSError, ValueError):
+                pass
+        return orte
+
+    def _tempdateien_aufraeumen(self) -> None:
+        """Reste eines abgebrochenen Laufs entfernen (siehe tempdateien.py).
+
+        Nur was sich als unser Werk ausweist UND dessen Prozess nicht mehr
+        laeuft -- eine zweite IDE mitten in einer Pruefung oder Debug-Sitzung
+        verliert ihre Datei nicht.
+        """
+        try:
+            weg = tempdateien.aufraeumen(self._temp_verzeichnisse())
+        except Exception:            # noqa: BLE001 -- Aufraeumen darf den Start nie verhindern
+            return
+        if weg:
+            self.statusBar().showMessage(
+                f"{len(weg)} liegengebliebene Temp-Datei(en) entfernt.", 4000)
+
     def _apply_window_icon(self) -> None:
         """Setzt das Drachenhauch-Logo als Window-/Taskbar-Icon.
 
