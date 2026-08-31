@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1590,
+ "count": 1595,
  "builtins": [
   {
    "name": "ABS",
@@ -2739,6 +2739,12 @@
    "module": "core"
   },
   {
+   "name": "GETALPHA",
+   "kind": "graphics",
+   "signature": "GETALPHA(img, x, y)",
+   "module": "core"
+  },
+  {
    "name": "GETENV$",
    "kind": "core",
    "signature": "GETENV$(name, vorgabe = \"\") AS STRING",
@@ -4155,6 +4161,12 @@
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_CLEAR",
+   "kind": "core",
+   "signature": "IMAGE_CLEAR(bild [, x, y, b, h])",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_CONTRAST",
    "kind": "core",
    "signature": "IMAGE_CONTRAST(img, n: -100..100)",
@@ -4188,6 +4200,12 @@
    "name": "IMAGE_DRAW_CIRCLE",
    "kind": "core",
    "signature": "IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_DRAW_IMAGE",
+   "kind": "core",
+   "signature": "IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])",
    "module": "imgfx"
   },
   {
@@ -4227,6 +4245,12 @@
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_NEW",
+   "kind": "core",
+   "signature": "IMAGE_NEW(breite, hoehe [, farbe])",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_PALETTE",
    "kind": "graphics",
    "signature": "IMAGE_PALETTE(bild: IMAGE, max: Zahl) -> ARRAY OF INTEGER",
@@ -4248,6 +4272,12 @@
    "name": "IMAGE_ROTATE",
    "kind": "core",
    "signature": "IMAGE_ROTATE(img: ?, degrees: Zahl)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_SAVE",
+   "kind": "core",
+   "signature": "IMAGE_SAVE(bild, pfad$)",
    "module": "imgfx"
   },
   {

@@ -1,6 +1,6 @@
 # Modul `imgfx`
 
-Bild-Effekte: skalieren, rotieren, spiegeln, einfärben. Jede Funktion gibt ein **neues** IMAGE zurück, das Original bleibt erhalten — Verkettung ist sicher.
+Bild-Effekte: skalieren, rotieren, spiegeln, einfärben. Die Filter geben ein **neues** IMAGE zurück, das Original bleibt erhalten — Verkettung ist sicher. Daneben gibt es Befehle, die **in** ein Bild malen (`IMAGE_DRAW_*`), und seit 2026-08-31 solche, mit denen ein Programm Bilder **herstellt** statt sie nur anzuzeigen: [anlegen, zusammensetzen und speichern](#bilder-anlegen-zusammensetzen-und-speichern).
 
 ```basic
 IMPORT "imgfx"
@@ -45,6 +45,60 @@ Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen d
 | `IMAGE_ALPHA_PREMULTIPLY(bild)` | IMAGE — Farbe mit der Deckkraft vorab verrechnen; verhindert dunkle Säume beim Skalieren |
 | `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
 | `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
+
+## Bilder anlegen, zusammensetzen und speichern
+
+Diese fuenf machen aus einem IMAGE etwas, das ein Programm nicht nur anzeigen,
+sondern auch **herstellen** kann. Vorher war es eine Einbahnstrasse:
+hineinzeichnen ging, aber ein durchsichtiges Bild liess sich nicht anlegen,
+kein Bild in ein anderes setzen, nichts wegradieren, die Deckkraft nicht lesen
+und ueberhaupt nichts speichern.
+
+| Funktion | Wirkung |
+|---|---|
+| `IMAGE_NEW(breite, hoehe [, farbe])` | IMAGE — ein neues Bild; **ohne Farbe vollstaendig durchsichtig** |
+| `IMAGE_CLEAR(bild [, x, y, b, h])` | einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild |
+| `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
+| `IMAGE_SAVE(bild, pfad$)` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`) |
+| `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
+
+```basic
+IMPORT "imgfx"
+' Zwei Ebenen zu einem Bild verrechnen und sichern.
+DIM unten AS IMAGE : unten = IMAGE_NEW(64, 64, &H204060)
+DIM oben AS IMAGE  : oben  = IMAGE_NEW(64, 64)          ' durchsichtig
+IMAGE_DRAW_CIRCLE(oben, 32, 32, 20, &HFFCC00)
+IMAGE_CLEAR(oben, 28, 28, 8, 8)                          ' ein Loch radieren
+
+DIM fertig AS IMAGE : fertig = IMAGE_NEW(64, 64)
+IMAGE_DRAW_IMAGE(fertig, unten, 0, 0)
+IMAGE_DRAW_IMAGE(fertig, oben, 0, 0)
+IMAGE_SAVE(fertig, "ebenen.png")
+```
+
+**Warum `IMAGE_NEW` und nicht `GENTEX_COLOR`:** ein vollstaendig durchsichtiges
+Bild laesst sich ueber eine **Farbe** gar nicht ausdruecken. Die Farbkonvention
+deutet Deckkraft 0 als *deckend* — nur so bleiben `&Hrrggbb` und `RGB(r,g,b)`
+undurchsichtig. `IMAGE_NEW` ohne Farbe umgeht das.
+
+**Warum `GETALPHA` und nicht ein viertes Byte in `GETPIXEL`:** aus demselben
+Grund. `GETPIXEL` liefert eine *Farbe* zurueck — ein durchsichtiger Punkt kaeme
+dort als deckendes Schwarz an. Wer wissen will, ob ein Punkt leer ist, fragt
+`GETALPHA(bild, x, y) = 0`.
+
+**`IMAGE_CLEAR` mischt nicht, es schreibt.** Ein durchsichtiges Rechteck
+einzumischen waere ein Nichts-Tun; Radieren muss den Punkt ersetzen.
+
+**`IMAGE_SAVE` und die Endung.** Sie bestimmt das Format, und eine unbekannte
+wird abgelehnt statt stillschweigend nichts zu tun (raylib schriebe dann nur
+eine Zeile ins Protokoll, und das Programm glaubte, es haette gespeichert).
+Ein misslungenes Schreiben — fehlendes Verzeichnis, kein Schreibrecht — meldet
+sich ebenfalls; nachgesehen wird an der Datei selbst, weil die raylib-Bindung
+das Erfolgs-Flag verwirft.
+
+**Nicht dabei: Bilder ueber die Zwischenablage.** `CLIPBOARD_GET`/`SET` koennen
+nur Text. raylibs `GetClipboardImage` gibt es nur unter Windows, und ein Befehl,
+den es auf zwei von drei Betriebssystemen nicht gibt, ist eine Falle.
 
 Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.dh](../examples/122_imgfx.dh).
 

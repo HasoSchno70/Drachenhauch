@@ -435,12 +435,12 @@ WHILE NOT QUITREQUESTED()
         GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
     NEXT
     IF NOT neuOffen THEN
-        IF KEYHIT(ASC("P")) THEN werkzeug = WZ_STIFT
-        IF KEYHIT(ASC("E")) THEN werkzeug = WZ_RADIER
-        IF KEYHIT(ASC("F")) THEN werkzeug = WZ_FUELL
-        IF KEYHIT(ASC("R")) THEN werkzeug = WZ_RECHT
-        IF KEYHIT(ASC("I")) THEN werkzeug = WZ_PIPETTE
-        IF KEYHIT(ASC("S")) AND NOT strg THEN werkzeug = WZ_AUSWAHL
+        IF KEYHIT(KEY_P) THEN werkzeug = WZ_STIFT
+        IF KEYHIT(KEY_E) THEN werkzeug = WZ_RADIER
+        IF KEYHIT(KEY_F) THEN werkzeug = WZ_FUELL
+        IF KEYHIT(KEY_R) THEN werkzeug = WZ_RECHT
+        IF KEYHIT(KEY_I) THEN werkzeug = WZ_PIPETTE
+        IF KEYHIT(KEY_S) AND NOT strg THEN werkzeug = WZ_AUSWAHL
     END IF
 
     ' ------------------------------------------------------------ Datei
@@ -458,12 +458,12 @@ WHILE NOT QUITREQUESTED()
         GUI_WINDOW_VISIBLE(winNeu, FALSE)
         neuOffen = FALSE
     END IF
-    IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(ASC("O"))) THEN oeffnen()
-    IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(ASC("S"))) THEN speichern()
+    IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O)) THEN oeffnen()
+    IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S)) THEN speichern()
 
     ' ---------------------------------------------------------- Verlauf
-    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(ASC("Z"))) THEN zurueck()
-    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(ASC("Y"))) THEN wieder()
+    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
+    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
     GUI_SET_ENABLED(bZur, uPos > 0)
     GUI_SET_ENABLED(bVor, uPos < uAnz)
 
@@ -628,9 +628,9 @@ WHILE NOT QUITREQUESTED()
 
     ' -------------------------------------------------- Zwischenablage
     IF strg AND NOT neuOffen THEN
-        IF KEYHIT(ASC("C")) THEN auswahlKopieren(FALSE)
-        IF KEYHIT(ASC("X")) THEN auswahlKopieren(TRUE)
-        IF KEYHIT(ASC("V")) THEN
+        IF KEYHIT(KEY_C) THEN auswahlKopieren(FALSE)
+        IF KEYHIT(KEY_X) THEN auswahlKopieren(TRUE)
+        IF KEYHIT(KEY_V) THEN
             IF selAn THEN
                 einfuegen(selX, selY)
             ELSEIF aufKarte THEN

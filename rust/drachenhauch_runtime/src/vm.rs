@@ -7501,6 +7501,40 @@ impl<'p> Vm<'p> {
             "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
             "image_copy" => Value::Int(g!().image_copy(gi(a,0,"IMAGE_COPY")?)?),
+            "image_new" => Value::Int(g!().image_new(
+                gi(a,0,"IMAGE_NEW")? as i32, gi(a,1,"IMAGE_NEW")? as i32,
+                if a.len() >= 3 { Some(gi(a,2,"IMAGE_NEW")?) } else { None })?),
+            "image_clear" => {
+                let r = if a.len() >= 5 {
+                    Some((gi(a,1,"IMAGE_CLEAR")? as i32, gi(a,2,"IMAGE_CLEAR")? as i32,
+                          gi(a,3,"IMAGE_CLEAR")? as i32, gi(a,4,"IMAGE_CLEAR")? as i32))
+                } else if a.len() == 1 { None } else {
+                    return Err("IMAGE_CLEAR: entweder nur das Bild oder Bild, x, y, b, h".into());
+                };
+                g!().image_clear(gi(a,0,"IMAGE_CLEAR")?, r)?;
+                Value::Nil
+            }
+            "image_draw_image" => {
+                let quelle = if a.len() >= 8 {
+                    Some((gi(a,4,"IMAGE_DRAW_IMAGE")? as i32, gi(a,5,"IMAGE_DRAW_IMAGE")? as i32,
+                          gi(a,6,"IMAGE_DRAW_IMAGE")? as i32, gi(a,7,"IMAGE_DRAW_IMAGE")? as i32))
+                } else if a.len() == 4 || a.len() == 5 { None } else {
+                    return Err("IMAGE_DRAW_IMAGE: erwartet (ziel, quelle, x, y), \
+optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
+                };
+                // Die Faerbung steht hinter der Quelle, bei kurzer Form direkt
+                // hinter y. WEISS ist "unveraendert".
+                let tint = match a.len() { 5 => gi(a,4,"IMAGE_DRAW_IMAGE")?,
+                                           9 => gi(a,8,"IMAGE_DRAW_IMAGE")?,
+                                           _ => 0xFFFFFF };
+                g!().image_draw_image(gi(a,0,"IMAGE_DRAW_IMAGE")?, gi(a,1,"IMAGE_DRAW_IMAGE")?,
+                                      gi(a,2,"IMAGE_DRAW_IMAGE")? as i32,
+                                      gi(a,3,"IMAGE_DRAW_IMAGE")? as i32, quelle, tint)?;
+                Value::Nil
+            }
+            "getalpha" => Value::Int(g!().get_alpha(gi(a,0,"GETALPHA")?,
+                gi(a,1,"GETALPHA")? as i32, gi(a,2,"GETALPHA")? as i32)),
+            "image_save" => { g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?)?; Value::Nil }
             "image_crop" => Value::Int(g!().image_crop(gi(a,0,"IMAGE_CROP")?, gi(a,1,"IMAGE_CROP")? as i32, gi(a,2,"IMAGE_CROP")? as i32, gi(a,3,"IMAGE_CROP")? as i32, gi(a,4,"IMAGE_CROP")? as i32)?),
             "image_resize_canvas" => {
                 let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };
