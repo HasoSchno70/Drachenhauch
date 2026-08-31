@@ -386,6 +386,16 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   hält nur noch `COLORS`/`KEYS` + Kamera-Mathematik fürs Editor-Tooling.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
+- **Tastencodes: Buchstaben gehen in BEIDER Schreibweise.** `KEY_A`..`KEY_Z`
+  (= 97..122, SDL-Zaehlung) ist die klare Form; `ASC("s")` und `ASC("S")`
+  meinen seit 2026-08-31 dieselbe Taste. Vorher galten nur die kleinen, und
+  `KEYHIT(ASC("S"))` traf STILL gar nichts -- daran waren alle Tastenkuerzel
+  des Tilemap-Editors tot, ohne Fehler oder Warnung. Ein totes Kuerzel sieht
+  aus wie ein vergessener Aufruf, man sucht den Fehler also im eigenen
+  Programm. Umsetzung in `map_key` (graphics.rs), Test
+  `tests/test_automation.py::test_buchstaben_treffen_in_beiden_schreibweisen`
+  (der hielt vorher das GEGENTEIL fest -- er nannte es in seiner eigenen
+  Beschreibung schon einen "Fehler, der beim Schreiben nicht auffaellt").
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
   `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität

@@ -5493,10 +5493,18 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         1073741919 => KEY_KP_7, 1073741920 => KEY_KP_8, 1073741921 => KEY_KP_9,
         1073741922 => KEY_KP_0,
         1073741923 => KEY_KP_DECIMAL,
-        // Buchstaben: pygame 97..122 (lowercase ascii) -> raylib 65..90.
-        // ACHTUNG: nur KLEINbuchstaben. `KEYHIT(ASC("S"))` (= 83) trifft nichts
-        // und tut still gar nichts -- `ASC("s")` ist gemeint.
+        // Buchstaben. pygame zaehlt sie als KLEINbuchstaben (97..122), raylib
+        // als GROSSE (65..90) -- beide Schreibweisen werden angenommen.
+        //
+        // Frueher galten nur die kleinen, und `KEYHIT(ASC("S"))` traf still
+        // GAR NICHTS: kein Fehler, keine Warnung, die Taste existierte fuer
+        // das Programm einfach nicht. Genau darueber ist der Tilemap-Editor
+        // gestolpert -- jedes seiner Tastenkuerzel war tot, und weil ein
+        // nicht reagierendes Kuerzel wie ein vergessener Aufruf aussieht,
+        // sucht man den Fehler im eigenen Programm. Ein Bereich, der ohnehin
+        // auf `None` lief, kann durch Annehmen niemand brechen.
         97..=122 => return key_from_i32((code - 32) as i32),
+        65..=90 => return key_from_i32(code as i32),
         // Satzzeichen (SDL-Keycodes). Ohne sie lief `KEYHIT(ASC("-"))` ins
         // Leere: die Taste existierte fuer Drachenhauch schlicht nicht, ohne
         // Fehlermeldung. raylib benennt die Tasten nach ihrer PHYSISCHEN Lage

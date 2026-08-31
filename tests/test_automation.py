@@ -259,12 +259,22 @@ def test_empty_filename_is_rejected(tmp_path):
 RL_KEY_S, RL_KEY_MINUS, RL_KEY_COMMA, RL_KEY_PERIOD = 83, 45, 44, 46
 
 
-def test_buchstaben_brauchen_kleinschreibung(tmp_path):
-    """GB-Tastencodes folgen SDL: Buchstaben sind KLEIN (97..122).
+def test_buchstaben_treffen_in_beiden_schreibweisen(tmp_path):
+    """Eine Taste, zwei Schreibweisen: `ASC("s")` und `ASC("S")`.
 
-    `KEYHIT(ASC("S"))` (= 83) trifft nichts und tut still gar nichts -- ein
-    Fehler, der beim Schreiben nicht auffaellt, weil er sich wie eine nicht
-    gedrueckte Taste verhaelt.
+    GB-Tastencodes folgen SDL, dort sind Buchstaben KLEIN (97..122). Bis
+    2026-08-31 galten deshalb NUR die kleinen, und `KEYHIT(ASC("S"))` (= 83)
+    traf still gar nichts -- kein Fehler, keine Warnung, die Taste existierte
+    fuer das Programm einfach nicht.
+
+    Dieser Test hielt frueher genau das fest, mit derselben Beschreibung, die
+    es einen "Fehler, der beim Schreiben nicht auffaellt" nannte. Genau als
+    solcher trat er dann auch auf: im Tilemap-Editor
+    (`examples/187_tilemap_editor.dh`) war JEDES Tastenkuerzel wirkungslos,
+    und weil ein totes Kuerzel wie ein vergessener Aufruf aussieht, sucht man
+    den Fehler im eigenen Programm. Seitdem nimmt die Umsetzungstabelle beide
+    Bereiche an -- 65..90 lief vorher ohnehin ins Leere, das Annehmen kann
+    also nichts brechen.
     """
     _events(tmp_path, "ev.txt", [(1, KEY_DOWN, RL_KEY_S)])
     gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
@@ -275,10 +285,9 @@ def test_buchstaben_brauchen_kleinschreibung(tmp_path):
           'NEXT\n')
     r = _run(gb, tmp_path)
     assert r.returncode == 0, r.stderr
-    # Ab dem Frame nach der Einspeisung ist die Kleinschreibung TRUE ...
-    assert "TRUE FALSE" in r.lines, r.lines
-    # ... und die Grossschreibung NIE.
-    assert not any(ln.startswith("TRUE TRUE") or ln.endswith(" TRUE") for ln in r.lines), r.lines
+    # Beide meinen dieselbe Taste -- sie sind IMMER gleich, nie nur eine.
+    assert "TRUE TRUE" in r.lines, r.lines
+    assert not any(ln in ("TRUE FALSE", "FALSE TRUE") for ln in r.lines), r.lines
 
 
 def test_satzzeichen_sind_ansprechbar(tmp_path):
