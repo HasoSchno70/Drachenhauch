@@ -1,4 +1,5 @@
-"""Auswahl-Werkzeuge des Sprite-Piloten: Lasso, Zauberstab, Verschieben (`examples/189_sprite_editor.dh`).
+"""Sprite-Pilot: Auswahl-Werkzeuge (Lasso, Zauberstab, Verschieben)
+und GIMP-Paletten (.gpl) (`examples/189_sprite_editor.dh`).
 
 Der Pilot ist ein Drachenhauch-Programm, also laesst er sich nicht wie ein
 Modul aufrufen -- geprueft wird er so, wie ein Mensch ihn bedient: mit
@@ -86,12 +87,31 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
     PRINT "P " + STR$(ox) + " " + STR$(oy) + " " + STR$(zoom) + " " + STR$(werkzeug) + _
           " " + STR$(selN) + " " + STR$(selB) + " " + STR$(selH) + _
           " " + STR$(prG) + " " + STR$(prD) + " " + STR$(prL) + _
-          " " + STR$(selX) + " " + STR$(selY)
+          " " + STR$(selX) + " " + STR$(selY) + _
+          " " + STR$(GUI_GET_X(bPalLaden)) + " " + STR$(GUI_GET_Y(bPalLaden)) + _
+          " " + STR$(GUI_GET_X(bPalSichern)) + " " + STR$(GUI_GET_Y(bPalSichern)) + _
+          " " + STR$(pal[0]) + " " + STR$(pal[15])
 '''
 
+# Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
+# Namen -- bei achtzehn Feldern ist `letzte[8]` nicht mehr zu lesen und beim
+# Anhaengen eines Feldes leicht zu verrutschen.
+_FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
+           "selX selY palLX palLY palSX palSY pal0 pal15").split()
 
-def _kopie(tmp_path):
+
+def _kopie(tmp_path, dialoge=None):
+    """`dialoge` ersetzt einzelne Dateidialog-Aufrufe durch feste Pfade.
+
+    Ein FILE_OPEN_DIALOG ist ein natives, blockierendes Fenster des
+    Betriebssystems -- keine aufgezeichnete Eingabe erreicht es. Ersetzt wird
+    deshalb GENAU der Dialogaufruf; alles dahinter (Lesen, Zerlegen,
+    Uebernehmen) ist der echte Code des Piloten.
+    """
     src = _PILOT.read_text(encoding="utf-8")
+    for alt, neu in (dialoge or {}).items():
+        assert src.count(alt) == 1, alt
+        src = src.replace(alt, neu)
     assert src.count("SET_FULLSCREEN(TRUE)") == 1
     src = src.replace("SET_FULLSCREEN(TRUE)", "SET_WINDOW_POS(-3000, -3000)")
     assert src.count("    FLIP()\nWEND") == 1
@@ -110,8 +130,8 @@ def _events(tmp_path, events):
     (tmp_path / "ev.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _lauf(tmp_path, frames, events=None):
-    quelle = _kopie(tmp_path)
+def _lauf(tmp_path, frames, events=None, dialoge=None):
+    quelle = _kopie(tmp_path, dialoge)
     if events is not None:
         _events(tmp_path, events)
         text = quelle.read_text(encoding="utf-8")
@@ -123,13 +143,14 @@ def _lauf(tmp_path, frames, events=None):
     assert r.returncode == 0, r.stderr
     zeilen = [ln for ln in (r.stdout or "").splitlines() if ln.startswith("P ")]
     assert zeilen, "keine Probe-Zeile\n%s\n%s" % (r.stdout, r.stderr)
-    return [[int(v) for v in re.split(r"\s+", ln)[1:]] for ln in zeilen]
+    return [dict(zip(_FELDER, [int(v) for v in re.split(r"\s+", ln)[1:]]))
+            for ln in zeilen]
 
 
 def _geometrie(tmp_path):
     """Ursprung und Zoom der Zeichenflaeche -- ohne sie trifft kein Mausweg."""
     letzte = _lauf(tmp_path, 6)[-1]
-    ox, oy, zoom = letzte[0], letzte[1], letzte[2]
+    ox, oy, zoom = letzte["ox"], letzte["oy"], letzte["zoom"]
     assert zoom > 1, "Zoom nicht eingepasst"
     return ox, oy, zoom
 
@@ -190,9 +211,8 @@ def test_zauberstab_waehlt_die_ganze_leere_ebene(tmp_path):
         (5, MOUSE_BUTTON_UP, 0),
     ]
     letzte = _lauf(tmp_path, 12, ev)[-1]
-    werkzeug, selN, selB, selH = letzte[3], letzte[4], letzte[5], letzte[6]
-    assert werkzeug == 10, "Z waehlt den Zauberstab"
-    assert (selN, selB, selH) == (32 * 32, 32, 32)
+    assert letzte["werkzeug"] == 10, "Z waehlt den Zauberstab"
+    assert (letzte["selN"], letzte["selB"], letzte["selH"]) == (32 * 32, 32, 32)
 
 
 def test_zauberstab_bleibt_in_der_gemalten_flaeche(tmp_path):
@@ -210,7 +230,7 @@ def test_zauberstab_bleibt_in_der_gemalten_flaeche(tmp_path):
            (start + 3, MOUSE_BUTTON_DOWN, 0),
            (start + 4, MOUSE_BUTTON_UP, 0)]
     letzte = _lauf(tmp_path, start + 12, ev)[-1]
-    selN, selH, gemalt = letzte[4], letzte[6], letzte[7]
+    selN, selH, gemalt = letzte["selN"], letzte["selH"], letzte["gemalt"]
     assert gemalt >= 20, "der Strich muss angekommen sein"
     assert selN == gemalt, "der Stab nimmt genau das Gemalte"
     assert selH == 1, "ein Strich ist eine Zeile hoch"
@@ -228,7 +248,8 @@ def test_rechteck_entsteht_erst_beim_loslassen_und_klick_hebt_auf(tmp_path):
     ev = [(0, MOUSE_POSITION) + weg[0]] + _taste(1, TASTE_S) + _zug(4, weg)
     ende = 4 + len(weg) + 4
     zeilen = _lauf(tmp_path, ende + 8, ev)
-    selN, selB, selH = zeilen[-1][4], zeilen[-1][5], zeilen[-1][6]
+    selN = zeilen[-1]["selN"]
+    selB, selH = zeilen[-1]["selB"], zeilen[-1]["selH"]
     assert (selB, selH) == (10, 10), "von (4,4) bis (13,13)"
     assert selN == 100, "ein Rechteck ist ganz gewaehlt"
 
@@ -237,7 +258,7 @@ def test_rechteck_entsteht_erst_beim_loslassen_und_klick_hebt_auf(tmp_path):
     ev2 = ev + [(ende, MOUSE_POSITION, klick[0], klick[1]),
                 (ende, MOUSE_BUTTON_DOWN, 0),
                 (ende + 1, MOUSE_BUTTON_UP, 0)]
-    assert _lauf(tmp_path, ende + 10, ev2)[-1][4] == 0, "Klick ohne Zug hebt auf"
+    assert _lauf(tmp_path, ende + 10, ev2)[-1]["selN"] == 0, "Klick ohne Zug hebt auf"
 
 
 # -------------------------------------------------------------------- Lasso
@@ -248,7 +269,8 @@ def test_lasso_waehlt_eine_freiform(tmp_path):
     weg = _dreieck(ox, oy, zoom)
     ev = [(0, MOUSE_POSITION) + weg[0]] + _taste(1, TASTE_Q) + _zug(4, weg)
     letzte = _lauf(tmp_path, 4 + len(weg) + 10, ev)[-1]
-    werkzeug, selN, selB, selH = letzte[3], letzte[4], letzte[5], letzte[6]
+    werkzeug, selN = letzte["werkzeug"], letzte["selN"]
+    selB, selH = letzte["selB"], letzte["selH"]
     assert werkzeug == 9, "Q waehlt das Lasso"
     assert (selB, selH) == (19, 19), "der Rahmen umspannt die drei Ecken"
     # Die halbe Rahmenflaeche plus der gezogene Rand -- eine feste Zahl waere
@@ -270,7 +292,7 @@ def test_lasso_laesst_keine_loecher_in_der_flaeche(tmp_path):
     weg = _dreieck(ox, oy, zoom)
     ev = [(0, MOUSE_POSITION) + weg[0]] + _taste(1, TASTE_Q) + _zug(4, weg)
     letzte = _lauf(tmp_path, 4 + len(weg) + 10, ev)[-1]
-    assert letzte[9] == 0, "kein Punkt darf zwischen gewaehlten Nachbarn liegen"
+    assert letzte["loecher"] == 0, "kein Punkt darf zwischen gewaehlten Nachbarn liegen"
 
 
 def test_auswahl_begrenzt_den_stift(tmp_path):
@@ -285,7 +307,8 @@ def test_auswahl_begrenzt_den_stift(tmp_path):
     strich = [_mitte(ox, oy, zoom, x, 8) for x in range(0, 32)]
     ev += _zug(start + 3, strich)
     letzte = _lauf(tmp_path, start + 3 + len(strich) + 10, ev)[-1]
-    selN, gemalt, draussen = letzte[4], letzte[7], letzte[8]
+    selN, gemalt = letzte["selN"], letzte["gemalt"]
+    draussen = letzte["draussen"]
     assert selN > 100, "die Auswahl muss stehen"
     assert gemalt > 0, "innerhalb der Auswahl muss der Strich ankommen"
     assert draussen == 0, "ausserhalb darf kein Punkt gesetzt sein"
@@ -306,7 +329,8 @@ def test_entf_loescht_genau_die_auswahl(tmp_path):
     entf = start + 3 + len(weg) + 2
     ev += _taste(entf, TASTE_ENTF)
     letzte = _lauf(tmp_path, entf + 10, ev)[-1]
-    selN, gemalt, draussen = letzte[4], letzte[7], letzte[8]
+    selN, gemalt = letzte["selN"], letzte["gemalt"]
+    draussen = letzte["draussen"]
     assert selN > 100, "die Auswahl muss stehen"
     assert draussen == gemalt, "innerhalb der Auswahl darf nichts uebrig sein"
     assert 15 <= gemalt < 32, "ausserhalb muss der Strich stehen bleiben"
@@ -331,7 +355,7 @@ def test_ausschneiden_und_einfuegen_nimmt_nur_die_freiform_mit(tmp_path):
     t = t + 3 + len(weg) + 2
     ev += _strg(t, TASTE_X)
     zeilen_x = _lauf(tmp_path, t + 10, ev)
-    nach_schnitt = zeilen_x[-1][7]
+    nach_schnitt = zeilen_x[-1]["gemalt"]
     assert 15 <= nach_schnitt < 32, "Strg+X raeumt nur die Auswahl"
 
     t += 8
@@ -339,8 +363,8 @@ def test_ausschneiden_und_einfuegen_nimmt_nur_die_freiform_mit(tmp_path):
     t += 8
     ev += _strg(t, TASTE_V)
     letzte = _lauf(tmp_path, t + 12, ev)[-1]
-    assert letzte[4] == 0, "die Auswahl ist aufgehoben"
-    assert letzte[7] == 32, ("eingefuegt gehoert genau das Ausgeschnittene -- "
+    assert letzte["selN"] == 0, "die Auswahl ist aufgehoben"
+    assert letzte["gemalt"] == 32, ("eingefuegt gehoert genau das Ausgeschnittene -- "
                              "nicht der ganze Rahmen")
 
 
@@ -362,12 +386,12 @@ def test_verschieben_nimmt_auswahl_und_inhalt_mit(tmp_path):
     ev += _zug(t + 3, [_mitte(ox, oy, zoom, 10, 10), _mitte(ox, oy, zoom, 15, 14)])
     vorher = _lauf(tmp_path, t + 2, ev)[-1]
     letzte = _lauf(tmp_path, t + 16, ev)[-1]
-    assert letzte[3] == 11, "V waehlt das Verschieben"
-    assert vorher[10:12] == [2, 2], "das Lasso begann links oben"
-    assert letzte[10:12] == [7, 6], "die Maske wandert um (5, 4) mit"
-    assert (letzte[5], letzte[6]) == (19, 19), "die Form aendert sich dabei nicht"
-    assert letzte[4] == vorher[4], "und ihre Punktzahl auch nicht"
-    assert letzte[7] == 32, "kein Punkt darf beim Verschieben verloren gehen"
+    assert letzte["werkzeug"] == 11, "V waehlt das Verschieben"
+    assert (vorher["selX"], vorher["selY"]) == (2, 2), "das Lasso begann links oben"
+    assert (letzte["selX"], letzte["selY"]) == (7, 6), "die Maske wandert um (5, 4) mit"
+    assert (letzte["selB"], letzte["selH"]) == (19, 19), "die Form aendert sich dabei nicht"
+    assert letzte["selN"] == vorher["selN"], "und ihre Punktzahl auch nicht"
+    assert letzte["gemalt"] == 32, "kein Punkt darf beim Verschieben verloren gehen"
 
 
 def test_verschieben_ohne_auswahl_nimmt_die_ganze_ebene(tmp_path):
@@ -381,5 +405,80 @@ def test_verschieben_ohne_auswahl_nimmt_die_ganze_ebene(tmp_path):
     ev += _taste(t, TASTE_V_WZ)
     ev += _zug(t + 3, [_mitte(ox, oy, zoom, 4, 8), _mitte(ox, oy, zoom, 14, 8)])
     letzte = _lauf(tmp_path, t + 16, ev)[-1]
-    assert letzte[4] == 0, "es entsteht dabei keine Auswahl"
-    assert letzte[7] == 22, "32 minus die zehn ueber den rechten Rand"
+    assert letzte["selN"] == 0, "es entsteht dabei keine Auswahl"
+    assert letzte["gemalt"] == 22, "32 minus die zehn ueber den rechten Rand"
+
+
+# ------------------------------------------------------------------ Palette
+_DIALOG_LADEN = 'FILE_OPEN_DIALOG("Palette laden", "gpl")'
+_DIALOG_SICHERN = 'FILE_SAVE_DIALOG("Palette sichern", "palette.gpl", "gpl")'
+
+
+def _knopf_klick(frame, x, y):
+    return [(frame, MOUSE_POSITION, x + 64, y + 14),
+            (frame + 1, MOUSE_POSITION, x + 64, y + 14),
+            (frame + 1, MOUSE_BUTTON_DOWN, 0),
+            (frame + 2, MOUSE_BUTTON_UP, 0)]
+
+
+def test_palette_laden_uebergeht_krumme_zeilen(tmp_path):
+    """Eine .gpl von Hand geschrieben, mit allem, was in echten Dateien
+    vorkommt: Kommentar, Tabulator, mehrere Leerzeichen, eine Wortzeile und
+    eine mit Werten ueber 255. Die beiden letzten muessen UEBERGANGEN werden,
+    nicht die Palette verschieben -- daran, dass die 16. Farbe stimmt, sieht
+    man beides auf einmal.
+    """
+    farben = [(10 * (i + 1), 0, 0) for i in range(16)]
+    zeilen = ["GIMP Palette", "Name: Probe", "Columns: 8", "# ein Kommentar",
+              "%3d %3d %3d	Rot" % farben[0],
+              "300 300 300	zu gross",
+              "Rot Gruen Blau",
+              ""]
+    for f in farben[1:]:
+        zeilen.append("%d   %d %d	Farbe" % f)
+    zeilen.append("0 0 255	die siebzehnte")     # passt nicht mehr hinein
+    text = chr(10).join(zeilen) + chr(10)
+    (tmp_path / "pal.gpl").write_text(text, encoding="utf-8")
+
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["palLX"], geo["palLY"])
+    letzte = _lauf(tmp_path, 14, ev, dialoge={_DIALOG_LADEN: '"pal.gpl"'})[-1]
+    assert letzte["pal0"] == 10 * 65536, "erste Farbe der Datei"
+    assert letzte["pal15"] == 160 * 65536, ("16. GUELTIGE Farbe -- eine "
+                                            "uebernommene Fehlzeile schoebe alles")
+
+
+def test_palette_sichern_liest_der_qt_editor_zurueck(tmp_path):
+    """Geschrieben wird gegen einen FREMDEN Leser geprueft: `_parse_gpl` des
+    Qt-Sprite-Editors. Ein Format, das nur sein eigener Schreiber wieder
+    liest, ist nicht geprueft, sondern nur in sich stimmig."""
+    pytest.importorskip("PySide6")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
+
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["palSX"], geo["palSY"])
+    _lauf(tmp_path, 14, ev, dialoge={_DIALOG_SICHERN: '"raus.gpl"'})
+    ziel = tmp_path / "raus.gpl"
+    assert ziel.exists(), "der Knopf muss geschrieben haben"
+    farben = SpriteEditorWindow._parse_gpl(ziel)
+    assert len(farben) == 16, "sechzehn Plaetze, sechzehn Zeilen"
+    assert farben[0] == (0, 0, 0, 255), "die Palette beginnt mit Schwarz"
+    assert farben[2] == (232, 75, 75, 255), "und hat an dritter Stelle das Rot"
+    kopf = ziel.read_text(encoding="utf-8").splitlines()[0]
+    assert kopf == "GIMP Palette", "die Kennzeile, an der GIMP das Format erkennt"
+
+
+def test_palette_rundweg_ueber_den_qt_schreiber(tmp_path):
+    """Die andere Richtung: der Qt-Editor schreibt, der Pilot liest."""
+    pytest.importorskip("PySide6")
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
+
+    farben = [(i * 4, 128, 255 - i * 4, 255) for i in range(16)]
+    SpriteEditorWindow._write_gpl(tmp_path / "pal.gpl", farben, name="Rundweg")
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["palLX"], geo["palLY"])
+    letzte = _lauf(tmp_path, 14, ev, dialoge={_DIALOG_LADEN: '"pal.gpl"'})[-1]
+    assert letzte["pal0"] == (0 << 16) | (128 << 8) | 255
+    assert letzte["pal15"] == (60 << 16) | (128 << 8) | 195

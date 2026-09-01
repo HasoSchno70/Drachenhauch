@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1754 | 0,24 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1877 | 0,25 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -75,10 +75,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Zeilen, dazu verstreutes mehr.
 >
 > **Und genau das laesst sich seither an EINER Datei ablesen.** Derselbe
-> Pilot steht heute bei 0,24: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
+> Pilot steht heute bei 0,25: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
-> (1754, mit Verschieben). Nichts daran ist schlechter geworden -- es wurde
-> nur weniger weggelassen.
+> (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten). Nichts daran ist
+> schlechter geworden -- es wurde nur weniger weggelassen.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -136,6 +136,16 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > aufzuheben und spaeter nur die Farbe zu setzen macht aus jedem
 > halbdurchsichtigen Punkt einen deckenden -- dafuer `mitAlpha`, das auch das
 > Einfuegen benutzt.
+>
+> **GIMP-Paletten (.gpl)** kann er seit 2026-09-01 laden und sichern -- ein
+> Textformat, und genau deshalb interessant: es ist das, was Aseprite, GIMP,
+> Krita und die Paletten-Sammlungen im Netz sprechen. Die Trennung darin ist
+> beliebig viel Leerraum samt Tabulatoren, und die Dateien werden von Hand
+> bearbeitet: eine krumme Zeile wird UEBERGANGEN statt gemeldet, sonst
+> verhindert ein Tippfehler die ganze Palette. Die Palette hat 16 Plaetze --
+> was darueber hinausgeht, sagt die Statuszeile, statt es still fallen zu
+> lassen. Geprueft wird gegen einen FREMDEN Leser (`_parse_gpl` des
+> Qt-Sprite-Editors) und in der Gegenrichtung gegen dessen Schreiber.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der

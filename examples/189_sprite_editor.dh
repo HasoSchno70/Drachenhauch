@@ -17,7 +17,9 @@
 '                Pinsel 1..6 px
 '    Bild        mehrere Einzelbilder, Ebenen (global, wie in Aseprite),
 '                Zwiebelhaut, Spiegeln X/Y beim Zeichnen
-'    Farbe       Farbwaehler + 16er-Palette + Pipette
+'    Farbe       Farbwaehler + 16er-Palette + Pipette; die Palette laedt
+'                und sichert GIMP-Dateien (.gpl) -- das Format, das Aseprite,
+'                GIMP, Krita und die Paletten-Sammlungen im Netz sprechen
 '    Auswahl     eine echte Punkt-MASKE, kein Rahmen: Rechteck, Lasso
 '                (Freiform) und Zauberstab (gleiche Farbe ringsum) fuellen
 '                dieselbe Maske, und ALLES was zeichnet fragt sie. Solange
@@ -40,8 +42,8 @@
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    .gpl-Paletten, Kachel-Vorschau 3x3, benannte Animationsbereiche,
-'    Zuschneiden/Groesse aendern, Statistik. Das
+'    Kachel-Vorschau 3x3, benannte Animationsbereiche, Zuschneiden/Groesse
+'    aendern, Statistik. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -672,6 +674,97 @@ FUNCTION mitAlpha(c AS INTEGER, a AS INTEGER) AS INTEGER
     RETURN RGBA((c \ 65536) MOD 256, (c \ 256) MOD 256, c MOD 256, a)
 END FUNCTION
 
+' ---------------------------------------------------------------- Palette
+' GIMP-Palette (.gpl). Ein Textformat, und genau deshalb interessant: es ist
+' das, was Aseprite, GIMP, Krita und die Sammlungen im Netz sprechen.
+'
+'     GIMP Palette
+'     Name: Irgendwas
+'     Columns: 8
+'     # ein Kommentar
+'     255   0   0     Rot
+'
+' Die Trennung ist BELIEBIG viel Leerraum, auch Tabulatoren -- SPLIT$ liefert
+' dafuer leere Stuecke, die uebergangen werden muessen.
+FUNCTION nurZiffern(t AS STRING) AS BOOLEAN
+    IF LEN(t) = 0 THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS INTEGER : c = ASC(MID$(t, i, 1))
+        IF c < 48 OR c > 57 THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Liefert die Zahl der uebernommenen Farben. Eine Zeile, die nicht passt,
+' wird UEBERGANGEN statt gemeldet -- .gpl-Dateien werden von Hand bearbeitet,
+' und eine einzelne krumme Zeile darf nicht die ganze Palette verhindern.
+FUNCTION paletteLaden(pfad AS STRING) AS INTEGER
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = READLINES(pfad)
+    DIM n AS INTEGER : n = 0
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM z AS STRING
+    FOR EACH z IN zeilen
+        DIM t AS STRING : t = TRIM$(z)
+        IF t <> "" AND LEFT$(t, 1) <> "#" AND LEFT$(t, 4) <> "GIMP" _
+           AND LEFT$(t, 5) <> "Name:" AND LEFT$(t, 8) <> "Columns:" THEN
+            DIM teile AS ARRAY OF STRING
+            teile = SPLIT$(REPLACE$(t, CHR$(9), " "), " ")
+            DIM w[3] AS INTEGER
+            DIM k AS INTEGER : k = 0
+            DIM st AS STRING
+            FOR EACH st IN teile
+                IF k < 3 AND st <> "" THEN
+                    IF nurZiffern(st) THEN
+                        w[k] = VAL(st) : k = k + 1
+                    ELSE
+                        k = 99            ' Wortzeile -- diese Zeile faellt aus
+                    END IF
+                END IF
+            NEXT
+            ' Werte ausserhalb 0..255 uebergehen: eine von Hand verdrehte
+            ' Zeile ("300 300 300") wuerde sonst eine unsinnige Farbe geben.
+            IF k = 3 AND w[0] <= 255 AND w[1] <= 255 AND w[2] <= 255 THEN
+                gesamt = gesamt + 1
+                IF n < 16 THEN
+                    pal[n] = RGB(w[0], w[1], w[2])
+                    n = n + 1
+                END IF
+            END IF
+        END IF
+    NEXT
+    ' Die Palette hat 16 Plaetze. Was darueber hinausgeht, sagen statt es
+    ' still fallen zu lassen -- Paletten aus dem Netz haben oft 32 oder mehr.
+    IF gesamt > 16 THEN
+        meldung = "16 von " + STR$(gesamt) + " Farben aus " + BASENAME(pfad)
+    ELSE
+        meldung = STR$(n) + " Farben aus " + BASENAME(pfad)
+    END IF
+    RETURN n
+END FUNCTION
+
+SUB paletteSichern(pfad AS STRING)
+    DIM name AS STRING : name = BASENAME(pfad)
+    IF LEN(name) > 4 AND RIGHT$(LOWER$(name), 4) = ".gpl" THEN
+        name = LEFT$(name, LEN(name) - 4)
+    END IF
+    ' Zeilenenden ausdruecklich als CHR$(10): so schreibt es auch GIMP. Ein
+    ' Leser, der am Zeilenvorschub trennt, bekommt dann keine
+    ' Wagenruecklauf-Reste an den Enden.
+    DIM t AS STRING
+    t = "GIMP Palette" + CHR$(10) + "Name: " + name + CHR$(10) + _
+        "Columns: 8" + CHR$(10) + "#" + CHR$(10)
+    DIM i AS INTEGER
+    FOR i = 0 TO 15
+        DIM c AS INTEGER : c = pal[i]
+        t = t + STR$((c \ 65536) MOD 256) + " " + STR$((c \ 256) MOD 256) + " " + _
+            STR$(c MOD 256) + CHR$(9) + "Farbe " + STR$(i + 1) + CHR$(10)
+    NEXT
+    WRITEALL(pfad, t)
+    meldung = "Palette gesichert: " + BASENAME(pfad)
+END SUB
+
 ' -------------------------------------------------------------- Verschieben
 ' Die Auswahl (oder, ohne Auswahl, die ganze Ebene) vom Bild ABHEBEN: die
 ' Punkte kommen nach movF/movA und werden im Bild geloescht. Deshalb sieht
@@ -1038,7 +1131,15 @@ lbl = GUI_LABEL(win, "Palette   (1..6 waehlen)", 12, y) : y = y + 22
 DIM palY AS INTEGER : palY = y
 DIM palette AS GUI_WIDGET
 palette = GUI_CANVAS(win, 12, y, LINKS - 24, 72)
-y = y + 84
+y = y + 78
+
+DIM bPalLaden AS GUI_WIDGET
+bPalLaden = GUI_BUTTON(win, "Palette laden", 12, y, 128, 28)
+GUI_TOOLTIP(bPalLaden, "GIMP-Palette (.gpl) -- die ersten 16 Farben")
+DIM bPalSichern AS GUI_WIDGET
+bPalSichern = GUI_BUTTON(win, "Palette sichern", 144, y, 128, 28)
+GUI_TOOLTIP(bPalSichern, "Diese 16 Farben als .gpl -- GIMP, Aseprite und Krita lesen sie")
+y = y + 40
 
 lbl = GUI_LABEL(win, "Pinsel", 12, y)
 DIM spPinsel AS GUI_WIDGET : spPinsel = GUI_SPINNER(win, 90, y - 4, 120, 1, 6, 1)
@@ -1211,6 +1312,28 @@ WHILE NOT QUITREQUESTED()
                 ELSE
                     streifenLaden(po)
                 END IF
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bPalLaden) THEN
+        DIM pl AS STRING
+        pl = FILE_OPEN_DIALOG("Palette laden", "gpl")
+        IF pl <> "" THEN
+            TRY
+                paletteLaden(pl)
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bPalSichern) THEN
+        DIM pv AS STRING
+        pv = FILE_SAVE_DIALOG("Palette sichern", "palette.gpl", "gpl")
+        IF pv <> "" THEN
+            TRY
+                paletteSichern(pv)
             CATCH e
                 meldung = e
             END TRY
