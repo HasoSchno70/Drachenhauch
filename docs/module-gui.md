@@ -61,7 +61,8 @@ IMPORT "gui"
 | `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
-| `GUI_DRAW()` | — | alle Fenster zeichnen (hinten→vorne) |
+| `GUI_DRAW([obenauf])` | — | alle Fenster zeichnen (hinten→vorne); `obenauf`=FALSE lässt Kontextmenü und Tooltip weg |
+| `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
 | `GUI_CLICKED(widget)` | BOOLEAN | Button in diesem Frame geklickt? |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
@@ -550,6 +551,28 @@ FLIP()
 Ein unsichtbares oder zerstörtes Fenster zeichnet nichts (kein Fehler) — der
 Aufruf darf also unbedingt in der Bildschleife stehen. Ist das Fenster das
 modale, kommt sein Schleier mit.
+
+**Kontextmenü und Tooltip** liegen über *allen* Fenstern und sind deshalb vom
+selben Problem betroffen — ein Tooltip folgt der Maus und landet also
+regelmäßig über einer Zeichenfläche. Für sie gibt es `GUI_DRAW_TOP()`, und
+`GUI_DRAW` lässt sie mit `GUI_DRAW(FALSE)` weg:
+
+```basic
+GUI_UPDATE()
+GUI_DRAW(FALSE)                             ' Fenster, ohne die obenauf-Schicht
+' ... hier malt das Programm in seine Zeichenflächen ...
+IF dialogOffen THEN GUI_DRAW_WINDOW(dlg)
+GUI_DRAW_TOP()                              ' Kontextmenü + Tooltip, zuletzt
+FLIP()
+```
+
+Warum nicht einfach zweimal zeichnen: Tooltip und Kontextmenü haben einen
+halbdurchsichtigen Schlagschatten. Zweimal übereinander ist er dunkler — und
+zwar **nur dort, wo das eigene Zeichnen die erste Fassung nicht zugedeckt
+hat**, also genau an einer Kante. Bei Fenstern (`GUI_DRAW_WINDOW`) bleibt das
+ein bekannter Rest: liegt ein Fenster teilweise außerhalb des selbst
+gezeichneten Bereichs, wird sein Glanz dort zweimal aufgetragen. Ein Dialog
+mitten auf der Fläche ist davon nicht betroffen.
 
 (Für echte Fenster-Überlappung/Occlusion ein Render-Target nutzen.)
 

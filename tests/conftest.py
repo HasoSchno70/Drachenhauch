@@ -260,7 +260,11 @@ def pytest_ignore_collect(collection_path, config):
 def pytest_configure(config):
     config.addinivalue_line("markers", "qt: braucht PySide6 (automatisch gesetzt)")
     config.addinivalue_line(
-        "markers", "seriell: braucht ein Betriebsmittel exklusiv (automatisch gesetzt)")
+        "markers",
+        "seriell: braucht ein Betriebsmittel exklusiv. Fuer die Dateien in "
+        "_SERIELL automatisch gesetzt; einzelne Tests duerfen ihn auch selbst "
+        "tragen -- etwa wenn nur drei von acht Tests einer Datei Eingabe "
+        "einspeisen.")
     config.addinivalue_line(
         "markers", "grafik: braucht einen dhrt mit raylib (automatisch gesetzt)")
 

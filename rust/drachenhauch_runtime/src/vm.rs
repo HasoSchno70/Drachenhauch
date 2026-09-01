@@ -5420,8 +5420,17 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "gui_draw" => {
+                // Ohne Argument wie bisher ALLES. `GUI_DRAW(FALSE)` laesst die
+                // obenauf-Schicht (Kontextmenue, Tooltip) weg -- die holt sich
+                // ein Programm, das danach selbst malt, mit GUI_DRAW_TOP.
+                let obenauf = if a.is_empty() { true } else { gbool(a, 0, "GUI_DRAW")? };
                 let g = self.gfx.as_mut().ok_or("GUI_DRAW: vor SCREEN aufgerufen")?;
-                self.gui.draw(g);
+                self.gui.draw(g, obenauf);
+                Value::Nil
+            }
+            "gui_draw_top" => {
+                let g = self.gfx.as_mut().ok_or("GUI_DRAW_TOP: vor SCREEN aufgerufen")?;
+                self.gui.draw_top(g);
                 Value::Nil
             }
             // Ein einzelnes Fenster NACH dem eigenen Zeichnen noch einmal

@@ -1801,7 +1801,10 @@ WHILE NOT QUITREQUESTED()
 
     ' ============================================================== Bild
     GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
-    GUI_DRAW()
+    ' Ohne die obenauf-Schicht: Kontextmenue und Tooltip kommen ganz zum
+    ' Schluss, sonst laegen sie unter der Zeichenflaeche. Der Tooltip
+    ' folgt der Maus und ist damit staendig ueber ihr.
+    GUI_DRAW(FALSE)
 
     ' ------------------------------------------------------------ Palette
     FOR i = 0 TO 15
@@ -2028,6 +2031,7 @@ WHILE NOT QUITREQUESTED()
     ' ging auf, sperrte die Eingabe und war nicht zu sehen.
     IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
     IF statOffen THEN GUI_DRAW_WINDOW(statDlg)
+    GUI_DRAW_TOP()
 
     FLIP()
 WEND
