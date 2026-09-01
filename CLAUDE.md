@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1608 | 0,22 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1754 | 0,24 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -75,9 +75,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Zeilen, dazu verstreutes mehr.
 >
 > **Und genau das laesst sich seither an EINER Datei ablesen.** Derselbe
-> Pilot steht heute bei 0,22: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
-> Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab). Nichts
-> daran ist schlechter geworden -- es wurde nur weniger weggelassen.
+> Pilot steht heute bei 0,24: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
+> Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
+> (1754, mit Verschieben). Nichts daran ist schlechter geworden -- es wurde
+> nur weniger weggelassen.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -122,6 +123,19 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Rand auseinander. Tests: `tests/test_pilot_sprite_auswahl.py` faehrt echte
 > Mauswege ueber `AUTOMATION_PLAY` (die Fenstergeometrie steht erst zur
 > Laufzeit fest, darum laeuft jeder Test zweimal).
+>
+> **Verschieben kam einen Tag spaeter** und war billig, weil die Maske schon
+> da war: abheben (die Punkte kommen in eine eigene Ablage und werden im Bild
+> GELOESCHT -- deshalb sieht man ein Loch statt einer Kopie), ziehen,
+> absetzen; ohne Auswahl gilt die ganze Ebene. Die MASKE wandert mit, sonst
+> zeigte sie auf die Stelle, wo das Verschobene nicht mehr ist. Dabei fiel
+> ein Loch auf, das alle Werkzeuge betraf: die Zug-Abschluesse fragten
+> `werkzeug`, nicht das Werkzeug, mit dem der Zug BEGANN -- ein
+> Werkzeugwechsel mitten im Zug haette beim Verschieben das Abgehobene nie
+> wieder abgesetzt (jetzt `ziehWz`). Und `GETPIXEL` + `GETALPHA` getrennt
+> aufzuheben und spaeter nur die Farbe zu setzen macht aus jedem
+> halbdurchsichtigen Punkt einen deckenden -- dafuer `mitAlpha`, das auch das
+> Einfuegen benutzt.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
