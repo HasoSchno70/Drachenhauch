@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1243 | 0,17 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1608 | 0,22 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -66,12 +66,18 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > **Der vierte Pilot hat meine eigene Vorhersage widerlegt.** Hier stand,
 > beim Sprite-Editor sei "groesstenteils KEIN Duplikat" dessen, was die
 > Laufzeit kann (Ebenen, Undo, Werkzeuge, Zwischenablage), man solle also
-> NICHT mit 0,5 rechnen. Herausgekommen ist 0,14 -- der BESTE Wert, nicht der
-> schlechteste. Der Grund ist nicht Sprachkraft: die Qt-Fassung ist schlicht
-> eine viel groessere Anwendung (Dialoge, Datei-Browser, `.dhsprite`-Format,
-> GIF, Streifen-Einlesen, .gpl-Paletten, Statistik), und der nicht portierte
-> ANTEIL ist damit der groesste aller vier Faelle -- allein die benennbaren
-> Bloecke sind 1595 der 7379 Zeilen, dazu verstreutes mehr.
+> NICHT mit 0,5 rechnen. Beim ersten Durchgang kam 0,14 heraus -- der BESTE
+> Wert, nicht der schlechteste. Der Grund ist nicht Sprachkraft: die
+> Qt-Fassung ist schlicht eine viel groessere Anwendung (Dialoge,
+> Datei-Browser, `.dhsprite`-Format, GIF, Streifen-Einlesen, .gpl-Paletten,
+> Statistik), und der nicht portierte ANTEIL war damit der groesste aller
+> vier Faelle -- allein die benennbaren Bloecke waren damals 1595 der 7379
+> Zeilen, dazu verstreutes mehr.
+>
+> **Und genau das laesst sich seither an EINER Datei ablesen.** Derselbe
+> Pilot steht heute bei 0,22: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
+> Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab). Nichts
+> daran ist schlechter geworden -- es wurde nur weniger weggelassen.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -99,6 +105,23 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > konnte es von Anfang an ueber `TILED_LOAD`. Das Sichern kostete die
 > Faktoren: SFX 0,77 -> 0,93, Partikel 0,48 -> 0,58. Alle vier Rundwege sind
 > nachgefahren (malen -> sichern -> zuruecksetzen -> laden -> vergleichen).
+>
+> **Der Sprite-Pilot hat seit 2026-09-01 Lasso und Zauberstab** -- und mit
+> ihnen eine echte Punkt-MASKE statt eines Auswahl-Rechtecks. Rechteck,
+> Lasso und Zauberstab schreiben in dieselbe Maske, und ALLES was zeichnet
+> fragt sie (`block` ist der einzige Ort, an dem Farbe ins Bild kommt);
+> vorher galt die Auswahl nur fuers Kopieren, ein Strich lief einfach
+> hindurch. Das Lasso fasst den gezogenen Weg als Vieleck auf und prueft ihn
+> mit `PHYSICS_POINT_POLY` -- der Befehl war laengst da, nur nie fuer so
+> etwas benutzt. **Zwei Fallen, beide erst im gerenderten Bild sichtbar:**
+> Vieleck auf den ECKEN der Punkte und Testpunkt in ihrer MITTE laesst einen
+> 45-Grad-Rand genau auf eine Kante fallen -- eine ganze Reihe einzelner
+> Punkte blieb ungewaehlt, MITTEN in der Auswahl (beide Seiten muessen
+> dasselbe Raster benutzen); und ein grob aufgezeichneter Weg braucht
+> LUECKENLOSE Zwischenpunkte, sonst liegen Vieleck-Rand und gezeichneter
+> Rand auseinander. Tests: `tests/test_pilot_sprite_auswahl.py` faehrt echte
+> Mauswege ueber `AUTOMATION_PLAY` (die Fenstergeometrie steht erst zur
+> Laufzeit fest, darum laeuft jeder Test zweimal).
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der

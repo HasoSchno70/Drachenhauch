@@ -60,8 +60,8 @@ def _module_uses_qt(path: str) -> bool:
 # Arbeitern, weil fast jeder Test einen dhrt-Prozess startet und auf ihn
 # wartet, statt zu rechnen.
 #
-# Vier Dateien vertragen das nicht, und zwar nicht aus Zufall: sie haengen an
-# etwas, das es auf der Maschine nur EINMAL gibt.
+# Einige Dateien vertragen das nicht, und zwar nicht aus Zufall: sie haengen
+# an etwas, das es auf der Maschine nur EINMAL gibt.
 #
 #   test_automation.py        raylibs AUTOMATION_* schreibt die ECHTE Eingabe
 #                             mit und speist sie wieder ein. Jede fremde
@@ -71,6 +71,10 @@ def _module_uses_qt(path: str) -> bool:
 #                             hintereinander waehrend ich die Maus bewegte,
 #                             danach im Leerlauf wieder gruen).
 #   test_gui_form_runner.py   speist einen Klick ein -- dasselbe Nadeloehr.
+#   test_gui_dialog.py        ebenso (Klick auf einen Dialog, mit Gegenprobe).
+#   test_pilot_sprite_auswahl.py  spielt ganze Mauswege in den Sprite-Piloten
+#                             ein (Lasso, Zauberstab) -- dasselbe Nadeloehr,
+#                             nur ueber viele Bilder statt einen Klick.
 #   test_gui_tastatur.py      speist TASTEN ein -- dasselbe Nadeloehr, nur von
 #                             der anderen Seite: wer waehrenddessen tippt,
 #                             schiebt seine Anschlaege in die Wiedergabe.
@@ -80,14 +84,16 @@ def _module_uses_qt(path: str) -> bool:
 #
 # Sie laufen deshalb in einem zweiten, seriellen Durchgang (`-m seriell`,
 # 18 s). Empirisch ermittelt, nicht geraten: ueber acht parallele Laeufe
-# fielen genau diese vier Dateien um, verteilt und jedes Mal andere Tests --
-# das Streumuster ist das Erkennungszeichen fuer geteilte Betriebsmittel.
+# fielen genau die Eingabe-, Ton- und Zeitmess-Dateien um, verteilt und jedes
+# Mal andere Tests -- das Streumuster ist das Erkennungszeichen fuer geteilte
+# Betriebsmittel.
 _SERIELL = {
     "test_automation.py",
     "test_gui_form_runner.py",
     "test_gui_tastatur.py",
     "test_gui_dialog.py",
     "test_audio_modulators.py",
+    "test_pilot_sprite_auswahl.py",
     "test_profiler.py",
 }
 
@@ -199,6 +205,7 @@ _BRAUCHT_GRAFIK = {
     "test_m3d.py",
     "test_modules_audio.py",
     "test_picking_geometry.py",
+    "test_pilot_sprite_auswahl.py",
     "test_runtime_font_delta.py",
     "test_scissor.py",
     "test_shader_uniforms_geometry.py",

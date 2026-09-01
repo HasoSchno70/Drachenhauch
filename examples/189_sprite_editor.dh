@@ -12,12 +12,16 @@
 '
 '  Was drin ist:
 '    Werkzeuge   Stift, Radierer, Fuellen, Linie, Rechteck, Ellipse,
-'                Pipette, Auswahl, Spruehen -- Rechteck/Ellipse wahlweise
-'                gefuellt, Pinsel 1..6 px
+'                Spruehen, Pipette, Auswahl, Lasso, Zauberstab --
+'                Rechteck/Ellipse wahlweise gefuellt, Pinsel 1..6 px
 '    Bild        mehrere Einzelbilder, Ebenen (global, wie in Aseprite),
 '                Zwiebelhaut, Spiegeln X/Y beim Zeichnen
 '    Farbe       Farbwaehler + 16er-Palette + Pipette
-'    Auswahl     Strg+C/X/V, Entf leert
+'    Auswahl     eine echte Punkt-MASKE, kein Rahmen: Rechteck, Lasso
+'                (Freiform) und Zauberstab (gleiche Farbe ringsum) fuellen
+'                dieselbe Maske, und ALLES was zeichnet fragt sie. Solange
+'                eine Auswahl steht, trifft kein Strich daneben.
+'                Strg+C/X/V, Entf leert, Strg+D hebt sie auf
 '    Historie    Strg+Z / Strg+Y, 24 Schritte
 '    Dateien     [Sichern]/[Oeffnen] .dhsprite -- das eigene Format MIT
 '                Ebenen: ein Raster-PNG (Spalten = Einzelbilder, Zeilen =
@@ -33,22 +37,23 @@
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Lasso, Zauberstab, Verschieben-Werkzeug, .gpl-Paletten,
-'    Kachel-Vorschau 3x3, benannte Animationsbereiche, Zuschneiden/Groesse
-'    aendern, Statistik. Das
+'    Verschieben-Werkzeug, .gpl-Paletten, Kachel-Vorschau 3x3, benannte
+'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
 '  Bedienung:
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
-'    P E F L R O I S Y           Werkzeuge (Y = Spruehen)
+'    P E F L R O Y I S Q Z       Werkzeuge (Q = Lasso, Z = Zauberstab)
 '    1..6        Palette 1..6    +/-           Pinsel
 '    Strg+Z/Y    zurueck/vor     Strg+C/X/V    Zwischenablage
+'    Strg+D      Auswahl weg
 '    ESC         Ende
 ' ============================================================
 IMPORT "gui"
 IMPORT "imgfx"
 IMPORT "json"
+IMPORT "physics"   ' PHYSICS_POINT_POLY fuer das Lasso
 
 CONST MAXG = 128               ' groesste Kantenlaenge eines Sprites
 CONST MAXBILD = 16             ' Einzelbilder
@@ -103,9 +108,12 @@ CONST WZ_FUELL = 2
 CONST WZ_LINIE = 3
 CONST WZ_RECHT = 4
 CONST WZ_ELLIPSE = 5
-CONST WZ_PIPETTE = 6
-CONST WZ_AUSWAHL = 7
-CONST WZ_SPRUEH = 8
+CONST WZ_SPRUEH = 6
+CONST WZ_PIPETTE = 7
+CONST WZ_AUSWAHL = 8
+CONST WZ_LASSO = 9
+CONST WZ_ZAUBER = 10
+CONST WZ_ANZ = 11
 
 DIM zieht AS BOOLEAN : zieht = FALSE
 DIM ankerX AS INTEGER : ankerX = 0
@@ -116,11 +124,31 @@ DIM schiebt AS BOOLEAN : schiebt = FALSE
 DIM schiebX AS INTEGER : schiebX = 0
 DIM schiebY AS INTEGER : schiebY = 0
 
+' Die Auswahl ist eine PUNKT-MASKE, kein Rechteck. Ein Rechteck waere nur
+' der Sonderfall, in dem alles im Rahmen gesetzt ist -- und mit dem Lasso
+' gibt es diesen Sonderfall nicht mehr. Weil alle drei Auswahlwerkzeuge in
+' dieselbe Maske schreiben, muss keine der Aktionen dahinter (Kopieren,
+' Ausschneiden, Loeschen, Zeichnen) zwischen ihnen unterscheiden.
+'
+' `selX/selY/selB/selH` sind der GERECHNETE Rahmen der Maske -- gebraucht,
+' um beim Suchen nicht jedes Mal ueber das ganze Bild zu laufen. Sie sind
+' abgeleitet, nie die Wahrheit; die steht in `maske`.
+DIM maske[MAXPKT] AS INTEGER
 DIM selAn AS BOOLEAN : selAn = FALSE
+DIM selN AS INTEGER : selN = 0
 DIM selX AS INTEGER : selX = 0
 DIM selY AS INTEGER : selY = 0
 DIM selB AS INTEGER : selB = 0
 DIM selH AS INTEGER : selH = 0
+DIM mnX AS INTEGER : mnX = 0
+DIM mnY AS INTEGER : mnY = 0
+DIM mxX AS INTEGER : mxX = -1
+DIM mxY AS INTEGER : mxY = -1
+
+' Der gezogene Weg des Lassos, in Bildpunkten.
+DIM lasX[MAXPKT] AS INTEGER
+DIM lasY[MAXPKT] AS INTEGER
+DIM lasN AS INTEGER : lasN = 0
 DIM clipF[MAXPKT] AS INTEGER          ' Farbe je Punkt
 DIM clipA[MAXPKT] AS INTEGER          ' Deckkraft je Punkt
 DIM clipB AS INTEGER : clipB = 0
@@ -162,6 +190,206 @@ DIM streifen AS IMAGE                  ' Arbeitsflaeche fuer den Export
 SUB kopiere(ziel AS IMAGE, quelle AS IMAGE)
     IMAGE_CLEAR(ziel)
     IMAGE_DRAW_IMAGE(ziel, quelle, 0, 0)
+END SUB
+
+' ----------------------------------------------------------- Auswahlmaske
+' Vier kleine SUBs statt einer grossen: `maskeBeginn` raeumt, `maskeAdd`
+' setzt einen Punkt und fuehrt Zaehler und Rahmen mit, `maskeEnde` schliesst
+' ab. Jedes Auswahlwerkzeug benutzt genau diese Reihenfolge -- damit gibt es
+' keinen Weg, eine Maske zu bauen und dabei den Rahmen zu vergessen.
+SUB maskeAlleWeg()
+    ' Das ganze Feld raeumen. Noetig, wenn sich die Sprite-GROESSE aendert:
+    ' danach zeigt derselbe Index auf einen anderen Punkt, der gemerkte
+    ' Rahmen taugt also nicht mehr zum gezielten Raeumen.
+    DIM i AS INTEGER
+    FOR i = 0 TO MAXPKT - 1
+        maske[i] = 0
+    NEXT
+    selAn = FALSE : selN = 0
+    selX = 0 : selY = 0 : selB = 0 : selH = 0
+END SUB
+
+SUB maskeBeginn()
+    ' Nur den bisherigen Rahmen raeumen -- ausserhalb ist die Maske per
+    ' Bauart leer. Ueber das ganze Feld zu laufen waeren bei 128x128
+    ' sechzehntausend Schritte, und der Zauberstab macht das bei JEDEM Klick.
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    IF selAn THEN
+        FOR y = selY TO selY + selH - 1
+            FOR x = selX TO selX + selB - 1
+                maske[y * gw + x] = 0
+            NEXT
+        NEXT
+    END IF
+    selN = 0
+    mnX = gw : mnY = gh : mxX = -1 : mxY = -1
+END SUB
+
+SUB maskeAdd(x AS INTEGER, y AS INTEGER)
+    IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
+        IF maske[y * gw + x] = 0 THEN
+            maske[y * gw + x] = 1
+            selN = selN + 1
+            IF x < mnX THEN mnX = x
+            IF y < mnY THEN mnY = y
+            IF x > mxX THEN mxX = x
+            IF y > mxY THEN mxY = y
+        END IF
+    END IF
+END SUB
+
+SUB maskeEnde()
+    selAn = selN > 0
+    IF selAn THEN
+        selX = mnX : selY = mnY
+        selB = mxX - mnX + 1 : selH = mxY - mnY + 1
+    ELSE
+        selX = 0 : selY = 0 : selB = 0 : selH = 0
+    END IF
+END SUB
+
+FUNCTION gewaehlt(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    ' OHNE Auswahl gilt das ganze Bild. So braucht keine Zeichenroutine einen
+    ' Sonderfall "es gibt keine Auswahl" -- sie fragt einfach immer.
+    IF NOT selAn THEN RETURN TRUE
+    IF x < 0 OR y < 0 OR x >= gw OR y >= gh THEN RETURN FALSE
+    RETURN maske[y * gw + x] = 1
+END FUNCTION
+
+FUNCTION istRechteck() AS BOOLEAN
+    ' Ist die Maske genau ihr eigener Rahmen? Nur dann darf ein Rahmen um
+    ' sie gezeichnet werden -- bei einer Freiform zeigte er einen Bereich,
+    ' der gar nicht gewaehlt ist.
+    RETURN selAn AND selN = selB * selH
+END FUNCTION
+
+SUB rechteckMaske(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER)
+    maskeBeginn()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = MIN(y0, y1) TO MAX(y0, y1)
+        FOR x = MIN(x0, x1) TO MAX(x0, x1)
+            maskeAdd(x, y)
+        NEXT
+    NEXT
+    maskeEnde()
+END SUB
+
+' Einen Punkt an den gezogenen Weg haengen -- und zwar LUECKENLOS: zwischen
+' zwei Bildern springt eine schnell gefuehrte Maus mehrere Punkte weit, also
+' wird die Strecke dorthin ausgezogen.
+'
+' Das ist nicht nur Kosmetik. Der Weg ist spaeter BEIDES: die Ecken des
+' Vielecks und der gezeichnete Rand. Waeren die Ecken grob und der Rand
+' fein, laegen beide an den Kanten um einen Punkt auseinander -- und genau
+' dort blieben einzelne Punkte ungewaehlt, mitten in der Auswahl.
+SUB lassoPunkt(x AS INTEGER, y AS INTEGER)
+    IF lasN > 0 AND x = lasX[lasN - 1] AND y = lasY[lasN - 1] THEN RETURN
+    IF lasN = 0 THEN
+        lasX[0] = x : lasY[0] = y : lasN = 1
+        RETURN
+    END IF
+    formPunkte(WZ_LINIE, lasX[lasN - 1], lasY[lasN - 1], x, y, FALSE)
+    DIM k AS INTEGER
+    FOR k = 1 TO pN - 1                ' der erste Punkt steht schon drin
+        IF lasN < MAXPKT THEN
+            lasX[lasN] = pX[k] : lasY[lasN] = pY[k] : lasN = lasN + 1
+        END IF
+    NEXT
+END SUB
+
+' Freiform. Der gezogene Weg wird als Vieleck aufgefasst und ueber
+' PHYSICS_POINT_POLY punktweise geprueft (Strahl-Verfahren, kann auch
+' konkave Formen -- und eine mit der Hand gezogene Schlaufe ist immer eine).
+' Von Hand nachgebaut waere das dieselbe Rechnung, nur langsamer und mit
+' eigenen Randfaellen.
+SUB lassoMaske()
+    IF lasN < 3 THEN
+        ' Ein Klick ohne Zug ist kein Vieleck -- das hebt die Auswahl auf.
+        maskeBeginn() : maskeEnde()
+        RETURN
+    END IF
+    ' Der Schluss-Strich zum Anfang zurueck gehoert zum Vieleck -- und damit
+    ' auch in den Weg, sonst haette ausgerechnet diese Kante wieder die
+    ' grobe Fassung.
+    lassoPunkt(lasX[0], lasY[0])
+    DIM i AS INTEGER
+    DIM xs[lasN] AS FLOAT
+    DIM ys[lasN] AS FLOAT
+    DIM ax AS INTEGER : ax = lasX[0]
+    DIM ay AS INTEGER : ay = lasY[0]
+    DIM bx AS INTEGER : bx = lasX[0]
+    DIM by AS INTEGER : by = lasY[0]
+    FOR i = 0 TO lasN - 1
+        ' Das Vieleck liegt auf den MITTEN der Punkte -- wie gleich auch die
+        ' Testpunkte. Beides muss dasselbe Raster benutzen: nimmt man hier
+        ' die Ecken und dort die Mitten, faellt ein 45-Grad-Rand genau auf
+        ' die Kante, und ausgerechnet dort entscheidet die Rundung. Gemessen
+        ' war das eine Reihe einzelner ungewaehlter Punkte MITTEN in der
+        ' Auswahl -- sichtbar erst im Bild, nicht in einer Zahl.
+        xs[i] = lasX[i] + 0.5 : ys[i] = lasY[i] + 0.5
+        ax = MIN(ax, lasX[i]) : ay = MIN(ay, lasY[i])
+        bx = MAX(bx, lasX[i]) : by = MAX(by, lasY[i])
+    NEXT
+    ax = MAX(0, ax) : ay = MAX(0, ay)
+    bx = MIN(gw - 1, bx) : by = MIN(gh - 1, by)
+    maskeBeginn()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = ay TO by
+        FOR x = ax TO bx
+            IF PHYSICS_POINT_POLY(x + 0.5, y + 0.5, xs, ys) THEN maskeAdd(x, y)
+        NEXT
+    NEXT
+    ' Der gezogene Weg selbst gehoert dazu. Bei einer duennen Schlaufe liegt
+    ' zwischen Hin- und Rueckweg kein einziger Punktmittelpunkt -- ohne das
+    ' waere die Auswahl leer, obwohl man sichtbar etwas umfahren hat.
+    FOR i = 0 TO lasN - 1
+        maskeAdd(lasX[i], lasY[i])
+    NEXT
+    maskeEnde()
+END SUB
+
+' Zauberstab: alles, was vom angeklickten Punkt aus ueber Nachbarn erreichbar
+' ist und dieselbe Farbe UND Deckkraft hat. Ohne Toleranz, wie beim Fuellen
+' auch -- in Pixelgrafik ist eine Flaeche genau eine Farbe, und zwei
+' verschiedene Regeln fuer "dieselbe Farbe" waeren die groessere Ueberraschung.
+SUB zauberMaske(sx AS INTEGER, sy AS INTEGER)
+    DIM bild AS IMAGE : bild = ebene[aktBild, aktEb]
+    DIM zf AS INTEGER : zf = GETPIXEL(bild, sx, sy)
+    DIM za AS INTEGER : za = GETALPHA(bild, sx, sy)
+    maskeBeginn()
+    DIM voll AS BOOLEAN : voll = FALSE
+    DIM n AS INTEGER : n = 1
+    flutX[0] = sx : flutY[0] = sy
+    WHILE n > 0
+        n = n - 1
+        DIM x AS INTEGER : x = flutX[n]
+        DIM y AS INTEGER : y = flutY[n]
+        IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
+            ' Die Maske selbst ist die Merkliste des Verfahrens. Das Fuellen
+            ' weiter oben merkt sich Besuchtes daran, dass es die Farbe
+            ' aendert -- hier aendert sich am Bild nichts, also braucht es
+            ' diesen eigenen Vermerk.
+            IF maske[y * gw + x] = 0 AND GETPIXEL(bild, x, y) = zf AND GETALPHA(bild, x, y) = za THEN
+                maskeAdd(x, y)
+                IF n + 4 < MAXPKT THEN
+                    flutX[n] = x - 1 : flutY[n] = y : n = n + 1
+                    flutX[n] = x + 1 : flutY[n] = y : n = n + 1
+                    flutX[n] = x : flutY[n] = y - 1 : n = n + 1
+                    flutX[n] = x : flutY[n] = y + 1 : n = n + 1
+                ELSE
+                    voll = TRUE
+                END IF
+            END IF
+        END IF
+    WEND
+    maskeEnde()
+    ' Ein voller Stapel laesst Teile der Flaeche stehen. Das sieht aus wie
+    ' eine seltsam ausgefranste Auswahl -- also sagen, was passiert ist,
+    ' statt es stillschweigend abzuschneiden.
+    IF voll THEN meldung = "Zauberstab: Flaeche zu verzweigt, Auswahl unvollstaendig"
 END SUB
 
 SUB neuesSprite(b AS INTEGER, h AS INTEGER)
@@ -206,7 +434,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     puffer = IMAGE_NEW(gw, gh)
     streifen = IMAGE_NEW(gw * MAXBILD, gh)
     uStart = 0 : uAnz = 0 : uPos = 0
-    selAn = FALSE
+    maskeAlleWeg()
     panX = 0 : panY = 0
     ' Den Zoom kann diese SUB nicht selbst setzen: sie laeuft schon, bevor
     ' es die Zeichenflaeche gibt (und ihre Groesse aendert sich mit dem
@@ -266,14 +494,35 @@ SUB wieder()
 END SUB
 
 ' -------------------------------------------------------------- Zeichnen
+' EIN Ort, an dem Farbe ins Bild kommt -- und damit der einzige, der die
+' Auswahl kennen muss. Stift, Radierer, Linie, Rechteck, Ellipse und
+' Spruehen laufen alle hier durch.
 SUB block(x AS INTEGER, y AS INTEGER, c AS INTEGER, weg AS BOOLEAN)
-    IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
+    IF x < 0 OR y < 0 OR x >= gw OR y >= gh THEN RETURN
+    IF NOT selAn THEN
+        ' Ohne Auswahl der ganze Pinsel in EINEM Aufruf. Punktweise waeren
+        ' es bei Pinsel 6 sechsunddreissig statt einem -- und ein Aufruf
+        ' schreibt die ganze Textur neu (gemessen rund 4 Mikrosekunden).
         IF weg THEN
             IMAGE_CLEAR(ebene[aktBild, aktEb], x, y, pinsel, pinsel)
         ELSE
             IMAGE_DRAW_RECT(ebene[aktBild, aktEb], x, y, pinsel, pinsel, c)
         END IF
+        RETURN
     END IF
+    DIM bx AS INTEGER
+    DIM by AS INTEGER
+    FOR by = y TO y + pinsel - 1
+        FOR bx = x TO x + pinsel - 1
+            IF gewaehlt(bx, by) THEN
+                IF weg THEN
+                    IMAGE_CLEAR(ebene[aktBild, aktEb], bx, by, 1, 1)
+                ELSE
+                    IMAGE_DRAW_RECT(ebene[aktBild, aktEb], bx, by, 1, 1, c)
+                END IF
+            END IF
+        NEXT
+    NEXT
 END SUB
 
 SUB punkt(x AS INTEGER, y AS INTEGER, c AS INTEGER, weg AS BOOLEAN)
@@ -390,6 +639,19 @@ SUB formPunkte(art AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, _
     END SELECT
 END SUB
 
+' Die Auswahl leeren -- Ausschneiden und Entf teilen sich das. Punktweise,
+' weil eine Freiform kein Rechteck ist; im schlimmsten Fall (128x128 ganz
+' gewaehlt) sind das gemessen rund 70 ms, und das genau einmal je Tastendruck.
+SUB auswahlLeeren()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = selY TO selY + selH - 1
+        FOR x = selX TO selX + selB - 1
+            IF gewaehlt(x, y) THEN IMAGE_CLEAR(ebene[aktBild, aktEb], x, y, 1, 1)
+        NEXT
+    NEXT
+END SUB
+
 ' ---------------------------------------------------------------- Fuellen
 SUB fluten(sx AS INTEGER, sy AS INTEGER, neu AS INTEGER)
     DIM bild AS IMAGE : bild = ebene[aktBild, aktEb]
@@ -407,7 +669,10 @@ SUB fluten(sx AS INTEGER, sy AS INTEGER, neu AS INTEGER)
             DIM x AS INTEGER : x = flutX[n]
             DIM y AS INTEGER : y = flutY[n]
             IF x >= 0 AND y >= 0 AND x < gw AND y < gh THEN
-                IF GETPIXEL(bild, x, y) = zf AND GETALPHA(bild, x, y) = za THEN
+                ' `gewaehlt` haelt die Fuellung in der Auswahl -- ohne das
+                ' liefe sie unter dem Lasso hindurch und der ganze Sinn
+                ' einer Freiform-Auswahl waere weg.
+                IF gewaehlt(x, y) AND GETPIXEL(bild, x, y) = zf AND GETALPHA(bild, x, y) = za THEN
                     IMAGE_DRAW_RECT(bild, x, y, 1, 1, neu)
                     IF n + 4 < MAXPKT THEN
                         flutX[n] = x - 1 : flutY[n] = y : n = n + 1
@@ -633,16 +898,22 @@ GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne 
 DIM bGif AS GUI_WIDGET     : bGif     = GUI_BUTTON(win, "GIF", 368, 7, 52, 32)
 GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Vorschau-Regler")
 
-CONST WZ_B = 88
+' Elf Werkzeuge auf demselben Platz wie vorher neun: die Knopfbreite ist
+' aus der Zahl gerechnet, damit alles rechts davon (Zurueck/Vor, die
+' Schalter) stehen bleibt, wo es war.
+CONST WZ_B = 71
 DIM wzName AS ARRAY OF STRING
-wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Pipette|Auswahl|Spruehen", "|")
-DIM wzKnopf[9] AS GUI_WIDGET
+wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Spruehen|Pipette|Auswahl|Lasso|Zauber", "|")
+DIM wzKnopf[WZ_ANZ] AS GUI_WIDGET
 DIM wx AS INTEGER : wx = 432
 DIM i AS INTEGER
-FOR i = 0 TO 8
+FOR i = 0 TO WZ_ANZ - 1
     wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
     wx = wx + WZ_B + 4
 NEXT
+GUI_TOOLTIP(wzKnopf[WZ_AUSWAHL], "Rechteck aufziehen (S) -- Klick ohne Zug hebt die Auswahl auf")
+GUI_TOOLTIP(wzKnopf[WZ_LASSO], "Freiform umfahren (Q) -- der Weg schliesst sich von selbst")
+GUI_TOOLTIP(wzKnopf[WZ_ZAUBER], "Zusammenhaengende Flaeche gleicher Farbe waehlen (Z)")
 
 DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", wx + 10, 7, 84, 32)
 DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", wx + 98, 7, 56, 32)
@@ -767,7 +1038,7 @@ WHILE NOT QUITREQUESTED()
     symY = GUI_CHECKED(cbSymY)
 
     ' ------------------------------------------------------ Werkzeugwahl
-    FOR i = 0 TO 8
+    FOR i = 0 TO WZ_ANZ - 1
         IF GUI_CLICKED(wzKnopf[i]) THEN werkzeug = i
         GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
     NEXT
@@ -781,6 +1052,8 @@ WHILE NOT QUITREQUESTED()
         IF KEYHIT(KEY_I) THEN werkzeug = WZ_PIPETTE
         IF KEYHIT(KEY_S) THEN werkzeug = WZ_AUSWAHL
         IF KEYHIT(KEY_Y) THEN werkzeug = WZ_SPRUEH
+        IF KEYHIT(KEY_Q) THEN werkzeug = WZ_LASSO
+        IF KEYHIT(KEY_Z) THEN werkzeug = WZ_ZAUBER
         FOR i = 0 TO 5
             IF KEYHIT(KEY_1 + i) THEN
                 farbe = pal[i]
@@ -1048,8 +1321,17 @@ WHILE NOT QUITREQUESTED()
                 END IF
                 zieht = FALSE
             CASE WZ_AUSWAHL
-                selAn = TRUE
-                selX = tx : selY = ty : selB = 1 : selH = 1
+                ' Die Maske entsteht erst beim LOSLASSEN. Waehrend des Zugs
+                ' ist nur ein Gummiband zu sehen -- sie bei jedem Bild neu
+                ' zu bauen waere bei 128x128 sechzehntausend Schritte, und
+                ' zu sehen gaebe es davon nichts.
+                lasN = 0
+            CASE WZ_LASSO
+                lasN = 0
+                lassoPunkt(tx, ty)
+            CASE WZ_ZAUBER
+                zauberMaske(tx, ty)
+                zieht = FALSE
         END SELECT
     END IF
 
@@ -1069,9 +1351,8 @@ WHILE NOT QUITREQUESTED()
                     DIM sy2 AS INTEGER : sy2 = ty + RND(7) - 3
                     IF RND(100) < 40 THEN punkt(sx2, sy2, farbe, FALSE)
                 NEXT
-            CASE WZ_AUSWAHL
-                selX = MIN(ankerX, tx) : selY = MIN(ankerY, ty)
-                selB = ABS(tx - ankerX) + 1 : selH = ABS(ty - ankerY) + 1
+            CASE WZ_LASSO
+                lassoPunkt(tx, ty)
         END SELECT
     END IF
 
@@ -1088,6 +1369,19 @@ WHILE NOT QUITREQUESTED()
                     punkt(pX[i], pY[i], farbe, FALSE)
                 NEXT
                 schrittEnde()
+            CASE WZ_AUSWAHL
+                IF tx = ankerX AND ty = ankerY THEN
+                    ' Ein Klick ohne Zug hebt die Auswahl auf. Ohne das
+                    ' bliebe ein Ein-Punkt-Rahmen stehen, und weil die
+                    ' Auswahl das Zeichnen begrenzt, traefe danach kein
+                    ' Strich mehr -- ohne dass man saehe, warum.
+                    maskeBeginn() : maskeEnde()
+                ELSE
+                    rechteckMaske(ankerX, ankerY, MAX(0, MIN(gw - 1, tx)), _
+                                  MAX(0, MIN(gh - 1, ty)))
+                END IF
+            CASE WZ_LASSO
+                lassoMaske()
         END SELECT
     END IF
 
@@ -1097,17 +1391,29 @@ WHILE NOT QUITREQUESTED()
             clipB = selB : clipH = selH
             DIM ax2 AS INTEGER
             DIM ay2 AS INTEGER
+            ' Kopiert wird der RAHMEN der Maske -- die Ablage ist ein
+            ' Rechteck. Was nicht gewaehlt ist, bekommt Deckkraft 0 und
+            ' wird beim Einfuegen uebergangen; sonst brachte eine
+            ' Lasso-Auswahl die Ecken ihres Rahmens mit.
             FOR ay2 = 0 TO selH - 1
                 FOR ax2 = 0 TO selB - 1
                     clipF[ay2 * clipB + ax2] = GETPIXEL(ebene[aktBild, aktEb], selX + ax2, selY + ay2)
-                    clipA[ay2 * clipB + ax2] = GETALPHA(ebene[aktBild, aktEb], selX + ax2, selY + ay2)
+                    IF gewaehlt(selX + ax2, selY + ay2) THEN
+                        clipA[ay2 * clipB + ax2] = GETALPHA(ebene[aktBild, aktEb], selX + ax2, selY + ay2)
+                    ELSE
+                        clipA[ay2 * clipB + ax2] = 0
+                    END IF
                 NEXT
             NEXT
             IF KEYHIT(KEY_X) THEN
                 schrittBeginn()
-                IMAGE_CLEAR(ebene[aktBild, aktEb], selX, selY, selB, selH)
+                auswahlLeeren()
                 schrittEnde()
             END IF
+        END IF
+        IF KEYHIT(KEY_D) THEN
+            maskeBeginn() : maskeEnde()
+            meldung = "Auswahl aufgehoben"
         END IF
         IF KEYHIT(KEY_V) AND clipB > 0 THEN
             schrittBeginn()
@@ -1132,7 +1438,7 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF KEYHIT(KEY_DELETE) AND selAn AND NOT neuOffen THEN
         schrittBeginn()
-        IMAGE_CLEAR(ebene[aktBild, aktEb], selX, selY, selB, selH)
+        auswahlLeeren()
         schrittEnde()
     END IF
 
@@ -1197,11 +1503,62 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
 
+    ' Die Auswahl. Zeilenweise in LAEUFEN gezeichnet -- je zusammenhaengendem
+    ' Stueck ein Rechteck statt eines je Punkt. Punktweise waeren es im
+    ' schlimmsten Fall 16384 Aufrufe, und zwar in JEDEM Bild (gemessen 3 ms);
+    ' bei einer Auswahl, die meist am Stueck liegt, sind es so ein paar.
     IF selAn THEN
-        BOX(ox + selX * zoom, oy + selY * zoom, _
-            ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &H302BC4E8)
-        RECT(ox + selX * zoom, oy + selY * zoom, _
-             ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &HE8C44B)
+        DIM azY AS INTEGER
+        DIM azX AS INTEGER
+        FOR azY = selY TO selY + selH - 1
+            DIM azLauf AS INTEGER : azLauf = -1
+            FOR azX = selX TO selX + selB
+                ' Eine Spalte ueber den Rahmen hinaus schliesst den letzten
+                ' Lauf -- sonst braeuchte es hinter der Schleife eine zweite
+                ' Fassung derselben drei Zeilen.
+                DIM azDrin AS BOOLEAN
+                azDrin = azX < selX + selB AND gewaehlt(azX, azY)
+                IF azDrin AND azLauf < 0 THEN azLauf = azX
+                IF NOT azDrin AND azLauf >= 0 THEN
+                    BOX(ox + azLauf * zoom, oy + azY * zoom, _
+                        ox + azX * zoom - 1, oy + (azY + 1) * zoom - 1, &H302BC4E8)
+                    azLauf = -1
+                END IF
+            NEXT
+        NEXT
+        ' Der Rahmen nur, wenn die Maske wirklich ihr Rechteck ist. Um eine
+        ' Freiform gezogen zeigte er einen Bereich, der gar nicht gewaehlt
+        ' ist -- die Flaeche sagt dort schon alles.
+        IF istRechteck() THEN
+            RECT(ox + selX * zoom, oy + selY * zoom, _
+                 ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &HE8C44B)
+        END IF
+    END IF
+
+    ' Was gerade gezogen wird: beim Rechteck das Gummiband, beim Lasso der
+    ' Weg. Die Maske entsteht erst beim Loslassen, also ist das hier das
+    ' einzige, was waehrenddessen zu sehen ist.
+    IF zieht AND werkzeug = WZ_AUSWAHL THEN
+        DIM gbX AS INTEGER : gbX = MIN(ankerX, MAX(0, MIN(gw - 1, tx)))
+        DIM gbY AS INTEGER : gbY = MIN(ankerY, MAX(0, MIN(gh - 1, ty)))
+        DIM gbB AS INTEGER : gbB = ABS(MAX(0, MIN(gw - 1, tx)) - ankerX) + 1
+        DIM gbH AS INTEGER : gbH = ABS(MAX(0, MIN(gh - 1, ty)) - ankerY) + 1
+        BOX(ox + gbX * zoom, oy + gbY * zoom, _
+            ox + (gbX + gbB) * zoom - 1, oy + (gbY + gbH) * zoom - 1, &H502BC4E8)
+        RECT(ox + gbX * zoom, oy + gbY * zoom, _
+             ox + (gbX + gbB) * zoom - 1, oy + (gbY + gbH) * zoom - 1, &HE8C44B)
+    END IF
+    IF zieht AND werkzeug = WZ_LASSO AND lasN > 1 THEN
+        DIM li AS INTEGER
+        DIM h2 AS INTEGER : h2 = zoom \ 2
+        FOR li = 0 TO lasN - 2
+            LINE(ox + lasX[li] * zoom + h2, oy + lasY[li] * zoom + h2, _
+                 ox + lasX[li + 1] * zoom + h2, oy + lasY[li + 1] * zoom + h2, &HE8C44B)
+        NEXT
+        ' Der Schluss-Strich zum Anfang zurueck. Er gehoert zum Vieleck,
+        ' also gehoert er auch ins Bild -- sonst ueberrascht die Auswahl.
+        LINE(ox + lasX[lasN - 1] * zoom + h2, oy + lasY[lasN - 1] * zoom + h2, _
+             ox + lasX[0] * zoom + h2, oy + lasY[0] * zoom + h2, &H802BC4E8)
     END IF
     IF drauf THEN
         RECT(ox + tx * zoom, oy + ty * zoom, _
@@ -1235,7 +1592,15 @@ WHILE NOT QUITREQUESTED()
            "   " + ebName[aktEb] + "   Pinsel " + STR$(pinsel) + _
            "   Zoom " + STR$(zoom) + "x   Farbe " + COLOR_HEX$(farbe)
     IF drauf THEN info = info + "   [" + STR$(tx) + ", " + STR$(ty) + "]"
-    IF selAn THEN info = info + "   Auswahl " + STR$(selB) + "x" + STR$(selH)
+    IF selAn THEN
+        ' Bei einer Freiform sagt BxH nichts -- der Rahmen ist gross, die
+        ' Auswahl darin klein. Also die Zahl der Punkte.
+        IF istRechteck() THEN
+            info = info + "   Auswahl " + STR$(selB) + "x" + STR$(selH)
+        ELSE
+            info = info + "   Auswahl " + STR$(selN) + " Punkte"
+        END IF
+    END IF
     IF meldung <> "" THEN info = info + "   |   " + meldung
     GUI_SET_TEXT(status, info)
 
