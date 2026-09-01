@@ -1,5 +1,5 @@
-"""Sprite-Pilot: Auswahl-Werkzeuge (Lasso, Zauberstab, Verschieben)
-und GIMP-Paletten (.gpl) (`examples/189_sprite_editor.dh`).
+"""Sprite-Pilot: Auswahl-Werkzeuge (Lasso, Zauberstab, Verschieben),
+GIMP-Paletten (.gpl), Kachel-Ansicht und Statistik (`examples/189_sprite_editor.dh`).
 
 Der Pilot ist ein Drachenhauch-Programm, also laesst er sich nicht wie ein
 Modul aufrufen -- geprueft wird er so, wie ein Mensch ihn bedient: mit
@@ -90,14 +90,18 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(selX) + " " + STR$(selY) + _
           " " + STR$(GUI_GET_X(bPalLaden)) + " " + STR$(GUI_GET_Y(bPalLaden)) + _
           " " + STR$(GUI_GET_X(bPalSichern)) + " " + STR$(GUI_GET_Y(bPalSichern)) + _
-          " " + STR$(pal[0]) + " " + STR$(pal[15])
+          " " + STR$(pal[0]) + " " + STR$(pal[15]) + _
+          " " + STR$(cw) + " " + STR$(ch) + _
+          " " + STR$(GUI_GET_X(bStat)) + " " + STR$(GUI_GET_Y(bStat)) + _
+          " " + STR$(GUI_GET_X(cbKacheln)) + " " + STR$(GUI_GET_Y(cbKacheln))
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
 # Namen -- bei achtzehn Feldern ist `letzte[8]` nicht mehr zu lesen und beim
 # Anhaengen eines Feldes leicht zu verrutschen.
 _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
-           "selX selY palLX palLY palSX palSY pal0 pal15").split()
+           "selX selY palLX palLY palSX palSY pal0 pal15 "
+           "cw ch statX statY kachX kachY").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -131,6 +135,13 @@ def _events(tmp_path, events):
 
 
 def _lauf(tmp_path, frames, events=None, dialoge=None):
+    return _starte(tmp_path, frames, events, dialoge)[0]
+
+
+def _starte(tmp_path, frames, events=None, dialoge=None):
+    """Wie `_lauf`, liefert aber auch die uebrige Ausgabe -- ein Test, der
+    einen mehrzeiligen Text pruefen will, laesst ihn sich auf EINER Zeile
+    ausgeben und liest sie hier ab."""
     quelle = _kopie(tmp_path, dialoge)
     if events is not None:
         _events(tmp_path, events)
@@ -143,8 +154,9 @@ def _lauf(tmp_path, frames, events=None, dialoge=None):
     assert r.returncode == 0, r.stderr
     zeilen = [ln for ln in (r.stdout or "").splitlines() if ln.startswith("P ")]
     assert zeilen, "keine Probe-Zeile\n%s\n%s" % (r.stdout, r.stderr)
-    return [dict(zip(_FELDER, [int(v) for v in re.split(r"\s+", ln)[1:]]))
-            for ln in zeilen]
+    proben = [dict(zip(_FELDER, [int(v) for v in re.split(r"\s+", ln)[1:]]))
+              for ln in zeilen]
+    return proben, (r.stdout or "").splitlines()
 
 
 def _geometrie(tmp_path):
@@ -482,3 +494,100 @@ def test_palette_rundweg_ueber_den_qt_schreiber(tmp_path):
     letzte = _lauf(tmp_path, 14, ev, dialoge={_DIALOG_LADEN: '"pal.gpl"'})[-1]
     assert letzte["pal0"] == (0 << 16) | (128 << 8) | 255
     assert letzte["pal15"] == (60 << 16) | (128 << 8) | 195
+
+
+# ---------------------------------------------------- Kachel-Ansicht + Statistik
+_DIALOG_STAT = 'statDlg = GUI_DIALOG("Statistik", statistik$())'
+_STAT_ERSATZ = ('PRINT "STAT " + REPLACE$(statistik$(), CHR$(10), " | ") : '
+                'statDlg = GUI_DIALOG("Statistik", "x")')
+
+
+def _kasten_klick(frame, x, y):
+    """Ein Kaestchen wird auf dem Kaestchen getroffen, nicht auf der
+    Beschriftung -- deshalb ein anderer Versatz als beim Knopf."""
+    return [(frame, MOUSE_POSITION, x + 8, y + 8),
+            (frame + 1, MOUSE_POSITION, x + 8, y + 8),
+            (frame + 1, MOUSE_BUTTON_DOWN, 0),
+            (frame + 2, MOUSE_BUTTON_UP, 0)]
+
+
+def _einpassung(cw, ch, kanten):
+    """Dieselbe Rechnung wie im Piloten -- der Test sagt damit, WELCHER Zoom
+    richtig ist, statt nur "kleiner als vorher"."""
+    return max(1, min(32, min((cw - 40) // (32 * kanten), (ch - 40) // (32 * kanten))))
+
+
+def test_kachel_ansicht_passt_den_zoom_neu_ein(tmp_path):
+    """Ohne das waere die Kachel-Ansicht bei eingepasstem Zoom gar nicht zu
+    sehen: das mittlere Bild fuellt die Flaeche schon allein, die acht
+    Nachbarn lagen ausserhalb."""
+    geo = _lauf(tmp_path, 6)[-1]
+    assert geo["zoom"] == _einpassung(geo["cw"], geo["ch"], 1), "erst einfach eingepasst"
+    ev = _kasten_klick(2, geo["kachX"], geo["kachY"])
+    letzte = _lauf(tmp_path, 14, ev)[-1]
+    assert letzte["zoom"] == _einpassung(geo["cw"], geo["ch"], 3)
+    assert letzte["zoom"] * 32 * 3 <= geo["cw"], "das 3x3 muss hineinpassen"
+    assert letzte["zoom"] < geo["zoom"], "und dafuer wird herausgezoomt"
+
+
+def test_statistik_zaehlt_deckende_punkte_und_farben(tmp_path):
+    """Sechzehn Punkte in einer Farbe auf ein leeres 32x32-Bild. Die Zahlen
+    im Kasten sind damit von Hand nachzurechnen -- nur die Prozentangabe
+    nicht, und genau die verrutscht am leichtesten.
+
+    Der Kasten selbst wird nicht geprueft, sondern der TEXT: die Kopie gibt
+    ihn auf einer Zeile aus. Ersetzt ist nur die Anzeige; gerechnet hat die
+    echte `statistik$()`.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+    strich = [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, 16) for x in range(4, 20)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    ev += _knopf_klick(t, geo["statX"], geo["statY"])
+    proben, roh = _starte(tmp_path, t + 14, ev, dialoge={_DIALOG_STAT: _STAT_ERSATZ})
+    assert proben[-1]["gemalt"] == 16, "so viele Punkte hat der Strich"
+    zeilen = [z for z in roh if z.startswith("STAT ")]
+    assert zeilen, "der Knopf muss die Statistik gerechnet haben"
+    z = zeilen[-1]
+    assert "32 x 32 Punkte, 1 Bilder, 1 Ebenen" in z
+    assert re.search(r"Punkte gesamt:\s+1024", z), z
+    assert re.search(r"davon deckend:\s+16\s+\(1\.6 %\)", z), z
+    assert re.search(r"davon durchsichtig:\s+1008\s+\(98\.4 %\)", z), z
+    assert re.search(r"verschiedene Farben:\s+1\b", z), z
+    assert re.search(r"haeufigste Farbe:\s+#E84B4B\s+\(16 Punkte\)", z), z
+    assert "Je Bild:" not in z, "bei einem einzigen Bild waere das eine leere Zeile"
+
+
+def test_statistik_nennt_die_haeufigste_farbe(tmp_path):
+    """DREI Farben, und die haeufigste ist weder die zuerst noch die zuletzt
+    gemalte.
+
+    Mit nur zwei Farben war der Test wertlos -- nachgemessen: mit
+    ausgebauter Maximumsuche blieb er gruen. Mit dreien faellt er, sobald
+    statt des groessten Zaehlers der zuletzt gesehene genommen wird.
+
+    Gegen "nimm den ERSTEN Eintrag" laesst er sich nicht absichern: die
+    Reihenfolge von MAPKEYS ist keine zugesicherte (weder Einfuege- noch
+    Sortierreihenfolge), also ist nicht vorherzusagen, welche Farbe dabei
+    herauskaeme. Das steht hier, damit niemand den Test fuer staerker haelt,
+    als er ist.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+
+    def strich(y, von, bis):
+        return [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, y) for x in range(von, bis)]
+
+    ev = [(0, MOUSE_POSITION) + strich(20, 2, 8)[0]]
+    t = 1
+    for taste, weg in ((ord("1"), strich(20, 2, 8)),        # Schwarz, 6 Punkte
+                       (ord("3"), strich(10, 2, 22)),       # Rot, 20 Punkte
+                       (ord("2"), strich(25, 2, 12))):      # Weiss, 10 Punkte
+        ev += _taste(t, taste)
+        ev += _zug(t + 3, weg)
+        t = t + 3 + len(weg) + 2
+    ev += _knopf_klick(t, geo["statX"], geo["statY"])
+    _, roh = _starte(tmp_path, t + 14, ev, dialoge={_DIALOG_STAT: _STAT_ERSATZ})
+    z = [x for x in roh if x.startswith("STAT ")][-1]
+    assert re.search(r"davon deckend:\s+36\b", z), z
+    assert re.search(r"verschiedene Farben:\s+3\b", z), z
+    assert re.search(r"haeufigste Farbe:\s+#E84B4B\s+\(20 Punkte\)", z), z

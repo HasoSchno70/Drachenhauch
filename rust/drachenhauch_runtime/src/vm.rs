@@ -5424,6 +5424,16 @@ impl<'p> Vm<'p> {
                 self.gui.draw(g);
                 Value::Nil
             }
+            // Ein einzelnes Fenster NACH dem eigenen Zeichnen noch einmal
+            // obendrauf. Fuer Programme, die in eine GUI_CANVAS malen: deren
+            // Inhalt entsteht per Bauart nach GUI_DRAW und deckt sonst jedes
+            // Fenster zu, das darueber liegt.
+            "gui_draw_window" => {
+                let h = gi(a, 0, "GUI_DRAW_WINDOW")?;
+                let g = self.gfx.as_mut().ok_or("GUI_DRAW_WINDOW: vor SCREEN aufgerufen")?;
+                self.gui.draw_window_top(g, h)?;
+                Value::Nil
+            }
             // Braucht die Zeilenhoehe (also die Schrift) -- darum hier bei
             // den Grafik-Builtins.
             "gui_textarea_view" => {

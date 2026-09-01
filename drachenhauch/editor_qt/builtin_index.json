@@ -2943,6 +2943,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DRAW_WINDOW",
+   "kind": "graphics",
+   "signature": "GUI_DRAW_WINDOW(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DROPDOWN",
    "kind": "core",
    "signature": "GUI_DROPDOWN(win, x, y, w, h, items)",

@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1877 | 0,25 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2033 | 0,28 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -75,10 +75,11 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Zeilen, dazu verstreutes mehr.
 >
 > **Und genau das laesst sich seither an EINER Datei ablesen.** Derselbe
-> Pilot steht heute bei 0,25: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
+> Pilot steht heute bei 0,28: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
-> (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten). Nichts daran ist
-> schlechter geworden -- es wurde nur weniger weggelassen.
+> (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2033,
+> mit Kachel-Ansicht und Statistik). Nichts daran ist schlechter geworden --
+> es wurde nur weniger weggelassen.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -146,6 +147,24 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > was darueber hinausgeht, sagt die Statuszeile, statt es still fallen zu
 > lassen. Geprueft wird gegen einen FREMDEN Leser (`_parse_gpl` des
 > Qt-Sprite-Editors) und in der Gegenrichtung gegen dessen Schreiber.
+>
+> **Kachel-Ansicht und Statistik** kamen am 2026-09-01 dazu -- und mit ihnen
+> der bisher schwerste Pilotenfund: **ein gui-Fenster ueber einer
+> Zeichenflaeche war UNSICHTBAR.** `GUI_DRAW` zeichnet Fenster und
+> Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche
+> entsteht per Bauart danach -- das Programm malt selbst hinein. Im Piloten
+> ging der Kasten "Neues Sprite" damit auf, sperrte die Eingabe und war nicht
+> zu sehen: das Programm wirkte eingefroren. Das stand seit dem ersten Tag im
+> gemergten Piloten, und weder ein Test noch ein Bildschirmfoto hat es
+> bemerkt -- niemand hatte je auf [Neu] geklickt und HINGESEHEN. Ein zweites
+> `GUI_DRAW` hilft nicht (es zeichnet Fenster-Hintergrund und
+> Zeichenflaechen neu, also genau das Gemalte); deshalb neu:
+> **`GUI_DRAW_WINDOW(win)`** -- ein Fenster noch einmal, ueber allem, was
+> inzwischen im Bild steht, samt Schleier wenn es das modale ist. Der
+> Schleier liegt jetzt in EINER Routine (`schleier`), damit die zwei Wege
+> nicht auseinanderlaufen. Tests `tests/test_gui_draw_window.py` mit der
+> Gegenprobe IM Test: derselbe Ablauf einmal mit und einmal ohne den Aufruf,
+> geprueft am Punkt in der Fenstermitte.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
@@ -247,7 +266,7 @@ Doku `docs/module-gui.md`, Demo `examples/186_farbe_und_datum.dh`, Tests `tests/
 
 **TEXTAREA als Code-Feld** (2026-08-30): `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` faerbt Zeichen-Abschnitte ein, `SYNTAX_SPANS(quelltext$)` -> TUPLE `(starts, laengen, arten)` zerlegt Drachenhauch-Quelltext (Arten: kommentar/text/zahl/schluessel/name/operator), `GUI_TEXTAREA_SET(ta, key$, wert)` mit `zeilennummern`/`aktive_zeile`/`tab_fuegt_ein`/`tabbreite`. **Der Hervorheber (`syntax.rs`) ist bewusst KEIN Lexer** -- der lexer.rs wirft Kommentare weg, expandiert f-Strings und bricht bei Fehlern ab; ein Editor sieht halb getippten Text und muss ihn trotzdem darstellen (offene Zeichenkette endet an der ZEILE, sonst faerbt ein Anfuehrungszeichen den Rest der Datei). Die Wortliste teilen sich beide ueber `lexer::keyword`. **Zwei Fallen:** (1) Farbige Laeufe werden ueber die Breite des VORSPANNS positioniert, nicht durch Addieren der Laufbreiten -- eine Textbreite enthaelt den Abstand ZWISCHEN Zeichen, aber keinen dahinter, also klebten die Woerter an jeder Farbgrenze zusammen; ausserdem rechnen Schreibmarke und Auswahl schon so. (2) Die Nummernspalte verschiebt ALLES, was eine Spalte verortet -> eine Quelle `ta_gutter()`, die Zeichnen, Treffertest und Schreibmarke gemeinsam fragen; der Text wird auf den Bereich rechts davon geclippt, sonst laeuft eine waagerecht gescrollte Zeile in die Zahlen. `scroll` ist beim TextArea die erste sichtbare ZEILE, `scroll_x` der Versatz in PIXELN. `GUI_SET_TEXT` loescht die Abschnitte (sie gehoerten zum alten Text). `tab_fuegt_ein` per Vorgabe AUS -- sonst kaeme man im Formular nicht mehr aus dem Feld heraus; an, rueckt TAB bis zur naechsten SPALTE ein. Doku `docs/module-gui.md`, Demo `examples/184_codefeld.dh`, Tests `tests/test_syntax_spans.py` + 12 Rust-`#[test]`s in `syntax.rs` + Tabulator in `tests/test_gui_tastatur.py`.
 
-**Dialog IM Fenster** `GUI_DIALOG(titel$, text$[, stil$])` -> GUI_WINDOW, `GUI_ANSWER(dlg)` (0 offen / 1 OK-Ja / 2 Abbrechen-Nein), `GUI_MODAL()`. **NICHT verwechseln mit `GUI_MESSAGE`/`GUI_CONFIRM`** -- das sind die schon vorhandenen NATIVEN, BLOCKIERENDEN OS-Kaesten (rfd, `filedialog.rs`, Feature `dialogs`, im Web-Bau nicht da). `GUI_DIALOG` ist der Kasten im eigenen Thema/Massstab, blockiert NICHT (gui ist ein Polling-Toolkit; ein blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene Zeichenschleife drehen und dessen Layer-/Render-Ziel-Zustand uebernehmen). Die Antwort gilt GENAU EIN BILD, wie `GUI_CLICKED` -- eine Antwort ist ein Ereignis, kein Zustand; danach ist das Fenster zerstoert (Tombstone-Handle bleibt gueltig). Modalitaet wird in `handle_press` UND `menu_input` durchgesetzt (`modal: Option<usize>`), sonst waere es nur ein Fenster obenauf; dazu ein Schleier in `draw` -- ohne sichtbares Zeichen klickt man in den Hintergrund und wundert sich. Stil-Woerter absichtlich dieselben wie bei `GUI_CONFIRM` (`ok`/`janein`). **Falle:** Widget-Koordinaten sind relativ zum INHALTsbereich, die Fensterhoehe nicht -- ohne den `title_h`-Zuschlag rutscht die Knopfreihe unter den Rand. Doku `docs/module-gui.md`, Tests `tests/test_gui_dialog.py` (die Modalitaet mit Gegenprobe: derselbe Klick trifft ohne Dialog).
+**Dialog IM Fenster** `GUI_DIALOG(titel$, text$[, stil$])` -> GUI_WINDOW, `GUI_ANSWER(dlg)` (0 offen / 1 OK-Ja / 2 Abbrechen-Nein), `GUI_MODAL()`. **NICHT verwechseln mit `GUI_MESSAGE`/`GUI_CONFIRM`** -- das sind die schon vorhandenen NATIVEN, BLOCKIERENDEN OS-Kaesten (rfd, `filedialog.rs`, Feature `dialogs`, im Web-Bau nicht da). `GUI_DIALOG` ist der Kasten im eigenen Thema/Massstab, blockiert NICHT (gui ist ein Polling-Toolkit; ein blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene Zeichenschleife drehen und dessen Layer-/Render-Ziel-Zustand uebernehmen). Die Antwort gilt GENAU EIN BILD, wie `GUI_CLICKED` -- eine Antwort ist ein Ereignis, kein Zustand; danach ist das Fenster zerstoert (Tombstone-Handle bleibt gueltig). Modalitaet wird in `handle_press` UND `menu_input` durchgesetzt (`modal: Option<usize>`), sonst waere es nur ein Fenster obenauf; dazu ein Schleier in `draw` -- ohne sichtbares Zeichen klickt man in den Hintergrund und wundert sich. Stil-Woerter absichtlich dieselben wie bei `GUI_CONFIRM` (`ok`/`janein`). **Falle:** Widget-Koordinaten sind relativ zum INHALTsbereich, die Fensterhoehe nicht -- ohne den `title_h`-Zuschlag rutscht die Knopfreihe unter den Rand. Doku `docs/module-gui.md`, Tests `tests/test_gui_dialog.py` (die Modalitaet mit Gegenprobe: derselbe Klick trifft ohne Dialog). **Ein Fenster ueber einer Zeichenflaeche braucht `GUI_DRAW_WINDOW(win)`** -- `GUI_DRAW` zeichnet Fenster und Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche entsteht per Bauart DANACH (das Programm malt selbst hinein). Ohne den zusaetzlichen Aufruf ist ein Dialog mitten auf der Flaeche unsichtbar: er sperrt die Eingabe und ist nicht zu sehen, das Programm wirkt eingefroren. Ein zweites `GUI_DRAW` hilft NICHT (es zeichnet Fenster-Hintergrund und Zeichenflaechen neu). Ein unsichtbares oder zerstoertes Fenster zeichnet nichts, ist aber kein Fehler -- der Aufruf darf unbedingt in der Bildschleife stehen. Tests `tests/test_gui_draw_window.py`.
 
 **Anzeige-Massstab** `GUI_SCALE(faktor)` (0.5..4.0) + `GUI_SCALE_GET()`: alle gui-Masse sind feste Pixel, auf einem 4K-Schirm mit 200 % wurde eine Oberflaeche darum halb so gross wie gedacht. Der Faktor multipliziert JEDE Laenge, die HINEINgeht (Fenster-/Widget-Geometrie, Metriken, die 15 Layout-Konstanten via `sk()`, Spaltenbreiten, Zeilenhoehen, Schriftgroesse); nach aussen bleibt alles LOGISCH (`unsk()` in den Gettern und in `widget_json`/`to_json`) -- sonst wuechse eine `.dhform` bei jedem Speichern um den Faktor weiter. EINZIGE Ausnahme: `GUI_HIT_TEST` spricht Bildschirm-Pixel (die Maus liefert nichts anderes). **Muss vor dem ersten Fenster kommen** -- danach Fehler, weil Bestehendes nur naeherungsweise umzurechnen waere. **Zwei Fallen, die erst das gerenderte Bild zeigte:** (1) `g.text`/`g.text_width` in der Fenster-Chrome (Titel/Menue/Reiter/Popup/Tooltip) kannten den Massstab nicht -> `ctext`/`ctext_width`/`ctext_height`, und die Editier-Helfer massen unskaliert, waehrend `wtext` skaliert zeichnete (Schreibmarke und Auswahl sassen auf halber Strecke) -> Buendel `Mass{size,font}` durch die statischen Helfer. (2) Die senkrechte Zentrierung stand als Literal `(h - 14) / 2` im Code -- bei Massstab 2 sass der Text zu tief und wurde vom Clip-Rechteck abgeschnitten -> `self.wsize(g,wdg)`. `GUI_LOAD`/`GUI_FROM_JSON` umgehen `add_widget` und brauchen den Massstab eigens. Doku `docs/module-gui.md` (Abschnitt Massstab), Tests `tests/test_gui_massstab.py`.
 

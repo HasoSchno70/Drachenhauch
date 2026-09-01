@@ -62,6 +62,7 @@ IMPORT "gui"
 | `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW()` | — | alle Fenster zeichnen (hinten→vorne) |
+| `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
 | `GUI_CLICKED(widget)` | BOOLEAN | Button in diesem Frame geklickt? |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
 | `GUI_VALUE(widget)` | FLOAT | Slider-Wert |
@@ -523,7 +524,34 @@ FLIP()
 
 `GUI_CANVAS_X/Y/W/H` liefern den **absoluten** Inhaltsbereich (folgt dem Fenster
 beim Verschieben). Du zeichnest **nach** `GUI_DRAW` und clippst selbst auf den
-Bereich. (Für echte Fenster-Überlappung/Occlusion ein Render-Target nutzen.)
+Bereich.
+
+### Ein Fenster über dem Gezeichneten: `GUI_DRAW_WINDOW`
+
+Daraus folgt ein Fallstrick, den man erst sieht, wenn man ihn hat: **ein
+Fenster, das über einer Zeichenfläche liegt, verschwindet hinter deren
+Inhalt.** `GUI_DRAW` zeichnet Fenster und Zeichenflächen in einem Durchgang,
+und der Inhalt einer Zeichenfläche entsteht per Bauart danach. Ein Dialog, der
+mitten auf der Fläche aufgeht, ist damit unsichtbar — er sperrt die Eingabe und
+ist nicht zu sehen, das Programm wirkt eingefroren.
+
+Ein zweites `GUI_DRAW` hilft nicht: es zeichnet auch die Fenster-Hintergründe
+und die Zeichenflächen neu, also genau das, was gerade gemalt wurde. Stattdessen
+das eine Fenster am Ende des Bildes noch einmal:
+
+```basic
+GUI_UPDATE()
+GUI_DRAW()
+' ... hier malt das Programm in seine Zeichenflächen ...
+IF dialogOffen THEN GUI_DRAW_WINDOW(dlg)    ' obenauf, zuletzt
+FLIP()
+```
+
+Ein unsichtbares oder zerstörtes Fenster zeichnet nichts (kein Fehler) — der
+Aufruf darf also unbedingt in der Bildschleife stehen. Ist das Fenster das
+modale, kommt sein Schleier mit.
+
+(Für echte Fenster-Überlappung/Occlusion ein Render-Target nutzen.)
 
 ## Tabelle
 

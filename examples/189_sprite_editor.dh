@@ -39,11 +39,13 @@
 '                Streifen samt Atlas-JSON. Beim Streifen sind die Ebenen
 '                weg -- er IST das zusammengerechnete Bild. Die Endung
 '                entscheidet, nicht der Nutzer.
-'    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
+'    Vorschau    laufende Wiedergabe mit einstellbarem Tempo; Kachel-Ansicht
+'                3x3 (T) zeigt das Bild acht Mal ringsum -- eine Naht sieht
+'                man erst neben ihrer Wiederholung
+'    Statistik   Punkte, Farben, haeufigste Farbe -- gesamt und je Bild
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Kachel-Vorschau 3x3, benannte Animationsbereiche, Zuschneiden/Groesse
-'    aendern, Statistik. Das
+'    benannte Animationsbereiche, Zuschneiden/Groesse aendern. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -51,6 +53,7 @@
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
 '    P E F L R O Y I S Q Z V     Werkzeuge (Q = Lasso, Z = Zauberstab,
 '                                V = Verschieben)
+'    T           Kachel-Ansicht
 '    1..6        Palette 1..6    +/-           Pinsel
 '    Strg+Z/Y    zurueck/vor     Strg+C/X/V    Zwischenablage
 '    Strg+D      Auswahl weg
@@ -181,6 +184,11 @@ DIM clipB AS INTEGER : clipB = 0
 DIM clipH AS INTEGER : clipH = 0
 
 DIM meldung AS STRING : meldung = ""
+
+' Kachel-Ansicht. Gemerkt statt bei jedem Bild aus dem Kaestchen gelesen:
+' beim UMSCHALTEN muss der Zoom neu eingepasst werden, und das faellt nur
+' auf, wenn man den vorigen Stand kennt.
+DIM kacheln AS BOOLEAN : kacheln = FALSE
 
 ' Formpunkte -- EINE Quelle fuer Vorschau und Uebernahme. Ohne das haette
 ' jede Form zwei Fassungen (eine fuer den Bildschirm, eine fuers Bild), und
@@ -674,6 +682,82 @@ FUNCTION mitAlpha(c AS INTEGER, a AS INTEGER) AS INTEGER
     RETURN RGBA((c \ 65536) MOD 256, (c \ 256) MOD 256, c MOD 256, a)
 END FUNCTION
 
+' -------------------------------------------------------------- Statistik
+' Zaehlt ueber die SICHTBAREN Ebenen -- also ueber das, was man sieht und was
+' auch exportiert wuerde. Eine ausgeblendete Ebene taucht nicht auf; ohne
+' diesen Satz im Ergebnis waere eine ploetzlich kleinere Zahl ein Raetsel.
+'
+' Gemessen: 16384 Punkte kosten mit Farbzaehlung rund 9 ms -- selbst bei
+' 128x128 und 16 Bildern bleibt das ein kurzer Halt auf Knopfdruck.
+DIM statZaehl AS MAP OF INTEGER          ' Farbe (als Text) -> Anzahl
+DIM statBild AS MAP OF INTEGER           ' dasselbe je Einzelbild
+
+FUNCTION statistik$() AS STRING
+    MAPCLEAR(statZaehl)
+    DIM gesamt AS INTEGER : gesamt = gw * gh * anzBild
+    DIM deckend AS INTEGER : deckend = 0
+    DIM proBild AS STRING : proBild = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        DIM eins AS IMAGE : eins = IMAGE_NEW(gw, gh)
+        FOR k = 0 TO anzEb - 1
+            IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(eins, ebene[i, k], 0, 0)
+        NEXT
+        MAPCLEAR(statBild)
+        DIM bDeck AS INTEGER : bDeck = 0
+        FOR y = 0 TO gh - 1
+            FOR x = 0 TO gw - 1
+                ' Halb durchsichtig zaehlt ab 128 als deckend -- dieselbe
+                ' Schwelle, mit der auch das GIF entscheidet. Zwei
+                ' verschiedene Grenzen im selben Programm waeren eine
+                ' Stolperfalle.
+                IF GETALPHA(eins, x, y) >= 128 THEN
+                    bDeck = bDeck + 1
+                    DIM sf AS STRING : sf = STR$(GETPIXEL(eins, x, y))
+                    MAPPUT(statBild, sf, 1)
+                    MAPPUT(statZaehl, sf, MAPGETOR(statZaehl, sf, 0) + 1)
+                END IF
+            NEXT
+        NEXT
+        deckend = deckend + bDeck
+        proBild = proBild + "  Bild " + STR$(i + 1) + ":  " + STR$(bDeck) + _
+                  " deckend, " + STR$(MAPSIZE(statBild)) + " Farben" + CHR$(10)
+        IMAGE_FREE(eins)                 ' nur zum Zaehlen gebraucht
+    NEXT
+
+    ' Die haeufigste Farbe. Ueber die Schluessel statt beim Zaehlen
+    ' mitzufuehren: so steht der Vergleich an EINER Stelle.
+    DIM haeufig AS INTEGER : haeufig = -1
+    DIM hAnz AS INTEGER : hAnz = 0
+    DIM ks AS STRING
+    FOR EACH ks IN MAPKEYS(statZaehl)
+        DIM n AS INTEGER : n = MAPGET(statZaehl, ks)
+        IF n > hAnz THEN
+            hAnz = n : haeufig = INT(VAL(ks))
+        END IF
+    NEXT
+
+    DIM t AS STRING
+    t = STR$(gw) + " x " + STR$(gh) + " Punkte, " + STR$(anzBild) + " Bilder, " + _
+        STR$(anzEb) + " Ebenen" + CHR$(10) + _
+        "(gerechnet ueber die sichtbaren Ebenen)" + CHR$(10) + CHR$(10) + _
+        "Punkte gesamt:        " + STR$(gesamt) + CHR$(10) + _
+        "davon deckend:        " + STR$(deckend) + _
+        "  (" + FORMAT$(100.0 * deckend / gesamt, "%.1f") + " %)" + CHR$(10) + _
+        "davon durchsichtig:   " + STR$(gesamt - deckend) + _
+        "  (" + FORMAT$(100.0 * (gesamt - deckend) / gesamt, "%.1f") + " %)" + CHR$(10) + _
+        "verschiedene Farben:  " + STR$(MAPSIZE(statZaehl)) + CHR$(10)
+    IF haeufig >= 0 THEN
+        t = t + "haeufigste Farbe:     " + COLOR_HEX$(haeufig) + _
+            "  (" + STR$(hAnz) + " Punkte)" + CHR$(10)
+    END IF
+    IF anzBild > 1 THEN t = t + CHR$(10) + "Je Bild:" + CHR$(10) + proBild
+    RETURN t
+END FUNCTION
+
 ' ---------------------------------------------------------------- Palette
 ' GIMP-Palette (.gpl). Ein Textformat, und genau deshalb interessant: es ist
 ' das, was Aseprite, GIMP, Krita und die Sammlungen im Netz sprechen.
@@ -1143,6 +1227,18 @@ y = y + 40
 
 lbl = GUI_LABEL(win, "Pinsel", 12, y)
 DIM spPinsel AS GUI_WIDGET : spPinsel = GUI_SPINNER(win, 90, y - 4, 120, 1, 6, 1)
+y = y + 36
+
+' Kachel-Ansicht und Statistik stehen hier und nicht in der Werkzeugleiste:
+' die endet bei einem 1920 breiten Schirm schon jetzt zwei Dutzend Punkte
+' vor dem Rand, und die linke Spalte hat Platz.
+DIM cbKacheln AS GUI_WIDGET
+cbKacheln = GUI_CHECKBOX(win, "Kachel-Ansicht 3x3", 12, y, FALSE)
+GUI_TOOLTIP(cbKacheln, "Das Bild acht Mal ringsum (T) -- zeigt, ob es nahtlos kachelt")
+y = y + 32
+DIM bStat AS GUI_WIDGET
+bStat = GUI_BUTTON(win, "Statistik", 12, y, 128, 28)
+GUI_TOOLTIP(bStat, "Punkte, Farben und haeufigste Farbe -- gesamt und je Bild")
 
 DIM pal AS ARRAY OF INTEGER
 pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
@@ -1198,6 +1294,8 @@ DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 3
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winNeu, FALSE)
 DIM neuOffen AS BOOLEAN : neuOffen = FALSE
+DIM statOffen AS BOOLEAN : statOffen = FALSE
+DIM statDlg AS GUI_WINDOW
 
 ' ============================================================ Listen
 
@@ -1227,7 +1325,11 @@ listenAuffrischen()
 DIM zeit AS FLOAT : zeit = 0.0
 
 WHILE NOT QUITREQUESTED()
-    IF KEYHIT(KEY_ESCAPE) AND NOT neuOffen THEN BREAK
+    ' Solange ein Fenster obenauf liegt, gehoert die Eingabe ihm. ESC waere
+    ' sonst nicht "Dialog zu", sondern "Programm zu" -- und Tastenkuerzel
+    ' wuerden hinter dem Dialog Werkzeuge umschalten.
+    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen
+    IF KEYHIT(KEY_ESCAPE) AND NOT sperre THEN BREAK
     zeit = zeit + DELTA()
     SW = SCREENWIDTH() : SH = SCREENHEIGHT()
     GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
@@ -1240,13 +1342,20 @@ WHILE NOT QUITREQUESTED()
     pinsel = INT(GUI_VALUE(spPinsel))
     symX = GUI_CHECKED(cbSymX)
     symY = GUI_CHECKED(cbSymY)
+    DIM kachelnJetzt AS BOOLEAN : kachelnJetzt = GUI_CHECKED(cbKacheln)
+    IF kachelnJetzt <> kacheln THEN
+        kacheln = kachelnJetzt
+        ' Neu einpassen: 3x3 braucht die dreifache Kantenlaenge. Ohne das
+        ' waere die Kachel-Ansicht bei eingepasstem Zoom gar nicht zu sehen.
+        anpassen = TRUE
+    END IF
 
     ' ------------------------------------------------------ Werkzeugwahl
     FOR i = 0 TO WZ_ANZ - 1
         IF GUI_CLICKED(wzKnopf[i]) THEN werkzeug = i
         GUI_SET_COLOR(wzKnopf[i], "bg", IIF(i = werkzeug, &H1B5C74, &H1A2430))
     NEXT
-    IF NOT neuOffen AND NOT strg THEN
+    IF NOT sperre AND NOT strg THEN
         IF KEYHIT(KEY_P) THEN werkzeug = WZ_STIFT
         IF KEYHIT(KEY_E) THEN werkzeug = WZ_RADIER
         IF KEYHIT(KEY_F) THEN werkzeug = WZ_FUELL
@@ -1259,6 +1368,7 @@ WHILE NOT QUITREQUESTED()
         IF KEYHIT(KEY_Q) THEN werkzeug = WZ_LASSO
         IF KEYHIT(KEY_Z) THEN werkzeug = WZ_ZAUBER
         IF KEYHIT(KEY_V) THEN werkzeug = WZ_VERSCHIEB
+        IF KEYHIT(KEY_T) THEN GUI_SET_CHECKED(cbKacheln, NOT kacheln)
         FOR i = 0 TO 5
             IF KEYHIT(KEY_1 + i) THEN
                 farbe = pal[i]
@@ -1316,6 +1426,14 @@ WHILE NOT QUITREQUESTED()
                 meldung = e
             END TRY
         END IF
+    END IF
+    IF GUI_CLICKED(bStat) AND NOT statOffen THEN
+        statDlg = GUI_DIALOG("Statistik", statistik$())
+        statOffen = TRUE
+    END IF
+    IF statOffen THEN
+        ' Die Antwort gilt genau EIN Bild -- danach ist das Fenster weg.
+        IF GUI_ANSWER(statDlg) <> 0 THEN statOffen = FALSE
     END IF
     IF GUI_CLICKED(bPalLaden) THEN
         DIM pl AS STRING
@@ -1480,13 +1598,15 @@ WHILE NOT QUITREQUESTED()
     DIM oy AS INTEGER : oy = cy + (ch - gh * zoom) \ 2 + panY
     IF anpassen AND cw > 0 AND ch > 0 THEN
         ' Einpassen mit etwas Luft, damit der Rand sichtbar bleibt.
-        zoom = MAX(1, MIN(32, MIN((cw - 40) \ gw, (ch - 40) \ gh)))
+        ' Bei Kachel-Ansicht muss die dreifache Kantenlaenge hineinpassen.
+        DIM kf AS INTEGER : kf = IIF(kacheln, 3, 1)
+        zoom = MAX(1, MIN(32, MIN((cw - 40) \ (gw * kf), (ch - 40) \ (gh * kf))))
         ox = cx + (cw - gw * zoom) \ 2
         oy = cy + (ch - gh * zoom) \ 2
         anpassen = FALSE
     END IF
     DIM ueber AS BOOLEAN
-    ueber = mx >= cx AND mx < cx + cw AND my >= cy AND my < cy + ch AND NOT neuOffen
+    ueber = mx >= cx AND mx < cx + cw AND my >= cy AND my < cy + ch AND NOT sperre
     DIM tx AS INTEGER : tx = FLOOR((mx - ox) / zoom)
     DIM ty AS INTEGER : ty = FLOOR((my - oy) / zoom)
     DIM drauf AS BOOLEAN
@@ -1511,7 +1631,7 @@ WHILE NOT QUITREQUESTED()
     ' -------------------------------------------------------- Palette
     DIM px2 AS INTEGER : px2 = GUI_CANVAS_X(palette)
     DIM py2 AS INTEGER : py2 = GUI_CANVAS_Y(palette)
-    IF MOUSE_HIT(0) AND NOT neuOffen THEN
+    IF MOUSE_HIT(0) AND NOT sperre THEN
         ' Nicht `pi` nennen -- das ist die eingebaute Kreiszahl, und die
         ' Kollision meldet sich erst zur LAUFZEIT, nicht beim Uebersetzen.
         DIM pSp AS INTEGER : pSp = (mx - px2) \ 34
@@ -1622,7 +1742,7 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     ' ------------------------------------------------------ Zwischenablage
-    IF strg AND NOT neuOffen THEN
+    IF strg AND NOT sperre THEN
         IF (KEYHIT(KEY_C) OR KEYHIT(KEY_X)) AND selAn THEN
             clipB = selB : clipH = selH
             DIM ax2 AS INTEGER
@@ -1673,7 +1793,7 @@ WHILE NOT QUITREQUESTED()
             schrittEnde()
         END IF
     END IF
-    IF KEYHIT(KEY_DELETE) AND selAn AND NOT neuOffen THEN
+    IF KEYHIT(KEY_DELETE) AND selAn AND NOT sperre THEN
         schrittBeginn()
         auswahlLeeren()
         schrittEnde()
@@ -1694,6 +1814,34 @@ WHILE NOT QUITREQUESTED()
     ' -------------------------------------------------------- Zeichenflaeche
     SCISSOR(cx, cy, cw, ch)
     BOX(cx, cy, cx + cw - 1, cy + ch - 1, &H070A0F)
+
+    ' Kachel-Ansicht: dasselbe Bild acht Mal ringsum. Ein Sprite, das sich
+    ' nahtlos wiederholen soll, zeigt seine Naht erst NEBEN ihrer
+    ' Wiederholung -- an einem einzelnen Bild ist sie nicht zu sehen.
+    IF kacheln THEN
+        DIM kx AS INTEGER
+        DIM ky AS INTEGER
+        FOR ky = -1 TO 1
+            FOR kx = -1 TO 1
+                IF kx <> 0 OR ky <> 0 THEN
+                    DIM rx2 AS INTEGER : rx2 = ox + kx * gw * zoom
+                    DIM ry2 AS INTEGER : ry2 = oy + ky * gh * zoom
+                    DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, rx2, ry2, gw * zoom, gh * zoom)
+                    DIM kk AS INTEGER
+                    FOR kk = 0 TO anzEb - 1
+                        IF ebSicht[kk] = 1 THEN
+                            DRAWIMAGEPARTEX(ebene[aktBild, kk], 0, 0, gw, gh, _
+                                            rx2, ry2, gw * zoom, gh * zoom)
+                        END IF
+                    NEXT
+                    ' Gedaempft. Ohne das saehe man neun gleichwertige Bilder
+                    ' und wuesste nicht mehr, welches davon man bearbeitet.
+                    BOX(rx2, ry2, rx2 + gw * zoom - 1, ry2 + gh * zoom - 1, &H70101820)
+                END IF
+            NEXT
+        NEXT
+    END IF
+
     DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, ox, oy, gw * zoom, gh * zoom)
 
     ' Zwiebelhaut: das vorige Bild blass darunter.
@@ -1872,6 +2020,14 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF meldung <> "" THEN info = info + "   |   " + meldung
     GUI_SET_TEXT(status, info)
+
+
+    ' Fenster zum Schluss noch einmal obenauf. Was in die Zeichenflaeche
+    ' gemalt wurde, ist erst NACH GUI_DRAW entstanden und laege sonst
+    ' darueber -- genau daran war der Kasten "Neues Sprite" unsichtbar: er
+    ' ging auf, sperrte die Eingabe und war nicht zu sehen.
+    IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
+    IF statOffen THEN GUI_DRAW_WINDOW(statDlg)
 
     FLIP()
 WEND
