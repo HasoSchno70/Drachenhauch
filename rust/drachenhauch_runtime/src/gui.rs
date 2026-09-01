@@ -5346,14 +5346,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     // --- Draw ---
     pub fn draw(&self, g: &mut Graphics) {
         for &wi in &self.z_order {
-            // Vor dem modalen Dialog alles dahinter abdunkeln. Das ist nicht
-            // Deko: ohne sichtbares Zeichen klickt man in den Hintergrund und
-            // wundert sich, warum nichts passiert.
-            if self.modal == Some(wi) {
-                // 0xAARRGGBB -- Alpha im obersten Byte (0 waere DECKEND).
-                let schleier = (110_i64 << 24) | 0x000000;
-                g.box_fill(0, 0, g.screen_width() as i32, g.screen_height() as i32, schleier);
-            }
+            if self.modal == Some(wi) { self.schleier(g); }
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
@@ -5364,6 +5357,49 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         // Tooltip ganz zuletzt (ueber allem), wenn die Maus lange genug ruht.
         self.draw_tooltip(g);
+    }
+
+    /// Alles hinter dem modalen Dialog abdunkeln. Das ist nicht Deko: ohne
+    /// sichtbares Zeichen klickt man in den Hintergrund und wundert sich,
+    /// warum nichts passiert.
+    ///
+    /// An EINER Stelle, weil `draw` und `draw_window_top` denselben Schleier
+    /// brauchen -- zwei Kopien liefen frueher oder spaeter auseinander.
+    fn schleier(&self, g: &mut Graphics) {
+        // 0xAARRGGBB -- Alpha im obersten Byte (0 waere DECKEND).
+        let c = (110_i64 << 24) | 0x000000;
+        g.box_fill(0, 0, g.screen_width() as i32, g.screen_height() as i32, c);
+    }
+
+    /// EIN Fenster noch einmal zeichnen -- ueber allem, was inzwischen im
+    /// Bild steht (GUI_DRAW_WINDOW).
+    ///
+    /// Der Anlass ist eine Luecke, die erst der Sprite-Pilot aufdeckte:
+    /// `GUI_DRAW` zeichnet Fenster und Zeichenflaechen in EINEM Durchgang,
+    /// und der Inhalt einer Zeichenflaeche entsteht per Bauart DANACH -- das
+    /// Programm malt selbst hinein (siehe `Kind::Canvas`). Ein Fenster, das
+    /// ueber einer Zeichenflaeche liegt, verschwindet damit hinter deren
+    /// Inhalt. Im Piloten war der Kasten "Neues Sprite" auf diese Weise
+    /// unsichtbar: er ging auf, sperrte die Eingabe und war nicht zu sehen --
+    /// das Programm wirkte eingefroren.
+    ///
+    /// Ein zweites `GUI_DRAW` hilft nicht: es zeichnet auch den
+    /// Fenster-Hintergrund und die Zeichenflaechen neu, also genau das, was
+    /// das Programm gerade gemalt hat.
+    ///
+    /// Ein unsichtbares oder zerstoertes Fenster zeichnet nichts (kein
+    /// Fehler) -- so darf der Aufruf unbedingt in der Bildschleife stehen.
+    pub fn draw_window_top(&self, g: &mut Graphics, h: i64) -> Result<(), String> {
+        let wi = h as usize;
+        let w = match self.windows.get(wi) {
+            Some(w) if w.alive => w,
+            Some(_) => return Ok(()),          // zerstoert -- Handle bleibt gueltig
+            None => return Err("GUI_DRAW_WINDOW: ungueltiges GUI_WINDOW-Handle".into()),
+        };
+        if !w.visible { return Ok(()); }
+        if self.modal == Some(wi) { self.schleier(g); }
+        self.draw_window(g, wi);
+        Ok(())
     }
 
     /// Zeichnet den Hilfetext des aktuell verweilten Widgets (nahe der Maus),

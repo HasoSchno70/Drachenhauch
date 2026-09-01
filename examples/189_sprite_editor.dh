@@ -1873,5 +1873,11 @@ WHILE NOT QUITREQUESTED()
     IF meldung <> "" THEN info = info + "   |   " + meldung
     GUI_SET_TEXT(status, info)
 
+    ' Fenster zum Schluss noch einmal obenauf. Was in die Zeichenflaeche
+    ' gemalt wurde, ist erst NACH GUI_DRAW entstanden und laege sonst
+    ' darueber -- genau daran war der Kasten "Neues Sprite" unsichtbar: er
+    ' ging auf, sperrte die Eingabe und war nicht zu sehen.
+    IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
+
     FLIP()
 WEND

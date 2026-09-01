@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1552,
+ "count": 1553,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -470,6 +470,7 @@
   "GUI_DESTROY": "Widget entfernen (Handle wird ungültig, andere bleiben gültig)",
   "GUI_DIALOG": "GUI_WINDOW — modalen Dialog öffnen (\"ok\" = Vorgabe, \"janein\")",
   "GUI_DRAW": "alle Fenster zeichnen (hinten→vorne)",
+  "GUI_DRAW_WINDOW": "EIN Fenster noch einmal zeichnen, über allem, was seit GUI_DRAW dazugekommen ist",
   "GUI_DROPDOWN": "GUI_WIDGET — aufklappende Auswahlliste; das Popup wird ueber allen anderen Widgets gezeichnet",
   "GUI_DROPDOWN_SELECTED": "INTEGER — Index der Auswahl (-1 = keine)",
   "GUI_DROPDOWN_SET_SELECTED": "Auswahl vom Programm aus setzen",

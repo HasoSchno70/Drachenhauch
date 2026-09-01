@@ -192,6 +192,7 @@ _BRAUCHT_GRAFIK = {
     "test_gebundene_methoden_gui.py",
     "test_gfx_push_pop.py",
     "test_gui_dialog.py",
+    "test_gui_draw_window.py",
     "test_gui_form_runner.py",
     "test_gui_table_frozen_edge.py",
     "test_gui_tastatur.py",
