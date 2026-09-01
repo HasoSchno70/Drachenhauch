@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2037 | 0,28 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2339 | 0,32 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -78,8 +78,11 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Pilot steht heute bei 0,28: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
-> mit Kachel-Ansicht und Statistik). Nichts daran ist schlechter geworden --
-> es wurde nur weniger weggelassen.
+> mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
+> Groesse aendern und Animationsbereichen). Nichts daran ist schlechter
+> geworden -- es wurde nur weniger weggelassen. Aus 0,17 sind so 0,32
+> geworden, fast das Doppelte, ohne dass sich an der Sprache etwas
+> geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -165,6 +168,22 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > nicht auseinanderlaufen. Tests `tests/test_gui_draw_window.py` mit der
 > Gegenprobe IM Test: derselbe Ablauf einmal mit und einmal ohne den Aufruf,
 > geprueft am Punkt in der Fenstermitte.
+>
+> **Zuschneiden, Groesse aendern und Animationsbereiche** (2026-09-01)
+> brachten die letzten drei Funde. Zwei davon lagen seit dem ersten Tag im
+> gemergten Piloten: (1) die beiden Neben-Fenster ("Neues Sprite",
+> "Groesse aendern") waren nicht nur unsichtbar, sondern auch **nicht
+> anklickbar** -- ein Klick bringt immer sein Fenster nach vorn, und der
+> Klick auf den oeffnenden Knopf war einer auf das bildschirmfuellende
+> Hauptfenster; danach lag es darueber und fing jeden Klick ab. `GUI_FOCUS`
+> auf das erste Feld holt es nach vorn. (2) **`GUI_CLICKED` auf einem
+> Kaestchen war stumm** -- siehe gui unten; der "sichtbar"-Schalter beider
+> Piloten (187 UND 189) war deshalb tot. Zuschneiden geht ueber ALLE Ebenen,
+> auch ausgeblendete: nach der Sichtbarkeit zu gehen wuerde Inhalt
+> wegschneiden, den man gerade nicht sieht. Die Bereiche wandern beim
+> Loeschen eines Bildes mit (`bereicheNachLoeschen`), sonst spielte die
+> Vorschau danach etwas anderes, ohne dass sich sichtbar etwas geaendert
+> haette.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der

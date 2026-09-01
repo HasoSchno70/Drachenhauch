@@ -93,15 +93,39 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(pal[0]) + " " + STR$(pal[15]) + _
           " " + STR$(cw) + " " + STR$(ch) + _
           " " + STR$(GUI_GET_X(bStat)) + " " + STR$(GUI_GET_Y(bStat)) + _
-          " " + STR$(GUI_GET_X(cbKacheln)) + " " + STR$(GUI_GET_Y(cbKacheln))
+          " " + STR$(GUI_GET_X(cbKacheln)) + " " + STR$(GUI_GET_Y(cbKacheln)) + _
+          " " + STR$(gw) + " " + STR$(gh) + " " + STR$(anzBild) + _
+          " " + STR$(anzAnim) + " " + STR$(aktAnim) + _
+          " " + STR$(anVon[0]) + " " + STR$(anBis[0]) + " " + STR$(anFps[0]) + _
+          " " + STR$(GUI_GET_X(bZuschnitt)) + " " + STR$(GUI_GET_Y(bZuschnitt)) + _
+          " " + STR$(GUI_GET_X(bGroesse)) + " " + STR$(GUI_GET_Y(bGroesse)) + _
+          " " + STR$(GUI_GET_X(bAnimNeu)) + " " + STR$(GUI_GET_Y(bAnimNeu)) + _
+          " " + STR$(GUI_GET_X(bAnimWeg)) + " " + STR$(GUI_GET_Y(bAnimWeg)) + _
+          " " + STR$(GUI_GET_X(bBildKopie)) + " " + STR$(GUI_GET_Y(bBildKopie)) + _
+          " " + STR$(GUI_GET_X(bBildWeg)) + " " + STR$(GUI_GET_Y(bBildWeg)) + _
+          " " + STR$(GUI_WINDOW_GET_X(winGr) + GUI_GET_X(bGrOk)) + _
+          " " + STR$(GUI_WINDOW_GET_Y(winGr) + GUI_GET_Y(bGrOk)) + _
+          " " + STR$(GUI_GET_X(lstBild)) + " " + STR$(GUI_GET_Y(lstBild)) + _
+          " " + STR$(GUI_GET_X(bEbNeu)) + " " + STR$(GUI_GET_Y(bEbNeu)) + _
+          " " + STR$(GUI_GET_X(cbEbSicht)) + " " + STR$(GUI_GET_Y(cbEbSicht)) + _
+          " " + STR$(anzEb) + " " + STR$(aktEb) + " " + STR$(ebSicht[aktEb])
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
-# Namen -- bei achtzehn Feldern ist `letzte[8]` nicht mehr zu lesen und beim
+# Namen -- bei vierzig Feldern ist `letzte[8]` nicht mehr zu lesen und beim
 # Anhaengen eines Feldes leicht zu verrutschen.
+#
+# Die Knopf-Lagen stehen mit drin, weil ein aufgezeichneter Klick sie
+# braucht: `win` sitzt bei (0,0) ohne Rahmen, dort sind Widget-Koordinaten
+# zugleich Bildschirm-Koordinaten. Nur `bGrOk` liegt in einem eigenen
+# Fenster -- dessen Ursprung kommt dazu.
 _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "selX selY palLX palLY palSX palSY pal0 pal15 "
-           "cw ch statX statY kachX kachY").split()
+           "cw ch statX statY kachX kachY "
+           "gw gh anzBild anzAnim aktAnim anVon anBis anFps "
+           "zusX zusY grX grY animNX animNY animWX animWY "
+           "kopieX kopieY bildWX bildWY grOkX grOkY lstBX lstBY "
+           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -426,11 +450,18 @@ _DIALOG_LADEN = 'FILE_OPEN_DIALOG("Palette laden", "gpl")'
 _DIALOG_SICHERN = 'FILE_SAVE_DIALOG("Palette sichern", "palette.gpl", "gpl")'
 
 
-def _knopf_klick(frame, x, y):
-    return [(frame, MOUSE_POSITION, x + 64, y + 14),
-            (frame + 1, MOUSE_POSITION, x + 64, y + 14),
+def _klick(frame, x, y):
+    """Ein Klick genau auf (x, y)."""
+    return [(frame, MOUSE_POSITION, x, y),
+            (frame + 1, MOUSE_POSITION, x, y),
             (frame + 1, MOUSE_BUTTON_DOWN, 0),
             (frame + 2, MOUSE_BUTTON_UP, 0)]
+
+
+def _knopf_klick(frame, x, y):
+    """Mitte eines Knopfes -- die Lagen in der Probe sind seine linke obere
+    Ecke, und die Knoepfe sind rund 128x28 gross."""
+    return _klick(frame, x + 64, y + 14)
 
 
 def test_palette_laden_uebergeht_krumme_zeilen(tmp_path):
@@ -591,3 +622,128 @@ def test_statistik_nennt_die_haeufigste_farbe(tmp_path):
     assert re.search(r"davon deckend:\s+36\b", z), z
     assert re.search(r"verschiedene Farben:\s+3\b", z), z
     assert re.search(r"haeufigste Farbe:\s+#E84B4B\s+\(20 Punkte\)", z), z
+
+
+# ---------------------------------------------- Zuschneiden / Groesse aendern
+def test_zuschneiden_nimmt_den_rahmen_ueber_alles(tmp_path):
+    """Ein Strich mitten auf der Flaeche, dann [Zuschneiden]: uebrig bleibt
+    genau sein Rahmen, und kein Punkt geht dabei verloren."""
+    geo = _lauf(tmp_path, 6)[-1]
+    strich = [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, 10) for x in range(10, 21)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    ev += _knopf_klick(t, geo["zusX"], geo["zusY"])
+    letzte = _lauf(tmp_path, t + 14, ev)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (11, 1), "elf Punkte breit, eine Zeile hoch"
+    assert letzte["gemalt"] == 11, "kein Punkt darf beim Zuschneiden verloren gehen"
+
+
+def test_zuschneiden_beachtet_auch_ausgeblendete_ebenen(tmp_path):
+    """Der Fall, der die bequeme Loesung verbietet: was auf einer
+    ausgeblendeten Ebene liegt, darf nicht weggeschnitten werden -- sonst
+    ist es beim Wiedereinblenden weg, und man weiss nicht warum.
+
+    Aufbau: auf Ebene 1 ein kurzer Strich links, dann eine zweite Ebene mit
+    einem Strich weit rechts, diese ausblenden, zuschneiden. Die Breite muss
+    BEIDE umfassen.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+
+    def strich(y, von, bis):
+        return [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, y) for x in range(von, bis)]
+
+    ev = [(0, MOUSE_POSITION) + strich(10, 4, 8)[0]] + _zug(1, strich(10, 4, 8))
+    t = 1 + 4 + 2
+    ev += _knopf_klick(t, geo["ebNeuX"], geo["ebNeuY"])      # zweite Ebene
+    t += 6
+    ev += _zug(t, strich(20, 24, 28))                        # weit rechts unten
+    t += 4 + 2
+    ev += _klick(t, geo["ebSichtX"] + 8, geo["ebSichtY"] + 8)  # ausblenden
+    t += 6
+    ev += _knopf_klick(t, geo["zusX"], geo["zusY"])
+    letzte = _lauf(tmp_path, t + 14, ev)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (24, 11), "von x=4 bis x=27, y=10 bis y=20"
+    assert letzte["gemalt"] == 4, "die aktive (ausgeblendete) Ebene hat vier Punkte"
+
+
+def test_groesse_aendern_haengt_durchsichtigen_rand_an(tmp_path):
+    """Vergroessern ist derselbe Aufruf wie Zuschneiden, nur mit positivem
+    Rand. Geprueft, weil die Richtung die andere ist: der Inhalt bleibt
+    links oben, der Rest wird durchsichtig -- nicht schwarz.
+
+    Die beiden Zahlen kommen aus einer Ersetzung: die Regler mit
+    aufgezeichneten Klicks zu verstellen waere ein Dutzend Klicks auf einen
+    Pfeil. Ersetzt ist nur das Ablesen, gerechnet hat `groesseAendern`.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+    strich = [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, 3) for x in range(2, 9)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    # Das Fenster bekommt eine feste Stelle und keinen Rahmen: sonst haengt
+    # die Lage seines Knopfes an der Titelhoehe des Themas, und die kann ein
+    # Programm nicht erfragen. Nur Aussehen und Ort, keine Logik.
+    ersatz = {
+        "GUI_WINDOW_VISIBLE(winGr, FALSE)\nDIM grOffen":
+            "GUI_WINDOW_CHROME(winGr, FALSE)\n"
+            "GUI_WINDOW_SET_BOUNDS(winGr, 100, 100, 300, 170)\n"
+            "GUI_WINDOW_VISIBLE(winGr, FALSE)\nDIM grOffen",
+        "DIM ngb AS INTEGER : ngb = INT(GUI_VALUE(spGrB))": "DIM ngb AS INTEGER : ngb = 48",
+        "DIM ngh AS INTEGER : ngh = INT(GUI_VALUE(spGrH))": "DIM ngh AS INTEGER : ngh = 40",
+    }
+    grOk = _lauf(tmp_path, 6, dialoge=ersatz)[-1]
+    ev += _knopf_klick(t, geo["grX"], geo["grY"])
+    t += 6
+    ev += _knopf_klick(t, grOk["grOkX"], grOk["grOkY"])
+    letzte = _lauf(tmp_path, t + 14, ev, dialoge=ersatz)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (48, 40)
+    assert letzte["gemalt"] == 7, "der Inhalt bleibt, der neue Rand ist durchsichtig"
+
+
+# ------------------------------------------------------ Animationsbereiche
+def test_bereich_anlegen_und_wieder_entfernen(tmp_path):
+    """[Hinzu] uebernimmt, was in den Feldern steht -- die Vorgaben sind
+    von=1, bis=1, fps=8, nach innen also 0/0/8."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["animNX"], geo["animNY"])
+    proben = _lauf(tmp_path, 20, ev)
+    nach_hinzu = proben[-1]
+    assert nach_hinzu["anzAnim"] == 1
+    assert nach_hinzu["aktAnim"] == 0
+    assert (nach_hinzu["anVon"], nach_hinzu["anBis"], nach_hinzu["anFps"]) == (0, 0, 8)
+
+    ev += _knopf_klick(10, geo["animWX"], geo["animWY"])
+    letzte = _lauf(tmp_path, 24, ev)[-1]
+    assert letzte["anzAnim"] == 0, "[Weg] nimmt ihn wieder heraus"
+    assert letzte["aktAnim"] == -1
+
+
+def test_bereiche_wandern_beim_loeschen_eines_bildes(tmp_path):
+    """Die Stelle, an der eine Bereichsliste still falsch wird. Nach dem
+    Loeschen von Bild 1 muss ein Bereich, der Bild 2..3 umfasste, auf 1..2
+    zeigen -- sonst spielt die Vorschau danach etwas anderes, ohne dass sich
+    sichtbar etwas geaendert haette.
+    """
+    # Der Bereich soll Bild 2..3 umfassen. Die beiden Regler mit
+    # aufgezeichneten Klicks zu verstellen waere ein Dutzend Klicks auf einen
+    # Pfeil -- ersetzt ist nur ihr Ablesen, alles danach ist der echte Code.
+    ersatz = {
+        "DIM v AS INTEGER : v = INT(GUI_VALUE(spVon)) - 1": "DIM v AS INTEGER : v = 1",
+        "DIM b AS INTEGER : b = INT(GUI_VALUE(spBis)) - 1": "DIM b AS INTEGER : b = 2",
+    }
+    geo = _lauf(tmp_path, 6, dialoge=ersatz)[-1]
+    # Drei Bilder: zweimal [Kopie]. Danach steht Bild 3 zur Bearbeitung.
+    ev = _knopf_klick(2, geo["kopieX"], geo["kopieY"])
+    ev += _knopf_klick(8, geo["kopieX"], geo["kopieY"])
+    ev += _knopf_klick(14, geo["animNX"], geo["animNY"])
+    mitte = _lauf(tmp_path, 22, ev, dialoge=ersatz)[-1]
+    assert mitte["anzBild"] == 3 and mitte["anzAnim"] == 1
+    assert (mitte["anVon"], mitte["anBis"]) == (1, 2), "Bild 2..3, nach innen 1..2"
+
+    # Bild 1 in der Liste waehlen und loeschen. Der Bereich lag DAHINTER --
+    # also muss er um eins nach vorn ruecken, auf 0..1.
+    ev += _klick(24, geo["lstBX"] + 40, geo["lstBY"] + 10)   # erste Zeile
+    ev += _knopf_klick(32, geo["bildWX"], geo["bildWY"])
+    letzte = _lauf(tmp_path, 42, ev, dialoge=ersatz)[-1]
+    assert letzte["anzBild"] == 2
+    assert letzte["anzAnim"] == 1, "der Bereich bleibt -- er hing nicht am Bild 1"
+    assert (letzte["anVon"], letzte["anBis"]) == (0, 1), "um eins nach vorn"

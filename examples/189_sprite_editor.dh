@@ -20,6 +20,11 @@
 '    Farbe       Farbwaehler + 16er-Palette + Pipette; die Palette laedt
 '                und sichert GIMP-Dateien (.gpl) -- das Format, das Aseprite,
 '                GIMP, Krita und die Paletten-Sammlungen im Netz sprechen
+'    Bereiche    benannte Animationsbereiche (Name, von, bis, fps) -- genau
+'                das, was SPRITE_ADD_ANIM braucht. Die Vorschau spielt den
+'                gewaehlten; sie stehen mit in der .dhsprite
+'    Leinwand    [Zuschneiden] auf den Inhalt (ueber ALLE Ebenen, auch
+'                ausgeblendete) und [Groesse aendern]
 '    Auswahl     eine echte Punkt-MASKE, kein Rahmen: Rechteck, Lasso
 '                (Freiform) und Zauberstab (gleiche Farbe ringsum) fuellen
 '                dieselbe Maske, und ALLES was zeichnet fragt sie. Solange
@@ -44,8 +49,9 @@
 '                man erst neben ihrer Wiederholung
 '    Statistik   Punkte, Farben, haeufigste Farbe -- gesamt und je Bild
 '
-'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    benannte Animationsbereiche, Zuschneiden/Groesse aendern. Das
+'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): der
+'    GB-Code- und .dhanim-Export der Bereiche, das Umbenennen von
+'    Einzelbildern, Dateibrowser und Dialoge der Qt-Fassung. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -68,6 +74,7 @@ CONST MAXG = 128               ' groesste Kantenlaenge eines Sprites
 CONST MAXBILD = 16             ' Einzelbilder
 CONST MAXEB = 4                ' Ebenen
 CONST UNDO_MAX = 24
+CONST MAXANIM = 8              ' benannte Animationsbereiche
 CONST MAXPKT = MAXG * MAXG     ' Punkte einer Form
 
 SCREEN(1440, 900, "Drachenhauch - Sprite-Editor", 1)
@@ -182,6 +189,17 @@ DIM clipF[MAXPKT] AS INTEGER          ' Farbe je Punkt
 DIM clipA[MAXPKT] AS INTEGER          ' Deckkraft je Punkt
 DIM clipB AS INTEGER : clipB = 0
 DIM clipH AS INTEGER : clipH = 0
+
+' Benannte Animationsbereiche -- genau das, was SPRITE_ADD_ANIM braucht:
+' Name, erstes und letztes Bild (beide EINSCHLIESSLICH) und ein Tempo.
+' Nach innen 0-basiert wie alles andere, in der Oberflaeche 1-basiert wie
+' die Bilderliste ("Bild 1").
+DIM anName[MAXANIM] AS STRING
+DIM anVon[MAXANIM] AS INTEGER
+DIM anBis[MAXANIM] AS INTEGER
+DIM anFps[MAXANIM] AS INTEGER
+DIM anzAnim AS INTEGER : anzAnim = 0
+DIM aktAnim AS INTEGER : aktAnim = -1
 
 DIM meldung AS STRING : meldung = ""
 
@@ -426,6 +444,114 @@ SUB zauberMaske(sx AS INTEGER, sy AS INTEGER)
     IF voll THEN meldung = "Zauberstab: Flaeche zu verzweigt, Auswahl unvollstaendig"
 END SUB
 
+' ------------------------------------------------- Groesse und Hilfsbilder
+' Alles, was an der GROESSE des Sprites haengt und kein Inhalt ist:
+' Verlaufsplaetze, Arbeitspuffer, Streifen und Schachbrett. Herausgeloest,
+' weil es zwei Anlaesse gibt -- ein neues Sprite und eine Groessenaenderung --
+' und zwei Fassungen davon frueher oder spaeter auseinanderlaufen.
+SUB hilfsbilderFrei()
+    DIM i AS INTEGER
+    FOR i = 0 TO UNDO_MAX - 1
+        IMAGE_FREE(uVor[i])
+        IMAGE_FREE(uNach[i])
+    NEXT
+    IMAGE_FREE(puffer)
+    IMAGE_FREE(streifen)
+    IMAGE_FREE(schachbrett)
+END SUB
+
+SUB hilfsbilderNeu(alteFrei AS BOOLEAN)
+    IF alteFrei THEN hilfsbilderFrei()
+    DIM i AS INTEGER
+    FOR i = 0 TO UNDO_MAX - 1
+        uVor[i] = IMAGE_NEW(gw, gh)
+        uNach[i] = IMAGE_NEW(gw, gh)
+    NEXT
+    puffer = IMAGE_NEW(gw, gh)
+    streifen = IMAGE_NEW(gw * MAXBILD, gh)
+    ' Der Verlauf wird geleert: seine Momentaufnahmen haetten die alte
+    ' Groesse, und ein Zurueck darauf brauchte eine zweite Umrechnung.
+    uStart = 0 : uAnz = 0 : uPos = 0
+
+    ' Schachbrett als Untergrund -- ohne das ist "durchsichtig" von
+    ' "schwarz" nicht zu unterscheiden.
+    schachbrett = IMAGE_NEW(gw, gh, &H2A3038)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF ((x \ 4) + (y \ 4)) MOD 2 = 0 THEN
+                IMAGE_DRAW_RECT(schachbrett, x, y, 1, 1, &H353C46)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+' Groesse aendern, Inhalt behalten: (vx, vy) ist die Ecke des alten Bildes,
+' die links oben landen soll. Ein NEGATIVER Zeichenort schneidet ab, ein
+' positiver laesst Rand stehen -- Zuschneiden und Vergroessern sind damit
+' derselbe Aufruf und koennen nicht auseinanderlaufen.
+SUB groesseAendern(nb AS INTEGER, nh AS INTEGER, vx AS INTEGER, vy AS INTEGER)
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            DIM n AS IMAGE : n = IMAGE_NEW(nb, nh)
+            IF i < anzBild AND k < anzEb THEN
+                IMAGE_DRAW_IMAGE(n, ebene[i, k], -vx, -vy)
+            END IF
+            IMAGE_FREE(ebene[i, k])
+            ebene[i, k] = n
+        NEXT
+    NEXT
+    gw = nb : gh = nh
+    hilfsbilderNeu(TRUE)
+    maskeAlleWeg()
+    panX = 0 : panY = 0
+    anpassen = TRUE
+END SUB
+
+' Auf den Inhalt zuschneiden: der Rahmen um alles, was nicht durchsichtig
+' ist -- ueber alle Einzelbilder UND alle Ebenen.
+'
+' Auch ueber die AUSGEBLENDETEN. Nach der Sichtbarkeit zu gehen waere
+' bequemer, wuerde aber Inhalt wegschneiden, den man gerade nicht sieht --
+' und das faellt erst auf, wenn man die Ebene wieder einblendet.
+SUB zuschneiden()
+    DIM mnx AS INTEGER : mnx = gw
+    DIM mny AS INTEGER : mny = gh
+    DIM mxx AS INTEGER : mxx = -1
+    DIM mxy AS INTEGER : mxy = -1
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR i = 0 TO anzBild - 1
+        FOR k = 0 TO anzEb - 1
+            FOR y = 0 TO gh - 1
+                FOR x = 0 TO gw - 1
+                    IF GETALPHA(ebene[i, k], x, y) > 0 THEN
+                        IF x < mnx THEN mnx = x
+                        IF y < mny THEN mny = y
+                        IF x > mxx THEN mxx = x
+                        IF y > mxy THEN mxy = y
+                    END IF
+                NEXT
+            NEXT
+        NEXT
+    NEXT
+    IF mxx < 0 THEN
+        meldung = "Alles durchsichtig -- da bleibt nichts uebrig."
+    ELIF mnx = 0 AND mny = 0 AND mxx = gw - 1 AND mxy = gh - 1 THEN
+        meldung = "Keine durchsichtigen Raender."
+    ELSE
+        DIM nb AS INTEGER : nb = mxx - mnx + 1
+        DIM nh AS INTEGER : nh = mxy - mny + 1
+        groesseAendern(nb, nh, mnx, mny)
+        meldung = "Zugeschnitten auf " + STR$(nb) + "x" + STR$(nh)
+    END IF
+END SUB
+
 SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     ' Beim zweiten Mal zuerst die alten Bilder freigeben -- sonst haengt
     ' jedes "Neu" einen kompletten Satz Texturen an, den niemand mehr
@@ -438,13 +564,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
                 IMAGE_FREE(ebene[fi, fk])
             NEXT
         NEXT
-        FOR fi = 0 TO UNDO_MAX - 1
-            IMAGE_FREE(uVor[fi])
-            IMAGE_FREE(uNach[fi])
-        NEXT
-        IMAGE_FREE(puffer)
-        IMAGE_FREE(streifen)
-        IMAGE_FREE(schachbrett)
+        hilfsbilderFrei()
     END IF
     angelegt = TRUE
     gw = b : gh = h
@@ -461,32 +581,14 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
         ebName[k] = "Ebene " + STR$(k + 1)
         ebSicht[k] = 1
     NEXT
-    FOR i = 0 TO UNDO_MAX - 1
-        uVor[i] = IMAGE_NEW(gw, gh)
-        uNach[i] = IMAGE_NEW(gw, gh)
-    NEXT
-    puffer = IMAGE_NEW(gw, gh)
-    streifen = IMAGE_NEW(gw * MAXBILD, gh)
-    uStart = 0 : uAnz = 0 : uPos = 0
+    hilfsbilderNeu(FALSE)          ' die alten hat der Block oben schon frei
+    anzAnim = 0 : aktAnim = -1
     maskeAlleWeg()
     panX = 0 : panY = 0
     ' Den Zoom kann diese SUB nicht selbst setzen: sie laeuft schon, bevor
     ' es die Zeichenflaeche gibt (und ihre Groesse aendert sich mit dem
     ' Fenster). Also nur vormerken -- die Schleife rechnet ihn aus.
     anpassen = TRUE
-
-    ' Schachbrett als Untergrund -- ohne das ist "durchsichtig" von
-    ' "schwarz" nicht zu unterscheiden.
-    schachbrett = IMAGE_NEW(gw, gh, &H2A3038)
-    DIM x AS INTEGER
-    DIM y AS INTEGER
-    FOR y = 0 TO gh - 1
-        FOR x = 0 TO gw - 1
-            IF ((x \ 4) + (y \ 4)) MOD 2 = 0 THEN
-                IMAGE_DRAW_RECT(schachbrett, x, y, 1, 1, &H353C46)
-            END IF
-        NEXT
-    NEXT
 END SUB
 
 ' ---------------------------------------------------------------- Verlauf
@@ -1063,6 +1165,19 @@ SUB nativSichern(pfad AS STRING)
         JSON_SET_BOOL(e, "sichtbar", ebSicht[k] = 1)
         JSON_APPEND_JSON(h, "ebenen", e)
     NEXT
+    ' Die Bereiche gehoeren zum Sprite, nicht zur Sitzung -- ohne sie waere
+    ' der Lauf beim naechsten Oeffnen wieder namenlos.
+    IF anzAnim > 0 THEN
+        JSON_SET_JSON(h, "bereiche", JSON_NEW_ARRAY())
+        FOR k = 0 TO anzAnim - 1
+            DIM ab AS JSON_HANDLE : ab = JSON_NEW_OBJECT()
+            JSON_SET_STRING(ab, "name", anName[k])
+            JSON_SET_INT(ab, "von", anVon[k])
+            JSON_SET_INT(ab, "bis", anBis[k])
+            JSON_SET_INT(ab, "fps", anFps[k])
+            JSON_APPEND_JSON(h, "bereiche", ab)
+        NEXT
+    END IF
     WRITEALL(pfad, JSON_PRETTY(h))
     meldung = STR$(anzBild) + " Bilder x " + STR$(anzEb) + " Ebenen: " + BASENAME(pfad)
 END SUB
@@ -1098,6 +1213,20 @@ SUB nativLaden(pfad AS STRING)
             NEXT
             IMAGE_FREE(raster)
             aktBild = 0 : aktEb = 0
+            ' Bereiche, falls die Datei welche hat. Eine aeltere .dhsprite
+            ' hat sie nicht -- das ist kein Fehler, sondern der Normalfall
+            ' fuer alles, was vor heute gesichert wurde.
+            anzAnim = MIN(JSON_LEN(h, "bereiche"), MAXANIM)
+            DIM q AS INTEGER
+            FOR q = 0 TO anzAnim - 1
+                DIM pf AS STRING : pf = "bereiche." + STR$(q) + "."
+                anName[q] = JSON_GET_STRING(h, pf + "name")
+                IF anName[q] = "" THEN anName[q] = "bereich" + STR$(q + 1)
+                anVon[q] = MAX(0, MIN(anzBild - 1, JSON_GET_INT(h, pf + "von")))
+                anBis[q] = MAX(anVon[q], MIN(anzBild - 1, JSON_GET_INT(h, pf + "bis")))
+                anFps[q] = MAX(1, JSON_GET_INT(h, pf + "fps"))
+            NEXT
+            aktAnim = IIF(anzAnim > 0, 0, -1)
             listenAuffrischen()
             meldung = STR$(anzBild) + " Bilder x " + STR$(anzEb) + " Ebenen aus " + BASENAME(pfad)
         END IF
@@ -1239,6 +1368,13 @@ y = y + 32
 DIM bStat AS GUI_WIDGET
 bStat = GUI_BUTTON(win, "Statistik", 12, y, 128, 28)
 GUI_TOOLTIP(bStat, "Punkte, Farben und haeufigste Farbe -- gesamt und je Bild")
+DIM bZuschnitt AS GUI_WIDGET
+bZuschnitt = GUI_BUTTON(win, "Zuschneiden", 144, y, 128, 28)
+GUI_TOOLTIP(bZuschnitt, "Auf den Inhalt zuschneiden -- ueber alle Bilder und ALLE Ebenen")
+y = y + 34
+DIM bGroesse AS GUI_WIDGET
+bGroesse = GUI_BUTTON(win, "Groesse aendern", 12, y, 260, 28)
+GUI_TOOLTIP(bGroesse, "Leinwand vergroessern oder beschneiden -- der Inhalt bleibt links oben")
 
 DIM pal AS ARRAY OF INTEGER
 pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
@@ -1273,6 +1409,26 @@ DIM vorY AS INTEGER : vorY = ry
 ry = ry + 148
 lbl = GUI_LABEL(win, "Tempo", rx, ry + 4)
 DIM slTempo AS GUI_WIDGET : slTempo = GUI_SLIDER(win, rx + 70, ry + 6, 180, 1.0, 24.0, 8.0)
+ry = ry + 38
+
+lbl = GUI_LABEL(win, "Bereiche   (die Vorschau spielt den gewaehlten)", rx, ry) : ry = ry + 22
+DIM lstAnim AS GUI_WIDGET
+lstAnim = GUI_LISTBOX(win, rx, ry, RECHTS - 16, 84, SPLIT$("", "|"))
+ry = ry + 92
+DIM tiAnim AS GUI_WIDGET
+tiAnim = GUI_TEXTINPUT(win, rx, ry, RECHTS - 16, 28, "lauf")
+GUI_TOOLTIP(tiAnim, "Name des Bereichs -- so heisst er spaeter in SPRITE_ADD_ANIM")
+ry = ry + 34
+DIM bAnimNeu AS GUI_WIDGET : bAnimNeu = GUI_BUTTON(win, "Hinzu", rx, ry, 100, 28)
+DIM bAnimAend AS GUI_WIDGET : bAnimAend = GUI_BUTTON(win, "Aendern", rx + 106, ry, 106, 28)
+DIM bAnimWeg AS GUI_WIDGET : bAnimWeg = GUI_BUTTON(win, "Weg", rx + 218, ry, 90, 28)
+ry = ry + 34
+lbl = GUI_LABEL(win, "von", rx, ry + 6)
+DIM spVon AS GUI_WIDGET : spVon = GUI_SPINNER(win, rx + 32, ry, 68, 1, MAXBILD, 1)
+lbl = GUI_LABEL(win, "bis", rx + 108, ry + 6)
+DIM spBis AS GUI_WIDGET : spBis = GUI_SPINNER(win, rx + 138, ry, 68, 1, MAXBILD, 1)
+lbl = GUI_LABEL(win, "fps", rx + 214, ry + 6)
+DIM spFps AS GUI_WIDGET : spFps = GUI_SPINNER(win, rx + 242, ry, 68, 1, 60, 8)
 
 ' ------------------------------------------------------------- Zeichenflaeche
 DIM leinwand AS GUI_WIDGET
@@ -1294,6 +1450,21 @@ DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 3
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winNeu, FALSE)
 DIM neuOffen AS BOOLEAN : neuOffen = FALSE
+
+' ------------------------------------------------ Fenster "Groesse aendern"
+' Eigenes Fenster statt zweier Regler in der Spalte: eine Groessenaenderung
+' braucht BEIDE Zahlen auf einmal, und dazwischen soll nichts passieren.
+DIM winGr AS GUI_WINDOW
+winGr = GUI_WINDOW("Groesse aendern", SW \ 2 - 150, SH \ 2 - 90, 300, 170)
+lbl = GUI_LABEL(winGr, "Breite", 16, 16)
+DIM spGrB AS GUI_WIDGET : spGrB = GUI_SPINNER(winGr, 110, 12, 160, 4, MAXG, 32)
+lbl = GUI_LABEL(winGr, "Hoehe", 16, 52)
+DIM spGrH AS GUI_WIDGET : spGrH = GUI_SPINNER(winGr, 110, 48, 160, 4, MAXG, 32)
+DIM bGrOk AS GUI_WIDGET : bGrOk = GUI_BUTTON(winGr, "Aendern", 110, 92, 90, 30)
+DIM bGrAb AS GUI_WIDGET : bGrAb = GUI_BUTTON(winGr, "Abbrechen", 206, 92, 90, 30)
+GUI_WINDOW_VISIBLE(winGr, FALSE)
+DIM grOffen AS BOOLEAN : grOffen = FALSE
+
 DIM statOffen AS BOOLEAN : statOffen = FALSE
 DIM statDlg AS GUI_WINDOW
 
@@ -1315,6 +1486,60 @@ SUB listenAuffrischen()
     GUI_SET_LISTBOX(lstEb, en)
     GUI_LISTBOX_SET_SELECTED(lstEb, aktEb)
     GUI_SET_CHECKED(cbEbSicht, ebSicht[aktEb] = 1)
+
+    DIM an[MAX(anzAnim, 1)] AS STRING
+    an[0] = ""
+    FOR k = 0 TO anzAnim - 1
+        an[k] = anName[k] + "   " + STR$(anVon[k] + 1) + "-" + STR$(anBis[k] + 1) + _
+                "  @" + STR$(anFps[k])
+    NEXT
+    GUI_SET_LISTBOX(lstAnim, an)
+    GUI_LISTBOX_SET_SELECTED(lstAnim, aktAnim)
+END SUB
+
+' Was in den Feldern steht, in Platz `idx` schreiben. EINE Stelle fuer
+' [Hinzu] und [Aendern] -- die beiden unterscheiden sich nur im Platz.
+SUB bereichSchreiben(idx AS INTEGER)
+    DIM nm AS STRING : nm = TRIM$(GUI_TEXT(tiAnim))
+    IF nm = "" THEN nm = "bereich" + STR$(idx + 1)
+    DIM v AS INTEGER : v = INT(GUI_VALUE(spVon)) - 1
+    DIM b AS INTEGER : b = INT(GUI_VALUE(spBis)) - 1
+    ' Verdrehte Grenzen tauschen statt melden: gemeint ist offensichtlich
+    ' der Bereich dazwischen.
+    IF v > b THEN
+        DIM t AS INTEGER : t = v : v = b : b = t
+    END IF
+    ' Auf vorhandene Bilder klemmen -- ein Bereich, der ins Leere zeigt,
+    ' liesse die Vorschau auf ein Bild greifen, das es nicht gibt.
+    v = MAX(0, MIN(anzBild - 1, v))
+    b = MAX(0, MIN(anzBild - 1, b))
+    anName[idx] = nm : anVon[idx] = v : anBis[idx] = b
+    anFps[idx] = MAX(1, INT(GUI_VALUE(spFps)))
+END SUB
+
+' Bereiche nachziehen, nachdem Bild `at` geloescht wurde (anzBild ist da
+' schon kleiner). `von` rueckt NUR nach, wenn das geloeschte Bild davor lag;
+' lag es genau auf `von`, ruecht das naechste Bild an dessen Stelle und der
+' Bereich beginnt weiterhin dort. Ein Bereich, der nur aus dem geloeschten
+' Bild bestand, faellt beim Vergleich unten von selbst heraus.
+SUB bereicheNachLoeschen(at AS INTEGER)
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO anzAnim - 1
+        DIM v AS INTEGER : v = anVon[i]
+        DIM b AS INTEGER : b = anBis[i]
+        IF v > at THEN v = v - 1
+        IF b >= at THEN b = b - 1
+        IF b >= v AND v >= 0 THEN
+            anName[n] = anName[i]
+            anVon[n] = v
+            anBis[n] = MIN(b, anzBild - 1)
+            anFps[n] = anFps[i]
+            n = n + 1
+        END IF
+    NEXT
+    anzAnim = n
+    IF aktAnim >= anzAnim THEN aktAnim = anzAnim - 1
 END SUB
 
 ' ============================================================ Hauptschleife
@@ -1328,7 +1553,7 @@ WHILE NOT QUITREQUESTED()
     ' Solange ein Fenster obenauf liegt, gehoert die Eingabe ihm. ESC waere
     ' sonst nicht "Dialog zu", sondern "Programm zu" -- und Tastenkuerzel
     ' wuerden hinter dem Dialog Werkzeuge umschalten.
-    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen
+    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen OR grOffen
     IF KEYHIT(KEY_ESCAPE) AND NOT sperre THEN BREAK
     zeit = zeit + DELTA()
     SW = SCREENWIDTH() : SH = SCREENHEIGHT()
@@ -1382,6 +1607,13 @@ WHILE NOT QUITREQUESTED()
     ' ------------------------------------------------------------ Datei
     IF GUI_CLICKED(bNeu) THEN
         GUI_WINDOW_VISIBLE(winNeu, TRUE) : neuOffen = TRUE
+        ' Nach VORNE holen, sonst ist es nicht bedienbar: ein Klick bringt
+        ' immer sein Fenster nach oben, und der Klick auf [Neu] war einer
+        ' auf das Hauptfenster -- das den ganzen Schirm fuellt. Danach
+        ' liegt es ueber dem Kasten und faengt jeden Klick ab.
+        ' GUI_FOCUS holt das Fenster nach vorn UND setzt die Schreibmarke
+        ' ins erste Feld.
+        GUI_FOCUS(spB)
     END IF
     IF GUI_CLICKED(bNeuAb) THEN
         GUI_WINDOW_VISIBLE(winNeu, FALSE) : neuOffen = FALSE
@@ -1426,6 +1658,27 @@ WHILE NOT QUITREQUESTED()
                 meldung = e
             END TRY
         END IF
+    END IF
+    IF GUI_CLICKED(bZuschnitt) THEN zuschneiden()
+    IF GUI_CLICKED(bGroesse) THEN
+        ' Mit der AKTUELLEN Groesse vorbelegen -- wer nur die Breite aendern
+        ' will, soll die Hoehe nicht von Hand nachstellen muessen.
+        GUI_SET_VALUE(spGrB, gw)
+        GUI_SET_VALUE(spGrH, gh)
+        GUI_WINDOW_VISIBLE(winGr, TRUE) : grOffen = TRUE
+        GUI_FOCUS(spGrB)                 ' nach vorn -- siehe [Neu]
+    END IF
+    IF GUI_CLICKED(bGrAb) THEN
+        GUI_WINDOW_VISIBLE(winGr, FALSE) : grOffen = FALSE
+    END IF
+    IF GUI_CLICKED(bGrOk) THEN
+        DIM ngb AS INTEGER : ngb = INT(GUI_VALUE(spGrB))
+        DIM ngh AS INTEGER : ngh = INT(GUI_VALUE(spGrH))
+        IF ngb <> gw OR ngh <> gh THEN
+            groesseAendern(ngb, ngh, 0, 0)
+            meldung = "Groesse: " + STR$(ngb) + "x" + STR$(ngh)
+        END IF
+        GUI_WINDOW_VISIBLE(winGr, FALSE) : grOffen = FALSE
     END IF
     IF GUI_CLICKED(bStat) AND NOT statOffen THEN
         statDlg = GUI_DIALOG("Statistik", statistik$())
@@ -1532,6 +1785,7 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(bBildWeg) THEN
         IF anzBild > 1 THEN
+            DIM weg AS INTEGER : weg = aktBild
             DIM j AS INTEGER
             DIM k4 AS INTEGER
             FOR j = aktBild TO anzBild - 2
@@ -1542,10 +1796,47 @@ WHILE NOT QUITREQUESTED()
             anzBild = anzBild - 1
             IF aktBild >= anzBild THEN aktBild = anzBild - 1
             uStart = 0 : uAnz = 0 : uPos = 0
+            bereicheNachLoeschen(weg)
             listenAuffrischen()
         ELSE
             meldung = "Das letzte Bild bleibt."
         END IF
+    END IF
+
+    ' --------------------------------------------------- Animationsbereiche
+    DIM selA AS INTEGER : selA = GUI_LISTBOX_SELECTED(lstAnim)
+    IF selA >= 0 AND selA < anzAnim AND selA <> aktAnim THEN
+        ' Die Auswahl fuellt die Felder -- sonst muesste man zum Aendern
+        ' alles noch einmal eintippen.
+        aktAnim = selA
+        GUI_SET_TEXT(tiAnim, anName[aktAnim])
+        GUI_SET_VALUE(spVon, anVon[aktAnim] + 1)
+        GUI_SET_VALUE(spBis, anBis[aktAnim] + 1)
+        GUI_SET_VALUE(spFps, anFps[aktAnim])
+    END IF
+    IF GUI_CLICKED(bAnimNeu) THEN
+        IF anzAnim >= MAXANIM THEN
+            meldung = "Mehr als " + STR$(MAXANIM) + " Bereiche gehen nicht."
+        ELSE
+            bereichSchreiben(anzAnim)
+            aktAnim = anzAnim
+            anzAnim = anzAnim + 1
+            listenAuffrischen()
+        END IF
+    END IF
+    IF GUI_CLICKED(bAnimAend) AND aktAnim >= 0 THEN
+        bereichSchreiben(aktAnim)
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bAnimWeg) AND aktAnim >= 0 THEN
+        DIM q2 AS INTEGER
+        FOR q2 = aktAnim TO anzAnim - 2
+            anName[q2] = anName[q2 + 1] : anVon[q2] = anVon[q2 + 1]
+            anBis[q2] = anBis[q2 + 1] : anFps[q2] = anFps[q2 + 1]
+        NEXT
+        anzAnim = anzAnim - 1
+        aktAnim = MIN(aktAnim, anzAnim - 1)
+        listenAuffrischen()
     END IF
 
     DIM selE AS INTEGER : selE = GUI_LISTBOX_SELECTED(lstEb)
@@ -1995,8 +2286,18 @@ WHILE NOT QUITREQUESTED()
     DIM vz AS INTEGER : vz = MAX(1, MIN((vw - 8) \ gw, (vh - 8) \ gh))
     DIM vox AS INTEGER : vox = vx + (vw - gw * vz) \ 2
     DIM voy AS INTEGER : voy = vy + (vh - gh * vz) \ 2
+    ' Ist ein Bereich gewaehlt, spielt die Vorschau IHN -- mit seinem Tempo.
+    ' Das ist der eigentliche Nutzen der Bereiche: man sieht den Lauf, nicht
+    ' das ganze Blatt.
     DIM tempo AS FLOAT : tempo = GUI_VALUE(slTempo)
-    DIM vb AS INTEGER : vb = INT(zeit * tempo) MOD anzBild
+    DIM vb AS INTEGER
+    IF aktAnim >= 0 AND aktAnim < anzAnim THEN
+        DIM alo AS INTEGER : alo = MIN(anVon[aktAnim], anzBild - 1)
+        DIM ahi AS INTEGER : ahi = MIN(anBis[aktAnim], anzBild - 1)
+        vb = alo + INT(zeit * anFps[aktAnim]) MOD (ahi - alo + 1)
+    ELSE
+        vb = INT(zeit * tempo) MOD anzBild
+    END IF
     DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, vox, voy, gw * vz, gh * vz)
     DIM k8 AS INTEGER
     FOR k8 = 0 TO anzEb - 1
@@ -2030,6 +2331,7 @@ WHILE NOT QUITREQUESTED()
     ' darueber -- genau daran war der Kasten "Neues Sprite" unsichtbar: er
     ' ging auf, sperrte die Eingabe und war nicht zu sehen.
     IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
+    IF grOffen THEN GUI_DRAW_WINDOW(winGr)
     IF statOffen THEN GUI_DRAW_WINDOW(statDlg)
     GUI_DRAW_TOP()
 
