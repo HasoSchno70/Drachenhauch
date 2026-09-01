@@ -29,6 +29,15 @@ rustc-hash = "2"
 # Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
 # koennen (raylibs CompressData haengt dagegen am graphics-Feature).
 miniz_oxide = "0.8"
+# Animierte GIFs schreiben (IMAGE_SAVE_GIF). raylib kann sie nur LESEN.
+# Pure-Rust (LZW ueber weezl, Farbreduktion ueber color_quant), keine
+# C-Toolchain -> ungated wie die anderen reinen Rust-Crates.
+#
+# BEWUSST eine Crate statt Handarbeit: GIF komprimiert mit LZW, und ein
+# LZW-Schreiber ist die Art Code, die auf den ersten Blick stimmt und in
+# einem Randfall still etwas Falsches liefert -- dieselbe Begruendung wie
+# unten bei den Pruefsummen.
+gif = "0.13"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
 rapier3d = "0.22"

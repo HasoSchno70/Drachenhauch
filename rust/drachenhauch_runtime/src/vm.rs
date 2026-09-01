@@ -7536,6 +7536,50 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
                 gi(a,1,"GETALPHA")? as i32, gi(a,2,"GETALPHA")? as i32)),
             "image_save" => { g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?)?; Value::Nil }
             "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
+            "image_save_gif" => {
+                // Die Bildnummern kommen als ARRAY OF IMAGE (so haelt ein
+                // Programm seine Einzelbilder ohnehin) oder als TUPLE.
+                //
+                // `anzahl` wird VOR dem Umwandeln gebraucht: ein fest
+                // dimensioniertes Feld hat hinter den benutzten Plaetzen NIL
+                // stehen, und die sind keine Bilder. Ohne diese Reihenfolge
+                // scheitert schon `DIM b[16] AS IMAGE` mit drei belegten
+                // Plaetzen -- der Normalfall.
+                let roh: Vec<Value> = match &a[0] {
+                    Value::Array(arr) => arr.borrow().cells.iter().collect(),
+                    Value::Tuple(t) => t.iter().cloned().collect(),
+                    _ => return Err("IMAGE_SAVE_GIF: erwartet ARRAY OF IMAGE".into()),
+                };
+                let anzahl = if a.len() >= 5 { gi(a,4,"IMAGE_SAVE_GIF")? } else { roh.len() as i64 };
+                if anzahl < 1 || anzahl as usize > roh.len() {
+                    return Err(std::format!(
+                        "IMAGE_SAVE_GIF: {} Bilder verlangt, {} vorhanden", anzahl, roh.len()));
+                }
+                let mut bilder = Vec::with_capacity(anzahl as usize);
+                for (i, x) in roh.iter().take(anzahl as usize).enumerate() {
+                    match x {
+                        Value::Int(n) => bilder.push(*n),
+                        Value::Nil => return Err(std::format!(
+                            "IMAGE_SAVE_GIF: Platz {} ist leer -- mit `anzahl` sagen, \
+wie viele Plaetze gelten", i + 1)),
+                        _ => return Err("IMAGE_SAVE_GIF: ARRAY OF IMAGE noetig".into()),
+                    }
+                }
+                let fps = if a.len() >= 3 { need_f(a,2,"IMAGE_SAVE_GIF")? } else { 10.0 };
+                if fps <= 0.0 {
+                    return Err("IMAGE_SAVE_GIF: Bilder je Sekunde muessen > 0 sein".into());
+                }
+                // GIF rechnet in Hundertstelsekunden. Unter 2 legen die
+                // meisten Betrachter still ihre eigene Dauer fest (meist 10) --
+                // dann liefe die Ausgabe LANGSAMER als verlangt, ohne Hinweis.
+                let verz = ((100.0 / fps).round() as i64).clamp(2, 65535) as u16;
+                // `gflag` fehlend = false -- hier ist die Vorgabe aber TRUE
+                // (eine Bewegung, die einmal laeuft und dann steht, ist
+                // selten gemeint), also selbst pruefen.
+                let wdh = if a.len() >= 4 { gflag(a, 3) } else { true };
+                g!().image_save_gif(&bilder, gs(a,1,"IMAGE_SAVE_GIF")?, verz, wdh)?;
+                Value::Nil
+            }
             "image_crop" => Value::Int(g!().image_crop(gi(a,0,"IMAGE_CROP")?, gi(a,1,"IMAGE_CROP")? as i32, gi(a,2,"IMAGE_CROP")? as i32, gi(a,3,"IMAGE_CROP")? as i32, gi(a,4,"IMAGE_CROP")? as i32)?),
             "image_resize_canvas" => {
                 let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };

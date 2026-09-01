@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1551,
+ "count": 1552,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -692,6 +692,7 @@
   "IMAGE_RESIZE_CANVAS": "IMAGE (neu): Bild auf Leinwand w × h ab Offset offx,offy; freie Fläche mit fill (Default schwarz)",
   "IMAGE_ROTATE": "IMAGE (neu, Bounding-Box wächst ggf.)",
   "IMAGE_SAVE": "das Bild in eine Datei schreiben (.png, .bmp, .jpg, .tga)",
+  "IMAGE_SAVE_GIF": "mehrere Bilder als bewegtes GIF schreiben",
   "IMAGE_SCALE": "IMAGE (neu, in w × h) — bilinear geglättet",
   "IMAGE_SCALE_NN": "IMAGE (neu, in w × h) — ohne Interpolation (Nearest-Neighbour), für Pixelgrafik",
   "IMAGE_TINT": "IMAGE (neu, RGB-multipliziert)",
