@@ -458,7 +458,7 @@
   "GUI_CANVAS_Y": "INTEGER — absolute Bildschirmposition der Flaeche (wandert mit dem Fenster)",
   "GUI_CHECKBOX": "GUI_WIDGET — Toggle",
   "GUI_CHECKED": "BOOLEAN — Checkbox-Zustand",
-  "GUI_CLICKED": "BOOLEAN — Button in diesem Frame geklickt?",
+  "GUI_CLICKED": "BOOLEAN — in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, Checkbox, Toggle und Radio",
   "GUI_COLORPICKER": "Sättigungs-/Helligkeitsfeld plus Ton-Streifen",
   "GUI_COLORPICKER_SET": "alpha (0/1) — Deckkraft-Streifen zeigen",
   "GUI_CONFIRM": "BOOLEAN — Rückfrage → TRUE bei Zustimmung",
