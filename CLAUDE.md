@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 1877 | 0,25 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2033 | 0,28 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -75,10 +75,11 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Zeilen, dazu verstreutes mehr.
 >
 > **Und genau das laesst sich seither an EINER Datei ablesen.** Derselbe
-> Pilot steht heute bei 0,25: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
+> Pilot steht heute bei 0,28: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
-> (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten). Nichts daran ist
-> schlechter geworden -- es wurde nur weniger weggelassen.
+> (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2033,
+> mit Kachel-Ansicht und Statistik). Nichts daran ist schlechter geworden --
+> es wurde nur weniger weggelassen.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -146,6 +147,24 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > was darueber hinausgeht, sagt die Statuszeile, statt es still fallen zu
 > lassen. Geprueft wird gegen einen FREMDEN Leser (`_parse_gpl` des
 > Qt-Sprite-Editors) und in der Gegenrichtung gegen dessen Schreiber.
+>
+> **Kachel-Ansicht und Statistik** kamen am 2026-09-01 dazu -- und mit ihnen
+> der bisher schwerste Pilotenfund: **ein gui-Fenster ueber einer
+> Zeichenflaeche war UNSICHTBAR.** `GUI_DRAW` zeichnet Fenster und
+> Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche
+> entsteht per Bauart danach -- das Programm malt selbst hinein. Im Piloten
+> ging der Kasten "Neues Sprite" damit auf, sperrte die Eingabe und war nicht
+> zu sehen: das Programm wirkte eingefroren. Das stand seit dem ersten Tag im
+> gemergten Piloten, und weder ein Test noch ein Bildschirmfoto hat es
+> bemerkt -- niemand hatte je auf [Neu] geklickt und HINGESEHEN. Ein zweites
+> `GUI_DRAW` hilft nicht (es zeichnet Fenster-Hintergrund und
+> Zeichenflaechen neu, also genau das Gemalte); deshalb neu:
+> **`GUI_DRAW_WINDOW(win)`** -- ein Fenster noch einmal, ueber allem, was
+> inzwischen im Bild steht, samt Schleier wenn es das modale ist. Der
+> Schleier liegt jetzt in EINER Routine (`schleier`), damit die zwei Wege
+> nicht auseinanderlaufen. Tests `tests/test_gui_draw_window.py` mit der
+> Gegenprobe IM Test: derselbe Ablauf einmal mit und einmal ohne den Aufruf,
+> geprueft am Punkt in der Fenstermitte.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
