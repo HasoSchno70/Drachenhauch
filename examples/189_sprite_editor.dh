@@ -12,8 +12,9 @@
 '
 '  Was drin ist:
 '    Werkzeuge   Stift, Radierer, Fuellen, Linie, Rechteck, Ellipse,
-'                Spruehen, Pipette, Auswahl, Lasso, Zauberstab --
-'                Rechteck/Ellipse wahlweise gefuellt, Pinsel 1..6 px
+'                Spruehen, Pipette, Auswahl, Lasso, Zauberstab,
+'                Verschieben -- Rechteck/Ellipse wahlweise gefuellt,
+'                Pinsel 1..6 px
 '    Bild        mehrere Einzelbilder, Ebenen (global, wie in Aseprite),
 '                Zwiebelhaut, Spiegeln X/Y beim Zeichnen
 '    Farbe       Farbwaehler + 16er-Palette + Pipette
@@ -21,7 +22,9 @@
 '                (Freiform) und Zauberstab (gleiche Farbe ringsum) fuellen
 '                dieselbe Maske, und ALLES was zeichnet fragt sie. Solange
 '                eine Auswahl steht, trifft kein Strich daneben.
-'                Strg+C/X/V, Entf leert, Strg+D hebt sie auf
+'                Strg+C/X/V, Entf leert, Strg+D hebt sie auf.
+'                Verschieben hebt sie vom Bild AB und setzt sie woanders
+'                wieder auf -- ohne Auswahl die ganze Ebene
 '    Historie    Strg+Z / Strg+Y, 24 Schritte
 '    Dateien     [Sichern]/[Oeffnen] .dhsprite -- das eigene Format MIT
 '                Ebenen: ein Raster-PNG (Spalten = Einzelbilder, Zeilen =
@@ -37,14 +40,15 @@
 '    Vorschau    laufende Wiedergabe mit einstellbarem Tempo
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten):
-'    Verschieben-Werkzeug, .gpl-Paletten, Kachel-Vorschau 3x3, benannte
-'    Animationsbereiche, Zuschneiden/Groesse aendern, Statistik. Das
+'    .gpl-Paletten, Kachel-Vorschau 3x3, benannte Animationsbereiche,
+'    Zuschneiden/Groesse aendern, Statistik. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
 '  Bedienung:
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
-'    P E F L R O Y I S Q Z       Werkzeuge (Q = Lasso, Z = Zauberstab)
+'    P E F L R O Y I S Q Z V     Werkzeuge (Q = Lasso, Z = Zauberstab,
+'                                V = Verschieben)
 '    1..6        Palette 1..6    +/-           Pinsel
 '    Strg+Z/Y    zurueck/vor     Strg+C/X/V    Zwischenablage
 '    Strg+D      Auswahl weg
@@ -113,9 +117,15 @@ CONST WZ_PIPETTE = 7
 CONST WZ_AUSWAHL = 8
 CONST WZ_LASSO = 9
 CONST WZ_ZAUBER = 10
-CONST WZ_ANZ = 11
+CONST WZ_VERSCHIEB = 11
+CONST WZ_ANZ = 12
 
 DIM zieht AS BOOLEAN : zieht = FALSE
+' Mit WELCHEM Werkzeug der Zug begonnen hat. Ein Werkzeugwechsel mitten im
+' Zug (Taste oder Knopf) wuerde sonst den falschen Abschluss ausfuehren --
+' beim Verschieben waere das Datenverlust: das Abgehobene wird nie wieder
+' abgesetzt.
+DIM ziehWz AS INTEGER : ziehWz = 0
 DIM ankerX AS INTEGER : ankerX = 0
 DIM ankerY AS INTEGER : ankerY = 0
 DIM letztX AS INTEGER : letztX = 0
@@ -144,6 +154,20 @@ DIM mnX AS INTEGER : mnX = 0
 DIM mnY AS INTEGER : mnY = 0
 DIM mxX AS INTEGER : mxX = -1
 DIM mxY AS INTEGER : mxY = -1
+
+' Das Abgehobene beim Verschieben: Farbe, Deckkraft und Zugehoerigkeit je
+' Punkt des Ausschnitts. Eine EIGENE Ablage, nicht die der Zwischenablage --
+' ein Verschieben darf nicht wegwerfen, was jemand vorher kopiert hat.
+DIM movF[MAXPKT] AS INTEGER
+DIM movA[MAXPKT] AS INTEGER
+DIM movM[MAXPKT] AS INTEGER
+DIM movX AS INTEGER : movX = 0
+DIM movY AS INTEGER : movY = 0
+DIM movB AS INTEGER : movB = 0
+DIM movH AS INTEGER : movH = 0
+DIM schwebt AS BOOLEAN : schwebt = FALSE
+DIM verX AS INTEGER : verX = 0
+DIM verY AS INTEGER : verY = 0
 
 ' Der gezogene Weg des Lassos, in Bildpunkten.
 DIM lasX[MAXPKT] AS INTEGER
@@ -639,6 +663,84 @@ SUB formPunkte(art AS INTEGER, x0 AS INTEGER, y0 AS INTEGER, _
     END SELECT
 END SUB
 
+' Farbe und Deckkraft wieder zu einer Farbe zusammensetzen. GETPIXEL liefert
+' nur RGB, GETALPHA nur die Deckkraft -- wer beides getrennt aufhebt und
+' spaeter allein die Farbe setzt, macht aus jedem halbdurchsichtigen Punkt
+' einen deckenden. Bei selbst Gemaltem faellt das nie auf, bei einem
+' geladenen Bild mit weichen Raendern sofort.
+FUNCTION mitAlpha(c AS INTEGER, a AS INTEGER) AS INTEGER
+    RETURN RGBA((c \ 65536) MOD 256, (c \ 256) MOD 256, c MOD 256, a)
+END FUNCTION
+
+' -------------------------------------------------------------- Verschieben
+' Die Auswahl (oder, ohne Auswahl, die ganze Ebene) vom Bild ABHEBEN: die
+' Punkte kommen nach movF/movA und werden im Bild geloescht. Deshalb sieht
+' man beim Ziehen ein Loch und nicht eine Kopie -- verschieben heisst
+' verschieben.
+SUB abheben()
+    IF selAn THEN
+        movX = selX : movY = selY : movB = selB : movH = selH
+    ELSE
+        movX = 0 : movY = 0 : movB = gw : movH = gh
+    END IF
+    DIM bild AS IMAGE : bild = ebene[aktBild, aktEb]
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO movH - 1
+        FOR x = 0 TO movB - 1
+            DIM i AS INTEGER : i = y * movB + x
+            IF gewaehlt(movX + x, movY + y) THEN
+                movM[i] = 1
+                movF[i] = GETPIXEL(bild, movX + x, movY + y)
+                movA[i] = GETALPHA(bild, movX + x, movY + y)
+                IF movA[i] > 0 THEN IMAGE_CLEAR(bild, movX + x, movY + y, 1, 1)
+            ELSE
+                movM[i] = 0 : movA[i] = 0
+            END IF
+        NEXT
+    NEXT
+    schwebt = TRUE
+    verX = 0 : verY = 0
+END SUB
+
+' ... und um (verX, verY) versetzt wieder absetzen.
+SUB absetzen()
+    DIM bild AS IMAGE : bild = ebene[aktBild, aktEb]
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM raus AS INTEGER : raus = 0
+    FOR y = 0 TO movH - 1
+        FOR x = 0 TO movB - 1
+            DIM i AS INTEGER : i = y * movB + x
+            IF movM[i] = 1 AND movA[i] > 0 THEN
+                DIM zx AS INTEGER : zx = movX + x + verX
+                DIM zy AS INTEGER : zy = movY + y + verY
+                IF zx >= 0 AND zy >= 0 AND zx < gw AND zy < gh THEN
+                    IMAGE_DRAW_RECT(bild, zx, zy, 1, 1, mitAlpha(movF[i], movA[i]))
+                ELSE
+                    raus = raus + 1
+                END IF
+            END IF
+        NEXT
+    NEXT
+    ' Die Auswahl wandert MIT. Bliebe sie liegen, zeigte sie auf die Stelle,
+    ' wo das Verschobene gerade NICHT mehr ist -- und der naechste Strich
+    ' landete dort.
+    IF selAn THEN
+        maskeBeginn()
+        FOR y = 0 TO movH - 1
+            FOR x = 0 TO movB - 1
+                IF movM[y * movB + x] = 1 THEN maskeAdd(movX + x + verX, movY + y + verY)
+            NEXT
+        NEXT
+        maskeEnde()
+    END IF
+    schwebt = FALSE
+    ' Was ueber den Rand hinausgeschoben wurde, ist weg. Das ist ueblich --
+    ' aber es still zu tun waere es nicht.
+    IF raus > 0 THEN meldung = STR$(raus) + " Punkte ueber den Rand hinaus -- weg"
+END SUB
+
 ' Die Auswahl leeren -- Ausschneiden und Entf teilen sich das. Punktweise,
 ' weil eine Freiform kein Rechteck ist; im schlimmsten Fall (128x128 ganz
 ' gewaehlt) sind das gemessen rund 70 ms, und das genau einmal je Tastendruck.
@@ -898,12 +1000,12 @@ GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne 
 DIM bGif AS GUI_WIDGET     : bGif     = GUI_BUTTON(win, "GIF", 368, 7, 52, 32)
 GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Vorschau-Regler")
 
-' Elf Werkzeuge auf demselben Platz wie vorher neun: die Knopfbreite ist
+' Zwoelf Werkzeuge auf demselben Platz wie vorher neun: die Knopfbreite ist
 ' aus der Zahl gerechnet, damit alles rechts davon (Zurueck/Vor, die
 ' Schalter) stehen bleibt, wo es war.
-CONST WZ_B = 71
+CONST WZ_B = 64
 DIM wzName AS ARRAY OF STRING
-wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Spruehen|Pipette|Auswahl|Lasso|Zauber", "|")
+wzName = SPLIT$("Stift|Radierer|Fuellen|Linie|Rechteck|Ellipse|Spruehen|Pipette|Auswahl|Lasso|Zauber|Schieben", "|")
 DIM wzKnopf[WZ_ANZ] AS GUI_WIDGET
 DIM wx AS INTEGER : wx = 432
 DIM i AS INTEGER
@@ -914,6 +1016,7 @@ NEXT
 GUI_TOOLTIP(wzKnopf[WZ_AUSWAHL], "Rechteck aufziehen (S) -- Klick ohne Zug hebt die Auswahl auf")
 GUI_TOOLTIP(wzKnopf[WZ_LASSO], "Freiform umfahren (Q) -- der Weg schliesst sich von selbst")
 GUI_TOOLTIP(wzKnopf[WZ_ZAUBER], "Zusammenhaengende Flaeche gleicher Farbe waehlen (Z)")
+GUI_TOOLTIP(wzKnopf[WZ_VERSCHIEB], "Die Auswahl versetzen (V) -- ohne Auswahl die ganze Ebene")
 
 DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", wx + 10, 7, 84, 32)
 DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", wx + 98, 7, 56, 32)
@@ -1054,6 +1157,7 @@ WHILE NOT QUITREQUESTED()
         IF KEYHIT(KEY_Y) THEN werkzeug = WZ_SPRUEH
         IF KEYHIT(KEY_Q) THEN werkzeug = WZ_LASSO
         IF KEYHIT(KEY_Z) THEN werkzeug = WZ_ZAUBER
+        IF KEYHIT(KEY_V) THEN werkzeug = WZ_VERSCHIEB
         FOR i = 0 TO 5
             IF KEYHIT(KEY_1 + i) THEN
                 farbe = pal[i]
@@ -1298,6 +1402,7 @@ WHILE NOT QUITREQUESTED()
     ' ------------------------------------------------------- Werkzeuge
     IF drauf AND MOUSE_HIT(0) THEN
         zieht = TRUE
+        ziehWz = werkzeug
         ankerX = tx : ankerY = ty
         letztX = tx : letztY = ty
         SELECT CASE werkzeug
@@ -1332,17 +1437,20 @@ WHILE NOT QUITREQUESTED()
             CASE WZ_ZAUBER
                 zauberMaske(tx, ty)
                 zieht = FALSE
+            CASE WZ_VERSCHIEB
+                schrittBeginn()
+                abheben()
         END SELECT
     END IF
 
     IF zieht AND MOUSEBUTTON(0) THEN
-        SELECT CASE werkzeug
+        SELECT CASE ziehWz
             CASE WZ_STIFT, WZ_RADIER
                 ' Ueber die Linie vom letzten Punkt -- bei schneller Maus
                 ' liegen zwischen zwei Bildern sonst Luecken im Strich.
                 formPunkte(WZ_LINIE, letztX, letztY, tx, ty, FALSE)
                 FOR i = 0 TO pN - 1
-                    punkt(pX[i], pY[i], farbe, werkzeug = WZ_RADIER)
+                    punkt(pX[i], pY[i], farbe, ziehWz = WZ_RADIER)
                 NEXT
                 letztX = tx : letztY = ty
             CASE WZ_SPRUEH
@@ -1353,16 +1461,18 @@ WHILE NOT QUITREQUESTED()
                 NEXT
             CASE WZ_LASSO
                 lassoPunkt(tx, ty)
+            CASE WZ_VERSCHIEB
+                verX = tx - ankerX : verY = ty - ankerY
         END SELECT
     END IF
 
     IF zieht AND NOT MOUSEBUTTON(0) THEN
         zieht = FALSE
-        SELECT CASE werkzeug
+        SELECT CASE ziehWz
             CASE WZ_STIFT, WZ_RADIER, WZ_SPRUEH
                 schrittEnde()
             CASE WZ_LINIE, WZ_RECHT, WZ_ELLIPSE
-                formPunkte(werkzeug, ankerX, ankerY, _
+                formPunkte(ziehWz, ankerX, ankerY, _
                            MAX(0, MIN(gw - 1, tx)), MAX(0, MIN(gh - 1, ty)), _
                            GUI_CHECKED(cbGefuellt))
                 FOR i = 0 TO pN - 1
@@ -1382,6 +1492,9 @@ WHILE NOT QUITREQUESTED()
                 END IF
             CASE WZ_LASSO
                 lassoMaske()
+            CASE WZ_VERSCHIEB
+                absetzen()
+                schrittEnde()
         END SELECT
     END IF
 
@@ -1427,8 +1540,9 @@ WHILE NOT QUITREQUESTED()
                         ' Leere Punkte der Ablage bleiben leer -- ein Ausschnitt
                         ' soll nicht als schwarzer Klotz landen.
                         IF clipA[ay3 * clipB + ax3] > 0 THEN
-                            IMAGE_DRAW_RECT(ebene[aktBild, aktEb], zx + ax3, zy + ay3, _
-                                            1, 1, clipF[ay3 * clipB + ax3])
+                            IMAGE_DRAW_RECT(ebene[aktBild, aktEb], zx + ax3, zy + ay3, 1, 1, _
+                                            mitAlpha(clipF[ay3 * clipB + ax3], _
+                                                     clipA[ay3 * clipB + ax3]))
                         END IF
                     END IF
                 NEXT
@@ -1492,8 +1606,8 @@ WHILE NOT QUITREQUESTED()
     ' Vorschau der laufenden Form -- dieselben Punkte, die gleich ins Bild
     ' geschrieben werden.
     IF zieht AND drauf THEN
-        IF werkzeug = WZ_LINIE OR werkzeug = WZ_RECHT OR werkzeug = WZ_ELLIPSE THEN
-            formPunkte(werkzeug, ankerX, ankerY, tx, ty, GUI_CHECKED(cbGefuellt))
+        IF ziehWz = WZ_LINIE OR ziehWz = WZ_RECHT OR ziehWz = WZ_ELLIPSE THEN
+            formPunkte(ziehWz, ankerX, ankerY, tx, ty, GUI_CHECKED(cbGefuellt))
             FOR i = 0 TO pN - 1
                 IF pX[i] >= 0 AND pY[i] >= 0 AND pX[i] < gw AND pY[i] < gh THEN
                     BOX(ox + pX[i] * zoom, oy + pY[i] * zoom, _
@@ -1503,11 +1617,41 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
 
+    ' Das Abgehobene, waehrend es gezogen wird. Es steht nicht mehr im Bild
+    ' (`abheben` hat es dort geloescht), also ist das hier das Einzige, was
+    ' davon zu sehen ist -- und es sitzt schon dort, wo es beim Loslassen
+    ' landen wird.
+    IF schwebt THEN
+        DIM vsY AS INTEGER
+        DIM vsX AS INTEGER
+        FOR vsY = 0 TO movH - 1
+            FOR vsX = 0 TO movB - 1
+                DIM vi AS INTEGER : vi = vsY * movB + vsX
+                IF movM[vi] = 1 AND movA[vi] > 0 THEN
+                    DIM zx3 AS INTEGER : zx3 = movX + vsX + verX
+                    DIM zy3 AS INTEGER : zy3 = movY + vsY + verY
+                    IF zx3 >= 0 AND zy3 >= 0 AND zx3 < gw AND zy3 < gh THEN
+                        BOX(ox + zx3 * zoom, oy + zy3 * zoom, _
+                            ox + (zx3 + 1) * zoom - 1, oy + (zy3 + 1) * zoom - 1, _
+                            mitAlpha(movF[vi], movA[vi]))
+                    END IF
+                END IF
+            NEXT
+        NEXT
+    END IF
+
     ' Die Auswahl. Zeilenweise in LAEUFEN gezeichnet -- je zusammenhaengendem
     ' Stueck ein Rechteck statt eines je Punkt. Punktweise waeren es im
     ' schlimmsten Fall 16384 Aufrufe, und zwar in JEDEM Bild (gemessen 3 ms);
     ' bei einer Auswahl, die meist am Stueck liegt, sind es so ein paar.
+    '
+    ' Waehrend eines Verschiebens wird sie um denselben Versatz MITgezeichnet:
+    ' die Maske selbst wandert erst beim Absetzen (vorher waere sie bei einem
+    ' Abbruch nicht mehr zurueckzuholen), zu sehen sein muss sie aber dort,
+    ' wo das Abgehobene gerade liegt.
     IF selAn THEN
+        DIM avX AS INTEGER : avX = IIF(schwebt, verX, 0)
+        DIM avY AS INTEGER : avY = IIF(schwebt, verY, 0)
         DIM azY AS INTEGER
         DIM azX AS INTEGER
         FOR azY = selY TO selY + selH - 1
@@ -1520,8 +1664,9 @@ WHILE NOT QUITREQUESTED()
                 azDrin = azX < selX + selB AND gewaehlt(azX, azY)
                 IF azDrin AND azLauf < 0 THEN azLauf = azX
                 IF NOT azDrin AND azLauf >= 0 THEN
-                    BOX(ox + azLauf * zoom, oy + azY * zoom, _
-                        ox + azX * zoom - 1, oy + (azY + 1) * zoom - 1, &H302BC4E8)
+                    BOX(ox + (azLauf + avX) * zoom, oy + (azY + avY) * zoom, _
+                        ox + (azX + avX) * zoom - 1, oy + (azY + avY + 1) * zoom - 1, _
+                        &H302BC4E8)
                     azLauf = -1
                 END IF
             NEXT
@@ -1530,15 +1675,16 @@ WHILE NOT QUITREQUESTED()
         ' Freiform gezogen zeigte er einen Bereich, der gar nicht gewaehlt
         ' ist -- die Flaeche sagt dort schon alles.
         IF istRechteck() THEN
-            RECT(ox + selX * zoom, oy + selY * zoom, _
-                 ox + (selX + selB) * zoom - 1, oy + (selY + selH) * zoom - 1, &HE8C44B)
+            RECT(ox + (selX + avX) * zoom, oy + (selY + avY) * zoom, _
+                 ox + (selX + avX + selB) * zoom - 1, _
+                 oy + (selY + avY + selH) * zoom - 1, &HE8C44B)
         END IF
     END IF
 
     ' Was gerade gezogen wird: beim Rechteck das Gummiband, beim Lasso der
     ' Weg. Die Maske entsteht erst beim Loslassen, also ist das hier das
     ' einzige, was waehrenddessen zu sehen ist.
-    IF zieht AND werkzeug = WZ_AUSWAHL THEN
+    IF zieht AND ziehWz = WZ_AUSWAHL THEN
         DIM gbX AS INTEGER : gbX = MIN(ankerX, MAX(0, MIN(gw - 1, tx)))
         DIM gbY AS INTEGER : gbY = MIN(ankerY, MAX(0, MIN(gh - 1, ty)))
         DIM gbB AS INTEGER : gbB = ABS(MAX(0, MIN(gw - 1, tx)) - ankerX) + 1
@@ -1548,7 +1694,7 @@ WHILE NOT QUITREQUESTED()
         RECT(ox + gbX * zoom, oy + gbY * zoom, _
              ox + (gbX + gbB) * zoom - 1, oy + (gbY + gbH) * zoom - 1, &HE8C44B)
     END IF
-    IF zieht AND werkzeug = WZ_LASSO AND lasN > 1 THEN
+    IF zieht AND ziehWz = WZ_LASSO AND lasN > 1 THEN
         DIM li AS INTEGER
         DIM h2 AS INTEGER : h2 = zoom \ 2
         FOR li = 0 TO lasN - 2

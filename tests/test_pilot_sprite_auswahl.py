@@ -1,4 +1,4 @@
-"""Lasso und Zauberstab im Sprite-Piloten (`examples/189_sprite_editor.dh`).
+"""Auswahl-Werkzeuge des Sprite-Piloten: Lasso, Zauberstab, Verschieben (`examples/189_sprite_editor.dh`).
 
 Der Pilot ist ein Drachenhauch-Programm, also laesst er sich nicht wie ein
 Modul aufrufen -- geprueft wird er so, wie ein Mensch ihn bedient: mit
@@ -45,7 +45,7 @@ MOUSE_BUTTON_UP, MOUSE_BUTTON_DOWN, MOUSE_POSITION = 5, 6, 7
 
 # raylib-Tastencodes (Grossbuchstaben)
 TASTE_P, TASTE_Q, TASTE_Z = ord("P"), ord("Q"), ord("Z")
-TASTE_S = ord("S")
+TASTE_S, TASTE_V_WZ = ord("S"), ord("V")
 TASTE_C, TASTE_D, TASTE_V, TASTE_X = ord("C"), ord("D"), ord("V"), ord("X")
 TASTE_STRG = 341   # raylib KEY_LEFT_CONTROL
 TASTE_ENTF = 261
@@ -85,7 +85,8 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
     END IF
     PRINT "P " + STR$(ox) + " " + STR$(oy) + " " + STR$(zoom) + " " + STR$(werkzeug) + _
           " " + STR$(selN) + " " + STR$(selB) + " " + STR$(selH) + _
-          " " + STR$(prG) + " " + STR$(prD) + " " + STR$(prL)
+          " " + STR$(prG) + " " + STR$(prD) + " " + STR$(prL) + _
+          " " + STR$(selX) + " " + STR$(selY)
 '''
 
 
@@ -341,3 +342,44 @@ def test_ausschneiden_und_einfuegen_nimmt_nur_die_freiform_mit(tmp_path):
     assert letzte[4] == 0, "die Auswahl ist aufgehoben"
     assert letzte[7] == 32, ("eingefuegt gehoert genau das Ausgeschnittene -- "
                              "nicht der ganze Rahmen")
+
+
+# --------------------------------------------------------------- Verschieben
+def test_verschieben_nimmt_auswahl_und_inhalt_mit(tmp_path):
+    """Ein Strich, ein Lasso ueber ein Stueck davon, dann mit V um (5, 4)
+    versetzt. Der Inhalt muss vollstaendig ankommen -- und die MASKE muss
+    mitwandern: bliebe sie liegen, zeigte sie auf die Stelle, wo das
+    Verschobene gerade nicht mehr ist, und der naechste Strich landete dort.
+    """
+    ox, oy, zoom = _geometrie(tmp_path)
+    strich = [_mitte(ox, oy, zoom, x, 8) for x in range(0, 32)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    weg = _dreieck(ox, oy, zoom)
+    ev += _taste(t, TASTE_Q) + _zug(t + 3, weg)
+    t = t + 3 + len(weg) + 2
+    ev += _taste(t, TASTE_V_WZ)
+    ev += _zug(t + 3, [_mitte(ox, oy, zoom, 10, 10), _mitte(ox, oy, zoom, 15, 14)])
+    vorher = _lauf(tmp_path, t + 2, ev)[-1]
+    letzte = _lauf(tmp_path, t + 16, ev)[-1]
+    assert letzte[3] == 11, "V waehlt das Verschieben"
+    assert vorher[10:12] == [2, 2], "das Lasso begann links oben"
+    assert letzte[10:12] == [7, 6], "die Maske wandert um (5, 4) mit"
+    assert (letzte[5], letzte[6]) == (19, 19), "die Form aendert sich dabei nicht"
+    assert letzte[4] == vorher[4], "und ihre Punktzahl auch nicht"
+    assert letzte[7] == 32, "kein Punkt darf beim Verschieben verloren gehen"
+
+
+def test_verschieben_ohne_auswahl_nimmt_die_ganze_ebene(tmp_path):
+    """Ohne Auswahl gilt die ganze Ebene -- und was ueber den Rand geschoben
+    wird, ist weg. Ein Strich ueber die volle Breite, um 10 nach rechts:
+    zehn Punkte fallen heraus."""
+    ox, oy, zoom = _geometrie(tmp_path)
+    strich = [_mitte(ox, oy, zoom, x, 8) for x in range(0, 32)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    ev += _taste(t, TASTE_V_WZ)
+    ev += _zug(t + 3, [_mitte(ox, oy, zoom, 4, 8), _mitte(ox, oy, zoom, 14, 8)])
+    letzte = _lauf(tmp_path, t + 16, ev)[-1]
+    assert letzte[4] == 0, "es entsteht dabei keine Auswahl"
+    assert letzte[7] == 22, "32 minus die zehn ueber den rechten Rand"

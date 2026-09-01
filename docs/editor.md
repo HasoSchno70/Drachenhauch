@@ -167,7 +167,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 | SFX-Generator | 522 | 484 |
 | Partikel-Editor | 802 | 468 |
 | Tilemap-Editor | 2428 | 762 |
-| Sprite-Editor | 7379 | 1608 |
+| Sprite-Editor | 7379 | 1754 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
 Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor waren allein die
@@ -175,9 +175,9 @@ benennbaren nicht portierten Blöcke beim ersten Durchgang 1595 der 7379
 Qt-Zeilen. Was fehlt, steht im Kopfkommentar jedes Piloten.
 
 Am Sprite-Editor lässt sich das an einer einzigen Datei ablesen: 0,14 → 0,17
-(eigenes Format, bewegtes GIF) → 0,22 (Lasso, Zauberstab). Der Faktor wurde mit
-jedem nachgeholten Stück **schlechter**, ohne dass eine Zeile schlechter
-geworden wäre.
+(eigenes Format, bewegtes GIF) → 0,22 (Lasso, Zauberstab) → 0,24
+(Verschieben). Der Faktor wurde mit jedem nachgeholten Stück **schlechter**,
+ohne dass eine Zeile schlechter geworden wäre.
 
 Jeder Eintrag **startet** das Werkzeug — über dieselbe Konsole und denselben
 Stopp-Knopf wie jedes andere Programm, denn es *ist* eines. Darunter öffnet
