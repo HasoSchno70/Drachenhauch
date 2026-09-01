@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2037 | 0,28 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2339 | 0,32 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -78,8 +78,11 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Pilot steht heute bei 0,28: 0,14 (1005 Zeilen) -> 0,17 (1243, mit eigenem
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
-> mit Kachel-Ansicht und Statistik). Nichts daran ist schlechter geworden --
-> es wurde nur weniger weggelassen.
+> mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
+> Groesse aendern und Animationsbereichen). Nichts daran ist schlechter
+> geworden -- es wurde nur weniger weggelassen. Aus 0,17 sind so 0,32
+> geworden, fast das Doppelte, ohne dass sich an der Sprache etwas
+> geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -165,6 +168,22 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > nicht auseinanderlaufen. Tests `tests/test_gui_draw_window.py` mit der
 > Gegenprobe IM Test: derselbe Ablauf einmal mit und einmal ohne den Aufruf,
 > geprueft am Punkt in der Fenstermitte.
+>
+> **Zuschneiden, Groesse aendern und Animationsbereiche** (2026-09-01)
+> brachten die letzten drei Funde. Zwei davon lagen seit dem ersten Tag im
+> gemergten Piloten: (1) die beiden Neben-Fenster ("Neues Sprite",
+> "Groesse aendern") waren nicht nur unsichtbar, sondern auch **nicht
+> anklickbar** -- ein Klick bringt immer sein Fenster nach vorn, und der
+> Klick auf den oeffnenden Knopf war einer auf das bildschirmfuellende
+> Hauptfenster; danach lag es darueber und fing jeden Klick ab. `GUI_FOCUS`
+> auf das erste Feld holt es nach vorn. (2) **`GUI_CLICKED` auf einem
+> Kaestchen war stumm** -- siehe gui unten; der "sichtbar"-Schalter beider
+> Piloten (187 UND 189) war deshalb tot. Zuschneiden geht ueber ALLE Ebenen,
+> auch ausgeblendete: nach der Sichtbarkeit zu gehen wuerde Inhalt
+> wegschneiden, den man gerade nicht sieht. Die Bereiche wandern beim
+> Loeschen eines Bildes mit (`bereicheNachLoeschen`), sonst spielte die
+> Vorschau danach etwas anderes, ohne dass sich sichtbar etwas geaendert
+> haette.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
@@ -269,6 +288,15 @@ Doku `docs/module-gui.md`, Demo `examples/186_farbe_und_datum.dh`, Tests `tests/
 **Dialog IM Fenster** `GUI_DIALOG(titel$, text$[, stil$])` -> GUI_WINDOW, `GUI_ANSWER(dlg)` (0 offen / 1 OK-Ja / 2 Abbrechen-Nein), `GUI_MODAL()`. **NICHT verwechseln mit `GUI_MESSAGE`/`GUI_CONFIRM`** -- das sind die schon vorhandenen NATIVEN, BLOCKIERENDEN OS-Kaesten (rfd, `filedialog.rs`, Feature `dialogs`, im Web-Bau nicht da). `GUI_DIALOG` ist der Kasten im eigenen Thema/Massstab, blockiert NICHT (gui ist ein Polling-Toolkit; ein blockierender Dialog muesste mitten im Bild des Aufrufers eine eigene Zeichenschleife drehen und dessen Layer-/Render-Ziel-Zustand uebernehmen). Die Antwort gilt GENAU EIN BILD, wie `GUI_CLICKED` -- eine Antwort ist ein Ereignis, kein Zustand; danach ist das Fenster zerstoert (Tombstone-Handle bleibt gueltig). Modalitaet wird in `handle_press` UND `menu_input` durchgesetzt (`modal: Option<usize>`), sonst waere es nur ein Fenster obenauf; dazu ein Schleier in `draw` -- ohne sichtbares Zeichen klickt man in den Hintergrund und wundert sich. Stil-Woerter absichtlich dieselben wie bei `GUI_CONFIRM` (`ok`/`janein`). **Falle:** Widget-Koordinaten sind relativ zum INHALTsbereich, die Fensterhoehe nicht -- ohne den `title_h`-Zuschlag rutscht die Knopfreihe unter den Rand. Doku `docs/module-gui.md`, Tests `tests/test_gui_dialog.py` (die Modalitaet mit Gegenprobe: derselbe Klick trifft ohne Dialog). **Ein Fenster ueber einer Zeichenflaeche braucht `GUI_DRAW_WINDOW(win)`** -- `GUI_DRAW` zeichnet Fenster und Zeichenflaechen in EINEM Durchgang, und der Inhalt einer Zeichenflaeche entsteht per Bauart DANACH (das Programm malt selbst hinein). Ohne den zusaetzlichen Aufruf ist ein Dialog mitten auf der Flaeche unsichtbar: er sperrt die Eingabe und ist nicht zu sehen, das Programm wirkt eingefroren. Ein zweites `GUI_DRAW` hilft NICHT (es zeichnet Fenster-Hintergrund und Zeichenflaechen neu). Ein unsichtbares oder zerstoertes Fenster zeichnet nichts, ist aber kein Fehler -- der Aufruf darf unbedingt in der Bildschleife stehen. Tests `tests/test_gui_draw_window.py`. **Kontextmenue und Tooltip liegen ueber ALLEN Fenstern** und haben dasselbe Problem -- der Tooltip folgt der Maus und landet also staendig ueber einer Zeichenflaeche: dafuer `GUI_DRAW_TOP()`, und `GUI_DRAW(FALSE)` laesst die Schicht beim Hauptdurchgang weg. Zweimal zeichnen waere hier KEIN Ersatz: Tooltip und Kontextmenue haben einen halbdurchsichtigen Schlagschatten, der uebereinander dunkler wird -- und zwar nur dort, wo das eigene Zeichnen die erste Fassung nicht zugedeckt hat, also genau an einer Kante. Bei Fenstern (`GUI_DRAW_WINDOW`) bleibt genau das ein bekannter Rest: ein Fenster, das nur teilweise unter dem selbst Gezeichneten liegt, bekommt seinen Glanz dort zweimal.
 
 **Anzeige-Massstab** `GUI_SCALE(faktor)` (0.5..4.0) + `GUI_SCALE_GET()`: alle gui-Masse sind feste Pixel, auf einem 4K-Schirm mit 200 % wurde eine Oberflaeche darum halb so gross wie gedacht. Der Faktor multipliziert JEDE Laenge, die HINEINgeht (Fenster-/Widget-Geometrie, Metriken, die 15 Layout-Konstanten via `sk()`, Spaltenbreiten, Zeilenhoehen, Schriftgroesse); nach aussen bleibt alles LOGISCH (`unsk()` in den Gettern und in `widget_json`/`to_json`) -- sonst wuechse eine `.dhform` bei jedem Speichern um den Faktor weiter. EINZIGE Ausnahme: `GUI_HIT_TEST` spricht Bildschirm-Pixel (die Maus liefert nichts anderes). **Muss vor dem ersten Fenster kommen** -- danach Fehler, weil Bestehendes nur naeherungsweise umzurechnen waere. **Zwei Fallen, die erst das gerenderte Bild zeigte:** (1) `g.text`/`g.text_width` in der Fenster-Chrome (Titel/Menue/Reiter/Popup/Tooltip) kannten den Massstab nicht -> `ctext`/`ctext_width`/`ctext_height`, und die Editier-Helfer massen unskaliert, waehrend `wtext` skaliert zeichnete (Schreibmarke und Auswahl sassen auf halber Strecke) -> Buendel `Mass{size,font}` durch die statischen Helfer. (2) Die senkrechte Zentrierung stand als Literal `(h - 14) / 2` im Code -- bei Massstab 2 sass der Text zu tief und wurde vom Clip-Rechteck abgeschnitten -> `self.wsize(g,wdg)`. `GUI_LOAD`/`GUI_FROM_JSON` umgehen `add_widget` und brauchen den Massstab eigens. Doku `docs/module-gui.md` (Abschnitt Massstab), Tests `tests/test_gui_massstab.py`.
+
+**`GUI_CLICKED` gilt auch fuer Kaestchen, Kippschalter und Radioknoepfe** (seit
+2026-09-01). Vorher war es dort STUMM -- immer FALSE, ohne Fehler; zwei von zwei
+Programmen, die es versucht haben (die Piloten 187 und 189), hatten damit einen
+toten Schalter. Ein Knopf setzt sein Flag beim LOSLASSEN, ein Kaestchen kippt
+schon beim DRUECKEN -- fuer den Abfragenden ist beides "in diesem Bild
+angeklickt", und beides meldet genau ein Bild lang. Der Zustand kommt weiter aus
+`GUI_CHECKED`. Tests `tests/test_gui_clicked_schalter.py` (mit Gegenprobe:
+danebengeklickt meldet nichts).
 
 **Bedienung ohne Maus** (seit 2026-08-30): `TAB`/`SHIFT+TAB` laeuft durch ALLE bedienbaren Widgets (vorher nur TextInput/TextArea -- ein Fenster ohne Textfeld war per Tastatur gar nicht bedienbar); Leertaste/Enter loest aus, Pfeile verstellen Werte bzw. bewegen Auswahlen, `ESC` schliesst eine offene Klappliste. EINE Quelle dafuer ist `Kind::fokussierbar()` -- Tab-Zyklus, Klick-Fokus und Fokus-Ring fragen alle dort. Der Ring (Akzentfarbe, 2 px ausserhalb) wird an EINER Stelle am Ende von `draw_widget` gezeichnet; ohne sichtbaren Fokus waere die Navigation wertlos. Abfragbar mit `GUI_FOCUSED()` (-1 = keins), Gegenstueck zu `GUI_FOCUS`. Weil damit auch Knopf/Kaestchen/Klappliste Fokus fuehren, feuern `on_focus`/`on_blur` dort jetzt ebenfalls -- der Form-Designer bietet sie entsprechend an (`_FOKUS` in formdesigner/document.py). Tests `tests/test_gui_tastatur.py` (echte Tasten via Automation-Wiedergabe, darum in `_SERIELL`). Window-Drag an der Titelleiste, Z-Order (Klick bringt nach vorne), Fokus, Schliessen-Button, **resizeable Fenster** (`GUI_WINDOW_RESIZABLE` — am unteren-rechten Griff ziehbar, `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` als Grenzen; in `.dhform`-JSON als `resizable`/`min_w`/`min_h`/`max_w`/`max_h`) + **Control-Anchoring** (`GUI_SET_ANCHOR(wdg, "lrtb")` — Reflow beim Resize: Widgets kleben an Kanten/dehnen sich; in JSON als `anchor`-Edge-String) + **randlos** (`GUI_WINDOW_CHROME(win, an)` — ohne Titelleiste/Rahmen, damit eine Form das OS-Fenster füllt; der Form-Designer-Run koppelt die Form so ans native OS-Fenster). **Widgets werden auf den Fenster-Innenbereich geclippt.** Cyan-Theme (programmierbar). Konstruktoren/Getter sind `@builtin`, nur `GUI_UPDATE`/`GUI_DRAW` sind `graphics_builtin`. Komplement zum Immediate-Mode-`ui`-Modul (dort `UI_WINDOW_BEGIN/END` + `UI_TABLE` mit `UI_TABLE_SELECTED`/`SET_SELECTED`/`HEADER_CLICK`). Doku `docs/module-gui.md`, Demos `examples/45_gui.dh` + `examples/81_table_select.dh` + **`examples/156_gui_alle_widgets.dh`** (alle 22 Widget-Arten in EINER Vollbild-Anwendung, jedes mit echter Aufgabe: Baum filtert Tabelle, Tabellenzeile fuellt Editor, Regler formen die Kurve auf der Zeichenflaeche -- der schnellste Weg, eine Widget-Art in Aktion zu sehen), Tests `tests/test_gui_*.py`.
 

@@ -64,7 +64,7 @@ IMPORT "gui"
 | `GUI_DRAW([obenauf])` | — | alle Fenster zeichnen (hinten→vorne); `obenauf`=FALSE lässt Kontextmenü und Tooltip weg |
 | `GUI_DRAW_TOP()` | — | nur was über allen Fenstern liegt: offenes Kontextmenü und Tooltip |
 | `GUI_DRAW_WINDOW(win)` | — | EIN Fenster noch einmal zeichnen, über allem, was seit `GUI_DRAW` dazugekommen ist |
-| `GUI_CLICKED(widget)` | BOOLEAN | Button in diesem Frame geklickt? |
+| `GUI_CLICKED(widget)` | BOOLEAN | in diesem Frame angeklickt? Gilt für Button, Menü-Eintrag, **Checkbox, Toggle und Radio** |
 | `GUI_CHECKED(widget)` | BOOLEAN | Checkbox-Zustand |
 | `GUI_VALUE(widget)` | FLOAT | Slider-Wert |
 | `GUI_TEXT(widget)` | STRING | Text (Label/Button/TextInput) |
@@ -575,6 +575,25 @@ gezeichneten Bereichs, wird sein Glanz dort zweimal aufgetragen. Ein Dialog
 mitten auf der Fläche ist davon nicht betroffen.
 
 (Für echte Fenster-Überlappung/Occlusion ein Render-Target nutzen.)
+
+### Wann `GUI_CLICKED` bei einem Schalter meldet
+
+Ein Button setzt sein Flag beim **Loslassen**, eine Checkbox (und Toggle,
+Radio) kippt schon beim **Drücken** — für den Abfragenden ist beides „in
+diesem Frame angeklickt", und in beiden Fällen ist es genau ein Frame lang
+TRUE. Der Zustand selbst kommt weiterhin aus `GUI_CHECKED`:
+
+```basic
+IF GUI_CLICKED(cbSichtbar) THEN
+    ebene_sichtbar = GUI_CHECKED(cbSichtbar)
+END IF
+```
+
+Bis 2026-09-01 blieb `GUI_CLICKED` auf einem Schalter **stumm** — immer
+FALSE, ohne Fehler. Zwei Editor-Piloten (Tilemap und Sprite) hatten dadurch
+denselben toten Schalter: das Häkchen kippte, die Ebene blieb sichtbar. Wer
+mit einer älteren Runtime testet, prüft stattdessen jeden Frame, ob sich
+`GUI_CHECKED` gegenüber dem eigenen Zustand geändert hat.
 
 ## Tabelle
 

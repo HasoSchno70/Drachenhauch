@@ -5006,6 +5006,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if ausloesen {
                     let w = &mut self.windows[wi].widgets[i];
                     w.checked = !w.checked;
+                    // `clicked` auch hier setzen. Vorher blieb GUI_CLICKED auf
+                    // einem Kaestchen STUMM -- immer FALSE, ohne Fehler. Zwei
+                    // von zwei Programmen, die es versucht haben (die Piloten
+                    // 187 und 189), hatten damit einen toten Schalter: das
+                    // Haekchen kippte, aber nichts passierte. Ein Klick auf
+                    // ein Kaestchen IST ein Klick; das Schweigen war der
+                    // Fehler, nicht die Erwartung.
+                    w.clicked = true;
                     let (oc, och) = (w.on_click.clone(), w.on_change.clone());
                     if let Some(f) = oc { self.pending.push(f); }
                     if let Some(f) = och { self.pending.push(f); }
@@ -5014,6 +5022,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::Radio => {
                 if ausloesen && !self.windows[wi].widgets[i].checked {
                     self.select_radio(wi, i);
+                    self.windows[wi].widgets[i].clicked = true;   // wie beim Kaestchen
                     let w = &self.windows[wi].widgets[i];
                     let (oc, och) = (w.on_click.clone(), w.on_change.clone());
                     if let Some(f) = oc { self.pending.push(f); }
@@ -5278,6 +5287,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::Checkbox => {
                 let w = &mut self.windows[win].widgets[i];
                 w.checked = !w.checked;
+                // Auch hier `clicked`. Ein Knopf setzt es beim LOSLASSEN
+                // (ueber press_origin), ein Kaestchen kippt schon beim
+                // Druecken -- fuer den Abfragenden ist beides "in diesem
+                // Bild angeklickt".
+                w.clicked = true;
                 let oc = w.on_click.clone();
                 let och = w.on_change.clone();
                 if let Some(f) = oc { self.pending.push(f); }
@@ -5287,6 +5301,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::Toggle => {
                 let w = &mut self.windows[win].widgets[i];
                 w.checked = !w.checked;
+                w.clicked = true;
                 let (oc, och) = (w.on_click.clone(), w.on_change.clone());
                 if let Some(f) = oc { self.pending.push(f); }
                 if let Some(f) = och { self.pending.push(f); }
@@ -5321,6 +5336,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let was = self.windows[win].widgets[i].checked;
                 self.select_radio(win, i);
                 if !was {
+                    self.windows[win].widgets[i].clicked = true;
                     let w = &self.windows[win].widgets[i];
                     let oc = w.on_click.clone(); let och = w.on_change.clone();
                     if let Some(f) = oc { self.pending.push(f); }
