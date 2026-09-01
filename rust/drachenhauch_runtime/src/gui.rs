@@ -5344,18 +5344,34 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     // --- Draw ---
-    pub fn draw(&self, g: &mut Graphics) {
+    /// Alle Fenster zeichnen. `obenauf` = FALSE laesst die Schicht weg, die
+    /// ueber ALLEN Fenstern liegt (offenes Kontextmenue, Tooltip) -- fuer
+    /// Programme, die danach noch selbst malen und sie mit `draw_top` wieder
+    /// aufsetzen.
+    ///
+    /// Warum nicht einfach zweimal zeichnen: Tooltip und Kontextmenue haben
+    /// einen halbdurchsichtigen Schlagschatten. Zweimal uebereinander ist er
+    /// dunkler -- und zwar nur DORT, wo das eigene Zeichnen die erste Fassung
+    /// nicht zugedeckt hat. Genau an einer Kante also, an der ein Tooltip oft
+    /// liegt, weil er der Maus folgt.
+    pub fn draw(&self, g: &mut Graphics, obenauf: bool) {
         for &wi in &self.z_order {
             if self.modal == Some(wi) { self.schleier(g); }
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
+        if obenauf { self.draw_top(g); }
+    }
+
+    /// Was ueber allen Fenstern liegt: ein offenes Kontextmenue und der
+    /// Tooltip (GUI_DRAW_TOP).
+    pub fn draw_top(&self, g: &mut Graphics) {
         // Kontextmenue ueber ALLEM (nach allen Fenstern).
         if let Some((wi, mi, cx, cy)) = self.context_open {
             if self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
                 self.draw_items_popup(g, wi, mi, cx, cy);
             }
         }
-        // Tooltip ganz zuletzt (ueber allem), wenn die Maus lange genug ruht.
+        // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
         self.draw_tooltip(g);
     }
 
