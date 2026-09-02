@@ -35,7 +35,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
-> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 984 | 0,41 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1254 | 0,52 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
@@ -48,13 +48,13 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Qt-Fassung ihre Vorschau von Hand (`paintEvent`, alle fuenf
 > Darstellungsarten in QPainter), die Drachenhauch-Fassung ruft
 > `PARTICLE_DRAW` -- rund 150 Zeilen Ersparnis kommen allein daher. Beim
-> Tilemap-Editor ist die 0,41 aus demselben Grund zu guenstig, nur
-> schrumpfend: nicht portiert sind noch Objekt-Ebenen und mehrere Tilesets.
-> **Eine genaue Restzahl gibt es dafuer nicht mehr** -- der
+> Tilemap-Editor ist die 0,52 aus demselben Grund zu guenstig, nur
+> schrumpfend: nicht portiert sind noch mehrere Tilesets und das Umsortieren
+> der Ebenen. **Eine genaue Restzahl gibt es dafuer nicht mehr** -- der
 > Qt-Eigenschaften-Dialog (167 Zeilen) bedient Kacheln UND Objekte, und
-> portiert ist davon nur die Kachel-Haelfte; sauber aufteilen laesst er sich
-> nicht. Die Zahl lag bei 620 (Faktor 0,42 gegen den Rest), als auch
-> GB-Code-Export und Eigenschaften noch fehlten.
+> beide Haelften sind inzwischen da, nur nicht als EIN Dialog. Die Zahl lag
+> bei 620 (Faktor 0,42 gegen den Rest), als GB-Code-Export,
+> Eigenschaften und Objekt-Ebenen noch alle fehlten.
 > Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
 > dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
 > Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
@@ -85,6 +85,24 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > eine Frage, die man schon kennt) -- dafuer neu `TILED_TILE_PROP_KEYS` und
 > `TILED_OBJECT_PROP_KEYS`, sortiert, weil eine Liste aus einer HashMap sich
 > sonst bei jedem Auffrischen neu mischt.
+>
+> **Objekt-Ebenen kamen einen Tag spaeter** und machten aus derselben
+> Zeichenflaeche ein zweites Werkzeug: Ziehen legt ein Rechteck an, ein Klick
+> einen Punkt, ein Klick auf ein vorhandenes waehlt es aus (Name, Typ und
+> beliebige Eigenschaften daneben, Entf loescht). **Die Ebenenart entscheidet,
+> was die Maus tut** -- eine zweite Werkzeugleiste waere ein Schalter, den man
+> vergisst umzulegen. Drei Dinge daran waren nicht offensichtlich:
+> (1) `TILED_TILE_AT` auf einer Objekt-Ebene ist ein FEHLER, kein leeres
+> Ergebnis -- die Zeichenschleife, die Nummern-Anzeige, die Zwischenablage und
+> das Entf fuer die Kachel-Auswahl mussten alle eigens ausgenommen werden, und
+> jede dieser Stellen brachte das Programm zum Abbruch statt zu einem falschen
+> Bild. (2) Ein Rueckgaengig gehoert zu SEINER Ebene, und weil
+> `verlaufAnwenden` dorthin zurueckschaltet, muss die linke Spalte mitgehen
+> (`verlaufAnzeige`) -- sonst zeigt sie die Bloecke der vorigen Ebene, waehrend
+> gemalt wird. Rueckgaengig deckt weiterhin nur KACHELN ab; ein geloeschtes
+> Objekt ist weg. (3) `DIM blockA[7] AS GUI_WIDGET` muss mit Groesse
+> deklariert werden -- ein Feld-Literal aus Widget-Handles wird als
+> `ARRAY OF INTEGER` gedeutet und dann abgelehnt.
 >
 > **Der dritte Pilot war der erste aus einer anderen Familie**: kein
 > Regler-Editor mit Vorschau, sondern Werkzeuge mit Zugbewegung, eine

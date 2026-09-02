@@ -32,7 +32,9 @@ _DHRT = _find_dhrt()
 pytestmark = [pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut"),
               pytest.mark.seriell]
 
+KEY_UP, KEY_DOWN = 1, 2
 MOUSE_BUTTON_UP, MOUSE_BUTTON_DOWN, MOUSE_POSITION = 5, 6, 7
+TASTE_ENTF = 261
 
 # Nur was dieser Test braucht: die Lage des Knopfes und die Kartenmasse.
 _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode)) + _
@@ -41,10 +43,20 @@ _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode
           " " + STR$(GUI_GET_X(bPropSetz)) + " " + STR$(GUI_GET_Y(bPropSetz)) + _
           " " + STR$(GUI_GET_X(bPropWeg)) + " " + STR$(GUI_GET_Y(bPropWeg)) + _
           " " + STR$(GUI_GET_X(lstProp)) + " " + STR$(GUI_GET_Y(lstProp)) + _
-          " " + STR$(gewaehlt)
+          " " + STR$(gewaehlt) + _
+          " " + STR$(GUI_GET_X(bObjEbene)) + " " + STR$(GUI_GET_Y(bObjEbene)) + _
+          " " + STR$(GUI_GET_X(bObjWeg)) + " " + STR$(GUI_GET_Y(bObjWeg)) + _
+          " " + STR$(GUI_GET_X(bObjUeb)) + " " + STR$(GUI_GET_Y(bObjUeb)) + _
+          " " + STR$(GUI_GET_X(lstObj)) + " " + STR$(GUI_GET_Y(lstObj)) + _
+          " " + STR$(IIF(istObjEbene(), 1, 0)) + " " + STR$(objSel) + _
+          " " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + _
+          " " + STR$(GUI_CANVAS_X(leinwand)) + " " + STR$(GUI_CANVAS_Y(leinwand)) + _
+          " " + STR$(zoom) + " " + STR$(TILED_LAYER_COUNT(karte))
 '''
 _FELDER = ("codeX codeY kb kh zell solidX solidY setzX setzY "
-           "wegX wegY propX propY gewaehlt").split()
+           "wegX wegY propX propY gewaehlt "
+           "objEbX objEbY objWegX objWegY objUebX objUebY lstObjX lstObjY "
+           "istObj objSel objAnz cvX cvY zoom ebenen").split()
 
 _DIALOG_CODE = 'FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")'
 
@@ -244,3 +256,118 @@ def test_die_eigenschaften_gehoeren_der_gewaehlten_kachel(tmp_path):
     assert proben[-1]["gewaehlt"] == 1, "die zweite Kachel ist gewaehlt"
     assert _eigenschaften_von(tmp_path, 1) == {"art": "wasser"}
     assert _eigenschaften_von(tmp_path, 0) == {}, "Kachel 0 bleibt unberuehrt"
+
+
+# ----------------------------------------------------------- Objekt-Ebenen
+_OBJ_NAME = 'DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))'
+_OBJ_NEU = 'DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))'
+
+
+def _mit_objnamen(name, typ="spawn", ebene="spawns"):
+    """Die drei Eingabefelder durch feste Werte ersetzen -- aufgezeichnete
+    Eingabe erreicht sie nicht."""
+    return {
+        _OBJ_NEU: 'DIM on2 AS STRING : on2 = "%s"' % ebene,
+        _OBJ_NAME: 'DIM nm3 AS STRING : nm3 = "%s"' % name,
+        'TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)': '"%s", nx, ny, nw, nh)' % typ,
+        _DIALOG_CODE: '"raus.dh"',
+    }
+
+
+def _karte_punkt(geo, px, py):
+    """Karten-Punkt -> Bildschirm. Ohne Verschiebung, also direkt."""
+    return geo["cvX"] + px * geo["zoom"], geo["cvY"] + py * geo["zoom"]
+
+
+def _ziehen(frame, x1, y1, x2, y2):
+    return [(frame, MOUSE_POSITION, x1, y1),
+            (frame + 1, MOUSE_POSITION, x1, y1),
+            (frame + 1, MOUSE_BUTTON_DOWN, 0),
+            (frame + 2, MOUSE_POSITION, x2, y2),
+            (frame + 2, MOUSE_BUTTON_DOWN, 0),
+            (frame + 3, MOUSE_POSITION, x2, y2),
+            (frame + 4, MOUSE_BUTTON_UP, 0)]
+
+
+def _objekte_von(tmp_path, ebene="spawns"):
+    """Die Objekte, gelesen vom FREMDEN Leser."""
+    from drachenhauch.tilemap.document import TileMapDoc, ObjectLayer
+    doc = TileMapDoc.load_json(tmp_path / "raus.json")
+    l = next(l for l in doc.layers if isinstance(l, ObjectLayer) and l.name == ebene)
+    return l.objects
+
+
+def test_objekt_ebene_anlegen_schaltet_den_block_um(tmp_path):
+    """Beide Bloecke liegen auf demselben Platz -- welcher zu sehen ist,
+    entscheidet die Art der Ebene. Ohne das waere die Spalte laenger als der
+    Schirm, und auf einer Objektebene staenden Kachel-Eigenschaften herum,
+    die dort nichts bewirken."""
+    geo = _lauf(tmp_path, 6)[-1]
+    assert geo["istObj"] == 0, "die Startebene ist eine Kachelebene"
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    letzte = _lauf(tmp_path, 20, ev, dialoge=_mit_objnamen("held"))[-1]
+    assert letzte["istObj"] == 1 and letzte["ebenen"] == 2
+    assert letzte["objAnz"] == 0
+
+
+def test_ziehen_legt_ein_rechteck_an(tmp_path):
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    ev += _ziehen(10, *_karte_punkt(geo, 16, 16), *_karte_punkt(geo, 48, 32))
+    ev += _klick(20, geo["codeX"] + 52, geo["codeY"] + 16)
+    letzte = _lauf(tmp_path, 40, ev, dialoge=_mit_objnamen("held"))[-1]
+    assert letzte["objAnz"] == 1
+    obj = _objekte_von(tmp_path)
+    assert len(obj) == 1
+    assert (obj[0].x, obj[0].y, obj[0].width, obj[0].height) == (16, 16, 32, 16)
+    assert obj[0].name == "held" and obj[0].type == "spawn"
+
+
+def test_klicken_ohne_zug_legt_einen_punkt_an(tmp_path):
+    """In Tiled ist ein Objekt mit Breite und Hoehe 0 ein PUNKT -- ein Klick
+    legt also bewusst einen an, keinen unsichtbaren Kasten. Der fremde Leser
+    sagt genau das (`is_point`)."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    ev += _klick(10, *_karte_punkt(geo, 32, 32))
+    ev += _klick(18, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 36, ev, dialoge=_mit_objnamen("marke", typ="trigger"))
+    obj = _objekte_von(tmp_path)
+    assert len(obj) == 1 and obj[0].is_point()
+    assert (obj[0].x, obj[0].y) == (32, 32)
+
+
+def test_klick_auf_ein_objekt_waehlt_es_statt_ein_neues_anzulegen(tmp_path):
+    """Sonst legte jeder Versuch, eins anzufassen, ein weiteres darueber --
+    und man kaeme nie wieder an das erste heran."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    ev += _ziehen(10, *_karte_punkt(geo, 16, 16), *_karte_punkt(geo, 48, 48))
+    ev += _klick(20, *_karte_punkt(geo, 32, 32))       # mitten hinein
+    letzte = _lauf(tmp_path, 36, ev, dialoge=_mit_objnamen("held"))[-1]
+    assert letzte["objAnz"] == 1, "kein zweites Objekt"
+    assert letzte["objSel"] == 0, "sondern das vorhandene gewaehlt"
+
+
+def test_entf_entfernt_das_gewaehlte_objekt(tmp_path):
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    ev += _ziehen(10, *_karte_punkt(geo, 16, 16), *_karte_punkt(geo, 48, 48))
+    ev += [(20, KEY_DOWN, TASTE_ENTF), (21, KEY_UP, TASTE_ENTF)]
+    letzte = _lauf(tmp_path, 36, ev, dialoge=_mit_objnamen("held"))[-1]
+    assert letzte["objAnz"] == 0 and letzte["objSel"] == -1
+
+
+def test_die_objekte_landen_in_der_datei(tmp_path):
+    """Der ganze Weg: anlegen, speichern, und der Qt-Editor findet sie --
+    mit Name, Typ und Rechteck."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["objEbX"] + 70, geo["objEbY"] + 14)
+    ev += _ziehen(10, *_karte_punkt(geo, 0, 0), *_karte_punkt(geo, 16, 16))
+    ev += _ziehen(20, *_karte_punkt(geo, 32, 32), *_karte_punkt(geo, 64, 48))
+    ev += _klick(30, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 50, ev, dialoge=_mit_objnamen("gegner", typ="feind"))
+    obj = _objekte_von(tmp_path)
+    assert len(obj) == 2
+    assert all(o.name == "gegner" and o.type == "feind" for o in obj)
+    assert sorted((o.x, o.y) for o in obj) == [(0, 0), (32, 32)]

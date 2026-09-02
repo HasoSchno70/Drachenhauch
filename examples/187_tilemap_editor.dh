@@ -25,10 +25,15 @@
 '                als Tiled-JSON und das Tileset-Bild -- alle drei unter
 '                demselben Namen, damit keins ins Leere zeigt
 '
+'    Objekte     Objekt-Ebenen fuer Spawns, Trigger und Zonen: ziehen legt
+'                ein Rechteck an, klicken einen PUNKT (Tiled: Breite und
+'                Hoehe 0), ein Klick auf ein vorhandenes waehlt es aus.
+'                Name und Typ aendern, Entf entfernt
+'
 '  Was NICHT drin ist (wie bei den anderen Piloten offen gesagt):
-'    Objekt-Ebenen, mehrere Tilesets und das Umsortieren von Ebenen.
-'    Rueckgaengig deckt KACHEL-Aenderungen ab, nicht das Anlegen/Loeschen
-'    von Ebenen und nicht die Kachel-Eigenschaften.
+'    mehrere Tilesets und das Umsortieren von Ebenen. Rueckgaengig deckt
+'    KACHEL-Aenderungen ab, nicht das Anlegen/Loeschen von Ebenen, nicht die
+'    Kachel-Eigenschaften und nicht die Objekte.
 '
 '  [ESC] Ende
 ' ============================================================
@@ -120,6 +125,15 @@ DIM uAnz AS INTEGER : uAnz = 0         ' aufgezeichnete Schritte
 DIM uPos AS INTEGER : uPos = 0         ' davon geltend (Rest = wiederholbar)
 DIM puffer[MAXZELLEN] AS INTEGER
 
+' Objekt-Ebenen. Der Verlauf (Strg+Z) fasst sie NICHT an -- er speichert das
+' Kachelfeld einer Ebene, und eine Objektebene hat keins.
+DIM objSel AS INTEGER : objSel = -1    ' gewaehltes Objekt der aktiven Ebene
+DIM objZieht AS BOOLEAN : objZieht = FALSE
+DIM objAx AS INTEGER : objAx = 0       ' Anker des Zugs in KARTEN-Punkten
+DIM objAy AS INTEGER : objAy = 0
+DIM objBx AS INTEGER : objBx = 0
+DIM objBy AS INTEGER : objBy = 0
+
 ' ============================================================ Hilfsmittel
 
 FUNCTION basisGid() AS INTEGER
@@ -196,10 +210,21 @@ SUB verlaufAnwenden(s AS INTEGER, nachher AS BOOLEAN)
     geaendert = TRUE
 END SUB
 
+' Ein Schritt gehoert zu SEINER Ebene, und `verlaufAnwenden` schaltet
+' dorthin zurueck -- die Anzeige muss also mit. Ohne das zeigte die linke
+' Spalte nach einem Strg+Z die Bloecke der vorigen Ebene.
+SUB verlaufAnzeige()
+    objSel = -1
+    listeAuffrischen()
+    objListeAuffrischen()
+    bloeckeUmschalten()
+END SUB
+
 SUB zurueck()
     IF uPos > 0 THEN
         uPos = uPos - 1
         verlaufAnwenden((uStart + uPos) MOD UNDO_MAX, FALSE)
+        verlaufAnzeige()
     END IF
 END SUB
 
@@ -207,6 +232,7 @@ SUB wieder()
     IF uPos < uAnz THEN
         verlaufAnwenden((uStart + uPos) MOD UNDO_MAX, TRUE)
         uPos = uPos + 1
+        verlaufAnzeige()
     END IF
 END SUB
 
@@ -270,11 +296,21 @@ DIM bEbUm AS GUI_WIDGET   : bEbUm   = GUI_BUTTON(win, "Umbenennen", 102, y, 116,
 DIM bEbWeg AS GUI_WIDGET  : bEbWeg  = GUI_BUTTON(win, "Weg", 222, y, 54, 28)
 y = y + 36
 DIM cbSicht AS GUI_WIDGET : cbSicht = GUI_CHECKBOX(win, "sichtbar", 12, y, TRUE)
+DIM bObjEbene AS GUI_WIDGET
+bObjEbene = GUI_BUTTON(win, "Objekt-Ebene", 126, y - 6, 150, 28)
+GUI_TOOLTIP(bObjEbene, "Eine Ebene fuer Spawns, Trigger und Zonen -- ohne Kacheln")
 y = y + 32
 
-' Eigenschaften der GEWAEHLTEN Palettenkachel -- sie gehoeren dem Tileset,
-' nicht der Karte, gelten also fuer jedes Vorkommen dieser Kachel.
-lbl = GUI_LABEL(win, "Eigenschaften der Kachel", 12, y) : y = y + 22
+' Ab hier zwei Bloecke auf DEMSELBEN Platz: welcher zu sehen ist, entscheidet
+' die Art der aktiven Ebene. Untereinander waere die Spalte laenger als der
+' Schirm -- und sinnvoll ist ohnehin immer nur einer: auf einer Kachelebene
+' gibt es keine Objekte, auf einer Objektebene keine Kacheln.
+DIM blockY AS INTEGER : blockY = y
+
+' --- Block A: Eigenschaften der GEWAEHLTEN Palettenkachel. Sie gehoeren dem
+' Tileset, nicht der Karte, gelten also fuer jedes Vorkommen dieser Kachel.
+DIM lblProp AS GUI_WIDGET
+lblProp = GUI_LABEL(win, "Eigenschaften der Kachel", 12, y) : y = y + 22
 DIM cbSolid AS GUI_WIDGET : cbSolid = GUI_CHECKBOX(win, "solid", 12, y, FALSE)
 GUI_TOOLTIP(cbSolid, "Die haeufigste Eigenschaft -- genau sie fragt tile_collide ab")
 y = y + 28
@@ -287,6 +323,33 @@ y = y + 34
 DIM bPropSetz AS GUI_WIDGET : bPropSetz = GUI_BUTTON(win, "Setzen", 12, y, 100, 28)
 DIM bPropWeg AS GUI_WIDGET : bPropWeg = GUI_BUTTON(win, "Weg", 116, y, 80, 28)
 GUI_TOOLTIP(bPropWeg, "Die in der Liste gewaehlte Eigenschaft entfernen")
+
+' --- Block B: die Objekte der aktiven Objekt-Ebene.
+y = blockY
+DIM lblObj AS GUI_WIDGET
+lblObj = GUI_LABEL(win, "Objekte  (ziehen legt eins an)", 12, y) : y = y + 22
+DIM lstObj AS GUI_WIDGET
+lstObj = GUI_LISTBOX(win, 12, y, LINKS - 24, 110, SPLIT$("", "|"))
+y = y + 118
+DIM edObjName AS GUI_WIDGET : edObjName = GUI_TEXTINPUT(win, 12, y, 130, 28, "held")
+DIM edObjTyp AS GUI_WIDGET : edObjTyp = GUI_TEXTINPUT(win, 148, y, 128, 28, "spawn")
+GUI_TOOLTIP(edObjName, "Name des NAECHSTEN Objekts -- und mit [Uebernehmen] auch des gewaehlten")
+y = y + 34
+DIM bObjUeb AS GUI_WIDGET : bObjUeb = GUI_BUTTON(win, "Uebernehmen", 12, y, 130, 28)
+DIM bObjWeg AS GUI_WIDGET : bObjWeg = GUI_BUTTON(win, "Objekt weg", 148, y, 128, 28)
+
+' Die beiden Bloecke als Listen -- so laeuft das Umschalten ueber EINE
+' Schleife, und ein spaeter dazukommendes Widget wird nicht vergessen.
+' Platzweise gefuellt, nicht als Feld-Literal: `[a, b, c]` aus Widget-Nummern
+' kommt als ARRAY OF INTEGER heraus und passt dann nicht in ein
+' ARRAY OF GUI_WIDGET -- der Fehler faellt erst zur Laufzeit auf.
+DIM blockA[7] AS GUI_WIDGET
+blockA[0] = lblProp : blockA[1] = cbSolid : blockA[2] = lstProp
+blockA[3] = edKey : blockA[4] = edWert : blockA[5] = bPropSetz
+blockA[6] = bPropWeg
+DIM blockB[6] AS GUI_WIDGET
+blockB[0] = lblObj : blockB[1] = lstObj : blockB[2] = edObjName
+blockB[3] = edObjTyp : blockB[4] = bObjUeb : blockB[5] = bObjWeg
 
 ' --------------------------------------------------------- Karten-Flaeche
 DIM leinwand AS GUI_WIDGET
@@ -307,6 +370,68 @@ DIM spH AS GUI_WIDGET  : spH = GUI_SPINNER(winNeu, 110, 48, 160, 4, MAXH, 30)
 DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 30)
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winNeu, FALSE)
+
+' ======================================================== Objekt-Ebenen
+
+FUNCTION istObjEbene() AS BOOLEAN
+    RETURN TILED_LAYER_TYPE(karte, ebene) = "object"
+END FUNCTION
+
+FUNCTION ebenenName$() AS STRING
+    RETURN TILED_LAYER_NAME(karte, ebene)
+END FUNCTION
+
+' Welcher der beiden Bloecke zu sehen ist. EINE Stelle dafuer -- sonst
+' bleibt beim naechsten neuen Widget eins von beiden stehen.
+SUB bloeckeUmschalten()
+    DIM obj AS BOOLEAN : obj = istObjEbene()
+    DIM w AS GUI_WIDGET
+    FOR EACH w IN blockA
+        GUI_SET_VISIBLE(w, NOT obj)
+    NEXT
+    FOR EACH w IN blockB
+        GUI_SET_VISIBLE(w, obj)
+    NEXT
+END SUB
+
+SUB objListeAuffrischen()
+    IF NOT istObjEbene() THEN
+        GUI_SET_LISTBOX(lstObj, SPLIT$("", "|"))
+        RETURN
+    END IF
+    DIM nm AS STRING : nm = ebenenName$()
+    DIM n AS INTEGER : n = TILED_OBJECT_COUNT(karte, nm)
+    DIM zeilen[MAX(n, 1)] AS STRING
+    zeilen[0] = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM t AS STRING : t = TILED_OBJECT_TYPE(karte, nm, i)
+        zeilen[i] = TILED_OBJECT_NAME(karte, nm, i) + _
+                    IIF(t = "", "", "  [" + t + "]") + "   " + _
+                    STR$(INT(TILED_OBJECT_X(karte, nm, i))) + "," + _
+                    STR$(INT(TILED_OBJECT_Y(karte, nm, i)))
+    NEXT
+    GUI_SET_LISTBOX(lstObj, zeilen)
+    IF objSel >= 0 AND objSel < n THEN GUI_LISTBOX_SET_SELECTED(lstObj, objSel)
+END SUB
+
+' Das Objekt unter einem Kartenpunkt -- das ZULETZT angelegte gewinnt, weil
+' es auch oben drauf gezeichnet wird.
+FUNCTION objektBei(px AS INTEGER, py AS INTEGER) AS INTEGER
+    IF NOT istObjEbene() THEN RETURN -1
+    DIM nm AS STRING : nm = ebenenName$()
+    DIM i AS INTEGER
+    FOR i = TILED_OBJECT_COUNT(karte, nm) - 1 TO 0 STEP -1
+        DIM ox AS INTEGER : ox = INT(TILED_OBJECT_X(karte, nm, i))
+        DIM oy AS INTEGER : oy = INT(TILED_OBJECT_Y(karte, nm, i))
+        ' Ein Punkt-Objekt (Breite 0) braucht trotzdem eine Trefferflaeche,
+        ' sonst laesst es sich nie wieder anklicken.
+        DIM ow AS INTEGER : ow = MAX(INT(TILED_OBJECT_WIDTH(karte, nm, i)), 6)
+        DIM oh AS INTEGER : oh = MAX(INT(TILED_OBJECT_HEIGHT(karte, nm, i)), 6)
+        IF px >= ox AND px < ox + ow AND py >= oy AND py < oy + oh THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
 
 ' =================================================== Kachel-Eigenschaften
 
@@ -387,7 +512,8 @@ SUB listeAuffrischen()
     DIM k AS INTEGER
     FOR k = 0 TO n - 1
         IF TILED_LAYER_VISIBLE(karte, k) THEN
-            namen[k] = TILED_LAYER_NAME(karte, k)
+            namen[k] = IIF(TILED_LAYER_TYPE(karte, k) = "object", "[Obj] ", "") + _
+                       TILED_LAYER_NAME(karte, k)
         ELSE
             namen[k] = "(aus)  " + TILED_LAYER_NAME(karte, k)
         END IF
@@ -572,6 +698,8 @@ END SUB
 neueKarte(kb, kh)
 listeAuffrischen()
 eigenschaftenAuffrischen()
+objListeAuffrischen()
+bloeckeUmschalten()
 
 DIM neuOffen AS BOOLEAN : neuOffen = FALSE
 DIM meldung AS STRING : meldung = ""
@@ -621,6 +749,50 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O)) THEN oeffnen()
     IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S)) THEN speichern()
+    ' ------------------------------------------------------- Objekt-Ebenen
+    IF GUI_CLICKED(bObjEbene) THEN
+        DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+        IF on2 = "" THEN on2 = "Objekte" + STR$(TILED_LAYER_COUNT(karte) + 1)
+        TRY
+            ebene = TILED_ADD_OBJECT_LAYER(karte, on2)
+            objSel = -1
+            geaendert = TRUE
+            listeAuffrischen()
+            objListeAuffrischen()
+            bloeckeUmschalten()
+            meldung = "Objekt-Ebene '" + on2 + "' angelegt"
+        CATCH e
+            meldung = e
+        END TRY
+    END IF
+    IF istObjEbene() THEN
+        DIM osel AS INTEGER : osel = GUI_LISTBOX_SELECTED(lstObj)
+        IF osel >= 0 AND osel <> objSel AND _
+           osel < TILED_OBJECT_COUNT(karte, ebenenName$()) THEN
+            objSel = osel
+            ' Die Felder folgen der Auswahl -- sonst muesste man zum Aendern
+            ' alles noch einmal eintippen.
+            GUI_SET_TEXT(edObjName, TILED_OBJECT_NAME(karte, ebenenName$(), objSel))
+            GUI_SET_TEXT(edObjTyp, TILED_OBJECT_TYPE(karte, ebenenName$(), objSel))
+        END IF
+        IF GUI_CLICKED(bObjUeb) AND objSel >= 0 THEN
+            TILED_OBJECT_SET_NAME(karte, ebenenName$(), objSel, TRIM$(GUI_TEXT(edObjName)))
+            TILED_OBJECT_SET_TYPE(karte, ebenenName$(), objSel, TRIM$(GUI_TEXT(edObjTyp)))
+            geaendert = TRUE
+            objListeAuffrischen()
+            meldung = "Objekt " + STR$(objSel) + " geaendert"
+        END IF
+        IF GUI_CLICKED(bObjWeg) AND objSel >= 0 THEN
+            TILED_REMOVE_OBJECT(karte, ebenenName$(), objSel)
+            ' Die Nummern dahinter ruecken auf -- ein gemerkter Index zeigt
+            ' danach auf ein anderes Objekt, also lieber gar keinen behalten.
+            objSel = -1
+            geaendert = TRUE
+            objListeAuffrischen()
+            meldung = "Objekt entfernt"
+        END IF
+    END IF
+
     ' ---------------------------------------------------- Kachel-Eigenschaften
     DIM pg AS INTEGER : pg = palGid()
     IF GUI_CLICKED(cbSolid) THEN
@@ -687,9 +859,15 @@ WHILE NOT QUITREQUESTED()
     DIM lsel AS INTEGER : lsel = GUI_LISTBOX_SELECTED(lstEbenen)
     IF lsel >= 0 AND lsel <> ebene AND lsel < TILED_LAYER_COUNT(karte) THEN
         ebene = lsel
+        ' Die Auswahl gilt je Ebene -- eine gemerkte Nummer zeigte in der
+        ' naechsten auf ein anderes Objekt oder ins Leere.
+        objSel = -1
         listeAuffrischen()
+        objListeAuffrischen()
+        bloeckeUmschalten()
     END IF
     IF GUI_CLICKED(bEbNeu) THEN
+        objSel = -1
         DIM nn AS STRING : nn = "Ebene " + STR$(TILED_LAYER_COUNT(karte) + 1)
         TRY
             ebene = TILED_ADD_LAYER(karte, nn)
@@ -699,6 +877,8 @@ WHILE NOT QUITREQUESTED()
             meldung = e
         END TRY
         listeAuffrischen()
+        objListeAuffrischen()
+        bloeckeUmschalten()
     END IF
     IF GUI_CLICKED(bEbUm) THEN
         TRY
@@ -715,7 +895,10 @@ WHILE NOT QUITREQUESTED()
             IF ebene >= TILED_LAYER_COUNT(karte) THEN ebene = TILED_LAYER_COUNT(karte) - 1
             geaendert = TRUE
             uStart = 0 : uAnz = 0 : uPos = 0
+            objSel = -1
             listeAuffrischen()
+            objListeAuffrischen()
+            bloeckeUmschalten()
         ELSE
             meldung = "Die letzte Ebene bleibt."
         END IF
@@ -794,7 +977,51 @@ WHILE NOT QUITREQUESTED()
     ' --------------------------------------------------------- Zeichnen
     DIM gid AS INTEGER : gid = basisGid() + gewaehlt
 
-    IF aufKarte AND MOUSE_HIT(0) THEN
+    ' Auf einer Objekt-Ebene gelten die Kachelwerkzeuge nicht -- dort gibt es
+    ' keine Kacheln. Gezogen wird ein Rechteck, geklickt ein PUNKT (in Tiled
+    ' ist ein Objekt mit Breite und Hoehe 0 genau das), und ein Klick auf ein
+    ' vorhandenes waehlt es aus, statt eins darueber zu legen.
+    DIM opx AS INTEGER : opx = (mx - cx + panX) \ zoom
+    DIM opy AS INTEGER : opy = (my - cy + panY) \ zoom
+    IF istObjEbene() THEN
+        IF ueber AND MOUSE_HIT(0) THEN
+            DIM tr AS INTEGER : tr = objektBei(opx, opy)
+            IF tr >= 0 THEN
+                objSel = tr
+                GUI_SET_TEXT(edObjName, TILED_OBJECT_NAME(karte, ebenenName$(), tr))
+                GUI_SET_TEXT(edObjTyp, TILED_OBJECT_TYPE(karte, ebenenName$(), tr))
+                objListeAuffrischen()
+            ELSE
+                objZieht = TRUE
+                objAx = opx : objAy = opy
+                objBx = opx : objBy = opy
+            END IF
+        END IF
+        IF objZieht AND MOUSEBUTTON(0) THEN
+            objBx = opx : objBy = opy
+        END IF
+        IF objZieht AND NOT MOUSEBUTTON(0) THEN
+            objZieht = FALSE
+            DIM nx AS INTEGER : nx = MIN(objAx, objBx)
+            DIM ny AS INTEGER : ny = MIN(objAy, objBy)
+            DIM nw AS INTEGER : nw = ABS(objBx - objAx)
+            DIM nh AS INTEGER : nh = ABS(objBy - objAy)
+            DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+            IF nm3 = "" THEN nm3 = "objekt"
+            TRY
+                objSel = TILED_ADD_OBJECT(karte, ebenenName$(), nm3, _
+                                          TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+                geaendert = TRUE
+                objListeAuffrischen()
+                meldung = IIF(nw = 0 AND nh = 0, "Punkt", "Rechteck") + _
+                          " '" + nm3 + "' bei " + STR$(nx) + "," + STR$(ny)
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+
+    IF aufKarte AND MOUSE_HIT(0) AND NOT istObjEbene() THEN
         zieht = TRUE
         ankerX = tx : ankerY = ty
         SELECT CASE werkzeug
@@ -849,7 +1076,9 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     ' -------------------------------------------------- Zwischenablage
-    IF strg AND NOT neuOffen THEN
+    ' Nur auf Kachel-Ebenen: sie kopiert ein KACHELfeld, und `TILED_TILE_AT`
+    ' auf einer Objekt-Ebene ist ein Fehler, kein leeres Ergebnis.
+    IF strg AND NOT neuOffen AND NOT istObjEbene() THEN
         IF KEYHIT(KEY_C) THEN auswahlKopieren(FALSE)
         IF KEYHIT(KEY_X) THEN auswahlKopieren(TRUE)
         IF KEYHIT(KEY_V) THEN
@@ -860,7 +1089,14 @@ WHILE NOT QUITREQUESTED()
             END IF
         END IF
     END IF
-    IF KEYHIT(KEY_DELETE) AND selAn AND NOT neuOffen THEN
+    IF KEYHIT(KEY_DELETE) AND istObjEbene() AND objSel >= 0 AND NOT neuOffen THEN
+        TILED_REMOVE_OBJECT(karte, ebenenName$(), objSel)
+        objSel = -1
+        geaendert = TRUE
+        objListeAuffrischen()
+        meldung = "Objekt entfernt"
+    END IF
+    IF KEYHIT(KEY_DELETE) AND selAn AND NOT neuOffen AND NOT istObjEbene() THEN
         schrittBeginn()
         TILED_FILL_RECT(karte, ebene, selX, selY, selB, selH, 0)
         schrittEnde()
@@ -900,7 +1136,10 @@ WHILE NOT QUITREQUESTED()
     DIM ax2 AS INTEGER
     DIM ay2 AS INTEGER
     FOR lay = 0 TO TILED_LAYER_COUNT(karte) - 1
-        IF TILED_LAYER_VISIBLE(karte, lay) THEN
+        ' Objekt-Ebenen haben kein Kachelfeld -- `TILED_TILE_AT` darauf ist
+        ' ein Fehler, kein leeres Ergebnis. Sie werden weiter unten eigens
+        ' gezeichnet.
+        IF TILED_LAYER_VISIBLE(karte, lay) AND TILED_LAYER_TYPE(karte, lay) <> "object" THEN
             FOR ay2 = vonY TO bisY
                 FOR ax2 = vonX TO bisX
                     DIM gg AS INTEGER : gg = TILED_TILE_AT(karte, lay, ax2, ay2)
@@ -935,7 +1174,7 @@ WHILE NOT QUITREQUESTED()
     ' Rand der Karte
     RECT(cx - panX, cy - panY, cx + kb * z - panX - 1, cy + kh * z - panY - 1, &H33455A)
 
-    IF GUI_CHECKED(cbNr) AND z >= 24 THEN
+    IF GUI_CHECKED(cbNr) AND z >= 24 AND NOT istObjEbene() THEN
         FOR ay2 = vonY TO bisY
             FOR ax2 = vonX TO bisX
                 DIM g2 AS INTEGER : g2 = TILED_TILE_AT(karte, ebene, ax2, ay2)
@@ -954,8 +1193,39 @@ WHILE NOT QUITREQUESTED()
              cx + (selX + selB) * z - panX - 1, cy + (selY + selH) * z - panY - 1, &HE8C44B)
     END IF
 
+    ' Objekte der aktiven Objekt-Ebene. Nur DIESER Ebene -- eine Karte kann
+    ' mehrere haben, und alle uebereinander waeren nicht auseinanderzuhalten.
+    IF istObjEbene() THEN
+        DIM onm AS STRING : onm = ebenenName$()
+        DIM oi AS INTEGER
+        FOR oi = 0 TO TILED_OBJECT_COUNT(karte, onm) - 1
+            DIM px1 AS INTEGER : px1 = cx + INT(TILED_OBJECT_X(karte, onm, oi)) * zoom - panX
+            DIM py1 AS INTEGER : py1 = cy + INT(TILED_OBJECT_Y(karte, onm, oi)) * zoom - panY
+            DIM pw AS INTEGER : pw = INT(TILED_OBJECT_WIDTH(karte, onm, oi)) * zoom
+            DIM ph AS INTEGER : ph = INT(TILED_OBJECT_HEIGHT(karte, onm, oi)) * zoom
+            DIM farbe AS INTEGER : farbe = IIF(oi = objSel, &HE8C44B, &H2BC4E8)
+            IF pw <= 0 OR ph <= 0 THEN
+                ' Punkt-Objekt: ein Kreuz, damit es ueberhaupt zu sehen ist.
+                LINE(px1 - 5, py1, px1 + 5, py1, farbe)
+                LINE(px1, py1 - 5, px1, py1 + 5, farbe)
+                CIRCLEOUTLINE(px1, py1, 4, farbe)
+            ELSE
+                BOX(px1, py1, px1 + pw - 1, py1 + ph - 1, &H302BC4E8)
+                RECT(px1, py1, px1 + pw - 1, py1 + ph - 1, farbe)
+            END IF
+            TEXT(px1 + 3, py1 - 16, TILED_OBJECT_NAME(karte, onm, oi))
+        NEXT
+        ' Das gerade aufgezogene Rechteck.
+        IF objZieht THEN
+            DIM zx1 AS INTEGER : zx1 = cx + MIN(objAx, objBx) * zoom - panX
+            DIM zy1 AS INTEGER : zy1 = cy + MIN(objAy, objBy) * zoom - panY
+            RECT(zx1, zy1, zx1 + ABS(objBx - objAx) * zoom - 1, _
+                 zy1 + ABS(objBy - objAy) * zoom - 1, &HFFFFFF)
+        END IF
+    END IF
+
     ' Zeiger: beim Rechteck der ganze aufgezogene Bereich, sonst die Kachel.
-    IF aufKarte THEN
+    IF aufKarte AND NOT istObjEbene() THEN
         DIM hx AS INTEGER : hx = tx
         DIM hy AS INTEGER : hy = ty
         DIM hb AS INTEGER : hb = 1
