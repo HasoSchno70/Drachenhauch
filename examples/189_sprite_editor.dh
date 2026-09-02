@@ -41,7 +41,9 @@
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich),
 '                bewegtes GIF (Tempo aus dem Vorschau-Regler), und
 '                [GB-Code]: ein lauffaehiges Programm samt Blatt, mit einer
-'                SPRITE_ADD_ANIM-Zeile je Bereich
+'                SPRITE_ADD_ANIM-Zeile je Bereich, und [dhanim]: dieselben
+'                Bereiche als Zustandsmaschine (.dhanim), die der
+'                dhanim-Editor oeffnet
 '    Eingabe     [Oeffnen] nimmt beides: `.dhsprite` mit Ebenen, oder einen
 '                Streifen samt Atlas-JSON. Beim Streifen sind die Ebenen
 '                weg -- er IST das zusammengerechnete Bild. Die Endung
@@ -51,9 +53,9 @@
 '                man erst neben ihrer Wiederholung
 '    Statistik   Punkte, Farben, haeufigste Farbe -- gesamt und je Bild
 '
-'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): der
-'    .dhanim-Export (die FSM-Vorlage fuer dhanim), das Umbenennen von
-'    Einzelbildern, Dateibrowser und Dialoge der Qt-Fassung. Das
+'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): das
+'    Umbenennen von Einzelbildern, Dateibrowser und Dialoge der Qt-Fassung.
+'    Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -843,6 +845,51 @@ SUB gbCodeSichern(pfad AS STRING)
     meldung = "Code + Blatt: " + BASENAME(pfad) + " / " + BASENAME(png)
 END SUB
 
+' ----------------------------------------------------------------- dhanim
+' Die Bereiche als Zustandsmaschine (.dhanim) -- ein Zustand je Bereich, der
+' erste als Startzustand. Uebergaenge und Parameter bleiben LEER: welcher
+' Zustand wann in welchen wechselt, weiss der Editor nicht, das ist eine
+' Aussage ueber das Spiel. Die Datei ist damit eine Vorlage, die `dhanim`
+' oeffnet und ergaenzt -- und die `ANIM_FSM_LOAD` schon so laedt.
+'
+' Ueber das json-Modul geschrieben, nicht von Hand: Bereichsnamen sind
+' Nutzertext, und die Maskierung will man nicht selbst schreiben.
+SUB dhanimSichern(pfad AS STRING)
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_INT(h, "version", 1)
+    DIM erster AS STRING : erster = IIF(anzAnim > 0, anName[0], "idle")
+    JSON_SET_STRING(h, "default", erster)
+    JSON_SET_JSON(h, "params", JSON_NEW_ARRAY())
+    JSON_SET_JSON(h, "states", JSON_NEW_ARRAY())
+    IF anzAnim = 0 THEN
+        ' Ohne eigene Bereiche einer ueber alles -- eine Maschine ohne
+        ' Zustand laedt zwar, hat aber nichts zu spielen.
+        DIM z0 AS JSON_HANDLE : z0 = JSON_NEW_OBJECT()
+        JSON_SET_STRING(z0, "name", "idle")
+        JSON_SET_STRING(z0, "anim", "idle")
+        JSON_SET_BOOL(z0, "loop", TRUE)
+        JSON_SET_INT(z0, "first", 0)
+        JSON_SET_INT(z0, "last", anzBild - 1)
+        JSON_SET_INT(z0, "fps", INT(GUI_VALUE(slTempo)))
+        JSON_APPEND_JSON(h, "states", z0)
+    ELSE
+        DIM k AS INTEGER
+        FOR k = 0 TO anzAnim - 1
+            DIM zt AS JSON_HANDLE : zt = JSON_NEW_OBJECT()
+            JSON_SET_STRING(zt, "name", anName[k])
+            JSON_SET_STRING(zt, "anim", anName[k])
+            JSON_SET_BOOL(zt, "loop", TRUE)
+            JSON_SET_INT(zt, "first", anVon[k])
+            JSON_SET_INT(zt, "last", anBis[k])
+            JSON_SET_INT(zt, "fps", anFps[k])
+            JSON_APPEND_JSON(h, "states", zt)
+        NEXT
+    END IF
+    JSON_SET_JSON(h, "transitions", JSON_NEW_ARRAY())
+    WRITEALL(pfad, JSON_PRETTY(h))
+    meldung = "Zustandsmaschine: " + BASENAME(pfad) + " (Uebergaenge in dhanim ergaenzen)"
+END SUB
+
 ' -------------------------------------------------------------- Statistik
 ' Zaehlt ueber die SICHTBAREN Ebenen -- also ueber das, was man sieht und was
 ' auch exportiert wuerde. Eine ausgeblendete Ebene taucht nicht auf; ohne
@@ -1436,8 +1483,11 @@ bGroesse = GUI_BUTTON(win, "Groesse aendern", 12, y, 260, 28)
 GUI_TOOLTIP(bGroesse, "Leinwand vergroessern oder beschneiden -- der Inhalt bleibt links oben")
 y = y + 34
 DIM bGbCode AS GUI_WIDGET
-bGbCode = GUI_BUTTON(win, "GB-Code", 12, y, 260, 28)
+bGbCode = GUI_BUTTON(win, "GB-Code", 12, y, 128, 28)
 GUI_TOOLTIP(bGbCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
+DIM bDhanim AS GUI_WIDGET
+bDhanim = GUI_BUTTON(win, "dhanim", 144, y, 128, 28)
+GUI_TOOLTIP(bDhanim, "Die Bereiche als Zustandsmaschine (.dhanim) -- Uebergaenge ergaenzt der dhanim-Editor")
 
 DIM pal AS ARRAY OF INTEGER
 pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
@@ -1728,6 +1778,17 @@ WHILE NOT QUITREQUESTED()
         IF pc <> "" THEN
             TRY
                 gbCodeSichern(pc)
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bDhanim) THEN
+        DIM pa AS STRING
+        pa = FILE_SAVE_DIALOG("Zustandsmaschine sichern", "sprite.dhanim", "dhanim")
+        IF pa <> "" THEN
+            TRY
+                dhanimSichern(pa)
             CATCH e
                 meldung = e
             END TRY

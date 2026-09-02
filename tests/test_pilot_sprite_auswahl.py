@@ -22,6 +22,7 @@ Weil die Fenstergeometrie erst zur Laufzeit feststeht, laeuft jeder Test
 ZWEIMAL: einmal ohne Eingabe, um Ursprung und Zoom der Zeichenflaeche zu
 erfahren, und einmal mit dem daraus gerechneten Mausweg.
 """
+import json
 import os
 import re
 import subprocess
@@ -112,7 +113,8 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(GUI_GET_X(bEbNeu)) + " " + STR$(GUI_GET_Y(bEbNeu)) + _
           " " + STR$(GUI_GET_X(cbEbSicht)) + " " + STR$(GUI_GET_Y(cbEbSicht)) + _
           " " + STR$(anzEb) + " " + STR$(aktEb) + " " + STR$(ebSicht[aktEb]) + _
-          " " + STR$(GUI_GET_X(bGbCode)) + " " + STR$(GUI_GET_Y(bGbCode))
+          " " + STR$(GUI_GET_X(bGbCode)) + " " + STR$(GUI_GET_Y(bGbCode)) + _
+          " " + STR$(GUI_GET_X(bDhanim)) + " " + STR$(GUI_GET_Y(bDhanim))
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
@@ -129,7 +131,7 @@ _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "gw gh anzBild anzAnim aktAnim anVon anBis anFps "
            "zusX zusY grX grY animNX animNY animWX animWY "
            "kopieX kopieY bildWX bildWY grOkX grOkY lstBX lstBY "
-           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY").split()
+           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY faX faY").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -805,3 +807,73 @@ def test_gb_code_ohne_bereiche_spielt_trotzdem(tmp_path):
                        capture_output=True, text=True, encoding="utf-8", errors="replace",
                        timeout=120, cwd=str(tmp_path), env=dict(os.environ, DHRT_FRAMES="5"))
     assert r.returncode == 0, r.stderr
+
+
+# -------------------------------------------------------------- dhanim
+_DIALOG_FSM = 'FILE_SAVE_DIALOG("Zustandsmaschine sichern", "sprite.dhanim", "dhanim")'
+
+# Ein Programm, das die erzeugte Maschine WIRKLICH laedt -- geprueft wird mit
+# dem Leser der Laufzeit, nicht mit einem zweiten eigenen.
+_FSM_PRUEFER = '''IMPORT "animfsm"
+IMPORT "sprite"
+SCREEN(320, 240, "Pruefer", 1)
+DIM sp AS SPRITE
+sp = SPRITE_NEW(LOADIMAGE("raus.png"), 32, 32)
+DIM f AS ANIM_FSM
+f = ANIM_FSM_LOAD("raus.dhanim")
+ANIM_FSM_SETUP(f, sp)
+ANIM_FSM_UPDATE(f, sp, 16)
+PRINT "ZUSTAND " + ANIM_FSM_STATE(f)
+'''
+
+
+def _fsm_pruefen(tmp_path):
+    """Die Maschine laden und einen Schritt fahren. Liefert den Zustandsnamen."""
+    (tmp_path / "pruef.dh").write_text(_FSM_PRUEFER, encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "pruef.dh")],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=120, cwd=str(tmp_path), env=dict(os.environ, DHRT_FRAMES="3"))
+    assert r.returncode == 0, r.stderr
+    zeilen = [ln for ln in (r.stdout or "").splitlines() if ln.startswith("ZUSTAND ")]
+    assert zeilen, r.stdout + r.stderr
+    return zeilen[-1].split(None, 1)[1]
+
+
+def test_dhanim_wird_von_der_laufzeit_geladen(tmp_path):
+    """Der Kreis wie beim GB-Code, nur mit dem anderen Leser: `ANIM_FSM_LOAD`
+    der Laufzeit macht die Datei auf, `ANIM_FSM_SETUP` traegt die Zustaende
+    als Sprite-Animationen ein, und ein Schritt sagt, in welchem Zustand die
+    Maschine steht. Dass die JSON gueltig ist, waere die schwaechere Aussage.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["kopieX"], geo["kopieY"])       # zweites Bild
+    ev += _knopf_klick(8, geo["animNX"], geo["animNY"])      # ein Bereich
+    ev += _knopf_klick(14, geo["gbX"], geo["gbY"])           # Blatt fuers Sprite
+    ev += _knopf_klick(20, geo["faX"], geo["faY"])
+    _lauf(tmp_path, 34, ev, dialoge={_DIALOG_GB: '"raus.dh"',
+                                     _DIALOG_FSM: '"raus.dhanim"'})
+    datei = tmp_path / "raus.dhanim"
+    assert datei.exists()
+    d = json.loads(datei.read_text(encoding="utf-8"))
+    assert d["version"] == 1
+    assert d["params"] == [] and d["transitions"] == [], "Vorlage, keine Erfindung"
+    assert len(d["states"]) == 1
+    z = d["states"][0]
+    assert (z["first"], z["last"], z["fps"], z["loop"]) == (0, 0, 8, True)
+    assert d["default"] == z["name"]
+    assert _fsm_pruefen(tmp_path) == z["name"]
+
+
+def test_dhanim_ohne_bereiche_bekommt_einen_zustand_ueber_alles(tmp_path):
+    """Eine Maschine ohne Zustand laedt zwar, hat aber nichts zu spielen --
+    also einer ueber alle Bilder, wie beim GB-Code auch."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["kopieX"], geo["kopieY"])
+    ev += _knopf_klick(8, geo["gbX"], geo["gbY"])
+    ev += _knopf_klick(14, geo["faX"], geo["faY"])
+    _lauf(tmp_path, 28, ev, dialoge={_DIALOG_GB: '"raus.dh"',
+                                     _DIALOG_FSM: '"raus.dhanim"'})
+    d = json.loads((tmp_path / "raus.dhanim").read_text(encoding="utf-8"))
+    assert [z["name"] for z in d["states"]] == ["idle"]
+    assert (d["states"][0]["first"], d["states"][0]["last"]) == (0, 1)
+    assert _fsm_pruefen(tmp_path) == "idle"
