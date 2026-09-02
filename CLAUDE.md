@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2339 | 0,32 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2413 | 0,33 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -79,10 +79,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Format und bewegtem GIF) -> 0,22 (1608, mit Lasso und Zauberstab) -> 0,24
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
 > mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
-> Groesse aendern und Animationsbereichen). Nichts daran ist schlechter
-> geworden -- es wurde nur weniger weggelassen. Aus 0,17 sind so 0,32
-> geworden, fast das Doppelte, ohne dass sich an der Sprache etwas
-> geaendert haette.
+> Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
+> GB-Code-Ausgabe). Nichts daran ist schlechter geworden -- es wurde nur
+> weniger weggelassen. Aus 0,17 sind so 0,33 geworden, fast das Doppelte,
+> ohne dass sich an der Sprache etwas geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -184,6 +184,15 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Loeschen eines Bildes mit (`bereicheNachLoeschen`), sonst spielte die
 > Vorschau danach etwas anderes, ohne dass sich sichtbar etwas geaendert
 > haette.
+>
+> **Die GB-Code-Ausgabe schliesst den Kreis** (2026-09-01): [GB-Code]
+> schreibt ein LAUFFAEHIGES Programm samt Blatt -- eine
+> `SPRITE_ADD_ANIM`-Zeile je Bereich, ohne Bereiche eine ueber alles
+> ("idle"), sonst faende `SPRITE_PLAY` nichts. Beides in EINEM Zug und unter
+> demselben Namen; wer nur den Code schreibt, hat einen Verweis ins Leere,
+> und das faellt erst beim Starten auf. Der Test uebersetzt ihn nicht, er
+> STARTET ihn -- ob erzeugter Code uebersetzt, sagt nichts darueber, ob er
+> sein Blatt findet und eine Animation kennt.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
