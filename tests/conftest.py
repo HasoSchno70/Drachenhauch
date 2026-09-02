@@ -94,6 +94,7 @@ _SERIELL = {
     "test_gui_dialog.py",
     "test_audio_modulators.py",
     "test_pilot_sprite_auswahl.py",
+    "test_pilot_partikel.py",
     "test_profiler.py",
 }
 
@@ -208,6 +209,7 @@ _BRAUCHT_GRAFIK = {
     "test_modules_audio.py",
     "test_picking_geometry.py",
     "test_pilot_tilemap.py",
+    "test_pilot_partikel.py",
     "test_pilot_sprite_auswahl.py",
     "test_runtime_font_delta.py",
     "test_scissor.py",

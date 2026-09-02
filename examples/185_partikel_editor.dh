@@ -12,6 +12,9 @@
 '  [Sichern] schreibt alle Regler in eine `.ini`, [Laden] holt sie zurueck.
 '  Lesbares Format: die Datei laesst sich auch von Hand aendern.
 '
+'  [Zurueck]/[Vor] (Strg+Z, Strg+Y) nehmen eine Aenderung zurueck. EIN Zug
+'  am Regler ist EIN Schritt -- nicht 60 pro Sekunde.
+'
 '  Bedienung:
 '    Regler ziehen, Werkseinstellung links waehlen.
 '    Alles auch ohne Maus: TAB wechselt, Leertaste loest aus,
@@ -82,18 +85,27 @@ presetNamen = SPLIT$("Funken|Rauch|Feuer|Regen|Schnee|Explosion|Zauber|Springbru
 DIM liste AS GUI_WIDGET
 liste = GUI_LISTBOX(win, 16, 494, 220, 190, presetNamen)
 
-DIM knopfCode AS GUI_WIDGET
-knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 250, 494, 210, 30)
+' NEBEN die Liste, nicht darauf. Vorher standen [Sichern] und [Laden] bei
+' x = 16 -- also genau auf den ersten beiden Eintraegen der Liste: "Funken"
+' war verdeckt und nicht anzuklicken, weil die Knoepfe den Klick fingen.
+DIM knopfZurueck AS GUI_WIDGET
+knopfZurueck = GUI_BUTTON(win, "Zurueck", 250, 494, 102, 30)
+GUI_TOOLTIP(knopfZurueck, "Strg+Z -- die letzte Aenderung zuruecknehmen")
+DIM knopfVor AS GUI_WIDGET
+knopfVor = GUI_BUTTON(win, "Vor", 358, 494, 102, 30)
+GUI_TOOLTIP(knopfVor, "Strg+Y -- wieder herstellen")
 DIM knopfSichern AS GUI_WIDGET
-knopfSichern = GUI_BUTTON(win, "Sichern ...", 16, 494, 102, 30)
+knopfSichern = GUI_BUTTON(win, "Sichern ...", 250, 532, 102, 30)
 GUI_TOOLTIP(knopfSichern, "Alle Regler in eine .ini schreiben")
 DIM knopfLaden AS GUI_WIDGET
-knopfLaden = GUI_BUTTON(win, "Laden ...", 124, 494, 102, 30)
+knopfLaden = GUI_BUTTON(win, "Laden ...", 358, 532, 102, 30)
 GUI_TOOLTIP(knopfLaden, "Eine gesicherte Einstellung zurueckholen")
+DIM knopfCode AS GUI_WIDGET
+knopfCode = GUI_BUTTON(win, "GB-Code kopieren", 250, 570, 210, 30)
 DIM lblStatus AS GUI_WIDGET
-lblStatus = GUI_LABEL(win, "Bereit.", 250, 534)
+lblStatus = GUI_LABEL(win, "Bereit.", 250, 612)
 DIM lblZahl AS GUI_WIDGET
-lblZahl = GUI_LABEL(win, "", 250, 556)
+lblZahl = GUI_LABEL(win, "", 250, 634)
 
 ' ============================================================
 '  Rechts: die Regler
@@ -344,6 +356,125 @@ FUNCTION gbCode$() AS STRING
 END FUNCTION
 
 ' ============================================================
+'  Rueckgaengig / Wiederholen
+'
+'  Der ganze Zustand dieses Werkzeugs sind 17 Reglerwerte, die Darstellungs-
+'  art und zwei Schalter -- also 20 Zahlen. Ein Schritt ist deshalb der VOLLE
+'  Stand, nicht eine Beschreibung dessen, was sich geaendert hat: das ist
+'  hier kuerzer als jede Buchfuehrung darueber, und es kann nichts
+'  auseinanderlaufen.
+'
+'  Der Ringpuffer der anderen Piloten waere hier fehl am Platz -- bei 20
+'  Zahlen je Stand kostet das Aufruecken nichts, und eine Liste ohne Modulo
+'  ist die Fassung, die man noch versteht.
+'
+'  **Wann ist ein Schritt fertig?** Das ist bei einem Regler-Editor die
+'  eigentliche Frage: ein gezogener Regler aendert sich in JEDEM Bild. Wer
+'  das aufzeichnet, hat nach einer Sekunde Ziehen 60 Schritte, und
+'  Rueckgaengig nimmt ein Sechzigstel der Bewegung zurueck -- unbrauchbar.
+'  Gesichert wird deshalb erst, wenn sich ein Bild lang NICHTS geaendert hat
+'  und keine Maustaste mehr haengt: ein Zug ist ein Schritt. Werkseinstellung
+'  waehlen und eine .ini laden sind auf demselben Weg genau ein Schritt.
+' ============================================================
+CONST U_MAX = 32
+CONST U_FELDER = N_PARAM + 3           ' Regler + Darstellung + zwei Schalter
+DIM uStand[U_MAX, U_FELDER] AS FLOAT
+DIM uAnz AS INTEGER : uAnz = 0         ' wie viele Staende aufgezeichnet sind
+DIM uPos AS INTEGER : uPos = 0         ' auf welchem wir gerade stehen
+DIM uOffen AS BOOLEAN : uOffen = FALSE ' eine Aenderung wartet auf ihr Ende
+
+SUB standLesen(ziel AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        uStand[ziel, k] = GUI_VALUE(regler[k])
+    NEXT
+    uStand[ziel, N_PARAM] = GUI_DROPDOWN_SELECTED(waehlModus)
+    uStand[ziel, N_PARAM + 1] = IIF(GUI_CHECKED(schalterFade), 1, 0)
+    uStand[ziel, N_PARAM + 2] = IIF(GUI_CHECKED(schalterEnde), 1, 0)
+END SUB
+
+' Die Erkennung im Hauptteil vergleicht jeden Regler mit `letzter[]`. Nach
+' einem Rueckgaengig muss sie den neuen Stand als BEKANNT ansehen -- sonst
+' zeichnet sie ihn als frische Aenderung auf und der Vor-Weg waere weg.
+SUB letzteAuffrischen()
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        letzter[k] = GUI_VALUE(regler[k])
+    NEXT
+    letzterModus = GUI_DROPDOWN_SELECTED(waehlModus)
+    letztesFade = GUI_CHECKED(schalterFade)
+    letzterVerlauf = GUI_CHECKED(schalterEnde)
+END SUB
+
+SUB standAnwenden(quelle AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        GUI_SET_VALUE(regler[k], uStand[quelle, k])
+    NEXT
+    GUI_DROPDOWN_SET_SELECTED(waehlModus, INT(uStand[quelle, N_PARAM]))
+    GUI_SET_CHECKED(schalterFade, uStand[quelle, N_PARAM + 1] = 1)
+    GUI_SET_CHECKED(schalterEnde, uStand[quelle, N_PARAM + 2] = 1)
+    letzteAuffrischen()
+    uebertrage()
+    uOffen = FALSE
+END SUB
+
+FUNCTION standGleich(i AS INTEGER) AS BOOLEAN
+    ' Ist der aufgezeichnete Stand `i` derselbe wie der jetzige?
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        IF uStand[i, k] <> GUI_VALUE(regler[k]) THEN RETURN FALSE
+    NEXT
+    IF uStand[i, N_PARAM] <> GUI_DROPDOWN_SELECTED(waehlModus) THEN RETURN FALSE
+    IF (uStand[i, N_PARAM + 1] = 1) <> GUI_CHECKED(schalterFade) THEN RETURN FALSE
+    IF (uStand[i, N_PARAM + 2] = 1) <> GUI_CHECKED(schalterEnde) THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+SUB schrittSichern()
+    ' Ein Stand, der sich nicht unterscheidet, ist kein Schritt -- sonst
+    ' braeuchte man zweimal Rueckgaengig fuer eine Aenderung, und der
+    ' Vor-Weg waere schon weg. (Die Pruefung muss VOR dem Abschneiden
+    ' stehen, sonst kostet ein Nichts-Schritt den Vor-Weg.)
+    IF uAnz > 0 AND standGleich(uPos) THEN RETURN
+    ' Der neue Stand kommt HINTER den aktuellen -- beim allerersten gibt es
+    ' keinen, der Platz ist also 0.
+    DIM ziel AS INTEGER
+    ziel = IIF(uAnz = 0, 0, uPos + 1)
+    IF ziel >= U_MAX THEN
+        ' Voll: der aelteste faellt weg, alles rueckt auf.
+        DIM i AS INTEGER
+        DIM k AS INTEGER
+        FOR i = 0 TO U_MAX - 2
+            FOR k = 0 TO U_FELDER - 1
+                uStand[i, k] = uStand[i + 1, k]
+            NEXT
+        NEXT
+        ziel = U_MAX - 1
+    END IF
+    standLesen(ziel)
+    uPos = ziel
+    ' Alles dahinter faellt weg -- ab hier geht die Geschichte anders weiter.
+    uAnz = ziel + 1
+END SUB
+
+SUB zurueck()
+    IF uPos > 0 THEN
+        uPos = uPos - 1
+        standAnwenden(uPos)
+        GUI_SET_TEXT(lblStatus, "Zurueck (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+    END IF
+END SUB
+
+SUB wieder()
+    IF uPos < uAnz - 1 THEN
+        uPos = uPos + 1
+        standAnwenden(uPos)
+        GUI_SET_TEXT(lblStatus, "Vor (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+    END IF
+END SUB
+
+' ============================================================
 '  Start
 ' ============================================================
 GUI_LISTBOX_SET_SELECTED(liste, 0)
@@ -360,6 +491,13 @@ DIM letzterVerlauf AS BOOLEAN
 letzterVerlauf = GUI_CHECKED(schalterEnde)
 DIM pausiert AS INTEGER
 pausiert = 0
+
+' Der Anfangsstand ist Schritt 0 -- ohne ihn haette das erste Rueckgaengig
+' nichts, wohin es zurueckkoennte. `letzteAuffrischen` gehoert dazu: sonst
+' sieht die Erkennung im ersten Bild die Werkseinstellung als frische
+' Aenderung und legt einen zweiten, gleichen Stand an.
+letzteAuffrischen()
+schrittSichern()
 
 WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
     CLS(&H0B1119)
@@ -393,9 +531,25 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
         letzterVerlauf = GUI_CHECKED(schalterEnde)
         geaendert = 1
     END IF
-    IF geaendert = 1 THEN uebertrage()
+    IF geaendert = 1 THEN
+        uebertrage()
+        uOffen = TRUE
+    ELSEIF uOffen AND NOT MOUSEBUTTON(0) THEN
+        ' Der Zug ist zu Ende: EIN Schritt fuer die ganze Bewegung. Solange
+        ' die Taste haengt, laeuft sie noch -- ein Regler steht zwischendurch
+        ' oft ein Bild lang still.
+        uOffen = FALSE
+        schrittSichern()
+    END IF
 
     ' --- Bedienung ---
+    DIM strg AS BOOLEAN
+    strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    IF GUI_CLICKED(knopfZurueck) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
+    IF GUI_CLICKED(knopfVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
+    GUI_SET_ENABLED(knopfZurueck, uPos > 0)
+    GUI_SET_ENABLED(knopfVor, uPos < uAnz - 1)
+
     IF GUI_CLICKED(knopfPause) THEN
         pausiert = 1 - pausiert
         GUI_SET_TEXT(knopfPause, IIF(pausiert = 1, "Weiter", "Pause"))

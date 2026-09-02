@@ -305,7 +305,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `188_bild_erzeugen.dh` | **ein Bild herstellen statt nur anzeigen** — Malprogramm mit durchsichtigen Ebenen, Radierer und PNG-Export |
 | `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, echtes Tiled-JSON |
 | `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
-| `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export |
+| `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export, Rueckgaengig/Wiederholen |
 | `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
 | `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export; das Gegenstueck zum Qt-Werkzeug `dhsfx` |
 | `182_gui_tastatur_massstab.dh` | **Bedienung ohne Maus**, `GUI_SCALE` fuer HiDPI und ein modaler Dialog im eigenen Thema |
