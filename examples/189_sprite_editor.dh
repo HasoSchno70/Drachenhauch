@@ -15,8 +15,9 @@
 '                Spruehen, Pipette, Auswahl, Lasso, Zauberstab,
 '                Verschieben -- Rechteck/Ellipse wahlweise gefuellt,
 '                Pinsel 1..6 px
-'    Bild        mehrere Einzelbilder, Ebenen (global, wie in Aseprite),
-'                Zwiebelhaut, Spiegeln X/Y beim Zeichnen
+'    Bild        mehrere Einzelbilder mit optionalem Namen ([Name]) --
+'                der Name wird sein Schluessel im Atlas; Ebenen (global,
+'                wie in Aseprite), Zwiebelhaut, Spiegeln X/Y beim Zeichnen
 '    Farbe       Farbwaehler + 16er-Palette + Pipette; die Palette laedt
 '                und sichert GIMP-Dateien (.gpl) -- das Format, das Aseprite,
 '                GIMP, Krita und die Paletten-Sammlungen im Netz sprechen
@@ -53,9 +54,8 @@
 '                man erst neben ihrer Wiederholung
 '    Statistik   Punkte, Farben, haeufigste Farbe -- gesamt und je Bild
 '
-'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): das
-'    Umbenennen von Einzelbildern, Dateibrowser und Dialoge der Qt-Fassung.
-'    Das
+'  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): der
+'    Dateibrowser und die Dialoge der Qt-Fassung. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
 '
@@ -202,6 +202,11 @@ DIM anName[MAXANIM] AS STRING
 DIM anVon[MAXANIM] AS INTEGER
 DIM anBis[MAXANIM] AS INTEGER
 DIM anFps[MAXANIM] AS INTEGER
+' Namen der Einzelbilder (leer = namenlos). Sie werden zu den Schluesseln im
+' Atlas, also zu dem, was ein Programm spaeter in ATLAS_DRAW schreibt --
+' deshalb sind es KENNUNGEN und kein Fliesstext, siehe `alsName$`.
+DIM bildName[MAXBILD] AS STRING
+
 DIM anzAnim AS INTEGER : anzAnim = 0
 DIM aktAnim AS INTEGER : aktAnim = -1
 
@@ -587,6 +592,10 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     NEXT
     hilfsbilderNeu(FALSE)          ' die alten hat der Block oben schon frei
     anzAnim = 0 : aktAnim = -1
+    DIM bn AS INTEGER
+    FOR bn = 0 TO MAXBILD - 1
+        bildName[bn] = ""
+    NEXT
     maskeAlleWeg()
     panX = 0 : panY = 0
     ' Den Zoom kann diese SUB nicht selbst setzen: sie laeuft schon, bevor
@@ -890,6 +899,35 @@ SUB dhanimSichern(pfad AS STRING)
     meldung = "Zustandsmaschine: " + BASENAME(pfad) + " (Uebergaenge in dhanim ergaenzen)"
 END SUB
 
+' ----------------------------------------------------------------- Namen
+' Aus Eingetipptem eine Kennung machen: Buchstaben, Ziffern, Unterstrich und
+' Bindestrich bleiben, alles andere wird zum Unterstrich.
+'
+' Der Punkt ist dabei nicht Geschmack, sondern eine gemessene Falle: das
+' json-Modul liest einen Schluessel mit PUNKT als PFAD -- aus dem Namen
+' "held.lauf" wird beim Schreiben `{"held": {"lauf": ...}}` statt eines
+' Eintrags, und `streifenLaden` sucht spaeter mit derselben Punkt-Notation.
+' Ein Name, der aus dem Atlas nicht mehr herauszulesen ist, waere ein
+' Fehler, den man erst beim Wiederoeffnen bemerkt.
+FUNCTION alsName$(roh AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(roh)
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        DIM o AS INTEGER : o = ASC(c)
+        IF (o >= 48 AND o <= 57) OR (o >= 65 AND o <= 90) OR _
+           (o >= 97 AND o <= 122) OR c = "_" OR c = "-" THEN
+            aus = aus + c
+        ELSE
+            aus = aus + "_"
+        END IF
+    NEXT
+    ' Lang genug fuer einen sprechenden Namen, kurz genug fuer die Liste.
+    IF LEN(aus) > 24 THEN aus = LEFT$(aus, 24)
+    RETURN aus
+END FUNCTION
+
 ' -------------------------------------------------------------- Statistik
 ' Zaehlt ueber die SICHTBAREN Ebenen -- also ueber das, was man sieht und was
 ' auch exportiert wuerde. Eine ausgeblendete Ebene taucht nicht auf; ohne
@@ -1187,24 +1225,43 @@ SUB baueStreifen()
     NEXT
 END SUB
 
+' Der Schluessel eines Einzelbildes im Atlas: sein Name, sonst `bild_<n>`.
+' Ein Name, den es schon gibt, bekommt die Nummer angehaengt -- zwei gleiche
+' Schluessel waeren ein Eintrag, und einer der beiden Ausschnitte fiele
+' stillschweigend weg.
+FUNCTION atlasName$(i AS INTEGER) AS STRING
+    IF bildName[i] = "" THEN RETURN "bild_" + STR$(i)
+    DIM k AS INTEGER
+    FOR k = 0 TO i - 1
+        IF bildName[k] = bildName[i] THEN RETURN bildName[i] + "_" + STR$(i)
+    NEXT
+    RETURN bildName[i]
+END FUNCTION
+
 FUNCTION atlasJson$(pngName AS STRING) AS STRING
     ' Genau die Form, die ATLAS_LOAD liest -- und die `streifenLaden` unten
-    ' wieder aufmacht. Von Hand zusammengesetzt: fuer eine so flache Datei
-    ' ist das kuerzer als der Weg ueber JSON_NEW_OBJECT/JSON_SET_*, und die
-    ' Form steht damit an einer Stelle lesbar da. (Frueher stand hier, das
-    ' json-Modul koenne nichts anlegen -- das ist falsch, es kann.)
-    DIM s AS STRING
-    s = "{" + CHR$(10) + "  " + CHR$(34) + "image" + CHR$(34) + ": " + _
-        CHR$(34) + pngName + CHR$(34) + "," + CHR$(10) + _
-        "  " + CHR$(34) + "sprites" + CHR$(34) + ": {" + CHR$(10)
+    ' wieder aufmacht.
+    '
+    ' Frueher stand hier von Hand zusammengesetzter Text, mit der Begruendung,
+    ' fuer eine so flache Datei sei das kuerzer. Das galt, solange alle
+    ' Schluessel `bild_0`, `bild_1` hiessen. Seit sie NUTZERTEXT enthalten
+    ' koennen, gilt es nicht mehr: ein Anfuehrungszeichen im Namen zerbraeche
+    ' die Datei, und Maskierung will man nicht selbst schreiben.
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "image", pngName)
+    JSON_SET_JSON(h, "sprites", JSON_NEW_OBJECT())
     DIM i AS INTEGER
     FOR i = 0 TO anzBild - 1
-        s = s + "    " + CHR$(34) + "bild_" + STR$(i) + CHR$(34) + ": [" + _
-            STR$(i * gw) + ", 0, " + STR$(gw) + ", " + STR$(gh) + "]"
-        IF i < anzBild - 1 THEN s = s + ","
-        s = s + CHR$(10)
+        ' JSON_APPEND_* haengt an ein Feld UNTER einem Pfad an, nicht an ein
+        ' loses Feld -- also erst den Platz anlegen, dann dorthin anhaengen.
+        DIM pf2 AS STRING : pf2 = "sprites." + atlasName$(i)
+        JSON_SET_JSON(h, pf2, JSON_NEW_ARRAY())
+        JSON_APPEND_INT(h, pf2, i * gw)
+        JSON_APPEND_INT(h, pf2, 0)
+        JSON_APPEND_INT(h, pf2, gw)
+        JSON_APPEND_INT(h, pf2, gh)
     NEXT
-    RETURN s + "  }" + CHR$(10) + "}" + CHR$(10)
+    RETURN JSON_PRETTY(h)
 END FUNCTION
 
 ' ---------------------------------------------------------------- Laden
@@ -1273,6 +1330,18 @@ SUB nativSichern(pfad AS STRING)
     NEXT
     ' Die Bereiche gehoeren zum Sprite, nicht zur Sitzung -- ohne sie waere
     ' der Lauf beim naechsten Oeffnen wieder namenlos.
+    ' Namen der Einzelbilder -- nur wenn es welche gibt, sonst blaeht ein
+    ' Feld voller Leerstrings jede Datei auf.
+    DIM hatNamen AS BOOLEAN : hatNamen = FALSE
+    FOR k = 0 TO anzBild - 1
+        IF bildName[k] <> "" THEN hatNamen = TRUE
+    NEXT
+    IF hatNamen THEN
+        JSON_SET_JSON(h, "bildnamen", JSON_NEW_ARRAY())
+        FOR k = 0 TO anzBild - 1
+            JSON_APPEND_STRING(h, "bildnamen", bildName[k])
+        NEXT
+    END IF
     IF anzAnim > 0 THEN
         JSON_SET_JSON(h, "bereiche", JSON_NEW_ARRAY())
         FOR k = 0 TO anzAnim - 1
@@ -1322,6 +1391,11 @@ SUB nativLaden(pfad AS STRING)
             ' Bereiche, falls die Datei welche hat. Eine aeltere .dhsprite
             ' hat sie nicht -- das ist kein Fehler, sondern der Normalfall
             ' fuer alles, was vor heute gesichert wurde.
+            DIM nn2 AS INTEGER : nn2 = MIN(JSON_LEN(h, "bildnamen"), anzBild)
+            DIM q3 AS INTEGER
+            FOR q3 = 0 TO nn2 - 1
+                bildName[q3] = alsName$(JSON_GET_STRING(h, "bildnamen." + STR$(q3)))
+            NEXT
             anzAnim = MIN(JSON_LEN(h, "bereiche"), MAXANIM)
             DIM q AS INTEGER
             FOR q = 0 TO anzAnim - 1
@@ -1370,6 +1444,15 @@ SUB streifenLaden(pngPfad AS STRING)
                     DIM qx AS INTEGER : qx = JSON_GET_INT(h, "sprites." + namen[i] + ".0")
                     DIM qy AS INTEGER : qy = JSON_GET_INT(h, "sprites." + namen[i] + ".1")
                     IMAGE_DRAW_IMAGE(ebene[i, 0], blatt, 0, 0, qx, qy, bw, bh)
+                    ' Der Schluessel IST der Name -- ausser er ist der
+                    ' namenlose Vorgabe-Schluessel. Damit kommt ein Streifen
+                    ' mit seinen Namen zurueck, statt sie beim Rundweg zu
+                    ' verlieren.
+                    IF namen[i] = "bild_" + STR$(i) THEN
+                        bildName[i] = ""
+                    ELSE
+                        bildName[i] = alsName$(namen[i])
+                    END IF
                 NEXT
                 ' Das Blatt hat seinen Zweck erfuellt -- ohne Freigabe bliebe
                 ' bei jedem Oeffnen eine Textur liegen.
@@ -1504,6 +1587,8 @@ ry = ry + 128
 DIM bBildNeu AS GUI_WIDGET  : bBildNeu  = GUI_BUTTON(win, "Neu", rx, ry, 78, 28)
 DIM bBildKopie AS GUI_WIDGET: bBildKopie= GUI_BUTTON(win, "Kopie", rx + 82, ry, 88, 28)
 DIM bBildWeg AS GUI_WIDGET  : bBildWeg  = GUI_BUTTON(win, "Weg", rx + 174, ry, 70, 28)
+DIM bBildName AS GUI_WIDGET : bBildName = GUI_BUTTON(win, "Name", rx + 248, ry, 72, 28)
+GUI_TOOLTIP(bBildName, "Dem Einzelbild einen Namen geben -- er wird sein Schluessel im Atlas")
 ry = ry + 38
 
 lbl = GUI_LABEL(win, "Ebenen", rx, ry) : ry = ry + 22
@@ -1578,6 +1663,19 @@ DIM bGrAb AS GUI_WIDGET : bGrAb = GUI_BUTTON(winGr, "Abbrechen", 206, 92, 90, 30
 GUI_WINDOW_VISIBLE(winGr, FALSE)
 DIM grOffen AS BOOLEAN : grOffen = FALSE
 
+' ------------------------------------------------- Fenster "Bild benennen"
+' Ein eigenes Fenster statt eines Feldes in der Spalte: die rechte Spalte ist
+' bis zur Statuszeile voll, und ein Umbau von ihr waere ein hoher Preis fuer
+' ein Feld, das man selten braucht.
+DIM winName AS GUI_WINDOW
+winName = GUI_WINDOW("Bild benennen", SW \ 2 - 170, SH \ 2 - 70, 340, 140)
+lbl = GUI_LABEL(winName, "Name", 16, 18)
+DIM tiBild AS GUI_WIDGET : tiBild = GUI_TEXTINPUT(winName, 16, 42, 308, 30, "")
+DIM bNamOk AS GUI_WIDGET : bNamOk = GUI_BUTTON(winName, "Uebernehmen", 130, 84, 110, 30)
+DIM bNamAb AS GUI_WIDGET : bNamAb = GUI_BUTTON(winName, "Abbrechen", 246, 84, 90, 30)
+GUI_WINDOW_VISIBLE(winName, FALSE)
+DIM namOffen AS BOOLEAN : namOffen = FALSE
+
 DIM statOffen AS BOOLEAN : statOffen = FALSE
 DIM statDlg AS GUI_WINDOW
 
@@ -1587,7 +1685,11 @@ SUB listenAuffrischen()
     DIM namen[MAX(anzBild, 1)] AS STRING
     DIM k AS INTEGER
     FOR k = 0 TO anzBild - 1
+        ' Die Nummer bleibt sichtbar -- ein Bild nur ueber seinen Namen zu
+        ' zeigen, macht die Reihenfolge unlesbar, und die ist beim Abspielen
+        ' das Entscheidende.
         namen[k] = "Bild " + STR$(k + 1)
+        IF bildName[k] <> "" THEN namen[k] = namen[k] + "  (" + bildName[k] + ")"
     NEXT
     GUI_SET_LISTBOX(lstBild, namen)
     GUI_LISTBOX_SET_SELECTED(lstBild, aktBild)
@@ -1666,7 +1768,7 @@ WHILE NOT QUITREQUESTED()
     ' Solange ein Fenster obenauf liegt, gehoert die Eingabe ihm. ESC waere
     ' sonst nicht "Dialog zu", sondern "Programm zu" -- und Tastenkuerzel
     ' wuerden hinter dem Dialog Werkzeuge umschalten.
-    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen OR grOffen
+    DIM sperre AS BOOLEAN : sperre = neuOffen OR statOffen OR grOffen OR namOffen
     IF KEYHIT(KEY_ESCAPE) AND NOT sperre THEN BREAK
     zeit = zeit + DELTA()
     SW = SCREENWIDTH() : SH = SCREENHEIGHT()
@@ -1906,6 +2008,7 @@ WHILE NOT QUITREQUESTED()
         FOR k2 = 0 TO MAXEB - 1
             IMAGE_CLEAR(ebene[aktBild, k2])
         NEXT
+        bildName[aktBild] = ""
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bBildKopie) AND anzBild < MAXBILD THEN
@@ -1916,6 +2019,30 @@ WHILE NOT QUITREQUESTED()
         FOR k3 = 0 TO MAXEB - 1
             kopiere(ebene[aktBild, k3], ebene[q, k3])
         NEXT
+        ' Der Name wird NICHT mitkopiert: zwei Bilder mit demselben Namen
+        ' waeren zwei Atlas-Schluessel, von denen einer verlorenginge.
+        bildName[aktBild] = ""
+        listenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bBildName) THEN
+        GUI_SET_TEXT(tiBild, bildName[aktBild])
+        GUI_WINDOW_VISIBLE(winName, TRUE) : namOffen = TRUE
+        GUI_FOCUS(tiBild)                ' nach vorn -- siehe [Neu]
+    END IF
+    IF GUI_CLICKED(bNamAb) THEN
+        GUI_WINDOW_VISIBLE(winName, FALSE) : namOffen = FALSE
+    END IF
+    IF GUI_CLICKED(bNamOk) THEN
+        DIM nn AS STRING : nn = alsName$(GUI_TEXT(tiBild))
+        ' Sagen, wenn etwas geaendert wurde -- still zu saeubern waere die
+        ' unangenehmere Ueberraschung.
+        IF nn <> TRIM$(GUI_TEXT(tiBild)) THEN
+            meldung = "Name auf Kennung gebracht: " + IIF(nn = "", "(leer)", nn)
+        ELSE
+            meldung = IIF(nn = "", "Name entfernt", "Bild heisst jetzt " + nn)
+        END IF
+        bildName[aktBild] = nn
+        GUI_WINDOW_VISIBLE(winName, FALSE) : namOffen = FALSE
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bBildWeg) THEN
@@ -1927,7 +2054,9 @@ WHILE NOT QUITREQUESTED()
                 FOR k4 = 0 TO MAXEB - 1
                     kopiere(ebene[j, k4], ebene[j + 1, k4])
                 NEXT
+                bildName[j] = bildName[j + 1]
             NEXT
+            bildName[anzBild - 1] = ""
             anzBild = anzBild - 1
             IF aktBild >= anzBild THEN aktBild = anzBild - 1
             uStart = 0 : uAnz = 0 : uPos = 0
@@ -2467,6 +2596,7 @@ WHILE NOT QUITREQUESTED()
     ' ging auf, sperrte die Eingabe und war nicht zu sehen.
     IF neuOffen THEN GUI_DRAW_WINDOW(winNeu)
     IF grOffen THEN GUI_DRAW_WINDOW(winGr)
+    IF namOffen THEN GUI_DRAW_WINDOW(winName)
     IF statOffen THEN GUI_DRAW_WINDOW(statDlg)
     GUI_DRAW_TOP()
 
