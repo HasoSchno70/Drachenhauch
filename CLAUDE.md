@@ -502,19 +502,35 @@ Baut `rust/drachenhauch_runtime/` → `dhrt`. Nötig für Run/Export/Editor-Run 
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-Das ist der serielle Weg (~10:40). **Schneller in zwei Durchgängen** (~65 s,
-so fährt auch die CI) — die Suite wartet fast nur auf `dhrt`-Prozesse, deshalb
-skaliert sie fast linear:
+Das ist der serielle Weg (~10:40). **Schneller in DREI Durchgängen — genau
+die, die auch die CI fährt** (zusammen ~3 min); die Suite wartet fast nur auf
+`dhrt`-Prozesse, deshalb skaliert der erste fast linear:
 ```
-.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
+.venv\Scripts\python.exe tools\qt_tests_einzeln.py
 .venv\Scripts\python.exe -m pytest tests/ -q -m seriell
 ```
-Der zweite Durchgang holt die vier Dateien nach, die ein Betriebsmittel
+
+**`and not qt` ist kein Beiwerk.** Die Qt-Dateien lassen ihre Fenster stehen,
+und jede Operation, die über ALLE Fenster eines Prozesses läuft
+(`processEvents()`, `QApplication.setStyleSheet()`), fasst dann die Altlasten
+FREMDER Dateien an — daran starb der xdist-Arbeiter sporadisch mit einer
+Zugriffsverletzung. Deshalb bekommt seit 2026-08-23 jede Qt-Datei ihren
+eigenen Prozess (`tools/qt_tests_einzeln.py`, 89 Dateien in ~25 s).
+
+Wer die Qt-Dateien doch in den parallelen Durchgang nimmt, bekommt
+**sporadische Fehlschläge in fremden Dateien** — Tests, die einzeln grün sind.
+Genau das ist am 2026-09-01 zweimal hintereinander passiert (einmal
+`test_editor_qt_particle_color`, einmal `test_editor_qt_companion_import_error`),
+weil hier lange der Zwei-Durchgang-Befehl stand. Ein falscher Roter kostet
+mehr Zeit als ein langsamer Lauf.
+
+Der letzte Durchgang holt die sieben Dateien nach, die ein Betriebsmittel
 **exklusiv** brauchen (Eingabe-Aufzeichnung, Soundkarte, gemessene Laufzeiten).
 Welche das sind und warum, steht in `tests/conftest.py` bei `_SERIELL`; dort
 eintragen, wenn ein neuer Test parallel sporadisch umfällt — aber erst, wenn
 das geteilte Betriebsmittel benannt ist, sonst verdeckt der Eintrag nur einen
-echten Fehler.
+echten Fehler. Ein einzelner Test darf den Marker auch selbst tragen.
 
 **Headless prüfen:** `DHRT_FRAMES=n DHRT_SCREENSHOT=p.png dhrt run x.dh` liefert
 EIN Bild (ein Augenblick). Für alles, was sich über die ZEIT falsch verhält
@@ -2249,8 +2265,10 @@ py -3.12 -m venv .venv                                # einmalig: venv anlegen
 .venv\Scripts\python.exe -m pip install -r requirements.txt   # einmalig: Werkzeuge
 .venv\Scripts\python.exe rust\build_runtime.py        # Runtime dhrt (Rust)
 .venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt (seriell)
-.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile -m "not seriell"
-.venv\Scripts\python.exe -m pytest tests/ -q -m seriell   # die 4 exklusiven Dateien
+# ... oder die drei Durchgänge der CI (siehe oben, "Build und Test"):
+.venv\Scripts\python.exe -m pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"
+.venv\Scripts\python.exe tools\qt_tests_einzeln.py     # je Qt-Datei ein Prozess
+.venv\Scripts\python.exe -m pytest tests/ -q -m seriell   # exklusive Betriebsmittel
 .venv\Scripts\python.exe dhrun.py examples/<file>.dh  # ausführen (-> dhrt run)
 ```
 

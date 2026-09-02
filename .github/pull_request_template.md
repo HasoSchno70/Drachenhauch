@@ -11,7 +11,11 @@
      Linker. Wo ein Fund behauptet wird, gehoert die Gegenprobe dazu: schlaegt
      der neue Test gegen den alten Stand wirklich fehl? -->
 
-- [ ] `pytest tests/ -q -n auto --dist loadfile -m "not seriell"` + `-m seriell`
+- [ ] die drei Durchgaenge der CI:
+      `pytest tests/ -q -n auto --dist loadfile --max-worker-restart=0 -m "not seriell and not qt"`,
+      `python tools/qt_tests_einzeln.py`, `pytest tests/ -q -m seriell`
+      (die Qt-Dateien NICHT in den parallelen Durchgang -- sie fallen dort
+      sporadisch in FREMDEN Dateien um)
 - [ ] `rust/build_runtime.py` (bei Aenderungen an `rust/`)
 - [ ] Doku-Pruefer, wenn `docs/`, `CLAUDE.md` oder ein Buch betroffen ist:
       `tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`, `tools/pruef_meldungen.js`
