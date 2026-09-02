@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2413 | 0,33 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2474 | 0,34 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -80,9 +80,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
 > mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
 > Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
-> GB-Code-Ausgabe). Nichts daran ist schlechter geworden -- es wurde nur
-> weniger weggelassen. Aus 0,17 sind so 0,33 geworden, fast das Doppelte,
-> ohne dass sich an der Sprache etwas geaendert haette.
+> GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe). Nichts daran ist
+> schlechter geworden -- es wurde nur weniger weggelassen. Aus 0,17 sind so
+> 0,34 geworden, das Doppelte, ohne dass sich an der Sprache etwas geaendert
+> haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -193,6 +194,14 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > und das faellt erst beim Starten auf. Der Test uebersetzt ihn nicht, er
 > STARTET ihn -- ob erzeugter Code uebersetzt, sagt nichts darueber, ob er
 > sein Blatt findet und eine Animation kennt.
+>
+> **Dieselben Bereiche auch als Zustandsmaschine** ([dhanim], 2026-09-01): ein
+> Zustand je Bereich, der erste als Start. Uebergaenge und Parameter bleiben
+> LEER -- welcher Zustand wann in welchen wechselt, ist eine Aussage ueber das
+> SPIEL, die der Sprite-Editor nicht treffen kann; die Datei ist eine Vorlage,
+> die `dhanim` oeffnet und die `ANIM_FSM_LOAD` schon so laedt. Geprueft mit
+> dem Leser der LAUFZEIT: laden, `ANIM_FSM_SETUP`, ein Schritt, Zustandsname
+> vergleichen -- dass die JSON gueltig ist, waere die schwaechere Aussage.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
