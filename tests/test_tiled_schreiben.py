@@ -238,6 +238,66 @@ PRINT TILED_LAYER_INDEX(m, "Drei"); " "; TILED_LAYER_INDEX(m, "Eins"); " "; _
     assert zeilen[1].split() == ["1", "-1", "9"]
 
 
+def test_ebene_verschieben_nimmt_ihre_kacheln_mit(run_gb, tmp_path):
+    """Die Reihenfolge ist die ZEICHENreihenfolge -- verschieben aendert das
+    Bild, nicht nur die Liste. Geprueft wird an der KACHEL: eine Ebene, die
+    ihren Inhalt beim Umstellen verloere, faellt sonst nicht auf."""
+    out = run_gb('''
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Eins")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Zwei")
+DIM c AS INTEGER : c = TILED_ADD_LAYER(m, "Drei")
+TILED_TILE_SET(m, 2, 1, 1, 9)
+TILED_MOVE_LAYER(m, 2, 0)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1); TILED_LAYER_NAME(m, 2)
+PRINT TILED_LAYER_INDEX(m, "Drei"); " "; TILED_TILE_AT(m, 0, 1, 1)
+TILED_MOVE_LAYER(m, 0, 2)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1); TILED_LAYER_NAME(m, 2)
+PRINT TILED_TILE_AT(m, 2, 1, 1)
+''', base=tmp_path)
+    zeilen = out.strip().splitlines()
+    assert zeilen[0] == "DreiEinsZwei"
+    assert zeilen[1].split() == ["0", "9"], "die Kachel wandert mit"
+    assert zeilen[2] == "EinsZweiDrei", "und wieder zurueck"
+    assert zeilen[3] == "9"
+
+
+def test_verschobene_ebenen_stehen_so_in_der_datei(run_gb, tmp_path):
+    """Gegengelesen vom FREMDEN Leser: die Reihenfolge in der JSON IST die
+    Zeichenreihenfolge, ein nur intern umgestellter Stapel waere wertlos."""
+    run_gb('''
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 4)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Deko")
+TILED_TILE_SET(m, 1, 0, 0, 2)
+TILED_MOVE_LAYER(m, 1, 0)
+TILED_SAVE(m, "r.json")
+''', base=tmp_path)
+    d = TileMapDoc.load_json(str(tmp_path / "r.json"))
+    assert [l.name for l in d.layers] == ["Deko", "Boden"]
+    assert d.layers[0].get(0, 0) == 2, "die Kachel gehoert weiter zu 'Deko'"
+
+
+def test_verschieben_an_dieselbe_stelle_ist_kein_fehler(run_gb, tmp_path):
+    """Aus einer Liste heraus ist `von = nach` der Normalfall (oberste Ebene
+    noch weiter nach oben) -- ein Fehler waere hier nur laestig."""
+    out = run_gb('''
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Eins")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Zwei")
+TILED_MOVE_LAYER(m, 1, 1)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1)
+''', base=tmp_path)
+    assert out.strip() == "EinsZwei"
+
+
 def test_ebenenbefehle_lehnen_falsche_nummern_ab(run_gb, tmp_path):
     out = run_gb('''
 IMPORT "tiled"
@@ -261,10 +321,20 @@ CATCH e
     n = n + 1
 END TRY
 TRY
+    TILED_MOVE_LAYER(m, 0, 4)
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    TILED_MOVE_LAYER(m, -1, 0)
+CATCH e
+    n = n + 1
+END TRY
+TRY
     DIM v AS BOOLEAN : v = TILED_LAYER_VISIBLE(m, 3)
 CATCH e
     n = n + 1
 END TRY
 PRINT n
 ''', base=tmp_path)
-    assert out.strip() == "4"
+    assert out.strip() == "6"

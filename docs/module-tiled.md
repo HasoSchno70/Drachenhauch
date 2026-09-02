@@ -177,15 +177,22 @@ Tippfehler in der Groesse nicht den Speicher frisst.
 | `TILED_LAYER_VISIBLE(m, idx)` | BOOLEAN | ist die Ebene eingeblendet? |
 | `TILED_LAYER_SET_VISIBLE(m, idx, an)` | — | Ebene ein- oder ausblenden |
 | `TILED_REMOVE_LAYER(m, idx)` | — | eine Ebene entfernen |
+| `TILED_MOVE_LAYER(m, von, nach)` | — | eine Ebene an eine andere Stelle setzen |
 
 Die Sichtbarkeit ist **nicht nur Anzeige** -- Tiled speichert sie in der Datei.
 Ohne `TILED_LAYER_SET_VISIBLE` liess sich eine ausgeblendete Ebene also gar nicht
 so speichern: sie kam beim naechsten Laden sichtbar zurueck.
 
+**Die Reihenfolge ist die ZEICHENreihenfolge**, nicht nur eine Anzeige-Sache:
+Ebene 0 liegt hinten, die letzte vorne. `TILED_MOVE_LAYER` nimmt die Ebene
+heraus und setzt sie an `nach` wieder ein (0 = ganz hinten) -- es TAUSCHT nicht,
+denn bei einem Sprung ueber mehrere Stellen waere das etwas anderes.
+
 **Achtung, Indizes verschieben sich.** `TILED_REMOVE_LAYER` rueckt alle Ebenen
-dahinter auf. Wer sich eine Ebenennummer gemerkt hat, muss sie danach neu holen
-(`TILED_LAYER_INDEX(m, name$)`). Der Namensindex wird bei Umbenennen und
-Entfernen mitgefuehrt -- ein alter Name liefert danach -1.
+dahinter auf, und `TILED_MOVE_LAYER` stellt sie um. Wer sich eine Ebenennummer
+gemerkt hat, muss sie danach neu holen (`TILED_LAYER_INDEX(m, name$)`). Der
+Namensindex wird bei Umbenennen, Entfernen und Verschieben mitgefuehrt -- ein
+alter Name liefert danach -1.
 
 ## Konzept: GIDs vs. lokale Tile-IDs
 

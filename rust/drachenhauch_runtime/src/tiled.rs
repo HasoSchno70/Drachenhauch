@@ -612,6 +612,33 @@ pub fn ebene_entfernen(m: &Rc<RefCell<TiledMap>>, idx: i64) -> Result<(), String
     Ok(())
 }
 
+/// Eine Ebene an eine andere Stelle setzen (TILED_MOVE_LAYER).
+///
+/// Die Reihenfolge der Ebenen ist im Tiled-Format ihre ZEICHENreihenfolge --
+/// die erste liegt hinten. Verschieben ist also keine Anzeigesache, sondern
+/// aendert das Bild.
+///
+/// `nach` ist die Stelle, an der die Ebene DANACH steht (0 = ganz hinten).
+/// Herausnehmen und einsetzen, nicht tauschen: ein Tausch waere bei einem
+/// Sprung ueber mehrere Stellen etwas anderes, und die Karte hat dafuer
+/// keine zweite Bedeutung.
+pub fn ebene_verschieben(m: &Rc<RefCell<TiledMap>>, von: i64, nach: i64) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    let n = map.layers.len() as i64;
+    if von < 0 || von >= n {
+        return Err(std::format!("TILED_MOVE_LAYER: Ebene {} gibt es nicht", von));
+    }
+    if nach < 0 || nach >= n {
+        return Err(std::format!(
+            "TILED_MOVE_LAYER: Stelle {} gibt es nicht (0..{})", nach, n - 1));
+    }
+    if von == nach { return Ok(()); }
+    let l = map.layers.remove(von as usize);
+    map.layers.insert(nach as usize, l);
+    namen_neu(&mut map);
+    Ok(())
+}
+
 /// Eine OBJEKT-Ebene anhaengen (TILED_ADD_OBJECT_LAYER) -> Index.
 ///
 /// Eigene Funktion statt eines Schalters an `ebene_anhaengen`: die beiden

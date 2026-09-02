@@ -12,7 +12,9 @@
 '  Was drin ist:
 '    Werkzeuge   Stift, Radierer, Fuellen, Rechteck, Pipette, Auswahl
 '    Auswahl     Strg+C/X/V kopieren/ausschneiden/einfuegen, Entf leert
-'    Ebenen      anlegen, umbenennen, ein-/ausblenden, loeschen
+'    Ebenen      anlegen, umbenennen, ein-/ausblenden, loeschen und
+'                umsortieren -- die Reihenfolge IST die Zeichenreihenfolge,
+'                die erste Ebene liegt hinten
 '    Kacheln     Eigenschaften je Kachel ([solid] und beliebige
 '                Schluessel/Werte) -- sie gehoeren dem Tileset, gelten also
 '                fuer jedes Vorkommen dieser Kachel
@@ -35,11 +37,12 @@
 '                die Pipette schaltet mit um
 '
 '  Was NICHT drin ist (wie bei den anderen Piloten offen gesagt):
-'    das Umsortieren von Ebenen, und ein Tileset wieder ENTFERNEN -- dabei
-'    verschoeben sich die GIDs dahinter, und jede damit gemalte Kachel zeigte
-'    danach stumm auf ein anderes Bild. Rueckgaengig deckt KACHEL-Aenderungen
-'    ab, nicht das Anlegen/Loeschen von Ebenen, nicht die Kachel-Eigenschaften
-'    und nicht die Objekte.
+'    ein Tileset wieder ENTFERNEN -- dabei verschoeben sich die GIDs
+'    dahinter, und jede damit gemalte Kachel zeigte danach stumm auf ein
+'    anderes Bild. Rueckgaengig deckt KACHEL-Aenderungen ab, nicht das
+'    Anlegen/Loeschen von Ebenen, nicht die Kachel-Eigenschaften und nicht
+'    die Objekte -- die Ebenen-NUMMERN darin wandern beim Umsortieren aber
+'    mit, sonst schriebe ein Rueckgaengig danach in die falsche Ebene.
 '
 '  [ESC] Ende
 ' ============================================================
@@ -269,6 +272,43 @@ SUB verlaufAnwenden(s AS INTEGER, nachher AS BOOLEAN)
     geaendert = TRUE
 END SUB
 
+' Ein aufgezeichneter Schritt merkt sich die NUMMER seiner Ebene. Stellt
+' man die Ebenen um, zeigt sie auf eine andere -- ein Rueckgaengig schriebe
+' dann in die falsche, ohne dass etwas meldete. Die Nummern wandern deshalb
+' mit, statt den Verlauf zu leeren: die Arbeit davor ist ja noch gueltig.
+SUB ebeneVerschieben(richtung AS INTEGER)
+    DIM ziel AS INTEGER : ziel = ebene + richtung
+    IF ziel < 0 OR ziel >= TILED_LAYER_COUNT(karte) THEN RETURN
+    TRY
+        TILED_MOVE_LAYER(karte, ebene, ziel)
+    CATCH e
+        meldung = e
+        RETURN
+    END TRY
+    verlaufUmnummerieren(ebene, ziel)
+    ebene = ziel
+    geaendert = TRUE
+    listeAuffrischen()
+    objListeAuffrischen()
+    meldung = "'" + TILED_LAYER_NAME(karte, ebene) + "' liegt jetzt weiter " + _
+              IIF(richtung < 0, "hinten", "vorne")
+END SUB
+
+SUB verlaufUmnummerieren(von AS INTEGER, nach AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO uAnz - 1
+        DIM s AS INTEGER : s = (uStart + i) MOD UNDO_MAX
+        DIM e AS INTEGER : e = uEbene[s]
+        IF e = von THEN
+            uEbene[s] = nach
+        ELSEIF von < nach AND e > von AND e <= nach THEN
+            uEbene[s] = e - 1
+        ELSEIF von > nach AND e >= nach AND e < von THEN
+            uEbene[s] = e + 1
+        END IF
+    NEXT
+END SUB
+
 ' Ein Schritt gehoert zu SEINER Ebene, und `verlaufAnwenden` schaltet
 ' dorthin zurueck -- die Anzeige muss also mit. Ohne das zeigte die linke
 ' Spalte nach einem Strg+Z die Bloecke der vorigen Ebene.
@@ -354,7 +394,7 @@ DIM palette AS GUI_WIDGET
 palette = GUI_CANVAS(win, 12, y, PAL_SP * KACHEL * PZ, palH)
 y = y + palH + 14
 
-lbl = GUI_LABEL(win, "Ebenen", 12, y) : y = y + 22
+lbl = GUI_LABEL(win, "Ebenen   (weiter unten = weiter vorne)", 12, y) : y = y + 22
 DIM lstEbenen AS GUI_WIDGET
 lstEbenen = GUI_LISTBOX(win, 12, y, LINKS - 24, 132, SPLIT$("Boden", "|"))
 y = y + 140
@@ -366,6 +406,13 @@ y = y + 34
 DIM bEbNeu AS GUI_WIDGET  : bEbNeu  = GUI_BUTTON(win, "Anlegen", 12, y, 86, 28)
 DIM bEbUm AS GUI_WIDGET   : bEbUm   = GUI_BUTTON(win, "Umbenennen", 102, y, 116, 28)
 DIM bEbWeg AS GUI_WIDGET  : bEbWeg  = GUI_BUTTON(win, "Weg", 222, y, 54, 28)
+y = y + 36
+' Nach der ZEICHENwirkung benannt, nicht nach der Liste: "hoch/runter"
+' waere doppeldeutig, weil die Liste die hinterste Ebene oben zeigt.
+DIM bEbHinten AS GUI_WIDGET
+bEbHinten = GUI_BUTTON(win, "Nach hinten", 12, y, 130, 28)
+DIM bEbVorne AS GUI_WIDGET
+bEbVorne = GUI_BUTTON(win, "Nach vorne", 146, y, 130, 28)
 y = y + 36
 DIM cbSicht AS GUI_WIDGET : cbSicht = GUI_CHECKBOX(win, "sichtbar", 12, y, TRUE)
 DIM bObjEbene AS GUI_WIDGET
@@ -1066,6 +1113,10 @@ WHILE NOT QUITREQUESTED()
         END TRY
         listeAuffrischen()
     END IF
+    IF GUI_CLICKED(bEbHinten) THEN ebeneVerschieben(-1)
+    IF GUI_CLICKED(bEbVorne) THEN ebeneVerschieben(1)
+    GUI_SET_ENABLED(bEbHinten, ebene > 0)
+    GUI_SET_ENABLED(bEbVorne, ebene < TILED_LAYER_COUNT(karte) - 1)
     IF GUI_CLICKED(bEbWeg) THEN
         IF TILED_LAYER_COUNT(karte) > 1 THEN
             TILED_REMOVE_LAYER(karte, ebene)

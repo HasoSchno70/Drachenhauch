@@ -8343,6 +8343,12 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_MOVE_LAYER",
+   "kind": "core",
+   "signature": "TILED_MOVE_LAYER(m, von, nach)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_REMOVE_LAYER",
    "kind": "core",
    "signature": "TILED_REMOVE_LAYER(m, idx)",

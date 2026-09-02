@@ -4361,6 +4361,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             crate::tiled::ebene_entfernen(&m, need_int(&a[1], "TILED_REMOVE_LAYER")?)?;
             Ok(Value::Nil)
         }
+        "tiled_move_layer" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_MOVE_LAYER")?;
+            crate::tiled::ebene_verschieben(&m, need_int(&a[1], "TILED_MOVE_LAYER")?,
+                                            need_int(&a[2], "TILED_MOVE_LAYER")?)?;
+            Ok(Value::Nil)
+        }
         "tiled_save" => {
             arity!(2);
             let m = tiled_h(&a[0], "TILED_SAVE")?;
