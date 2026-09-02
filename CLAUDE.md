@@ -34,7 +34,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
-> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
+> | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
@@ -297,7 +297,34 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Gegenprobe auf den alten Schluessel; dass der Pilot ein Format schreibt,
 > das ATLAS_LOAD liest, stand bis dahin nur als Behauptung im Kopfkommentar.
 >
-> **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
+> **Rueckgaengig hat seit 2026-09-02 auch der zweite** (Faktor 0,58 ->
+> 0,78) -- und dort stellte sich eine Frage, die bei Kachel- und
+> Pixel-Editoren gar nicht auftaucht: **wann ist ein Schritt fertig?** Ein
+> gezogener Regler aendert sich in JEDEM Bild; jedes davon aufzuzeichnen
+> ergibt nach einer Sekunde 60 Schritte, und Strg+Z nimmt ein Sechzigstel
+> der Bewegung zurueck. Gesichert wird deshalb erst, wenn sich ein Bild lang
+> nichts geaendert hat UND keine Maustaste mehr haengt -- ein Zug ist ein
+> Schritt, und eine Werkseinstellung (20 Werte auf einmal) auf demselben Weg
+> ebenfalls. Gespeichert wird der VOLLE Stand (20 Zahlen), nicht die
+> Aenderung: bei der Groesse ist das kuerzer als jede Buchfuehrung darueber.
+> Kein Ringpuffer wie bei den anderen beiden -- bei 20 Zahlen je Stand
+> kostet das Aufruecken nichts, und eine Liste ohne Modulo versteht man noch.
+> Zwei eigene Fallen: nach einem Rueckgaengig muss die Aenderungs-Erkennung
+> den neuen Stand als BEKANNT ansehen (`letzteAuffrischen`), sonst zeichnet
+> sie ihn als frische Aenderung auf und der Vor-Weg ist weg; und der
+> Einfuegeplatz ist `uPos + 1` -- beim allerersten Stand gibt es aber keinen
+> Vorgaenger, da muss es 0 sein (sonst steht Schritt 0 leer und der Start
+> zaehlt als zwei).
+>
+> **Dabei fiel ein Fehler auf, den kein Test je gesehen hatte:** [Sichern]
+> und [Laden] lagen seit dem 2026-08-31 genau auf den ersten beiden
+> Eintraegen der Werkseinstellungs-Liste (beide bei x = 16, y = 494, die
+> Liste ebenso). "Funken" war verdeckt und fing seine Klicks nicht mehr --
+> der Knopf darueber tat es. Sichtbar nur im BILD. Der Test dazu fragt
+> `GUI_HIT_TEST` statt zu klicken: ein echter Klick wuerde beim alten Stand
+> einen Datei-Dialog oeffnen und den Lauf haengen lassen.
+>
+> **Nicht portiert:** Undo/Redo im ERSTEN Piloten (SFX). Der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
 > betroffenen Ebene; beim Sprite-Editor werden die Plaetze EINMAL angelegt
 > und wiederverwendet -- `IMAGE_FREE` gibt es seit dem Pilotenbefund zwar,
