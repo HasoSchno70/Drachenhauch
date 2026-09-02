@@ -38,6 +38,8 @@ MAUSRAD = 8                    # raylibs INPUT_MOUSE_WHEEL_MOTION (x, y)
 TASTE_ENTF = 261
 TASTE_I = 73                   # raylib-Codes, nicht die von Drachenhauch
 TASTE_UMSCHALT = 340
+TASTE_STRG = 341
+TASTE_Z = 90
 
 # Nur was dieser Test braucht: die Lage des Knopfes und die Kartenmasse.
 _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode)) + _
@@ -57,13 +59,19 @@ _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode
           " " + STR$(zoom) + " " + STR$(TILED_LAYER_COUNT(karte)) + _
           " " + STR$(GUI_CANVAS_X(palette)) + " " + STR$(GUI_CANVAS_Y(palette)) + _
           " " + STR$(GUI_GET_X(bTsNeu)) + " " + STR$(GUI_GET_Y(bTsNeu)) + _
-          " " + STR$(tsAnz) + " " + STR$(tsAkt) + " " + STR$(basisGid())
+          " " + STR$(tsAnz) + " " + STR$(tsAkt) + " " + STR$(basisGid()) + _
+          " " + STR$(GUI_GET_X(bEbHinten)) + " " + STR$(GUI_GET_Y(bEbHinten)) + _
+          " " + STR$(GUI_GET_X(bEbVorne)) + " " + STR$(GUI_GET_Y(bEbVorne)) + _
+          " " + STR$(GUI_GET_X(bEbNeu)) + " " + STR$(GUI_GET_Y(bEbNeu)) + _
+          " " + STR$(GUI_GET_X(lstEbenen)) + " " + STR$(GUI_GET_Y(lstEbenen)) + _
+          " " + STR$(ebene)
 '''
 _FELDER = ("codeX codeY kb kh zell solidX solidY setzX setzY "
            "wegX wegY propX propY gewaehlt "
            "objEbX objEbY objWegX objWegY objUebX objUebY lstObjX lstObjY "
            "istObj objSel objAnz cvX cvY zoom ebenen "
-           "palX palY tsNeuX tsNeuY tsAnz tsAkt basisGid").split()
+           "palX palY tsNeuX tsNeuY tsAnz tsAkt basisGid "
+           "hintenX hintenY vorneX vorneY ebNeuX ebNeuY lstEbX lstEbY ebene").split()
 
 _DIALOG_CODE = 'FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")'
 
@@ -530,3 +538,82 @@ def test_umschalt_rollt_die_palette_zur_seite(tmp_path):
     ev += _klick(22, geo["palX"] + 8, geo["palY"] + 8)
     letzte = _lauf(tmp_path, 38, ev, dialoge=_mit_tileset(datei))[-1]
     assert letzte["gewaehlt"] == 2, "Zeile 0, Spalte 2"
+
+
+# ---------------------------------------------------------- Ebenen umsortieren
+# Die Reihenfolge der Ebenen IST ihre Zeichenreihenfolge -- die erste liegt
+# hinten. Umsortieren aendert also das Bild, nicht nur die Liste.
+
+def _ebenen_von(tmp_path):
+    from drachenhauch.tilemap.document import TileMapDoc
+    return [l.name for l in TileMapDoc.load_json(tmp_path / "raus.json").layers]
+
+
+def _zweite_ebene(geo, ab=3):
+    """Eine zweite Ebene anlegen -- sie wird die aktive und liegt vorne."""
+    return _klick(ab, geo["ebNeuX"] + 40, geo["ebNeuY"] + 14)
+
+
+def test_eine_ebene_laesst_sich_nach_hinten_holen(tmp_path):
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _zweite_ebene(geo)
+    ev += _klick(10, geo["hintenX"] + 60, geo["hintenY"] + 14)
+    ev += _klick(18, geo["codeX"] + 52, geo["codeY"] + 16)
+    letzte = _lauf(tmp_path, 34, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})[-1]
+    assert letzte["ebene"] == 0, "die aktive Ebene folgt ihrer Ebene"
+    assert _ebenen_von(tmp_path) == ["Ebene 2", "Boden"]
+
+
+def test_und_wieder_nach_vorne(tmp_path):
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _zweite_ebene(geo)
+    ev += _klick(10, geo["hintenX"] + 60, geo["hintenY"] + 14)
+    ev += _klick(16, geo["vorneX"] + 60, geo["vorneY"] + 14)
+    ev += _klick(24, geo["codeX"] + 52, geo["codeY"] + 16)
+    letzte = _lauf(tmp_path, 40, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})[-1]
+    assert letzte["ebene"] == 1
+    assert _ebenen_von(tmp_path) == ["Boden", "Ebene 2"]
+
+
+def test_die_kacheln_bleiben_bei_ihrer_ebene(tmp_path):
+    """Der eigentliche Test: eine Ebene, die beim Umstellen ihren Inhalt
+    verloere (oder den der Nachbarin bekaeme), faellt an der Liste nicht auf."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, *_karte_punkt(geo, 16, 16))          # Kachel auf "Boden"
+    ev += _zweite_ebene(geo, ab=10)
+    ev += _klick(18, geo["hintenX"] + 60, geo["hintenY"] + 14)
+    ev += _klick(26, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 42, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
+    from drachenhauch.tilemap.document import TileMapDoc
+    doc = TileMapDoc.load_json(tmp_path / "raus.json")
+    assert [l.name for l in doc.layers] == ["Ebene 2", "Boden"]
+    assert doc.layers[0].get(1, 1) == 0, "die neue Ebene ist leer"
+    assert doc.layers[1].get(1, 1) == 1, "und die Kachel blieb bei 'Boden'"
+
+
+def test_rueckgaengig_trifft_nach_dem_umsortieren_noch_seine_ebene(tmp_path):
+    """Ein aufgezeichneter Schritt merkt sich die NUMMER seiner Ebene. Ohne
+    Umnummerieren schriebe das Rueckgaengig danach in die falsche -- und
+    zwar stumm: es setzte den Vorher-Stand der EINEN Ebene in die ANDERE,
+    hier also eine leere Flaeche ueber die gemalte Kachel von 'Boden'.
+
+    Der Ablauf muss deshalb genau so sein: erst 'Boden' bemalen, dann die
+    Ebene anlegen (das leert den Verlauf), dann auf der neuen malen -- nur
+    so gibt es einen Schritt, der nach dem Umstellen woanders hinzeigt.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, *_karte_punkt(geo, 16, 16))            # Kachel auf "Boden"
+    ev += _zweite_ebene(geo, ab=10)
+    ev += _klick(16, *_karte_punkt(geo, 48, 16))          # Kachel auf "Ebene 2"
+    ev += _klick(24, geo["hintenX"] + 60, geo["hintenY"] + 14)
+    # Strg muss in JEDEM Bild gemeldet werden -- eine eingespeiste Taste
+    # gilt nur fuer ihr eigenes, die echte Abfrage ueberschreibt sie danach.
+    ev += [(f, KEY_DOWN, TASTE_STRG) for f in (32, 33, 34, 35)]
+    ev += [(33, KEY_DOWN, TASTE_Z)]
+    ev += _klick(42, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 58, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
+    from drachenhauch.tilemap.document import TileMapDoc
+    doc = TileMapDoc.load_json(tmp_path / "raus.json")
+    assert [l.name for l in doc.layers] == ["Ebene 2", "Boden"]
+    assert doc.layers[0].get(3, 1) == 0, "das Rueckgaengig nimmt seine Kachel zurueck"
+    assert doc.layers[1].get(1, 1) == 1, "und faellt nicht in die Nachbar-Ebene"

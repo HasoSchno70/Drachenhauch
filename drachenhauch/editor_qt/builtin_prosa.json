@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1566,
+ "count": 1567,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1334,6 +1334,7 @@
   "TILED_LAYER_VISIBLE": "BOOLEAN — ist die Ebene eingeblendet?",
   "TILED_LAYER_WIDTH": "INTEGER (nur Tile-Layer) Groesse der Ebene in Kacheln",
   "TILED_LOAD": "TILED_MAP",
+  "TILED_MOVE_LAYER": "eine Ebene an eine andere Stelle setzen",
   "TILED_NEW": "TILED_MAP — eine leere Karte anlegen -- ohne Ebene und ohne Tileset",
   "TILED_OBJECT_COUNT": "INTEGER — wie viele Objekte hat diese Objekt-Ebene?",
   "TILED_OBJECT_HEIGHT": "FLOAT — Groesse des Objekts in Pixeln",
