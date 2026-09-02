@@ -166,7 +166,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 |---|---|---|
 | SFX-Generator | 522 | 484 |
 | Partikel-Editor | 802 | 468 |
-| Tilemap-Editor | 2428 | 762 |
+| Tilemap-Editor | 2428 | 842 |
 | Sprite-Editor | 7379 | 2604 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die

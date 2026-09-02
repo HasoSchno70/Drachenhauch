@@ -35,7 +35,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
-> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 842 | 0,35 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
@@ -48,13 +48,26 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Qt-Fassung ihre Vorschau von Hand (`paintEvent`, alle fuenf
 > Darstellungsarten in QPainter), die Drachenhauch-Fassung ruft
 > `PARTICLE_DRAW` -- rund 150 Zeilen Ersparnis kommen allein daher. Beim
-> Tilemap-Editor ist die 0,31 aus einem anderen Grund zu guenstig: rund
-> **620 der 2428 Qt-Zeilen** sind Objekt-Ebenen, mehrere Tilesets,
-> Kachel-Eigenschaften und der GB-Code-Export -- alles nicht portiert.
-> Gegen den vergleichbaren Rest steht es 762 zu ~1800, also **0,42**.
+> Tilemap-Editor ist die 0,35 aus einem anderen Grund zu guenstig: rund
+> **494 der 2428 Qt-Zeilen** sind Objekt-Ebenen, mehrere Tilesets und
+> Kachel-Eigenschaften -- alles nicht portiert. Gegen den vergleichbaren
+> Rest steht es 842 zu ~1930, also **0,44**. (Die Zahl war 620 bzw. 0,42,
+> solange auch der GB-Code-Export fehlte: seine 126 Qt-Zeilen sind seit
+> 2026-09-02 portiert.)
 > Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
 > dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
 > Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
+>
+> **Der Tilemap-Pilot schreibt seit 2026-09-02 auch GB-Code** -- einen
+> lauffaehigen Renderer, die Karte als Tiled-JSON und das Tileset-Bild, alle
+> drei unter demselben Namen und in einem Zug. Das Bild kommt mit, obwohl die
+> Karte seinen Pfad ohnehin nennt: der Pfad zeigt dorthin, wo das Tileset beim
+> BEARBEITEN lag, und wer den Ordner weitergibt, haette sonst eine Karte, die
+> auf nichts zeigt. Geprueft am BILD des erzeugten Programms, mit der
+> Gegenprobe im Test: die leere Karte ergibt genau EINEN Farbton, dieselbe mit
+> einer gemalten Kachel mehr. Uebersetzen allein bewiese nichts -- ein
+> Renderer, der sein Tileset nicht findet oder die gid falsch aufloest,
+> uebersetzt genauso und zeigt einen leeren Schirm.
 >
 > **Der dritte Pilot war der erste aus einer anderen Familie**: kein
 > Regler-Editor mit Vorschau, sondern Werkzeuge mit Zugbewegung, eine
