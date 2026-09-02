@@ -13,6 +13,9 @@
 '    Werkzeuge   Stift, Radierer, Fuellen, Rechteck, Pipette, Auswahl
 '    Auswahl     Strg+C/X/V kopieren/ausschneiden/einfuegen, Entf leert
 '    Ebenen      anlegen, umbenennen, ein-/ausblenden, loeschen
+'    Kacheln     Eigenschaften je Kachel ([solid] und beliebige
+'                Schluessel/Werte) -- sie gehoeren dem Tileset, gelten also
+'                fuer jedes Vorkommen dieser Kachel
 '    Ansicht     Zoom 1..6, schieben (rechte Maustaste oder Pfeiltasten),
 '                Gitter, Kachelnummern
 '    Datei       Neu / Oeffnen / Speichern -- echtes Tiled-JSON
@@ -23,9 +26,9 @@
 '                demselben Namen, damit keins ins Leere zeigt
 '
 '  Was NICHT drin ist (wie bei den anderen Piloten offen gesagt):
-'    Objekt-Ebenen, mehrere Tilesets, Eigenschaften je Kachel und das
-'    Umsortieren von Ebenen. Rueckgaengig deckt KACHEL-Aenderungen ab,
-'    nicht das Anlegen/Loeschen von Ebenen.
+'    Objekt-Ebenen, mehrere Tilesets und das Umsortieren von Ebenen.
+'    Rueckgaengig deckt KACHEL-Aenderungen ab, nicht das Anlegen/Loeschen
+'    von Ebenen und nicht die Kachel-Eigenschaften.
 '
 '  [ESC] Ende
 ' ============================================================
@@ -267,6 +270,23 @@ DIM bEbUm AS GUI_WIDGET   : bEbUm   = GUI_BUTTON(win, "Umbenennen", 102, y, 116,
 DIM bEbWeg AS GUI_WIDGET  : bEbWeg  = GUI_BUTTON(win, "Weg", 222, y, 54, 28)
 y = y + 36
 DIM cbSicht AS GUI_WIDGET : cbSicht = GUI_CHECKBOX(win, "sichtbar", 12, y, TRUE)
+y = y + 32
+
+' Eigenschaften der GEWAEHLTEN Palettenkachel -- sie gehoeren dem Tileset,
+' nicht der Karte, gelten also fuer jedes Vorkommen dieser Kachel.
+lbl = GUI_LABEL(win, "Eigenschaften der Kachel", 12, y) : y = y + 22
+DIM cbSolid AS GUI_WIDGET : cbSolid = GUI_CHECKBOX(win, "solid", 12, y, FALSE)
+GUI_TOOLTIP(cbSolid, "Die haeufigste Eigenschaft -- genau sie fragt tile_collide ab")
+y = y + 28
+DIM lstProp AS GUI_WIDGET
+lstProp = GUI_LISTBOX(win, 12, y, LINKS - 24, 88, SPLIT$("", "|"))
+y = y + 96
+DIM edKey AS GUI_WIDGET : edKey = GUI_TEXTINPUT(win, 12, y, 130, 28, "damage")
+DIM edWert AS GUI_WIDGET : edWert = GUI_TEXTINPUT(win, 148, y, 128, 28, "5")
+y = y + 34
+DIM bPropSetz AS GUI_WIDGET : bPropSetz = GUI_BUTTON(win, "Setzen", 12, y, 100, 28)
+DIM bPropWeg AS GUI_WIDGET : bPropWeg = GUI_BUTTON(win, "Weg", 116, y, 80, 28)
+GUI_TOOLTIP(bPropWeg, "Die in der Liste gewaehlte Eigenschaft entfernen")
 
 ' --------------------------------------------------------- Karten-Flaeche
 DIM leinwand AS GUI_WIDGET
@@ -287,6 +307,77 @@ DIM spH AS GUI_WIDGET  : spH = GUI_SPINNER(winNeu, 110, 48, 160, 4, MAXH, 30)
 DIM bNeuOk AS GUI_WIDGET : bNeuOk = GUI_BUTTON(winNeu, "Anlegen", 110, 92, 90, 30)
 DIM bNeuAb AS GUI_WIDGET : bNeuAb = GUI_BUTTON(winNeu, "Abbrechen", 206, 92, 90, 30)
 GUI_WINDOW_VISIBLE(winNeu, FALSE)
+
+' =================================================== Kachel-Eigenschaften
+
+FUNCTION palGid() AS INTEGER
+    RETURN basisGid() + gewaehlt
+END FUNCTION
+
+SUB eigenschaftenAuffrischen()
+    DIM g AS INTEGER : g = palGid()
+    DIM k AS ARRAY OF STRING : k = TILED_TILE_PROP_KEYS(karte, g)
+    DIM n AS INTEGER : n = LEN(k)
+    DIM zeilen[MAX(n, 1)] AS STRING
+    zeilen[0] = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ' Der Wert als Text -- die Laufzeit gibt jeden Typ so aus, und in
+        ' einer Liste ist genau das die brauchbare Form.
+        zeilen[i] = k[i] + " = " + TILED_TILE_PROP_STRING(karte, g, k[i])
+    NEXT
+    GUI_SET_LISTBOX(lstProp, zeilen)
+    GUI_SET_CHECKED(cbSolid, TILED_TILE_HAS_PROP(karte, g, "solid"))
+END SUB
+
+FUNCTION istZahl(t AS STRING) AS BOOLEAN
+    IF LEN(t) = 0 THEN RETURN FALSE
+    DIM punkte AS INTEGER : punkte = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        DIM c AS STRING : c = MID$(t, i, 1)
+        DIM o AS INTEGER : o = ASC(c)
+        IF c = "." THEN
+            punkte = punkte + 1
+        ELIF c = "-" AND i = 0 THEN
+            ' Vorzeichen nur ganz vorn
+        ELIF o < 48 OR o > 57 THEN
+            RETURN FALSE
+        END IF
+    NEXT
+    IF punkte > 1 THEN RETURN FALSE
+    ' "-" und "." allein sind keine Zahlen.
+    RETURN INSTR(t, "0") >= 0 OR INSTR(t, "1") >= 0 OR INSTR(t, "2") >= 0 OR _
+           INSTR(t, "3") >= 0 OR INSTR(t, "4") >= 0 OR INSTR(t, "5") >= 0 OR _
+           INSTR(t, "6") >= 0 OR INSTR(t, "7") >= 0 OR INSTR(t, "8") >= 0 OR _
+           INSTR(t, "9") >= 0
+END FUNCTION
+
+' Aus dem Eingetippten die passende Art machen. Tiled unterscheidet vier
+' (bool/int/float/string), EIN Eingabefeld kann sie nicht erfragen -- also
+' wird gedeutet: "true"/"false" (auch deutsch), eine Zahl mit Punkt wird
+' FLOAT, eine ohne INTEGER, alles andere bleibt Text.
+'
+' Das Ergebnis steht sofort in der Liste. Deuten ohne Rueckmeldung waere die
+' unangenehme Fassung: "3" als Text abgelegt sieht in der Datei genauso aus
+' wie eine 3, verhaelt sich aber anders, sobald jemand damit rechnet.
+SUB eigenschaftSetzen(g AS INTEGER, key AS STRING, roh AS STRING)
+    DIM t AS STRING : t = TRIM$(roh)
+    DIM kl AS STRING : kl = LOWER$(t)
+    IF kl = "true" OR kl = "wahr" THEN
+        TILED_TILE_SET_PROP(karte, g, key, TRUE)
+    ELIF kl = "false" OR kl = "falsch" THEN
+        TILED_TILE_SET_PROP(karte, g, key, FALSE)
+    ELIF istZahl(t) THEN
+        IF INSTR(t, ".") >= 0 THEN
+            TILED_TILE_SET_PROP(karte, g, key, VAL(t))
+        ELSE
+            TILED_TILE_SET_PROP(karte, g, key, INT(VAL(t)))
+        END IF
+    ELSE
+        TILED_TILE_SET_PROP(karte, g, key, t)
+    END IF
+END SUB
 
 ' ============================================================ Ebenenliste
 
@@ -480,6 +571,7 @@ END SUB
 
 neueKarte(kb, kh)
 listeAuffrischen()
+eigenschaftenAuffrischen()
 
 DIM neuOffen AS BOOLEAN : neuOffen = FALSE
 DIM meldung AS STRING : meldung = ""
@@ -529,6 +621,50 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O)) THEN oeffnen()
     IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S)) THEN speichern()
+    ' ---------------------------------------------------- Kachel-Eigenschaften
+    DIM pg AS INTEGER : pg = palGid()
+    IF GUI_CLICKED(cbSolid) THEN
+        ' Beim Abwaehlen ENTFERNEN statt auf FALSE zu setzen. `solid = FALSE`
+        ' waere nicht dasselbe: sobald IRGENDEINE Kachel ein `solid` hat,
+        ' schaltet die Kollision von "jede Kachel blockiert" auf "nur die mit
+        ' solid = TRUE" um (`solid_aware`). Ein zurueckgelassenes FALSE haelt
+        ' diesen Schalter also umgelegt, ohne dass man es sieht.
+        IF GUI_CHECKED(cbSolid) THEN
+            TILED_TILE_SET_PROP(karte, pg, "solid", TRUE)
+        ELSE
+            TILED_TILE_REMOVE_PROP(karte, pg, "solid")
+        END IF
+        geaendert = TRUE
+        eigenschaftenAuffrischen()
+    END IF
+    IF GUI_CLICKED(bPropSetz) THEN
+        DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+        IF sk = "" THEN
+            meldung = "Ohne Schluessel geht es nicht."
+        ELSE
+            TRY
+                eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+                geaendert = TRUE
+                eigenschaftenAuffrischen()
+                meldung = "Kachel " + STR$(gewaehlt) + ": " + sk + " gesetzt"
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bPropWeg) THEN
+        DIM pi AS INTEGER : pi = GUI_LISTBOX_SELECTED(lstProp)
+        DIM pk AS ARRAY OF STRING : pk = TILED_TILE_PROP_KEYS(karte, pg)
+        IF pi >= 0 AND pi < LEN(pk) THEN
+            TILED_TILE_REMOVE_PROP(karte, pg, pk[pi])
+            geaendert = TRUE
+            eigenschaftenAuffrischen()
+            meldung = pk[pi] + " entfernt"
+        ELSE
+            meldung = "Erst eine Eigenschaft in der Liste waehlen."
+        END IF
+    END IF
+
     IF GUI_CLICKED(bCode) THEN
         DIM pc AS STRING
         pc = FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
@@ -648,7 +784,10 @@ WHILE NOT QUITREQUESTED()
         DIM pyi AS INTEGER : pyi = (my - py) \ (KACHEL * PZ)
         IF mx >= px AND my >= py AND pxi < tsSp AND pyi < tsRe THEN
             DIM k AS INTEGER : k = pyi * tsSp + pxi
-            IF k < tsN THEN gewaehlt = k
+            IF k < tsN AND k <> gewaehlt THEN
+                gewaehlt = k
+                eigenschaftenAuffrischen()
+            END IF
         END IF
     END IF
 
@@ -674,7 +813,10 @@ WHILE NOT QUITREQUESTED()
                 schrittBeginn()
             CASE WZ_PIPETTE
                 DIM g AS INTEGER : g = TILED_TILE_AT(karte, ebene, tx, ty)
-                IF g > 0 AND g - basisGid() < tsN THEN gewaehlt = g - basisGid()
+                IF g > 0 AND g - basisGid() < tsN THEN
+                    gewaehlt = g - basisGid()
+                    eigenschaftenAuffrischen()
+                END IF
                 zieht = FALSE
             CASE WZ_AUSWAHL
                 selAn = TRUE

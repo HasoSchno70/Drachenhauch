@@ -8373,6 +8373,18 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_TILE_PROP_KEYS",
+   "kind": "builtin",
+   "signature": "TILED_TILE_PROP_KEYS(m, gid) -> ARRAY OF STRING",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_PROP_KEYS",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_PROP_KEYS(m, ebene$, idx) -> ARRAY OF STRING",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_TILE_HEIGHT",
    "kind": "core",
    "signature": "TILED_TILE_HEIGHT(m)",

@@ -4479,6 +4479,36 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let m = tiled_h(&a[0], "TILED_TILE_HAS_PROP")?; let mb = m.borrow();
             Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).is_some()))
         }
+        // Die Schluessel einer Kachel bzw. eines Objekts. Ohne sie liesse
+        // sich nicht ANZEIGEN, was ein Tile hat -- `TILED_TILE_HAS_PROP`
+        // beantwortet nur eine Frage, die man schon kennt. Aufgefallen beim
+        // Eigenschaften-Kasten des Tilemap-Piloten.
+        //
+        // SORTIERT: die Ablage ist eine HashMap, ihre Reihenfolge also
+        // beliebig und von Lauf zu Lauf verschieden. Eine Liste, die sich
+        // bei jedem Auffrischen neu mischt, waere nicht zu bedienen.
+        "tiled_tile_prop_keys" | "tiled_object_prop_keys" => {
+            let kachel = name.starts_with("tiled_tile");
+            let fn_ = if kachel { "TILED_TILE_PROP_KEYS" } else { "TILED_OBJECT_PROP_KEYS" };
+            let n = if kachel { 2 } else { 3 };
+            if a.len() != n {
+                return err(format!("{}: erwartet {} Argumente, bekam {}", fn_, n, a.len()));
+            }
+            let m = tiled_h(&a[0], fn_)?;
+            let mb = m.borrow();
+            let mut keys: Vec<String> = if kachel {
+                mb.tile_properties_of(need_int(&a[1], fn_)?)
+                    .map(|p| p.keys().cloned().collect()).unwrap_or_default()
+            } else {
+                get_obj(&mb, need_str(&a[1], fn_)?, need_int(&a[2], fn_)?, fn_)?
+                    .properties.keys().cloned().collect()
+            };
+            keys.sort();
+            let mut arr = GbArray::new("string".to_string(), vec![keys.len() as i64],
+                                       || Value::str_rc(""));
+            for (i, k) in keys.iter().enumerate() { arr.cells.set(i, Value::str_rc(k)); }
+            Ok(Value::Array(Rc::new(RefCell::new(arr))))
+        }
         "tiled_object_count" => {
             arity!(2);
             let m = tiled_h(&a[0], "TILED_OBJECT_COUNT")?; let mb = m.borrow();

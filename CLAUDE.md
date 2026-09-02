@@ -35,7 +35,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
-> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 842 | 0,35 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 984 | 0,41 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
@@ -48,12 +48,13 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Qt-Fassung ihre Vorschau von Hand (`paintEvent`, alle fuenf
 > Darstellungsarten in QPainter), die Drachenhauch-Fassung ruft
 > `PARTICLE_DRAW` -- rund 150 Zeilen Ersparnis kommen allein daher. Beim
-> Tilemap-Editor ist die 0,35 aus einem anderen Grund zu guenstig: rund
-> **494 der 2428 Qt-Zeilen** sind Objekt-Ebenen, mehrere Tilesets und
-> Kachel-Eigenschaften -- alles nicht portiert. Gegen den vergleichbaren
-> Rest steht es 842 zu ~1930, also **0,44**. (Die Zahl war 620 bzw. 0,42,
-> solange auch der GB-Code-Export fehlte: seine 126 Qt-Zeilen sind seit
-> 2026-09-02 portiert.)
+> Tilemap-Editor ist die 0,41 aus demselben Grund zu guenstig, nur
+> schrumpfend: nicht portiert sind noch Objekt-Ebenen und mehrere Tilesets.
+> **Eine genaue Restzahl gibt es dafuer nicht mehr** -- der
+> Qt-Eigenschaften-Dialog (167 Zeilen) bedient Kacheln UND Objekte, und
+> portiert ist davon nur die Kachel-Haelfte; sauber aufteilen laesst er sich
+> nicht. Die Zahl lag bei 620 (Faktor 0,42 gegen den Rest), als auch
+> GB-Code-Export und Eigenschaften noch fehlten.
 > Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
 > dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
 > Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
@@ -68,6 +69,22 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > einer gemalten Kachel mehr. Uebersetzen allein bewiese nichts -- ein
 > Renderer, der sein Tileset nicht findet oder die gid falsch aufloest,
 > uebersetzt genauso und zeigt einen leeren Schirm.
+>
+> **Kachel-Eigenschaften kann der dritte Pilot seit 2026-09-02** -- ein
+> [solid]-Kaestchen und beliebige Schluessel/Werte, mit der Liste dessen, was
+> die gewaehlte Palettenkachel schon hat. Beim ABWAEHLEN von `solid` wird die
+> Eigenschaft ENTFERNT, nicht auf FALSE gesetzt: sobald irgendeine Kachel ein
+> `solid` traegt, schaltet `solid_aware` die Kollision von "jede Kachel
+> blockiert" auf "nur die mit solid = TRUE" um -- ein zurueckgelassenes FALSE
+> haelt diesen Schalter umgelegt, ohne dass man es sieht. Der Wert aus dem
+> Eingabefeld wird GEDEUTET (true/false, Zahl mit Punkt -> FLOAT, ohne ->
+> INTEGER, sonst Text) und das Ergebnis sofort angezeigt: eine 5 als Text
+> sieht in der Datei fast aus wie eine 5 als Zahl, verhaelt sich aber anders.
+> Dabei fiel eine weitere Modul-Luecke auf: es gab keine Moeglichkeit, die
+> Schluessel einer Kachel AUFZUZAEHLEN (`TILED_TILE_HAS_PROP` beantwortet nur
+> eine Frage, die man schon kennt) -- dafuer neu `TILED_TILE_PROP_KEYS` und
+> `TILED_OBJECT_PROP_KEYS`, sortiert, weil eine Liste aus einer HashMap sich
+> sonst bei jedem Auffrischen neu mischt.
 >
 > **Der dritte Pilot war der erste aus einer anderen Familie**: kein
 > Regler-Editor mit Vorschau, sondern Werkzeuge mit Zugbewegung, eine
