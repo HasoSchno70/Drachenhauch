@@ -35,7 +35,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > |---|---|---|---|
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
-> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1254 | 0,52 |
+> | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1485 | 0,61 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
@@ -48,13 +48,13 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Qt-Fassung ihre Vorschau von Hand (`paintEvent`, alle fuenf
 > Darstellungsarten in QPainter), die Drachenhauch-Fassung ruft
 > `PARTICLE_DRAW` -- rund 150 Zeilen Ersparnis kommen allein daher. Beim
-> Tilemap-Editor ist die 0,52 aus demselben Grund zu guenstig, nur
-> schrumpfend: nicht portiert sind noch mehrere Tilesets und das Umsortieren
-> der Ebenen. **Eine genaue Restzahl gibt es dafuer nicht mehr** -- der
+> Tilemap-Editor ist die 0,61 aus demselben Grund zu guenstig, nur
+> schrumpfend: nicht portiert ist noch das Umsortieren der Ebenen.
+> **Eine genaue Restzahl gibt es dafuer nicht mehr** -- der
 > Qt-Eigenschaften-Dialog (167 Zeilen) bedient Kacheln UND Objekte, und
 > beide Haelften sind inzwischen da, nur nicht als EIN Dialog. Die Zahl lag
 > bei 620 (Faktor 0,42 gegen den Rest), als GB-Code-Export,
-> Eigenschaften und Objekt-Ebenen noch alle fehlten.
+> Eigenschaften, Objekt-Ebenen und mehrere Tilesets noch alle fehlten.
 > Wer hochrechnet, muss beide Fragen stellen: wie viel von dem Qt-Code
 > dupliziert etwas, das die Laufzeit schon kann -- und wie viel von dem
 > Qt-Code hat die Drachenhauch-Fassung gar nicht erst?
@@ -103,6 +103,23 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Objekt ist weg. (3) `DIM blockA[7] AS GUI_WIDGET` muss mit Groesse
 > deklariert werden -- ein Feld-Literal aus Widget-Handles wird als
 > `ARRAY OF INTEGER` gedeutet und dann abgelehnt.
+>
+> **Mehrere Tilesets** (2026-09-02) waren der letzte grosse Rest und
+> brauchten keinen einzigen neuen Befehl -- das `tiled`-Modul konnte sie
+> laengst, der Pilot rechnete nur ueberall mit EINEM. Drei Stellen mussten
+> auseinandergezogen werden: die Palette zeigt eines (`tsAkt`, Klappliste
+> plus [+]), gemalt wird aus dessen GID-Bereich -- **gezeichnet aber jede
+> Kachel mit IHREM eigenen** (`tsFuerGid`), sonst saehe die halbe Karte
+> falsch aus, sobald zwei Tilesets im Spiel sind. Die Pipette schaltet mit
+> um, sonst zeigte die Palette die aufgenommene Kachel gar nicht und der
+> naechste Strich malte eine andere. **Entfernen gibt es bewusst NICHT**:
+> die firstgids dahinter wuerden sich verschieben, und jede damit gemalte
+> Kachel zeigte danach stumm auf ein anderes Bild -- genau der Fehler, den
+> die Qt-Fassung 2026-07-26 hatte. Und die Palette ist jetzt ein
+> AUSSCHNITT fester Groesse mit Rad-Rollen (Umschalt: seitwaerts): ein
+> zweites Tileset hat selten dieselben Masse, und eine mitwachsende Palette
+> haette die ganze linke Spalte bei jedem Umschalten verschoben.
+> Faktor 0,52 -> 0,61.
 >
 > **Der dritte Pilot war der erste aus einer anderen Familie**: kein
 > Regler-Editor mit Vorschau, sondern Werkzeuge mit Zugbewegung, eine

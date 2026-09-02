@@ -30,10 +30,16 @@
 '                Hoehe 0), ein Klick auf ein vorhandenes waehlt es aus.
 '                Name und Typ aendern, Entf entfernt
 '
+'    Tilesets   mehrere je Karte ([+] haengt eins an, die Klappliste
+'                schaltet um). Jede Kachel wird mit IHREM Tileset gezeichnet,
+'                die Pipette schaltet mit um
+'
 '  Was NICHT drin ist (wie bei den anderen Piloten offen gesagt):
-'    mehrere Tilesets und das Umsortieren von Ebenen. Rueckgaengig deckt
-'    KACHEL-Aenderungen ab, nicht das Anlegen/Loeschen von Ebenen, nicht die
-'    Kachel-Eigenschaften und nicht die Objekte.
+'    das Umsortieren von Ebenen, und ein Tileset wieder ENTFERNEN -- dabei
+'    verschoeben sich die GIDs dahinter, und jede damit gemalte Kachel zeigte
+'    danach stumm auf ein anderes Bild. Rueckgaengig deckt KACHEL-Aenderungen
+'    ab, nicht das Anlegen/Loeschen von Ebenen, nicht die Kachel-Eigenschaften
+'    und nicht die Objekte.
 '
 '  [ESC] Ende
 ' ============================================================
@@ -68,12 +74,40 @@ CONST FUSS = 28                ' Hoehe der Statuszeile
 DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 
-' ---------------------------------------------------------------- Tileset
+' --------------------------------------------------------------- Tilesets
+' Eine Karte darf mehrere Tilesets mitbringen. Jedes hat einen eigenen
+' GID-Bereich (`firstgid` .. `firstgid + Kachelzahl`), und die Zuordnung
+' GID -> Tileset laeuft ueber genau diese Kette -- deshalb vergibt die
+' Laufzeit die firstgid selbst und niemand hier rechnet sie nach.
+'
+' Die Palette zeigt immer EINES davon (`tsAkt`); gemalt wird eine GID aus
+' dessen Bereich. Gezeichnet wird dagegen JEDE Kachel mit ihrem eigenen
+' Tileset -- eine Ebene kann Kacheln aus allen enthalten.
+CONST MAXTS = 8
+DIM tsPfadA[MAXTS] AS STRING
+DIM tsBildA[MAXTS] AS IMAGE
+DIM tsSpA[MAXTS] AS INTEGER
+DIM tsReA[MAXTS] AS INTEGER
+DIM tsNA[MAXTS] AS INTEGER
+' Liegt das Bild da? Fehlt es, bleiben SEINE Kacheln leer statt mit einem
+' fremden Bild gefuellt zu werden -- das saehe richtig aus und waere falsch.
+DIM tsDaA[MAXTS] AS BOOLEAN
+DIM tsAnz AS INTEGER : tsAnz = 0
+DIM tsAkt AS INTEGER : tsAkt = 0
+
+' Spiegel des aktiven Tilesets. Die Palette rechnet damit, und die Spiegel
+' stehen an EINER Stelle (`tsSpiegeln`) -- zwei Quellen fuer dieselbe Zahl
+' laufen auseinander, sobald eine Stelle das Umschalten vergisst.
 DIM tsPfad AS STRING : tsPfad = "assets/editor_tileset.png"
 DIM tsBild AS IMAGE  : tsBild = LOADIMAGE(tsPfad)
 DIM tsSp AS INTEGER  : tsSp = IMAGEWIDTH(tsBild) \ KACHEL
 DIM tsRe AS INTEGER  : tsRe = IMAGEHEIGHT(tsBild) \ KACHEL
 DIM tsN AS INTEGER   : tsN = tsSp * tsRe
+
+' Ausschnitt der Kachel-Auswahl -- ein Tileset kann groesser sein als der
+' Platz in der linken Spalte.
+DIM palSp AS INTEGER : palSp = 0       ' erste sichtbare Spalte
+DIM palZe AS INTEGER : palZe = 0       ' erste sichtbare Zeile
 
 ' ---------------------------------------------------------------- Zustand
 DIM karte AS TILED_MAP
@@ -137,10 +171,32 @@ DIM objBy AS INTEGER : objBy = 0
 ' ============================================================ Hilfsmittel
 
 FUNCTION basisGid() AS INTEGER
-    ' Kachel 0 des ersten Tilesets. Ohne Tileset waere jede Kachel leer.
+    ' Kachel 0 des AKTIVEN Tilesets -- die Palette malt aus dessen Bereich.
     IF TILED_TILESET_COUNT(karte) = 0 THEN RETURN 1
-    RETURN TILED_TILESET_FIRSTGID(karte, 0)
+    RETURN TILED_TILESET_FIRSTGID(karte, MIN(tsAkt, TILED_TILESET_COUNT(karte) - 1))
 END FUNCTION
+
+FUNCTION tsFuerGid(g AS INTEGER) AS INTEGER
+    ' Welches Tileset gehoert zu dieser GID? Von hinten gesucht: das letzte,
+    ' dessen Bereich sie noch trifft. Eine GID ausserhalb aller Bereiche
+    ' (fremde Datei, geloeschtes Tileset) gibt -1 statt eines falschen Bildes.
+    DIM i AS INTEGER
+    FOR i = tsAnz - 1 TO 0 STEP -1
+        DIM fg AS INTEGER : fg = TILED_TILESET_FIRSTGID(karte, i)
+        IF g >= fg AND g < fg + tsNA[i] THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB tsSpiegeln()
+    IF tsAnz = 0 THEN RETURN
+    tsAkt = MAX(0, MIN(tsAkt, tsAnz - 1))
+    tsPfad = tsPfadA[tsAkt]
+    tsBild = tsBildA[tsAkt]
+    tsSp = tsSpA[tsAkt]
+    tsRe = tsReA[tsAkt]
+    tsN = tsNA[tsAkt]
+END SUB
 
 FUNCTION zell() AS INTEGER
     RETURN KACHEL * zoom
@@ -149,8 +205,11 @@ END FUNCTION
 SUB neueKarte(b AS INTEGER, h AS INTEGER)
     kb = b : kh = h
     karte = TILED_NEW(kb, kh, KACHEL, KACHEL)
+    ' Die neue Karte beginnt mit dem Tileset, mit dem gerade gearbeitet
+    ' wurde -- die anderen sind weg, weil ihre GIDs zu nichts mehr gehoeren.
     DIM t AS INTEGER : t = TILED_ADD_TILESET(karte, tsPfad, tsN)
     DIM e AS INTEGER : e = TILED_ADD_LAYER(karte, "Boden")
+    tilesetsLaden()
     ebene = 0
     panX = 0 : panY = 0
     selAn = FALSE
@@ -276,10 +335,23 @@ DIM y AS INTEGER : y = TB_H + 10
 DIM lbl AS GUI_WIDGET
 lbl = GUI_LABEL(win, "Kacheln", 12, y) : y = y + 22
 
-CONST PAL_B = 264                          ' 8 Spalten * 16 px * 2
-DIM palH AS INTEGER : palH = tsRe * KACHEL * PZ
+' Welches Tileset die Palette zeigt. Entfernen gibt es NICHT: die GIDs
+' dahinter wuerden sich verschieben, und jede damit gemalte Kachel zeigte
+' danach stumm auf ein anderes Bild.
+DIM ddTs AS GUI_WIDGET
+ddTs = GUI_DROPDOWN(win, 12, y, LINKS - 24 - 38, 26, SPLIT$("tileset", "|"))
+DIM bTsNeu AS GUI_WIDGET
+bTsNeu = GUI_BUTTON(win, "+", LINKS - 12 - 32, y, 32, 26)
+y = y + 32
+
+' Die Palette ist ein AUSSCHNITT fester Groesse: ein zweites Tileset hat
+' selten dieselben Masse wie das erste, und die Spalte darunter darf nicht
+' bei jedem Umschalten wandern. Was nicht hineinpasst, wird gerollt.
+CONST PAL_SP = 8                           ' sichtbare Spalten
+CONST PAL_RE = 4                           ' sichtbare Zeilen
+DIM palH AS INTEGER : palH = PAL_RE * KACHEL * PZ
 DIM palette AS GUI_WIDGET
-palette = GUI_CANVAS(win, 12, y, tsSp * KACHEL * PZ, palH)
+palette = GUI_CANVAS(win, 12, y, PAL_SP * KACHEL * PZ, palH)
 y = y + palH + 14
 
 lbl = GUI_LABEL(win, "Ebenen", 12, y) : y = y + 22
@@ -529,21 +601,87 @@ END SUB
 
 ' ============================================================ Datei
 
-SUB kartenTilesetLaden()
-    ' Nach dem Oeffnen das Tileset der Datei nehmen, wenn es daneben liegt.
-    ' Sonst bliebe das eingebaute stehen -- die Karte saehe falsch aus, ohne
-    ' dass etwas gemeldet wuerde.
-    IF TILED_TILESET_COUNT(karte) > 0 THEN
-        DIM p AS STRING : p = TILED_TILESET_IMAGE(karte, 0)
-        IF FILEEXISTS(p) THEN
-            tsPfad = p
-            tsBild = LOADIMAGE(p)
-            tsSp = IMAGEWIDTH(tsBild) \ KACHEL
-            tsRe = IMAGEHEIGHT(tsBild) \ KACHEL
-            tsN = tsSp * tsRe
-            IF gewaehlt >= tsN THEN gewaehlt = 0
+SUB tsListeAuffrischen()
+    DIM n AS INTEGER : n = MAX(tsAnz, 1)
+    DIM namen[n] AS STRING
+    namen[0] = "(keins)"
+    DIM i AS INTEGER
+    FOR i = 0 TO tsAnz - 1
+        ' Der Dateiname, nicht der ganze Pfad -- der passt nicht in die
+        ' Klappliste und sagt fuer die Auswahl auch nichts mehr.
+        namen[i] = BASENAME(tsPfadA[i])
+        IF NOT tsDaA[i] THEN namen[i] = namen[i] + "  (fehlt)"
+    NEXT
+    GUI_SET_DROPDOWN(ddTs, namen)
+    GUI_DROPDOWN_SET_SELECTED(ddTs, MIN(tsAkt, MAX(tsAnz - 1, 0)))
+END SUB
+
+SUB tsWaehlen(i AS INTEGER)
+    IF i < 0 OR i >= tsAnz THEN RETURN
+    tsAkt = i
+    tsSpiegeln()
+    gewaehlt = 0
+    palSp = 0 : palZe = 0
+    tsListeAuffrischen()
+    eigenschaftenAuffrischen()
+END SUB
+
+SUB tilesetsLaden()
+    ' Die Tilesets der Karte einlesen -- ihre Bilder liegen dort, wo die
+    ' Datei sie nennt. Fehlt eins, wird es GEMELDET und bleibt leer: mit dem
+    ' eingebauten Bild einzuspringen saehe richtig aus und waere falsch.
+    tsAnz = MIN(TILED_TILESET_COUNT(karte), MAXTS)
+    DIM fehlt AS STRING : fehlt = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO tsAnz - 1
+        tsPfadA[i] = TILED_TILESET_IMAGE(karte, i)
+        tsNA[i] = TILED_TILESET_TILES(karte, i)
+        tsDaA[i] = FILEEXISTS(tsPfadA[i])
+        IF tsDaA[i] THEN
+            tsBildA[i] = LOADIMAGE(tsPfadA[i])
+            tsSpA[i] = MAX(1, IMAGEWIDTH(tsBildA[i]) \ KACHEL)
+            tsReA[i] = MAX(1, IMAGEHEIGHT(tsBildA[i]) \ KACHEL)
+        ELSE
+            tsSpA[i] = 1 : tsReA[i] = 1
+            fehlt = fehlt + IIF(fehlt = "", "", ", ") + BASENAME(tsPfadA[i])
         END IF
+    NEXT
+    tsAkt = 0
+    tsSpiegeln()
+    IF gewaehlt >= tsN THEN gewaehlt = 0
+    palSp = 0 : palZe = 0
+    tsListeAuffrischen()
+    IF fehlt <> "" THEN meldung = "Tileset-Bild fehlt: " + fehlt
+END SUB
+
+SUB tilesetAnhaengen(pf AS STRING)
+    IF tsAnz >= MAXTS THEN
+        meldung = "Mehr als " + STR$(MAXTS) + " Tilesets kann dieser Editor nicht."
+        RETURN
     END IF
+    IF NOT FILEEXISTS(pf) THEN
+        meldung = "Datei nicht gefunden: " + BASENAME(pf)
+        RETURN
+    END IF
+    DIM b AS IMAGE : b = LOADIMAGE(pf)
+    DIM sp AS INTEGER : sp = IMAGEWIDTH(b) \ KACHEL
+    DIM re AS INTEGER : re = IMAGEHEIGHT(b) \ KACHEL
+    IF sp < 1 OR re < 1 THEN
+        meldung = "Zu klein fuer " + STR$(KACHEL) + "x" + STR$(KACHEL) + "-Kacheln."
+        RETURN
+    END IF
+    ' Die Kachelzahl muss stimmen: aus ihr vergibt die Laufzeit die firstgid
+    ' des NAECHSTEN Tilesets. Eine zu kleine Zahl liesse die Bereiche
+    ' ueberlappen -- und das zerstoert die Zuordnung ALLER Kacheln, stumm.
+    DIM idx AS INTEGER : idx = TILED_ADD_TILESET(karte, pf, sp * re)
+    tsAnz = tsAnz + 1
+    tsPfadA[idx] = pf : tsBildA[idx] = b
+    tsSpA[idx] = sp : tsReA[idx] = re : tsNA[idx] = sp * re
+    tsDaA[idx] = TRUE
+    geaendert = TRUE
+    tsWaehlen(idx)
+    meldung = BASENAME(pf) + ": " + STR$(sp * re) + " Kacheln, ab GID " + _
+              STR$(TILED_TILESET_FIRSTGID(karte, idx))
 END SUB
 
 SUB oeffnen()
@@ -564,7 +702,7 @@ SUB oeffnen()
                 uStart = 0 : uAnz = 0 : uPos = 0
                 dateiname = p
                 geaendert = FALSE
-                kartenTilesetLaden()
+                tilesetsLaden()
             END IF
         CATCH e
             GUI_MESSAGE("Fehler", "Die Datei liess sich nicht lesen." + CHR$(10) + e)
@@ -604,7 +742,13 @@ SUB gbCodeSichern(pfad AS STRING)
         basis = LEFT$(basis, LEN(basis) - 3)
     END IF
     TILED_SAVE(karte, basis + ".json")
-    IMAGE_SAVE(tsBild, basis + ".png")
+    ' Jedes Tileset kommt mit, unter dem Namen, den der erzeugte Code sucht.
+    ' Ein fehlendes Bild wird UEBERGANGEN statt einen Abbruch zu erzeugen --
+    ' der Rest der Karte ist deswegen nicht weniger brauchbar.
+    DIM ti AS INTEGER
+    FOR ti = 0 TO tsAnz - 1
+        IF tsDaA[ti] THEN IMAGE_SAVE(tsBildA[ti], basis + "_" + STR$(ti + 1) + ".png")
+    NEXT
 
     DIM z AS STRING : z = CHR$(10)
     DIM q AS STRING : q = CHR$(34)
@@ -618,27 +762,46 @@ SUB gbCodeSichern(pfad AS STRING)
         "CONST TW = " + STR$(KACHEL) + z + _
         "CONST TH = " + STR$(KACHEL) + z + z + _
         "SCREEN(" + STR$(fw) + ", " + STR$(fh) + ", " + q + "Karte" + q + ", 1)" + z + z + _
-        "DIM blatt AS IMAGE" + z + _
-        "blatt = LOADIMAGE(" + q + BASENAME(basis) + ".png" + q + ")" + z + _
         "DIM lvl AS TILED_MAP" + z + _
         "lvl = TILED_LOAD(" + q + BASENAME(basis) + ".json" + q + ")" + z + z + _
-        "' Spalten des Tilesets aus dem BILD, nicht aus der Karte: die JSON" + z + _
-        "' nennt sie nicht, und geraten waere sie eine stille Fehlerquelle." + z + _
-        "DIM sp AS INTEGER : sp = IMAGEWIDTH(blatt) \ TW" + z + _
-        "DIM fg AS INTEGER : fg = TILED_TILESET_FIRSTGID(lvl, 0)" + z + z + _
+        "' Ein Blatt je Tileset. Die Spalten kommen aus dem BILD, nicht aus" + z + _
+        "' der Karte: die JSON nennt sie nicht, und geraten waeren sie eine" + z + _
+        "' stille Fehlerquelle." + z + _
+        "CONST TSN = " + STR$(MAX(tsAnz, 1)) + z + _
+        "DIM blatt[TSN] AS IMAGE" + z + _
+        "DIM sp[TSN] AS INTEGER" + z + _
+        "DIM ti AS INTEGER" + z + _
+        "FOR ti = 0 TO TSN - 1" + z + _
+        "    blatt[ti] = LOADIMAGE(" + q + BASENAME(basis) + "_" + q + " + STR$(ti + 1) + " + _
+        q + ".png" + q + ")" + z + _
+        "    sp[ti] = MAX(1, IMAGEWIDTH(blatt[ti]) \ TW)" + z + _
+        "NEXT" + z + z + _
         "WHILE NOT QUITREQUESTED()" + z + _
         "    CLS(&H0A0F16)" + z + _
         "    DIM e AS INTEGER" + z + _
         "    FOR e = 0 TO TILED_LAYER_COUNT(lvl) - 1" + z + _
-        "        IF TILED_LAYER_VISIBLE(lvl, e) THEN" + z + _
+        "        IF TILED_LAYER_VISIBLE(lvl, e) AND TILED_LAYER_TYPE(lvl, e) <> " + _
+        q + "object" + q + " THEN" + z + _
         "            DIM ty AS INTEGER" + z + _
         "            DIM tx AS INTEGER" + z + _
         "            FOR ty = 0 TO TILED_HEIGHT(lvl) - 1" + z + _
         "                FOR tx = 0 TO TILED_WIDTH(lvl) - 1" + z + _
         "                    DIM g AS INTEGER : g = TILED_TILE_AT(lvl, e, tx, ty)" + z + _
-        "                    IF g >= fg THEN" + z + _
-        "                        DIM lid AS INTEGER : lid = g - fg" + z + _
-        "                        DRAWIMAGEPART(blatt, (lid MOD sp) * TW, (lid \ sp) * TH, _" + z + _
+        "                    ' GID -> Tileset: das letzte, dessen firstgid sie" + z + _
+        "                    ' noch trifft." + z + _
+        "                    DIM ts AS INTEGER : ts = -1" + z + _
+        "                    DIM k AS INTEGER" + z + _
+        "                    FOR k = TILED_TILESET_COUNT(lvl) - 1 TO 0 STEP -1" + z + _
+        "                        IF g >= TILED_TILESET_FIRSTGID(lvl, k) THEN" + z + _
+        "                            ts = k" + z + _
+        "                            BREAK" + z + _
+        "                        END IF" + z + _
+        "                    NEXT" + z + _
+        "                    IF ts >= 0 AND ts < TSN THEN" + z + _
+        "                        DIM lid AS INTEGER" + z + _
+        "                        lid = g - TILED_TILESET_FIRSTGID(lvl, ts)" + z + _
+        "                        DRAWIMAGEPART(blatt[ts], (lid MOD sp[ts]) * TW, _" + z + _
+        "                                      (lid \ sp[ts]) * TH, _" + z + _
         "                                      TW, TH, tx * TW, ty * TH)" + z + _
         "                    END IF" + z + _
         "                NEXT" + z + _
@@ -648,7 +811,7 @@ SUB gbCodeSichern(pfad AS STRING)
         "    FLIP()" + z + _
         "WEND" + z
     WRITEALL(pfad, t)
-    meldung = "Renderer + Karte + Tileset: " + BASENAME(pfad)
+    meldung = "Renderer + Karte + " + STR$(tsAnz) + " Tileset(s): " + BASENAME(pfad)
 END SUB
 
 SUB rechteckFuellen(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gid AS INTEGER)
@@ -855,6 +1018,20 @@ WHILE NOT QUITREQUESTED()
     GUI_SET_ENABLED(bZur, uPos > 0)
     GUI_SET_ENABLED(bVor, uPos < uAnz)
 
+    ' --------------------------------------------------------- Tilesets
+    DIM tsel AS INTEGER : tsel = GUI_DROPDOWN_SELECTED(ddTs)
+    IF tsel >= 0 AND tsel <> tsAkt AND tsel < tsAnz THEN tsWaehlen(tsel)
+    IF GUI_CLICKED(bTsNeu) THEN
+        DIM tp AS STRING : tp = FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+        IF tp <> "" THEN
+            TRY
+                tilesetAnhaengen(tp)
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+
     ' ----------------------------------------------------------- Ebenen
     DIM lsel AS INTEGER : lsel = GUI_LISTBOX_SELECTED(lstEbenen)
     IF lsel >= 0 AND lsel <> ebene AND lsel < TILED_LAYER_COUNT(karte) THEN
@@ -962,10 +1139,22 @@ WHILE NOT QUITREQUESTED()
     ' ----------------------------------------------------- Kachelauswahl
     DIM px AS INTEGER : px = GUI_CANVAS_X(palette)
     DIM py AS INTEGER : py = GUI_CANVAS_Y(palette)
-    IF MOUSE_HIT(0) AND NOT neuOffen THEN
-        DIM pxi AS INTEGER : pxi = (mx - px) \ (KACHEL * PZ)
-        DIM pyi AS INTEGER : pyi = (my - py) \ (KACHEL * PZ)
-        IF mx >= px AND my >= py AND pxi < tsSp AND pyi < tsRe THEN
+    DIM ueberPal AS BOOLEAN
+    ueberPal = mx >= px AND mx < px + PAL_SP * KACHEL * PZ AND _
+               my >= py AND my < py + PAL_RE * KACHEL * PZ AND NOT neuOffen
+    ' Rollen, solange etwas ausserhalb liegt. Waagerecht mit Umschalt --
+    ' ein Tileset ist meist hoch, breit ist es der Ausnahmefall.
+    IF ueberPal AND MOUSEWHEEL() <> 0 THEN
+        IF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN
+            palSp = MAX(0, MIN(palSp - SGN(MOUSEWHEEL()), MAX(0, tsSp - PAL_SP)))
+        ELSE
+            palZe = MAX(0, MIN(palZe - SGN(MOUSEWHEEL()), MAX(0, tsRe - PAL_RE)))
+        END IF
+    END IF
+    IF ueberPal AND MOUSE_HIT(0) THEN
+        DIM pxi AS INTEGER : pxi = (mx - px) \ (KACHEL * PZ) + palSp
+        DIM pyi AS INTEGER : pyi = (my - py) \ (KACHEL * PZ) + palZe
+        IF pxi < tsSp AND pyi < tsRe THEN
             DIM k AS INTEGER : k = pyi * tsSp + pxi
             IF k < tsN AND k <> gewaehlt THEN
                 gewaehlt = k
@@ -1040,8 +1229,20 @@ WHILE NOT QUITREQUESTED()
                 schrittBeginn()
             CASE WZ_PIPETTE
                 DIM g AS INTEGER : g = TILED_TILE_AT(karte, ebene, tx, ty)
-                IF g > 0 AND g - basisGid() < tsN THEN
-                    gewaehlt = g - basisGid()
+                DIM pts AS INTEGER : pts = IIF(g > 0, tsFuerGid(g), -1)
+                IF pts >= 0 THEN
+                    ' Auch das TILESET umschalten, sonst zeigte die Palette
+                    ' die aufgenommene Kachel gar nicht -- und der naechste
+                    ' Strich malte eine andere.
+                    IF pts <> tsAkt THEN tsWaehlen(pts)
+                    gewaehlt = g - TILED_TILESET_FIRSTGID(karte, pts)
+                    ' Den Ausschnitt mitziehen, wenn sie ausserhalb liegt.
+                    DIM ps2 AS INTEGER : ps2 = gewaehlt MOD tsSp
+                    DIM pz2 AS INTEGER : pz2 = gewaehlt \ tsSp
+                    IF ps2 < palSp THEN palSp = ps2
+                    IF ps2 >= palSp + PAL_SP THEN palSp = ps2 - PAL_SP + 1
+                    IF pz2 < palZe THEN palZe = pz2
+                    IF pz2 >= palZe + PAL_RE THEN palZe = pz2 - PAL_RE + 1
                     eigenschaftenAuffrischen()
                 END IF
                 zieht = FALSE
@@ -1107,18 +1308,42 @@ WHILE NOT QUITREQUESTED()
     GUI_DRAW()
 
     ' ---------------------------------------------------- Kachelauswahl
-    DIM sx AS INTEGER
-    DIM sy AS INTEGER
-    FOR i = 0 TO tsN - 1
-        sx = (i MOD tsSp) * KACHEL
-        sy = (i \ tsSp) * KACHEL
-        DRAWIMAGEPARTEX(tsBild, sx, sy, KACHEL, KACHEL, _
-                        px + (i MOD tsSp) * KACHEL * PZ, py + (i \ tsSp) * KACHEL * PZ, _
-                        KACHEL * PZ, KACHEL * PZ)
-    NEXT
-    RECT(px + (gewaehlt MOD tsSp) * KACHEL * PZ, py + (gewaehlt \ tsSp) * KACHEL * PZ, _
-         px + (gewaehlt MOD tsSp) * KACHEL * PZ + KACHEL * PZ - 1, _
-         py + (gewaehlt \ tsSp) * KACHEL * PZ + KACHEL * PZ - 1, &H2BC4E8)
+    ' Nur der Ausschnitt: bei einem grossen Tileset liefe der Rest sonst in
+    ' die Ebenenliste darunter.
+    DIM palC AS INTEGER
+    DIM palR AS INTEGER
+    IF tsAnz > 0 AND tsDaA[tsAkt] THEN
+        FOR palR = 0 TO PAL_RE - 1
+            FOR palC = 0 TO PAL_SP - 1
+                DIM qs AS INTEGER : qs = palSp + palC
+                DIM qz AS INTEGER : qz = palZe + palR
+                IF qs < tsSp AND qz < tsRe AND qz * tsSp + qs < tsN THEN
+                    DRAWIMAGEPARTEX(tsBild, qs * KACHEL, qz * KACHEL, KACHEL, KACHEL, _
+                                    px + palC * KACHEL * PZ, py + palR * KACHEL * PZ, _
+                                    KACHEL * PZ, KACHEL * PZ)
+                END IF
+            NEXT
+        NEXT
+    END IF
+    ' Der Rahmen um die gewaehlte Kachel nur, wenn sie im Ausschnitt liegt --
+    ' sonst saesse er an der Kante auf einer fremden Kachel.
+    DIM gsp AS INTEGER : gsp = (gewaehlt MOD tsSp) - palSp
+    DIM gze AS INTEGER : gze = (gewaehlt \ tsSp) - palZe
+    IF gsp >= 0 AND gsp < PAL_SP AND gze >= 0 AND gze < PAL_RE THEN
+        RECT(px + gsp * KACHEL * PZ, py + gze * KACHEL * PZ, _
+             px + gsp * KACHEL * PZ + KACHEL * PZ - 1, _
+             py + gze * KACHEL * PZ + KACHEL * PZ - 1, &H2BC4E8)
+    END IF
+    ' Ein Hinweis, dass mehr da ist als zu sehen -- ohne ihn sucht man die
+    ' fehlenden Kacheln im Tileset statt im Ausschnitt.
+    IF tsRe > PAL_RE OR tsSp > PAL_SP THEN
+        ' Auf einem dunklen Streifen -- ueber hellen Kacheln waere der
+        ' Hinweis sonst nicht zu lesen.
+        BOX(px + PAL_SP * KACHEL * PZ - 100, py + PAL_RE * KACHEL * PZ - 20, _
+            px + PAL_SP * KACHEL * PZ - 2, py + PAL_RE * KACHEL * PZ - 2, &H90101820)
+        TEXT(px + PAL_SP * KACHEL * PZ - 94, py + PAL_RE * KACHEL * PZ - 17, _
+             "Rad rollt", &HAABBCC)
+    END IF
 
     ' ------------------------------------------------------------ Karte
     SCISSOR(cx, cy, cw, ch)
@@ -1144,10 +1369,15 @@ WHILE NOT QUITREQUESTED()
                 FOR ax2 = vonX TO bisX
                     DIM gg AS INTEGER : gg = TILED_TILE_AT(karte, lay, ax2, ay2)
                     IF gg > 0 THEN
-                        DIM lokal AS INTEGER : lokal = gg - basisGid()
-                        IF lokal >= 0 AND lokal < tsN THEN
-                            DRAWIMAGEPARTEX(tsBild, (lokal MOD tsSp) * KACHEL, _
-                                            (lokal \ tsSp) * KACHEL, KACHEL, KACHEL, _
+                        ' Jede Kachel mit IHREM Tileset -- eine Ebene darf
+                        ' Kacheln aus allen enthalten, und mit dem aktiven
+                        ' gerechnet saehe die halbe Karte falsch aus.
+                        DIM its AS INTEGER : its = tsFuerGid(gg)
+                        IF its >= 0 AND tsDaA[its] THEN
+                            DIM lokal AS INTEGER
+                            lokal = gg - TILED_TILESET_FIRSTGID(karte, its)
+                            DRAWIMAGEPARTEX(tsBildA[its], (lokal MOD tsSpA[its]) * KACHEL, _
+                                            (lokal \ tsSpA[its]) * KACHEL, KACHEL, KACHEL, _
                                             cx + ax2 * z - panX, cy + ay2 * z - panY, z, z)
                         END IF
                     END IF
@@ -1241,7 +1471,8 @@ WHILE NOT QUITREQUESTED()
 
     ' -------------------------------------------------------- Statuszeile
     DIM info AS STRING
-    info = wzName[werkzeug] + "   Kachel " + STR$(gewaehlt) + "   Zoom " + STR$(zoom) + "x"
+    info = wzName[werkzeug] + "   " + IIF(tsAnz > 0, BASENAME(tsPfad), "-") + _
+           " #" + STR$(gewaehlt) + "   Zoom " + STR$(zoom) + "x"
     IF aufKarte THEN info = info + "   [" + STR$(tx) + ", " + STR$(ty) + "]"
     IF selAn THEN info = info + "   Auswahl " + STR$(selB) + "x" + STR$(selH)
     IF clipB > 0 THEN info = info + "   Ablage " + STR$(clipB) + "x" + STR$(clipH)
