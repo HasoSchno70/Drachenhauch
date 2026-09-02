@@ -604,6 +604,130 @@ pub fn ebene_entfernen(m: &Rc<RefCell<TiledMap>>, idx: i64) -> Result<(), String
     Ok(())
 }
 
+/// Eine OBJEKT-Ebene anhaengen (TILED_ADD_OBJECT_LAYER) -> Index.
+///
+/// Eigene Funktion statt eines Schalters an `ebene_anhaengen`: die beiden
+/// Arten teilen fast nichts. Eine Kachelebene ist ein Feld fester Groesse
+/// (`tiles`), eine Objektebene eine Liste -- und `speichern` schreibt sie in
+/// verschiedene Formen ("tilelayer" gegen "objectgroup").
+pub fn objekt_ebene_anhaengen(m: &Rc<RefCell<TiledMap>>, name: &str) -> Result<i64, String> {
+    let mut map = m.borrow_mut();
+    if map.layer_by_name.contains_key(name) {
+        return Err(std::format!("TILED_ADD_OBJECT_LAYER: '{}' gibt es schon", name));
+    }
+    if name.is_empty() {
+        return Err("TILED_ADD_OBJECT_LAYER: der Name darf nicht leer sein".into());
+    }
+    let idx = map.layers.len();
+    map.layers.push(TiledLayer {
+        name: name.to_string(), kind: "object".into(),
+        // Breite/Hoehe bleiben 0 und `tiles` leer: eine Objektebene hat kein
+        // Raster. Tiled schreibt bei einer objectgroup ebenfalls keins.
+        width: 0, height: 0, tiles: Vec::new(), objects: Vec::new(),
+        image: String::new(), visible: true, opacity: 1.0,
+        obj_by_name: HashMap::new(),
+    });
+    map.layer_by_name.insert(name.to_string(), idx);
+    Ok(idx as i64)
+}
+
+/// Die Position einer Objektebene ueber ihren Namen (mit Pruefung der Art).
+fn objekt_ebene(map: &TiledMap, ebene: &str, fn_: &str) -> Result<usize, String> {
+    match map.layer_by_name.get(ebene) {
+        Some(&i) if map.layers[i].kind == "object" => Ok(i),
+        Some(_) => Err(std::format!("{}: '{}' ist keine Objekt-Ebene", fn_, ebene)),
+        None => Err(std::format!("{}: Ebene '{}' gibt es nicht", fn_, ebene)),
+    }
+}
+
+/// Ein Objekt anhaengen (TILED_ADD_OBJECT) -> Index INNERHALB seiner Ebene.
+///
+/// Angesprochen wird die Ebene ueber ihren NAMEN, wie bei allen
+/// TILED_OBJECT_*-Abfragen -- eine Objektebene heisst "spawns" oder
+/// "trigger", und danach sucht ein Spiel sie auch.
+#[allow(clippy::too_many_arguments)]
+pub fn objekt_anhaengen(m: &Rc<RefCell<TiledMap>>, ebene: &str, name: &str, typ: &str,
+                        x: f64, y: f64, w: f64, h: f64) -> Result<i64, String> {
+    let mut map = m.borrow_mut();
+    let li = objekt_ebene(&map, ebene, "TILED_ADD_OBJECT")?;
+    let l = &mut map.layers[li];
+    let idx = l.objects.len();
+    l.objects.push(TiledObject {
+        name: name.to_string(), type_: typ.to_string(),
+        x, y, width: w, height: h, properties: HashMap::new(),
+    });
+    // Der Namensindex wird MITgefuehrt, nicht spaeter neu gebaut: die
+    // TILED_OBJECT_*-Abfragen suchen darueber, und ein fehlender Eintrag
+    // liesse ein gerade angelegtes Objekt unauffindbar erscheinen.
+    l.obj_by_name.entry(name.to_string()).or_default().push(idx);
+    Ok(idx as i64)
+}
+
+/// Eigenschaft eines Objekts setzen (`Some`) oder entfernen (`None`).
+pub fn objekt_eigenschaft(m: &Rc<RefCell<TiledMap>>, ebene: &str, idx: i64, key: &str,
+                          wert: Option<PropVal>) -> Result<(), String> {
+    let fn_ = if wert.is_some() { "TILED_OBJECT_SET_PROP" } else { "TILED_OBJECT_REMOVE_PROP" };
+    let mut map = m.borrow_mut();
+    let li = objekt_ebene(&map, ebene, fn_)?;
+    let l = &mut map.layers[li];
+    if idx < 0 || idx as usize >= l.objects.len() {
+        return Err(std::format!("{}: Objekt {} gibt es in '{}' nicht", fn_, idx, ebene));
+    }
+    if key.is_empty() {
+        return Err(std::format!("{}: der Schluessel darf nicht leer sein", fn_));
+    }
+    match wert {
+        Some(v) => { l.objects[idx as usize].properties.insert(key.to_string(), v); }
+        None => { l.objects[idx as usize].properties.remove(key); }
+    }
+    Ok(())
+}
+
+/// Eigenschaft einer KACHEL setzen (`Some`) oder entfernen (`None`).
+///
+/// Angesprochen ueber die GID, wie beim Lesen (`TILED_TILE_PROP_*`) --
+/// gespeichert wird sie beim Tileset unter der lokalen Nummer, aber das ist
+/// Buchhaltung, die ein Programm nicht kennen muss. Die Flip-Bits werden
+/// dabei genauso maskiert wie beim Lesen: sonst legte eine gespiegelte
+/// Kachel ihre Eigenschaft woanders ab als eine ungespiegelte.
+pub fn kachel_eigenschaft(m: &Rc<RefCell<TiledMap>>, gid: i64, key: &str,
+                          wert: Option<PropVal>) -> Result<(), String> {
+    let fn_ = if wert.is_some() { "TILED_TILE_SET_PROP" } else { "TILED_TILE_REMOVE_PROP" };
+    if key.is_empty() {
+        return Err(std::format!("{}: der Schluessel darf nicht leer sein", fn_));
+    }
+    let gid = gid & 0x1FFF_FFFF;
+    let mut map = m.borrow_mut();
+    // Dasselbe "letztes passendes Tileset"-Verfahren wie `tileset_for_gid`,
+    // nur mit dem INDEX -- fuer das Aendern braucht es eine veraenderliche
+    // Ausleihe, und die gibt eine Referenz nicht her.
+    let mut treffer: Option<usize> = None;
+    for (i, ts) in map.tilesets.iter().enumerate() {
+        if ts.first_gid <= gid { treffer = Some(i); } else { break; }
+    }
+    let ti = treffer.ok_or_else(|| std::format!(
+        "{}: zu GID {} gibt es kein Tileset", fn_, gid))?;
+    let lokal = gid - map.tilesets[ti].first_gid;
+    let ts = &mut map.tilesets[ti];
+    if lokal < 0 || lokal >= ts.tile_count {
+        return Err(std::format!(
+            "{}: GID {} liegt ausserhalb des Tilesets (0..{})", fn_, gid, ts.tile_count - 1));
+    }
+    match wert {
+        Some(v) => { ts.tile_properties.entry(lokal).or_default().insert(key.to_string(), v); }
+        None => {
+            if let Some(props) = ts.tile_properties.get_mut(&lokal) {
+                props.remove(key);
+                // Leere Eintraege wieder loswerden -- `speichern` listet
+                // jede Kachel auf, die einen Eintrag hat, und eine mit einer
+                // leeren Eigenschaftsliste waere Rauschen in der Datei.
+                if props.is_empty() { ts.tile_properties.remove(&lokal); }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Ein Tileset anhaengen (TILED_ADD_TILESET) -> Index.
 ///
 /// Die `firstgid` wird selbst vergeben: erste GID = 1, danach jeweils hinter

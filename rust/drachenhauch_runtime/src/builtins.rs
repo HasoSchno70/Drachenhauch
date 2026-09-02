@@ -799,6 +799,20 @@ fn tiled_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
     }
 }
 
+/// Ein Drachenhauch-Wert als Tiled-Eigenschaft. Tiled kennt genau diese vier
+/// Arten; alles andere (ARRAY, MAP, Handles) haette dort keine Entsprechung
+/// und wuerde beim Speichern still zu Text zerfallen.
+fn prop_val(v: &Value, fn_: &str) -> Result<crate::tiled::PropVal, String> {
+    use crate::tiled::PropVal;
+    match v {
+        Value::Bool(b) => Ok(PropVal::Bool(*b)),
+        Value::Int(i) => Ok(PropVal::Int(*i)),
+        Value::Float(f) => Ok(PropVal::Float(*f)),
+        Value::Str(s) => Ok(PropVal::Str(s.to_string())),
+        _ => Err(format!("{}: der Wert muss BOOLEAN, INTEGER, FLOAT oder STRING sein", fn_)),
+    }
+}
+
 fn layer_by_idx<'a>(m: &'a TiledMap, idx: i64, fn_: &str) -> Result<&'a TiledLayer, String> {
     if idx < 0 || idx as usize >= m.layers.len() {
         return Err(format!("{}: Layer-Index {} ausserhalb [0..{}]", fn_, idx, m.layers.len() as i64 - 1));
@@ -4234,6 +4248,53 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(2);
             let m = tiled_h(&a[0], "TILED_ADD_LAYER")?;
             Ok(Value::Int(crate::tiled::ebene_anhaengen(&m, need_str(&a[1], "TILED_ADD_LAYER")?)?))
+        }
+        "tiled_add_object_layer" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_ADD_OBJECT_LAYER")?;
+            Ok(Value::Int(crate::tiled::objekt_ebene_anhaengen(
+                &m, need_str(&a[1], "TILED_ADD_OBJECT_LAYER")?)?))
+        }
+        "tiled_add_object" => {
+            arity!(8);
+            let m = tiled_h(&a[0], "TILED_ADD_OBJECT")?;
+            Ok(Value::Int(crate::tiled::objekt_anhaengen(
+                &m, need_str(&a[1], "TILED_ADD_OBJECT")?,
+                need_str(&a[2], "TILED_ADD_OBJECT")?,
+                need_str(&a[3], "TILED_ADD_OBJECT")?,
+                need_num(&a[4], "TILED_ADD_OBJECT")?, need_num(&a[5], "TILED_ADD_OBJECT")?,
+                need_num(&a[6], "TILED_ADD_OBJECT")?, need_num(&a[7], "TILED_ADD_OBJECT")?)?))
+        }
+        // EIN Setzer je Ziel statt vier. Die LESER muessen typisiert sein --
+        // der Aufrufer sagt dort, was er erwartet. Beim Schreiben traegt der
+        // Wert seinen Typ schon mit sich: Drachenhauch unterscheidet BOOLEAN,
+        // INTEGER, FLOAT und STRING, also gibt es nichts zu waehlen.
+        "tiled_tile_set_prop" | "tiled_object_set_prop"
+        | "tiled_tile_remove_prop" | "tiled_object_remove_prop" => {
+            let kachel = name.starts_with("tiled_tile");
+            let setzen = name.ends_with("set_prop");
+            let fn_ = match (kachel, setzen) {
+                (true, true) => "TILED_TILE_SET_PROP",
+                (true, false) => "TILED_TILE_REMOVE_PROP",
+                (false, true) => "TILED_OBJECT_SET_PROP",
+                (false, false) => "TILED_OBJECT_REMOVE_PROP",
+            };
+            // Kachel: (map, gid, key[, wert]) -- Objekt: (map, ebene, idx, key[, wert])
+            let n = if kachel { 3 } else { 4 } + if setzen { 1 } else { 0 };
+            if a.len() != n {
+                return err(format!("{}: erwartet {} Argumente, bekam {}", fn_, n, a.len()));
+            }
+            let wert = if setzen { Some(prop_val(&a[n - 1], fn_)?) } else { None };
+            let m = tiled_h(&a[0], fn_)?;
+            if kachel {
+                crate::tiled::kachel_eigenschaft(
+                    &m, need_int(&a[1], fn_)?, need_str(&a[2], fn_)?, wert)?;
+            } else {
+                crate::tiled::objekt_eigenschaft(
+                    &m, need_str(&a[1], fn_)?, need_int(&a[2], fn_)?,
+                    need_str(&a[3], fn_)?, wert)?;
+            }
+            Ok(Value::Nil)
         }
         "tiled_add_tileset" => {
             arity!(3);

@@ -8127,6 +8127,42 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_ADD_OBJECT_LAYER",
+   "kind": "builtin",
+   "signature": "TILED_ADD_OBJECT_LAYER(m, name$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_ADD_OBJECT",
+   "kind": "builtin",
+   "signature": "TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_TILE_SET_PROP",
+   "kind": "builtin",
+   "signature": "TILED_TILE_SET_PROP(m, gid, key$, wert)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_TILE_REMOVE_PROP",
+   "kind": "builtin",
+   "signature": "TILED_TILE_REMOVE_PROP(m, gid, key$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_PROP",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_REMOVE_PROP",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_COUNT_GID",
    "kind": "core",
    "signature": "TILED_COUNT_GID(m: ?, layer_idx: INTEGER, gid: INTEGER)",
