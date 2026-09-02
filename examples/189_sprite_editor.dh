@@ -39,7 +39,9 @@
 '                Sichtbarkeit. Beides fuer sich lesbar.
 '    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich),
-'                bewegtes GIF (Tempo aus dem Vorschau-Regler)
+'                bewegtes GIF (Tempo aus dem Vorschau-Regler), und
+'                [GB-Code]: ein lauffaehiges Programm samt Blatt, mit einer
+'                SPRITE_ADD_ANIM-Zeile je Bereich
 '    Eingabe     [Oeffnen] nimmt beides: `.dhsprite` mit Ebenen, oder einen
 '                Streifen samt Atlas-JSON. Beim Streifen sind die Ebenen
 '                weg -- er IST das zusammengerechnete Bild. Die Endung
@@ -50,7 +52,7 @@
 '    Statistik   Punkte, Farben, haeufigste Farbe -- gesamt und je Bild
 '
 '  Was NICHT drin ist (offen gesagt, wie bei den anderen Piloten): der
-'    GB-Code- und .dhanim-Export der Bereiche, das Umbenennen von
+'    .dhanim-Export (die FSM-Vorlage fuer dhanim), das Umbenennen von
 '    Einzelbildern, Dateibrowser und Dialoge der Qt-Fassung. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
@@ -784,6 +786,63 @@ FUNCTION mitAlpha(c AS INTEGER, a AS INTEGER) AS INTEGER
     RETURN RGBA((c \ 65536) MOD 256, (c \ 256) MOD 256, c MOD 256, a)
 END FUNCTION
 
+' ---------------------------------------------------------------- GB-Code
+' Ein LAUFFAEHIGES Drachenhauch-Programm zu diesem Sprite: der Streifen als
+' PNG daneben, dazu eine SPRITE_ADD_ANIM-Zeile je Bereich. Damit schliesst
+' sich der Kreis -- was hier gemalt wurde, laeuft ohne Zwischenschritt.
+'
+' Beides unter DEMSELBEN Namen und in EINEM Zug. Wer nur den Code schreibt,
+' hat einen Verweis ins Leere, und das faellt erst beim Starten auf.
+SUB gbCodeSichern(pfad AS STRING)
+    DIM png AS STRING : png = pfad
+    IF LEN(png) > 3 AND RIGHT$(LOWER$(png), 3) = ".dh" THEN
+        png = LEFT$(png, LEN(png) - 3)
+    END IF
+    png = png + ".png"
+
+    baueStreifen()
+    ' Wie beim Streifen-Export auf die belegten Bilder zuschneiden: SPRITE_NEW
+    ' rechnet die Bildzahl aus der BREITE, ein zu breites Blatt haette also
+    ' lauter leere Einzelbilder am Ende.
+    DIM eng AS IMAGE : eng = IMAGE_CROP(streifen, 0, 0, gw * anzBild, gh)
+    IMAGE_SAVE(eng, png)
+    IMAGE_FREE(eng)
+
+    DIM z AS STRING : z = CHR$(10)
+    DIM t AS STRING
+    t = "' Von 189_sprite_editor.dh erzeugt." + z + _
+        "IMPORT " + CHR$(34) + "sprite" + CHR$(34) + z + z + _
+        "SCREEN(640, 400, " + CHR$(34) + "Sprite" + CHR$(34) + ", 1)" + z + z + _
+        "DIM blatt AS IMAGE" + z + _
+        "blatt = LOADIMAGE(" + CHR$(34) + BASENAME(png) + CHR$(34) + ")" + z + _
+        "DIM sp AS SPRITE" + z + _
+        "sp = SPRITE_NEW(blatt, " + STR$(gw) + ", " + STR$(gh) + ")" + z
+    ' Ohne eigene Bereiche einer ueber alles -- so hat das Programm immer
+    ' etwas zu spielen, und der Name ist der uebliche.
+    DIM erster AS STRING : erster = "idle"
+    IF anzAnim = 0 THEN
+        t = t + "SPRITE_ADD_ANIM(sp, " + CHR$(34) + "idle" + CHR$(34) + ", 0, " + _
+            STR$(anzBild - 1) + ", " + STR$(INT(GUI_VALUE(slTempo))) + ")" + z
+    ELSE
+        erster = anName[0]
+        DIM k AS INTEGER
+        FOR k = 0 TO anzAnim - 1
+            t = t + "SPRITE_ADD_ANIM(sp, " + CHR$(34) + anName[k] + CHR$(34) + ", " + _
+                STR$(anVon[k]) + ", " + STR$(anBis[k]) + ", " + STR$(anFps[k]) + ")" + z
+        NEXT
+    END IF
+    t = t + "SPRITE_PLAY(sp, " + CHR$(34) + erster + CHR$(34) + ")" + z + _
+        "SPRITE_SET_POS(sp, 300, 180)" + z + z + _
+        "WHILE NOT QUITREQUESTED()" + z + _
+        "    CLS(&H101820)" + z + _
+        "    SPRITE_UPDATE(sp, INT(DELTA() * 1000))" + z + _
+        "    SPRITE_DRAW(sp)" + z + _
+        "    FLIP()" + z + _
+        "WEND" + z
+    WRITEALL(pfad, t)
+    meldung = "Code + Blatt: " + BASENAME(pfad) + " / " + BASENAME(png)
+END SUB
+
 ' -------------------------------------------------------------- Statistik
 ' Zaehlt ueber die SICHTBAREN Ebenen -- also ueber das, was man sieht und was
 ' auch exportiert wuerde. Eine ausgeblendete Ebene taucht nicht auf; ohne
@@ -1375,6 +1434,10 @@ y = y + 34
 DIM bGroesse AS GUI_WIDGET
 bGroesse = GUI_BUTTON(win, "Groesse aendern", 12, y, 260, 28)
 GUI_TOOLTIP(bGroesse, "Leinwand vergroessern oder beschneiden -- der Inhalt bleibt links oben")
+y = y + 34
+DIM bGbCode AS GUI_WIDGET
+bGbCode = GUI_BUTTON(win, "GB-Code", 12, y, 260, 28)
+GUI_TOOLTIP(bGbCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
 
 DIM pal AS ARRAY OF INTEGER
 pal = [&H000000, &HFFFFFF, &HE84B4B, &HE8C44B, &H4BE87A, &H2BC4E8, _
@@ -1654,6 +1717,17 @@ WHILE NOT QUITREQUESTED()
                 ELSE
                     streifenLaden(po)
                 END IF
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
+    IF GUI_CLICKED(bGbCode) THEN
+        DIM pc AS STRING
+        pc = FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")
+        IF pc <> "" THEN
+            TRY
+                gbCodeSichern(pc)
             CATCH e
                 meldung = e
             END TRY

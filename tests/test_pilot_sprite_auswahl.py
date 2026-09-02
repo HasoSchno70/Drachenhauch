@@ -1,5 +1,8 @@
-"""Sprite-Pilot: Auswahl-Werkzeuge (Lasso, Zauberstab, Verschieben),
-GIMP-Paletten (.gpl), Kachel-Ansicht und Statistik (`examples/189_sprite_editor.dh`).
+"""Der Sprite-Pilot, bedient wie von Hand (`examples/189_sprite_editor.dh`).
+
+Abgedeckt: Auswahl-Werkzeuge (Lasso, Zauberstab, Verschieben), GIMP-Paletten
+(.gpl), Kachel-Ansicht, Statistik, Zuschneiden/Groesse aendern,
+Animationsbereiche und die GB-Code-Ausgabe.
 
 Der Pilot ist ein Drachenhauch-Programm, also laesst er sich nicht wie ein
 Modul aufrufen -- geprueft wird er so, wie ein Mensch ihn bedient: mit
@@ -108,7 +111,8 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(GUI_GET_X(lstBild)) + " " + STR$(GUI_GET_Y(lstBild)) + _
           " " + STR$(GUI_GET_X(bEbNeu)) + " " + STR$(GUI_GET_Y(bEbNeu)) + _
           " " + STR$(GUI_GET_X(cbEbSicht)) + " " + STR$(GUI_GET_Y(cbEbSicht)) + _
-          " " + STR$(anzEb) + " " + STR$(aktEb) + " " + STR$(ebSicht[aktEb])
+          " " + STR$(anzEb) + " " + STR$(aktEb) + " " + STR$(ebSicht[aktEb]) + _
+          " " + STR$(GUI_GET_X(bGbCode)) + " " + STR$(GUI_GET_Y(bGbCode))
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
@@ -125,7 +129,7 @@ _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "gw gh anzBild anzAnim aktAnim anVon anBis anFps "
            "zusX zusY grX grY animNX animNY animWX animWY "
            "kopieX kopieY bildWX bildWY grOkX grOkY lstBX lstBY "
-           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt").split()
+           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -747,3 +751,57 @@ def test_bereiche_wandern_beim_loeschen_eines_bildes(tmp_path):
     assert letzte["anzBild"] == 2
     assert letzte["anzAnim"] == 1, "der Bereich bleibt -- er hing nicht am Bild 1"
     assert (letzte["anVon"], letzte["anBis"]) == (0, 1), "um eins nach vorn"
+
+
+# ------------------------------------------------------------- GB-Code
+_DIALOG_GB = 'FILE_SAVE_DIALOG("GB-Code sichern", "sprite.dh", "dh")'
+
+
+def test_gb_code_laeuft_wirklich(tmp_path):
+    """Der Kreis schliesst sich: der Editor schreibt ein Programm, und der
+    Test STARTET es. Das ist die einzige Pruefung, die etwas ueber erzeugten
+    Code wirklich aussagt -- ob er uebersetzt, sagt noch nichts darueber, ob
+    er ein Blatt findet und eine Animation kennt.
+
+    Aufbau: ein Strich, ein zweites Bild, ein Bereich ueber beide -- dann
+    [GB-Code]. Erwartet werden zwei Dateien und ein sauberer Lauf.
+    """
+    geo = _lauf(tmp_path, 6)[-1]
+    strich = [_mitte(geo["ox"], geo["oy"], geo["zoom"], x, 10) for x in range(6, 18)]
+    ev = [(0, MOUSE_POSITION) + strich[0]] + _zug(1, strich)
+    t = 1 + len(strich) + 2
+    ev += _knopf_klick(t, geo["kopieX"], geo["kopieY"])       # zweites Bild
+    t += 6
+    ev += _knopf_klick(t, geo["animNX"], geo["animNY"])       # ein Bereich
+    t += 6
+    ev += _knopf_klick(t, geo["gbX"], geo["gbY"])
+    _lauf(tmp_path, t + 14, ev, dialoge={_DIALOG_GB: '"raus.dh"'})
+
+    code = tmp_path / "raus.dh"
+    blatt = tmp_path / "raus.png"
+    assert code.exists() and blatt.exists(), "Code UND Blatt, sonst zeigt er ins Leere"
+    text = code.read_text(encoding="utf-8")
+    assert 'SPRITE_NEW(blatt, 32, 32)' in text
+    assert re.search(r'SPRITE_ADD_ANIM\(sp, "\w+", 0, 0, 8\)', text), text
+
+    # Und jetzt laufen lassen -- headless, ein paar Bilder.
+    r = subprocess.run([str(_DHRT), "run", str(code)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=120, cwd=str(tmp_path),
+                       env=dict(os.environ, DHRT_FRAMES="5"))
+    assert r.returncode == 0, r.stderr
+
+
+def test_gb_code_ohne_bereiche_spielt_trotzdem(tmp_path):
+    """Ohne eigene Bereiche gehoert einer ueber alles hinein -- sonst
+    uebersetzt das Programm zwar, aber SPRITE_PLAY findet nichts."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(2, geo["kopieX"], geo["kopieY"])
+    ev += _knopf_klick(10, geo["gbX"], geo["gbY"])
+    _lauf(tmp_path, 26, ev, dialoge={_DIALOG_GB: '"raus.dh"'})
+    text = (tmp_path / "raus.dh").read_text(encoding="utf-8")
+    assert 'SPRITE_ADD_ANIM(sp, "idle", 0, 1, 8)' in text, text
+    assert 'SPRITE_PLAY(sp, "idle")' in text
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "raus.dh")],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace",
+                       timeout=120, cwd=str(tmp_path), env=dict(os.environ, DHRT_FRAMES="5"))
+    assert r.returncode == 0, r.stderr
