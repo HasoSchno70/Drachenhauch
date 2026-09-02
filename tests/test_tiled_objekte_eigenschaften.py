@@ -168,3 +168,68 @@ TILED_TILE_SET_PROP(m, 1, "x", feld)
 ''')
     assert r.returncode != 0
     assert "BOOLEAN, INTEGER, FLOAT oder STRING" in (r.stderr + r.stdout), r.stderr
+
+
+# ------------------------------------------ Objekte entfernen und aendern
+_MIT_OBJEKTEN = '''IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+'''
+
+
+def test_entfernen_laesst_die_dahinter_aufruecken(tmp_path):
+    """Wie bei jeder Liste -- und die einzige Ueberraschung daran: ein
+    gemerkter Index zeigt danach auf ein anderes Objekt."""
+    r = _run(tmp_path, _MIT_OBJEKTEN + '''TILED_REMOVE_OBJECT(m, "s", 1)
+PRINT TILED_OBJECT_COUNT(m, "s")
+PRINT TILED_OBJECT_NAME(m, "s", 0)
+PRINT TILED_OBJECT_NAME(m, "s", 1)
+''')
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split() == ["2", "a", "c"]
+
+
+def test_name_typ_und_rechteck_lassen_sich_aendern(tmp_path):
+    r = _run(tmp_path, _MIT_OBJEKTEN + '''TILED_OBJECT_SET_NAME(m, "s", 2, "cc")
+TILED_OBJECT_SET_TYPE(m, "s", 2, "trigger")
+TILED_OBJECT_SET_RECT(m, "s", 2, 10.5, 20.5, 8, 4)
+TILED_SAVE(m, "karte.json")
+''')
+    assert r.returncode == 0, r.stderr
+    from drachenhauch.tilemap.document import TileMapDoc, ObjectLayer
+    doc = TileMapDoc.load_json(tmp_path / "karte.json")
+    ebene = next(l for l in doc.layers if isinstance(l, ObjectLayer))
+    geaendert = next(o for o in ebene.objects if o.name == "cc")
+    assert geaendert.type == "trigger"
+    assert (geaendert.x, geaendert.y, geaendert.width, geaendert.height) == (10.5, 20.5, 8, 4)
+
+
+def test_der_namensindex_bleibt_nach_dem_entfernen_richtig(tmp_path):
+    """Der Index bildet Name -> Position ab. Bliebe er stehen, zeigte er
+    nach einem Entfernen stillschweigend auf das NACHBAR-Objekt -- derselbe
+    Fehler, den `namen_neu` fuer die Ebenen abwehrt. Sichtbar wird er erst
+    ueber einen Zugriff NACH dem Entfernen."""
+    r = _run(tmp_path, _MIT_OBJEKTEN + '''TILED_REMOVE_OBJECT(m, "s", 0)
+TILED_OBJECT_SET_NAME(m, "s", 0, "neu")
+PRINT TILED_OBJECT_NAME(m, "s", 0)
+PRINT TILED_OBJECT_NAME(m, "s", 1)
+PRINT TILED_OBJECT_X(m, "s", 1)
+''')
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split() == ["neu", "c", "64.0"]
+
+
+@pytest.mark.parametrize("zeile,teil", [
+    ('TILED_REMOVE_OBJECT(m, "s", 9)', "gibt es in 's' nicht"),
+    ('TILED_REMOVE_OBJECT(m, "weg", 0)', "gibt es nicht"),
+    ('TILED_OBJECT_SET_RECT(m, "s", 9, 0, 0, 1, 1)', "gibt es in 's' nicht"),
+    ('TILED_OBJECT_SET_NAME(m, "s", -1, "x")', "gibt es in 's' nicht"),
+])
+def test_objekt_fehler_sagen_was_los_ist(tmp_path, zeile, teil):
+    r = _run(tmp_path, _MIT_OBJEKTEN + zeile + "\n")
+    assert r.returncode != 0
+    assert teil in (r.stderr + r.stdout), r.stderr

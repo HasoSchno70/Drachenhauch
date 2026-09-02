@@ -86,6 +86,12 @@ IMPORT "tiled"
 | `TILED_TILE_REMOVE_PROP(m, gid, key$)` | — | Eigenschaft einer Kachel entfernen |
 | `TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)` | — | Eigenschaft eines Objekts setzen |
 | `TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)` | — | Eigenschaft eines Objekts entfernen |
+| `TILED_REMOVE_OBJECT(m, ebene$, idx)` | — | ein Objekt entfernen |
+| `TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)` | — | ein Objekt umbenennen |
+| `TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)` | — | seinen Typ aendern |
+| `TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)` | — | Lage und Groesse aendern |
+| `TILED_TILE_PROP_KEYS(m, gid)` | ARRAY OF STRING | welche Eigenschaften hat diese Kachel? |
+| `TILED_OBJECT_PROP_KEYS(m, ebene$, idx)` | ARRAY OF STRING | dasselbe fuer ein Objekt |
 | `TILED_SAVE(m, pfad$)` | — | die Karte als Tiled-JSON schreiben |
 
 ```basic
@@ -135,6 +141,21 @@ Lesen. Gespeichert wird die Eigenschaft beim Tileset unter der lokalen Nummer,
 aber das ist Buchhaltung, die ein Programm nicht kennen muss. Flip-Bits werden
 dabei genauso maskiert wie beim Lesen; sonst legte eine gespiegelte Kachel ihre
 Eigenschaft woanders ab als eine ungespiegelte.
+
+`TILED_OBJECT_SET_RECT` setzt **alle vier** Werte auf einmal, nicht vier
+einzelne Setzer: in einem Editor gehoeren Verschieben und Groessenaendern zur
+selben Geste, und ein halb nachgezogenes Rechteck ist ein Fehler, den man
+nicht sieht.
+
+`TILED_REMOVE_OBJECT` laesst die Indizes **dahinter aufruecken** — wie jede
+Liste. Wer sich einen gemerkt hat, holt ihn danach neu; das ist die einzige
+Ueberraschung daran.
+
+**Was hat diese Kachel eigentlich?** `TILED_TILE_HAS_PROP` beantwortet nur
+eine Frage, die man schon kennt. `TILED_TILE_PROP_KEYS` (und
+`TILED_OBJECT_PROP_KEYS`) liefern die Schluessel selbst — **sortiert**, weil
+die Ablage eine HashMap ist und eine Liste, die sich bei jedem Auffrischen
+neu mischt, nicht zu bedienen waere.
 
 Ein `TILED_TILE_REMOVE_PROP`, das die letzte Eigenschaft einer Kachel nimmt,
 entfernt auch ihren Eintrag ganz: `TILED_SAVE` fuehrt jede Kachel auf, die einen

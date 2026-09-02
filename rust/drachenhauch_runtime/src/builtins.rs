@@ -4296,6 +4296,32 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(Value::Nil)
         }
+        "tiled_remove_object" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_REMOVE_OBJECT")?;
+            crate::tiled::objekt_entfernen(&m, need_str(&a[1], "TILED_REMOVE_OBJECT")?,
+                                           need_int(&a[2], "TILED_REMOVE_OBJECT")?)?;
+            Ok(Value::Nil)
+        }
+        "tiled_object_set_name" | "tiled_object_set_type" => {
+            arity!(4);
+            let ist_name = name.ends_with("name");
+            let fn_ = if ist_name { "TILED_OBJECT_SET_NAME" } else { "TILED_OBJECT_SET_TYPE" };
+            let m = tiled_h(&a[0], fn_)?;
+            crate::tiled::objekt_benennen(&m, need_str(&a[1], fn_)?, need_int(&a[2], fn_)?,
+                                          need_str(&a[3], fn_)?, ist_name)?;
+            Ok(Value::Nil)
+        }
+        "tiled_object_set_rect" => {
+            arity!(7);
+            let m = tiled_h(&a[0], "TILED_OBJECT_SET_RECT")?;
+            crate::tiled::objekt_rechteck(
+                &m, need_str(&a[1], "TILED_OBJECT_SET_RECT")?,
+                need_int(&a[2], "TILED_OBJECT_SET_RECT")?,
+                need_num(&a[3], "TILED_OBJECT_SET_RECT")?, need_num(&a[4], "TILED_OBJECT_SET_RECT")?,
+                need_num(&a[5], "TILED_OBJECT_SET_RECT")?, need_num(&a[6], "TILED_OBJECT_SET_RECT")?)?;
+            Ok(Value::Nil)
+        }
         "tiled_add_tileset" => {
             arity!(3);
             let m = tiled_h(&a[0], "TILED_ADD_TILESET")?;
