@@ -34,7 +34,10 @@ pytestmark = [pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' ni
 
 KEY_UP, KEY_DOWN = 1, 2
 MOUSE_BUTTON_UP, MOUSE_BUTTON_DOWN, MOUSE_POSITION = 5, 6, 7
+MAUSRAD = 8                    # raylibs INPUT_MOUSE_WHEEL_MOTION (x, y)
 TASTE_ENTF = 261
+TASTE_I = 73                   # raylib-Codes, nicht die von Drachenhauch
+TASTE_UMSCHALT = 340
 
 # Nur was dieser Test braucht: die Lage des Knopfes und die Kartenmasse.
 _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode)) + _
@@ -51,12 +54,16 @@ _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode
           " " + STR$(IIF(istObjEbene(), 1, 0)) + " " + STR$(objSel) + _
           " " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + _
           " " + STR$(GUI_CANVAS_X(leinwand)) + " " + STR$(GUI_CANVAS_Y(leinwand)) + _
-          " " + STR$(zoom) + " " + STR$(TILED_LAYER_COUNT(karte))
+          " " + STR$(zoom) + " " + STR$(TILED_LAYER_COUNT(karte)) + _
+          " " + STR$(GUI_CANVAS_X(palette)) + " " + STR$(GUI_CANVAS_Y(palette)) + _
+          " " + STR$(GUI_GET_X(bTsNeu)) + " " + STR$(GUI_GET_Y(bTsNeu)) + _
+          " " + STR$(tsAnz) + " " + STR$(tsAkt) + " " + STR$(basisGid())
 '''
 _FELDER = ("codeX codeY kb kh zell solidX solidY setzX setzY "
            "wegX wegY propX propY gewaehlt "
            "objEbX objEbY objWegX objWegY objUebX objUebY lstObjX lstObjY "
-           "istObj objSel objAnz cvX cvY zoom ebenen").split()
+           "istObj objSel objAnz cvX cvY zoom ebenen "
+           "palX palY tsNeuX tsNeuY tsAnz tsAkt basisGid").split()
 
 _DIALOG_CODE = 'FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")'
 
@@ -80,6 +87,11 @@ def _kopie(tmp_path, dialoge=None):
 
 
 def _events(tmp_path, events):
+    # Nach Bild sortiert: die Wiedergabe arbeitet die Liste der Reihe nach ab
+    # und haelt beim ersten spaeteren Eintrag an. Ein nachgereichtes frueheres
+    # Ereignis kaeme sonst zusammen mit einem spaeteren in EINEM Bild an --
+    # zwei Radschritte in einem Bild sind aber nur einer.
+    events = sorted(events, key=lambda e: e[0])
     lines = ["# Test-Aufnahme", "c %d" % len(events)]
     for frame, typ, *params in events:
         p = (list(params) + [0, 0, 0, 0])[:4]
@@ -116,7 +128,7 @@ def _exportieren(tmp_path):
     geo = _lauf(tmp_path, 6)[-1]
     ev = _klick(3, geo["codeX"] + 52, geo["codeY"] + 16)
     _lauf(tmp_path, 20, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
-    return tmp_path / "raus.dh", tmp_path / "raus.json", tmp_path / "raus.png"
+    return tmp_path / "raus.dh", tmp_path / "raus.json", tmp_path / "raus_1.png"
 
 
 def test_gb_code_bringt_karte_und_tileset_mit(tmp_path):
@@ -125,7 +137,7 @@ def test_gb_code_bringt_karte_und_tileset_mit(tmp_path):
     code, karte, tileset = _exportieren(tmp_path)
     assert code.exists() and karte.exists() and tileset.exists()
     text = code.read_text(encoding="utf-8")
-    assert 'LOADIMAGE("raus.png")' in text
+    assert 'LOADIMAGE("raus_" + STR$(ti + 1) + ".png")' in text
     assert 'TILED_LOAD("raus.json")' in text
 
 
@@ -247,9 +259,8 @@ def test_die_eigenschaften_gehoeren_der_gewaehlten_kachel(tmp_path):
     Palettenkachel hat also andere. Ohne diesen Test koennte der Kasten
     stumpf immer Kachel 0 beschreiben, und es fiele nicht auf."""
     geo = _lauf(tmp_path, 6)[-1]
-    # Zweite Palettenkachel waehlen (die Palette sitzt bei (12, 78),
-    # jede Kachel ist 16*2 Punkte gross).
-    ev = _klick(3, 12 + 48, 78 + 16)
+    # Zweite Palettenkachel waehlen (jede ist 16*2 Punkte gross).
+    ev = _klick(3, geo["palX"] + 48, geo["palY"] + 16)
     ev += _klick(9, geo["setzX"] + 50, geo["setzY"] + 14)
     ev += _klick(15, geo["codeX"] + 52, geo["codeY"] + 16)
     proben = _lauf(tmp_path, 30, ev, dialoge=_mit_feldern("art", "wasser"))
@@ -371,3 +382,151 @@ def test_die_objekte_landen_in_der_datei(tmp_path):
     assert len(obj) == 2
     assert all(o.name == "gegner" and o.type == "feind" for o in obj)
     assert sorted((o.x, o.y) for o in obj) == [(0, 0), (32, 32)]
+
+
+# ------------------------------------------------------------ mehrere Tilesets
+# Eine Karte darf mehrere Tilesets mitbringen. Der Editor haengt sie an
+# ([+]), zeigt eines in der Palette und muss beim ZEICHNEN jede Kachel ihrem
+# eigenen zuordnen -- mit dem aktiven gerechnet saehe die halbe Karte falsch
+# aus. Der Dialog liefert den Pfad; alles andere macht der echte Code.
+_DIALOG_TS = 'FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")'
+
+
+def _mit_tileset(datei, weiteres=None):
+    d = {_DIALOG_TS: '"%s"' % datei, _DIALOG_CODE: '"raus.dh"'}
+    d.update(weiteres or {})
+    return d
+
+
+def _tileset_daneben(tmp_path, name="tiles.png"):
+    """Ein zweites Tileset in den Arbeitsordner legen (4x2 Kacheln)."""
+    quelle = _ROOT / "examples" / "assets" / name
+    (tmp_path / name).write_bytes(quelle.read_bytes())
+    return name
+
+
+def _tileset_bauen(tmp_path, name, spalten, zeilen):
+    """Ein Tileset beliebiger Groesse -- jede Kachel eine eigene Farbe, damit
+    sich im Bild nachsehen laesst, WELCHE gewaehlt wurde."""
+    from PIL import Image
+    im = Image.new("RGB", (spalten * 16, zeilen * 16))
+    for zy in range(zeilen):
+        for zx in range(spalten):
+            i = zy * spalten + zx
+            for py in range(16):
+                for px in range(16):
+                    im.putpixel((zx * 16 + px, zy * 16 + py),
+                                (20 + i * 3, 200 - i * 2, 60 + i))
+    im.save(tmp_path / name)
+    return name
+
+
+def test_ein_zweites_tileset_haengt_sich_hinter_das_erste(tmp_path):
+    """Die firstgid vergibt die LAUFZEIT -- der Editor rechnet sie nicht
+    nach. Ueberlappende Bereiche zerstoeren sonst stumm die Zuordnung aller
+    Kacheln. Gegenprobe im Test: vorher steht sie bei 1."""
+    datei = _tileset_daneben(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    assert geo["tsAnz"] == 1 and geo["basisGid"] == 1, "vorher nur das eingebaute"
+    ev = _klick(3, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)
+    letzte = _lauf(tmp_path, 20, ev, dialoge=_mit_tileset(datei))[-1]
+    assert letzte["tsAnz"] == 2, "das zweite ist da"
+    assert letzte["tsAkt"] == 1, "und die Palette zeigt es"
+    # 8x4 Kacheln im eingebauten Tileset -> das zweite beginnt bei 33.
+    assert letzte["basisGid"] == 33
+
+
+def test_kacheln_beider_tilesets_stehen_in_derselben_ebene(tmp_path):
+    """Der eigentliche Punkt: eine Ebene darf Kacheln aus allen Tilesets
+    enthalten. Gelesen wird mit dem FREMDEN Leser -- er loest die GID genau
+    wie Tiled auf, und nur so ist belegt, dass die Datei stimmt."""
+    datei = _tileset_daneben(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, *_karte_punkt(geo, 16, 16))              # aus dem ersten
+    ev += _klick(9, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)  # zweites anhaengen
+    ev += _klick(18, geo["palX"] + 48, geo["palY"] + 16)     # dessen Kachel 1
+    ev += _klick(24, *_karte_punkt(geo, 80, 16))
+    ev += _klick(30, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 46, ev, dialoge=_mit_tileset(datei))
+
+    from drachenhauch.tilemap.document import TileMapDoc
+    doc = TileMapDoc.load_json(tmp_path / "raus.json")
+    assert len(doc.tilesets) == 2
+    links = doc.layers[0].get(1, 1)
+    rechts = doc.layers[0].get(5, 1)
+    assert doc.gid_to_tileset(links) == (0, 0)
+    assert doc.gid_to_tileset(rechts) == (1, 1)
+
+
+def test_die_pipette_schaltet_das_tileset_um(tmp_path):
+    """Ohne das zeigte die Palette die aufgenommene Kachel gar nicht -- und
+    der naechste Strich malte eine andere."""
+    datei = _tileset_daneben(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, *_karte_punkt(geo, 16, 16))              # Kachel aus ts 0
+    ev += _klick(9, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)  # ts 1 wird aktiv
+    ev += [(16, KEY_DOWN, TASTE_I), (17, KEY_UP, TASTE_I)]   # Pipette
+    ev += _klick(22, *_karte_punkt(geo, 16, 16))
+    letzte = _lauf(tmp_path, 40, ev, dialoge=_mit_tileset(datei))[-1]
+    assert letzte["tsAkt"] == 0, "die Pipette holt das Tileset ihrer Kachel"
+    assert letzte["basisGid"] == 1
+
+
+def test_der_erzeugte_renderer_zeichnet_beide_tilesets(tmp_path):
+    """Er laedt ein Blatt je Tileset und loest jede GID einzeln auf. Mit nur
+    einem Blatt bliebe die zweite Kachel leer -- und der Code uebersetzte
+    genauso. Darum wird er GESTARTET und sein Bild angesehen."""
+    pytest.importorskip("PIL")
+    datei = _tileset_daneben(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, *_karte_punkt(geo, 16, 16))
+    ev += _klick(9, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)
+    ev += _klick(18, geo["palX"] + 48, geo["palY"] + 16)
+    ev += _klick(24, *_karte_punkt(geo, 80, 16))
+    ev += _klick(30, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 46, ev, dialoge=_mit_tileset(datei))
+    assert (tmp_path / "raus_1.png").exists() and (tmp_path / "raus_2.png").exists()
+
+    from PIL import Image
+    _rendern(tmp_path)
+    im = Image.open(tmp_path / "gerendert.png").convert("RGB")
+    hintergrund = im.getpixel((300, 300))
+    links = im.getpixel((24, 24))
+    rechts = im.getpixel((88, 24))
+    assert links != hintergrund, "die Kachel aus dem ersten Tileset fehlt"
+    assert rechts != hintergrund, "die Kachel aus dem zweiten Tileset fehlt"
+    assert links != rechts, "beide zeigen dasselbe -- die GID wurde falsch aufgeloest"
+
+
+def test_ein_grosses_tileset_laesst_sich_rollen(tmp_path):
+    """Die Palette ist ein Ausschnitt fester Groesse. Ohne Rollen waere von
+    einem 10x6-Tileset die Haelfte unerreichbar -- ohne dass etwas fehlte."""
+    pytest.importorskip("PIL")
+    datei = _tileset_bauen(tmp_path, "gross.png", 10, 6)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)
+    # Das Rad wirkt nur UEBER der Palette -- der Zeiger steht nach dem
+    # Klick noch auf dem Knopf.
+    ev += [(10, MOUSE_POSITION, geo["palX"] + 8, geo["palY"] + 8)]
+    # Zwei Zeilen nach unten, dann die erste Kachel des Ausschnitts.
+    ev += [(12, MAUSRAD, 0, -1), (14, MAUSRAD, 0, -1)]
+    ev += _klick(18, geo["palX"] + 8, geo["palY"] + 8)
+    letzte = _lauf(tmp_path, 34, ev, dialoge=_mit_tileset(datei))[-1]
+    assert letzte["gewaehlt"] == 20, "Zeile 2, Spalte 0 eines 10 Spalten breiten"
+
+
+def test_umschalt_rollt_die_palette_zur_seite(tmp_path):
+    """Ein breites Tileset braucht die zweite Richtung -- sonst waeren die
+    Spalten ab 8 nicht anzuklicken."""
+    pytest.importorskip("PIL")
+    datei = _tileset_bauen(tmp_path, "breit.png", 10, 6)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["tsNeuX"] + 16, geo["tsNeuY"] + 13)
+    ev += [(10, MOUSE_POSITION, geo["palX"] + 8, geo["palY"] + 8)]
+    ev += [(12, KEY_DOWN, TASTE_UMSCHALT), (14, KEY_DOWN, TASTE_UMSCHALT),
+           (16, KEY_DOWN, TASTE_UMSCHALT)]
+    ev += [(14, MAUSRAD, 0, -1), (16, MAUSRAD, 0, -1)]
+    ev += [(18, KEY_UP, TASTE_UMSCHALT)]
+    ev += _klick(22, geo["palX"] + 8, geo["palY"] + 8)
+    letzte = _lauf(tmp_path, 38, ev, dialoge=_mit_tileset(datei))[-1]
+    assert letzte["gewaehlt"] == 2, "Zeile 0, Spalte 2"

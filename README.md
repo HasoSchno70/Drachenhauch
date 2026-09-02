@@ -303,7 +303,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
 | `189_sprite_editor.dh` | **der Sprite-Editor, geschrieben IN Drachenhauch** — neun Werkzeuge, Ebenen, Einzelbilder, Zwiebelhaut, Streifen- und Atlas-Ausgabe |
 | `188_bild_erzeugen.dh` | **ein Bild herstellen statt nur anzeigen** — Malprogramm mit durchsichtigen Ebenen, Radierer und PNG-Export |
-| `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen, echtes Tiled-JSON |
+| `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen, Objekt-Ebenen, mehrere Tilesets, echtes Tiled-JSON |
 | `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
 | `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export |
 | `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
