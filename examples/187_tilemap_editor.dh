@@ -18,15 +18,20 @@
 '    Datei       Neu / Oeffnen / Speichern -- echtes Tiled-JSON
 '    Historie    Strg+Z / Strg+Y, 16 Schritte
 '
+'    Ausgabe     [GB-Code] schreibt einen lauffaehigen Renderer, die Karte
+'                als Tiled-JSON und das Tileset-Bild -- alle drei unter
+'                demselben Namen, damit keins ins Leere zeigt
+'
 '  Was NICHT drin ist (wie bei den anderen Piloten offen gesagt):
-'    Objekt-Ebenen, mehrere Tilesets, Eigenschaften je Kachel, der
-'    GB-Code-Export und das Umsortieren von Ebenen. Rueckgaengig deckt
-'    KACHEL-Aenderungen ab, nicht das Anlegen/Loeschen von Ebenen.
+'    Objekt-Ebenen, mehrere Tilesets, Eigenschaften je Kachel und das
+'    Umsortieren von Ebenen. Rueckgaengig deckt KACHEL-Aenderungen ab,
+'    nicht das Anlegen/Loeschen von Ebenen.
 '
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
 IMPORT "tiled"
+IMPORT "imgfx"   ' IMAGE_SAVE fuer das Tileset neben dem Code
 
 SCREEN(1400, 880, "Drachenhauch - Tilemap-Editor", 1)
 SET_FULLSCREEN(TRUE)
@@ -214,6 +219,8 @@ GUI_SET_ANCHOR(tb, "lr")
 DIM bNeu AS GUI_WIDGET  : bNeu  = GUI_BUTTON(win, "Neu", 10, 7, 62, 32)
 DIM bAuf AS GUI_WIDGET  : bAuf  = GUI_BUTTON(win, "Oeffnen", 76, 7, 84, 32)
 DIM bSpei AS GUI_WIDGET : bSpei = GUI_BUTTON(win, "Speichern", 164, 7, 100, 32)
+DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "GB-Code", 268, 7, 104, 32)
+GUI_TOOLTIP(bCode, "Ein lauffaehiger Renderer + Karte + Tileset daneben -- alles unter einem Namen")
 
 ' Werkzeuge. GUI_TOGGLE waere das naheliegende Widget, ist aber ein
 ' SCHIEBEschalter: schmal, mit dem Text daneben statt darin -- sechs davon
@@ -223,7 +230,7 @@ CONST WZ_B = 92                          ' Knopfbreite
 DIM wzName AS ARRAY OF STRING
 wzName = SPLIT$("Stift|Radierer|Fuellen|Rechteck|Pipette|Auswahl", "|")
 DIM wzKnopf[6] AS GUI_WIDGET
-DIM wx AS INTEGER : wx = 284
+DIM wx AS INTEGER : wx = 384
 DIM i AS INTEGER
 FOR i = 0 TO 5
     wzKnopf[i] = GUI_BUTTON(win, wzName[i], wx, 7, WZ_B, 32)
@@ -365,6 +372,68 @@ END SUB
 
 ' ============================================================ Werkzeuge
 
+' ---------------------------------------------------------------- GB-Code
+' Ein LAUFFAEHIGER Renderer zu dieser Karte: das Programm, die Karte als
+' Tiled-JSON und das Tileset-Bild -- alle drei unter demselben Namen und in
+' einem Zug.
+'
+' Das Bild kommt mit, obwohl die Karte seinen Pfad ohnehin nennt: der Pfad in
+' der JSON zeigt dorthin, wo das Tileset beim BEARBEITEN lag. Wer den Ordner
+' weitergibt, haette sonst eine Karte, die auf nichts zeigt -- und das faellt
+' erst beim Starten auf.
+SUB gbCodeSichern(pfad AS STRING)
+    DIM basis AS STRING : basis = pfad
+    IF LEN(basis) > 3 AND RIGHT$(LOWER$(basis), 3) = ".dh" THEN
+        basis = LEFT$(basis, LEN(basis) - 3)
+    END IF
+    TILED_SAVE(karte, basis + ".json")
+    IMAGE_SAVE(tsBild, basis + ".png")
+
+    DIM z AS STRING : z = CHR$(10)
+    DIM q AS STRING : q = CHR$(34)
+    ' Fenstergroesse aus der Karte, aber gedeckelt -- eine 128x128-Karte
+    ' waere 2048 Punkte breit und passte auf keinen Schirm.
+    DIM fw AS INTEGER : fw = MIN(1280, kb * KACHEL)
+    DIM fh AS INTEGER : fh = MIN(800, kh * KACHEL)
+    DIM t AS STRING
+    t = "' Von 187_tilemap_editor.dh erzeugt." + z + _
+        "IMPORT " + q + "tiled" + q + z + z + _
+        "CONST TW = " + STR$(KACHEL) + z + _
+        "CONST TH = " + STR$(KACHEL) + z + z + _
+        "SCREEN(" + STR$(fw) + ", " + STR$(fh) + ", " + q + "Karte" + q + ", 1)" + z + z + _
+        "DIM blatt AS IMAGE" + z + _
+        "blatt = LOADIMAGE(" + q + BASENAME(basis) + ".png" + q + ")" + z + _
+        "DIM lvl AS TILED_MAP" + z + _
+        "lvl = TILED_LOAD(" + q + BASENAME(basis) + ".json" + q + ")" + z + z + _
+        "' Spalten des Tilesets aus dem BILD, nicht aus der Karte: die JSON" + z + _
+        "' nennt sie nicht, und geraten waere sie eine stille Fehlerquelle." + z + _
+        "DIM sp AS INTEGER : sp = IMAGEWIDTH(blatt) \ TW" + z + _
+        "DIM fg AS INTEGER : fg = TILED_TILESET_FIRSTGID(lvl, 0)" + z + z + _
+        "WHILE NOT QUITREQUESTED()" + z + _
+        "    CLS(&H0A0F16)" + z + _
+        "    DIM e AS INTEGER" + z + _
+        "    FOR e = 0 TO TILED_LAYER_COUNT(lvl) - 1" + z + _
+        "        IF TILED_LAYER_VISIBLE(lvl, e) THEN" + z + _
+        "            DIM ty AS INTEGER" + z + _
+        "            DIM tx AS INTEGER" + z + _
+        "            FOR ty = 0 TO TILED_HEIGHT(lvl) - 1" + z + _
+        "                FOR tx = 0 TO TILED_WIDTH(lvl) - 1" + z + _
+        "                    DIM g AS INTEGER : g = TILED_TILE_AT(lvl, e, tx, ty)" + z + _
+        "                    IF g >= fg THEN" + z + _
+        "                        DIM lid AS INTEGER : lid = g - fg" + z + _
+        "                        DRAWIMAGEPART(blatt, (lid MOD sp) * TW, (lid \ sp) * TH, _" + z + _
+        "                                      TW, TH, tx * TW, ty * TH)" + z + _
+        "                    END IF" + z + _
+        "                NEXT" + z + _
+        "            NEXT" + z + _
+        "        END IF" + z + _
+        "    NEXT" + z + _
+        "    FLIP()" + z + _
+        "WEND" + z
+    WRITEALL(pfad, t)
+    meldung = "Renderer + Karte + Tileset: " + BASENAME(pfad)
+END SUB
+
 SUB rechteckFuellen(x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER, gid AS INTEGER)
     DIM ax AS INTEGER : ax = MIN(x1, x2)
     DIM ay AS INTEGER : ay = MIN(y1, y2)
@@ -460,6 +529,17 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O)) THEN oeffnen()
     IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S)) THEN speichern()
+    IF GUI_CLICKED(bCode) THEN
+        DIM pc AS STRING
+        pc = FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+        IF pc <> "" THEN
+            TRY
+                gbCodeSichern(pc)
+            CATCH e
+                meldung = e
+            END TRY
+        END IF
+    END IF
 
     ' ---------------------------------------------------------- Verlauf
     IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()

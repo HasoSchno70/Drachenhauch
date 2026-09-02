@@ -207,6 +207,7 @@ _BRAUCHT_GRAFIK = {
     "test_m3d.py",
     "test_modules_audio.py",
     "test_picking_geometry.py",
+    "test_pilot_tilemap.py",
     "test_pilot_sprite_auswahl.py",
     "test_runtime_font_delta.py",
     "test_scissor.py",
