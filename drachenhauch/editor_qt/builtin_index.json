@@ -8139,6 +8139,30 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_REMOVE_OBJECT",
+   "kind": "builtin",
+   "signature": "TILED_REMOVE_OBJECT(m, ebene$, idx)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_NAME",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_TYPE",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_RECT",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_TILE_SET_PROP",
    "kind": "builtin",
    "signature": "TILED_TILE_SET_PROP(m, gid, key$, wert)",

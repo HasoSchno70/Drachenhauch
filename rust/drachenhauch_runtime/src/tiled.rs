@@ -671,6 +671,75 @@ pub fn objekt_anhaengen(m: &Rc<RefCell<TiledMap>>, ebene: &str, name: &str, typ:
     Ok(idx as i64)
 }
 
+/// Ein Objekt entfernen (TILED_REMOVE_OBJECT).
+///
+/// Die Indizes DAHINTER ruecken auf -- wie bei jeder Liste. Wer sich einen
+/// gemerkt hat, muss ihn nach dem Entfernen neu holen; das steht so in der
+/// Doku, weil es die einzige Ueberraschung daran ist.
+pub fn objekt_entfernen(m: &Rc<RefCell<TiledMap>>, ebene: &str, idx: i64) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    let li = objekt_ebene(&map, ebene, "TILED_REMOVE_OBJECT")?;
+    let l = &mut map.layers[li];
+    if idx < 0 || idx as usize >= l.objects.len() {
+        return Err(std::format!(
+            "TILED_REMOVE_OBJECT: Objekt {} gibt es in '{}' nicht", idx, ebene));
+    }
+    l.objects.remove(idx as usize);
+    namen_neu_objekte(l);
+    Ok(())
+}
+
+/// Den Namensindex einer Objektebene neu aufbauen.
+///
+/// Noetig nach jedem Entfernen und jedem Umbenennen: er bildet Name ->
+/// Positionen ab, und eine stehengebliebene Position zeigt danach
+/// stillschweigend auf das NACHBAR-Objekt (derselbe Fehler, den `namen_neu`
+/// fuer die Ebenen abwehrt).
+fn namen_neu_objekte(l: &mut TiledLayer) {
+    l.obj_by_name.clear();
+    for (i, o) in l.objects.iter().enumerate() {
+        l.obj_by_name.entry(o.name.clone()).or_default().push(i);
+    }
+}
+
+/// Name und Typ eines Objekts aendern (TILED_OBJECT_SET_NAME / _SET_TYPE).
+pub fn objekt_benennen(m: &Rc<RefCell<TiledMap>>, ebene: &str, idx: i64,
+                       wert: &str, ist_name: bool) -> Result<(), String> {
+    let fn_ = if ist_name { "TILED_OBJECT_SET_NAME" } else { "TILED_OBJECT_SET_TYPE" };
+    let mut map = m.borrow_mut();
+    let li = objekt_ebene(&map, ebene, fn_)?;
+    let l = &mut map.layers[li];
+    if idx < 0 || idx as usize >= l.objects.len() {
+        return Err(std::format!("{}: Objekt {} gibt es in '{}' nicht", fn_, idx, ebene));
+    }
+    if ist_name {
+        l.objects[idx as usize].name = wert.to_string();
+        namen_neu_objekte(l);
+    } else {
+        l.objects[idx as usize].type_ = wert.to_string();
+    }
+    Ok(())
+}
+
+/// Lage und Groesse eines Objekts (TILED_OBJECT_SET_RECT).
+///
+/// Alle vier Werte auf einmal, nicht vier Setzer: in einem Editor gehoeren
+/// Verschieben und Groessenaendern zur selben Geste, und ein halb
+/// nachgezogenes Rechteck ist ein Fehler, den man nicht sieht.
+pub fn objekt_rechteck(m: &Rc<RefCell<TiledMap>>, ebene: &str, idx: i64,
+                       x: f64, y: f64, w: f64, h: f64) -> Result<(), String> {
+    let mut map = m.borrow_mut();
+    let li = objekt_ebene(&map, ebene, "TILED_OBJECT_SET_RECT")?;
+    let l = &mut map.layers[li];
+    if idx < 0 || idx as usize >= l.objects.len() {
+        return Err(std::format!(
+            "TILED_OBJECT_SET_RECT: Objekt {} gibt es in '{}' nicht", idx, ebene));
+    }
+    let o = &mut l.objects[idx as usize];
+    o.x = x; o.y = y; o.width = w; o.height = h;
+    Ok(())
+}
+
 /// Eigenschaft eines Objekts setzen (`Some`) oder entfernen (`None`).
 pub fn objekt_eigenschaft(m: &Rc<RefCell<TiledMap>>, ebene: &str, idx: i64, key: &str,
                           wert: Option<PropVal>) -> Result<(), String> {
