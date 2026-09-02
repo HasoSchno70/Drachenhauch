@@ -80,6 +80,12 @@ IMPORT "tiled"
 | `TILED_ADD_LAYER(m, name$)` | INTEGER (Index) | eine leere Kachel-Ebene anhaengen |
 | `TILED_ADD_TILESET(m, bild$, kachelzahl)` | INTEGER (Index) | ein Tileset anhaengen; die `firstgid` vergibt die Laufzeit selbst |
 | `TILED_TILESET_TILES(m, idx)` | INTEGER | wie viele Kacheln hat dieses Tileset? |
+| `TILED_ADD_OBJECT_LAYER(m, name$)` | INTEGER (Index) | eine Objekt-Ebene anhaengen |
+| `TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)` | INTEGER (Index) | ein Objekt in eine Objekt-Ebene legen |
+| `TILED_TILE_SET_PROP(m, gid, key$, wert)` | — | Eigenschaft einer Kachel setzen |
+| `TILED_TILE_REMOVE_PROP(m, gid, key$)` | — | Eigenschaft einer Kachel entfernen |
+| `TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)` | — | Eigenschaft eines Objekts setzen |
+| `TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)` | — | Eigenschaft eines Objekts entfernen |
 | `TILED_SAVE(m, pfad$)` | — | die Karte als Tiled-JSON schreiben |
 
 ```basic
@@ -105,10 +111,40 @@ an einem **fremden**: `drachenhauch/tilemap/document.py`, dem Datenmodell des
 Qt-Editors `dhtilemap` (`tests/test_tiled_schreiben.py`). Ein Format, das nur sein
 eigener Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig.
 
+### Objekt-Ebenen und Eigenschaften anlegen
+
+```basic
+DIM sp AS INTEGER : sp = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM held AS INTEGER
+held = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+TILED_OBJECT_SET_PROP(m, "spawns", held, "leben", 3)
+
+TILED_TILE_SET_PROP(m, 5, "solid", TRUE)      ' GID, nicht lokale Nummer
+TILED_TILE_SET_PROP(m, 5, "damage", 10)
+```
+
+**Ein Setzer statt vier.** Die Leser sind typisiert
+(`TILED_TILE_PROP_BOOL/INT/FLOAT/STRING`), weil dort der Aufrufer sagt, was er
+erwartet. Beim Schreiben ist das unnoetig: Drachenhauch unterscheidet BOOLEAN,
+INTEGER, FLOAT und STRING schon im Wert, also traegt der Wert seinen Typ mit
+sich. Alles andere (ARRAY, MAP, Handles) wird abgelehnt — Tiled kennt genau
+diese vier Arten, und ein Feld wuerde beim Speichern still zu Text zerfallen.
+
+Die **GID** ist auch beim Setzen die Adresse, nicht die lokale Nummer — wie beim
+Lesen. Gespeichert wird die Eigenschaft beim Tileset unter der lokalen Nummer,
+aber das ist Buchhaltung, die ein Programm nicht kennen muss. Flip-Bits werden
+dabei genauso maskiert wie beim Lesen; sonst legte eine gespiegelte Kachel ihre
+Eigenschaft woanders ab als eine ungespiegelte.
+
+Ein `TILED_TILE_REMOVE_PROP`, das die letzte Eigenschaft einer Kachel nimmt,
+entfernt auch ihren Eintrag ganz: `TILED_SAVE` fuehrt jede Kachel auf, die einen
+hat, und eine mit leerer Liste waere Rauschen in der Datei.
+
 **Grenzen:** `TILED_NEW` legt nur orthogonale, endliche Karten an (kein
-isometrisch, kein `infinite`), Objekt-Ebenen lassen sich nicht neu anlegen (nur
-geladene werden mitgeschrieben), und Kachel-Eigenschaften einer selbst gebauten
-Karte lassen sich nicht setzen -- gelesene bleiben beim Speichern erhalten.
+isometrisch, kein `infinite`). Objekte sind immer Rechtecke — Polygone,
+Ellipsen und Punkte (Tiled: `"point": true`) lassen sich nicht anlegen, ein
+Objekt mit Breite und Hoehe 0 liest der Qt-Editor allerdings als Punkt.
+Objekt-Ebenen lassen sich nicht wieder in Kachel-Ebenen verwandeln.
 Sehr grosse Karten werden abgelehnt (ueber 4 Millionen Kacheln), damit ein
 Tippfehler in der Groesse nicht den Speicher frisst.
 
