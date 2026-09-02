@@ -114,7 +114,12 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(GUI_GET_X(cbEbSicht)) + " " + STR$(GUI_GET_Y(cbEbSicht)) + _
           " " + STR$(anzEb) + " " + STR$(aktEb) + " " + STR$(ebSicht[aktEb]) + _
           " " + STR$(GUI_GET_X(bGbCode)) + " " + STR$(GUI_GET_Y(bGbCode)) + _
-          " " + STR$(GUI_GET_X(bDhanim)) + " " + STR$(GUI_GET_Y(bDhanim))
+          " " + STR$(GUI_GET_X(bDhanim)) + " " + STR$(GUI_GET_Y(bDhanim)) + _
+          " " + STR$(GUI_GET_X(bBlatt)) + " " + STR$(GUI_GET_Y(bBlatt)) + _
+          " " + STR$(GUI_GET_X(bBildName)) + " " + STR$(GUI_GET_Y(bBildName)) + _
+          " " + STR$(GUI_WINDOW_GET_X(winName) + GUI_GET_X(bNamOk)) + _
+          " " + STR$(GUI_WINDOW_GET_Y(winName) + GUI_GET_Y(bNamOk)) + _
+          " " + STR$(LEN(bildName[aktBild]))
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
@@ -131,7 +136,8 @@ _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "gw gh anzBild anzAnim aktAnim anVon anBis anFps "
            "zusX zusY grX grY animNX animNY animWX animWY "
            "kopieX kopieY bildWX bildWY grOkX grOkY lstBX lstBY "
-           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY faX faY").split()
+           "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY faX faY "
+           "blattX blattY namX namY namOkX namOkY namLen").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -877,3 +883,99 @@ def test_dhanim_ohne_bereiche_bekommt_einen_zustand_ueber_alles(tmp_path):
     assert [z["name"] for z in d["states"]] == ["idle"]
     assert (d["states"][0]["first"], d["states"][0]["last"]) == (0, 1)
     assert _fsm_pruefen(tmp_path) == "idle"
+
+
+# --------------------------------------------------- Namen der Einzelbilder
+_DIALOG_BLATT = 'FILE_SAVE_DIALOG("Streifen sichern", "sprites.png", "png")'
+_NAME_LESEN = 'DIM nn AS STRING : nn = alsName$(GUI_TEXT(tiBild))'
+
+# Ein Programm, das den erzeugten Atlas mit dem Leser der LAUFZEIT aufmacht.
+# Ein Schluessel, den es nicht gibt, laesst ATLAS_DRAW scheitern -- damit ist
+# der Rueckgabewert des Prozesses die ganze Pruefung.
+_ATLAS_PRUEFER = '''SCREEN(320, 240, "Pruefer", 1)
+DIM a AS SPRITE_ATLAS
+a = ATLAS_LOAD("raus.json")
+ATLAS_DRAW(a, "%s", 10, 10)
+PRINT "GEZEICHNET"
+'''
+
+
+def _atlas_pruefen(tmp_path, schluessel):
+    (tmp_path / "atl.dh").write_text(_ATLAS_PRUEFER % schluessel, encoding="utf-8")
+    return subprocess.run([str(_DHRT), "run", str(tmp_path / "atl.dh")],
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=120, cwd=str(tmp_path),
+                          env=dict(os.environ, DHRT_FRAMES="3"))
+
+
+# Das Namensfenster bekommt eine feste Stelle und keinen Rahmen -- sonst
+# haengt die Lage seines Knopfes an der Titelhoehe des Themas, und die kann
+# ein Programm nicht erfragen (dieselbe Naht wie beim Groessen-Fenster).
+_FENSTER_FLACH = {
+    "GUI_WINDOW_VISIBLE(winName, FALSE)\nDIM namOffen":
+        "GUI_WINDOW_CHROME(winName, FALSE)\n"
+        "GUI_WINDOW_SET_BOUNDS(winName, 100, 100, 340, 140)\n"
+        "GUI_WINDOW_VISIBLE(winName, FALSE)\nDIM namOffen",
+}
+
+
+def _benennen(tmp_path, name):
+    """Bild 1 benennen und den Streifen samt Atlas schreiben."""
+    ersatz = dict(_FENSTER_FLACH)
+    ersatz[_NAME_LESEN] = 'DIM nn AS STRING : nn = alsName$("%s")' % name
+    ersatz[_DIALOG_BLATT] = '"raus.png"' 
+    geo = _lauf(tmp_path, 6, dialoge=ersatz)[-1]
+    ev = _knopf_klick(2, geo["namX"], geo["namY"])
+    ev += _knopf_klick(10, geo["namOkX"], geo["namOkY"])
+    ev += _knopf_klick(18, geo["blattX"], geo["blattY"])
+    return _lauf(tmp_path, 34, ev, dialoge=ersatz)[-1]
+
+
+def test_benanntes_bild_wird_zum_atlas_schluessel(tmp_path):
+    """Der Zweck der Namen: ein Programm schreibt spaeter
+    `ATLAS_DRAW(atlas, "kopf", ...)` statt `"bild_0"`. Geprueft wird deshalb
+    mit ATLAS_LOAD der Laufzeit -- ein Schluessel, den es nicht gibt, laesst
+    das Zeichnen scheitern.
+    """
+    _benennen(tmp_path, "kopf")
+    assert (tmp_path / "raus.json").exists()
+    d = json.loads((tmp_path / "raus.json").read_text(encoding="utf-8"))
+    assert list(d["sprites"]) == ["kopf"], d
+    assert _atlas_pruefen(tmp_path, "kopf").returncode == 0
+    # Gegenprobe: der alte Vorgabe-Schluessel darf es NICHT mehr geben,
+    # sonst sagt der Test oben nur, dass irgendein Eintrag existiert.
+    r = _atlas_pruefen(tmp_path, "bild_0")
+    assert r.returncode != 0, r.stdout
+
+
+def test_name_wird_auf_eine_kennung_gebracht(tmp_path):
+    """Ein Punkt im Namen ist die gefaehrlichste Eingabe: das json-Modul
+    liest einen Schluessel mit Punkt als PFAD, aus "held.lauf" wuerde ein
+    verschachteltes Objekt statt eines Eintrags -- und `streifenLaden` sucht
+    spaeter mit derselben Punkt-Notation. Deshalb wird gesaeubert."""
+    _benennen(tmp_path, "held.lauf 2!")
+    d = json.loads((tmp_path / "raus.json").read_text(encoding="utf-8"))
+    assert list(d["sprites"]) == ["held_lauf_2_"], d
+    assert _atlas_pruefen(tmp_path, "held_lauf_2_").returncode == 0
+
+
+def test_namen_kommen_ueber_den_streifen_zurueck(tmp_path):
+    """Rundweg: benennen, Streifen schreiben, denselben Streifen wieder
+    aufmachen -- der Name muss wieder da sein. Ohne das verliert jeder Weg
+    ueber den Streifen die Namen, und man merkt es erst, wenn der naechste
+    Export wieder `bild_0` schreibt."""
+    ersatz = dict(_FENSTER_FLACH)
+    ersatz[_NAME_LESEN] = 'DIM nn AS STRING : nn = alsName$("kopf")'
+    ersatz[_DIALOG_BLATT] = '"raus.png"'
+    ersatz['po = FILE_OPEN_DIALOG("Oeffnen", "dhsprite,png")'] = 'po = "raus.png"'
+    geo = _lauf(tmp_path, 6, dialoge=ersatz)[-1]
+    ev = _knopf_klick(2, geo["namX"], geo["namY"])
+    ev += _knopf_klick(10, geo["namOkX"], geo["namOkY"])
+    ev += _knopf_klick(18, geo["blattX"], geo["blattY"])
+    nach_export = _lauf(tmp_path, 30, ev, dialoge=ersatz)[-1]
+    assert nach_export["namLen"] == 4, "der Name steht"
+
+    ev += _knopf_klick(32, 66 - 64, 7 - 14)      # [Oeffnen] in der Werkzeugleiste
+    letzte = _lauf(tmp_path, 50, ev, dialoge=ersatz)[-1]
+    assert letzte["anzBild"] == 1, "der Streifen ist wieder drin"
+    assert letzte["namLen"] == 4, "und sein Name mit ihm"

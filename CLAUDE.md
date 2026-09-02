@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 468 | 0,58 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 762 | 0,31 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2474 | 0,34 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -80,10 +80,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > (1754, mit Verschieben) -> 0,25 (1877, mit .gpl-Paletten) -> 0,28 (2037,
 > mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
 > Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
-> GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe). Nichts daran ist
-> schlechter geworden -- es wurde nur weniger weggelassen. Aus 0,17 sind so
-> 0,34 geworden, das Doppelte, ohne dass sich an der Sprache etwas geaendert
-> haette.
+> GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe) -> 0,35 (2604,
+> mit benannten Einzelbildern). Nichts daran ist schlechter geworden -- es
+> wurde nur weniger weggelassen. Aus 0,17 sind so 0,35 geworden, mehr als das
+> Doppelte, ohne dass sich an der Sprache etwas geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
@@ -202,6 +202,20 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > die `dhanim` oeffnet und die `ANIM_FSM_LOAD` schon so laedt. Geprueft mit
 > dem Leser der LAUFZEIT: laden, `ANIM_FSM_SETUP`, ein Schritt, Zustandsname
 > vergleichen -- dass die JSON gueltig ist, waere die schwaechere Aussage.
+>
+> **Benannte Einzelbilder** (2026-09-01) schliessen die Liste: der Name wird
+> zum Schluessel im Atlas, ein Programm schreibt dann
+> `ATLAS_DRAW(atlas, "kopf", ...)` statt `"bild_0"`. Namen sind KENNUNGEN und
+> kein Fliesstext -- gesaeubert auf Buchstaben, Ziffern, `_` und `-`, und das
+> aus einem gemessenen Grund: das json-Modul liest einen Schluessel mit PUNKT
+> als PFAD, aus "held.lauf" wuerde beim Schreiben ein verschachteltes Objekt
+> statt eines Eintrags, und `streifenLaden` sucht spaeter mit derselben
+> Punkt-Notation. Dass Nutzertext in den Atlas kommt, hat ausserdem
+> `atlasJson$` vom handgebauten Text auf das json-Modul gebracht -- die alte
+> Begruendung ("fuer eine so flache Datei kuerzer") galt nur, solange alle
+> Schluessel `bild_0` hiessen. Geprueft mit `ATLAS_LOAD` der Laufzeit, samt
+> Gegenprobe auf den alten Schluessel; dass der Pilot ein Format schreibt,
+> das ATLAS_LOAD liest, stand bis dahin nur als Behauptung im Kopfkommentar.
 >
 > **Nicht portiert:** in den ersten beiden Undo/Redo -- der dritte
 > und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
