@@ -36,9 +36,15 @@ MOUSE_BUTTON_UP, MOUSE_BUTTON_DOWN, MOUSE_POSITION = 5, 6, 7
 
 # Nur was dieser Test braucht: die Lage des Knopfes und die Kartenmasse.
 _PROBE = '''    PRINT "P " + STR$(GUI_GET_X(bCode)) + " " + STR$(GUI_GET_Y(bCode)) + _
-          " " + STR$(kb) + " " + STR$(kh) + " " + STR$(zell())
+          " " + STR$(kb) + " " + STR$(kh) + " " + STR$(zell()) + _
+          " " + STR$(GUI_GET_X(cbSolid)) + " " + STR$(GUI_GET_Y(cbSolid)) + _
+          " " + STR$(GUI_GET_X(bPropSetz)) + " " + STR$(GUI_GET_Y(bPropSetz)) + _
+          " " + STR$(GUI_GET_X(bPropWeg)) + " " + STR$(GUI_GET_Y(bPropWeg)) + _
+          " " + STR$(GUI_GET_X(lstProp)) + " " + STR$(GUI_GET_Y(lstProp)) + _
+          " " + STR$(gewaehlt)
 '''
-_FELDER = "codeX codeY kb kh zell".split()
+_FELDER = ("codeX codeY kb kh zell solidX solidY setzX setzY "
+           "wegX wegY propX propY gewaehlt").split()
 
 _DIALOG_CODE = 'FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")'
 
@@ -146,3 +152,95 @@ def test_der_erzeugte_renderer_zeichnet_wirklich(tmp_path):
     _lauf(tmp_path, 26, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
     gemalt = _rendern(tmp_path)
     assert len(gemalt) > 1, "die gemalte Kachel fehlt im erzeugten Bild"
+
+
+# ------------------------------------------------------- Kachel-Eigenschaften
+# Die Werte kommen aus Eingabefeldern; aufgezeichnete Eingabe erreicht sie
+# nicht (Zeichen gehen einen anderen Weg als Tasten). Ersetzt wird deshalb
+# genau das ABLESEN der beiden Felder -- gedeutet und gesetzt wird vom
+# echten Code.
+_KEY = 'DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))'
+_WERT = 'eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))'
+
+
+def _mit_feldern(key, wert):
+    return {_KEY: 'DIM sk AS STRING : sk = "%s"' % key,
+            _WERT: 'eigenschaftSetzen(pg, sk, "%s")' % wert,
+            _DIALOG_CODE: '"raus.dh"'}
+
+
+def _eigenschaften_von(tmp_path, lokal=0):
+    """Die Eigenschaften einer Kachel, gelesen vom FREMDEN Leser -- dem
+    Datenmodell des Qt-Editors."""
+    from drachenhauch.tilemap.document import TileMapDoc
+    return TileMapDoc.load_json(tmp_path / "raus.json").properties_of(lokal)
+
+
+def test_solid_kaestchen_setzt_und_entfernt(tmp_path):
+    """Der haeufigste Fall, und der einzige mit eigenem Schalter: genau
+    `solid` fragt `tile_collide` ab."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["solidX"] + 8, geo["solidY"] + 8)
+    ev += _klick(9, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 24, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
+    assert _eigenschaften_von(tmp_path) == {"solid": True}
+
+    # ... und wieder ab. ENTFERNT werden muss es, nicht auf FALSE gesetzt:
+    # sobald irgendeine Kachel ein `solid` hat, schaltet die Kollision auf
+    # "nur die mit solid = TRUE" um.
+    ev += _klick(28, geo["solidX"] + 8, geo["solidY"] + 8)
+    ev += _klick(34, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 50, ev, dialoge={_DIALOG_CODE: '"raus.dh"'})
+    assert _eigenschaften_von(tmp_path) == {}
+
+
+@pytest.mark.parametrize("eingabe,erwartet", [
+    ("5", 5),                 # INTEGER
+    ("2.5", 2.5),             # FLOAT -- am Punkt erkannt
+    ("true", True),           # BOOLEAN
+    ("falsch", False),        # auch deutsch
+    ("stein", "stein"),       # alles andere bleibt Text
+    ("-3", -3),               # Vorzeichen nur ganz vorn
+    ("1-2", "1-2"),           # ... also ist das hier KEINE Zahl
+])
+def test_der_wert_bekommt_die_passende_art(tmp_path, eingabe, erwartet):
+    """Tiled unterscheidet vier Arten, ein Eingabefeld kann sie nicht
+    erfragen -- also wird gedeutet. Geprueft am fremden Leser, weil erst der
+    zeigt, was WIRKLICH in der Datei steht: eine 5 als Text sieht dort fast
+    genauso aus wie eine 5 als Zahl."""
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _klick(3, geo["setzX"] + 50, geo["setzY"] + 14)
+    ev += _klick(9, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 24, ev, dialoge=_mit_feldern("wert", eingabe))
+    gelesen = _eigenschaften_von(tmp_path)
+    assert gelesen == {"wert": erwartet}
+    assert type(gelesen["wert"]) is type(erwartet), gelesen
+
+
+def test_eigenschaft_aus_der_liste_entfernen(tmp_path):
+    """[Weg] nimmt die in der Liste gewaehlte -- ohne Auswahl sagt es das,
+    statt stillschweigend die erste zu nehmen."""
+    geo = _lauf(tmp_path, 6)[-1]
+    setzen = _klick(3, geo["setzX"] + 50, geo["setzY"] + 14)
+    # Erste Zeile der Liste waehlen, dann [Weg].
+    ev = setzen + _klick(9, geo["propX"] + 40, geo["propY"] + 10)
+    ev += _klick(15, geo["wegX"] + 40, geo["wegY"] + 14)
+    ev += _klick(21, geo["codeX"] + 52, geo["codeY"] + 16)
+    _lauf(tmp_path, 36, ev, dialoge=_mit_feldern("damage", "7"))
+    assert _eigenschaften_von(tmp_path) == {}
+
+
+def test_die_eigenschaften_gehoeren_der_gewaehlten_kachel(tmp_path):
+    """Sie haengen am Tileset, nicht an einem Kartenfeld -- eine andere
+    Palettenkachel hat also andere. Ohne diesen Test koennte der Kasten
+    stumpf immer Kachel 0 beschreiben, und es fiele nicht auf."""
+    geo = _lauf(tmp_path, 6)[-1]
+    # Zweite Palettenkachel waehlen (die Palette sitzt bei (12, 78),
+    # jede Kachel ist 16*2 Punkte gross).
+    ev = _klick(3, 12 + 48, 78 + 16)
+    ev += _klick(9, geo["setzX"] + 50, geo["setzY"] + 14)
+    ev += _klick(15, geo["codeX"] + 52, geo["codeY"] + 16)
+    proben = _lauf(tmp_path, 30, ev, dialoge=_mit_feldern("art", "wasser"))
+    assert proben[-1]["gewaehlt"] == 1, "die zweite Kachel ist gewaehlt"
+    assert _eigenschaften_von(tmp_path, 1) == {"art": "wasser"}
+    assert _eigenschaften_von(tmp_path, 0) == {}, "Kachel 0 bleibt unberuehrt"

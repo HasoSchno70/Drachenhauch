@@ -134,6 +134,14 @@ impl TiledMap {
 
     // --- tile_collide-Helfer (Solid-Detection + Sweep) ---
     /// True, wenn irgendein Tileset irgendwo ein `solid`-Property gesetzt hat.
+    /// Alle Eigenschaften EINER Kachel (fuer TILED_TILE_PROP_KEYS).
+    /// `tile_property` beantwortet nur die Frage nach einem bekannten
+    /// Schluessel -- anzeigen laesst sich damit nichts.
+    pub fn tile_properties_of(&self, gid: i64) -> Option<&HashMap<String, PropVal>> {
+        let (ts, local) = self.tileset_for_gid(gid)?;
+        ts.tile_properties.get(&local)
+    }
+
     pub fn solid_aware(&self) -> bool {
         self.tilesets.iter().any(|ts| {
             ts.tile_properties.values().any(|p| p.contains_key("solid"))
