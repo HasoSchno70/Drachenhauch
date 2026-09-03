@@ -8022,7 +8022,7 @@ wie viele Plaetze gelten", i + 1)),
 // Vordefinierte Globals -- Werte IDENTISCH zu drachenhauch/graphics.py
 // (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
 // vergleicht jede Python-Konstante gegen PRINT-Output von dhrt.
-const DEFAULT_COLORS: &[(&str, i64)] = &[
+pub(crate) const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("black", 0), ("white", 16777215), ("gray", 8421504), ("lightgray", 12632256),
     ("darkgray", 4210752), ("red", 16711680), ("green", 65280), ("blue", 255),
     ("yellow", 16776960), ("cyan", 65535), ("magenta", 16711935), ("orange", 16753920),
@@ -8030,7 +8030,7 @@ const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("darkgreen", 32768), ("darkblue", 128),
 ];
 
-const DEFAULT_KEYS: &[(&str, i64)] = &[
+pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_escape", 27), ("key_return", 13), ("key_enter", 13), ("key_space", 32),
     ("key_tab", 9), ("key_backspace", 8),
     ("key_left", 1073741904), ("key_right", 1073741903), ("key_up", 1073741906), ("key_down", 1073741905),

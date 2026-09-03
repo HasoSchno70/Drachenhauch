@@ -351,6 +351,14 @@ pub struct Compiler {
     // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
     warnings: Vec<(u32, String)>,
+    /// Alle Namen, die zur Laufzeit im globalen Namens-Verzeichnis stehen
+    /// werden (`vm.globals`) -- gefuellt VOR dem Uebersetzen aus dem ganzen
+    /// Baum, siehe `sammle_bekannte_namen`. Grundlage der Warnung im
+    /// LOAD_NAME/STORE_NAME-Rueckfall von `load_var`/`store_var`.
+    bekannte_namen: std::collections::HashSet<String>,
+    /// Schon gemeldete `(Name, Zeile)` -- ohne das meldete `x = x + 1` den
+    /// Tippfehler zweimal (einmal beim Lesen, einmal beim Schreiben).
+    gemeldete_namen: std::collections::HashSet<(String, u32)>,
 }
 
 /// Namen aller dhrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
@@ -561,7 +569,9 @@ impl Compiler {
                    gemeldete_module: std::collections::HashSet::new(),
                    enum_decls: HashMap::new(), global_types: HashMap::new(),
                    ctx: Ctx::new(), err_line: 0,
-                   warnings: vec![] }
+                   warnings: vec![],
+                   bekannte_namen: vorbelegte_globals(),
+                   gemeldete_namen: Default::default() }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -1563,6 +1573,9 @@ impl Compiler {
         if let Some(&slot) = self.ctx.local_slots.get(target) {
             self.ctx.emit(oc::INPUT_LOCAL, json!([slot, has_prompt]));
         } else {
+            // INPUT_NAME sucht das Ziel wie LOAD_NAME im Verzeichnis und
+            // meldet dort erst zur Laufzeit -- gleiche Pruefung.
+            self.warn_unbekannter_name(target);
             let name_idx = self.ctx.add_const(json!(target));
             self.ctx.emit(oc::INPUT_NAME, json!([name_idx, has_prompt]));
         }
@@ -1576,6 +1589,7 @@ impl Compiler {
                 if let Some(&slot) = self.ctx.local_slots.get(name) {
                     self.ctx.emit(oc::STORE_LOCAL, json!(slot));
                 } else {
+                    self.warn_unbekannter_name(name);
                     let idx = self.ctx.add_const(json!(name));
                     self.ctx.emit(oc::STORE_NAME, json!(idx));
                 }
@@ -1864,6 +1878,43 @@ impl Compiler {
         }
     }
 
+    /// Nicht deklarierter Name im LOAD_NAME/STORE_NAME-Rueckfall.
+    ///
+    /// Hierher kommt jeder Name, den `load_var`/`store_var` weder als lokalen
+    /// Platz noch als Feld der eigenen Klasse noch als globalen Platz
+    /// aufloesen konnten. Die VM sucht ihn dann zur LAUFZEIT im
+    /// Namens-Verzeichnis -- und meldet erst DORT "nicht deklariert". Weil DIM
+    /// in Drachenhauch ueberall Pflicht ist, ist das fast immer ein
+    /// Tippfehler; er bleibt aber still, bis die Zeile tatsaechlich einmal
+    /// laeuft.
+    ///
+    /// Bewusst nur eine WARNUNG, kein Uebersetzungsfehler: bestehende
+    /// Programme sollen weiter uebersetzen, und die Menge der gueltigen Namen
+    /// (`sammle_bekannte_namen` + `vorbelegte_globals`) ist eine Schaetzung
+    /// nach oben -- was sie nicht kennt, muss deshalb nicht falsch sein.
+    fn warn_unbekannter_name(&mut self, name: &str) {
+        if self.bekannte_namen.contains(name) { return; }
+        // `__`-Namen erzeugt der Compiler selbst (Hilfsvariablen des
+        // WITH-/Comprehension-Umbaus) -- sie stehen in keiner Deklaration.
+        //
+        // Fuer Funktions-, Klassen- und Struct-Namen gibt es bewusst KEINE
+        // Ausnahme. In gueltigem Code kommen sie hier gar nicht an: eine
+        // Funktion faengt `Node::Identifier` schon vorher als FUNCREF ab, eine
+        // Klasse steht in `NEW`/`IS`/`AS` in einem eigenen AST-Feld -- gemessen
+        // an allen 384 .dh-Dateien des Repos aendert eine Ausnahme fuer sie an
+        // KEINER etwas. Sie liesse nur `spieler = 5` (Zuweisung an einen
+        // Klassennamen) stumm durch, und das ist selbst ein Fehler.
+        if name.starts_with("__") { return; }
+        let zeile = self.ctx.cur_line;
+        // `x = x + 1` liefe sonst zweimal durch (Lesen UND Schreiben).
+        if !self.gemeldete_namen.insert((name.to_string(), zeile)) { return; }
+        self.warnings.push((zeile, format!(
+            "'{}' ist nirgends deklariert -- entweder fehlt ein DIM, oder der Name ist \
+             verschrieben. Sonst faellt es erst auf, wenn diese Zeile tatsaechlich einmal \
+             ausgefuehrt wird -- in einem selten genommenen Zweig kann das beliebig lange \
+             dauern.", name)));
+    }
+
     fn load_var(&mut self, name: &str) {
         if self.ctx.local_slots.contains_key(name) {
             let slot = self.ctx.local_slots[name];
@@ -1876,6 +1927,7 @@ impl Compiler {
         } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::LOAD_GLOBAL_SLOT, json!(slot));
         } else {
+            self.warn_unbekannter_name(name);
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::LOAD_NAME, json!(idx));
         }
@@ -1890,6 +1942,7 @@ impl Compiler {
         } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::STORE_GLOBAL_SLOT, json!(slot));
         } else {
+            self.warn_unbekannter_name(name);
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::STORE_NAME, json!(idx));
         }
@@ -3491,6 +3544,96 @@ fn globale_unterbloecke(n: &Node) -> Vec<&Vec<Node>> {
     }
 }
 
+/// Die Namen, die die VM schon VOR dem ersten Opcode kennt: Farben, Tasten,
+/// `PI`, `TAU`.
+///
+/// Sie stehen ABSICHTLICH nicht in `global_slots` -- der Compiler sieht sie im
+/// Quelltext nicht als Deklaration und laesst sie ueber LOAD_NAME laufen
+/// ("Globals-as-Slots", CLAUDE.md). Fuer die Warnung im Rueckfall muss er sie
+/// aber kennen, sonst waere jedes `KEY_SPACE` eine Falschmeldung.
+///
+/// Quelle sind die Tabellen in `vm.rs` SELBST, nicht eine zweite Liste hier --
+/// eine Kopie liefe beim naechsten neuen Tastencode auseinander, und die
+/// Falschmeldung stuende dann genau bei dem, der ihn benutzt.
+fn vorbelegte_globals() -> std::collections::HashSet<String> {
+    let mut s: std::collections::HashSet<String> = Default::default();
+    for (n, _) in crate::vm::DEFAULT_COLORS { s.insert((*n).to_string()); }
+    for (n, _) in crate::vm::DEFAULT_KEYS { s.insert((*n).to_string()); }
+    s.insert("pi".into());
+    s.insert("tau".into());
+    s
+}
+
+/// Die Anweisungslisten einer Anweisung, die einen EIGENEN
+/// Gueltigkeitsbereich aufmachen -- Gegenstueck zu `globale_unterbloecke`,
+/// das genau diese auslaesst.
+///
+/// Gebraucht fuer die CONST-Sammlung: `stmt_const` faellt ausserhalb des
+/// Hauptprogramms auf DECLARE_CONST zurueck, und das legt den Namen im
+/// GLOBALEN Verzeichnis ab (vm.rs) -- eine `CONST` in einer SUB ist also von
+/// ueberall lesbar, waehrend ein `DIM` daneben nur lokal gilt.
+fn eigene_bereiche(n: &Node) -> Vec<&Vec<Node>> {
+    match n {
+        Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } => vec![body],
+        // Methoden/Properties sind selbst SubDecl/FunctionDecl/PropertyDecl --
+        // der Durchlauf steigt ueber sie weiter hinab.
+        Node::ClassDecl { methods, properties, .. } => vec![methods, properties],
+        Node::PropertyDecl { func, .. } => eigene_bereiche(unwrap_stmt(func)),
+        _ => vec![],
+    }
+}
+
+/// Alle Namen einsammeln, die zur Laufzeit im globalen Namens-Verzeichnis
+/// stehen werden.
+///
+/// Wozu: `load_var`/`store_var` fallen auf LOAD_NAME/STORE_NAME zurueck, wenn
+/// sich ein Name nicht aufloesen liess -- und dort meldet die VM erst zur
+/// LAUFZEIT "Variable nicht deklariert". Ein Tippfehler in einem selten
+/// genommenen Zweig bleibt so beliebig lange still. Diese Menge sagt, welche
+/// Namen im Rueckfall gueltig sind; alles andere warnt.
+///
+/// Der Durchlauf muss VOR dem Uebersetzen laufen: die Funktionsruempfe werden
+/// vor dem Hauptprogramm uebersetzt (Phase 2/3 vor Phase 5), eine SUB darf aber
+/// eine Variable benutzen, deren `DIM` weiter unten im Hauptprogramm steht.
+///
+/// `im_hauptprogramm` unterscheidet die beiden Faelle: auf oberster Ebene ist
+/// JEDE Deklaration global (auch die in einem IF-Block -- Drachenhauch kennt
+/// keine Block-Gueltigkeit), innerhalb einer SUB/FUNCTION/Methode bekommen
+/// `DIM`/`FOR`/`FOR EACH`/`CATCH` einen LOKALEN Platz und nur `CONST` landet
+/// global.
+fn sammle_bekannte_namen(stmts: &[Node], im_hauptprogramm: bool,
+                         out: &mut std::collections::HashSet<String>) {
+    for s in stmts {
+        let n = unwrap_stmt(s);
+        match n {
+            Node::Const { name, .. } => { out.insert(name.clone()); }
+            Node::EnumDecl { name, .. } => { out.insert(name.clone()); }
+            // Eine Klasse MIT Statics bekommt einen globalen Platz unter ihrem
+            // Namen (`emit_class_statics`) -- `Player.MAX_HP` laedt ihn.
+            Node::ClassDecl { name, statics, .. } if !statics.is_empty() => {
+                out.insert(name.clone());
+            }
+            Node::Dim { name, .. } if im_hauptprogramm => { out.insert(name.clone()); }
+            Node::MultiDim { dims } if im_hauptprogramm => {
+                for d in dims {
+                    if let Node::Dim { name, .. } = unwrap_stmt(d) { out.insert(name.clone()); }
+                }
+            }
+            Node::For { var, .. } if im_hauptprogramm => { out.insert(var.clone()); }
+            Node::ForEach { var, var2, .. } if im_hauptprogramm => {
+                out.insert(var.clone());
+                if let Some(v2) = var2 { out.insert(v2.clone()); }
+            }
+            Node::Try { catch_var, .. } if im_hauptprogramm && !catch_var.is_empty() => {
+                out.insert(catch_var.clone());
+            }
+            _ => {}
+        }
+        for blk in globale_unterbloecke(n) { sammle_bekannte_namen(blk, im_hauptprogramm, out); }
+        for blk in eigene_bereiche(n) { sammle_bekannte_namen(blk, false, out); }
+    }
+}
+
 fn collect_global_names(n: &Node) -> Vec<(String, &'static str)> {
     match n {
         Node::Dim { name, .. } => vec![(name.clone(), "var")],
@@ -3582,6 +3725,13 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
     // collect_data laufen erst danach auf dem Ok-Pfad.
     let mut data = Vec::new();
     let outcome: Result<(), String> = (|| {
+        // Vorlauf VOR allem anderen: welche Namen wird es zur Laufzeit im
+        // globalen Verzeichnis geben? Muss vor Phase 2/3 stehen, weil die
+        // Funktionsruempfe VOR dem Hauptprogramm uebersetzt werden -- eine SUB
+        // darf eine Variable benutzen, deren DIM weiter unten steht.
+        // `stmts` (nicht `main_owned`): die SUB/FUNCTION/CLASS-Deklarationen
+        // sind oben herausgezogen, ihre CONSTs gehoeren aber dazu.
+        sammle_bekannte_namen(stmts, true, &mut c.bekannte_namen);
         c.collect_globals(&main_owned)?;
         // Klassen-Statics bekommen einen Slot.
         for (cd, _) in &cls_decls {

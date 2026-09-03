@@ -241,7 +241,7 @@ Reflexionen/Mirror-Effekte.
 
 ---
 
-## H — Befunde aus den Editor-Piloten (2026-08-31)
+## H — Befunde aus den Editor-Piloten (2026-08-31 / 2026-09-03)
 
 ### H1. `DIM red` in einem Block scheiterte, oben nicht — ✅ BEHOBEN
 > **Vorbelegte Konstanten liessen sich nur auf oberster Ebene verschatten.**
@@ -273,6 +273,55 @@ Reflexionen/Mirror-Effekte.
 >
 > Gefunden im Sprite-Editor (`DIM pi` in der Hauptschleife). Tests:
 > `tests/test_name_collision.py`.
+
+### H2. `dhrt --check` meldete gar keine nicht deklarierte Variable — ✅ BEHOBEN
+> **Ein Tippfehler blieb still, bis die Zeile zufällig einmal lief.**
+> `DIM zaehler` oben, `zaehlr = zaehlr + 1` in einer `SUB` — `--check` lieferte
+> `[]`, das Programm startete und druckte, und erst der Aufruf der `SUB` brachte
+> „Variable 'zaehlr' nicht deklariert (DIM fehlt?)". Dasselbe beim LESEN eines
+> unbekannten Namens und auch auf oberster Ebene.
+>
+> Das kostet, weil `DIM` in Drachenhauch **überall Pflicht** ist: ein
+> verschriebener Name ist immer ein Fehler, nur eben einer, den ein selten
+> genommener Zweig beliebig lange verdeckt. Gefunden am Sprite-Piloten
+> (`examples/189`, 2700 Zeilen): dort stand `geaendert = TRUE` in einer neuen
+> `SUB` — eine Variable, die es in DIESEM Programm gar nicht gibt (sie stammt
+> aus einem Schwester-Piloten). Herausgebracht hat es erst ein Test, der den
+> Knopf drückte.
+>
+> **Ursache:** `load_var`/`store_var` (compiler.rs) haben als letzten Zweig
+> einen Rückfall auf `LOAD_NAME`/`STORE_NAME` — dort landet jeder Name, den der
+> Compiler nicht auflösen konnte, und gesucht wird er erst zur Laufzeit.
+>
+> **Die Schwierigkeit war nicht das Melden, sondern die Falschmeldungen.** Drei
+> Gruppen von Namen sind dort gültig, ohne dass eine Deklaration danebensteht:
+> die **vorbelegten Globals** (18 Farben, alle `KEY_*`/`JOY_*`, `pi`, `tau`)
+> gehen absichtlich über `LOAD_NAME`, weil der Compiler sie im Quelltext nicht
+> als Deklaration sieht; einige **DIM-Formen** (`ARRAY OF`/`MAP OF`, `FOR EACH`,
+> `CATCH`) legen ihren Namen per `DECLARE_NAME` an statt über einen Platz; und
+> eine **`CONST` in einer SUB** landet im globalen Verzeichnis, ein `DIM`
+> daneben nicht. Dazu kommt, dass die Funktionsrümpfe VOR dem Hauptprogramm
+> übersetzt werden — eine `SUB` darf eine Variable benutzen, deren `DIM` weiter
+> unten steht.
+>
+> Deshalb sammelt ein **Vorlauf über den ganzen Baum** (`sammle_bekannte_namen`)
+> erst ein, welche Namen es zur Laufzeit geben wird; der Rückfall meldet nur,
+> was dort fehlt. Die Liste der vorbelegten Globals kommt aus den Tabellen in
+> `vm.rs` SELBST — eine Kopie liefe beim nächsten neuen Tastencode auseinander,
+> und die Falschmeldung stünde dann genau bei dem, der ihn benutzt.
+>
+> Es ist bewusst eine **Warnung**, kein Übersetzungsfehler: die Menge der
+> gültigen Namen ist eine Schätzung nach oben, und ein Fehler würde bestehenden
+> Code stilllegen, den sie nicht kennt.
+>
+> **Der Beleg ist der Sweep, nicht der Einzeltest:** alle 384 `.dh`-Dateien des
+> Repos melden null Treffer (`tests/test_dhrt_check.py`), mit der Gegenprobe in
+> `tests/test_compiler_warnungen.py`. Die Codeblöcke in `docs/` und in den
+> Büchern lösen sie dagegen oft aus — dort sind es AUSSCHNITTE, deren Variable
+> aus dem Absatz davor stammt; `tools/pruef_docs.py` und die beiden
+> `pruef_codebloecke.js` filtern schon vorher auf die Phasen `lex`/`parse` und
+> sehen sie deshalb nicht. Kein einziger docs-Block, der wie ein vollständiges
+> Programm aussieht (`SCREEN` + `FLIP`), löst sie aus.
 
 ---
 

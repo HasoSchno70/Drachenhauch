@@ -738,6 +738,24 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   eigene Plaetze. Nebenertrag: die Kollisions-Erkennung sah bis dahin nur
   Geschwister und liess `CONST Modus` oben + `DIM modus` im Block durch.
   Doku `docs/stolpersteine.md` H1, Tests `tests/test_name_collision.py`.
+- **`dhrt --check` meldet seit 2026-09-03 nicht deklarierte Namen** -- vorher
+  gar nicht, weder oben noch in einer SUB: `zaehlr = zaehlr + 1` uebersetzte,
+  das Programm startete, und der Fehler kam erst, wenn die SUB tatsaechlich
+  aufgerufen wurde. Weil DIM ueberall Pflicht ist, blieb ein Tippfehler in
+  einem selten genommenen Zweig damit beliebig lange still (gefunden am
+  Sprite-Piloten, wo `geaendert = TRUE` auf eine Variable aus einem
+  SCHWESTER-Programm zeigte). Der Rueckfall auf LOAD_NAME/STORE_NAME in
+  `load_var`/`store_var` (compiler.rs) warnt jetzt. **Der schwierige Teil ist
+  nicht das Melden, sondern die Falschmeldungen:** ein Vorlauf ueber den
+  GANZEN Baum (`sammle_bekannte_namen`) sammelt vorher ein, welche Namen es
+  zur Laufzeit geben wird -- er muss vor Phase 2/3 laufen, weil die
+  Funktionsruempfe VOR dem Hauptprogramm uebersetzt werden und eine SUB eine
+  Variable benutzen darf, deren DIM weiter unten steht. Die vorbelegten
+  Globals (Farben/`KEY_*`/`pi`/`tau`) kommen aus den Tabellen in `vm.rs`
+  SELBST, nicht aus einer zweiten Liste. Bewusst eine WARNUNG, kein
+  Uebersetzungsfehler. Beleg ist der Sweep ueber alle 384 `.dh`-Dateien des
+  Repos (null Treffer, `tests/test_dhrt_check.py`) samt Gegenprobe in
+  `tests/test_compiler_warnungen.py`; Doku `docs/stolpersteine.md` H2.
 - **Tastencodes: Buchstaben gehen in BEIDER Schreibweise.** `KEY_A`..`KEY_Z`
   (= 97..122, SDL-Zaehlung) ist die klare Form; `ASC("s")` und `ASC("S")`
   meinen seit 2026-08-31 dieselbe Taste. Vorher galten nur die kleinen, und

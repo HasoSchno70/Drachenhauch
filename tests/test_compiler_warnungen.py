@@ -756,3 +756,152 @@ k = NEW Kreis()
 k.zeige()
 """)
     assert not any("kein einziges RETURN" in m for m in w), w
+
+
+# ------------------------------------------------- Nicht deklarierter Name
+#
+# Bis 2026-09-03 meldete `dhrt --check` GAR KEINE nicht deklarierte Variable --
+# weder oben noch in einer SUB. Weil DIM in Drachenhauch ueberall Pflicht ist,
+# blieb ein Tippfehler in einem selten genommenen Zweig damit beliebig lange
+# still: er faellt erst auf, wenn die Zeile tatsaechlich einmal laeuft.
+# Gefunden wurde die Luecke am Sprite-Piloten (examples/189, 2700 Zeilen), wo
+# `geaendert = TRUE` in einer neuen SUB stand -- ein Name, den es in DIESEM
+# Programm gar nicht gibt.
+#
+# Die Schwierigkeit ist nicht das Melden, sondern die FALSCHmeldungen. Deshalb
+# steht unter jedem Melde-Test eine Reihe Gegenproben mit gueltigem Code.
+
+def _unbekannte(tmp_path, quelle: str) -> list[str]:
+    """Die gemeldeten Namen -- nur aus den 'nirgends deklariert'-Warnungen."""
+    return [m.split("'")[1] for m in _warnungen(tmp_path, quelle)
+            if "nirgends deklariert" in m]
+
+
+def test_tippfehler_in_einer_sub_wird_gemeldet(tmp_path):
+    """Der Fall aus dem Sprite-Piloten, auf das Noetigste eingedampft."""
+    assert _unbekannte(tmp_path, """
+DIM zaehler AS INTEGER
+SUB erhoehe()
+    zaehlr = zaehlr + 1
+END SUB
+PRINT "laeuft"
+""") == ["zaehlr"]
+
+
+def test_lesen_und_schreiben_derselben_zeile_meldet_einmal(tmp_path):
+    """`x = x + 1` laeuft zweimal durch den Rueckfall (Lesen UND Schreiben)."""
+    assert _unbekannte(tmp_path, "tippfehler = tippfehler + 1\n") == ["tippfehler"]
+
+
+def test_auch_auf_oberster_ebene(tmp_path):
+    assert _unbekannte(tmp_path, 'DIM a AS INTEGER\na = fehlt\n') == ["fehlt"]
+
+
+def test_auch_bei_input_und_read(tmp_path):
+    """INPUT_NAME und STORE_NAME suchen ihr Ziel genauso im Verzeichnis."""
+    assert _unbekannte(tmp_path, "INPUT fehlt1\n") == ["fehlt1"]
+    assert _unbekannte(tmp_path, "DATA 1\nREAD fehlt2\n") == ["fehlt2"]
+
+
+def test_es_bleibt_eine_warnung(tmp_path):
+    """Kein harter Uebersetzungsfehler -- bestehender Code soll weiter laufen.
+
+    Die Menge der gueltigen Namen ist eine Schaetzung nach oben; was sie nicht
+    kennt, MUSS nicht falsch sein. Ein Fehler wuerde solchen Code stilllegen.
+    """
+    f = tmp_path / "w.dh"
+    f.write_text('SUB nie()\n    fehlt = 1\nEND SUB\nPRINT "durch"\n', encoding="utf-8")
+    r = subprocess.run([str(_DHRT), "--check", str(f)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    probleme = json.loads(r.stdout or "[]")
+    assert [p["severity"] for p in probleme] == ["warning"], probleme
+    # ... und das Programm laeuft weiterhin bis zum Ende durch.
+    r2 = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
+                        text=True, encoding="utf-8", timeout=60)
+    assert r2.returncode == 0 and "durch" in r2.stdout, (r2.stdout, r2.stderr)
+
+
+# ---------------------------------------------------------- Gegenproben
+def test_vorbelegte_globals_werden_nicht_gemeldet(tmp_path):
+    """Farben, Tasten, PI/TAU stehen ABSICHTLICH in keiner Deklaration.
+
+    Der Compiler kennt sie nicht statisch und laesst sie ueber LOAD_NAME
+    laufen ("Globals-as-Slots") -- ohne die Ausnahme waere jedes `KEY_SPACE`
+    eine Falschmeldung. Quelle sind die Tabellen in vm.rs selbst.
+    """
+    assert _unbekannte(tmp_path, """
+PRINT RED, WHITE, DARKBLUE, PI, TAU
+PRINT KEY_SPACE, KEY_LSHIFT, KEY_KP_ENTER, KEY_F12, JOY_DPAD_UP
+""") == []
+
+
+def test_dim_in_einem_block_wird_nicht_gemeldet(tmp_path):
+    """Drachenhauch kennt keine Block-Gueltigkeit: das DIM gilt global."""
+    assert _unbekannte(tmp_path, """
+IF TRUE THEN
+    DIM imblock AS INTEGER
+    imblock = 3
+END IF
+PRINT imblock
+""") == []
+
+
+def test_dim_darf_weiter_unten_stehen(tmp_path):
+    """Funktionsruempfe werden VOR dem Hauptprogramm uebersetzt.
+
+    Ohne den Vorlauf ueber den ganzen Baum saehe die SUB das DIM darunter
+    nicht -- und jede aufgeraeumte Datei (erst die Unterprogramme, dann das
+    Hauptprogramm) waere ein Falschalarm-Feld.
+    """
+    assert _unbekannte(tmp_path, """
+SUB zeige()
+    PRINT punkte
+END SUB
+DIM punkte AS INTEGER
+punkte = 7
+zeige()
+""") == []
+
+
+def test_const_in_einer_sub_gilt_global(tmp_path):
+    """`stmt_const` faellt ausserhalb des Hauptprogramms auf DECLARE_CONST
+    zurueck, und das legt den Namen im GLOBALEN Verzeichnis ab."""
+    assert _unbekannte(tmp_path, """
+SUB setzt()
+    CONST AUS_SUB AS INTEGER = 42
+    PRINT AUS_SUB
+END SUB
+setzt()
+PRINT AUS_SUB
+""") == []
+
+
+def test_schleifen_und_catch_variablen(tmp_path):
+    """FOR EACH und CATCH deklarieren ihre Variable selbst -- auch nach dem
+    Block bleibt sie gueltig."""
+    assert _unbekannte(tmp_path, """
+DIM feld AS ARRAY OF INTEGER
+feld = [1, 2]
+FOR EACH e IN feld
+    PRINT e
+NEXT
+PRINT e
+TRY
+    THROW "x"
+CATCH fehler
+    PRINT fehler
+END TRY
+PRINT fehler
+""") == []
+
+
+def test_enum_und_klassen_statics(tmp_path):
+    """Beide bekommen einen globalen Platz unter ihrem NAMEN."""
+    assert _unbekannte(tmp_path, """
+ENUM Zustand = MENUE, SPIEL
+CLASS Spieler
+    STATIC CONST MAX_HP AS INTEGER = 100
+    DIM hp AS INTEGER
+END CLASS
+PRINT Zustand.SPIEL, Spieler.MAX_HP
+""") == []
