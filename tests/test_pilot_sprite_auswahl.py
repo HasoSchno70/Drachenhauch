@@ -128,7 +128,17 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + _
           " " + STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + _
           " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1)) + _
-          " " + STR$(uAnz)
+          " " + STR$(uAnz) + _
+          " " + STR$(GUI_GET_X(spMs)) + " " + STR$(GUI_GET_Y(spMs)) + _
+          " " + STR$(GUI_GET_W(spMs)) + _
+          " " + STR$(bildMs[0]) + " " + STR$(bildMs[1]) + " " + STR$(dauerMs(0)) + _
+          " " + STR$(GUI_GET_X(bGif)) + " " + STR$(GUI_GET_Y(bGif)) + _
+          " " + STR$(GUI_GET_X(bSichern)) + " " + STR$(GUI_GET_W(bSichern)) + _
+          " " + STR$(GUI_GET_X(bOeffnen)) + " " + STR$(GUI_GET_W(bOeffnen)) + _
+          " " + STR$(GUI_GET_X(bNeu)) + " " + STR$(GUI_GET_W(bNeu)) + _
+          " " + STR$(GUI_GET_Y(bNeu)) + _
+          " " + STR$(GUI_WINDOW_GET_X(winNeu) + GUI_GET_X(bNeuOk)) + _
+          " " + STR$(GUI_WINDOW_GET_Y(winNeu) + GUI_GET_Y(bNeuOk))
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
@@ -148,7 +158,9 @@ _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY faX faY "
            "blattX blattY namX namY namOkX namOkY namLen "
            "spXX spXY spYX spYY drRX drRY drLX drLY "
-           "eckLO eckRO eckRU eckLU uAnz").split()
+           "eckLO eckRO eckRU eckLU uAnz "
+           "msX msY msW ms0 ms1 dauer0 gifX gifY "
+           "sichX sichW oeffX oeffW neuX neuW kopfY neuOkX neuOkY").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -1105,3 +1117,130 @@ def test_eine_wandlung_leert_den_verlauf(tmp_path):
     ev += _knopf_klick(18, geo["spXX"], geo["spXY"], 62)
     letzte = _lauf(tmp_path, 34, ev)[-1]
     assert letzte["uAnz"] == 0, "danach ist er leer"
+
+
+# ------------------------------------------------- Dauer je Einzelbild
+# GIF kann eine Dauer JE BILD -- eine Pose wird gehalten, der Lauf dazwischen
+# nicht. Der Editor haelt sie in `bildMs` (0 = der Tempo-Regler gilt); die
+# Vorschau und die GIF-Ausgabe fragen dieselbe Stelle (`dauerMs`), sonst
+# liefe das Bild anders als die Datei.
+_DIALOG_GIF = 'FILE_SAVE_DIALOG("Bewegtes GIF sichern", "sprite.gif", "gif")'
+
+
+def _drehfeld_hoch(frame, geo, mal):
+    """Auf den oberen Pfeil eines Drehfelds klicken -- er sitzt rechts,
+    obere Haelfte. Ein Klick je Schritt, mit Abstand dazwischen."""
+    ev = []
+    for i in range(mal):
+        ev += _klick(frame + i * 3, geo["msX"] + geo["msW"] - 8, geo["msY"] + 6)
+    return ev
+
+
+def test_ohne_eigene_dauer_gilt_der_tempo_regler(tmp_path):
+    """Die Ausgangslage -- und die Gegenprobe zu allem darunter: 0 heisst
+    NICHT 0 ms, sondern "der Regler gilt"."""
+    letzte = _lauf(tmp_path, 8)[-1]
+    assert letzte["ms0"] == 0
+    # Der Regler steht auf 8 Bildern je Sekunde -> 125 ms.
+    assert letzte["dauer0"] == 125
+
+
+def test_das_drehfeld_setzt_die_dauer_des_gewaehlten_bildes(tmp_path):
+    geo = _lauf(tmp_path, 8)[-1]
+    letzte = _lauf(tmp_path, 30, _drehfeld_hoch(4, geo, 3))[-1]
+    assert letzte["ms0"] > 0, "die Dauer haengt am ersten Bild"
+    assert letzte["dauer0"] == letzte["ms0"], "und sie gewinnt gegen den Regler"
+
+
+def test_die_eigenen_zeiten_stehen_im_gif(tmp_path):
+    """Der ganze Weg bis in die Datei, gelesen von Pillow -- einem FREMDEN
+    Leser. Dass die eigene Datei die eigenen Zahlen enthaelt, waere die
+    schwaechere Aussage.
+
+    Bild 1 bekommt eine eigene Dauer, Bild 2 nicht: im GIF muessen sich die
+    beiden Zeiten deshalb UNTERSCHEIDEN. Waeren beide gleich, wuerde der
+    Test auch dann bestehen, wenn die Einzelzeit gar nicht ankommt.
+    """
+    pytest.importorskip("PIL")
+    geo = _lauf(tmp_path, 8)[-1]
+    ev = _knopf_klick(4, geo["bildWX"] - 92, geo["bildWY"], 88)   # [Kopie] -> 2 Bilder
+    ev += _drehfeld_hoch(12, geo, 4)                              # Bild 2 bekommt Zeit
+    ev += _knopf_klick(30, geo["gifX"], geo["gifY"], 52)
+    _lauf(tmp_path, 52, ev, dialoge={_DIALOG_GIF: '"raus.gif"'})
+
+    from PIL import Image, ImageSequence
+    im = Image.open(tmp_path / "raus.gif")
+    dauern = [f.info.get("duration") for f in ImageSequence.Iterator(im)]
+    assert len(dauern) == 2, "zwei Einzelbilder"
+    assert dauern[0] != dauern[1], "eins traegt seine eigene Zeit: %s" % dauern
+    # 8 Bilder/s = 125 ms; GIF rechnet in Hundertstelsekunden, 13 davon
+    # kommen als 130 ms zurueck.
+    assert 130 in dauern, "das andere folgt dem Tempo-Regler (8/s): %s" % dauern
+
+
+def test_die_dauer_uebersteht_die_eigene_datei(tmp_path):
+    """Rundweg durch `.dhsprite`: setzen, sichern, neu anfangen, laden."""
+    # Der Kasten "Neues Sprite" bekommt einen festen Platz OHNE Rahmen --
+    # sonst laegen seine Widget-Koordinaten um die Titelhoehe neben dem, was
+    # die Maus spricht. Dasselbe Mittel wie beim Groesse-aendern-Test.
+    ersatz = {
+        "GUI_WINDOW_VISIBLE(winNeu, FALSE)\nDIM neuOffen":
+            "GUI_WINDOW_CHROME(winNeu, FALSE)\n"
+            "GUI_WINDOW_SET_BOUNDS(winNeu, 100, 100, 300, 170)\n"
+            "GUI_WINDOW_VISIBLE(winNeu, FALSE)\nDIM neuOffen",
+        'FILE_SAVE_DIALOG("Sichern", "sprite.dhsprite", "dhsprite")': '"r.dhsprite"',
+        'FILE_OPEN_DIALOG("Oeffnen", "dhsprite,png")': '"r.dhsprite"',
+    }
+    geo = _lauf(tmp_path, 8, dialoge=ersatz)[-1]
+    ev = _drehfeld_hoch(4, geo, 5)
+    gesetzt = _lauf(tmp_path, 26, ev, dialoge=ersatz)[-1]["ms0"]
+    assert gesetzt > 0
+    # Die Knopf-Lagen kommen aus der PROBE, nicht aus einer Rechnung. Der
+    # erste Versuch rechnete [Sichern] aus der Lage von [Streifen] aus und
+    # traf damit [PNG] -- das oeffnet einen NATIVEN Dateidialog, den keine
+    # aufgezeichnete Eingabe erreicht: der Lauf hing 180 Sekunden lang.
+    ev += _knopf_klick(24, geo["sichX"], geo["kopfY"], geo["sichW"])
+    ev += _knopf_klick(34, geo["neuX"], geo["kopfY"], geo["neuW"])
+    # [Neu] oeffnet einen Kasten und wartet auf sein [Anlegen]. Ohne diesen
+    # Klick passierte GAR NICHTS -- und der Test war trotzdem gruen, weil der
+    # Wert dann eben nie zurueckgesetzt wurde. Deshalb steht unten die
+    # Zwischenpruefung: erst 0, dann wieder da.
+    ev += _knopf_klick(44, geo["neuOkX"], geo["neuOkY"], 90)
+    leer = _lauf(tmp_path, 62, ev, dialoge=ersatz)[-1]
+    assert leer["ms0"] == 0, "ein neues Sprite hat keine eigenen Zeiten"
+    ev += _knopf_klick(64, geo["oeffX"], geo["kopfY"], geo["oeffW"])
+    letzte = _lauf(tmp_path, 90, ev, dialoge=ersatz)[-1]
+    assert letzte["ms0"] == gesetzt, "die Dauer kam zurueck"
+
+
+def test_eine_datei_ohne_namen_verliert_ihre_bereiche_nicht(tmp_path):
+    """Ein Fund, der aelter ist als die Einzelbild-Dauern: `JSON_LEN` WIRFT
+    bei einem Pfad, den es nicht gibt -- es liefert nicht 0.
+
+    `bildnamen`, `bilddauern` und `bereiche` stehen alle nur dann in der
+    `.dhsprite`, wenn es sie gibt. Ohne `JSON_HAS` brach das Laden an der
+    ersten fehlenden ab: die Ebenen standen schon, alles dahinter kam nie
+    an. Eine Datei MIT Bereich, aber OHNE Namen verlor also beim Laden
+    stillschweigend ihren Bereich -- gemeldet wurde nur eine Pfad-Meldung,
+    die nach einem Programmierfehler im Editor aussieht.
+    """
+    ersatz = {
+        "GUI_WINDOW_VISIBLE(winNeu, FALSE)\nDIM neuOffen":
+            "GUI_WINDOW_CHROME(winNeu, FALSE)\n"
+            "GUI_WINDOW_SET_BOUNDS(winNeu, 100, 100, 300, 170)\n"
+            "GUI_WINDOW_VISIBLE(winNeu, FALSE)\nDIM neuOffen",
+        'FILE_SAVE_DIALOG("Sichern", "sprite.dhsprite", "dhsprite")': '"o.dhsprite"',
+        'FILE_OPEN_DIALOG("Oeffnen", "dhsprite,png")': '"o.dhsprite"',
+    }
+    geo = _lauf(tmp_path, 8, dialoge=ersatz)[-1]
+    # Einen Bereich anlegen (die Vorgaben genuegen), aber KEINEN Namen
+    # vergeben -- dann fehlt `bildnamen` in der Datei.
+    ev = _knopf_klick(4, geo["animNX"], geo["animNY"], 100)
+    ev += _knopf_klick(14, geo["sichX"], geo["kopfY"], geo["sichW"])
+    ev += _knopf_klick(24, geo["neuX"], geo["kopfY"], geo["neuW"])
+    ev += _knopf_klick(34, geo["neuOkX"], geo["neuOkY"], 90)
+    leer = _lauf(tmp_path, 52, ev, dialoge=ersatz)[-1]
+    assert leer["anzAnim"] == 0, "ein neues Sprite hat keine Bereiche"
+    ev += _knopf_klick(54, geo["oeffX"], geo["kopfY"], geo["oeffW"])
+    letzte = _lauf(tmp_path, 80, ev, dialoge=ersatz)[-1]
+    assert letzte["anzAnim"] == 1, "der Bereich kam zurueck"

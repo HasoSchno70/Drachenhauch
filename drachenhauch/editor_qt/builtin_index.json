@@ -4313,7 +4313,7 @@
   {
    "name": "IMAGE_SAVE_GIF",
    "kind": "core",
-   "signature": "IMAGE_SAVE_GIF(bilder, pfad$ [, fps [, wiederholen [, anzahl]]])",
+   "signature": "IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])",
    "module": "imgfx"
   },
   {

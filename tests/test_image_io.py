@@ -317,6 +317,92 @@ IMAGE_SAVE_GIF(b, "a.gif", 8)
     assert im.info.get("loop") == 0, "0 heisst endlos"
 
 
+def test_jedes_bild_kann_seine_eigene_dauer_haben(tmp_path):
+    """Der dritte Parameter ist ZWEIERLEI: eine Zahl sind Bilder je Sekunde
+    fuer alle, ein FELD ist die Dauer JE BILD in Millisekunden. GIF kann das
+    von Haus aus, und eine Bildfolge braucht es -- eine Pose wird gehalten,
+    eine Bewegung laeuft schnell durch.
+
+    Gelesen wird mit Pillow, einem FREMDEN Leser: dass die eigene Datei die
+    eigenen Zahlen enthaelt, waere die schwaechere Aussage.
+    """
+    _run('''
+DIM b[3] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+b[2] = IMAGE_NEW(8, 8, RGB(0, 0, 255))
+IMAGE_SAVE_GIF(b, "a.gif", [1000, 80, 500])
+''', tmp_path)
+    from PIL import ImageSequence
+    dauern = [f.info.get("duration") for f in ImageSequence.Iterator(_gif(tmp_path))]
+    assert dauern == [1000, 80, 500]
+
+
+def test_eine_zahl_gilt_weiter_fuer_alle(tmp_path):
+    """Die Gegenprobe zum Test darueber: ohne sie waere nicht belegt, dass
+    die beiden Formen ueberhaupt etwas Verschiedenes tun."""
+    _run('''
+DIM b[3] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8, RGB(i * 100, 0, 0))
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+''', tmp_path)
+    from PIL import ImageSequence
+    dauern = [f.info.get("duration") for f in ImageSequence.Iterator(_gif(tmp_path))]
+    assert dauern == [100, 100, 100]
+
+
+def test_zu_wenige_zeiten_sind_ein_fehler(tmp_path):
+    """Stillschweigend die letzte zu wiederholen waere eine Vermutung -- und
+    eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur."""
+    aus = _run('''
+DIM b[3] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+NEXT
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", [100, 200])
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+''', tmp_path)
+    assert "3 Bilder" in aus[0] and "2 Zeiten" in aus[0]
+
+
+def test_eine_zeit_von_null_wird_abgelehnt(tmp_path):
+    aus = _run('''
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", [100, 0])
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+''', tmp_path)
+    assert "Zeit 2" in aus[0]
+
+
+def test_sehr_kurze_zeiten_werden_angehoben(tmp_path):
+    """Unter 2 Hundertstel legen die meisten Betrachter still ihre eigene
+    Dauer fest (meist 10) -- die Ausgabe liefe dann LANGSAMER als verlangt,
+    ohne Hinweis. Dieselbe Klemmung wie bei der Bildrate."""
+    _run('''
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+IMAGE_SAVE_GIF(b, "a.gif", [5, 1000])
+''', tmp_path)
+    from PIL import ImageSequence
+    dauern = [f.info.get("duration") for f in ImageSequence.Iterator(_gif(tmp_path))]
+    assert dauern == [20, 1000]
+
+
 def test_wenige_farben_bleiben_exakt(tmp_path):
     """Bei Pixelgrafik wird die Farbtafel EXAKT gebaut. Ein Verfahren, das
     immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht."""

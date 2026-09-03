@@ -95,7 +95,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_SAVE(bild, pfad$)` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`) |
 | `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
 | `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
-| `IMAGE_SAVE_GIF(bilder, pfad$ [, fps [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
+| `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |
 
 ```basic
 IMPORT "imgfx"
@@ -157,10 +157,17 @@ in einer Schleife Momentaufnahmen braucht, legt die Plätze besser einmal an
 und überschreibt sie mit `IMAGE_CLEAR` + `IMAGE_DRAW_IMAGE`.
 
 **Bewegte GIFs.** `IMAGE_SAVE_GIF` nimmt ein `ARRAY OF IMAGE` (oder ein
-TUPLE) und schreibt daraus eine Animation. `fps` ist die Bildrate (Vorgabe 10),
-`wiederholen` die Endlosschleife (Vorgabe TRUE), `anzahl` sagt, **wie viele
-Plätze des Feldes gelten** — ein `DIM b[16] AS IMAGE` mit drei belegten Plätzen
-ist der Normalfall, und die leeren wären sonst ein Fehler.
+TUPLE) und schreibt daraus eine Animation. `wiederholen` ist die
+Endlosschleife (Vorgabe TRUE), `anzahl` sagt, **wie viele Plätze des Feldes
+gelten** — ein `DIM b[16] AS IMAGE` mit drei belegten Plätzen ist der
+Normalfall, und die leeren wären sonst ein Fehler.
+
+**Der dritte Parameter ist zweierlei:**
+
+| Form | Bedeutung |
+|---|---|
+| eine Zahl | **Bilder je Sekunde** für alle (Vorgabe 10) |
+| ein ARRAY / TUPLE | **Dauer je Bild in Millisekunden** |
 
 ```basic
 IMPORT "imgfx"
@@ -170,8 +177,19 @@ FOR i = 0 TO 2
     b[i] = IMAGE_NEW(16, 16)
     IMAGE_DRAW_CIRCLE(b[i], 4 + i * 4, 8, 3, &HE84B4B)
 NEXT
-IMAGE_SAVE_GIF(b, "lauf.gif", 8)
+IMAGE_SAVE_GIF(b, "lauf.gif", 8)                  ' 8 Bilder je Sekunde
+IMAGE_SAVE_GIF(b, "pose.gif", [1000, 80, 80])     ' erste Pose wird gehalten
 ```
+
+Dass die **Einheit wechselt**, ist Absicht: ein einzelnes Bild hat keine
+Bildrate, es hat eine Dauer. `[4, 12]` als „250 ms, dann 83 ms" zu lesen wäre
+die schlechtere Zumutung. Sind es weniger Zeiten als Bilder, ist das ein
+Fehler — die letzte stillschweigend zu wiederholen wäre eine Vermutung, und
+eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur.
+
+Genau dafür gibt es das: eine Bildfolge hält eine Pose und lässt die Bewegung
+dazwischen schnell durchlaufen. Der Sprite-Editor
+(`examples/189_sprite_editor.dh`) schreibt seine Einzelbild-Dauern so heraus.
 
 **Was GIF nicht kann, und was daraus folgt:**
 

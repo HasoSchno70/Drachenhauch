@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 615 | 1,18 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2696 | 0,37 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -162,8 +162,9 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
 > GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe) -> 0,35 (2604,
 > mit benannten Einzelbildern) -> 0,37 (2696, mit Spiegeln und
-> Vierteldrehen). Nichts daran ist schlechter geworden -- es
-> wurde nur weniger weggelassen. Aus 0,17 sind so 0,37 geworden, mehr als das
+> Vierteldrehen) -> 0,38 (2811, mit einer Dauer je Einzelbild). Nichts daran
+> ist schlechter geworden -- es
+> wurde nur weniger weggelassen. Aus 0,17 sind so 0,38 geworden, mehr als das
 > Doppelte, ohne dass sich an der Sprache etwas geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
@@ -192,6 +193,37 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > zurueck -- sichtbar erst beim Umschalten der Ebene. Er wird deshalb
 > geleert; die Gegenrichtung nimmt die Wandlung ohnehin zurueck.
 > Faktor 0,35 -> 0,37.
+>
+> **Eine Dauer je Einzelbild** (2026-09-03) fand die naechste Modul-Luecke:
+> **`IMAGE_SAVE_GIF` nahm EINE Bildrate fuer alles**, obwohl GIF von Haus
+> aus eine Dauer je Bild kann -- und genau die braucht eine Bildfolge: eine
+> Pose wird gehalten, der Lauf dazwischen nicht. Der dritte Parameter nimmt
+> jetzt zusaetzlich ein FELD (siehe `imgfx` unten). Im Piloten ein Drehfeld
+> neben der Bildliste; **0 heisst "der Tempo-Regler gilt"**, nicht 0 ms --
+> sonst waere der Regler nach dem ersten Bild wirkungslos, ohne dass man es
+> sieht. Vorschau und GIF-Ausgabe fragen dieselbe Stelle (`dauerMs`), sonst
+> liefe das Bild anders als die Datei; die Zeit steht in der Bildliste,
+> wandert beim Kopieren mit (anders als der NAME -- der ist eine Kennung,
+> die Dauer eine Eigenschaft) und steht in der `.dhsprite`. Faktor 0,37 ->
+> 0,38.
+>
+> **Dabei fielen zwei Fehler auf, die aelter sind als die Aenderung.**
+> (1) `JSON_LEN` WIRFT bei einem Pfad, den es nicht gibt -- es liefert nicht
+> 0. `bildnamen`, `bilddauern` und `bereiche` stehen alle nur dann in der
+> `.dhsprite`, wenn es sie gibt; ohne `JSON_HAS` brach das Laden an der
+> ersten fehlenden ab. Eine Datei MIT Bereich, aber OHNE Einzelbild-Namen
+> verlor beim Laden also stillschweigend ihren Bereich, und gemeldet wurde
+> nur eine Pfad-Meldung, die nach einem Programmierfehler aussieht. Kein
+> Test hatte das je getroffen, weil in allen bisherigen Faellen Namen
+> gesetzt waren.
+> (2) Ein Wert, den das PROGRAMM in ein Bedienelement setzt, sieht fuer eine
+> Aenderungs-Erkennung wie eine Eingabe aus -- nach dem Laden schrieb sie
+> die alte Zahl sofort zurueck. Dafuer `msLetzt`, derselbe Spiegel wie
+> `letzteAuffrischen` im Partikel-Editor. **Beide Male war der erste Test
+> dazu gruen und wertlos**: er klickte [Neu], ohne den Kasten "Neues
+> Sprite" zu bestaetigen -- es passierte gar nichts, und weil dann auch
+> nichts zurueckgesetzt wurde, stimmte die Zusage zufaellig. Seither prueft
+> er den Zwischenstand (erst 0, dann wieder da).
 >
 > **In der IDE erreichbar** (seit 2026-08-31): `Datei` -> `Werkzeuge in
 > Drachenhauch` startet jeden Piloten ueber dieselbe Konsole wie jedes
@@ -573,7 +605,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | Zustand sichern | `GFX_PUSH()` / `GFX_POP()` — Zeichenzustand auf einen Stapel legen und zurueckholen: 2D-Kamera+Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient/Nebel/alle Lichtquellen), Umgebung (`LIGHT_ENV`, IBL-Schalter, `SKYBOX`), Schatten (an/Bereich/Ziel), 3D-Kamera samt View-/Projektions-Ueberschreibung, Schrift und `POSTFX`. **Nicht** enthalten: geladene Ressourcen (bleiben geladen — POP schaltet nur ihre Benutzung zurueck), die Schatten-AUFLOESUNG (haengt am allozierten Tiefenpuffer) und der Blend-Modus (ohnehin nur ein Bild lang gueltig). Analog `AUDIO_PUSH()` / `AUDIO_POP()` fuer alle Bus-Einstellungen (Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ) — eine laufende `AUDIO_MODULATE`-Bindung wird dabei abgeloest, weil das Zurueckschreiben denselben Kira-Parameter beschreibt (empirisch belegt in `tests/test_gfx_push_pop.py`). `GFX_DEPTH`/`AUDIO_DEPTH` liefern die Stapeltiefe, ein POP ohne PUSH ist ein Fehler. **Der Grund:** dieser Zustand ist global, und eine vergessene Ruecknahme faellt erst Szenen spaeter auf. | — |
 | Fenster-Zustand | `WINDOW_FOCUSED()` (Spiel pausieren, wenn der Nutzer wegklickt), `WINDOW_MINIMIZED/MAXIMIZED/HIDDEN()`, `WINDOW_IS_FULLSCREEN()`, `WINDOW_FOCUS()` (nach vorne holen), `WINDOW_OPACITY(0..1)` (ganzes Fenster durchscheinend), **`WINDOW_ICON(bild)`** — ohne das trug jedes exportierte Spiel das raylib-Standardsymbol. `WINDOW_DPI_X/Y()` = Bildschirm-Skalierung (1.0 normal, 2.0 HiDPI/Retina — ohne sie weiss ein Programm nicht, ob seine Pixelgroessen auf dem Zielgeraet winzig herauskommen). `GET_TIME()` = monotone Sekunden seit Programmstart. `OPENURL(adresse$)` oeffnet den Standardbrowser — **bewusst auf http/https begrenzt**, weil raylib die Zeichenkette an die Shell weiterreicht und ein `file:`-Schema sonst ein Weg waere, aus einem GB-Programm Beliebiges zu starten. | — |
 | Kompression | `COMPRESS$(text$)` / `DECOMPRESS$(gepackt$)` — DEFLATE, Ergebnis Base64 (GB-Strings sind UTF-8, roher Deflate-Output waere keins). Typisch ~9x kleiner bei Savegame-artigem Text; passt ueberall dorthin, wo heute schon `BASE64_ENCODE`-Ausgaben stehen. **Ungated** (miniz_oxide statt raylibs CompressData) — laeuft also auch in Konsolen-Programmen ohne Fenster. | — |
-| Bild HERSTELLEN | `IMAGE_NEW(b, h [, farbe])` (**ohne Farbe vollstaendig durchsichtig** -- ueber eine FARBE ist das gar nicht auszudruecken, weil Deckkraft 0 als DECKEND gilt; `GENTEX_COLOR` kann es deshalb nicht), `IMAGE_CLEAR(bild [, x, y, b, h])` (Radierer -- SCHREIBT die Durchsichtigkeit, mischte es, waere es ein Nichts-Tun), `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` (Ebenen verrechnen, Ausschnitt einsetzen), `GETALPHA(bild, x, y)` (0..255, -1 ausserhalb -- noetig, weil `GETPIXEL` eine FARBE liefert und ein durchsichtiger Punkt dort als deckendes Schwarz ankaeme), `IMAGE_FREE(bild)` (Bild + Grafikspeicher-Textur freigeben -- gemessen 1200 Kopien zu 256x256: **393 MB gegen 91 MB**. Das Handle wird danach NICHT neu vergeben, jede weitere Benutzung meldet sich im Klartext statt still auf ein fremdes Bild zu zeigen; `GETPIXEL`/`GETALPHA` bleiben bei -1. Der Pfad-Cache von `LOADIMAGE` wird mitgeraeumt. **Weiss nichts von** Texturen, die per `MODEL_TEXTURE` an ein Modell gingen -- raylibs `Texture2D` ist ein Struct ohne Zaehlung. **Nicht anlegen ist billiger als anlegen und freigeben**), `IMAGE_SAVE_GIF(bilder, pfad$ [, fps [, wiederholen [, anzahl]]])` (**bewegtes GIF** aus einem `ARRAY OF IMAGE`; raylib kann GIFs nur LESEN. Ueber die pure-Rust-Crate `gif` -- ein LZW-Kodierer von Hand ist die Art Code, die auf den ersten Blick stimmt und im Randfall still etwas Falsches liefert. **Farbtafel EXAKT bei bis zu 255 Farben** -- ein Verfahren, das immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht; darueber wird reduziert. Durchsichtigkeit nur ganz/gar nicht (Schwelle 128), EINE Leinwand fuer alle Bilder (abweichende Groesse = Fehler, nicht beschneiden), Dauer auf >= 2 Hundertstel geklemmt weil Betrachter darunter still ihre eigene nehmen. `anzahl` = wie viele Plaetze des Feldes gelten, sonst sind die leeren Plaetze eines `DIM b[16]` ein Fehler. Reine Kodier-Logik in `gifschreiber.rs` mit 8 Rust-`#[test]`s -- sie kennt raylib nicht und ist damit fuer sich pruefbar), `IMAGE_SAVE(bild, pfad$)` (png/bmp/jpg/tga; unbekannte Endung wird abgelehnt, raylib taete sonst still nichts; ob geschrieben wurde, sagt nur die Datei -- die Bindung wirft das Erfolgs-Flag weg). **Der Anlass:** ein IMAGE war eine Einbahnstrasse -- hineinzeichnen ja, aber nicht herstellen; Ton hatte seit dem SFX-Piloten `AUDIO_SAVE_WAV`, Bild gar nichts. **Nicht dabei:** Bilder ueber die Zwischenablage (raylibs `GetClipboardImage` gibt es nur unter Windows). Doku `docs/module-imgfx.md`, Demo `examples/188_bild_erzeugen.dh`, Tests `tests/test_image_io.py`. | — |
+| Bild HERSTELLEN | `IMAGE_NEW(b, h [, farbe])` (**ohne Farbe vollstaendig durchsichtig** -- ueber eine FARBE ist das gar nicht auszudruecken, weil Deckkraft 0 als DECKEND gilt; `GENTEX_COLOR` kann es deshalb nicht), `IMAGE_CLEAR(bild [, x, y, b, h])` (Radierer -- SCHREIBT die Durchsichtigkeit, mischte es, waere es ein Nichts-Tun), `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` (Ebenen verrechnen, Ausschnitt einsetzen), `GETALPHA(bild, x, y)` (0..255, -1 ausserhalb -- noetig, weil `GETPIXEL` eine FARBE liefert und ein durchsichtiger Punkt dort als deckendes Schwarz ankaeme), `IMAGE_FREE(bild)` (Bild + Grafikspeicher-Textur freigeben -- gemessen 1200 Kopien zu 256x256: **393 MB gegen 91 MB**. Das Handle wird danach NICHT neu vergeben, jede weitere Benutzung meldet sich im Klartext statt still auf ein fremdes Bild zu zeigen; `GETPIXEL`/`GETALPHA` bleiben bei -1. Der Pfad-Cache von `LOADIMAGE` wird mitgeraeumt. **Weiss nichts von** Texturen, die per `MODEL_TEXTURE` an ein Modell gingen -- raylibs `Texture2D` ist ein Struct ohne Zaehlung. **Nicht anlegen ist billiger als anlegen und freigeben**), `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` (**bewegtes GIF** aus einem `ARRAY OF IMAGE`; raylib kann GIFs nur LESEN. **Das dritte Argument ist ZWEIERLEI:** eine Zahl sind Bilder je Sekunde fuer alle, ein FELD ist die Dauer JE BILD in Millisekunden. GIF kann das von Haus aus, und eine Bildfolge braucht es -- eine Pose wird gehalten, der Lauf dazwischen nicht. Dass die EINHEIT wechselt, ist Absicht: ein einzelnes Bild hat keine Bildrate, es hat eine Dauer; `[4, 12]` als "250 ms, dann 83 ms" zu lesen waere die schlechtere Zumutung. Zu wenige Zeiten sind ein FEHLER -- die letzte stillschweigend zu wiederholen waere eine Vermutung, und eine falsche Zeit sieht man dem GIF nicht an, man merkt sie nur. Ueber die pure-Rust-Crate `gif` -- ein LZW-Kodierer von Hand ist die Art Code, die auf den ersten Blick stimmt und im Randfall still etwas Falsches liefert. **Farbtafel EXAKT bei bis zu 255 Farben** -- ein Verfahren, das immer zusammenfasst, haette schon ein Vier-Farben-Sprite verfaelscht; darueber wird reduziert. Durchsichtigkeit nur ganz/gar nicht (Schwelle 128), EINE Leinwand fuer alle Bilder (abweichende Groesse = Fehler, nicht beschneiden), Dauer auf >= 2 Hundertstel geklemmt weil Betrachter darunter still ihre eigene nehmen. `anzahl` = wie viele Plaetze des Feldes gelten, sonst sind die leeren Plaetze eines `DIM b[16]` ein Fehler. Reine Kodier-Logik in `gifschreiber.rs` mit 8 Rust-`#[test]`s -- sie kennt raylib nicht und ist damit fuer sich pruefbar), `IMAGE_SAVE(bild, pfad$)` (png/bmp/jpg/tga; unbekannte Endung wird abgelehnt, raylib taete sonst still nichts; ob geschrieben wurde, sagt nur die Datei -- die Bindung wirft das Erfolgs-Flag weg). **Der Anlass:** ein IMAGE war eine Einbahnstrasse -- hineinzeichnen ja, aber nicht herstellen; Ton hatte seit dem SFX-Piloten `AUDIO_SAVE_WAV`, Bild gar nichts. **Nicht dabei:** Bilder ueber die Zwischenablage (raylibs `GetClipboardImage` gibt es nur unter Windows). Doku `docs/module-imgfx.md`, Demo `examples/188_bild_erzeugen.dh`, Tests `tests/test_image_io.py`. | — |
 | Bild-Verarbeitung (Ausbau) | `IMAGE_CONVOLVE(bild, kern)` — freie Faltung mit quadratischem, ungerade-seitigem Kern als flachem `ARRAY OF FLOAT` (Schaerfen, Kanten, Praegen; `IMAGE_BLUR` kann nur Gauss). `IMAGE_ALPHA_MASK/CROP/PREMULTIPLY` (weiche Raender, eng zuschneiden, dunkle Saeume beim Skalieren vermeiden). `IMAGE_DITHER(bild, r,g,b,a)` — **nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4**; raylib warnt bei allem anderen bloss und liefert ein Bild mit ungueltigem Format (Textur wird schwarz), deshalb hier hart abgelehnt. `IMAGE_PALETTE(bild, max)` -> `ARRAY OF INTEGER` der haeufigsten Farben. | — |
 | Textur-Generatoren (Ausbau) | `GENTEX_CELLULAR(w,h,kachel)` (Voronoi/Zellrauschen — Steinboden, Risse), `GENTEX_NOISE(w,h,anteil)` (Weissrauschen — Sternenfelder, Korn), `GENTEX_GRADIENT_BOX(w,h,dichte,c1,c2)` (rechteckiger Verlauf von innen nach aussen — Vignetten; das eckige Gegenstueck zu `GENTEX_RADIAL`). | — |
 | Bitmap-Fonts | `LOADFONT_IMAGE(bild, trennfarbe, erstes_zeichen)` — Pixel-Schrift aus einem PNG, dessen Zeichen durch die Trennfarbe getrennt sind. Bleibt bewusst ungefiltert (nearest), damit Pixel-Schrift pixelig bleibt — anders als `LOADFONT` (TTF), das bilinear glaettet. `TEXT_LINE_SPACING(px)` fuer mehrzeiligen Text. **Nicht umgesetzt:** animierte GIFs (`LoadImageAnim` liefert nur Bild 0 nutzbar, raylib-rs macht `Image` readonly) und `GetClipboardImage` (Windows-only) — Begruendungen stehen im Quelltext. | — |

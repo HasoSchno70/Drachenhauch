@@ -21,6 +21,11 @@
 '    Farbe       Farbwaehler + 16er-Palette + Pipette; die Palette laedt
 '                und sichert GIMP-Dateien (.gpl) -- das Format, das Aseprite,
 '                GIMP, Krita und die Paletten-Sammlungen im Netz sprechen
+'    Dauer       je Einzelbild eine eigene Zeit in Millisekunden (0 = der
+'                Tempo-Regler gilt). Eine Pose wird gehalten, der Lauf
+'                dazwischen nicht -- GIF kann das je Bild, und die Vorschau
+'                zeigt es genauso. Die Zeit steht in der Bildliste und
+'                wandert mit in die .dhsprite
 '    Bereiche    benannte Animationsbereiche (Name, von, bis, fps) -- genau
 '                das, was SPRITE_ADD_ANIM braucht. Die Vorschau spielt den
 '                gewaehlten; sie stehen mit in der .dhsprite
@@ -45,7 +50,8 @@
 '                Sichtbarkeit. Beides fuer sich lesbar.
 '    Ausgabe     einzelnes PNG, Streifen-PNG + Atlas-JSON (das Format, das
 '                ATLAS_LOAD direkt liest -- der Kreis schliesst sich),
-'                bewegtes GIF (Tempo aus dem Vorschau-Regler), und
+'                bewegtes GIF (Tempo aus dem Regler, je Bild mit eigener
+'                Dauer die eigene), und
 '                [GB-Code]: ein lauffaehiges Programm samt Blatt, mit einer
 '                SPRITE_ADD_ANIM-Zeile je Bereich, und [dhanim]: dieselben
 '                Bereiche als Zustandsmaschine (.dhanim), die der
@@ -217,6 +223,18 @@ DIM anFps[MAXANIM] AS INTEGER
 ' Atlas, also zu dem, was ein Programm spaeter in ATLAS_DRAW schreibt --
 ' deshalb sind es KENNUNGEN und kein Fliesstext, siehe `alsName$`.
 DIM bildName[MAXBILD] AS STRING
+' Dauer je Einzelbild in Millisekunden. 0 = folgt dem Tempo-Regler.
+'
+' Warum 0 und nicht "beim Anlegen aus dem Regler rechnen": sonst waere der
+' Regler nach dem ersten Bild wirkungslos, ohne dass man es sieht. So gilt
+' er weiter fuer alles, was nicht ausdruecklich eine eigene Zeit hat.
+DIM bildMs[MAXBILD] AS INTEGER
+' Der zuletzt GESEHENE Stand des Drehfelds. Ohne ihn sieht die Erkennung
+' unten jeden Wert, den das Programm selbst setzt (Bildwechsel, Laden), wie
+' eine Eingabe aus und schreibt ihn zurueck -- beim Laden einer Datei stand
+' danach wieder die alte Zahl im Bild. Dieselbe Falle wie `letzteAuffrischen`
+' im Partikel-Editor.
+DIM msLetzt AS INTEGER : msLetzt = 0
 
 DIM anzAnim AS INTEGER : anzAnim = 0
 DIM aktAnim AS INTEGER : aktAnim = -1
@@ -658,6 +676,7 @@ SUB neuesSprite(b AS INTEGER, h AS INTEGER)
     DIM bn AS INTEGER
     FOR bn = 0 TO MAXBILD - 1
         bildName[bn] = ""
+        bildMs[bn] = 0
     NEXT
     maskeAlleWeg()
     panX = 0 : panY = 0
@@ -1342,25 +1361,45 @@ FUNCTION rasterPfad$(pfad AS STRING) AS STRING
     RETURN pfad + ".png"
 END FUNCTION
 
+' Die Dauer EINES Bildes in Millisekunden. 0 im Feld heisst: der
+' Tempo-Regler gilt. Damit gibt es genau EINE Stelle, an der aus "Tempo" und
+' "eigene Zeit" eine Zahl wird -- Vorschau und GIF-Ausgabe fragen dieselbe,
+' sonst laeuft das Bild anders als die Datei.
+FUNCTION dauerMs(i AS INTEGER) AS INTEGER
+    IF bildMs[i] > 0 THEN RETURN bildMs[i]
+    RETURN MAX(1, INT(1000.0 / MAX(1.0, GUI_VALUE(slTempo))))
+END FUNCTION
+
 ' Alle Einzelbilder als bewegtes GIF. Jedes wird vorher zusammengerechnet --
 ' ein GIF kennt keine Ebenen, und "unsichtbar" heisst hier: kommt nicht mit.
 SUB gifSichern(pfad AS STRING, fps AS FLOAT)
     DIM ausgabe[MAXBILD] AS IMAGE
+    DIM zeiten[MAXBILD] AS INTEGER
     DIM i AS INTEGER
     DIM k AS INTEGER
+    DIM eigene AS INTEGER : eigene = 0
     FOR i = 0 TO anzBild - 1
         ausgabe[i] = IMAGE_NEW(gw, gh)
         FOR k = 0 TO anzEb - 1
             IF ebSicht[k] = 1 THEN IMAGE_DRAW_IMAGE(ausgabe[i], ebene[i, k], 0, 0)
         NEXT
+        zeiten[i] = dauerMs(i)
+        IF bildMs[i] > 0 THEN eigene = eigene + 1
     NEXT
     ' `anzahl` sagt, wie viele Plaetze des Feldes gelten -- ohne das kaemen
-    ' die unbenutzten als leere Bilder mit in die Bewegung.
-    IMAGE_SAVE_GIF(ausgabe, pfad, fps, TRUE, anzBild)
+    ' die unbenutzten als leere Bilder mit in die Bewegung. Die Zeiten
+    ' gehen als FELD hinein: GIF kann eine Dauer JE BILD, und genau darum
+    ' geht es hier -- eine Pose wird gehalten, der Lauf dazwischen nicht.
+    IMAGE_SAVE_GIF(ausgabe, pfad, zeiten, TRUE, anzBild)
     FOR i = 0 TO anzBild - 1
         IMAGE_FREE(ausgabe[i])
     NEXT
-    meldung = STR$(anzBild) + " Bilder mit " + FORMAT$(fps, "%.0f") + "/s: " + BASENAME(pfad)
+    IF eigene > 0 THEN
+        meldung = STR$(anzBild) + " Bilder, " + STR$(eigene) + _
+                  " mit eigener Dauer: " + BASENAME(pfad)
+    ELSE
+        meldung = STR$(anzBild) + " Bilder mit " + FORMAT$(fps, "%.0f") + "/s: " + BASENAME(pfad)
+    END IF
 END SUB
 
 SUB nativSichern(pfad AS STRING)
@@ -1403,6 +1442,18 @@ SUB nativSichern(pfad AS STRING)
         JSON_SET_JSON(h, "bildnamen", JSON_NEW_ARRAY())
         FOR k = 0 TO anzBild - 1
             JSON_APPEND_STRING(h, "bildnamen", bildName[k])
+        NEXT
+    END IF
+    ' Dasselbe fuer die Einzelzeiten -- nur wenn ueberhaupt eine gesetzt ist.
+    ' 0 heisst "folgt dem Tempo", und ein Feld voller Nullen sagt nichts.
+    DIM hatZeiten AS BOOLEAN : hatZeiten = FALSE
+    FOR k = 0 TO anzBild - 1
+        IF bildMs[k] > 0 THEN hatZeiten = TRUE
+    NEXT
+    IF hatZeiten THEN
+        JSON_SET_JSON(h, "bilddauern", JSON_NEW_ARRAY())
+        FOR k = 0 TO anzBild - 1
+            JSON_APPEND_INT(h, "bilddauern", bildMs[k])
         NEXT
     END IF
     IF anzAnim > 0 THEN
@@ -1454,12 +1505,28 @@ SUB nativLaden(pfad AS STRING)
             ' Bereiche, falls die Datei welche hat. Eine aeltere .dhsprite
             ' hat sie nicht -- das ist kein Fehler, sondern der Normalfall
             ' fuer alles, was vor heute gesichert wurde.
-            DIM nn2 AS INTEGER : nn2 = MIN(JSON_LEN(h, "bildnamen"), anzBild)
+            ' Alle drei Bloecke sind OPTIONAL, und `JSON_LEN` WIRFT bei
+            ' einem Pfad, den es nicht gibt -- nicht 0. Ohne die
+            ' `JSON_HAS`-Abfrage brach das Laden hier ab, sobald eine Datei
+            ' keine Einzelbild-Namen hatte: die Ebenen standen schon, die
+            ' BEREICHE dahinter kamen nie an, und gemeldet wurde nur eine
+            ' Pfad-Meldung, die nach einem Programmierfehler aussieht.
+            ' Aufgefallen erst an einer Datei mit Zeiten, aber ohne Namen.
             DIM q3 AS INTEGER
-            FOR q3 = 0 TO nn2 - 1
-                bildName[q3] = alsName$(JSON_GET_STRING(h, "bildnamen." + STR$(q3)))
-            NEXT
-            anzAnim = MIN(JSON_LEN(h, "bereiche"), MAXANIM)
+            IF JSON_HAS(h, "bildnamen") THEN
+                DIM nn2 AS INTEGER : nn2 = MIN(JSON_LEN(h, "bildnamen"), anzBild)
+                FOR q3 = 0 TO nn2 - 1
+                    bildName[q3] = alsName$(JSON_GET_STRING(h, "bildnamen." + STR$(q3)))
+                NEXT
+            END IF
+            IF JSON_HAS(h, "bilddauern") THEN
+                DIM nz AS INTEGER : nz = MIN(JSON_LEN(h, "bilddauern"), anzBild)
+                FOR q3 = 0 TO nz - 1
+                    bildMs[q3] = MAX(0, JSON_GET_INT(h, "bilddauern." + STR$(q3)))
+                NEXT
+            END IF
+            anzAnim = 0
+            IF JSON_HAS(h, "bereiche") THEN anzAnim = MIN(JSON_LEN(h, "bereiche"), MAXANIM)
             DIM q AS INTEGER
             FOR q = 0 TO anzAnim - 1
                 DIM pf AS STRING : pf = "bereiche." + STR$(q) + "."
@@ -1556,7 +1623,7 @@ GUI_TOOLTIP(bPng, "Nur das aktuelle Einzelbild, zusammengerechnet")
 DIM bBlatt AS GUI_WIDGET   : bBlatt   = GUI_BUTTON(win, "Streifen", 278, 7, 86, 32)
 GUI_TOOLTIP(bBlatt, "Alle Einzelbilder nebeneinander als PNG + Atlas-JSON (ohne Ebenen)")
 DIM bGif AS GUI_WIDGET     : bGif     = GUI_BUTTON(win, "GIF", 368, 7, 52, 32)
-GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Vorschau-Regler")
+GUI_TOOLTIP(bGif, "Alle Einzelbilder als bewegtes GIF -- Tempo aus dem Regler, je Bild mit eigener Dauer die eigene")
 
 ' Zwoelf Werkzeuge auf demselben Platz wie vorher neun: die Knopfbreite ist
 ' aus der Zahl gerechnet, damit alles rechts davon (Zurueck/Vor, die
@@ -1665,6 +1732,15 @@ DIM bBildKopie AS GUI_WIDGET: bBildKopie= GUI_BUTTON(win, "Kopie", rx + 82, ry, 
 DIM bBildWeg AS GUI_WIDGET  : bBildWeg  = GUI_BUTTON(win, "Weg", rx + 174, ry, 70, 28)
 DIM bBildName AS GUI_WIDGET : bBildName = GUI_BUTTON(win, "Name", rx + 248, ry, 72, 28)
 GUI_TOOLTIP(bBildName, "Dem Einzelbild einen Namen geben -- er wird sein Schluessel im Atlas")
+ry = ry + 34
+lbl = GUI_LABEL(win, "Dauer", rx, ry + 6)
+DIM spMs AS GUI_WIDGET : spMs = GUI_SPINNER(win, rx + 56, ry, 84, 0, 10000, 0, 20)
+' Schritt 20 ms: in Einerschritten braeuchte eine halbe Sekunde 500
+' Klicks. 20 ist die kleinste Stufe, die ein GIF ueberhaupt haelt (es
+' rechnet in Hundertstelsekunden, und unter 2 legen die Betrachter ihre
+' eigene fest).
+GUI_TOOLTIP(spMs, "Millisekunden fuer DIESES Bild. 0 = das Tempo darunter gilt")
+lbl = GUI_LABEL(win, "ms   (0 = Tempo)", rx + 148, ry + 6)
 ry = ry + 38
 
 lbl = GUI_LABEL(win, "Ebenen", rx, ry) : ry = ry + 22
@@ -1766,9 +1842,15 @@ SUB listenAuffrischen()
         ' das Entscheidende.
         namen[k] = "Bild " + STR$(k + 1)
         IF bildName[k] <> "" THEN namen[k] = namen[k] + "  (" + bildName[k] + ")"
+        ' Eine eigene Dauer steht in der Liste -- sonst sieht man einem Bild
+        ' nicht an, dass es aus der Reihe faellt, und sucht den Fehler in der
+        ' Bewegung.
+        IF bildMs[k] > 0 THEN namen[k] = namen[k] + "  " + STR$(bildMs[k]) + " ms"
     NEXT
     GUI_SET_LISTBOX(lstBild, namen)
     GUI_LISTBOX_SET_SELECTED(lstBild, aktBild)
+    GUI_SET_VALUE(spMs, bildMs[aktBild])
+    msLetzt = bildMs[aktBild]
 
     DIM en[MAX(anzEb, 1)] AS STRING
     FOR k = 0 TO anzEb - 1
@@ -2101,6 +2183,7 @@ WHILE NOT QUITREQUESTED()
             IMAGE_CLEAR(ebene[aktBild, k2])
         NEXT
         bildName[aktBild] = ""
+        bildMs[aktBild] = 0
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bBildKopie) AND anzBild < MAXBILD THEN
@@ -2114,6 +2197,10 @@ WHILE NOT QUITREQUESTED()
         ' Der Name wird NICHT mitkopiert: zwei Bilder mit demselben Namen
         ' waeren zwei Atlas-Schluessel, von denen einer verlorenginge.
         bildName[aktBild] = ""
+        ' Die DAUER wird mitkopiert -- anders als der Name: sie ist keine
+        ' Kennung, sondern eine Eigenschaft des Bildes, und eine Kopie soll
+        ' genauso lange stehen wie ihr Original.
+        bildMs[aktBild] = bildMs[q]
         listenAuffrischen()
     END IF
     IF GUI_CLICKED(bBildName) THEN
@@ -2147,8 +2234,10 @@ WHILE NOT QUITREQUESTED()
                     kopiere(ebene[j, k4], ebene[j + 1, k4])
                 NEXT
                 bildName[j] = bildName[j + 1]
+                bildMs[j] = bildMs[j + 1]
             NEXT
             bildName[anzBild - 1] = ""
+            bildMs[anzBild - 1] = 0
             anzBild = anzBild - 1
             IF aktBild >= anzBild THEN aktBild = anzBild - 1
             uStart = 0 : uAnz = 0 : uPos = 0
@@ -2157,6 +2246,14 @@ WHILE NOT QUITREQUESTED()
         ELSE
             meldung = "Das letzte Bild bleibt."
         END IF
+    END IF
+
+    ' Die eigene Dauer des gewaehlten Bildes. Ein Drehfeld meldet keinen
+    ' Klick, es hat nur einen Wert -- also mit dem gemerkten vergleichen.
+    IF INT(GUI_VALUE(spMs)) <> msLetzt THEN
+        msLetzt = INT(GUI_VALUE(spMs))
+        bildMs[aktBild] = msLetzt
+        listenAuffrischen()
     END IF
 
     ' --------------------------------------------------- Animationsbereiche
@@ -2648,11 +2745,29 @@ WHILE NOT QUITREQUESTED()
     DIM tempo AS FLOAT : tempo = GUI_VALUE(slTempo)
     DIM vb AS INTEGER
     IF aktAnim >= 0 AND aktAnim < anzAnim THEN
+        ' Ein Bereich bringt sein eigenes Tempo mit -- dort gelten die
+        ' Einzelzeiten NICHT. Beides zu mischen ergaebe eine Bewegung, die
+        ' sich aus zwei Quellen speist und aus keiner erklaeren laesst.
         DIM alo AS INTEGER : alo = MIN(anVon[aktAnim], anzBild - 1)
         DIM ahi AS INTEGER : ahi = MIN(anBis[aktAnim], anzBild - 1)
         vb = alo + INT(zeit * anFps[aktAnim]) MOD (ahi - alo + 1)
     ELSE
-        vb = INT(zeit * tempo) MOD anzBild
+        ' Ueber die Einzelzeiten laufen: die Vorschau muss zeigen, was das
+        ' GIF spaeter tut, sonst ist sie keine.
+        DIM ganz AS INTEGER : ganz = 0
+        DIM q9 AS INTEGER
+        FOR q9 = 0 TO anzBild - 1
+            ganz = ganz + dauerMs(q9)
+        NEXT
+        DIM rest AS INTEGER : rest = INT(zeit * 1000.0) MOD MAX(1, ganz)
+        vb = anzBild - 1
+        FOR q9 = 0 TO anzBild - 1
+            IF rest < dauerMs(q9) THEN
+                vb = q9
+                BREAK
+            END IF
+            rest = rest - dauerMs(q9)
+        NEXT
     END IF
     DRAWIMAGEPARTEX(schachbrett, 0, 0, gw, gh, vox, voy, gw * vz, gh * vz)
     DIM k8 AS INTEGER

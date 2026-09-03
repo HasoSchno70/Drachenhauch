@@ -7586,19 +7586,62 @@ wie viele Plaetze gelten", i + 1)),
                         _ => return Err("IMAGE_SAVE_GIF: ARRAY OF IMAGE noetig".into()),
                     }
                 }
-                let fps = if a.len() >= 3 { need_f(a,2,"IMAGE_SAVE_GIF")? } else { 10.0 };
-                if fps <= 0.0 {
-                    return Err("IMAGE_SAVE_GIF: Bilder je Sekunde muessen > 0 sein".into());
-                }
                 // GIF rechnet in Hundertstelsekunden. Unter 2 legen die
                 // meisten Betrachter still ihre eigene Dauer fest (meist 10) --
                 // dann liefe die Ausgabe LANGSAMER als verlangt, ohne Hinweis.
-                let verz = ((100.0 / fps).round() as i64).clamp(2, 65535) as u16;
+                let hundertstel = |ms: f64| ((ms / 10.0).round() as i64).clamp(2, 65535) as u16;
+                // Der dritte Parameter ist ZWEIERLEI: eine Zahl sind Bilder je
+                // Sekunde fuer alle, ein FELD ist die Dauer JE BILD in
+                // Millisekunden. GIF kann das je Bild, und eine Bildfolge
+                // braucht es -- eine Pose wird gehalten, eine Bewegung laeuft
+                // schnell durch.
+                //
+                // Warum die Einheit wechselt: ein einzelnes Bild hat keine
+                // Bildrate, es hat eine Dauer. `[4, 12]` als "250 ms, 83 ms"
+                // zu lesen waere die schlechtere Zumutung als zwei Einheiten,
+                // die je Form eindeutig sind.
+                let zeiten: Vec<u16> = match a.get(2) {
+                    None => vec![hundertstel(100.0); bilder.len()],
+                    Some(Value::Array(_)) | Some(Value::Tuple(_)) => {
+                        let roh: Vec<Value> = match &a[2] {
+                            Value::Array(arr) => arr.borrow().cells.iter().collect(),
+                            Value::Tuple(t) => t.iter().cloned().collect(),
+                            _ => unreachable!(),
+                        };
+                        if roh.len() < bilder.len() {
+                            return Err(std::format!(
+                                "IMAGE_SAVE_GIF: {} Bilder, aber nur {} Zeiten -- je Bild eine Dauer in Millisekunden", bilder.len(), roh.len()));
+                        }
+                        let mut v = Vec::with_capacity(bilder.len());
+                        for (i, x) in roh.iter().take(bilder.len()).enumerate() {
+                            let ms = match x {
+                                Value::Int(n) => *n as f64,
+                                Value::Float(f) => *f,
+                                _ => return Err(std::format!(
+                                    "IMAGE_SAVE_GIF: Zeit {} ist keine Zahl", i + 1)),
+                            };
+                            if ms <= 0.0 {
+                                return Err(std::format!(
+                                    "IMAGE_SAVE_GIF: Zeit {} ist {} ms -- muss > 0 sein",
+                                    i + 1, ms));
+                            }
+                            v.push(hundertstel(ms));
+                        }
+                        v
+                    }
+                    Some(_) => {
+                        let fps = need_f(a,2,"IMAGE_SAVE_GIF")?;
+                        if fps <= 0.0 {
+                            return Err("IMAGE_SAVE_GIF: Bilder je Sekunde muessen > 0 sein".into());
+                        }
+                        vec![hundertstel(1000.0 / fps); bilder.len()]
+                    }
+                };
                 // `gflag` fehlend = false -- hier ist die Vorgabe aber TRUE
                 // (eine Bewegung, die einmal laeuft und dann steht, ist
                 // selten gemeint), also selbst pruefen.
                 let wdh = if a.len() >= 4 { gflag(a, 3) } else { true };
-                g!().image_save_gif(&bilder, gs(a,1,"IMAGE_SAVE_GIF")?, verz, wdh)?;
+                g!().image_save_gif(&bilder, gs(a,1,"IMAGE_SAVE_GIF")?, &zeiten, wdh)?;
                 Value::Nil
             }
             "image_crop" => Value::Int(g!().image_crop(gi(a,0,"IMAGE_CROP")?, gi(a,1,"IMAGE_CROP")? as i32, gi(a,2,"IMAGE_CROP")? as i32, gi(a,3,"IMAGE_CROP")? as i32, gi(a,4,"IMAGE_CROP")? as i32)?),
