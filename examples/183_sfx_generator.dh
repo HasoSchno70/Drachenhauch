@@ -17,6 +17,9 @@
 '    [Sichern]      schreibt alle Regler in eine `.ini` ...
 '    [Laden]        ... und holt sie zurueck. Lesbares Format: die Datei
 '                   laesst sich auch von Hand aendern.
+'
+'  [Zurueck]/[Vor] (Strg+Z, Strg+Y) nehmen eine Aenderung zurueck. EIN Zug
+'  am Regler ist EIN Schritt -- nicht 60 pro Sekunde.
 ' ============================================================
 IMPORT "gui"
 IMPORT "audio"
@@ -96,10 +99,20 @@ DIM knopfBits AS GUI_WIDGET
 knopfBits = GUI_CHECKBOX(win, "8 Bit (Lo-Fi)", 244, 416)
 GUI_TOOLTIP(knopfBits, "Halb so gross, mehr Rauschen -- der Retro-Klang")
 
+DIM knopfZurueck AS GUI_WIDGET
+knopfZurueck = GUI_BUTTON(win, "Zurueck", 244, 444, 100, 28)
+GUI_TOOLTIP(knopfZurueck, "Strg+Z -- die letzte Aenderung zuruecknehmen")
+DIM knopfVor AS GUI_WIDGET
+knopfVor = GUI_BUTTON(win, "Vor", 352, 444, 100, 28)
+GUI_TOOLTIP(knopfVor, "Strg+Y -- wieder herstellen")
+
+' UNTER die Knopfreihe, nicht darauf. Vorher standen beide Beschriftungen
+' bei y = 482 und 504 -- also mitten auf [Sichern] und [Laden] (478..506):
+' "Bereit." war ueber den Knopftext gedruckt und keins von beidem lesbar.
 DIM lblStatus AS GUI_WIDGET
-lblStatus = GUI_LABEL(win, "Bereit.", 16, 482)
+lblStatus = GUI_LABEL(win, "Bereit.", 16, 514)
 DIM lblDauer AS GUI_WIDGET
-lblDauer = GUI_LABEL(win, "", 16, 504)
+lblDauer = GUI_LABEL(win, "", 16, 536)
 
 ' ============================================================
 '  Rechte Spalte: vier Gruppen mit Reglern
@@ -392,9 +405,112 @@ END SUB
 ' ============================================================
 '  Start
 ' ============================================================
+' ============================================================
+'  Rueckgaengig / Wiederholen
+'
+'  Der Zustand dieses Werkzeugs sind 16 Reglerwerte und die Wellenform --
+'  genau das, was auch die `.ini` sichert. Ein Schritt ist deshalb der VOLLE
+'  Stand: bei 17 Zahlen kuerzer als jede Buchfuehrung darueber, und es kann
+'  nichts auseinanderlaufen.
+'
+'  **Wann ist ein Schritt fertig?** Dieselbe Frage wie im Partikel-Editor
+'  (`185`), und dieselbe Antwort: ein gezogener Regler aendert sich in JEDEM
+'  Bild. Aufgezeichnet wird erst, wenn sich ein Bild lang nichts geaendert
+'  hat UND keine Maustaste mehr haengt -- ein Zug ist ein Schritt. Eine
+'  Werkseinstellung, ein Wuerfelwurf und eine geladene .ini setzen alle
+'  Werte auf einmal und sind auf demselben Weg ebenfalls je einer.
+' ============================================================
+CONST U_MAX = 32
+CONST U_FELDER = N_PARAM + 1           ' Regler + Wellenform
+DIM uStand[U_MAX, U_FELDER] AS FLOAT
+DIM uAnz AS INTEGER : uAnz = 0
+DIM uPos AS INTEGER : uPos = 0
+DIM uOffen AS BOOLEAN : uOffen = FALSE
+
+SUB standLesen(ziel AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        uStand[ziel, k] = GUI_VALUE(regler[k])
+    NEXT
+    uStand[ziel, N_PARAM] = GUI_DROPDOWN_SELECTED(waehlWave)
+END SUB
+
+FUNCTION standGleich(i AS INTEGER) AS BOOLEAN
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        IF uStand[i, k] <> GUI_VALUE(regler[k]) THEN RETURN FALSE
+    NEXT
+    RETURN uStand[i, N_PARAM] = GUI_DROPDOWN_SELECTED(waehlWave)
+END FUNCTION
+
+' Die Erkennung in der Schleife vergleicht mit `letzter[]` und `letzteWelle`.
+' Nach einem Rueckgaengig muss sie den neuen Stand als BEKANNT ansehen --
+' sonst zeichnet sie ihn als frische Aenderung auf und der Vor-Weg ist weg.
+SUB letzteAuffrischen()
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        letzter[k] = GUI_VALUE(regler[k])
+    NEXT
+    letzteWelle = GUI_DROPDOWN_SELECTED(waehlWave)
+END SUB
+
+SUB standAnwenden(quelle AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO N_PARAM - 1
+        GUI_SET_VALUE(regler[k], uStand[quelle, k])
+    NEXT
+    GUI_DROPDOWN_SET_SELECTED(waehlWave, INT(uStand[quelle, N_PARAM]))
+    letzteAuffrischen()
+    baueKlang()
+    uOffen = FALSE
+END SUB
+
+SUB schrittSichern()
+    ' Ein Stand, der sich nicht unterscheidet, ist kein Schritt -- die
+    ' Pruefung muss VOR dem Abschneiden stehen, sonst kostet ein
+    ' Nichts-Schritt den Vor-Weg.
+    IF uAnz > 0 AND standGleich(uPos) THEN RETURN
+    ' Der neue Stand kommt HINTER den aktuellen -- beim allerersten gibt es
+    ' keinen, der Platz ist also 0.
+    DIM ziel AS INTEGER
+    ziel = IIF(uAnz = 0, 0, uPos + 1)
+    IF ziel >= U_MAX THEN
+        DIM i AS INTEGER
+        DIM k AS INTEGER
+        FOR i = 0 TO U_MAX - 2
+            FOR k = 0 TO U_FELDER - 1
+                uStand[i, k] = uStand[i + 1, k]
+            NEXT
+        NEXT
+        ziel = U_MAX - 1
+    END IF
+    standLesen(ziel)
+    uPos = ziel
+    ' Alles dahinter faellt weg -- ab hier geht die Geschichte anders weiter.
+    uAnz = ziel + 1
+END SUB
+
+SUB zurueck()
+    IF uPos > 0 THEN
+        uPos = uPos - 1
+        standAnwenden(uPos)
+        GUI_SET_TEXT(lblStatus, "Zurueck (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+    END IF
+END SUB
+
+SUB wieder()
+    IF uPos < uAnz - 1 THEN
+        uPos = uPos + 1
+        standAnwenden(uPos)
+        GUI_SET_TEXT(lblStatus, "Vor (" + STR$(uPos) + "/" + STR$(uAnz - 1) + ")")
+    END IF
+END SUB
+
 ladePreset(0)
 GUI_LISTBOX_SET_SELECTED(liste, 0)
 baueKlang()
+letzteAuffrischen()
+schrittSichern()
 
 DIM frage AS GUI_WINDOW
 frage = -1                     ' -1 = keine Rueckfrage offen
@@ -413,6 +529,13 @@ WHILE NOT QUITREQUESTED()
 
     IF GUI_CLICKED(knopfZufall) THEN wuerfle()
 
+    DIM strg AS BOOLEAN
+    strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    IF GUI_CLICKED(knopfZurueck) OR (strg AND KEYHIT(KEY_Z)) THEN zurueck()
+    IF GUI_CLICKED(knopfVor) OR (strg AND KEYHIT(KEY_Y)) THEN wieder()
+    GUI_SET_ENABLED(knopfZurueck, uPos > 0)
+    GUI_SET_ENABLED(knopfVor, uPos < uAnz - 1)
+
     ' --- Hat sich etwas veraendert? ---
     geaendert = 0
     DIM k AS INTEGER
@@ -430,8 +553,16 @@ WHILE NOT QUITREQUESTED()
     IF geaendert = 1 THEN
         baueKlang()
         ruhig = 0
+        uOffen = TRUE
     ELSE
         ruhig = ruhig + 1
+        ' Der Zug ist zu Ende: EIN Schritt fuer die ganze Bewegung. Solange
+        ' die Taste haengt, laeuft er noch -- ein Regler steht zwischendurch
+        ' oft ein Bild lang still.
+        IF uOffen AND NOT MOUSEBUTTON(0) THEN
+            uOffen = FALSE
+            schrittSichern()
+        END IF
     END IF
 
     ' Erst spielen, wenn der Regler ZUR RUHE gekommen ist. Bei jedem

@@ -33,7 +33,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
-> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 484 | 0,93 |
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 615 | 1,18 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
@@ -324,11 +324,32 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > `GUI_HIT_TEST` statt zu klicken: ein echter Klick wuerde beim alten Stand
 > einen Datei-Dialog oeffnen und den Lauf haengen lassen.
 >
-> **Nicht portiert:** Undo/Redo im ERSTEN Piloten (SFX). Der dritte
-> und vierte haben es (Ringpuffer, je Schritt der Vorher/Nachher-Stand der
-> betroffenen Ebene; beim Sprite-Editor werden die Plaetze EINMAL angelegt
-> und wiederverwendet -- `IMAGE_FREE` gibt es seit dem Pilotenbefund zwar,
-> aber gar nicht erst anzulegen ist billiger als anlegen und freigeben).
+> **Seit 2026-09-02 haben ALLE VIER Rueckgaengig** -- und der erste (SFX)
+> hat dabei den lehrreichsten Wert geliefert: **Faktor 1,18**, die
+> Drachenhauch-Fassung ist LAENGER als die Qt-Fassung. Der Grund ist nicht
+> Wortreichtum, sondern was in der Qt-Zahl FEHLT: dort kostet das Undo rund
+> 15 Zeilen Verdrahtung, weil `SnapshotUndo` (140 Zeilen,
+> `editor_qt/undo_history.py`) in einem gemeinsamen Modul liegt und von VIER
+> Qt-Editoren benutzt wird -- gezaehlt wird es bei keinem. Rechnet man es
+> dazu, steht es 615 zu 662, also wieder 0,93. Der Pilot traegt seine 90
+> Zeilen selbst. **Damit misst der Faktor auch das: was die Vergleichszahl
+> nicht enthaelt.** Der dritte und vierte Pilot loesen es anders (Ringpuffer,
+> je Schritt der Vorher/Nachher-Stand der betroffenen Ebene; beim
+> Sprite-Editor werden die Plaetze EINMAL angelegt und wiederverwendet --
+> `IMAGE_FREE` gibt es seit dem Pilotenbefund zwar, aber gar nicht erst
+> anzulegen ist billiger als anlegen und freigeben).
+>
+> **Und derselbe Layout-Fehler steckte auch im ersten** (gefunden beim
+> Einbauen, gesehen nur im BILD): "Bereit." und die Dauer-Anzeige standen bei
+> y = 482 und 504 -- mitten auf [Sichern] und [Laden] (478..506), Knopftext
+> und Meldung uebereinander gedruckt. Beide Piloten hatten ihn seit dem
+> 2026-08-31, beide durch dieselbe Ursache: neue Knoepfe eingesetzt, ohne zu
+> pruefen, was dort schon lag. **Der erste Testversuch dafuer war gruen und
+> wertlos** -- `GUI_HIT_TEST` liefert an der Stelle die zuletzt angelegte
+> Beschriftung, also in beiden Lagen dasselbe; eine Beschriftung nimmt keine
+> Klicks an, der Schaden ist rein optisch. Geprueft werden jetzt die
+> RECHTECKE. Beim Partikel-Editor traf es eine LISTE, die Klicks sehr wohl
+> annimmt -- dort ist der Treffertest die richtige Frage.
 
 ## Verzeichnisstruktur
 
