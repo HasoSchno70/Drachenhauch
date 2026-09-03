@@ -307,7 +307,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `186_farbe_und_datum.dh` | **Farbwaehler und Datumswaehler** — zwei neue Widget-Arten, beide ohne Maus bedienbar |
 | `185_partikel_editor.dh` | **der Partikel-Editor, geschrieben IN Drachenhauch** — 17 Regler, echte Vorschau, GB-Code-Export, Rueckgaengig/Wiederholen |
 | `184_codefeld.dh` | **das TEXTAREA als Code-Feld** — Syntax-Einfaerbung, Zeilennummern, aktive Zeile, Tabulator |
-| `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export; das Gegenstueck zum Qt-Werkzeug `dhsfx` |
+| `183_sfx_generator.dh` | **der SFX-Generator, geschrieben IN Drachenhauch** — 16 Regler, Wellenform-Anzeige, WAV-Export, Rueckgaengig/Wiederholen; das Gegenstueck zum Qt-Werkzeug `dhsfx` |
 | `182_gui_tastatur_massstab.dh` | **Bedienung ohne Maus**, `GUI_SCALE` fuer HiDPI und ein modaler Dialog im eigenen Thema |
 | `157_gui_tabelle.dh`, `158_gui_tabelle_sqlite.dh` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
 | `159_esp32_bruecke.dh` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |

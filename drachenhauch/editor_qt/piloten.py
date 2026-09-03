@@ -22,8 +22,8 @@ from pathlib import Path
 
 PILOTEN: list[dict] = [
     {"datei": "183_sfx_generator.dh", "titel": "SFX-Generator",
-     "qt": 522, "dh": 484,
-     "kurz": "16 Regler, Wellenform-Anzeige, WAV- und GB-Code-Ausgabe, Einstellungen sichern/laden"},
+     "qt": 522, "dh": 615,
+     "kurz": "16 Regler, Wellenform-Anzeige, WAV- und GB-Code-Ausgabe, Einstellungen sichern/laden, Rueckgaengig/Wiederholen"},
     {"datei": "185_partikel_editor.dh", "titel": "Partikel-Editor",
      "qt": 802, "dh": 622,
      "kurz": "17 Regler, echte Vorschau, GB-Code-Ausgabe, Einstellungen sichern/laden, Rueckgaengig/Wiederholen"},
