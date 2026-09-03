@@ -351,6 +351,16 @@ pub struct Compiler {
     // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
     warnings: Vec<(u32, String)>,
+    // Jeder Name, der irgendwo im Programm DEKLARIERT wird (globaler Slot,
+    // DECLARE_NAME, Funktions-Local, Parameter, Klassenfeld) -- lowercase.
+    // Grundlage fuer die Tippfehler-Warnung unten.
+    bekannte_namen: std::collections::HashSet<String>,
+    // Namen, die weder Local noch Feld noch globaler Slot waren und deshalb
+    // ueber LOAD_NAME/STORE_NAME laufen: `(zeile, name, ist_zuweisung)`.
+    // Ausgewertet wird ERST am Ende -- ein `DIM` weiter unten in der Datei
+    // ist voellig in Ordnung, und waehrend des Uebersetzens weiss man das
+    // noch nicht.
+    offene_namen: Vec<(u32, String, bool)>,
 }
 
 /// Namen aller dhrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
@@ -547,7 +557,9 @@ impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>,
            importierte_module: std::collections::HashSet<String>) -> Self {
-        Compiler { global_slots: HashMap::new(),
+        Compiler { bekannte_namen: std::collections::HashSet::new(),
+                   offene_namen: Vec::new(),
+                   global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
                    fn_sigs: HashMap::new(), fn_lines: HashMap::new(),
@@ -652,6 +664,24 @@ impl Compiler {
     fn alloc_slot(&mut self, name: &str) {
         let n = self.global_slots.len();
         self.global_slots.entry(name.to_string()).or_insert(n);
+        self.merke_deklariert(name);
+    }
+
+    /// Diesen Namen gibt es -- er wurde irgendwo deklariert.
+    fn merke_deklariert(&mut self, name: &str) {
+        self.bekannte_namen.insert(name.to_lowercase());
+    }
+
+    /// Alle Locals und Parameter einer fertig uebersetzten Funktion
+    /// uebernehmen. Das ist absichtlich GROBKOERNIG: die Namen gelten danach
+    /// programmweit als bekannt, obwohl sie nur in dieser Funktion sichtbar
+    /// sind. Damit kann die Warnung unten einen Tippfehler UEBERSEHEN (wenn
+    /// er zufaellig einer Variablen anderswo gleicht) -- aber sie kann keinen
+    /// erfinden. Falschmeldungen waeren hier teurer als Luecken: eine
+    /// Pruefung, die bei richtigem Code anschlaegt, schaltet man ab.
+    fn namen_aus_kontext(&mut self, ctx: &Ctx) {
+        let namen: Vec<String> = ctx.local_slots.keys().cloned().collect();
+        for n in namen { self.merke_deklariert(&n); }
     }
 
     /// Bekommt ein DIM einen Slot? Skalar (primitiv ODER Klasse), nicht
@@ -1348,6 +1378,12 @@ impl Compiler {
     }
 
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
+        // Der Name ist ab hier bekannt -- EINMAL fuer alle DIM-Formen. Sie
+        // laufen unten in fuenf verschiedene Zweige (Feld mit Groesse,
+        // ARRAY/MAP ohne, STRUCT, Skalar, je main/lokal); die Zweige einzeln
+        // zu erfassen war der erste Versuch und hat genau EINEN uebersehen --
+        // `DIM x[N] AS T`. Das ergab 243 Falschmeldungen ueber die Beispiele.
+        self.merke_deklariert(name);
         self.warn_shadowed_const(name);
         let eff = if array_dims.is_some() { format!("array:{}", type_name) }
                   else { type_name.to_string() };
@@ -1615,6 +1651,7 @@ impl Compiler {
                 self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
             }
         }
+        self.merke_deklariert(var);
         // Konstanten-STEP-Richtung bestimmen.
         let step_num: Option<f64> = match step.as_deref() {
             None => Some(1.0),
@@ -1736,6 +1773,13 @@ impl Compiler {
     }
 
     fn stmt_const(&mut self, name: &str, type_name: Option<&str>, value: &Node) -> CR {
+        // Auch eine CONST deklariert einen Namen -- und die auf oberster
+        // Ebene bekommt zwar einen Slot, eine INNERHALB einer SUB aber nicht
+        // (siehe der Review-Fund unten). Ohne diese Zeile meldete die
+        // Tippfehler-Warnung `CONST MAXT = 200` in einer Funktion als
+        // unbekannt: gefunden am Buch-Beispiel `tippspiel.dh`, nachdem 208
+        // Beispieldateien sauber durchgelaufen waren.
+        self.merke_deklariert(name);
         self.expr(value)?;
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = match type_name {
@@ -1878,6 +1922,8 @@ impl Compiler {
         } else {
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::LOAD_NAME, json!(idx));
+            let z = self.ctx.cur_line;
+            self.offene_namen.push((z, name.to_string(), false));
         }
     }
     fn store_var(&mut self, name: &str) {
@@ -1892,6 +1938,56 @@ impl Compiler {
         } else {
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::STORE_NAME, json!(idx));
+            let z = self.ctx.cur_line;
+            self.offene_namen.push((z, name.to_string(), true));
+        }
+    }
+
+    /// Warnt vor Namen, die NIRGENDS deklariert sind -- der klassische
+    /// Tippfehler in einem Variablennamen.
+    ///
+    /// **Warum das noetig war:** In Drachenhauch ist `DIM` Pflicht, und ein
+    /// unbekannter Name bricht zur Laufzeit ab ("Variable 'x' nicht
+    /// deklariert"). Nur passiert das erst, wenn die ZEILE laeuft. In einem
+    /// Programm von einigen tausend Zeilen bleibt ein Tippfehler in einem
+    /// selten genommenen Zweig damit beliebig lange still; gefunden wurde
+    /// diese Luecke 2026-09-03 an einer SUB des Sprite-Editors, die eine
+    /// Variable aus einem SCHWESTER-Programm ansprach.
+    ///
+    /// **Bewusst grobkoernig:** geprueft wird gegen alle Namen, die
+    /// IRGENDWO im Programm deklariert werden (siehe `namen_aus_kontext`),
+    /// nicht gegen den Gueltigkeitsbereich an dieser Stelle. Ein Tippfehler,
+    /// der zufaellig einer Variablen in einer anderen Funktion gleicht,
+    /// rutscht deshalb durch. Das ist der Preis dafuer, dass die Warnung bei
+    /// richtigem Code NICHT anschlaegt -- und diese Richtung ist die
+    /// wichtigere: eine Pruefung mit Falschmeldungen schaltet man ab.
+    ///
+    /// Ebenfalls ausgenommen: die vorbelegten Konstanten (Farben, KEY_*, pi,
+    /// tau). Sie haben absichtlich keinen Slot und laufen ueber genau diesen
+    /// Weg -- ohne die Ausnahme wuerde jedes `KEYHIT(KEY_SPACE)` gemeldet.
+    fn warn_unbekannte_namen(&mut self) {
+        let offen = std::mem::take(&mut self.offene_namen);
+        let mut gemeldet: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        let mut kandidaten: Vec<String> =
+            self.bekannte_namen.iter().cloned().collect();
+        kandidaten.sort();
+        for (zeile, name, ist_zuweisung) in offen {
+            let low = name.to_lowercase();
+            if self.bekannte_namen.contains(&low) { continue; }
+            if crate::vm::ist_vorbelegter_name(&low) { continue; }
+            // Funktionen (FUNCREF), Klassen und Modul-Typen sind keine
+            // Variablen, kommen aber ueber denselben Weg.
+            if self.fn_sigs.contains_key(&low) || self.classes.contains_key(&low) { continue; }
+            if !gemeldet.insert(low.clone()) { continue; }
+            let hinweis = match Self::naechster_name(&low, &kandidaten) {
+                Some(v) => format!(" Meintest du '{}'?", v),
+                None => String::new(),
+            };
+            let was = if ist_zuweisung { "beschrieben" } else { "gelesen" };
+            self.warnings.push((zeile, format!(
+                "'{}' wird hier {}, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab (\"Variable '{}' nicht deklariert\").{}",
+                name, was, name, hinweis)));
         }
     }
 
@@ -2467,6 +2563,7 @@ impl Compiler {
                         self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
                     }
                 }
+                self.merke_deklariert(name);
             } else if !self.ctx.local_slots.contains_key(name) {
                 self.ctx.declare_local(name, "any");
             }
@@ -2609,6 +2706,7 @@ impl Compiler {
                         let default_idx = self.ctx.add_const(json!(""));
                         self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
                     }
+                    self.merke_deklariert(catch_var);
                 } else if !self.ctx.local_slots.contains_key(catch_var) {
                     self.ctx.declare_local(catch_var, "string");
                 }
@@ -2971,6 +3069,7 @@ impl Compiler {
                 Ok::<(), String>(())
             })();
             let fn_ctx = std::mem::replace(&mut self.ctx, saved);
+            self.namen_aus_kontext(&fn_ctx);
             r?;
             let sig = &self.classes[&cname].method_sigs[mname];
             let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
@@ -3060,6 +3159,7 @@ impl Compiler {
             Ok::<(), String>(())
         })();
         let fn_ctx = std::mem::replace(&mut self.ctx, saved);
+        self.namen_aus_kontext(&fn_ctx);
         r?;
         let sig = &self.fn_sigs[name];
         let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
@@ -3664,6 +3764,9 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
     })();
     match outcome {
         Ok(()) => {
+            // Erst JETZT -- vorher weiss niemand, ob ein Name weiter unten
+            // noch deklariert wird.
+            c.warn_unbekannte_namen();
             let warnings = std::mem::take(&mut c.warnings);
             Ok((c.finish(data), warnings))
         }
