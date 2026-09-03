@@ -36,7 +36,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 615 | 1,18 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
-> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2604 | 0,35 |
+> | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2696 | 0,37 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -161,12 +161,37 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > mit Kachel-Ansicht und Statistik) -> 0,32 (2339, mit Zuschneiden,
 > Groesse aendern und Animationsbereichen) -> 0,33 (2413, mit der
 > GB-Code-Ausgabe) -> 0,34 (2474, mit der .dhanim-Ausgabe) -> 0,35 (2604,
-> mit benannten Einzelbildern). Nichts daran ist schlechter geworden -- es
-> wurde nur weniger weggelassen. Aus 0,17 sind so 0,35 geworden, mehr als das
+> mit benannten Einzelbildern) -> 0,37 (2696, mit Spiegeln und
+> Vierteldrehen). Nichts daran ist schlechter geworden -- es
+> wurde nur weniger weggelassen. Aus 0,17 sind so 0,37 geworden, mehr als das
 > Doppelte, ohne dass sich an der Sprache etwas geaendert haette.
 > **Damit ist die eigentliche Lehre aus vier Punkten: der Faktor misst vor
 > allem, wie viel man weglaesst.** Er taugt nicht zum Hochrechnen, in keine
 > Richtung.
+>
+> **Spiegeln und Vierteldrehen** (2026-09-03) waren der naechste Rest im
+> vierten Piloten -- und der Weg dorthin fand die Luecke, die diese Runde
+> ausmacht: **`IMAGE_ROTATE` ist fuer Pixelgrafik unbrauchbar, auch bei 90
+> Grad.** Gemessen an einem 16x16-Bild mit vier verschiedenfarbigen
+> Eckpunkten: nach `IMAGE_ROTATE(b, 90.0)` sind ALLE VIER verschwunden, und
+> selbst die einfarbige Flaeche kommt verwaschen zurueck (0x141414 ->
+> 0x131413). Sie rechnet trigonometrisch und tastet neu ab -- dieselbe Falle
+> wie `IMAGE_SCALE` gegen `IMAGE_SCALE_NN`, nur faellt sie hier staerker auf,
+> weil eine Vierteldrehung eigentlich verlustfrei IST. Neu deshalb
+> **`IMAGE_ROTATE_CW`/`IMAGE_ROTATE_CCW`** (raylibs eigene, die die Punkte
+> nur umsortieren; Breite und Hoehe tauschen). Im Test steht die Gegenprobe
+> mit drin: `IMAGE_ROTATE` verliert die Marken, die neuen halten sie, und
+> vier Vierteldrehungen geben Punkt fuer Punkt das Original.
+>
+> Zwei Entscheidungen im Piloten dazu: (1) **Alle vier Wandlungen gelten
+> fuer das GANZE Sprite** (alle Bilder, alle Ebenen). Die Qt-Fassung dreht
+> bei quadratischen Sprites nur das aktuelle Bild und sonst alle -- dieselbe
+> Taste haette damit zwei Bedeutungen, und die sieht man nicht. (2) Sie
+> stehen **NICHT im Verlauf**: der zeichnet je Schritt EINE Ebene auf, und
+> ein Rueckgaengig nach einer Wandlung ueber alle drehte genau diese eine
+> zurueck -- sichtbar erst beim Umschalten der Ebene. Er wird deshalb
+> geleert; die Gegenrichtung nimmt die Wandlung ohnehin zurueck.
+> Faktor 0,35 -> 0,37.
 >
 > **In der IDE erreichbar** (seit 2026-08-31): `Datei` -> `Werkzeuge in
 > Drachenhauch` startet jeden Piloten ueber dieselbe Konsole wie jedes

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1567,
+ "count": 1569,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -692,7 +692,9 @@
   "IMAGE_PALETTE": "ARRAY OF INTEGER — die häufigsten Farben des Bildes",
   "IMAGE_REPLACE_COLOR": "IMAGE (neu): tauscht exakt die Farbe from gegen to",
   "IMAGE_RESIZE_CANVAS": "IMAGE (neu): Bild auf Leinwand w × h ab Offset offx,offy; freie Fläche mit fill (Default schwarz)",
-  "IMAGE_ROTATE": "IMAGE (neu, Bounding-Box wächst ggf.)",
+  "IMAGE_ROTATE": "IMAGE (neu, Bounding-Box wächst ggf.) — tastet neu ab, siehe unten",
+  "IMAGE_ROTATE_CCW": "IMAGE (neu, um 90° gegen den Uhrzeigersinn) — exakt",
+  "IMAGE_ROTATE_CW": "IMAGE (neu, um 90° im Uhrzeigersinn) — exakt, w × h → h × w",
   "IMAGE_SAVE": "das Bild in eine Datei schreiben (.png, .bmp, .jpg, .tga)",
   "IMAGE_SAVE_GIF": "mehrere Bilder als bewegtes GIF schreiben",
   "IMAGE_SCALE": "IMAGE (neu, in w × h) — bilinear geglättet",

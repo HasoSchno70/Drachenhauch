@@ -4293,6 +4293,18 @@
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_ROTATE_CCW",
+   "kind": "core",
+   "signature": "IMAGE_ROTATE_CCW(img)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_ROTATE_CW",
+   "kind": "core",
+   "signature": "IMAGE_ROTATE_CW(img)",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_SAVE",
    "kind": "core",
    "signature": "IMAGE_SAVE(bild, pfad$)",

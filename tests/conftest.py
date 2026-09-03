@@ -201,6 +201,7 @@ _BRAUCHT_GRAFIK = {
     "test_gui_tastatur.py",
     "test_gui_textarea_view.py",
     "test_image_io.py",
+    "test_image_rotate_exakt.py",
     "test_image_scale_nn.py",
     "test_image_text_extras.py",
     "test_input_edges.py",

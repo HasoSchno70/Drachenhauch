@@ -25,7 +25,12 @@
 '                das, was SPRITE_ADD_ANIM braucht. Die Vorschau spielt den
 '                gewaehlten; sie stehen mit in der .dhsprite
 '    Leinwand    [Zuschneiden] auf den Inhalt (ueber ALLE Ebenen, auch
-'                ausgeblendete) und [Groesse aendern]
+'                ausgeblendete), [Groesse aendern], Spiegeln waagerecht/
+'                senkrecht und Vierteldrehung links/rechts. Alle vier gelten
+'                fuer das GANZE Sprite -- eine Drehung tauscht Breite und
+'                Hoehe, und die gehoeren nicht einem einzelnen Bild. Sie
+'                stehen NICHT im Verlauf (die Gegenrichtung nimmt sie
+'                zurueck), siehe unten
 '    Auswahl     eine echte Punkt-MASKE, kein Rahmen: Rechteck, Lasso
 '                (Freiform) und Zauberstab (gleiche Farbe ringsum) fuellen
 '                dieselbe Maske, und ALLES was zeichnet fragt sie. Solange
@@ -58,6 +63,12 @@
 '    Dateibrowser und die Dialoge der Qt-Fassung. Das
 '    `.dhsprite` hier ist NICHT das der Qt-Fassung (die legt die Pixel als
 '    base64 in die JSON) -- gleicher Zweck, anderes Format.
+'
+'    Spiegeln und Drehen stehen NICHT im Verlauf. Der zeichnet je Schritt
+'    EINE Ebene auf; die vier wandeln alle. Ein Rueckgaengig danach drehte
+'    genau eine wieder zurueck und den Rest nicht -- man saehe es erst beim
+'    Umschalten der Ebene. Deshalb wird er geleert, und beide Richtungen
+'    sind ohnehin da: die Gegendrehung nimmt die Drehung zurueck.
 '
 '  Bedienung:
 '    Maus links  zeichnen        Maus rechts   Ansicht schieben
@@ -518,6 +529,58 @@ SUB groesseAendern(nb AS INTEGER, nh AS INTEGER, vx AS INTEGER, vy AS INTEGER)
     maskeAlleWeg()
     panX = 0 : panY = 0
     anpassen = TRUE
+END SUB
+
+' Spiegeln und Vierteldrehen -- ueber ALLE Einzelbilder und ALLE Ebenen.
+'
+' Warum nicht nur das aktuelle Bild? Weil eine Vierteldrehung Breite und
+' Hoehe tauscht, und die gehoeren dem ganzen Sprite. Waere die Drehung bei
+' quadratischen Sprites auf ein Bild beschraenkt und sonst auf alle (so
+' macht es die Qt-Fassung), haette dieselbe Taste zwei Bedeutungen -- ein
+' Modus, den man nicht sieht. Spiegeln folgt derselben Regel, damit es keine
+' zweite gibt.
+'
+' `IMAGE_ROTATE` waere hier falsch: sie tastet neu ab und verliert bei 90
+' Grad die Punkte (siehe docs/module-imgfx.md). `IMAGE_ROTATE_CW/CCW`
+' sortieren sie nur um.
+SUB alleWandeln(art AS STRING)
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO MAXBILD - 1
+        FOR k = 0 TO MAXEB - 1
+            DIM n AS IMAGE
+            SELECT CASE art
+                CASE "cw"
+                    n = IMAGE_ROTATE_CW(ebene[i, k])
+                CASE "ccw"
+                    n = IMAGE_ROTATE_CCW(ebene[i, k])
+                CASE "x"
+                    n = IMAGE_FLIP(ebene[i, k], TRUE, FALSE)
+                CASE ELSE
+                    n = IMAGE_FLIP(ebene[i, k], FALSE, TRUE)
+            END SELECT
+            IMAGE_FREE(ebene[i, k])
+            ebene[i, k] = n
+        NEXT
+    NEXT
+    IF art = "cw" OR art = "ccw" THEN
+        DIM t AS INTEGER : t = gw
+        gw = gh : gh = t
+        ' Die Hilfsbilder haengen an der Groesse -- `hilfsbilderNeu` legt sie
+        ' neu an und leert dabei den Verlauf.
+        hilfsbilderNeu(TRUE)
+        panX = 0 : panY = 0
+        anpassen = TRUE
+    ELSE
+        ' Auch beim Spiegeln muss der Verlauf weg, obwohl die Masse bleiben:
+        ' ein aufgezeichneter Schritt haelt das Bild EINER Ebene von VOR der
+        ' Wandlung. Ein Rueckgaengig danach spiegelte genau diese eine wieder
+        ' zurueck -- der Rest bliebe gespiegelt, und man saehe es erst beim
+        ' Umschalten der Ebene. `schrittBeginn`/`schrittEnde` reichen hier
+        ' nicht: sie kennen nur die AKTIVE Ebene, gewandelt werden alle.
+        uStart = 0 : uAnz = 0 : uPos = 0
+    END IF
+    maskeAlleWeg()
 END SUB
 
 ' Auf den Inhalt zuschneiden: der Rahmen um alles, was nicht durchsichtig
@@ -1565,6 +1628,19 @@ DIM bGroesse AS GUI_WIDGET
 bGroesse = GUI_BUTTON(win, "Groesse aendern", 12, y, 260, 28)
 GUI_TOOLTIP(bGroesse, "Leinwand vergroessern oder beschneiden -- der Inhalt bleibt links oben")
 y = y + 34
+DIM bSpiegelX AS GUI_WIDGET
+bSpiegelX = GUI_BUTTON(win, "Spiegeln |", 12, y, 62, 28)
+GUI_TOOLTIP(bSpiegelX, "Waagerecht spiegeln -- ALLE Bilder und Ebenen")
+DIM bSpiegelY AS GUI_WIDGET
+bSpiegelY = GUI_BUTTON(win, "Spiegeln --", 78, y, 62, 28)
+GUI_TOOLTIP(bSpiegelY, "Senkrecht spiegeln -- ALLE Bilder und Ebenen")
+DIM bDrehR AS GUI_WIDGET
+bDrehR = GUI_BUTTON(win, "90 >", 144, y, 62, 28)
+GUI_TOOLTIP(bDrehR, "Vierteldrehung nach rechts -- Breite und Hoehe tauschen. Nicht im Verlauf: die Gegendrehung nimmt sie zurueck")
+DIM bDrehL AS GUI_WIDGET
+bDrehL = GUI_BUTTON(win, "< 90", 210, y, 62, 28)
+GUI_TOOLTIP(bDrehL, "Vierteldrehung nach links -- Breite und Hoehe tauschen")
+y = y + 34
 DIM bGbCode AS GUI_WIDGET
 bGbCode = GUI_BUTTON(win, "GB-Code", 12, y, 128, 28)
 GUI_TOOLTIP(bGbCode, "Ein lauffaehiges Programm + das Blatt daneben -- je Bereich eine SPRITE_ADD_ANIM-Zeile")
@@ -1897,6 +1973,22 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
     IF GUI_CLICKED(bZuschnitt) THEN zuschneiden()
+    IF GUI_CLICKED(bSpiegelX) THEN
+        alleWandeln("x")
+        meldung = "Waagerecht gespiegelt -- alle Bilder und Ebenen"
+    END IF
+    IF GUI_CLICKED(bSpiegelY) THEN
+        alleWandeln("y")
+        meldung = "Senkrecht gespiegelt -- alle Bilder und Ebenen"
+    END IF
+    IF GUI_CLICKED(bDrehR) THEN
+        alleWandeln("cw")
+        meldung = "Gedreht auf " + STR$(gw) + "x" + STR$(gh)
+    END IF
+    IF GUI_CLICKED(bDrehL) THEN
+        alleWandeln("ccw")
+        meldung = "Gedreht auf " + STR$(gw) + "x" + STR$(gh)
+    END IF
     IF GUI_CLICKED(bGroesse) THEN
         ' Mit der AKTUELLEN Groesse vorbelegen -- wer nur die Breite aendern
         ' will, soll die Hoehe nicht von Hand nachstellen muessen.
