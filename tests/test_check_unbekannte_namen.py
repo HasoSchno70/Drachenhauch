@@ -82,6 +82,23 @@ def test_die_warnung_blockiert_nicht(tmp_path):
     assert r.returncode == 0 and "ok" in r.stdout
 
 
+def test_auch_das_ziel_von_input_und_read(tmp_path):
+    """Zwei weitere Wege in denselben Rueckfall -- beide brechen zur Laufzeit
+    mit derselben Meldung ab.
+
+    `INPUT punkte` emittiert INPUT_NAME statt STORE_NAME, und `READ x` geht
+    nicht ueber `store_var` (es braucht den Zwischenspeicher fuer Feld- und
+    Index-Ziele) -- beide liefen deshalb an der Erfassung in
+    `load_var`/`store_var` vorbei und blieben still, obwohl die VM ihr Ziel
+    in genau demselben Verzeichnis sucht.
+    """
+    b = _befunde('INPUT punkte\n', tmp_path)
+    assert len(b) == 1 and b[0]["line"] == 1
+
+    b = _befunde('DATA 1, 2\nDIM ok AS INTEGER\nREAD ok, punte\n', tmp_path)
+    assert len(b) == 1 and b[0]["line"] == 3
+
+
 # ------------------------------------------------- und wo sie schweigen muss
 
 def test_vorbelegte_konstanten_sind_keine_befunde(tmp_path):
@@ -169,3 +186,11 @@ def test_ein_name_aus_einer_anderen_funktion_wird_uebersehen(tmp_path):
     src = ('SUB a()\n    DIM hilf AS INTEGER : hilf = 1\n    PRINT hilf\nEND SUB\n'
            'SUB b()\n    PRINT hilf\nEND SUB\na()\n')
     assert _befunde(src, tmp_path) == []
+
+
+def test_input_und_read_auf_deklarierte_namen_schweigen(tmp_path):
+    """Gegenprobe zu `test_auch_das_ziel_von_input_und_read` -- ohne sie
+    waere ein zu scharfer INPUT-/READ-Zweig ebenfalls gruen."""
+    assert _befunde(
+        'DIM punkte AS INTEGER\nINPUT punkte\nDATA 1\nREAD punkte\n', tmp_path) == []
+

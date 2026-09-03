@@ -241,7 +241,7 @@ Reflexionen/Mirror-Effekte.
 
 ---
 
-## H — Befunde aus den Editor-Piloten (2026-08-31)
+## H — Befunde aus den Editor-Piloten (2026-08-31 / 2026-09-03)
 
 ### H1. `DIM red` in einem Block scheiterte, oben nicht — ✅ BEHOBEN
 > **Vorbelegte Konstanten liessen sich nur auf oberster Ebene verschatten.**
@@ -273,6 +273,35 @@ Reflexionen/Mirror-Effekte.
 >
 > Gefunden im Sprite-Editor (`DIM pi` in der Hauptschleife). Tests:
 > `tests/test_name_collision.py`.
+
+### H2. `dhrt --check` meldete keinen einzigen Tippfehler im Variablennamen — ✅ BEHOBEN
+> **`DIM zaehler` oben, `zaehlr = zaehlr + 1` in einer SUB** — `--check` lieferte
+> `[]`, das Programm startete und druckte, und erst der Aufruf der SUB brachte
+> „Variable 'zaehlr' nicht deklariert (DIM fehlt?)". Dasselbe beim Lesen eines
+> unbekannten Namens und auch auf oberster Ebene. Weil `DIM` in Drachenhauch
+> überall Pflicht ist, ist ein verschriebener Name **immer** ein Fehler — nur
+> einer, den ein selten genommener Zweig beliebig lange verdeckt.
+>
+> Gefunden am Sprite-Piloten (`examples/189`, 2700 Zeilen): dort stand
+> `geaendert = TRUE` in einer neuen SUB — eine Variable, die es in DIESEM
+> Programm gar nicht gibt (sie stammt aus einem Schwester-Piloten).
+> Herausgebracht hat es erst ein Test, der den Knopf drückte.
+>
+> **Ursache:** `load_var`/`store_var` (compiler.rs) haben als letzten Zweig einen
+> Rückfall auf `LOAD_NAME`/`STORE_NAME`; dort landet jeder Name, den der Compiler
+> nicht auflösen konnte, und gesucht wird er erst zur Laufzeit. **Drei** Wege
+> enden dort, nicht zwei — `INPUT x` (emittiert `INPUT_NAME`) und das
+> `READ`-Ziel (das den Zwischenspeicher für Feld-/Index-Ziele braucht und
+> deshalb nicht über `store_var` geht) blieben zunächst weiter still.
+>
+> Warum das mehr Arbeit war, als es klingt, und wo die Prüfung bewusst grob
+> bleibt, steht in `docs/sprache.md` und in `CLAUDE.md`. Der eigentliche Beleg
+> ist der Lauf über **alle 384 `.dh`-Dateien des Repos** (0 Meldungen) — und
+> genau der fand die zwei Fehlalarme der ersten Fassungen: `DIM x[N] AS T` und
+> `CONST` innerhalb einer SUB. Er ist deshalb inzwischen ein Test
+> (`tests/test_dhrt_check.py`), nicht mehr ein Aufruf von Hand.
+>
+> Tests: `tests/test_check_unbekannte_namen.py`, `tests/test_dhrt_check.py`.
 
 ---
 
