@@ -90,14 +90,23 @@ pub fn tafel_bytes(tafel: &[[u8; 3]], durchsichtig: u8) -> Vec<u8> {
 
 /// Die Bilder als animiertes GIF schreiben.
 ///
-/// `verzoegerung` in Hundertstelsekunden; `wiederholen` schaltet die
-/// Endlosschleife. Alle Bilder muessen gleich gross sein -- ein GIF hat EINE
-/// Leinwand, und ein abweichendes Bild waere entweder beschnitten oder
-/// verschoben; beides waere stiller Verlust.
-pub fn schreiben(pfad: &str, bilder: &[Bild], verzoegerung: u16,
+/// `verzoegerungen` in Hundertstelsekunden, EINE JE BILD -- das Format kann
+/// das, und eine Bildfolge braucht es: eine Pose wird gehalten, eine
+/// Bewegung laeuft schnell durch. Wer fuer alle dasselbe will, gibt
+/// dieselbe Zahl mehrfach; das ist billiger als zwei Wege dafuer.
+///
+/// `wiederholen` schaltet die Endlosschleife. Alle Bilder muessen gleich
+/// gross sein -- ein GIF hat EINE Leinwand, und ein abweichendes Bild waere
+/// entweder beschnitten oder verschoben; beides waere stiller Verlust.
+pub fn schreiben(pfad: &str, bilder: &[Bild], verzoegerungen: &[u16],
                  wiederholen: bool) -> Result<(), String> {
     if bilder.is_empty() {
         return Err("IMAGE_SAVE_GIF: keine Bilder".into());
+    }
+    if verzoegerungen.len() != bilder.len() {
+        return Err(std::format!(
+            "IMAGE_SAVE_GIF: {} Bilder, aber {} Zeiten -- je Bild genau eine",
+            bilder.len(), verzoegerungen.len()));
     }
     let (b, h) = (bilder[0].breite, bilder[0].hoehe);
     if b == 0 || h == 0 {
@@ -118,7 +127,7 @@ pub fn schreiben(pfad: &str, bilder: &[Bild], verzoegerung: u16,
         schreiber.set_repeat(gif::Repeat::Infinite)
             .map_err(|e| std::format!("IMAGE_SAVE_GIF: {}", e))?;
     }
-    for bild in bilder {
+    for (nr, bild) in bilder.iter().enumerate() {
         let mut rahmen = match farben_exakt(&bild.rgba, 255) {
             Some(tafel) => {
                 // Der Platz HINTER den benutzten Farben ist der durchsichtige.
@@ -148,7 +157,7 @@ pub fn schreiben(pfad: &str, bilder: &[Bild], verzoegerung: u16,
                 r
             }
         };
-        rahmen.delay = verzoegerung;
+        rahmen.delay = verzoegerungen[nr];
         schreiber.write_frame(&rahmen)
             .map_err(|e| std::format!("IMAGE_SAVE_GIF: {}", e))?;
     }

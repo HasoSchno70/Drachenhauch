@@ -3330,7 +3330,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// RGBA umgewandelt -- der Schreiber selbst kennt raylib nicht und ist
     /// damit fuer sich testbar (siehe gifschreiber.rs).
     pub fn image_save_gif(&mut self, handles: &[i64], pfad: &str,
-                          verzoegerung: u16, wiederholen: bool) -> Result<(), String> {
+                          verzoegerungen: &[u16], wiederholen: bool) -> Result<(), String> {
         let mut bilder = Vec::with_capacity(handles.len());
         for &idx in handles {
             if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, "IMAGE_SAVE_GIF")); }
@@ -3350,7 +3350,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
                 breite: w as u16, hoehe: h as u16, rgba,
             });
         }
-        crate::gifschreiber::schreiben(pfad, &bilder, verzoegerung, wiederholen)
+        crate::gifschreiber::schreiben(pfad, &bilder, verzoegerungen, wiederholen)
     }
 
     /// Ein Bild in eine Datei schreiben (IMAGE_SAVE).
