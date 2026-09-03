@@ -8022,6 +8022,21 @@ wie viele Plaetze gelten", i + 1)),
 // Vordefinierte Globals -- Werte IDENTISCH zu drachenhauch/graphics.py
 // (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
 // vergleicht jede Python-Konstante gegen PRINT-Output von dhrt.
+/// Ist das einer der vorbelegten Namen (Farben, Tasten, pi, tau)?
+///
+/// Sie bekommen beim Uebersetzen KEINEN Slot -- der Compiler kennt sie nicht
+/// statisch, sie laufen ueber `LOAD_NAME` (siehe "Globals-as-Slots"). Fuer
+/// die Tippfehler-Warnung in `compiler.rs` ist genau das die noetige
+/// Ausnahme: ohne sie waere jedes `KEY_SPACE` ein Befund.
+///
+/// `name` muss lowercase sein -- Drachenhauch unterscheidet Gross- und
+/// Kleinschreibung bei Namen nicht.
+pub fn ist_vorbelegter_name(name: &str) -> bool {
+    name == "pi" || name == "tau"
+        || DEFAULT_COLORS.iter().any(|(n, _)| *n == name)
+        || DEFAULT_KEYS.iter().any(|(n, _)| *n == name)
+}
+
 const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("black", 0), ("white", 16777215), ("gray", 8421504), ("lightgray", 12632256),
     ("darkgray", 4210752), ("red", 16711680), ("green", 65280), ("blue", 255),

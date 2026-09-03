@@ -748,6 +748,26 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   `tests/test_automation.py::test_buchstaben_treffen_in_beiden_schreibweisen`
   (der hielt vorher das GEGENTEIL fest -- er nannte es in seiner eigenen
   Beschreibung schon einen "Fehler, der beim Schreiben nicht auffaellt").
+- **`dhrt --check` meldet seit 2026-09-03 auch Tippfehler in Variablennamen.**
+  `DIM zaehler` und spaeter `zaehlr = zaehlr + 1` ist zur Laufzeit ein
+  Abbruch ("Variable nicht deklariert") -- aber eben erst, wenn die ZEILE
+  laeuft; in einer selten genommenen SUB bleibt das beliebig lange still.
+  Gefunden beim Sprite-Piloten, wo eine SUB eine Variable aus einem
+  SCHWESTER-Programm ansprach. **Bewusst grobkoernig:** geprueft wird gegen
+  alle Namen, die IRGENDWO im Programm deklariert werden, nicht gegen den
+  Gueltigkeitsbereich -- ein Tippfehler, der zufaellig einer Variablen in
+  einer anderen Funktion gleicht, rutscht durch. Die Richtung ist Absicht:
+  eine Pruefung mit Falschmeldungen schaltet man ab. Ausgenommen sind die
+  vorbelegten Konstanten (`vm::ist_vorbelegter_name` -- Farben, KEY_*, pi,
+  tau), die absichtlich keinen Slot haben und ueber denselben LOAD_NAME-Weg
+  laufen. **Der Beleg ist nicht der Test, sondern der Lauf ueber ALLES:** 384
+  `.dh`-Dateien im Repo, 0 Meldungen. Die erste Fassung hatte 243 -- sie
+  uebersah `DIM x[N] AS T` (eigener Compiler-Zweig), deshalb wird der Name
+  jetzt EINMAL oben in `stmt_dim` gemerkt statt in fuenf Zweigen. Der zweite
+  Fehlalarm (`CONST` INNERHALB einer SUB) tauchte erst am Buch-Beispiel
+  `tippspiel.dh` auf, nachdem die 208 examples sauber waren.
+  Tests `tests/test_check_unbekannte_namen.py` (5 Treffer, 10 Faelle, in
+  denen sie schweigen MUSS).
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
   `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität

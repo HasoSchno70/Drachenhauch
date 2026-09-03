@@ -176,7 +176,7 @@ p.anzhal                    ' Mitglied, das die Klasse nicht hat
 RETURN "text"               ' in einer FUNCTION ... AS INTEGER
 ```
 
-Dazu zwei Fälle, die keine Umwandlung betreffen, aber genauso sicher
+Dazu drei Fälle, die keine Umwandlung betreffen, aber genauso sicher
 schiefgehen:
 
 * **Kommazahl an eine ganzzahlige Variable** (`n = 7 / 2`) — hier ist die
@@ -184,6 +184,11 @@ schiefgehen:
   `f = 1.6` schief), gemeldet wird die Zeile trotzdem.
 * **Eine typisierte FUNCTION ohne jedes `RETURN`** — sie liefert still `NIL`,
   und `NIL` ist kein `INTEGER`.
+* **Ein Name, den nirgends ein `DIM` oder `CONST` anlegt** — der klassische
+  Tippfehler. `DIM zaehler` und zwei Zeilen später `zaehlr = zaehlr + 1`
+  bricht zur Laufzeit ab, aber eben erst, wenn die Zeile läuft; in einem
+  selten genommenen Zweig kann das lange dauern. Die Meldung schlägt einen
+  ähnlichen bekannten Namen vor, wenn es einen gibt.
 
 **Alles davon ist eine Warnung, kein Fehler.** Das Programm lässt sich
 übersetzen und läuft. Der Grund ist Ehrlichkeit: der Übersetzer leitet den Typ
@@ -201,6 +206,13 @@ Programm abweisen.
   Hund() : t.belle()` ist gültig und bleibt still.
 * **Ob jeder Zweig ein `RETURN` erreicht.** Gemeldet wird nur, wo es gar keines
   gibt.
+* **Der Gültigkeitsbereich eines Namens.** Beim Tippfehler-Test zählt jeder
+  Name, der *irgendwo* im Programm deklariert wird — nicht nur der, den man an
+  dieser Stelle sehen kann. Eine lokale Variable aus einer anderen Funktion
+  bricht also zur Laufzeit trotzdem ab, ohne dass es gemeldet wird. Der Grund
+  ist derselbe wie oben: eine Meldung, die bei richtigem Code anschlägt, ist
+  teurer als eine Lücke. Wer den Gültigkeitsbereich mitprüfen will, muss
+  zuerst belegen, dass dabei kein Fehlalarm entsteht.
 
 ## ENUM
 
