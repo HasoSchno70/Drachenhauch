@@ -766,7 +766,15 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   jetzt EINMAL oben in `stmt_dim` gemerkt statt in fuenf Zweigen. Der zweite
   Fehlalarm (`CONST` INNERHALB einer SUB) tauchte erst am Buch-Beispiel
   `tippspiel.dh` auf, nachdem die 208 examples sauber waren.
-  Tests `tests/test_check_unbekannte_namen.py` (5 Treffer, 10 Faelle, in
+  Dieser Lauf ist inzwischen ein TEST
+  (`tests/test_dhrt_check.py::test_kein_beispiel_meldet_einen_unbekannten_namen`)
+  -- von Hand gelaufen faengt er den naechsten uebersehenen DIM-Zweig nicht.
+  **Drei Wege enden in dem Rueckfall, nicht zwei:** `load_var`/`store_var` --
+  und `INPUT x` (emittiert INPUT_NAME) sowie das `READ`-Ziel (geht nicht ueber
+  `store_var`, es braucht den Zwischenspeicher fuer Feld-/Index-Ziele). Beide
+  liefen anfangs an der Erfassung vorbei und blieben still, obwohl die VM ihr
+  Ziel in genau demselben Verzeichnis sucht.
+  Tests `tests/test_check_unbekannte_namen.py` (6 Treffer, 11 Faelle, in
   denen sie schweigen MUSS).
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/

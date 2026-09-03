@@ -68,7 +68,12 @@ def _check_viele(dateien):
     beim selben Arbeiter haelt, lagen sie alle auf demselben kritischen Pfad.
 
     Bei mehreren Dateien antwortet dhrt mit einer JSON-Zeile je Datei. Liefert
-    {Dateiname: [Diagnosen]}.
+    {Pfad: [Diagnosen]}.
+
+    Der Schluessel ist der VOLLE Pfad, nicht der Dateiname: ueber das ganze
+    Repo gesehen gibt es Basisnamen doppelt (`fenster.dh`, `politur.dh`), und
+    die zweite Datei haette die erste stillschweigend ueberschrieben -- also
+    genau die eine, deren Diagnose keiner mehr sieht.
     """
     if not dateien:
         return {}
@@ -97,7 +102,7 @@ def _check_viele(dateien):
         if not zeile:
             continue
         eintrag = json.loads(zeile)
-        raus[Path(eintrag["datei"]).name] = eintrag["probleme"]
+        raus[eintrag["datei"]] = eintrag["probleme"]
     return raus
 
 
@@ -108,8 +113,8 @@ def test_all_examples_check_clean():
     keine Fehler, sondern ein bewusster Hinweis."""
     dateien = [f for f in sorted(_EXAMPLES.glob("*.dh"))
                if "_smoketest" not in f.name]
-    bad = [(name, [d for d in diags if d.get("severity") != "warning"])
-           for name, diags in _check_viele(dateien).items()
+    bad = [(Path(pfad).name, [d for d in diags if d.get("severity") != "warning"])
+           for pfad, diags in _check_viele(dateien).items()
            if any(d.get("severity") != "warning" for d in diags)]
     assert not bad, f"Fehlalarme bei gueltigem Code: {bad}"
 
@@ -122,12 +127,46 @@ def test_examples_use_no_unknown_builtin():
     Greift Hand in Hand mit compiler::is_known_builtin (G1, systemisch)."""
     dateien = [f for f in sorted(_EXAMPLES.rglob("*.dh"))
                if "_smoketest" not in f.name]
-    drift = [(name, d.get("line"), d.get("message"))
-             for name, diags in _check_viele(dateien).items()
+    drift = [(Path(pfad).name, d.get("line"), d.get("message"))
+             for pfad, diags in _check_viele(dateien).items()
              for d in diags if "Unbekanntes Builtin" in d.get("message", "")]
     assert not drift, (
         "Beispiele nutzen Builtins, die dhrt nicht (im builtin_index.json) "
         f"kennt -> Index ergaenzen: {drift}")
+
+
+def test_kein_beispiel_meldet_einen_unbekannten_namen():
+    """Null-Falschmeldung fuer die "nirgends deklariert"-Warnung.
+
+    Sie ist die einzige Warnung, die aus einer SCHAETZUNG kommt: der Compiler
+    sammelt alle Namen ein, die im Programm deklariert werden, und meldet, was
+    im LOAD_NAME/STORE_NAME-Rueckfall uebrig bleibt. Uebersieht diese Sammlung
+    eine Deklarationsform, warnt sie vor gueltigem Code -- und eine Warnung,
+    die man wegsehen muss, ist schlimmer als gar keine. Genau so ist es beim
+    Bau zweimal passiert: `DIM x[N] AS T` fehlte (243 Fehlalarme), und `CONST`
+    INNERHALB einer SUB fiel erst am Buch-Beispiel `tippspiel.dh` auf, nachdem
+    examples/ schon sauber war.
+
+    Deshalb geht dieser Test ueber ALLE .dh-Dateien des Repos, nicht nur ueber
+    examples/: die Piloten, die Demos und die Buch-Beispiele decken zusammen
+    deutlich mehr Sprachformen ab als ein von Hand geschriebener Test -- und
+    genau das hat den zweiten Fehlalarm gefunden. Beim Einchecken waren es 384
+    Dateien mit null Treffern.
+
+    Die Gegenprobe -- dass die Warnung ueberhaupt anschlaegt -- steht in
+    tests/test_check_unbekannte_namen.py; ohne sie waere ein stummgeschaltetes
+    Feature hier ebenfalls gruen.
+    """
+    from drachenhauch.editor_qt import tempdateien
+    dateien = [f for f in sorted(_ROOT.rglob("*.dh"))
+               if "target" not in f.parts
+               and not f.name.startswith(tempdateien.PRAEFIX)]
+    assert len(dateien) > 300, f"nur {len(dateien)} .dh-Dateien gefunden -- Sweep leer?"
+    funde = [(Path(pfad).name, d.get("line"), d.get("message"))
+             for pfad, diags in _check_viele(dateien).items()
+             for d in diags
+             if "nirgends im Programm mit DIM oder CONST angelegt" in d.get("message", "")]
+    assert not funde, f"Falschmeldung bei gueltigem Code: {funde}"
 
 
 def test_hardware_import_warns_at_import(tmp_path):

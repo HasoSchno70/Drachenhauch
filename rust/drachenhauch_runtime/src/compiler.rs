@@ -1601,6 +1601,11 @@ impl Compiler {
         } else {
             let name_idx = self.ctx.add_const(json!(target));
             self.ctx.emit(oc::INPUT_NAME, json!([name_idx, has_prompt]));
+            // INPUT_NAME sucht sein Ziel zur Laufzeit im selben Verzeichnis
+            // wie LOAD_NAME und bricht dort mit derselben Meldung ab -- also
+            // dieselbe Warnung (`INPUT punkte` ohne `DIM punkte`).
+            let z = self.ctx.cur_line;
+            self.offene_namen.push((z, target.to_string(), true));
         }
         Ok(())
     }
@@ -1614,6 +1619,11 @@ impl Compiler {
                 } else {
                     let idx = self.ctx.add_const(json!(name));
                     self.ctx.emit(oc::STORE_NAME, json!(idx));
+                    // Dritter Weg in denselben Rueckfall: `READ x` geht NICHT
+                    // ueber `store_var` (es braucht den Zwischenspeicher fuer
+                    // Feld-/Index-Ziele), landet aber bei demselben STORE_NAME.
+                    let z = self.ctx.cur_line;
+                    self.offene_namen.push((z, name.to_string(), true));
                 }
                 Ok(())
             }
