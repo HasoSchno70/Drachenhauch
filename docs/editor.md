@@ -167,7 +167,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 | SFX-Generator | 522 | 615 |
 | Partikel-Editor | 802 | 622 |
 | Tilemap-Editor | 2428 | 1536 |
-| Sprite-Editor | 7379 | 2604 |
+| Sprite-Editor | 7379 | 2696 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
 Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor waren allein die

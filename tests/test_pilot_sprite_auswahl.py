@@ -119,7 +119,16 @@ _PROBE = '''    DIM prG AS INTEGER : prG = 0
           " " + STR$(GUI_GET_X(bBildName)) + " " + STR$(GUI_GET_Y(bBildName)) + _
           " " + STR$(GUI_WINDOW_GET_X(winName) + GUI_GET_X(bNamOk)) + _
           " " + STR$(GUI_WINDOW_GET_Y(winName) + GUI_GET_Y(bNamOk)) + _
-          " " + STR$(LEN(bildName[aktBild]))
+          " " + STR$(LEN(bildName[aktBild])) + _
+          " " + STR$(GUI_GET_X(bSpiegelX)) + " " + STR$(GUI_GET_Y(bSpiegelX)) + _
+          " " + STR$(GUI_GET_X(bSpiegelY)) + " " + STR$(GUI_GET_Y(bSpiegelY)) + _
+          " " + STR$(GUI_GET_X(bDrehR)) + " " + STR$(GUI_GET_Y(bDrehR)) + _
+          " " + STR$(GUI_GET_X(bDrehL)) + " " + STR$(GUI_GET_Y(bDrehL)) + _
+          " " + STR$(GETALPHA(ebene[0, 0], 0, 0)) + _
+          " " + STR$(GETALPHA(ebene[0, 0], gw - 1, 0)) + _
+          " " + STR$(GETALPHA(ebene[0, 0], gw - 1, gh - 1)) + _
+          " " + STR$(GETALPHA(ebene[0, 0], 0, gh - 1)) + _
+          " " + STR$(uAnz)
 '''
 
 # Die Reihenfolge der Zahlen in der Probe-Zeile. Ein Test liest sie ueber den
@@ -137,7 +146,9 @@ _FELDER = ("ox oy zoom werkzeug selN selB selH gemalt draussen loecher "
            "zusX zusY grX grY animNX animNY animWX animWY "
            "kopieX kopieY bildWX bildWY grOkX grOkY lstBX lstBY "
            "ebNeuX ebNeuY ebSichtX ebSichtY anzEb aktEb sichtAkt gbX gbY faX faY "
-           "blattX blattY namX namY namOkX namOkY namLen").split()
+           "blattX blattY namX namY namOkX namOkY namLen "
+           "spXX spXY spYX spYY drRX drRY drLX drLY "
+           "eckLO eckRO eckRU eckLU uAnz").split()
 
 
 def _kopie(tmp_path, dialoge=None):
@@ -470,10 +481,15 @@ def _klick(frame, x, y):
             (frame + 2, MOUSE_BUTTON_UP, 0)]
 
 
-def _knopf_klick(frame, x, y):
+def _knopf_klick(frame, x, y, breite=128):
     """Mitte eines Knopfes -- die Lagen in der Probe sind seine linke obere
-    Ecke, und die Knoepfe sind rund 128x28 gross."""
-    return _klick(frame, x + 64, y + 14)
+    Ecke, die meisten Knoepfe sind 128x28 gross.
+
+    `breite` ist kein Beiwerk: die vier Wandlungs-Knoepfe sind nur 62 breit,
+    und mit dem festen +64 landete der Klick in der LUECKE zwischen zweien --
+    also nirgends. Das sieht in der Probe genauso aus wie ein Knopf, der
+    nichts tut."""
+    return _klick(frame, x + breite // 2, y + 14)
 
 
 def test_palette_laden_uebergeht_krumme_zeilen(tmp_path):
@@ -979,3 +995,113 @@ def test_namen_kommen_ueber_den_streifen_zurueck(tmp_path):
     letzte = _lauf(tmp_path, 50, ev, dialoge=ersatz)[-1]
     assert letzte["anzBild"] == 1, "der Streifen ist wieder drin"
     assert letzte["namLen"] == 4, "und sein Name mit ihm"
+
+
+# --------------------------------------------------- Spiegeln und Drehen
+# Vier Wandlungen ueber ALLE Bilder und Ebenen. Die Vierteldrehung tauscht
+# Breite und Hoehe -- und die gehoeren dem ganzen Sprite, nicht einem Bild.
+# Geprueft wird an den vier ECKEN der ersten Ebene (Deckkraft je Ecke steht
+# in der Probe): ein gesetzter Punkt muss nach der Wandlung an genau einer
+# anderen Ecke liegen, nicht verschwinden.
+
+def _ecken(probe):
+    return (probe["eckLO"], probe["eckRO"], probe["eckRU"], probe["eckLU"])
+
+
+def _punkt_links_oben(ox, oy, zoom, frame=4):
+    """Einen Punkt in die linke obere Ecke malen."""
+    return _zug(frame, [_mitte(ox, oy, zoom, 0, 0)] * 2)
+
+
+def _kleines_sprite(tmp_path):
+    """Ein NICHT quadratisches Sprite -- sonst faellt ein Groessentausch
+    gar nicht auf. Der Dialog wird durch feste Werte ersetzt."""
+    return {'INT(GUI_VALUE(spB))': "24", 'INT(GUI_VALUE(spH))': "12"}
+
+
+def test_drehen_tauscht_breite_und_hoehe(tmp_path):
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _knopf_klick(4, geo["drRX"], geo["drRY"], 62)
+    letzte = _lauf(tmp_path, 24, ev)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (geo["gh"], geo["gw"]), \
+        "Breite und Hoehe muessen tauschen"
+
+
+def test_die_rechtsdrehung_setzt_den_punkt_nach_rechts_oben(tmp_path):
+    """Die eigentliche Zusage: der Punkt geht nicht verloren. Mit
+    `IMAGE_ROTATE(bild, 90.0)` waere er weg -- genau dafuer gibt es
+    `IMAGE_ROTATE_CW` (siehe tests/test_image_rotate_exakt.py)."""
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    assert _ecken(vorher)[0] > 0, "der Punkt liegt erst einmal links oben"
+    ev += _knopf_klick(18, geo["drRX"], geo["drRY"], 62)
+    letzte = _lauf(tmp_path, 34, ev)[-1]
+    assert _ecken(letzte) == (0, vorher["eckLO"], 0, 0), \
+        "links oben -> rechts oben, und sonst nichts: %s" % (_ecken(letzte),)
+
+
+def test_die_linksdrehung_geht_in_die_andere_richtung(tmp_path):
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    ev += _knopf_klick(18, geo["drLX"], geo["drLY"], 62)
+    letzte = _lauf(tmp_path, 34, ev)[-1]
+    assert _ecken(letzte) == (0, 0, 0, vorher["eckLO"]), \
+        "links oben -> links unten: %s" % (_ecken(letzte),)
+
+
+def test_waagerecht_spiegeln_laesst_die_masse_stehen(tmp_path):
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    ev += _knopf_klick(18, geo["spXX"], geo["spXY"], 62)
+    letzte = _lauf(tmp_path, 34, ev)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (vorher["gw"], vorher["gh"])
+    assert _ecken(letzte) == (0, vorher["eckLO"], 0, 0), \
+        "links oben -> rechts oben: %s" % (_ecken(letzte),)
+
+
+def test_senkrecht_spiegeln_geht_nach_unten(tmp_path):
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    ev += _knopf_klick(18, geo["spYX"], geo["spYY"], 62)
+    letzte = _lauf(tmp_path, 34, ev)[-1]
+    assert _ecken(letzte) == (0, 0, 0, vorher["eckLO"]), \
+        "links oben -> links unten: %s" % (_ecken(letzte),)
+
+
+def test_zweimal_drehen_und_zurueck_gibt_das_bild_wieder(tmp_path):
+    """Vierteldrehungen sind verlustfrei -- rechts und wieder links muss
+    denselben Punkt an derselben Stelle ergeben."""
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    ev += _knopf_klick(18, geo["drRX"], geo["drRY"], 62)
+    ev += _knopf_klick(26, geo["drLX"], geo["drLY"], 62)
+    letzte = _lauf(tmp_path, 42, ev)[-1]
+    assert (letzte["gw"], letzte["gh"]) == (vorher["gw"], vorher["gh"])
+    assert _ecken(letzte) == _ecken(vorher), "der Punkt steht wieder links oben"
+    assert letzte["gemalt"] == vorher["gemalt"], "und es ist kein Punkt dazugekommen"
+
+
+def test_eine_wandlung_leert_den_verlauf(tmp_path):
+    """Ein aufgezeichneter Schritt haelt das Bild EINER Ebene. Nach einer
+    Wandlung ueber alle waere ein Rueckgaengig darauf halbseitig: es
+    spiegelte genau diese eine wieder zurueck, den Rest nicht -- und man
+    saehe es erst beim Umschalten der Ebene.
+    """
+    ox, oy, zoom = _geometrie(tmp_path)
+    geo = _lauf(tmp_path, 6)[-1]
+    ev = _punkt_links_oben(ox, oy, zoom)
+    vorher = _lauf(tmp_path, 16, ev)[-1]
+    assert vorher["uAnz"] > 0, "der Strich steht im Verlauf"
+    ev += _knopf_klick(18, geo["spXX"], geo["spXY"], 62)
+    letzte = _lauf(tmp_path, 34, ev)[-1]
+    assert letzte["uAnz"] == 0, "danach ist er leer"

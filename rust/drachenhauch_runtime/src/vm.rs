@@ -7517,6 +7517,8 @@ impl<'p> Vm<'p> {
             "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
             "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
+            "image_rotate_cw" => Value::Int(g!().image_rotate_cw(gi(a,0,"IMAGE_ROTATE_CW")?)?),
+            "image_rotate_ccw" => Value::Int(g!().image_rotate_ccw(gi(a,0,"IMAGE_ROTATE_CCW")?)?),
             "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
             "image_copy" => Value::Int(g!().image_copy(gi(a,0,"IMAGE_COPY")?)?),

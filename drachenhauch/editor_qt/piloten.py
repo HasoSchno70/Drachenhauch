@@ -31,8 +31,8 @@ PILOTEN: list[dict] = [
      "qt": 2428, "dh": 1536,
      "kurz": "sechs Werkzeuge, Auswahl mit Zwischenablage, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, Kachel-Eigenschaften, Tiled-JSON, GB-Code-Ausgabe"},
     {"datei": "189_sprite_editor.dh", "titel": "Sprite-Editor",
-     "qt": 7379, "dh": 2604,
-     "kurz": "zwoelf Werkzeuge (mit Lasso, Zauberstab und Verschieben), Ebenen, benannte Einzelbilder, Kachel-Ansicht, Statistik, eigenes Format mit Ebenen, Streifen, Atlas, bewegtes GIF, .gpl-Paletten, Zuschneiden, Animationsbereiche, GB-Code und .dhanim"},
+     "qt": 7379, "dh": 2696,
+     "kurz": "zwoelf Werkzeuge (mit Lasso, Zauberstab und Verschieben), Ebenen, benannte Einzelbilder, Kachel-Ansicht, Statistik, eigenes Format mit Ebenen, Streifen, Atlas, bewegtes GIF, .gpl-Paletten, Zuschneiden, Spiegeln und Vierteldrehen, Animationsbereiche, GB-Code und .dhanim"},
 ]
 
 

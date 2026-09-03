@@ -3048,6 +3048,28 @@ impl Graphics {
         img.rotate(degrees as i32);
         self.push_tex_from_image(img)
     }
+    /// IMAGE_ROTATE_CW / IMAGE_ROTATE_CCW: EXAKTE Vierteldrehung.
+    ///
+    /// `IMAGE_ROTATE` rechnet trigonometrisch und tastet dabei neu ab -- fuer
+    /// Pixelgrafik ist das falsch, und zwar auch bei 90 Grad: gemessen an
+    /// einem 16x16-Bild mit vier Eckpunkten verschwinden nach
+    /// `IMAGE_ROTATE(b, 90.0)` ALLE vier, und selbst die einfarbige Flaeche
+    /// kommt verwaschen zurueck (0x141414 -> 0x131413). Dieselbe Falle wie
+    /// `IMAGE_SCALE` gegen `IMAGE_SCALE_NN`, nur faellt sie hier noch mehr
+    /// auf, weil eine Vierteldrehung eigentlich verlustfrei ist.
+    ///
+    /// raylib hat dafuer eigene Funktionen (`ImageRotateCW`/`CCW`), die die
+    /// Punkte nur UMSORTIEREN. Breite und Hoehe tauschen dabei.
+    pub fn image_rotate_cw(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ROTATE_CW")?;
+        img.rotate_cw();
+        self.push_tex_from_image(img)
+    }
+    pub fn image_rotate_ccw(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ROTATE_CCW")?;
+        img.rotate_ccw();
+        self.push_tex_from_image(img)
+    }
     pub fn image_flip(&mut self, idx: i64, fx: bool, fy: bool) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_FLIP")?;
         if fx { img.flip_horizontal(); }

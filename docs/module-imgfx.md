@@ -12,7 +12,9 @@ IMPORT "imgfx"
 |---|---|
 | `IMAGE_SCALE(img, w, h)` | IMAGE (neu, in `w × h`) — **bilinear geglättet** |
 | `IMAGE_SCALE_NN(img, w, h)` | IMAGE (neu, in `w × h`) — **ohne Interpolation** (Nearest-Neighbour), für Pixelgrafik |
-| `IMAGE_ROTATE(img, grad)` | IMAGE (neu, Bounding-Box wächst ggf.) |
+| `IMAGE_ROTATE(img, grad)` | IMAGE (neu, Bounding-Box wächst ggf.) — **tastet neu ab**, siehe unten |
+| `IMAGE_ROTATE_CW(img)` | IMAGE (neu, um 90° im Uhrzeigersinn) — **exakt**, `w × h` → `h × w` |
+| `IMAGE_ROTATE_CCW(img)` | IMAGE (neu, um 90° gegen den Uhrzeigersinn) — **exakt** |
 | `IMAGE_FLIP(img, flipX, flipY)` | IMAGE (neu, gespiegelt) |
 | `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
 | `IMAGE_COPY(img)` | IMAGE (tiefer Klon) |
@@ -244,6 +246,25 @@ DIM r45 AS IMAGE
 r45 = IMAGE_ROTATE(hero, 45.0)               ' jetzt 22x22
 DIM r90 AS IMAGE
 r90 = IMAGE_ROTATE(hero, 90.0)               ' wieder 16x16
+```
+
+> **`IMAGE_ROTATE` ist für Pixelgrafik nicht zu gebrauchen — auch nicht bei
+> 90°.** Sie rechnet trigonometrisch und tastet dabei neu ab. Gemessen an
+> einem 16×16-Bild mit vier verschiedenfarbigen Eckpunkten: nach
+> `IMAGE_ROTATE(b, 90.0)` sind **alle vier verschwunden**, und selbst die
+> einfarbige Fläche kommt verwaschen zurück (`0x141414` → `0x131413`).
+>
+> Für Vierteldrehungen deshalb `IMAGE_ROTATE_CW` / `IMAGE_ROTATE_CCW`: die
+> sortieren die Punkte nur um, verlieren also nichts und erfinden nichts.
+> Breite und Höhe tauschen dabei — aus 16×32 wird 32×16. Dieselbe
+> Unterscheidung wie `IMAGE_SCALE` gegen `IMAGE_SCALE_NN`; sie fällt hier nur
+> stärker auf, weil eine Vierteldrehung eigentlich verlustfrei ist.
+
+```basic
+' Exakt -- fuer Sprites die einzige brauchbare Drehung:
+DIM rechts AS IMAGE : rechts = IMAGE_ROTATE_CW(hero)     ' 16x32 -> 32x16
+DIM links AS IMAGE  : links  = IMAGE_ROTATE_CCW(hero)
+' Zweimal CW ist eine halbe Drehung, dreimal ist CCW.
 ```
 
 **TINT als RGB-Multiplikation:** `IMAGE_TINT(img, color)` multipliziert jeden Pixel mit `color`/255 pro Kanal:
