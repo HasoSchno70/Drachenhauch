@@ -36,6 +36,8 @@ const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
 const K_X: i64 = 120;
+const K_Y: i64 = 121;
+const K_Z: i64 = 122;
 
 // Tabellen-Layout (analog zum Immediate-Mode-UI_TABLE).
 const TBL_HEADER_H: i32 = 22;
@@ -312,6 +314,21 @@ impl CellKind {
 /// Ausrichtung: 0 links, 1 mitte, 2 rechts. Eigener Wert je Zelle mit -1 =
 /// "nimm die Spalte" -- so setzt man eine Zahlenspalte EINMAL rechtsbuendig,
 /// kann aber einzelne Zellen ausscheren lassen.
+/// Zahlenfilter des Textfelds: 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl
+/// (Punkt ODER Komma, hoechstens eines). Zwischenstaende wie "" und "-" sind
+/// erlaubt -- sonst liesse sich eine negative Zahl gar nicht tippen.
+fn zahl_erlaubt(text: &str, zahlen: u8) -> bool {
+    if zahlen == 0 { return true; }
+    let mut trenner = 0;
+    for (i, ch) in text.chars().enumerate() {
+        if ch.is_ascii_digit() { continue; }
+        if ch == '-' && i == 0 { continue; }
+        if zahlen == 2 && (ch == '.' || ch == ',') { trenner += 1; if trenner > 1 { return false; } continue; }
+        return false;
+    }
+    true
+}
+
 fn parse_align(s: &str) -> Option<i8> {
     Some(match s.to_lowercase().as_str() {
         "links" | "left" => 0,
@@ -756,6 +773,26 @@ pub struct Widget {
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
     wochenbeginn: i32,
+    // Ausrichtung des Textes: -1 = Vorgabe der Art (Beschriftung und Textfeld
+    // links, Knopf mittig), 0 links, 1 mitte, 2 rechts.
+    align: i8,
+    // Nur Label: bei `w` an Wortgrenzen umbrechen; die Hoehe folgt dem Text.
+    wrap: bool,
+    // Nur TextInput: Punkte statt Zeichen, kein Schreiben, Hoechstlaenge
+    // (0 = frei), Zahlenfilter (0 frei, 1 ganze Zahl, 2 Kommazahl).
+    passwort: bool,
+    nur_lesen: bool,
+    maxlaenge: i32,
+    zahlen: u8,
+    // Enter im Textfeld -- GENAU EIN BILD lang, wie `clicked`.
+    entered: bool,
+    on_enter: Option<Rueckruf>,
+    // Rueckgaengig beim Tippen (Textfeld und Textbereich): der Stand VOR einer
+    // Aenderung samt Schreibmarke. Anschlaege innerhalb von 0,8 s sind EIN
+    // Schritt -- sonst naehme Strg+Z ein Zeichen statt eines Wortes zurueck.
+    undo: Vec<(String, i32)>,
+    redo: Vec<(String, i32)>,
+    undo_zeit: f64,
 }
 
 pub struct Window {
@@ -790,6 +827,11 @@ pub struct Window {
     // (oder tab_page == -1 = immer sichtbar) werden gezeigt/bedient.
     tabs: Vec<String>,
     active_tab: i32,
+    // Standard-Knopf (Enter) und Abbrechen-Knopf (ESC) -- Widget-Index im
+    // Fenster oder -1. Was jedes Formular braucht und was sonst jedes
+    // Programm selbst mit KEYHIT nachbaute, ohne den Fokus zu beachten.
+    default_btn: i32,
+    cancel_btn: i32,
 }
 
 struct Menu {
@@ -1056,6 +1098,7 @@ impl Gui {
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
             tabs: Vec::new(), active_tab: 0,
+            default_btn: -1, cancel_btn: -1,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -1412,6 +1455,8 @@ impl Gui {
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
+            align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0,
+            entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
         }
     }
 
@@ -2810,6 +2855,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // den neuen nach den Positionen des alten -- besser sichtbar farblos
         // als sichtbar falsch.
         w.spans.clear();
+        // Der Verlauf gehoerte zum alten Text -- ein Strg+Z danach brachte
+        // sonst etwas zurueck, das der Nutzer nie getippt hat.
+        w.undo.clear(); w.redo.clear();
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
@@ -3161,6 +3209,198 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// zurueckgerechnet: eine `.dhform` beschreibt das Layout, nicht die
     /// Anzeige. Sonst waere jede bei Massstab 2 gespeicherte Datei beim
     /// naechsten Laden doppelt so gross -- und wieder, und wieder.
+    // ---- Text und Formular (Punkt 1 des gui-Ausbaus, 2026-09-04) ----------
+
+    /// GUI_SET_ALIGN(wdg, "links"|"mitte"|"rechts") -- Beschriftung, Knopf,
+    /// Textfeld. Gilt innerhalb der Breite des Widgets.
+    pub fn set_align(&mut self, h: i64, wie: &str) -> Result<(), String> {
+        let a = parse_align(wie).ok_or_else(|| format!(
+            "GUI_SET_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
+        let w = self.wdg_mut(h, "GUI_SET_ALIGN")?;
+        if !matches!(w.kind, Kind::Label | Kind::Button | Kind::TextInput) {
+            return Err("GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung".into());
+        }
+        w.align = a;
+        Ok(())
+    }
+
+    /// GUI_SET_WRAP(label, breite) -- bei `breite` Pixeln an Wortgrenzen
+    /// umbrechen (0 = aus). Die Hoehe folgt dem Text (siehe umbruch_layout);
+    /// GUI_GET_H liefert sie ab dem naechsten GUI_UPDATE.
+    pub fn set_wrap(&mut self, h: i64, breite: i32) -> Result<(), String> {
+        if breite < 0 { return Err("GUI_SET_WRAP: breite muss >= 0 sein (0 = aus)".into()); }
+        let breite = self.sk(breite);
+        let w = self.wdg_mut(h, "GUI_SET_WRAP")?;
+        if w.kind != Kind::Label {
+            return Err("GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen".into());
+        }
+        w.wrap = breite > 0;
+        if breite > 0 { w.w = breite; w.bw = breite; }
+        Ok(())
+    }
+
+    /// GUI_TEXTINPUT_SET(tf, key$, wert) -- `passwort`, `nur_lesen`,
+    /// `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl). EIN Setter
+    /// statt vier Builtins, wie bei GUI_TEXTAREA_SET und GUI_TABLE_SET.
+    pub fn textinput_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_TEXTINPUT_SET")?;
+        if w.kind != Kind::TextInput {
+            return Err("GUI_TEXTINPUT_SET: das Widget ist kein GUI_TEXTINPUT".into());
+        }
+        match key.to_lowercase().as_str() {
+            "passwort" | "password" => w.passwort = wert != 0.0,
+            "nur_lesen" | "readonly" => w.nur_lesen = wert != 0.0,
+            "maxlaenge" | "maxlen" => {
+                if wert < 0.0 { return Err("GUI_TEXTINPUT_SET: maxlaenge muss >= 0 sein (0 = frei)".into()); }
+                w.maxlaenge = wert as i32;
+            }
+            "zahlen" | "numeric" => {
+                if !(0.0..=2.0).contains(&wert) {
+                    return Err("GUI_TEXTINPUT_SET: zahlen ist 0 (frei), 1 (ganze Zahl) oder 2 (Kommazahl)".into());
+                }
+                w.zahlen = wert as u8;
+            }
+            _ => return Err(format!(
+                "GUI_TEXTINPUT_SET: unbekannter Schluessel '{}' -- passwort, nur_lesen, maxlaenge, zahlen", key)),
+        }
+        Ok(())
+    }
+
+    /// GUI_ENTERED(tf) -- wurde in DIESEM Bild Enter im Textfeld gedrueckt?
+    pub fn entered(&self, h: i64) -> Result<bool, String> {
+        Ok(self.wdg(h, "GUI_ENTERED")?.entered)
+    }
+
+    /// GUI_ON_ENTER(tf, handler) -- Rueckruf statt Abfrage.
+    pub fn on_enter(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_ON_ENTER")?;
+        if w.kind != Kind::TextInput {
+            return Err("GUI_ON_ENTER: nur ein Textfeld (GUI_TEXTINPUT) meldet Enter".into());
+        }
+        w.on_enter = func;
+        Ok(())
+    }
+
+    /// GUI_WINDOW_DEFAULT(win, knopf) / GUI_WINDOW_CANCEL(win, knopf) -- der
+    /// Knopf, den Enter bzw. ESC im Fenster ausloest (-1 = keiner). Nur ein
+    /// Knopf desselben Fensters kommt in Frage.
+    pub fn window_default(&mut self, win: i64, knopf: i64, abbruch: bool) -> Result<(), String> {
+        let fn_ = if abbruch { "GUI_WINDOW_CANCEL" } else { "GUI_WINDOW_DEFAULT" };
+        let wi = win as usize;
+        if win < 0 || wi >= self.windows.len() || !self.windows[wi].alive {
+            return Err(format!("{}: ungueltiges Fenster-Handle {}", fn_, win));
+        }
+        let idx = if knopf < 0 { -1 } else {
+            let (kwi, ki) = Self::dec_widget(knopf);
+            if kwi != wi {
+                return Err(format!("{}: der Knopf gehoert zu einem anderen Fenster", fn_));
+            }
+            let w = self.windows[wi].widgets.get(ki).filter(|w| w.alive)
+                .ok_or_else(|| format!("{}: ungueltiges Widget-Handle {}", fn_, knopf))?;
+            if w.kind != Kind::Button {
+                return Err(format!("{}: nur ein Knopf (GUI_BUTTON) kann Standard- oder Abbrechen-Knopf sein", fn_));
+            }
+            ki as i32
+        };
+        if abbruch { self.windows[wi].cancel_btn = idx; } else { self.windows[wi].default_btn = idx; }
+        Ok(())
+    }
+
+    /// Einen Knopf per Taste ausloesen -- wie ein Klick, mit denselben
+    /// Bedingungen (lebendig, sichtbar, bedienbar).
+    fn knopf_ausloesen(&mut self, wi: usize, idx: i32) {
+        if idx < 0 { return; }
+        let i = idx as usize;
+        let ok = match self.windows[wi].widgets.get(i) {
+            Some(w) => w.alive && w.enabled && w.kind == Kind::Button && self.widget_shown(wi, w),
+            None => false,
+        };
+        if !ok { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        w.clicked = true;
+        let f = w.on_click.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+
+    /// Umbrechende Beschriftungen: die Hoehe folgt dem Text. Laeuft in
+    /// GUI_UPDATE, weil nur dort Graphics (zum Messen) UND Schreibzugriff
+    /// zusammenkommen -- das Zeichnen ist `&self`.
+    fn umbruch_layout(&mut self, g: &Graphics) {
+        let mut neu: Vec<(usize, usize, i32)> = Vec::new();
+        for wi in 0..self.windows.len() {
+            if !self.windows[wi].alive { continue; }
+            for i in 0..self.windows[wi].widgets.len() {
+                let w = &self.windows[wi].widgets[i];
+                if !w.alive || w.kind != Kind::Label || !w.wrap { continue; }
+                let n = self.umbrechen(g, w, &w.text, w.w).len().max(1) as i32;
+                let h = n * (self.wsize(g, w) + self.sk(4));
+                if h != w.h { neu.push((wi, i, h)); }
+            }
+        }
+        for (wi, i, h) in neu {
+            let w = &mut self.windows[wi].widgets[i];
+            w.h = h; w.bh = h;
+        }
+    }
+
+    /// Text an Wortgrenzen auf `breite` Pixel umbrechen. Ein Wort, das allein
+    /// nicht in eine Zeile passt, wird an der Zeichengrenze geteilt; `\n`
+    /// bleibt ein Umbruch. Gemessen wird mit der Schrift des Widgets.
+    fn umbrechen(&self, g: &Graphics, w: &Widget, text: &str, breite: i32) -> Vec<String> {
+        let mut zeilen: Vec<String> = Vec::new();
+        for absatz in text.split('\n') {
+            let mut zeile = String::new();
+            for wort in absatz.split(' ') {
+                let mut rest = wort.to_string();
+                loop {
+                    let probe = if zeile.is_empty() { rest.clone() } else { format!("{} {}", zeile, rest) };
+                    if self.wtext_width(g, w, &probe) <= breite { zeile = probe; break; }
+                    if !zeile.is_empty() { zeilen.push(std::mem::take(&mut zeile)); continue; }
+                    // Leere Zeile und das Wort ist trotzdem zu breit: so viele
+                    // Zeichen, wie passen -- mindestens eines, sonst dreht es sich.
+                    let mut teil = String::new();
+                    let mut n = 0usize;
+                    for ch in rest.chars() {
+                        let p2 = format!("{}{}", teil, ch);
+                        if n > 0 && self.wtext_width(g, w, &p2) > breite { break; }
+                        teil = p2; n += 1;
+                    }
+                    zeilen.push(teil);
+                    rest = rest.chars().skip(n).collect();
+                    if rest.is_empty() { break; }
+                }
+            }
+            zeilen.push(zeile);
+        }
+        zeilen
+    }
+
+    /// Stand VOR einer Aenderung merken. Anschlaege innerhalb von 0,8 s
+    /// bilden EINEN Schritt.
+    fn undo_merken(w: &mut Widget, before: &str, caret: i32, jetzt: f64) {
+        if w.undo.is_empty() || jetzt - w.undo_zeit > 0.8 {
+            w.undo.push((before.to_string(), caret));
+            if w.undo.len() > 100 { w.undo.remove(0); }
+        }
+        w.undo_zeit = jetzt;
+        w.redo.clear();
+    }
+
+    /// Strg+Z / Strg+Y im Textfeld oder Textbereich.
+    fn text_undo(&mut self, wi: usize, i: usize, wieder: bool) {
+        let w = &mut self.windows[wi].widgets[i];
+        let stand = if wieder { w.redo.pop() } else { w.undo.pop() };
+        let Some((t, c)) = stand else { return; };
+        let jetzt_stand = (w.text.clone(), w.caret);
+        if wieder { w.undo.push(jetzt_stand); } else { w.redo.push(jetzt_stand); }
+        let n = t.chars().count() as i32;
+        w.text = t;
+        w.caret = c.clamp(0, n); w.sel_anchor = w.caret;
+        w.undo_zeit = -10.0;      // die naechste Eingabe ist ein neuer Schritt
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+
     fn widget_json(&self, w: &Widget) -> serde_json::Value {
         let mut o = serde_json::json!({
             "kind": w.kind.as_str(),
@@ -3207,6 +3447,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
         }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
+        if w.align >= 0 {
+            o["align"] = serde_json::json!(match w.align { 1 => "mitte", 2 => "rechts", _ => "links" });
+        }
+        if w.wrap { o["wrap"] = serde_json::json!(true); }
+        if w.passwort { o["passwort"] = serde_json::json!(true); }
+        if w.nur_lesen { o["nur_lesen"] = serde_json::json!(true); }
+        if w.maxlaenge > 0 { o["maxlaenge"] = serde_json::json!(w.maxlaenge); }
+        if w.zahlen != 0 { o["zahlen"] = serde_json::json!(w.zahlen); }
+        // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
+        // nach dem Laden weg.
+        if !w.tooltip.is_empty() { o["tooltip"] = serde_json::json!(w.tooltip); }
+        if let Some(f) = &w.on_enter {
+            if !f.ist_gebunden() { o["on_enter"] = serde_json::json!(&*f.name); }
+        }
         if let Some(t) = &w.tbl {
             // Eine schlichte Textzelle wird als STRING geschrieben, nur eine
             // mit eigener Farbe/Art/Bild als Objekt. Damit bleibt das
@@ -3308,6 +3562,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.enabled = wj["enabled"].as_bool().unwrap_or(true);
         w.font = wj["font"].as_i64().unwrap_or(-1);
         w.font_size = wj["font_size"].as_i64().unwrap_or(0) as i32;
+        if let Some(a) = wj["align"].as_str() { if let Some(v) = parse_align(a) { w.align = v; } }
+        w.wrap = wj["wrap"].as_bool().unwrap_or(false);
+        w.passwort = wj["passwort"].as_bool().unwrap_or(false);
+        w.nur_lesen = wj["nur_lesen"].as_bool().unwrap_or(false);
+        w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
+        w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
+        w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
+        w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
         // Farbe als "#RRGGBB" -- lesbar in der Datei und nicht als Zahl, die
         // niemand entziffert. Unlesbares wird still uebergangen: eine von Hand
         // bearbeitete Form soll nicht am Farbfeld scheitern.
@@ -3448,6 +3710,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             "max_w": self.unsk(win.max_w), "max_h": self.unsk(win.max_h),
             "widgets": widgets,
             "menus": menus, "tabs": win.tabs, "active_tab": win.active_tab,
+            "default_button": win.default_btn, "cancel_button": win.cancel_btn,
         });
         serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
     }
@@ -3501,6 +3764,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             self.windows[wi].tabs = ts.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
         }
         self.windows[wi].active_tab = v["active_tab"].as_i64().unwrap_or(0) as i32;
+        let n = self.windows[wi].widgets.len() as i64;
+        let knopf = |k: &str| -> i32 {
+            let i = v[k].as_i64().unwrap_or(-1);
+            if i >= 0 && i < n { i as i32 } else { -1 }
+        };
+        self.windows[wi].default_btn = knopf("default_button");
+        self.windows[wi].cancel_btn = knopf("cancel_button");
         Ok(h)
     }
 
@@ -3922,7 +4192,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         for win in self.windows.iter_mut() {
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
-                wdg.clicked = false; wdg.hovered = false;
+                wdg.clicked = false; wdg.hovered = false; wdg.entered = false;
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
             }
@@ -3930,6 +4200,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 for it in m.items.iter_mut() { it.clicked = false; }
             }
         }
+        self.umbruch_layout(g);
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -4257,6 +4528,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        // Standard- und Abbrechen-Knopf: Enter loest den einen aus, ESC den
+        // anderen -- aber nur, wenn die Taste nicht schon einem Widget gehoert.
+        // Ein Knopf oder Kaestchen mit Fokus nimmt Enter selbst (widget_keys),
+        // ein Textbereich macht daraus einen Umbruch, eine Zelle in
+        // Bearbeitung ihr Ende. Aus einem Textfeld heraus ist Enter dagegen
+        // genau das: das Formular abschicken.
+        if let Some(top) = self.focus_window {
+            if top < self.windows.len() && self.windows[top].alive && self.windows[top].visible
+                && self.modal.map_or(true, |m| m == top) && self.editing_table.is_none() {
+                let fok = self.focus_widget.filter(|(w, _)| *w == top)
+                    .and_then(|(_, i)| self.windows[top].widgets.get(i).map(|w| w.kind));
+                let enter_frei = matches!(fok, None | Some(Kind::TextInput));
+                if enter_frei && g.key_pressed(KEY_ENTER) {
+                    let k = self.windows[top].default_btn;
+                    self.knopf_ausloesen(top, k);
+                }
+                if g.key_pressed(KEY_ESC) && self.open_dropdown.is_none() {
+                    let k = self.windows[top].cancel_btn;
+                    self.knopf_ausloesen(top, k);
+                }
+            }
+        }
         self.dialog_auswerten();
         self.was_mouse_down = is_down;
         self.was_right_down = right_down;
@@ -4404,18 +4697,35 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let ms = self.mass(g, &self.windows[wi].widgets[i]);
         let before = self.windows[wi].widgets[i].text.clone();
         let (ax, _ay, fw, _fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (nur_lesen, maxl, zahlen, passwort) = {
+            let w = &self.windows[wi].widgets[i];
+            (w.nur_lesen, w.maxlaenge, w.zahlen, w.passwort)
+        };
         let mut chars: Vec<char> = before.chars().collect();
         let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
         let mut anchor = self.windows[wi].widgets[i].sel_anchor.clamp(0, chars.len() as i32);
+        let (caret0, anchor0) = (caret, anchor);
         let scroll = self.windows[wi].widgets[i].scroll;
         let shift = g.key_shift();
         let ctrl = g.key_ctrl();
+
+        // Rueckgaengig/Wiederholen vor allem anderen -- der Schritt ersetzt
+        // die Eingabe dieses Bildes.
+        if ctrl && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
+            if !nur_lesen { self.text_undo(wi, i, g.key_pressed(K_Y) || shift); }
+            return;
+        }
+        // Passwortpunkte sind anders breit als die Zeichen -- Treffertest
+        // und Rollen rechnen mit dem, was zu SEHEN ist.
+        let sichtbar = |cs: &[char]| -> Vec<char> {
+            if passwort { vec!['\u{2022}'; cs.len()] } else { cs.to_vec() }
+        };
 
         // --- Maus: Klick setzt Caret (rising edge), Ziehen erweitert Selektion ---
         if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let target = mx - (ax + 5) + scroll;
-            let idx = Self::caret_index_at(g, &chars, target, ms);
+            let idx = Self::caret_index_at(g, &sichtbar(&chars), target, ms);
             if !self.was_mouse_down {
                 let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
                 if Self::in_rect(mx, my, r) { caret = idx; anchor = idx; }
@@ -4425,9 +4735,31 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
 
         Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
+        let enter = g.key_pressed(KEY_ENTER);
+
+        // --- Grenzen des Feldes ---
+        // Ein gesperrtes Feld nimmt nichts an (Schreibmarke und Kopieren
+        // gehen weiter), eine Hoechstlaenge schneidet ab -- auch beim
+        // Einfuegen --, der Zahlenfilter lehnt den ganzen Schritt ab.
+        let mut neu: String = chars.iter().collect();
+        if neu != before {
+            let mut zurueck = nur_lesen;
+            if !zurueck && maxl > 0 && chars.len() as i32 > maxl {
+                chars.truncate(maxl as usize);
+                neu = chars.iter().collect();
+                caret = caret.min(maxl); anchor = anchor.min(maxl);
+            }
+            if !zurueck && !zahl_erlaubt(&neu, zahlen) { zurueck = true; }
+            if zurueck {
+                chars = before.chars().collect();
+                neu = before.clone();
+                caret = caret0.min(chars.len() as i32); anchor = anchor0.min(chars.len() as i32);
+            }
+        }
 
         // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
-        let caret_px = ms.breite(g, &chars[..caret as usize].iter().collect::<String>());
+        let vor = sichtbar(&chars[..caret as usize]);
+        let caret_px = ms.breite(g, &vor.iter().collect::<String>());
         let inner = (fw - 10).max(1);
         let mut scroll = scroll;
         if caret_px - scroll > inner { scroll = caret_px - inner; }
@@ -4435,12 +4767,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if scroll < 0 { scroll = 0; }
 
         // --- Zurueckschreiben ---
-        let new_text: String = chars.iter().collect();
+        let geaendert = neu != before;
+        let jetzt = g.get_time();
         let w = &mut self.windows[wi].widgets[i];
-        w.text = new_text;
+        if geaendert { Self::undo_merken(w, &before, caret0, jetzt); }
+        w.text = neu;
         w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
-        if w.text != before {
+        if geaendert {
             if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+        }
+        if enter {
+            let w = &mut self.windows[wi].widgets[i];
+            w.entered = true;
+            let f = w.on_enter.clone();
+            if let Some(f) = f { self.pending.push(f); }
         }
     }
 
@@ -4575,8 +4915,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let mut chars: Vec<char> = before.chars().collect();
         let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
         let mut anchor = self.windows[wi].widgets[i].sel_anchor.clamp(0, chars.len() as i32);
+        let caret0 = caret;
         let ctrl = g.key_ctrl();
         let shift = g.key_shift();
+        if ctrl && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
+            self.text_undo(wi, i, g.key_pressed(K_Y) || shift);
+            return;
+        }
         let pad = 5;
         let lh = self.ta_line_h(g);
         let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
@@ -4732,7 +5077,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         sx = sx.max(0);
 
         let new_text: String = chars.iter().collect();
+        let jetzt = g.get_time();
         let w = &mut self.windows[wi].widgets[i];
+        if new_text != before { Self::undo_merken(w, &before, caret0, jetzt); }
         w.text = new_text; w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
         w.scroll_x = sx;
         if w.text != before {
@@ -5629,7 +5976,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let eigen = if wdg.color < 0 { self.th("text_fg") } else { wdg.color };
                 let fg = if !wdg.enabled { self.th("muted_fg") }
                          else { wdg.ov.get("fg").copied().unwrap_or(eigen) };
-                self.wtext(g, wdg, ax, ay, wdg.text.clone(), fg);
+                // Zeilen einzeln: so gilt die Ausrichtung je Zeile, und ein
+                // umbrechendes Label zeichnet genau das, was umbruch_layout
+                // gemessen hat.
+                let zeilen: Vec<String> = if wdg.wrap { self.umbrechen(g, wdg, &wdg.text, w) }
+                                          else { wdg.text.split('\n').map(str::to_string).collect() };
+                let lh = self.wsize(g, wdg) + self.sk(4);
+                for (k, z) in zeilen.iter().enumerate() {
+                    let x = match wdg.align {
+                        1 => ax + (w - self.wtext_width(g, wdg, z)) / 2,
+                        2 => ax + w - self.wtext_width(g, wdg, z),
+                        _ => ax,
+                    };
+                    self.wtext(g, wdg, x, ay + k as i32 * lh, z.clone(), fg);
+                }
             }
             Kind::Panel => {
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
@@ -5670,7 +6030,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 } else {
                     let mut bg = self.wcol(wdg, "bg", "widget_bg");
                     if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
-                    self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
+                    // Der Standard-Knopf traegt den Akzent als Rahmen -- man
+                    // soll sehen, was Enter tun wird.
+                    let rahmen = if self.windows[wi].default_btn == idx as i32 {
+                        self.wcol(wdg, "accent", "accent")
+                    } else { self.wcol(wdg, "border", "widget_border") };
+                    self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, rahmen);
                 }
                 // Icon + optionaler Text.
                 let isz = if has_icon {
@@ -5690,6 +6055,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let links = if has_icon { pad + isz + 4 } else { pad };
                     let frei = (w - links - pad).max(0);
                     let (versatz, beschnitten) = knopf_text_x(frei, tw);
+                    let versatz = match wdg.align {
+                        0 if !beschnitten => 0,
+                        2 if !beschnitten => frei - tw,
+                        _ => versatz,
+                    };
                     let tx = ax + links + versatz;
                     let ty = ay + (h - sz) / 2;
                     if beschnitten {
@@ -5809,9 +6179,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
-                let tx = ax + 5;
+                // Im Passwortmodus stehen Punkte -- gemessen wird dann auch an
+                // den Punkten, sonst saesse die Schreibmarke neben dem Text.
+                let anzeige: String = if wdg.passwort {
+                    "\u{2022}".repeat(wdg.text.chars().count())
+                } else { wdg.text.clone() };
                 let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
-                let scroll = wdg.scroll;
+                let inner = (w - 10).max(1);
+                let tw = self.wtext_width(g, wdg, &anzeige);
+                // Ausrichtung nur, solange der Text hineinpasst -- sonst gilt
+                // links mit Rollen, damit die Schreibmarke sichtbar bleibt.
+                let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
+                    (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
+                } else { (ax + 5, wdg.scroll) };
                 // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
                 g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
                 if wdg.text.is_empty() {
@@ -5819,7 +6199,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.th("muted_fg"));
                     }
                 } else {
-                    let chars: Vec<char> = wdg.text.chars().collect();
+                    let chars: Vec<char> = anzeige.chars().collect();
                     // Selektion-Highlight (halbtransparenter Akzent hinter dem Text).
                     if focused {
                         let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
@@ -5830,11 +6210,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
                         }
                     }
-                    self.wtext(g, wdg, tx - scroll, ty, wdg.text.clone(), fg);
+                    self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
                 }
                 // Caret (blinkend) an der gemessenen Position.
                 if focused && self.caret_blink_on() {
-                    let pre: String = wdg.text.chars().take(wdg.caret.max(0) as usize).collect();
+                    let pre: String = anzeige.chars().take(wdg.caret.max(0) as usize).collect();
                     let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
@@ -6685,6 +7065,34 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                            cell.text.clone(), fgc);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod zahlenfilter_tests {
+    use super::zahl_erlaubt;
+
+    #[test]
+    fn frei_nimmt_alles() { assert!(zahl_erlaubt("ab-1.2x", 0)); }
+
+    #[test]
+    fn ganze_zahl() {
+        assert!(zahl_erlaubt("", 1));
+        assert!(zahl_erlaubt("-", 1), "Zwischenstand beim Tippen einer negativen Zahl");
+        assert!(zahl_erlaubt("-42", 1));
+        assert!(!zahl_erlaubt("4-2", 1));
+        assert!(!zahl_erlaubt("4.2", 1));
+        assert!(!zahl_erlaubt("12a", 1));
+    }
+
+    #[test]
+    fn kommazahl() {
+        assert!(zahl_erlaubt("3.14", 2));
+        assert!(zahl_erlaubt("3,14", 2), "deutsche Tastatur, deutsches Komma");
+        assert!(zahl_erlaubt("-0.5", 2));
+        assert!(!zahl_erlaubt("3.1.4", 2));
+        assert!(!zahl_erlaubt("3,1.4", 2));
+        assert!(!zahl_erlaubt("x", 2));
     }
 }
 

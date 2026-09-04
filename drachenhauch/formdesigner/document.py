@@ -65,6 +65,7 @@ EVENTS: dict = {
     "on_leave":  "Leave",
     "on_focus":  "Focus",
     "on_blur":   "Blur",
+    "on_enter":  "Enter",
 }
 
 # Zeigen/Verlassen kann jedes anklickbare Control; Fokus bekommt seit
@@ -94,7 +95,7 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("checkbox",  "Checkbox",      16, 16, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
     PaletteSpec("radio",     "RadioButton",   16, 16, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
     PaletteSpec("slider",    "Slider",       160, 14, ("on_change",) + _ZEIGEN + _FOKUS),
-    PaletteSpec("textinput", "TextInput",    180, 26, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("textinput", "TextInput",    180, 26, ("on_change", "on_enter") + _ZEIGEN + _FOKUS),
     PaletteSpec("dropdown",  "Dropdown",     160, 24, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
     PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
     PaletteSpec("progress",  "ProgressBar",  180, 18, _ZEIGEN),
@@ -387,6 +388,17 @@ class Control:
     on_leave: str = ""
     on_focus: str = ""
     on_blur: str = ""
+    on_enter: str = ""
+    # Text und Formular (gui-Ausbau Punkt 1): Ausrichtung ("" = Vorgabe der
+    # Art), Umbruch (Label), Passwort/Nur-Lesen/Hoechstlaenge/Zahlenfilter
+    # (TextInput) -- dieselben Schluessel wie `gui.rs::widget_json`.
+    align: str = ""
+    wrap: bool = False
+    passwort: bool = False
+    nur_lesen: bool = False
+    maxlaenge: int = 0
+    zahlen: int = 0
+    tooltip: str = ""
     ov: dict = field(default_factory=dict)   # Farb-Overrides: bg/fg/border/accent -> int
     # Laufzeit-Felder, die der Designer (noch) nicht darstellt -- z.B. `table`,
     # `tree`, `tab_page`, `font`. Sie werden unveraendert durchgereicht, damit
@@ -399,6 +411,7 @@ class Control:
         "kind", "name", "x", "y", "w", "h", "text", "color", "value", "min",
         "max", "checked", "placeholder", "group", "items", "sel", "enabled",
         "visible", "font_size", "anchor", "ov",
+        "align", "wrap", "passwort", "nur_lesen", "maxlaenge", "zahlen", "tooltip",
         *EVENTS,
     ))
 
@@ -432,6 +445,20 @@ class Control:
             d["font_size"] = self.font_size
         if self.anchor and self.anchor != "lt":
             d["anchor"] = self.anchor
+        if self.align:
+            d["align"] = self.align
+        if self.wrap:
+            d["wrap"] = True
+        if self.passwort:
+            d["passwort"] = True
+        if self.nur_lesen:
+            d["nur_lesen"] = True
+        if self.maxlaenge > 0:
+            d["maxlaenge"] = self.maxlaenge
+        if self.zahlen:
+            d["zahlen"] = self.zahlen
+        if self.tooltip:
+            d["tooltip"] = self.tooltip
         if self.kind == "tree":
             knoten = _baum_knoten(self)
             if knoten is not None:
@@ -482,6 +509,13 @@ class Control:
             visible=_as_bool(d, "visible", True),
             font_size=_as_int(d, "font_size", 0),
             anchor=_as_str(d, "anchor", "lt") or "lt",
+            align=_as_str(d, "align") if _as_str(d, "align") in ("links", "mitte", "rechts") else "",
+            wrap=_as_bool(d, "wrap", False),
+            passwort=_as_bool(d, "passwort", False),
+            nur_lesen=_as_bool(d, "nur_lesen", False),
+            maxlaenge=max(0, _as_int(d, "maxlaenge", 0)),
+            zahlen=min(2, max(0, _as_int(d, "zahlen", 0))),
+            tooltip=_as_str(d, "tooltip"),
             **{_ev: _as_str(d, _ev) for _ev in EVENTS},
             ov=ov,
             extra=extra,
@@ -575,9 +609,15 @@ class FormDoc:
     # `Control.extra`.
     extra: dict = field(default_factory=dict)
 
+    # Standard- und Abbrechen-Knopf als Widget-INDEX (wie in der Laufzeit);
+    # -1 = keiner. Der Index zeigt in `controls`.
+    default_button: int = -1
+    cancel_button: int = -1
+
     _KNOWN = frozenset((
         "title", "x", "y", "w", "h", "movable", "closable", "visible",
         "resizable", "min_w", "min_h", "max_w", "max_h", "theme", "widgets", "code",
+        "default_button", "cancel_button",
     ))
 
     # ---- Bearbeiten ----
@@ -818,6 +858,10 @@ class FormDoc:
         if self.code:
             # Designer-Metadaten (Handler-Koerper); die Runtime ignoriert `code`.
             d["code"] = {str(k): str(v) for k, v in self.code.items()}
+        if 0 <= self.default_button < len(self.controls):
+            d["default_button"] = self.default_button
+        if 0 <= self.cancel_button < len(self.controls):
+            d["cancel_button"] = self.cancel_button
         for k, v in self.extra.items():       # unbekannte Laufzeit-Felder zurueckgeben
             d.setdefault(k, copy.deepcopy(v))
         return d
@@ -843,6 +887,8 @@ class FormDoc:
             resizable=_as_bool(d, "resizable", False),
             min_w=_as_int(d, "min_w", 0), min_h=_as_int(d, "min_h", 0),
             max_w=_as_int(d, "max_w", 0), max_h=_as_int(d, "max_h", 0),
+            default_button=_as_int(d, "default_button", -1),
+            cancel_button=_as_int(d, "cancel_button", -1),
             theme=_as_str(d, "theme", ""),
             code=code,
             extra={k: v for k, v in d.items() if k not in cls._KNOWN},
@@ -939,6 +985,23 @@ class FormDoc:
         return "\n".join(lines)
 
     # ---- GB-Code-Export (explizite GUI_*-Konstruktion statt GUI_LOAD) ----
+    @staticmethod
+    def _gb_text_extras(c: "Control", var: str) -> list[str]:
+        """Ausrichtung, Umbruch, Textfeld-Grenzen, Tooltip -- nur, wo gesetzt."""
+        out: list[str] = []
+        if c.align and c.kind in ("label", "button", "textinput"):
+            out.append(f"GUI_SET_ALIGN({var}, {_gb_str(c.align)})")
+        if c.wrap and c.kind == "label":
+            out.append(f"GUI_SET_WRAP({var}, {c.w})")
+        if c.kind == "textinput":
+            for schluessel, wert in (("passwort", int(c.passwort)), ("nur_lesen", int(c.nur_lesen)),
+                                     ("maxlaenge", c.maxlaenge), ("zahlen", c.zahlen)):
+                if wert:
+                    out.append(f"GUI_TEXTINPUT_SET({var}, {_gb_str(schluessel)}, {wert})")
+        if c.tooltip:
+            out.append(f"GUI_TOOLTIP({var}, {_gb_str(c.tooltip)})")
+        return out
+
     def generate_gb_code(self, screen_w: int = 800, screen_h: int = 480,
                          screen_title: str | None = None,
                          handler_bodies: dict | None = None,
@@ -987,12 +1050,21 @@ class FormDoc:
         L.append("")
         # Controls
         used = {"frm"} | set(self.handler_names())
+        vars_: dict[int, str] = {}
         for idx, c in enumerate(self.controls):
             var = self._gb_var(c, idx, used)
+            vars_[idx] = var
             block = self._gb_control(c, var)
             if block:
                 L.extend(block)
+                L.extend(self._gb_text_extras(c, var))
                 L.append("")
+        # Standard- und Abbrechen-Knopf -- nach den Controls, sie brauchen die Handles.
+        for feld, befehl in (("default_button", "GUI_WINDOW_DEFAULT"),
+                             ("cancel_button", "GUI_WINDOW_CANCEL")):
+            i = getattr(self, feld)
+            if 0 <= i < len(self.controls) and self.controls[i].kind == "button" and i in vars_:
+                L.append(f"{befehl}(frm, {vars_[i]})")
         # Hauptschleife
         if with_loop:
             L += [

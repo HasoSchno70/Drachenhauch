@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1619,
+ "count": 1626,
  "builtins": [
   {
    "name": "ABS",
@@ -3009,6 +3009,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ENTERED",
+   "kind": "core",
+   "signature": "GUI_ENTERED(tf)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_FOCUS",
    "kind": "core",
    "signature": "GUI_FOCUS(wdg)",
@@ -3189,6 +3195,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ON_ENTER",
+   "kind": "core",
+   "signature": "GUI_ON_ENTER(tf, handler)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ON_FOCUS",
    "kind": "core",
    "signature": "GUI_ON_FOCUS(widget, fn: FUNCREF)",
@@ -3270,6 +3282,12 @@
    "name": "GUI_SET_ACTIVE_TAB",
    "kind": "core",
    "signature": "GUI_SET_ACTIVE_TAB(win, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_ALIGN",
+   "kind": "core",
+   "signature": "GUI_SET_ALIGN(wdg, wie$)",
    "module": "gui"
   },
   {
@@ -3378,6 +3396,12 @@
    "name": "GUI_SET_VISIBLE",
    "kind": "core",
    "signature": "GUI_SET_VISIBLE(wdg, on)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_WRAP",
+   "kind": "core",
+   "signature": "GUI_SET_WRAP(label, breite)",
    "module": "gui"
   },
   {
@@ -3711,6 +3735,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTINPUT_SET",
+   "kind": "core",
+   "signature": "GUI_TEXTINPUT_SET(tf, key$, wert)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_THEME",
    "kind": "core",
    "signature": "GUI_THEME(accent)",
@@ -3825,6 +3855,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_CANCEL",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CANCEL(win, knopf)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_CHROME",
    "kind": "core",
    "signature": "GUI_WINDOW_CHROME(win, flag)",
@@ -3840,6 +3876,12 @@
    "name": "GUI_WINDOW_CLOSED",
    "kind": "core",
    "signature": "GUI_WINDOW_CLOSED(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_DEFAULT",
+   "kind": "core",
+   "signature": "GUI_WINDOW_DEFAULT(win, knopf)",
    "module": "gui"
   },
   {
