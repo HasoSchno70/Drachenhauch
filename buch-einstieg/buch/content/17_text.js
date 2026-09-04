@@ -108,7 +108,7 @@ module.exports = (H) => [
 
   H.p("Der Kniff steckt in der ersten Zeile. Der Text wird an sich selbst gehängt, und der Ausschnitt wandert nur über die erste Hälfte. Dadurch ist am Ende immer noch genug übrig, um das Fenster zu füllen — die Laufschrift läuft nahtlos rundherum, ohne dass irgendwo ein Sonderfall stünde."),
 
-  H.warn("Beim Schreiben dieses Programms hieß die Variable zuerst text — und das Programm brach ab: „'text' ist eine Variable vom Typ STRING und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl 'TEXT' meinst: benenne die Variable um.“ Eine Variable darf nicht heißen wie ein eingebauter Befehl; sie verdeckt ihn sonst. Die Meldung sagt einem das zum Glück sehr deutlich.", "Namen, die schon vergeben sind"),
+  H.warn("Beim Schreiben dieses Programms hieß die Variable zuerst text — und lange Zeit brach das Programm damit ab: „'text' ist eine Variable vom Typ STRING und kann nicht wie eine Funktion aufgerufen werden.“ Inzwischen versteht Drachenhauch den Fall: hat die Variable einen festen Typ, bleibt TEXT(...) der Befehl, und text als STRING daneben stört nicht — genauso wie len = LEN(zeile) oder deg = DEG(winkel). Die Meldung kommt nur noch, wenn die Variable eine FUNCREF ist, denn dann könnte tatsächlich sie gemeint sein. Umbenannt habe ich sie trotzdem: Ein Name, der nach dem Befehl klingt, liest sich schlechter.", "Namen, die schon vergeben sind"),
 
   H.h2("Buchstaben zählen"),
 
@@ -134,7 +134,7 @@ module.exports = (H) => [
   H.table([
     ["Das erste Zeichen fehlt", "MID$ ab 1 statt ab 0 begonnen."],
     ["Ein Zeichen zu wenig am Ende", "Die Schleife läuft bis LEN statt bis LEN minus eins."],
-    [{ text: "kann nicht wie eine Funktion aufgerufen werden", mono: true }, "Eine Variable heißt wie ein eingebauter Befehl. Umbenennen."],
+    [{ text: "kann nicht wie eine Funktion aufgerufen werden", mono: true }, "Eine FUNCREF-Variable heißt wie ein eingebauter Befehl. Umbenennen."],
     ["Die Suche findet immer etwas", "INSTR liefert -1 für „nicht gefunden“, nicht 0. Eine Prüfung auf „größer null“ übersieht das erste Zeichen."],
     ["Die Laufschrift stockt am Ende", "Der Text wurde nicht verdoppelt; MID$ läuft über das Ende hinaus."],
     ["Zahlen lassen sich nicht anhängen", "STR$ vergessen — oder umgekehrt VAL, wenn aus Text eine Zahl werden soll."],

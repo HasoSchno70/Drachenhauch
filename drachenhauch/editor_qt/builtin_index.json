@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1597,
+ "count": 1619,
  "builtins": [
   {
    "name": "ABS",
@@ -669,6 +669,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_NOTE",
+   "kind": "core",
+   "signature": "AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol [, vib_depth, vib_speed, detune_cents, slide_halbtoene])",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_NUM_CHANNELS",
    "kind": "core",
    "signature": "AUDIO_NUM_CHANNELS()",
@@ -787,6 +793,24 @@
    "kind": "graphics",
    "signature": "AUDIO_SOUND_COUNT()",
    "module": "core"
+  },
+  {
+   "name": "AUDIO_SOUND_MIX",
+   "kind": "core",
+   "signature": "AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_SOUND_NEW",
+   "kind": "core",
+   "signature": "AUDIO_SOUND_NEW(dauer_ms)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_SOUND_NORMALIZE",
+   "kind": "core",
+   "signature": "AUDIO_SOUND_NORMALIZE(sound[, spitze])",
+   "module": "audio"
   },
   {
    "name": "AUDIO_SOUND_WAVE",
@@ -2943,15 +2967,15 @@
    "module": "gui"
   },
   {
-   "name": "GUI_DRAW_WINDOW",
-   "kind": "graphics",
-   "signature": "GUI_DRAW_WINDOW(win)",
-   "module": "gui"
-  },
-  {
    "name": "GUI_DRAW_TOP",
    "kind": "graphics",
    "signature": "GUI_DRAW_TOP()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DRAW_WINDOW",
+   "kind": "graphics",
+   "signature": "GUI_DRAW_WINDOW(win)",
    "module": "gui"
   },
   {
@@ -4590,6 +4614,12 @@
    "name": "JSON_APPEND_JSON",
    "kind": "core",
    "signature": "JSON_APPEND_JSON(h: JSON_HANDLE, pfad: STRING, andere: JSON_HANDLE)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_APPEND_NULL",
+   "kind": "core",
+   "signature": "JSON_APPEND_NULL(h: JSON_HANDLE, pfad: STRING)",
    "module": "json"
   },
   {
@@ -8133,9 +8163,9 @@
    "module": "tiled"
   },
   {
-   "name": "TILED_ADD_TILESET",
-   "kind": "core",
-   "signature": "TILED_ADD_TILESET(m, bild$, kachelzahl)",
+   "name": "TILED_ADD_OBJECT",
+   "kind": "builtin",
+   "signature": "TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)",
    "module": "tiled"
   },
   {
@@ -8145,57 +8175,9 @@
    "module": "tiled"
   },
   {
-   "name": "TILED_ADD_OBJECT",
-   "kind": "builtin",
-   "signature": "TILED_ADD_OBJECT(m, ebene$, name$, typ$, x, y, w, h)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_REMOVE_OBJECT",
-   "kind": "builtin",
-   "signature": "TILED_REMOVE_OBJECT(m, ebene$, idx)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_SET_NAME",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_SET_TYPE",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_SET_RECT",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_TILE_SET_PROP",
-   "kind": "builtin",
-   "signature": "TILED_TILE_SET_PROP(m, gid, key$, wert)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_TILE_REMOVE_PROP",
-   "kind": "builtin",
-   "signature": "TILED_TILE_REMOVE_PROP(m, gid, key$)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_SET_PROP",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_REMOVE_PROP",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)",
+   "name": "TILED_ADD_TILESET",
+   "kind": "core",
+   "signature": "TILED_ADD_TILESET(m, bild$, kachelzahl)",
    "module": "tiled"
   },
   {
@@ -8283,6 +8265,12 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_MOVE_LAYER",
+   "kind": "core",
+   "signature": "TILED_MOVE_LAYER(m, von, nach)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_NEW",
    "kind": "core",
    "signature": "TILED_NEW(breite, hoehe, kachel_w, kachel_h)",
@@ -8325,9 +8313,45 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_OBJECT_PROP_KEYS",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_PROP_KEYS(m, ebene$, idx) -> ARRAY OF STRING",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_OBJECT_PROP_STRING",
    "kind": "core",
    "signature": "TILED_OBJECT_PROP_STRING(m: ?, layer_name: STRING, idx: INTEGER, key: STRING)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_REMOVE_PROP",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_REMOVE_PROP(m, ebene$, idx, key$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_NAME",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_NAME(m, ebene$, idx, name$)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_PROP",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_PROP(m, ebene$, idx, key$, wert)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_RECT",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_RECT(m, ebene$, idx, x, y, w, h)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_OBJECT_SET_TYPE",
+   "kind": "builtin",
+   "signature": "TILED_OBJECT_SET_TYPE(m, ebene$, idx, typ$)",
    "module": "tiled"
   },
   {
@@ -8355,15 +8379,15 @@
    "module": "tiled"
   },
   {
-   "name": "TILED_MOVE_LAYER",
-   "kind": "core",
-   "signature": "TILED_MOVE_LAYER(m, von, nach)",
-   "module": "tiled"
-  },
-  {
    "name": "TILED_REMOVE_LAYER",
    "kind": "core",
    "signature": "TILED_REMOVE_LAYER(m, idx)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_REMOVE_OBJECT",
+   "kind": "builtin",
+   "signature": "TILED_REMOVE_OBJECT(m, ebene$, idx)",
    "module": "tiled"
   },
   {
@@ -8415,18 +8439,6 @@
    "module": "tiled"
   },
   {
-   "name": "TILED_TILE_PROP_KEYS",
-   "kind": "builtin",
-   "signature": "TILED_TILE_PROP_KEYS(m, gid) -> ARRAY OF STRING",
-   "module": "tiled"
-  },
-  {
-   "name": "TILED_OBJECT_PROP_KEYS",
-   "kind": "builtin",
-   "signature": "TILED_OBJECT_PROP_KEYS(m, ebene$, idx) -> ARRAY OF STRING",
-   "module": "tiled"
-  },
-  {
    "name": "TILED_TILE_HEIGHT",
    "kind": "core",
    "signature": "TILED_TILE_HEIGHT(m)",
@@ -8451,15 +8463,33 @@
    "module": "tiled"
   },
   {
+   "name": "TILED_TILE_PROP_KEYS",
+   "kind": "builtin",
+   "signature": "TILED_TILE_PROP_KEYS(m, gid) -> ARRAY OF STRING",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_TILE_PROP_STRING",
    "kind": "core",
    "signature": "TILED_TILE_PROP_STRING(m: ?, gid: INTEGER, key: STRING)",
    "module": "tiled"
   },
   {
+   "name": "TILED_TILE_REMOVE_PROP",
+   "kind": "builtin",
+   "signature": "TILED_TILE_REMOVE_PROP(m, gid, key$)",
+   "module": "tiled"
+  },
+  {
    "name": "TILED_TILE_SET",
    "kind": "core",
    "signature": "TILED_TILE_SET(m: ?, layer_idx: INTEGER, tx: INTEGER, ty: INTEGER, gid: INTEGER)",
+   "module": "tiled"
+  },
+  {
+   "name": "TILED_TILE_SET_PROP",
+   "kind": "builtin",
+   "signature": "TILED_TILE_SET_PROP(m, gid, key$, wert)",
    "module": "tiled"
   },
   {

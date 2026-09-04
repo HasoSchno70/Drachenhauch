@@ -274,3 +274,17 @@ def test_remove_meldet_ob_etwas_da_war(run_gb):
                  'PRINT JSON_REMOVE(h, "a")\n'
                  'PRINT JSON_REMOVE(h, "a")\n')
     assert _lines(out) == ["TRUE", "FALSE"]
+
+
+def test_null_laesst_sich_anhaengen(run_gb):
+    """Eine Liste mit LEEREN Plaetzen -- so notiert der Tracker eine Zeile
+    ohne Note. Bis 2026-09-04 gab es dafuer keine Form: JSON_SET_NULL
+    braucht einen Platz, der schon da ist, und den legt bei einem Array nur
+    ein APPEND an."""
+    out = run_gb(KOPF + "h = JSON_NEW_ARRAY()\n"
+                 'JSON_APPEND_INT(h, "", 60)\n'
+                 'JSON_APPEND_NULL(h, "")\n'
+                 'JSON_APPEND_INT(h, "", 62)\n'
+                 "PRINT JSON_STRINGIFY(h)\n"
+                 'PRINT JSON_TYPE(h, "1")\n')
+    assert _lines(out) == ["[60,null,62]", "null"]

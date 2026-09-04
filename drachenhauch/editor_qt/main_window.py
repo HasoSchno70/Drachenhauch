@@ -469,7 +469,7 @@ class DrachenhauchEditor(QMainWindow):
             self.act_piloten.append(_a)
         self.act_piloten_quelltext = QAction("Quelltexte der Piloten oeffnen", self)
         self.act_piloten_quelltext.setToolTip(
-            "Oeffnet alle vier als Tabs -- sie sind Drachenhauch-Programme, "
+            "Oeffnet alle fuenf als Tabs -- sie sind Drachenhauch-Programme, "
             "also lesbar und aenderbar")
         self.act_piloten_quelltext.triggered.connect(self._open_pilot_sources)
 
@@ -1973,7 +1973,7 @@ class DrachenhauchEditor(QMainWindow):
             self.statusBar().showMessage(f"▶ {eintrag['titel']} (in Drachenhauch): {p.name}")
 
     def _open_pilot_sources(self) -> None:
-        """Alle vier als Tabs oeffnen."""
+        """Alle fuenf als Tabs oeffnen."""
         offen = 0
         for e in PILOTEN:
             p = piloten_pfad(self.project_root, e)

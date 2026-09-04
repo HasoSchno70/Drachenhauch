@@ -86,6 +86,22 @@ Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`
 
 Das Datenmodell + I/O + Export liegen Qt-frei in `drachenhauch/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `drachenhauch/tracker/instrument.py`, der **Mixer/Render** in `drachenhauch/tracker/mixer.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`, `tests/test_tracker_mixer.py`).
 
+## Der Tracker in Drachenhauch selbst
+
+Denselben Tracker gibt es ein zweites Mal — als Drachenhauch-Programm
+[`examples/190_tracker.dh`](../examples/190_tracker.dh), auf dem `gui`-Modul
+geschrieben (in der IDE unter `Datei → Werkzeuge in Drachenhauch`). Er liest
+und schreibt **dasselbe `dhtracker-song`-JSON** wie dieses Werkzeug, in beide
+Richtungen: eine hier gebaute Datei öffnet dort, und umgekehrt. Er hat
+Patterns und Reihenfolge, 4..32 Kanäle, die 18 Instrument-Presets (dort im
+Kasten änderbar), Lautstärke/Slide/Effekt/Instrument je Note, Blockauswahl
+mit Kopieren/Transponieren/Interpolieren, Stumm/Solo, Rückgängig über den
+ganzen Song, die WAV-Mischung (Stereo/Amiga-Pan) und den GB-Code-Export.
+Anders als hier läuft die Wiedergabe auf einer **Audio-Uhr** (`AUDIO_CLOCK`)
+samplegenau statt über einen Timer. **Nicht** dabei: Sample-Instrumente,
+Keymaps und SoundFonts (alles, was eingebettete PCM-Daten braucht), VU-Meter,
+Pattern-Namen, der Sample-Offset-Effekt.
+
 ## Audio Studio
 
 Tracker und [SFX-Generator](sfx-generator.md) leben zusammen im **Audio Studio** — einem fullscreen Fenster mit zwei Reitern (`🎹 Tracker / Song` und `💥 SFX-Generator`). Start: `dhsound` / `dhrun.py --audio`, oder im Code-Editor die jeweiligen Menüpunkte (sie öffnen dasselbe Studio auf dem passenden Tab). `F11` schaltet echtes Vollbild, `Strg+1`/`Strg+2` wechseln die Tabs. Jeder Tab behält seinen eigenen Undo-Verlauf (`Strg+Z`/`Strg+Y` wirken auf den fokussierten Tab).

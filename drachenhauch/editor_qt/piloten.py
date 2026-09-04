@@ -1,6 +1,6 @@
 """Die Werkzeuge, die in Drachenhauch selbst geschrieben sind.
 
-Vier der Qt-Begleit-Editoren gibt es ein zweites Mal -- als Drachenhauch-
+Fuenf der Qt-Begleit-Editoren gibt es ein zweites Mal -- als Drachenhauch-
 Programm unter `examples/`. Sie sind nicht der Ersatz fuer die Qt-Fassungen,
 sondern die Antwort auf die Frage, ob die Sprache dafuer taugt: gemessen
 statt geschaetzt. Und weil sie Drachenhauch sind, lassen sie sich lesen und
@@ -33,6 +33,9 @@ PILOTEN: list[dict] = [
     {"datei": "189_sprite_editor.dh", "titel": "Sprite-Editor",
      "qt": 7379, "dh": 2811,
      "kurz": "zwoelf Werkzeuge (mit Lasso, Zauberstab und Verschieben), Ebenen, benannte Einzelbilder, Kachel-Ansicht, Statistik, eigenes Format mit Ebenen, Streifen, Atlas, bewegtes GIF, .gpl-Paletten, Zuschneiden, Spiegeln und Vierteldrehen, Dauer je Einzelbild, Animationsbereiche, GB-Code und .dhanim"},
+    {"datei": "190_tracker.dh", "titel": "Tracker",
+     "qt": 3911, "dh": 2091,
+     "kurz": "Patterns und Reihenfolge, 4..32 Kanaele, 18 Instrumente mit ADSR/Vibrato/Detune, je Note Lautstaerke/Slide/Effekt/Instrument, Blockauswahl mit Kopieren/Transponieren/Interpolieren, Stumm/Solo, Wiedergabe auf einer Audio-Uhr, Rueckgaengig ueber den ganzen Song, dasselbe JSON wie die Qt-Fassung, WAV-Mischung und GB-Code"},
 ]
 
 

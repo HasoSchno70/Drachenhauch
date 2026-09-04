@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1569,
+ "count": 1574,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -110,6 +110,7 @@
   "AUDIO_MUSIC_SET_VOLUME": "AUDIO_MUSIC_VOLUME(v)",
   "AUDIO_MUSIC_STOP": "stoppen, optional ausfaden (nicht-blockierend)",
   "AUDIO_NOISE": "Weisses Rauschen",
+  "AUDIO_NOTE": "eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik",
   "AUDIO_NUM_CHANNELS": "aktuelle Channel-Anzahl",
   "AUDIO_PAN": "Stereo-Pan (beide 0..1)",
   "AUDIO_PAN_POS": "Position direkt setzen (beendet eine laufende Animation)",
@@ -130,6 +131,9 @@
   "AUDIO_SET_VOLUME": "AUDIO_VOLUME(ch, v)",
   "AUDIO_SFX": "Erzeugt einen SOUND.",
   "AUDIO_SOUND_COUNT": "Anzahl lebender (nicht freigegebener) Sound-Slots — Diagnose gegen Sound-Lecks",
+  "AUDIO_SOUND_MIX": "die Quelle ab offset_ms in das Ziel addieren",
+  "AUDIO_SOUND_NEW": "Stille der angegebenen Länge, als Leinwand",
+  "AUDIO_SOUND_NORMALIZE": "die lauteste Stelle auf spitze bringen (Vorgabe 1.0); liefert den Faktor",
   "AUDIO_SOUND_WAVE": "anzahl Punkte der Wellenform, -1..1 — zum Zeichnen",
   "AUDIO_STOP": "Channel stoppen, optional ausfaden",
   "AUDIO_STOP_ALL": "alle stoppen",
@@ -742,6 +746,7 @@
   "JSON_APPEND_FLOAT": "an das Array am Pfad anhängen",
   "JSON_APPEND_INT": "an das Array am Pfad anhängen",
   "JSON_APPEND_JSON": "an das Array am Pfad anhängen",
+  "JSON_APPEND_NULL": "ein null an das Array am Pfad anhängen — für Listen mit leeren Plätzen",
   "JSON_APPEND_STRING": "an das Array am Pfad anhängen",
   "JSON_GET_BOOL": "BOOLEAN — Wert am Pfad als Wahrheitswert lesen",
   "JSON_GET_FLOAT": "FLOAT — Wert am Pfad als Kommazahl lesen",
