@@ -36,6 +36,7 @@ IMPORT "json"
 | `JSON_SET_NULL(h, pfad$)` | Feld auf null setzen |
 | `JSON_SET_JSON(h, pfad$, andere)` | ganzes Dokument einhängen (**Kopie**) |
 | `JSON_APPEND_STRING/INT/FLOAT/BOOL/JSON(h, pfad$, wert)` | an das Array am Pfad anhängen |
+| `JSON_APPEND_NULL(h, pfad$)` | ein `null` an das Array am Pfad anhängen — für Listen mit leeren Plätzen |
 | `JSON_REMOVE(h, pfad$)` | entfernen → BOOLEAN (war etwas da?) |
 
 ## Pfad-Notation

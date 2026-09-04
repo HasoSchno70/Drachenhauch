@@ -190,6 +190,7 @@ Fuer prozedurale Sounds ohne Audio-Files. Liefert ein `SOUND`-Objekt, das du wie
 |---|---|
 | `AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, vol]])` | Sine/Square/Saw/Triangle-Ton |
 | `AUDIO_NOISE(dauer_ms[, vol])` | Weisses Rauschen |
+| `AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol[, vib_depth, vib_speed, detune_cents, slide_halbtoene])` | eine gehaltene Note mit echter ADSR-Hüllkurve, Vibrato, Detune-Schicht und Portamento — das Instrument für Tracker und Musik |
 
 **Waveforms** (case-insensitive): `"sine"`, `"square"`, `"saw"`, `"triangle"`, `"noise"`.
 
@@ -238,6 +239,78 @@ DIM s AS SOUND
 s = AUDIO_SFX("square", 110, 0, 0, 600, 200, 0, 0, 0.8, _
               0.0, 0.25, 0.15, 5.0, 4000, -7000, 0.7)
 PLAYSOUND(s)
+```
+
+### `AUDIO_NOTE` (eine Note, kein Effekt)
+
+`AUDIO_SFX` kennt drei **Zeiten** (Attack, Sustain, Decay), die zusammen die
+Dauer ergeben — für einen Effekt genau richtig, für ein Instrument nicht: dort
+wird eine Note **gehalten**, so lange wie der Spieler will, und klingt
+danach aus. `AUDIO_NOTE` ist dafür da.
+
+```
+AUDIO_NOTE(waveform$, freq, dauer_ms, attack_ms, decay_ms, sustain, release_ms, vol
+           [, vib_depth, vib_speed, detune_cents, slide_halbtoene])
+```
+
+| Argument | Wirkung |
+|---|---|
+| `dauer_ms` | die **gehaltene** Zeit (bis zur nächsten Note) |
+| `attack_ms` / `decay_ms` | Anstieg auf voll, dann Abfall auf den Sustain-Pegel |
+| `sustain` | der Pegel 0..1, der danach **bleibt** — bei `0.0` verstummt die Note nach dem Decay, egal wie lange sie gehalten wird (Klavier); bei `1.0` bleibt sie voll (Orgel) |
+| `release_ms` | das Ausklingen — es hängt **hinten an**, der Klang ist also `dauer_ms + release_ms` lang und überlappt die nächste Note wie bei einem echten Synthesizer |
+| `vib_depth` / `vib_speed` | Vibrato wie bei `AUDIO_SFX` |
+| `detune_cents` | eine zweite, um so viele Cent verstimmte Schicht darunter (Chorus) — aus einer nackten Wellenform wird ein Instrument |
+| `slide_halbtoene` | Portamento: die Tonhöhe gleitet über die gehaltene Zeit zum Ziel, in Halbtönen und exponentiell (musikalisch gleichmäßig), nicht in Hz/s wie bei `AUDIO_SFX` |
+
+```basic
+' Ein Klavierton: schneller Anstieg, klingt von allein aus
+DIM piano AS SOUND
+piano = AUDIO_NOTE("triangle", 261.6, 500, 2, 700, 0.0, 200, 0.8, 0, 0, 6)
+' Eine Orgel: bleibt, solange gehalten
+DIM orgel AS SOUND
+orgel = AUDIO_NOTE("square", 261.6, 500, 6, 0, 1.0, 70, 0.6, 0.06, 6, 5)
+```
+
+Der Tracker in Drachenhauch (`examples/190_tracker.dh`) baut jede Note so.
+
+## Klänge mischen
+
+Bis hierher war jeder Klang eine Einbahnstraße: bauen, abspielen, sichern.
+Zwei Klänge zu **einem** machen ging nicht — und genau das braucht ein
+Musikprogramm, das einen Song als WAV abliefern will.
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_SOUND_NEW(dauer_ms)` → SOUND | Stille der angegebenen Länge, als Leinwand |
+| `AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])` | die Quelle ab `offset_ms` in das Ziel **addieren** |
+| `AUDIO_SOUND_NORMALIZE(sound[, spitze])` → FLOAT | die lauteste Stelle auf `spitze` bringen (Vorgabe 1.0); liefert den Faktor |
+
+Drei Dinge, die man wissen muss:
+
+1. **Es wird nicht geklemmt.** Zwei laute Klänge übereinander ergeben Werte
+   über 1.0, und die bleiben stehen — zwischendurch zu klemmen würde jede
+   Überlagerung verzerren. Vor dem Abspielen oder Sichern kommt deshalb
+   `AUDIO_SOUND_NORMALIZE`.
+2. **Was über das Ende hinausragt, fällt weg.** Ein Ausklingen hinter dem
+   letzten Takt ist normal, kein Fehler.
+3. **`pan` verteilt die Quelle als Mono** (-1 links, 0 Mitte, +1 rechts,
+   Equal-Power). Ohne `pan` bleiben ihre eigenen Kanäle, wie sie sind — ein
+   Stereo-Klang bleibt stereo, ein Mono-Klang bleibt in der Mitte bei voller
+   Lautstärke.
+
+Eine Quelle mit anderer Abtastrate (eine 48-kHz-Datei) wird beim Mischen
+umgerechnet. Mischt man in einen Klang, der gerade **spielt**, arbeitet die
+Runtime auf einer Kopie — der Audio-Faden darf den Puffer unter sich nicht
+wechseln sehen.
+
+```basic
+DIM song AS SOUND
+song = AUDIO_SOUND_NEW(2000)                       ' 2 s Leinwand
+AUDIO_SOUND_MIX(song, AUDIO_TONE(440, 500), 0)     ' A bei 0 ms
+AUDIO_SOUND_MIX(song, AUDIO_TONE(554, 500), 500, 0.8, -0.5)   ' Cis bei 500 ms, halblinks
+AUDIO_SOUND_NORMALIZE(song)
+AUDIO_SAVE_WAV(song, "akkord.wav")
 ```
 
 ## Einen Klang anschauen und sichern

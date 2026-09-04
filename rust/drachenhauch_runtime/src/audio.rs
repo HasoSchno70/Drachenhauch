@@ -1556,6 +1556,161 @@ resonance/reverb/distortion", other)),
         Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
+    /// AUDIO_NOTE -- eine MUSIKALISCHE Note, kein Effekt.
+    ///
+    /// Der Unterschied zu `sfx`: dort sind Attack/Sustain/Decay drei ZEITEN,
+    /// die zusammen die Dauer ergeben; ein Sustain-PEGEL fehlt, und ein Klang
+    /// kann nicht "gehalten und dann losgelassen" werden. Ein Instrument in
+    /// einem Tracker braucht genau das: `dauer_ms` ist die gehaltene Zeit
+    /// (bis zur naechsten Note), der Pegel faellt nach dem Decay auf
+    /// `sustain` und bleibt dort, und das Ausklingen (`release_ms`) kommt
+    /// HINTEN DRAN -- es ueberlappt also die naechste Note, wie bei jedem
+    /// echten Synthesizer. Die Laenge des Klangs ist damit
+    /// `dauer_ms + release_ms`.
+    ///
+    /// `slide_halbtoene` gleitet exponentiell vom Grundton zum Ziel ueber die
+    /// gehaltene Zeit (musikalisch: ein Portamento in Halbtoenen), nicht
+    /// linear in Hz/s wie bei `sfx`. `detune_cents` legt eine zweite, leicht
+    /// verstimmte Schicht darunter (Chorus) -- das macht aus einer nackten
+    /// Wellenform ein Instrument.
+    #[allow(clippy::too_many_arguments)]
+    pub fn note(&mut self, waveform: &str, freq: f64, dauer_ms: i64,
+                attack_ms: i64, decay_ms: i64, sustain: f64, release_ms: i64,
+                volume: f64, vib_depth: f64, vib_speed: f64,
+                detune_cents: f64, slide_halbtoene: f64) -> Result<i64, String> {
+        let wf = waveform.to_lowercase();
+        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
+            return Err(format!(
+                "AUDIO_NOTE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
+        }
+        if wf != "noise" && !(freq > 0.0 && freq.is_finite()) {
+            return Err("AUDIO_NOTE: freq muss > 0 sein".into());
+        }
+        if !(1..=600_000).contains(&dauer_ms) {
+            return Err("AUDIO_NOTE: dauer_ms muss 1..600000 sein".into());
+        }
+        if attack_ms < 0 || decay_ms < 0 || release_ms < 0 {
+            return Err("AUDIO_NOTE: attack/decay/release muessen >= 0 sein".into());
+        }
+        if release_ms > 60_000 {
+            return Err("AUDIO_NOTE: release_ms muss <= 60000 sein".into());
+        }
+        if !(-120.0..=120.0).contains(&slide_halbtoene) || !slide_halbtoene.is_finite() {
+            return Err("AUDIO_NOTE: slide_halbtoene muss -120..120 sein".into());
+        }
+        let sr: u32 = 44100;
+        let buf = build_note_buffer(&wf, freq, dauer_ms, attack_ms, decay_ms, sustain,
+                                    release_ms, vib_depth, vib_speed, detune_cents,
+                                    slide_halbtoene, sr);
+        let data = self.make_data_mono(&buf, volume, sr);
+        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
+    }
+
+    /// AUDIO_SOUND_NEW(dauer_ms) -- Stille, in die AUDIO_SOUND_MIX mischt.
+    pub fn sound_new(&mut self, dauer_ms: i64) -> Result<i64, String> {
+        if !(1..=600_000).contains(&dauer_ms) {
+            return Err("AUDIO_SOUND_NEW: dauer_ms muss 1..600000 sein".into());
+        }
+        let sr: u32 = 44100;
+        let n = (sr as f64 * dauer_ms as f64 / 1000.0) as usize;
+        let frames: Arc<[Frame]> = vec![Frame { left: 0.0, right: 0.0 }; n].into();
+        let data = StaticSoundData { sample_rate: sr, frames, settings: StaticSoundSettings::new(), slice: None };
+        Ok(self.push_slot(data, 1.0))
+    }
+
+    /// AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]]) -- die Quelle
+    /// ab `offset_ms` in das Ziel ADDIEREN. Das ist der Schritt, den ein
+    /// Tracker fuer seinen WAV-Export braucht und den es bis dahin nicht gab:
+    /// jeder Klang war eine Einbahnstrasse (bauen, abspielen, sichern), aber
+    /// zwei Klaenge liessen sich nicht zu einem machen.
+    ///
+    /// Es wird NICHT geklemmt -- was ueber 1.0 hinausgeht, bleibt stehen,
+    /// damit `AUDIO_SOUND_NORMALIZE` am Ende die lauteste Stelle findet;
+    /// zwischendurch zu klemmen wuerde jede Ueberlagerung verzerren. Was
+    /// ueber das Ende des Ziels hinausragt, faellt weg (ein Ausklingen hinter
+    /// dem letzten Takt ist normal, kein Fehler). `pan` (-1..+1, Equal-Power)
+    /// verteilt die Quelle als Mono auf links/rechts; OHNE `pan` bleiben ihre
+    /// eigenen Kanaele, wie sie sind.
+    pub fn sound_mix(&mut self, ziel: i64, quelle: i64, offset_ms: f64, vol: f64,
+                     pan: Option<f64>) -> Result<(), String> {
+        if ziel == quelle {
+            return Err("AUDIO_SOUND_MIX: ziel und quelle sind derselbe Klang".into());
+        }
+        if !(offset_ms >= 0.0 && offset_ms.is_finite()) {
+            return Err("AUDIO_SOUND_MIX: offset_ms muss >= 0 sein".into());
+        }
+        let (src_frames, src_sr) = {
+            let s = self.slot(quelle, "AUDIO_SOUND_MIX")?;
+            let d = s.data.as_ref()
+                .ok_or("AUDIO_SOUND_MIX: die Quelle wurde bereits mit UNLOADSOUND freigegeben")?;
+            (d.frames.clone(), d.sample_rate)
+        };
+        let (gl, gr, mono) = match pan {
+            None => (1.0f32, 1.0f32, false),
+            Some(p) => {
+                let p = p.clamp(-1.0, 1.0);
+                let ang = (p + 1.0) * 0.25 * PI64;
+                (ang.cos() as f32, ang.sin() as f32, true)
+            }
+        };
+        let v = vol as f32;
+        let z = self.slot_mut(ziel, "AUDIO_SOUND_MIX")?;
+        let d = z.data.as_mut()
+            .ok_or("AUDIO_SOUND_MIX: das Ziel wurde bereits mit UNLOADSOUND freigegeben")?;
+        let dst_sr = d.sample_rate;
+        let start = (offset_ms / 1000.0 * dst_sr as f64).round() as usize;
+        // Der Puffer ist ein Arc: solange niemand sonst ihn haelt (der Klang
+        // spielt nicht), schreiben wir hinein. Sonst eine Kopie -- teurer,
+        // aber richtig; ein Klang, der gerade spielt, darf sich nicht unter
+        // dem Audio-Faden aendern.
+        if Arc::get_mut(&mut d.frames).is_none() {
+            d.frames = d.frames.to_vec().into();
+        }
+        let dst = Arc::get_mut(&mut d.frames).expect("frames eben exklusiv gemacht");
+        let n_dst = dst.len();
+        if start >= n_dst { return Ok(()); }
+        let step = src_sr as f64 / dst_sr as f64;      // Abtastraten angleichen
+        let n_src = src_frames.len();
+        if n_src == 0 { return Ok(()); }
+        let n_out = ((n_src as f64 / step).floor() as usize).min(n_dst - start);
+        for i in 0..n_out {
+            let pos = i as f64 * step;
+            let j = pos.floor() as usize;
+            let frac = (pos - j as f64) as f32;
+            let a = src_frames[j.min(n_src - 1)];
+            let b = src_frames[(j + 1).min(n_src - 1)];
+            let (mut l, mut r) = (a.left + (b.left - a.left) * frac,
+                                  a.right + (b.right - a.right) * frac);
+            if mono { let m = 0.5 * (l + r); l = m; r = m; }
+            let o = &mut dst[start + i];
+            o.left += l * v * gl;
+            o.right += r * v * gr;
+        }
+        Ok(())
+    }
+
+    /// AUDIO_SOUND_NORMALIZE(sound[, spitze]) -- die lauteste Stelle auf
+    /// `spitze` bringen (Vorgabe 1.0), in beide Richtungen. Liefert den
+    /// Faktor. Ein stiller Klang bleibt still (Faktor 1).
+    pub fn sound_normalize(&mut self, idx: i64, spitze: f64) -> Result<f64, String> {
+        if !(spitze > 0.0 && spitze <= 1.0) {
+            return Err("AUDIO_SOUND_NORMALIZE: spitze muss > 0 und <= 1 sein".into());
+        }
+        let z = self.slot_mut(idx, "AUDIO_SOUND_NORMALIZE")?;
+        let d = z.data.as_mut()
+            .ok_or("AUDIO_SOUND_NORMALIZE: dieser Klang wurde bereits mit UNLOADSOUND freigegeben")?;
+        let peak = d.frames.iter().fold(0.0f32, |m, f| m.max(f.left.abs()).max(f.right.abs()));
+        if peak <= 0.0 { return Ok(1.0); }
+        let faktor = spitze as f32 / peak;
+        if Arc::get_mut(&mut d.frames).is_none() {
+            d.frames = d.frames.to_vec().into();
+        }
+        for f in Arc::get_mut(&mut d.frames).expect("frames eben exklusiv gemacht").iter_mut() {
+            f.left *= faktor; f.right *= faktor;
+        }
+        Ok(faktor as f64)
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn sfx(&mut self, waveform: &str, base_freq: f64, slide: f64,
                attack_ms: i64, sustain_ms: i64, decay_ms: i64,
@@ -2194,6 +2349,68 @@ fn svf_lowpass(wave: &mut [f64], cutoff: f64, sweep: f64, res: f64, sr: u32) {
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Der Rechenkern von AUDIO_NOTE -- ohne Kira, deshalb fuer sich pruefbar.
+///
+/// Huellkurve wie im Qt-Tracker (`tracker/instrument.py::_adsr_env`): Attack
+/// zuerst geschuetzt, Decay auf den Rest der gehaltenen Zeit geklemmt, der
+/// Sustain-Pegel fuellt, was bleibt. Anders als dort haengt das Release
+/// HINTEN an: die Laenge ist `dauer + release`.
+#[allow(clippy::too_many_arguments)]
+fn build_note_buffer(wf: &str, freq: f64, dauer_ms: i64, attack_ms: i64, decay_ms: i64,
+                     sustain: f64, release_ms: i64, vib_depth: f64, vib_speed: f64,
+                     detune_cents: f64, slide_halbtoene: f64, sr: u32) -> Vec<f64> {
+    let srf = sr as f64;
+    let n_hold = ((srf * dauer_ms as f64 / 1000.0) as usize).max(1);
+    let nr = (srf * release_ms as f64 / 1000.0) as usize;
+    let n = n_hold + nr;
+    let na = ((srf * attack_ms as f64 / 1000.0) as usize).min(n_hold);
+    let nd = ((srf * decay_ms as f64 / 1000.0) as usize).min(n_hold - na);
+    let sustain = sustain.clamp(0.0, 1.0);
+    let mut buf = vec![0.0f64; n];
+    if wf == "noise" {
+        for b in buf.iter_mut() { *b = rng_uniform(); }
+    } else {
+        // Zwei Phasen-Akkumulatoren (Grundton + Detune-Schicht): bei einem
+        // Slide aendert sich die Frequenz, und `waveform_value(freq, t)`
+        // ohne Akkumulator spraenge dann in der Phase.
+        let layers = if detune_cents > 0.0 { 2 } else { 1 };
+        let f2 = freq * 2f64.powf(detune_cents / 1200.0);
+        let mut phase = [0.0f64; 2];
+        let ziel = 2f64.powf(slide_halbtoene / 12.0);
+        for (i, out) in buf.iter_mut().enumerate() {
+            let t = i as f64 / srf;
+            let glide = if slide_halbtoene != 0.0 {
+                ziel.powf((i.min(n_hold) as f64 / n_hold as f64).min(1.0))
+            } else { 1.0 };
+            let vib = if vib_depth > 0.0 && vib_speed > 0.0 {
+                1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin()
+            } else { 1.0 };
+            let mut v = 0.0;
+            for (k, base) in [freq, f2].iter().enumerate().take(layers) {
+                let f = (base * glide * vib).clamp(1.0, srf / 2.0);
+                phase[k] += 2.0 * PI64 * f / srf;
+                v += phase_value(wf, phase[k]);
+            }
+            *out = v / layers as f64;
+        }
+    }
+    // Huellkurve
+    let mut pegel_am_ende = sustain;
+    for (i, b) in buf.iter_mut().enumerate().take(n_hold) {
+        let env = if i < na {
+            i as f64 / na as f64
+        } else if i < na + nd {
+            1.0 - (1.0 - sustain) * ((i - na) as f64 / nd as f64)
+        } else { sustain };
+        pegel_am_ende = env;
+        *b *= env;
+    }
+    for i in 0..nr {
+        buf[n_hold + i] *= pegel_am_ende * (1.0 - i as f64 / nr as f64);
+    }
+    buf
+}
+
 fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
                     na: usize, nd: usize, vib_depth: f64, vib_speed: f64,
                     sr: u32, fx: SidFx) -> Vec<f64> {
@@ -2296,7 +2513,7 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
+    use super::{build_note_buffer, build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
                 svf_lowpass, Decibels, FadeCurve, SidFx, yaw_quat};
     use kira::Tweenable;
 
@@ -2478,4 +2695,63 @@ mod tests {
         assert!(q.v.x.abs() < 1e-6);
         assert!(q.v.z.abs() < 1e-6);
     }
+    // --- AUDIO_NOTE: die Huellkurve, nachgemessen -----------------------
+    fn huelle(buf: &[f64], sr: u32, fenster_ms: u32) -> Vec<f64> {
+        let f = (sr * fenster_ms / 1000) as usize;
+        buf.chunks(f).map(|c| c.iter().fold(0.0f64, |m, v| m.max(v.abs()))).collect()
+    }
+
+    #[test]
+    fn note_laenge_ist_dauer_plus_release() {
+        let b = build_note_buffer("square", 220.0, 400, 0, 0, 1.0, 100, 0.0, 0.0, 0.0, 0.0, 1000);
+        assert_eq!(b.len(), 500);
+    }
+
+    #[test]
+    fn note_sustain_null_verstummt_obwohl_gehalten() {
+        // Klavier: Decay 200 ms auf 0, danach 600 ms "gehalten" -- aber still.
+        let b = build_note_buffer("square", 220.0, 800, 2, 200, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 8000);
+        let h = huelle(&b, 8000, 10);
+        assert!(h[1] > 0.5, "{:?}", &h[..4]);
+        assert!(h[30..].iter().all(|&v| v < 0.01), "nach dem Decay ist nichts mehr da");
+    }
+
+    #[test]
+    fn note_sustain_pegel_bleibt_stehen() {
+        let b = build_note_buffer("square", 220.0, 800, 0, 100, 0.5, 0, 0.0, 0.0, 0.0, 0.0, 8000);
+        let h = huelle(&b, 8000, 10);
+        assert!((h[30] - 0.5).abs() < 0.05 && (h[70] - 0.5).abs() < 0.05, "{} {}", h[30], h[70]);
+    }
+
+    #[test]
+    fn note_release_beginnt_am_gehaltenen_pegel_und_endet_bei_null() {
+        let b = build_note_buffer("square", 220.0, 200, 0, 0, 0.5, 200, 0.0, 0.0, 0.0, 0.0, 8000);
+        let h = huelle(&b, 8000, 10);
+        assert!((h[19] - 0.5).abs() < 0.06, "vor dem Release: Sustain-Pegel, {}", h[19]);
+        assert!((h[30] - 0.25).abs() < 0.06, "Mitte des Release: die Haelfte davon, {}", h[30]);
+        assert!(h[39] < 0.06, "am Ende: null, {}", h[39]);
+    }
+
+    #[test]
+    fn note_kurze_note_schuetzt_den_attack() {
+        // 10 ms gehalten, aber 50 ms Attack + 50 ms Decay verlangt: der Attack
+        // bekommt alles, Decay faellt weg -- die Note darf nicht stumm sein.
+        let b = build_note_buffer("square", 220.0, 10, 50, 50, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 8000);
+        assert_eq!(b.len(), 80);
+        assert!(b.iter().fold(0.0f64, |m, v| m.max(v.abs())) > 0.9);
+    }
+
+    #[test]
+    fn note_slide_verdoppelt_die_frequenz() {
+        let sr = 8000;
+        let b = build_note_buffer("sine", 100.0, 1000, 0, 0, 1.0, 0, 0.0, 0.0, 0.0, 12.0, sr);
+        let hz = |von: usize, bis: usize| -> f64 {
+            let seg = &b[von..bis];
+            let kreuz = seg.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count();
+            kreuz as f64 / 2.0 / ((bis - von) as f64 / sr as f64)
+        };
+        assert!((hz(0, 800) - 100.0).abs() < 15.0, "{}", hz(0, 800));
+        assert!((hz(7200, 8000) - 200.0).abs() < 15.0, "{}", hz(7200, 8000));
+    }
+
 }

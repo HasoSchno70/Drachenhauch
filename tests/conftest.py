@@ -184,6 +184,7 @@ _NUR_WINDOWS = {
 _BRAUCHT_GRAFIK = {
     "test_arc_width.py",
     "test_audio_modulators.py",
+    "test_audio_note_mix.py",
     "test_audio_sound_io.py",
     "test_automation.py",
     "test_beispiel_sqlite_tabelle.py",

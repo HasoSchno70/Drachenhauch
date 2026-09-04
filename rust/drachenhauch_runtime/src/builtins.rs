@@ -3813,6 +3813,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "json_append_bool" => { arity!(3); let p = need_str(&a[1], "JSON_APPEND_BOOL")?.to_string();
             let w = need_bool(&a[2], "JSON_APPEND_BOOL")?;
             json_haenge_an(&a[0], &p, serde_json::Value::Bool(w), "JSON_APPEND_BOOL") }
+        // Ohne diese Form liess sich eine Liste mit LEEREN Plaetzen gar nicht
+        // schreiben -- und genau so notiert ein Tracker eine Zeile ohne Note.
+        "json_append_null" => { arity!(2); let p = need_str(&a[1], "JSON_APPEND_NULL")?.to_string();
+            json_haenge_an(&a[0], &p, serde_json::Value::Null, "JSON_APPEND_NULL") }
         "json_append_json" => {
             arity!(3); let p = need_str(&a[1], "JSON_APPEND_JSON")?.to_string();
             let w = json_h(&a[2], "JSON_APPEND_JSON")?.borrow().clone();

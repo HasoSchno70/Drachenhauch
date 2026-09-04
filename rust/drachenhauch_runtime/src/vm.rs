@@ -7084,6 +7084,50 @@ impl<'p> Vm<'p> {
                     &wf, freq, slide, atk, sus, dec, vd, vs, vol, width,
                     duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res)?)
             }
+            "audio_note" => {
+                // AUDIO_NOTE(wf$, freq, dauer_ms, attack_ms, decay_ms, sustain,
+                //   release_ms, vol [, vib_depth, vib_speed, detune_cents,
+                //   slide_halbtoene]) -- eine gehaltene Note mit echter ADSR.
+                let wf = gs(a, 0, "AUDIO_NOTE")?.to_string();
+                let freq = need_f(a, 1, "AUDIO_NOTE")?;
+                let dauer = gi(a, 2, "AUDIO_NOTE")?;
+                let atk = gi(a, 3, "AUDIO_NOTE")?;
+                let dec = gi(a, 4, "AUDIO_NOTE")?;
+                let sus = need_f(a, 5, "AUDIO_NOTE")?;
+                let rel = gi(a, 6, "AUDIO_NOTE")?;
+                let vol = need_f(a, 7, "AUDIO_NOTE")?;
+                let optf = |i: usize, d: f64| -> R<f64> {
+                    if a.len() > i { need_f(a, i, "AUDIO_NOTE") } else { Ok(d) }
+                };
+                let vd = optf(8, 0.0)?;
+                let vs = optf(9, 0.0)?;
+                let det = optf(10, 0.0)?;
+                let slide = optf(11, 0.0)?;
+                Value::Int(self.audio_mut()?.note(&wf, freq, dauer, atk, dec, sus, rel, vol,
+                                                   vd, vs, det, slide)?)
+            }
+            "audio_sound_new" => {
+                let dauer = gi(a, 0, "AUDIO_SOUND_NEW")?;
+                Value::Int(self.audio_mut()?.sound_new(dauer)?)
+            }
+            "audio_sound_mix" => {
+                // AUDIO_SOUND_MIX(ziel, quelle, offset_ms[, vol[, pan]])
+                let ziel = gi(a, 0, "AUDIO_SOUND_MIX")?;
+                let quelle = gi(a, 1, "AUDIO_SOUND_MIX")?;
+                let offset = need_f(a, 2, "AUDIO_SOUND_MIX")?;
+                let vol = if a.len() > 3 { need_f(a, 3, "AUDIO_SOUND_MIX")? } else { 1.0 };
+                let pan = if a.len() > 4 { Some(need_f(a, 4, "AUDIO_SOUND_MIX")?) } else { None };
+                if !(0.0..=4.0).contains(&vol) {
+                    return Err("AUDIO_SOUND_MIX: vol muss 0..4 sein".into());
+                }
+                self.audio_mut()?.sound_mix(ziel, quelle, offset, vol, pan)?;
+                Value::Nil
+            }
+            "audio_sound_normalize" => {
+                let idx = gi(a, 0, "AUDIO_SOUND_NORMALIZE")?;
+                let spitze = if a.len() > 1 { need_f(a, 1, "AUDIO_SOUND_NORMALIZE")? } else { 1.0 };
+                Value::Float(self.audio_mut()?.sound_normalize(idx, spitze)?)
+            }
             // Am SOUND-Handle, nicht an AUDIO_SFX: so gelten beide fuer jede
             // Klangquelle (TONE, NOISE, SFX, geladene Datei).
             "audio_sound_wave" => {
