@@ -92,6 +92,7 @@ _SERIELL = {
     "test_gui_form_runner.py",
     "test_gui_tastatur.py",
     "test_gui_dialog.py",
+    "test_gui_menu_ausbau.py",       # speist Tasten UND Klicks ein
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
     "test_gui_text_formular.py",
@@ -201,6 +202,7 @@ _BRAUCHT_GRAFIK = {
     "test_gui_draw_window.py",
     "test_gui_clicked_schalter.py",
     "test_gui_form_runner.py",
+    "test_gui_menu_ausbau.py",
     "test_gui_table_frozen_edge.py",
     "test_gui_tastatur.py",
     "test_gui_text_formular.py",

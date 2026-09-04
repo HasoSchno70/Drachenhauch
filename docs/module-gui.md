@@ -97,10 +97,21 @@ IMPORT "gui"
 |---|---|---|
 | `GUI_MENU(win, label$)` | Menü-Handle | Top-Level-Menü in der **Menüleiste** (z. B. „Datei") |
 | `GUI_CONTEXT(win)` | Menü-Handle | **Kontextmenü** (per Rechtsklick im Fenster) |
-| `GUI_MENU_ITEM(menu, label$)` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED` |
+| `GUI_SUBMENU(menu, label$)` | Menü-Handle | **Untermenü** — öffnet beim Überfahren rechts daneben, beliebig tief |
+| `GUI_MENU_ITEM(menu, label$[, kuerzel$])` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED`; `kuerzel$` z. B. `"Strg+S"` |
 | `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
+| `GUI_MENU_SHORTCUT(item, kuerzel$)` | — | Kürzel setzen oder mit `""` entfernen |
+| `GUI_MENU_ENABLE(item, an)` | — | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben |
+| `GUI_MENU_CHECK(item, an)` | — | macht den Eintrag zum **Häkchen-Eintrag** und setzt ihn; ein Klick kippt ihn danach selbst |
+| `GUI_MENU_CHECKED(item)` | BOOLEAN | Zustand des Häkchens |
+| `GUI_MENU_ICON(item, bild)` | — | Sinnbild links vom Text (Textur-Handle wie bei `GUI_ICON_BUTTON`, -1 entfernt) |
+| `GUI_MENU_TEXT(item, label$)` | — | Beschriftung ändern („Pause" / „Weiter") |
 
 Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.dh`](../examples/129_gui_menu.dh).
+
+**Tastenkürzel** stehen rechts im Eintrag und werden im Fenster mit Fokus jedes Bild geprüft — auch bei geschlossenem Menü. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert.
+
+**Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Der Form-Designer bearbeitet Menüs nicht, reicht sie aber unverändert durch und schreibt sie in den GB-Code.
 
 ### Reiter (Tabs) + Tastatur-Navigation
 

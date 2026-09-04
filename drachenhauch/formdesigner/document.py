@@ -985,6 +985,52 @@ class FormDoc:
         return "\n".join(lines)
 
     # ---- GB-Code-Export (explizite GUI_*-Konstruktion statt GUI_LOAD) ----
+    def _gb_menus(self) -> list[str]:
+        """GUI_MENU/GUI_CONTEXT/GUI_SUBMENU/GUI_MENU_ITEM-Zeilen aus `extra["menus"]`
+        (dem Format von gui.rs::to_json, Untermenues verschachtelt)."""
+        menus = self.extra.get("menus")
+        if not isinstance(menus, list) or not menus:
+            return []
+        out: list[str] = []
+        zaehler = [0]
+
+        def eintraege(var: str, items) -> None:
+            for it in items or []:
+                if not isinstance(it, dict):
+                    continue
+                if it.get("separator"):
+                    out.append(f"GUI_MENU_SEPARATOR({var})")
+                    continue
+                label = str(it.get("label", ""))
+                if isinstance(it.get("items"), list):
+                    zaehler[0] += 1
+                    sv = f"{var}_u{zaehler[0]}"
+                    out.append(f"DIM {sv} AS INTEGER : {sv} = GUI_SUBMENU({var}, {_gb_str(label)})")
+                    eintraege(sv, it["items"])
+                    continue
+                zaehler[0] += 1
+                iv = f"{var}_e{zaehler[0]}"
+                kuerzel = str(it.get("shortcut") or "")
+                args = f"{var}, {_gb_str(label)}" + (f", {_gb_str(kuerzel)}" if kuerzel else "")
+                out.append(f"DIM {iv} AS INTEGER : {iv} = GUI_MENU_ITEM({args})")
+                if it.get("checkable"):
+                    out.append(f"GUI_MENU_CHECK({iv}, {_gb_bool(bool(it.get('checked')))})")
+                if it.get("enabled") is False:
+                    out.append(f"GUI_MENU_ENABLE({iv}, FALSE)")
+
+        for k, m in enumerate(menus):
+            if not isinstance(m, dict):
+                continue
+            mv = f"menue{k + 1}"
+            if m.get("in_bar", True):
+                out.append(f"DIM {mv} AS INTEGER : {mv} = GUI_MENU(frm, {_gb_str(str(m.get('label', '')))})")
+            else:
+                out.append(f"DIM {mv} AS INTEGER : {mv} = GUI_CONTEXT(frm)")
+            eintraege(mv, m.get("items"))
+        if out:
+            out.append("")
+        return out
+
     @staticmethod
     def _gb_text_extras(c: "Control", var: str) -> list[str]:
         """Ausrichtung, Umbruch, Textfeld-Grenzen, Tooltip -- nur, wo gesetzt."""
@@ -1048,6 +1094,9 @@ class FormDoc:
         if self.max_w or self.max_h:
             L.append(f"GUI_WINDOW_SET_MAX_SIZE(frm, {self.max_w}, {self.max_h})")
         L.append("")
+        # Menues (aus `extra`, der Designer bearbeitet sie nicht -- aber ein
+        # geladenes Formular soll sie im erzeugten Programm nicht verlieren).
+        L.extend(self._gb_menus())
         # Controls
         used = {"frm"} | set(self.handler_names())
         vars_: dict[int, str] = {}

@@ -5199,7 +5199,22 @@ impl<'p> Vm<'p> {
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_menu" => Value::Int(self.gui.add_menu(gi(a,0,"GUI_MENU")?, gs(a,1,"GUI_MENU")?.to_string())?),
             "gui_context" => Value::Int(self.gui.add_context(gi(a,0,"GUI_CONTEXT")?)?),
-            "gui_menu_item" => Value::Int(self.gui.add_menu_item(gi(a,0,"GUI_MENU_ITEM")?, gs(a,1,"GUI_MENU_ITEM")?.to_string())?),
+            "gui_menu_item" => {
+                // GUI_MENU_ITEM(menu, label$[, kuerzel$])
+                let h = self.gui.add_menu_item(gi(a,0,"GUI_MENU_ITEM")?, gs(a,1,"GUI_MENU_ITEM")?.to_string())?;
+                if a.len() > 2 {
+                    let k = gs(a,2,"GUI_MENU_ITEM")?.to_string();
+                    self.gui.menu_shortcut(h, &k).map_err(|e| e.replace("GUI_MENU_SHORTCUT", "GUI_MENU_ITEM"))?;
+                }
+                Value::Int(h)
+            }
+            "gui_submenu" => Value::Int(self.gui.add_submenu(gi(a,0,"GUI_SUBMENU")?, gs(a,1,"GUI_SUBMENU")?.to_string())?),
+            "gui_menu_shortcut" => { let k = gs(a,1,"GUI_MENU_SHORTCUT")?.to_string(); self.gui.menu_shortcut(gi(a,0,"GUI_MENU_SHORTCUT")?, &k)?; Value::Nil }
+            "gui_menu_enable" => { self.gui.menu_enable(gi(a,0,"GUI_MENU_ENABLE")?, gbool(a,1,"GUI_MENU_ENABLE")?)?; Value::Nil }
+            "gui_menu_check" => { self.gui.menu_check(gi(a,0,"GUI_MENU_CHECK")?, gbool(a,1,"GUI_MENU_CHECK")?)?; Value::Nil }
+            "gui_menu_checked" => Value::Bool(self.gui.menu_checked(gi(a,0,"GUI_MENU_CHECKED")?)?),
+            "gui_menu_icon" => { self.gui.menu_icon(gi(a,0,"GUI_MENU_ICON")?, gi(a,1,"GUI_MENU_ICON")?)?; Value::Nil }
+            "gui_menu_text" => { self.gui.menu_text(gi(a,0,"GUI_MENU_TEXT")?, gs(a,1,"GUI_MENU_TEXT")?.to_string())?; Value::Nil }
             "gui_menu_separator" => { self.gui.add_menu_separator(gi(a,0,"GUI_MENU_SEPARATOR")?)?; Value::Nil }
             "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
             "gui_checked" => Value::Bool(self.gui.checked(gi(a,0,"GUI_CHECKED")?)?),
@@ -8144,7 +8159,7 @@ const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("darkgreen", 32768), ("darkblue", 128),
 ];
 
-const DEFAULT_KEYS: &[(&str, i64)] = &[
+pub(crate) const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_escape", 27), ("key_return", 13), ("key_enter", 13), ("key_space", 32),
     ("key_tab", 9), ("key_backspace", 8),
     ("key_left", 1073741904), ("key_right", 1073741903), ("key_up", 1073741906), ("key_down", 1073741905),

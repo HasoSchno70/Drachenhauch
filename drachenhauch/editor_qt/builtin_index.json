@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1626,
+ "count": 1633,
  "builtins": [
   {
    "name": "ABS",
@@ -3141,15 +3141,51 @@
    "module": "gui"
   },
   {
+   "name": "GUI_MENU_CHECK",
+   "kind": "core",
+   "signature": "GUI_MENU_CHECK(item, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MENU_CHECKED",
+   "kind": "core",
+   "signature": "GUI_MENU_CHECKED(item)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MENU_ENABLE",
+   "kind": "core",
+   "signature": "GUI_MENU_ENABLE(item, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MENU_ICON",
+   "kind": "core",
+   "signature": "GUI_MENU_ICON(item, bild)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_MENU_ITEM",
    "kind": "core",
-   "signature": "GUI_MENU_ITEM(menu, label$)",
+   "signature": "GUI_MENU_ITEM(menu, label$[, kuerzel$])",
    "module": "gui"
   },
   {
    "name": "GUI_MENU_SEPARATOR",
    "kind": "core",
    "signature": "GUI_MENU_SEPARATOR(menu)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MENU_SHORTCUT",
+   "kind": "core",
+   "signature": "GUI_MENU_SHORTCUT(item, kuerzel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MENU_TEXT",
+   "kind": "core",
+   "signature": "GUI_MENU_TEXT(item, label$)",
    "module": "gui"
   },
   {
@@ -3432,6 +3468,12 @@
    "name": "GUI_STYLE_SET",
    "kind": "core",
    "signature": "GUI_STYLE_SET(name$, prop$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SUBMENU",
+   "kind": "core",
+   "signature": "GUI_SUBMENU(menu, label$)",
    "module": "gui"
   },
   {

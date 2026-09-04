@@ -5,6 +5,12 @@
 '  fuegt Eintraege hinzu (-> Handle fuer GUI_CLICKED), GUI_MENU_SEPARATOR
 '  eine Trennlinie. GUI_CONTEXT(win) ist ein Kontextmenue (Rechtsklick im
 '  Fenster). Die Menueleiste schiebt den Fensterinhalt automatisch nach unten.
+'
+'  Seit 2026-09-04 dazu: Tastenkuerzel (drittes Argument oder
+'  GUI_MENU_SHORTCUT -- sie gelten auch bei geschlossenem Menue),
+'  Untermenues (GUI_SUBMENU), Haekchen-Eintraege (GUI_MENU_CHECK/CHECKED),
+'  gesperrte Eintraege (GUI_MENU_ENABLE), Sinnbilder (GUI_MENU_ICON) und
+'  GUI_MENU_TEXT zum Umbeschriften.
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
@@ -28,14 +34,31 @@ win = GUI_WINDOW("Editor", (SW - 620) \ 2, (SH - 420) \ 2, 620, 420)
 
 ' --- Menueleiste ---
 DIM mFile AS INTEGER : mFile = GUI_MENU(win, "Datei")
-DIM miNew AS INTEGER : miNew = GUI_MENU_ITEM(mFile, "Neu")
-DIM miOpen AS INTEGER : miOpen = GUI_MENU_ITEM(mFile, "Oeffnen ...")
+DIM miNew AS INTEGER : miNew = GUI_MENU_ITEM(mFile, "Neu", "Strg+N")
+DIM miOpen AS INTEGER : miOpen = GUI_MENU_ITEM(mFile, "Oeffnen ...", "Strg+O")
+GUI_MENU_ICON(miNew, GENTEX_COLOR(16, 16, &H4BE87A))
+GUI_MENU_ICON(miOpen, GENTEX_COLOR(16, 16, &HE8B44B))
+' Ein Untermenue: oeffnet beim Ueberfahren, beliebig tief.
+DIM mRecent AS INTEGER : mRecent = GUI_SUBMENU(mFile, "Zuletzt geoeffnet")
+DIM miR1 AS INTEGER : miR1 = GUI_MENU_ITEM(mRecent, "pong.dh")
+DIM miR2 AS INTEGER : miR2 = GUI_MENU_ITEM(mRecent, "schwarm.dh")
 GUI_MENU_SEPARATOR(mFile)
-DIM miQuit AS INTEGER : miQuit = GUI_MENU_ITEM(mFile, "Beenden")
+DIM miQuit AS INTEGER : miQuit = GUI_MENU_ITEM(mFile, "Beenden", "Alt+F4")
 
 DIM mEdit AS INTEGER : mEdit = GUI_MENU(win, "Bearbeiten")
-DIM miCopy AS INTEGER : miCopy = GUI_MENU_ITEM(mEdit, "Kopieren")
-DIM miPaste AS INTEGER : miPaste = GUI_MENU_ITEM(mEdit, "Einfuegen")
+' Gesperrt, bis es etwas zurueckzunehmen gibt -- das Kuerzel schweigt dann mit.
+DIM miUndo AS INTEGER : miUndo = GUI_MENU_ITEM(mEdit, "Rueckgaengig", "Strg+Z")
+GUI_MENU_ENABLE(miUndo, FALSE)
+GUI_MENU_SEPARATOR(mEdit)
+DIM miCopy AS INTEGER : miCopy = GUI_MENU_ITEM(mEdit, "Kopieren", "Strg+C")
+DIM miPaste AS INTEGER : miPaste = GUI_MENU_ITEM(mEdit, "Einfuegen", "Strg+V")
+
+DIM mView AS INTEGER : mView = GUI_MENU(win, "Ansicht")
+' Haekchen-Eintrag: ein Klick oder das Kuerzel kippt ihn, GUI_MENU_CHECKED liest ihn.
+DIM miStatus AS INTEGER : miStatus = GUI_MENU_ITEM(mView, "Statusleiste", "Strg+Umschalt+S")
+GUI_MENU_CHECK(miStatus, TRUE)
+DIM miGrid AS INTEGER : miGrid = GUI_MENU_ITEM(mView, "Gitter", "Strg+G")
+GUI_MENU_CHECK(miGrid, FALSE)
 
 DIM mHelp AS INTEGER : mHelp = GUI_MENU(win, "Hilfe")
 DIM miAbout AS INTEGER : miAbout = GUI_MENU_ITEM(mHelp, "Ueber ...")
@@ -56,9 +79,17 @@ WHILE NOT QUITREQUESTED()
 
     IF GUI_CLICKED(miNew) THEN status = "Datei > Neu"
     IF GUI_CLICKED(miOpen) THEN status = "Datei > Oeffnen"
+    IF GUI_CLICKED(miR1) THEN status = "Zuletzt > pong.dh"
+    IF GUI_CLICKED(miR2) THEN status = "Zuletzt > schwarm.dh"
     IF GUI_CLICKED(miQuit) THEN BREAK
-    IF GUI_CLICKED(miCopy) THEN status = "Bearbeiten > Kopieren"
+    IF GUI_CLICKED(miUndo) THEN status = "Bearbeiten > Rueckgaengig"
+    IF GUI_CLICKED(miCopy) THEN
+        status = "Bearbeiten > Kopieren"
+        GUI_MENU_ENABLE(miUndo, TRUE)          ' jetzt gibt es etwas zurueckzunehmen
+    END IF
     IF GUI_CLICKED(miPaste) THEN status = "Bearbeiten > Einfuegen"
+    IF GUI_CLICKED(miStatus) THEN status = "Statusleiste " + IIF(GUI_MENU_CHECKED(miStatus), "an", "aus")
+    IF GUI_CLICKED(miGrid) THEN status = "Gitter " + IIF(GUI_MENU_CHECKED(miGrid), "an", "aus")
     IF GUI_CLICKED(miAbout) THEN status = "Hilfe > Ueber Drachenhauch"
     IF GUI_CLICKED(cCut) THEN status = "Kontext: Ausschneiden"
     IF GUI_CLICKED(cCopy) THEN status = "Kontext: Kopieren"
