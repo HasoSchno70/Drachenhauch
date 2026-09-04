@@ -189,6 +189,14 @@ schiefgehen:
   bricht zur Laufzeit ab, aber eben erst, wenn die Zeile läuft; in einem
   selten genommenen Zweig kann das lange dauern. Die Meldung schlägt einen
   ähnlichen bekannten Namen vor, wenn es einen gibt.
+* **Ein Name, den es gibt — nur nicht hier.** Eine lokale Variable gehört
+  ihrer `SUB`/`FUNCTION`/Methode; wer sie in einer zweiten benutzt, bekommt
+  denselben Laufzeit-Abbruch. Die Meldung sagt das ausdrücklich („ist an
+  dieser Stelle nicht sichtbar"), weil man den Namen sonst vor sich im
+  Quelltext stehen sieht und lange nach einem Tippfehler sucht, den es nicht
+  gibt. Wer ihn an beiden Stellen braucht, legt ihn mit `DIM` auf oberster
+  Ebene an — dort ist er global, auch innerhalb eines `IF`-Blocks und auch
+  für eine `SUB`, die im Quelltext darüber steht.
 
 **Alles davon ist eine Warnung, kein Fehler.** Das Programm lässt sich
 übersetzen und läuft. Der Grund ist Ehrlichkeit: der Übersetzer leitet den Typ
@@ -206,13 +214,13 @@ Programm abweisen.
   Hund() : t.belle()` ist gültig und bleibt still.
 * **Ob jeder Zweig ein `RETURN` erreicht.** Gemeldet wird nur, wo es gar keines
   gibt.
-* **Der Gültigkeitsbereich eines Namens.** Beim Tippfehler-Test zählt jeder
-  Name, der *irgendwo* im Programm deklariert wird — nicht nur der, den man an
-  dieser Stelle sehen kann. Eine lokale Variable aus einer anderen Funktion
-  bricht also zur Laufzeit trotzdem ab, ohne dass es gemeldet wird. Der Grund
-  ist derselbe wie oben: eine Meldung, die bei richtigem Code anschlägt, ist
-  teurer als eine Lücke. Wer den Gültigkeitsbereich mitprüfen will, muss
-  zuerst belegen, dass dabei kein Fehlalarm entsteht.
+* **Eine Zuweisung, die im selben Unterprogramm *vor* ihrem `DIM` steht.**
+  `t = 1` und erst danach `DIM t AS INTEGER` bricht zur Laufzeit ebenfalls ab
+  — der lokale Platz entsteht erst am `DIM`. Gemeldet wird es nicht: der
+  Übersetzer arbeitet die Zeilen der Reihe nach ab, und was er an einer
+  Stelle noch nicht kennt, gilt ihm als „kommt vielleicht noch". Der Grund ist
+  derselbe wie oben — eine Meldung, die bei richtigem Code anschlägt, ist
+  teurer als eine Lücke.
 
 ## ENUM
 

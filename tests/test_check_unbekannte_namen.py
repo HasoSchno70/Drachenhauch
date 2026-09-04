@@ -31,7 +31,11 @@ def _find_dhrt():
 _DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
-_MARKE = "nirgends im Programm mit DIM oder CONST angelegt"
+# Beide Fassungen der Warnung tragen diesen Satz -- die fuer einen Namen,
+# den es nirgends gibt, und die fuer einen, den es nur in einem anderen
+# Gueltigkeitsbereich gibt. Ein Marker auf nur einen der beiden Texte
+# haette die andere Haelfte stillschweigend uebersehen.
+_MARKE = "Beim Laufen bricht diese Zeile ab"
 
 
 def _befunde(src, tmp_path):
@@ -173,19 +177,48 @@ def test_ein_spaeteres_dim_zaehlt_auch(tmp_path):
     assert _befunde(src, tmp_path) == []
 
 
-def test_ein_name_aus_einer_anderen_funktion_wird_uebersehen(tmp_path):
-    """Die bewusste Luecke, festgehalten damit sie nicht fuer einen Fehler
-    gehalten wird: geprueft wird gegen alle Namen im GANZEN Programm, nicht
-    gegen den Gueltigkeitsbereich. `hilf` ist in `b` nicht sichtbar und
-    braeche dort ab -- gemeldet wird es trotzdem nicht.
+def test_ein_name_aus_einer_anderen_funktion_ist_ein_befund(tmp_path):
+    """Bis 2026-09-03 war das die bewusste Luecke: geprueft wurde gegen alle
+    Namen im GANZEN Programm, nicht gegen den Gueltigkeitsbereich. `hilf` ist
+    in `b` nicht sichtbar und bricht dort ab -- gemeldet wurde es trotzdem
+    nicht, weil `a` eine Variable dieses Namens hat.
 
-    Das ist der Preis dafuer, dass die Pruefung bei richtigem Code schweigt.
-    Wer den Gueltigkeitsbereich mitpruefen will, muss zuerst belegen, dass
-    dabei keine Falschmeldung entsteht.
+    Die Bedingung, unter der die Luecke geschlossen werden durfte, stand in
+    docs/sprache.md: erst belegen, dass dabei keine Falschmeldung entsteht.
+    Der Beleg ist der Sweep in tests/test_dhrt_check.py -- 384 .dh-Dateien,
+    null Meldungen.
+
+    Die Meldung sagt hier ausdruecklich etwas anderes als beim Tippfehler:
+    den Namen GIBT es, er ist nur nicht sichtbar. Wer ihn vor sich im
+    Quelltext stehen sieht, sucht sonst lange nach einem Tippfehler, den es
+    nicht gibt.
     """
     src = ('SUB a()\n    DIM hilf AS INTEGER : hilf = 1\n    PRINT hilf\nEND SUB\n'
            'SUB b()\n    PRINT hilf\nEND SUB\na()\n')
-    assert _befunde(src, tmp_path) == []
+    b = _befunde(src, tmp_path)
+    assert len(b) == 1 and b[0]["line"] == 6
+    assert "nicht sichtbar" in b[0]["message"]
+    assert "nirgends im Programm" not in b[0]["message"]
+
+
+def test_dasselbe_zwischen_zwei_methoden(tmp_path):
+    """Jede Methode ist ein eigener Bereich -- nicht nur SUBs untereinander."""
+    src = ('CLASS K\n'
+           '    SUB eins()\n        DIM merk AS INTEGER\n        merk = 1\n    END SUB\n'
+           '    SUB zwei()\n        PRINT merk\n    END SUB\n'
+           'END CLASS\n'
+           'DIM k AS K\nk = NEW K()\nk.eins()\n')
+    b = _befunde(src, tmp_path)
+    assert len(b) == 1 and b[0]["line"] == 7 and "nicht sichtbar" in b[0]["message"]
+
+
+def test_der_vorschlag_kennt_die_eigenen_lokalen(tmp_path):
+    """Gegenprobe zur Bereichs-Trennung: ein Tippfehler auf eine LOKALE
+    Variable muss sie weiterhin vorschlagen koennen -- sonst haette die
+    Trennung den Hinweis nebenbei entwertet."""
+    b = _befunde('SUB a()\n    DIM zaehler AS INTEGER\n    zaehlr = 1\nEND SUB\nPRINT 1\n',
+                 tmp_path)
+    assert len(b) == 1 and "Meintest du 'zaehler'?" in b[0]["message"]
 
 
 def test_input_und_read_auf_deklarierte_namen_schweigen(tmp_path):
@@ -194,3 +227,29 @@ def test_input_und_read_auf_deklarierte_namen_schweigen(tmp_path):
     assert _befunde(
         'DIM punkte AS INTEGER\nINPUT punkte\nDATA 1\nREAD punkte\n', tmp_path) == []
 
+
+def test_ein_globales_dim_ist_in_jeder_funktion_sichtbar(tmp_path):
+    """Die Gegenrichtung zur Bereichs-Trennung, und der Fall, der bei einer zu
+    scharfen Umsetzung als Erstes umfaellt: was auf oberster Ebene deklariert
+    ist, gilt ueberall -- auch in einer SUB, die im Quelltext darueber steht,
+    und auch wenn das DIM in einem IF-Block sitzt (Drachenhauch kennt keine
+    Block-Gueltigkeit)."""
+    src = ('SUB zeige()\n    PRINT punkte + bonus\nEND SUB\n'
+           'DIM punkte AS INTEGER\n'
+           'IF TRUE THEN\n    DIM bonus AS INTEGER\nEND IF\n'
+           'zeige()\n')
+    assert _befunde(src, tmp_path) == []
+
+
+def test_ein_spaeteres_dim_in_derselben_funktion_schweigt(tmp_path):
+    """Innerhalb einer Funktion faellt eine Zuweisung VOR dem DIM in denselben
+    Rueckfall -- der lokale Platz entsteht erst am DIM. Zur Laufzeit waere das
+    ebenfalls ein Abbruch; gemeldet wird es trotzdem nicht.
+
+    Gemessen: ohne diese Ausnahme melden die 384 .dh-Dateien des Repos genauso
+    wenig. Sie bleibt als Netz unter der Bereichs-Trennung -- der Compiler
+    uebersetzt linear, und welche Deklarationsform wann einen lokalen Platz
+    anlegt, soll man hier nicht alles wissen muessen.
+    """
+    assert _befunde('SUB a()\n    t = 1\n    DIM t AS INTEGER\nEND SUB\nPRINT 1\n',
+                    tmp_path) == []

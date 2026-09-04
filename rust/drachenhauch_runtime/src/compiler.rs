@@ -360,7 +360,15 @@ pub struct Compiler {
     // Ausgewertet wird ERST am Ende -- ein `DIM` weiter unten in der Datei
     // ist voellig in Ordnung, und waehrend des Uebersetzens weiss man das
     // noch nicht.
-    offene_namen: Vec<(u32, String, bool)>,
+    /// Offene Namen als `(Zeile, Name, ist_zuweisung, Bereich)`. `Bereich` ist
+    /// der Index in `lokale_namen` -- 0 = Hauptprogramm.
+    offene_namen: Vec<(u32, String, bool, usize)>,
+    /// Locals + Parameter je uebersetzter Funktion/Methode, unter ihrer
+    /// Bereichsnummer. Sie gelten NUR dort -- deshalb liegen sie nicht in
+    /// `bekannte_namen`, wo alles steht, was zur Laufzeit global existiert.
+    lokale_namen: Vec<std::collections::HashSet<String>>,
+    /// Der Bereich, in dem gerade uebersetzt wird (0 = Hauptprogramm).
+    aktueller_bereich: usize,
 }
 
 /// Namen aller dhrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
@@ -559,6 +567,11 @@ impl Compiler {
            importierte_module: std::collections::HashSet<String>) -> Self {
         Compiler { bekannte_namen: std::collections::HashSet::new(),
                    offene_namen: Vec::new(),
+                   // Platz 0 gehoert dem Hauptprogramm. Es hat keine
+                   // Locals ausser den `__`-Hilfsvariablen, die der Compiler
+                   // selbst erzeugt -- der Satz bleibt leer.
+                   lokale_namen: vec![Default::default()],
+                   aktueller_bereich: 0,
                    global_slots: HashMap::new(),
                    global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
@@ -672,16 +685,31 @@ impl Compiler {
         self.bekannte_namen.insert(name.to_lowercase());
     }
 
-    /// Alle Locals und Parameter einer fertig uebersetzten Funktion
-    /// uebernehmen. Das ist absichtlich GROBKOERNIG: die Namen gelten danach
-    /// programmweit als bekannt, obwohl sie nur in dieser Funktion sichtbar
-    /// sind. Damit kann die Warnung unten einen Tippfehler UEBERSEHEN (wenn
-    /// er zufaellig einer Variablen anderswo gleicht) -- aber sie kann keinen
-    /// erfinden. Falschmeldungen waeren hier teurer als Luecken: eine
-    /// Pruefung, die bei richtigem Code anschlaegt, schaltet man ab.
-    fn namen_aus_kontext(&mut self, ctx: &Ctx) {
-        let namen: Vec<String> = ctx.local_slots.keys().cloned().collect();
-        for n in namen { self.merke_deklariert(&n); }
+    /// Einen neuen Namensbereich fuer eine Funktion/Methode aufmachen.
+    ///
+    /// Muss VOR dem Uebersetzen des Rumpfes laufen, weil die offenen Namen
+    /// waehrenddessen mit dieser Nummer aufgezeichnet werden. Der alte
+    /// Bereich wird zurueckgegeben und vom Aufrufer wiederhergestellt -- so
+    /// wie `self.ctx` selbst.
+    fn bereich_beginnen(&mut self) -> (usize, usize) {
+        self.lokale_namen.push(Default::default());
+        let neu = self.lokale_namen.len() - 1;
+        (std::mem::replace(&mut self.aktueller_bereich, neu), neu)
+    }
+
+    /// Locals und Parameter der fertig uebersetzten Funktion in IHREN Bereich
+    /// legen -- nicht in `bekannte_namen`.
+    ///
+    /// Bis 2026-09-03 landeten sie im globalen Satz. Das war absichtlich
+    /// grobkoernig (Falschmeldungen sind teurer als Luecken), hat die Warnung
+    /// aber genau dort blind gemacht, wo ein Tippfehler am ehesten unbemerkt
+    /// bleibt: `punkte` in einer SUB, das nur deshalb durchging, weil eine
+    /// ANDERE SUB eine Variable dieses Namens hat.
+    fn bereich_beenden(&mut self, alt: usize, neu: usize, ctx: &Ctx) {
+        for n in ctx.local_slots.keys() {
+            self.lokale_namen[neu].insert(n.to_lowercase());
+        }
+        self.aktueller_bereich = alt;
     }
 
     /// Bekommt ein DIM einen Slot? Skalar (primitiv ODER Klasse), nicht
@@ -1383,7 +1411,11 @@ impl Compiler {
         // ARRAY/MAP ohne, STRUCT, Skalar, je main/lokal); die Zweige einzeln
         // zu erfassen war der erste Versuch und hat genau EINEN uebersehen --
         // `DIM x[N] AS T`. Das ergab 243 Falschmeldungen ueber die Beispiele.
-        self.merke_deklariert(name);
+        // Nur auf oberster Ebene ist ein DIM global. In einer SUB/FUNCTION
+        // bekommt es einen lokalen Platz und kommt am Ende ueber
+        // `bereich_beenden` in SEINEN Bereich -- traege man es hier ein,
+        // waere jede Funktions-Variable programmweit "bekannt".
+        if self.ctx.is_main { self.merke_deklariert(name); }
         self.warn_shadowed_const(name);
         let eff = if array_dims.is_some() { format!("array:{}", type_name) }
                   else { type_name.to_string() };
@@ -1605,7 +1637,7 @@ impl Compiler {
             // wie LOAD_NAME und bricht dort mit derselben Meldung ab -- also
             // dieselbe Warnung (`INPUT punkte` ohne `DIM punkte`).
             let z = self.ctx.cur_line;
-            self.offene_namen.push((z, target.to_string(), true));
+            self.offene_namen.push((z, target.to_string(), true, self.aktueller_bereich));
         }
         Ok(())
     }
@@ -1623,7 +1655,7 @@ impl Compiler {
                     // ueber `store_var` (es braucht den Zwischenspeicher fuer
                     // Feld-/Index-Ziele), landet aber bei demselben STORE_NAME.
                     let z = self.ctx.cur_line;
-                    self.offene_namen.push((z, name.to_string(), true));
+                    self.offene_namen.push((z, name.to_string(), true, self.aktueller_bereich));
                 }
                 Ok(())
             }
@@ -1661,7 +1693,9 @@ impl Compiler {
                 self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
             }
         }
-        self.merke_deklariert(var);
+        // Wie beim DIM: global nur auf oberster Ebene (in einer Funktion hat
+        // die Laufvariable einen lokalen Platz, siehe oben im Zweig).
+        if self.ctx.is_main { self.merke_deklariert(var); }
         // Konstanten-STEP-Richtung bestimmen.
         let step_num: Option<f64> = match step.as_deref() {
             None => Some(1.0),
@@ -1933,7 +1967,7 @@ impl Compiler {
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::LOAD_NAME, json!(idx));
             let z = self.ctx.cur_line;
-            self.offene_namen.push((z, name.to_string(), false));
+            self.offene_namen.push((z, name.to_string(), false, self.aktueller_bereich));
         }
     }
     fn store_var(&mut self, name: &str) {
@@ -1949,7 +1983,7 @@ impl Compiler {
             let idx = self.ctx.add_const(json!(name));
             self.ctx.emit(oc::STORE_NAME, json!(idx));
             let z = self.ctx.cur_line;
-            self.offene_namen.push((z, name.to_string(), true));
+            self.offene_namen.push((z, name.to_string(), true, self.aktueller_bereich));
         }
     }
 
@@ -1979,22 +2013,48 @@ impl Compiler {
         let offen = std::mem::take(&mut self.offene_namen);
         let mut gemeldet: std::collections::HashSet<String> =
             std::collections::HashSet::new();
-        let mut kandidaten: Vec<String> =
-            self.bekannte_namen.iter().cloned().collect();
-        kandidaten.sort();
-        for (zeile, name, ist_zuweisung) in offen {
+        for (zeile, name, ist_zuweisung, bereich) in offen {
             let low = name.to_lowercase();
             if self.bekannte_namen.contains(&low) { continue; }
+            // Der EIGENE Bereich zaehlt mit: innerhalb einer Funktion faellt
+            // eine Zuweisung, die VOR dem `DIM` steht, in den Rueckfall, weil
+            // der lokale Platz erst am DIM entsteht.
+            //
+            // Das WAERE zur Laufzeit ebenfalls ein Abbruch, und ohne diese
+            // Zeile gemessen: die 384 .dh-Dateien des Repos melden auch dann
+            // nichts. Sie bleibt trotzdem, weil sie nichts kostet und das
+            // Netz unter der Bereichs-Umstellung ist -- der Compiler
+            // uebersetzt linear, und welche Deklarationsform wann einen
+            // lokalen Platz anlegt, will man hier nicht alles wissen
+            // muessen.
+            if self.lokale_namen[bereich].contains(&low) { continue; }
             if crate::vm::ist_vorbelegter_name(&low) { continue; }
             // Funktionen (FUNCREF), Klassen und Modul-Typen sind keine
             // Variablen, kommen aber ueber denselben Weg.
             if self.fn_sigs.contains_key(&low) || self.classes.contains_key(&low) { continue; }
             if !gemeldet.insert(low.clone()) { continue; }
+            let was = if ist_zuweisung { "beschrieben" } else { "gelesen" };
+            // Den Namen gibt es -- nur nicht HIER. Das ist eine andere
+            // Auskunft als "nirgends angelegt": wer `hilf` in einer zweiten
+            // SUB benutzt, hat es meist vor sich im Quelltext stehen und
+            // sucht dann lange nach einem Tippfehler, den es nicht gibt.
+            let woanders = self.lokale_namen.iter().enumerate()
+                .any(|(i, s)| i != bereich && s.contains(&low));
+            if woanders {
+                self.warnings.push((zeile, format!(
+                    "'{}' wird hier {}, ist an dieser Stelle aber nicht sichtbar -- den Namen gibt es nur als lokale Variable einer anderen SUB/FUNCTION. Beim Laufen bricht diese Zeile ab (\"Variable '{}' nicht deklariert\"). Wer ihn an beiden Stellen braucht, legt ihn mit DIM auf oberster Ebene an.",
+                    name, was, name)));
+                continue;
+            }
+            // Vorschlaege aus dem, was an DIESER Stelle sichtbar ist.
+            let mut kandidaten: Vec<String> = self.bekannte_namen.iter()
+                .chain(self.lokale_namen[bereich].iter()).cloned().collect();
+            kandidaten.sort();
+            kandidaten.dedup();
             let hinweis = match Self::naechster_name(&low, &kandidaten) {
                 Some(v) => format!(" Meintest du '{}'?", v),
                 None => String::new(),
             };
-            let was = if ist_zuweisung { "beschrieben" } else { "gelesen" };
             self.warnings.push((zeile, format!(
                 "'{}' wird hier {}, aber nirgends im Programm mit DIM oder CONST angelegt. Beim Laufen bricht diese Zeile ab (\"Variable '{}' nicht deklariert\").{}",
                 name, was, name, hinweis)));
@@ -3066,6 +3126,7 @@ impl Compiler {
                 ctx.local_defaults.push(type_default(&p.type_name));
             }
             let saved = std::mem::replace(&mut self.ctx, ctx);
+            let (alt_bereich, mein_bereich) = self.bereich_beginnen();
             let r = (|| {
                 self.emit_default_prologue(params)?;
                 for s in body { self.stmt(s)?; }
@@ -3079,7 +3140,7 @@ impl Compiler {
                 Ok::<(), String>(())
             })();
             let fn_ctx = std::mem::replace(&mut self.ctx, saved);
-            self.namen_aus_kontext(&fn_ctx);
+            self.bereich_beenden(alt_bereich, mein_bereich, &fn_ctx);
             r?;
             let sig = &self.classes[&cname].method_sigs[mname];
             let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
@@ -3156,6 +3217,7 @@ impl Compiler {
             ctx.local_defaults.push(type_default(&p.type_name));
         }
         let saved = std::mem::replace(&mut self.ctx, ctx);
+        let (alt_bereich, mein_bereich) = self.bereich_beginnen();
         let r = (|| {
             self.emit_default_prologue(params)?;
             for s in body { self.stmt(s)?; }
@@ -3169,7 +3231,7 @@ impl Compiler {
             Ok::<(), String>(())
         })();
         let fn_ctx = std::mem::replace(&mut self.ctx, saved);
-        self.namen_aus_kontext(&fn_ctx);
+        self.bereich_beenden(alt_bereich, mein_bereich, &fn_ctx);
         r?;
         let sig = &self.fn_sigs[name];
         let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,

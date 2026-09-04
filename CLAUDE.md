@@ -785,11 +785,26 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   Abbruch ("Variable nicht deklariert") -- aber eben erst, wenn die ZEILE
   laeuft; in einer selten genommenen SUB bleibt das beliebig lange still.
   Gefunden beim Sprite-Piloten, wo eine SUB eine Variable aus einem
-  SCHWESTER-Programm ansprach. **Bewusst grobkoernig:** geprueft wird gegen
-  alle Namen, die IRGENDWO im Programm deklariert werden, nicht gegen den
-  Gueltigkeitsbereich -- ein Tippfehler, der zufaellig einer Variablen in
-  einer anderen Funktion gleicht, rutscht durch. Die Richtung ist Absicht:
-  eine Pruefung mit Falschmeldungen schaltet man ab. Ausgenommen sind die
+  SCHWESTER-Programm ansprach. **Seit 2026-09-04 mit Gueltigkeitsbereich**
+  (vorher stand hier "bewusst grobkoernig: geprueft wird gegen alle Namen, die
+  IRGENDWO im Programm deklariert werden"). Die Locals einer Funktion landeten
+  im GLOBALEN Satz -- damit war die Warnung genau dort blind, wo ein
+  Tippfehler am ehesten unbemerkt bleibt: `punkte` in einer SUB ging durch,
+  weil eine ANDERE SUB eine Variable dieses Namens hat. Jetzt bekommt jede
+  SUB/FUNCTION/Methode einen eigenen Bereich (`lokale_namen`, Platz 0 = das
+  Hauptprogramm), und `bekannte_namen` haelt nur noch, was zur Laufzeit
+  wirklich global ist -- Top-Level-`DIM`/`FOR`/`FOR EACH`/`CATCH`/`ENUM`, und
+  `CONST`, das auch in einer SUB global wird. **Zwei Meldungen statt einer:**
+  gibt es den Namen woanders im Programm, sagt sie das ausdruecklich ("ist an
+  dieser Stelle nicht sichtbar") statt "nirgends angelegt" -- wer ihn vor sich
+  im Quelltext stehen sieht, sucht sonst lange nach einem Tippfehler, den es
+  nicht gibt. Bewusst weiter still: eine Zuweisung, die im SELBEN
+  Unterprogramm VOR ihrem `DIM` steht (gemessen faengt diese Ausnahme nichts
+  weg -- sie ist das Netz unter der Umstellung, weil der Compiler linear
+  uebersetzt). **Falle beim Nachziehen:** Sweep und Test filtern auf den
+  Meldungstext, und der Marker muss ein Satz sein, den BEIDE Fassungen tragen
+  ("Beim Laufen bricht diese Zeile ab") -- sonst uebersieht die Messung die
+  halbe Warnung, und zwar stillschweigend. Ausgenommen sind die
   vorbelegten Konstanten (`vm::ist_vorbelegter_name` -- Farben, KEY_*, pi,
   tau), die absichtlich keinen Slot haben und ueber denselben LOAD_NAME-Weg
   laufen. **Der Beleg ist nicht der Test, sondern der Lauf ueber ALLES:** 384
@@ -806,8 +821,7 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   `store_var`, es braucht den Zwischenspeicher fuer Feld-/Index-Ziele). Beide
   liefen anfangs an der Erfassung vorbei und blieben still, obwohl die VM ihr
   Ziel in genau demselben Verzeichnis sucht.
-  Tests `tests/test_check_unbekannte_namen.py` (6 Treffer, 11 Faelle, in
-  denen sie schweigen MUSS).
+  Tests `tests/test_check_unbekannte_namen.py`.
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
   `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität
