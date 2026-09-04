@@ -2376,7 +2376,21 @@ impl Compiler {
             return Err(format!("{}: Named-Args nur bei SUB/FUNCTION", name));
         }
         // Globale FUNCREF-Variable -> CALL_VALUE, sonst Builtin.
-        if is_global || is_local {
+        //
+        // Eine Variable, die wie ein Builtin heisst (`deg = DEG(x)`,
+        // `len = LEN(s)`), ist in BASIC Alltag. Ist ihr angesagter Typ bekannt
+        // und kein FUNCREF, kann mit `NAME(...)` nur der Builtin gemeint sein
+        // -- eine FLOAT laesst sich nicht aufrufen. Bis 2026-09-04 lief das
+        // ueber CALL_VALUE, brach zur Laufzeit ab ("kann nicht wie eine
+        // Funktion aufgerufen werden") und --check schwieg dazu; gefunden am
+        // Beispiel 145 (`deg = DEG(winkel)`). Verdecken tut damit nur noch
+        // eine FUNCREF -- und der Sonderfall, dass der Typ unbekannt ist
+        // (zweimal mit verschiedenem Typ deklariert); dort waere die
+        // Entscheidung geraten.
+        let variable_gemeint = (is_global || is_local) && !matches!(
+            self.angesagter_typ(&name),
+            Some(t) if t != "funcref" && is_known_builtin(&self.resolve_builtin_alias(&name)));
+        if variable_gemeint {
             self.load_var(&name);
             for a in args { self.expr(a)?; }
             // Name mitgeben, damit die VM bei nicht-aufrufbarem Wert (Variable

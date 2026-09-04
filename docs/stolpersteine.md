@@ -241,7 +241,7 @@ Reflexionen/Mirror-Effekte.
 
 ---
 
-## H — Befunde aus den Editor-Piloten (2026-08-31 / 2026-09-03)
+## H — Befunde aus den Editor-Piloten (2026-08-31 / 2026-09-04)
 
 ### H1. `DIM red` in einem Block scheiterte, oben nicht — ✅ BEHOBEN
 > **Vorbelegte Konstanten liessen sich nur auf oberster Ebene verschatten.**
@@ -304,6 +304,25 @@ Reflexionen/Mirror-Effekte.
 > Tests: `tests/test_check_unbekannte_namen.py`, `tests/test_dhrt_check.py`.
 
 ---
+
+### H3. `deg = DEG(winkel)` brach zur Laufzeit ab — ✅ BEHOBEN
+> **Eine Variable, die wie ein Befehl heißt, verdeckte den Befehl — auch wenn
+> sie ihn gar nicht verdecken KONNTE.** `DIM deg AS FLOAT : deg = DEG(w)`
+> lief bis 2026-09-04 in die Meldung „'deg' ist eine Variable vom Typ FLOAT
+> und kann nicht wie eine Funktion aufgerufen werden", und `dhrt --check`
+> schwieg dazu. Gefunden am Beispiel 145, das deshalb `eg` statt `deg`
+> schrieb. In BASIC ist `len = LEN(s)` Alltag.
+>
+> **Ursache:** der Compiler nahm bei jedem Variablennamen vor der Klammer
+> `CALL_VALUE` (den FUNCREF-Weg), ohne den Typ zu fragen.
+>
+> **Regel jetzt:** ist der angesagte Typ der Variablen bekannt und kein
+> FUNCREF, und gibt es einen Builtin dieses Namens, meint `NAME(...)` den
+> Builtin — eine FLOAT lässt sich nicht aufrufen. Nur eine FUNCREF-Variable
+> dieses Namens ruft weiter die Variable (dort könnte sie gemeint sein);
+> die Meldung sagt das jetzt dazu. Die FOR-EACH-Laufvariable läuft gar
+> nicht über diesen Weg und verdeckt nicht. Tests
+> `tests/test_variable_wie_builtin.py`.
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 

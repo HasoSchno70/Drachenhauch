@@ -24,14 +24,27 @@ Shoot()
 
 
 def test_var_shadows_builtin_call_names_the_builtin(run_gb):
-    """Variable verdeckt einen Builtin -> Laufzeitmeldung nennt Variable + Befehl."""
+    """Eine FUNCREF-Variable verdeckt einen Builtin -> die Laufzeitmeldung
+    nennt Variable + Befehl und sagt, welche Variablen ueberhaupt verdecken.
+
+    Bis 2026-09-04 galt das fuer JEDE Variable, auch `DIM len AS INTEGER`
+    neben `LEN(s)` -- siehe test_variable_wie_builtin.py fuer die neue
+    Regel (bekannter Typ, kein FUNCREF -> der Builtin ist gemeint)."""
     src = '''
-DIM box AS INTEGER
-box = 5
+DIM box AS FUNCREF
 BOX(0, 0, 10, 10, 255)
 '''
     with pytest.raises(DHRuntimeError, match="'box'.*BOX"):
         run_gb(src)
+
+
+def test_typed_variable_named_like_builtin_calls_the_builtin(run_gb):
+    src = '''
+DIM len AS INTEGER
+len = 5
+PRINT LEN("abc") + len
+'''
+    assert run_gb(src).strip() == "8"
 
 
 def test_funcref_variable_call_still_works(run_gb):

@@ -2428,7 +2428,9 @@ impl<'p> Vm<'p> {
                         other => return Err(format!(
                             "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
                              aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: \
-                             benenne die Variable um.",
+                             benenne die Variable um -- eine Variable mit festem Wert-Typ \
+                             (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine \
+                             FUNCREF schon.",
                             cname, other.type_name(), cname.to_uppercase())),
                     }
                 }

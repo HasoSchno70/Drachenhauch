@@ -826,6 +826,16 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   eigene Plaetze. Nebenertrag: die Kollisions-Erkennung sah bis dahin nur
   Geschwister und liess `CONST Modus` oben + `DIM modus` im Block durch.
   Doku `docs/stolpersteine.md` H1, Tests `tests/test_name_collision.py`.
+- **Eine Variable darf heissen wie ein Builtin, und der Aufruf meint den
+  Builtin** (seit 2026-09-04): `DIM deg AS FLOAT : deg = DEG(w)`,
+  `len = LEN(s)`. Vorher lief jeder Variablenname vor einer Klammer ueber
+  `CALL_VALUE` (den FUNCREF-Weg) und brach zur Laufzeit ab -- `--check`
+  schwieg. Regel in `expr_call` (compiler.rs): angesagter Typ bekannt und
+  kein FUNCREF + Builtin dieses Namens vorhanden -> Builtin; eine
+  FUNCREF-Variable ruft weiter die Variable (und der Sonderfall "Typ
+  unbekannt", zweimal verschieden deklariert); die FOR-EACH-Laufvariable
+  laeuft gar nicht ueber diesen Weg und verdeckt nicht.
+  Doku `docs/stolpersteine.md` H3, Tests `tests/test_variable_wie_builtin.py`.
 - **Tastencodes: Buchstaben gehen in BEIDER Schreibweise.** `KEY_A`..`KEY_Z`
   (= 97..122, SDL-Zaehlung) ist die klare Form; `ASC("s")` und `ASC("S")`
   meinen seit 2026-08-31 dieselbe Taste. Vorher galten nur die kleinen, und
