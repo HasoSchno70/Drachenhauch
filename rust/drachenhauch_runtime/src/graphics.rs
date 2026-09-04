@@ -3645,6 +3645,11 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         use raylib::consts::KeyboardKey::*;
         self.rl.is_key_down(KEY_LEFT_CONTROL) || self.rl.is_key_down(KEY_RIGHT_CONTROL)
     }
+    /// Ist eine Alt-Taste gedrueckt? (fuer Menue-Kuerzel wie Alt+Enter)
+    pub fn key_alt(&self) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        self.rl.is_key_down(KEY_LEFT_ALT) || self.rl.is_key_down(KEY_RIGHT_ALT)
+    }
 
     // --- Gamepad (Modul input: INPUT_JOY_*) ---
     /// Anzahl zusammenhaengend verfuegbarer Pads ab Slot 0.

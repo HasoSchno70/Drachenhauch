@@ -837,6 +837,8 @@ pub struct Window {
 struct Menu {
     label: String,
     in_bar: bool,
+    // Untermenue eines anderen Menues: nie Kontextmenue, nie in der Leiste.
+    unter: bool,
     items: Vec<MenuItem>,
 }
 
@@ -845,6 +847,87 @@ struct MenuItem {
     separator: bool,
     enabled: bool,
     clicked: bool,     // gesetzt im Frame des Klicks (via GUI_CLICKED gelesen)
+    // Tastenkuerzel: Anzeige ("Strg+S") und geparste Form -- Bits 1 Strg,
+    // 2 Umschalt, 4 Alt; `k_code` ist der Tastencode der gui-Ebene, 0 = keins.
+    kuerzel: String,
+    k_mods: u8,
+    k_code: i64,
+    // Haekchen-Eintrag: `haken` = ist einer, `an` = Zustand. Ein Klick kippt.
+    haken: bool,
+    an: bool,
+    // Sinnbild (Textur-Handle) links vom Text, -1 = keins.
+    icon: i64,
+    // Untermenue: Index in `Window::menus`, -1 = keins.
+    sub: i32,
+}
+
+impl MenuItem {
+    fn neu(label: String, separator: bool) -> MenuItem {
+        MenuItem { label, separator, enabled: !separator, clicked: false,
+                   kuerzel: String::new(), k_mods: 0, k_code: 0,
+                   haken: false, an: false, icon: -1, sub: -1 }
+    }
+}
+
+/// Tastenkuerzel lesen: "Strg+S", "Strg+Umschalt+O", "F5", "Entf", "Alt+Enter".
+/// Deutsche und englische Namen, Gross-/Kleinschreibung egal. Liefert
+/// (Modifier-Bits, gui-Tastencode) -- derselbe Code-Raum wie KEY_*.
+fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
+    let mut mods = 0u8;
+    let mut code = 0i64;
+    for teil in s.split('+') {
+        let t = teil.trim().to_lowercase();
+        if t.is_empty() { continue; }
+        match t.as_str() {
+            "strg" | "ctrl" | "steuerung" | "control" => { mods |= 1; continue; }
+            "umschalt" | "shift" => { mods |= 2; continue; }
+            "alt" => { mods |= 4; continue; }
+            _ => {}
+        }
+        if code != 0 {
+            return Err(format!("Tastenkuerzel '{}': mehr als eine Taste", s));
+        }
+        let ch: Vec<char> = t.chars().collect();
+        if ch.len() == 1 && (ch[0].is_ascii_lowercase() || ch[0].is_ascii_digit()) {
+            code = ch[0] as i64;
+            continue;
+        }
+        let name = match t.as_str() {
+            "entf" | "delete" | "del" => "key_delete",
+            "einfg" | "insert" | "ins" => "key_insert",
+            "pos1" | "home" => "key_home",
+            "ende" | "end" => "key_end",
+            "bild auf" | "bild-auf" | "bildauf" | "pageup" | "bild hoch" => "key_pageup",
+            "bild ab" | "bild-ab" | "bildab" | "pagedown" | "bild runter" => "key_pagedown",
+            "leer" | "leertaste" | "space" => "key_space",
+            "enter" | "eingabe" | "return" => "key_enter",
+            "esc" | "escape" => "key_escape",
+            "tab" | "tabulator" => "key_tab",
+            "rueck" | "ruecktaste" | "backspace" => "key_backspace",
+            "links" | "left" => "key_left",
+            "rechts" | "right" => "key_right",
+            "hoch" | "auf" | "up" => "key_up",
+            "runter" | "ab" | "down" => "key_down",
+            _ => {
+                if t.len() >= 2 && t.starts_with('f') && t[1..].chars().all(|c| c.is_ascii_digit()) {
+                    // F1..F12 ueber die Tabelle unten
+                    ""
+                } else {
+                    return Err(format!(
+                        "Tastenkuerzel '{}': Taste '{}' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, \
+                         Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter",
+                        s, teil.trim()));
+                }
+            }
+        };
+        let key_name = if name.is_empty() { format!("key_{}", t) } else { name.to_string() };
+        code = crate::vm::DEFAULT_KEYS.iter().find(|(n, _)| *n == key_name).map(|(_, v)| *v)
+            .ok_or_else(|| format!("Tastenkuerzel '{}': Taste '{}' unbekannt", s, teil.trim()))?;
+    }
+    if code == 0 {
+        return Err(format!("Tastenkuerzel '{}': keine Taste angegeben", s));
+    }
+    Ok((mods, code))
 }
 
 // Aufgeloestes Tabellen-Layout (einzige Wahrheit fuer Hit-Test + Zeichnen).
@@ -908,6 +991,9 @@ pub struct Gui {
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
+    // Offene Untermenues unter dem offenen Wurzelmenue: (Menue-Index, x, y)
+    // je Ebene. Leer, wenn keine Kette offen ist.
+    sub_chain: Vec<(usize, i32, i32)>,
     was_right_down: bool,                    // Rechtsklick-Flankenerkennung
     scroll_drag: Option<usize>,              // Fenster, dessen Inhalts-Scrollbar gezogen wird
     active_table: Option<(usize, usize)>,
@@ -987,7 +1073,7 @@ impl Gui {
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             editing_table: None, last_click: None, dbl_click: false,
-            open_menu: None, context_open: None, was_right_down: false,
+            open_menu: None, context_open: None, sub_chain: Vec::new(), was_right_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
@@ -2801,7 +2887,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let wi = win as usize;
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
         let mi = w.menus.len();
-        w.menus.push(Menu { label, in_bar, items: Vec::new() });
+        w.menus.push(Menu { label, in_bar, unter: false, items: Vec::new() });
         Ok(enc_menu(wi, mi))
     }
     /// Top-Level-Menue in der Menueleiste (z.B. "Datei").
@@ -2823,14 +2909,142 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (wi, mi) = dec_menu(menu);
         let m = self.menu_mut(menu, "GUI_MENU_ITEM")?;
         let ii = m.items.len();
-        m.items.push(MenuItem { label, separator: false, enabled: true, clicked: false });
+        m.items.push(MenuItem::neu(label, false));
         Ok(enc_item(wi, mi, ii))
     }
     /// Trennlinie an ein Menue anhaengen.
     pub fn add_menu_separator(&mut self, menu: i64) -> Result<(), String> {
         let m = self.menu_mut(menu, "GUI_MENU_SEPARATOR")?;
-        m.items.push(MenuItem { label: String::new(), separator: true, enabled: false, clicked: false });
+        m.items.push(MenuItem::neu(String::new(), true));
         Ok(())
+    }
+
+    // ---- Menue-Ausbau (Punkt 2, 2026-09-04) ------------------------------
+
+    /// GUI_SUBMENU(menu, label$) -> Menue-Handle. Der Eintrag im Elternmenue
+    /// oeffnet es beim Ueberfahren; Eintraege haengt man wie ueberall mit
+    /// GUI_MENU_ITEM an. Beliebig tief.
+    pub fn add_submenu(&mut self, menu: i64, label: String) -> Result<i64, String> {
+        let (wi, mi) = dec_menu(menu);
+        self.menu_mut(menu, "GUI_SUBMENU")?;
+        let w = &mut self.windows[wi];
+        let smi = w.menus.len();
+        w.menus.push(Menu { label: label.clone(), in_bar: false, unter: true, items: Vec::new() });
+        let mut it = MenuItem::neu(label, false);
+        it.sub = smi as i32;
+        w.menus[mi].items.push(it);
+        Ok(enc_menu(wi, smi))
+    }
+    fn item_mut(&mut self, h: i64, fn_: &str) -> Result<&mut MenuItem, String> {
+        if h & ITEM_FLAG == 0 { return Err(format!("{}: erwartet einen Menue-Eintrag (von GUI_MENU_ITEM)", fn_)); }
+        let (wi, mi, ii) = dec_item(h);
+        self.windows.get_mut(wi).and_then(|w| w.menus.get_mut(mi)).and_then(|m| m.items.get_mut(ii))
+            .ok_or_else(|| format!("{}: ungueltiges Eintrags-Handle", fn_))
+    }
+    /// GUI_MENU_SHORTCUT(item, kuerzel$) -- "" entfernt es. Angezeigt wird der
+    /// Text, wie er angegeben wurde; ausgeloest wird ueber die geparste Form.
+    pub fn menu_shortcut(&mut self, h: i64, kuerzel: &str) -> Result<(), String> {
+        let (mods, code) = if kuerzel.trim().is_empty() { (0, 0) }
+                           else { kuerzel_parsen(kuerzel).map_err(|e| format!("GUI_MENU_SHORTCUT: {}", e))? };
+        let it = self.item_mut(h, "GUI_MENU_SHORTCUT")?;
+        it.kuerzel = kuerzel.trim().to_string();
+        it.k_mods = mods; it.k_code = code;
+        Ok(())
+    }
+    /// GUI_MENU_ENABLE(item, an) -- ein gesperrter Eintrag ist grau, nimmt
+    /// keinen Klick und kein Kuerzel an.
+    pub fn menu_enable(&mut self, h: i64, an: bool) -> Result<(), String> {
+        let it = self.item_mut(h, "GUI_MENU_ENABLE")?;
+        if it.separator { return Err("GUI_MENU_ENABLE: eine Trennlinie laesst sich nicht schalten".into()); }
+        it.enabled = an; Ok(())
+    }
+    /// GUI_MENU_CHECK(item, an) -- macht den Eintrag zum Haekchen-Eintrag und
+    /// setzt den Zustand. Ein Klick (oder das Kuerzel) kippt ihn danach selbst.
+    pub fn menu_check(&mut self, h: i64, an: bool) -> Result<(), String> {
+        let it = self.item_mut(h, "GUI_MENU_CHECK")?;
+        it.haken = true; it.an = an; Ok(())
+    }
+    /// GUI_MENU_CHECKED(item) -> BOOLEAN
+    pub fn menu_checked(&self, h: i64) -> Result<bool, String> {
+        if h & ITEM_FLAG == 0 { return Err("GUI_MENU_CHECKED: erwartet einen Menue-Eintrag".into()); }
+        let (wi, mi, ii) = dec_item(h);
+        self.windows.get(wi).and_then(|w| w.menus.get(mi)).and_then(|m| m.items.get(ii))
+            .map(|it| it.an).ok_or_else(|| "GUI_MENU_CHECKED: ungueltiges Eintrags-Handle".into())
+    }
+    /// GUI_MENU_ICON(item, bild) -- Textur-Handle wie bei GUI_ICON_BUTTON, -1 entfernt.
+    pub fn menu_icon(&mut self, h: i64, tex: i64) -> Result<(), String> {
+        let it = self.item_mut(h, "GUI_MENU_ICON")?;
+        it.icon = tex.max(-1); Ok(())
+    }
+    /// GUI_MENU_TEXT(item, label$) -- Beschriftung aendern ("Pause" / "Weiter").
+    pub fn menu_text(&mut self, h: i64, label: String) -> Result<(), String> {
+        let it = self.item_mut(h, "GUI_MENU_TEXT")?;
+        it.label = label; Ok(())
+    }
+
+    /// Kuerzel pruefen -- jedes Bild, im Fenster mit Fokus. Ohne Strg/Alt
+    /// gehoert eine Taste dem Textfeld mit Fokus (ein "Entf" darf dort
+    /// loeschen, nicht den Menuepunkt ausloesen).
+    fn kuerzel_pruefen(&mut self, g: &Graphics) {
+        let Some(top) = self.focus_window else { return };
+        if top >= self.windows.len() || !self.windows[top].alive || !self.windows[top].visible { return; }
+        if self.modal.is_some_and(|m| m != top) { return; }
+        let mods = (g.key_ctrl() as u8) | ((g.key_shift() as u8) << 1) | ((g.key_alt() as u8) << 2);
+        let text_fokus = self.focus_widget.filter(|(w, _)| *w == top)
+            .and_then(|(_, i)| self.windows[top].widgets.get(i))
+            .map(|w| w.kind.nimmt_text()).unwrap_or(false);
+        let mut treffer: Option<(usize, usize)> = None;
+        'suche: for (mi, m) in self.windows[top].menus.iter().enumerate() {
+            for (ii, it) in m.items.iter().enumerate() {
+                if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
+                if text_fokus && (mods & 5) == 0 { continue; }
+                if g.key_pressed(it.k_code) { treffer = Some((mi, ii)); break 'suche; }
+            }
+        }
+        if let Some((mi, ii)) = treffer {
+            self.open_menu = None; self.context_open = None; self.sub_chain.clear();
+            self.fire_menu_item(top, mi, ii);
+        }
+    }
+
+    /// Alle offenen Popups von der Wurzel abwaerts: (Fenster, Menue, x, y).
+    fn popup_chain(&self, g: &Graphics) -> Vec<(usize, usize, i32, i32)> {
+        let mut out = Vec::new();
+        if let Some((wi, mi, cx, cy)) = self.context_open {
+            out.push((wi, mi, cx, cy));
+        } else if let Some((wi, mi)) = self.open_menu {
+            let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + self.sk(MENUBAR_H);
+            if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
+                out.push((wi, mi, x0, self.windows[wi].y + toff));
+            }
+        }
+        if let Some(&(wi, _, _, _)) = out.first() {
+            for &(smi, px, py) in &self.sub_chain { out.push((wi, smi, px, py)); }
+        }
+        out
+    }
+
+    /// Untermenues folgen der Maus: ueber einem Eintrag mit Untermenue geht
+    /// es auf, ueber einem anderen Eintrag derselben Ebene geht die tiefere
+    /// Kette zu. Ausserhalb aller Popups aendert sich nichts -- sonst
+    /// klappte das Untermenue zu, waehrend man schraeg hinueberfaehrt.
+    fn untermenues_folgen(&mut self, g: &Graphics, mx: i32, my: i32) {
+        if self.open_menu.is_none() && self.context_open.is_none() { self.sub_chain.clear(); return; }
+        let chain = self.popup_chain(g);
+        for (level, &(wi, mi, px, py)) in chain.iter().enumerate().rev() {
+            let (wmax, h) = self.popup_size(g, wi, mi);
+            if !(mx >= px && mx < px + wmax && my >= py && my < py + h) { continue; }
+            let zeile = ((my - py - 2) / self.sk(MENU_ITEM_H)).max(0) as usize;
+            let (sub, iy) = match self.windows[wi].menus[mi].items.get(zeile) {
+                Some(it) if !it.separator && it.enabled => (it.sub, py + 2 + zeile as i32 * self.sk(MENU_ITEM_H)),
+                _ => return,
+            };
+            self.sub_chain.truncate(level);
+            if sub >= 0 {
+                self.sub_chain.push((sub as usize, px + wmax - 4, iy - 2));
+            }
+            return;
+        }
     }
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
@@ -3163,7 +3377,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if self.editing_table.map(|(w, _)| w) == Some(wi) { self.editing_table = None; }
         if self.hover_w.map(|(w, _)| w) == Some(wi) { self.hover_w = None; }
         if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
-        if self.open_menu.map(|(w, _)| w) == Some(wi) { self.open_menu = None; }
+        if self.open_menu.map(|(w, _)| w) == Some(wi) { self.open_menu = None; self.sub_chain.clear(); }
         if self.context_open.map(|(w, _, _, _)| w) == Some(wi) { self.context_open = None; }
     }
     pub fn window_destroy(&mut self, h: i64) -> Result<(), String> {
@@ -3399,6 +3613,47 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.undo_zeit = -10.0;      // die naechste Eingabe ist ein neuer Schritt
         let f = w.on_change.clone();
         if let Some(f) = f { self.pending.push(f); }
+    }
+
+    fn menu_items_json(&self, win: &Window, m: &Menu) -> Vec<serde_json::Value> {
+        m.items.iter().map(|it| {
+            let mut o = serde_json::json!({
+                "label": it.label, "separator": it.separator, "enabled": it.enabled,
+            });
+            if !it.kuerzel.is_empty() { o["shortcut"] = serde_json::json!(it.kuerzel); }
+            if it.haken { o["checkable"] = serde_json::json!(true); o["checked"] = serde_json::json!(it.an); }
+            if it.sub >= 0 {
+                if let Some(sm) = win.menus.get(it.sub as usize) {
+                    o["items"] = serde_json::json!(self.menu_items_json(win, sm));
+                }
+            }
+            o
+        }).collect()
+    }
+    /// Eintraege aus JSON -- ein Eintrag mit `items` wird zum Untermenue, das
+    /// dafuer an `win.menus` angehaengt wird (Index im Eintrag).
+    fn menu_items_aus_json(win: &mut Window, its: &[serde_json::Value]) -> Vec<MenuItem> {
+        let mut out = Vec::new();
+        for itj in its {
+            let sep = itj["separator"].as_bool().unwrap_or(false);
+            let mut it = MenuItem::neu(itj["label"].as_str().unwrap_or("").to_string(), sep);
+            if !sep { it.enabled = itj["enabled"].as_bool().unwrap_or(true); }
+            if let Some(k) = itj["shortcut"].as_str() {
+                if let Ok((mods, code)) = kuerzel_parsen(k) { it.kuerzel = k.to_string(); it.k_mods = mods; it.k_code = code; }
+            }
+            if itj["checkable"].as_bool().unwrap_or(false) {
+                it.haken = true; it.an = itj["checked"].as_bool().unwrap_or(false);
+            }
+            if let Some(sub) = itj["items"].as_array() {
+                let smi = win.menus.len();
+                win.menus.push(Menu { label: it.label.clone(), in_bar: false, unter: true, items: Vec::new() });
+                let sub_items = Self::menu_items_aus_json(win, sub);
+                win.menus[smi].items = sub_items;
+                it.sub = smi as i32;
+            }
+            out.push(it);
+        }
+        out
     }
 
     fn widget_json(&self, w: &Widget) -> serde_json::Value {
@@ -3694,11 +3949,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             .ok_or("GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle")?;
         let widgets: Vec<serde_json::Value> =
             win.widgets.iter().filter(|w| w.alive).map(|w| self.widget_json(w)).collect();
-        let menus: Vec<serde_json::Value> = win.menus.iter().map(|m| serde_json::json!({
+        // Untermenues werden VERSCHACHTELT geschrieben (`items` am Eintrag),
+        // nicht als Index -- so bleibt die Datei lesbar und von Hand aenderbar.
+        let menus: Vec<serde_json::Value> = win.menus.iter().filter(|m| !m.unter).map(|m| serde_json::json!({
             "label": m.label, "in_bar": m.in_bar,
-            "items": m.items.iter().map(|it| serde_json::json!({
-                "label": it.label, "separator": it.separator, "enabled": it.enabled,
-            })).collect::<Vec<_>>(),
+            "items": self.menu_items_json(win, m),
         })).collect();
         let obj = serde_json::json!({
             "title": win.title,
@@ -3749,16 +4004,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
         if let Some(ms) = v["menus"].as_array() {
-            self.windows[wi].menus = ms.iter().map(|mj| Menu {
-                label: mj["label"].as_str().unwrap_or("").to_string(),
-                in_bar: mj["in_bar"].as_bool().unwrap_or(true),
-                items: mj["items"].as_array().map(|its| its.iter().map(|itj| MenuItem {
-                    label: itj["label"].as_str().unwrap_or("").to_string(),
-                    separator: itj["separator"].as_bool().unwrap_or(false),
-                    enabled: itj["enabled"].as_bool().unwrap_or(true),
-                    clicked: false,
-                }).collect()).unwrap_or_default(),
-            }).collect();
+            for mj in ms {
+                let mi = self.windows[wi].menus.len();
+                self.windows[wi].menus.push(Menu {
+                    label: mj["label"].as_str().unwrap_or("").to_string(),
+                    in_bar: mj["in_bar"].as_bool().unwrap_or(true),
+                    unter: false, items: Vec::new(),
+                });
+                let items = match mj["items"].as_array() {
+                    Some(its) => Self::menu_items_aus_json(&mut self.windows[wi], its),
+                    None => Vec::new(),
+                };
+                self.windows[wi].menus[mi].items = items;
+            }
         }
         if let Some(ts) = v["tabs"].as_array() {
             self.windows[wi].tabs = ts.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
@@ -4206,6 +4464,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
         let menu_consumed = if self.modal.is_some() { false }
                             else { self.menu_input(mx, my, just_pressed, right_just, g) };
+        self.untermenues_folgen(g, mx, my);
+        if !menu_consumed { self.kuerzel_pruefen(g); }
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
         if let Some(top) = self.topmost_at(mx, my) {
@@ -4589,14 +4849,31 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     // --- Menue-Eingabe + Hit-Tests -----------------------------------------
-    fn popup_width(&self, g: &Graphics, wi: usize, mi: usize) -> i32 {
+    /// Layout eines Popups aus EINER Quelle fuer Treffertest und Zeichnen:
+    /// (Breite, linker Einzug fuer Haekchen/Sinnbild, Breite der Kuerzelspalte).
+    fn popup_layout(&self, g: &Graphics, wi: usize, mi: usize) -> (i32, i32, i32) {
         let pad = self.m("pad");
-        let mut wmax = 80;
+        let mut wlbl = 60;
+        let mut wk = 0;
+        let mut links = 0;
+        let mut pfeil = 0;
         if let Some(m) = self.windows.get(wi).and_then(|w| w.menus.get(mi)) {
-            for it in &m.items { if !it.separator { wmax = wmax.max(self.ctext_width(g, &it.label) + pad * 4); } }
+            for it in &m.items {
+                if it.separator { continue; }
+                wlbl = wlbl.max(self.ctext_width(g, &it.label));
+                if !it.kuerzel.is_empty() { wk = wk.max(self.ctext_width(g, &it.kuerzel)); }
+                if it.haken || it.icon >= 0 { links = self.sk(22); }
+                if it.sub >= 0 { pfeil = self.sk(16); }
+            }
         }
-        wmax
+        let wmax = pad * 4 + links + wlbl + (if wk > 0 { self.sk(24) + wk } else { 0 }) + pfeil;
+        (wmax.max(80), links, wk)
     }
+    fn popup_size(&self, g: &Graphics, wi: usize, mi: usize) -> (i32, i32) {
+        let n = self.windows.get(wi).and_then(|w| w.menus.get(mi)).map(|m| m.items.len()).unwrap_or(0);
+        (self.popup_layout(g, wi, mi).0, n as i32 * self.sk(MENU_ITEM_H) + 4)
+    }
+    fn popup_width(&self, g: &Graphics, wi: usize, mi: usize) -> i32 { self.popup_layout(g, wi, mi).0 }
     fn popup_item_at(&self, g: &Graphics, wi: usize, mi: usize, px: i32, py: i32, mx: i32, my: i32) -> Option<usize> {
         let m = self.windows.get(wi).and_then(|w| w.menus.get(mi))?;
         let wmax = self.popup_width(g, wi, mi);
@@ -4619,41 +4896,46 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn fire_menu_item(&mut self, wi: usize, mi: usize, ii: usize) {
         if let Some(it) = self.windows.get_mut(wi).and_then(|w| w.menus.get_mut(mi)).and_then(|m| m.items.get_mut(ii)) {
             it.clicked = true;
+            if it.haken { it.an = !it.an; }
         }
     }
     /// Verarbeitet Menueleisten-/Dropdown-/Kontext-Klicks. Gibt true zurueck,
     /// wenn der Klick konsumiert wurde (dann kein Widget-Press).
     fn menu_input(&mut self, mx: i32, my: i32, left_just: bool, right_just: bool, g: &Graphics) -> bool {
-        // 1) Offenes Kontextmenue
-        if let Some((wi, mi, cx, cy)) = self.context_open {
-            if left_just || right_just {
-                let hit = self.popup_item_at(g, wi, mi, cx, cy, mx, my);
+        // 1) + 2) Ein Wurzelmenue ist offen (Kontext oder Leiste), womoeglich
+        // mit Untermenues darunter. Der Klick wird von der TIEFSTEN Ebene aus
+        // gesucht -- ein Untermenue liegt ueber seinem Elternmenue.
+        if self.context_open.is_some() || self.open_menu.is_some() {
+            if !(left_just || right_just) { return false; }
+            let chain = self.popup_chain(g);
+            let ist_kontext = self.context_open.is_some();
+            for &(wi, mi, px, py) in chain.iter().rev() {
+                let (wmax, h) = self.popup_size(g, wi, mi);
+                if !(mx >= px && mx < px + wmax && my >= py && my < py + h) { continue; }
+                if let Some(ii) = self.popup_item_at(g, wi, mi, px, py, mx, my) {
+                    if self.windows[wi].menus[mi].items[ii].sub >= 0 {
+                        return true;          // Untermenue-Kopf: bleibt offen
+                    }
+                    self.open_menu = None; self.context_open = None; self.sub_chain.clear();
+                    self.fire_menu_item(wi, mi, ii);
+                }
+                return true;                  // Trennlinie/gesperrt: Klick verpufft, Menue bleibt
+            }
+            // Klick neben allen Popups.
+            self.sub_chain.clear();
+            if ist_kontext {
                 self.context_open = None;
-                if let Some(ii) = hit { self.fire_menu_item(wi, mi, ii); }
                 return true;
             }
-            return false;
-        }
-        // 2) Offenes Menueleisten-Dropdown
-        if let Some((wi, mi)) = self.open_menu {
+            let (wi, _) = self.open_menu.unwrap();
             if left_just {
-                let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + self.sk(MENUBAR_H);
-                let py = self.windows[wi].y + toff;
-                if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
-                    if let Some(ii) = self.popup_item_at(g, wi, mi, x0, py, mx, my) {
-                        self.open_menu = None;
-                        self.fire_menu_item(wi, mi, ii);
-                        return true;
-                    }
-                }
                 if let Some(nm) = self.bar_menu_at(g, wi, mx, my) {
                     self.open_menu = Some((wi, nm));   // auf anderes Bar-Menue umschalten
                     return true;
                 }
-                self.open_menu = None;                 // Klick ausserhalb -> schliessen
-                return true;
             }
-            return false;
+            self.open_menu = None;                     // Klick ausserhalb -> schliessen
+            return true;
         }
         // 3) Kein Menue offen
         if left_just {
@@ -4667,7 +4949,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if right_just {
             if let Some(wi) = self.topmost_at(mx, my) {
-                if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar) {
+                if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar && !m.unter) {
                     self.context_open = Some((wi, mi, mx, my));
                     return true;
                 }
@@ -5732,6 +6014,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if let Some((wi, mi, cx, cy)) = self.context_open {
             if self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
                 self.draw_items_popup(g, wi, mi, cx, cy);
+                for &(smi, spx, spy) in &self.sub_chain { self.draw_items_popup(g, wi, smi, spx, spy); }
             }
         }
         // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
@@ -5828,30 +6111,62 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         out
     }
 
-    /// Zeichnet ein Menue-Popup (Dropdown/Kontext) mit Items ab (px, py).
+    /// Zeichnet ein Menue-Popup (Dropdown/Kontext/Untermenue) mit Items ab
+    /// (px, py): links Haekchen oder Sinnbild, dann der Text, rechts das
+    /// Kuerzel gedaempft, ganz rechts ein Pfeil bei einem Untermenue.
     fn draw_items_popup(&self, g: &mut Graphics, wi: usize, mi: usize, px: i32, py: i32) {
         let m = match self.windows.get(wi).and_then(|w| w.menus.get(mi)) { Some(m) => m, None => return };
         let pad = self.m("pad");
-        let mut wmax = 80;
-        for it in &m.items { if !it.separator { wmax = wmax.max(self.ctext_width(g, &it.label) + pad * 4); } }
-        let h = m.items.len() as i32 * self.sk(MENU_ITEM_H) + 4;
+        let (wmax, links, _wk) = self.popup_layout(g, wi, mi);
+        let ih = self.sk(MENU_ITEM_H);
+        let h = m.items.len() as i32 * ih + 4;
         let rad = self.m("corner_radius").min(6);
         // Schatten + Hintergrund + Rahmen.
         g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), (0x44i64 << 24) as i64, true);
         g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("widget_bg"), true);
         g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("win_border"), false);
         let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        // Der Eintrag, dessen Untermenue offen ist, bleibt hervorgehoben --
+        // sonst verliert man beim Hinueberfahren den Faden.
+        let offen_sub: Option<i32> = self.sub_chain.iter()
+            .find(|(smi, _, _)| m.items.iter().any(|it| it.sub == *smi as i32))
+            .map(|(smi, _, _)| *smi as i32);
         for (ii, it) in m.items.iter().enumerate() {
-            let iy = py + 2 + ii as i32 * self.sk(MENU_ITEM_H);
+            let iy = py + 2 + ii as i32 * ih;
             if it.separator {
-                g.line(px + 6, iy + self.sk(MENU_ITEM_H) / 2, px + wmax - 7, iy + self.sk(MENU_ITEM_H) / 2, self.th("win_border"));
+                g.line(px + 6, iy + ih / 2, px + wmax - 7, iy + ih / 2, self.th("win_border"));
                 continue;
             }
-            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + self.sk(MENU_ITEM_H);
-            if hov { g.box_fill(px + 2, iy, px + wmax - 3, iy + self.sk(MENU_ITEM_H) - 1, self.th("title_bg_focus")); }
+            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + ih;
+            let aktiv = hov || (it.sub >= 0 && offen_sub == Some(it.sub));
+            if aktiv { g.box_fill(px + 2, iy, px + wmax - 3, iy + ih - 1, self.th("title_bg_focus")); }
             let fg = if it.enabled { self.th("text_fg") } else { self.th("muted_fg") };
             let th14 = self.ctext_height(g);
-            self.ctext(g, px + pad + 4, iy + (self.sk(MENU_ITEM_H) - th14) / 2, it.label.clone(), fg);
+            let ty = iy + (ih - th14) / 2;
+            let tx = px + pad + 4 + links;
+            if it.icon >= 0 {
+                let isz = (ih - 6).min(self.sk(18));
+                g.draw_image_rect(it.icon, px + pad + 2, iy + (ih - isz) / 2, isz, isz);
+            } else if it.haken && it.an {
+                // Haekchen aus zwei Strichen -- eine Glyphe haette nicht jede Schrift.
+                let cx = px + pad + 5;
+                let cy = iy + ih / 2;
+                g.line(cx, cy, cx + 3, cy + 3, fg);
+                g.line(cx + 1, cy, cx + 4, cy + 3, fg);
+                g.line(cx + 3, cy + 3, cx + 9, cy - 4, fg);
+                g.line(cx + 4, cy + 3, cx + 10, cy - 4, fg);
+            }
+            self.ctext(g, tx, ty, it.label.clone(), fg);
+            if !it.kuerzel.is_empty() {
+                let kw = self.ctext_width(g, &it.kuerzel);
+                let kx = px + wmax - pad - 4 - kw - (if it.sub >= 0 { self.sk(16) } else { 0 });
+                self.ctext(g, kx, ty, it.kuerzel.clone(), self.th("muted_fg"));
+            }
+            if it.sub >= 0 {
+                let ax = px + wmax - pad - 8;
+                let ay = iy + ih / 2;
+                for d in 0..4 { g.line(ax + d, ay - 4 + d, ax + d, ay + 4 - d, fg); }
+            }
         }
     }
 
@@ -5957,6 +6272,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let slot = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi);
                 if let Some((_, x0, _)) = slot {
                     self.draw_items_popup(g, wi, mi, x0, y + toff + mboff);
+                    for &(smi, spx, spy) in &self.sub_chain { self.draw_items_popup(g, wi, smi, spx, spy); }
                 }
             }
         }
@@ -7065,6 +7381,34 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                            cell.text.clone(), fgc);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod kuerzel_tests {
+    use super::kuerzel_parsen;
+
+    #[test]
+    fn buchstabe_mit_strg() {
+        assert_eq!(kuerzel_parsen("Strg+S").unwrap(), (1, 's' as i64));
+        assert_eq!(kuerzel_parsen("ctrl+shift+o").unwrap(), (3, 'o' as i64));
+        assert_eq!(kuerzel_parsen("Alt+Enter").unwrap(), (4, 13));
+    }
+
+    #[test]
+    fn benannte_tasten_deutsch_und_englisch() {
+        assert_eq!(kuerzel_parsen("F5").unwrap(), kuerzel_parsen("f5").unwrap());
+        assert_eq!(kuerzel_parsen("Entf").unwrap(), kuerzel_parsen("Delete").unwrap());
+        assert_eq!(kuerzel_parsen("Entf").unwrap().1, 127);
+        assert_eq!(kuerzel_parsen("Bild ab").unwrap(), kuerzel_parsen("PageDown").unwrap());
+        assert_eq!(kuerzel_parsen("Strg+Pos1").unwrap().0, 1);
+    }
+
+    #[test]
+    fn fehler_im_klartext() {
+        assert!(kuerzel_parsen("Strg+").unwrap_err().contains("keine Taste"));
+        assert!(kuerzel_parsen("Strg+Q+W").unwrap_err().contains("mehr als eine Taste"));
+        assert!(kuerzel_parsen("Hyper").unwrap_err().contains("unbekannt"));
     }
 }
 
