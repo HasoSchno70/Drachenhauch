@@ -1626,6 +1626,11 @@ class _Inspector(QWidget):
         self.zahlen.addItem("frei", 0)
         self.zahlen.addItem("ganze Zahl", 1)
         self.zahlen.addItem("Kommazahl", 2)
+        # Liste: die zwei Schalter liegen in `extra["list"]`, dem Schluessel
+        # der Laufzeit -- so ueberlebt ein per GUI_SAVE geschriebener Haken
+        # den Rundweg durch den Designer.
+        self.l_multi = QCheckBox("Mehrfachauswahl")
+        self.l_kaestchen = QCheckBox("Kaestchen je Eintrag")
         # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
         # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
         # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
@@ -1704,6 +1709,8 @@ class _Inspector(QWidget):
         self._add("", self.nur_lesen)
         self._add("Hoechstlaenge", self.maxlaenge)
         self._add("Zahlen", self.zahlen)
+        self._add("", self.l_multi)
+        self._add("", self.l_kaestchen)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1750,7 +1757,7 @@ class _Inspector(QWidget):
         self.align.currentIndexChanged.connect(self._apply)
         self.zahlen.currentIndexChanged.connect(self._apply)
         self.maxlaenge.valueChanged.connect(self._apply)
-        for _w in (self.wrap, self.passwort, self.nur_lesen):
+        for _w in (self.wrap, self.passwort, self.nur_lesen, self.l_multi, self.l_kaestchen):
             _w.toggled.connect(self._apply)
         self.datum.editingFinished.connect(self._apply)
         self.orient.currentIndexChanged.connect(self._apply)
@@ -1931,6 +1938,9 @@ class _Inspector(QWidget):
         self.nur_lesen.setChecked(c.nur_lesen); self.maxlaenge.setValue(c.maxlaenge)
         zi = self.zahlen.findData(int(c.zahlen))
         self.zahlen.setCurrentIndex(zi if zi >= 0 else 0)
+        lj = c.extra.get("list") if isinstance(c.extra.get("list"), dict) else {}
+        self.l_multi.setChecked(bool(lj.get("multi")))
+        self.l_kaestchen.setChecked(bool(lj.get("kaestchen")))
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -1968,6 +1978,8 @@ class _Inspector(QWidget):
         self._show(self.wrap, c.kind == "label")
         for _w in (self.passwort, self.nur_lesen, self.maxlaenge, self.zahlen):
             self._show(_w, c.kind == "textinput")
+        self._show(self.l_multi, c.kind == "listbox")
+        self._show(self.l_kaestchen, c.kind == "listbox")
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -2006,6 +2018,20 @@ class _Inspector(QWidget):
         c.nur_lesen = self.nur_lesen.isChecked()
         c.maxlaenge = self.maxlaenge.value()
         c.zahlen = int(self.zahlen.currentData() or 0)
+        if c.kind == "listbox":
+            lj = dict(c.extra.get("list") or {}) if isinstance(c.extra.get("list"), dict) else {}
+            if self.l_multi.isChecked():
+                lj["multi"] = True
+            else:
+                lj.pop("multi", None)
+            if self.l_kaestchen.isChecked():
+                lj["kaestchen"] = True
+            else:
+                lj.pop("kaestchen", None)
+            if lj:
+                c.extra["list"] = lj
+            else:
+                c.extra.pop("list", None)
         if c.kind == "splitter":
             # Der Trenner hat kein Text-Feld im Inspektor -- `text` traegt bei
             # ihm die Richtung, die aus dem Auswahlfeld kommt.

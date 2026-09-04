@@ -1046,6 +1046,16 @@ class FormDoc:
                     out.append(f"GUI_TEXTINPUT_SET({var}, {_gb_str(schluessel)}, {wert})")
         if c.tooltip:
             out.append(f"GUI_TOOLTIP({var}, {_gb_str(c.tooltip)})")
+        if c.kind == "listbox":
+            lj_roh = c.extra.get("list")
+            lj: dict = lj_roh if isinstance(lj_roh, dict) else {}
+            if lj.get("multi"):
+                out.append(f'GUI_LISTBOX_SET({var}, "mehrfachauswahl", 1)')
+            if lj.get("kaestchen"):
+                out.append(f'GUI_LISTBOX_SET({var}, "kaestchen", 1)')
+            for i, an in enumerate(lj.get("checked") or []):
+                if an:
+                    out.append(f"GUI_LISTBOX_SET_CHECKED({var}, {i}, TRUE)")
         return out
 
     def generate_gb_code(self, screen_w: int = 800, screen_h: int = 480,

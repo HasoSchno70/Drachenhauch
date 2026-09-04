@@ -1,0 +1,98 @@
+' ============================================================
+'  gui: Listen
+' ============================================================
+'  Was eine Liste in einer Anwendung koennen muss -- und was das gui-Modul
+'  bis zum 2026-09-04 nicht konnte:
+'
+'    GUI_LISTBOX_ADD / REMOVE / MOVE   Eintraege einzeln statt die Liste
+'                                      als Ganzes zu ersetzen
+'    GUI_LISTBOX_ICON / COLOR          Sinnbild und Farbe je Eintrag
+'    GUI_LISTBOX_SET "kaestchen"       ein Haken je Eintrag
+'    GUI_LISTBOX_SET "mehrfachauswahl" Strg+Klick sammelt, Umschalt spannt
+'    GUI_DOUBLE_CLICKED                Doppelklick oeffnet
+'
+'  Links eine Aufgabenliste mit Kaestchen, rechts eine Auswahl mit
+'  Mehrfachauswahl und Sinnbildern. [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+SCREEN(640, 420, "Drachenhauch - Listen", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Listen", 20, 20, 600, 380)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' --- links: Aufgaben mit Kaestchen -------------------------------------
+DIM l1 AS GUI_WIDGET : l1 = GUI_LABEL(win, "Aufgaben", 16, 12)
+DIM aufgaben AS GUI_WIDGET
+aufgaben = GUI_LISTBOX(win, 16, 36, 270, 200, SPLIT$("Einkaufen|Rasen maehen|Steuer|Oma anrufen", "|"))
+GUI_LISTBOX_SET(aufgaben, "kaestchen", 1)
+GUI_LISTBOX_SET_CHECKED(aufgaben, 1, TRUE)
+GUI_LISTBOX_COLOR(aufgaben, 2, &HFF7060)          ' dringend
+
+DIM neu AS GUI_WIDGET : neu = GUI_TEXTINPUT(win, 16, 246, 190, 26, "neue Aufgabe + Enter")
+DIM bNeu AS GUI_WIDGET : bNeu = GUI_BUTTON(win, "+", 212, 246, 34, 26)
+DIM bWeg AS GUI_WIDGET : bWeg = GUI_BUTTON(win, "-", 252, 246, 34, 26)
+GUI_TOOLTIP(bWeg, "Gewaehlte Aufgabe entfernen")
+DIM bHoch AS GUI_WIDGET : bHoch = GUI_BUTTON(win, "hoch", 16, 280, 76, 26)
+DIM bRunter AS GUI_WIDGET : bRunter = GUI_BUTTON(win, "runter", 98, 280, 90, 26)
+
+' --- rechts: Auswahl mit Sinnbildern und Mehrfachauswahl ------------------
+DIM l2 AS GUI_WIDGET : l2 = GUI_LABEL(win, "Werkzeuge", 310, 12)
+DIM werkzeuge AS GUI_WIDGET
+werkzeuge = GUI_LISTBOX(win, 310, 36, 270, 200, SPLIT$("Stift|Radierer|Fuellen|Pipette|Auswahl", "|"))
+GUI_LISTBOX_SET(werkzeuge, "mehrfachauswahl", 1)
+DIM farben AS ARRAY OF INTEGER
+farben = [&H4BE87A, &HE8B44B, &H4BA8E8, &HE84B9A, &HB0B8C0]
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    GUI_LISTBOX_ICON(werkzeuge, i, GENTEX_COLOR(16, 16, farben[i]))
+NEXT
+GUI_LISTBOX_SELECT(werkzeuge, 0, TRUE)
+
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "Kaestchen anklicken, Doppelklick = erledigt; rechts Strg/Umschalt+Klick.", 16, 330)
+GUI_SET_FONT_SIZE(status, 15)
+GUI_SET_BOUNDS(status, 16, 330, 564, 16)
+
+SUB aufgabeAnlegen()
+    DIM t AS STRING : t = TRIM$(GUI_TEXT(neu))
+    IF t = "" THEN RETURN
+    DIM k AS INTEGER : k = GUI_LISTBOX_ADD(aufgaben, t)
+    GUI_LISTBOX_SET_SELECTED(aufgaben, k)
+    GUI_SET_TEXT(neu, "")
+END SUB
+
+SUB werkzeugeZeigen()
+    DIM s AS STRING : s = ""
+    DIM k AS INTEGER
+    FOR k = 0 TO GUI_LISTBOX_SEL_COUNT(werkzeuge) - 1
+        IF k > 0 THEN s = s + ", "
+        s = s + GUI_LISTBOX_ITEM(werkzeuge, GUI_LISTBOX_SEL_ROW(werkzeuge, k))
+    NEXT
+    GUI_SET_TEXT(status, "Gewaehlt: " + IIF(s = "", "nichts", s))
+END SUB
+
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_ESCAPE) THEN EXIT(0)
+    GUI_UPDATE()
+    IF GUI_CLICKED(bNeu) OR GUI_ENTERED(neu) THEN aufgabeAnlegen()
+    IF GUI_CLICKED(bWeg) AND GUI_LISTBOX_SELECTED(aufgaben) >= 0 THEN
+        GUI_LISTBOX_REMOVE(aufgaben, GUI_LISTBOX_SELECTED(aufgaben))
+    END IF
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(aufgaben)
+    IF GUI_CLICKED(bHoch) AND sel > 0 THEN GUI_LISTBOX_MOVE(aufgaben, sel, sel - 1)
+    IF GUI_CLICKED(bRunter) AND sel >= 0 AND sel < GUI_LISTBOX_COUNT(aufgaben) - 1 THEN
+        GUI_LISTBOX_MOVE(aufgaben, sel, sel + 1)
+    END IF
+    ' Doppelklick = erledigt: Haken setzen und ans Ende schieben.
+    IF GUI_DOUBLE_CLICKED(aufgaben) AND sel >= 0 THEN
+        GUI_LISTBOX_SET_CHECKED(aufgaben, sel, TRUE)
+        GUI_LISTBOX_MOVE(aufgaben, sel, GUI_LISTBOX_COUNT(aufgaben) - 1)
+        GUI_SET_TEXT(status, "Erledigt: " + GUI_LISTBOX_TEXT(aufgaben))
+    END IF
+    IF GUI_CLICKED(werkzeuge) OR GUI_HOVERED(werkzeuge) THEN werkzeugeZeigen()
+    GUI_DRAW()
+    FLIP()
+WEND
