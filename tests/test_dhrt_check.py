@@ -165,7 +165,10 @@ def test_kein_beispiel_meldet_einen_unbekannten_namen():
     funde = [(Path(pfad).name, d.get("line"), d.get("message"))
              for pfad, diags in _check_viele(dateien).items()
              for d in diags
-             if "nirgends im Programm mit DIM oder CONST angelegt" in d.get("message", "")]
+             # Satz aus BEIDEN Fassungen der Warnung (nirgends deklariert /
+             # hier nicht sichtbar) -- ein Marker auf nur eine haette die
+             # andere Haelfte des Sweeps stillschweigend uebersehen.
+             if "Beim Laufen bricht diese Zeile ab" in d.get("message", "")]
     assert not funde, f"Falschmeldung bei gueltigem Code: {funde}"
 
 
