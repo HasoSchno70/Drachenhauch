@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 87 MB, aktuell Fassung 2026.11.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 204 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 205 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
