@@ -1609,6 +1609,23 @@ class _Inspector(QWidget):
         # derselben leeren Gruppe und schliessen sich nicht gegenseitig aus.
         self.group = QLineEdit(); self.group.setPlaceholderText("z.B. schwierigkeit")
         self.placeholder = QLineEdit()
+        self.tooltip = QLineEdit(); self.tooltip.setPlaceholderText("Hinweis beim Ueberfahren")
+        # Text und Formular: Ausrichtung, Umbruch, Textfeld-Grenzen -- dieselben
+        # Schluessel wie die Laufzeit (`align`, `wrap`, `passwort`, ...).
+        self.align = QComboBox()
+        self.align.addItem("(Vorgabe)", "")
+        self.align.addItem("links", "links")
+        self.align.addItem("mitte", "mitte")
+        self.align.addItem("rechts", "rechts")
+        self.wrap = QCheckBox("umbrechen (bei Breite)")
+        self.passwort = QCheckBox("Passwort (Punkte)")
+        self.nur_lesen = QCheckBox("nur lesen")
+        self.maxlaenge = QSpinBox(); self.maxlaenge.setRange(0, 100000)
+        self.maxlaenge.setToolTip("Hoechstlaenge in Zeichen (0 = frei)")
+        self.zahlen = QComboBox()
+        self.zahlen.addItem("frei", 0)
+        self.zahlen.addItem("ganze Zahl", 1)
+        self.zahlen.addItem("Kommazahl", 2)
         # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
         # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
         # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
@@ -1680,6 +1697,13 @@ class _Inspector(QWidget):
         self._add("Text", self.text)
         self._add("Gruppe", self.group)
         self._add("Platzhalter", self.placeholder)
+        self._add("Tooltip", self.tooltip)
+        self._add("Ausrichtung", self.align)
+        self._add("", self.wrap)
+        self._add("", self.passwort)
+        self._add("", self.nur_lesen)
+        self._add("Hoechstlaenge", self.maxlaenge)
+        self._add("Zahlen", self.zahlen)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1722,6 +1746,12 @@ class _Inspector(QWidget):
         self.text.editingFinished.connect(self._apply)
         self.group.editingFinished.connect(self._apply)
         self.placeholder.editingFinished.connect(self._apply)
+        self.tooltip.editingFinished.connect(self._apply)
+        self.align.currentIndexChanged.connect(self._apply)
+        self.zahlen.currentIndexChanged.connect(self._apply)
+        self.maxlaenge.valueChanged.connect(self._apply)
+        for _w in (self.wrap, self.passwort, self.nur_lesen):
+            _w.toggled.connect(self._apply)
         self.datum.editingFinished.connect(self._apply)
         self.orient.currentIndexChanged.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
@@ -1894,6 +1924,13 @@ class _Inspector(QWidget):
         for ev, feld in self.ev_edits.items():
             feld.setText(getattr(c, ev))
         self.group.setText(c.group); self.placeholder.setText(c.placeholder)
+        self.tooltip.setText(c.tooltip)
+        ai = self.align.findData(c.align or "")
+        self.align.setCurrentIndex(ai if ai >= 0 else 0)
+        self.wrap.setChecked(c.wrap); self.passwort.setChecked(c.passwort)
+        self.nur_lesen.setChecked(c.nur_lesen); self.maxlaenge.setValue(c.maxlaenge)
+        zi = self.zahlen.findData(int(c.zahlen))
+        self.zahlen.setCurrentIndex(zi if zi >= 0 else 0)
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -1926,6 +1963,11 @@ class _Inspector(QWidget):
             self._show(_w, ist_tabelle)
         self._show(self.group, c.kind == "radio")
         self._show(self.placeholder, c.kind in ("textinput", "textarea"))
+        self._show(self.tooltip, True)
+        self._show(self.align, c.kind in ("label", "button", "textinput"))
+        self._show(self.wrap, c.kind == "label")
+        for _w in (self.passwort, self.nur_lesen, self.maxlaenge, self.zahlen):
+            self._show(_w, c.kind == "textinput")
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -1957,6 +1999,13 @@ class _Inspector(QWidget):
             setattr(c, ev, feld.text().strip())
         c.group = self.group.text().strip()
         c.placeholder = self.placeholder.text()
+        c.tooltip = self.tooltip.text()
+        c.align = self.align.currentData() or ""
+        c.wrap = self.wrap.isChecked()
+        c.passwort = self.passwort.isChecked()
+        c.nur_lesen = self.nur_lesen.isChecked()
+        c.maxlaenge = self.maxlaenge.value()
+        c.zahlen = int(self.zahlen.currentData() or 0)
         if c.kind == "splitter":
             # Der Trenner hat kein Text-Feld im Inspektor -- `text` traegt bei
             # ihm die Richtung, die aus dem Auswahlfeld kommt.
@@ -2026,8 +2075,14 @@ class _WindowInspector(QWidget):
         self.theme = QComboBox()
         for name in FORM_THEMES:
             self.theme.addItem(name or "(Vorgabe)", name)
+        # Standard- (Enter) und Abbrechen-Knopf (ESC): Auswahl unter den
+        # Knoepfen des Formulars, gefuehrt als Widget-Index wie in der Datei.
+        self.default_btn = QComboBox()
+        self.cancel_btn = QComboBox()
         f.addRow("Titel", self.title)
         f.addRow("Thema", self.theme)
+        f.addRow("Enter-Knopf", self.default_btn)
+        f.addRow("ESC-Knopf", self.cancel_btn)
         f.addRow("Breite", self.sw); f.addRow("Hoehe", self.sh)
         f.addRow("Min. Breite", self.minw); f.addRow("Min. Hoehe", self.minh)
         f.addRow("Max. Breite", self.maxw); f.addRow("Max. Hoehe", self.maxh)
@@ -2039,11 +2094,24 @@ class _WindowInspector(QWidget):
         for c in (self.movable, self.closable, self.resizable, self.visible):
             c.toggled.connect(self._apply)
         self.theme.currentIndexChanged.connect(self._apply)
+        self.default_btn.currentIndexChanged.connect(self._apply)
+        self.cancel_btn.currentIndexChanged.connect(self._apply)
+
+    def _knopf_listen(self, doc: FormDoc) -> None:
+        for combo, feld in ((self.default_btn, "default_button"), (self.cancel_btn, "cancel_button")):
+            combo.clear()
+            combo.addItem("(keiner)", -1)
+            for i, c in enumerate(doc.controls):
+                if c.kind == "button":
+                    combo.addItem(c.name or c.text or f"Knopf {i}", i)
+            k = combo.findData(getattr(doc, feld))
+            combo.setCurrentIndex(k if k >= 0 else 0)
 
     def set_doc(self, doc: FormDoc):
         self.doc = doc
         self._loading = True
         if doc is not None:
+            self._knopf_listen(doc)
             self.title.setText(doc.title)
             self.sw.setValue(doc.w); self.sh.setValue(doc.h)
             self.minw.setValue(doc.min_w); self.minh.setValue(doc.min_h)
@@ -2071,6 +2139,8 @@ class _WindowInspector(QWidget):
         d.movable, d.closable = self.movable.isChecked(), self.closable.isChecked()
         d.resizable, d.visible = self.resizable.isChecked(), self.visible.isChecked()
         d.theme = self.theme.currentData() or ""
+        d.default_button = int(self.default_btn.currentData() if self.default_btn.currentData() is not None else -1)
+        d.cancel_button = int(self.cancel_btn.currentData() if self.cancel_btn.currentData() is not None else -1)
         self.changed.emit()
 
 

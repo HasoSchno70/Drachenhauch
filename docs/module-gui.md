@@ -39,12 +39,19 @@ IMPORT "gui"
 | `GUI_SET_ICON(button, tex)` | — | Icon eines Buttons setzen/ersetzen (-1 entfernt) |
 | `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | flacher Werkzeugleisten-Streifen (Deko, für Icon-Button-Reihe) |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
+| `GUI_SET_ALIGN(wdg, wie$)` | — | Text links, `mitte` oder `rechts` ausrichten (Beschriftung, Knopf, Textfeld) |
+| `GUI_SET_WRAP(label, breite)` | — | Beschriftung bei `breite` Pixeln an Wortgrenzen umbrechen (0 = aus); die Höhe folgt dem Text |
+| `GUI_WINDOW_DEFAULT(win, knopf)` | — | Standard-Knopf: Enter im Fenster löst ihn aus (-1 = keiner) |
+| `GUI_WINDOW_CANCEL(win, knopf)` | — | Abbrechen-Knopf: ESC löst ihn aus (-1 = keiner) |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
 | `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y) |
+| `GUI_TEXTINPUT_SET(tf, key$, wert)` | — | `passwort`, `nur_lesen`, `maxlaenge`, `zahlen` (0 frei, 1 ganze Zahl, 2 Kommazahl) |
+| `GUI_ENTERED(tf)` | BOOLEAN | wurde in diesem Bild Enter im Textfeld gedrückt? |
+| `GUI_ON_ENTER(tf, handler)` | — | Rückruf dafür |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als **Code-Feld** einfärbbar — siehe [Code-Feld](#das-textarea-als-code-feld) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
 | `GUI_TREE(win, x, y, w, h)` | GUI_WIDGET | Baum-Ansicht (auf-/zuklappbar, scrollbar) |
@@ -332,6 +339,27 @@ GUI_BUTTON(win, text$, x, y, w, h) -> GUI_WIDGET
 dem Knopf **losgelassen** wurde (nachdem sie vorher darauf gedrückt wurde —
 press-and-release über demselben Knopf, wie ein klassischer OK-Knopf).
 
+Die Beschriftung steht mittig; `GUI_SET_ALIGN(btn, "links")` oder `"rechts"`
+verschiebt sie (mit Sinnbild bleibt dessen Platz links stehen).
+
+### Standard- und Abbrechen-Knopf
+
+```basic
+GUI_WINDOW_DEFAULT(win, okKnopf)      ' Enter im Fenster drückt ihn
+GUI_WINDOW_CANCEL(win, abbruchKnopf)  ' ESC drückt ihn
+```
+
+Was jedes Formular braucht und was sonst jedes Programm mit `KEYHIT`
+nachbaute, ohne den Fokus zu beachten. Der Standard-Knopf trägt den Akzent
+als Rahmen, damit man sieht, was Enter tun wird. Die Taste gehört aber zuerst
+dem Widget mit Fokus: ein Knopf oder Kästchen mit Fokus nimmt Enter selbst,
+ein Textbereich macht daraus einen Umbruch, eine Tabellenzelle in
+Bearbeitung ihr Ende. **Aus einem Textfeld heraus** ist Enter dagegen genau
+das: das Formular abschicken — das Feld meldet `GUI_ENTERED` **und** der
+Standard-Knopf klickt. ESC greift nicht, solange eine Klappliste offen ist.
+Beide werden in die `.dhform` geschrieben (`default_button`/`cancel_button`,
+als Widget-Index).
+
 ## Label
 
 ```basic
@@ -340,6 +368,20 @@ GUI_LABEL(win, text$, x, y[, farbe]) -> GUI_WIDGET
 
 Statischer Text. Default-Farbe weiß. Mit `GUI_SET_TEXT(lbl, ...)` jederzeit
 änderbar (z. B. um einen Slider-Wert live anzuzeigen).
+
+```basic
+GUI_SET_WRAP(lbl, 220)              ' bei 220 px an Wortgrenzen umbrechen
+GUI_SET_ALIGN(lbl, "rechts")        ' innerhalb der Widget-Breite
+```
+
+**Umbruch:** `GUI_SET_WRAP(lbl, breite)` setzt die Breite und lässt den Text
+an Wortgrenzen umbrechen; ein Wort, das allein nicht in die Zeile passt, wird
+an der Zeichengrenze geteilt, `\n` bleibt ein Umbruch. Die **Höhe folgt dem
+Text** — `GUI_GET_H(lbl)` liefert sie ab dem nächsten `GUI_UPDATE`, denn
+gemessen wird mit der Schrift des Widgets, und die kennt nur die Laufzeit.
+`0` schaltet den Umbruch ab. **Ausrichtung:** `GUI_SET_ALIGN` gilt je Zeile
+innerhalb der Widget-Breite; ohne Umbruch ist die Breite die geschätzte
+Textbreite, also vorher `GUI_SET_BOUNDS` geben.
 
 ## Checkbox
 
@@ -369,6 +411,25 @@ GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$]) -> GUI_WIDGET
 Einzeiliges Eingabefeld. Klick fokussiert, getippte Zeichen werden angehängt,
 Backspace löscht. `GUI_TEXT(tf)` liefert den Inhalt, `GUI_SET_TEXT(tf, ...)`
 belegt ihn vor. Ein blinkender Cursor erscheint am fokussierten Feld.
+**Strg+Z / Strg+Y** nehmen beim Tippen zurück und holen wieder — Anschläge
+innerhalb von 0,8 s sind ein Schritt, sonst nähme Strg+Z ein Zeichen statt
+eines Wortes zurück. Ein `GUI_SET_TEXT` leert den Verlauf: was das Programm
+setzt, ist kein Schritt des Nutzers.
+
+```basic
+GUI_TEXTINPUT_SET(tf, "passwort", 1)     ' Punkte statt Zeichen; GUI_TEXT liefert den echten Text
+GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)    ' anzeigen, markieren, kopieren -- aber nicht ändern
+GUI_TEXTINPUT_SET(tf, "maxlaenge", 8)    ' schneidet ab, auch beim Einfügen (0 = frei)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)       ' 1 = ganze Zahl (mit Vorzeichen), 2 = Kommazahl (Punkt oder Komma)
+GUI_SET_ALIGN(tf, "rechts")              ' Zahlen stehen rechts -- solange der Text hineinpasst
+```
+
+Der Zahlenfilter lehnt eine Eingabe als Ganzes ab, die das Feld ungültig
+machte, lässt aber Zwischenstände wie `-` durch — sonst ließe sich eine
+negative Zahl gar nicht tippen. **Enter** meldet das Feld über
+`GUI_ENTERED(tf)` (genau ein Bild lang, wie `GUI_CLICKED`) oder den Rückruf
+`GUI_ON_ENTER(tf, handler)`; hat das Fenster einen Standard-Knopf, klickt der
+im selben Bild (siehe [Button](#button)).
 
 ## Panel
 
@@ -1447,7 +1508,7 @@ weiterhin auf 0 und sehen unverändert flach aus.
 
 ## Ereignisse
 
-Sechs Rückrufe je Widget, alle über FUNCREF (parameterlos):
+Sieben Rückrufe je Widget, alle über FUNCREF (parameterlos):
 
 | Befehl | Wann |
 |---|---|
@@ -1457,6 +1518,7 @@ Sechs Rückrufe je Widget, alle über FUNCREF (parameterlos):
 | `GUI_ON_LEAVE(w, fn)` | Maus verlässt es |
 | `GUI_ON_FOCUS(w, fn)` | bekommt die Eingabe |
 | `GUI_ON_BLUR(w, fn)` | verliert sie — der Punkt, an dem man eine Eingabe prüft |
+| `GUI_ON_ENTER(tf, fn)` | Enter im Textfeld (nur `GUI_TEXTINPUT`) |
 
 Die letzten vier sind **Flanken**: sie feuern beim Übergang, nicht in jedem
 Bild, solange der Zustand anhält. Ausgelöst werden sie in `GUI_UPDATE`;
@@ -1470,7 +1532,7 @@ landet. Reine Deko (Beschriftung, Panel, Trennlinie, Gruppe, Werkzeugleiste,
 Fortschritt, Bild, Zeichenfläche) bekommt weiterhin keinen Fokus und feuert
 die beiden Flanken nie.
 
-Alle sechs überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
+Alle sieben überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
 — das ist der Weg, über den ein im Form-Designer gebautes Formular seine
 Handler bekommt.
 

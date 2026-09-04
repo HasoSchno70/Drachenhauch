@@ -1,0 +1,86 @@
+' ============================================================
+'  gui: Text und Formular
+' ============================================================
+'  Was ein Anmeldeformular braucht -- und was das gui-Modul bis zum
+'  2026-09-04 nicht konnte:
+'
+'    GUI_SET_WRAP        Beschriftung bricht an Wortgrenzen um, die Hoehe
+'                        folgt dem Text
+'    GUI_SET_ALIGN       Text links, mittig oder rechts (Beschriftung,
+'                        Knopf, Textfeld)
+'    GUI_TEXTINPUT_SET   passwort / nur_lesen / maxlaenge / zahlen
+'    GUI_ENTERED         Enter im Textfeld, ein Bild lang (oder GUI_ON_ENTER)
+'    GUI_WINDOW_DEFAULT  Enter drueckt den Standard-Knopf ...
+'    GUI_WINDOW_CANCEL   ... ESC den Abbrechen-Knopf
+'    Strg+Z / Strg+Y     beim Tippen zuruecknehmen und wiederholen
+'
+'  ESC schliesst das Programm ueber den Abbrechen-Knopf -- so, wie ein
+'  Dialog es taete.
+' ============================================================
+IMPORT "gui"
+
+SCREEN(560, 420, "Drachenhauch - Formular", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Anmeldung", 20, 20, 520, 380)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' Ein Hinweistext, der umbricht: die Breite gibt man vor, die Hoehe kommt
+' vom Text -- GUI_GET_H sagt sie einem nach dem ersten GUI_UPDATE.
+DIM hinweis AS GUI_WIDGET
+hinweis = GUI_LABEL(win, "Melde dich mit Benutzername und Passwort an. Der Benutzername " + _
+                    "ist hoechstens zwoelf Zeichen lang, die Mitgliedsnummer eine ganze Zahl. " + _
+                    "Enter schickt das Formular ab, ESC bricht ab.", 16, 12)
+GUI_SET_WRAP(hinweis, 488)
+GUI_SET_FONT_SIZE(hinweis, 15)
+
+DIM lName AS GUI_WIDGET : lName = GUI_LABEL(win, "Benutzername", 16, 124)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(win, 180, 120, 320, 28, "max. 12 Zeichen")
+GUI_TEXTINPUT_SET(name, "maxlaenge", 12)
+
+DIM lPass AS GUI_WIDGET : lPass = GUI_LABEL(win, "Passwort", 16, 162)
+DIM pass AS GUI_WIDGET : pass = GUI_TEXTINPUT(win, 180, 158, 320, 28)
+GUI_TEXTINPUT_SET(pass, "passwort", 1)
+
+DIM lNr AS GUI_WIDGET : lNr = GUI_LABEL(win, "Mitgliedsnummer", 16, 200)
+DIM nr AS GUI_WIDGET : nr = GUI_TEXTINPUT(win, 180, 196, 120, 28)
+GUI_TEXTINPUT_SET(nr, "zahlen", 1)
+GUI_SET_ALIGN(nr, "rechts")             ' Zahlen stehen rechts
+
+DIM lFest AS GUI_WIDGET : lFest = GUI_LABEL(win, "Server", 16, 238)
+DIM server AS GUI_WIDGET : server = GUI_TEXTINPUT(win, 180, 234, 320, 28)
+GUI_SET_TEXT(server, "spiele.example.org")
+GUI_TEXTINPUT_SET(server, "nur_lesen", 1)   ' zum Ansehen und Kopieren, nicht zum Aendern
+
+' Rechtsbuendige Beschriftung: die Ausrichtung gilt innerhalb der Breite,
+' also erst die Breite geben.
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "Bereit.", 16, 280)
+GUI_SET_BOUNDS(status, 16, 280, 484, 16)
+GUI_SET_ALIGN(status, "rechts")
+
+DIM bOk AS GUI_WIDGET : bOk = GUI_BUTTON(win, "Anmelden", 244, 312, 122, 30)
+DIM bAb AS GUI_WIDGET : bAb = GUI_BUTTON(win, "Abbrechen", 374, 312, 126, 30)
+GUI_WINDOW_DEFAULT(win, bOk)             ' Enter -- der Knopf traegt den Akzent
+GUI_WINDOW_CANCEL(win, bAb)              ' ESC
+GUI_FOCUS(name)
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(bOk) THEN
+        IF GUI_TEXT(name) = "" THEN
+            GUI_SET_TEXT(status, "Bitte einen Benutzernamen eingeben.")
+            GUI_FOCUS(name)
+        ELSE
+            GUI_SET_TEXT(status, "Angemeldet als " + GUI_TEXT(name) + _
+                         IIF(GUI_TEXT(nr) <> "", " (Nr. " + GUI_TEXT(nr) + ")", ""))
+        END IF
+    END IF
+    IF GUI_CLICKED(bAb) THEN EXIT(0)
+    ' Enter im Passwortfeld: die Zeile darunter sagt, dass es ankam -- der
+    ' Standard-Knopf klickt im selben Bild ohnehin.
+    IF GUI_ENTERED(pass) THEN GUI_SET_TEXT(lPass, "Passwort (Enter)")
+    GUI_DRAW()
+    FLIP()
+WEND

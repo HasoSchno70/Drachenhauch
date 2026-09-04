@@ -5211,6 +5211,16 @@ impl<'p> Vm<'p> {
             "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
             "gui_on_click" => { self.gui.on_click(gi(a,0,"GUI_ON_CLICK")?, gfunc(a,1,"GUI_ON_CLICK")?)?; Value::Nil }
             "gui_on_change" => { self.gui.on_change(gi(a,0,"GUI_ON_CHANGE")?, gfunc(a,1,"GUI_ON_CHANGE")?)?; Value::Nil }
+            "gui_on_enter" => { self.gui.on_enter(gi(a,0,"GUI_ON_ENTER")?, gfunc(a,1,"GUI_ON_ENTER")?)?; Value::Nil }
+            "gui_entered" => Value::Bool(self.gui.entered(gi(a,0,"GUI_ENTERED")?)?),
+            "gui_set_align" => { self.gui.set_align(gi(a,0,"GUI_SET_ALIGN")?, &gs(a,1,"GUI_SET_ALIGN")?)?; Value::Nil }
+            "gui_set_wrap" => { self.gui.set_wrap(gi(a,0,"GUI_SET_WRAP")?, gi(a,1,"GUI_SET_WRAP")? as i32)?; Value::Nil }
+            "gui_textinput_set" => {
+                self.gui.textinput_set(gi(a,0,"GUI_TEXTINPUT_SET")?, &gs(a,1,"GUI_TEXTINPUT_SET")?,
+                                       gnum(a,2,"GUI_TEXTINPUT_SET")?)?; Value::Nil
+            }
+            "gui_window_default" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_DEFAULT")?, gi(a,1,"GUI_WINDOW_DEFAULT")?, false)?; Value::Nil }
+            "gui_window_cancel" => { self.gui.window_default(gi(a,0,"GUI_WINDOW_CANCEL")?, gi(a,1,"GUI_WINDOW_CANCEL")?, true)?; Value::Nil }
             "gui_on_hover" => { self.gui.on_hover(gi(a,0,"GUI_ON_HOVER")?, gfunc(a,1,"GUI_ON_HOVER")?)?; Value::Nil }
             "gui_on_leave" => { self.gui.on_leave(gi(a,0,"GUI_ON_LEAVE")?, gfunc(a,1,"GUI_ON_LEAVE")?)?; Value::Nil }
             "gui_on_focus" => { self.gui.on_focus(gi(a,0,"GUI_ON_FOCUS")?, gfunc(a,1,"GUI_ON_FOCUS")?)?; Value::Nil }
