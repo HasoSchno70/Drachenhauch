@@ -214,6 +214,7 @@ _BRAUCHT_GRAFIK = {
     "test_pilot_tilemap.py",
     "test_pilot_partikel.py",
     "test_pilot_sfx.py",
+    "test_pilot_tracker.py",
     "test_pilot_sprite_auswahl.py",
     "test_runtime_font_delta.py",
     "test_scissor.py",

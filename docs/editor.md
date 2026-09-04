@@ -158,7 +158,7 @@ jetzt höchstens einer.
 
 ## Werkzeuge in Drachenhauch (`Datei` → Untermenü)
 
-Vier der Begleit-Editoren gibt es ein zweites Mal — als **Drachenhauch-Programm**
+Fünf der Begleit-Editoren gibt es ein zweites Mal — als **Drachenhauch-Programm**
 unter `examples/`. Sie sind nicht der Ersatz für die Qt-Fassungen, sondern die
 Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 
@@ -168,6 +168,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 | Partikel-Editor | 802 | 622 |
 | Tilemap-Editor | 2428 | 1536 |
 | Sprite-Editor | 7379 | 2811 |
+| Tracker | 3911 | 2091 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
 Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor waren allein die
@@ -192,7 +193,7 @@ schlechter geworden wäre — aus 0,17 sind fast das Doppelte geworden.
 
 Jeder Eintrag **startet** das Werkzeug — über dieselbe Konsole und denselben
 Stopp-Knopf wie jedes andere Programm, denn es *ist* eines. Darunter öffnet
-`Quelltexte der Piloten öffnen` alle vier als Tabs: sie zu lesen und zu ändern
+`Quelltexte der Piloten öffnen` alle fünf als Tabs: sie zu lesen und zu ändern
 ist der halbe Zweck. Alle Einträge stehen auch in der Befehlspalette.
 
 Die Liste ist eine einzige Quelle (`editor_qt/piloten.py`); ein Test prüft, dass

@@ -1,0 +1,2091 @@
+' ============================================================
+'  DRACHENHAUCH -- Tracker (Musik-Editor)
+' ============================================================
+'  Ein mehrspuriger Tracker, geschrieben IN Drachenhauch auf dem eigenen
+'  gui-Modul. Das Gegenstueck zum Qt-Werkzeug `dhtracker` -- und der fuenfte
+'  Pilot, der misst, ob die Sprache fuer ihre eigenen Werkzeuge taugt.
+'
+'  Was er kann:
+'    Patterns (1..64 Reihen) x Kanaele (4..32, der LETZTE ist der Schlagzeug-
+'    kanal), eine Reihenfolge (Order) daraus, 18 fertige Instrumente mit
+'    ADSR/Vibrato/Detune -- alle im Instrument-Kasten aenderbar --, je Note
+'    Lautstaerke, Portamento (Slide), Effekt (Arp/Vib/Ret) und ein eigenes
+'    Instrument; Blockauswahl mit Kopieren/Ausschneiden/Einfuegen,
+'    Transponieren und Interpolieren; Stumm/Solo und ein Lautstaerke-Regler
+'    je Kanal; Wiedergabe von Pattern oder Song auf einer Audio-UHR
+'    (samplegenau, nicht bildgetrieben); Rueckgaengig/Wiederholen ueber den
+'    ganzen Song; Datei = dasselbe JSON wie die Qt-Fassung (`dhtracker-song`,
+'    in beide Richtungen); [WAV] mischt den Song offline zu einer Datei,
+'    [GB-Code] schreibt den frame-basierten Live-Player wie die Qt-Fassung.
+'
+'  Bedienung:
+'    Klick ins Gitter setzt den Cursor, Ziehen oder Umschalt+Klick waehlt
+'    einen Block. Pfeile bewegen, Umschalt+Pfeile waehlen, Bild auf/ab
+'    springen, Pos1/Ende an den Rand. Klaviatur unten ODER die Tastatur
+'    (Z S X D C V G B H N J M = untere Oktave, Q 2 W 3 E R 5 T 6 Y 7 U =
+'    obere; die Lage ist die der US-Tastatur, auf einer deutschen liegt das
+'    Z also auf dem Y). `0` = Note aus, Entf/Ruecktaste loescht.
+'    Strg+C/X/V Block kopieren/ausschneiden/einfuegen, Strg+Pfeil auf/ab
+'    transponiert (+Umschalt: Oktave), Strg+I interpoliert, Strg+Z/Y
+'    zurueck/vor, Strg+S sichert, Strg+O oeffnet, Leertaste spielt das
+'    Pattern. ESC beendet (fragt bei ungesicherten Aenderungen).
+'
+'  Nicht portiert (die Qt-Fassung hat es):
+'    Sample-Instrumente (WAV/OGG), Keymaps und SoundFonts -- alles, was
+'    eingebettete PCM-Daten braucht; VU-Meter je Kanal; Umbenennen von
+'    Patterns; der Sample-Offset-Effekt (er braucht Samples).
+'
+'  Was dieser Pilot in der Laufzeit freigelegt hat: AUDIO_NOTE (eine Note
+'  mit Sustain-PEGEL und Ausklingen -- AUDIO_SFX kennt nur drei Zeiten),
+'  AUDIO_SOUND_NEW/MIX/NORMALIZE (ohne Mischen kein WAV-Export) und
+'  JSON_APPEND_NULL (eine Liste mit leeren Plaetzen liess sich nicht
+'  schreiben).
+' ============================================================
+IMPORT "gui"
+IMPORT "audio"
+IMPORT "json"
+
+' ------------------------------------------------------------ Grenzen
+CONST MAX_CH = 32
+CONST MIN_CH = 4
+CONST MAX_ROWS = 64
+CONST MAX_PAT = 32
+CONST MAX_ORDER = 128
+CONST MAX_INST = 48
+CONST LEER = -2                 ' keine Note (die Qt-Fassung schreibt null)
+CONST NOTE_OFF = -1             ' Note aus (Key Off)
+CONST TICKS = 6                 ' Ticks je Reihe -- Raster fuer Arp/Retrigger
+CONST FX_ARP = 1
+CONST FX_VIB = 2
+CONST FX_RET = 3
+CONST FX_OFF = 4
+CONST UNDO_MAX = 32
+
+' ------------------------------------------------------------ Der Song
+' Ein Wert je Zelle, sechs Gitter -- so liegt es auch in der Datei.
+DIM note[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER
+DIM vol[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER       ' 1..15, 0 = Standard
+DIM slide[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER     ' -12..12, 0 = keiner
+DIM fx[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER        ' FX_*, 0 = keiner
+DIM fxp[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER       ' Parameter 0..255
+DIM inst[MAX_PAT, MAX_CH, MAX_ROWS] AS INTEGER      ' Instrument, -1 = Kanal
+DIM patName[MAX_PAT] AS STRING
+DIM patRows[MAX_PAT] AS INTEGER
+DIM patAnz AS INTEGER
+DIM order[MAX_ORDER] AS INTEGER
+DIM orderAnz AS INTEGER
+DIM bpm AS INTEGER
+DIM kanaele AS INTEGER
+DIM wave[MAX_CH] AS STRING          ' Wellenform der Tonkanaele ohne Instrument
+DIM chInst[MAX_CH] AS INTEGER       ' Instrument je Kanal, -1 = Wellenform
+DIM chVol[MAX_CH] AS FLOAT          ' Mixer-Regler 0..1
+DIM mute[MAX_CH] AS BOOLEAN
+DIM solo[MAX_CH] AS BOOLEAN
+
+' Instrumente: nur Synth-Klaenge (siehe Kopf).
+DIM iName[MAX_INST] AS STRING
+DIM iWave[MAX_INST] AS STRING
+DIM iAtk[MAX_INST] AS INTEGER
+DIM iDec[MAX_INST] AS INTEGER
+DIM iSus[MAX_INST] AS FLOAT
+DIM iRel[MAX_INST] AS INTEGER
+DIM iVibD[MAX_INST] AS FLOAT
+DIM iVibS[MAX_INST] AS FLOAT
+DIM iDet[MAX_INST] AS FLOAT
+DIM iPan[MAX_INST] AS FLOAT
+DIM iVol[MAX_INST] AS INTEGER       ' 1..15
+DIM instAnz AS INTEGER
+
+DIM wellenformen AS ARRAY OF STRING
+wellenformen = SPLIT$("square|saw|sine|triangle", "|")
+DIM notenNamen AS ARRAY OF STRING
+notenNamen = SPLIT$("C-|C#|D-|D#|E-|F-|F#|G-|G#|A-|A#|B-", "|")
+
+' ------------------------------------------------------------ Zustand
+DIM patAkt AS INTEGER : patAkt = 0
+DIM curC AS INTEGER : curC = 0
+DIM curR AS INTEGER : curR = 0
+DIM selAn AS BOOLEAN : selAn = FALSE
+DIM ankC AS INTEGER : ankC = 0       ' Anker der Blockauswahl
+DIM ankR AS INTEGER : ankR = 0
+DIM rowOff AS INTEGER : rowOff = 0   ' erste sichtbare Reihe
+DIM chOff AS INTEGER : chOff = 0     ' erster sichtbarer Kanal
+DIM dateiPfad AS STRING : dateiPfad = ""
+DIM dirty AS BOOLEAN : dirty = FALSE
+DIM undoFaellig AS BOOLEAN : undoFaellig = FALSE
+DIM meldung AS STRING : meldung = "Bereit."
+DIM bildNr AS INTEGER : bildNr = 0
+
+' Zwischenablage fuer Bloecke
+DIM cbNote[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbVol[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbSlide[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbFx[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbFxp[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbInst[MAX_CH, MAX_ROWS] AS INTEGER
+DIM cbW AS INTEGER : cbW = 0
+DIM cbH AS INTEGER : cbH = 0
+
+' ------------------------------------------------------------ Hilfen
+FUNCTION notenName$(m AS INTEGER) AS STRING
+    IF m = NOTE_OFF THEN RETURN "OFF"
+    IF m < 0 THEN RETURN "..."
+    RETURN notenNamen[m MOD 12] + STR$(m \ 12 - 1)
+END FUNCTION
+
+FUNCTION freqVon(m AS INTEGER) AS FLOAT
+    RETURN 440.0 * POW(2.0, (m - 69) / 12.0)
+END FUNCTION
+
+FUNCTION reihenMs() AS FLOAT
+    RETURN 60000.0 / MAX(1, bpm) / 4.0
+END FUNCTION
+
+FUNCTION tickMs() AS FLOAT
+    RETURN reihenMs() / TICKS
+END FUNCTION
+
+FUNCTION istDrum(c AS INTEGER) AS BOOLEAN
+    RETURN c = kanaele - 1
+END FUNCTION
+
+FUNCTION hoerbar(c AS INTEGER) AS BOOLEAN
+    IF mute[c] THEN RETURN FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO kanaele - 1
+        IF solo[i] THEN RETURN solo[c]
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+' Eine Zelle loeschen nimmt ihre Effekte mit -- wie in der Qt-Fassung.
+SUB zelleSetzen(p AS INTEGER, c AS INTEGER, r AS INTEGER, n AS INTEGER)
+    note[p, c, r] = n
+    IF n < 0 THEN
+        vol[p, c, r] = 0 : slide[p, c, r] = 0
+        fx[p, c, r] = 0 : fxp[p, c, r] = 0 : inst[p, c, r] = -1
+    END IF
+END SUB
+
+SUB patternLeeren(p AS INTEGER)
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO MAX_CH - 1
+        FOR r = 0 TO MAX_ROWS - 1
+            note[p, c, r] = LEER
+            vol[p, c, r] = 0 : slide[p, c, r] = 0
+            fx[p, c, r] = 0 : fxp[p, c, r] = 0 : inst[p, c, r] = -1
+        NEXT
+    NEXT
+END SUB
+
+SUB patternKopieren(von AS INTEGER, nach AS INTEGER)
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO MAX_CH - 1
+        FOR r = 0 TO MAX_ROWS - 1
+            note[nach, c, r] = note[von, c, r]
+            vol[nach, c, r] = vol[von, c, r]
+            slide[nach, c, r] = slide[von, c, r]
+            fx[nach, c, r] = fx[von, c, r]
+            fxp[nach, c, r] = fxp[von, c, r]
+            inst[nach, c, r] = inst[von, c, r]
+        NEXT
+    NEXT
+    patRows[nach] = patRows[von]
+END SUB
+
+' ------------------------------------------------------------ Instrumente
+SUB instrumentSetzen(i AS INTEGER, nm AS STRING, wf AS STRING, atk AS INTEGER, _
+                     dec AS INTEGER, sus AS FLOAT, rel AS INTEGER, _
+                     vd AS FLOAT, vs AS FLOAT, det AS FLOAT)
+    iName[i] = nm : iWave[i] = wf
+    iAtk[i] = atk : iDec[i] = dec : iSus[i] = sus : iRel[i] = rel
+    iVibD[i] = vd : iVibS[i] = vs : iDet[i] = det
+    iPan[i] = 0.0 : iVol[i] = 15
+END SUB
+
+' Dieselbe Tabelle wie `tracker/presets.py` -- ein Song, den die Qt-Fassung
+' anlegt, klingt hier also mit denselben Zahlen.
+SUB werksInstrumente()
+    instrumentSetzen(0,  "Fluegel (Piano)", "triangle",   2, 700, 0.0,  200, 0.0,  0, 6)
+    instrumentSetzen(1,  "E-Piano",         "sine",       2, 450, 0.30, 220, 0.0,  0, 8)
+    instrumentSetzen(2,  "Orgel",           "square",     6,   0, 1.0,   70, 0.06, 6, 5)
+    instrumentSetzen(3,  "Kirchenorgel",    "saw",       14,   0, 1.0,  140, 0.04, 5, 10)
+    instrumentSetzen(4,  "Streicher",       "saw",      140,   0, 1.0,  280, 0.05, 5, 14)
+    instrumentSetzen(5,  "Synth-Pad",       "triangle", 220,   0, 0.85, 420, 0.03, 4, 18)
+    instrumentSetzen(6,  "Bass",            "square",     2, 140, 0.55,  80, 0.0,  0, 0)
+    instrumentSetzen(7,  "Synth-Bass",      "saw",        2, 120, 0.50,  70, 0.0,  0, 6)
+    instrumentSetzen(8,  "Lead",            "saw",        2,   0, 0.9,   90, 0.05, 6, 4)
+    instrumentSetzen(9,  "Pluck",           "triangle",   1, 220, 0.0,  130, 0.0,  0, 4)
+    instrumentSetzen(10, "Glocke",          "sine",       1, 900, 0.0,  320, 0.0,  0, 10)
+    instrumentSetzen(11, "Marimba",         "sine",       1, 260, 0.0,  130, 0.0,  0, 0)
+    instrumentSetzen(12, "Chip-Square",     "square",     1,   0, 1.0,   20, 0.0,  0, 0)
+    instrumentSetzen(13, "Chip-Saw",        "saw",        1,   0, 1.0,   20, 0.0,  0, 0)
+    instrumentSetzen(14, "Kick",            "sine",       0,  90, 0.0,   30, 0.0,  0, 0)
+    instrumentSetzen(15, "Snare",           "noise",      0, 140, 0.0,   40, 0.0,  0, 0)
+    instrumentSetzen(16, "HiHat",           "noise",      0,  40, 0.0,   20, 0.0,  0, 0)
+    instrumentSetzen(17, "Tom",             "sine",       0, 160, 0.0,   40, 0.0,  0, 0)
+    instAnz = 18
+END SUB
+
+SUB neuerSong()
+    DIM i AS INTEGER
+    bpm = 120
+    kanaele = 4
+    FOR i = 0 TO MAX_CH - 1
+        wave[i] = "square" : chInst[i] = -1 : chVol[i] = 1.0
+        mute[i] = FALSE : solo[i] = FALSE
+    NEXT
+    wave[0] = "square" : wave[1] = "saw" : wave[2] = "triangle"
+    FOR i = 0 TO MAX_PAT - 1
+        patternLeeren(i)
+        patRows[i] = 16
+        patName[i] = "P" + STR$(i + 1)
+    NEXT
+    patAnz = 1
+    order[0] = 0 : orderAnz = 1
+    werksInstrumente()
+    ' Dieselben Vorgaben wie die Qt-Fassung: Fluegel / Streicher /
+    ' Synth-Bass / Kick.
+    chInst[0] = 0 : chInst[1] = 4 : chInst[2] = 7 : chInst[3] = 14
+    patAkt = 0 : curC = 0 : curR = 0 : selAn = FALSE
+    rowOff = 0 : chOff = 0
+END SUB
+
+' ------------------------------------------------------------ JSON
+' EINE Routine fuer Datei UND Verlauf: der Verlauf merkt sich den ganzen
+' Song als Text. Bei einem Tracker ist das billig genug (ein paar tausend
+' Zahlen), und es deckt ALLES ab -- Noten, Patterns, Reihenfolge, Tempo,
+' Instrumente -- ohne fuer jede Aenderungsart eine eigene Buchfuehrung.
+FUNCTION gitterHatWerte(p AS INTEGER, welches AS INTEGER) AS BOOLEAN
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO kanaele - 1
+        FOR r = 0 TO patRows[p] - 1
+            IF welches = 1 AND vol[p, c, r] > 0 THEN RETURN TRUE
+            IF welches = 2 AND slide[p, c, r] <> 0 THEN RETURN TRUE
+            IF welches = 3 AND fx[p, c, r] <> 0 THEN RETURN TRUE
+            IF welches = 4 AND inst[p, c, r] >= 0 THEN RETURN TRUE
+        NEXT
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Ein Gitter als Liste von Listen; `welches` waehlt das Feld. Leere
+' Plaetze werden null -- so liest es die Qt-Fassung.
+FUNCTION gitterJson(p AS INTEGER, welches AS INTEGER) AS JSON_HANDLE
+    DIM g AS JSON_HANDLE : g = JSON_NEW_ARRAY()
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO kanaele - 1
+        DIM col AS JSON_HANDLE : col = JSON_NEW_ARRAY()
+        FOR r = 0 TO patRows[p] - 1
+            DIM w AS INTEGER : w = 0
+            DIM istLeer AS BOOLEAN : istLeer = TRUE
+            IF welches = 0 THEN
+                w = note[p, c, r] : istLeer = (w = LEER)
+            ELSEIF welches = 1 THEN
+                w = vol[p, c, r] : istLeer = (w = 0)
+            ELSEIF welches = 2 THEN
+                w = slide[p, c, r] : istLeer = (w = 0)
+            ELSEIF welches = 3 THEN
+                w = fx[p, c, r] : istLeer = (w = 0)
+            ELSEIF welches = 4 THEN
+                w = fxp[p, c, r] : istLeer = (fx[p, c, r] = 0)
+            ELSE
+                w = inst[p, c, r] : istLeer = (w < 0)
+            END IF
+            IF istLeer THEN
+                JSON_APPEND_NULL(col, "")
+            ELSE
+                JSON_APPEND_INT(col, "", w)
+            END IF
+        NEXT
+        JSON_APPEND_JSON(g, "", col)
+    NEXT
+    RETURN g
+END FUNCTION
+
+FUNCTION songHandle() AS JSON_HANDLE
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "format", "dhtracker-song")
+    JSON_SET_INT(h, "version", 1)
+    JSON_SET_INT(h, "bpm", bpm)
+    JSON_SET_INT(h, "channels", kanaele)
+    DIM i AS INTEGER
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    FOR i = 0 TO kanaele - 2
+        JSON_APPEND_STRING(a, "", wave[i])
+    NEXT
+    JSON_SET_JSON(h, "waves", a)
+    DIM pats AS JSON_HANDLE : pats = JSON_NEW_ARRAY()
+    DIM p AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        DIM po AS JSON_HANDLE : po = JSON_NEW_OBJECT()
+        JSON_SET_STRING(po, "name", patName[p])
+        JSON_SET_INT(po, "rows", patRows[p])
+        JSON_SET_INT(po, "channels", kanaele)
+        JSON_SET_JSON(po, "data", gitterJson(p, 0))
+        IF gitterHatWerte(p, 1) THEN JSON_SET_JSON(po, "vol", gitterJson(p, 1))
+        IF gitterHatWerte(p, 2) THEN JSON_SET_JSON(po, "slide", gitterJson(p, 2))
+        IF gitterHatWerte(p, 3) THEN
+            JSON_SET_JSON(po, "fx", gitterJson(p, 3))
+            JSON_SET_JSON(po, "fxp", gitterJson(p, 4))
+        END IF
+        IF gitterHatWerte(p, 4) THEN JSON_SET_JSON(po, "inst", gitterJson(p, 5))
+        JSON_APPEND_JSON(pats, "", po)
+    NEXT
+    JSON_SET_JSON(h, "patterns", pats)
+    a = JSON_NEW_ARRAY()
+    FOR i = 0 TO orderAnz - 1
+        JSON_APPEND_INT(a, "", order[i])
+    NEXT
+    JSON_SET_JSON(h, "order", a)
+    DIM abweichend AS BOOLEAN : abweichend = FALSE
+    FOR i = 0 TO kanaele - 1
+        IF chVol[i] <> 1.0 THEN abweichend = TRUE
+    NEXT
+    IF abweichend THEN
+        a = JSON_NEW_ARRAY()
+        FOR i = 0 TO kanaele - 1
+            JSON_APPEND_FLOAT(a, "", chVol[i])
+        NEXT
+        JSON_SET_JSON(h, "channel_vol", a)
+    END IF
+    a = JSON_NEW_ARRAY()
+    FOR i = 0 TO instAnz - 1
+        DIM io AS JSON_HANDLE : io = JSON_NEW_OBJECT()
+        JSON_SET_STRING(io, "name", iName[i])
+        JSON_SET_STRING(io, "kind", "synth")
+        JSON_SET_INT(io, "default_vol", iVol[i])
+        JSON_SET_FLOAT(io, "pan", iPan[i])
+        JSON_SET_STRING(io, "waveform", iWave[i])
+        JSON_SET_STRING(io, "loop_mode", "none")
+        JSON_SET_INT(io, "loop_start", 0)
+        JSON_SET_INT(io, "loop_end", 0)
+        JSON_SET_INT(io, "env_attack_ms", iAtk[i])
+        JSON_SET_INT(io, "env_decay_ms", iDec[i])
+        JSON_SET_FLOAT(io, "env_sustain", iSus[i])
+        JSON_SET_INT(io, "env_release_ms", iRel[i])
+        JSON_SET_FLOAT(io, "vib_depth", iVibD[i])
+        JSON_SET_FLOAT(io, "vib_speed", iVibS[i])
+        JSON_SET_FLOAT(io, "detune_cents", iDet[i])
+        JSON_APPEND_JSON(a, "", io)
+    NEXT
+    JSON_SET_JSON(h, "instruments", a)
+    a = JSON_NEW_ARRAY()
+    FOR i = 0 TO kanaele - 1
+        IF chInst[i] >= 0 THEN
+            JSON_APPEND_INT(a, "", chInst[i])
+        ELSE
+            JSON_APPEND_NULL(a, "")
+        END IF
+    NEXT
+    JSON_SET_JSON(h, "channel_inst", a)
+    RETURN h
+END FUNCTION
+
+FUNCTION zahlOder(h AS JSON_HANDLE, pfad AS STRING, sonst AS INTEGER) AS INTEGER
+    IF JSON_TYPE(h, pfad) = "number" THEN RETURN JSON_GET_INT(h, pfad)
+    RETURN sonst
+END FUNCTION
+
+FUNCTION kommaOder(h AS JSON_HANDLE, pfad AS STRING, sonst AS FLOAT) AS FLOAT
+    IF JSON_TYPE(h, pfad) = "number" THEN RETURN JSON_GET_FLOAT(h, pfad)
+    RETURN sonst
+END FUNCTION
+
+' Ein Gitter aus der Datei; Zeilen, die die Datei nicht hat, bleiben leer.
+SUB gitterLesen(h AS JSON_HANDLE, pp AS STRING, p AS INTEGER, welches AS INTEGER)
+    IF NOT JSON_HAS(h, pp) THEN RETURN
+    DIM nc AS INTEGER : nc = MIN(kanaele, JSON_LEN(h, pp))
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO nc - 1
+        DIM cp AS STRING : cp = pp + "." + STR$(c)
+        DIM nr AS INTEGER : nr = MIN(patRows[p], JSON_LEN(h, cp))
+        FOR r = 0 TO nr - 1
+            DIM zp AS STRING : zp = cp + "." + STR$(r)
+            IF JSON_TYPE(h, zp) = "number" THEN
+                DIM w AS INTEGER : w = JSON_GET_INT(h, zp)
+                IF welches = 0 THEN
+                    IF w >= -1 AND w <= 127 THEN note[p, c, r] = w
+                ELSEIF welches = 1 THEN
+                    vol[p, c, r] = CLAMP(w, 0, 15)
+                ELSEIF welches = 2 THEN
+                    slide[p, c, r] = CLAMP(w, -12, 12)
+                ELSEIF welches = 3 THEN
+                    IF w >= 1 AND w <= 4 THEN fx[p, c, r] = w
+                ELSEIF welches = 4 THEN
+                    fxp[p, c, r] = CLAMP(w, 0, 255)
+                ELSE
+                    IF w >= 0 THEN inst[p, c, r] = w
+                END IF
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB songAusHandle(h AS JSON_HANDLE)
+    neuerSong()
+    instAnz = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX_CH - 1
+        chInst[i] = -1
+    NEXT
+    bpm = CLAMP(zahlOder(h, "bpm", 120), 40, 300)
+    kanaele = CLAMP(zahlOder(h, "channels", 4), MIN_CH, MAX_CH)
+    IF JSON_HAS(h, "waves") THEN
+        FOR i = 0 TO MIN(kanaele - 2, JSON_LEN(h, "waves") - 1)
+            wave[i] = JSON_GET_STRING(h, "waves." + STR$(i))
+        NEXT
+    END IF
+    patAnz = 0
+    IF JSON_HAS(h, "patterns") THEN patAnz = MIN(MAX_PAT, JSON_LEN(h, "patterns"))
+    DIM p AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        DIM pp AS STRING : pp = "patterns." + STR$(p)
+        IF JSON_HAS(h, pp + ".name") THEN patName[p] = JSON_GET_STRING(h, pp + ".name")
+        patRows[p] = CLAMP(zahlOder(h, pp + ".rows", 16), 1, MAX_ROWS)
+        gitterLesen(h, pp + ".data", p, 0)
+        gitterLesen(h, pp + ".vol", p, 1)
+        gitterLesen(h, pp + ".slide", p, 2)
+        gitterLesen(h, pp + ".fx", p, 3)
+        gitterLesen(h, pp + ".fxp", p, 4)
+        gitterLesen(h, pp + ".inst", p, 5)
+    NEXT
+    IF patAnz = 0 THEN patAnz = 1
+    orderAnz = 0
+    IF JSON_HAS(h, "order") THEN
+        FOR i = 0 TO MIN(MAX_ORDER, JSON_LEN(h, "order")) - 1
+            DIM o AS INTEGER : o = zahlOder(h, "order." + STR$(i), -1)
+            IF o >= 0 AND o < patAnz THEN
+                order[orderAnz] = o : orderAnz = orderAnz + 1
+            END IF
+        NEXT
+    END IF
+    IF orderAnz = 0 THEN order[0] = 0 : orderAnz = 1
+    IF JSON_HAS(h, "channel_vol") THEN
+        FOR i = 0 TO MIN(kanaele, JSON_LEN(h, "channel_vol")) - 1
+            chVol[i] = CLAMP(kommaOder(h, "channel_vol." + STR$(i), 1.0), 0.0, 1.0)
+        NEXT
+    END IF
+    IF JSON_HAS(h, "instruments") THEN
+        DIM n AS INTEGER : n = MIN(MAX_INST, JSON_LEN(h, "instruments"))
+        FOR i = 0 TO n - 1
+            DIM ip AS STRING : ip = "instruments." + STR$(i)
+            DIM art AS STRING : art = "synth"
+            IF JSON_HAS(h, ip + ".kind") THEN art = JSON_GET_STRING(h, ip + ".kind")
+            DIM wf AS STRING : wf = "square"
+            IF JSON_HAS(h, ip + ".waveform") THEN wf = JSON_GET_STRING(h, ip + ".waveform")
+            DIM nm AS STRING : nm = "Instrument"
+            IF JSON_HAS(h, ip + ".name") THEN nm = JSON_GET_STRING(h, ip + ".name")
+            ' Ein Sample- oder Keymap-Instrument kann dieser Pilot nicht
+            ' spielen -- es bleibt als Platzhalter stehen, damit die Nummern
+            ' der anderen stimmen, und sagt es im Namen.
+            IF art <> "synth" THEN nm = nm + " [" + art + ", hier stumm]"
+            instrumentSetzen(instAnz, nm, wf, zahlOder(h, ip + ".env_attack_ms", 0), _
+                             zahlOder(h, ip + ".env_decay_ms", 0), _
+                             kommaOder(h, ip + ".env_sustain", 1.0), _
+                             zahlOder(h, ip + ".env_release_ms", 0), _
+                             kommaOder(h, ip + ".vib_depth", 0.0), _
+                             kommaOder(h, ip + ".vib_speed", 0.0), _
+                             kommaOder(h, ip + ".detune_cents", 0.0))
+            iPan[instAnz] = CLAMP(kommaOder(h, ip + ".pan", 0.0), -1.0, 1.0)
+            iVol[instAnz] = CLAMP(zahlOder(h, ip + ".default_vol", 15), 1, 15)
+            instAnz = instAnz + 1
+        NEXT
+        IF JSON_HAS(h, "channel_inst") THEN
+            FOR i = 0 TO MIN(kanaele, JSON_LEN(h, "channel_inst")) - 1
+                DIM ci AS INTEGER : ci = zahlOder(h, "channel_inst." + STR$(i), -1)
+                IF ci >= 0 AND ci < instAnz THEN chInst[i] = ci
+            NEXT
+        END IF
+    END IF
+    ' Verwaiste Instrument-Nummern in den Zellen zuruecksetzen -- sonst
+    ' klaenge eine Note mit einem Instrument, das es nicht gibt.
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        FOR c = 0 TO kanaele - 1
+            FOR r = 0 TO patRows[p] - 1
+                IF inst[p, c, r] >= instAnz THEN inst[p, c, r] = -1
+            NEXT
+        NEXT
+    NEXT
+END SUB
+
+' ------------------------------------------------------------ Verlauf
+DIM uStand[UNDO_MAX] AS STRING
+DIM uAnz AS INTEGER : uAnz = 0
+DIM uPos AS INTEGER : uPos = 0
+DIM uStart AS INTEGER : uStart = 0
+
+FUNCTION standJetzt$() AS STRING
+    RETURN JSON_STRINGIFY(songHandle())
+END FUNCTION
+
+SUB verlaufLeeren()
+    uAnz = 1 : uPos = 1 : uStart = 0
+    uStand[0] = standJetzt$()
+END SUB
+
+' Gesichert wird der VOLLE Stand, und nur, wenn er sich vom letzten
+' unterscheidet -- ein Klick, der nichts aendert, ist kein Schritt.
+SUB schrittSichern()
+    DIM s AS STRING : s = standJetzt$()
+    IF uPos > 0 AND s = uStand[(uStart + uPos - 1) MOD UNDO_MAX] THEN RETURN
+    uAnz = uPos                        ' alles Wiederholbare verfaellt
+    IF uAnz = UNDO_MAX THEN
+        uStart = (uStart + 1) MOD UNDO_MAX
+        uAnz = uAnz - 1
+    END IF
+    uStand[(uStart + uAnz) MOD UNDO_MAX] = s
+    uAnz = uAnz + 1
+    uPos = uAnz
+END SUB
+
+SUB geaendert()
+    dirty = TRUE
+    undoFaellig = TRUE
+END SUB
+
+' ------------------------------------------------------------ Klang
+' Klaenge werden EINMAL gebaut und wiederverwendet: dieselbe Note mit
+' derselben Laenge und demselben Instrument ist derselbe SOUND.
+DIM cache AS MAP OF INTEGER
+DIM gWf AS STRING
+DIM gAtk AS INTEGER
+DIM gDec AS INTEGER
+DIM gSus AS FLOAT
+DIM gRel AS INTEGER
+DIM gVd AS FLOAT
+DIM gVs AS FLOAT
+DIM gDet AS FLOAT
+
+SUB cacheLeeren()
+    DIM k AS STRING
+    FOR EACH k IN MAPKEYS(cache)
+        UNLOADSOUND(MAPGET(cache, k))
+    NEXT
+    MAPCLEAR(cache)
+END SUB
+
+' Die Klang-Parameter fuer eine Note: das Instrument -- oder die nackte
+' Wellenform des Kanals (Schlagzeugkanal: kurzes Rauschen).
+SUB parameterLaden(ii AS INTEGER, c AS INTEGER)
+    IF ii >= 0 AND ii < instAnz THEN
+        gWf = iWave[ii] : gAtk = iAtk[ii] : gDec = iDec[ii] : gSus = iSus[ii]
+        gRel = iRel[ii] : gVd = iVibD[ii] : gVs = iVibS[ii] : gDet = iDet[ii]
+    ELSEIF istDrum(c) THEN
+        gWf = "noise" : gAtk = 0 : gDec = 120 : gSus = 0.0 : gRel = 0
+        gVd = 0.0 : gVs = 0.0 : gDet = 0.0
+    ELSE
+        gWf = wave[c] : gAtk = 0 : gDec = 0 : gSus = 1.0 : gRel = 20
+        gVd = 0.0 : gVs = 0.0 : gDet = 0.0
+    END IF
+END SUB
+
+FUNCTION klangFuer(midi AS INTEGER, tks AS INTEGER, sl AS INTEGER, _
+                   vibX AS INTEGER, vibY AS INTEGER) AS INTEGER
+    DIM k AS STRING
+    k = gWf + "|" + STR$(gAtk) + "|" + STR$(gDec) + "|" + FORMAT$(gSus, "%.2f") + "|" + _
+        STR$(gRel) + "|" + FORMAT$(gVd, "%.3f") + "|" + FORMAT$(gVs, "%.1f") + "|" + _
+        FORMAT$(gDet, "%.1f") + "|" + STR$(midi) + "|" + STR$(tks) + "|" + _
+        STR$(sl) + "|" + STR$(vibX) + "|" + STR$(vibY)
+    IF MAPHAS(cache, k) THEN RETURN MAPGET(cache, k)
+    DIM ms AS INTEGER : ms = MAX(1, INT(tks * tickMs()))
+    DIM vd AS FLOAT : vd = gVd
+    DIM vs AS FLOAT : vs = gVs
+    ' Vibrato-Effekt: x = Hz, y = Tiefe in Achtel-Halbtoenen (wie im Render
+    ' der Qt-Fassung) -- AUDIO_NOTE will die Tiefe als Anteil der Frequenz.
+    IF vibY > 0 AND vibX > 0 THEN
+        vd = POW(2.0, vibY * 0.125 / 12.0) - 1.0
+        vs = vibX
+    END IF
+    DIM s AS INTEGER
+    ' 0.6 als Kopfraum, wie die Qt-Fassung -- vier Kanaele uebereinander
+    ' bei voller Lautstaerke wuerden sonst uebersteuern.
+    s = AUDIO_NOTE(gWf, freqVon(midi), ms, gAtk, gDec, gSus, gRel, 0.6, vd, vs, gDet, sl)
+    MAPPUT(cache, k, s)
+    RETURN s
+END FUNCTION
+
+' ------------------------------------------------------------ Wiedergabe
+' Die Noten laufen auf einer AUDIO-UHR: geplant wird zwei Reihen voraus,
+' gestartet wird samplegenau vom Audio-Faden. Ein bildgetriebener Zaehler
+' (wie im GB-Code-Export) schwankt um bis zu ein Bild -- bei 60 Bildern
+' sind das 16 ms, und das hoert man bei schnellen Sechzehnteln.
+DIM takt AS AUDIO_CLOCK
+DIM spielt AS BOOLEAN : spielt = FALSE
+DIM songModus AS BOOLEAN : songModus = FALSE
+DIM plPos AS INTEGER : plPos = 0        ' Stelle in der Reihenfolge
+DIM plPat AS INTEGER : plPat = 0
+DIM plRow AS INTEGER : plRow = 0
+DIM planTick AS INTEGER : planTick = 0
+DIM geplantPat[256] AS INTEGER
+DIM geplantRow[256] AS INTEGER
+DIM kopfPat AS INTEGER : kopfPat = -1   ' was gerade klingt
+DIM kopfRow AS INTEGER : kopfRow = -1
+' Beim Rendern in eine Datei laufen dieselben Routinen -- nur das Ziel ist
+' ein Misch-Puffer statt der Uhr.
+DIM rendern AS BOOLEAN : rendern = FALSE
+DIM renderStereo AS BOOLEAN : renderStereo = FALSE
+DIM renderAmiga AS BOOLEAN : renderAmiga = FALSE
+DIM mixZiel AS INTEGER : mixZiel = -1
+
+SUB ausgeben(snd AS INTEGER, tick AS INTEGER, lautst AS FLOAT, pan AS FLOAT)
+    IF rendern THEN
+        IF renderStereo THEN
+            AUDIO_SOUND_MIX(mixZiel, snd, tick * tickMs(), lautst, pan)
+        ELSE
+            AUDIO_SOUND_MIX(mixZiel, snd, tick * tickMs(), lautst)
+        END IF
+    ELSE
+        AUDIO_PLAY_AT(snd, takt, tick, lautst)
+    END IF
+END SUB
+
+' Reihen, bis auf diesem Kanal die naechste Note (oder ein OFF) kommt.
+' Am Pattern-Ende geht es im Song in das naechste Pattern der Reihenfolge
+' weiter, im Pattern-Modus endet die Note dort.
+FUNCTION notenLaenge(p AS INTEGER, c AS INTEGER, r AS INTEGER, _
+                     weiter AS BOOLEAN, opos AS INTEGER) AS INTEGER
+    DIM n AS INTEGER : n = 1
+    DIM rr AS INTEGER
+    FOR rr = r + 1 TO patRows[p] - 1
+        IF note[p, c, rr] <> LEER THEN RETURN n
+        n = n + 1
+    NEXT
+    IF weiter AND orderAnz > 0 THEN
+        DIM p2 AS INTEGER : p2 = order[(opos + 1) MOD orderAnz]
+        FOR rr = 0 TO patRows[p2] - 1
+            IF note[p2, c, rr] <> LEER THEN RETURN n
+            n = n + 1
+        NEXT
+    END IF
+    RETURN n
+END FUNCTION
+
+FUNCTION kanalPan(c AS INTEGER, ii AS INTEGER) AS FLOAT
+    DIM p AS FLOAT : p = 0.0
+    IF ii >= 0 THEN p = iPan[ii]
+    IF renderAmiga THEN
+        ' Kanal 1+4 links, 2+3 rechts -- die Paula-Verteilung, nicht ganz
+        ' hart, wie im Render der Qt-Fassung.
+        DIM m AS INTEGER : m = c MOD 4
+        IF m = 0 OR m = 3 THEN
+            p = p - 0.8
+        ELSE
+            p = p + 0.8
+        END IF
+    END IF
+    RETURN CLAMP(p, -1.0, 1.0)
+END FUNCTION
+
+SUB reiheAusgeben(p AS INTEGER, r AS INTEGER, tick AS INTEGER, _
+                  weiter AS BOOLEAN, opos AS INTEGER)
+    DIM c AS INTEGER
+    FOR c = 0 TO kanaele - 1
+        DIM n AS INTEGER : n = note[p, c, r]
+        IF n >= 0 AND (rendern OR hoerbar(c)) THEN
+            DIM ii AS INTEGER : ii = inst[p, c, r]
+            IF ii < 0 OR ii >= instAnz THEN ii = chInst[c]
+            parameterLaden(ii, c)
+            DIM ticksL AS INTEGER : ticksL = notenLaenge(p, c, r, weiter, opos) * TICKS
+            DIM lautst AS FLOAT
+            IF vol[p, c, r] > 0 THEN
+                lautst = vol[p, c, r] / 15.0
+            ELSEIF ii >= 0 THEN
+                lautst = iVol[ii] / 15.0
+            ELSE
+                lautst = 1.0
+            END IF
+            lautst = lautst * chVol[c]
+            DIM pan AS FLOAT : pan = kanalPan(c, ii)
+            DIM f AS INTEGER : f = fx[p, c, r]
+            DIM par AS INTEGER : par = fxp[p, c, r]
+            DIM t AS INTEGER
+            IF f = FX_ARP THEN
+                ' Der C64-Akkord: Grundton, +x, +y im Tick-Takt.
+                DIM ax AS INTEGER : ax = par \ 16
+                DIM ay AS INTEGER : ay = par MOD 16
+                FOR t = 0 TO ticksL - 1
+                    DIM off AS INTEGER : off = 0
+                    IF t MOD 3 = 1 THEN off = ax
+                    IF t MOD 3 = 2 THEN off = ay
+                    ausgeben(klangFuer(MIN(127, n + off), 1, 0, 0, 0), tick + t, lautst, pan)
+                NEXT
+            ELSEIF f = FX_RET THEN
+                DIM alle AS INTEGER : alle = MAX(1, par)
+                FOR t = 0 TO ticksL - 1 STEP alle
+                    ausgeben(klangFuer(n, MIN(alle, ticksL - t), 0, 0, 0), tick + t, lautst, pan)
+                NEXT
+            ELSEIF f = FX_VIB THEN
+                ausgeben(klangFuer(n, ticksL, slide[p, c, r], par \ 16, par MOD 16), tick, lautst, pan)
+            ELSE
+                ausgeben(klangFuer(n, ticksL, slide[p, c, r], 0, 0), tick, lautst, pan)
+            END IF
+        END IF
+    NEXT
+END SUB
+
+SUB stopp()
+    IF spielt THEN
+        ' Die Uhr ENTFERNEN, nicht anhalten: ein Klang, der auf eine Uhr
+        ' wartet, die es nicht mehr gibt, startet nie (Kira verwirft ihn).
+        ' Angehalten bliebe er stehen und kaeme beim naechsten Start als
+        ' Geisternote wieder -- an einer Stelle, die dann eine andere ist.
+        AUDIO_CLOCK_REMOVE(takt)
+    END IF
+    spielt = FALSE
+    kopfPat = -1 : kopfRow = -1
+END SUB
+
+' Zwei Reihen voraus planen. Mehr waere bei einer Aenderung im Gitter zu
+' spaet zu hoeren, weniger reicht bei einem Ruckler nicht ueber das Bild.
+SUB planen()
+    DIM jetzt AS INTEGER : jetzt = AUDIO_CLOCK_TICKS(takt)
+    DIM grenze AS INTEGER : grenze = 0
+    WHILE planTick <= jetzt + TICKS * 2 AND grenze < 64
+        reiheAusgeben(plPat, plRow, planTick, songModus, plPos)
+        geplantPat[(planTick \ TICKS) MOD 256] = plPat
+        geplantRow[(planTick \ TICKS) MOD 256] = plRow
+        planTick = planTick + TICKS
+        plRow = plRow + 1
+        IF plRow >= patRows[plPat] THEN
+            plRow = 0
+            IF songModus THEN
+                plPos = (plPos + 1) MOD orderAnz
+                plPat = order[plPos]
+            END IF
+        END IF
+        grenze = grenze + 1
+    WEND
+    kopfPat = geplantPat[(jetzt \ TICKS) MOD 256]
+    kopfRow = geplantRow[(jetzt \ TICKS) MOD 256]
+END SUB
+
+SUB starten(song AS BOOLEAN)
+    stopp()
+    songModus = song
+    IF songModus THEN
+        plPos = 0 : plPat = order[0]
+    ELSE
+        plPos = 0 : plPat = patAkt
+    END IF
+    plRow = 0 : planTick = 0
+    takt = AUDIO_CLOCK_NEW(bpm / 60.0 * 4.0 * TICKS)
+    spielt = TRUE
+    planen()
+    AUDIO_CLOCK_START(takt)
+END SUB
+
+' Eine einzelne Note vorhoeren (Klaviatur, Tastatur).
+SUB vorhoeren(c AS INTEGER, midi AS INTEGER)
+    DIM ii AS INTEGER : ii = chInst[c]
+    parameterLaden(ii, c)
+    DIM tks AS INTEGER : tks = MAX(TICKS * 2, INT(600.0 / tickMs()))
+    DIM lautst AS FLOAT : lautst = chVol[c]
+    IF ii >= 0 THEN lautst = lautst * iVol[ii] / 15.0
+    AUDIO_PLAY(klangFuer(midi, tks, 0, 0, 0), 0, lautst)
+END SUB
+
+' ------------------------------------------------------------ WAV-Ausgabe
+SUB wavRendern(pfad AS STRING)
+    stopp()
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO orderAnz - 1
+        gesamt = gesamt + patRows[order[i]]
+    NEXT
+    rendern = TRUE
+    mixZiel = AUDIO_SOUND_NEW(INT(gesamt * reihenMs()) + 800)
+    DIM tick AS INTEGER : tick = 0
+    FOR i = 0 TO orderAnz - 1
+        DIM p AS INTEGER : p = order[i]
+        DIM r AS INTEGER
+        FOR r = 0 TO patRows[p] - 1
+            reiheAusgeben(p, r, tick, i < orderAnz - 1, i)
+            tick = tick + TICKS
+        NEXT
+    NEXT
+    rendern = FALSE
+    DIM faktor AS FLOAT : faktor = AUDIO_SOUND_NORMALIZE(mixZiel)
+    AUDIO_SAVE_WAV(mixZiel, pfad)
+    UNLOADSOUND(mixZiel)
+    meldung = "WAV gesichert: " + pfad + " (" + STR$(gesamt) + " Reihen, Pegel x" + _
+              FORMAT$(faktor, "%.2f") + ")"
+END SUB
+
+' ------------------------------------------------------------ GB-Code
+' Derselbe Player wie der Export der Qt-Fassung (`Song.dh_code`): die
+' Reihenfolge wird zu EINER Zeitachse, jede Note klingt genau eine Reihe.
+FUNCTION gbCode$() AS STRING
+    DIM z AS STRING : z = CHR$(10)
+    DIM q AS STRING : q = CHR$(34)
+    DIM gesamt AS INTEGER : gesamt = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO orderAnz - 1
+        gesamt = gesamt + patRows[order[i]]
+    NEXT
+    DIM rowms AS INTEGER : rowms = INT(reihenMs())
+    DIM s AS STRING
+    s = "IMPORT " + q + "audio" + q + z + z + _
+        "' === Tracker-Song (Drachenhauch-Tracker) -- " + STR$(patAnz) + " Pattern(s), " + _
+        "Order-Laenge " + STR$(orderAnz) + ", " + STR$(gesamt) + " Reihen, BPM " + STR$(bpm) + " ===" + z + _
+        "CONST TRK_ROWS = " + STR$(gesamt) + z + _
+        "CONST TRK_ROWMS = " + STR$(rowms) + z + z
+    DIM c AS INTEGER
+    DIM hatVol[MAX_CH] AS BOOLEAN
+    DIM hatSlide[MAX_CH] AS BOOLEAN
+    DIM irgendVol AS BOOLEAN : irgendVol = FALSE
+    FOR c = 0 TO kanaele - 1
+        s = s + "DIM trk" + STR$(c) + "[TRK_ROWS] AS INTEGER" + z
+        DIM g AS INTEGER : g = 0
+        FOR i = 0 TO orderAnz - 1
+            DIM p AS INTEGER : p = order[i]
+            DIM r AS INTEGER
+            FOR r = 0 TO patRows[p] - 1
+                DIM n AS INTEGER : n = note[p, c, r]
+                IF n >= 0 THEN
+                    DIM w AS INTEGER : w = 1
+                    IF NOT istDrum(c) THEN w = INT(freqVon(n) + 0.5)
+                    s = s + "trk" + STR$(c) + "[" + STR$(g) + "] = " + STR$(w) + z
+                    IF vol[p, c, r] > 0 THEN hatVol[c] = TRUE : irgendVol = TRUE
+                    IF slide[p, c, r] <> 0 AND NOT istDrum(c) THEN hatSlide[c] = TRUE
+                END IF
+                g = g + 1
+            NEXT
+        NEXT
+    NEXT
+    FOR c = 0 TO kanaele - 1
+        IF hatVol[c] THEN
+            s = s + "DIM trkV" + STR$(c) + "[TRK_ROWS] AS INTEGER" + z
+            s = s + spur$(c, 1)
+        END IF
+        IF hatSlide[c] THEN
+            s = s + "DIM trkSl" + STR$(c) + "[TRK_ROWS] AS INTEGER" + z
+            s = s + spur$(c, 2)
+        END IF
+    NEXT
+    s = s + z + "' --- Player-Status + Update (im Game-Loop aufrufen) ---" + z + _
+        "DIM trkRow AS INTEGER" + z + "DIM trkAcc AS FLOAT" + z + _
+        "trkRow = 0" + z + "trkAcc = 0.0" + z + z
+    IF irgendVol THEN
+        s = s + "' Lautstaerke-Spur -> Amplitude (0 = Standard 0.5)" + z + _
+            "FUNCTION TRACKER_AMP(pct AS INTEGER) AS FLOAT" + z + _
+            "    IF pct <= 0 THEN RETURN 0.5" + z + _
+            "    RETURN pct / 100.0" + z + "END FUNCTION" + z + z
+    END IF
+    s = s + "SUB TRACKER_PLAY_ROW(r AS INTEGER)" + z
+    FOR c = 0 TO kanaele - 2
+        DIM wf AS STRING : wf = wave[c]
+        IF chInst[c] >= 0 THEN wf = iWave[chInst[c]]
+        DIM amp AS STRING : amp = "0.5"
+        IF hatVol[c] THEN amp = "TRACKER_AMP(trkV" + STR$(c) + "[r])"
+        IF chVol[c] <> 1.0 THEN amp = "(" + amp + " * " + FORMAT$(chVol[c], "%.2f") + ")"
+        DIM ton AS STRING
+        ton = "AUDIO_TONE(trk" + STR$(c) + "[r], TRK_ROWMS, " + q + wf + q + ", " + amp + ")"
+        IF hatSlide[c] THEN
+            DIM sfx AS STRING
+            sfx = "AUDIO_SFX(" + q + wf + q + ", trk" + STR$(c) + "[r], trkSl" + STR$(c) + _
+                  "[r], 4, TRK_ROWMS, 40, 0.0, 0, " + amp + ")"
+            s = s + "    IF trk" + STR$(c) + "[r] > 0 THEN" + z + _
+                "        IF trkSl" + STR$(c) + "[r] <> 0 THEN" + z + _
+                "            PLAYSOUND(" + sfx + ")" + z + "        ELSE" + z + _
+                "            PLAYSOUND(" + ton + ")" + z + "        END IF" + z + "    END IF" + z
+        ELSE
+            s = s + "    IF trk" + STR$(c) + "[r] > 0 THEN PLAYSOUND(" + ton + ")" + z
+        END IF
+    NEXT
+    DIM d AS INTEGER : d = kanaele - 1
+    DIM damp AS STRING : damp = "0.5"
+    IF hatVol[d] THEN damp = "TRACKER_AMP(trkV" + STR$(d) + "[r])"
+    IF chVol[d] <> 1.0 THEN damp = "(" + damp + " * " + FORMAT$(chVol[d], "%.2f") + ")"
+    s = s + "    IF trk" + STR$(d) + "[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, " + damp + "))" + z
+    s = s + "END SUB" + z + z + _
+        "SUB TRACKER_UPDATE(dt_ms AS FLOAT)" + z + _
+        "    trkAcc = trkAcc + dt_ms" + z + _
+        "    WHILE trkAcc >= TRK_ROWMS" + z + _
+        "        trkAcc = trkAcc - TRK_ROWMS" + z + _
+        "        TRACKER_PLAY_ROW(trkRow)" + z + _
+        "        trkRow = (trkRow + 1) MOD TRK_ROWS" + z + _
+        "    WEND" + z + "END SUB" + z + z + _
+        "' Im Game-Loop:  TRACKER_UPDATE(DELTA() * 1000.0)" + z
+    RETURN s
+END FUNCTION
+
+' Die Lautstaerke- (welches = 1) bzw. Slide-Spur (2) eines Kanals als
+' Zuweisungen -- nur die belegten Reihen.
+FUNCTION spur$(c AS INTEGER, welches AS INTEGER) AS STRING
+    DIM z AS STRING : z = CHR$(10)
+    DIM s AS STRING : s = ""
+    DIM g AS INTEGER : g = 0
+    DIM i AS INTEGER
+    DIM rowms AS INTEGER : rowms = INT(reihenMs())
+    FOR i = 0 TO orderAnz - 1
+        DIM p AS INTEGER : p = order[i]
+        DIM r AS INTEGER
+        FOR r = 0 TO patRows[p] - 1
+            IF note[p, c, r] >= 0 THEN
+                IF welches = 1 AND vol[p, c, r] > 0 THEN
+                    DIM pct AS INTEGER : pct = CLAMP(INT(vol[p, c, r] / 15.0 * 100.0 + 0.5), 1, 100)
+                    s = s + "trkV" + STR$(c) + "[" + STR$(g) + "] = " + STR$(pct) + z
+                ELSEIF welches = 2 AND slide[p, c, r] <> 0 THEN
+                    DIM f0 AS FLOAT : f0 = freqVon(note[p, c, r])
+                    DIM f1 AS FLOAT : f1 = f0 * POW(2.0, slide[p, c, r] / 12.0)
+                    DIM hz AS INTEGER : hz = INT((f1 - f0) * 1000.0 / rowms + 0.5)
+                    s = s + "trkSl" + STR$(c) + "[" + STR$(g) + "] = " + STR$(hz) + z
+                END IF
+            END IF
+            g = g + 1
+        NEXT
+    NEXT
+    RETURN s
+END FUNCTION
+
+' ------------------------------------------------------------ Fenster
+CONST SW = 1400
+CONST SH = 840
+CONST LINKS = 300
+CONST GRID_Y = 84
+CONST PIANO_H = 96
+CONST HDR_H = 24
+CONST RH_W = 40
+CONST CELL_W = 118
+CONST ROW_H = 20
+
+SCREEN(SW, SH, "Drachenhauch - Tracker", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+TEXT_SIZE(16)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Tracker", 0, 0, SW, SH)
+GUI_WINDOW_CHROME(win, FALSE)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' Werkzeugleiste 1: Datei, Tempo, Wiedergabe, Verlauf, Ausgabe
+DIM bNeu AS GUI_WIDGET : bNeu = GUI_BUTTON(win, "Neu", 12, 8, 56, 28)
+DIM bAuf AS GUI_WIDGET : bAuf = GUI_BUTTON(win, "Oeffnen", 72, 8, 78, 28)
+DIM bSpei AS GUI_WIDGET : bSpei = GUI_BUTTON(win, "Sichern", 154, 8, 78, 28)
+DIM bSpeiAls AS GUI_WIDGET : bSpeiAls = GUI_BUTTON(win, "Sichern als", 236, 8, 100, 28)
+DIM lblBpm AS GUI_WIDGET : lblBpm = GUI_LABEL(win, "BPM", 350, 14)
+DIM spBpm AS GUI_WIDGET : spBpm = GUI_SPINNER(win, 386, 8, 80, 40, 300, 120)
+DIM lblKan AS GUI_WIDGET : lblKan = GUI_LABEL(win, "Kanaele", 480, 14)
+DIM spKan AS GUI_WIDGET : spKan = GUI_SPINNER(win, 546, 8, 70, MIN_CH, MAX_CH, 4)
+DIM bPlayPat AS GUI_WIDGET : bPlayPat = GUI_BUTTON(win, "> Pattern", 632, 8, 96, 28)
+DIM bPlaySong AS GUI_WIDGET : bPlaySong = GUI_BUTTON(win, "> Song", 732, 8, 80, 28)
+DIM bStop AS GUI_WIDGET : bStop = GUI_BUTTON(win, "Stopp", 816, 8, 64, 28)
+DIM bZur AS GUI_WIDGET : bZur = GUI_BUTTON(win, "Zurueck", 896, 8, 82, 28)
+GUI_TOOLTIP(bZur, "Strg+Z -- die letzte Aenderung zuruecknehmen")
+DIM bVor AS GUI_WIDGET : bVor = GUI_BUTTON(win, "Vor", 982, 8, 50, 28)
+GUI_TOOLTIP(bVor, "Strg+Y -- wieder herstellen")
+DIM bWav AS GUI_WIDGET : bWav = GUI_BUTTON(win, "WAV ...", 1046, 8, 68, 28)
+GUI_TOOLTIP(bWav, "Den ganzen Song offline mischen und als WAV sichern")
+DIM cbStereo AS GUI_WIDGET : cbStereo = GUI_CHECKBOX(win, "Stereo", 1122, 14, FALSE)
+GUI_TOOLTIP(cbStereo, "WAV mit Instrument-Pan statt Mono")
+DIM cbAmiga AS GUI_WIDGET : cbAmiga = GUI_CHECKBOX(win, "Amiga", 1204, 14, FALSE)
+GUI_TOOLTIP(cbAmiga, "Kanal 1+4 links, 2+3 rechts -- der Paula-Stereoeindruck")
+DIM bCode AS GUI_WIDGET : bCode = GUI_BUTTON(win, "GB-Code", 1284, 8, 80, 28)
+GUI_TOOLTIP(bCode, "Den frame-basierten Live-Player als .dh schreiben")
+
+' Werkzeugleiste 2: Pattern, Oktave, die Zelle unter dem Cursor
+DIM lblPat AS GUI_WIDGET : lblPat = GUI_LABEL(win, "Pattern", 12, 50)
+DIM ddPat AS GUI_WIDGET : ddPat = GUI_DROPDOWN(win, 74, 44, 90, 26, SPLIT$("P1", "|"))
+DIM lblRows AS GUI_WIDGET : lblRows = GUI_LABEL(win, "Reihen", 174, 50)
+DIM spRows AS GUI_WIDGET : spRows = GUI_SPINNER(win, 232, 44, 76, 1, MAX_ROWS, 16)
+DIM bPatNeu AS GUI_WIDGET : bPatNeu = GUI_BUTTON(win, "+", 316, 44, 30, 26)
+GUI_TOOLTIP(bPatNeu, "Neues Pattern anlegen")
+DIM bPatDup AS GUI_WIDGET : bPatDup = GUI_BUTTON(win, "Dup", 350, 44, 46, 26)
+GUI_TOOLTIP(bPatDup, "Das aktuelle Pattern kopieren")
+DIM bPatDel AS GUI_WIDGET : bPatDel = GUI_BUTTON(win, "Loesch", 400, 44, 72, 26)
+DIM bPatLeer AS GUI_WIDGET : bPatLeer = GUI_BUTTON(win, "Leeren", 476, 44, 68, 26)
+DIM lblOkt AS GUI_WIDGET : lblOkt = GUI_LABEL(win, "Oktave", 552, 50)
+DIM spOkt AS GUI_WIDGET : spOkt = GUI_SPINNER(win, 610, 44, 64, 1, 7, 4)
+DIM lblZelle AS GUI_WIDGET : lblZelle = GUI_LABEL(win, "Zelle:  Vol", 690, 50)
+DIM spVol AS GUI_WIDGET : spVol = GUI_SPINNER(win, 784, 44, 58, 0, 15, 0)
+GUI_TOOLTIP(spVol, "Lautstaerke der Note 1..15, 0 = Standard")
+DIM lblSlide AS GUI_WIDGET : lblSlide = GUI_LABEL(win, "Slide", 852, 50)
+DIM spSlide AS GUI_WIDGET : spSlide = GUI_SPINNER(win, 896, 44, 66, -12, 12, 0)
+GUI_TOOLTIP(spSlide, "Portamento in Halbtoenen ueber die Notendauer")
+DIM lblFx AS GUI_WIDGET : lblFx = GUI_LABEL(win, "FX", 970, 50)
+DIM ddFx AS GUI_WIDGET : ddFx = GUI_DROPDOWN(win, 994, 44, 62, 26, SPLIT$("-|Arp|Vib|Ret|Off", "|"))
+GUI_TOOLTIP(ddFx, "Arp xy: Akkord +x/+y -- Vib xy: x Hz, Tiefe y -- Ret n: alle n Ticks neu")
+DIM spFxp AS GUI_WIDGET : spFxp = GUI_SPINNER(win, 1060, 44, 70, 0, 255, 0)
+DIM ddZInst AS GUI_WIDGET : ddZInst = GUI_DROPDOWN(win, 1136, 44, 130, 26, SPLIT$("Standard", "|"))
+GUI_TOOLTIP(ddZInst, "Instrument NUR dieser Note (Standard = das des Kanals)")
+DIM bOff AS GUI_WIDGET : bOff = GUI_BUTTON(win, "Note aus", 1272, 44, 86, 26)
+GUI_TOOLTIP(bOff, "Taste 0 -- schneidet die klingende Note hier ab")
+
+' Linke Spalte: der Kanal unter dem Cursor
+DIM gKanal AS GUI_WIDGET : gKanal = GUI_GROUPBOX(win, 12, GRID_Y, LINKS - 24, 134, "Kanal")
+DIM lblKanal AS GUI_WIDGET : lblKanal = GUI_LABEL(win, "Kanal 1", 24, GRID_Y + 26)
+DIM ddChInst AS GUI_WIDGET : ddChInst = GUI_DROPDOWN(win, 24, GRID_Y + 48, 252, 26, SPLIT$("Wellenform", "|"))
+GUI_TOOLTIP(ddChInst, "Standard-Klang dieses Kanals")
+DIM ddWave AS GUI_WIDGET : ddWave = GUI_DROPDOWN(win, 24, GRID_Y + 80, 110, 26, wellenformen)
+GUI_TOOLTIP(ddWave, "Wellenform, wenn der Kanal kein Instrument hat")
+DIM cbMute AS GUI_WIDGET : cbMute = GUI_CHECKBOX(win, "M", 148, GRID_Y + 84, FALSE)
+GUI_TOOLTIP(cbMute, "Stumm")
+DIM cbSolo AS GUI_WIDGET : cbSolo = GUI_CHECKBOX(win, "S", 206, GRID_Y + 84, FALSE)
+GUI_TOOLTIP(cbSolo, "Solo -- nur die Solo-Kanaele klingen")
+DIM slChVol AS GUI_WIDGET : slChVol = GUI_SLIDER(win, 24, GRID_Y + 112, 252, 0, 100, 100)
+GUI_TOOLTIP(slChVol, "Mixer-Regler des Kanals")
+
+' Das Instrument des Kanals -- hier aenderbar, fuer alle Kanaele, die es nutzen
+CONST IY = GRID_Y + 146
+DIM gInst AS GUI_WIDGET : gInst = GUI_GROUPBOX(win, 12, IY, LINKS - 24, 330, "Instrument")
+DIM lblIName AS GUI_WIDGET : lblIName = GUI_LABEL(win, "-", 24, IY + 26)
+DIM ddIWave AS GUI_WIDGET : ddIWave = GUI_DROPDOWN(win, 24, IY + 48, 110, 26, SPLIT$("square|saw|sine|triangle|noise", "|"))
+DIM lblIVol AS GUI_WIDGET : lblIVol = GUI_LABEL(win, "Vol", 146, IY + 54)
+DIM spIVol AS GUI_WIDGET : spIVol = GUI_SPINNER(win, 180, IY + 48, 96, 1, 15, 15)
+DIM lblA AS GUI_WIDGET : lblA = GUI_LABEL(win, "Attack ms", 24, IY + 84)
+DIM spA AS GUI_WIDGET : spA = GUI_SPINNER(win, 130, IY + 78, 146, 0, 2000, 0, 5)
+DIM lblD AS GUI_WIDGET : lblD = GUI_LABEL(win, "Decay ms", 24, IY + 114)
+DIM spD AS GUI_WIDGET : spD = GUI_SPINNER(win, 130, IY + 108, 146, 0, 4000, 0, 10)
+DIM lblS AS GUI_WIDGET : lblS = GUI_LABEL(win, "Sustain %", 24, IY + 144)
+DIM spS AS GUI_WIDGET : spS = GUI_SPINNER(win, 130, IY + 138, 146, 0, 100, 100, 5)
+DIM lblR AS GUI_WIDGET : lblR = GUI_LABEL(win, "Release ms", 24, IY + 174)
+DIM spR AS GUI_WIDGET : spR = GUI_SPINNER(win, 130, IY + 168, 146, 0, 4000, 0, 10)
+DIM lblVib AS GUI_WIDGET : lblVib = GUI_LABEL(win, "Vibrato %/Hz", 24, IY + 204)
+DIM spVibD AS GUI_WIDGET : spVibD = GUI_SPINNER(win, 130, IY + 198, 70, 0, 50, 0)
+DIM spVibS AS GUI_WIDGET : spVibS = GUI_SPINNER(win, 206, IY + 198, 70, 0, 15, 0)
+DIM lblDet AS GUI_WIDGET : lblDet = GUI_LABEL(win, "Detune Cent", 24, IY + 234)
+DIM spDet AS GUI_WIDGET : spDet = GUI_SPINNER(win, 130, IY + 228, 146, 0, 60, 0)
+DIM lblPan AS GUI_WIDGET : lblPan = GUI_LABEL(win, "Pan L/R", 24, IY + 264)
+DIM slPan AS GUI_WIDGET : slPan = GUI_SLIDER(win, 130, IY + 262, 146, -100, 100, 0)
+DIM bINeu AS GUI_WIDGET : bINeu = GUI_BUTTON(win, "+ Instrument", 24, IY + 292, 122, 26)
+GUI_TOOLTIP(bINeu, "Eine Kopie des gezeigten Instruments anlegen")
+DIM bIDel AS GUI_WIDGET : bIDel = GUI_BUTTON(win, "Entfernen", 154, IY + 292, 122, 26)
+
+' Die Reihenfolge der Patterns
+CONST OY = IY + 342
+DIM gOrder AS GUI_WIDGET : gOrder = GUI_GROUPBOX(win, 12, OY, LINKS - 24, SH - OY - 40, "Song (Reihenfolge)")
+DIM lstOrder AS GUI_WIDGET : lstOrder = GUI_LISTBOX(win, 24, OY + 26, 252, SH - OY - 112, SPLIT$("1: P1", "|"))
+DIM bOAdd AS GUI_WIDGET : bOAdd = GUI_BUTTON(win, "+ akt.", 24, SH - 80, 62, 26)
+GUI_TOOLTIP(bOAdd, "Das gezeigte Pattern hinten anhaengen")
+DIM bODel AS GUI_WIDGET : bODel = GUI_BUTTON(win, "entf.", 90, SH - 80, 56, 26)
+DIM bOLinks AS GUI_WIDGET : bOLinks = GUI_BUTTON(win, "<", 150, SH - 80, 40, 26)
+DIM bORechts AS GUI_WIDGET : bORechts = GUI_BUTTON(win, ">", 194, SH - 80, 40, 26)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 12, SH - 26)
+
+' Gitter und Klaviatur
+DIM gitter AS GUI_WIDGET
+gitter = GUI_CANVAS(win, LINKS, GRID_Y, SW - LINKS - 12, SH - GRID_Y - PIANO_H - 28)
+DIM piano AS GUI_WIDGET
+piano = GUI_CANVAS(win, LINKS, SH - PIANO_H - 20, SW - LINKS - 12, PIANO_H)
+
+' Spiegel der Bedienelemente: ein Wert, den das PROGRAMM setzt, sieht fuer
+' die Aenderungs-Erkennung wie eine Eingabe aus. Was zuletzt hineingestellt
+' wurde, steht hier -- nur eine Abweichung davon ist eine Eingabe.
+DIM lBpm AS INTEGER
+DIM lKan AS INTEGER
+DIM lPat AS INTEGER
+DIM lRows AS INTEGER
+DIM lVol AS INTEGER
+DIM lSlide AS INTEGER
+DIM lFx AS INTEGER
+DIM lFxp AS INTEGER
+DIM lZInst AS INTEGER
+DIM lChInst AS INTEGER
+DIM lWave AS INTEGER
+DIM lMute AS BOOLEAN
+DIM lSolo AS BOOLEAN
+DIM lChVol AS INTEGER
+DIM lIWave AS INTEGER
+DIM lIVol AS INTEGER
+DIM lA AS INTEGER
+DIM lD AS INTEGER
+DIM lS AS INTEGER
+DIM lR AS INTEGER
+DIM lVibD AS INTEGER
+DIM lVibS AS INTEGER
+DIM lDet AS INTEGER
+DIM lPan AS INTEGER
+DIM lOrder AS INTEGER
+DIM lKanalAnz AS INTEGER : lKanalAnz = -1   ' der Kanal, den die Spalte zeigt
+DIM lInstAnz AS INTEGER : lInstAnz = -1     ' das Instrument, das der Kasten zeigt
+
+FUNCTION waveIndex(wf AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(wellenformen) - 1
+        IF wellenformen[i] = wf THEN RETURN i
+    NEXT
+    RETURN 0
+END FUNCTION
+
+FUNCTION instListe$() AS STRING
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO instAnz - 1
+        s = s + "|" + STR$(i + 1) + " " + iName[i]
+    NEXT
+    RETURN s
+END FUNCTION
+
+SUB patternListeAnzeigen()
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO patAnz - 1
+        IF i > 0 THEN s = s + "|"
+        s = s + patName[i] + " (" + STR$(patRows[i]) + ")"
+    NEXT
+    GUI_SET_DROPDOWN(ddPat, SPLIT$(s, "|"))
+    GUI_DROPDOWN_SET_SELECTED(ddPat, patAkt)
+    lPat = patAkt
+    GUI_SET_VALUE(spRows, patRows[patAkt])
+    lRows = patRows[patAkt]
+END SUB
+
+SUB orderAnzeigen()
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO orderAnz - 1
+        IF i > 0 THEN s = s + "|"
+        s = s + STR$(i + 1) + ": " + patName[order[i]]
+    NEXT
+    GUI_SET_LISTBOX(lstOrder, SPLIT$(s, "|"))
+    IF lOrder >= orderAnz THEN lOrder = orderAnz - 1
+    IF lOrder < 0 THEN lOrder = 0
+    GUI_LISTBOX_SET_SELECTED(lstOrder, lOrder)
+END SUB
+
+SUB zelleAnzeigen()
+    DIM p AS INTEGER : p = patAkt
+    lVol = vol[p, curC, curR] : GUI_SET_VALUE(spVol, lVol)
+    lSlide = slide[p, curC, curR] : GUI_SET_VALUE(spSlide, lSlide)
+    lFx = fx[p, curC, curR] : GUI_DROPDOWN_SET_SELECTED(ddFx, lFx)
+    lFxp = fxp[p, curC, curR] : GUI_SET_VALUE(spFxp, lFxp)
+    lZInst = inst[p, curC, curR] + 1 : GUI_DROPDOWN_SET_SELECTED(ddZInst, lZInst)
+END SUB
+
+SUB kanalAnzeigen()
+    lKanalAnz = curC
+    DIM art AS STRING : art = "Ton"
+    IF istDrum(curC) THEN art = "Schlagzeug"
+    GUI_SET_TEXT(lblKanal, "Kanal " + STR$(curC + 1) + " (" + art + ")")
+    lChInst = chInst[curC] + 1 : GUI_DROPDOWN_SET_SELECTED(ddChInst, lChInst)
+    lWave = waveIndex(wave[curC]) : GUI_DROPDOWN_SET_SELECTED(ddWave, lWave)
+    lMute = mute[curC] : GUI_SET_CHECKED(cbMute, lMute)
+    lSolo = solo[curC] : GUI_SET_CHECKED(cbSolo, lSolo)
+    lChVol = INT(chVol[curC] * 100.0 + 0.5) : GUI_SET_VALUE(slChVol, lChVol)
+    GUI_SET_ENABLED(ddWave, chInst[curC] < 0 AND NOT istDrum(curC))
+END SUB
+
+SUB instrumentAnzeigen()
+    DIM ii AS INTEGER : ii = chInst[curC]
+    lInstAnz = ii
+    DIM da AS BOOLEAN : da = (ii >= 0)
+    GUI_SET_ENABLED(ddIWave, da) : GUI_SET_ENABLED(spIVol, da)
+    GUI_SET_ENABLED(spA, da) : GUI_SET_ENABLED(spD, da)
+    GUI_SET_ENABLED(spS, da) : GUI_SET_ENABLED(spR, da)
+    GUI_SET_ENABLED(spVibD, da) : GUI_SET_ENABLED(spVibS, da)
+    GUI_SET_ENABLED(spDet, da) : GUI_SET_ENABLED(slPan, da)
+    GUI_SET_ENABLED(bIDel, da)
+    IF NOT da THEN
+        GUI_SET_TEXT(lblIName, "(Kanal ohne Instrument)")
+        RETURN
+    END IF
+    GUI_SET_TEXT(lblIName, STR$(ii + 1) + " " + iName[ii])
+    DIM wi AS INTEGER : wi = waveIndex(iWave[ii])
+    IF iWave[ii] = "noise" THEN wi = 4
+    lIWave = wi : GUI_DROPDOWN_SET_SELECTED(ddIWave, wi)
+    lIVol = iVol[ii] : GUI_SET_VALUE(spIVol, lIVol)
+    lA = iAtk[ii] : GUI_SET_VALUE(spA, lA)
+    lD = iDec[ii] : GUI_SET_VALUE(spD, lD)
+    lS = INT(iSus[ii] * 100.0 + 0.5) : GUI_SET_VALUE(spS, lS)
+    lR = iRel[ii] : GUI_SET_VALUE(spR, lR)
+    lVibD = INT(iVibD[ii] * 100.0 + 0.5) : GUI_SET_VALUE(spVibD, lVibD)
+    lVibS = INT(iVibS[ii] + 0.5) : GUI_SET_VALUE(spVibS, lVibS)
+    lDet = INT(iDet[ii] + 0.5) : GUI_SET_VALUE(spDet, lDet)
+    lPan = INT(iPan[ii] * 100.0) : GUI_SET_VALUE(slPan, lPan)
+END SUB
+
+SUB instrumentListenAnzeigen()
+    DIM l AS STRING : l = instListe$()
+    GUI_SET_DROPDOWN(ddChInst, SPLIT$("Wellenform" + l, "|"))
+    GUI_SET_DROPDOWN(ddZInst, SPLIT$("Standard" + l, "|"))
+END SUB
+
+' Alles nachfuehren -- nach Laden, Neu, Rueckgaengig.
+SUB allesAnzeigen()
+    lBpm = bpm : GUI_SET_VALUE(spBpm, bpm)
+    lKan = kanaele : GUI_SET_VALUE(spKan, kanaele)
+    IF patAkt >= patAnz THEN patAkt = patAnz - 1
+    IF curC >= kanaele THEN curC = kanaele - 1
+    IF curR >= patRows[patAkt] THEN curR = patRows[patAkt] - 1
+    patternListeAnzeigen()
+    orderAnzeigen()
+    instrumentListenAnzeigen()
+    kanalAnzeigen()
+    instrumentAnzeigen()
+    zelleAnzeigen()
+    GUI_SET_TEXT(lblStatus, meldung)
+END SUB
+
+' ------------------------------------------------------------ Bearbeiten
+SUB cursorSichtbar()
+    DIM sichtR AS INTEGER : sichtR = (GUI_CANVAS_H(gitter) - HDR_H) \ ROW_H
+    DIM sichtC AS INTEGER : sichtC = (GUI_CANVAS_W(gitter) - RH_W) \ CELL_W
+    IF curR < rowOff THEN rowOff = curR
+    IF curR >= rowOff + sichtR THEN rowOff = curR - sichtR + 1
+    IF curC < chOff THEN chOff = curC
+    IF curC >= chOff + sichtC THEN chOff = curC - sichtC + 1
+    IF rowOff < 0 THEN rowOff = 0
+    IF chOff < 0 THEN chOff = 0
+END SUB
+
+SUB cursorSetzen(c AS INTEGER, r AS INTEGER, auswahl AS BOOLEAN)
+    curC = CLAMP(c, 0, kanaele - 1)
+    curR = CLAMP(r, 0, patRows[patAkt] - 1)
+    IF auswahl THEN
+        selAn = (curC <> ankC OR curR <> ankR)
+    ELSE
+        selAn = FALSE : ankC = curC : ankR = curR
+    END IF
+    cursorSichtbar()
+    zelleAnzeigen()
+END SUB
+
+' Der markierte Block als Rechteck -- ohne Auswahl die Cursorzelle.
+FUNCTION selC0() AS INTEGER
+    IF selAn THEN RETURN MIN(ankC, curC)
+    RETURN curC
+END FUNCTION
+FUNCTION selC1() AS INTEGER
+    IF selAn THEN RETURN MAX(ankC, curC)
+    RETURN curC
+END FUNCTION
+FUNCTION selR0() AS INTEGER
+    IF selAn THEN RETURN MIN(ankR, curR)
+    RETURN curR
+END FUNCTION
+FUNCTION selR1() AS INTEGER
+    IF selAn THEN RETURN MAX(ankR, curR)
+    RETURN curR
+END FUNCTION
+
+SUB noteSetzen(midi AS INTEGER)
+    zelleSetzen(patAkt, curC, curR, midi)
+    geaendert()
+    IF midi >= 0 THEN vorhoeren(curC, midi)
+    ' Eine Reihe weiter -- so tippt man eine Melodie ohne Pfeiltaste.
+    cursorSetzen(curC, MIN(curR + 1, patRows[patAkt] - 1), FALSE)
+END SUB
+
+SUB blockLoeschen()
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = selC0() TO selC1()
+        FOR r = selR0() TO selR1()
+            zelleSetzen(patAkt, c, r, LEER)
+        NEXT
+    NEXT
+    geaendert()
+    zelleAnzeigen()
+END SUB
+
+SUB blockKopieren(ausschneiden AS BOOLEAN)
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    cbW = selC1() - selC0() + 1
+    cbH = selR1() - selR0() + 1
+    FOR c = 0 TO cbW - 1
+        FOR r = 0 TO cbH - 1
+            DIM sc AS INTEGER : sc = selC0() + c
+            DIM sr AS INTEGER : sr = selR0() + r
+            cbNote[c, r] = note[patAkt, sc, sr]
+            cbVol[c, r] = vol[patAkt, sc, sr]
+            cbSlide[c, r] = slide[patAkt, sc, sr]
+            cbFx[c, r] = fx[patAkt, sc, sr]
+            cbFxp[c, r] = fxp[patAkt, sc, sr]
+            cbInst[c, r] = inst[patAkt, sc, sr]
+        NEXT
+    NEXT
+    IF ausschneiden THEN blockLoeschen()
+    meldung = "Block " + STR$(cbW) + " x " + STR$(cbH) + IIF(ausschneiden, " ausgeschnitten", " kopiert")
+END SUB
+
+' Am Rand wird geschnitten, nicht gemeldet -- wie in der Qt-Fassung.
+SUB blockEinfuegen()
+    IF cbW = 0 THEN RETURN
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = 0 TO cbW - 1
+        FOR r = 0 TO cbH - 1
+            DIM zc AS INTEGER : zc = curC + c
+            DIM zr AS INTEGER : zr = curR + r
+            IF zc < kanaele AND zr < patRows[patAkt] THEN
+                zelleSetzen(patAkt, zc, zr, cbNote[c, r])
+                IF cbNote[c, r] >= 0 THEN
+                    vol[patAkt, zc, zr] = cbVol[c, r]
+                    slide[patAkt, zc, zr] = cbSlide[c, r]
+                    fx[patAkt, zc, zr] = cbFx[c, r]
+                    fxp[patAkt, zc, zr] = cbFxp[c, r]
+                    inst[patAkt, zc, zr] = cbInst[c, r]
+                END IF
+            END IF
+        NEXT
+    NEXT
+    geaendert()
+    zelleAnzeigen()
+END SUB
+
+' Der Schlagzeugkanal bleibt stehen: seine "Note" ist nur ein Schlag.
+SUB blockTransponieren(halbtoene AS INTEGER)
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = selC0() TO selC1()
+        IF NOT istDrum(c) THEN
+            FOR r = selR0() TO selR1()
+                IF note[patAkt, c, r] >= 0 THEN
+                    note[patAkt, c, r] = CLAMP(note[patAkt, c, r] + halbtoene, 0, 127)
+                END IF
+            NEXT
+        END IF
+    NEXT
+    geaendert()
+END SUB
+
+' Je Kanal eine gerade Rampe von der ersten zur letzten Note im Block;
+' belegte Zwischenzellen bleiben, wie sie sind.
+SUB blockInterpolieren()
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR c = selC0() TO selC1()
+        IF NOT istDrum(c) THEN
+            DIM erste AS INTEGER : erste = -1
+            DIM letzte AS INTEGER : letzte = -1
+            FOR r = selR0() TO selR1()
+                IF note[patAkt, c, r] >= 0 THEN
+                    IF erste < 0 THEN erste = r
+                    letzte = r
+                END IF
+            NEXT
+            IF erste >= 0 AND letzte > erste THEN
+                DIM n0 AS INTEGER : n0 = note[patAkt, c, erste]
+                DIM n1 AS INTEGER : n1 = note[patAkt, c, letzte]
+                FOR r = erste + 1 TO letzte - 1
+                    IF note[patAkt, c, r] = LEER THEN
+                        DIM t AS FLOAT : t = (r - erste) / (letzte - erste)
+                        zelleSetzen(patAkt, c, r, CLAMP(INT(n0 + (n1 - n0) * t + 0.5), 0, 127))
+                    END IF
+                NEXT
+            END IF
+        END IF
+    NEXT
+    geaendert()
+END SUB
+
+SUB kanaeleSetzen(n AS INTEGER)
+    n = CLAMP(n, MIN_CH, MAX_CH)
+    IF n = kanaele THEN RETURN
+    DIM i AS INTEGER
+    DIM p AS INTEGER
+    DIM r AS INTEGER
+    ' Neue Kanaele kommen leer; ueberzaehlige verlieren ihren Inhalt -- die
+    ' Datei hat danach nur noch so viele.
+    FOR i = MIN(n, kanaele) TO MAX_CH - 1
+        wave[i] = "square" : chInst[i] = -1 : chVol[i] = 1.0
+        mute[i] = FALSE : solo[i] = FALSE
+        FOR p = 0 TO patAnz - 1
+            FOR r = 0 TO MAX_ROWS - 1
+                zelleSetzen(p, i, r, LEER)
+            NEXT
+        NEXT
+    NEXT
+    kanaele = n
+    IF curC >= kanaele THEN curC = kanaele - 1
+    selAn = FALSE
+    geaendert()
+    kanalAnzeigen()
+    instrumentAnzeigen()
+    zelleAnzeigen()
+END SUB
+
+SUB reihenSetzen(n AS INTEGER)
+    n = CLAMP(n, 1, MAX_ROWS)
+    IF n = patRows[patAkt] THEN RETURN
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR r = n TO MAX_ROWS - 1
+        FOR c = 0 TO MAX_CH - 1
+            zelleSetzen(patAkt, c, r, LEER)
+        NEXT
+    NEXT
+    patRows[patAkt] = n
+    IF curR >= n THEN curR = n - 1
+    selAn = FALSE
+    geaendert()
+    patternListeAnzeigen()
+    orderAnzeigen()
+END SUB
+
+SUB patternWaehlen(p AS INTEGER)
+    IF p < 0 OR p >= patAnz OR p = patAkt THEN RETURN
+    patAkt = p
+    selAn = FALSE
+    IF curR >= patRows[patAkt] THEN curR = patRows[patAkt] - 1
+    rowOff = MIN(rowOff, MAX(0, patRows[patAkt] - 1))
+    patternListeAnzeigen()
+    zelleAnzeigen()
+END SUB
+
+SUB patternNeu(kopie AS BOOLEAN)
+    IF patAnz >= MAX_PAT THEN meldung = "Hoechstens " + STR$(MAX_PAT) + " Patterns" : RETURN
+    DIM p AS INTEGER : p = patAnz
+    patternLeeren(p)
+    patRows[p] = 16
+    patName[p] = "P" + STR$(p + 1)
+    IF kopie THEN
+        patternKopieren(patAkt, p)
+        patName[p] = patName[patAkt] + "*"
+    END IF
+    patAnz = patAnz + 1
+    geaendert()
+    patAkt = p - 1        ' damit patternWaehlen die Anzeige nachzieht
+    patternWaehlen(p)
+END SUB
+
+SUB patternLoeschen()
+    IF patAnz <= 1 THEN meldung = "Das letzte Pattern bleibt." : RETURN
+    DIM p AS INTEGER
+    FOR p = patAkt TO patAnz - 2
+        patternKopieren(p + 1, p)
+        patName[p] = patName[p + 1]
+    NEXT
+    patAnz = patAnz - 1
+    ' Reihenfolge nachziehen: Verweise auf das geloeschte fallen weg,
+    ' hoehere ruecken nach; leer darf sie nicht werden.
+    DIM neu AS INTEGER : neu = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO orderAnz - 1
+        IF order[i] <> patAkt THEN
+            order[neu] = IIF(order[i] > patAkt, order[i] - 1, order[i])
+            neu = neu + 1
+        END IF
+    NEXT
+    orderAnz = neu
+    IF orderAnz = 0 THEN order[0] = 0 : orderAnz = 1
+    IF patAkt >= patAnz THEN patAkt = patAnz - 1
+    IF curR >= patRows[patAkt] THEN curR = patRows[patAkt] - 1
+    selAn = FALSE
+    geaendert()
+    patternListeAnzeigen()
+    orderAnzeigen()
+    zelleAnzeigen()
+END SUB
+
+SUB instrumentNeu()
+    IF instAnz >= MAX_INST THEN meldung = "Hoechstens " + STR$(MAX_INST) + " Instrumente" : RETURN
+    DIM q AS INTEGER : q = chInst[curC]
+    DIM i AS INTEGER : i = instAnz
+    IF q >= 0 THEN
+        instrumentSetzen(i, iName[q] + " (Kopie)", iWave[q], iAtk[q], iDec[q], iSus[q], _
+                         iRel[q], iVibD[q], iVibS[q], iDet[q])
+        iPan[i] = iPan[q] : iVol[i] = iVol[q]
+    ELSE
+        instrumentSetzen(i, "Neu", wave[curC], 0, 0, 1.0, 20, 0.0, 0.0, 0.0)
+    END IF
+    instAnz = instAnz + 1
+    chInst[curC] = i
+    cacheLeeren()
+    geaendert()
+    instrumentListenAnzeigen()
+    kanalAnzeigen()
+    instrumentAnzeigen()
+END SUB
+
+' Kanal-Zuweisungen UND die Nummern in den Zellen ruecken nach -- sonst
+' zeigte jede Note hinter dem entfernten auf das falsche Instrument.
+SUB instrumentEntfernen()
+    DIM q AS INTEGER : q = chInst[curC]
+    IF q < 0 THEN RETURN
+    DIM i AS INTEGER
+    FOR i = q TO instAnz - 2
+        instrumentSetzen(i, iName[i + 1], iWave[i + 1], iAtk[i + 1], iDec[i + 1], iSus[i + 1], _
+                         iRel[i + 1], iVibD[i + 1], iVibS[i + 1], iDet[i + 1])
+        iPan[i] = iPan[i + 1] : iVol[i] = iVol[i + 1]
+    NEXT
+    instAnz = instAnz - 1
+    FOR i = 0 TO MAX_CH - 1
+        IF chInst[i] = q THEN chInst[i] = -1
+        IF chInst[i] > q THEN chInst[i] = chInst[i] - 1
+    NEXT
+    DIM p AS INTEGER
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        FOR c = 0 TO kanaele - 1
+            FOR r = 0 TO patRows[p] - 1
+                IF inst[p, c, r] = q THEN inst[p, c, r] = -1
+                IF inst[p, c, r] > q THEN inst[p, c, r] = inst[p, c, r] - 1
+            NEXT
+        NEXT
+    NEXT
+    cacheLeeren()
+    geaendert()
+    instrumentListenAnzeigen()
+    kanalAnzeigen()
+    instrumentAnzeigen()
+    zelleAnzeigen()
+END SUB
+
+' ------------------------------------------------------------ Dateien
+SUB songNeu()
+    stopp()
+    neuerSong()
+    cacheLeeren()
+    dateiPfad = ""
+    dirty = FALSE
+    meldung = "Neuer Song."
+    allesAnzeigen()
+    verlaufLeeren()
+END SUB
+
+SUB oeffnen()
+    DIM p AS STRING : p = FILE_OPEN_DIALOG("Song oeffnen", "json")
+    IF p = "" THEN RETURN
+    ladeDatei(p)
+END SUB
+
+SUB ladeDatei(p AS STRING)
+    stopp()
+    TRY
+        DIM h AS JSON_HANDLE : h = JSON_LOAD(p)
+        songAusHandle(h)
+        cacheLeeren()
+        dateiPfad = p
+        dirty = FALSE
+        meldung = "Geladen: " + p
+        allesAnzeigen()
+        verlaufLeeren()
+    CATCH e
+        meldung = "Laden fehlgeschlagen: " + e
+        GUI_SET_TEXT(lblStatus, meldung)
+    END TRY
+END SUB
+
+SUB speichern(als AS BOOLEAN)
+    DIM p AS STRING : p = dateiPfad
+    IF als OR p = "" THEN p = FILE_SAVE_DIALOG("Song sichern", "song.json", "json")
+    IF p = "" THEN RETURN
+    WRITEALL(p, JSON_PRETTY(songHandle()))
+    dateiPfad = p
+    dirty = FALSE
+    meldung = "Gesichert: " + p
+END SUB
+
+SUB gbCodeSichern(p AS STRING)
+    WRITEALL(p, gbCode$())
+    meldung = "GB-Code gesichert: " + p
+END SUB
+
+' ------------------------------------------------------------ Zeichnen
+DIM akzent AS ARRAY OF INTEGER
+akzent = [&H2BC4E8, &HF0B040, &H60E0A0, &HE070E0, &H80A0FF, &HFF8060, &HC0E060, &H60D0D0]
+
+FUNCTION kanalFarbe(c AS INTEGER) AS INTEGER
+    IF istDrum(c) THEN RETURN &HFF60E0
+    RETURN akzent[c MOD 8]
+END FUNCTION
+
+SUB zeichneGitter()
+    DIM gx AS INTEGER : gx = GUI_CANVAS_X(gitter)
+    DIM gy AS INTEGER : gy = GUI_CANVAS_Y(gitter)
+    DIM gw AS INTEGER : gw = GUI_CANVAS_W(gitter)
+    DIM gh AS INTEGER : gh = GUI_CANVAS_H(gitter)
+    SCISSOR(gx, gy, gw, gh)
+    BOX(gx, gy, gx + gw - 1, gy + gh - 1, &H0A0E14)
+    DIM sichtR AS INTEGER : sichtR = (gh - HDR_H) \ ROW_H + 1
+    DIM sichtC AS INTEGER : sichtC = (gw - RH_W) \ CELL_W + 1
+    DIM p AS INTEGER : p = patAkt
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    ' Reihen: Beat-Raster, Cursor, Wiedergabe
+    FOR r = rowOff TO MIN(patRows[p] - 1, rowOff + sichtR - 1)
+        DIM y AS INTEGER : y = gy + HDR_H + (r - rowOff) * ROW_H
+        DIM hg AS INTEGER : hg = &H0A0E14
+        IF r MOD 4 = 0 THEN hg = &H121A24
+        IF r MOD 16 = 0 THEN hg = &H18222E
+        IF kopfPat = p AND kopfRow = r THEN hg = &H1E4A2E
+        BOX(gx, y, gx + gw - 1, y + ROW_H - 1, hg)
+        TEXT(gx + 6, y + 2, RIGHT$("0" + STR$(r), 2), &H8090A0)
+    NEXT
+    ' Auswahl
+    IF selAn THEN
+        DIM sx0 AS INTEGER : sx0 = gx + RH_W + (selC0() - chOff) * CELL_W
+        DIM sy0 AS INTEGER : sy0 = gy + HDR_H + (selR0() - rowOff) * ROW_H
+        DIM sx1 AS INTEGER : sx1 = gx + RH_W + (selC1() - chOff + 1) * CELL_W - 1
+        DIM sy1 AS INTEGER : sy1 = gy + HDR_H + (selR1() - rowOff + 1) * ROW_H - 1
+        BOX(sx0, sy0, sx1, sy1, &H70305A9A)
+    END IF
+    ' Zellen
+    FOR c = chOff TO MIN(kanaele - 1, chOff + sichtC - 1)
+        DIM x AS INTEGER : x = gx + RH_W + (c - chOff) * CELL_W
+        LINE(x, gy, x, gy + gh - 1, &H1E2A38)
+        FOR r = rowOff TO MIN(patRows[p] - 1, rowOff + sichtR - 1)
+            DIM y2 AS INTEGER : y2 = gy + HDR_H + (r - rowOff) * ROW_H
+            DIM n AS INTEGER : n = note[p, c, r]
+            DIM nf AS INTEGER : nf = kanalFarbe(c)
+            IF n = LEER THEN nf = &H303A46
+            IF n = NOTE_OFF THEN nf = &H8090A0
+            DIM tx AS INTEGER : tx = x + 5
+            TEXT(tx, y2 + 2, notenName$(n), nf)
+            IF n >= 0 THEN
+                tx = tx + 34
+                IF vol[p, c, r] > 0 THEN
+                    TEXT(tx, y2 + 2, "v" + STR$(vol[p, c, r]), &H7FE0C0) : tx = tx + 26
+                END IF
+                IF slide[p, c, r] <> 0 THEN
+                    TEXT(tx, y2 + 2, "s" + IIF(slide[p, c, r] > 0, "+", "") + STR$(slide[p, c, r]), &HFFC060)
+                    tx = tx + 30
+                END IF
+                IF fx[p, c, r] <> 0 THEN
+                    DIM fn AS STRING
+                    fn = MID$("ArpVibRetOff", (fx[p, c, r] - 1) * 3, 3) + STR$(fxp[p, c, r])
+                    TEXT(tx, y2 + 2, fn, &HFF60E0)
+                END IF
+                IF inst[p, c, r] >= 0 THEN
+                    TEXT(x + CELL_W - 24, y2 + 2, "i" + STR$(inst[p, c, r] + 1), &HA0A8B0)
+                END IF
+            END IF
+        NEXT
+    NEXT
+    ' Cursor
+    DIM cx AS INTEGER : cx = gx + RH_W + (curC - chOff) * CELL_W
+    DIM cy AS INTEGER : cy = gy + HDR_H + (curR - rowOff) * ROW_H
+    RECT(cx, cy, cx + CELL_W - 1, cy + ROW_H - 1, &H2BC4E8)
+    ' Kopfzeile zuletzt -- ueber den Zellen, die darunter herausrollen
+    BOX(gx, gy, gx + gw - 1, gy + HDR_H - 1, &H141C26)
+    FOR c = chOff TO MIN(kanaele - 1, chOff + sichtC - 1)
+        DIM hx AS INTEGER : hx = gx + RH_W + (c - chOff) * CELL_W
+        DIM kn AS STRING : kn = "Ch" + STR$(c + 1)
+        IF istDrum(c) THEN kn = "Drum"
+        IF mute[c] THEN kn = kn + " M"
+        IF solo[c] THEN kn = kn + " S"
+        DIM nm AS STRING : nm = wave[c]
+        IF chInst[c] >= 0 THEN nm = iName[chInst[c]]
+        IF istDrum(c) AND chInst[c] < 0 THEN nm = "noise"
+        TEXT(hx + 5, gy + 4, kn, kanalFarbe(c))
+        DIM kb AS INTEGER : kb = TEXT_WIDTH(kn)
+        TEXT_SIZE(12)
+        TEXT(hx + 5 + kb + 8, gy + 7, LEFT$(nm, 10), &H8090A0)
+        TEXT_SIZE(16)
+    NEXT
+    LINE(gx, gy + HDR_H - 1, gx + gw - 1, gy + HDR_H - 1, &H2A3848)
+    SCISSOR_END()
+END SUB
+
+' Zwei Oktaven, ab C der gewaehlten Oktave. Weisse Tasten teilen die
+' Breite, schwarze sitzen auf den Fugen.
+FUNCTION pianoTasteBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    DIM px AS INTEGER : px = GUI_CANVAS_X(piano)
+    DIM py AS INTEGER : py = GUI_CANVAS_Y(piano)
+    DIM pw AS INTEGER : pw = GUI_CANVAS_W(piano)
+    DIM ph AS INTEGER : ph = GUI_CANVAS_H(piano)
+    IF mx < px OR my < py OR mx >= px + pw OR my >= py + ph THEN RETURN -1
+    DIM basis AS INTEGER : basis = INT(GUI_VALUE(spOkt)) * 12 + 12
+    DIM wb AS FLOAT : wb = pw / 14.0
+    DIM schwarz AS ARRAY OF INTEGER
+    schwarz = [1, 3, 6, 8, 10]
+    DIM weissHalb AS ARRAY OF INTEGER
+    weissHalb = [0, 2, 4, 5, 7, 9, 11]
+    ' Erst die schwarzen: sie liegen oben und vorn.
+    IF my < py + ph * 0.6 THEN
+        DIM o AS INTEGER
+        DIM k AS INTEGER
+        FOR o = 0 TO 1
+            FOR k = 0 TO 4
+                DIM wIdx AS INTEGER : wIdx = o * 7 + IIF(schwarz[k] < 5, (schwarz[k] + 1) \ 2, (schwarz[k] + 2) \ 2)
+                DIM bx AS FLOAT : bx = px + wIdx * wb - wb * 0.3
+                IF mx >= bx AND mx < bx + wb * 0.6 THEN RETURN basis + o * 12 + schwarz[k]
+            NEXT
+        NEXT
+    END IF
+    DIM w AS INTEGER : w = INT((mx - px) / wb)
+    RETURN basis + (w \ 7) * 12 + weissHalb[w MOD 7]
+END FUNCTION
+
+SUB zeichnePiano()
+    DIM px AS INTEGER : px = GUI_CANVAS_X(piano)
+    DIM py AS INTEGER : py = GUI_CANVAS_Y(piano)
+    DIM pw AS INTEGER : pw = GUI_CANVAS_W(piano)
+    DIM ph AS INTEGER : ph = GUI_CANVAS_H(piano)
+    DIM wb AS FLOAT : wb = pw / 14.0
+    DIM i AS INTEGER
+    DIM basis AS INTEGER : basis = INT(GUI_VALUE(spOkt)) * 12 + 12
+    FOR i = 0 TO 13
+        DIM x0 AS INTEGER : x0 = px + INT(i * wb)
+        DIM x1 AS INTEGER : x1 = px + INT((i + 1) * wb) - 2
+        BOX(x0, py, x1, py + ph - 1, &HE8ECF0)
+        IF i MOD 7 = 0 THEN
+            TEXT_SIZE(12)
+            TEXT(x0 + 4, py + ph - 16, "C" + STR$(basis \ 12 - 1 + i \ 7), &H506070)
+            TEXT_SIZE(16)
+        END IF
+    NEXT
+    DIM schwarzPos AS ARRAY OF INTEGER
+    schwarzPos = [1, 2, 4, 5, 6, 8, 9, 11, 12, 13]
+    FOR i = 0 TO 9
+        DIM bx AS INTEGER : bx = px + INT(schwarzPos[i] * wb - wb * 0.3)
+        BOX(bx, py, bx + INT(wb * 0.6), py + INT(ph * 0.6), &H1A2028)
+    NEXT
+END SUB
+
+' ------------------------------------------------------------ Verlauf anwenden
+' Der Cursor bleibt, wo er war -- ein Rueckgaengig soll die Noten
+' zuruecknehmen, nicht die Arbeitsstelle.
+SUB standAnwenden(idx AS INTEGER)
+    DIM c AS INTEGER : c = curC
+    DIM r AS INTEGER : r = curR
+    DIM pa AS INTEGER : pa = patAkt
+    stopp()
+    songAusHandle(JSON_PARSE(uStand[idx]))
+    cacheLeeren()
+    dirty = TRUE
+    patAkt = MIN(pa, patAnz - 1)
+    curC = MIN(c, kanaele - 1)
+    curR = MIN(r, patRows[patAkt] - 1)
+    allesAnzeigen()
+END SUB
+
+SUB zurueck()
+    IF uPos <= 1 THEN RETURN
+    uPos = uPos - 1
+    standAnwenden((uStart + uPos - 1) MOD UNDO_MAX)
+END SUB
+
+SUB wieder()
+    IF uPos >= uAnz THEN RETURN
+    uPos = uPos + 1
+    standAnwenden((uStart + uPos - 1) MOD UNDO_MAX)
+END SUB
+
+' ------------------------------------------------------------ Start
+songNeu()
+DIM frage AS GUI_WINDOW : frage = -1
+DIM frageNeu AS GUI_WINDOW : frageNeu = -1
+DIM ziehen AS BOOLEAN : ziehen = FALSE
+
+' Klaviatur auf der Tastatur (US-Lage): untere Reihe = Oktave, obere = +1.
+DIM tastNote AS ARRAY OF INTEGER
+tastNote = [KEY_Z, KEY_S, KEY_X, KEY_D, KEY_C, KEY_V, KEY_G, KEY_B, KEY_H, KEY_N, KEY_J, KEY_M, _
+            KEY_Q, KEY_2, KEY_W, KEY_3, KEY_E, KEY_R, KEY_5, KEY_T, KEY_6, KEY_Y, KEY_7, KEY_U]
+
+WHILE NOT QUITREQUESTED()
+    bildNr = bildNr + 1
+    GUI_UPDATE()
+    DIM strg AS BOOLEAN : strg = KEYPRESSED(KEY_LCTRL) OR KEYPRESSED(KEY_RCTRL)
+    DIM umsch AS BOOLEAN : umsch = KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)
+    DIM dialogOffen AS BOOLEAN : dialogOffen = (frage >= 0 OR frageNeu >= 0)
+    ' Tasten gehen ins Gitter, solange kein Bedienelement den Fokus hat --
+    ' ein Drehfeld mit Fokus nimmt die Pfeile selbst.
+    DIM tasten AS BOOLEAN : tasten = (GUI_FOCUSED() < 0) AND NOT dialogOffen
+
+    ' ---- Wiedergabe planen
+    IF spielt THEN
+        planen()
+        IF songModus AND kopfPat >= 0 AND kopfPat <> patAkt THEN patternWaehlen(kopfPat)
+    END IF
+
+    ' ---- Werkzeugleiste 1
+    IF GUI_CLICKED(bNeu) AND NOT dialogOffen THEN
+        IF dirty THEN
+            frageNeu = GUI_DIALOG("Neuer Song", "Ungesicherte Aenderungen verwerfen?", "janein")
+        ELSE
+            songNeu()
+        END IF
+    END IF
+    IF frageNeu >= 0 THEN
+        IF GUI_ANSWER(frageNeu) = 1 THEN songNeu() : frageNeu = -1
+        IF GUI_ANSWER(frageNeu) = 2 THEN frageNeu = -1
+    END IF
+    IF GUI_CLICKED(bAuf) OR (strg AND KEYHIT(KEY_O) AND tasten) THEN oeffnen()
+    IF GUI_CLICKED(bSpei) OR (strg AND KEYHIT(KEY_S) AND tasten) THEN speichern(FALSE)
+    IF GUI_CLICKED(bSpeiAls) THEN speichern(TRUE)
+    IF INT(GUI_VALUE(spBpm)) <> lBpm THEN
+        bpm = INT(GUI_VALUE(spBpm)) : lBpm = bpm
+        cacheLeeren()
+        IF spielt THEN AUDIO_CLOCK_SET_SPEED(takt, bpm / 60.0 * 4.0 * TICKS)
+        geaendert()
+    END IF
+    IF INT(GUI_VALUE(spKan)) <> lKan THEN
+        lKan = INT(GUI_VALUE(spKan))
+        kanaeleSetzen(lKan)
+    END IF
+    IF GUI_CLICKED(bPlayPat) THEN starten(FALSE)
+    IF GUI_CLICKED(bPlaySong) THEN starten(TRUE)
+    IF GUI_CLICKED(bStop) THEN stopp()
+    ' EINE Abfrage fuer beide Richtungen: zwei Zeilen hintereinander
+    ' starteten und stoppten im selben Bild, weil die zweite den eben
+    ' gesetzten Zustand schon sah.
+    IF KEYHIT(KEY_SPACE) AND tasten THEN
+        IF spielt THEN
+            stopp()
+        ELSE
+            starten(FALSE)
+        END IF
+    END IF
+    IF GUI_CLICKED(bZur) OR (strg AND KEYHIT(KEY_Z) AND tasten) THEN zurueck()
+    IF GUI_CLICKED(bVor) OR (strg AND KEYHIT(KEY_Y) AND tasten) THEN wieder()
+    IF GUI_CLICKED(bWav) THEN
+        DIM wp AS STRING : wp = FILE_SAVE_DIALOG("Song als WAV", "song.wav", "wav")
+        IF wp <> "" THEN
+            renderStereo = GUI_CHECKED(cbStereo)
+            renderAmiga = GUI_CHECKED(cbAmiga)
+            wavRendern(wp)
+        END IF
+    END IF
+    IF GUI_CLICKED(bCode) THEN
+        DIM cp AS STRING : cp = FILE_SAVE_DIALOG("GB-Code sichern", "song.dh", "dh")
+        IF cp <> "" THEN gbCodeSichern(cp)
+    END IF
+
+    ' ---- Werkzeugleiste 2
+    IF GUI_DROPDOWN_SELECTED(ddPat) <> lPat AND GUI_DROPDOWN_SELECTED(ddPat) >= 0 THEN
+        patternWaehlen(GUI_DROPDOWN_SELECTED(ddPat))
+    END IF
+    IF INT(GUI_VALUE(spRows)) <> lRows THEN
+        lRows = INT(GUI_VALUE(spRows))
+        reihenSetzen(lRows)
+    END IF
+    IF GUI_CLICKED(bPatNeu) THEN patternNeu(FALSE)
+    IF GUI_CLICKED(bPatDup) THEN patternNeu(TRUE)
+    IF GUI_CLICKED(bPatDel) THEN patternLoeschen()
+    IF GUI_CLICKED(bPatLeer) THEN
+        patternLeeren(patAkt)
+        geaendert()
+        zelleAnzeigen()
+    END IF
+    IF GUI_CLICKED(bOff) THEN noteSetzen(NOTE_OFF)
+    ' Die Zellen-Felder wirken nur, wo eine Note steht -- sonst zurueck.
+    DIM hatNote AS BOOLEAN : hatNote = (note[patAkt, curC, curR] >= 0)
+    IF INT(GUI_VALUE(spVol)) <> lVol THEN
+        IF hatNote THEN
+            vol[patAkt, curC, curR] = INT(GUI_VALUE(spVol)) : lVol = vol[patAkt, curC, curR]
+            geaendert()
+        ELSE
+            GUI_SET_VALUE(spVol, lVol)
+        END IF
+    END IF
+    IF INT(GUI_VALUE(spSlide)) <> lSlide THEN
+        IF hatNote AND NOT istDrum(curC) THEN
+            slide[patAkt, curC, curR] = INT(GUI_VALUE(spSlide)) : lSlide = slide[patAkt, curC, curR]
+            geaendert()
+        ELSE
+            GUI_SET_VALUE(spSlide, lSlide)
+        END IF
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddFx) <> lFx AND GUI_DROPDOWN_SELECTED(ddFx) >= 0 THEN
+        IF hatNote THEN
+            fx[patAkt, curC, curR] = GUI_DROPDOWN_SELECTED(ddFx) : lFx = fx[patAkt, curC, curR]
+            IF lFx = 0 THEN fxp[patAkt, curC, curR] = 0 : lFxp = 0 : GUI_SET_VALUE(spFxp, 0)
+            geaendert()
+        ELSE
+            GUI_DROPDOWN_SET_SELECTED(ddFx, lFx)
+        END IF
+    END IF
+    IF INT(GUI_VALUE(spFxp)) <> lFxp THEN
+        IF hatNote AND fx[patAkt, curC, curR] <> 0 THEN
+            fxp[patAkt, curC, curR] = INT(GUI_VALUE(spFxp)) : lFxp = fxp[patAkt, curC, curR]
+            geaendert()
+        ELSE
+            GUI_SET_VALUE(spFxp, lFxp)
+        END IF
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddZInst) <> lZInst AND GUI_DROPDOWN_SELECTED(ddZInst) >= 0 THEN
+        IF hatNote THEN
+            inst[patAkt, curC, curR] = GUI_DROPDOWN_SELECTED(ddZInst) - 1 : lZInst = inst[patAkt, curC, curR] + 1
+            geaendert()
+        ELSE
+            GUI_DROPDOWN_SET_SELECTED(ddZInst, lZInst)
+        END IF
+    END IF
+
+    ' ---- Kanal-Spalte
+    IF lKanalAnz <> curC THEN kanalAnzeigen() : instrumentAnzeigen()
+    IF GUI_DROPDOWN_SELECTED(ddChInst) <> lChInst AND GUI_DROPDOWN_SELECTED(ddChInst) >= 0 THEN
+        lChInst = GUI_DROPDOWN_SELECTED(ddChInst)
+        chInst[curC] = lChInst - 1
+        geaendert()
+        kanalAnzeigen()
+        instrumentAnzeigen()
+    END IF
+    IF GUI_DROPDOWN_SELECTED(ddWave) <> lWave AND GUI_DROPDOWN_SELECTED(ddWave) >= 0 THEN
+        lWave = GUI_DROPDOWN_SELECTED(ddWave)
+        wave[curC] = wellenformen[lWave]
+        geaendert()
+    END IF
+    IF GUI_CHECKED(cbMute) <> lMute THEN lMute = GUI_CHECKED(cbMute) : mute[curC] = lMute
+    IF GUI_CHECKED(cbSolo) <> lSolo THEN lSolo = GUI_CHECKED(cbSolo) : solo[curC] = lSolo
+    IF INT(GUI_VALUE(slChVol)) <> lChVol THEN
+        lChVol = INT(GUI_VALUE(slChVol))
+        chVol[curC] = lChVol / 100.0
+        geaendert()
+    END IF
+
+    ' ---- Instrument-Kasten
+    IF lInstAnz <> chInst[curC] THEN instrumentAnzeigen()
+    DIM ii AS INTEGER : ii = chInst[curC]
+    IF ii >= 0 THEN
+        DIM iGeaendert AS BOOLEAN : iGeaendert = FALSE
+        IF GUI_DROPDOWN_SELECTED(ddIWave) <> lIWave AND GUI_DROPDOWN_SELECTED(ddIWave) >= 0 THEN
+            lIWave = GUI_DROPDOWN_SELECTED(ddIWave)
+            iWave[ii] = IIF(lIWave = 4, "noise", wellenformen[lIWave]) : iGeaendert = TRUE
+        END IF
+        IF INT(GUI_VALUE(spIVol)) <> lIVol THEN lIVol = INT(GUI_VALUE(spIVol)) : iVol[ii] = lIVol : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spA)) <> lA THEN lA = INT(GUI_VALUE(spA)) : iAtk[ii] = lA : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spD)) <> lD THEN lD = INT(GUI_VALUE(spD)) : iDec[ii] = lD : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spS)) <> lS THEN lS = INT(GUI_VALUE(spS)) : iSus[ii] = lS / 100.0 : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spR)) <> lR THEN lR = INT(GUI_VALUE(spR)) : iRel[ii] = lR : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spVibD)) <> lVibD THEN lVibD = INT(GUI_VALUE(spVibD)) : iVibD[ii] = lVibD / 100.0 : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spVibS)) <> lVibS THEN lVibS = INT(GUI_VALUE(spVibS)) : iVibS[ii] = lVibS : iGeaendert = TRUE
+        IF INT(GUI_VALUE(spDet)) <> lDet THEN lDet = INT(GUI_VALUE(spDet)) : iDet[ii] = lDet : iGeaendert = TRUE
+        IF INT(GUI_VALUE(slPan)) <> lPan THEN lPan = INT(GUI_VALUE(slPan)) : iPan[ii] = lPan / 100.0 : iGeaendert = TRUE
+        IF iGeaendert THEN
+            cacheLeeren()
+            geaendert()
+        END IF
+    END IF
+    IF GUI_CLICKED(bINeu) THEN instrumentNeu()
+    IF GUI_CLICKED(bIDel) THEN instrumentEntfernen()
+
+    ' ---- Reihenfolge
+    IF GUI_LISTBOX_SELECTED(lstOrder) <> lOrder AND GUI_LISTBOX_SELECTED(lstOrder) >= 0 THEN
+        lOrder = GUI_LISTBOX_SELECTED(lstOrder)
+        IF NOT spielt THEN patternWaehlen(order[lOrder])
+    END IF
+    IF GUI_CLICKED(bOAdd) THEN
+        IF orderAnz < MAX_ORDER THEN
+            order[orderAnz] = patAkt : orderAnz = orderAnz + 1
+            lOrder = orderAnz - 1
+            geaendert()
+            orderAnzeigen()
+        END IF
+    END IF
+    IF GUI_CLICKED(bODel) THEN
+        IF orderAnz > 1 AND lOrder >= 0 THEN
+            DIM oi AS INTEGER
+            FOR oi = lOrder TO orderAnz - 2
+                order[oi] = order[oi + 1]
+            NEXT
+            orderAnz = orderAnz - 1
+            geaendert()
+            orderAnzeigen()
+        END IF
+    END IF
+    IF GUI_CLICKED(bOLinks) OR GUI_CLICKED(bORechts) THEN
+        DIM ziel AS INTEGER : ziel = lOrder + IIF(GUI_CLICKED(bOLinks), -1, 1)
+        IF lOrder >= 0 AND ziel >= 0 AND ziel < orderAnz THEN
+            DIM tmp AS INTEGER : tmp = order[lOrder]
+            order[lOrder] = order[ziel] : order[ziel] = tmp
+            lOrder = ziel
+            geaendert()
+            orderAnzeigen()
+        END IF
+    END IF
+
+    ' ---- Maus im Gitter
+    DIM gx AS INTEGER : gx = GUI_CANVAS_X(gitter)
+    DIM gy AS INTEGER : gy = GUI_CANVAS_Y(gitter)
+    DIM gw AS INTEGER : gw = GUI_CANVAS_W(gitter)
+    DIM gh AS INTEGER : gh = GUI_CANVAS_H(gitter)
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM imGitter AS BOOLEAN
+    imGitter = (mx >= gx + RH_W AND my >= gy + HDR_H AND mx < gx + gw AND my < gy + gh) AND NOT dialogOffen
+    IF imGitter THEN
+        DIM hc AS INTEGER : hc = chOff + (mx - gx - RH_W) \ CELL_W
+        DIM hr AS INTEGER : hr = rowOff + (my - gy - HDR_H) \ ROW_H
+        IF hc < kanaele AND hr < patRows[patAkt] THEN
+            IF MOUSE_HIT(0) THEN
+                cursorSetzen(hc, hr, umsch)
+                ziehen = TRUE
+            ELSEIF ziehen AND MOUSEBUTTON(0) THEN
+                IF hc <> curC OR hr <> curR THEN cursorSetzen(hc, hr, TRUE)
+            END IF
+        END IF
+        DIM rad AS INTEGER : rad = MOUSEWHEEL()
+        IF rad <> 0 THEN
+            IF umsch THEN
+                chOff = CLAMP(chOff - rad, 0, MAX(0, kanaele - 1))
+            ELSE
+                rowOff = CLAMP(rowOff - rad * 3, 0, MAX(0, patRows[patAkt] - 1))
+            END IF
+        END IF
+    END IF
+    IF NOT MOUSEBUTTON(0) THEN ziehen = FALSE
+
+    ' ---- Klaviatur (Maus)
+    IF MOUSE_HIT(0) AND NOT dialogOffen THEN
+        DIM pm AS INTEGER : pm = pianoTasteBei(mx, my)
+        IF pm >= 0 THEN noteSetzen(MIN(127, pm))
+    END IF
+
+    ' ---- Tastatur
+    IF tasten THEN
+        DIM schritt AS INTEGER : schritt = 0
+        IF strg THEN
+            IF KEYHIT(KEY_UP) THEN blockTransponieren(IIF(umsch, 12, 1))
+            IF KEYHIT(KEY_DOWN) THEN blockTransponieren(IIF(umsch, -12, -1))
+            IF KEYHIT(KEY_C) THEN blockKopieren(FALSE)
+            IF KEYHIT(KEY_X) THEN blockKopieren(TRUE)
+            IF KEYHIT(KEY_V) THEN blockEinfuegen()
+            IF KEYHIT(KEY_I) THEN blockInterpolieren()
+        ELSE
+            IF KEYREPEAT(KEY_UP) THEN cursorSetzen(curC, curR - 1, umsch)
+            IF KEYREPEAT(KEY_DOWN) THEN cursorSetzen(curC, curR + 1, umsch)
+            IF KEYREPEAT(KEY_LEFT) THEN cursorSetzen(curC - 1, curR, umsch)
+            IF KEYREPEAT(KEY_RIGHT) THEN cursorSetzen(curC + 1, curR, umsch)
+            IF KEYREPEAT(KEY_PAGEUP) THEN cursorSetzen(curC, curR - 16, umsch)
+            IF KEYREPEAT(KEY_PAGEDOWN) THEN cursorSetzen(curC, curR + 16, umsch)
+            IF KEYHIT(KEY_HOME) THEN cursorSetzen(curC, 0, umsch)
+            IF KEYHIT(KEY_END) THEN cursorSetzen(curC, patRows[patAkt] - 1, umsch)
+            IF KEYHIT(KEY_DELETE) OR KEYHIT(KEY_BACKSPACE) THEN blockLoeschen()
+            IF KEYHIT(KEY_0) THEN noteSetzen(NOTE_OFF)
+            DIM tk AS INTEGER
+            FOR tk = 0 TO 23
+                IF KEYHIT(tastNote[tk]) THEN
+                    noteSetzen(MIN(127, INT(GUI_VALUE(spOkt)) * 12 + 12 + tk))
+                END IF
+            NEXT
+        END IF
+    END IF
+
+    ' ---- Verlauf: ein Schritt, sobald die Maus los ist -- ein Zug am
+    ' Regler ist EIN Schritt, nicht sechzig.
+    IF undoFaellig AND NOT MOUSEBUTTON(0) THEN
+        undoFaellig = FALSE
+        schrittSichern()
+    END IF
+
+    ' ---- Zeichnen
+    GUI_SET_TEXT(lblStatus, meldung + IIF(dirty, "  *", ""))
+    GUI_DRAW()
+    zeichneGitter()
+    zeichnePiano()
+    ' Ein Dialog liegt ueber der Zeichenflaeche -- ohne diesen Aufruf
+    ' sperrt er die Eingabe und ist nicht zu sehen.
+    IF frage >= 0 THEN GUI_DRAW_WINDOW(frage)
+    IF frageNeu >= 0 THEN GUI_DRAW_WINDOW(frageNeu)
+
+    ' ---- Beenden
+    IF KEYHIT(KEY_ESCAPE) AND NOT dialogOffen THEN
+        IF dirty THEN
+            frage = GUI_DIALOG("Beenden", "Ungesicherte Aenderungen verwerfen und beenden?", "janein")
+        ELSE
+            stopp()
+            EXIT(0)
+        END IF
+    END IF
+    IF frage >= 0 THEN
+        IF GUI_ANSWER(frage) = 1 THEN stopp() : EXIT(0)
+        IF GUI_ANSWER(frage) = 2 THEN frage = -1
+    END IF
+
+    FLIP()
+WEND
+

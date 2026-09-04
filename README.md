@@ -301,6 +301,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `190_tracker.dh` | **der Tracker, geschrieben IN Drachenhauch** — Patterns, Reihenfolge, 18 Instrumente, Effekte je Note, Wiedergabe auf einer Audio-Uhr, dasselbe JSON wie `dhtracker`, WAV-Mischung und GB-Code |
 | `189_sprite_editor.dh` | **der Sprite-Editor, geschrieben IN Drachenhauch** — zwoelf Werkzeuge, Ebenen, Einzelbilder, Zwiebelhaut, Spiegeln und Vierteldrehen, Streifen- und Atlas-Ausgabe |
 | `188_bild_erzeugen.dh` | **ein Bild herstellen statt nur anzeigen** — Malprogramm mit durchsichtigen Ebenen, Radierer und PNG-Export |
 | `187_tilemap_editor.dh` | **der Tilemap-Editor, geschrieben IN Drachenhauch** — sechs Werkzeuge, Auswahl mit Zwischenablage, Rueckgaengig, Ebenen (mit Umsortieren), Objekt-Ebenen, mehrere Tilesets, echtes Tiled-JSON |

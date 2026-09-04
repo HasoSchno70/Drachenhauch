@@ -655,6 +655,8 @@ END IF
 
 [examples/115_modplayer.dh](../examples/115_modplayer.dh) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
 
+[examples/190_tracker.dh](../examples/190_tracker.dh) — **der Tracker in Drachenhauch**: Noten aus `AUDIO_NOTE`, Wiedergabe über `AUDIO_CLOCK`/`AUDIO_PLAY_AT` (zwei Reihen voraus geplant, gestoppt wird durch Entfernen der Uhr), WAV-Export über `AUDIO_SOUND_NEW/MIX/NORMALIZE`.
+
 [examples/116_sampler.dh](../examples/116_sampler.dh) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
 
 ## In der nativen Runtime (dhrt)
