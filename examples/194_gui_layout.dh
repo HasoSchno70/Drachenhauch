@@ -1,0 +1,90 @@
+' ============================================================
+'  gui: Layout
+' ============================================================
+'  Ein Formular ohne eine einzige ausgerechnete Koordinate -- und es fliesst
+'  mit dem Fenster. Zieh am rechten unteren Griff.
+'
+'    GUI_LAYOUT(win, "spalte"|"zeile"|"raster:N", x, y, w, h)
+'    GUI_LAYOUT_ADD(layout, wdg[, gewicht])   Gewicht 0 = eigene Groesse,
+'                                             ab 1 = Anteil am Restplatz
+'    GUI_LAYOUT_SPACER(layout)                Leerraum, schiebt
+'    GUI_AUTOSIZE / Breite 0                  Groesse nach Inhalt
+'
+'  Der aeussere Behaelter klebt an allen vier Kanten; alles darin bekommt
+'  seine Lage von ihm. [Rahmen] zeigt die Behaelter gestrichelt. [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+SCREEN(560, 420, "Drachenhauch - Layout", 1)
+SETFPS(60)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(420, 320)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Nachricht senden", 0, 0, 560, 420)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' Der aeussere Behaelter: eine Spalte, so gross wie das Fenster, verankert
+' an allen Kanten -- er ist das Einzige, was eine Groesse braucht.
+DIM form AS GUI_WIDGET : form = GUI_LAYOUT(win, "spalte", 12, 12, 536, 396)
+GUI_SET_ANCHOR(form, "lrtb")
+GUI_LAYOUT_SET(form, "abstand", 8)
+
+' Kopf: eine Zeile mit Beschriftung, Eingabefeld (nimmt den Rest) und Knopf
+' nach Inhalt (Breite 0).
+DIM kopf AS GUI_WIDGET : kopf = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+GUI_LAYOUT_SET(kopf, "ausrichtung", 1) : GUI_LAYOUT_SET(kopf, "dehnen", 0)
+DIM lAn AS GUI_WIDGET : lAn = GUI_LABEL(win, "An:", 0, 0)
+DIM an AS GUI_WIDGET : an = GUI_TEXTINPUT(win, 0, 0, 0, 0, "name@example.org")
+DIM bAdr AS GUI_WIDGET : bAdr = GUI_BUTTON(win, "Adressbuch ...", 0, 0, 0, 0)
+GUI_LAYOUT_ADD(kopf, lAn) : GUI_LAYOUT_ADD(kopf, an, 1) : GUI_LAYOUT_ADD(kopf, bAdr)
+
+DIM betreff AS GUI_WIDGET : betreff = GUI_TEXTINPUT(win, 0, 0, 0, 0, "Betreff")
+
+' Der Text bekommt alles, was uebrig bleibt.
+DIM text AS GUI_WIDGET : text = GUI_TEXTAREA(win, 0, 0, 10, 10, "Nachricht ...")
+
+' Ein Raster mit drei Spalten fuer die Schalter.
+DIM optionen AS GUI_WIDGET : optionen = GUI_LAYOUT(win, "raster:3", 0, 0, 10, 24)
+GUI_LAYOUT_SET(optionen, "dehnen", 0)
+DIM cb1 AS GUI_WIDGET : cb1 = GUI_CHECKBOX(win, "Kopie an mich", 0, 0, TRUE)
+DIM cb2 AS GUI_WIDGET : cb2 = GUI_CHECKBOX(win, "Bestaetigung", 0, 0)
+DIM cb3 AS GUI_WIDGET : cb3 = GUI_CHECKBOX(win, "Wichtig", 0, 0)
+GUI_LAYOUT_ADD(optionen, cb1) : GUI_LAYOUT_ADD(optionen, cb2) : GUI_LAYOUT_ADD(optionen, cb3)
+
+' Die Knopfreihe: ein Leerraum links drueckt die Knoepfe nach rechts.
+DIM knoepfe AS GUI_WIDGET : knoepfe = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+DIM cbRahmen AS GUI_WIDGET : cbRahmen = GUI_CHECKBOX(win, "Rahmen zeigen", 0, 0)
+DIM bSenden AS GUI_WIDGET : bSenden = GUI_BUTTON(win, "Senden", 0, 0, 0, 0)
+DIM bAbbruch AS GUI_WIDGET : bAbbruch = GUI_BUTTON(win, "Abbrechen", 0, 0, 0, 0)
+GUI_LAYOUT_ADD(knoepfe, cbRahmen) : GUI_LAYOUT_SPACER(knoepfe)
+GUI_LAYOUT_ADD(knoepfe, bSenden) : GUI_LAYOUT_ADD(knoepfe, bAbbruch)
+GUI_WINDOW_DEFAULT(win, bSenden) : GUI_WINDOW_CANCEL(win, bAbbruch)
+
+' Zusammenbauen: Behaelter im Behaelter.
+GUI_LAYOUT_ADD(form, kopf)
+GUI_LAYOUT_ADD(form, betreff)
+GUI_LAYOUT_ADD(form, text, 1)
+GUI_LAYOUT_ADD(form, optionen)
+GUI_LAYOUT_ADD(form, knoepfe)
+GUI_FOCUS(an)
+
+DIM rahmen AS BOOLEAN : rahmen = FALSE
+WHILE NOT QUITREQUESTED()
+    ' Das OS-Fenster waechst -> das gui-Fenster mit -> der Behaelter (Anker)
+    ' -> alles darin.
+    IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+    GUI_UPDATE()
+    IF GUI_CHECKED(cbRahmen) <> rahmen THEN
+        rahmen = GUI_CHECKED(cbRahmen)
+        GUI_LAYOUT_SET(form, "rahmen", IIF(rahmen, 1, 0))
+        GUI_LAYOUT_SET(kopf, "rahmen", IIF(rahmen, 1, 0))
+        GUI_LAYOUT_SET(optionen, "rahmen", IIF(rahmen, 1, 0))
+        GUI_LAYOUT_SET(knoepfe, "rahmen", IIF(rahmen, 1, 0))
+    END IF
+    IF GUI_CLICKED(bSenden) THEN GUI_SET_TEXT(betreff, "Gesendet an " + GUI_TEXT(an))
+    IF GUI_CLICKED(bAbbruch) THEN EXIT(0)
+    GUI_DRAW()
+    FLIP()
+WEND

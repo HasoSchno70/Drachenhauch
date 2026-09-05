@@ -586,6 +586,33 @@ module.exports = (H) => [
       'GUI_SET_ANCHOR(tab, "lrtb")           \' Tabelle fuellt das Fenster',
       'GUI_SET_ANCHOR(ok, "rb")              \' Knopf bleibt unten rechts',
     ]),
+  H.cmd("GUI_AUTOSIZE", 'GUI_AUTOSIZE(widget)',
+    "Misst Breite und Höhe eines Widgets an seinem Inhalt (Knopf, Beschriftung, Kästchen, Radio, Kippschalter; bei Textfeldern nur die Höhe). Dasselbe erreicht eine 0 als Breite oder Höhe beim Anlegen – gemessen wird dann im nächsten GUI_UPDATE. GUI_SET_BOUNDS hebt das Automaß wieder auf.",
+    [
+      'DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "Speichern unter ...", 10, 10, 0, 0)   \' Breite nach Text',
+      'GUI_AUTOSIZE(hinweis)                  \' Beschriftung nach neuem Text nachmessen',
+    ]),
+  H.cmd("GUI_LAYOUT", 'GUI_LAYOUT(win, art$, x, y, w, h)',
+    "Legt einen unsichtbaren Layout-Behälter an, der seine Kinder in jedem GUI_UPDATE verteilt. art$ ist \"zeile\", \"spalte\" oder \"raster:N\" (N Spalten gleicher Breite). Anker gelten für den Behälter – seine Kinder bekommen ihre Lage von ihm. Der Behälter schluckt keine Klicks.",
+    [
+      'DIM form AS GUI_WIDGET : form = GUI_LAYOUT(win, "spalte", 12, 12, 376, 236)',
+      'GUI_SET_ANCHOR(form, "lrtb")           \' fliesst mit dem Fenster',
+      'DIM reihe AS GUI_WIDGET : reihe = GUI_LAYOUT(win, "raster:3", 0, 0, 10, 24)',
+    ]),
+  H.cmd("GUI_LAYOUT_ADD · GUI_LAYOUT_SPACER · GUI_LAYOUT_REMOVE", 'GUI_LAYOUT_ADD(layout, widget[, gewicht])   GUI_LAYOUT_SPACER(layout[, gewicht])   GUI_LAYOUT_REMOVE(layout, widget)',
+    "Hängt ein Widget (auch einen weiteren Behälter) an einen Layout-Behälter. Gewicht 0 behält die eigene Größe, ab 1 bekommt das Kind seinen Anteil am Platz, der nach den festen Kindern übrig bleibt. GUI_LAYOUT_SPACER ist ein Leerraum mit Gewicht – am Anfang einer Zeile schiebt er alles nach rechts. Ein Widget steckt in höchstens einem Behälter; ein Behälter darf weder sich selbst noch einen Vorfahren aufnehmen.",
+    [
+      'GUI_LAYOUT_ADD(form, lbl)              \' Gewicht 0: eigene Hoehe',
+      'GUI_LAYOUT_ADD(form, text, 1)          \' Gewicht 1: der Rest',
+      'GUI_LAYOUT_SPACER(knoepfe) : GUI_LAYOUT_ADD(knoepfe, ok) : GUI_LAYOUT_ADD(knoepfe, abbruch)',
+    ]),
+  H.cmd("GUI_LAYOUT_SET", 'GUI_LAYOUT_SET(layout, key$, wert)',
+    "Stellt einen Behälter ein: \"abstand\" (zwischen den Kindern, Vorgabe 6), \"rand\" (innen), \"dehnen\" (Kinder quer zur Richtung auf volle Größe ziehen, Vorgabe an), \"ausrichtung\" (quer, wenn nicht gedehnt: 0 Anfang, 1 Mitte, 2 Ende) und \"rahmen\" (gestrichelt sichtbar, zum Entwickeln).",
+    [
+      'GUI_LAYOUT_SET(form, "abstand", 8)',
+      'GUI_LAYOUT_SET(kopf, "dehnen", 0) : GUI_LAYOUT_SET(kopf, "ausrichtung", 1)',
+      'GUI_LAYOUT_SET(form, "rahmen", 1)      \' zeigt, wo der Behaelter liegt',
+    ]),
   H.cmd("GUI_FOCUS · GUI_HIT_TEST", 'GUI_FOCUS(widget)   GUI_HIT_TEST(x, y)',
     "GUI_FOCUS setzt den Tastatur-Fokus (z. B. auf ein Eingabefeld beim Öffnen). GUI_HIT_TEST liefert das oberste sichtbare Widget an einem Bildschirmpunkt oder -1 – so baut man eine eigene Auswahl per Mausklick.",
     [

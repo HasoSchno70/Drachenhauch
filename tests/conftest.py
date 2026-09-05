@@ -206,6 +206,7 @@ _BRAUCHT_GRAFIK = {
     "test_gui_form_runner.py",
     "test_gui_menu_ausbau.py",
     "test_gui_listen.py",
+    "test_gui_layout.py",
     "test_gui_dialoge_ausbau.py",
     "test_gui_table_frozen_edge.py",
     "test_gui_tastatur.py",

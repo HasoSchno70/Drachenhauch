@@ -1123,6 +1123,14 @@ class _Canvas(QWidget):
         elif k == "canvas":
             qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
             qp.setPen(_col(th["muted_fg"])); qp.drawText(r, al.AlignCenter, "Canvas")
+        elif k == "layout":
+            # Unsichtbar zur Laufzeit -- im Entwurf gestrichelt mit seiner Art,
+            # damit man ihn anfassen kann. Die Kinder liegen im Entwurf, wo
+            # sie liegen; verteilt werden sie beim Start.
+            yj = c.extra.get("layout") if isinstance(c.extra.get("layout"), dict) else {}
+            qp.setBrush(Qt.BrushStyle.NoBrush); qp.setPen(QPen(accent, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
+            qp.setPen(_col(th["muted_fg"]))
+            qp.drawText(r.adjusted(4, 2, -4, -2), al.AlignLeft | al.AlignTop, "Layout: " + str(yj.get("art") or "spalte"))
         elif _preview_neu(qp, k, r, fg=fg, muted=_col(th["muted_fg"]), accent=accent,
                           border=border, face=face, sunk=sunk,
                           title_bg=_col(th["title_bg"]), win_bg=_col(th["win_bg"]),
@@ -1587,6 +1595,7 @@ class _Inspector(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._c: Control | None = None
+        self._doc: FormDoc | None = None          # fuer die Layout-Zuordnung
         self._loading = False
         self._form = QFormLayout(self)
         self.name = QLineEdit(); self.text = QLineEdit()
@@ -1631,6 +1640,21 @@ class _Inspector(QWidget):
         # den Rundweg durch den Designer.
         self.l_multi = QCheckBox("Mehrfachauswahl")
         self.l_kaestchen = QCheckBox("Kaestchen je Eintrag")
+        # Layout-Behaelter: Art und Masse; fuer jedes andere Control der
+        # Behaelter, in dem es steckt, und sein Gewicht.
+        self.ly_art = QComboBox()
+        for name, wert in (("Zeile", "zeile"), ("Spalte", "spalte"), ("Raster", "raster")):
+            self.ly_art.addItem(name, wert)
+        self.ly_spalten = QSpinBox(); self.ly_spalten.setRange(1, 32); self.ly_spalten.setValue(2)
+        self.ly_abstand = QSpinBox(); self.ly_abstand.setRange(0, 200); self.ly_abstand.setValue(6)
+        self.ly_rand = QSpinBox(); self.ly_rand.setRange(0, 200)
+        self.ly_dehnen = QCheckBox("quer dehnen"); self.ly_dehnen.setChecked(True)
+        self.ly_ausr = QComboBox()
+        for name, wert in (("Anfang", 0), ("Mitte", 1), ("Ende", 2)):
+            self.ly_ausr.addItem(name, wert)
+        self.in_layout = QComboBox()
+        self.in_gewicht = QSpinBox(); self.in_gewicht.setRange(0, 99)
+        self.in_gewicht.setToolTip("0 = eigene Groesse, ab 1 = Anteil am Restplatz")
         # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
         # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
         # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
@@ -1711,6 +1735,14 @@ class _Inspector(QWidget):
         self._add("Zahlen", self.zahlen)
         self._add("", self.l_multi)
         self._add("", self.l_kaestchen)
+        self._add("Layout-Art", self.ly_art)
+        self._add("Spalten", self.ly_spalten)
+        self._add("Abstand", self.ly_abstand)
+        self._add("Rand", self.ly_rand)
+        self._add("Quer", self.ly_ausr)
+        self._add("", self.ly_dehnen)
+        self._add("Layout", self.in_layout)
+        self._add("Gewicht", self.in_gewicht)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1757,8 +1789,12 @@ class _Inspector(QWidget):
         self.align.currentIndexChanged.connect(self._apply)
         self.zahlen.currentIndexChanged.connect(self._apply)
         self.maxlaenge.valueChanged.connect(self._apply)
-        for _w in (self.wrap, self.passwort, self.nur_lesen, self.l_multi, self.l_kaestchen):
+        for _w in (self.wrap, self.passwort, self.nur_lesen, self.l_multi, self.l_kaestchen, self.ly_dehnen):
             _w.toggled.connect(self._apply)
+        for _w in (self.ly_art, self.ly_ausr, self.in_layout):
+            _w.currentIndexChanged.connect(self._apply)
+        for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht):
+            _w.valueChanged.connect(self._apply)
         self.datum.editingFinished.connect(self._apply)
         self.orient.currentIndexChanged.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
@@ -1916,6 +1952,9 @@ class _Inspector(QWidget):
         tj.setdefault("rows", [])
         c.extra["table"] = tj
 
+    def set_doc(self, doc: FormDoc | None):
+        self._doc = doc
+
     def set_control(self, c: Control | None):
         self._c = c
         self._loading = True
@@ -1941,6 +1980,25 @@ class _Inspector(QWidget):
         lj = c.extra.get("list") if isinstance(c.extra.get("list"), dict) else {}
         self.l_multi.setChecked(bool(lj.get("multi")))
         self.l_kaestchen.setChecked(bool(lj.get("kaestchen")))
+        yj = c.extra.get("layout") if isinstance(c.extra.get("layout"), dict) else {}
+        ai = self.ly_art.findData(str(yj.get("art") or "spalte"))
+        self.ly_art.setCurrentIndex(ai if ai >= 0 else 1)
+        self.ly_spalten.setValue(int(yj.get("spalten") or 2))
+        self.ly_abstand.setValue(int(yj.get("abstand", 6)))
+        self.ly_rand.setValue(int(yj.get("rand", 0)))
+        self.ly_dehnen.setChecked(yj.get("dehnen", True) is not False)
+        qi = self.ly_ausr.findData(int(yj.get("ausrichtung", 0)))
+        self.ly_ausr.setCurrentIndex(qi if qi >= 0 else 0)
+        self.in_layout.clear()
+        self.in_layout.addItem("(keins)", "")
+        if self._doc is not None:
+            for l in self._doc.controls:
+                if l.kind == "layout" and l is not c:
+                    self.in_layout.addItem(l.name, l.name)
+            eltern, gew = self._doc.layout_von(c)
+            li = self.in_layout.findData(eltern.name if eltern else "")
+            self.in_layout.setCurrentIndex(li if li >= 0 else 0)
+            self.in_gewicht.setValue(gew)
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -1980,6 +2038,13 @@ class _Inspector(QWidget):
             self._show(_w, c.kind == "textinput")
         self._show(self.l_multi, c.kind == "listbox")
         self._show(self.l_kaestchen, c.kind == "listbox")
+        ist_layout = c.kind == "layout"
+        for _w in (self.ly_art, self.ly_abstand, self.ly_rand, self.ly_dehnen, self.ly_ausr):
+            self._show(_w, ist_layout)
+        self._show(self.ly_spalten, ist_layout and self.ly_art.currentData() == "raster")
+        hat_layouts = self.in_layout.count() > 1
+        self._show(self.in_layout, hat_layouts)
+        self._show(self.in_gewicht, hat_layouts)
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -2018,6 +2083,35 @@ class _Inspector(QWidget):
         c.nur_lesen = self.nur_lesen.isChecked()
         c.maxlaenge = self.maxlaenge.value()
         c.zahlen = int(self.zahlen.currentData() or 0)
+        if c.kind == "layout":
+            yj = dict(c.extra.get("layout") or {}) if isinstance(c.extra.get("layout"), dict) else {}
+            yj["art"] = self.ly_art.currentData() or "spalte"
+            if yj["art"] == "raster":
+                yj["spalten"] = self.ly_spalten.value()
+            else:
+                yj.pop("spalten", None)
+            for schluessel, feld, standard in (("abstand", self.ly_abstand, 6), ("rand", self.ly_rand, 0)):
+                if feld.value() != standard:
+                    yj[schluessel] = feld.value()
+                else:
+                    yj.pop(schluessel, None)
+            if self.ly_ausr.currentData():
+                yj["ausrichtung"] = int(self.ly_ausr.currentData())
+            else:
+                yj.pop("ausrichtung", None)
+            if self.ly_dehnen.isChecked():
+                yj.pop("dehnen", None)
+            else:
+                yj["dehnen"] = False
+            yj.setdefault("kinder", [])
+            c.extra["layout"] = yj
+            self._show(self.ly_spalten, yj["art"] == "raster")
+        if self._doc is not None and self.in_layout.count() > 1:
+            ziel = self.in_layout.currentData() or ""
+            eltern = next((l for l in self._doc.controls if l.kind == "layout" and l.name == ziel), None)
+            alt_eltern, alt_gew = self._doc.layout_von(c)
+            if eltern is not alt_eltern or alt_gew != self.in_gewicht.value():
+                self._doc.layout_zuordnen(c, eltern, self.in_gewicht.value())
         if c.kind == "listbox":
             lj = dict(c.extra.get("list") or {}) if isinstance(c.extra.get("list"), dict) else {}
             if self.l_multi.isChecked():
@@ -2351,6 +2445,8 @@ class FormDesigner(QMainWindow):
         self.canvas.selection_changed.connect(self._update_status)
         self.canvas.doc_changed.connect(self._on_doc_changed)
         self.canvas.doc_replaced.connect(self.code_panel.set_doc)
+        self.canvas.doc_replaced.connect(self.inspector.set_doc)
+        self.inspector.set_doc(self.canvas.doc)
         self.canvas.form_resized.connect(self._on_form_resized)
         self.canvas.handler_requested.connect(self._open_handler)
         self.canvas.context_menu.connect(self._show_context_menu)

@@ -1566,7 +1566,7 @@ def test_palette_zeigt_alle_arten(tmp_path):
     from drachenhauch.formdesigner import PALETTE
     _app()
     win = FormDesigner(tmp_path)
-    assert win.palette.count() == len(PALETTE) == 24
+    assert win.palette.count() == len(PALETTE) == 25
     win.close()
 
 
@@ -1632,4 +1632,46 @@ def test_inspector_schreibt_farbe_datum_und_richtung(tmp_path):
     win.inspector.orient.setCurrentIndex(1)          # senkrecht
     win.inspector._apply()
     assert sp.text == "v"
+    win.close()
+
+
+def test_inspector_ordnet_ein_control_einem_layout_zu(tmp_path):
+    """gui Punkt 5: am Behaelter stehen Art und Masse, an jedem anderen
+    Control das Feld 'Layout' plus Gewicht -- und das Feld gibt es nur, wenn
+    die Form einen Behaelter hat."""
+    _app()
+    win = FormDesigner(tmp_path)
+    i = win.inspector
+    btn = win.canvas.doc.add("button", 10, 10)
+    win.canvas._select(btn)
+    assert not i.in_layout.isVisibleTo(i), "ohne Behaelter kein Feld"
+    lay = win.canvas.doc.add("layout", 10, 60)
+    win.canvas._select(lay)
+    for f in (i.ly_art, i.ly_abstand, i.ly_rand, i.ly_dehnen):
+        assert f.isVisibleTo(i)
+    assert not i.ly_spalten.isVisibleTo(i), "Spalten nur beim Raster"
+    i.ly_art.setCurrentIndex(i.ly_art.findData("raster"))
+    i.ly_spalten.setValue(4)
+    i.ly_abstand.setValue(2)
+    i.ly_dehnen.setChecked(False)
+    i._apply()
+    assert lay.extra["layout"]["art"] == "raster" and lay.extra["layout"]["spalten"] == 4
+    assert lay.extra["layout"]["abstand"] == 2 and lay.extra["layout"]["dehnen"] is False
+    assert i.ly_spalten.isVisibleTo(i)
+    # Der Knopf wandert in den Behaelter.
+    win.canvas._select(btn)
+    assert i.in_layout.isVisibleTo(i)
+    i.in_layout.setCurrentIndex(i.in_layout.findData(lay.name))
+    i.in_gewicht.setValue(3)
+    i._apply()
+    eltern, gew = win.canvas.doc.layout_von(btn)
+    assert eltern is lay and gew == 3
+    # Erneutes Anwaehlen zeigt die Zuordnung wieder.
+    win.canvas._select(lay)
+    win.canvas._select(btn)
+    assert i.in_layout.currentData() == lay.name and i.in_gewicht.value() == 3
+    # Und (keins) nimmt ihn wieder heraus.
+    i.in_layout.setCurrentIndex(0)
+    i._apply()
+    assert win.canvas.doc.layout_von(btn)[0] is None
     win.close()

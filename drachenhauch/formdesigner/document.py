@@ -110,6 +110,7 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("knob",      "Drehknopf",     48, 48, ("on_change",) + _ZEIGEN + _FOKUS),
     PaletteSpec("toggle",    "Umschalter",    46, 22, ("on_click", "on_change") + _ZEIGEN + _FOKUS, has_text=True),
     PaletteSpec("tree",      "Baum",         180, 140, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
+    PaletteSpec("layout",    "Layout",       200, 120, ()),
     PaletteSpec("toolbar",   "Werkzeugleiste", 240, 32, ()),
     PaletteSpec("splitter",  "Trenner",      160,  6, _ZEIGEN),
     PaletteSpec("colorpicker", "Farbwaehler", 200, 150, ("on_change",) + _ZEIGEN + _FOKUS),
@@ -841,6 +842,76 @@ class FormDoc:
         return f"{base}{i}"
 
     # ---- .dhform IO (Runtime-Format) ----
+    # ---- Layout-Behaelter ----
+    # Im Designer haengen die Kinder eines Behaelters an NAMEN (in
+    # `extra["layout"]["kinder"]` als [name | None, gewicht]); die Laufzeit
+    # will Indizes. Umgerechnet wird nur an der Dateigrenze -- so ueberleben
+    # Zuordnungen das Loeschen und Umsortieren von Controls, ohne dass jede
+    # dieser Operationen Indizes nachfuehren muesste. None ist ein Leerraum.
+    def layout_von(self, c: "Control"):
+        """Der Behaelter, in dem `c` steckt, und sein Gewicht -- oder (None, 0)."""
+        for l in self.controls:
+            if l.kind != "layout":
+                continue
+            for k in (l.extra.get("layout") or {}).get("kinder") or []:
+                if isinstance(k, (list, tuple)) and k and k[0] == c.name:
+                    return l, int(k[1]) if len(k) > 1 else 0
+        return None, 0
+
+    def layout_zuordnen(self, c: "Control", layout: "Control | None", gewicht: int = 0) -> None:
+        """`c` in `layout` legen (oder mit None herausnehmen)."""
+        for l in self.controls:
+            if l.kind != "layout":
+                continue
+            lj = l.extra.get("layout")
+            if isinstance(lj, dict) and isinstance(lj.get("kinder"), list):
+                lj["kinder"] = [k for k in lj["kinder"] if not (isinstance(k, (list, tuple)) and k and k[0] == c.name)]
+        if layout is not None and layout is not c:
+            lj = layout.extra.setdefault("layout", {"art": "spalte"})
+            lj.setdefault("kinder", []).append([c.name, int(gewicht)])
+
+    def _kinder_zu_indizes(self, widgets: list) -> None:
+        namen = {c.name: i for i, c in enumerate(self.controls)}
+        for c, d in zip(self.controls, widgets):
+            if c.kind != "layout":
+                continue
+            lj = dict(c.extra.get("layout") or {"art": "spalte"})
+            kinder = []
+            for k in lj.get("kinder") or []:
+                if not isinstance(k, (list, tuple)) or not k:
+                    continue
+                g = int(k[1]) if len(k) > 1 and isinstance(k[1], (int, float)) else 0
+                if k[0] is None:
+                    kinder.append([-1, g])
+                elif k[0] in namen:
+                    kinder.append([namen[k[0]], g])
+            lj["kinder"] = kinder
+            d["layout"] = lj
+
+    @staticmethod
+    def _kinder_zu_namen(controls: list) -> None:
+        for c in controls:
+            if c.kind != "layout":
+                continue
+            lj = c.extra.get("layout")
+            if not isinstance(lj, dict):
+                continue
+            kinder = []
+            for k in lj.get("kinder") or []:
+                if not isinstance(k, (list, tuple)) or not k:
+                    continue
+                g = int(k[1]) if len(k) > 1 and isinstance(k[1], (int, float)) else 0
+                idx = k[0]
+                if isinstance(idx, str):            # schon Name (Designer-Datei)
+                    kinder.append([idx, g])
+                elif isinstance(idx, (int, float)) and int(idx) < 0:
+                    kinder.append([None, g])
+                elif isinstance(idx, (int, float)) and 0 <= int(idx) < len(controls):
+                    kinder.append([controls[int(idx)].name, g])
+            # Kopie statt in place: `lj` ist womoeglich noch das Dict des
+            # Aufrufers (from_dict kopiert extra nicht tief).
+            c.extra["layout"] = dict(lj, kinder=kinder)
+
     def to_dict(self) -> dict:
         d: dict = {
             "title": self.title, "x": self.x, "y": self.y, "w": self.w, "h": self.h,
@@ -848,6 +919,7 @@ class FormDoc:
             "resizable": self.resizable,
             "widgets": [c.to_dict() for c in self.controls],
         }
+        self._kinder_zu_indizes(d["widgets"])
         if self.theme:
             # Nur schreiben, wenn gesetzt -- sonst bekaeme jede alte Datei beim
             # blossen Oeffnen+Speichern ein neues Feld.
@@ -896,6 +968,7 @@ class FormDoc:
         widgets = d.get("widgets")
         doc.controls = [Control.from_dict(w) for w in widgets] \
             if isinstance(widgets, list) else []
+        FormDoc._kinder_zu_namen(doc.controls)
         return doc
 
     def save(self, path: str) -> None:
@@ -1118,6 +1191,19 @@ class FormDoc:
                 L.extend(block)
                 L.extend(self._gb_text_extras(c, var))
                 L.append("")
+        # Layout-Kinder -- nach den Controls, sie brauchen die Handles.
+        namen = {c.name: i for i, c in enumerate(self.controls)}
+        for idx, c in enumerate(self.controls):
+            if c.kind != "layout" or idx not in vars_:
+                continue
+            for k in (c.extra.get("layout") or {}).get("kinder") or []:
+                if not isinstance(k, (list, tuple)) or not k:
+                    continue
+                g = int(k[1]) if len(k) > 1 and isinstance(k[1], (int, float)) else 0
+                if k[0] is None:
+                    L.append(f"GUI_LAYOUT_SPACER({vars_[idx]}, {max(1, g)})")
+                elif k[0] in namen and namen[k[0]] in vars_:
+                    L.append(f"GUI_LAYOUT_ADD({vars_[idx]}, {vars_[namen[k[0]]]}, {g})")
         # Standard- und Abbrechen-Knopf -- nach den Controls, sie brauchen die Handles.
         for feld, befehl in (("default_button", "GUI_WINDOW_DEFAULT"),
                              ("cancel_button", "GUI_WINDOW_CANCEL")):
@@ -1257,6 +1343,19 @@ class FormDoc:
             f = hex_zu_int(c.extra.get("color_value"))
             if f is not None:
                 out.append(f"GUI_SET_PICKED_COLOR({var}, {_gb_hex(f)})")
+        elif k == "layout":
+            yj0 = c.extra.get("layout")
+            lj: dict = yj0 if isinstance(yj0, dict) else {}
+            art = str(lj.get("art") or "spalte")
+            if art == "raster":
+                art = f"raster:{int(lj.get('spalten') or 2)}"
+            out.append(f"{var} = GUI_LAYOUT(frm, {_gb_str(art)}, {c.x}, {c.y}, {c.w}, {c.h})")
+            for schluessel, standard in (("abstand", 6), ("rand", 0), ("ausrichtung", 0)):
+                wert = lj.get(schluessel, standard)
+                if isinstance(wert, (int, float)) and wert != standard:
+                    out.append(f"GUI_LAYOUT_SET({var}, {_gb_str(schluessel)}, {int(wert)})")
+            if lj.get("dehnen") is False:
+                out.append(f'GUI_LAYOUT_SET({var}, "dehnen", 0)')
         elif k == "datepicker":
             out.append(f"{var} = GUI_DATEPICKER(frm, {c.x}, {c.y}, {c.w}, {c.h})")
             d = c.extra.get("date")
