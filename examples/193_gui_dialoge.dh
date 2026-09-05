@@ -1,0 +1,96 @@
+' ============================================================
+'  gui: Dialoge
+' ============================================================
+'  Drei Dinge, die ein Dialog in einer Anwendung koennen muss -- und die
+'  das gui-Modul bis zum 2026-09-04 nicht konnte:
+'
+'    GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")   eigene Knoepfe;
+'        die Antwort ist die Nummer des Knopfs, Enter = der erste,
+'        ESC = der letzte
+'    GUI_PROMPT(t, x[, vorgabe])   eine Frage mit Eingabefeld;
+'        GUI_DIALOG_TEXT liefert die Antwort, auch nach dem Schliessen
+'    GUI_WINDOW_MODAL(win, an)     ein EIGENES Fenster modal schalten --
+'        fuer alles, was ein Dialog nicht kann (Formulare, Einstellungen)
+'
+'  Alle drei blockieren nicht: die Antwort kommt ueber GUI_ANSWER, ein
+'  Bild lang, wie ein Klick. [ESC] Ende (wenn kein Dialog offen ist)
+' ============================================================
+IMPORT "gui"
+
+SCREEN(620, 400, "Drachenhauch - Dialoge", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Dialoge", 20, 20, 580, 360)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+DIM bFrage AS GUI_WIDGET : bFrage = GUI_BUTTON(win, "Knoepfe ...", 20, 20, 150, 30)
+DIM bName AS GUI_WIDGET : bName = GUI_BUTTON(win, "Name ...", 180, 20, 130, 30)
+DIM bEinst AS GUI_WIDGET : bEinst = GUI_BUTTON(win, "Einstellungen ...", 320, 20, 210, 30)
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "Bereit.", 20, 70)
+GUI_SET_BOUNDS(status, 20, 70, 540, 16)
+DIM name AS STRING : name = "Anonym"
+
+' Ein eigenes Fenster, das modal geschaltet wird: es hat, was ein Dialog
+' nicht hat -- hier ein Kaestchen und einen Schieber.
+DIM einst AS GUI_WINDOW
+einst = GUI_WINDOW("Einstellungen", 160, 110, 300, 190)
+GUI_WINDOW_VISIBLE(einst, FALSE)
+DIM cbTon AS GUI_WIDGET : cbTon = GUI_CHECKBOX(einst, "Ton an", 16, 14, TRUE)
+DIM lLaut AS GUI_WIDGET : lLaut = GUI_LABEL(einst, "Lautstaerke", 16, 48)
+DIM slLaut AS GUI_WIDGET : slLaut = GUI_SLIDER(einst, 16, 70, 268, 0, 100, 70)
+DIM bUebernehmen AS GUI_WIDGET : bUebernehmen = GUI_BUTTON(einst, "Uebernehmen", 60, 116, 110, 28)
+DIM bZu AS GUI_WIDGET : bZu = GUI_BUTTON(einst, "Abbrechen", 178, 116, 106, 28)
+GUI_WINDOW_DEFAULT(einst, bUebernehmen)
+GUI_WINDOW_CANCEL(einst, bZu)
+
+DIM frage AS GUI_WINDOW : frage = -1     ' -1 = gerade keiner offen
+DIM welcher AS INTEGER : welcher = 0     ' 1 = Knoepfe, 2 = Name
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(bFrage) AND frage < 0 THEN
+        frage = GUI_DIALOG("Aenderungen", "Die Datei wurde geaendert." + CHR$(10) + "Was soll geschehen?", _
+                           "Speichern|Verwerfen|Abbrechen")
+        welcher = 1
+    END IF
+    IF GUI_CLICKED(bName) AND frage < 0 THEN
+        frage = GUI_PROMPT("Name", "Wie heisst du?", name)
+        welcher = 2
+    END IF
+    IF GUI_CLICKED(bEinst) AND frage < 0 THEN
+        GUI_WINDOW_VISIBLE(einst, TRUE)
+        GUI_WINDOW_MODAL(einst, TRUE)
+        GUI_FOCUS(cbTon)
+    END IF
+
+    ' Die Antwort gilt ein Bild lang -- hier wird sie sofort verwertet.
+    IF frage >= 0 AND GUI_ANSWER(frage) <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(frage)
+        IF welcher = 1 THEN
+            GUI_SET_TEXT(status, "Knopf " + STR$(a) + ": " + _
+                         IIF(a = 1, "gespeichert", IIF(a = 2, "verworfen", "abgebrochen")))
+        ELSE
+            IF a = 1 THEN name = GUI_DIALOG_TEXT(frage)
+            GUI_SET_TEXT(status, IIF(a = 1, "Hallo, " + name + "!", "Kein Name -- bleibt " + name))
+        END IF
+        frage = -1
+    END IF
+
+    ' Das modale Fenster schliesst sich selbst -- ein Knopf darin ist ein
+    ' Klick, kein Dialog-Ende.
+    IF GUI_CLICKED(bUebernehmen) OR GUI_CLICKED(bZu) THEN
+        IF GUI_CLICKED(bUebernehmen) THEN
+            GUI_SET_TEXT(status, "Ton " + IIF(GUI_CHECKED(cbTon), "an", "aus") + ", Lautstaerke " + _
+                         STR$(INT(GUI_VALUE(slLaut))) + " %")
+        END IF
+        GUI_WINDOW_MODAL(einst, FALSE)
+        GUI_WINDOW_VISIBLE(einst, FALSE)
+    END IF
+
+    GUI_DRAW()
+    IF KEYHIT(KEY_ESCAPE) AND NOT GUI_MODAL() THEN EXIT(0)
+    FLIP()
+WEND

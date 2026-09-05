@@ -5509,18 +5509,34 @@ impl<'p> Vm<'p> {
             // nativen, BLOCKIERENDEN OS-Kaesten (rfd, weiter unten).
             "gui_dialog" => {
                 let (titel, text) = (gs(a, 0, "GUI_DIALOG")?, gs(a, 1, "GUI_DIALOG")?);
-                let stil = if a.len() > 2 { gs(a, 2, "GUI_DIALOG")?.to_lowercase() } else { String::new() };
+                let stil = if a.len() > 2 { gs(a, 2, "GUI_DIALOG")? } else { String::new() };
                 // Dieselben Stil-Woerter wie GUI_CONFIRM -- zwei Vokabulare
-                // fuer dieselbe Wahl waeren eine Stolperfalle.
-                let frage = match stil.as_str() {
-                    "" | "ok" => false,
-                    "janein" | "ja/nein" | "frage" => true,
+                // fuer dieselbe Wahl waeren eine Stolperfalle. Alles mit `|`
+                // ist ein eigener Knopfsatz: "Speichern|Verwerfen|Abbrechen".
+                let knoepfe: Vec<String> = match stil.to_lowercase().as_str() {
+                    "" | "ok" => vec!["OK".into()],
+                    "janein" | "ja/nein" | "frage" => vec!["Ja".into(), "Nein".into()],
+                    _ if stil.contains('|') => stil.split('|').map(|k| k.trim().to_string()).collect(),
                     other => return Err(format!(
-                        "GUI_DIALOG: '{}' ist kein Stil -- moeglich sind \"ok\" (Vorgabe) und \"janein\"", other)),
+                        "GUI_DIALOG: '{}' ist kein Stil -- moeglich sind \"ok\" (Vorgabe), \"janein\" \
+                         oder eigene Knoepfe mit | getrennt (\"Speichern|Verwerfen|Abbrechen\")", other)),
                 };
                 let g = self.gfx.as_ref().ok_or("GUI_DIALOG: vor SCREEN aufgerufen")?;
-                Value::Int(self.gui.dialog(g, titel, text, frage)?)
+                Value::Int(self.gui.dialog_frei(g, titel, text, knoepfe, None)?)
             }
+            "gui_prompt" => {
+                // GUI_PROMPT(titel$, text$[, vorgabe$[, knoepfe$]]) -> GUI_WINDOW
+                let (titel, text) = (gs(a, 0, "GUI_PROMPT")?, gs(a, 1, "GUI_PROMPT")?);
+                let vorgabe = if a.len() > 2 { gs(a, 2, "GUI_PROMPT")? } else { String::new() };
+                let knoepfe: Vec<String> = if a.len() > 3 {
+                    gs(a, 3, "GUI_PROMPT")?.split('|').map(|k| k.trim().to_string()).collect()
+                } else { vec!["OK".into(), "Abbrechen".into()] };
+                let g = self.gfx.as_ref().ok_or("GUI_PROMPT: vor SCREEN aufgerufen")?;
+                Value::Int(self.gui.dialog_frei(g, titel, text, knoepfe, Some(vorgabe))
+                    .map_err(|e| e.replace("GUI_DIALOG", "GUI_PROMPT"))?)
+            }
+            "gui_dialog_text" => Value::str_rc(&self.gui.dialog_text(gi(a, 0, "GUI_DIALOG_TEXT")?)?),
+            "gui_window_modal" => { self.gui.window_modal(gi(a, 0, "GUI_WINDOW_MODAL")?, gbool(a, 1, "GUI_WINDOW_MODAL")?)?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(r))

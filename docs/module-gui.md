@@ -203,9 +203,31 @@ an.
 
 | Funktion | Rückgabe | Zweck |
 |---|---|---|
-| `GUI_DIALOG(titel$, text$[, stil$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`) |
-| `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, `1` = OK/Ja, `2` = Abbrechen/Nein |
-| `GUI_MODAL()` | BOOLEAN | steht gerade ein Dialog? |
+| `GUI_DIALOG(titel$, text$[, stil$])` | GUI_WINDOW | modalen Dialog öffnen (`"ok"` = Vorgabe, `"janein"`, oder **eigene Knöpfe** mit `\|` getrennt: `"Speichern\|Verwerfen\|Abbrechen"`) |
+| `GUI_PROMPT(titel$, text$[, vorgabe$[, knoepfe$]])` | GUI_WINDOW | Frage **mit Eingabefeld** (Vorgabe markiert; ohne `knoepfe$` OK/Abbrechen) |
+| `GUI_ANSWER(dialog)` | INTEGER | `0` = noch offen, sonst die **Nummer des Knopfs** (1-basiert): `1` = OK/Ja, `2` = Abbrechen/Nein |
+| `GUI_DIALOG_TEXT(dialog)` | STRING | was in das Eingabefeld eines `GUI_PROMPT` getippt wurde — auch nach der Antwort |
+| `GUI_MODAL()` | BOOLEAN | steht gerade ein Dialog oder ein modales Fenster? |
+| `GUI_WINDOW_MODAL(win, an)` | — | ein **eigenes** Fenster modal schalten: alles andere liegt hinter dem Schleier und nimmt keine Eingabe an |
+
+**Eigene Knöpfe** (seit 2026-09-04): ein bis fünf Beschriftungen, mit `|`
+getrennt. Die Antwort ist die Nummer des Knopfs. **Enter drückt den ersten,
+ESC und das Schließen-Kreuz den letzten** — die Konvention jedes Systemdialogs,
+Abbrechen steht rechts. Die Knopfbreite folgt der längsten Beschriftung.
+
+**`GUI_PROMPT`** ist derselbe Dialog mit einem Eingabefeld zwischen Text und
+Knöpfen; der Fokus liegt im Feld, die Vorgabe ist markiert (das erste Tippen
+ersetzt sie), Enter ist OK. Den Text holt `GUI_DIALOG_TEXT(dialog)` — auch noch
+in dem Bild, in dem `GUI_ANSWER` antwortet, und danach: der Handle bleibt gültig.
+
+**`GUI_WINDOW_MODAL`** macht aus einem beliebigen eigenen Fenster einen Dialog
+mit allem, was man hineinbaut (Kästchen, Schieber, Listen): Klicks daneben
+werden verschluckt, Menü-Kürzel anderer Fenster schweigen, der Schleier liegt
+über allem anderen. Anders als bei `GUI_DIALOG` **beendet ein Knopf im Fenster
+nichts** — das Programm gibt frei, wenn es so weit ist (`GUI_WINDOW_MODAL(win,
+FALSE)`), und Ausblenden oder Zerstören des Fensters gibt von selbst frei.
+`GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` liefern Enter und ESC dazu.
+Beispiel: [`examples/193_gui_dialoge.dh`](../examples/193_gui_dialoge.dh).
 
 `\n` im Text (`CHR$(10)`) trennt Zeilen; das Fenster passt sich Text und
 Zeilenzahl an und wird auf dem Bildschirm zentriert.
