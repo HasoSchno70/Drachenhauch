@@ -5204,6 +5204,99 @@ impl<'p> Vm<'p> {
             "gui_layout_remove" => { self.gui.layout_remove(gi(a,0,"GUI_LAYOUT_REMOVE")?, gi(a,1,"GUI_LAYOUT_REMOVE")?)?; Value::Nil }
             "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gnum(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
             "gui_autosize" => { let g = self.gfx.as_ref(); self.gui.autosize(g, gi(a,0,"GUI_AUTOSIZE")?)?; Value::Nil }
+            // --- Datenbindung ---
+            "gui_bind" => {
+                let form = if a.len() > 2 { gs(a,2,"GUI_BIND")? } else { String::new() };
+                self.gui.bind(gi(a,0,"GUI_BIND")?, gs(a,1,"GUI_BIND")?, form)?; Value::Nil
+            }
+            "gui_form_get" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_GET")? } else { String::new() };
+                let mut m = GbMap::new("string".to_string());
+                for (k, t) in self.gui.form_get(gi(a,0,"GUI_FORM_GET")?, &form)? { m.put(k, Value::str_rc(&t)); }
+                Value::Map(Rc::new(RefCell::new(m)))
+            }
+            "gui_form_set" => {
+                let form = if a.len() > 2 { gs(a,2,"GUI_FORM_SET")? } else { String::new() };
+                let werte: Vec<(String, Value)> = match a.get(1) {
+                    Some(Value::Map(m)) => m.borrow().entries().iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+                    _ => return Err("GUI_FORM_SET: erwartet eine MAP mit den Werten".into()),
+                };
+                self.gui.form_set(gi(a,0,"GUI_FORM_SET")?, &form, &werte)?; Value::Nil
+            }
+            "gui_form_clear" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CLEAR")? } else { String::new() };
+                self.gui.form_clear(gi(a,0,"GUI_FORM_CLEAR")?, &form)?; Value::Nil
+            }
+            "gui_form_clean" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CLEAN")? } else { String::new() };
+                self.gui.form_clean(gi(a,0,"GUI_FORM_CLEAN")?, &form)?; Value::Nil
+            }
+            "gui_form_changed" => {
+                let form = if a.len() > 1 { gs(a,1,"GUI_FORM_CHANGED")? } else { String::new() };
+                Value::Bool(self.gui.form_changed(gi(a,0,"GUI_FORM_CHANGED")?, &form)?)
+            }
+            // GUI_FORM_LOAD(win, db, tabelle$, id[, formular$]) -> BOOLEAN
+            // GUI_FORM_SAVE(win, db, tabelle$, id[, formular$]) -> id
+            // Die Spalte heisst `id` -- die Konvention von SQLite (rowid-Alias)
+            // und von jedem ORM; wer anders heisst, schreibt sein SQL selbst.
+            "gui_form_load" | "gui_form_save" => {
+                #[cfg(feature = "db")]
+                {
+                    let fn_ = if name == "gui_form_load" { "GUI_FORM_LOAD" } else { "GUI_FORM_SAVE" };
+                    let win = gi(a,0,fn_)?;
+                    let conn_idx = gi(a,1,fn_)?;
+                    let tabelle = gs(a,2,fn_)?;
+                    let id = gi(a,3,fn_)?;
+                    let form = if a.len() > 4 { gs(a,4,fn_)? } else { String::new() };
+                    if tabelle.is_empty() || !tabelle.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                        return Err(format!("{}: '{}' ist kein Tabellenname (Buchstaben, Ziffern, _)", fn_, tabelle));
+                    }
+                    let keys = self.gui.form_keys(win, &form)?;
+                    if keys.is_empty() {
+                        return Err(format!("{}: im Formular '{}' ist kein Widget gebunden (GUI_BIND)", fn_, form));
+                    }
+                    if name == "gui_form_load" {
+                        let sql = format!("SELECT {} FROM {} WHERE id = ?", keys.join(", "), tabelle);
+                        let res = { let c = self.db_conn(conn_idx)?; crate::db::query(c, &sql, &[rusqlite::types::Value::Integer(id)])? };
+                        match res.rows.first() {
+                            None => Value::Bool(false),
+                            Some(row) => {
+                                let werte: Vec<(String, Value)> = keys.iter().cloned().zip(row.iter().map(|z| match z {
+                                    crate::db::DbVal::Null => Value::str_rc(""),
+                                    crate::db::DbVal::Int(n) => Value::Int(*n),
+                                    crate::db::DbVal::Real(f) => Value::Float(*f),
+                                    crate::db::DbVal::Text(t) => Value::str_rc(t),
+                                    crate::db::DbVal::Blob(b) => Value::str_rc(&String::from_utf8_lossy(b)),
+                                })).collect();
+                                self.gui.form_set(win, &form, &werte)?;
+                                Value::Bool(true)
+                            }
+                        }
+                    } else {
+                        let werte = self.gui.form_get_typisiert(win, &form)?;
+                        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+                        for (_, wv) in &werte { params.push(crate::db::gb_to_sql(wv, fn_)?); }
+                        let neue_id = if id < 0 {
+                            let sql = format!("INSERT INTO {} ({}) VALUES ({})", tabelle, keys.join(", "),
+                                              keys.iter().map(|_| "?").collect::<Vec<_>>().join(", "));
+                            let c = self.db_conn(conn_idx)?;
+                            crate::db::exec(c, &sql, &params)?;
+                            c.last_insert_rowid()
+                        } else {
+                            let sql = format!("UPDATE {} SET {} WHERE id = ?", tabelle,
+                                              keys.iter().map(|k| format!("{} = ?", k)).collect::<Vec<_>>().join(", "));
+                            params.push(rusqlite::types::Value::Integer(id));
+                            let c = self.db_conn(conn_idx)?;
+                            crate::db::exec(c, &sql, &params)?;
+                            id
+                        };
+                        self.gui.form_clean(win, &form)?;
+                        Value::Int(neue_id)
+                    }
+                }
+                #[cfg(not(feature = "db"))]
+                { return Err("GUI_FORM_LOAD/SAVE: dieser Bau hat kein db-Modul".into()); }
+            }
             // --- Mindestmasse + Formularpruefung ---
             "gui_set_min_size" => { self.gui.set_min_size(gi(a,0,"GUI_SET_MIN_SIZE")?, gi(a,1,"GUI_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_SET_MIN_SIZE")? as i32)?; Value::Nil }
             "gui_layout_min_w" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0),

@@ -1671,6 +1671,11 @@ class _Inspector(QWidget):
         self.min_w = QSpinBox(); self.min_w.setRange(0, 4000)
         self.min_h = QSpinBox(); self.min_h.setRange(0, 4000)
         self.regeln = QLineEdit()
+        self.bindung = QLineEdit()
+        self.bindung.setPlaceholderText("Spaltenname (GUI_BIND)")
+        self.formular = QLineEdit()
+        self.formular.setPlaceholderText("Formularname (leer = Vorgabe)")
+        self.ta_umbruch = QCheckBox("Zeilenumbruch (Notizen statt Code)")
         self.regeln.setPlaceholderText("pflicht; laenge 2 60; email; bereich 0 100; muster [0-9]{5}")
         self.regeln.setToolTip("Regeln durch ; getrennt: pflicht, zahl, ganz, bereich a b, laenge min max, email, datum, muster regex. "
                                "Eigene Meldung mit = dahinter: pflicht = Der Name fehlt.")
@@ -1771,6 +1776,9 @@ class _Inspector(QWidget):
         self._add("Min-Breite", self.min_w)
         self._add("Min-Hoehe", self.min_h)
         self._add("Regeln", self.regeln)
+        self._add("Bindung", self.bindung)
+        self._add("Formular", self.formular)
+        self._add("", self.ta_umbruch)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1825,6 +1833,9 @@ class _Inspector(QWidget):
         for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht, self.min_w, self.min_h):
             _w.valueChanged.connect(self._apply)
         self.regeln.editingFinished.connect(self._apply)
+        self.bindung.editingFinished.connect(self._apply)
+        self.formular.editingFinished.connect(self._apply)
+        self.ta_umbruch.toggled.connect(self._apply)
         self.datum.editingFinished.connect(self._apply)
         self.orient.currentIndexChanged.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
@@ -2049,6 +2060,9 @@ class _Inspector(QWidget):
         self.min_w.setValue(int(c.extra.get("min_w") or 0))
         self.min_h.setValue(int(c.extra.get("min_h") or 0))
         self.regeln.setText(regeln_text(c.extra.get("rules")))
+        self.bindung.setText(str(c.extra.get("bind") or ""))
+        self.formular.setText(str(c.extra.get("form") or ""))
+        self.ta_umbruch.setChecked(bool(c.extra.get("wrap_text")))
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -2104,6 +2118,11 @@ class _Inspector(QWidget):
         self._show(self.min_w, True)
         self._show(self.min_h, True)
         self._show(self.regeln, c.kind in ("textinput", "textarea", "dropdown", "checkbox", "toggle"))
+        bindbar = c.kind in ("textinput", "textarea", "label", "checkbox", "toggle", "dropdown",
+                             "slider", "spinner", "knob", "datepicker", "colorpicker")
+        self._show(self.bindung, bindbar)
+        self._show(self.formular, bindbar)
+        self._show(self.ta_umbruch, c.kind == "textarea")
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -2165,6 +2184,20 @@ class _Inspector(QWidget):
             yj.setdefault("kinder", [])
             c.extra["layout"] = yj
             self._show(self.ly_spalten, yj["art"] == "raster")
+        b = self.bindung.text().strip()
+        if b:
+            c.extra["bind"] = b
+            if self.formular.text().strip():
+                c.extra["form"] = self.formular.text().strip()
+            else:
+                c.extra.pop("form", None)
+        else:
+            c.extra.pop("bind", None); c.extra.pop("form", None)
+        if c.kind == "textarea":
+            if self.ta_umbruch.isChecked():
+                c.extra["wrap_text"] = True
+            else:
+                c.extra.pop("wrap_text", None)
         for schluessel, feld in (("min_w", self.min_w), ("min_h", self.min_h)):
             if feld.value() > 0:
                 c.extra[schluessel] = feld.value()

@@ -1142,3 +1142,18 @@ def test_regeln_zeile_hin_und_zurueck_und_codegen():
     # Roundtrip durch die Datei: unbekannte Schluessel gehen durch extra.
     d = doc.to_dict()
     assert FormDoc.from_dict(d).controls[0].extra["rules"] == rl
+
+
+# ---------------------------------------------------------------- Bindung + Umbruch
+def test_codegen_bindung_und_umbruch():
+    doc = FormDoc()
+    tf = doc.add("textinput", 10, 10); tf.extra["bind"] = "name"; tf.extra["form"] = "kunde"
+    ta = doc.add("textarea", 10, 50); ta.extra["wrap_text"] = True; ta.extra["bind"] = "notiz"
+    code = doc.generate_gb_code()
+    assert 'GUI_BIND(txt1, "name", "kunde")' in code
+    assert 'GUI_BIND(txt2, "notiz")' in code or 'GUI_BIND(ta1, "notiz")' in code or '"notiz")' in code
+    assert '"umbruch", 1)' in code
+    d = doc.to_dict()
+    w0 = d["widgets"][0]
+    assert w0["bind"] == "name" and w0["form"] == "kunde"
+    assert FormDoc.from_dict(d).controls[1].extra["wrap_text"] is True

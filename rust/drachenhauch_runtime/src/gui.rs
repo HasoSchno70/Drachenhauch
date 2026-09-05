@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use crate::graphics::Graphics;
-use crate::value::Rueckruf;
+use crate::value::{Rueckruf, Value};
 
 const KEY_BACKSPACE: i64 = 8;
 const KEY_TAB: i64 = 9;
@@ -945,6 +945,12 @@ pub struct Widget {
     regeln: Vec<Regel>,
     fehler: String,
     fehler_label: i32,
+    /// TextArea: an Wortgrenzen auf die Breite umbrechen (GUI_TEXTAREA_SET
+    /// "umbruch"); dann gibt es keinen waagerechten Versatz.
+    umbruch: bool,
+    /// Datenbindung (GUI_BIND): Schluessel (= Spaltenname) und Formularname.
+    bind: String,
+    form: String,
     ziehbar: bool,       // Quelle fuer Ziehen (GUI_DRAGGABLE)
     ablage: bool,        // nimmt Abgelegtes an (GUI_DROP_TARGET)
     abgelegt: bool,      // in DIESEM Bild etwas abgelegt bekommen (transient, wie `clicked`)
@@ -1052,6 +1058,9 @@ pub struct Window {
     /// es verlaesst -- nicht bei jedem Anschlag (eine halb getippte Adresse
     /// ist keine falsche).
     pruefung_live: bool,
+    /// Stand der gebundenen Werte beim letzten Setzen/Leeren/Bereinigen:
+    /// (Formular, Schluessel, Text). Daraus antwortet GUI_FORM_CHANGED.
+    form_stand: Vec<(String, String, String)>,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -1439,7 +1448,7 @@ impl Gui {
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true,
-            resizable: false, pruefung_live: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            resizable: false, pruefung_live: false, form_stand: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
@@ -1773,9 +1782,12 @@ impl Gui {
             // bleibt, wie sie ist.
             "tab_fuegt_ein" => wd.tab_fuegt_ein = n != 0,
             "tabbreite" => wd.tabbreite = n.clamp(1, 16),
+            // Umbruch an Wortgrenzen -- fuer Notizen und Briefe, nicht fuer
+            // Code. Mit Umbruch gibt es keinen waagerechten Versatz mehr.
+            "umbruch" | "wrap" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
-                 aktive_zeile, tab_fuegt_ein, tabbreite", other)),
+                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch", other)),
         }
         Ok(())
     }
@@ -1855,6 +1867,7 @@ impl Gui {
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
+            umbruch: false, bind: String::new(), form: String::new(),
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
@@ -4607,6 +4620,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if w.unbestimmt { o["indeterminate"] = serde_json::json!(true); }
         if w.bildmodus != 0 { o["mode"] = serde_json::json!(bildmodus_str(w.bildmodus)); }
         if w.ziehbar { o["draggable"] = serde_json::json!(true); }
+        if w.umbruch { o["wrap_text"] = serde_json::json!(true); }
+        if !w.bind.is_empty() {
+            o["bind"] = serde_json::json!(w.bind);
+            if !w.form.is_empty() { o["form"] = serde_json::json!(w.form); }
+        }
         if w.min_w > 0 || w.min_h > 0 {
             o["min_w"] = serde_json::json!(self.unsk(w.min_w));
             o["min_h"] = serde_json::json!(self.unsk(w.min_h));
@@ -4754,6 +4772,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.unbestimmt = kind == Kind::Progress && wj["indeterminate"].as_bool().unwrap_or(false);
         if let Some(m) = wj["mode"].as_str() { w.bildmodus = bildmodus_parsen(m).unwrap_or(0); }
         w.ziehbar = wj["draggable"].as_bool().unwrap_or(false);
+        w.umbruch = kind == Kind::TextArea && wj["wrap_text"].as_bool().unwrap_or(false);
+        w.bind = wj["bind"].as_str().unwrap_or("").to_string();
+        w.form = wj["form"].as_str().unwrap_or("").to_string();
         w.min_w = wj["min_w"].as_i64().unwrap_or(0).max(0) as i32;
         w.min_h = wj["min_h"].as_i64().unwrap_or(0).max(0) as i32;
         if let Some(rs) = wj["rules"].as_array() {
@@ -6197,6 +6218,63 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
     fn ta_line_h(&self, g: &Graphics) -> i32 { (self.ctext_height(g) + self.sk(5)).max(self.sk(10)) }
 
+    /// Breite, auf die ein Textbereich umbricht (0 = kein Umbruch).
+    fn ta_breite(&self, g: &Graphics, wdg: &Widget, zeilen: usize) -> i32 {
+        if !wdg.umbruch { return 0; }
+        let gutter = self.ta_gutter(g, wdg, zeilen);
+        (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
+    }
+
+    /// Sichtbare Zeilen eines Textbereichs: ohne Umbruch eine je logischer
+    /// Zeile; mit Umbruch an Wortgrenzen auf `breite` gebrochen -- ein Wort,
+    /// das allein nicht passt, wird im Zeichen gebrochen. Jede Zeile als
+    /// (logische Zeile, von, bis) in ZEICHEN, `bis` ohne den Umbruch.
+    ///
+    /// EINE Quelle fuer Zeichnen, Klick, Pfeile, Schreibmarke und Scroll --
+    /// liefe eine davon anders, saesse die Marke neben dem Text.
+    fn ta_rows(&self, g: &Graphics, wdg: &Widget, chars: &[char], starts: &[usize], breite: i32) -> Vec<(usize, usize, usize)> {
+        let mut rows = Vec::new();
+        for (li, &ls) in starts.iter().enumerate() {
+            let le = if li + 1 < starts.len() { starts[li + 1] - 1 } else { chars.len() };
+            if breite <= 0 || le <= ls { rows.push((li, ls, le)); continue; }
+            let mut von = ls;
+            while von < le {
+                let mut bis = von;
+                let mut k = von;
+                // Wort fuer Wort anhaengen, solange es passt; gemessen wird
+                // OHNE die Leerzeichen dahinter, die aber zur Zeile gehoeren.
+                while k < le {
+                    let mut e = k;
+                    while e < le && chars[e] != ' ' { e += 1; }
+                    let wort_ende = e;
+                    while e < le && chars[e] == ' ' { e += 1; }
+                    let stueck: String = chars[von..wort_ende].iter().collect();
+                    if self.wtext_width(g, wdg, &stueck) > breite { break; }
+                    bis = e;
+                    k = e;
+                }
+                if bis == von {
+                    // Kein ganzes Wort passt: zeichenweise, mindestens eins.
+                    bis = von + 1;
+                    while bis < le {
+                        let stueck: String = chars[von..=bis].iter().collect();
+                        if self.wtext_width(g, wdg, &stueck) > breite { break; }
+                        bis += 1;
+                    }
+                }
+                rows.push((li, von, bis));
+                von = bis;
+            }
+        }
+        rows
+    }
+
+    /// Zeile, in der die Schreibmarke steht: die letzte, deren Anfang nicht
+    /// hinter ihr liegt -- am Umbruch gehoert die Marke damit zur NEUEN Zeile.
+    fn ta_row_of(rows: &[(usize, usize, usize)], caret: usize) -> usize {
+        rows.iter().rposition(|&(_, von, _)| von <= caret).unwrap_or(0)
+    }
+
     /// Welcher Ausschnitt ist gerade zu sehen? (GUI_TEXTAREA_VIEW)
     ///
     /// Liefert `(erste_zeile, zeilen, start_zeichen, laenge_zeichen)` -- die
@@ -6223,15 +6301,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // sie auseinander, faerbte das Programm einen anderen Ausschnitt, als
         // zu sehen ist.
         let lh = self.ta_line_h(g);
-        let zeilen = ((wd.h - 2 * 5) / lh).max(1);
-        let erste = wd.scroll.clamp(0, (starts.len() as i32 - 1).max(0));
-        let letzte = (erste + zeilen).min(starts.len() as i32);
-        let von = starts[erste as usize];
-        // Bis zum Ende der letzten sichtbaren Zeile -- also bis zum Anfang der
-        // naechsten, ohne deren Umbruch.
-        let bis = if (letzte as usize) < starts.len() {
-            starts[letzte as usize].saturating_sub(1)
-        } else { chars.len() };
+        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let erste_row = wd.scroll.clamp(0, (rows.len() as i32 - 1).max(0)) as usize;
+        let letzte_row = (erste_row + sicht as usize).min(rows.len());
+        // Nach aussen zaehlen weiter LOGISCHE Zeilen -- ein Programm, das den
+        // Ausschnitt einfaerbt, kennt keine umgebrochenen.
+        let erste = rows[erste_row].0;
+        let letzte = rows[letzte_row - 1].0 + 1;
+        // Ohne Umbruch bleibt `zeilen` die Zahl der sichtbaren PLAETZE (so
+        // war es immer, und Programme rechnen damit); mit Umbruch ist es die
+        // Zahl der logischen Zeilen, die im Ausschnitt liegen.
+        let zeilen = if wd.umbruch { (letzte - erste).max(1) } else { sicht as usize };
+        let von = starts[erste];
+        let bis = if letzte < starts.len() { starts[letzte].saturating_sub(1) } else { chars.len() };
         Ok((erste as i64, zeilen as i64, von as i64, bis.saturating_sub(von) as i64))
     }
 
@@ -6263,9 +6346,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
             let starts = Self::line_starts(&chars);
-            let r = (row as usize).min(starts.len().saturating_sub(1));
-            let lstart = starts[r];
-            let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
+            let wref = &self.windows[wi].widgets[i];
+            let rows = self.ta_rows(g, wref, &chars, &starts, self.ta_breite(g, wref, starts.len()));
+            let r = (row as usize).min(rows.len().saturating_sub(1));
+            let (_, lstart, lend) = rows[r];
             // Dieselbe Rechnung wie beim Zeichnen: hinter der Nummernspalte,
             // um den waagerechten Versatz verschoben. Liefe der Treffertest
             // hier auseinander, landete die Schreibmarke neben dem Klick.
@@ -6353,8 +6437,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let len = chars.len() as i32;
         caret = caret.clamp(0, len); anchor = anchor.clamp(0, len);
         let starts = Self::line_starts(&chars);
-        let row = starts.iter().rposition(|&s| s as i32 <= caret).unwrap_or(0);
-        let col = caret - starts[row] as i32;
+        let rows = {
+            let wref = &self.windows[wi].widgets[i];
+            self.ta_rows(g, wref, &chars, &starts, self.ta_breite(g, wref, starts.len()))
+        };
+        let row = Self::ta_row_of(&rows, caret.max(0) as usize);
+        let col = caret - rows[row].1 as i32;
         if g.key_pressed(KEY_LEFT) {
             let (lo, hi) = (caret.min(anchor), caret.max(anchor));
             if !shift && lo != hi { caret = lo; } else { caret = (caret - 1).max(0); }
@@ -6365,38 +6453,40 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if !shift && lo != hi { caret = hi; } else { caret = (caret + 1).min(len); }
             if !shift { anchor = caret; }
         }
-        if g.key_pressed(KEY_HOME) { caret = starts[row] as i32; if !shift { anchor = caret; } }
-        if g.key_pressed(KEY_END) {
-            caret = if row + 1 < starts.len() { starts[row + 1] as i32 - 1 } else { len };
-            if !shift { anchor = caret; }
-        }
+        // Pos1/Ende und Pfeile bewegen sich in SICHTBAREN Zeilen -- bei
+        // Umbruch also innerhalb der umgebrochenen, wie in jedem Editor.
+        if g.key_pressed(KEY_HOME) { caret = rows[row].1 as i32; if !shift { anchor = caret; } }
+        if g.key_pressed(KEY_END) { caret = rows[row].2 as i32; if !shift { anchor = caret; } }
         if g.key_pressed(KEY_UP) && row > 0 {
-            let ps = starts[row - 1] as i32;
-            let pe = starts[row] as i32 - 1;
-            caret = (ps + col).min(pe);
+            let (_, ps, pe) = rows[row - 1];
+            caret = (ps as i32 + col).min(pe as i32);
             if !shift { anchor = caret; }
         }
-        if g.key_pressed(KEY_DOWN) && row + 1 < starts.len() {
-            let ns = starts[row + 1] as i32;
-            let ne = if row + 2 < starts.len() { starts[row + 2] as i32 - 1 } else { len };
-            caret = (ns + col).min(ne);
+        if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() {
+            let (_, ns, ne) = rows[row + 1];
+            caret = (ns as i32 + col).min(ne as i32);
             if !shift { anchor = caret; }
         }
 
         // Vertikal scrollen, damit die Caret-Zeile sichtbar bleibt.
         let starts2 = Self::line_starts(&chars);
-        let crow = starts2.iter().rposition(|&s| s as i32 <= caret).unwrap_or(0) as i32;
+        let rows2 = {
+            let wref = &self.windows[wi].widgets[i];
+            self.ta_rows(g, wref, &chars, &starts2, self.ta_breite(g, wref, starts2.len()))
+        };
+        let crow = Self::ta_row_of(&rows2, caret.max(0) as usize) as i32;
         let view_lines = ((fh - 2 * pad) / lh).max(1);
         let mut scroll = scroll;
         if crow < scroll { scroll = crow; }
         if crow >= scroll + view_lines { scroll = crow - view_lines + 1; }
-        let max_scroll = (starts2.len() as i32 - view_lines).max(0);
+        let max_scroll = (rows2.len() as i32 - view_lines).max(0);
         scroll = scroll.clamp(0, max_scroll);
 
         // Waagerecht mitziehen, damit die Schreibmarke im Feld bleibt. Ohne
         // das endet eine lange Zeile am Rand und man tippt blind weiter --
-        // in einem Code-Feld der haeufigste Fall ueberhaupt.
-        let zeilen_start = starts2[crow.max(0) as usize];
+        // in einem Code-Feld der haeufigste Fall ueberhaupt. Mit Umbruch
+        // gibt es nichts mitzuziehen.
+        let zeilen_start = rows2[crow.max(0) as usize].1;
         let vorspann: String = chars[zeilen_start..(caret as usize).min(chars.len())].iter().collect();
         let marke_px = self.wtext_width(g, &self.windows[wi].widgets[i], &vorspann);
         let gut = self.ta_gutter(g, &self.windows[wi].widgets[i], starts2.len());
@@ -6405,6 +6495,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if marke_px - sx > sicht - self.sk(8) { sx = marke_px - sicht + self.sk(8); }
         if marke_px - sx < 0 { sx = marke_px; }
         sx = sx.max(0);
+        if self.windows[wi].widgets[i].umbruch { sx = 0; }
 
         let new_text: String = chars.iter().collect();
         let jetzt = g.get_time();
@@ -7134,6 +7225,198 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
         if obenauf { self.draw_top(g); }
+    }
+
+    // ---------------------------------------------------------------- Datenbindung
+    /// GUI_BIND(widget, schluessel$[, formular$]): ein Widget traegt einen
+    /// Schluessel -- den Spaltennamen, unter dem sein Wert gelesen und
+    /// gesetzt wird. Mehrere Formulare in einem Fenster (Reiter!) halten
+    /// sich mit dem Formularnamen auseinander.
+    pub fn bind(&mut self, h: i64, key: String, form: String) -> Result<(), String> {
+        if !key.is_empty() && !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err("GUI_BIND: der Schluessel darf nur Buchstaben, Ziffern und _ enthalten -- er wird ein Spaltenname".into());
+        }
+        let (wi, i) = Self::dec_widget(h);
+        let w = self.wdg_mut(h, "GUI_BIND")?;
+        if !matches!(w.kind, Kind::TextInput | Kind::TextArea | Kind::Label | Kind::Checkbox | Kind::Toggle
+                            | Kind::Dropdown | Kind::Slider | Kind::Spinner | Kind::Knob | Kind::DatePicker | Kind::ColorPicker) {
+            return Err("GUI_BIND: dieses Widget traegt keinen Wert (Textfeld, Kaestchen, Klappliste, Regler, Datum, Farbe)".into());
+        }
+        w.bind = key; w.form = form;
+        // Der Stand beim Binden ist der saubere Stand -- meist leer.
+        self.form_stand_merken(wi, i);
+        Ok(())
+    }
+    /// Die gebundenen Widgets eines Formulars, in Reihenfolge: (Schluessel, Index).
+    fn form_widgets(&self, wi: usize, form: &str) -> Vec<(String, usize)> {
+        self.windows[wi].widgets.iter().enumerate()
+            .filter(|(_, w)| w.alive && !w.bind.is_empty() && w.form == form)
+            .map(|(i, w)| (w.bind.clone(), i)).collect()
+    }
+    /// Wert eines Widgets als Text -- die Form fuer Vergleich und MAP.
+    fn wert_text(&self, w: &Widget) -> String {
+        match w.kind {
+            Kind::Checkbox | Kind::Toggle => if w.checked { "1".into() } else { "0".into() },
+            Kind::Dropdown => w.sel.to_string(),
+            Kind::Slider | Kind::Spinner | Kind::Knob => Self::fmt_num(w.value),
+            Kind::DatePicker => crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]),
+            Kind::ColorPicker => format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])),
+            _ => w.text.clone(),
+        }
+    }
+    /// Wert eines Widgets typisiert -- fuer die Datenbank: ein Zahlenfeld
+    /// liefert eine Zahl, ein Kaestchen ein BOOLEAN, eine Klappliste ihren
+    /// Index, ein Regler eine FLOAT, alles andere Text.
+    fn wert_typisiert(&self, w: &Widget) -> Value {
+        match w.kind {
+            Kind::Checkbox | Kind::Toggle => Value::Bool(w.checked),
+            Kind::Dropdown => Value::Int(w.sel as i64),
+            Kind::Slider | Kind::Knob => Value::Float(w.value),
+            Kind::Spinner => if w.step.fract() == 0.0 && w.value.fract() == 0.0 { Value::Int(w.value as i64) } else { Value::Float(w.value) },
+            // Ein Zahlenfeld liefert eine Zahl -- AUSSER es beginnt mit einer
+            // Null und hat mehr als eine Stelle: das ist eine Postleitzahl
+            // oder eine Nummer, und die verloere als INTEGER ihre Null.
+            Kind::TextInput if w.zahlen > 0 && !(w.text.trim().len() > 1 && w.text.trim().starts_with('0')) => match zahl_lesen(&w.text) {
+                Some(x) if w.zahlen == 1 && x.fract() == 0.0 => Value::Int(x as i64),
+                Some(x) => Value::Float(x),
+                None => Value::str_rc(&w.text),
+            },
+            _ => Value::str_rc(&self.wert_text(w)),
+        }
+    }
+    /// Einen Wert in ein Widget schreiben -- so tolerant, wie eine Datenbank
+    /// oder eine MAP ihn liefern kann (Zahl als Text, "1" als Haken ...).
+    fn wert_setzen(&mut self, wi: usize, i: usize, v: &Value) {
+        let text = match v { Value::Str(s) => s.to_string(), other => other.fmt() };
+        let zahl = match v {
+            Value::Int(n) => Some(*n as f64), Value::Float(f) => Some(*f),
+            Value::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
+            _ => zahl_lesen(&text),
+        };
+        let items = self.windows[wi].widgets[i].items.clone();
+        let w = &mut self.windows[wi].widgets[i];
+        match w.kind {
+            Kind::Checkbox | Kind::Toggle => {
+                w.checked = match v {
+                    Value::Bool(b) => *b,
+                    _ => zahl.map(|x| x != 0.0).unwrap_or_else(|| matches!(text.to_ascii_lowercase().as_str(), "true" | "ja" | "wahr" | "x")),
+                };
+                if w.kind == Kind::Toggle { w.value = if w.checked { 1.0 } else { 0.0 }; }
+            }
+            Kind::Dropdown => {
+                let n = items.len() as i32;
+                w.sel = match v {
+                    Value::Int(k) => (*k as i32).clamp(-1, n - 1),
+                    Value::Float(f) => (*f as i32).clamp(-1, n - 1),
+                    _ => items.iter().position(|it| it.eq_ignore_ascii_case(text.trim())).map(|p| p as i32)
+                            .or_else(|| zahl.map(|x| (x as i32).clamp(-1, n - 1))).unwrap_or(-1),
+                };
+            }
+            Kind::Slider | Kind::Spinner | Kind::Knob => {
+                if let Some(x) = zahl { w.value = x.clamp(w.min, w.max); }
+            }
+            Kind::DatePicker => {
+                if let Some((j, m, d)) = crate::kalender::parse(text.trim()) { w.datum = [j, m, d]; }
+            }
+            Kind::ColorPicker => {
+                let rgb = match v {
+                    Value::Int(n) => Some(*n & 0xFF_FFFF),
+                    _ => i64::from_str_radix(text.trim().trim_start_matches('#'), 16).ok(),
+                };
+                if let Some(rgb) = rgb {
+                    let (h, sa, va) = crate::farbraum::rgb_zu_hsv(rgb);
+                    w.hsv = [h, sa, va];
+                }
+            }
+            _ => {
+                // Textfelder: eine Zahl aus der Datenbank kommt als Text an,
+                // ein Zahlenfeld mit Komma-Stellen zeigt sie deutsch.
+                let t = match v {
+                    Value::Float(f) if w.zahlen == 2 => format!("{:.2}", f).replace('.', ","),
+                    _ => text,
+                };
+                w.text = t;
+                w.caret = 0; w.sel_anchor = 0; w.scroll = 0; w.scroll_x = 0;
+                w.undo.clear(); w.redo.clear();
+            }
+        }
+    }
+    fn form_stand_merken(&mut self, wi: usize, i: usize) {
+        let (form, key, text) = {
+            let w = &self.windows[wi].widgets[i];
+            (w.form.clone(), w.bind.clone(), self.wert_text(w))
+        };
+        let st = &mut self.windows[wi].form_stand;
+        st.retain(|(f, k, _)| !(*f == form && *k == key));
+        st.push((form, key, text));
+    }
+    /// GUI_FORM_GET: alle gebundenen Werte eines Formulars, als Text.
+    pub fn form_get(&self, win: i64, form: &str) -> Result<Vec<(String, String)>, String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_GET: erwartet GUI_WINDOW")?;
+        Ok(self.form_widgets(wi, form).into_iter()
+            .map(|(k, i)| (k, self.wert_text(&self.windows[wi].widgets[i]))).collect())
+    }
+    /// Dasselbe typisiert (fuer die Datenbank).
+    pub fn form_get_typisiert(&self, win: i64, form: &str) -> Result<Vec<(String, Value)>, String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_SAVE: erwartet GUI_WINDOW")?;
+        Ok(self.form_widgets(wi, form).into_iter()
+            .map(|(k, i)| (k, self.wert_typisiert(&self.windows[wi].widgets[i]))).collect())
+    }
+    /// GUI_FORM_SET: Werte nach Schluessel eintragen; was nicht dabei ist,
+    /// bleibt stehen. Danach gilt der Stand als sauber.
+    pub fn form_set(&mut self, win: i64, form: &str, werte: &[(String, Value)]) -> Result<(), String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_SET: erwartet GUI_WINDOW")?;
+        for (k, i) in self.form_widgets(wi, form) {
+            if let Some((_, v)) = werte.iter().find(|(wk, _)| wk.eq_ignore_ascii_case(&k)) {
+                self.wert_setzen(wi, i, v);
+            }
+        }
+        self.form_clean(win, form)
+    }
+    /// GUI_FORM_CLEAR: alle gebundenen Widgets leeren (Text leer, Haken weg,
+    /// Klappliste ohne Auswahl, Regler auf Minimum). Danach sauber.
+    pub fn form_clear(&mut self, win: i64, form: &str) -> Result<(), String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_CLEAR: erwartet GUI_WINDOW")?;
+        for (_, i) in self.form_widgets(wi, form) {
+            let w = &mut self.windows[wi].widgets[i];
+            match w.kind {
+                Kind::Checkbox | Kind::Toggle => { w.checked = false; w.value = 0.0; }
+                Kind::Dropdown => w.sel = -1,
+                Kind::Slider | Kind::Spinner | Kind::Knob => w.value = w.min,
+                Kind::DatePicker | Kind::ColorPicker => {}
+                _ => { w.text.clear(); w.caret = 0; w.sel_anchor = 0; w.scroll = 0; w.scroll_x = 0; w.undo.clear(); w.redo.clear(); }
+            }
+            w.fehler.clear();
+        }
+        self.form_clean(win, form)
+    }
+    /// GUI_FORM_CLEAN: der jetzige Stand gilt als gespeichert.
+    pub fn form_clean(&mut self, win: i64, form: &str) -> Result<(), String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_CLEAN: erwartet GUI_WINDOW")?;
+        for (_, i) in self.form_widgets(wi, form) { self.form_stand_merken(wi, i); }
+        Ok(())
+    }
+    /// GUI_FORM_CHANGED: weicht ein gebundener Wert vom sauberen Stand ab?
+    pub fn form_changed(&self, win: i64, form: &str) -> Result<bool, String> {
+        let wi = win as usize;
+        let w = self.windows.get(wi).ok_or("GUI_FORM_CHANGED: erwartet GUI_WINDOW")?;
+        for (k, i) in self.form_widgets(wi, form) {
+            let jetzt = self.wert_text(&w.widgets[i]);
+            let alt = w.form_stand.iter().find(|(f, kk, _)| f == form && *kk == k).map(|(_, _, t)| t.as_str()).unwrap_or("");
+            if jetzt != alt { return Ok(true); }
+        }
+        Ok(false)
+    }
+    /// Die Schluessel eines Formulars (fuer SELECT/INSERT/UPDATE in der VM).
+    pub fn form_keys(&self, win: i64, form: &str) -> Result<Vec<String>, String> {
+        let wi = win as usize;
+        self.windows.get(wi).ok_or("GUI_FORM_LOAD: erwartet GUI_WINDOW")?;
+        Ok(self.form_widgets(wi, form).into_iter().map(|(k, _)| k).collect())
     }
 
     // ---------------------------------------------------------------- Formularpruefung
@@ -8154,15 +8437,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 } else {
                     let chars: Vec<char> = wdg.text.chars().collect();
                     let starts = Self::line_starts(&chars);
-                    let lines: Vec<&str> = wdg.text.split('\n').collect();
                     let view_lines = ((h - 2 * pad) / lh).max(1);
                     // Linke Kante des TEXTES: hinter der Nummernspalte und um
                     // den waagerechten Versatz nach links geschoben. Alles,
                     // was eine Spalte verortet, geht durch diese eine Zahl.
                     let gutter = self.ta_gutter(g, wdg, starts.len());
+                    let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
                     let tx0 = ax + pad + gutter - wdg.scroll_x;
                     if wdg.aktive_zeile {
-                        let crow = starts.iter().rposition(|&s| s as i32 <= wdg.caret).unwrap_or(0) as i32;
+                        let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize) as i32;
                         let r = crow - scroll;
                         if r >= 0 && r < view_lines {
                             let y = ay + pad + r * lh;
@@ -8178,12 +8461,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if focused && lo != hi {
                         let selbg = self.selection_bg(wdg);
                         for r in 0..view_lines {
-                            let li = scroll + r;
-                            if li < 0 || li as usize >= starts.len() { continue; }
-                            let lstart = starts[li as usize] as i32;
-                            let lend = if (li as usize) + 1 < starts.len() {
-                                starts[li as usize + 1] as i32 - 1
-                            } else { chars.len() as i32 };
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (_, rs, re) = rows[ri as usize];
+                            let (lstart, lend) = (rs as i32, re as i32);
                             let a = lo.max(lstart);
                             let b = hi.min(lend);
                             if b < a || (a == b && hi <= lend) { continue; }
@@ -8195,15 +8476,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         }
                     }
                     for r in 0..view_lines {
-                        let li = scroll + r;
-                        if li < 0 || li as usize >= lines.len() { continue; }
+                        let ri = scroll + r;
+                        if ri < 0 || ri as usize >= rows.len() { continue; }
+                        let (_, rs, re) = rows[ri as usize];
                         let y = ay + pad + r * lh;
-                        let zeile = lines[li as usize];
+                        let zeile: String = chars[rs..re].iter().collect();
                         if wdg.spans.is_empty() {
-                            self.wtext(g, wdg, tx0, y, zeile.to_string(), fg);
+                            self.wtext(g, wdg, tx0, y, zeile, fg);
                         } else {
-                            self.zeile_bunt(g, wdg, tx0, y, zeile,
-                                            starts[li as usize], fg);
+                            self.zeile_bunt(g, wdg, tx0, y, &zeile, rs, fg);
                         }
                     }
                     g.pop_clip();
@@ -8214,8 +8495,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         g.box_fill(ax + 2, ay + 2, ax + pad + gutter - self.sk(5), ay + h - 3,
                                    self.wcol(wdg, "bg", "win_bg"));
                         for r in 0..view_lines {
-                            let li = scroll + r;
-                            if li < 0 || li as usize >= lines.len() { continue; }
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (li, rs, _) = rows[ri as usize];
+                            // Eine umgebrochene Fortsetzung traegt keine Nummer.
+                            if rs != starts[li] { continue; }
                             let nr = (li + 1).to_string();
                             let nx = ax + pad + gutter - self.sk(9) - self.wtext_width(g, wdg, &nr);
                             self.wtext(g, wdg, nx, ay + pad + r * lh, nr, self.th("muted_fg"));
@@ -8227,8 +8511,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if focused && self.caret_blink_on() {
                     let chars: Vec<char> = wdg.text.chars().collect();
                     let starts = Self::line_starts(&chars);
-                    let crow = starts.iter().rposition(|&s| s as i32 <= wdg.caret).unwrap_or(0);
-                    let lstart = starts[crow];
+                    let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
+                    let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize);
+                    let lstart = rows[crow].1;
                     let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
                     let prefix: String = chars[lstart..cend].iter().collect();
                     let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x

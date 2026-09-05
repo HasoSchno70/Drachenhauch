@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1691,
+ "count": 1699,
  "builtins": [
   {
    "name": "ABS",
@@ -2853,6 +2853,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_BIND",
+   "kind": "core",
+   "signature": "GUI_BIND(widget, schluessel$[, formular$])",
+   "module": "gui"
+  },
+  {
    "name": "GUI_BUTTON",
    "kind": "core",
    "signature": "GUI_BUTTON(win, text, x, y, w, h)",
@@ -3114,6 +3120,48 @@
    "name": "GUI_FOCUSED",
    "kind": "core",
    "signature": "GUI_FOCUSED()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_CHANGED",
+   "kind": "core",
+   "signature": "GUI_FORM_CHANGED(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_CLEAN",
+   "kind": "core",
+   "signature": "GUI_FORM_CLEAN(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_CLEAR",
+   "kind": "core",
+   "signature": "GUI_FORM_CLEAR(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_GET",
+   "kind": "core",
+   "signature": "GUI_FORM_GET(win[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_LOAD",
+   "kind": "core",
+   "signature": "GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_SAVE",
+   "kind": "core",
+   "signature": "GUI_FORM_SAVE(win, db, tabelle$, id[, formular$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FORM_SET",
+   "kind": "core",
+   "signature": "GUI_FORM_SET(win, werte[, formular$])",
    "module": "gui"
   },
   {
