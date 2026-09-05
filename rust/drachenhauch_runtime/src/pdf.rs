@@ -265,18 +265,42 @@ impl Dokument {
     }
 }
 
-/// Breite eines Textes in Millimetern -- nur bei dicktengleicher Schrift.
+/// Breite eines Textes in Millimetern.
 ///
-/// **Warum nicht bei allen:** die Breite jedes Zeichens von Helvetica und
-/// Times steht in Adobes Schriftmassen. Die liegen hier nicht vor, und sie
-/// aus dem Gedaechtnis hinzuschreiben waere die Art Zahl, die auf den ersten
-/// Blick stimmt und eine Rechnungsspalte still um zwei Millimeter verschiebt.
 /// Bei Courier ist jedes Zeichen 600/1000 der Schriftgroesse breit -- das ist
-/// keine Schaetzung, sondern die Bauart der Schrift.
-pub fn zeichenbreite(schrift: usize, groesse_pt: f64, text: &str) -> Option<f64> {
-    let (_, _, fest) = SCHRIFTEN.get(schrift)?;
-    if !fest { return None; }
-    Some(text.chars().count() as f64 * groesse_pt * 0.6 / MM)
+/// die Bauart der Schrift. Fuer Helvetica und Times (je vier Schnitte) liegen
+/// die Schriftmasse in `pdf_masse.rs`: **nicht aus dem Gedaechtnis**, sondern
+/// von `tools/gen_pdf_masse.py` aus PyMuPDFs Base-14-Metriken erzeugt und in
+/// `tests/test_pdf.py` gegen PyMuPDF nachgemessen. Lange stand hier, eine
+/// geschaetzte Breite sei schlimmer als keine -- das galt, solange es nur
+/// die Schaetzung gab. Ohne die Masse liess sich in einer Rechnung kein
+/// Betrag rechtsbuendig setzen (sechster Pilot, 2026-09-05).
+///
+/// Symbol und ZapfDingbats bleiben ohne Mass, ebenso ein Zeichen, das die
+/// Schrift nicht hat -- beides ein Fehler, keine Schaetzung.
+pub fn zeichenbreite(schrift: usize, groesse_pt: f64, text: &str) -> Result<f64, String> {
+    use crate::pdf_masse::*;
+    let (name, _, fest) = SCHRIFTEN.get(schrift).ok_or("PDF_TEXT_WIDTH: unbekannte Schrift")?;
+    if *fest { return Ok(text.chars().count() as f64 * groesse_pt * 0.6 / MM); }
+    let tabelle: &[u16; 224] = match schrift {
+        0 => &BREITEN_HELVETICA, 1 => &BREITEN_HELVETICA_FETT,
+        2 => &BREITEN_HELVETICA_KURSIV, 3 => &BREITEN_HELVETICA_FETT_KURSIV,
+        4 => &BREITEN_TIMES, 5 => &BREITEN_TIMES_FETT,
+        6 => &BREITEN_TIMES_KURSIV, 7 => &BREITEN_TIMES_FETT_KURSIV,
+        _ => return Err(format!("PDF_TEXT_WIDTH: fuer '{}' liegen keine Schriftmasse vor \
+                                 (Helvetica, Times und Courier lassen sich messen)", name)),
+    };
+    let bytes = crate::kodierung::kodieren(text, crate::kodierung::Kodierung::Cp1252, "PDF_TEXT_WIDTH")?;
+    let mut summe: u64 = 0;
+    for b in bytes {
+        if b < 32 { continue; }
+        let w = tabelle[(b - 32) as usize];
+        if w == 0 {
+            return Err(format!("PDF_TEXT_WIDTH: '{}' hat kein Mass fuer das Zeichen '{}'", name, b as char));
+        }
+        summe += w as u64;
+    }
+    Ok(summe as f64 * groesse_pt / 1000.0 / MM)
 }
 
 pub fn ist_fest(schrift: usize) -> bool {
@@ -330,14 +354,20 @@ mod tests {
     }
 
     #[test]
-    fn nur_feste_schriften_lassen_sich_messen() {
+    fn schriften_lassen_sich_messen() {
         // Courier: jedes Zeichen 600/1000 der Groesse -- das ist die Bauart
         // der Schrift, keine Schaetzung.
         let b = zeichenbreite(8, 12.0, "abcd").unwrap();
         assert!((b - 4.0 * 12.0 * 0.6 / MM).abs() < 1e-9);
-        // Helvetica: keine Schriftmasse da, also keine Antwort statt einer
-        // erfundenen.
-        assert_eq!(zeichenbreite(0, 12.0, "abcd"), None);
+        // Helvetica aus den erzeugten Massen: a 556, b 556, c 500, d 556.
+        let h = zeichenbreite(0, 12.0, "abcd").unwrap();
+        assert!((h - 2168.0 * 12.0 / 1000.0 / MM).abs() < 1e-9, "{}", h);
+        // Fett ist breiter als normal, Times schmaler als Helvetica.
+        assert!(zeichenbreite(1, 12.0, "Rechnung").unwrap() > h * 0.5);
+        assert!(zeichenbreite(4, 12.0, "abcd").unwrap() < h);
+        // Ein Euro-Zeichen hat ein Mass, Symbol hat keines.
+        assert!(zeichenbreite(0, 12.0, "1,00 \u{20AC}").is_ok());
+        assert!(zeichenbreite(12, 12.0, "abcd").is_err());
     }
 
     #[test]

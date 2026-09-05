@@ -57,30 +57,33 @@ Jeder PDF-Leser bringt sie mit — **es wird nichts eingebettet**. Genau daran
 hängt der Aufwand eines PDF-Erzeugers: eine TrueType-Datei einzubetten hieße
 Tabellen parsen, Untermengen bilden und einen CID-Font aufbauen.
 
-Das hat einen Preis, und der steht hier offen:
+Das hat einen Preis, und der steht hier offen: **Symbol und ZapfDingbats
+lassen sich nicht messen**, und ein Zeichen außerhalb von WinAnsi auch
+nicht — `PDF_TEXT_WIDTH` meldet das, statt zu raten.
 
-**`PDF_TEXT_WIDTH` geht nur bei Courier** (und seinen Schnitten). Dort ist
-jedes Zeichen 600/1000 der Schriftgröße breit — das ist die Bauart der
-Schrift, keine Schätzung. Für Helvetica und Times steht die Breite jedes
-Zeichens in Adobes Schriftmaßen; die liegen hier nicht vor, und sie zu
-schätzen wäre die Art Zahl, die auf den ersten Blick stimmt und eine
-Rechnungsspalte still um zwei Millimeter verschiebt. Der Aufruf meldet das,
-statt zu raten.
+**`PDF_TEXT_WIDTH` kennt Helvetica, Times und Courier** (je alle vier
+Schnitte). Bei Courier ist jedes Zeichen 600/1000 der Schriftgröße breit —
+die Bauart der Schrift. Für Helvetica und Times liegen die Schriftmaße in
+`pdf_masse.rs`: nicht aus dem Gedächtnis, sondern von
+`tools/gen_pdf_masse.py` aus den Base-14-Metriken von PyMuPDF erzeugt und im
+Test gegen PyMuPDF nachgemessen (lange stand hier, eine geschätzte Breite sei
+schlimmer als keine — das galt, solange es nur die Schätzung gab; ohne die
+Maße ließ sich in einer Rechnung kein Betrag rechtsbündig setzen).
 
-**Praktische Folge:** Beschriftungen in Helvetica, **Zahlenspalten in
-Courier** — dann lassen sie sich exakt rechtsbündig setzen:
+**Praktische Folge:** Beträge lassen sich in jeder der zwölf Schriften exakt
+rechtsbündig setzen:
 
 ```basic
 SUB Rechtsbuendig(p AS PDF, x AS FLOAT, y AS FLOAT, text AS STRING)
     PDF_TEXT(p, x - PDF_TEXT_WIDTH(p, text), y, text)
 END SUB
 
-PDF_FONT(p, "courier", 10)
-Rechtsbuendig(p, 188, 120, FORMAT$(betrag, "%.2f"))
+PDF_FONT(p, "helvetica", 10)
+Rechtsbuendig(p, 190, 120, "1.234,56 EUR")
 ```
 
-Nebenbei sieht eine Zahlenspalte in einer dicktengleichen Schrift ohnehin
-besser aus: die Stellen stehen untereinander.
+Eine Zahlenspalte in Courier sieht trotzdem oft besser aus: die Stellen
+stehen untereinander.
 
 ## Umlaute
 

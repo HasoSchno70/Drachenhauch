@@ -1695,6 +1695,10 @@ Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
   END IF
   ```
 
+- **Kästchen, Radio und Kippschalter** reichen seit 2026-09-05 über ihre
+  Beschriftung: ein Klick auf den Text trifft, und ein Layout-Behälter
+  reserviert den ganzen Platz. Das Kästchen selbst behält die Größe der
+  Metrik `check_size`, wie breit das Rechteck auch ist.
 - **Cursorformen** kommen von selbst: I-Balken über Textfeldern, Hand über
   Knopf, Kästchen, Radio und Kippschalter (und während eines Zugs),
   Doppelpfeil an Trennern und am Fenstergriff. Die gui setzt die Form nur bei

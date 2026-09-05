@@ -3545,15 +3545,8 @@ impl<'p> Vm<'p> {
                 let d = self.pdf_d(i)?;
                 let (schrift, groesse) = (d.schrift_index(), d.groesse_pt);
                 match pdf::zeichenbreite(schrift, groesse, &t) {
-                    Some(b) => Value::Float(b),
-                    // Lieber keine Antwort als eine erfundene: fuer Helvetica
-                    // und Times liegen die Schriftmasse nicht vor, und eine
-                    // geschaetzte Breite verschiebt eine Rechnungsspalte
-                    // still um zwei Millimeter.
-                    None => return Err(
-                        "PDF_TEXT_WIDTH: geht nur bei einer dicktengleichen Schrift (courier...). \
-                         Fuer Helvetica und Times liegen die Schriftmasse nicht vor -- eine \
-                         geschaetzte Breite waere schlimmer als keine.".to_string()),
+                    Ok(b) => Value::Float(b),
+                    Err(e) => return Err(e),
                 }
             }
             "pdf_line" => {
