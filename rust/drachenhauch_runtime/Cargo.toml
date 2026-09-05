@@ -110,6 +110,12 @@ rfd = { version = "0.14", optional = true }
 #
 # Deshalb hier die letzte Version festgehalten, mit der er uebersetzt. Betrifft
 # NUR den emscripten-Build -- auf dem Desktop ist wasm-bindgen gar nicht dabei.
+# Drucken (PDF_PRINT) und OPENDOC unter Windows: GDI, winspool, ShellExecute.
+# Das Crate liegt ueber andere Abhaengigkeiten ohnehin im Baum; hier nur die
+# Features, die die Druckseite braucht. Unter macOS/Linux druckt CUPS (`lp`).
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+
 [target.'cfg(target_os = "emscripten")'.dependencies]
 wasm-bindgen = "=0.2.100"
 # Im Browser WebGL 2 statt WebGL 1 verlangen. Der Grund ist die Shader-Sprache:

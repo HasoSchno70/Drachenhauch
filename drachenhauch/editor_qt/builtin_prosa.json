@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1662,
+ "count": 1665,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1038,6 +1038,7 @@
   "NOISE3": "Rauschwert im Raum — Höhlen, oder Fläche plus Zeit als dritte Achse",
   "NUMFMT$": "grosse Zahlen kurz schreiben (1.2K, 3.4M) — für Punktestände und Idle-Spiele",
   "OCT$": "INTEGER als Binär-/Oktalstring (mit Vorzeichen)",
+  "OPENDOC": "Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in der Tabellenkalkulation.",
   "OPENFILE": "Modi: \"r\" lesen, \"w\" neu schreiben, \"a\" anhängen",
   "OPENURL": "Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels.",
   "PADL$": "Auffüllen links/rechts",
@@ -1071,6 +1072,8 @@
   "PDF_PAGE_COUNT": "wie viele bisher",
   "PDF_PAGE_HEIGHT": "Seitenmaß in mm",
   "PDF_PAGE_WIDTH": "Seitenmaß in mm",
+  "PDF_PREVIEW": "die Seite als Bild, für eine Vorschau im Fenster",
+  "PDF_PRINT": "drucken — Windows über GDI, macOS/Linux über CUPS; siehe Drucken",
   "PDF_RECT": "Umriss / Fläche",
   "PDF_RECT_FILL": "Umriss / Fläche",
   "PDF_SAVE": "schreiben",

@@ -39,6 +39,8 @@ PDF_SAVE(p, "rechnung.pdf")
 | `PDF_LINE(p, x1, y1, x2, y2)` | Linie zeichnen |
 | `PDF_RECT(p, x, y, b, h)` / `PDF_RECT_FILL(…)` | Umriss / Fläche |
 | `PDF_SAVE(p, pfad$)` | schreiben |
+| `PDF_PRINT(p[, drucker$[, kopien[, zieldatei$]]])` | **drucken** — Windows über GDI, macOS/Linux über CUPS; siehe [Drucken](#drucken-und-vorschau) |
+| `PDF_PREVIEW(p, seite[, breite_px])` → IMAGE | die Seite als Bild, für eine Vorschau im Fenster |
 | `PDF_CLOSE(p)` | Speicher freigeben |
 
 Schrift, Größe, Farbe und Strichstärke sind Einstellungen des **Dokuments**,
@@ -84,6 +86,51 @@ Rechtsbuendig(p, 190, 120, "1.234,56 EUR")
 
 Eine Zahlenspalte in Courier sieht trotzdem oft besser aus: die Stellen
 stehen untereinander.
+
+## Drucken und Vorschau
+
+Das Modul zeichnet seine Seiten selbst — und zeichnet sie seit 2026-09-05
+auch **auf**. Dieselbe Seite geht damit auf drei Ziele: die Datei
+(`PDF_SAVE`), den Drucker (`PDF_PRINT`) und ein Bild (`PDF_PREVIEW`). Es gibt
+keinen PDF-Renderer dahinter; der Renderer ist das Betriebssystem
+([Entwurf](entwurf-drucken.md)).
+
+```basic
+PDF_PRINT(p)                                   ' Standarddrucker, eine Kopie
+PDF_PRINT(p, "Brother MFC-L3760CDW series", 2) ' Drucker und Kopien
+PDF_PRINT(p, "Microsoft Print to PDF", 1, "ausgabe.pdf")   ' in eine Datei, ohne Dialog
+DIM bild AS IMAGE : bild = PDF_PREVIEW(p, 1, 600)          ' Seite 1, 600 px breit
+PRINT PRINTER_DEFAULT$() : PRINT PRINTERS()                ' für einen eigenen Dialog
+```
+
+- **Windows:** GDI auf den Drucker — der Treiber rastert. Die Standard-
+  schriften werden zu ihren Windows-Geschwistern (Helvetica → Arial, Times →
+  Times New Roman, Courier → Courier New); die Lage jedes Textes bleibt, weil
+  das Programm Positionen setzt — rechtsbündige Beträge bleiben rechtsbündig,
+  die Buchstaben sind nur nicht Helvetica. Millimeter gelten ab Papierkante;
+  den nicht druckbaren Rand rechnet das Modul heraus.
+- **macOS/Linux:** die PDF geht an CUPS (`lp -d drucker -n kopien`), das
+  PDF versteht. Eine `zieldatei` ist dort die PDF selbst.
+- **`zieldatei`** ist für Drucker gedacht, die in eine Datei schreiben —
+  „Microsoft Print to PDF" fragt dann **nicht** nach. Genau so prüft
+  `tests/test_drucken.py` den Druck: durch einen echten Treiber, zurück-
+  gelesen mit PyMuPDF. Gemessen: zwei Seiten in ~0,9 s.
+- `PRINTERS()` liefert die Namen, wie das System sie kennt, `PRINTER_DEFAULT$()`
+  den Standarddrucker (`""`, wenn es keinen gibt). Eine Falle unter Windows: die
+  Einstellung „Standarddrucker von Windows verwalten lassen“ macht den
+  **zuletzt benutzten** Drucker zum Standard — nach einem Druck auf „Microsoft
+  Print to PDF“ ist das dann der Standard. Wer einen bestimmten Drucker will,
+  nennt ihn. Fehlt der Drucker oder
+  nimmt er den Auftrag nicht an, ist das ein Fehler mit Namen, kein stilles
+  Nichts.
+- `PDF_PREVIEW` zeichnet in raylibs Standardschrift auf weißes Papier:
+  eine Vorschau, kein Belichter. Höhe nach Seitenverhältnis; braucht ein
+  Fenster, weil es ein `IMAGE` ist.
+
+Bewusst nicht: fremde PDFs drucken (das Modul druckt, was es gesetzt hat)
+und ein nachgebauter Druckdialog — `PRINTERS()` plus eine Klappliste im
+eigenen Fenster tut es, einheitlich und testbar. Duplex und Papierfach
+fehlen; nachrüstbar als Treiberfelder.
 
 ## Umlaute
 

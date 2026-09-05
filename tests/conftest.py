@@ -211,6 +211,7 @@ _BRAUCHT_GRAFIK = {
     "test_gui_layout.py",
     "test_gui_pruefung.py",
     "test_gui_umbruch.py",
+    "test_drucken.py",
     "test_fenster_prozess.py",
     "test_gui_bindung.py",
     "test_gui_dialoge_ausbau.py",

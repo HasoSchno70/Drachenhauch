@@ -18,6 +18,10 @@
 '      Artikel rechnet Preis (Cent) und MwSt um und bleibt darum von Hand,
 '      nutzt die Bindung aber fuer die Aenderungserkennung
 '    * Notiz je Kunde in einem Textbereich mit Zeilenumbruch
+'    * Drucken (Strg+D): ein Druckdialog aus Bordmitteln -- Klappliste der
+'      Drucker (PRINTERS), Kopien, Vorschau (PDF_PREVIEW) -- und PDF_PRINT
+'      schickt dieselbe Seite durch den Druckertreiber; OPENDOC oeffnet die
+'      zuletzt geschriebene PDF im Betrachter
 '    * eine Rechnung in einem EIGENEN OS-Fenster (Strg+F): ein zweiter dhrt
 '      mit 196_rechnung_fenster.dh, verbunden ueber WINDOW_OPEN/SEND/RECV$;
 '      beide arbeiten auf derselben Datenbank, geteilt wird nur Text
@@ -37,6 +41,7 @@
 IMPORT "gui"
 IMPORT "db"
 IMPORT "pdf"
+IMPORT "imgfx"
 
 SCREEN(1120, 680, "Drachenhauch - Rechnungen", 1)
 SETFPS(60)
@@ -165,6 +170,8 @@ DIM miNeuR AS INTEGER : miNeuR = GUI_MENU_ITEM(mDatei, "Neue Rechnung", "Strg+R"
 GUI_MENU_SEPARATOR(mDatei)
 DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Rechnung als PDF ...", "Strg+P")
 DIM miFenster AS INTEGER : miFenster = GUI_MENU_ITEM(mDatei, "Rechnung in eigenem Fenster", "Strg+F")
+DIM miDruck AS INTEGER : miDruck = GUI_MENU_ITEM(mDatei, "Rechnung drucken ...", "Strg+D")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Letzte PDF oeffnen")
 DIM miCsv AS INTEGER : miCsv = GUI_MENU_ITEM(mDatei, "Alle Rechnungen als CSV", "Strg+E")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miEinst AS INTEGER : miEinst = GUI_MENU_ITEM(mDatei, "Einstellungen ...")
@@ -719,14 +726,20 @@ FUNCTION rechnungSpeichern() AS BOOLEAN
 END FUNCTION
 
 ' ============================================================ PDF und CSV
-FUNCTION pdfSchreiben(rid AS INTEGER) AS STRING
+' Die Rechnung als PDF-Dokument SETZEN -- Datei, Drucker und Vorschau sind
+' drei Ziele derselben Seite (PDF_SAVE, PDF_PRINT, PDF_PREVIEW).
+DIM pdfNummer AS STRING : pdfNummer = ""
+DIM letztePdf AS STRING : letztePdf = ""
+
+FUNCTION pdfBauen(rid AS INTEGER) AS PDF
     DIM r AS DB_RESULT
     r = DB_QUERY(db, "SELECT r.nummer, r.datum, r.bezahlt, k.name, k.strasse, k.plz, k.ort FROM rechnungen r JOIN kunden k ON k.id = r.kunde_id WHERE r.id = ?", rid)
     IF NOT DB_NEXT(r) THEN
         DB_CLOSE_RESULT(r)
-        RETURN ""
+        THROW "Rechnung #" + STR$(rid) + " gibt es nicht."
     END IF
     DIM nummer AS STRING : nummer = DB_GET_STRING(r, 0)
+    pdfNummer = nummer
     DIM datum AS STRING : datum = DB_GET_STRING(r, 1)
     DIM bezahlt AS BOOLEAN : bezahlt = DB_GET_INT(r, 2) = 1
     DIM kName AS STRING : kName = DB_GET_STRING(r, 3)
@@ -797,9 +810,15 @@ FUNCTION pdfSchreiben(rid AS INTEGER) AS STRING
         y = y + 6
     END IF
     PDF_TEXT(p, 20, y, einst$("fuss", ""))
-    DIM pfad AS STRING : pfad = "rechnung_" + nummer + ".pdf"
+    RETURN p
+END FUNCTION
+
+FUNCTION pdfSchreiben(rid AS INTEGER) AS STRING
+    DIM p AS PDF : p = pdfBauen(rid)
+    DIM pfad AS STRING : pfad = "rechnung_" + pdfNummer + ".pdf"
     PDF_SAVE(p, pfad)
     PDF_CLOSE(p)
+    letztePdf = pfad
     RETURN pfad
 END FUNCTION
 
@@ -855,6 +874,66 @@ GUI_TEXTINPUT_SET(eFeld[5], "zahlen", 1) : GUI_TEXTINPUT_SET(eFeld[6], "zahlen",
 DIM bEOk AS GUI_WIDGET : bEOk = GUI_BUTTON(einst, "Uebernehmen", 220, 266, 100, 28)
 DIM bEAbbruch AS GUI_WIDGET : bEAbbruch = GUI_BUTTON(einst, "Abbrechen", 328, 266, 80, 28)
 GUI_WINDOW_DEFAULT(einst, bEOk) : GUI_WINDOW_CANCEL(einst, bEAbbruch)
+
+' ============================================================ Drucken (eigener Dialog aus Bordmitteln)
+' Klappliste der Drucker, Kopien, Vorschau der ersten Seite -- kein nativer
+' Druckdialog, sondern dieselben Widgets wie ueberall; damit ist er testbar.
+DIM druck AS GUI_WINDOW
+druck = GUI_WINDOW("Drucken", 260, 80, 600, 470)
+GUI_WINDOW_VISIBLE(druck, FALSE)
+DIM lDDrucker AS GUI_WIDGET : lDDrucker = GUI_LABEL(druck, "Drucker", 16, 12)
+DIM ddDrucker AS GUI_WIDGET : ddDrucker = GUI_DROPDOWN(druck, 16, 32, 300, 28, [])
+DIM lDKopien AS GUI_WIDGET : lDKopien = GUI_LABEL(druck, "Kopien", 330, 12)
+DIM tfDKopien AS GUI_WIDGET : tfDKopien = GUI_TEXTINPUT(druck, 330, 32, 60, 28, "1")
+GUI_TEXTINPUT_SET(tfDKopien, "zahlen", 1) : GUI_SET_TEXT(tfDKopien, "1")
+GUI_RULE(tfDKopien, "pflicht", "Wie viele?") : GUI_RULE(tfDKopien, "bereich", 1, 99)
+DIM bDDrucken AS GUI_WIDGET : bDDrucken = GUI_BUTTON(druck, "Drucken", 404, 32, 90, 28)
+DIM bDAbbruch AS GUI_WIDGET : bDAbbruch = GUI_BUTTON(druck, "Abbrechen", 500, 32, 84, 28)
+GUI_WINDOW_DEFAULT(druck, bDDrucken) : GUI_WINDOW_CANCEL(druck, bDAbbruch)
+DIM imgDVorschau AS GUI_WIDGET : imgDVorschau = GUI_IMAGE(druck, 16, 72, 568, 380, -1)
+GUI_IMAGE_MODE(imgDVorschau, "einpassen")
+DIM druckPdf AS PDF : druckPdf = -1
+DIM druckVorschau AS IMAGE : druckVorschau = -1
+
+SUB druckenOeffnen()
+    IF druckVorschau >= 0 THEN IMAGE_FREE(druckVorschau)
+    druckPdf = pdfBauen(rechIdAkt)
+    druckVorschau = PDF_PREVIEW(druckPdf, 1, 540)
+    GUI_SET_IMAGE(imgDVorschau, druckVorschau)
+    DIM namen AS ARRAY OF STRING : namen = PRINTERS()
+    GUI_SET_DROPDOWN(ddDrucker, namen)
+    DIM std AS STRING : std = PRINTER_DEFAULT$()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(namen) - 1
+        IF namen[i] = std THEN GUI_DROPDOWN_SET_SELECTED(ddDrucker, i)
+    NEXT
+    GUI_WINDOW_SET_BOUNDS(druck, (SCREENWIDTH() - 600) \ 2, (SCREENHEIGHT() - 470) \ 2, 600, 470)
+    GUI_WINDOW_VISIBLE(druck, TRUE)
+    GUI_WINDOW_MODAL(druck, TRUE)
+    GUI_FOCUS(ddDrucker)
+END SUB
+
+SUB druckenSchliessen(los AS BOOLEAN)
+    DIM zu AS BOOLEAN : zu = TRUE
+    IF los THEN
+        IF GUI_VALIDATE(druck) > 0 THEN
+            zu = FALSE
+        ELSE
+            TRY
+                PDF_PRINT(druckPdf, GUI_DROPDOWN_TEXT(ddDrucker), VAL(GUI_TEXT(tfDKopien)))
+                status("Rechnung " + pdfNummer + " gedruckt auf " + GUI_DROPDOWN_TEXT(ddDrucker) + ".")
+            CATCH e
+                fehler(e)
+            END TRY
+        END IF
+    END IF
+    IF zu THEN
+        GUI_WINDOW_MODAL(druck, FALSE)
+        GUI_WINDOW_VISIBLE(druck, FALSE)
+        IF druckPdf >= 0 THEN PDF_CLOSE(druckPdf)
+        druckPdf = -1
+    END IF
+END SUB
 
 SUB einstellungenOeffnen()
     DIM i AS INTEGER
@@ -999,6 +1078,8 @@ WHILE NOT QUITREQUESTED()
 
     ' --- Einstellungen ---
     IF GUI_CLICKED(miEinst) THEN einstellungenOeffnen()
+    IF GUI_CLICKED(bDDrucken) THEN druckenSchliessen(TRUE)
+    IF GUI_CLICKED(bDAbbruch) THEN druckenSchliessen(FALSE)
     IF GUI_CLICKED(bEOk) THEN einstellungenSchliessen(TRUE)
     IF GUI_CLICKED(bEAbbruch) THEN einstellungenSchliessen(FALSE)
 
@@ -1043,6 +1124,12 @@ WHILE NOT QUITREQUESTED()
                 END IF
             END IF
         NEXT
+        IF GUI_CLICKED(miDruck) THEN
+            IF rechIdAkt < 0 OR rDirty THEN fehler("Erst speichern, dann drucken.") ELSE druckenOeffnen()
+        END IF
+        IF GUI_CLICKED(miOeffnen) THEN
+            IF letztePdf = "" THEN fehler("Noch keine PDF geschrieben (Strg+P).") ELSE OPENDOC(letztePdf)
+        END IF
         IF GUI_CLICKED(miPdf) OR GUI_CLICKED(bRPdf) THEN
             IF rechIdAkt < 0 OR rDirty THEN
                 fehler("Erst speichern, dann PDF -- die Datei soll zeigen, was in der Datenbank steht.")

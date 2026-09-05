@@ -1,5 +1,17 @@
 # Entwurf: Drucken aus Drachenhauch
 
+> **Stand 05.09.2026: A und C sind gebaut.** `OPENDOC(pfad$)` öffnet eine
+> Datei mit ihrem Standardprogramm (Endungsliste); das pdf-Modul zeichnet
+> seine Befehle auf und spielt sie auf drei Ziele: `PDF_SAVE`, `PDF_PRINT`
+> (GDI unter Windows, `lp` unter macOS/Linux; dazu `PRINTERS()` und
+> `PRINTER_DEFAULT$()`) und `PDF_PREVIEW` (die Seite als `IMAGE`). Siehe
+> [module-pdf.md](module-pdf.md#drucken-und-vorschau). Prüfstein 1, gemessen:
+> zwei Seiten durch „Microsoft Print to PDF“ in eine Datei in ~0,9 s, PyMuPDF
+> findet Nummer, Name und den rechtsbündigen Betrag an seiner Stelle
+> (`tests/test_drucken.py`). Die Rechnungsverwaltung hat einen Druckdialog aus
+> Bordmitteln (Klappliste der Drucker, Kopien, Vorschau) und „PDF öffnen“.
+> B ist der Unix-Teil von C; D bleibt ungebaut.
+
 *Untersuchung, keine Umsetzung.* Der zweite Architekturpunkt der Lückenliste
 nach dem sechsten Piloten (nach den [Fenstern](entwurf-native-fenster.md)):
 die Rechnungsverwaltung schreibt eine PDF-Datei — und dann? Ein Programm, das
