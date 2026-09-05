@@ -144,6 +144,13 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_TEXT(lb)` | STRING | Text der Auswahl |
 | `GUI_LISTBOX_SET_SELECTED(lb, i)` | — | Auswahl vom Programm aus setzen |
 | `GUI_SET_LISTBOX(lb, items)` | — | Eintraege ersetzen |
+| `GUI_LISTBOX_ADD(lb, text$[, pos])` / `GUI_LISTBOX_REMOVE(lb, i)` / `GUI_LISTBOX_CLEAR(lb)` | INTEGER / — / — | Einträge einzeln (auch bei Klapplisten); `pos` weglassen = hinten anhängen |
+| `GUI_LISTBOX_COUNT(lb)` / `GUI_LISTBOX_ITEM(lb, i)` / `GUI_LISTBOX_SET_ITEM(lb, i, text$)` / `GUI_LISTBOX_MOVE(lb, von, nach)` | — | zählen, lesen, umbeschriften, verschieben |
+| `GUI_LISTBOX_SET(lb, key$, wert)` | — | `mehrfachauswahl`, `kaestchen` |
+| `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
+| `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
+| `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
+| `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | Doppelklick auf einen Eintrag, ein Bild lang |
 | `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | Bild oder Symbol im Fenster |
 | `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen |
 | `GUI_CANVAS(win, x, y, w, h)` | GUI_WIDGET | freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, **nach** `GUI_DRAW` |
@@ -560,6 +567,33 @@ lb = GUI_LISTBOX(win, 20, 40, 160, 100, obst)   ' Klick wählt, Mausrad scrollt
 - `GUI_LISTBOX_SET_SELECTED(lb, i)`, `GUI_SET_LISTBOX(lb, items)`.
 - `GUI_ON_CHANGE(lb, handler)` feuert bei Auswahl. (Teilt die Item-Logik mit
   Dropdown — die `GUI_DROPDOWN_*`-Getter funktionieren auch auf ListBoxen.)
+
+**Einträge einzeln** (seit 2026-09-04, auch für Klapplisten): `GUI_LISTBOX_ADD(lb, text$[, pos])`
+liefert den Index, `GUI_LISTBOX_REMOVE`, `GUI_LISTBOX_CLEAR`, `GUI_LISTBOX_COUNT`,
+`GUI_LISTBOX_ITEM`, `GUI_LISTBOX_SET_ITEM`, `GUI_LISTBOX_MOVE(lb, von, nach)`
+(herausnehmen und einsetzen, nicht tauschen). Die Auswahl **meint weiter denselben
+Eintrag**: wird davor eingefügt oder gelöscht, rückt sie mit; wird der gewählte
+Eintrag gelöscht, ist nichts mehr gewählt. Vorher ließ sich die Liste nur als Ganzes
+ersetzen, und `GUI_SET_LISTBOX` setzt den Rollstand zurück.
+
+```basic
+GUI_LISTBOX_SET(lb, "kaestchen", 1)          ' ein Haken je Eintrag; Klick aufs Kaestchen kippt NUR den Haken
+GUI_LISTBOX_SET(lb, "mehrfachauswahl", 1)    ' Strg+Klick sammelt, Umschalt+Klick spannt vom Anker
+GUI_LISTBOX_ICON(lb, 0, bild)                ' Sinnbild links vom Text
+GUI_LISTBOX_COLOR(lb, 2, RED)                ' Textfarbe eines Eintrags
+IF GUI_DOUBLE_CLICKED(lb) THEN oeffnen(GUI_LISTBOX_SELECTED(lb))
+```
+
+Mit **Kästchen** kippt ein Klick auf das Kästchen nur den Haken (die Auswahl bleibt,
+sonst wählte man beim Abhaken jedes Mal um), die Leertaste den Haken der gewählten
+Zeile; beides feuert `on_change`. Die **Mehrfachauswahl** hat dieselben Abfragen wie
+die Tabelle: `GUI_LISTBOX_IS_SELECTED`, `GUI_LISTBOX_SELECT`, `GUI_LISTBOX_SEL_COUNT`,
+`GUI_LISTBOX_SEL_ROW(lb, k)` (der k-te gewählte, in Listenreihenfolge),
+`GUI_LISTBOX_CLEAR_SELECTION`; `GUI_LISTBOX_SELECTED` bleibt die zuletzt angeklickte
+Zeile, ein Pfeil setzt die Menge auf eine Zeile. Ohne Mehrfachauswahl liefern die
+Abfragen die eine gewählte Zeile. `GUI_DOUBLE_CLICKED(lb)` gilt ein Bild lang wie
+`GUI_CLICKED`. Haken, Farben, Auswahl und die beiden Schalter stehen in der `.dhform`
+(`list`), Sinnbilder als Textur-Handles nicht.
 
 ### Image — Bild/Icon im UI
 

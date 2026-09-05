@@ -682,6 +682,46 @@ impl Mass {
     fn breite(&self, g: &Graphics, s: &str) -> i32 { g.text_width_in(s, self.size, self.font) }
 }
 
+/// Was eine Liste ueber ihre Eintraege hinaus weiss -- nur angelegt, wenn
+/// ein Programm eines davon benutzt; eine schlichte Liste bleibt, was sie war.
+/// Alle Felder je Eintrag laufen ueber `sync` mit `items` gleich lang.
+#[derive(Default)]
+struct ListState {
+    icons: Vec<i64>,      // Textur-Handle je Eintrag, -1 = keins
+    checks: Vec<bool>,    // Haken je Eintrag (nur mit `kaestchen`)
+    colors: Vec<i64>,     // Textfarbe je Eintrag, -1 = Thema
+    sel: Vec<bool>,       // Mehrfachauswahl je Eintrag
+    multi: bool,
+    kaestchen: bool,
+    anker: i32,           // Anker fuer Umschalt+Klick
+    doppel: bool,         // Doppelklick in DIESEM Bild (wie `clicked`)
+}
+
+impl ListState {
+    fn sync(&mut self, n: usize) {
+        self.icons.resize(n, -1);
+        self.checks.resize(n, false);
+        self.colors.resize(n, -1);
+        self.sel.resize(n, false);
+    }
+    fn einfuegen(&mut self, pos: usize) {
+        self.icons.insert(pos, -1);
+        self.checks.insert(pos, false);
+        self.colors.insert(pos, -1);
+        self.sel.insert(pos, false);
+    }
+    fn entfernen(&mut self, pos: usize) {
+        self.icons.remove(pos);
+        self.checks.remove(pos);
+        self.colors.remove(pos);
+        self.sel.remove(pos);
+    }
+    fn ist_leer(&self) -> bool {
+        !self.multi && !self.kaestchen && self.icons.iter().all(|&i| i < 0)
+            && self.colors.iter().all(|&c| c < 0) && !self.checks.iter().any(|&c| c)
+    }
+}
+
 pub struct Widget {
     kind: Kind,
     x: i32, y: i32, w: i32, h: i32,
@@ -707,6 +747,7 @@ pub struct Widget {
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
+    list: Option<Box<ListState>>,   // nur fuer Kind::ListBox, bei Bedarf
     // Laufzeit-Lifecycle (Tombstone -- Indizes/Handles bleiben stabil): `alive`
     // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
     alive: bool,
@@ -991,6 +1032,8 @@ pub struct Gui {
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
+    // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
+    tasten_mod: (bool, bool),
     // Offene Untermenues unter dem offenen Wurzelmenue: (Menue-Index, x, y)
     // je Ebene. Leer, wenn keine Kette offen ist.
     sub_chain: Vec<(usize, i32, i32)>,
@@ -1073,7 +1116,7 @@ impl Gui {
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             editing_table: None, last_click: None, dbl_click: false,
-            open_menu: None, context_open: None, sub_chain: Vec::new(), was_right_down: false,
+            open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false), was_right_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
@@ -1525,7 +1568,7 @@ impl Gui {
             kind, x, y, w, h, text: String::new(), color: -1,   // -1 = dem Thema folgen
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
-            on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None,
+            on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false,
@@ -1856,7 +1899,181 @@ impl Gui {
         self.item_widget(h, "GUI_SET_DROPDOWN")?;
         let w = self.wdg_mut(h, "GUI_SET_DROPDOWN")?;
         w.sel = if items.is_empty() { -1 } else { w.sel.min(items.len() as i32 - 1) };
+        // Symbole, Haken, Farben und Auswahl gehoerten zu den ALTEN Eintraegen.
+        if let Some(l) = w.list.as_mut() {
+            let n = items.len();
+            l.icons = vec![-1; n]; l.checks = vec![false; n]; l.colors = vec![-1; n]; l.sel = vec![false; n];
+            l.anker = -1;
+        }
         w.items = items; w.value = 0.0; Ok(())
+    }
+
+    // ---- Listen-Ausbau (Punkt 3, 2026-09-04) ------------------------------
+
+    /// Den Zusatzzustand einer ListBox holen (bei Bedarf anlegen).
+    fn list_mut(&mut self, h: i64, fn_: &str) -> Result<&mut ListState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
+        let n = w.items.len();
+        let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+        l.sync(n);
+        Ok(l)
+    }
+    fn list_idx(w: &Widget, i: i64, fn_: &str) -> Result<usize, String> {
+        if i < 0 || i as usize >= w.items.len() {
+            return Err(format!("{}: Eintrag {} gibt es nicht (die Liste hat {})", fn_, i, w.items.len()));
+        }
+        Ok(i as usize)
+    }
+    /// GUI_LISTBOX_ADD(lb, text$[, pos]) -> Index. Auch fuer Klapplisten.
+    pub fn list_add(&mut self, h: i64, text: String, pos: i64) -> Result<i64, String> {
+        self.item_widget(h, "GUI_LISTBOX_ADD")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_ADD")?;
+        let n = w.items.len();
+        let p = if pos < 0 || pos as usize > n { n } else { pos as usize };
+        w.items.insert(p, text);
+        if let Some(l) = w.list.as_mut() { l.sync(n); l.einfuegen(p); }
+        // Eine Auswahl HINTER der Einfuegestelle rueckt mit -- sie meint
+        // denselben Eintrag wie vorher.
+        if w.sel >= p as i32 { w.sel += 1; }
+        Ok(p as i64)
+    }
+    /// GUI_LISTBOX_REMOVE(lb, i)
+    pub fn list_remove(&mut self, h: i64, i: i64) -> Result<(), String> {
+        self.item_widget(h, "GUI_LISTBOX_REMOVE")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_REMOVE")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_REMOVE")?;
+        let n = w.items.len();
+        w.items.remove(p);
+        if let Some(l) = w.list.as_mut() { l.sync(n); l.entfernen(p); if l.anker >= p as i32 { l.anker -= 1; } }
+        if w.sel == p as i32 { w.sel = -1; } else if w.sel > p as i32 { w.sel -= 1; }
+        Ok(())
+    }
+    /// GUI_LISTBOX_CLEAR(lb)
+    pub fn list_clear(&mut self, h: i64) -> Result<(), String> {
+        self.set_dropdown_items(h, Vec::new())
+    }
+    /// GUI_LISTBOX_COUNT(lb)
+    pub fn list_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.item_widget(h, "GUI_LISTBOX_COUNT")?.items.len() as i64)
+    }
+    /// GUI_LISTBOX_ITEM(lb, i) -> Text
+    pub fn list_item(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.item_widget(h, "GUI_LISTBOX_ITEM")?;
+        Ok(w.items[Self::list_idx(w, i, "GUI_LISTBOX_ITEM")?].clone())
+    }
+    /// GUI_LISTBOX_SET_ITEM(lb, i, text$)
+    pub fn list_set_item(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
+        self.item_widget(h, "GUI_LISTBOX_SET_ITEM")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_SET_ITEM")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_SET_ITEM")?;
+        w.items[p] = text; Ok(())
+    }
+    /// GUI_LISTBOX_MOVE(lb, von, nach) -- herausnehmen und einsetzen, nicht
+    /// tauschen (wie TILED_MOVE_LAYER: ein Sprung ueber mehrere Plaetze ist
+    /// sonst etwas anderes). Symbol, Haken, Farbe und Auswahl reisen mit.
+    pub fn list_move(&mut self, h: i64, von: i64, nach: i64) -> Result<(), String> {
+        self.item_widget(h, "GUI_LISTBOX_MOVE")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_MOVE")?;
+        let a = Self::list_idx(w, von, "GUI_LISTBOX_MOVE")?;
+        let b = Self::list_idx(w, nach, "GUI_LISTBOX_MOVE")?;
+        if a == b { return Ok(()); }
+        let t = w.items.remove(a); w.items.insert(b, t);
+        if let Some(l) = w.list.as_mut() {
+            l.sync(w.items.len());
+            let ic = l.icons.remove(a); l.icons.insert(b, ic);
+            let ch = l.checks.remove(a); l.checks.insert(b, ch);
+            let co = l.colors.remove(a); l.colors.insert(b, co);
+            let se = l.sel.remove(a); l.sel.insert(b, se);
+        }
+        if w.sel == a as i32 { w.sel = b as i32; }
+        else if a < b && w.sel > a as i32 && w.sel <= b as i32 { w.sel -= 1; }
+        else if a > b && w.sel >= b as i32 && w.sel < a as i32 { w.sel += 1; }
+        Ok(())
+    }
+    /// GUI_LISTBOX_SET(lb, key$, wert): `mehrfachauswahl`, `kaestchen`.
+    pub fn list_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let l = self.list_mut(h, "GUI_LISTBOX_SET")?;
+        match key.to_lowercase().as_str() {
+            "mehrfachauswahl" | "multi_select" | "multi" => { l.multi = wert != 0.0; if !l.multi { for x in l.sel.iter_mut() { *x = false; } } }
+            "kaestchen" | "checkboxes" => l.kaestchen = wert != 0.0,
+            _ => return Err(format!("GUI_LISTBOX_SET: unbekannter Schluessel '{}' -- mehrfachauswahl, kaestchen", key)),
+        }
+        Ok(())
+    }
+    pub fn list_icon(&mut self, h: i64, i: i64, tex: i64) -> Result<(), String> {
+        let p = Self::list_idx(self.wdg(h, "GUI_LISTBOX_ICON")?, i, "GUI_LISTBOX_ICON")?;
+        self.list_mut(h, "GUI_LISTBOX_ICON")?.icons[p] = tex.max(-1); Ok(())
+    }
+    pub fn list_color(&mut self, h: i64, i: i64, farbe: i64) -> Result<(), String> {
+        let p = Self::list_idx(self.wdg(h, "GUI_LISTBOX_COLOR")?, i, "GUI_LISTBOX_COLOR")?;
+        self.list_mut(h, "GUI_LISTBOX_COLOR")?.colors[p] = farbe.max(-1); Ok(())
+    }
+    pub fn list_checked(&self, h: i64, i: i64) -> Result<bool, String> {
+        let w = self.item_widget(h, "GUI_LISTBOX_CHECKED")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_CHECKED")?;
+        Ok(w.list.as_ref().and_then(|l| l.checks.get(p).copied()).unwrap_or(false))
+    }
+    pub fn list_set_checked(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let p = Self::list_idx(self.wdg(h, "GUI_LISTBOX_SET_CHECKED")?, i, "GUI_LISTBOX_SET_CHECKED")?;
+        self.list_mut(h, "GUI_LISTBOX_SET_CHECKED")?.checks[p] = an; Ok(())
+    }
+    /// GUI_LISTBOX_IS_SELECTED(lb, i) -- in der Mehrfachauswahl die Menge,
+    /// sonst die eine gewaehlte Zeile.
+    pub fn list_is_selected(&self, h: i64, i: i64) -> Result<bool, String> {
+        let w = self.item_widget(h, "GUI_LISTBOX_IS_SELECTED")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_IS_SELECTED")?;
+        Ok(match w.list.as_ref() {
+            Some(l) if l.multi => l.sel.get(p).copied().unwrap_or(false),
+            _ => w.sel == p as i32,
+        })
+    }
+    pub fn list_select(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let p = Self::list_idx(self.wdg(h, "GUI_LISTBOX_SELECT")?, i, "GUI_LISTBOX_SELECT")?;
+        let multi = self.list_mut(h, "GUI_LISTBOX_SELECT")?.multi;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_SELECT")?;
+        if multi {
+            let l = w.list.as_mut().unwrap();
+            l.sel[p] = an;
+            if an { w.sel = p as i32; l.anker = p as i32; }
+        } else {
+            w.sel = if an { p as i32 } else if w.sel == p as i32 { -1 } else { w.sel };
+        }
+        Ok(())
+    }
+    pub fn list_sel_count(&self, h: i64) -> Result<i64, String> {
+        let w = self.item_widget(h, "GUI_LISTBOX_SEL_COUNT")?;
+        Ok(match w.list.as_ref() {
+            Some(l) if l.multi => l.sel.iter().filter(|&&x| x).count() as i64,
+            _ => if w.sel >= 0 { 1 } else { 0 },
+        })
+    }
+    /// GUI_LISTBOX_SEL_ROW(lb, k) -- der k-te gewaehlte Eintrag (0-basiert),
+    /// in Listenreihenfolge; -1 wenn es ihn nicht gibt.
+    pub fn list_sel_row(&self, h: i64, k: i64) -> Result<i64, String> {
+        let w = self.item_widget(h, "GUI_LISTBOX_SEL_ROW")?;
+        Ok(match w.list.as_ref() {
+            Some(l) if l.multi => l.sel.iter().enumerate().filter(|(_, &x)| x).nth(k.max(0) as usize)
+                                    .map(|(i, _)| i as i64).unwrap_or(-1),
+            _ => if k == 0 { w.sel as i64 } else { -1 },
+        })
+    }
+    pub fn list_clear_selection(&mut self, h: i64) -> Result<(), String> {
+        self.item_widget(h, "GUI_LISTBOX_CLEAR_SELECTION")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_CLEAR_SELECTION")?;
+        w.sel = -1;
+        if let Some(l) = w.list.as_mut() { for x in l.sel.iter_mut() { *x = false; } l.anker = -1; }
+        Ok(())
+    }
+    /// GUI_DOUBLE_CLICKED(lb) -- ein Bild lang, wie GUI_CLICKED.
+    pub fn double_clicked(&self, h: i64) -> Result<bool, String> {
+        let w = self.wdg(h, "GUI_DOUBLE_CLICKED")?;
+        if w.kind != Kind::ListBox { return Err("GUI_DOUBLE_CLICKED: bisher nur fuer Listen (GUI_LISTBOX)".into()); }
+        Ok(w.list.as_ref().map(|l| l.doppel).unwrap_or(false))
+    }
+    /// Breite der Kaestchen-Spalte einer Liste (0 ohne Kaestchen).
+    fn list_box_w(&self, w: &Widget) -> i32 {
+        if w.list.as_ref().map(|l| l.kaestchen).unwrap_or(false) { self.sk(DROPDOWN_ITEM_H) } else { 0 }
     }
 
     // --- Tabelle ---
@@ -3702,6 +3919,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             o["date"] = serde_json::json!(crate::kalender::format(w.datum[0], w.datum[1], w.datum[2]));
         }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
+        if let Some(l) = w.list.as_ref() {
+            // Symbole sind Textur-Handles und bleiben draussen (wie bei GUI_IMAGE).
+            if !l.ist_leer() {
+                let mut lo = serde_json::Map::new();
+                if l.multi { lo.insert("multi".into(), serde_json::json!(true)); }
+                if l.kaestchen { lo.insert("kaestchen".into(), serde_json::json!(true)); }
+                if l.checks.iter().any(|&c| c) { lo.insert("checked".into(), serde_json::json!(l.checks)); }
+                if l.colors.iter().any(|&c| c >= 0) { lo.insert("colors".into(), serde_json::json!(l.colors)); }
+                if l.multi && l.sel.iter().any(|&x| x) { lo.insert("selected".into(), serde_json::json!(l.sel)); }
+                o["list"] = serde_json::Value::Object(lo);
+            }
+        }
         if w.align >= 0 {
             o["align"] = serde_json::json!(match w.align { 1 => "mitte", 2 => "rechts", _ => "links" });
         }
@@ -3825,6 +4054,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
+        if let Some(lj) = wj.get("list").and_then(|v| v.as_object()) {
+            let n = w.items.len();
+            let mut l = ListState { anker: -1, ..Default::default() };
+            l.sync(n);
+            l.multi = lj.get("multi").and_then(|v| v.as_bool()).unwrap_or(false);
+            l.kaestchen = lj.get("kaestchen").and_then(|v| v.as_bool()).unwrap_or(false);
+            if let Some(a) = lj.get("checked").and_then(|v| v.as_array()) {
+                for (k, v) in a.iter().enumerate().take(n) { l.checks[k] = v.as_bool().unwrap_or(false); }
+            }
+            if let Some(a) = lj.get("colors").and_then(|v| v.as_array()) {
+                for (k, v) in a.iter().enumerate().take(n) { l.colors[k] = v.as_i64().unwrap_or(-1); }
+            }
+            if let Some(a) = lj.get("selected").and_then(|v| v.as_array()) {
+                for (k, v) in a.iter().enumerate().take(n) { l.sel[k] = v.as_bool().unwrap_or(false); }
+            }
+            w.list = Some(Box::new(l));
+        }
         // Farbe als "#RRGGBB" -- lesbar in der Datei und nicht als Zahl, die
         // niemand entziffert. Unlesbares wird still uebergangen: eine von Hand
         // bearbeitete Form soll nicht am Farbfeld scheitern.
@@ -4451,6 +4697,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false;
+                if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
             }
@@ -4685,6 +4932,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // Nach einem erkannten Doppelklick von vorn zaehlen, sonst waere
             // ein dritter Klick gleich wieder einer.
             self.last_click = if self.dbl_click { None } else { Some((jetzt, mx, my)) };
+            self.tasten_mod = (g.key_ctrl(), g.key_shift());
             self.handle_press(mx, my);
             self.dbl_click = false;
         }
@@ -5554,6 +5802,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let neu = (w.sel + d).clamp(0, n - 1);
         if neu != w.sel {
             w.sel = neu;
+            if let Some(l) = w.list.as_mut() {
+                if l.multi { l.sync(n as usize); for k in 0..n { l.sel[k as usize] = k == neu; } l.anker = neu; }
+            }
             let f = w.on_change.clone();
             if let Some(f) = f { self.pending.push(f); }
         }
@@ -5700,6 +5951,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::ListBox => {
                 let d = ab as i32 - auf as i32;
                 if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
+                if g.key_pressed(KEY_HOME) { let n = self.windows[wi].widgets[i].items.len() as i32; self.liste_bewegen(wi, i, -n); self.liste_sichtbar(wi, i); }
+                if g.key_pressed(KEY_END) { let n = self.windows[wi].widgets[i].items.len() as i32; self.liste_bewegen(wi, i, n); self.liste_sichtbar(wi, i); }
+                // Leertaste kippt den Haken der gewaehlten Zeile.
+                if g.key_pressed(KEY_SPACE) {
+                    let w = &mut self.windows[wi].widgets[i];
+                    let sel = w.sel;
+                    let n = w.items.len();
+                    if let Some(l) = w.list.as_mut() {
+                        if l.kaestchen && sel >= 0 && (sel as usize) < n {
+                            l.sync(n);
+                            l.checks[sel as usize] = !l.checks[sel as usize];
+                            let f = w.on_change.clone();
+                            if let Some(f) = f { self.pending.push(f); }
+                        }
+                    }
+                }
             }
             Kind::ColorPicker => {
                 // Pfeile verstellen Saettigung und Helligkeit, Bild auf/ab den
@@ -5974,13 +6241,52 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             Kind::Dropdown => self.open_dropdown = Some((win, i)),
             Kind::ListBox => {
-                let ay = self.abs_rect(win, &self.windows[win].widgets[i]).1;
+                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 let scroll = self.windows[win].widgets[i].value as i32;
                 let row = (my - ay + scroll) / self.sk(DROPDOWN_ITEM_H);
                 let n = self.windows[win].widgets[i].items.len() as i32;
-                if row >= 0 && row < n && self.windows[win].widgets[i].sel != row {
-                    self.windows[win].widgets[i].sel = row;
-                    let f = self.windows[win].widgets[i].on_change.clone();
+                if row < 0 || row >= n { return; }
+                let box_w = self.list_box_w(&self.windows[win].widgets[i]);
+                let (ctrl, shift) = self.tasten_mod;
+                let dbl = self.dbl_click;
+                let w = &mut self.windows[win].widgets[i];
+                let mut geaendert = false;
+                // Klick auf das Kaestchen kippt NUR den Haken -- die Auswahl
+                // bleibt, sonst waehlte man beim Abhaken jedes Mal um.
+                if box_w > 0 && mx < ax + box_w {
+                    if let Some(l) = w.list.as_mut() {
+                        l.sync(n as usize);
+                        l.checks[row as usize] = !l.checks[row as usize];
+                        geaendert = true;
+                    }
+                } else {
+                    let multi = w.list.as_ref().map(|l| l.multi).unwrap_or(false);
+                    if multi {
+                        let l = w.list.as_mut().unwrap();
+                        l.sync(n as usize);
+                        if ctrl {
+                            l.sel[row as usize] = !l.sel[row as usize];
+                            l.anker = row;
+                        } else if shift && l.anker >= 0 {
+                            let (a, b) = (l.anker.min(row), l.anker.max(row));
+                            for k in 0..n { l.sel[k as usize] = k >= a && k <= b; }
+                        } else {
+                            for k in 0..n { l.sel[k as usize] = k == row; }
+                            l.anker = row;
+                        }
+                        if dbl { l.doppel = true; }
+                        geaendert = true;
+                        w.sel = row;
+                    } else {
+                        if w.sel != row { w.sel = row; geaendert = true; }
+                        if dbl {
+                            let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+                            l.doppel = true;
+                        }
+                    }
+                }
+                if geaendert {
+                    let f = w.on_change.clone();
                     if let Some(f) = f { self.pending.push(f); }
                 }
             }
@@ -6724,16 +7030,44 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let acc = self.acc_col(wdg);
                 let scroll = wdg.value as i32;
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                let ih = self.sk(DROPDOWN_ITEM_H);
+                let box_w = self.list_box_w(wdg);
+                let l = wdg.list.as_deref();
+                let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
+                let icon_w = if hat_icon { ih } else { 0 };
                 g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
                 for (k, it) in wdg.items.iter().enumerate() {
-                    let iy = ay + k as i32 * self.sk(DROPDOWN_ITEM_H) - scroll;
-                    if iy + self.sk(DROPDOWN_ITEM_H) < ay || iy > ay + h { continue; }
-                    if k as i32 == wdg.sel {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(acc, -110));
-                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + self.sk(DROPDOWN_ITEM_H) {
-                        g.box_fill(ax + 1, iy, ax + w - 2, iy + self.sk(DROPDOWN_ITEM_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
+                    let iy = ay + k as i32 * ih - scroll;
+                    if iy + ih < ay || iy > ay + h { continue; }
+                    let gewaehlt = match l {
+                        Some(l) if l.multi => l.sel.get(k).copied().unwrap_or(false),
+                        _ => k as i32 == wdg.sel,
+                    };
+                    if gewaehlt {
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(acc, -110));
+                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + ih {
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
                     }
-                    self.wtext(g, wdg, ax + pad, iy + (self.sk(DROPDOWN_ITEM_H) - self.wsize(g, wdg)).max(0) / 2, it.clone(), fg);
+                    let mut tx = ax + pad;
+                    if box_w > 0 {
+                        // Kaestchen wie das Checkbox-Widget: Rahmen, gefuellt mit Haken.
+                        let cs = (ih - 8).max(8);
+                        let bx = ax + 4;
+                        let by = iy + (ih - cs) / 2;
+                        let an = l.and_then(|l| l.checks.get(k).copied()).unwrap_or(false);
+                        g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
+                        if an {
+                            g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
+                        }
+                        tx = ax + box_w;
+                    }
+                    if let Some(ic) = l.and_then(|l| l.icons.get(k).copied()).filter(|&i| i >= 0) {
+                        let isz = ih - 4;
+                        g.draw_image_rect(ic, tx, iy + 2, isz, isz);
+                    }
+                    tx += icon_w + if icon_w > 0 { 2 } else { 0 };
+                    let farbe = l.and_then(|l| l.colors.get(k).copied()).filter(|&c| c >= 0).unwrap_or(fg);
+                    self.wtext(g, wdg, tx, iy + (ih - self.wsize(g, wdg)).max(0) / 2, it.clone(), farbe);
                 }
                 g.pop_clip();
             }

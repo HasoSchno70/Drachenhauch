@@ -5177,6 +5177,27 @@ impl<'p> Vm<'p> {
             "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?)?),
             "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?)?; Value::Nil }
             "gui_set_listbox" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_LISTBOX")?, gstrs(a,1,"GUI_SET_LISTBOX")?)?; Value::Nil }
+            "gui_listbox_add" => {
+                let pos = if a.len() > 2 { gi(a,2,"GUI_LISTBOX_ADD")? } else { -1 };
+                Value::Int(self.gui.list_add(gi(a,0,"GUI_LISTBOX_ADD")?, gs(a,1,"GUI_LISTBOX_ADD")?.to_string(), pos)?)
+            }
+            "gui_listbox_remove" => { self.gui.list_remove(gi(a,0,"GUI_LISTBOX_REMOVE")?, gi(a,1,"GUI_LISTBOX_REMOVE")?)?; Value::Nil }
+            "gui_listbox_clear" => { self.gui.list_clear(gi(a,0,"GUI_LISTBOX_CLEAR")?)?; Value::Nil }
+            "gui_listbox_count" => Value::Int(self.gui.list_count(gi(a,0,"GUI_LISTBOX_COUNT")?)?),
+            "gui_listbox_item" => Value::str_rc(&self.gui.list_item(gi(a,0,"GUI_LISTBOX_ITEM")?, gi(a,1,"GUI_LISTBOX_ITEM")?)?),
+            "gui_listbox_set_item" => { self.gui.list_set_item(gi(a,0,"GUI_LISTBOX_SET_ITEM")?, gi(a,1,"GUI_LISTBOX_SET_ITEM")?, gs(a,2,"GUI_LISTBOX_SET_ITEM")?.to_string())?; Value::Nil }
+            "gui_listbox_move" => { self.gui.list_move(gi(a,0,"GUI_LISTBOX_MOVE")?, gi(a,1,"GUI_LISTBOX_MOVE")?, gi(a,2,"GUI_LISTBOX_MOVE")?)?; Value::Nil }
+            "gui_listbox_set" => { self.gui.list_set(gi(a,0,"GUI_LISTBOX_SET")?, &gs(a,1,"GUI_LISTBOX_SET")?, gnum(a,2,"GUI_LISTBOX_SET")?)?; Value::Nil }
+            "gui_listbox_icon" => { self.gui.list_icon(gi(a,0,"GUI_LISTBOX_ICON")?, gi(a,1,"GUI_LISTBOX_ICON")?, gi(a,2,"GUI_LISTBOX_ICON")?)?; Value::Nil }
+            "gui_listbox_color" => { self.gui.list_color(gi(a,0,"GUI_LISTBOX_COLOR")?, gi(a,1,"GUI_LISTBOX_COLOR")?, gi(a,2,"GUI_LISTBOX_COLOR")?)?; Value::Nil }
+            "gui_listbox_checked" => Value::Bool(self.gui.list_checked(gi(a,0,"GUI_LISTBOX_CHECKED")?, gi(a,1,"GUI_LISTBOX_CHECKED")?)?),
+            "gui_listbox_set_checked" => { self.gui.list_set_checked(gi(a,0,"GUI_LISTBOX_SET_CHECKED")?, gi(a,1,"GUI_LISTBOX_SET_CHECKED")?, gbool(a,2,"GUI_LISTBOX_SET_CHECKED")?)?; Value::Nil }
+            "gui_listbox_is_selected" => Value::Bool(self.gui.list_is_selected(gi(a,0,"GUI_LISTBOX_IS_SELECTED")?, gi(a,1,"GUI_LISTBOX_IS_SELECTED")?)?),
+            "gui_listbox_select" => { self.gui.list_select(gi(a,0,"GUI_LISTBOX_SELECT")?, gi(a,1,"GUI_LISTBOX_SELECT")?, gbool(a,2,"GUI_LISTBOX_SELECT")?)?; Value::Nil }
+            "gui_listbox_sel_count" => Value::Int(self.gui.list_sel_count(gi(a,0,"GUI_LISTBOX_SEL_COUNT")?)?),
+            "gui_listbox_sel_row" => Value::Int(self.gui.list_sel_row(gi(a,0,"GUI_LISTBOX_SEL_ROW")?, gi(a,1,"GUI_LISTBOX_SEL_ROW")?)?),
+            "gui_listbox_clear_selection" => { self.gui.list_clear_selection(gi(a,0,"GUI_LISTBOX_CLEAR_SELECTION")?)?; Value::Nil }
+            "gui_double_clicked" => Value::Bool(self.gui.double_clicked(gi(a,0,"GUI_DOUBLE_CLICKED")?)?),
             // --- Image + Canvas ---
             "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
                 gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),
