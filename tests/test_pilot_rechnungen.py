@@ -152,12 +152,15 @@ def test_erster_start_legt_datenbank_mit_beispieldaten_an(tmp_path):
 
 
 def test_geld_wird_in_cent_gerechnet(tmp_path):
-    zusatz = ('    IF tBild = 1 THEN PRINT "G " + geld$(1999) + "|" + STR$(centVon("19,99")) + "|" + STR$(centVon("1.234,56")) + '
+    zusatz = ('    PRINT "G " + geld$(1999) + "|" + STR$(centVon("19,99")) + "|" + STR$(centVon("1.234,56")) + '
               '"|" + STR$(centVon("12.5")) + "|" + STR$(centVon("abc")) + "|" + geld$(123456789) + "|" + geld$(-5)\n')
     quelle = _kopie(tmp_path, zusatz)
     r = subprocess.run([str(_DHRT), "run", str(quelle)], capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", timeout=120, env=dict(os.environ, DHRT_FRAMES="2"), cwd=str(tmp_path))
-    g = [ln for ln in r.stdout.splitlines() if ln.startswith("G ")][0][2:].split("|")
+                       errors="replace", timeout=120, env=dict(os.environ, DHRT_FRAMES="4"), cwd=str(tmp_path))
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    zeilen = [ln for ln in r.stdout.splitlines() if ln.startswith("G ")]
+    assert zeilen, (r.stdout, r.stderr)
+    g = zeilen[-1][2:].split("|")
     assert g == ["19,99 EUR", "1999", "123456", "1250", "-1", "1.234.567,89 EUR", "-0,05 EUR"]
 
 
