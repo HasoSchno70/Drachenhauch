@@ -283,3 +283,46 @@ def test_csv_export_per_kuerzel(tmp_path):
     assert zeilen[0] == ["Nummer", "Datum", "Kunde", "Netto", "MwSt", "Brutto", "Status"]
     assert zeilen[1] == ["2026-0001", "2026-08-14", "Muellerbau GmbH", "304,99", "57,95", "362,94", "bezahlt"]
     assert zeilen[2][0] == "2026-0002" and zeilen[2][5] == "85,39" and zeilen[2][6] == "offen"
+
+
+# ---------------------------------------------------------------- Rechnung im eigenen Fenster
+def test_rechnungsfenster_meldet_sich_bei_fremden_eltern(tmp_path):
+    """Pruefstein 3 des Entwurfs `entwurf-native-fenster.md`: das Kind
+    (`196_rechnung_fenster.dh`) laeuft als eigener Prozess auf derselben
+    Datenbank. Die Eltern spielt hier Python -- ein FREMDER Teilnehmer am
+    Kanal, kein zweites dhrt: es lauscht auf einem Port, reicht ihn in der
+    Umgebung weiter, liest die Meldung "offen <id>" und beendet das Kind,
+    indem es die Verbindung schliesst."""
+    import socket
+    _lauf(tmp_path, 2)                                   # legt rechnungen.db an
+    kind = _ROOT / "examples" / "196_rechnung_fenster.dh"
+    srv = socket.socket(); srv.bind(("127.0.0.1", 0)); srv.listen(1); srv.settimeout(20)
+    port = srv.getsockname()[1]
+    env = dict(os.environ, DHRT_ELTERN_PORT=str(port))
+    env.pop("DHRT_FRAMES", None)
+    # Programmargumente stehen bei `dhrt run` hinter `--` (davor gehoeren sie
+    # der Laufzeit); WINDOW_OPEN setzt den Trenner selbst.
+    p = subprocess.Popen([str(_DHRT), "run", str(kind), "--", str(tmp_path / "rechnungen.db"), "2"],
+                         cwd=str(tmp_path), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        conn, _ = srv.accept()
+        conn.settimeout(10)
+        f = conn.makefile("r", encoding="utf-8")
+        assert f.readline().strip() == "offen 2"
+        assert p.poll() is None, "das Kind laeuft mit Eltern weiter"
+        # makefile() haelt die Verbindung offen -- erst die Datei, dann der Socket.
+        f.close()
+        conn.close()
+        srv.close()
+        # Verbindung weg -> das Kind beendet sich von selbst.
+        p.wait(timeout=10)
+    finally:
+        if p.poll() is None:
+            p.kill()
+            p.wait()
+    assert p.returncode is not None
+    # Und allein gestartet (ohne Eltern) laeuft es ebenfalls -- nur ohne Meldung.
+    r = subprocess.run([str(_DHRT), "run", str(kind), "--", str(tmp_path / "rechnungen.db"), "1"],
+                       cwd=str(tmp_path), env=dict(os.environ, DHRT_FRAMES="3"),
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr

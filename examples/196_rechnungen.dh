@@ -18,6 +18,9 @@
 '      Artikel rechnet Preis (Cent) und MwSt um und bleibt darum von Hand,
 '      nutzt die Bindung aber fuer die Aenderungserkennung
 '    * Notiz je Kunde in einem Textbereich mit Zeilenumbruch
+'    * eine Rechnung in einem EIGENEN OS-Fenster (Strg+F): ein zweiter dhrt
+'      mit 196_rechnung_fenster.dh, verbunden ueber WINDOW_OPEN/SEND/RECV$;
+'      beide arbeiten auf derselben Datenbank, geteilt wird nur Text
 '    * Formulare mit Pruefung ueber GUI_RULE / GUI_VALIDATE (Pflichtfeld,
 '      PLZ, E-Mail, Zahl, Datum -- die Meldung steht in einer Beschriftung
 '      und im Tooltip, das falsche Feld bekommt den Fokus), Enter speichert;
@@ -161,6 +164,7 @@ DIM miNeuA AS INTEGER : miNeuA = GUI_MENU_ITEM(mDatei, "Neuer Artikel", "Strg+Um
 DIM miNeuR AS INTEGER : miNeuR = GUI_MENU_ITEM(mDatei, "Neue Rechnung", "Strg+R")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Rechnung als PDF ...", "Strg+P")
+DIM miFenster AS INTEGER : miFenster = GUI_MENU_ITEM(mDatei, "Rechnung in eigenem Fenster", "Strg+F")
 DIM miCsv AS INTEGER : miCsv = GUI_MENU_ITEM(mDatei, "Alle Rechnungen als CSV", "Strg+E")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miEinst AS INTEGER : miEinst = GUI_MENU_ITEM(mDatei, "Einstellungen ...")
@@ -709,6 +713,7 @@ FUNCTION rechnungSpeichern() AS BOOLEAN
     rZeileAlt = zeileVonId(rechId, rechAnz, rechIdAkt)
     GUI_TABLE_SET_SELECTED(tRech, rZeileAlt)
     rechnungZeigen(rechIdAkt)
+    fensterMelden("neu")
     status("Rechnung " + rechNummer + " gespeichert.")
     RETURN TRUE
 END FUNCTION
@@ -919,6 +924,18 @@ GUI_UPDATE()
 DIM minB AS INTEGER : minB = 12 + listeW + 12 + GUI_LAYOUT_MIN_W(zR) + 12
 WINDOW_MIN_SIZE(minB, 540)
 
+' Offene Rechnungsfenster (zweite Prozesse): sie melden "geaendert <id>",
+' und die Verwaltung schickt ihnen "neu", wenn sie selbst gespeichert hat.
+DIM fenster[16] AS INTEGER
+DIM fensterAnz AS INTEGER : fensterAnz = 0
+
+SUB fensterMelden(text AS STRING)
+    DIM i AS INTEGER
+    FOR i = 0 TO fensterAnz - 1
+        IF WINDOW_ALIVE(fenster[i]) THEN WINDOW_SEND(fenster[i], text)
+    NEXT
+END SUB
+
 DIM loeschFrage AS GUI_WINDOW : loeschFrage = -1
 DIM loeschWas AS INTEGER : loeschWas = 0       ' 1 Kunde, 2 Artikel, 3 Rechnung
 DIM mengeZeileAlt AS INTEGER : mengeZeileAlt = -1
@@ -1001,6 +1018,31 @@ WHILE NOT QUITREQUESTED()
             IF seite = 2 THEN rechnungSpeichern()
         END IF
         IF GUI_CLICKED(miCsv) THEN status("Geschrieben: " + csvSchreiben())
+        IF GUI_CLICKED(miFenster) THEN
+            IF rechIdAkt < 0 OR rDirty THEN
+                fehler("Erst speichern -- das zweite Fenster liest aus der Datenbank.")
+            ELSEIF fensterAnz >= 16 THEN
+                fehler("Mehr als 16 Fenster sind genug.")
+            ELSE
+                fenster[fensterAnz] = WINDOW_OPEN("196_rechnung_fenster.dh", DBDATEI, rechIdAkt)
+                fensterAnz = fensterAnz + 1
+                status("Rechnung " + rechNummer + " in eigenem Fenster geoeffnet.")
+            END IF
+        END IF
+        ' Post aus den Rechnungsfenstern.
+        DIM fi AS INTEGER
+        FOR fi = 0 TO fensterAnz - 1
+            IF WINDOW_ALIVE(fenster[fi]) THEN
+                DIM post AS STRING : post = WINDOW_RECV$(fenster[fi])
+                IF LEFT$(post, 10) = "geaendert " THEN
+                    rechnungenLaden()
+                    IF VAL(MID$(post, 10)) = rechIdAkt AND NOT rDirty THEN rechnungZeigen(rechIdAkt)
+                    rZeileAlt = zeileVonId(rechId, rechAnz, rechIdAkt)
+                    GUI_TABLE_SET_SELECTED(tRech, rZeileAlt)
+                    status("Rechnung " + MID$(post, 10) + " im anderen Fenster geaendert.")
+                END IF
+            END IF
+        NEXT
         IF GUI_CLICKED(miPdf) OR GUI_CLICKED(bRPdf) THEN
             IF rechIdAkt < 0 OR rDirty THEN
                 fehler("Erst speichern, dann PDF -- die Datei soll zeigen, was in der Datenbank steht.")

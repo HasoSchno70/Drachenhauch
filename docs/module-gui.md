@@ -1447,6 +1447,9 @@ Themen umschalten.
   geplante Alternative (Phase 4).
 - **Koordinaten plus Anker**, dazu Automaß und Zeilen-/Spalten-/Rasterbehälter
   (`GUI_LAYOUT`); kein Constraint-System.
+- **Ein Programm, ein OS-Fenster**; gui-Fenster leben darin — nicht über den
+  Rand, nicht auf dem zweiten Monitor, ohne eigenen Eintrag in der Taskleiste.
+  Warum, und welche Wege es gäbe: [entwurf-native-fenster.md](entwurf-native-fenster.md).
 - **Laufzeit-Manipulation** (Verschieben/Skalieren/Löschen/Ein-/Ausblenden/
   Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
