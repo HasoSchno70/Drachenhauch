@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 from .formdesigner import (
     FormDoc, FormProject, Control, History, PALETTE, palette_spec, GRID, HANDLES,
     snap, resize_rect, FORM_THEMES, theme_colors, EVENTS, hex_zu_int,
+    regeln_parsen, regeln_text,
 )
 
 try:
@@ -1127,7 +1128,8 @@ class _Canvas(QWidget):
             # Unsichtbar zur Laufzeit -- im Entwurf gestrichelt mit seiner Art,
             # damit man ihn anfassen kann. Die Kinder liegen im Entwurf, wo
             # sie liegen; verteilt werden sie beim Start.
-            yj = c.extra.get("layout") if isinstance(c.extra.get("layout"), dict) else {}
+            yj0 = c.extra.get("layout")
+            yj: dict = yj0 if isinstance(yj0, dict) else {}
             qp.setBrush(Qt.BrushStyle.NoBrush); qp.setPen(QPen(accent, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
             qp.setPen(_col(th["muted_fg"]))
             qp.drawText(r.adjusted(4, 2, -4, -2), al.AlignLeft | al.AlignTop, "Layout: " + str(yj.get("art") or "spalte"))
@@ -1665,6 +1667,13 @@ class _Inspector(QWidget):
         self.ziehbar = QCheckBox("ziehbar (Quelle)")
         self.ablage = QCheckBox("Ablage (nimmt Gezogenes an)")
         self.in_panel = QComboBox()
+        # Mindestmass und Pruefregeln.
+        self.min_w = QSpinBox(); self.min_w.setRange(0, 4000)
+        self.min_h = QSpinBox(); self.min_h.setRange(0, 4000)
+        self.regeln = QLineEdit()
+        self.regeln.setPlaceholderText("pflicht; laenge 2 60; email; bereich 0 100; muster [0-9]{5}")
+        self.regeln.setToolTip("Regeln durch ; getrennt: pflicht, zahl, ganz, bereich a b, laenge min max, email, datum, muster regex. "
+                               "Eigene Meldung mit = dahinter: pflicht = Der Name fehlt.")
         # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
         # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
         # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
@@ -1759,6 +1768,9 @@ class _Inspector(QWidget):
         self._add("", self.ziehbar)
         self._add("", self.ablage)
         self._add("Panel", self.in_panel)
+        self._add("Min-Breite", self.min_w)
+        self._add("Min-Hoehe", self.min_h)
+        self._add("Regeln", self.regeln)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1810,8 +1822,9 @@ class _Inspector(QWidget):
             _w.toggled.connect(self._apply)
         for _w in (self.ly_art, self.ly_ausr, self.in_layout, self.bildmodus, self.in_panel):
             _w.currentIndexChanged.connect(self._apply)
-        for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht):
+        for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht, self.min_w, self.min_h):
             _w.valueChanged.connect(self._apply)
+        self.regeln.editingFinished.connect(self._apply)
         self.datum.editingFinished.connect(self._apply)
         self.orient.currentIndexChanged.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
@@ -1994,10 +2007,12 @@ class _Inspector(QWidget):
         self.nur_lesen.setChecked(c.nur_lesen); self.maxlaenge.setValue(c.maxlaenge)
         zi = self.zahlen.findData(int(c.zahlen))
         self.zahlen.setCurrentIndex(zi if zi >= 0 else 0)
-        lj = c.extra.get("list") if isinstance(c.extra.get("list"), dict) else {}
+        lj0 = c.extra.get("list")
+        lj: dict = lj0 if isinstance(lj0, dict) else {}
         self.l_multi.setChecked(bool(lj.get("multi")))
         self.l_kaestchen.setChecked(bool(lj.get("kaestchen")))
-        yj = c.extra.get("layout") if isinstance(c.extra.get("layout"), dict) else {}
+        yj0 = c.extra.get("layout")
+        yj: dict = yj0 if isinstance(yj0, dict) else {}
         ai = self.ly_art.findData(str(yj.get("art") or "spalte"))
         self.ly_art.setCurrentIndex(ai if ai >= 0 else 1)
         self.ly_spalten.setValue(int(yj.get("spalten") or 2))
@@ -2031,6 +2046,9 @@ class _Inspector(QWidget):
         self.s_senkrecht.setChecked(bool(c.extra.get("vertical")))
         self.ziehbar.setChecked(bool(c.extra.get("draggable")))
         self.ablage.setChecked(bool(c.extra.get("drop_target")))
+        self.min_w.setValue(int(c.extra.get("min_w") or 0))
+        self.min_h.setValue(int(c.extra.get("min_h") or 0))
+        self.regeln.setText(regeln_text(c.extra.get("rules")))
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -2083,6 +2101,9 @@ class _Inspector(QWidget):
         self._show(self.ziehbar, not ist_layout)
         self._show(self.ablage, not ist_layout)
         self._show(self.in_panel, self.in_panel.count() > 1 and c.kind not in ("panel", "layout"))
+        self._show(self.min_w, True)
+        self._show(self.min_h, True)
+        self._show(self.regeln, c.kind in ("textinput", "textarea", "dropdown", "checkbox", "toggle"))
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -2144,6 +2165,17 @@ class _Inspector(QWidget):
             yj.setdefault("kinder", [])
             c.extra["layout"] = yj
             self._show(self.ly_spalten, yj["art"] == "raster")
+        for schluessel, feld in (("min_w", self.min_w), ("min_h", self.min_h)):
+            if feld.value() > 0:
+                c.extra[schluessel] = feld.value()
+            else:
+                c.extra.pop(schluessel, None)
+        if c.kind in ("textinput", "textarea", "dropdown", "checkbox", "toggle"):
+            rl = regeln_parsen(self.regeln.text())
+            if rl:
+                c.extra["rules"] = rl
+            else:
+                c.extra.pop("rules", None)
         for schluessel, feld in (("indeterminate", self.p_unbestimmt), ("vertical", self.s_senkrecht),
                                  ("draggable", self.ziehbar), ("drop_target", self.ablage)):
             if feld.isChecked():

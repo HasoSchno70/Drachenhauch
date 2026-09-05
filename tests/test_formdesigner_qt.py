@@ -1707,3 +1707,26 @@ def test_inspector_feinschliff_felder(tmp_path):
     win.canvas._select(pn)
     assert not i.in_panel.isVisibleTo(i), "ein Panel steckt nicht in einem Panel"
     win.close()
+
+
+def test_inspector_mindestmass_und_regeln(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    i = win.inspector
+    tf = win.canvas.doc.add("textinput", 10, 10)
+    win.canvas._select(tf)
+    assert i.regeln.isVisibleTo(i) and i.min_w.isVisibleTo(i)
+    i.min_w.setValue(150)
+    i.regeln.setText("pflicht = Der Name fehlt.; email")
+    i._apply()
+    assert tf.extra["min_w"] == 150 and "min_h" not in tf.extra
+    assert [r["art"] for r in tf.extra["rules"]] == ["pflicht", "email"]
+    assert tf.extra["rules"][0]["meldung"] == "Der Name fehlt."
+    # Leeren nimmt die Regeln wieder heraus; ein Knopf hat kein Regel-Feld.
+    i.regeln.setText("")
+    i._apply()
+    assert "rules" not in tf.extra
+    btn = win.canvas.doc.add("button", 10, 60)
+    win.canvas._select(btn)
+    assert not i.regeln.isVisibleTo(i) and i.min_w.isVisibleTo(i)
+    win.close()

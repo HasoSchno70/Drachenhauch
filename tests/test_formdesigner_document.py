@@ -1120,3 +1120,25 @@ def test_codegen_feinschliff():
     ohne = FormDoc(); ohne.add("slider", 0, 0); ohne.add("image", 0, 0); ohne.add("progress", 0, 0)
     c2 = ohne.generate_gb_code()
     assert "GUI_VSLIDER" not in c2 and "GUI_IMAGE_MODE" not in c2 and "GUI_PROGRESS_SET" not in c2
+
+
+# ---------------------------------------------------------------- Mindestmass + Regeln
+def test_regeln_zeile_hin_und_zurueck_und_codegen():
+    from drachenhauch.formdesigner.document import regeln_parsen, regeln_text
+    zeile = "pflicht = Der Name fehlt.; laenge 2 60; muster [0-9]{5} = PLZ; email; quatsch 3"
+    rl = regeln_parsen(zeile)
+    assert [r["art"] for r in rl] == ["pflicht", "laenge", "muster", "email"], "Unbekanntes wird uebergangen"
+    assert rl[0]["meldung"] == "Der Name fehlt." and rl[1]["a"] == 2 and rl[1]["b"] == 60 and rl[2]["text"] == "[0-9]{5}"
+    assert regeln_text(rl) == "pflicht = Der Name fehlt.; laenge 2 60; muster [0-9]{5} = PLZ; email"
+    doc = FormDoc()
+    tf = doc.add("textinput", 10, 10)
+    tf.extra["rules"] = rl
+    tf.extra["min_w"] = 120
+    code = doc.generate_gb_code()
+    assert 'GUI_RULE(txt1, "pflicht", "Der Name fehlt.")' in code
+    assert 'GUI_RULE(txt1, "laenge", 2, 60)' in code
+    assert 'GUI_RULE(txt1, "muster", "[0-9]{5}", "PLZ")' in code
+    assert "GUI_SET_MIN_SIZE(txt1, 120, 0)" in code
+    # Roundtrip durch die Datei: unbekannte Schluessel gehen durch extra.
+    d = doc.to_dict()
+    assert FormDoc.from_dict(d).controls[0].extra["rules"] == rl

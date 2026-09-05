@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1679,
+ "count": 1691,
  "builtins": [
   {
    "name": "ABS",
@@ -2901,6 +2901,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CLEAR_ERRORS",
+   "kind": "core",
+   "signature": "GUI_CLEAR_ERRORS(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CLICKED",
    "kind": "core",
    "signature": "GUI_CLICKED(wdg)",
@@ -3087,6 +3093,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ERROR",
+   "kind": "core",
+   "signature": "GUI_ERROR(feld)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ERROR_LABEL",
+   "kind": "core",
+   "signature": "GUI_ERROR_LABEL(feld, label)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_FOCUS",
    "kind": "core",
    "signature": "GUI_FOCUS(wdg)",
@@ -3198,6 +3216,18 @@
    "name": "GUI_LAYOUT_ADD",
    "kind": "core",
    "signature": "GUI_LAYOUT_ADD(layout, wdg[, gewicht])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_MIN_H",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_MIN_H(layout)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_MIN_W",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_MIN_W(layout)",
    "module": "gui"
   },
   {
@@ -3543,6 +3573,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_RULE",
+   "kind": "core",
+   "signature": "GUI_RULE(2..5 Argumente)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RULES_CLEAR",
+   "kind": "core",
+   "signature": "GUI_RULES_CLEAR(feld)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SAVE",
    "kind": "core",
    "signature": "GUI_SAVE(win, pfad$)",
@@ -3621,6 +3663,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_ERROR",
+   "kind": "core",
+   "signature": "GUI_SET_ERROR(feld, meldung$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_FONT",
    "kind": "core",
    "signature": "GUI_SET_FONT(wdg, font)",
@@ -3648,6 +3696,12 @@
    "name": "GUI_SET_LISTBOX",
    "kind": "core",
    "signature": "GUI_SET_LISTBOX(lb, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_MIN_SIZE",
+   "kind": "core",
+   "signature": "GUI_SET_MIN_SIZE(widget, min_w, min_h)",
    "module": "gui"
   },
   {
@@ -4140,6 +4194,24 @@
    "name": "GUI_UPDATE",
    "kind": "graphics",
    "signature": "GUI_UPDATE()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_VALIDATE",
+   "kind": "core",
+   "signature": "GUI_VALIDATE(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_VALIDATE_LIVE",
+   "kind": "core",
+   "signature": "GUI_VALIDATE_LIVE(win, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_VALIDATE_WIDGET",
+   "kind": "core",
+   "signature": "GUI_VALIDATE_WIDGET(feld)",
    "module": "gui"
   },
   {

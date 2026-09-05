@@ -5204,6 +5204,41 @@ impl<'p> Vm<'p> {
             "gui_layout_remove" => { self.gui.layout_remove(gi(a,0,"GUI_LAYOUT_REMOVE")?, gi(a,1,"GUI_LAYOUT_REMOVE")?)?; Value::Nil }
             "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gnum(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
             "gui_autosize" => { let g = self.gfx.as_ref(); self.gui.autosize(g, gi(a,0,"GUI_AUTOSIZE")?)?; Value::Nil }
+            // --- Mindestmasse + Formularpruefung ---
+            "gui_set_min_size" => { self.gui.set_min_size(gi(a,0,"GUI_SET_MIN_SIZE")?, gi(a,1,"GUI_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_SET_MIN_SIZE")? as i32)?; Value::Nil }
+            "gui_layout_min_w" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_W")?)?.0),
+            "gui_layout_min_h" => Value::Int(self.gui.layout_min(gi(a,0,"GUI_LAYOUT_MIN_H")?)?.1),
+            "gui_rule" => {
+                // GUI_RULE(feld, art$[, a, b][, muster$][, meldung$]) -- die
+                // Zahl der Argumente haengt an der Art; der letzte Text ist
+                // immer die Meldung, wenn einer uebrig bleibt.
+                let feld = gi(a,0,"GUI_RULE")?;
+                let art = gs(a,1,"GUI_RULE")?.to_ascii_lowercase();
+                let (mut x, mut y, mut muster, mut meldung) = (0.0, 0.0, String::new(), String::new());
+                let mut rest = 2;
+                match art.as_str() {
+                    "bereich" | "range" | "laenge" | "länge" | "length" => {
+                        if a.len() < 4 { return Err(format!("GUI_RULE: '{}' braucht von und bis", art)); }
+                        x = gnum(a,2,"GUI_RULE")?; y = gnum(a,3,"GUI_RULE")?; rest = 4;
+                    }
+                    "muster" | "pattern" | "regex" => {
+                        if a.len() < 3 { return Err("GUI_RULE: 'muster' braucht das Muster".into()); }
+                        muster = gs(a,2,"GUI_RULE")?; rest = 3;
+                    }
+                    _ => {}
+                }
+                if a.len() > rest { meldung = gs(a,rest,"GUI_RULE")?; }
+                if a.len() > rest + 1 { return Err("GUI_RULE: zu viele Argumente".into()); }
+                self.gui.rule_add(feld, &art, x, y, muster, meldung)?; Value::Nil
+            }
+            "gui_rules_clear" => { self.gui.rules_clear(gi(a,0,"GUI_RULES_CLEAR")?)?; Value::Nil }
+            "gui_validate" => Value::Int(self.gui.validate(gi(a,0,"GUI_VALIDATE")?)?),
+            "gui_validate_widget" => Value::Str(Rc::from(self.gui.validate_widget(gi(a,0,"GUI_VALIDATE_WIDGET")?)?)),
+            "gui_error" => Value::Str(Rc::from(self.gui.error_get(gi(a,0,"GUI_ERROR")?)?)),
+            "gui_set_error" => { self.gui.error_set(gi(a,0,"GUI_SET_ERROR")?, gs(a,1,"GUI_SET_ERROR")?)?; Value::Nil }
+            "gui_clear_errors" => { self.gui.errors_clear(gi(a,0,"GUI_CLEAR_ERRORS")?)?; Value::Nil }
+            "gui_error_label" => { self.gui.error_label(gi(a,0,"GUI_ERROR_LABEL")?, gi(a,1,"GUI_ERROR_LABEL")?)?; Value::Nil }
+            "gui_validate_live" => { self.gui.validate_live(gi(a,0,"GUI_VALIDATE_LIVE")?, gbool(a,1,"GUI_VALIDATE_LIVE")?)?; Value::Nil }
             // --- Punkt 6: senkrechter Schieber, Fortschritt, Bildmodi, Cursor, Baum, Panel, Ziehen ---
             "gui_vslider" => Value::Int(self.gui.vslider(gi(a,0,"GUI_VSLIDER")?, gi(a,1,"GUI_VSLIDER")? as i32,
                 gi(a,2,"GUI_VSLIDER")? as i32, gi(a,3,"GUI_VSLIDER")? as i32,
