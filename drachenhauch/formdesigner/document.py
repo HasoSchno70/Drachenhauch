@@ -1521,4 +1521,13 @@ class FormDoc:
             if r.get("meldung"):
                 args.append(_gb_str(str(r["meldung"])))
             out.append(f"GUI_RULE({', '.join(args)})")
+        if k == "textarea" and c.extra.get("wrap_text"):
+            out.append(f'GUI_TEXTAREA_SET({var}, "umbruch", 1)')
+        bind = c.extra.get("bind")
+        if isinstance(bind, str) and bind:
+            form = c.extra.get("form")
+            if isinstance(form, str) and form:
+                out.append(f"GUI_BIND({var}, {_gb_str(bind)}, {_gb_str(form)})")
+            else:
+                out.append(f"GUI_BIND({var}, {_gb_str(bind)})")
         return out

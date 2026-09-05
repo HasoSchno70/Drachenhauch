@@ -613,6 +613,36 @@ module.exports = (H) => [
       'GUI_LAYOUT_SET(kopf, "dehnen", 0) : GUI_LAYOUT_SET(kopf, "ausrichtung", 1)',
       'GUI_LAYOUT_SET(form, "rahmen", 1)      \' zeigt, wo der Behaelter liegt',
     ]),
+  H.cmd("GUI_TEXTAREA_SET", 'GUI_TEXTAREA_SET(ta, schluessel$, wert)',
+    "Stellt einen Textbereich ein: \"umbruch\" (1 = an Wortgrenzen umbrechen – für Notizen und Briefe statt Code; Pos1, Ende und Pfeile laufen dann in sichtbaren Zeilen), \"zeilennummern\", \"aktive_zeile\", \"tab_fuegt_ein\" (TAB rückt ein statt das Bedienelement zu wechseln) und \"tabbreite\".",
+    [
+      'GUI_TEXTAREA_SET(notiz, "umbruch", 1)',
+      'GUI_TEXTAREA_SET(code, "zeilennummern", 1) : GUI_TEXTAREA_SET(code, "tab_fuegt_ein", 1)',
+    ]),
+  H.cmd("GUI_BIND", 'GUI_BIND(widget, schluessel$ [, formular$])',
+    "Datenbindung: das Widget trägt einen Schlüssel – den Spaltennamen, unter dem sein Wert gelesen und gesetzt wird. Der Formularname hält mehrere Formulare in einem Fenster (Reiter) auseinander. Bindbar sind Textfeld, Textbereich, Beschriftung, Kästchen, Kippschalter, Klappliste, Schieber, Drehfeld, Drehregler, Datums- und Farbwähler; der Schlüssel darf nur Buchstaben, Ziffern und _ enthalten.",
+    [
+      'GUI_BIND(tfName, "name", "kunde")',
+      'GUI_BIND(cbAktiv, "aktiv", "kunde")',
+    ]),
+  H.cmd("GUI_FORM_GET · GUI_FORM_SET · GUI_FORM_CLEAR", 'GUI_FORM_GET(win [, formular$]) AS MAP OF STRING   GUI_FORM_SET(win, werte [, formular$])   GUI_FORM_CLEAR(win [, formular$])',
+    "Alle gebundenen Werte eines Formulars als MAP lesen (Kästchen 1/0, Klappliste als Index), aus einer MAP setzen (tolerant: \"ja\", 1 oder TRUE setzen einen Haken, ein Eintragstext oder ein Index wählt in der Klappliste; nicht genannte Schlüssel bleiben) oder alles leeren. Nach SET und CLEAR gilt der Stand als gespeichert.",
+    [
+      'DIM m AS MAP OF STRING : m = GUI_FORM_GET(win, "kunde")',
+      'PRINT MAPGET(m, "name")',
+      'GUI_FORM_CLEAR(win, "kunde")           \' Neuer Kunde',
+    ]),
+  H.cmd("GUI_FORM_CHANGED · GUI_FORM_CLEAN", 'GUI_FORM_CHANGED(win [, formular$]) AS BOOLEAN   GUI_FORM_CLEAN(win [, formular$])',
+    "Hat sich ein gebundener Wert seit dem letzten Setzen, Laden, Speichern oder Bereinigen geändert? Damit ist die Rückfrage \"Speichern | Verwerfen | Abbrechen\" eine Zeile. GUI_FORM_CLEAN erklärt den jetzigen Stand für gespeichert.",
+    [
+      'IF GUI_FORM_CHANGED(win, "kunde") THEN frage = GUI_DIALOG("Aenderungen", "Speichern?", "Speichern|Verwerfen|Abbrechen")',
+    ]),
+  H.cmd("GUI_FORM_LOAD · GUI_FORM_SAVE", 'GUI_FORM_LOAD(win, db, tabelle$, id [, formular$]) AS BOOLEAN   GUI_FORM_SAVE(win, db, tabelle$, id [, formular$]) AS INTEGER',
+    "Das Formular gegen eine SQLite-Tabelle: LOAD liest SELECT schluessel… FROM tabelle WHERE id = ? in die gebundenen Widgets (FALSE, wenn es die Zeile nicht gibt); SAVE schreibt INSERT (bei id < 0, liefert die neue id) oder UPDATE. Gespeichert wird typisiert: Zahlenfeld als Zahl (außer mit führender Null, wie eine Postleitzahl), Kästchen als 0/1, Klappliste als Index, Regler als Kommazahl, sonst Text. Die Spalte heißt id.",
+    [
+      'IF GUI_VALIDATE(win) = 0 THEN kundeId = GUI_FORM_SAVE(win, db, "kunden", kundeId, "kunde")',
+      'IF NOT GUI_FORM_LOAD(win, db, "kunden", id, "kunde") THEN PRINT "gibt es nicht mehr"',
+    ]),
   H.cmd("GUI_SET_MIN_SIZE · GUI_LAYOUT_MIN_W · GUI_LAYOUT_MIN_H", 'GUI_SET_MIN_SIZE(widget, min_w, min_h)   GUI_LAYOUT_MIN_W(layout)   GUI_LAYOUT_MIN_H(layout)',
     "Mindestmaß eines Widgets: ein gewichtetes Kind in einem Layout-Behälter fällt nie darunter (dann läuft die Zeile lieber über, als dass ein Knopf zu einem Strich wird), ein verankertes Widget schrumpft beim Verkleinern des Fensters nicht darunter. GUI_LAYOUT_MIN_W/H liefern, was ein Behälter samt Inhalt mindestens braucht – der richtige Wert für WINDOW_MIN_SIZE.",
     [

@@ -32,6 +32,11 @@ IMPORT "gui"
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | gerahmte Gruppe mit eingelassenem Titel |
+| `GUI_BIND(wdg, schluessel$[, formular$])` | — | **Datenbindung**: das Widget trägt einen Schlüssel (Spaltennamen) — siehe [Datenbindung](#datenbindung) |
+| `GUI_FORM_GET(win[, formular$])` / `GUI_FORM_SET(win, map[, formular$])` | MAP OF STRING / — | alle gebundenen Werte lesen / aus einer MAP setzen |
+| `GUI_FORM_CLEAR` / `GUI_FORM_CLEAN` / `GUI_FORM_CHANGED(win[, formular$])` | — / — / BOOL | leeren / als gespeichert markieren / seit dem letzten Setzen geändert? |
+| `GUI_FORM_LOAD(win, db, tabelle$, id[, formular$])` / `GUI_FORM_SAVE(…)` | BOOL / INTEGER | Zeile `WHERE id = ?` in die Widgets laden / INSERT (id < 0) oder UPDATE, liefert die id |
+| `GUI_TEXTAREA_SET(ta, "umbruch", 1)` | — | Textbereich bricht an Wortgrenzen um (Notizen, Briefe) |
 | `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
 | `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
 | `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
@@ -1657,6 +1662,67 @@ Kein Constraint-System — für ein Formular reicht das, und man versteht es noc
 (Art, Maße, `kinder` als `[Index, Gewicht]`); der Form-Designer kennt ihn als
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
+
+## Zeilenumbruch im Textbereich
+
+Der Textbereich war ein Code-Feld: lange Zeilen rollen waagerecht. Für
+Notizen und Briefe schaltet `GUI_TEXTAREA_SET(ta, "umbruch", 1)` den Umbruch
+an Wortgrenzen ein (ein Wort, das allein nicht passt, bricht im Zeichen).
+Pos1, Ende und die Pfeile bewegen sich dann in **sichtbaren** Zeilen, wie in
+jedem Editor; Zeilennummern stehen nur an der ersten Zeile eines Absatzes;
+`GUI_TEXTAREA_VIEW` zählt weiter logische Zeilen. Mit Umbruch gibt es keinen
+waagerechten Versatz. In der `.dhform`: `wrap_text`.
+
+## Datenbindung
+
+Der sechste Pilot füllte drei Formulare von Hand aus der Datenbank und schrieb
+sie von Hand zurück: je Feld ein `GUI_SET_TEXT`, ein Parameter im `UPDATE`,
+und ein zusammengeklebter Text für die Frage „geändert?". Seit 2026-09-05
+trägt ein Widget einen **Schlüssel**, und ein Aufruf erledigt das Formular:
+
+```basic
+GUI_BIND(tfName, "name", "kunde")
+GUI_BIND(tfPlz, "plz", "kunde")
+GUI_BIND(cbAktiv, "aktiv", "kunde")
+GUI_BIND(ddArt, "art", "kunde")
+
+' laden, speichern, fragen -- ohne eine einzige Spaltenliste im Programm
+IF NOT GUI_FORM_LOAD(win, db, "kunden", id, "kunde") THEN status("weg")
+IF GUI_VALIDATE(win) = 0 THEN id = GUI_FORM_SAVE(win, db, "kunden", id, "kunde")
+IF GUI_FORM_CHANGED(win, "kunde") THEN nachfragen()
+```
+
+- **Formularname** (dritter Parameter, Vorgabe leer): mehrere Formulare in
+  einem Fenster — etwa auf Reitern — halten sich damit auseinander, und
+  derselbe Schlüssel `name` darf in zweien vorkommen.
+- **Was gebunden werden kann:** Textfeld, Textbereich, Beschriftung,
+  Kästchen, Kippschalter, Klappliste, Schieber, Drehfeld, Drehregler, Datums-
+  und Farbwähler. Der Schlüssel darf nur Buchstaben, Ziffern und `_`
+  enthalten — er wird ein Spaltenname.
+- **Werte:** `GUI_FORM_GET` liefert alles als Text (Kästchen `1`/`0`,
+  Klappliste ihren Index, Zahlen mit Punkt). `GUI_FORM_SET` nimmt jede MAP und
+  ist tolerant: `"ja"`, `1` oder `TRUE` setzen einen Haken, ein
+  Eintragstext oder ein Index wählt in der Klappliste, eine Zahl als Text
+  landet im Regler. Nicht genannte Schlüssel lassen ihr Widget stehen.
+- **Datenbank:** `GUI_FORM_LOAD` liest `SELECT schlüssel… FROM tabelle WHERE
+  id = ?` und liefert FALSE, wenn es die Zeile nicht gibt; `GUI_FORM_SAVE`
+  schreibt `INSERT` (bei `id < 0`, liefert die neue id) oder `UPDATE`. Die
+  Spalte heißt `id` — die Konvention von SQLite. Gespeichert wird
+  **typisiert**: ein Zahlenfeld als Zahl (außer es beginnt mit einer Null wie
+  eine Postleitzahl — das bleibt Text), ein Kästchen als 0/1, eine Klappliste
+  als Index, ein Regler als Kommazahl, alles andere als Text. Was das
+  Programm umrechnet (Beträge in Cent, eine Klappliste in einen Steuersatz),
+  bindet es nicht und schreibt es selbst.
+- **Geändert?** Beim Binden, nach `GUI_FORM_SET/LOAD/SAVE/CLEAR` und nach
+  `GUI_FORM_CLEAN` gilt der Stand als sauber; `GUI_FORM_CHANGED` vergleicht
+  dagegen. Damit ist die Rückfrage „Speichern | Verwerfen | Abbrechen" eine
+  Zeile.
+- In der `.dhform`: `bind` und `form`; der Form-Designer hat dafür die Felder
+  „Bindung" und „Formular".
+
+Bewusst nicht: Tabellenzeilen an Listen binden, Fremdschlüssel auflösen,
+Verbunde. Das ist die Grenze zwischen Formular und ORM, und hinter ihr ist
+ein `DB_QUERY` ehrlicher.
 
 ## Formularprüfung
 

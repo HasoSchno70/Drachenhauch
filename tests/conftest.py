@@ -210,6 +210,8 @@ _BRAUCHT_GRAFIK = {
     "test_pilot_rechnungen.py",
     "test_gui_layout.py",
     "test_gui_pruefung.py",
+    "test_gui_umbruch.py",
+    "test_gui_bindung.py",
     "test_gui_dialoge_ausbau.py",
     "test_gui_table_frozen_edge.py",
     "test_gui_tastatur.py",

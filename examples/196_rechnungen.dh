@@ -12,6 +12,12 @@
 '      Layout-Behaelter)
 '    * Tabellen mit Filterzeile und Sortierung; jede Zeile merkt sich
 '      ihre Datenbank-id (Sortieren/Filtern stellt Datenzeilen nicht um)
+'    * Kunden-Formular ueber Datenbindung: GUI_BIND je Feld, GUI_FORM_LOAD /
+'      GUI_FORM_SAVE / GUI_FORM_CHANGED erledigen Laden, Speichern und die
+'      Frage "geaendert?" -- keine Spaltenliste mehr im Programm. Der
+'      Artikel rechnet Preis (Cent) und MwSt um und bleibt darum von Hand,
+'      nutzt die Bindung aber fuer die Aenderungserkennung
+'    * Notiz je Kunde in einem Textbereich mit Zeilenumbruch
 '    * Formulare mit Pruefung ueber GUI_RULE / GUI_VALIDATE (Pflichtfeld,
 '      PLZ, E-Mail, Zahl, Datum -- die Meldung steht in einer Beschriftung
 '      und im Tooltip, das falsche Feld bekommt den Fokus), Enter speichert;
@@ -94,7 +100,13 @@ END FUNCTION
 DIM db AS DB_CONN
 DIM neuAngelegt AS BOOLEAN : neuAngelegt = NOT FILEEXISTS(DBDATEI)
 db = DB_OPEN(DBDATEI)
-DB_EXEC(db, "CREATE TABLE IF NOT EXISTS kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strasse TEXT, plz TEXT, ort TEXT, email TEXT)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strasse TEXT, plz TEXT, ort TEXT, email TEXT, notiz TEXT)")
+' Eine Datenbank aus der Zeit vor der Notiz bekommt die Spalte nachgereicht;
+' gibt es sie schon, meldet SQLite das -- und genau das darf hier still sein.
+TRY
+    DB_EXEC(db, "ALTER TABLE kunden ADD COLUMN notiz TEXT")
+CATCH e
+END TRY
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS artikel (id INTEGER PRIMARY KEY, bezeichnung TEXT NOT NULL, preis_cent INTEGER NOT NULL, mwst INTEGER NOT NULL)")
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS rechnungen (id INTEGER PRIMARY KEY, nummer TEXT NOT NULL UNIQUE, kunde_id INTEGER NOT NULL, datum TEXT NOT NULL, bezahlt INTEGER NOT NULL DEFAULT 0)")
 DB_EXEC(db, "CREATE TABLE IF NOT EXISTS positionen (id INTEGER PRIMARY KEY, rechnung_id INTEGER NOT NULL, bezeichnung TEXT NOT NULL, menge INTEGER NOT NULL, preis_cent INTEGER NOT NULL, mwst INTEGER NOT NULL)")
@@ -205,7 +217,7 @@ reiter(tKunden, 0)
 DIM kundenId[MAXZ] AS INTEGER
 DIM kundenAnz AS INTEGER : kundenAnz = 0
 
-DIM fK AS GUI_WIDGET : fK = GUI_LAYOUT(win, "spalte", formX, 12, formW, 330)
+DIM fK AS GUI_WIDGET : fK = GUI_LAYOUT(win, "spalte", formX, 12, formW, 440)
 GUI_SET_ANCHOR(fK, "rt") : GUI_LAYOUT_SET(fK, "abstand", 4)
 reiter(fK, 0)
 DIM lKTitel AS GUI_WIDGET : lKTitel = GUI_LABEL(win, "Kunde", 0, 0)
@@ -223,6 +235,15 @@ reiter(tfKPlz, 0) : reiter(tfKOrt, 0)
 GUI_LAYOUT_ADD(zK, tfKPlz) : GUI_LAYOUT_ADD(zK, tfKOrt, 1)
 GUI_LAYOUT_ADD(fK, zK)
 DIM tfKMail AS GUI_WIDGET : tfKMail = feld(fK, 0, "E-Mail", "name@firma.de")
+DIM lKNotiz AS GUI_WIDGET : lKNotiz = GUI_LABEL(win, "Notiz", 0, 0)
+DIM tfKNotiz AS GUI_WIDGET : tfKNotiz = GUI_TEXTAREA(win, 0, 0, 0, 72, "Was man ueber den Kunden wissen sollte ...")
+GUI_TEXTAREA_SET(tfKNotiz, "umbruch", 1)
+reiter(lKNotiz, 0) : reiter(tfKNotiz, 0)
+GUI_LAYOUT_ADD(fK, lKNotiz) : GUI_LAYOUT_ADD(fK, tfKNotiz)
+' Datenbindung: jedes Feld traegt seinen Spaltennamen. Laden, Speichern und
+' "geaendert?" laufen ueber das Formular "kunde" -- keine Spaltenliste mehr.
+GUI_BIND(tfKName, "name", "kunde") : GUI_BIND(tfKStr, "strasse", "kunde") : GUI_BIND(tfKPlz, "plz", "kunde")
+GUI_BIND(tfKOrt, "ort", "kunde") : GUI_BIND(tfKMail, "email", "kunde") : GUI_BIND(tfKNotiz, "notiz", "kunde")
 DIM lKFehler AS GUI_WIDGET : lKFehler = GUI_LABEL(win, "", 0, 0)
 GUI_SET_COLOR(lKFehler, "fg", ROT) : GUI_SET_WRAP(lKFehler, formW)
 reiter(lKFehler, 0) : GUI_LAYOUT_ADD(fK, lKFehler)
@@ -242,12 +263,7 @@ GUI_LAYOUT_ADD(kK, bKNeu) : GUI_LAYOUT_SPACER(kK) : GUI_LAYOUT_ADD(kK, bKSpeiche
 GUI_LAYOUT_ADD(fK, kK)
 
 DIM kundeId AS INTEGER : kundeId = -1          ' -1 = neuer Kunde
-DIM kStand AS STRING : kStand = ""              ' Formularinhalt beim Laden (fuer "geaendert?")
 DIM kZeileAlt AS INTEGER : kZeileAlt = -1
-
-FUNCTION kFormular$() AS STRING
-    RETURN GUI_TEXT(tfKName) + "|" + GUI_TEXT(tfKStr) + "|" + GUI_TEXT(tfKPlz) + "|" + GUI_TEXT(tfKOrt) + "|" + GUI_TEXT(tfKMail)
-END FUNCTION
 
 SUB kundenLaden()
     GUI_TABLE_CLEAR(tKunden)
@@ -264,22 +280,14 @@ END SUB
 
 SUB kundeZeigen(id AS INTEGER)
     kundeId = id
-    GUI_SET_TEXT(lKFehler, "")
+    GUI_CLEAR_ERRORS(win)
     IF id < 0 THEN
-        GUI_SET_TEXT(tfKName, "") : GUI_SET_TEXT(tfKStr, "") : GUI_SET_TEXT(tfKPlz, "")
-        GUI_SET_TEXT(tfKOrt, "") : GUI_SET_TEXT(tfKMail, "")
+        GUI_FORM_CLEAR(win, "kunde")
         GUI_SET_TEXT(lKTitel, "Neuer Kunde")
     ELSE
-        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, strasse, plz, ort, email FROM kunden WHERE id = ?", id)
-        IF DB_NEXT(r) THEN
-            GUI_SET_TEXT(tfKName, DB_GET_STRING(r, 0)) : GUI_SET_TEXT(tfKStr, DB_GET_STRING(r, 1))
-            GUI_SET_TEXT(tfKPlz, DB_GET_STRING(r, 2)) : GUI_SET_TEXT(tfKOrt, DB_GET_STRING(r, 3))
-            GUI_SET_TEXT(tfKMail, DB_GET_STRING(r, 4))
-        END IF
-        DB_CLOSE_RESULT(r)
+        IF NOT GUI_FORM_LOAD(win, db, "kunden", id, "kunde") THEN fehler("Kunde #" + STR$(id) + " gibt es nicht mehr.")
         GUI_SET_TEXT(lKTitel, "Kunde #" + STR$(id))
     END IF
-    kStand = kFormular$()
 END SUB
 
 ' Zeile der Tabelle, die eine id traegt (oder -1).
@@ -296,16 +304,8 @@ FUNCTION kundeSpeichern() AS BOOLEAN
     ' sind nicht sichtbar und zaehlen nicht. Genau richtig hier.
     IF GUI_VALIDATE(win) > 0 THEN RETURN FALSE
     DIM name AS STRING : name = TRIM$(GUI_TEXT(tfKName))
-    DIM plz AS STRING : plz = TRIM$(GUI_TEXT(tfKPlz))
-    DIM mail AS STRING : mail = TRIM$(GUI_TEXT(tfKMail))
-    IF kundeId < 0 THEN
-        DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", _
-                name, TRIM$(GUI_TEXT(tfKStr)), plz, TRIM$(GUI_TEXT(tfKOrt)), mail)
-        kundeId = DB_LAST_ROWID(db)
-    ELSE
-        DB_EXEC(db, "UPDATE kunden SET name = ?, strasse = ?, plz = ?, ort = ?, email = ? WHERE id = ?", _
-                name, TRIM$(GUI_TEXT(tfKStr)), plz, TRIM$(GUI_TEXT(tfKOrt)), mail, kundeId)
-    END IF
+    ' INSERT oder UPDATE, je nach id -- die Spalten kennt das Formular.
+    kundeId = GUI_FORM_SAVE(win, db, "kunden", kundeId, "kunde")
     kundenLaden()
     kZeileAlt = zeileVonId(kundenId, kundenAnz, kundeId)
     GUI_TABLE_SET_SELECTED(tKunden, kZeileAlt)
@@ -355,8 +355,10 @@ GUI_LAYOUT_ADD(kA, bANeu) : GUI_LAYOUT_SPACER(kA) : GUI_LAYOUT_ADD(kA, bASpeiche
 GUI_LAYOUT_ADD(fA, kA)
 
 DIM artikelIdAkt AS INTEGER : artikelIdAkt = -1
-DIM aStand AS STRING : aStand = ""
 DIM aZeileAlt AS INTEGER : aZeileAlt = -1
+' Der Artikel rechnet Preis (Cent) und MwSt (Index -> Satz) um und schreibt
+' darum selbst -- die Bindung dient hier nur der Frage "geaendert?".
+GUI_BIND(tfABez, "bezeichnung", "artikel") : GUI_BIND(tfAPreis, "preis", "artikel") : GUI_BIND(ddAMwst, "mwst", "artikel")
 
 FUNCTION mwstVonIndex(i AS INTEGER) AS INTEGER
     IF i = 1 THEN RETURN 7
@@ -367,10 +369,6 @@ FUNCTION indexVonMwst(m AS INTEGER) AS INTEGER
     IF m = 7 THEN RETURN 1
     IF m = 0 THEN RETURN 2
     RETURN 0
-END FUNCTION
-
-FUNCTION aFormular$() AS STRING
-    RETURN GUI_TEXT(tfABez) + "|" + GUI_TEXT(tfAPreis) + "|" + STR$(GUI_DROPDOWN_SELECTED(ddAMwst))
 END FUNCTION
 
 SUB artikelLaden()
@@ -404,7 +402,7 @@ SUB artikelZeigen(id AS INTEGER)
         DB_CLOSE_RESULT(r)
         GUI_SET_TEXT(lATitel, "Artikel #" + STR$(id))
     END IF
-    aStand = aFormular$()
+    GUI_FORM_CLEAN(win, "artikel")
 END SUB
 
 FUNCTION artikelSpeichern() AS BOOLEAN
@@ -929,8 +927,8 @@ WHILE NOT QUITREQUESTED()
     IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
     GUI_UPDATE()
     DIM seite AS INTEGER : seite = GUI_ACTIVE_TAB(win)
-    DIM kDirty AS BOOLEAN : kDirty = kFormular$() <> kStand
-    DIM aDirty AS BOOLEAN : aDirty = aFormular$() <> aStand
+    DIM kDirty AS BOOLEAN : kDirty = GUI_FORM_CHANGED(win, "kunde")
+    DIM aDirty AS BOOLEAN : aDirty = GUI_FORM_CHANGED(win, "artikel")
     DIM rDirty AS BOOLEAN : rDirty = rFormular$() <> rStand
 
     ' --- Antwort auf die Rueckfrage (ein Bild lang) ---
