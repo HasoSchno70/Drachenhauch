@@ -32,6 +32,12 @@ IMPORT "gui"
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | gerahmte Gruppe mit eingelassenem Titel |
+| `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` | — | Mindestmaß: ein gewichtetes Kind im Behälter und ein verankertes Widget schrumpfen nicht darunter |
+| `GUI_LAYOUT_MIN_W(layout)` / `GUI_LAYOUT_MIN_H(layout)` | INTEGER | was ein Behälter mindestens braucht — der Wert für `WINDOW_MIN_SIZE` |
+| `GUI_RULE(feld, art$[, a, b][, muster$][, meldung$])` | — | **Prüfregel** anhängen: `pflicht`, `zahl`, `ganz`, `bereich a b`, `laenge min max`, `email`, `datum`, `muster regex$` — siehe [Formularprüfung](#formularprüfung) |
+| `GUI_VALIDATE(win)` / `GUI_VALIDATE_WIDGET(feld)` | INTEGER / STRING | alle Regeln des Fensters prüfen (Zahl der Fehler, erstes Feld bekommt den Fokus) / ein Feld (Meldung oder "") |
+| `GUI_ERROR(feld)` / `GUI_SET_ERROR(feld, meldung$)` / `GUI_CLEAR_ERRORS(win)` | STRING / — / — | Meldung lesen, von außen setzen (z. B. aus der Datenbank), alle löschen |
+| `GUI_ERROR_LABEL(feld, label)` / `GUI_VALIDATE_LIVE(win, an)` / `GUI_RULES_CLEAR(feld)` | — | Beschriftung zeigt die Meldung / beim Verlassen eines Feldes prüfen / Regeln entfernen |
 | `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **senkrechter Schieber** — `h` ist die Länge, der Wert wächst nach oben |
 | `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt |
 | `GUI_IMAGE_MODE(image, modus$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (Vorgabe), `einpassen`, `fuellen`, `mitte`, `kacheln` |
@@ -1639,11 +1645,67 @@ Die Regeln, kurz:
   ihn gestrichelt, zum Entwickeln.
 - Anker gelten für den **Behälter**; seine Kinder bekommen ihre Lage von ihm.
 
-Kein Constraint-System, keine Mindestgrößen — für ein Formular reicht das,
-und man versteht es noch. In der `.dhform` steht der Behälter mit `layout`
+**Mindestmaße:** `GUI_SET_MIN_SIZE(wdg, min_w, min_h)` — ein gewichtetes Kind
+fällt nie darunter (dann läuft die Zeile lieber über, als dass ein Knopf zu
+einem Strich wird), ein verankertes Widget beim Schrumpfen des Fensters auch
+nicht. Ein Behälter bringt das Maß seines Inhalts mit (feste Kinder in ihrer
+natürlichen Größe, gewichtete mit ihrem Mindestmaß, Abstände und Rand dazu),
+auch durch mehrere Ebenen. `GUI_LAYOUT_MIN_W/H(layout)` liefern es — der
+richtige Wert für `WINDOW_MIN_SIZE`.
+
+Kein Constraint-System — für ein Formular reicht das, und man versteht es noch. In der `.dhform` steht der Behälter mit `layout`
 (Art, Maße, `kinder` als `[Index, Gewicht]`); der Form-Designer kennt ihn als
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
+
+## Formularprüfung
+
+Der sechste Pilot (die Rechnungsverwaltung) hat dieselbe Prüfung dreimal von
+Hand geschrieben: Pflichtfeld, Postleitzahl, E-Mail, Zahl, Datum, jedes Mal
+mit Fehlertext, Fokus und einer roten Beschriftung. Seit 2026-09-05 hängen
+**Regeln am Feld**, und ein Aufruf prüft das Fenster:
+
+```basic
+GUI_RULE(tfName, "pflicht", "Der Name fehlt.")
+GUI_RULE(tfName, "laenge", 2, 60)
+GUI_RULE(tfPlz, "muster", "[0-9]{5}", "Eine Postleitzahl hat fünf Ziffern.")
+GUI_RULE(tfMail, "email")
+GUI_RULE(tfPreis, "zahl") : GUI_RULE(tfPreis, "bereich", 0, 100000)
+GUI_RULE(tfDatum, "datum")
+GUI_RULE(cbAgb, "pflicht", "Bitte zustimmen.")
+GUI_ERROR_LABEL(tfName, lblFehler)         ' die Meldung erscheint hier
+
+IF GUI_CLICKED(bSpeichern) THEN
+    IF GUI_VALIDATE(win) = 0 THEN speichern()
+END IF
+```
+
+- **Arten:** `pflicht` (Text nicht leer; Klappliste gewählt; Kästchen an),
+  `zahl` (Komma oder Punkt), `ganz`, `bereich a b`, `laenge min max` (in
+  Zeichen), `email`, `datum` (`JJJJ-MM-TT`, echter Kalendertag), `muster`
+  (regulärer Ausdruck, gilt für die **ganze** Eingabe). Der letzte Text ist
+  die eigene Meldung; ohne sie gilt eine deutsche Vorgabe.
+- **Leer lässt jede Regel außer `pflicht` durch.** Ob ein Feld leer sein darf,
+  sagt allein `pflicht` — sonst hieße „Bereich 1..10" zugleich „muss
+  ausgefüllt sein", und das sieht man der Regel nicht an.
+- `GUI_VALIDATE(win)` prüft alle sichtbaren, bedienbaren Felder mit Regeln,
+  liefert die Zahl der Fehler und setzt den Fokus auf das erste falsche Feld.
+  Jedes Feld mit Fehler bekommt einen roten Rahmen; seine Meldung steht im
+  Tooltip (vor einem eigenen Hilfetext) und in der Beschriftung aus
+  `GUI_ERROR_LABEL`. Felder auf einem anderen Reiter oder ausgeblendete
+  zählen nicht — ein Fehler dort wäre einer ohne Ausweg.
+- `GUI_SET_ERROR(feld, meldung$)` setzt eine Meldung von außen, etwa
+  „Nummer schon vergeben" aus der Datenbank; leer nimmt sie zurück.
+  `GUI_CLEAR_ERRORS(win)` löscht alle.
+- `GUI_VALIDATE_LIVE(win, TRUE)` prüft ein Feld, sobald der Fokus es
+  verlässt — nicht bei jedem Anschlag: eine halb getippte Adresse ist keine
+  falsche.
+- Regeln stehen in der `.dhform` (`rules`, `error_label`); der Form-Designer
+  hat dafür ein Feld „Regeln" (`pflicht; laenge 2 60; email`).
+
+Bewusst nicht: eine eigene Regel als FUNCREF. Was eine Regel nicht kann,
+prüft das Programm nach `GUI_VALIDATE` selbst und meldet es mit
+`GUI_SET_ERROR` — dann läuft es durch dieselbe Anzeige.
 
 ## Feinschliff: Schieber, Fortschritt, Bild, Baum, Panel, Ziehen
 

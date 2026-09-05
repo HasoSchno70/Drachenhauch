@@ -303,10 +303,6 @@ pub fn zeichenbreite(schrift: usize, groesse_pt: f64, text: &str) -> Result<f64,
     Ok(summe as f64 * groesse_pt / 1000.0 / MM)
 }
 
-pub fn ist_fest(schrift: usize) -> bool {
-    SCHRIFTEN.get(schrift).map(|(_, _, f)| *f).unwrap_or(false)
-}
-
 /// Text als PDF-Zeichenkette `(...)` -- in WinAnsi (= cp1252) kodiert.
 ///
 /// Ein Zeichen, das cp1252 nicht kennt, ist ein FEHLER und wird nicht durch

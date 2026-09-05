@@ -613,6 +613,33 @@ module.exports = (H) => [
       'GUI_LAYOUT_SET(kopf, "dehnen", 0) : GUI_LAYOUT_SET(kopf, "ausrichtung", 1)',
       'GUI_LAYOUT_SET(form, "rahmen", 1)      \' zeigt, wo der Behaelter liegt',
     ]),
+  H.cmd("GUI_SET_MIN_SIZE · GUI_LAYOUT_MIN_W · GUI_LAYOUT_MIN_H", 'GUI_SET_MIN_SIZE(widget, min_w, min_h)   GUI_LAYOUT_MIN_W(layout)   GUI_LAYOUT_MIN_H(layout)',
+    "Mindestmaß eines Widgets: ein gewichtetes Kind in einem Layout-Behälter fällt nie darunter (dann läuft die Zeile lieber über, als dass ein Knopf zu einem Strich wird), ein verankertes Widget schrumpft beim Verkleinern des Fensters nicht darunter. GUI_LAYOUT_MIN_W/H liefern, was ein Behälter samt Inhalt mindestens braucht – der richtige Wert für WINDOW_MIN_SIZE.",
+    [
+      'GUI_SET_MIN_SIZE(bSenden, 90, 0)',
+      'WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form) + 24, GUI_LAYOUT_MIN_H(form) + 80)',
+    ]),
+  H.cmd("GUI_RULE · GUI_RULES_CLEAR", 'GUI_RULE(feld, art$ [, a, b] [, meldung$])   GUI_RULES_CLEAR(feld)',
+    "Hängt eine Prüfregel an ein Feld (bei \"muster\" steht statt a, b der reguläre Ausdruck): \"pflicht\" (Text nicht leer; Klappliste gewählt; Kästchen an), \"zahl\", \"ganz\", \"bereich a b\", \"laenge min max\" (Zeichen), \"email\", \"datum\" (JJJJ-MM-TT, echter Kalendertag), \"muster regex$\" (gilt für die ganze Eingabe). Der letzte Text ist die eigene Meldung, sonst gilt eine deutsche Vorgabe. Ein leeres Feld lässt jede Regel außer pflicht durch – ob es leer sein darf, sagt allein pflicht.",
+    [
+      'GUI_RULE(tfName, "pflicht", "Der Name fehlt.")',
+      'GUI_RULE(tfPlz, "muster", "[0-9]{5}", "Eine Postleitzahl hat fuenf Ziffern.")',
+      'GUI_RULE(tfPreis, "zahl") : GUI_RULE(tfPreis, "bereich", 0, 100000)',
+      'GUI_RULE(cbAgb, "pflicht", "Bitte zustimmen.")',
+    ]),
+  H.cmd("GUI_VALIDATE · GUI_VALIDATE_WIDGET · GUI_VALIDATE_LIVE", 'GUI_VALIDATE(win) AS INTEGER   GUI_VALIDATE_WIDGET(feld) AS STRING   GUI_VALIDATE_LIVE(win, an)',
+    "GUI_VALIDATE prüft alle sichtbaren, bedienbaren Felder des Fensters gegen ihre Regeln, liefert die Zahl der Fehler und setzt den Fokus auf das erste falsche Feld; jedes falsche Feld bekommt einen roten Rahmen und seine Meldung im Tooltip. GUI_VALIDATE_WIDGET prüft ein Feld und liefert dessen Meldung (\"\" = in Ordnung). GUI_VALIDATE_LIVE prüft ein Feld, sobald der Fokus es verlässt.",
+    [
+      'IF GUI_CLICKED(bSpeichern) THEN',
+      '    IF GUI_VALIDATE(win) = 0 THEN speichern()',
+      'END IF',
+    ]),
+  H.cmd("GUI_ERROR · GUI_SET_ERROR · GUI_CLEAR_ERRORS · GUI_ERROR_LABEL", 'GUI_ERROR(feld) AS STRING   GUI_SET_ERROR(feld, meldung$)   GUI_CLEAR_ERRORS(win)   GUI_ERROR_LABEL(feld, label)',
+    "Die Meldung eines Feldes lesen, von außen setzen (etwa \"Nummer schon vergeben\" aus der Datenbank – leer nimmt sie zurück) oder alle löschen. GUI_ERROR_LABEL bindet eine Beschriftung, die die Meldung anzeigt – dort, wo das Formular sie haben will.",
+    [
+      'GUI_ERROR_LABEL(tfName, lblFehler)',
+      'IF nummerVergeben THEN GUI_SET_ERROR(tfNummer, "Diese Nummer gibt es schon.")',
+    ]),
   H.cmd("GUI_VSLIDER", 'GUI_VSLIDER(win, x, y, h, min, max, default)',
     "Ein senkrechter Schieber: wie GUI_SLIDER, nur steht h (die Länge) statt w, und der Wert wächst nach oben – wie an jedem Mischpult. Pfeil hoch erhöht, Pos1/Ende springen an die Enden.",
     [

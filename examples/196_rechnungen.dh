@@ -12,8 +12,10 @@
 '      Layout-Behaelter)
 '    * Tabellen mit Filterzeile und Sortierung; jede Zeile merkt sich
 '      ihre Datenbank-id (Sortieren/Filtern stellt Datenzeilen nicht um)
-'    * Formulare mit Pruefung (Pflichtfeld, PLZ, E-Mail, Zahlen), Enter
-'      speichert; Wechsel mit ungesicherten Aenderungen fragt nach
+'    * Formulare mit Pruefung ueber GUI_RULE / GUI_VALIDATE (Pflichtfeld,
+'      PLZ, E-Mail, Zahl, Datum -- die Meldung steht in einer Beschriftung
+'      und im Tooltip, das falsche Feld bekommt den Fokus), Enter speichert;
+'      Wechsel mit ungesicherten Aenderungen fragt nach
 '      (Speichern | Verwerfen | Abbrechen)
 '    * Rechnung: Positionen in einer Tabelle, Menge direkt in der Zelle
 '      editierbar, Netto/MwSt/Brutto in CENT gerechnet (nie in FLOAT --
@@ -30,7 +32,6 @@ IMPORT "pdf"
 SCREEN(1120, 680, "Drachenhauch - Rechnungen", 1)
 SETFPS(60)
 WINDOW_RESIZABLE(TRUE)
-WINDOW_MIN_SIZE(840, 540)
 
 DIM uiFont AS INTEGER : uiFont = -1
 DIM fp AS STRING
@@ -225,6 +226,12 @@ DIM tfKMail AS GUI_WIDGET : tfKMail = feld(fK, 0, "E-Mail", "name@firma.de")
 DIM lKFehler AS GUI_WIDGET : lKFehler = GUI_LABEL(win, "", 0, 0)
 GUI_SET_COLOR(lKFehler, "fg", ROT) : GUI_SET_WRAP(lKFehler, formW)
 reiter(lKFehler, 0) : GUI_LAYOUT_ADD(fK, lKFehler)
+' Die Pruefung haengt an den Feldern; kundeSpeichern ruft nur GUI_VALIDATE.
+GUI_RULE(tfKName, "pflicht", "Der Name fehlt.")
+GUI_RULE(tfKName, "laenge", 2, 80)
+GUI_RULE(tfKPlz, "muster", "[0-9]{5}", "Eine Postleitzahl hat fuenf Ziffern.")
+GUI_RULE(tfKMail, "email", "Das sieht nicht nach einer E-Mail-Adresse aus.")
+GUI_ERROR_LABEL(tfKName, lKFehler) : GUI_ERROR_LABEL(tfKPlz, lKFehler) : GUI_ERROR_LABEL(tfKMail, lKFehler)
 DIM kK AS GUI_WIDGET : kK = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
 reiter(kK, 0)
 DIM bKNeu AS GUI_WIDGET : bKNeu = GUI_BUTTON(win, "Neu", 0, 0, 0, 0)
@@ -285,18 +292,12 @@ FUNCTION zeileVonId(ids AS ARRAY OF INTEGER, anz AS INTEGER, id AS INTEGER) AS I
 END FUNCTION
 
 FUNCTION kundeSpeichern() AS BOOLEAN
+    ' GUI_VALIDATE prueft nur die Felder des aktiven Reiters -- die anderen
+    ' sind nicht sichtbar und zaehlen nicht. Genau richtig hier.
+    IF GUI_VALIDATE(win) > 0 THEN RETURN FALSE
     DIM name AS STRING : name = TRIM$(GUI_TEXT(tfKName))
     DIM plz AS STRING : plz = TRIM$(GUI_TEXT(tfKPlz))
     DIM mail AS STRING : mail = TRIM$(GUI_TEXT(tfKMail))
-    IF name = "" THEN
-        GUI_SET_TEXT(lKFehler, "Der Name fehlt.") : GUI_FOCUS(tfKName) : RETURN FALSE
-    END IF
-    IF plz <> "" AND LEN(plz) <> 5 THEN
-        GUI_SET_TEXT(lKFehler, "Eine Postleitzahl hat fuenf Ziffern.") : GUI_FOCUS(tfKPlz) : RETURN FALSE
-    END IF
-    IF mail <> "" AND (INSTR(mail, "@") < 1 OR INSTR(mail, ".") < 0) THEN
-        GUI_SET_TEXT(lKFehler, "Das sieht nicht nach einer E-Mail-Adresse aus.") : GUI_FOCUS(tfKMail) : RETURN FALSE
-    END IF
     IF kundeId < 0 THEN
         DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", _
                 name, TRIM$(GUI_TEXT(tfKStr)), plz, TRIM$(GUI_TEXT(tfKOrt)), mail)
@@ -339,6 +340,11 @@ reiter(ddAMwst, 1) : GUI_LAYOUT_ADD(fA, ddAMwst)
 DIM lAFehler AS GUI_WIDGET : lAFehler = GUI_LABEL(win, "", 0, 0)
 GUI_SET_COLOR(lAFehler, "fg", ROT) : GUI_SET_WRAP(lAFehler, formW)
 reiter(lAFehler, 1) : GUI_LAYOUT_ADD(fA, lAFehler)
+GUI_RULE(tfABez, "pflicht", "Die Bezeichnung fehlt.")
+GUI_RULE(tfAPreis, "pflicht", "Der Preis fehlt.")
+GUI_RULE(tfAPreis, "zahl", "Der Preis ist keine Zahl (z. B. 19,99).")
+GUI_RULE(tfAPreis, "bereich", 0, 1000000)
+GUI_ERROR_LABEL(tfABez, lAFehler) : GUI_ERROR_LABEL(tfAPreis, lAFehler)
 DIM kA AS GUI_WIDGET : kA = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
 reiter(kA, 1)
 DIM bANeu AS GUI_WIDGET : bANeu = GUI_BUTTON(win, "Neu", 0, 0, 0, 0)
@@ -402,13 +408,13 @@ SUB artikelZeigen(id AS INTEGER)
 END SUB
 
 FUNCTION artikelSpeichern() AS BOOLEAN
+    IF GUI_VALIDATE(win) > 0 THEN RETURN FALSE
     DIM bez AS STRING : bez = TRIM$(GUI_TEXT(tfABez))
     DIM cent AS INTEGER : cent = centVon(GUI_TEXT(tfAPreis))
-    IF bez = "" THEN
-        GUI_SET_TEXT(lAFehler, "Die Bezeichnung fehlt.") : GUI_FOCUS(tfABez) : RETURN FALSE
-    END IF
     IF cent < 0 THEN
-        GUI_SET_TEXT(lAFehler, "Der Preis ist keine Zahl (z. B. 19,99).") : GUI_FOCUS(tfAPreis) : RETURN FALSE
+        ' Was die Regel nicht kennt (Tausenderpunkte), meldet das Programm
+        ' ueber denselben Weg.
+        GUI_SET_ERROR(tfAPreis, "Der Preis ist keine Zahl (z. B. 19,99).") : GUI_FOCUS(tfAPreis) : RETURN FALSE
     END IF
     DIM mwst AS INTEGER : mwst = mwstVonIndex(GUI_DROPDOWN_SELECTED(ddAMwst))
     IF artikelIdAkt < 0 THEN
@@ -454,6 +460,8 @@ DIM cbRBezahlt AS GUI_WIDGET : cbRBezahlt = GUI_CHECKBOX(win, "bezahlt", 0, 0)
 reiter(lRNummer, 2) : reiter(lRKunde, 2) : reiter(ddRKunde, 2) : reiter(lRDatum, 2) : reiter(tfRDatum, 2) : reiter(cbRBezahlt, 2)
 GUI_LAYOUT_ADD(zR, lRNummer) : GUI_LAYOUT_SPACER(zR) : GUI_LAYOUT_ADD(zR, lRKunde) : GUI_LAYOUT_ADD(zR, ddRKunde)
 GUI_LAYOUT_ADD(zR, lRDatum) : GUI_LAYOUT_ADD(zR, tfRDatum) : GUI_LAYOUT_ADD(zR, cbRBezahlt)
+GUI_RULE(tfRDatum, "pflicht", "Das Datum fehlt.")
+GUI_RULE(tfRDatum, "datum", "Das Datum muss JJJJ-MM-TT sein.")
 
 ' Positionen: Menge direkt in der Zelle editierbar.
 DIM posH AS INTEGER : posH = tabH - 30 - 12 - 36 - 12 - 70 - 12 - 30
@@ -499,6 +507,7 @@ NEXT
 DIM lRFehler AS GUI_WIDGET : lRFehler = GUI_LABEL(win, "", rX, sY)
 GUI_SET_COLOR(lRFehler, "fg", ROT) : GUI_SET_WRAP(lRFehler, rW - 280) : GUI_SET_ANCHOR(lRFehler, "lb")
 reiter(lRFehler, 2)
+GUI_ERROR_LABEL(tfRDatum, lRFehler)
 
 ' Knopfreihe unten.
 DIM kR AS GUI_WIDGET : kR = GUI_LAYOUT(win, "zeile", rX, sY + 70, rW, 30)
@@ -672,23 +681,13 @@ SUB rechnungZeigen(id AS INTEGER)
     rStand = rFormular$()
 END SUB
 
-FUNCTION datumGueltig(d AS STRING) AS BOOLEAN
-    IF LEN(d) <> 10 THEN RETURN FALSE
-    IF MID$(d, 4, 1) <> "-" OR MID$(d, 7, 1) <> "-" THEN RETURN FALSE
-    DIM m AS INTEGER : m = VAL(MID$(d, 5, 2))
-    DIM t AS INTEGER : t = VAL(MID$(d, 8, 2))
-    RETURN VAL(LEFT$(d, 4)) >= 2000 AND m >= 1 AND m <= 12 AND t >= 1 AND t <= 31
-END FUNCTION
-
 FUNCTION rechnungSpeichern() AS BOOLEAN
     DIM ki AS INTEGER : ki = GUI_DROPDOWN_SELECTED(ddRKunde)
     IF ki < 0 OR ki >= auswKundeAnz THEN
         GUI_SET_TEXT(lRFehler, "Es fehlt der Kunde.") : RETURN FALSE
     END IF
+    IF GUI_VALIDATE(win) > 0 THEN RETURN FALSE
     DIM datum AS STRING : datum = TRIM$(GUI_TEXT(tfRDatum))
-    IF NOT datumGueltig(datum) THEN
-        GUI_SET_TEXT(lRFehler, "Das Datum muss JJJJ-MM-TT sein.") : GUI_FOCUS(tfRDatum) : RETURN FALSE
-    END IF
     IF posAnz = 0 THEN
         GUI_SET_TEXT(lRFehler, "Eine Rechnung ohne Position ist keine.") : RETURN FALSE
     END IF
@@ -916,6 +915,11 @@ END SUB
 kundenLaden() : artikelLaden() : kundenAuswahlFuellen() : artikelAuswahlFuellen() : rechnungenLaden()
 kundeZeigen(-1) : artikelZeigen(-1) : rechnungZeigen(-1)
 GUI_FOCUS(tfKName)
+' Das Fenster darf nicht kleiner werden, als die Behaelter brauchen -- die
+' Zahl kommt aus den Behaeltern selbst, nicht aus einer Schaetzung.
+GUI_UPDATE()
+DIM minB AS INTEGER : minB = 12 + listeW + 12 + GUI_LAYOUT_MIN_W(zR) + 12
+WINDOW_MIN_SIZE(minB, 540)
 
 DIM loeschFrage AS GUI_WINDOW : loeschFrage = -1
 DIM loeschWas AS INTEGER : loeschWas = 0       ' 1 Kunde, 2 Artikel, 3 Rechnung

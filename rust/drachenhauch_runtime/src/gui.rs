@@ -678,6 +678,115 @@ struct TreeNode {
     color: i64,   // Textfarbe, -1 = Thema
 }
 
+/// Eine Pruefregel an einem Formularfeld (GUI_RULE). `a`/`b` sind Zahlen
+/// (Bereich, Laenge), `text` ein Muster, `meldung` der Satz fuer den Nutzer
+/// (leer = Vorgabe der Regel).
+#[derive(Clone, Debug)]
+pub struct Regel {
+    art: RegelArt,
+    a: f64,
+    b: f64,
+    text: String,
+    meldung: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum RegelArt { Pflicht, Zahl, Ganz, Bereich, Laenge, Email, Datum, Muster }
+
+impl RegelArt {
+    fn from_str(s: &str) -> Option<RegelArt> {
+        Some(match s.to_ascii_lowercase().as_str() {
+            "pflicht" | "required" => RegelArt::Pflicht,
+            "zahl" | "number" => RegelArt::Zahl,
+            "ganz" | "integer" => RegelArt::Ganz,
+            "bereich" | "range" => RegelArt::Bereich,
+            "laenge" | "länge" | "length" => RegelArt::Laenge,
+            "email" | "e-mail" => RegelArt::Email,
+            "datum" | "date" => RegelArt::Datum,
+            "muster" | "pattern" | "regex" => RegelArt::Muster,
+            _ => return None,
+        })
+    }
+    fn as_str(self) -> &'static str {
+        match self {
+            RegelArt::Pflicht => "pflicht", RegelArt::Zahl => "zahl", RegelArt::Ganz => "ganz",
+            RegelArt::Bereich => "bereich", RegelArt::Laenge => "laenge", RegelArt::Email => "email",
+            RegelArt::Datum => "datum", RegelArt::Muster => "muster",
+        }
+    }
+}
+
+/// Zahl aus einem Formularfeld: Komma oder Punkt als Dezimaltrenner, Leerraum
+/// aussen herum egal. None, wenn es keine Zahl ist.
+fn zahl_lesen(text: &str) -> Option<f64> {
+    let t = text.trim().replace(',', ".");
+    if t.is_empty() { return None; }
+    t.parse::<f64>().ok().filter(|x| x.is_finite())
+}
+
+fn zahl_kurz(x: f64) -> String {
+    if x.fract() == 0.0 && x.abs() < 1e15 { format!("{}", x as i64) } else { format!("{}", x) }
+}
+
+/// Eine Regel gegen einen Wert pruefen. `text` ist der Feldinhalt (bei
+/// Klappliste/Kaestchen leer, dort zaehlt `gewaehlt`). Liefert die Meldung
+/// oder None, wenn die Regel erfuellt ist. Reine Funktion -- mit Rust-Tests.
+fn regel_pruefen(r: &Regel, text: &str, gewaehlt: bool) -> Option<String> {
+    let t = text.trim();
+    let melde = |vorgabe: String| Some(if r.meldung.is_empty() { vorgabe } else { r.meldung.clone() });
+    match r.art {
+        RegelArt::Pflicht => {
+            if t.is_empty() && !gewaehlt { melde("Pflichtfeld".to_string()) } else { None }
+        }
+        // Alle weiteren Regeln lassen ein LEERES Feld durch -- ob es leer sein
+        // darf, sagt allein `pflicht`. Sonst hiesse "Bereich 1..10" zugleich
+        // "muss ausgefuellt sein", und das sieht man der Regel nicht an.
+        _ if t.is_empty() => None,
+        RegelArt::Zahl => {
+            if zahl_lesen(t).is_none() { melde("Bitte eine Zahl eingeben".to_string()) } else { None }
+        }
+        RegelArt::Ganz => {
+            match zahl_lesen(t) {
+                Some(x) if x.fract() == 0.0 => None,
+                _ => melde("Bitte eine ganze Zahl eingeben".to_string()),
+            }
+        }
+        RegelArt::Bereich => {
+            match zahl_lesen(t) {
+                Some(x) if x >= r.a && x <= r.b => None,
+                _ => melde(format!("Bitte einen Wert von {} bis {} eingeben", zahl_kurz(r.a), zahl_kurz(r.b))),
+            }
+        }
+        RegelArt::Laenge => {
+            let n = t.chars().count() as f64;
+            if n >= r.a && n <= r.b { None }
+            else { melde(format!("Bitte {} bis {} Zeichen eingeben", zahl_kurz(r.a), zahl_kurz(r.b))) }
+        }
+        RegelArt::Email => {
+            let ok = match t.find('@') {
+                Some(p) if p > 0 => {
+                    let rest = &t[p + 1..];
+                    rest.contains('.') && !rest.starts_with('.') && !rest.ends_with('.')
+                        && !rest.contains('@') && !t.contains(char::is_whitespace)
+                }
+                _ => false,
+            };
+            if ok { None } else { melde("Bitte eine gueltige E-Mail-Adresse eingeben".to_string()) }
+        }
+        RegelArt::Datum => {
+            if crate::kalender::parse(t).is_some() { None }
+            else { melde("Bitte ein Datum als JJJJ-MM-TT eingeben".to_string()) }
+        }
+        RegelArt::Muster => {
+            match regex::Regex::new(&format!("^(?:{})$", r.text)) {
+                Ok(re) if re.is_match(t) => None,
+                Ok(_) => melde("Die Eingabe hat nicht das erwartete Format".to_string()),
+                Err(e) => Some(format!("GUI_RULE: ungueltiges Muster '{}': {}", r.text, e)),
+            }
+        }
+    }
+}
+
 /// Ein Panel, das seine Kinder rollt: die Kinder behalten ihre Lage im
 /// Fenster, `scroll` ist nur ein Blick-Versatz (abs_rect zieht ihn ab).
 /// Dadurch muss beim Rollen nichts verschoben werden, und ein Layout im
@@ -823,6 +932,19 @@ pub struct Widget {
     vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
     unbestimmt: bool,    // Progress: laufendes Band statt Wert
     bildmodus: u8,       // Image: 0 strecken, 1 einpassen, 2 fuellen, 3 mitte, 4 kacheln
+    /// Mindestmasse (GUI_SET_MIN_SIZE): ein gewichtetes Kind im Behaelter
+    /// faellt nie darunter, ein verankertes Widget beim Schrumpfen auch nicht.
+    min_w: i32, min_h: i32,
+    /// Natuerliche Groesse: was das Programm gesetzt oder das Automass
+    /// gemessen hat -- NICHT, was ein Behaelter oder Anker daraus gemacht
+    /// hat. Nur daraus laesst sich ein Mindestmass ableiten; `w`/`h` tragen
+    /// nach dem ersten Layout-Durchlauf die gedehnte Groesse.
+    nat_w: i32, nat_h: i32,
+    /// Formularpruefung: Regeln (GUI_RULE), aktuelle Meldung (leer = ok) und
+    /// eine Beschriftung, die die Meldung anzeigt (Widget-Index, -1 = keine).
+    regeln: Vec<Regel>,
+    fehler: String,
+    fehler_label: i32,
     ziehbar: bool,       // Quelle fuer Ziehen (GUI_DRAGGABLE)
     ablage: bool,        // nimmt Abgelegtes an (GUI_DROP_TARGET)
     abgelegt: bool,      // in DIESEM Bild etwas abgelegt bekommen (transient, wie `clicked`)
@@ -926,6 +1048,10 @@ pub struct Window {
     closable: bool,
     visible: bool,
     resizable: bool,                 // am unteren-rechten Griff ziehbar?
+    /// GUI_VALIDATE_LIVE: die Regeln eines Feldes laufen, sobald der Fokus
+    /// es verlaesst -- nicht bei jedem Anschlag (eine halb getippte Adresse
+    /// ist keine falsche).
+    pruefung_live: bool,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -1313,7 +1439,7 @@ impl Gui {
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true,
-            resizable: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            resizable: false, pruefung_live: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
@@ -1729,6 +1855,7 @@ impl Gui {
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
+            min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false,
@@ -1787,6 +1914,10 @@ impl Gui {
             if t && b { h = (wd.bh + dy).max(1); }
             else if b { y = wd.by + dy; }
             else if !t { y = wd.by + dy / 2; }
+            // Mindestmass gilt auch hier: ein gedehntes Widget schrumpft
+            // nicht unter das, was sein Inhalt braucht.
+            if wd.min_w > 0 { w = w.max(wd.min_w); }
+            if wd.min_h > 0 { h = h.max(wd.min_h); }
             wd.x = x; wd.y = y; wd.w = w; wd.h = h;
         }
     }
@@ -3622,6 +3753,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (x, y, w, ht) = (self.sk(x), self.sk(y), self.sk(w), self.sk(ht));
         let wd = self.wdg_mut(h, "GUI_SET_BOUNDS")?;
         wd.x = x; wd.y = y; wd.w = w.max(0); wd.h = ht.max(0);
+        wd.nat_w = wd.w; wd.nat_h = wd.h;       // das ist jetzt die natuerliche Groesse
         wd.auto_w = false; wd.auto_h = false;   // eine gesetzte Groesse ist keine automatische mehr
         Ok(())
     }
@@ -4170,7 +4302,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Some(g) => {
                 let (nw, nh) = self.inhalt_mass(g, &self.windows[wi].widgets[i]);
                 let w = &mut self.windows[wi].widgets[i];
-                w.w = nw; w.h = nh; w.bw = nw; w.bh = nh;
+                w.w = nw; w.h = nh; w.bw = nw; w.bh = nh; w.nat_w = nw; w.nat_h = nh;
                 w.auto_w = false; w.auto_h = false;
             }
             None => { let w = &mut self.windows[wi].widgets[i]; w.auto_w = true; w.auto_h = true; }
@@ -4206,6 +4338,83 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    /// Mindestmass eines Widgets: das gesetzte (GUI_SET_MIN_SIZE) -- und bei
+    /// einem Behaelter zusaetzlich das, was sein Inhalt mindestens braucht
+    /// (feste Kinder in voller Groesse, gewichtete mit ihrem Mindestmass,
+    /// Abstaende und Rand dazu). Rekursiv, damit ein Behaelter im Behaelter
+    /// sein Mass nach oben reicht.
+    fn min_mass(&self, wi: usize, k: usize, tiefe: u32) -> (i32, i32) {
+        let w = match self.windows[wi].widgets.get(k) { Some(w) => w, None => return (0, 0) };
+        let (mut mw, mut mh) = (w.min_w, w.min_h);
+        if tiefe > 16 { return (mw, mh); }
+        if let Some(l) = w.layout.as_ref() {
+            let rand = self.sk(l.rand);
+            let ab = self.sk(l.abstand);
+            let n = self.windows[wi].widgets.len();
+            let kinder: Vec<(i32, i32)> = l.kinder.iter().copied()
+                .filter(|&(c, _)| c < 0 || ((c as usize) < n && self.windows[wi].widgets[c as usize].alive))
+                .collect();
+            if kinder.is_empty() { return (mw, mh); }
+            match l.art {
+                0 | 1 => {
+                    let zeile = l.art == 0;
+                    let mut laengs = ab * (kinder.len() as i32 - 1);
+                    let mut quer = 0;
+                    for &(c, gew) in &kinder {
+                        if c < 0 { continue; }
+                        let (cw, ch) = self.min_mass(wi, c as usize, tiefe + 1);
+                        let wd = &self.windows[wi].widgets[c as usize];
+                        let (eigen_l, eigen_q) = if zeile { (wd.nat_w, wd.nat_h) } else { (wd.nat_h, wd.nat_w) };
+                        let (min_l, min_q) = if zeile { (cw, ch) } else { (ch, cw) };
+                        laengs += if gew > 0 { min_l } else { eigen_l.max(min_l) };
+                        // Quer zaehlt die eigene Groesse auch bei `dehnen`:
+                        // ein auf 5 px gestauchter Knopf ist kein Knopf mehr.
+                        quer = quer.max(eigen_q.max(min_q));
+                    }
+                    let (lw, lh) = if zeile { (laengs, quer) } else { (quer, laengs) };
+                    mw = mw.max(lw + 2 * rand);
+                    mh = mh.max(lh + 2 * rand);
+                }
+                _ => {
+                    // Raster: breiteste Zelle mal Spalten, Zeilenhoehen summiert.
+                    let sp = l.spalten.max(1) as usize;
+                    let mut zelle_w = 0;
+                    let mut hoehe = 0;
+                    let mut zeilen = 0;
+                    let mut zeile_h = 0;
+                    for (i, &(c, _)) in kinder.iter().enumerate() {
+                        if i % sp == 0 && i > 0 { hoehe += zeile_h; zeilen += 1; zeile_h = 0; }
+                        if c < 0 { continue; }
+                        let (cw, ch) = self.min_mass(wi, c as usize, tiefe + 1);
+                        let wd = &self.windows[wi].widgets[c as usize];
+                        zelle_w = zelle_w.max(cw.max(wd.nat_w));
+                        zeile_h = zeile_h.max(wd.nat_h.max(ch));
+                    }
+                    hoehe += zeile_h;
+                    zeilen += 1;
+                    mw = mw.max(zelle_w * sp as i32 + ab * (sp as i32 - 1) + 2 * rand);
+                    mh = mh.max(hoehe + ab * (zeilen - 1) + 2 * rand);
+                }
+            }
+        }
+        (mw, mh)
+    }
+    /// GUI_LAYOUT_MIN_W / _H: was ein Behaelter mindestens braucht --
+    /// gedacht fuer WINDOW_MIN_SIZE / GUI_WINDOW_SET_MIN_SIZE.
+    pub fn layout_min(&self, h: i64) -> Result<(i64, i64), String> {
+        let (wi, i) = Self::dec_widget(h);
+        let w = self.wdg(h, "GUI_LAYOUT_MIN_W")?;
+        if w.kind != Kind::Layout { return Err("GUI_LAYOUT_MIN_W: Widget ist kein Layout-Behaelter".into()); }
+        let (mw, mh) = self.min_mass(wi, i, 0);
+        Ok((self.unsk(mw) as i64, self.unsk(mh) as i64))
+    }
+    pub fn set_min_size(&mut self, h: i64, mw: i32, mh: i32) -> Result<(), String> {
+        let (mw, mh) = (self.sk(mw.max(0)), self.sk(mh.max(0)));
+        let w = self.wdg_mut(h, "GUI_SET_MIN_SIZE")?;
+        w.min_w = mw; w.min_h = mh;
+        Ok(())
+    }
+
     fn layout_anwenden(&mut self, g: &Graphics, wi: usize, li: usize, tiefe: u32) {
         if tiefe > 16 { return; }   // gegen Kreise aus einer von Hand gebauten Datei
         let (l, lx, ly, lw, lh) = {
@@ -4233,8 +4442,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let (nw, nh) = self.inhalt_mass(g, w);
                 let (aw, ah) = (w.auto_w || inhaltlich, w.auto_h);
                 let w = &mut self.windows[wi].widgets[k as usize];
-                if aw { w.w = nw; }
-                if ah { w.h = nh; }
+                if aw { w.w = nw; w.nat_w = nw; }
+                if ah { w.h = nh; w.nat_h = nh; }
             }
         }
         let mut setzen: Vec<(usize, i32, i32, i32, i32)> = Vec::new();
@@ -4246,7 +4455,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let mut summe_g = 0;
                 for &(k, gew) in &kinder {
                     if gew > 0 { summe_g += gew; continue; }
-                    if k >= 0 { let w = &self.windows[wi].widgets[k as usize]; fest += if zeile { w.w } else { w.h }; }
+                    if k >= 0 {
+                        let (mw, mh) = self.min_mass(wi, k as usize, 0);
+                        let w = &self.windows[wi].widgets[k as usize];
+                        fest += if zeile { w.w.max(mw) } else { w.h.max(mh) };
+                    }
                 }
                 let rest = (laenge - fest).max(0);
                 let mut pos = if zeile { ix } else { iy };
@@ -4261,16 +4474,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     } else { -1 };
                     if k < 0 { pos += anteil.max(0) + ab; continue; }
                     let (ow, oh) = { let w = &self.windows[wi].widgets[k as usize]; (w.w, w.h) };
+                    // Mindestmass: ein gewichtetes Kind faellt nie darunter --
+                    // dann laeuft die Zeile lieber ueber, als dass ein Knopf
+                    // zu einem Strich wird. Ein Behaelter als Kind bringt das
+                    // Mass seines Inhalts mit.
+                    let (mw, mh) = self.min_mass(wi, k as usize, 0);
                     let (nw, nh, nx, ny);
                     if zeile {
-                        nw = if anteil >= 0 { anteil } else { ow };
-                        nh = if l.dehnen { ih } else { oh.min(ih) };
+                        nw = if anteil >= 0 { anteil.max(mw) } else { ow.max(mw) };
+                        nh = if l.dehnen { ih.max(mh) } else { oh.max(mh).min(ih.max(mh)) };
                         nx = pos;
                         ny = iy + match l.ausrichtung { 1 => (ih - nh) / 2, 2 => ih - nh, _ => 0 };
                         pos += nw + ab;
                     } else {
-                        nh = if anteil >= 0 { anteil } else { oh };
-                        nw = if l.dehnen { iw } else { ow.min(iw) };
+                        nh = if anteil >= 0 { anteil.max(mh) } else { oh.max(mh) };
+                        nw = if l.dehnen { iw.max(mw) } else { ow.max(mw).min(iw.max(mw)) };
                         ny = pos;
                         nx = ix + match l.ausrichtung { 1 => (iw - nw) / 2, 2 => iw - nw, _ => 0 };
                         pos += nh + ab;
@@ -4389,6 +4607,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if w.unbestimmt { o["indeterminate"] = serde_json::json!(true); }
         if w.bildmodus != 0 { o["mode"] = serde_json::json!(bildmodus_str(w.bildmodus)); }
         if w.ziehbar { o["draggable"] = serde_json::json!(true); }
+        if w.min_w > 0 || w.min_h > 0 {
+            o["min_w"] = serde_json::json!(self.unsk(w.min_w));
+            o["min_h"] = serde_json::json!(self.unsk(w.min_h));
+        }
+        if !w.regeln.is_empty() {
+            o["rules"] = serde_json::json!(w.regeln.iter().map(|r| {
+                let mut rj = serde_json::json!({ "art": r.art.as_str() });
+                if matches!(r.art, RegelArt::Bereich | RegelArt::Laenge) { rj["a"] = serde_json::json!(r.a); rj["b"] = serde_json::json!(r.b); }
+                if r.art == RegelArt::Muster { rj["text"] = serde_json::json!(r.text); }
+                if !r.meldung.is_empty() { rj["meldung"] = serde_json::json!(r.meldung); }
+                rj
+            }).collect::<Vec<_>>());
+        }
+        if w.fehler_label >= 0 { o["error_label"] = serde_json::json!(w.fehler_label); }
         if w.ablage { o["drop_target"] = serde_json::json!(true); }
         if let Some(p) = w.panel.as_ref() {
             o["panel"] = serde_json::json!({ "kinder": p.kinder, "scroll": self.unsk(p.scroll) });
@@ -4522,6 +4754,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.unbestimmt = kind == Kind::Progress && wj["indeterminate"].as_bool().unwrap_or(false);
         if let Some(m) = wj["mode"].as_str() { w.bildmodus = bildmodus_parsen(m).unwrap_or(0); }
         w.ziehbar = wj["draggable"].as_bool().unwrap_or(false);
+        w.min_w = wj["min_w"].as_i64().unwrap_or(0).max(0) as i32;
+        w.min_h = wj["min_h"].as_i64().unwrap_or(0).max(0) as i32;
+        if let Some(rs) = wj["rules"].as_array() {
+            for rj in rs {
+                let art = match rj["art"].as_str().and_then(RegelArt::from_str) { Some(a) => a, None => continue };
+                w.regeln.push(Regel {
+                    art,
+                    a: rj["a"].as_f64().unwrap_or(0.0), b: rj["b"].as_f64().unwrap_or(0.0),
+                    text: rj["text"].as_str().unwrap_or("").to_string(),
+                    meldung: rj["meldung"].as_str().unwrap_or("").to_string(),
+                });
+            }
+        }
+        w.fehler_label = wj["error_label"].as_i64().unwrap_or(-1) as i32;
         w.ablage = wj["drop_target"].as_bool().unwrap_or(false);
         if kind == Kind::Panel {
             if let Some(pj) = wj.get("panel").and_then(|v| v.as_object()) {
@@ -5341,7 +5587,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 } else if !f_jetzt && f_vorher {
                     if let Some(f) = w.on_blur.clone() { feuern.push(f); }
                 }
+                let verlassen = !f_jetzt && f_vorher && !w.regeln.is_empty();
                 self.pending.extend(feuern);
+                if verlassen && self.windows[wi].pruefung_live { self.widget_pruefen(wi, i); }
             }
         }
 
@@ -5352,7 +5600,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let mut found = None;
             for i in 0..self.windows[top].widgets.len() {
                 let w = &self.windows[top].widgets[i];
-                if w.hovered && !w.tooltip.is_empty() { found = Some((top, i)); }
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty()) { found = Some((top, i)); }
             }
             found
         });
@@ -6888,6 +7136,144 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if obenauf { self.draw_top(g); }
     }
 
+    // ---------------------------------------------------------------- Formularpruefung
+    /// GUI_RULE(feld, art$, ...): eine Regel anhaengen. Erlaubt an Textfeld,
+    /// Textbereich, Klappliste und Kaestchen (dort nur `pflicht`).
+    pub fn rule_add(&mut self, h: i64, art: &str, a: f64, b: f64, text: String, meldung: String) -> Result<(), String> {
+        let art = RegelArt::from_str(art).ok_or_else(|| format!(
+            "GUI_RULE: '{}' ist keine Regel -- pflicht, zahl, ganz, bereich, laenge, email, datum oder muster", art))?;
+        if art == RegelArt::Muster {
+            // Die Meldung der regex-Crate ist mehrzeilig (mit Zeiger unter das
+            // Muster) -- fuer eine Fehlermeldung reicht die letzte Zeile.
+            regex::Regex::new(&text).map_err(|e| format!("GUI_RULE: ungueltiges Muster '{}': {}", text,
+                e.to_string().lines().last().unwrap_or("").trim()))?;
+        }
+        if art == RegelArt::Bereich && a > b { return Err("GUI_RULE: bereich -- von muss <= bis sein".into()); }
+        if art == RegelArt::Laenge && (a < 0.0 || a > b) { return Err("GUI_RULE: laenge -- min muss zwischen 0 und max liegen".into()); }
+        let w = self.wdg_mut(h, "GUI_RULE")?;
+        match w.kind {
+            Kind::TextInput | Kind::TextArea => {}
+            Kind::Dropdown | Kind::Checkbox | Kind::Toggle if art == RegelArt::Pflicht => {}
+            Kind::Dropdown | Kind::Checkbox | Kind::Toggle =>
+                return Err("GUI_RULE: an Klappliste und Kaestchen geht nur 'pflicht'".into()),
+            _ => return Err("GUI_RULE: Regeln gehen an Textfeld, Textbereich, Klappliste und Kaestchen".into()),
+        }
+        w.regeln.push(Regel { art, a, b, text, meldung });
+        Ok(())
+    }
+    pub fn rules_clear(&mut self, h: i64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_RULES_CLEAR")?;
+        w.regeln.clear(); w.fehler.clear();
+        Ok(())
+    }
+    /// Alle Regeln EINES Widgets pruefen; setzt seine Meldung und liefert sie.
+    fn widget_pruefen(&mut self, wi: usize, i: usize) -> String {
+        let (text, gewaehlt, regeln) = {
+            let w = &self.windows[wi].widgets[i];
+            let gewaehlt = match w.kind {
+                Kind::Dropdown => w.sel >= 0,
+                Kind::Checkbox | Kind::Toggle => w.checked,
+                _ => false,
+            };
+            let text = match w.kind { Kind::Dropdown | Kind::Checkbox | Kind::Toggle => String::new(), _ => w.text.clone() };
+            (text, gewaehlt, w.regeln.clone())
+        };
+        let mut meldung = String::new();
+        for r in &regeln {
+            if let Some(m) = regel_pruefen(r, &text, gewaehlt) { meldung = m; break; }
+        }
+        self.fehler_setzen(wi, i, meldung.clone());
+        meldung
+    }
+    /// Meldung an ein Widget haengen und, wenn eine Beschriftung gebunden
+    /// ist, dort anzeigen -- EINE Stelle dafuer.
+    fn fehler_setzen(&mut self, wi: usize, i: usize, meldung: String) {
+        let label = {
+            let w = &mut self.windows[wi].widgets[i];
+            w.fehler = meldung;
+            w.fehler_label
+        };
+        if label < 0 { return; }
+        // Mehrere Felder duerfen sich EINE Beschriftung teilen (ein Formular,
+        // eine Fehlerzeile). Sie zeigt die Meldung des ersten Feldes, das
+        // eine hat -- sonst loeschte das naechste fehlerfreie Feld die
+        // Meldung des falschen wieder.
+        let anzeige = self.windows[wi].widgets.iter()
+            .find(|w| w.fehler_label == label && !w.fehler.is_empty())
+            .map(|w| w.fehler.clone()).unwrap_or_default();
+        if let Some(l) = self.windows[wi].widgets.get_mut(label as usize) { l.text = anzeige; }
+    }
+    /// GUI_VALIDATE(win): alle Widgets mit Regeln pruefen; Zahl der Fehler.
+    /// Das erste fehlerhafte Feld bekommt den Fokus -- der Nutzer soll nicht
+    /// suchen muessen, wo es hakt.
+    pub fn validate(&mut self, win: i64) -> Result<i64, String> {
+        let wi = win as usize;
+        self.win_mut(win, "GUI_VALIDATE")?;
+        let n = self.windows[wi].widgets.len();
+        let mut fehler = 0;
+        let mut erstes: Option<usize> = None;
+        for i in 0..n {
+            let w = &self.windows[wi].widgets[i];
+            if w.regeln.is_empty() || !w.alive { continue; }
+            let sichtbar = self.widget_shown(wi, w) && w.enabled;
+            if !sichtbar { self.fehler_setzen(wi, i, String::new()); continue; }
+            if !self.widget_pruefen(wi, i).is_empty() {
+                fehler += 1;
+                if erstes.is_none() { erstes = Some(i); }
+            }
+        }
+        if let Some(i) = erstes {
+            if self.windows[wi].widgets[i].kind.fokussierbar() {
+                self.focus_widget = Some((wi, i));
+                self.focus_window = Some(wi);
+            }
+        }
+        Ok(fehler)
+    }
+    /// GUI_VALIDATE_WIDGET(feld): nur dieses Feld; liefert die Meldung ("" = ok).
+    pub fn validate_widget(&mut self, h: i64) -> Result<String, String> {
+        let (wi, i) = Self::dec_widget(h);
+        self.wdg(h, "GUI_VALIDATE_WIDGET")?;
+        Ok(self.widget_pruefen(wi, i))
+    }
+    pub fn error_get(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_ERROR")?.fehler.clone()) }
+    /// GUI_SET_ERROR(feld, meldung$): eine Meldung von aussen -- etwa aus der
+    /// Datenbank ("Nummer schon vergeben"). Leer nimmt sie zurueck.
+    pub fn error_set(&mut self, h: i64, meldung: String) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        self.wdg(h, "GUI_SET_ERROR")?;
+        self.fehler_setzen(wi, i, meldung);
+        Ok(())
+    }
+    pub fn errors_clear(&mut self, win: i64) -> Result<(), String> {
+        let wi = win as usize;
+        self.win_mut(win, "GUI_CLEAR_ERRORS")?;
+        for i in 0..self.windows[wi].widgets.len() {
+            if !self.windows[wi].widgets[i].fehler.is_empty() { self.fehler_setzen(wi, i, String::new()); }
+        }
+        Ok(())
+    }
+    /// GUI_ERROR_LABEL(feld, label): die Beschriftung zeigt die Meldung des
+    /// Feldes -- dort, wo das Programm sie haben will, statt nur im Tooltip.
+    pub fn error_label(&mut self, h: i64, label: i64) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        self.wdg(h, "GUI_ERROR_LABEL")?;
+        if label < 0 {
+            self.windows[wi].widgets[i].fehler_label = -1;
+            return Ok(());
+        }
+        let (lw, li) = Self::dec_widget(label);
+        let l = self.wdg(label, "GUI_ERROR_LABEL")?;
+        if l.kind != Kind::Label { return Err("GUI_ERROR_LABEL: das zweite Widget muss eine Beschriftung sein".into()); }
+        if lw != wi { return Err("GUI_ERROR_LABEL: Feld und Beschriftung liegen in verschiedenen Fenstern".into()); }
+        self.windows[wi].widgets[i].fehler_label = li as i32;
+        Ok(())
+    }
+    pub fn validate_live(&mut self, win: i64, an: bool) -> Result<(), String> {
+        self.win_mut(win, "GUI_VALIDATE_LIVE")?.pruefung_live = an;
+        Ok(())
+    }
+
     // ---------------------------------------------------------------- Punkt 6
     /// Senkrechter Schieber: wie GUI_SLIDER, nur steht `h` statt `w`, und der
     /// Wert waechst nach oben.
@@ -7252,6 +7638,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (wi, i) = match self.hover_w { Some(p) => p, None => return };
         if self.frame_count - self.hover_frame < TOOLTIP_DELAY { return; }
         let text = match self.windows.get(wi).and_then(|w| w.widgets.get(i)) {
+            Some(w) if !w.fehler.is_empty() => w.fehler.clone(),   // die Meldung gewinnt
             Some(w) if !w.tooltip.is_empty() => w.tooltip.clone(),
             _ => return,
         };
@@ -8034,6 +8421,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Tab-Navigation wertlos: man wuesste nie, wo man gerade ist.
         if self.focus_widget == Some((wi, idx)) && wdg.kind.fokussierbar() {
             g.rect(ax - 3, ay - 3, ax + w + 2, ay + h + 2, self.th("accent"));
+        }
+        // Fehlerrahmen der Formularpruefung: zwei Linien in Rot, direkt am
+        // Rand -- der Fokusring liegt weiter aussen, beide bleiben sichtbar.
+        if !wdg.fehler.is_empty() {
+            let rot = 0xE0_5050;
+            g.rect(ax - 1, ay - 1, ax + w, ay + h, rot);
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, rot);
         }
     }
 
@@ -8866,6 +9260,47 @@ mod tests {
 
     // Tooltip-Setter (ohne Graphics): Default leer, setzen/loeschen, Fehler bei
     // ungueltigem Handle.
+    #[test]
+    fn regel(art: RegelArt, a: f64, b: f64, text: &str) -> Regel {
+        Regel { art, a, b, text: text.to_string(), meldung: String::new() }
+    }
+
+    #[test]
+    fn regeln_pruefen_wie_ein_formular() {
+        let p = regel(RegelArt::Pflicht, 0.0, 0.0, "");
+        assert_eq!(regel_pruefen(&p, "  ", false).as_deref(), Some("Pflichtfeld"));
+        assert!(regel_pruefen(&p, "x", false).is_none());
+        assert!(regel_pruefen(&p, "", true).is_none(), "Kaestchen/Klappliste: gewaehlt zaehlt");
+        // Leer laesst jede andere Regel durch -- ob leer sein darf, sagt pflicht.
+        let z = regel(RegelArt::Zahl, 0.0, 0.0, "");
+        assert!(regel_pruefen(&z, "", false).is_none());
+        assert!(regel_pruefen(&z, "12,5", false).is_none());
+        assert!(regel_pruefen(&z, "12.5", false).is_none());
+        assert!(regel_pruefen(&z, "zwoelf", false).is_some());
+        let g = regel(RegelArt::Ganz, 0.0, 0.0, "");
+        assert!(regel_pruefen(&g, "7", false).is_none() && regel_pruefen(&g, "7,5", false).is_some());
+        let b = regel(RegelArt::Bereich, 1.0, 10.0, "");
+        assert!(regel_pruefen(&b, "10", false).is_none());
+        assert_eq!(regel_pruefen(&b, "11", false).as_deref(), Some("Bitte einen Wert von 1 bis 10 eingeben"));
+        let l = regel(RegelArt::Laenge, 2.0, 4.0, "");
+        assert!(regel_pruefen(&l, "ab", false).is_none() && regel_pruefen(&l, "abcde", false).is_some());
+        assert!(regel_pruefen(&l, "\u{e4}\u{f6}", false).is_none(), "Zeichen, nicht Bytes");
+        let e = regel(RegelArt::Email, 0.0, 0.0, "");
+        assert!(regel_pruefen(&e, "a@b.de", false).is_none());
+        for schlecht in ["ab.de", "@b.de", "a@b", "a@.de", "a@b.", "a b@c.de", "a@b@c.de"] {
+            assert!(regel_pruefen(&e, schlecht, false).is_some(), "{}", schlecht);
+        }
+        let d = regel(RegelArt::Datum, 0.0, 0.0, "");
+        assert!(regel_pruefen(&d, "2026-02-28", false).is_none());
+        assert!(regel_pruefen(&d, "2026-02-30", false).is_some() && regel_pruefen(&d, "28.02.2026", false).is_some());
+        let m = regel(RegelArt::Muster, 0.0, 0.0, "[0-9]{5}");
+        assert!(regel_pruefen(&m, "12345", false).is_none() && regel_pruefen(&m, "1234", false).is_some());
+        assert!(regel_pruefen(&m, "123456", false).is_some(), "das Muster gilt fuer die GANZE Eingabe");
+        let mut eigen = regel(RegelArt::Pflicht, 0.0, 0.0, "");
+        eigen.meldung = "Der Name fehlt.".into();
+        assert_eq!(regel_pruefen(&eigen, "", false).as_deref(), Some("Der Name fehlt."));
+    }
+
     #[test]
     fn tooltip_set_clear_and_invalid() {
         let mut g = Gui::new();

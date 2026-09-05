@@ -361,6 +361,70 @@ class History:
 
 
 # --- Control ----------------------------------------------------------------
+# ---- Pruefregeln (gui: GUI_RULE) --------------------------------------------
+# In der .dhform als Liste von {"art", "a", "b", "text", "meldung"}; im
+# Inspector als eine Zeile "pflicht; laenge 2 60; email = Bitte eine Adresse".
+_REGEL_ARTEN = ("pflicht", "zahl", "ganz", "bereich", "laenge", "email", "datum", "muster")
+
+
+def regeln_parsen(text: str) -> list:
+    """'pflicht = Der Name fehlt.; laenge 2 60; muster [0-9]{5}' -> Regel-Dicts.
+    Unbekanntes wird uebergangen, nicht gemeldet -- die Zeile wird von Hand
+    getippt, und ein Tippfehler soll nicht alle Regeln verwerfen."""
+    aus = []
+    for teil in (text or "").split(";"):
+        teil = teil.strip()
+        if not teil:
+            continue
+        kopf, _, meldung = teil.partition("=")
+        woerter = kopf.split()
+        if not woerter or woerter[0].lower() not in _REGEL_ARTEN:
+            continue
+        art = woerter[0].lower()
+        r: dict = {"art": art}
+        if art in ("bereich", "laenge"):
+            try:
+                r["a"] = float(woerter[1].replace(",", ".")); r["b"] = float(woerter[2].replace(",", "."))
+            except (IndexError, ValueError):
+                continue
+        elif art == "muster":
+            if len(woerter) < 2:
+                continue
+            r["text"] = " ".join(woerter[1:])
+        if meldung.strip():
+            r["meldung"] = meldung.strip()
+        aus.append(r)
+    return aus
+
+
+def regeln_text(regeln) -> str:
+    """Umkehrung von regeln_parsen (fuer den Inspector)."""
+    if not isinstance(regeln, list):
+        return ""
+    teile = []
+    for r in regeln:
+        if not isinstance(r, dict) or r.get("art") not in _REGEL_ARTEN:
+            continue
+        art = r["art"]
+        s = art
+        if art in ("bereich", "laenge"):
+            s += f" {_zahl_kurz(r.get('a', 0))} {_zahl_kurz(r.get('b', 0))}"
+        elif art == "muster":
+            s += f" {r.get('text', '')}"
+        if r.get("meldung"):
+            s += f" = {r['meldung']}"
+        teile.append(s)
+    return "; ".join(teile)
+
+
+def _zahl_kurz(x) -> str:
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return "0"
+    return str(int(f)) if f == int(f) else str(f)
+
+
 @dataclass
 class Control:
     kind: str
@@ -1443,4 +1507,18 @@ class FormDoc:
             out.append(f"GUI_DRAGGABLE({var}, TRUE)")
         if c.extra.get("drop_target"):
             out.append(f"GUI_DROP_TARGET({var}, TRUE)")
+        mw, mh = c.extra.get("min_w"), c.extra.get("min_h")
+        if isinstance(mw, (int, float)) or isinstance(mh, (int, float)):
+            out.append(f"GUI_SET_MIN_SIZE({var}, {int(mw or 0)}, {int(mh or 0)})")
+        for r in c.extra.get("rules") or []:
+            if not isinstance(r, dict) or r.get("art") not in _REGEL_ARTEN:
+                continue
+            args = [var, _gb_str(str(r["art"]))]
+            if r["art"] in ("bereich", "laenge"):
+                args += [_zahl_kurz(r.get("a", 0)), _zahl_kurz(r.get("b", 0))]
+            elif r["art"] == "muster":
+                args.append(_gb_str(str(r.get("text", ""))))
+            if r.get("meldung"):
+                args.append(_gb_str(str(r["meldung"])))
+            out.append(f"GUI_RULE({', '.join(args)})")
         return out

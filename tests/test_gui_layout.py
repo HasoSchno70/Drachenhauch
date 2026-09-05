@@ -230,3 +230,53 @@ def test_layout_ueberlebt_die_datei(tmp_path):
                 'PRINT GUI_TO_JSON(w2) = j\n'
                 'PRINT INSTR(j, "raster") >= 0 ; " " ; INSTR(j, "auto_w") >= 0\n', frames=1)
     assert out == ["TRUE", "TRUE TRUE"]
+
+
+# ---------------------------------------------------------------- Mindestmasse
+def test_gewichtetes_kind_faellt_nicht_unter_sein_mindestmass(tmp_path):
+    """Ohne Mindestmass wird ein gewichteter Knopf in einer engen Zeile zu
+    einem Strich. Mit GUI_SET_MIN_SIZE laeuft die Zeile lieber ueber."""
+    out = _lauf(tmp_path, _KOPF +
+                'DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 10, 10, 200, 30)\n'
+                'GUI_LAYOUT_SET(z, "abstand", 0)\n'
+                'DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 50, 30)\n'
+                'DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 50, 30)\n'
+                'GUI_SET_MIN_SIZE(b, 120, 0)\n'
+                'GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b, 1)\n'
+                'GUI_UPDATE()\n'
+                'PRINT GUI_GET_W(b) ; " " ; GUI_LAYOUT_MIN_W(z) ; " " ; GUI_LAYOUT_MIN_H(z)\n'
+                'GUI_SET_BOUNDS(z, 10, 10, 100, 30)\nGUI_UPDATE()\n'
+                'PRINT GUI_GET_X(b) ; " " ; GUI_GET_W(b)\n', frames=1)
+    assert out[0] == "150 170 30", "genug Platz: der Rest; Mindestbreite der Zeile = 50 + 120, Hoehe = hoechstes Kind"
+    assert out[1] == "60 120", "zu wenig Platz: das Mindestmass bleibt, die Zeile laeuft ueber"
+
+
+def test_mindestmass_eines_behaelters_reicht_nach_oben(tmp_path):
+    """Ein Behaelter im Behaelter bringt das Mass seines Inhalts mit -- und
+    GUI_LAYOUT_MIN_W taugt als Wert fuer WINDOW_MIN_SIZE."""
+    out = _lauf(tmp_path, _KOPF +
+                'DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "spalte", 0, 0, 300, 200)\n'
+                'GUI_LAYOUT_SET(s, "abstand", 10) : GUI_LAYOUT_SET(s, "rand", 5)\n'
+                'DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 0, 0, 10, 30)\n'
+                'GUI_LAYOUT_SET(z, "abstand", 4)\n'
+                'DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 80, 30)\n'
+                'DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 90, 30)\n'
+                'GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b)\n'
+                'DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 0, 0, 100, 60)\n'
+                'GUI_SET_MIN_SIZE(t, 0, 80)\n'
+                'GUI_LAYOUT_ADD(s, z) : GUI_LAYOUT_ADD(s, t, 1)\n'
+                'GUI_UPDATE()\n'
+                'PRINT GUI_LAYOUT_MIN_W(s) ; " " ; GUI_LAYOUT_MIN_H(s)\n'
+                'GUI_SET_BOUNDS(s, 0, 0, 300, 60)\nGUI_UPDATE()\n'
+                'PRINT GUI_GET_H(t)\n', frames=1)
+    assert out[0] == "184 130", "Breite: 80+4+90 plus Rand; Hoehe: 30 + 10 + 80 plus Rand"
+    assert out[1] == "80", "der gewichtete Textbereich bleibt bei seinem Mindestmass"
+
+
+def test_anker_schrumpfen_nicht_unter_das_mindestmass(tmp_path):
+    out = _lauf(tmp_path, _KOPF +
+                'DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 10, 10, 480, 300)\n'
+                'GUI_SET_ANCHOR(t, "lrtb") : GUI_SET_MIN_SIZE(t, 200, 100)\n'
+                'GUI_WINDOW_SET_BOUNDS(w, 0, 0, 150, 120)\nGUI_UPDATE()\n'
+                'PRINT GUI_GET_W(t) ; " " ; GUI_GET_H(t)\n', frames=1)
+    assert out[0] == "200 100"
