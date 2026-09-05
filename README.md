@@ -75,7 +75,7 @@ Nachzulesen im [Handbuch](docs/README.md); wie es dazu kam, steht in der
 
 **[Drachenhauch für Windows herunterladen](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — ein Installer, rund 87 MB, aktuell Fassung 2026.11.
 
-Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 209 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
+Python muss dafür **nicht** installiert sein. Mit dabei sind die komplette Entwicklungsumgebung, die Runtime `dhrt`, alle 210 Beispiele samt Assets, beide Bücher (*Der Einstieg* und *Das Lehrbuch*, letzteres in beiden Sprachen) als `.docx` und `.epub` sowie das ESP32-Grundgerüst. Windows 64-Bit; die Datei ist nicht signiert, SmartScreen meldet sich also beim ersten Start.
 
 ## Aus dem Quelltext arbeiten
 
@@ -301,6 +301,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `98_coroutines.dh` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 | `154_chart.dh` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
 | `156_gui_alle_widgets.dh` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `195_gui_feinschliff.dh` | **gui-Feinschliff** — senkrechter Schieber, unbestimmter Fortschritt, Bildmodi, Baumsymbole, rollendes Panel, Ziehen zwischen Listen |
 | `194_gui_layout.dh` | **Layout im gui-Modul** — Größe nach Inhalt, Zeile/Spalte/Raster mit Gewichten, geschachtelt, fließt mit dem Fenster |
 | `193_gui_dialoge.dh` | **Dialoge im gui-Modul** — eigene Knopfsätze, Frage mit Eingabefeld, eigene Fenster modal |
 | `192_gui_listen.dh` | **Listen im gui-Modul** — Einträge einzeln, Sinnbilder, Kästchen, Mehrfachauswahl, Doppelklick |

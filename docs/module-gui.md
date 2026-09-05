@@ -32,6 +32,14 @@ IMPORT "gui"
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | gerahmte Gruppe mit eingelassenem Titel |
+| `GUI_VSLIDER(win, x, y, h, min, max, default)` | GUI_WIDGET | **senkrechter Schieber** — `h` ist die Länge, der Wert wächst nach oben |
+| `GUI_PROGRESS_SET(progress, "unbestimmt", 1)` | — | laufendes Band statt Wert, für alles, dessen Dauer man nicht kennt |
+| `GUI_IMAGE_MODE(image, modus$)` / `GUI_IMAGE_MODE_GET(image)` | — / STRING | `strecken` (Vorgabe), `einpassen`, `fuellen`, `mitte`, `kacheln` |
+| `GUI_TREE_ICON(tree, node, bild)` / `GUI_TREE_COLOR(tree, node, farbe)` | — | Sinnbild und Textfarbe je Baumknoten |
+| `GUI_PANEL_ADD(panel, wdg)` / `GUI_PANEL_REMOVE` / `GUI_PANEL_SCROLL(panel, y)` / `GUI_PANEL_SCROLL_GET(panel)` | — | ein **Panel, das seine Kinder rollt** (Mausrad, Rollbalken) — siehe [Feinschliff](#feinschliff-schieber-fortschritt-bild-baum-panel-ziehen) |
+| `GUI_DRAGGABLE(wdg, an)` / `GUI_DROP_TARGET(wdg, an)` | — | **Ziehen zwischen Widgets**: Quelle und Ablage |
+| `GUI_DRAGGING()` / `GUI_DROPPED(wdg)` / `GUI_DROP_TEXT()` / `GUI_DROP_SOURCE()` / `GUI_DRAG_INDEX()` / `GUI_DROP_INDEX()` | GUI_WIDGET / BOOL / STRING / GUI_WIDGET / INTEGER / INTEGER | laufender Zug, Ablage in diesem Bild, was gezogen wurde, woher, welche Zeile, auf welche Zeile |
+| `GUI_CURSORS(an)` | — | Cursorformen über Widgets (Vorgabe an): I-Balken über Text, Hand über Knöpfen, Doppelpfeil an Trennern und am Fenstergriff |
 | `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte` oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
 | `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` / `GUI_LAYOUT_SPACER(layout[, gewicht])` / `GUI_LAYOUT_REMOVE(layout, wdg)` | — | Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen |
 | `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln) |
@@ -1426,7 +1434,8 @@ Themen umschalten.
   Checkbox) werden unterstützt.
 - **Immediate-Mode-Fenster** (`UI_WINDOW_BEGIN/END` im `ui`-Modul) sind die
   geplante Alternative (Phase 4).
-- **Absolute Koordinaten**, kein Auto-Layout.
+- **Koordinaten plus Anker**, dazu Automaß und Zeilen-/Spalten-/Rasterbehälter
+  (`GUI_LAYOUT`); kein Constraint-System.
 - **Laufzeit-Manipulation** (Verschieben/Skalieren/Löschen/Ein-/Ausblenden/
   Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
@@ -1635,6 +1644,68 @@ und man versteht es noch. In der `.dhform` steht der Behälter mit `layout`
 (Art, Maße, `kinder` als `[Index, Gewicht]`); der Form-Designer kennt ihn als
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
+
+## Feinschliff: Schieber, Fortschritt, Bild, Baum, Panel, Ziehen
+
+Die kleinen Dinge, an denen man eine Anwendung von einer Demo unterscheidet
+(seit 2026-09-05):
+
+- **Senkrechter Schieber** `GUI_VSLIDER(win, x, y, h, min, max, default)`:
+  wie `GUI_SLIDER`, nur steht `h` statt `w`, und der Wert wächst nach oben —
+  wie an jedem Mischpult. Pfeil hoch/rechts erhöht, Pos1/Ende springen.
+- **Unbestimmter Fortschritt** `GUI_PROGRESS_SET(p, "unbestimmt", 1)`: ein
+  Band läuft, getrieben von der Zeit, nicht vom Wert. Für alles, dessen
+  Dauer man nicht kennt (Suche, Verbindung). `0` schaltet zurück.
+- **Bildmodi** `GUI_IMAGE_MODE(img, modus$)`: `strecken` (wie bisher),
+  `einpassen` (ganz sichtbar, Seitenverhältnis bleibt, zentriert),
+  `fuellen` (Fläche voll, Überstand abgeschnitten), `mitte` (Originalgröße),
+  `kacheln`. `GUI_IMAGE_MODE_GET` liest ihn.
+- **Baumsymbole** `GUI_TREE_ICON(tree, node, bild)` und
+  `GUI_TREE_COLOR(tree, node, farbe)`: sobald ein Knoten ein Sinnbild hat,
+  bekommt jede Zeile den Platz dafür, sonst stünden die Namen versetzt.
+- **Rollendes Panel** `GUI_PANEL_ADD(panel, wdg)`: die Kinder behalten ihre
+  Lage im Fenster (`GUI_GET_Y` ändert sich beim Rollen nicht), das Panel legt
+  nur einen Blick-Versatz darüber. Was herausgerollt ist, ist weder zu sehen
+  noch zu treffen. Mausrad über dem Panel rollt (eine Liste darin bekommt das
+  Rad zuerst), ein Rollbalken erscheint, sobald der Inhalt höher ist;
+  `GUI_PANEL_SCROLL`/`_GET` setzen und lesen ihn. Ein Layout-Behälter im Panel
+  nimmt seine Kinder mit. Kinder nach dem Panel anlegen, sonst liegen sie
+  unter seiner Fläche. Ein rollendes Panel in einem rollenden Panel gibt es
+  nicht.
+- **Ziehen zwischen Widgets**: `GUI_DRAGGABLE(wdg, TRUE)` macht ein Widget
+  zur Quelle (bei Liste und Baum die getroffene Zeile, sonst das Widget
+  selbst mit seinem Text), `GUI_DROP_TARGET(wdg, TRUE)` zur Ablage. Ein
+  Druck wird ab 5 px Bewegung zum Zug — ein Klick bleibt ein Klick. Während
+  des Zugs hängt der Text an der Maus und die Ablage darunter bekommt einen
+  Rahmen; `GUI_DRAGGING()` liefert die Quelle. Beim Loslassen über einer
+  Ablage meldet `GUI_DROPPED(ziel)` **ein Bild lang** (wie `GUI_CLICKED`),
+  dazu `GUI_DROP_TEXT()`, `GUI_DROP_SOURCE()`, `GUI_DRAG_INDEX()` (Zeile in
+  der Quelle) und `GUI_DROP_INDEX()` (Zeile in der Ablage, -1 = keine).
+  Losgelassen neben einer Ablage verpufft der Zug still. **Innerhalb
+  derselben Liste sortiert die Liste selbst um** — das ist die eine
+  Bedeutung, die ein Zug dort haben kann; was sonst mit dem Eintrag
+  geschieht, entscheidet das Programm:
+
+  ```basic
+  GUI_DRAGGABLE(vorrat, TRUE) : GUI_DROP_TARGET(einkauf, TRUE)
+  ...
+  IF GUI_DROPPED(einkauf) THEN
+      GUI_LISTBOX_ADD(einkauf, GUI_DROP_TEXT())
+      GUI_LISTBOX_REMOVE(vorrat, GUI_DRAG_INDEX())
+  END IF
+  ```
+
+- **Cursorformen** kommen von selbst: I-Balken über Textfeldern, Hand über
+  Knopf, Kästchen, Radio und Kippschalter (und während eines Zugs),
+  Doppelpfeil an Trennern und am Fenstergriff. Die gui setzt die Form nur bei
+  Wechsel und nimmt nur zurück, was sie selbst gesetzt hat — ein Programm,
+  das `MOUSE_CURSOR` nach `GUI_UPDATE` ruft, gewinnt. `GUI_CURSORS(FALSE)`
+  schaltet es ab.
+
+In der `.dhform`: `vertical`, `indeterminate`, `mode`, `draggable`,
+`drop_target`, `panel` (mit `kinder` als Indizes und `scroll`). Baumsymbole
+und -farben stehen nicht in der Datei (Symbole sind Textur-Handles).
+Beispiel: [`examples/195_gui_feinschliff.dh`](../examples/195_gui_feinschliff.dh).
 
 ## Ereignisse
 

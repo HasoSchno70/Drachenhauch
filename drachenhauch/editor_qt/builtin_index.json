@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1660,
+ "count": 1679,
  "builtins": [
   {
    "name": "ABS",
@@ -2931,6 +2931,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_CURSORS",
+   "kind": "core",
+   "signature": "GUI_CURSORS(an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DATE",
    "kind": "core",
    "signature": "GUI_DATE(picker)",
@@ -2979,6 +2985,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DRAGGABLE",
+   "kind": "core",
+   "signature": "GUI_DRAGGABLE(widget, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DRAGGING",
+   "kind": "core",
+   "signature": "GUI_DRAGGING()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DRAG_INDEX",
+   "kind": "core",
+   "signature": "GUI_DRAG_INDEX()",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DRAW",
    "kind": "graphics",
    "signature": "GUI_DRAW([obenauf])",
@@ -3018,6 +3042,36 @@
    "name": "GUI_DROPDOWN_TEXT",
    "kind": "core",
    "signature": "GUI_DROPDOWN_TEXT(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPPED",
+   "kind": "core",
+   "signature": "GUI_DROPPED(widget)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROP_INDEX",
+   "kind": "core",
+   "signature": "GUI_DROP_INDEX()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROP_SOURCE",
+   "kind": "core",
+   "signature": "GUI_DROP_SOURCE()",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROP_TARGET",
+   "kind": "core",
+   "signature": "GUI_DROP_TARGET(widget, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROP_TEXT",
+   "kind": "core",
+   "signature": "GUI_DROP_TEXT()",
    "module": "gui"
   },
   {
@@ -3102,6 +3156,18 @@
    "name": "GUI_IMAGE",
    "kind": "core",
    "signature": "GUI_IMAGE(win, x, y, w, h, image)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_IMAGE_MODE",
+   "kind": "core",
+   "signature": "GUI_IMAGE_MODE(image, modus$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_IMAGE_MODE_GET",
+   "kind": "core",
+   "signature": "GUI_IMAGE_MODE_GET(image)",
    "module": "gui"
   },
   {
@@ -3411,6 +3477,30 @@
    "module": "gui"
   },
   {
+   "name": "GUI_PANEL_ADD",
+   "kind": "core",
+   "signature": "GUI_PANEL_ADD(panel, widget)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PANEL_REMOVE",
+   "kind": "core",
+   "signature": "GUI_PANEL_REMOVE(panel, widget)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PANEL_SCROLL",
+   "kind": "core",
+   "signature": "GUI_PANEL_SCROLL(panel, y)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PANEL_SCROLL_GET",
+   "kind": "core",
+   "signature": "GUI_PANEL_SCROLL_GET(panel)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_PICKED_COLOR",
    "kind": "core",
    "signature": "GUI_PICKED_COLOR(picker)",
@@ -3420,6 +3510,12 @@
    "name": "GUI_PROGRESS",
    "kind": "core",
    "signature": "GUI_PROGRESS(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PROGRESS_SET",
+   "kind": "core",
+   "signature": "GUI_PROGRESS_SET(progress, key$, wert)",
    "module": "gui"
   },
   {
@@ -4005,9 +4101,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_COLOR",
+   "kind": "core",
+   "signature": "GUI_TREE_COLOR(tree, node, farbe)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_EXPAND",
    "kind": "core",
    "signature": "GUI_TREE_EXPAND(tree, node, flag)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_ICON",
+   "kind": "core",
+   "signature": "GUI_TREE_ICON(tree, node, bild)",
    "module": "gui"
   },
   {
@@ -4044,6 +4152,12 @@
    "name": "GUI_VISIBLE",
    "kind": "core",
    "signature": "GUI_VISIBLE(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_VSLIDER",
+   "kind": "core",
+   "signature": "GUI_VSLIDER(win, x, y, h, min, max, default)",
    "module": "gui"
   },
   {

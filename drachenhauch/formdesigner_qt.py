@@ -1655,6 +1655,16 @@ class _Inspector(QWidget):
         self.in_layout = QComboBox()
         self.in_gewicht = QSpinBox(); self.in_gewicht.setRange(0, 99)
         self.in_gewicht.setToolTip("0 = eigene Groesse, ab 1 = Anteil am Restplatz")
+        # Punkt 6: Bildmodus, unbestimmter Fortschritt, senkrechter Schieber,
+        # Ziehen/Ablage, rollendes Panel.
+        self.bildmodus = QComboBox()
+        for wert in ("strecken", "einpassen", "fuellen", "mitte", "kacheln"):
+            self.bildmodus.addItem(wert, wert)
+        self.p_unbestimmt = QCheckBox("unbestimmt (laufendes Band)")
+        self.s_senkrecht = QCheckBox("senkrecht (GUI_VSLIDER, h = Laenge)")
+        self.ziehbar = QCheckBox("ziehbar (Quelle)")
+        self.ablage = QCheckBox("Ablage (nimmt Gezogenes an)")
+        self.in_panel = QComboBox()
         # Der Trenner traegt seine Richtung im `text`-Feld -- als freie
         # Eingabe waere "h"/"v" nicht zu erraten, und ein Tippfehler faellt
         # erst zur Laufzeit auf (GUI_SPLITTER lehnt alles andere ab).
@@ -1743,6 +1753,12 @@ class _Inspector(QWidget):
         self._add("", self.ly_dehnen)
         self._add("Layout", self.in_layout)
         self._add("Gewicht", self.in_gewicht)
+        self._add("Bildmodus", self.bildmodus)
+        self._add("", self.p_unbestimmt)
+        self._add("", self.s_senkrecht)
+        self._add("", self.ziehbar)
+        self._add("", self.ablage)
+        self._add("Panel", self.in_panel)
         self._add("Richtung", self.orient)
         self._add("Startfarbe", self.pick_btn)
         self._add("Startdatum", self.datum)
@@ -1789,9 +1805,10 @@ class _Inspector(QWidget):
         self.align.currentIndexChanged.connect(self._apply)
         self.zahlen.currentIndexChanged.connect(self._apply)
         self.maxlaenge.valueChanged.connect(self._apply)
-        for _w in (self.wrap, self.passwort, self.nur_lesen, self.l_multi, self.l_kaestchen, self.ly_dehnen):
+        for _w in (self.wrap, self.passwort, self.nur_lesen, self.l_multi, self.l_kaestchen, self.ly_dehnen,
+                   self.p_unbestimmt, self.s_senkrecht, self.ziehbar, self.ablage):
             _w.toggled.connect(self._apply)
-        for _w in (self.ly_art, self.ly_ausr, self.in_layout):
+        for _w in (self.ly_art, self.ly_ausr, self.in_layout, self.bildmodus, self.in_panel):
             _w.currentIndexChanged.connect(self._apply)
         for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht):
             _w.valueChanged.connect(self._apply)
@@ -1999,6 +2016,21 @@ class _Inspector(QWidget):
             li = self.in_layout.findData(eltern.name if eltern else "")
             self.in_layout.setCurrentIndex(li if li >= 0 else 0)
             self.in_gewicht.setValue(gew)
+        self.in_panel.clear()
+        self.in_panel.addItem("(keins)", "")
+        if self._doc is not None:
+            for p in self._doc.controls:
+                if p.kind == "panel" and p is not c:
+                    self.in_panel.addItem(p.name, p.name)
+            pe, _ = self._doc.layout_von(c, "panel")
+            pi = self.in_panel.findData(pe.name if pe else "")
+            self.in_panel.setCurrentIndex(pi if pi >= 0 else 0)
+        mi = self.bildmodus.findData(str(c.extra.get("mode") or "strecken"))
+        self.bildmodus.setCurrentIndex(mi if mi >= 0 else 0)
+        self.p_unbestimmt.setChecked(bool(c.extra.get("indeterminate")))
+        self.s_senkrecht.setChecked(bool(c.extra.get("vertical")))
+        self.ziehbar.setChecked(bool(c.extra.get("draggable")))
+        self.ablage.setChecked(bool(c.extra.get("drop_target")))
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
         self._tabelle_laden(c)
@@ -2045,6 +2077,12 @@ class _Inspector(QWidget):
         hat_layouts = self.in_layout.count() > 1
         self._show(self.in_layout, hat_layouts)
         self._show(self.in_gewicht, hat_layouts)
+        self._show(self.bildmodus, c.kind == "image")
+        self._show(self.p_unbestimmt, c.kind == "progress")
+        self._show(self.s_senkrecht, c.kind == "slider")
+        self._show(self.ziehbar, not ist_layout)
+        self._show(self.ablage, not ist_layout)
+        self._show(self.in_panel, self.in_panel.count() > 1 and c.kind not in ("panel", "layout"))
         self._show(self.orient, c.kind == "splitter")
         self._show(self.pick_btn, c.kind == "colorpicker")
         self._show(self.datum, c.kind == "datepicker")
@@ -2106,6 +2144,23 @@ class _Inspector(QWidget):
             yj.setdefault("kinder", [])
             c.extra["layout"] = yj
             self._show(self.ly_spalten, yj["art"] == "raster")
+        for schluessel, feld in (("indeterminate", self.p_unbestimmt), ("vertical", self.s_senkrecht),
+                                 ("draggable", self.ziehbar), ("drop_target", self.ablage)):
+            if feld.isChecked():
+                c.extra[schluessel] = True
+            else:
+                c.extra.pop(schluessel, None)
+        if c.kind == "image":
+            modus = self.bildmodus.currentData() or "strecken"
+            if modus == "strecken":
+                c.extra.pop("mode", None)
+            else:
+                c.extra["mode"] = modus
+        if self._doc is not None and self.in_panel.count() > 1:
+            ziel = self.in_panel.currentData() or ""
+            eltern = next((p for p in self._doc.controls if p.kind == "panel" and p.name == ziel), None)
+            if eltern is not self._doc.layout_von(c, "panel")[0]:
+                self._doc.layout_zuordnen(c, eltern, 0, "panel")
         if self._doc is not None and self.in_layout.count() > 1:
             ziel = self.in_layout.currentData() or ""
             eltern = next((l for l in self._doc.controls if l.kind == "layout" and l.name == ziel), None)

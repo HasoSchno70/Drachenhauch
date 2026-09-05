@@ -848,34 +848,41 @@ class FormDoc:
     # will Indizes. Umgerechnet wird nur an der Dateigrenze -- so ueberleben
     # Zuordnungen das Loeschen und Umsortieren von Controls, ohne dass jede
     # dieser Operationen Indizes nachfuehren muesste. None ist ein Leerraum.
-    def layout_von(self, c: "Control"):
+    # Dasselbe gilt fuer ein rollendes Panel (`art = "panel"`): dort stehen
+    # die Kinder in der Datei als blosse Indizes, im Designer ebenso als
+    # [name, 0]-Paare -- eine Buchfuehrung fuer beide.
+    def layout_von(self, c: "Control", art: str = "layout"):
         """Der Behaelter, in dem `c` steckt, und sein Gewicht -- oder (None, 0)."""
         for l in self.controls:
-            if l.kind != "layout":
+            if l.kind != art:
                 continue
-            for k in (l.extra.get("layout") or {}).get("kinder") or []:
+            for k in (l.extra.get(art) or {}).get("kinder") or []:
                 if isinstance(k, (list, tuple)) and k and k[0] == c.name:
                     return l, int(k[1]) if len(k) > 1 else 0
         return None, 0
 
-    def layout_zuordnen(self, c: "Control", layout: "Control | None", gewicht: int = 0) -> None:
+    def layout_zuordnen(self, c: "Control", layout: "Control | None", gewicht: int = 0,
+                        art: str = "layout") -> None:
         """`c` in `layout` legen (oder mit None herausnehmen)."""
         for l in self.controls:
-            if l.kind != "layout":
+            if l.kind != art:
                 continue
-            lj = l.extra.get("layout")
+            lj = l.extra.get(art)
             if isinstance(lj, dict) and isinstance(lj.get("kinder"), list):
                 lj["kinder"] = [k for k in lj["kinder"] if not (isinstance(k, (list, tuple)) and k and k[0] == c.name)]
         if layout is not None and layout is not c:
-            lj = layout.extra.setdefault("layout", {"art": "spalte"})
+            lj = layout.extra.setdefault(art, {"art": "spalte"} if art == "layout" else {})
             lj.setdefault("kinder", []).append([c.name, int(gewicht)])
 
     def _kinder_zu_indizes(self, widgets: list) -> None:
         namen = {c.name: i for i, c in enumerate(self.controls)}
         for c, d in zip(self.controls, widgets):
-            if c.kind != "layout":
+            if c.kind not in ("layout", "panel"):
                 continue
-            lj = dict(c.extra.get("layout") or {"art": "spalte"})
+            art = c.kind
+            if art == "panel" and not isinstance(c.extra.get("panel"), dict):
+                continue                       # ein Panel, das nichts rollt
+            lj = dict(c.extra.get(art) or ({"art": "spalte"} if art == "layout" else {}))
             kinder = []
             for k in lj.get("kinder") or []:
                 if not isinstance(k, (list, tuple)) or not k:
@@ -885,19 +892,22 @@ class FormDoc:
                     kinder.append([-1, g])
                 elif k[0] in namen:
                     kinder.append([namen[k[0]], g])
-            lj["kinder"] = kinder
-            d["layout"] = lj
+            # Ein Panel kennt keine Gewichte und keine Leerraeume.
+            lj["kinder"] = kinder if art == "layout" else [k[0] for k in kinder if k[0] >= 0]
+            d[art] = lj
 
     @staticmethod
     def _kinder_zu_namen(controls: list) -> None:
         for c in controls:
-            if c.kind != "layout":
+            if c.kind not in ("layout", "panel"):
                 continue
-            lj = c.extra.get("layout")
+            lj = c.extra.get(c.kind)
             if not isinstance(lj, dict):
                 continue
             kinder = []
             for k in lj.get("kinder") or []:
+                if isinstance(k, (int, float, str)) and not isinstance(k, bool):
+                    k = [k, 0]                 # Panel-Kinder sind blosse Indizes
                 if not isinstance(k, (list, tuple)) or not k:
                     continue
                 g = int(k[1]) if len(k) > 1 and isinstance(k[1], (int, float)) else 0
@@ -910,7 +920,7 @@ class FormDoc:
                     kinder.append([controls[int(idx)].name, g])
             # Kopie statt in place: `lj` ist womoeglich noch das Dict des
             # Aufrufers (from_dict kopiert extra nicht tief).
-            c.extra["layout"] = dict(lj, kinder=kinder)
+            c.extra[c.kind] = dict(lj, kinder=kinder)
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -1204,6 +1214,13 @@ class FormDoc:
                     L.append(f"GUI_LAYOUT_SPACER({vars_[idx]}, {max(1, g)})")
                 elif k[0] in namen and namen[k[0]] in vars_:
                     L.append(f"GUI_LAYOUT_ADD({vars_[idx]}, {vars_[namen[k[0]]]}, {g})")
+        # Panel-Kinder ebenso.
+        for idx, c in enumerate(self.controls):
+            if c.kind != "panel" or idx not in vars_ or not isinstance(c.extra.get("panel"), dict):
+                continue
+            for k in c.extra["panel"].get("kinder") or []:
+                if isinstance(k, (list, tuple)) and k and k[0] in namen and namen[k[0]] in vars_:
+                    L.append(f"GUI_PANEL_ADD({vars_[idx]}, {vars_[namen[k[0]]]})")
         # Standard- und Abbrechen-Knopf -- nach den Controls, sie brauchen die Handles.
         for feld, befehl in (("default_button", "GUI_WINDOW_DEFAULT"),
                              ("cancel_button", "GUI_WINDOW_CANCEL")):
@@ -1236,8 +1253,10 @@ class FormDoc:
         """GB-Zeilen, die ein Control aufbauen (DIM + Konstruktor + Setter)."""
         k = c.kind
         if k == "image":
+            modus = c.extra.get("mode")
+            hinweis = f"; Modus: {modus} (GUI_IMAGE_MODE)" if modus and modus != "strecken" else ""
             return [f"' image '{var}' uebersprungen -- GUI_IMAGE braucht eine "
-                    f"Bildquelle (LOADIMAGE), die das .dhform nicht speichert"]
+                    f"Bildquelle (LOADIMAGE), die das .dhform nicht speichert{hinweis}"]
         out = [f"DIM {var} AS GUI_WIDGET"]
         if k == "button":
             out.append(f"{var} = GUI_BUTTON(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {c.w}, {c.h})")
@@ -1250,6 +1269,9 @@ class FormDoc:
             out.append(f"{var} = GUI_CHECKBOX(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {_gb_bool(c.checked)})")
         elif k == "radio":
             out.append(f"{var} = GUI_RADIO(frm, {_gb_str(c.group)}, {_gb_str(c.text)}, {c.x}, {c.y})")
+        elif k == "slider" and c.extra.get("vertical"):
+            out.append(f"{var} = GUI_VSLIDER(frm, {c.x}, {c.y}, {c.h}, "
+                       f"{_gb_num(c.min)}, {_gb_num(c.max)}, {_gb_num(c.value)})")
         elif k == "slider":
             out.append(f"{var} = GUI_SLIDER(frm, {c.x}, {c.y}, {c.w}, "
                        f"{_gb_num(c.min)}, {_gb_num(c.max)}, {_gb_num(c.value)})")
@@ -1263,6 +1285,8 @@ class FormDoc:
             out.append(f"{var} = GUI_SEPARATOR(frm, {c.x}, {c.y}, {c.w})")
         elif k == "progress":
             out.append(f"{var} = GUI_PROGRESS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            if c.extra.get("indeterminate"):
+                out.append(f'GUI_PROGRESS_SET({var}, "unbestimmt", 1)')
         elif k == "canvas":
             out.append(f"{var} = GUI_CANVAS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
         elif k == "table":
@@ -1413,4 +1437,10 @@ class FormDoc:
             name = getattr(c, ev)
             if name:
                 out.append(f"{ev.upper().replace('ON_', 'GUI_ON_', 1)}({var}, {name})")
+        if k == "image" and c.extra.get("mode") not in (None, "", "strecken"):
+            out.append(f"GUI_IMAGE_MODE({var}, {_gb_str(str(c.extra.get('mode')))})")
+        if c.extra.get("draggable"):
+            out.append(f"GUI_DRAGGABLE({var}, TRUE)")
+        if c.extra.get("drop_target"):
+            out.append(f"GUI_DROP_TARGET({var}, TRUE)")
         return out

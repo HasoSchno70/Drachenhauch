@@ -1675,3 +1675,35 @@ def test_inspector_ordnet_ein_control_einem_layout_zu(tmp_path):
     i._apply()
     assert win.canvas.doc.layout_von(btn)[0] is None
     win.close()
+
+
+def test_inspector_feinschliff_felder(tmp_path):
+    """Punkt 6: Bildmodus am Bild, unbestimmt am Fortschritt, senkrecht am
+    Schieber, ziehbar/Ablage ueberall, Panel-Zuordnung wie beim Layout."""
+    _app()
+    win = FormDesigner(tmp_path)
+    i = win.inspector
+    img = win.canvas.doc.add("image", 10, 10)
+    win.canvas._select(img)
+    assert i.bildmodus.isVisibleTo(i) and not i.p_unbestimmt.isVisibleTo(i) and not i.s_senkrecht.isVisibleTo(i)
+    i.bildmodus.setCurrentIndex(i.bildmodus.findData("einpassen"))
+    i.ziehbar.setChecked(True)
+    i._apply()
+    assert img.extra["mode"] == "einpassen" and img.extra["draggable"] is True
+    i.bildmodus.setCurrentIndex(0)
+    i._apply()
+    assert "mode" not in img.extra, "die Vorgabe steht nicht in der Datei"
+    pr = win.canvas.doc.add("progress", 10, 60)
+    win.canvas._select(pr)
+    assert i.p_unbestimmt.isVisibleTo(i) and not i.bildmodus.isVisibleTo(i)
+    i.p_unbestimmt.setChecked(True); i._apply()
+    assert pr.extra["indeterminate"] is True
+    pn = win.canvas.doc.add("panel", 10, 100)
+    btn = win.canvas.doc.add("button", 20, 120)
+    win.canvas._select(btn)
+    assert i.in_panel.isVisibleTo(i)
+    i.in_panel.setCurrentIndex(i.in_panel.findData(pn.name)); i._apply()
+    assert win.canvas.doc.layout_von(btn, "panel")[0] is pn
+    win.canvas._select(pn)
+    assert not i.in_panel.isVisibleTo(i), "ein Panel steckt nicht in einem Panel"
+    win.close()

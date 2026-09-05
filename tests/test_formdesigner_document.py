@@ -1077,3 +1077,46 @@ def test_layout_codegen_legt_behaelter_an_und_fuellt_ihn_nach_den_controls():
     assert z_add > code.index("GUI_BUTTON(frm"), "erst alle Controls, dann die Zuordnung"
     assert "GUI_LAYOUT_SPACER(" in code
     assert code.index("GUI_LAYOUT_ADD(") < code.index("GUI_LAYOUT_SPACER("), "in der Reihenfolge der Kinder"
+
+
+# ---------------------------------------------------------------- Punkt 6 (Feinschliff)
+def test_panel_kinder_wie_beim_layout_an_namen():
+    """Ein rollendes Panel fuehrt seine Kinder in der Datei als blosse
+    Indizes; der Designer haengt sie an Namen -- dieselbe Buchfuehrung wie
+    beim Layout, ohne Gewichte."""
+    doc = FormDoc()
+    pn = doc.add("panel", 10, 10)
+    a = doc.add("button", 20, 20)
+    b = doc.add("checkbox", 20, 60)
+    doc.layout_zuordnen(a, pn, 0, "panel")
+    doc.layout_zuordnen(b, pn, 0, "panel")
+    assert doc.layout_von(b, "panel")[0] is pn
+    d = doc.to_dict()
+    assert d["widgets"][0]["panel"]["kinder"] == [1, 2]
+    doc2 = FormDoc.from_dict(d)
+    assert doc2.controls[0].extra["panel"]["kinder"] == [[a.name, 0], [b.name, 0]]
+    assert doc2.to_dict() == d
+    code = doc.generate_gb_code()
+    assert code.index("GUI_PANEL_ADD(") > code.index("GUI_CHECKBOX(frm"), "erst die Controls, dann die Zuordnung"
+    # Ein Panel ohne Kinder schreibt kein `panel` -- es rollt nichts.
+    leer = FormDoc(); leer.add("panel", 0, 0)
+    assert "panel" not in leer.to_dict()["widgets"][0]
+
+
+def test_codegen_feinschliff():
+    doc = FormDoc()
+    s = doc.add("slider", 10, 10); s.h = 120; s.extra["vertical"] = True
+    p = doc.add("progress", 10, 40); p.extra["indeterminate"] = True
+    i = doc.add("image", 10, 80); i.extra["mode"] = "kacheln"
+    b = doc.add("button", 10, 120); b.extra["draggable"] = True; b.extra["drop_target"] = True
+    code = doc.generate_gb_code()
+    assert "GUI_VSLIDER(frm, 10, 10, 120," in code
+    assert 'GUI_PROGRESS_SET(' in code and '"unbestimmt", 1)' in code
+    # Bilder werden im Code uebersprungen (keine Bildquelle in der Datei);
+    # der Modus steht wenigstens im Hinweis, damit er nicht still verloren geht.
+    assert "Modus: kacheln" in code
+    assert "GUI_DRAGGABLE(" in code and "GUI_DROP_TARGET(" in code
+    # Vorgaben erzeugen keine Zeile.
+    ohne = FormDoc(); ohne.add("slider", 0, 0); ohne.add("image", 0, 0); ohne.add("progress", 0, 0)
+    c2 = ohne.generate_gb_code()
+    assert "GUI_VSLIDER" not in c2 and "GUI_IMAGE_MODE" not in c2 and "GUI_PROGRESS_SET" not in c2
