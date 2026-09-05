@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1651,
+ "count": 1654,
  "builtins": [
   {
    "name": "ABS",
@@ -2961,6 +2961,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_DIALOG_TEXT",
+   "kind": "core",
+   "signature": "GUI_DIALOG_TEXT(dlg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_DOUBLE_CLICKED",
    "kind": "core",
    "signature": "GUI_DOUBLE_CLICKED(lb)",
@@ -3378,6 +3384,12 @@
    "name": "GUI_PROGRESS",
    "kind": "core",
    "signature": "GUI_PROGRESS(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PROMPT",
+   "kind": "core",
+   "signature": "GUI_PROMPT(titel$, text$[, vorgabe$[, knoepfe$]])",
    "module": "gui"
   },
   {
@@ -4062,6 +4074,12 @@
    "name": "GUI_WINDOW_GET_Y",
    "kind": "core",
    "signature": "GUI_WINDOW_GET_Y(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_MODAL",
+   "kind": "core",
+   "signature": "GUI_WINDOW_MODAL(win, an)",
    "module": "gui"
   },
   {

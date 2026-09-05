@@ -1247,51 +1247,113 @@ impl Gui {
     /// lang in `GUI_ANSWER` an, genau wie ein Klick in `GUI_CLICKED`.
     pub fn dialog(&mut self, g: &Graphics, titel: String, text: String, frage: bool)
                   -> Result<i64, String> {
+        let knoepfe: Vec<String> = if frage { vec!["Ja".into(), "Nein".into()] } else { vec!["OK".into()] };
+        self.dialog_frei(g, titel, text, knoepfe, None)
+    }
+
+    /// Der Dialog mit BELIEBIGEN Knoepfen (`GUI_DIALOG(t, x, "Speichern|Verwerfen|Abbrechen")`)
+    /// und wahlweise einem Eingabefeld (`GUI_PROMPT`). Antwort = Nummer des
+    /// Knopfs, 1-basiert. Enter drueckt den ERSTEN, ESC und das Schliessen-
+    /// Kreuz den LETZTEN -- die Konvention jedes Systemdialogs: Abbrechen
+    /// steht rechts. Bei nur einem Knopf ist der beides.
+    pub fn dialog_frei(&mut self, g: &Graphics, titel: String, text: String,
+                       knoepfe: Vec<String>, eingabe: Option<String>) -> Result<i64, String> {
+        if knoepfe.is_empty() || knoepfe.len() > 5 {
+            return Err("GUI_DIALOG: ein bis fuenf Knoepfe, getrennt mit |".into());
+        }
+        if knoepfe.iter().any(|k| k.trim().is_empty()) {
+            return Err("GUI_DIALOG: ein Knopf ohne Beschriftung".into());
+        }
         // In LOGISCHEN Einheiten rechnen -- `new_window`/`add_widget`
         // skalieren selbst, und zweimal waere zweimal zu viel.
         let zeilen: Vec<String> = text.split('\n').map(|z| z.to_string()).collect();
         let zh = self.unsk(self.ctext_height(g)) + 6;
+        let pad = 16;
+        // Knopfbreite nach der laengsten Beschriftung -- "Verwerfen" passt
+        // nicht in 84 Pixel.
+        let bw = knoepfe.iter().map(|k| self.unsk(self.ctext_width(g, k)) + 24).max().unwrap_or(84).max(84);
+        let n = knoepfe.len() as i32;
+        let gesamt = n * bw + (n - 1) * 8;
         let breiteste = zeilen.iter()
             .map(|z| self.unsk(self.ctext_width(g, z)))
             .max().unwrap_or(0)
-            .max(self.unsk(self.ctext_width(g, &titel)) + 30);
-        let knopf_reihe = if frage { 2 } else { 1 };
-        let bw = 84;
-        let ww = (breiteste + 40).clamp(220, 560);
+            .max(self.unsk(self.ctext_width(g, &titel)) + 30)
+            .max(gesamt);
+        let ww = (breiteste + 2 * pad + 8).clamp(220, 640);
+        let feld_h = if eingabe.is_some() { 28 + 10 } else { 0 };
         // Widget-Koordinaten sind RELATIV zum Inhaltsbereich, die Fensterhoehe
         // ist es nicht -- die Titelleiste kommt oben drauf. Ohne diesen
         // Zuschlag rutschte die Knopfreihe unter den unteren Rand.
-        let inhalt_h = 14 + zeilen.len() as i32 * zh + 12 + 26 + 12;
+        let inhalt_h = 14 + zeilen.len() as i32 * zh + feld_h + 12 + 26 + 12;
         let wh = self.m_roh("title_h") + inhalt_h;
         let (sw, sh) = (self.unsk(g.screen_width() as i32), self.unsk(g.screen_height() as i32));
         let h = self.new_window(titel, (sw - ww) / 2, (sh - wh) / 2, ww, wh);
         let wi = h as usize;
         for (i, z) in zeilen.iter().enumerate() {
-            self.label(h, z.clone(), 16, 14 + i as i32 * zh, None)?;
+            self.label(h, z.clone(), pad, 14 + i as i32 * zh, None)?;
+        }
+        let mut feld: Option<usize> = None;
+        if let Some(vorgabe) = eingabe {
+            let fy = 14 + zeilen.len() as i32 * zh + 4;
+            let fh = self.textinput(h, pad, fy, ww - 2 * pad, 28, String::new())?;
+            self.set_text(fh, vorgabe)?;
+            // Alles markiert: das erste Tippen ersetzt die Vorgabe.
+            let (fwi, fi) = Self::dec_widget(fh);
+            self.windows[fwi].widgets[fi].sel_anchor = 0;
+            feld = Some(fi);
         }
         // Knopfreihe unten rechts -- wie in jedem Systemdialog.
         let by = inhalt_h - 12 - 26;
-        let gesamt = knopf_reihe * bw + (knopf_reihe - 1) * 8;
-        let bx0 = ww - 16 - gesamt;
-        if frage {
-            self.button(h, "Ja".into(), bx0, by, bw, 26)?;
-            self.button(h, "Nein".into(), bx0 + bw + 8, by, bw, 26)?;
-        } else {
-            self.button(h, "OK".into(), bx0, by, bw, 26)?;
+        let bx0 = ww - pad - gesamt;
+        let erster = self.windows[wi].widgets.len();
+        for (k, kn) in knoepfe.iter().enumerate() {
+            self.button(h, kn.clone(), bx0 + k as i32 * (bw + 8), by, bw, 26)?;
         }
+        let letzter = self.windows[wi].widgets.len() - 1;
         {
             let win = &mut self.windows[wi];
             win.dlg = true;
             win.movable = true;
-            win.closable = frage;   // Schliessen = Abbrechen; eine Meldung hat nur OK
+            win.closable = n > 1;   // Schliessen = der letzte Knopf; eine Meldung hat nur OK
+            win.default_btn = erster as i32;
+            win.cancel_btn = letzter as i32;
         }
         self.modal = Some(wi);
         self.bring_to_front(wi);
         self.focus_window = Some(wi);
-        // Fokus auf den ersten Knopf: der Dialog soll sofort mit der Tastatur
-        // beantwortbar sein, ohne erst einmal Tab druecken zu muessen.
-        self.focus_widget = Some((wi, self.windows[wi].widgets.len() - knopf_reihe as usize));
+        // Fokus auf das Eingabefeld, sonst auf den ersten Knopf: der Dialog
+        // soll sofort mit der Tastatur zu bedienen sein.
+        self.focus_widget = Some((wi, feld.unwrap_or(erster)));
         Ok(h)
+    }
+
+    /// GUI_DIALOG_TEXT(dlg) -- was in das Eingabefeld eines GUI_PROMPT getippt
+    /// wurde. Auch nach der Antwort lesbar: das Fenster bleibt als Tombstone.
+    pub fn dialog_text(&self, h: i64) -> Result<String, String> {
+        let w = self.windows.get(h as usize).filter(|_| h >= 0)
+            .ok_or("GUI_DIALOG_TEXT: ungueltiges GUI_WINDOW-Handle")?;
+        if !w.dlg { return Err("GUI_DIALOG_TEXT: das Fenster ist kein Dialog (GUI_PROMPT)".into()); }
+        w.widgets.iter().find(|x| x.kind == Kind::TextInput).map(|x| x.text.clone())
+            .ok_or_else(|| "GUI_DIALOG_TEXT: dieser Dialog hat kein Eingabefeld (nur GUI_PROMPT)".into())
+    }
+
+    /// GUI_WINDOW_MODAL(win, an) -- ein EIGENES Fenster modal schalten: alles
+    /// andere nimmt keine Eingabe an und liegt hinter dem Schleier, bis das
+    /// Fenster wieder freigegeben, ausgeblendet oder zerstoert wird.
+    pub fn window_modal(&mut self, win: i64, an: bool) -> Result<(), String> {
+        let wi = win as usize;
+        if win < 0 || wi >= self.windows.len() || !self.windows[wi].alive {
+            return Err(format!("GUI_WINDOW_MODAL: ungueltiges Fenster-Handle {}", win));
+        }
+        if an {
+            if self.windows[wi].dlg { return Err("GUI_WINDOW_MODAL: ein Dialog ist schon modal".into()); }
+            self.modal = Some(wi);
+            self.bring_to_front(wi);
+            self.focus_window = Some(wi);
+        } else if self.modal == Some(wi) {
+            self.modal = None;
+        }
+        Ok(())
     }
 
     /// Antwort eines Dialogs: 0 = noch offen, 1 = OK/Ja, 2 = Abbrechen/Nein.
@@ -1307,7 +1369,7 @@ impl Gui {
         if h < 0 { return Ok(0); }
         let w = self.windows.get(h as usize)
             .ok_or("GUI_ANSWER: ungueltiges GUI_WINDOW-Handle")?;
-        if !w.dlg { return Err("GUI_ANSWER: das Fenster ist kein Dialog (GUI_MESSAGE/GUI_CONFIRM)".into()); }
+        if !w.dlg { return Err("GUI_ANSWER: das Fenster ist kein Dialog (GUI_DIALOG/GUI_PROMPT)".into()); }
         Ok(w.answer as i64)
     }
 
@@ -5073,15 +5135,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// liest die Antwort also noch in diesem Bild.
     fn dialog_auswerten(&mut self) {
         let wi = match self.modal { Some(wi) => wi, None => return };
-        if !self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
+        // Ein per GUI_WINDOW_MODAL geschaltetes EIGENES Fenster gibt die
+        // Modalitaet frei, sobald es weg oder ausgeblendet ist -- sonst
+        // saesse das Programm hinter einem Schleier ohne Fenster.
+        if !self.windows.get(wi).map(|w| w.alive && w.visible).unwrap_or(false) {
             self.modal = None;
             return;
         }
+        if !self.windows[wi].dlg { return; }
+        // Antwort = Nummer des Knopfs (1-basiert); Schliessen = der letzte.
+        let n_knoepfe = self.windows[wi].widgets.iter().filter(|w| w.kind == Kind::Button).count() as i32;
         let mut antwort = 0;
-        if self.windows[wi].close_clicked { antwort = 2; }   // Schliessen = Abbrechen
+        if self.windows[wi].close_clicked { antwort = n_knoepfe; }
+        let mut k = 0;
         for wdg in self.windows[wi].widgets.iter() {
-            if wdg.kind == Kind::Button && wdg.clicked {
-                antwort = match wdg.text.as_str() { "Nein" => 2, _ => 1 };
+            if wdg.kind == Kind::Button {
+                k += 1;
+                if wdg.clicked { antwort = k; }
             }
         }
         if antwort == 0 { return; }
