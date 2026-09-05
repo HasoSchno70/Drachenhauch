@@ -1,5 +1,17 @@
 # Entwurf: Mehrere OS-Fenster in Drachenhauch
 
+> **Stand 05.09.2026: Weg B ist gebaut** — `WINDOW_OPEN/SEND/RECV$/ALIVE/CLOSE`
+> und `PARENT_SEND/RECV$/ALIVE`, siehe [builtins-core.md](builtins-core.md#ein-zweites-fenster-window_open).
+> Der Kanal ist eine TCP-Verbindung auf 127.0.0.1 statt stdin/stdout (das Kind
+> darf weiter `PRINT`). Die drei Prüfsteine unten, gemessen: 1000 Nachrichten
+> im Schub hin und zurück ~60 ms; eine **einzelne** Runde kostet ein bis drei
+> Bilder des Kindes (17–50 ms), weil es seine Post einmal je Bild liest — der
+> Kanal ist nicht der Engpass, die Bildschleife ist es; das Kind stirbt, die
+> Eltern leben (`tests/test_fenster_prozess.py`); die Rechnungsverwaltung
+> öffnet eine Rechnung im zweiten Fenster in 64 Zeilen (`196_rechnung_fenster.dh`).
+> Wege C und D bleiben ungebaut; Fall a (geteilte Bilder und Objekte) bleibt
+> ein Nicht-Ziel.
+
 *Untersuchung, keine Umsetzung.* Nach dem sechsten Piloten (der
 Rechnungsverwaltung, [PR #76](https://github.com/HasoSchno70/Drachenhauch/pull/76))
 blieb eine Lückenliste übrig, deren Punkte das gui-Modul selbst nicht

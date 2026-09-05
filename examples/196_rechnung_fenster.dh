@@ -1,0 +1,64 @@
+' ============================================================
+'  Rechnungen -- eine Rechnung im EIGENEN OS-Fenster (Kind von 196_rechnungen.dh)
+' ============================================================
+'  Gestartet ueber WINDOW_OPEN("196_rechnung_fenster.dh", datenbank$, id)
+'  aus der Rechnungsverwaltung: ein zweiter dhrt, ein zweites Fenster, mit
+'  eigenem Eintrag in der Taskleiste und auf jedem Monitor. Beide arbeiten
+'  auf DERSELBEN Datenbank; geteilt wird kein Speicher, nur Text ueber den
+'  Kanal: dieses Fenster meldet "geaendert <id>", die Verwaltung laedt neu.
+'  Laeuft es ohne Eltern (direkt gestartet), fehlt nur die Meldung.
+' ============================================================
+IMPORT "gui"
+IMPORT "db"
+
+DIM dbPfad AS STRING : dbPfad = IIF(ARGC() > 0, ARG$(0), "rechnungen.db")
+DIM id AS INTEGER : id = IIF(ARGC() > 1, VAL(ARG$(1)), 1)
+
+SCREEN(560, 420, "Rechnung", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+DIM db AS DB_CONN : db = DB_OPEN(dbPfad)
+
+DIM win AS GUI_WINDOW : win = GUI_WINDOW("Rechnung", 0, 0, 560, 420)
+GUI_WINDOW_CHROME(win, FALSE)
+DIM titel AS GUI_WIDGET : titel = GUI_LABEL(win, "", 12, 12)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(win, 12, 40, 536, 280, ["Bezeichnung", "Menge", "Einzelpreis", "Summe"], [])
+GUI_TABLE_COL_WIDTHS(t, [250, 70, 100, 110])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(win, "bezahlt", 12, 336)
+DIM bSpeichern AS GUI_WIDGET : bSpeichern = GUI_BUTTON(win, "Speichern", 420, 330, 128, 30)
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "", 12, 380)
+GUI_BIND(cb, "bezahlt")
+
+SUB laden()
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT r.nummer, k.name, r.bezahlt FROM rechnungen r JOIN kunden k ON k.id = r.kunde_id WHERE r.id = ?", id)
+    IF DB_NEXT(r) THEN
+        GUI_SET_TEXT(titel, "Rechnung " + DB_GET_STRING(r, 0) + " -- " + DB_GET_STRING(r, 1))
+        SETWINDOWTITLE("Rechnung " + DB_GET_STRING(r, 0))
+    END IF
+    DB_CLOSE_RESULT(r)
+    GUI_FORM_LOAD(win, db, "rechnungen", id)
+    GUI_TABLE_CLEAR(t)
+    DIM p AS DB_RESULT : p = DB_QUERY(db, "SELECT bezeichnung, menge, preis_cent FROM positionen WHERE rechnung_id = ? ORDER BY id", id)
+    WHILE DB_NEXT(p)
+        DIM z AS INTEGER : z = DB_GET_INT(p, 1) * DB_GET_INT(p, 2)
+        GUI_TABLE_ADD_ROW(t, [DB_GET_STRING(p, 0), STR$(DB_GET_INT(p, 1)), FORMAT$(DB_GET_INT(p, 2) / 100.0, "%.2f"), FORMAT$(z / 100.0, "%.2f")])
+    WEND
+    DB_CLOSE_RESULT(p)
+END SUB
+laden()
+IF PARENT_ALIVE() THEN PARENT_SEND("offen " + STR$(id))
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(bSpeichern) THEN
+        GUI_FORM_SAVE(win, db, "rechnungen", id)
+        GUI_SET_TEXT(status, "Gespeichert.")
+        IF PARENT_ALIVE() THEN PARENT_SEND("geaendert " + STR$(id))
+    END IF
+    ' Die Verwaltung kann "neu" schicken, wenn sie selbst gespeichert hat.
+    IF PARENT_ALIVE() THEN
+        IF PARENT_RECV$() = "neu" THEN laden()
+    END IF
+    CLS(&H0E1014) : GUI_DRAW() : FLIP()
+WEND

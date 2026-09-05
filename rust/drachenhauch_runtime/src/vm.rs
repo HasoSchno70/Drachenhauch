@@ -698,6 +698,12 @@ pub struct Vm<'p> {
     shell_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::ShellErgebnis, String>>,
     /// Auftraege, die eine EIGENE GB-Funktion ausfuehren (`TASK_*`).
     task_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::TaskErgebnis, String>>,
+    /// Fenster als Prozess: die Kinder (WINDOW_*) und, wenn dieses Programm
+    /// selbst ein Kind ist, die Verbindung zu den Eltern (PARENT_*). Die
+    /// Elternverbindung wird beim ersten PARENT_*-Aufruf aufgebaut.
+    fenster: crate::fenster::Fenster,
+    eltern: Option<crate::fenster::Eltern>,
+    eltern_geprueft: bool,
     shell_letzter_code: i64,
     shell_letzter_fehler: String,
     // WP E -- Melden: Pegel fuer LOG_*, aus der Umgebung (DH_LOG) gelesen.
@@ -863,6 +869,7 @@ impl<'p> Vm<'p> {
             assert_sammeln: false,
             shell_auftraege: Default::default(),
             task_auftraege: Default::default(),
+            fenster: Default::default(), eltern: None, eltern_geprueft: false,
             shell_letzter_code: 0,
             shell_letzter_fehler: String::new(),
             log_pegel: None,
@@ -4556,8 +4563,51 @@ impl<'p> Vm<'p> {
     /// `Program` damit weder Send noch Sync ist.
     fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
-             || name.starts_with("task_")) { return Ok(None); }
+             || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")) { return Ok(None); }
         let v = match name {
+            // ===== Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) =====
+            // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
+            // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --
+            // dieselbe Grenze wie bei TASK_START, aus demselben Grund.
+            "window_open" => {
+                if a.is_empty() { return Err("WINDOW_OPEN: erwartet die Programmdatei, z.B. WINDOW_OPEN(\"palette.dh\")".into()); }
+                let datei = bi_str(a, 0, "WINDOW_OPEN")?.to_string();
+                let exe = std::env::current_exe().map_err(|e| format!(
+                    "WINDOW_OPEN: eigenen Programmpfad nicht gefunden: {}", e))?;
+                let mut args: Vec<String> = Vec::new();
+                for (i, wert) in a.iter().enumerate().skip(1) {
+                    args.push(match wert {
+                        Value::Int(n) => n.to_string(),
+                        Value::Str(s) => s.to_string(),
+                        Value::Bool(b) => if *b { "TRUE".into() } else { "FALSE".into() },
+                        Value::Float(f) => f.to_string(),
+                        andere => return Err(format!(
+                            "WINDOW_OPEN: Argument {} geht ueber eine Prozessgrenze und muss eine Zahl, \
+                             ein Text oder BOOLEAN sein, nicht {}. Fuer alles andere reich JSON durch.",
+                            i, andere.type_name())),
+                    });
+                }
+                Value::Int(self.fenster.oeffnen(exe, &datei, &args)?)
+            }
+            "window_send" => { self.fenster.senden(bi_int(a, 0, "WINDOW_SEND")?, bi_str(a, 1, "WINDOW_SEND")?)?; Value::Nil }
+            "window_recv$" | "window_recv" => Value::str_rc(&self.fenster.empfangen(bi_int(a, 0, "WINDOW_RECV$")?)?),
+            "window_alive" => Value::Bool(self.fenster.lebt(bi_int(a, 0, "WINDOW_ALIVE")?)?),
+            "window_close" => { self.fenster.schliessen(bi_int(a, 0, "WINDOW_CLOSE")?)?; Value::Nil }
+            "parent_send" | "parent_recv$" | "parent_recv" | "parent_alive" => {
+                if !self.eltern_geprueft {
+                    self.eltern = crate::fenster::Eltern::verbinden();
+                    self.eltern_geprueft = true;
+                }
+                match (name, self.eltern.as_ref()) {
+                    ("parent_alive", None) => Value::Bool(false),
+                    ("parent_alive", Some(e)) => Value::Bool(e.lebt()),
+                    (_, None) => return Err(format!(
+                        "{}: dieses Programm wurde nicht mit WINDOW_OPEN gestartet -- es hat keine Eltern \
+                         (PARENT_ALIVE() sagt das ohne Fehler)", name.to_uppercase())),
+                    ("parent_send", Some(e)) => { e.senden(bi_str(a, 0, "PARENT_SEND")?)?; Value::Nil }
+                    (_, Some(e)) => Value::str_rc(&e.empfangen()),
+                }
+            }
             "shell_start" => {
                 if a.is_empty() { return Err("SHELL_START: erwartet mind. 1 Argument (Programm)".into()); }
                 let prog = bi_str(a, 0, "SHELL_START")?.to_string();

@@ -75,6 +75,19 @@ module.exports = (H) => [
 
   H.h2("Eigene Funktionen im Hintergrund"),
   H.p("TASK_START lässt deine eigene Funktion nebenher rechnen, während die Hauptschleife weiterläuft – für eine Kartengenerierung, eine große Auswertung, alles was länger dauert als ein Bild."),
+  H.cmd("WINDOW_OPEN · WINDOW_SEND · WINDOW_RECV$ · WINDOW_ALIVE · WINDOW_CLOSE", 'WINDOW_OPEN(datei$ [, arg1, ...]) AS INTEGER   WINDOW_SEND(fenster, text$)   WINDOW_RECV$(fenster) AS STRING   WINDOW_ALIVE(fenster) AS BOOLEAN   WINDOW_CLOSE(fenster)',
+    "Ein zweites OS-Fenster ist ein zweiter dhrt: WINDOW_OPEN startet datei$ als eigenes Programm mit eigenem SCREEN (Argumente kommen dort als ARG$ an) und liefert eine Fensternummer. Beide Seiten reden über Textzeilen: WINDOW_SEND schickt eine, WINDOW_RECV$ holt die nächste (\"\" wenn keine da ist), WINDOW_ALIVE sagt, ob der Prozess noch läuft, WINDOW_CLOSE beendet ihn. Kein geteilter Speicher – was hinüber soll, wird Text; ein Dokument liegt in einer Datei oder Datenbank, die beide öffnen. Fällt die Verbindung, beendet sich das Kind von selbst.",
+    [
+      'DIM k AS INTEGER : k = WINDOW_OPEN("rechnung_fenster.dh", "rechnungen.db", 7)',
+      'IF WINDOW_RECV$(k) = "geaendert 7" THEN neuLaden()',
+      'IF NOT WINDOW_ALIVE(k) THEN PRINT "Fenster geschlossen"',
+    ]),
+  H.cmd("PARENT_SEND · PARENT_RECV$ · PARENT_ALIVE", 'PARENT_SEND(text$)   PARENT_RECV$() AS STRING   PARENT_ALIVE() AS BOOLEAN',
+    "Die Gegenseite im Kindprogramm: eine Zeile an das Hauptprogramm schicken, die nächste von ihm holen, und fragen, ob es Eltern gibt. PARENT_ALIVE liefert FALSE, wenn das Programm allein gestartet wurde – so läuft dieselbe Datei auch ohne Hauptprogramm, nur ohne die Meldungen.",
+    [
+      'IF PARENT_ALIVE() THEN PARENT_SEND("geaendert " + STR$(id))',
+      'IF PARENT_RECV$() = "neu" THEN laden()',
+    ]),
   H.cmd("TASK_START · TASK_READY · TASK_RESULT$", "TASK_START(funktion[, arg1, arg2, …])   TASK_READY(auftrag)   TASK_RESULT$(auftrag)",
     "Startet die Funktion (ohne Klammern hingeschrieben, wie eine FUNCREF) und liefert eine Auftragsnummer. TASK_READY fragt nach, TASK_RESULT$ holt das Ergebnis ab – einmal.",
     [

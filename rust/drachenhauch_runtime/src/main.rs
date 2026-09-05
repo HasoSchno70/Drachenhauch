@@ -49,6 +49,8 @@ mod db;
 mod ecs;
 // Hintergrund-Auftraege (WP H) -- ungated: SHELL_START braucht kein http.
 mod hintergrund;
+// Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) -- ungated wie hintergrund.
+mod fenster;
 #[cfg(feature = "http")]
 mod html;
 #[cfg(feature = "net")]

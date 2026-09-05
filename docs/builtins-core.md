@@ -603,6 +603,67 @@ Was der Auftrag selbst mit `PRINT` ausgibt, kommt **nicht** zurück — ein
 Auftrag rechnet, er redet nicht. Beispiel:
 [examples/170_task.dh](../examples/170_task.dh).
 
+
+## Ein zweites Fenster: `WINDOW_OPEN`
+
+Drachenhauch kennt **ein OS-Fenster je Prozess** (raylib hält seinen Zustand
+global; die Abwägung steht in [entwurf-native-fenster.md](entwurf-native-fenster.md)).
+Ein zweites Fenster ist deshalb ein **zweiter `dhrt`**, der sein eigenes
+Programm mit eigenem `SCREEN` fährt — mit eigenem Eintrag in der Taskleiste,
+auf jedem Monitor, und ein Absturz dort reißt das erste nicht mit. Verbunden
+sind beide über einen **zeilenweisen Textkanal**:
+
+```basic
+' im Hauptprogramm
+DIM k AS INTEGER
+k = WINDOW_OPEN("rechnung_fenster.dh", "rechnungen.db", 7)   ' Argumente wie auf der Kommandozeile
+WINDOW_SEND(k, "neu")
+DIM post AS STRING : post = WINDOW_RECV$(k)                   ' "" wenn nichts da
+IF NOT WINDOW_ALIVE(k) THEN PRINT "Fenster ist zu"
+
+' im Kindprogramm (rechnung_fenster.dh)
+DIM id AS INTEGER : id = VAL(ARG$(1))
+IF PARENT_ALIVE() THEN PARENT_SEND("geaendert " + STR$(id))
+IF PARENT_RECV$() = "neu" THEN laden()
+```
+
+| Funktion | Zweck |
+|---|---|
+| `WINDOW_OPEN(datei$[, arg1, …])` → INTEGER | zweiten `dhrt run datei$` starten; Zahlen, Texte, BOOLEAN werden Kommandozeilen-Argumente (`ARGC`/`ARG$`) |
+| `WINDOW_SEND(fenster, text$)` | eine Zeile schicken — vor der Verbindung Gesendetes kommt nach, sobald das Kind `PARENT_*` ruft |
+| `WINDOW_RECV$(fenster)` → STRING | nächste Zeile vom Kind oder `""` |
+| `WINDOW_ALIVE(fenster)` → BOOLEAN | läuft der Prozess noch? |
+| `WINDOW_CLOSE(fenster)` | Prozess beenden |
+| `PARENT_SEND(text$)` / `PARENT_RECV$()` | im Kind: an die Eltern / von den Eltern |
+| `PARENT_ALIVE()` → BOOLEAN | im Kind: gibt es Eltern, und leben sie? `FALSE`, wenn das Programm allein gestartet wurde — so läuft dasselbe Programm auch ohne Eltern |
+
+Was man wissen muss:
+
+- **Kein geteilter Zustand.** Ein `IMAGE`, ein Feld, ein Objekt gehört einem
+  Prozess. Was hinüber soll, wird Text — JSON, wenn es Struktur braucht. Ein
+  Dokument liegt in einer Datei oder Datenbank, die beide öffnen. Dieselbe
+  Grenze wie bei `TASK_START`, aus demselben Grund.
+- **Eine Nachricht ist eine Zeile.** Ein Zeilenumbruch darin ist ein Fehler.
+  Die Warteschlange hält 1024 Zeilen, die älteste fällt weg — wer nicht
+  liest, blockiert die Gegenseite nicht.
+- **Fällt die Verbindung, beendet sich das Kind.** Ein Fenster ohne
+  Hauptprogramm wäre ein Zombie, den niemand mehr schließt. Geht das
+  Hauptprogramm regulär zu Ende, nimmt es seine Fenster mit.
+- **Zeiten, gemessen:** ~0,4 s bis das Kind sein erstes Bild zeigt (ein
+  Prozessstart). 1000 Nachrichten in einem Schub hin und zurück: ~60 ms. Eine
+  **einzelne** Runde kostet ein bis drei Bilder des Kindes (17–50 ms bei
+  60 Hz), weil das Kind seine Post einmal je Bild liest — das ist die Bauart,
+  nicht der Kanal; wer es eiliger braucht, setzt im Kind `SETFPS(0)`.
+- Der Kanal ist eine TCP-Verbindung auf `127.0.0.1` (Port in der Umgebung
+  `DHRT_ELTERN_PORT`), nicht stdin/stdout — das Kind darf weiter `PRINT`
+  benutzen. Im Web-Bau gibt es keine Prozesse; dort ist `WINDOW_OPEN` ein
+  Fehler.
+
+Beispiel: die Rechnungsverwaltung `examples/196_rechnungen.dh` öffnet mit
+Strg+F eine Rechnung in `examples/196_rechnung_fenster.dh`; beide arbeiten
+auf derselben SQLite-Datei, das Kind meldet `geaendert <id>`, die Verwaltung
+schickt `neu`, wenn sie selbst gespeichert hat.
+
 ## Mengen
 
 Eine Menge ist eine `MAP OF INTEGER`, deren Werte niemanden interessieren —

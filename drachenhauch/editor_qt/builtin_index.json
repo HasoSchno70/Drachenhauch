@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1699,
+ "count": 1707,
  "builtins": [
   {
    "name": "ABS",
@@ -6423,6 +6423,24 @@
    "module": "core"
   },
   {
+   "name": "PARENT_ALIVE",
+   "kind": "core",
+   "signature": "PARENT_ALIVE()",
+   "module": "dhrt"
+  },
+  {
+   "name": "PARENT_RECV$",
+   "kind": "core",
+   "signature": "PARENT_RECV$()",
+   "module": "dhrt"
+  },
+  {
+   "name": "PARENT_SEND",
+   "kind": "core",
+   "signature": "PARENT_SEND(text$)",
+   "module": "dhrt"
+  },
+  {
    "name": "PARTICLE_CLEAR",
    "kind": "core",
    "signature": "PARTICLE_CLEAR(sys)",
@@ -9741,6 +9759,18 @@
    "module": "wifi"
   },
   {
+   "name": "WINDOW_ALIVE",
+   "kind": "core",
+   "signature": "WINDOW_ALIVE(fenster)",
+   "module": "dhrt"
+  },
+  {
+   "name": "WINDOW_CLOSE",
+   "kind": "core",
+   "signature": "WINDOW_CLOSE(fenster)",
+   "module": "dhrt"
+  },
+  {
    "name": "WINDOW_DPI_X",
    "kind": "graphics",
    "signature": "WINDOW_DPI_X() -> FLOAT",
@@ -9831,9 +9861,21 @@
    "module": "core"
   },
   {
+   "name": "WINDOW_OPEN",
+   "kind": "core",
+   "signature": "WINDOW_OPEN(datei$, ...)",
+   "module": "dhrt"
+  },
+  {
    "name": "WINDOW_PASSTHROUGH",
    "kind": "graphics",
    "signature": "WINDOW_PASSTHROUGH(flag: BOOLEAN)",
+   "module": "dhrt"
+  },
+  {
+   "name": "WINDOW_RECV$",
+   "kind": "core",
+   "signature": "WINDOW_RECV$(fenster)",
    "module": "dhrt"
   },
   {
@@ -9852,6 +9894,12 @@
    "name": "WINDOW_RESTORE",
    "kind": "graphics",
    "signature": "WINDOW_RESTORE()",
+   "module": "dhrt"
+  },
+  {
+   "name": "WINDOW_SEND",
+   "kind": "core",
+   "signature": "WINDOW_SEND(fenster, text$)",
    "module": "dhrt"
   },
   {
