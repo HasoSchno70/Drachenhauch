@@ -203,7 +203,8 @@ Das Experiment hätte drei Prüfsteine, jeder messbar:
    ist die Schnittstelle falsch.
 
 Was man B **nicht** geben sollte: eine Fassade, die so tut, als wären es
-Aufrufe (`WINDOW_CALL(k, "funktion", ...)`). Die Verlockung ist groß, und
+Aufrufe — ein „rufe im anderen Fenster die Funktion X" mit Rückgabewert.
+Die Verlockung ist groß, und
 das Ergebnis wäre ein RPC-System mit allen Fragen nach Wartezeiten und
 Fehlern — dieselben Fragen, die der Entwurf zu `TASK_START` schon einmal mit
 „nur Text und Zahlen" beantwortet hat.
