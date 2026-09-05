@@ -1030,3 +1030,50 @@ def test_farbe_und_datum_ueberstehen_den_rundweg(tmp_path):
     zurueck = FormDoc.load(str(p)).controls
     assert zurueck[0].extra["color_value"] == "#E84B4B"
     assert zurueck[1].extra["date"] == "2026-08-31"
+
+
+# ---------------------------------------------------------------- Layout-Behaelter (gui Punkt 5)
+def test_layout_kinder_heissen_im_designer_und_zaehlen_in_der_datei():
+    """Die Laufzeit will Kinder als [Index, Gewicht]; der Designer fuehrt sie
+    an NAMEN, damit Loeschen und Umsortieren keine Index-Buchfuehrung
+    braucht. Umgerechnet wird nur an der Dateigrenze."""
+    doc = FormDoc()
+    lay = doc.add("layout", 10, 10)
+    a = doc.add("button", 0, 0)
+    b = doc.add("button", 0, 0)
+    doc.layout_zuordnen(a, lay, 0)
+    doc.layout_zuordnen(b, lay, 2)
+    lay.extra["layout"]["kinder"].insert(1, [None, 1])       # Leerraum
+    d = doc.to_dict()
+    lj = d["widgets"][0]["layout"]
+    assert lj["kinder"] == [[1, 0], [-1, 1], [2, 2]]
+    assert lay.extra["layout"]["kinder"][0][0] == a.name, "im Speicher bleiben die Namen"
+    # Zurueck: Indizes werden wieder zu Namen -- und ein Roundtrip ist stabil.
+    doc2 = FormDoc.from_dict(d)
+    assert doc2.controls[0].extra["layout"]["kinder"] == [[a.name, 0], [None, 1], [b.name, 2]]
+    assert doc2.to_dict() == d
+    # Ein Control wandert in einen anderen Behaelter: der alte laesst los.
+    lay2 = doc.add("layout", 10, 100)
+    doc.layout_zuordnen(b, lay2, 1)
+    assert doc.layout_von(b)[0] is lay2
+    assert [k[0] for k in lay.extra["layout"]["kinder"]] == [a.name, None]
+    # Geloeschtes Control faellt beim Schreiben still weg, statt einen
+    # falschen Index zu hinterlassen.
+    doc.remove(a)
+    assert doc.to_dict()["widgets"][0]["layout"]["kinder"] == [[-1, 1]]
+
+
+def test_layout_codegen_legt_behaelter_an_und_fuellt_ihn_nach_den_controls():
+    doc = FormDoc()
+    lay = doc.add("layout", 10, 10)
+    lay.extra["layout"] = {"art": "raster", "spalten": 3, "abstand": 4, "dehnen": False, "kinder": []}
+    a = doc.add("button", 0, 0)
+    doc.layout_zuordnen(a, lay, 1)
+    lay.extra["layout"]["kinder"].append([None, 2])
+    code = doc.generate_gb_code()
+    assert 'GUI_LAYOUT(frm, "raster:3", 10, 10, 200, 120)' in code
+    assert 'GUI_LAYOUT_SET(' in code and '"abstand", 4)' in code and '"dehnen", 0)' in code
+    z_add = code.index("GUI_LAYOUT_ADD(")
+    assert z_add > code.index("GUI_BUTTON(frm"), "erst alle Controls, dann die Zuordnung"
+    assert "GUI_LAYOUT_SPACER(" in code
+    assert code.index("GUI_LAYOUT_ADD(") < code.index("GUI_LAYOUT_SPACER("), "in der Reihenfolge der Kinder"

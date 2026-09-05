@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1654,
+ "count": 1660,
  "builtins": [
   {
    "name": "ABS",
@@ -2847,6 +2847,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_AUTOSIZE",
+   "kind": "core",
+   "signature": "GUI_AUTOSIZE(wdg)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_BUTTON",
    "kind": "core",
    "signature": "GUI_BUTTON(win, text, x, y, w, h)",
@@ -3114,6 +3120,36 @@
    "name": "GUI_LABEL",
    "kind": "core",
    "signature": "GUI_LABEL(4..5 Argumente)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT",
+   "kind": "core",
+   "signature": "GUI_LAYOUT(win, art$, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_ADD",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_ADD(layout, wdg[, gewicht])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_REMOVE",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_REMOVE(layout, wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_SET",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_SET(layout, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LAYOUT_SPACER",
+   "kind": "core",
+   "signature": "GUI_LAYOUT_SPACER(layout[, gewicht])",
    "module": "gui"
   },
   {

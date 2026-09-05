@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1609,
+ "count": 1615,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -454,6 +454,7 @@
   "GUI_ACTIVE_TAB": "INTEGER — aktiver Reiter-Index",
   "GUI_ANSWER": "INTEGER — 0 = noch offen, sonst die Nummer des Knopfs (1-basiert): 1 = OK/Ja, 2 = Abbrechen/Nein",
   "GUI_APPLY_STYLE": "einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen",
+  "GUI_AUTOSIZE": "Breite und Höhe aus dem Inhalt; Breite oder Höhe 0 beim Anlegen heißt dasselbe",
   "GUI_BUTTON": "GUI_WIDGET — Knopf",
   "GUI_CANVAS": "GUI_WIDGET — freie Zeichenflaeche -- hinein malt man mit den normalen Zeichenbefehlen, nach GUI_DRAW",
   "GUI_CANVAS_H": "INTEGER — Groesse der Flaeche",
@@ -499,6 +500,11 @@
   "GUI_KIND": "\"button\"/\"label\"/\"checkbox\"/\"slider\"/\"textinput\"/\"panel\"/\"table\"",
   "GUI_KNOB": "Ein Drehregler: senkrecht ziehen dreht ihn.",
   "GUI_LABEL": "GUI_WIDGET — Text",
+  "GUI_LAYOUT": "GUI_WIDGET — unsichtbarer Layout-Behälter: zeile, spalte oder raster:N — verteilt seine Kinder in jedem GUI_UPDATE (siehe Layout)",
+  "GUI_LAYOUT_ADD": "Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen",
+  "GUI_LAYOUT_REMOVE": "Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen",
+  "GUI_LAYOUT_SET": "abstand, rand, ausrichtung (0/1/2 quer), dehnen (quer, Vorgabe an), rahmen (sichtbar zum Entwickeln)",
+  "GUI_LAYOUT_SPACER": "Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen",
   "GUI_LISTBOX": "GUI_WIDGET — scrollbare Auswahlliste (Mausrad scrollt)",
   "GUI_LISTBOX_ADD": "INTEGER / — / — Einträge einzeln (auch bei Klapplisten); pos weglassen = hinten anhängen",
   "GUI_LISTBOX_CHECKED": "BOOLEAN / — — Haken je Eintrag (mit kaestchen)",

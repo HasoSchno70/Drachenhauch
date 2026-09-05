@@ -5198,6 +5198,19 @@ impl<'p> Vm<'p> {
             "gui_listbox_sel_row" => Value::Int(self.gui.list_sel_row(gi(a,0,"GUI_LISTBOX_SEL_ROW")?, gi(a,1,"GUI_LISTBOX_SEL_ROW")?)?),
             "gui_listbox_clear_selection" => { self.gui.list_clear_selection(gi(a,0,"GUI_LISTBOX_CLEAR_SELECTION")?)?; Value::Nil }
             "gui_double_clicked" => Value::Bool(self.gui.double_clicked(gi(a,0,"GUI_DOUBLE_CLICKED")?)?),
+            "gui_layout" => Value::Int(self.gui.layout_new(gi(a,0,"GUI_LAYOUT")?, &gs(a,1,"GUI_LAYOUT")?,
+                gi(a,2,"GUI_LAYOUT")? as i32, gi(a,3,"GUI_LAYOUT")? as i32, gi(a,4,"GUI_LAYOUT")? as i32, gi(a,5,"GUI_LAYOUT")? as i32)?),
+            "gui_layout_add" => {
+                let gew = if a.len() > 2 { gi(a,2,"GUI_LAYOUT_ADD")? } else { 0 };
+                self.gui.layout_add(gi(a,0,"GUI_LAYOUT_ADD")?, gi(a,1,"GUI_LAYOUT_ADD")?, gew)?; Value::Nil
+            }
+            "gui_layout_spacer" => {
+                let gew = if a.len() > 1 { gi(a,1,"GUI_LAYOUT_SPACER")? } else { 1 };
+                self.gui.layout_spacer(gi(a,0,"GUI_LAYOUT_SPACER")?, gew)?; Value::Nil
+            }
+            "gui_layout_remove" => { self.gui.layout_remove(gi(a,0,"GUI_LAYOUT_REMOVE")?, gi(a,1,"GUI_LAYOUT_REMOVE")?)?; Value::Nil }
+            "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gnum(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
+            "gui_autosize" => { let g = self.gfx.as_ref(); self.gui.autosize(g, gi(a,0,"GUI_AUTOSIZE")?)?; Value::Nil }
             // --- Image + Canvas ---
             "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
                 gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),

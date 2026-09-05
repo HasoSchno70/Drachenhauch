@@ -221,6 +221,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
+    Layout,
 }
 
 impl Kind {
@@ -235,6 +236,7 @@ impl Kind {
             Kind::Toolbar => "toolbar", Kind::Tree => "tree",
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
+            Kind::Layout => "layout",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -248,6 +250,7 @@ impl Kind {
             "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
+            "layout" => Kind::Layout,
             _ => return None,
         })
     }
@@ -260,7 +263,7 @@ impl Kind {
     fn fokussierbar(self) -> bool {
         !matches!(self,
             Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
-            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas)
+            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas | Kind::Layout)
     }
 
     /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
@@ -722,6 +725,22 @@ impl ListState {
     }
 }
 
+/// Ein Layout-Behaelter: unsichtbar, verteilt seine Kinder in jedem
+/// GUI_UPDATE neu. Kinder sind Widget-Indizes desselben Fensters; -1 ist ein
+/// Leerraum (GUI_LAYOUT_SPACER). Masse (abstand, rand) liegen UNskaliert --
+/// der Massstab kommt erst im Durchlauf dazu, wie bei allen Laengen.
+#[derive(Default, Clone)]
+struct LayoutState {
+    art: u8,                 // 0 zeile, 1 spalte, 2 raster
+    spalten: i32,            // nur raster
+    kinder: Vec<(i32, i32)>, // (Widget-Index oder -1, Gewicht)
+    abstand: i32,
+    rand: i32,
+    ausrichtung: u8,         // quer zur Richtung: 0 Anfang, 1 Mitte, 2 Ende
+    dehnen: bool,            // quer dehnen
+    rahmen: bool,            // zum Entwickeln sichtbar machen
+}
+
 pub struct Widget {
     kind: Kind,
     x: i32, y: i32, w: i32, h: i32,
@@ -748,6 +767,11 @@ pub struct Widget {
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
     list: Option<Box<ListState>>,   // nur fuer Kind::ListBox, bei Bedarf
+    layout: Option<Box<LayoutState>>, // nur fuer Kind::Layout
+    // Automass: Breite/Hoehe folgen dem Inhalt (0 beim Anlegen oder GUI_AUTOSIZE),
+    // gemessen im naechsten GUI_UPDATE -- nur dort gibt es Graphics.
+    auto_w: bool,
+    auto_h: bool,
     // Laufzeit-Lifecycle (Tombstone -- Indizes/Handles bleiben stabil): `alive`
     // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
     alive: bool,
@@ -1619,6 +1643,9 @@ impl Gui {
         // auch die aus `GUI_LOAD`/`GUI_FROM_JSON`. Eine im Designer bei
         // Massstab 1 gebaute Form wird damit einfach groesser gezeichnet.
         wdg.x = sx; wdg.y = sy; wdg.w = sw; wdg.h = sh;
+        // Breite oder Hoehe 0 heisst "nach Inhalt" -- gemessen im ersten GUI_UPDATE.
+        if sw <= 0 { wdg.auto_w = true; }
+        if sh <= 0 { wdg.auto_h = true; }
         wdg.bx = wdg.x; wdg.by = wdg.y; wdg.bw = wdg.w; wdg.bh = wdg.h;  // Anchor-Basis
         let idx = w.widgets.len();
         w.widgets.push(wdg);
@@ -1631,6 +1658,7 @@ impl Gui {
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
+            layout: None, auto_w: false, auto_h: false,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false,
@@ -3515,7 +3543,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     pub fn set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
         let (x, y, w, ht) = (self.sk(x), self.sk(y), self.sk(w), self.sk(ht));
         let wd = self.wdg_mut(h, "GUI_SET_BOUNDS")?;
-        wd.x = x; wd.y = y; wd.w = w.max(0); wd.h = ht.max(0); Ok(())
+        wd.x = x; wd.y = y; wd.w = w.max(0); wd.h = ht.max(0);
+        wd.auto_w = false; wd.auto_h = false;   // eine gesetzte Groesse ist keine automatische mehr
+        Ok(())
     }
     pub fn widget_bounds(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
         let w = self.wdg(h, fn_)?;
@@ -3602,7 +3632,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // unsichtbare Controls selektiert.
             for i in (0..win.widgets.len()).rev() {
                 let wd = &win.widgets[i];
-                if self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
+                if wd.kind != Kind::Layout && self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
                     return Self::enc_widget(wi, i);
                 }
             }
@@ -3935,6 +3965,267 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         out
     }
 
+    // ---- Layout (Punkt 5 des gui-Ausbaus, 2026-09-04) ---------------------
+
+    fn layout_art(art: &str) -> Result<(u8, i32), String> {
+        let a = art.trim().to_lowercase();
+        if let Some(rest) = a.strip_prefix("raster:").or_else(|| a.strip_prefix("grid:")) {
+            let n: i32 = rest.trim().parse().map_err(|_| format!("GUI_LAYOUT: '{}' -- nach raster: gehoert die Spaltenzahl", art))?;
+            if !(1..=32).contains(&n) { return Err("GUI_LAYOUT: 1 bis 32 Spalten".into()); }
+            return Ok((2, n));
+        }
+        match a.as_str() {
+            "zeile" | "row" | "waagerecht" | "horizontal" => Ok((0, 0)),
+            "spalte" | "column" | "senkrecht" | "vertikal" | "vertical" => Ok((1, 0)),
+            _ => Err(format!("GUI_LAYOUT: '{}' ist keine Art -- zeile, spalte oder raster:N", art)),
+        }
+    }
+    /// GUI_LAYOUT(win, art$, x, y, w, h) -> GUI_WIDGET
+    pub fn layout_new(&mut self, win: i64, art: &str, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let (a, n) = Self::layout_art(art)?;
+        let mut wd = Self::blank(Kind::Layout, x, y, w, h);
+        wd.layout = Some(Box::new(LayoutState { art: a, spalten: n, abstand: 6, rand: 0,
+                                                ausrichtung: 0, dehnen: true, rahmen: false, kinder: Vec::new() }));
+        self.add_widget(win, "GUI_LAYOUT", wd)
+    }
+    fn layout_mut(&mut self, h: i64, fn_: &str) -> Result<&mut LayoutState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Layout { return Err(format!("{}: das Widget ist kein Layout (GUI_LAYOUT)", fn_)); }
+        w.layout.as_deref_mut().ok_or_else(|| format!("{}: Layout ohne Zustand", fn_))
+    }
+    /// Enthaelt Layout `li` (direkt oder tiefer) den Index `ziel`?
+    fn layout_enthaelt(&self, wi: usize, li: usize, ziel: usize) -> bool {
+        let Some(l) = self.windows[wi].widgets.get(li).and_then(|w| w.layout.as_ref()) else { return false };
+        for &(k, _) in &l.kinder {
+            if k < 0 { continue; }
+            if k as usize == ziel { return true; }
+            if self.layout_enthaelt(wi, k as usize, ziel) { return true; }
+        }
+        false
+    }
+    /// GUI_LAYOUT_ADD(layout, wdg[, gewicht]) -- Gewicht 0 = eigene Groesse,
+    /// ab 1 = Anteil am Restplatz. Ein Widget steckt in hoechstens EINEM
+    /// Behaelter; ein Behaelter darf nicht sich selbst oder einen Vorfahren
+    /// aufnehmen (das liefe in der Verteilung im Kreis).
+    pub fn layout_add(&mut self, layout: i64, wdg: i64, gewicht: i64) -> Result<(), String> {
+        if gewicht < 0 { return Err("GUI_LAYOUT_ADD: gewicht muss >= 0 sein".into()); }
+        let (lwi, li) = Self::dec_widget(layout);
+        self.layout_mut(layout, "GUI_LAYOUT_ADD")?;
+        let (wwi, ki) = Self::dec_widget(wdg);
+        self.wdg(wdg, "GUI_LAYOUT_ADD")?;
+        if wwi != lwi { return Err("GUI_LAYOUT_ADD: das Widget gehoert zu einem anderen Fenster".into()); }
+        if ki == li { return Err("GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen".into()); }
+        if self.layout_enthaelt(lwi, ki, li) {
+            return Err("GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt".into());
+        }
+        // Aus jedem anderen Behaelter des Fensters loesen.
+        for w in self.windows[lwi].widgets.iter_mut() {
+            if let Some(l) = w.layout.as_mut() { l.kinder.retain(|&(k, _)| k != ki as i32); }
+        }
+        let l = self.layout_mut(layout, "GUI_LAYOUT_ADD")?;
+        l.kinder.push((ki as i32, gewicht as i32));
+        Ok(())
+    }
+    /// GUI_LAYOUT_SPACER(layout[, gewicht]) -- Leerraum, der Platz nimmt.
+    pub fn layout_spacer(&mut self, layout: i64, gewicht: i64) -> Result<(), String> {
+        if gewicht < 0 { return Err("GUI_LAYOUT_SPACER: gewicht muss >= 0 sein".into()); }
+        self.layout_mut(layout, "GUI_LAYOUT_SPACER")?.kinder.push((-1, gewicht as i32));
+        Ok(())
+    }
+    /// GUI_LAYOUT_REMOVE(layout, wdg) -- das Widget bleibt, wo es zuletzt lag.
+    pub fn layout_remove(&mut self, layout: i64, wdg: i64) -> Result<(), String> {
+        let (_, ki) = Self::dec_widget(wdg);
+        self.layout_mut(layout, "GUI_LAYOUT_REMOVE")?.kinder.retain(|&(k, _)| k != ki as i32);
+        Ok(())
+    }
+    /// GUI_LAYOUT_SET(layout, key$, wert): abstand, rand, ausrichtung, dehnen, rahmen.
+    pub fn layout_set(&mut self, layout: i64, key: &str, wert: f64) -> Result<(), String> {
+        let l = self.layout_mut(layout, "GUI_LAYOUT_SET")?;
+        match key.to_lowercase().as_str() {
+            "abstand" | "gap" | "spacing" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: abstand muss >= 0 sein".into()); } l.abstand = wert as i32; }
+            "rand" | "padding" => { if wert < 0.0 { return Err("GUI_LAYOUT_SET: rand muss >= 0 sein".into()); } l.rand = wert as i32; }
+            "ausrichtung" | "align" => {
+                if !(0.0..=2.0).contains(&wert) { return Err("GUI_LAYOUT_SET: ausrichtung ist 0 (Anfang), 1 (Mitte) oder 2 (Ende)".into()); }
+                l.ausrichtung = wert as u8;
+            }
+            "dehnen" | "stretch" => l.dehnen = wert != 0.0,
+            "rahmen" | "frame" => l.rahmen = wert != 0.0,
+            _ => return Err(format!("GUI_LAYOUT_SET: unbekannter Schluessel '{}' -- abstand, rand, ausrichtung, dehnen, rahmen", key)),
+        }
+        Ok(())
+    }
+
+    /// Mass eines Widgets nach seinem Inhalt (skalierte Pixel).
+    fn inhalt_mass(&self, g: &Graphics, w: &Widget) -> (i32, i32) {
+        let sz = self.wsize(g, w);
+        let tw = self.wtext_width(g, w, &w.text);
+        match w.kind {
+            Kind::Label => {
+                let zeilen: Vec<&str> = w.text.split('\n').collect();
+                let bw = zeilen.iter().map(|z| self.wtext_width(g, w, z)).max().unwrap_or(0);
+                (bw.max(1), (zeilen.len().max(1) as i32) * (sz + self.sk(4)))
+            }
+            Kind::Button => {
+                let icon = if w.sel >= 0 { self.sk(22) } else { 0 };
+                ((tw + icon + self.sk(24)).max(self.sk(28)), (sz + self.sk(12)).max(self.sk(26)))
+            }
+            Kind::Checkbox | Kind::Radio => {
+                let cs = self.m("check_size");
+                (cs + self.sk(8) + tw, cs.max(sz))
+            }
+            Kind::Toggle => (self.sk(46) + self.sk(8) + tw, self.sk(22).max(sz)),
+            Kind::TextInput | Kind::Dropdown | Kind::Spinner => (if w.w > 0 { w.w } else { self.sk(160) }, sz + self.sk(12)),
+            _ => (if w.w > 0 { w.w } else { self.sk(100) }, if w.h > 0 { w.h } else { self.sk(24) }),
+        }
+    }
+    /// GUI_AUTOSIZE(wdg) -- sofort messen, wenn Graphics da ist.
+    pub fn autosize(&mut self, g: Option<&Graphics>, h: i64) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        self.wdg(h, "GUI_AUTOSIZE")?;
+        match g {
+            Some(g) => {
+                let (nw, nh) = self.inhalt_mass(g, &self.windows[wi].widgets[i]);
+                let w = &mut self.windows[wi].widgets[i];
+                w.w = nw; w.h = nh; w.bw = nw; w.bh = nh;
+                w.auto_w = false; w.auto_h = false;
+            }
+            None => { let w = &mut self.windows[wi].widgets[i]; w.auto_w = true; w.auto_h = true; }
+        }
+        Ok(())
+    }
+
+    /// Jedes Bild: erst das Automass, dann jeder Wurzel-Behaelter (einer,
+    /// der in keinem anderen steckt) von oben nach unten.
+    fn layout_pass(&mut self, g: &Graphics) {
+        for wi in 0..self.windows.len() {
+            if !self.windows[wi].alive { continue; }
+            let n = self.windows[wi].widgets.len();
+            for i in 0..n {
+                let w = &self.windows[wi].widgets[i];
+                if !w.alive || !(w.auto_w || w.auto_h) { continue; }
+                let (nw, nh) = self.inhalt_mass(g, w);
+                let (aw, ah) = (w.auto_w, w.auto_h);
+                let w = &mut self.windows[wi].widgets[i];
+                if aw { w.w = nw; w.bw = nw; }
+                if ah { w.h = nh; w.bh = nh; }
+            }
+            let mut ist_kind = vec![false; n];
+            for i in 0..n {
+                if let Some(l) = self.windows[wi].widgets[i].layout.as_ref() {
+                    for &(k, _) in &l.kinder { if k >= 0 && (k as usize) < n { ist_kind[k as usize] = true; } }
+                }
+            }
+            for i in 0..n {
+                let w = &self.windows[wi].widgets[i];
+                if w.alive && w.kind == Kind::Layout && !ist_kind[i] { self.layout_anwenden(g, wi, i, 0); }
+            }
+        }
+    }
+
+    fn layout_anwenden(&mut self, g: &Graphics, wi: usize, li: usize, tiefe: u32) {
+        if tiefe > 16 { return; }   // gegen Kreise aus einer von Hand gebauten Datei
+        let (l, lx, ly, lw, lh) = {
+            let w = &self.windows[wi].widgets[li];
+            match w.layout.as_ref() { Some(l) => ((**l).clone(), w.x, w.y, w.w, w.h), None => return }
+        };
+        let rand = self.sk(l.rand);
+        let ab = self.sk(l.abstand);
+        let (ix, iy, iw, ih) = (lx + rand, ly + rand, (lw - 2 * rand).max(0), (lh - 2 * rand).max(0));
+        let n = self.windows[wi].widgets.len();
+        let kinder: Vec<(i32, i32)> = l.kinder.iter().copied()
+            .filter(|&(k, _)| k < 0 || ((k as usize) < n && self.windows[wi].widgets[k as usize].alive))
+            .collect();
+        if kinder.is_empty() { return; }
+        // Kinder mit Automass zuerst messen -- ein Knopf "nach Inhalt" muss
+        // seine Breite kennen, bevor der Restplatz verteilt wird.
+        for &(k, _) in &kinder {
+            if k < 0 { continue; }
+            let w = &self.windows[wi].widgets[k as usize];
+            if w.auto_w || w.auto_h || w.kind == Kind::Label {
+                let (nw, nh) = self.inhalt_mass(g, w);
+                let (aw, ah) = (w.auto_w || w.kind == Kind::Label, w.auto_h);
+                let w = &mut self.windows[wi].widgets[k as usize];
+                if aw { w.w = nw; }
+                if ah { w.h = nh; }
+            }
+        }
+        let mut setzen: Vec<(usize, i32, i32, i32, i32)> = Vec::new();
+        match l.art {
+            0 | 1 => {
+                let zeile = l.art == 0;
+                let laenge = if zeile { iw } else { ih };
+                let mut fest = ab * (kinder.len() as i32 - 1);
+                let mut summe_g = 0;
+                for &(k, gew) in &kinder {
+                    if gew > 0 { summe_g += gew; continue; }
+                    if k >= 0 { let w = &self.windows[wi].widgets[k as usize]; fest += if zeile { w.w } else { w.h }; }
+                }
+                let rest = (laenge - fest).max(0);
+                let mut pos = if zeile { ix } else { iy };
+                let mut vergeben = 0;
+                let mut gi = 0;
+                for &(k, gew) in &kinder {
+                    let anteil = if gew > 0 {
+                        gi += 1;
+                        // Der letzte Gewichtete bekommt den Rundungsrest.
+                        if gi == kinder.iter().filter(|(_, g2)| *g2 > 0).count() { rest - vergeben }
+                        else { let a = rest * gew / summe_g.max(1); vergeben += a; a }
+                    } else { -1 };
+                    if k < 0 { pos += anteil.max(0) + ab; continue; }
+                    let (ow, oh) = { let w = &self.windows[wi].widgets[k as usize]; (w.w, w.h) };
+                    let (nw, nh, nx, ny);
+                    if zeile {
+                        nw = if anteil >= 0 { anteil } else { ow };
+                        nh = if l.dehnen { ih } else { oh.min(ih) };
+                        nx = pos;
+                        ny = iy + match l.ausrichtung { 1 => (ih - nh) / 2, 2 => ih - nh, _ => 0 };
+                        pos += nw + ab;
+                    } else {
+                        nh = if anteil >= 0 { anteil } else { oh };
+                        nw = if l.dehnen { iw } else { ow.min(iw) };
+                        ny = pos;
+                        nx = ix + match l.ausrichtung { 1 => (iw - nw) / 2, 2 => iw - nw, _ => 0 };
+                        pos += nh + ab;
+                    }
+                    setzen.push((k as usize, nx, ny, nw.max(1), nh.max(1)));
+                }
+            }
+            _ => {
+                let sp = l.spalten.max(1);
+                let zw = ((iw - ab * (sp - 1)) / sp).max(1);
+                let mut y = iy;
+                let mut zeile_kinder: Vec<(i32, i32)> = Vec::new();
+                let alle: Vec<(i32, i32)> = kinder.clone();
+                let mut idx = 0;
+                while idx < alle.len() {
+                    zeile_kinder.clear();
+                    for _ in 0..sp { if idx < alle.len() { zeile_kinder.push(alle[idx]); idx += 1; } }
+                    // Zeilenhoehe = hoechstes Kind der Zeile.
+                    let zh = zeile_kinder.iter().filter(|&&(k, _)| k >= 0)
+                        .map(|&(k, _)| self.windows[wi].widgets[k as usize].h).max().unwrap_or(0).max(1);
+                    for (c, &(k, _)) in zeile_kinder.iter().enumerate() {
+                        if k < 0 { continue; }
+                        let (ow, oh) = { let w = &self.windows[wi].widgets[k as usize]; (w.w, w.h) };
+                        let x = ix + c as i32 * (zw + ab);
+                        let nw = if l.dehnen { zw } else { ow.min(zw) };
+                        let nh = oh.min(zh).max(1);
+                        let ny = y + match l.ausrichtung { 1 => (zh - nh) / 2, 2 => zh - nh, _ => 0 };
+                        setzen.push((k as usize, x, ny, nw.max(1), nh));
+                    }
+                    y += zh + ab;
+                }
+            }
+        }
+        let mut unter: Vec<usize> = Vec::new();
+        for (k, x, y, w, h) in setzen {
+            let wd = &mut self.windows[wi].widgets[k];
+            wd.x = x; wd.y = y; wd.w = w; wd.h = h;
+            wd.bx = x; wd.by = y; wd.bw = w; wd.bh = h;
+            if wd.kind == Kind::Layout { unter.push(k); }
+        }
+        for k in unter { self.layout_anwenden(g, wi, k, tiefe + 1); }
+    }
+
     fn widget_json(&self, w: &Widget) -> serde_json::Value {
         let mut o = serde_json::json!({
             "kind": w.kind.as_str(),
@@ -3993,6 +4284,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 o["list"] = serde_json::Value::Object(lo);
             }
         }
+        if let Some(l) = w.layout.as_ref() {
+            let art = match l.art { 0 => "zeile", 1 => "spalte", _ => "raster" };
+            let mut lo = serde_json::json!({ "art": art, "kinder": l.kinder.iter().map(|&(k, g)| serde_json::json!([k, g])).collect::<Vec<_>>() });
+            if l.art == 2 { lo["spalten"] = serde_json::json!(l.spalten); }
+            if l.abstand != 6 { lo["abstand"] = serde_json::json!(l.abstand); }
+            if l.rand != 0 { lo["rand"] = serde_json::json!(l.rand); }
+            if l.ausrichtung != 0 { lo["ausrichtung"] = serde_json::json!(l.ausrichtung); }
+            if !l.dehnen { lo["dehnen"] = serde_json::json!(false); }
+            if l.rahmen { lo["rahmen"] = serde_json::json!(true); }
+            o["layout"] = lo;
+        }
+        if w.auto_w { o["auto_w"] = serde_json::json!(true); }
+        if w.auto_h { o["auto_h"] = serde_json::json!(true); }
         if w.align >= 0 {
             o["align"] = serde_json::json!(match w.align { 1 => "mitte", 2 => "rechts", _ => "links" });
         }
@@ -4116,6 +4420,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
+        w.auto_w = wj["auto_w"].as_bool().unwrap_or(false);
+        w.auto_h = wj["auto_h"].as_bool().unwrap_or(false);
+        if kind == Kind::Layout {
+            let lj = &wj["layout"];
+            let art = match lj["art"].as_str().unwrap_or("spalte") { "zeile" => 0, "raster" => 2, _ => 1 };
+            let kinder: Vec<(i32, i32)> = lj["kinder"].as_array().map(|a| a.iter().filter_map(|p| {
+                let arr = p.as_array()?;
+                Some((arr.first()?.as_i64()? as i32, arr.get(1).and_then(|g| g.as_i64()).unwrap_or(0) as i32))
+            }).collect()).unwrap_or_default();
+            w.layout = Some(Box::new(LayoutState {
+                art, spalten: lj["spalten"].as_i64().unwrap_or(2).clamp(1, 32) as i32, kinder,
+                abstand: lj["abstand"].as_i64().unwrap_or(6).max(0) as i32,
+                rand: lj["rand"].as_i64().unwrap_or(0).max(0) as i32,
+                ausrichtung: lj["ausrichtung"].as_i64().unwrap_or(0).clamp(0, 2) as u8,
+                dehnen: lj["dehnen"].as_bool().unwrap_or(true),
+                rahmen: lj["rahmen"].as_bool().unwrap_or(false),
+            }));
+        }
         if let Some(lj) = wj.get("list").and_then(|v| v.as_object()) {
             let n = w.items.len();
             let mut l = ListState { anker: -1, ..Default::default() };
@@ -4768,6 +5090,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
         self.umbruch_layout(g);
+        self.layout_pass(g);
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -4837,7 +5160,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             for i in 0..n {
                 let (r, kind, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled)
+                    (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled && w.kind != Kind::Layout)
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
@@ -6239,7 +6562,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let mut hit = None;
         let n = self.windows[win].widgets.len();
         for i in 0..n {
-            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled) };
+            // Ein Layout-Behaelter ist Luft: er darf den Klick nicht schlucken,
+            // der seinen Kindern gilt (sie kommen in der Reihenfolge NACH ihm).
+            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout) };
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
@@ -6664,6 +6989,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
         let pad = self.m("pad");
         match wdg.kind {
+            Kind::Layout => {
+                // Unsichtbar -- nur mit `rahmen` zum Entwickeln als gestrichelte Linie.
+                if wdg.layout.as_ref().map(|l| l.rahmen).unwrap_or(false) {
+                    let c = self.th("muted_fg");
+                    let s = self.sk(6);
+                    let mut x = ax;
+                    while x < ax + w { g.line(x, ay, (x + s / 2).min(ax + w - 1), ay, c); g.line(x, ay + h - 1, (x + s / 2).min(ax + w - 1), ay + h - 1, c); x += s; }
+                    let mut y = ay;
+                    while y < ay + h { g.line(ax, y, ax, (y + s / 2).min(ay + h - 1), c); g.line(ax + w - 1, y, ax + w - 1, (y + s / 2).min(ay + h - 1), c); y += s; }
+                }
+            }
             Kind::Label => {
                 let eigen = if wdg.color < 0 { self.th("text_fg") } else { wdg.color };
                 let fg = if !wdg.enabled { self.th("muted_fg") }

@@ -32,6 +32,10 @@ IMPORT "gui"
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SEPARATOR(win, x, y, w)` | GUI_WIDGET | dekorative Trennlinie (horizontal) |
 | `GUI_GROUPBOX(win, x, y, w, h, title$)` | GUI_WIDGET | gerahmte Gruppe mit eingelassenem Titel |
+| `GUI_LAYOUT(win, art$, x, y, w, h)` | GUI_WIDGET | unsichtbarer **Layout-Behälter**: `zeile`, `spalte` oder `raster:N` — verteilt seine Kinder in jedem `GUI_UPDATE` (siehe [Layout](#layout-größe-nach-inhalt-und-behälter)) |
+| `GUI_LAYOUT_ADD(layout, wdg[, gewicht])` / `GUI_LAYOUT_SPACER(layout[, gewicht])` / `GUI_LAYOUT_REMOVE(layout, wdg)` | — | Kind anhängen (Gewicht 0 = eigene Größe, ab 1 = Anteil am Restplatz), Leerraum, lösen |
+| `GUI_LAYOUT_SET(layout, key$, wert)` | — | `abstand`, `rand`, `ausrichtung` (0/1/2 quer), `dehnen` (quer, Vorgabe an), `rahmen` (sichtbar zum Entwickeln) |
+| `GUI_AUTOSIZE(wdg)` | — | Breite und Höhe aus dem Inhalt; Breite oder Höhe `0` beim Anlegen heißt dasselbe |
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
@@ -1572,6 +1576,65 @@ Knopf abgeschnitten statt überzulaufen.
 Alle bisherigen `ui`-Themen (`dark`, `light`, `retro`, `contrast`) stehen
 weiterhin auf 0 und sehen unverändert flach aus.
 
+
+## Layout: Größe nach Inhalt und Behälter
+
+Bis hierher liegt jedes Widget dort, wo man es hinschreibt, und Anker
+lassen es beim Vergrößern des Fensters mitfließen. Für ein Formular, das man
+nicht Pixel für Pixel ausrechnen will, gibt es seit 2026-09-04 zwei Dinge dazu.
+
+**Größe nach Inhalt.** `GUI_AUTOSIZE(wdg)` misst Knopf, Beschriftung,
+Kästchen, Radio und Kippschalter an ihrem Text (bei Textfeldern nur die Höhe).
+Dasselbe erreicht eine `0` als Breite oder Höhe beim Anlegen — gemessen wird
+im nächsten `GUI_UPDATE`, denn nur dort gibt es die Schrift. `GUI_SET_BOUNDS`
+hebt das Automaß wieder auf.
+
+**Layout-Behälter.** `GUI_LAYOUT(win, art$, x, y, w, h)` legt einen
+unsichtbaren Behälter an, `art$` ist `"zeile"`, `"spalte"` oder
+`"raster:3"`. Was man mit `GUI_LAYOUT_ADD` hineinlegt, verteilt er in jedem
+`GUI_UPDATE` neu:
+
+```basic
+DIM form AS GUI_WIDGET : form = GUI_LAYOUT(win, "spalte", 12, 12, 376, 236)
+GUI_SET_ANCHOR(form, "lrtb")                  ' der Behälter fließt mit dem Fenster
+GUI_LAYOUT_SET(form, "abstand", 8)
+
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, "Nachricht", 0, 0)
+DIM txt AS GUI_WIDGET : txt = GUI_TEXTAREA(win, 0, 0, 10, 10)
+GUI_LAYOUT_ADD(form, lbl)                     ' Gewicht 0: eigene Höhe
+GUI_LAYOUT_ADD(form, txt, 1)                  ' Gewicht 1: bekommt den Rest
+
+DIM knoepfe AS GUI_WIDGET : knoepfe = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+GUI_LAYOUT_SPACER(knoepfe)                    ' schiebt die Knöpfe nach rechts
+GUI_LAYOUT_ADD(knoepfe, GUI_BUTTON(win, "Senden", 0, 0, 0, 0))
+GUI_LAYOUT_ADD(knoepfe, GUI_BUTTON(win, "Abbrechen", 0, 0, 0, 0))
+GUI_LAYOUT_ADD(form, knoepfe)                 ' Behälter im Behälter
+```
+
+Die Regeln, kurz:
+
+- **Gewichte** teilen den Platz, der nach den festen Kindern übrig bleibt, im
+  Verhältnis; Gewicht 0 behält die eigene Größe. `GUI_LAYOUT_SPACER` ist ein
+  Leerraum mit Gewicht — ein Leerraum am Anfang einer Zeile drückt alles nach
+  rechts.
+- **Quer zur Richtung** (in einer Zeile: die Höhe) werden Kinder gedehnt
+  (`dehnen`, Vorgabe an) oder nach `ausrichtung` gesetzt: 0 Anfang, 1 Mitte,
+  2 Ende. `abstand` liegt zwischen den Kindern, `rand` innen am Behälter.
+- Ein **Raster** hat gleich breite Spalten; die Zeilenhöhe ist die des
+  höchsten Kindes darin.
+- Beschriftungen in einem Behälter werden immer genau gemessen (nicht mit der
+  Schätzung aus `GUI_LABEL`), sonst stimmten die Zeilen nicht.
+- Ein Widget steckt in höchstens **einem** Behälter; ein Behälter darf weder
+  sich selbst noch einen Vorfahren aufnehmen. Der Behälter ist **Luft für
+  Klicks** — er schluckt nichts, was seinen Kindern gilt. `rahmen` zeichnet
+  ihn gestrichelt, zum Entwickeln.
+- Anker gelten für den **Behälter**; seine Kinder bekommen ihre Lage von ihm.
+
+Kein Constraint-System, keine Mindestgrößen — für ein Formular reicht das,
+und man versteht es noch. In der `.dhform` steht der Behälter mit `layout`
+(Art, Maße, `kinder` als `[Index, Gewicht]`); der Form-Designer kennt ihn als
+Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
+[`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
 ## Ereignisse
 
