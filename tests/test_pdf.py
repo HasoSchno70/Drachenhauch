@@ -149,14 +149,39 @@ def test_breite_bei_courier_ist_exakt(tmp_path, run_gb):
     assert abs(float(out.strip()) - erwartet) < 0.001
 
 
-def test_breite_bei_helvetica_verweigert_sich_mit_grund(tmp_path, run_gb):
-    """Lieber keine Antwort als eine erfundene: eine geschaetzte Breite
-    verschiebt eine Rechnungsspalte still um zwei Millimeter."""
+def test_breite_bei_helvetica_und_times_stimmt_mit_pymupdf_ueberein(tmp_path, run_gb):
+    """Die Schriftmasse in pdf_masse.rs sind aus PyMuPDFs Base-14-Metriken
+    erzeugt (tools/gen_pdf_masse.py) -- hier wird jede der acht Schriften an
+    einem Text mit Umlaut und Euro-Zeichen GEGEN PyMuPDF nachgemessen, nicht
+    gegen die eigene Tabelle. Vorher verweigerte sich der Aufruf bei allem
+    ausser Courier; ohne die Masse liess sich in einer Rechnung kein Betrag
+    rechtsbuendig setzen."""
+    text = "Rechnung 1.234,56 " + chr(0x20AC) + " f" + chr(252) + "r Gr" + chr(246) + chr(223) + "e W"
+    schriften = [("helvetica", "helv"), ("helvetica-fett", "hebo"), ("helvetica-kursiv", "heit"),
+                 ("helvetica-fett-kursiv", "hebi"), ("times", "tiro"), ("times-fett", "tibo"),
+                 ("times-kursiv", "tiit"), ("times-fett-kursiv", "tibi")]
+    src = KOPF + "".join(f'PDF_FONT(p, "{name}", 11)\nPRINT FORMAT$(PDF_TEXT_WIDTH(p, "{text}"), "%.4f")\n'
+                         for name, _ in schriften)
+    out = run_gb(src).split()
+    assert len(out) == 8
+    for (name, alias), gemessen in zip(schriften, out):
+        erwartet = fitz.Font(alias).text_length(text, fontsize=11) * 25.4 / 72
+        assert abs(float(gemessen) - erwartet) < 0.01, (name, gemessen, erwartet)
+    # Zwei Fettschnitte, zweimal breiter als der Grundschnitt -- die Tabellen
+    # sind nicht vertauscht.
+    assert float(out[1]) > float(out[0]) and float(out[5]) > float(out[4])
+
+
+def test_breite_ohne_mass_ist_ein_fehler(tmp_path, run_gb):
+    """Symbol hat keine Masse, und ein Zeichen ausserhalb von WinAnsi auch
+    nicht -- beides eine Meldung, keine Schaetzung."""
     from drachenhauch.errors import DHRuntimeError
     with pytest.raises(DHRuntimeError) as e:
-        run_gb(KOPF + 'PDF_FONT(p, "helvetica", 11)\n'
-               'PRINT PDF_TEXT_WIDTH(p, "abc")\n')
-    assert "dicktengleich" in str(e.value)
+        run_gb(KOPF + 'PDF_FONT(p, "symbol", 11)\nPRINT PDF_TEXT_WIDTH(p, "abc")\n')
+    assert "Schriftmasse" in str(e.value)
+    with pytest.raises(DHRuntimeError) as e2:
+        run_gb(KOPF + 'PDF_FONT(p, "helvetica", 11)\nPRINT PDF_TEXT_WIDTH(p, "a" + CHR$(937))\n')
+    assert "PDF_TEXT_WIDTH" in str(e2.value)
 
 
 # ----------------------------------------------------------- Fehlerfaelle

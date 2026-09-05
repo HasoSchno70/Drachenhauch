@@ -279,6 +279,37 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > fremden Lesern fuer JSON, WAV und GB-Code; der GB-Code wird gestartet, nicht
 > nur uebersetzt), `tests/test_audio_note_mix.py`.
 >
+> **Der sechste Pilot ist keine Werkzeug-Portierung, sondern eine
+> Geschaeftsanwendung** (2026-09-05, `examples/196_rechnungen.dh`, 1100
+> Zeilen, ohne Qt-Gegenstueck -- deshalb NICHT in `piloten.py`): Kunden,
+> Artikel, Rechnungen mit Positionen, SQLite als Wahrheit, PDF und CSV,
+> Menues mit Kuerzeln, drei Reiter, Formulare mit Pruefung, Rueckfrage
+> "Speichern|Verwerfen|Abbrechen" bei ungesicherten Aenderungen, Einstellungen
+> in einem modalen Fenster mit rollendem Panel, groessenveraenderbar ueber
+> Anker + Layout-Behaelter. Geld ist INTEGER in Cent (`INT(19.99 * 100)` ist
+> 1998), die MwSt wird je Position gerundet. Er sollte nach den sechs
+> gui-Ausbaustufen zeigen, was einer ANWENDUNG noch fehlt -- vier Funde:
+> (1) **`PDF_TEXT_WIDTH` ging nur bei Courier**, ein Betrag liess sich in
+> Helvetica nicht rechtsbuendig setzen. Die Schriftmasse fuer Helvetica und
+> Times (je vier Schnitte) liegen jetzt in `pdf_masse.rs` -- NICHT aus dem
+> Gedaechtnis, sondern von `tools/gen_pdf_masse.py` aus PyMuPDFs
+> Base-14-Metriken erzeugt und in `tests/test_pdf.py` gegen PyMuPDF
+> nachgemessen. (2) **Kaestchen, Radio und Kippschalter waren nur so breit
+> wie ihr Kaestchen**: die Beschriftung hing ausserhalb des Rechtecks, ein
+> Klick auf den Text traf nichts, und in einem Layout-Behaelter lief der
+> Text ueber den rechten Rand. Jetzt misst `auto_w` das Rechteck ueber den
+> Text, gezeichnet werden Kaestchen/Ring/Pille in ihrer eigenen Groesse
+> (`check_size`), unabhaengig von der Breite -- alte `.dhform`-Dateien mit
+> schmalem `w` zeichnen deshalb unveraendert. (3) `GUI_SET_ACTIVE_TAB` gab
+> es, stand aber nicht im `builtin_index.json` -- `--check` meldete den
+> Befehl als unbekannt, die IDE bot ihn nicht an. (4) Ein Feld waechst nicht
+> per `a = a + [x]` (Laufzeitfehler "erwartet Zahlen"), sondern mit
+> `ARRAY_PUSH` -- kein Fehler der Sprache, aber die Meldung fuehrt in die
+> Irre. Tests `tests/test_pilot_rechnungen.py` (11; Datenbank liest Pythons
+> `sqlite3`, das PDF PyMuPDF, den Export das `csv`-Modul; die Knopflagen
+> kommen aus einem ersten Lauf, weil Layout-Behaelter sie erst zur Laufzeit
+> verteilen).
+>
 > **In der IDE erreichbar** (seit 2026-08-31): `Datei` -> `Werkzeuge in
 > Drachenhauch` startet jeden Piloten ueber dieselbe Konsole wie jedes
 > andere Programm, ein Eintrag darunter oeffnet alle fuenf Quelltexte als

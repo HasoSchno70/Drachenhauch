@@ -1849,6 +1849,11 @@ impl Gui {
     pub fn checkbox(&mut self, win: i64, label: String, x: i32, y: i32, default: bool) -> Result<i64, String> {
         let cs = self.m_roh("check_size");
         let mut wd = Self::blank(Kind::Checkbox, x, y, cs, cs); wd.text = label; wd.checked = default;
+        // Das Rechteck umfasst Kaestchen UND Beschriftung (Breite wird im
+        // naechsten GUI_UPDATE gemessen): ein Klick auf den Text trifft, und
+        // ein Layout-Behaelter reserviert den ganzen Platz. Gezeichnet wird
+        // das Kaestchen unabhaengig von der Breite (siehe draw_widget).
+        wd.auto_w = true;
         self.add_widget(win, "GUI_CHECKBOX", wd)
     }
     /// Kippschalter (An/Aus-Pille). Zustand liegt wie beim Kaestchen in
@@ -1858,6 +1863,7 @@ impl Gui {
         let h = self.m_roh("check_size").max(14);
         let mut wd = Self::blank(Kind::Toggle, x, y, h * 2, h);
         wd.text = label;
+        wd.auto_w = true;                        // wie beim Kaestchen
         wd.checked = default;
         wd.value = if default { 1.0 } else { 0.0 };
         self.add_widget(win, "GUI_TOGGLE", wd)
@@ -1946,6 +1952,7 @@ impl Gui {
         let cs = self.m_roh("check_size");
         let mut wd = Self::blank(Kind::Radio, x, y, cs, cs);
         wd.text = label; wd.group = group;
+        wd.auto_w = true;                        // wie beim Kaestchen
         self.add_widget(win, "GUI_RADIO", wd)
     }
     pub fn progress(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
@@ -4147,7 +4154,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let cs = self.m("check_size");
                 (cs + self.sk(8) + tw, cs.max(sz))
             }
-            Kind::Toggle => (self.sk(46) + self.sk(8) + tw, self.sk(22).max(sz)),
+            Kind::Toggle => {
+                let ph = self.m("check_size").max(self.sk(14));
+                (ph * 2 + self.sk(8) + tw, ph.max(sz))
+            }
             Kind::TextInput | Kind::Dropdown | Kind::Spinner => (if w.w > 0 { w.w } else { self.sk(160) }, sz + self.sk(12)),
             _ => (if w.w > 0 { w.w } else { self.sk(100) }, if w.h > 0 { w.h } else { self.sk(24) }),
         }
@@ -4215,9 +4225,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         for &(k, _) in &kinder {
             if k < 0 { continue; }
             let w = &self.windows[wi].widgets[k as usize];
-            if w.auto_w || w.auto_h || w.kind == Kind::Label {
+            // Beschriftung, Kaestchen, Radio und Kippschalter haben keine
+            // eigene Groesse, nur ihren Inhalt -- im Behaelter werden sie
+            // immer exakt gemessen.
+            let inhaltlich = matches!(w.kind, Kind::Label | Kind::Checkbox | Kind::Radio | Kind::Toggle);
+            if w.auto_w || w.auto_h || inhaltlich {
                 let (nw, nh) = self.inhalt_mass(g, w);
-                let (aw, ah) = (w.auto_w || w.kind == Kind::Label, w.auto_h);
+                let (aw, ah) = (w.auto_w || inhaltlich, w.auto_h);
                 let w = &mut self.windows[wi].widgets[k as usize];
                 if aw { w.w = nw; }
                 if ah { w.h = nh; }
@@ -7582,6 +7596,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             Kind::Checkbox => {
+                // Das Kaestchen ist so gross wie die Metrik, nicht wie das
+                // Rechteck: das reicht seit dem Automass ueber den Text.
+                let cs = self.m("check_size").min(h).max(8);
+                let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let bordc = self.wcol(wdg, "border", "widget_border");
                 if self.modern() {
@@ -7643,6 +7661,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             Kind::Toggle => {
+                // Die Pille ist doppelt so breit wie hoch; das Rechteck
+                // reicht ueber die Beschriftung.
+                let ph = self.m("check_size").max(self.sk(14)).min(h);
+                let (ay, w, h) = (ay + (h - ph) / 2, ph * 2, ph);
                 let acc = self.acc_col(wdg);
                 let aus = self.wcol(wdg, "bg", "widget_bg");
                 let r = h / 2;
@@ -7879,6 +7901,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             Kind::Radio => {
+                let cs = self.m("check_size").min(h).max(8);
+                let (ay, w, h) = (ay + (h - cs) / 2, cs, cs);
                 let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
                 g.circle(cx, cy, r, self.wcol(wdg, "border", "widget_border"));   // Ring

@@ -1,0 +1,1104 @@
+' ============================================================
+'  Rechnungen -- eine Geschaeftsanwendung in Drachenhauch (sechster Pilot)
+' ============================================================
+'  Kein Editor und kein Spiel: Kunden, Artikel und Rechnungen mit
+'  Positionen, SQLite als Wahrheit, PDF und CSV als Ausgabe. Der Pilot
+'  soll zeigen, was dem gui-Modul fuer eine ANWENDUNG noch fehlt -- nach
+'  den sechs Ausbaustufen vom September 2026.
+'
+'  Was drin ist:
+'    * drei Reiter (Kunden / Artikel / Rechnungen), Menueleiste mit
+'      Kuerzeln, Statuszeile, groessenveraenderbares Fenster (Anker +
+'      Layout-Behaelter)
+'    * Tabellen mit Filterzeile und Sortierung; jede Zeile merkt sich
+'      ihre Datenbank-id (Sortieren/Filtern stellt Datenzeilen nicht um)
+'    * Formulare mit Pruefung (Pflichtfeld, PLZ, E-Mail, Zahlen), Enter
+'      speichert; Wechsel mit ungesicherten Aenderungen fragt nach
+'      (Speichern | Verwerfen | Abbrechen)
+'    * Rechnung: Positionen in einer Tabelle, Menge direkt in der Zelle
+'      editierbar, Netto/MwSt/Brutto in CENT gerechnet (nie in FLOAT --
+'      INT(19.99 * 100) ist 1998), PDF ueber das pdf-Modul, CSV-Export
+'    * Einstellungen in einem eigenen modalen Fenster mit rollendem Panel
+'
+'  Die Datenbank `rechnungen.db` entsteht neben dem Programm, beim ersten
+'  Start mit Beispieldaten. [Strg+Q] Ende
+' ============================================================
+IMPORT "gui"
+IMPORT "db"
+IMPORT "pdf"
+
+SCREEN(1120, 680, "Drachenhauch - Rechnungen", 1)
+SETFPS(60)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(840, 540)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+CONST DBDATEI = "rechnungen.db"
+CONST MAXZ = 500            ' Zeilen je Tabelle
+CONST MAXPOS = 60           ' Positionen je Rechnung
+CONST KOPF = 60             ' Menueleiste + Reiterleiste (Schaetzung fuer die Grundmasse)
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+DIM ROT AS INTEGER : ROT = RGB(240, 100, 100)
+DIM GRUEN AS INTEGER : GRUEN = RGB(120, 220, 140)
+
+' ============================================================ Geld
+' Geld ist eine ganze Zahl in CENT. Der Weg ueber FLOAT sieht harmlos aus
+' und ist es nicht: INT(19.99 * 100) ergibt 1998.
+DIM waehrung AS STRING : waehrung = "EUR"
+
+FUNCTION geld$(cent AS INTEGER) AS STRING
+    DIM neg AS BOOLEAN : neg = cent < 0
+    IF neg THEN cent = -cent
+    DIM euro AS INTEGER : euro = cent \ 100
+    DIM rest AS INTEGER : rest = cent MOD 100
+    ' Tausenderpunkte von rechts einsetzen.
+    DIM e$ AS STRING : e$ = STR$(euro)
+    DIM aus AS STRING : aus = ""
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = LEN(e$) - 1 TO 0 STEP -1
+        aus = MID$(e$, i, 1) + aus
+        n = n + 1
+        IF n MOD 3 = 0 AND i > 0 THEN aus = "." + aus
+    NEXT
+    RETURN IIF(neg, "-", "") + aus + "," + FORMAT$(rest, "%02d") + " " + waehrung
+END FUNCTION
+
+' "12,50", "12.50", "12" und " 1.234,56 " -> Cent. Ungueltiges -> -1.
+FUNCTION centVon(text AS STRING) AS INTEGER
+    DIM s AS STRING : s = TRIM$(text)
+    IF s = "" THEN RETURN -1
+    ' Deutsche Schreibweise: Punkt als Tausender, Komma als Dezimaltrenner.
+    IF INSTR(s, ",") >= 0 THEN
+        s = s.replace(".", "")
+        s = s.replace(",", ".")
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        IF INSTR("0123456789.", MID$(s, i, 1)) < 0 THEN RETURN -1
+    NEXT
+    RETURN INT(VAL(s) * 100.0 + 0.5)
+END FUNCTION
+
+' ============================================================ Datenbank
+DIM db AS DB_CONN
+DIM neuAngelegt AS BOOLEAN : neuAngelegt = NOT FILEEXISTS(DBDATEI)
+db = DB_OPEN(DBDATEI)
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS kunden (id INTEGER PRIMARY KEY, name TEXT NOT NULL, strasse TEXT, plz TEXT, ort TEXT, email TEXT)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS artikel (id INTEGER PRIMARY KEY, bezeichnung TEXT NOT NULL, preis_cent INTEGER NOT NULL, mwst INTEGER NOT NULL)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS rechnungen (id INTEGER PRIMARY KEY, nummer TEXT NOT NULL UNIQUE, kunde_id INTEGER NOT NULL, datum TEXT NOT NULL, bezahlt INTEGER NOT NULL DEFAULT 0)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS positionen (id INTEGER PRIMARY KEY, rechnung_id INTEGER NOT NULL, bezeichnung TEXT NOT NULL, menge INTEGER NOT NULL, preis_cent INTEGER NOT NULL, mwst INTEGER NOT NULL)")
+DB_EXEC(db, "CREATE TABLE IF NOT EXISTS einstellungen (key TEXT PRIMARY KEY, wert TEXT NOT NULL)")
+
+SUB einstSetzen(k AS STRING, v AS STRING)
+    DB_EXEC(db, "INSERT OR REPLACE INTO einstellungen (key, wert) VALUES (?, ?)", k, v)
+END SUB
+
+FUNCTION einst$(k AS STRING, vorgabe AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT wert FROM einstellungen WHERE key = ?", k)
+    DIM aus AS STRING : aus = vorgabe
+    IF DB_NEXT(r) THEN aus = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN aus
+END FUNCTION
+
+IF neuAngelegt THEN
+    DB_BEGIN(db)
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES ('Muellerbau GmbH', 'Hafenweg 3', '20457', 'Hamburg', 'buero@muellerbau.example')")
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES ('Anna Berger', 'Lindenstr. 12', '80331', 'Muenchen', 'anna@berger.example')")
+    DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES ('Werkstatt Kolb', 'Am Markt 1', '01067', 'Dresden', 'kolb@werkstatt.example')")
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES ('Beratung (Stunde)', 9500, 19)")
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES ('Fachbuch Drachenhauch', 3990, 7)")
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES ('Wartungsvertrag (Monat)', 12000, 19)")
+    DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES ('Anfahrt (pauschal)', 1999, 19)")
+    DB_EXEC(db, "INSERT INTO rechnungen (nummer, kunde_id, datum, bezahlt) VALUES ('2026-0001', 1, '2026-08-14', 1)")
+    DB_EXEC(db, "INSERT INTO positionen (rechnung_id, bezeichnung, menge, preis_cent, mwst) VALUES (1, 'Beratung (Stunde)', 3, 9500, 19)")
+    DB_EXEC(db, "INSERT INTO positionen (rechnung_id, bezeichnung, menge, preis_cent, mwst) VALUES (1, 'Anfahrt (pauschal)', 1, 1999, 19)")
+    DB_EXEC(db, "INSERT INTO rechnungen (nummer, kunde_id, datum, bezahlt) VALUES ('2026-0002', 2, '2026-09-01', 0)")
+    DB_EXEC(db, "INSERT INTO positionen (rechnung_id, bezeichnung, menge, preis_cent, mwst) VALUES (2, 'Fachbuch Drachenhauch', 2, 3990, 7)")
+    einstSetzen("firma", "Drachenhauch Software")
+    einstSetzen("strasse", "Burgweg 7")
+    einstSetzen("ort", "12345 Drachenfels")
+    einstSetzen("email", "post@drachenhauch.example")
+    einstSetzen("waehrung", "EUR")
+    einstSetzen("mwst", "19")
+    einstSetzen("zahlungsziel", "14")
+    einstSetzen("fuss", "Vielen Dank fuer Ihren Auftrag.")
+    DB_COMMIT(db)
+END IF
+waehrung = einst$("waehrung", "EUR")
+
+' ============================================================ Fenster, Menue, Reiter
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Rechnungen", 0, 0, SW, SH)
+GUI_WINDOW_CHROME(win, FALSE)
+
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeuK AS INTEGER : miNeuK = GUI_MENU_ITEM(mDatei, "Neuer Kunde", "Strg+N")
+DIM miNeuA AS INTEGER : miNeuA = GUI_MENU_ITEM(mDatei, "Neuer Artikel", "Strg+Umschalt+N")
+DIM miNeuR AS INTEGER : miNeuR = GUI_MENU_ITEM(mDatei, "Neue Rechnung", "Strg+R")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Rechnung als PDF ...", "Strg+P")
+DIM miCsv AS INTEGER : miCsv = GUI_MENU_ITEM(mDatei, "Alle Rechnungen als CSV", "Strg+E")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEinst AS INTEGER : miEinst = GUI_MENU_ITEM(mDatei, "Einstellungen ...")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miSpeichern AS INTEGER : miSpeichern = GUI_MENU_ITEM(mBearb, "Speichern", "Strg+S")
+DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Loeschen", "Strg+Entf")
+DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
+DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber Rechnungen")
+
+GUI_TABS(win, ["Kunden", "Artikel", "Rechnungen"])
+
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 12, SH - KOPF - 30)
+GUI_SET_BOUNDS(lblStatus, 12, SH - KOPF - 30, SW - 24, 18)
+GUI_SET_ANCHOR(lblStatus, "lrb")
+
+SUB status(t AS STRING)
+    GUI_SET_TEXT(lblStatus, t)
+    GUI_SET_COLOR(lblStatus, "fg", RGB(200, 200, 200))
+END SUB
+SUB fehler(t AS STRING)
+    GUI_SET_TEXT(lblStatus, t)
+    GUI_SET_COLOR(lblStatus, "fg", ROT)
+END SUB
+
+' Ein Widget auf einen Reiter legen -- die Kinder eines Behaelters muessen
+' es EINZELN, der Behaelter vererbt den Reiter nicht.
+SUB reiter(w AS GUI_WIDGET, seite AS INTEGER)
+    GUI_SET_TAB(w, seite)
+END SUB
+
+' Ein beschriftetes Feld in einer Spalte: Beschriftung + Textfeld, beide im
+' Behaelter, beide auf dem Reiter. Liefert das Textfeld.
+FUNCTION feld(spalte AS GUI_WIDGET, seite AS INTEGER, titel AS STRING, platzhalter AS STRING) AS GUI_WIDGET
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(win, titel, 0, 0)
+    DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(win, 0, 0, 0, 0, platzhalter)
+    reiter(l, seite) : reiter(t, seite)
+    GUI_LAYOUT_ADD(spalte, l) : GUI_LAYOUT_ADD(spalte, t)
+    RETURN t
+END FUNCTION
+
+' ============================================================ Reiter 0: Kunden
+DIM tabH AS INTEGER : tabH = SH - KOPF - 52
+DIM formX AS INTEGER : formX = SW - 350
+DIM formW AS INTEGER : formW = 338
+
+DIM tKunden AS GUI_WIDGET
+tKunden = GUI_TABLE(win, 12, 12, formX - 24, tabH, ["Name", "Ort", "E-Mail"], [])
+GUI_TABLE_COL_WIDTHS(tKunden, [220, 140, 240])
+GUI_TABLE_SET(tKunden, "filterzeile", 1)
+GUI_SET_ANCHOR(tKunden, "lrtb")
+reiter(tKunden, 0)
+DIM kundenId[MAXZ] AS INTEGER
+DIM kundenAnz AS INTEGER : kundenAnz = 0
+
+DIM fK AS GUI_WIDGET : fK = GUI_LAYOUT(win, "spalte", formX, 12, formW, 330)
+GUI_SET_ANCHOR(fK, "rt") : GUI_LAYOUT_SET(fK, "abstand", 4)
+reiter(fK, 0)
+DIM lKTitel AS GUI_WIDGET : lKTitel = GUI_LABEL(win, "Kunde", 0, 0)
+reiter(lKTitel, 0) : GUI_LAYOUT_ADD(fK, lKTitel)
+DIM tfKName AS GUI_WIDGET : tfKName = feld(fK, 0, "Name *", "Firma oder Person")
+DIM tfKStr AS GUI_WIDGET : tfKStr = feld(fK, 0, "Strasse", "")
+DIM zK AS GUI_WIDGET : zK = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+GUI_LAYOUT_SET(zK, "abstand", 6) : reiter(zK, 0)
+DIM lKPlz AS GUI_WIDGET : lKPlz = GUI_LABEL(win, "PLZ / Ort", 0, 0)
+reiter(lKPlz, 0) : GUI_LAYOUT_ADD(fK, lKPlz)
+DIM tfKPlz AS GUI_WIDGET : tfKPlz = GUI_TEXTINPUT(win, 0, 0, 70, 0, "PLZ")
+GUI_TEXTINPUT_SET(tfKPlz, "zahlen", 1) : GUI_TEXTINPUT_SET(tfKPlz, "maxlaenge", 5)
+DIM tfKOrt AS GUI_WIDGET : tfKOrt = GUI_TEXTINPUT(win, 0, 0, 0, 0, "Ort")
+reiter(tfKPlz, 0) : reiter(tfKOrt, 0)
+GUI_LAYOUT_ADD(zK, tfKPlz) : GUI_LAYOUT_ADD(zK, tfKOrt, 1)
+GUI_LAYOUT_ADD(fK, zK)
+DIM tfKMail AS GUI_WIDGET : tfKMail = feld(fK, 0, "E-Mail", "name@firma.de")
+DIM lKFehler AS GUI_WIDGET : lKFehler = GUI_LABEL(win, "", 0, 0)
+GUI_SET_COLOR(lKFehler, "fg", ROT) : GUI_SET_WRAP(lKFehler, formW)
+reiter(lKFehler, 0) : GUI_LAYOUT_ADD(fK, lKFehler)
+DIM kK AS GUI_WIDGET : kK = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+reiter(kK, 0)
+DIM bKNeu AS GUI_WIDGET : bKNeu = GUI_BUTTON(win, "Neu", 0, 0, 0, 0)
+DIM bKSpeichern AS GUI_WIDGET : bKSpeichern = GUI_BUTTON(win, "Speichern", 0, 0, 0, 0)
+DIM bKLoeschen AS GUI_WIDGET : bKLoeschen = GUI_BUTTON(win, "Loeschen", 0, 0, 0, 0)
+reiter(bKNeu, 0) : reiter(bKSpeichern, 0) : reiter(bKLoeschen, 0)
+GUI_LAYOUT_ADD(kK, bKNeu) : GUI_LAYOUT_SPACER(kK) : GUI_LAYOUT_ADD(kK, bKSpeichern) : GUI_LAYOUT_ADD(kK, bKLoeschen)
+GUI_LAYOUT_ADD(fK, kK)
+
+DIM kundeId AS INTEGER : kundeId = -1          ' -1 = neuer Kunde
+DIM kStand AS STRING : kStand = ""              ' Formularinhalt beim Laden (fuer "geaendert?")
+DIM kZeileAlt AS INTEGER : kZeileAlt = -1
+
+FUNCTION kFormular$() AS STRING
+    RETURN GUI_TEXT(tfKName) + "|" + GUI_TEXT(tfKStr) + "|" + GUI_TEXT(tfKPlz) + "|" + GUI_TEXT(tfKOrt) + "|" + GUI_TEXT(tfKMail)
+END FUNCTION
+
+SUB kundenLaden()
+    GUI_TABLE_CLEAR(tKunden)
+    kundenAnz = 0
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name, ort, email FROM kunden ORDER BY name")
+    WHILE DB_NEXT(r)
+        IF kundenAnz >= MAXZ THEN BREAK
+        GUI_TABLE_ADD_ROW(tKunden, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3)])
+        kundenId[kundenAnz] = DB_GET_INT(r, 0)
+        kundenAnz = kundenAnz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+SUB kundeZeigen(id AS INTEGER)
+    kundeId = id
+    GUI_SET_TEXT(lKFehler, "")
+    IF id < 0 THEN
+        GUI_SET_TEXT(tfKName, "") : GUI_SET_TEXT(tfKStr, "") : GUI_SET_TEXT(tfKPlz, "")
+        GUI_SET_TEXT(tfKOrt, "") : GUI_SET_TEXT(tfKMail, "")
+        GUI_SET_TEXT(lKTitel, "Neuer Kunde")
+    ELSE
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT name, strasse, plz, ort, email FROM kunden WHERE id = ?", id)
+        IF DB_NEXT(r) THEN
+            GUI_SET_TEXT(tfKName, DB_GET_STRING(r, 0)) : GUI_SET_TEXT(tfKStr, DB_GET_STRING(r, 1))
+            GUI_SET_TEXT(tfKPlz, DB_GET_STRING(r, 2)) : GUI_SET_TEXT(tfKOrt, DB_GET_STRING(r, 3))
+            GUI_SET_TEXT(tfKMail, DB_GET_STRING(r, 4))
+        END IF
+        DB_CLOSE_RESULT(r)
+        GUI_SET_TEXT(lKTitel, "Kunde #" + STR$(id))
+    END IF
+    kStand = kFormular$()
+END SUB
+
+' Zeile der Tabelle, die eine id traegt (oder -1).
+FUNCTION zeileVonId(ids AS ARRAY OF INTEGER, anz AS INTEGER, id AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO anz - 1
+        IF ids[i] = id THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION kundeSpeichern() AS BOOLEAN
+    DIM name AS STRING : name = TRIM$(GUI_TEXT(tfKName))
+    DIM plz AS STRING : plz = TRIM$(GUI_TEXT(tfKPlz))
+    DIM mail AS STRING : mail = TRIM$(GUI_TEXT(tfKMail))
+    IF name = "" THEN
+        GUI_SET_TEXT(lKFehler, "Der Name fehlt.") : GUI_FOCUS(tfKName) : RETURN FALSE
+    END IF
+    IF plz <> "" AND LEN(plz) <> 5 THEN
+        GUI_SET_TEXT(lKFehler, "Eine Postleitzahl hat fuenf Ziffern.") : GUI_FOCUS(tfKPlz) : RETURN FALSE
+    END IF
+    IF mail <> "" AND (INSTR(mail, "@") < 1 OR INSTR(mail, ".") < 0) THEN
+        GUI_SET_TEXT(lKFehler, "Das sieht nicht nach einer E-Mail-Adresse aus.") : GUI_FOCUS(tfKMail) : RETURN FALSE
+    END IF
+    IF kundeId < 0 THEN
+        DB_EXEC(db, "INSERT INTO kunden (name, strasse, plz, ort, email) VALUES (?, ?, ?, ?, ?)", _
+                name, TRIM$(GUI_TEXT(tfKStr)), plz, TRIM$(GUI_TEXT(tfKOrt)), mail)
+        kundeId = DB_LAST_ROWID(db)
+    ELSE
+        DB_EXEC(db, "UPDATE kunden SET name = ?, strasse = ?, plz = ?, ort = ?, email = ? WHERE id = ?", _
+                name, TRIM$(GUI_TEXT(tfKStr)), plz, TRIM$(GUI_TEXT(tfKOrt)), mail, kundeId)
+    END IF
+    kundenLaden()
+    kZeileAlt = zeileVonId(kundenId, kundenAnz, kundeId)
+    GUI_TABLE_SET_SELECTED(tKunden, kZeileAlt)
+    kundeZeigen(kundeId)
+    status("Kunde gespeichert: " + name)
+    RETURN TRUE
+END FUNCTION
+
+' ============================================================ Reiter 1: Artikel
+DIM tArtikel AS GUI_WIDGET
+tArtikel = GUI_TABLE(win, 12, 12, formX - 24, tabH, ["Bezeichnung", "Preis", "MwSt"], [])
+GUI_TABLE_COL_WIDTHS(tArtikel, [300, 140, 80])
+GUI_TABLE_COL_ALIGN(tArtikel, 1, "rechts") : GUI_TABLE_COL_ALIGN(tArtikel, 2, "rechts")
+GUI_TABLE_SET(tArtikel, "filterzeile", 1)
+GUI_SET_ANCHOR(tArtikel, "lrtb")
+reiter(tArtikel, 1)
+DIM artikelId[MAXZ] AS INTEGER
+DIM artikelAnz AS INTEGER : artikelAnz = 0
+
+DIM fA AS GUI_WIDGET : fA = GUI_LAYOUT(win, "spalte", formX, 12, formW, 260)
+GUI_SET_ANCHOR(fA, "rt") : GUI_LAYOUT_SET(fA, "abstand", 4)
+reiter(fA, 1)
+DIM lATitel AS GUI_WIDGET : lATitel = GUI_LABEL(win, "Artikel", 0, 0)
+reiter(lATitel, 1) : GUI_LAYOUT_ADD(fA, lATitel)
+DIM tfABez AS GUI_WIDGET : tfABez = feld(fA, 1, "Bezeichnung *", "")
+DIM tfAPreis AS GUI_WIDGET : tfAPreis = feld(fA, 1, "Preis (netto)", "z. B. 19,99")
+GUI_TEXTINPUT_SET(tfAPreis, "zahlen", 2)
+DIM lAMwst AS GUI_WIDGET : lAMwst = GUI_LABEL(win, "MwSt", 0, 0)
+reiter(lAMwst, 1) : GUI_LAYOUT_ADD(fA, lAMwst)
+DIM ddAMwst AS GUI_WIDGET : ddAMwst = GUI_DROPDOWN(win, 0, 0, 0, 0, ["19 %", "7 %", "0 %"])
+reiter(ddAMwst, 1) : GUI_LAYOUT_ADD(fA, ddAMwst)
+DIM lAFehler AS GUI_WIDGET : lAFehler = GUI_LABEL(win, "", 0, 0)
+GUI_SET_COLOR(lAFehler, "fg", ROT) : GUI_SET_WRAP(lAFehler, formW)
+reiter(lAFehler, 1) : GUI_LAYOUT_ADD(fA, lAFehler)
+DIM kA AS GUI_WIDGET : kA = GUI_LAYOUT(win, "zeile", 0, 0, 10, 30)
+reiter(kA, 1)
+DIM bANeu AS GUI_WIDGET : bANeu = GUI_BUTTON(win, "Neu", 0, 0, 0, 0)
+DIM bASpeichern AS GUI_WIDGET : bASpeichern = GUI_BUTTON(win, "Speichern", 0, 0, 0, 0)
+DIM bALoeschen AS GUI_WIDGET : bALoeschen = GUI_BUTTON(win, "Loeschen", 0, 0, 0, 0)
+reiter(bANeu, 1) : reiter(bASpeichern, 1) : reiter(bALoeschen, 1)
+GUI_LAYOUT_ADD(kA, bANeu) : GUI_LAYOUT_SPACER(kA) : GUI_LAYOUT_ADD(kA, bASpeichern) : GUI_LAYOUT_ADD(kA, bALoeschen)
+GUI_LAYOUT_ADD(fA, kA)
+
+DIM artikelIdAkt AS INTEGER : artikelIdAkt = -1
+DIM aStand AS STRING : aStand = ""
+DIM aZeileAlt AS INTEGER : aZeileAlt = -1
+
+FUNCTION mwstVonIndex(i AS INTEGER) AS INTEGER
+    IF i = 1 THEN RETURN 7
+    IF i = 2 THEN RETURN 0
+    RETURN 19
+END FUNCTION
+FUNCTION indexVonMwst(m AS INTEGER) AS INTEGER
+    IF m = 7 THEN RETURN 1
+    IF m = 0 THEN RETURN 2
+    RETURN 0
+END FUNCTION
+
+FUNCTION aFormular$() AS STRING
+    RETURN GUI_TEXT(tfABez) + "|" + GUI_TEXT(tfAPreis) + "|" + STR$(GUI_DROPDOWN_SELECTED(ddAMwst))
+END FUNCTION
+
+SUB artikelLaden()
+    GUI_TABLE_CLEAR(tArtikel)
+    artikelAnz = 0
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, bezeichnung, preis_cent, mwst FROM artikel ORDER BY bezeichnung")
+    WHILE DB_NEXT(r)
+        IF artikelAnz >= MAXZ THEN BREAK
+        GUI_TABLE_ADD_ROW(tArtikel, [DB_GET_STRING(r, 1), geld$(DB_GET_INT(r, 2)), STR$(DB_GET_INT(r, 3)) + " %"])
+        artikelId[artikelAnz] = DB_GET_INT(r, 0)
+        artikelAnz = artikelAnz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+SUB artikelZeigen(id AS INTEGER)
+    artikelIdAkt = id
+    GUI_SET_TEXT(lAFehler, "")
+    IF id < 0 THEN
+        GUI_SET_TEXT(tfABez, "") : GUI_SET_TEXT(tfAPreis, "")
+        GUI_DROPDOWN_SET_SELECTED(ddAMwst, indexVonMwst(VAL(einst$("mwst", "19"))))
+        GUI_SET_TEXT(lATitel, "Neuer Artikel")
+    ELSE
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT bezeichnung, preis_cent, mwst FROM artikel WHERE id = ?", id)
+        IF DB_NEXT(r) THEN
+            GUI_SET_TEXT(tfABez, DB_GET_STRING(r, 0))
+            DIM c AS INTEGER : c = DB_GET_INT(r, 1)
+            GUI_SET_TEXT(tfAPreis, STR$(c \ 100) + "," + FORMAT$(c MOD 100, "%02d"))
+            GUI_DROPDOWN_SET_SELECTED(ddAMwst, indexVonMwst(DB_GET_INT(r, 2)))
+        END IF
+        DB_CLOSE_RESULT(r)
+        GUI_SET_TEXT(lATitel, "Artikel #" + STR$(id))
+    END IF
+    aStand = aFormular$()
+END SUB
+
+FUNCTION artikelSpeichern() AS BOOLEAN
+    DIM bez AS STRING : bez = TRIM$(GUI_TEXT(tfABez))
+    DIM cent AS INTEGER : cent = centVon(GUI_TEXT(tfAPreis))
+    IF bez = "" THEN
+        GUI_SET_TEXT(lAFehler, "Die Bezeichnung fehlt.") : GUI_FOCUS(tfABez) : RETURN FALSE
+    END IF
+    IF cent < 0 THEN
+        GUI_SET_TEXT(lAFehler, "Der Preis ist keine Zahl (z. B. 19,99).") : GUI_FOCUS(tfAPreis) : RETURN FALSE
+    END IF
+    DIM mwst AS INTEGER : mwst = mwstVonIndex(GUI_DROPDOWN_SELECTED(ddAMwst))
+    IF artikelIdAkt < 0 THEN
+        DB_EXEC(db, "INSERT INTO artikel (bezeichnung, preis_cent, mwst) VALUES (?, ?, ?)", bez, cent, mwst)
+        artikelIdAkt = DB_LAST_ROWID(db)
+    ELSE
+        DB_EXEC(db, "UPDATE artikel SET bezeichnung = ?, preis_cent = ?, mwst = ? WHERE id = ?", bez, cent, mwst, artikelIdAkt)
+    END IF
+    artikelLaden()
+    aZeileAlt = zeileVonId(artikelId, artikelAnz, artikelIdAkt)
+    GUI_TABLE_SET_SELECTED(tArtikel, aZeileAlt)
+    artikelZeigen(artikelIdAkt)
+    artikelAuswahlFuellen()
+    status("Artikel gespeichert: " + bez + " zu " + geld$(cent))
+    RETURN TRUE
+END FUNCTION
+
+' ============================================================ Reiter 2: Rechnungen
+DIM listeW AS INTEGER : listeW = 380
+DIM tRech AS GUI_WIDGET
+tRech = GUI_TABLE(win, 12, 12, listeW, tabH, ["Nummer", "Kunde", "Brutto", "Status"], [])
+GUI_TABLE_COL_WIDTHS(tRech, [76, 128, 100, 64])
+GUI_TABLE_COL_ALIGN(tRech, 2, "rechts")
+GUI_TABLE_SET(tRech, "filterzeile", 1)
+GUI_SET_ANCHOR(tRech, "ltb")
+reiter(tRech, 2)
+DIM rechId[MAXZ] AS INTEGER
+DIM rechAnz AS INTEGER : rechAnz = 0
+
+DIM rX AS INTEGER : rX = 12 + listeW + 12
+DIM rW AS INTEGER : rW = SW - rX - 12
+' Kopf der Rechnung: eine Zeile mit Nummer, Kunde, Datum, bezahlt.
+DIM zR AS GUI_WIDGET : zR = GUI_LAYOUT(win, "zeile", rX, 12, rW, 30)
+GUI_SET_ANCHOR(zR, "lrt") : GUI_LAYOUT_SET(zR, "abstand", 8) : GUI_LAYOUT_SET(zR, "ausrichtung", 1) : GUI_LAYOUT_SET(zR, "dehnen", 0)
+reiter(zR, 2)
+DIM lRNummer AS GUI_WIDGET : lRNummer = GUI_LABEL(win, "Neue Rechnung", 0, 0)
+DIM lRKunde AS GUI_WIDGET : lRKunde = GUI_LABEL(win, "Kunde", 0, 0)
+DIM ddRKunde AS GUI_WIDGET : ddRKunde = GUI_DROPDOWN(win, 0, 0, 190, 28, [])
+DIM lRDatum AS GUI_WIDGET : lRDatum = GUI_LABEL(win, "Datum", 0, 0)
+DIM tfRDatum AS GUI_WIDGET : tfRDatum = GUI_TEXTINPUT(win, 0, 0, 104, 28, "JJJJ-MM-TT")
+GUI_TEXTINPUT_SET(tfRDatum, "maxlaenge", 10)
+DIM cbRBezahlt AS GUI_WIDGET : cbRBezahlt = GUI_CHECKBOX(win, "bezahlt", 0, 0)
+reiter(lRNummer, 2) : reiter(lRKunde, 2) : reiter(ddRKunde, 2) : reiter(lRDatum, 2) : reiter(tfRDatum, 2) : reiter(cbRBezahlt, 2)
+GUI_LAYOUT_ADD(zR, lRNummer) : GUI_LAYOUT_SPACER(zR) : GUI_LAYOUT_ADD(zR, lRKunde) : GUI_LAYOUT_ADD(zR, ddRKunde)
+GUI_LAYOUT_ADD(zR, lRDatum) : GUI_LAYOUT_ADD(zR, tfRDatum) : GUI_LAYOUT_ADD(zR, cbRBezahlt)
+
+' Positionen: Menge direkt in der Zelle editierbar.
+DIM posH AS INTEGER : posH = tabH - 30 - 12 - 36 - 12 - 70 - 12 - 30
+DIM tPos AS GUI_WIDGET
+tPos = GUI_TABLE(win, rX, 54, rW, posH, ["Bezeichnung", "Menge", "Einzelpreis", "MwSt", "Summe"], [])
+GUI_TABLE_COL_WIDTHS(tPos, [260, 70, 110, 60, 120])
+GUI_TABLE_COL_ALIGN(tPos, 1, "rechts") : GUI_TABLE_COL_ALIGN(tPos, 2, "rechts")
+GUI_TABLE_COL_ALIGN(tPos, 3, "rechts") : GUI_TABLE_COL_ALIGN(tPos, 4, "rechts")
+GUI_TABLE_COL_EDIT(tPos, 1, TRUE)
+GUI_TABLE_SET(tPos, "sortierbar", 0)
+GUI_SET_ANCHOR(tPos, "lrtb")
+reiter(tPos, 2)
+
+' Position anlegen: Artikel waehlen, Menge, [Hinzufuegen]; [Entfernen] nimmt die gewaehlte.
+DIM zP AS GUI_WIDGET : zP = GUI_LAYOUT(win, "zeile", rX, 54 + posH + 12, rW, 30)
+GUI_SET_ANCHOR(zP, "lrb") : GUI_LAYOUT_SET(zP, "abstand", 8) : GUI_LAYOUT_SET(zP, "ausrichtung", 1) : GUI_LAYOUT_SET(zP, "dehnen", 0)
+reiter(zP, 2)
+DIM ddPArtikel AS GUI_WIDGET : ddPArtikel = GUI_DROPDOWN(win, 0, 0, 230, 28, [])
+DIM lPMenge AS GUI_WIDGET : lPMenge = GUI_LABEL(win, "Menge", 0, 0)
+DIM tfPMenge AS GUI_WIDGET : tfPMenge = GUI_TEXTINPUT(win, 0, 0, 60, 28, "1")
+GUI_TEXTINPUT_SET(tfPMenge, "zahlen", 1) : GUI_SET_TEXT(tfPMenge, "1")
+DIM bPAdd AS GUI_WIDGET : bPAdd = GUI_BUTTON(win, "Hinzufuegen", 0, 0, 0, 28)
+DIM bPDel AS GUI_WIDGET : bPDel = GUI_BUTTON(win, "Entfernen", 0, 0, 0, 28)
+reiter(ddPArtikel, 2) : reiter(lPMenge, 2) : reiter(tfPMenge, 2) : reiter(bPAdd, 2) : reiter(bPDel, 2)
+GUI_LAYOUT_ADD(zP, ddPArtikel) : GUI_LAYOUT_ADD(zP, lPMenge) : GUI_LAYOUT_ADD(zP, tfPMenge)
+GUI_LAYOUT_ADD(zP, bPAdd) : GUI_LAYOUT_SPACER(zP) : GUI_LAYOUT_ADD(zP, bPDel)
+
+' Summen rechts, drei Zeilen.
+DIM sY AS INTEGER : sY = 54 + posH + 12 + 30 + 12
+DIM lSNetto AS GUI_WIDGET : lSNetto = GUI_LABEL(win, "Netto", rX + rW - 260, sY)
+DIM lSMwst AS GUI_WIDGET : lSMwst = GUI_LABEL(win, "MwSt", rX + rW - 260, sY + 22)
+DIM lSBrutto AS GUI_WIDGET : lSBrutto = GUI_LABEL(win, "Brutto", rX + rW - 260, sY + 44)
+DIM vSNetto AS GUI_WIDGET : vSNetto = GUI_LABEL(win, "", rX + rW - 150, sY)
+DIM vSMwst AS GUI_WIDGET : vSMwst = GUI_LABEL(win, "", rX + rW - 150, sY + 22)
+DIM vSBrutto AS GUI_WIDGET : vSBrutto = GUI_LABEL(win, "", rX + rW - 150, sY + 44)
+GUI_SET_BOUNDS(vSNetto, rX + rW - 150, sY, 150, 18) : GUI_SET_ALIGN(vSNetto, "rechts")
+GUI_SET_BOUNDS(vSMwst, rX + rW - 150, sY + 22, 150, 18) : GUI_SET_ALIGN(vSMwst, "rechts")
+GUI_SET_BOUNDS(vSBrutto, rX + rW - 150, sY + 44, 150, 18) : GUI_SET_ALIGN(vSBrutto, "rechts")
+DIM sumW AS GUI_WIDGET
+FOR EACH sumW IN (lSNetto, lSMwst, lSBrutto, vSNetto, vSMwst, vSBrutto)
+    reiter(sumW, 2) : GUI_SET_ANCHOR(sumW, "rb")
+NEXT
+DIM lRFehler AS GUI_WIDGET : lRFehler = GUI_LABEL(win, "", rX, sY)
+GUI_SET_COLOR(lRFehler, "fg", ROT) : GUI_SET_WRAP(lRFehler, rW - 280) : GUI_SET_ANCHOR(lRFehler, "lb")
+reiter(lRFehler, 2)
+
+' Knopfreihe unten.
+DIM kR AS GUI_WIDGET : kR = GUI_LAYOUT(win, "zeile", rX, sY + 70, rW, 30)
+GUI_SET_ANCHOR(kR, "lrb") : GUI_LAYOUT_SET(kR, "abstand", 8)
+reiter(kR, 2)
+DIM bRNeu AS GUI_WIDGET : bRNeu = GUI_BUTTON(win, "Neue Rechnung", 0, 0, 0, 0)
+DIM bRPdf AS GUI_WIDGET : bRPdf = GUI_BUTTON(win, "PDF schreiben", 0, 0, 0, 0)
+DIM bRSpeichern AS GUI_WIDGET : bRSpeichern = GUI_BUTTON(win, "Speichern", 0, 0, 0, 0)
+DIM bRLoeschen AS GUI_WIDGET : bRLoeschen = GUI_BUTTON(win, "Loeschen", 0, 0, 0, 0)
+reiter(bRNeu, 2) : reiter(bRPdf, 2) : reiter(bRSpeichern, 2) : reiter(bRLoeschen, 2)
+GUI_LAYOUT_ADD(kR, bRNeu) : GUI_LAYOUT_ADD(kR, bRPdf) : GUI_LAYOUT_SPACER(kR)
+GUI_LAYOUT_ADD(kR, bRSpeichern) : GUI_LAYOUT_ADD(kR, bRLoeschen)
+
+' Zustand der offenen Rechnung -- Positionen leben im Speicher, bis
+' gespeichert wird (eine Transaktion: alte Positionen weg, neue rein).
+DIM rechIdAkt AS INTEGER : rechIdAkt = -1
+DIM rechNummer AS STRING : rechNummer = ""
+DIM posBez[MAXPOS] AS STRING
+DIM posMenge[MAXPOS] AS INTEGER
+DIM posPreis[MAXPOS] AS INTEGER
+DIM posMwst[MAXPOS] AS INTEGER
+DIM posAnz AS INTEGER : posAnz = 0
+DIM rStand AS STRING : rStand = ""
+DIM rZeileAlt AS INTEGER : rZeileAlt = -1
+' Kunden-Auswahl im Kopf: Index -> id.
+DIM auswKundeId[MAXZ] AS INTEGER
+DIM auswKundeAnz AS INTEGER : auswKundeAnz = 0
+DIM auswArtikelId[MAXZ] AS INTEGER
+DIM auswArtikelAnz AS INTEGER : auswArtikelAnz = 0
+
+SUB kundenAuswahlFuellen()
+    DIM namen AS ARRAY OF STRING : namen = []
+    auswKundeAnz = 0
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, name FROM kunden ORDER BY name")
+    WHILE DB_NEXT(r)
+        IF auswKundeAnz >= MAXZ THEN BREAK
+        ARRAY_PUSH(namen, DB_GET_STRING(r, 1))
+        auswKundeId[auswKundeAnz] = DB_GET_INT(r, 0)
+        auswKundeAnz = auswKundeAnz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+    DIM alt AS INTEGER : alt = GUI_DROPDOWN_SELECTED(ddRKunde)
+    GUI_SET_DROPDOWN(ddRKunde, namen)
+    IF alt >= 0 AND alt < auswKundeAnz THEN GUI_DROPDOWN_SET_SELECTED(ddRKunde, alt)
+END SUB
+
+SUB artikelAuswahlFuellen()
+    DIM namen AS ARRAY OF STRING : namen = []
+    auswArtikelAnz = 0
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT id, bezeichnung, preis_cent FROM artikel ORDER BY bezeichnung")
+    WHILE DB_NEXT(r)
+        IF auswArtikelAnz >= MAXZ THEN BREAK
+        ARRAY_PUSH(namen, DB_GET_STRING(r, 1) + "  (" + geld$(DB_GET_INT(r, 2)) + ")")
+        auswArtikelId[auswArtikelAnz] = DB_GET_INT(r, 0)
+        auswArtikelAnz = auswArtikelAnz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+    DIM alt AS INTEGER : alt = GUI_DROPDOWN_SELECTED(ddPArtikel)
+    GUI_SET_DROPDOWN(ddPArtikel, namen)
+    IF alt >= 0 AND alt < auswArtikelAnz THEN GUI_DROPDOWN_SET_SELECTED(ddPArtikel, alt)
+    IF alt < 0 AND auswArtikelAnz > 0 THEN GUI_DROPDOWN_SET_SELECTED(ddPArtikel, 0)
+END SUB
+
+' Summen einer Positionsliste in Cent: (netto, mwst, brutto). Die MwSt wird
+' je Position gerundet, wie es das Finanzamt sieht -- nicht einmal am Ende.
+FUNCTION summen() AS TUPLE
+    DIM netto AS INTEGER : netto = 0
+    DIM steuer AS INTEGER : steuer = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO posAnz - 1
+        DIM z AS INTEGER : z = posMenge[i] * posPreis[i]
+        netto = netto + z
+        steuer = steuer + (z * posMwst[i] + 50) \ 100
+    NEXT
+    RETURN (netto, steuer, netto + steuer)
+END FUNCTION
+
+FUNCTION rFormular$() AS STRING
+    DIM s AS STRING
+    s = STR$(GUI_DROPDOWN_SELECTED(ddRKunde)) + "|" + GUI_TEXT(tfRDatum) + "|" + STR$(GUI_CHECKED(cbRBezahlt))
+    DIM i AS INTEGER
+    FOR i = 0 TO posAnz - 1
+        s = s + "|" + posBez[i] + ";" + STR$(posMenge[i]) + ";" + STR$(posPreis[i]) + ";" + STR$(posMwst[i])
+    NEXT
+    RETURN s
+END FUNCTION
+
+SUB positionenZeigen()
+    GUI_TABLE_CLEAR(tPos)
+    DIM i AS INTEGER
+    FOR i = 0 TO posAnz - 1
+        GUI_TABLE_ADD_ROW(tPos, [posBez[i], STR$(posMenge[i]), geld$(posPreis[i]), STR$(posMwst[i]) + " %", geld$(posMenge[i] * posPreis[i])])
+    NEXT
+    DIM n AS INTEGER
+    DIM m AS INTEGER
+    DIM b AS INTEGER
+    (n, m, b) = summen()
+    GUI_SET_TEXT(vSNetto, geld$(n)) : GUI_SET_TEXT(vSMwst, geld$(m)) : GUI_SET_TEXT(vSBrutto, geld$(b))
+END SUB
+
+FUNCTION bruttoVon(rid AS INTEGER) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT menge, preis_cent, mwst FROM positionen WHERE rechnung_id = ?", rid)
+    DIM summe AS INTEGER : summe = 0
+    WHILE DB_NEXT(r)
+        DIM z AS INTEGER : z = DB_GET_INT(r, 0) * DB_GET_INT(r, 1)
+        summe = summe + z + (z * DB_GET_INT(r, 2) + 50) \ 100
+    WEND
+    DB_CLOSE_RESULT(r)
+    RETURN summe
+END FUNCTION
+
+SUB rechnungenLaden()
+    GUI_TABLE_CLEAR(tRech)
+    rechAnz = 0
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT r.id, r.nummer, k.name, r.datum, r.bezahlt FROM rechnungen r JOIN kunden k ON k.id = r.kunde_id ORDER BY r.nummer DESC")
+    WHILE DB_NEXT(r)
+        IF rechAnz >= MAXZ THEN BREAK
+        DIM rid AS INTEGER : rid = DB_GET_INT(r, 0)
+        GUI_TABLE_ADD_ROW(tRech, [DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), geld$(bruttoVon(rid)), IIF(DB_GET_INT(r, 4) = 1, "bezahlt", "offen")])
+        IF DB_GET_INT(r, 4) = 0 THEN GUI_TABLE_CELL_COLOR(tRech, rechAnz, 3, ROT, -1) ELSE GUI_TABLE_CELL_COLOR(tRech, rechAnz, 3, GRUEN, -1)
+        rechId[rechAnz] = rid
+        rechAnz = rechAnz + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+FUNCTION nummerNeu$() AS STRING
+    DIM jahr AS STRING : jahr = LEFT$(DATE$(), 4)
+    DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT COUNT(*) FROM rechnungen WHERE nummer LIKE ?", jahr + "-%")
+    DIM n AS INTEGER : n = 0
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN jahr + "-" + FORMAT$(n + 1, "%04d")
+END FUNCTION
+
+SUB rechnungZeigen(id AS INTEGER)
+    rechIdAkt = id
+    posAnz = 0
+    GUI_SET_TEXT(lRFehler, "")
+    IF id < 0 THEN
+        rechNummer = nummerNeu$()
+        GUI_SET_TEXT(lRNummer, "Neue Rechnung " + rechNummer)
+        GUI_SET_TEXT(tfRDatum, DATE$())
+        GUI_SET_CHECKED(cbRBezahlt, FALSE)
+        IF auswKundeAnz > 0 AND GUI_DROPDOWN_SELECTED(ddRKunde) < 0 THEN GUI_DROPDOWN_SET_SELECTED(ddRKunde, 0)
+    ELSE
+        DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT nummer, kunde_id, datum, bezahlt FROM rechnungen WHERE id = ?", id)
+        IF DB_NEXT(r) THEN
+            rechNummer = DB_GET_STRING(r, 0)
+            GUI_SET_TEXT(lRNummer, "Rechnung " + rechNummer)
+            DIM kid AS INTEGER : kid = DB_GET_INT(r, 1)
+            DIM i AS INTEGER
+            FOR i = 0 TO auswKundeAnz - 1
+                IF auswKundeId[i] = kid THEN GUI_DROPDOWN_SET_SELECTED(ddRKunde, i)
+            NEXT
+            GUI_SET_TEXT(tfRDatum, DB_GET_STRING(r, 2))
+            GUI_SET_CHECKED(cbRBezahlt, DB_GET_INT(r, 3) = 1)
+        END IF
+        DB_CLOSE_RESULT(r)
+        DIM p AS DB_RESULT : p = DB_QUERY(db, "SELECT bezeichnung, menge, preis_cent, mwst FROM positionen WHERE rechnung_id = ? ORDER BY id", id)
+        WHILE DB_NEXT(p)
+            IF posAnz >= MAXPOS THEN BREAK
+            posBez[posAnz] = DB_GET_STRING(p, 0) : posMenge[posAnz] = DB_GET_INT(p, 1)
+            posPreis[posAnz] = DB_GET_INT(p, 2) : posMwst[posAnz] = DB_GET_INT(p, 3)
+            posAnz = posAnz + 1
+        WEND
+        DB_CLOSE_RESULT(p)
+    END IF
+    positionenZeigen()
+    rStand = rFormular$()
+END SUB
+
+FUNCTION datumGueltig(d AS STRING) AS BOOLEAN
+    IF LEN(d) <> 10 THEN RETURN FALSE
+    IF MID$(d, 4, 1) <> "-" OR MID$(d, 7, 1) <> "-" THEN RETURN FALSE
+    DIM m AS INTEGER : m = VAL(MID$(d, 5, 2))
+    DIM t AS INTEGER : t = VAL(MID$(d, 8, 2))
+    RETURN VAL(LEFT$(d, 4)) >= 2000 AND m >= 1 AND m <= 12 AND t >= 1 AND t <= 31
+END FUNCTION
+
+FUNCTION rechnungSpeichern() AS BOOLEAN
+    DIM ki AS INTEGER : ki = GUI_DROPDOWN_SELECTED(ddRKunde)
+    IF ki < 0 OR ki >= auswKundeAnz THEN
+        GUI_SET_TEXT(lRFehler, "Es fehlt der Kunde.") : RETURN FALSE
+    END IF
+    DIM datum AS STRING : datum = TRIM$(GUI_TEXT(tfRDatum))
+    IF NOT datumGueltig(datum) THEN
+        GUI_SET_TEXT(lRFehler, "Das Datum muss JJJJ-MM-TT sein.") : GUI_FOCUS(tfRDatum) : RETURN FALSE
+    END IF
+    IF posAnz = 0 THEN
+        GUI_SET_TEXT(lRFehler, "Eine Rechnung ohne Position ist keine.") : RETURN FALSE
+    END IF
+    DB_BEGIN(db)
+    IF rechIdAkt < 0 THEN
+        DB_EXEC(db, "INSERT INTO rechnungen (nummer, kunde_id, datum, bezahlt) VALUES (?, ?, ?, ?)", _
+                rechNummer, auswKundeId[ki], datum, IIF(GUI_CHECKED(cbRBezahlt), 1, 0))
+        rechIdAkt = DB_LAST_ROWID(db)
+    ELSE
+        DB_EXEC(db, "UPDATE rechnungen SET kunde_id = ?, datum = ?, bezahlt = ? WHERE id = ?", _
+                auswKundeId[ki], datum, IIF(GUI_CHECKED(cbRBezahlt), 1, 0), rechIdAkt)
+        DB_EXEC(db, "DELETE FROM positionen WHERE rechnung_id = ?", rechIdAkt)
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO posAnz - 1
+        DB_EXEC(db, "INSERT INTO positionen (rechnung_id, bezeichnung, menge, preis_cent, mwst) VALUES (?, ?, ?, ?, ?)", _
+                rechIdAkt, posBez[i], posMenge[i], posPreis[i], posMwst[i])
+    NEXT
+    DB_COMMIT(db)
+    rechnungenLaden()
+    rZeileAlt = zeileVonId(rechId, rechAnz, rechIdAkt)
+    GUI_TABLE_SET_SELECTED(tRech, rZeileAlt)
+    rechnungZeigen(rechIdAkt)
+    status("Rechnung " + rechNummer + " gespeichert.")
+    RETURN TRUE
+END FUNCTION
+
+' ============================================================ PDF und CSV
+FUNCTION pdfSchreiben(rid AS INTEGER) AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT r.nummer, r.datum, r.bezahlt, k.name, k.strasse, k.plz, k.ort FROM rechnungen r JOIN kunden k ON k.id = r.kunde_id WHERE r.id = ?", rid)
+    IF NOT DB_NEXT(r) THEN
+        DB_CLOSE_RESULT(r)
+        RETURN ""
+    END IF
+    DIM nummer AS STRING : nummer = DB_GET_STRING(r, 0)
+    DIM datum AS STRING : datum = DB_GET_STRING(r, 1)
+    DIM bezahlt AS BOOLEAN : bezahlt = DB_GET_INT(r, 2) = 1
+    DIM kName AS STRING : kName = DB_GET_STRING(r, 3)
+    DIM kStr AS STRING : kStr = DB_GET_STRING(r, 4)
+    DIM kOrt AS STRING : kOrt = TRIM$(DB_GET_STRING(r, 5) + " " + DB_GET_STRING(r, 6))
+    DB_CLOSE_RESULT(r)
+
+    DIM p AS PDF : p = PDF_NEW()
+    PDF_TITLE(p, "Rechnung " + nummer)
+    ' Absender
+    PDF_FONT(p, "helvetica-fett", 14)
+    PDF_TEXT(p, 20, 20, einst$("firma", ""))
+    PDF_FONT(p, "helvetica", 9)
+    PDF_TEXT(p, 20, 26, einst$("strasse", "") + " - " + einst$("ort", "") + " - " + einst$("email", ""))
+    PDF_LINE(p, 20, 29, 190, 29)
+    ' Empfaenger
+    PDF_FONT(p, "helvetica", 11)
+    PDF_TEXT(p, 20, 45, kName)
+    PDF_TEXT(p, 20, 51, kStr)
+    PDF_TEXT(p, 20, 57, kOrt)
+    ' Titel + Daten
+    PDF_FONT(p, "helvetica-fett", 18)
+    PDF_TEXT(p, 20, 80, "Rechnung " + nummer)
+    PDF_FONT(p, "helvetica", 10)
+    PDF_TEXT(p, 140, 80, "Datum: " + datum)
+    IF bezahlt THEN PDF_TEXT(p, 140, 86, "Status: bezahlt")
+    ' Tabellenkopf
+    DIM y AS FLOAT : y = 98.0
+    PDF_FONT(p, "helvetica-fett", 10)
+    PDF_TEXT(p, 20, y, "Bezeichnung")
+    PDF_TEXT(p, 110, y, "Menge")
+    PDF_TEXT(p, 130, y, "Einzelpreis")
+    PDF_TEXT(p, 160, y, "MwSt")
+    PDF_TEXT(p, 172, y, "Summe")
+    PDF_LINE(p, 20, y + 2, 190, y + 2)
+    PDF_FONT(p, "helvetica", 10)
+    y = y + 8
+    DIM netto AS INTEGER : netto = 0
+    DIM steuer AS INTEGER : steuer = 0
+    DIM q AS DB_RESULT : q = DB_QUERY(db, "SELECT bezeichnung, menge, preis_cent, mwst FROM positionen WHERE rechnung_id = ? ORDER BY id", rid)
+    WHILE DB_NEXT(q)
+        DIM z AS INTEGER : z = DB_GET_INT(q, 1) * DB_GET_INT(q, 2)
+        netto = netto + z
+        steuer = steuer + (z * DB_GET_INT(q, 3) + 50) \ 100
+        PDF_TEXT(p, 20, y, DB_GET_STRING(q, 0))
+        rechtsbuendig(p, 122, y, STR$(DB_GET_INT(q, 1)))
+        rechtsbuendig(p, 155, y, geld$(DB_GET_INT(q, 2)))
+        rechtsbuendig(p, 168, y, STR$(DB_GET_INT(q, 3)) + " %")
+        rechtsbuendig(p, 190, y, geld$(z))
+        y = y + 6
+        IF y > 270 THEN
+            PDF_PAGE(p) : y = 25
+        END IF
+    WEND
+    DB_CLOSE_RESULT(q)
+    PDF_LINE(p, 20, y, 190, y)
+    y = y + 7
+    PDF_TEXT(p, 140, y, "Netto") : rechtsbuendig(p, 190, y, geld$(netto))
+    y = y + 6
+    PDF_TEXT(p, 140, y, "MwSt") : rechtsbuendig(p, 190, y, geld$(steuer))
+    y = y + 7
+    PDF_FONT(p, "helvetica-fett", 11)
+    PDF_TEXT(p, 140, y, "Brutto") : rechtsbuendig(p, 190, y, geld$(netto + steuer))
+    y = y + 14
+    PDF_FONT(p, "helvetica", 10)
+    IF NOT bezahlt THEN
+        PDF_TEXT(p, 20, y, "Zahlbar innerhalb von " + einst$("zahlungsziel", "14") + " Tagen ohne Abzug.")
+        y = y + 6
+    END IF
+    PDF_TEXT(p, 20, y, einst$("fuss", ""))
+    DIM pfad AS STRING : pfad = "rechnung_" + nummer + ".pdf"
+    PDF_SAVE(p, pfad)
+    PDF_CLOSE(p)
+    RETURN pfad
+END FUNCTION
+
+' PDF_TEXT setzt linksbuendig; Zahlen will man rechts -- ueber die Breite.
+SUB rechtsbuendig(p AS PDF, rechts AS FLOAT, y AS FLOAT, t AS STRING)
+    PDF_TEXT(p, rechts - PDF_TEXT_WIDTH(p, t), y, t)
+END SUB
+
+FUNCTION csvSchreiben() AS STRING
+    DIM text AS STRING : text = "Nummer;Datum;Kunde;Netto;MwSt;Brutto;Status" + CHR$(10)
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT r.id, r.nummer, r.datum, k.name, r.bezahlt FROM rechnungen r JOIN kunden k ON k.id = r.kunde_id ORDER BY r.nummer")
+    WHILE DB_NEXT(r)
+        DIM rid AS INTEGER : rid = DB_GET_INT(r, 0)
+        DIM q AS DB_RESULT : q = DB_QUERY(db, "SELECT menge, preis_cent, mwst FROM positionen WHERE rechnung_id = ?", rid)
+        DIM netto AS INTEGER : netto = 0
+        DIM steuer AS INTEGER : steuer = 0
+        WHILE DB_NEXT(q)
+            DIM z AS INTEGER : z = DB_GET_INT(q, 0) * DB_GET_INT(q, 1)
+            netto = netto + z
+            steuer = steuer + (z * DB_GET_INT(q, 2) + 50) \ 100
+        WEND
+        DB_CLOSE_RESULT(q)
+        text = text + CSV_ROW$([DB_GET_STRING(r, 1), DB_GET_STRING(r, 2), DB_GET_STRING(r, 3), _
+                                centText$(netto), centText$(steuer), centText$(netto + steuer), _
+                                IIF(DB_GET_INT(r, 4) = 1, "bezahlt", "offen")], ";") + CHR$(10)
+    WEND
+    DB_CLOSE_RESULT(r)
+    WRITEALL("rechnungen.csv", text)
+    RETURN "rechnungen.csv"
+END FUNCTION
+
+' Fuer Tabellenkalkulationen: Komma, keine Tausenderpunkte, keine Waehrung.
+FUNCTION centText$(cent AS INTEGER) AS STRING
+    RETURN STR$(cent \ 100) + "," + FORMAT$(cent MOD 100, "%02d")
+END FUNCTION
+
+' ============================================================ Einstellungen (modales Fenster, rollendes Panel)
+DIM einst AS GUI_WINDOW
+einst = GUI_WINDOW("Einstellungen", 300, 120, 420, 340)
+GUI_WINDOW_VISIBLE(einst, FALSE)
+DIM pnE AS GUI_WIDGET : pnE = GUI_PANEL(einst, 12, 12, 396, 240, "")
+DIM eSchluessel AS ARRAY OF STRING : eSchluessel = ["firma", "strasse", "ort", "email", "waehrung", "mwst", "zahlungsziel", "fuss"]
+DIM eTitel AS ARRAY OF STRING : eTitel = ["Firma", "Strasse", "PLZ und Ort", "E-Mail", "Waehrung (Kuerzel)", "MwSt-Vorgabe (%)", "Zahlungsziel (Tage)", "Fusszeile der Rechnung"]
+DIM eFeld[8] AS GUI_WIDGET
+DIM ei AS INTEGER
+FOR ei = 0 TO 7
+    DIM eL AS GUI_WIDGET : eL = GUI_LABEL(einst, eTitel[ei], 22, 22 + ei * 56)
+    eFeld[ei] = GUI_TEXTINPUT(einst, 22, 40 + ei * 56, 360, 28, "")
+    GUI_PANEL_ADD(pnE, eL) : GUI_PANEL_ADD(pnE, eFeld[ei])
+NEXT
+GUI_TEXTINPUT_SET(eFeld[5], "zahlen", 1) : GUI_TEXTINPUT_SET(eFeld[6], "zahlen", 1)
+DIM bEOk AS GUI_WIDGET : bEOk = GUI_BUTTON(einst, "Uebernehmen", 220, 266, 100, 28)
+DIM bEAbbruch AS GUI_WIDGET : bEAbbruch = GUI_BUTTON(einst, "Abbrechen", 328, 266, 80, 28)
+GUI_WINDOW_DEFAULT(einst, bEOk) : GUI_WINDOW_CANCEL(einst, bEAbbruch)
+
+SUB einstellungenOeffnen()
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        GUI_SET_TEXT(eFeld[i], einst$(eSchluessel[i], ""))
+    NEXT
+    GUI_PANEL_SCROLL(pnE, 0)
+    GUI_WINDOW_SET_BOUNDS(einst, (SCREENWIDTH() - 420) \ 2, (SCREENHEIGHT() - 340) \ 2, 420, 340)
+    GUI_WINDOW_VISIBLE(einst, TRUE)
+    GUI_WINDOW_MODAL(einst, TRUE)
+    GUI_FOCUS(eFeld[0])
+END SUB
+
+SUB einstellungenSchliessen(uebernehmen AS BOOLEAN)
+    IF uebernehmen THEN
+        DIM i AS INTEGER
+        FOR i = 0 TO 7
+            einstSetzen(eSchluessel[i], TRIM$(GUI_TEXT(eFeld[i])))
+        NEXT
+        waehrung = einst$("waehrung", "EUR")
+        artikelLaden() : rechnungenLaden() : artikelAuswahlFuellen()
+        IF rechIdAkt >= 0 THEN rechnungZeigen(rechIdAkt) ELSE positionenZeigen()
+        status("Einstellungen uebernommen.")
+    END IF
+    GUI_WINDOW_MODAL(einst, FALSE)
+    GUI_WINDOW_VISIBLE(einst, FALSE)
+END SUB
+
+' ============================================================ Rueckfrage bei ungesicherten Aenderungen
+' Ein Wechsel (andere Zeile, Neu, Reiter) mit geaendertem Formular fragt
+' nach. Die Antwort kommt ein Bild lang; `frageZiel` merkt, was danach
+' geschehen soll: 1 = Kunde zeigen, 2 = Artikel zeigen, 3 = Rechnung zeigen.
+DIM frage AS GUI_WINDOW : frage = -1
+DIM frageZiel AS INTEGER : frageZiel = 0
+DIM frageId AS INTEGER : frageId = 0
+DIM frageZeile AS INTEGER : frageZeile = -1
+
+SUB nachfragen(ziel AS INTEGER, id AS INTEGER, zeile AS INTEGER)
+    frage = GUI_DIALOG("Ungesicherte Aenderungen", "Das Formular wurde geaendert." + CHR$(10) + "Was soll geschehen?", _
+                       "Speichern|Verwerfen|Abbrechen")
+    frageZiel = ziel : frageId = id : frageZeile = zeile
+END SUB
+
+SUB zielZeigen(ziel AS INTEGER, id AS INTEGER, zeile AS INTEGER)
+    SELECT CASE ziel
+        CASE 1
+            kundeZeigen(id) : kZeileAlt = zeile : GUI_TABLE_SET_SELECTED(tKunden, zeile)
+        CASE 2
+            artikelZeigen(id) : aZeileAlt = zeile : GUI_TABLE_SET_SELECTED(tArtikel, zeile)
+        CASE 3
+            rechnungZeigen(id) : rZeileAlt = zeile : GUI_TABLE_SET_SELECTED(tRech, zeile)
+    END SELECT
+END SUB
+
+' Wechsel anfordern: sofort, wenn nichts geaendert ist -- sonst nachfragen.
+SUB wechseln(ziel AS INTEGER, id AS INTEGER, zeile AS INTEGER, geaendert AS BOOLEAN)
+    IF geaendert THEN nachfragen(ziel, id, zeile) ELSE zielZeigen(ziel, id, zeile)
+END SUB
+
+' ============================================================ Start
+kundenLaden() : artikelLaden() : kundenAuswahlFuellen() : artikelAuswahlFuellen() : rechnungenLaden()
+kundeZeigen(-1) : artikelZeigen(-1) : rechnungZeigen(-1)
+GUI_FOCUS(tfKName)
+
+DIM loeschFrage AS GUI_WINDOW : loeschFrage = -1
+DIM loeschWas AS INTEGER : loeschWas = 0       ' 1 Kunde, 2 Artikel, 3 Rechnung
+DIM mengeZeileAlt AS INTEGER : mengeZeileAlt = -1
+
+WHILE NOT QUITREQUESTED()
+    IF WINDOW_RESIZED() THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+    GUI_UPDATE()
+    DIM seite AS INTEGER : seite = GUI_ACTIVE_TAB(win)
+    DIM kDirty AS BOOLEAN : kDirty = kFormular$() <> kStand
+    DIM aDirty AS BOOLEAN : aDirty = aFormular$() <> aStand
+    DIM rDirty AS BOOLEAN : rDirty = rFormular$() <> rStand
+
+    ' --- Antwort auf die Rueckfrage (ein Bild lang) ---
+    IF frage >= 0 AND GUI_ANSWER(frage) <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(frage)
+        frage = -1
+        IF a = 1 THEN
+            DIM ok AS BOOLEAN : ok = TRUE
+            IF frageZiel = 1 THEN ok = kundeSpeichern()
+            IF frageZiel = 2 THEN ok = artikelSpeichern()
+            IF frageZiel = 3 THEN ok = rechnungSpeichern()
+            IF ok THEN zielZeigen(frageZiel, frageId, frageZeile)
+        ELSEIF a = 2 THEN
+            zielZeigen(frageZiel, frageId, frageZeile)
+        ELSE
+            ' Abbrechen: die alte Zeile bleibt gewaehlt.
+            IF frageZiel = 1 THEN GUI_TABLE_SET_SELECTED(tKunden, kZeileAlt)
+            IF frageZiel = 2 THEN GUI_TABLE_SET_SELECTED(tArtikel, aZeileAlt)
+            IF frageZiel = 3 THEN GUI_TABLE_SET_SELECTED(tRech, rZeileAlt)
+        END IF
+    END IF
+    IF loeschFrage >= 0 AND GUI_ANSWER(loeschFrage) <> 0 THEN
+        IF GUI_ANSWER(loeschFrage) = 1 THEN
+            IF loeschWas = 1 AND kundeId >= 0 THEN
+                DIM offen AS DB_RESULT : offen = DB_QUERY(db, "SELECT COUNT(*) FROM rechnungen WHERE kunde_id = ?", kundeId)
+                DIM n AS INTEGER : n = 0
+                IF DB_NEXT(offen) THEN n = DB_GET_INT(offen, 0)
+                DB_CLOSE_RESULT(offen)
+                IF n > 0 THEN
+                    fehler("Der Kunde hat " + STR$(n) + " Rechnung(en) -- erst die loeschen.")
+                ELSE
+                    DB_EXEC(db, "DELETE FROM kunden WHERE id = ?", kundeId)
+                    kundenLaden() : kundenAuswahlFuellen() : kundeZeigen(-1) : kZeileAlt = -1
+                    status("Kunde geloescht.")
+                END IF
+            ELSEIF loeschWas = 2 AND artikelIdAkt >= 0 THEN
+                DB_EXEC(db, "DELETE FROM artikel WHERE id = ?", artikelIdAkt)
+                artikelLaden() : artikelAuswahlFuellen() : artikelZeigen(-1) : aZeileAlt = -1
+                status("Artikel geloescht.")
+            ELSEIF loeschWas = 3 AND rechIdAkt >= 0 THEN
+                DB_BEGIN(db)
+                DB_EXEC(db, "DELETE FROM positionen WHERE rechnung_id = ?", rechIdAkt)
+                DB_EXEC(db, "DELETE FROM rechnungen WHERE id = ?", rechIdAkt)
+                DB_COMMIT(db)
+                rechnungenLaden() : rechnungZeigen(-1) : rZeileAlt = -1
+                status("Rechnung geloescht.")
+            END IF
+        END IF
+        loeschFrage = -1
+    END IF
+
+    ' --- Einstellungen ---
+    IF GUI_CLICKED(miEinst) THEN einstellungenOeffnen()
+    IF GUI_CLICKED(bEOk) THEN einstellungenSchliessen(TRUE)
+    IF GUI_CLICKED(bEAbbruch) THEN einstellungenSchliessen(FALSE)
+
+    IF NOT GUI_MODAL() THEN
+        ' --- Menue ---
+        IF GUI_CLICKED(miEnde) THEN EXIT(0)
+        IF GUI_CLICKED(miUeber) THEN
+            frage = GUI_DIALOG("Ueber", "Rechnungen -- der sechste Pilot." + CHR$(10) + "Eine Geschaeftsanwendung in Drachenhauch.", "Schliessen")
+            frageZiel = 0
+        END IF
+        IF GUI_CLICKED(miNeuK) THEN wechseln(1, -1, -1, kDirty)
+        IF GUI_CLICKED(miNeuA) THEN wechseln(2, -1, -1, aDirty)
+        IF GUI_CLICKED(miNeuR) THEN wechseln(3, -1, -1, rDirty)
+        IF GUI_CLICKED(miSpeichern) THEN
+            IF seite = 0 THEN kundeSpeichern()
+            IF seite = 1 THEN artikelSpeichern()
+            IF seite = 2 THEN rechnungSpeichern()
+        END IF
+        IF GUI_CLICKED(miCsv) THEN status("Geschrieben: " + csvSchreiben())
+        IF GUI_CLICKED(miPdf) OR GUI_CLICKED(bRPdf) THEN
+            IF rechIdAkt < 0 OR rDirty THEN
+                fehler("Erst speichern, dann PDF -- die Datei soll zeigen, was in der Datenbank steht.")
+            ELSE
+                status("Geschrieben: " + pdfSchreiben(rechIdAkt))
+            END IF
+        END IF
+
+        ' --- Kunden ---
+        IF GUI_CLICKED(bKNeu) THEN wechseln(1, -1, -1, kDirty)
+        IF GUI_CLICKED(bKSpeichern) OR GUI_ENTERED(tfKName) OR GUI_ENTERED(tfKStr) OR GUI_ENTERED(tfKPlz) OR GUI_ENTERED(tfKOrt) OR GUI_ENTERED(tfKMail) THEN kundeSpeichern()
+        IF (GUI_CLICKED(bKLoeschen) OR (GUI_CLICKED(miLoeschen) AND seite = 0)) AND kundeId >= 0 THEN
+            loeschFrage = GUI_DIALOG("Kunde loeschen", "Kunde #" + STR$(kundeId) + " wirklich loeschen?", "Loeschen|Abbrechen")
+            loeschWas = 1
+        END IF
+        DIM kZeile AS INTEGER : kZeile = GUI_TABLE_SELECTED(tKunden)
+        IF kZeile <> kZeileAlt AND kZeile >= 0 AND frage < 0 THEN
+            IF kDirty THEN
+                nachfragen(1, kundenId[kZeile], kZeile)
+            ELSE
+                kZeileAlt = kZeile : kundeZeigen(kundenId[kZeile])
+            END IF
+        END IF
+
+        ' --- Artikel ---
+        IF GUI_CLICKED(bANeu) THEN wechseln(2, -1, -1, aDirty)
+        IF GUI_CLICKED(bASpeichern) OR GUI_ENTERED(tfABez) OR GUI_ENTERED(tfAPreis) THEN artikelSpeichern()
+        IF (GUI_CLICKED(bALoeschen) OR (GUI_CLICKED(miLoeschen) AND seite = 1)) AND artikelIdAkt >= 0 THEN
+            loeschFrage = GUI_DIALOG("Artikel loeschen", "Artikel #" + STR$(artikelIdAkt) + " wirklich loeschen?", "Loeschen|Abbrechen")
+            loeschWas = 2
+        END IF
+        DIM aZeile AS INTEGER : aZeile = GUI_TABLE_SELECTED(tArtikel)
+        IF aZeile <> aZeileAlt AND aZeile >= 0 AND frage < 0 THEN
+            IF aDirty THEN
+                nachfragen(2, artikelId[aZeile], aZeile)
+            ELSE
+                aZeileAlt = aZeile : artikelZeigen(artikelId[aZeile])
+            END IF
+        END IF
+
+        ' --- Rechnungen ---
+        IF GUI_CLICKED(bRNeu) THEN wechseln(3, -1, -1, rDirty)
+        IF GUI_CLICKED(bRSpeichern) OR GUI_ENTERED(tfRDatum) THEN rechnungSpeichern()
+        IF (GUI_CLICKED(bRLoeschen) OR (GUI_CLICKED(miLoeschen) AND seite = 2)) AND rechIdAkt >= 0 THEN
+            loeschFrage = GUI_DIALOG("Rechnung loeschen", "Rechnung " + rechNummer + " samt Positionen loeschen?", "Loeschen|Abbrechen")
+            loeschWas = 3
+        END IF
+        DIM rZeile AS INTEGER : rZeile = GUI_TABLE_SELECTED(tRech)
+        IF rZeile <> rZeileAlt AND rZeile >= 0 AND frage < 0 THEN
+            IF rDirty THEN
+                nachfragen(3, rechId[rZeile], rZeile)
+            ELSE
+                rZeileAlt = rZeile : rechnungZeigen(rechId[rZeile])
+            END IF
+        END IF
+        IF GUI_CLICKED(bPAdd) OR GUI_ENTERED(tfPMenge) THEN
+            DIM ai AS INTEGER : ai = GUI_DROPDOWN_SELECTED(ddPArtikel)
+            DIM menge AS INTEGER : menge = VAL(GUI_TEXT(tfPMenge))
+            IF ai < 0 OR ai >= auswArtikelAnz THEN
+                GUI_SET_TEXT(lRFehler, "Erst einen Artikel waehlen.")
+            ELSEIF menge < 1 THEN
+                GUI_SET_TEXT(lRFehler, "Die Menge muss mindestens 1 sein.") : GUI_FOCUS(tfPMenge)
+            ELSEIF posAnz >= MAXPOS THEN
+                GUI_SET_TEXT(lRFehler, "Mehr als " + STR$(MAXPOS) + " Positionen passen nicht auf eine Rechnung.")
+            ELSE
+                DIM q AS DB_RESULT : q = DB_QUERY(db, "SELECT bezeichnung, preis_cent, mwst FROM artikel WHERE id = ?", auswArtikelId[ai])
+                IF DB_NEXT(q) THEN
+                    posBez[posAnz] = DB_GET_STRING(q, 0) : posMenge[posAnz] = menge
+                    posPreis[posAnz] = DB_GET_INT(q, 1) : posMwst[posAnz] = DB_GET_INT(q, 2)
+                    posAnz = posAnz + 1
+                END IF
+                DB_CLOSE_RESULT(q)
+                GUI_SET_TEXT(lRFehler, "")
+                positionenZeigen()
+            END IF
+        END IF
+        IF GUI_CLICKED(bPDel) THEN
+            DIM pz AS INTEGER : pz = GUI_TABLE_SELECTED(tPos)
+            IF pz >= 0 AND pz < posAnz THEN
+                DIM j AS INTEGER
+                FOR j = pz TO posAnz - 2
+                    posBez[j] = posBez[j + 1] : posMenge[j] = posMenge[j + 1]
+                    posPreis[j] = posPreis[j + 1] : posMwst[j] = posMwst[j + 1]
+                NEXT
+                posAnz = posAnz - 1
+                positionenZeigen()
+            END IF
+        END IF
+        ' Menge in der Zelle geaendert: die Bearbeitung ist zu Ende, wenn
+        ' GUI_TABLE_EDITING_ROW von einer Zeile auf -1 faellt.
+        DIM mengeZeile AS INTEGER : mengeZeile = GUI_TABLE_EDITING_ROW(tPos)
+        IF mengeZeile < 0 AND mengeZeileAlt >= 0 AND mengeZeileAlt < posAnz THEN
+            DIM neu AS INTEGER : neu = VAL(GUI_TABLE_GET_CELL(tPos, mengeZeileAlt, 1))
+            IF neu >= 1 THEN posMenge[mengeZeileAlt] = neu
+            positionenZeigen()
+        END IF
+        mengeZeileAlt = mengeZeile
+    END IF
+
+    CLS(&H0E1014)
+    GUI_DRAW()
+    FLIP()
+WEND
