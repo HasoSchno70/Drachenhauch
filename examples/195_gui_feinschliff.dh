@@ -1,0 +1,108 @@
+' ============================================================
+'  gui: Feinschliff -- die kleinen Dinge, die eine Anwendung braucht
+' ============================================================
+'    GUI_VSLIDER              senkrechter Schieber (Wert waechst nach oben)
+'    GUI_PROGRESS_SET         "unbestimmt": laufendes Band ohne Wert
+'    GUI_IMAGE_MODE           strecken / einpassen / fuellen / mitte / kacheln
+'    GUI_TREE_ICON / _COLOR   Sinnbild und Farbe je Baumknoten
+'    GUI_PANEL_ADD            ein Panel, das seine Kinder rollt (Rad, Balken)
+'    GUI_DRAGGABLE / GUI_DROP_TARGET   Ziehen zwischen Widgets
+'    Cursorformen ueber Textfeldern, Knoepfen und Trennern kommen von selbst
+'
+'  Zieh einen Eintrag aus "Vorrat" in den "Einkauf" -- oder innerhalb des
+'  Vorrats an eine andere Stelle. [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+SCREEN(720, 480, "Drachenhauch - gui Feinschliff", 1)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Feinschliff", 0, 0, 720, 480)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' --- links: Ziehen zwischen zwei Listen -------------------------------
+DIM lVorrat AS GUI_WIDGET : lVorrat = GUI_LABEL(win, "Vorrat (ziehbar)", 16, 12)
+DIM vorrat AS GUI_WIDGET
+vorrat = GUI_LISTBOX(win, 16, 32, 180, 150, ["Mehl", "Eier", "Milch", "Butter", "Zucker", "Salz"])
+GUI_DRAGGABLE(vorrat, TRUE)
+GUI_DROP_TARGET(vorrat, TRUE)          ' innerhalb der Liste: umsortieren
+DIM lEinkauf AS GUI_WIDGET : lEinkauf = GUI_LABEL(win, "Einkauf (Ablage)", 216, 12)
+DIM einkauf AS GUI_WIDGET : einkauf = GUI_LISTBOX(win, 216, 32, 180, 150, [])
+GUI_DROP_TARGET(einkauf, TRUE)
+DIM papierkorb AS GUI_WIDGET : papierkorb = GUI_BUTTON(win, "Papierkorb", 216, 190, 180, 28)
+GUI_DROP_TARGET(papierkorb, TRUE)
+DIM status AS GUI_WIDGET : status = GUI_LABEL(win, "Zieh etwas.", 16, 190)
+GUI_SET_BOUNDS(status, 16, 194, 190, 16)
+
+' --- Mitte: Baum mit Sinnbildern und Farben ----------------------------
+DIM ordner AS IMAGE : ordner = GENTEX_COLOR(16, 16, RGB(230, 180, 60))
+DIM datei AS IMAGE : datei = GENTEX_COLOR(16, 16, RGB(120, 170, 240))
+DIM baum AS GUI_WIDGET : baum = GUI_TREE(win, 16, 230, 380, 130)
+DIM nProj AS INTEGER : nProj = GUI_TREE_ADD(baum, -1, "projekt")
+DIM nSrc AS INTEGER : nSrc = GUI_TREE_ADD(baum, nProj, "src")
+DIM nMain AS INTEGER : nMain = GUI_TREE_ADD(baum, nSrc, "main.dh")
+DIM nAlt AS INTEGER : nAlt = GUI_TREE_ADD(baum, nSrc, "alt.dh (veraltet)")
+DIM nDoc AS INTEGER : nDoc = GUI_TREE_ADD(baum, nProj, "README.md")
+GUI_TREE_ICON(baum, nProj, ordner) : GUI_TREE_ICON(baum, nSrc, ordner)
+GUI_TREE_ICON(baum, nMain, datei) : GUI_TREE_ICON(baum, nAlt, datei) : GUI_TREE_ICON(baum, nDoc, datei)
+GUI_TREE_COLOR(baum, nAlt, RGB(150, 150, 150))
+GUI_TREE_EXPAND(baum, nProj, TRUE) : GUI_TREE_EXPAND(baum, nSrc, TRUE)
+
+' --- rechts oben: senkrechte Schieber + Fortschritt -------------------
+DIM lMix AS GUI_WIDGET : lMix = GUI_LABEL(win, "Pegel", 430, 12)
+DIM s1 AS GUI_WIDGET : s1 = GUI_VSLIDER(win, 430, 32, 100, 0, 100, 70)
+DIM s2 AS GUI_WIDGET : s2 = GUI_VSLIDER(win, 460, 32, 100, 0, 100, 40)
+DIM s3 AS GUI_WIDGET : s3 = GUI_VSLIDER(win, 490, 32, 100, 0, 100, 90)
+DIM lWarte AS GUI_WIDGET : lWarte = GUI_LABEL(win, "Suche laeuft ...", 530, 12)
+DIM warten AS GUI_WIDGET : warten = GUI_PROGRESS(win, 530, 32, 170, 18)
+GUI_PROGRESS_SET(warten, "unbestimmt", 1)
+DIM lFertig AS GUI_WIDGET : lFertig = GUI_LABEL(win, "Kopiert", 530, 60)
+DIM fertig AS GUI_WIDGET : fertig = GUI_PROGRESS(win, 530, 80, 170, 18)
+
+' --- rechts Mitte: ein Bild in vier Modi -----------------------------
+DIM muster AS IMAGE : muster = GENTEX_CHECKED(48, 24, 12, 12, RGB(80, 160, 220), RGB(240, 240, 240))
+DIM modi AS ARRAY OF STRING : modi = ["strecken", "einpassen", "fuellen", "kacheln"]
+DIM bilder[4] AS GUI_WIDGET
+DIM lBild[4] AS GUI_WIDGET
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    lBild[k] = GUI_LABEL(win, modi[k], 430 + (k MOD 2) * 140, 140 + (k \ 2) * 78)
+    bilder[k] = GUI_IMAGE(win, 430 + (k MOD 2) * 140, 130, 130, 60, muster)
+    GUI_SET_BOUNDS(bilder[k], 430 + (k MOD 2) * 140, 158 + (k \ 2) * 78, 130, 60)
+    GUI_IMAGE_MODE(bilder[k], modi[k])
+NEXT
+
+' --- rechts unten: ein Panel, das seine Kinder rollt ------------------
+DIM panel AS GUI_WIDGET : panel = GUI_PANEL(win, 430, 300, 270, 160, "Einstellungen (rollt)")
+DIM zeile AS INTEGER
+DIM schalter[12] AS GUI_WIDGET
+FOR zeile = 0 TO 11
+    schalter[zeile] = GUI_CHECKBOX(win, "Option " + STR$(zeile + 1), 442, 326 + zeile * 26, zeile MOD 3 = 0)
+    GUI_PANEL_ADD(panel, schalter[zeile])
+NEXT
+
+DIM t AS FLOAT : t = 0.0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    t = t + DELTA()
+    GUI_SET_VALUE(fertig, (t / 6.0) - INT(t / 6.0))
+
+    ' Abgelegt: im Einkauf einfuegen, im Papierkorb loeschen. Innerhalb des
+    ' Vorrats sortiert die Liste selbst um.
+    IF GUI_DROPPED(einkauf) THEN
+        GUI_LISTBOX_ADD(einkauf, GUI_DROP_TEXT())
+        GUI_LISTBOX_REMOVE(vorrat, GUI_DRAG_INDEX())
+        GUI_SET_TEXT(status, GUI_DROP_TEXT() + " -> Einkauf")
+    END IF
+    IF GUI_DROPPED(papierkorb) THEN
+        GUI_LISTBOX_REMOVE(vorrat, GUI_DRAG_INDEX())
+        GUI_SET_TEXT(status, GUI_DROP_TEXT() + " weggeworfen")
+    END IF
+    IF GUI_DROPPED(vorrat) THEN GUI_SET_TEXT(status, GUI_DROP_TEXT() + " umsortiert")
+
+    GUI_DRAW()
+    IF KEYHIT(KEY_ESCAPE) THEN EXIT(0)
+    FLIP()
+WEND

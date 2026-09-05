@@ -674,6 +674,52 @@ struct TreeNode {
     level: i32,
     expanded: bool,
     has_children: bool,
+    icon: i64,    // Textur-Handle, -1 = keins
+    color: i64,   // Textfarbe, -1 = Thema
+}
+
+/// Ein Panel, das seine Kinder rollt: die Kinder behalten ihre Lage im
+/// Fenster, `scroll` ist nur ein Blick-Versatz (abs_rect zieht ihn ab).
+/// Dadurch muss beim Rollen nichts verschoben werden, und ein Layout im
+/// Panel rechnet weiter mit denselben Koordinaten.
+#[derive(Default)]
+struct PanelState {
+    kinder: Vec<usize>,   // Widget-Indizes im selben Fenster
+    scroll: i32,
+    inhalt_h: i32,        // unterster Kindrand + Rand, je Bild gemessen
+}
+
+/// Ein laufender Zug: beginnt mit dem Druck auf ein ziehbares Widget, wird
+/// nach 5 px Bewegung `aktiv` -- vorher ist es ein Klick.
+struct DragState {
+    quelle: (usize, usize),
+    index: i32,           // Listenzeile / Baumknoten, -1 = das Widget selbst
+    text: String,
+    x0: i32, y0: i32,
+    aktiv: bool,
+}
+
+/// Die Ablage dieses Bildes -- ein Ereignis, kein Zustand.
+struct DropInfo {
+    ziel: (usize, usize),
+    quelle: (usize, usize),
+    index_quelle: i32,
+    index_ziel: i32,
+    text: String,
+}
+
+fn bildmodus_str(m: u8) -> &'static str {
+    match m { 1 => "einpassen", 2 => "fuellen", 3 => "mitte", 4 => "kacheln", _ => "strecken" }
+}
+fn bildmodus_parsen(s: &str) -> Option<u8> {
+    match s.to_ascii_lowercase().as_str() {
+        "strecken" | "stretch" => Some(0),
+        "einpassen" | "fit" => Some(1),
+        "fuellen" | "füllen" | "cover" | "fill" => Some(2),
+        "mitte" | "center" | "zentrieren" => Some(3),
+        "kacheln" | "tile" => Some(4),
+        _ => None,
+    }
 }
 
 /// Wie in einem Textfeld gemessen wird: dieselbe Groesse und Schrift, mit
@@ -768,6 +814,18 @@ pub struct Widget {
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
     list: Option<Box<ListState>>,   // nur fuer Kind::ListBox, bei Bedarf
     layout: Option<Box<LayoutState>>, // nur fuer Kind::Layout
+    /// Nur Kind::Panel, sobald es Kinder rollt (GUI_PANEL_ADD).
+    panel: Option<Box<PanelState>>,
+    /// Panel, in dem dieses Widget steckt (Widget-Index, -1 = keins). Wird
+    /// je Bild aus den Panel-Kindern gesetzt -- auch durch Layouts hindurch,
+    /// damit ein Behaelter im Panel seine Kinder mitnimmt.
+    panel_von: i32,
+    vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
+    unbestimmt: bool,    // Progress: laufendes Band statt Wert
+    bildmodus: u8,       // Image: 0 strecken, 1 einpassen, 2 fuellen, 3 mitte, 4 kacheln
+    ziehbar: bool,       // Quelle fuer Ziehen (GUI_DRAGGABLE)
+    ablage: bool,        // nimmt Abgelegtes an (GUI_DROP_TARGET)
+    abgelegt: bool,      // in DIESEM Bild etwas abgelegt bekommen (transient, wie `clicked`)
     // Automass: Breite/Hoehe folgen dem Inhalt (0 beim Anlegen oder GUI_AUTOSIZE),
     // gemessen im naechsten GUI_UPDATE -- nur dort gibt es Graphics.
     auto_w: bool,
@@ -1077,6 +1135,15 @@ pub struct Gui {
     /// gibt es die Zeit) gesetzt und von `handle_press` gelesen.
     dbl_click: bool,
     press_origin: Option<(usize, usize)>,
+    /// Ziehen: begonnen beim Druck auf ein ziehbares Widget, aktiv ab 5 px.
+    drag: Option<DragState>,
+    /// Ablage dieses Bildes (transient).
+    drop: Option<DropInfo>,
+    /// Cursorformen ueber Widgets (GUI_CURSORS, Vorgabe an). `cursor_form`
+    /// merkt, was die gui zuletzt gesetzt hat -- sie setzt nur zurueck, was
+    /// sie selbst war, und laesst eine Form des Programms in Ruhe.
+    cursors: bool,
+    cursor_form: Option<&'static str>,
     was_mouse_down: bool,
     frame_count: i64,
     theme: HashMap<String, i64>,
@@ -1139,6 +1206,7 @@ impl Gui {
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
+            drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false), was_right_down: false,
             scroll_drag: None,
@@ -1659,6 +1727,8 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
+            panel: None, panel_von: -1, vert: false, unbestimmt: false, bildmodus: 0,
+            ziehbar: false, ablage: false, abgelegt: false,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false,
@@ -2621,7 +2691,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         let level = if parent < 0 { 0 } else { t.nodes[parent as usize].level + 1 };
         if parent >= 0 { t.nodes[parent as usize].has_children = true; }
-        t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false });
+        t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false, icon: -1, color: -1 });
         Ok((t.nodes.len() - 1) as i64)
     }
     pub fn tree_clear(&mut self, h: i64) -> Result<(), String> {
@@ -3491,6 +3561,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if self.press_origin == Some((wi, i)) { self.press_origin = None; }
             if self.cp_drag.map(|(w, x, _)| (w, x)) == Some((wi, i)) { self.cp_drag = None; }
             if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+        if self.drag.as_ref().map(|d| d.quelle) == Some((wi, i)) { self.drag = None; }
         if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
             if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
             if self.active_split == Some((wi, i)) { self.active_split = None; }
@@ -3564,6 +3635,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // clamp-Panic-Risiko) fuer das zerstoerte Widget ausloesen.
         if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
         if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+        if self.drag.as_ref().map(|d| d.quelle) == Some((wi, i)) { self.drag = None; }
         if self.active_split == Some((wi, i)) { self.active_split = None; }
         if self.press_origin == Some((wi, i)) { self.press_origin = None; }
         if self.cp_drag.map(|(w, x, _)| (w, x)) == Some((wi, i)) { self.cp_drag = None; }
@@ -3632,7 +3704,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // unsichtbare Controls selektiert.
             for i in (0..win.widgets.len()).rev() {
                 let wd = &win.widgets[i];
-                if wd.kind != Kind::Layout && self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
+                if wd.kind != Kind::Layout && self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd))
+                    && self.im_panel_sichtbar(wi, wd, mx, my) {
                     return Self::enc_widget(wi, i);
                 }
             }
@@ -3679,6 +3752,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if self.focus_widget.map(|(w, _)| w) == Some(wi) { self.focus_widget = None; }
         if self.press_origin.map(|(w, _)| w) == Some(wi) { self.press_origin = None; }
         if self.active_slider.map(|(w, _)| w) == Some(wi) { self.active_slider = None; }
+        if self.drag.as_ref().map(|d| d.quelle.0) == Some(wi) { self.drag = None; }
         if self.active_knob.map(|(w, _, _, _)| w) == Some(wi) { self.active_knob = None; }
         if self.active_split.map(|(w, _)| w) == Some(wi) { self.active_split = None; }
         if self.active_table.map(|(w, _)| w) == Some(wi) { self.active_table = None; }
@@ -4297,6 +4371,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if w.auto_w { o["auto_w"] = serde_json::json!(true); }
         if w.auto_h { o["auto_h"] = serde_json::json!(true); }
+        if w.vert { o["vertical"] = serde_json::json!(true); }
+        if w.unbestimmt { o["indeterminate"] = serde_json::json!(true); }
+        if w.bildmodus != 0 { o["mode"] = serde_json::json!(bildmodus_str(w.bildmodus)); }
+        if w.ziehbar { o["draggable"] = serde_json::json!(true); }
+        if w.ablage { o["drop_target"] = serde_json::json!(true); }
+        if let Some(p) = w.panel.as_ref() {
+            o["panel"] = serde_json::json!({ "kinder": p.kinder, "scroll": self.unsk(p.scroll) });
+        }
         if w.align >= 0 {
             o["align"] = serde_json::json!(match w.align { 1 => "mitte", 2 => "rechts", _ => "links" });
         }
@@ -4422,6 +4504,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
         w.auto_w = wj["auto_w"].as_bool().unwrap_or(false);
         w.auto_h = wj["auto_h"].as_bool().unwrap_or(false);
+        w.vert = kind == Kind::Slider && wj["vertical"].as_bool().unwrap_or(false);
+        w.unbestimmt = kind == Kind::Progress && wj["indeterminate"].as_bool().unwrap_or(false);
+        if let Some(m) = wj["mode"].as_str() { w.bildmodus = bildmodus_parsen(m).unwrap_or(0); }
+        w.ziehbar = wj["draggable"].as_bool().unwrap_or(false);
+        w.ablage = wj["drop_target"].as_bool().unwrap_or(false);
+        if kind == Kind::Panel {
+            if let Some(pj) = wj.get("panel").and_then(|v| v.as_object()) {
+                let kinder: Vec<usize> = pj.get("kinder").and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|x| x.as_i64()).filter(|&x| x >= 0).map(|x| x as usize).collect())
+                    .unwrap_or_default();
+                w.panel = Some(Box::new(PanelState { kinder, scroll: pj.get("scroll").and_then(|v| v.as_i64()).unwrap_or(0) as i32, inhalt_h: 0 }));
+            }
+        }
         if kind == Kind::Layout {
             let lj = &wj["layout"];
             let art = match lj["art"].as_str().unwrap_or("spalte") { "zeile" => 0, "raster" => 2, _ => 1 };
@@ -4560,6 +4655,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         level: nj["level"].as_i64().unwrap_or(0) as i32,
                         expanded: nj["expanded"].as_bool().unwrap_or(false),
                         has_children: nj["has_children"].as_bool().unwrap_or(false),
+                        icon: -1,   // Textur-Handles stehen nicht in der Datei
+                        color: nj["color"].as_i64().unwrap_or(-1),
                     }).collect();
                 }
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
@@ -4701,8 +4798,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn abs_rect(&self, win: usize, w: &Widget) -> (i32, i32, i32, i32) {
         let toff = self.content_top(win);
         let sy = if self.windows[win].scrollable { self.windows[win].scroll_y } else { 0 };
+        // Kind eines rollenden Panels: dessen Blick-Versatz kommt dazu.
+        let sp = if w.panel_von >= 0 {
+            self.windows[win].widgets.get(w.panel_von as usize)
+                .and_then(|p| p.panel.as_ref()).map(|p| p.scroll).unwrap_or(0)
+        } else { 0 };
         let win = &self.windows[win];
-        (win.x + w.x, win.y + toff + w.y - sy, w.w, w.h)
+        (win.x + w.x, win.y + toff + w.y - sy - sp, w.w, w.h)
+    }
+    /// Steckt das Widget in einem rollenden Panel, zaehlt es nur innerhalb
+    /// von dessen Flaeche -- was herausgerollt ist, ist weder zu sehen noch
+    /// zu treffen.
+    fn im_panel_sichtbar(&self, win: usize, w: &Widget, mx: i32, my: i32) -> bool {
+        if w.panel_von < 0 { return true; }
+        match self.windows[win].widgets.get(w.panel_von as usize) {
+            Some(p) => Self::in_rect(mx, my, self.abs_rect(win, p)),
+            None => true,
+        }
     }
     /// Hoehe der Menueleiste dieses Fensters (0, wenn keine Bar-Menues).
     fn menubar_h(&self, win: usize) -> i32 {
@@ -4738,7 +4850,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn content_height(&self, win: usize) -> i32 {
         let pad = self.m("pad");
         self.windows[win].widgets.iter()
-            .filter(|w| self.widget_shown(win, w) && w.kind != Kind::Canvas)
+            .filter(|w| self.widget_shown(win, w) && w.kind != Kind::Canvas && w.panel_von < 0)
             .map(|w| w.y + w.h).max().unwrap_or(0) + pad * 2
     }
     /// Sichtbare Inhaltshoehe (Fenster minus Titel/Menue/Rand).
@@ -5080,7 +5192,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         for win in self.windows.iter_mut() {
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
-                wdg.clicked = false; wdg.hovered = false; wdg.entered = false;
+                wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
@@ -5089,8 +5201,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 for it in m.items.iter_mut() { it.clicked = false; }
             }
         }
+        self.drop = None;
         self.umbruch_layout(g);
         self.layout_pass(g);
+        self.panel_pass();
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -5160,7 +5274,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             for i in 0..n {
                 let (r, kind, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled && w.kind != Kind::Layout)
+                    (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled && w.kind != Kind::Layout
+                        && self.im_panel_sichtbar(top, w, mx, my))
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
@@ -5168,6 +5283,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
+                }
+            }
+            // Mausrad ueber einem rollenden Panel -- NACH den Kindern, damit
+            // eine Liste darin das Rad zuerst bekommt (pop_mouse_wheel
+            // liefert es nur einmal).
+            for i in 0..n {
+                let (r, rollt) = {
+                    let w = &self.windows[top].widgets[i];
+                    (self.abs_rect(top, w), w.panel.is_some() && self.widget_shown(top, w))
+                };
+                if rollt && Self::in_rect(mx, my, r) {
+                    let wheel = g.pop_mouse_wheel();
+                    if wheel != 0 { self.panel_scroll_um(top, i, -(wheel as i32) * 40); }
                 }
             }
         }
@@ -5203,6 +5331,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
 
+        self.cursor_pass(g, mx, my);
         // Tooltip-Dwell: oberstes Widget mit Hilfetext unter der Maus bestimmen.
         // Bei Wechsel/Bewegung/gedrueckter Maus startet der Verweil-Timer neu.
         let tip_cur = self.topmost_at(mx, my).and_then(|top| {
@@ -5243,7 +5372,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         // Laufendes Slider-Drag.
         if let Some((wi, i)) = self.active_slider {
-            if is_down { self.drag_slider(wi, i, mx); } else { self.active_slider = None; }
+            if is_down { self.drag_slider(wi, i, mx, my); } else { self.active_slider = None; }
+        }
+        // Ziehen: ab 5 px Bewegung wird aus dem Druck ein Zug; beim
+        // Loslassen ueber einer Ablage wird abgelegt (ein Bild lang
+        // abfragbar), sonst verpufft es still.
+        let zieh_ende = match self.drag.as_mut() {
+            Some(d) if is_down => {
+                if !d.aktiv && ((mx - d.x0).abs() >= 5 || (my - d.y0).abs() >= 5) { d.aktiv = true; }
+                false
+            }
+            Some(_) => true,
+            None => false,
+        };
+        if zieh_ende {
+            if let Some(d) = self.drag.take() {
+                if d.aktiv { self.ablegen(d, mx, my); }
+            }
         }
         // Laufendes Drehregler-Ziehen: senkrecht, ausgehend vom Wert beim
         // Anfassen. 140 Pixel entsprechen dem ganzen Bereich -- weit genug
@@ -6020,10 +6165,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.value = nv as f64;
     }
 
-    fn drag_slider(&mut self, wi: usize, i: usize, mx: i32) {
-        let ax = self.windows[wi].x + self.windows[wi].widgets[i].x;
+    fn drag_slider(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let (ax, ay, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let w = &mut self.windows[wi].widgets[i];
-        let rel = ((mx - ax) as f64 / (w.w - 1).max(1) as f64).clamp(0.0, 1.0);
+        // Senkrecht waechst der Wert nach OBEN -- wie an jedem Mischpult.
+        let rel = if w.vert { 1.0 - ((my - ay) as f64 / (w.h - 1).max(1) as f64).clamp(0.0, 1.0) }
+                  else { ((mx - ax) as f64 / (w.w - 1).max(1) as f64).clamp(0.0, 1.0) };
         let new_val = w.min + rel * (w.max - w.min);
         if new_val != w.value {
             w.value = new_val;
@@ -6558,16 +6705,35 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             return;
         }
+        // Rollbalken eines Panels: ein Klick springt an die Stelle.
+        let n = self.windows[win].widgets.len();
+        for i in 0..n {
+            if let Some((tx, ty, bw, th, _thy, thh)) = self.panel_bar_geom(win, i) {
+                if Self::in_rect(mx, my, (tx, ty, bw, th)) {
+                    let rel = ((my - ty - thh / 2) as f32 / (th - thh).max(1) as f32).clamp(0.0, 1.0);
+                    let max = self.panel_max_scroll(win, i);
+                    if let Some(p) = self.windows[win].widgets[i].panel.as_mut() { p.scroll = (rel * max as f32) as i32; }
+                    return;
+                }
+            }
+        }
         // Widget unter der Maus.
         let mut hit = None;
-        let n = self.windows[win].widgets.len();
         for i in 0..n {
             // Ein Layout-Behaelter ist Luft: er darf den Klick nicht schlucken,
             // der seinen Kindern gilt (sie kommen in der Reihenfolge NACH ihm).
-            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout) };
+            // Ein rollendes Panel ebenso -- der erste Treffer gewinnt hier,
+            // und das Panel liegt vor seinen Kindern.
+            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled && w.kind != Kind::Layout && w.panel.is_none() && self.im_panel_sichtbar(win, w, mx, my)) };
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
+        // Ziehen beginnt mit dem Druck -- ob es eines wird, entscheidet die
+        // Bewegung (siehe update). Der Druck selbst wirkt weiter wie immer.
+        if self.windows[win].widgets[i].ziehbar {
+            let (index, text) = self.zieh_nutzlast(win, i, mx, my);
+            self.drag = Some(DragState { quelle: (win, i), index, text, x0: mx, y0: my, aktiv: false });
+        }
         // Fokus folgt dem Klick -- an EINER Stelle fuer alle Arten, damit ein
         // spaeteres Tab dort weiterlaeuft, wo die Maus zuletzt war. Deko faengt
         // keinen Fokus (fokussierbar() ist die eine Quelle).
@@ -6588,7 +6754,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if let Some(f) = oc { self.pending.push(f); }
                 if let Some(f) = och { self.pending.push(f); }
             }
-            Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
+            Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx, my); }
             Kind::Toggle => {
                 let w = &mut self.windows[win].widgets[i];
                 w.checked = !w.checked;
@@ -6708,6 +6874,285 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if obenauf { self.draw_top(g); }
     }
 
+    // ---------------------------------------------------------------- Punkt 6
+    /// Senkrechter Schieber: wie GUI_SLIDER, nur steht `h` statt `w`, und der
+    /// Wert waechst nach oben.
+    pub fn vslider(&mut self, win: i64, x: i32, y: i32, h: i32, mn: f64, mx: f64, default: f64) -> Result<i64, String> {
+        if mx <= mn { return Err("GUI_VSLIDER: max muss > min sein".into()); }
+        let sw = self.m_roh("slider_h");
+        let mut wd = Self::blank(Kind::Slider, x, y, sw, h);
+        wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx); wd.vert = true;
+        self.add_widget(win, "GUI_VSLIDER", wd)
+    }
+    pub fn progress_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_PROGRESS_SET")?;
+        if w.kind != Kind::Progress { return Err("GUI_PROGRESS_SET: Widget ist kein Fortschrittsbalken".into()); }
+        match key.to_ascii_lowercase().as_str() {
+            "unbestimmt" | "indeterminate" => { w.unbestimmt = wert != 0.0; Ok(()) }
+            k => Err(format!("GUI_PROGRESS_SET: unbekannter Schluessel '{}' -- erwartet unbestimmt", k)),
+        }
+    }
+    pub fn image_mode(&mut self, h: i64, modus: &str) -> Result<(), String> {
+        let m = bildmodus_parsen(modus).ok_or_else(|| format!(
+            "GUI_IMAGE_MODE: '{}' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln", modus))?;
+        let w = self.wdg_mut(h, "GUI_IMAGE_MODE")?;
+        if w.kind != Kind::Image { return Err("GUI_IMAGE_MODE: Widget ist kein image".into()); }
+        w.bildmodus = m;
+        Ok(())
+    }
+    pub fn image_mode_get(&self, h: i64) -> Result<String, String> {
+        Ok(bildmodus_str(self.wdg(h, "GUI_IMAGE_MODE_GET")?.bildmodus).to_string())
+    }
+    pub fn cursors(&mut self, an: bool) { self.cursors = an; }
+
+    /// Welche Form die Maus ueber dem obersten Widget bekommt. Gesetzt wird
+    /// nur bei Wechsel, und zurueckgesetzt nur, was die gui selbst gesetzt
+    /// hat -- ein Programm, das MOUSE_CURSOR nach GUI_UPDATE ruft, gewinnt.
+    fn cursor_pass(&mut self, g: &mut Graphics, mx: i32, my: i32) {
+        if !self.cursors {
+            if self.cursor_form.take().is_some() { let _ = g.mouse_cursor("default"); }
+            return;
+        }
+        let mut form: Option<&'static str> = None;
+        if self.drag.as_ref().map(|d| d.aktiv).unwrap_or(false) { form = Some("hand"); }
+        else if self.resize_window.is_some() { form = Some("resize_nwse"); }
+        else if let Some((sw, si)) = self.active_split {
+            form = Some(if self.windows[sw].widgets[si].group == "v" { "resize_ew" } else { "resize_ns" });
+        }
+        else if let Some(top) = self.topmost_at(mx, my) {
+            let win = &self.windows[top];
+            if win.chrome && win.resizable && Self::in_rect(mx, my, (win.x + win.w - 14, win.y + win.h - 14, 14, 14)) {
+                form = Some("resize_nwse");
+            } else {
+                for w in win.widgets.iter().rev() {
+                    if !w.hovered { continue; }
+                    form = match w.kind {
+                        Kind::TextInput | Kind::TextArea => Some("ibeam"),
+                        Kind::Button | Kind::Checkbox | Kind::Radio | Kind::Toggle => Some("hand"),
+                        Kind::Splitter => Some(if w.group == "v" { "resize_ew" } else { "resize_ns" }),
+                        _ => None,
+                    };
+                    break;
+                }
+            }
+        }
+        if form != self.cursor_form {
+            let _ = g.mouse_cursor(form.unwrap_or("default"));
+            self.cursor_form = form;
+        }
+    }
+
+    // --- Baum: Sinnbild und Farbe je Knoten ---
+    pub fn tree_icon(&mut self, h: i64, node: i64, tex: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_ICON")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_ICON: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].icon = tex.max(-1); Ok(())
+    }
+    pub fn tree_color(&mut self, h: i64, node: i64, farbe: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_COLOR")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_COLOR: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].color = farbe; Ok(())
+    }
+
+    // --- Rollendes Panel ---
+    fn panel_pruefen(&self, h: i64, fn_: &str) -> Result<(usize, usize), String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Panel { return Err(format!("{}: Widget ist kein Panel", fn_)); }
+        Ok(Self::dec_widget(h))
+    }
+    pub fn panel_add(&mut self, h: i64, kind: i64) -> Result<(), String> {
+        let (wi, pi) = self.panel_pruefen(h, "GUI_PANEL_ADD")?;
+        let (kw, ki) = Self::dec_widget(kind);
+        if self.wdg(kind, "GUI_PANEL_ADD").is_err() { return Err("GUI_PANEL_ADD: ungueltiges GUI_WIDGET-Handle".into()); }
+        if kw != wi { return Err("GUI_PANEL_ADD: das Widget liegt in einem anderen Fenster".into()); }
+        if ki == pi { return Err("GUI_PANEL_ADD: ein Panel kann sich nicht selbst aufnehmen".into()); }
+        if self.windows[kw].widgets[ki].panel.is_some() {
+            return Err("GUI_PANEL_ADD: ein rollendes Panel in einem rollenden Panel gibt es nicht".into());
+        }
+        // Aus jedem anderen Panel loesen -- ein Widget rollt mit hoechstens einem.
+        for w in self.windows[wi].widgets.iter_mut() {
+            if let Some(p) = w.panel.as_mut() { p.kinder.retain(|&k| k != ki); }
+        }
+        let p = self.windows[wi].widgets[pi].panel.get_or_insert_with(Default::default);
+        p.kinder.push(ki);
+        Ok(())
+    }
+    pub fn panel_remove(&mut self, h: i64, kind: i64) -> Result<(), String> {
+        let (wi, pi) = self.panel_pruefen(h, "GUI_PANEL_REMOVE")?;
+        let (_, ki) = Self::dec_widget(kind);
+        if let Some(p) = self.windows[wi].widgets[pi].panel.as_mut() { p.kinder.retain(|&k| k != ki); }
+        if let Some(w) = self.windows[wi].widgets.get_mut(ki) { if w.panel_von == pi as i32 { w.panel_von = -1; } }
+        Ok(())
+    }
+    pub fn panel_scroll(&mut self, h: i64, y: i32) -> Result<(), String> {
+        let (wi, pi) = self.panel_pruefen(h, "GUI_PANEL_SCROLL")?;
+        let max = self.panel_max_scroll(wi, pi);
+        let y = self.sk(y);
+        match self.windows[wi].widgets[pi].panel.as_mut() {
+            Some(p) => { p.scroll = y.clamp(0, max); Ok(()) }
+            None => Err("GUI_PANEL_SCROLL: das Panel rollt nichts -- erst GUI_PANEL_ADD".into()),
+        }
+    }
+    pub fn panel_scroll_get(&self, h: i64) -> Result<i64, String> {
+        let (wi, pi) = self.panel_pruefen(h, "GUI_PANEL_SCROLL_GET")?;
+        Ok(self.unsk(self.windows[wi].widgets[pi].panel.as_ref().map(|p| p.scroll).unwrap_or(0)) as i64)
+    }
+    fn panel_max_scroll(&self, wi: usize, pi: usize) -> i32 {
+        let w = &self.windows[wi].widgets[pi];
+        let kopf = if w.text.is_empty() { 0 } else { 18 };
+        w.panel.as_ref().map(|p| (p.inhalt_h - (w.h - kopf)).max(0)).unwrap_or(0)
+    }
+    fn panel_scroll_um(&mut self, wi: usize, pi: usize, dy: i32) {
+        let max = self.panel_max_scroll(wi, pi);
+        if let Some(p) = self.windows[wi].widgets[pi].panel.as_mut() { p.scroll = (p.scroll + dy).clamp(0, max); }
+    }
+    /// Rollbalken eines Panels: (x, y, breite, hoehe, griff_y, griff_h) --
+    /// nur wenn der Inhalt hoeher ist als das Panel. EINE Quelle fuer
+    /// Zeichnen und Klick.
+    fn panel_bar_geom(&self, wi: usize, pi: usize) -> Option<(i32, i32, i32, i32, i32, i32)> {
+        let w = &self.windows[wi].widgets[pi];
+        let p = w.panel.as_ref()?;
+        if !self.widget_shown(wi, w) { return None; }
+        let kopf = if w.text.is_empty() { 0 } else { 18 };
+        let sicht = w.h - kopf - 2;
+        if p.inhalt_h <= sicht || sicht <= 0 { return None; }
+        let (ax, ay, aw, _) = self.abs_rect(wi, w);
+        let bw = self.sk(8);
+        let (tx, ty, th) = (ax + aw - 1 - bw, ay + kopf + 1, sicht);
+        let thh = ((th as i64 * sicht as i64 / p.inhalt_h.max(1) as i64) as i32).clamp(self.sk(16).min(th), th);
+        let max = (p.inhalt_h - sicht).max(1);
+        let thy = ty + ((th - thh) as i64 * p.scroll as i64 / max as i64) as i32;
+        Some((tx, ty, bw, th, thy, thh))
+    }
+    /// Je Bild: welches Widget in welchem Panel steckt (durch Layouts
+    /// hindurch), und wie hoch der Inhalt jedes Panels ist.
+    fn panel_pass(&mut self) {
+        for wi in 0..self.windows.len() {
+            let n = self.windows[wi].widgets.len();
+            for i in 0..n { self.windows[wi].widgets[i].panel_von = -1; }
+            for p in 0..n {
+                let kinder = match self.windows[wi].widgets[p].panel.as_ref() {
+                    Some(ps) => ps.kinder.clone(),
+                    None => continue,
+                };
+                let mut menge = Vec::new();
+                for k in kinder { self.panel_sammeln(wi, k, &mut menge, 0); }
+                let py = self.windows[wi].widgets[p].y;
+                let mut unten = 0;
+                for &k in &menge {
+                    if k == p { continue; }
+                    let w = &mut self.windows[wi].widgets[k];
+                    w.panel_von = p as i32;
+                    if w.alive && w.visible { unten = unten.max(w.y + w.h - py); }
+                }
+                let pad = self.m("pad");
+                let ph = self.windows[wi].widgets[p].h;
+                let kopf = if self.windows[wi].widgets[p].text.is_empty() { 0 } else { 18 };
+                if let Some(ps) = self.windows[wi].widgets[p].panel.as_mut() {
+                    ps.inhalt_h = unten + pad;
+                    ps.scroll = ps.scroll.clamp(0, (ps.inhalt_h - (ph - kopf)).max(0));
+                }
+            }
+        }
+    }
+    fn panel_sammeln(&self, wi: usize, k: usize, aus: &mut Vec<usize>, tiefe: u32) {
+        if tiefe > 16 || aus.contains(&k) { return; }
+        let w = match self.windows[wi].widgets.get(k) { Some(w) => w, None => return };
+        aus.push(k);
+        if let Some(l) = w.layout.as_ref() {
+            for &(c, _) in &l.kinder { if c >= 0 { self.panel_sammeln(wi, c as usize, aus, tiefe + 1); } }
+        }
+    }
+
+    // --- Ziehen zwischen Widgets ---
+    pub fn draggable(&mut self, h: i64, an: bool) -> Result<(), String> { self.wdg_mut(h, "GUI_DRAGGABLE")?.ziehbar = an; Ok(()) }
+    pub fn drop_target(&mut self, h: i64, an: bool) -> Result<(), String> { self.wdg_mut(h, "GUI_DROP_TARGET")?.ablage = an; Ok(()) }
+    pub fn dragging(&self) -> i64 {
+        self.drag.as_ref().filter(|d| d.aktiv).map(|d| Self::enc_widget(d.quelle.0, d.quelle.1)).unwrap_or(-1)
+    }
+    pub fn dropped(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_DROPPED")?.abgelegt) }
+    pub fn drop_text(&self) -> String {
+        if let Some(d) = self.drop.as_ref() { return d.text.clone(); }
+        self.drag.as_ref().filter(|d| d.aktiv).map(|d| d.text.clone()).unwrap_or_default()
+    }
+    pub fn drop_source(&self) -> i64 {
+        self.drop.as_ref().map(|d| Self::enc_widget(d.quelle.0, d.quelle.1)).unwrap_or_else(|| self.dragging())
+    }
+    pub fn drop_index(&self) -> i64 { self.drop.as_ref().map(|d| d.index_ziel as i64).unwrap_or(-1) }
+    pub fn drag_index(&self) -> i64 {
+        if let Some(d) = self.drop.as_ref() { return d.index_quelle as i64; }
+        self.drag.as_ref().filter(|d| d.aktiv).map(|d| d.index as i64).unwrap_or(-1)
+    }
+    /// Was ein Druck auf ein ziehbares Widget mitnimmt: bei Liste und Baum
+    /// die getroffene Zeile, sonst das Widget selbst mit seinem Text.
+    fn zieh_nutzlast(&self, wi: usize, i: usize, mx: i32, my: i32) -> (i32, String) {
+        let w = &self.windows[wi].widgets[i];
+        match w.kind {
+            Kind::ListBox => {
+                let k = self.zeile_unter(wi, i, mx, my);
+                if k >= 0 { (k, w.items[k as usize].clone()) } else { (-1, String::new()) }
+            }
+            Kind::Tree => {
+                let k = self.zeile_unter(wi, i, mx, my);
+                let t = w.tree.as_ref().unwrap();
+                if k >= 0 { (k, t.nodes[k as usize].label.clone()) } else { (-1, String::new()) }
+            }
+            _ => (-1, w.text.clone()),
+        }
+    }
+    /// Listenzeile bzw. Baumknoten (id) unter der Maus, sonst -1.
+    fn zeile_unter(&self, wi: usize, i: usize, _mx: i32, my: i32) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        let (_, ay, _, _) = self.abs_rect(wi, w);
+        match w.kind {
+            Kind::ListBox => {
+                let ih = self.sk(DROPDOWN_ITEM_H);
+                let k = (my - ay + w.value as i32) / ih;
+                if k >= 0 && (k as usize) < w.items.len() { k } else { -1 }
+            }
+            Kind::Tree => {
+                let t = w.tree.as_ref().unwrap();
+                let vis = Self::tree_visible(t);
+                let row = (my - (ay + 1) + t.scroll) / self.sk(TREE_ROW_H);
+                if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 }
+            }
+            _ => -1,
+        }
+    }
+    /// Oberste Ablage unter der Maus (im obersten Fenster dort).
+    fn ablage_unter(&self, mx: i32, my: i32) -> Option<(usize, usize)> {
+        let top = self.topmost_at(mx, my)?;
+        let win = &self.windows[top];
+        for i in (0..win.widgets.len()).rev() {
+            let w = &win.widgets[i];
+            if w.ablage && w.enabled && self.widget_shown(top, w) && Self::in_rect(mx, my, self.abs_rect(top, w))
+                && self.im_panel_sichtbar(top, w, mx, my) {
+                return Some((top, i));
+            }
+        }
+        None
+    }
+    fn ablegen(&mut self, d: DragState, mx: i32, my: i32) {
+        let ziel = match self.ablage_unter(mx, my) { Some(z) => z, None => return };
+        let index_ziel = self.zeile_unter(ziel.0, ziel.1, mx, my);
+        // Innerhalb derselben Liste wird der Eintrag gleich umsortiert -- das
+        // ist die eine Bedeutung, die ein Zug dort haben kann. Losgelassen
+        // unter dem letzten Eintrag heisst: ans Ende.
+        if ziel == d.quelle && d.index >= 0 && self.windows[ziel.0].widgets[ziel.1].kind == Kind::ListBox {
+            let n = self.windows[ziel.0].widgets[ziel.1].items.len() as i32;
+            let nach = if index_ziel < 0 { n - 1 } else { index_ziel.min(n - 1) };
+            if nach >= 0 && nach != d.index {
+                let _ = self.list_move(Self::enc_widget(ziel.0, ziel.1), d.index as i64, nach as i64);
+            }
+        }
+        self.windows[ziel.0].widgets[ziel.1].abgelegt = true;
+        self.drop = Some(DropInfo { ziel, quelle: d.quelle, index_quelle: d.index, index_ziel, text: d.text });
+    }
+
     /// Was ueber allen Fenstern liegt: ein offenes Kontextmenue und der
     /// Tooltip (GUI_DRAW_TOP).
     pub fn draw_top(&self, g: &mut Graphics) {
@@ -6717,6 +7162,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.draw_items_popup(g, wi, mi, cx, cy);
                 for &(smi, spx, spy) in &self.sub_chain { self.draw_items_popup(g, wi, smi, spx, spy); }
             }
+        }
+        // Laufender Zug: die Ablage darunter bekommt einen Rahmen, der Text
+        // haengt an der Maus -- sonst sieht man nicht, dass man etwas traegt.
+        if let Some(d) = self.drag.as_ref().filter(|d| d.aktiv) {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            if let Some((zw, zi)) = self.ablage_unter(mx, my) {
+                let (x, y, w, h) = self.abs_rect(zw, &self.windows[zw].widgets[zi]);
+                let acc = self.th("accent");
+                g.rect(x - 1, y - 1, x + w, y + h, acc);
+                g.rect(x - 2, y - 2, x + w + 1, y + h + 1, acc);
+            }
+            let text = if d.text.is_empty() { "\u{25AA}".to_string() } else { d.text.clone() };
+            let pad = 6;
+            let tw = self.ctext_width(g, &text);
+            let th = self.ctext_height(g);
+            let (bx, by) = (mx + 12, my + 12);
+            let rad = self.m("corner_radius").min(6);
+            g.round_rect(bx + 2, by + 3, bx + tw + pad * 2 + 1, by + th + pad + 2, rad.max(2), (0x55i64 << 24) as i64, true);
+            g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("widget_bg"), true);
+            g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("accent"), false);
+            self.ctext(g, bx + pad, by + pad / 2, text, self.th("text_fg"));
         }
         // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
         self.draw_tooltip(g);
@@ -6959,7 +7425,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // gezogen, ragt nichts ueber den Rand/die Titelleiste/Menueleiste hinaus.
         g.push_clip(x + 1, y + coff, (w - 2).max(0), (h - coff - 1).max(0));
         for (i, wdg) in win.widgets.iter().enumerate() {
-            if self.widget_shown(wi, wdg) { self.draw_widget(g, wi, i, wdg); }
+            if !self.widget_shown(wi, wdg) { continue; }
+            if wdg.panel_von >= 0 {
+                // Kind eines rollenden Panels: auf dessen Innenflaeche beschnitten.
+                let p = &win.widgets[wdg.panel_von as usize];
+                let (px, py, pw, ph) = self.abs_rect(wi, p);
+                let kopf = if p.text.is_empty() { 0 } else { 18 };
+                g.push_clip(px + 1, py + kopf + 1, (pw - 2).max(0), (ph - kopf - 2).max(0));
+                self.draw_widget(g, wi, i, wdg);
+                g.pop_clip();
+            } else {
+                self.draw_widget(g, wi, i, wdg);
+            }
         }
         g.pop_clip();
         // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
@@ -7025,6 +7502,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if !wdg.text.is_empty() {
                     g.box_fill(ax, ay, ax + w - 1, ay + 17, self.th("win_border"));
                     self.wtext(g, wdg, ax + 5, ay + 2, wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
+                }
+                // Rollbalken rechts, wenn der Inhalt hoeher ist als das Panel.
+                if let Some((tx, ty, bw, th, thy, thh)) = self.panel_bar_geom(wi, idx) {
+                    g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.wcol(wdg, "bg", "widget_bg"), -10));
+                    g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 3, self.wcol(wdg, "border", "widget_border"), true);
                 }
             }
             Kind::Button => {
@@ -7132,6 +7614,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
             }
+            Kind::Slider if wdg.vert => self.draw_vslider(g, wdg, ax, ay, w, h),
             Kind::Slider => {
                 let handle_w = self.m("slider_handle_w");
                 let span = wdg.max - wdg.min;
@@ -7408,13 +7891,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let acc = self.acc_col(wdg);
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
-                let span = wdg.max - wdg.min;
-                let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
-                let fw = (ratio * (w - 2) as f64) as i32;
-                if fw > 0 { g.box_fill(ax + 1, ay + 1, ax + fw, ay + h - 2, acc); }
-                let pct = format!("{}%", (ratio * 100.0).round() as i32);
-                let pctw = self.wtext_width(g, wdg, &pct);
-                self.wtext(g, wdg, ax + w / 2 - pctw / 2, ay + (h - self.wsize(g, wdg)).max(0) / 2, pct, self.txt_col(wdg));
+                if wdg.unbestimmt {
+                    // Laufendes Band: die Zeit treibt es, nicht der Wert --
+                    // fuer alles, dessen Dauer man nicht kennt.
+                    let bw = (w / 3).max(8);
+                    let t = (g.get_time() * 0.6).fract();
+                    let x0 = ax + 1 - bw + (t * (w - 2 + bw) as f64) as i32;
+                    g.push_clip(ax + 1, ay + 1, (w - 2).max(0), (h - 2).max(0));
+                    g.round_gradient(x0, ay + 1, x0 + bw - 1, ay + h - 2, 3, shade(acc, 24), shade(acc, -18));
+                    g.pop_clip();
+                } else {
+                    let span = wdg.max - wdg.min;
+                    let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+                    let fw = (ratio * (w - 2) as f64) as i32;
+                    if fw > 0 { g.box_fill(ax + 1, ay + 1, ax + fw, ay + h - 2, acc); }
+                    let pct = format!("{}%", (ratio * 100.0).round() as i32);
+                    let pctw = self.wtext_width(g, wdg, &pct);
+                    self.wtext(g, wdg, ax + w / 2 - pctw / 2, ay + (h - self.wsize(g, wdg)).max(0) / 2, pct, self.txt_col(wdg));
+                }
             }
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");
@@ -7478,7 +7972,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.pop_clip();
             }
             Kind::Image => {
-                if wdg.sel >= 0 { g.draw_image_rect(wdg.sel as i64, ax, ay, w, h); }
+                if wdg.sel >= 0 { self.draw_bild(g, wdg, ax, ay, w, h); }
             }
             Kind::Canvas => {
                 // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
@@ -7712,6 +8206,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let fg = self.txt_col(wdg);
         let acc = self.acc_col(wdg);
         let scroll = t.scroll;
+        let hat_icon = t.nodes.iter().any(|n| n.icon >= 0);
+        let isz = self.sk(TREE_ROW_H) - 4;
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
         for (r, &ni) in vis.iter().enumerate() {
             let ry = ay + 1 + r as i32 * self.sk(TREE_ROW_H) - scroll;
@@ -7736,8 +8232,68 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     g.line(cx + 2, cy, cx - 2, cy + 4, fg);
                 }
             }
-            let lx = tx + self.sk(TREE_TOGGLE_W) + 2;
-            self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), fg);
+            let mut lx = tx + self.sk(TREE_TOGGLE_W) + 2;
+            if hat_icon {
+                // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine
+                // eines hat -- sonst staenden die Namen versetzt.
+                if node.icon >= 0 { g.draw_image_rect(node.icon, lx, ry + 2, isz, isz); }
+                lx += isz + 3;
+            }
+            let farbe = if node.color >= 0 { node.color } else { fg };
+            self.wtext(g, wdg, lx, ry + (self.sk(TREE_ROW_H) - self.wsize(g, wdg)).max(0) / 2, node.label.clone(), farbe);
+        }
+        g.pop_clip();
+    }
+
+    /// Senkrechter Schieber (GUI_VSLIDER): dieselbe Rinne wie waagerecht, nur
+    /// gedreht -- und gefuellt wird von UNTEN, weil der Wert nach oben waechst.
+    fn draw_vslider(&self, g: &mut Graphics, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) {
+        let handle_w = self.m("slider_handle_w");
+        let span = wdg.max - wdg.min;
+        let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+        let acc = self.acc_col(wdg);
+        if self.m("gradient") > 0 {
+            let (tx, tr) = (ax + w / 2 - 3, ax + w / 2 + 3);
+            self.fbox_tief(g, tx, ay, tr, ay + h - 1,
+                           self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+            let von = ay + h - 1 - (ratio * (h - 1) as f64) as i32;
+            if von < ay + h - 3 {
+                g.round_gradient(tx + 1, von, tr - 1, ay + h - 2, 3, shade(acc, 24), shade(acc, -18));
+            }
+            let hy = ay + h - 1 - (ratio * (h - handle_w) as f64) as i32 - handle_w / 2;
+            self.knauf(g, ax + w / 2, hy, (w / 2).max(5), self.griff_farbe(wdg));
+        } else {
+            g.box_fill(ax + w / 2 - 1, ay, ax + w / 2 + 1, ay + h - 1, self.wcol(wdg, "bg", "widget_bg"));
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
+            let hy = ay + h - handle_w - (ratio * (h - handle_w) as f64) as i32;
+            g.box_fill(ax, hy, ax + w - 1, hy + handle_w - 1, acc);
+        }
+    }
+
+    /// Bild nach Modus: strecken (wie bisher), einpassen/fuellen mit
+    /// Seitenverhaeltnis, mitte in Originalgroesse, kacheln.
+    fn draw_bild(&self, g: &mut Graphics, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) {
+        let tex = wdg.sel as i64;
+        if wdg.bildmodus == 0 { g.draw_image_rect(tex, ax, ay, w, h); return; }
+        let (iw, ih) = (g.image_width(tex).unwrap_or(0) as i32, g.image_height(tex).unwrap_or(0) as i32);
+        if iw <= 0 || ih <= 0 || w <= 0 || h <= 0 { return; }
+        g.push_clip(ax, ay, w, h);
+        match wdg.bildmodus {
+            1 | 2 => {
+                let (sx, sy) = (w as f64 / iw as f64, h as f64 / ih as f64);
+                let f = if wdg.bildmodus == 1 { sx.min(sy) } else { sx.max(sy) };
+                let (dw, dh) = (((iw as f64 * f) as i32).max(1), ((ih as f64 * f) as i32).max(1));
+                g.draw_image_rect(tex, ax + (w - dw) / 2, ay + (h - dh) / 2, dw, dh);
+            }
+            3 => g.draw_image_rect(tex, ax + (w - iw) / 2, ay + (h - ih) / 2, iw, ih),
+            _ => {
+                let mut y = ay;
+                while y < ay + h {
+                    let mut x = ax;
+                    while x < ax + w { g.draw_image_rect(tex, x, y, iw, ih); x += iw; }
+                    y += ih;
+                }
+            }
         }
         g.pop_clip();
     }

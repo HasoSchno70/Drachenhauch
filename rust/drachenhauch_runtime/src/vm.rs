@@ -5211,6 +5211,28 @@ impl<'p> Vm<'p> {
             "gui_layout_remove" => { self.gui.layout_remove(gi(a,0,"GUI_LAYOUT_REMOVE")?, gi(a,1,"GUI_LAYOUT_REMOVE")?)?; Value::Nil }
             "gui_layout_set" => { self.gui.layout_set(gi(a,0,"GUI_LAYOUT_SET")?, &gs(a,1,"GUI_LAYOUT_SET")?, gnum(a,2,"GUI_LAYOUT_SET")?)?; Value::Nil }
             "gui_autosize" => { let g = self.gfx.as_ref(); self.gui.autosize(g, gi(a,0,"GUI_AUTOSIZE")?)?; Value::Nil }
+            // --- Punkt 6: senkrechter Schieber, Fortschritt, Bildmodi, Cursor, Baum, Panel, Ziehen ---
+            "gui_vslider" => Value::Int(self.gui.vslider(gi(a,0,"GUI_VSLIDER")?, gi(a,1,"GUI_VSLIDER")? as i32,
+                gi(a,2,"GUI_VSLIDER")? as i32, gi(a,3,"GUI_VSLIDER")? as i32,
+                gnum(a,4,"GUI_VSLIDER")?, gnum(a,5,"GUI_VSLIDER")?, gnum(a,6,"GUI_VSLIDER")?)?),
+            "gui_progress_set" => { self.gui.progress_set(gi(a,0,"GUI_PROGRESS_SET")?, &gs(a,1,"GUI_PROGRESS_SET")?, gnum(a,2,"GUI_PROGRESS_SET")?)?; Value::Nil }
+            "gui_image_mode" => { self.gui.image_mode(gi(a,0,"GUI_IMAGE_MODE")?, &gs(a,1,"GUI_IMAGE_MODE")?)?; Value::Nil }
+            "gui_image_mode_get" => Value::Str(Rc::from(self.gui.image_mode_get(gi(a,0,"GUI_IMAGE_MODE_GET")?)?)),
+            "gui_cursors" => { self.gui.cursors(gbool(a,0,"GUI_CURSORS")?); Value::Nil }
+            "gui_tree_icon" => { self.gui.tree_icon(gi(a,0,"GUI_TREE_ICON")?, gi(a,1,"GUI_TREE_ICON")?, gi(a,2,"GUI_TREE_ICON")?)?; Value::Nil }
+            "gui_tree_color" => { self.gui.tree_color(gi(a,0,"GUI_TREE_COLOR")?, gi(a,1,"GUI_TREE_COLOR")?, gi(a,2,"GUI_TREE_COLOR")?)?; Value::Nil }
+            "gui_panel_add" => { self.gui.panel_add(gi(a,0,"GUI_PANEL_ADD")?, gi(a,1,"GUI_PANEL_ADD")?)?; Value::Nil }
+            "gui_panel_remove" => { self.gui.panel_remove(gi(a,0,"GUI_PANEL_REMOVE")?, gi(a,1,"GUI_PANEL_REMOVE")?)?; Value::Nil }
+            "gui_panel_scroll" => { self.gui.panel_scroll(gi(a,0,"GUI_PANEL_SCROLL")?, gi(a,1,"GUI_PANEL_SCROLL")? as i32)?; Value::Nil }
+            "gui_panel_scroll_get" => Value::Int(self.gui.panel_scroll_get(gi(a,0,"GUI_PANEL_SCROLL_GET")?)?),
+            "gui_draggable" => { self.gui.draggable(gi(a,0,"GUI_DRAGGABLE")?, gbool(a,1,"GUI_DRAGGABLE")?)?; Value::Nil }
+            "gui_drop_target" => { self.gui.drop_target(gi(a,0,"GUI_DROP_TARGET")?, gbool(a,1,"GUI_DROP_TARGET")?)?; Value::Nil }
+            "gui_dragging" => Value::Int(self.gui.dragging()),
+            "gui_dropped" => Value::Bool(self.gui.dropped(gi(a,0,"GUI_DROPPED")?)?),
+            "gui_drop_text" => Value::Str(Rc::from(self.gui.drop_text())),
+            "gui_drop_source" => Value::Int(self.gui.drop_source()),
+            "gui_drop_index" => Value::Int(self.gui.drop_index()),
+            "gui_drag_index" => Value::Int(self.gui.drag_index()),
             // --- Image + Canvas ---
             "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
                 gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),
