@@ -114,8 +114,9 @@ Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie e
 - **[Entwurf: TASK_START](entwurf-task-start.md)** — GB-Code im Hintergrund; drei Wege, und der dritte umgeht das Send-Problem ganz
 - **[Entwurf: Mehrere OS-Fenster](entwurf-native-fenster.md)** — warum es ein Fenster je Prozess gibt, vier Wege; gebaut ist Weg B: ein zweites Fenster als zweiter `dhrt` mit Textkanal (`WINDOW_OPEN`)
 - **[Entwurf: Drucken](entwurf-drucken.md)** — kein raylib fuers Papier: geprüfte Bausteine, vier Wege; Empfehlung: die Seite selbst zeichnen (GDI/CUPS als Ziele des pdf-Moduls), dazu ein Befehl, der eine Datei öffnet
-- **[Release 2026.11](release-2026.11.md)** — was in dieser Fassung neu ist
-- **[Release 2026.10](release-2026.10.md)** — die Fassung davor
+- **[Release 2026.12](release-2026.12.md)** — was in dieser Fassung neu ist
+- **[Release 2026.11](release-2026.11.md)** — die Fassung davor
+- **[Release 2026.10](release-2026.10.md)** — und die davor
 - **[Release 2026.9](release-2026.9.md)** — und die davor
 - **[Release 2026.8](release-2026.8.md)** — und die davor
 - **[Allzweck-Roadmap](allzweck-roadmap.md)** — was fehlt, damit man damit *alles* schreiben kann und nicht nur Spiele (aktuell, Audit 2026-08)
