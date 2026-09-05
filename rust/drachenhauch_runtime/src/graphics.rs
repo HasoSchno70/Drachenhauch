@@ -3255,6 +3255,39 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         t.img.draw_text(text, x, y, size.max(1), col(color));
         self.reupload_tex(i)
     }
+    /// PDF_PREVIEW: eine aufgezeichnete Seite als Bild -- weisses Papier,
+    /// `breite_px` breit, Hoehe nach Seitenverhaeltnis. Text in raylibs
+    /// Standardschrift: eine Vorschau, kein Belichter. Die Lage stimmt, die
+    /// Buchstaben sind nicht Helvetica.
+    pub fn pdf_vorschau(&mut self, ops: &[crate::pdf::Op], breite_mm: f64, hoehe_mm: f64, breite_px: i32) -> Result<i64, String> {
+        use crate::pdf::Op;
+        let breite_px = breite_px.clamp(32, 4096);
+        let f = breite_px as f64 / breite_mm.max(1.0);
+        let hoehe_px = ((hoehe_mm * f).round() as i32).max(1);
+        let mut img = Image::gen_image_color(breite_px, hoehe_px, Color::WHITE);
+        let farbe = |c: (f64, f64, f64)| Color::new((c.0 * 255.0) as u8, (c.1 * 255.0) as u8, (c.2 * 255.0) as u8, 255);
+        let px = |mm: f64| (mm * f).round() as i32;
+        for op in ops {
+            match op {
+                Op::Text { x, y, text, groesse_pt, farbe: c, .. } => {
+                    let groesse = ((groesse_pt * 25.4 / 72.0) * f).round() as i32;
+                    img.draw_text(text, px(*x), px(*y), groesse.max(4), farbe(*c));
+                }
+                Op::Linie { x1, y1, x2, y2, farbe: c, .. } => {
+                    img.draw_line(px(*x1), px(*y1), px(*x2), px(*y2), farbe(*c));
+                }
+                Op::Rechteck { x, y, b, h, fuellen, farbe: c, .. } => {
+                    if *fuellen {
+                        img.draw_rectangle(px(*x), px(*y), px(*b).max(1), px(*h).max(1), farbe(*c));
+                    } else {
+                        img.draw_rectangle_lines(Rectangle::new(px(*x) as f32, px(*y) as f32, px(*b) as f32, px(*h) as f32), 1, farbe(*c));
+                    }
+                }
+            }
+        }
+        self.push_tex_from_image(img)
+    }
+
     /// Ein neues Bild anlegen (IMAGE_NEW). Ohne Farbe: vollstaendig DURCHSICHTIG.
     ///
     /// `GENTEX_COLOR` kann das nicht, und zwar aus einem Grund, der sich nicht

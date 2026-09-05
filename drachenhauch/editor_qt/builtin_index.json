@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1707,
+ "count": 1712,
  "builtins": [
   {
    "name": "ABS",
@@ -6387,6 +6387,12 @@
    "module": "dhrt"
   },
   {
+   "name": "OPENDOC",
+   "kind": "core",
+   "signature": "OPENDOC(pfad$)",
+   "module": "dhrt"
+  },
+  {
    "name": "OPENFILE",
    "kind": "core",
    "signature": "OPENFILE(path: STRING, mode: STRING [, kodierung$])",
@@ -6594,6 +6600,18 @@
    "name": "PDF_PAGE_WIDTH",
    "kind": "core",
    "signature": "PDF_PAGE_WIDTH(p: PDF) AS FLOAT",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PREVIEW",
+   "kind": "core",
+   "signature": "PDF_PREVIEW(p: PDF, seite [, breite_px]) AS IMAGE",
+   "module": "pdf"
+  },
+  {
+   "name": "PDF_PRINT",
+   "kind": "core",
+   "signature": "PDF_PRINT(p: PDF [, drucker$ [, kopien [, zieldatei$]]])",
    "module": "pdf"
   },
   {
@@ -7123,6 +7141,18 @@
    "kind": "core",
    "signature": "POW(base: Zahl, exponent: Zahl)",
    "module": "core"
+  },
+  {
+   "name": "PRINTERS",
+   "kind": "core",
+   "signature": "PRINTERS()",
+   "module": "dhrt"
+  },
+  {
+   "name": "PRINTER_DEFAULT$",
+   "kind": "core",
+   "signature": "PRINTER_DEFAULT$()",
+   "module": "dhrt"
   },
   {
    "name": "QUAT_CONJUGATE",

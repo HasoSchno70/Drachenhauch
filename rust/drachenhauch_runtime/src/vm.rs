@@ -3579,6 +3579,41 @@ impl<'p> Vm<'p> {
                     .map_err(|e| format!("PDF_SAVE: {}: {}", pfad, e))?;
                 Value::Nil
             }
+            // Drucken (docs/entwurf-drucken.md, Weg C): dieselbe Seite auf den
+            // Drucker -- GDI unter Windows, lp unter Unix. `zieldatei` fuer
+            // Drucker, die in eine Datei schreiben (Microsoft Print to PDF).
+            "pdf_print" => {
+                let i = bi_int(a, 0, "PDF_PRINT")?;
+                let drucker = if a.len() > 1 { bi_str(a, 1, "PDF_PRINT")?.to_string() } else { String::new() };
+                let kopien = if a.len() > 2 { bi_int(a, 2, "PDF_PRINT")? } else { 1 };
+                let ziel = if a.len() > 3 { bi_str(a, 3, "PDF_PRINT")?.to_string() } else { String::new() };
+                if a.len() > 4 { return Err("PDF_PRINT: erwartet 1..4 Argumente (pdf[, drucker$[, kopien[, zieldatei$]]])".into()); }
+                let doc = self.pdf_d(i)?;
+                crate::drucken::drucken(doc, &drucker, kopien, &ziel)?;
+                Value::Nil
+            }
+            // PDF_PREVIEW(p, seite[, breite_px]) -> IMAGE: die Seite als Bild.
+            "pdf_preview" => {
+                let i = bi_int(a, 0, "PDF_PREVIEW")?;
+                let seite = bi_int(a, 1, "PDF_PREVIEW")?;
+                let breite = if a.len() > 2 { bi_int(a, 2, "PDF_PREVIEW")? as i32 } else { 600 };
+                let (ops, b_mm, h_mm) = {
+                    let doc = self.pdf_d(i)?;
+                    let n = doc.seiten.len() as i64;
+                    if seite < 1 || seite > n {
+                        return Err(format!("PDF_PREVIEW: Seite {} gibt es nicht (1..{})", seite, n));
+                    }
+                    let sz = &doc.seiten[(seite - 1) as usize];
+                    (sz.ops.clone(), sz.breite_mm, sz.hoehe_mm)
+                };
+                #[cfg(feature = "graphics")]
+                {
+                    let g = self.gfx.as_mut().ok_or("PDF_PREVIEW: braucht ein Fenster (SCREEN) -- die Vorschau ist ein IMAGE")?;
+                    Value::Int(g.pdf_vorschau(&ops, b_mm, h_mm, breite)?)
+                }
+                #[cfg(not(feature = "graphics"))]
+                { let _ = (ops, b_mm, h_mm, breite); return Err("PDF_PREVIEW: dieser Bau hat keine Grafik".into()); }
+            }
             "pdf_close" => {
                 let i = bi_int(a, 0, "PDF_CLOSE")? as usize;
                 if let Some(slot) = self.pdf_dok.get_mut(i) { *slot = None; }
@@ -4563,8 +4598,19 @@ impl<'p> Vm<'p> {
     /// `Program` damit weder Send noch Sync ist.
     fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
-             || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")) { return Ok(None); }
+             || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")
+             || name == "opendoc" || name.starts_with("printer")) { return Ok(None); }
         let v = match name {
+            // ===== Drucken + Oeffnen (docs/entwurf-drucken.md) =====
+            "opendoc" => { crate::drucken::oeffnen(bi_str(a, 0, "OPENDOC")?)?; Value::Nil }
+            "printers" => {
+                let namen = crate::drucken::drucker_liste()?;
+                let n = namen.len() as i64;
+                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "printer_default$" | "printer_default" => Value::str_rc(&crate::drucken::standard_drucker()?),
             // ===== Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) =====
             // Ein zweites OS-Fenster ist ein zweiter dhrt mit eigenem SCREEN;
             // die Seiten reden ueber Textzeilen. Kein geteilter Zustand --

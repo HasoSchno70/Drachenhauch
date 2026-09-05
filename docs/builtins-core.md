@@ -604,6 +604,15 @@ Auftrag rechnet, er redet nicht. Beispiel:
 [examples/170_task.dh](../examples/170_task.dh).
 
 
+## Eine Datei öffnen: `OPENDOC`
+
+`OPENDOC(pfad$)` öffnet eine **lokale Datei mit ihrem Standardprogramm** —
+die geschriebene PDF im Betrachter, die Tabelle in der Tabellenkalkulation.
+Das Gegenstück zu `OPENURL`, das absichtlich nur `http://` und `https://`
+darf. Begrenzt auf Dokument- und Bildendungen (pdf, png, jpg, txt, csv,
+json, xml, html, xlsx, docx, …): `.exe` und Co. sind ein Fehler, kein Start.
+Für Programme gibt es `SHELL`, mit Absicht getrennt.
+
 ## Ein zweites Fenster: `WINDOW_OPEN`
 
 Drachenhauch kennt **ein OS-Fenster je Prozess** (raylib hält seinen Zustand

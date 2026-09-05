@@ -21,12 +21,25 @@
 /// 1 mm in PDF-Punkten (1/72 Zoll).
 const MM: f64 = 72.0 / 25.4;
 
+/// Ein aufgezeichneter Zeichenbefehl -- damit dieselbe Seite auf mehr als ein
+/// Ziel geht: PDF (hier), Drucker (`drucken.rs`), Vorschau (`graphics.rs`).
+/// Masse in Millimetern ab Papierkante von oben, Farbe als Anteile 0..1.
+/// `y` bei Text meint die OBERKANTE der Zeile, wie im Programm angegeben.
+#[derive(Clone, Debug)]
+pub enum Op {
+    Text { x: f64, y: f64, text: String, schrift: usize, groesse_pt: f64, farbe: (f64, f64, f64) },
+    Linie { x1: f64, y1: f64, x2: f64, y2: f64, breite_mm: f64, farbe: (f64, f64, f64) },
+    Rechteck { x: f64, y: f64, b: f64, h: f64, fuellen: bool, breite_mm: f64, farbe: (f64, f64, f64) },
+}
+
 pub struct Seite {
     pub breite_mm: f64,
     pub hoehe_mm: f64,
     inhalt: String,
     /// Welche Schriften diese Seite benutzt (Index in `SCHRIFTEN`).
     benutzt: Vec<usize>,
+    /// Dieselben Befehle noch einmal, fuer die anderen Ziele.
+    pub ops: Vec<Op>,
 }
 
 pub struct Dokument {
@@ -64,6 +77,12 @@ const SCHRIFTEN: &[(&str, &str, bool)] = &[
 
 pub fn schriftnamen() -> String {
     SCHRIFTEN.iter().map(|(n, _, _)| *n).collect::<Vec<_>>().join(", ")
+}
+
+/// Der Name, wie das Programm die Schrift nennt ("helvetica-fett") -- fuer
+/// die Abbildung auf GDI-Schriften beim Drucken.
+pub fn schrift_programmname(index: usize) -> &'static str {
+    SCHRIFTEN.get(index).map(|(n, _, _)| *n).unwrap_or("helvetica")
 }
 
 pub fn schrift_index(name: &str) -> Option<usize> {
@@ -104,7 +123,7 @@ impl Dokument {
     pub fn neue_seite(&mut self) {
         self.seiten.push(Seite {
             breite_mm: self.breite_mm, hoehe_mm: self.hoehe_mm,
-            inhalt: String::new(), benutzt: Vec::new(),
+            inhalt: String::new(), benutzt: Vec::new(), ops: Vec::new(),
         });
         // Die Einstellungen gelten auch auf der neuen Seite -- der
         // Inhaltsstrom jeder Seite faengt aber bei null an, also noch einmal
@@ -165,13 +184,17 @@ impl Dokument {
         let grundlinie = y - groesse;
         s.inhalt.push_str(&format!("BT /F{} {:.2} Tf {:.2} {:.2} Td {} Tj ET\n",
                                    schrift, groesse, x, grundlinie, roh));
+        let farbe = self.farbe;
+        self.hier().ops.push(Op::Text { x: x_mm, y: y_mm, text: text.to_string(), schrift, groesse_pt: groesse, farbe });
         Ok(())
     }
 
     pub fn linie(&mut self, x1: f64, y1: f64, x2: f64, y2: f64) {
         let (a, b) = (self.y(y1), self.y(y2));
-        let (x1, x2) = (x1 * MM, x2 * MM);
-        self.hier().inhalt.push_str(&format!("{:.2} {:.2} m {:.2} {:.2} l S\n", x1, a, x2, b));
+        let (px1, px2) = (x1 * MM, x2 * MM);
+        self.hier().inhalt.push_str(&format!("{:.2} {:.2} m {:.2} {:.2} l S\n", px1, a, px2, b));
+        let (farbe, breite_mm) = (self.farbe, self.strich_mm);
+        self.hier().ops.push(Op::Linie { x1, y1, x2, y2, breite_mm, farbe });
     }
 
     /// Rechteck von (x,y) mit Breite/Hoehe -- `fuellen` entscheidet zwischen
@@ -182,6 +205,8 @@ impl Dokument {
         let op = if fuellen { "f" } else { "S" };
         self.hier().inhalt.push_str(&format!("{:.2} {:.2} {:.2} {:.2} re {}\n",
                                              x * MM, unten, b * MM, h * MM, op));
+        let (farbe, breite_mm) = (self.farbe, self.strich_mm);
+        self.hier().ops.push(Op::Rechteck { x, y, b, h, fuellen, breite_mm, farbe });
     }
 
     /// Das fertige PDF als Bytes.

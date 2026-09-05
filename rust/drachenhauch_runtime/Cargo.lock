@@ -881,6 +881,7 @@ dependencies = [
  "uuid",
  "wasm-bindgen",
  "webpki-roots 0.26.11",
+ "windows",
  "xmrs",
  "xmrsplayer",
  "zip",

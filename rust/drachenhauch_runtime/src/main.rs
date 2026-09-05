@@ -51,6 +51,8 @@ mod ecs;
 mod hintergrund;
 // Fenster als Prozess (docs/entwurf-native-fenster.md, Weg B) -- ungated wie hintergrund.
 mod fenster;
+// Drucken + OPENDOC (docs/entwurf-drucken.md, Wege A und C) -- ungated.
+mod drucken;
 #[cfg(feature = "http")]
 mod html;
 #[cfg(feature = "net")]

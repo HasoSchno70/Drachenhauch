@@ -84,6 +84,19 @@ module.exports = (H) => [
     "Umlaute und Sonderzeichen"),
 
   H.h2("Speichern"),
+  H.cmd("PDF_PRINT · PRINTERS · PRINTER_DEFAULT$", 'PDF_PRINT(p [, drucker$ [, kopien [, zieldatei$]]])   PRINTERS() AS ARRAY OF STRING   PRINTER_DEFAULT$() AS STRING',
+    "Druckt das Dokument: unter Windows über den Druckertreiber (GDI; die Standardschriften werden zu Arial, Times New Roman und Courier New, die Lage jedes Textes bleibt), unter macOS und Linux über CUPS. Ohne Drucker den Standarddrucker, Kopien 1..99. Die Zieldatei ist für Drucker gedacht, die in eine Datei schreiben – \"Microsoft Print to PDF\" fragt dann nicht nach. PRINTERS liefert die Namen, PRINTER_DEFAULT$ den Standarddrucker (\"\" wenn keiner). Ein fehlender Drucker ist ein Fehler mit Namen.",
+    [
+      'PDF_PRINT(p)                                   \' Standarddrucker',
+      'PDF_PRINT(p, "Microsoft Print to PDF", 1, "rechnung.pdf")',
+      'DIM d AS STRING : FOR EACH d IN PRINTERS() : PRINT d : NEXT',
+    ]),
+  H.cmd("PDF_PREVIEW", 'PDF_PREVIEW(p, seite [, breite_px]) AS IMAGE',
+    "Eine Seite des Dokuments als Bild – weißes Papier, so breit wie angegeben (Vorgabe 600 Pixel), Höhe nach Seitenverhältnis, Text in der Standardschrift der Laufzeit. Für eine Vorschau im eigenen Fenster (z. B. auf GUI_IMAGE); braucht ein Fenster.",
+    [
+      'DIM vorschau AS IMAGE : vorschau = PDF_PREVIEW(p, 1, 300)',
+      'GUI_SET_IMAGE(bildfeld, vorschau)',
+    ]),
   H.cmd("PDF_SAVE · PDF_CLOSE", "PDF_SAVE(p, pfad$)   PDF_CLOSE(p)",
     "PDF_SAVE schreibt die Datei, PDF_CLOSE gibt den Speicher frei. Zwei Zusagen gelten dabei: Dieselbe Eingabe ergibt dieselbe Datei – es wird kein Erstellungsdatum hineingeschrieben, was Prüfungen vergleichbar und einen Versionsverlauf lesbar macht. Und die Inhalte sind gepackt, eine Seite kostet also auch bei viel Text kaum etwas.",
     [

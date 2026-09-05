@@ -260,6 +260,11 @@ module.exports = (H) => [
       '    PRINT "Geladen: " + FILE_DROPPED(i)',
       'NEXT',
     ]),
+  H.cmd("OPENDOC", 'OPENDOC(pfad$)',
+    "Öffnet eine lokale Datei mit ihrem Standardprogramm – die geschriebene PDF im Betrachter, die Tabelle in der Tabellenkalkulation. Begrenzt auf Dokument- und Bildendungen (pdf, png, jpg, txt, csv, json, xml, html, xlsx, docx …); .exe und Co. sind ein Fehler, kein Start. Für Programme gibt es SHELL, mit Absicht getrennt.",
+    [
+      'PDF_SAVE(p, "rechnung.pdf") : OPENDOC("rechnung.pdf")',
+    ]),
   H.cmd("OPENURL", 'OPENURL(adresse$)',
     "Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels.",
     [
