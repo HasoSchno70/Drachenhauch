@@ -256,7 +256,7 @@ jobs:
       # nicht baut -- als eigenes Feature `a11y` uebersetzt sie jeder Laeufer
       # fuer SEIN System (ohne raylib). Gebaut, nicht gelaufen: auf dieser
       # Entwicklungsmaschine gibt es macOS und Linux nicht.
-      - name: cargo check (+ a11y: AccessKit-Adapter dieses Systems)
+      - name: cargo check (+ a11y, die AccessKit-Adapter dieses Systems)
         run: cargo check --locked --features "a11y"
 
       # Die Rust-#[test]s liefen bis 2026-09-06 NIRGENDS: die CI prueft nur
