@@ -36,7 +36,8 @@ KEY_UP, KEY_DOWN = 1, 2
 # raylib-Tastencodes (US-Belegung, physisch)
 RL_F5, RL_F7, RL_F8, RL_F9, RL_F10 = 294, 296, 297, 298, 299
 RL_ENTER, RL_DOWN, RL_LSHIFT, RL_LCTRL = 257, 264, 340, 341
-RL_F, RL_P, RL_V, RL_Y = 70, 80, 86, 89
+RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
+RL_F1 = 290
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
@@ -65,7 +66,8 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
         quelle.write_text(text, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(quelle), "--", str(datei)], capture_output=True,
                        text=True, encoding="utf-8", errors="replace", timeout=180,
-                       env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log)),
+                       env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
+                                DH_IDE_WURZEL=str(_ROOT)),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -171,3 +173,52 @@ def test_befehlspalette_fuehrt_den_getippten_befehl_aus(tmp_path):
     log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=ev, zwischenablage="profil")
     assert "palette profil" in log, log
     assert "profil gestartet" in log, log
+
+
+# ---------------------------------------------------------------- Stufe 3
+
+def test_f1_schlaegt_das_wort_unter_der_marke_im_handbuch_nach(tmp_path):
+    """Die Marke steht nach dem Oeffnen auf 1,1 -- vor `SPRITE_NEW`. F1 sucht
+    das Wort in docs/ und oeffnet das Dokument mit den meisten Fundstellen in
+    Codeschrift: das Sprite-Modul, nicht irgendeines, das das Wort erwaehnt."""
+    (tmp_path / "spiel.dh").write_text('SPRITE_NEW(1, 2, 3)\n', encoding="utf-8")
+    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=_taste(30, RL_F1))
+    treffer = [z for z in log if z.startswith("handbuch ")]
+    assert treffer, log
+    datei, zeile = treffer[0].split()[1], int(treffer[0].split()[2])
+    assert datei == "module-sprite.md" and zeile >= 1, log
+
+
+def test_listing_als_pdf_neben_der_quelle(tmp_path):
+    fitz = pytest.importorskip("fitz")
+    quelle = tmp_path / "spiel.dh"
+    quelle.write_text("".join(f'PRINT "Zeile {i} mit Umlaut ae oe ue"\n' for i in range(1, 141)),
+                      encoding="utf-8")
+    ev = _taste(20, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=150, events=ev, zwischenablage="pdf")
+    assert any(z.startswith("pdf ") for z in log), log
+    pdf = tmp_path / "spiel.pdf"
+    assert pdf.exists()
+    doc = fitz.open(str(pdf))
+    assert doc.page_count == 3, doc.page_count            # 140 Zeilen, 66 je Seite
+    text = doc[0].get_text()
+    assert "spiel.dh" in text and "Seite 1" in text and "Zeile 1 mit" in text, text[:300]
+    assert "Zeile 140" in doc[2].get_text()
+
+
+def test_werkzeug_startet_aus_dem_menue(tmp_path):
+    (tmp_path / "spiel.dh").write_text('PRINT 1\n', encoding="utf-8")
+    ev = _taste(20, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=ev, zwischenablage="Werkzeug: SFX")
+    assert "werkzeug 183_sfx_generator.dh" in log, log
+
+
+def test_ausdruck_im_angehaltenen_debugger(tmp_path):
+    """F7 haelt in Zeile 1 (kein Haltepunkt); Strg+E holt die Eingabezeile,
+    Strg+V tippt den Ausdruck, Enter schickt ihn als `eval` -- die Antwort des
+    Kindes landet im Protokoll."""
+    (tmp_path / "spiel.dh").write_text('DIM a AS INTEGER\na = 20\nPRINT a\n', encoding="utf-8")
+    ev = _taste(20, RL_F7) + _taste(120, RL_E, RL_LCTRL) + _taste(140, RL_V, RL_LCTRL) + _taste(160, RL_ENTER)
+    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=260, events=ev, zwischenablage="2 * 21")
+    assert "debug pause 1" in log, log
+    assert "eval 42" in log, log

@@ -22,8 +22,12 @@
 > Debugger als Client von `dhrt debug` (Haltepunkte, Schritte, Variablen),
 > Profil aus `dhrt profile`, Suche im Projekt, Befehlspalette, Marken in der
 > Nummernspalte (`GUI_TEXTAREA_MARKS`), echte Schriften, Start maximiert.
-> Offen aus C: Handbuch im Fenster, Drucken, Begleit-Editoren, Installer
-> ohne PyInstaller -- siehe `docs/ide.md`.
+> **Stufe 3 (gleicher Tag):** Handbuch im Fenster (F1), Listing drucken/PDF,
+> Werkzeuge-Menue mit den fuenf Begleit-Editoren, Ausdruck-Auswertung im
+> Debugger, und `installer/Drachenhauch-IDE.iss` -- ein Installer ohne
+> Python (33 MB statt 92). Damit ist die Liste aus Abschnitt C bis auf
+> Willkommensseite und Themen abgearbeitet; was der Qt-IDE noch voraus ist,
+> steht in `docs/ide.md` unter "Was noch fehlt".
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

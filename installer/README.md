@@ -17,6 +17,25 @@ einen Tarball mit `install.sh`.
 > aber nie auf einem echten Mac/Linux-Rechner gelaufen. Rückmeldungen von
 > echten macOS-/Linux-Nutzern sind ausdrücklich erwünscht.
 
+## Ohne Python: die IDE in Drachenhauch
+
+Seit Weg C, Stand 3 (`docs/ide.md`) gibt es einen zweiten Installer, der
+**kein PyInstaller und kein Python** braucht: `Drachenhauch-IDE.iss` packt
+`dhrt.exe`, die IDE (`ide\ide.dh`), das Handbuch (`docs\*.md`) und die
+Beispiele samt Begleit-Editoren. Gemessen 33 MB statt 92. Eigene AppId und
+eigener Ordner (`Drachenhauch-IDE`), damit er die Qt-Fassung nicht ersetzt,
+solange die noch die Referenz ist.
+
+```
+.venv\Scripts\python.exe rust\build_runtime.py --hardware
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.14 installer\Drachenhauch-IDE.iss
+```
+
+Die Verknuepfungen starten `dhrt.exe run "{app}\ide\ide.dh"` mit dem
+Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
+IDE (`-- "%1"`). Kein Signieren, kein macOS/Linux-Paket -- das kommt,
+wenn die Qt-IDE faellt.
+
 ## Schnellstart
 
 ```
