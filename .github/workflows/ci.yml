@@ -250,3 +250,11 @@ jobs:
 
       - name: cargo check (+ wifi)
         run: cargo check --locked --features "wifi"
+
+      # Die Rust-#[test]s liefen bis 2026-09-06 NIRGENDS: die CI prueft nur
+      # (cargo check), und lokal scheiterte `cargo test` an raylibs
+      # MAX_PATH -- zwei kaputte Tests (gui.rs, gifschreiber.rs) lagen so
+      # unbemerkt herum. Ohne Grafik-Feature, wie die Checks davor; die
+      # Grafik-Tests laufen lokal mit CARGO_TARGET_DIR=C:/dht.
+      - name: cargo test (ohne Grafik)
+        run: cargo test --locked --features "db net http smtp"

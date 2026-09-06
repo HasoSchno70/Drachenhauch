@@ -1408,6 +1408,8 @@ impl Graphics {
         builder.hidden();
         let (mut rl, thread) = builder.build();
         let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
+        // Eingabemethoden (ime.rs): zweiter Subclass fuer die Umwandlung im Feld.
+        crate::ime::einhaengen(unsafe { rl.get_window_handle() });
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
@@ -3197,6 +3199,12 @@ impl Graphics {
         }
         Ok(())
     }
+
+    /// Eingabemethoden: hat ein gui-Textfeld den Fokus? Dann nimmt dhrt die
+    /// Umwandlung selbst (Vorschau im Feld), sonst laeuft sie wie bisher.
+    pub fn ime_feld_aktiv(&mut self, an: bool) { crate::ime::feld_aktiv(an); }
+    /// Fertige IME-Ergebnisse und die laufende Vorschau (Text, Marke).
+    pub fn ime_abholen(&mut self) -> (Vec<String>, Option<(String, i32)>) { crate::ime::abholen() }
 
     /// Lage des IME-Umwandlungsfensters: an die Schreibmarke des Textfelds
     /// mit Fokus (docs/entwurf-eingabemethoden.md, Weg B). Ohne diesen Ruf

@@ -85,6 +85,8 @@ mod graphics;
 mod gui;
 #[cfg(feature = "graphics")]
 mod a11y;
+#[cfg(feature = "graphics")]
+mod ime;
 mod lexer;
 mod model;
 mod physics;

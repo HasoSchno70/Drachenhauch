@@ -1963,10 +1963,18 @@ nicht), Ton nie als einzige Rückmeldung, Bewegung abschaltbar machen. Und
 eine Zeichenfläche ist für den Leser ein Bild: was darauf passiert, sagt
 man ihm mit `GUI_ANNOUNCE`.
 
-**Eingabemethoden (IME):** unter Windows steht das Umwandlungsfenster einer
-Eingabemethode (Japanisch, Chinesisch, Koreanisch) an der Schreibmarke des
-Textfelds oder Textbereichs mit Fokus; das Bestätigte kommt wie getippt ins
-Feld. Was das Feld anzeigen kann, steht in
+**Eingabemethoden (IME):** wer Japanisch, Chinesisch oder Koreanisch über
+eine Eingabemethode schreibt, sieht die **Umwandlung im Feld** — die noch
+unfertige Vorschau steht unterstrichen an der Schreibmarke des Textfelds
+oder Textbereichs mit Fokus, die Kandidatenliste des Systems daneben; mit
+der Bestätigung wird das Ergebnis eingefügt, durch dieselben Grenzen wie
+getippter Text (Höchstlänge, Zahlenfilter, Rückgängig, `on_change`).
+Während der Umwandlung gehören Pfeile und Enter der Eingabemethode. Das
+gilt nur, solange ein Textfeld den Fokus hat; ohne eines (ein Spiel mit
+`INKEY$`) läuft die Eingabemethode wie bisher über ihr eigenes Fenster.
+Windows; nach der Windows-Dokumentation gebaut und ohne installierte
+Eingabemethode nicht nachgemessen — wer eine hat, ist die Abnahme. Was das
+Feld anzeigen kann, steht in
 [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften)
 — Kanji, Hangul und Emoji werden auf Zuruf nachgeladen.
 

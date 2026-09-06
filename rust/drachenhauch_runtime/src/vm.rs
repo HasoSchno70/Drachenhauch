@@ -5725,9 +5725,20 @@ impl<'p> Vm<'p> {
                     // zuerst loescht: ein davor gesetzter Klick war fuer
                     // GUI_CLICKED im selben Bild schon wieder weg.
                     self.gui.screenreader = g.a11y_aktiv();
+                    // Eingabemethoden (ime.rs): fertige Ergebnisse einfuegen,
+                    // die laufende Vorschau ans Feld haengen -- VOR update,
+                    // damit dasselbe Bild sie schon zeigt.
+                    {
+                        let (ergebnisse, vorschau) = g.ime_abholen();
+                        let jetzt = g.get_time();
+                        for t in ergebnisse { self.gui.ime_ergebnis(&t, jetzt); }
+                        self.gui.ime_vorschau(vorschau);
+                    }
                     self.gui.update(g);
-                    // Eingabemethoden: das Umwandlungsfenster der IME an die
-                    // Schreibmarke des Textfelds mit Fokus (Weg B).
+                    // Danach: hat ein Textfeld den Fokus (dann gehoert die
+                    // Umwandlung dem Feld), und wo steht seine Schreibmarke
+                    // (Kandidatenliste der IME, Weg B).
+                    g.ime_feld_aktiv(self.gui.ime_feld_aktiv());
                     if let Some((x, y, h)) = self.gui.schreibmarke(g) { g.ime_position(x, y, h); }
                     if self.gui.screenreader {
                         for req in g.a11y_aktionen() { self.gui.a11y_aktion(req, g); }
