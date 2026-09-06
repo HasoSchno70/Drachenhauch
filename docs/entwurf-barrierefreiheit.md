@@ -1,5 +1,18 @@
 # Entwurf: Barrierefreiheit
 
+> **Stand 06.09.2026: A und C sind gebaut (Windows).** Das `gui`-Modul
+> meldet seinen Baum über AccessKit an UI Automation — Fenster, Widgets,
+> Menüs, Reiter, Listen, Tabellen, Bäume, mit Aktionen zurück;
+> `GUI_ANNOUNCE`, `GUI_SCREENREADER`, `GUI_SET_TAB_INDEX`; Menüleiste per
+> F10/Alt, Tooltip bei Tastaturfokus, helles Thema über 4,5:1. Prüfstein
+> gemessen: derselbe UIA-Leser, der oben null Nachkommen fand, zählt im
+> gui-Beispiel 45 jetzt acht — Gruppe, Beschriftungen, Regler mit Namen aus
+> der Nachbar-Beschriftung, Kästchen, Eingabefeld, Knopf
+> (`tests/test_gui_barrierefreiheit.py`). Siehe
+> [module-gui.md](module-gui.md#barrierefreiheit). macOS/Linux-Adapter und
+> die Schreibmarke im Textfeld stehen noch aus; B (Selbst sprechen) ist
+> nicht gebaut.
+
 *Untersuchung, keine Umsetzung.* Der dritte Architekturpunkt der Lückenliste
 nach dem sechsten Piloten (nach den [Fenstern](entwurf-native-fenster.md) und
 dem [Drucken](entwurf-drucken.md)): die Rechnungsverwaltung läuft, sieht gut

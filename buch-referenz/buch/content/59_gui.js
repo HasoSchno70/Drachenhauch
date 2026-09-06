@@ -649,6 +649,18 @@ module.exports = (H) => [
       'GUI_SET_MIN_SIZE(bSenden, 90, 0)',
       'WINDOW_MIN_SIZE(GUI_LAYOUT_MIN_W(form) + 24, GUI_LAYOUT_MIN_H(form) + 80)',
     ]),
+  H.cmd("GUI_ANNOUNCE · GUI_SCREENREADER", 'GUI_ANNOUNCE(text$ [, dringend])   GUI_SCREENREADER() AS BOOLEAN',
+    "Barrierefreiheit: das gui-Modul meldet seine Fenster und Widgets von selbst an die Schnittstelle des Systems (Windows: UI Automation) – Bildschirmleser, Lupe und Sprachsteuerung sehen Knöpfe, Felder, Menüs und Listen und können sie bedienen, ohne dass das Programm etwas tut. GUI_ANNOUNCE gibt dem Bildschirmleser des Nutzers einen Satz mit (höflich: nach dem laufenden Satz; dringend = TRUE: sofort) – für alles, was sonst nur in einer Statuszeile steht. Ohne Hilfsprogramm passiert nichts. GUI_SCREENREADER ist TRUE, sobald eines den Baum angefordert hat.",
+    [
+      'IF GUI_CLICKED(bSpeichern) THEN GUI_ANNOUNCE("Rechnung gespeichert")',
+      'IF fehler THEN GUI_ANNOUNCE("Der Name fehlt.", TRUE)',
+      'IF GUI_SCREENREADER() THEN GUI_ANNOUNCE("Zeile " + STR$(zeile) + " von " + STR$(n))',
+    ]),
+  H.cmd("GUI_SET_TAB_INDEX", 'GUI_SET_TAB_INDEX(wdg, index)',
+    "Tab-Reihenfolge festlegen: Widgets mit einem Index über 0 kommen zuerst (aufsteigend), der Rest folgt in der Reihenfolge des Anlegens; 0 ist die Vorgabe. Nützlich, wenn ein Feld nachträglich dazukam und sonst als letztes an die Reihe käme. Die Menüleiste erreicht man ohne Maus mit F10 oder Alt allein, Pfeile laufen, Enter wählt.",
+    [
+      'GUI_SET_TAB_INDEX(tfName, 1) : GUI_SET_TAB_INDEX(tfOrt, 2)',
+    ]),
   H.cmd("GUI_RULE · GUI_RULES_CLEAR", 'GUI_RULE(feld, art$ [, a, b] [, meldung$])   GUI_RULES_CLEAR(feld)',
     "Hängt eine Prüfregel an ein Feld (bei \"muster\" steht statt a, b der reguläre Ausdruck): \"pflicht\" (Text nicht leer; Klappliste gewählt; Kästchen an), \"zahl\", \"ganz\", \"bereich a b\", \"laenge min max\" (Zeichen), \"email\", \"datum\" (JJJJ-MM-TT, echter Kalendertag), \"muster regex$\" (gilt für die ganze Eingabe). Der letzte Text ist die eigene Meldung, sonst gilt eine deutsche Vorgabe. Ein leeres Feld lässt jede Regel außer pflicht durch – ob es leer sein darf, sagt allein pflicht.",
     [

@@ -93,6 +93,7 @@ _SERIELL = {
     "test_gui_tastatur.py",
     "test_gui_dialog.py",
     "test_gui_menu_ausbau.py",       # speist Tasten UND Klicks ein
+    "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
     "test_gui_listen.py",            # Klicks mit Strg/Umschalt
     "test_gui_dialoge_ausbau.py",    # Klicks und Tasten in Dialoge
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
@@ -188,6 +189,7 @@ _NUR_WINDOWS = {
 }
 
 _BRAUCHT_GRAFIK = {
+    "test_gui_barrierefreiheit.py",
     "test_arc_width.py",
     "test_audio_modulators.py",
     "test_audio_note_mix.py",

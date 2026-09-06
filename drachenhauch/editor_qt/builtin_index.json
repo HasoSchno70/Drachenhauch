@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1712,
+ "count": 1715,
  "builtins": [
   {
    "name": "ABS",
@@ -2835,6 +2835,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ANNOUNCE",
+   "kind": "core",
+   "signature": "GUI_ANNOUNCE(text$[, dringend])",
+   "module": "gui"
+  },
+  {
    "name": "GUI_ANSWER",
    "kind": "core",
    "signature": "GUI_ANSWER(dialog)",
@@ -3651,6 +3657,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SCREENREADER",
+   "kind": "core",
+   "signature": "GUI_SCREENREADER()",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SEPARATOR",
    "kind": "core",
    "signature": "GUI_SEPARATOR(win, x, y, w)",
@@ -3768,6 +3780,12 @@
    "name": "GUI_SET_TAB",
    "kind": "core",
    "signature": "GUI_SET_TAB(widget, page)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_TAB_INDEX",
+   "kind": "core",
+   "signature": "GUI_SET_TAB_INDEX(wdg, index)",
    "module": "gui"
   },
   {

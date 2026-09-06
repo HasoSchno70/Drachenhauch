@@ -617,7 +617,7 @@ FORM_THEME_COLORS = {
                  radius=0, gradient=0, gloss=0),
     "light": dict(win_bg=0xF4F6F9, win_border=0xA8AEB6, title_bg=0xD0D5DC,
                   title_fg=0x202428, widget_bg=0xD8DCE2, widget_border=0x9AA0A8,
-                  text_fg=0x202428, muted_fg=0x90969C, accent=0x2A7DE1,
+                  text_fg=0x202428, muted_fg=0x545B63, accent=0x1F62B5,
                   radius=0, gradient=0, gloss=0),
     "retro": dict(win_bg=0x020802, win_border=0x1F8C3C, title_bg=0x0A2A0A,
                   title_fg=0x33FF66, widget_bg=0x0A1A0A, widget_border=0x1F8C3C,
@@ -1510,6 +1510,9 @@ class FormDoc:
         mw, mh = c.extra.get("min_w"), c.extra.get("min_h")
         if isinstance(mw, (int, float)) or isinstance(mh, (int, float)):
             out.append(f"GUI_SET_MIN_SIZE({var}, {int(mw or 0)}, {int(mh or 0)})")
+        ti = c.extra.get("tab_index")
+        if isinstance(ti, (int, float)) and int(ti) > 0:
+            out.append(f"GUI_SET_TAB_INDEX({var}, {int(ti)})")
         for r in c.extra.get("rules") or []:
             if not isinstance(r, dict) or r.get("art") not in _REGEL_ARTEN:
                 continue

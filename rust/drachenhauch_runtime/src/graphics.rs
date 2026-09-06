@@ -855,6 +855,12 @@ fn web_leinwand_groesse(w: i32, h: i32) {
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
+    /// Barrierefreiheit (a11y.rs): der Adapter am Fenster, ob in DIESEM Bild
+    /// schon ein Baum geschickt wurde (sonst schickt FLIP einen ohne Widgets),
+    /// und der Fenstertitel als Name des Wurzelknotens.
+    a11y: Option<crate::a11y::A11y>,
+    a11y_versorgt: bool,
+    titel: String,
     width: i32,
     height: i32,
     scale: i32,
@@ -1180,9 +1186,14 @@ impl Graphics {
             .log_level(raylib::consts::TraceLogLevel::LOG_WARNING);
         // FLAG_WINDOW_TRANSPARENT MUSS vor build() gesetzt sein (GLFW-Hint).
         if transparent { builder.transparent(); }
+        // IMMER versteckt anlegen: der Barrierefreiheits-Adapter (a11y.rs)
+        // verlangt ein Fenster, das noch nie sichtbar war. Gezeigt wird es
+        // gleich darunter -- ausser der Aufrufer wollte es ohnehin versteckt.
+        builder.hidden();
         let (mut rl, thread) = builder.build();
-        if hidden {
-            rl.set_window_state(WindowState::default().set_window_hidden(true));
+        let a11y = crate::a11y::A11y::neu(unsafe { rl.get_window_handle() });
+        if !hidden {
+            rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
         rl.set_target_fps(60);
         // Web: die HTML-Leinwand auf die Fenstergroesse bringen.
@@ -1217,6 +1228,7 @@ impl Graphics {
         let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
             rl, thread, width, height, scale,
+            a11y, a11y_versorgt: false, titel: title.to_string(),
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
             post_shader_idx: None, gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
@@ -1390,6 +1402,7 @@ impl Graphics {
         self.rl.clear_window_state(WindowState::default().set_window_hidden(true));
         self.rl.set_window_size(win_w, win_h);
         self.rl.set_window_title(&self.thread, title);
+        self.titel = title.to_string();
         // Szene-Render-Target an die neue Groesse anpassen (Post-Processing).
         self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
     }
@@ -3907,6 +3920,20 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn key_hit(&self, code: i64) -> bool {
         self.key_test(code, |k| self.rl.is_key_pressed(k))
     }
+    /// Wurde in DIESEM Bild irgendeine Taste ausser Alt gedrueckt? Fuer
+    /// "Alt allein oeffnet das Menue" (gui.rs) -- ein Alt+X darf es nicht.
+    /// Fragt die Tasten einzeln ab statt raylibs Warteschlange zu leeren
+    /// (die braucht KEY_ANY_HIT).
+    pub fn key_any_pressed_except_alt(&self) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        for code in 32..=348 {
+            if let Some(k) = raylib::core::input::key_from_i32(code) {
+                if k == KEY_LEFT_ALT || k == KEY_RIGHT_ALT { continue; }
+                if self.rl.is_key_pressed(k) { return true; }
+            }
+        }
+        false
+    }
     /// KEYRELEASED(code): in DIESEM Frame losgelassen.
     pub fn key_released_edge(&self, code: i64) -> bool {
         self.key_test(code, |k| self.rl.is_key_released(k))
@@ -4200,7 +4227,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     }
     pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
     pub fn set_target_fps(&mut self, n: i64) { self.rl.set_target_fps(n.max(0) as u32); }
-    pub fn set_window_title(&mut self, title: &str) { self.rl.set_window_title(&self.thread, title); }
+    pub fn set_window_title(&mut self, title: &str) { self.titel = title.to_string(); self.rl.set_window_title(&self.thread, title); }
     pub fn save_screenshot(&mut self, path: &str) { self.write_screenshot(path); }
 
     /// Schreibt einen Screenshot robust unter `path` (relativ = zum cwd).
@@ -4833,7 +4860,41 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         }
     }
 
+    // --- Barrierefreiheit ---------------------------------------------------
+    /// Hat ein Hilfsprogramm (Bildschirmleser, Lupe, Sprachsteuerung) nach dem
+    /// Baum gefragt? Erst dann lohnt es, einen zu bauen.
+    pub fn a11y_aktiv(&self) -> bool { self.a11y.as_ref().map_or(false, |a| a.aktiv()) }
+    /// Aktionen des Hilfsprogramms seit dem letzten Abruf.
+    pub fn a11y_aktionen(&mut self) -> Vec<accesskit::ActionRequest> {
+        self.a11y.as_mut().map(|a| a.aktionen()).unwrap_or_default()
+    }
+    /// Einen vollstaendigen Baum uebergeben (aus GUI_UPDATE).
+    pub fn a11y_senden(&mut self, baum: accesskit::TreeUpdate) {
+        if let Some(a) = self.a11y.as_mut() { a.senden(|| baum); self.a11y_versorgt = true; }
+    }
+    /// Fenstertitel (SCREEN/SETWINDOWTITLE) -- Name des Wurzelknotens.
+    pub fn fenster_titel(&self) -> &str { &self.titel }
+    /// Am Ende jedes Bildes: hat kein GUI_UPDATE einen Baum geschickt, bekommt
+    /// das Hilfsprogramm wenigstens das Fenster mit seinem Titel -- sonst
+    /// bliebe ein Programm ohne gui fuer immer bei "noch kein Baum".
+    fn a11y_bild_ende(&mut self) {
+        if self.a11y_aktiv() && !self.a11y_versorgt {
+            use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
+            let mut root = Node::new(Role::Window);
+            root.set_label(self.titel.clone());
+            let baum = TreeUpdate {
+                nodes: vec![(NodeId(crate::a11y::ids::ROOT), root)],
+                tree: Some(TreeInfo::new(NodeId(crate::a11y::ids::ROOT))),
+                tree_id: TreeId::ROOT,
+                focus: NodeId(crate::a11y::ids::ROOT),
+            };
+            if let Some(a) = self.a11y.as_mut() { a.senden(|| baum); }
+        }
+        self.a11y_versorgt = false;
+    }
+
     pub fn flip(&mut self) {
+        self.a11y_bild_ende();
         // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
         self.update_light_uniforms();
         self.update_inst_light_uniforms();
