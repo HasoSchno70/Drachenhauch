@@ -99,6 +99,11 @@ xmrsplayer = { version = "0.13", optional = true }
 # Desktop-GUI -> ans graphics-Feature gekoppelt. Auf Windows pure-Rust (windows-sys),
 # keine C-Toolchain.
 rfd = { version = "0.14", optional = true }
+# Barrierefreiheit (docs/entwurf-barrierefreiheit.md, Weg C): das gui-Modul
+# schiebt seinen Widget-Baum an die Schnittstelle des Systems (Windows: UI
+# Automation), damit Bildschirmleser, Lupe und Sprachsteuerung ihn sehen.
+# Reines Rust; der Baum wird nur gebaut, wenn ein Hilfsprogramm danach fragt.
+accesskit = { version = "0.25", optional = true }
 
 # --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
 # Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein
@@ -114,7 +119,9 @@ rfd = { version = "0.14", optional = true }
 # Das Crate liegt ueber andere Abhaengigkeiten ohnehin im Baum; hier nur die
 # Features, die die Druckseite braucht. Unter macOS/Linux druckt CUPS (`lp`).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+# UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
+accesskit_windows = { version = "0.35", optional = true }
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 wasm-bindgen = "=0.2.100"
@@ -131,7 +138,7 @@ raylib = { version = "6.0", optional = true, features = ["opengl_es_30"] }
 [features]
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
-graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer"]
+graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer", "dep:accesskit", "dep:accesskit_windows"]
 # Native OS-Dialoge (rfd) -- vom graphics-Feature GETRENNT, weil sie es im
 # Web-Build blockieren: rfd zieht js-sys/wasm-bindgen in einer Version nach,
 # die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1665,
+ "count": 1668,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -452,6 +452,7 @@
   "GREEN": "Kanal 0..255 aus &HRRGGBB",
   "GRID3D": "Bodenraster — hilft ungemein beim Einschätzen von Entfernungen",
   "GUI_ACTIVE_TAB": "INTEGER — aktiver Reiter-Index",
+  "GUI_ANNOUNCE": "einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; dringend: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“",
   "GUI_ANSWER": "INTEGER — 0 = noch offen, sonst die Nummer des Knopfs (1-basiert): 1 = OK/Ja, 2 = Abbrechen/Nein",
   "GUI_APPLY_STYLE": "einen benannten Stil auf ein Widget uebertragen -- spart, ihn Widget fuer Widget zu wiederholen",
   "GUI_AUTOSIZE": "Breite und Höhe aus dem Inhalt; Breite oder Höhe 0 beim Anlegen heißt dasselbe",
@@ -588,6 +589,7 @@
   "GUI_SAVE": "Fenster als JSON-Datei speichern",
   "GUI_SCALE": "Anzeige-Maßstab (0.5–4.0), vor dem ersten Fenster",
   "GUI_SCALE_GET": "aktueller Maßstab",
+  "GUI_SCREENREADER": "TRUE, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten",
   "GUI_SEPARATOR": "GUI_WIDGET — dekorative Trennlinie (horizontal)",
   "GUI_SET_ACTIVE_TAB": "Reiter umschalten",
   "GUI_SET_ALIGN": "Text links, mitte oder rechts ausrichten (Beschriftung, Knopf, Textfeld)",
@@ -608,6 +610,7 @@
   "GUI_SET_PICKED_COLOR": "Farbe setzen",
   "GUI_SET_ROUND": "Macht aus einem rechteckigen Knopf einen runden – für Transport-Tasten (Start/Stopp/Aufnahme) und alles, was nach Gerät aussehen soll.",
   "GUI_SET_TAB": "Widget einem Reiter zuordnen (-1 = auf allen Reitern sichtbar)",
+  "GUI_SET_TAB_INDEX": "Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens",
   "GUI_SET_TEXT": "Text setzen",
   "GUI_SET_VALUE": "Slider-Wert setzen (wird geclamped)",
   "GUI_SET_VISIBLE": "ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv)",

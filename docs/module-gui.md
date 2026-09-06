@@ -1888,6 +1888,14 @@ Akzentfarbe**; ohne sichtbaren Fokus wäre die Navigation wertlos.
 | `POS1` / `ENDE` | Regler/Drehknopf auf Minimum / Maximum |
 | `→` / `←` im Baum | aufklappen bzw. ins Kind / zuklappen bzw. zum Elternknoten |
 | `ESC` | offene Klappliste schließen |
+| `F10` oder `ALT` allein | Menüleiste öffnen (erster Eintrag markiert); `←`/`→` wechseln das Menü oder öffnen ein Untermenü, `↑`/`↓` laufen, `ENTER` wählt, `ESC` schließt eine Ebene |
+
+Die **Tab-Reihenfolge** ist die des Anlegens. Wer sie anders will — etwa
+weil ein Feld nachträglich dazukam —, setzt `GUI_SET_TAB_INDEX(wdg, n)`:
+Widgets mit einem Index über 0 kommen zuerst, aufsteigend, der Rest folgt
+wie gehabt. Ein Widget, das per Tastatur den Fokus bekommt, zeigt nach
+kurzem Verweilen seinen **Tooltip** unter sich — der Hilfetext stand sonst
+nur der Maus zur Verfügung.
 
 Welches Widget gerade dran ist, liefert `GUI_FOCUSED()` (`-1` = keins) —
 gedacht für eine Statuszeile oder einen Hilfetext zum aktiven Feld. Setzen
@@ -1905,6 +1913,75 @@ IF aktiv = knopfOk THEN TEXT(10, 220, "Uebernimmt die Aenderung")
 > gerade eine Klappliste offen ist oder eine Tabellenzelle bearbeitet wird
 > (`GUI_TABLE_EDITING_ROW < 0`) — sonst beendet die Taste das Programm,
 > während der Benutzer nur ein Popup schließen wollte.
+
+## Barrierefreiheit
+
+Ein Bildschirmleser (Windows: NVDA, JAWS, die Sprachausgabe), die Lupe und
+die Sprachsteuerung fragen ein Fenster über die Schnittstelle des Systems
+ab — unter Windows *UI Automation*. raylib malt Pixel und meldet dem
+System keine Bedienelemente; bis September 2026 war jedes
+Drachenhauch-Fenster für diese Programme ein Titel und sonst nichts
+(gemessen: null Nachkommen im UIA-Baum, siehe
+[entwurf-barrierefreiheit.md](entwurf-barrierefreiheit.md)).
+
+Seither **meldet das `gui`-Modul seinen Baum von selbst**, über die
+Rust-Bibliothek [AccessKit](https://accesskit.dev/): jedes Fenster, jedes
+Widget mit Rolle, Beschriftung, Wert, Lage und Zustand, die Menüleiste
+samt Einträgen und Kürzeln, die Reiter, Listeneinträge, Tabellenzeilen und
+Baumknoten. Und die Gegenrichtung geht auch: klickt ein Hilfsprogramm einen
+Knopf, feuern `GUI_CLICKED` und `GUI_ON_CLICK` wie bei einem Mausklick;
+setzt es den Fokus oder einen Text, sind es dieselben Wege wie bei der
+Tastatur. **Ein Programm muss dafür nichts tun.** Gebaut wird der Baum nur,
+wenn ein Hilfsprogramm danach fragt — ein Spiel ohne Bildschirmleser zahlt
+nichts.
+
+Was das Programm beisteuern kann:
+
+| Befehl | Beschreibung |
+|---|---|
+| `GUI_ANNOUNCE(text$[, dringend])` | einen Satz an den Bildschirmleser des Nutzers geben — er spricht ihn mit seiner Stimme (höflich: nach dem laufenden Satz; dringend: sofort). Ohne Hilfsprogramm passiert nichts. Für alles, was sonst nur in einer Statuszeile steht: „Rechnung gespeichert“, „3 Zeilen gelöscht“ |
+| `GUI_SCREENREADER()` | `TRUE`, sobald ein Hilfsprogramm den Baum angefordert hat — etwa um mehr anzusagen oder Bewegung abzuschalten |
+| `GUI_SET_TAB_INDEX(wdg, index)` | Tab-Reihenfolge festlegen: Widgets mit Index über 0 zuerst, aufsteigend; 0 (Vorgabe) = Reihenfolge des Anlegens |
+
+**Beschriftungen.** Ein Eingabefeld hat keinen eigenen Text; der
+Bildschirmleser nimmt die **Beschriftung links daneben** (gleiche Zeile)
+oder **direkt darüber** (gleiche linke Kante) — so, wie der Form-Designer
+sie setzt. Gibt es keine, gilt der Tooltip als Name. Eine Fehlermeldung aus
+der Formularprüfung wird als Beschreibung mitgelesen. Wer ein Feld ohne
+Nachbar-Beschriftung baut, gibt ihm also wenigstens einen `GUI_TOOLTIP`.
+
+**Was das Toolkit sonst schon mitbringt:** Bedienung ohne Maus (oben),
+`GUI_SCALE` für große Schrift, das Thema `contrast` (Weiß auf Schwarz,
+gelbe Rahmen, Kontrast 21:1) über `GUI_THEME_PRESET("contrast")`; die
+Vorgabe `dark` und das helle Thema liegen mit allen Texten über dem
+WCAG-Wert von 4,5:1.
+
+**Was das Programm tun muss — und nur es kann:** nie eine Information nur
+über Farbe geben (das rote Feld hat deshalb auch eine Meldung), jede
+Mausgeste auch als Taste anbieten (das `gui` tut es, die Zeichenfläche
+nicht), Ton nie als einzige Rückmeldung, Bewegung abschaltbar machen. Und
+eine Zeichenfläche ist für den Leser ein Bild: was darauf passiert, sagt
+man ihm mit `GUI_ANNOUNCE`.
+
+**Grenzen (Stand 2026-09-06):** Windows. macOS (VoiceOver) und Linux (Orca)
+haben ihre Adapter in derselben Bibliothek, sie sind aber noch nicht
+eingehängt, weil sie hier nicht zu prüfen sind. Die Schreibmarke in einem
+Textfeld wird noch nicht zeichenweise gemeldet (der Inhalt schon). Das
+`ui`-Modul (Immediate Mode) und der Web-Bau melden nichts.
+
+```basic
+IMPORT "gui"
+SCREEN(480, 320, "Ansage", 1)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Formular", 10, 10, 440, 280)
+DIM name AS GUI_WIDGET : name = GUI_LABEL(w, "Name", 10, 12)
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(w, 70, 8, 220, 26)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "Speichern", 10, 50, 120, 32)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN GUI_ANNOUNCE("Gespeichert: " + GUI_TEXT(feld))
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+```
 
 ## Das `TEXTAREA` als Code-Feld
 

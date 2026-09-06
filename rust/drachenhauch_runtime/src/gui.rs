@@ -113,8 +113,12 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
         "light" => Some(m(&[
             ("win_bg", 0xF4F6F9), ("win_border", 0xA8AEB6), ("title_bg", 0xD0D5DC),
             ("title_bg_focus", 0x2A7DE1), ("title_fg", 0x202428), ("widget_bg", 0xD8DCE2),
-            ("widget_border", 0x9AA0A8), ("text_fg", 0x202428), ("muted_fg", 0x90969C),
-            ("accent", 0x2A7DE1), ("close_hover", 0xC04848)])),
+            // Gedaempfter Text und Akzent nachgezogen (2026-09-06): 0x90969C
+            // lag bei 2,76:1 auf dem Fensterhintergrund, unter WCAG AA (4,5:1);
+            // 0x545B63 hat 6,3:1, auf Widget-Grund 4,9:1. Der Akzent von
+            // 3,8:1 auf 5,6:1 (0x1F62B5) -- er ist Fokusring und Haekchen.
+            ("widget_border", 0x9AA0A8), ("text_fg", 0x202428), ("muted_fg", 0x545B63),
+            ("accent", 0x1F62B5), ("close_hover", 0xC04848)])),
         // Dunkles Glas: Anthrazit-Blau mit Cyan-Akzent -- der Look aus dem
         // Vorlagenbild (Verlaeufe + Glanz kommen aus dem Metrik-Profil).
         "glas_dunkel" | "glas_dark" => Some(m(&[
@@ -989,6 +993,9 @@ pub struct Widget {
     tab_page: i32,
     // Hover-Hilfetext (Tooltip); leer = keiner. Erscheint nach kurzem Verweilen.
     tooltip: String,
+    /// Tab-Reihenfolge (GUI_SET_TAB_INDEX): Widgets mit Index > 0 kommen
+    /// zuerst, aufsteigend; der Rest folgt in der Reihenfolge des Anlegens.
+    tab_index: i32,
     // Schrittweite (nur Spinner): +/- / Pfeil / Mausrad aendert value um step.
     step: f64,
     // Farbige Abschnitte (nur TextArea): (start, laenge, farbe) in ZEICHEN,
@@ -1303,6 +1310,25 @@ pub struct Gui {
     // schon steht, wird nicht nachtraeglich umgerechnet (darum lehnt
     // `set_scale` einen Wechsel ab, solange Fenster existieren).
     scale: f64,
+    // --- Bedienung ohne Maus, zweiter Teil (docs/entwurf-barrierefreiheit.md, Weg A)
+    /// Per Tastatur gefuehrter Eintrag im tiefsten offenen Leistenmenue
+    /// (Index in `items`); None = die Maus fuehrt.
+    menu_cursor: Option<usize>,
+    /// Alt ist gedrueckt und bisher OHNE andere Taste -- beim Loslassen
+    /// oeffnet es das Menue (wie ueberall unter Windows). Ein Kuerzel mit Alt
+    /// loescht den Merker.
+    alt_allein: bool,
+    /// Tooltip am Widget, das per TASTATUR den Fokus bekam, und seit welchem
+    /// Bild -- ohne das stand der Hilfetext nur der Maus zur Verfuegung.
+    tip_fokus: Option<(usize, usize)>,
+    tip_fokus_frame: i64,
+    // --- Barrierefreiheit (Weg C): Ansage und ob ein Hilfsprogramm zuhoert
+    ansage: String,
+    ansage_dringend: bool,
+    ansage_nr: u32,
+    /// Von der VM je Bild gesetzt: hat ein Bildschirmleser (o.ae.) den Baum
+    /// angefordert? GUI_SCREENREADER() liest es.
+    pub screenreader: bool,
 }
 
 const WIDGET_SHIFT: i64 = 20;
@@ -1351,6 +1377,8 @@ impl Gui {
             pending: Vec::new(),
             hover_w: None, hover_frame: 0, hover_x: 0, hover_y: 0,
             scale: 1.0,
+            menu_cursor: None, alt_allein: false, tip_fokus: None, tip_fokus_frame: 0,
+            ansage: String::new(), ansage_dringend: false, ansage_nr: 0, screenreader: false,
         }
     }
 
@@ -1878,6 +1906,7 @@ impl Gui {
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
             tooltip: String::new(),
+            tab_index: 0,
             spans: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
@@ -4654,6 +4683,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Der Tooltip fehlte in der Datei -- ein im Designer gesetzter war
         // nach dem Laden weg.
         if !w.tooltip.is_empty() { o["tooltip"] = serde_json::json!(w.tooltip); }
+        if w.tab_index > 0 { o["tab_index"] = serde_json::json!(w.tab_index); }
         if let Some(f) = &w.on_enter {
             if !f.ist_gebunden() { o["on_enter"] = serde_json::json!(&*f.name); }
         }
@@ -4765,6 +4795,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.maxlaenge = wj["maxlaenge"].as_i64().unwrap_or(0).max(0) as i32;
         w.zahlen = wj["zahlen"].as_i64().unwrap_or(0).clamp(0, 2) as u8;
         w.tooltip = wj["tooltip"].as_str().unwrap_or("").to_string();
+        w.tab_index = wj["tab_index"].as_i64().unwrap_or(0).max(0) as i32;
         w.on_enter = wj["on_enter"].as_str().map(Rueckruf::benannt);
         w.auto_w = wj["auto_w"].as_bool().unwrap_or(false);
         w.auto_h = wj["auto_h"].as_bool().unwrap_or(false);
@@ -5625,6 +5656,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             found
         });
+        if mx != self.hover_x || my != self.hover_y || is_down {
+            // Die Maus uebernimmt: der Tastatur-Tooltip und der
+            // Tastatur-Menuecursor treten zurueck.
+            self.tip_fokus = None;
+            self.menu_cursor = None;
+        }
         if tip_cur != self.hover_w || mx != self.hover_x || my != self.hover_y || is_down {
             self.hover_w = tip_cur;
             self.hover_frame = self.frame_count;
@@ -5799,6 +5836,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        // Menue per Tastatur (Alt / F10, Pfeile, Enter, ESC). Solange ein
+        // Leistenmenue offen ist, gehoeren die Tasten dem Menue -- sonst
+        // tippte man in ein Textfeld, waehrend das Menue aufsteht.
+        let menue_hat_tasten = self.menue_tasten(g);
+        if !menue_hat_tasten {
         // Tastatur + Maus fuer das fokussierte Textfeld (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
             match self.windows[wi].widgets[i].kind {
@@ -5822,12 +5864,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             .unwrap_or(false);
         if g.key_pressed(KEY_TAB) && !tab_belegt {
             if let Some(top) = self.focus_window {
-                let n = self.windows[top].widgets.len();
-                let mut idxs: Vec<usize> = Vec::new();
-                for i in 0..n {
-                    let w = &self.windows[top].widgets[i];
-                    if w.kind.fokussierbar() && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
-                }
+                let idxs = self.tab_reihenfolge(top);
                 if !idxs.is_empty() {
                     let cur = self.focus_widget.filter(|(w, _)| *w == top).map(|(_, i)| i);
                     let pos = cur.and_then(|c| idxs.iter().position(|&i| i == c));
@@ -5839,6 +5876,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let ni = idxs[next];
                     self.open_dropdown = None;   // beim Weitertabben nichts offen stehen lassen
                     self.focus_widget = Some((top, ni));
+                    // Der Hilfetext erscheint nach kurzem Verweilen auch hier
+                    // -- bisher stand er nur der Maus zur Verfuegung.
+                    self.tip_fokus = Some((top, ni));
+                    self.tip_fokus_frame = self.frame_count;
                     // Nur ein Textfeld bekommt Caret + Markierung -- bei einem
                     // Knopf waeren beide bedeutungslos.
                     if self.windows[top].widgets[ni].kind.nimmt_text() {
@@ -5871,6 +5912,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        }   // !menue_hat_tasten
         self.dialog_auswerten();
         self.was_mouse_down = is_down;
         self.was_right_down = right_down;
@@ -7914,30 +7956,46 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         Ok(())
     }
 
+    /// Hilfetext (Tooltip) bzw. Fehlermeldung eines Widgets -- die Meldung
+    /// gewinnt. None, wenn es nichts zu sagen gibt.
+    fn tip_text(&self, wi: usize, i: usize) -> Option<String> {
+        let w = self.windows.get(wi)?.widgets.get(i)?;
+        if !w.fehler.is_empty() { return Some(w.fehler.clone()); }
+        if !w.tooltip.is_empty() { return Some(w.tooltip.clone()); }
+        None
+    }
+
     /// Zeichnet den Hilfetext des aktuell verweilten Widgets (nahe der Maus),
-    /// sobald TOOLTIP_DELAY ruhende Frames vergangen sind. Mehrzeilig (\n),
-    /// am Bildschirmrand zurueckgeklemmt.
+    /// sobald TOOLTIP_DELAY ruhende Frames vergangen sind -- oder den des
+    /// Widgets, das per Tastatur den Fokus bekam (unter dem Widget). Die
+    /// Maus gewinnt. Mehrzeilig (\n), am Bildschirmrand zurueckgeklemmt.
     fn draw_tooltip(&self, g: &mut Graphics) {
-        let (wi, i) = match self.hover_w { Some(p) => p, None => return };
-        if self.frame_count - self.hover_frame < TOOLTIP_DELAY { return; }
-        let text = match self.windows.get(wi).and_then(|w| w.widgets.get(i)) {
-            Some(w) if !w.fehler.is_empty() => w.fehler.clone(),   // die Meldung gewinnt
-            Some(w) if !w.tooltip.is_empty() => w.tooltip.clone(),
-            _ => return,
-        };
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        let (sw, sh) = (g.screen_width() as i32, g.screen_height() as i32);
+        let per_maus = self.hover_w
+            .filter(|_| self.frame_count - self.hover_frame >= TOOLTIP_DELAY)
+            .and_then(|(wi, i)| self.tip_text(wi, i).map(|t| (t, mx + 14, my + 18)));
+        let anker = per_maus.or_else(|| {
+            let (wi, i) = self.tip_fokus?;
+            if self.frame_count - self.tip_fokus_frame < TOOLTIP_DELAY { return None; }
+            if self.focus_widget != Some((wi, i)) { return None; }
+            let w = self.windows.get(wi)?.widgets.get(i)?;
+            if !self.widget_shown(wi, w) { return None; }
+            let (x, y, _, h) = self.abs_rect(wi, w);
+            self.tip_text(wi, i).map(|t| (t, x, y + h + 4))
+        });
+        let (text, ax, ay) = match anker { Some(a) => a, None => return };
         let pad = 6;
         let lh = (self.ctext_height(g) + self.sk(3)).max(self.sk(12));
         let lines: Vec<&str> = text.split('\n').collect();
         let tw = lines.iter().map(|l| self.ctext_width(g, l)).max().unwrap_or(0);
         let bw = tw + pad * 2;
         let bh = lines.len() as i32 * lh + pad * 2 - 3;
-        // Position: rechts-unter dem Cursor, an den Bildschirmrand geklemmt.
-        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-        let (sw, sh) = (g.screen_width() as i32, g.screen_height() as i32);
-        let mut bx = mx + 14;
-        let mut by = my + 18;
-        if bx + bw > sw { bx = (mx - bw - 6).max(0); }
-        if by + bh > sh { by = (my - bh - 6).max(0); }
+        // Position: am Anker, an den Bildschirmrand geklemmt.
+        let mut bx = ax;
+        let mut by = ay;
+        if bx + bw > sw { bx = (sw - bw).max(0); }
+        if by + bh > sh { by = (ay - bh - 24).max(0); }
         let rad = self.m("corner_radius").min(6);
         g.round_rect(bx + 2, by + 3, bx + bw - 1 + 2, by + bh - 1 + 3, rad.max(2), (0x55i64 << 24) as i64, true);
         g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("widget_bg"), true);
@@ -7945,6 +8003,730 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         for (r, line) in lines.iter().enumerate() {
             self.ctext(g, bx + pad, by + pad + r as i32 * lh, line.to_string(), self.th("text_fg"));
         }
+    }
+
+
+    // --- Bedienung ohne Maus, zweiter Teil ------------------------------------
+    /// Tab-Reihenfolge eines Fensters: bedienbare, sichtbare, eingeschaltete
+    /// Widgets -- die mit `tab_index` > 0 zuerst (aufsteigend), der Rest in
+    /// der Reihenfolge des Anlegens. EINE Quelle fuer den Tab-Zyklus.
+    fn tab_reihenfolge(&self, wi: usize) -> Vec<usize> {
+        let win = &self.windows[wi];
+        let mut idxs: Vec<usize> = (0..win.widgets.len())
+            .filter(|&i| { let w = &win.widgets[i]; w.kind.fokussierbar() && self.widget_shown(wi, w) && w.enabled })
+            .collect();
+        idxs.sort_by_key(|&i| {
+            let t = win.widgets[i].tab_index;
+            (if t > 0 { 0 } else { 1 }, if t > 0 { t } else { 0 }, i)
+        });
+        idxs
+    }
+    pub fn set_tab_index(&mut self, h: i64, n: i64) -> Result<(), String> {
+        if n < 0 { return Err("GUI_SET_TAB_INDEX: der Index ist 0 (Anlege-Reihenfolge) oder groesser".into()); }
+        let w = self.wdg_mut(h, "GUI_SET_TAB_INDEX")?;
+        w.tab_index = n as i32;
+        Ok(())
+    }
+
+    /// Das tiefste offene Leistenmenue: (Fenster, Menue) -- das letzte
+    /// Untermenue der Kette oder das Wurzelmenue.
+    fn tiefstes_menue(&self) -> Option<(usize, usize)> {
+        let (wi, mi) = self.open_menu?;
+        Some((wi, self.sub_chain.last().map(|s| s.0).unwrap_or(mi)))
+    }
+    /// Erster bedienbarer Eintrag eines Menues ab `von` in Richtung `d`
+    /// (+1/-1), umlaufend; None, wenn es keinen gibt.
+    fn menue_schritt(&self, wi: usize, mi: usize, von: Option<usize>, d: i32) -> Option<usize> {
+        let items = &self.windows.get(wi)?.menus.get(mi)?.items;
+        let n = items.len() as i32;
+        if n == 0 { return None; }
+        let mut k = match von { Some(v) => v as i32 + d, None => if d > 0 { 0 } else { n - 1 } };
+        for _ in 0..n {
+            k = k.rem_euclid(n);
+            let it = &items[k as usize];
+            if !it.separator && it.enabled { return Some(k as usize); }
+            k += d;
+        }
+        None
+    }
+    /// Menueleiste per Tastatur oeffnen: das erste Leistenmenue des Fensters
+    /// mit Fokus (oder des obersten Fensters mit Leiste).
+    fn menue_oeffnen_per_taste(&mut self) {
+        let kandidaten: Vec<usize> = self.focus_window.into_iter()
+            .chain(self.z_order.iter().rev().copied()).collect();
+        for wi in kandidaten {
+            let win = match self.windows.get(wi) { Some(w) if w.alive && w.visible => w, _ => continue };
+            if self.modal.map_or(false, |m| m != wi) { continue; }
+            if let Some(mi) = win.menus.iter().position(|m| m.in_bar) {
+                self.open_menu = Some((wi, mi));
+                self.context_open = None;
+                self.sub_chain.clear();
+                self.open_dropdown = None;
+                self.menu_cursor = self.menue_schritt(wi, mi, None, 1);
+                return;
+            }
+        }
+    }
+    /// Zum naechsten/vorigen Leistenmenue wechseln (Kette schliessen).
+    fn menue_seitwaerts(&mut self, d: i32) {
+        let (wi, mi) = match self.open_menu { Some(x) => x, None => return };
+        let leiste: Vec<usize> = self.windows[wi].menus.iter().enumerate()
+            .filter(|(_, m)| m.in_bar).map(|(k, _)| k).collect();
+        if leiste.is_empty() { return; }
+        let pos = leiste.iter().position(|&k| k == mi).unwrap_or(0) as i32;
+        let neu = leiste[(pos + d).rem_euclid(leiste.len() as i32) as usize];
+        self.open_menu = Some((wi, neu));
+        self.sub_chain.clear();
+        self.menu_cursor = self.menue_schritt(wi, neu, None, 1);
+    }
+    /// Untermenue des Eintrags `ii` per Tastatur oeffnen -- dieselbe Lage
+    /// wie beim Ueberfahren mit der Maus (`untermenues_folgen`).
+    fn untermenue_per_taste(&mut self, g: &Graphics, ii: usize) {
+        let chain = self.popup_chain(g);
+        let &(wi, mi, px, py) = match chain.last() { Some(x) => x, None => return };
+        let sub = match self.windows[wi].menus[mi].items.get(ii) { Some(it) if it.sub >= 0 => it.sub as usize, _ => return };
+        let (wmax, _) = self.popup_size(g, wi, mi);
+        let iy = py + 2 + ii as i32 * self.sk(MENU_ITEM_H);
+        self.sub_chain.push((sub, px + wmax - 4, iy - 2));
+        self.menu_cursor = self.menue_schritt(wi, sub, None, 1);
+    }
+    /// Tasten fuers Leistenmenue. Liefert true, wenn die Tasten dem Menue
+    /// gehoeren (es ist offen oder wurde eben geoeffnet) -- dann bekommen
+    /// die Widgets sie nicht.
+    fn menue_tasten(&mut self, g: &Graphics) -> bool {
+        // Alt allein: gedrueckt merken, jede andere Taste loescht, das
+        // Loslassen oeffnet. F10 oeffnet sofort.
+        const K_LALT: i64 = 1073742050;
+        const K_RALT: i64 = 1073742054;
+        const K_F10: i64 = 1073741891;
+        let alt = g.key_alt();
+        if alt && !self.alt_allein && (g.key_pressed(K_LALT) || g.key_pressed(K_RALT)) { self.alt_allein = true; }
+        if alt && self.alt_allein && g.key_any_pressed_except_alt() { self.alt_allein = false; }
+        let alt_los = !alt && self.alt_allein && (g.key_released_edge(K_LALT) || g.key_released_edge(K_RALT));
+        if !alt { self.alt_allein = false; }
+        let oeffnen = g.key_pressed(K_F10) || alt_los;
+        if self.open_menu.is_none() || self.context_open.is_some() {
+            if oeffnen && self.context_open.is_none() {
+                self.menue_oeffnen_per_taste();
+                return self.open_menu.is_some();
+            }
+            return false;
+        }
+        if oeffnen {   // F10/Alt bei offenem Menue: schliessen
+            self.open_menu = None; self.sub_chain.clear(); self.menu_cursor = None;
+            return true;
+        }
+        let (wi, mi) = match self.tiefstes_menue() { Some(x) => x, None => return false };
+        let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
+        let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
+        let waehlen = g.key_pressed(KEY_ENTER) || g.key_pressed(KEY_SPACE);
+        if ab { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, 1); }
+        if auf { self.menu_cursor = self.menue_schritt(wi, mi, self.menu_cursor, -1); }
+        let hat_sub = |gui: &Gui, ii: usize| gui.windows[wi].menus[mi].items.get(ii).map_or(false, |it| it.sub >= 0);
+        if rechts {
+            match self.menu_cursor {
+                Some(ii) if hat_sub(self, ii) => self.untermenue_per_taste(g, ii),
+                _ => self.menue_seitwaerts(1),
+            }
+        }
+        if links {
+            if let Some((sub, _, _)) = self.sub_chain.pop() {
+                // Zurueck auf den Eintrag, dessen Untermenue das war.
+                let (_, eltern) = self.tiefstes_menue().unwrap_or((wi, mi));
+                self.menu_cursor = self.windows[wi].menus[eltern].items.iter().position(|it| it.sub == sub as i32);
+            } else {
+                self.menue_seitwaerts(-1);
+            }
+        }
+        if waehlen {
+            match self.menu_cursor {
+                Some(ii) if hat_sub(self, ii) => self.untermenue_per_taste(g, ii),
+                Some(ii) => {
+                    self.open_menu = None; self.sub_chain.clear(); self.menu_cursor = None;
+                    self.fire_menu_item(wi, mi, ii);
+                }
+                None => { self.menu_cursor = self.menue_schritt(wi, mi, None, 1); }
+            }
+        }
+        if g.key_pressed(KEY_ESC) {
+            if let Some((sub, _, _)) = self.sub_chain.pop() {
+                let (_, eltern) = self.tiefstes_menue().unwrap_or((wi, mi));
+                self.menu_cursor = self.windows[wi].menus[eltern].items.iter().position(|it| it.sub == sub as i32);
+            } else {
+                self.open_menu = None; self.menu_cursor = None;
+            }
+        }
+        true
+    }
+
+    // --- Barrierefreiheit (a11y.rs, Weg C) -------------------------------------
+    /// GUI_ANNOUNCE: ein Satz fuer den Bildschirmleser des Nutzers. Er wird
+    /// als Live-Knoten in den Baum gestellt; das Hilfsprogramm spricht ihn
+    /// mit seiner Stimme. Ohne Hilfsprogramm passiert nichts.
+    pub fn announce(&mut self, text: String, dringend: bool) {
+        self.ansage = text;
+        self.ansage_dringend = dringend;
+        self.ansage_nr = self.ansage_nr.wrapping_add(1);
+    }
+
+    fn a11y_rect(x: i32, y: i32, w: i32, h: i32) -> accesskit::Rect {
+        accesskit::Rect::new(x as f64, y as f64, (x + w) as f64, (y + h) as f64)
+    }
+
+    /// Beschriftung fuer ein Eingabe-Widget ohne eigenen Text: die
+    /// Beschriftung LINKS daneben (gleiche Zeile) oder DARUEBER (gleiche
+    /// linke Kante) -- so setzt der Form-Designer sie, und so erwartet es
+    /// jeder Nutzer eines Bildschirmlesers ("Name, Eingabefeld").
+    fn a11y_beschriftung(&self, wi: usize, i: usize) -> Option<usize> {
+        let win = &self.windows[wi];
+        let w = &win.widgets[i];
+        let mut beste: Option<(i32, usize)> = None;
+        for (k, l) in win.widgets.iter().enumerate() {
+            if k == i || l.kind != Kind::Label || !self.widget_shown(wi, l) || l.text.is_empty() { continue; }
+            let links = l.y < w.y + w.h && l.y + l.h > w.y && l.x + l.w <= w.x + 8 && w.x - (l.x + l.w) < 60;
+            let oben = (l.x - w.x).abs() <= 8 && l.y + l.h <= w.y + 4 && w.y - (l.y + l.h) < 16;
+            if !(links || oben) { continue; }
+            let abstand = if links { w.x - (l.x + l.w) } else { w.y - (l.y + l.h) + 100 };
+            if beste.map_or(true, |(d, _)| abstand < d) { beste = Some((abstand, k)); }
+        }
+        beste.map(|(_, k)| k)
+    }
+
+    /// Der ganze Baum fuer das Hilfsprogramm: Wurzel = das OS-Fenster,
+    /// darunter ein Ansage-Knoten und jedes sichtbare gui-Fenster mit
+    /// Menueleiste, Reitern und Widgets. Vollstaendig, jedes Bild -- nur
+    /// gebaut, wenn jemand zuhoert (siehe vm.rs).
+    pub fn a11y_baum(&self, g: &Graphics, titel: &str) -> accesskit::TreeUpdate {
+        use accesskit::{Live, Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
+        use crate::a11y::ids;
+        let mut nodes: Vec<(NodeId, Node)> = Vec::new();
+        let mut kinder: Vec<NodeId> = Vec::new();
+        // Ansage: dieselbe Ansage zweimal waere fuer den Baum keine
+        // Aenderung -- ein wechselndes Leerzeichen macht sie zu einer.
+        let mut an = Node::new(Role::Label);
+        an.set_live(if self.ansage_dringend { Live::Assertive } else { Live::Polite });
+        let mut t = self.ansage.clone();
+        if self.ansage_nr % 2 == 1 { t.push(' '); }
+        an.set_value(t.clone());
+        an.set_label(t);
+        nodes.push((NodeId(ids::ANSAGE), an));
+        kinder.push(NodeId(ids::ANSAGE));
+        for &wi in &self.z_order {
+            if let Some(win) = self.windows.get(wi) {
+                if win.alive && win.visible { kinder.push(self.a11y_fenster(g, wi, &mut nodes)); }
+            }
+        }
+        let mut root = Node::new(Role::Window);
+        root.set_label(titel.to_string());
+        root.set_children(kinder);
+        nodes.push((NodeId(ids::ROOT), root));
+        // Fokus: das Widget mit Fokus, sonst das Fenster mit Fokus, sonst die Wurzel.
+        let mut focus = NodeId(ids::ROOT);
+        if let Some(fw) = self.focus_window {
+            if self.windows.get(fw).map_or(false, |w| w.alive && w.visible) {
+                focus = NodeId(ids::fenster(fw));
+                if let Some((wi, i)) = self.focus_widget {
+                    if wi == fw {
+                        if let Some(w) = self.windows[wi].widgets.get(i) {
+                            if self.widget_shown(wi, w) { focus = NodeId(ids::widget(wi, i)); }
+                        }
+                    }
+                }
+            }
+        }
+        TreeUpdate { nodes, tree: Some(TreeInfo::new(NodeId(ids::ROOT))), tree_id: TreeId::ROOT, focus }
+    }
+
+    fn a11y_fenster(&self, g: &Graphics, wi: usize, nodes: &mut Vec<(accesskit::NodeId, accesskit::Node)>) -> accesskit::NodeId {
+        use accesskit::{Node, NodeId, Role};
+        use crate::a11y::ids;
+        let win = &self.windows[wi];
+        let modal = self.modal == Some(wi);
+        let mut n = Node::new(if win.dlg || modal { Role::Dialog } else { Role::Group });
+        if modal { n.set_modal(); }
+        n.set_label(win.title.clone());
+        n.set_bounds(Self::a11y_rect(win.x, win.y, win.w, win.h));
+        let mut kinder: Vec<NodeId> = Vec::new();
+        if self.menubar_h(wi) > 0 { kinder.push(self.a11y_menueleiste(g, wi, nodes)); }
+        if !win.tabs.is_empty() { kinder.push(self.a11y_reiter(g, wi, nodes)); }
+        for i in 0..win.widgets.len() {
+            let w = &win.widgets[i];
+            if !self.widget_shown(wi, w) || matches!(w.kind, Kind::Layout | Kind::Separator) { continue; }
+            kinder.push(self.a11y_widget(wi, i, nodes));
+        }
+        n.set_children(kinder);
+        let id = NodeId(ids::fenster(wi));
+        nodes.push((id, n));
+        id
+    }
+
+    fn a11y_menueleiste(&self, g: &Graphics, wi: usize, nodes: &mut Vec<(accesskit::NodeId, accesskit::Node)>) -> accesskit::NodeId {
+        use accesskit::{Action, Node, NodeId, Role};
+        use crate::a11y::ids;
+        let win = &self.windows[wi];
+        let by = win.y + if win.chrome { self.m("title_h") } else { 0 };
+        let mh = self.sk(MENUBAR_H);
+        let mut leiste = Node::new(Role::MenuBar);
+        leiste.set_bounds(Self::a11y_rect(win.x, by, win.w, mh));
+        let chain = self.popup_chain(g);
+        let mut kinder = Vec::new();
+        for (mi, x0, x1) in self.menubar_slots(g, wi) {
+            let mut m = Node::new(Role::Menu);
+            m.set_label(win.menus[mi].label.clone());
+            m.set_bounds(Self::a11y_rect(x0, by, x1 - x0, mh));
+            m.add_action(Action::Click);
+            m.add_action(Action::Expand);
+            m.add_action(Action::Collapse);
+            m.set_expanded(self.open_menu == Some((wi, mi)));
+            m.set_children(self.a11y_eintraege(wi, mi, &chain, g, nodes, 0));
+            let id = NodeId(ids::menue(wi, mi));
+            nodes.push((id, m));
+            kinder.push(id);
+        }
+        leiste.set_children(kinder);
+        let id = NodeId(ids::leiste(wi));
+        nodes.push((id, leiste));
+        id
+    }
+
+    /// Die Eintraege eines Menues (rekursiv fuer Untermenues, begrenzt).
+    /// Lage nur, wenn das Popup gerade offen ist.
+    fn a11y_eintraege(&self, wi: usize, mi: usize, chain: &[(usize, usize, i32, i32)], g: &Graphics,
+                      nodes: &mut Vec<(accesskit::NodeId, accesskit::Node)>, tiefe: u32) -> Vec<accesskit::NodeId> {
+        use accesskit::{Action, Node, NodeId, Role, Toggled};
+        use crate::a11y::ids;
+        let mut kinder = Vec::new();
+        let menu = match self.windows[wi].menus.get(mi) { Some(m) => m, None => return kinder };
+        let offen = chain.iter().find(|c| c.0 == wi && c.1 == mi).map(|c| (c.2, c.3));
+        let (wmax, ih) = (offen.map(|_| self.popup_size(g, wi, mi).0).unwrap_or(0), self.sk(MENU_ITEM_H));
+        for (ii, it) in menu.items.iter().enumerate() {
+            if it.separator { continue; }
+            let mut n = Node::new(if it.haken { Role::MenuItemCheckBox } else { Role::MenuItem });
+            n.set_label(it.label.clone());
+            if !it.kuerzel.is_empty() { n.set_keyboard_shortcut(it.kuerzel.clone()); }
+            if !it.enabled { n.set_disabled(); }
+            if it.haken { n.set_toggled(if it.an { Toggled::True } else { Toggled::False }); }
+            n.add_action(Action::Click);
+            if let Some((px, py)) = offen { n.set_bounds(Self::a11y_rect(px, py + 2 + ii as i32 * ih, wmax, ih)); }
+            if it.sub >= 0 && tiefe < 6 {
+                n.set_expanded(self.sub_chain.iter().any(|s| s.0 == it.sub as usize));
+                n.set_children(self.a11y_eintraege(wi, it.sub as usize, chain, g, nodes, tiefe + 1));
+            }
+            let id = NodeId(ids::eintrag(wi, mi, ii));
+            nodes.push((id, n));
+            kinder.push(id);
+        }
+        kinder
+    }
+
+    fn a11y_reiter(&self, g: &Graphics, wi: usize, nodes: &mut Vec<(accesskit::NodeId, accesskit::Node)>) -> accesskit::NodeId {
+        use accesskit::{Action, Node, NodeId, Role};
+        use crate::a11y::ids;
+        let win = &self.windows[wi];
+        let by = win.y + (if win.chrome { self.m("title_h") } else { 0 }) + self.menubar_h(wi);
+        let mut liste = Node::new(Role::TabList);
+        liste.set_bounds(Self::a11y_rect(win.x, by, win.w, TABBAR_H));
+        let mut kinder = Vec::new();
+        for (ti, x0, x1) in self.tab_slots(g, wi) {
+            let mut t = Node::new(Role::Tab);
+            t.set_label(win.tabs[ti].clone());
+            t.set_bounds(Self::a11y_rect(x0, by, x1 - x0, TABBAR_H));
+            t.set_selected(win.active_tab == ti as i32);
+            t.add_action(Action::Click);
+            let id = NodeId(ids::reiter(wi, ti));
+            nodes.push((id, t));
+            kinder.push(id);
+        }
+        liste.set_children(kinder);
+        let id = NodeId(ids::reiterleiste(wi));
+        nodes.push((id, liste));
+        id
+    }
+
+    /// Ein Widget als Knoten, samt Unterknoten (Listeneintraege, Zellen,
+    /// Baumknoten). Rolle nach Art, Beschriftung aus Text oder Nachbar-
+    /// Beschriftung, Wert, Rechteck, Zustaende, erlaubte Aktionen.
+    fn a11y_widget(&self, wi: usize, i: usize, nodes: &mut Vec<(accesskit::NodeId, accesskit::Node)>) -> accesskit::NodeId {
+        use accesskit::{Action, Node, NodeId, Orientation, Role, Toggled};
+        use crate::a11y::ids;
+        let w = &self.windows[wi].widgets[i];
+        let (x, y, bw, bh) = self.abs_rect(wi, w);
+        let id = NodeId(ids::widget(wi, i));
+        let mut kinder: Vec<NodeId> = Vec::new();
+        let mut n = match w.kind {
+            Kind::Button => {
+                let mut n = Node::new(if self.windows[wi].default_btn == i as i32 { Role::DefaultButton } else { Role::Button });
+                n.set_label(w.text.clone());
+                n.add_action(Action::Click);
+                n
+            }
+            Kind::Label => { let mut n = Node::new(Role::Label); n.set_label(w.text.clone()); n.set_value(w.text.clone()); n }
+            Kind::Checkbox | Kind::Toggle | Kind::Radio => {
+                let mut n = Node::new(match w.kind { Kind::Checkbox => Role::CheckBox, Kind::Toggle => Role::Switch, _ => Role::RadioButton });
+                n.set_label(w.text.clone());
+                n.set_toggled(if w.checked { Toggled::True } else { Toggled::False });
+                n.add_action(Action::Click);
+                n
+            }
+            Kind::Slider | Kind::Knob | Kind::Spinner | Kind::Progress => {
+                let mut n = Node::new(match w.kind { Kind::Spinner => Role::SpinButton, Kind::Progress => Role::ProgressIndicator, _ => Role::Slider });
+                n.set_numeric_value(w.value);
+                n.set_min_numeric_value(w.min);
+                n.set_max_numeric_value(w.max);
+                n.set_numeric_value_step(if w.kind == Kind::Spinner { w.step.max(f64::EPSILON) } else { ((w.max - w.min) / 20.0).abs().max(f64::EPSILON) });
+                n.set_value(zahl_kurz(w.value));
+                if w.kind == Kind::Slider && w.vert { n.set_orientation(Orientation::Vertical); }
+                if w.kind != Kind::Progress {
+                    n.add_action(Action::Increment);
+                    n.add_action(Action::Decrement);
+                    n.add_action(Action::SetValue);
+                }
+                n
+            }
+            Kind::TextInput => {
+                let mut n = Node::new(if w.passwort { Role::PasswordInput } else if w.zahlen != 0 { Role::NumberInput } else { Role::TextInput });
+                if !w.passwort { n.set_value(w.text.clone()); }
+                if !w.placeholder.is_empty() { n.set_placeholder(w.placeholder.clone()); }
+                if w.nur_lesen { n.set_read_only(); } else { n.add_action(Action::SetValue); }
+                n
+            }
+            Kind::TextArea => {
+                let mut n = Node::new(Role::MultilineTextInput);
+                n.set_value(w.text.clone());
+                if w.nur_lesen { n.set_read_only(); } else { n.add_action(Action::SetValue); }
+                n
+            }
+            Kind::Dropdown => {
+                let mut n = Node::new(Role::ComboBox);
+                if w.sel >= 0 { if let Some(t) = w.items.get(w.sel as usize) { n.set_value(t.clone()); } }
+                n.set_expanded(self.open_dropdown == Some((wi, i)));
+                n.add_action(Action::Expand);
+                n.add_action(Action::Collapse);
+                n.add_action(Action::SetValue);
+                for (k, item) in w.items.iter().enumerate().take(4000) {
+                    let mut o = Node::new(Role::ListBoxOption);
+                    o.set_label(item.clone());
+                    o.set_selected(w.sel == k as i32);
+                    o.add_action(Action::Click);
+                    let oid = NodeId(ids::teil(wi, i, k));
+                    nodes.push((oid, o));
+                    kinder.push(oid);
+                }
+                n
+            }
+            Kind::ListBox => {
+                let mut n = Node::new(Role::ListBox);
+                let l = w.list.as_ref();
+                if l.map_or(false, |l| l.multi) { n.set_multiselectable(); }
+                let zh = self.sk(DROPDOWN_ITEM_H);
+                for (k, item) in w.items.iter().enumerate().take(4000) {
+                    let mut o = Node::new(Role::ListBoxOption);
+                    o.set_label(item.clone());
+                    let gewaehlt = match l { Some(l) if l.multi => l.sel.get(k).copied().unwrap_or(false), _ => w.sel == k as i32 };
+                    o.set_selected(gewaehlt);
+                    if let Some(l) = l { if l.kaestchen { o.set_toggled(if l.checks.get(k).copied().unwrap_or(false) { Toggled::True } else { Toggled::False }); } }
+                    o.set_bounds(Self::a11y_rect(x, y + k as i32 * zh - w.value as i32, bw, zh));
+                    o.add_action(Action::Click);
+                    let oid = NodeId(ids::teil(wi, i, k));
+                    nodes.push((oid, o));
+                    kinder.push(oid);
+                }
+                n
+            }
+            Kind::Table => {
+                let n = Node::new(Role::Table);
+                if let Some(t) = w.tbl.as_ref() {
+                    // Kopfzeile
+                    let mut kopf = Node::new(Role::Row);
+                    let mut zellen = Vec::new();
+                    for (c, h) in t.headers.iter().enumerate().take(63) {
+                        let mut z = Node::new(Role::ColumnHeader);
+                        z.set_label(h.clone());
+                        z.set_column_index(c);
+                        let zid = NodeId(ids::teil(wi, i, 64000 + c));
+                        nodes.push((zid, z));
+                        zellen.push(zid);
+                    }
+                    kopf.set_children(zellen);
+                    let kid = NodeId(ids::teil(wi, i, 65000));
+                    nodes.push((kid, kopf));
+                    kinder.push(kid);
+                    // Datenzeilen in der sichtbaren Reihenfolge
+                    for (r, &dz) in t.view.iter().enumerate().take(400) {
+                        let mut zeile = Node::new(Role::Row);
+                        zeile.set_row_index(r + 1);
+                        zeile.set_selected(t.selected == dz as i32);
+                        zeile.add_action(Action::Click);
+                        let mut zellen = Vec::new();
+                        if let Some(row) = t.rows.get(dz) {
+                            for (c, cell) in row.iter().enumerate().take(63) {
+                                let mut z = Node::new(Role::Cell);
+                                let text = match cell.kind {
+                                    CellKind::Check => (if cell.value > 0.5 { "ja" } else { "nein" }).to_string(),
+                                    CellKind::Bar => zahl_kurz(cell.value),
+                                    _ => cell.text.clone(),
+                                };
+                                z.set_label(text.clone());
+                                z.set_value(text);
+                                z.set_row_index(r + 1);
+                                z.set_column_index(c);
+                                let zid = NodeId(ids::teil(wi, i, r * 64 + 1 + c));
+                                nodes.push((zid, z));
+                                zellen.push(zid);
+                            }
+                        }
+                        zeile.set_children(zellen);
+                        let zid = NodeId(ids::teil(wi, i, r * 64));
+                        nodes.push((zid, zeile));
+                        kinder.push(zid);
+                    }
+                }
+                n
+            }
+            Kind::Tree => {
+                let n = Node::new(Role::Tree);
+                if let Some(t) = w.tree.as_ref() {
+                    let zh = self.sk(TREE_ROW_H);
+                    for (r, k) in Self::tree_visible(t).into_iter().enumerate().take(4000) {
+                        let kn = &t.nodes[k];
+                        let mut o = Node::new(Role::TreeItem);
+                        o.set_label(kn.label.clone());
+                        o.set_level(kn.level as usize + 1);
+                        o.set_selected(t.selected == k as i32);
+                        if kn.has_children {
+                            o.set_expanded(kn.expanded);
+                            o.add_action(if kn.expanded { Action::Collapse } else { Action::Expand });
+                        }
+                        o.set_bounds(Self::a11y_rect(x, y + r as i32 * zh - t.scroll, bw, zh));
+                        o.add_action(Action::Click);
+                        let oid = NodeId(ids::teil(wi, i, k));
+                        nodes.push((oid, o));
+                        kinder.push(oid);
+                    }
+                }
+                n
+            }
+            Kind::ColorPicker => {
+                let mut n = Node::new(Role::ColorWell);
+                n.set_value(format!("#{:06X}", crate::farbraum::hsv_zu_rgb(w.hsv[0], w.hsv[1], w.hsv[2])));
+                n
+            }
+            Kind::DatePicker => {
+                let mut n = Node::new(Role::DateInput);
+                n.set_value(format!("{:04}-{:02}-{:02}", w.datum[0], w.datum[1], w.datum[2]));
+                n
+            }
+            Kind::GroupBox | Kind::Panel => { let mut n = Node::new(Role::Group); if !w.text.is_empty() { n.set_label(w.text.clone()); } n }
+            Kind::Image => Node::new(Role::Image),
+            Kind::Canvas => Node::new(Role::Canvas),
+            Kind::Toolbar => Node::new(Role::Toolbar),
+            Kind::Splitter => { let mut n = Node::new(Role::Splitter); n.set_orientation(if w.group == "v" { Orientation::Vertical } else { Orientation::Horizontal }); n }
+            Kind::Separator | Kind::Layout => Node::new(Role::GenericContainer),
+        };
+        n.set_bounds(Self::a11y_rect(x, y, bw, bh));
+        if !w.enabled { n.set_disabled(); }
+        if w.kind.fokussierbar() { n.add_action(Action::Focus); }
+        // Beschriftung: Tooltip als Beschreibung, Fehler vor allem anderen;
+        // Eingabe-Widgets ohne eigenen Text bekommen die Nachbar-Beschriftung.
+        if !w.fehler.is_empty() { n.set_description(w.fehler.clone()); }
+        else if !w.tooltip.is_empty() { n.set_description(w.tooltip.clone()); }
+        let ohne_text = matches!(w.kind, Kind::TextInput | Kind::TextArea | Kind::Dropdown | Kind::Spinner | Kind::Slider
+            | Kind::Knob | Kind::ListBox | Kind::Table | Kind::Tree | Kind::ColorPicker | Kind::DatePicker | Kind::Progress
+            | Kind::Image | Kind::Canvas);
+        if ohne_text {
+            if let Some(k) = self.a11y_beschriftung(wi, i) {
+                n.set_labelled_by(vec![NodeId(ids::widget(wi, k))]);
+            } else if !w.tooltip.is_empty() {
+                n.set_label(w.tooltip.clone());
+            }
+        }
+        if !kinder.is_empty() { n.set_children(kinder); }
+        nodes.push((id, n));
+        id
+    }
+
+    /// Eine Aktion des Hilfsprogramms ausfuehren -- auf DERSELBEN Mechanik
+    /// wie Maus und Tastatur, damit `GUI_CLICKED`, `GUI_ON_CLICK` und
+    /// `on_change` genauso feuern.
+    pub fn a11y_aktion(&mut self, req: accesskit::ActionRequest, g: &Graphics) {
+        use accesskit::{Action, ActionData};
+        use crate::a11y::ids::{self, Ziel};
+        let lebt = |gui: &Gui, wi: usize| gui.windows.get(wi).map_or(false, |w| w.alive && w.visible);
+        match ids::zerlegen(req.target_node.0) {
+            Ziel::Fenster(wi) => {
+                if lebt(self, wi) && req.action == Action::Focus { self.focus_window = Some(wi); self.bring_to_front(wi); }
+            }
+            Ziel::Widget(wi, i) => {
+                if !lebt(self, wi) || i >= self.windows[wi].widgets.len() { return; }
+                let (kind, shown, enabled) = { let w = &self.windows[wi].widgets[i]; (w.kind, self.widget_shown(wi, w), w.enabled) };
+                if !shown { return; }
+                match req.action {
+                    Action::Focus => {
+                        if kind.fokussierbar() {
+                            self.focus_widget = Some((wi, i)); self.focus_window = Some(wi); self.bring_to_front(wi);
+                        }
+                    }
+                    Action::Click if enabled => self.a11y_klick(wi, i, kind),
+                    Action::Increment | Action::Decrement if enabled => {
+                        let d = if req.action == Action::Increment { 1.0 } else { -1.0 };
+                        let (lo, hi, v, st) = { let w = &self.windows[wi].widgets[i]; (w.min, w.max, w.value, w.step) };
+                        match kind {
+                            Kind::Slider | Kind::Knob => self.set_value_fire(wi, i, v + d * (hi - lo) / 20.0),
+                            Kind::Spinner => self.set_value_fire(wi, i, v + d * st),
+                            _ => {}
+                        }
+                    }
+                    Action::SetValue if enabled => match (kind, req.data) {
+                        (Kind::TextInput | Kind::TextArea, Some(ActionData::Value(t))) => self.a11y_text_setzen(wi, i, t.to_string(), g),
+                        (Kind::Slider | Kind::Knob | Kind::Spinner, Some(ActionData::NumericValue(v))) => self.set_value_fire(wi, i, v),
+                        (Kind::Slider | Kind::Knob | Kind::Spinner, Some(ActionData::Value(t))) => {
+                            if let Some(v) = zahl_lesen(&t) { self.set_value_fire(wi, i, v); }
+                        }
+                        (Kind::Dropdown, Some(ActionData::Value(t))) => {
+                            if let Some(k) = self.windows[wi].widgets[i].items.iter().position(|x| x == &*t) { self.a11y_eintrag_waehlen(wi, i, k); }
+                        }
+                        _ => {}
+                    },
+                    Action::Expand if kind == Kind::Dropdown && enabled => { self.open_dropdown = Some((wi, i)); }
+                    Action::Collapse if kind == Kind::Dropdown => { if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; } }
+                    _ => {}
+                }
+            }
+            Ziel::Teil(wi, i, k) => {
+                if !lebt(self, wi) || i >= self.windows[wi].widgets.len() { return; }
+                let (kind, shown, enabled) = { let w = &self.windows[wi].widgets[i]; (w.kind, self.widget_shown(wi, w), w.enabled) };
+                if !shown || !enabled { return; }
+                match (kind, req.action) {
+                    (Kind::ListBox | Kind::Dropdown, Action::Click) => self.a11y_eintrag_waehlen(wi, i, k),
+                    (Kind::Tree, Action::Click) => {
+                        let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tree.as_mut() { Some(t) if k < t.nodes.len() && t.selected != k as i32 => { t.selected = k as i32; true } _ => false } };
+                        if ok { self.focus_widget = Some((wi, i)); self.focus_window = Some(wi); let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
+                    }
+                    (Kind::Tree, Action::Expand | Action::Collapse) => {
+                        if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+                            if let Some(kn) = t.nodes.get_mut(k) { if kn.has_children { kn.expanded = req.action == Action::Expand; } }
+                        }
+                    }
+                    (Kind::Table, Action::Click) => {
+                        // k = Zeile * 64 (+ Spalte + 1): die Zeile waehlen.
+                        let r = k / 64;
+                        let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tbl.as_mut() { Some(t) => match t.view.get(r).copied() { Some(dz) => { t.selected = dz as i32; true } None => false }, None => false } };
+                        if ok { self.focus_widget = Some((wi, i)); self.focus_window = Some(wi); let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
+                    }
+                    _ => {}
+                }
+            }
+            Ziel::Menue(wi, mi) => {
+                if !lebt(self, wi) || mi >= self.windows[wi].menus.len() { return; }
+                match req.action {
+                    Action::Click | Action::Expand => {
+                        self.open_menu = Some((wi, mi)); self.context_open = None; self.sub_chain.clear();
+                        self.menu_cursor = self.menue_schritt(wi, mi, None, 1);
+                    }
+                    Action::Collapse => { if self.open_menu.map(|m| m.0) == Some(wi) { self.open_menu = None; self.sub_chain.clear(); self.menu_cursor = None; } }
+                    _ => {}
+                }
+            }
+            Ziel::Eintrag(wi, mi, ii) => {
+                if !lebt(self, wi) || req.action != Action::Click { return; }
+                let (ok, sub) = match self.windows[wi].menus.get(mi).and_then(|m| m.items.get(ii)) {
+                    Some(it) => (it.enabled && !it.separator, it.sub),
+                    None => (false, -1),
+                };
+                if !ok { return; }
+                if sub >= 0 {
+                    // Untermenue-Kopf: Wurzel oeffnen, Kette bis hierher -- die
+                    // Lage rechnet erst das naechste Zeichnen; ohne Geometrie
+                    // steht das Popup an der Wurzel.
+                    if self.open_menu.map(|m| m.0) != Some(wi) { self.open_menu = Some((wi, mi)); self.sub_chain.clear(); }
+                    if !self.sub_chain.iter().any(|s| s.0 == sub as usize) { self.untermenue_per_taste(g, ii); }
+                } else {
+                    self.open_menu = None; self.context_open = None; self.sub_chain.clear(); self.menu_cursor = None;
+                    self.fire_menu_item(wi, mi, ii);
+                }
+            }
+            Ziel::Reiter(wi, ti) => {
+                if lebt(self, wi) && req.action == Action::Click && ti < self.windows[wi].tabs.len() { self.windows[wi].active_tab = ti as i32; }
+            }
+            Ziel::Root | Ziel::Sonst => {}
+        }
+    }
+
+    /// Klick des Hilfsprogramms auf ein Widget -- dieselben Wege wie die
+    /// Leertaste (`widget_keys`), damit `clicked` und die Rueckrufe stimmen.
+    fn a11y_klick(&mut self, wi: usize, i: usize, kind: Kind) {
+        match kind {
+            Kind::Button => {
+                let w = &mut self.windows[wi].widgets[i];
+                w.clicked = true;
+                let f = w.on_click.clone();
+                if let Some(f) = f { self.pending.push(f); }
+            }
+            Kind::Checkbox | Kind::Toggle => {
+                let w = &mut self.windows[wi].widgets[i];
+                w.checked = !w.checked;
+                w.clicked = true;
+                let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                if let Some(f) = oc { self.pending.push(f); }
+                if let Some(f) = och { self.pending.push(f); }
+            }
+            Kind::Radio => {
+                if !self.windows[wi].widgets[i].checked {
+                    self.select_radio(wi, i);
+                    self.windows[wi].widgets[i].clicked = true;
+                    let w = &self.windows[wi].widgets[i];
+                    let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Dropdown => {
+                self.open_dropdown = if self.open_dropdown == Some((wi, i)) { None } else { Some((wi, i)) };
+            }
+            _ => {
+                if kind.fokussierbar() { self.focus_widget = Some((wi, i)); self.focus_window = Some(wi); self.bring_to_front(wi); }
+            }
+        }
+    }
+
+    /// Eintrag `k` einer Liste/Klappliste waehlen (wie ein Klick darauf).
+    fn a11y_eintrag_waehlen(&mut self, wi: usize, i: usize, k: usize) {
+        let n = self.windows[wi].widgets[i].items.len();
+        if k >= n { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        let vorher = w.sel;
+        w.sel = k as i32;
+        if let Some(l) = w.list.as_mut() {
+            if l.multi { l.sync(n); for j in 0..n { l.sel[j] = j == k; } l.anker = k as i32; }
+        }
+        if w.kind == Kind::Dropdown { self.open_dropdown = None; }
+        self.focus_widget = Some((wi, i)); self.focus_window = Some(wi);
+        if vorher != k as i32 {
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Text aus dem Hilfsprogramm in ein Textfeld schreiben -- durch
+    /// dieselben Grenzen wie beim Tippen (Hoechstlaenge, Zahlenfilter).
+    fn a11y_text_setzen(&mut self, wi: usize, i: usize, mut neu: String, g: &Graphics) {
+        let jetzt = g.get_time();
+        let w = &mut self.windows[wi].widgets[i];
+        if w.nur_lesen { return; }
+        if w.kind == Kind::TextInput {
+            if w.maxlaenge > 0 { neu = neu.chars().take(w.maxlaenge as usize).collect(); }
+            if !zahl_erlaubt(&neu, w.zahlen) { return; }
+        }
+        if neu == w.text { return; }
+        let before = w.text.clone();
+        let caret0 = w.caret;
+        Self::undo_merken(w, &before, caret0, jetzt);
+        let n = neu.chars().count() as i32;
+        w.text = neu;
+        w.spans.clear();
+        w.caret = n; w.sel_anchor = n; w.scroll = 0;
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
     }
 
     /// Layout der Menueleiste: (menu_idx, x_links_abs, x_rechts_abs) je Bar-Menue.
@@ -7982,6 +8764,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let offen_sub: Option<i32> = self.sub_chain.iter()
             .find(|(smi, _, _)| m.items.iter().any(|it| it.sub == *smi as i32))
             .map(|(smi, _, _)| *smi as i32);
+        // Der Tastatur-Cursor gilt nur im TIEFSTEN offenen Leistenmenue.
+        let cursor_hier = self.menu_cursor.filter(|_| self.context_open.is_none() && self.tiefstes_menue() == Some((wi, mi)));
         for (ii, it) in m.items.iter().enumerate() {
             let iy = py + 2 + ii as i32 * ih;
             if it.separator {
@@ -7989,7 +8773,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 continue;
             }
             let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + ih;
-            let aktiv = hov || (it.sub >= 0 && offen_sub == Some(it.sub));
+            let per_taste = cursor_hier == Some(ii);
+            let aktiv = hov || per_taste || (it.sub >= 0 && offen_sub == Some(it.sub));
             if aktiv { g.box_fill(px + 2, iy, px + wmax - 3, iy + ih - 1, self.th("title_bg_focus")); }
             let fg = if it.enabled { self.th("text_fg") } else { self.th("muted_fg") };
             let th14 = self.ctext_height(g);

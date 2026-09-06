@@ -1670,6 +1670,7 @@ class _Inspector(QWidget):
         # Mindestmass und Pruefregeln.
         self.min_w = QSpinBox(); self.min_w.setRange(0, 4000)
         self.min_h = QSpinBox(); self.min_h.setRange(0, 4000)
+        self.tab_index = QSpinBox(); self.tab_index.setRange(0, 999); self.tab_index.setToolTip("0 = Anlege-Reihenfolge; groesser 0 kommt zuerst, aufsteigend")
         self.regeln = QLineEdit()
         self.bindung = QLineEdit()
         self.bindung.setPlaceholderText("Spaltenname (GUI_BIND)")
@@ -1775,6 +1776,7 @@ class _Inspector(QWidget):
         self._add("Panel", self.in_panel)
         self._add("Min-Breite", self.min_w)
         self._add("Min-Hoehe", self.min_h)
+        self._add("Tab-Index", self.tab_index)
         self._add("Regeln", self.regeln)
         self._add("Bindung", self.bindung)
         self._add("Formular", self.formular)
@@ -1830,7 +1832,7 @@ class _Inspector(QWidget):
             _w.toggled.connect(self._apply)
         for _w in (self.ly_art, self.ly_ausr, self.in_layout, self.bildmodus, self.in_panel):
             _w.currentIndexChanged.connect(self._apply)
-        for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht, self.min_w, self.min_h):
+        for _w in (self.ly_spalten, self.ly_abstand, self.ly_rand, self.in_gewicht, self.min_w, self.min_h, self.tab_index):
             _w.valueChanged.connect(self._apply)
         self.regeln.editingFinished.connect(self._apply)
         self.bindung.editingFinished.connect(self._apply)
@@ -2059,6 +2061,7 @@ class _Inspector(QWidget):
         self.ablage.setChecked(bool(c.extra.get("drop_target")))
         self.min_w.setValue(int(c.extra.get("min_w") or 0))
         self.min_h.setValue(int(c.extra.get("min_h") or 0))
+        self.tab_index.setValue(int(c.extra.get("tab_index") or 0))
         self.regeln.setText(regeln_text(c.extra.get("rules")))
         self.bindung.setText(str(c.extra.get("bind") or ""))
         self.formular.setText(str(c.extra.get("form") or ""))
@@ -2117,6 +2120,7 @@ class _Inspector(QWidget):
         self._show(self.in_panel, self.in_panel.count() > 1 and c.kind not in ("panel", "layout"))
         self._show(self.min_w, True)
         self._show(self.min_h, True)
+        self._show(self.tab_index, c.kind not in ("label", "panel", "separator", "groupbox", "toolbar", "progress", "image", "canvas", "layout"))
         self._show(self.regeln, c.kind in ("textinput", "textarea", "dropdown", "checkbox", "toggle"))
         bindbar = c.kind in ("textinput", "textarea", "label", "checkbox", "toggle", "dropdown",
                              "slider", "spinner", "knob", "datepicker", "colorpicker")
@@ -2198,7 +2202,7 @@ class _Inspector(QWidget):
                 c.extra["wrap_text"] = True
             else:
                 c.extra.pop("wrap_text", None)
-        for schluessel, feld in (("min_w", self.min_w), ("min_h", self.min_h)):
+        for schluessel, feld in (("min_w", self.min_w), ("min_h", self.min_h), ("tab_index", self.tab_index)):
             if feld.value() > 0:
                 c.extra[schluessel] = feld.value()
             else:

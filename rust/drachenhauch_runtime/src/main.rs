@@ -83,6 +83,8 @@ mod filedialog;
 mod graphics;
 #[cfg(feature = "graphics")]
 mod gui;
+#[cfg(feature = "graphics")]
+mod a11y;
 mod lexer;
 mod model;
 mod physics;

@@ -5528,6 +5528,14 @@ impl<'p> Vm<'p> {
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_scale" => { self.gui.set_scale(gnum(a,0,"GUI_SCALE")?)?; Value::Nil }
             "gui_scale_get" => Value::Float(self.gui.get_scale()),
+            "gui_screenreader" => Value::Bool(self.gui.screenreader),
+            "gui_announce" => {
+                let text = gs(a,0,"GUI_ANNOUNCE")?;
+                let dringend = if a.len() > 1 { gbool(a,1,"GUI_ANNOUNCE")? } else { false };
+                if a.len() > 2 { return Err("GUI_ANNOUNCE: erwartet (text$[, dringend])".into()); }
+                self.gui.announce(text, dringend); Value::Nil
+            }
+            "gui_set_tab_index" => { self.gui.set_tab_index(gi(a,0,"GUI_SET_TAB_INDEX")?, gi(a,1,"GUI_SET_TAB_INDEX")?)?; Value::Nil }
             "gui_answer" => Value::Int(self.gui.answer(gi(a,0,"GUI_ANSWER")?)?),
             "gui_modal" => Value::Bool(self.gui.modal_offen()),
             "gui_reset" => { self.gui.reset(); Value::Nil }
@@ -5709,7 +5717,21 @@ impl<'p> Vm<'p> {
             "gui_update" => {
                 {
                     let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
+                    // Barrierefreiheit: das Bild rechnen, DANN die Aktionen des
+                    // Hilfsprogramms (Fokus, Klick, Wert) anwenden, dann den
+                    // vollstaendigen Baum schicken -- nur, wenn ueberhaupt
+                    // jemand zuhoert (a11y.rs). Die Aktionen kommen NACH
+                    // `update`, weil das die transienten Flags (`clicked`)
+                    // zuerst loescht: ein davor gesetzter Klick war fuer
+                    // GUI_CLICKED im selben Bild schon wieder weg.
+                    self.gui.screenreader = g.a11y_aktiv();
                     self.gui.update(g);
+                    if self.gui.screenreader {
+                        for req in g.a11y_aktionen() { self.gui.a11y_aktion(req, g); }
+                        let titel = g.fenster_titel().to_string();
+                        let baum = self.gui.a11y_baum(g, &titel);
+                        g.a11y_senden(baum);
+                    }
                 }
                 // Ausgeloeste FUNCREF-Callbacks feuern (parameterlos), nachdem
                 // der State-Update fertig ist -- so kann ein Callback die GUI

@@ -189,13 +189,17 @@ DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 12, SH - KOP
 GUI_SET_BOUNDS(lblStatus, 12, SH - KOPF - 30, SW - 24, 18)
 GUI_SET_ANCHOR(lblStatus, "lrb")
 
+' Die Statuszeile ist fuer einen Bildschirmleser nur Pixel -- GUI_ANNOUNCE
+' gibt ihm denselben Satz (er spricht ihn, wenn einer zuhoert; sonst nichts).
 SUB status(t AS STRING)
     GUI_SET_TEXT(lblStatus, t)
     GUI_SET_COLOR(lblStatus, "fg", RGB(200, 200, 200))
+    GUI_ANNOUNCE(t)
 END SUB
 SUB fehler(t AS STRING)
     GUI_SET_TEXT(lblStatus, t)
     GUI_SET_COLOR(lblStatus, "fg", ROT)
+    GUI_ANNOUNCE(t, TRUE)
 END SUB
 
 ' Ein Widget auf einen Reiter legen -- die Kinder eines Behaelters muessen
