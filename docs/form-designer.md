@@ -218,6 +218,51 @@ anschließendes Speichern die Projektdatei überschrieben).
   `FormDesigner.closeEvent` ihn via `code_panel.detach_highlighter()`
   (`setDocument(None)`); Qt-Tests müssen das Fenster mit `win.close()` schließen.
 
+## In Drachenhauch: `examples/197_form_designer.dh`
+
+Seit 2026-09-06 gibt es den Designer auch **in Drachenhauch selbst** (Weg B
+aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der erste der vier
+Editoren ohne Piloten). 860 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
+1 536 Modell), Faktor 0,17 — mit demselben Vorbehalt wie bei allen
+Piloten: der Faktor misst, wie viel weggelassen ist (siehe unten).
+
+```
+dhrt run examples/197_form_designer.dh [-- formular.dhform]
+```
+
+Die Entwurfsfläche ist ein **echtes `GUI_WINDOW` im Entwurfsmodus**
+(`GUI_WINDOW_DESIGN(win, TRUE)`, neu in `gui`): die Laufzeit zeichnet die
+Controls genau so, wie das Programm sie später bekommt, nimmt ihnen aber
+jede Eingabe; die Maus verwaltet der Designer selbst (`GUI_HIT_TEST` geht
+weiter). Es gibt also keine nachgemalte Vorschau, die von der Laufzeit
+abweichen könnte — der Qt-Designer malt jede Widget-Art in QPainter nach.
+
+**Das Modell ist das `.dhform`-JSON** (json-Modul), das Fenster nur die
+Ansicht: jede Änderung schreibt ins JSON und baut die Ansicht neu
+(`GUI_FROM_JSON`). Sichern ist `JSON_PRETTY`, Laden `JSON_LOAD`,
+Rückgängig ein JSON-Text je Stand — und alles, was die Laufzeit kennt und
+der Inspektor nicht zeigt (Menüs, Reiter, Tabellendaten, `code`), läuft
+unverändert mit durch. Geprüft gegen den **fremden Leser**: der Test
+(`tests/test_pilot_formdesigner.py`) legt per echtem Klick einen Button ab,
+sichert mit Strg+S und liest die Datei mit `FormDoc.load`, dem Modell des
+Qt-Designers.
+
+Kann: Palette aller 25 Arten (anklicken, dann auf die Form klicken), Ziehen,
+acht Griffe, Raster 8 px, Entf, Strg+D, Pfeile, Nach vorn/hinten, Strg+Z/Y,
+Inspektor (Name, Lage, Text, Tooltip, Anker, `on_click`/`on_change`/
+`on_enter`, aktiviert; ohne Auswahl: Titel, Größe, größenveränderbar,
+Thema), F5 erzeugt `<name>_lauf.dh` mit denselben Handler-Rümpfen wie
+`generate_runner` und startet es. Aus der IDE in Drachenhauch: Menü
+Werkzeuge.
+
+Noch nicht: Mehrfachauswahl und Ausrichten, Layout-/Panel-Zuordnung,
+Regeln und Bindung im Inspektor, Menü-Editor, Code-Editor für Handler
+(der Rumpf steht im `code`-Feld und wird durchgereicht), GB-Code-Export,
+Mehrformular-Projekte. Zwei Fallen beim Bau: eine Liste meldet kein
+`GUI_CLICKED` (die Auswahl ist das Ereignis), und ein neu gebautes Fenster
+nimmt den Fokus — Kürzel gelten im Fenster mit Fokus, ohne Zurückgeben
+wären Strg+S und F5 nach dem ersten Ablegen tot.
+
 ## Status / geplant
 
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,

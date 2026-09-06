@@ -1,0 +1,860 @@
+' ============================================================
+'  DRACHENHAUCH -- Form-Designer (Weg B, der erste der vier fehlenden Editoren)
+' ============================================================
+'  Oberflaechen fuer das gui-Modul zusammenklicken, wie im Qt-Form-Designer
+'  (docs/form-designer.md), aber IN Drachenhauch: die Entwurfsflaeche ist
+'  ein echtes GUI_WINDOW im Entwurfsmodus (GUI_WINDOW_DESIGN) -- die Laufzeit
+'  zeichnet die Controls genau so, wie das Programm sie spaeter bekommt,
+'  nimmt ihnen aber die Eingabe; die Maus verwaltet der Designer selbst.
+'
+'  Das Modell ist das .dhform-JSON (json-Modul), das Fenster nur die
+'  Ansicht: jede Aenderung schreibt ins JSON und baut die Ansicht neu.
+'  Damit sind Sichern (JSON_PRETTY), Laden (JSON_LOAD) und Rueckgaengig
+'  (JSON-Text je Stand) dasselbe Format, das GUI_SAVE/GUI_LOAD und der
+'  Qt-Designer lesen; Designer-Felder (`name`, `code`) laufen mit durch.
+'
+'  Links die Palette (alle 25 Arten der Laufzeit), in der Mitte die Form,
+'  rechts der Inspektor. Palette anklicken, dann auf die Form klicken =
+'  ablegen; ziehen = verschieben; an den acht Griffen = Groesse; Entf =
+'  loeschen; Strg+Z/Y = Rueckgaengig/Wiederholen; Strg+D = verdoppeln;
+'  Pfeile = um ein Raster schieben; F5 = Formular laufen lassen (erzeugt
+'  <name>_lauf.dh mit Handler-Ruempfen neben der .dhform).
+'
+'  Aufruf:  dhrt run examples/197_form_designer.dh [-- formular.dhform]
+'  Test:    DH_FORM_LOG=<datei> protokolliert die Ereignisse zeilenweise.
+' ============================================================
+IMPORT "gui"
+IMPORT "json"
+
+CONST RASTER = 8
+CONST LINKS = 0                 ' Maustaste
+CONST PAL_B = 230               ' Breite der Palette
+CONST INSP_B = 330              ' Breite des Inspektors
+CONST NL = CHR$(10)
+
+SCREEN(1280, 800, "Drachenhauch - Form-Designer", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(960, 600)
+SETFPS(60)
+WINDOW_MAXIMIZE()
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
+
+DIM logDatei AS STRING : logDatei = GETENV$("DH_FORM_LOG")
+SUB protokoll(text AS STRING)
+    IF logDatei = "" THEN RETURN
+    DIM f AS FILE
+    f = OPENFILE(logDatei, "a")
+    WRITELINE(f, text)
+    CLOSEFILE(f)
+END SUB
+
+' --- Palette: Art, Anzeigename, Vorgabegroesse, Ereignisse -------------------
+DIM palArt AS ARRAY OF STRING : palArt = []
+DIM palName AS ARRAY OF STRING : palName = []
+DIM palB AS ARRAY OF INTEGER : palB = []
+DIM palH AS ARRAY OF INTEGER : palH = []
+DIM palText AS ARRAY OF BOOLEAN : palText = []
+
+SUB palette(art AS STRING, name AS STRING, b AS INTEGER, h AS INTEGER, hatText AS BOOLEAN)
+    ARRAY_PUSH(palArt, art) : ARRAY_PUSH(palName, name)
+    ARRAY_PUSH(palB, b) : ARRAY_PUSH(palH, h) : ARRAY_PUSH(palText, hatText)
+END SUB
+
+palette("button", "Button", 100, 28, TRUE)
+palette("label", "Label", 80, 16, TRUE)
+palette("checkbox", "Checkbox", 16, 16, TRUE)
+palette("radio", "RadioButton", 16, 16, TRUE)
+palette("slider", "Slider", 160, 14, FALSE)
+palette("textinput", "TextInput", 180, 26, FALSE)
+palette("dropdown", "Dropdown", 160, 24, FALSE)
+palette("listbox", "ListBox", 160, 96, FALSE)
+palette("progress", "ProgressBar", 180, 18, FALSE)
+palette("image", "Image", 96, 96, FALSE)
+palette("table", "Tabelle", 320, 140, FALSE)
+palette("canvas", "Canvas", 200, 150, FALSE)
+palette("panel", "Panel", 160, 100, TRUE)
+palette("groupbox", "GroupBox", 160, 100, TRUE)
+palette("separator", "Separator", 160, 8, FALSE)
+palette("textarea", "TextArea", 220, 90, FALSE)
+palette("spinner", "Zahlenfeld", 120, 24, FALSE)
+palette("knob", "Drehknopf", 48, 48, FALSE)
+palette("toggle", "Umschalter", 46, 22, TRUE)
+palette("tree", "Baum", 180, 140, FALSE)
+palette("layout", "Layout", 200, 120, FALSE)
+palette("toolbar", "Werkzeugleiste", 240, 32, FALSE)
+palette("splitter", "Trenner", 160, 6, FALSE)
+palette("colorpicker", "Farbwaehler", 200, 150, FALSE)
+palette("datepicker", "Datumswaehler", 200, 180, FALSE)
+
+' --- Modell -----------------------------------------------------------------
+DIM doc AS JSON_HANDLE
+DIM frm AS GUI_WINDOW : frm = -1
+DIM formPfad AS STRING : formPfad = ""
+DIM auswahl AS INTEGER : auswahl = -1           ' Index in doc.widgets
+DIM geaendert AS BOOLEAN : geaendert = FALSE
+DIM formX AS INTEGER : formX = PAL_B + 40        ' wo die Form auf dem Schirm liegt
+DIM formY AS INTEGER : formY = 60
+
+' Rueckgaengig: ein JSON-Text je Stand, ein Zeiger darauf.
+DIM staende AS ARRAY OF STRING : staende = []
+DIM standPos AS INTEGER : standPos = -1
+
+FUNCTION leeresFormular$() AS STRING
+    RETURN "{" + CHR$(34) + "title" + CHR$(34) + ":" + CHR$(34) + "Formular" + CHR$(34) + "," + CHR$(34) + "x" + CHR$(34) + ":0," + CHR$(34) + "y" + CHR$(34) + ":0," + CHR$(34) + "w" + CHR$(34) + ":480," + CHR$(34) + "h" + CHR$(34) + ":360," + CHR$(34) + "movable" + CHR$(34) + ":true," + CHR$(34) + "closable" + CHR$(34) + ":true," + CHR$(34) + "visible" + CHR$(34) + ":true," + CHR$(34) + "resizable" + CHR$(34) + ":false," + CHR$(34) + "widgets" + CHR$(34) + ":[]}"
+END FUNCTION
+
+FUNCTION anzahl() AS INTEGER
+    RETURN JSON_LEN(doc, "widgets")
+END FUNCTION
+
+FUNCTION wz$(i AS INTEGER, feld AS STRING) AS STRING
+    ' Pfad zu einem Widget-Feld
+    RETURN "widgets." + STR$(i) + "." + feld
+END FUNCTION
+
+FUNCTION feldText$(i AS INTEGER, feld AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, wz$(i, feld))
+END FUNCTION
+
+FUNCTION feldZahl(i AS INTEGER, feld AS STRING) AS INTEGER
+    IF NOT JSON_HAS(doc, wz$(i, feld)) THEN RETURN 0
+    RETURN JSON_GET_INT(doc, wz$(i, feld))
+END FUNCTION
+
+' --- Ansicht: das Formular als echtes Fenster im Entwurfsmodus ---------------
+SUB ansichtBauen()
+    ' Ein neues Fenster nimmt den Fokus -- und Kuerzel gelten im Fenster mit
+    ' Fokus. Also merken und zurueckgeben, sonst waeren Strg+S und F5 nach
+    ' dem ersten Ablegen tot.
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    IF frm >= 0 THEN GUI_WINDOW_DESTROY(frm)
+    frm = GUI_FROM_JSON(JSON_STRINGIFY(doc))
+    GUI_WINDOW_DESIGN(frm, TRUE)
+    GUI_WINDOW_CHROME(frm, FALSE)
+    GUI_WINDOW_MOVABLE(frm, FALSE)
+    GUI_WINDOW_RESIZABLE(frm, FALSE)
+    GUI_WINDOW_SET_BOUNDS(frm, formX, formY, JSON_GET_INT(doc, "w"), JSON_GET_INT(doc, "h"))
+    GUI_WINDOW_VISIBLE(frm, TRUE)
+    IF fokus >= 0 THEN GUI_FOCUS(fokus) ELSE GUI_FOCUS(lstPalette)
+END SUB
+
+' Stand merken (nach jeder abgeschlossenen Aenderung).
+SUB merken()
+    DIM text AS STRING : text = JSON_STRINGIFY(doc)
+    ' alles hinter dem Zeiger verwerfen (ein neuer Zweig)
+    WHILE LEN(staende) > standPos + 1
+        ARRAY_REMOVE_AT(staende, LEN(staende) - 1)
+    WEND
+    ARRAY_PUSH(staende, text)
+    IF LEN(staende) > 200 THEN ARRAY_REMOVE_AT(staende, 0)
+    standPos = LEN(staende) - 1
+    geaendert = TRUE
+END SUB
+
+SUB standHolen()
+    doc = JSON_PARSE(staende[standPos])
+    IF auswahl >= anzahl() THEN auswahl = -1
+    ansichtBauen()
+    inspektorFuellen()
+END SUB
+
+SUB rueckgaengig()
+    IF standPos <= 0 THEN RETURN
+    standPos = standPos - 1
+    standHolen()
+    protokoll("rueckgaengig " + STR$(anzahl()))
+END SUB
+
+SUB wiederholen()
+    IF standPos >= LEN(staende) - 1 THEN RETURN
+    standPos = standPos + 1
+    standHolen()
+    protokoll("wiederholen " + STR$(anzahl()))
+END SUB
+
+' --- Fenster: Palette links (mit Menue), Inspektor rechts -------------------
+DIM winPal AS GUI_WINDOW : winPal = GUI_WINDOW("Palette", 0, 0, PAL_B, SCREENHEIGHT())
+GUI_WINDOW_CHROME(winPal, FALSE)
+GUI_WINDOW_MOVABLE(winPal, FALSE)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(winPal, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miLauf AS INTEGER : miLauf = GUI_MENU_ITEM(mDatei, "Formular ausfuehren", "F5")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(winPal, "Bearbeiten")
+DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rueckgaengig", "Strg+Z")
+DIM miWieder AS INTEGER : miWieder = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+DIM miDoppel AS INTEGER : miDoppel = GUI_MENU_ITEM(mBearb, "Verdoppeln", "Strg+D")
+DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Loeschen")
+DIM miVorn AS INTEGER : miVorn = GUI_MENU_ITEM(mBearb, "Nach vorn")
+DIM miHinten AS INTEGER : miHinten = GUI_MENU_ITEM(mBearb, "Nach hinten")
+
+DIM lblPalette AS GUI_WIDGET : lblPalette = GUI_LABEL(winPal, "Palette -- anklicken, dann auf die Form", 8, 34)
+DIM lstPalette AS GUI_WIDGET : lstPalette = GUI_LISTBOX(winPal, 8, 56, PAL_B - 16, 560, palName)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winPal, "Bereit.", 8, 630)
+GUI_SET_WRAP(lblStatus, PAL_B - 16)
+DIM palScharf AS INTEGER : palScharf = -1
+
+DIM winInsp AS GUI_WINDOW : winInsp = GUI_WINDOW("Inspektor", SCREENWIDTH() - INSP_B, 0, INSP_B, SCREENHEIGHT())
+GUI_WINDOW_CHROME(winInsp, FALSE)
+GUI_WINDOW_MOVABLE(winInsp, FALSE)
+DIM lblInsp AS GUI_WIDGET : lblInsp = GUI_LABEL(winInsp, "Formular", 8, 8)
+
+' Eingabefelder des Inspektors: eine Beschriftung, ein Feld je Zeile.
+DIM inspNamen AS ARRAY OF STRING : inspNamen = []
+DIM inspFelder AS ARRAY OF GUI_WIDGET : inspFelder = []
+DIM inspLabels AS ARRAY OF GUI_WIDGET : inspLabels = []
+
+FUNCTION inspFeld(schluessel AS STRING, titel AS STRING, zeile AS INTEGER) AS GUI_WIDGET
+    DIM y AS INTEGER : y = 36 + zeile * 34
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(winInsp, titel, 8, y + 4)
+    DIM f AS GUI_WIDGET : f = GUI_TEXTINPUT(winInsp, 100, y, INSP_B - 110, 26, "")
+    ARRAY_PUSH(inspNamen, schluessel) : ARRAY_PUSH(inspFelder, f) : ARRAY_PUSH(inspLabels, l)
+    RETURN f
+END FUNCTION
+
+' Widget-Felder
+DIM fName AS GUI_WIDGET : fName = inspFeld("name", "Name", 0)
+DIM fX AS GUI_WIDGET : fX = inspFeld("x", "X", 1)
+DIM fY AS GUI_WIDGET : fY = inspFeld("y", "Y", 2)
+DIM fW AS GUI_WIDGET : fW = inspFeld("w", "Breite", 3)
+DIM fH AS GUI_WIDGET : fH = inspFeld("h", "Hoehe", 4)
+DIM fText AS GUI_WIDGET : fText = inspFeld("text", "Text", 5)
+DIM fTip AS GUI_WIDGET : fTip = inspFeld("tooltip", "Tooltip", 6)
+DIM fAnker AS GUI_WIDGET : fAnker = inspFeld("anchor", "Anker (lrtb)", 7)
+DIM fClick AS GUI_WIDGET : fClick = inspFeld("on_click", "on_click", 8)
+DIM fChange AS GUI_WIDGET : fChange = inspFeld("on_change", "on_change", 9)
+DIM fEnter AS GUI_WIDGET : fEnter = inspFeld("on_enter", "on_enter", 10)
+DIM cbAktiv AS GUI_WIDGET : cbAktiv = GUI_CHECKBOX(winInsp, "Aktiviert", 100, 36 + 11 * 34)
+DIM btnUebernehmen AS GUI_WIDGET : btnUebernehmen = GUI_BUTTON(winInsp, "Uebernehmen", 100, 36 + 12 * 34, 140, 28)
+' Formular-Felder (wenn nichts ausgewaehlt ist)
+DIM fTitel AS GUI_WIDGET : fTitel = GUI_TEXTINPUT(winInsp, 100, 36, INSP_B - 110, 26, "")
+DIM lTitel AS GUI_WIDGET : lTitel = GUI_LABEL(winInsp, "Titel", 8, 40)
+DIM fFormB AS GUI_WIDGET : fFormB = GUI_TEXTINPUT(winInsp, 100, 70, INSP_B - 110, 26, "")
+DIM lFormB AS GUI_WIDGET : lFormB = GUI_LABEL(winInsp, "Breite", 8, 74)
+DIM fFormH AS GUI_WIDGET : fFormH = GUI_TEXTINPUT(winInsp, 100, 104, INSP_B - 110, 26, "")
+DIM lFormH AS GUI_WIDGET : lFormH = GUI_LABEL(winInsp, "Hoehe", 8, 108)
+DIM cbResizable AS GUI_WIDGET : cbResizable = GUI_CHECKBOX(winInsp, "Groessenveraenderbar", 100, 138)
+DIM lThema AS GUI_WIDGET : lThema = GUI_LABEL(winInsp, "Thema", 8, 176)
+DIM ddThema AS GUI_WIDGET : ddThema = GUI_DROPDOWN(winInsp, 100, 172, INSP_B - 110, 24, ["(keines)", "glas_dunkel", "glas_hell", "dark", "light"])
+DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 36 + 13 * 34 + 10)
+GUI_SET_WRAP(lblHinweis, INSP_B - 16)
+
+DIM inspStumm AS BOOLEAN : inspStumm = FALSE     ' beim Fuellen nicht als Eingabe werten
+
+SUB inspektorSichtbar(widgetModus AS BOOLEAN)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(inspFelder) - 1
+        GUI_SET_VISIBLE(inspFelder[i], widgetModus) : GUI_SET_VISIBLE(inspLabels[i], widgetModus)
+    NEXT
+    GUI_SET_VISIBLE(cbAktiv, widgetModus) : GUI_SET_VISIBLE(btnUebernehmen, TRUE)
+    GUI_SET_VISIBLE(fTitel, NOT widgetModus) : GUI_SET_VISIBLE(lTitel, NOT widgetModus)
+    GUI_SET_VISIBLE(fFormB, NOT widgetModus) : GUI_SET_VISIBLE(lFormB, NOT widgetModus)
+    GUI_SET_VISIBLE(fFormH, NOT widgetModus) : GUI_SET_VISIBLE(lFormH, NOT widgetModus)
+    GUI_SET_VISIBLE(cbResizable, NOT widgetModus) : GUI_SET_VISIBLE(lThema, NOT widgetModus) : GUI_SET_VISIBLE(ddThema, NOT widgetModus)
+END SUB
+
+SUB inspektorFuellen()
+    inspStumm = TRUE
+    IF auswahl >= 0 AND auswahl < anzahl() THEN
+        inspektorSichtbar(TRUE)
+        GUI_SET_TEXT(lblInsp, feldText$(auswahl, "kind") + "  #" + STR$(auswahl))
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(inspFelder) - 1
+            DIM k AS STRING : k = inspNamen[i]
+            IF k = "x" OR k = "y" OR k = "w" OR k = "h" THEN
+                GUI_SET_TEXT(inspFelder[i], STR$(feldZahl(auswahl, k)))
+            ELSE
+                GUI_SET_TEXT(inspFelder[i], feldText$(auswahl, k))
+            END IF
+        NEXT
+        DIM an AS BOOLEAN : an = TRUE
+        IF JSON_HAS(doc, wz$(auswahl, "enabled")) THEN an = JSON_GET_BOOL(doc, wz$(auswahl, "enabled"))
+        GUI_SET_CHECKED(cbAktiv, an)
+        GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Uebernehmen] schreibt die Werte. Entf loescht, Strg+D verdoppelt, Pfeile schieben.")
+    ELSE
+        inspektorSichtbar(FALSE)
+        GUI_SET_TEXT(lblInsp, "Formular")
+        GUI_SET_TEXT(fTitel, JSON_GET_STRING(doc, "title"))
+        GUI_SET_TEXT(fFormB, STR$(JSON_GET_INT(doc, "w")))
+        GUI_SET_TEXT(fFormH, STR$(JSON_GET_INT(doc, "h")))
+        DIM rz AS BOOLEAN : rz = FALSE
+        IF JSON_HAS(doc, "resizable") THEN rz = JSON_GET_BOOL(doc, "resizable")
+        GUI_SET_CHECKED(cbResizable, rz)
+        DIM thema AS STRING : thema = ""
+        IF JSON_HAS(doc, "theme") THEN thema = JSON_GET_STRING(doc, "theme")
+        DIM ti AS INTEGER : ti = 0
+        IF thema = "glas_dunkel" THEN ti = 1
+        IF thema = "glas_hell" THEN ti = 2
+        IF thema = "dark" THEN ti = 3
+        IF thema = "light" THEN ti = 4
+        GUI_DROPDOWN_SET_SELECTED(ddThema, ti)
+        GUI_SET_TEXT(lblHinweis, "Kein Control ausgewaehlt: das sind die Werte des Formulars. Ein Klick auf ein Control zeigt seine.")
+    END IF
+    inspStumm = FALSE
+END SUB
+
+' Inspektor -> Modell
+SUB inspektorUebernehmen()
+    IF auswahl >= 0 AND auswahl < anzahl() THEN
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(inspFelder) - 1
+            DIM k AS STRING : k = inspNamen[i]
+            DIM t AS STRING : t = GUI_TEXT(inspFelder[i])
+            IF k = "x" OR k = "y" OR k = "w" OR k = "h" THEN
+                DIM v AS INTEGER : v = INT(VAL(t))
+                IF (k = "w" OR k = "h") AND v < 4 THEN v = 4
+                JSON_SET_INT(doc, wz$(auswahl, k), v)
+            ELSEIF t = "" THEN
+                IF JSON_HAS(doc, wz$(auswahl, k)) THEN JSON_REMOVE(doc, wz$(auswahl, k))
+            ELSE
+                JSON_SET_STRING(doc, wz$(auswahl, k), t)
+            END IF
+        NEXT
+        IF GUI_CHECKED(cbAktiv) THEN
+            IF JSON_HAS(doc, wz$(auswahl, "enabled")) THEN JSON_REMOVE(doc, wz$(auswahl, "enabled"))
+        ELSE
+            JSON_SET_BOOL(doc, wz$(auswahl, "enabled"), FALSE)
+        END IF
+    ELSE
+        JSON_SET_STRING(doc, "title", GUI_TEXT(fTitel))
+        JSON_SET_INT(doc, "w", MAX(INT(VAL(GUI_TEXT(fFormB))), 80))
+        JSON_SET_INT(doc, "h", MAX(INT(VAL(GUI_TEXT(fFormH))), 60))
+        JSON_SET_BOOL(doc, "resizable", GUI_CHECKED(cbResizable))
+        DIM ti AS INTEGER : ti = GUI_DROPDOWN_SELECTED(ddThema)
+        IF ti <= 0 THEN
+            IF JSON_HAS(doc, "theme") THEN JSON_REMOVE(doc, "theme")
+        ELSE
+            JSON_SET_STRING(doc, "theme", GUI_DROPDOWN_TEXT(ddThema))
+        END IF
+    END IF
+    ansichtBauen()
+    merken()
+    inspektorFuellen()
+    protokoll("uebernommen")
+END SUB
+
+' --- Controls anlegen, loeschen, ordnen -------------------------------------
+FUNCTION eindeutigerName$(art AS STRING) AS STRING
+    DIM n AS INTEGER : n = 1
+    DIM kandidat AS STRING
+    REPEAT
+        kandidat = art + STR$(n)
+        DIM frei AS BOOLEAN : frei = TRUE
+        DIM i AS INTEGER
+        FOR i = 0 TO anzahl() - 1
+            IF feldText$(i, "name") = kandidat THEN frei = FALSE
+        NEXT
+        n = n + 1
+    UNTIL frei
+    RETURN kandidat
+END FUNCTION
+
+FUNCTION amRaster(v AS INTEGER) AS INTEGER
+    RETURN INT((v + RASTER \ 2) \ RASTER) * RASTER
+END FUNCTION
+
+SUB controlAnlegen(p AS INTEGER, x AS INTEGER, y AS INTEGER)
+    DIM w AS JSON_HANDLE : w = JSON_NEW_OBJECT()
+    JSON_SET_STRING(w, "kind", palArt[p])
+    JSON_SET_STRING(w, "name", eindeutigerName$(palArt[p]))
+    JSON_SET_INT(w, "x", amRaster(x)) : JSON_SET_INT(w, "y", amRaster(y))
+    JSON_SET_INT(w, "w", palB[p]) : JSON_SET_INT(w, "h", palH[p])
+    IF palText[p] THEN JSON_SET_STRING(w, "text", palName[p])
+    IF palArt[p] = "dropdown" OR palArt[p] = "listbox" THEN
+        JSON_SET_JSON(w, "items", JSON_PARSE("[" + CHR$(34) + "Eintrag 1" + CHR$(34) + "," + CHR$(34) + "Eintrag 2" + CHR$(34) + "]"))
+    END IF
+    IF palArt[p] = "slider" OR palArt[p] = "progress" THEN JSON_SET_FLOAT(w, "min", 0.0) : JSON_SET_FLOAT(w, "max", 100.0) : JSON_SET_FLOAT(w, "value", 50.0)
+    JSON_APPEND_JSON(doc, "widgets", w)
+    auswahl = anzahl() - 1
+    ansichtBauen()
+    merken()
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, palName[p] + " abgelegt bei " + STR$(amRaster(x)) + ", " + STR$(amRaster(y)))
+    protokoll("neu " + palArt[p] + " " + STR$(amRaster(x)) + " " + STR$(amRaster(y)))
+END SUB
+
+SUB controlLoeschen()
+    IF auswahl < 0 THEN RETURN
+    JSON_REMOVE(doc, "widgets." + STR$(auswahl))
+    protokoll("geloescht " + STR$(auswahl))
+    auswahl = -1
+    ansichtBauen()
+    merken()
+    inspektorFuellen()
+END SUB
+
+SUB controlVerdoppeln()
+    IF auswahl < 0 THEN RETURN
+    ' Das Widget als eigenes Handle (JSON_SET_JSON/APPEND_JSON brauchen eins).
+    DIM neu AS JSON_HANDLE : neu = teilbaum(doc, "widgets." + STR$(auswahl))
+    JSON_SET_INT(neu, "x", feldZahl(auswahl, "x") + RASTER)
+    JSON_SET_INT(neu, "y", feldZahl(auswahl, "y") + RASTER)
+    JSON_SET_STRING(neu, "name", eindeutigerName$(feldText$(auswahl, "kind")))
+    JSON_APPEND_JSON(doc, "widgets", neu)
+    auswahl = anzahl() - 1
+    ansichtBauen()
+    merken()
+    inspektorFuellen()
+    protokoll("verdoppelt")
+END SUB
+
+' Ein Teilbaum als eigenes Handle -- ueber seinen Text.
+FUNCTION teilbaum(h AS JSON_HANDLE, pfad AS STRING) AS JSON_HANDLE
+    DIM huelle AS JSON_HANDLE : huelle = JSON_NEW_OBJECT()
+    ' JSON_STRINGIFY kennt nur ganze Handles: den Teil in ein neues Objekt heben.
+    DIM typ AS STRING : typ = JSON_TYPE(h, pfad)
+    IF typ = "array" THEN
+        DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+        DIM n AS INTEGER : n = JSON_LEN(h, pfad)
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            DIM ep AS STRING : ep = pfad + "." + STR$(i)
+            DIM et AS STRING : et = JSON_TYPE(h, ep)
+            IF et = "string" THEN JSON_APPEND_STRING(a, "", JSON_GET_STRING(h, ep))
+            IF et = "number" THEN
+                ' JSON_TYPE unterscheidet nicht: eine ganze Zahl bleibt ganz,
+                ' sonst laese GUI_FROM_JSON aus 48.0 kein x mehr.
+                DIM ef AS FLOAT : ef = JSON_GET_FLOAT(h, ep)
+                IF ef = INT(ef) THEN JSON_APPEND_INT(a, "", INT(ef)) ELSE JSON_APPEND_FLOAT(a, "", ef)
+            END IF
+            IF et = "boolean" THEN JSON_APPEND_BOOL(a, "", JSON_GET_BOOL(h, ep))
+            IF et = "array" OR et = "object" THEN JSON_APPEND_JSON(a, "", teilbaum(h, ep))
+        NEXT
+        RETURN a
+    END IF
+    DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(h, pfad)
+        DIM kp AS STRING : kp = pfad + "." + k
+        DIM kt AS STRING : kt = JSON_TYPE(h, kp)
+        IF kt = "string" THEN JSON_SET_STRING(o, k, JSON_GET_STRING(h, kp))
+        IF kt = "number" THEN
+            DIM kf AS FLOAT : kf = JSON_GET_FLOAT(h, kp)
+            IF kf = INT(kf) THEN JSON_SET_INT(o, k, INT(kf)) ELSE JSON_SET_FLOAT(o, k, kf)
+        END IF
+        IF kt = "boolean" THEN JSON_SET_BOOL(o, k, JSON_GET_BOOL(h, kp))
+        IF kt = "array" OR kt = "object" THEN JSON_SET_JSON(o, k, teilbaum(h, kp))
+    NEXT
+    RETURN o
+END FUNCTION
+
+' Reihenfolge = Zeichenreihenfolge: das letzte liegt vorn.
+SUB controlOrdnen(nachVorn AS BOOLEAN)
+    IF auswahl < 0 THEN RETURN
+    DIM n AS INTEGER : n = anzahl()
+    DIM ziel AS INTEGER
+    IF nachVorn THEN ziel = n - 1 ELSE ziel = 0
+    IF ziel = auswahl THEN RETURN
+    DIM kopie AS JSON_HANDLE : kopie = teilbaum(doc, "widgets." + STR$(auswahl))
+    JSON_REMOVE(doc, "widgets." + STR$(auswahl))
+    IF nachVorn THEN
+        JSON_APPEND_JSON(doc, "widgets", kopie)
+        auswahl = n - 1
+    ELSE
+        ' vorn einfuegen: alle anderen hinten anhaengen, dann die Liste tauschen
+        DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+        JSON_APPEND_JSON(neu, "", kopie)
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 2
+            JSON_APPEND_JSON(neu, "", teilbaum(doc, "widgets." + STR$(i)))
+        NEXT
+        JSON_SET_JSON(doc, "widgets", neu)
+        auswahl = 0
+    END IF
+    ansichtBauen()
+    merken()
+    inspektorFuellen()
+END SUB
+
+' --- Datei ------------------------------------------------------------------
+SUB neuesFormular()
+    doc = JSON_PARSE(leeresFormular$())
+    formPfad = ""
+    auswahl = -1
+    staende = [] : standPos = -1
+    ansichtBauen()
+    merken()
+    geaendert = FALSE
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, "Neues Formular.")
+END SUB
+
+SUB formularLaden(pfad AS STRING)
+    IF NOT FILEEXISTS(pfad) THEN
+        ' Eine noch nicht vorhandene Datei: neues Formular, das dorthin gesichert wird.
+        neuesFormular()
+        formPfad = pfad
+        GUI_SET_TEXT(lblStatus, "Neu: " + pfad)
+        protokoll("neu-datei " + pfad)
+        RETURN
+    END IF
+    doc = JSON_LOAD(pfad)
+    IF NOT JSON_HAS(doc, "widgets") THEN JSON_SET_JSON(doc, "widgets", JSON_NEW_ARRAY())
+    formPfad = pfad
+    auswahl = -1
+    staende = [] : standPos = -1
+    ansichtBauen()
+    merken()
+    geaendert = FALSE
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, "Geladen: " + pfad + " (" + STR$(anzahl()) + " Controls)")
+    protokoll("geladen " + STR$(anzahl()))
+END SUB
+
+FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
+    IF formPfad = "" OR alsNeu THEN
+        DIM p AS STRING : p = FILE_SAVE_DIALOG("Formular sichern", "formular.dhform", "dhform")
+        IF p = "" THEN RETURN FALSE
+        formPfad = p
+    END IF
+    WRITEALL(formPfad, JSON_PRETTY(doc))
+    geaendert = FALSE
+    GUI_SET_TEXT(lblStatus, "Gesichert: " + formPfad)
+    protokoll("gesichert " + formPfad)
+    RETURN TRUE
+END FUNCTION
+
+' --- Ausfuehren: Programm-Geruest wie der Qt-Designer, dann dhrt run ---------
+DIM laufProzess AS INTEGER : laufProzess = -1
+
+FUNCTION handlerNamen() AS ARRAY OF STRING
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM i AS INTEGER
+    DIM ev AS STRING
+    FOR i = 0 TO anzahl() - 1
+        FOR EACH ev IN ("on_click", "on_change", "on_enter", "on_hover", "on_leave", "on_focus", "on_blur")
+            DIM n AS STRING : n = feldText$(i, ev)
+            IF n <> "" AND ARRAY_INDEXOF(namen, n) < 0 THEN ARRAY_PUSH(namen, n)
+        NEXT
+    NEXT
+    RETURN namen
+END FUNCTION
+
+FUNCTION dhString$(s AS STRING) AS STRING
+    RETURN CHR$(34) + REPLACE$(s, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+FUNCTION laufProgramm$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    ARRAY_PUSH(z, "' Erzeugt vom Form-Designer -- Layout: " + BASENAME(formPfad))
+    ARRAY_PUSH(z, "IMPORT " + dhString$("gui"))
+    ARRAY_PUSH(z, "SCREEN(" + STR$(JSON_GET_INT(doc, "w")) + ", " + STR$(JSON_GET_INT(doc, "h")) + ", " + dhString$(JSON_GET_STRING(doc, "title")) + ", 1)")
+    IF JSON_HAS(doc, "theme") THEN ARRAY_PUSH(z, "GUI_THEME_PRESET(" + dhString$(JSON_GET_STRING(doc, "theme")) + ")")
+    IF JSON_HAS(doc, "resizable") THEN
+        IF JSON_GET_BOOL(doc, "resizable") THEN ARRAY_PUSH(z, "WINDOW_RESIZABLE(TRUE)")
+    END IF
+    ARRAY_PUSH(z, "")
+    ARRAY_PUSH(z, "DIM frm AS GUI_WINDOW")
+    ARRAY_PUSH(z, "frm = GUI_LOAD(" + dhString$(BASENAME(formPfad)) + ")")
+    ARRAY_PUSH(z, "GUI_WINDOW_CHROME(frm, FALSE)        ' randlos -- das OS-Fenster liefert den Rahmen")
+    ARRAY_PUSH(z, "GUI_WINDOW_RESIZABLE(frm, FALSE)")
+    ARRAY_PUSH(z, "")
+    DIM n AS STRING
+    FOR EACH n IN handlerNamen()
+        ARRAY_PUSH(z, "SUB " + n + "()")
+        IF JSON_HAS(doc, "code." + n) THEN
+            DIM zeile AS STRING
+            FOR EACH zeile IN SPLIT$(JSON_GET_STRING(doc, "code." + n), NL)
+                ARRAY_PUSH(z, "    " + zeile)
+            NEXT
+        ELSE
+            ARRAY_PUSH(z, "    ' TODO: " + n)
+        END IF
+        ARRAY_PUSH(z, "END SUB")
+        ARRAY_PUSH(z, "")
+    NEXT
+    ARRAY_PUSH(z, "WHILE NOT QUITREQUESTED()")
+    ARRAY_PUSH(z, "    GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())")
+    ARRAY_PUSH(z, "    GUI_UPDATE()")
+    ARRAY_PUSH(z, "    CLS(&H0E1014)")
+    ARRAY_PUSH(z, "    GUI_DRAW()")
+    ARRAY_PUSH(z, "    FLIP()")
+    ARRAY_PUSH(z, "WEND")
+    RETURN JOIN$(z, NL) + NL
+END FUNCTION
+
+SUB ausfuehren()
+    IF formPfad = "" OR geaendert THEN
+        IF NOT sichern(FALSE) THEN RETURN
+    END IF
+    IF laufProzess >= 0 THEN PROCESS_KILL(laufProzess) : PROCESS_CLOSE(laufProzess) : laufProzess = -1
+    DIM stamm AS STRING : stamm = formPfad
+    IF LOWER$(RIGHT$(stamm, 7)) = ".dhform" THEN stamm = LEFT$(stamm, LEN(stamm) - 7)
+    DIM lauf AS STRING : lauf = stamm + "_lauf.dh"
+    WRITEALL(lauf, laufProgramm$())
+    laufProzess = PROCESS_START("dhrt", "run", lauf)
+    GUI_SET_TEXT(lblStatus, "Gestartet: " + BASENAME(lauf))
+    protokoll("gestartet " + lauf)
+END SUB
+
+' --- Maus auf der Form --------------------------------------------------------
+DIM modus AS INTEGER : modus = 0          ' 0 nichts, 1 verschieben, 2 groesse
+DIM griff AS INTEGER : griff = -1         ' 0..7: NW N NE E SE S SW W
+DIM startMx AS INTEGER
+DIM startMy AS INTEGER
+DIM startX AS INTEGER
+DIM startY AS INTEGER
+DIM startW AS INTEGER
+DIM startH AS INTEGER
+DIM bewegt AS BOOLEAN : bewegt = FALSE
+
+FUNCTION indexVonHandle(h AS GUI_WIDGET) AS INTEGER
+    IF h < 0 OR frm < 0 THEN RETURN -1
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(frm) - 1
+        IF GUI_WINDOW_WIDGET(frm, i) = h THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Griff unter der Maus (Bildschirmkoordinaten), -1 = keiner.
+FUNCTION griffBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    IF auswahl < 0 THEN RETURN -1
+    DIM x AS INTEGER : x = formX + feldZahl(auswahl, "x")
+    DIM y AS INTEGER : y = formY + feldZahl(auswahl, "y")
+    DIM w AS INTEGER : w = feldZahl(auswahl, "w")
+    DIM h AS INTEGER : h = feldZahl(auswahl, "h")
+    DIM gx[8] AS INTEGER
+    DIM gy[8] AS INTEGER
+    gx[0] = x : gy[0] = y : gx[1] = x + w \ 2 : gy[1] = y : gx[2] = x + w : gy[2] = y
+    gx[3] = x + w : gy[3] = y + h \ 2 : gx[4] = x + w : gy[4] = y + h : gx[5] = x + w \ 2 : gy[5] = y + h
+    gx[6] = x : gy[6] = y + h : gx[7] = x : gy[7] = y + h \ 2
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        IF ABS(mx - gx[i]) <= 5 AND ABS(my - gy[i]) <= 5 THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB griffeZeichnen()
+    IF auswahl < 0 OR auswahl >= anzahl() THEN RETURN
+    DIM x AS INTEGER : x = formX + feldZahl(auswahl, "x")
+    DIM y AS INTEGER : y = formY + feldZahl(auswahl, "y")
+    DIM w AS INTEGER : w = feldZahl(auswahl, "w")
+    DIM h AS INTEGER : h = feldZahl(auswahl, "h")
+    RECT(x - 1, y - 1, x + w, y + h, &H4FC3F7)
+    DIM gx AS INTEGER
+    DIM gy AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        SELECT CASE i
+            CASE 0 : gx = x : gy = y
+            CASE 1 : gx = x + w \ 2 : gy = y
+            CASE 2 : gx = x + w : gy = y
+            CASE 3 : gx = x + w : gy = y + h \ 2
+            CASE 4 : gx = x + w : gy = y + h
+            CASE 5 : gx = x + w \ 2 : gy = y + h
+            CASE 6 : gx = x : gy = y + h
+            CASE 7 : gx = x : gy = y + h \ 2
+        END SELECT
+        BOX(gx - 3, gy - 3, gx + 3, gy + 3, &H4FC3F7)
+    NEXT
+END SUB
+
+' Lage/Groesse waehrend eines Zuges: ins Modell UND live ins Widget.
+SUB lageSetzen(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER)
+    JSON_SET_INT(doc, wz$(auswahl, "x"), x) : JSON_SET_INT(doc, wz$(auswahl, "y"), y)
+    JSON_SET_INT(doc, wz$(auswahl, "w"), w) : JSON_SET_INT(doc, wz$(auswahl, "h"), h)
+    DIM hd AS GUI_WIDGET : hd = GUI_WINDOW_WIDGET(frm, auswahl)
+    IF hd >= 0 THEN GUI_SET_BOUNDS(hd, x, y, w, h)
+END SUB
+
+SUB mausAufForm()
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    DIM fw AS INTEGER : fw = JSON_GET_INT(doc, "w")
+    DIM fh AS INTEGER : fh = JSON_GET_INT(doc, "h")
+    DIM drin AS BOOLEAN : drin = mx >= formX AND my >= formY AND mx < formX + fw AND my < formY + fh
+    IF MOUSE_HIT(LINKS) AND drin THEN
+        IF palScharf >= 0 THEN
+            controlAnlegen(palScharf, mx - formX, my - formY)
+            palScharf = -1
+            GUI_LISTBOX_CLEAR_SELECTION(lstPalette)
+            RETURN
+        END IF
+        griff = griffBei(mx, my)
+        IF griff >= 0 THEN
+            modus = 2
+        ELSE
+            DIM h AS GUI_WIDGET : h = GUI_HIT_TEST(mx, my)
+            DIM i AS INTEGER : i = indexVonHandle(h)
+            IF i <> auswahl THEN auswahl = i : inspektorFuellen()
+            IF i >= 0 THEN modus = 1 ELSE modus = 0
+        END IF
+        IF auswahl >= 0 THEN
+            startMx = mx : startMy = my
+            startX = feldZahl(auswahl, "x") : startY = feldZahl(auswahl, "y")
+            startW = feldZahl(auswahl, "w") : startH = feldZahl(auswahl, "h")
+            bewegt = FALSE
+        END IF
+        GUI_FOCUS(lstPalette)     ' Tastatur (Entf, Pfeile) zum Designer, nicht in ein Inspektor-Feld
+        RETURN
+    END IF
+    IF modus > 0 AND MOUSEBUTTON(LINKS) AND auswahl >= 0 THEN
+        DIM dx AS INTEGER : dx = mx - startMx
+        DIM dy AS INTEGER : dy = my - startMy
+        IF dx <> 0 OR dy <> 0 THEN bewegt = TRUE
+        IF modus = 1 THEN
+            lageSetzen(amRaster(startX + dx), amRaster(startY + dy), startW, startH)
+        ELSE
+            DIM x AS INTEGER : x = startX
+            DIM y AS INTEGER : y = startY
+            DIM w AS INTEGER : w = startW
+            DIM hh AS INTEGER : hh = startH
+            IF griff = 0 OR griff = 6 OR griff = 7 THEN x = amRaster(startX + dx) : w = startX + startW - x
+            IF griff = 2 OR griff = 3 OR griff = 4 THEN w = amRaster(startW + dx)
+            IF griff = 0 OR griff = 1 OR griff = 2 THEN y = amRaster(startY + dy) : hh = startY + startH - y
+            IF griff = 4 OR griff = 5 OR griff = 6 THEN hh = amRaster(startH + dy)
+            IF w < RASTER THEN w = RASTER
+            IF hh < RASTER THEN hh = RASTER
+            lageSetzen(x, y, w, hh)
+        END IF
+        RETURN
+    END IF
+    IF modus > 0 AND NOT MOUSEBUTTON(LINKS) THEN
+        IF bewegt THEN
+            merken()
+            inspektorFuellen()
+            protokoll("bewegt " + STR$(auswahl) + " " + STR$(feldZahl(auswahl, "x")) + " " + STR$(feldZahl(auswahl, "y")) + " " + STR$(feldZahl(auswahl, "w")) + " " + STR$(feldZahl(auswahl, "h")))
+        END IF
+        modus = 0
+    END IF
+END SUB
+
+SUB schieben(dx AS INTEGER, dy AS INTEGER)
+    IF auswahl < 0 THEN RETURN
+    lageSetzen(feldZahl(auswahl, "x") + dx, feldZahl(auswahl, "y") + dy, feldZahl(auswahl, "w"), feldZahl(auswahl, "h"))
+    merken()
+    inspektorFuellen()
+END SUB
+
+' --- Start ------------------------------------------------------------------
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        DIM start AS STRING : start = GETENV$("DHRT_START_DIR")
+        IF start <> "" THEN startDatei = PATHJOIN(start, startDatei)
+    END IF
+    formularLaden(startDatei)
+ELSE
+    neuesFormular()
+END IF
+GUI_FOCUS(lstPalette)      ' Kuerzel gelten im Fenster mit Fokus -- vor dem ersten Klick gaebe es keins
+protokoll("bereit")
+
+DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
+DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
+DIM beenden AS BOOLEAN : beenden = FALSE
+DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
+
+WHILE NOT QUITREQUESTED() AND NOT beenden
+    GUI_UPDATE()
+    IF SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
+        warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(winPal, 0, 0, PAL_B, warHoehe)
+        GUI_WINDOW_SET_BOUNDS(winInsp, warBreite - INSP_B, 0, INSP_B, warHoehe)
+    END IF
+
+    ' Menue
+    IF GUI_CLICKED(miNeu) THEN neuesFormular()
+    IF GUI_CLICKED(miOeffnen) THEN
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Formular oeffnen", "dhform")
+        IF p <> "" THEN formularLaden(p)
+    END IF
+    IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
+    IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
+    IF GUI_CLICKED(miLauf) THEN ausfuehren()
+    IF GUI_CLICKED(miBeenden) THEN
+        IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Formular ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
+    END IF
+    IF GUI_CLICKED(miRueck) THEN rueckgaengig()
+    IF GUI_CLICKED(miWieder) THEN wiederholen()
+    IF GUI_CLICKED(miDoppel) THEN controlVerdoppeln()
+    IF GUI_CLICKED(miLoeschen) THEN controlLoeschen()
+    IF GUI_CLICKED(miVorn) THEN controlOrdnen(TRUE)
+    IF GUI_CLICKED(miHinten) THEN controlOrdnen(FALSE)
+    IF dlgSchliessen <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
+        IF a = 1 THEN
+            dlgSchliessen = 0
+            IF sichern(FALSE) THEN beenden = TRUE
+        ELSEIF a = 2 THEN
+            dlgSchliessen = 0 : beenden = TRUE
+        ELSEIF a = 3 THEN
+            dlgSchliessen = 0
+        END IF
+    END IF
+
+    ' Palette: eine (neue) Auswahl macht die Art scharf, der naechste Klick auf
+    ' die Form legt ab. Eine Liste meldet kein GUI_CLICKED -- die Auswahl ist
+    ' das Ereignis.
+    IF GUI_LISTBOX_SELECTED(lstPalette) <> palScharf AND GUI_LISTBOX_SELECTED(lstPalette) >= 0 THEN
+        palScharf = GUI_LISTBOX_SELECTED(lstPalette)
+        GUI_SET_TEXT(lblStatus, palName[palScharf] + ": jetzt auf die Form klicken.")
+        protokoll("palette " + palArt[palScharf])
+    END IF
+
+    ' Inspektor: Enter in einem Feld oder der Knopf uebernimmt.
+    DIM uebernehmen AS BOOLEAN : uebernehmen = GUI_CLICKED(btnUebernehmen)
+    DIM fi AS INTEGER
+    FOR fi = 0 TO LEN(inspFelder) - 1
+        IF GUI_ENTERED(inspFelder[fi]) THEN uebernehmen = TRUE
+    NEXT
+    IF GUI_ENTERED(fTitel) OR GUI_ENTERED(fFormB) OR GUI_ENTERED(fFormH) THEN uebernehmen = TRUE
+    IF uebernehmen AND NOT inspStumm THEN inspektorUebernehmen()
+
+    ' Tastatur, solange kein Eingabefeld den Fokus hat
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    DIM imFeld AS BOOLEAN : imFeld = FALSE
+    IF fokus >= 0 THEN
+        DIM art AS STRING : art = GUI_KIND(fokus)
+        imFeld = art = "textinput" OR art = "textarea" OR art = "spinner"
+    END IF
+    IF NOT imFeld THEN
+        IF KEYHIT(KEY_DELETE) THEN controlLoeschen()
+        DIM schritt AS INTEGER : schritt = RASTER
+        IF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN schritt = 1
+        IF KEYHIT(KEY_LEFT) THEN schieben(-schritt, 0)
+        IF KEYHIT(KEY_RIGHT) THEN schieben(schritt, 0)
+        IF KEYHIT(KEY_UP) THEN schieben(0, -schritt)
+        IF KEYHIT(KEY_DOWN) THEN schieben(0, schritt)
+        IF KEYHIT(KEY_ESCAPE) THEN palScharf = -1 : auswahl = -1 : inspektorFuellen()
+    END IF
+
+    mausAufForm()
+
+    IF laufProzess >= 0 THEN
+        IF NOT PROCESS_RUNNING(laufProzess) THEN
+            GUI_SET_TEXT(lblStatus, "Formular beendet mit Code " + STR$(PROCESS_CODE(laufProzess)))
+            PROCESS_CLOSE(laufProzess)
+            laufProzess = -1
+        END IF
+    END IF
+
+    CLS(&H0B1119)
+    ' Rahmen und Titel der Form -- die Form selbst ist randlos
+    DIM fw2 AS INTEGER : fw2 = JSON_GET_INT(doc, "w")
+    DIM fh2 AS INTEGER : fh2 = JSON_GET_INT(doc, "h")
+    BOX(formX - 1, formY - 28, formX + fw2, formY - 1, &H1F2A38)
+    TEXT(formX + 8, formY - 22, JSON_GET_STRING(doc, "title") + "   " + STR$(fw2) + " x " + STR$(fh2), &HD8E4F0)
+    RECT(formX - 1, formY - 28, formX + fw2, formY + fh2, &H3A4A5C)
+    GUI_DRAW()
+    griffeZeichnen()
+    FLIP()
+WEND
+
+IF laufProzess >= 0 THEN PROCESS_KILL(laufProzess)
+protokoll("ende")

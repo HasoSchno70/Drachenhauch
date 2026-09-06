@@ -38,6 +38,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2091 | 0.53 |
+> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 860 | 0,17 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -2563,6 +2564,40 @@ solange die IDE Python ist), `tools/*.js` (Node, Buch). **Falle beim Bau:**
 `serde` musste als direkte Abhaengigkeit dazu (fuer den 1-Leerzeichen-
 Einzug der JSON-Ausgabe; nur `serde_json` reichte nicht, weil der Trait
 `Serialize` aus `serde` kommt).
+
+## Python-Abbau, Weg B: der Form-Designer in Drachenhauch (2026-09-06)
+
+Der erste der vier Editoren ohne Piloten (Form-Designer, Anim-FSM,
+Notenblatt, Audio Studio): `examples/197_form_designer.dh`, 860 Zeilen gegen
+5055 der Qt-Fassung (Faktor 0,17 -- misst wie immer vor allem, was
+weggelassen ist: Mehrfachauswahl, Layout-Zuordnung, Regeln/Bindung,
+Menue-Editor, Code-Editor, GB-Code-Export, Projekte fehlen). **Bauweise:**
+die Entwurfsflaeche ist ein ECHTES GUI_WINDOW im neuen Entwurfsmodus
+`GUI_WINDOW_DESIGN(win, TRUE)` (gui.rs `Window::entwurf`: `handle_press`
+kehrt nach dem Modal-Check um -- Fenster nach vorn, KEIN Fokus, kein
+Rahmen-Zug; der Hover-Durchlauf ueberspringt es; `GUI_HIT_TEST` und alle
+Setter gehen weiter). Damit zeichnet die Laufzeit die Controls selbst,
+statt dass der Designer sie nachmalt. **Das Modell ist das .dhform-JSON**
+(json-Modul), das Fenster nur die Ansicht: jede Aenderung schreibt ins JSON
+und baut die Ansicht neu (`GUI_WINDOW_DESTROY` + `GUI_FROM_JSON`); waehrend
+eines Zuges gehen x/y live per `GUI_SET_BOUNDS` ins Widget, gemerkt wird
+beim Loslassen. Undo = JSON-Text je Stand mit Zeiger. Widget-Index im JSON
+= `GUI_WINDOW_WIDGET(frm, i)`. Fremde Felder (`code`, `menus`, `tabs`)
+laufen unveraendert durch -- der Test schreibt sie hinein und liest sie
+zurueck. F5 schreibt `<name>_lauf.dh` (dasselbe Geruest wie
+`generate_runner`) und startet es per PROCESS_START. **Fallen:** (1) eine
+Liste meldet kein `GUI_CLICKED` -- die Palette wird ueber die AUSWAHL scharf;
+(2) ein neu gebautes Fenster nimmt den Fokus, Kuerzel gelten im
+Fokus-Fenster -- `ansichtBauen` merkt `GUI_FOCUSED()` und gibt ihn zurueck,
+sonst waren Strg+S/F5 nach dem ersten Ablegen tot; (3) `JSON_TYPE` sagt nur
+`number` -- beim Kopieren eines Teilbaums eine ganze Zahl ganz lassen, sonst
+liest `GUI_FROM_JSON` aus `48.0` kein x mehr; (4) `CONST RASTER` und
+`FUNCTION raster` kollidieren (Namen sind schreibungsunabhaengig). Tests
+`tests/test_pilot_formdesigner.py` (echte Klicks ueber die Wiedergabe:
+Palette -> Form -> Strg+S, Datei gelesen mit `FormDoc.load`, dem Modell des
+Qt-Designers; Ziehen + zweimal Strg+Z; F5-Laufprogramm uebersetzt;
+Entwurfsmodus mit Gegenprobe). In der IDE unter Werkzeuge, im Installer
+ohne Python als Verknuepfung.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 
