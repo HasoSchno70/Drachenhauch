@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1715,
+ "count": 1723,
  "builtins": [
   {
    "name": "ABS",
@@ -8365,6 +8365,54 @@
    "kind": "core",
    "signature": "SPACE$(n: INTEGER)",
    "module": "core"
+  },
+  {
+   "name": "SPEAK",
+   "kind": "core",
+   "signature": "SPEAK(text$[, unterbrechen])",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAKING",
+   "kind": "core",
+   "signature": "SPEAKING()",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_RATE",
+   "kind": "core",
+   "signature": "SPEAK_RATE(faktor)",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_SOUND",
+   "kind": "core",
+   "signature": "SPEAK_SOUND(text$)",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_STOP",
+   "kind": "core",
+   "signature": "SPEAK_STOP()",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_VOICE",
+   "kind": "core",
+   "signature": "SPEAK_VOICE(name$)",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_VOICES",
+   "kind": "core",
+   "signature": "SPEAK_VOICES()",
+   "module": "audio"
+  },
+  {
+   "name": "SPEAK_WAIT",
+   "kind": "core",
+   "signature": "SPEAK_WAIT()",
+   "module": "audio"
   },
   {
    "name": "SPHERE",

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von tools/gen_builtin_prosa.py -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.py (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1668,
+ "count": 1676,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1360,6 +1360,14 @@
   "SMTP_TO": "Empfänger — mehrfach aufrufbar",
   "SORT": "1D IN PLACE sortieren / umkehren",
   "SPACE$": "n Leerzeichen",
+  "SPEAK": "spricht text$; unterbrechen = die laufende Ansage abbrechen und sofort sprechen, sonst hinten anhängen",
+  "SPEAKING": "BOOLEAN — läuft oder wartet noch eine Ansage?",
+  "SPEAK_RATE": "Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0",
+  "SPEAK_SOUND": "SOUND — nur synthetisieren — ein Klang wie aus AUDIO_NOTE, für AUDIO_PLAY, AUDIO_PLAY_ON(emitter), AUDIO_SOUND_MIX, AUDIO_SAVE_WAV",
+  "SPEAK_STOP": "alles Laufende und Geplante verwerfen",
+  "SPEAK_VOICE": "Stimme wählen (ein Name aus SPEAK_VOICES(), Groß/Klein egal); leer = Systemstimme. Unbekannt = Fehler",
+  "SPEAK_VOICES": "ARRAY OF STRING die installierten Stimmen, z. B. Katja, Stefan, Hedda",
+  "SPEAK_WAIT": "blockiert, bis alles gesprochen ist (für Konsolenprogramme vor INPUT; im Spiel lieber SPEAKING() abfragen)",
   "SPHERE": "Kugel um einen Mittelpunkt",
   "SPHERE_WIRES": "Kugel als Drahtgitter",
   "SPLINE": "weiche Catmull-Rom-Kurve durch die Punkte; xs/ys sind ARRAY OF INTEGER gleicher Länge",

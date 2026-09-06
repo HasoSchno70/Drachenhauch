@@ -1961,7 +1961,9 @@ WCAG-Wert von 4,5:1.
 Mausgeste auch als Taste anbieten (das `gui` tut es, die Zeichenfläche
 nicht), Ton nie als einzige Rückmeldung, Bewegung abschaltbar machen. Und
 eine Zeichenfläche ist für den Leser ein Bild: was darauf passiert, sagt
-man ihm mit `GUI_ANNOUNCE`.
+man ihm mit `GUI_ANNOUNCE` — oder mit `SPEAK` (siehe
+[module-audio.md](module-audio.md)), das ohne Leser die Systemstimme nimmt
+und mit Leser dessen Stimme; das geht auch in einem Programm ohne gui.
 
 **Eingabemethoden (IME):** wer Japanisch, Chinesisch oder Koreanisch über
 eine Eingabemethode schreibt, sieht die **Umwandlung im Feld** — die noch

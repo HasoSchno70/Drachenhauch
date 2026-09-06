@@ -1,6 +1,17 @@
 # Entwurf: SPEAK — Spiele ohne gui sprechen lassen
 
-*Untersuchung, keine Umsetzung.* Der Rest aus der
+> **Stand 06.09.2026: C ist gebaut.** `SPEAK`, `SPEAK_STOP`, `SPEAKING`,
+> `SPEAK_WAIT`, `SPEAK_VOICE`, `SPEAK_VOICES`, `SPEAK_RATE`, `SPEAK_SOUND`
+> (`rust/drachenhauch_runtime/src/sprache.rs`): Windows über WinRT zu PCM,
+> als `SOUND` durch Kira auf dem Bus `speech`; die Warteschlange läuft über
+> Kiras `StartTime::Delayed` auf dem Audio-Thread, ohne Polling. Läuft ein
+> Bildschirmleser, geht der Satz als Ansage in den Baum — auch ohne gui.
+> macOS (`say`) und Linux (`espeak-ng`) wie unten beschrieben, ungeprüft.
+> Prüfstein: `tests/test_speak.py` (WAV von Pythons `wave` gelesen, Dauern
+> gemessen) und der fremde UIA-Leser in `tests/test_gui_barrierefreiheit.py`.
+> Doku: [module-audio.md](module-audio.md), Abschnitt „Sprechen".
+
+*Untersuchung, seither umgesetzt.* Der Rest aus der
 [Barrierefreiheit](entwurf-barrierefreiheit.md): dort war Weg B („selbst
 sprechen") zugunsten des Baums zurückgestellt worden, mit dem Satz, der eine
 Befehl `SPEAK` gehöre trotzdem dazu — für das Text-Adventure, das keinen

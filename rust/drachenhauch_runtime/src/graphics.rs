@@ -861,6 +861,11 @@ pub struct Graphics {
     a11y: Option<crate::a11y::A11y>,
     a11y_versorgt: bool,
     titel: String,
+    /// SPEAK bei laufendem Bildschirmleser ohne gui: die Ansage fuer den
+    /// Baum, den FLIP ohne GUI_UPDATE schickt (wie `Gui::ansage`).
+    ansage: String,
+    ansage_dringend: bool,
+    ansage_nr: u64,
     width: i32,
     height: i32,
     scale: i32,
@@ -1447,6 +1452,7 @@ impl Graphics {
         let mut g = Graphics {
             rl, thread, width, height, scale,
             a11y, a11y_versorgt: false, titel: title.to_string(),
+            ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
             post_shader_idx: None, gfx_stack: Vec::new(), clip_tiefe: 0, scene_rt,
@@ -5253,6 +5259,14 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     }
     /// Fenstertitel (SCREEN/SETWINDOWTITLE) -- Name des Wurzelknotens.
     pub fn fenster_titel(&self) -> &str { &self.titel }
+    /// Ansage fuer den Bildschirmleser aus einem Programm OHNE gui (SPEAK):
+    /// landet im Fenster-Baum von `a11y_bild_ende`. Der Zaehler macht aus
+    /// derselben Ansage zweimal eine Aenderung (wechselndes Leerzeichen).
+    pub fn a11y_ansagen(&mut self, text: String, dringend: bool) {
+        self.ansage = text;
+        self.ansage_dringend = dringend;
+        self.ansage_nr = self.ansage_nr.wrapping_add(1);
+    }
     /// Am Ende jedes Bildes: hat kein GUI_UPDATE einen Baum geschickt, bekommt
     /// das Hilfsprogramm wenigstens das Fenster mit seinem Titel -- sonst
     /// bliebe ein Programm ohne gui fuer immer bei "noch kein Baum".
@@ -5269,8 +5283,21 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
             let mut root = Node::new(Role::Window);
             root.set_label(self.titel.clone());
+            let mut nodes = Vec::new();
+            if !self.ansage.is_empty() {
+                use accesskit::Live;
+                let mut an = Node::new(Role::Label);
+                an.set_live(if self.ansage_dringend { Live::Assertive } else { Live::Polite });
+                let mut t = self.ansage.clone();
+                if self.ansage_nr % 2 == 1 { t.push(' '); }
+                an.set_value(t.clone());
+                an.set_label(t);
+                nodes.push((NodeId(crate::a11y::ids::ANSAGE), an));
+                root.set_children(vec![NodeId(crate::a11y::ids::ANSAGE)]);
+            }
+            nodes.push((NodeId(crate::a11y::ids::ROOT), root));
             let baum = TreeUpdate {
-                nodes: vec![(NodeId(crate::a11y::ids::ROOT), root)],
+                nodes,
                 tree: Some(TreeInfo::new(NodeId(crate::a11y::ids::ROOT))),
                 tree_id: TreeId::ROOT,
                 focus: NodeId(crate::a11y::ids::ROOT),

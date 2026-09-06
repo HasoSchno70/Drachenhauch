@@ -116,10 +116,12 @@ accesskit = { version = "0.25", optional = true }
 # Deshalb hier die letzte Version festgehalten, mit der er uebersetzt. Betrifft
 # NUR den emscripten-Build -- auf dem Desktop ist wasm-bindgen gar nicht dabei.
 # Drucken (PDF_PRINT) und OPENDOC unter Windows: GDI, winspool, ShellExecute.
+# Sprachausgabe (SPEAK, sprache.rs): WinRT Windows.Media.SpeechSynthesis liefert
+# einen WAV-Strom, den Kira wie jeden anderen Klang spielt.
 # Das Crate liegt ueber andere Abhaengigkeiten ohnehin im Baum; hier nur die
 # Features, die die Druckseite braucht. Unter macOS/Linux druckt CUPS (`lp`).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime", "Win32_System_WinRT", "Foundation", "Foundation_Collections", "Media_Core", "Media_SpeechSynthesis", "Storage_Streams"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 

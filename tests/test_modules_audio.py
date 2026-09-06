@@ -190,8 +190,8 @@ def test_bus_volume_validation(run_gb):
         'END TRY',
     ])
     out = run_gb(src)
-    assert "AUDIO_BUS_VOLUME: unbekannter Bus 'foo' (sfx, music, master)" in out
-    assert "AUDIO_BUS_GET_VOLUME: unbekannter Bus 'bar' (sfx, music, master)" in out
+    assert "AUDIO_BUS_VOLUME: unbekannter Bus 'foo' (sfx, music, master, speech)" in out
+    assert "AUDIO_BUS_GET_VOLUME: unbekannter Bus 'bar' (sfx, music, master, speech)" in out
 
 
 def test_bus_effects_validation(run_gb):

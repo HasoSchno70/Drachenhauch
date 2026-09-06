@@ -440,8 +440,10 @@ unabhaengig von den Einzel-Lautstaerken (sie multiplizieren sich im Mixer).
 | `AUDIO_BUS_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) |
 | `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | aktuelle Bus-Lautstaerke |
 
-`bus$` ist `"sfx"`, `"music"` oder `"master"` (case-insensitive). Typischer
-Einsatz: Optionsmenue mit getrennten Reglern.
+`bus$` ist `"sfx"`, `"music"`, `"master"` oder `"speech"` (case-insensitive;
+`speech` traegt die Sprachausgabe von `SPEAK`, siehe unten, und hat nur eine
+Lautstaerke, keine Effektkette). Typischer Einsatz: Optionsmenue mit
+getrennten Reglern.
 
 ```basic
 AUDIO_BUS_VOLUME("music", 0.4)        ' Musik leiser
@@ -554,10 +556,66 @@ Die Orientierung ist bewusst auf **Yaw** beschränkt — die Drehung um die
 Hochachse. Das deckt Vogelperspektive und Verfolgerkamera ab, ohne dass man sich
 mit Quaternionen befassen muss.
 
+## Sprechen: `SPEAK`
+
+Die Systemstimme spricht jeden Text — Namen, Zahlen, was der Spieler
+eingetippt hat. Für das Audiogame, das Text-Adventure mit Vorleser, das
+Lernspiel für Kinder, die noch nicht lesen, den Sprecher im Strategiespiel
+(„Einheit bereit"). Vorher ging das nur mit vorher aufgenommenen Dateien.
+
+| Funktion | Rückgabe | Bedeutung |
+|---|---|---|
+| `SPEAK(text$[, unterbrechen])` | — | spricht `text$`; `unterbrechen` = die laufende Ansage abbrechen und sofort sprechen, sonst hinten anhängen |
+| `SPEAK_STOP()` | — | alles Laufende und Geplante verwerfen |
+| `SPEAKING()` | BOOLEAN | läuft oder wartet noch eine Ansage? |
+| `SPEAK_WAIT()` | — | blockiert, bis alles gesprochen ist (für Konsolenprogramme vor `INPUT`; im Spiel lieber `SPEAKING()` abfragen) |
+| `SPEAK_VOICE(name$)` | — | Stimme wählen (ein Name aus `SPEAK_VOICES()`, Groß/Klein egal); leer = Systemstimme. Unbekannt = Fehler |
+| `SPEAK_VOICES()` | ARRAY OF STRING | die installierten Stimmen, z. B. `Katja`, `Stefan`, `Hedda` |
+| `SPEAK_RATE(faktor)` | — | Tempo 0.5 (halb so schnell) .. 2.0 (doppelt), Vorgabe 1.0 |
+| `SPEAK_SOUND(text$)` | SOUND | nur synthetisieren — ein Klang wie aus `AUDIO_NOTE`, für `AUDIO_PLAY`, `AUDIO_PLAY_ON(emitter)`, `AUDIO_SOUND_MIX`, `AUDIO_SAVE_WAV` |
+
+```basic
+SPEAK("Willkommen. Wohin willst du gehen?")
+SPEAK_WAIT()
+INPUT antwort$
+
+' im Spiel: nicht warten, sondern fragen
+IF treffer AND NOT SPEAKING() THEN SPEAK("Treffer!")
+SPEAK("Achtung, hinter dir!", TRUE)        ' unterbricht, was gerade laeuft
+
+' eine sprechende Figur im Raum
+DIM stimme AS SOUND
+stimme = SPEAK_SOUND("Wer wagt es, mich zu stoeren?")
+AUDIO_PLAY_ON(stimme, drache)              ' raeumlich, an ihrem Emitter
+AUDIO_SAVE_WAV(stimme, "drache_01.wav")    ' oder als Datei ins Spiel einbacken
+```
+
+**Eine gesprochene Zeile ist ein Klang unter Klängen.** Die Stimme liefert
+Abtastwerte (Windows: WinRT `Windows.Media.SpeechSynthesis`, gemessen 12–35 ms
+je Satz, mono 16 kHz; macOS: `say`; Linux: `espeak-ng` — beide über einen
+Prozess je Satz, ungeprüft, ohne Werkzeug ein Fehler mit Installationshinweis),
+daraus wird ein `SOUND`, und der läuft auf dem Bus **`speech`**:
+`AUDIO_BUS_VOLUME("speech", 0.8)` regelt ihn, `AUDIO_PAUSE_ALL` hält ihn an,
+`AUDIO_PUSH`/`AUDIO_POP` sichern seine Lautstärke mit. Derselbe Text mit
+derselben Stimme und demselben Tempo wird nicht zweimal gerechnet (Vorrat von
+64 Sätzen, der älteste fällt weg).
+
+**Die Warteschlange läuft auf dem Audio-Thread.** Ein angehängter Satz bekommt
+seinen Startzeitpunkt an Kira mit (wie `AUDIO_PLAY_AT`) — niemand muss je Bild
+nachfragen, und ein Konsolenprogramm, das in `INPUT` wartet, hört seine drei
+Sätze trotzdem nacheinander.
+
+**Läuft ein Bildschirmleser, spricht er.** `SPEAK` fragt zuerst, ob ein
+Hilfsprogramm zuhört (`GUI_SCREENREADER()`, auch ohne gui). Dann geht der Satz
+als Ansage in den Barrierefreiheits-Baum — mit der Stimme, dem Tempo und der
+Braillezeile des Nutzers, und ohne zwei Stimmen zugleich. `SPEAKING()` ist
+dann FALSE, `SPEAK_WAIT()` kehrt sofort zurück. `SPEAK_SOUND` ist immer
+Synthese: ein Klang ist ein Klang.
+
 ## Zustand sichern: AUDIO_PUSH / AUDIO_POP
 
 Alle Bus-Einstellungen (Lautstärke, Balance, Filter, Hall, Echo, Verzerrer,
-Kompressor, EQ) hängen global. Eine vergessene Rücknahme fällt erst Szenen
+Kompressor, EQ — und die Lautstärke des Busses `speech`) hängen global. Eine vergessene Rücknahme fällt erst Szenen
 später auf — dafür gibt es einen Stapel, wie `GFX_PUSH`/`GFX_POP` bei der Grafik.
 
 | Funktion | Rückgabe | Bedeutung |
