@@ -228,37 +228,17 @@ def main(argv):
     args = argv[1:]
     mode = "run"
 
-    # --- Referenz aus dem Quelltext erzeugen ---
+    # --- Referenz aus dem Quelltext erzeugen: `dhrt doku referenz` ---
     #
-    # Steht hier und nicht in `dhrt`: der Rust-Lexer wirft Kommentare weg,
-    # der Python-Lexer behaelt die Zeilen -- und ohne die Kommentare waere
-    # eine "Doku" nur eine Liste von Signaturen.
+    # Bis 2026-09-06 lag das in `drachenhauch/doku.py`, "weil der Rust-Lexer
+    # Kommentare wegwirft". dhrt liest die Kommentare seither aus dem Text
+    # (`symbole.rs`); hier bleibt nur die alte Schreibweise als Durchreiche.
     if args and args[0] in ("--doku", "--doc"):
-        args = args[1:]
-        ziel = None
-        if "-o" in args:
-            i = args.index("-o")
-            if i + 1 >= len(args):
-                print("--doku: nach -o fehlt der Dateiname")
-                return 2
-            ziel = Path(args[i + 1])
-            args = args[:i] + args[i + 2:]
-        quellen = [Path(a) for a in args if not a.startswith("-")]
-        if not quellen:
-            print("Verwendung: dhrun.py --doku <datei.dh ...> [-o referenz.md]")
+        dhrt = _find_dhrt()
+        if dhrt is None:
+            print("dhrt nicht gefunden -- einmalig bauen mit: python rust/build_runtime.py")
             return 2
-        fehlend = [p for p in quellen if not p.is_file()]
-        if fehlend:
-            print("--doku: gibt es nicht: " + ", ".join(str(p) for p in fehlend))
-            return 2
-        from drachenhauch.doku import erzeuge
-        text = erzeuge(quellen)
-        if ziel is None:
-            print(text)
-        else:
-            ziel.write_text(text, encoding="utf-8")
-            print(f"geschrieben: {ziel}")
-        return 0
+        return subprocess.call([str(dhrt), "doku", "referenz", *args[1:]])
 
     # --- Editor explizit per Flag ---
     if args and args[0] in ("--editor", "-e"):

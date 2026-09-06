@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 # preserve_order: JSON-Objekt-Keys behalten Einfuege-Reihenfolge (wie Python
 # json) -- noetig fuer bit-identisches JSON_STRINGIFY.
+serde = "1"
 serde_json = { version = "1", features = ["preserve_order"] }
 # ZIP (ZIP_*). Pure-Rust (Deflate ueber flate2/miniz_oxide, das ueber ureq
 # ohnehin schon in der Lockfile steht) -- keine C-Toolchain. default-features

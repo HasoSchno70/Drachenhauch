@@ -1,15 +1,17 @@
 """Kurzbeschreibungen der Builtins, erzeugt aus `docs/`.
 
-`builtin_docs.BUILTIN_DOCS` ist von Hand gepflegt und deckte 328 von 1558
-Builtins ab -- 21 %. Ganze Module standen bei null: gui (161 Befehle), g3d,
-m3d, chart, json, sprite, tiled. Hover und Signaturhilfe fielen dort auf die
+`builtin_docs.json` (die handgepflegte Tabelle) deckte 328 von 1558 Builtins
+ab -- 21 %. Ganze Module standen bei null: gui (161 Befehle), g3d, m3d,
+chart, json, sprite, tiled. Hover und Signaturhilfe fielen dort auf die
 blosse Signatur zurueck, obwohl die Beschreibungen laengst in den
 Modul-Dokumenten stehen.
 
-`tools/gen_builtin_prosa.py` sammelt sie ein und schreibt
-`drachenhauch/editor_qt/builtin_prosa.json`. Erzeugt statt zur Laufzeit
-gelesen, weil der Installer `docs/*.md` nicht mitpackt (nur examples/, esp32/
-und die Buecher) -- im installierten Editor gaebe es nichts zu lesen.
+`dhrt doku prosa` sammelt sie ein und schreibt
+`drachenhauch/editor_qt/builtin_prosa.json` (bis 2026-09-06 tat das
+`tools/gen_builtin_prosa.py` in Python -- Weg A aus
+docs/entwurf-python-abbau.md). Erzeugt statt zur Laufzeit gelesen, weil der
+Installer `docs/*.md` nicht mitpackt und dhrt die Datei fuer `dhrt lsp`
+einbettet.
 
 Diese Tests halten dreierlei fest: dass die Datei zum Stand von `docs/` passt,
 dass die Texte brauchbar sind (kein Markdown-Schrott, keine abgeschnittenen
@@ -18,8 +20,8 @@ Saetze), und dass die handgepflegte Tabelle weiterhin gewinnt.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -29,6 +31,15 @@ from drachenhauch.editor_qt.dhrt_meta import builtin_index
 
 WURZEL = Path(__file__).resolve().parents[1]
 PROSA = WURZEL / "drachenhauch" / "editor_qt" / "builtin_prosa.json"
+
+
+def _dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    for v in ("release", "debug"):
+        p = WURZEL / "rust" / "drachenhauch_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
 
 
 def _prosa() -> dict[str, str]:
@@ -48,8 +59,10 @@ def test_datei_passt_zum_stand_von_docs():
     """Der Generator im Pruefmodus. Wer eine Beschreibung in `docs/` oder im
     Referenzbuch aendert, aendert damit auch den Hover -- die erzeugte Datei
     muss also mitkommen."""
-    r = subprocess.run([sys.executable, str(WURZEL / "tools" / "gen_builtin_prosa.py"),
-                        "--pruefen"], capture_output=True, text=True,
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    r = subprocess.run([str(dhrt), "doku", "prosa", "--pruefen"], capture_output=True, text=True,
                        encoding="utf-8", cwd=str(WURZEL), timeout=120)
     assert r.returncode == 0, r.stdout + r.stderr
 
@@ -94,7 +107,7 @@ def test_keine_abgeschnittenen_saetze():
 
 def test_handgepflegte_tabelle_gewinnt():
     """Die Texte aus `docs/` sind Tabellenzellen und oft knapp; die Tabelle in
-    `builtin_docs.py` ist auf den Hover zugeschnitten und muss vorgehen."""
+    `builtin_docs.json` ist auf den Hover zugeschnitten und muss vorgehen."""
     gemeinsam = [n for n in _prosa() if n.lower() in BUILTIN_DOCS]
     assert gemeinsam, "kein ueberlappender Eintrag -- Test waere wirkungslos"
     name = gemeinsam[0]

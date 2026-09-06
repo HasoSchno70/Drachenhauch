@@ -1,22 +1,22 @@
-# Drachenhauch — VSCode-Extension
+# Drachenhauch — VS-Code-Erweiterung
 
 Sprachunterstützung für [Drachenhauch](../README.md) (`.dh`-Dateien) in VS Code:
 
-- **Syntax-Highlighting** (TextMate-Grammatik, aus den echten Lexer-Keywords +
-  registrierten Built-ins/Konstanten generiert).
-- **Language Server** (Python, `drachenhauch.lsp`):
-  - Diagnostics (Live-Fehler aus der Preprocess→Lex→Parse→Compile-Pipeline)
-  - Auto-Completion (Keywords, Built-ins, Konstanten, Snippets, Symbole der Datei)
-  - Hover-Doku (Built-ins + eigene SUB/FUNCTION/CLASS … mit Doc-Kommentar)
+- **Syntax-Highlighting** (TextMate-Grammatik, aus den Schlüsselwörtern des
+  Lexers und dem Befehlsindex erzeugt).
+- **Language Server** — die Runtime selbst, `dhrt lsp`:
+  - Diagnostics (Fehler und Warnungen der Preprocess→Lex→Parse→Compile-Kette)
+  - Auto-Completion (Befehle, Schlüsselwörter, Konstanten, Symbole der Datei)
+  - Hover-Doku (Befehle + eigene SUB/FUNCTION/CLASS … mit Doc-Kommentar)
   - Gehe zur Definition, Find References
   - Outline / Document Symbols (Klassen mit Methoden verschachtelt)
 
 ## Voraussetzungen
 
-Der Language Server ist Teil des Drachenhauch-Repos und läuft über den Python des
-Projekts. Damit `python -m drachenhauch.lsp` das Paket findet, am einfachsten **den
-Drachenhauch-Projektordner in VS Code öffnen** (der Server startet mit diesem Ordner
-als Arbeitsverzeichnis).
+Eine gebaute `dhrt` (`python rust/build_runtime.py` im Repo, oder die
+Runtime aus dem Installer). Liegt sie nicht im PATH, ihren Pfad in der
+Einstellung `drachenhauch.dhrtPath` eintragen. **Python braucht die
+Erweiterung nicht.**
 
 ## Installation (Entwicklung)
 
@@ -34,24 +34,22 @@ vsce package
 
 ## Einstellungen
 
-- `drachenhauch.pythonPath` — Python-Interpreter für den Server. **Auf den
-  `.venv`-Python des Projekts setzen**, z. B.
-  `C:\\Programmieren\\Python\\Drachenhauch\\.venv\\Scripts\\python.exe`.
-- `drachenhauch.serverModule` — Server-Modul (Default `drachenhauch.lsp`).
+- `drachenhauch.dhrtPath` — Pfad zu `dhrt` bzw. `dhrt.exe` (Vorgabe: `dhrt`,
+  also die Suche im PATH), z. B.
+  `C:\\Programmieren\\Python\\Drachenhauch\\rust\\drachenhauch_runtime\\target\\release\\dhrt.exe`.
 - `drachenhauch.enableLanguageServer` — auf `false` für nur Syntax-Highlighting.
 
-## Grammatik neu generieren
+## Grammatik neu erzeugen
 
-Nach Sprach-Änderungen (neue Keywords/Built-ins):
+Nach Sprach-Änderungen (neue Schlüsselwörter oder Befehle):
 
 ```bash
-.venv\\Scripts\\python.exe vscode-drachenhauch\\build_grammar.py
+dhrt doku grammatik
 ```
 
 ## Architektur
 
-Der Server (`drachenhauch/lsp/`) trennt **Feature-Logik** (`features.py`, headless
-getestet in `tests/test_lsp_features.py`) von der **JSON-RPC-Transportschicht**
-(`server.py`, getestet in `tests/test_lsp_server.py` inkl. echtem stdio-
-Subprozess). Die Sprach-Intelligenz teilt sich denselben Code wie der eingebaute
-Qt-Editor (`drachenhauch/editor_qt/`).
+Der Server liegt in `rust/drachenhauch_runtime/src/lsp.rs` (Rahmung, Verfahren,
+Hover-Daten) und `symbole.rs` (Definitionen, Fundstellen, Gliederung), geprüft
+über den echten Prozess in `tests/test_dhrt_lsp.py`. Siehe
+[docs/lsp.md](../docs/lsp.md).

@@ -556,10 +556,12 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    Modul) — Completion/Highlighting/LSP ziehen daraus (`editor_qt/dhrt_meta.py`).
    Die Kurzbeschreibung fuer Hover/Tooltip schreibt man NICHT hier hin,
    sondern ins passende `docs/module-*.md` (Tabellenzeile
-   ``| `NAME(args)` | was es tut |``); `tools/gen_builtin_prosa.py` sammelt
+   ``| `NAME(args)` | was es tut |``); `dhrt doku prosa` sammelt
    sie nach `editor_qt/builtin_prosa.json` ein, und
-   `tests/test_builtin_prosa.py` haelt beides synchron. `builtin_docs.py`
+   `tests/test_builtin_prosa.py` haelt beides synchron. `builtin_docs.json`
    ist fuer ausfuehrlichere Texte da und gewinnt, wo es einen Eintrag hat.
+   Beide Dateien bettet dhrt fuer `dhrt lsp` ein -> nach einer Aenderung neu
+   bauen.
 3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
    **Die Signatur in `builtin_index.json` muss stimmen** — der Compiler leitet
    daraus die erlaubte Argumentzahl ab und warnt bei Abweichung (`dhrt --check`).
@@ -567,7 +569,8 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    optional), `NAME(a, b, ...)` (beliebig viele), `NAME(6..8 Argumente)`.
    `NAME(*args)` schaltet die Pruefung ab — nur nehmen, wenn es wirklich offen
    ist. Eine zu enge Signatur erzeugt Falsch-Alarme in fremdem Code.
-4. Bei neuem Keyword: `vscode-drachenhauch/build_grammar.py` neu generieren.
+4. Bei neuem Keyword: `lexer::KEYWORDS` ergaenzen und die VS-Code-Grammatik
+   neu erzeugen (`dhrt doku grammatik`).
 
 (Es gibt KEINE Python-`@builtin`-Registry / kein `interpreter.py` mehr.)
 
@@ -963,7 +966,8 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   Debug-Sitzung soll ihre nicht verlieren) und sie mindestens eine Minute alt
   sind (Prozessnummern werden wiederverwendet). Wer `examples/*.dh` globbt,
   filtert `tempdateien.PRAEFIX` heraus -- ein Rest kippte sonst die Zaehlung
-  (`tools/pruef_doku_aussagen.py`, `tests/test_dhrt_werkzeuge.py` tun es).
+  (`dhrt pruef beispiele` zaehlt darum den git-Index, `tests/test_dhrt_werkzeuge.py`
+  filtert das Praefix).
   Modul `drachenhauch/editor_qt/tempdateien.py`.
 - **Qt-Tests: nie ungebremst `app.processEvents()` aufrufen.** Die Qt-Testdateien
   lassen ihre Fenster stehen; in EINEM gemeinsamen `pytest tests/`-Prozess
@@ -2528,24 +2532,71 @@ Doku [docs/score-editor.md](docs/score-editor.md), Tests
 Konvertierung, headless), `tests/test_scoreeditor_qt.py` (Offscreen-UI),
 `tests/test_audio_preview_mixer.py` (geteilter Mixer).
 
-## Language Server (`drachenhauch.lsp`) + VSCode-Extension
+## Python-Abbau, Weg A: Werkzeugkette in dhrt (2026-09-06)
 
-Externe Editor-Unterstützung via **LSP**, mit derselben Sprach-Intelligenz wie
-der Qt-Editor. Start: `py -m drachenhauch.lsp` (stdio, JSON-RPC). Aufbau bewusst
-zweigeteilt: [`drachenhauch/lsp/features.py`](drachenhauch/lsp/features.py) =
-**transport-freie** Feature-Logik (Text+Position → LSP-Daten: diagnostics/
-completions/hover/definition/references/document_symbols), headless testbar;
-[`drachenhauch/lsp/server.py`](drachenhauch/lsp/server.py) (`LspServer`) = nur
-JSON-RPC + Dokument-Store + Position/URI-Mapping. Beide bauen auf den schon
-vorhandenen Editor-Bausteinen auf (`editor_qt/symbols.py`, `error_check.py`,
-`builtin_docs.py`, `completer.py`) — **keine Logik-Duplizierung**. Tests:
-[`tests/test_lsp_features.py`](tests/test_lsp_features.py) (Feature-Logik) +
-[`tests/test_lsp_server.py`](tests/test_lsp_server.py) (Protokoll + echter
-stdio-Subprozess). VSCode-Extension in [`vscode-drachenhauch/`](vscode-drachenhauch/):
-`extension.js` startet den Server, die TextMate-Grammatik wird aus den echten
-Lexer-Keywords + Built-ins **generiert** (`build_grammar.py`). Doku
+Richtung des Nutzers: Python soll wegfallen, alles laeuft ueber Rust und
+Drachenhauch (`docs/entwurf-python-abbau.md`, Empfehlung A -> C -> B, D je
+Bereich). **A ist gebaut.** Drei Unterbefehle, alle im Repo-Kontext
+(`doku::repo_wurzel` sucht von cwd aufwaerts nach `docs/` + Index):
+`dhrt lsp` (siehe naechster Abschnitt), `dhrt doku prosa|grammatik|referenz`
+(`doku.rs`: Prosa aus `docs/`-Tabellen und -Listen plus Referenzbuch ueber
+`node tools/buch_cmd_export.js`; Grammatik aus `lexer::KEYWORDS` + Index +
+Handdoku; Referenz aus dem Quelltext ueber `symbole.rs` -- das lag frueher
+NICHT in dhrt, "weil der Rust-Lexer Kommentare wegwirft"; der Symbol-Scanner
+liest den Text) und `dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade|
+beispiele]` (`pruef.rs`: die Codebloecke laufen IN-PROZESS durch
+`check_source`, kein dhrt-Start je Buendel; `GEDULDET`/`GEDULDETE_PFADE` mit
+Begruendung je Eintrag; `pfade` prueft Inline-Code UND Markdown-Links, die
+Duldung gilt nur fuer Inline-Code). `--pruefen` bei `doku` = schreibt nichts,
+Rueckgabe 1 bei Abweichung -- so haengen `builtin_prosa.json` und die
+VS-Code-Grammatik an der Suite (`tests/test_builtin_prosa.py`,
+`tests/test_vscode_grammatik.py`); `tests/test_docs_codebloecke.py` und
+`tests/test_doku_aussagen.py` rufen `dhrt pruef`. **Geloescht:**
+`drachenhauch/lsp/`, `drachenhauch/doku.py`, `tools/gen_builtin_prosa.py`,
+`tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`,
+`vscode-drachenhauch/build_grammar.py`, die zwei LSP-Testdateien.
+`builtin_docs.py` haelt keine Tabelle mehr, sondern laedt `builtin_docs.json`
+(dieselbe Datei bettet dhrt ein). `dhrun.py --doku` reicht an
+`dhrt doku referenz` durch. **Bleibt Python:** `rust/build_runtime.py` (Bau),
+`tools/qt_tests_einzeln.py` (Qt-Testlaeufer), der Installer (PyInstaller,
+solange die IDE Python ist), `tools/*.js` (Node, Buch). **Falle beim Bau:**
+`serde` musste als direkte Abhaengigkeit dazu (fuer den 1-Leerzeichen-
+Einzug der JSON-Ausgabe; nur `serde_json` reichte nicht, weil der Trait
+`Serialize` aus `serde` kommt).
+
+## Sprachserver `dhrt lsp` + VS-Code-Erweiterung
+
+Externe Editor-Unterstuetzung via **LSP** -- und der Server ist die Runtime
+selbst: `dhrt lsp` (stdio, JSON-RPC). **Weg A aus
+`docs/entwurf-python-abbau.md` (2026-09-06):** bis dahin rechnete
+`drachenhauch/lsp/` in Python nach, was dhrt beim Uebersetzen laengst wusste.
+Jetzt: [`src/lsp.rs`](rust/drachenhauch_runtime/src/lsp.rs) (Rahmung,
+Dokumentspeicher, Verfahren, Hover-Daten) und
+[`src/symbole.rs`](rust/drachenhauch_runtime/src/symbole.rs) (Port von
+`editor_qt/symbols.py`: Definitionen, Fundstellen, Bloecke, Kommentar-Doku --
+zeilenweise mit ausgeblendeten Kommentaren/Zeichenketten, bewusst KEIN Lexer,
+weil ein Sprachserver halb getippten Text sieht; Spalten in ZEICHEN). Diagnose
+= dieselbe Kette wie `--check` (`check_source`), auf Pufferzeilen
+zurueckgerechnet (`Herkunft` aus preprocess; Fehler in importierter Datei ->
+Zeile 1 mit `in datei:zeile ->`). **Diagnose im eigenen Faden** mit
+Generationszaehler und 120 ms Sammelzeit -- sonst warteten Hover und
+Vervollstaendigung hinter jedem didChange; stdout hinter einem Mutex. Hover:
+`builtin_docs.json` (handgepflegt; die Tabelle aus `builtin_docs.py` ist seither
+eine JSON-Datei, die Python laedt und dhrt per `include_str!` einbettet) vor
+`builtin_prosa.json` (aus `docs/`) vor der Signatur aus dem Index; eigene
+Symbole ueber den Kommentarblock ueber der Definition. Vervollstaendigung:
+Index (`compiler::builtin_eintraege`), `lexer::KEYWORDS` (neue Liste, Test
+haelt sie an `keyword()` fest -- 75 Eintraege), Farben/Tasten aus vm.rs, PI/TAU,
+eigene Definitionen. Tests: Rust-`#[test]`s in beiden Dateien +
+[`tests/test_dhrt_lsp.py`](tests/test_dhrt_lsp.py) (echter Prozess ueber
+stdio; prueft nebenbei `tokens.KEYWORDS` gegen `lexer::KEYWORDS`). Der
+Qt-Editor benutzt weiter seine Python-Bausteine (`symbols.py`,
+`error_check.py`) -- die gehen mit der IDE (Weg C). VS-Code-Erweiterung in
+[`vscode-drachenhauch/`](vscode-drachenhauch/): `extension.js` startet
+`dhrt lsp` (Einstellung `drachenhauch.dhrtPath`), die TextMate-Grammatik wird
+aus `lexer::KEYWORDS` + Index **generiert** (`dhrt doku grammatik`). Doku
 [docs/lsp.md](docs/lsp.md). **Bei neuen Keywords/Built-ins:** Grammatik neu
-generieren (`python vscode-drachenhauch/build_grammar.py`).
+generieren (`dhrt doku grammatik`).
 
 ## Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
 

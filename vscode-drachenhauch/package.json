@@ -1,20 +1,32 @@
 {
   "name": "drachenhauch",
   "displayName": "Drachenhauch",
-  "description": "Sprachunterstuetzung fuer Drachenhauch (.dh): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
-  "version": "1.0.0",
+  "description": "Sprachunterstuetzung fuer Drachenhauch (.dh): Syntax-Highlighting + Language Server (`dhrt lsp`: Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
+  "version": "2.0.0",
   "publisher": "drachenhauch",
   "license": "MIT",
-  "engines": { "vscode": "^1.75.0" },
-  "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:drachenhauch"],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:drachenhauch"
+  ],
   "main": "./extension.js",
   "contributes": {
     "languages": [
       {
         "id": "drachenhauch",
-        "aliases": ["Drachenhauch", "drachenhauch", "gb"],
-        "extensions": [".dh"],
+        "aliases": [
+          "Drachenhauch",
+          "drachenhauch",
+          "gb"
+        ],
+        "extensions": [
+          ".dh"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -28,15 +40,10 @@
     "configuration": {
       "title": "Drachenhauch",
       "properties": {
-        "drachenhauch.pythonPath": {
+        "drachenhauch.dhrtPath": {
           "type": "string",
-          "default": "python",
-          "description": "Python-Interpreter, der den Drachenhauch-Language-Server startet (am besten der .venv-Python des Projekts)."
-        },
-        "drachenhauch.serverModule": {
-          "type": "string",
-          "default": "drachenhauch.lsp",
-          "description": "Python-Modul des Language-Servers (py -m <modul>)."
+          "default": "dhrt",
+          "description": "Pfad zur Drachenhauch-Runtime `dhrt` (oder `dhrt.exe`). Sie ist selbst der Language Server (`dhrt lsp`); ohne Pfad wird sie im PATH gesucht."
         },
         "drachenhauch.enableLanguageServer": {
           "type": "boolean",

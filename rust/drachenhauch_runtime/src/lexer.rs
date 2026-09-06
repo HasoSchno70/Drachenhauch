@@ -65,6 +65,32 @@ impl Tt {
     }
 }
 
+/// Alle Schluesselwoerter (klein) -- fuer Vervollstaendigung, Grammatik und
+/// Symbolfilter des Sprachservers. Muss zu `keyword()` passen; der Test unten
+/// haelt beide zusammen.
+pub(crate) const KEYWORDS: &[&str] = &[
+    "dim", "as", "integer", "float", "string", "boolean", "print", "input", "if", "then",
+    "else", "elseif", "elif", "end", "while", "wend", "for", "to", "step", "next", "sub",
+    "function", "return", "class", "new", "extends", "true", "false", "nil", "and", "or",
+    "not", "mod", "const", "break", "continue", "image", "sound", "array", "of", "struct",
+    "file", "map", "try", "catch", "throw", "finally", "import", "select", "case", "is",
+    "repeat", "until", "data", "read", "restore", "byref", "enum", "private", "band", "bor",
+    "bxor", "bnot", "shl", "shr", "tuple", "with", "static", "funcref", "in", "where",
+    "property", "operator", "yield", "coroutine",
+];
+
+#[cfg(test)]
+mod keyword_tests {
+    #[test]
+    fn liste_und_lookup_passen_zusammen() {
+        for k in super::KEYWORDS { assert!(super::keyword(k).is_some(), "{} fehlt im Lookup", k); }
+        // Jedes Wort des Lookups steht in der Liste: alle Buchstabenfolgen bis
+        // Laenge 9 durchzuprobieren waere zu viel -- stattdessen die Liste
+        // gegen die Anzahl der Zweige halten, die `keyword()` kennt.
+        assert_eq!(super::KEYWORDS.len(), 75);
+    }
+}
+
 /// Keyword-Lookup (lowercase) -> Tt. Spiegelt `KEYWORDS` aus tokens.py.
 pub(crate) fn keyword(text: &str) -> Option<Tt> {
     use Tt::*;

@@ -18,7 +18,7 @@
       sporadisch in FREMDEN Dateien um)
 - [ ] `rust/build_runtime.py` (bei Aenderungen an `rust/`)
 - [ ] Doku-Pruefer, wenn `docs/`, `CLAUDE.md` oder ein Buch betroffen ist:
-      `tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`, `tools/pruef_meldungen.js`
+      `dhrt pruef`, `dhrt doku prosa --pruefen`, `tools/pruef_meldungen.js`
 
 ## Grenzen
 

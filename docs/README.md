@@ -97,7 +97,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 - **[Animations-Editor (`dhanim`)](anim-editor.md)** — Zustandsautomat für Sprite-Animationen
 - **[Notenblatt-Editor (`dhscore`)](score-editor.md)** — Noten setzen statt Tracker-Zeilen füllen
 - **[Tracker](tracker.md)** und **[SFX-Generator](sfx-generator.md)** — Musik und Geräusche (beide im Audio Studio)
-- **[Sprachserver + VSCode](lsp.md)** — dieselbe Diagnose in fremden Editoren
+- **[Sprachserver + VS Code](lsp.md)** — `dhrt lsp`: dieselbe Diagnose in fremden Editoren, ohne Python
 - **[Eingabe aufzeichnen](automation.md)** — Demo-Modus, nachspielbare Fehlerberichte, automatische Spieltests
 - **[Web-Playground](web-playground.md)** — dhrt als WebAssembly, ein Link genügt
 
@@ -106,7 +106,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 Arbeitsnotizen, keine Anwender-Doku — sie erklären, warum etwas so ist, wie es ist:
 
 - **[Stolpersteine](stolpersteine.md)** — Reibungspunkte der Sprache, beim Schreiben des Lehrbuchs gesammelt
-- **Doku-Prüfer** — `tools/pruef_docs.py` schickt jeden `basic`-Block durch den Compiler, `tools/pruef_doku_aussagen.py` prüft Befehlsnamen in Tabellen/Fließtext und die Zählungen im README. Beide hängen an der Testsuite
+- **Doku-Prüfer** — `dhrt pruef` schickt jeden `basic`-Block durch die Front-End-Kette (`bloecke`), prüft Befehlsnamen in Tabellen/Fließtext (`namen`), die Zählungen im README (`zaehlungen`), Tasten-Konstanten (`konstanten`) und Pfade/Links (`pfade`). Hängt an der Testsuite; bis September 2026 zwei Python-Skripte in `tools/`
 - **[Rust-Front-End-Portierung](rust-frontend-port.md)** und **[Runtime-Migration](rust-runtime.md)** — wie `dhrt` entstand
 - **[Entwurf: Namensräume](entwurf-namensraeume.md)** — WP I der Allzweck-Roadmap. Alle vier Stufen sind inzwischen gebaut; das Dokument bleibt als Protokoll der Entscheidungen
 - **[Entwurf: Python-Parser entfernen](entwurf-python-parser-entfernen.md)** — gemessen, was noch am zweiten Parser hängt, und was ein Schnitt kostet

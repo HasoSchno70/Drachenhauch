@@ -1,7 +1,8 @@
 // VSCode-Client fuer den Drachenhauch-Language-Server.
 //
-// Startet `python -m drachenhauch.lsp` (stdio) und verbindet ihn als
-// LanguageClient. Syntax-Highlighting kommt aus der TextMate-Grammatik und
+// Startet `dhrt lsp` (stdio) und verbindet ihn als LanguageClient -- die
+// Runtime IST der Sprachserver, Python braucht es dafuer seit 2026-09-06
+// nicht mehr (Weg A aus docs/entwurf-python-abbau.md). Syntax-Highlighting kommt aus der TextMate-Grammatik und
 // laeuft auch ohne Server; der Server liefert Diagnostics/Completion/Hover/
 // Goto-Definition/References/Outline.
 
@@ -16,19 +17,16 @@ let client;
 // Fehler half nur ein manueller Fenster-Reload, ohne jeden Hinweis darauf,
 // dass genau das noetig waere (Review-Fund).
 const _RESTART_KEYS = [
-  "drachenhauch.pythonPath",
-  "drachenhauch.serverModule",
+  "drachenhauch.dhrtPath",
   "drachenhauch.enableLanguageServer",
 ];
 
 function _buildClient() {
   const cfg = workspace.getConfiguration("drachenhauch");
-  const pythonPath = cfg.get("pythonPath", "python");
-  const serverModule = cfg.get("serverModule", "drachenhauch.lsp");
+  const dhrtPath = cfg.get("dhrtPath", "dhrt");
 
-  // cwd = erster Workspace-Ordner, damit `drachenhauch` importierbar ist
-  // (am besten den Drachenhauch-Projektordner oeffnen, oder pythonPath auf
-  //  einen Python setzen, der das Paket findet).
+  // cwd = erster Workspace-Ordner: relative IMPORT-Pfade einer Datei ohne
+  // eigene URI loesen sich dann wenigstens gegen das Projekt auf.
   const folder =
     workspace.workspaceFolders && workspace.workspaceFolders.length
       ? workspace.workspaceFolders[0].uri.fsPath
@@ -36,14 +34,14 @@ function _buildClient() {
 
   const serverOptions = {
     run: {
-      command: pythonPath,
-      args: ["-m", serverModule],
+      command: dhrtPath,
+      args: ["lsp"],
       transport: TransportKind.stdio,
       options: { cwd: folder },
     },
     debug: {
-      command: pythonPath,
-      args: ["-m", serverModule],
+      command: dhrtPath,
+      args: ["lsp"],
       transport: TransportKind.stdio,
       options: { cwd: folder },
     },
@@ -76,7 +74,7 @@ async function _startClient() {
     window.showErrorMessage(
       "Drachenhauch-Language-Server konnte nicht starten: " +
         err.message +
-        " (drachenhauch.pythonPath pruefen)"
+        " (drachenhauch.dhrtPath pruefen -- dhrt gebaut und im PATH?)"
     );
   }
 }

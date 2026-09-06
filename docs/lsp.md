@@ -1,45 +1,65 @@
-# Language Server + VSCode-Extension
+# Sprachserver + VS Code
 
-Neben dem eingebauten Qt-Editor gibt es einen **Language Server (LSP)** und eine
-**VSCode-Extension**, die Drachenhauch-Unterstützung in jeden LSP-fähigen Editor
-bringen — mit derselben Sprach-Intelligenz wie der Qt-Editor.
+Neben dem eingebauten Qt-Editor gibt es einen **Sprachserver (LSP)** und eine
+**VS-Code-Erweiterung**, die Drachenhauch-Unterstützung in jeden LSP-fähigen
+Editor bringen — mit derselben Diagnose wie der Qt-Editor.
 
-## Language Server (`drachenhauch.lsp`)
+## Sprachserver: `dhrt lsp`
 
-Start (stdio, JSON-RPC 2.0):
+Der Sprachserver ist die Runtime selbst. Start (stdio, JSON-RPC 2.0):
 
 ```
-.venv\Scripts\python.exe -m drachenhauch.lsp
+dhrt lsp
 ```
 
-Fähigkeiten:
+Kein Python, kein zweites Programm: Lexer, Parser, Compiler, der
+Befehlsindex und die Hover-Texte liegen in `dhrt`, und der Server benutzt
+sie in einem Prozess. Bis September 2026 rechnete ein Python-Server
+(`drachenhauch/lsp/`) nach, was `dhrt` beim Übersetzen längst wusste — er
+ist mit Weg A aus [entwurf-python-abbau.md](entwurf-python-abbau.md)
+entfallen.
 
 | LSP-Methode | Funktion |
 |---|---|
-| `publishDiagnostics` | Live-Fehler aus der Pipeline (Preprocess→Lex→Parse→Compile), erste Fehlerstelle |
-| `completion` | Keywords, Built-ins, Konstanten, Snippets + im Dokument definierte Symbole (Präfix-gefiltert) |
-| `hover` | Signatur + Doku für Built-ins **und** eigene `SUB`/`FUNCTION`/`CLASS`/… (Doc-Kommentar über der Definition) |
-| `definition` | Gehe zur Definition |
-| `references` | Alle Vorkommen eines Symbols |
-| `documentSymbol` | Outline — Klassen mit Methoden/Properties verschachtelt, plus ENUMs |
+| `publishDiagnostics` | Fehler und Warnungen der ganzen Kette (Preprocess → Lex → Parse → Namensraum → Compile), dieselben wie `dhrt --check`, auf die Zeilen des Puffers zurückgerechnet — ein Fehler in einer importierten Datei steht in Zeile 1 mit Herkunft |
+| `completion` | Befehle aus dem Index, Schlüsselwörter, Konstanten (Farben, Tasten, `PI`, `TAU`) und die im Dokument definierten Symbole, nach dem Präfix links von der Marke gefiltert |
+| `hover` | Signatur und Beschreibung für Befehle (handgepflegte Texte vor den aus `docs/` erzeugten, sonst die Signatur aus dem Index) und für eigene `SUB`/`FUNCTION`/`CLASS`/… (der Kommentarblock über der Definition) |
+| `definition` | zur Definition springen |
+| `references` | alle Vorkommen eines Symbols |
+| `documentSymbol` | Gliederung — Klassen mit Methoden und Properties verschachtelt, dazu ENUMs |
 
-### Architektur
+**Diagnose im Hintergrund.** Jeder Tastendruck schickt das ganze Dokument;
+die Prüfung einer Datei mit 2 800 Zeilen kostet rund 90 ms. Damit Hover und
+Vervollständigung nicht dahinter warten, prüft je Dokument ein eigener Faden
+mit Generationszähler: er wartet kurz, ob noch ein Anschlag folgt, und
+schickt nur, wenn er der neueste ist.
 
-Die **Feature-Logik** (`drachenhauch/lsp/features.py`) ist reine, transport-freie
-Funktion (Dokument-Text + Position → LSP-Daten) und damit headless testbar
-(`tests/test_lsp_features.py`). Die **Transportschicht** (`drachenhauch/lsp/server.py`,
-`LspServer`) macht nur JSON-RPC + Dokument-Store + Position/URI-Mapping
-(`tests/test_lsp_server.py`, inkl. echtem stdio-Subprozess-Test). Die
-Intelligenz teilt sich denselben Code wie der Qt-Editor (`editor_qt/symbols.py`,
-`error_check.py`, `builtin_docs.py`, `completer.py`).
+### Aufbau
 
-## VSCode-Extension (`vscode-drachenhauch/`)
+* `rust/drachenhauch_runtime/src/lsp.rs` — Rahmung (Content-Length),
+  Dokumentspeicher, Verfahren, Hover-Daten. Die Hover-Texte kommen aus zwei
+  eingebetteten Dateien: `drachenhauch/editor_qt/builtin_docs.json`
+  (handgepflegt, gewinnt) und `builtin_prosa.json` (aus `docs/` erzeugt, siehe
+  `dhrt doku`).
+* `rust/drachenhauch_runtime/src/symbole.rs` — Definitionen, Fundstellen,
+  Blöcke und Kommentar-Doku aus dem Text, mit Kommentaren und Zeichenketten
+  ausgeblendet; bewusst kein Lexer, weil ein Sprachserver halb getippten Text
+  sieht.
+* Prüfstein: `tests/test_dhrt_lsp.py` fährt den echten Prozess über stdio
+  (Fähigkeiten, Diagnose, Definition, Hover, Vervollständigung, Fundstellen,
+  Gliederung, kaputte Rahmung, sauberes Ende); dazu Rust-Tests in beiden
+  Dateien.
 
-- **Syntax-Highlighting** via TextMate-Grammatik, aus den echten Lexer-Keywords +
-  registrierten Built-ins/Konstanten **generiert** (`build_grammar.py` →
-  `syntaxes/drachenhauch.tmLanguage.json`).
-- **LSP-Client** (`extension.js`) startet `python -m drachenhauch.lsp` und verbindet
-  ihn über stdio.
+Der Qt-Editor benutzt für dieselben Aufgaben noch seine Python-Bausteine
+(`editor_qt/symbols.py`, `error_check.py`); sie wandern mit der IDE (Weg C).
 
-Setup + Einstellungen (vor allem `drachenhauch.pythonPath` auf den `.venv`-Python):
-siehe [vscode-drachenhauch/README.md](../vscode-drachenhauch/README.md).
+## VS-Code-Erweiterung (`vscode-drachenhauch/`)
+
+- **Syntax-Highlighting** über eine TextMate-Grammatik, aus den
+  Schlüsselwörtern des Lexers und dem Befehlsindex **erzeugt**
+  (`dhrt doku grammatik` → `syntaxes/drachenhauch.tmLanguage.json`).
+- **LSP-Client** (`extension.js`) startet `dhrt lsp` und verbindet ihn über
+  stdio.
+
+Einstellung `drachenhauch.dhrtPath`: Pfad zur Runtime, falls sie nicht im
+PATH liegt. Details: [vscode-drachenhauch/README.md](../vscode-drachenhauch/README.md).

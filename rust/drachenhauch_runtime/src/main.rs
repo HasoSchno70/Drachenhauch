@@ -64,6 +64,10 @@ mod mqtt;
 mod farbraum;
 mod kalender;
 mod syntax;
+mod symbole;
+mod lsp;
+mod doku;
+mod pruef;
 mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
@@ -247,6 +251,9 @@ dhrt -- die Drachenhauch-Runtime
   dhrt --export <datei.dh>     zu einer eigenstaendigen .exe buendeln
   dhrt debug <datei.dh>        Debug-Sitzung (JSON-Protokoll, fuer den Editor)
   dhrt profile <datei.dh>      Laufzeit je Zeile messen
+  dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
+  dhrt doku <prosa|grammatik|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
+  dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
   dhrt --version               Fassung und eingebaute Bestandteile
   dhrt --help                  diese Uebersicht
 
@@ -329,6 +336,18 @@ fn main() -> ExitCode {
         // Ohne Pfad das aktuelle Verzeichnis.
         if raw.len() >= 2 && raw[1] == "test" {
             return test_main(&raw[2..]);
+        }
+        // `dhrt lsp` -- der Sprachserver fuer VS Code und jede andere IDE.
+        if raw.len() >= 2 && raw[1] == "lsp" {
+            return lsp::serve();
+        }
+        // `dhrt doku prosa|grammatik|referenz` -- die Doku-Werkzeuge.
+        if raw.len() >= 2 && raw[1] == "doku" {
+            return doku::main(&raw[2..]);
+        }
+        // `dhrt pruef ...` -- die Doku-Pruefer.
+        if raw.len() >= 2 && raw[1] == "pruef" {
+            return pruef::main(&raw[2..]);
         }
         if raw.len() >= 3 && raw[1] == "run" {
             setze_programm_args(&raw);

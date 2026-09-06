@@ -1,7 +1,10 @@
 """Die Codebeispiele in docs/ muessen syntaktisch laufen.
 
 Ein eingecheckter Pruefer, den niemand aufruft, findet nichts. Deshalb haengt
-`tools/pruef_docs.py` hier an der Testsuite.
+`dhrt pruef bloecke` hier an der Testsuite (bis 2026-09-06 `tools/pruef_docs.py`
+in Python; Weg A aus docs/entwurf-python-abbau.md -- die Bloecke laufen jetzt
+IN-PROZESS durch dieselbe Front-End-Kette wie `--check`, kein dhrt-Start je
+Buendel mehr).
 
 Beim ersten Lauf fand er elf Beispiele, die beim Abtippen abbrechen -- drei
 Variablen mit reservierten Namen (`data`, `sound`, `map`), zwei entfernte
@@ -10,7 +13,9 @@ Builtins (`BITOR`/`SHL`), `FUNCREF(f)` als Aufruf (gab es nie), `EXIT WHILE`
 """
 from __future__ import annotations
 
-import importlib.util
+import os
+import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -18,25 +23,44 @@ import pytest
 WURZEL = Path(__file__).resolve().parents[1]
 
 
-def _pruefer():
-    spec = importlib.util.spec_from_file_location(
-        "_pruef_docs", WURZEL / "tools" / "pruef_docs.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    return m
+def _dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    for v in ("release", "debug"):
+        p = WURZEL / "rust" / "drachenhauch_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
+
+
+def _pruef(*args):
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    r = subprocess.run([str(dhrt), "pruef", *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", cwd=str(WURZEL), timeout=300)
+    return r.returncode, r.stdout + r.stderr
 
 
 def test_alle_codebloecke_parsen():
-    m = _pruefer()
-    dhrt = m.finde_dhrt()
-    if dhrt is None:
-        pytest.skip("native Runtime 'dhrt' nicht gebaut")
-    bloecke, funde = m.pruefe(WURZEL / "docs", dhrt)
-    assert bloecke > 100, "kaum Codebloecke gefunden -- Erkennung kaputt?"
-    if funde:
-        zeilen = "\n".join(f"  {n}:{z}  {q[:70]}  -> {msg[:70]}"
-                           for n, z, q, msg in funde)
-        pytest.fail(f"{len(funde)} Codebeispiel(e) in docs/ parsen nicht:\n{zeilen}")
+    code, out = _pruef("bloecke")
+    m = re.search(r"(\d+) Codebloecke", out)
+    assert m and int(m.group(1)) > 100, "kaum Codebloecke gefunden -- Erkennung kaputt?\n" + out
+    assert code == 0, "Codebeispiel(e) in docs/ parsen nicht:\n" + out
+
+
+def test_notation_gilt_nicht_als_fehler(tmp_path):
+    """`...`, `[optional]`, `->` und `FOR each` sind Schreibweise, kein
+    Programm -- ohne den Filter meldete der Pruefer 27 Fehler, die alle mit
+    Absicht so dastehen. Und ein echter Fehler wird weiter gemeldet."""
+    (tmp_path / "probe.md").write_text(
+        "```basic\nPRINT ...\nSPEAK(text$ [, unterbrechen])\n```\n\n```basic\nPRINT 1\n```\n",
+        encoding="utf-8")
+    code, out = _pruef("bloecke", str(tmp_path))
+    assert code == 0, out
+    assert "2 Codebloecke" in out
+    (tmp_path / "kaputt.md").write_text("```basic\nDIM x AS\n```\n", encoding="utf-8")
+    code, out = _pruef("bloecke", str(tmp_path))
+    assert code == 1 and "kaputt.md:2" in out, out
 
 
 def test_keine_toten_links_in_den_docs():
@@ -45,7 +69,6 @@ def test_keine_toten_links_in_den_docs():
     Gefunden hatte das acht Stueck: dreimal ein Pfad relativ zum falschen
     Ordner, fuenfmal Python-Dateien, die mit Stufe B geloescht wurden.
     """
-    import re
     muster = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
     kaputt = []
     for datei in sorted((WURZEL / "docs").glob("*.md")):
@@ -61,7 +84,6 @@ def test_keine_toten_links_in_den_docs():
 
 def test_jede_doku_ist_vom_index_erreichbar():
     """Sonst schreibt jemand 181 Zeilen, die niemand findet (scope.md)."""
-    import re
     index = (WURZEL / "docs" / "README.md").read_text(encoding="utf-8")
     verlinkt = set(re.findall(r"\(([A-Za-z0-9_.-]+\.md)\)", index))
     alle = {p.name for p in (WURZEL / "docs").glob("*.md")} - {"README.md"}

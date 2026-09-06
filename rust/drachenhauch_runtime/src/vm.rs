@@ -8540,7 +8540,7 @@ pub fn ist_vorbelegter_name(name: &str) -> bool {
         || DEFAULT_KEYS.iter().any(|(n, _)| *n == name)
 }
 
-const DEFAULT_COLORS: &[(&str, i64)] = &[
+pub(crate) const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("black", 0), ("white", 16777215), ("gray", 8421504), ("lightgray", 12632256),
     ("darkgray", 4210752), ("red", 16711680), ("green", 65280), ("blue", 255),
     ("yellow", 16776960), ("cyan", 65535), ("magenta", 16711935), ("orange", 16753920),

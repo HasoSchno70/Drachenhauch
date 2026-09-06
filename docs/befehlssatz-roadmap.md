@@ -22,7 +22,7 @@ absichern.
 - [ ] Golden-Test in `tests/` ueber die `run_gb`-Fixture (kein Parity-Test
       mehr — es gibt nur noch einen Pfad, gegen den man vergleichen koennte).
 - [ ] Doku: `drachenhauch/editor_qt/builtin_docs.py` (Hover) +
-      `vscode-drachenhauch/build_grammar.py` neu generieren; `docs/` und
+      die VS-Code-Grammatik neu erzeugen (`dhrt doku grammatik`); `docs/` und
       README-Tabelle bei Bedarf.
 
 ---

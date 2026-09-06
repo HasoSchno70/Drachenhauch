@@ -2,16 +2,17 @@
 
 Ergaenzt `test_docs_codebloecke.py`: der prueft ```basic-BLOECKE gegen den
 Compiler, dieser hier die Stellen daneben -- Befehlsnamen in Tabellen und
-Fliesstext, und Zaehlungen wie "39 Module".
+Fliesstext, Zaehlungen wie "39 Module", Tasten-Konstanten, Pfade und Links.
 
-Entstanden aus einem systematischen Durchgang durch docs/, der sieben
-falsche Aussagen fand. Vier davon waren Verhaltensaussagen und nur durch
-Nachmessen zu finden; drei waren Zahlen, die niemand nachzaehlt -- und
-genau die haelt dieser Test ab jetzt fest.
+Der Pruefer ist `dhrt pruef` (bis 2026-09-06 `tools/pruef_doku_aussagen.py`
+in Python; Weg A aus docs/entwurf-python-abbau.md). Entstanden aus einem
+systematischen Durchgang durch docs/, der sieben falsche Aussagen fand. Vier
+davon waren Verhaltensaussagen und nur durch Nachmessen zu finden; drei waren
+Zahlen, die niemand nachzaehlt -- und genau die haelt dieser Test ab jetzt fest.
 """
 from __future__ import annotations
 
-import importlib.util
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,30 +22,44 @@ import pytest
 WURZEL = Path(__file__).resolve().parents[1]
 
 
-def _pruefer():
-    spec = importlib.util.spec_from_file_location(
-        "_pruef_aussagen", WURZEL / "tools" / "pruef_doku_aussagen.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    return m
+def _dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    for v in ("release", "debug"):
+        p = WURZEL / "rust" / "drachenhauch_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
+
+
+def _pruef(*args):
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    r = subprocess.run([str(dhrt), "pruef", *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", cwd=str(WURZEL), timeout=300)
+    return r.returncode, r.stdout + r.stderr
 
 
 def test_befehlsnamen_in_prosa_existieren():
     """Jeder `NAME(`-Verweis in Tabellen/Fliesstext muss ein echtes Builtin
     sein. Faengt Tippfehler und umbenannte Befehle, die kein Codeblock
     abdeckt."""
-    m = _pruefer()
-    funde = m.pruefe_namen(WURZEL / "docs")
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+    code, out = _pruef("namen")
+    assert code == 0, out
+
+
+def test_befehlsnamen_pruefung_schlaegt_an(tmp_path):
+    """Gegenprobe: ein erfundener Befehl faellt auf, ein Schluesselwort nicht."""
+    (tmp_path / "probe.md").write_text(
+        "Mit `GIBTSNICHT_XY(1)` und `PRINT(1)` und `ABS(x)`.\n", encoding="utf-8")
+    code, out = _pruef("namen", str(tmp_path))
+    assert code == 1 and "GIBTSNICHT_XY" in out and "PRINT" not in out.split("Befund")[1], out
 
 
 def test_zaehlungen_stimmen():
     """'39 Module', '183 Beispiele' -- Zahlen veralten beim naechsten Commit."""
-    m = _pruefer()
-    funde = m.zaehlungen()
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+    code, out = _pruef("zaehlungen")
+    assert code == 0, out
 
 
 def test_beispiel_zaehlung_kommt_aus_der_versionsverwaltung(tmp_path):
@@ -54,19 +69,16 @@ def test_beispiel_zaehlung_kommt_aus_der_versionsverwaltung(tmp_path):
     ein sporadischer Fehlschlag (2026-08-27, etwa jeder fuenfte parallele
     Lauf, beim Wiederholen gruen). Ursache ist keine Test-Datei: die
     Live-Diagnose des Editors legt ihre Temp-Datei NEBEN die gepruefte
-    Quelle (`editor_qt/error_check.py:_check_via_dhrt`, ebenso Debugger,
-    Profiler und LSP) -- sie muss dort liegen, damit `IMPORT "x.dh"` und
-    relative Asset-Pfade aufloesen. Wer waehrend des Testlaufs ein Beispiel
-    im Editor offen hat, dem blinkt fuer ~40 ms ein `examples/tmpXXXX.dh`
-    ins Verzeichnis; faellt der glob hinein, meldet der Pruefer
+    Quelle -- sie muss dort liegen, damit `IMPORT "x.dh"` und relative
+    Asset-Pfade aufloesen. Wer waehrend des Testlaufs ein Beispiel im Editor
+    offen hat, dem blinkt fuer ~40 ms ein `examples/tmpXXXX.dh` ins
+    Verzeichnis; faellt der glob hinein, meldet der Pruefer
     "sagt 195, tatsaechlich 196".
 
     Nachgestellt wird das hier in einem EIGENEN Wegwerf-Repo -- eine
-    Streudatei im echten `examples/` wuerde parallel laufenden Sweeps
-    (`test_rust_lexer_parity`, `test_dhrt_check`) genau denselben Streich
-    spielen.
+    Streudatei im echten `examples/` wuerde parallel laufenden Sweeps genau
+    denselben Streich spielen.
     """
-    m = _pruefer()
     if shutil.which("git") is None:
         pytest.skip("git nicht installiert -- dann zaehlt die Rueckfallebene")
 
@@ -83,19 +95,11 @@ def test_beispiel_zaehlung_kommt_aus_der_versionsverwaltung(tmp_path):
     git("add", "examples")
     git("-c", "commit.gpgsign=false", "commit", "-m", "zwei Beispiele")
 
-    assert m.beispiele(repo) == (2, "versioniert")
+    assert _pruef("beispiele", str(repo))[1].strip() == "2 versioniert"
     # Der Fremdkoerper aus der Live-Diagnose -- unversioniert, also unsichtbar.
     (repo / "examples" / "tmp9k3x.dh").write_text("PRINT 1\n", encoding="utf-8")
-    assert m.beispiele(repo) == (2, "versioniert")
+    assert _pruef("beispiele", str(repo))[1].strip() == "2 versioniert"
     assert len(list((repo / "examples").glob("*.dh"))) == 3   # der glob saehe ihn
-
-
-def test_geduldete_namen_sind_begruendet():
-    """Die Ausnahmeliste soll eine bewusste Entscheidung bleiben, kein
-    Abstellgleis -- jeder Eintrag braucht einen Grund im Klartext."""
-    m = _pruefer()
-    for name, grund in m.GEDULDET.items():
-        assert len(grund) > 20, f"{name}: Grund zu duenn ({grund!r})"
 
 
 def test_tasten_konstanten_stehen_in_der_doku():
@@ -107,10 +111,8 @@ def test_tasten_konstanten_stehen_in_der_doku():
     aufzaehlen ist offensichtlich die falsche Methode -- darum zaehlt das
     jetzt die Runtime selbst gegen.
     """
-    m = _pruefer()
-    funde = m.konstanten(WURZEL / "docs")
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+    code, out = _pruef("konstanten")
+    assert code == 0, out
 
 
 def test_pfadverweise_zeigen_auf_existierende_dateien():
@@ -121,17 +123,8 @@ def test_pfadverweise_zeigen_auf_existierende_dateien():
     ERSTEN Schritt in diese Datei. Solche Verweise verrotten leise -- niemand
     klickt eine Doku systematisch durch.
     """
-    m = _pruefer()
-    funde = m.pfade(WURZEL / "docs")
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
-
-
-def test_geduldete_pfade_sind_begruendet():
-    """Wie GEDULDET: die Ausnahmeliste braucht Gruende, keine Eintraege."""
-    m = _pruefer()
-    for pfad, grund in m.GEDULDETE_PFADE.items():
-        assert len(grund) > 20, f"{pfad}: Grund zu duenn ({grund!r})"
+    code, out = _pruef("pfade")
+    assert code == 0, out
 
 
 # ------------------------------------------------------------- CLAUDE.md
@@ -144,17 +137,13 @@ def test_geduldete_pfade_sind_begruendet():
 # Stufe B nicht mehr gibt.
 
 def test_claude_md_befehlsnamen_existieren():
-    m = _pruefer()
-    funde = m.pruefe_namen(WURZEL, nur={"CLAUDE.md"})
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+    code, out = _pruef("namen", str(WURZEL), "--nur", "CLAUDE.md")
+    assert code == 0, out
 
 
 def test_claude_md_pfade_und_links_leben():
-    m = _pruefer()
-    funde = m.pfade(WURZEL, nur={"CLAUDE.md"})
-    assert not funde, "\n".join(
-        f"{d}:{z}  {w}  -> {msg}" for d, z, w, msg in funde)
+    code, out = _pruef("pfade", str(WURZEL), "--nur", "CLAUDE.md")
+    assert code == 0, out
 
 
 def test_markdown_links_werden_ueberhaupt_geprueft(tmp_path):
@@ -163,29 +152,22 @@ def test_markdown_links_werden_ueberhaupt_geprueft(tmp_path):
     toten Verweise in CLAUDE.md standen.
 
     Mitgeprueft wird gleich, was NICHT anschlagen darf: ein Ordner-Ziel, eine
-    Zeilennummer am Ende und ein Ziel im Netz.
+    Zeilennummer am Ende und ein Ziel im Netz. Und dass GEDULDETE_PFADE fuer
+    Links NICHT gilt: eine historische Nennung schreibt man als Inline-Code,
+    ein Link verspricht 'hier kannst du hinspringen'.
     """
-    m = _pruefer()
     (tmp_path / "probe.md").write_text(
         "[tot](drachenhauch/gibtsnicht.py)\n"
         "[lebt](rust/build_wasm.py)\n"
         "[ordner](docs/)\n"
         "[mit Zeile](drachenhauch/lexer.py:114)\n"
-        "[netz](https://example.invalid/x.py)\n", encoding="utf-8")
-    funde = m.pfade(tmp_path, nur={"probe.md"})
-    assert len(funde) == 1, funde
-    assert "gibtsnicht.py" in funde[0][2]
-
-
-def test_geduldete_pfade_gelten_nicht_fuer_links():
-    """Eine historische Nennung schreibt man als Inline-Code, nicht als Link:
-    ein Link verspricht 'hier kannst du hinspringen'. Genau so standen der
-    geloeschte Tree-Walker und die Parser-Parity in CLAUDE.md -- klickbar."""
-    m = _pruefer()
-    tot = next(iter(m.GEDULDETE_PFADE))
-    from pathlib import Path
-    import tempfile
-    ordner = Path(tempfile.mkdtemp())
-    (ordner / "probe.md").write_text(f"[klick]({tot})\n", encoding="utf-8")
-    assert m.pfade(ordner, nur={"probe.md"}), (
-        f"{tot} ist als Link durchgerutscht, weil es in GEDULDETE_PFADE steht")
+        "[netz](https://example.invalid/x.py)\n"
+        "`drachenhauch/interpreter.py` als Inline-Code ist geduldet\n"
+        "[klick](drachenhauch/interpreter.py)\n", encoding="utf-8")
+    # Das Repo ist die Wahrheit fuer "gibt es": geprueft wird die Probe im
+    # Repo-Kontext, nur die Datei liegt woanders.
+    code, out = _pruef("pfade", str(tmp_path), "--nur", "probe.md")
+    assert code == 1, out
+    befunde = [z for z in out.splitlines() if z.strip().startswith("->")]
+    assert len(befunde) == 2, out
+    assert "gibtsnicht.py" in out and "[...](drachenhauch/interpreter.py)" in out
