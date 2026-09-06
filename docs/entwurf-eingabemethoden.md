@@ -18,8 +18,18 @@
 > größeren Grundvorrat (357 → 407 ms). Tests `tests/test_schriften_vorrat.py`
 > (Bildvergleich echt gegen `?`, Gegenprobe U+E000 bleibt `?`). Siehe
 > [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften).
-> C (Vorschau im Feld) und D bleiben ungebaut; Arabisch/Hebräisch ohne
-> Formung und Rechts-nach-links.
+> **Nachtrag, selber Tag: C ist gebaut.** `ime.rs` hängt einen zweiten
+> Subclass an raylibs Fenster (derselbe Griff wie AccessKit), nimmt
+> `WM_IME_STARTCOMPOSITION` / `WM_IME_COMPOSITION` (`GCS_COMPSTR`,
+> `GCS_CURSORPOS`, `GCS_RESULTSTR`) / `WM_IME_ENDCOMPOSITION` selbst und
+> verschluckt `WM_IME_CHAR` — nur, solange ein gui-Textfeld den Fokus hat;
+> sonst läuft alles wie bisher durch. Die Vorschau steht unterstrichen an der
+> Schreibmarke (Textfeld und Textbereich, Marke der IME innerhalb der
+> Vorschau), das Ergebnis geht durch dieselben Grenzen wie Tippen. Belegt mit
+> einem Rust-Test für die Zeichenkettenseite (`ime_ergebnis_und_vorschau`);
+> die Fensternachrichten selbst sind hier ohne installierte IME **nicht
+> gemessen**. D bleibt ungebaut; Arabisch/Hebräisch ohne Formung und
+> Rechts-nach-links.
 
 *Untersuchung, keine Umsetzung.* Der vierte und letzte Architekturpunkt der
 Lückenliste nach dem sechsten Piloten (nach den

@@ -219,12 +219,12 @@ mod tests {
     fn verschieden_grosse_bilder_werden_abgelehnt() {
         let a = Bild { breite: 2, hoehe: 2, rgba: vec![0; 16] };
         let b = Bild { breite: 3, hoehe: 2, rgba: vec![0; 24] };
-        let e = schreiben("egal.gif", &[a, b], 10, true).unwrap_err();
+        let e = schreiben("egal.gif", &[a, b], &[10, 10], true).unwrap_err();
         assert!(e.contains("EINE Leinwand"), "{}", e);
     }
 
     #[test]
     fn ohne_bilder_ist_es_ein_fehler() {
-        assert!(schreiben("egal.gif", &[], 10, true).is_err());
+        assert!(schreiben("egal.gif", &[], &[], true).is_err());
     }
 }

@@ -993,6 +993,11 @@ pub struct Widget {
     tab_page: i32,
     // Hover-Hilfetext (Tooltip); leer = keiner. Erscheint nach kurzem Verweilen.
     tooltip: String,
+    /// Eingabemethoden: die unfertige Umwandlung (Vorschau) und die
+    /// Schreibmarke darin -- steht an `caret`, unterstrichen, bis die IME
+    /// ein Ergebnis liefert. Transient, nie in der Datei.
+    vorschau: String,
+    vorschau_marke: i32,
     /// Tab-Reihenfolge (GUI_SET_TAB_INDEX): Widgets mit Index > 0 kommen
     /// zuerst, aufsteigend; der Rest folgt in der Reihenfolge des Anlegens.
     tab_index: i32,
@@ -1906,6 +1911,7 @@ impl Gui {
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
             tooltip: String::new(),
+            vorschau: String::new(), vorschau_marke: 0,
             tab_index: 0,
             spans: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
@@ -8159,6 +8165,84 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         true
     }
 
+    /// Der angezeigte Text eines Textfelds/Textbereichs: der Inhalt (im
+    /// Passwortmodus Punkte) mit der IME-Vorschau an der Schreibmarke, und
+    /// die Lage der Schreibmarke IN dieser Anzeige (hinter der Marke der
+    /// Vorschau). EINE Quelle fuer Zeichnen, Unterstreichen und die Meldung
+    /// an die IME.
+    fn anzeige_mit_vorschau(&self, wdg: &Widget) -> (Vec<char>, i32) {
+        let mut chars: Vec<char> = if wdg.passwort {
+            std::iter::repeat('\u{2022}').take(wdg.text.chars().count()).collect()
+        } else { wdg.text.chars().collect() };
+        let caret = wdg.caret.clamp(0, chars.len() as i32);
+        if wdg.vorschau.is_empty() { return (chars, caret); }
+        let v: Vec<char> = wdg.vorschau.chars().collect();
+        let marke = wdg.vorschau_marke.clamp(0, v.len() as i32);
+        for (k, ch) in v.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
+        (chars, caret + marke)
+    }
+
+    /// Eingabemethoden: hat ein Textfeld/Textbereich den Fokus, der Eingaben
+    /// annimmt? Nur dann uebernimmt dhrt die Umwandlung (ime.rs).
+    pub fn ime_feld_aktiv(&self) -> bool {
+        let (wi, i) = match self.focus_widget { Some(f) => f, None => return false };
+        if self.focus_window != Some(wi) { return false; }
+        let win = match self.windows.get(wi) { Some(w) if w.alive && w.visible => w, _ => return false };
+        match win.widgets.get(i) {
+            Some(w) => matches!(w.kind, Kind::TextInput | Kind::TextArea) && self.widget_shown(wi, w) && w.enabled && !w.nur_lesen,
+            None => false,
+        }
+    }
+
+    /// Die laufende Vorschau der IME ans Feld mit Fokus haengen (None =
+    /// keine Umwandlung). Alle anderen Felder verlieren ihre.
+    pub fn ime_vorschau(&mut self, vorschau: Option<(String, i32)>) {
+        let ziel = if self.ime_feld_aktiv() { self.focus_widget } else { None };
+        for (wi, win) in self.windows.iter_mut().enumerate() {
+            for (i, w) in win.widgets.iter_mut().enumerate() {
+                match (&vorschau, ziel) {
+                    (Some((t, m)), Some((zw, zi))) if zw == wi && zi == i => { w.vorschau = t.clone(); w.vorschau_marke = *m; }
+                    _ => { w.vorschau.clear(); w.vorschau_marke = 0; }
+                }
+            }
+        }
+    }
+
+    /// Ein Ergebnis der IME ins Feld mit Fokus einfuegen -- durch dieselben
+    /// Grenzen wie Tippen (Hoechstlaenge, Zahlenfilter), mit Rueckgaengig
+    /// und `on_change`; eine Markierung wird ersetzt.
+    pub fn ime_ergebnis(&mut self, text: &str, jetzt: f64) {
+        if text.is_empty() || !self.ime_feld_aktiv() { return; }
+        let (wi, i) = match self.focus_widget { Some(f) => f, None => return };
+        let w = &mut self.windows[wi].widgets[i];
+        let before = w.text.clone();
+        let mut chars: Vec<char> = before.chars().collect();
+        let n = chars.len() as i32;
+        let (lo, hi) = (w.caret.min(w.sel_anchor).clamp(0, n), w.caret.max(w.sel_anchor).clamp(0, n));
+        if lo != hi { chars.drain(lo as usize..hi as usize); }
+        let mut neu: Vec<char> = text.chars().filter(|c| !c.is_control() || *c == '\n').collect();
+        if w.kind == Kind::TextInput {
+            neu.retain(|c| *c != '\n');
+            if w.maxlaenge > 0 {
+                let platz = (w.maxlaenge as usize).saturating_sub(chars.len());
+                neu.truncate(platz);
+            }
+        }
+        for (k, ch) in neu.iter().enumerate() { chars.insert(lo as usize + k, *ch); }
+        let text_neu: String = chars.iter().collect();
+        if w.kind == Kind::TextInput && !zahl_erlaubt(&text_neu, w.zahlen) { return; }
+        if text_neu == before { return; }
+        let caret0 = w.caret;
+        Self::undo_merken(w, &before, caret0, jetzt);
+        w.text = text_neu;
+        w.spans.clear();
+        w.caret = lo + neu.len() as i32;
+        w.sel_anchor = w.caret;
+        w.vorschau.clear(); w.vorschau_marke = 0;
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+
     /// Lage der Schreibmarke des Textfelds/Textbereichs mit Fokus in
     /// Bildschirm-Pixeln: (x, y_oben, hoehe). None ohne Text-Fokus. Dieselbe
     /// Rechnung wie das Zeichnen der Marke in `draw_widget` -- fuer das
@@ -8172,25 +8256,26 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
         match wdg.kind {
             Kind::TextInput => {
-                let anzeige: String = if wdg.passwort { "\u{2022}".repeat(wdg.text.chars().count()) } else { wdg.text.clone() };
+                let (anz, caret_anz) = self.anzeige_mit_vorschau(wdg);
+                let anzeige: String = anz.iter().collect();
                 let inner = (w - 10).max(1);
                 let tw = self.wtext_width(g, wdg, &anzeige);
                 let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
                     (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
                 } else { (ax + 5, wdg.scroll) };
-                let pre: String = anzeige.chars().take(wdg.caret.max(0) as usize).collect();
+                let pre: String = anz.iter().take(caret_anz.max(0) as usize).collect();
                 let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
                 Some((cx, ay + 3, (h - 7).max(1)))
             }
             Kind::TextArea => {
                 let pad = 5;
                 let lh = self.ta_line_h(g);
-                let chars: Vec<char> = wdg.text.chars().collect();
+                let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                 let starts = Self::line_starts(&chars);
                 let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
-                let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize);
+                let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize);
                 let lstart = rows.get(crow)?.1;
-                let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
+                let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
                 let prefix: String = chars[lstart..cend].iter().collect();
                 let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x + self.wtext_width(g, wdg, &prefix);
                 let cy = ay + pad + (crow as i32 - wdg.scroll) * lh;
@@ -9210,9 +9295,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 // Im Passwortmodus stehen Punkte -- gemessen wird dann auch an
                 // den Punkten, sonst saesse die Schreibmarke neben dem Text.
-                let anzeige: String = if wdg.passwort {
-                    "\u{2022}".repeat(wdg.text.chars().count())
-                } else { wdg.text.clone() };
+                // Die IME-Vorschau steht an der Schreibmarke mit im Text.
+                let (anz_chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
+                let anzeige: String = anz_chars.iter().collect();
                 let ty = ay + (h - self.wsize(g, wdg)).max(0) / 2;
                 let inner = (w - 10).max(1);
                 let tw = self.wtext_width(g, wdg, &anzeige);
@@ -9223,14 +9308,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 } else { (ax + 5, wdg.scroll) };
                 // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
                 g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
-                if wdg.text.is_empty() {
+                if anzeige.is_empty() {
                     if !wdg.placeholder.is_empty() && !focused {
                         self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.th("muted_fg"));
                     }
                 } else {
-                    let chars: Vec<char> = anzeige.chars().collect();
+                    let chars: Vec<char> = anz_chars;
                     // Selektion-Highlight (halbtransparenter Akzent hinter dem Text).
-                    if focused {
+                    if focused && wdg.vorschau.is_empty() {
                         let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
                         let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
                         if lo != hi {
@@ -9240,10 +9325,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         }
                     }
                     self.wtext(g, wdg, tx - scroll, ty, anzeige.clone(), fg);
+                    // Die IME-Vorschau unterstreichen -- so sieht man, was
+                    // noch nicht fertig ist.
+                    if !wdg.vorschau.is_empty() {
+                        let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
+                        let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
+                        let x0 = tx + self.wtext_width(g, wdg, &chars[..von].iter().collect::<String>()) - scroll;
+                        let x1 = tx + self.wtext_width(g, wdg, &chars[..bis].iter().collect::<String>()) - scroll;
+                        g.line(x0, ay + h - 5, x1, ay + h - 5, fg);
+                    }
                 }
-                // Caret (blinkend) an der gemessenen Position.
+                // Caret (blinkend) an der gemessenen Position -- in der
+                // Vorschau dort, wo die IME ihre Marke hat.
                 if focused && self.caret_blink_on() {
-                    let pre: String = anzeige.chars().take(wdg.caret.max(0) as usize).collect();
+                    let pre: String = anzeige.chars().take(caret_anz.max(0) as usize).collect();
                     let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
@@ -9261,7 +9356,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
                     self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.th("muted_fg"));
                 } else {
-                    let chars: Vec<char> = wdg.text.chars().collect();
+                    let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
                     let view_lines = ((h - 2 * pad) / lh).max(1);
                     // Linke Kante des TEXTES: hinter der Nummernspalte und um
@@ -9271,7 +9366,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
                     let tx0 = ax + pad + gutter - wdg.scroll_x;
                     if wdg.aktive_zeile {
-                        let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize) as i32;
+                        let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize) as i32;
                         let r = crow - scroll;
                         if r >= 0 && r < view_lines {
                             let y = ay + pad + r * lh;
@@ -9282,9 +9377,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     // Text bleibt rechts der Nummernspalte.
                     g.push_clip(ax + 2 + gutter, ay + 2, (w - 4 - gutter).max(0), (h - 4).max(0));
                     // Selektion-Highlight pro sichtbarer Zeile (halbtransparenter Akzent).
-                    let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                    let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                    if focused && lo != hi {
+                    let lo = caret_anz.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                    let hi = caret_anz.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                    if focused && lo != hi && wdg.vorschau.is_empty() {
                         let selbg = self.selection_bg(wdg);
                         for r in 0..view_lines {
                             let ri = scroll + r;
@@ -9334,13 +9429,31 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         g.line(gx, ay + 2, gx, ay + h - 3, self.wcol(wdg, "border", "widget_border"));
                     }
                 }
-                if focused && self.caret_blink_on() {
-                    let chars: Vec<char> = wdg.text.chars().collect();
+                // Die IME-Vorschau unterstreichen, je sichtbarer Zeile ihr Stueck.
+                if focused && !wdg.vorschau.is_empty() {
+                    let (chars, _) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
                     let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
-                    let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize);
+                    let von = wdg.caret.clamp(0, chars.len() as i32) as usize;
+                    let bis = (von + wdg.vorschau.chars().count()).min(chars.len());
+                    let tx0 = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x;
+                    for (r, &(_, rs, re)) in rows.iter().enumerate() {
+                        let (a, b) = (von.max(rs), bis.min(re));
+                        if b <= a { continue; }
+                        let y = ay + pad + (r as i32 - scroll) * lh + lh - 3;
+                        if y < ay + 2 || y > ay + h - 3 { continue; }
+                        let x0 = tx0 + self.wtext_width(g, wdg, &chars[rs..a].iter().collect::<String>());
+                        let x1 = tx0 + self.wtext_width(g, wdg, &chars[rs..b].iter().collect::<String>());
+                        g.line(x0, y, x1, y, fg);
+                    }
+                }
+                if focused && self.caret_blink_on() {
+                    let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
+                    let starts = Self::line_starts(&chars);
+                    let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
+                    let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize);
                     let lstart = rows[crow].1;
-                    let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
+                    let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());
                     let prefix: String = chars[lstart..cend].iter().collect();
                     let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
                              + self.wtext_width(g, wdg, &prefix);
@@ -10369,9 +10482,8 @@ mod tests {
         assert!(g.take_pending().is_empty());
     }
 
-    // Tooltip-Setter (ohne Graphics): Default leer, setzen/loeschen, Fehler bei
-    // ungueltigem Handle.
-    #[test]
+    // Helfer fuer die Regel-Tests (kein Test -- das #[test] davor stand
+    // falsch und liess `cargo test --features graphics` nicht uebersetzen).
     fn regel(art: RegelArt, a: f64, b: f64, text: &str) -> Regel {
         Regel { art, a, b, text: text.to_string(), meldung: String::new() }
     }
@@ -10410,6 +10522,43 @@ mod tests {
         let mut eigen = regel(RegelArt::Pflicht, 0.0, 0.0, "");
         eigen.meldung = "Der Name fehlt.".into();
         assert_eq!(regel_pruefen(&eigen, "", false).as_deref(), Some("Der Name fehlt."));
+    }
+
+    #[test]
+    fn ime_ergebnis_und_vorschau() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 300, 200);
+        let tf = g.textinput(win, 10, 10, 200, 26, String::new()).unwrap();
+        let (wi, i) = Gui::dec_widget(tf);
+        // Ohne Fokus: nichts ist aktiv, ein Ergebnis verpufft.
+        assert!(!g.ime_feld_aktiv());
+        g.ime_ergebnis("日本", 1.0);
+        assert_eq!(g.windows[wi].widgets[i].text, "");
+        g.focus(tf).unwrap();
+        assert!(g.ime_feld_aktiv());
+        // Vorschau haengt am Feld mit Fokus, die Anzeige traegt sie an der Marke.
+        g.set_text(tf, "ab".into()).unwrap();          // Marke am Ende
+        g.ime_vorschau(Some(("にほ".into(), 1)));
+        assert_eq!(g.windows[wi].widgets[i].vorschau, "にほ");
+        let (anz, marke) = g.anzeige_mit_vorschau(&g.windows[wi].widgets[i]);
+        assert_eq!(anz.iter().collect::<String>(), "abにほ");
+        assert_eq!(marke, 3);                          // hinter dem ersten Vorschauzeichen
+        // Ergebnis: eingefuegt, Vorschau weg, Marke dahinter, Rueckgaengig moeglich.
+        g.ime_ergebnis("日本", 2.0);
+        let w = &g.windows[wi].widgets[i];
+        assert_eq!(w.text, "ab日本");
+        assert_eq!(w.caret, 4);
+        assert_eq!(w.vorschau, "");
+        assert_eq!(w.undo.last().map(|u| u.0.as_str()), Some("ab"));
+        // Hoechstlaenge und Zahlenfilter gelten auch fuer die IME.
+        g.textinput_set(tf, "maxlaenge", 5.0).unwrap();
+        g.ime_ergebnis("語です", 3.0);
+        assert_eq!(g.windows[wi].widgets[i].text, "ab日本語");
+        g.ime_vorschau(None);
+        assert_eq!(g.windows[wi].widgets[i].vorschau, "");
+        // Ein gesperrtes Feld ist kein aktives.
+        g.textinput_set(tf, "nur_lesen", 1.0).unwrap();
+        assert!(!g.ime_feld_aktiv());
     }
 
     #[test]

@@ -378,11 +378,12 @@ Ausweich-Schriften hinweg: ein zentrierter Text mit Umlaut oder Kanji sitzt
 dort, wo er gemessen wurde.
 
 **Eingabemethoden (IME).** Wer Japanisch oder Chinesisch über eine
-Eingabemethode tippt, bekommt das Bestätigte in ein `gui`-Textfeld wie
-getippt; die Tipp-Warteschlange fasst 256 Zeichen je Bild (raylibs Vorgabe
-von 16 hätte einen bestätigten Satz still gekürzt), und unter Windows steht
-das Umwandlungsfenster der IME an der Schreibmarke des Feldes mit Fokus. Eine
-Vorschau der Umwandlung im Feld selbst gibt es nicht.
+Eingabemethode tippt, sieht in einem `gui`-Textfeld die Umwandlung
+unterstrichen an der Schreibmarke und bekommt das Bestätigte direkt
+eingefügt (Windows; siehe [module-gui.md](module-gui.md#barrierefreiheit)).
+Ohne Textfeld mit Fokus — `INKEY$`, das `ui`-Modul — kommt das Bestätigte
+wie getippt über die Tipp-Warteschlange, die 256 Zeichen je Bild fasst
+(raylibs Vorgabe von 16 hätte einen bestätigten Satz still gekürzt).
 
 ## Bilder
 
