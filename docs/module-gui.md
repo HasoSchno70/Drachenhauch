@@ -1978,11 +1978,15 @@ Feld anzeigen kann, steht in
 [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften)
 — Kanji, Hangul und Emoji werden auf Zuruf nachgeladen.
 
-**Grenzen (Stand 2026-09-06):** Windows. macOS (VoiceOver) und Linux (Orca)
-haben ihre Adapter in derselben Bibliothek, sie sind aber noch nicht
-eingehängt, weil sie hier nicht zu prüfen sind. Die Schreibmarke in einem
-Textfeld wird noch nicht zeichenweise gemeldet (der Inhalt schon). Das
-`ui`-Modul (Immediate Mode) und der Web-Bau melden nichts.
+**Grenzen (Stand 2026-09-06):** Gemessen ist das unter Windows. Die
+Adapter für macOS (VoiceOver, NSAccessibility) und Linux (Orca, AT-SPI über
+D-Bus) sind eingehängt und werden in der CI auf den echten Systemen
+übersetzt — **gelaufen ist dort noch nichts**, weil es hier weder Mac noch
+Linux gibt; unter Wayland kennt ein Programm die Lage seines Fensters nicht,
+dann fehlt sie dem Baum. Wer VoiceOver oder Orca hat, ist die Abnahme. Die
+Schreibmarke in einem Textfeld wird noch nicht zeichenweise gemeldet (der
+Inhalt schon). Das `ui`-Modul (Immediate Mode) und der Web-Bau melden
+nichts.
 
 ```basic
 IMPORT "gui"

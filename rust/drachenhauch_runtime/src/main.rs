@@ -83,7 +83,11 @@ mod filedialog;
 mod graphics;
 #[cfg(feature = "graphics")]
 mod gui;
-#[cfg(feature = "graphics")]
+// Barrierefreiheit: eigenes Feature (vom graphics-Feature eingeschaltet), damit
+// die macOS-/Linux-Adapter mit `cargo check --features a11y --target ...`
+// ohne raylib-Bau pruefbar sind. Ohne Grafik wird das Modul nicht benutzt.
+#[cfg(feature = "a11y")]
+#[allow(dead_code)]
 mod a11y;
 #[cfg(feature = "graphics")]
 mod ime;

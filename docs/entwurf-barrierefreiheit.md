@@ -9,9 +9,14 @@
 > gui-Beispiel 45 jetzt acht — Gruppe, Beschriftungen, Regler mit Namen aus
 > der Nachbar-Beschriftung, Kästchen, Eingabefeld, Knopf
 > (`tests/test_gui_barrierefreiheit.py`). Siehe
-> [module-gui.md](module-gui.md#barrierefreiheit). macOS/Linux-Adapter und
-> die Schreibmarke im Textfeld stehen noch aus; B (Selbst sprechen) ist
-> nicht gebaut.
+> [module-gui.md](module-gui.md#barrierefreiheit). **Nachtrag, selber Tag:
+> die Adapter für macOS (NSAccessibility, Objective-C-Subclassing von GLFWs
+> Fenster-View samt Fokus-Weiterleitung an `GLFWWindow`) und Linux (AT-SPI,
+> `accesskit_unix` mit `async-io`; Fensterlage und -fokus meldet FLIP) sind
+> eingehängt** — mit `cargo check --features a11y --target …` für beide Ziele
+> übersetzt und in der CI auf den echten Läufern gebaut, aber ohne Gerät
+> nicht gelaufen. Die Schreibmarke im Textfeld steht noch aus; B (Selbst
+> sprechen) ist nicht gebaut.
 
 *Untersuchung, keine Umsetzung.* Der dritte Architekturpunkt der Lückenliste
 nach dem sechsten Piloten (nach den [Fenstern](entwurf-native-fenster.md) und

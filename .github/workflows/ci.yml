@@ -251,6 +251,14 @@ jobs:
       - name: cargo check (+ wifi)
         run: cargo check --locked --features "wifi"
 
+      # Barrierefreiheit: die Adapter fuer UIA (Windows), NSAccessibility
+      # (macOS) und AT-SPI (Linux) haengen am graphics-Feature, das die CI
+      # nicht baut -- als eigenes Feature `a11y` uebersetzt sie jeder Laeufer
+      # fuer SEIN System (ohne raylib). Gebaut, nicht gelaufen: auf dieser
+      # Entwicklungsmaschine gibt es macOS und Linux nicht.
+      - name: cargo check (+ a11y: AccessKit-Adapter dieses Systems)
+        run: cargo check --locked --features "a11y"
+
       # Die Rust-#[test]s liefen bis 2026-09-06 NIRGENDS: die CI prueft nur
       # (cargo check), und lokal scheiterte `cargo test` an raylibs
       # MAX_PATH -- zwei kaputte Tests (gui.rs, gifschreiber.rs) lagen so
