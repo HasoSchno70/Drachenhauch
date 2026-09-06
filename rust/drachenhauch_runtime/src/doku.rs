@@ -73,8 +73,11 @@ fn eins_eingerueckt(v: &Value) -> String {
 /// Schreiben oder pruefen -- der gemeinsame Schluss beider Generatoren.
 fn abliefern(ziel: &Path, text: &str, pruefen: bool, was: &str, tipp: &str) -> ExitCode {
     if pruefen {
-        let alt = std::fs::read_to_string(ziel).unwrap_or_default();
-        if alt == text {
+        // Zeilenenden nicht mitvergleichen: auf dem Windows-Laeufer der CI
+        // checkt git mit CRLF aus, erzeugt wird mit LF -- byteweise war die
+        // eingecheckte Grammatik dort immer "veraltet".
+        let alt = std::fs::read_to_string(ziel).unwrap_or_default().replace("\r\n", "\n");
+        if alt == text.replace("\r\n", "\n") {
             println!("{} ist aktuell.", ziel.display());
             return ExitCode::SUCCESS;
         }
@@ -504,6 +507,18 @@ mod tests {
         assert_eq!(erster_satz("Ohne Ende"), "Ohne Ende");
         let a = alternativen(&["AB".into(), "ABC".into(), "AA".into()]);
         assert_eq!(a, "ABC|AA|AB");
+    }
+
+    #[test]
+    fn pruefen_ist_blind_fuer_zeilenenden() {
+        // Der CI-Fund: git auf Windows checkt mit CRLF aus, erzeugt wird LF.
+        let dir = std::env::temp_dir().join(format!("dhrt_doku_crlf_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let ziel = dir.join("g.json");
+        std::fs::write(&ziel, "{\r\n \"a\": 1\r\n}\r\n").unwrap();
+        assert_eq!(abliefern(&ziel, "{\n \"a\": 1\n}\n", true, "G", "t"), ExitCode::SUCCESS);
+        assert_eq!(abliefern(&ziel, "{\n \"a\": 2\n}\n", true, "G", "t"), ExitCode::from(1));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
