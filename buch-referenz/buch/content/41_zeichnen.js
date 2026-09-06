@@ -112,8 +112,8 @@ module.exports = (H) => [
 
   H.h2("Schriften"),
   H.p("Standardmäßig zeichnet TEXT in einer eingebauten Schrift. Für Überschriften, ein Menü oder einen eigenen Stil lädst du eine TrueType-Datei – oder eine Pixelschrift aus einem PNG."),
-  H.cmd("LOADFONT · SETFONT · TEXT_SIZE", 'LOADFONT(pfad$, groesse)   SETFONT(font)   TEXT_SIZE(px)',
-    "LOADFONT lädt eine .ttf-Datei in einer bestimmten Größe und liefert ein Handle; SETFONT macht sie zur aktiven Schrift (-1 schaltet zurück auf die eingebaute). TEXT_SIZE ändert die Zeichengröße für die folgenden TEXT-Aufrufe.",
+  H.cmd("LOADFONT · SETFONT · TEXT_SIZE", 'LOADFONT(pfad$, groesse [, zeichen$])   SETFONT(font)   TEXT_SIZE(px)',
+    "LOADFONT lädt eine .ttf-, .otf- oder .ttc-Datei in einer bestimmten Größe und liefert ein Handle; SETFONT macht sie zur aktiven Schrift (-1 schaltet zurück auf die eingebaute). TEXT_SIZE ändert die Zeichengröße für die folgenden TEXT-Aufrufe. Gebacken werden ASCII, Latin-1 und Latin Extended, Griechisch, Kyrillisch, Interpunktion und das Euro-Zeichen; mit zeichen$ wählt man mehr – Blocknamen wie \"japanisch\", \"kyrillisch, griechisch\", \"emoji\" oder die Zeichen selbst. Fehlt einer Schrift ein Zeichen, springt für dieses Zeichen eine Systemschrift ein (Kanji, Hangul, Emoji werden auf Zuruf nachgeladen).",
     [
       'DIM titel AS INTEGER',
       'titel = LOADFONT("assets/fonts/pixel.ttf", 32)',

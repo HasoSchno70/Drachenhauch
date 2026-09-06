@@ -119,7 +119,7 @@ accesskit = { version = "0.25", optional = true }
 # Das Crate liegt ueber andere Abhaengigkeiten ohnehin im Baum; hier nur die
 # Features, die die Druckseite braucht. Unter macOS/Linux druckt CUPS (`lp`).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_Ime"] }
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 

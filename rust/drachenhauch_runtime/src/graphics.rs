@@ -1006,7 +1006,22 @@ pub struct Graphics {
     /// jedes `LOADFONT` bekaeme eine um eins verschobene Nummer.
     /// Reiner ASCII-Text geht weiterhin durch die eingebaute Schrift -- so
     /// sieht jedes bestehende Programm aus wie zuvor.
-    fallback: Option<Font>,
+    /// Ausweich-Schriften, Glyphen auf Zuruf: [0] die Grundschrift mit dem
+    /// ganzen `zeichensatz()`, danach je eine je Datei, gebacken nur mit den
+    /// Zeichen, die bisher gebraucht wurden (`ausweich_nachladen`).
+    ausweich: Vec<Ausweich>,
+    /// Je LOADFONT-Handle die Codepunkte, die der Font wirklich hat --
+    /// parallel zu `fonts`.
+    font_glyphs: Vec<std::collections::HashSet<u32>>,
+    /// Codepunkte, fuer die beim Messen oder Aufzeichnen keine Glyphe da war;
+    /// FLIP backt daraus nach. RefCell, weil das Messen `&self` ist.
+    glyphen_fehlend: std::cell::RefCell<std::collections::HashSet<u32>>,
+    /// Codepunkte, die keine Datei liefern konnte -- nicht jedes Bild neu.
+    glyphen_unmoeglich: std::collections::HashSet<u32>,
+    /// Groesse, in der die Ausweich-Schriften gebacken werden.
+    ausweich_groesse: i32,
+    /// Zuletzt gemeldete Lage des IME-Umwandlungsfensters (Client-Pixel).
+    ime_zuletzt: Option<(i32, i32, i32)>,
     text_spacing: f32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
@@ -1079,12 +1094,213 @@ pub struct Graphics {
 /// Latin-1-Bereich (deutsche Umlaute, Akzente franzoesischer und spanischer
 /// Vereinsnamen) und gaengige Typografie/Pfeile. raylib backt ohne diese
 /// Liste nur die 95 ASCII-Glyphen und zeichnet fuer alles andere ein `?`.
+/// Der Grund-Zeichenvorrat jeder Schrift (eingebaute Ausweich-Schrift und
+/// LOADFONT ohne Zeichenwahl): ASCII, Latin-1, Latin Extended-A/B (die
+/// Sprachen Mitteleuropas: ő ł č ş), Griechisch, Kyrillisch, die allgemeine
+/// Interpunktion (Gedankenstriche, Anfuehrungszeichen, Auslassungspunkte)
+/// und das Euro-Zeichen. Bis 2026-09-06 fehlte alles ab Latin Extended --
+/// auch das `€`, das damit in jedem Preis ein Fragezeichen war (gemessen,
+/// docs/entwurf-eingabemethoden.md). Was hier nicht steht (CJK, Hangul,
+/// Emoji, Arabisch, ...), holt `ausweich_nachladen` auf Zuruf.
 fn zeichensatz() -> String {
     let mut chars = String::new();
-    for c in 0x20u32..=0x7Eu32 { chars.push(char::from_u32(c).unwrap()); }
-    for c in 0xA0u32..=0xFFu32 { chars.push(char::from_u32(c).unwrap()); }
-    chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
+    let bereiche: [(u32, u32); 7] = [
+        (0x20, 0x7E), (0xA0, 0xFF), (0x100, 0x17F), (0x180, 0x24F),
+        (0x370, 0x3FF), (0x400, 0x4FF), (0x2010, 0x2027),
+    ];
+    for (a, b) in bereiche {
+        for c in a..=b { if let Some(ch) = char::from_u32(c) { chars.push(ch); } }
+    }
+    chars.push_str("€‹›→←↑↓≈≠≤≥™");
     chars
+}
+
+/// Eine Ausweich-Schrift: eine Datei, gebacken mit genau den Zeichen in
+/// `zeichen` (bei der Grundschrift der ganze `zeichensatz()`, sonst nur
+/// das, was bisher gebraucht wurde), und `hat` = die Codepunkte, die die
+/// Datei wirklich liefern konnte.
+struct Ausweich {
+    datei: String,
+    font: Font,
+    zeichen: std::collections::BTreeSet<u32>,
+    hat: std::collections::HashSet<u32>,
+}
+
+/// Welche Codepunkte ein gebackener Font wirklich hat (raylib traegt jede
+/// gefundene Glyphe mit ihrem Codepunkt ein; fehlende fallen weg).
+fn glyph_menge(f: &Font) -> std::collections::HashSet<u32> {
+    let n = f.glyphCount.max(0) as usize;
+    if n == 0 || f.glyphs.is_null() { return std::collections::HashSet::new(); }
+    let glyphen = unsafe { std::slice::from_raw_parts(f.glyphs, n) };
+    glyphen.iter().map(|g| g.value as u32).collect()
+}
+
+/// Schriftbloecke mit Namen -- fuer LOADFONT(pfad$, groesse, zeichen$) und
+/// fuer die Wahl der Datei beim Nachladen. Bereiche einschliesslich.
+const BLOECKE: &[(&str, &[(u32, u32)])] = &[
+    ("latein",     &[(0x20, 0x7E), (0xA0, 0x24F), (0x2010, 0x2027), (0x20AC, 0x20AC)]),
+    ("griechisch", &[(0x370, 0x3FF), (0x1F00, 0x1FFF)]),
+    ("kyrillisch", &[(0x400, 0x52F)]),
+    ("hebraeisch", &[(0x590, 0x5FF)]),
+    ("arabisch",   &[(0x600, 0x6FF), (0x750, 0x77F), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF)]),
+    ("thai",       &[(0xE00, 0xE7F)]),
+    ("japanisch",  &[(0x3000, 0x30FF), (0x31F0, 0x31FF), (0x4E00, 0x9FFF), (0xFF00, 0xFFEF)]),
+    ("chinesisch", &[(0x3000, 0x303F), (0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xFF00, 0xFFEF)]),
+    ("koreanisch", &[(0x1100, 0x11FF), (0x3130, 0x318F), (0xAC00, 0xD7A3)]),
+    ("emoji",      &[(0x2600, 0x27BF), (0x1F300, 0x1F5FF), (0x1F600, 0x1F64F), (0x1F680, 0x1F6FF), (0x1F900, 0x1F9FF)]),
+    ("symbole",    &[(0x2000, 0x2BFF)]),
+];
+
+/// Englische Zweitnamen der Bloecke.
+fn block_name(n: &str) -> Option<&'static str> {
+    let n = n.trim().to_lowercase();
+    Some(match n.as_str() {
+        "latein" | "latin" => "latein",
+        "griechisch" | "greek" => "griechisch",
+        "kyrillisch" | "cyrillic" => "kyrillisch",
+        "hebraeisch" | "hebräisch" | "hebrew" => "hebraeisch",
+        "arabisch" | "arabic" => "arabisch",
+        "thai" => "thai",
+        "japanisch" | "japanese" => "japanisch",
+        "chinesisch" | "chinese" => "chinesisch",
+        "koreanisch" | "korean" => "koreanisch",
+        "emoji" => "emoji",
+        "symbole" | "symbols" => "symbole",
+        _ => return None,
+    })
+}
+
+/// Die Zeichen fuer LOADFONT aus dem dritten Argument: Blocknamen (durch
+/// Komma oder Leerzeichen getrennt, deutsch oder englisch) ODER eine
+/// Zeichenkette mit genau den Zeichen, die gebacken werden sollen. Der
+/// Grundvorrat ist immer dabei -- ein Programm, das "japanisch" sagt, will
+/// die Zahlen und Satzzeichen nicht verlieren.
+fn zeichen_aus_namen(spez: &str) -> Result<String, String> {
+    let mut menge: std::collections::BTreeSet<u32> = zeichensatz().chars().map(|c| c as u32).collect();
+    let woerter: Vec<&str> = spez.split(|c: char| c == ',' || c == ';' || c.is_whitespace())
+        .filter(|w| !w.is_empty()).collect();
+    let alle_namen = !woerter.is_empty() && woerter.iter().all(|w| block_name(w).is_some());
+    if alle_namen {
+        for w in woerter {
+            let name = block_name(w).unwrap();
+            let (_, bereiche) = BLOECKE.iter().find(|(n, _)| *n == name).unwrap();
+            for &(a, b) in bereiche.iter() { for c in a..=b { menge.insert(c); } }
+        }
+    } else if spez.chars().any(|c| c.is_alphabetic()) && spez.chars().all(|c| c.is_ascii_alphabetic() || c == ',' || c == ';' || c.is_whitespace()) {
+        // Sieht aus wie eine Namensliste, aber ein Name ist unbekannt.
+        let bekannt: Vec<&str> = BLOECKE.iter().map(|(n, _)| *n).collect();
+        return Err(format!("LOADFONT: unbekannter Schriftblock '{}' -- bekannt sind {} (oder eine Zeichenkette mit den gewuenschten Zeichen)",
+                           spez.trim(), bekannt.join(", ")));
+    } else {
+        for c in spez.chars() { menge.insert(c as u32); }
+    }
+    Ok(menge.into_iter().filter_map(char::from_u32).collect())
+}
+
+/// Welche Datei ein Zeichen liefern koennte, das keine geladene Schrift hat
+/// -- je Block eine Kandidatenliste, der erste vorhandene Pfad gewinnt.
+/// Chinesisch bekommt hier die japanische Schrift: dieselben Codepunkte,
+/// leicht andere Glyphenformen -- besser als ein Fragezeichen.
+fn ausweich_datei_fuer(c: u32) -> &'static [&'static str] {
+    let cjk = matches!(c, 0x2E80..=0x9FFF | 0xF900..=0xFAFF | 0xFF00..=0xFFEF);
+    let hangul = matches!(c, 0x1100..=0x11FF | 0x3130..=0x318F | 0xA960..=0xA97F | 0xAC00..=0xD7FF);
+    let emoji = matches!(c, 0x2600..=0x27BF | 0x1F000..=0x1FAFF);
+    let thai = matches!(c, 0xE00..=0xE7F);
+    #[cfg(target_os = "windows")]
+    {
+        // Sammlungen (.ttc) loest `schrift_laden` auf -- MS Gothic (japanische
+        // Formen) zuerst, dann die chinesischen; wer eine bestimmte Form
+        // will, laedt seine Schrift selbst ueber LOADFONT.
+        if cjk { return &["C:/Windows/Fonts/msgothic.ttc", "C:/Windows/Fonts/YuGothR.ttc", "C:/Windows/Fonts/msyh.ttc",
+                          "C:/Windows/Fonts/simsun.ttc", "C:/Windows/Fonts/simhei.ttf"]; }
+        if hangul { return &["C:/Windows/Fonts/malgun.ttf", "C:/Windows/Fonts/gulim.ttc"]; }
+        if emoji { return &["C:/Windows/Fonts/seguiemj.ttf", "C:/Windows/Fonts/seguisym.ttf"]; }
+        if thai { return &["C:/Windows/Fonts/leelawui.ttf", "C:/Windows/Fonts/segoeui.ttf"]; }
+        return &["C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/seguisym.ttf", "C:/Windows/Fonts/arial.ttf"];
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (hangul, emoji, thai);
+        if cjk || hangul || thai { return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/Library/Fonts/Arial Unicode.ttf",
+                                             "/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc"]; }
+        return &["/System/Library/Fonts/Supplemental/Arial Unicode.ttf", "/System/Library/Fonts/Helvetica.ttc"];
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let _ = emoji;
+        if cjk || hangul {
+            return &["/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+                     "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
+                     "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"];
+        }
+        if thai { return &["/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]; }
+        return &["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                 "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"];
+    }
+}
+
+/// Die erste Schrift einer Schriftsammlung (.ttc) als eigenstaendige
+/// TrueType-Datei herausloesen. raylib (stb_truetype) liest ab Versatz 0
+/// und findet in einer Sammlung dort nur den Sammlungskopf -- und tauscht
+/// die Schrift dann STILL gegen seine Bitmapschrift. Unter Windows liegen
+/// aber genau die Schriften, die ein Programm fuer Japan, China oder
+/// Taiwan braucht, nur als Sammlung vor (msgothic.ttc, msyh.ttc,
+/// YuGothR.ttc, simsun.ttc, msjh.ttc; gemessen 2026-09-06: kein einziges
+/// CJK-.ttf auf einer deutschen Windows-11-Maschine).
+///
+/// Aufbau: `ttcf`, Version, Anzahl, je Schrift ein Versatz auf einen
+/// sfnt-Kopf (Version, Tabellenzahl, drei Suchfelder) mit Tabellenverzeichnis
+/// (Kennung, Pruefsumme, Versatz, Laenge; die Versaetze zaehlen ab Dateianfang).
+/// Herausgeloest wird durch Kopieren des Verzeichnisses mit neuen Versaetzen
+/// und der Tabellen dahinter; die Pruefsummen bleiben, stb prueft sie nicht.
+fn ttc_erste_schrift(daten: &[u8]) -> Option<Vec<u8>> {
+    let be32 = |o: usize| -> Option<u32> { daten.get(o..o + 4).map(|b| u32::from_be_bytes([b[0], b[1], b[2], b[3]])) };
+    let be16 = |o: usize| -> Option<u16> { daten.get(o..o + 2).map(|b| u16::from_be_bytes([b[0], b[1]])) };
+    if daten.get(0..4)? != b"ttcf" { return None; }
+    let anzahl = be32(8)? as usize;
+    if anzahl == 0 { return None; }
+    let kopf = be32(12)? as usize;
+    let tabellen = be16(kopf + 4)? as usize;
+    let mut aus: Vec<u8> = Vec::new();
+    aus.extend_from_slice(daten.get(kopf..kopf + 12)?);
+    let mut versatz = 12 + 16 * tabellen;
+    let mut inhalte: Vec<(usize, usize)> = Vec::with_capacity(tabellen);
+    for t in 0..tabellen {
+        let e = kopf + 12 + 16 * t;
+        let tag = daten.get(e..e + 4)?;
+        let pruef = daten.get(e + 4..e + 8)?;
+        let von = be32(e + 8)? as usize;
+        let laenge = be32(e + 12)? as usize;
+        daten.get(von..von + laenge)?;   // muss in der Datei liegen
+        aus.extend_from_slice(tag);
+        aus.extend_from_slice(pruef);
+        aus.extend_from_slice(&(versatz as u32).to_be_bytes());
+        aus.extend_from_slice(&(laenge as u32).to_be_bytes());
+        inhalte.push((von, laenge));
+        versatz += (laenge + 3) & !3;
+    }
+    for (von, laenge) in inhalte {
+        aus.extend_from_slice(&daten[von..von + laenge]);
+        while aus.len() % 4 != 0 { aus.push(0); }
+    }
+    Some(aus)
+}
+
+/// Eine Schriftdatei fuer raylib laden: Sammlungen werden vorher aufgeloest,
+/// alles laeuft ueber `LoadFontFromMemory`. EINE Stelle fuer LOADFONT, die
+/// Standardschrift (DHRT_FONT) und die Ausweich-Schriften.
+fn schrift_laden(rl: &mut RaylibHandle, thread: &RaylibThread, pfad: &str, groesse: i32, zeichen: &str) -> Result<Font, String> {
+    let daten = std::fs::read(pfad).map_err(|e| format!("'{}': {}", pfad, e))?;
+    let (daten, art) = match ttc_erste_schrift(&daten) {
+        Some(erste) => (erste, ".ttf"),
+        None => {
+            let art = if daten.starts_with(b"OTTO") { ".otf" } else { ".ttf" };
+            (daten, art)
+        }
+    };
+    ohne_warnungen(|| rl.load_font_from_memory(thread, art, &daten, groesse.max(4), Some(zeichen)))
+        .map_err(|e| format!("'{}': {}", pfad, e))
 }
 
 /// Fuehrt `f` aus, waehrend raylib nur Fehler meldet.
@@ -1309,7 +1525,10 @@ impl Graphics {
             fonts: Vec::new(),
             font_sizes: Vec::new(),
             active_font: -1,
-            fallback: None,
+            ausweich: Vec::new(), font_glyphs: Vec::new(),
+            glyphen_fehlend: std::cell::RefCell::new(std::collections::HashSet::new()),
+            glyphen_unmoeglich: std::collections::HashSet::new(),
+            ausweich_groesse: 32, ime_zuletzt: None,
             text_spacing: 0.0,
             textures: Vec::new(),
             image_cache: HashMap::new(),
@@ -1349,14 +1568,17 @@ impl Graphics {
         // ein Layout mit anderen Breiten, als am Ende dastehen.
         if g.active_font < 0 {
             let bake = (32 * scale.max(1)).clamp(32, 256);
+            g.ausweich_groesse = bake;
             let chars = zeichensatz();
             for pfad in ausweich_schriften() {
                 if !std::path::Path::new(pfad).exists() { continue; }
                 let rl = &mut g.rl;
                 let thread = &g.thread;
-                if let Ok(f) = ohne_warnungen(|| rl.load_font_ex(thread, pfad, bake, Some(&chars))) {
+                if let Ok(f) = schrift_laden(rl, thread, pfad, bake, &chars) {
                     unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
-                    g.fallback = Some(f);
+                    let hat = glyph_menge(&f);
+                    g.ausweich.push(Ausweich { datei: pfad.to_string(), font: f,
+                                               zeichen: chars.chars().map(|c| c as u32).collect(), hat });
                 }
                 break;
             }
@@ -1370,16 +1592,108 @@ impl Graphics {
     /// `FONT_AUSWEICH`, das nicht in `fonts` steht.
     fn font_fuer(&self, s: &str) -> i64 {
         if self.active_font >= 0 { return self.active_font; }
-        if self.fallback.is_some() && !s.is_ascii() { return FONT_AUSWEICH; }
+        if !self.ausweich.is_empty() && !s.is_ascii() { return FONT_AUSWEICH; }
         -1
     }
 
     /// Font zu einem Handle -- inklusive des Ausweich-Fonts, den `fonts`
     /// nicht enthaelt. `None` = eingebaute Schrift.
     fn font_von(&self, h: i64) -> Option<&Font> {
-        if h == FONT_AUSWEICH { return self.fallback.as_ref(); }
+        if h == FONT_AUSWEICH { return self.ausweich.first().map(|a| &a.font); }
         if h < 0 { return None; }
         self.fonts.get(h as usize)
+    }
+
+    /// Hat der Font mit Handle `h` (LOADFONT-Nummer, -1 eingebaut, -2
+    /// Ausweich-Grundschrift) eine Glyphe fuer `c`?
+    fn font_hat(&self, h: i64, c: u32) -> bool {
+        if h == FONT_AUSWEICH { return self.ausweich.first().map_or(false, |a| a.hat.contains(&c)); }
+        if h < 0 { return c < 0x7F || (0xA0..=0xFF).contains(&c); }   // raylibs Bitmapschrift
+        self.font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c))
+    }
+
+    /// Codepunkte eines Textes vormerken, fuer die weder der gewaehlte Font
+    /// noch eine Ausweich-Schrift eine Glyphe hat -- FLIP laedt nach.
+    fn glyphen_pruefen(&self, h: i64, s: &str) {
+        if s.is_ascii() { return; }
+        let mut fehlend = self.glyphen_fehlend.borrow_mut();
+        for ch in s.chars() {
+            let c = ch as u32;
+            if c < 0x80 || self.font_hat(h, c) || self.glyphen_unmoeglich.contains(&c) { continue; }
+            if self.ausweich.iter().any(|a| a.hat.contains(&c)) { continue; }
+            fehlend.insert(c);
+        }
+    }
+
+    /// Textbreite mit Font `h`, Zeichen ohne Glyphe im Font laufen ueber die
+    /// Ausweich-Schriften -- dieselbe Aufteilung wie `zeichne_text`, sonst
+    /// misst ein Layout etwas anderes, als am Ende dasteht.
+    fn breite_mit(&self, h: i64, s: &str, size: f32) -> f32 {
+        self.glyphen_pruefen(h, s);
+        let basis = self.font_von(h);
+        if s.is_ascii() || basis.is_none() {
+            return match basis {
+                Some(f) => f.measure_text(s, size, self.text_spacing).x,
+                None => {
+                    let c = std::ffi::CString::new(s).unwrap_or_default();
+                    unsafe { raylib::ffi::MeasureText(c.as_ptr(), size as i32) as f32 }
+                }
+            };
+        }
+        let mut breite = 0.0f32;
+        let mut erster = true;
+        for (fi, lauf) in text_laeufe(h, s, |c| self.font_hat(h, c), &self.ausweich) {
+            let f = if fi == 0 { basis.unwrap() } else { &self.ausweich[fi - 1].font };
+            if !erster { breite += self.text_spacing; }
+            erster = false;
+            breite += f.measure_text(&lauf, size, self.text_spacing).x;
+        }
+        breite
+    }
+
+    /// Nach dem Bild: fuer vorgemerkte Zeichen ohne Glyphe die passende
+    /// Datei (neu) backen -- mit ALLEN bisher gebrauchten Zeichen dieser
+    /// Datei, damit nichts verloren geht. Ein Zeichen, das keine Datei
+    /// liefert, wandert nach `glyphen_unmoeglich` und bleibt ein `?`.
+    fn ausweich_nachladen(&mut self) {
+        let fehlend: Vec<u32> = self.glyphen_fehlend.borrow_mut().drain().collect();
+        if fehlend.is_empty() { return; }
+        let mut je_datei: std::collections::BTreeMap<String, Vec<u32>> = std::collections::BTreeMap::new();
+        for c in fehlend {
+            if self.glyphen_unmoeglich.contains(&c) { continue; }
+            let datei = ausweich_datei_fuer(c).iter().find(|p| std::path::Path::new(p).exists());
+            match datei {
+                Some(p) => je_datei.entry(p.to_string()).or_default().push(c),
+                None => { self.glyphen_unmoeglich.insert(c); }
+            }
+        }
+        for (datei, neue) in je_datei {
+            // Nur die Nachlade-Eintraege (ab 1) werden ersetzt; die Grundschrift
+            // (0) bleibt, auch wenn dieselbe Datei nachgeladen wird -- sie
+            // bekommt dann einen eigenen Eintrag mit den Zusatzzeichen.
+            let pos = self.ausweich.iter().enumerate().skip(1).find(|(_, a)| a.datei == datei).map(|(i, _)| i);
+            let mut zeichen: std::collections::BTreeSet<u32> = match pos {
+                Some(i) => self.ausweich[i].zeichen.clone(),
+                None => zeichensatz().chars().filter(|c| c.is_ascii()).map(|c| c as u32).collect(),
+            };
+            zeichen.extend(neue.iter().copied());
+            let text: String = zeichen.iter().filter_map(|&c| char::from_u32(c)).collect();
+            let groesse = self.ausweich_groesse;
+            let rl = &mut self.rl;
+            let thread = &self.thread;
+            let f = match schrift_laden(rl, thread, &datei, groesse, &text) {
+                Ok(f) => f,
+                Err(_) => { for c in neue { self.glyphen_unmoeglich.insert(c); } continue; }
+            };
+            unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+            let hat = glyph_menge(&f);
+            for c in &neue { if !hat.contains(c) { self.glyphen_unmoeglich.insert(*c); } }
+            let eintrag = Ausweich { datei: datei.clone(), font: f, zeichen, hat };
+            match pos {
+                Some(i) => self.ausweich[i] = eintrag,
+                None => self.ausweich.push(eintrag),
+            }
+        }
     }
 
     /// SCREEN nach einem Lazy-Init (oder erneutes SCREEN): das bestehende Fenster
@@ -2788,6 +3102,7 @@ impl Graphics {
         let sz = self.text_size;
         let font = self.font_fuer(&s);
         let spacing = self.text_spacing;
+        self.glyphen_pruefen(font, &s);
         self.emit(Cmd::Text(x, y, s, sz, col(c), font, spacing));
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
@@ -2822,9 +3137,10 @@ impl Graphics {
         let (x, y) = self.w2s(x, y);
         // Auch hier ausweichen: ein Widget ohne eigene Schrift (font = -1)
         // zeigt sonst "K?ln" in der Tabelle.
-        let font = if font < 0 && self.fallback.is_some() && !s.is_ascii() {
+        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
             FONT_AUSWEICH
         } else { font };
+        self.glyphen_pruefen(font, &s);
         self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
     }
 
@@ -2838,14 +3154,81 @@ impl Graphics {
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        let f = ohne_warnungen(|| rl.load_font_ex(thread, path, size.max(4), Some(&chars)))
-            .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
+        let f = schrift_laden(rl, thread, path, size, &chars)
+            .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
+        Self::keine_ersatzschrift(&f, path)?;
         // Bilinear filtern -> skalierter Text bleibt glatt statt pixelig/jaggy
         // (Default ist Nearest; sichtbar v.a. bei kleiner UI-Schrift).
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+        self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
         Ok((self.fonts.len() - 1) as i64)
+    }
+
+    /// LOADFONT(pfad$, groesse, zeichen$): wie `load_font`, aber mit eigener
+    /// Zeichenwahl -- Blocknamen ("kyrillisch", "japanisch, emoji") oder die
+    /// Zeichen selbst. Ein Spiel mit festen Texten backt so genau das, was
+    /// es braucht; ein Programm fuer Japan die Kana und alle Kanji.
+    pub fn load_font_mit(&mut self, path: &str, size: i32, zeichen: &str) -> Result<i64, String> {
+        let chars = zeichen_aus_namen(zeichen)?;
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
+        let rl = &mut self.rl;
+        let thread = &self.thread;
+        let f = schrift_laden(rl, thread, path, size, &chars)
+            .map_err(|e| format!("LOADFONT: Font nicht ladbar: {}", e))?;
+        Self::keine_ersatzschrift(&f, path)?;
+        unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+        self.font_glyphs.push(glyph_menge(&f));
+        self.fonts.push(f);
+        self.font_sizes.push(size.max(4));
+        Ok((self.fonts.len() - 1) as i64)
+    }
+
+    /// raylib tauscht eine Schrift, die es nicht lesen kann (eine
+    /// Schriftsammlung .ttc, eine kaputte Datei), STILL gegen seine
+    /// eingebaute Bitmapschrift -- LOADFONT gab dann ein Handle zurueck, und
+    /// der Text erschien in der falschen Schrift ohne jede Meldung.
+    fn keine_ersatzschrift(f: &Font, path: &str) -> Result<(), String> {
+        let standard = unsafe { raylib::ffi::GetFontDefault() };
+        if f.texture.id == standard.texture.id {
+            return Err(format!("LOADFONT: Font '{}' nicht ladbar (keine TrueType-/OpenType-Schrift, die raylib lesen kann)", path));
+        }
+        Ok(())
+    }
+
+    /// Lage des IME-Umwandlungsfensters: an die Schreibmarke des Textfelds
+    /// mit Fokus (docs/entwurf-eingabemethoden.md, Weg B). Ohne diesen Ruf
+    /// stellt Windows sein Fenster, wohin es will -- meist links oben.
+    /// `x`, `y`, `h` in Bildschirm-Pixeln des Programms (vor dem Massstab).
+    pub fn ime_position(&mut self, x: i32, y: i32, h: i32) {
+        if self.ime_zuletzt == Some((x, y, h)) { return; }
+        self.ime_zuletzt = Some((x, y, h));
+        #[cfg(windows)]
+        {
+            use windows::Win32::Foundation::{HWND, POINT, RECT};
+            use windows::Win32::UI::Input::Ime::{
+                ImmGetContext, ImmReleaseContext, ImmSetCandidateWindow, ImmSetCompositionWindow,
+                CANDIDATEFORM, CFS_CANDIDATEPOS, CFS_POINT, COMPOSITIONFORM,
+            };
+            let handle = unsafe { self.rl.get_window_handle() };
+            if handle.is_null() { return; }
+            let hwnd = HWND(handle);
+            let s = self.scale.max(1);
+            let punkt = POINT { x: x * s, y: (y + h) * s };
+            unsafe {
+                let ctx = ImmGetContext(hwnd);
+                if ctx.is_invalid() { return; }
+                let comp = COMPOSITIONFORM { dwStyle: CFS_POINT, ptCurrentPos: POINT { x: x * s, y: y * s },
+                                             rcArea: RECT::default() };
+                let _ = ImmSetCompositionWindow(ctx, &comp);
+                let kand = CANDIDATEFORM { dwIndex: 0, dwStyle: CFS_CANDIDATEPOS, ptCurrentPos: punkt,
+                                           rcArea: RECT::default() };
+                let _ = ImmSetCandidateWindow(ctx, &kand);
+                let _ = ImmReleaseContext(hwnd, ctx);
+            }
+        }
     }
 
     /// Wie `load_font`, aber ohne den Umweg ueber `resolve_asset_path` und mit
@@ -2854,9 +3237,10 @@ impl Graphics {
         let chars = zeichensatz();
         let rl = &mut self.rl;
         let thread = &self.thread;
-        let f = ohne_warnungen(|| rl.load_font_ex(thread, path, size.max(4), Some(&chars)))
-            .map_err(|e| format!("DHRT_FONT '{}' nicht ladbar: {}", path, e))?;
+        let f = schrift_laden(rl, thread, path, size, &chars)
+            .map_err(|e| format!("DHRT_FONT nicht ladbar: {}", e))?;
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
+        self.font_glyphs.push(glyph_menge(&f));
         self.fonts.push(f);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
         Ok((self.fonts.len() - 1) as i64)
@@ -2882,11 +3266,7 @@ impl Graphics {
     pub fn text_width(&self, s: &str) -> i32 {
         // font_fuer: dieselbe Wahl wie beim Zeichnen, sonst misst ein Layout
         // die Standardschrift und bekommt am Ende den Ausweich-Font zu sehen.
-        if let Some(f) = self.font_von(self.font_fuer(s)) {
-            return f.measure_text(s, self.text_size as f32, self.text_spacing).x as i32;
-        }
-        let c = std::ffi::CString::new(s).unwrap_or_default();
-        unsafe { raylib::ffi::MeasureText(c.as_ptr(), self.text_size) }
+        self.breite_mit(self.font_fuer(s), s, self.text_size as f32) as i32
     }
     pub fn text_height(&self) -> i32 { self.text_size }
 
@@ -2909,24 +3289,15 @@ impl Graphics {
     pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
         let size = size.max(1);
         // Gegenstueck zu text_styled, das bei Umlauten ebenfalls ausweicht.
-        let font = if font < 0 && self.fallback.is_some() && !s.is_ascii() {
+        let font = if font < 0 && !self.ausweich.is_empty() && !s.is_ascii() {
             FONT_AUSWEICH
         } else { font };
-        if let Some(f) = self.font_von(font) {
-            return f.measure_text(s, size as f32, self.text_spacing).x as i32;
-        }
-        // -1 (oder ein ungueltiges Handle) = Standardschrift.
-        let c = std::ffi::CString::new(s).unwrap_or_default();
-        unsafe { raylib::ffi::MeasureText(c.as_ptr(), size) }
+        self.breite_mit(font, s, size as f32) as i32
     }
 
     pub fn text_width_at(&self, s: &str, size: i32) -> i32 {
         let size = size.max(1);
-        if let Some(f) = self.font_von(self.font_fuer(s)) {
-            return f.measure_text(s, size as f32, self.text_spacing).x as i32;
-        }
-        let c = std::ffi::CString::new(s).unwrap_or_default();
-        unsafe { raylib::ffi::MeasureText(c.as_ptr(), size) }
+        self.breite_mit(self.font_fuer(s), s, size as f32) as i32
     }
 
     // Bewusst NICHT uebernommen: animierte GIFs (`LoadImageAnim`). raylib haengt
@@ -4894,6 +5265,9 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     }
 
     pub fn flip(&mut self) {
+        // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
+        // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
+        self.ausweich_nachladen();
         self.a11y_bild_ende();
         // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
         self.update_light_uniforms();
@@ -4917,12 +5291,13 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         let cam_proj = self.cam3d_proj;
         // Instancing-Shader (ffi::Shader = Copy) fuer den DrawMeshInstanced-Pfad.
         let inst_ffi = self.inst_shader.as_ref().map(|s| *s.as_ref());
-        let Graphics { rl, thread, layers, textures, fonts, fallback, cmds3d, cam3d, models,
+        let Graphics { rl, thread, layers, textures, fonts, ausweich, font_glyphs, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             emissive, loc_emissive,
             scene_rt, shaders, shader_textures, post_shader_idx, render_targets, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
-        let ausweich: Option<&Font> = fallback.as_ref();
+        let ausweich: &[Ausweich] = ausweich.as_slice();
+        let font_glyphs: &[std::collections::HashSet<u32>] = font_glyphs.as_slice();
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
         let emis_ref: &std::collections::HashMap<usize, (f32, f32, f32, f32)> = emissive;
@@ -4952,7 +5327,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
                 // behaltenen Target blieben die abgeschnittenen Raender stehen
                 // ("die Kurven kleben am rechten Rand"). Hochskaliert wird beim
                 // Stempeln (Cmd::RtDraw rechnet dort mit `s`), nicht hier.
-                render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich,
+                render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts, ausweich, font_glyphs,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
             }
@@ -4967,7 +5342,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, ausweich, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -4990,7 +5365,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, ausweich, font_glyphs, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -5069,16 +5444,70 @@ fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
 /// Voraussetzung fuer Rueckkopplungs-/Nachzieheffekte).
 /// Font-Handle eines Zeichen-Befehls aufloesen. `None` = eingebaute Schrift.
 /// FONT_AUSWEICH steht fuer den Umlaut-Ausweichfont, der nicht in `fonts` liegt.
-fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: Option<&'a Font>) -> Option<&'a Font> {
-    if h == FONT_AUSWEICH { return ausweich; }
+fn font_zu_handle<'a>(h: i64, fonts: &'a [Font], ausweich: &'a [Ausweich]) -> Option<&'a Font> {
+    if h == FONT_AUSWEICH { return ausweich.first().map(|a| &a.font); }
     if h < 0 { return None; }
     fonts.get(h as usize)
+}
+
+/// Einen Text in Laeufe zerlegen: (Font-Nummer, Stueck), 0 = der gewaehlte
+/// Font, k > 0 = Ausweich-Schrift k-1. Zeichen, die keiner hat, bleiben im
+/// gewaehlten Font (raylib malt dort ein `?`). EINE Quelle fuer Messen und
+/// Zeichnen.
+fn text_laeufe(h: i64, s: &str, basis_hat: impl Fn(u32) -> bool, ausweich: &[Ausweich]) -> Vec<(usize, String)> {
+    let mut laeufe: Vec<(usize, String)> = Vec::new();
+    for ch in s.chars() {
+        let c = ch as u32;
+        let fi = if c < 0x80 || basis_hat(c) { 0 } else {
+            // Die Grundschrift (Index 0) zaehlt hier nicht doppelt, wenn sie
+            // schon der gewaehlte Font ist.
+            ausweich.iter().enumerate()
+                .find(|(k, a)| !(h == FONT_AUSWEICH && *k == 0) && a.hat.contains(&c))
+                .map(|(k, _)| k + 1).unwrap_or(0)
+        };
+        match laeufe.last_mut() {
+            Some((f, t)) if *f == fi => t.push(ch),
+            _ => laeufe.push((fi, ch.to_string())),
+        }
+    }
+    laeufe
+}
+
+/// Text zeichnen, Zeichen ohne Glyphe im gewaehlten Font laufen ueber die
+/// Ausweich-Schriften (dieselbe Aufteilung wie `Graphics::breite_mit`).
+#[allow(clippy::too_many_arguments)]
+fn zeichne_text<D: RaylibDraw>(d: &mut D, h: i64, txt: &str, x: f32, y: f32, size: f32, spacing: f32,
+                               col: Color, fonts: &[Font], font_glyphs: &[std::collections::HashSet<u32>],
+                               ausweich: &[Ausweich]) {
+    let basis = font_zu_handle(h, fonts, ausweich);
+    let basis = match basis {
+        Some(f) => f,
+        None => { d.draw_text(txt, x as i32, y as i32, size as i32, col); return; }
+    };
+    if txt.is_ascii() || ausweich.is_empty() {
+        d.draw_text_ex(basis, txt, Vector2::new(x, y), size, spacing, col);
+        return;
+    }
+    let basis_hat = |c: u32| -> bool {
+        if h == FONT_AUSWEICH { ausweich.first().map_or(false, |a| a.hat.contains(&c)) }
+        else if h < 0 { c < 0x7F }
+        else { font_glyphs.get(h as usize).map_or(false, |m| m.contains(&c)) }
+    };
+    let mut cx = x;
+    let mut erster = true;
+    for (fi, lauf) in text_laeufe(h, txt, basis_hat, ausweich) {
+        let f = if fi == 0 { basis } else { &ausweich[fi - 1].font };
+        if !erster { cx += spacing; }
+        erster = false;
+        d.draw_text_ex(f, &lauf, Vector2::new(cx, y), size, spacing, col);
+        cx += f.measure_text(&lauf, size, spacing).x;
+    }
 }
 
 fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Option<Color>,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
-    ausweich: Option<&Font>,
+    ausweich: &[Ausweich], font_glyphs: &[std::collections::HashSet<u32>],
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
     mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32, i32),
     normal_mapped: &std::collections::HashSet<usize>,
@@ -5368,12 +5797,8 @@ fn render_scene<D: RaylibDraw>(
                         }
                     }
                     Cmd::Text(x, y, txt, sz, col, font, spacing) => {
-                        match font_zu_handle(*font, fonts, ausweich) {
-                            Some(f) => d.draw_text_ex(
-                                f, txt, Vector2::new((x * s) as f32, (y * s) as f32),
-                                (sz * s) as f32, spacing * s as f32, *col),
-                            None => d.draw_text(txt, x * s, y * s, sz * s, *col),
-                        }
+                        zeichne_text(d, *font, txt, (x * s) as f32, (y * s) as f32,
+                                     (sz * s) as f32, spacing * s as f32, *col, fonts, font_glyphs, ausweich);
                     }
                     Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => {
                         // Zentriert auf (cx,cy), Rotation um das Text-Zentrum
@@ -5926,6 +6351,52 @@ fn rotate_point_around(px: f64, py: f64, cx: f64, cy: f64, deg: f64) -> (f64, f6
     let dx = px - cx;
     let dy = py - cy;
     (cx + dx * c - dy * s, cy + dx * s + dy * c)
+}
+
+#[cfg(test)]
+mod schrift_tests {
+    use super::ttc_erste_schrift;
+
+    /// Eine kleine Sammlung von Hand: zwei Schriften, die sich eine Tabelle
+    /// teilen. Die erste hat zwei Tabellen; herausgeloest muessen Versaetze
+    /// und Inhalte stimmen.
+    #[test]
+    fn sammlung_erste_schrift_herausloesen() {
+        let mut d: Vec<u8> = Vec::new();
+        d.extend_from_slice(b"ttcf"); d.extend_from_slice(&[0, 1, 0, 0]);
+        d.extend_from_slice(&2u32.to_be_bytes());          // zwei Schriften
+        d.extend_from_slice(&20u32.to_be_bytes());          // Kopf 1 bei 20
+        d.extend_from_slice(&64u32.to_be_bytes());          // Kopf 2 bei 64
+        // Kopf 1 (bei 20): Version, 2 Tabellen, Suchfelder
+        d.extend_from_slice(&[0, 1, 0, 0]); d.extend_from_slice(&2u16.to_be_bytes()); d.extend_from_slice(&[0; 6]);
+        // Tabelle "aaaa" bei 100, Laenge 5; Tabelle "bbbb" bei 108, Laenge 3
+        d.extend_from_slice(b"aaaa"); d.extend_from_slice(&[0; 4]); d.extend_from_slice(&100u32.to_be_bytes()); d.extend_from_slice(&5u32.to_be_bytes());
+        d.extend_from_slice(b"bbbb"); d.extend_from_slice(&[0; 4]); d.extend_from_slice(&108u32.to_be_bytes()); d.extend_from_slice(&3u32.to_be_bytes());
+        while d.len() < 64 { d.push(0); }
+        // Kopf 2 (bei 64): eine Tabelle, teilt "bbbb"
+        d.extend_from_slice(&[0, 1, 0, 0]); d.extend_from_slice(&1u16.to_be_bytes()); d.extend_from_slice(&[0; 6]);
+        d.extend_from_slice(b"bbbb"); d.extend_from_slice(&[0; 4]); d.extend_from_slice(&108u32.to_be_bytes()); d.extend_from_slice(&3u32.to_be_bytes());
+        while d.len() < 100 { d.push(0); }
+        d.extend_from_slice(b"HALLO"); d.extend_from_slice(&[0, 0, 0]);   // "aaaa" bei 100 (+Polster)
+        d.extend_from_slice(b"XYZ");                                       // "bbbb" bei 108
+        let e = ttc_erste_schrift(&d).expect("Sammlung erkannt");
+        assert_eq!(&e[0..4], &[0, 1, 0, 0]);
+        assert_eq!(u16::from_be_bytes([e[4], e[5]]), 2);
+        // Verzeichnis: "aaaa" jetzt bei 12 + 32 = 44, "bbbb" bei 44 + 8 = 52
+        assert_eq!(&e[12..16], b"aaaa");
+        assert_eq!(u32::from_be_bytes([e[20], e[21], e[22], e[23]]), 44);
+        assert_eq!(&e[28..32], b"bbbb");
+        assert_eq!(u32::from_be_bytes([e[36], e[37], e[38], e[39]]), 52);
+        assert_eq!(&e[44..49], b"HALLO");
+        assert_eq!(&e[52..55], b"XYZ");
+        assert_eq!(e.len() % 4, 0);
+    }
+
+    #[test]
+    fn keine_sammlung_bleibt_unangetastet() {
+        assert!(ttc_erste_schrift(b"\x00\x01\x00\x00 irgendwas").is_none());
+        assert!(ttc_erste_schrift(b"ttcf").is_none());   // abgeschnitten
+    }
 }
 
 #[cfg(test)]

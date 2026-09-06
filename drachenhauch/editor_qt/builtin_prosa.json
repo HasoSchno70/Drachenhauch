@@ -881,7 +881,7 @@
   "LINE3D": "Linie zwischen zwei Punkten",
   "LINES": "viele Linien",
   "LINEW": "Linie mit Strichbreite (Float)",
-  "LOADFONT": "TTF/OTF laden → FONT-Handle (INTEGER)",
+  "LOADFONT": "TTF/OTF/TTC laden → FONT-Handle (INTEGER); zeichen$ = Schriftblöcke (\"kyrillisch, griechisch\", \"japanisch\", \"emoji\" …) oder die Zeichen selbst, die gebacken werden sollen",
   "LOADFONT_IMAGE": "Lädt eine Pixelschrift aus einem PNG, in dem die Zeichen durch eine Trennfarbe voneinander abgesetzt sind.",
   "LOADIMAGE": "Datei laden (PNG, JPG, BMP, …)",
   "LOADMODEL": "INTEGER — Modell aus einer Datei laden (OBJ, GLTF, IQM …)",

@@ -8159,6 +8159,47 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         true
     }
 
+    /// Lage der Schreibmarke des Textfelds/Textbereichs mit Fokus in
+    /// Bildschirm-Pixeln: (x, y_oben, hoehe). None ohne Text-Fokus. Dieselbe
+    /// Rechnung wie das Zeichnen der Marke in `draw_widget` -- fuer das
+    /// IME-Umwandlungsfenster (docs/entwurf-eingabemethoden.md, Weg B).
+    pub fn schreibmarke(&self, g: &Graphics) -> Option<(i32, i32, i32)> {
+        let (wi, i) = self.focus_widget?;
+        let win = self.windows.get(wi)?;
+        if !win.alive || !win.visible || self.focus_window != Some(wi) { return None; }
+        let wdg = win.widgets.get(i)?;
+        if !self.widget_shown(wi, wdg) { return None; }
+        let (ax, ay, w, h) = self.abs_rect(wi, wdg);
+        match wdg.kind {
+            Kind::TextInput => {
+                let anzeige: String = if wdg.passwort { "\u{2022}".repeat(wdg.text.chars().count()) } else { wdg.text.clone() };
+                let inner = (w - 10).max(1);
+                let tw = self.wtext_width(g, wdg, &anzeige);
+                let (tx, scroll) = if wdg.align >= 1 && tw <= inner {
+                    (if wdg.align == 1 { ax + 5 + (inner - tw) / 2 } else { ax + 5 + inner - tw }, 0)
+                } else { (ax + 5, wdg.scroll) };
+                let pre: String = anzeige.chars().take(wdg.caret.max(0) as usize).collect();
+                let cx = tx + self.wtext_width(g, wdg, &pre) - scroll;
+                Some((cx, ay + 3, (h - 7).max(1)))
+            }
+            Kind::TextArea => {
+                let pad = 5;
+                let lh = self.ta_line_h(g);
+                let chars: Vec<char> = wdg.text.chars().collect();
+                let starts = Self::line_starts(&chars);
+                let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
+                let crow = Self::ta_row_of(&rows, wdg.caret.max(0) as usize);
+                let lstart = rows.get(crow)?.1;
+                let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
+                let prefix: String = chars[lstart..cend].iter().collect();
+                let cx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x + self.wtext_width(g, wdg, &prefix);
+                let cy = ay + pad + (crow as i32 - wdg.scroll) * lh;
+                Some((cx, cy, lh))
+            }
+            _ => None,
+        }
+    }
+
     // --- Barrierefreiheit (a11y.rs, Weg C) -------------------------------------
     /// GUI_ANNOUNCE: ein Satz fuer den Bildschirmleser des Nutzers. Er wird
     /// als Live-Knoten in den Baum gestellt; das Hilfsprogramm spricht ihn

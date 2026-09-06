@@ -288,7 +288,7 @@ zweite Zeichenfläche samt Speicher, wo ein Rechteck genügt.
 | `TEXT_WIDTH(s$)` | Pixelbreite von `s$` in der aktiven Schrift/Größe |
 | `TEXT_HEIGHT()` | Zeilenhöhe der aktiven Schrift |
 | `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | Fett/Kursiv (nativ No-Op — raylib ohne Fett/Kursiv) |
-| `LOADFONT(pfad$, groesse)` → FONT | TTF/OTF laden → FONT-Handle (INTEGER) |
+| `LOADFONT(pfad$, groesse[, zeichen$])` → FONT | TTF/OTF/TTC laden → FONT-Handle (INTEGER); `zeichen$` = Schriftblöcke (`"kyrillisch, griechisch"`, `"japanisch"`, `"emoji"` …) oder die Zeichen selbst, die gebacken werden sollen |
 | `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
 | `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 | `TEXT_LINE_SPACING(px)` | Zeilenabstand für mehrzeiligen Text |
@@ -311,26 +311,78 @@ SETFONT(-1)                                             ' zurueck zum Default
 
 Demo: [examples/87_ttf_fonts.dh](../examples/87_ttf_fonts.dh).
 
-### Umlaute und Akzente
+### Umlaute, Euro und fremde Schriften
 
-`TEXT(x, y, "Köln")` zeichnet **Köln**, nicht `K?ln`. Dafür sorgen zwei Dinge:
+`TEXT(x, y, "Köln")` zeichnet **Köln**, nicht `K?ln`, und `TEXT(x, y, "12,50 €")`
+zeigt das Euro-Zeichen — bis September 2026 war es ein Fragezeichen, ebenso
+`ő`, `ł`, `Ω`, `Я`, jedes Kanji und jedes Emoji (gemessen in
+[entwurf-eingabemethoden.md](entwurf-eingabemethoden.md)). Dafür sorgen drei
+Dinge:
 
-- **`LOADFONT` backt einen erweiterten Zeichensatz** — ASCII, den ganzen
-  Latin-1-Bereich (`äöüß`, `éèàç`, `ñ`) und gängige Typografie (`… – „ " · → ×`).
-  Enthält die Schriftdatei ein Zeichen nicht, zeichnet raylib dort ein `?`; eine
-  Pixel-Schrift für ein Retro-Spiel hat oft keine Umlaute.
-- **Ohne eigene Schrift springt ein Ausweich-Font ein.** Die eingebaute
-  raylib-Schrift kennt nur ASCII. Kommt ein Zeichen darüber hinaus vor, zeichnet
-  die Runtime diesen Text mit einer Systemschrift (Windows: Segoe UI, macOS:
-  SF/Helvetica, Linux: DejaVu/Liberation). Reiner ASCII-Text geht weiterhin
-  durch die eingebaute Schrift — bestehende Programme sehen aus wie zuvor.
+- **Der Grund-Zeichenvorrat** jeder Schrift — der Ausweich-Schrift und jeder
+  per `LOADFONT` geladenen — umfasst ASCII, Latin-1, Latin Extended-A/B (die
+  Sprachen Mitteleuropas), Griechisch, Kyrillisch, die allgemeine
+  Interpunktion (`… – „ “`) und `€`. Enthält die Schriftdatei ein Zeichen
+  nicht, zeichnet raylib dort ein `?`; eine Pixel-Schrift für ein Retro-Spiel
+  hat oft keine Umlaute.
+- **Ohne eigene Schrift springt eine Ausweich-Schrift ein.** Die eingebaute
+  raylib-Schrift kennt nur ASCII. Kommt ein Zeichen darüber hinaus vor,
+  zeichnet die Runtime diesen Text mit einer Systemschrift (Windows: Segoe
+  UI, macOS: SF/Helvetica, Linux: DejaVu/Liberation). Reiner ASCII-Text geht
+  weiterhin durch die eingebaute Schrift.
+- **Glyphen auf Zuruf.** Steht ein Zeichen in keiner geladenen Schrift
+  (Kanji, Hangul, Emoji, Arabisch, Hebräisch, Thai), merkt sich die Runtime
+  es beim Zeichnen oder Messen und backt es beim nächsten `FLIP` aus der
+  passenden Systemschrift nach — Windows: MS Gothic, Malgun Gothic, Segoe UI
+  Emoji, Segoe UI; macOS: Arial Unicode; Linux: Noto Sans CJK, sofern
+  installiert. Gebacken wird nur, was gebraucht wurde, nicht der ganze Block.
+  Gemessen: das erste Bild mit Kanji, Hangul, Emoji und Hebräisch zugleich
+  kostet einmalig etwa 100 ms, jedes weitere neue Zeichen etwa 15 ms, danach
+  nichts mehr. Das gilt auch in einer selbst geladenen Schrift: fehlt ihr ein
+  Zeichen, springt für genau dieses Zeichen die Ausweich-Schrift ein.
 
-Findet sich keine Systemschrift, bleibt es beim `?`. Wer ein einheitliches
-Schriftbild will, lädt selbst eine Schrift und setzt sie mit `SETFONT` —
-dann zeichnet alles in derselben.
+Wer den Vorrat selbst bestimmen will, gibt ihn `LOADFONT` als drittes
+Argument mit — Blocknamen, deutsch oder englisch, durch Komma getrennt:
+`latein`, `griechisch`, `kyrillisch`, `hebraeisch`, `arabisch`, `thai`,
+`japanisch`, `chinesisch`, `koreanisch`, `emoji`, `symbole`. Oder gleich die
+Zeichen, die das Programm braucht (bei einem Spiel mit festen Texten das
+Billigste). Der Grundvorrat ist immer dabei. Ein unbekannter Name ist ein
+Fehler, der die bekannten aufzählt.
 
-`TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet: ein zentrierter Text mit
-Umlaut sitzt dort, wo er gemessen wurde.
+```basic
+DIM jp AS INTEGER
+jp = LOADFONT("C:/Windows/Fonts/msgothic.ttc", 24, "japanisch")
+SETFONT(jp)
+TEXT(10, 10, "東京 こんにちは")
+DIM ru AS INTEGER
+ru = LOADFONT("assets/schrift.ttf", 20, "kyrillisch, griechisch")
+DIM titel AS INTEGER
+titel = LOADFONT("assets/titel.ttf", 48, "SPIEL VORBEI 0123456789")   ' nur diese Zeichen
+```
+
+**Schriftsammlungen (`.ttc`)** gehen seit demselben Datum: raylib selbst
+kann sie nicht lesen und tauschte die Schrift bisher **still** gegen seine
+Bitmapschrift — `LOADFONT` gab ein Handle zurück, und der Text erschien in
+der falschen Schrift ohne Meldung. Die Runtime löst jetzt die erste Schrift
+der Sammlung heraus (die CJK-Schriften von Windows liegen alle nur so vor).
+Eine Datei, die trotzdem keine Schrift ergibt, ist ein Fehler.
+
+**Grenzen:** Emoji kommen einfarbig (raylib rastert keine Farbschriften);
+Arabisch und Hebräisch erscheinen Zeichen für Zeichen von links nach rechts
+ohne Verbindung der Buchstaben — Textformung und Rechts-nach-links sind
+nicht gebaut. Wer eine bestimmte Glyphenform will (japanische statt
+chinesische Formen), lädt seine Schrift selbst.
+
+`TEXT_WIDTH` misst denselben Weg, den `TEXT` zeichnet — auch über die
+Ausweich-Schriften hinweg: ein zentrierter Text mit Umlaut oder Kanji sitzt
+dort, wo er gemessen wurde.
+
+**Eingabemethoden (IME).** Wer Japanisch oder Chinesisch über eine
+Eingabemethode tippt, bekommt das Bestätigte in ein `gui`-Textfeld wie
+getippt; die Tipp-Warteschlange fasst 256 Zeichen je Bild (raylibs Vorgabe
+von 16 hätte einen bestätigten Satz still gekürzt), und unter Windows steht
+das Umwandlungsfenster der IME an der Schreibmarke des Feldes mit Fokus. Eine
+Vorschau der Umwandlung im Feld selbst gibt es nicht.
 
 ## Bilder
 

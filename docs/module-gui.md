@@ -1963,6 +1963,13 @@ nicht), Ton nie als einzige Rückmeldung, Bewegung abschaltbar machen. Und
 eine Zeichenfläche ist für den Leser ein Bild: was darauf passiert, sagt
 man ihm mit `GUI_ANNOUNCE`.
 
+**Eingabemethoden (IME):** unter Windows steht das Umwandlungsfenster einer
+Eingabemethode (Japanisch, Chinesisch, Koreanisch) an der Schreibmarke des
+Textfelds oder Textbereichs mit Fokus; das Bestätigte kommt wie getippt ins
+Feld. Was das Feld anzeigen kann, steht in
+[builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften)
+— Kanji, Hangul und Emoji werden auf Zuruf nachgeladen.
+
 **Grenzen (Stand 2026-09-06):** Windows. macOS (VoiceOver) und Linux (Orca)
 haben ihre Adapter in derselben Bibliothek, sie sind aber noch nicht
 eingehängt, weil sie hier nicht zu prüfen sind. Die Schreibmarke in einem

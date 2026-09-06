@@ -189,6 +189,7 @@ _NUR_WINDOWS = {
 }
 
 _BRAUCHT_GRAFIK = {
+    "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
     "test_arc_width.py",
     "test_audio_modulators.py",
