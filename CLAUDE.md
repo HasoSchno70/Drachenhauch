@@ -2564,7 +2564,7 @@ solange die IDE Python ist), `tools/*.js` (Node, Buch). **Falle beim Bau:**
 Einzug der JSON-Ausgabe; nur `serde_json` reichte nicht, weil der Trait
 `Serialize` aus `serde` kommt).
 
-## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 + 2, 2026-09-06)
+## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 
 `ide/ide.dh` (~760 Zeilen) ist die IDE als Drachenhauch-Programm, gestartet
 mit `dhrt run ide/ide.dh [-- datei.dh]`; Doku `docs/ide.md`. Stufe 1: Reiter
@@ -2627,6 +2627,24 @@ F10 -> 3; F8 -> Ende; ohne Haltepunkt Halt in 1; Profil; Projektsuche und
 Palette tippen ueber die Zwischenablage, `CLIPBOARD_SET` wird in die
 Testkopie eingeschoben -- die Kopie liegt darum in einem Unterordner,
 sonst zaehlt die Suche sie mit).
+
+**Stufe 3 (selber Tag):** Handbuch im Fenster (F1 = Wort unter der Marke in
+ALLEN `docs/*.md` suchen, das Dokument mit den meisten Fundstellen in
+Codeschrift gewinnt; Klappliste + Suche im Dokument; Textbereich mit
+`umbruch`), Listing drucken (`PDF_PRINT` auf den Standarddrucker) oder als
+PDF neben die Quelle (Courier 9 pt, 66 Zeilen/Seite, `PDF_TEXT` je Zeile in
+TRY -- cp1252-fremde Zeichen sind dort ein Fehler), Werkzeuge-Menue (die
+fuenf Piloten als eigene `dhrt run`-Prozesse in `werkzeuge[]`, beim Ende
+gekillt), Ausdruck-Auswertung im angehaltenen Debugger (Eingabezeile ->
+`{"cmd":"eval"}`, Strg+E holt sie), und `installer/Drachenhauch-IDE.iss`:
+Installer OHNE Python (dhrt.exe + ide/ + docs/ + examples, 33 MB statt 92,
+eigene AppId, Verknuepfung `dhrt run ide\ide.dh` mit den Beispielen als
+Arbeitsverzeichnis, `.dh` oeffnet in der IDE). Ordner: `docs/` und
+`examples/` neben `ide/` (`DH_IDE_WURZEL` uebersteuert -- die Tests
+setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
+`%PUBLIC%\Documents\Drachenhauch\examples`. **Falle:** ISCC-Schalter
+(`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
+Pfade um ("more than one script filename"); PowerShell nehmen.
 
 ## Sprachserver `dhrt lsp` + VS-Code-Erweiterung
 

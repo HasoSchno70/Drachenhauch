@@ -16,18 +16,20 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
-## Stand 2 (06.09.2026)
+## Stand 3 (06.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
-| Dateien | Neu, Öffnen, Sichern, Sichern unter, Reiter schließen; bis zu 12 Reiter; Rückfrage bei ungesicherten Änderungen | Strg+N, Strg+O, Strg+S, Strg+W, Strg+Q |
+| Dateien | Neu, Öffnen, Sichern, Sichern unter, Reiter schließen; bis zu 12 Reiter; Rückfrage bei ungesicherten Änderungen; Listing drucken (Standarddrucker) oder als PDF neben die Quelle (Courier 9 pt, 66 Zeilen je Seite, Zeilennummern, Kopfzeile mit Seitenzahl) | Strg+N, Strg+O, Strg+S, Strg+W, Strg+Q, Strg+P |
 | Bearbeiten | Suchen, Weitersuchen, Ersetzen (alle Treffer), Gehe zu Zeile, Suche im Projekt (alle `.dh` im Projektordner, Treffer unten rechts, Doppelklick öffnet), Befehlspalette (tippen filtert, Enter führt aus) | Strg+F, F3, Strg+H, Strg+G, Strg+Umschalt+F, Strg+Umschalt+P |
 | Sprache | Einfärbung des sichtbaren Ausschnitts, Hilfe zum Wort unter der Marke (Statuszeile), Vervollständigung, Zur Definition | Strg+Leer, F12 |
 | Prüfen | Fehlerliste unten rechts, 0,6 s nach der letzten Änderung von selbst; Klick springt zur Zeile; Fehlerzeilen tragen eine orange Marke | Umschalt+F7 |
-| Debugger | Haltepunkte (rote Marke) an der Zeile der Schreibmarke; Debuggen läuft bis zum ersten Haltepunkt, ohne Haltepunkte steht es in Zeile 1; die angehaltene Zeile ist gelb markiert, Variablen (lokal und global) stehen unten rechts anstelle der Problemliste, dazu die Schritt-Knöpfe | F9, F7, F8 weiter, F10 drüber, F11 hinein, Umschalt+F11 heraus, Umschalt+F5 stopp |
+| Debugger | Haltepunkte (rote Marke) an der Zeile der Schreibmarke; Debuggen läuft bis zum ersten Haltepunkt, ohne Haltepunkte steht es in Zeile 1; die angehaltene Zeile ist gelb markiert, Variablen (lokal und global) stehen unten rechts anstelle der Problemliste, dazu die Schritt-Knöpfe; steht das Programm, wertet die Eingabezeile Ausdrücke aus (`? 2 * 21` → `= 42 (INTEGER)`) | F9, F7, F8 weiter, F10 drüber, F11 hinein, Umschalt+F11 heraus, Umschalt+F5 stopp, Strg+E Ausdruck |
 | Profil | Lauf unter `dhrt profile`; am Ende ein Fenster mit den Zeilen nach Zeit (Anzahl, ms, Anteil, Quelltext), Klick springt zur Zeile | Strg+Umschalt+Y |
 | Ausführen | Starten mit laufender Ausgabe unten links, Eingabezeile für `INPUT`, Stoppen | F5, Umschalt+F5 |
+| Werkzeuge | Die fünf Begleit-Editoren in Drachenhauch (SFX-Generator, Partikel-Editor, Tilemap-Editor, Sprite-Editor, Tracker) als eigene Programme; die Beispiele als Projekt öffnen | |
 | Ansicht | Helles/dunkles Thema, Vollbild; die IDE startet maximiert | Alt+Enter |
+| Hilfe | Handbuch im Fenster: F1 schlägt das Wort unter der Schreibmarke in `docs/` nach und öffnet das Dokument mit den meisten Fundstellen in Codeschrift; Klappliste aller Dokumente, Suche im Dokument | F1 |
 
 ## Woraus sie gebaut ist
 
@@ -64,6 +66,13 @@ Haltepunkte und lässt es weiterlaufen, wenn es welche gibt. Der Profiler
 (`dhrt profile`) liefert am Ende eine JSON-Zeile mit `total_time`, `lines`
 (Zeile, Anzahl, Zeit) und der Programmausgabe.
 
+Wo Handbuch und Beispiele liegen: `docs/` und `examples/` neben `ide/`, im
+Repo wie in der Installation; die Umgebungsvariable `DH_IDE_WURZEL`
+übersteuert das (die Tests brauchen es, weil ihre IDE-Kopie woanders
+liegt). Fehlen die Beispiele neben `ide/`, sieht die IDE unter
+`%PUBLIC%\Documents\Drachenhauch\examples` nach, wohin der Installer
+sie legt.
+
 Schrift: eine Textschrift für die Oberfläche (Segoe UI, sonst Arial oder
 DejaVu Sans) und eine dicktengleiche für den Code (Consolas, sonst Menlo
 oder DejaVu Sans Mono), beide in 32 px geladen und in 16 gezeichnet. Ohne
@@ -75,14 +84,17 @@ Setzt man `DH_IDE_LOG=<datei>`, schreibt die IDE ihre Ereignisse zeilenweise
 mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `beendet <code>`, `gesichert`, `projekt <ordner>`, `haltepunkt <zeile> an|aus`,
 `debug gestartet`, `debug pause <zeile>`, `debug beendet`, `profil <zeilen>`,
-`suche <treffer>`, `palette <befehl>`, `ende`. So sieht `tests/test_ide.py`, was sie
+`suche <treffer>`, `palette <befehl>`, `handbuch <datei> <zeile>`, `pdf <pfad>`,
+`gedruckt`, `werkzeug <datei>`, `eval <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
 
 ## Was noch fehlt
 
-Willkommensseite, das Handbuch im Fenster, Drucken des Listings über das
-pdf-Modul, die Begleit-Editoren aus dem Menü, Ausdruck-Auswertung im
-Debugger (`eval` kann das Kind schon), bedingte Haltepunkte, ein Installer
-ohne PyInstaller. Die Liste
+Willkommensseite, bedingte Haltepunkte, ein Druckdialog mit Druckerwahl
+(heute: Standarddrucker oder PDF), eine gerenderte Markdown-Ansicht (das
+Handbuch zeigt den Quelltext der Dokumente). Ein Installer ohne Python
+gibt es seit Stand 3: `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`,
+`ide/`, `docs/` und die Beispiele -- 33 MB statt 92; die Qt-IDE bleibt
+daneben installierbar, bis diese hier gleichzieht. Die Liste
 steht in [entwurf-python-abbau.md](entwurf-python-abbau.md), Abschnitt C.

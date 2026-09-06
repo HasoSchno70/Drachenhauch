@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 2)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 3)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -16,6 +16,13 @@
 '  im Fenster -- Client von `dhrt debug`), Profil (`dhrt profile`, Tabelle
 '  nach Zeit), Suche im Projekt, Befehlspalette, Marken in der Nummern-
 '  spalte (GUI_TEXTAREA_MARKS), echte Schriften, Start maximiert.
+'  Stand 3 dazu: Handbuch im Fenster (F1 = das Wort unter der Marke in
+'  docs/ nachschlagen), Listing drucken oder als PDF (pdf-Modul), die
+'  Begleit-Editoren in Drachenhauch aus dem Menue Werkzeuge, Ausdruecke im
+'  angehaltenen Debugger auswerten (Strg+E in die Eingabezeile).
+'
+'  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
+'  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
 '
 '  Aufruf:  dhrt run ide/ide.dh [-- datei.dh]
 '  Test:    DH_IDE_LOG=<datei> schreibt die Ereignisse zeilenweise mit --
@@ -23,6 +30,7 @@
 ' ============================================================
 IMPORT "gui"
 IMPORT "json"
+IMPORT "pdf"
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -97,6 +105,19 @@ DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
 ' Profil
 DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
 
+' Wo Handbuch und Beispiele liegen: neben ide/ (dhrt hat nach ide/ gewechselt).
+DIM wurzel AS STRING : wurzel = GETENV$("DH_IDE_WURZEL")
+IF wurzel = "" THEN wurzel = PATHJOIN(CWD$(), "..")
+DIM docsOrdner AS STRING : docsOrdner = PATHJOIN(wurzel, "docs")
+DIM beispielOrdner AS STRING : beispielOrdner = PATHJOIN(wurzel, "examples")
+IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "183_sfx_generator.dh")) AND GETENV$("PUBLIC") <> "" THEN
+    ' Installation: der Installer legt die Beispiele in die oeffentlichen Dokumente.
+    beispielOrdner = PATHJOIN(GETENV$("PUBLIC"), "Documents/Drachenhauch/examples")
+END IF
+DIM werkzeuge AS ARRAY OF INTEGER : werkzeuge = []     ' laufende Begleitprogramme
+DIM docNamen AS ARRAY OF STRING : docNamen = []
+DIM docLetzteWahl AS INTEGER : docLetzteWahl = -1
+
 ' offene Dialoge (0 = keiner)
 DIM dlgSuche AS GUI_WINDOW : dlgSuche = 0
 DIM dlgErsetze AS GUI_WINDOW : dlgErsetze = 0
@@ -128,6 +149,9 @@ DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Str
 DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
 DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...")
 GUI_MENU_SEPARATOR(mDatei)
+DIM miDrucken AS INTEGER : miDrucken = GUI_MENU_ITEM(mDatei, "Listing drucken", "Strg+P")
+DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Listing als PDF neben die Quelle")
+GUI_MENU_SEPARATOR(mDatei)
 DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Reiter schliessen", "Strg+W")
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 
@@ -156,12 +180,23 @@ DIM miHeraus AS INTEGER : miHeraus = GUI_MENU_ITEM(mLauf, "Schritt heraus", "Ums
 GUI_MENU_SEPARATOR(mLauf)
 DIM miProfil AS INTEGER : miProfil = GUI_MENU_ITEM(mLauf, "Profil aufnehmen", "Strg+Umschalt+Y")
 
+DIM mWerkzeuge AS INTEGER : mWerkzeuge = GUI_MENU(win, "Werkzeuge")
+DIM miWzSfx AS INTEGER : miWzSfx = GUI_MENU_ITEM(mWerkzeuge, "SFX-Generator")
+DIM miWzPartikel AS INTEGER : miWzPartikel = GUI_MENU_ITEM(mWerkzeuge, "Partikel-Editor")
+DIM miWzTilemap AS INTEGER : miWzTilemap = GUI_MENU_ITEM(mWerkzeuge, "Tilemap-Editor")
+DIM miWzSprite AS INTEGER : miWzSprite = GUI_MENU_ITEM(mWerkzeuge, "Sprite-Editor")
+DIM miWzTracker AS INTEGER : miWzTracker = GUI_MENU_ITEM(mWerkzeuge, "Tracker")
+GUI_MENU_SEPARATOR(mWerkzeuge)
+DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, "Beispiele als Projekt oeffnen")
+DIM miAusdruck AS INTEGER : miAusdruck = GUI_MENU_ITEM(mWerkzeuge, "Ausdruck im Debugger auswerten", "Strg+E")
+
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
 DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, "Helles Thema")
 GUI_MENU_CHECK(miThema, FALSE)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
+DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, "Handbuch (Wort unter der Marke)", "F1")
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
@@ -207,6 +242,18 @@ GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
 GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
 GUI_TABLE_SET(tblProfil, "sortierbar", 1)
 GUI_WINDOW_VISIBLE(winProfil, FALSE)
+
+' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
+DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", 200, 60, 980, 720)
+GUI_WINDOW_CLOSABLE(winHandbuch, TRUE)
+DIM ddDoku AS GUI_WIDGET : ddDoku = GUI_DROPDOWN(winHandbuch, 8, 8, 420, 26, [])
+DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 436, 8, 380, 26, "")
+DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Suchen", 824, 8, 80, 26)
+DIM lblHbStand AS GUI_WIDGET : lblHbStand = GUI_LABEL(winHandbuch, "", 8, 40)
+DIM taHandbuch AS GUI_WIDGET : taHandbuch = GUI_TEXTAREA(winHandbuch, 8, 60, 964, 620)
+GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
+GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
+GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 
 ' Befehlspalette: tippen filtert, Enter fuehrt aus.
 DIM winPalette AS GUI_WINDOW : winPalette = GUI_WINDOW("Befehle", 400, 80, 440, 340)
@@ -852,8 +899,11 @@ SUB debugEreignis(zeile AS STRING)
             debugZeile = JSON_GET_INT(j, "line")
             ausgabe("-- Fehler in Zeile " + STR$(debugZeile) + ": " + JSON_GET_STRING(j, "message"))
             protokoll("debug fehler " + STR$(debugZeile))
-        CASE "eval-result", "eval-error"
-            ausgabe(zeile)
+        CASE "eval-result"
+            ausgabe("= " + JSON_GET_STRING(j, "value") + "   (" + JSON_GET_STRING(j, "type") + ")")
+            protokoll("eval " + JSON_GET_STRING(j, "value"))
+        CASE "eval-error"
+            ausgabe("Fehler: " + JSON_GET_STRING(j, "message"))
     END SELECT
 END SUB
 
@@ -969,6 +1019,221 @@ SUB prozessNachsehen()
     END IF
 END SUB
 
+' --- Handbuch: docs/*.md im Fenster -----------------------------------
+FUNCTION wortUnterMarke$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    ' Spalte ist 1-basiert und steht HINTER dem Zeichen links der Marke.
+    DIM a AS INTEGER : a = s - 1
+    DIM e AS INTEGER : e = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    WHILE e < LEN(zeile) AND istWortzeichen(MID$(zeile, e, 1)) : e = e + 1 : WEND
+    RETURN MID$(zeile, a, e - a)
+END FUNCTION
+
+FUNCTION istWortzeichen(c AS STRING) AS BOOLEAN
+    IF c = "" THEN RETURN FALSE
+    RETURN c = "_" OR c = "$" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")
+END FUNCTION
+
+SUB handbuchDokumente()
+    IF LEN(docNamen) > 0 THEN RETURN
+    docNamen = DIRLIST(docsOrdner, "*.md")
+    GUI_SET_DROPDOWN(ddDoku, docNamen)
+END SUB
+
+SUB handbuchZeigen(datei AS STRING, zeile AS INTEGER)
+    handbuchDokumente()
+    DIM i AS INTEGER
+    DIM k AS INTEGER : k = -1
+    FOR i = 0 TO LEN(docNamen) - 1
+        IF docNamen[i] = datei THEN k = i
+    NEXT
+    IF k < 0 THEN GUI_SET_TEXT(lblStatus, "Kein Handbuch gefunden in " + docsOrdner) : RETURN
+    GUI_SET_TEXT(taHandbuch, dateiLesen(PATHJOIN(docsOrdner, datei)))
+    GUI_DROPDOWN_SET_SELECTED(ddDoku, k)
+    docLetzteWahl = k
+    GUI_SET_TEXT(lblHbStand, datei)
+    GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
+    GUI_TEXTAREA_GOTO(taHandbuch, MAX(zeile, 1), 1)
+    GUI_FOCUS(taHandbuch)            ' holt das Fenster nach vorn
+    protokoll("handbuch " + datei + " " + STR$(zeile))
+END SUB
+
+' F1: das Wort unter der Marke in allen Dokumenten suchen; das Dokument mit
+' den meisten Fundstellen in Codeschrift (`WORT) gewinnt, sonst Klartext.
+SUB handbuch()
+    handbuchDokumente()
+    IF LEN(docNamen) = 0 THEN GUI_SET_TEXT(lblStatus, "Kein Handbuch gefunden in " + docsOrdner) : RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN handbuchZeigen("README.md", 1) : RETURN
+    DIM klein AS STRING : klein = LOWER$(wort)
+    DIM besteDatei AS STRING : besteDatei = ""
+    DIM besteZeile AS INTEGER : besteZeile = 1
+    DIM besteZahl AS INTEGER : besteZahl = 0
+    DIM d AS STRING
+    FOR EACH d IN docNamen
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(docsOrdner, d))
+        DIM zahl AS INTEGER : zahl = 0
+        DIM erste AS INTEGER : erste = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            DIM lz AS STRING : lz = LOWER$(zeilen[i])
+            IF LEFT$(lz, LEN(klein) + 3) = "| `" + klein THEN
+                ' die Tabellenzeile, die den Befehl BESCHREIBT -- das Referenzdokument
+                zahl = zahl + 10
+                IF erste = 0 THEN erste = i + 1
+            ELSEIF INSTR(lz, "`" + klein) >= 0 THEN
+                zahl = zahl + 2
+                IF erste = 0 THEN erste = i + 1
+            ELSEIF INSTR(lz, klein) >= 0 THEN
+                zahl = zahl + 1
+                IF erste = 0 THEN erste = i + 1
+            END IF
+        NEXT
+        IF zahl > besteZahl THEN besteZahl = zahl : besteDatei = d : besteZeile = erste
+    NEXT
+    IF besteDatei = "" THEN
+        GUI_SET_TEXT(lblStatus, "'" + wort + "' steht in keinem Dokument.")
+        handbuchZeigen("README.md", 1)
+        RETURN
+    END IF
+    GUI_SET_TEXT(tfHbSuche, wort)
+    handbuchZeigen(besteDatei, besteZeile)
+END SUB
+
+SUB handbuchSuchen()
+    DIM gesucht AS STRING : gesucht = GUI_TEXT(tfHbSuche)
+    IF gesucht = "" THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(taHandbuch)
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, z, s + 1)
+    IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+    IF tz < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + "' nicht in diesem Dokument") : RETURN
+    GUI_TEXTAREA_GOTO(taHandbuch, tz, ts)
+    GUI_TEXTAREA_SELECT(taHandbuch, tz, ts, tz, ts + LEN(gesucht))
+    GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + " -- Zeile " + STR$(tz))
+END SUB
+
+' --- Listing drucken / als PDF (pdf-Modul) -----------------------------
+FUNCTION listingPdf() AS PDF
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    DIM name AS STRING : name = "Unbenannt"
+    IF tabPfade[aktiverTab] <> "" THEN name = BASENAME(tabPfade[aktiverTab])
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM p AS PDF : p = PDF_NEW()
+    PDF_TITLE(p, name)
+    CONST BREITE = 92                   ' Zeichen je Zeile in Courier 9 pt auf A4
+    CONST JE_SEITE = 66
+    DIM reihe AS INTEGER : reihe = JE_SEITE
+    DIM seite AS INTEGER : seite = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM rest AS STRING : rest = REPLACE$(zeilen[i], CHR$(9), "    ")
+        DIM nummer AS STRING : nummer = RIGHT$("     " + STR$(i + 1), 5)
+        DIM ersteHaelfte AS BOOLEAN : ersteHaelfte = TRUE
+        REPEAT
+            IF reihe >= JE_SEITE THEN
+                ' PDF_NEW bringt die erste Seite schon mit -- ein PDF_PAGE davor
+                ' liesse ein leeres Blatt vorn (so war es zuerst).
+                IF seite > 0 THEN PDF_PAGE(p)
+                seite = seite + 1
+                PDF_FONT(p, "helvetica", 9)
+                PDF_TEXT(p, 20, 12, name + "   Seite " + STR$(seite))
+                PDF_LINE(p, 20, 15, 190, 15)
+                PDF_FONT(p, "courier", 9)
+                reihe = 0
+            END IF
+            DIM stueck AS STRING : stueck = LEFT$(rest, BREITE)
+            rest = MID$(rest, LEN(stueck))
+            DIM vorspann AS STRING : vorspann = nummer + "  "
+            IF NOT ersteHaelfte THEN vorspann = "       "
+            TRY
+                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + stueck)
+            CATCH e
+                ' Ein Zeichen ausserhalb von cp1252 -- die Zeile kommt gekennzeichnet.
+                PDF_TEXT(p, 20, 22 + reihe * 3.9, vorspann + "[Zeile mit Zeichen ausserhalb von cp1252]")
+            END TRY
+            reihe = reihe + 1
+            ersteHaelfte = FALSE
+        UNTIL rest = ""
+    NEXT
+    RETURN p
+END FUNCTION
+
+SUB listingAlsPdf()
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- die PDF kommt neben die Quelle.") : RETURN
+    DIM ziel AS STRING : ziel = pfad
+    IF LOWER$(RIGHT$(ziel, 3)) = ".dh" THEN ziel = LEFT$(ziel, LEN(ziel) - 3)
+    ziel = ziel + ".pdf"
+    DIM p AS PDF : p = listingPdf()
+    PDF_SAVE(p, ziel)
+    GUI_SET_TEXT(lblStatus, "PDF geschrieben: " + ziel + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten)")
+    PDF_CLOSE(p)
+    protokoll("pdf " + ziel)
+END SUB
+
+SUB listingDrucken()
+    IF aktiverTab < 0 THEN RETURN
+    IF PRINTER_DEFAULT$() = "" THEN GUI_SET_TEXT(lblStatus, "Kein Standarddrucker -- nimm 'Listing als PDF'.") : RETURN
+    DIM p AS PDF : p = listingPdf()
+    TRY
+        PDF_PRINT(p)
+        GUI_SET_TEXT(lblStatus, "Gedruckt auf " + PRINTER_DEFAULT$() + " (" + STR$(PDF_PAGE_COUNT(p)) + " Seiten)")
+        protokoll("gedruckt")
+    CATCH e
+        GUI_SET_TEXT(lblStatus, "Drucken: " + e)
+    END TRY
+    PDF_CLOSE(p)
+END SUB
+
+' --- Werkzeuge: die Begleit-Editoren in Drachenhauch --------------------
+SUB werkzeugStarten(datei AS STRING)
+    DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, "Nicht gefunden: " + pfad)
+        protokoll("werkzeug fehlt " + datei)
+        RETURN
+    END IF
+    ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
+    GUI_SET_TEXT(lblStatus, "Gestartet: " + datei)
+    protokoll("werkzeug " + datei)
+END SUB
+
+SUB werkzeugeAufraeumen()
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(werkzeuge)
+        IF PROCESS_RUNNING(werkzeuge[i]) THEN
+            i = i + 1
+        ELSE
+            PROCESS_CLOSE(werkzeuge[i])
+            ARRAY_REMOVE_AT(werkzeuge, i)
+        END IF
+    WEND
+END SUB
+
+SUB beispieleOeffnen()
+    IF NOT FILEEXISTS(PATHJOIN(beispielOrdner, "01_hello.dh")) THEN
+        GUI_SET_TEXT(lblStatus, "Keine Beispiele in " + beispielOrdner)
+        RETURN
+    END IF
+    projektOrdner = beispielOrdner
+    baumFuellen()
+    GUI_SET_TEXT(lblStatus, "Projekt: " + beispielOrdner)
+    protokoll("projekt " + projektOrdner)
+END SUB
+
 ' --- Befehlspalette ------------------------------------------------------
 SUB paletteEintrag(name AS STRING, kennung AS STRING)
     ARRAY_PUSH(paletteNamen, name)
@@ -987,6 +1252,12 @@ paletteEintrag("Weiter", "weiter_d") : paletteEintrag("Schritt drueber", "druebe
 paletteEintrag("Schritt hinein", "hinein") : paletteEintrag("Schritt heraus", "heraus")
 paletteEintrag("Profil aufnehmen", "profil") : paletteEintrag("Helles Thema", "thema")
 paletteEintrag("Vollbild", "vollbild") : paletteEintrag("Ueber ...", "ueber") : paletteEintrag("Beenden", "beenden")
+paletteEintrag("Handbuch", "handbuch") : paletteEintrag("Listing drucken", "drucken")
+paletteEintrag("Listing als PDF neben die Quelle", "pdf")
+paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel")
+paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker") : paletteEintrag("Beispiele als Projekt oeffnen", "beispiele")
+paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck")
 
 SUB paletteFuellen(filter AS STRING)
     GUI_LISTBOX_CLEAR(lstPalette)
@@ -1031,6 +1302,16 @@ SUB eingabeSenden()
     DIM t AS STRING : t = GUI_TEXT(tfEingabe)
     IF prozess < 0 THEN
         GUI_SET_TEXT(lblStatus, "Kein Programm laeuft.")
+        RETURN
+    END IF
+    IF prozessArt = "debug" THEN
+        ' Im Debugger ist die Eingabezeile die Ausdruck-Auswertung.
+        IF NOT debugPause THEN GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht.") : RETURN
+        DIM j AS STRING : j = REPLACE$(t, "\", "\\")
+        j = REPLACE$(j, CHR$(34), "\" + CHR$(34))
+        PROCESS_WRITE(prozess, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "eval" + CHR$(34) + "," + CHR$(34) + "expr" + CHR$(34) + ":" + CHR$(34) + j + CHR$(34) + "}" + NL)
+        ausgabe("? " + t)
+        GUI_SET_TEXT(tfEingabe, "")
         RETURN
     END IF
     PROCESS_WRITE(prozess, t + NL)
@@ -1093,7 +1374,18 @@ SUB befehl(k AS STRING)
             GUI_MENU_CHECK(miThema, hell)
             IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 2 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 3 -- geschrieben in Drachenhauch.", "ok")
+        CASE "handbuch" : handbuch()
+        CASE "drucken" : listingDrucken()
+        CASE "pdf" : listingAlsPdf()
+        CASE "wz_sfx" : werkzeugStarten("183_sfx_generator.dh")
+        CASE "wz_partikel" : werkzeugStarten("185_partikel_editor.dh")
+        CASE "wz_tilemap" : werkzeugStarten("187_tilemap_editor.dh")
+        CASE "wz_sprite" : werkzeugStarten("189_sprite_editor.dh")
+        CASE "wz_tracker" : werkzeugStarten("190_tracker.dh")
+        CASE "beispiele" : beispieleOeffnen()
+        CASE "ausdruck"
+            IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
     END SELECT
 END SUB
 
@@ -1160,6 +1452,22 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miThema) THEN befehl("thema")
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
     IF GUI_CLICKED(miUeber) THEN befehl("ueber")
+    IF GUI_CLICKED(miHandbuch) THEN befehl("handbuch")
+    IF GUI_CLICKED(miDrucken) THEN befehl("drucken")
+    IF GUI_CLICKED(miPdf) THEN befehl("pdf")
+    IF GUI_CLICKED(miWzSfx) THEN befehl("wz_sfx")
+    IF GUI_CLICKED(miWzPartikel) THEN befehl("wz_partikel")
+    IF GUI_CLICKED(miWzTilemap) THEN befehl("wz_tilemap")
+    IF GUI_CLICKED(miWzSprite) THEN befehl("wz_sprite")
+    IF GUI_CLICKED(miWzTracker) THEN befehl("wz_tracker")
+    IF GUI_CLICKED(miBeispiele) THEN befehl("beispiele")
+    IF GUI_CLICKED(miAusdruck) THEN befehl("ausdruck")
+    ' Handbuch: Klappliste wechselt das Dokument, Enter/Knopf sucht darin.
+    IF GUI_DROPDOWN_SELECTED(ddDoku) <> docLetzteWahl AND GUI_DROPDOWN_SELECTED(ddDoku) >= 0 THEN
+        handbuchZeigen(docNamen[GUI_DROPDOWN_SELECTED(ddDoku)], 1)
+    END IF
+    IF GUI_CLICKED(btnHbSuche) OR GUI_ENTERED(tfHbSuche) THEN handbuchSuchen()
+    werkzeugeAufraeumen()
     IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
 
     ' --- Dialoge auswerten ---
@@ -1293,4 +1601,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
 WEND
 
 IF prozess >= 0 THEN PROCESS_KILL(prozess)
+DIM wz AS INTEGER
+FOR EACH wz IN werkzeuge
+    PROCESS_KILL(wz)
+NEXT
 protokoll("ende")
