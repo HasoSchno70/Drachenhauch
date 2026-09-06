@@ -132,7 +132,7 @@ IMPORT "gui"
 
 Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.dh`](../examples/129_gui_menu.dh).
 
-**Tastenkürzel** stehen rechts im Eintrag und werden im Fenster mit Fokus jedes Bild geprüft — auch bei geschlossenem Menü. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert.
+**Tastenkürzel** stehen rechts im Eintrag und werden im Fenster mit Fokus jedes Bild geprüft — auch bei geschlossenem Menü. Geschrieben werden sie, wie man sie liest: `Strg+S`, `Strg+Umschalt+O`, `Alt+Enter`, `F5`, `Entf`; englische Namen (`Ctrl`, `Shift`, `Delete`, `PageDown`) gehen auch. Die Modifier müssen **genau** passen: ein bloßes S ist kein Strg+S. **Ohne Strg oder Alt gehört eine Taste dem Textfeld mit Fokus** — ein `Entf`-Kürzel löscht dort ein Zeichen, statt den Menüpunkt auszulösen; ohne Textfokus löst es aus. **Ausgenommen sind F1 bis F12**: sie erzeugen nie Text und lösen auch aus dem Textfeld heraus aus (F5 startet in einer IDE aus dem Code-Feld). Ein gesperrter Eintrag hat kein Kürzel. Ein unbekannter Tastenname ist ein Fehler beim Anlegen, nicht ein Kürzel, das still nie feuert.
 
 **Untermenüs** entstehen mit `GUI_SUBMENU` und bekommen ihre Einträge wie jedes Menü; sie öffnen beim Überfahren und bleiben offen, solange man schräg hinüberfährt (erst ein anderer Eintrag derselben Ebene schließt sie). In der `.dhform` liegen sie **verschachtelt** am Eintrag (`items`), Kürzel als `shortcut`, Häkchen als `checkable`/`checked`. Sinnbilder sind Textur-Handles und werden wie bei `GUI_IMAGE` nicht gespeichert. Der Form-Designer bearbeitet Menüs nicht, reicht sie aber unverändert durch und schreibt sie in den GB-Code.
 
@@ -2015,6 +2015,12 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |
+| `GUI_TEXTAREA_CURSOR(ta)` → (zeile, spalte) | wo die Schreibmarke steht (ab 1, in Zeichen) |
+| `GUI_TEXTAREA_GOTO(ta, zeile[, spalte])` | Marke setzen, Auswahl aufheben, den Ausschnitt so rollen, dass die Zeile in der Mitte steht |
+| `GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)` | einen Bereich markieren, Marke am Ende |
+| `GUI_TEXTAREA_SELECTION$(ta)` → STRING | der markierte Text |
+| `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
+| `GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])` → (zeile, spalte) | nächster Treffer ab der Stelle, `(-1, -1)` wenn keiner; ohne `genau` ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab `1, 1` suchen |
 
 ```basic
 DIM ta AS GUI_WIDGET
@@ -2071,6 +2077,26 @@ Zeichen; mitten in der Zeile getippt stünde die Einrückung sonst schief.
 > unschädlich.
 
 Vollständiges Beispiel: [`examples/184_codefeld.dh`](../examples/184_codefeld.dh).
+
+### Marke, Auswahl, Suchen — die Befehle einer Entwicklungsumgebung
+
+Mit den sechs Befehlen oben baut ein Programm Suchen/Ersetzen, „Gehe zu
+Zeile“, das Anspringen einer Fehlerzeile und eine Vervollständigung, die den
+getippten Wortanfang ersetzt. Die IDE in Drachenhauch (`ide/ide.dh`) benutzt
+genau sie:
+
+```basic
+' Ersetzen: alle Treffer von vorn
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_FIND(ta, "alt", 1, 1)
+WHILE z >= 0
+    GUI_TEXTAREA_SELECT(ta, z, s, z, s + LEN("alt"))
+    GUI_TEXTAREA_INSERT(ta, "neu")
+    (z, s) = GUI_TEXTAREA_FIND(ta, "alt", z, s + LEN("neu"))
+WEND
+```
 
 ### Große Dateien: nur einfärben, was man sieht
 

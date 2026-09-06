@@ -10,6 +10,17 @@
 > startet `dhrt lsp` und braucht kein Python mehr; `dhrun.py --doku` reicht nur
 > noch durch. Offen aus A: `build_runtime.py` bleibt (Bau der Runtime), der
 > Installer bleibt bei PyInstaller, solange die IDE Python ist (Weg C).
+>
+> **Stand 06.09.2026, abends: Weg C hat Stufe 1.** `ide/ide.dh` (rund 760
+> Zeilen Drachenhauch) oeffnet Dateien in Reitern, faerbt ein, prueft ueber
+> `CODE_CHECK$`, zeigt Hilfe und Vervollstaendigung aus dem Sprachserver-Kern
+> (`CODE_HOVER$`, `CODE_COMPLETE`), sucht und ersetzt, startet das Programm
+> mit laufender Ausgabe (`PROCESS_*`) und reicht Eingaben durch. Dafuer kamen
+> in dhrt die drei Bausteine aus Abschnitt 2: Prozesse mit laufender Ausgabe,
+> die Textbereich-Befehle (`GUI_TEXTAREA_CURSOR/GOTO/SELECTION$/SELECT/INSERT/FIND`)
+> und die Sprachdienste als Builtins (`CODE_*`). Offen aus C: Debugger- und
+> Profiler-Fenster, Befehlspalette, Suche im Projekt, Handbuch im Fenster,
+> Drucken, Themen, Installer ohne PyInstaller -- siehe `docs/ide.md`.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

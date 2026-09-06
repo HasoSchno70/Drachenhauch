@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1723,
+ "count": 1744,
  "builtins": [
   {
    "name": "ABS",
@@ -1759,6 +1759,42 @@
    "kind": "graphics",
    "signature": "CLS(0..1 Argumente)",
    "module": "core"
+  },
+  {
+   "name": "CODE_CHECK$",
+   "kind": "core",
+   "signature": "CODE_CHECK$(quelltext$[, basis$]) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_COMPLETE",
+   "kind": "core",
+   "signature": "CODE_COMPLETE(quelltext$, zeile, spalte) AS ARRAY OF STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_DEFINITION",
+   "kind": "core",
+   "signature": "CODE_DEFINITION(quelltext$, zeile, spalte)",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_HOVER$",
+   "kind": "core",
+   "signature": "CODE_HOVER$(quelltext$, zeile, spalte) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_REFERENCES",
+   "kind": "core",
+   "signature": "CODE_REFERENCES(quelltext$, zeile, spalte) AS ARRAY OF INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_SYMBOLS$",
+   "kind": "core",
+   "signature": "CODE_SYMBOLS$(quelltext$) AS STRING",
+   "module": "dhrt"
   },
   {
    "name": "COLLIDES",
@@ -4122,6 +4158,42 @@
    "name": "GUI_TEXTAREA",
    "kind": "core",
    "signature": "GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_CURSOR",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_CURSOR(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FIND",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_GOTO",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_GOTO(ta, zeile[, spalte])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_INSERT",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_INSERT(ta, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SELECT",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SELECTION$",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SELECTION$(ta) AS STRING",
    "module": "gui"
   },
   {
@@ -7170,6 +7242,60 @@
    "name": "PRINTER_DEFAULT$",
    "kind": "core",
    "signature": "PRINTER_DEFAULT$()",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_CLOSE",
+   "kind": "core",
+   "signature": "PROCESS_CLOSE(prozess)",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_CLOSE_INPUT",
+   "kind": "core",
+   "signature": "PROCESS_CLOSE_INPUT(prozess)",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_CODE",
+   "kind": "core",
+   "signature": "PROCESS_CODE(prozess) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_ERR$",
+   "kind": "core",
+   "signature": "PROCESS_ERR$(prozess) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_KILL",
+   "kind": "core",
+   "signature": "PROCESS_KILL(prozess)",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_READ$",
+   "kind": "core",
+   "signature": "PROCESS_READ$(prozess) AS STRING",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_RUNNING",
+   "kind": "core",
+   "signature": "PROCESS_RUNNING(prozess) AS BOOLEAN",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_START",
+   "kind": "core",
+   "signature": "PROCESS_START(programm$, ...) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "PROCESS_WRITE",
+   "kind": "core",
+   "signature": "PROCESS_WRITE(prozess, text$)",
    "module": "dhrt"
   },
   {

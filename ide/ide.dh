@@ -1,0 +1,773 @@
+' ============================================================
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 1)
+' ============================================================
+'  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
+'  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
+'  die Qt-IDE im Installer (docs/entwurf-python-abbau.md, Weg C).
+'
+'  Stand 1 kann: Dateien in Reitern oeffnen, bearbeiten, sichern;
+'  Projektbaum; Syntax-Einfaerbung des sichtbaren Ausschnitts; Fehler-
+'  liste aus der Front-End-Kette (CODE_CHECK$), Klick springt zur Zeile;
+'  Hilfe zum Wort unter der Marke (CODE_HOVER$); Vervollstaendigung
+'  (Strg+Leertaste, CODE_COMPLETE); Suchen, Ersetzen, Gehe zu Zeile;
+'  Programm starten und stoppen mit laufender Ausgabe (PROCESS_*),
+'  Eingaben an INPUT durchreichen.
+'
+'  Aufruf:  dhrt run ide/ide.dh [-- datei.dh]
+'  Test:    DH_IDE_LOG=<datei> schreibt die Ereignisse zeilenweise mit --
+'           so pruefen die Tests, was die IDE getan hat, ohne ins Bild zu sehen.
+' ============================================================
+IMPORT "gui"
+IMPORT "json"
+
+CONST MAX_TABS = 12
+CONST NL = CHR$(10)
+
+' --- Farben der Einfaerbung ------------------------------------------
+CONST F_GRUND      = &HD8E4F0
+CONST F_KOMMENTAR  = &H6A8A5A
+CONST F_TEXT       = &HE0A060
+CONST F_ZAHL       = &HD07070
+CONST F_SCHLUESSEL = &H2BC4E8
+CONST F_OPERATOR   = &H9AA8B8
+
+SCREEN(1280, 800, "Drachenhauch", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(800, 500)
+SETFPS(60)
+GUI_THEME_PRESET("glas_dunkel")
+
+' --- Zustand -----------------------------------------------------------
+DIM logDatei AS STRING : logDatei = GETENV$("DH_IDE_LOG")
+' dhrt wechselt vor dem Lauf ins Verzeichnis der IDE -- der Nutzer steht
+' woanders, und DORT liegt sein Projekt (DHRT_START_DIR, von dhrt gesetzt).
+DIM startOrdner AS STRING : startOrdner = GETENV$("DHRT_START_DIR")
+IF startOrdner = "" THEN startOrdner = CWD$()
+DIM projektOrdner AS STRING : projektOrdner = startOrdner
+
+DIM tabPfade[MAX_TABS] AS STRING
+DIM tabFelder[MAX_TABS] AS GUI_WIDGET
+DIM tabGesichert[MAX_TABS] AS STRING
+DIM tabLetzterText[MAX_TABS] AS STRING
+DIM tabAnzahl AS INTEGER : tabAnzahl = 0
+DIM aktiverTab AS INTEGER : aktiverTab = -1
+
+DIM prozess AS INTEGER : prozess = -1
+DIM prozessDatei AS STRING : prozessDatei = ""
+DIM pruefungFaellig AS FLOAT : pruefungFaellig = -1.0
+DIM letzteMarke AS STRING : letzteMarke = ""
+DIM suchtext AS STRING : suchtext = ""
+DIM ersatztext AS STRING : ersatztext = ""
+DIM fertigNachStopp AS BOOLEAN : fertigNachStopp = FALSE
+
+' offene Dialoge (0 = keiner)
+DIM dlgSuche AS GUI_WINDOW : dlgSuche = 0
+DIM dlgErsetze AS GUI_WINDOW : dlgErsetze = 0
+DIM dlgZeile AS GUI_WINDOW : dlgZeile = 0
+DIM dlgEingabe AS GUI_WINDOW : dlgEingabe = 0
+DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
+DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
+DIM schliessenNachDialog AS BOOLEAN : schliessenNachDialog = FALSE
+
+SUB protokoll(text AS STRING)
+    IF logDatei = "" THEN RETURN
+    DIM f AS FILE
+    f = OPENFILE(logDatei, "a")
+    WRITELINE(f, text)
+    CLOSEFILE(f)
+END SUB
+
+' --- Hauptfenster ------------------------------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Drachenhauch", 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+GUI_WINDOW_CHROME(win, FALSE)
+GUI_WINDOW_MOVABLE(win, FALSE)
+
+' Menue
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Reiter schliessen", "Strg+W")
+DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
+DIM miSuchen AS INTEGER : miSuchen = GUI_MENU_ITEM(mBearb, "Suchen ...", "Strg+F")
+DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mBearb, "Weitersuchen", "F3")
+DIM miErsetzen AS INTEGER : miErsetzen = GUI_MENU_ITEM(mBearb, "Ersetzen ...", "Strg+H")
+DIM miZeile AS INTEGER : miZeile = GUI_MENU_ITEM(mBearb, "Gehe zu Zeile ...", "Strg+G")
+DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, "Vervollstaendigen", "Strg+Leer")
+DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definition", "F12")
+
+DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
+DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
+DIM miStopp AS INTEGER : miStopp = GUI_MENU_ITEM(mLauf, "Stoppen", "Umschalt+F5")
+DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Pruefen", "F7")
+
+DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
+DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, "Helles Thema")
+GUI_MENU_CHECK(miThema, FALSE)
+
+DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
+DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
+
+' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
+DIM baum AS GUI_WIDGET : baum = GUI_TREE(win, 0, 0, 10, 10)
+DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, "Projekt", 0, 0)
+DIM lblKeineDatei AS GUI_WIDGET : lblKeineDatei = GUI_LABEL(win, "Strg+O oeffnet eine Datei, Strg+N legt eine neue an.", 0, 0)
+DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
+DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
+DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
+DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(win, "", 0, 0)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 0, 0)
+DIM tfEingabe AS GUI_WIDGET : tfEingabe = GUI_TEXTINPUT(win, 0, 0, 10, 26, "Eingabe fuer das laufende Programm -- Enter schickt")
+DIM btnEingabe AS GUI_WIDGET : btnEingabe = GUI_BUTTON(win, "Senden", 0, 0, 80, 26)
+
+' Vervollstaendigung: ein kleines Fenster mit Liste, sonst unsichtbar.
+DIM winVervoll AS GUI_WINDOW : winVervoll = GUI_WINDOW("Vervollstaendigen", 400, 200, 320, 240)
+DIM lstVervoll AS GUI_WIDGET : lstVervoll = GUI_LISTBOX(winVervoll, 6, 6, 300, 200, [])
+GUI_WINDOW_VISIBLE(winVervoll, FALSE)
+DIM vervollPraefixLaenge AS INTEGER : vervollPraefixLaenge = 0
+DIM vervollOffen AS BOOLEAN : vervollOffen = FALSE
+
+' Alle Widgets auf jedem Reiter sichtbar -- die Reiter schalten nur die Code-Felder.
+DIM tabTitel[MAX_TABS] AS STRING
+
+DIM breiteLinks AS INTEGER : breiteLinks = 220
+DIM hoeheUnten AS INTEGER : hoeheUnten = 200
+
+SUB layout()
+    DIM w AS INTEGER : w = SCREENWIDTH()
+    DIM h AS INTEGER : h = SCREENHEIGHT()
+    GUI_WINDOW_SET_BOUNDS(win, 0, 0, w, h)
+    DIM oben AS INTEGER : oben = 30          ' unter der Menueleiste
+    DIM statusH AS INTEGER : statusH = 24
+    DIM eingabeH AS INTEGER : eingabeH = 30
+    DIM mitteH AS INTEGER : mitteH = h - oben - hoeheUnten - statusH - eingabeH - 12
+    GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
+    GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, mitteH - 22)
+    DIM ex AS INTEGER : ex = breiteLinks
+    DIM ew AS INTEGER : ew = w - breiteLinks - 8
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        ' Platz fuer die Reiterleiste oben lassen.
+        GUI_SET_BOUNDS(tabFelder[i], ex, oben + 30, ew, mitteH - 30)
+    NEXT
+    GUI_SET_BOUNDS(lblKeineDatei, ex + 10, oben + 40, ew - 20, 18)
+    GUI_SET_VISIBLE(lblKeineDatei, tabAnzahl = 0)
+    DIM uy AS INTEGER : uy = oben + mitteH + 4
+    DIM halb AS INTEGER : halb = (w - 24) \ 2
+    GUI_SET_BOUNDS(lblAusgabe, 8, uy, 200, 18)
+    GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
+    GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, 200, 18)
+    GUI_SET_BOUNDS(lstProbleme, 16 + halb, uy + 20, halb, (hoeheUnten - 20) \ 2 - 4)
+    GUI_SET_BOUNDS(lblHilfe, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, (hoeheUnten - 20) \ 2)
+    GUI_SET_WRAP(lblHilfe, halb - 8)
+    DIM ey AS INTEGER : ey = h - statusH - eingabeH - 4
+    GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
+    GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
+    GUI_SET_BOUNDS(lblStatus, 8, h - statusH, w - 16, 18)
+END SUB
+
+' --- Reiter ------------------------------------------------------------
+SUB reiterNeuSetzen()
+    DIM titel[MAX(tabAnzahl, 1)] AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        DIM t AS STRING
+        IF tabPfade[i] = "" THEN t = "Unbenannt" ELSE t = BASENAME(tabPfade[i])
+        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN t = t + " *"
+        titel[i] = t
+    NEXT
+    IF tabAnzahl = 0 THEN titel[0] = "Drachenhauch"
+    GUI_TABS(win, titel)
+    IF aktiverTab >= 0 THEN GUI_SET_ACTIVE_TAB(win, aktiverTab)
+END SUB
+
+SUB feldEinrichten(ta AS GUI_WIDGET)
+    GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+    GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+    GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+    GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+END SUB
+
+FUNCTION dateiLesen(pfad AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = READLINES(pfad)
+    RETURN JOIN$(zeilen, NL)
+END FUNCTION
+
+SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
+    IF tabAnzahl >= MAX_TABS THEN
+        GUI_SET_TEXT(lblStatus, "Hoechstens " + STR$(MAX_TABS) + " Reiter -- erst einen schliessen.")
+        RETURN
+    END IF
+    ' Schon offen? Dann nur hin.
+    DIM i AS INTEGER
+    IF pfad <> "" THEN
+        FOR i = 0 TO tabAnzahl - 1
+            IF tabPfade[i] = pfad THEN
+                aktiverTab = i
+                reiterNeuSetzen()
+                GUI_FOCUS(tabFelder[i])
+                RETURN
+            END IF
+        NEXT
+    END IF
+    DIM ta AS GUI_WIDGET
+    ta = GUI_TEXTAREA(win, 0, 0, 10, 10)
+    feldEinrichten(ta)
+    GUI_SET_TEXT(ta, inhalt)
+    GUI_SET_TAB(ta, tabAnzahl)
+    tabPfade[tabAnzahl] = pfad
+    tabFelder[tabAnzahl] = ta
+    tabGesichert[tabAnzahl] = inhalt
+    tabLetzterText[tabAnzahl] = ""
+    aktiverTab = tabAnzahl
+    tabAnzahl = tabAnzahl + 1
+    reiterNeuSetzen()
+    layout()
+    GUI_FOCUS(ta)
+    GUI_TEXTAREA_GOTO(ta, 1, 1)
+    pruefungFaellig = GET_TIME()
+    protokoll("geoeffnet " + pfad)
+END SUB
+
+SUB dateiOeffnen(pfad AS STRING)
+    IF NOT FILEEXISTS(pfad) THEN
+        GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + pfad)
+        RETURN
+    END IF
+    tabOeffnen(pfad, dateiLesen(pfad))
+    projektOrdner = DIRNAME(pfad)
+    baumFuellen()
+    GUI_SET_TEXT(lblStatus, pfad)
+END SUB
+
+FUNCTION aktivesFeld() AS GUI_WIDGET
+    IF aktiverTab < 0 THEN RETURN -1
+    RETURN tabFelder[aktiverTab]
+END FUNCTION
+
+FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
+    IF i < 0 THEN RETURN FALSE
+    DIM pfad AS STRING : pfad = tabPfade[i]
+    IF pfad = "" OR alsNeu THEN
+        pfad = FILE_SAVE_DIALOG("Sichern unter", "programm.dh", "dh")
+        IF pfad = "" THEN RETURN FALSE
+        tabPfade[i] = pfad
+    END IF
+    DIM text AS STRING : text = GUI_TEXT(tabFelder[i])
+    WRITEALL(pfad, text)
+    tabGesichert[i] = text
+    reiterNeuSetzen()
+    GUI_SET_TEXT(lblStatus, "Gesichert: " + pfad)
+    protokoll("gesichert " + pfad)
+    IF DIRNAME(pfad) <> projektOrdner THEN
+        projektOrdner = DIRNAME(pfad)
+        baumFuellen()
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+SUB tabSchliessen(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    GUI_DESTROY(tabFelder[i])
+    DIM k AS INTEGER
+    FOR k = i TO tabAnzahl - 2
+        tabPfade[k] = tabPfade[k + 1]
+        tabFelder[k] = tabFelder[k + 1]
+        tabGesichert[k] = tabGesichert[k + 1]
+        tabLetzterText[k] = tabLetzterText[k + 1]
+        GUI_SET_TAB(tabFelder[k], k)
+    NEXT
+    tabAnzahl = tabAnzahl - 1
+    IF aktiverTab >= tabAnzahl THEN aktiverTab = tabAnzahl - 1
+    reiterNeuSetzen()
+    layout()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    protokoll("geschlossen")
+END SUB
+
+' --- Projektbaum -------------------------------------------------------
+DIM baumDateien AS ARRAY OF STRING
+DIM baumKnoten AS ARRAY OF INTEGER
+
+SUB baumFuellen()
+    GUI_TREE_CLEAR(baum)
+    GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
+    baumDateien = DIRLIST(projektOrdner, "*.dh")
+    DIM n AS INTEGER : n = LEN(baumDateien)
+    DIM knoten[MAX(n, 1)] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        knoten[i] = GUI_TREE_ADD(baum, -1, baumDateien[i])
+    NEXT
+    baumKnoten = knoten
+END SUB
+
+DIM baumLetzteWahl AS INTEGER : baumLetzteWahl = -1
+
+SUB baumAbfragen()
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baum)
+    IF sel < 0 OR sel = baumLetzteWahl THEN RETURN
+    baumLetzteWahl = sel
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(baumDateien) - 1
+        IF baumKnoten[i] = sel THEN dateiOeffnen(PATHJOIN(projektOrdner, baumDateien[i]))
+    NEXT
+END SUB
+
+' --- Einfaerben (nur der sichtbare Ausschnitt) ------------------------
+FUNCTION farbeFuer(art AS STRING) AS INTEGER
+    IF art = "kommentar" THEN RETURN F_KOMMENTAR
+    IF art = "text" THEN RETURN F_TEXT
+    IF art = "zahl" THEN RETURN F_ZAHL
+    IF art = "schluessel" THEN RETURN F_SCHLUESSEL
+    IF art = "operator" THEN RETURN F_OPERATOR
+    RETURN F_GRUND
+END FUNCTION
+
+SUB faerben(ta AS GUI_WIDGET)
+    DIM erste AS INTEGER
+    DIM zeilen AS INTEGER
+    DIM von AS INTEGER
+    DIM laenge AS INTEGER
+    (erste, zeilen, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM stueck AS STRING : stueck = MID$(q, von, laenge)
+    DIM starts AS ARRAY OF INTEGER
+    DIM laengen AS ARRAY OF INTEGER
+    DIM arten AS ARRAY OF STRING
+    (starts, laengen, arten) = SYNTAX_SPANS(stueck)
+    DIM n AS INTEGER : n = LEN(starts)
+    IF n = 0 THEN RETURN
+    DIM farben[n] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        starts[i] = starts[i] + von
+        farben[i] = farbeFuer(arten[i])
+    NEXT
+    GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)
+END SUB
+
+' --- Pruefen -----------------------------------------------------------
+DIM problemZeilen AS ARRAY OF INTEGER
+
+SUB pruefen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    IF ta < 0 THEN RETURN
+    DIM basis AS STRING : basis = projektOrdner
+    IF tabPfade[aktiverTab] <> "" THEN basis = DIRNAME(tabPfade[aktiverTab])
+    DIM j AS JSON_HANDLE
+    j = JSON_PARSE(CODE_CHECK$(GUI_TEXT(ta), basis))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM zeilen[MAX(n, 1)] AS INTEGER
+    DIM i AS INTEGER
+    DIM fehler AS INTEGER : fehler = 0
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = STR$(i)
+        zeilen[i] = JSON_GET_INT(j, p + ".zeile")
+        DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
+        IF art = "fehler" THEN fehler = fehler + 1
+        GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
+        IF art = "fehler" THEN GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060) ELSE GUI_LISTBOX_COLOR(lstProbleme, i, &HE0C060)
+    NEXT
+    problemZeilen = zeilen
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblProbleme, "Probleme: keine")
+    ELSE
+        GUI_SET_TEXT(lblProbleme, "Probleme: " + STR$(fehler) + " Fehler, " + STR$(n - fehler) + " Warnungen")
+    END IF
+    protokoll("geprueft " + STR$(n))
+END SUB
+
+SUB problemAnspringen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
+    IF sel < 0 OR sel >= LEN(problemZeilen) THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_TEXTAREA_GOTO(ta, problemZeilen[sel], 1)
+    GUI_FOCUS(ta)
+END SUB
+
+' --- Hilfe zum Wort unter der Marke ----------------------------------
+SUB hilfeNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM marke AS STRING : marke = STR$(z) + ":" + STR$(s)
+    IF marke = letzteMarke THEN RETURN
+    letzteMarke = marke
+    GUI_SET_TEXT(lblStatus, "Zeile " + STR$(z) + ", Spalte " + STR$(s))
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, s)
+    ' Die Markdown-Zaeune weglassen -- die Beschriftung zeigt Text.
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, NL + "```", "")
+    md = REPLACE$(md, "```", "")
+    GUI_SET_TEXT(lblHilfe, md)
+END SUB
+
+' --- Vervollstaendigen -------------------------------------------------
+SUB vervollstaendigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM namen AS ARRAY OF STRING
+    namen = CODE_COMPLETE(q, z, s)
+    ' Laenge des Praefixes links der Marke -- so viel wird beim Uebernehmen ersetzt.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM k AS INTEGER : k = s - 1
+    vervollPraefixLaenge = 0
+    WHILE k > 0
+        DIM c AS STRING : c = MID$(zeile, k - 1, 1)
+        IF NOT (c = "_" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")) THEN BREAK
+        vervollPraefixLaenge = vervollPraefixLaenge + 1
+        k = k - 1
+    WEND
+    GUI_LISTBOX_CLEAR(lstVervoll)
+    DIM i AS INTEGER
+    FOR i = 0 TO MIN(LEN(namen), 200) - 1
+        GUI_LISTBOX_ADD(lstVervoll, namen[i])
+    NEXT
+    IF LEN(namen) = 0 THEN RETURN
+    GUI_LISTBOX_SET_SELECTED(lstVervoll, 0)
+    GUI_WINDOW_SET_BOUNDS(winVervoll, breiteLinks + 40, 120, 320, 240)
+    GUI_WINDOW_VISIBLE(winVervoll, TRUE)
+    vervollOffen = TRUE
+    GUI_FOCUS(lstVervoll)
+END SUB
+
+SUB vervollUebernehmen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVervoll)
+    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
+    vervollOffen = FALSE
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF sel >= 0 THEN
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        GUI_TEXTAREA_SELECT(ta, z, s - vervollPraefixLaenge, z, s)
+        GUI_TEXTAREA_INSERT(ta, GUI_LISTBOX_ITEM(lstVervoll, sel))
+        protokoll("vervollstaendigt " + GUI_LISTBOX_ITEM(lstVervoll, sel))
+    END IF
+    GUI_FOCUS(ta)
+END SUB
+
+' --- Suchen / Ersetzen / Zeile ----------------------------------------
+FUNCTION weitersuchen(abNaechstem AS BOOLEAN) AS BOOLEAN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR suchtext = "" THEN RETURN FALSE
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    IF abNaechstem THEN s = s + 1
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, z, s)
+    IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, 1, 1)
+    IF tz < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Nicht gefunden: " + suchtext)
+        RETURN FALSE
+    END IF
+    GUI_TEXTAREA_SELECT(ta, tz, ts, tz, ts + LEN(suchtext))
+    GUI_FOCUS(ta)
+    RETURN TRUE
+END FUNCTION
+
+SUB zurDefinition()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM dz AS INTEGER
+    DIM ds AS INTEGER
+    (dz, ds) = CODE_DEFINITION(GUI_TEXT(ta), z, s)
+    IF dz < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Keine Definition in dieser Datei.")
+        RETURN
+    END IF
+    GUI_TEXTAREA_GOTO(ta, dz, ds)
+END SUB
+
+' --- Ausfuehren --------------------------------------------------------
+SUB ausgabe(zeile AS STRING)
+    GUI_LISTBOX_ADD(lstAusgabe, zeile)
+    IF GUI_LISTBOX_COUNT(lstAusgabe) > 2000 THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
+    GUI_LISTBOX_SET_SELECTED(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1)
+END SUB
+
+DIM ausgabeRest AS STRING : ausgabeRest = ""
+
+SUB ausgabeVerteilen(text AS STRING)
+    IF text = "" THEN RETURN
+    ausgabeRest = ausgabeRest + text
+    WHILE INSTR(ausgabeRest, NL) >= 0
+        DIM p AS INTEGER : p = INSTR(ausgabeRest, NL)
+        DIM z AS STRING : z = LEFT$(ausgabeRest, p)
+        z = REPLACE$(z, CHR$(13), "")
+        ausgabe(z)
+        ausgabeRest = MID$(ausgabeRest, p + 1)
+    WEND
+END SUB
+
+SUB starten()
+    IF aktiverTab < 0 THEN RETURN
+    IF prozess >= 0 THEN
+        GUI_SET_TEXT(lblStatus, "Es laeuft noch ein Programm -- erst stoppen (Umschalt+F5).")
+        RETURN
+    END IF
+    IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
+        IF NOT sichern(aktiverTab, FALSE) THEN RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstAusgabe)
+    ausgabeRest = ""
+    prozessDatei = tabPfade[aktiverTab]
+    prozess = PROCESS_START("dhrt", "run", prozessDatei)
+    GUI_SET_TEXT(lblAusgabe, "Ausgabe: " + BASENAME(prozessDatei) + " laeuft ...")
+    GUI_SET_TEXT(lblStatus, "Gestartet: " + prozessDatei)
+    protokoll("gestartet " + prozessDatei)
+END SUB
+
+SUB stoppen()
+    IF prozess < 0 THEN RETURN
+    PROCESS_KILL(prozess)
+    fertigNachStopp = TRUE
+END SUB
+
+SUB prozessNachsehen()
+    IF prozess < 0 THEN RETURN
+    ausgabeVerteilen(PROCESS_READ$(prozess))
+    DIM err AS STRING : err = PROCESS_ERR$(prozess)
+    IF err <> "" THEN ausgabeVerteilen(err)
+    IF NOT PROCESS_RUNNING(prozess) THEN
+        ausgabeVerteilen(PROCESS_READ$(prozess))
+        IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
+        DIM code AS INTEGER : code = PROCESS_CODE(prozess)
+        PROCESS_CLOSE(prozess)
+        prozess = -1
+        IF fertigNachStopp THEN
+            GUI_SET_TEXT(lblAusgabe, "Ausgabe: gestoppt")
+            protokoll("gestoppt")
+        ELSE
+            GUI_SET_TEXT(lblAusgabe, "Ausgabe: beendet mit Code " + STR$(code))
+            protokoll("beendet " + STR$(code))
+        END IF
+        fertigNachStopp = FALSE
+    END IF
+END SUB
+
+SUB eingabeSenden()
+    DIM t AS STRING : t = GUI_TEXT(tfEingabe)
+    IF prozess < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein Programm laeuft.")
+        RETURN
+    END IF
+    PROCESS_WRITE(prozess, t + NL)
+    ausgabe("> " + t)
+    GUI_SET_TEXT(tfEingabe, "")
+END SUB
+
+' --- Beenden mit Rueckfrage ------------------------------------------
+FUNCTION ungesichert() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+DIM beenden AS BOOLEAN : beenden = FALSE
+
+SUB beendenAnfragen()
+    IF ungesichert() THEN
+        dlgSchliessen = GUI_DIALOG("Beenden", "Es gibt ungesicherte Aenderungen.", "Alle sichern|Verwerfen|Abbrechen")
+    ELSE
+        beenden = TRUE
+    END IF
+END SUB
+
+' --- Start -------------------------------------------------------------
+layout()
+reiterNeuSetzen()
+baumFuellen()
+' ARG$ zaehlt ab 0: das erste Wort hinter `--`.
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    ' relativ heisst: relativ zum Ort des Nutzers, nicht zum Ort der IDE
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        startDatei = PATHJOIN(startOrdner, startDatei)
+    END IF
+    IF FILEEXISTS(startDatei) THEN dateiOeffnen(startDatei) ELSE GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + startDatei)
+END IF
+protokoll("projekt " + projektOrdner)
+protokoll("bereit")
+
+DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
+DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
+DIM letzterTab AS INTEGER : letzterTab = -1
+DIM hell AS BOOLEAN : hell = FALSE
+
+WHILE NOT QUITREQUESTED() AND NOT beenden
+    GUI_UPDATE()
+    IF WINDOW_RESIZED() OR SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
+        warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
+        layout()
+    END IF
+
+    ' Reiterwechsel durch Klick auf die Leiste
+    IF tabAnzahl > 0 AND GUI_ACTIVE_TAB(win) <> aktiverTab THEN
+        aktiverTab = GUI_ACTIVE_TAB(win)
+        letzteMarke = ""
+        pruefungFaellig = GET_TIME()
+    END IF
+
+    ' --- Menue ---
+    IF GUI_CLICKED(miNeu) THEN tabOeffnen("", "")
+    IF GUI_CLICKED(miOeffnen) THEN
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Datei oeffnen", "dh")
+        IF p <> "" THEN dateiOeffnen(p)
+    END IF
+    IF GUI_CLICKED(miSichern) THEN sichern(aktiverTab, FALSE)
+    IF GUI_CLICKED(miSichernAls) THEN sichern(aktiverTab, TRUE)
+    IF GUI_CLICKED(miSchliessen) THEN tabSchliessen(aktiverTab)
+    IF GUI_CLICKED(miBeenden) THEN beendenAnfragen()
+    IF GUI_CLICKED(miSuchen) THEN dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
+    IF GUI_CLICKED(miWeiter) THEN weitersuchen(TRUE)
+    IF GUI_CLICKED(miErsetzen) THEN dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
+    IF GUI_CLICKED(miZeile) THEN dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
+    IF GUI_CLICKED(miVervoll) THEN vervollstaendigen()
+    IF GUI_CLICKED(miDefinition) THEN zurDefinition()
+    IF GUI_CLICKED(miStart) THEN starten()
+    IF GUI_CLICKED(miStopp) THEN stoppen()
+    IF GUI_CLICKED(miPruefen) THEN pruefen()
+    IF GUI_CLICKED(miThema) THEN
+        hell = NOT hell
+        GUI_MENU_CHECK(miThema, hell)
+        IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
+    END IF
+    IF GUI_CLICKED(miUeber) THEN dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 1 -- geschrieben in Drachenhauch.", "ok")
+
+    ' --- Dialoge auswerten ---
+    IF dlgSuche <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSuche)
+        IF a = 1 THEN
+            suchtext = GUI_DIALOG_TEXT(dlgSuche)
+            dlgSuche = 0
+            IF schliessenNachDialog THEN
+                schliessenNachDialog = FALSE
+                dlgErsetze = GUI_PROMPT("Ersetzen", "Ersetzen durch:", ersatztext)
+            ELSE
+                weitersuchen(FALSE)
+            END IF
+        ELSEIF a = 2 THEN
+            dlgSuche = 0 : schliessenNachDialog = FALSE
+        END IF
+    END IF
+    IF dlgErsetze <> 0 THEN
+        DIM a2 AS INTEGER : a2 = GUI_ANSWER(dlgErsetze)
+        IF a2 = 1 THEN
+            ersatztext = GUI_DIALOG_TEXT(dlgErsetze)
+            dlgErsetze = 0
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            DIM anzahl AS INTEGER : anzahl = 0
+            IF ta >= 0 THEN
+                GUI_TEXTAREA_GOTO(ta, 1, 1)
+                DIM tz AS INTEGER
+                DIM ts AS INTEGER
+                (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, 1, 1)
+                WHILE tz >= 0 AND anzahl < 10000
+                    GUI_TEXTAREA_SELECT(ta, tz, ts, tz, ts + LEN(suchtext))
+                    GUI_TEXTAREA_INSERT(ta, ersatztext)
+                    anzahl = anzahl + 1
+                    (tz, ts) = GUI_TEXTAREA_FIND(ta, suchtext, tz, ts + LEN(ersatztext))
+                WEND
+            END IF
+            GUI_SET_TEXT(lblStatus, STR$(anzahl) + " mal ersetzt.")
+            protokoll("ersetzt " + STR$(anzahl))
+        ELSEIF a2 = 2 THEN
+            dlgErsetze = 0
+        END IF
+    END IF
+    IF dlgZeile <> 0 THEN
+        DIM a3 AS INTEGER : a3 = GUI_ANSWER(dlgZeile)
+        IF a3 = 1 THEN
+            DIM zt AS STRING : zt = GUI_DIALOG_TEXT(dlgZeile)
+            dlgZeile = 0
+            DIM ta2 AS GUI_WIDGET : ta2 = aktivesFeld()
+            IF ta2 >= 0 AND VAL(zt) >= 1 THEN GUI_TEXTAREA_GOTO(ta2, INT(VAL(zt)), 1) : GUI_FOCUS(ta2)
+        ELSEIF a3 = 2 THEN
+            dlgZeile = 0
+        END IF
+    END IF
+    IF dlgSchliessen <> 0 THEN
+        DIM a4 AS INTEGER : a4 = GUI_ANSWER(dlgSchliessen)
+        IF a4 = 1 THEN
+            DIM i AS INTEGER
+            DIM alles AS BOOLEAN : alles = TRUE
+            FOR i = 0 TO tabAnzahl - 1
+                IF GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN
+                    IF NOT sichern(i, FALSE) THEN alles = FALSE
+                END IF
+            NEXT
+            dlgSchliessen = 0
+            IF alles THEN beenden = TRUE
+        ELSEIF a4 = 2 THEN
+            dlgSchliessen = 0 : beenden = TRUE
+        ELSEIF a4 = 3 THEN
+            dlgSchliessen = 0
+        END IF
+    END IF
+    IF dlgUeber <> 0 THEN
+        IF GUI_ANSWER(dlgUeber) <> 0 THEN dlgUeber = 0
+    END IF
+
+    ' --- Vervollstaendigung: Enter/Doppelklick uebernimmt, ESC schliesst ---
+    IF vervollOffen THEN
+        IF GUI_DOUBLE_CLICKED(lstVervoll) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstVervoll) THEN vervollUebernehmen()
+        IF KEYHIT(KEY_ESCAPE) THEN GUI_WINDOW_VISIBLE(winVervoll, FALSE) : vervollOffen = FALSE : GUI_FOCUS(aktivesFeld())
+    END IF
+
+    ' --- Baum, Probleme, Eingabe ---
+    baumAbfragen()
+    IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+    IF GUI_CLICKED(btnEingabe) OR GUI_ENTERED(tfEingabe) THEN eingabeSenden()
+
+    ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---
+    IF aktiverTab >= 0 THEN
+        DIM tf AS GUI_WIDGET : tf = tabFelder[aktiverTab]
+        DIM jetzt AS STRING : jetzt = GUI_TEXT(tf)
+        IF jetzt <> tabLetzterText[aktiverTab] THEN
+            tabLetzterText[aktiverTab] = jetzt
+            pruefungFaellig = GET_TIME() + 0.6
+            reiterNeuSetzen()
+        END IF
+        faerben(tf)
+        hilfeNachziehen()
+        IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
+            pruefungFaellig = -1.0
+            pruefen()
+        END IF
+    END IF
+
+    prozessNachsehen()
+
+    CLS(&H0B1119)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+IF prozess >= 0 THEN PROCESS_KILL(prozess)
+protokoll("ende")

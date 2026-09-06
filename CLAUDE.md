@@ -605,7 +605,7 @@ danebengeklickt meldet nichts).
 
 **Text und Formular** (2026-09-04, Punkt 1 des gui-Ausbaus -- Ziel: dass Drachenhauch genannt wird, wenn jemand fragt, womit er eine Anwendung schreiben soll): `GUI_SET_ALIGN(wdg, links|mitte|rechts)` fuer Beschriftung/Knopf/Textfeld; `GUI_SET_WRAP(label, breite)` bricht an Wortgrenzen um, die HOEHE folgt dem Text -- gemessen in `umbruch_layout` (in GUI_UPDATE, weil nur dort Graphics und Schreibzugriff zusammenkommen; das Zeichnen ist `&self`); `GUI_TEXTINPUT_SET(tf, key$, wert)` mit `passwort` (Punkte statt Zeichen -- Treffertest und Rollen messen an den PUNKTEN, sonst sitzt die Schreibmarke neben dem Text), `nur_lesen`, `maxlaenge` (schneidet ab, auch beim Einfuegen), `zahlen` (1 ganz, 2 Komma; Zwischenstand `-` erlaubt, sonst liesse sich keine negative Zahl tippen); `GUI_ENTERED`/`GUI_ON_ENTER`; **Strg+Z/Y in Textfeld und Textbereich** (Anschlaege innerhalb 0,8 s = EIN Schritt; `GUI_SET_TEXT` leert den Verlauf); `GUI_WINDOW_DEFAULT`/`GUI_WINDOW_CANCEL` (Enter/ESC druecken den Knopf -- aber die Taste gehoert zuerst dem Widget mit Fokus: Knopf/Kaestchen nehmen Enter selbst, Textbereich macht einen Umbruch, Zelle in Bearbeitung ihr Ende; aus einem TEXTFELD heraus ist Enter das Abschicken; der Standard-Knopf traegt den Akzent als Rahmen). Alles in der `.dhform` (auch der Tooltip -- der fehlte dort bisher) und im Form-Designer (Inspector + Codegen). **Testfalle:** raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber KEINE Zeichen in die Zeichenwarteschlange -- Tests tippen ueber die Zwischenablage mit Strg+V, das laeuft durch dieselben Filter. Tests `tests/test_gui_text_formular.py`, Doku `docs/module-gui.md`.
 
-**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild im Fenster mit Fokus geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/test_gui_menu_ausbau.py`, Beispiel `examples/129_gui_menu.dh`.
+**Menues** (2026-09-04, Punkt 2 des gui-Ausbaus): `GUI_MENU_ITEM(menu, label$[, kuerzel$])` / `GUI_MENU_SHORTCUT` -- Kuerzel werden als Text geschrieben (`Strg+S`, `Alt+Enter`, `F5`, `Entf`, deutsch oder englisch; `kuerzel_parsen` in gui.rs mit Rust-Tests, unbekannte Taste = Fehler beim Anlegen statt eines still stummen Kuerzels) und jedes Bild im Fenster mit Fokus geprueft (`kuerzel_pruefen`), auch bei geschlossenem Menue; die Modifier muessen GENAU passen, und **ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus** (ein `Entf`-Kuerzel loescht dort ein Zeichen) -- AUSSER F1..F12 (`ist_funktionstaste`, seit 2026-09-06: die IDE in Drachenhauch startete per F5 nie, weil das Code-Feld den Fokus hatte). `GUI_SUBMENU` (beliebig tief; `sub_chain` = offene Untermenues, `untermenues_folgen` oeffnet beim Ueberfahren und schliesst NICHT, wenn die Maus neben allen Popups ist -- sonst klappt es beim schraegen Hinueberfahren zu; ein Untermenue ist nie Kontextmenue, `Menu::unter`), `GUI_MENU_CHECK`/`GUI_MENU_CHECKED` (Klick oder Kuerzel kippt), `GUI_MENU_ENABLE` (gesperrt = kein Klick, kein Kuerzel), `GUI_MENU_ICON`, `GUI_MENU_TEXT`. Popup-Layout aus EINER Quelle `popup_layout` (Treffertest + Zeichnen). In der `.dhform` verschachtelt (`items` am Eintrag, `shortcut`, `checkable`/`checked`); der Form-Designer bearbeitet Menues nicht, schreibt sie aber jetzt in den GB-Code (`_gb_menus`). **Testfalle:** raylib meldet beim Lesen mancher Aufnahmedateien "Issue reading line to buffer" auf stdout, die Ereignisse kommen trotzdem an -- Tests filtern `WARNING:`-Zeilen. Tests `tests/test_gui_menu_ausbau.py`, Beispiel `examples/129_gui_menu.dh`.
 
 **Listen** (2026-09-04, Punkt 3 des gui-Ausbaus): Eintraege einzeln (`GUI_LISTBOX_ADD/REMOVE/CLEAR/COUNT/ITEM/SET_ITEM/MOVE`, auch fuer Klapplisten -- vorher ging nur `GUI_SET_LISTBOX` als Ganzes; die Auswahl rueckt beim Einfuegen/Loeschen davor MIT, sie meint denselben Eintrag), `GUI_LISTBOX_SET(lb, "kaestchen"|"mehrfachauswahl", 1)`, `GUI_LISTBOX_ICON/COLOR` je Eintrag, `GUI_LISTBOX_CHECKED/SET_CHECKED`, Mehrfachauswahl mit denselben Abfragen wie die Tabelle (`IS_SELECTED/SELECT/SEL_COUNT/SEL_ROW/CLEAR_SELECTION`; Strg+Klick sammelt, Umschalt+Klick spannt vom Anker, ein Pfeil setzt die Menge auf eine Zeile), `GUI_DOUBLE_CLICKED` (bisher nur Listen). Zusatzzustand in `ListState` (`Widget::list`, nur bei Bedarf angelegt -- eine schlichte Liste bleibt, was sie war; `sync` haelt die Vektoren mit `items` gleich lang). **Ein Klick aufs Kaestchen kippt NUR den Haken**, die Auswahl bleibt -- sonst waehlte man beim Abhaken jedes Mal um. `handle_press` hat kein `g`, Strg/Umschalt kommen deshalb ueber `tasten_mod`, das `update` vor dem Druck fuellt. In der `.dhform` unter `list` (Sinnbilder nicht -- Textur-Handles). Designer: zwei Schalter im Inspector, Codegen. Tests `tests/test_gui_listen.py` (Klicks mit Strg/Umschalt echt eingespeist; der Versatz kommt aus einer Zeichenflaeche bei (0,0)), Beispiel `examples/192_gui_listen.dh`.
 
@@ -2563,6 +2563,40 @@ solange die IDE Python ist), `tools/*.js` (Node, Buch). **Falle beim Bau:**
 `serde` musste als direkte Abhaengigkeit dazu (fuer den 1-Leerzeichen-
 Einzug der JSON-Ausgabe; nur `serde_json` reichte nicht, weil der Trait
 `Serialize` aus `serde` kommt).
+
+## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1, 2026-09-06)
+
+`ide/ide.dh` (~760 Zeilen) ist die IDE als Drachenhauch-Programm, gestartet
+mit `dhrt run ide/ide.dh [-- datei.dh]`; Doku `docs/ide.md`. Stufe 1: Reiter
+mit Code-Feldern, Projektbaum, Einfaerbung des sichtbaren Ausschnitts,
+Fehlerliste (0,6 s nach der letzten Aenderung), Hilfe zum Wort,
+Vervollstaendigung, Suchen/Ersetzen/Gehe zu Zeile, Zur Definition, Starten
+mit laufender Ausgabe und Eingabezeile. **Drei Bausteine kamen dafuer in
+dhrt** -- alle ohne IMPORT: (1) `prozess.rs` + `PROCESS_START/READ$/ERR$/
+WRITE/CLOSE_INPUT/RUNNING/CODE/KILL/CLOSE` (Faeden lesen stdout/stderr
+zeilenweise in Puffer, wie `WINDOW_RECV$`; "dhrt" als Programm = eigene Exe;
+`DHRT_FRAMES`/`SCREENSHOT`/`CONTACT*` werden dem Kind genommen; Windows
+`CREATE_NO_WINDOW`). **Falle:** ein `dhrt run`-Kind an einer Leitung sammelt
+PRINT in `self.out` und schreibt erst am `flush_out()`-Punkt -- die IDE
+saehe alles am Ende auf einmal. `PROCESS_START` setzt deshalb `DHRT_LIVE=1`,
+und die VM flusht dann nach jeder PRINT-Zeile (`live_ausgabe()` in vm.rs,
+einmal gelesen). (2) `CODE_CHECK$/HOVER$/COMPLETE/DEFINITION/REFERENCES/
+SYMBOLS$` = derselbe Kern wie `dhrt lsp` (`lsp::diagnose` usw.), Positionen
+1-basiert, Ergebnisse als JSON-Text bzw. ARRAY/TUPLE. (3) `GUI_TEXTAREA_
+CURSOR/GOTO/SELECTION$/SELECT/INSERT/FIND` (gui.rs nach `textarea_view`;
+GOTO/SELECT brauchen Grafik, weil sie den sichtbaren Ausschnitt nachziehen;
+INSERT ersetzt eine Auswahl, schreibt Undo und feuert on_change). **Fallen
+in der IDE:** `dhrt run` wechselt ins Verzeichnis der Quelle (`ide/`) -- den
+Ort des Aufrufers hinterlegt dhrt seit 2026-09-06 als `DHRT_START_DIR`
+(`ins_quellverzeichnis` in main.rs, alle vier chdir-Stellen), die IDE nimmt
+ihn fuer Projektbaum und relatives Argument; `ARG$` ist 0-basiert (`ARG$(0)` = erstes Argument nach `--`);
+`GUI_WINDOW_VISIBLE` hat keinen Getter -> eigenes Flag fuer das
+Vervollstaendigungs-Fenster; eine Wiedergabe-Taste bleibt gedrueckt, bis
+KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/test_ide_bausteine.py`
+(Bausteine einzeln, Fenster ausserhalb des Schirms) und `tests/test_ide.py`
+(die IDE ueber `DH_IDE_LOG` + `AUTOMATION_PLAY`, seriell). Offen: Debugger/
+Profiler-Fenster, Suche im Projekt, Befehlspalette, Handbuch, Drucken,
+Installer ohne PyInstaller -- dann Weg B (Editoren), D nebenher.
 
 ## Sprachserver `dhrt lsp` + VS-Code-Erweiterung
 

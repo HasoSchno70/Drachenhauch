@@ -89,6 +89,7 @@ entworfen, empfohlen; entschieden ist nichts davon.
 ### Werkzeug
 
 - **[Die Werkzeuge um die Sprache](werkzeuge.md)** — `dhrt --version`, `dhrt test` (Prüfprogramme laufen lassen), `dhrt fmt` (einheitlich schreiben), `dhrt --check`, `dhrun.py --doku` (Referenz aus dem Quelltext)
+- **[Die IDE in Drachenhauch (`ide/ide.dh`)](ide.md)** — die Entwicklungsumgebung, geschrieben in der Sprache, die sie bedient (Stand 1: Reiter, Pruefung, Hilfe, Vervollstaendigung, Suchen, Starten mit laufender Ausgabe)
 - **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
 - **[Sprite-Editor (`dhsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
 - **[Tilemap-Editor (`dhtilemap`)](tilemap-editor.md)** — Level bauen, Tiled-JSON lesen und schreiben
