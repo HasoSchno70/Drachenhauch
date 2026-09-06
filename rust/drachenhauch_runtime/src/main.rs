@@ -68,6 +68,7 @@ mod symbole;
 mod lsp;
 mod doku;
 mod pruef;
+mod prozess;
 mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
@@ -946,6 +947,18 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
 /// Profile-Daten trotzdem ausgegeben (`stopped:true`). Damit lassen sich
 /// Endlos-Loops (Grafik-Render-Loop, `WHILE TRUE`) profilieren, ohne dass ein
 /// harter Prozess-Kill die Auswertung verschluckt.
+/// Ins Verzeichnis der Quelle wechseln (relative Asset- und IMPORT-Pfade)
+/// -- und vorher das Verzeichnis des AUFRUFERS als `DHRT_START_DIR`
+/// hinterlegen: nach dem Wechsel kann kein Programm es mehr erfragen, und
+/// ein Werkzeug wie die IDE (`ide/ide.dh -- spiel.dh`) meint mit einem
+/// relativen Namen den Ort, an dem der Nutzer steht, nicht den der IDE.
+fn ins_quellverzeichnis(base: &std::path::Path) {
+    if let Ok(hier) = std::env::current_dir() {
+        std::env::set_var("DHRT_START_DIR", hier);
+    }
+    let _ = std::env::set_current_dir(base);
+}
+
 fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path).map(strip_extended_prefix).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -954,7 +967,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
         Ok(t) => t,
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
-    let _ = std::env::set_current_dir(&base);
+    ins_quellverzeichnis(&base);
     let json = match compile_source(&raw_source, &base, &label) {
         Ok(j) => j,
         Err(code) => return code,
@@ -1020,7 +1033,7 @@ fn debug_main(path: &str) -> ExitCode {
         Ok(t) => t,
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
-    let _ = std::env::set_current_dir(&base);
+    ins_quellverzeichnis(&base);
     let json = match compile_source(&raw_source, &base, &label) {
         Ok(j) => j,
         Err(code) => return code,
@@ -1203,7 +1216,7 @@ fn run_main(path: &str) -> ExitCode {
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
     // Ins Datei-Verzeichnis wechseln (wie dhrun.py os.chdir(file.parent)).
-    let _ = std::env::set_current_dir(&base);
+    ins_quellverzeichnis(&base);
     // TASK_START braucht den eigenen Dateinamen, um `dhrt call` darauf zu
     // starten. Nach dem chdir genuegt der blosse Name.
     builtins::set_quelldatei(label.clone());
@@ -1222,7 +1235,7 @@ fn call_main(path: &str, fn_name: &str, args: Vec<String>) -> ExitCode {
         Ok(t) => t,
         Err(e) => { return call_fehler(&format!("Kann {} nicht lesen: {}", path, e)); }
     };
-    let _ = std::env::set_current_dir(&base);
+    ins_quellverzeichnis(&base);
     builtins::set_quelldatei(label.clone());
     match compile_source(&raw_source, &base, &label) {
         Ok(json) => call_program_value(json, fn_name, args),

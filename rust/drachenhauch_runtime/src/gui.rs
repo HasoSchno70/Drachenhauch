@@ -1142,6 +1142,11 @@ impl MenuItem {
 /// Tastenkuerzel lesen: "Strg+S", "Strg+Umschalt+O", "F5", "Entf", "Alt+Enter".
 /// Deutsche und englische Namen, Gross-/Kleinschreibung egal. Liefert
 /// (Modifier-Bits, gui-Tastencode) -- derselbe Code-Raum wie KEY_*.
+/// F1..F12 (Codes aus `vm::DEFAULT_KEYS`, zusammenhaengend).
+fn ist_funktionstaste(code: i64) -> bool {
+    (1073741882..=1073741893).contains(&code)
+}
+
 fn kuerzel_parsen(s: &str) -> Result<(u8, i64), String> {
     let mut mods = 0u8;
     let mut code = 0i64;
@@ -3560,7 +3565,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         'suche: for (mi, m) in self.windows[top].menus.iter().enumerate() {
             for (ii, it) in m.items.iter().enumerate() {
                 if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
-                if text_fokus && (mods & 5) == 0 { continue; }
+                // Ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus (Entf
+                // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
+                // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
+                if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
                 if g.key_pressed(it.k_code) { treffer = Some((mi, ii)); break 'suche; }
             }
         }
@@ -6364,6 +6372,133 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let von = starts[erste];
         let bis = if letzte < starts.len() { starts[letzte].saturating_sub(1) } else { chars.len() };
         Ok((erste as i64, zeilen as i64, von as i64, bis.saturating_sub(von) as i64))
+    }
+
+    // --- Textbereich-Befehle fuer Editoren (Weg C) --------------------------
+    // Zeilen und Spalten zaehlen ab 1, in ZEICHEN (wie GUI_TEXTAREA_VIEW und
+    // die Fehlermeldungen von --check). Alle Rechnungen gehen ueber den
+    // Zeichen-Index `caret`, denselben, den das Editieren fuehrt.
+
+    fn ta_wdg(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let wd = self.wdg(h, fn_)?;
+        if wd.kind != Kind::TextArea { return Err(format!("{}: das Widget ist kein GUI_TEXTAREA", fn_)); }
+        Ok(wd)
+    }
+
+    /// Zeichen-Index -> (Zeile, Spalte), beide ab 1.
+    fn ta_zeile_spalte(chars: &[char], idx: usize) -> (i64, i64) {
+        let idx = idx.min(chars.len());
+        let starts = Self::line_starts(chars);
+        let z = starts.iter().rposition(|&s| s <= idx).unwrap_or(0);
+        (z as i64 + 1, (idx - starts[z]) as i64 + 1)
+    }
+
+    /// (Zeile, Spalte) ab 1 -> Zeichen-Index, an die Grenzen geklemmt.
+    fn ta_index(chars: &[char], zeile: i64, spalte: i64) -> usize {
+        let starts = Self::line_starts(chars);
+        let z = (zeile.max(1) as usize - 1).min(starts.len() - 1);
+        let ende = if z + 1 < starts.len() { starts[z + 1] - 1 } else { chars.len() };
+        (starts[z] + (spalte.max(1) as usize - 1)).min(ende)
+    }
+
+    /// GUI_TEXTAREA_CURSOR: Zeile und Spalte der Schreibmarke.
+    pub fn textarea_cursor(&self, h: i64) -> Result<(i64, i64), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_CURSOR")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        Ok(Self::ta_zeile_spalte(&chars, wd.caret.max(0) as usize))
+    }
+
+    /// GUI_TEXTAREA_SELECTION$: der markierte Text (leer ohne Auswahl).
+    pub fn textarea_selection(&self, h: i64) -> Result<String, String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_SELECTION$")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let n = chars.len() as i32;
+        let (lo, hi) = (wd.caret.clamp(0, n).min(wd.sel_anchor.clamp(0, n)), wd.caret.clamp(0, n).max(wd.sel_anchor.clamp(0, n)));
+        Ok(chars[lo as usize..hi as usize].iter().collect())
+    }
+
+    /// Den Ausschnitt so legen, dass die Marke zu sehen ist -- mittig, damit
+    /// nach einem Sprung Umgebung da ist; die Editierschleife klemmt danach.
+    fn ta_marke_zeigen(&mut self, g: &Graphics, h: i64) -> Result<(), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let lh = self.ta_line_h(g);
+        let sicht = ((wd.h - 2 * 5) / lh).max(1);
+        let rows = self.ta_rows(g, wd, &chars, &starts, self.ta_breite(g, wd, starts.len()));
+        let crow = Self::ta_row_of(&rows, wd.caret.max(0) as usize) as i32;
+        let max_scroll = (rows.len() as i32 - sicht).max(0);
+        let scroll = (crow - sicht / 2).clamp(0, max_scroll);
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_GOTO")?;
+        w.scroll = scroll;
+        w.scroll_x = 0;
+        Ok(())
+    }
+
+    /// GUI_TEXTAREA_GOTO(ta, zeile[, spalte]): Marke setzen, Auswahl aufheben,
+    /// Ausschnitt nachziehen.
+    pub fn textarea_goto(&mut self, g: &Graphics, h: i64, zeile: i64, spalte: i64) -> Result<(), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_GOTO")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let idx = Self::ta_index(&chars, zeile, spalte) as i32;
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_GOTO")?;
+        w.caret = idx; w.sel_anchor = idx;
+        self.ta_marke_zeigen(g, h)
+    }
+
+    /// GUI_TEXTAREA_SELECT(ta, z1, s1, z2, s2): Bereich markieren, Marke am Ende.
+    pub fn textarea_select(&mut self, g: &Graphics, h: i64, z1: i64, s1: i64, z2: i64, s2: i64) -> Result<(), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_SELECT")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let a = Self::ta_index(&chars, z1, s1) as i32;
+        let b = Self::ta_index(&chars, z2, s2) as i32;
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_SELECT")?;
+        w.sel_anchor = a; w.caret = b;
+        self.ta_marke_zeigen(g, h)
+    }
+
+    /// GUI_TEXTAREA_INSERT(ta, text$): ersetzt die Auswahl bzw. fuegt an der
+    /// Marke ein -- als eigener Undo-Schritt, mit on_change wie beim Tippen.
+    pub fn textarea_insert(&mut self, h: i64, text: &str, jetzt: f64) -> Result<(), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_INSERT")?;
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_INSERT")?;
+        let before = w.text.clone();
+        let mut chars: Vec<char> = before.chars().collect();
+        let n = chars.len() as i32;
+        let (lo, hi) = (w.caret.clamp(0, n).min(w.sel_anchor.clamp(0, n)), w.caret.clamp(0, n).max(w.sel_anchor.clamp(0, n)));
+        let caret0 = w.caret;
+        chars.drain(lo as usize..hi as usize);
+        let neu: Vec<char> = text.chars().filter(|c| *c == '\n' || *c == '\t' || !c.is_control()).collect();
+        for (k, ch) in neu.iter().enumerate() { chars.insert(lo as usize + k, *ch); }
+        // Ein eingefuegter Block ist ein eigener Schritt, kein Teil des Tippens davor.
+        w.undo_zeit = -10.0;
+        Self::undo_merken(w, &before, caret0, jetzt);
+        w.text = chars.iter().collect();
+        w.caret = lo + neu.len() as i32; w.sel_anchor = w.caret;
+        w.spans.clear();
+        if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+        Ok(())
+    }
+
+    /// GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]]) ->
+    /// (Zeile, Spalte) des naechsten Treffers ab der Stelle, sonst (-1, -1).
+    /// Ohne `genau` ohne Ruecksicht auf Gross/Klein. Kein Umlauf: wer am
+    /// Ende nichts findet, sucht ab 1,1 noch einmal.
+    pub fn textarea_find(&self, h: i64, gesucht: &str, ab_zeile: i64, ab_spalte: i64, genau: bool) -> Result<(i64, i64), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_FIND")?;
+        if gesucht.is_empty() { return Ok((-1, -1)); }
+        let chars: Vec<char> = wd.text.chars().collect();
+        let ab = Self::ta_index(&chars, ab_zeile, ab_spalte);
+        let (heu, nadel): (Vec<char>, Vec<char>) = if genau {
+            (chars.clone(), gesucht.chars().collect())
+        } else {
+            (chars.iter().flat_map(|c| c.to_lowercase()).collect(), gesucht.chars().flat_map(|c| c.to_lowercase()).collect())
+        };
+        if nadel.len() > heu.len() { return Ok((-1, -1)); }
+        for i in ab..=heu.len() - nadel.len() {
+            if heu[i..i + nadel.len()] == nadel[..] { return Ok(Self::ta_zeile_spalte(&chars, i)); }
+        }
+        Ok((-1, -1))
     }
 
     /// Mehrzeiliges Textfeld editieren: Tippen, Enter=Umbruch, Backspace/Delete,

@@ -563,6 +563,13 @@ fn dbg_read_cmd() -> Option<serde_json::Value> {
     serde_json::from_str(line.trim()).ok()
 }
 
+/// `DHRT_LIVE=1`: jede PRINT-Zeile sofort hinausschreiben. Gesetzt von
+/// PROCESS_START fuer seine Kinder (prozess.rs); einmal gelesen.
+fn live_ausgabe() -> bool {
+    static LIVE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *LIVE.get_or_init(|| std::env::var("DHRT_LIVE").map(|v| v == "1").unwrap_or(false))
+}
+
 /// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
 fn dbg_emit(ev: &serde_json::Value) {
     use std::io::Write;
@@ -696,6 +703,9 @@ pub struct Vm<'p> {
     // sie lesen koennen, ohne dass SHELL_RESULT$ drei Werte auf einmal
     // liefern muesste -- dasselbe Muster wie HTTP_STATUS()/HTTP_HEADER().
     shell_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::ShellErgebnis, String>>,
+    /// Kindprozesse mit laufender Ausgabe (`PROCESS_*`, prozess.rs). Tombstone-
+    /// Vec wie die Auftraege: eine Nummer bleibt gueltig, bis PROCESS_CLOSE.
+    prozesse: Vec<Option<crate::prozess::Prozess>>,
     /// Auftraege, die eine EIGENE GB-Funktion ausfuehren (`TASK_*`).
     task_auftraege: crate::hintergrund::Auftraege<Result<crate::hintergrund::TaskErgebnis, String>>,
     /// Fenster als Prozess: die Kinder (WINDOW_*) und, wenn dieses Programm
@@ -871,6 +881,7 @@ impl<'p> Vm<'p> {
             assert_fehler: 0,
             assert_sammeln: false,
             shell_auftraege: Default::default(),
+            prozesse: Vec::new(),
             task_auftraege: Default::default(),
             fenster: Default::default(), eltern: None, eltern_geprueft: false,
             shell_letzter_code: 0,
@@ -2831,6 +2842,11 @@ impl<'p> Vm<'p> {
                         }
                     }
                     if newline { self.out.push('\n'); }
+                    // Zeilenweise hinaus, wenn jemand live mitliest (die IDE
+                    // ueber PROCESS_START setzt DHRT_LIVE): an einer Leitung
+                    // waere stdout sonst blockgepuffert, und die Ausgabe kaeme
+                    // erst am Ende auf einmal.
+                    if newline && live_ausgabe() { self.flush_out(); }
                 }
 
                 // --- INPUT (Konsolen-Eingabe) ---
@@ -4601,11 +4617,120 @@ impl<'p> Vm<'p> {
     /// fuehrt dagegen GB-Code aus, und zwar in einem EIGENEN dhrt-Prozess:
     /// im Thread ginge es nicht, weil `Value` ueberall `Rc` haelt und
     /// `Program` damit weder Send noch Sync ist.
+    /// Der Kindprozess zu Argument 0 (PROCESS_*), mit Meldung fuer eine
+    /// unbekannte oder schon geschlossene Nummer.
+    fn prozess(&mut self, a: &[Value], fn_: &str) -> R<&mut crate::prozess::Prozess> {
+        let id = bi_int(a, 0, fn_)?;
+        if id >= 0 {
+            if let Some(Some(p)) = self.prozesse.get_mut(id as usize) { return Ok(p); }
+        }
+        Err(format!("{}: Prozess {} gibt es nicht (nie gestartet oder schon PROCESS_CLOSE)", fn_, id))
+    }
+
     fn try_hintergrund(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("shell_") || name.starts_with("db_query_")
              || name.starts_with("task_") || name.starts_with("window_") || name.starts_with("parent_")
+             || name.starts_with("process_") || name.starts_with("code_")
              || name == "opendoc" || name.starts_with("printer")) { return Ok(None); }
         let v = match name {
+            // ===== Kindprozesse mit laufender Ausgabe (prozess.rs, fuer die IDE) =====
+            "process_start" => {
+                if a.is_empty() { return Err("PROCESS_START: erwartet mind. 1 Argument (Programm)".into()); }
+                let prog = bi_str(a, 0, "PROCESS_START")?.to_string();
+                let mut rest: Vec<String> = Vec::new();
+                for i in 1..a.len() { rest.push(bi_str(a, i, "PROCESS_START")?.to_string()); }
+                let p = crate::prozess::Prozess::starten(&prog, &rest)?;
+                self.prozesse.push(Some(p));
+                Value::Int((self.prozesse.len() - 1) as i64)
+            }
+            "process_read$" | "process_read" => Value::str_rc(&self.prozess(a, "PROCESS_READ$")?.lesen()),
+            "process_err$" | "process_err" => Value::str_rc(&self.prozess(a, "PROCESS_ERR$")?.fehler_lesen()),
+            "process_write" => {
+                let text = bi_str(a, 1, "PROCESS_WRITE")?.to_string();
+                self.prozess(a, "PROCESS_WRITE")?.schreiben(&text)?;
+                Value::Nil
+            }
+            "process_close_input" => { self.prozess(a, "PROCESS_CLOSE_INPUT")?.eingabe_schliessen(); Value::Nil }
+            "process_running" => Value::Bool(self.prozess(a, "PROCESS_RUNNING")?.laeuft()),
+            "process_code" => Value::Int(self.prozess(a, "PROCESS_CODE")?.code()),
+            "process_kill" => { self.prozess(a, "PROCESS_KILL")?.beenden(); Value::Nil }
+            "process_close" => {
+                let id = bi_int(a, 0, "PROCESS_CLOSE")?;
+                if id >= 0 { if let Some(platz) = self.prozesse.get_mut(id as usize) { *platz = None; } }
+                Value::Nil
+            }
+            // ===== Sprachdienste fuer Editoren in Drachenhauch (lsp.rs, in-Prozess) =====
+            // Dieselben Funktionen, die `dhrt lsp` VS Code anbietet -- eine IDE
+            // in Drachenhauch braucht dafuer keinen zweiten Prozess und keine
+            // JSON-RPC-Rahmung in BASIC. Zeilen und Spalten zaehlen ab 1.
+            "code_check$" | "code_check" => {
+                let text = bi_str(a, 0, "CODE_CHECK$")?.to_string();
+                let basis = if a.len() > 1 { std::path::PathBuf::from(bi_str(a, 1, "CODE_CHECK$")?) }
+                            else { std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")) };
+                let liste: Vec<serde_json::Value> = crate::lsp::diagnose(&text, &basis).into_iter().map(|d| {
+                    let zeile = d["range"]["start"]["line"].as_u64().unwrap_or(0) + 1;
+                    let schwere = if d["severity"].as_u64() == Some(2) { "warnung" } else { "fehler" };
+                    serde_json::json!({"zeile": zeile, "schwere": schwere,
+                                       "meldung": d["message"].as_str().unwrap_or("")})
+                }).collect();
+                Value::str_rc(&serde_json::Value::Array(liste).to_string())
+            }
+            "code_hover$" | "code_hover" => {
+                let text = bi_str(a, 0, "CODE_HOVER$")?;
+                let z = bi_int(a, 1, "CODE_HOVER$")?.max(1) as usize - 1;
+                let s = bi_int(a, 2, "CODE_HOVER$")?.max(1) as usize - 1;
+                let md = crate::lsp::hover(text, z, s)
+                    .and_then(|h| h["contents"]["value"].as_str().map(str::to_string)).unwrap_or_default();
+                Value::str_rc(&md)
+            }
+            "code_complete" => {
+                let text = bi_str(a, 0, "CODE_COMPLETE")?;
+                let z = bi_int(a, 1, "CODE_COMPLETE")?.max(1) as usize - 1;
+                let s = bi_int(a, 2, "CODE_COMPLETE")?.max(1) as usize - 1;
+                let namen: Vec<String> = crate::lsp::vervollstaendigung(text, z, s).into_iter()
+                    .filter_map(|e| e["label"].as_str().map(str::to_string)).collect();
+                let n = namen.len() as i64;
+                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "code_definition" => {
+                let text = bi_str(a, 0, "CODE_DEFINITION")?;
+                let z = bi_int(a, 1, "CODE_DEFINITION")?.max(1) as usize - 1;
+                let s = bi_int(a, 2, "CODE_DEFINITION")?.max(1) as usize - 1;
+                let d = crate::lsp::definition(text, "", z, s);
+                let (zeile, spalte) = match d["range"]["start"]["line"].as_u64() {
+                    Some(l) => (l as i64 + 1, d["range"]["start"]["character"].as_u64().unwrap_or(0) as i64 + 1),
+                    None => (-1, -1),
+                };
+                Value::Tuple(Rc::new(vec![Value::Int(zeile), Value::Int(spalte)]))
+            }
+            "code_references" => {
+                let text = bi_str(a, 0, "CODE_REFERENCES")?;
+                let z = bi_int(a, 1, "CODE_REFERENCES")?.max(1) as usize - 1;
+                let s = bi_int(a, 2, "CODE_REFERENCES")?.max(1) as usize - 1;
+                let zeilen: Vec<i64> = crate::lsp::fundstellen(text, "", z, s).as_array().map(|v| v.iter()
+                    .filter_map(|o| o["range"]["start"]["line"].as_u64().map(|l| l as i64 + 1)).collect()).unwrap_or_default();
+                let n = zeilen.len() as i64;
+                let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+                for (k, l) in zeilen.into_iter().enumerate() { arr.cells.set(k, Value::Int(l)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "code_symbols$" | "code_symbols" => {
+                fn um(v: &serde_json::Value) -> serde_json::Value {
+                    serde_json::json!({
+                        "name": v["name"], "art": match v["kind"].as_i64() {
+                            Some(5) => "class", Some(23) => "struct", Some(7) => "property", Some(10) => "enum", _ => "function" },
+                        "von": v["range"]["start"]["line"].as_u64().unwrap_or(0) + 1,
+                        "bis": v["range"]["end"]["line"].as_u64().unwrap_or(0) + 1,
+                        "kinder": v["children"].as_array().map(|k| k.iter().map(um).collect::<Vec<_>>()).unwrap_or_default(),
+                    })
+                }
+                let text = bi_str(a, 0, "CODE_SYMBOLS$")?;
+                let g = crate::lsp::gliederung(text);
+                let liste: Vec<serde_json::Value> = g.as_array().map(|v| v.iter().map(um).collect()).unwrap_or_default();
+                Value::str_rc(&serde_json::Value::Array(liste).to_string())
+            }
             // ===== Drucken + Oeffnen (docs/entwurf-drucken.md) =====
             "opendoc" => { crate::drucken::oeffnen(bi_str(a, 0, "OPENDOC")?)?; Value::Nil }
             "printers" => {
@@ -5794,6 +5919,39 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![
                     Value::Int(z0), Value::Int(n), Value::Int(von), Value::Int(len),
                 ]))
+            }
+            // Textbereich-Befehle fuer Editoren (Weg C): Marke, Auswahl, Suchen,
+            // Einfuegen. Hier, weil GOTO die Zeilenhoehe braucht (Scroll) und
+            // INSERT die Uhr (Undo-Schritte).
+            "gui_textarea_cursor" => {
+                let (z, s) = self.gui.textarea_cursor(gi(a, 0, "GUI_TEXTAREA_CURSOR")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
+            }
+            "gui_textarea_goto" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_GOTO: vor SCREEN aufgerufen")?;
+                let spalte = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_GOTO")? } else { 1 };
+                self.gui.textarea_goto(g, gi(a, 0, "GUI_TEXTAREA_GOTO")?, gi(a, 1, "GUI_TEXTAREA_GOTO")?, spalte)?;
+                Value::Nil
+            }
+            "gui_textarea_selection$" | "gui_textarea_selection" =>
+                Value::str_rc(&self.gui.textarea_selection(gi(a, 0, "GUI_TEXTAREA_SELECTION$")?)?),
+            "gui_textarea_select" => {
+                let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_SELECT: vor SCREEN aufgerufen")?;
+                self.gui.textarea_select(g, gi(a, 0, "GUI_TEXTAREA_SELECT")?, gi(a, 1, "GUI_TEXTAREA_SELECT")?,
+                    gi(a, 2, "GUI_TEXTAREA_SELECT")?, gi(a, 3, "GUI_TEXTAREA_SELECT")?, gi(a, 4, "GUI_TEXTAREA_SELECT")?)?;
+                Value::Nil
+            }
+            "gui_textarea_insert" => {
+                let jetzt = self.gfx.as_ref().map(|g| g.get_time()).unwrap_or(0.0);
+                self.gui.textarea_insert(gi(a, 0, "GUI_TEXTAREA_INSERT")?, &gs(a, 1, "GUI_TEXTAREA_INSERT")?, jetzt)?;
+                Value::Nil
+            }
+            "gui_textarea_find" => {
+                let ab_zeile = if a.len() > 2 { gi(a, 2, "GUI_TEXTAREA_FIND")? } else { 1 };
+                let ab_spalte = if a.len() > 3 { gi(a, 3, "GUI_TEXTAREA_FIND")? } else { 1 };
+                let genau = a.len() > 4 && gbool(a, 4, "GUI_TEXTAREA_FIND")?;
+                let (z, s) = self.gui.textarea_find(gi(a, 0, "GUI_TEXTAREA_FIND")?, &gs(a, 1, "GUI_TEXTAREA_FIND")?, ab_zeile, ab_spalte, genau)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
             }
             // Dialog IM Fenster (eigenes Thema, kein OS-Kasten). Braucht die
             // Bildschirmgroesse (Zentrieren) und die Textbreite (das Fenster

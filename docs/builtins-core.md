@@ -1207,6 +1207,65 @@ zuletzt abgeholten Auftrag — dasselbe Muster wie `HTTP_STATUS()` zur zuletzt
 geholten Antwort. Ein Programm, das gar nicht erst startet, meldet sich beim
 **Abholen**, nicht beim Starten.
 
+### Ein Programm mit laufender Ausgabe
+
+`SHELL_START` liefert die Ausgabe erst am Ende. Eine Entwicklungsumgebung
+muss zeigen, was ein Programm druckt, *während* es läuft, und ihm Eingaben
+schicken — dafür gibt es Prozesse mit Leitung in beide Richtungen:
+
+| Funktion | Wirkung |
+|---|---|
+| `PROCESS_START(programm$, ...)` → INTEGER | startet mit offener Eingabe und Ausgabe; `"dhrt"` als Programm meint diese Runtime selbst |
+| `PROCESS_READ$(prozess)` → STRING | was seit dem letzten Abruf auf stdout kam (leer = nichts Neues) |
+| `PROCESS_ERR$(prozess)` → STRING | dasselbe für stderr |
+| `PROCESS_WRITE(prozess, text$)` | an die Eingabe schicken — ein `INPUT` im Kind braucht das Zeilenende `CHR$(10)` |
+| `PROCESS_CLOSE_INPUT(prozess)` | Eingabe schließen (Dateiende für das Kind) |
+| `PROCESS_RUNNING(prozess)` → BOOLEAN | läuft es noch? |
+| `PROCESS_CODE(prozess)` → INTEGER | Rückgabewert; `-1` solange es läuft oder wenn es abgebrochen wurde |
+| `PROCESS_KILL(prozess)`, `PROCESS_CLOSE(prozess)` | beenden / den Platz freigeben |
+
+```basic
+DIM p AS INTEGER
+p = PROCESS_START("dhrt", "run", "spiel.dh")
+WHILE PROCESS_RUNNING(p)
+    DIM t AS STRING : t = PROCESS_READ$(p)
+    IF t <> "" THEN PRINT t;          ' zeigen, sobald es kommt
+    SLEEP(16)
+WEND
+PRINT "beendet mit " ; PROCESS_CODE(p)
+PROCESS_CLOSE(p)
+```
+
+Die Ausgabe kommt in Stücken, nicht in Zeilen — wer Zeilen braucht, sammelt
+bis zum nächsten `CHR$(10)` (so macht es die IDE in `ide/ide.dh`). Ein Kind
+erbt `DHRT_FRAMES` und die Bildschirmfoto-Variablen **nicht**, sonst stürbe ein
+aus der IDE gestartetes Programm nach den Bildern des IDE-Tests. Endet das
+Elternprogramm, werden laufende Kinder beendet.
+
+### Sprachdienste für Editoren: `CODE_*`
+
+Dieselben Funktionen, die `dhrt lsp` einem fremden Editor über LSP anbietet —
+hier ohne zweiten Prozess und ohne JSON-RPC, für eine IDE in Drachenhauch.
+Zeilen und Spalten zählen ab 1, in Zeichen.
+
+| Funktion | Rückgabe | Wirkung |
+|---|---|---|
+| `CODE_CHECK$(quelltext$[, basis$])` | STRING (JSON) | die Front-End-Kette wie `dhrt --check`: eine Liste von `{zeile, schwere, meldung}` mit `schwere` = `fehler`/`warnung`; `basis$` = Ordner für `IMPORT "x.dh"` (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen |
+| `CODE_HOVER$(quelltext$, zeile, spalte)` | STRING | Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht |
+| `CODE_COMPLETE(quelltext$, zeile, spalte)` | ARRAY OF STRING | Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten |
+| `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |
+| `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
+| `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden |
+
+```basic
+DIM j AS JSON_HANDLE
+j = JSON_PARSE(CODE_CHECK$(GUI_TEXT(feld), DIRNAME(pfad)))
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "") - 1
+    PRINT JSON_GET_INT(j, STR$(i) + ".zeile") ; ": " ; JSON_GET_STRING(j, STR$(i) + ".meldung")
+NEXT
+```
+
 > **`CWD$()` ist nicht das Verzeichnis, aus dem du gestartet hast.** `dhrt`
 > wechselt beim Start ins Verzeichnis der `.dh`-Datei (damit
 > `LOADIMAGE("assets/…")` von überall funktioniert), die exportierte `.exe`

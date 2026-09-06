@@ -93,6 +93,24 @@ def test_ohne_strg_loest_es_nicht_aus(tmp_path):
     assert "sichern" not in out
 
 
+def test_funktionstaste_trifft_auch_aus_dem_textfeld(tmp_path):
+    """Ohne Strg/Alt gehoert eine Taste dem Textfeld mit Fokus -- F1..F12 aber
+    nicht: sie erzeugen nie Text. Gefunden an der IDE in Drachenhauch, deren
+    F5 aus dem Code-Feld heraus nie startete. Gegenprobe: Entf bleibt dort
+    dem Feld (loescht das Zeichen), der Eintrag schweigt."""
+    out = _lauf(tmp_path, _KOPF + 'DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Start", "F5")\n'
+                'DIM b AS INTEGER : b = GUI_MENU_ITEM(m, "Loeschen", "Entf")\n'
+                'DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 40, 200, 24, "abc")\n'
+                'GUI_FOCUS(tf)\n'
+                + _schleife(12, '    IF GUI_CLICKED(a) THEN PRINT "start"\n'
+                                '    IF GUI_CLICKED(b) THEN PRINT "loeschen"\n'
+                                '    IF f = 12 THEN PRINT "text=" + GUI_TEXT(tf)\n'),
+                frames=14, events=_tipp(3, RL_F5) + _tipp(8, RL_DELETE))
+    # Entf ging ans Feld (der Text ist nicht mehr "abc"), nicht ans Menue.
+    assert out[0] == "start" and "loeschen" not in out, out
+    assert out[-1].startswith("text=") and out[-1] != "text=abc", out
+
+
 def test_funktionstaste_und_alt(tmp_path):
     out = _lauf(tmp_path, _KOPF + 'DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Start", "F5")\n'
                 'DIM b AS INTEGER : b = GUI_MENU_ITEM(m, "Eigenschaften", "Alt+Enter")\n'
