@@ -32,7 +32,7 @@ use kira::{
     modulator::ModulatorId,
     modulator::lfo::{LfoBuilder, LfoHandle, Waveform},
     modulator::tweener::{TweenerBuilder, TweenerHandle},
-    Mapping, Value as KValue,
+    Mapping, StartTime, Value as KValue,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::PlaybackState,
     sound::FromFileError,
@@ -717,9 +717,13 @@ pub struct Audio {
     // Bus-Volume × Sound-Volume multiplizieren sich im Mixer -> echter Master.
     sfx_track: TrackHandle,
     music_track: TrackHandle,
+    /// Bus `speech` (SPEAK, sprache.rs): eigene Lautstaerke, keine Effektkette.
+    speech_track: TrackHandle,
+    speech_handles: Vec<StaticSoundHandle>,
     sfx_bus: f32,
     music_bus: f32,
     master_bus: f32,
+    speech_bus: f32,
     // Echtzeit-Effektketten je Bus (Filter/Reverb/Delay).
     sfx_fx: BusFx,
     music_fx: BusFx,
@@ -727,7 +731,7 @@ pub struct Audio {
     /// Gespiegelte Bus-Einstellungen (sfx/music/master) + Stapel fuer
     /// AUDIO_PUSH/AUDIO_POP.
     bus_values: [BusValues; 3],
-    audio_stack: Vec<[BusValues; 3]>,
+    audio_stack: Vec<([BusValues; 3], f32)>,
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
@@ -784,9 +788,11 @@ impl Audio {
         let music_fx = attach_bus_fx!(music_b);
         let music_track = manager.add_sub_track(music_b)
             .map_err(|e| format!("Musik-Bus konnte nicht angelegt werden: {e:?}"))?;
+        let speech_track = manager.add_sub_track(TrackBuilder::new())
+            .map_err(|e| format!("Sprach-Bus konnte nicht angelegt werden: {e:?}"))?;
         Ok(Audio {
-            manager, sfx_track, music_track,
-            sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
+            manager, sfx_track, music_track, speech_track, speech_handles: Vec::new(),
+            sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0, speech_bus: 1.0,
             sfx_fx, music_fx, master_fx,
             bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
             sounds: Vec::new(), samples: Vec::new(),
@@ -851,6 +857,47 @@ impl Audio {
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
         self.sounds.push(SoundSlot { data: Some(data), handle: None, vol, loops: 0, pan_anim: None });
         (self.sounds.len() - 1) as i64
+    }
+
+    // --- Sprachausgabe (sprache.rs) ----------------------------------------
+    /// Klang aus rohen Mono-Abtastwerten: derselbe Weg wie AUDIO_NOTE, samt
+    /// Lo-Fi und den 5-ms-Flanken gegen Knackser.
+    pub fn sound_aus_pcm(&mut self, samples: &[f64], sr: u32) -> i64 {
+        let data = self.make_data_mono(samples, 1.0, sr);
+        self.push_slot(data, 1.0)
+    }
+
+    /// Lebt der Slot noch (nicht per UNLOADSOUND freigegeben)?
+    pub fn sound_lebt(&self, idx: i64) -> bool {
+        usize::try_from(idx).ok().and_then(|i| self.sounds.get(i)).map_or(false, |s| s.data.is_some())
+    }
+
+    pub fn sound_dauer(&self, idx: i64) -> Result<Duration, String> {
+        let d = self.slot(idx, "SPEAK")?.data.as_ref()
+            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (UNLOADSOUND)".to_string())?;
+        Ok(Duration::from_secs_f64(d.frames.len() as f64 / d.sample_rate.max(1) as f64))
+    }
+
+    /// Eine gesprochene Zeile auf dem Bus `speech`, ab `verzoegerung` -- Kira
+    /// zaehlt sie auf dem Audio-Faden herunter, so reiht sich eine Ansage
+    /// hinter die vorige, ohne dass jemand je Bild nachfragen muss. Die
+    /// Handles bleiben hier, damit SPEAK_STOP alles Geplante zugleich
+    /// anhaelt; ein zweites SPEAK desselben Textes stoppt das erste NICHT
+    /// (anders als AUDIO_PLAY auf demselben Slot).
+    pub fn speech_play(&mut self, idx: i64, verzoegerung: Duration) -> Result<(), String> {
+        let settings = StaticSoundSettings::new().start_time(StartTime::Delayed(verzoegerung));
+        let data = self.slot(idx, "SPEAK")?.data.as_ref()
+            .ok_or_else(|| "SPEAK: Klang wurde freigegeben (UNLOADSOUND)".to_string())?
+            .clone().with_settings(settings);
+        let handle = self.speech_track.play(data).map_err(|e| format!("SPEAK: {:?}", e))?;
+        self.speech_handles.retain(|h| h.state() != PlaybackState::Stopped);
+        self.speech_handles.push(handle);
+        Ok(())
+    }
+
+    pub fn speech_stop(&mut self) {
+        for h in &mut self.speech_handles { h.stop(tween_now()); }
+        self.speech_handles.clear();
     }
 
     /// UNLOADSOUND(sound) -- stoppt die laufende Instanz und gibt den
@@ -1337,13 +1384,18 @@ resonance/reverb/distortion", other)),
     /// einzelnen Sound-/Musik-Volumes (Kira-Mixer).
     pub fn set_bus_volume(&mut self, bus: &str, v: f64) -> Result<(), String> {
         let vol = v.clamp(0.0, 1.0);
+        if bus.eq_ignore_ascii_case("speech") {
+            self.speech_bus = vol as f32;
+            self.speech_track.set_volume(db(vol), tween_now());
+            return Ok(());
+        }
         self.bus_values[Self::bus_idx(bus, "AUDIO_BUS_VOLUME")?].volume = vol;
         match bus.to_lowercase().as_str() {
             "sfx" => { self.sfx_bus = vol as f32; self.sfx_track.set_volume(db(vol), tween_now()); }
             "music" => { self.music_bus = vol as f32; self.music_track.set_volume(db(vol), tween_now()); }
             "master" => { self.master_bus = vol as f32; self.manager.main_track().set_volume(db(vol), tween_now()); }
             other => return Err(format!(
-                "AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master)", other)),
+                "AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", other)),
         }
         Ok(())
     }
@@ -1352,8 +1404,9 @@ resonance/reverb/distortion", other)),
             "sfx" => self.sfx_bus,
             "music" => self.music_bus,
             "master" => self.master_bus,
+            "speech" => self.speech_bus,
             other => return Err(format!(
-                "AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", other)),
+                "AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", other)),
         } as f64)
     }
 
@@ -1380,12 +1433,12 @@ resonance/reverb/distortion", other)),
     /// Modulator laeuft dann weiter, wirkt aber nicht mehr auf diesen Bus.
     pub fn audio_push(&mut self) {
         if self.audio_stack.len() >= 64 { return; }   // Fehler soll auffallen, nicht wachsen
-        self.audio_stack.push(self.bus_values);
+        self.audio_stack.push((self.bus_values, self.speech_bus));
     }
 
     /// Bus-Einstellungen zurueckholen. `false`, wenn der Stapel leer ist.
     pub fn audio_pop(&mut self) -> Result<bool, String> {
-        let Some(werte) = self.audio_stack.pop() else { return Ok(false) };
+        let Some((werte, sprache)) = self.audio_stack.pop() else { return Ok(false) };
         // Ueber die normalen Setter zurueckschreiben -- so landet alles auch
         // wirklich bei Kira (und loest nebenbei Modulationen ab).
         for (i, name) in ["sfx", "music", "master"].iter().enumerate() {
@@ -1399,6 +1452,7 @@ resonance/reverb/distortion", other)),
             self.set_compressor(name, w.comp_thresh, w.comp_ratio, w.comp_makeup)?;
             self.set_eq(name, w.eq_freq, w.eq_gain, w.eq_q)?;
         }
+        self.set_bus_volume("speech", sprache as f64)?;
         Ok(true)
     }
 

@@ -728,6 +728,9 @@ pub struct Vm<'p> {
     // Retained-Mode-GUI (Modul gui): persistente Fenster/Widgets.
     #[cfg(feature = "graphics")]
     gui: crate::gui::Gui,
+    // Sprachausgabe (SPEAK): Stimme, Tempo, Vorrat, geplantes Ende.
+    #[cfg(feature = "graphics")]
+    sprecher: crate::sprache::Sprecher,
     // Modul db (SQLite): Verbindungen + (eager geladene) Resultsets, INTEGER-Handles.
     #[cfg(feature = "db")]
     db_conns: Vec<Option<rusqlite::Connection>>,
@@ -883,6 +886,8 @@ impl<'p> Vm<'p> {
             audio: None,
             #[cfg(feature = "graphics")]
             gui: crate::gui::Gui::new(),
+            #[cfg(feature = "graphics")]
+            sprecher: crate::sprache::Sprecher::new(),
             #[cfg(feature = "db")]
             db_conns: Vec::new(),
             #[cfg(feature = "db")]
@@ -5528,7 +5533,9 @@ impl<'p> Vm<'p> {
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_scale" => { self.gui.set_scale(gnum(a,0,"GUI_SCALE")?)?; Value::Nil }
             "gui_scale_get" => Value::Float(self.gui.get_scale()),
-            "gui_screenreader" => Value::Bool(self.gui.screenreader),
+            // Direkt am Fenster gefragt, nicht am gui-Spiegel: so stimmt die
+            // Antwort auch in einem Programm ohne GUI_UPDATE (SPEAK ohne gui).
+            "gui_screenreader" => Value::Bool(self.gfx.as_ref().map_or(false, |g| g.a11y_aktiv())),
             "gui_announce" => {
                 let text = gs(a,0,"GUI_ANNOUNCE")?;
                 let dringend = if a.len() > 1 { gbool(a,1,"GUI_ANNOUNCE")? } else { false };
@@ -7193,8 +7200,8 @@ impl<'p> Vm<'p> {
                 // AUDIO_BUS_VOLUME(bus$, vol) -- Master pro Bus (sfx/music/master).
                 // Bus-Name VOR der Audio-Initialisierung pruefen (golden-testbar).
                 let bus = gs(a, 0, "AUDIO_BUS_VOLUME")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master)", bus));
+                if !matches!(bus.as_str(), "sfx" | "music" | "master" | "speech") {
+                    return Err(format!("AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", bus));
                 }
                 let v = need_f(a, 1, "AUDIO_BUS_VOLUME")?;
                 self.audio_mut()?.set_bus_volume(&bus, v)?;
@@ -7202,8 +7209,8 @@ impl<'p> Vm<'p> {
             }
             "audio_bus_get_volume" => {
                 let bus = gs(a, 0, "AUDIO_BUS_GET_VOLUME")?.to_lowercase();
-                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
-                    return Err(format!("AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", bus));
+                if !matches!(bus.as_str(), "sfx" | "music" | "master" | "speech") {
+                    return Err(format!("AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master, speech)", bus));
                 }
                 Value::Float(round_audio(self.audio_mut()?.get_bus_volume(&bus)?))
             }
@@ -7500,6 +7507,56 @@ impl<'p> Vm<'p> {
                 let bits = if a.len() > 2 { gi(a, 2, "AUDIO_SAVE_WAV")? } else { 16 };
                 self.audio_mut()?.save_wav(idx, &pfad, bits)?;
                 Value::Nil
+            }
+            // --- Sprachausgabe (sprache.rs, Weg C aus docs/entwurf-speak.md) ---
+            // SPEAK fragt ZUERST, ob ein Bildschirmleser zuhoert: dann geht der
+            // Satz als Ansage in den Baum (seine Stimme, sein Tempo, seine
+            // Braillezeile -- und nicht zwei Stimmen zugleich). Sonst die
+            // Systemstimme durch Kira. SPEAK_SOUND ist immer Synthese.
+            "speak" => {
+                let text = gs(a, 0, "SPEAK")?.to_string();
+                let unterbrechen = a.len() > 1 && gflag(a, 1);
+                if a.len() > 2 { return Err("SPEAK: erwartet (text$[, unterbrechen])".into()); }
+                if self.gfx.as_ref().map_or(false, |g| g.a11y_aktiv()) {
+                    self.gui.announce(text.clone(), unterbrechen);
+                    if let Some(g) = self.gfx.as_mut() { g.a11y_ansagen(text, unterbrechen); }
+                } else {
+                    self.audio_mut()?;
+                    let au = self.audio.as_mut().unwrap();
+                    self.sprecher.sprechen(au, &text, unterbrechen)?;
+                }
+                Value::Nil
+            }
+            "speak_stop" => {
+                if !a.is_empty() { return Err("SPEAK_STOP: erwartet keine Argumente".into()); }
+                if let Some(au) = self.audio.as_mut() { self.sprecher.stopp(au); }
+                Value::Nil
+            }
+            "speaking" => {
+                if !a.is_empty() { return Err("SPEAKING: erwartet keine Argumente".into()); }
+                Value::Bool(self.sprecher.spricht())
+            }
+            "speak_wait" => {
+                if !a.is_empty() { return Err("SPEAK_WAIT: erwartet keine Argumente".into()); }
+                if let Some(au) = self.audio.as_mut() { self.sprecher.warten(au); }
+                Value::Nil
+            }
+            "speak_voice" => { self.sprecher.stimme_setzen(&gs(a, 0, "SPEAK_VOICE")?)?; Value::Nil }
+            "speak_voices" => {
+                if !a.is_empty() { return Err("SPEAK_VOICES: erwartet keine Argumente".into()); }
+                let namen = self.sprecher.stimmen()?;
+                let n = namen.len() as i64;
+                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (k, s) in namen.into_iter().enumerate() { arr.cells.set(k, Value::str_rc(&s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            "speak_rate" => { self.sprecher.tempo_setzen(need_f(a, 0, "SPEAK_RATE")?)?; Value::Nil }
+            "speak_sound" => {
+                let text = gs(a, 0, "SPEAK_SOUND")?.to_string();
+                if a.len() != 1 { return Err("SPEAK_SOUND: erwartet (text$)".into()); }
+                self.audio_mut()?;
+                let au = self.audio.as_mut().unwrap();
+                Value::Int(self.sprecher.klang(au, &text)?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {

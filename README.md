@@ -174,7 +174,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | `g3d` | 3D: Kamera, Modelle (OBJ/GLTF), Skelett-Animation, PBR, HDR-IBL, Schatten, Normal-Maps, Picking — siehe [Grafik-Built-ins](docs/builtins-grafik.md) |
 | [`particles`](docs/module-particles.md) | Partikel-Emitter mit Schwerkraft, Farbverlauf über die Lebenszeit, fünf Zeichenarten |
 | [`imgfx`](docs/module-imgfx.md) | Bilder skalieren, drehen, spiegeln, einfärben — auch kantentreu für Pixelgrafik |
-| [`audio`](docs/module-audio.md) | auf **Kira**: Kanäle, Busse, Echtzeit-Effekte (Filter/Hall/Echo/Verzerrer/Kompressor/EQ), Synthese, Sampler, `.mod`/`.xm`-Wiedergabe, Musik anspringen (`AUDIO_MUSIC_SEEK`), räumliches Audio, taktgenaue Uhr. [Modulatoren](docs/module-audio-modulatoren.md) laufen auf dem Audio-Thread weiter, auch wenn die Bildrate einbricht Einen Klang **anschauen und sichern**: `AUDIO_SOUND_WAVE` (Kurve zum Zeichnen) und `AUDIO_SAVE_WAV`. |
+| [`audio`](docs/module-audio.md) | auf **Kira**: Kanäle, Busse, Echtzeit-Effekte (Filter/Hall/Echo/Verzerrer/Kompressor/EQ), Synthese, Sampler, `.mod`/`.xm`-Wiedergabe, Musik anspringen (`AUDIO_MUSIC_SEEK`), räumliches Audio, taktgenaue Uhr. [Modulatoren](docs/module-audio-modulatoren.md) laufen auf dem Audio-Thread weiter, auch wenn die Bildrate einbricht Einen Klang **anschauen und sichern**: `AUDIO_SOUND_WAVE` (Kurve zum Zeichnen) und `AUDIO_SAVE_WAV`. **Sprechen**: `SPEAK` lässt die Systemstimme jeden Text sagen — als Klang auf dem Bus `speech`, mit Warteschlange, `SPEAK_SOUND` für räumliche Stimmen und WAV; läuft ein Bildschirmleser, spricht der. |
 
 **Oberfläche**
 

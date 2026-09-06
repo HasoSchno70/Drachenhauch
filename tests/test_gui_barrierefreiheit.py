@@ -253,3 +253,66 @@ def test_ein_fremder_leser_sieht_und_bedient_das_fenster(tmp_path):
     assert "WERT: Anna" in ps.stdout, ps.stdout
     zeilen = [z.strip() for z in out.splitlines() if z.strip() and not z.startswith(("WARNING:", "INFO:"))]
     assert zeilen == ["leser da", "fokus kaestchen", "haken", "geklickt Anna"], (zeilen, err)
+
+
+# ------------------------------------------------ SPEAK ohne gui, mit Leser
+_PS_ANSAGE = r"""
+param([int]$ZielPid)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$A = [System.Windows.Automation.AutomationElement]
+$win = $null
+for ($i = 0; $i -lt 100; $i++) {
+    $h = (Get-Process -Id $ZielPid -ErrorAction SilentlyContinue).MainWindowHandle
+    if ($h -and $h -ne 0) { $win = $A::FromHandle($h); break }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $win) { "kein Fenster"; exit 2 }
+# Das Anfassen des Fensters ist die Aktivierung: ab jetzt schickt dhrt einen
+# Baum. Die Ansage kommt ein paar Bilder spaeter -- nachfragen, nicht raten.
+for ($i = 0; $i -lt 100; $i++) {
+    foreach ($k in $win.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)) {
+        $n = [string]$k.Current.Name
+        if ($n.Trim() -eq "Der Drache erwacht") {
+            "ANSAGE: " + $k.Current.ControlType.ProgrammaticName + " [" + $n.Trim() + "]"
+            exit 0
+        }
+    }
+    Start-Sleep -Milliseconds 100
+}
+"keine Ansage"; exit 3
+"""
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="UI Automation gibt es nur unter Windows")
+def test_speak_ohne_gui_spricht_ueber_den_leser(tmp_path):
+    """SPEAK fragt zuerst den Bildschirmleser (docs/entwurf-speak.md, Weg C):
+    laeuft einer, geht der Satz als Ansage in den Baum -- auch in einem
+    Programm OHNE gui, dessen Baum sonst nur das Fenster waere. Der fremde
+    Leser findet den Satz als Live-Knoten; die Systemstimme bleibt still."""
+    src = ('SCREEN(400, 300, "Sprecher", 1)\n'
+           'SET_WINDOW_POS(-3000, -3000)\n'
+           'DIM gesagt AS BOOLEAN : gesagt = FALSE\n'
+           'WHILE NOT QUITREQUESTED()\n'
+           '    IF GUI_SCREENREADER() AND NOT gesagt THEN SPEAK("Der Drache erwacht") : PRINT "gesagt" : gesagt = TRUE\n'
+           '    CLS(0) : FLIP()\n'
+           'WEND\n'
+           'PRINT SPEAKING()\n')
+    (tmp_path / "t.dh").write_text(src, encoding="utf-8")
+    (tmp_path / "leser.ps1").write_text(_PS_ANSAGE, encoding="utf-8")
+    p = subprocess.Popen([str(_DHRT), "run", str(tmp_path / "t.dh")], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace",
+                         env=dict(os.environ, DHRT_FRAMES="1500"), cwd=str(tmp_path))
+    try:
+        ps = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                             "-File", str(tmp_path / "leser.ps1"), str(p.pid)],
+                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+        out, err = p.communicate(timeout=40)
+    finally:
+        if p.poll() is None:
+            p.kill()
+    assert ps.returncode == 0, (ps.stdout, ps.stderr, out, err)
+    assert "ANSAGE: ControlType.Text [Der Drache erwacht]" in ps.stdout, ps.stdout
+    zeilen = [z.strip() for z in out.splitlines() if z.strip() and not z.startswith(("WARNING:", "INFO:"))]
+    # "gesagt" ueber den Leser -- und SPEAKING ist FALSE, weil keine Stimme lief.
+    assert zeilen == ["gesagt", "FALSE"], (zeilen, err)
