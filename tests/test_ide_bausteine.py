@@ -197,6 +197,20 @@ def test_textbereich_einfuegen_ist_ein_undo_schritt(tmp_path):
     assert out == ["EINS zwei", "drei Zwei", "fuenf", "1 5", "EINS zwei", "drei Zwei", "fuenf sechs"], out
 
 
+def test_textbereich_marken(tmp_path):
+    """Marken haengen an Zeilen; leere Felder loeschen; ungleiche Laengen sind
+    ein Fehler. Ob sie ZU SEHEN sind, sagt das Bild (docs/ide.md) -- hier
+    steht, dass der Aufruf durchlaeuft und nicht zeichnet, was er nicht soll."""
+    out = _lauf(tmp_path, _TA +
+                'GUI_TEXTAREA_MARKS(ta, [1, 3], [&HE05050, &HFFD040])\n'
+                'GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()\n'
+                'GUI_TEXTAREA_MARKS(ta, [], [])\n'
+                'PRINT "ok"\n'
+                'TRY\n    GUI_TEXTAREA_MARKS(ta, [1, 2], [1])\nCATCH e\n    PRINT e\nEND TRY\n'
+                'WHILE NOT QUITREQUESTED() : GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP() : WEND\n')
+    assert out[0] == "ok" and "gleich lang" in out[1], out
+
+
 def test_textbereich_befehle_nur_fuer_textareas(tmp_path):
     f = tmp_path / "t.dh"
     f.write_text(_TA + 'DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 0, 250, 40, 20)\n'

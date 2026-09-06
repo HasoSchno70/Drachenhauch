@@ -1008,6 +1008,11 @@ pub struct Widget {
     // von aussen (GUI_TEXTAREA_SPANS) -- welche Farbe ein Kommentar hat, ist
     // eine Frage des Themas, nicht der Laufzeit.
     spans: Vec<(u32, u32, i64)>,
+    // Marken je ZEILE (0-basiert, Farbe): Haltepunkt, angehaltene Zeile,
+    // Fehler -- ein Punkt in der Nummernspalte und ein Farbhauch ueber der
+    // Zeile. Sie haengen an der Zeilennummer, nicht am Text: GUI_SET_TEXT
+    // laesst sie stehen, das Programm setzt sie neu (GUI_TEXTAREA_MARKS).
+    marken: Vec<(usize, i64)>,
     // Nur TextArea: was aus einem Textfeld ein Code-Feld macht.
     // `scroll` ist dort die erste SICHTBARE ZEILE, `scroll_x` der waagerechte
     // Versatz in Pixeln -- ohne den waeren lange Zeilen einfach abgeschnitten.
@@ -1800,6 +1805,24 @@ impl Gui {
         Ok(())
     }
 
+    /// Marken je Zeile setzen (ersetzt alle bisherigen; leere Listen loeschen).
+    pub fn textarea_marks(&mut self, h: i64, zeilen: Vec<i64>, farben: Vec<i64>) -> Result<(), String> {
+        if zeilen.len() != farben.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_MARKS: beide Listen muessen gleich lang sein ({} Zeilen, {} Farben)",
+                zeilen.len(), farben.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_MARKS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_MARKS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.marken = zeilen.iter().zip(&farben)
+            .filter(|(&z, _)| z >= 1)
+            .map(|(&z, &c)| ((z - 1) as usize, c))
+            .collect();
+        Ok(())
+    }
+
     /// Einstellungen eines Textbereichs (GUI_TEXTAREA_SET).
     ///
     /// EIN Setter mit Schluesselwort statt vier Builtins -- dasselbe Muster
@@ -1919,6 +1942,7 @@ impl Gui {
             vorschau: String::new(), vorschau_marke: 0,
             tab_index: 0,
             spans: Vec::new(),
+            marken: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
@@ -9500,6 +9524,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let gutter = self.ta_gutter(g, wdg, starts.len());
                     let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
                     let tx0 = ax + pad + gutter - wdg.scroll_x;
+                    // Marken: ein Farbhauch ueber der ganzen Zeile, unter allem
+                    // anderen. Nur die erste sichtbare Zeile eines umgebrochenen
+                    // Absatzes traegt ihn, wie die Zeilennummer.
+                    if !wdg.marken.is_empty() {
+                        for r in 0..view_lines {
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (li, rs, _) = rows[ri as usize];
+                            if rs != starts[li] { continue; }
+                            if let Some(&(_, farbe)) = wdg.marken.iter().find(|(z, _)| *z == li) {
+                                let y = ay + pad + r * lh;
+                                g.box_fill(ax + 2 + gutter, y, ax + w - 3, y + lh - 2,
+                                           0x38_000000 | (farbe & 0xFF_FFFF));
+                            }
+                        }
+                    }
                     if wdg.aktive_zeile {
                         let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize) as i32;
                         let r = crow - scroll;
@@ -9557,6 +9597,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             // Eine umgebrochene Fortsetzung traegt keine Nummer.
                             if rs != starts[li] { continue; }
                             let nr = (li + 1).to_string();
+                            // Marke: ein Punkt am linken Rand der Nummernspalte.
+                            if let Some(&(_, farbe)) = wdg.marken.iter().find(|(z, _)| *z == li) {
+                                let rr = (lh / 4).max(3);
+                                g.circle(ax + 2 + rr + self.sk(3), ay + pad + r * lh + lh / 2 - 1, rr, farbe);
+                            }
                             let nx = ax + pad + gutter - self.sk(9) - self.wtext_width(g, wdg, &nr);
                             self.wtext(g, wdg, nx, ay + pad + r * lh, nr, self.th("muted_fg"));
                         }

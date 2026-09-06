@@ -2564,7 +2564,7 @@ solange die IDE Python ist), `tools/*.js` (Node, Buch). **Falle beim Bau:**
 Einzug der JSON-Ausgabe; nur `serde_json` reichte nicht, weil der Trait
 `Serialize` aus `serde` kommt).
 
-## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1, 2026-09-06)
+## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 + 2, 2026-09-06)
 
 `ide/ide.dh` (~760 Zeilen) ist die IDE als Drachenhauch-Programm, gestartet
 mit `dhrt run ide/ide.dh [-- datei.dh]`; Doku `docs/ide.md`. Stufe 1: Reiter
@@ -2597,6 +2597,36 @@ KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/test_ide_bausteine.py`
 (die IDE ueber `DH_IDE_LOG` + `AUTOMATION_PLAY`, seriell). Offen: Debugger/
 Profiler-Fenster, Suche im Projekt, Befehlspalette, Handbuch, Drucken,
 Installer ohne PyInstaller -- dann Weg B (Editoren), D nebenher.
+
+**Stufe 2 (selber Tag):** Debugger als Client von `dhrt debug` (JSON-Zeilen:
+stdout Ereignisse `paused`/`output`/`finished`/`error`, stdin Kommandos --
+das Kind liest sie NUR, solange es steht; erster Halt ist Zeile 1, dort
+schickt die IDE `set-breakpoints` und `continue`, wenn es Haltepunkte gibt,
+sonst bleibt sie stehen), Profil aus `dhrt profile` (EINE JSON-Zeile am
+Ende; serde sortiert die Schluessel, also NICHT am Anfang `total_time`
+erkennen), Suche im Projekt (teilt sich die Liste mit den Problemen,
+`problemModus`), Befehlspalette (alle Befehle laufen ueber EINE `befehl(k$)`
+-- Menue, Kuerzel, Knoepfe, Palette), Marken in der Nummernspalte
+(`GUI_TEXTAREA_MARKS(ta, zeilen, farben)`, gui.rs `marken`: Punkt + Farbhauch,
+an der Zeilennummer, nicht am Text), Schriften (Segoe UI/Consolas, 32 px
+geladen, 16 gezeichnet, `GUI_SET_FONT` je Code-Feld), Start `WINDOW_MAXIMIZE`,
+Vollbild Alt+Enter. Kuerzel wie die Qt-IDE: F7 Debuggen (Pruefen jetzt
+Umschalt+F7), F8/F10/F11/Umschalt+F11, F9 Haltepunkt, Strg+Umschalt+F/P/Y.
+**Vier Fallen:** (1) `DIM a AS ARRAY OF T` ohne Groesse ist KEIN Feld --
+`ARRAY_PUSH` meldet "erwartet ARRAY"; erst `a = []`. (2) Widget-Koordinaten
+zaehlen ab dem INHALT unter Menue- und Reiterleiste (56 px) -- Stand 1
+rechnete ab dem Fensterrand, Eingabezeile und Status lagen unter dem Rand,
+und kein Test sah es, nur das Bild. (3) Ein zweites GUI-Fenster liegt hinter
+dem bildschirmfuellenden Hauptfenster, und Menue-Kuerzel gelten nur im
+Fenster mit Fokus -- das Debugger-Panel liegt darum IM Hauptfenster (rechts
+unten statt der Problemliste); das Profilfenster holt `GUI_FOCUS(tblProfil)`
+nach vorn. (4) `flush_out` schreibt im Debugger NICHT mehr roh (stdout ist
+dort der Ereigniskanal; `DHRT_LIVE` haette PRINT-Zeilen hineingemischt).
+Tests in `tests/test_ide.py` (Haltepunkt in Zeile 2 -> Halt in 2, nicht 1;
+F10 -> 3; F8 -> Ende; ohne Haltepunkt Halt in 1; Profil; Projektsuche und
+Palette tippen ueber die Zwischenablage, `CLIPBOARD_SET` wird in die
+Testkopie eingeschoben -- die Kopie liegt darum in einem Unterordner,
+sonst zaehlt die Suche sie mit).
 
 ## Sprachserver `dhrt lsp` + VS-Code-Erweiterung
 

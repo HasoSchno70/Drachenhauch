@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1697,
+ "count": 1698,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -677,6 +677,7 @@
   "GUI_TEXTAREA_FIND": "nächster Treffer ab der Stelle, (-1, -1) wenn keiner; ohne genau ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab 1, 1 suchen",
   "GUI_TEXTAREA_GOTO": "Marke setzen, Auswahl aufheben, den Ausschnitt so rollen, dass die Zeile in der Mitte steht",
   "GUI_TEXTAREA_INSERT": "ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, GUI_ON_CHANGE feuert wie beim Tippen",
+  "GUI_TEXTAREA_MARKS": "Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text",
   "GUI_TEXTAREA_SELECT": "einen Bereich markieren, Marke am Ende",
   "GUI_TEXTAREA_SELECTION$": "der markierte Text",
   "GUI_TEXTAREA_SET": "Textbereich bricht an Wortgrenzen um (Notizen, Briefe)",

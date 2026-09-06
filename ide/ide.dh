@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 1)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 2)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -12,6 +12,10 @@
 '  (Strg+Leertaste, CODE_COMPLETE); Suchen, Ersetzen, Gehe zu Zeile;
 '  Programm starten und stoppen mit laufender Ausgabe (PROCESS_*),
 '  Eingaben an INPUT durchreichen.
+'  Stand 2 dazu: Debugger (Haltepunkte F9, Schritte F8/F10/F11, Variablen
+'  im Fenster -- Client von `dhrt debug`), Profil (`dhrt profile`, Tabelle
+'  nach Zeit), Suche im Projekt, Befehlspalette, Marken in der Nummern-
+'  spalte (GUI_TEXTAREA_MARKS), echte Schriften, Start maximiert.
 '
 '  Aufruf:  dhrt run ide/ide.dh [-- datei.dh]
 '  Test:    DH_IDE_LOG=<datei> schreibt die Ereignisse zeilenweise mit --
@@ -35,7 +39,22 @@ SCREEN(1280, 800, "Drachenhauch", 1)
 WINDOW_RESIZABLE(TRUE)
 WINDOW_MIN_SIZE(800, 500)
 SETFPS(60)
+WINDOW_MAXIMIZE()
 GUI_THEME_PRESET("glas_dunkel")
+
+' Schrift: eine Textschrift fuer die Oberflaeche, eine dicktengleiche fuer den
+' Code. Geladen in 32 px und in 16 gezeichnet -- so bleibt sie scharf. Ohne
+' Fund bleibt raylibs Bitmapschrift.
+DIM uiFont AS INTEGER : uiFont = -1
+DIM codeFont AS INTEGER : codeFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+FOR EACH fp IN ("C:/Windows/Fonts/consola.ttf", "/System/Library/Fonts/Menlo.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf")
+    IF codeFont < 0 AND FILEEXISTS(fp) THEN codeFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
 
 ' --- Zustand -----------------------------------------------------------
 DIM logDatei AS STRING : logDatei = GETENV$("DH_IDE_LOG")
@@ -59,6 +78,24 @@ DIM letzteMarke AS STRING : letzteMarke = ""
 DIM suchtext AS STRING : suchtext = ""
 DIM ersatztext AS STRING : ersatztext = ""
 DIM fertigNachStopp AS BOOLEAN : fertigNachStopp = FALSE
+DIM prozessArt AS STRING : prozessArt = ""          ' run / debug / profile
+DIM prozessRest AS STRING : prozessRest = ""        ' halbe Zeile aus stdout
+
+' Debugger
+DIM debugPause AS BOOLEAN : debugPause = FALSE
+DIM debugErst AS BOOLEAN : debugErst = FALSE
+DIM debugZeile AS INTEGER : debugZeile = 0
+DIM hpDateien AS ARRAY OF STRING : hpDateien = []
+DIM hpZeilen AS ARRAY OF INTEGER : hpZeilen = []
+DIM markenSchluessel AS STRING : markenSchluessel = ""
+
+' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
+DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
+DIM sucheDateien AS ARRAY OF STRING : sucheDateien = []
+DIM sucheZeilen AS ARRAY OF INTEGER : sucheZeilen = []
+
+' Profil
+DIM profilZeilen AS ARRAY OF INTEGER : profilZeilen = []
 
 ' offene Dialoge (0 = keiner)
 DIM dlgSuche AS GUI_WINDOW : dlgSuche = 0
@@ -67,6 +104,7 @@ DIM dlgZeile AS GUI_WINDOW : dlgZeile = 0
 DIM dlgEingabe AS GUI_WINDOW : dlgEingabe = 0
 DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
 DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
+DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM schliessenNachDialog AS BOOLEAN : schliessenNachDialog = FALSE
 
 SUB protokoll(text AS STRING)
@@ -98,17 +136,30 @@ DIM miSuchen AS INTEGER : miSuchen = GUI_MENU_ITEM(mBearb, "Suchen ...", "Strg+F
 DIM miWeiter AS INTEGER : miWeiter = GUI_MENU_ITEM(mBearb, "Weitersuchen", "F3")
 DIM miErsetzen AS INTEGER : miErsetzen = GUI_MENU_ITEM(mBearb, "Ersetzen ...", "Strg+H")
 DIM miZeile AS INTEGER : miZeile = GUI_MENU_ITEM(mBearb, "Gehe zu Zeile ...", "Strg+G")
+DIM miProjekt AS INTEGER : miProjekt = GUI_MENU_ITEM(mBearb, "Im Projekt suchen ...", "Strg+Umschalt+F")
+GUI_MENU_SEPARATOR(mBearb)
 DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, "Vervollstaendigen", "Strg+Leer")
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definition", "F12")
+DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
 DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
 DIM miStopp AS INTEGER : miStopp = GUI_MENU_ITEM(mLauf, "Stoppen", "Umschalt+F5")
-DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Pruefen", "F7")
+DIM miPruefen AS INTEGER : miPruefen = GUI_MENU_ITEM(mLauf, "Pruefen", "Umschalt+F7")
+GUI_MENU_SEPARATOR(mLauf)
+DIM miDebug AS INTEGER : miDebug = GUI_MENU_ITEM(mLauf, "Debuggen", "F7")
+DIM miHaltepunkt AS INTEGER : miHaltepunkt = GUI_MENU_ITEM(mLauf, "Haltepunkt setzen/entfernen", "F9")
+DIM miWeiterD AS INTEGER : miWeiterD = GUI_MENU_ITEM(mLauf, "Weiter", "F8")
+DIM miDrueber AS INTEGER : miDrueber = GUI_MENU_ITEM(mLauf, "Schritt drueber", "F10")
+DIM miHinein AS INTEGER : miHinein = GUI_MENU_ITEM(mLauf, "Schritt hinein", "F11")
+DIM miHeraus AS INTEGER : miHeraus = GUI_MENU_ITEM(mLauf, "Schritt heraus", "Umschalt+F11")
+GUI_MENU_SEPARATOR(mLauf)
+DIM miProfil AS INTEGER : miProfil = GUI_MENU_ITEM(mLauf, "Profil aufnehmen", "Strg+Umschalt+Y")
 
 DIM mAnsicht AS INTEGER : mAnsicht = GUI_MENU(win, "Ansicht")
 DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, "Helles Thema")
 GUI_MENU_CHECK(miThema, FALSE)
+DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
@@ -133,43 +184,99 @@ GUI_WINDOW_VISIBLE(winVervoll, FALSE)
 DIM vervollPraefixLaenge AS INTEGER : vervollPraefixLaenge = 0
 DIM vervollOffen AS BOOLEAN : vervollOffen = FALSE
 
+' Debugger: Variablen und die Schritt-Knoepfe rechts unten IM Hauptfenster,
+' anstelle der Problemliste, solange der Debugger laeuft. Ein eigenes Fenster
+' laege hinter dem bildschirmfuellenden Hauptfenster, und Kuerzel gelten nur
+' im Fenster mit Fokus -- F8/F10 waeren dort tot.
+DIM lblDebug AS GUI_WIDGET : lblDebug = GUI_LABEL(win, "", 0, 0)
+DIM btnWeiter AS GUI_WIDGET : btnWeiter = GUI_BUTTON(win, "Weiter (F8)", 0, 0, 100, 26)
+DIM btnDrueber AS GUI_WIDGET : btnDrueber = GUI_BUTTON(win, "Drueber (F10)", 0, 0, 108, 26)
+DIM btnHinein AS GUI_WIDGET : btnHinein = GUI_BUTTON(win, "Hinein (F11)", 0, 0, 104, 26)
+DIM btnHeraus AS GUI_WIDGET : btnHeraus = GUI_BUTTON(win, "Heraus", 0, 0, 70, 26)
+DIM btnStoppD AS GUI_WIDGET : btnStoppD = GUI_BUTTON(win, "Stopp", 0, 0, 60, 26)
+DIM tblVars AS GUI_WIDGET : tblVars = GUI_TABLE(win, 0, 0, 10, 10)
+GUI_TABLE_HEADERS(tblVars, ["Name", "Typ", "Wert", "Bereich"])
+GUI_TABLE_COL_WIDTHS(tblVars, [140, 90, 260, 70])
+DIM debugSichtbar AS BOOLEAN : debugSichtbar = FALSE
+
+' Profil: die Zeilen nach Zeit, ein Klick springt hin.
+DIM winProfil AS GUI_WINDOW : winProfil = GUI_WINDOW("Profil", 600, 60, 640, 460)
+DIM lblProfil AS GUI_WIDGET : lblProfil = GUI_LABEL(winProfil, "", 8, 6)
+DIM tblProfil AS GUI_WIDGET : tblProfil = GUI_TABLE(winProfil, 8, 30, 624, 396)
+GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
+GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
+GUI_TABLE_SET(tblProfil, "sortierbar", 1)
+GUI_WINDOW_VISIBLE(winProfil, FALSE)
+
+' Befehlspalette: tippen filtert, Enter fuehrt aus.
+DIM winPalette AS GUI_WINDOW : winPalette = GUI_WINDOW("Befehle", 400, 80, 440, 340)
+DIM tfPalette AS GUI_WIDGET : tfPalette = GUI_TEXTINPUT(winPalette, 8, 8, 424, 26, "")
+DIM lstPalette AS GUI_WIDGET : lstPalette = GUI_LISTBOX(winPalette, 8, 40, 424, 260, [])
+GUI_WINDOW_VISIBLE(winPalette, FALSE)
+DIM paletteOffen AS BOOLEAN : paletteOffen = FALSE
+DIM paletteLetzterFilter AS STRING : paletteLetzterFilter = "-"
+DIM paletteNamen AS ARRAY OF STRING : paletteNamen = []
+DIM paletteKennungen AS ARRAY OF STRING : paletteKennungen = []
+DIM paletteSichtbar AS ARRAY OF STRING : paletteSichtbar = []
+
 ' Alle Widgets auf jedem Reiter sichtbar -- die Reiter schalten nur die Code-Felder.
 DIM tabTitel[MAX_TABS] AS STRING
 
 DIM breiteLinks AS INTEGER : breiteLinks = 220
 DIM hoeheUnten AS INTEGER : hoeheUnten = 200
 
+SUB debugPanelZeigen(an AS BOOLEAN)
+    debugSichtbar = an
+    GUI_SET_VISIBLE(lblProbleme, NOT an) : GUI_SET_VISIBLE(lstProbleme, NOT an) : GUI_SET_VISIBLE(lblHilfe, NOT an)
+    GUI_SET_VISIBLE(lblDebug, an) : GUI_SET_VISIBLE(tblVars, an)
+    GUI_SET_VISIBLE(btnWeiter, an) : GUI_SET_VISIBLE(btnDrueber, an) : GUI_SET_VISIBLE(btnHinein, an)
+    GUI_SET_VISIBLE(btnHeraus, an) : GUI_SET_VISIBLE(btnStoppD, an)
+END SUB
+
 SUB layout()
     DIM w AS INTEGER : w = SCREENWIDTH()
     DIM h AS INTEGER : h = SCREENHEIGHT()
     GUI_WINDOW_SET_BOUNDS(win, 0, 0, w, h)
-    DIM oben AS INTEGER : oben = 30          ' unter der Menueleiste
+    ' Widget-Koordinaten zaehlen ab dem INHALT: Menueleiste und Reiterleiste
+    ' liegen darueber (zusammen 56 px) und gehen von der Hoehe ab -- sonst
+    ' rutschen Eingabezeile und Status unter den Fensterrand (Stand 1 tat das).
+    DIM kopf AS INTEGER : kopf = 56
+    DIM hi AS INTEGER : hi = h - kopf
+    DIM oben AS INTEGER : oben = 4
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
-    DIM mitteH AS INTEGER : mitteH = h - oben - hoeheUnten - statusH - eingabeH - 12
+    DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12
     GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
     GUI_SET_BOUNDS(baum, 8, oben + 22, breiteLinks - 16, mitteH - 22)
     DIM ex AS INTEGER : ex = breiteLinks
     DIM ew AS INTEGER : ew = w - breiteLinks - 8
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        ' Platz fuer die Reiterleiste oben lassen.
-        GUI_SET_BOUNDS(tabFelder[i], ex, oben + 30, ew, mitteH - 30)
+        GUI_SET_BOUNDS(tabFelder[i], ex, oben, ew, mitteH)
     NEXT
-    GUI_SET_BOUNDS(lblKeineDatei, ex + 10, oben + 40, ew - 20, 18)
+    GUI_SET_BOUNDS(lblKeineDatei, ex + 10, oben + 10, ew - 20, 18)
     GUI_SET_VISIBLE(lblKeineDatei, tabAnzahl = 0)
     DIM uy AS INTEGER : uy = oben + mitteH + 4
     DIM halb AS INTEGER : halb = (w - 24) \ 2
     GUI_SET_BOUNDS(lblAusgabe, 8, uy, 200, 18)
     GUI_SET_BOUNDS(lstAusgabe, 8, uy + 20, halb, hoeheUnten - 20)
-    GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, 200, 18)
+    GUI_SET_BOUNDS(lblProbleme, 16 + halb, uy, halb, 18)
     GUI_SET_BOUNDS(lstProbleme, 16 + halb, uy + 20, halb, (hoeheUnten - 20) \ 2 - 4)
     GUI_SET_BOUNDS(lblHilfe, 16 + halb, uy + 20 + (hoeheUnten - 20) \ 2, halb, (hoeheUnten - 20) \ 2)
     GUI_SET_WRAP(lblHilfe, halb - 8)
-    DIM ey AS INTEGER : ey = h - statusH - eingabeH - 4
+    ' Debugger-Panel auf derselben Flaeche
+    GUI_SET_BOUNDS(lblDebug, 16 + halb, uy, halb, 18)
+    GUI_SET_BOUNDS(btnWeiter, 16 + halb, uy + 20, 100, 26)
+    GUI_SET_BOUNDS(btnDrueber, 122 + halb, uy + 20, 108, 26)
+    GUI_SET_BOUNDS(btnHinein, 236 + halb, uy + 20, 104, 26)
+    GUI_SET_BOUNDS(btnHeraus, 346 + halb, uy + 20, 70, 26)
+    GUI_SET_BOUNDS(btnStoppD, 422 + halb, uy + 20, 60, 26)
+    GUI_SET_BOUNDS(tblVars, 16 + halb, uy + 52, halb, hoeheUnten - 52)
+    debugPanelZeigen(debugSichtbar)
+    DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
     GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
     GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
-    GUI_SET_BOUNDS(lblStatus, 8, h - statusH, w - 16, 18)
+    GUI_SET_BOUNDS(lblStatus, 8, hi - statusH, w - 16, 18)
 END SUB
 
 ' --- Reiter ------------------------------------------------------------
@@ -188,6 +295,7 @@ SUB reiterNeuSetzen()
 END SUB
 
 SUB feldEinrichten(ta AS GUI_WIDGET)
+    IF codeFont >= 0 THEN GUI_SET_FONT(ta, codeFont) : GUI_SET_FONT_SIZE(ta, 16)
     GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
     GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
     GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
@@ -355,11 +463,11 @@ SUB faerben(ta AS GUI_WIDGET)
 END SUB
 
 ' --- Pruefen -----------------------------------------------------------
-DIM problemZeilen AS ARRAY OF INTEGER
+DIM problemZeilen AS ARRAY OF INTEGER : problemZeilen = []
 
 SUB pruefen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    GUI_LISTBOX_CLEAR(lstProbleme)
+    IF problemModus = 0 THEN GUI_LISTBOX_CLEAR(lstProbleme)
     IF ta < 0 THEN RETURN
     DIM basis AS STRING : basis = projektOrdner
     IF tabPfade[aktiverTab] <> "" THEN basis = DIRNAME(tabPfade[aktiverTab])
@@ -374,25 +482,122 @@ SUB pruefen()
         zeilen[i] = JSON_GET_INT(j, p + ".zeile")
         DIM art AS STRING : art = JSON_GET_STRING(j, p + ".schwere")
         IF art = "fehler" THEN fehler = fehler + 1
-        GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
-        IF art = "fehler" THEN GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060) ELSE GUI_LISTBOX_COLOR(lstProbleme, i, &HE0C060)
+        IF problemModus = 0 THEN
+            GUI_LISTBOX_ADD(lstProbleme, "Zeile " + STR$(zeilen[i]) + ": " + JSON_GET_STRING(j, p + ".meldung"))
+            IF art = "fehler" THEN GUI_LISTBOX_COLOR(lstProbleme, i, &HE06060) ELSE GUI_LISTBOX_COLOR(lstProbleme, i, &HE0C060)
+        END IF
     NEXT
     problemZeilen = zeilen
-    IF n = 0 THEN
-        GUI_SET_TEXT(lblProbleme, "Probleme: keine")
-    ELSE
-        GUI_SET_TEXT(lblProbleme, "Probleme: " + STR$(fehler) + " Fehler, " + STR$(n - fehler) + " Warnungen")
+    IF problemModus = 0 THEN
+        IF n = 0 THEN
+            GUI_SET_TEXT(lblProbleme, "Probleme: keine")
+        ELSE
+            GUI_SET_TEXT(lblProbleme, "Probleme: " + STR$(fehler) + " Fehler, " + STR$(n - fehler) + " Warnungen")
+        END IF
     END IF
     protokoll("geprueft " + STR$(n))
 END SUB
 
 SUB problemAnspringen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstProbleme)
+    IF problemModus = 1 THEN
+        IF sel < 0 OR sel >= LEN(sucheZeilen) THEN RETURN
+        dateiOeffnen(PATHJOIN(projektOrdner, sucheDateien[sel]))
+        DIM tf AS GUI_WIDGET : tf = aktivesFeld()
+        IF tf >= 0 THEN GUI_TEXTAREA_GOTO(tf, sucheZeilen[sel], 1) : GUI_FOCUS(tf)
+        RETURN
+    END IF
     IF sel < 0 OR sel >= LEN(problemZeilen) THEN RETURN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     GUI_TEXTAREA_GOTO(ta, problemZeilen[sel], 1)
     GUI_FOCUS(ta)
+END SUB
+
+' --- Suche im Projekt --------------------------------------------------
+SUB projektSuchen(gesucht AS STRING)
+    IF gesucht = "" THEN RETURN
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM klein AS STRING : klein = LOWER$(gesucht)
+    DIM treffer AS INTEGER : treffer = 0
+    DIM inDateien AS INTEGER : inDateien = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM vorher AS INTEGER : vorher = treffer
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF treffer >= 500 THEN BREAK
+            IF INSTR(LOWER$(zeilen[i]), klein) >= 0 THEN
+                ARRAY_PUSH(sd, d)
+                ARRAY_PUSH(sz, i + 1)
+                GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
+                treffer = treffer + 1
+            END IF
+        NEXT
+        IF treffer > vorher THEN inDateien = inDateien + 1
+    NEXT
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, "Suche '" + gesucht + "': " + STR$(treffer) + " Treffer in " + STR$(inDateien) + " Dateien -- Umschalt+F7 zeigt wieder die Probleme")
+    protokoll("suche " + STR$(treffer))
+END SUB
+
+' --- Haltepunkte und Marken in der Nummernspalte ---------------------
+FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hpZeilen) - 1
+        IF hpDateien[i] = pfad AND hpZeilen[i] = zeile THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB haltepunktUmschalten()
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF pfad = "" THEN GUI_SET_TEXT(lblStatus, "Erst sichern -- Haltepunkte gehoeren zu einer Datei.") : RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
+    DIM k AS INTEGER : k = haltepunktIndex(pfad, z)
+    IF k >= 0 THEN
+        ARRAY_REMOVE_AT(hpDateien, k)
+        ARRAY_REMOVE_AT(hpZeilen, k)
+        protokoll("haltepunkt " + STR$(z) + " aus")
+    ELSE
+        ARRAY_PUSH(hpDateien, pfad)
+        ARRAY_PUSH(hpZeilen, z)
+        protokoll("haltepunkt " + STR$(z) + " an")
+    END IF
+    ' Laeuft der Debugger gerade an dieser Datei und steht, gilt es sofort.
+    IF prozessArt = "debug" AND debugPause AND prozessDatei = pfad THEN debugHaltepunkteSenden()
+END SUB
+
+SUB markenNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    DIM zeilen AS ARRAY OF INTEGER : zeilen = []
+    DIM farben AS ARRAY OF INTEGER : farben = []
+    DIM schl AS STRING : schl = pfad + "|"
+    ' Reihenfolge = Vorrang: die angehaltene Zeile vor dem Haltepunkt vor dem Fehler.
+    IF prozessArt = "debug" AND debugPause AND prozessDatei = pfad AND debugZeile > 0 THEN
+        ARRAY_PUSH(zeilen, debugZeile) : ARRAY_PUSH(farben, &HFFD040) : schl = schl + "p" + STR$(debugZeile)
+    END IF
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hpZeilen) - 1
+        IF hpDateien[i] = pfad THEN ARRAY_PUSH(zeilen, hpZeilen[i]) : ARRAY_PUSH(farben, &HE05050) : schl = schl + "h" + STR$(hpZeilen[i])
+    NEXT
+    FOR i = 0 TO LEN(problemZeilen) - 1
+        ARRAY_PUSH(zeilen, problemZeilen[i]) : ARRAY_PUSH(farben, &HD08040) : schl = schl + "f" + STR$(problemZeilen[i])
+    NEXT
+    IF schl = markenSchluessel THEN RETURN
+    markenSchluessel = schl
+    GUI_TEXTAREA_MARKS(ta, zeilen, farben)
 END SUB
 
 ' --- Hilfe zum Wort unter der Marke ----------------------------------
@@ -523,41 +728,235 @@ SUB ausgabeVerteilen(text AS STRING)
     WEND
 END SUB
 
-SUB starten()
-    IF aktiverTab < 0 THEN RETURN
+' Ein Programm starten -- als Lauf, im Debugger oder unter dem Profiler.
+' Alle drei sind derselbe Kindprozess mit einem anderen Unterbefehl.
+FUNCTION prozessStarten(art AS STRING) AS BOOLEAN
+    IF aktiverTab < 0 THEN RETURN FALSE
     IF prozess >= 0 THEN
         GUI_SET_TEXT(lblStatus, "Es laeuft noch ein Programm -- erst stoppen (Umschalt+F5).")
-        RETURN
+        RETURN FALSE
     END IF
     IF tabPfade[aktiverTab] = "" OR GUI_TEXT(tabFelder[aktiverTab]) <> tabGesichert[aktiverTab] THEN
-        IF NOT sichern(aktiverTab, FALSE) THEN RETURN
+        IF NOT sichern(aktiverTab, FALSE) THEN RETURN FALSE
     END IF
     GUI_LISTBOX_CLEAR(lstAusgabe)
-    ausgabeRest = ""
+    ausgabeRest = "" : prozessRest = ""
     prozessDatei = tabPfade[aktiverTab]
-    prozess = PROCESS_START("dhrt", "run", prozessDatei)
+    prozessArt = art
+    prozess = PROCESS_START("dhrt", art, prozessDatei)
     GUI_SET_TEXT(lblAusgabe, "Ausgabe: " + BASENAME(prozessDatei) + " laeuft ...")
     GUI_SET_TEXT(lblStatus, "Gestartet: " + prozessDatei)
-    protokoll("gestartet " + prozessDatei)
+    RETURN TRUE
+END FUNCTION
+
+SUB starten()
+    IF prozessStarten("run") THEN protokoll("gestartet " + prozessDatei)
 END SUB
 
 SUB stoppen()
     IF prozess < 0 THEN RETURN
+    IF prozessArt = "debug" AND debugPause THEN debugSenden("stop")
     PROCESS_KILL(prozess)
     fertigNachStopp = TRUE
 END SUB
 
+' --- Debugger: Client von `dhrt debug` (JSON-Zeilen: stdin Kommandos,
+' stdout Ereignisse). Kommandos nimmt das Kind nur an, solange es steht.
+SUB debuggen()
+    IF NOT prozessStarten("debug") THEN RETURN
+    debugPause = FALSE : debugErst = TRUE : debugZeile = 0
+    GUI_SET_TEXT(lblDebug, "Debugger: laeuft ...")
+    GUI_TABLE_CLEAR(tblVars)
+    debugPanelZeigen(TRUE)
+    protokoll("debug gestartet")
+END SUB
+
+SUB debugSenden(cmd AS STRING)
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    PROCESS_WRITE(prozess, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + cmd + CHR$(34) + "}" + NL)
+END SUB
+
+SUB debugHaltepunkteSenden()
+    IF prozess < 0 OR prozessArt <> "debug" THEN RETURN
+    DIM liste AS STRING : liste = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(hpZeilen) - 1
+        IF hpDateien[i] = prozessDatei THEN
+            IF liste <> "" THEN liste = liste + ","
+            liste = liste + STR$(hpZeilen[i])
+        END IF
+    NEXT
+    PROCESS_WRITE(prozess, "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "set-breakpoints" + CHR$(34) + "," + CHR$(34) + "lines" + CHR$(34) + ":[" + liste + "]}" + NL)
+END SUB
+
+' Ein Schritt-Kommando: nur, wenn das Kind steht.
+SUB debugSchritt(cmd AS STRING)
+    IF prozessArt <> "debug" OR NOT debugPause THEN
+        GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- F7 startet ihn, F9 setzt einen Haltepunkt.")
+        RETURN
+    END IF
+    debugSenden(cmd)
+    debugPause = FALSE
+    GUI_SET_TEXT(lblDebug, "Debugger: laeuft ...")
+END SUB
+
+SUB variablenZeigen(j AS JSON_HANDLE)
+    GUI_TABLE_CLEAR(tblVars)
+    DIM bereich AS STRING
+    FOR EACH bereich IN ("locals", "globals")
+        IF NOT JSON_HAS(j, bereich) THEN CONTINUE
+        DIM n AS INTEGER : n = JSON_LEN(j, bereich)
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            DIM p AS STRING : p = bereich + "." + STR$(i)
+            DIM wo AS STRING : wo = "lokal"
+            IF bereich = "globals" THEN wo = "global"
+            GUI_TABLE_ADD_ROW(tblVars, [JSON_GET_STRING(j, p + ".name"), JSON_GET_STRING(j, p + ".type"), JSON_GET_STRING(j, p + ".value"), wo])
+        NEXT
+    NEXT
+END SUB
+
+SUB debugEreignis(zeile AS STRING)
+    IF LEFT$(zeile, 1) <> "{" THEN ausgabe(zeile) : RETURN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
+    DIM ev AS STRING : ev = JSON_GET_STRING(j, "event")
+    SELECT CASE ev
+        CASE "output"
+            ausgabeVerteilen(JSON_GET_STRING(j, "text"))
+        CASE "paused"
+            debugZeile = JSON_GET_INT(j, "line")
+            IF debugErst THEN
+                ' Der erste Halt ist die erste Zeile: jetzt kennt das Kind
+                ' seine Haltepunkte. Gibt es welche, laeuft es bis dorthin;
+                ' ohne Haltepunkte bleibt es stehen -- sonst saehe man nichts.
+                debugErst = FALSE
+                debugHaltepunkteSenden()
+                DIM hat AS BOOLEAN : hat = FALSE
+                DIM i AS INTEGER
+                FOR i = 0 TO LEN(hpZeilen) - 1
+                    IF hpDateien[i] = prozessDatei THEN hat = TRUE
+                NEXT
+                IF hat AND haltepunktIndex(prozessDatei, debugZeile) < 0 THEN debugSenden("continue") : RETURN
+            END IF
+            debugPause = TRUE
+            variablenZeigen(j)
+            GUI_SET_TEXT(lblDebug, "Debugger steht in Zeile " + STR$(debugZeile) + " (Tiefe " + STR$(JSON_GET_INT(j, "depth")) + ")")
+            dateiOeffnen(prozessDatei)
+            DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+            IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, debugZeile, 1)
+            protokoll("debug pause " + STR$(debugZeile))
+        CASE "finished"
+            ausgabe("-- Debugger: " + JSON_GET_STRING(j, "reason"))
+            protokoll("debug beendet")
+        CASE "error"
+            debugZeile = JSON_GET_INT(j, "line")
+            ausgabe("-- Fehler in Zeile " + STR$(debugZeile) + ": " + JSON_GET_STRING(j, "message"))
+            protokoll("debug fehler " + STR$(debugZeile))
+        CASE "eval-result", "eval-error"
+            ausgabe(zeile)
+    END SELECT
+END SUB
+
+' --- Profil: `dhrt profile` liefert am Ende EINE JSON-Zeile --------------
+SUB profilAufnehmen()
+    IF prozessStarten("profile") THEN protokoll("profil gestartet")
+END SUB
+
+SUB profilAnzeigen(zeile AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(zeile)
+    ausgabeVerteilen(JSON_GET_STRING(j, "output"))
+    DIM gesamt AS FLOAT : gesamt = JSON_GET_FLOAT(j, "total_time")
+    DIM n AS INTEGER : n = JSON_LEN(j, "lines")
+    DIM zl[MAX(n, 1)] AS INTEGER
+    DIM za[MAX(n, 1)] AS INTEGER
+    DIM zt[MAX(n, 1)] AS FLOAT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = "lines." + STR$(i)
+        zl[i] = JSON_GET_INT(j, p + ".line")
+        za[i] = JSON_GET_INT(j, p + ".count")
+        zt[i] = JSON_GET_FLOAT(j, p + ".time")
+    NEXT
+    ' Nach Zeit absteigend -- die teuerste Zeile zuerst.
+    DIM k AS INTEGER
+    FOR i = 0 TO n - 2
+        DIM best AS INTEGER : best = i
+        FOR k = i + 1 TO n - 1
+            IF zt[k] > zt[best] THEN best = k
+        NEXT
+        IF best <> i THEN
+            DIM t1 AS INTEGER : t1 = zl[i] : zl[i] = zl[best] : zl[best] = t1
+            t1 = za[i] : za[i] = za[best] : za[best] = t1
+            DIM t2 AS FLOAT : t2 = zt[i] : zt[i] = zt[best] : zt[best] = t2
+        END IF
+    NEXT
+    DIM quelle AS ARRAY OF STRING : quelle = []
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 AND tabPfade[aktiverTab] = prozessDatei THEN quelle = SPLIT$(GUI_TEXT(ta), NL)
+    GUI_TABLE_CLEAR(tblProfil)
+    DIM pz AS ARRAY OF INTEGER : pz = []
+    FOR i = 0 TO MIN(n, 300) - 1
+        DIM anteil AS STRING : anteil = "-"
+        IF gesamt > 0.0 THEN anteil = FORMAT$(zt[i] / gesamt * 100.0, "%.1f") + " %"
+        DIM q AS STRING : q = ""
+        IF zl[i] >= 1 AND zl[i] <= LEN(quelle) THEN q = TRIM$(quelle[zl[i] - 1])
+        GUI_TABLE_ADD_ROW(tblProfil, [STR$(zl[i]), STR$(za[i]), FORMAT$(zt[i] * 1000.0, "%.2f"), anteil, q])
+        ARRAY_PUSH(pz, zl[i])
+    NEXT
+    profilZeilen = pz
+    GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + " ms gesamt, " + STR$(n) + " Zeilen gemessen")
+    IF JSON_HAS(j, "error") THEN ausgabe("-- Fehler in Zeile " + STR$(JSON_GET_INT(j, "error_line")) + ": " + JSON_GET_STRING(j, "error"))
+    GUI_WINDOW_VISIBLE(winProfil, TRUE)
+    GUI_FOCUS(tblProfil)          ' holt das Fenster vor das Hauptfenster
+    protokoll("profil " + STR$(n))
+END SUB
+
+SUB profilAnspringen()
+    DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tblProfil)
+    IF r < 0 OR r >= LEN(profilZeilen) THEN RETURN
+    dateiOeffnen(prozessDatei)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN GUI_TEXTAREA_GOTO(ta, profilZeilen[r], 1) : GUI_FOCUS(ta)
+END SUB
+
+' stdout des Kindes: beim Lauf Text, beim Debugger Ereignisse, beim Profil
+' am Ende die eine JSON-Zeile -- alles zeilenweise, halbe Zeilen warten.
+SUB stdoutVerteilen(text AS STRING)
+    IF text = "" THEN RETURN
+    IF prozessArt = "run" THEN ausgabeVerteilen(text) : RETURN
+    prozessRest = prozessRest + text
+    WHILE INSTR(prozessRest, NL) >= 0
+        DIM p AS INTEGER : p = INSTR(prozessRest, NL)
+        DIM z AS STRING : z = REPLACE$(LEFT$(prozessRest, p), CHR$(13), "")
+        prozessRest = MID$(prozessRest, p + 1)
+        IF prozessArt = "debug" THEN
+            debugEreignis(z)
+        ELSEIF LEFT$(z, 1) = "{" AND INSTR(z, CHR$(34) + "total_time" + CHR$(34)) >= 0 THEN
+            ' die eine Ergebniszeile des Profilers (Schluessel sortiert, also
+            ' nicht am Anfang zu erkennen)
+            profilAnzeigen(z)
+        ELSE
+            ausgabe(z)
+        END IF
+    WEND
+END SUB
+
 SUB prozessNachsehen()
     IF prozess < 0 THEN RETURN
-    ausgabeVerteilen(PROCESS_READ$(prozess))
+    stdoutVerteilen(PROCESS_READ$(prozess))
     DIM err AS STRING : err = PROCESS_ERR$(prozess)
     IF err <> "" THEN ausgabeVerteilen(err)
     IF NOT PROCESS_RUNNING(prozess) THEN
-        ausgabeVerteilen(PROCESS_READ$(prozess))
+        stdoutVerteilen(PROCESS_READ$(prozess))
+        IF prozessRest <> "" THEN stdoutVerteilen(NL)
         IF ausgabeRest <> "" THEN ausgabe(ausgabeRest) : ausgabeRest = ""
         DIM code AS INTEGER : code = PROCESS_CODE(prozess)
         PROCESS_CLOSE(prozess)
         prozess = -1
+        IF prozessArt = "debug" THEN
+            debugPause = FALSE : debugZeile = 0
+            debugPanelZeigen(FALSE)
+        END IF
         IF fertigNachStopp THEN
             GUI_SET_TEXT(lblAusgabe, "Ausgabe: gestoppt")
             protokoll("gestoppt")
@@ -566,7 +965,66 @@ SUB prozessNachsehen()
             protokoll("beendet " + STR$(code))
         END IF
         fertigNachStopp = FALSE
+        prozessArt = ""
     END IF
+END SUB
+
+' --- Befehlspalette ------------------------------------------------------
+SUB paletteEintrag(name AS STRING, kennung AS STRING)
+    ARRAY_PUSH(paletteNamen, name)
+    ARRAY_PUSH(paletteKennungen, kennung)
+END SUB
+
+paletteEintrag("Neu", "neu") : paletteEintrag("Oeffnen ...", "oeffnen")
+paletteEintrag("Sichern", "sichern") : paletteEintrag("Sichern unter ...", "sichern_unter")
+paletteEintrag("Reiter schliessen", "schliessen") : paletteEintrag("Suchen ...", "suchen")
+paletteEintrag("Weitersuchen", "weiter") : paletteEintrag("Ersetzen ...", "ersetzen")
+paletteEintrag("Gehe zu Zeile ...", "zeile") : paletteEintrag("Im Projekt suchen ...", "projekt")
+paletteEintrag("Vervollstaendigen", "vervoll") : paletteEintrag("Zur Definition", "definition")
+paletteEintrag("Starten", "start") : paletteEintrag("Stoppen", "stopp") : paletteEintrag("Pruefen", "pruefen")
+paletteEintrag("Debuggen", "debug") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt")
+paletteEintrag("Weiter", "weiter_d") : paletteEintrag("Schritt drueber", "drueber")
+paletteEintrag("Schritt hinein", "hinein") : paletteEintrag("Schritt heraus", "heraus")
+paletteEintrag("Profil aufnehmen", "profil") : paletteEintrag("Helles Thema", "thema")
+paletteEintrag("Vollbild", "vollbild") : paletteEintrag("Ueber ...", "ueber") : paletteEintrag("Beenden", "beenden")
+
+SUB paletteFuellen(filter AS STRING)
+    GUI_LISTBOX_CLEAR(lstPalette)
+    DIM sichtbar AS ARRAY OF STRING : sichtbar = []
+    DIM klein AS STRING : klein = LOWER$(filter)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(paletteNamen) - 1
+        IF klein = "" OR INSTR(LOWER$(paletteNamen[i]), klein) >= 0 THEN
+            GUI_LISTBOX_ADD(lstPalette, paletteNamen[i])
+            ARRAY_PUSH(sichtbar, paletteKennungen[i])
+        END IF
+    NEXT
+    paletteSichtbar = sichtbar
+    IF LEN(sichtbar) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstPalette, 0)
+END SUB
+
+SUB paletteOeffnen()
+    GUI_SET_TEXT(tfPalette, "")
+    paletteLetzterFilter = "-"
+    GUI_WINDOW_SET_BOUNDS(winPalette, (SCREENWIDTH() - 440) \ 2, 80, 440, 340)
+    GUI_WINDOW_VISIBLE(winPalette, TRUE)
+    paletteOffen = TRUE
+    GUI_FOCUS(tfPalette)
+END SUB
+
+SUB paletteSchliessen()
+    GUI_WINDOW_VISIBLE(winPalette, FALSE)
+    paletteOffen = FALSE
+    GUI_FOCUS(aktivesFeld())
+END SUB
+
+SUB paletteAusfuehren()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstPalette)
+    IF sel < 0 AND LEN(paletteSichtbar) > 0 THEN sel = 0
+    paletteSchliessen()
+    IF sel < 0 OR sel >= LEN(paletteSichtbar) THEN RETURN
+    protokoll("palette " + paletteSichtbar[sel])
+    befehl(paletteSichtbar[sel])
 END SUB
 
 SUB eingabeSenden()
@@ -599,6 +1057,46 @@ SUB beendenAnfragen()
     END IF
 END SUB
 
+DIM hell AS BOOLEAN : hell = FALSE
+
+' EIN Ort fuer jeden Befehl: Menue, Kuerzel, Palette und Knoepfe rufen ihn.
+SUB befehl(k AS STRING)
+    SELECT CASE k
+        CASE "neu" : tabOeffnen("", "")
+        CASE "oeffnen"
+            DIM p AS STRING : p = FILE_OPEN_DIALOG("Datei oeffnen", "dh")
+            IF p <> "" THEN dateiOeffnen(p)
+        CASE "sichern" : sichern(aktiverTab, FALSE)
+        CASE "sichern_unter" : sichern(aktiverTab, TRUE)
+        CASE "schliessen" : tabSchliessen(aktiverTab)
+        CASE "beenden" : beendenAnfragen()
+        CASE "suchen" : dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
+        CASE "weiter" : weitersuchen(TRUE)
+        CASE "ersetzen" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
+        CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
+        CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
+        CASE "vervoll" : vervollstaendigen()
+        CASE "definition" : zurDefinition()
+        CASE "palette" : paletteOeffnen()
+        CASE "start" : starten()
+        CASE "stopp" : stoppen()
+        CASE "pruefen" : problemModus = 0 : pruefen()
+        CASE "debug" : debuggen()
+        CASE "haltepunkt" : haltepunktUmschalten()
+        CASE "weiter_d" : debugSchritt("continue")
+        CASE "drueber" : debugSchritt("step-over")
+        CASE "hinein" : debugSchritt("step-into")
+        CASE "heraus" : debugSchritt("step-out")
+        CASE "profil" : profilAufnehmen()
+        CASE "thema"
+            hell = NOT hell
+            GUI_MENU_CHECK(miThema, hell)
+            IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
+        CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 2 -- geschrieben in Drachenhauch.", "ok")
+    END SELECT
+END SUB
+
 ' --- Start -------------------------------------------------------------
 layout()
 reiterNeuSetzen()
@@ -618,7 +1116,6 @@ protokoll("bereit")
 DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
 DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
 DIM letzterTab AS INTEGER : letzterTab = -1
-DIM hell AS BOOLEAN : hell = FALSE
 
 WHILE NOT QUITREQUESTED() AND NOT beenden
     GUI_UPDATE()
@@ -634,31 +1131,36 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         pruefungFaellig = GET_TIME()
     END IF
 
-    ' --- Menue ---
-    IF GUI_CLICKED(miNeu) THEN tabOeffnen("", "")
-    IF GUI_CLICKED(miOeffnen) THEN
-        DIM p AS STRING : p = FILE_OPEN_DIALOG("Datei oeffnen", "dh")
-        IF p <> "" THEN dateiOeffnen(p)
-    END IF
-    IF GUI_CLICKED(miSichern) THEN sichern(aktiverTab, FALSE)
-    IF GUI_CLICKED(miSichernAls) THEN sichern(aktiverTab, TRUE)
-    IF GUI_CLICKED(miSchliessen) THEN tabSchliessen(aktiverTab)
-    IF GUI_CLICKED(miBeenden) THEN beendenAnfragen()
-    IF GUI_CLICKED(miSuchen) THEN dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
-    IF GUI_CLICKED(miWeiter) THEN weitersuchen(TRUE)
-    IF GUI_CLICKED(miErsetzen) THEN dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
-    IF GUI_CLICKED(miZeile) THEN dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
-    IF GUI_CLICKED(miVervoll) THEN vervollstaendigen()
-    IF GUI_CLICKED(miDefinition) THEN zurDefinition()
-    IF GUI_CLICKED(miStart) THEN starten()
-    IF GUI_CLICKED(miStopp) THEN stoppen()
-    IF GUI_CLICKED(miPruefen) THEN pruefen()
-    IF GUI_CLICKED(miThema) THEN
-        hell = NOT hell
-        GUI_MENU_CHECK(miThema, hell)
-        IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
-    END IF
-    IF GUI_CLICKED(miUeber) THEN dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 1 -- geschrieben in Drachenhauch.", "ok")
+    ' --- Menue (Klick oder Kuerzel) ---
+    IF GUI_CLICKED(miNeu) THEN befehl("neu")
+    IF GUI_CLICKED(miOeffnen) THEN befehl("oeffnen")
+    IF GUI_CLICKED(miSichern) THEN befehl("sichern")
+    IF GUI_CLICKED(miSichernAls) THEN befehl("sichern_unter")
+    IF GUI_CLICKED(miSchliessen) THEN befehl("schliessen")
+    IF GUI_CLICKED(miBeenden) THEN befehl("beenden")
+    IF GUI_CLICKED(miSuchen) THEN befehl("suchen")
+    IF GUI_CLICKED(miWeiter) THEN befehl("weiter")
+    IF GUI_CLICKED(miErsetzen) THEN befehl("ersetzen")
+    IF GUI_CLICKED(miZeile) THEN befehl("zeile")
+    IF GUI_CLICKED(miProjekt) THEN befehl("projekt")
+    IF GUI_CLICKED(miVervoll) THEN befehl("vervoll")
+    IF GUI_CLICKED(miDefinition) THEN befehl("definition")
+    IF GUI_CLICKED(miPalette) THEN befehl("palette")
+    IF GUI_CLICKED(miStart) THEN befehl("start")
+    IF GUI_CLICKED(miStopp) THEN befehl("stopp")
+    IF GUI_CLICKED(miPruefen) THEN befehl("pruefen")
+    IF GUI_CLICKED(miDebug) THEN befehl("debug")
+    IF GUI_CLICKED(miHaltepunkt) THEN befehl("haltepunkt")
+    IF GUI_CLICKED(miWeiterD) OR GUI_CLICKED(btnWeiter) THEN befehl("weiter_d")
+    IF GUI_CLICKED(miDrueber) OR GUI_CLICKED(btnDrueber) THEN befehl("drueber")
+    IF GUI_CLICKED(miHinein) OR GUI_CLICKED(btnHinein) THEN befehl("hinein")
+    IF GUI_CLICKED(miHeraus) OR GUI_CLICKED(btnHeraus) THEN befehl("heraus")
+    IF GUI_CLICKED(btnStoppD) THEN befehl("stopp")
+    IF GUI_CLICKED(miProfil) THEN befehl("profil")
+    IF GUI_CLICKED(miThema) THEN befehl("thema")
+    IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
+    IF GUI_CLICKED(miUeber) THEN befehl("ueber")
+    IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
 
     ' --- Dialoge auswerten ---
     IF dlgSuche <> 0 THEN
@@ -733,6 +1235,26 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF dlgUeber <> 0 THEN
         IF GUI_ANSWER(dlgUeber) <> 0 THEN dlgUeber = 0
     END IF
+    IF dlgProjekt <> 0 THEN
+        DIM a5 AS INTEGER : a5 = GUI_ANSWER(dlgProjekt)
+        IF a5 = 1 THEN
+            suchtext = GUI_DIALOG_TEXT(dlgProjekt)
+            dlgProjekt = 0
+            projektSuchen(suchtext)
+        ELSEIF a5 = 2 THEN
+            dlgProjekt = 0
+        END IF
+    END IF
+
+    ' --- Befehlspalette: tippen filtert, Enter/Doppelklick fuehrt aus, ESC schliesst ---
+    IF paletteOffen THEN
+        IF GUI_TEXT(tfPalette) <> paletteLetzterFilter THEN
+            paletteLetzterFilter = GUI_TEXT(tfPalette)
+            paletteFuellen(paletteLetzterFilter)
+        END IF
+        IF GUI_ENTERED(tfPalette) OR GUI_DOUBLE_CLICKED(lstPalette) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstPalette) THEN paletteAusfuehren()
+        IF KEYHIT(KEY_ESCAPE) THEN paletteSchliessen()
+    END IF
 
     ' --- Vervollstaendigung: Enter/Doppelklick uebernimmt, ESC schliesst ---
     IF vervollOffen THEN
@@ -755,6 +1277,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             reiterNeuSetzen()
         END IF
         faerben(tf)
+        markenNachziehen()
         hilfeNachziehen()
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0

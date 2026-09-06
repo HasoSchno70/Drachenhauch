@@ -18,9 +18,12 @@
 > mit laufender Ausgabe (`PROCESS_*`) und reicht Eingaben durch. Dafuer kamen
 > in dhrt die drei Bausteine aus Abschnitt 2: Prozesse mit laufender Ausgabe,
 > die Textbereich-Befehle (`GUI_TEXTAREA_CURSOR/GOTO/SELECTION$/SELECT/INSERT/FIND`)
-> und die Sprachdienste als Builtins (`CODE_*`). Offen aus C: Debugger- und
-> Profiler-Fenster, Befehlspalette, Suche im Projekt, Handbuch im Fenster,
-> Drucken, Themen, Installer ohne PyInstaller -- siehe `docs/ide.md`.
+> und die Sprachdienste als Builtins (`CODE_*`). **Stufe 2 (gleicher Tag):**
+> Debugger als Client von `dhrt debug` (Haltepunkte, Schritte, Variablen),
+> Profil aus `dhrt profile`, Suche im Projekt, Befehlspalette, Marken in der
+> Nummernspalte (`GUI_TEXTAREA_MARKS`), echte Schriften, Start maximiert.
+> Offen aus C: Handbuch im Fenster, Drucken, Begleit-Editoren, Installer
+> ohne PyInstaller -- siehe `docs/ide.md`.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über
