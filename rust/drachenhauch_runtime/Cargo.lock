@@ -992,6 +992,7 @@ dependencies = [
  "rusqlite",
  "rustc-hash",
  "rustls",
+ "serde",
  "serde_json",
  "serialport",
  "sha1",

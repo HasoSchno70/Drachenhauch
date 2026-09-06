@@ -392,6 +392,29 @@ fn known_builtins() -> &'static std::collections::HashSet<String> {
     })
 }
 
+/// Alle Eintraege des Index `(Name, Signatur, Modul)`, Name wie eingetragen
+/// (gross) -- fuer den Sprachserver (`lsp.rs`) und `dhrt doku`.
+pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
+    use std::sync::OnceLock;
+    static V: OnceLock<Vec<(String, String, String)>> = OnceLock::new();
+    V.get_or_init(|| {
+        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let mut v = Vec::new();
+        if let Ok(j) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(arr) = j.get("builtins").and_then(|b| b.as_array()) {
+                for e in arr {
+                    let n = e.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                    if n.is_empty() { continue; }
+                    v.push((n.to_string(),
+                            e.get("signature").and_then(|s| s.as_str()).unwrap_or("").to_string(),
+                            e.get("module").and_then(|s| s.as_str()).unwrap_or("core").to_string()));
+                }
+            }
+        }
+        v
+    })
+}
+
 /// Kleinste und groesste erlaubte Argumentzahl je Builtin, aus den Signaturen
 /// in `builtin_index.json` gelesen.
 ///

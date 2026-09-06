@@ -310,18 +310,14 @@ def test_der_bestand_ist_sauber():
 
 # ------------------------------------------------------ Referenz erzeugen
 def _doku(quelle: str, tmp_path):
-    """`dhrun.py --doku` auf eine Datei anwenden und die Markdown-Seite
-    zurueckgeben."""
-    import sys
+    """`dhrt doku referenz` auf eine Datei anwenden und die Markdown-Seite
+    zurueckgeben. (Bis 2026-09-06 `dhrun.py --doku` ueber `drachenhauch/doku.py`;
+    `dhrun.py --doku` reicht seither nur noch an dhrt durch.)"""
     f = tmp_path / "mathe.dh"
     f.write_text(quelle, encoding="utf-8")
-    venv = _ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    py = str(venv) if venv.exists() else sys.executable
-    r = subprocess.run([py, str(_ROOT / "dhrun.py"), "--doku", str(f)],
-                       capture_output=True, text=True, encoding="utf-8",
-                       cwd=str(_ROOT), timeout=60)
-    assert r.returncode == 0, r.stderr
-    return r.stdout
+    code, out, err = _lauf("doku", "referenz", str(f))
+    assert code == 0, err
+    return out
 
 
 BIB = '''\' Kleine Sammlung fuer Streckenrechnung.
@@ -362,11 +358,13 @@ def test_doku_laesst_privates_weg(tmp_path):
 
 
 def test_doku_ohne_datei_meldet_sich(tmp_path):
-    import sys
-    venv = _ROOT / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    py = str(venv) if venv.exists() else sys.executable
-    r = subprocess.run([py, str(_ROOT / "dhrun.py"), "--doku"],
-                       capture_output=True, text=True, encoding="utf-8",
-                       cwd=str(_ROOT), timeout=60)
-    assert r.returncode == 2
-    assert "Verwendung" in r.stdout
+    code, out, _ = _lauf("doku", "referenz")
+    assert code == 2
+    assert "Verwendung" in out
+
+
+def test_doku_ohne_unterbefehl_zeigt_die_uebersicht():
+    code, out, _ = _lauf("doku")
+    assert code == 2
+    for wort in ("prosa", "grammatik", "referenz"):
+        assert wort in out, out

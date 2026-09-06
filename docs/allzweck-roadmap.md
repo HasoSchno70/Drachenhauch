@@ -40,7 +40,7 @@ Netz, Fenstern, Reitern und Saison-Verwaltung — vollständig in Drachenhauch.
 - [ ] Golden-Test in `tests/` (`assert run_gb(src) == erwartet`), plus
       Rust-`#[test]` für reine Rechen-Anteile.
 - [ ] Hover-Doku in `editor_qt/builtin_docs.py`.
-- [ ] Bei neuem Keyword: `vscode-drachenhauch/build_grammar.py` neu generieren.
+- [ ] Bei neuem Keyword: die VS-Code-Grammatik neu erzeugen (`dhrt doku grammatik`).
 - [ ] Bei neuem Modul: Name in `preprocess.rs` `MODULES` **und**
       `drachenhauch/modules/__init__.py` `KNOWN_MODULES` (synchron halten),
       dazu `docs/module-<name>.md` + Zeile in `docs/README.md`.

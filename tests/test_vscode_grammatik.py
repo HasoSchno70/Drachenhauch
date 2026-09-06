@@ -13,12 +13,24 @@ Neu-Erzeugen nichts aendert.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
+
+import pytest
 
 WURZEL = Path(__file__).resolve().parents[1]
 EXT = WURZEL / "vscode-drachenhauch"
+
+
+def _dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    for v in ("release", "debug"):
+        p = WURZEL / "rust" / "drachenhauch_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
 
 
 def _pfad_aus_package_json() -> Path:
@@ -43,13 +55,19 @@ def test_keine_verwaiste_grammatik_daneben():
 
 
 def test_grammatik_ist_aktuell():
-    """Neu erzeugen darf nichts aendern -- sonst ist sie gedriftet."""
-    spec = importlib.util.spec_from_file_location(
-        "_build_grammar", EXT / "build_grammar.py")
-    m = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(m)
-    frisch = m.build()
-    eingecheckt = json.loads(_pfad_aus_package_json().read_text(encoding="utf-8"))
-    assert frisch == eingecheckt, (
-        "Grammatik ist veraltet -- neu erzeugen mit\n"
-        "  <venv>\\python.exe vscode-drachenhauch\\build_grammar.py")
+    """Neu erzeugen darf nichts aendern -- sonst ist sie gedriftet. Erzeugt
+    wird sie seit 2026-09-06 von `dhrt doku grammatik` (vorher
+    `build_grammar.py` in Python)."""
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
+    r = subprocess.run([str(dhrt), "doku", "grammatik", "--pruefen"], capture_output=True,
+                       text=True, encoding="utf-8", cwd=str(WURZEL), timeout=60)
+    assert r.returncode == 0, "Grammatik ist veraltet -- neu erzeugen mit dhrt doku grammatik: " + r.stdout
+
+
+def test_grammatik_kennt_neue_befehle():
+    """Der Sinn der Erzeugung: ein Befehl, der im Index steht, wird gefaerbt."""
+    text = _pfad_aus_package_json().read_text(encoding="utf-8")
+    assert "SPEAK_SOUND" in text and "GUI_ANNOUNCE" in text
+    assert "WHILE" in text and "KEY_SPACE" in text

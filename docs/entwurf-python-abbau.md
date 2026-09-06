@@ -1,5 +1,16 @@
 # Entwurf: Python abbauen — alles über Rust und Drachenhauch
 
+> **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
+> `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
+> `dhrt pruef bloecke|namen|zaehlungen|konstanten|pfade` ersetzen
+> `drachenhauch/lsp/`, `tools/gen_builtin_prosa.py`, `tools/pruef_docs.py`,
+> `tools/pruef_doku_aussagen.py`, `vscode-drachenhauch/build_grammar.py` und
+> `drachenhauch/doku.py`; die handgepflegten Hover-Texte liegen als
+> `builtin_docs.json` vor (Python lädt, dhrt bettet ein). Die VS-Code-Erweiterung
+> startet `dhrt lsp` und braucht kein Python mehr; `dhrun.py --doku` reicht nur
+> noch durch. Offen aus A: `build_runtime.py` bleibt (Bau der Runtime), der
+> Installer bleibt bei PyInstaller, solange die IDE Python ist (Weg C).
+
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über
 `dhrt` und über Programme, die in Drachenhauch selbst geschrieben sind.

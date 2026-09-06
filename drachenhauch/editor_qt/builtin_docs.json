@@ -1,0 +1,1318 @@
+{
+ "_comment": "Handgepflegte Hover-Texte: Name (klein) -> [Signatur, Beschreibung]. Gelesen von editor_qt/builtin_docs.py (Qt-Editor) und eingebettet in dhrt (lsp.rs, `dhrt lsp`). Ausfuehrlicher als die aus docs/ erzeugte builtin_prosa.json und gewinnt vor ihr.",
+ "count": 328,
+ "docs": {
+  "abs": [
+   "ABS(zahl)",
+   "Absolutwert."
+  ],
+  "acos": [
+   "ACOS(x) AS FLOAT",
+   "Arcuscosinus (Radiant); x in [-1, 1]."
+  ],
+  "arg$": [
+   "ARG$(nummer) AS STRING",
+   "Argument Nummer n (0-basiert). Ausserhalb: Leerstring, kein Fehler. Beim Start ueber dhrt: alles hinter '--'; in der exportierten Exe: alle."
+  ],
+  "argc": [
+   "ARGC() AS INTEGER",
+   "Anzahl der Argumente, die dem Programm uebergeben wurden."
+  ],
+  "array_avg": [
+   "ARRAY_AVG(arr) AS FLOAT",
+   "Durchschnitt eines 1D-Zahl-Arrays (nicht leer)."
+  ],
+  "array_copy": [
+   "ARRAY_COPY(arr) AS ARRAY",
+   "Liefert eine unabhaengige Kopie des Arrays."
+  ],
+  "array_fill": [
+   "ARRAY_FILL(arr, wert)",
+   "Fuellt alle Elemente mit wert (IN PLACE)."
+  ],
+  "array_insert": [
+   "ARRAY_INSERT(arr, idx, wert) AS INTEGER",
+   "Element an Index einfuegen (0..len); neue Laenge."
+  ],
+  "array_max": [
+   "ARRAY_MAX(arr) AS T",
+   "Groesstes Element eines 1D-Zahl-Arrays."
+  ],
+  "array_min": [
+   "ARRAY_MIN(arr) AS T",
+   "Kleinstes Element eines 1D-Zahl-Arrays."
+  ],
+  "array_pop": [
+   "ARRAY_POP(arr) AS T",
+   "Entfernt letztes Element und liefert es (Array nicht leer)."
+  ],
+  "array_push": [
+   "ARRAY_PUSH(arr, wert) AS INTEGER",
+   "Element ans Ende; liefert die neue Laenge."
+  ],
+  "array_remove_at": [
+   "ARRAY_REMOVE_AT(arr, idx) AS T",
+   "Element an Index entfernen und liefern."
+  ],
+  "array_sum": [
+   "ARRAY_SUM(arr) AS INTEGER/FLOAT",
+   "Summe eines 1D-Zahl-Arrays."
+  ],
+  "asc": [
+   "ASC(s$)",
+   "Codepoint des ersten Zeichens."
+  ],
+  "asin": [
+   "ASIN(x) AS FLOAT",
+   "Arcussinus (Radiant); x in [-1, 1]."
+  ],
+  "assert": [
+   "ASSERT(bedingung[, meldung])",
+   "Schlaegt fehl, wenn die Bedingung FALSE ist. Verlangt einen BOOLEAN -- ASSERT(anzahl) ist ein Fehler, ASSERT(anzahl > 0) ist gemeint. Bricht ab, ausser im Sammel-Modus (ASSERT_COLLECT)."
+  ],
+  "assert_collect": [
+   "ASSERT_COLLECT(an)",
+   "Sammel-Modus: Fehlschlaege werden vermerkt statt abzubrechen -- fuer ein Pruefprogramm, das ALLE Fehler zeigen soll. Vorgabe: aus."
+  ],
+  "assert_count": [
+   "ASSERT_COUNT() AS INTEGER",
+   "Wie viele Pruefungen gelaufen sind."
+  ],
+  "assert_eq": [
+   "ASSERT_EQ(ist, soll[, was])",
+   "Wie ASSERT, aber die Meldung zeigt beide Werte. Vergleicht wie der '='-Operator der Sprache (inkl. 1 = 1.0)."
+  ],
+  "assert_failed": [
+   "ASSERT_FAILED() AS INTEGER",
+   "Wie viele davon fehlgeschlagen sind."
+  ],
+  "assert_report": [
+   "ASSERT_REPORT() AS INTEGER",
+   "Bilanz nach stdout schreiben und die Zahl der Fehlschlaege liefern. Muster: IF ASSERT_REPORT() > 0 THEN EXIT(1)"
+  ],
+  "atan": [
+   "ATAN(x) AS FLOAT",
+   "Arcustangens."
+  ],
+  "atan2": [
+   "ATAN2(y, x) AS FLOAT",
+   "Winkel von (x, y) zur X-Achse, in Radiant."
+  ],
+  "audio_autopan": [
+   "AUDIO_AUTOPAN(ch, periode_s[, tiefe])",
+   "Endloses Pendeln links<->rechts (startet links). periode_s = Dauer einer Runde, tiefe 0..1 = Auslenkung; periode_s <= 0 = aus."
+  ],
+  "audio_busy_channels": [
+   "AUDIO_BUSY_CHANNELS() AS INTEGER",
+   "Anzahl aktuell aktiver Channels."
+  ],
+  "audio_get_volume": [
+   "AUDIO_GET_VOLUME(ch) AS FLOAT",
+   "Aktuelle Lautstaerke."
+  ],
+  "audio_init": [
+   "AUDIO_INIT([freq[, channels[, buffer]]])",
+   "Mixer initialisieren. Default 44100Hz, stereo, 512-Buffer."
+  ],
+  "audio_is_playing": [
+   "AUDIO_IS_PLAYING(ch) AS BOOLEAN",
+   "Spielt der Channel?"
+  ],
+  "audio_music_busy": [
+   "AUDIO_MUSIC_BUSY() AS BOOLEAN",
+   "Spielt Musik?"
+  ],
+  "audio_music_get_pitch": [
+   "AUDIO_MUSIC_GET_PITCH() AS FLOAT",
+   "Aktueller Musik-Pitch."
+  ],
+  "audio_music_get_volume": [
+   "AUDIO_MUSIC_GET_VOLUME() AS FLOAT",
+   "Aktuelle Musik-Lautstaerke."
+  ],
+  "audio_music_load": [
+   "AUDIO_MUSIC_LOAD(path)",
+   "Musik laden (streamt vom File)."
+  ],
+  "audio_music_pause": [
+   "AUDIO_MUSIC_PAUSE()",
+   "Musik pausieren."
+  ],
+  "audio_music_pitch": [
+   "AUDIO_MUSIC_PITCH(faktor)",
+   "Musik-Pitch (1.0=normal; ueberlebt LOAD/QUEUE). Slow-Motion: zusammen mit der Spielzeit absenken."
+  ],
+  "audio_music_play": [
+   "AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])",
+   "Musik starten. loops=-1 bedeutet endlos (Default), loops=N spielt N+1 Durchlaeufe; fade_in_ms blendet ein."
+  ],
+  "audio_music_position": [
+   "AUDIO_MUSIC_POSITION() AS FLOAT",
+   "Position in Sekunden."
+  ],
+  "audio_music_queue": [
+   "AUDIO_MUSIC_QUEUE(path)",
+   "Naechsten Track queuen."
+  ],
+  "audio_music_resume": [
+   "AUDIO_MUSIC_RESUME()",
+   "Musik fortsetzen."
+  ],
+  "audio_music_set_volume": [
+   "AUDIO_MUSIC_SET_VOLUME(v)",
+   "Musik-Lautstaerke setzen (Alias fuer AUDIO_MUSIC_VOLUME)."
+  ],
+  "audio_music_stop": [
+   "AUDIO_MUSIC_STOP([fade_out_ms])",
+   "Musik stoppen, optional ausfaden (nicht-blockierend; AUDIO_MUSIC_BUSY() bleibt bis zum Fade-Ende TRUE)."
+  ],
+  "audio_music_volume": [
+   "AUDIO_MUSIC_VOLUME(v)",
+   "Musik-Lautstaerke (0..1)."
+  ],
+  "audio_noise": [
+   "AUDIO_NOISE(dauer_ms[, volume]) AS SOUND",
+   "Weisses Rauschen."
+  ],
+  "audio_num_channels": [
+   "AUDIO_NUM_CHANNELS() AS INTEGER",
+   "Aktuelle Channel-Anzahl."
+  ],
+  "audio_pan": [
+   "AUDIO_PAN(ch, left, right)",
+   "Stereo-Pan -- left/right je 0..1."
+  ],
+  "audio_pan_pos": [
+   "AUDIO_PAN_POS(ch, p)",
+   "Stereo-Position direkt: 0=links, 0.5=Mitte, 1=rechts. Fasst nur das Pan an (Volume bleibt)."
+  ],
+  "audio_pan_slide": [
+   "AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)",
+   "Einmalige Stereo-Wanderung von Position von nach nach (je 0=links..1=rechts), nicht-blockierend; bleibt am Ziel."
+  ],
+  "audio_pause": [
+   "AUDIO_PAUSE(ch)",
+   "Channel pausieren."
+  ],
+  "audio_pause_all": [
+   "AUDIO_PAUSE_ALL()",
+   "Alle Channels pausieren."
+  ],
+  "audio_pitch": [
+   "AUDIO_PITCH(ch, faktor)",
+   "Tonhoehe/Geschwindigkeit (1.0=normal, 2.0=Oktave hoeher). Klassiker: pro Schuss leicht variieren (0.9 + RANDF()*0.2)."
+  ],
+  "audio_play": [
+   "AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) AS AUDIO_CHANNEL",
+   "Sound abspielen, Channel-Handle zurueckgeben. loops=0 einmal, N -> N+1 Durchlaeufe, -1 endlos; fade_in_ms blendet ein."
+  ],
+  "audio_resume": [
+   "AUDIO_RESUME(ch)",
+   "Channel fortsetzen."
+  ],
+  "audio_resume_all": [
+   "AUDIO_RESUME_ALL()",
+   "Alle Channels fortsetzen."
+  ],
+  "audio_set_num_channels": [
+   "AUDIO_SET_NUM_CHANNELS(n)",
+   "Anzahl simultaner Channels setzen (Default 8)."
+  ],
+  "audio_set_volume": [
+   "AUDIO_SET_VOLUME(ch, v)",
+   "Channel-Lautstaerke setzen (Alias fuer AUDIO_VOLUME)."
+  ],
+  "audio_sound_count": [
+   "AUDIO_SOUND_COUNT() AS INTEGER",
+   "Anzahl lebender (nicht freigegebener) Sound-Slots -- Diagnose."
+  ],
+  "audio_stop": [
+   "AUDIO_STOP(ch[, fade_out_ms])",
+   "Channel stoppen, optional ausblenden."
+  ],
+  "audio_stop_all": [
+   "AUDIO_STOP_ALL()",
+   "Alle Channels stoppen."
+  ],
+  "audio_tone": [
+   "AUDIO_TONE(freq_hz, dauer_ms[, waveform$[, volume]]) AS SOUND",
+   "Ton synthetisieren. Waveforms: \"sine\", \"square\", \"saw\", \"triangle\", \"noise\"."
+  ],
+  "audio_volume": [
+   "AUDIO_VOLUME(ch, v)",
+   "Channel-Lautstaerke (0..1)."
+  ],
+  "bin$": [
+   "BIN$(n) AS STRING",
+   "INTEGER als Binaerstring (mit Vorzeichen)."
+  ],
+  "blue": [
+   "BLUE(farbe) AS INTEGER",
+   "Blau-Kanal 0..255."
+  ],
+  "box": [
+   "BOX(x1, y1, x2, y2[, farbe])",
+   "Gefuelltes Rechteck."
+  ],
+  "buffer_concat": [
+   "BUFFER_CONCAT(a, b) AS BUFFER",
+   "Neuer Puffer aus beiden hintereinander."
+  ],
+  "buffer_fill": [
+   "BUFFER_FILL(puffer, byte)",
+   "Ganzen Puffer mit einem Byte fuellen."
+  ],
+  "buffer_from_base64": [
+   "BUFFER_FROM_BASE64(text) AS BUFFER",
+   "Base64 zu rohen Bytes (anders als BASE64_DECODE, das UTF-8 verlangt)."
+  ],
+  "buffer_from_hex": [
+   "BUFFER_FROM_HEX(hex) AS BUFFER",
+   "Hex-Text zu Bytes; Leerzeichen sind erlaubt."
+  ],
+  "buffer_from_string": [
+   "BUFFER_FROM_STRING(text) AS BUFFER",
+   "Text als UTF-8-Bytes."
+  ],
+  "buffer_get": [
+   "BUFFER_GET(puffer, position) AS INTEGER",
+   "Byte 0..255 an dieser Stelle."
+  ],
+  "buffer_get_f32": [
+   "BUFFER_GET_F32(puffer, position[, reihenfolge]) AS FLOAT",
+   "32-Bit-Gleitkomma lesen."
+  ],
+  "buffer_get_f64": [
+   "BUFFER_GET_F64(puffer, position[, reihenfolge]) AS FLOAT",
+   "64-Bit-Gleitkomma lesen."
+  ],
+  "buffer_get_i16": [
+   "BUFFER_GET_I16(puffer, position[, reihenfolge]) AS INTEGER",
+   "16-Bit mit Vorzeichen lesen."
+  ],
+  "buffer_get_i32": [
+   "BUFFER_GET_I32(puffer, position[, reihenfolge]) AS INTEGER",
+   "32-Bit mit Vorzeichen lesen."
+  ],
+  "buffer_get_i64": [
+   "BUFFER_GET_I64(puffer, position[, reihenfolge]) AS INTEGER",
+   "64-Bit mit Vorzeichen lesen."
+  ],
+  "buffer_get_u16": [
+   "BUFFER_GET_U16(puffer, position[, reihenfolge]) AS INTEGER",
+   "16-Bit ohne Vorzeichen lesen."
+  ],
+  "buffer_get_u32": [
+   "BUFFER_GET_U32(puffer, position[, reihenfolge]) AS INTEGER",
+   "32-Bit ohne Vorzeichen lesen."
+  ],
+  "buffer_indexof": [
+   "BUFFER_INDEXOF(puffer, nadel[, ab]) AS INTEGER",
+   "Position der ersten Fundstelle, sonst -1."
+  ],
+  "buffer_len": [
+   "BUFFER_LEN(puffer) AS INTEGER",
+   "Laenge in BYTES (nicht Zeichen)."
+  ],
+  "buffer_new": [
+   "BUFFER_NEW(groesse) AS BUFFER",
+   "Neuer Puffer, mit Nullen gefuellt."
+  ],
+  "buffer_resize": [
+   "BUFFER_RESIZE(puffer, groesse)",
+   "Groesse aendern; waechst mit Nullen, schrumpft durch Abschneiden."
+  ],
+  "buffer_set": [
+   "BUFFER_SET(puffer, position, byte)",
+   "Byte 0..255 setzen (veraendert IN PLACE)."
+  ],
+  "buffer_set_f32": [
+   "BUFFER_SET_F32(puffer, position, wert[, reihenfolge])",
+   "32-Bit-Gleitkomma schreiben."
+  ],
+  "buffer_set_f64": [
+   "BUFFER_SET_F64(puffer, position, wert[, reihenfolge])",
+   "64-Bit-Gleitkomma schreiben."
+  ],
+  "buffer_set_i16": [
+   "BUFFER_SET_I16(puffer, position, wert[, reihenfolge])",
+   "16-Bit mit Vorzeichen schreiben."
+  ],
+  "buffer_set_i32": [
+   "BUFFER_SET_I32(puffer, position, wert[, reihenfolge])",
+   "32-Bit mit Vorzeichen schreiben."
+  ],
+  "buffer_set_i64": [
+   "BUFFER_SET_I64(puffer, position, wert[, reihenfolge])",
+   "64-Bit mit Vorzeichen schreiben."
+  ],
+  "buffer_set_u16": [
+   "BUFFER_SET_U16(puffer, position, wert[, reihenfolge])",
+   "16-Bit ohne Vorzeichen schreiben."
+  ],
+  "buffer_set_u32": [
+   "BUFFER_SET_U32(puffer, position, wert[, reihenfolge])",
+   "32-Bit ohne Vorzeichen schreiben."
+  ],
+  "buffer_slice": [
+   "BUFFER_SLICE(puffer, von, bis) AS BUFFER",
+   "Neuer Puffer mit den Bytes [von, bis). Klemmt an den Grenzen (wie Array-Slicing)."
+  ],
+  "buffer_to_base64$": [
+   "BUFFER_TO_BASE64$(puffer) AS STRING",
+   "Bytes als Base64."
+  ],
+  "buffer_to_hex$": [
+   "BUFFER_TO_HEX$(puffer) AS STRING",
+   "Bytes als Hex-Text ('deadbeef')."
+  ],
+  "buffer_to_string$": [
+   "BUFFER_TO_STRING$(puffer) AS STRING",
+   "Bytes als UTF-8-Text. Fehler, wenn es kein gueltiges UTF-8 ist (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)."
+  ],
+  "camera_shake": [
+   "CAMERA_SHAKE(staerke[, dauer_ms])",
+   "Screen-Shake: zufaelliger Kamera-Ruckel (Welt-Pixel), klingt linear ueber dauer_ms ab (Default 300). Laeuft selbststaendig; staerke=0 stoppt sofort. Der Juice-Klassiker bei Explosionen."
+  ],
+  "ceil": [
+   "CEIL(zahl) AS INTEGER",
+   "Aufrundung."
+  ],
+  "chdir": [
+   "CHDIR(pfad)",
+   "Arbeitsverzeichnis wechseln."
+  ],
+  "choice": [
+   "CHOICE(array) AS T",
+   "Zufaelliges Element eines 1D-Arrays."
+  ],
+  "chr$": [
+   "CHR$(code)",
+   "Zeichen aus Unicode-Codepoint."
+  ],
+  "circle": [
+   "CIRCLE(x, y, r[, farbe])",
+   "Gefuellter Kreis."
+  ],
+  "clamp": [
+   "CLAMP(wert, min, max)",
+   "Wert in [min..max] beschraenken."
+  ],
+  "closefile": [
+   "CLOSEFILE(f)",
+   "Schliesst eine geoeffnete Datei."
+  ],
+  "cls": [
+   "CLS([farbe])",
+   "Bildschirm loeschen."
+  ],
+  "collides": [
+   "COLLIDES(x1, y1, w1, h1, x2, y2, w2, h2) AS BOOLEAN",
+   "AABB-Rechteck-Kollision."
+  ],
+  "color_lerp": [
+   "COLOR_LERP(c1, c2, t) AS INTEGER",
+   "Zwei Farben kanalweise mischen (t 0..1)."
+  ],
+  "contains": [
+   "CONTAINS(s, teil) AS BOOLEAN",
+   "Enthaelt s den Teilstring?"
+  ],
+  "cooldown": [
+   "COOLDOWN(id, ms) AS BOOLEAN",
+   "TRUE wenn die String-ID frei ist -- startet dann die ms-Sperre. FALSE solange gesperrt. Ideal fuer Schuss-Raten."
+  ],
+  "cos": [
+   "COS(rad) AS FLOAT",
+   "Kosinus, Eingabe in Radiant."
+  ],
+  "curve_bezier": [
+   "CURVE_BEZIER(t, p0, p1, p2, p3) AS FLOAT",
+   "Cubic Bezier 1D durch 4 Control-Points."
+  ],
+  "curve_bezier2": [
+   "CURVE_BEZIER2(t, x0, y0, x1, y1, x2, y2, x3, y3) AS TUPLE",
+   "Cubic Bezier 2D -> Tupel (x, y)."
+  ],
+  "curve_catmull": [
+   "CURVE_CATMULL(t, p0, p1, p2, p3) AS FLOAT",
+   "Catmull-Rom-Spline 1D zwischen p1 und p2."
+  ],
+  "curve_catmull2": [
+   "CURVE_CATMULL2(t, x0, y0, x1, y1, x2, y2, x3, y3) AS TUPLE",
+   "Catmull-Rom 2D -> Tupel (x, y)."
+  ],
+  "curve_hermite": [
+   "CURVE_HERMITE(t, p0, p1, m0, m1) AS FLOAT",
+   "Cubic-Hermite zwischen p0 und p1 mit Tangenten m0, m1."
+  ],
+  "curve_lerp": [
+   "CURVE_LERP(a, b, t) AS FLOAT",
+   "Lineare Interpolation a..b mit t in [0,1]."
+  ],
+  "curve_smootherstep": [
+   "CURVE_SMOOTHERSTEP(edge0, edge1, x) AS FLOAT",
+   "Wie smoothstep, aber mit kontinuierlicher 2. Ableitung."
+  ],
+  "curve_smoothstep": [
+   "CURVE_SMOOTHSTEP(edge0, edge1, x) AS FLOAT",
+   "GLSL-style smoothstep mit S-Kurven-Uebergang."
+  ],
+  "cwd$": [
+   "CWD$() AS STRING",
+   "Aktuelles Arbeitsverzeichnis. Achtung: dhrt wechselt beim Start ins Verzeichnis der .dh-Datei (fuer relative Asset-Pfade)."
+  ],
+  "date$": [
+   "DATE$() AS STRING",
+   "Aktuelles Datum \"YYYY-MM-DD\"."
+  ],
+  "db_query_cancel": [
+   "DB_QUERY_CANCEL(auftrag)",
+   "Auftrag verwerfen (unbekannte Nummer = wirkungslos)."
+  ],
+  "db_query_pending": [
+   "DB_QUERY_PENDING() AS INTEGER",
+   "Wie viele Abfragen noch offen sind."
+  ],
+  "db_query_ready": [
+   "DB_QUERY_READY(auftrag) AS BOOLEAN",
+   "Ist das Ergebnis da? Fragt nach, wartet nicht."
+  ],
+  "db_query_result": [
+   "DB_QUERY_RESULT(auftrag) AS DB_RESULT",
+   "Ergebnis abholen und den Platz freigeben. Ein Fehler aus dem Auftrag (kaputtes SQL, fehlende Tabelle) wird HIER geworfen."
+  ],
+  "db_query_start": [
+   "DB_QUERY_START(datei, sql, ...) AS INTEGER",
+   "Abfrage im Hintergrund starten, liefert sofort die Auftragsnummer. Oeffnet eine EIGENE Verbindung zur Datei -- sieht darum nur, was schon festgeschrieben ist, nicht die offene Transaktion des Programms."
+  ],
+  "deg": [
+   "DEG(rad) AS FLOAT",
+   "Radiant -> Grad."
+  ],
+  "deletefile": [
+   "DELETEFILE(pfad)",
+   "Datei loeschen."
+  ],
+  "dimcount": [
+   "DIMCOUNT(arr)",
+   "Anzahl der Dimensionen."
+  ],
+  "dimsize": [
+   "DIMSIZE(arr, n)",
+   "Groesse der n-ten Dimension (0-basiert)."
+  ],
+  "direxists": [
+   "DIREXISTS(pfad) AS BOOLEAN",
+   "Existiert das Verzeichnis?"
+  ],
+  "dirlist": [
+   "DIRLIST(pfad) AS ARRAY OF STRING",
+   "Eintragsnamen eines Verzeichnisses (sortiert)."
+  ],
+  "drawimage": [
+   "DRAWIMAGE(img, x, y)",
+   "Bild zeichnen."
+  ],
+  "drawimageflipped": [
+   "DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])",
+   "Bild gespiegelt zeichnen (z.B. Sprite nach links/rechts)."
+  ],
+  "drawimagepart": [
+   "DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)",
+   "Bildausschnitt."
+  ],
+  "drawtilemap": [
+   "DRAWTILEMAP(tileset, map, tw, th, sx, sy)",
+   "2D-Tilemap rendern. -1 = transparent."
+  ],
+  "ecs_add_bool": [
+   "ECS_ADD_BOOL(world, ent, name, value)",
+   "BOOLEAN-Component."
+  ],
+  "ecs_add_float": [
+   "ECS_ADD_FLOAT(world, ent, name, value)",
+   "FLOAT-Component."
+  ],
+  "ecs_add_int": [
+   "ECS_ADD_INT(world, ent, name, value)",
+   "INTEGER-Component an Entity haengen."
+  ],
+  "ecs_add_obj": [
+   "ECS_ADD_OBJ(world, ent, name, value)",
+   "Beliebiges Objekt als Component (User-Klasse, MAP, ...)."
+  ],
+  "ecs_add_string": [
+   "ECS_ADD_STRING(world, ent, name, value)",
+   "STRING-Component."
+  ],
+  "ecs_alive": [
+   "ECS_ALIVE(world, ent) AS BOOLEAN",
+   "Lebt die Entity noch?"
+  ],
+  "ecs_count": [
+   "ECS_COUNT(world) AS INTEGER",
+   "Anzahl lebender Entities."
+  ],
+  "ecs_destroy": [
+   "ECS_DESTROY(world, ent) AS BOOLEAN",
+   "Entity entfernen. TRUE wenn existierte."
+  ],
+  "ecs_get": [
+   "ECS_GET(world, ent, name)",
+   "Beliebiger Component-Wert. Wirft wenn fehlt."
+  ],
+  "ecs_get_bool": [
+   "ECS_GET_BOOL(world, ent, name) AS BOOLEAN",
+   "BOOLEAN-Component lesen."
+  ],
+  "ecs_get_float": [
+   "ECS_GET_FLOAT(world, ent, name) AS FLOAT",
+   "FLOAT-Component lesen."
+  ],
+  "ecs_get_int": [
+   "ECS_GET_INT(world, ent, name) AS INTEGER",
+   "INTEGER-Component lesen. Wirft wenn fehlt oder falscher Typ."
+  ],
+  "ecs_get_or_bool": [
+   "ECS_GET_OR_BOOL(world, ent, name, default) AS BOOLEAN",
+   "BOOLEAN-Component oder default."
+  ],
+  "ecs_get_or_float": [
+   "ECS_GET_OR_FLOAT(world, ent, name, default) AS FLOAT",
+   "FLOAT-Component oder default."
+  ],
+  "ecs_get_or_int": [
+   "ECS_GET_OR_INT(world, ent, name, default) AS INTEGER",
+   "INTEGER-Component oder default."
+  ],
+  "ecs_get_or_string": [
+   "ECS_GET_OR_STRING(world, ent, name, default) AS STRING",
+   "STRING-Component oder default."
+  ],
+  "ecs_get_string": [
+   "ECS_GET_STRING(world, ent, name) AS STRING",
+   "STRING-Component lesen."
+  ],
+  "ecs_has": [
+   "ECS_HAS(world, ent, name) AS BOOLEAN",
+   "Hat Entity diesen Component?"
+  ],
+  "ecs_new_entity": [
+   "ECS_NEW_ENTITY(world) AS INTEGER",
+   "Neue Entity, gibt eindeutige Entity-ID zurueck."
+  ],
+  "ecs_new_world": [
+   "ECS_NEW_WORLD() AS ECS_WORLD",
+   "Neue ECS-Welt anlegen."
+  ],
+  "ecs_query": [
+   "ECS_QUERY(world, name) AS ARRAY OF INTEGER",
+   "Entities mit dem Component."
+  ],
+  "ecs_query2": [
+   "ECS_QUERY2(world, n1, n2) AS ARRAY OF INTEGER",
+   "Entities mit beiden Components (Intersection)."
+  ],
+  "ecs_query3": [
+   "ECS_QUERY3(world, n1, n2, n3) AS ARRAY OF INTEGER",
+   "Entities mit allen drei Components."
+  ],
+  "ecs_remove": [
+   "ECS_REMOVE(world, ent, name) AS BOOLEAN",
+   "Component entfernen."
+  ],
+  "endoffile": [
+   "ENDOFFILE(f) AS BOOLEAN",
+   "TRUE am Datei-Ende."
+  ],
+  "endswith": [
+   "ENDSWITH(s, suffix) AS BOOLEAN",
+   "Endet s mit suffix?"
+  ],
+  "eprint": [
+   "EPRINT(text)",
+   "Zeile nach stderr statt stdout -- fuer Meldungen, die nicht zu den Nutzdaten gehoeren. Anders als PRINT ein Builtin, also mit Klammern."
+  ],
+  "error_code$": [
+   "ERROR_CODE$() AS STRING",
+   "Code des zuletzt gefangenen Fehlers -- gesetzt von `THROW code, meldung`. Eingebaute Laufzeitfehler haben \"\"."
+  ],
+  "error_line": [
+   "ERROR_LINE() AS INTEGER",
+   "Zeile, in der der zuletzt gefangene Fehler entstand (0 = keiner)."
+  ],
+  "exit": [
+   "EXIT([code])",
+   "Programm sofort beenden, code wird der Rueckgabewert (0..255, Vorgabe 0). Wird von TRY/CATCH NICHT gefangen."
+  ],
+  "exp": [
+   "EXP(x) AS FLOAT",
+   "e hoch x."
+  ],
+  "fileexists": [
+   "FILEEXISTS(pfad) AS BOOLEAN",
+   "Existenz pruefen."
+  ],
+  "filesize": [
+   "FILESIZE(pfad) AS INTEGER",
+   "Dateigroesse in Bytes."
+  ],
+  "flip": [
+   "FLIP()",
+   "Doppelpuffer-Swap (anzeigen)."
+  ],
+  "floor": [
+   "FLOOR(zahl) AS INTEGER",
+   "Abrundung."
+  ],
+  "frac": [
+   "FRAC(x) AS FLOAT",
+   "Nachkommaanteil (vorzeichenbehaftet): x - TRUNC(x)."
+  ],
+  "getenv$": [
+   "GETENV$(name[, vorgabe]) AS STRING",
+   "Umgebungsvariable lesen. Fehlt sie, kommt die Vorgabe (sonst Leerstring)."
+  ],
+  "green": [
+   "GREEN(farbe) AS INTEGER",
+   "Gruen-Kanal 0..255."
+  ],
+  "hex$": [
+   "HEX$(n) AS STRING",
+   "INTEGER als Hex (\"FF\", \"1A2B\", ...)."
+  ],
+  "hmac_sha256$": [
+   "HMAC_SHA256$(schluessel, daten) AS STRING",
+   "Signatur mit geheimem Schluessel (Webhooks, signierte API-Aufrufe). Ergebnis mit SECURE_EQUALS vergleichen, nicht mit '='."
+  ],
+  "hsv": [
+   "HSV(h, s, v) AS INTEGER",
+   "HSV -> 0xRRGGBB. h in Grad, s/v in [0,1]."
+  ],
+  "http_bytes": [
+   "HTTP_BYTES() AS BUFFER",
+   "Roher Rumpf der letzten Antwort -- ungewandelt, also auch fuer Bilder und andere Binaerdaten brauchbar. Nach einem Fehler leer."
+  ],
+  "http_clear_headers": [
+   "HTTP_CLEAR_HEADERS()",
+   "Alle dauerhaften Kopfzeilen entfernen."
+  ],
+  "http_request": [
+   "HTTP_REQUEST(methode, url[, rumpf[, kopfzeilen]]) AS STRING",
+   "HTTP-Anfrage mit eigener Methode (GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS), Rumpf (STRING oder BUFFER) und Kopfzeilen (MAP OF STRING). Raet KEINEN Content-Type -- den setzt der Aufrufer."
+  ],
+  "http_request_start": [
+   "HTTP_REQUEST_START(methode, url[, rumpf[, kopfzeilen]]) AS INTEGER",
+   "Wie HTTP_REQUEST, aber im Hintergrund: liefert sofort die Abruf-Nummer fuer HTTP_READY/HTTP_RESULT."
+  ],
+  "http_set_header": [
+   "HTTP_SET_HEADER(name, wert)",
+   "Kopfzeile, die JEDER folgende HTTP-Aufruf mitschickt (z.B. ein Token). Gleicher Name ersetzt; pro Aufruf uebergebene gewinnen."
+  ],
+  "http_timeout": [
+   "HTTP_TIMEOUT(sekunden)",
+   "Zeitgrenze fuer folgende Aufrufe (1..600, Vorgabe 10)."
+  ],
+  "hypot": [
+   "HYPOT(x, y) AS FLOAT",
+   "SQR(x*x + y*y) ohne Overflow."
+  ],
+  "imageheight": [
+   "IMAGEHEIGHT(img) AS INTEGER",
+   "Hoehe eines IMAGE."
+  ],
+  "imagewidth": [
+   "IMAGEWIDTH(img) AS INTEGER",
+   "Breite eines IMAGE."
+  ],
+  "instr": [
+   "INSTR(haystack, needle[, start])",
+   "0-basiert, -1 wenn nicht gefunden."
+  ],
+  "int": [
+   "INT(zahl) AS INTEGER",
+   "Schneidet die Nachkommastellen ab (Floor)."
+  ],
+  "isnumeric": [
+   "ISNUMERIC(s) AS BOOLEAN",
+   "Ist s als Zahl (INT/FLOAT) parsebar?"
+  ],
+  "join$": [
+   "JOIN$(arr, trenner) AS STRING",
+   "Fuegt ein STRING-Array zu einem STRING zusammen."
+  ],
+  "keypressed": [
+   "KEYPRESSED(code) AS BOOLEAN",
+   "Pruefe Taste (KEY_*)."
+  ],
+  "left$": [
+   "LEFT$(s, n)",
+   "Erste n Zeichen."
+  ],
+  "len": [
+   "LEN(s/array)",
+   "Laenge eines STRINGs oder erste Dim eines ARRAYs."
+  ],
+  "lerp": [
+   "LERP(a, b, t) AS FLOAT",
+   "Lineare Interpolation a..b bei t (nicht geklemmt)."
+  ],
+  "line": [
+   "LINE(x1, y1, x2, y2[, farbe])",
+   "Linie zeichnen."
+  ],
+  "loadimage": [
+   "LOADIMAGE(pfad) AS IMAGE",
+   "Bild laden."
+  ],
+  "loadsound": [
+   "LOADSOUND(pfad) AS SOUND",
+   "Soundeffekt laden."
+  ],
+  "log": [
+   "LOG(x[, basis]) AS FLOAT",
+   "Natuerlicher Log oder Log zur Basis."
+  ],
+  "log_debug": [
+   "LOG_DEBUG(text)",
+   "Meldung nach stderr. Schweigt per Vorgabe (DH_LOG=debug schaltet sie ein)."
+  ],
+  "log_error": [
+   "LOG_ERROR(text)",
+   "Fehlermeldung mit Uhrzeit nach stderr."
+  ],
+  "log_info": [
+   "LOG_INFO(text)",
+   "Meldung mit Uhrzeit nach stderr. Pegel ueber DH_LOG."
+  ],
+  "log_warn": [
+   "LOG_WARN(text)",
+   "Warnung mit Uhrzeit nach stderr."
+  ],
+  "lower$": [
+   "LOWER$(s)",
+   "Kleinbuchstaben."
+  ],
+  "ltrim$": [
+   "LTRIM$(s) AS STRING",
+   "Fuehrende Leerzeichen entfernen."
+  ],
+  "mapclear": [
+   "MAPCLEAR(map)",
+   "Alle Eintraege entfernen."
+  ],
+  "mapget": [
+   "MAPGET(map, key$)",
+   "Wert zum Schluessel - Fehler wenn nicht vorhanden."
+  ],
+  "mapgetor": [
+   "MAPGETOR(map, key$, default)",
+   "Wert oder Default."
+  ],
+  "maphas": [
+   "MAPHAS(map, key$) AS BOOLEAN",
+   "Schluessel existiert?"
+  ],
+  "mapkeys": [
+   "MAPKEYS(map) AS ARRAY OF STRING",
+   "Liste aller Schluessel."
+  ],
+  "mapput": [
+   "MAPPUT(map, key$, value)",
+   "Wert unter Schluessel speichern."
+  ],
+  "mapremove": [
+   "MAPREMOVE(map, key$) AS BOOLEAN",
+   "Eintrag entfernen, TRUE bei Erfolg."
+  ],
+  "mapsize": [
+   "MAPSIZE(map) AS INTEGER",
+   "Anzahl Eintraege."
+  ],
+  "max": [
+   "MAX(a, b, ...)",
+   "Maximum von 1+ Argumenten."
+  ],
+  "md5$": [
+   "MD5$(daten) AS STRING",
+   "MD5 als Hex. NUR fuer Vertraeglichkeit (ETags, alte Pruefsummen-Listen) -- gilt als gebrochen, nichts Sicherheitsrelevantes darauf stuetzen."
+  ],
+  "md5_file$": [
+   "MD5_FILE$(pfad) AS STRING",
+   "MD5 einer Datei, blockweise gelesen."
+  ],
+  "mid$": [
+   "MID$(s, start[, n])",
+   "Substring ab start (0-basiert), optional n Zeichen."
+  ],
+  "millis": [
+   "MILLIS() AS INTEGER",
+   "Millisekunden seit Programmstart."
+  ],
+  "min": [
+   "MIN(a, b, ...)",
+   "Minimum von 1+ Argumenten."
+  ],
+  "mkdir": [
+   "MKDIR(pfad)",
+   "Verzeichnis anlegen (inkl. Elternverzeichnisse)."
+  ],
+  "mouse_hidden": [
+   "MOUSE_HIDDEN() AS BOOLEAN",
+   "Ist der Cursor versteckt/gefangen?"
+  ],
+  "mouse_lock": [
+   "MOUSE_LOCK(an)",
+   "Cursor fangen: verstecken + im Fenster einsperren (First-Person-Maussteuerung). FALSE gibt frei."
+  ],
+  "mouse_visible": [
+   "MOUSE_VISIBLE(an)",
+   "OS-Maus-Cursor zeigen/verstecken (fuer eigenes Fadenkreuz/Cursor-Sprite)."
+  ],
+  "mousebutton": [
+   "MOUSEBUTTON(n) AS BOOLEAN",
+   "n=0/1/2 (links/mitte/rechts)."
+  ],
+  "mousewheel": [
+   "MOUSEWHEEL() AS INTEGER",
+   "Mausrad-Delta seit letztem Aufruf (+hoch/-runter)."
+  ],
+  "mousex": [
+   "MOUSEX() AS INTEGER",
+   "Aktuelle X-Position."
+  ],
+  "mousey": [
+   "MOUSEY() AS INTEGER",
+   "Aktuelle Y-Position."
+  ],
+  "net_close": [
+   "NET_CLOSE(sock)",
+   "TCP-Socket schliessen."
+  ],
+  "net_close_listener": [
+   "NET_CLOSE_LISTENER(listener)",
+   "TCP-Listener schliessen."
+  ],
+  "net_is_connected": [
+   "NET_IS_CONNECTED(sock) AS BOOLEAN",
+   "FALSE sobald die Gegenseite geschlossen hat oder ein Recv/Send fehlgeschlagen ist."
+  ],
+  "net_peer_addr": [
+   "NET_PEER_ADDR(sock) AS STRING",
+   "Remote-IP-Adresse."
+  ],
+  "net_peer_port": [
+   "NET_PEER_PORT(sock) AS INTEGER",
+   "Remote-Port."
+  ],
+  "net_recv": [
+   "NET_RECV(sock, max_bytes) AS STRING",
+   "Bis zu max_bytes empfangen. Leerer STRING wenn nichts (non-blocking). Ein an der Lesegrenze zerschnittenes Mehrbyte-Zeichen wird korrekt erst im naechsten Aufruf vervollstaendigt."
+  ],
+  "net_send": [
+   "NET_SEND(sock, text) AS INTEGER",
+   "UTF-8-Bytes schicken. Rueckgabe: tatsaechlich gesendete Bytes."
+  ],
+  "net_set_timeout": [
+   "NET_SET_TIMEOUT(sock, ms)",
+   "Timeout setzen. ms=0 non-blocking, ms<0 blocking, ms>0 Timeout in ms."
+  ],
+  "net_tcp_accept": [
+   "NET_TCP_ACCEPT(listener) AS NET_SOCKET",
+   "Wartende Verbindung annehmen, oder NIL wenn keine da ist."
+  ],
+  "net_tcp_connect": [
+   "NET_TCP_CONNECT(host, port) AS NET_SOCKET",
+   "TCP-Verbindung zu host:port aufbauen (DNS + Connect je 5s Timeout)."
+  ],
+  "net_tcp_listen": [
+   "NET_TCP_LISTEN(port [, bind_addr$]) AS NET_LISTENER",
+   "TCP-Server auf Port. port=0 = OS-zugewiesener Port. bind_addr$ optional: \"::\" fuer IPv6 statt IPv4."
+  ],
+  "net_udp_bind": [
+   "NET_UDP_BIND(port [, bind_addr$]) AS NET_UDP",
+   "UDP-Socket auf Port lauschen. bind_addr$ optional: \"::\" fuer IPv6."
+  ],
+  "net_udp_close": [
+   "NET_UDP_CLOSE(sock)",
+   "UDP-Socket schliessen."
+  ],
+  "net_udp_last_from": [
+   "NET_UDP_LAST_FROM(sock) AS STRING",
+   "Absender des letzten RECV als 'host:port'."
+  ],
+  "net_udp_open": [
+   "NET_UDP_OPEN() AS NET_UDP",
+   "Ungebundener UDP-Socket (nur Senden)."
+  ],
+  "net_udp_recv": [
+   "NET_UDP_RECV(sock, max_bytes) AS STRING",
+   "UDP-Datagramm empfangen."
+  ],
+  "net_udp_send": [
+   "NET_UDP_SEND(sock, host, port, text) AS INTEGER",
+   "UDP-Datagramm senden."
+  ],
+  "net_udp_set_timeout": [
+   "NET_UDP_SET_TIMEOUT(sock, ms)",
+   "UDP-Timeout setzen."
+  ],
+  "oct$": [
+   "OCT$(n) AS STRING",
+   "INTEGER als Oktalstring (mit Vorzeichen)."
+  ],
+  "openfile": [
+   "OPENFILE(pfad, modus) AS FILE",
+   "Modus: \"r\", \"w\", \"a\"."
+  ],
+  "padl$": [
+   "PADL$(s, breite[, fueller]) AS STRING",
+   "String linksbuendig auffuellen."
+  ],
+  "padr$": [
+   "PADR$(s, breite[, fueller]) AS STRING",
+   "String rechtsbuendig auffuellen."
+  ],
+  "pathjoin": [
+   "PATHJOIN(a, b, ...) AS STRING",
+   "Pfadteile mit '/' verbinden."
+  ],
+  "playmusic": [
+   "PLAYMUSIC(pfad[, loops, vol])",
+   "Musik streamen."
+  ],
+  "playsound": [
+   "PLAYSOUND(s[, loops, vol])",
+   "Sound abspielen."
+  ],
+  "plot": [
+   "PLOT(x, y[, farbe])",
+   "Pixel zeichnen."
+  ],
+  "pow": [
+   "POW(basis, exp) AS FLOAT",
+   "basis hoch exp."
+  ],
+  "quitrequested": [
+   "QUITREQUESTED() AS BOOLEAN",
+   "Hat User Fenster geschlossen?"
+  ],
+  "rad": [
+   "RAD(grad) AS FLOAT",
+   "Grad -> Radiant."
+  ],
+  "randf": [
+   "RANDF(lo, hi) AS FLOAT",
+   "Zufalls-FLOAT in [lo, hi)."
+  ],
+  "randint": [
+   "RANDINT(lo, hi) AS INTEGER",
+   "Zufalls-INTEGER in [lo, hi] (inklusiv)."
+  ],
+  "random_bytes": [
+   "RANDOM_BYTES(anzahl) AS BUFFER",
+   "Zufallsbytes aus der Quelle des Betriebssystems -- fuer Tokens, Schluessel, Salz. NICHT von RANDOMIZE beeinflussbar (anders als RND)."
+  ],
+  "randomize": [
+   "RANDOMIZE([seed])",
+   "Zufallsgenerator setzen (deterministisch mit Seed)."
+  ],
+  "read_bytes": [
+   "READ_BYTES(datei, anzahl) AS BUFFER",
+   "Bis zu `anzahl` Bytes lesen. Am Dateiende kommen WENIGER zurueck (0 = fertig) -- das ist kein Fehler."
+  ],
+  "readall$": [
+   "READALL$(f) AS STRING",
+   "Gesamten Datei-Inhalt einlesen."
+  ],
+  "readall_bytes": [
+   "READALL_BYTES(pfad) AS BUFFER",
+   "Ganze Datei als Bytes lesen."
+  ],
+  "readline": [
+   "READLINE(f) AS STRING",
+   "Liest eine Zeile (ohne \\n)."
+  ],
+  "readlines": [
+   "READLINES(pfad) AS ARRAY OF STRING",
+   "Datei als Zeilen-Array lesen."
+  ],
+  "rect": [
+   "RECT(x1, y1, x2, y2[, farbe])",
+   "Rechteck-Rahmen."
+  ],
+  "red": [
+   "RED(farbe) AS INTEGER",
+   "Rot-Kanal 0..255 aus 0xRRGGBB."
+  ],
+  "redim": [
+   "REDIM(arr, laenge)",
+   "1D-Array auf laenge bringen (waechst mit Default, schrumpft schneidet ab; Bestand bleibt)."
+  ],
+  "remap": [
+   "REMAP(v, in_lo, in_hi, out_lo, out_hi) AS FLOAT",
+   "v aus [in_lo,in_hi] auf [out_lo,out_hi] abbilden."
+  ],
+  "rename": [
+   "RENAME(alt, neu)",
+   "Datei/Verzeichnis umbenennen oder verschieben."
+  ],
+  "repeat$": [
+   "REPEAT$(s, n) AS STRING",
+   "String n-mal wiederholen."
+  ],
+  "replace$": [
+   "REPLACE$(s, alt, neu)",
+   "Ersetzt alle Vorkommen."
+  ],
+  "reverse$": [
+   "REVERSE$(s) AS STRING",
+   "Zeichen umkehren."
+  ],
+  "rgb": [
+   "RGB(r, g, b) AS INTEGER",
+   "Farbe aus 3x INTEGER 0..255."
+  ],
+  "right$": [
+   "RIGHT$(s, n)",
+   "Letzte n Zeichen."
+  ],
+  "rnd": [
+   "RND([n])",
+   "Zufallszahl. Ohne Argument 0..1.0; mit n: 0..n-1."
+  ],
+  "round": [
+   "ROUND(zahl[, dezimalstellen]) AS INTEGER/FLOAT",
+   "Banker-Rundung; mit dezimalstellen auf N Nachkommastellen (FLOAT)."
+  ],
+  "rtrim$": [
+   "RTRIM$(s) AS STRING",
+   "Abschliessende Leerzeichen entfernen."
+  ],
+  "screen": [
+   "SCREEN(w, h[, titel[, skala]])",
+   "Fenster oeffnen. skala>1 macht Pixel groesser (Retro-Look)."
+  ],
+  "screenheight": [
+   "SCREENHEIGHT() AS INTEGER",
+   "Logische Fensterhoehe; 0 vor SCREEN."
+  ],
+  "screenwidth": [
+   "SCREENWIDTH() AS INTEGER",
+   "Logische Fensterbreite; 0 vor SCREEN."
+  ],
+  "secure_equals": [
+   "SECURE_EQUALS(a, b) AS BOOLEAN",
+   "Vergleich in konstanter Zeit. '=' bricht beim ersten Unterschied ab; wer eine Signatur raten will, misst die Zeit und hat sie zeichenweise."
+  ],
+  "seek": [
+   "SEEK(datei, position)",
+   "Lese-/Schreibposition auf ein Byte setzen (0 = Anfang)."
+  ],
+  "setenv": [
+   "SETENV(name, wert)",
+   "Umgebungsvariable setzen -- gilt fuer dieses Programm und seine Kindprozesse (SHELL), nicht fuer die Konsole des Aufrufers."
+  ],
+  "sgn": [
+   "SGN(zahl) AS INTEGER",
+   "-1, 0 oder 1 (Alias fuer SIGN)."
+  ],
+  "sha1$": [
+   "SHA1$(daten) AS STRING",
+   "SHA-1 als Hex. Fuer Vertraeglichkeit mit Bestehendem (git, alte APIs) -- fuer neue Sicherheitsentscheidungen SHA256$ nehmen."
+  ],
+  "sha1_file$": [
+   "SHA1_FILE$(pfad) AS STRING",
+   "SHA-1 einer Datei, blockweise gelesen."
+  ],
+  "sha256$": [
+   "SHA256$(daten) AS STRING",
+   "SHA-256 als Hex. `daten` ist STRING (UTF-8) oder BUFFER. Fuer alles, wo jemand die Antwort faelschen koennte -- anders als CRC32/HASH, die nur zum Wiedererkennen taugen."
+  ],
+  "sha256_file$": [
+   "SHA256_FILE$(pfad) AS STRING",
+   "SHA-256 einer Datei, blockweise gelesen -- auch bei mehreren GB."
+  ],
+  "shell": [
+   "SHELL(programm, ...) AS INTEGER",
+   "Programm starten, auf das Ende warten, Rueckgabewert liefern (-1 = durch Signal beendet). Argumente EINZELN uebergeben, nicht als eine Kommandozeile. Ausgabe geht direkt auf die Konsole."
+  ],
+  "shell_cancel": [
+   "SHELL_CANCEL(auftrag)",
+   "Auftrag verwerfen; der Prozess laeuft zu Ende."
+  ],
+  "shell_code": [
+   "SHELL_CODE() AS INTEGER",
+   "Rueckgabewert des zuletzt abgeholten Auftrags."
+  ],
+  "shell_err$": [
+   "SHELL_ERR$() AS STRING",
+   "stderr des zuletzt abgeholten Auftrags."
+  ],
+  "shell_out$": [
+   "SHELL_OUT$(programm, ...) AS STRING",
+   "Wie SHELL, sammelt aber die stdout-Ausgabe ein und liefert sie. stderr des Kindes bleibt stderr."
+  ],
+  "shell_pending": [
+   "SHELL_PENDING() AS INTEGER",
+   "Wie viele Prozesse noch offen sind."
+  ],
+  "shell_ready": [
+   "SHELL_READY(auftrag) AS BOOLEAN",
+   "Ist der Prozess fertig? Fragt nach, wartet nicht."
+  ],
+  "shell_result$": [
+   "SHELL_RESULT$(auftrag) AS STRING",
+   "stdout abholen und den Platz freigeben. Danach liefern SHELL_CODE() und SHELL_ERR$() die uebrigen Angaben dieses Auftrags."
+  ],
+  "shell_start": [
+   "SHELL_START(programm, ...) AS INTEGER",
+   "Programm im Hintergrund starten, liefert sofort die Auftragsnummer. Argumente einzeln, wie bei SHELL."
+  ],
+  "shuffle": [
+   "SHUFFLE(array)",
+   "Mischt ein 1D-Array IN PLACE (Fisher-Yates)."
+  ],
+  "sign": [
+   "SIGN(zahl) AS INTEGER",
+   "-1, 0 oder 1."
+  ],
+  "sin": [
+   "SIN(rad) AS FLOAT",
+   "Sinus, Eingabe in Radiant."
+  ],
+  "sleep": [
+   "SLEEP(ms)",
+   "Pausiert das Programm."
+  ],
+  "sort": [
+   "SORT(arr [, absteigend?-BOOL | comparator-FUNCREF])",
+   "1D IN PLACE sortieren. BOOL-Flag fuer absteigend ODER FUNCREF-Comparator(a,b)->INT (<0/0/>0). Zweiarg-Formen: nur native Runtime."
+  ],
+  "space$": [
+   "SPACE$(n) AS STRING",
+   "String aus n Leerzeichen."
+  ],
+  "split$": [
+   "SPLIT$(s, trenner) AS ARRAY OF STRING",
+   "Spaltet den STRING."
+  ],
+  "sqr": [
+   "SQR(zahl) AS FLOAT",
+   "Quadratwurzel."
+  ],
+  "sqrt": [
+   "SQRT(zahl) AS FLOAT",
+   "Quadratwurzel (Alias fuer SQR)."
+  ],
+  "startswith": [
+   "STARTSWITH(s, praefix) AS BOOLEAN",
+   "Beginnt s mit praefix?"
+  ],
+  "stopmusic": [
+   "STOPMUSIC()",
+   "Musik stoppen."
+  ],
+  "stopsound": [
+   "STOPSOUND(s)",
+   "Sound stoppen."
+  ],
+  "str$": [
+   "STR$(value) AS STRING",
+   "Wandelt einen Wert in einen STRING."
+  ],
+  "tan": [
+   "TAN(rad) AS FLOAT",
+   "Tangens."
+  ],
+  "tell": [
+   "TELL(datei) AS INTEGER",
+   "Aktuelle Lese-/Schreibposition."
+  ],
+  "text": [
+   "TEXT(x, y, s[, farbe])",
+   "Text rendern."
+  ],
+  "textrot": [
+   "TEXTROT(x, y, s, winkel[, skala[, farbe]])",
+   "Text ZENTRIERT auf (x,y), um das Zentrum gedreht (Grad, wie DRAWIMAGEROT) und skaliert -- Score-Popups, schraege Labels."
+  ],
+  "time$": [
+   "TIME$() AS STRING",
+   "Aktuelle Uhrzeit \"HH:MM:SS\"."
+  ],
+  "timer_active": [
+   "TIMER_ACTIVE(id) AS BOOLEAN",
+   "Laeuft der Timer noch?"
+  ],
+  "timer_after": [
+   "TIMER_AFTER(ms, fn) AS INTEGER",
+   "Ruft die FUNCREF einmalig nach ms Millisekunden auf (beim naechsten TIMER_UPDATE danach). Liefert eine Timer-ID."
+  ],
+  "timer_cancel": [
+   "TIMER_CANCEL(id)",
+   "Timer abbrechen. Bereits gefeuerte/unbekannte IDs sind ein No-Op."
+  ],
+  "timer_clear": [
+   "TIMER_CLEAR()",
+   "Alle Timer und Cooldowns verwerfen (z.B. Scene-Wechsel)."
+  ],
+  "timer_count": [
+   "TIMER_COUNT() AS INTEGER",
+   "Anzahl aktiver Timer."
+  ],
+  "timer_every": [
+   "TIMER_EVERY(ms, fn) AS INTEGER",
+   "Ruft die FUNCREF alle ms Millisekunden auf (max. 1x pro TIMER_UPDATE). Liefert eine Timer-ID."
+  ],
+  "timer_update": [
+   "TIMER_UPDATE()",
+   "Pro Frame aufrufen: feuert faellige TIMER_AFTER/EVERY-Callbacks (wie INPUT_UPDATE/GUI_UPDATE)."
+  ],
+  "trim$": [
+   "TRIM$(s)",
+   "Entfernt fuehrende/nachstehende Whitespaces."
+  ],
+  "tryval": [
+   "TRYVAL(s, default) AS INTEGER/FLOAT",
+   "s zu Zahl parsen, sonst default (robustes VAL)."
+  ],
+  "unloadsound": [
+   "UNLOADSOUND(s)",
+   "Sound stoppen und seinen Puffer freigeben (gegen Puffer-Akkumulation in langen Songs). Index bleibt gueltig, erneutes Abspielen wirft."
+  ],
+  "upper$": [
+   "UPPER$(s)",
+   "Grossbuchstaben."
+  ],
+  "uuid4$": [
+   "UUID4$() AS STRING",
+   "Zufaellige eindeutige Kennung (Version 4)."
+  ],
+  "val": [
+   "VAL(s$) AS INTEGER/FLOAT",
+   "Liest eine Zahl aus dem STRING."
+  ],
+  "write": [
+   "WRITE(f, text)",
+   "Schreibt ohne Newline."
+  ],
+  "write_bytes": [
+   "WRITE_BYTES(datei, puffer)",
+   "Bytes an die geoeffnete Datei schreiben."
+  ],
+  "writeall": [
+   "WRITEALL(pfad, text)",
+   "Text in Datei schreiben (ueberschreibt)."
+  ],
+  "writeall_bytes": [
+   "WRITEALL_BYTES(pfad, puffer)",
+   "Bytes in eine Datei schreiben (ueberschreibt)."
+  ],
+  "writeline": [
+   "WRITELINE(f, text)",
+   "Schreibt eine Zeile mit Newline."
+  ]
+ }
+}
