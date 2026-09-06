@@ -5435,7 +5435,7 @@
   {
    "name": "LOADFONT",
    "kind": "graphics",
-   "signature": "LOADFONT(path: STRING, size: Zahl)",
+   "signature": "LOADFONT(pfad$, groesse[, zeichen$])",
    "module": "core"
   },
   {

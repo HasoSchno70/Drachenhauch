@@ -5726,6 +5726,9 @@ impl<'p> Vm<'p> {
                     // GUI_CLICKED im selben Bild schon wieder weg.
                     self.gui.screenreader = g.a11y_aktiv();
                     self.gui.update(g);
+                    // Eingabemethoden: das Umwandlungsfenster der IME an die
+                    // Schreibmarke des Textfelds mit Fokus (Weg B).
+                    if let Some((x, y, h)) = self.gui.schreibmarke(g) { g.ime_position(x, y, h); }
                     if self.gui.screenreader {
                         for req in g.a11y_aktionen() { self.gui.a11y_aktion(req, g); }
                         let titel = g.fenster_titel().to_string();
@@ -6459,7 +6462,14 @@ impl<'p> Vm<'p> {
             "text_size" => { g!().set_text_size(gi(a,0,"TEXT_SIZE")? as i32); Value::Nil }
             "text_width" => Value::Int(g!().text_width(gs(a,0,"TEXT_WIDTH")?) as i64),
             "text_height" => Value::Int(g!().text_height() as i64),
-            "loadfont" => Value::Int(g!().load_font(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32)?),
+            "loadfont" => {
+                if a.len() > 3 { return Err("LOADFONT: erwartet (pfad$, groesse[, zeichen$])".into()); }
+                if a.len() == 3 {
+                    Value::Int(g!().load_font_mit(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32, &gs(a,2,"LOADFONT")?)?)
+                } else {
+                    Value::Int(g!().load_font(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32)?)
+                }
+            }
             "setfont" => { g!().set_font(gi(a,0,"SETFONT")?)?; Value::Nil }
             "text_spacing" => { g!().set_text_spacing(gi(a,0,"TEXT_SPACING")? as i32); Value::Nil }
             "loadimage" => Value::Int(g!().load_texture(gs(a,0,"LOADIMAGE")?)?),

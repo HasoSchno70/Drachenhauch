@@ -1,5 +1,26 @@
 # Entwurf: Eingabemethoden (IME) und fremde Schriften
 
+> **Stand 06.09.2026: A und B sind gebaut.** Der Grundvorrat reicht jetzt
+> von ASCII bis Kyrillisch samt `€` und Interpunktion; was darüber hinausgeht,
+> backt die Laufzeit **auf Zuruf** aus den Systemschriften nach (nur die
+> gebrauchten Zeichen, je Datei ein Eintrag; Zeichen ohne Glyphe im gewählten
+> Font laufen zeichenweise über die Ausweich-Schriften — auch in einer per
+> `LOADFONT` geladenen). `LOADFONT(pfad$, groesse[, zeichen$])` nimmt
+> Blocknamen oder die Zeichen selbst; Schriftsammlungen (`.ttc`) werden
+> aufgelöst — raylib tauschte sie bisher still gegen seine Bitmapschrift, und
+> genau so liegen die CJK-Schriften von Windows vor. Die Tipp-Warteschlange
+> steht auf 256 (`CFLAGS` in `build_runtime.py`, nachgesehen im CMake-Cache
+> von raylib-sys). Weg B: das gui meldet die Schreibmarke des Feldes mit Fokus
+> an `ImmSetCompositionWindow`/`ImmSetCandidateWindow` (Windows, ohne IME
+> nicht messbar). **Gemessen:** `12,50 € Ω Я ő ł`, `日本語 한글 😀 שלום` und
+> `東京` erscheinen statt `?`; das erste Bild mit vier neuen Schriften kostet
+> ~100 ms, ein weiteres neues Kanji ~15 ms, der Start 50 ms mehr für den
+> größeren Grundvorrat (357 → 407 ms). Tests `tests/test_schriften_vorrat.py`
+> (Bildvergleich echt gegen `?`, Gegenprobe U+E000 bleibt `?`). Siehe
+> [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften).
+> C (Vorschau im Feld) und D bleiben ungebaut; Arabisch/Hebräisch ohne
+> Formung und Rechts-nach-links.
+
 *Untersuchung, keine Umsetzung.* Der vierte und letzte Architekturpunkt der
 Lückenliste nach dem sechsten Piloten (nach den
 [Fenstern](entwurf-native-fenster.md), dem [Drucken](entwurf-drucken.md) und
