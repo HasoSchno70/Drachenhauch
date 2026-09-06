@@ -123,6 +123,15 @@ windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gd
 # UIA-Adapter von AccessKit: haengt sich per Subclassing an raylibs GLFW-Fenster.
 accesskit_windows = { version = "0.35", optional = true }
 
+# Dieselbe Bruecke fuer macOS (NSAccessibility, per Objective-C-Subclassing an
+# GLFWs NSWindow) und Linux (AT-SPI ueber D-Bus, zbus + async-io). Nicht fuer
+# den Web-Bau (emscripten ist auch "unix").
+[target.'cfg(target_os = "macos")'.dependencies]
+accesskit_macos = { version = "0.27", optional = true }
+
+[target.'cfg(all(unix, not(target_os = "macos"), not(target_os = "emscripten")))'.dependencies]
+accesskit_unix = { version = "0.23", optional = true, features = ["async-io"] }
+
 [target.'cfg(target_os = "emscripten")'.dependencies]
 wasm-bindgen = "=0.2.100"
 # Im Browser WebGL 2 statt WebGL 1 verlangen. Der Grund ist die Shader-Sprache:
@@ -138,7 +147,11 @@ raylib = { version = "6.0", optional = true, features = ["opengl_es_30"] }
 [features]
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
-graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer", "dep:accesskit", "dep:accesskit_windows"]
+graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer", "a11y"]
+# Barrierefreiheit (a11y.rs) als eigenes Feature, damit sich der Adapter-Code
+# fuer macOS/Linux mit `cargo check --features a11y --target ...` pruefen
+# laesst, ohne raylib fuer das fremde Ziel zu bauen.
+a11y = ["dep:accesskit", "dep:accesskit_windows", "dep:accesskit_macos", "dep:accesskit_unix"]
 # Native OS-Dialoge (rfd) -- vom graphics-Feature GETRENNT, weil sie es im
 # Web-Build blockieren: rfd zieht js-sys/wasm-bindgen in einer Version nach,
 # die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit

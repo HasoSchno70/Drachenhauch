@@ -5257,6 +5257,14 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     /// das Hilfsprogramm wenigstens das Fenster mit seinem Titel -- sonst
     /// bliebe ein Programm ohne gui fuer immer bei "noch kein Baum".
     fn a11y_bild_ende(&mut self) {
+        // Lage und Fokus des Fensters nachmelden (Linux braucht beides von
+        // uns, macOS den Fokus; unter Windows sind es No-Ops). Nur bei
+        // Aenderung -- die Adapter merken sich den letzten Stand selbst.
+        if let Some(a) = self.a11y.as_mut() {
+            let pos = self.rl.get_window_position();
+            a.fenster_lage(pos.x as i32, pos.y as i32, self.width * self.scale, self.height * self.scale);
+            a.fenster_fokus(self.rl.is_window_focused());
+        }
         if self.a11y_aktiv() && !self.a11y_versorgt {
             use accesskit::{Node, NodeId, Role, TreeId, TreeInfo, TreeUpdate};
             let mut root = Node::new(Role::Window);
