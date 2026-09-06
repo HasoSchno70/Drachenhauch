@@ -5095,7 +5095,10 @@ impl<'p> Vm<'p> {
     /// Unter dem Profiler NICHT -- dort gehoert stdout dem JSON-Blob (gleiche
     /// Ueberlegung wie in `flush_and_prompt`).
     fn flush_out(&mut self) {
-        if self.prof.is_some() || self.out.is_empty() { return; }
+        // Im Debugger ist stdout der EREIGNISKANAL (JSON-Zeilen): Programm-
+        // Ausgabe geht dort als `output`-Ereignis hinaus (out_sent), nie roh --
+        // sonst schriebe DHRT_LIVE eine PRINT-Zeile mitten in den Strom.
+        if self.prof.is_some() || self.dbg.is_some() || self.out.is_empty() { return; }
         use std::io::Write;
         let so = std::io::stdout();
         let mut h = so.lock();
@@ -5952,6 +5955,29 @@ impl<'p> Vm<'p> {
                 let genau = a.len() > 4 && gbool(a, 4, "GUI_TEXTAREA_FIND")?;
                 let (z, s) = self.gui.textarea_find(gi(a, 0, "GUI_TEXTAREA_FIND")?, &gs(a, 1, "GUI_TEXTAREA_FIND")?, ab_zeile, ab_spalte, genau)?;
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
+            }
+            "gui_textarea_marks" => {
+                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+                    match v {
+                        Value::Array(a) => {
+                            let a = a.borrow();
+                            let mut o = Vec::with_capacity(a.cells.len());
+                            for x in a.cells.iter() {
+                                match x {
+                                    Value::Int(i) => o.push(i),
+                                    Value::Float(f) => o.push(f as i64),
+                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                                }
+                            }
+                            Ok(o)
+                        }
+                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                    }
+                }
+                let n = "GUI_TEXTAREA_MARKS";
+                if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
+                self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
+                Value::Nil
             }
             // Dialog IM Fenster (eigenes Thema, kein OS-Kasten). Braucht die
             // Bildschirmgroesse (Zentrieren) und die Textbreite (das Fenster
