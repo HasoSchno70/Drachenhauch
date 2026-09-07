@@ -1,0 +1,156 @@
+{
+ "format": "dhscore-song",
+ "version": 1,
+ "bpm": 100,
+ "time_sig": [
+  4,
+  4
+ ],
+ "tracks": [
+  {
+   "name": "Melodie",
+   "clef": "treble",
+   "instrument": {
+    "name": "Fluegel (Piano)",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "triangle",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 700,
+    "env_sustain": 0.0,
+    "env_release_ms": 200,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 6.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 1.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 2.0,
+     "dur": 0.5,
+     "pitch": 76
+    },
+    {
+     "start": 2.5,
+     "dur": 0.5,
+     "pitch": 77
+    },
+    {
+     "start": 3.0,
+     "dur": 1.0,
+     "pitch": 79,
+     "staccato": true
+    },
+    {
+     "start": 4.0,
+     "dur": 2.0,
+     "pitch": 76
+    },
+    {
+     "start": 6.0,
+     "dur": 1.0,
+     "pitch": 72,
+     "fingering": 1
+    },
+    {
+     "start": 7.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 76
+    },
+    {
+     "start": 9.0,
+     "dur": 4.0,
+     "pitch": 74
+    },
+    {
+     "start": 13.0,
+     "dur": 1.0,
+     "pitch": 73
+    },
+    {
+     "start": 14.0,
+     "dur": 4.0,
+     "pitch": 72
+    }
+   ],
+   "slurs": [
+    [
+     0.0,
+     1.0
+    ]
+   ]
+  },
+  {
+   "name": "Bass",
+   "clef": "bass",
+   "instrument": {
+    "name": "Bass",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "square",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 140,
+    "env_sustain": 0.55,
+    "env_release_ms": 80,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 0.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 2.0,
+     "pitch": 48
+    },
+    {
+     "start": 2.0,
+     "dur": 2.0,
+     "pitch": 43
+    },
+    {
+     "start": 4.0,
+     "dur": 4.0,
+     "pitch": 48
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "rest": true,
+     "accidental": 0
+    },
+    {
+     "start": 12.0,
+     "dur": 2.0,
+     "pitch": 50
+    }
+   ]
+  }
+ ]
+}

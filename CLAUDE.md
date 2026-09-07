@@ -37,9 +37,10 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
-> | Tracker (`examples/190_tracker.dh`) | 3911 | 2091 | 0.53 |
+> | Tracker (`examples/190_tracker.dh`) | 3911 | 2103 | 0,54 |
 > | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 860 | 0,17 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
+> | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1449 | 0,85 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -2632,7 +2633,33 @@ Ziehen + Strg+Z, Entf (der Laufzeit-Leser ist hier die Pruefung -- ein
 stehengebliebener Uebergang laedt nicht), Bedingung ueber den Inspektor
 mit Wirkungsprobe (speed 10 -> run, speed 1 -> idle), Parameter, F5-Vorschau
 uebersetzt UND laeuft. Audio Studio wird NICHT portiert (123 Zeilen
-Reiterrahmen; das Werkzeuge-Menue der IDE ersetzt es). Offen aus B: Notenblatt.
+Reiterrahmen; das Werkzeuge-Menue der IDE ersetzt es).
+
+**Das Notenblatt** (2026-09-07, `examples/199_notenblatt.dh`, 1449 Zeilen
+gegen 1710 = `scoreeditor_qt.py` + `score/document.py` + `score/convert.py`,
+Faktor 0,85 -- der hoechste der drei, weil nichts wegfaellt: Notensatz muss
+man zeichnen, der Tracker-Konverter ist Logik) -- damit hat JEDER Qt-Editor
+eine Drachenhauch-Fassung. Fuenf Linien je Spur, Tonhoehe <-> Linie ueber
+den diatonischen Index wie in Qt (C->D und E->F je EIN Schritt), Hilfslinien,
+Koepfe/Haelse/Faehnchen, Balkengruppen gleicher Dauer, Pausen, Boegen als
+SPLINE, Vorschau an der Maus, Spielkopf; Werkzeuge oben, je Spur Name/
+Schluessel/Instrument links (die 18 Tracker-Presets), bis zu 8 Spuren.
+**Schluessel und Vorzeichen sind selbst gezeichnet:** die Notenzeichen
+U+1D11E/U+266F kamen trotz Glyphen-auf-Zuruf als Fragezeichen -- eine Kurve
+durch feste Punkte (SPLINE, will ARRAY OF INTEGER) und vier Striche sind
+besser als ein `?` am Zeilenanfang. Wiedergabe auf einer Audio-Uhr
+(AUDIO_CLOCK + AUDIO_PLAY_AT, alle Noten beim Start geplant; Stopp =
+Uhr ENTFERNEN wie im Tracker-Piloten). **[In Tracker oeffnen] rechnet mit
+denselben Regeln wie `score/convert.py`** und der Test vergleicht das
+Gitter des Piloten Zelle fuer Zelle mit `to_tracker_song` am Demo-Stueck
+`examples/notenblatt_demo.json` (Akkord, Staccato, Note ueber die
+64-Zeilen-Grenze, zwei Spuren); der Tracker-Pilot 190 nimmt seither ein
+Dateiargument. Drei fremde Leser: `ScoreDoc.load_json`, `Song.load_json`,
+`to_tracker_song`. **Fallen:** `STEP` ist ein Schluesselwort (kein `CONST
+STEP`); `GUI_MODAL()` liefert einen Wahrheitswert, kein Handle; Klapplisten
+in Tests: Eintrag k liegt bei y + 24 + k * 22 + 11 unter dem Feld. Tests
+`tests/test_pilot_notenblatt.py` (8, seriell). Schluesselwechsel rueckt die
+Noten ohne Dialog um Oktaven heran und sagt es (Strg+Z nimmt es zurueck).
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 

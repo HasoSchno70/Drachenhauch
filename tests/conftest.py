@@ -98,6 +98,7 @@ _SERIELL = {
     "test_ide.py",                   # speist Tasten in die IDE ein (F5/F7)
     "test_pilot_formdesigner.py",    # speist Klicks und Tasten in den Form-Designer ein
     "test_pilot_animfsm.py",         # speist Klicks und Tasten in den Anim-FSM-Editor ein
+    "test_pilot_notenblatt.py",      # speist Klicks und Tasten ins Notenblatt ein, spielt Ton
     "test_gui_listen.py",            # Klicks mit Strg/Umschalt
     "test_gui_dialoge_ausbau.py",    # Klicks und Tasten in Dialoge
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
@@ -198,6 +199,7 @@ _BRAUCHT_GRAFIK = {
     "test_ide.py",
     "test_pilot_formdesigner.py",
     "test_pilot_animfsm.py",
+    "test_pilot_notenblatt.py",
     "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
     "test_arc_width.py",

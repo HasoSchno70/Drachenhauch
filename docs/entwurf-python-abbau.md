@@ -34,10 +34,13 @@
 > einem neuen Entwurfsmodus der Laufzeit (`GUI_WINDOW_DESIGN`); Details in
 > `docs/form-designer.md`. Der Anim-FSM-Editor folgte am 2026-09-07
 > (`examples/198_anim_fsm_editor.dh`, 1 336 gegen 1 728, Faktor 0,77;
-> `docs/anim-editor.md`). Offen aus B: Notenblatt. Audio Studio wird nicht
-> portiert -- die Qt-Fassung ist ein 123-Zeilen-Reiterrahmen um Tracker und
-> SFX-Generator, und das Werkzeuge-Menue der IDE ersetzt ihn. Dazu je
-> Pilot der Rest aus dem Kopfkommentar.
+> `docs/anim-editor.md`), das Notenblatt am selben Tag
+> (`examples/199_notenblatt.dh`, 1 449 gegen 1 710, Faktor 0,85;
+> `docs/score-editor.md`). Audio Studio wird nicht portiert -- die
+> Qt-Fassung ist ein 123-Zeilen-Reiterrahmen um Tracker und SFX-Generator,
+> und das Werkzeuge-Menue der IDE ersetzt ihn. **Damit hat jeder
+> Qt-Editor eine Drachenhauch-Fassung.** Offen aus B: je Pilot der Rest
+> aus dem Kopfkommentar.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

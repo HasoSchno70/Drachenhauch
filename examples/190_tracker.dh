@@ -1775,6 +1775,18 @@ DIM tastNote AS ARRAY OF INTEGER
 tastNote = [KEY_Z, KEY_S, KEY_X, KEY_D, KEY_C, KEY_V, KEY_G, KEY_B, KEY_H, KEY_N, KEY_J, KEY_M, _
             KEY_Q, KEY_2, KEY_W, KEY_3, KEY_E, KEY_R, KEY_5, KEY_T, KEY_6, KEY_Y, KEY_7, KEY_U]
 
+' Ein Dateiargument oeffnet den Song gleich -- so startet das Notenblatt
+' (199) den Tracker mit dem eben uebernommenen Stueck. Ein relativer Pfad
+' meint den Ordner des Aufrufers (DHRT_START_DIR), nicht den der Quelle.
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        DIM startOrdner AS STRING : startOrdner = GETENV$("DHRT_START_DIR")
+        IF startOrdner <> "" THEN startDatei = PATHJOIN(startOrdner, startDatei)
+    END IF
+    IF FILEEXISTS(startDatei) THEN ladeDatei(startDatei)
+END IF
+
 WHILE NOT QUITREQUESTED()
     bildNr = bildNr + 1
     GUI_UPDATE()

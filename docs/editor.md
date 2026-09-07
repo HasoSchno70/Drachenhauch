@@ -168,7 +168,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 | Partikel-Editor | 802 | 622 |
 | Tilemap-Editor | 2428 | 1536 |
 | Sprite-Editor | 7379 | 2811 |
-| Tracker | 3911 | 2091 |
+| Tracker | 3911 | 2103 |
 
 **Der Faktor ist nicht übertragbar.** Er misst vor allem, wie viel die
 Drachenhauch-Fassung gar nicht erst hat — beim Sprite-Editor waren allein die

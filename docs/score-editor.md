@@ -107,6 +107,58 @@ angezeigt, bevor die Datei gespeichert wird — nichts geht unbemerkt verloren.
 Anschließend wird die Datei gespeichert und `dhtracker` per Subprozess mit
 dieser Datei gestartet.
 
+## In Drachenhauch: `examples/199_notenblatt.dh`
+
+Seit 2026-09-07 gibt es das Notenblatt auch **in Drachenhauch selbst** (Weg B
+aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der dritte und
+letzte der Editoren ohne Piloten). 1 449 Zeilen gegen 1 710 der Qt-Fassung
+(1 266 UI + 282 Modell + 162 Konverter), Faktor 0,85 — hoch, weil hier
+nichts wegfällt, was die Laufzeit hätte übernehmen können: Notensatz muss
+man zeichnen, und der Tracker-Konverter ist Logik, keine Oberfläche.
+
+```
+dhrt run examples/199_notenblatt.dh [-- stueck.json]
+```
+
+Oben die Werkzeuge (Dauer, punktiert, Vorzeichen, Modus, Fingersatz-Zahl,
+BPM, Abspielen, In Tracker, +/- Spur), links je Spur Name, Schlüssel und
+Instrument (die 18 Presets des Trackers), in der Mitte die Notensysteme —
+mit den normalen Zeichenbefehlen gemalt: fünf Linien, Taktschattierung,
+Taktstriche, Hilfslinien, Köpfe (gefüllt unter der Halben), Hälse, Fähnchen,
+Balken für Achtel- und Sechzehntelläufe gleicher Dauer, Pausen, Bögen als
+`SPLINE`, Fingersatz, Staccato-Punkt, Vorschau an der Maus, Spielkopf.
+**Schlüssel und Vorzeichen sind selbst gezeichnet** (Kurve durch feste
+Punkte, Kreuz aus vier Strichen): die Notenzeichen der Symbolschriften
+kamen als Fragezeichen an, und ein Fragezeichen am Zeilenanfang ist
+schlimmer als eine schlichte Form.
+
+| Aktion | so |
+|---|---|
+| Note setzen | Klick aufs System (Dauer = Raster, Vorzeichen aus der Klappliste) |
+| Note entfernen | nochmal klicken, oder rechte Maustaste |
+| Note verschieben | ziehen (Zeit und Tonhöhe); eine andere Note am Ziel wird ersetzt, Bogen-Anker wandern mit |
+| Pause / Bindebogen / Fingersatz / Staccato | Modus in der Klappliste, dann wie in der Qt-Fassung (Bogen: erste Note, dann zweite; Rechtsklick entfernt Bögen an der Stelle) |
+| Schlüsselwechsel | Klappliste je Spur; liegen die Noten danach weit ab, rückt ein Oktavversatz sie heran und die Statuszeile sagt es (kein Dialog — Strg+Z nimmt es zurück) |
+| Abspielen | Leertaste oder F5: alle Noten auf einer Audio-Uhr (`AUDIO_CLOCK` + `AUDIO_PLAY_AT`, eine Sechzehntel je Tick), samplegenau statt bildgetrieben; Staccato halbiert wie beim Export |
+| Rollen | Mausrad = Zeit, Umschalt+Rad = Spuren (bis zu 8) |
+| In Tracker öffnen | Strg+T: schreibt `<name>_tracker.json` neben das Stück und startet den Tracker-Piloten (190, der seither ein Dateiargument nimmt) damit |
+
+**Der Tracker-Export rechnet mit denselben Regeln wie `score/convert.py`**
+(4 Zeilen je Beat, Patterns zu 64 Zeilen, Akkord → höchste Note, Staccato
+halbiert mit mindestens einer Zeile, `NOTE_OFF` am Ende wenn die Zelle frei
+ist, Kürzung an der Pattern-Grenze, mindestens vier Kanäle, Drum-Kanal
+leer) — und der Test hält ihn daran fest: `tests/test_pilot_notenblatt.py`
+lässt den Piloten das Demo-Stück `examples/notenblatt_demo.json` exportieren
+(Akkord, Staccato, Note über die 64-Zeilen-Grenze, zwei Spuren) und
+vergleicht das Gitter Zelle für Zelle mit `to_tracker_song`. Die Stück-Datei
+liest `ScoreDoc.load_json`, das Tracker-Projekt `Song.load_json` — drei
+fremde Leser.
+
+Noch nicht: der Transponier-Dialog beim Schlüsselwechsel (es wird
+verschoben und gesagt), mehr als acht Spuren, ein Klick auf eine Note eines
+Akkords trifft immer die erste am Beat. Bewusst nicht: die Notenzeichen aus
+einer Schrift.
+
 ## V1-Limitationen
 
 Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
