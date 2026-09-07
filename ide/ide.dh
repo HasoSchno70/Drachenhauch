@@ -188,6 +188,7 @@ DIM miWzSprite AS INTEGER : miWzSprite = GUI_MENU_ITEM(mWerkzeuge, "Sprite-Edito
 DIM miWzTracker AS INTEGER : miWzTracker = GUI_MENU_ITEM(mWerkzeuge, "Tracker")
 DIM miWzForm AS INTEGER : miWzForm = GUI_MENU_ITEM(mWerkzeuge, "Form-Designer")
 DIM miWzAnim AS INTEGER : miWzAnim = GUI_MENU_ITEM(mWerkzeuge, "Anim-FSM-Editor")
+DIM miWzNoten AS INTEGER : miWzNoten = GUI_MENU_ITEM(mWerkzeuge, "Notenblatt")
 GUI_MENU_SEPARATOR(mWerkzeuge)
 DIM miBeispiele AS INTEGER : miBeispiele = GUI_MENU_ITEM(mWerkzeuge, "Beispiele als Projekt oeffnen")
 DIM miAusdruck AS INTEGER : miAusdruck = GUI_MENU_ITEM(mWerkzeuge, "Ausdruck im Debugger auswerten", "Strg+E")
@@ -1258,7 +1259,7 @@ paletteEintrag("Handbuch", "handbuch") : paletteEintrag("Listing drucken", "druc
 paletteEintrag("Listing als PDF neben die Quelle", "pdf")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel")
 paletteEintrag("Werkzeug: Tilemap-Editor", "wz_tilemap") : paletteEintrag("Werkzeug: Sprite-Editor", "wz_sprite")
-paletteEintrag("Werkzeug: Tracker", "wz_tracker") : paletteEintrag("Werkzeug: Form-Designer", "wz_form") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim") : paletteEintrag("Beispiele als Projekt oeffnen", "beispiele")
+paletteEintrag("Werkzeug: Tracker", "wz_tracker") : paletteEintrag("Werkzeug: Form-Designer", "wz_form") : paletteEintrag("Werkzeug: Anim-FSM-Editor", "wz_anim") : paletteEintrag("Werkzeug: Notenblatt", "wz_noten") : paletteEintrag("Beispiele als Projekt oeffnen", "beispiele")
 paletteEintrag("Ausdruck im Debugger auswerten", "ausdruck")
 
 SUB paletteFuellen(filter AS STRING)
@@ -1387,6 +1388,7 @@ SUB befehl(k AS STRING)
         CASE "wz_tracker" : werkzeugStarten("190_tracker.dh")
         CASE "wz_form" : werkzeugStarten("197_form_designer.dh")
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
+        CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
         CASE "beispiele" : beispieleOeffnen()
         CASE "ausdruck"
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
@@ -1466,6 +1468,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miWzTracker) THEN befehl("wz_tracker")
     IF GUI_CLICKED(miWzForm) THEN befehl("wz_form")
     IF GUI_CLICKED(miWzAnim) THEN befehl("wz_anim")
+    IF GUI_CLICKED(miWzNoten) THEN befehl("wz_noten")
     IF GUI_CLICKED(miBeispiele) THEN befehl("beispiele")
     IF GUI_CLICKED(miAusdruck) THEN befehl("ausdruck")
     ' Handbuch: Klappliste wechselt das Dokument, Enter/Knopf sucht darin.

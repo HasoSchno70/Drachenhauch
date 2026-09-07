@@ -1,0 +1,1451 @@
+' ============================================================
+'  DRACHENHAUCH -- Notenblatt (Weg B, der dritte der vier fehlenden Editoren)
+' ============================================================
+'  Komponieren in Notensatz-Darstellung wie im Qt-Notenblatt-Editor dhscore
+'  (docs/score-editor.md), aber IN Drachenhauch: fuenf Linien je Spur,
+'  Violin- oder Bassschluessel, Hilfslinien, Vorzeichen, Haelse, Faehnchen,
+'  Balken, Pausen, Bindeboegen, Fingersatz, Staccato. Oben die Werkzeuge
+'  (Dauer, Vorzeichen, Modus, Tempo), links je Spur Name, Schluessel und
+'  Instrument, in der Mitte die Notensysteme -- mit den normalen
+'  Zeichenbefehlen gemalt.
+'
+'  Das Modell ist das JSON der Qt-Fassung ("format": "dhscore-song",
+'  Zeiten in Viertel-Beats), das Rueckgaengig ein JSON-Text je Stand.
+'  [In Tracker oeffnen] rechnet das Stueck mit denselben Regeln wie
+'  drachenhauch/score/convert.py in ein Tracker-Projekt um (4 Zeilen je
+'  Beat, Patterns zu 64 Zeilen, Akkord -> hoechste Note, Staccato halbiert,
+'  NOTE_OFF am Ende) und startet den Tracker-Piloten (190) damit.
+'
+'  Bedienung: Klick setzt eine Note (Dauer = Raster), Klick auf eine Note
+'  entfernt sie, Ziehen verschiebt sie; rechte Maustaste entfernt immer.
+'  Modus Pause/Bindebogen (zwei Klicks)/Fingersatz/Staccato wie in Qt.
+'  Leertaste oder F5 spielt alles auf einer Audio-Uhr, Mausrad rollt die
+'  Zeit (Umschalt: die Spuren), Strg+Z/Y Rueckgaengig/Wiederholen.
+'
+'  Aufruf:  dhrt run examples/199_notenblatt.dh [-- stueck.json]
+'  Test:    DH_SCORE_LOG=<datei> protokolliert die Ereignisse zeilenweise.
+' ============================================================
+IMPORT "gui"
+IMPORT "json"
+IMPORT "audio"
+
+CONST LINKS = 0                 ' Maustasten
+CONST RECHTS = 1
+CONST TOP_B = 96                ' Hoehe der Werkzeugleiste (mit Menue)
+CONST LINKS_B = 250             ' Breite des Spurfensters
+CONST STAFF_H = 190             ' Hoehe je Notensystem
+CONST HALB = 7                  ' halber Linienabstand (STEP ist ein Schluesselwort)
+CONST LEFT_MARGIN = 76          ' Platz fuer den Schluessel
+CONST PPB = 64                  ' Pixel je Viertel-Beat
+CONST NOTE_R = 6
+CONST STEM_LEN = 32
+CONST BARLINE_LEAD = 8
+CONST MID_STEP = 4              ' ab hier zeigt der Hals nach unten
+CONST MAX_SPUREN = 8
+CONST ROWS_PER_BEAT = 4         ' Tracker: eine Zeile = Sechzehntel
+CONST MAX_ROWS = 64
+CONST NOTE_OFF = -1
+CONST NL = CHR$(10)
+
+SCREEN(1280, 800, "Drachenhauch - Notenblatt", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(1024, 600)
+SETFPS(60)
+WINDOW_MAXIMIZE()
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
+
+DIM logDatei AS STRING : logDatei = GETENV$("DH_SCORE_LOG")
+SUB protokoll(text AS STRING)
+    IF logDatei = "" THEN RETURN
+    DIM f AS FILE
+    f = OPENFILE(logDatei, "a")
+    WRITELINE(f, text)
+    CLOSEFILE(f)
+END SUB
+
+FUNCTION zahl$(v AS FLOAT) AS STRING
+    IF v = INT(v) THEN RETURN STR$(INT(v))
+    RETURN STR$(v)
+END FUNCTION
+
+' --- Instrumente: dieselbe Tabelle wie tracker/presets.py und der Tracker-Pilot
+DIM pName AS ARRAY OF STRING : pName = []
+DIM pWave AS ARRAY OF STRING : pWave = []
+DIM pAtk AS ARRAY OF INTEGER : pAtk = []
+DIM pDec AS ARRAY OF INTEGER : pDec = []
+DIM pSus AS ARRAY OF FLOAT : pSus = []
+DIM pRel AS ARRAY OF INTEGER : pRel = []
+DIM pVd AS ARRAY OF FLOAT : pVd = []
+DIM pVs AS ARRAY OF FLOAT : pVs = []
+DIM pDet AS ARRAY OF FLOAT : pDet = []
+
+SUB preset(nm AS STRING, wf AS STRING, atk AS INTEGER, dec AS INTEGER, sus AS FLOAT, rel AS INTEGER, vd AS FLOAT, vs AS FLOAT, det AS FLOAT)
+    ARRAY_PUSH(pName, nm) : ARRAY_PUSH(pWave, wf)
+    ARRAY_PUSH(pAtk, atk) : ARRAY_PUSH(pDec, dec) : ARRAY_PUSH(pSus, sus) : ARRAY_PUSH(pRel, rel)
+    ARRAY_PUSH(pVd, vd) : ARRAY_PUSH(pVs, vs) : ARRAY_PUSH(pDet, det)
+END SUB
+
+preset("Fluegel (Piano)", "triangle",   2, 700, 0.0,  200, 0.0,  0.0, 6.0)
+preset("E-Piano",         "sine",       2, 450, 0.30, 220, 0.0,  0.0, 8.0)
+preset("Orgel",           "square",     6,   0, 1.0,   70, 0.06, 6.0, 5.0)
+preset("Kirchenorgel",    "saw",       14,   0, 1.0,  140, 0.04, 5.0, 10.0)
+preset("Streicher",       "saw",      140,   0, 1.0,  280, 0.05, 5.0, 14.0)
+preset("Synth-Pad",       "triangle", 220,   0, 0.85, 420, 0.03, 4.0, 18.0)
+preset("Bass",            "square",     2, 140, 0.55,  80, 0.0,  0.0, 0.0)
+preset("Synth-Bass",      "saw",        2, 120, 0.50,  70, 0.0,  0.0, 6.0)
+preset("Lead",            "saw",        2,   0, 0.9,   90, 0.05, 6.0, 4.0)
+preset("Pluck",           "triangle",   1, 220, 0.0,  130, 0.0,  0.0, 4.0)
+preset("Glocke",          "sine",       1, 900, 0.0,  320, 0.0,  0.0, 10.0)
+preset("Marimba",         "sine",       1, 260, 0.0,  130, 0.0,  0.0, 0.0)
+preset("Chip-Square",     "square",     1,   0, 1.0,   20, 0.0,  0.0, 0.0)
+preset("Chip-Saw",        "saw",        1,   0, 1.0,   20, 0.0,  0.0, 0.0)
+preset("Kick",            "sine",       0,  90, 0.0,   30, 0.0,  0.0, 0.0)
+preset("Snare",           "noise",      0, 140, 0.0,   40, 0.0,  0.0, 0.0)
+preset("HiHat",           "noise",      0,  40, 0.0,   20, 0.0,  0.0, 0.0)
+preset("Tom",             "sine",       0, 160, 0.0,   40, 0.0,  0.0, 0.0)
+
+FUNCTION presetJson(j AS INTEGER) AS JSON_HANDLE
+    DIM io AS JSON_HANDLE : io = JSON_NEW_OBJECT()
+    JSON_SET_STRING(io, "name", pName[j])
+    JSON_SET_STRING(io, "kind", "synth")
+    JSON_SET_INT(io, "default_vol", 15)
+    JSON_SET_FLOAT(io, "pan", 0.0)
+    JSON_SET_STRING(io, "waveform", pWave[j])
+    JSON_SET_STRING(io, "loop_mode", "none")
+    JSON_SET_INT(io, "loop_start", 0) : JSON_SET_INT(io, "loop_end", 0)
+    JSON_SET_INT(io, "env_attack_ms", pAtk[j]) : JSON_SET_INT(io, "env_decay_ms", pDec[j])
+    JSON_SET_FLOAT(io, "env_sustain", pSus[j]) : JSON_SET_INT(io, "env_release_ms", pRel[j])
+    JSON_SET_FLOAT(io, "vib_depth", pVd[j]) : JSON_SET_FLOAT(io, "vib_speed", pVs[j])
+    JSON_SET_FLOAT(io, "detune_cents", pDet[j])
+    RETURN io
+END FUNCTION
+
+' Namen fuer die Klappliste: alle Presets plus ein Platz fuer ein Instrument
+' aus einer Datei, das keinem Preset entspricht.
+DIM instNamen AS ARRAY OF STRING : instNamen = []
+DIM pi AS INTEGER
+FOR pi = 0 TO LEN(pName) - 1
+    ARRAY_PUSH(instNamen, pName[pi])
+NEXT
+ARRAY_PUSH(instNamen, "(aus Datei)")
+
+' --- Modell -----------------------------------------------------------------
+DIM doc AS JSON_HANDLE
+DIM pfad AS STRING : pfad = ""
+DIM geaendert AS BOOLEAN : geaendert = FALSE
+DIM staende AS ARRAY OF STRING : staende = []
+DIM standPos AS INTEGER : standPos = -1
+DIM scrollX AS INTEGER : scrollX = 0
+DIM scrollY AS INTEGER : scrollY = 0
+
+FUNCTION nt() AS INTEGER
+    RETURN JSON_LEN(doc, "tracks")
+END FUNCTION
+FUNCTION tp$(i AS INTEGER, feld AS STRING) AS STRING
+    RETURN "tracks." + STR$(i) + "." + feld
+END FUNCTION
+FUNCTION nn(i AS INTEGER) AS INTEGER
+    RETURN JSON_LEN(doc, tp$(i, "notes"))
+END FUNCTION
+FUNCTION np$(i AS INTEGER, k AS INTEGER, feld AS STRING) AS STRING
+    RETURN "tracks." + STR$(i) + ".notes." + STR$(k) + "." + feld
+END FUNCTION
+
+FUNCTION text$(p AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, p) THEN RETURN ""
+    IF JSON_TYPE(doc, p) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, p)
+END FUNCTION
+FUNCTION ganz(p AS STRING, sonst AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "number" THEN RETURN sonst
+    RETURN INT(JSON_GET_FLOAT(doc, p))
+END FUNCTION
+FUNCTION komma(p AS STRING, sonst AS FLOAT) AS FLOAT
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "number" THEN RETURN sonst
+    RETURN JSON_GET_FLOAT(doc, p)
+END FUNCTION
+FUNCTION wahr(p AS STRING, sonst AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "boolean" THEN RETURN sonst
+    RETURN JSON_GET_BOOL(doc, p)
+END FUNCTION
+
+FUNCTION istPause(i AS INTEGER, k AS INTEGER) AS BOOLEAN
+    IF wahr(np$(i, k, "rest"), FALSE) THEN RETURN TRUE
+    RETURN NOT JSON_HAS(doc, np$(i, k, "pitch"))
+END FUNCTION
+FUNCTION nStart(i AS INTEGER, k AS INTEGER) AS FLOAT
+    RETURN komma(np$(i, k, "start"), 0.0)
+END FUNCTION
+FUNCTION nDauer(i AS INTEGER, k AS INTEGER) AS FLOAT
+    RETURN komma(np$(i, k, "dur"), 1.0)
+END FUNCTION
+FUNCTION nPitch(i AS INTEGER, k AS INTEGER) AS INTEGER
+    RETURN ganz(np$(i, k, "pitch"), 60)
+END FUNCTION
+FUNCTION bpm() AS INTEGER
+    RETURN CLAMP(ganz("bpm", 120), 20, 400)
+END FUNCTION
+FUNCTION spurLaenge(i AS INTEGER) AS FLOAT
+    DIM m AS FLOAT : m = 0.0
+    DIM k AS INTEGER
+    FOR k = 0 TO nn(i) - 1
+        m = MAX(m, nStart(i, k) + nDauer(i, k))
+    NEXT
+    RETURN m
+END FUNCTION
+FUNCTION stueckLaenge() AS FLOAT
+    DIM m AS FLOAT : m = 0.0
+    DIM i AS INTEGER
+    FOR i = 0 TO nt() - 1
+        m = MAX(m, spurLaenge(i))
+    NEXT
+    RETURN m
+END FUNCTION
+FUNCTION notenGesamt() AS INTEGER
+    DIM s AS INTEGER : s = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO nt() - 1
+        s = s + nn(i)
+    NEXT
+    RETURN s
+END FUNCTION
+
+' Note an einem Beat (erste Treffende), -1 = keine.
+FUNCTION noteBei(i AS INTEGER, beat AS FLOAT) AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO nn(i) - 1
+        IF ABS(nStart(i, k) - beat) < 0.000001 THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Ein Teilbaum als eigenes Handle -- ueber seine Werte; ganze Zahlen bleiben ganz.
+FUNCTION teilbaum(h AS JSON_HANDLE, p AS STRING) AS JSON_HANDLE
+    DIM typ AS STRING : typ = JSON_TYPE(h, p)
+    IF typ = "array" THEN
+        DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+        DIM n AS INTEGER : n = JSON_LEN(h, p)
+        DIM i AS INTEGER
+        FOR i = 0 TO n - 1
+            DIM ep AS STRING : ep = p + "." + STR$(i)
+            DIM et AS STRING : et = JSON_TYPE(h, ep)
+            IF et = "string" THEN JSON_APPEND_STRING(a, "", JSON_GET_STRING(h, ep))
+            IF et = "number" THEN
+                DIM ef AS FLOAT : ef = JSON_GET_FLOAT(h, ep)
+                IF ef = INT(ef) THEN JSON_APPEND_INT(a, "", INT(ef)) ELSE JSON_APPEND_FLOAT(a, "", ef)
+            END IF
+            IF et = "boolean" THEN JSON_APPEND_BOOL(a, "", JSON_GET_BOOL(h, ep))
+            IF et = "null" THEN JSON_APPEND_NULL(a, "")
+            IF et = "array" OR et = "object" THEN JSON_APPEND_JSON(a, "", teilbaum(h, ep))
+        NEXT
+        RETURN a
+    END IF
+    DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+    DIM k AS STRING
+    FOR EACH k IN JSON_KEYS(h, p)
+        DIM kp AS STRING : kp = p + "." + k
+        DIM kt AS STRING : kt = JSON_TYPE(h, kp)
+        IF kt = "string" THEN JSON_SET_STRING(o, k, JSON_GET_STRING(h, kp))
+        IF kt = "number" THEN
+            DIM kf AS FLOAT : kf = JSON_GET_FLOAT(h, kp)
+            IF kf = INT(kf) THEN JSON_SET_INT(o, k, INT(kf)) ELSE JSON_SET_FLOAT(o, k, kf)
+        END IF
+        IF kt = "boolean" THEN JSON_SET_BOOL(o, k, JSON_GET_BOOL(h, kp))
+        IF kt = "null" THEN JSON_SET_NULL(o, k)
+        IF kt = "array" OR kt = "object" THEN JSON_SET_JSON(o, k, teilbaum(h, kp))
+    NEXT
+    RETURN o
+END FUNCTION
+
+' Noten einer Spur nach Beginn sortieren (die Datei der Qt-Fassung ist sortiert,
+' und die Balkengruppen verlassen sich darauf).
+SUB notenSortieren(i AS INTEGER)
+    DIM n AS INTEGER : n = nn(i)
+    IF n < 2 THEN RETURN
+    DIM idx AS ARRAY OF INTEGER : idx = []
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        ARRAY_PUSH(idx, k)
+    NEXT
+    DIM a AS INTEGER
+    DIM b AS INTEGER
+    FOR a = 1 TO n - 1
+        b = a
+        WHILE b > 0
+            IF nStart(i, idx[b - 1]) > nStart(i, idx[b]) THEN
+                DIM tmp AS INTEGER : tmp = idx[b - 1] : idx[b - 1] = idx[b] : idx[b] = tmp
+                b = b - 1
+            ELSE
+                b = 0
+            END IF
+        WEND
+    NEXT
+    DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+    FOR k = 0 TO n - 1
+        JSON_APPEND_JSON(neu, "", teilbaum(doc, "tracks." + STR$(i) + ".notes." + STR$(idx[k])))
+    NEXT
+    JSON_SET_JSON(doc, tp$(i, "notes"), neu)
+END SUB
+
+' --- Rueckgaengig -------------------------------------------------------------
+SUB merken()
+    DIM t AS STRING : t = JSON_STRINGIFY(doc)
+    WHILE LEN(staende) > standPos + 1
+        ARRAY_REMOVE_AT(staende, LEN(staende) - 1)
+    WEND
+    ARRAY_PUSH(staende, t)
+    IF LEN(staende) > 200 THEN ARRAY_REMOVE_AT(staende, 0)
+    standPos = LEN(staende) - 1
+    geaendert = TRUE
+END SUB
+
+' --- Tonhoehe <-> Linie ---------------------------------------------------------
+DIM natur AS ARRAY OF INTEGER : natur = [0, 2, 4, 5, 7, 9, 11]
+
+FUNCTION naturIndex(pc AS INTEGER) AS INTEGER
+    DIM j AS INTEGER
+    FOR j = 0 TO 6
+        IF natur[j] = pc THEN RETURN j
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Diatonischer Index: streng monoton mit der Tonhoehe, Linien sind diatonisch
+' gleich verteilt (C->D und E->F je EIN Schritt), nicht halbtonlinear.
+FUNCTION diaIndex(midi AS INTEGER) AS INTEGER
+    DIM pc AS INTEGER : pc = midi MOD 12
+    DIM okt AS INTEGER : okt = midi \ 12 - 1
+    DIM ni AS INTEGER : ni = naturIndex(pc)
+    IF ni < 0 THEN ni = naturIndex(pc - 1)
+    RETURN okt * 7 + ni
+END FUNCTION
+
+FUNCTION hatVorzeichen(midi AS INTEGER) AS BOOLEAN
+    RETURN naturIndex(midi MOD 12) < 0
+END FUNCTION
+
+FUNCTION schluesselRef(i AS INTEGER) AS INTEGER
+    IF text$(tp$(i, "clef")) = "bass" THEN RETURN 43
+    RETURN 64
+END FUNCTION
+
+DIM gx0 AS INTEGER : gx0 = LINKS_B
+DIM gy0 AS INTEGER : gy0 = TOP_B + 8
+
+FUNCTION spurOben(i AS INTEGER) AS INTEGER
+    RETURN gy0 + i * STAFF_H - scrollY
+END FUNCTION
+FUNCTION yRef(i AS INTEGER) AS INTEGER
+    RETURN spurOben(i) + 30 + 8 * HALB
+END FUNCTION
+FUNCTION stufe(i AS INTEGER, midi AS INTEGER) AS INTEGER
+    RETURN diaIndex(midi) - diaIndex(schluesselRef(i))
+END FUNCTION
+FUNCTION yStufe(i AS INTEGER, s AS INTEGER) AS INTEGER
+    RETURN yRef(i) - s * HALB
+END FUNCTION
+FUNCTION yNote(i AS INTEGER, k AS INTEGER) AS INTEGER
+    IF istPause(i, k) THEN RETURN yStufe(i, 4)
+    RETURN yStufe(i, stufe(i, nPitch(i, k)))
+END FUNCTION
+FUNCTION pitchBeiY(i AS INTEGER, y AS INTEGER, acc AS INTEGER) AS INTEGER
+    DIM s AS INTEGER : s = INT(ROUND((yRef(i) - y) / HALB))
+    DIM dia AS INTEGER : dia = diaIndex(schluesselRef(i)) + s
+    DIM okt AS INTEGER : okt = dia \ 7
+    DIM ni AS INTEGER : ni = dia MOD 7
+    RETURN (okt + 1) * 12 + natur[ni] + acc
+END FUNCTION
+FUNCTION xBeat(beat AS FLOAT) AS INTEGER
+    RETURN INT(gx0 + LEFT_MARGIN + beat * PPB) - scrollX
+END FUNCTION
+FUNCTION beatBeiX(x AS INTEGER) AS FLOAT
+    RETURN MAX(0.0, (x + scrollX - gx0 - LEFT_MARGIN) / PPB)
+END FUNCTION
+
+' --- Fenster oben: Werkzeuge mit Menue --------------------------------------------
+DIM winTop AS GUI_WINDOW : winTop = GUI_WINDOW("Werkzeuge", 0, 0, SCREENWIDTH(), TOP_B)
+GUI_WINDOW_CHROME(winTop, FALSE)
+GUI_WINDOW_MOVABLE(winTop, FALSE)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(winTop, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miTracker AS INTEGER : miTracker = GUI_MENU_ITEM(mDatei, "In Tracker oeffnen", "Strg+T")
+DIM miSpielen AS INTEGER : miSpielen = GUI_MENU_ITEM(mDatei, "Abspielen / Stopp", "F5")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(winTop, "Bearbeiten")
+DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rueckgaengig", "Strg+Z")
+DIM miWieder AS INTEGER : miWieder = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+GUI_MENU_SEPARATOR(mBearb)
+DIM miSpurPlus AS INTEGER : miSpurPlus = GUI_MENU_ITEM(mBearb, "Spur hinzufuegen")
+DIM miSpurWeg AS INTEGER : miSpurWeg = GUI_MENU_ITEM(mBearb, "Letzte Spur entfernen")
+
+DIM dauerNamen AS ARRAY OF STRING : dauerNamen = ["Ganze", "Halbe", "Viertel", "Achtel", "Sechzehntel"]
+DIM dauerWerte AS ARRAY OF FLOAT : dauerWerte = [4.0, 2.0, 1.0, 0.5, 0.25]
+DIM ddDauer AS GUI_WIDGET : ddDauer = GUI_DROPDOWN(winTop, 8, 8, 110, 24, dauerNamen)
+GUI_DROPDOWN_SET_SELECTED(ddDauer, 2)
+GUI_TOOLTIP(ddDauer, "Notendauer -- zugleich das Raster fuer den Klick")
+DIM cbPunkt AS GUI_WIDGET : cbPunkt = GUI_CHECKBOX(winTop, "punktiert", 126, 12)
+DIM ddVorz AS GUI_WIDGET : ddVorz = GUI_DROPDOWN(winTop, 226, 8, 100, 24, ["natuerlich", "Kreuz", "B"])
+GUI_TOOLTIP(ddVorz, "Vorzeichen: verschiebt die geklickte Stammnote um einen Halbton")
+DIM modusNamen AS ARRAY OF STRING : modusNamen = ["Note", "Pause", "Bindebogen", "Fingersatz", "Staccato"]
+DIM ddModus AS GUI_WIDGET : ddModus = GUI_DROPDOWN(winTop, 334, 8, 120, 24, modusNamen)
+GUI_TOOLTIP(ddModus, "Was ein Klick tut")
+DIM ddFinger AS GUI_WIDGET : ddFinger = GUI_DROPDOWN(winTop, 462, 8, 50, 24, ["1", "2", "3", "4", "5"])
+GUI_TOOLTIP(ddFinger, "Fingersatz-Zahl (Modus Fingersatz)")
+DIM lblBpm AS GUI_WIDGET : lblBpm = GUI_LABEL(winTop, "BPM", 522, 12)
+DIM fBpm AS GUI_WIDGET : fBpm = GUI_TEXTINPUT(winTop, 558, 8, 56, 24, "120")
+GUI_TEXTINPUT_SET(fBpm, "zahlen", 1)
+DIM btnSpielen AS GUI_WIDGET : btnSpielen = GUI_BUTTON(winTop, "Abspielen", 624, 7, 110, 26)
+DIM btnTracker AS GUI_WIDGET : btnTracker = GUI_BUTTON(winTop, "In Tracker", 742, 7, 110, 26)
+DIM btnSpurPlus AS GUI_WIDGET : btnSpurPlus = GUI_BUTTON(winTop, "+ Spur", 860, 7, 70, 26)
+DIM btnSpurWeg AS GUI_WIDGET : btnSpurWeg = GUI_BUTTON(winTop, "- Spur", 938, 7, 70, 26)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winTop, "Bereit.", 8, 44)
+GUI_SET_WRAP(lblStatus, 1200)
+
+' --- Fenster links: je Spur Name, Schluessel, Instrument --------------------------
+DIM winLinks AS GUI_WINDOW : winLinks = GUI_WINDOW("Spuren", 0, TOP_B, LINKS_B, SCREENHEIGHT() - TOP_B)
+GUI_WINDOW_CHROME(winLinks, FALSE)
+GUI_WINDOW_MOVABLE(winLinks, FALSE)
+DIM sLabel[MAX_SPUREN] AS GUI_WIDGET
+DIM sName[MAX_SPUREN] AS GUI_WIDGET
+DIM sClef[MAX_SPUREN] AS GUI_WIDGET
+DIM sInst[MAX_SPUREN] AS GUI_WIDGET
+DIM sClefSel[MAX_SPUREN] AS INTEGER
+DIM sInstSel[MAX_SPUREN] AS INTEGER
+DIM si AS INTEGER
+FOR si = 0 TO MAX_SPUREN - 1
+    sLabel[si] = GUI_LABEL(winLinks, "Spur " + STR$(si + 1), 8, 8)
+    sName[si] = GUI_TEXTINPUT(winLinks, 8, 30, LINKS_B - 16, 24, "")
+    sClef[si] = GUI_DROPDOWN(winLinks, 8, 60, LINKS_B - 16, 24, ["Violinschluessel", "Bassschluessel"])
+    sInst[si] = GUI_DROPDOWN(winLinks, 8, 90, LINKS_B - 16, 24, instNamen)
+    sClefSel[si] = 0 : sInstSel[si] = 0
+NEXT
+DIM stumm AS BOOLEAN : stumm = FALSE
+
+DIM spurFarben AS ARRAY OF INTEGER : spurFarben = [&H2DE0E0, &H2DE89A, &HE55A8C, &HFFB74D, &H7FA7FF, &HC792EA, &HFFD54F, &H80CBC4]
+FUNCTION spurFarbe(i AS INTEGER) AS INTEGER
+    RETURN spurFarben[i MOD LEN(spurFarben)]
+END FUNCTION
+
+FUNCTION instrumentIndex(i AS INTEGER) AS INTEGER
+    DIM nm AS STRING : nm = text$(tp$(i, "instrument.name"))
+    DIM j AS INTEGER : j = ARRAY_INDEXOF(pName, nm)
+    IF j < 0 THEN j = LEN(pName)          ' "(aus Datei)"
+    RETURN j
+END FUNCTION
+
+SUB spurenAnzeigen()
+    stumm = TRUE
+    DIM i AS INTEGER
+    FOR i = 0 TO MAX_SPUREN - 1
+        DIM da AS BOOLEAN : da = i < nt()
+        DIM y AS INTEGER : y = 8 + i * STAFF_H - scrollY
+        GUI_SET_VISIBLE(sLabel[i], da) : GUI_SET_VISIBLE(sName[i], da)
+        GUI_SET_VISIBLE(sClef[i], da) : GUI_SET_VISIBLE(sInst[i], da)
+        IF da THEN
+            GUI_SET_BOUNDS(sLabel[i], 8, y, 200, 20)
+            GUI_SET_BOUNDS(sName[i], 8, y + 22, LINKS_B - 16, 24)
+            GUI_SET_BOUNDS(sClef[i], 8, y + 52, LINKS_B - 16, 24)
+            GUI_SET_BOUNDS(sInst[i], 8, y + 82, LINKS_B - 16, 24)
+            GUI_SET_TEXT(sLabel[i], "Spur " + STR$(i + 1) + "  (" + STR$(nn(i)) + " Noten)")
+            GUI_SET_TEXT(sName[i], text$(tp$(i, "name")))
+            sClefSel[i] = IIF(text$(tp$(i, "clef")) = "bass", 1, 0)
+            GUI_DROPDOWN_SET_SELECTED(sClef[i], sClefSel[i])
+            sInstSel[i] = instrumentIndex(i)
+            GUI_DROPDOWN_SET_SELECTED(sInst[i], sInstSel[i])
+        END IF
+    NEXT
+    GUI_SET_TEXT(fBpm, STR$(bpm()))
+    stumm = FALSE
+END SUB
+
+' --- Aenderungen am Modell ---------------------------------------------------------
+DIM entryDauer AS FLOAT : entryDauer = 1.0
+DIM entryAcc AS INTEGER : entryAcc = 0
+DIM entryModus AS INTEGER : entryModus = 0       ' 0 Note, 1 Pause, 2 Bogen, 3 Finger, 4 Staccato
+
+SUB werkzeugeLesen()
+    entryDauer = dauerWerte[CLAMP(GUI_DROPDOWN_SELECTED(ddDauer), 0, 4)]
+    IF GUI_CHECKED(cbPunkt) THEN entryDauer = entryDauer * 1.5
+    DIM v AS INTEGER : v = GUI_DROPDOWN_SELECTED(ddVorz)
+    entryAcc = 0
+    IF v = 1 THEN entryAcc = 1
+    IF v = 2 THEN entryAcc = -1
+    entryModus = CLAMP(GUI_DROPDOWN_SELECTED(ddModus), 0, 4)
+END SUB
+
+FUNCTION rastern(beat AS FLOAT) AS FLOAT
+    IF entryDauer <= 0.0 THEN RETURN MAX(0.0, beat)
+    RETURN MAX(0.0, ROUND(beat / entryDauer) * entryDauer)
+END FUNCTION
+
+SUB boegenWeg(i AS INTEGER, beat AS FLOAT)
+    IF NOT JSON_HAS(doc, tp$(i, "slurs")) THEN RETURN
+    DIM k AS INTEGER
+    FOR k = JSON_LEN(doc, tp$(i, "slurs")) - 1 TO 0 STEP -1
+        DIM sp AS STRING : sp = tp$(i, "slurs." + STR$(k))
+        IF ABS(komma(sp + ".0", -1.0) - beat) < 0.000001 OR ABS(komma(sp + ".1", -1.0) - beat) < 0.000001 THEN JSON_REMOVE(doc, sp)
+    NEXT
+END SUB
+
+SUB bogenHinzu(i AS INTEGER, a AS FLOAT, b AS FLOAT)
+    DIM lo AS FLOAT : lo = MIN(a, b)
+    DIM hi AS FLOAT : hi = MAX(a, b)
+    IF ABS(hi - lo) < 0.000001 THEN RETURN
+    IF NOT JSON_HAS(doc, tp$(i, "slurs")) THEN JSON_SET_JSON(doc, tp$(i, "slurs"), JSON_NEW_ARRAY())
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, tp$(i, "slurs")) - 1
+        DIM sp AS STRING : sp = tp$(i, "slurs." + STR$(k))
+        IF ABS(komma(sp + ".0", -1.0) - lo) < 0.000001 AND ABS(komma(sp + ".1", -1.0) - hi) < 0.000001 THEN RETURN
+    NEXT
+    DIM paar AS JSON_HANDLE : paar = JSON_NEW_ARRAY()
+    JSON_APPEND_FLOAT(paar, "", lo) : JSON_APPEND_FLOAT(paar, "", hi)
+    JSON_APPEND_JSON(doc, tp$(i, "slurs"), paar)
+END SUB
+
+' Bogen-Anker wandern mit einer verschobenen Note -- aber nur, wenn am alten
+' Beat keine andere Note mehr sitzt (der Bogen gehoerte sonst wohl ihr).
+SUB boegenVerschieben(i AS INTEGER, alt AS FLOAT, neu AS FLOAT)
+    IF ABS(alt - neu) < 0.000001 THEN RETURN
+    IF noteBei(i, alt) >= 0 THEN RETURN
+    IF NOT JSON_HAS(doc, tp$(i, "slurs")) THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, tp$(i, "slurs")) - 1
+        DIM sp AS STRING : sp = tp$(i, "slurs." + STR$(k))
+        DIM a AS FLOAT : a = komma(sp + ".0", 0.0)
+        DIM b AS FLOAT : b = komma(sp + ".1", 0.0)
+        IF ABS(a - alt) < 0.000001 THEN a = neu
+        IF ABS(b - alt) < 0.000001 THEN b = neu
+        JSON_SET_FLOAT(doc, sp + ".0", MIN(a, b)) : JSON_SET_FLOAT(doc, sp + ".1", MAX(a, b))
+    NEXT
+END SUB
+
+SUB noteEntfernen(i AS INTEGER, k AS INTEGER)
+    DIM beat AS FLOAT : beat = nStart(i, k)
+    JSON_REMOVE(doc, "tracks." + STR$(i) + ".notes." + STR$(k))
+    IF noteBei(i, beat) < 0 THEN boegenWeg(i, beat)
+END SUB
+
+SUB setzen(i AS INTEGER, beat AS FLOAT, pitch AS INTEGER, pause AS BOOLEAN)
+    DIM k AS INTEGER : k = noteBei(i, beat)
+    DIM gleich AS BOOLEAN : gleich = FALSE
+    IF k >= 0 THEN
+        gleich = istPause(i, k) = pause AND (pause OR nPitch(i, k) = pitch)
+        noteEntfernen(i, k)
+    END IF
+    IF NOT gleich THEN
+        DIM n AS JSON_HANDLE : n = JSON_NEW_OBJECT()
+        JSON_SET_FLOAT(n, "start", beat) : JSON_SET_FLOAT(n, "dur", entryDauer)
+        IF pause THEN
+            JSON_SET_BOOL(n, "rest", TRUE)
+        ELSE
+            JSON_SET_INT(n, "pitch", pitch)
+            IF entryAcc <> 1 THEN JSON_SET_INT(n, "accidental", entryAcc)
+        END IF
+        JSON_APPEND_JSON(doc, tp$(i, "notes"), n)
+        notenSortieren(i)
+        IF pause THEN
+            protokoll("pause " + STR$(i) + " " + zahl$(beat) + " " + zahl$(entryDauer))
+        ELSE
+            protokoll("note " + STR$(i) + " " + zahl$(beat) + " " + STR$(pitch) + " " + zahl$(entryDauer))
+        END IF
+    ELSE
+        protokoll("entfernt " + STR$(i) + " " + zahl$(beat))
+    END IF
+    merken()
+    spurenAnzeigen()
+END SUB
+
+SUB spurAnlegen()
+    DIM t AS JSON_HANDLE : t = JSON_NEW_OBJECT()
+    JSON_SET_STRING(t, "name", "Stimme " + STR$(nt() + 1))
+    JSON_SET_STRING(t, "clef", "treble")
+    JSON_SET_JSON(t, "instrument", presetJson(0))
+    JSON_SET_JSON(t, "notes", JSON_NEW_ARRAY())
+    JSON_APPEND_JSON(doc, "tracks", t)
+END SUB
+
+SUB spurHinzu()
+    IF nt() >= MAX_SPUREN THEN
+        GUI_SET_TEXT(lblStatus, "Hoechstens " + STR$(MAX_SPUREN) + " Spuren.")
+        RETURN
+    END IF
+    spurAnlegen()
+    merken()
+    spurenAnzeigen()
+    protokoll("spur " + STR$(nt()))
+END SUB
+
+SUB spurWeg()
+    IF nt() <= 1 THEN RETURN
+    JSON_REMOVE(doc, "tracks." + STR$(nt() - 1))
+    merken()
+    spurenAnzeigen()
+    protokoll("spur weg " + STR$(nt()))
+END SUB
+
+' Schluesselwechsel transponiert nicht -- aber liegen die Noten danach weit ab
+' vom System, rueckt ein Oktavversatz sie heran (Melodie bleibt gleich).
+SUB schluesselSetzen(i AS INTEGER, clef AS STRING)
+    IF text$(tp$(i, "clef")) = clef THEN RETURN
+    JSON_SET_STRING(doc, tp$(i, "clef"), clef)
+    DIM summe AS FLOAT : summe = 0.0
+    DIM anz AS INTEGER : anz = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO nn(i) - 1
+        IF NOT istPause(i, k) THEN summe = summe + nPitch(i, k) : anz = anz + 1
+    NEXT
+    DIM versatz AS INTEGER : versatz = 0
+    IF anz > 0 THEN
+        DIM mitte AS INTEGER : mitte = IIF(clef = "bass", 50, 71)
+        versatz = INT(ROUND((mitte - summe / anz) / 12.0)) * 12
+        IF versatz <> 0 THEN
+            FOR k = 0 TO nn(i) - 1
+                IF NOT istPause(i, k) THEN JSON_SET_INT(doc, np$(i, k, "pitch"), nPitch(i, k) + versatz)
+            NEXT
+            GUI_SET_TEXT(lblStatus, "Schluessel gewechselt; die Noten um " + STR$(versatz \ 12) + " Oktave(n) ans System gerueckt (Strg+Z nimmt es zurueck).")
+        END IF
+    END IF
+    merken()
+    protokoll("schluessel " + STR$(i) + " " + clef + " " + STR$(versatz))
+END SUB
+
+' --- Klang und Wiedergabe --------------------------------------------------------
+DIM cache AS MAP OF INTEGER
+DIM takt AS AUDIO_CLOCK
+DIM spielt AS BOOLEAN : spielt = FALSE
+DIM spielEnde AS INTEGER : spielEnde = 0
+
+FUNCTION freqVon(m AS INTEGER) AS FLOAT
+    RETURN 440.0 * POW(2.0, (m - 69) / 12.0)
+END FUNCTION
+
+FUNCTION klang(i AS INTEGER, midi AS INTEGER, ms AS INTEGER) AS INTEGER
+    DIM ip AS STRING : ip = tp$(i, "instrument")
+    DIM wf AS STRING : wf = text$(ip + ".waveform")
+    IF wf = "" THEN wf = "triangle"
+    DIM atk AS INTEGER : atk = ganz(ip + ".env_attack_ms", 0)
+    DIM dec AS INTEGER : dec = ganz(ip + ".env_decay_ms", 0)
+    DIM sus AS FLOAT : sus = komma(ip + ".env_sustain", 1.0)
+    DIM rel AS INTEGER : rel = ganz(ip + ".env_release_ms", 0)
+    DIM vd AS FLOAT : vd = komma(ip + ".vib_depth", 0.0)
+    DIM vs AS FLOAT : vs = komma(ip + ".vib_speed", 0.0)
+    DIM det AS FLOAT : det = komma(ip + ".detune_cents", 0.0)
+    DIM key AS STRING : key = wf + "|" + STR$(atk) + "|" + STR$(dec) + "|" + FORMAT$(sus, "%.2f") + "|" + STR$(rel) + "|" + FORMAT$(vd, "%.3f") + "|" + FORMAT$(vs, "%.1f") + "|" + FORMAT$(det, "%.1f") + "|" + STR$(midi) + "|" + STR$(ms)
+    IF MAPHAS(cache, key) THEN RETURN MAPGET(cache, key)
+    ' 0.6 als Kopfraum wie die Qt-Fassung -- mehrere Stimmen liegen uebereinander.
+    DIM s AS INTEGER : s = AUDIO_NOTE(wf, freqVon(midi), ms, atk, dec, sus, rel, 0.6, vd, vs, det, 0.0)
+    MAPPUT(cache, key, s)
+    RETURN s
+END FUNCTION
+
+SUB stopp()
+    IF spielt THEN AUDIO_CLOCK_REMOVE(takt)      ' entfernen, nicht anhalten: Geplantes startet dann nie
+    spielt = FALSE
+    protokoll("stopp")
+END SUB
+
+' Alle Noten auf einer Audio-Uhr planen (eine Sechzehntel = ein Tick) --
+' samplegenau vom Audio-Faden gestartet, nicht bildgetrieben.
+SUB starten()
+    IF spielt THEN stopp()
+    IF notenGesamt() = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Nichts zu spielen.")
+        RETURN
+    END IF
+    takt = AUDIO_CLOCK_NEW(bpm() / 60.0 * ROWS_PER_BEAT)
+    DIM geplant AS INTEGER : geplant = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO nt() - 1
+        DIM lautst AS FLOAT : lautst = CLAMP(ganz(tp$(i, "instrument.default_vol"), 15), 1, 15) / 15.0
+        DIM k AS INTEGER
+        FOR k = 0 TO nn(i) - 1
+            IF istPause(i, k) THEN CONTINUE
+            DIM d AS FLOAT : d = nDauer(i, k)
+            ' Staccato: halbe Dauer, mindestens eine Tracker-Zeile -- wie convert.py
+            IF wahr(np$(i, k, "staccato"), FALSE) THEN d = MAX(1.0 / ROWS_PER_BEAT, d * 0.5)
+            DIM ms AS INTEGER : ms = MAX(1, INT(d * 60000.0 / bpm()))
+            AUDIO_PLAY_AT(klang(i, nPitch(i, k), ms), takt, INT(ROUND(nStart(i, k) * ROWS_PER_BEAT)), lautst)
+            geplant = geplant + 1
+        NEXT
+    NEXT
+    spielEnde = INT(ROUND((stueckLaenge() + 0.5) * ROWS_PER_BEAT))
+    spielt = TRUE
+    AUDIO_CLOCK_START(takt)
+    GUI_SET_TEXT(lblStatus, STR$(geplant) + " Noten geplant, " + STR$(bpm()) + " BPM.")
+    protokoll("spielt " + STR$(geplant))
+END SUB
+
+' --- Tracker-Projekt: dieselben Regeln wie drachenhauch/score/convert.py ----------
+FUNCTION beatZeile(beat AS FLOAT) AS INTEGER
+    RETURN INT(ROUND(beat * ROWS_PER_BEAT))
+END FUNCTION
+
+FUNCTION trackerJson() AS JSON_HANDLE
+    DIM n AS INTEGER : n = nt()
+    DIM kanaele AS INTEGER : kanaele = MAX(4, n + 1)     ' + Pflicht-Drum-Kanal, mindestens 4
+    DIM gesamt AS INTEGER : gesamt = MAX(1, beatZeile(stueckLaenge()))
+    DIM patAnz AS INTEGER : patAnz = (gesamt + MAX_ROWS - 1) \ MAX_ROWS
+    ' Gitter: [pattern][kanal][zeile], -2 = leer (null), NOTE_OFF = -1
+    DIM patRows AS ARRAY OF INTEGER : patRows = []
+    DIM p AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        ARRAY_PUSH(patRows, MIN(MAX_ROWS, gesamt - p * MAX_ROWS))
+    NEXT
+    DIM zelle[patAnz, kanaele, MAX_ROWS] AS INTEGER
+    DIM c AS INTEGER
+    DIM r AS INTEGER
+    FOR p = 0 TO patAnz - 1
+        FOR c = 0 TO kanaele - 1
+            FOR r = 0 TO MAX_ROWS - 1
+                zelle[p, c, r] = -2
+            NEXT
+        NEXT
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        ' Akkord-Reduktion je Zeile: nur die hoechste Note bleibt (ein Kanal ist einstimmig).
+        DIM besteZeile AS ARRAY OF INTEGER : besteZeile = []
+        DIM besteNote AS ARRAY OF INTEGER : besteNote = []
+        DIM k AS INTEGER
+        FOR k = 0 TO nn(i) - 1
+            IF istPause(i, k) THEN CONTINUE
+            DIM z AS INTEGER : z = beatZeile(nStart(i, k))
+            DIM j AS INTEGER : j = ARRAY_INDEXOF(besteZeile, z)
+            IF j < 0 THEN
+                ARRAY_PUSH(besteZeile, z) : ARRAY_PUSH(besteNote, k)
+            ELSEIF nPitch(i, k) > nPitch(i, besteNote[j]) THEN
+                besteNote[j] = k
+            END IF
+        NEXT
+        ' in Reihenfolge der Zeilen (die Noten sind nach Beginn sortiert, also
+        ' sind es die Zeilen auch)
+        FOR j = 0 TO LEN(besteZeile) - 1
+            k = besteNote[j]
+            DIM startZ AS INTEGER : startZ = besteZeile[j]
+            DIM endZ AS INTEGER : endZ = beatZeile(nStart(i, k) + nDauer(i, k))
+            IF wahr(np$(i, k, "staccato"), FALSE) THEN endZ = MAX(startZ + 1, beatZeile(nStart(i, k) + nDauer(i, k) * 0.5))
+            DIM sp AS INTEGER : sp = startZ \ MAX_ROWS
+            IF sp >= patAnz THEN CONTINUE
+            zelle[sp, i, startZ - sp * MAX_ROWS] = nPitch(i, k)
+            DIM patEnde AS INTEGER : patEnde = sp * MAX_ROWS + patRows[sp]
+            IF endZ > patEnde THEN CONTINUE           ' an der Pattern-Grenze gekuerzt
+            IF endZ < gesamt THEN
+                DIM ep AS INTEGER : ep = endZ \ MAX_ROWS
+                IF ep < patAnz THEN
+                    IF zelle[ep, i, endZ - ep * MAX_ROWS] = -2 THEN zelle[ep, i, endZ - ep * MAX_ROWS] = NOTE_OFF
+                END IF
+            END IF
+        NEXT
+    NEXT
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "format", "dhtracker-song")
+    JSON_SET_INT(h, "version", 1)
+    JSON_SET_INT(h, "bpm", bpm())
+    JSON_SET_INT(h, "channels", kanaele)
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    FOR c = 0 TO kanaele - 2
+        IF c < n THEN
+            DIM wf AS STRING : wf = text$(tp$(c, "instrument.waveform"))
+            IF wf = "" THEN wf = "square"
+            JSON_APPEND_STRING(a, "", wf)
+        ELSE
+            JSON_APPEND_STRING(a, "", "square")
+        END IF
+    NEXT
+    JSON_SET_JSON(h, "waves", a)
+    DIM pats AS JSON_HANDLE : pats = JSON_NEW_ARRAY()
+    FOR p = 0 TO patAnz - 1
+        DIM po AS JSON_HANDLE : po = JSON_NEW_OBJECT()
+        JSON_SET_STRING(po, "name", "P" + STR$(p + 1))
+        JSON_SET_INT(po, "rows", patRows[p])
+        JSON_SET_INT(po, "channels", kanaele)
+        DIM g AS JSON_HANDLE : g = JSON_NEW_ARRAY()
+        FOR c = 0 TO kanaele - 1
+            DIM col AS JSON_HANDLE : col = JSON_NEW_ARRAY()
+            FOR r = 0 TO patRows[p] - 1
+                IF zelle[p, c, r] = -2 THEN JSON_APPEND_NULL(col, "") ELSE JSON_APPEND_INT(col, "", zelle[p, c, r])
+            NEXT
+            JSON_APPEND_JSON(g, "", col)
+        NEXT
+        JSON_SET_JSON(po, "data", g)
+        JSON_APPEND_JSON(pats, "", po)
+    NEXT
+    JSON_SET_JSON(h, "patterns", pats)
+    a = JSON_NEW_ARRAY()
+    FOR p = 0 TO patAnz - 1
+        JSON_APPEND_INT(a, "", p)
+    NEXT
+    JSON_SET_JSON(h, "order", a)
+    a = JSON_NEW_ARRAY()
+    FOR i = 0 TO n - 1
+        JSON_APPEND_JSON(a, "", teilbaum(doc, tp$(i, "instrument")))
+    NEXT
+    JSON_SET_JSON(h, "instruments", a)
+    a = JSON_NEW_ARRAY()
+    FOR c = 0 TO kanaele - 1
+        IF c < n THEN JSON_APPEND_INT(a, "", c) ELSE JSON_APPEND_NULL(a, "")
+    NEXT
+    JSON_SET_JSON(h, "channel_inst", a)
+    RETURN h
+END FUNCTION
+
+DIM trackerProzess AS INTEGER : trackerProzess = -1
+
+FUNCTION trackerPilot$() AS STRING
+    DIM k AS STRING
+    FOR EACH k IN ("190_tracker.dh", PATHJOIN(GETENV$("DH_IDE_WURZEL"), "examples/190_tracker.dh"), PATHJOIN(GETENV$("DHRT_START_DIR"), "190_tracker.dh"))
+        IF k <> "" AND FILEEXISTS(k) THEN RETURN k
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB inTrackerOeffnen()
+    IF nt() + 1 > 32 THEN
+        GUI_SET_TEXT(lblStatus, "Zu viele Spuren fuer den Tracker.")
+        RETURN
+    END IF
+    IF pfad = "" OR geaendert THEN
+        IF NOT sichern(FALSE) THEN RETURN
+    END IF
+    DIM stamm AS STRING : stamm = pfad
+    IF LOWER$(RIGHT$(stamm, 5)) = ".json" THEN stamm = LEFT$(stamm, LEN(stamm) - 5)
+    DIM ziel AS STRING : ziel = stamm + "_tracker.json"
+    DIM h AS JSON_HANDLE : h = trackerJson()
+    WRITEALL(ziel, JSON_PRETTY(h))
+    protokoll("tracker " + ziel + " " + STR$(JSON_LEN(h, "patterns")))
+    DIM pilot AS STRING : pilot = trackerPilot$()
+    IF pilot = "" THEN
+        GUI_SET_TEXT(lblStatus, "Tracker-Projekt geschrieben: " + ziel + " (den Tracker-Piloten daneben nicht gefunden).")
+        RETURN
+    END IF
+    IF trackerProzess >= 0 THEN PROCESS_CLOSE(trackerProzess)
+    trackerProzess = PROCESS_START("dhrt", "run", pilot, "--", ziel)
+    GUI_SET_TEXT(lblStatus, "Tracker geoeffnet mit " + BASENAME(ziel))
+END SUB
+
+' --- Datei ---------------------------------------------------------------------
+SUB nachLaden()
+    IF NOT JSON_HAS(doc, "tracks") THEN JSON_SET_JSON(doc, "tracks", JSON_NEW_ARRAY())
+    IF nt() = 0 THEN spurAnlegen()
+    DIM i AS INTEGER
+    FOR i = 0 TO nt() - 1
+        IF NOT JSON_HAS(doc, tp$(i, "notes")) THEN JSON_SET_JSON(doc, tp$(i, "notes"), JSON_NEW_ARRAY())
+        IF NOT JSON_HAS(doc, tp$(i, "instrument")) THEN JSON_SET_JSON(doc, tp$(i, "instrument"), presetJson(0))
+        IF text$(tp$(i, "clef")) = "" THEN JSON_SET_STRING(doc, tp$(i, "clef"), "treble")
+        IF text$(tp$(i, "name")) = "" THEN JSON_SET_STRING(doc, tp$(i, "name"), "Stimme " + STR$(i + 1))
+        notenSortieren(i)
+    NEXT
+    IF NOT JSON_HAS(doc, "format") THEN JSON_SET_STRING(doc, "format", "dhscore-song")
+    IF NOT JSON_HAS(doc, "version") THEN JSON_SET_INT(doc, "version", 1)
+    IF NOT JSON_HAS(doc, "bpm") THEN JSON_SET_INT(doc, "bpm", 120)
+    IF NOT JSON_HAS(doc, "time_sig") THEN JSON_SET_JSON(doc, "time_sig", JSON_PARSE("[4, 4]"))
+    IF spielt THEN stopp()
+    scrollX = 0 : scrollY = 0
+    staende = [] : standPos = -1
+    merken()
+    geaendert = FALSE
+    spurenAnzeigen()
+END SUB
+
+SUB neuesStueck()
+    doc = JSON_NEW_OBJECT()
+    pfad = ""
+    nachLaden()
+    GUI_SET_TEXT(lblStatus, "Neues Stueck.")
+END SUB
+
+SUB laden(p AS STRING)
+    IF NOT FILEEXISTS(p) THEN
+        neuesStueck()
+        pfad = p
+        GUI_SET_TEXT(lblStatus, "Neu: " + p)
+        protokoll("neu-datei " + p)
+        RETURN
+    END IF
+    doc = JSON_LOAD(p)
+    pfad = p
+    nachLaden()
+    GUI_SET_TEXT(lblStatus, "Geladen: " + p + " (" + STR$(nt()) + " Spuren, " + STR$(notenGesamt()) + " Noten)")
+    protokoll("geladen " + STR$(nt()) + " " + STR$(notenGesamt()))
+END SUB
+
+FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
+    IF pfad = "" OR alsNeu THEN
+        DIM p AS STRING : p = FILE_SAVE_DIALOG("Stueck sichern", "stueck.json", "json")
+        IF p = "" THEN RETURN FALSE
+        pfad = p
+    END IF
+    WRITEALL(pfad, JSON_PRETTY(doc))
+    geaendert = FALSE
+    GUI_SET_TEXT(lblStatus, "Gesichert: " + pfad)
+    protokoll("gesichert " + pfad)
+    RETURN TRUE
+END FUNCTION
+
+SUB standHolen()
+    doc = JSON_PARSE(staende[standPos])
+    spurenAnzeigen()
+END SUB
+
+SUB rueckgaengig()
+    IF standPos <= 0 THEN RETURN
+    standPos = standPos - 1
+    standHolen()
+    protokoll("rueckgaengig " + STR$(notenGesamt()))
+END SUB
+
+SUB wiederholen()
+    IF standPos >= LEN(staende) - 1 THEN RETURN
+    standPos = standPos + 1
+    standHolen()
+    protokoll("wiederholen " + STR$(notenGesamt()))
+END SUB
+
+' --- Maus auf dem Blatt ---------------------------------------------------------
+DIM zugSpur AS INTEGER : zugSpur = -1
+DIM zugNote AS INTEGER : zugNote = -1
+DIM zugBewegt AS BOOLEAN : zugBewegt = FALSE
+DIM zugAlt AS FLOAT : zugAlt = 0.0
+DIM ankerSpur AS INTEGER : ankerSpur = -1        ' Bindebogen: erste Note
+DIM ankerBeat AS FLOAT : ankerBeat = 0.0
+DIM hoverSpur AS INTEGER : hoverSpur = -1
+DIM hoverBeat AS FLOAT : hoverBeat = 0.0
+DIM hoverPitch AS INTEGER : hoverPitch = 0
+DIM hoverPause AS BOOLEAN : hoverPause = FALSE
+
+FUNCTION imBlatt(mx AS INTEGER, my AS INTEGER) AS BOOLEAN
+    RETURN mx >= gx0 AND my >= TOP_B AND my < SCREENHEIGHT()
+END FUNCTION
+
+FUNCTION spurBei(my AS INTEGER) AS INTEGER
+    DIM i AS INTEGER : i = (my - gy0 + scrollY) \ STAFF_H
+    IF my - gy0 + scrollY < 0 THEN RETURN -1
+    IF i < 0 OR i >= nt() THEN RETURN -1
+    RETURN i
+END FUNCTION
+
+SUB mausAufBlatt()
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    hoverSpur = -1
+    IF zugNote < 0 AND imBlatt(mx, my) AND NOT GUI_MODAL() THEN
+        DIM i AS INTEGER : i = spurBei(my)
+        IF i >= 0 THEN
+            DIM beat AS FLOAT : beat = rastern(beatBeiX(mx))
+            IF entryModus <= 1 THEN
+                hoverSpur = i : hoverBeat = beat : hoverPause = entryModus = 1
+                IF NOT hoverPause THEN hoverPitch = pitchBeiY(i, my, entryAcc)
+            END IF
+            DIM k AS INTEGER : k = noteBei(i, beat)
+            IF MOUSE_HIT(RECHTS) THEN
+                GUI_FOCUS(ddDauer)
+                IF entryModus = 2 THEN
+                    boegenWeg(i, beat) : merken()
+                    protokoll("bogen weg " + STR$(i) + " " + zahl$(beat))
+                ELSEIF k >= 0 THEN
+                    noteEntfernen(i, k) : merken() : spurenAnzeigen()
+                    protokoll("entfernt " + STR$(i) + " " + zahl$(beat))
+                END IF
+                RETURN
+            END IF
+            IF MOUSE_HIT(LINKS) THEN
+                GUI_FOCUS(ddDauer)      ' Tastatur (Leertaste) zum Blatt, nicht in ein Feld
+                IF entryModus = 3 THEN
+                    IF k >= 0 AND NOT istPause(i, k) THEN
+                        DIM z AS INTEGER : z = GUI_DROPDOWN_SELECTED(ddFinger) + 1
+                        IF ganz(np$(i, k, "fingering"), 0) = z THEN
+                            JSON_REMOVE(doc, np$(i, k, "fingering")) : z = 0
+                        ELSE
+                            JSON_SET_INT(doc, np$(i, k, "fingering"), z)
+                        END IF
+                        merken()
+                        protokoll("finger " + STR$(i) + " " + zahl$(beat) + " " + STR$(z))
+                    END IF
+                ELSEIF entryModus = 4 THEN
+                    IF k >= 0 AND NOT istPause(i, k) THEN
+                        DIM an AS BOOLEAN : an = NOT wahr(np$(i, k, "staccato"), FALSE)
+                        IF an THEN JSON_SET_BOOL(doc, np$(i, k, "staccato"), TRUE) ELSE JSON_REMOVE(doc, np$(i, k, "staccato"))
+                        merken()
+                        protokoll("staccato " + STR$(i) + " " + zahl$(beat) + " " + IIF(an, "an", "aus"))
+                    END IF
+                ELSEIF entryModus = 2 THEN
+                    IF k < 0 THEN
+                        ankerSpur = -1
+                    ELSEIF ankerSpur <> i OR ABS(ankerBeat - beat) < 0.000001 THEN
+                        IF ankerSpur = i THEN
+                            ankerSpur = -1
+                        ELSE
+                            ankerSpur = i : ankerBeat = beat
+                        END IF
+                    ELSE
+                        bogenHinzu(i, ankerBeat, beat)
+                        merken()
+                        protokoll("bogen " + STR$(i) + " " + zahl$(MIN(ankerBeat, beat)) + " " + zahl$(MAX(ankerBeat, beat)))
+                        ankerSpur = -1
+                    END IF
+                ELSEIF k >= 0 THEN
+                    zugSpur = i : zugNote = k : zugBewegt = FALSE : zugAlt = nStart(i, k)
+                ELSEIF entryModus = 1 THEN
+                    setzen(i, beat, 0, TRUE)
+                ELSE
+                    setzen(i, beat, pitchBeiY(i, my, entryAcc), FALSE)
+                END IF
+                RETURN
+            END IF
+        END IF
+    END IF
+    IF zugNote >= 0 AND MOUSEBUTTON(LINKS) THEN
+        DIM beat2 AS FLOAT : beat2 = rastern(beatBeiX(mx))
+        IF ABS(beat2 - nStart(zugSpur, zugNote)) > 0.000001 THEN
+            JSON_SET_FLOAT(doc, np$(zugSpur, zugNote, "start"), beat2)
+            zugBewegt = TRUE
+        END IF
+        IF NOT istPause(zugSpur, zugNote) THEN
+            DIM p2 AS INTEGER : p2 = pitchBeiY(zugSpur, my, entryAcc)
+            IF p2 <> nPitch(zugSpur, zugNote) THEN
+                JSON_SET_INT(doc, np$(zugSpur, zugNote, "pitch"), p2)
+                IF entryAcc <> 1 THEN JSON_SET_INT(doc, np$(zugSpur, zugNote, "accidental"), entryAcc) ELSE JSON_REMOVE(doc, np$(zugSpur, zugNote, "accidental"))
+                zugBewegt = TRUE
+            END IF
+        END IF
+        RETURN
+    END IF
+    IF zugNote >= 0 AND NOT MOUSEBUTTON(LINKS) THEN
+        DIM i2 AS INTEGER : i2 = zugSpur
+        DIM k2 AS INTEGER : k2 = zugNote
+        zugNote = -1 : zugSpur = -1
+        IF zugBewegt THEN
+            DIM neu AS FLOAT : neu = nStart(i2, k2)
+            ' eine ANDERE Note an der Zielstelle wird ersetzt (wie beim Neu-Setzen)
+            DIM j AS INTEGER
+            FOR j = nn(i2) - 1 TO 0 STEP -1
+                IF j <> k2 AND ABS(nStart(i2, j) - neu) < 0.000001 THEN
+                    noteEntfernen(i2, j)
+                    IF j < k2 THEN k2 = k2 - 1
+                END IF
+            NEXT
+            boegenVerschieben(i2, zugAlt, neu)
+            DIM ph AS STRING : ph = IIF(istPause(i2, k2), "pause", STR$(nPitch(i2, k2)))
+            notenSortieren(i2)
+            merken()
+            protokoll("bewegt " + STR$(i2) + " " + zahl$(neu) + " " + ph)
+        ELSE
+            DIM beat3 AS FLOAT : beat3 = nStart(i2, k2)
+            noteEntfernen(i2, k2)
+            merken()
+            protokoll("entfernt " + STR$(i2) + " " + zahl$(beat3))
+        END IF
+        spurenAnzeigen()
+    END IF
+END SUB
+
+' --- Zeichnen -------------------------------------------------------------------
+CONST F_TEXT = &HD8E4F0
+CONST F_LINIE = &H6E8494
+CONST F_BAND = &H121C28
+CONST F_VORZ = &HFFB74D
+CONST F_KOPF = &HFF5A5A
+
+DIM balken AS ARRAY OF BOOLEAN : balken = []
+
+SUB hilfslinien(i AS INTEGER, x AS INTEGER, s AS INTEGER, farbe AS INTEGER)
+    DIM l AS INTEGER
+    IF s > 8 THEN
+        FOR l = 10 TO s STEP 2
+            LINE(x - 12, yStufe(i, l), x + 12, yStufe(i, l), farbe)
+        NEXT
+    ELSEIF s < 0 THEN
+        FOR l = -2 TO s STEP -2
+            LINE(x - 12, yStufe(i, l), x + 12, yStufe(i, l), farbe)
+        NEXT
+    END IF
+END SUB
+
+SUB notenkopf(x AS INTEGER, y AS INTEGER, gefuellt AS BOOLEAN, farbe AS INTEGER)
+    IF gefuellt THEN
+        CIRCLE(x, y, NOTE_R, farbe)
+    ELSE
+        CIRCLEOUTLINE(x, y, NOTE_R, farbe)
+        CIRCLEOUTLINE(x, y, NOTE_R - 1, farbe)
+    END IF
+END SUB
+
+SUB pauseZeichnen(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
+    RECT(x - 5, y - 3, x + 5, y + 3, farbe)
+    RECT(x - 4, y - 2, x + 4, y + 2, farbe)
+END SUB
+
+' Balkengruppen: zusammenhaengende Achtel/Sechzehntel GLEICHER Dauer im
+' selben Beat -- markiert die Noten und zeichnet den Balken.
+SUB balkenZeichnen(i AS INTEGER, farbe AS INTEGER)
+    DIM n AS INTEGER : n = nn(i)
+    balken = []
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        ARRAY_PUSH(balken, FALSE)
+    NEXT
+    DIM gruppe AS ARRAY OF INTEGER : gruppe = []
+    DIM kand AS ARRAY OF INTEGER : kand = []
+    FOR k = 0 TO n - 1
+        IF NOT istPause(i, k) AND nDauer(i, k) <= 0.5 THEN ARRAY_PUSH(kand, k)
+    NEXT
+    DIM q AS INTEGER
+    FOR q = 0 TO LEN(kand)          ' ein Schritt mehr: die letzte Gruppe abschliessen
+        DIM passt AS BOOLEAN : passt = FALSE
+        IF q < LEN(kand) AND LEN(gruppe) > 0 THEN
+            DIM v AS INTEGER : v = gruppe[LEN(gruppe) - 1]
+            DIM w AS INTEGER : w = kand[q]
+            passt = INT(nStart(i, v)) = INT(nStart(i, w)) AND ABS(nStart(i, v) + nDauer(i, v) - nStart(i, w)) < 0.000001 AND ABS(nDauer(i, v) - nDauer(i, w)) < 0.000001
+        END IF
+        IF passt THEN
+            ARRAY_PUSH(gruppe, kand[q])
+        ELSE
+            IF LEN(gruppe) >= 2 THEN
+                DIM summe AS INTEGER : summe = 0
+                DIM minY AS INTEGER : minY = 100000
+                DIM maxY AS INTEGER : maxY = -100000
+                DIM g AS INTEGER
+                FOR g = 0 TO LEN(gruppe) - 1
+                    DIM s AS INTEGER : s = stufe(i, nPitch(i, gruppe[g]))
+                    summe = summe + s
+                    minY = MIN(minY, yStufe(i, s)) : maxY = MAX(maxY, yStufe(i, s))
+                    balken[gruppe[g]] = TRUE
+                NEXT
+                DIM oben AS BOOLEAN : oben = summe / LEN(gruppe) < MID_STEP
+                DIM by AS INTEGER : by = IIF(oben, minY - STEM_LEN, maxY + STEM_LEN)
+                DIM dx AS INTEGER : dx = IIF(oben, NOTE_R, -NOTE_R)
+                FOR g = 0 TO LEN(gruppe) - 1
+                    DIM x AS INTEGER : x = xBeat(nStart(i, gruppe[g])) + dx
+                    LINE(x, yStufe(i, stufe(i, nPitch(i, gruppe[g]))), x, by, farbe)
+                NEXT
+                DIM x0 AS INTEGER : x0 = xBeat(nStart(i, gruppe[0])) + dx
+                DIM x1 AS INTEGER : x1 = xBeat(nStart(i, gruppe[LEN(gruppe) - 1])) + dx
+                DIM nb AS INTEGER : nb = IIF(nDauer(i, gruppe[0]) <= 0.25, 2, 1)
+                DIM b AS INTEGER
+                FOR b = 0 TO nb - 1
+                    LINEW(x0, by + b * IIF(oben, 5, -5), x1, by + b * IIF(oben, 5, -5), 3, farbe)
+                NEXT
+            END IF
+            gruppe = []
+            IF q < LEN(kand) THEN ARRAY_PUSH(gruppe, kand[q])
+        END IF
+    NEXT
+END SUB
+
+SUB noteZeichnen(i AS INTEGER, k AS INTEGER, farbe AS INTEGER)
+    DIM x AS INTEGER : x = xBeat(nStart(i, k))
+    IF istPause(i, k) THEN
+        pauseZeichnen(x, yStufe(i, 4), farbe)
+        RETURN
+    END IF
+    DIM p AS INTEGER : p = nPitch(i, k)
+    DIM s AS INTEGER : s = stufe(i, p)
+    DIM y AS INTEGER : y = yStufe(i, s)
+    DIM d AS FLOAT : d = nDauer(i, k)
+    hilfslinien(i, x, s, F_LINIE)
+    notenkopf(x, y, d < 2.0, farbe)
+    DIM oben AS BOOLEAN : oben = s < MID_STEP
+    DIM sx AS INTEGER : sx = IIF(oben, x + NOTE_R, x - NOTE_R)
+    IF d < 4.0 AND NOT balken[k] THEN
+        DIM fy AS INTEGER : fy = IIF(oben, y - STEM_LEN, y + STEM_LEN)
+        LINE(sx, y, sx, fy, farbe)
+        IF d <= 0.5 THEN
+            DIM nf AS INTEGER : nf = IIF(d <= 0.25, 2, 1)
+            DIM f AS INTEGER
+            FOR f = 0 TO nf - 1
+                DIM off AS INTEGER : off = f * 7 * IIF(oben, 1, -1)
+                LINEW(sx, fy + off, sx + 9, fy + off + 7, 2, farbe)
+            NEXT
+        END IF
+    END IF
+    IF hatVorzeichen(p) THEN
+        IF ganz(np$(i, k, "accidental"), 1) = -1 THEN bZeichen(x - 22, y, F_VORZ) ELSE kreuz(x - 22, y, F_VORZ)
+    END IF
+    IF wahr(np$(i, k, "staccato"), FALSE) THEN CIRCLE(x, IIF(oben, y + NOTE_R + 7, y - NOTE_R - 7), 3, farbe)
+    DIM fz AS INTEGER : fz = ganz(np$(i, k, "fingering"), 0)
+    IF fz > 0 THEN
+        TEXT_SIZE(13)
+        TEXT(x - 4, y - STEM_LEN - 22, STR$(fz), F_TEXT)
+        TEXT_SIZE(16)
+    END IF
+END SUB
+
+SUB bogenZeichnen(xa AS INTEGER, ya AS INTEGER, xb AS INTEGER, yb AS INTEGER, farbe AS INTEGER)
+    DIM dx AS INTEGER : dx = xb - xa
+    DIM hub AS INTEGER : hub = CLAMP(INT(ABS(dx) * 0.3), 10, 26)
+    DIM top AS INTEGER : top = MIN(ya, yb) - hub
+    DIM xs AS ARRAY OF INTEGER : xs = [xa, xa + INT(dx * 0.3), xa + INT(dx * 0.7), xb]
+    DIM ys AS ARRAY OF INTEGER : ys = [ya - 4, top, top, yb - 4]
+    SPLINE(xs, ys, farbe, 2)
+END SUB
+
+' Ein Violinschluessel als Kurve durch feste Punkte (Linienabstand 14 px):
+' Schleife um die G-Linie, Stiel nach oben mit Haken, kleine Schnecke unten.
+SUB violinschluessel(cx AS INTEGER, yBot AS INTEGER, farbe AS INTEGER)
+    DIM xs AS ARRAY OF INTEGER : xs = [cx - 2, cx + 7, cx + 3, cx - 9, cx - 8, cx + 4, cx + 12, cx + 4, cx - 6, cx - 2, cx + 8, cx + 4, cx - 6, cx - 4, cx]
+    DIM ys AS ARRAY OF INTEGER : ys = [yBot + 16, yBot + 12, yBot + 2, yBot - 8, yBot - 22, yBot - 28, yBot - 18, yBot - 10, yBot - 24, yBot - 50, yBot - 68, yBot - 82, yBot - 66, yBot - 30, yBot + 10]
+    SPLINE(xs, ys, farbe, 2)
+    CIRCLE(cx - 2, yBot + 16, 3, farbe)
+END SUB
+
+' Ein Bassschluessel: Punkt auf der F-Linie, Bogen nach rechts unten, zwei Punkte.
+SUB bassschluessel(cx AS INTEGER, yBot AS INTEGER, farbe AS INTEGER)
+    DIM xs AS ARRAY OF INTEGER : xs = [cx - 8, cx - 2, cx + 6, cx + 8, cx + 2, cx - 8]
+    DIM ys AS ARRAY OF INTEGER : ys = [yBot - 42, yBot - 58, yBot - 49, yBot - 35, yBot - 17, yBot - 6]
+    SPLINE(xs, ys, farbe, 2)
+    CIRCLE(cx - 8, yBot - 42, 4, farbe)
+    CIRCLE(cx + 15, yBot - 49, 2, farbe)
+    CIRCLE(cx + 15, yBot - 35, 2, farbe)
+END SUB
+
+SUB kreuz(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
+    LINE(x - 3, y - 9, x - 3, y + 9, farbe)
+    LINE(x + 3, y - 10, x + 3, y + 8, farbe)
+    LINEW(x - 7, y - 2, x + 7, y - 5, 2, farbe)
+    LINEW(x - 7, y + 5, x + 7, y + 2, 2, farbe)
+END SUB
+
+SUB bZeichen(x AS INTEGER, y AS INTEGER, farbe AS INTEGER)
+    LINE(x - 3, y - 14, x - 3, y + 5, farbe)
+    DIM xs AS ARRAY OF INTEGER : xs = [x - 3, x + 3, x + 2, x - 3]
+    DIM ys AS ARRAY OF INTEGER : ys = [y - 3, y - 2, y + 3, y + 5]
+    SPLINE(xs, ys, farbe, 2)
+END SUB
+
+SUB spurZeichnen(i AS INTEGER)
+    DIM oben AS INTEGER : oben = spurOben(i)
+    IF oben + STAFF_H < TOP_B OR oben > SCREENHEIGHT() THEN RETURN
+    DIM farbe AS INTEGER : farbe = spurFarbe(i)
+    DIM yTop AS INTEGER : yTop = yStufe(i, 8)
+    DIM yBot AS INTEGER : yBot = yStufe(i, 0)
+    DIM breite AS INTEGER : breite = SCREENWIDTH()
+    DIM takte AS INTEGER : takte = INT(MAX(8.0, spurLaenge(i) + 4.0) / 4) + 1 + scrollX \ (PPB * 4)
+    DIM m AS INTEGER
+    FOR m = 0 TO takte STEP 2
+        BOX(MAX(gx0 + LEFT_MARGIN - 10, xBeat(m * 4.0)), yTop - 20, xBeat((m + 1) * 4.0), yBot + 20, F_BAND)
+    NEXT
+    DIM l AS INTEGER
+    FOR l = 0 TO 4
+        LINE(gx0 + LEFT_MARGIN - 14, yStufe(i, l * 2), breite, yStufe(i, l * 2), F_LINIE)
+    NEXT
+    FOR m = 1 TO takte
+        DIM bx AS INTEGER : bx = xBeat(m * 4.0) - BARLINE_LEAD
+        IF bx > gx0 + LEFT_MARGIN THEN LINE(bx, yTop - 6, bx, yBot + 6, F_LINIE)
+    NEXT
+    ' Schluessel -- selbst gezeichnet: die Notenzeichen der Symbolschriften
+    ' kommen nicht durch jede Schrift, ein Fragezeichen am Zeilenanfang ist
+    ' schlimmer als eine schlichte Form.
+    BOX(gx0, yTop - 30, gx0 + LEFT_MARGIN - 16, yBot + 30, &H0B1119)
+    IF text$(tp$(i, "clef")) = "bass" THEN
+        bassschluessel(gx0 + 26, yBot, farbe)
+    ELSE
+        violinschluessel(gx0 + 30, yBot, farbe)
+    END IF
+    ' Bindeboegen
+    IF JSON_HAS(doc, tp$(i, "slurs")) THEN
+        DIM b AS INTEGER
+        FOR b = 0 TO JSON_LEN(doc, tp$(i, "slurs")) - 1
+            DIM sp AS STRING : sp = tp$(i, "slurs." + STR$(b))
+            DIM a1 AS FLOAT : a1 = komma(sp + ".0", 0.0)
+            DIM a2 AS FLOAT : a2 = komma(sp + ".1", 0.0)
+            DIM k1 AS INTEGER : k1 = noteBei(i, a1)
+            DIM k2 AS INTEGER : k2 = noteBei(i, a2)
+            DIM y1 AS INTEGER : y1 = IIF(k1 >= 0, yNote(i, k1), yStufe(i, 4))
+            DIM y2 AS INTEGER : y2 = IIF(k2 >= 0, yNote(i, k2), yStufe(i, 4))
+            bogenZeichnen(xBeat(a1), y1, xBeat(a2), y2, farbe)
+        NEXT
+    END IF
+    balkenZeichnen(i, farbe)
+    DIM k AS INTEGER
+    FOR k = 0 TO nn(i) - 1
+        noteZeichnen(i, k, farbe)
+    NEXT
+    ' Bogen-Anker
+    IF ankerSpur = i THEN
+        DIM ka AS INTEGER : ka = noteBei(i, ankerBeat)
+        IF ka >= 0 THEN CIRCLEOUTLINE(xBeat(ankerBeat), yNote(i, ka), NOTE_R + 5, F_TEXT)
+    END IF
+    ' Spielkopf
+    IF spielt THEN
+        DIM px AS INTEGER : px = xBeat(AUDIO_CLOCK_TICKS(takt) / (ROWS_PER_BEAT * 1.0))
+        LINEW(px, yTop - 12, px, yBot + 12, 2, F_KOPF)
+    END IF
+    ' Vorschau an der Maus
+    IF hoverSpur = i THEN
+        DIM hx AS INTEGER : hx = xBeat(hoverBeat)
+        LINE(hx, yTop - 18, hx, yBot + 18, &H3A4A5C)
+        IF hoverPause THEN
+            pauseZeichnen(hx, yStufe(i, 4), &H7A8E96)
+        ELSE
+            DIM hs AS INTEGER : hs = stufe(i, hoverPitch)
+            hilfslinien(i, hx, hs, &H3A4A5C)
+            CIRCLEOUTLINE(hx, yStufe(i, hs), NOTE_R, &H9AAABB)
+        END IF
+    END IF
+    TEXT_SIZE(13)
+    TEXT(gx0 + LEFT_MARGIN, oben + STAFF_H - 26, text$(tp$(i, "name")) + "  -  " + text$(tp$(i, "instrument.name")), farbe)
+    TEXT_SIZE(16)
+END SUB
+
+SUB blattZeichnen()
+    SCISSOR(gx0, TOP_B, SCREENWIDTH() - gx0, SCREENHEIGHT() - TOP_B)
+    BOX(gx0, TOP_B, SCREENWIDTH(), SCREENHEIGHT(), &H0B1119)
+    DIM i AS INTEGER
+    FOR i = 0 TO nt() - 1
+        spurZeichnen(i)
+    NEXT
+    SCISSOR_END()
+END SUB
+
+' --- Start --------------------------------------------------------------------
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        DIM start AS STRING : start = GETENV$("DHRT_START_DIR")
+        IF start <> "" THEN startDatei = PATHJOIN(start, startDatei)
+    END IF
+    laden(startDatei)
+ELSE
+    neuesStueck()
+END IF
+GUI_FOCUS(ddDauer)
+protokoll("bereit")
+
+DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
+DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
+DIM beenden AS BOOLEAN : beenden = FALSE
+DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
+
+WHILE NOT QUITREQUESTED() AND NOT beenden
+    GUI_UPDATE()
+    werkzeugeLesen()
+    IF SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
+        warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(winTop, 0, 0, warBreite, TOP_B)
+        GUI_WINDOW_SET_BOUNDS(winLinks, 0, TOP_B, LINKS_B, warHoehe - TOP_B)
+    END IF
+
+    ' Menue und Knoepfe
+    IF GUI_CLICKED(miNeu) THEN neuesStueck()
+    IF GUI_CLICKED(miOeffnen) THEN
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Stueck oeffnen", "json")
+        IF p <> "" THEN laden(p)
+    END IF
+    IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
+    IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
+    IF GUI_CLICKED(miTracker) OR GUI_CLICKED(btnTracker) THEN inTrackerOeffnen() : GUI_FOCUS(ddDauer)
+    IF GUI_CLICKED(miSpielen) OR GUI_CLICKED(btnSpielen) THEN
+        IF spielt THEN stopp() ELSE starten()
+        GUI_FOCUS(ddDauer)
+    END IF
+    IF GUI_CLICKED(miBeenden) THEN
+        IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Stueck ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
+    END IF
+    IF GUI_CLICKED(miRueck) THEN rueckgaengig()
+    IF GUI_CLICKED(miWieder) THEN wiederholen()
+    IF GUI_CLICKED(miSpurPlus) OR GUI_CLICKED(btnSpurPlus) THEN spurHinzu() : GUI_FOCUS(ddDauer)
+    IF GUI_CLICKED(miSpurWeg) OR GUI_CLICKED(btnSpurWeg) THEN spurWeg() : GUI_FOCUS(ddDauer)
+    IF dlgSchliessen <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
+        IF a = 1 THEN
+            dlgSchliessen = 0
+            IF sichern(FALSE) THEN beenden = TRUE
+        ELSEIF a = 2 THEN
+            dlgSchliessen = 0 : beenden = TRUE
+        ELSEIF a = 3 THEN
+            dlgSchliessen = 0
+        END IF
+    END IF
+    GUI_SET_TEXT(btnSpielen, IIF(spielt, "Stopp", "Abspielen"))
+
+    ' Tempo
+    IF NOT stumm AND GUI_ENTERED(fBpm) THEN
+        DIM b AS INTEGER : b = CLAMP(INT(VAL(GUI_TEXT(fBpm))), 20, 400)
+        IF b <> bpm() THEN JSON_SET_INT(doc, "bpm", b) : merken() : protokoll("bpm " + STR$(b))
+        spurenAnzeigen()
+        GUI_FOCUS(ddDauer)
+    END IF
+
+    ' Spuren: Name (Enter), Schluessel und Instrument (Auswahl ist das Ereignis)
+    DIM i AS INTEGER
+    IF NOT stumm THEN
+        FOR i = 0 TO nt() - 1
+            IF GUI_ENTERED(sName[i]) THEN
+                DIM nm AS STRING : nm = TRIM$(GUI_TEXT(sName[i]))
+                IF nm = "" THEN nm = "Stimme " + STR$(i + 1)
+                IF nm <> text$(tp$(i, "name")) THEN JSON_SET_STRING(doc, tp$(i, "name"), nm) : merken() : protokoll("name " + STR$(i) + " " + nm)
+                spurenAnzeigen()
+                GUI_FOCUS(ddDauer)
+            END IF
+            IF GUI_DROPDOWN_SELECTED(sClef[i]) <> sClefSel[i] AND GUI_DROPDOWN_SELECTED(sClef[i]) >= 0 THEN
+                sClefSel[i] = GUI_DROPDOWN_SELECTED(sClef[i])
+                schluesselSetzen(i, IIF(sClefSel[i] = 1, "bass", "treble"))
+                spurenAnzeigen()
+                GUI_FOCUS(ddDauer)     ' Kuerzel gelten im Fenster mit Fokus -- das Menue haengt oben
+            END IF
+            IF GUI_DROPDOWN_SELECTED(sInst[i]) <> sInstSel[i] AND GUI_DROPDOWN_SELECTED(sInst[i]) >= 0 THEN
+                sInstSel[i] = GUI_DROPDOWN_SELECTED(sInst[i])
+                IF sInstSel[i] < LEN(pName) THEN
+                    JSON_SET_JSON(doc, tp$(i, "instrument"), presetJson(sInstSel[i]))
+                    merken()
+                    protokoll("instrument " + STR$(i) + " " + pName[sInstSel[i]])
+                END IF
+                spurenAnzeigen()
+                GUI_FOCUS(ddDauer)
+            END IF
+        NEXT
+    END IF
+
+    ' Tastatur und Rad, solange kein Eingabefeld den Fokus hat
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    DIM imFeld AS BOOLEAN : imFeld = FALSE
+    IF fokus >= 0 THEN imFeld = GUI_KIND(fokus) = "textinput"
+    IF NOT imFeld THEN
+        IF KEYHIT(KEY_SPACE) THEN
+            IF spielt THEN stopp() ELSE starten()
+        END IF
+        IF KEYHIT(KEY_ESCAPE) THEN ankerSpur = -1
+    END IF
+    DIM rad AS INTEGER : rad = MOUSEWHEEL()
+    IF rad <> 0 AND imBlatt(MOUSEX(), MOUSEY()) THEN
+        IF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN
+            scrollY = CLAMP(scrollY - rad * 40, 0, MAX(0, nt() * STAFF_H - (SCREENHEIGHT() - TOP_B - 20)))
+            spurenAnzeigen()
+        ELSE
+            scrollX = MAX(0, scrollX - rad * PPB)
+        END IF
+    END IF
+
+    IF spielt THEN
+        IF AUDIO_CLOCK_TICKS(takt) > spielEnde THEN stopp()
+    END IF
+    IF trackerProzess >= 0 THEN
+        IF NOT PROCESS_RUNNING(trackerProzess) THEN PROCESS_CLOSE(trackerProzess) : trackerProzess = -1
+    END IF
+
+    mausAufBlatt()
+
+    CLS(&H0B1119)
+    blattZeichnen()
+    GUI_DRAW()
+    FLIP()
+WEND
+
+IF spielt THEN stopp()
+IF trackerProzess >= 0 THEN PROCESS_CLOSE(trackerProzess)
+protokoll("ende")
