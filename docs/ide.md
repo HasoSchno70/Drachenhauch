@@ -27,7 +27,7 @@ ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 | Debugger | Haltepunkte (rote Marke) an der Zeile der Schreibmarke; Debuggen läuft bis zum ersten Haltepunkt, ohne Haltepunkte steht es in Zeile 1; die angehaltene Zeile ist gelb markiert, Variablen (lokal und global) stehen unten rechts anstelle der Problemliste, dazu die Schritt-Knöpfe; steht das Programm, wertet die Eingabezeile Ausdrücke aus (`? 2 * 21` → `= 42 (INTEGER)`) | F9, F7, F8 weiter, F10 drüber, F11 hinein, Umschalt+F11 heraus, Umschalt+F5 stopp, Strg+E Ausdruck |
 | Profil | Lauf unter `dhrt profile`; am Ende ein Fenster mit den Zeilen nach Zeit (Anzahl, ms, Anteil, Quelltext), Klick springt zur Zeile | Strg+Umschalt+Y |
 | Ausführen | Starten mit laufender Ausgabe unten links, Eingabezeile für `INPUT`, Stoppen | F5, Umschalt+F5 |
-| Werkzeuge | Die fünf Begleit-Editoren in Drachenhauch (SFX-Generator, Partikel-Editor, Tilemap-Editor, Sprite-Editor, Tracker) als eigene Programme; die Beispiele als Projekt öffnen | |
+| Werkzeuge | Die Begleit-Editoren in Drachenhauch (SFX-Generator, Partikel-Editor, Tilemap-Editor, Sprite-Editor, Tracker, Form-Designer, Anim-FSM-Editor) als eigene Programme; die Beispiele als Projekt öffnen | |
 | Ansicht | Helles/dunkles Thema, Vollbild; die IDE startet maximiert | Alt+Enter |
 | Hilfe | Handbuch im Fenster: F1 schlägt das Wort unter der Schreibmarke in `docs/` nach und öffnet das Dokument mit den meisten Fundstellen in Codeschrift; Klappliste aller Dokumente, Suche im Dokument | F1 |
 

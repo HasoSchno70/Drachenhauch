@@ -78,6 +78,54 @@ ANIM_FSM_UPDATE(fsm, hero, dt_ms)
 SPRITE_DRAW(hero)
 ```
 
+## In Drachenhauch: `examples/198_anim_fsm_editor.dh`
+
+Seit 2026-09-07 gibt es den Editor auch **in Drachenhauch selbst** (Weg B
+aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der zweite der
+vier Editoren ohne Piloten). 1 336 Zeilen gegen 1 728 der Qt-Fassung
+(1 247 UI + 481 Modell), Faktor 0,77 — mit dem üblichen Vorbehalt: der
+Faktor misst vor allem, was weggelassen ist (siehe unten).
+
+```
+dhrt run examples/198_anim_fsm_editor.dh [-- maschine.dhanim]
+```
+
+Ohne Datei öffnet er wie die Qt-Fassung `anim_demo.dhanim`. Der Graph in
+der Mitte wird mit den normalen Zeichenbefehlen gemalt (Knoten, Pfeile mit
+Spitze und Beschriftung, die Pille „Any State", der Eingangspfeil zum
+Startzustand); links Sprite-Blatt und Parameter, rechts der Inspektor für
+den gewählten Zustand oder Übergang, alles `gui`-Fenster.
+
+| Aktion | so |
+|---|---|
+| Zustand anlegen | Doppelklick auf freie Fläche, oder `Einfg` |
+| Zustand verschieben | Knoten ziehen (Raster 8), Pfeile schieben den gewählten |
+| **Übergang ziehen** | **mit der rechten Maustaste** von einem Knoten auf einen anderen ziehen (auch von „Any State"); oder `L` für den Verbinden-Modus mit der linken |
+| Übergang bearbeiten | auf den Pfeil klicken → Inspektor: „erst wenn fertig", bis zu sechs Bedingungen (Parameter, Operator, Wert), `+ Bedingung`, `x` |
+| Zustand bearbeiten | Knoten klicken → Name, Animation, Bild von/bis, Bilder/s, endlos, Startzustand |
+| Parameter | links `+`/`-`, Name/Typ/Vorgabe, Umbenennen zieht die Bedingungen mit |
+| Löschen | `Entf` — ein Zustand nimmt seine Übergänge mit |
+| Rückgängig / Wiederholen | `Strg+Z` / `Strg+Y` |
+| Vorschau | `F5` — schreibt `<name>_vorschau.dh` neben die `.dhanim` (Regler links, Sprite rechts, wie die Qt-Vorschau) und startet es mit `dhrt` |
+
+**Das Modell ist das `.dhanim`-JSON** (json-Modul), Rückgängig ein JSON-Text
+je Stand; was der Inspektor nicht kennt, läuft unverändert mit durch.
+Geprüft wird die Datei von **zwei fremden Lesern**
+(`tests/test_pilot_animfsm.py`): dem Modell des Qt-Editors (`AnimDoc.load`)
+und der Laufzeit selbst — `ANIM_FSM_LOAD`, `ANIM_FSM_SETUP`, ein Schritt,
+Zustandsname vergleichen. Dass die JSON gültig ist, wäre die schwächere
+Aussage: ein Übergang zu einem gelöschten Zustand lädt nicht, und genau das
+prüft der Test nach `Entf`.
+
+Noch nicht: Umbenennen per Rechtsklick (nur im Inspektor), Rollen des
+Graphen (Knoten jenseits des Fensters erreicht man nicht), Rückfrage beim
+Schließen nur über das Menü. Zwei Fallen beim Bau: die Pille „Any State"
+steht nicht in der Datei, also merkt der Editor sie sich selbst; und ein
+Klick auf einen Knopf im Inspektor gibt dessen Fenster den Fokus — Kürzel
+wie `Strg+S` gelten aber nur im Fenster mit Fokus, dessen Menü links hängt.
+Nach jedem Knopf geht der Fokus deshalb zurück zur Parameterliste; ohne das
+war Sichern nach `+ Bedingung` stumm, und der Test sah es.
+
 ## Architektur
 
 Wie die anderen Begleit-Tools (`dhform`, `dhtilemap`) ist das **Datenmodell
