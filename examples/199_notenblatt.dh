@@ -1348,18 +1348,17 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     END IF
     IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
     IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
-    IF GUI_CLICKED(miTracker) OR GUI_CLICKED(btnTracker) THEN inTrackerOeffnen() : GUI_FOCUS(ddDauer)
+    IF GUI_CLICKED(miTracker) OR GUI_CLICKED(btnTracker) THEN inTrackerOeffnen()
     IF GUI_CLICKED(miSpielen) OR GUI_CLICKED(btnSpielen) THEN
         IF spielt THEN stopp() ELSE starten()
-        GUI_FOCUS(ddDauer)
     END IF
     IF GUI_CLICKED(miBeenden) THEN
         IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Das Stueck ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
     END IF
     IF GUI_CLICKED(miRueck) THEN rueckgaengig()
     IF GUI_CLICKED(miWieder) THEN wiederholen()
-    IF GUI_CLICKED(miSpurPlus) OR GUI_CLICKED(btnSpurPlus) THEN spurHinzu() : GUI_FOCUS(ddDauer)
-    IF GUI_CLICKED(miSpurWeg) OR GUI_CLICKED(btnSpurWeg) THEN spurWeg() : GUI_FOCUS(ddDauer)
+    IF GUI_CLICKED(miSpurPlus) OR GUI_CLICKED(btnSpurPlus) THEN spurHinzu()
+    IF GUI_CLICKED(miSpurWeg) OR GUI_CLICKED(btnSpurWeg) THEN spurWeg()
     IF dlgSchliessen <> 0 THEN
         DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
         IF a = 1 THEN
@@ -1396,7 +1395,6 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
                 sClefSel[i] = GUI_DROPDOWN_SELECTED(sClef[i])
                 schluesselSetzen(i, IIF(sClefSel[i] = 1, "bass", "treble"))
                 spurenAnzeigen()
-                GUI_FOCUS(ddDauer)     ' Kuerzel gelten im Fenster mit Fokus -- das Menue haengt oben
             END IF
             IF GUI_DROPDOWN_SELECTED(sInst[i]) <> sInstSel[i] AND GUI_DROPDOWN_SELECTED(sInst[i]) >= 0 THEN
                 sInstSel[i] = GUI_DROPDOWN_SELECTED(sInst[i])
@@ -1406,7 +1404,6 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
                     protokoll("instrument " + STR$(i) + " " + pName[sInstSel[i]])
                 END IF
                 spurenAnzeigen()
-                GUI_FOCUS(ddDauer)
             END IF
         NEXT
     END IF

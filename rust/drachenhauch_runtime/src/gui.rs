@@ -3586,31 +3586,49 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         it.label = label; Ok(())
     }
 
-    /// Kuerzel pruefen -- jedes Bild, im Fenster mit Fokus. Ohne Strg/Alt
-    /// gehoert eine Taste dem Textfeld mit Fokus (ein "Entf" darf dort
-    /// loeschen, nicht den Menuepunkt ausloesen).
+    /// Kuerzel pruefen -- jedes Bild. Zuerst im Fenster mit Fokus, dann in
+    /// allen anderen sichtbaren Fenstern von oben nach unten: ein Programm
+    /// mit Werkzeugleiste links und Inspektor rechts hat EIN Menue, und
+    /// Strg+S soll auch dann sichern, wenn der letzte Klick in den Inspektor
+    /// ging. Drei Piloten (Form-Designer, Anim-FSM, Notenblatt) mussten sich
+    /// vorher nach jedem Knopf den Fokus zurueckholen, sonst war Strg+S stumm
+    /// -- und jedes Mal sah es erst der Test. Hat das Fokus-Fenster dasselbe
+    /// Kuerzel selbst, gewinnt es (es steht vorn in der Reihe). Ein modales
+    /// Fenster laesst nur seine eigenen zu, ein Fenster im Entwurfsmodus
+    /// (`GUI_WINDOW_DESIGN`) zaehlt nicht: seine Menues sind Ansicht, nicht
+    /// Bedienung. Ohne Strg/Alt gehoert eine Taste dem Textfeld mit Fokus
+    /// (ein "Entf" darf dort loeschen, nicht den Menuepunkt ausloesen).
     fn kuerzel_pruefen(&mut self, g: &Graphics) {
-        let Some(top) = self.focus_window else { return };
-        if top >= self.windows.len() || !self.windows[top].alive || !self.windows[top].visible { return; }
-        if self.modal.is_some_and(|m| m != top) { return; }
         let mods = (g.key_ctrl() as u8) | ((g.key_shift() as u8) << 1) | ((g.key_alt() as u8) << 2);
-        let text_fokus = self.focus_widget.filter(|(w, _)| *w == top)
-            .and_then(|(_, i)| self.windows[top].widgets.get(i))
+        let text_fokus = self.focus_widget
+            .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
             .map(|w| w.kind.nimmt_text()).unwrap_or(false);
-        let mut treffer: Option<(usize, usize)> = None;
-        'suche: for (mi, m) in self.windows[top].menus.iter().enumerate() {
-            for (ii, it) in m.items.iter().enumerate() {
-                if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
-                // Ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus (Entf
-                // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
-                // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
-                if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
-                if g.key_pressed(it.k_code) { treffer = Some((mi, ii)); break 'suche; }
+        let kandidaten: Vec<usize> = self.focus_window.into_iter()
+            .chain(self.z_order.iter().rev().copied())
+            .filter(|&wi| wi < self.windows.len())
+            .collect();
+        let mut gesehen: Vec<usize> = Vec::new();
+        let mut treffer: Option<(usize, usize, usize)> = None;
+        'suche: for wi in kandidaten {
+            if gesehen.contains(&wi) { continue; }
+            gesehen.push(wi);
+            let win = &self.windows[wi];
+            if !win.alive || !win.visible || win.entwurf { continue; }
+            if self.modal.is_some_and(|m| m != wi) { continue; }
+            for (mi, m) in win.menus.iter().enumerate() {
+                for (ii, it) in m.items.iter().enumerate() {
+                    if it.k_code == 0 || !it.enabled || it.separator || it.k_mods != mods { continue; }
+                    // Ohne Strg/Alt gehoert die Taste dem Textfeld mit Fokus (Entf
+                    // loescht dort ein Zeichen) -- AUSSER F1..F12: die erzeugen nie
+                    // Text, und F5 in einer IDE muss aus dem Code-Feld heraus starten.
+                    if text_fokus && (mods & 5) == 0 && !ist_funktionstaste(it.k_code) { continue; }
+                    if g.key_pressed(it.k_code) { treffer = Some((wi, mi, ii)); break 'suche; }
+                }
             }
         }
-        if let Some((mi, ii)) = treffer {
+        if let Some((wi, mi, ii)) = treffer {
             self.open_menu = None; self.context_open = None; self.sub_chain.clear();
-            self.fire_menu_item(top, mi, ii);
+            self.fire_menu_item(wi, mi, ii);
         }
     }
 

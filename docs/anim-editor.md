@@ -121,10 +121,12 @@ Noch nicht: Umbenennen per Rechtsklick (nur im Inspektor), Rollen des
 Graphen (Knoten jenseits des Fensters erreicht man nicht), Rückfrage beim
 Schließen nur über das Menü. Zwei Fallen beim Bau: die Pille „Any State"
 steht nicht in der Datei, also merkt der Editor sie sich selbst; und ein
-Klick auf einen Knopf im Inspektor gibt dessen Fenster den Fokus — Kürzel
-wie `Strg+S` gelten aber nur im Fenster mit Fokus, dessen Menü links hängt.
-Nach jedem Knopf geht der Fokus deshalb zurück zur Parameterliste; ohne das
-war Sichern nach `+ Bedingung` stumm, und der Test sah es.
+Klick auf einen Knopf im Inspektor gibt dessen Fenster den Fokus — und bis
+2026-09-07 galt ein Kürzel wie `Strg+S` nur im Fenster mit Fokus, dessen
+Menü hier links hängt. Der Editor holte sich den Fokus nach jedem Knopf
+zurück, sonst war Sichern nach `+ Bedingung` stumm (der Test sah es). Seit
+die Laufzeit Kürzel in allen Fenstern des Programms prüft, braucht er das
+nicht mehr.
 
 ## Architektur
 

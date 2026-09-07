@@ -431,13 +431,6 @@ SUB dokumentUebernehmen()
     protokoll("dokument " + GUI_TEXT(fSheet) + " " + STR$(ganz("frame_w", 16)) + " " + STR$(ganz("frame_h", 16)))
 END SUB
 
-' Ein Klick auf einen Knopf gibt seinem Fenster den Fokus -- und Kuerzel wie
-' Strg+S gelten nur im Fenster mit Fokus, dessen Menue links haengt. Also nach
-' jedem Knopf zurueck zur Parameterliste; Eingabefelder behalten ihren Fokus.
-SUB fokusZurueck()
-    GUI_FOCUS(lstParam)
-END SUB
-
 SUB paramAnlegen()
     DIM p AS JSON_HANDLE : p = JSON_NEW_OBJECT()
     DIM n AS STRING : n = eindeutig$("param", FALSE)
@@ -1268,7 +1261,6 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnSheet) THEN
         DIM b AS STRING : b = FILE_OPEN_DIALOG("Sprite-Blatt waehlen", "png,bmp,jpg")
         IF b <> "" THEN GUI_SET_TEXT(fSheet, b) : dokumentUebernehmen()
-        fokusZurueck()
     END IF
     IF NOT stumm AND (GUI_ENTERED(fSheet) OR GUI_ENTERED(fFrameW) OR GUI_ENTERED(fFrameH) OR GUI_ENTERED(fSkala)) THEN dokumentUebernehmen()
 
@@ -1277,9 +1269,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         paramSel = GUI_LISTBOX_SELECTED(lstParam)
         paramFelderFuellen()
     END IF
-    IF GUI_CLICKED(btnParPlus) THEN paramAnlegen() : fokusZurueck()
-    IF GUI_CLICKED(btnParMinus) THEN paramLoeschen() : fokusZurueck()
-    IF NOT stumm AND (GUI_CLICKED(btnPUeb) OR GUI_ENTERED(fPName) OR GUI_ENTERED(fPVor)) THEN paramUebernehmen() : fokusZurueck()
+    IF GUI_CLICKED(btnParPlus) THEN paramAnlegen()
+    IF GUI_CLICKED(btnParMinus) THEN paramLoeschen()
+    IF NOT stumm AND (GUI_CLICKED(btnPUeb) OR GUI_ENTERED(fPName) OR GUI_ENTERED(fPVor)) THEN paramUebernehmen()
 
     ' Inspektor
     DIM ueb AS BOOLEAN : ueb = GUI_CLICKED(btnZUeb)
@@ -1287,14 +1279,14 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     FOR fi = 0 TO LEN(zFelder) - 1
         IF GUI_ENTERED(zFelder[fi]) THEN ueb = TRUE
     NEXT
-    IF ueb AND NOT stumm THEN zustandUebernehmen() : fokusZurueck()
+    IF ueb AND NOT stumm THEN zustandUebernehmen()
     DIM uebU AS BOOLEAN : uebU = GUI_CLICKED(btnUUeb)
     FOR fi = 0 TO MAX_BED - 1
         IF GUI_ENTERED(bWert[fi]) THEN uebU = TRUE
-        IF GUI_CLICKED(bWeg[fi]) THEN bedingungWeg(fi) : fokusZurueck()
+        IF GUI_CLICKED(bWeg[fi]) THEN bedingungWeg(fi)
     NEXT
-    IF uebU AND NOT stumm THEN uebergangUebernehmen() : fokusZurueck()
-    IF GUI_CLICKED(btnBedPlus) THEN bedingungHinzu() : fokusZurueck()
+    IF uebU AND NOT stumm THEN uebergangUebernehmen()
+    IF GUI_CLICKED(btnBedPlus) THEN bedingungHinzu()
 
     ' Tastatur, solange kein Eingabefeld den Fokus hat
     DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
