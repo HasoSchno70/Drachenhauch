@@ -1,0 +1,117 @@
+' Aus test_static_class.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== static int const
+CLASS Player
+    STATIC CONST MAX_HP AS INTEGER = 100
+    DIM hp AS INTEGER
+END CLASS
+
+PRINT Player.MAX_HP
+--- erwartet
+100
+
+=== static string const
+CLASS Game
+    STATIC CONST TITLE AS STRING = "Awesome"
+END CLASS
+
+PRINT Game.TITLE
+--- erwartet
+Awesome
+
+=== static in method
+' Methoden koennen ihre eigenen Statics nutzen.
+CLASS Player
+    STATIC CONST MAX_HP AS INTEGER = 100
+    DIM hp AS INTEGER
+    SUB Init()
+        Self.hp = Player.MAX_HP
+    END SUB
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+PRINT p.hp
+--- erwartet
+100
+
+=== multiple statics
+CLASS Cfg
+    STATIC CONST WIDTH AS INTEGER = 800
+    STATIC CONST HEIGHT AS INTEGER = 600
+    STATIC CONST FPS AS INTEGER = 60
+    STATIC CONST TITLE AS STRING = "Demo"
+END CLASS
+
+PRINT Cfg.WIDTH, Cfg.HEIGHT, Cfg.FPS
+PRINT Cfg.TITLE
+--- erwartet
+800 600 60
+Demo
+
+=== static negative number
+CLASS Limits
+    STATIC CONST MIN_X AS INTEGER = -100
+END CLASS
+
+PRINT Limits.MIN_X
+--- erwartet
+-100
+
+=== static float
+CLASS Phys
+    STATIC CONST GRAVITY AS FLOAT = 9.81
+END CLASS
+
+PRINT Phys.GRAVITY
+--- erwartet
+9.81
+
+=== static bool
+CLASS Cfg
+    STATIC CONST DEBUG AS BOOLEAN = TRUE
+END CLASS
+
+IF Cfg.DEBUG THEN PRINT "debug" ELSE PRINT "release"
+--- erwartet
+debug
+
+=== unknown static throws
+CLASS C
+    STATIC CONST X AS INTEGER = 1
+END CLASS
+
+PRINT C.NONEXISTENT
+--- fehler
+c hat keinen Member 'nonexistent'
+
+=== duplicate static rejected at compile
+' Doppelte STATIC CONST werden beim Compile (dhrt) abgelehnt.
+CLASS C
+    STATIC CONST X AS INTEGER = 1
+    STATIC CONST X AS INTEGER = 2
+END CLASS
+--- fehler
+Compile-Fehler: STATIC CONST c.x: doppelt deklariert
+
+=== static non literal rejected
+' STATIC CONST mit Ausdruck statt Literal -> Compile-Fehler (dhrt).
+CLASS C
+    STATIC CONST X AS INTEGER = 1 + 1
+END CLASS
+--- fehler
+Compile-Fehler: Default-Parameter muessen Literale sein (VM-Pfad)
+
+=== class with no statics unaffected
+' Eine Klasse ohne Statics darf weiter normal verwendet werden -- der
+CLASS Foo
+    DIM v AS INTEGER
+END CLASS
+
+DIM f AS Foo
+f = NEW Foo()
+f.v = 42
+PRINT f.v
+--- erwartet
+42
+

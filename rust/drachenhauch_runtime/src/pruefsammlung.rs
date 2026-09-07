@@ -29,8 +29,9 @@
 //! (die Ausgabe, Zeile fuer Zeile), `--- enthaelt` (jede Zeile muss in der
 //! Ausgabe vorkommen), `--- fehler` (Rueckgabewert ungleich 0, und jede Zeile
 //! des Blocks steht in der Fehlermeldung), `--- datei <name>` (eine Datei, die
-//! vor dem Lauf neben dem Programm liegt -- fuer JSON, Karten, Bilder als Text),
-//! `--- umgebung` (`NAME=WERT` je Zeile, z. B. `DHRT_FRAMES=1`). Ohne Erwartung
+//! vor dem Lauf neben dem Programm liegt -- fuer JSON, Karten, Bilder als Text;
+//! `--- datei <name> base64` fuer Bytes, die kein Text sind: cp1252-Dateien,
+//! ZIP-Archive, Bilder), `--- umgebung` (`NAME=WERT` je Zeile, z. B. `DHRT_FRAMES=1`). Ohne Erwartung
 //! zaehlt ein Fall als bestanden, wenn er mit 0 endet -- wie ein Pruefprogramm.
 //!
 //! Jeder Fall laeuft als eigener `dhrt run`-Prozess in einem eigenen
@@ -56,7 +57,10 @@ pub struct Fall {
     pub ungefaehr: bool,
     pub enthaelt: Vec<String>,
     pub fehler: Option<Vec<String>>,
-    pub dateien: Vec<(String, String)>,
+    /// Beilagen als Bytes -- Text landet unveraendert (UTF-8), ein
+    /// `base64`-Block dekodiert. Bytes, nicht String, weil eine cp1252-Datei
+    /// oder ein ZIP-Archiv sich als String gar nicht halten liesse.
+    pub dateien: Vec<(String, Vec<u8>)>,
     /// `--- verzeichnis name`: ein (leeres) Verzeichnis neben dem Programm --
     /// fuer DIRLIST, RMDIR und alles, was Ordner sehen will.
     pub verzeichnisse: Vec<String>,
@@ -91,8 +95,9 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
     let mut abschnitt = Abschnitt::Quelle;
     let mut puffer: Vec<String> = Vec::new();
     let mut datei_name = String::new();
+    let mut datei_b64 = false;
 
-    fn abschliessen(f: &mut Fall, a: Abschnitt, puffer: &mut Vec<String>, datei_name: &str) {
+    fn abschliessen(f: &mut Fall, a: Abschnitt, puffer: &mut Vec<String>, datei_name: &str, datei_b64: bool) -> Result<(), String> {
         let text = puffer.join("\n");
         match a {
             Abschnitt::Quelle => f.quelle = text,
@@ -108,7 +113,18 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                 let zeilen: Vec<String> = puffer.iter().filter(|z| !z.trim().is_empty()).cloned().collect();
                 f.fehler = Some(zeilen);
             }
-            Abschnitt::Datei => f.dateien.push((datei_name.to_string(), text)),
+            Abschnitt::Datei => {
+                // Base64 darf umbrochen sein (76 Zeichen je Zeile ist ueblich):
+                // aller Leerraum faellt vor dem Dekodieren weg.
+                let bytes = if datei_b64 {
+                    let dicht: String = text.split_whitespace().collect();
+                    crate::builtins::b64_decode(&dicht)
+                        .map_err(|e| format!("Fall '{}', Beilage '{}': kein gueltiges Base64 ({})", f.name, datei_name, e))?
+                } else {
+                    text.into_bytes()
+                };
+                f.dateien.push((datei_name.to_string(), bytes));
+            }
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
             Abschnitt::Umgebung => {
                 for z in puffer.iter().filter(|z| !z.trim().is_empty()) {
@@ -119,12 +135,13 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
             }
         }
         puffer.clear();
+        Ok(())
     }
 
     for (nr, roh) in text.lines().enumerate() {
         let zeile = roh.trim_end_matches('\r');
         if let Some(rest) = zeile.strip_prefix("=== ") {
-            if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name); }
+            if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?; }
             let name = rest.trim().to_string();
             if name.is_empty() { return Err(format!("Zeile {}: ein Fall braucht einen Namen hinter '==='", nr + 1)); }
             if faelle.iter().any(|f| f.name == name) {
@@ -137,7 +154,7 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
         if faelle.is_empty() { continue; }           // Kopfkommentar vor dem ersten Fall
         if let Some(rest) = zeile.strip_prefix("--- ") {
             let f = faelle.last_mut().unwrap();
-            abschliessen(f, abschnitt, &mut puffer, &datei_name);
+            abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?;
             let (wort, arg) = match rest.trim().split_once(char::is_whitespace) {
                 Some((w, a)) => (w, a.trim()),
                 None => (rest.trim(), ""),
@@ -153,7 +170,16 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                 "umgebung" => Abschnitt::Umgebung,
                 "datei" => {
                     if arg.is_empty() { return Err(format!("Zeile {}: '--- datei' braucht einen Namen", nr + 1)); }
-                    datei_name = arg.to_string();
+                    let (name, art) = match arg.split_once(char::is_whitespace) {
+                        Some((n, a)) => (n, a.trim()),
+                        None => (arg, ""),
+                    };
+                    datei_b64 = match art {
+                        "" => false,
+                        "base64" => true,
+                        other => return Err(format!("Zeile {}: '--- datei {} {}' kenne ich nicht (nur 'base64')", nr + 1, name, other)),
+                    };
+                    datei_name = name.to_string();
                     Abschnitt::Datei
                 }
                 "verzeichnis" => {
@@ -167,7 +193,7 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
         }
         puffer.push(zeile.to_string());
     }
-    if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name); }
+    if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?; }
     for f in &faelle {
         if f.quelle.trim().is_empty() {
             return Err(format!("Zeile {}: der Fall '{}' hat keinen Quelltext", f.zeile, f.name));
@@ -288,11 +314,22 @@ mod tests {
         assert_eq!(parsen("=== a\nPRINT 1\n--- erwartet\n1\n\n\n").unwrap()[0].erwartet.as_deref(), Some("1"));
         assert_eq!(f[1].fehler.as_ref().unwrap(), &vec!["Division".to_string()]);
         assert_eq!(f[2].enthaelt, vec!["b".to_string()]);
-        assert_eq!(f[2].dateien, vec![("karte.json".to_string(), "{\"x\": 1}".to_string())]);
+        assert_eq!(f[2].dateien, vec![("karte.json".to_string(), "{\"x\": 1}".to_string().into_bytes())]);
         assert_eq!(f[2].umgebung, vec![("DHRT_FRAMES".to_string(), "1".to_string())]);
         let v = parsen("=== a\nPRINT 1\n--- verzeichnis leer/tief\n--- erwartet\n1\n").unwrap();
         assert_eq!(v[0].verzeichnisse, vec!["leer/tief".to_string()]);
         assert_eq!(v[0].erwartet.as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn beilage_als_base64_wird_zu_bytes() {
+        // "Köln" in cp1252: 4B F6 6C 6E -- als UTF-8-Text nicht darstellbar,
+        // genau der Fall, fuer den es den Block gibt. Umbruch im Block ist erlaubt.
+        let f = parsen("=== a\nPRINT 1\n--- datei alt.txt base64\nS/Zs\nbg==\n--- erwartet\n1\n").unwrap();
+        assert_eq!(f[0].dateien, vec![("alt.txt".to_string(), vec![0x4B, 0xF6, 0x6C, 0x6E])]);
+        assert_eq!(f[0].erwartet.as_deref(), Some("1"));
+        assert!(parsen("=== a\nPRINT 1\n--- datei x.bin base64\n!!!\n").unwrap_err().contains("kein gueltiges Base64"));
+        assert!(parsen("=== a\nPRINT 1\n--- datei x.bin hex\nff\n").unwrap_err().contains("nur 'base64'"));
     }
 
     #[test]

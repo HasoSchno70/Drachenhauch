@@ -1,0 +1,278 @@
+' Aus test_modules_zeit.py uebertragen (41 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== parse und text sind umkehrbar
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))
+--- erwartet
+2026-08-28 20:30:00
+
+=== parse versteht die ueblichen schreibweisen[2026-08-28 20:30:00-2026-08-28 20:30:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30:00"))
+--- erwartet
+2026-08-28 20:30:00
+
+=== parse versteht die ueblichen schreibweisen[2026-08-28T20:30:00-2026-08-28 20:30:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00"))
+--- erwartet
+2026-08-28 20:30:00
+
+=== parse versteht die ueblichen schreibweisen[2026-08-28 20:30-2026-08-28 20:30:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28 20:30"))
+--- erwartet
+2026-08-28 20:30:00
+
+=== parse versteht die ueblichen schreibweisen[2026-08-28-2026-08-28 00:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28"))
+--- erwartet
+2026-08-28 00:00:00
+
+=== parse versteht die ueblichen schreibweisen[2026-08-28T20:30:00Z-2026-08-28 20:30:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PARSE("2026-08-28T20:30:00Z"))
+--- erwartet
+2026-08-28 20:30:00
+
+=== parse meldet unlesbares im klartext
+IMPORT "zeit"
+PRINT ZEIT_PARSE("naechsten Dienstag")
+--- fehler
+ZEIT_PARSE: 'naechsten Dienstag' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+
+=== parse lehnt unmoegliche daten ab (1)
+IMPORT "zeit"
+PRINT ZEIT_PARSE("2026-02-30")
+--- fehler
+ZEIT_PARSE: '2026-02-30' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+
+=== parse lehnt unmoegliche daten ab (2)
+IMPORT "zeit"
+PRINT ZEIT_PARSE("2026-13-01")
+--- fehler
+ZEIT_PARSE: '2026-13-01' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+
+=== parse lehnt unmoegliche daten ab (3)
+IMPORT "zeit"
+PRINT ZEIT_PARSE("2026-08-28 25:00:00")
+--- fehler
+ZEIT_PARSE: '2026-08-28 25:00:00' ist kein Zeitpunkt -- erwartet 'JJJJ-MM-TT hh:mm:ss' (auch mit T, ohne Sekunden oder nur Datum)
+
+=== lesbar fragt nach statt abzubrechen
+IMPORT "zeit"
+PRINT ZEIT_LESBAR("2026-08-28 20:30:00")
+PRINT ZEIT_LESBAR("naechsten Dienstag")
+--- erwartet
+TRUE
+FALSE
+
+=== tippschluss ist anstoss minus 15 minuten
+IMPORT "zeit"
+DIM a AS INTEGER : a = ZEIT_PARSE("2026-08-28 20:30:00")
+PRINT ZEIT_TEXT$(ZEIT_PLUS(a, -15 * 60))
+--- erwartet
+2026-08-28 20:15:00
+
+=== plus geht ueber alle grenzen[2026-08-28 00:10:00--1200-2026-08-27 23:50:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-08-28 00:10:00"), -1200))
+--- erwartet
+2026-08-27 23:50:00
+
+=== plus geht ueber alle grenzen[2026-08-31 12:00:00-86400-2026-09-01 12:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-08-31 12:00:00"), 86400))
+--- erwartet
+2026-09-01 12:00:00
+
+=== plus geht ueber alle grenzen[2026-12-31 23:00:00-3600-2027-01-01 00:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-12-31 23:00:00"), 3600))
+--- erwartet
+2027-01-01 00:00:00
+
+=== plus geht ueber alle grenzen[2028-02-28 12:00:00-86400-2028-02-29 12:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2028-02-28 12:00:00"), 86400))
+--- erwartet
+2028-02-29 12:00:00
+
+=== plus geht ueber alle grenzen[2026-02-28 12:00:00-86400-2026-03-01 12:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2026-02-28 12:00:00"), 86400))
+--- erwartet
+2026-03-01 12:00:00
+
+=== plus geht ueber alle grenzen[2100-02-28 12:00:00-86400-2100-03-01 12:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2100-02-28 12:00:00"), 86400))
+--- erwartet
+2100-03-01 12:00:00
+
+=== plus geht ueber alle grenzen[2000-02-28 12:00:00-86400-2000-02-29 12:00:00]
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_PLUS(ZEIT_PARSE("2000-02-28 12:00:00"), 86400))
+--- erwartet
+2000-02-29 12:00:00
+
+=== diff zaehlt sekunden
+IMPORT "zeit"
+DIM a AS INTEGER : a = ZEIT_PARSE("2026-08-28 20:30:00")
+DIM b AS INTEGER : b = ZEIT_PARSE("2026-08-28 18:15:00")
+PRINT ZEIT_DIFF(a, b)
+PRINT ZEIT_DIFF(b, a)
+--- erwartet
+8100
+-8100
+
+=== dauer liest sich wie gesprochen[0-0 s]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(0)
+--- erwartet
+0 s
+
+=== dauer liest sich wie gesprochen[45-45 s]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(45)
+--- erwartet
+45 s
+
+=== dauer liest sich wie gesprochen[720-12 min]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(720)
+--- erwartet
+12 min
+
+=== dauer liest sich wie gesprochen[8100-2:15 h]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(8100)
+--- erwartet
+2:15 h
+
+=== dauer liest sich wie gesprochen[259200-3 Tage]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(259200)
+--- erwartet
+3 Tage
+
+=== dauer liest sich wie gesprochen[86400-1 Tag]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(86400)
+--- erwartet
+1 Tag
+
+=== dauer liest sich wie gesprochen[-3600-vor 1:00 h]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(-3600)
+--- erwartet
+vor 1:00 h
+
+=== dauer liest sich wie gesprochen[-45-vor 45 s]
+IMPORT "zeit"
+PRINT ZEIT_DAUER$(-45)
+--- erwartet
+vor 45 s
+
+=== teile lesen
+IMPORT "zeit"
+DIM a AS INTEGER : a = ZEIT_PARSE("2026-08-28 20:30:15")
+PRINT ZEIT_TEIL(a, "jahr")
+PRINT ZEIT_TEIL(a, "monat")
+PRINT ZEIT_TEIL(a, "tag")
+PRINT ZEIT_TEIL(a, "stunde")
+PRINT ZEIT_TEIL(a, "minute")
+PRINT ZEIT_TEIL(a, "sekunde")
+--- erwartet
+2026
+8
+28
+20
+30
+15
+
+=== unbekanntes feld nennt die moeglichen
+IMPORT "zeit"
+PRINT ZEIT_TEIL(ZEIT_PARSE("2026-08-28"), "quartal")
+--- fehler
+ZEIT_TEIL: 'quartal' ist kein Feld -- moeglich sind jahr, monat, tag, stunde, minute, sekunde, wochentag
+
+=== wochentag montag ist eins
+IMPORT "zeit"
+DIM i AS INTEGER
+FOR i = 0 TO 6
+    PRINT ZEIT_WOCHENTAG(ZEIT_PLUS(ZEIT_PARSE("2026-08-24"), i * 86400));
+NEXT
+PRINT ""
+--- erwartet
+1234567
+
+=== format setzt die muster ein[TT.MM.JJJJ-28.08.2026]
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "TT.MM.JJJJ")
+--- erwartet
+28.08.2026
+
+=== format setzt die muster ein[hh:mm-20:30]
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "hh:mm")
+--- erwartet
+20:30
+
+=== format setzt die muster ein[WT TT.MM. hh:mm-Fr 28.08. 20:30]
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "WT TT.MM. hh:mm")
+--- erwartet
+Fr 28.08. 20:30
+
+=== format setzt die muster ein[WTAG, TT.MM.JJJJ-Freitag, 28.08.2026]
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "WTAG, TT.MM.JJJJ")
+--- erwartet
+Freitag, 28.08.2026
+
+=== format setzt die muster ein[JJJJ-MM-TT hh:mm:ss-2026-08-28 20:30:00]
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "JJJJ-MM-TT hh:mm:ss")
+--- erwartet
+2026-08-28 20:30:00
+
+=== format ohne muster ist die normalform
+IMPORT "zeit"
+PRINT ZEIT_FORMAT$(ZEIT_PARSE("2026-08-28 20:30:00"), "")
+--- erwartet
+2026-08-28 20:30:00
+
+=== aus teilen bauen
+IMPORT "zeit"
+PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 8, 28, 20, 30, 0))
+PRINT ZEIT_TEXT$(ZEIT_AUS_TEILEN(2026, 8, 28))
+--- erwartet
+2026-08-28 20:30:00
+2026-08-28 00:00:00
+
+=== jetzt ist umkehrbar
+IMPORT "zeit"
+DIM j AS INTEGER : j = ZEIT_JETZT()
+PRINT ZEIT_PARSE(ZEIT_TEXT$(j)) = j
+--- erwartet
+TRUE
+
+=== anstosszeiten sortieren gleich als text und als zahl
+' Die Datenbank sortiert Anstosszeiten als Text. Das darf nicht
+IMPORT "zeit"
+DIM a AS STRING : a = "2026-08-28 20:30:00"
+DIM b AS STRING : b = "2026-08-29 15:30:00"
+PRINT (a < b) = (ZEIT_PARSE(a) < ZEIT_PARSE(b))
+--- erwartet
+TRUE
+
+=== jetzt passt zu date und time
+' ZEIT_JETZT() und DATE$()/TIME$() muessen dieselbe Uhr meinen; zwischen den Zeilen kann eine Sekunde vergehen, verglichen wird bis zur Minute.
+IMPORT "zeit"
+DIM a AS STRING : a = DATE$() + " " + TIME$()
+DIM b AS STRING : b = ZEIT_TEXT$(ZEIT_JETZT())
+PRINT LEFT$(a, 16) = LEFT$(b, 16)
+--- erwartet
+TRUE

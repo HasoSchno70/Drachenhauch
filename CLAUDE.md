@@ -2682,8 +2682,10 @@ Verzeichnis, die Faelle einer Datei laufen parallel (bis 8 Faeden);
 wie in conftest.py. Doku `docs/werkzeuge.md`. **Die Sammlungen liegen unter
 `tests/pruef/`**, `tests/test_dhrt_test.py` ist der CI-Anker (ruft `dhrt
 test tests/pruef`) und prueft das Format am echten Laeufer. **Umgezogen und
-aus `tests/` geloescht: 60 pytest-Dateien mit 1230 Faellen** (Stand
-2026-09-07, `dhrt test tests/pruef` laeuft sie in ~5 s). Der Weg dorthin war
+aus `tests/` geloescht: 73 pytest-Dateien, 74 Sammlungen mit 1540 Faellen**
+(Stand 2026-09-07, `dhrt test tests/pruef` laeuft sie in ~6 s; die 74. ist
+`rekursionstiefe.dhtest`, dessen pytest-Datei mit drei Tests bleibt, die
+`vm.rs`/`build.rs` LESEN statt etwas laufen zu lassen). Der Weg dorthin war
 nicht Quelltext-Umbau, sondern **Aufzeichnung**: ein Wegwerf-Plugin (nicht
 im Repo) hing sich in pytest an `run_gb`/`run_all`, schrieb je Aufruf
 Quelltext, Ausgabe bzw. Fehlermeldung und die Dateien in `tmp_path` mit, und
@@ -2691,11 +2693,25 @@ ZWEI Laeufe mussten dasselbe liefern -- so fielen `TIME$`, Dateizeiten und
 alles Zufaellige von selbst heraus. Ein Modul zog nur um, wenn JEDER seiner
 Tests bestanden hatte und aufgezeichnet war; Faelle, deren Test mit
 `pytest.approx` oder Vergleichen arbeitete oder lange Kommazahlen ausgibt,
-bekamen `--- erwartet ungefaehr`. Bewusst NICHT umgezogen:
+bekamen `--- erwartet ungefaehr`. **Der dritte Schritt holte die 14 Module
+nach, die beim zweiten liegen blieben** -- drei Ursachen, drei Mittel:
+(1) "kein Aufruf" bei `[tw]/[vm]`-Laeufen war ein Loch des PLUGINS, nicht
+der Tests: die `run_either`-Fixture hielt die urspruengliche `run_gb` fest,
+bevor das Plugin sie umwickelte -- `run_either` mit umwickeln, und
+gleiche Aufrufe aus `[tw]` und `[vm]` (oder `run_gb` + `run_vm`) werden EIN
+Fall. (2) Binaere Beilagen: **`--- datei name base64`** (Block darf
+umbrochen sein; `Fall::dateien` traegt seither `Vec<u8>`) -- fuer die
+cp1252-Dateien von ini/xml/kodierung und die ZIP-Slip-Archive, die Pythons
+`zipfile` mit `../`-Namen baut und dhrt selbst nie schriebe. (3) Zufall
+(`UUID4$`, `RANDOM_BYTES`), Uhr (`TIME$`, `ZEIT_JETZT`) und absolute
+Pfade im Quelltext (zip, csv, tiled) wurden zu SELBSTPRUEFENDEN Faellen: das
+Programm prueft die Eigenschaft (Form per `REGEX_TEST`, Eindeutigkeit ueber
+eine MAP, Pfadende per `RIGHT$`) und gibt TRUE aus; die 256-KB-Datei der
+Hash-Tests entsteht im Programm (`BUFFER_NEW` + `WRITEALL_BYTES`), der
+Erwartungswert stammt weiter von `hashlib`. Bewusst NICHT umgezogen:
 `test_dateisystem.py` (Dateizeiten, Gross/Klein je System), alles mit
-Fenster, Ton oder Eingabe (bleibt pytest, bis `--- bild` da ist), und 14
-Module mit binaeren Beilagen, Zeit oder parametrisierten Laeufen ohne
-Aufruf. Regel fuer den weiteren Umzug: **eine pytest-Datei wird geloescht,
+Fenster, Ton oder Eingabe (bleibt pytest, bis `--- bild` da ist), und Tests,
+die Quelltext oder Bauskripte lesen. Regel fuer den weiteren Umzug: **eine pytest-Datei wird geloescht,
 sobald ihre Faelle in einer Sammlung liegen** -- nie beides pflegen; ein
 Verweis in der Doku wandert mit (`dhrt pruef pfade` findet ihn). Ein
 Golden aus einer Aufzeichnung ist STRENGER als der Test davor (er prueft die
@@ -2704,7 +2720,10 @@ aendert die Erwartung bewusst. **Betriebssystem-Fehlertexte sind lokalisiert**
 ("Das System kann die angegebene Datei nicht finden" hier, "No such file or
 directory" auf den Laeufern, und der os-error-Code weicht auch ab) -- in
 `--- fehler` steht darum nur der eigene Teil der Meldung (Befehl, Pfad); die
-ersten CI-Laeufe fanden genau zwei solche Faelle unter 1230.
+ersten CI-Laeufe fanden genau zwei solche Faelle unter 1230. Und ein
+Fehlerfall traegt den zufaelligen Namen der pytest-Testdatei
+(`_gbtest_xxx.dh: Compile-Fehler: ...`) -- der Vergleich zweier Laeufe muss
+ihn vorher abschneiden, sonst gilt jeder Compile-Fehler als instabil.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 

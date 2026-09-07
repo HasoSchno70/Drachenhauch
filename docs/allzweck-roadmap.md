@@ -249,7 +249,7 @@ in der Lockfile (über `ureq`/`rustls`). Alles **ungated** — ein
 Konsolenprogramm, das eine Prüfsumme bildet, soll nicht das `http`-Feature
 brauchen.
 
-Tests: `tests/test_krypto.py` (33), gegen die Vektoren aus den Normen
+Tests: `tests/pruef/krypto.dhtest` (33), gegen die Vektoren aus den Normen
 (FIPS 180-4, RFC 1321, RFC 4231) bzw. gegen Pythons `hashlib`/`hmac` — eine
 Prüfsumme, die nur mit sich selbst übereinstimmt, wäre wertlos. Beispiel:
 `examples/164_signatur.dh` (Webhook prüfen, Token würfeln, Datei-Prüfsumme).

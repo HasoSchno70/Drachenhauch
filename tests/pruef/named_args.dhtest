@@ -1,0 +1,156 @@
+' Aus test_named_args.py uebertragen (15 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== all named
+SUB f(a AS INTEGER, b AS INTEGER)
+    PRINT a, b
+END SUB
+f(a: 1, b: 2)
+--- erwartet
+1 2
+
+=== named can reorder
+SUB f(a AS INTEGER, b AS INTEGER)
+    PRINT a, b
+END SUB
+f(b: 99, a: 7)
+--- erwartet
+7 99
+
+=== positional then named
+SUB f(a AS INTEGER, b AS INTEGER, c AS INTEGER)
+    PRINT a, b, c
+END SUB
+f(1, b: 2, c: 3)
+--- erwartet
+1 2 3
+
+=== named skips to later default
+' Named-Arg auf einen Param mit Default - Slots dazwischen kriegen Default.
+SUB f(a AS INTEGER, b AS INTEGER = 10, c AS INTEGER = 20)
+    PRINT a, b, c
+END SUB
+f(1, c: 3)
+--- erwartet
+1 10 3
+
+=== named only with defaults
+SUB f(a AS INTEGER = 1, b AS INTEGER = 2, c AS INTEGER = 3)
+    PRINT a, b, c
+END SUB
+f(c: 99)
+--- erwartet
+1 2 99
+
+=== default with string
+SUB g(name AS STRING, greet AS STRING = "Hallo", suffix AS STRING = "!")
+    PRINT greet + ", " + name + suffix
+END SUB
+g(name: "Anna")
+g("Bob", suffix: "?")
+--- erwartet
+Hallo, Anna!
+Hallo, Bob?
+
+=== named args in function
+FUNCTION add(a AS INTEGER, b AS INTEGER = 10) AS INTEGER
+    RETURN a + b
+END FUNCTION
+PRINT add(a: 5, b: 7)
+PRINT add(b: 100, a: 1)
+PRINT add(2)
+--- erwartet
+12
+101
+12
+
+=== named in new class
+CLASS P
+    DIM n AS STRING
+    DIM a AS INTEGER
+    SUB Init(n AS STRING, a AS INTEGER = 0)
+        MyName = n
+        MyAge = a
+    END SUB
+    SUB Show()
+        PRINT MyName, MyAge
+    END SUB
+END CLASS
+CLASS Person
+    DIM mname AS STRING
+    DIM mage AS INTEGER
+    SUB Init(name AS STRING, age AS INTEGER = 0)
+        mname = name
+        mage = age
+    END SUB
+    SUB Show()
+        PRINT mname, mage
+    END SUB
+END CLASS
+DIM p AS Person
+p = NEW Person(name: "Anna", age: 30)
+p.Show()
+p = NEW Person("Bob")
+p.Show()
+p = NEW Person(age: 50, name: "Cara")
+p.Show()
+--- erwartet
+Anna 30
+Bob 0
+Cara 50
+
+=== unknown name raises
+SUB f(a AS INTEGER)
+END SUB
+f(schwurbel: 1)
+--- fehler
+f: kein Parameter 'schwurbel'
+
+=== duplicate named raises
+SUB f(a AS INTEGER)
+END SUB
+f(a: 1, a: 2)
+--- fehler
+f: Parameter 'a' doppelt belegt
+
+=== positional and named overlap raises
+' Slot via positional UND named ist auch 'doppelt belegt'.
+SUB f(a AS INTEGER, b AS INTEGER)
+END SUB
+f(1, a: 2)
+--- fehler
+f: Parameter 'a' doppelt belegt
+
+=== positional after named raises
+SUB f(a AS INTEGER, b AS INTEGER)
+END SUB
+f(a: 1, 2)
+--- fehler
+f: positional Argument nach Named-Arg
+
+=== missing required param raises
+SUB f(a AS INTEGER, b AS INTEGER)
+END SUB
+f(b: 2)
+--- fehler
+f: Parameter 'a' fehlt
+
+=== named arg on builtin raises
+' Built-ins haben keine deklarierten Param-Namen -> Fehler.
+PRINT ABS(x: -5)
+--- fehler
+abs: Named-Args nur bei SUB/FUNCTION
+
+=== tw and vm match
+SUB g(name AS STRING, age AS INTEGER, greet AS STRING = "Hi", excl AS STRING = ".")
+    PRINT greet + ", " + name + " (" + STR$(age) + ")" + excl
+END SUB
+g("Anna", 30)
+g(name: "Bob", age: 25)
+g("Cara", 40, excl: "!")
+g(name: "Dora", age: 50, greet: "Hey")
+--- erwartet
+Hi, Anna (30).
+Hi, Bob (25).
+Hi, Cara (40)!
+Hey, Dora (50).
+

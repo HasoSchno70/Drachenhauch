@@ -115,6 +115,7 @@ Division durch Null
 | `--- enthaelt` | jede Zeile des Blocks muss in der Ausgabe vorkommen |
 | `--- fehler` | das Programm muss abbrechen (Rückgabewert ungleich 0), und jede Zeile des Blocks steht in der Meldung |
 | `--- datei name` | eine Beilage, die vor dem Lauf neben dem Programm liegt (JSON, Karte, Text) |
+| `--- datei name base64` | dieselbe Beilage als Bytes — für alles, was kein UTF-8 ist (eine cp1252-Datei, ein ZIP-Archiv, ein Bild); der Block ist Base64 und darf umbrochen sein |
 | `--- verzeichnis name` | ein leeres Verzeichnis neben dem Programm, für `DIRLIST`, `RMDIR` und alles, was Ordner sehen will |
 | `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
 

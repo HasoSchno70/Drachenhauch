@@ -1,0 +1,225 @@
+' Aus test_krypto.py uebertragen (33 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== sha256 gegen hashlib[abc]
+PRINT SHA256$("abc")
+--- erwartet
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+=== sha256 gegen hashlib[]
+PRINT SHA256$("")
+--- erwartet
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+=== sha256 gegen hashlib[The quick brown fox jumps over the lazy dog]
+PRINT SHA256$("The quick brown fox jumps over the lazy dog")
+--- erwartet
+d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592
+
+=== sha1 gegen hashlib[abc]
+PRINT SHA1$("abc")
+--- erwartet
+a9993e364706816aba3e25717850c26c9cd0d89d
+
+=== sha1 gegen hashlib[]
+PRINT SHA1$("")
+--- erwartet
+da39a3ee5e6b4b0d3255bfef95601890afd80709
+
+=== md5 gegen hashlib[abc]
+PRINT MD5$("abc")
+--- erwartet
+900150983cd24fb0d6963f7d28e17f72
+
+=== md5 gegen hashlib[]
+PRINT MD5$("")
+--- erwartet
+d41d8cd98f00b204e9800998ecf8427e
+
+=== sha256 bekannter vektor
+PRINT SHA256$("abc")
+--- erwartet
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+=== hmac sha256 gegen python
+PRINT HMAC_SHA256$("key", "The quick brown fox jumps over the lazy dog")
+--- erwartet
+f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8
+
+=== hmac mit leerem schluessel
+PRINT HMAC_SHA256$("", "daten")
+--- erwartet
+b849883a945873e945ff1fe9e91e3abb9fd9a493f85839162f93336d750cbfa2
+
+=== hmac mit langem schluessel
+PRINT HMAC_SHA256$("kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk", "daten")
+--- erwartet
+d6f14e461295fb59720d634e8712f52614091e72ba8afc1a653251d67c7c5f56
+
+=== hash ueber buffer gleicht dem ueber string
+PRINT SHA256$("abc")
+PRINT SHA256$(BUFFER_FROM_STRING("abc"))
+--- erwartet
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+=== hash ueber bytes die kein text sind
+' Der Grund, warum BUFFER zugelassen ist: eine Signatur bildet man ueber
+PRINT SHA256$(BUFFER_FROM_HEX("00fffe"))
+--- erwartet
+d590f90f7944340fb253f0c59cb89fd41d4ec255ff246f524f8f7c94f0a233e5
+
+=== hmac nimmt buffer als daten
+PRINT HMAC_SHA256$("k", BUFFER_FROM_HEX("00ff"))
+--- erwartet
+ee96a94d853b37fb3fd1f94e644450fbe67a12fed480c344901dd83e8ebed2dd
+
+=== falscher typ wirft
+PRINT SHA256$(42)
+--- fehler
+SHA256$: erwartet STRING oder BUFFER, erhalten INTEGER
+
+=== umlaute werden als utf8 gehasht
+PRINT SHA256$("Grüße")
+--- erwartet
+f83e039796c6453a10f5519e39fd113901572316a1a8ea07cb525d2801dfd074
+
+=== weitere datei hashes[MD5 FILE$-openssl md5]
+PRINT MD5_FILE$("x.bin")
+--- datei x.bin
+inhalt
+--- erwartet
+b53abb22d914d3c15953fae66d375b60
+
+=== weitere datei hashes[SHA1 FILE$-openssl sha1]
+PRINT SHA1_FILE$("x.bin")
+--- datei x.bin
+inhalt
+--- erwartet
+746f52c3d888a6817cac16ecfc7bddc85016976d
+
+=== datei hash auf fehlende datei wirft
+PRINT SHA256_FILE$("gibt_es_nicht_xyz.bin")
+--- fehler
+SHA256_FILE$: Das System kann die angegebene Datei nicht finden. (os error 2) (gibt_es_nicht_xyz.bin)
+
+=== secure equals vergleicht richtig
+PRINT SECURE_EQUALS(SHA256$("a"), SHA256$("a"))
+PRINT SECURE_EQUALS(SHA256$("a"), SHA256$("b"))
+PRINT SECURE_EQUALS("kurz", "laenger")
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== secure equals auf buffern
+PRINT SECURE_EQUALS(BUFFER_FROM_HEX("00ff"), BUFFER_FROM_HEX("00ff"))
+PRINT SECURE_EQUALS(BUFFER_FROM_HEX("00ff"), BUFFER_FROM_HEX("00fe"))
+--- erwartet
+TRUE
+FALSE
+
+=== secure equals leer
+PRINT SECURE_EQUALS("", "")
+--- erwartet
+TRUE
+
+=== random bytes hat die gewuenschte laenge
+PRINT BUFFER_LEN(RANDOM_BYTES(32))
+--- erwartet
+32
+
+=== random bytes null ist erlaubt
+PRINT BUFFER_LEN(RANDOM_BYTES(0))
+--- erwartet
+0
+
+=== random bytes negativ wirft
+PRINT BUFFER_LEN(RANDOM_BYTES(-1))
+--- fehler
+RANDOM_BYTES: Anzahl -1 ist negativ
+
+=== random bytes absurd gross wirft
+PRINT BUFFER_LEN(RANDOM_BYTES(999999999999))
+--- fehler
+RANDOM_BYTES: Anzahl 999999999999 ueberschreitet die Obergrenze von 1073741824 Bytes
+
+=== signatur pruefen wie bei einem webhook
+' Der Fall, fuer den WP D da ist: ein Dienst schickt Daten plus eine
+DIM erwartet AS STRING
+erwartet = HMAC_SHA256$("streng-geheim", "{""ereignis"":""zahlung""}")
+PRINT SECURE_EQUALS(erwartet, "92ee776cdfb2460b451ffc22592dfa3d80dd0a2f6c4456d7935ebc0f40d306db")
+PRINT SECURE_EQUALS(erwartet, "0000000000000000000000000000000000000000000000000000000000000000")
+--- erwartet
+TRUE
+FALSE
+
+=== datei hash gleicht dem ueber den inhalt
+' Die Datei entsteht im Programm (Bytes 0..255, zehnmal) -- der Hash stammt von Pythons hashlib.
+DIM b AS BUFFER : b = BUFFER_NEW(2560)
+DIM i AS INTEGER
+FOR i = 0 TO 2559
+    BUFFER_SET(b, i, i MOD 256)
+NEXT
+WRITEALL_BYTES("d.bin", b)
+PRINT SHA256_FILE$("d.bin")
+PRINT SHA256$(READALL_BYTES("d.bin"))
+--- erwartet
+e392378f849d67bbb1a7bbec84f1098ae3faa751049c009a850130ce6073d91a
+e392378f849d67bbb1a7bbec84f1098ae3faa751049c009a850130ce6073d91a
+
+=== datei hash ueber mehrere bloecke
+' Groesser als der 64-KiB-Lesepuffer -- blockweise gehasht, nicht nur der erste Block.
+DIM b AS BUFFER : b = BUFFER_NEW(256000)
+DIM i AS INTEGER
+FOR i = 0 TO 255999
+    BUFFER_SET(b, i, i MOD 256)
+NEXT
+WRITEALL_BYTES("gross.bin", b)
+PRINT SHA256_FILE$("gross.bin")
+--- erwartet
+b57b64b198d5d59ce5a22a9b9f25e72a7d081476d432051aa923f3dbebb90934
+
+=== uuid4 hat die richtige form
+' 8-4-4-4-12, Version 4, Variante 8/9/a/b
+IMPORT "regex"
+PRINT REGEX_TEST(UUID4$(), "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+--- erwartet
+TRUE
+
+=== uuid4 wiederholt sich nicht
+DIM gesehen AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 50
+    MAPPUT(gesehen, UUID4$(), 1)
+NEXT
+PRINT MAPSIZE(gesehen)
+--- erwartet
+50
+
+=== random bytes wiederholt sich nicht
+DIM gesehen AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    MAPPUT(gesehen, BUFFER_TO_HEX$(RANDOM_BYTES(16)), 1)
+NEXT
+PRINT MAPSIZE(gesehen)
+--- erwartet
+20
+
+=== random bytes folgt nicht dem saatbaren generator
+' RANDOMIZE legt die Folge von RND fest -- RANDOM_BYTES kommt aus der Quelle des Betriebssystems und darf sich davon NICHT beeindrucken lassen.
+DIM r1 AS STRING
+DIM r2 AS STRING
+DIM z1 AS STRING
+DIM z2 AS STRING
+RANDOMIZE(1)
+r1 = STR$(RND(1000))
+z1 = BUFFER_TO_HEX$(RANDOM_BYTES(16))
+RANDOMIZE(1)
+r2 = STR$(RND(1000))
+z2 = BUFFER_TO_HEX$(RANDOM_BYTES(16))
+PRINT r1 = r2
+PRINT z1 <> z2
+--- erwartet
+TRUE
+TRUE

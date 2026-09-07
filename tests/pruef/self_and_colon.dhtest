@@ -1,0 +1,127 @@
+' Aus test_self_and_colon.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== colon separates two assignments
+DIM x AS INTEGER : DIM y AS INTEGER
+x = 1 : y = 2
+PRINT x
+PRINT y
+--- erwartet
+1
+2
+
+=== colon chain three statements
+DIM a AS INTEGER : DIM b AS INTEGER : DIM c AS INTEGER
+a = 1 : b = 2 : c = 3
+PRINT a + b + c
+--- erwartet
+6
+
+=== colon in sub body
+SUB Greet(name AS STRING) : PRINT "Hi " + name : END SUB
+Greet("Anna")
+--- erwartet
+Hi Anna
+
+=== empty colon is no op
+' Mehrere Doppelpunkte hintereinander sind harmlos.
+DIM x AS INTEGER
+ : : :
+x = 5
+PRINT x
+--- erwartet
+5
+
+=== self in method returns instance
+CLASS Foo
+    DIM x AS INTEGER
+    SUB Init() : x = 42 : END SUB
+    FUNCTION Get() AS INTEGER : RETURN Self.x : END FUNCTION
+END CLASS
+DIM f AS Foo : f = NEW Foo()
+PRINT f.Get()
+--- erwartet
+42
+
+=== self outside method treated as normal var
+' Ausserhalb eines Methodenkontexts ist `Self` ein normaler
+PRINT Self
+--- fehler
+Variable 'self' nicht deklariert (DIM fehlt?)
+
+=== implicit method call in init
+' Method aus Init aufrufen ohne Self.-Praefix.
+CLASS Counter
+    DIM v AS INTEGER
+    SUB Init() : v = 0 : Reset() : END SUB
+    SUB Reset() : v = 7 : END SUB
+END CLASS
+DIM c AS Counter : c = NEW Counter()
+PRINT c.v
+--- erwartet
+7
+
+=== implicit method call in other method
+CLASS Foo
+    DIM x AS INTEGER
+    SUB Init() : x = 0 : END SUB
+    SUB Inc() : x = x + 1 : END SUB
+    FUNCTION DoubleInc() AS INTEGER
+        Inc() : Inc()
+        RETURN x
+    END FUNCTION
+END CLASS
+DIM f AS Foo : f = NEW Foo()
+PRINT f.DoubleInc()
+--- erwartet
+2
+
+=== implicit call resolves inherited methods
+' Aufruf einer geerbten Methode aus einer Subklassen-Methode.
+CLASS Base
+    DIM val AS INTEGER
+    SUB Init() : val = 0 : END SUB
+    SUB SetTo(n AS INTEGER) : val = n : END SUB
+END CLASS
+CLASS Child EXTENDS Base
+    SUB DoubleSet(n AS INTEGER)
+        SetTo(n * 2)
+    END SUB
+END CLASS
+DIM c AS Child : c = NEW Child()
+c.DoubleSet(5)
+PRINT c.val
+--- erwartet
+10
+
+=== implicit method overrides global function
+' Wenn es eine globale Funktion mit gleichem Namen UND eine Methode
+SUB Hello() : PRINT "global" : END SUB
+CLASS Box
+    SUB Test() : Hello() : END SUB
+    SUB Hello() : PRINT "method" : END SUB
+END CLASS
+DIM b AS Box : b = NEW Box()
+b.Test()
+Hello()
+--- erwartet
+method
+global
+
+=== tw and vm match with self
+' Beide Pfade liefern gleiche Ausgabe bei Self-Nutzung.
+CLASS Box
+    DIM v AS INTEGER
+    SUB Init() : v = 5 : END SUB
+    SUB Inc() : v = v + 1 : END SUB
+    FUNCTION Triple() AS INTEGER
+        Inc() : Inc()
+        RETURN Self.v * 3
+    END FUNCTION
+END CLASS
+DIM b AS Box : b = NEW Box()
+PRINT b.Triple()
+PRINT b.v
+--- erwartet
+21
+7
+

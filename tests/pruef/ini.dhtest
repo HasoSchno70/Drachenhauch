@@ -1,0 +1,147 @@
+' Aus test_ini.py uebertragen (14 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== abschnitte werden zu punkt schluesseln
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("[fenster]" + CHR$(10) + "breite=1280")
+PRINT MAPGET(c, "fenster.breite")
+--- erwartet
+1280
+
+=== fehlender wert nimmt die vorgabe
+' Der haeufigste Fall bei einer Einstellungsdatei: der Schluessel ist
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("[a]" + CHR$(10) + "x=1")
+PRINT MAPGETOR(c, "a.gibtsnicht", "Vorgabe")
+--- erwartet
+Vorgabe
+
+=== kommentare und leerzeilen
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("; hallo" + CHR$(10) + "" + CHR$(10) + "# auch" + CHR$(10) + "[a]" + CHR$(10) + "x=1")
+PRINT MAPSIZE(c)
+--- erwartet
+1
+
+=== ohne abschnitt bleibt der name nackt
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("name=Anna" + CHR$(10) + "[a]" + CHR$(10) + "x=1")
+PRINT MAPGET(c, "name")
+--- erwartet
+Anna
+
+=== semikolon im wert bleibt
+' Nur am ZEILENANFANG ist es ein Kommentar -- sonst waere ein Pfad wie
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("pfad=C:/a;C:/b")
+PRINT MAPGET(c, "pfad")
+--- erwartet
+C:/a;C:/b
+
+=== gleichheitszeichen im wert
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("formel=a=b+c")
+PRINT MAPGET(c, "formel")
+--- erwartet
+a=b+c
+
+=== kaputte zeilen halten nicht auf
+' Eine Einstellungsdatei bearbeitet ein Mensch, oft kein Programmierer.
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("[a]" + CHR$(10) + "ohne Gleichheitszeichen" + CHR$(10) + "x=1")
+PRINT MAPSIZE(c)
+PRINT MAPGET(c, "a.x")
+--- erwartet
+1
+1
+
+=== reihenfolge bleibt
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("[a]" + CHR$(10) + "z=1" + CHR$(10) + "b=2" + CHR$(10) + "m=3")
+DIM k AS ARRAY OF STRING
+k = MAPKEYS(c)
+PRINT JOIN$(k, ",")
+--- erwartet
+a.z,a.b,a.m
+
+=== text gruppiert nach abschnitt
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_PARSE("")
+MAPPUT(c, "fenster.breite", "1280")
+MAPPUT(c, "ton.laut", "0.8")
+MAPPUT(c, "fenster.hoehe", "720")
+PRINT INI_TEXT$(c)
+--- erwartet
+[fenster]
+breite=1280
+hoehe=720
+
+[ton]
+laut=0.8
+
+=== hin und zurueck ueber eine datei
+IMPORT "ini"
+DIM c AS MAP OF STRING
+DIM zwei AS MAP OF STRING
+c = INI_PARSE("[fenster]" + CHR$(10) + "titel=Mein Spiel" + CHR$(10) + "[ton]" + CHR$(10) + "laut=0.8")
+INI_SAVE("e.ini", c)
+zwei = INI_LOAD("e.ini")
+PRINT MAPSIZE(zwei)
+PRINT MAPGET(zwei, "fenster.titel")
+PRINT MAPGET(zwei, "ton.laut")
+--- erwartet
+2
+Mein Spiel
+0.8
+
+=== heikle werte ueberleben
+' Leerraum am Rand und ein fuehrendes `#` gingen ohne
+IMPORT "ini"
+DIM c AS MAP OF STRING
+DIM zwei AS MAP OF STRING
+c = INI_PARSE("")
+MAPPUT(c, "a.rand", "  x  ")
+MAPPUT(c, "a.raute", "#eins")
+INI_SAVE("e.ini", c)
+zwei = INI_LOAD("e.ini")
+PRINT "[" + MAPGET(zwei, "a.rand") + "]"
+PRINT MAPGET(zwei, "a.raute")
+--- erwartet
+[  x  ]
+#eins
+
+=== kodierung geht auch hier
+' Eine alte Einstellungsdatei ist oft cp1252 -- Punkt 3 gilt weiter.
+IMPORT "ini"
+DIM c AS MAP OF STRING
+c = INI_LOAD("alt.ini", "cp1252")
+PRINT MAPGET(c, "a.ort")
+--- datei alt.ini base64
+W2FdCm9ydD1L9mxuCg==
+--- erwartet
+Köln
+
+=== zahlen map laesst sich speichern
+' Eine INI-Datei kennt nur Text -- wer seine Zahlen in einer
+IMPORT "ini"
+DIM z AS MAP OF INTEGER
+MAPPUT(z, "a.x", 42)
+PRINT INI_TEXT$(z)
+--- erwartet
+[a]
+x=42
+
+=== falscher typ erklaert sich
+IMPORT "ini"
+PRINT INI_TEXT$("kein Map")
+--- fehler
+INI_TEXT$ erwartet eine MAP (INI ist eine MAP OF STRING mit Punkt-Schluesseln)
+

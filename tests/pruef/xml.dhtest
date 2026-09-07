@@ -1,0 +1,188 @@
+' Aus test_xml.py uebertragen (19 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== wurzel name und attribut
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT XML_NAME$(d)
+PRINT XML_ATTR$(d, "nr")
+--- erwartet
+rechnung
+4711
+
+=== pfad mit schraegstrich
+' Dieselbe Idee wie bei JSON, nur mit `/` -- so steht es in jedem
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT XML_TEXT$(d, "kunde")
+--- erwartet
+Anna
+
+=== mehrfache kinder zaehlen und holen
+IMPORT "xml"
+DIM d AS XML_HANDLE
+DIM p AS XML_HANDLE
+DIM i AS INTEGER
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT XML_COUNT(d, "posten/p")
+FOR i = 0 TO XML_COUNT(d, "posten/p") - 1
+    p = XML_AT(d, "posten/p", i)
+    PRINT XML_ATTR$(p, "menge") + "x " + XML_TEXT$(p)
+NEXT
+--- erwartet
+2
+2x Schraube
+5x Mutter
+
+=== fehlendes attribut nimmt die vorgabe
+' Eine fremde Datei laesst weg, was sie nicht braucht -- das ist der
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT "[" + XML_ATTR$(d, "gibtsnicht") + "]"
+PRINT XML_ATTR$(d, "gibtsnicht", "Vorgabe")
+--- erwartet
+[]
+Vorgabe
+
+=== has vor find
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT XML_HAS(d, "kunde")
+PRINT XML_HAS(d, "anschrift")
+--- erwartet
+TRUE
+FALSE
+
+=== find ohne treffer sagt wo man haette fragen koennen
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<rechnung nr=""4711""><kunde>Anna</kunde><posten><p menge=""2"">Schraube</p><p menge=""5"">Mutter</p></posten></rechnung>")
+PRINT XML_NAME$(XML_FIND(d, "anschrift"))
+--- fehler
+XML_FIND: 'anschrift' gibt es unter <rechnung> nicht -- mit XML_HAS vorher fragen
+
+=== entities und cdata
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<a>5 &lt; 6 &amp; 7</a>")
+PRINT XML_TEXT$(d)
+d = XML_PARSE("<a><![CDATA[roh & <ungeschuetzt>]]></a>")
+PRINT XML_TEXT$(d)
+--- erwartet
+5 < 6 & 7
+roh & <ungeschuetzt>
+
+=== gemischter inhalt behaelt die reihenfolge
+' Der Modellfehler, den es zu vermeiden galt: Text und Kind-Elemente
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<p>Hallo <b>schoene</b> Welt</p>")
+PRINT XML_TEXT$(d)
+--- erwartet
+Hallo schoene Welt
+
+=== deklaration kommentar doctype
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<?xml version=""1.0""?><!-- Hinweis --><!DOCTYPE a><a>x</a>")
+PRINT XML_NAME$(d)
+PRINT XML_TEXT$(d)
+--- erwartet
+a
+x
+
+=== namensraeume bleiben im namen
+' Echte Namensraum-Aufloesung beantwortet eine Frage, die beim Auslesen
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<ns:a xmlns:ns=""http://x""><ns:b>1</ns:b></ns:a>")
+PRINT XML_NAME$(d)
+PRINT XML_TEXT$(d, "ns:b")
+--- erwartet
+ns:a
+1
+
+=== unbekannten baum durchlaufen
+' Wer die Struktur nicht kennt, geht ueber XML_CHILD_COUNT/XML_CHILD.
+IMPORT "xml"
+DIM d AS XML_HANDLE
+DIM i AS INTEGER
+DIM k AS XML_HANDLE
+d = XML_PARSE("<a><b/><c>x</c></a>")
+FOR i = 0 TO XML_CHILD_COUNT(d) - 1
+    k = XML_CHILD(d, i)
+    PRINT XML_NAME$(k)
+NEXT
+--- erwartet
+b
+c
+
+=== attributnamen auflisten
+IMPORT "xml"
+DIM d AS XML_HANDLE
+DIM n AS ARRAY OF STRING
+d = XML_PARSE("<a x=""1"" y=""2""/>")
+n = XML_ATTR_NAMES(d)
+PRINT JOIN$(n, ",")
+--- erwartet
+x,y
+
+=== nicht geschlossenes element
+' Bewusst STRENG (anders als INI): eine XML-Datei kommt aus einem
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<a><b></a>")
+--- fehler
+XML_PARSE: Zeile 1: </a> schliesst <b> -- die Namen muessen zusammenpassen
+
+=== fehler nennt die zeile
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<a>" + CHR$(10) + "<b>" + CHR$(10))
+--- fehler
+XML_PARSE: Zeile 3: <b> wurde nie geschlossen
+
+=== kein xml
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("einfach nur Text")
+--- fehler
+XML_PARSE: Zeile 1: kein Element gefunden -- ist das wirklich XML?
+
+=== zwei wurzeln
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_PARSE("<a/><b/>")
+--- fehler
+XML_PARSE: Zeile 1: 2 Wurzelelemente -- XML erlaubt genau eines
+
+=== laden mit kodierung
+IMPORT "xml"
+DIM d AS XML_HANDLE
+d = XML_LOAD("alt.xml", "cp1252")
+PRINT XML_TEXT$(d, "ort")
+--- datei alt.xml base64
+PGE+PG9ydD5L9mxuPC9vcnQ+PC9hPg==
+--- erwartet
+Köln
+
+=== escape schuetzt handarbeit
+IMPORT "xml"
+PRINT XML_ESCAPE$("5 < 6 & ""sieben""")
+--- erwartet
+5 &lt; 6 &amp; &quot;sieben&quot;
+
+=== escape und wieder lesen
+' Die Zusage: was durch XML_ESCAPE$ gegangen ist, kommt beim Lesen
+IMPORT "xml"
+DIM d AS XML_HANDLE
+DIM roh AS STRING
+roh = "5 < 6 & Ende"
+d = XML_PARSE("<a>" + XML_ESCAPE$(roh) + "</a>")
+PRINT XML_TEXT$(d)
+--- erwartet
+5 < 6 & Ende
+

@@ -1,0 +1,277 @@
+' Aus test_modules_tiled.py uebertragen (23 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== load basic map
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_WIDTH(m)
+PRINT TILED_HEIGHT(m)
+PRINT TILED_TILE_WIDTH(m)
+PRINT TILED_TILE_HEIGHT(m)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+4
+3
+16
+16
+
+=== load missing file
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("missing.json")
+--- fehler
+TILED_LOAD: Datei nicht gefunden: missing.json
+
+=== load invalid json
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("bad.json")
+--- datei bad.json
+{not json}
+--- fehler
+TILED_LOAD: Lesefehler 'bad.json': key must be a string at line 1 column 2
+
+=== load wrong type
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("wrong.json")
+--- datei wrong.json
+{"type": "tileset"}
+--- fehler
+TILED_LOAD: erwartet eine Tiled-Map (type='map'), erhalten type='tileset'
+
+=== layer count
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_LAYER_COUNT(m)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+1
+
+=== layer name and type
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_LAYER_NAME(m, 0)
+PRINT TILED_LAYER_TYPE(m, 0)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+ground
+tile
+
+=== layer index lookup
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_LAYER_INDEX(m, "ground")
+PRINT TILED_LAYER_INDEX(m, "no_such")
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+0
+-1
+
+=== layer idx out of bounds
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_LAYER_NAME(m, 99)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- fehler
+TILED_LAYER_NAME: Layer-Index 99 ausserhalb [0..0]
+
+=== tile at returns gid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_AT(m, 0, 0, 0)
+PRINT TILED_TILE_AT(m, 0, 1, 1)
+PRINT TILED_TILE_AT(m, 0, 0, 2)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+0
+1
+1
+
+=== tile at out of bounds returns 0
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_AT(m, 0, -1, 0)
+PRINT TILED_TILE_AT(m, 0, 99, 0)
+PRINT TILED_TILE_AT(m, 0, 0, 99)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+0
+0
+0
+
+=== tile property solid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_PROP_BOOL(m, 1, "solid")
+PRINT TILED_TILE_PROP_BOOL(m, 2, "solid")
+PRINT TILED_TILE_PROP_BOOL(m, 1, "damage")
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}, {"id": 1, "properties": [{"name": "solid", "type": "bool", "value": false}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== tile has prop
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_HAS_PROP(m, 1, "solid")
+PRINT TILED_TILE_HAS_PROP(m, 1, "nonexistent")
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}, {"id": 1, "properties": [{"name": "solid", "type": "bool", "value": false}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+TRUE
+FALSE
+
+=== tile property int float string
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_PROP_INT(m, 1, "damage")
+PRINT TILED_TILE_PROP_FLOAT(m, 1, "speed")
+PRINT TILED_TILE_PROP_STRING(m, 1, "team")
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "damage", "type": "int", "value": 5}, {"name": "speed", "type": "float", "value": 1.5}, {"name": "team", "type": "string", "value": "red"}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+5
+1.5
+red
+
+=== object layer
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_OBJECT_COUNT(m, "spawns")
+PRINT TILED_OBJECT_NAME(m, "spawns", 0)
+PRINT TILED_OBJECT_TYPE(m, "spawns", 0)
+PRINT TILED_OBJECT_X(m, "spawns", 0)
+PRINT TILED_OBJECT_Y(m, "spawns", 0)
+PRINT TILED_OBJECT_WIDTH(m, "spawns", 0)
+PRINT TILED_OBJECT_HEIGHT(m, "spawns", 0)
+PRINT TILED_OBJECT_PROP_STRING(m, "spawns", 0, "team")
+PRINT TILED_OBJECT_PROP_INT(m, "spawns", 0, "hp")
+PRINT TILED_OBJECT_NAME(m, "spawns", 1)
+PRINT TILED_OBJECT_TYPE(m, "spawns", 1)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}, {"type": "objectgroup", "name": "spawns", "objects": [{"id": 1, "name": "player_start", "type": "spawn", "x": 100.0, "y": 200.0, "width": 16.0, "height": 16.0, "properties": [{"name": "team", "type": "string", "value": "blue"}, {"name": "hp", "type": "int", "value": 100}]}, {"id": 2, "name": "enemy", "type": "mob", "x": 300.0, "y": 220.0, "width": 32.0, "height": 32.0, "properties": []}]}]}
+--- erwartet
+2
+player_start
+spawn
+100.0
+200.0
+16.0
+16.0
+blue
+100
+enemy
+mob
+
+=== object layer not found
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_OBJECT_COUNT(m, "no_such")
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- fehler
+TILED_OBJECT_COUNT: Layer 'no_such' nicht gefunden
+
+=== object idx out of bounds
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_OBJECT_NAME(m, "obj", 99)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}, {"type": "objectgroup", "name": "obj", "objects": []}]}
+--- fehler
+TILED_OBJECT_NAME: Object-Index 99 ausserhalb [0..-1]
+
+=== tileset firstgid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILESET_FIRSTGID(m, 0)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+1
+
+=== non map argument errors
+IMPORT "tiled"
+PRINT TILED_WIDTH("not a map")
+--- fehler
+TILED_WIDTH erwartet TILED_MAP
+
+=== tile set changes gid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_AT(m, 0, 0, 2)
+PRINT TILED_TILE_SET(m, 0, 0, 2, 0)
+PRINT TILED_TILE_AT(m, 0, 0, 2)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+1
+1
+0
+
+=== tile set out of bounds silent
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_SET(m, 0, -1, 0, 5)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+0
+
+=== tile set on object layer errors
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_SET(m, 1, 0, 0, 1)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}, {"type": "objectgroup", "name": "obj", "objects": []}]}
+--- fehler
+TILED_TILE_SET: Layer 1 ('obj') ist kein Tile-Layer
+
+=== tile at on object layer errors
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILE_AT(m, 1, 0, 0)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}, {"type": "objectgroup", "name": "obj", "objects": []}]}
+--- fehler
+TILED_TILE_AT: Layer 1 ('obj') ist kein Tile-Layer
+
+=== tileset count and image
+' Der Bildpfad kommt absolut zurueck -- verglichen wird sein Ende.
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILED_TILESET_COUNT(m)
+PRINT RIGHT$(TILED_TILESET_IMAGE(m, 0), 9)
+--- datei level.json
+{"type": "map", "width": 4, "height": 3, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 4, "height": 3, "data": [0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1], "visible": true, "opacity": 1.0}]}
+--- erwartet
+1
+tiles.png

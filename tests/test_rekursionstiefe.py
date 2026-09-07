@@ -17,15 +17,17 @@ Ebenen, MAX_CALL_DEPTH liegt bei 1000.
 
 Ohne diese Tests war der Zustand jahrelang unbemerkt: eine Schutzgrenze war
 eingebaut, aber nie geprueft worden, ob sie ueberhaupt greift.
+
+Die drei Laeufe dazu (knapp unter der Grenze rechnet es, endlose Rekursion
+meldet, der Fehler ist fangbar) liegen als Pruefsammlung in
+`tests/pruef/rekursionstiefe.dhtest`; hier bleiben die drei Tests, die den
+QUELLTEXT lesen -- `MAX_CALL_DEPTH` in vm.rs gegen die kleinste Plattform,
+und das Stack-Flag in build.rs.
 """
 from __future__ import annotations
 
 import re
 from pathlib import Path
-
-import pytest
-
-from drachenhauch.errors import DHRuntimeError
 
 WURZEL = Path(__file__).resolve().parents[1]
 _VM_RS = WURZEL / "rust" / "drachenhauch_runtime" / "src" / "vm.rs"
@@ -42,46 +44,6 @@ def _max_call_depth() -> int:
     m = re.search(r"const MAX_CALL_DEPTH: u32 = (\d+);", _VM_RS.read_text(encoding="utf-8"))
     assert m, "MAX_CALL_DEPTH nicht in vm.rs gefunden"
     return int(m.group(1))
-
-
-def test_tiefe_rekursion_laeuft_durch(run_gb):
-    """Knapp unter der Grenze muss es normal rechnen -- die Grenze soll
-    Endlosschleifen fangen, nicht ernsthafte Rekursion verbieten."""
-    tiefe = _max_call_depth() - 100
-    src = ("FUNCTION f(n AS INTEGER) AS INTEGER\n"
-           "IF n <= 0 THEN RETURN 0\n"
-           "RETURN 1 + f(n - 1)\n"
-           "END FUNCTION\n"
-           f"PRINT f({tiefe})\n")
-    assert run_gb(src).strip() == str(tiefe)
-
-
-def test_endlose_rekursion_meldet_statt_abzustuerzen(run_gb):
-    """Der Anfaengerfehler schlechthin -- und genau der Fall, fuer den das
-    Lehrbuch ("bis das Programm mit einem Fehler abbricht") eine Meldung
-    verspricht. Vorher stuerzte der Prozess ohne Programmbezug ab."""
-    src = ("FUNCTION fakultaet(n AS INTEGER) AS INTEGER\n"
-           "    RETURN n * fakultaet(n - 1)\n"
-           "END FUNCTION\n"
-           "PRINT fakultaet(5)\n")
-    with pytest.raises(DHRuntimeError, match=r"Maximale Aufruftiefe .* unendliche Rekursion"):
-        run_gb(src)
-
-
-def test_der_fehler_ist_fangbar(run_gb):
-    """`exec` beschreibt die Grenze als "fangbaren Fehler" -- ein Absturz war
-    es nicht. Jetzt stimmt die Zusage: TRY/CATCH faengt, das Programm laeuft
-    weiter."""
-    src = ("FUNCTION f(n AS INTEGER) AS INTEGER\n"
-           "RETURN f(n + 1)\n"
-           "END FUNCTION\n"
-           "TRY\n"
-           "  PRINT f(1)\n"
-           "CATCH e\n"
-           '  PRINT "gefangen"\n'
-           "END TRY\n"
-           'PRINT "weiter"\n')
-    assert run_gb(src).split() == ["gefangen", "weiter"]
 
 
 def test_grenze_passt_zur_kleinsten_plattform():

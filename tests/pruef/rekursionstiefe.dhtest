@@ -1,0 +1,36 @@
+' Aus test_rekursionstiefe.py uebertragen (3 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== tiefe rekursion laeuft durch
+' Knapp unter der Grenze muss es normal rechnen -- die Grenze soll
+FUNCTION f(n AS INTEGER) AS INTEGER
+IF n <= 0 THEN RETURN 0
+RETURN 1 + f(n - 1)
+END FUNCTION
+PRINT f(900)
+--- erwartet
+900
+
+=== endlose rekursion meldet statt abzustuerzen
+' Der Anfaengerfehler schlechthin -- und genau der Fall, fuer den das
+FUNCTION fakultaet(n AS INTEGER) AS INTEGER
+    RETURN n * fakultaet(n - 1)
+END FUNCTION
+PRINT fakultaet(5)
+--- fehler
+Maximale Aufruftiefe (1000) ueberschritten -- unendliche Rekursion?
+
+=== der fehler ist fangbar
+' `exec` beschreibt die Grenze als "fangbaren Fehler" -- ein Absturz war
+FUNCTION f(n AS INTEGER) AS INTEGER
+RETURN f(n + 1)
+END FUNCTION
+TRY
+  PRINT f(1)
+CATCH e
+  PRINT "gefangen"
+END TRY
+PRINT "weiter"
+--- erwartet
+gefangen
+weiter
+
