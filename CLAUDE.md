@@ -2700,7 +2700,11 @@ sobald ihre Faelle in einer Sammlung liegen** -- nie beides pflegen; ein
 Verweis in der Doku wandert mit (`dhrt pruef pfade` findet ihn). Ein
 Golden aus einer Aufzeichnung ist STRENGER als der Test davor (er prueft die
 ganze Ausgabe, nicht eine Eigenschaft) -- wer einen solchen Fall aendert,
-aendert die Erwartung bewusst.
+aendert die Erwartung bewusst. **Betriebssystem-Fehlertexte sind lokalisiert**
+("Das System kann die angegebene Datei nicht finden" hier, "No such file or
+directory" auf den Laeufern, und der os-error-Code weicht auch ab) -- in
+`--- fehler` steht darum nur der eigene Teil der Meldung (Befehl, Pfad); die
+ersten CI-Laeufe fanden genau zwei solche Faelle unter 1230.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 

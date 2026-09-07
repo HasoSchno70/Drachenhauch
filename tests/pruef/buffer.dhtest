@@ -359,7 +359,8 @@ WRITE_BYTES: Datei wurde nicht im Schreib-Modus geoeffnet
 === readall bytes auf fehlende datei wirft
 PRINT BUFFER_LEN(READALL_BYTES("gibt_es_nicht_xyz.dat"))
 --- fehler
-READALL_BYTES: Das System kann die angegebene Datei nicht finden. (os error 2) (gibt_es_nicht_xyz.dat)
+READALL_BYTES:
+(gibt_es_nicht_xyz.dat)
 
 === jedes byte ueberlebt den dateiweg
 ' Die Kernzusage von WP B: alle 256 Bytewerte gehen unveraendert durch

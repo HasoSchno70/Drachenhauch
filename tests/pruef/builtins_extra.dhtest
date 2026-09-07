@@ -205,5 +205,5 @@ TRUE
 === dirlist missing dir raises
 PRINT LEN(DIRLIST("does_not_exist_xyz_123"))
 --- fehler
-DIRLIST: does_not_exist_xyz_123: Das System kann den angegebenen Pfad nicht finden. (os error 3)
+DIRLIST: does_not_exist_xyz_123:
 
