@@ -229,3 +229,47 @@ def test_ein_untermenue_ist_kein_kontextmenue(tmp_path):
                                 '    IF GUI_CLICKED(z) THEN PRINT "unter"\n'),
                 events=ev)
     assert out == ["kontext"]
+
+
+# ------------------------------------------- Kuerzel ueber Fenstergrenzen
+_ZWEI = _KOPF + ('DIM w2 AS GUI_WINDOW\n'
+                 'w2 = GUI_WINDOW("Inspektor", 200, 40, 150, 200)\n'
+                 'DIM k AS GUI_WIDGET : k = GUI_BUTTON(w2, "Ok", 10, 10, 80, 26)\n'
+                 'DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Sichern", "Strg+S")\n')
+
+
+def test_kuerzel_gilt_auch_wenn_ein_anderes_fenster_den_fokus_hat(tmp_path):
+    """Werkzeugleiste links, Inspektor rechts, EIN Menue: Strg+S muss auch
+    sichern, wenn der letzte Klick in den Inspektor ging. Drei Piloten
+    holten sich vorher nach jedem Knopf den Fokus zurueck -- jedes Mal, weil
+    ein Test das stumme Strg+S gefunden hatte."""
+    out = _lauf(tmp_path, _ZWEI + 'GUI_FOCUS(k)\n'
+                + _schleife(10, '    IF GUI_CLICKED(a) THEN PRINT "sichern " + STR$(f) + " " + STR$(GUI_FOCUSED() = k)\n'),
+                events=_tipp(4, RL_S, RL_LCTRL))
+    treffer = [ln for ln in out if ln.startswith("sichern ")]
+    assert len(treffer) == 1 and treffer[0].endswith("TRUE"), out   # der Fokus blieb im Inspektor
+
+
+def test_das_fokus_fenster_gewinnt_bei_gleichem_kuerzel(tmp_path):
+    out = _lauf(tmp_path, _ZWEI + 'DIM m2 AS INTEGER : m2 = GUI_MENU(w2, "Datei")\n'
+                'DIM b AS INTEGER : b = GUI_MENU_ITEM(m2, "Eigenes Sichern", "Strg+S")\n'
+                'GUI_FOCUS(k)\n'
+                + _schleife(10, '    IF GUI_CLICKED(a) THEN PRINT "haupt"\n    IF GUI_CLICKED(b) THEN PRINT "inspektor"\n'),
+                events=_tipp(4, RL_S, RL_LCTRL))
+    assert out.count("inspektor") == 1 and "haupt" not in out, out
+
+
+def test_ein_entwurfsfenster_hat_keine_kuerzel(tmp_path):
+    """Ein Formular im Entwurfsmodus (GUI_WINDOW_DESIGN) traegt seine Menues
+    als Ansicht -- sein Strg+S darf im Designer nichts ausloesen."""
+    out = _lauf(tmp_path, _ZWEI + 'GUI_WINDOW_DESIGN(w, TRUE)\nGUI_FOCUS(k)\n'
+                + _schleife(10, '    IF GUI_CLICKED(a) THEN PRINT "sichern"\n'),
+                events=_tipp(4, RL_S, RL_LCTRL))
+    assert "sichern" not in out, out
+
+
+def test_ein_modales_fenster_laesst_fremde_kuerzel_nicht_zu(tmp_path):
+    out = _lauf(tmp_path, _ZWEI + 'DIM d AS GUI_WINDOW : d = GUI_DIALOG("Frage", "Wirklich?", "janein")\n'
+                + _schleife(10, '    IF GUI_CLICKED(a) THEN PRINT "sichern"\n'),
+                events=_tipp(4, RL_S, RL_LCTRL))
+    assert "sichern" not in out, out
