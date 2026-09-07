@@ -1052,7 +1052,7 @@ bit-identisch.
 
 Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
 Doku-Demo [examples/98_coroutines.dh](examples/98_coroutines.dh), Tests
-[tests/test_coroutines.py](tests/test_coroutines.py).
+`tests/pruef/coroutines.dhtest` (Pruefsammlung fuer `dhrt test`, seit 2026-09-07 -- vorher tests/test_coroutines.py).
 
 ## Input-Mapping (Modul `input`)
 
@@ -1144,7 +1144,7 @@ DO : i = i + 1 : LOOP UNTIL i >= 5
   Schluesselwoerter: `DIM dO AS INTEGER` gibt es in `examples/127_filedialog.dh`,
   und ein neues Keyword haette das gebrochen. `DO` zaehlt nur als Schleife,
   wenn WHILE/UNTIL/Zeilenende folgt. Bedingung oben UND unten ist ein Fehler.
-- Tests: `tests/test_sprach_symmetrie.py` (18).
+- Tests: `tests/pruef/sprach_symmetrie.dhtest` (18 Faelle, `dhrt test`; bis 2026-09-07 tests/test_sprach_symmetrie.py).
 
 ## Laufzeit-Typtest: `IS` + `TYPEOF`
 
@@ -2661,6 +2661,33 @@ STEP`); `GUI_MODAL()` liefert einen Wahrheitswert, kein Handle; Klapplisten
 in Tests: Eintrag k liegt bei y + 24 + k * 22 + 11 unter dem Feld. Tests
 `tests/test_pilot_notenblatt.py` (8, seriell). Schluesselwechsel rueckt die
 Noten ohne Dialog um Oktaven heran und sagt es (Strg+Z nimmt es zurueck).
+
+## Python-Abbau, Weg D: Pruefsammlungen fuer `dhrt test` (2026-09-07)
+
+`dhrt test` lief bisher nur Pruefprogramme (`*_pruefung.dh`, ein Programm
+mit ASSERT). Die Golden-Tests der Sprache sind aber Ausgabevergleiche --
+gemessen 1084 der 3949 pytest-Tests in 79 Dateien (`assert run_gb(src) ==
+"..."`). Dafuer gibt es jetzt **Pruefsammlungen** `*.dhtest`
+(`pruefsammlung.rs`: Parser + Bewertung mit Rust-Tests; Laeufer in
+`main.rs::sammlung_laufen`): `=== Name` beginnt einen Fall, dann der
+Quelltext, dann `--- erwartet` (zeilenweise, Leerzeilen am Blockende und EIN
+Umbruch am Ende zaehlen nicht), `--- enthaelt`, `--- fehler` (Abbruch +
+Teiltext der Meldung), `--- datei name` (Beilage neben dem Programm),
+`--- umgebung`. Jeder Fall ist ein eigener `dhrt run` in einem eigenen
+Verzeichnis, die Faelle einer Datei laufen parallel (bis 8 Faeden);
+`--filter Text` waehlt Faelle. KEIN_FENSTER-Meldungen und (mit
+`DHRT_OHNE_GRAFIK=1`) fehlende Grafik-Builtins heissen "uebersprungen",
+wie in conftest.py. Doku `docs/werkzeuge.md`. **Die Sammlungen liegen unter
+`tests/pruef/`**, `tests/test_dhrt_test.py` ist der CI-Anker (ruft `dhrt
+test tests/pruef`) und prueft das Format am echten Laeufer. Umgezogen und
+aus `tests/` geloescht: `test_coroutines.py`, `test_array_literal.py`,
+`test_chex_literal.py`, `test_sprach_symmetrie.py` (60 Faelle) -- die
+vier, die ein Wegwerf-Umsetzer (nicht im Repo; Python, weil einmalig)
+vollstaendig uebertragen konnte. Regel fuer den weiteren Umzug: **eine
+pytest-Datei wird geloescht, sobald ihre Faelle in einer Sammlung
+liegen** -- nie beides pflegen. Was nicht mechanisch geht (Ausgabe
+zerlegen, Python rechnet nach, Dateien in tmp_path): von Hand, je Bereich,
+wenn er ohnehin angefasst wird.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 

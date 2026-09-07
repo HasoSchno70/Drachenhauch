@@ -1,0 +1,40 @@
+' Aus test_chex_literal.py uebertragen (6 Faelle). Format: docs/werkzeuge.md, dhrt test.
+' C-Stil Hex-/Binaer-Literale: 0xFF / 0b1010.
+'
+' Zusaetzlich zur klassischen BASIC-Form &H/&B akzeptieren beide Lexer
+' (Python-Front-End + dhrt) jetzt auch die C-Schreibweise. `0`/`0.5` duerfen
+' dabei NICHT als Praefix fehlgedeutet werden.
+
+=== hex literal value
+PRINT 0xFF
+--- erwartet
+255
+
+=== binary literal value
+PRINT 0b1010
+--- erwartet
+10
+
+=== uppercase prefix
+PRINT 0XCAFE
+--- erwartet
+51966
+
+=== equivalent to basic form
+PRINT 0xFF8000 = &HFF8000
+--- erwartet
+TRUE
+
+=== hex in const
+CONST C AS INTEGER = 0x141E3C
+PRINT C
+--- erwartet
+1318460
+
+=== zero and float unaffected
+PRINT 0
+PRINT 0.5
+--- erwartet
+0
+0.5
+

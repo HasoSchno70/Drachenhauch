@@ -68,6 +68,7 @@ mod symbole;
 mod lsp;
 mod doku;
 mod pruef;
+mod pruefsammlung;
 mod prozess;
 mod text_stream;
 #[cfg(feature = "bt")]
@@ -725,10 +726,88 @@ fn pruefdateien(wurzel: &std::path::Path, raus: &mut Vec<std::path::PathBuf>) {
             if !NICHT_SUCHEN.contains(&name.as_str()) && !name.starts_with('.') {
                 pruefdateien(&p, raus);
             }
-        } else if name.ends_with(PRUEF_ENDUNG) {
+        } else if name.ends_with(PRUEF_ENDUNG) || name.ends_with(SAMMLUNG_ENDUNG) {
             raus.push(p);
         }
     }
+}
+
+/// Endung einer Pruefsammlung: viele Faelle mit erwarteter Ausgabe in EINER
+/// Datei (siehe `pruefsammlung.rs`).
+const SAMMLUNG_ENDUNG: &str = ".dhtest";
+
+/// Eine Pruefsammlung laufen lassen: jeder Fall als eigener `dhrt run` in einem
+/// eigenen Verzeichnis, die Faelle parallel. Liefert (ok, fehl, uebersprungen,
+/// Meldungen der Fehlschlaege und Uebersprungenen).
+fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option<&str>)
+    -> Result<(usize, usize, usize, Vec<String>), String>
+{
+    use std::sync::{Arc, Mutex};
+    let text = std::fs::read_to_string(pfad).map_err(|e| format!("nicht lesbar: {}", e))?;
+    let faelle: Vec<pruefsammlung::Fall> = pruefsammlung::parsen(&text)?
+        .into_iter()
+        .filter(|f| filter.map_or(true, |t| f.name.contains(t)))
+        .collect();
+    if faelle.is_empty() { return Ok((0, 0, 0, Vec::new())); }
+    let ohne_grafik = std::env::var("DHRT_OHNE_GRAFIK").is_ok();
+    let stamm = pfad.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "sammlung".into());
+    let wurzel = std::env::temp_dir().join(format!("dhrt_test_{}_{}", std::process::id(), stamm));
+    let _ = std::fs::create_dir_all(&wurzel);
+    let faelle = Arc::new(faelle);
+    let naechster = Arc::new(Mutex::new(0usize));
+    let ergebnisse: Arc<Mutex<Vec<Option<pruefsammlung::Ergebnis>>>> =
+        Arc::new(Mutex::new(vec![None; faelle.len()]));
+    let faeden = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(faelle.len());
+    let mut griffe = Vec::new();
+    for _ in 0..faeden {
+        let (faelle, naechster, ergebnisse) = (faelle.clone(), naechster.clone(), ergebnisse.clone());
+        let (exe, wurzel) = (exe.to_path_buf(), wurzel.clone());
+        griffe.push(std::thread::spawn(move || loop {
+            let i = { let mut n = naechster.lock().unwrap(); let i = *n; *n += 1; i };
+            if i >= faelle.len() { break; }
+            let f = &faelle[i];
+            let dir = wurzel.join(format!("fall_{}", i));
+            let _ = std::fs::create_dir_all(&dir);
+            let erg = (|| {
+                std::fs::write(dir.join("fall.dh"), &f.quelle).map_err(|e| e.to_string())?;
+                for (name, inhalt) in &f.dateien {
+                    let ziel = dir.join(name);
+                    if let Some(eltern) = ziel.parent() { let _ = std::fs::create_dir_all(eltern); }
+                    std::fs::write(&ziel, inhalt).map_err(|e| e.to_string())?;
+                }
+                let mut cmd = std::process::Command::new(&exe);
+                cmd.arg("run").arg(dir.join("fall.dh"))
+                    .stdin(std::process::Stdio::null())
+                    // Ein Fall ist ein Programm fuer sich: was die Umgebung des
+                    // Laeufers an Bildzahl oder Foto vorgibt, gilt nicht fuer ihn.
+                    .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
+                    .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
+                    .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY");
+                for (k, v) in &f.umgebung { cmd.env(k, v); }
+                let o = cmd.output().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
+                Ok::<_, String>(pruefsammlung::bewerten(
+                    f, o.status.code().unwrap_or(-1),
+                    &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik))
+            })();
+            let erg = erg.unwrap_or_else(pruefsammlung::Ergebnis::Fehl);
+            let _ = std::fs::remove_dir_all(&dir);
+            ergebnisse.lock().unwrap()[i] = Some(erg);
+        }));
+    }
+    for g in griffe { let _ = g.join(); }
+    let _ = std::fs::remove_dir_all(&wurzel);
+    let (mut ok, mut fehl, mut ueber) = (0, 0, 0);
+    let mut meldungen = Vec::new();
+    let ergebnisse = ergebnisse.lock().unwrap();
+    for (f, e) in faelle.iter().zip(ergebnisse.iter()) {
+        match e {
+            Some(pruefsammlung::Ergebnis::Ok) => ok += 1,
+            Some(pruefsammlung::Ergebnis::Fehl(m)) => { fehl += 1; meldungen.push(format!("FEHL  Zeile {}: {}: {}", f.zeile, f.name, m)); }
+            Some(pruefsammlung::Ergebnis::Uebersprungen(m)) => { ueber += 1; meldungen.push(format!("uebersprungen  Zeile {}: {}: {}", f.zeile, f.name, m)); }
+            None => { fehl += 1; meldungen.push(format!("FEHL  Zeile {}: {}: nicht gelaufen", f.zeile, f.name)); }
+        }
+    }
+    Ok((ok, fehl, ueber, meldungen))
 }
 
 /// `dhrt test [pfad ...]` -- die Pruefprogramme laufen lassen und Bilanz ziehen.
@@ -747,13 +826,23 @@ fn pruefdateien(wurzel: &std::path::Path, raus: &mut Vec<std::path::PathBuf>) {
 /// **Die Standardeingabe des Kindes ist leer.** Ein Pruefprogramm mit einem
 /// vergessenen `INPUT` wuerde sonst auf eine Eingabe warten, die nie kommt,
 /// und der ganze Lauf haengt -- mit leerem stdin bekommt es sofort das Ende.
-fn test_main(pfade: &[String]) -> ExitCode {
+fn test_main(args: &[String]) -> ExitCode {
     let exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => { eprintln!("dhrt test: eigenen Pfad nicht gefunden: {}", e); return ExitCode::from(2); }
     };
+    // `--filter text`: nur die Faelle einer Sammlung, deren Name den Text
+    // enthaelt -- zum Nachstellen eines einzelnen Fehlschlags.
+    let mut filter: Option<String> = None;
+    let mut pfade: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--filter" && i + 1 < args.len() { filter = Some(args[i + 1].clone()); i += 2; continue; }
+        pfade.push(args[i].clone());
+        i += 1;
+    }
     let ziele: Vec<String> = if pfade.is_empty() { vec![".".to_string()] }
-                             else { pfade.to_vec() };
+                             else { pfade.clone() };
     let mut dateien: Vec<std::path::PathBuf> = Vec::new();
     for z in &ziele {
         let p = std::path::Path::new(z);
@@ -769,16 +858,39 @@ fn test_main(pfade: &[String]) -> ExitCode {
         }
     }
     if dateien.is_empty() {
-        eprintln!("dhrt test: keine Pruefprogramme gefunden (gesucht wird nach *{})",
-                  PRUEF_ENDUNG);
+        eprintln!("dhrt test: keine Pruefprogramme gefunden (gesucht wird nach *{} und *{})",
+                  PRUEF_ENDUNG, SAMMLUNG_ENDUNG);
         // Kein Fehler-Rueckgabewert: "nichts zu tun" ist kein Fehlschlag,
         // sonst faellt eine Kette ueber ein noch leeres Projekt.
         return ExitCode::SUCCESS;
     }
     let start = std::time::Instant::now();
     let mut fehler = 0usize;
+    let (mut faelle_ok, mut faelle_fehl, mut faelle_ueber) = (0usize, 0usize, 0usize);
     for d in &dateien {
         let t0 = std::time::Instant::now();
+        let name = d.display().to_string();
+        if name.ends_with(SAMMLUNG_ENDUNG) {
+            match sammlung_laufen(&exe, d, filter.as_deref()) {
+                Ok((ok, fehl, ueber, meldungen)) => {
+                    let dauer = t0.elapsed().as_secs_f64();
+                    faelle_ok += ok; faelle_fehl += fehl; faelle_ueber += ueber;
+                    let zusatz = if ueber > 0 { format!(", {} uebersprungen", ueber) } else { String::new() };
+                    if fehl > 0 {
+                        fehler += 1;
+                        println!("  FEHLER  {}  ({} von {} Faellen{}, {:.2}s)", name, fehl, ok + fehl + ueber, zusatz, dauer);
+                    } else {
+                        println!("  ok      {}  ({} Faelle{}, {:.2}s)", name, ok + ueber, zusatz, dauer);
+                    }
+                    for m in meldungen { println!("          {}", m); }
+                }
+                Err(e) => {
+                    fehler += 1;
+                    println!("  FEHLER  {}  ({})", name, e);
+                }
+            }
+            continue;
+        }
         let r = std::process::Command::new(&exe)
             .arg("run").arg(d)
             .stdin(std::process::Stdio::null())
@@ -808,8 +920,15 @@ fn test_main(pfade: &[String]) -> ExitCode {
             }
         }
     }
-    println!("\n{} Datei(en), {} ok, {} mit Fehlern  ({:.2}s)",
-             dateien.len(), dateien.len() - fehler, fehler, start.elapsed().as_secs_f64());
+    let faelle = faelle_ok + faelle_fehl + faelle_ueber;
+    if faelle > 0 {
+        println!("\n{} Datei(en), {} ok, {} mit Fehlern; {} Faelle, {} ok, {} fehl, {} uebersprungen  ({:.2}s)",
+                 dateien.len(), dateien.len() - fehler, fehler,
+                 faelle, faelle_ok, faelle_fehl, faelle_ueber, start.elapsed().as_secs_f64());
+    } else {
+        println!("\n{} Datei(en), {} ok, {} mit Fehlern  ({:.2}s)",
+                 dateien.len(), dateien.len() - fehler, fehler, start.elapsed().as_secs_f64());
+    }
     if fehler > 0 { ExitCode::from(1) } else { ExitCode::SUCCESS }
 }
 

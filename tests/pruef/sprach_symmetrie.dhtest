@@ -1,0 +1,196 @@
+' Aus test_sprach_symmetrie.py uebertragen (18 Faelle). Format: docs/werkzeuge.md, dhrt test.
+' Drei Stellen, an denen genau eine Haelfte fehlte.
+'
+' Das Array-Literal gab es, das MAP-Literal nicht. `FOR EACH` lief ueber die
+' Schluessel einer MAP, an den Wert kam man nur ueber den Umweg
+' `MAPITEMS` + Destructuring. Und von den drei BASIC-Schleifenformen fehlte
+' ausgerechnet die gelaeufigste (`DO ... LOOP`).
+'
+' Keine der drei braucht neue Laufzeit-Mechanik: das MAP-Literal benutzt
+' dieselbe Sammelstelle wie die Dict-Comprehension, die Paar-Form von
+' `FOR EACH` einen Vorschalt-Aufruf, und `DO ... LOOP` wird im Parser zu
+' `WHILE` bzw. `REPEAT`.
+
+=== map literal
+DIM m AS MAP OF INTEGER
+m = {"a": 1, "b": 2, "c": 3}
+PRINT MAPSIZE(m); " "; MAPGET(m, "b")
+--- erwartet
+3 2
+
+=== leeres map literal
+DIM m AS MAP OF INTEGER
+m = {}
+PRINT MAPSIZE(m)
+MAPPUT(m, "x", 5)
+PRINT MAPGET(m, "x")
+--- erwartet
+0
+5
+
+=== map literal mit ausdruecken
+' Schluessel und Wert sind volle Ausdruecke, keine Literale.
+DIM n AS INTEGER
+n = 2
+DIM m AS MAP OF INTEGER
+m = {"x" + STR$(n): n * 10}
+PRINT MAPGET(m, "x2")
+--- erwartet
+20
+
+=== map literal nachgestelltes komma
+DIM m AS MAP OF STRING
+m = {"a": "eins", "b": "zwei",}
+PRINT MAPGET(m, "b")
+--- erwartet
+zwei
+
+=== map literal verlangt string schluessel
+' MAP-Schluessel sind STRING -- das gilt fuer das Literal wie ueberall.
+DIM m AS MAP OF INTEGER
+m = {5: 1}
+PRINT MAPSIZE(m)
+--- fehler
+MAP-Schluessel
+
+=== dict comprehension bleibt unberuehrt
+' `{k: v FOR ...}` und `{v FOR ...}` duerfen sich nicht verschieben --
+' die Klammer traegt jetzt drei Bedeutungen.
+DIM q AS MAP OF INTEGER
+q = {STR$(x): x * x FOR x IN (1, 2, 3)}
+PRINT MAPGET(q, "3")
+PRINT {x MOD 3 FOR x IN (0, 1, 2, 3, 4)}
+--- erwartet
+9
+(0, 1, 2)
+
+=== foreach paar ueber map
+DIM m AS MAP OF INTEGER
+m = {"a": 1, "b": 2}
+FOR EACH k, v IN m
+  PRINT k; "="; v
+NEXT
+--- erwartet
+a=1
+b=2
+
+=== foreach einzelvariable bleibt bei den schluesseln
+' Die alte Form darf sich NICHT auf Paare umstellen -- sonst haette die
+' Erweiterung bestehenden Code umgedeutet.
+DIM m AS MAP OF INTEGER
+m = {"a": 1, "b": 2}
+FOR EACH k IN m
+  PRINT k;
+NEXT
+PRINT ""
+--- erwartet
+ab
+
+=== foreach paar ueber tupel von paaren
+FOR EACH a, b IN (("x", 9), ("y", 8))
+  PRINT a; b;
+NEXT
+PRINT ""
+--- erwartet
+x9y8
+
+=== foreach paar mit break und continue
+DIM m AS MAP OF INTEGER
+m = {"a": 1, "b": 2, "c": 3}
+FOR EACH k, v IN m
+  IF v = 2 THEN CONTINUE
+  IF v = 3 THEN BREAK
+  PRINT k
+NEXT
+--- erwartet
+a
+
+=== do while
+DIM i AS INTEGER
+DO WHILE i < 3
+  i = i + 1
+LOOP
+PRINT i
+--- erwartet
+3
+
+=== do until
+DIM i AS INTEGER
+DO UNTIL i >= 3
+  i = i + 1
+LOOP
+PRINT i
+--- erwartet
+3
+
+=== loop while laeuft mindestens einmal
+' Fusspruefung: der Rumpf laeuft, bevor zum ersten Mal geprueft wird.
+DIM z AS INTEGER
+z = 99
+DO
+  z = z + 1
+LOOP WHILE FALSE
+PRINT z
+--- erwartet
+100
+
+=== loop until
+DIM n AS INTEGER
+DO
+  n = n + 1
+LOOP UNTIL n >= 3
+PRINT n
+--- erwartet
+3
+
+=== do ohne bedingung braucht break
+DIM c AS INTEGER
+DIM summe AS INTEGER
+DO
+  c = c + 1
+  IF c > 5 THEN BREAK
+  IF c MOD 2 = 0 THEN CONTINUE
+  summe = summe + c
+LOOP
+PRINT summe
+--- erwartet
+9
+
+=== do verschachtelt
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM t AS INTEGER
+DO WHILE a < 2
+  a = a + 1
+  b = 0
+  DO WHILE b < 2
+    b = b + 1
+    t = t + 1
+  LOOP
+LOOP
+PRINT t
+--- erwartet
+4
+
+=== bedingung nur an einer stelle
+' Beim UEBERSETZEN abgelehnt, nicht erst beim Laufen -- die Form ist
+' am Text entscheidbar.
+DIM i AS INTEGER
+DO WHILE i < 3
+  i = i + 1
+LOOP UNTIL i > 9
+--- fehler
+nicht an beide Stellen
+
+=== do bleibt ein gewoehnlicher name
+' `do` und `loop` sind KONTEXTUELL, keine Schluesselwoerter -- sonst
+' waere `DIM dO AS INTEGER` in bestehendem Code (examples/127_filedialog.dh)
+' ploetzlich ein Fehler.
+DIM dO AS INTEGER
+DIM loop AS INTEGER
+dO = 7
+loop = 8
+PRINT dO + loop
+--- erwartet
+15
+
