@@ -1078,6 +1078,11 @@ pub struct Window {
     /// Stand der gebundenen Werte beim letzten Setzen/Leeren/Bereinigen:
     /// (Formular, Schluessel, Text). Daraus antwortet GUI_FORM_CHANGED.
     form_stand: Vec<(String, String, String)>,
+    /// Entwurfsmodus (GUI_WINDOW_DESIGN): das Fenster wird gezeichnet, aber
+    /// seine Widgets bekommen KEINE Eingabe -- kein Hover, kein Klick, kein
+    /// Fokus, keine Rueckrufe. Ein Form-Designer legt so echte Widgets auf
+    /// die Flaeche und verwaltet die Maus selbst (GUI_HIT_TEST geht weiter).
+    entwurf: bool,
     chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
                                      //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
@@ -1490,7 +1495,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true,
+            movable: true, closable: false, visible: true, entwurf: false,
             resizable: false, pruefung_live: false, form_stand: Vec::new(), chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true, dlg: false, answer: 0,
@@ -2013,6 +2018,13 @@ impl Gui {
     /// Inhalt beginnt oben; gedacht, damit eine Form das OS-Fenster ausfuellt.
     pub fn window_chrome(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_CHROME")?.chrome = f; Ok(())
+    }
+    pub fn window_design(&mut self, h: i64, f: bool) -> Result<(), String> {
+        let wi = h as usize;
+        self.win_mut(h, "GUI_WINDOW_DESIGN")?.entwurf = f;
+        // Ein Fokus, der schon drin sitzt, bliebe sonst haengen.
+        if f { self.clear_window_interactions(wi); }
+        Ok(())
     }
     pub fn window_min_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
         let (w, ht) = (self.sk(w), self.sk(ht));
@@ -5619,7 +5631,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
         // Hover (nur oberstes Fenster); Tabellen aktualisieren Scroll/Hover/Wheel.
-        if let Some(top) = self.topmost_at(mx, my) {
+        if let Some(top) = self.topmost_at(mx, my).filter(|&t| !self.windows[t].entwurf) {
             let n = self.windows[top].widgets.len();
             for i in 0..n {
                 let (r, kind, active) = {
@@ -7231,6 +7243,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // liegt -- man koennte daneben weiterarbeiten, und genau das soll eine
         // Rueckfrage verhindern.
         if let Some(m) = self.modal { if win != m { return; } }
+        // Entwurfsmodus: der Klick gehoert dem Designer, nicht den Widgets --
+        // und auch nicht dem Fensterrahmen (kein Ziehen, kein Schliessen).
+        // Das Fenster kommt nach vorn, nimmt aber keinen Fokus, damit die
+        // Kuerzel beim Fenster des Designers bleiben.
+        if self.windows[win].entwurf { self.bring_to_front(win); return; }
         self.bring_to_front(win);
         self.focus_window = Some(win);
         let th = self.m("title_h");

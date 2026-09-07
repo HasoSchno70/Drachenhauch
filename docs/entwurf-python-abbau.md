@@ -28,6 +28,12 @@
 > Python (33 MB statt 92). Damit ist die Liste aus Abschnitt C bis auf
 > Willkommensseite und Themen abgearbeitet; was der Qt-IDE noch voraus ist,
 > steht in `docs/ide.md` unter "Was noch fehlt".
+>
+> **Weg B hat begonnen (gleicher Tag):** der Form-Designer als
+> `examples/197_form_designer.dh` (860 Zeilen gegen 5 055, Faktor 0,17) auf
+> einem neuen Entwurfsmodus der Laufzeit (`GUI_WINDOW_DESIGN`); Details in
+> `docs/form-designer.md`. Offen aus B: Anim-FSM-Editor, Notenblatt, Audio
+> Studio, und je Pilot der Rest aus dem Kopfkommentar.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

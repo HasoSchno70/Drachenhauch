@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1698,
+ "count": 1699,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -715,6 +715,7 @@
   "GUI_WINDOW_CLOSABLE": "Schließen-Button anzeigen (Default: aus)",
   "GUI_WINDOW_CLOSED": "BOOLEAN — wurde das Fenster geschlossen?",
   "GUI_WINDOW_DEFAULT": "Standard-Knopf: Enter im Fenster löst ihn aus (-1 = keiner)",
+  "GUI_WINDOW_DESIGN": "Entwurfsmodus: das Fenster wird gezeichnet, aber seine Widgets bekommen keine Eingabe (kein Hover, Klick, Fokus, Rückruf; auch kein Ziehen am Rahmen). Ein Form-Designer legt so echte Widgets auf die Fläche und verwaltet die Maus selbst — GUI_HIT_TEST und alle Setter gehen weiter. Default: aus",
   "GUI_WINDOW_DESTROY": "Fenster + Inhalt entfernen",
   "GUI_WINDOW_GET_H": "INTEGER — Lage und Groesse des Fensters auf dem Bildschirm",
   "GUI_WINDOW_GET_W": "INTEGER — Lage und Groesse des Fensters auf dem Bildschirm",
