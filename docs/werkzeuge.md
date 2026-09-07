@@ -80,6 +80,61 @@ ASSERT_REPORT()
 IF ASSERT_FAILED() > 0 THEN EXIT(1)
 ```
 
+### Prüfsammlungen: viele Fälle in einer Datei (`*.dhtest`)
+
+Ein Prüfprogramm prüft sich selbst mit `ASSERT`. Die meisten Tests der
+Sprache sind aber Ausgabevergleiche: ein kurzes Programm, eine erwartete
+Ausgabe. Dafür braucht es kein Programm je Datei, sondern eine **Sammlung**
+(seit 2026-09-07, Weg D des [Python-Abbaus](entwurf-python-abbau.md)):
+
+```text
+' Kopfkommentar bis zum ersten Fall
+=== Zähler liefert drei Werte
+FUNCTION z() AS INTEGER
+    YIELD 1
+    YIELD 2
+END FUNCTION
+DIM c AS COROUTINE : c = z()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+--- erwartet
+1
+2
+=== Division durch Null bricht ab
+PRINT 1 \ 0
+--- fehler
+Division durch Null
+```
+
+`=== Name` beginnt einen Fall, dann folgt sein Quelltext, dann Abschnitte:
+
+| Abschnitt | Bedeutung |
+|---|---|
+| `--- erwartet` | die Ausgabe, Zeile für Zeile; Leerzeilen am Blockende zählen nicht, ein Zeilenumbruch am Ende auch nicht |
+| `--- enthaelt` | jede Zeile des Blocks muss in der Ausgabe vorkommen |
+| `--- fehler` | das Programm muss abbrechen (Rückgabewert ungleich 0), und jede Zeile des Blocks steht in der Meldung |
+| `--- datei name` | eine Beilage, die vor dem Lauf neben dem Programm liegt (JSON, Karte, Text) |
+| `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
+
+Ohne Erwartung gilt ein Fall als bestanden, wenn er mit 0 endet. **Jeder
+Fall läuft als eigener Prozess in einem eigenen Verzeichnis**, die Fälle
+einer Datei parallel; `dhrt test datei.dhtest --filter Text` lässt nur die
+Fälle laufen, deren Name den Text enthält. Ein Fall, der an einer Maschine
+ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
+falsch; mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
+Grafik-Befehl fehlt. Die Bilanz nennt Dateien und Fälle:
+
+```text
+  ok      tests\pruef\coroutines.dhtest  (13 Faelle, 0.61s)
+  FEHLER  tests\pruef\array_literal.dhtest  (1 von 23 Faellen, 0.90s)
+          FEHL  Zeile 61: leeres Feld: Ausgabezeile 1: erwartet '0', erhalten '1'
+
+2 Datei(en), 1 ok, 1 mit Fehlern; 36 Faelle, 35 ok, 1 fehl, 0 uebersprungen  (1.52s)
+```
+
+Die Sammlungen des Projekts liegen unter `tests/pruef/`; bis pytest ganz
+fällt, lässt `tests/test_dhrt_test.py` sie in der CI mitlaufen.
+
 ## `dhrt fmt` — einheitlich schreiben
 
 ```bash

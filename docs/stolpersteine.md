@@ -16,7 +16,7 @@ Reihenfolge ≈ nach Nutzen/Aufwand. Erledigtes am Ende.
 > Parser disambiguiert jetzt: FOR nach dem ersten Ausdruck = List-Comprehension,
 > sonst Array-Literal. Opcode `BUILD_ARRAY` (117), Element-Typ aus den Werten
 > (int/float/string/boolean/any). Leeres `[]` -> Hinweis auf `DIM ... AS ARRAY OF T`.
-> Tests: `tests/test_array_literal.py`. (Historischer Text unten zur Doku.)
+> Tests: `tests/pruef/array_literal.dhtest` (`dhrt test`). (Historischer Text unten zur Doku.)
 ```basic
 DIM a AS ARRAY OF INTEGER
 a = [1, 2, 3]      ' -> Parse-Fehler (7): Erwartet FOR in List-Comprehension

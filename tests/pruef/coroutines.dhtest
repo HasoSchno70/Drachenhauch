@@ -1,0 +1,236 @@
+' Aus test_coroutines.py uebertragen (13 Faelle). Format: docs/werkzeuge.md, dhrt test.
+' Coroutines / YIELD: Frame-Schnappschuss in der VM (kein Cross-Frame-YIELD),
+' CORO_RESUME/SEND/DONE/RESULT/CLOSE, FOR EACH und Comprehension treiben eager.
+
+=== basic yield sequence
+FUNCTION zaehler() AS INTEGER
+    YIELD 1
+    YIELD 2
+    YIELD 3
+END FUNCTION
+
+DIM c AS COROUTINE
+c = zaehler()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+--- erwartet
+1
+2
+3
+
+=== yield send expression
+FUNCTION echo() AS INTEGER
+    DIM r AS INTEGER
+    r = YIELD 10
+    PRINT "got " + STR$(r)
+    YIELD r * 2
+END FUNCTION
+
+DIM e AS COROUTINE
+e = echo()
+PRINT CORO_RESUME(e)
+PRINT CORO_SEND(e, 7)
+--- erwartet
+10
+got 7
+14
+
+=== return value via result
+FUNCTION g() AS INTEGER
+    YIELD 1
+    RETURN 99
+END FUNCTION
+
+DIM c AS COROUTINE
+c = g()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+PRINT CORO_DONE(c)
+PRINT CORO_RESULT(c)
+--- erwartet
+1
+99
+TRUE
+99
+
+=== for each drain
+FUNCTION nums() AS INTEGER
+    YIELD 5
+    YIELD 10
+    YIELD 15
+    RETURN 0
+END FUNCTION
+
+DIM total AS INTEGER
+total = 0
+FOR EACH v IN nums()
+    total = total + v
+NEXT
+PRINT total
+--- erwartet
+30
+
+=== comprehension over coroutine
+FUNCTION nums() AS INTEGER
+    YIELD 1
+    YIELD 2
+    YIELD 3
+END FUNCTION
+
+DIM sq AS TUPLE
+sq = [n * n FOR n IN nums()]
+PRINT sq
+--- erwartet
+(1, 4, 9)
+
+=== sub coroutine no return type
+SUB ticker()
+    YIELD 1
+    YIELD 2
+END SUB
+
+DIM c AS COROUTINE
+c = ticker()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+PRINT CORO_DONE(c)
+--- erwartet
+1
+2
+NIL
+TRUE
+
+=== helper coroutine no cross frame
+FUNCTION inner() AS INTEGER
+    YIELD 100
+    YIELD 200
+END FUNCTION
+
+FUNCTION outer() AS INTEGER
+    DIM ic AS COROUTINE
+    ic = inner()
+    YIELD CORO_RESUME(ic)
+    YIELD CORO_RESUME(ic)
+END FUNCTION
+
+DIM c AS COROUTINE
+c = outer()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+--- erwartet
+100
+200
+
+=== error propagates through resume
+FUNCTION bad() AS INTEGER
+    YIELD 1
+    THROW "kaputt"
+END FUNCTION
+
+DIM c AS COROUTINE
+c = bad()
+PRINT CORO_RESUME(c)
+TRY
+    PRINT CORO_RESUME(c)
+CATCH msg
+    PRINT "fehler: " + msg
+END TRY
+--- erwartet
+1
+fehler: kaputt
+
+=== close and idempotent
+SUB endless()
+    DIM i AS INTEGER
+    i = 0
+    WHILE TRUE
+        YIELD i
+        i = i + 1
+    WEND
+END SUB
+
+DIM c AS COROUTINE
+c = endless()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+CORO_CLOSE(c)
+PRINT CORO_DONE(c)
+CORO_CLOSE(c)
+PRINT CORO_DONE(c)
+--- erwartet
+0
+1
+TRUE
+TRUE
+
+=== coroutine type and print
+FUNCTION g() AS INTEGER
+    YIELD 1
+END FUNCTION
+
+DIM c AS COROUTINE
+c = g()
+PRINT c
+--- erwartet
+<COROUTINE g>
+
+=== method coroutine with self
+CLASS Gen
+    DIM base AS INTEGER
+    SUB stream()
+        YIELD Self.base + 1
+        YIELD Self.base + 2
+    END SUB
+END CLASS
+
+DIM g AS Gen
+g = NEW Gen()
+g.base = 100
+DIM c AS COROUTINE
+c = g.stream()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+--- erwartet
+101
+102
+
+=== interleaved coroutines deterministic
+FUNCTION a() AS STRING
+    YIELD "a1"
+    YIELD "a2"
+END FUNCTION
+FUNCTION b() AS STRING
+    YIELD "b1"
+    YIELD "b2"
+END FUNCTION
+
+DIM ca AS COROUTINE
+DIM cb AS COROUTINE
+ca = a()
+cb = b()
+PRINT CORO_RESUME(ca)
+PRINT CORO_RESUME(cb)
+PRINT CORO_RESUME(ca)
+PRINT CORO_RESUME(cb)
+--- erwartet
+a1
+b1
+a2
+b2
+
+=== yield coerces to return type
+FUNCTION halves() AS FLOAT
+    YIELD 1
+    YIELD 2
+END FUNCTION
+
+DIM c AS COROUTINE
+c = halves()
+PRINT CORO_RESUME(c)
+PRINT CORO_RESUME(c)
+--- erwartet
+1.0
+2.0
+

@@ -41,6 +41,16 @@
 > und das Werkzeuge-Menue der IDE ersetzt ihn. **Damit hat jeder
 > Qt-Editor eine Drachenhauch-Fassung.** Offen aus B: je Pilot der Rest
 > aus dem Kopfkommentar.
+>
+> **Weg D hat begonnen (2026-09-07):** `dhrt test` kann Pruefsammlungen
+> (`*.dhtest`: viele Faelle mit erwarteter Ausgabe in einer Datei, siehe
+> `docs/werkzeuge.md`). Gemessen sind 1 084 der 3 949 pytest-Tests reine
+> Ausgabevergleiche in 79 Dateien; die ersten vier Dateien (60 Faelle:
+> Coroutinen, Feld-Literale, `&H`-Literale, Sprachsymmetrie) sind
+> umgezogen und aus `tests/` geloescht. Ein Wegwerf-Umsetzer uebertraegt
+> die unmittelbaren Formen (`assert run_gb(src) == ...`,
+> `pytest.raises(match=...)`); 929 Tests brauchen Handarbeit, weil sie
+> Ausgaben zerlegen, Dateien anlegen oder in Python nachrechnen.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

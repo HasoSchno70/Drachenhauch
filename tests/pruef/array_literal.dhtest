@@ -1,0 +1,200 @@
+' Aus test_array_literal.py uebertragen (23 Faelle). Format: docs/werkzeuge.md, dhrt test.
+' A1: Array-Literale `[a, b, c]`.
+'
+' Frueher kollidierte `[...]` ausschliesslich mit der List-Comprehension
+' (`a = [1,2,3]` -> „Erwartet FOR in List-Comprehension"). Jetzt disambiguiert
+' der Parser: FOR nach dem ersten Ausdruck = Comprehension, sonst Array-Literal.
+
+=== int array literal
+DIM a AS ARRAY OF INTEGER
+a = [10, 20, 30]
+PRINT a[0], a[2], LEN(a)
+--- erwartet
+10 30 3
+
+=== float promotion
+DIM f AS ARRAY OF FLOAT
+f = [1.5, 2, 3.5]
+PRINT f[1]
+--- erwartet
+2.0
+
+=== string array literal
+DIM s AS ARRAY OF STRING
+s = ["hallo", "welt"]
+PRINT s[0]; "-"; s[1]
+--- erwartet
+hallo-welt
+
+=== array literal as iterable
+DIM sum AS INTEGER
+sum = 0
+FOR EACH n IN [1, 2, 3, 4]
+    sum = sum + n
+NEXT
+PRINT sum
+--- erwartet
+10
+
+=== single element array
+DIM a AS ARRAY OF INTEGER
+a = [5]
+PRINT LEN(a), a[0]
+--- erwartet
+1 5
+
+=== trailing comma
+PRINT [1, 2, 3,][2]
+--- erwartet
+3
+
+=== sort on literal array
+DIM a AS ARRAY OF INTEGER
+a = [3, 1, 2]
+SORT(a)
+PRINT a[0], a[1], a[2]
+--- erwartet
+1 2 3
+
+=== comprehension still works
+DIM sq AS TUPLE
+sq = [x * x FOR x IN [1, 2, 3]]
+PRINT sq
+--- erwartet
+(1, 4, 9)
+
+=== leeres array literal ist erlaubt
+DIM a AS ARRAY OF INTEGER
+a = []
+PRINT LEN(a)
+--- erwartet
+0
+
+=== leeres literal uebernimmt den typ der variablen
+' Sonst waere `a = []` ein stilles Loch in der Typpruefung.
+DIM a AS ARRAY OF STRING
+a = []
+ARRAY_PUSH(a, 42)
+--- fehler
+Erwartet STRING
+
+=== leeres literal als parameter
+SUB zeige(liste AS ARRAY OF STRING)
+    PRINT LEN(liste)
+END SUB
+zeige([])
+--- erwartet
+0
+
+=== leeres literal als rueckgabewert
+FUNCTION leer() AS ARRAY OF STRING
+    RETURN []
+END FUNCTION
+DIM x AS ARRAY OF STRING
+x = leer()
+ARRAY_PUSH(x, 42)
+--- fehler
+Erwartet STRING
+
+=== ohne kontext bleibt es any
+' Ohne typisiertes Ziel nimmt das Array alles auf -- ARRAY OF ANY.
+DIM frei AS ARRAY OF ANY
+frei = []
+ARRAY_PUSH(frei, "Text")
+ARRAY_PUSH(frei, 42)
+PRINT LEN(frei)
+--- erwartet
+2
+
+=== leeres array wird von builtins angenommen
+' Ein leeres Array kann keinen falschen Wert enthalten -- Builtins, die
+' ARRAY OF STRING erwarten, duerfen es nicht wegen seines Typs ablehnen.
+' Geprueft an JOIN$, das dieselbe Pruefung nutzt wie GUI_DROPDOWN.
+PRINT "[" + JOIN$([], ",") + "]"
+--- erwartet
+[]
+
+=== falscher elementtyp wird gemeldet
+DIM zahlen AS ARRAY OF INTEGER
+zahlen = [1, 2, 3]
+DIM texte AS ARRAY OF STRING
+texte = zahlen
+--- fehler
+Erwartet ARRAY OF STRING, erhalten ARRAY OF INTEGER
+
+=== falscher elementtyp als parameter
+SUB zeige(liste AS ARRAY OF STRING)
+    PRINT LEN(liste)
+END SUB
+DIM zahlen AS ARRAY OF INTEGER
+zahlen = [1, 2]
+zeige(zahlen)
+--- fehler
+Parameter: Erwartet ARRAY OF STRING
+
+=== einfacher wert an array ziel
+DIM a AS ARRAY OF INTEGER
+a = 42
+--- fehler
+Erwartet ARRAY OF INTEGER, erhalten INTEGER
+
+=== gleicher elementtyp geht weiterhin
+DIM a AS ARRAY OF STRING
+a = SPLIT$("x|y|z", "|")
+DIM b AS ARRAY OF STRING
+b = a
+PRINT LEN(b); b[2]
+--- erwartet
+3z
+
+=== array of any bleibt zuweisbar
+' ARRAY OF ANY kann jeden Wert enthalten -- es einem engeren Ziel zu
+' geben ist eine bewusste Entscheidung, so wie das Auspacken einer Map.
+DIM frei AS ARRAY OF ANY
+frei = []
+ARRAY_PUSH(frei, "Text")
+DIM texte AS ARRAY OF STRING
+texte = frei
+PRINT texte[0]
+--- erwartet
+Text
+
+=== ganzzahl literal an float ziel
+' `[1, 2, 3]` an einem FLOAT-Ziel: die Zellen werden umgebaut, statt die
+' Zuweisung abzulehnen -- sonst waere ein FLOAT-Array ohne Komma-Werte im
+' Literal nicht mehr zu schreiben.
+DIM werte AS ARRAY OF FLOAT
+werte = [1, 2, 3]
+werte[0] = 1.5
+PRINT werte[0]; " "; werte[1]
+--- erwartet
+1.5 2.0
+
+=== vorhandenes int array wird nicht zu float
+' Umbauen darf nur ein frisches Literal. Ein vorhandenes ARRAY OF INTEGER
+' wuerde sonst unter der Hand zu FLOAT -- sein bisheriger Name zeigt ja
+' weiter auf dieselben Zellen.
+DIM ganz AS ARRAY OF INTEGER
+ganz = [7, 8]
+DIM komma AS ARRAY OF FLOAT
+komma = ganz
+--- fehler
+Erwartet ARRAY OF FLOAT, erhalten ARRAY OF INTEGER
+
+=== unzugewiesenes array bleibt erlaubt
+' Ein sizeless ARRAY ist bis zur ersten Zuweisung NIL.
+DIM leer AS ARRAY OF STRING
+PRINT "ok"
+--- erwartet
+ok
+
+=== rueckgabewert prueft den elementtyp
+FUNCTION namen() AS ARRAY OF STRING
+    DIM zahlen AS ARRAY OF INTEGER
+    zahlen = [1, 2]
+    RETURN zahlen
+END FUNCTION
+PRINT LEN(namen())
+--- fehler
+RETURN: Erwartet ARRAY OF STRING
+
