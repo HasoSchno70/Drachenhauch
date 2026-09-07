@@ -1,0 +1,1336 @@
+' ============================================================
+'  DRACHENHAUCH -- Anim-FSM-Editor (Weg B, der zweite der vier fehlenden Editoren)
+' ============================================================
+'  Animations-Zustandsmaschinen fuer das animfsm-Modul zeichnen, wie im
+'  Qt-Editor dhanim (docs/anim-editor.md), aber IN Drachenhauch: Knoten sind
+'  Zustaende (an eine Sprite-Animation gebunden), Pfeile sind Uebergaenge mit
+'  UND-verknuepften Bedingungen. Der Graph liegt in der Mitte und wird mit
+'  den normalen Zeichenbefehlen gemalt; links das Dokument (Sprite-Blatt,
+'  Parameter), rechts der Inspektor fuer den gewaehlten Zustand oder Uebergang.
+'
+'  Das Modell ist das .dhanim-JSON (json-Modul) -- dieselbe Datei, die
+'  ANIM_FSM_LOAD liest und der Qt-Editor schreibt. Jede Aenderung schreibt ins
+'  JSON, Rueckgaengig ist ein JSON-Text je Stand. Was der Inspektor nicht
+'  kennt, laeuft unveraendert mit durch.
+'
+'  Bedienung: Doppelklick auf freie Flaeche = neuer Zustand (auch Einfg);
+'  Knoten ziehen = verschieben (Raster 8); Klick auf einen Pfeil = Uebergang
+'  waehlen; MIT DER RECHTEN Maustaste von einem Knoten auf einen anderen
+'  ziehen = Uebergang anlegen (auch von der Pille "Any State"); Entf =
+'  loeschen; Strg+Z/Y = Rueckgaengig/Wiederholen; F5 = Vorschau: erzeugt
+'  <name>_vorschau.dh neben der .dhanim (Parameter-Regler links, der Sprite
+'  rechts) und startet es mit dhrt.
+'
+'  Aufruf:  dhrt run examples/198_anim_fsm_editor.dh [-- maschine.dhanim]
+'  Test:    DH_ANIM_LOG=<datei> protokolliert die Ereignisse zeilenweise.
+' ============================================================
+IMPORT "gui"
+IMPORT "json"
+
+CONST RASTER = 8
+CONST LINKS = 0                 ' Maustasten
+CONST RECHTS = 1
+CONST LINKS_B = 270             ' Breite des linken Fensters
+CONST INSP_B = 340              ' Breite des Inspektors
+CONST NODE_W = 150
+CONST NODE_H = 50
+CONST ANY_W = 120
+CONST ANY_H = 36
+CONST TREFFER = 7               ' Klick-Toleranz auf einen Pfeil (px)
+CONST MAX_BED = 6               ' Bedingungszeilen im Inspektor
+CONST NL = CHR$(10)
+
+SCREEN(1280, 800, "Drachenhauch - Anim-FSM-Editor", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(960, 600)
+SETFPS(60)
+WINDOW_MAXIMIZE()
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont) : TEXT_SIZE(16)
+
+DIM logDatei AS STRING : logDatei = GETENV$("DH_ANIM_LOG")
+SUB protokoll(text AS STRING)
+    IF logDatei = "" THEN RETURN
+    DIM f AS FILE
+    f = OPENFILE(logDatei, "a")
+    WRITELINE(f, text)
+    CLOSEFILE(f)
+END SUB
+
+' Operatoren und Parameter-Typen -- dieselben Woerter wie animfsm.rs.
+DIM opCode AS ARRAY OF STRING : opCode = ["gt", "lt", "ge", "le", "eq", "ne", "is_true", "is_false", "trigger"]
+DIM opName AS ARRAY OF STRING : opName = [">", "<", ">=", "<=", "=", "<>", "ist wahr", "ist falsch", "ausgeloest"]
+DIM typNamen AS ARRAY OF STRING : typNamen = ["bool", "float", "int", "trigger"]
+
+FUNCTION opIndex(code AS STRING) AS INTEGER
+    DIM i AS INTEGER : i = ARRAY_INDEXOF(opCode, code)
+    IF i < 0 THEN i = 8
+    RETURN i
+END FUNCTION
+
+FUNCTION istZahlOp(code AS STRING) AS BOOLEAN
+    RETURN opIndex(code) <= 5
+END FUNCTION
+
+FUNCTION zahl$(v AS FLOAT) AS STRING
+    IF v = INT(v) THEN RETURN STR$(INT(v))
+    RETURN STR$(v)
+END FUNCTION
+
+' --- Modell -----------------------------------------------------------------
+DIM doc AS JSON_HANDLE
+DIM pfad AS STRING : pfad = ""
+DIM geaendert AS BOOLEAN : geaendert = FALSE
+DIM selArt AS INTEGER : selArt = 0           ' 0 nichts, 1 Zustand, 2 Uebergang
+DIM selIdx AS INTEGER : selIdx = -1
+DIM anyX AS INTEGER : anyX = 40              ' die Pille "Any State" (nicht gespeichert)
+DIM anyY AS INTEGER : anyY = 40
+
+' Rueckgaengig: ein JSON-Text je Stand, ein Zeiger darauf.
+DIM staende AS ARRAY OF STRING : staende = []
+DIM standPos AS INTEGER : standPos = -1
+
+FUNCTION nz() AS INTEGER
+    RETURN JSON_LEN(doc, "states")
+END FUNCTION
+FUNCTION nu() AS INTEGER
+    RETURN JSON_LEN(doc, "transitions")
+END FUNCTION
+FUNCTION np() AS INTEGER
+    RETURN JSON_LEN(doc, "params")
+END FUNCTION
+
+FUNCTION zp$(i AS INTEGER, feld AS STRING) AS STRING
+    RETURN "states." + STR$(i) + "." + feld
+END FUNCTION
+FUNCTION up$(i AS INTEGER, feld AS STRING) AS STRING
+    RETURN "transitions." + STR$(i) + "." + feld
+END FUNCTION
+FUNCTION pp$(i AS INTEGER, feld AS STRING) AS STRING
+    RETURN "params." + STR$(i) + "." + feld
+END FUNCTION
+
+FUNCTION text$(p AS STRING) AS STRING
+    IF NOT JSON_HAS(doc, p) THEN RETURN ""
+    IF JSON_TYPE(doc, p) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(doc, p)
+END FUNCTION
+FUNCTION ganz(p AS STRING, sonst AS INTEGER) AS INTEGER
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "number" THEN RETURN sonst
+    RETURN INT(JSON_GET_FLOAT(doc, p))
+END FUNCTION
+FUNCTION komma(p AS STRING, sonst AS FLOAT) AS FLOAT
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "number" THEN RETURN sonst
+    RETURN JSON_GET_FLOAT(doc, p)
+END FUNCTION
+FUNCTION wahr(p AS STRING, sonst AS BOOLEAN) AS BOOLEAN
+    IF NOT JSON_HAS(doc, p) THEN RETURN sonst
+    IF JSON_TYPE(doc, p) <> "boolean" THEN RETURN sonst
+    RETURN JSON_GET_BOOL(doc, p)
+END FUNCTION
+
+FUNCTION zustandIndex(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nz() - 1
+        IF text$(zp$(i, "name")) = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION paramIndex(name AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO np() - 1
+        IF text$(pp$(i, "name")) = name THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Der wirksame Startzustand: der eingetragene, wenn es ihn gibt, sonst der erste.
+FUNCTION startZustand$() AS STRING
+    DIM d AS STRING : d = text$("default")
+    IF d <> "" AND zustandIndex(d) >= 0 THEN RETURN d
+    IF nz() > 0 THEN RETURN text$(zp$(0, "name"))
+    RETURN ""
+END FUNCTION
+
+FUNCTION animName$(i AS INTEGER) AS STRING
+    DIM a AS STRING : a = text$(zp$(i, "anim"))
+    IF a = "" THEN a = text$(zp$(i, "name"))
+    RETURN a
+END FUNCTION
+
+FUNCTION eindeutig$(basis AS STRING, istZustand AS BOOLEAN) AS STRING
+    DIM kandidat AS STRING : kandidat = basis
+    DIM n AS INTEGER : n = 1
+    WHILE TRUE
+        DIM frei AS BOOLEAN
+        IF istZustand THEN frei = zustandIndex(kandidat) < 0 ELSE frei = paramIndex(kandidat) < 0
+        IF frei THEN RETURN kandidat
+        n = n + 1
+        kandidat = basis + STR$(n)
+    WEND
+    RETURN kandidat
+END FUNCTION
+
+FUNCTION amRaster(v AS INTEGER) AS INTEGER
+    RETURN INT((v + RASTER \ 2) \ RASTER) * RASTER
+END FUNCTION
+
+FUNCTION leereMaschine$() AS STRING
+    DIM q AS STRING : q = CHR$(34)
+    RETURN "{" + q + "version" + q + ":1," + q + "sheet" + q + ":" + q + q + "," + q + "frame_w" + q + ":16," + q + "frame_h" + q + ":16," + q + "scale" + q + ":4.0," + q + "default" + q + ":" + q + q + "," + q + "params" + q + ":[]," + q + "states" + q + ":[]," + q + "transitions" + q + ":[]}"
+END FUNCTION
+
+' --- Rueckgaengig -------------------------------------------------------------
+SUB merken()
+    DIM t AS STRING : t = JSON_STRINGIFY(doc)
+    WHILE LEN(staende) > standPos + 1
+        ARRAY_REMOVE_AT(staende, LEN(staende) - 1)
+    WEND
+    ARRAY_PUSH(staende, t)
+    IF LEN(staende) > 200 THEN ARRAY_REMOVE_AT(staende, 0)
+    standPos = LEN(staende) - 1
+    geaendert = TRUE
+END SUB
+
+' --- Fenster links: Dokument + Parameter (mit Menue) --------------------------
+DIM winLinks AS GUI_WINDOW : winLinks = GUI_WINDOW("Dokument", 0, 0, LINKS_B, SCREENHEIGHT())
+GUI_WINDOW_CHROME(winLinks, FALSE)
+GUI_WINDOW_MOVABLE(winLinks, FALSE)
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(winLinks, "Datei")
+DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
+DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
+DIM miSichern AS INTEGER : miSichern = GUI_MENU_ITEM(mDatei, "Sichern", "Strg+S")
+DIM miSichernAls AS INTEGER : miSichernAls = GUI_MENU_ITEM(mDatei, "Sichern unter ...", "Strg+Umschalt+S")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miVorschau AS INTEGER : miVorschau = GUI_MENU_ITEM(mDatei, "Vorschau", "F5")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
+DIM mBearb AS INTEGER : mBearb = GUI_MENU(winLinks, "Bearbeiten")
+DIM miRueck AS INTEGER : miRueck = GUI_MENU_ITEM(mBearb, "Rueckgaengig", "Strg+Z")
+DIM miWieder AS INTEGER : miWieder = GUI_MENU_ITEM(mBearb, "Wiederholen", "Strg+Y")
+GUI_MENU_SEPARATOR(mBearb)
+DIM miZustand AS INTEGER : miZustand = GUI_MENU_ITEM(mBearb, "Zustand anlegen", "Einfg")
+DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mBearb, "Als Startzustand")
+DIM miLoeschen AS INTEGER : miLoeschen = GUI_MENU_ITEM(mBearb, "Loeschen")
+
+DIM lblDok AS GUI_WIDGET : lblDok = GUI_LABEL(winLinks, "Sprite-Blatt", 8, 10)
+DIM fSheet AS GUI_WIDGET : fSheet = GUI_TEXTINPUT(winLinks, 8, 30, LINKS_B - 58, 26, "")
+DIM btnSheet AS GUI_WIDGET : btnSheet = GUI_BUTTON(winLinks, "...", LINKS_B - 44, 30, 36, 26)
+DIM lblBild AS GUI_WIDGET : lblBild = GUI_LABEL(winLinks, "Bild B x H", 8, 66)
+DIM fFrameW AS GUI_WIDGET : fFrameW = GUI_TEXTINPUT(winLinks, 96, 62, 60, 26, "")
+DIM fFrameH AS GUI_WIDGET : fFrameH = GUI_TEXTINPUT(winLinks, 164, 62, 60, 26, "")
+DIM lblSkala AS GUI_WIDGET : lblSkala = GUI_LABEL(winLinks, "Skala", 8, 98)
+DIM fSkala AS GUI_WIDGET : fSkala = GUI_TEXTINPUT(winLinks, 96, 94, 60, 26, "")
+GUI_TEXTINPUT_SET(fFrameW, "zahlen", 1) : GUI_TEXTINPUT_SET(fFrameH, "zahlen", 1) : GUI_TEXTINPUT_SET(fSkala, "zahlen", 2)
+
+DIM lblPar AS GUI_WIDGET : lblPar = GUI_LABEL(winLinks, "Parameter", 8, 134)
+DIM lstParam AS GUI_WIDGET : lstParam = GUI_LISTBOX(winLinks, 8, 154, LINKS_B - 16, 150, [])
+DIM btnParPlus AS GUI_WIDGET : btnParPlus = GUI_BUTTON(winLinks, "+", 8, 310, 40, 24)
+DIM btnParMinus AS GUI_WIDGET : btnParMinus = GUI_BUTTON(winLinks, "-", 54, 310, 40, 24)
+DIM lblPName AS GUI_WIDGET : lblPName = GUI_LABEL(winLinks, "Name", 8, 346)
+DIM fPName AS GUI_WIDGET : fPName = GUI_TEXTINPUT(winLinks, 96, 342, LINKS_B - 104, 26, "")
+DIM lblPTyp AS GUI_WIDGET : lblPTyp = GUI_LABEL(winLinks, "Typ", 8, 378)
+DIM ddPTyp AS GUI_WIDGET : ddPTyp = GUI_DROPDOWN(winLinks, 96, 374, LINKS_B - 104, 24, typNamen)
+DIM lblPVor AS GUI_WIDGET : lblPVor = GUI_LABEL(winLinks, "Vorgabe", 8, 410)
+DIM fPVor AS GUI_WIDGET : fPVor = GUI_TEXTINPUT(winLinks, 96, 406, LINKS_B - 104, 26, "")
+DIM btnPUeb AS GUI_WIDGET : btnPUeb = GUI_BUTTON(winLinks, "Uebernehmen", 96, 440, 130, 26)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winLinks, "Bereit.", 8, 490)
+GUI_SET_WRAP(lblStatus, LINKS_B - 16)
+DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(winLinks, "Doppelklick = Zustand. Rechte Maustaste von Knoten zu Knoten ziehen = Uebergang. Klick auf den Pfeil = bearbeiten. Entf loescht.", 8, 560)
+GUI_SET_WRAP(lblHilfe, LINKS_B - 16)
+DIM paramSel AS INTEGER : paramSel = -1
+DIM stumm AS BOOLEAN : stumm = FALSE         ' beim Fuellen nicht als Eingabe werten
+
+' --- Fenster rechts: Inspektor -------------------------------------------------
+DIM winInsp AS GUI_WINDOW : winInsp = GUI_WINDOW("Inspektor", SCREENWIDTH() - INSP_B, 0, INSP_B, SCREENHEIGHT())
+GUI_WINDOW_CHROME(winInsp, FALSE)
+GUI_WINDOW_MOVABLE(winInsp, FALSE)
+DIM lblInsp AS GUI_WIDGET : lblInsp = GUI_LABEL(winInsp, "Nichts gewaehlt", 8, 8)
+GUI_SET_WRAP(lblInsp, INSP_B - 16)
+
+' Zustand
+DIM zLabels AS ARRAY OF GUI_WIDGET : zLabels = []
+DIM zFelder AS ARRAY OF GUI_WIDGET : zFelder = []
+FUNCTION zFeld(titel AS STRING, zeile AS INTEGER) AS GUI_WIDGET
+    DIM y AS INTEGER : y = 36 + zeile * 34
+    DIM l AS GUI_WIDGET : l = GUI_LABEL(winInsp, titel, 8, y + 4)
+    DIM f AS GUI_WIDGET : f = GUI_TEXTINPUT(winInsp, 110, y, INSP_B - 120, 26, "")
+    ARRAY_PUSH(zLabels, l) : ARRAY_PUSH(zFelder, f)
+    RETURN f
+END FUNCTION
+DIM fZName AS GUI_WIDGET : fZName = zFeld("Name", 0)
+DIM fZAnim AS GUI_WIDGET : fZAnim = zFeld("Animation", 1)
+DIM fZVon AS GUI_WIDGET : fZVon = zFeld("Bild von", 2)
+DIM fZBis AS GUI_WIDGET : fZBis = zFeld("Bild bis", 3)
+DIM fZFps AS GUI_WIDGET : fZFps = zFeld("Bilder/s", 4)
+GUI_TEXTINPUT_SET(fZVon, "zahlen", 1) : GUI_TEXTINPUT_SET(fZBis, "zahlen", 1) : GUI_TEXTINPUT_SET(fZFps, "zahlen", 2)
+DIM cbLoop AS GUI_WIDGET : cbLoop = GUI_CHECKBOX(winInsp, "Endlos (sonst einmal)", 110, 36 + 5 * 34)
+DIM cbStart AS GUI_WIDGET : cbStart = GUI_CHECKBOX(winInsp, "Startzustand", 110, 36 + 6 * 34)
+DIM btnZUeb AS GUI_WIDGET : btnZUeb = GUI_BUTTON(winInsp, "Uebernehmen", 110, 36 + 7 * 34, 140, 28)
+
+' Uebergang
+DIM cbWarten AS GUI_WIDGET : cbWarten = GUI_CHECKBOX(winInsp, "Erst wenn die Animation fertig ist", 8, 40)
+DIM lblBed AS GUI_WIDGET : lblBed = GUI_LABEL(winInsp, "Bedingungen (alle muessen gelten):", 8, 74)
+DIM bParam[MAX_BED] AS GUI_WIDGET
+DIM bOp[MAX_BED] AS GUI_WIDGET
+DIM bWert[MAX_BED] AS GUI_WIDGET
+DIM bWeg[MAX_BED] AS GUI_WIDGET
+DIM bi AS INTEGER
+FOR bi = 0 TO MAX_BED - 1
+    DIM by AS INTEGER : by = 98 + bi * 32
+    bParam[bi] = GUI_DROPDOWN(winInsp, 8, by, 96, 24, [])
+    bOp[bi] = GUI_DROPDOWN(winInsp, 110, by, 92, 24, opName)
+    bWert[bi] = GUI_TEXTINPUT(winInsp, 208, by, 84, 24, "")
+    GUI_TEXTINPUT_SET(bWert[bi], "zahlen", 2)
+    bWeg[bi] = GUI_BUTTON(winInsp, "x", 298, by, 30, 24)
+NEXT
+DIM btnBedPlus AS GUI_WIDGET : btnBedPlus = GUI_BUTTON(winInsp, "+ Bedingung", 8, 98 + MAX_BED * 32 + 6, 130, 26)
+DIM btnUUeb AS GUI_WIDGET : btnUUeb = GUI_BUTTON(winInsp, "Uebernehmen", 148, 98 + MAX_BED * 32 + 6, 140, 26)
+DIM lblHinweis AS GUI_WIDGET : lblHinweis = GUI_LABEL(winInsp, "", 8, 98 + MAX_BED * 32 + 48)
+GUI_SET_WRAP(lblHinweis, INSP_B - 16)
+
+FUNCTION paramNamen() AS ARRAY OF STRING
+    DIM n AS ARRAY OF STRING : n = []
+    DIM i AS INTEGER
+    FOR i = 0 TO np() - 1
+        ARRAY_PUSH(n, text$(pp$(i, "name")))
+    NEXT
+    RETURN n
+END FUNCTION
+
+SUB inspektorSichtbar()
+    DIM zustand AS BOOLEAN : zustand = selArt = 1 AND selIdx >= 0 AND selIdx < nz()
+    DIM ueber AS BOOLEAN : ueber = selArt = 2 AND selIdx >= 0 AND selIdx < nu()
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zFelder) - 1
+        GUI_SET_VISIBLE(zFelder[i], zustand) : GUI_SET_VISIBLE(zLabels[i], zustand)
+    NEXT
+    GUI_SET_VISIBLE(cbLoop, zustand) : GUI_SET_VISIBLE(cbStart, zustand) : GUI_SET_VISIBLE(btnZUeb, zustand)
+    GUI_SET_VISIBLE(cbWarten, ueber) : GUI_SET_VISIBLE(lblBed, ueber)
+    DIM anz AS INTEGER : anz = 0
+    IF ueber THEN anz = JSON_LEN(doc, up$(selIdx, "conditions"))
+    FOR i = 0 TO MAX_BED - 1
+        DIM da AS BOOLEAN : da = ueber AND i < anz
+        GUI_SET_VISIBLE(bParam[i], da) : GUI_SET_VISIBLE(bOp[i], da) : GUI_SET_VISIBLE(bWert[i], da) : GUI_SET_VISIBLE(bWeg[i], da)
+    NEXT
+    GUI_SET_VISIBLE(btnBedPlus, ueber AND anz < MAX_BED AND np() > 0) : GUI_SET_VISIBLE(btnUUeb, ueber)
+END SUB
+
+SUB inspektorFuellen()
+    stumm = TRUE
+    inspektorSichtbar()
+    IF selArt = 1 AND selIdx >= 0 AND selIdx < nz() THEN
+        GUI_SET_TEXT(lblInsp, "Zustand")
+        GUI_SET_TEXT(fZName, text$(zp$(selIdx, "name")))
+        GUI_SET_TEXT(fZAnim, animName$(selIdx))
+        GUI_SET_TEXT(fZVon, STR$(ganz(zp$(selIdx, "first"), 0)))
+        GUI_SET_TEXT(fZBis, STR$(ganz(zp$(selIdx, "last"), 0)))
+        GUI_SET_TEXT(fZFps, zahl$(komma(zp$(selIdx, "fps"), 8.0)))
+        GUI_SET_CHECKED(cbLoop, wahr(zp$(selIdx, "loop"), TRUE))
+        GUI_SET_CHECKED(cbStart, startZustand$() = text$(zp$(selIdx, "name")))
+        GUI_SET_TEXT(lblHinweis, "Enter in einem Feld oder [Uebernehmen] schreibt die Werte. Bild von/bis sind Einzelbilder auf dem Blatt.")
+    ELSEIF selArt = 2 AND selIdx >= 0 AND selIdx < nu() THEN
+        DIM von AS STRING : von = text$(up$(selIdx, "from"))
+        IF von = "" OR von = "*" THEN von = "Any State"
+        GUI_SET_TEXT(lblInsp, "Uebergang  " + von + "  ->  " + text$(up$(selIdx, "to")))
+        GUI_SET_CHECKED(cbWarten, wahr(up$(selIdx, "wait_finished"), FALSE))
+        DIM namen AS ARRAY OF STRING : namen = paramNamen()
+        DIM anz AS INTEGER : anz = JSON_LEN(doc, up$(selIdx, "conditions"))
+        DIM k AS INTEGER
+        FOR k = 0 TO MIN(anz, MAX_BED) - 1
+            DIM cp AS STRING : cp = up$(selIdx, "conditions." + STR$(k))
+            GUI_SET_DROPDOWN(bParam[k], namen)
+            DIM pi AS INTEGER : pi = ARRAY_INDEXOF(namen, text$(cp + ".param"))
+            IF pi < 0 THEN pi = 0
+            GUI_DROPDOWN_SET_SELECTED(bParam[k], pi)
+            GUI_DROPDOWN_SET_SELECTED(bOp[k], opIndex(text$(cp + ".op")))
+            GUI_SET_TEXT(bWert[k], zahl$(komma(cp + ".value", 0.0)))
+        NEXT
+        IF np() = 0 THEN
+            GUI_SET_TEXT(lblHinweis, "Ohne Parameter gibt es keine Bedingung -- links einen anlegen. Ein Uebergang ohne Bedingung feuert sofort (mit 'fertig': nach der Animation).")
+        ELSE
+            GUI_SET_TEXT(lblHinweis, "Hoechstens " + STR$(MAX_BED) + " Bedingungen je Uebergang. Zahlvergleiche lesen den Wert, 'ist wahr/falsch' und 'ausgeloest' nicht.")
+        END IF
+    ELSE
+        GUI_SET_TEXT(lblInsp, "Nichts gewaehlt")
+        GUI_SET_TEXT(lblHinweis, "Ein Klick auf einen Knoten oder Pfeil zeigt hier seine Werte.")
+    END IF
+    stumm = FALSE
+END SUB
+
+' --- Parameter-Panel -------------------------------------------------------
+SUB paramListeFuellen()
+    DIM z AS ARRAY OF STRING : z = []
+    DIM i AS INTEGER
+    FOR i = 0 TO np() - 1
+        ARRAY_PUSH(z, text$(pp$(i, "name")) + "  (" + text$(pp$(i, "type")) + ")")
+    NEXT
+    GUI_SET_LISTBOX(lstParam, z)
+    IF paramSel >= np() THEN paramSel = -1
+    IF paramSel >= 0 THEN GUI_LISTBOX_SET_SELECTED(lstParam, paramSel)
+END SUB
+
+SUB paramFelderFuellen()
+    stumm = TRUE
+    DIM da AS BOOLEAN : da = paramSel >= 0 AND paramSel < np()
+    GUI_SET_ENABLED(fPName, da) : GUI_SET_ENABLED(ddPTyp, da) : GUI_SET_ENABLED(fPVor, da) : GUI_SET_ENABLED(btnPUeb, da)
+    IF da THEN
+        GUI_SET_TEXT(fPName, text$(pp$(paramSel, "name")))
+        DIM t AS STRING : t = text$(pp$(paramSel, "type"))
+        DIM ti AS INTEGER : ti = ARRAY_INDEXOF(typNamen, t)
+        IF ti < 0 THEN ti = 1
+        GUI_DROPDOWN_SET_SELECTED(ddPTyp, ti)
+        DIM vp AS STRING : vp = pp$(paramSel, "default")
+        IF t = "bool" THEN
+            GUI_SET_TEXT(fPVor, IIF(wahr(vp, FALSE), "1", "0"))
+        ELSEIF t = "trigger" THEN
+            GUI_SET_TEXT(fPVor, "")
+        ELSE
+            GUI_SET_TEXT(fPVor, zahl$(komma(vp, 0.0)))
+        END IF
+    ELSE
+        GUI_SET_TEXT(fPName, "") : GUI_SET_TEXT(fPVor, "")
+    END IF
+    stumm = FALSE
+END SUB
+
+SUB dokumentFuellen()
+    stumm = TRUE
+    GUI_SET_TEXT(fSheet, text$("sheet"))
+    GUI_SET_TEXT(fFrameW, STR$(ganz("frame_w", 16)))
+    GUI_SET_TEXT(fFrameH, STR$(ganz("frame_h", 16)))
+    GUI_SET_TEXT(fSkala, zahl$(komma("scale", 4.0)))
+    stumm = FALSE
+END SUB
+
+SUB allesFuellen()
+    dokumentFuellen()
+    paramListeFuellen()
+    paramFelderFuellen()
+    inspektorFuellen()
+END SUB
+
+SUB dokumentUebernehmen()
+    JSON_SET_STRING(doc, "sheet", GUI_TEXT(fSheet))
+    JSON_SET_INT(doc, "frame_w", MAX(1, INT(VAL(GUI_TEXT(fFrameW)))))
+    JSON_SET_INT(doc, "frame_h", MAX(1, INT(VAL(GUI_TEXT(fFrameH)))))
+    DIM sk AS FLOAT : sk = VAL(GUI_TEXT(fSkala))
+    IF sk <= 0.0 THEN sk = 1.0
+    JSON_SET_FLOAT(doc, "scale", sk)
+    merken()
+    dokumentFuellen()
+    protokoll("dokument " + GUI_TEXT(fSheet) + " " + STR$(ganz("frame_w", 16)) + " " + STR$(ganz("frame_h", 16)))
+END SUB
+
+' Ein Klick auf einen Knopf gibt seinem Fenster den Fokus -- und Kuerzel wie
+' Strg+S gelten nur im Fenster mit Fokus, dessen Menue links haengt. Also nach
+' jedem Knopf zurueck zur Parameterliste; Eingabefelder behalten ihren Fokus.
+SUB fokusZurueck()
+    GUI_FOCUS(lstParam)
+END SUB
+
+SUB paramAnlegen()
+    DIM p AS JSON_HANDLE : p = JSON_NEW_OBJECT()
+    DIM n AS STRING : n = eindeutig$("param", FALSE)
+    JSON_SET_STRING(p, "name", n)
+    JSON_SET_STRING(p, "type", "float")
+    JSON_SET_FLOAT(p, "default", 0.0)
+    JSON_APPEND_JSON(doc, "params", p)
+    paramSel = np() - 1
+    merken()
+    paramListeFuellen()
+    paramFelderFuellen()
+    inspektorFuellen()
+    protokoll("parameter " + n)
+END SUB
+
+' Bedingungen, die einen Parameter nennen, entfernen (von hinten, damit die
+' Nummern der vorderen stehen bleiben).
+SUB bedingungenOhne(name AS STRING)
+    DIM t AS INTEGER
+    FOR t = 0 TO nu() - 1
+        DIM k AS INTEGER
+        FOR k = JSON_LEN(doc, up$(t, "conditions")) - 1 TO 0 STEP -1
+            IF text$(up$(t, "conditions." + STR$(k) + ".param")) = name THEN JSON_REMOVE(doc, up$(t, "conditions." + STR$(k)))
+        NEXT
+    NEXT
+END SUB
+
+SUB paramLoeschen()
+    IF paramSel < 0 OR paramSel >= np() THEN RETURN
+    DIM n AS STRING : n = text$(pp$(paramSel, "name"))
+    JSON_REMOVE(doc, "params." + STR$(paramSel))
+    bedingungenOhne(n)
+    paramSel = -1
+    merken()
+    paramListeFuellen()
+    paramFelderFuellen()
+    inspektorFuellen()
+    protokoll("parameter weg " + n)
+END SUB
+
+SUB paramUebernehmen()
+    IF paramSel < 0 OR paramSel >= np() THEN RETURN
+    DIM alt AS STRING : alt = text$(pp$(paramSel, "name"))
+    DIM neu AS STRING : neu = TRIM$(GUI_TEXT(fPName))
+    IF neu <> "" AND neu <> alt AND paramIndex(neu) < 0 THEN
+        JSON_SET_STRING(doc, pp$(paramSel, "name"), neu)
+        ' Bedingungen ziehen mit -- sie nennen den Parameter beim Namen.
+        DIM t AS INTEGER
+        FOR t = 0 TO nu() - 1
+            DIM k AS INTEGER
+            FOR k = 0 TO JSON_LEN(doc, up$(t, "conditions")) - 1
+                DIM cp AS STRING : cp = up$(t, "conditions." + STR$(k) + ".param")
+                IF text$(cp) = alt THEN JSON_SET_STRING(doc, cp, neu)
+            NEXT
+        NEXT
+    END IF
+    DIM typ AS STRING : typ = typNamen[MAX(0, GUI_DROPDOWN_SELECTED(ddPTyp))]
+    JSON_SET_STRING(doc, pp$(paramSel, "type"), typ)
+    DIM vp AS STRING : vp = pp$(paramSel, "default")
+    IF typ = "trigger" THEN
+        IF JSON_HAS(doc, vp) THEN JSON_REMOVE(doc, vp)
+    ELSEIF typ = "bool" THEN
+        JSON_SET_BOOL(doc, vp, VAL(GUI_TEXT(fPVor)) <> 0)
+    ELSEIF typ = "int" THEN
+        JSON_SET_INT(doc, vp, INT(VAL(GUI_TEXT(fPVor))))
+    ELSE
+        JSON_SET_FLOAT(doc, vp, VAL(GUI_TEXT(fPVor)))
+    END IF
+    merken()
+    paramListeFuellen()
+    paramFelderFuellen()
+    inspektorFuellen()
+    protokoll("parameter " + text$(pp$(paramSel, "name")) + " " + typ)
+END SUB
+
+' --- Zustaende und Uebergaenge -------------------------------------------------
+SUB zustandAnlegen(x AS INTEGER, y AS INTEGER)
+    DIM s AS JSON_HANDLE : s = JSON_NEW_OBJECT()
+    DIM n AS STRING : n = eindeutig$("state", TRUE)
+    ' Das naechste Einzelbild hinter dem letzten Zustand -- spart Klicks,
+    ' wenn mehrere Zustaende nacheinander auf ein Blatt gelegt werden.
+    DIM erstes AS INTEGER : erstes = 0
+    IF nz() > 0 THEN erstes = ganz(zp$(nz() - 1, "last"), -1) + 1
+    JSON_SET_STRING(s, "name", n) : JSON_SET_STRING(s, "anim", n)
+    JSON_SET_BOOL(s, "loop", TRUE)
+    JSON_SET_INT(s, "first", erstes) : JSON_SET_INT(s, "last", erstes)
+    JSON_SET_FLOAT(s, "fps", 8.0)
+    JSON_SET_INT(s, "x", MAX(0, amRaster(x))) : JSON_SET_INT(s, "y", MAX(0, amRaster(y)))
+    JSON_APPEND_JSON(doc, "states", s)
+    IF text$("default") = "" THEN JSON_SET_STRING(doc, "default", n)
+    selArt = 1 : selIdx = nz() - 1
+    merken()
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, "Zustand " + n + " angelegt.")
+    protokoll("zustand " + n + " " + STR$(MAX(0, amRaster(x))) + " " + STR$(MAX(0, amRaster(y))))
+END SUB
+
+SUB uebergangAnlegen(von AS STRING, nach AS STRING)
+    IF nach = "" OR nach = "*" OR von = nach THEN RETURN
+    IF zustandIndex(nach) < 0 THEN RETURN
+    IF von <> "*" AND zustandIndex(von) < 0 THEN RETURN
+    DIM t AS JSON_HANDLE : t = JSON_NEW_OBJECT()
+    JSON_SET_STRING(t, "from", von) : JSON_SET_STRING(t, "to", nach)
+    JSON_SET_JSON(t, "conditions", JSON_NEW_ARRAY())
+    JSON_APPEND_JSON(doc, "transitions", t)
+    selArt = 2 : selIdx = nu() - 1
+    merken()
+    inspektorFuellen()
+    GUI_SET_TEXT(lblStatus, "Uebergang " + von + " -> " + nach + " angelegt. Bedingungen rechts.")
+    protokoll("verbunden " + von + " " + nach)
+END SUB
+
+SUB umbenennen(alt AS STRING, neu AS STRING)
+    DIM i AS INTEGER : i = zustandIndex(alt)
+    IF i < 0 THEN RETURN
+    IF animName$(i) = alt THEN JSON_SET_STRING(doc, zp$(i, "anim"), neu)
+    JSON_SET_STRING(doc, zp$(i, "name"), neu)
+    DIM t AS INTEGER
+    FOR t = 0 TO nu() - 1
+        IF text$(up$(t, "from")) = alt THEN JSON_SET_STRING(doc, up$(t, "from"), neu)
+        IF text$(up$(t, "to")) = alt THEN JSON_SET_STRING(doc, up$(t, "to"), neu)
+    NEXT
+    IF text$("default") = alt THEN JSON_SET_STRING(doc, "default", neu)
+END SUB
+
+SUB loeschen()
+    IF selArt = 1 AND selIdx >= 0 AND selIdx < nz() THEN
+        DIM n AS STRING : n = text$(zp$(selIdx, "name"))
+        JSON_REMOVE(doc, "states." + STR$(selIdx))
+        DIM t AS INTEGER
+        FOR t = nu() - 1 TO 0 STEP -1
+            IF text$(up$(t, "from")) = n OR text$(up$(t, "to")) = n THEN JSON_REMOVE(doc, "transitions." + STR$(t))
+        NEXT
+        IF text$("default") = n THEN JSON_SET_STRING(doc, "default", startZustand$())
+        protokoll("geloescht zustand " + n + " " + STR$(nz()) + " " + STR$(nu()))
+    ELSEIF selArt = 2 AND selIdx >= 0 AND selIdx < nu() THEN
+        protokoll("geloescht uebergang " + text$(up$(selIdx, "from")) + " " + text$(up$(selIdx, "to")))
+        JSON_REMOVE(doc, "transitions." + STR$(selIdx))
+    ELSE
+        RETURN
+    END IF
+    selArt = 0 : selIdx = -1
+    merken()
+    inspektorFuellen()
+END SUB
+
+SUB alsStart()
+    IF selArt <> 1 OR selIdx < 0 THEN RETURN
+    JSON_SET_STRING(doc, "default", text$(zp$(selIdx, "name")))
+    merken()
+    inspektorFuellen()
+    protokoll("start " + text$("default"))
+END SUB
+
+SUB zustandUebernehmen()
+    IF selArt <> 1 OR selIdx < 0 OR selIdx >= nz() THEN RETURN
+    DIM alt AS STRING : alt = text$(zp$(selIdx, "name"))
+    DIM neu AS STRING : neu = TRIM$(GUI_TEXT(fZName))
+    IF neu <> "" AND neu <> "*" AND neu <> alt AND zustandIndex(neu) < 0 THEN umbenennen(alt, neu)
+    DIM a AS STRING : a = TRIM$(GUI_TEXT(fZAnim))
+    IF a = "" THEN a = text$(zp$(selIdx, "name"))
+    JSON_SET_STRING(doc, zp$(selIdx, "anim"), a)
+    DIM von AS INTEGER : von = MAX(0, INT(VAL(GUI_TEXT(fZVon))))
+    DIM bis AS INTEGER : bis = MAX(von, INT(VAL(GUI_TEXT(fZBis))))
+    JSON_SET_INT(doc, zp$(selIdx, "first"), von) : JSON_SET_INT(doc, zp$(selIdx, "last"), bis)
+    DIM fps AS FLOAT : fps = VAL(GUI_TEXT(fZFps))
+    IF fps <= 0.0 THEN fps = 8.0
+    JSON_SET_FLOAT(doc, zp$(selIdx, "fps"), fps)
+    JSON_SET_BOOL(doc, zp$(selIdx, "loop"), GUI_CHECKED(cbLoop))
+    IF GUI_CHECKED(cbStart) THEN JSON_SET_STRING(doc, "default", text$(zp$(selIdx, "name")))
+    merken()
+    inspektorFuellen()
+    protokoll("uebernommen zustand " + text$(zp$(selIdx, "name")))
+END SUB
+
+SUB uebergangUebernehmen()
+    IF selArt <> 2 OR selIdx < 0 OR selIdx >= nu() THEN RETURN
+    IF GUI_CHECKED(cbWarten) THEN
+        JSON_SET_BOOL(doc, up$(selIdx, "wait_finished"), TRUE)
+    ELSEIF JSON_HAS(doc, up$(selIdx, "wait_finished")) THEN
+        JSON_REMOVE(doc, up$(selIdx, "wait_finished"))
+    END IF
+    DIM namen AS ARRAY OF STRING : namen = paramNamen()
+    DIM anz AS INTEGER : anz = MIN(JSON_LEN(doc, up$(selIdx, "conditions")), MAX_BED)
+    DIM neu AS JSON_HANDLE : neu = JSON_NEW_ARRAY()
+    DIM k AS INTEGER
+    FOR k = 0 TO anz - 1
+        IF LEN(namen) = 0 THEN CONTINUE
+        DIM c AS JSON_HANDLE : c = JSON_NEW_OBJECT()
+        JSON_SET_STRING(c, "param", namen[MAX(0, GUI_DROPDOWN_SELECTED(bParam[k]))])
+        DIM op AS STRING : op = opCode[MAX(0, GUI_DROPDOWN_SELECTED(bOp[k]))]
+        JSON_SET_STRING(c, "op", op)
+        IF istZahlOp(op) THEN JSON_SET_FLOAT(c, "value", VAL(GUI_TEXT(bWert[k])))
+        JSON_APPEND_JSON(neu, "", c)
+    NEXT
+    JSON_SET_JSON(doc, up$(selIdx, "conditions"), neu)
+    merken()
+    inspektorFuellen()
+    protokoll("uebernommen uebergang " + STR$(JSON_LEN(doc, up$(selIdx, "conditions"))))
+END SUB
+
+SUB bedingungHinzu()
+    IF selArt <> 2 OR selIdx < 0 OR np() = 0 THEN RETURN
+    IF JSON_LEN(doc, up$(selIdx, "conditions")) >= MAX_BED THEN RETURN
+    uebergangUebernehmen()          ' was in den Zeilen steht, zuerst sichern
+    DIM c AS JSON_HANDLE : c = JSON_NEW_OBJECT()
+    DIM t AS STRING : t = text$(pp$(0, "type"))
+    JSON_SET_STRING(c, "param", text$(pp$(0, "name")))
+    IF t = "trigger" THEN
+        JSON_SET_STRING(c, "op", "trigger")
+    ELSEIF t = "bool" THEN
+        JSON_SET_STRING(c, "op", "is_true")
+    ELSE
+        JSON_SET_STRING(c, "op", "gt") : JSON_SET_FLOAT(c, "value", 0.0)
+    END IF
+    JSON_APPEND_JSON(doc, up$(selIdx, "conditions"), c)
+    merken()
+    inspektorFuellen()
+    protokoll("bedingung " + STR$(JSON_LEN(doc, up$(selIdx, "conditions"))))
+END SUB
+
+SUB bedingungWeg(k AS INTEGER)
+    IF selArt <> 2 OR selIdx < 0 THEN RETURN
+    IF k >= JSON_LEN(doc, up$(selIdx, "conditions")) THEN RETURN
+    JSON_REMOVE(doc, up$(selIdx, "conditions." + STR$(k)))
+    merken()
+    inspektorFuellen()
+    protokoll("bedingung " + STR$(JSON_LEN(doc, up$(selIdx, "conditions"))))
+END SUB
+
+SUB standHolen()
+    doc = JSON_PARSE(staende[standPos])
+    IF selArt = 1 AND selIdx >= nz() THEN selArt = 0 : selIdx = -1
+    IF selArt = 2 AND selIdx >= nu() THEN selArt = 0 : selIdx = -1
+    allesFuellen()
+END SUB
+
+SUB rueckgaengig()
+    IF standPos <= 0 THEN RETURN
+    standPos = standPos - 1
+    standHolen()
+    protokoll("rueckgaengig " + STR$(nz()) + " " + STR$(nu()))
+END SUB
+
+SUB wiederholen()
+    IF standPos >= LEN(staende) - 1 THEN RETURN
+    standPos = standPos + 1
+    standHolen()
+    protokoll("wiederholen " + STR$(nz()) + " " + STR$(nu()))
+END SUB
+
+' --- Datei ------------------------------------------------------------------
+SUB nachLaden()
+    IF NOT JSON_HAS(doc, "params") THEN JSON_SET_JSON(doc, "params", JSON_NEW_ARRAY())
+    IF NOT JSON_HAS(doc, "states") THEN JSON_SET_JSON(doc, "states", JSON_NEW_ARRAY())
+    IF NOT JSON_HAS(doc, "transitions") THEN JSON_SET_JSON(doc, "transitions", JSON_NEW_ARRAY())
+    IF NOT JSON_HAS(doc, "version") THEN JSON_SET_INT(doc, "version", 1)
+    selArt = 0 : selIdx = -1 : paramSel = -1
+    staende = [] : standPos = -1
+    merken()
+    geaendert = FALSE
+    allesFuellen()
+END SUB
+
+SUB neueMaschine()
+    doc = JSON_PARSE(leereMaschine$())
+    pfad = ""
+    nachLaden()
+    GUI_SET_TEXT(lblStatus, "Neue Zustandsmaschine.")
+END SUB
+
+SUB laden(p AS STRING)
+    IF NOT FILEEXISTS(p) THEN
+        neueMaschine()
+        pfad = p
+        GUI_SET_TEXT(lblStatus, "Neu: " + p)
+        protokoll("neu-datei " + p)
+        RETURN
+    END IF
+    doc = JSON_LOAD(p)
+    pfad = p
+    nachLaden()
+    GUI_SET_TEXT(lblStatus, "Geladen: " + p + " (" + STR$(nz()) + " Zustaende, " + STR$(nu()) + " Uebergaenge)")
+    protokoll("geladen " + STR$(nz()) + " " + STR$(nu()))
+END SUB
+
+FUNCTION sichern(alsNeu AS BOOLEAN) AS BOOLEAN
+    IF pfad = "" OR alsNeu THEN
+        DIM p AS STRING : p = FILE_SAVE_DIALOG("Zustandsmaschine sichern", "maschine.dhanim", "dhanim")
+        IF p = "" THEN RETURN FALSE
+        pfad = p
+    END IF
+    JSON_SET_STRING(doc, "default", startZustand$())
+    WRITEALL(pfad, JSON_PRETTY(doc))
+    geaendert = FALSE
+    GUI_SET_TEXT(lblStatus, "Gesichert: " + pfad)
+    protokoll("gesichert " + pfad)
+    RETURN TRUE
+END FUNCTION
+
+' --- Vorschau: Programm wie der Qt-Editor, dann dhrt run ----------------------
+DIM laufProzess AS INTEGER : laufProzess = -1
+
+FUNCTION dhString$(s AS STRING) AS STRING
+    RETURN CHR$(34) + REPLACE$(s, CHR$(34), CHR$(34) + CHR$(34)) + CHR$(34)
+END FUNCTION
+
+FUNCTION absolut$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = "\" OR MID$(p, 1, 1) = ":" THEN RETURN p
+    RETURN PATHJOIN(CWD$(), p)
+END FUNCTION
+
+' Das Sprite-Blatt finden: wie eingetragen, neben der .dhanim, oder vom
+' Startordner aus. Absolut, mit Schraegstrichen -- das Vorschauprogramm
+' laeuft im Ordner der .dhanim.
+FUNCTION blattPfad$() AS STRING
+    DIM s AS STRING : s = text$("sheet")
+    IF s = "" THEN RETURN ""
+    DIM k AS STRING
+    FOR EACH k IN (s, PATHJOIN(DIRNAME(pfad), s), PATHJOIN(GETENV$("DHRT_START_DIR"), s))
+        IF FILEEXISTS(k) THEN RETURN REPLACE$(absolut$(k), "\", "/")
+    NEXT
+    RETURN ""
+END FUNCTION
+
+' Regler-Bereich eines Zahlparameters: aus den Schwellen der Bedingungen,
+' damit sich jeder Uebergang in der Vorschau auch ausloesen laesst.
+FUNCTION reglerBis(name AS STRING, typ AS STRING) AS FLOAT
+    DIM hi AS FLOAT : hi = 1.0
+    DIM t AS INTEGER
+    FOR t = 0 TO nu() - 1
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(doc, up$(t, "conditions")) - 1
+            DIM cp AS STRING : cp = up$(t, "conditions." + STR$(k))
+            IF text$(cp + ".param") = name AND istZahlOp(text$(cp + ".op")) THEN hi = MAX(hi, ABS(komma(cp + ".value", 0.0)) * 2.0)
+        NEXT
+    NEXT
+    IF typ = "int" THEN hi = MAX(hi, 10.0)
+    RETURN hi
+END FUNCTION
+
+FUNCTION vorschauProgramm$() AS STRING
+    DIM z AS ARRAY OF STRING : z = []
+    DIM blatt AS STRING : blatt = blattPfad$()
+    DIM fw AS INTEGER : fw = ganz("frame_w", 16)
+    DIM fh AS INTEGER : fh = ganz("frame_h", 16)
+    DIM sx AS INTEGER : sx = 640 - 230
+    DIM sy AS INTEGER : sy = 420 \ 2 - 20
+    ARRAY_PUSH(z, "' Erzeugt vom Anim-FSM-Editor -- Maschine: " + BASENAME(pfad))
+    ARRAY_PUSH(z, "IMPORT " + dhString$("animfsm"))
+    ARRAY_PUSH(z, "IMPORT " + dhString$("sprite"))
+    ARRAY_PUSH(z, "IMPORT " + dhString$("ui"))
+    ARRAY_PUSH(z, "SCREEN(640, 420, " + dhString$("Vorschau: " + BASENAME(pfad)) + ", 1)")
+    ARRAY_PUSH(z, "DIM spr AS SPRITE")
+    IF blatt <> "" THEN
+        ARRAY_PUSH(z, "DIM blatt AS IMAGE")
+        ARRAY_PUSH(z, "blatt = LOADIMAGE(" + dhString$(blatt) + ")")
+        ARRAY_PUSH(z, "spr = SPRITE_NEW(blatt, " + STR$(fw) + ", " + STR$(fh) + ")")
+    ELSE
+        ARRAY_PUSH(z, "spr = SPRITE_NEW(0, " + STR$(fw) + ", " + STR$(fh) + ")")
+    END IF
+    ARRAY_PUSH(z, "SPRITE_SET_SCALE(spr, " + STR$(komma("scale", 4.0)) + ", " + STR$(komma("scale", 4.0)) + ")")
+    ARRAY_PUSH(z, "SPRITE_SET_POS(spr, " + STR$(sx) + ", " + STR$(sy) + ")")
+    ARRAY_PUSH(z, "DIM fsm AS ANIM_FSM")
+    ARRAY_PUSH(z, "fsm = ANIM_FSM_LOAD(" + dhString$(BASENAME(pfad)) + ")")
+    ARRAY_PUSH(z, "ANIM_FSM_SETUP(fsm, spr)")
+    ARRAY_PUSH(z, "DIM vorher AS INTEGER : vorher = MILLIS()")
+    DIM i AS INTEGER
+    FOR i = 0 TO np() - 1
+        DIM t AS STRING : t = text$(pp$(i, "type"))
+        IF t = "float" OR t = "int" THEN ARRAY_PUSH(z, "DIM pv" + STR$(i) + " AS FLOAT")
+        IF t = "bool" THEN ARRAY_PUSH(z, "DIM pv" + STR$(i) + " AS BOOLEAN")
+    NEXT
+    ARRAY_PUSH(z, "WHILE NOT QUITREQUESTED()")
+    ARRAY_PUSH(z, "    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK")
+    ARRAY_PUSH(z, "    DIM jetzt AS INTEGER : jetzt = MILLIS()")
+    ARRAY_PUSH(z, "    DIM dt AS INTEGER : dt = jetzt - vorher")
+    ARRAY_PUSH(z, "    vorher = jetzt")
+    ARRAY_PUSH(z, "    CLS(RGB(26, 28, 40))")
+    ARRAY_PUSH(z, "    UI_PANEL(10, 10, 260, " + STR$(60 + MAX(1, np()) * 52) + ", " + dhString$("Parameter") + ")")
+    DIM y AS INTEGER : y = 44
+    FOR i = 0 TO np() - 1
+        DIM n AS STRING : n = text$(pp$(i, "name"))
+        DIM typ AS STRING : typ = text$(pp$(i, "type"))
+        DIM v AS STRING : v = "pv" + STR$(i)
+        IF typ = "float" OR typ = "int" THEN
+            DIM hi AS FLOAT : hi = reglerBis(n, typ)
+            DIM vor AS FLOAT : vor = MIN(hi, MAX(0.0, komma(pp$(i, "default"), 0.0)))
+            ARRAY_PUSH(z, "    UI_LABEL(22, " + STR$(y) + ", " + dhString$(n + "  (" + typ + ")") + ")")
+            ARRAY_PUSH(z, "    " + v + " = UI_SLIDER(" + dhString$(n) + ", 22, " + STR$(y + 18) + ", 230, 0.0, " + STR$(hi) + ", " + STR$(vor) + ")")
+            IF typ = "int" THEN
+                ARRAY_PUSH(z, "    ANIM_FSM_SET_INT(fsm, " + dhString$(n) + ", INT(" + v + "))")
+            ELSE
+                ARRAY_PUSH(z, "    ANIM_FSM_SET_FLOAT(fsm, " + dhString$(n) + ", " + v + ")")
+            END IF
+        ELSEIF typ = "bool" THEN
+            ARRAY_PUSH(z, "    " + v + " = UI_CHECKBOX(" + dhString$(n) + ", 22, " + STR$(y) + ", " + dhString$(n) + ", " + IIF(wahr(pp$(i, "default"), FALSE), "TRUE", "FALSE") + ")")
+            ARRAY_PUSH(z, "    ANIM_FSM_SET_BOOL(fsm, " + dhString$(n) + ", " + v + ")")
+        ELSE
+            ARRAY_PUSH(z, "    IF UI_BUTTON(" + dhString$(n) + ", 22, " + STR$(y) + ", 230, 26, " + dhString$(n + " ausloesen") + ") THEN ANIM_FSM_TRIGGER(fsm, " + dhString$(n) + ")")
+        END IF
+        y = y + 52
+    NEXT
+    ARRAY_PUSH(z, "    ANIM_FSM_UPDATE(fsm, spr, dt)")
+    IF blatt <> "" THEN
+        ARRAY_PUSH(z, "    SPRITE_DRAW(spr)")
+    ELSE
+        ARRAY_PUSH(z, "    BOX(" + STR$(sx) + ", " + STR$(sy) + ", " + STR$(sx + 64) + ", " + STR$(sy + 64) + ", RGB(90, 120, 200))")
+        ARRAY_PUSH(z, "    TEXT(" + STR$(sx) + ", " + STR$(sy + 72) + ", " + dhString$("Bild ") + " + STR$(SPRITE_GET_FRAME(spr)))")
+    END IF
+    ARRAY_PUSH(z, "    TEXT(390, 20, " + dhString$("Zustand:  ") + " + ANIM_FSM_STATE(fsm))")
+    ARRAY_PUSH(z, "    TEXT(12, 398, " + dhString$("ESC = Ende") + ")")
+    ARRAY_PUSH(z, "    UI_END_FRAME()")
+    ARRAY_PUSH(z, "    FLIP()")
+    ARRAY_PUSH(z, "WEND")
+    RETURN JOIN$(z, NL) + NL
+END FUNCTION
+
+SUB vorschau()
+    IF nz() = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Erst mindestens einen Zustand anlegen.")
+        RETURN
+    END IF
+    IF pfad = "" OR geaendert THEN
+        IF NOT sichern(FALSE) THEN RETURN
+    END IF
+    IF laufProzess >= 0 THEN PROCESS_KILL(laufProzess) : PROCESS_CLOSE(laufProzess) : laufProzess = -1
+    DIM stamm AS STRING : stamm = pfad
+    IF LOWER$(RIGHT$(stamm, 7)) = ".dhanim" THEN stamm = LEFT$(stamm, LEN(stamm) - 7)
+    DIM lauf AS STRING : lauf = stamm + "_vorschau.dh"
+    WRITEALL(lauf, vorschauProgramm$())
+    laufProzess = PROCESS_START("dhrt", "run", lauf)
+    GUI_SET_TEXT(lblStatus, "Vorschau gestartet: " + BASENAME(lauf))
+    protokoll("gestartet " + lauf)
+END SUB
+
+' --- Graph: Geometrie ---------------------------------------------------------
+DIM gx0 AS INTEGER : gx0 = LINKS_B + 20        ' Ursprung des Graphen auf dem Schirm
+DIM gy0 AS INTEGER : gy0 = 20
+
+FUNCTION knotenRect(name AS STRING) AS TUPLE
+    IF name = "*" THEN RETURN (gx0 + anyX, gy0 + anyY, ANY_W, ANY_H)
+    DIM i AS INTEGER : i = zustandIndex(name)
+    IF i < 0 THEN RETURN (0, 0, 0, 0)
+    RETURN (gx0 + ganz(zp$(i, "x"), 0), gy0 + ganz(zp$(i, "y"), 0), NODE_W, NODE_H)
+END FUNCTION
+
+' Knoten unter der Maus: Zustaende zuerst (die spaeteren liegen oben), dann die Pille.
+FUNCTION knotenBei(mx AS INTEGER, my AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = nz() - 1 TO 0 STEP -1
+        DIM x AS INTEGER : x = gx0 + ganz(zp$(i, "x"), 0)
+        DIM y AS INTEGER : y = gy0 + ganz(zp$(i, "y"), 0)
+        IF mx >= x AND mx < x + NODE_W AND my >= y AND my < y + NODE_H THEN RETURN text$(zp$(i, "name"))
+    NEXT
+    IF mx >= gx0 + anyX AND mx < gx0 + anyX + ANY_W AND my >= gy0 + anyY AND my < gy0 + anyY + ANY_H THEN RETURN "*"
+    RETURN ""
+END FUNCTION
+
+' Punkt auf dem Rand eines Rechtecks in Richtung eines Zielpunkts (vom Mittelpunkt aus).
+FUNCTION randPunkt(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, zx AS FLOAT, zy AS FLOAT) AS TUPLE
+    DIM cx AS FLOAT : cx = x + w / 2.0
+    DIM cy AS FLOAT : cy = y + h / 2.0
+    DIM dx AS FLOAT : dx = zx - cx
+    DIM dy AS FLOAT : dy = zy - cy
+    IF dx = 0.0 AND dy = 0.0 THEN RETURN (cx, cy)
+    DIM s AS FLOAT : s = 1000000000.0
+    IF dx <> 0.0 THEN s = (w / 2.0) / ABS(dx)
+    IF dy <> 0.0 THEN s = MIN(s, (h / 2.0) / ABS(dy))
+    RETURN (cx + dx * s, cy + dy * s)
+END FUNCTION
+
+' Die gezeichnete Strecke eines Uebergangs -- seitlich versetzt, wenn es die
+' Gegenrichtung auch gibt, damit beide Pfeile zu sehen sind.
+FUNCTION kante(t AS INTEGER) AS TUPLE
+    DIM von AS STRING : von = text$(up$(t, "from"))
+    IF von = "" THEN von = "*"
+    DIM nach AS STRING : nach = text$(up$(t, "to"))
+    DIM ax AS INTEGER : DIM ay AS INTEGER : DIM aw AS INTEGER : DIM ah AS INTEGER
+    DIM bx AS INTEGER : DIM bby AS INTEGER : DIM bw AS INTEGER : DIM bh AS INTEGER
+    (ax, ay, aw, ah) = knotenRect(von)
+    (bx, bby, bw, bh) = knotenRect(nach)
+    IF aw = 0 OR bw = 0 THEN RETURN (0.0, 0.0, 0.0, 0.0, FALSE, FALSE)
+    DIM p1x AS FLOAT : DIM p1y AS FLOAT : DIM p2x AS FLOAT : DIM p2y AS FLOAT
+    (p1x, p1y) = randPunkt(ax, ay, aw, ah, bx + bw / 2.0, bby + bh / 2.0)
+    (p2x, p2y) = randPunkt(bx, bby, bw, bh, ax + aw / 2.0, ay + ah / 2.0)
+    DIM gegen AS BOOLEAN : gegen = FALSE
+    DIM k AS INTEGER
+    FOR k = 0 TO nu() - 1
+        IF k <> t AND text$(up$(k, "from")) = nach AND text$(up$(k, "to")) = von THEN gegen = TRUE
+    NEXT
+    IF gegen THEN
+        DIM dx AS FLOAT : dx = p2x - p1x
+        DIM dy AS FLOAT : dy = p2y - p1y
+        DIM l AS FLOAT : l = MAX(1.0, SQR(dx * dx + dy * dy))
+        p1x = p1x - dy / l * 9.0 : p1y = p1y + dx / l * 9.0
+        p2x = p2x - dy / l * 9.0 : p2y = p2y + dx / l * 9.0
+    END IF
+    RETURN (p1x, p1y, p2x, p2y, TRUE, gegen)
+END FUNCTION
+
+FUNCTION abstandStrecke(px AS FLOAT, py AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, bby AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT : dx = bx - ax
+    DIM dy AS FLOAT : dy = bby - ay
+    IF dx = 0.0 AND dy = 0.0 THEN RETURN SQR((px - ax) * (px - ax) + (py - ay) * (py - ay))
+    DIM tt AS FLOAT : tt = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)
+    tt = MAX(0.0, MIN(1.0, tt))
+    DIM cx AS FLOAT : cx = ax + tt * dx
+    DIM cy AS FLOAT : cy = ay + tt * dy
+    RETURN SQR((px - cx) * (px - cx) + (py - cy) * (py - cy))
+END FUNCTION
+
+FUNCTION uebergangBei(mx AS INTEGER, my AS INTEGER) AS INTEGER
+    DIM t AS INTEGER
+    FOR t = 0 TO nu() - 1
+        DIM x1 AS FLOAT : DIM y1 AS FLOAT : DIM x2 AS FLOAT : DIM y2 AS FLOAT : DIM ok AS BOOLEAN : DIM gegen AS BOOLEAN
+        (x1, y1, x2, y2, ok, gegen) = kante(t)
+        IF ok THEN
+            IF abstandStrecke(mx, my, x1, y1, x2, y2) <= TREFFER THEN RETURN t
+        END IF
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION uebergangText$(t AS INTEGER) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = []
+    IF wahr(up$(t, "wait_finished"), FALSE) THEN ARRAY_PUSH(teile, "fertig")
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, up$(t, "conditions")) - 1
+        DIM cp AS STRING : cp = up$(t, "conditions." + STR$(k))
+        DIM op AS STRING : op = text$(cp + ".op")
+        IF istZahlOp(op) THEN
+            ARRAY_PUSH(teile, text$(cp + ".param") + opName[opIndex(op)] + zahl$(komma(cp + ".value", 0.0)))
+        ELSE
+            ARRAY_PUSH(teile, text$(cp + ".param") + " " + opName[opIndex(op)])
+        END IF
+    NEXT
+    IF LEN(teile) = 0 THEN RETURN ""
+    IF LEN(teile) = 1 THEN RETURN teile[0]
+    RETURN teile[0] + "  +" + STR$(LEN(teile) - 1)
+END FUNCTION
+
+FUNCTION hatTrigger(t AS INTEGER) AS BOOLEAN
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(doc, up$(t, "conditions")) - 1
+        IF text$(up$(t, "conditions." + STR$(k) + ".op")) = "trigger" THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' --- Graph: Maus --------------------------------------------------------------
+DIM modus AS INTEGER : modus = 0         ' 0 nichts, 1 Zustand ziehen, 2 Pille ziehen, 3 verbinden
+DIM zugName AS STRING : zugName = ""
+DIM zugTaste AS INTEGER : zugTaste = LINKS
+DIM startMx AS INTEGER : DIM startMy AS INTEGER
+DIM startX AS INTEGER : DIM startY AS INTEGER
+DIM bewegt AS BOOLEAN : bewegt = FALSE
+DIM letzterKlick AS INTEGER : letzterKlick = -100000
+DIM letzterKx AS INTEGER : DIM letzterKy AS INTEGER
+DIM verbinden AS BOOLEAN : verbinden = FALSE    ' Verbinden-Modus: auch die linke Taste zieht Pfeile
+
+FUNCTION imGraph(mx AS INTEGER, my AS INTEGER) AS BOOLEAN
+    RETURN mx >= LINKS_B AND mx < SCREENWIDTH() - INSP_B AND my >= 0 AND my < SCREENHEIGHT()
+END FUNCTION
+
+SUB waehlen(art AS INTEGER, idx AS INTEGER)
+    IF art = selArt AND idx = selIdx THEN RETURN
+    selArt = art : selIdx = idx
+    inspektorFuellen()
+    IF art = 1 THEN protokoll("gewaehlt zustand " + text$(zp$(idx, "name")))
+    IF art = 2 THEN protokoll("gewaehlt uebergang " + STR$(idx))
+END SUB
+
+SUB mausImGraph()
+    DIM mx AS INTEGER : mx = MOUSEX()
+    DIM my AS INTEGER : my = MOUSEY()
+    IF modus = 0 AND imGraph(mx, my) AND (MOUSE_HIT(LINKS) OR MOUSE_HIT(RECHTS)) THEN
+        GUI_FOCUS(lstParam)          ' Tastatur (Entf, Pfeile) zum Graphen, nicht in ein Feld
+        DIM n AS STRING : n = knotenBei(mx, my)
+        IF MOUSE_HIT(RECHTS) OR (verbinden AND n <> "") THEN
+            IF n <> "" THEN
+                modus = 3 : zugName = n
+                zugTaste = IIF(MOUSE_HIT(RECHTS), RECHTS, LINKS)
+            END IF
+            RETURN
+        END IF
+        startMx = mx : startMy = my : bewegt = FALSE
+        IF n = "*" THEN
+            modus = 2 : startX = anyX : startY = anyY
+            waehlen(0, -1)
+        ELSEIF n <> "" THEN
+            DIM i AS INTEGER : i = zustandIndex(n)
+            modus = 1 : zugName = n
+            startX = ganz(zp$(i, "x"), 0) : startY = ganz(zp$(i, "y"), 0)
+            waehlen(1, i)
+        ELSE
+            DIM t AS INTEGER : t = uebergangBei(mx, my)
+            IF t >= 0 THEN
+                waehlen(2, t)
+            ELSE
+                ' Doppelklick auf freie Flaeche = neuer Zustand
+                IF MILLIS() - letzterKlick < 400 AND ABS(mx - letzterKx) <= 4 AND ABS(my - letzterKy) <= 4 THEN
+                    zustandAnlegen(mx - gx0 - NODE_W \ 2, my - gy0 - NODE_H \ 2)
+                    letzterKlick = -100000
+                    RETURN
+                END IF
+                waehlen(0, -1)
+            END IF
+        END IF
+        letzterKlick = MILLIS() : letzterKx = mx : letzterKy = my
+        RETURN
+    END IF
+    IF modus = 1 AND MOUSEBUTTON(LINKS) THEN
+        DIM i AS INTEGER : i = zustandIndex(zugName)
+        IF i >= 0 THEN
+            DIM nx AS INTEGER : nx = MAX(0, amRaster(startX + mx - startMx))
+            DIM ny AS INTEGER : ny = MAX(0, amRaster(startY + my - startMy))
+            IF nx <> ganz(zp$(i, "x"), 0) OR ny <> ganz(zp$(i, "y"), 0) THEN
+                JSON_SET_INT(doc, zp$(i, "x"), nx) : JSON_SET_INT(doc, zp$(i, "y"), ny)
+                bewegt = TRUE
+            END IF
+        END IF
+        RETURN
+    END IF
+    IF modus = 2 AND MOUSEBUTTON(LINKS) THEN
+        anyX = MAX(0, amRaster(startX + mx - startMx)) : anyY = MAX(0, amRaster(startY + my - startMy))
+        RETURN
+    END IF
+    IF modus = 3 AND MOUSEBUTTON(zugTaste) THEN RETURN
+    IF modus = 1 AND NOT MOUSEBUTTON(LINKS) THEN
+        IF bewegt THEN
+            DIM i AS INTEGER : i = zustandIndex(zugName)
+            merken()
+            protokoll("bewegt " + zugName + " " + STR$(ganz(zp$(i, "x"), 0)) + " " + STR$(ganz(zp$(i, "y"), 0)))
+        END IF
+        modus = 0
+    ELSEIF modus = 2 AND NOT MOUSEBUTTON(LINKS) THEN
+        modus = 0
+    ELSEIF modus = 3 AND NOT MOUSEBUTTON(zugTaste) THEN
+        DIM ziel AS STRING : ziel = knotenBei(mx, my)
+        modus = 0
+        IF ziel <> "" AND ziel <> "*" AND ziel <> zugName THEN uebergangAnlegen(zugName, ziel)
+    END IF
+END SUB
+
+SUB schieben(dx AS INTEGER, dy AS INTEGER)
+    IF selArt <> 1 OR selIdx < 0 THEN RETURN
+    JSON_SET_INT(doc, zp$(selIdx, "x"), MAX(0, ganz(zp$(selIdx, "x"), 0) + dx))
+    JSON_SET_INT(doc, zp$(selIdx, "y"), MAX(0, ganz(zp$(selIdx, "y"), 0) + dy))
+    merken()
+    protokoll("bewegt " + text$(zp$(selIdx, "name")) + " " + STR$(ganz(zp$(selIdx, "x"), 0)) + " " + STR$(ganz(zp$(selIdx, "y"), 0)))
+END SUB
+
+' --- Graph: Zeichnen ----------------------------------------------------------
+CONST F_TEXT = &HD8E4F0
+CONST F_SUB = &H8FA3B3
+CONST F_PFEIL = &H2DE0E0
+CONST F_TRIGGER = &HFFB74D
+CONST F_START = &H2DE89A
+CONST F_WAHL = &HFFFFFF
+CONST F_RAND = &H3A4A5C
+
+SUB pfeilspitze(ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, bby AS FLOAT, farbe AS INTEGER)
+    DIM w AS FLOAT : w = ATAN2(bby - ay, bx - ax)
+    DIM p1x AS FLOAT : p1x = bx - 11.0 * COS(w - 0.4)
+    DIM p1y AS FLOAT : p1y = bby - 11.0 * SIN(w - 0.4)
+    DIM p2x AS FLOAT : p2x = bx - 11.0 * COS(w + 0.4)
+    DIM p2y AS FLOAT : p2y = bby - 11.0 * SIN(w + 0.4)
+    TRIANGLE(INT(bx), INT(bby), INT(p1x), INT(p1y), INT(p2x), INT(p2y), farbe)
+END SUB
+
+SUB graphZeichnen()
+    DIM gl AS INTEGER : gl = LINKS_B
+    DIM gr AS INTEGER : gr = SCREENWIDTH() - INSP_B
+    DIM gh AS INTEGER : gh = SCREENHEIGHT()
+    SCISSOR(gl, 0, gr - gl, gh)
+    BOX(gl, 0, gr, gh, &H0B1119)
+    DIM x AS INTEGER
+    FOR x = gx0 TO gr STEP 32
+        LINE(x, 0, x, gh, &H141E2A)
+    NEXT
+    DIM y AS INTEGER
+    FOR y = gy0 TO gh STEP 32
+        LINE(gl, y, gr, y, &H141E2A)
+    NEXT
+
+    ' Uebergaenge
+    DIM t AS INTEGER
+    TEXT_SIZE(13)
+    FOR t = 0 TO nu() - 1
+        DIM x1 AS FLOAT : DIM y1 AS FLOAT : DIM x2 AS FLOAT : DIM y2 AS FLOAT : DIM ok AS BOOLEAN : DIM gegen AS BOOLEAN
+        (x1, y1, x2, y2, ok, gegen) = kante(t)
+        IF ok THEN
+            DIM farbe AS INTEGER : farbe = F_PFEIL
+            DIM gewaehlt AS BOOLEAN : gewaehlt = selArt = 2 AND selIdx = t
+            IF hatTrigger(t) THEN farbe = F_TRIGGER
+            IF wahr(up$(t, "wait_finished"), FALSE) AND JSON_LEN(doc, up$(t, "conditions")) = 0 THEN farbe = F_START
+            IF gewaehlt THEN farbe = F_WAHL
+            LINEW(INT(x1), INT(y1), INT(x2), INT(y2), IIF(gewaehlt, 3, 2), farbe)
+            pfeilspitze(x1, y1, x2, y2, farbe)
+            DIM lbl AS STRING : lbl = uebergangText$(t)
+            IF lbl <> "" THEN
+                DIM mx AS INTEGER : mx = INT((x1 + x2) / 2.0)
+                DIM my AS INTEGER : my = INT((y1 + y2) / 2.0) - 10
+                IF gegen THEN
+                    ' Hin- und Rueckweg: jede Beschriftung auf ihre Seite der Linie,
+                    ' sonst liegen beide aufeinander.
+                    DIM dl AS FLOAT : dl = MAX(1.0, SQR((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)))
+                    mx = INT((x1 + x2) / 2.0 - (y2 - y1) / dl * 14.0)
+                    my = INT((y1 + y2) / 2.0 + (x2 - x1) / dl * 14.0) - 7
+                END IF
+                DIM tb AS INTEGER : tb = TEXT_WIDTH(lbl)
+                BOX(mx - tb \ 2 - 3, my - 8, mx + tb \ 2 + 3, my + 7, &H0B1119)
+                TEXT(mx - tb \ 2, my - 7, lbl, IIF(gewaehlt, F_TEXT, F_SUB))
+            END IF
+        END IF
+    NEXT
+    ' Verbinden-Vorschau
+    IF modus = 3 THEN
+        DIM ax AS INTEGER : DIM ay AS INTEGER : DIM aw AS INTEGER : DIM ah AS INTEGER
+        (ax, ay, aw, ah) = knotenRect(zugName)
+        LINEW(ax + aw \ 2, ay + ah \ 2, MOUSEX(), MOUSEY(), 2, F_WAHL)
+    END IF
+    ' Eingangspfeil zum Startzustand
+    DIM sz AS STRING : sz = startZustand$()
+    IF sz <> "" THEN
+        DIM sx AS INTEGER : DIM sy AS INTEGER : DIM sw AS INTEGER : DIM sh AS INTEGER
+        (sx, sy, sw, sh) = knotenRect(sz)
+        LINEW(sx - 34, sy + sh \ 2, sx - 2, sy + sh \ 2, 2, F_START)
+        pfeilspitze(sx - 34, sy + sh \ 2, sx - 2, sy + sh \ 2, F_START)
+    END IF
+    ' Pille "Any State"
+    DIM px AS INTEGER : px = gx0 + anyX
+    DIM py AS INTEGER : py = gy0 + anyY
+    BOXROUND(px, py, px + ANY_W, py + ANY_H, 16, &H5A3E8C)
+    RECTROUND(px, py, px + ANY_W, py + ANY_H, 16, F_RAND)
+    TEXT_SIZE(15)
+    TEXT(px + (ANY_W - TEXT_WIDTH("Any State")) \ 2, py + 9, "Any State", F_TEXT)
+    ' Zustaende
+    DIM i AS INTEGER
+    FOR i = 0 TO nz() - 1
+        DIM nx AS INTEGER : nx = gx0 + ganz(zp$(i, "x"), 0)
+        DIM ny AS INTEGER : ny = gy0 + ganz(zp$(i, "y"), 0)
+        DIM endlos AS BOOLEAN : endlos = wahr(zp$(i, "loop"), TRUE)
+        DIM istWahl AS BOOLEAN : istWahl = selArt = 1 AND selIdx = i
+        DIM istStart AS BOOLEAN : istStart = text$(zp$(i, "name")) = sz
+        DIM fuell AS INTEGER : fuell = IIF(endlos, &H1C3644, &H44341C)
+        IF istWahl THEN fuell = IIF(endlos, &H2A4E60, &H604A2A)
+        BOXROUND(nx, ny, nx + NODE_W, ny + NODE_H, 9, fuell)
+        DIM rand AS INTEGER : rand = F_RAND
+        IF istStart THEN rand = F_START
+        IF istWahl THEN rand = F_WAHL
+        RECTROUND(nx, ny, nx + NODE_W, ny + NODE_H, 9, rand)
+        IF istWahl OR istStart THEN RECTROUND(nx - 1, ny - 1, nx + NODE_W + 1, ny + NODE_H + 1, 9, rand)
+        BOX(nx + 4, ny + 7, nx + 8, ny + NODE_H - 7, IIF(endlos, F_START, F_TRIGGER))
+        TEXT_SIZE(16)
+        TEXT(nx + 16, ny + 6, text$(zp$(i, "name")), F_TEXT)
+        TEXT_SIZE(12)
+        IF istStart THEN TEXT(nx + NODE_W - 44, ny + 5, "START", F_START)
+        DIM unter AS STRING : unter = animName$(i) + "  [" + STR$(ganz(zp$(i, "first"), 0)) + "-" + STR$(ganz(zp$(i, "last"), 0)) + "]  " + IIF(endlos, "endlos", "einmal")
+        TEXT(nx + 16, ny + 29, unter, F_SUB)
+    NEXT
+    TEXT_SIZE(16)
+    SCISSOR_END()
+END SUB
+
+' --- Start ------------------------------------------------------------------
+IF ARGC() >= 1 THEN
+    DIM startDatei AS STRING : startDatei = ARG$(0)
+    IF LEFT$(startDatei, 1) <> "/" AND LEFT$(startDatei, 1) <> "\" AND MID$(startDatei, 1, 1) <> ":" THEN
+        DIM start AS STRING : start = GETENV$("DHRT_START_DIR")
+        IF start <> "" THEN startDatei = PATHJOIN(start, startDatei)
+    END IF
+    laden(startDatei)
+ELSEIF FILEEXISTS("anim_demo.dhanim") THEN
+    ' Ohne Datei die mitgelieferte Beispielmaschine -- so sieht man sofort,
+    ' wie ein fertiger Graph aussieht (Strg+N leert).
+    laden("anim_demo.dhanim")
+ELSE
+    neueMaschine()
+END IF
+GUI_FOCUS(lstParam)        ' Kuerzel gelten im Fenster mit Fokus -- vor dem ersten Klick gaebe es keins
+protokoll("bereit")
+
+DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
+DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
+DIM beenden AS BOOLEAN : beenden = FALSE
+DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
+
+WHILE NOT QUITREQUESTED() AND NOT beenden
+    GUI_UPDATE()
+    IF SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
+        warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
+        GUI_WINDOW_SET_BOUNDS(winLinks, 0, 0, LINKS_B, warHoehe)
+        GUI_WINDOW_SET_BOUNDS(winInsp, warBreite - INSP_B, 0, INSP_B, warHoehe)
+    END IF
+
+    ' Menue
+    IF GUI_CLICKED(miNeu) THEN neueMaschine()
+    IF GUI_CLICKED(miOeffnen) THEN
+        DIM p AS STRING : p = FILE_OPEN_DIALOG("Zustandsmaschine oeffnen", "dhanim")
+        IF p <> "" THEN laden(p)
+    END IF
+    IF GUI_CLICKED(miSichern) THEN sichern(FALSE)
+    IF GUI_CLICKED(miSichernAls) THEN sichern(TRUE)
+    IF GUI_CLICKED(miVorschau) THEN vorschau()
+    IF GUI_CLICKED(miBeenden) THEN
+        IF geaendert THEN dlgSchliessen = GUI_DIALOG("Beenden", "Die Zustandsmaschine ist nicht gesichert.", "Sichern|Verwerfen|Abbrechen") ELSE beenden = TRUE
+    END IF
+    IF GUI_CLICKED(miRueck) THEN rueckgaengig()
+    IF GUI_CLICKED(miWieder) THEN wiederholen()
+    IF GUI_CLICKED(miZustand) THEN zustandAnlegen(200 + (nz() MOD 4) * 24, 160 + (nz() MOD 4) * 24)
+    IF GUI_CLICKED(miStart) THEN alsStart()
+    IF GUI_CLICKED(miLoeschen) THEN loeschen()
+    IF dlgSchliessen <> 0 THEN
+        DIM a AS INTEGER : a = GUI_ANSWER(dlgSchliessen)
+        IF a = 1 THEN
+            dlgSchliessen = 0
+            IF sichern(FALSE) THEN beenden = TRUE
+        ELSEIF a = 2 THEN
+            dlgSchliessen = 0 : beenden = TRUE
+        ELSEIF a = 3 THEN
+            dlgSchliessen = 0
+        END IF
+    END IF
+
+    ' Dokument
+    IF GUI_CLICKED(btnSheet) THEN
+        DIM b AS STRING : b = FILE_OPEN_DIALOG("Sprite-Blatt waehlen", "png,bmp,jpg")
+        IF b <> "" THEN GUI_SET_TEXT(fSheet, b) : dokumentUebernehmen()
+        fokusZurueck()
+    END IF
+    IF NOT stumm AND (GUI_ENTERED(fSheet) OR GUI_ENTERED(fFrameW) OR GUI_ENTERED(fFrameH) OR GUI_ENTERED(fSkala)) THEN dokumentUebernehmen()
+
+    ' Parameter: die Auswahl ist das Ereignis (eine Liste meldet kein GUI_CLICKED)
+    IF GUI_LISTBOX_SELECTED(lstParam) <> paramSel THEN
+        paramSel = GUI_LISTBOX_SELECTED(lstParam)
+        paramFelderFuellen()
+    END IF
+    IF GUI_CLICKED(btnParPlus) THEN paramAnlegen() : fokusZurueck()
+    IF GUI_CLICKED(btnParMinus) THEN paramLoeschen() : fokusZurueck()
+    IF NOT stumm AND (GUI_CLICKED(btnPUeb) OR GUI_ENTERED(fPName) OR GUI_ENTERED(fPVor)) THEN paramUebernehmen() : fokusZurueck()
+
+    ' Inspektor
+    DIM ueb AS BOOLEAN : ueb = GUI_CLICKED(btnZUeb)
+    DIM fi AS INTEGER
+    FOR fi = 0 TO LEN(zFelder) - 1
+        IF GUI_ENTERED(zFelder[fi]) THEN ueb = TRUE
+    NEXT
+    IF ueb AND NOT stumm THEN zustandUebernehmen() : fokusZurueck()
+    DIM uebU AS BOOLEAN : uebU = GUI_CLICKED(btnUUeb)
+    FOR fi = 0 TO MAX_BED - 1
+        IF GUI_ENTERED(bWert[fi]) THEN uebU = TRUE
+        IF GUI_CLICKED(bWeg[fi]) THEN bedingungWeg(fi) : fokusZurueck()
+    NEXT
+    IF uebU AND NOT stumm THEN uebergangUebernehmen() : fokusZurueck()
+    IF GUI_CLICKED(btnBedPlus) THEN bedingungHinzu() : fokusZurueck()
+
+    ' Tastatur, solange kein Eingabefeld den Fokus hat
+    DIM fokus AS GUI_WIDGET : fokus = GUI_FOCUSED()
+    DIM imFeld AS BOOLEAN : imFeld = FALSE
+    IF fokus >= 0 THEN
+        DIM art AS STRING : art = GUI_KIND(fokus)
+        imFeld = art = "textinput" OR art = "textarea" OR art = "spinner"
+    END IF
+    IF NOT imFeld THEN
+        IF KEYHIT(KEY_DELETE) THEN loeschen()
+        IF KEYHIT(KEY_INSERT) THEN zustandAnlegen(200 + (nz() MOD 4) * 24, 160 + (nz() MOD 4) * 24)
+        DIM schritt AS INTEGER : schritt = RASTER
+        IF KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT) THEN schritt = 1
+        IF KEYHIT(KEY_LEFT) THEN schieben(-schritt, 0)
+        IF KEYHIT(KEY_RIGHT) THEN schieben(schritt, 0)
+        IF KEYHIT(KEY_UP) THEN schieben(0, -schritt)
+        IF KEYHIT(KEY_DOWN) THEN schieben(0, schritt)
+        IF KEYHIT(KEY_ESCAPE) THEN modus = 0 : waehlen(0, -1)
+        IF KEYHIT(KEY_L) THEN verbinden = NOT verbinden : GUI_SET_TEXT(lblStatus, IIF(verbinden, "Verbinden-Modus: von Knoten zu Knoten ziehen.", "Verbinden-Modus aus."))
+    END IF
+
+    mausImGraph()
+
+    IF laufProzess >= 0 THEN
+        IF NOT PROCESS_RUNNING(laufProzess) THEN
+            GUI_SET_TEXT(lblStatus, "Vorschau beendet mit Code " + STR$(PROCESS_CODE(laufProzess)))
+            PROCESS_CLOSE(laufProzess)
+            laufProzess = -1
+        END IF
+    END IF
+
+    CLS(&H0B1119)
+    graphZeichnen()
+    GUI_DRAW()
+    FLIP()
+WEND
+
+IF laufProzess >= 0 THEN PROCESS_KILL(laufProzess)
+protokoll("ende")

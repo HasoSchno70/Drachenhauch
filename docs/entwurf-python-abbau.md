@@ -32,8 +32,12 @@
 > **Weg B hat begonnen (gleicher Tag):** der Form-Designer als
 > `examples/197_form_designer.dh` (860 Zeilen gegen 5 055, Faktor 0,17) auf
 > einem neuen Entwurfsmodus der Laufzeit (`GUI_WINDOW_DESIGN`); Details in
-> `docs/form-designer.md`. Offen aus B: Anim-FSM-Editor, Notenblatt, Audio
-> Studio, und je Pilot der Rest aus dem Kopfkommentar.
+> `docs/form-designer.md`. Der Anim-FSM-Editor folgte am 2026-09-07
+> (`examples/198_anim_fsm_editor.dh`, 1 336 gegen 1 728, Faktor 0,77;
+> `docs/anim-editor.md`). Offen aus B: Notenblatt. Audio Studio wird nicht
+> portiert -- die Qt-Fassung ist ein 123-Zeilen-Reiterrahmen um Tracker und
+> SFX-Generator, und das Werkzeuge-Menue der IDE ersetzt ihn. Dazu je
+> Pilot der Rest aus dem Kopfkommentar.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

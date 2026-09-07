@@ -39,6 +39,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2091 | 0.53 |
 > | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 860 | 0,17 |
+> | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
 >
 > Die Zahlen sind gegen die Dateien geprueft (`tests/test_editor_qt_piloten.py`)
 > -- zwei standen hier lange falsch: 400 statt 402 (von Anfang an falsch
@@ -2598,6 +2599,40 @@ Palette -> Form -> Strg+S, Datei gelesen mit `FormDoc.load`, dem Modell des
 Qt-Designers; Ziehen + zweimal Strg+Z; F5-Laufprogramm uebersetzt;
 Entwurfsmodus mit Gegenprobe). In der IDE unter Werkzeuge, im Installer
 ohne Python als Verknuepfung.
+
+**Der Anim-FSM-Editor** (2026-09-07, `examples/198_anim_fsm_editor.dh`, 1336
+Zeilen gegen 1728 = `animeditor_qt.py` + `animeditor/document.py`, Faktor
+0,77 -- der hoechste seit dem SFX-Generator, weil hier fast nichts
+weggelassen ist: der Qt-Editor ist klein und die Laufzeit hat fuer einen
+Graphen nichts, das man wiederverwenden koennte). Der Graph ist die erste
+Familie mit KANTEN: Knoten (Zustaende), Pfeile mit Spitze, Beschriftung und
+seitlichem Versatz bei Hin- und Rueckweg, die Pille "Any State", der
+Eingangspfeil zum Startzustand -- alles mit LINEW/TRIANGLE/BOXROUND in
+einem SCISSOR-Bereich zwischen zwei gui-Fenstern gemalt; Treffertest auf
+einen Pfeil = Abstand Punkt/Strecke <= 7 px, Randpunkte der Knoten aus
+EINER Geometrie (`kante`), die Zeichnen und Treffertest teilen. **Uebergaenge
+zieht man mit der RECHTEN Maustaste** von Knoten zu Knoten (oder `L` +
+links): ein Modus-Schalter wie in Qt ("Link-Modus") ist ein Schalter, den
+man vergisst. Doppelklick auf freie Flaeche = Zustand (eigene Erkennung
+ueber MILLIS, `GUI_DOUBLE_CLICKED` gibt es nur fuer Listen). Modell =
+.dhanim-JSON, Undo = JSON-Text je Stand, Inspektor mit bis zu sechs
+Bedingungszeilen (fest angelegte Widgets, sichtbar so viele wie noetig).
+F5 schreibt `<name>_vorschau.dh` (dasselbe Geruest wie `generate_runner`:
+ui-Regler je Parameter, Sprite rechts) und startet es; das Sprite-Blatt
+wird wie eingetragen, neben der .dhanim oder vom `DHRT_START_DIR` aus
+gesucht und ABSOLUT eingetragen. **Zwei Fallen:** (1) `first`/`last`/`x`/`y`
+muessen GANZE Zahlen bleiben -- animfsm.rs liest sie mit `as_i64`, aus
+`3.0` wird `None`, und der Zustand haette keine Bilder; deshalb JSON_SET_INT
+an jeder Stelle, die sie schreibt. (2) Ein Klick auf einen Knopf im
+Inspektor gibt dessen Fenster den Fokus, Kuerzel gelten nur im Fokus-Fenster,
+und das Menue haengt links -- `fokusZurueck` nach jedem Knopf, sonst war
+Strg+S nach `+ Bedingung` stumm (der Test sah es: die Datei blieb alt).
+Tests `tests/test_pilot_animfsm.py` (8, seriell): Doppelklick, Rechtsziehen,
+Ziehen + Strg+Z, Entf (der Laufzeit-Leser ist hier die Pruefung -- ein
+stehengebliebener Uebergang laedt nicht), Bedingung ueber den Inspektor
+mit Wirkungsprobe (speed 10 -> run, speed 1 -> idle), Parameter, F5-Vorschau
+uebersetzt UND laeuft. Audio Studio wird NICHT portiert (123 Zeilen
+Reiterrahmen; das Werkzeuge-Menue der IDE ersetzt es). Offen aus B: Notenblatt.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 
