@@ -1,0 +1,55 @@
+' Aus test_physics3d.py uebertragen (3 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== ball faellt auf boden
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+DIM g AS INTEGER
+DIM b AS INTEGER
+g = PHYS3D_ADD_BOX(w, 0.0, 0.0, 0.0, 20.0, 0.5, 20.0, 0, 0.0)
+b = PHYS3D_ADD_SPHERE(w, 0.0, 10.0, 0.0, 0.5, 1, 0.3)
+DIM i AS INTEGER
+FOR i = 0 TO 179
+    PHYS3D_STEP(w, 0.0166)
+NEXT
+PRINT PHYS3D_BODY_Y(w, b) < 2.0
+PRINT PHYS3D_BODY_Y(w, b) > 0.5
+PRINT PHYS3D_COUNT(w)
+--- erwartet
+TRUE
+TRUE
+2
+
+=== gravity und impulse
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+PHYS3D_SET_GRAVITY(w, 0.0, 0.0, 0.0)
+DIM b AS INTEGER
+b = PHYS3D_ADD_SPHERE(w, 0.0, 5.0, 0.0, 0.5, 1, 0.0)
+PHYS3D_APPLY_IMPULSE(w, b, 5.0, 0.0, 0.0)
+DIM i AS INTEGER
+FOR i = 0 TO 59
+    PHYS3D_STEP(w, 0.0166)
+NEXT
+PRINT PHYS3D_BODY_X(w, b) > 0.5
+PRINT ABS(PHYS3D_BODY_Y(w, b) - 5.0) < 0.5
+--- erwartet
+TRUE
+TRUE
+
+=== remove und count
+IMPORT "physics3d"
+DIM w AS PHYS_WORLD
+w = PHYS3D_NEW()
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = PHYS3D_ADD_SPHERE(w, 0.0, 5.0, 0.0, 0.5, 1, 0.0)
+b = PHYS3D_ADD_SPHERE(w, 2.0, 5.0, 0.0, 0.5, 1, 0.0)
+PRINT PHYS3D_COUNT(w)
+PHYS3D_REMOVE(w, a)
+PRINT PHYS3D_COUNT(w)
+--- erwartet
+2
+1
+

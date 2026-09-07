@@ -31,7 +31,7 @@ als Array-Literal werten (`[1,2,3]` → `ARRAY OF INTEGER`, Typ aus den Elemente
 ### A2. `NIL` ist kein Literal  —  ✅ BEHOBEN (commit f4c8b78)
 > NIL ist jetzt ein Keyword-Literal (lexer/parser/compiler in dhrt + Python-Front-End
 > fuer Editor/Paritaet). `x = NIL`, `x <> NIL`, `IS_NIL(NIL)` funktionieren; das in der
-> db-Doku versprochene NIL→NULL-Binding klappt nun wirklich. Tests: `tests/test_nil_literal.py`.
+> db-Doku versprochene NIL→NULL-Binding klappt nun wirklich. Tests: `tests/pruef/nil_literal.dhtest`.
 ```basic
 IF o = NIL THEN ...        ' -> Laufzeitfehler: Variable 'nil' nicht deklariert (DIM fehlt?)
 IF o <> NIL THEN ...       ' dito
@@ -53,7 +53,7 @@ das db-NULL-Binding möglich. Größter „Vertrag-vs-Realität"-Punkt.
 ### B1. „Stufe 3e: DIM-Typ 'vec2' noch nicht unterstuetzt" bei fehlendem IMPORT  —  ✅ BEHOBEN (commit f4c8b78)
 > Jetzt: `Unbekannter Typ 'vec2' -- fehlt IMPORT "vec2"?` (bei mehreren Modulen werden
 > alle Kandidaten genannt). Kein „Stufe 3e"-Leak mehr in der DIM-Typ-Meldung.
-> `preprocess::modules_for_type` + `compiler::unknown_dim_type_msg`. Tests: `tests/test_dim_type_error.py`.
+> `preprocess::modules_for_type` + `compiler::unknown_dim_type_msg`. Tests: `tests/pruef/dim_type_error.dhtest`.
 ```basic
 DIM v AS VEC2              ' ohne vorheriges IMPORT "vec2"
 ' -> Compile-Fehler: Stufe 3e: DIM-Typ 'vec2' noch nicht unterstuetzt
@@ -272,7 +272,7 @@ Reflexionen/Mirror-Effekte.
 > durch — jetzt nicht mehr.
 >
 > Gefunden im Sprite-Editor (`DIM pi` in der Hauptschleife). Tests:
-> `tests/test_name_collision.py`.
+> `tests/pruef/name_collision.dhtest`.
 
 ### H2. `dhrt --check` meldete keinen einzigen Tippfehler im Variablennamen — ✅ BEHOBEN
 > **`DIM zaehler` oben, `zaehlr = zaehlr + 1` in einer SUB** — `--check` lieferte

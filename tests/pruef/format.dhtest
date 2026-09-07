@@ -1,0 +1,25 @@
+' Aus test_format.py uebertragen (2 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== format spezifizierer sind vollstaendig dokumentiert
+' builtins-core.md behauptete, die Maske folge "Python's %-Operator".
+PRINT FORMAT$(42, "%05d")
+PRINT FORMAT$(42, "%i")
+PRINT FORMAT$(3.14159, "%.2f")
+PRINT FORMAT$(255, "%x")
+PRINT FORMAT$(255, "%X")
+PRINT FORMAT$("hi", "%s")
+PRINT FORMAT$(50, "%d%%")
+--- erwartet
+00042
+42
+3.14
+ff
+FF
+hi
+50%
+
+=== unbekannter spezifizierer meldet
+PRINT FORMAT$(1234567, "%e")
+--- fehler
+FORMAT$: unbekannter Spezifizierer %e
+

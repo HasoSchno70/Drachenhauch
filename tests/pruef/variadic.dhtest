@@ -1,0 +1,214 @@
+' Aus test_variadic.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== variadic basic (1)
+SUB show(...args)
+    PRINT args.length()
+END SUB
+
+show()
+show(1)
+show(1, 2, 3)
+show("a", "b", "c", "d")
+--- erwartet
+0
+1
+3
+4
+
+=== variadic basic (2)
+SUB show(...args)
+    PRINT args.length()
+END SUB
+
+show()
+show(1)
+show(1, 2, 3)
+show("a", "b", "c", "d")
+--- erwartet
+0
+1
+3
+4
+
+=== variadic with required (1)
+' Pflicht-Param + Variadic: erste Args bedienen Pflicht, Rest -> Tuple.
+SUB log(label AS STRING, ...args)
+    PRINT label, "=>", args.length()
+END SUB
+
+log("a")
+log("b", 1)
+log("c", 1, 2, 3)
+--- erwartet
+a => 0
+b => 1
+c => 3
+
+=== variadic with required (2)
+' Pflicht-Param + Variadic: erste Args bedienen Pflicht, Rest -> Tuple.
+SUB log(label AS STRING, ...args)
+    PRINT label, "=>", args.length()
+END SUB
+
+log("a")
+log("b", 1)
+log("c", 1, 2, 3)
+--- erwartet
+a => 0
+b => 1
+c => 3
+
+=== variadic index access (1)
+' `args[0]`, `args[1]` etc. funktioniert auf dem Tupel.
+FUNCTION sum_all(...nums) AS INTEGER
+    DIM total AS INTEGER
+    DIM i AS INTEGER
+    total = 0
+    FOR i = 0 TO nums.length() - 1
+        total = total + nums[i]
+    NEXT
+    RETURN total
+END FUNCTION
+
+PRINT sum_all()
+PRINT sum_all(1, 2, 3, 4, 5)
+PRINT sum_all(100)
+--- erwartet
+0
+15
+100
+
+=== variadic index access (2)
+' `args[0]`, `args[1]` etc. funktioniert auf dem Tupel.
+FUNCTION sum_all(...nums) AS INTEGER
+    DIM total AS INTEGER
+    DIM i AS INTEGER
+    total = 0
+    FOR i = 0 TO nums.length() - 1
+        total = total + nums[i]
+    NEXT
+    RETURN total
+END FUNCTION
+
+PRINT sum_all()
+PRINT sum_all(1, 2, 3, 4, 5)
+PRINT sum_all(100)
+--- erwartet
+0
+15
+100
+
+=== variadic too few args throws (1)
+' Wenn Pflicht-Args vor Variadic nicht erfuellt sind.
+SUB log(label AS STRING, ...args)
+    PRINT label
+END SUB
+
+log()
+--- fehler
+LOG: erwartet mind. 1 Argument(e), erhalten 0
+
+=== variadic too few args throws (2)
+' Wenn Pflicht-Args vor Variadic nicht erfuellt sind.
+SUB log(label AS STRING, ...args)
+    PRINT label
+END SUB
+
+log()
+--- fehler
+LOG: erwartet mind. 1 Argument(e), erhalten 0
+
+=== variadic must be last (1)
+' `SUB foo(...args, x)` -> ParseError.
+SUB foo(...args, x AS INTEGER)
+END SUB
+--- fehler
+Variadic-Parameter (`...args`) muss der letzte Parameter sein
+
+=== variadic must be last (2)
+' `SUB foo(...args, x)` -> ParseError.
+SUB foo(...args, x AS INTEGER)
+END SUB
+--- fehler
+Variadic-Parameter (`...args`) muss der letzte Parameter sein
+
+=== variadic two variadic rejected (1)
+' Zwei Variadic-Params -> ParseError.
+SUB foo(...a, ...b)
+END SUB
+--- fehler
+Variadic-Parameter (`...args`) muss der letzte Parameter sein
+
+=== variadic two variadic rejected (2)
+' Zwei Variadic-Params -> ParseError.
+SUB foo(...a, ...b)
+END SUB
+--- fehler
+Variadic-Parameter (`...args`) muss der letzte Parameter sein
+
+=== variadic passed to helper (1)
+' Die gesammelten Args koennen als TUPLE an andere Funktionen
+FUNCTION first_or_default(t AS TUPLE, dflt AS INTEGER) AS INTEGER
+    IF t.length() = 0 THEN RETURN dflt
+    RETURN t[0]
+END FUNCTION
+
+FUNCTION head(...nums) AS INTEGER
+    RETURN first_or_default(nums, -1)
+END FUNCTION
+
+PRINT head()
+PRINT head(42, 99)
+--- erwartet
+-1
+42
+
+=== variadic passed to helper (2)
+' Die gesammelten Args koennen als TUPLE an andere Funktionen
+FUNCTION first_or_default(t AS TUPLE, dflt AS INTEGER) AS INTEGER
+    IF t.length() = 0 THEN RETURN dflt
+    RETURN t[0]
+END FUNCTION
+
+FUNCTION head(...nums) AS INTEGER
+    RETURN first_or_default(nums, -1)
+END FUNCTION
+
+PRINT head()
+PRINT head(42, 99)
+--- erwartet
+-1
+42
+
+=== variadic mixed types (1)
+' TUPLE kann Werte verschiedener Typen halten.
+SUB describe(...items)
+    DIM i AS INTEGER
+    FOR i = 0 TO items.length() - 1
+        PRINT items[i]
+    NEXT
+END SUB
+
+describe(1, "zwei", 3.5, TRUE)
+--- erwartet
+1
+zwei
+3.5
+TRUE
+
+=== variadic mixed types (2)
+' TUPLE kann Werte verschiedener Typen halten.
+SUB describe(...items)
+    DIM i AS INTEGER
+    FOR i = 0 TO items.length() - 1
+        PRINT items[i]
+    NEXT
+END SUB
+
+describe(1, "zwei", 3.5, TRUE)
+--- erwartet
+1
+zwei
+3.5
+TRUE
+

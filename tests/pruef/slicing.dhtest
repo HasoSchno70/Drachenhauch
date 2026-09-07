@@ -1,0 +1,244 @@
+' Aus test_slicing.py uebertragen (28 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== string slice basic (1)
+DIM s AS STRING
+s = "Hello World"
+PRINT s[0:5]
+PRINT s[6:11]
+--- erwartet
+Hello
+World
+
+=== string slice basic (2)
+DIM s AS STRING
+s = "Hello World"
+PRINT s[0:5]
+PRINT s[6:11]
+--- erwartet
+Hello
+World
+
+=== string slice open lo (1)
+PRINT "abcdef"[:3]
+--- erwartet
+abc
+
+=== string slice open lo (2)
+PRINT "abcdef"[:3]
+--- erwartet
+abc
+
+=== string slice open hi (1)
+PRINT "abcdef"[3:]
+--- erwartet
+def
+
+=== string slice open hi (2)
+PRINT "abcdef"[3:]
+--- erwartet
+def
+
+=== string slice open both (1)
+' `s[:]` liefert eine Kopie des Strings.
+DIM s AS STRING
+s = "kopie"
+PRINT s[:]
+--- erwartet
+kopie
+
+=== string slice open both (2)
+' `s[:]` liefert eine Kopie des Strings.
+DIM s AS STRING
+s = "kopie"
+PRINT s[:]
+--- erwartet
+kopie
+
+=== string slice clamps high bound (1)
+' `hi > len(s)` wird auf len(s) geclampt -- kein Fehler.
+PRINT "abc"[0:100]
+--- erwartet
+abc
+
+=== string slice clamps high bound (2)
+' `hi > len(s)` wird auf len(s) geclampt -- kein Fehler.
+PRINT "abc"[0:100]
+--- erwartet
+abc
+
+=== string slice empty when lo ge hi (1)
+PRINT "[" + "abc"[2:1] + "]"
+--- erwartet
+[]
+
+=== string slice empty when lo ge hi (2)
+PRINT "[" + "abc"[2:1] + "]"
+--- erwartet
+[]
+
+=== string slice with variable bounds (1)
+DIM s AS STRING
+s = "TestString"
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+lo = 4
+hi = 10
+PRINT s[lo:hi]
+--- erwartet
+String
+
+=== string slice with variable bounds (2)
+DIM s AS STRING
+s = "TestString"
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+lo = 4
+hi = 10
+PRINT s[lo:hi]
+--- erwartet
+String
+
+=== string slice negative throws (1)
+PRINT "abc"[-1:2]
+--- fehler
+Slice: negativer Index
+
+=== string slice negative throws (2)
+PRINT "abc"[-1:2]
+--- fehler
+Slice: negativer Index
+
+=== array slice basic (1)
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    a[i] = i * 10
+NEXT
+DIM b AS ARRAY OF INTEGER
+b = a[1:4]
+PRINT b[0]
+PRINT b[1]
+PRINT b[2]
+--- erwartet
+10
+20
+30
+
+=== array slice basic (2)
+DIM a[5] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    a[i] = i * 10
+NEXT
+DIM b AS ARRAY OF INTEGER
+b = a[1:4]
+PRINT b[0]
+PRINT b[1]
+PRINT b[2]
+--- erwartet
+10
+20
+30
+
+=== array slice full copy (1)
+' `a[:]` liefert eine echte Kopie -- Mutation der Quelle aendert
+DIM a[3] AS INTEGER
+a[0] = 1 : a[1] = 2 : a[2] = 3
+DIM b AS ARRAY OF INTEGER
+b = a[:]
+a[1] = 999
+PRINT b[1]
+--- erwartet
+2
+
+=== array slice full copy (2)
+' `a[:]` liefert eine echte Kopie -- Mutation der Quelle aendert
+DIM a[3] AS INTEGER
+a[0] = 1 : a[1] = 2 : a[2] = 3
+DIM b AS ARRAY OF INTEGER
+b = a[:]
+a[1] = 999
+PRINT b[1]
+--- erwartet
+2
+
+=== array slice string array (1)
+DIM s[3] AS STRING
+s[0] = "a"
+s[1] = "b"
+s[2] = "c"
+DIM t AS ARRAY OF STRING
+t = s[1:]
+PRINT t[0]
+PRINT t[1]
+--- erwartet
+b
+c
+
+=== array slice string array (2)
+DIM s[3] AS STRING
+s[0] = "a"
+s[1] = "b"
+s[2] = "c"
+DIM t AS ARRAY OF STRING
+t = s[1:]
+PRINT t[0]
+PRINT t[1]
+--- erwartet
+b
+c
+
+=== array 2d slice throws (1)
+' Multi-Dim-Arrays unterstuetzen kein Slicing.
+DIM g[3, 3] AS INTEGER
+DIM x AS ARRAY OF INTEGER
+x = g[0:2]
+--- fehler
+Slicing nur fuer 1D-Arrays
+
+=== array 2d slice throws (2)
+' Multi-Dim-Arrays unterstuetzen kein Slicing.
+DIM g[3, 3] AS INTEGER
+DIM x AS ARRAY OF INTEGER
+x = g[0:2]
+--- fehler
+Slicing nur fuer 1D-Arrays
+
+=== slice assign rejected (1)
+' `s[a:b] = ...` ist kein Slice-Assign, soll werfen.
+DIM a[5] AS INTEGER
+a[1:3] = 7
+--- fehler
+Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.
+
+=== slice assign rejected (2)
+' `s[a:b] = ...` ist kein Slice-Assign, soll werfen.
+DIM a[5] AS INTEGER
+a[1:3] = 7
+--- fehler
+Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.
+
+=== string slice for parsing (1)
+' Klassischer Use-Case: erstes Wort extrahieren.
+DIM s AS STRING
+s = "foo bar baz"
+DIM space AS INTEGER
+space = INSTR(s, " ", 0)
+PRINT s[0:space]
+PRINT s[space + 1:]
+--- erwartet
+foo
+bar baz
+
+=== string slice for parsing (2)
+' Klassischer Use-Case: erstes Wort extrahieren.
+DIM s AS STRING
+s = "foo bar baz"
+DIM space AS INTEGER
+space = INSTR(s, " ", 0)
+PRINT s[0:space]
+PRINT s[space + 1:]
+--- erwartet
+foo
+bar baz
+

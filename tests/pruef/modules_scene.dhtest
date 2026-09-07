@@ -1,0 +1,194 @@
+' Aus test_modules_scene.py uebertragen (20 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== empty stack current is blank
+IMPORT "scene"
+PRINT "[" + SCENE_CURRENT() + "]"
+PRINT SCENE_DEPTH()
+--- erwartet
+[]
+0
+
+=== push makes scene current
+IMPORT "scene"
+SCENE_PUSH("menu")
+PRINT SCENE_CURRENT()
+PRINT SCENE_DEPTH()
+--- erwartet
+menu
+1
+
+=== push pop roundtrip
+IMPORT "scene"
+SCENE_PUSH("menu")
+SCENE_PUSH("playing")
+PRINT SCENE_CURRENT()
+PRINT SCENE_DEPTH()
+SCENE_POP()
+PRINT SCENE_CURRENT()
+PRINT SCENE_DEPTH()
+--- erwartet
+playing
+2
+menu
+1
+
+=== pop on empty raises
+IMPORT "scene"
+SCENE_POP()
+--- fehler
+SCENE_POP: Stack ist bereits leer
+
+=== switch replaces stack
+IMPORT "scene"
+SCENE_PUSH("a")
+SCENE_PUSH("b")
+SCENE_PUSH("c")
+PRINT SCENE_DEPTH()
+SCENE_SWITCH("x")
+PRINT SCENE_DEPTH()
+PRINT SCENE_CURRENT()
+--- erwartet
+3
+1
+x
+
+=== has finds in middle
+IMPORT "scene"
+SCENE_PUSH("a")
+SCENE_PUSH("b")
+SCENE_PUSH("c")
+PRINT SCENE_HAS("a")
+PRINT SCENE_HAS("b")
+PRINT SCENE_HAS("zzz")
+--- erwartet
+TRUE
+TRUE
+FALSE
+
+=== set get int
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_INT("score", 42)
+PRINT SCENE_GET_INT("score")
+--- erwartet
+42
+
+=== set get string
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_STRING("name", "Anna")
+PRINT SCENE_GET_STRING("name")
+--- erwartet
+Anna
+
+=== set get float
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_FLOAT("t", 1.5)
+PRINT SCENE_GET_FLOAT("t")
+--- erwartet
+1.5
+
+=== set get bool
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_BOOL("paused", TRUE)
+PRINT SCENE_GET_BOOL("paused")
+--- erwartet
+TRUE
+
+=== get missing key raises
+IMPORT "scene"
+SCENE_PUSH("s")
+PRINT SCENE_GET_INT("fehlt")
+--- fehler
+SCENE_GET_INT: Key 'fehlt' nicht in Scene
+
+=== get wrong type raises
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_INT("x", 1)
+PRINT SCENE_GET_STRING("x")
+--- fehler
+SCENE_GET_STRING: Key 'x' hat falschen Typ
+
+=== get or returns default when missing
+IMPORT "scene"
+SCENE_PUSH("s")
+PRINT SCENE_GET_INT_OR("x", 99)
+PRINT SCENE_GET_STRING_OR("x", "fallback")
+PRINT SCENE_GET_BOOL_OR("x", TRUE)
+PRINT SCENE_GET_FLOAT_OR("x", 3.14)
+--- erwartet
+99
+fallback
+TRUE
+3.14
+
+=== get or returns default when wrong type
+' get_or vergleicht den Typ - bei Mismatch liefert er Default.
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_STRING("x", "hello")
+PRINT SCENE_GET_INT_OR("x", 42)
+--- erwartet
+42
+
+=== get or returns value when present
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_INT("x", 7)
+PRINT SCENE_GET_INT_OR("x", 99)
+--- erwartet
+7
+
+=== has key and delete
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_SET_INT("x", 1)
+PRINT SCENE_HAS_KEY("x")
+SCENE_DELETE("x")
+PRINT SCENE_HAS_KEY("x")
+--- erwartet
+TRUE
+FALSE
+
+=== delete missing is idempotent
+IMPORT "scene"
+SCENE_PUSH("s")
+SCENE_DELETE("x")
+PRINT "ok"
+--- erwartet
+ok
+
+=== set without scene raises
+' Ohne Scene auf dem Stack ist set/get sinnlos und wirft.
+IMPORT "scene"
+SCENE_SET_INT("x", 1)
+--- fehler
+Scene-Stack ist leer - SCENE_PUSH oder SCENE_SWITCH zuerst
+
+=== data does not leak between scenes
+IMPORT "scene"
+SCENE_PUSH("a")
+SCENE_SET_INT("x", 1)
+SCENE_PUSH("b")
+PRINT SCENE_HAS_KEY("x")
+SCENE_SET_INT("x", 99)
+PRINT SCENE_GET_INT("x")
+SCENE_POP()
+PRINT SCENE_GET_INT("x")
+--- erwartet
+FALSE
+99
+1
+
+=== switch drops old data
+IMPORT "scene"
+SCENE_PUSH("a")
+SCENE_SET_INT("x", 1)
+SCENE_SWITCH("b")
+PRINT SCENE_HAS_KEY("x")
+--- erwartet
+FALSE
+

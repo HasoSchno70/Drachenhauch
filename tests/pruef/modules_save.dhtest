@@ -1,0 +1,322 @@
+' Aus test_modules_save.py uebertragen (33 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== new returns handle
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+PRINT SAVE_VERSION(s)
+PRINT "[" + SAVE_KEYS(s) + "]"
+--- erwartet
+1
+[]
+
+=== load missing file raises
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD("fehlt.save")
+--- fehler
+SAVE_LOAD: Datei 'fehlt.save' nicht gefunden
+
+=== load or new missing returns empty
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD_OR_NEW("fehlt.save")
+PRINT SAVE_VERSION(s)
+PRINT "[" + SAVE_KEYS(s) + "]"
+--- erwartet
+1
+[]
+
+=== load or new invalid json still raises
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD_OR_NEW("kaputt.save")
+--- datei kaputt.save
+nicht echtes json
+--- fehler
+SAVE_LOAD: 'kaputt.save' ist kein gueltiges JSON (expected ident at line 1 column 2)
+
+=== exists true for real file
+IMPORT "save"
+PRINT SAVE_EXISTS("x.save")
+--- datei x.save
+{}
+--- erwartet
+TRUE
+
+=== exists false for missing
+IMPORT "save"
+PRINT SAVE_EXISTS("nope.save")
+--- erwartet
+FALSE
+
+=== write then load roundtrip
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "score", 42)
+SAVE_SET_STRING(s, "name", "Anna")
+SAVE_WRITE(s, "rt.save")
+DIM l AS SAVE_HANDLE
+l = SAVE_LOAD("rt.save")
+PRINT SAVE_GET_INT(l, "score")
+PRINT SAVE_GET_STRING(l, "name")
+--- erwartet
+42
+Anna
+
+=== write produces readable json
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "x", 1)
+SAVE_WRITE(s, "p.save")
+--- erwartet
+
+=== delete file
+IMPORT "save"
+PRINT SAVE_EXISTS("del.save")
+SAVE_DELETE_FILE("del.save")
+PRINT SAVE_EXISTS("del.save")
+--- datei del.save
+{}
+--- erwartet
+TRUE
+FALSE
+
+=== delete file missing is idempotent
+IMPORT "save"
+SAVE_DELETE_FILE("weg.save")
+PRINT "ok"
+--- erwartet
+ok
+
+=== set get int
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "k", 5)
+PRINT SAVE_GET_INT(s, "k")
+--- erwartet
+5
+
+=== set get float
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_FLOAT(s, "k", 1.25)
+PRINT SAVE_GET_FLOAT(s, "k")
+--- erwartet
+1.25
+
+=== set get string
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_STRING(s, "k", "hi")
+PRINT SAVE_GET_STRING(s, "k")
+--- erwartet
+hi
+
+=== set get bool
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_BOOL(s, "k", TRUE)
+PRINT SAVE_GET_BOOL(s, "k")
+--- erwartet
+TRUE
+
+=== get missing key raises
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+PRINT SAVE_GET_INT(s, "fehlt")
+--- fehler
+SAVE_GET_INT: Key 'fehlt' nicht im Save
+
+=== get wrong type raises
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_STRING(s, "k", "hi")
+PRINT SAVE_GET_INT(s, "k")
+--- fehler
+SAVE_GET_INT: kein INTEGER
+
+=== int from integer float after load
+' JSON-float 5.0 -> strict GET_INT toleriert ganzzahlige floats.
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD("x.save")
+PRINT SAVE_GET_INT(s, "x")
+--- datei x.save
+{"_version": 1, "data": {"x": 5.0}}
+--- erwartet
+5
+
+=== int from non integer float rejects
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_FLOAT(s, "k", 5.5)
+PRINT SAVE_GET_INT(s, "k")
+--- fehler
+SAVE_GET_INT: kein INTEGER
+
+=== get or returns default when missing
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+PRINT SAVE_GET_INT_OR(s, "x", 7)
+PRINT SAVE_GET_STRING_OR(s, "x", "fb")
+PRINT SAVE_GET_BOOL_OR(s, "x", FALSE)
+PRINT SAVE_GET_FLOAT_OR(s, "x", 1.5)
+--- erwartet
+7
+fb
+FALSE
+1.5
+
+=== get or returns default on type mismatch
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_STRING(s, "k", "hi")
+PRINT SAVE_GET_INT_OR(s, "k", 99)
+--- erwartet
+99
+
+=== get or returns value when present
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "k", 5)
+PRINT SAVE_GET_INT_OR(s, "k", 99)
+--- erwartet
+5
+
+=== has and delete
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "k", 1)
+PRINT SAVE_HAS(s, "k")
+SAVE_DELETE(s, "k")
+PRINT SAVE_HAS(s, "k")
+--- erwartet
+TRUE
+FALSE
+
+=== delete missing is idempotent
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_DELETE(s, "fehlt")
+PRINT "ok"
+--- erwartet
+ok
+
+=== clear removes all keys
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "a", 1)
+SAVE_SET_INT(s, "b", 2)
+SAVE_CLEAR(s)
+PRINT SAVE_HAS(s, "a")
+PRINT SAVE_HAS(s, "b")
+--- erwartet
+FALSE
+FALSE
+
+=== clear keeps version
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_VERSION(s, 7)
+SAVE_SET_INT(s, "a", 1)
+SAVE_CLEAR(s)
+PRINT SAVE_VERSION(s)
+--- erwartet
+7
+
+=== keys lists sorted
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_INT(s, "z", 1)
+SAVE_SET_INT(s, "a", 1)
+SAVE_SET_INT(s, "m", 1)
+PRINT SAVE_KEYS(s)
+--- erwartet
+a, m, z
+
+=== default version is one
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+PRINT SAVE_VERSION(s)
+--- erwartet
+1
+
+=== set version persists in file
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_VERSION(s, 3)
+SAVE_SET_INT(s, "x", 1)
+SAVE_WRITE(s, "v.save")
+DIM l AS SAVE_HANDLE
+l = SAVE_LOAD("v.save")
+PRINT SAVE_VERSION(l)
+--- erwartet
+3
+
+=== load tolerates missing version
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD("old.save")
+PRINT SAVE_VERSION(s)
+PRINT SAVE_GET_INT(s, "x")
+--- datei old.save
+{"data": {"x": 1}}
+--- erwartet
+1
+1
+
+=== load tolerates missing data
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD("old.save")
+PRINT SAVE_VERSION(s)
+PRINT "[" + SAVE_KEYS(s) + "]"
+--- datei old.save
+{"_version": 5}
+--- erwartet
+5
+[]
+
+=== load rejects non object
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_LOAD("list.save")
+--- datei list.save
+[1, 2, 3]
+--- fehler
+SAVE_LOAD: Save-Datei muss ein JSON-Objekt sein
+
+=== non handle raises
+IMPORT "save"
+PRINT SAVE_GET_INT("nicht ein handle", "k")
+--- fehler
+SAVE_GET_INT erwartet SAVE_HANDLE (aus SAVE_NEW/SAVE_LOAD)
+
+=== set bool wrong type message
+IMPORT "save"
+DIM s AS SAVE_HANDLE
+s = SAVE_NEW()
+SAVE_SET_BOOL(s, "k", 1)
+--- fehler
+SAVE_SET_BOOL erwartet BOOLEAN, erhalten INTEGER
+

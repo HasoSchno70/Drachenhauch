@@ -1,0 +1,524 @@
+' Aus test_user_operator.py uebertragen (15 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== tw plus
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM r AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 250
+r = a + b
+PRINT r.cents
+--- erwartet
+350
+
+=== tw minus
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM r AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 500
+b.cents = 175
+r = a - b
+PRINT r.cents
+--- erwartet
+325
+
+=== tw eq
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM c AS Money
+a = NEW Money()
+b = NEW Money()
+c = NEW Money()
+a.cents = 100
+b.cents = 100
+c.cents = 200
+PRINT a = b
+PRINT a = c
+--- erwartet
+TRUE
+FALSE
+
+=== tw neq
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 200
+PRINT a <> b
+--- erwartet
+TRUE
+
+=== tw lt
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 50
+b.cents = 100
+PRINT a < b
+PRINT b < a
+--- erwartet
+TRUE
+FALSE
+
+=== vm matches tw for plus (1)
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM r AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 250
+r = a + b
+PRINT r.cents
+--- erwartet
+350
+
+=== vm matches tw for plus (2)
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM r AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 250
+r = a + b
+PRINT r.cents
+--- erwartet
+350
+
+=== vm matches tw for eq (1)
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 100
+PRINT a = b
+--- erwartet
+TRUE
+
+=== vm matches tw for eq (2)
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 100
+b.cents = 100
+PRINT a = b
+--- erwartet
+TRUE
+
+=== inherited operator used (1)
+' Operator-Methoden werden ueber die Vererbungs-Kette gesucht --
+CLASS Base
+    DIM x AS INTEGER
+    OPERATOR + (other AS Base) AS Base
+        DIM r AS Base
+        r = NEW Base()
+        r.x = Self.x + other.x
+        RETURN r
+    END OPERATOR
+END CLASS
+
+CLASS Child EXTENDS Base
+END CLASS
+
+DIM a AS Child
+DIM b AS Child
+DIM r AS Base
+a = NEW Child()
+b = NEW Child()
+a.x = 5
+b.x = 7
+r = a + b
+PRINT r.x
+--- erwartet
+12
+
+=== inherited operator used (2)
+' Operator-Methoden werden ueber die Vererbungs-Kette gesucht --
+CLASS Base
+    DIM x AS INTEGER
+    OPERATOR + (other AS Base) AS Base
+        DIM r AS Base
+        r = NEW Base()
+        r.x = Self.x + other.x
+        RETURN r
+    END OPERATOR
+END CLASS
+
+CLASS Child EXTENDS Base
+END CLASS
+
+DIM a AS Child
+DIM b AS Child
+DIM r AS Base
+a = NEW Child()
+b = NEW Child()
+a.x = 5
+b.x = 7
+r = a + b
+PRINT r.x
+--- erwartet
+12
+
+=== inherited operator used (3)
+' Operator-Methoden werden ueber die Vererbungs-Kette gesucht --
+CLASS Base
+    DIM x AS INTEGER
+    OPERATOR + (other AS Base) AS Base
+        DIM r AS Base
+        r = NEW Base()
+        r.x = Self.x + other.x
+        RETURN r
+    END OPERATOR
+END CLASS
+
+CLASS Child EXTENDS Base
+END CLASS
+
+DIM a AS Child
+DIM b AS Child
+DIM r AS Base
+a = NEW Child()
+b = NEW Child()
+a.x = 5
+b.x = 7
+r = a + b
+PRINT r.x
+--- erwartet
+12
+
+=== chained operators
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR <> (other AS Money) AS BOOLEAN
+        RETURN Self.cents <> other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+DIM c AS Money
+DIM r AS Money
+a = NEW Money()
+b = NEW Money()
+c = NEW Money()
+a.cents = 100
+b.cents = 200
+c.cents = 50
+r = a + b - c
+PRINT r.cents
+--- erwartet
+250
+
+=== int int still works after introducing ops
+' Sanity: User-Class-Op darf nicht den INT+INT-Pfad shadowen.
+PRINT 2 + 3
+--- erwartet
+5
+
+=== string concat still works
+PRINT "hi" + "!"
+--- erwartet
+hi!
+

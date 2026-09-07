@@ -1,0 +1,148 @@
+' Aus test_robustness.py uebertragen (23 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== too few args is clean error not crash[PRINT MID$("hi")]
+PRINT MID$("hi")
+--- fehler
+MID$: erwartet 2..3 Argumente, erhalten 1
+
+=== too few args is clean error not crash[PRINT INSTR("abc")]
+PRINT INSTR("abc")
+--- fehler
+INSTR: erwartet 2..3 Argumente, erhalten 1
+
+=== too few args is clean error not crash[PRINT LOG()]
+PRINT LOG()
+--- fehler
+LOG: erwartet 1..2 Argument(e), erhalten 0
+
+=== too few args is clean error not crash[PRINT PADL$("x")]
+PRINT PADL$("x")
+--- fehler
+PAD: erwartet 2..3 Argument(e), erhalten 1
+
+=== array equals itself
+DIM a[3] AS INTEGER
+a[0]=1
+PRINT a = a
+--- erwartet
+TRUE
+
+=== array alias equal
+DIM a[2] AS INTEGER
+DIM b AS ARRAY OF INTEGER
+b = a
+PRINT a = b
+--- erwartet
+TRUE
+
+=== distinct arrays not equal
+DIM a[2] AS INTEGER
+DIM b[2] AS INTEGER
+PRINT a = b
+--- erwartet
+FALSE
+
+=== map equals itself
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "k", 1)
+PRINT m = m
+--- erwartet
+TRUE
+
+=== add overflow errors
+PRINT 9223372036854775807 + 1
+--- fehler
+Ganzzahl-Ueberlauf bei '+' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== pow overflow errors
+PRINT 10 ^ 30
+--- fehler
+Ganzzahl-Ueberlauf bei '^' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== mul overflow errors
+PRINT 1000000000000 * 1000000000000
+--- fehler
+Ganzzahl-Ueberlauf bei '*' (INTEGER ist 64-bit; Wertebereich ueberschritten)
+
+=== oversized int literal errors
+PRINT 99999999999999999999
+--- fehler
+Ganzzahl-Literal zu gross (INTEGER ist 64-bit)
+
+=== normal math unaffected
+PRINT 2 + 3 * 4
+PRINT 2 ^ 10
+PRINT 100 - 250
+--- erwartet
+14
+1024
+-150
+
+=== map of integer accepts whole float
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "k", 3.0)
+PRINT MAPGET(m, "k")
+--- erwartet
+3
+
+=== map of integer rejects fractional float
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "k", 3.5)
+--- fehler
+Map-Wert: Erwartet INTEGER, erhalten FLOAT
+
+=== format d rejects bool
+PRINT FORMAT$(TRUE, "%d")
+--- fehler
+FORMAT$: %d erwartet Zahl
+
+=== format d int still ok
+PRINT FORMAT$(42, "%05d")
+--- erwartet
+00042
+
+=== instr empty needle out of range
+PRINT INSTR("abc", "", 5)
+PRINT INSTR("abc", "", 2)
+PRINT INSTR("abcdef", "cd")
+--- erwartet
+-1
+2
+2
+
+=== array sum overflow errors
+DIM a[2] AS INTEGER
+a[0]=9223372036854775807
+a[1]=1
+PRINT ARRAY_SUM(a)
+--- fehler
+ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)
+
+=== curve bezier2 type error names builtin
+IMPORT "curves"
+PRINT CURVE_BEZIER2(0.5,"x",0,0,0,0,0,0,0)
+--- fehler
+CURVE_BEZIER2 erwartet Zahl, erhalten STRING
+
+=== unterminated if is clean parse error[IF 1 = 1 THEN\nPRINT "hi"]
+IF 1 = 1 THEN
+PRINT "hi"
+--- fehler
+END IF erwartet, Programmende erreicht
+
+=== unterminated if is clean parse error[IF 1 = 1 THEN\nPRINT "a"\nELSEIF 2 = 2 THEN\nPRINT "b"]
+IF 1 = 1 THEN
+PRINT "a"
+ELSEIF 2 = 2 THEN
+PRINT "b"
+--- fehler
+END IF erwartet, Programmende erreicht
+
+=== unterminated if is clean parse error[IF 1 = 1 THEN\nPRINT "a"\nELSE\nPRINT "b"]
+IF 1 = 1 THEN
+PRINT "a"
+ELSE
+PRINT "b"
+--- fehler
+END IF erwartet, Programmende erreicht
+

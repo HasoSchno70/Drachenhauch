@@ -252,6 +252,9 @@ const KEINE_MELDUNG = [
   // docs/stolpersteine.md: ein VORSCHLAG mit Gedankenstrich statt "--".
   // Der geltende Wortlaut steht dreizehn Zeilen darueber und wird geprueft.
   'Unbekannter Typ \'vec2\' — fehlt IMPORT "vec2"?',
+  // docs/werkzeuge.md: Beispiel-Bilanz einer Pruefsammlung (`dhrt test`) --
+  // ein Vergleichsergebnis des Laeufers, keine Laufzeitmeldung eines Programms.
+  "FEHL  Zeile 61: leeres Feld: Ausgabezeile 1: erwartet '0', erhalten '1'",
 ];
 
 // Steht diese Zeile in einem H.code([...], { out: true })-Block?
@@ -289,7 +292,9 @@ function zitateAusMarkdown(datei) {
     if (!ANKER.test(zeile)) return;
     const roh = [];
     if (imBlock) {
-      if (sprache === "basic") return;
+      // ```dhtest ist eine Pruefsammlung: Quelltext plus ERWARTETE Ausgabe --
+      // beides ist keine Meldung, die dhrt so ausgibt (docs/werkzeuge.md).
+      if (sprache === "basic" || sprache === "dhtest") return;
       // Zwei Randnotizen, die der Text den Ausgabezeilen anhaengt und die
       // nicht zur Meldung gehoeren: ein "-> " davor und ein "   <- stderr"
       // dahinter.
@@ -304,6 +309,7 @@ function zitateAusMarkdown(datei) {
       if (!ANKER.test(s)) continue;
       if (s !== s.trim()) continue;              // Fliesstext zwischen Spans
       if (/==|\bassert\b/.test(s)) continue;     // Quelltext
+      if (/^--- /.test(s)) continue;             // Abschnittsmarke einer Pruefsammlung
       if (KEINE_MELDUNG.includes(s)) continue;
       raus.push({ datei: path.basename(datei), zeile: i + 1, text: s, tok: tokens(s) });
     }

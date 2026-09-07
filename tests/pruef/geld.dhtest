@@ -1,0 +1,277 @@
+' Aus test_geld.py uebertragen (45 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== die falle gibt es wirklich (1)
+' Nicht nur behauptet -- so verhaelt sich der Rechner heute.
+PRINT INT(19.99 * 100)
+--- erwartet
+1998
+
+=== die falle gibt es wirklich (2)
+' Nicht nur behauptet -- so verhaelt sich der Rechner heute.
+PRINT INT(0.29 * 100)
+--- erwartet
+28
+
+=== und cent faellt nicht hinein (1)
+PRINT CENT(19.99)
+--- erwartet
+1999
+
+=== und cent faellt nicht hinein (2)
+PRINT CENT(0.29)
+--- erwartet
+29
+
+=== und cent faellt nicht hinein (3)
+PRINT CENT(0.1 + 0.2)
+--- erwartet
+30
+
+=== negative betraege (1)
+PRINT CENT(-19.99)
+--- erwartet
+-1999
+
+=== negative betraege (2)
+PRINT CENT(-0.005)
+--- erwartet
+-1
+
+=== null und ganze zahlen (1)
+PRINT CENT(0)
+--- erwartet
+0
+
+=== null und ganze zahlen (2)
+PRINT CENT(7)
+--- erwartet
+700
+
+=== null und ganze zahlen (3)
+PRINT CENT(7.0)
+--- erwartet
+700
+
+=== mehr als zwei nachkommastellen werden gerundet (1)
+PRINT CENT(1.005)
+--- erwartet
+101
+
+=== mehr als zwei nachkommastellen werden gerundet (2)
+PRINT CENT(1.004)
+--- erwartet
+100
+
+=== mehr als zwei nachkommastellen werden gerundet (3)
+PRINT CENT(9.999)
+--- erwartet
+1000
+
+=== cent aus text (1)
+' Damit ein Betrag aus einer CSV-Datei nicht erst durch FLOAT muss.
+PRINT CENT("19,99")
+--- erwartet
+1999
+
+=== cent aus text (2)
+' Damit ein Betrag aus einer CSV-Datei nicht erst durch FLOAT muss.
+PRINT CENT("19.99")
+--- erwartet
+1999
+
+=== cent aus text (3)
+' Damit ein Betrag aus einer CSV-Datei nicht erst durch FLOAT muss.
+PRINT CENT("-19,99")
+--- erwartet
+-1999
+
+=== cent aus text (4)
+' Damit ein Betrag aus einer CSV-Datei nicht erst durch FLOAT muss.
+PRINT CENT(" 42 ")
+--- erwartet
+4200
+
+=== tausendertrenner im text (1)
+PRINT CENT("1.234,56")
+--- erwartet
+123456
+
+=== tausendertrenner im text (2)
+PRINT CENT("1,234.56")
+--- erwartet
+123456
+
+=== tausendertrenner im text (3)
+PRINT CENT("1.234.567")
+--- erwartet
+123456700
+
+=== text mit waehrung ist ein fehler
+' Lieber ein Fehler als still die 19 aus "19,99 EUR" zu nehmen.
+PRINT CENT("19,99 EUR")
+--- fehler
+CENT: "19,99 EUR" ist kein Betrag -- erlaubt sind Ziffern, ein Vorzeichen und ein Komma (oder Punkt)
+
+=== leerer text
+PRINT CENT("")
+--- fehler
+CENT: leerer Betrag
+
+=== deutsche schreibweise (1)
+PRINT EURO$(1999)
+--- erwartet
+19,99 €
+
+=== deutsche schreibweise (2)
+PRINT EURO$(123456789)
+--- erwartet
+1.234.567,89 €
+
+=== deutsche schreibweise (3)
+PRINT EURO$(-1999)
+--- erwartet
+-19,99 €
+
+=== deutsche schreibweise (4)
+PRINT EURO$(5)
+--- erwartet
+0,05 €
+
+=== deutsche schreibweise (5)
+PRINT EURO$(0)
+--- erwartet
+0,00 €
+
+=== deutsche schreibweise (6)
+PRINT EURO$(100000)
+--- erwartet
+1.000,00 €
+
+=== anderes symbol oder gar keins (1)
+PRINT EURO$(1999, "CHF")
+--- erwartet
+19,99 CHF
+
+=== anderes symbol oder gar keins (2)
+PRINT EURO$(1999, "")
+--- erwartet
+19,99
+
+=== euro nimmt keine kommazahl und sagt warum
+' Der haeufigste Denkfehler -- und die Fehlermeldung ist gleich die
+PRINT EURO$(19.99)
+--- fehler
+EURO$: erwartet GANZE CENT, keine Kommazahl -- aus 19.99 macht CENT(19.99) die Zahl 1999
+
+=== kaufmaennisch gegen ROUND (1)
+' `ROUND` rundet zur GERADEN Zahl (wie Python); kaufmaennisch wird von
+PRINT ROUND(2.5)
+--- erwartet
+2
+
+=== kaufmaennisch gegen ROUND (2)
+' `ROUND` rundet zur GERADEN Zahl (wie Python); kaufmaennisch wird von
+PRINT ROUND_HALF_UP(2.5)
+--- erwartet
+3
+
+=== kaufmaennisch gegen ROUND (3)
+' `ROUND` rundet zur GERADEN Zahl (wie Python); kaufmaennisch wird von
+PRINT ROUND(3.5)
+--- erwartet
+4
+
+=== kaufmaennisch gegen ROUND (4)
+' `ROUND` rundet zur GERADEN Zahl (wie Python); kaufmaennisch wird von
+PRINT ROUND_HALF_UP(3.5)
+--- erwartet
+4
+
+=== kaufmaennisch gegen ROUND (5)
+' `ROUND` rundet zur GERADEN Zahl (wie Python); kaufmaennisch wird von
+PRINT ROUND_HALF_UP(-2.5)
+--- erwartet
+-3
+
+=== auf nachkommastellen (1)
+PRINT ROUND_HALF_UP(2.675, 2)
+--- erwartet
+2.68
+
+=== auf nachkommastellen (2)
+PRINT ROUND_HALF_UP(1.0 / 3.0, 4)
+--- erwartet
+0.3333
+
+=== auf nachkommastellen (3)
+PRINT ROUND_HALF_UP(9.99, 1)
+--- erwartet
+10.0
+
+=== gerundet wird was dasteht (1)
+' 2.675 ist als FLOAT in Wahrheit 2.67499999999999982... Wer die
+PRINT ROUND(2.675, 2)
+--- erwartet
+2.67
+
+=== gerundet wird was dasteht (2)
+' 2.675 ist als FLOAT in Wahrheit 2.67499999999999982... Wer die
+PRINT ROUND_HALF_UP(2.675, 2)
+--- erwartet
+2.68
+
+=== negative stellenzahl
+PRINT ROUND_HALF_UP(1.5, -1)
+--- fehler
+ROUND_HALF_UP: Nachkommastellen muessen >= 0 sein
+
+=== eine ganze rechnung geht auf (1)
+' Der Sinn der Uebung: in Cent summiert stimmt am Ende der Cent.
+DIM preis AS ARRAY OF FLOAT
+preis = [19.99, 0.29, 4.95, 100.0]
+DIM menge AS ARRAY OF INTEGER
+menge = [3, 7, 1, 2]
+DIM summe AS INTEGER
+DIM i AS INTEGER
+summe = 0
+FOR i = 0 TO LEN(preis) - 1
+    summe = summe + CENT(preis[i]) * menge[i]
+NEXT
+PRINT EURO$(summe)
+PRINT EURO$(ROUND_HALF_UP(summe * 0.19))
+--- erwartet
+266,95 €
+50,72 €
+
+=== eine ganze rechnung geht auf (2)
+' Der Sinn der Uebung: in Cent summiert stimmt am Ende der Cent.
+DIM preis AS ARRAY OF FLOAT
+preis = [19.99, 0.29, 4.95, 100.0]
+DIM menge AS ARRAY OF INTEGER
+menge = [3, 7, 1, 2]
+DIM summe AS INTEGER
+DIM i AS INTEGER
+summe = 0
+FOR i = 0 TO LEN(preis) - 1
+    summe = summe + CENT(preis[i]) * menge[i]
+NEXT
+PRINT EURO$(summe)
+PRINT EURO$(ROUND_HALF_UP(summe * 0.19))
+--- erwartet
+266,95 €
+50,72 €
+
+=== zehnmal zehn cent sind ein euro
+' In FLOAT ergibt dieselbe Schleife 0.9999999999999999.
+DIM s AS INTEGER
+DIM i AS INTEGER
+s = 0
+FOR i = 1 TO 10
+    s = s + CENT(0.1)
+NEXT
+PRINT EURO$(s)
+PRINT s = 100
+--- erwartet
+1,00 €
+TRUE
+

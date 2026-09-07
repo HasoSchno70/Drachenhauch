@@ -1,0 +1,184 @@
+' Aus test_modules_tile_collide.py uebertragen (15 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== solid with property
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_IS_SOLID(m, 0, 2, 1)
+PRINT TILE_IS_SOLID(m, 0, 0, 0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+TRUE
+FALSE
+
+=== solid fallback no property
+' Kein Tileset mit solid-Property: jeder GID > 0 ist solid.
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_IS_SOLID(m, 0, 2, 1)
+PRINT TILE_IS_SOLID(m, 0, 0, 0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+TRUE
+FALSE
+
+=== solid out of bounds is solid
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_IS_SOLID(m, 0, -1, 0)
+PRINT TILE_IS_SOLID(m, 0, 99, 0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+TRUE
+TRUE
+
+=== tile at pixel
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_AT_PIXEL(m, 0, 32, 16)
+PRINT TILE_AT_PIXEL(m, 0, 48, 16)
+PRINT TILE_AT_PIXEL(m, 0, 0, 0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": []}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+1
+2
+0
+
+=== sweep x no collision
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 10.0, 10.0, 8.0, 8.0, 5.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+(15.0, FALSE)
+
+=== sweep x hits wall right
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 20.0, 16.0, 10.0, 16.0, 50.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]}]}
+--- erwartet
+(38.0, TRUE)
+
+=== sweep x hits wall left
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 80.0, 16.0, 10.0, 16.0, -50.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0]}]}
+--- erwartet
+(64.0, TRUE)
+
+=== sweep x zero delta
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 10.0, 10.0, 8.0, 8.0, 0.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+(10.0, FALSE)
+
+=== sweep y falls onto ground
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_Y(m, 0, 10.0, 20.0, 8.0, 16.0, 30.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+(32.0, TRUE)
+
+=== sweep y hits ceiling
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_Y(m, 0, 10.0, 40.0, 8.0, 8.0, -40.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+(16.0, TRUE)
+
+=== sweep y falls freely
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_Y(m, 0, 10.0, 10.0, 8.0, 8.0, 20.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+(30.0, FALSE)
+
+=== sweep y stops at world edge
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_Y(m, 0, 10.0, 50.0, 8.0, 8.0, 20.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+(56.0, TRUE)
+
+=== sweep diagonal via two axes
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM r AS TUPLE
+r = TILE_SWEEP_X(m, 0, 20.0, 20.0, 8.0, 8.0, 50.0)
+PRINT r
+DIM nx AS FLOAT
+nx = r[0]
+PRINT TILE_SWEEP_Y(m, 0, nx, 20.0, 8.0, 8.0, 50.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0]}]}
+--- erwartet
+(40.0, TRUE)
+(40.0, TRUE)
+
+=== sweep invalid layer
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 0.0, 0.0, 8.0, 8.0, 5.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "objectgroup", "name": "obj", "objects": []}]}
+--- fehler
+TILE_SWEEP_X: Layer 0 ('obj') ist kein Tile-Layer
+
+=== sweep zero size box errors
+IMPORT "tiled"
+IMPORT "tile_collide"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+PRINT TILE_SWEEP_X(m, 0, 10.0, 10.0, 0.0, 8.0, 5.0)
+--- datei level.json
+{"type": "map", "width": 8, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "tiles", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "tiles.png", "imagewidth": 64, "imageheight": 32, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 8, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- fehler
+TILE_SWEEP_X: w und h muessen > 0 sein
+

@@ -1,0 +1,233 @@
+' Aus test_modules_regex.py uebertragen (23 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== regex match full (1)
+IMPORT "regex"
+PRINT REGEX_MATCH("abc123", "[a-z]+[0-9]+")
+PRINT REGEX_MATCH("abc123x", "[a-z]+[0-9]+")
+--- erwartet
+TRUE
+FALSE
+
+=== regex match full (2)
+IMPORT "regex"
+PRINT REGEX_MATCH("abc123", "[a-z]+[0-9]+")
+PRINT REGEX_MATCH("abc123x", "[a-z]+[0-9]+")
+--- erwartet
+TRUE
+FALSE
+
+=== regex test searches anywhere (1)
+IMPORT "regex"
+PRINT REGEX_TEST("Hallo Welt", "Welt")
+PRINT REGEX_TEST("Hallo Welt", "X")
+PRINT REGEX_TEST("hello123world", "[0-9]+")
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== regex test searches anywhere (2)
+IMPORT "regex"
+PRINT REGEX_TEST("Hallo Welt", "Welt")
+PRINT REGEX_TEST("Hallo Welt", "X")
+PRINT REGEX_TEST("hello123world", "[0-9]+")
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== regex find first (1)
+IMPORT "regex"
+PRINT REGEX_FIND("foo123bar456", "[0-9]+")
+PRINT REGEX_FIND("nothing here", "[0-9]+")
+--- erwartet
+123
+
+=== regex find first (2)
+IMPORT "regex"
+PRINT REGEX_FIND("foo123bar456", "[0-9]+")
+PRINT REGEX_FIND("nothing here", "[0-9]+")
+--- erwartet
+123
+
+=== regex find all (1)
+IMPORT "regex"
+DIM nums AS ARRAY OF STRING
+nums = REGEX_FIND_ALL("a1 b22 c333", "[0-9]+")
+PRINT nums.length()
+PRINT nums[0]
+PRINT nums[1]
+PRINT nums[2]
+--- erwartet
+3
+1
+22
+333
+
+=== regex find all (2)
+IMPORT "regex"
+DIM nums AS ARRAY OF STRING
+nums = REGEX_FIND_ALL("a1 b22 c333", "[0-9]+")
+PRINT nums.length()
+PRINT nums[0]
+PRINT nums[1]
+PRINT nums[2]
+--- erwartet
+3
+1
+22
+333
+
+=== regex find all no match empty (1)
+IMPORT "regex"
+DIM r AS ARRAY OF STRING
+r = REGEX_FIND_ALL("nothing", "[0-9]+")
+PRINT r.length()
+--- erwartet
+0
+
+=== regex find all no match empty (2)
+IMPORT "regex"
+DIM r AS ARRAY OF STRING
+r = REGEX_FIND_ALL("nothing", "[0-9]+")
+PRINT r.length()
+--- erwartet
+0
+
+=== regex replace all (1)
+IMPORT "regex"
+PRINT REGEX_REPLACE("Hallo Welt", "[aeiou]", "*")
+PRINT REGEX_REPLACE("foo123bar456", "[0-9]+", "X")
+--- erwartet
+H*ll* W*lt
+fooXbarX
+
+=== regex replace all (2)
+IMPORT "regex"
+PRINT REGEX_REPLACE("Hallo Welt", "[aeiou]", "*")
+PRINT REGEX_REPLACE("foo123bar456", "[0-9]+", "X")
+--- erwartet
+H*ll* W*lt
+fooXbarX
+
+=== regex replace once only first (1)
+IMPORT "regex"
+PRINT REGEX_REPLACE_ONCE("aaa", "a", "X")
+--- erwartet
+Xaa
+
+=== regex replace once only first (2)
+IMPORT "regex"
+PRINT REGEX_REPLACE_ONCE("aaa", "a", "X")
+--- erwartet
+Xaa
+
+=== regex replace with backref (1)
+' Capture-Gruppen via `\1` im Replacement.
+IMPORT "regex"
+PRINT REGEX_REPLACE("hello world", "(\w+) (\w+)", "\2 \1")
+--- erwartet
+world hello
+
+=== regex replace with backref (2)
+' Capture-Gruppen via `\1` im Replacement.
+IMPORT "regex"
+PRINT REGEX_REPLACE("hello world", "(\w+) (\w+)", "\2 \1")
+--- erwartet
+world hello
+
+=== regex split multi separator (1)
+' SPLIT$ kann nur Single-Char-Sep -- regex_split kann jedes Pattern.
+IMPORT "regex"
+DIM parts AS ARRAY OF STRING
+parts = REGEX_SPLIT("a,b;c, d", "[,;]\s*")
+PRINT parts.length()
+PRINT parts[0]
+PRINT parts[1]
+PRINT parts[2]
+PRINT parts[3]
+--- erwartet
+4
+a
+b
+c
+d
+
+=== regex split multi separator (2)
+' SPLIT$ kann nur Single-Char-Sep -- regex_split kann jedes Pattern.
+IMPORT "regex"
+DIM parts AS ARRAY OF STRING
+parts = REGEX_SPLIT("a,b;c, d", "[,;]\s*")
+PRINT parts.length()
+PRINT parts[0]
+PRINT parts[1]
+PRINT parts[2]
+PRINT parts[3]
+--- erwartet
+4
+a
+b
+c
+d
+
+=== regex split whitespace (1)
+IMPORT "regex"
+DIM words AS ARRAY OF STRING
+words = REGEX_SPLIT("hello   world  foo", "\s+")
+PRINT words.length()
+PRINT words[0]
+PRINT words[1]
+PRINT words[2]
+--- erwartet
+3
+hello
+world
+foo
+
+=== regex split whitespace (2)
+IMPORT "regex"
+DIM words AS ARRAY OF STRING
+words = REGEX_SPLIT("hello   world  foo", "\s+")
+PRINT words.length()
+PRINT words[0]
+PRINT words[1]
+PRINT words[2]
+--- erwartet
+3
+hello
+world
+foo
+
+=== invalid regex throws gb error
+' Ungueltige Regex (z.B. unbalanced paren) wirft DHRuntimeError,
+IMPORT "regex"
+PRINT REGEX_TEST("abc", "(unbalanced")
+--- fehler
+error: unclosed group
+
+=== regex pattern cache (1)
+' Wiederholte Aufrufe mit gleichem Pattern muessen funktionieren --
+IMPORT "regex"
+DIM i AS INTEGER
+DIM count AS INTEGER
+count = 0
+FOR i = 1 TO 5
+    IF REGEX_TEST("hello123", "[0-9]+") THEN count = count + 1
+NEXT
+PRINT count
+--- erwartet
+5
+
+=== regex pattern cache (2)
+' Wiederholte Aufrufe mit gleichem Pattern muessen funktionieren --
+IMPORT "regex"
+DIM i AS INTEGER
+DIM count AS INTEGER
+count = 0
+FOR i = 1 TO 5
+    IF REGEX_TEST("hello123", "[0-9]+") THEN count = count + 1
+NEXT
+PRINT count
+--- erwartet
+5
+

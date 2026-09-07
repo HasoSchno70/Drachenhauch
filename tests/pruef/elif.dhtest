@@ -1,0 +1,88 @@
+' Aus test_elif.py uebertragen (6 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== elif basic (1)
+DIM x AS INTEGER
+x = 5
+IF x = 1 THEN
+    PRINT "a"
+ELIF x = 2 THEN
+    PRINT "b"
+ELIF x = 5 THEN
+    PRINT "c"
+ELSE
+    PRINT "d"
+END IF
+--- erwartet
+c
+
+=== elif basic (2)
+DIM x AS INTEGER
+x = 5
+IF x = 1 THEN
+    PRINT "a"
+ELIF x = 2 THEN
+    PRINT "b"
+ELIF x = 5 THEN
+    PRINT "c"
+ELSE
+    PRINT "d"
+END IF
+--- erwartet
+c
+
+=== elif else chain (1)
+' ELIF kann beliebig oft verkettet werden, ELSE bleibt optional.
+DIM g AS INTEGER
+g = 90
+IF g >= 90 THEN
+    PRINT "A"
+ELIF g >= 80 THEN
+    PRINT "B"
+ELIF g >= 70 THEN
+    PRINT "C"
+END IF
+--- erwartet
+A
+
+=== elif else chain (2)
+' ELIF kann beliebig oft verkettet werden, ELSE bleibt optional.
+DIM g AS INTEGER
+g = 90
+IF g >= 90 THEN
+    PRINT "A"
+ELIF g >= 80 THEN
+    PRINT "B"
+ELIF g >= 70 THEN
+    PRINT "C"
+END IF
+--- erwartet
+A
+
+=== elif and elseif can mix (1)
+' ELIF und ELSEIF sind dasselbe Token -- Mischen ist erlaubt.
+DIM x AS INTEGER
+x = 3
+IF x = 1 THEN
+    PRINT "1"
+ELSEIF x = 2 THEN
+    PRINT "2"
+ELIF x = 3 THEN
+    PRINT "3"
+END IF
+--- erwartet
+3
+
+=== elif and elseif can mix (2)
+' ELIF und ELSEIF sind dasselbe Token -- Mischen ist erlaubt.
+DIM x AS INTEGER
+x = 3
+IF x = 1 THEN
+    PRINT "1"
+ELSEIF x = 2 THEN
+    PRINT "2"
+ELIF x = 3 THEN
+    PRINT "3"
+END IF
+--- erwartet
+3
+

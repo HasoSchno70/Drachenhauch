@@ -1,0 +1,29 @@
+' Aus test_arity_hints.py uebertragen (5 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== randf arity shows signature
+PRINT RANDF()
+--- fehler
+RANDF: erwartet 2 Argument(e), erhalten 0 -- Aufruf: RANDF(min, max)
+
+=== randint arity shows signature
+PRINT RANDINT(5)
+--- fehler
+RANDINT: erwartet 2 Argument(e), erhalten 1 -- Aufruf: RANDINT(lo, hi)
+
+=== curve bezier2 arity shows signature
+IMPORT "curves"
+PRINT CURVE_BEZIER2(0.5, 1.0)
+--- fehler
+CURVE_BEZIER2: erwartet 9 Argument(e), erhalten 2 -- Aufruf: CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)
+
+=== builtin without signature unchanged
+' Builtins ohne Tabellen-Eintrag behalten die schlichte Aritaets-Meldung.
+PRINT ABS()
+--- fehler
+ABS: erwartet 1 Argument(e), erhalten 0
+
+=== correct arity still works
+PRINT RANDF(0.0, 1.0) >= 0.0
+--- erwartet
+TRUE
+

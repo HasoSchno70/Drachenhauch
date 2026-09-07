@@ -1,0 +1,238 @@
+' Aus test_comprehensions.py uebertragen (24 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== comp basic tuple source (1)
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5)
+DIM doubled AS TUPLE
+doubled = [n * 2 FOR n IN nums]
+PRINT doubled
+--- erwartet
+(2, 4, 6, 8, 10)
+
+=== comp basic tuple source (2)
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5)
+DIM doubled AS TUPLE
+doubled = [n * 2 FOR n IN nums]
+PRINT doubled
+--- erwartet
+(2, 4, 6, 8, 10)
+
+=== comp with filter (1)
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5, 6)
+DIM evens AS TUPLE
+evens = [n FOR n IN nums WHERE n MOD 2 = 0]
+PRINT evens
+--- erwartet
+(2, 4, 6)
+
+=== comp with filter (2)
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5, 6)
+DIM evens AS TUPLE
+evens = [n FOR n IN nums WHERE n MOD 2 = 0]
+PRINT evens
+--- erwartet
+(2, 4, 6)
+
+=== comp empty filter result (1)
+DIM nums AS TUPLE
+nums = (1, 2, 3)
+DIM nada AS TUPLE
+nada = [n FOR n IN nums WHERE n > 100]
+PRINT nada
+PRINT nada.length()
+--- erwartet
+()
+0
+
+=== comp empty filter result (2)
+DIM nums AS TUPLE
+nums = (1, 2, 3)
+DIM nada AS TUPLE
+nada = [n FOR n IN nums WHERE n > 100]
+PRINT nada
+PRINT nada.length()
+--- erwartet
+()
+0
+
+=== comp over string (1)
+' String iteriert ueber chars.
+DIM caps AS TUPLE
+caps = [c FOR c IN "abc"]
+PRINT caps
+--- erwartet
+(a, b, c)
+
+=== comp over string (2)
+' String iteriert ueber chars.
+DIM caps AS TUPLE
+caps = [c FOR c IN "abc"]
+PRINT caps
+--- erwartet
+(a, b, c)
+
+=== comp over array (1)
+DIM nums[4] AS INTEGER
+nums[0] = 10 : nums[1] = 20 : nums[2] = 30 : nums[3] = 40
+DIM tripled AS TUPLE
+tripled = [n * 3 FOR n IN nums]
+PRINT tripled
+--- erwartet
+(30, 60, 90, 120)
+
+=== comp over array (2)
+DIM nums[4] AS INTEGER
+nums[0] = 10 : nums[1] = 20 : nums[2] = 30 : nums[3] = 40
+DIM tripled AS TUPLE
+tripled = [n * 3 FOR n IN nums]
+PRINT tripled
+--- erwartet
+(30, 60, 90, 120)
+
+=== comp uses outer variable (1)
+' Comp-Body kann auf Variablen aus dem aeusseren Scope zugreifen.
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4)
+DIM threshold AS INTEGER
+threshold = 2
+DIM big AS TUPLE
+big = [n FOR n IN nums WHERE n > threshold]
+PRINT big
+--- erwartet
+(3, 4)
+
+=== comp uses outer variable (2)
+' Comp-Body kann auf Variablen aus dem aeusseren Scope zugreifen.
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4)
+DIM threshold AS INTEGER
+threshold = 2
+DIM big AS TUPLE
+big = [n FOR n IN nums WHERE n > threshold]
+PRINT big
+--- erwartet
+(3, 4)
+
+=== comp with method call in transform (1)
+DIM names AS TUPLE
+names = ("alice", "bob", "cilla")
+DIM upper AS TUPLE
+upper = [n.upper() FOR n IN names]
+PRINT upper
+--- erwartet
+(ALICE, BOB, CILLA)
+
+=== comp with method call in transform (2)
+DIM names AS TUPLE
+names = ("alice", "bob", "cilla")
+DIM upper AS TUPLE
+upper = [n.upper() FOR n IN names]
+PRINT upper
+--- erwartet
+(ALICE, BOB, CILLA)
+
+=== comp string filter (1)
+' Filter auf String-Container -- nur Vokale.
+DIM vowels AS TUPLE
+vowels = [c FOR c IN "Hallo Welt" WHERE c IN "aeiouAEIOU"]
+PRINT vowels
+--- erwartet
+(a, o, e)
+
+=== comp string filter (2)
+' Filter auf String-Container -- nur Vokale.
+DIM vowels AS TUPLE
+vowels = [c FOR c IN "Hallo Welt" WHERE c IN "aeiouAEIOU"]
+PRINT vowels
+--- erwartet
+(a, o, e)
+
+=== comp var does not leak (1)
+' Iter-Variable lebt nur im Comp-Kontext (Tree-Walker stellt
+DIM x AS INTEGER
+x = 999
+DIM nums AS TUPLE
+nums = (1, 2, 3)
+DIM r AS TUPLE
+r = [x * 2 FOR x IN nums]
+PRINT x
+PRINT r
+--- erwartet
+999
+(2, 4, 6)
+
+=== comp var does not leak (2)
+' Iter-Variable lebt nur im Comp-Kontext (Tree-Walker stellt
+DIM x AS INTEGER
+x = 999
+DIM nums AS TUPLE
+nums = (1, 2, 3)
+DIM r AS TUPLE
+r = [x * 2 FOR x IN nums]
+PRINT x
+PRINT r
+--- erwartet
+999
+(2, 4, 6)
+
+=== comp nested in function (1)
+FUNCTION squares_of(t AS TUPLE) AS TUPLE
+    RETURN [n * n FOR n IN t]
+END FUNCTION
+
+DIM r AS TUPLE
+r = squares_of((1, 2, 3, 4))
+PRINT r
+--- erwartet
+(1, 4, 9, 16)
+
+=== comp nested in function (2)
+FUNCTION squares_of(t AS TUPLE) AS TUPLE
+    RETURN [n * n FOR n IN t]
+END FUNCTION
+
+DIM r AS TUPLE
+r = squares_of((1, 2, 3, 4))
+PRINT r
+--- erwartet
+(1, 4, 9, 16)
+
+=== comp destructuring (1)
+' Comp-Result kann via destructuring auseinandergenommen werden.
+DIM nums AS TUPLE
+nums = (10, 20, 30)
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+(a, b, c) = [n + 1 FOR n IN nums]
+PRINT a, b, c
+--- erwartet
+11 21 31
+
+=== comp destructuring (2)
+' Comp-Result kann via destructuring auseinandergenommen werden.
+DIM nums AS TUPLE
+nums = (10, 20, 30)
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+(a, b, c) = [n + 1 FOR n IN nums]
+PRINT a, b, c
+--- erwartet
+11 21 31
+
+=== comp unsupported iter throws (1)
+DIM r AS TUPLE
+r = [x FOR x IN 42]
+--- fehler
+Comprehension: nicht iterierbar (INTEGER)
+
+=== comp unsupported iter throws (2)
+DIM r AS TUPLE
+r = [x FOR x IN 42]
+--- fehler
+Comprehension: nicht iterierbar (INTEGER)
+

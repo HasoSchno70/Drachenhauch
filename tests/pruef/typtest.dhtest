@@ -1,0 +1,205 @@
+' Aus test_typtest.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== typeof nennt die klasse
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+t = NEW Hund()
+PRINT TYPEOF(t)
+--- erwartet
+HUND
+
+=== typeof bleibt bei werttypen wie bisher
+DIM i AS INTEGER
+DIM s AS STRING
+DIM b AS BOOLEAN
+DIM f AS FLOAT
+PRINT TYPEOF(i); " "; TYPEOF(s); " "; TYPEOF(b); " "; TYPEOF(f)
+PRINT TYPEOF(NIL)
+--- erwartet
+INTEGER STRING BOOLEAN FLOAT
+NIL
+
+=== typeof schreibt gross unabhaengig von der deklaration
+' Alle anderen TYPEOF-Antworten sind gross -- ein Vergleich soll nicht
+CLASS GrossKlein
+END CLASS
+DIM g AS GrossKlein
+g = NEW GrossKlein()
+PRINT TYPEOF(g) = "GROSSKLEIN"
+--- erwartet
+TRUE
+
+=== is trifft die eigene klasse und jede elternklasse
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+t = NEW Dackel()
+PRINT t IS Dackel
+PRINT t IS Hund
+PRINT t IS Tier
+PRINT t IS Katze
+--- erwartet
+TRUE
+TRUE
+TRUE
+FALSE
+
+=== is auf werttypen
+DIM i AS INTEGER
+DIM s AS STRING
+i = 5
+PRINT i IS INTEGER; " "; i IS STRING; " "; s IS STRING
+--- erwartet
+TRUE FALSE TRUE
+
+=== is nil und is not nil
+' Die Doku nannte `IS NIL` lange als fehlend -- jetzt gibt es beides.
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+PRINT t IS NIL; " "; t IS NOT NIL
+t = NEW Hund()
+PRINT t IS NIL; " "; t IS NOT NIL
+--- erwartet
+TRUE FALSE
+FALSE TRUE
+
+=== is not ist dasselbe wie verneintes is
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+t = NEW Katze()
+PRINT (t IS NOT Hund) = (NOT (t IS Hund))
+--- erwartet
+TRUE
+
+=== nil ist keine instanz
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+PRINT t IS Tier
+--- erwartet
+FALSE
+
+=== is auf array und map
+DIM a AS ARRAY OF INTEGER
+DIM m AS MAP OF INTEGER
+a = [1, 2]
+PRINT a IS ARRAY; " "; m IS MAP; " "; a IS MAP
+--- erwartet
+TRUE TRUE FALSE
+
+=== is auf modultyp
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(1.0, 2.0)
+PRINT v IS VEC2; " "; v IS INTEGER
+--- erwartet
+TRUE FALSE
+
+=== is auf struct
+STRUCT P
+    DIM x AS INTEGER
+END STRUCT
+DIM p AS P
+PRINT p IS P
+--- erwartet
+TRUE
+
+=== tippfehler im typnamen ist ein uebersetzungsfehler
+' Ohne diese Pruefung waere `x IS Gegnr` still fuer immer FALSE -- ein
+CLASS Gegner
+END CLASS
+DIM g AS Gegner
+g = NEW Gegner()
+PRINT g IS Gegnr
+--- fehler
+IS: unbekannter Typ 'gegnr' (keine Klasse, kein Werttyp)
+
+=== fehlender import wird benannt
+DIM x AS INTEGER
+PRINT x IS VEC2
+--- fehler
+IS: unbekannter Typ 'vec2' -- fehlt ein IMPORT? (z.B. "vec2")
+
+=== select case is bleibt unberuehrt
+' `CASE IS > 5` verschluckt sein IS im Case-Parser -- der neue Operator
+DIM i AS INTEGER
+i = 7
+SELECT CASE i
+    CASE IS > 5
+        PRINT "gross"
+    CASE ELSE
+        PRINT "klein"
+END SELECT
+--- erwartet
+gross
+
+=== is in bedingungen und ausdruecken
+CLASS Tier
+END CLASS
+CLASS Hund EXTENDS Tier
+END CLASS
+CLASS Dackel EXTENDS Hund
+END CLASS
+CLASS Katze EXTENDS Tier
+END CLASS
+
+DIM t AS Tier
+t = NEW Hund()
+IF t IS Hund AND t IS NOT Katze THEN PRINT "ja"
+DIM b AS BOOLEAN
+b = t IS Tier
+PRINT b
+--- erwartet
+ja
+TRUE
+
+=== is ueber namensraum
+' Der Typname hinter IS wird umgeschrieben wie bei DIM und NEW.
+IMPORT "zoo.dh" AS zoo
+DIM t AS zoo.Tier
+t = NEW zoo.Tier()
+PRINT t IS zoo.Tier
+--- datei zoo.dh
+CLASS Tier
+END CLASS
+--- erwartet
+TRUE
+

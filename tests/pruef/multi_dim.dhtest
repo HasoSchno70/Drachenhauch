@@ -1,0 +1,153 @@
+' Aus test_multi_dim.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== multi dim treewalker[DIM a, b, c AS INTEGER\na = 1\nb = 2\nc = 3\nPRINT a + b + c\n-6\n]
+DIM a, b, c AS INTEGER
+a = 1
+b = 2
+c = 3
+PRINT a + b + c
+--- erwartet
+6
+
+=== multi dim treewalker[DIM x, y AS STRING\nx = "Hallo"\ny = "Welt"\nPRINT x + " " + y\n-Hallo Welt\n]
+DIM x, y AS STRING
+x = "Hallo"
+y = "Welt"
+PRINT x + " " + y
+--- erwartet
+Hallo Welt
+
+=== multi dim treewalker[DIM a, b AS FLOAT\na = 1.5\nb = 2.5\nPRINT a + b\n-4.0\n]
+DIM a, b AS FLOAT
+a = 1.5
+b = 2.5
+PRINT a + b
+--- erwartet
+4.0
+
+=== multi dim treewalker[DIM a, b AS BOOLEAN\na = TRUE\nb = FALSE\nPRINT a\nPRINT b\n-TRUE\nFALSE\n]
+DIM a, b AS BOOLEAN
+a = TRUE
+b = FALSE
+PRINT a
+PRINT b
+--- erwartet
+TRUE
+FALSE
+
+=== multi dim treewalker[DIM x[3], y AS INTEGER\nx[0] = 10\nx[1] = 20\nx[2] = 30\ny = 99\nPRINT x[0] + x[1] + x[2]\nPRINT y\n-60\n99\n]
+DIM x[3], y AS INTEGER
+x[0] = 10
+x[1] = 20
+x[2] = 30
+y = 99
+PRINT x[0] + x[1] + x[2]
+PRINT y
+--- erwartet
+60
+99
+
+=== multi dim treewalker[DIM small[2], big[5] AS INTEGER\nsmall[0] = 1\nbig[4] = 99\nPRINT small[0]\nPRINT big[4]\n-1\n99\n]
+DIM small[2], big[5] AS INTEGER
+small[0] = 1
+big[4] = 99
+PRINT small[0]
+PRINT big[4]
+--- erwartet
+1
+99
+
+=== multi dim treewalker[DIM grid[2, 2], scalar AS INTEGER\ngrid[0, 0] = 7\ngrid[1, 1] = 8\nscalar = 5\nPRINT grid[0, 0] + grid[1, 1] + scalar\n-20\n]
+DIM grid[2, 2], scalar AS INTEGER
+grid[0, 0] = 7
+grid[1, 1] = 8
+scalar = 5
+PRINT grid[0, 0] + grid[1, 1] + scalar
+--- erwartet
+20
+
+=== multi dim vm[DIM a, b, c AS INTEGER\na = 1\nb = 2\nc = 3\nPRINT a + b + c\n-6\n]
+DIM a, b, c AS INTEGER
+a = 1
+b = 2
+c = 3
+PRINT a + b + c
+--- erwartet
+6
+
+=== multi dim vm[DIM x, y AS STRING\nx = "Hallo"\ny = "Welt"\nPRINT x + " " + y\n-Hallo Welt\n]
+DIM x, y AS STRING
+x = "Hallo"
+y = "Welt"
+PRINT x + " " + y
+--- erwartet
+Hallo Welt
+
+=== multi dim vm[DIM a, b AS FLOAT\na = 1.5\nb = 2.5\nPRINT a + b\n-4.0\n]
+DIM a, b AS FLOAT
+a = 1.5
+b = 2.5
+PRINT a + b
+--- erwartet
+4.0
+
+=== multi dim vm[DIM a, b AS BOOLEAN\na = TRUE\nb = FALSE\nPRINT a\nPRINT b\n-TRUE\nFALSE\n]
+DIM a, b AS BOOLEAN
+a = TRUE
+b = FALSE
+PRINT a
+PRINT b
+--- erwartet
+TRUE
+FALSE
+
+=== multi dim vm[DIM x[3], y AS INTEGER\nx[0] = 10\nx[1] = 20\nx[2] = 30\ny = 99\nPRINT x[0] + x[1] + x[2]\nPRINT y\n-60\n99\n]
+DIM x[3], y AS INTEGER
+x[0] = 10
+x[1] = 20
+x[2] = 30
+y = 99
+PRINT x[0] + x[1] + x[2]
+PRINT y
+--- erwartet
+60
+99
+
+=== multi dim vm[DIM small[2], big[5] AS INTEGER\nsmall[0] = 1\nbig[4] = 99\nPRINT small[0]\nPRINT big[4]\n-1\n99\n]
+DIM small[2], big[5] AS INTEGER
+small[0] = 1
+big[4] = 99
+PRINT small[0]
+PRINT big[4]
+--- erwartet
+1
+99
+
+=== multi dim vm[DIM grid[2, 2], scalar AS INTEGER\ngrid[0, 0] = 7\ngrid[1, 1] = 8\nscalar = 5\nPRINT grid[0, 0] + grid[1, 1] + scalar\n-20\n]
+DIM grid[2, 2], scalar AS INTEGER
+grid[0, 0] = 7
+grid[1, 1] = 8
+scalar = 5
+PRINT grid[0, 0] + grid[1, 1] + scalar
+--- erwartet
+20
+
+=== multi dim single var still works
+' Single-DIM darf NICHT durch die Multi-DIM-Aenderung kaputt gehen.
+DIM x AS INTEGER
+x = 42
+PRINT x
+--- erwartet
+42
+
+=== multi dim each var initialized to default
+' Alle Vars im Multi-DIM kriegen den Typ-Default (0 bei INTEGER).
+DIM a, b, c AS INTEGER
+PRINT a
+PRINT b
+PRINT c
+--- erwartet
+0
+0
+0
+

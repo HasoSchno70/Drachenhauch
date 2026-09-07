@@ -1,0 +1,158 @@
+' Aus test_physics2d.py uebertragen (10 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== box falls and rests on floor
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM floor AS INTEGER
+floor = PHYS2D_ADD_BOX(w, 240.0, 400.0, 240.0, 10.0, FALSE, 0.0)
+DIM ball AS INTEGER
+ball = PHYS2D_ADD_BOX(w, 240.0, 50.0, 16.0, 16.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 180
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+PRINT INT(PHYS2D_BODY_Y(w, ball))
+--- erwartet
+374
+
+=== gravity pulls down by default
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM b AS INTEGER
+b = PHYS2D_ADD_CIRCLE(w, 100.0, 100.0, 8.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+IF PHYS2D_BODY_Y(w, b) > 100.0 THEN PRINT "fell"
+--- erwartet
+fell
+
+=== set gravity direction
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, -980.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_CIRCLE(w, 100.0, 300.0, 8.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 30
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+IF PHYS2D_BODY_Y(w, b) < 300.0 THEN PRINT "rose"
+--- erwartet
+rose
+
+=== impulse moves body
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, 0.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_CIRCLE(w, 50.0, 50.0, 8.0, TRUE, 0.0)
+PHYS2D_APPLY_IMPULSE(w, b, 500.0, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+IF PHYS2D_BODY_VX(w, b) > 0.0 AND PHYS2D_BODY_X(w, b) > 50.0 THEN PRINT "moved"
+--- erwartet
+moved
+
+=== count and remove
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM a AS INTEGER
+a = PHYS2D_ADD_CIRCLE(w, 10.0, 10.0, 4.0, TRUE, 0.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_CIRCLE(w, 20.0, 20.0, 4.0, TRUE, 0.0)
+PRINT PHYS2D_COUNT(w)
+PHYS2D_REMOVE(w, a)
+PRINT PHYS2D_COUNT(w)
+--- erwartet
+2
+1
+
+=== lock rotation keeps angle zero
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM floor AS INTEGER
+floor = PHYS2D_ADD_BOX(w, 240.0, 400.0, 240.0, 10.0, FALSE, 0.0)
+DIM box AS INTEGER
+box = PHYS2D_ADD_BOX(w, 100.0, 50.0, 16.0, 16.0, TRUE, 0.0)
+PHYS2D_LOCK_ROTATION(w, box, TRUE)
+PHYS2D_APPLY_IMPULSE(w, box, 200.0, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 180
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+IF ABS(PHYS2D_BODY_ANGLE(w, box)) < 0.05 THEN PRINT "upright"
+--- erwartet
+upright
+
+=== static floor does not move
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+DIM floor AS INTEGER
+floor = PHYS2D_ADD_BOX(w, 240.0, 400.0, 240.0, 10.0, FALSE, 0.0)
+DIM i AS INTEGER
+FOR i = 1 TO 60
+    PHYS2D_STEP(w, 0.0166667)
+NEXT
+PRINT INT(PHYS2D_BODY_Y(w, floor))
+--- erwartet
+400
+
+=== bad world type errors
+IMPORT "physics2d"
+PHYS2D_STEP(42, 0.016)
+--- fehler
+PHYS2D_STEP erwartet PHYS2D_WORLD
+
+=== statischer koerper faellt erst nach dem umschalten
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, 980.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, FALSE, 0.0)
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT "statisch: " + STR$(ROUND(PHYS2D_BODY_Y(w, b))) + " dyn=" + STR$(PHYS2D_IS_DYNAMIC(w, b))
+PHYS2D_SET_DYNAMIC(w, b, TRUE)
+FOR i = 0 TO 29
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT "gefallen: " + STR$(PHYS2D_BODY_Y(w, b) > 110.0) + " dyn=" + STR$(PHYS2D_IS_DYNAMIC(w, b))
+--- erwartet
+statisch: 100 dyn=FALSE
+gefallen: TRUE dyn=TRUE
+
+=== dynamisch zu statisch haelt den koerper an
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, 980.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PHYS2D_SET_DYNAMIC(w, b, FALSE)
+DIM y0 AS FLOAT
+y0 = PHYS2D_BODY_Y(w, b)
+FOR i = 0 TO 19
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT ABS(PHYS2D_BODY_Y(w, b) - y0) < 0.01
+--- erwartet
+TRUE
+

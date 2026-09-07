@@ -1,0 +1,385 @@
+' Aus test_buffer.py uebertragen (48 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== buffer ist ein kerntyp ohne import
+DIM b AS BUFFER
+b = BUFFER_NEW(3)
+PRINT BUFFER_LEN(b)
+--- erwartet
+3
+
+=== buffer als variablenname bleibt erlaubt
+DIM buffer AS INTEGER
+buffer = 7
+PRINT buffer
+--- erwartet
+7
+
+=== neuer buffer ist genullt
+PRINT BUFFER_TO_HEX$(BUFFER_NEW(4))
+--- erwartet
+00000000
+
+=== default ist nil
+DIM b AS BUFFER
+PRINT IS_NIL(b)
+--- erwartet
+TRUE
+
+=== typeof und print
+DIM b AS BUFFER
+b = BUFFER_NEW(5)
+PRINT TYPEOF(b)
+PRINT b
+--- erwartet
+BUFFER
+<BUFFER 5 Bytes>
+
+=== get und set
+DIM b AS BUFFER
+b = BUFFER_NEW(2)
+BUFFER_SET(b, 0, 222)
+BUFFER_SET(b, 1, 173)
+PRINT BUFFER_GET(b, 0)
+PRINT BUFFER_TO_HEX$(b)
+--- erwartet
+222
+dead
+
+=== fill und resize
+DIM b AS BUFFER
+b = BUFFER_NEW(3)
+BUFFER_FILL(b, 255)
+PRINT BUFFER_TO_HEX$(b)
+BUFFER_RESIZE(b, 5)
+PRINT BUFFER_TO_HEX$(b)
+BUFFER_RESIZE(b, 2)
+PRINT BUFFER_TO_HEX$(b)
+--- erwartet
+ffffff
+ffffff0000
+ffff
+
+=== buffer wird per referenz uebergeben
+SUB fuellen(p AS BUFFER)
+    BUFFER_SET(p, 0, 99)
+END SUB
+DIM b AS BUFFER
+b = BUFFER_NEW(2)
+fuellen(b)
+PRINT BUFFER_TO_HEX$(b)
+--- erwartet
+6300
+
+=== index ausserhalb wirft
+PRINT BUFFER_GET(BUFFER_NEW(2), 5)
+--- fehler
+BUFFER_GET: 1 Byte(s) ab Position 5 liegen ausserhalb des Puffers (Laenge 2)
+
+=== negative position wirft
+PRINT BUFFER_GET(BUFFER_NEW(2), -1)
+--- fehler
+BUFFER_GET: 1 Byte(s) ab Position -1 liegen ausserhalb des Puffers (Laenge 2)
+
+=== byte ausserhalb 0 255 wirft[256]
+BUFFER_SET(BUFFER_NEW(2), 0, 256)
+--- fehler
+BUFFER_SET: Byte-Wert 256 liegt ausserhalb 0..255
+
+=== byte ausserhalb 0 255 wirft[-1]
+BUFFER_SET(BUFFER_NEW(2), 0, -1)
+--- fehler
+BUFFER_SET: Byte-Wert -1 liegt ausserhalb 0..255
+
+=== negative groesse wirft
+PRINT BUFFER_NEW(-1)
+--- fehler
+BUFFER_NEW: Groesse -1 ist negativ
+
+=== absurde groesse wirft statt den rechner lahmzulegen
+PRINT BUFFER_NEW(999999999999)
+--- fehler
+BUFFER_NEW: Groesse 999999999999 ueberschreitet die Obergrenze von 1073741824 Bytes
+
+=== slice klemmt wie beim array
+DIM b AS BUFFER
+b = BUFFER_FROM_HEX("00112233")
+PRINT BUFFER_TO_HEX$(BUFFER_SLICE(b, 1, 3))
+PRINT BUFFER_TO_HEX$(BUFFER_SLICE(b, 0, 99))
+PRINT BUFFER_LEN(BUFFER_SLICE(b, 3, 1))
+--- erwartet
+1122
+00112233
+0
+
+=== slice liefert eine kopie nicht dieselben bytes
+DIM b AS BUFFER
+DIM s AS BUFFER
+b = BUFFER_FROM_HEX("aabb")
+s = BUFFER_SLICE(b, 0, 2)
+BUFFER_SET(s, 0, 0)
+PRINT BUFFER_TO_HEX$(b)
+--- erwartet
+aabb
+
+=== concat
+PRINT BUFFER_TO_HEX$(BUFFER_CONCAT(BUFFER_FROM_HEX("aa"), BUFFER_FROM_HEX("bbcc")))
+--- erwartet
+aabbcc
+
+=== concat mit sich selbst paniert nicht
+DIM b AS BUFFER
+b = BUFFER_FROM_HEX("aabb")
+PRINT BUFFER_TO_HEX$(BUFFER_CONCAT(b, b))
+--- erwartet
+aabbaabb
+
+=== indexof
+DIM h AS BUFFER
+h = BUFFER_FROM_HEX("0011223311")
+PRINT BUFFER_INDEXOF(h, BUFFER_FROM_HEX("2233"))
+PRINT BUFFER_INDEXOF(h, BUFFER_FROM_HEX("11"))
+PRINT BUFFER_INDEXOF(h, BUFFER_FROM_HEX("11"), 2)
+PRINT BUFFER_INDEXOF(h, BUFFER_FROM_HEX("ff"))
+--- erwartet
+2
+1
+4
+-1
+
+=== string hin und zurueck
+PRINT BUFFER_TO_STRING$(BUFFER_FROM_STRING("Grueezi"))
+--- erwartet
+Grueezi
+
+=== bytes sind nicht zeichen
+' Der eigentliche Grund fuer den Typ: STRING ist UTF-8, LEN zaehlt
+PRINT LEN("Gruesse")
+PRINT BUFFER_LEN(BUFFER_FROM_STRING("Gruesse"))
+PRINT LEN("Grusz")
+PRINT BUFFER_LEN(BUFFER_FROM_STRING("Grüsz"))
+--- erwartet
+7
+7
+5
+6
+
+=== to string ist streng bei kaputtem utf8
+PRINT BUFFER_TO_STRING$(BUFFER_FROM_HEX("fffe"))
+--- fehler
+BUFFER_TO_STRING$: Byte 0 ist kein gueltiges UTF-8 -- der Puffer enthaelt keinen Text (fuer Binaerdaten BUFFER_TO_HEX$ nehmen)
+
+=== hex hin und zurueck
+PRINT BUFFER_TO_HEX$(BUFFER_FROM_HEX("DEADBEEF"))
+--- erwartet
+deadbeef
+
+=== hex darf leerzeichen enthalten
+PRINT BUFFER_TO_HEX$(BUFFER_FROM_HEX("de ad be ef"))
+--- erwartet
+deadbeef
+
+=== hex ungerade wirft
+PRINT BUFFER_FROM_HEX("abc")
+--- fehler
+BUFFER_FROM_HEX: ungerade Zahl von Hex-Ziffern (3)
+
+=== hex mit unsinn wirft
+PRINT BUFFER_FROM_HEX("zz")
+--- fehler
+BUFFER_FROM_HEX: 'z' ist keine Hex-Ziffer
+
+=== base64 hin und zurueck mit rohen bytes
+DIM b AS BUFFER
+b = BUFFER_FROM_HEX("fffe00")
+PRINT BUFFER_TO_HEX$(BUFFER_FROM_BASE64(BUFFER_TO_BASE64$(b)))
+--- erwartet
+fffe00
+
+=== ganzzahlen hin und zurueck[I16--1000]
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I16(b, 0, -1000)
+PRINT BUFFER_GET_I16(b, 0)
+--- erwartet
+-1000
+
+=== ganzzahlen hin und zurueck[U16-65535]
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_U16(b, 0, 65535)
+PRINT BUFFER_GET_U16(b, 0)
+--- erwartet
+65535
+
+=== ganzzahlen hin und zurueck[I32--70000]
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I32(b, 0, -70000)
+PRINT BUFFER_GET_I32(b, 0)
+--- erwartet
+-70000
+
+=== ganzzahlen hin und zurueck[U32-4000000000]
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_U32(b, 0, 4000000000)
+PRINT BUFFER_GET_U32(b, 0)
+--- erwartet
+4000000000
+
+=== ganzzahlen hin und zurueck[I64--9007199254740993]
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I64(b, 0, -9007199254740993)
+PRINT BUFFER_GET_I64(b, 0)
+--- erwartet
+-9007199254740993
+
+=== gleitkomma hin und zurueck
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_F64(b, 0, 3.5)
+PRINT BUFFER_GET_F64(b, 0)
+BUFFER_SET_F32(b, 0, 0.5)
+PRINT BUFFER_GET_F32(b, 0)
+--- erwartet
+3.5
+0.5
+
+=== byte reihenfolge ist wirklich verschieden
+DIM b AS BUFFER
+b = BUFFER_NEW(8)
+BUFFER_SET_I32(b, 0, 1000)
+BUFFER_SET_I32(b, 4, 1000, "be")
+PRINT BUFFER_TO_HEX$(b)
+--- erwartet
+e8030000000003e8
+
+=== vorgabe ist little endian
+DIM b AS BUFFER
+b = BUFFER_NEW(4)
+BUFFER_SET_I32(b, 0, 1000, "le")
+PRINT BUFFER_GET_I32(b, 0)
+--- erwartet
+1000
+
+=== falsche byte reihenfolge wirft
+PRINT BUFFER_GET_I32(BUFFER_NEW(4), 0, "mittel")
+--- fehler
+BUFFER_GET_I32: Byte-Reihenfolge 'mittel' unbekannt (erlaubt: "le" = little-endian, "be" = big-endian)
+
+=== zahl ausserhalb des wertebereichs wirft
+BUFFER_SET_U16(BUFFER_NEW(4), 0, 70000)
+--- fehler
+BUFFER_SET_U16: Wert 70000 liegt ausserhalb 0..65535
+
+=== zahl ueber das pufferende hinaus wirft
+PRINT BUFFER_GET_I32(BUFFER_NEW(4), 1)
+--- fehler
+BUFFER_GET_I32: 4 Byte(s) ab Position 1 liegen ausserhalb des Puffers (Laenge 4)
+
+=== writeall und readall bytes
+WRITEALL_BYTES("roh.dat", BUFFER_FROM_HEX("00ff0a0d1a"))
+PRINT FILESIZE("roh.dat")
+PRINT BUFFER_TO_HEX$(READALL_BYTES("roh.dat"))
+--- erwartet
+5
+00ff0a0d1a
+
+=== read bytes und tell
+DIM f AS FILE
+WRITEALL_BYTES("b.dat", BUFFER_FROM_HEX("00010203040506070809"))
+f = OPENFILE("b.dat", "r")
+PRINT BUFFER_TO_HEX$(READ_BYTES(f, 3))
+PRINT TELL(f)
+CLOSEFILE(f)
+--- erwartet
+000102
+3
+
+=== read bytes liefert am ende weniger
+DIM f AS FILE
+WRITEALL_BYTES("b.dat", BUFFER_FROM_HEX("0001"))
+f = OPENFILE("b.dat", "r")
+PRINT BUFFER_LEN(READ_BYTES(f, 100))
+PRINT BUFFER_LEN(READ_BYTES(f, 100))
+CLOSEFILE(f)
+--- erwartet
+2
+0
+
+=== write bytes
+DIM f AS FILE
+f = OPENFILE("w.dat", "w")
+WRITE_BYTES(f, BUFFER_FROM_HEX("aabb"))
+WRITE_BYTES(f, BUFFER_FROM_HEX("cc"))
+PRINT TELL(f)
+CLOSEFILE(f)
+PRINT BUFFER_TO_HEX$(READALL_BYTES("w.dat"))
+--- erwartet
+3
+aabbcc
+
+=== seek verwirft den lesepuffer
+' BufReader::seek muss den gepufferten Rest wegwerfen -- sonst laese ein
+DIM f AS FILE
+WRITEALL("t.txt", "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei" + CHR$(10))
+f = OPENFILE("t.txt", "r")
+PRINT READLINE(f)
+SEEK(f, 10)
+PRINT READLINE(f)
+CLOSEFILE(f)
+--- erwartet
+eins
+drei
+
+=== seek negativ wirft
+DIM f AS FILE
+WRITEALL("t.txt", "x")
+f = OPENFILE("t.txt", "r")
+SEEK(f, -1)
+--- fehler
+SEEK: Position -1 ist negativ
+
+=== read bytes auf schreib handle wirft
+DIM f AS FILE
+f = OPENFILE("x.dat", "w")
+PRINT BUFFER_LEN(READ_BYTES(f, 1))
+--- fehler
+READ_BYTES: Datei wurde nicht im Lese-Modus geoeffnet
+
+=== write bytes auf lese handle wirft
+DIM f AS FILE
+WRITEALL("x.dat", "y")
+f = OPENFILE("x.dat", "r")
+WRITE_BYTES(f, BUFFER_NEW(1))
+--- fehler
+WRITE_BYTES: Datei wurde nicht im Schreib-Modus geoeffnet
+
+=== readall bytes auf fehlende datei wirft
+PRINT BUFFER_LEN(READALL_BYTES("gibt_es_nicht_xyz.dat"))
+--- fehler
+READALL_BYTES: Das System kann die angegebene Datei nicht finden. (os error 2) (gibt_es_nicht_xyz.dat)
+
+=== jedes byte ueberlebt den dateiweg
+' Die Kernzusage von WP B: alle 256 Bytewerte gehen unveraendert durch
+DIM b AS BUFFER
+DIM i AS INTEGER
+DIM zurueck AS BUFFER
+b = BUFFER_NEW(256)
+FOR i = 0 TO 255
+    BUFFER_SET(b, i, i)
+NEXT
+WRITEALL_BYTES("alle.dat", b)
+zurueck = READALL_BYTES("alle.dat")
+PRINT BUFFER_LEN(zurueck)
+FOR i = 0 TO 255
+    IF BUFFER_GET(zurueck, i) <> i THEN
+        PRINT "FALSCH bei " + STR$(i)
+    END IF
+NEXT
+PRINT "alle gleich"
+--- erwartet
+256
+alle gleich
+

@@ -1,0 +1,106 @@
+' Aus test_string_mul.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== string mul basic (1)
+PRINT "ab" * 3
+PRINT "-" * 10
+--- erwartet
+ababab
+----------
+
+=== string mul basic (2)
+PRINT "ab" * 3
+PRINT "-" * 10
+--- erwartet
+ababab
+----------
+
+=== string mul int first (1)
+' 3 * "ab" muss genauso funktionieren wie "ab" * 3.
+PRINT 3 * "ab"
+--- erwartet
+ababab
+
+=== string mul int first (2)
+' 3 * "ab" muss genauso funktionieren wie "ab" * 3.
+PRINT 3 * "ab"
+--- erwartet
+ababab
+
+=== string mul zero (1)
+PRINT "x" * 0
+--- erwartet
+
+=== string mul zero (2)
+PRINT "x" * 0
+--- erwartet
+
+=== string mul negative yields empty (1)
+' Negative Counts liefern leeren String -- konsistent zu Python.
+PRINT "[" + "x" * -3 + "]"
+--- erwartet
+[]
+
+=== string mul negative yields empty (2)
+' Negative Counts liefern leeren String -- konsistent zu Python.
+PRINT "[" + "x" * -3 + "]"
+--- erwartet
+[]
+
+=== string mul with variable (1)
+DIM n AS INTEGER
+n = 5
+PRINT "*" * n
+--- erwartet
+*****
+
+=== string mul with variable (2)
+DIM n AS INTEGER
+n = 5
+PRINT "*" * n
+--- erwartet
+*****
+
+=== string mul rejects float (1)
+' `"x" * 3.0` wird abgelehnt -- nur strikt INTEGER.
+PRINT "x" * 3.0
+--- fehler
+Operator '*' erwartet Zahlen, erhalten STRING / FLOAT
+
+=== string mul rejects float (2)
+' `"x" * 3.0` wird abgelehnt -- nur strikt INTEGER.
+PRINT "x" * 3.0
+--- fehler
+Operator '*' erwartet Zahlen, erhalten STRING / FLOAT
+
+=== string mul rejects bool (1)
+' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in GB.
+PRINT "x" * TRUE
+--- fehler
+Operator '*' erwartet Zahlen, erhalten STRING / BOOLEAN
+
+=== string mul rejects bool (2)
+' `"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in GB.
+PRINT "x" * TRUE
+--- fehler
+Operator '*' erwartet Zahlen, erhalten STRING / BOOLEAN
+
+=== string mul for separator line (1)
+' Praktischer Use-Case: Trennlinien.
+PRINT "=" * 30
+PRINT "Header"
+PRINT "=" * 30
+--- erwartet
+==============================
+Header
+==============================
+
+=== string mul for separator line (2)
+' Praktischer Use-Case: Trennlinien.
+PRINT "=" * 30
+PRINT "Header"
+PRINT "=" * 30
+--- erwartet
+==============================
+Header
+==============================
+

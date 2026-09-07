@@ -50,9 +50,16 @@ pub struct Fall {
     pub zeile: usize,
     pub quelle: String,
     pub erwartet: Option<String>,
+    /// `--- erwartet ungefaehr`: Zahlen in der Ausgabe duerfen um 1e-6 (relativ
+    /// oder absolut) abweichen -- fuer SIN, SQR und alles, was auf drei
+    /// Betriebssystemen in der letzten Stelle anders rundet.
+    pub ungefaehr: bool,
     pub enthaelt: Vec<String>,
     pub fehler: Option<Vec<String>>,
     pub dateien: Vec<(String, String)>,
+    /// `--- verzeichnis name`: ein (leeres) Verzeichnis neben dem Programm --
+    /// fuer DIRLIST, RMDIR und alles, was Ordner sehen will.
+    pub verzeichnisse: Vec<String>,
     pub umgebung: Vec<(String, String)>,
 }
 
@@ -76,7 +83,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Umgebung }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung }
 
 /// Eine Sammlung aus ihrem Text lesen.
 pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
@@ -102,6 +109,7 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                 f.fehler = Some(zeilen);
             }
             Abschnitt::Datei => f.dateien.push((datei_name.to_string(), text)),
+            Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
             Abschnitt::Umgebung => {
                 for z in puffer.iter().filter(|z| !z.trim().is_empty()) {
                     if let Some((k, v)) = z.split_once('=') {
@@ -135,7 +143,11 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                 None => (rest.trim(), ""),
             };
             abschnitt = match wort {
-                "erwartet" => Abschnitt::Erwartet,
+                "erwartet" => {
+                    if arg == "ungefaehr" { f.ungefaehr = true; }
+                    else if !arg.is_empty() { return Err(format!("Zeile {}: '--- erwartet {}' kenne ich nicht (nur 'ungefaehr')", nr + 1, arg)); }
+                    Abschnitt::Erwartet
+                }
                 "enthaelt" => Abschnitt::Enthaelt,
                 "fehler" => Abschnitt::Fehler,
                 "umgebung" => Abschnitt::Umgebung,
@@ -144,7 +156,12 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                     datei_name = arg.to_string();
                     Abschnitt::Datei
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, umgebung)", nr + 1, other)),
+                "verzeichnis" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- verzeichnis' braucht einen Namen", nr + 1)); }
+                    f.verzeichnisse.push(arg.to_string());
+                    Abschnitt::Verzeichnis
+                }
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung)", nr + 1, other)),
             };
             continue;
         }
@@ -159,11 +176,44 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
     Ok(faelle)
 }
 
-/// Ein Zeilenumbruch am Ende zaehlt nicht, Windows-Umbrueche auch nicht.
+/// Leerzeilen am Ende zaehlen nicht, Windows-Umbrueche auch nicht -- in einer
+/// Sammlung ist die Leerzeile am Blockende der Abstand zum naechsten Fall, und
+/// dieselbe Regel muss fuer die Ausgabe gelten, sonst waere ein `PRINT ""` als
+/// letzte Zeile nie zu treffen.
 fn glatt(s: &str) -> String {
     let s = s.replace("\r\n", "\n");
-    let s = s.strip_suffix('\n').unwrap_or(&s).to_string();
-    s
+    let mut zeilen: Vec<&str> = s.split('\n').collect();
+    while zeilen.last().is_some_and(|z| z.trim().is_empty()) { zeilen.pop(); }
+    zeilen.join("\n")
+}
+
+/// Zeilenweise gleich, wobei Zahlen um 1e-6 abweichen duerfen. Verglichen
+/// wird je Zeile Wort fuer Wort (getrennt an Leerraum und Komma); ein Wort,
+/// das auf beiden Seiten als Zahl lesbar ist, zaehlt numerisch, alles andere
+/// wortgleich.
+fn gleich_ungefaehr(erwartet: &str, ist: &str) -> bool {
+    let e: Vec<&str> = erwartet.lines().collect();
+    let i: Vec<&str> = ist.lines().collect();
+    if e.len() != i.len() { return false; }
+    let teile = |z: &str| -> Vec<String> {
+        z.split(|c: char| c.is_whitespace() || c == ',' || c == '(' || c == ')' || c == '[' || c == ']')
+            .filter(|s| !s.is_empty()).map(|s| s.to_string()).collect()
+    };
+    for (a, b) in e.iter().zip(i.iter()) {
+        let (ta, tb) = (teile(a), teile(b));
+        if ta.len() != tb.len() { return false; }
+        for (x, y) in ta.iter().zip(tb.iter()) {
+            if x == y { continue; }
+            match (x.parse::<f64>(), y.parse::<f64>()) {
+                (Ok(p), Ok(q)) => {
+                    let tol = 1e-6_f64.max(p.abs().max(q.abs()) * 1e-6);
+                    if (p - q).abs() > tol { return false; }
+                }
+                _ => return false,
+            }
+        }
+    }
+    true
 }
 
 /// Erste abweichende Zeile als lesbare Meldung.
@@ -210,7 +260,8 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
     }
     if let Some(e) = &fall.erwartet {
         let e = glatt(e);
-        if e != out { return Ergebnis::Fehl(unterschied(&e, &out)); }
+        let gleich = if fall.ungefaehr { gleich_ungefaehr(&e, &out) } else { e == out };
+        if !gleich { return Ergebnis::Fehl(unterschied(&e, &out)); }
     }
     for z in &fall.enthaelt {
         if !out.contains(z.as_str()) {
@@ -239,6 +290,9 @@ mod tests {
         assert_eq!(f[2].enthaelt, vec!["b".to_string()]);
         assert_eq!(f[2].dateien, vec![("karte.json".to_string(), "{\"x\": 1}".to_string())]);
         assert_eq!(f[2].umgebung, vec![("DHRT_FRAMES".to_string(), "1".to_string())]);
+        let v = parsen("=== a\nPRINT 1\n--- verzeichnis leer/tief\n--- erwartet\n1\n").unwrap();
+        assert_eq!(v[0].verzeichnisse, vec!["leer/tief".to_string()]);
+        assert_eq!(v[0].erwartet.as_deref(), Some("1"));
     }
 
     #[test]
@@ -255,6 +309,7 @@ mod tests {
         assert_eq!(bewerten(f, 0, "1\n", "", false), Ergebnis::Ok);
         assert_eq!(bewerten(f, 0, "1\r\n", "", false), Ergebnis::Ok);
         assert_eq!(bewerten(f, 0, "1", "", false), Ergebnis::Ok);
+        assert_eq!(bewerten(f, 0, "1\n\n\n", "", false), Ergebnis::Ok);   // PRINT "" am Ende
         match bewerten(f, 0, "2\n", "", false) {
             Ergebnis::Fehl(m) => assert!(m.contains("Ausgabezeile 1") && m.contains("'1'") && m.contains("'2'"), "{}", m),
             r => panic!("{:?}", r),
@@ -271,6 +326,17 @@ mod tests {
         assert_eq!(bewerten(f, 1, "", "Laufzeitfehler in x.dh:1: Division durch Null\n", false), Ergebnis::Ok);
         assert!(matches!(bewerten(f, 0, "", "", false), Ergebnis::Fehl(_)));
         assert!(matches!(bewerten(f, 1, "", "etwas anderes", false), Ergebnis::Fehl(_)));
+    }
+
+    #[test]
+    fn ungefaehr_laesst_zahlen_in_der_letzten_stelle_durch() {
+        let f = &parsen("=== a\nPRINT SIN(1.0)\n--- erwartet ungefaehr\n0.8414709848078965 x (1, 2.5)\n").unwrap()[0];
+        assert!(f.ungefaehr);
+        assert_eq!(bewerten(f, 0, "0.8414709848078966 x (1, 2.5000000001)\n", "", false), Ergebnis::Ok);
+        assert!(matches!(bewerten(f, 0, "0.8414 x (1, 2.5)\n", "", false), Ergebnis::Fehl(_)));
+        assert!(matches!(bewerten(f, 0, "0.8414709848078965 y (1, 2.5)\n", "", false), Ergebnis::Fehl(_)));
+        assert!(matches!(bewerten(f, 0, "0.8414709848078965 x (1, 2.5)\nmehr\n", "", false), Ergebnis::Fehl(_)));
+        assert!(parsen("=== a\nPRINT 1\n--- erwartet genau\n1\n").unwrap_err().contains("kenne ich nicht"));
     }
 
     #[test]

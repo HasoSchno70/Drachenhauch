@@ -1,0 +1,358 @@
+' Aus test_vererbung.py uebertragen (20 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== super init statt abschreiben
+CLASS Spieler
+    DIM x AS FLOAT
+    DIM hp AS INTEGER
+    SUB Init(sx AS FLOAT)
+        x = sx
+        hp = 100
+    END SUB
+    FUNCTION Wer() AS STRING
+        RETURN "Spieler"
+    END FUNCTION
+END CLASS
+CLASS Held EXTENDS Spieler
+    DIM waffe AS STRING
+    SUB Init(sx AS FLOAT, w AS STRING)
+        SUPER.Init(sx)
+        hp = 150
+        waffe = w
+    END SUB
+END CLASS
+DIM h AS Held
+h = NEW Held(10.0, "Schwert")
+PRINT h.x
+PRINT h.hp
+PRINT h.waffe
+--- erwartet
+10.0
+150
+Schwert
+
+=== super ruft die ueberschriebene methode
+CLASS Spieler
+    DIM x AS FLOAT
+    DIM hp AS INTEGER
+    SUB Init(sx AS FLOAT)
+        x = sx
+        hp = 100
+    END SUB
+    FUNCTION Wer() AS STRING
+        RETURN "Spieler"
+    END FUNCTION
+END CLASS
+CLASS Held EXTENDS Spieler
+    FUNCTION Wer() AS STRING
+        RETURN SUPER.Wer() + " (Held)"
+    END FUNCTION
+END CLASS
+DIM h AS Held
+h = NEW Held(1.0)
+PRINT h.Wer()
+--- erwartet
+Spieler (Held)
+
+=== super ueber drei ebenen
+' Jede Ebene fragt ihre EIGENE Elternklasse, nicht die des Objekts. Ohne
+CLASS Spieler
+    DIM x AS FLOAT
+    DIM hp AS INTEGER
+    SUB Init(sx AS FLOAT)
+        x = sx
+        hp = 100
+    END SUB
+    FUNCTION Wer() AS STRING
+        RETURN "Spieler"
+    END FUNCTION
+END CLASS
+CLASS Held EXTENDS Spieler
+    FUNCTION Wer() AS STRING
+        RETURN SUPER.Wer() + "/Held"
+    END FUNCTION
+END CLASS
+CLASS Meister EXTENDS Held
+    FUNCTION Wer() AS STRING
+        RETURN SUPER.Wer() + "/Meister"
+    END FUNCTION
+END CLASS
+DIM m AS Meister
+m = NEW Meister(1.0)
+PRINT m.Wer()
+--- erwartet
+Spieler/Held/Meister
+
+=== super findet auch uebersprungene ebenen
+' Die Mitte ueberschreibt nichts -- SUPER muss weiter hochsuchen.
+CLASS Spieler
+    DIM x AS FLOAT
+    DIM hp AS INTEGER
+    SUB Init(sx AS FLOAT)
+        x = sx
+        hp = 100
+    END SUB
+    FUNCTION Wer() AS STRING
+        RETURN "Spieler"
+    END FUNCTION
+END CLASS
+CLASS Mitte EXTENDS Spieler
+END CLASS
+CLASS Unten EXTENDS Mitte
+    FUNCTION Wer() AS STRING
+        RETURN SUPER.Wer() + "/Unten"
+    END FUNCTION
+END CLASS
+DIM u AS Unten
+u = NEW Unten(1.0)
+PRINT u.Wer()
+--- erwartet
+Spieler/Unten
+
+=== super mit argumenten und rueckgabewert
+CLASS Rechner
+    FUNCTION Plus(a AS INTEGER, b AS INTEGER) AS INTEGER
+        RETURN a + b
+    END FUNCTION
+END CLASS
+CLASS LauterRechner EXTENDS Rechner
+    FUNCTION Plus(a AS INTEGER, b AS INTEGER) AS INTEGER
+        RETURN SUPER.Plus(a, b) * 10
+    END FUNCTION
+END CLASS
+DIM r AS LauterRechner
+r = NEW LauterRechner()
+PRINT r.Plus(2, 3)
+--- erwartet
+50
+
+=== super in einer sub ohne rueckgabewert
+CLASS A
+    SUB Melde()
+        PRINT "A"
+    END SUB
+END CLASS
+CLASS B EXTENDS A
+    SUB Melde()
+        SUPER.Melde()
+        PRINT "B"
+    END SUB
+END CLASS
+DIM b AS B
+b = NEW B()
+b.Melde()
+--- erwartet
+A
+B
+
+=== super ohne elternklasse ist ein fehler
+CLASS A
+    SUB M()
+        SUPER.M()
+    END SUB
+END CLASS
+DIM a AS A
+a = NEW A()
+a.M()
+--- fehler
+SUPER.m: Klasse a hat keine Elternklasse (kein EXTENDS)
+
+=== super auf unbekannte methode ist ein fehler
+CLASS Spieler
+    DIM x AS FLOAT
+    DIM hp AS INTEGER
+    SUB Init(sx AS FLOAT)
+        x = sx
+        hp = 100
+    END SUB
+    FUNCTION Wer() AS STRING
+        RETURN "Spieler"
+    END FUNCTION
+END CLASS
+CLASS Held EXTENDS Spieler
+    SUB M()
+        SUPER.GibtsNicht()
+    END SUB
+END CLASS
+DIM h AS Held
+h = NEW Held(1.0)
+h.M()
+--- fehler
+SUPER.gibtsnicht: spieler und ihre Elternklassen haben keine Methode 'gibtsnicht'
+
+=== super ausserhalb einer methode ist ein fehler
+SUB frei()
+    SUPER.Irgendwas()
+END SUB
+frei()
+--- fehler
+SUPER geht nur in einer Methode
+
+=== super bleibt als variablenname erlaubt
+' SUPER ist bewusst kein Schluesselwort -- bestehender Code darf es
+DIM super AS INTEGER
+super = 5
+PRINT super
+--- erwartet
+5
+
+=== abstract wird von der unterklasse ausgefuellt
+CLASS Form
+    DIM name AS STRING
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    FUNCTION Zeige() AS STRING
+        RETURN name + ": " + STR$(Flaeche())
+    END FUNCTION
+END CLASS
+CLASS Quadrat EXTENDS Form
+    DIM a AS FLOAT
+    SUB Init(seite AS FLOAT)
+        SUPER.Init("Quadrat")
+        a = seite
+    END SUB
+    FUNCTION Flaeche() AS FLOAT
+        RETURN a * a
+    END FUNCTION
+END CLASS
+DIM q AS Quadrat
+q = NEW Quadrat(3.0)
+PRINT q.Zeige()
+--- erwartet
+Quadrat: 9.0
+
+=== die basisklasse ruft die ausgefuellte methode
+' `Zeige()` steht in Form und ruft `Flaeche()` -- zur Laufzeit landet das
+CLASS Form
+    DIM name AS STRING
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    FUNCTION Zeige() AS STRING
+        RETURN name + ": " + STR$(Flaeche())
+    END FUNCTION
+END CLASS
+CLASS Zwei EXTENDS Form
+    SUB Init()
+        SUPER.Init("Zwei")
+    END SUB
+    FUNCTION Flaeche() AS FLOAT
+        RETURN 2.0
+    END FUNCTION
+END CLASS
+DIM z AS Zwei
+z = NEW Zwei()
+PRINT z.Zeige()
+--- erwartet
+Zwei: 2.0
+
+=== new auf die unfertige klasse ist ein fehler
+CLASS Form
+    DIM name AS STRING
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    FUNCTION Zeige() AS STRING
+        RETURN name + ": " + STR$(Flaeche())
+    END FUNCTION
+END CLASS
+DIM f AS Form
+f = NEW Form("x")
+--- fehler
+NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+
+=== die meldung nennt die fehlende methode
+CLASS Form
+    DIM name AS STRING
+    SUB Init(n AS STRING)
+        name = n
+    END SUB
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    FUNCTION Zeige() AS STRING
+        RETURN name + ": " + STR$(Flaeche())
+    END FUNCTION
+END CLASS
+DIM f AS Form
+f = NEW Form("x")
+--- fehler
+NEW form: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (flaeche). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+
+=== halb ausgefuellte unterklasse bleibt unfertig
+CLASS Form
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    ABSTRACT SUB Zeichne()
+END CLASS
+CLASS Halb EXTENDS Form
+    FUNCTION Flaeche() AS FLOAT
+        RETURN 1.0
+    END FUNCTION
+END CLASS
+DIM h AS Halb
+h = NEW Halb()
+--- fehler
+NEW halb: die Klasse kuendigt eine Methode an, ohne sie auszufuellen (zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in halb mit einem Rumpf versehen.
+
+=== zwei offene methoden werden beide genannt
+CLASS Form
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    ABSTRACT SUB Zeichne()
+END CLASS
+DIM f AS Form
+f = NEW Form()
+--- fehler
+NEW form: die Klasse kuendigt Methoden an, ohne sie auszufuellen (flaeche, zeichne). Entweder eine Unterklasse nehmen, die sie ausschreibt, oder die Methode in form mit einem Rumpf versehen.
+
+=== ganz ausgefuellte unterklasse geht
+CLASS Form
+    ABSTRACT FUNCTION Flaeche() AS FLOAT
+    ABSTRACT SUB Zeichne()
+END CLASS
+CLASS Voll EXTENDS Form
+    FUNCTION Flaeche() AS FLOAT
+        RETURN 1.0
+    END FUNCTION
+    SUB Zeichne()
+        PRINT "gezeichnet"
+    END SUB
+END CLASS
+DIM v AS Voll
+v = NEW Voll()
+v.Zeichne()
+PRINT v.Flaeche()
+--- erwartet
+gezeichnet
+1.0
+
+=== abstract mit parametern
+CLASS Basis
+    ABSTRACT FUNCTION Mal(n AS INTEGER) AS INTEGER
+END CLASS
+CLASS Doppelt EXTENDS Basis
+    FUNCTION Mal(n AS INTEGER) AS INTEGER
+        RETURN n * 2
+    END FUNCTION
+END CLASS
+DIM d AS Doppelt
+d = NEW Doppelt()
+PRINT d.Mal(21)
+--- erwartet
+42
+
+=== abstract bleibt als variablenname erlaubt
+' ABSTRACT ist bewusst kein Schluesselwort geworden -- sonst waere
+DIM abstract AS INTEGER
+abstract = 7
+PRINT abstract
+--- erwartet
+7
+
+=== abstract allein bleibt im class body unerwartet
+CLASS A
+    abstract
+END CLASS
+--- fehler
+Unerwartet im CLASS-Body (erlaubt: DIM, SUB, FUNCTION, OPERATOR, STATIC CONST, PROPERTY)
+

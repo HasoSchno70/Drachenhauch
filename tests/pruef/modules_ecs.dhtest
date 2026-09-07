@@ -1,0 +1,361 @@
+' Aus test_modules_ecs.py uebertragen (28 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== new world is empty
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+PRINT ECS_COUNT(w)
+--- erwartet
+0
+
+=== new entity returns growing ids
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+PRINT ECS_NEW_ENTITY(w)
+PRINT ECS_NEW_ENTITY(w)
+--- erwartet
+1
+2
+
+=== count grows
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+ECS_NEW_ENTITY(w)
+ECS_NEW_ENTITY(w)
+ECS_NEW_ENTITY(w)
+PRINT ECS_COUNT(w)
+--- erwartet
+3
+
+=== destroy returns true on success
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_DESTROY(w, e)
+PRINT ECS_COUNT(w)
+--- erwartet
+TRUE
+0
+
+=== destroy returns false for unknown
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+PRINT ECS_DESTROY(w, 999)
+--- erwartet
+FALSE
+
+=== alive
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_ALIVE(w, e)
+ECS_DESTROY(w, e)
+PRINT ECS_ALIVE(w, e)
+--- erwartet
+TRUE
+FALSE
+
+=== add int and get int
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e, "hp", 100)
+PRINT ECS_GET_INT(w, e, "hp")
+--- erwartet
+100
+
+=== add string
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_STRING(w, e, "name", "Anna")
+PRINT ECS_GET_STRING(w, e, "name")
+--- erwartet
+Anna
+
+=== add float
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_FLOAT(w, e, "x", 3.14)
+PRINT ECS_GET_FLOAT(w, e, "x")
+--- erwartet
+3.14
+
+=== add bool
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_BOOL(w, e, "alive", TRUE)
+PRINT ECS_GET_BOOL(w, e, "alive")
+--- erwartet
+TRUE
+
+=== has returns false when missing
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_HAS(w, e, "nope")
+--- erwartet
+FALSE
+
+=== has returns true after add
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e, "hp", 50)
+PRINT ECS_HAS(w, e, "hp")
+--- erwartet
+TRUE
+
+=== remove returns true on success
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e, "hp", 50)
+PRINT ECS_REMOVE(w, e, "hp")
+PRINT ECS_HAS(w, e, "hp")
+--- erwartet
+TRUE
+FALSE
+
+=== remove returns false when missing
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_REMOVE(w, e, "nope")
+--- erwartet
+FALSE
+
+=== get missing raises
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_GET_INT(w, e, "nope")
+--- fehler
+ECS_GET_INT: Component 'nope' fehlt bei Entity 1
+
+=== get or int returns default
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+PRINT ECS_GET_OR_INT(w, e, "missing", 42)
+--- erwartet
+42
+
+=== get or int returns existing
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e, "hp", 75)
+PRINT ECS_GET_OR_INT(w, e, "hp", 0)
+--- erwartet
+75
+
+=== destroy cleans components
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e, "hp", 100)
+ECS_DESTROY(w, e)
+PRINT ECS_HAS(w, e, "hp")
+--- erwartet
+FALSE
+
+=== get int type mismatch
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_STRING(w, e, "x", "hi")
+PRINT ECS_GET_INT(w, e, "x")
+--- fehler
+ECS_GET_INT: Component ist nicht INTEGER
+
+=== world type check
+IMPORT "ecs"
+PRINT ECS_COUNT("not a world")
+--- fehler
+ECS_COUNT erwartet ECS_WORLD
+
+=== add to dead entity raises
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+ECS_ADD_INT(w, 999, "x", 1)
+--- fehler
+ECS_ADD_INT: Entity 999 nicht in World
+
+=== query returns matching entities
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e1 AS INTEGER
+DIM e2 AS INTEGER
+DIM e3 AS INTEGER
+e1 = ECS_NEW_ENTITY(w)
+e2 = ECS_NEW_ENTITY(w)
+e3 = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e1, "pos", 10)
+ECS_ADD_INT(w, e2, "pos", 20)
+DIM q AS ARRAY OF INTEGER
+q = ECS_QUERY(w, "pos")
+PRINT LEN(q)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(q) - 1
+    PRINT q[i]
+NEXT
+--- erwartet
+2
+1
+2
+
+=== query2 intersection
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e1 AS INTEGER
+DIM e2 AS INTEGER
+DIM e3 AS INTEGER
+e1 = ECS_NEW_ENTITY(w)
+e2 = ECS_NEW_ENTITY(w)
+e3 = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e1, "pos", 1)
+ECS_ADD_INT(w, e1, "vel", 2)
+ECS_ADD_INT(w, e2, "pos", 3)
+ECS_ADD_INT(w, e3, "vel", 4)
+DIM q AS ARRAY OF INTEGER
+q = ECS_QUERY2(w, "pos", "vel")
+PRINT LEN(q)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(q) - 1
+    PRINT q[i]
+NEXT
+--- erwartet
+1
+1
+
+=== query3 intersection
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e1 AS INTEGER
+DIM e2 AS INTEGER
+e1 = ECS_NEW_ENTITY(w)
+e2 = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e1, "a", 1)
+ECS_ADD_INT(w, e1, "b", 1)
+ECS_ADD_INT(w, e1, "c", 1)
+ECS_ADD_INT(w, e2, "a", 1)
+ECS_ADD_INT(w, e2, "b", 1)
+DIM q AS ARRAY OF INTEGER
+q = ECS_QUERY3(w, "a", "b", "c")
+PRINT LEN(q)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(q) - 1
+    PRINT q[i]
+NEXT
+--- erwartet
+1
+1
+
+=== query empty when no match
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+ECS_NEW_ENTITY(w)
+DIM q AS ARRAY OF INTEGER
+q = ECS_QUERY(w, "nonexistent")
+PRINT LEN(q)
+--- erwartet
+0
+
+=== add obj with arbitrary value
+' ECS_ADD_OBJ speichert beliebige Werte per Referenz (hier eine MAP);
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 1)
+ECS_ADD_OBJ(w, e, "data", m)
+DIM got AS MAP OF INTEGER
+got = ECS_GET(w, e, "data")
+PRINT MAPGET(got, "x")
+MAPPUT(got, "x", 99)
+PRINT MAPGET(m, "x")
+--- erwartet
+1
+99
+
+=== movement system via query
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e1 AS INTEGER
+DIM e2 AS INTEGER
+e1 = ECS_NEW_ENTITY(w)
+e2 = ECS_NEW_ENTITY(w)
+ECS_ADD_INT(w, e1, "pos", 0)
+ECS_ADD_INT(w, e1, "vel", 5)
+ECS_ADD_INT(w, e2, "pos", 100)
+ECS_ADD_INT(w, e2, "vel", -3)
+
+DIM moved AS ARRAY OF INTEGER
+moved = ECS_QUERY2(w, "pos", "vel")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(moved) - 1
+    DIM ent AS INTEGER
+    ent = moved[i]
+    ECS_ADD_INT(w, ent, "pos",
+                ECS_GET_INT(w, ent, "pos") + ECS_GET_INT(w, ent, "vel"))
+NEXT
+PRINT ECS_GET_INT(w, e1, "pos")
+PRINT ECS_GET_INT(w, e2, "pos")
+--- erwartet
+5
+97
+
+=== add bool wrong type message
+IMPORT "ecs"
+DIM w AS ECS_WORLD
+w = ECS_NEW_WORLD()
+DIM e AS INTEGER
+e = ECS_NEW_ENTITY(w)
+ECS_ADD_BOOL(w, e, "alive", 1)
+--- fehler
+ECS_ADD_BOOL erwartet BOOLEAN, erhalten INTEGER
+

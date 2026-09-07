@@ -1,0 +1,123 @@
+' Aus test_map_reihenfolge.py uebertragen (9 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== reihenfolge ist einfuegereihenfolge
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "zebra", 1)
+MAPPUT(m, "anton", 2)
+MAPPUT(m, "mitte", 3)
+PRINT JOIN$(MAPKEYS(m), ",")
+--- erwartet
+zebra,anton,mitte
+
+=== ueberschreiben behaelt die position
+' Ein zweites MAPPUT auf denselben Key ist eine Aenderung, kein Anhaengen.
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1)
+MAPPUT(m, "b", 2)
+MAPPUT(m, "a", 99)
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT MAPGET(m, "a")
+PRINT MAPSIZE(m)
+--- erwartet
+a,b
+99
+2
+
+=== entfernen in der mitte
+' Der heikle Fall: nach dem Loeschen verschieben sich alle Positionen
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1)
+MAPPUT(m, "b", 2)
+MAPPUT(m, "c", 3)
+MAPPUT(m, "d", 4)
+MAPREMOVE(m, "b")
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT STR$(MAPGET(m, "a")) + "," + STR$(MAPGET(m, "c")) + "," + STR$(MAPGET(m, "d"))
+--- erwartet
+a,c,d
+1,3,4
+
+=== entfernen und wieder einfuegen
+' Nach dem Entfernen muss der Key als NEU gelten -- also hinten landen,
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1)
+MAPPUT(m, "b", 2)
+MAPREMOVE(m, "a")
+MAPPUT(m, "a", 7)
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT MAPGET(m, "a")
+--- erwartet
+b,a
+7
+
+=== mehrfaches entfernen
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    MAPPUT(m, "k" + STR$(i), i)
+NEXT
+MAPREMOVE(m, "k1")
+MAPREMOVE(m, "k5")
+MAPREMOVE(m, "k10")
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT STR$(MAPGET(m, "k9")) + "|" + STR$(MAPSIZE(m))
+--- erwartet
+k2,k3,k4,k6,k7,k8,k9
+9|7
+
+=== entfernen eines unbekannten keys
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1)
+PRINT STR$(MAPREMOVE(m, "gibtsnicht"))
+PRINT JOIN$(MAPKEYS(m), ",")
+--- erwartet
+FALSE
+a
+
+=== leeren und neu fuellen
+' MAPCLEAR griff frueher direkt auf die Liste zu -- mit einem Index
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "a", 1)
+MAPPUT(m, "b", 2)
+MAPCLEAR(m)
+PRINT MAPSIZE(m)
+MAPPUT(m, "c", 3)
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT MAPGET(m, "c")
+PRINT STR$(MAPHAS(m, "a"))
+--- erwartet
+0
+c
+3
+FALSE
+
+=== werte und items folgen derselben reihenfolge
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "z", 26)
+MAPPUT(m, "a", 1)
+PRINT JOIN$(MAPKEYS(m), ",")
+PRINT STR$(MAPVALUES(m)[0]) + "," + STR$(MAPVALUES(m)[1])
+--- erwartet
+z,a
+26,1
+
+=== viele eintraege bleiben korrekt
+' Der Fall, der die Beschleunigung ueberhaupt noetig machte -- und der
+DIM m AS MAP OF INTEGER
+DIM i AS INTEGER
+DIM summe AS INTEGER
+FOR i = 1 TO 3000
+    MAPPUT(m, "k" + STR$(i), i)
+NEXT
+summe = 0
+FOR i = 1 TO 3000
+    summe = summe + MAPGET(m, "k" + STR$(i))
+NEXT
+PRINT summe
+PRINT MAPSIZE(m)
+PRINT MAPKEYS(m)[0] + "," + MAPKEYS(m)[2999]
+--- erwartet
+4501500
+3000
+k1,k3000
+

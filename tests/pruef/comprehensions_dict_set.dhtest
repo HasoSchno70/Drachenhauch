@@ -1,0 +1,122 @@
+' Aus test_comprehensions_dict_set.py uebertragen (14 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== dict comp basic tw
+DIM m AS MAP OF INTEGER
+m = {STR$(x) + "sq": x * x FOR x IN (1, 2, 3)}
+PRINT MAPGET(m, "1sq")
+PRINT MAPGET(m, "2sq")
+PRINT MAPGET(m, "3sq")
+PRINT MAPSIZE(m)
+--- erwartet
+1
+4
+9
+3
+
+=== dict comp with filter tw
+DIM m AS MAP OF INTEGER
+m = {STR$(x): x FOR x IN (1, 2, 3, 4, 5) WHERE x MOD 2 = 0}
+PRINT MAPSIZE(m)
+PRINT MAPHAS(m, "2")
+PRINT MAPHAS(m, "1")
+--- erwartet
+2
+TRUE
+FALSE
+
+=== dict comp string keys required
+' Key muss STRING sein -- INTEGER-Keys werfen TypeMismatch.
+DIM m AS MAP OF INTEGER
+m = {x: x FOR x IN (1, 2, 3)}
+--- fehler
+MAP-Schluessel erwartet STRING, erhalten INTEGER
+
+=== dict comp vm matches tw (1)
+DIM m AS MAP OF INTEGER
+m = {STR$(i): i * 10 FOR i IN (1, 2, 3, 4)}
+PRINT MAPGET(m, "1")
+PRINT MAPGET(m, "4")
+--- erwartet
+10
+40
+
+=== dict comp vm matches tw (2)
+DIM m AS MAP OF INTEGER
+m = {STR$(i): i * 10 FOR i IN (1, 2, 3, 4)}
+PRINT MAPGET(m, "1")
+PRINT MAPGET(m, "4")
+--- erwartet
+10
+40
+
+=== dict comp from array
+DIM nums[3] AS INTEGER
+nums[0] = 5
+nums[1] = 10
+nums[2] = 15
+DIM m AS MAP OF INTEGER
+m = {STR$(n): n + 1 FOR n IN nums}
+PRINT MAPGET(m, "5")
+PRINT MAPGET(m, "10")
+PRINT MAPGET(m, "15")
+--- erwartet
+6
+11
+16
+
+=== set comp dedupes tw
+DIM s AS TUPLE
+s = {x MOD 3 FOR x IN (0, 1, 2, 3, 4, 5, 6, 7, 8)}
+PRINT s
+--- erwartet
+(0, 1, 2)
+
+=== set comp preserves first occurrence order
+DIM s AS TUPLE
+s = {c FOR c IN "banana"}
+PRINT s
+--- erwartet
+(b, a, n)
+
+=== set comp with filter
+DIM s AS TUPLE
+s = {x FOR x IN (1, 2, 3, 1, 2, 3, 4, 5) WHERE x > 2}
+PRINT s
+--- erwartet
+(3, 4, 5)
+
+=== set comp vm matches tw (1)
+DIM s AS TUPLE
+s = {x * 2 FOR x IN (1, 2, 1, 3, 2, 4)}
+PRINT s
+--- erwartet
+(2, 4, 6, 8)
+
+=== set comp vm matches tw (2)
+DIM s AS TUPLE
+s = {x * 2 FOR x IN (1, 2, 1, 3, 2, 4)}
+PRINT s
+--- erwartet
+(2, 4, 6, 8)
+
+=== set comp empty
+DIM s AS TUPLE
+s = {x FOR x IN (1, 2, 3) WHERE x > 100}
+PRINT s
+--- erwartet
+()
+
+=== leere klammer ist die leere map
+' `{}` war frueher ein Parser-Fehler ("kein Comprehension").
+DIM m AS MAP OF INTEGER
+m = {}
+PRINT MAPSIZE(m)
+--- erwartet
+0
+
+=== klammer ohne doppelpunkt und ohne for bleibt ein fehler
+' Was WEDER Literal (`k: v`) NOCH Comprehension (`x FOR ...`) ist, muss
+PRINT {1, 2}
+--- fehler
+Erwartet ':' (Dict-Comp) oder FOR (Set-Comp) im `{...}`-Block
+

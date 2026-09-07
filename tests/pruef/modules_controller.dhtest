@@ -1,0 +1,362 @@
+' Aus test_modules_controller.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== char new initializes
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(10.0, 20.0, 12.0, 14.0)
+PRINT CHAR_X(c)
+PRINT CHAR_Y(c)
+PRINT CHAR_W(c)
+PRINT CHAR_H(c)
+PRINT CHAR_VX(c)
+PRINT CHAR_VY(c)
+PRINT CHAR_ON_GROUND(c)
+PRINT CHAR_FACING(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+10.0
+20.0
+12.0
+14.0
+0.0
+0.0
+FALSE
+1
+
+=== char new zero size errors
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(0.0, 0.0, 0.0, 10.0)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- fehler
+CHAR_NEW: w und h muessen > 0 sein
+
+=== char set pos
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(0.0, 0.0, 8.0, 8.0)
+CHAR_SET_POS(c, 100.0, 200.0)
+PRINT CHAR_X(c)
+PRINT CHAR_Y(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+100.0
+200.0
+
+=== horizontal move
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(16.0, 96.0, 8.0, 8.0)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    CHAR_SET_INPUT(c, 1, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_X(c)
+PRINT CHAR_FACING(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+22.0
+1
+
+=== facing changes with input
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 96.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, -1, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_FACING(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+-1
+
+=== gravity pulls down
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 10.0, 8.0, 8.0)
+PRINT CHAR_Y(c)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_Y(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+10.0
+11.5
+
+=== lands on ground
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 10.0, 8.0, 8.0)
+DIM i AS INTEGER
+FOR i = 1 TO 60
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_ON_GROUND(c)
+PRINT CHAR_Y(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+TRUE
+104.0
+
+=== jump from ground
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_ON_GROUND(c)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+PRINT CHAR_ON_GROUND(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+TRUE
+-6.0
+FALSE
+
+=== jump no ground no action
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 10.0, 8.0, 8.0)
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_VY(c)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet ungefaehr
+5.0
+5.25
+
+=== coyote time allows jump after ledge
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_ON_GROUND(c)
+CHAR_SET_POS(c, 50.0, 50.0)
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+TRUE
+-6.0
+
+=== coyote time expires
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+CHAR_SET_POS(c, 50.0, 30.0)
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_VY(c)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet ungefaehr
+2.5
+2.75
+
+=== jump buffer fires on landing
+' Sprung-Press kurz vor der Landung feuert beim Touchdown (vy < 0).
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 102.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+DIM best AS FLOAT
+best = CHAR_VY(c)
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    CHAR_SET_INPUT(c, 0, FALSE, TRUE)
+    CHAR_UPDATE(c, m, 0)
+    IF CHAR_VY(c) < best THEN best = CHAR_VY(c)
+NEXT
+PRINT best
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet
+-6.0
+
+=== variable jump cuts velocity on release
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet ungefaehr
+-6.0
+-2.75
+
+=== variable jump no effect when disabled
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(50.0, 104.0, 8.0, 8.0)
+CHAR_SET_VARIABLE_JUMP(c, FALSE)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+CHAR_SET_INPUT(c, 0, TRUE, TRUE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+CHAR_SET_INPUT(c, 0, FALSE, FALSE)
+CHAR_UPDATE(c, m, 0)
+PRINT CHAR_VY(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]}]}
+--- erwartet ungefaehr
+-6.0
+-5.75
+
+=== set jump velocity takes absolute value
+' JUMP_VELOCITY-Setter darf nicht crashen (negativer Eingabewert).
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(0.0, 0.0, 8.0, 8.0)
+CHAR_SET_JUMP_VELOCITY(c, -8.0)
+PRINT "ok"
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+ok
+
+=== set move speed zero
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(0.0, 0.0, 8.0, 8.0)
+CHAR_SET_MOVE_SPEED(c, 0.0)
+PRINT "ok"
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+ok
+
+=== on wall left
+IMPORT "tiled"
+IMPORT "tile_collide"
+IMPORT "controller"
+DIM m AS TILED_MAP
+m = TILED_LOAD("level.json")
+DIM c AS CHAR_CONTROLLER
+c = CHAR_NEW(16.0, 10.0, 8.0, 8.0)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    CHAR_SET_INPUT(c, -1, FALSE, FALSE)
+    CHAR_UPDATE(c, m, 0)
+NEXT
+PRINT CHAR_ON_WALL_LEFT(c)
+--- datei level.json
+{"type": "map", "width": 10, "height": 8, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 1, "image": "x.png", "imagewidth": 16, "imageheight": 16, "tiles": [{"id": 0, "properties": [{"name": "solid", "type": "bool", "value": true}]}]}], "layers": [{"type": "tilelayer", "name": "ground", "width": 10, "height": 8, "data": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+TRUE
+
+=== char x wrong type
+IMPORT "controller"
+PRINT CHAR_X("not a controller")
+--- fehler
+CHAR_X erwartet CHAR_CONTROLLER
+

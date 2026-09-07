@@ -1,0 +1,588 @@
+' Aus test_three_paths.py uebertragen (71 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== arithmetic (1)
+PRINT 7 - 3
+--- erwartet
+4
+
+=== arithmetic (2)
+PRINT 7 / 2
+--- erwartet
+3.5
+
+=== arithmetic (3)
+PRINT 8 / 2
+--- erwartet
+4
+
+=== arithmetic (4)
+PRINT 7 MOD 3
+--- erwartet
+1
+
+=== arithmetic (5)
+PRINT 2 ^ 10
+--- erwartet
+1024
+
+=== arithmetic (6)
+PRINT 7 \ 2
+--- erwartet
+3
+
+=== arithmetic (7)
+PRINT -7 \ 2
+--- erwartet
+-3
+
+=== arithmetic type errors (1)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t - t
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== arithmetic type errors (2)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t / 2
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== arithmetic type errors (3)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t MOD 2
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== arithmetic type errors (4)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t ^ 2
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== arithmetic type errors (5)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t + t
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== arithmetic type errors (6)
+DIM t AS BOOLEAN
+t = TRUE
+TRY
+  PRINT t * 2
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== bitwise (1)
+PRINT 12 BAND 10
+--- erwartet
+8
+
+=== bitwise (2)
+PRINT 12 BOR 10
+--- erwartet
+14
+
+=== bitwise (3)
+PRINT 12 BXOR 10
+--- erwartet
+6
+
+=== bitwise (4)
+PRINT 1 SHL 4
+--- erwartet
+16
+
+=== bitwise (5)
+PRINT 256 SHR 2
+--- erwartet
+64
+
+=== bitwise (6)
+PRINT BNOT 0
+--- erwartet
+-1
+
+=== string mult and concat (1)
+PRINT "ab" * 3
+--- erwartet
+ababab
+
+=== string mult and concat (2)
+PRINT 3 * "ab"
+--- erwartet
+ababab
+
+=== string mult and concat (3)
+PRINT "x" + STR$(5) + "y"
+--- erwartet
+x5y
+
+=== fmt scalars (1)
+PRINT 1.0
+--- erwartet
+1.0
+
+=== fmt scalars (2)
+PRINT 1.5
+--- erwartet
+1.5
+
+=== fmt scalars (3)
+PRINT TRUE
+--- erwartet
+TRUE
+
+=== fmt scalars (4)
+PRINT FALSE
+--- erwartet
+FALSE
+
+=== fmt tuple
+PRINT (1, 2, 3)
+--- erwartet
+(1, 2, 3)
+
+=== fmt array and map (1)
+DIM a[3] AS INTEGER
+PRINT a
+--- erwartet
+<ARRAY[3] OF INTEGER>
+
+=== fmt array and map (2)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "k", 1)
+PRINT m
+--- erwartet
+<MAP[1] OF INTEGER>
+
+=== fmt funcref
+FUNCTION sq(x AS INTEGER) AS INTEGER
+  RETURN x * x
+END FUNCTION
+DIM f AS FUNCREF
+f = sq
+PRINT f
+--- erwartet
+<FUNCREF sq>
+
+=== untyped const scalar (1)
+CONST C = 42
+PRINT C
+--- erwartet
+42
+
+=== untyped const scalar (2)
+CONST C = "hi"
+PRINT C
+--- erwartet
+hi
+
+=== untyped const scalar (3)
+CONST C = 3.5
+PRINT C
+--- erwartet
+3.5
+
+=== untyped const array
+DIM a[3] AS INTEGER
+a[1] = 9
+CONST C = a
+PRINT C[1]
+--- erwartet
+9
+
+=== untyped const funcref
+FUNCTION dbl(x AS INTEGER) AS INTEGER
+  RETURN x + x
+END FUNCTION
+CONST F = dbl
+PRINT F(21)
+--- erwartet
+42
+
+=== coerce int float (1)
+DIM x AS FLOAT
+x = 3
+PRINT x
+--- erwartet
+3.0
+
+=== coerce int float (2)
+DIM x AS INTEGER
+TRY
+  x = 3.5
+CATCH e
+  PRINT "caught"
+END TRY
+--- erwartet
+caught
+
+=== in operator (1)
+IF "lo" IN "Hello" THEN
+  PRINT 1
+END IF
+--- erwartet
+1
+
+=== in operator (2)
+IF 5 IN (1, 5, 9) THEN
+  PRINT 1
+END IF
+--- erwartet
+1
+
+=== in operator (3)
+DIM a[3] AS INTEGER
+a[0]=7
+IF 7 IN a THEN
+  PRINT 1
+END IF
+--- erwartet
+1
+
+=== slicing (1)
+PRINT "Hello World"[6:11]
+--- erwartet
+World
+
+=== slicing (2)
+PRINT "Hello"[:3]
+--- erwartet
+Hel
+
+=== slicing (3)
+PRINT "Hello"[2:]
+--- erwartet
+llo
+
+=== comprehension
+DIM nums AS TUPLE
+nums = (1, 2, 3, 4, 5, 6)
+DIM evens AS TUPLE
+evens = [n FOR n IN nums WHERE n MOD 2 = 0]
+PRINT evens
+--- erwartet
+(2, 4, 6)
+
+=== oop inheritance and self
+CLASS Animal
+  DIM name AS STRING
+  FUNCTION speak() AS STRING
+    RETURN "..."
+  END FUNCTION
+  SUB describe()
+    PRINT Self.name + ": " + Self.speak()
+  END SUB
+END CLASS
+CLASS Dog EXTENDS Animal
+  FUNCTION speak() AS STRING
+    RETURN "Wuff"
+  END FUNCTION
+END CLASS
+DIM d AS Dog
+d = NEW Dog()
+d.name = "Rex"
+d.describe()
+--- erwartet
+Rex: Wuff
+
+=== property clamp
+CLASS P
+  DIM _hp AS INTEGER
+  PROPERTY GET hp() AS INTEGER
+    RETURN Self._hp
+  END PROPERTY
+  PROPERTY SET hp(v AS INTEGER)
+    IF v > 100 THEN v = 100
+    Self._hp = v
+  END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 250
+PRINT p.hp
+--- erwartet
+100
+
+=== enum and static (1)
+ENUM St = MENU, PLAY, OVER
+PRINT St.PLAY
+--- erwartet
+1
+
+=== enum and static (2)
+CLASS C
+  STATIC CONST MAX AS INTEGER = 7
+END CLASS
+PRINT C.MAX
+--- erwartet
+7
+
+=== tuple destructuring
+FUNCTION mm(a AS INTEGER, b AS INTEGER) AS TUPLE
+  IF a < b THEN RETURN (a, b)
+  RETURN (b, a)
+END FUNCTION
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+(lo, hi) = mm(9, 2)
+PRINT lo
+PRINT hi
+--- erwartet
+2
+9
+
+=== data read restore
+DATA 10, 20, 30
+DIM a AS INTEGER
+DIM b AS INTEGER
+READ a
+READ b
+PRINT a + b
+RESTORE
+READ a
+PRINT a
+--- erwartet
+30
+10
+
+=== fstring
+DIM n AS STRING
+n = "Anna"
+DIM hp AS INTEGER
+hp = 75
+PRINT f"{n} hat {hp} HP"
+--- erwartet
+Anna hat 75 HP
+
+=== fstring format specs
+DIM fps AS FLOAT
+fps = 59.731
+DIM sc AS INTEGER
+sc = 42
+PRINT f"{fps:.1f}|{sc:05d}"
+--- erwartet
+59.7|00042
+
+=== fstring slice not spec
+DIM s AS STRING
+s = "Hello"
+PRINT f"{s[0:3]}"
+--- erwartet
+Hel
+
+=== array sort reverse indexof
+DIM a[5] AS INTEGER
+a[0]=5 : a[1]=2 : a[2]=8 : a[3]=1 : a[4]=2
+SORT(a)
+PRINT a[0]
+PRINT a[4]
+PRINT ARRAY_INDEXOF(a, 8)
+REVERSE(a)
+PRINT a[0]
+--- erwartet
+1
+8
+4
+8
+
+=== array method syntax
+DIM a[3] AS INTEGER
+a[0]=3 : a[1]=1 : a[2]=2
+a.sort()
+PRINT a[0]
+PRINT a.indexof(3)
+--- erwartet
+1
+2
+
+=== map values items
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "x", 10)
+MAPPUT(m, "y", 20)
+DIM vs AS ARRAY OF INTEGER
+vs = MAPVALUES(m)
+PRINT vs[0] + vs[1]
+DIM it AS ARRAY OF TUPLE
+it = m.items()
+DIM k AS STRING
+DIM v AS INTEGER
+(k, v) = it[0]
+PRINT k
+PRINT v
+--- erwartet
+30
+x
+10
+
+=== array index fastpath edges (1)
+DIM a[3] AS INTEGER
+a[2] = 9
+PRINT a[2]
+--- erwartet
+9
+
+=== array index fastpath edges (2)
+DIM a[3] AS INTEGER
+TRY
+  PRINT a[5]
+CATCH e
+  PRINT "oob"
+END TRY
+--- erwartet
+oob
+
+=== array index fastpath edges (3)
+DIM a[3] AS INTEGER
+TRY
+  PRINT a[0 - 1]
+CATCH e
+  PRINT "neg"
+END TRY
+--- erwartet
+neg
+
+=== array index fastpath edges (4)
+DIM g[3, 3] AS INTEGER
+TRY
+  PRINT g[1]
+CATCH e
+  PRINT "dim"
+END TRY
+--- erwartet
+dim
+
+=== iif basic (1)
+PRINT IIF(5 > 3, "a", "b")
+--- erwartet
+a
+
+=== iif basic (2)
+PRINT IIF(1 > 9, 100, 7)
+--- erwartet
+7
+
+=== iif lazy
+DIM x AS INTEGER
+x = 0
+PRINT IIF(x <> 0, 100 \ x, -1)
+--- erwartet
+-1
+
+=== iif as variable
+DIM iif AS INTEGER
+iif = 5
+PRINT iif
+--- erwartet
+5
+
+=== foreach array
+DIM a[4] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30 : a[3]=40
+DIM s AS INTEGER
+s = 0
+FOR EACH v IN a
+  s = s + v
+NEXT
+PRINT s
+--- erwartet
+100
+
+=== foreach break continue
+DIM a[4] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30 : a[3]=40
+DIM c AS INTEGER
+c = 0
+FOR EACH v IN a
+  IF v = 20 THEN CONTINUE
+  IF v = 40 THEN BREAK
+  c = c + 1
+NEXT
+PRINT c
+--- erwartet
+2
+
+=== foreach string tuple map (1)
+FOR EACH ch IN "ab"
+  PRINT ch
+NEXT
+--- erwartet
+a
+b
+
+=== foreach string tuple map (2)
+FOR EACH x IN (7, 8)
+  PRINT x
+NEXT
+--- erwartet
+7
+8
+
+=== foreach string tuple map (3)
+DIM m AS MAP OF INTEGER
+MAPPUT(m, "k1", 1)
+MAPPUT(m, "k2", 2)
+FOR EACH k IN m
+  PRINT k
+NEXT
+--- erwartet
+k1
+k2
+
+=== foreach var named each still regular
+DIM s AS INTEGER
+s = 0
+FOR each = 1 TO 3
+  s = s + each
+NEXT
+PRINT s
+--- erwartet
+6
+
+=== select guards
+DIM hp AS INTEGER
+hp = 20
+DIM trank AS BOOLEAN
+trank = TRUE
+SELECT CASE hp
+  CASE IS <= 0
+    PRINT "tot"
+  CASE IS <= 30 WHERE trank
+    PRINT "heilen"
+  CASE IS <= 30
+    PRINT "fliehen"
+  CASE ELSE
+    PRINT "ok"
+END SELECT
+--- erwartet
+heilen
+

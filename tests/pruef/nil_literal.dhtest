@@ -1,0 +1,56 @@
+' Aus test_nil_literal.py uebertragen (5 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== is nil of nil literal
+PRINT IS_NIL(NIL)
+--- erwartet
+TRUE
+
+=== uninitialized object equals nil
+CLASS Foo
+  DIM x AS INTEGER
+END CLASS
+DIM o AS Foo
+PRINT o = NIL
+PRINT o <> NIL
+--- erwartet
+TRUE
+FALSE
+
+=== object after new is not nil
+CLASS Foo
+  DIM x AS INTEGER
+END CLASS
+DIM o AS Foo
+o = NEW Foo()
+PRINT o = NIL
+PRINT IS_NIL(o)
+--- erwartet
+FALSE
+FALSE
+
+=== assign nil clears object
+CLASS Foo
+  DIM x AS INTEGER
+END CLASS
+DIM o AS Foo
+o = NEW Foo()
+o = NIL
+PRINT IS_NIL(o)
+--- erwartet
+TRUE
+
+=== db bind nil stores null
+' Das in docs/module-db.md versprochene NIL->NULL-Binding funktioniert jetzt.
+IMPORT "db"
+DIM con AS DB_CONN
+con = DB_OPEN(":memory:")
+DB_EXEC(con, "CREATE TABLE u (name TEXT, email TEXT)")
+DB_EXEC(con, "INSERT INTO u VALUES (?, ?)", "Anna", NIL)
+DIM r AS DB_RESULT
+r = DB_QUERY(con, "SELECT name, email FROM u")
+IF DB_NEXT(r) THEN PRINT DB_IS_NULL(r, 1)
+DB_CLOSE_RESULT(r)
+DB_CLOSE(con)
+--- erwartet
+TRUE
+

@@ -45,12 +45,14 @@
 > **Weg D hat begonnen (2026-09-07):** `dhrt test` kann Pruefsammlungen
 > (`*.dhtest`: viele Faelle mit erwarteter Ausgabe in einer Datei, siehe
 > `docs/werkzeuge.md`). Gemessen sind 1 084 der 3 949 pytest-Tests reine
-> Ausgabevergleiche in 79 Dateien; die ersten vier Dateien (60 Faelle:
-> Coroutinen, Feld-Literale, `&H`-Literale, Sprachsymmetrie) sind
-> umgezogen und aus `tests/` geloescht. Ein Wegwerf-Umsetzer uebertraegt
-> die unmittelbaren Formen (`assert run_gb(src) == ...`,
-> `pytest.raises(match=...)`); 929 Tests brauchen Handarbeit, weil sie
-> Ausgaben zerlegen, Dateien anlegen oder in Python nachrechnen.
+> Ausgabevergleiche in 79 Dateien. **60 Dateien mit 1 230 Faellen sind
+> umgezogen und aus `tests/` geloescht** -- nicht durch Umbau des Quelltexts,
+> sondern durch Aufzeichnung: ein Wegwerf-Plugin schrieb bei zwei
+> pytest-Laeufen je Aufruf Quelltext, Ausgabe und Beilagen mit, und nur was
+> beide Male gleich war, wurde ein Fall. Bleiben in pytest: alles mit
+> Fenster, Ton oder Eingabe (bis `--- bild` da ist), das Dateisystem
+> (Dateizeiten, Gross/Klein je System) und 14 Module mit binaeren Beilagen
+> oder Zeitabhaengigkeit.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über
