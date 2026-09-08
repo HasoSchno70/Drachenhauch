@@ -285,12 +285,17 @@ class DHHighlighter(QSyntaxHighlighter):
                 i += 1
                 continue
             # f-String: f" oder F" am Wortanfang (kein ident-char davor)
-            if ch in ("f", "F") and i + 1 < n and text[i + 1] == '"':
+            # `f!"..."` ist der f-String mit Escape-Folgen -- dort beendet `\"` nicht.
+            f_escaped = (ch in ("f", "F") and i + 2 < n and text[i + 1] == "!" and text[i + 2] == '"')
+            if (ch in ("f", "F") and i + 1 < n and text[i + 1] == '"') or f_escaped:
                 if i == 0 or not (text[i - 1].isalnum() or text[i - 1] == "_"):
                     start = i
-                    i += 2  # nach f"
+                    i += 3 if f_escaped else 2  # nach f" bzw. f!"
                     while i < n:
                         c2 = text[i]
+                        if f_escaped and c2 == "\\" and i + 1 < n:
+                            i += 2
+                            continue
                         if c2 == '"':
                             if i + 1 < n and text[i + 1] == '"':
                                 i += 2

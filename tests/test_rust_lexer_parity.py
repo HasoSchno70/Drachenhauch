@@ -88,6 +88,9 @@ _SNIPPETS = [
     "MyVar = OtherVar\n",                                # Idents lowercased
     "x = STR$(5) + CHR$(65)\n",                          # $-Suffix-Builtins
     "' nur ein Kommentar\nREM auch einer\nPRINT 1\n",
+    r'PRINT !"a\nb\t""c""\"d\\eä\0\e"' + "\n",      # !"..." mit Escape-Folgen
+    r'PRINT "\d+" + "assets\tiles.png"' + "\n",           # ohne ! bleibt \ woertlich
+    r'PRINT f!"x={x}\n", f"y={y}\n"' + "\n",              # f!"..." gegen f"..."
 ]
 
 

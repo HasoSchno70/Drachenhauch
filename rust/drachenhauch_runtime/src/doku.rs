@@ -327,6 +327,10 @@ pub fn grammatik(wurzel: &Path) -> Result<Value, String> {
         // `end` faengt auch am Zeilenende: der Lexer verbietet Umbrueche im
         // Text, eine halb getippte Zeichenkette faerbte sonst alles bis zum
         // naechsten `"` irgendwo spaeter im Dokument.
+        // `!"..."` (auch `f!"..."`) traegt Escape-Folgen -- erst dieses Muster,
+        // sonst faengt das schlichte `"` die Kette ohne ihr `!`.
+        {"name": "string.quoted.double.escaped.drachenhauch", "begin": "!\"", "end": "\"|$",
+         "patterns": [{"name": "constant.character.escape.drachenhauch", "match": "\"\"|\\\\."}]},
         {"name": "string.quoted.double.drachenhauch", "begin": "\"", "end": "\"|$",
          "patterns": [{"name": "constant.character.escape.drachenhauch", "match": "\"\""}]},
         {"name": "constant.numeric.hex.drachenhauch", "match": "\\b0[xX][0-9a-fA-F]+\\b|&[Hh][0-9a-fA-F]+"},

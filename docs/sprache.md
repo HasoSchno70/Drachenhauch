@@ -388,6 +388,24 @@ DIM s AS STRING
 s = "Sie sagte ""Hallo""."     ' -> Sie sagte "Hallo".
 ```
 
+Ein Backslash ist in einer normalen Zeichenkette ein Zeichen wie jedes
+andere: `"\d+"` ist ein Regex-Muster, `"assets\tiles.png"` ein Pfad. Wer
+Escape-Folgen will, stellt ein `!` voran (wie in FreeBASIC):
+
+```basic
+PRINT !"Zeile 1\nZeile 2"          ' Zeilenumbruch
+PRINT !"Name:\tWert"               ' Tabulator
+PRINT !"Sie sagte \"Hallo\"."      ' Anführungszeichen (auch "" geht weiter)
+PRINT !"C:\\Spiele\\held.png"      ' ein Backslash
+PRINT f!"Punkte: {p}\n"            ' auch im f-String
+```
+
+Erlaubt sind `\n`, `\t`, `\r`, `\\`, `\"`, `\0`, `\e` (Escape, 27) und
+`\uXXXX` (vier Hexziffern, `\u00E4` ist ä). Jede andere Folge ist ein
+Fehler beim Übersetzen, kein stilles Weglassen: wer `!` schreibt, meint
+Escapes, und ein `\q`, das zu `q` würde, versteckte einen Tippfehler.
+`CHR$(10)` und `+` gehen natürlich weiter.
+
 String-Funktionen siehe [Standard-Built-ins](builtins-core.md): `LEFT$`, `RIGHT$`, `MID$`, `INSTR`, `REPLACE$`, `TRIM$`, `SPLIT$`, `JOIN$`, `UPPER$`, `LOWER$`, `LEN`, `STR$`, `VAL`, `CHR$`, `ASC`, `PADL$`, `PADR$`, `REPEAT$`, `SPACE$`, `HEX$`.
 
 Konvention: String-Funktionen mit `$`-Suffix existieren auch ohne Suffix (`UPPER$` und `UPPER` sind dasselbe).
@@ -612,7 +630,7 @@ total = a + b + _
         e
 ```
 
-In String-Literalen sind Newlines weiterhin **nicht** erlaubt — das ist Absicht (`CHR$(10)` einfügen oder mit `+` verketten).
+In String-Literalen sind echte Zeilenumbrüche weiterhin **nicht** erlaubt — das ist Absicht. Ein Umbruch im Text ist `!"...\n..."` (siehe [Strings](#strings)), `CHR$(10)` oder Verketten mit `+`.
 
 ## Statement-Trenner
 

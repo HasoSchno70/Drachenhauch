@@ -248,7 +248,15 @@ impl Lexer {
             return Ok(());
         }
 
-        if ch == '"' { return self.scan_string(line, col); }
+        if ch == '"' { return self.scan_string(line, col, false); }
+        // `!"..."`: Zeichenkette MIT Escape-Folgen (\n, \t, \", \\, \uXXXX ...).
+        // Opt-in wie in FreeBASIC, weil `\` in normalen Zeichenketten woertlich
+        // bleibt -- Regex-Muster ("\d+") und Windows-Pfade ("assets\tiles.png")
+        // haengen daran.
+        if ch == '!' && self.peek(1) == '"' {
+            self.advance();
+            return self.scan_string(line, col, true);
+        }
         if ch.is_ascii_digit() { return self.scan_number(line, col); }
 
         if ch == '&' {
@@ -261,7 +269,10 @@ impl Lexer {
         }
 
         if (ch == 'f' || ch == 'F') && self.peek(1) == '"' {
-            return self.scan_fstring(line, col);
+            return self.scan_fstring(line, col, false);
+        }
+        if (ch == 'f' || ch == 'F') && self.peek(1) == '!' && self.peek(2) == '"' {
+            return self.scan_fstring(line, col, true);
         }
 
         if ch.is_alphabetic() || ch == '_' {
@@ -271,7 +282,38 @@ impl Lexer {
         self.scan_operator(line, col)
     }
 
-    fn scan_string(&mut self, line: usize, col: usize) -> Result<(), LexError> {
+    /// Eine Escape-Folge hinter `\` in einer `!"..."`-Zeichenkette lesen (der
+    /// `\` steht noch an). Erlaubt: \n \t \r \\ \" \0 \e \uXXXX. Alles andere
+    /// ist ein Fehler -- wer `!` schreibt, will Escapes, und ein stilles
+    /// `\q` -> `q` versteckte einen Tippfehler.
+    fn scan_escape(&mut self, line: usize, col: usize) -> Result<char, LexError> {
+        self.advance();    // der Backslash
+        let c = self.peek(0);
+        if c == '\0' || c == '\n' {
+            return Err(self.err("Zeichenkette endet mitten in einer Escape-Folge", line, col));
+        }
+        self.advance();
+        Ok(match c {
+            'n' => '\n', 't' => '\t', 'r' => '\r', '\\' => '\\', '"' => '"',
+            '0' => '\0', 'e' => '\u{1b}',
+            'u' => {
+                let mut hex = String::new();
+                for _ in 0..4 {
+                    let h = self.peek(0);
+                    if !h.is_ascii_hexdigit() {
+                        return Err(self.err("\\u braucht genau vier Hexziffern (z. B. \\u00E4)", line, col));
+                    }
+                    hex.push(self.advance());
+                }
+                char::from_u32(u32::from_str_radix(&hex, 16).unwrap())
+                    .ok_or_else(|| self.err(&format!("\\u{} ist kein gueltiges Zeichen", hex), line, col))?
+            }
+            andere => return Err(self.err(&format!(
+                "Unbekannte Escape-Folge '\\{}' in !\"...\" (erlaubt: \\n \\t \\r \\\\ \\\" \\0 \\e \\uXXXX)", andere), line, col)),
+        })
+    }
+
+    fn scan_string(&mut self, line: usize, col: usize, escapes: bool) -> Result<(), LexError> {
         self.advance();
         let mut chars = String::new();
         loop {
@@ -286,6 +328,10 @@ impl Lexer {
                 }
                 self.advance();
                 break;
+            }
+            if escapes && c == '\\' {
+                chars.push(self.scan_escape(line, col)?);
+                continue;
             }
             chars.push(self.advance());
         }
@@ -400,8 +446,9 @@ impl Lexer {
         Ok(())
     }
 
-    fn scan_fstring(&mut self, line: usize, col: usize) -> Result<(), LexError> {
+    fn scan_fstring(&mut self, line: usize, col: usize, escapes: bool) -> Result<(), LexError> {
         self.advance();    // f
+        if escapes { self.advance(); }    // !
         self.advance();    // "
         // parts: (true=text|false=expr, content)
         let mut parts: Vec<(bool, String)> = Vec::new();
@@ -419,6 +466,10 @@ impl Lexer {
                 self.advance();
                 if !cur.is_empty() { parts.push((true, std::mem::take(&mut cur))); }
                 break;
+            }
+            if escapes && c == '\\' {
+                cur.push(self.scan_escape(line, col)?);
+                continue;
             }
             if c == '{' {
                 if self.peek(1) == '{' {
@@ -584,6 +635,36 @@ pub fn dump_tokens_json(source: &str) -> Result<String, LexError> {
         out.push('\n');
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod escape_tests {
+    use super::*;
+
+    fn strs(src: &str) -> Vec<String> {
+        Lexer::new(src).tokenize().unwrap_or_else(|e| panic!("{}", e.msg)).into_iter()
+            .filter(|t| t.tt == Tt::Str)
+            .map(|t| if let Val::Str(s) = t.val { s } else { unreachable!() })
+            .collect()
+    }
+
+    #[test]
+    fn ausrufezeichen_schaltet_escapes_ein() {
+        assert_eq!(strs(r#"PRINT !"a\nb\t""c""\"d\\eä\0\e""#), vec!["a\nb\t\"c\"\"d\\e\u{e4}\0\u{1b}".to_string()]);
+        // ohne `!` bleibt der Backslash woertlich -- Regex und Pfade
+        assert_eq!(strs(r#"PRINT "\d+" + "assets\tiles.png""#), vec![r"\d+".to_string(), r"assets\tiles.png".to_string()]);
+        // im f-String gelten sie in den Textteilen
+        assert_eq!(strs(r#"PRINT f!"x={x}\n""#), vec!["x=".to_string(), "\n".to_string()]);
+        assert_eq!(strs(r#"PRINT f"x={x}\n""#), vec!["x=".to_string(), r"\n".to_string()]);
+    }
+
+    #[test]
+    fn unbekannte_escape_folge_ist_ein_fehler() {
+        let e = Lexer::new(r#"PRINT !"\q""#).tokenize().unwrap_err();
+        assert!(e.msg.contains("Unbekannte Escape-Folge '\\q'"), "{}", e.msg);
+        assert!(Lexer::new(r#"PRINT !"\u12""#).tokenize().unwrap_err().msg.contains("vier Hexziffern"));
+        assert!(Lexer::new("PRINT !\"abc\\").tokenize().is_err());
+    }
 }
 
 #[cfg(test)]

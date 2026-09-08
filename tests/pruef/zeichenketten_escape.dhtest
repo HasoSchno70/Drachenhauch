@@ -1,0 +1,64 @@
+' Zeichenketten mit Escape-Folgen: `!"..."` und `f!"..."` (2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Ohne `!` bleibt der Backslash woertlich -- Regex-Muster und Windows-Pfade haengen daran.
+
+=== zeilenumbruch und tabulator
+PRINT !"Zeile 1\nZeile 2"
+PRINT !"a\tb"
+PRINT LEN(!"a\tb")
+--- erwartet
+Zeile 1
+Zeile 2
+a	b
+3
+
+=== anfuehrungszeichen und backslash
+PRINT !"Sie sagte \"Hallo\"."
+PRINT !"Sie sagte ""Hallo""."
+PRINT !"C:\\Spiele\\held.png"
+PRINT LEN(!"\\")
+--- erwartet
+Sie sagte "Hallo".
+Sie sagte "Hallo".
+C:\Spiele\held.png
+1
+
+=== unicode null und escape
+PRINT !"\u00E4\u00F6\u00FC"
+PRINT ASC(!"\0")
+PRINT ASC(!"\e")
+PRINT ASC(!"\r")
+--- erwartet
+äöü
+0
+27
+13
+
+=== ohne ausrufezeichen bleibt der backslash woertlich
+' Regex-Muster und Pfade schreibt man weiter ohne Verdopplung.
+PRINT "\d+"
+PRINT "assets\tiles.png"
+PRINT LEN("\n")
+--- erwartet
+\d+
+assets\tiles.png
+2
+
+=== im f string gelten die escapes in den textteilen
+DIM p AS INTEGER
+p = 42
+PRINT f!"Punkte: {p}\nEnde"
+PRINT f"Punkte: {p}\nEnde"
+--- erwartet
+Punkte: 42
+Ende
+Punkte: 42\nEnde
+
+=== unbekannte escape folge ist ein fehler
+PRINT !"\q"
+--- fehler
+Unbekannte Escape-Folge '\q'
+
+=== unicode braucht vier hexziffern
+PRINT !"\u12"
+--- fehler
+vier Hexziffern

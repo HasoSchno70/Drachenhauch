@@ -875,6 +875,18 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
 - **Grafik/Audio NUR in dhrt:** Konsolen-Programme (PRINT/INPUT/Logik) laufen voll;
   Grafik/Audio rendert raylib (Fenster). pygame ist raus; `graphics.py` (Python)
   hält nur noch `COLORS`/`KEYS` + Kamera-Mathematik fürs Editor-Tooling.
+- **Escape-Folgen nur mit `!`** (seit 2026-09-08): `!"Zeile 1\nZeile 2"`,
+  `!"Sie sagte \"Hallo\""`, `f!"Punkte: {p}\n"`. In einer NORMALEN
+  Zeichenkette bleibt der Backslash woertlich -- gemessen stand er im Bestand
+  63-mal in Zeichenketten, fast immer als Regex (`"\d+"`, `"\s+"`) oder
+  Windows-Pfad, und aus `"assets\tiles.png"` waere still ein Tabulator
+  geworden. Opt-in wie in FreeBASIC (`!"..."`). Erlaubt: `\n \t \r \\ \"
+  \0 \e \uXXXX`; jede andere Folge ist ein Uebersetzungsfehler (kein stilles
+  Weglassen). Beide Lexer (`lexer.rs` `scan_escape`, `lexer.py`
+  `_scan_escape`), Hervorheber (`syntax.rs`, `highlighter.py`) und die
+  VS-Code-Grammatik kennen es; Paritaets-Schnipsel in
+  `tests/test_rust_lexer_parity.py`, Sammlung `tests/pruef/zeichenketten_escape.dhtest`,
+  Doku `docs/sprache.md` (Strings).
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
 - **Vorbelegte Namen als Variable gehen ueberall** (seit 2026-08-31). `DIM red`,

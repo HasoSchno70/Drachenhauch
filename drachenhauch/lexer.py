@@ -182,9 +182,18 @@ class Lexer:
             self._error("Erwartet H oder B nach '&' (Hex-/Binaer-Literal)",
                         line, col)
 
+        # `!"..."`: Zeichenkette MIT Escape-Folgen (siehe lexer.rs scan_escape).
+        if ch == "!" and self._peek(1) == '"':
+            self._advance()
+            self._scan_string(line, col, escapes=True)
+            return
+
         # f-String: f"... {expr} ..."  -> wird zu (STR$(...) + "..." + STR$(...)) expandiert
         if (ch in ("f", "F")) and self._peek(1) == '"':
             self._scan_fstring(line, col)
+            return
+        if (ch in ("f", "F")) and self._peek(1) == "!" and self._peek(2) == '"':
+            self._scan_fstring(line, col, escapes=True)
             return
 
         # Bezeichner / Keyword
@@ -195,7 +204,29 @@ class Lexer:
         # Operatoren
         self._scan_operator(line, col)
 
-    def _scan_string(self, line: int, col: int):
+    _ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"', "0": "\0", "e": "\x1b"}
+
+    def _scan_escape(self, line: int, col: int) -> str:
+        """Escape-Folge hinter `\\` in einer `!"..."`-Zeichenkette -- dieselbe
+        Liste wie `scan_escape` in lexer.rs, dieselben Meldungen."""
+        self._advance()              # der Backslash
+        c = self._advance()
+        if c in self._ESCAPES:
+            return self._ESCAPES[c]
+        if c == "u":
+            hexdigits = ""
+            for _ in range(4):
+                h = self._peek()
+                if not (h and h in "0123456789abcdefABCDEF"):
+                    self._error("\\u braucht genau vier Hexziffern (z. B. \\u00E4)", line, col)
+                hexdigits += self._advance()
+            return chr(int(hexdigits, 16))
+        if c in ("", "\n"):
+            self._error("Zeichenkette endet mitten in einer Escape-Folge", line, col)
+        self._error(f"Unbekannte Escape-Folge '\\{c}' in !\"...\" (erlaubt: \\n \\t \\r \\\\ \\\" \\0 \\e \\uXXXX)", line, col)
+        return ""
+
+    def _scan_string(self, line: int, col: int, escapes: bool = False):
         self._advance()  # oeffnendes "
         chars: list[str] = []
         while True:
@@ -212,6 +243,9 @@ class Lexer:
                     continue
                 self._advance()
                 break
+            if escapes and c == "\\":
+                chars.append(self._scan_escape(line, col))
+                continue
             chars.append(self._advance())
         self._add(TokenType.STRING, "".join(chars), line, col)
 
@@ -257,9 +291,9 @@ class Lexer:
         value = float(text) if is_float else int(text)
         self._add(TokenType.NUMBER, value, line, col)
 
-    def _scan_fstring(self, line: int, col: int):
+    def _scan_fstring(self, line: int, col: int, escapes: bool = False):
         """f"text {expr} text..."  -> emits ('text' + STR$(expr) + 'text' + ...)
-        als Token-Sequenz.
+        als Token-Sequenz. `f!"..."` erlaubt in den Textteilen Escape-Folgen.
 
         - {{ und }} sind Escapes fuer wortlich { bzw. }.
         - Jeder Ausdruck zwischen { } wird mit STR$(...) automatisch
@@ -273,6 +307,8 @@ class Lexer:
           scheitert also ohnehin -- Editor und Laufzeit sind sich einig.
         """
         self._advance()              # 'f'
+        if escapes:
+            self._advance()          # '!'
         self._advance()              # '"'
 
         parts: list = []             # ('text', str) oder ('expr', str)
@@ -293,6 +329,9 @@ class Lexer:
                 if cur:
                     parts.append(("text", "".join(cur)))
                 break
+            if escapes and c == "\\":
+                cur.append(self._scan_escape(line, col))
+                continue
             if c == "{":
                 if self._peek(1) == "{":
                     cur.append("{")
