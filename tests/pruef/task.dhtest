@@ -1,0 +1,317 @@
+' Aus test_task.py uebertragen (18 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== auftrag rechnet und liefert
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 21)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+42
+
+=== die hauptschleife laeuft weiter
+' Der ganze Zweck: waehrend der Auftrag rechnet, blockiert nichts.
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+DIM runden AS INTEGER
+a = TASK_START(Langsam, 1)
+runden = 0
+WHILE NOT TASK_READY(a)
+    runden = runden + 1
+WEND
+PRINT STR$(runden > 0)
+--- erwartet
+TRUE
+
+=== pending zaehlt
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 1)
+PRINT TASK_PENDING()
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+PRINT TASK_PENDING()
+--- erwartet
+1
+2
+0
+
+=== text als argument und ergebnis
+FUNCTION Gruss(wer AS STRING) AS STRING
+    RETURN "hallo " + wer
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Gruss, "welt")
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+hallo welt
+
+=== auftrag sieht die globals NICHT
+' Die Zusage, und sie meldet sich statt still zu rechnen.
+CONST FAKTOR AS INTEGER = 10
+FUNCTION Nutzt() AS INTEGER
+    RETURN FAKTOR
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Nutzt)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- fehler
+TASK: Zugriff auf eine globale Variable, die noch nicht gesetzt ist. Laeuft das hier als Auftrag (`dhrt call` / TASK_START)? Dann ist das erwartet: das Hauptprogramm laeuft dabei NICHT, also ist kein Global gesetzt -- auch keine CONST auf oberster Ebene. Gib der Funktion als Parameter mit, was sie braucht.
+
+=== unbekannte funktion meldet
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START("Gibtsnicht", 1)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- fehler
+TASK: Funktion 'Gibtsnicht' gibt es nicht. Bekannt: langsam
+
+=== abholen vor fertig meldet klar
+' Statt zu blockieren oder Unsinn zu liefern: sag, was zu tun ist.
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 1)
+PRINT TASK_RESULT$(a)
+--- fehler
+TASK_RESULT$: Auftrag 0 ist noch nicht fertig -- erst TASK_READY(0) fragen
+
+=== ergebnis ist nur einmal abholbar
+' Wie bei SHELL_RESULT$ -- `abholen` nimmt es aus der Verwaltung. Genau
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 1)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+PRINT TASK_RESULT$(a)
+--- fehler
+TASK_RESULT$: Auftrag 0 ist noch nicht fertig -- erst TASK_READY(0) fragen
+
+=== abbrechen
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 1)
+TASK_CANCEL(a)
+PRINT TASK_PENDING()
+--- erwartet
+0
+
+=== kein funktionsname meldet mit beispiel
+DIM a AS INTEGER
+a = TASK_START(42)
+--- fehler
+TASK_START: erwartet eine Funktion als erstes Argument, bekommen INTEGER. Schreib den Namen ohne Klammern: TASK_START(Rechne, 42)
+
+=== untragbares argument meldet
+' Ein Objekt geht nicht ueber eine Prozessgrenze -- und das soll die
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM feld AS ARRAY OF INTEGER
+DIM a AS INTEGER
+a = TASK_START(Langsam, feld)
+--- fehler
+TASK_START: Argument 1 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht NIL. Fuer alles andere reich JSON durch.
+
+=== mehrere auftraege nebeneinander
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = TASK_START(Langsam, 1)
+b = TASK_START(Langsam, 2)
+PRINT TASK_PENDING()
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+WHILE NOT TASK_READY(b)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a) + "," + TASK_RESULT$(b)
+--- erwartet
+2
+2,4
+
+=== pending zaehlt das UNABGEHOLTE nicht das laufende
+' Die Falle, in die ich beim Schreiben dieser Tests selbst getappt bin.
+FUNCTION Langsam(x AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    DIM s AS INTEGER
+    s = 0
+    FOR i = 1 TO 2000
+        s = s + i MOD 7
+    NEXT
+    RETURN x * 2
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Langsam, 1)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_PENDING()
+PRINT TASK_RESULT$(a)
+PRINT TASK_PENDING()
+--- erwartet
+1
+2
+0
+
+=== drei zahlen
+FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER
+    RETURN a + b + c
+END FUNCTION
+FUNCTION Satz(wer AS STRING, wie AS STRING) AS STRING
+    RETURN wer + " ist " + wie
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Summe, 1, 2, 3)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+6
+
+=== text mit leerzeichen bleibt EIN argument
+' Die Argumente gehen als eigene Kommandozeilen-Worte an `dhrt call` --
+FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER
+    RETURN a + b + c
+END FUNCTION
+FUNCTION Satz(wer AS STRING, wie AS STRING) AS STRING
+    RETURN wer + " ist " + wie
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Satz, "der Text mit Leerzeichen", "heil")
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+der Text mit Leerzeichen ist heil
+
+=== ohne argument geht weiterhin
+FUNCTION Nix() AS INTEGER
+    RETURN 7
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Nix)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- erwartet
+7
+
+=== zu wenige argumente melden sich
+' Die Stelligkeit prueft der Auftrag selbst, im Kindprozess -- die
+FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER
+    RETURN a + b + c
+END FUNCTION
+FUNCTION Satz(wer AS STRING, wie AS STRING) AS STRING
+    RETURN wer + " ist " + wie
+END FUNCTION
+DIM a AS INTEGER
+a = TASK_START(Summe, 1)
+WHILE NOT TASK_READY(a)
+    SLEEP(2)
+WEND
+PRINT TASK_RESULT$(a)
+--- fehler
+TASK: SUMME: erwartet 3..3 Argument(e), erhalten 1
+
+=== untragbares argument nennt die stelle
+FUNCTION Summe(a AS INTEGER, b AS INTEGER, c AS INTEGER) AS INTEGER
+    RETURN a + b + c
+END FUNCTION
+FUNCTION Satz(wer AS STRING, wie AS STRING) AS STRING
+    RETURN wer + " ist " + wie
+END FUNCTION
+DIM feld AS ARRAY OF INTEGER
+DIM a AS INTEGER
+a = TASK_START(Summe, 1, feld, 3)
+--- fehler
+TASK_START: Argument 2 geht ueber eine Prozessgrenze und muss eine Zahl, ein Text oder BOOLEAN sein, nicht NIL. Fuer alles andere reich JSON durch.
+

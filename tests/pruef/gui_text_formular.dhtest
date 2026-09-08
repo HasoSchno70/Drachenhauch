@@ -1,0 +1,771 @@
+' Aus test_gui_text_formular.py uebertragen (24 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Die Faelle laufen nacheinander: tippt ueber die Zwischenablage -- die gibt es nur einmal.
+--- seriell
+
+=== umbruch laesst die hoehe wachsen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM l AS GUI_WIDGET
+l = GUI_LABEL(w, "Ein Satz mit vielen Woertern, der nicht in eine Zeile passt", 10, 10)
+PRINT GUI_GET_H(l)
+GUI_SET_WRAP(l, 150)
+GUI_UPDATE()
+PRINT GUI_GET_W(l) : PRINT GUI_GET_H(l)
+GUI_SET_WRAP(l, 0)
+GUI_UPDATE()
+PRINT GUI_GET_H(l)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+16
+150
+120
+120
+
+=== umbruch nur fuer beschriftungen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "x", 10, 10, 80, 26)
+TRY
+    GUI_SET_WRAP(b, 100)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_SET_WRAP: nur eine Beschriftung (GUI_LABEL) kann umbrechen
+
+=== ausrichtung wird gespeichert und geprueft
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM l AS GUI_WIDGET
+l = GUI_LABEL(w, "rechts", 10, 10)
+GUI_SET_BOUNDS(l, 10, 10, 200, 16)
+GUI_SET_ALIGN(l, "rechts")
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "OK", 10, 40, 100, 26)
+GUI_SET_ALIGN(b, "links")
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j
+TRY
+    GUI_SET_ALIGN(l, "oben")
+CATCH e
+    PRINT e
+END TRY
+DIM s AS GUI_WIDGET : s = GUI_SLIDER(w, 10, 80, 100, 0, 1)
+TRY
+    GUI_SET_ALIGN(s, "mitte")
+CATCH e2
+    PRINT e2
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+GUI_SET_ALIGN: 'oben' unbekannt -- links, mitte oder rechts
+GUI_SET_ALIGN: nur Beschriftung, Knopf und Textfeld haben eine Ausrichtung
+
+=== einfuegen ueber die zwischenablage geht ueberhaupt
+' Die Gegenprobe fuer alles Weitere: ohne Filter kommt an, was in der
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+CLIPBOARD_SET("hallo")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TEXT(tf)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+hallo
+
+=== nur lesen nimmt nichts an
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_SET_TEXT(tf, "fest")
+GUI_TEXTINPUT_SET(tf, "nur_lesen", 1)
+CLIPBOARD_SET("hallo")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TEXT(tf)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+fest
+
+=== hoechstlaenge schneidet ab
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "maxlaenge", 3)
+CLIPBOARD_SET("abcdef")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TEXT(tf)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+abc
+
+=== zahlenfilter[1-42-42]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 1)
+CLIPBOARD_SET("42")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[42]
+
+=== zahlenfilter[1--7--7]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 1)
+CLIPBOARD_SET("-7")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[-7]
+
+=== zahlenfilter[1-12a3-]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 1)
+CLIPBOARD_SET("12a3")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[]
+
+=== zahlenfilter[1-3.5-]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 1)
+CLIPBOARD_SET("3.5")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[]
+
+=== zahlenfilter[2-3.14-3.14]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)
+CLIPBOARD_SET("3.14")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[3.14]
+
+=== zahlenfilter[2-3,14-3,14]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)
+CLIPBOARD_SET("3,14")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[3,14]
+
+=== zahlenfilter[2-3.1.4-]
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "zahlen", 2)
+CLIPBOARD_SET("3.1.4")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TEXT(tf) + "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+[]
+
+=== passwort verbirgt nur die anzeige
+' GUI_TEXT liefert den echten Text; in der Datei steht der Modus.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_TEXTINPUT_SET(tf, "passwort", 1)
+CLIPBOARD_SET("geheim")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TEXT(tf)
+PRINT INSTR(GUI_TO_JSON(w), CHR$(34) + "passwort" + CHR$(34) + ": true") >= 0
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+geheim
+TRUE
+
+=== unbekannter schluessel nennt die gueltigen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+TRY
+    GUI_TEXTINPUT_SET(tf, "farbe", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_TEXTINPUT_SET: unbekannter Schluessel 'farbe' -- passwort, nur_lesen, maxlaenge, zahlen
+
+=== enter meldet sich ein bild lang und ruft den handler
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+SUB fertig()
+    PRINT "handler"
+END SUB
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+GUI_ON_ENTER(tf, fertig)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_ENTERED(tf) THEN PRINT "enter " + STR$(f)
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 4 2 257 0 0 0 // Event: test
+e 5 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+handler
+enter 2
+
+=== strg z nimmt einen schritt zurueck und strg y holt ihn
+' Zwei Einfuegungen mehr als 0,8 s auseinander sind zwei Schritte.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ab")
+DIM f AS INTEGER
+FOR f = 1 TO 120
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF f = 85 OR f = 95 OR f = 105 OR f = 115 THEN PRINT "[" + GUI_TEXT(tf) + "]"
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 20
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+e 70 2 341 0 0 0 // Event: test
+e 70 2 86 0 0 0 // Event: test
+e 71 1 86 0 0 0 // Event: test
+e 71 1 341 0 0 0 // Event: test
+e 90 2 341 0 0 0 // Event: test
+e 90 2 90 0 0 0 // Event: test
+e 91 1 90 0 0 0 // Event: test
+e 91 1 341 0 0 0 // Event: test
+e 100 2 341 0 0 0 // Event: test
+e 100 2 90 0 0 0 // Event: test
+e 101 1 90 0 0 0 // Event: test
+e 101 1 341 0 0 0 // Event: test
+e 110 2 341 0 0 0 // Event: test
+e 110 2 89 0 0 0 // Event: test
+e 111 1 89 0 0 0 // Event: test
+e 111 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=122
+--- erwartet
+[abab]
+[ab]
+[]
+[ab]
+
+=== gui set text leert den verlauf
+' Ein vom Programm gesetzter Text ist kein Schritt des Nutzers -- Strg+Z
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+GUI_FOCUS(tf)
+CLIPBOARD_SET("ab")
+DIM f AS INTEGER
+FOR f = 1 TO 70
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF f = 30 THEN GUI_SET_TEXT(tf, "neu")
+    IF f = 65 THEN PRINT "[" + GUI_TEXT(tf) + "]"
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+e 60 2 341 0 0 0 // Event: test
+e 60 2 90 0 0 0 // Event: test
+e 61 1 90 0 0 0 // Event: test
+e 61 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=72
+--- erwartet
+[neu]
+
+=== enter im textfeld loest den standardknopf aus
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 10, 50, 80, 26)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 100, 50, 100, 26)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_FOCUS(tf)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_CLICKED(ok) THEN PRINT "ok " + STR$(f)
+    IF GUI_CLICKED(ab) THEN PRINT "ab " + STR$(f)
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 4 2 257 0 0 0 // Event: test
+e 5 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+ok 2
+
+=== esc loest den abbrechen knopf aus
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 10, 50, 80, 26)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 100, 50, 100, 26)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_FOCUS(tf)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_CLICKED(ok) THEN PRINT "ok " + STR$(f)
+    IF GUI_CLICKED(ab) THEN PRINT "ab " + STR$(f)
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 4 2 256 0 0 0 // Event: test
+e 5 1 256 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+ab 2
+
+=== ein knopf mit fokus nimmt enter selbst
+' Gegenprobe: Enter auf dem Abbrechen-Knopf drueckt DIESEN, nicht den
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 10, 50, 80, 26)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 100, 50, 100, 26)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+GUI_FOCUS(ab)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_CLICKED(ok) THEN PRINT "ok " + STR$(f)
+    IF GUI_CLICKED(ab) THEN PRINT "ab " + STR$(f)
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 4 2 257 0 0 0 // Event: test
+e 5 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+ab 2
+
+=== ohne fokus gilt der standardknopf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 10, 50, 80, 26)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 100, 50, 100, 26)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_CLICKED(ok) THEN PRINT "ok " + STR$(f)
+    IF GUI_CLICKED(ab) THEN PRINT "ab " + STR$(f)
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 4 2 257 0 0 0 // Event: test
+e 5 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+ok 2
+
+=== standardknopf ueberlebt die datei
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(w, "OK", 10, 50, 80, 26)
+DIM ab AS GUI_WIDGET
+ab = GUI_BUTTON(w, "Abbrechen", 100, 50, 100, 26)
+GUI_WINDOW_DEFAULT(w, ok)
+GUI_WINDOW_CANCEL(w, ab)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM q AS STRING : q = CHR$(34)
+PRINT INSTR(j, q + "default_button" + q + ": 1") >= 0
+PRINT INSTR(j, q + "cancel_button" + q + ": 2") >= 0
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT INSTR(GUI_TO_JSON(w2), q + "cancel_button" + q + ": 2") >= 0
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+TRUE
+TRUE
+
+=== nur ein knopf desselben fensters
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET
+tf = GUI_TEXTINPUT(w, 10, 10, 200, 26)
+TRY
+    GUI_WINDOW_DEFAULT(w, tf)
+CATCH e
+    PRINT e
+END TRY
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("B", 20, 20, 100, 100)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w2, "x", 5, 5, 40, 20)
+TRY
+    GUI_WINDOW_DEFAULT(w, b)
+CATCH e2
+    PRINT e2
+END TRY
+GUI_WINDOW_DEFAULT(w, -1)
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_WINDOW_DEFAULT: nur ein Knopf (GUI_BUTTON) kann Standard- oder Abbrechen-Knopf sein
+GUI_WINDOW_DEFAULT: der Knopf gehoert zu einem anderen Fenster
+ok
+

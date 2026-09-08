@@ -14,6 +14,10 @@ Zeitliche Zuordnung: eingespeist wird am ENDE eines FLIP (direkt nachdem
 raylib die echte Eingabe fuer den naechsten Frame gelesen hat). Ein
 Ereignis mit Aufnahme-Frame N wirkt daher im Programm-Durchlauf N+1 -- die
 Erwartungen unten sind entsprechend um eins verschoben.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/automation.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import os
 import subprocess
@@ -78,106 +82,6 @@ _HEAD = ('SCREEN(160, 120, "Auto", 1)\n'
 
 
 # ------------------------------------------------------------- Wiedergabe
-def test_recorded_keys_and_mouse_reach_the_program(tmp_path):
-    # Eine gehaltene Taste steht in JEDEM Frame in der Aufnahme (so schreibt
-    # raylib mit) -- losgelassen wird sie mit einem eigenen KEY_UP.
-    _events(tmp_path, "ev.txt", [
-        (0, MOUSE_POSITION, 40, 25),
-        (1, KEY_DOWN, 32),
-        (2, KEY_DOWN, 32),
-        (3, KEY_UP, 32),
-    ])
-    gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 5\n'
-          '    PRINT STR$(f) + " " + STR$(MOUSEX()) + "," + STR$(MOUSEY()) + " " + _\n'
-          '          STR$(KEYPRESSED(KEY_SPACE)) + " " + STR$(KEYHIT(KEY_SPACE))\n'
-          '    FLIP()\n'
-          'NEXT\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert r.lines == [
-        "0 0,0 FALSE FALSE",        # noch nichts eingespeist
-        "1 40,25 FALSE FALSE",      # Mausposition aus Frame 0
-        "2 40,25 TRUE TRUE",        # Taste gedrueckt -> auch die Flanke
-        "3 40,25 TRUE FALSE",       # gehalten: keine neue Flanke
-        "4 40,25 FALSE FALSE",      # losgelassen
-        "5 40,25 FALSE FALSE",
-    ]
-
-
-def test_mouse_buttons_are_replayed(tmp_path):
-    _events(tmp_path, "click.txt", [
-        (0, MOUSE_BUTTON_DOWN, 0),
-        (1, MOUSE_BUTTON_UP, 0),
-    ])
-    gb = (_HEAD + 'AUTOMATION_PLAY("click.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 3\n'
-          '    PRINT STR$(MOUSEBUTTON(0)) + " " + STR$(MOUSE_HIT(0))\n'
-          '    FLIP()\n'
-          'NEXT\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert r.lines == ["FALSE FALSE", "TRUE TRUE", "FALSE FALSE", "FALSE FALSE"]
-
-
-def test_playback_reports_state_and_ends_by_itself(tmp_path):
-    _events(tmp_path, "ev.txt", [(0, KEY_DOWN, 32), (1, KEY_UP, 32)])
-    gb = (_HEAD + 'PRINT AUTOMATION_PLAY("ev.txt")\n'
-          'PRINT AUTOMATION_COUNT()\n'
-          'PRINT AUTOMATION_PLAYING()\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 3\n'
-          '    FLIP()\n'
-          'NEXT\n'
-          'PRINT AUTOMATION_PLAYING()\n'
-          'PRINT AUTOMATION_FRAME()\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert r.lines[:3] == ["2", "2", "TRUE"]
-    assert r.lines[3] == "FALSE", "Wiedergabe muss nach dem letzten Ereignis enden"
-    assert int(r.lines[4]) >= 2
-
-
-def test_far_away_events_wait_instead_of_being_skipped(tmp_path):
-    # Die Wiedergabe zaehlt Frame fuer Frame hoch: ein Ereignis weit hinten in
-    # der Aufnahme bleibt liegen, bis sein Frame dran ist -- es wird weder
-    # vorgezogen noch verworfen (die Wiedergabe endet also auch nicht zu frueh).
-    _events(tmp_path, "sparse.txt", [(0, MOUSE_POSITION, 10, 10), (900, MOUSE_POSITION, 99, 88)])
-    gb = (_HEAD + 'AUTOMATION_PLAY("sparse.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 2\n'
-          '    FLIP()\n'
-          'NEXT\n'
-          'PRINT STR$(MOUSEX()) + "," + STR$(MOUSEY())\n'
-          'PRINT AUTOMATION_PLAYING()\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert r.lines == ["10,10", "TRUE"]
-    # Die zweite Zusage ausdruecklich, weil sie den Namen des Tests traegt:
-    # das Ereignis bei Frame 900 darf weder vorgezogen noch verworfen werden.
-    assert r.lines[0] != "99,88", "Ereignis aus Frame 900 wurde vorgezogen"
-
-
-def test_injected_keys_do_not_count_as_user_input(tmp_path):
-    # Der Attract-Modus ist der Haupt-Anwendungsfall: die Demo laeuft, bis der
-    # Spieler eine Taste drueckt. raylib legt eingespeiste Tasten aber AUCH in
-    # seine "zuletzt gedrueckt"-Warteschlange -- ohne Filter meldete
-    # KEY_ANY_HIT die Demo-Tasten als Nutzereingabe und die Demo brach sofort
-    # an sich selbst ab. KEYHIT muss sie weiterhin sehen (darum geht es ja).
-    _events(tmp_path, "demo.txt", [(0, KEY_DOWN, 32), (2, KEY_UP, 32)])
-    gb = (_HEAD + 'AUTOMATION_PLAY("demo.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 3\n'
-          '    PRINT STR$(KEY_ANY_HIT()) + " " + STR$(KEYHIT(KEY_SPACE))\n'
-          '    FLIP()\n'
-          'NEXT\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert [ln.split()[0] for ln in r.lines] == ["-1"] * 4, \
-        "KEY_ANY_HIT darf keine eingespeiste Taste melden"
-    assert "TRUE" in r.lines[1], "KEYHIT muss die eingespeiste Taste sehr wohl sehen"
 
 
 # -------------------------------------------------------------- Aufnahme
@@ -231,24 +135,6 @@ def test_recorded_file_can_be_played_back(tmp_path):
 
 
 # ----------------------------------------------------------------- Fehler
-def test_missing_file_is_reported(tmp_path):
-    r = _run(_HEAD + 'AUTOMATION_PLAY("gibtsnicht.txt")\n', tmp_path)
-    assert r.returncode != 0
-    assert "AUTOMATION_PLAY" in r.stderr and "gibtsnicht" in r.stderr
-
-
-def test_recording_blocks_playback(tmp_path):
-    # raylib spielt waehrend einer Aufnahme grundsaetzlich nichts ab -- das
-    # still zu schlucken waere die schlechtere Antwort als eine klare Meldung.
-    _events(tmp_path, "ev.txt", [(0, KEY_DOWN, 32)])
-    r = _run(_HEAD + 'AUTOMATION_RECORD("x.txt")\nAUTOMATION_PLAY("ev.txt")\n', tmp_path)
-    assert r.returncode != 0
-    assert "AUTOMATION_STOP" in r.stderr
-
-
-def test_empty_filename_is_rejected(tmp_path):
-    r = _run(_HEAD + 'AUTOMATION_RECORD("")\n', tmp_path)
-    assert r.returncode != 0 and "AUTOMATION_RECORD" in r.stderr
 
 
 # --------------------------------------------------- Tastencode-Umsetzung
@@ -257,54 +143,3 @@ def test_empty_filename_is_rejected(tmp_path):
 # eine Taste druecken muss.
 
 RL_KEY_S, RL_KEY_MINUS, RL_KEY_COMMA, RL_KEY_PERIOD = 83, 45, 44, 46
-
-
-def test_buchstaben_treffen_in_beiden_schreibweisen(tmp_path):
-    """Eine Taste, zwei Schreibweisen: `ASC("s")` und `ASC("S")`.
-
-    GB-Tastencodes folgen SDL, dort sind Buchstaben KLEIN (97..122). Bis
-    2026-08-31 galten deshalb NUR die kleinen, und `KEYHIT(ASC("S"))` (= 83)
-    traf still gar nichts -- kein Fehler, keine Warnung, die Taste existierte
-    fuer das Programm einfach nicht.
-
-    Dieser Test hielt frueher genau das fest, mit derselben Beschreibung, die
-    es einen "Fehler, der beim Schreiben nicht auffaellt" nannte. Genau als
-    solcher trat er dann auch auf: im Tilemap-Editor
-    (`examples/187_tilemap_editor.dh`) war JEDES Tastenkuerzel wirkungslos,
-    und weil ein totes Kuerzel wie ein vergessener Aufruf aussieht, sucht man
-    den Fehler im eigenen Programm. Seitdem nimmt die Umsetzungstabelle beide
-    Bereiche an -- 65..90 lief vorher ohnehin ins Leere, das Annehmen kann
-    also nichts brechen.
-    """
-    _events(tmp_path, "ev.txt", [(1, KEY_DOWN, RL_KEY_S)])
-    gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 3\n'
-          '    PRINT STR$(KEYPRESSED(ASC("s"))) + " " + STR$(KEYPRESSED(ASC("S")))\n'
-          '    FLIP()\n'
-          'NEXT\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    # Beide meinen dieselbe Taste -- sie sind IMMER gleich, nie nur eine.
-    assert "TRUE TRUE" in r.lines, r.lines
-    assert not any(ln in ("TRUE FALSE", "FALSE TRUE") for ln in r.lines), r.lines
-
-
-def test_satzzeichen_sind_ansprechbar(tmp_path):
-    """Regression: Satzzeichen fehlten in der Umsetzungstabelle ganz --
-    `KEYHIT(ASC("-"))` lief ins Leere, ohne Fehlermeldung."""
-    _events(tmp_path, "ev.txt", [
-        (1, KEY_DOWN, RL_KEY_MINUS),
-        (1, KEY_DOWN, RL_KEY_COMMA),
-        (1, KEY_DOWN, RL_KEY_PERIOD),
-    ])
-    gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
-          'DIM f AS INTEGER\n'
-          'FOR f = 0 TO 3\n'
-          '    PRINT STR$(KEYPRESSED(ASC("-"))) + " " + STR$(KEYPRESSED(ASC(","))) + _\n'
-          '          " " + STR$(KEYPRESSED(ASC(".")))\n'
-          '    FLIP()\n'
-          'NEXT\n')
-    r = _run(gb, tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert "TRUE TRUE TRUE" in r.lines, r.lines

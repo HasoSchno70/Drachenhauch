@@ -81,5 +81,5 @@ SPRITE_DRAW(hero)
 Externer Typ `ANIM_FSM` (Referenz-Handle). Implementierung
 `rust/drachenhauch_runtime/src/animfsm.rs` (reine Logik, kein Grafik-State), Demo
 [examples/111_anim_fsm.dh](../examples/111_anim_fsm.dh) + Daten
-`examples/assets/hero.dhanim`, Tests `tests/test_animfsm.py`. Editor: **`dhanim`**
+`examples/assets/hero.dhanim`, Tests `tests/pruef/animfsm.dhtest`. Editor: **`dhanim`**
 (siehe [docs/anim-editor.md](anim-editor.md)).

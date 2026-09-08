@@ -3,6 +3,10 @@
 Verifiziert, dass dhrts Compiler echte Zeilennummern emittiert (Voraussetzung
 fuer Profiler/Debugger/Laufzeitfehler-Zeilen) und dass `dhrt profile` pro Zeile
 Count + Zeit liefert. Skippt, wenn dhrt nicht gebaut ist.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/dhrt_profile.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import json
 import os
@@ -66,12 +70,3 @@ def test_profile_line_counts(tmp_path):
     counts = {ln["line"]: ln["count"] for ln in d["lines"]}
     assert counts.get(3) == 1001     # FOR-Test: 1000 Durchlaeufe + 1 Abbruch
     assert counts.get(4) == 1000     # Schleifenkoerper
-
-
-def test_runtime_error_has_line(tmp_path):
-    """Bonus: dhrt-Laufzeitfehler tragen jetzt die Quell-Zeile."""
-    f = _write(tmp_path, 'PRINT "a"\nPRINT 1 \\ 0\n')
-    r = subprocess.run([str(_DHRT), "run", str(f)],
-                       capture_output=True, text=True, timeout=30)
-    assert r.returncode != 0
-    assert ":2:" in r.stderr      # Division-durch-0 in Zeile 2

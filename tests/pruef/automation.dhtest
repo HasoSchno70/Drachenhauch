@@ -1,0 +1,207 @@
+' Aus test_automation.py uebertragen (10 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== recorded keys and mouse reach the program
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 5
+    PRINT STR$(f) + " " + STR$(MOUSEX()) + "," + STR$(MOUSEY()) + " " + _
+          STR$(KEYPRESSED(KEY_SPACE)) + " " + STR$(KEYHIT(KEY_SPACE))
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 0 7 40 25 0 0 // Event: test
+e 1 2 32 0 0 0 // Event: test
+e 2 2 32 0 0 0 // Event: test
+e 3 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+0 0,0 FALSE FALSE
+1 40,25 FALSE FALSE
+2 40,25 TRUE TRUE
+3 40,25 TRUE FALSE
+4 40,25 FALSE FALSE
+5 40,25 FALSE FALSE
+
+=== mouse buttons are replayed
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("click.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    PRINT STR$(MOUSEBUTTON(0)) + " " + STR$(MOUSE_HIT(0))
+    FLIP()
+NEXT
+--- datei click.txt
+# Test-Aufnahme
+c 2
+e 0 6 0 0 0 0 // Event: test
+e 1 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+FALSE FALSE
+TRUE TRUE
+FALSE FALSE
+FALSE FALSE
+
+=== playback reports state and ends by itself
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT AUTOMATION_PLAY("ev.txt")
+PRINT AUTOMATION_COUNT()
+PRINT AUTOMATION_PLAYING()
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    FLIP()
+NEXT
+PRINT AUTOMATION_PLAYING()
+PRINT AUTOMATION_FRAME()
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 0 2 32 0 0 0 // Event: test
+e 1 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+2
+2
+TRUE
+FALSE
+2
+
+=== far away events wait instead of being skipped
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("sparse.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 2
+    FLIP()
+NEXT
+PRINT STR$(MOUSEX()) + "," + STR$(MOUSEY())
+PRINT AUTOMATION_PLAYING()
+--- datei sparse.txt
+# Test-Aufnahme
+c 2
+e 0 7 10 10 0 0 // Event: test
+e 900 7 99 88 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+10,10
+TRUE
+
+=== injected keys do not count as user input
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("demo.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    PRINT STR$(KEY_ANY_HIT()) + " " + STR$(KEYHIT(KEY_SPACE))
+    FLIP()
+NEXT
+--- datei demo.txt
+# Test-Aufnahme
+c 2
+e 0 2 32 0 0 0 // Event: test
+e 2 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+-1 FALSE
+-1 TRUE
+-1 FALSE
+-1 FALSE
+
+=== missing file is reported
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("gibtsnicht.txt")
+--- umgebung
+DHRT_FRAMES=12
+--- fehler
+AUTOMATION_PLAY: 'gibtsnicht.txt' nicht gefunden
+
+=== recording blocks playback
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_RECORD("x.txt")
+AUTOMATION_PLAY("ev.txt")
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 0 2 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- fehler
+AUTOMATION_PLAY: laeuft noch eine Aufnahme (erst AUTOMATION_STOP)
+
+=== empty filename is rejected
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_RECORD("")
+--- umgebung
+DHRT_FRAMES=12
+--- fehler
+AUTOMATION_RECORD: Dateiname fehlt
+
+=== buchstaben treffen in beiden schreibweisen
+' Eine Taste, zwei Schreibweisen: `ASC("s")` und `ASC("S")`.
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    PRINT STR$(KEYPRESSED(ASC("s"))) + " " + STR$(KEYPRESSED(ASC("S")))
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 1 2 83 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+FALSE FALSE
+TRUE TRUE
+TRUE TRUE
+TRUE TRUE
+
+=== satzzeichen sind ansprechbar
+' Regression: Satzzeichen fehlten in der Umsetzungstabelle ganz --
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    PRINT STR$(KEYPRESSED(ASC("-"))) + " " + STR$(KEYPRESSED(ASC(","))) + _
+          " " + STR$(KEYPRESSED(ASC(".")))
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 3
+e 1 2 45 0 0 0 // Event: test
+e 1 2 44 0 0 0 // Event: test
+e 1 2 46 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=12
+--- erwartet
+FALSE FALSE FALSE
+TRUE TRUE TRUE
+TRUE TRUE TRUE
+TRUE TRUE TRUE
+

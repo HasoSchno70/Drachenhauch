@@ -1,0 +1,33 @@
+' Aus test_module_alias.py uebertragen (3 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== alias in full program
+' GB-Programm mit IMPORT-AS: aliasierte Builtins + externer Typ.
+IMPORT "json" AS j
+DIM h AS J_HANDLE
+h = J_PARSE("[10,20,30]")
+PRINT J_GET_INT(h, "0")
+PRINT J_GET_INT(h, "1")
+PRINT J_GET_INT(h, "2")
+--- erwartet
+10
+20
+30
+
+=== alias does not break original names
+' Alias ist additiv: die Original-Built-ins funktionieren weiter.
+IMPORT "json" AS j
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("[42]")
+PRINT JSON_GET_INT(h, "0")
+--- erwartet
+42
+
+=== alias with vec2 via program
+' Vec2 mit Alias -- Built-ins, externer Typ und Operator-Registry.
+IMPORT "vec2" AS v
+DIM a AS V
+a = V_NEW(3.0, 4.0)
+PRINT V_LENGTH(a)
+--- erwartet
+5.0
+

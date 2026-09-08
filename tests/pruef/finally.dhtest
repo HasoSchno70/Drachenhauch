@@ -1,0 +1,314 @@
+' Aus test_finally.py uebertragen (24 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== normaler durchlauf
+TRY
+    PRINT "rumpf"
+FINALLY
+    PRINT "finally"
+END TRY
+--- erwartet
+rumpf
+finally
+
+=== nach gefangenem fehler
+TRY
+    THROW "kaputt"
+CATCH e
+    PRINT "gefangen: " + e
+FINALLY
+    PRINT "finally"
+END TRY
+--- erwartet
+gefangen: kaputt
+finally
+
+=== ohne catch laeuft finally und der fehler geht weiter
+' `TRY ... FINALLY ... END TRY` faengt NICHT -- es raeumt nur auf.
+TRY
+    TRY
+        THROW "durch"
+    FINALLY
+        PRINT "finally"
+    END TRY
+CATCH e
+    PRINT "aussen: " + e
+END TRY
+--- erwartet
+finally
+aussen: durch
+
+=== fehler im catch laesst finally trotzdem laufen
+TRY
+    TRY
+        THROW "erster"
+    CATCH e
+        THROW "zweiter"
+    FINALLY
+        PRINT "finally"
+    END TRY
+CATCH e
+    PRINT "aussen: " + e
+END TRY
+--- erwartet
+finally
+aussen: zweiter
+
+=== return laeuft nicht am finally vorbei
+' Der wichtigste Fall: ein RETURN mitten im TRY. Ohne die Buchfuehrung im
+FUNCTION f() AS INTEGER
+    TRY
+        RETURN 42
+    FINALLY
+        PRINT "finally"
+    END TRY
+END FUNCTION
+PRINT f()
+--- erwartet
+finally
+42
+
+=== return ohne wert in einer sub
+SUB s()
+    TRY
+        RETURN
+    FINALLY
+        PRINT "finally"
+    END TRY
+END SUB
+s()
+PRINT "danach"
+--- erwartet
+finally
+danach
+
+=== der rueckgabewert wird vom finally nicht veraendert
+' Der Wert wird VOR dem FINALLY berechnet -- was danach mit der Variablen
+DIM x AS INTEGER
+FUNCTION f() AS INTEGER
+    TRY
+        x = 1
+        RETURN x
+    FINALLY
+        x = 99
+    END TRY
+END FUNCTION
+PRINT f()
+PRINT x
+--- erwartet
+1
+99
+
+=== break und continue
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    TRY
+        IF i = 2 THEN CONTINUE
+        IF i = 3 THEN BREAK
+        PRINT "rumpf " + STR$(i)
+    FINALLY
+        PRINT "  finally " + STR$(i)
+    END TRY
+NEXT
+PRINT "fertig"
+--- erwartet
+rumpf 1
+  finally 1
+  finally 2
+  finally 3
+fertig
+
+=== verschachtelt von innen nach aussen
+FUNCTION f() AS STRING
+    TRY
+        TRY
+            RETURN "raus"
+        FINALLY
+            PRINT "innen"
+        END TRY
+    FINALLY
+        PRINT "aussen"
+    END TRY
+END FUNCTION
+PRINT f()
+--- erwartet
+innen
+aussen
+raus
+
+=== fehler im finally selbst geht nach aussen
+TRY
+    TRY
+        PRINT "rumpf"
+    FINALLY
+        THROW "im finally"
+    END TRY
+CATCH e
+    PRINT "aussen: " + e
+END TRY
+--- erwartet
+rumpf
+aussen: im finally
+
+=== try catch ohne finally unveraendert
+TRY
+    THROW "x"
+CATCH e
+    PRINT "ok: " + e
+END TRY
+--- erwartet
+ok: x
+
+=== catch ohne namen unveraendert
+TRY
+    THROW "x"
+CATCH
+    PRINT "gefangen"
+END TRY
+--- erwartet
+gefangen
+
+=== try ganz ohne catch und finally schluckt weiterhin
+' Altes Verhalten, bewusst unveraendert: `TRY ... END TRY` ohne beides
+TRY
+    THROW "weg damit"
+END TRY
+PRINT "weiter"
+--- erwartet
+weiter
+
+=== throw mit code
+TRY
+    THROW "DB_WEG", "Datenbank nicht erreichbar"
+CATCH e
+    PRINT e
+    PRINT ERROR_CODE$()
+END TRY
+--- erwartet
+Datenbank nicht erreichbar
+DB_WEG
+
+=== code erlaubt entscheiden ohne texte zu vergleichen
+DIM i AS INTEGER
+FOR i = 1 TO 2
+    TRY
+        IF i = 1 THEN THROW "NETZ", "keine Verbindung"
+        THROW "DATEI", "nicht gefunden"
+    CATCH e
+        SELECT CASE ERROR_CODE$()
+            CASE "NETZ"
+                PRINT "nochmal versuchen"
+            CASE "DATEI"
+                PRINT "Vorgabe benutzen"
+        END SELECT
+    END TRY
+NEXT
+--- erwartet
+nochmal versuchen
+Vorgabe benutzen
+
+=== eingebauter fehler hat keinen code
+' Sonst klebte der Code eines frueheren THROW an einem fremden Fehler.
+TRY
+    THROW "ALT", "erster"
+CATCH e
+    PRINT ERROR_CODE$()
+END TRY
+TRY
+    PRINT 1 / 0
+CATCH e
+    PRINT "[" + ERROR_CODE$() + "]"
+END TRY
+--- erwartet
+ALT
+[]
+
+=== throw ohne code hat leeren code
+TRY
+    THROW "nur text"
+CATCH e
+    PRINT "[" + ERROR_CODE$() + "]"
+END TRY
+--- erwartet
+[]
+
+=== error line nennt die wurfstelle
+PRINT "eins"
+TRY
+    THROW "hier"
+CATCH e
+    PRINT ERROR_LINE()
+END TRY
+--- erwartet
+eins
+3
+
+=== error line bei einem eingebauten fehler
+TRY
+    PRINT 1 / 0
+CATCH e
+    PRINT ERROR_LINE()
+END TRY
+--- erwartet
+2
+
+=== error line zeigt in die gerufene funktion
+SUB tief()
+    THROW "unten"
+END SUB
+TRY
+    tief()
+CATCH e
+    PRINT ERROR_LINE()
+END TRY
+--- erwartet
+2
+
+=== ohne fehler sind die angaben leer
+PRINT ERROR_LINE()
+PRINT "[" + ERROR_CODE$() + "]"
+--- erwartet
+0
+[]
+
+=== throw mit code auch als einzeiler
+TRY
+    IF TRUE THEN THROW "C", "m"
+CATCH e
+    PRINT ERROR_CODE$() + "/" + e
+END TRY
+--- erwartet
+C/m
+
+=== code ueberlebt ein finally
+TRY
+    TRY
+        THROW "CODE", "text"
+    FINALLY
+        PRINT "aufgeraeumt"
+    END TRY
+CATCH e
+    PRINT ERROR_CODE$()
+END TRY
+--- erwartet
+aufgeraeumt
+CODE
+
+=== datei wird auch bei einem fehler geschlossen
+' Wofuer FINALLY da ist: aufraeumen, egal wie man herauskommt.
+DIM f AS FILE
+WRITEALL("d.txt", "inhalt")
+TRY
+    TRY
+        f = OPENFILE("d.txt", "r")
+        THROW "etwas geht schief"
+    FINALLY
+        CLOSEFILE(f)
+        PRINT "Datei geschlossen"
+    END TRY
+CATCH e
+    PRINT "gemeldet: " + e
+END TRY
+--- erwartet
+Datei geschlossen
+gemeldet: etwas geht schief
+

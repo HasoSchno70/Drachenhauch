@@ -1,0 +1,75 @@
+' Aus test_os_builtins.py uebertragen (12 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== argc ohne argumente ist null
+PRINT ARGC()
+--- erwartet
+0
+
+=== setenv dann getenv
+SETENV("DH_TESTVAR", "hallo")
+PRINT GETENV$("DH_TESTVAR")
+--- erwartet
+hallo
+
+=== getenv unbekannt ist leer und nimmt vorgabe
+PRINT "[" + GETENV$("DH_GIBTESGANZSICHERNICHT") + "]"
+PRINT GETENV$("DH_GIBTESGANZSICHERNICHT", "vorgabe")
+--- erwartet
+[]
+vorgabe
+
+=== setenv lehnt ungueltige namen ab[""]
+SETENV("", "x")
+--- fehler
+SETENV: ungueltiger Name '' (leer, '=' oder Null-Byte)
+
+=== setenv lehnt ungueltige namen ab["MIT=GLEICH"]
+SETENV("MIT=GLEICH", "x")
+--- fehler
+SETENV: ungueltiger Name 'MIT=GLEICH' (leer, '=' oder Null-Byte)
+
+=== chdir wirkt auf folgende dateizugriffe
+PRINT FILEEXISTS("beleg.txt")
+CHDIR("unter")
+PRINT FILEEXISTS("beleg.txt")
+PRINT READALL$(OPENFILE("beleg.txt", "r"))
+--- datei unter/beleg.txt
+gefunden
+--- erwartet
+FALSE
+TRUE
+gefunden
+
+=== chdir auf nichtexistierendes wirft
+CHDIR("gibt_es_nicht_xyz_123")
+--- fehler
+CHDIR:
+(gibt_es_nicht_xyz_123)
+
+=== exit ausserhalb von 0 bis 255 wirft
+EXIT(256)
+--- fehler
+EXIT: Rueckgabewert 256 liegt ausserhalb 0..255
+
+=== shell liefert den rueckgabewert
+PRINT SHELL("cmd", "/c", "exit 7")
+--- erwartet
+7
+
+=== shell out sammelt die ausgabe ein
+PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo hallo"))
+--- erwartet
+hallo
+
+=== shell auf unbekanntes programm wirft
+PRINT SHELL("gibt_es_ganz_sicher_nicht_xyz123")
+--- fehler
+SHELL: 'gibt_es_ganz_sicher_nicht_xyz123' laesst sich nicht starten: program not found
+
+=== shell sieht was setenv gesetzt hat
+' SETENV wirkt auf diesen Prozess UND seine Kinder -- das ist der Weg,
+SETENV("DH_FUER_KIND", "weitergereicht")
+PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo %DH_FUER_KIND%"))
+--- erwartet
+weitergereicht
+

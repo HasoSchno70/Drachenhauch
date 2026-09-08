@@ -15,6 +15,10 @@ der Client traut; ein selbst ausgestelltes wuerde zu Recht abgelehnt. Der
 verschluesselte Weg unterscheidet sich nur in der Huelle des Datenstroms --
 alles darueber (EHLO/AUTH/MAIL/RCPT/DATA) ist derselbe Code. Steht so auch
 in docs/module-smtp.md.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/smtp.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import email
 import socket
@@ -282,64 +286,3 @@ def test_ein_abgelehnter_empfaenger_ist_ein_fehler(run_gb, tmp_path):
 
 
 # ------------------------------------------------------------- Fehlerfaelle
-def test_umbruch_im_betreff_wird_abgelehnt(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_SUBJECT(m, "Rechnung" + CHR$(13) + CHR$(10) + "Bcc: fremd@x.de")\n')
-    assert "Zeilenumbruch" in str(e.value)
-
-
-def test_adresse_ohne_klammeraffe(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_TO(m, "du.beispiel.de")\n')
-    assert "sieht nicht wie eine Adresse aus" in str(e.value)
-
-
-def test_anzeigename_gehoert_nicht_in_die_adresse(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_TO(m, "Du <du@beispiel.de>")\n')
-    assert "EIGENES Argument" in str(e.value)
-
-
-def test_leere_nachricht_wird_abgelehnt(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_FROM(m, "ich@beispiel.de")\nSMTP_TO(m, "du@beispiel.de")\n'
-               "PRINT SMTP_MESSAGE$(m)\n")
-    assert "leer" in str(e.value)
-
-
-def test_ohne_empfaenger_geht_nichts(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_FROM(m, "ich@beispiel.de")\nSMTP_TEXT(m, "x")\n'
-               "PRINT SMTP_MESSAGE$(m)\n")
-    assert "Empfaenger" in str(e.value)
-
-
-def test_kennwort_im_klartext_ins_netz_wird_verweigert(run_gb):
-    """Nicht der Server entscheidet das, sondern wir: ohne Verschluesselung
-    ginge das Kennwort mitlesbar ueber die Leitung."""
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_SERVER(m, "mail.beispiel.de", 2525, "keine")\n'
-               'SMTP_LOGIN(m, "hans", "geheim")\n'
-               'SMTP_FROM(m, "ich@beispiel.de")\nSMTP_TO(m, "du@beispiel.de")\n'
-               'SMTP_TEXT(m, "x")\nSMTP_SEND(m)\n')
-    assert "Klartext" in str(e.value)
-
-
-def test_unbekannte_sicherheit(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_SERVER(m, "x", 587, "vielleicht")\n')
-    assert "starttls" in str(e.value)
-
-
-def test_geschlossenes_handle(run_gb):
-    with pytest.raises(DHRuntimeError) as e:
-        run_gb('IMPORT "smtp"\nDIM m AS SMTP\nm = SMTP_NEW()\n'
-               'SMTP_CLOSE(m)\nSMTP_SUBJECT(m, "x")\n')
-    assert "SMTP-Handle" in str(e.value)

@@ -1,0 +1,27 @@
+' Aus test_http_request.py uebertragen (4 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== zeilenumbruch in der kopfzeile wird abgelehnt
+' Header-Injection: ein CRLF im Wert haengt beliebige weitere Kopfzeilen
+IMPORT "html"
+HTTP_SET_HEADER("X-Bad", "a" + CHR$(13) + CHR$(10) + "X-Rein: ja")
+--- fehler
+HTTP: der Wert der Kopfzeile 'X-Bad' enthaelt einen Zeilenumbruch -- damit liessen sich weitere Kopfzeilen einschmuggeln
+
+=== kopfzeilen name mit doppelpunkt wird abgelehnt
+IMPORT "html"
+HTTP_SET_HEADER("X:Y", "z")
+--- fehler
+HTTP: Kopfzeilen-Name 'X:Y' enthaelt unerlaubte Zeichen (erlaubt ist sichtbares ASCII ohne ':')
+
+=== unsinnige zeitgrenze wirft[0]
+IMPORT "html"
+HTTP_TIMEOUT(0)
+--- fehler
+HTTP_TIMEOUT: 0 Sekunden liegen ausserhalb 1..600
+
+=== unsinnige zeitgrenze wirft[601]
+IMPORT "html"
+HTTP_TIMEOUT(601)
+--- fehler
+HTTP_TIMEOUT: 601 Sekunden liegen ausserhalb 1..600
+

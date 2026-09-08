@@ -1,0 +1,77 @@
+' Aus test_smtp.py uebertragen (8 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== umbruch im betreff wird abgelehnt
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SUBJECT(m, "Rechnung" + CHR$(13) + CHR$(10) + "Bcc: fremd@x.de")
+--- fehler
+SMTP_SUBJECT: der Betreff enthaelt einen Zeilenumbruch -- das waere eine zusaetzliche Kopfzeile und ist deshalb nicht erlaubt
+
+=== adresse ohne klammeraffe
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_TO(m, "du.beispiel.de")
+--- fehler
+SMTP_TO: SMTP_TO "du.beispiel.de" sieht nicht wie eine Adresse aus (erwartet wird name@beispiel.de)
+
+=== anzeigename gehoert nicht in die adresse
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_TO(m, "Du <du@beispiel.de>")
+--- fehler
+SMTP_TO: SMTP_TO "Du <du@beispiel.de>" enthaelt ein Zeichen, das in einer Adresse nicht vorkommt (< > oder Leerzeichen). Der Anzeigename ist ein EIGENES Argument
+
+=== leere nachricht wird abgelehnt
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+PRINT SMTP_MESSAGE$(m)
+--- fehler
+SMTP_MESSAGE$: die Nachricht ist leer (SMTP_TEXT, SMTP_HTML oder SMTP_ATTACH)
+
+=== ohne empfaenger geht nichts
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TEXT(m, "x")
+PRINT SMTP_MESSAGE$(m)
+--- fehler
+SMTP_MESSAGE$: es fehlt ein Empfaenger (SMTP_TO)
+
+=== kennwort im klartext ins netz wird verweigert
+' Nicht der Server entscheidet das, sondern wir: ohne Verschluesselung
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "mail.beispiel.de", 2525, "keine")
+SMTP_LOGIN(m, "hans", "geheim")
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_TEXT(m, "x")
+SMTP_SEND(m)
+--- fehler
+SMTP_SEND: Anmeldung ohne Verschluesselung an mail.beispiel.de -- das Kennwort ginge im Klartext ueber das Netz. Nimm "starttls" (Port 587) oder "tls" (Port 465); ohne Verschluesselung geht eine Anmeldung nur an den eigenen Rechner
+
+=== unbekannte sicherheit
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "x", 587, "vielleicht")
+--- fehler
+SMTP_SERVER: unbekannte Sicherheit "vielleicht" -- erlaubt sind "starttls", "tls", "keine"
+
+=== geschlossenes handle
+IMPORT "smtp"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_CLOSE(m)
+SMTP_SUBJECT(m, "x")
+--- fehler
+SMTP: ungueltiges/geschlossenes SMTP-Handle 0
+

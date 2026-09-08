@@ -1,0 +1,64 @@
+' Aus test_skeletal_animation.py uebertragen (5 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== model animate blend smoke
+' Blend zwischen zwei verschiedenen Animationen darf nicht crashen.
+IMPORT "g3d"
+SCREEN(320, 240)
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+anims = MODEL_LOAD_ANIMS("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+MODEL_ANIMATE_BLEND(robot, anims, 0, 5, 10, 3, 0.5)
+PRINT "OK"
+--- erwartet
+OK
+
+=== model animate blend endpoints match single frame pose
+' blend=0.0/1.0 (reine A- bzw. B-Pose) darf ebenfalls nicht crashen --
+IMPORT "g3d"
+SCREEN(320, 240)
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+anims = MODEL_LOAD_ANIMS("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+MODEL_ANIMATE_BLEND(robot, anims, 0, 2, 10, 7, 0.0)
+MODEL_ANIMATE_BLEND(robot, anims, 0, 2, 10, 7, 1.0)
+PRINT "OK"
+--- erwartet
+OK
+
+=== model animate blend loops frame like model animate
+' Frame-Index ausserhalb der Keyframe-Anzahl loopt (rem_euclid), analog
+IMPORT "g3d"
+SCREEN(320, 240)
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+anims = MODEL_LOAD_ANIMS("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+MODEL_ANIMATE_BLEND(robot, anims, 0, 99999, 10, -5, 0.3)
+PRINT "OK"
+--- erwartet
+OK
+
+=== model animate blend invalid anim index raises
+IMPORT "g3d"
+SCREEN(320, 240)
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+anims = MODEL_LOAD_ANIMS("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+MODEL_ANIMATE_BLEND(robot, anims, 0, 0, 9999, 0, 0.5)
+--- fehler
+MODEL_ANIMATE_BLEND: Animations-Index 9999 ausserhalb [0..13]
+
+=== model animate blend invalid model raises
+IMPORT "g3d"
+SCREEN(320, 240)
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+anims = MODEL_LOAD_ANIMS("C:/Programmieren/Python/GameBasic/examples/assets/robot.glb")
+MODEL_ANIMATE_BLEND(9999, anims, 0, 0, 1, 0, 0.5)
+--- fehler
+MODEL_ANIMATE_BLEND: ungueltiges MODEL-Handle 9999
+

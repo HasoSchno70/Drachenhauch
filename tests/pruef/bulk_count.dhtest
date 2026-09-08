@@ -1,0 +1,110 @@
+' Aus test_bulk_count.py uebertragen (8 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== plots zeichnet nur die angegebene anzahl
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+xs[0] = 10 : ys[0] = 10
+xs[1] = 20 : ys[1] = 10
+xs[2] = 30 : ys[2] = 10
+DIM f AS INTEGER
+FOR f = 0 TO 3
+CLS(0)
+PLOTS(xs, ys, &HFF0000, 2)
+FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== ohne anzahl wird weiterhin alles gezeichnet
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+xs[0] = 10 : ys[0] = 10
+xs[1] = 20 : ys[1] = 10
+xs[2] = 30 : ys[2] = 10
+DIM f AS INTEGER
+FOR f = 0 TO 3
+CLS(0)
+PLOTS(xs, ys, &HFF0000)
+FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== anzahl groesser als das array wird gekappt
+SCREEN(64, 64, "b", 1)
+DIM xs[2] AS INTEGER
+DIM ys[2] AS INTEGER
+xs[0] = 5 : ys[0] = 5
+xs[1] = 6 : ys[1] = 5
+DIM f AS INTEGER
+FOR f = 0 TO 3
+CLS(0)
+PLOTS(xs, ys, &HFF0000, 99)
+FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== lines boxes circles nehmen die anzahl auch
+SCREEN(64, 64, "b", 1)
+DIM a[2] AS INTEGER
+DIM b[2] AS INTEGER
+DIM c[2] AS INTEGER
+DIM d[2] AS INTEGER
+DIM r[2] AS INTEGER
+a[0] = 2  : b[0] = 2  : c[0] = 6  : d[0] = 2  : r[0] = 1
+a[1] = 40 : b[1] = 40 : c[1] = 44 : d[1] = 40 : r[1] = 1
+DIM f AS INTEGER
+FOR f = 0 TO 3
+CLS(0)
+LINES(a, b, c, d, &HFF0000, 1)
+BOXES(a, b, c, d, &HFF0000, 1)
+CIRCLES(a, b, r, &HFF0000, 1)
+FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== farb array darf laenger sein als die stueckzahl
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+DIM cs[3] AS INTEGER
+xs[0] = 10 : ys[0] = 10 : cs[0] = &HFF0000
+xs[1] = 20 : ys[1] = 10 : cs[1] = &HFF0000
+xs[2] = 30 : ys[2] = 10 : cs[2] = &HFF0000
+DIM f AS INTEGER
+FOR f = 0 TO 3
+CLS(0)
+PLOTS(xs, ys, cs, 1)
+FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== falsche anzahl wird gemeldet[PLOTS(xs, ys, &HFF0000, 1, 2)-zu viele Argumente]
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+PLOTS(xs, ys, &HFF0000, 1, 2)
+--- fehler
+PLOTS: zu viele Argumente (5 statt hoechstens 4)
+
+=== falsche anzahl wird gemeldet[PLOTS(xs, ys, &HFF0000, -1)-nicht negativ]
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+PLOTS(xs, ys, &HFF0000, -1)
+--- fehler
+PLOTS: anzahl darf nicht negativ sein
+
+=== falsche anzahl wird gemeldet[PLOTS(xs, ys, &HFF0000, 1.5)-ganze Zahl]
+SCREEN(64, 64, "b", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+PLOTS(xs, ys, &HFF0000, 1.5)
+--- fehler
+PLOTS: anzahl muss eine ganze Zahl sein
+

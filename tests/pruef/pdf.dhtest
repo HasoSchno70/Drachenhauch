@@ -1,0 +1,206 @@
+' Aus test_pdf.py uebertragen (20 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== ein leeres dokument laesst sich oeffnen
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== a4 ist die vorgabe
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== querformat und andere groessen
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW("a5", "quer")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== text kommt an
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "Rechnung 4711")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== umlaute kommen an
+' WinAnsi (= cp1252) deckt Deutsch ab -- ohne eingebettete Schrift.
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "Grüße aus Köln")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== millimeter von oben
+' Der Unterschied zu rohem PDF: dort wird in Punkten von UNTEN
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "helvetica", 10)
+PDF_TEXT(p, 20, 25, "Marke")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== mehrere seiten
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "eins")
+PDF_PAGE(p)
+PDF_TEXT(p, 20, 25, "zwei")
+PRINT PDF_PAGE_COUNT(p)
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+2
+
+=== schriften landen auf der seite
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "helvetica-fett", 18)
+PDF_TEXT(p, 20, 25, "fett")
+PDF_FONT(p, "times", 11)
+PDF_TEXT(p, 20, 40, "times")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== striche und flaechen
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_LINE(p, 20, 45, 190, 45)
+PDF_RECT(p, 20, 50, 40, 10)
+PDF_RECT_FILL(p, 70, 50, 40, 10)
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== farbe wirkt
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_COLOR(p, RGB(220, 30, 30))
+PDF_RECT_FILL(p, 20, 50, 40, 10)
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== titel steht in den angaben
+' Der Fehler, den erst der fremde Leser zeigte: im Trailer sieht ihn
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TITLE(p, "Rechnung 4711")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== einstellungen gelten ueber den seitenwechsel
+' Schrift und Farbe sind Sache des Dokuments, nicht der Seite -- alles
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "courier-fett", 14)
+PDF_PAGE(p)
+PDF_TEXT(p, 20, 25, "zweite")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+
+=== breite bei courier ist exakt
+' Bei Courier ist jedes Zeichen 600/1000 der Schriftgroesse breit --
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "courier", 10)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "1234567890"), "%.3f")
+--- erwartet ungefaehr
+21.167
+
+=== breite bei helvetica und times stimmt mit pymupdf ueberein
+' Die Schriftmasse in pdf_masse.rs sind aus PyMuPDFs Base-14-Metriken
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "helvetica", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "helvetica-fett", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "helvetica-kursiv", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "helvetica-fett-kursiv", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "times", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "times-fett", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "times-kursiv", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+PDF_FONT(p, "times-fett-kursiv", 11)
+PRINT FORMAT$(PDF_TEXT_WIDTH(p, "Rechnung 1.234,56 € für Größe W"), "%.4f")
+--- erwartet ungefaehr
+59.5316
+61.8910
+59.5316
+61.8910
+53.9940
+56.8075
+53.5672
+55.3018
+
+=== breite ohne mass ist ein fehler (1)
+' Symbol hat keine Masse, und ein Zeichen ausserhalb von WinAnsi auch
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "symbol", 11)
+PRINT PDF_TEXT_WIDTH(p, "abc")
+--- fehler
+PDF_TEXT_WIDTH: fuer 'symbol' liegen keine Schriftmasse vor (Helvetica, Times und Courier lassen sich messen)
+
+=== breite ohne mass ist ein fehler (2)
+' Symbol hat keine Masse, und ein Zeichen ausserhalb von WinAnsi auch
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "helvetica", 11)
+PRINT PDF_TEXT_WIDTH(p, "a" + CHR$(937))
+--- fehler
+PDF_TEXT_WIDTH: das Zeichen 'Ω' (U+03A9) gibt es in cp1252 nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen
+
+=== unbekannte schrift zaehlt die moeglichen auf
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_FONT(p, "comic sans", 12)
+--- fehler
+PDF_FONT: Schrift 'comic sans' gibt es nicht. Ohne Einbetten stehen die vierzehn Standardschriften zur Verfuegung: helvetica, helvetica-fett, helvetica-kursiv, helvetica-fett-kursiv, times, times-fett, times-kursiv, times-fett-kursiv, courier, courier-fett, courier-kursiv, courier-fett-kursiv, symbol, zapfdingbats
+
+=== unbekannte seitengroesse
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW("din a4")
+--- fehler
+PDF_NEW: Seitengroesse 'din a4' kenne ich nicht -- a3, a4, a5, a6, letter, legal
+
+=== zeichen ausserhalb winansi
+' Dieselbe Regel wie beim Schreiben einer cp1252-Datei: kein stilles
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "Smiley " + CHR$(128512))
+--- fehler
+PDF_TEXT: das Zeichen '😀' (U+1F600) gibt es in cp1252 nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen (ein PDF mit den Standardschriften kann nur WinAnsi)
+
+=== klammern im text brechen nichts
+' In PDF begrenzen Klammern die Zeichenkette -- ohne Schutz waere die
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "Posten (2 Stueck) \ Rest")
+PDF_SAVE(p, "a.pdf")
+--- erwartet
+

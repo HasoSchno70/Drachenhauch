@@ -4,6 +4,10 @@ EXIT, EPRINT, SHELL/SHELL_OUT$.
 Golden-Tests gegen die native Runtime. Was hier geprueft wird, laesst sich mit
 `run_gb` NICHT pruefen (es wirft bei Exit != 0 und verwirft stderr) -- darum
 `run_gb_roh`, das `(code, stdout, stderr)` liefert und Argumente durchreicht.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/os_builtins.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import os
 import sys
@@ -14,9 +18,6 @@ from drachenhauch.errors import DHRuntimeError
 
 
 # --------------------------------------------------------------- Argumente
-
-def test_argc_ohne_argumente_ist_null(run_gb):
-    assert run_gb("PRINT ARGC()") == "0\n"
 
 
 def test_argumente_hinter_doppelstrich(run_gb_roh):
@@ -54,25 +55,10 @@ def test_ohne_doppelstrich_bekommt_das_programm_keine_argumente(dhrt_pfad, tmp_p
 
 # --------------------------------------------------------------- Umgebung
 
-def test_setenv_dann_getenv(run_gb):
-    assert run_gb('SETENV("DH_TESTVAR", "hallo")\nPRINT GETENV$("DH_TESTVAR")') == "hallo\n"
-
-
-def test_getenv_unbekannt_ist_leer_und_nimmt_vorgabe(run_gb):
-    out = run_gb('PRINT "[" + GETENV$("DH_GIBTESGANZSICHERNICHT") + "]"\n'
-                 'PRINT GETENV$("DH_GIBTESGANZSICHERNICHT", "vorgabe")')
-    assert out == "[]\nvorgabe\n"
-
 
 def test_getenv_sieht_die_umgebung_des_aufrufers(run_gb, monkeypatch):
     monkeypatch.setenv("DH_VON_AUSSEN", "durchgereicht")
     assert run_gb('PRINT GETENV$("DH_VON_AUSSEN")') == "durchgereicht\n"
-
-
-@pytest.mark.parametrize("name", ['""', '"MIT=GLEICH"'])
-def test_setenv_lehnt_ungueltige_namen_ab(run_gb, name):
-    with pytest.raises(DHRuntimeError, match="SETENV: ungueltiger Name"):
-        run_gb(f'SETENV({name}, "x")')
 
 
 # ------------------------------------------------- Arbeitsverzeichnis
@@ -82,22 +68,6 @@ def test_cwd_ist_das_verzeichnis_der_quelldatei(run_gb, tmp_path):
     # CWD$() muss genau das zeigen, sonst ueberrascht es.
     out = run_gb("PRINT CWD$()", base=tmp_path).strip()
     assert os.path.realpath(out) == os.path.realpath(str(tmp_path))
-
-
-def test_chdir_wirkt_auf_folgende_dateizugriffe(run_gb, tmp_path):
-    unter = tmp_path / "unter"
-    unter.mkdir()
-    (unter / "beleg.txt").write_text("gefunden", encoding="utf-8")
-    out = run_gb('PRINT FILEEXISTS("beleg.txt")\n'
-                 'CHDIR("unter")\n'
-                 'PRINT FILEEXISTS("beleg.txt")\n'
-                 'PRINT READALL$(OPENFILE("beleg.txt", "r"))', base=tmp_path)
-    assert out == "FALSE\nTRUE\ngefunden\n"
-
-
-def test_chdir_auf_nichtexistierendes_wirft(run_gb):
-    with pytest.raises(DHRuntimeError, match="CHDIR:"):
-        run_gb('CHDIR("gibt_es_nicht_xyz_123")')
 
 
 # ------------------------------------------------------------------- EXIT
@@ -149,13 +119,6 @@ def test_throw_exit_sentinel_bleibt_ein_normaler_fehler(run_gb_roh):
     assert out == "gefangen: __EXIT__\n"
 
 
-def test_exit_ausserhalb_von_0_bis_255_wirft(run_gb):
-    # 256 wuerde vom Betriebssystem zu 0 gekappt -- aus "Fehler" wuerde
-    # stillschweigend "alles gut". Darum Fehler mit Ansage.
-    with pytest.raises(DHRuntimeError, match="ausserhalb 0..255"):
-        run_gb("EXIT(256)")
-
-
 def test_exit_in_einer_funktion_beendet_das_ganze_programm(run_gb_roh):
     code, out, _ = run_gb_roh('SUB abbrechen()\n'
                               '    EXIT(5)\n'
@@ -197,15 +160,6 @@ def test_reihenfolge_von_print_und_eprint_bleibt_erhalten(dhrt_pfad, tmp_path):
 
 # ------------------------------------------------------------------ SHELL
 
-@pytest.mark.skipif(sys.platform != "win32", reason="benutzt cmd.exe")
-def test_shell_liefert_den_rueckgabewert(run_gb):
-    assert run_gb('PRINT SHELL("cmd", "/c", "exit 7")') == "7\n"
-
-
-@pytest.mark.skipif(sys.platform != "win32", reason="benutzt cmd.exe")
-def test_shell_out_sammelt_die_ausgabe_ein(run_gb):
-    assert run_gb('PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo hallo"))') == "hallo\n"
-
 
 @pytest.mark.skipif(sys.platform != "win32", reason="benutzt cmd.exe")
 def test_shell_out_nimmt_stderr_nicht_in_die_nutzdaten(run_gb_roh):
@@ -232,18 +186,3 @@ def test_shell_argumente_bleiben_einzeln(run_gb, dhrt_pfad, tmp_path):
     out = run_gb(f'PRINT TRIM$(SHELL_OUT$("{dhrt_pfad.replace(chr(92), "/")}", '
                  f'"run", "{p}", "--", "zwei woerter"))')
     assert out == "1\nzwei woerter\n"
-
-
-def test_shell_auf_unbekanntes_programm_wirft(run_gb):
-    with pytest.raises(DHRuntimeError, match="laesst sich nicht starten"):
-        run_gb('PRINT SHELL("gibt_es_ganz_sicher_nicht_xyz123")')
-
-
-def test_shell_sieht_was_setenv_gesetzt_hat(run_gb):
-    """SETENV wirkt auf diesen Prozess UND seine Kinder -- das ist der Weg,
-    einem Kindprogramm etwas mitzugeben."""
-    if sys.platform != "win32":
-        pytest.skip("benutzt cmd.exe")
-    out = run_gb('SETENV("DH_FUER_KIND", "weitergereicht")\n'
-                 'PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo %DH_FUER_KIND%"))')
-    assert out == "weitergereicht\n"

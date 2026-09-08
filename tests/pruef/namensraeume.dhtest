@@ -1,0 +1,502 @@
+' Aus test_namensraeume.py uebertragen (26 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== qualifizierter aufruf
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.Quadrat(5)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- erwartet
+25
+
+=== konstante ueber den namensraum
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.FAKTOR
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- erwartet
+10
+
+=== modul ruft sich selbst unqualifiziert
+' Innerhalb der Datei bleibt `Quadrat` schlicht `Quadrat`.
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.Skaliert(3)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- erwartet
+90
+
+=== gleicher name in beiden dateien
+' Der eigentliche Zweck: dieselbe Funktion zweimal, ohne Kollision.
+IMPORT "mathe.dh" AS mathe
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN 999
+END FUNCTION
+PRINT Quadrat(5)
+PRINT mathe.Quadrat(5)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- erwartet
+999
+25
+
+=== ohne alias kollidiert es weiterhin
+' Gegenprobe: ohne `AS` bleibt es beim Fehler aus WP I.4.
+IMPORT "mathe.dh"
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN 999
+END FUNCTION
+PRINT Quadrat(5)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- fehler
+Compile-Fehler: 'quadrat' ist schon in mathe.dh:3 deklariert -- eines von beiden umbenennen
+
+=== unbekannter name im namensraum
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.Gibtsnicht(1)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- fehler
+Namensraum-Fehler: mathe kennt keinen Namen gibtsnicht.
+
+=== klassenname allein im ausdruck meldet
+' Seit I.2 ist `k.Punkt` als TYP gueltig. In Ausdrucks-Position bleibt er
+IMPORT "k.dh" AS k
+DIM n AS INTEGER
+n = k.Punkt
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+
+--- fehler
+Namensraum-Fehler: k.punkt ist eine Klasse. Zum Erzeugen `NEW k.punkt(...)`, als Typ `DIM x AS k.punkt`.
+
+=== interner name leckt nicht in meldungen
+' Der Nutzer darf `mathe@quadrat` nie zu sehen bekommen -- er hat den
+IMPORT "mathe.dh" AS mathe
+PRINT mathe.Quadrat(1, 2, 3)
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- fehler
+Compile-Fehler: mathe.quadrat: zu viele Argumente (max 1)
+
+=== lokale variable verschmilzt nicht mit globaler
+' Ein lokales `DIM zaehler` in einer Modul-Funktion darf nicht auf das
+IMPORT "m.dh" AS m
+PRINT m.Zaehle()
+PRINT m.Global()
+--- datei m.dh
+DIM zaehler AS INTEGER
+zaehler = 100
+FUNCTION Zaehle() AS INTEGER
+    DIM zaehler AS INTEGER
+    zaehler = 7
+    RETURN zaehler
+END FUNCTION
+FUNCTION Global() AS INTEGER
+    RETURN zaehler
+END FUNCTION
+
+--- erwartet
+7
+100
+
+=== ohne as bleibt alles flach
+' Bestandsschutz: ohne `AS` aendert sich nichts am bisherigen Verhalten.
+IMPORT "mathe.dh"
+PRINT Quadrat(4)
+PRINT FAKTOR
+--- datei mathe.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION Skaliert(x AS INTEGER) AS INTEGER
+    DIM h AS INTEGER
+    h = Quadrat(x)
+    RETURN h * FAKTOR
+END FUNCTION
+
+--- erwartet
+16
+10
+
+=== private ist innen nutzbar
+' Privat heisst unsichtbar von aussen, nicht unbenutzbar: `Offen` ruft
+IMPORT "p.dh" AS p
+PRINT p.Offen(1)
+--- datei p.dh
+PRIVATE CONST GEHEIM AS INTEGER = 42
+
+PRIVATE FUNCTION Intern(x AS INTEGER) AS INTEGER
+    RETURN x + GEHEIM
+END FUNCTION
+
+FUNCTION Offen(x AS INTEGER) AS INTEGER
+    RETURN Intern(x)
+END FUNCTION
+
+--- erwartet
+43
+
+=== private ist von aussen gesperrt
+IMPORT "p.dh" AS p
+PRINT p.Intern(1)
+--- datei p.dh
+PRIVATE CONST GEHEIM AS INTEGER = 42
+
+PRIVATE FUNCTION Intern(x AS INTEGER) AS INTEGER
+    RETURN x + GEHEIM
+END FUNCTION
+
+FUNCTION Offen(x AS INTEGER) AS INTEGER
+    RETURN Intern(x)
+END FUNCTION
+
+--- fehler
+Namensraum-Fehler: p.intern ist PRIVATE und nur innerhalb der eigenen Datei verwendbar.
+
+=== private ohne namensraum stoert nicht
+' `PRIVATE` in einer Datei ohne `AS` ist ein wirkungsloser Marker --
+PRIVATE FUNCTION F() AS INTEGER
+    RETURN 5
+END FUNCTION
+PRINT F()
+--- erwartet
+5
+
+=== namensraum sieht globals des hauptprogramms nicht
+' Der eigentliche Gewinn von `AS`: die Datei haengt nicht mehr davon ab,
+IMPORT "g.dh" AS g
+DIM punkte AS INTEGER
+punkte = 5
+PRINT g.LiestGlobal()
+--- datei g.dh
+FUNCTION LiestGlobal() AS INTEGER
+    RETURN punkte
+END FUNCTION
+
+--- fehler
+Namensraum-Fehler: punkte kommt aus dem Hauptprogramm. Eine mit AS importierte Datei sieht dessen Globals nicht -- reiche den Wert als Parameter herein oder deklariere ihn in der Datei selbst.
+
+=== ohne as bleibt der globale zugriff erlaubt
+' Gegenprobe und Bestandsschutz: dieselbe Datei ohne `AS` laeuft wie eh.
+IMPORT "g.dh"
+DIM punkte AS INTEGER
+punkte = 5
+PRINT LiestGlobal()
+--- datei g.dh
+FUNCTION LiestGlobal() AS INTEGER
+    RETURN punkte
+END FUNCTION
+
+--- erwartet
+5
+
+=== funktion darf einen modul typ liefern
+' Gemessen beim Zuschnitt von I.2: den Typ BENENNEN geht nicht, ihn
+IMPORT "k.dh" AS k
+PRINT k.Neu(3).x
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- erwartet
+3
+
+=== dim as qualifizierter typ
+IMPORT "k.dh" AS k
+DIM p AS k.Punkt
+p = NEW k.Punkt()
+p.x = 7
+PRINT p.x
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- erwartet
+7
+
+=== gleiche klasse in beiden dateien
+' Der Zweck der Uebung: zwei Klassen `Punkt`, nebeneinander.
+IMPORT "k.dh" AS k
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+DIM a AS Punkt
+DIM b AS k.Punkt
+a = NEW Punkt()
+b = NEW k.Punkt()
+a.x = 1
+b.x = 2
+PRINT STR$(a.x) + "," + STR$(b.x)
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- erwartet
+1,2
+
+=== modul nutzt die eigene klasse unqualifiziert
+' Innerhalb der Datei bleibt `Punkt` schlicht `Punkt` -- auch als Typ,
+IMPORT "k.dh" AS k
+PRINT k.Neu(5).x
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- erwartet
+5
+
+=== array of qualifiziertem typ
+' `array:` und `map:` koennen den Typnamen schachteln -- der Aufloeser
+IMPORT "k.dh" AS k
+DIM feld AS ARRAY OF k.Punkt
+DIM p AS k.Punkt
+p = NEW k.Punkt()
+p.x = 9
+PRINT p.x
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- erwartet
+9
+
+=== unbekannte klasse meldet klar
+IMPORT "k.dh" AS k
+DIM p AS k.Gibtsnicht
+--- datei k.dh
+CLASS Punkt
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+FUNCTION Neu(a AS INTEGER) AS Punkt
+    DIM p AS Punkt
+    p = NEW Punkt()
+    p.x = a
+    RETURN p
+END FUNCTION
+
+--- fehler
+Namensraum-Fehler: k kennt keine Klasse gibtsnicht.
+
+=== enum member ueber den namensraum
+' `e.Farbe.BLAU` -- zwei Punkte hintereinander.
+IMPORT "e.dh" AS e
+PRINT e.Farbe.BLAU
+--- datei e.dh
+ENUM Farbe
+    ROT
+    GRUEN
+    BLAU
+END ENUM
+FUNCTION Name$(f AS Farbe) AS STRING
+    IF f = Farbe.ROT THEN RETURN "rot"
+    IF f = Farbe.GRUEN THEN RETURN "gruen"
+    RETURN "blau"
+END FUNCTION
+
+--- erwartet
+2
+
+=== enum als typ
+' Ein ENUM ist als Typ ein INTEGER -- wie ein flaches ENUM auch.
+IMPORT "e.dh" AS e
+DIM f AS e.Farbe
+f = e.Farbe.GRUEN
+PRINT f
+--- datei e.dh
+ENUM Farbe
+    ROT
+    GRUEN
+    BLAU
+END ENUM
+FUNCTION Name$(f AS Farbe) AS STRING
+    IF f = Farbe.ROT THEN RETURN "rot"
+    IF f = Farbe.GRUEN THEN RETURN "gruen"
+    RETURN "blau"
+END FUNCTION
+
+--- erwartet
+1
+
+=== modul nutzt sein enum unqualifiziert
+' Der Fall, der beim Bauen zuerst brach: `Farbe.ROT` INNERHALB der Datei
+IMPORT "e.dh" AS e
+PRINT e.Name$(e.Farbe.ROT)
+--- datei e.dh
+ENUM Farbe
+    ROT
+    GRUEN
+    BLAU
+END ENUM
+FUNCTION Name$(f AS Farbe) AS STRING
+    IF f = Farbe.ROT THEN RETURN "rot"
+    IF f = Farbe.GRUEN THEN RETURN "gruen"
+    RETURN "blau"
+END FUNCTION
+
+--- erwartet
+rot
+
+=== gleiches enum in beiden dateien
+' Der Zweck: zwei ENUMs `Farbe` mit verschiedener Bedeutung.
+IMPORT "e.dh" AS e
+ENUM Farbe
+    BLAU
+    ROT
+END ENUM
+PRINT STR$(Farbe.ROT) + "," + STR$(e.Farbe.ROT)
+--- datei e.dh
+ENUM Farbe
+    ROT
+    GRUEN
+    BLAU
+END ENUM
+FUNCTION Name$(f AS Farbe) AS STRING
+    IF f = Farbe.ROT THEN RETURN "rot"
+    IF f = Farbe.GRUEN THEN RETURN "gruen"
+    RETURN "blau"
+END FUNCTION
+
+--- erwartet
+1,0
+
+=== unbekanntes enum meldet
+IMPORT "e.dh" AS e
+DIM f AS e.Gibtsnicht
+--- datei e.dh
+ENUM Farbe
+    ROT
+    GRUEN
+    BLAU
+END ENUM
+FUNCTION Name$(f AS Farbe) AS STRING
+    IF f = Farbe.ROT THEN RETURN "rot"
+    IF f = Farbe.GRUEN THEN RETURN "gruen"
+    RETURN "blau"
+END FUNCTION
+
+--- fehler
+Namensraum-Fehler: e kennt keine Klasse gibtsnicht.
+

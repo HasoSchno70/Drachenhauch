@@ -1,0 +1,124 @@
+' Aus test_gui_phase4b.py uebertragen (10 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== apply style
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+GUI_STYLE_SET("primary", "bg", 100)
+GUI_STYLE_SET("primary", "font_size", 18)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 10, 10, 80, 24)
+GUI_APPLY_STYLE(b, "primary")
+PRINT GUI_KIND(b)
+--- erwartet
+button
+
+=== style unknown raises
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 0, 0, 50, 20)
+GUI_APPLY_STYLE(b, "nope")
+--- fehler
+GUI_APPLY_STYLE: unbekannter Style 'nope'
+
+=== style bad prop raises
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+GUI_STYLE_SET("s", "blarg", 1)
+--- fehler
+GUI_STYLE_SET: prop muss bg/fg/border/accent/font/font_size sein
+
+=== listbox select
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM it[3] AS STRING
+it[0]="A" : it[1]="B" : it[2]="C"
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(win, 10, 30, 140, 88, it)
+PRINT GUI_LISTBOX_SELECTED(lb)
+GUI_LISTBOX_SET_SELECTED(lb, 2)
+PRINT f"{GUI_LISTBOX_SELECTED(lb)} {GUI_LISTBOX_TEXT(lb)}"
+--- erwartet
+-1
+2 C
+
+=== listbox set items
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM it[1] AS STRING
+it[0]="x"
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(win, 10, 30, 140, 88, it)
+DIM it2[2] AS STRING
+it2[0]="p" : it2[1]="q"
+GUI_SET_LISTBOX(lb, it2)
+GUI_LISTBOX_SET_SELECTED(lb, 1)
+PRINT GUI_LISTBOX_TEXT(lb)
+--- erwartet
+q
+
+=== listbox roundtrip
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM it[3] AS STRING
+it[0]="A" : it[1]="B" : it[2]="C"
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(win, 10, 30, 140, 88, it)
+GUI_LISTBOX_SET_SELECTED(lb, 1)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_FROM_JSON(GUI_TO_JSON(win))
+PRINT GUI_LISTBOX_TEXT(GUI_WINDOW_WIDGET(w2, 0))
+--- erwartet
+B
+
+=== image kind and roundtrip
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM im AS GUI_WIDGET
+im = GUI_IMAGE(win, 10, 10, 64, 64, 3)
+PRINT GUI_KIND(im)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_FROM_JSON(GUI_TO_JSON(win))
+PRINT GUI_KIND(GUI_WINDOW_WIDGET(w2, 0))
+--- erwartet
+image
+image
+
+=== canvas rect
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM cv AS GUI_WIDGET
+cv = GUI_CANVAS(win, 10, 130, 200, 100)
+PRINT f"{GUI_CANVAS_X(cv)},{GUI_CANVAS_Y(cv)},{GUI_CANVAS_W(cv)},{GUI_CANVAS_H(cv)}"
+--- erwartet
+61,193,198,98
+
+=== canvas rect follows window
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM cv AS GUI_WIDGET
+cv = GUI_CANVAS(win, 10, 130, 200, 100)
+GUI_WINDOW_SET_BOUNDS(win, 0, 0, 320, 260)
+PRINT f"{GUI_CANVAS_X(cv)},{GUI_CANVAS_Y(cv)}"
+--- erwartet
+11,153
+
+=== canvas wrong kind raises
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("W", 50, 40, 320, 260)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "x", 0, 0, 50, 20)
+PRINT GUI_CANVAS_X(b)
+--- fehler
+GUI_CANVAS_*: Widget ist kein canvas
+

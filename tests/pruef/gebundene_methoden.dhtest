@@ -1,0 +1,221 @@
+' Aus test_gebundene_methoden.py uebertragen (11 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== gebundene sub wirkt auf ihre instanz
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM z AS Zaehler
+z = NEW Zaehler()
+DIM f AS FUNCREF
+f = z.tick
+f()
+f()
+PRINT z.stand
+--- erwartet
+2
+
+=== gebundene funktion mit argument und rueckgabe
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM z AS Zaehler
+z = NEW Zaehler()
+z.stand = 3
+DIM f AS FUNCREF
+f = z.mal
+PRINT f(7)
+--- erwartet
+21
+
+=== zwei instanzen bleiben getrennt
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM a AS Zaehler
+DIM b AS Zaehler
+a = NEW Zaehler()
+b = NEW Zaehler()
+DIM fa AS FUNCREF
+DIM fb AS FUNCREF
+fa = a.tick
+fb = b.tick
+fa()
+fa()
+fb()
+PRINT a.stand; " "; b.stand
+--- erwartet
+2 1
+
+=== ueberschriebene methode gewinnt
+' Aufgeloest wird beim AUFRUF, nicht beim Binden -- eine als Elternklasse
+CLASS Tier
+    SUB laut()
+        PRINT "..."
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    SUB laut()
+        PRINT "Wuff"
+    END SUB
+END CLASS
+DIM t AS Tier
+t = NEW Hund()
+DIM f AS FUNCREF
+f = t.laut
+f()
+--- erwartet
+Wuff
+
+=== ist nach aussen ein funcref
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM z AS Zaehler
+z = NEW Zaehler()
+DIM f AS FUNCREF
+f = z.tick
+PRINT TYPEOF(f)
+PRINT f
+--- erwartet
+FUNCREF
+<FUNCREF zaehler.tick>
+
+=== gleichheit vergleicht instanz und methode
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM a AS Zaehler
+DIM b AS Zaehler
+a = NEW Zaehler()
+b = NEW Zaehler()
+PRINT a.tick = a.tick
+PRINT a.tick = b.tick
+PRINT a.tick = a.mal
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== unbekannter name bleibt ein fehler
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM z AS Zaehler
+z = NEW Zaehler()
+DIM f AS FUNCREF
+f = z.gibtsnicht
+--- fehler
+Feld 'gibtsnicht' existiert nicht in zaehler
+
+=== feld gewinnt vor methode
+' Heisst ein Feld wie eine Methode, liefert der Zugriff weiterhin das
+CLASS K
+    DIM wert AS INTEGER
+    SUB wert2()
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+k.wert = 42
+PRINT k.wert
+--- erwartet
+42
+
+=== timer ruft gebundene methode
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+IMPORT "timer"
+DIM z AS Zaehler
+z = NEW Zaehler()
+TIMER_AFTER(0, z.tick)
+TIMER_UPDATE()
+PRINT z.stand
+--- erwartet
+1
+
+=== sort mit gebundenem vergleicher
+CLASS Regel
+    DIM absteigend AS BOOLEAN
+    FUNCTION cmp(a AS INTEGER, b AS INTEGER) AS INTEGER
+        IF Self.absteigend THEN RETURN b - a
+        RETURN a - b
+    END FUNCTION
+END CLASS
+DIM r AS Regel
+r = NEW Regel()
+r.absteigend = TRUE
+DIM a AS ARRAY OF INTEGER
+a = [3, 1, 2]
+SORT(a, r.cmp)
+PRINT a[0]; a[1]; a[2]
+--- erwartet
+321
+
+=== task start lehnt gebundene methode ab
+' Ein Auftrag laeuft in einem eigenen Prozess -- die Instanz gibt es dort
+CLASS Zaehler
+    DIM stand AS INTEGER
+    SUB tick()
+        Self.stand = Self.stand + 1
+    END SUB
+    FUNCTION mal(x AS INTEGER) AS INTEGER
+        RETURN x * Self.stand
+    END FUNCTION
+END CLASS
+
+DIM z AS Zaehler
+z = NEW Zaehler()
+TASK_START(z.tick)
+--- fehler
+TASK_START: 'tick' ist an ein Objekt gebunden. Ein Auftrag laeuft in einem eigenen Prozess und sieht dieses Objekt nicht -- nimm eine freie FUNCTION und gib ihr die Werte als Argumente mit.
+

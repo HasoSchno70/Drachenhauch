@@ -1,0 +1,156 @@
+' Aus test_modules_tween.py uebertragen (16 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== zero duration tween is done
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 0)
+PRINT TWEEN_DONE(t)
+PRINT TWEEN_VALUE(t)
+--- erwartet
+TRUE
+100.0
+
+=== progress starts at zero
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 60000)
+PRINT TWEEN_PROGRESS(t) < 0.01
+--- erwartet
+TRUE
+
+=== value at progress zero is start
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(50.0, 200.0, 60000)
+PRINT TWEEN_VALUE(t) < 56.0
+--- erwartet
+TRUE
+
+=== easing unknown raises
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 1.0, 100, "schwurbel")
+--- fehler
+TWEEN: unbekanntes easing 'schwurbel'
+
+=== easing names are case insensitive
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 1.0, 100, "OUT_BOUNCE")
+PRINT TWEEN_DONE(t)
+--- erwartet
+FALSE
+
+=== tween easings lists all
+IMPORT "tween"
+PRINT TWEEN_EASINGS()
+--- erwartet
+in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine
+
+=== tween new with new easing
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 1000, "out_back")
+PRINT TWEEN_DONE(t)
+t = TWEEN_NEW(0.0, 100.0, 1000, "inout_elastic")
+PRINT TWEEN_DONE(t)
+--- erwartet
+FALSE
+FALSE
+
+=== easing endpoints via zero duration
+' 0ms-Tween (progress=1) liefert exakt den Endwert -- auch Overshoot-
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 0, "linear")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "out_back")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "in_back")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "inout_back")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "out_bounce")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "in_elastic")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "inout_elastic")
+PRINT TWEEN_VALUE(t)
+t = TWEEN_NEW(0.0, 100.0, 0, "out_elastic")
+PRINT TWEEN_VALUE(t)
+--- erwartet ungefaehr
+100.0
+100.0
+99.99999999999997
+100.0
+100.0
+100.0
+100.0
+100.0
+
+=== reverse swaps endpoints
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 0)
+PRINT TWEEN_VALUE(t)
+TWEEN_REVERSE(t)
+PRINT TWEEN_VALUE(t)
+--- erwartet
+100.0
+0.0
+
+=== negative duration raises
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 1.0, -1)
+--- fehler
+TWEEN: dauer_ms muss >= 0 sein
+
+=== non tween to value raises
+IMPORT "tween"
+PRINT TWEEN_VALUE("nicht ein tween")
+--- fehler
+TWEEN_VALUE erwartet TWEEN
+
+=== loop never done
+' Loop-Tween ist per Definition nie 'done' (auch sofort nach Erstellung).
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW_LOOP(0.0, 1.0, 100)
+PRINT TWEEN_DONE(t)
+--- erwartet
+FALSE
+
+=== pingpong never done
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW_PINGPONG(0.0, 1.0, 100)
+PRINT TWEEN_DONE(t)
+--- erwartet
+FALSE
+
+=== loop zero duration rejected
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW_LOOP(0.0, 1.0, 0)
+--- fehler
+TWEEN: dauer_ms muss > 0 sein
+
+=== pingpong zero duration rejected
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW_PINGPONG(0.0, 1.0, 0)
+--- fehler
+TWEEN: dauer_ms muss > 0 sein
+
+=== loop works with easing
+IMPORT "tween"
+DIM t AS TWEEN
+t = TWEEN_NEW_LOOP(0.0, 1.0, 100, "out_cubic")
+PRINT TWEEN_DONE(t)
+t = TWEEN_NEW_PINGPONG(0.0, 1.0, 100, "inout_sine")
+PRINT TWEEN_DONE(t)
+--- erwartet
+FALSE
+FALSE
+

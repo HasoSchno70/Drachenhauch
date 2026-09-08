@@ -11,6 +11,10 @@ Der wichtigste Test hier ist der am BILD: zweimal dasselbe zeichnen, dazwischen
 den Zustand kraeftig verstellen und wieder zurueckholen -- beide Bilder muessen
 Pixel fuer Pixel gleich sein. Zahlen zurueckzugeben ist leicht; dass die Optik
 wirklich wieder stimmt, zeigt nur ein Vergleich.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/gfx_push_pop.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import os
 import subprocess
@@ -37,46 +41,6 @@ def _run(tmp_path, quelle: str):
     r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
                        text=True, encoding="utf-8", timeout=120, cwd=str(tmp_path))
     return r
-
-
-def test_kamera_schrift_und_stapeltiefe(tmp_path):
-    r = _run(tmp_path, """
-IMPORT "camera"
-SCREEN(120, 80, "p", 1)
-PRINT GFX_DEPTH()
-GFX_PUSH()
-CAMERA_SET(120.0, 80.0, 2.0)
-PRINT STR$(INT(CAMERA_X())) + " " + FORMAT$(CAMERA_ZOOM(), "%.1f") + " " + STR$(GFX_DEPTH())
-GFX_POP()
-PRINT STR$(INT(CAMERA_X())) + " " + FORMAT$(CAMERA_ZOOM(), "%.1f") + " " + STR$(GFX_DEPTH())
-""")
-    assert r.returncode == 0, r.stderr
-    zeilen = [z for z in r.stdout.splitlines() if z and not z.startswith(("INFO", "WARNING", "TRACE"))]
-    assert zeilen == ["0", "120 2.0 1", "0 1.0 0"]
-
-
-def test_pop_ohne_push_meldet_sich(tmp_path):
-    r = _run(tmp_path, 'SCREEN(64, 64, "p", 1)\nGFX_POP()\n')
-    assert r.returncode != 0
-    assert "GFX_POP" in r.stderr and "leer" in r.stderr
-
-
-def test_verschachteln_geht(tmp_path):
-    r = _run(tmp_path, """
-IMPORT "camera"
-SCREEN(64, 64, "p", 1)
-GFX_PUSH()
-CAMERA_SET(10.0, 0.0, 1.0)
-GFX_PUSH()
-CAMERA_SET(99.0, 0.0, 1.0)
-GFX_POP()
-PRINT INT(CAMERA_X())
-GFX_POP()
-PRINT INT(CAMERA_X())
-""")
-    assert r.returncode == 0, r.stderr
-    zeilen = [z for z in r.stdout.splitlines() if z.strip().isdigit()]
-    assert zeilen == ["10", "0"]
 
 
 @pytest.mark.parametrize("stoerung", [
@@ -224,27 +188,6 @@ SAVESCREENSHOT("nachher.png")
 
 
 # ---------------------------------------------------------- AUDIO_PUSH/POP
-def test_audio_lautstaerke_kommt_zurueck(tmp_path):
-    r = _run(tmp_path, """
-IMPORT "audio"
-SCREEN(64, 64, "p", 1)
-AUDIO_BUS_VOLUME("music", 0.8)
-PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
-AUDIO_PUSH()
-AUDIO_BUS_VOLUME("music", 0.1)
-PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
-AUDIO_POP()
-PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
-""")
-    assert r.returncode == 0, r.stderr
-    zeilen = [z for z in r.stdout.splitlines() if z and z[0].isdigit()]
-    assert zeilen == ["0.80 0", "0.10 1", "0.80 0"]
-
-
-def test_audio_pop_ohne_push_meldet_sich(tmp_path):
-    r = _run(tmp_path, 'IMPORT "audio"\nSCREEN(64, 64, "p", 1)\nAUDIO_POP()\n')
-    assert r.returncode != 0
-    assert "AUDIO_POP" in r.stderr and "leer" in r.stderr
 
 
 def test_filter_wirkt_nach_pop_nicht_mehr(tmp_path):

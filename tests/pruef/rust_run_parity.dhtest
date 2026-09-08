@@ -1,0 +1,27 @@
+' Aus test_rust_run_parity.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== run with relative file and imports
+IMPORT "lib.dh"
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+DIM f AS FILE
+f = OpenFile("data.txt", "r")
+PRINT ReadLine(f)
+CloseFile(f)
+PRINT tri(10)
+PRINT VEC2_LENGTH(v)
+--- datei data.txt
+hallo
+welt
+
+--- datei lib.dh
+FUNCTION tri(n AS INTEGER) AS INTEGER
+  RETURN n * (n + 1) \ 2
+END FUNCTION
+
+--- erwartet
+hallo
+55
+5.0
+

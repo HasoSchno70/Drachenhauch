@@ -1,0 +1,125 @@
+' Aus test_modules_html.py uebertragen (17 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== http get invalid url raises
+IMPORT "html"
+PRINT HTTP_GET("not-a-url")
+--- fehler
+HTTP-Fehler: Bad URL: failed to parse URL: RelativeUrlWithoutBase: relative URL without a base - not-a-url
+
+=== url encode special chars
+IMPORT "html"
+PRINT URL_ENCODE("Hallo Welt!")
+--- erwartet
+Hallo%20Welt%21
+
+=== url encode decode roundtrip
+IMPORT "html"
+PRINT URL_DECODE(URL_ENCODE("ä?&=#/+ space"))
+--- erwartet
+ä?&=#/+ space
+
+=== html text strips tags
+IMPORT "html"
+PRINT HTML_TEXT("<p>Hallo <b>Welt</b></p>")
+--- erwartet
+Hallo Welt
+
+=== html text decodes entities
+IMPORT "html"
+PRINT HTML_TEXT("<p>5 &lt; 10 &amp; ok</p>")
+--- erwartet
+5 < 10 & ok
+
+=== html text comment with gt does not leak into text
+IMPORT "html"
+PRINT HTML_TEXT("<p>vorher</p><!-- if (x>1) then y --><p>nachher</p>")
+--- erwartet
+vorher
+nachher
+
+=== html text skips script and style
+IMPORT "html"
+PRINT HTML_TEXT("<html><head><style>body { color: red; }</style><script>alert('hi')</script></head><body>Sichtbarer Text</body></html>")
+--- erwartet
+Sichtbarer Text
+
+=== find all simple tags
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("<a href=""x"">eins</a> Filler <a>zwei</a>", "a")
+PRINT LEN(a)
+PRINT a[0]
+PRINT a[1]
+--- erwartet
+2
+eins
+zwei
+
+=== find all no matches returns empty
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("<p>x</p>", "a")
+PRINT LEN(a)
+--- erwartet
+0
+
+=== find all preserves inner tags
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("<li><b>bold</b> text</li>", "li")
+PRINT LEN(a)
+PRINT a[0]
+--- erwartet
+1
+<b>bold</b> text
+
+=== find all orphaned closing tag does not break later matches
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("</div><div>echt</div>", "div")
+PRINT LEN(a)
+PRINT a[0]
+--- erwartet
+1
+echt
+
+=== find all nested same tag
+IMPORT "html"
+DIM a AS ARRAY OF STRING
+a = HTML_FIND_ALL("<div><div>inner</div></div>", "div")
+PRINT LEN(a)
+PRINT a[0]
+--- erwartet
+1
+<div>inner</div>
+
+=== get attr double quoted
+IMPORT "html"
+PRINT HTML_GET_ATTR("<a href=""https://x.com"" class=""big"">link</a>", "href")
+--- erwartet
+https://x.com
+
+=== get attr single quoted
+IMPORT "html"
+PRINT HTML_GET_ATTR("<a href='https://x.com'>link</a>", "href")
+--- erwartet
+https://x.com
+
+=== get attr unquoted
+IMPORT "html"
+PRINT HTML_GET_ATTR("<input value=42 type=hidden>", "value")
+--- erwartet
+42
+
+=== get attr missing returns empty
+IMPORT "html"
+PRINT "[" + HTML_GET_ATTR("<a href='x'>link</a>", "title") + "]"
+--- erwartet
+[]
+
+=== get attr decodes entities
+IMPORT "html"
+PRINT HTML_GET_ATTR("<a title=""A &amp; B"">link</a>", "title")
+--- erwartet
+A & B
+

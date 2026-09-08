@@ -1,0 +1,299 @@
+' Aus test_tiled_schreiben.py uebertragen (18 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== ein fremder leser versteht die datei
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(8, 5, 16, 16)
+DIM ts AS INTEGER
+ts = TILED_ADD_TILESET(m, "tiles.png", 64)
+DIM boden AS INTEGER
+boden = TILED_ADD_LAYER(m, "Boden")
+DIM deko AS INTEGER
+deko = TILED_ADD_LAYER(m, "Deko")
+TILED_FILL_RECT(m, boden, 0, 0, 8, 5, 1)
+TILED_TILE_SET(m, boden, 3, 2, 7)
+TILED_TILE_SET(m, deko, 1, 1, 12)
+TILED_SAVE(m, "karte.json")
+--- erwartet
+
+=== die datei ist eine tiled map
+' `type: "map"` ist das, woran jeder Leser sie erkennt -- der eigene
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(8, 5, 16, 16)
+DIM ts AS INTEGER
+ts = TILED_ADD_TILESET(m, "tiles.png", 64)
+DIM boden AS INTEGER
+boden = TILED_ADD_LAYER(m, "Boden")
+DIM deko AS INTEGER
+deko = TILED_ADD_LAYER(m, "Deko")
+TILED_FILL_RECT(m, boden, 0, 0, 8, 5, 1)
+TILED_TILE_SET(m, boden, 3, 2, 7)
+TILED_TILE_SET(m, deko, 1, 1, 12)
+TILED_SAVE(m, "karte.json")
+--- erwartet
+
+=== der eigene leser bekommt dasselbe zurueck
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(8, 5, 16, 16)
+DIM ts AS INTEGER
+ts = TILED_ADD_TILESET(m, "tiles.png", 64)
+DIM boden AS INTEGER
+boden = TILED_ADD_LAYER(m, "Boden")
+DIM deko AS INTEGER
+deko = TILED_ADD_LAYER(m, "Deko")
+TILED_FILL_RECT(m, boden, 0, 0, 8, 5, 1)
+TILED_TILE_SET(m, boden, 3, 2, 7)
+TILED_TILE_SET(m, deko, 1, 1, 12)
+TILED_SAVE(m, "karte.json")
+
+DIM m2 AS TILED_MAP
+m2 = TILED_LOAD("karte.json")
+PRINT TILED_WIDTH(m2); " "; TILED_HEIGHT(m2); " "; TILED_LAYER_COUNT(m2); " "; _
+      TILED_TILE_AT(m2, 0, 3, 2); " "; TILED_TILE_AT(m2, 1, 1, 1)
+--- erwartet
+8 5 2 7 12
+
+=== gids der tilesets ueberlappen nicht
+' Die `firstgid` wird selbst vergeben. Überlappende Bereiche zerstören
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER
+a = TILED_ADD_TILESET(m, "a.png", 64)
+DIM b AS INTEGER
+b = TILED_ADD_TILESET(m, "b.png", 20)
+DIM c AS INTEGER
+c = TILED_ADD_TILESET(m, "c.png", 5)
+PRINT TILED_TILESET_FIRSTGID(m, 0); " "; TILED_TILESET_FIRSTGID(m, 1); " "; _
+      TILED_TILESET_FIRSTGID(m, 2)
+--- erwartet
+1 65 85
+
+=== doppelter ebenenname wird abgelehnt
+' Ebenen werden auch über den Namen gefunden (`TILED_LAYER_INDEX`) --
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER
+a = TILED_ADD_LAYER(m, "Boden")
+TRY
+    DIM b AS INTEGER
+    b = TILED_ADD_LAYER(m, "Boden")
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== unsinnige masse werden abgelehnt (1)
+IMPORT "tiled"
+TRY
+    DIM m AS TILED_MAP
+    m = TILED_NEW(0, 5, 16, 16)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== unsinnige masse werden abgelehnt (2)
+IMPORT "tiled"
+TRY
+    DIM m AS TILED_MAP
+    m = TILED_NEW(5, 0, 16, 16)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== unsinnige masse werden abgelehnt (3)
+IMPORT "tiled"
+TRY
+    DIM m AS TILED_MAP
+    m = TILED_NEW(-3, 5, 16, 16)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== riesige karte wird abgelehnt
+' Ein Tippfehler in der Kachelzahl darf nicht den Speicher fressen.
+IMPORT "tiled"
+TRY
+    DIM m AS TILED_MAP
+    m = TILED_NEW(9000, 9000, 16, 16)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== leere karte bleibt lesbar
+' Ohne Ebenen und ohne Tileset -- der Grenzfall, den ein Editor beim
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(3, 3, 8, 8)
+TILED_SAVE(m, "leer.json")
+--- erwartet
+
+=== ebene umbenennen fuehrt den namensindex mit
+' `TILED_LAYER_INDEX` sucht ueber den Namen. Bliebe der alte Eintrag
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Deko")
+TILED_LAYER_RENAME(m, 1, "Vordergrund")
+PRINT TILED_LAYER_NAME(m, 1); " "; TILED_LAYER_INDEX(m, "Vordergrund"); " "; _
+      TILED_LAYER_INDEX(m, "Deko")
+--- erwartet
+Vordergrund 1 -1
+
+=== umbenennen auf den eigenen namen ist kein fehler
+' Aus einem Eingabefeld heraus ist genau das der Normalfall.
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Deko")
+TRY
+    TILED_LAYER_RENAME(m, 0, "Boden")
+    PRINT "ok"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+TRY
+    TILED_LAYER_RENAME(m, 0, "Deko")
+    PRINT "kollision-durch"
+CATCH e
+    PRINT "kollision-erkannt"
+END TRY
+--- erwartet
+ok
+kollision-erkannt
+
+=== sichtbarkeit uebersteht die datei
+' Tiled speichert `visible`. Ohne den Setter liess sich eine
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Deko")
+TILED_LAYER_SET_VISIBLE(m, 0, FALSE)
+TILED_SAVE(m, "v.json")
+DIM m2 AS TILED_MAP : m2 = TILED_LOAD("v.json")
+PRINT TILED_LAYER_VISIBLE(m2, 0); " "; TILED_LAYER_VISIBLE(m2, 1)
+--- erwartet
+FALSE TRUE
+
+=== ebene entfernen rueckt die dahinter auf
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Eins")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Zwei")
+DIM c AS INTEGER : c = TILED_ADD_LAYER(m, "Drei")
+TILED_TILE_SET(m, 2, 1, 1, 9)
+TILED_REMOVE_LAYER(m, 0)
+PRINT TILED_LAYER_COUNT(m); " "; TILED_LAYER_NAME(m, 0); " "; TILED_LAYER_NAME(m, 1)
+PRINT TILED_LAYER_INDEX(m, "Drei"); " "; TILED_LAYER_INDEX(m, "Eins"); " "; _
+      TILED_TILE_AT(m, 1, 1, 1)
+--- erwartet
+2 Zwei Drei
+1 -1 9
+
+=== ebene verschieben nimmt ihre kacheln mit
+' Die Reihenfolge ist die ZEICHENreihenfolge -- verschieben aendert das
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Eins")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Zwei")
+DIM c AS INTEGER : c = TILED_ADD_LAYER(m, "Drei")
+TILED_TILE_SET(m, 2, 1, 1, 9)
+TILED_MOVE_LAYER(m, 2, 0)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1); TILED_LAYER_NAME(m, 2)
+PRINT TILED_LAYER_INDEX(m, "Drei"); " "; TILED_TILE_AT(m, 0, 1, 1)
+TILED_MOVE_LAYER(m, 0, 2)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1); TILED_LAYER_NAME(m, 2)
+PRINT TILED_TILE_AT(m, 2, 1, 1)
+--- erwartet
+DreiEinsZwei
+0 9
+EinsZweiDrei
+9
+
+=== verschobene ebenen stehen so in der datei
+' Gegengelesen vom FREMDEN Leser: die Reihenfolge in der JSON IST die
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 4)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Deko")
+TILED_TILE_SET(m, 1, 0, 0, 2)
+TILED_MOVE_LAYER(m, 1, 0)
+TILED_SAVE(m, "r.json")
+--- erwartet
+
+=== verschieben an dieselbe stelle ist kein fehler
+' Aus einer Liste heraus ist `von = nach` der Normalfall (oberste Ebene
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Eins")
+DIM b AS INTEGER : b = TILED_ADD_LAYER(m, "Zwei")
+TILED_MOVE_LAYER(m, 1, 1)
+PRINT TILED_LAYER_NAME(m, 0); TILED_LAYER_NAME(m, 1)
+--- erwartet
+EinsZwei
+
+=== ebenenbefehle lehnen falsche nummern ab
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_NEW(4, 4, 16, 16)
+DIM a AS INTEGER : a = TILED_ADD_LAYER(m, "Boden")
+DIM n AS INTEGER : n = 0
+TRY
+    TILED_LAYER_RENAME(m, 5, "x")
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    TILED_LAYER_SET_VISIBLE(m, -1, FALSE)
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    TILED_REMOVE_LAYER(m, 9)
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    TILED_MOVE_LAYER(m, 0, 4)
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    TILED_MOVE_LAYER(m, -1, 0)
+CATCH e
+    n = n + 1
+END TRY
+TRY
+    DIM v AS BOOLEAN : v = TILED_LAYER_VISIBLE(m, 3)
+CATCH e
+    n = n + 1
+END TRY
+PRINT n
+--- erwartet
+6
+

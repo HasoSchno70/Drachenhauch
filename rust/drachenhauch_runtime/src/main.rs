@@ -777,7 +777,9 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
 {
     use std::sync::{Arc, Mutex};
     let text = std::fs::read_to_string(pfad).map_err(|e| format!("nicht lesbar: {}", e))?;
-    let faelle: Vec<pruefsammlung::Fall> = pruefsammlung::parsen(&text)?
+    let sammlung = pruefsammlung::sammlung_parsen(&text)?;
+    let seriell = sammlung.seriell;
+    let faelle: Vec<pruefsammlung::Fall> = sammlung.faelle
         .into_iter()
         .filter(|f| filter.map_or(true, |t| f.name.contains(t)))
         .collect();
@@ -790,7 +792,11 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
     let naechster = Arc::new(Mutex::new(0usize));
     let ergebnisse: Arc<Mutex<Vec<Option<pruefsammlung::Ergebnis>>>> =
         Arc::new(Mutex::new(vec![None; faelle.len()]));
-    let faeden = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(faelle.len());
+    // `--- seriell` im Kopf: die Faelle teilen sich etwas, das es nur einmal
+    // gibt (Zwischenablage, fester Port, Soundkarte) -- dann einer nach dem anderen.
+    let faeden = if seriell { 1 } else {
+        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8).min(faelle.len())
+    };
     let mut griffe = Vec::new();
     for _ in 0..faeden {
         let (faelle, naechster, ergebnisse) = (faelle.clone(), naechster.clone(), ergebnisse.clone());
@@ -836,7 +842,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                 let erg = pruefsammlung::bewerten(
                     f, o.status.code().unwrap_or(-1),
                     &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik);
-                Ok::<_, String>(match (&erg, &f.bild, &bild_pfad) {
+                let erg = match (&erg, &f.bild, &bild_pfad) {
                     (pruefsammlung::Ergebnis::Ok, Some(bp), Some(pfad)) => match bild_laden(pfad) {
                         Ok(bild) => match pruefsammlung::bild_pruefen(bp, &bild) {
                             Ok(()) => pruefsammlung::Ergebnis::Ok,
@@ -844,6 +850,20 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         },
                         Err(BildFehler::KeinGrafikBau) => pruefsammlung::Ergebnis::Uebersprungen("Bildpruefung braucht den Grafik-Bau".into()),
                         Err(BildFehler::Lesen(m)) => pruefsammlung::Ergebnis::Fehl(format!("Bild '{}': {}", pfad.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), m)),
+                    },
+                    _ => erg,
+                };
+                // `--- ton datei.wav`: die WAV liest der Laeufer selbst (kein raylib noetig).
+                Ok::<_, String>(match (&erg, &f.ton) {
+                    (pruefsammlung::Ergebnis::Ok, Some(tp)) => match std::fs::read(dir.join(&tp.datei)) {
+                        Err(_) => pruefsammlung::Ergebnis::Fehl(format!("Ton '{}': nicht geschrieben (AUDIO_SAVE_WAV nicht aufgerufen?)", tp.datei)),
+                        Ok(bytes) => match pruefsammlung::wav_lesen(&bytes) {
+                            Err(m) => pruefsammlung::Ergebnis::Fehl(format!("Ton '{}': {}", tp.datei, m)),
+                            Ok(wav) => match pruefsammlung::ton_pruefen(tp, &wav) {
+                                Ok(()) => pruefsammlung::Ergebnis::Ok,
+                                Err(m) => pruefsammlung::Ergebnis::Fehl(format!("Ton '{}': {}", tp.datei, m)),
+                            },
+                        },
                     },
                     _ => erg,
                 })

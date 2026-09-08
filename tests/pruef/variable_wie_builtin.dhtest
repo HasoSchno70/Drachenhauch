@@ -1,0 +1,56 @@
+' Aus test_variable_wie_builtin.py uebertragen (6 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== globale variable mit builtin namen
+DIM deg AS FLOAT
+deg = DEG(3.141592653589793)
+PRINT INT(deg + 0.5)
+DIM len AS INTEGER
+len = LEN("abc")
+PRINT len
+--- erwartet
+180
+3
+
+=== lokale variable mit builtin namen
+SUB t()
+    DIM sqr AS FLOAT
+    sqr = SQR(16.0)
+    PRINT sqr
+END SUB
+t()
+--- erwartet
+4.0
+
+=== parameter mit builtin namen
+FUNCTION f(abs AS INTEGER) AS INTEGER
+    RETURN ABS(abs) + abs
+END FUNCTION
+PRINT f(-3)
+--- erwartet
+0
+
+=== eine funcref dieses namens ruft weiter die variable
+' Der Grund, warum es nicht einfach 'immer der Builtin' heisst.
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+DIM abs AS FUNCREF
+abs = quadrat
+PRINT abs(-5)
+--- erwartet
+25
+
+=== eine leere funcref dieses namens gibt die klare meldung
+DIM len AS FUNCREF
+PRINT LEN("ab")
+--- fehler
+'len' ist eine Variable vom Typ NIL und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl 'LEN' meinst: benenne die Variable um -- eine Variable mit festem Wert-Typ (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine FUNCREF schon.
+
+=== die for each laufvariable verdeckt nicht
+FOR EACH len IN (1, 2)
+    PRINT LEN("ab")
+NEXT
+--- erwartet
+2
+2
+

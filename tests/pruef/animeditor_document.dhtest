@@ -1,0 +1,152 @@
+' Aus test_animeditor_document.py uebertragen (2 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== shipped demo runtime valid
+' Die Demo muss vom animfsm-Runtime ladbar sein (kein Validierungsfehler).
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("anim_demo.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei anim_demo.dhanim
+{
+  "version": 1,
+  "sheet": "examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    { "name": "speed", "type": "float", "default": 0.0 },
+    { "name": "grounded", "type": "bool", "default": true },
+    { "name": "jump", "type": "trigger" }
+  ],
+  "states": [
+    { "name": "idle", "anim": "idle", "loop": true,  "first": 0, "last": 0, "fps": 2.0,  "x": 120, "y": 176 },
+    { "name": "run",  "anim": "run",  "loop": true,  "first": 0, "last": 3, "fps": 10.0, "x": 432, "y": 176 },
+    { "name": "jump", "anim": "jump", "loop": false, "first": 2, "last": 3, "fps": 8.0,  "x": 272, "y": 40  },
+    { "name": "fall", "anim": "fall", "loop": true,  "first": 1, "last": 1, "fps": 1.0,  "x": 272, "y": 336 }
+  ],
+  "transitions": [
+    { "from": "idle", "to": "run",  "conditions": [ { "param": "speed", "op": "gt", "value": 5.0 } ] },
+    { "from": "run",  "to": "idle", "conditions": [ { "param": "speed", "op": "lt", "value": 5.0 } ] },
+    { "from": "*",    "to": "jump", "conditions": [ { "param": "jump", "op": "trigger" } ] },
+    { "from": "jump", "to": "fall", "wait_finished": true, "conditions": [] },
+    { "from": "fall", "to": "idle", "conditions": [ { "param": "grounded", "op": "is_true" } ] }
+  ]
+}
+
+--- erwartet
+idle
+
+=== editor output loads in runtime
+' Editor-Output -> `.dhanim` -> ANIM_FSM_LOAD: identischer Default-State.
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+PRINT ANIM_FSM_STATE(fsm)
+ANIM_FSM_SET_FLOAT(fsm, "speed", 9.0)
+ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{
+  "version": 1,
+  "sheet": "",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 8.0,
+      "x": 80,
+      "y": 120
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 8.0,
+      "x": 320,
+      "y": 120
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 0,
+      "last": 3,
+      "fps": 14.0,
+      "x": 200,
+      "y": 30
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "idle",
+      "wait_finished": true,
+      "conditions": []
+    }
+  ]
+}
+--- erwartet
+idle
+run
+

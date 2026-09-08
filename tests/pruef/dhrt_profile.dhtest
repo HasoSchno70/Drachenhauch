@@ -1,0 +1,9 @@
+' Aus test_dhrt_profile.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== runtime error has line
+' Bonus: dhrt-Laufzeitfehler tragen jetzt die Quell-Zeile.
+PRINT "a"
+PRINT 1 \ 0
+--- fehler
+Integer-Division durch 0
+

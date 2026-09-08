@@ -1,0 +1,193 @@
+' Aus test_syntax_spans.py uebertragen (12 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== liefert drei gleich lange listen
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+(s, l, a) = SYNTAX_SPANS("DIM x AS INTEGER")
+PRINT LEN(s); " "; LEN(l); " "; LEN(a)
+--- erwartet
+4 4 4
+
+=== arten stimmen
+' Die Zerlegung kommt aus `syntax.rs`; hier zählt, dass sie unverfälscht
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+DIM q AS STRING
+q = "DIM n AS INTEGER"
+(s, l, a) = SYNTAX_SPANS(q)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    PRINT a[i]; "=" ; MID$(q, s[i], l[i])
+NEXT
+--- erwartet
+schluessel=DIM
+name=n
+schluessel=AS
+schluessel=INTEGER
+
+=== schluesselwort und name werden unterschieden
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+(s, l, a) = SYNTAX_SPANS("WHILE zaehler")
+PRINT a[0]; " "; a[1]
+--- erwartet
+schluessel name
+
+=== kommentar und zahl
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+(s, l, a) = SYNTAX_SPANS("x = 42 " + CHR$(39) + " Notiz")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(a) - 1
+    PRINT a[i]
+NEXT
+--- erwartet
+name
+operator
+zahl
+kommentar
+
+=== leerer text gibt leere listen
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+(s, l, a) = SYNTAX_SPANS("")
+PRINT LEN(s)
+--- erwartet
+0
+
+=== spans brauchen gleich lange listen
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 4, 4, 180, 100)
+DIM s AS ARRAY OF INTEGER
+s = [0, 4]
+DIM l AS ARRAY OF INTEGER
+l = [3]
+DIM f AS ARRAY OF INTEGER
+f = [255]
+TRY
+    GUI_TEXTAREA_SPANS(ta, s, l, f)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== spans nur auf einem textfeld
+' Ein Knopf hat keine Zeilen -- die Angabe waere sinnlos, und still
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 4, 4, 60, 20)
+DIM s AS ARRAY OF INTEGER
+s = [0]
+DIM l AS ARRAY OF INTEGER
+l = [3]
+DIM f AS ARRAY OF INTEGER
+f = [255]
+TRY
+    GUI_TEXTAREA_SPANS(b, s, l, f)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== abschnitt hinter dem textende ist harmlos
+' Beim Tippen hinkt die Einfärbung dem Text immer ein Stück hinterher.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 4, 4, 180, 100)
+GUI_SET_TEXT(ta, "kurz")
+DIM s AS ARRAY OF INTEGER
+s = [0, 900]
+DIM l AS ARRAY OF INTEGER
+l = [9999, 5]
+DIM f AS ARRAY OF INTEGER
+f = [255, 255]
+GUI_TEXTAREA_SPANS(ta, s, l, f)
+PRINT "ok"
+--- erwartet
+ok
+
+=== der ganze weg
+' Vom Quelltext zur Einfärbung, so wie ein Editor es tut.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 4, 4, 280, 150)
+DIM q AS STRING
+q = "FOR i = 0 TO 9" + CHR$(10) + "NEXT"
+GUI_SET_TEXT(ta, q)
+DIM s AS ARRAY OF INTEGER
+DIM l AS ARRAY OF INTEGER
+DIM a AS ARRAY OF STRING
+(s, l, a) = SYNTAX_SPANS(q)
+DIM f[LEN(s)] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO LEN(s) - 1
+    f[i] = IIF(a[i] = "schluessel", &H2BC4E8, &HFFFFFF)
+NEXT
+GUI_TEXTAREA_SPANS(ta, s, l, f)
+PRINT LEN(s)
+--- erwartet
+7
+
+=== einstellung muss bekannt sein
+' Ein unbekannter Schlüssel zählt die gültigen auf, statt still nichts
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 4, 4, 180, 100)
+TRY
+    GUI_TEXTAREA_SET(ta, "zeilennumern", 1)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== einstellung nur auf einem textbereich
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 200, 200)
+DIM e AS GUI_WIDGET
+e = GUI_TEXTINPUT(w, 4, 4, 120, 24)
+TRY
+    GUI_TEXTAREA_SET(e, "zeilennummern", 1)
+    PRINT "kein Fehler"
+CATCH ex
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== die vier einstellungen werden angenommen
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 4, 4, 280, 150)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 8)
+PRINT "ok"
+--- erwartet
+ok
+

@@ -5,6 +5,10 @@ Golden-Tests gegen `dhrt` (Stufe B): laufen gegen einen lokalen Mock-Server
 REST-Protokoll aus cloudserver/server.py nachbildet (nicht der echte Flask-
 Server -- der wird separat in cloudserver/test_server.py getestet). Das
 GB-Programm laeuft im dhrt-Subprozess und macht echte localhost-Requests.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/modules_cloud.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import contextlib
 import json
@@ -152,11 +156,6 @@ def test_cloud_correct_api_key_works(run_gb):
             'CLOUD_SAVE("p", "ok")\n'
             'PRINT CLOUD_LOAD("p")\n'))
     assert out == ["ok"]
-
-
-def test_cloud_call_without_configure_raises(run_gb):
-    with pytest.raises(DHRuntimeError, match="CLOUD_CONFIGURE"):
-        run_gb('IMPORT "cloud"\nPRINT CLOUD_LOAD("p")\n')
 
 
 # --- LEADERBOARD_SUBMIT / LEADERBOARD_FETCH ---------------------------------
