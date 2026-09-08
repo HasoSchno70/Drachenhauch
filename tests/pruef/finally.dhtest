@@ -1,4 +1,4 @@
-' Aus test_finally.py uebertragen (24 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Aus test_finally.py uebertragen (25 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
 === normaler durchlauf
 TRY
@@ -311,4 +311,14 @@ END TRY
 --- erwartet
 Datei geschlossen
 gemeldet: etwas geht schief
+
+=== finally laeuft auch wenn niemand faengt
+TRY
+    THROW "ungefangen"
+FINALLY
+    PRINT "aufgeraeumt"
+END TRY
+--- rueckgabe 2
+--- fehler
+ungefangen
 

@@ -821,8 +821,10 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     std::fs::write(&ziel, inhalt).map_err(|e| e.to_string())?;
                 }
                 let mut cmd = std::process::Command::new(&exe);
-                cmd.arg("run").arg(dir.join("fall.dh"))
-                    .stdin(std::process::Stdio::null())
+                cmd.arg("run").arg(dir.join("fall.dh"));
+                if !f.argumente.is_empty() { cmd.arg("--").args(&f.argumente); }
+                cmd.stdin(if f.eingabe.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() })
+                    .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped())
                     // Ein Fall ist ein Programm fuer sich: was die Umgebung des
                     // Laeufers an Bildzahl oder Foto vorgibt, gilt nicht fuer ihn.
                     .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
@@ -843,7 +845,18 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     }
                 }
                 for (k, v) in &f.umgebung { cmd.env(k, v); }
-                let o = cmd.output().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
+                let mut kind = cmd.spawn().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
+                if let Some(bytes) = &f.eingabe {
+                    // Die Eingabe ganz hineinschreiben und das Ende schliessen --
+                    // ein Programm, das bis EOF liest, wartete sonst ewig. Ein
+                    // Kind, das frueher aufhoert zu lesen, schliesst die Leitung
+                    // (BrokenPipe); das ist kein Fehler des Falls.
+                    use std::io::Write;
+                    if let Some(mut stdin) = kind.stdin.take() {
+                        let _ = stdin.write_all(bytes);
+                    }
+                }
+                let o = kind.wait_with_output().map_err(|e| format!("Lauf fehlgeschlagen: {}", e))?;
                 let erg = pruefsammlung::bewerten(
                     f, o.status.code().unwrap_or(-1),
                     &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik);

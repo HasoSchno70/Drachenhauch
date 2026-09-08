@@ -1,4 +1,4 @@
-' Aus test_pruefen.py uebertragen (5 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Aus test_pruefen.py uebertragen (16 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
 === erfuellte pruefung laeuft durch
 ASSERT(1 < 2)
@@ -29,4 +29,104 @@ PRINT ASSERT_REPORT()
 --- erwartet
 ALLES GRUEN -- 0 Pruefungen
 0
+
+=== fehlgeschlagene pruefung bricht ab
+PRINT "vorher"
+ASSERT(1 > 2, "geht nicht")
+PRINT "nachher"
+--- rueckgabe 2
+--- fehler
+ASSERT fehlgeschlagen: geht nicht
+
+=== assert eq bricht ab und zeigt beide werte
+ASSERT_EQ(2 + 2, 5)
+--- rueckgabe 2
+--- fehler
+ASSERT fehlgeschlagen: erhalten 4, erwartet 5
+
+=== sammeln laeuft weiter und zaehlt
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 1)
+ASSERT_EQ(1, 2)
+ASSERT_EQ(3, 3)
+PRINT ASSERT_COUNT()
+PRINT ASSERT_FAILED()
+--- stderr
+FEHL  Zeile 3: erhalten 1, erwartet 2
+--- erwartet
+3
+1
+
+=== sammeln meldet die zeile
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 1)
+ASSERT_EQ(1, 2, "zweite")
+--- stderr
+FEHL  Zeile 3: zweite: erhalten 1, erwartet 2
+--- erwartet
+
+=== fehler gehen nach stderr nutzdaten bleiben sauber
+ASSERT_COLLECT(TRUE)
+PRINT "nutzdaten"
+ASSERT_EQ(1, 2, "kaputt")
+' Ein Pruefprogramm soll sich umleiten lassen: `... > bericht.txt` darf
+--- stderr
+FEHL  Zeile 3: kaputt: erhalten 1, erwartet 2
+--- erwartet
+nutzdaten
+
+=== bilanz gruen
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 1)
+ASSERT_EQ(2, 2)
+PRINT ASSERT_REPORT()
+--- erwartet
+ALLES GRUEN -- 2 Pruefungen
+0
+
+=== bilanz rot
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 1)
+ASSERT_EQ(1, 2)
+PRINT ASSERT_REPORT()
+--- stderr
+FEHL  Zeile 3: erhalten 1, erwartet 2
+--- erwartet
+FEHLER: 1 von 2 Pruefungen
+1
+
+=== das ganze muster eines pruefprogramms
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(2 + 2, 4, "Addition")
+ASSERT_EQ(2 * 3, 7, "Multiplikation")
+IF ASSERT_REPORT() > 0 THEN
+    EXIT(1)
+END IF
+' Genau die Form, die ein Pruefprogramm haben soll -- inklusive
+--- rueckgabe 1
+--- stderr
+FEHL  Zeile 3: Multiplikation: erhalten 6, erwartet 7
+--- erwartet
+FEHLER: 1 von 2 Pruefungen
+
+=== assert eq vergleicht wie der gleichheitsoperator
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 1.0)
+ASSERT_EQ("a", "a")
+ASSERT_EQ(TRUE, TRUE)
+PRINT ASSERT_FAILED()
+' Dieselbe Gleichheit wie `=` -- eine zweite Vorstellung davon, wann zwei
+--- erwartet
+0
+
+=== assert eq auf strings zeigt beide
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ("abc", "abd", "Text")
+--- stderr
+FEHL  Zeile 2: Text: erhalten abc, erwartet abd
+--- erwartet
+
+=== log ganz aus
+LOG_ERROR("nicht mal das")
+--- erwartet
 

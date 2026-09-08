@@ -2762,8 +2762,18 @@ der Fall gilt nur dort, anderswo ist er uebersprungen, nicht falsch.
 (2) Ein Bau ohne Audio meldet "im Rust-Kern noch nicht verfuegbar" --
 und ein Fall, der die Meldung mit TRY/CATCH faengt und AUSGIBT, endet mit
 0 und der Meldung auf STDOUT; die Ueberspringregel prueft darum beide
-Kanaele und nicht mehr den Rueckgabewert. Stand danach: 149 Sammlungen mit 2362 Faellen in ~65 s,
-117 pytest-Dateien geloescht. Nicht uebertragbar und darum in pytest geblieben:
+Kanaele und nicht mehr den Rueckgabewert. **Der sechste Schritt (selber
+Tag) nahm die `run_gb_roh`-Tests**: `--- eingabe` (Standardeingabe fuer
+INPUT/STDIN(), `base64` fuer Bytes, Leerzeile am Ende = Endumbruch; der
+Laeufer schreibt sie in ein gepipetes stdin und schliesst es -- ohne den
+Block bleibt stdin `null`), `--- argumente` (eine Zeile je Argument, hinter
+`--`), `--- rueckgabe N` (EXIT(N); ohne Angabe weiter 0) und `--- stderr`
+(jede Zeile in der Fehlerausgabe, OHNE Abbruch -- fuer EPRINT; `fehler`
+verlangt weiter Exit ungleich 0). Zwei Fallen dabei: der Kommentar aus dem
+Docstring stand VOR dem Quelltext und verschob jede Zeilennummer in einer
+Meldung um eins (jetzt dahinter), und `_dedent` nahm die fuehrende Leerzeile
+weg, die pytest mitgeschrieben hatte (jetzt bleibt sie). Stand danach:
+151 Sammlungen mit 2403 Faellen in ~65 s, 118 pytest-Dateien geloescht. Nicht uebertragbar und darum in pytest geblieben:
 gui_table_frozen_edge (Kantenprobe mit Schwellwert), gui_draw_window und schriften_vorrat (vergleichen zwei Laeufe miteinander), gui_bindung (SQLite-Datei), die 13 image_io-Tests mit Pillow als fremdem Leser fuer PNG/BMP/GIF, drei Shader-Bildproben, der Instancing-Render in m3d, drei Kontaktbogen-Tests und ein Index-Leser in input_edges. Bewusst NICHT umgezogen:
 `test_dateisystem.py` (Dateizeiten, Gross/Klein je System), alles mit Ton
 oder echter Eingabe-Wiedergabe (seriell), und Tests, die Quelltext oder

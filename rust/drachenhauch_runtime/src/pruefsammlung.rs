@@ -78,6 +78,18 @@ pub struct Fall {
     /// Leerzeichen): der Fall gilt nur dort, anderswo ist er uebersprungen --
     /// fuer `SHELL("cmd", "/c", ...)` und alles, was ein Betriebssystem braucht.
     pub system: Option<Vec<String>>,
+    /// `--- eingabe` (auch `--- eingabe base64`): was das Programm auf der
+    /// Standardeingabe liest -- fuer INPUT und STDIN(). Ohne den Block ist
+    /// stdin leer (nicht offen), wie bisher.
+    pub eingabe: Option<Vec<u8>>,
+    /// `--- argumente`: eine Zeile je Argument, landen hinter `--` (ARGC/ARG$).
+    pub argumente: Vec<String>,
+    /// `--- rueckgabe N`: der Rueckgabewert, den das Programm liefern muss
+    /// (EXIT(N)); ohne Angabe 0, bei `--- fehler` ungleich 0.
+    pub rueckgabe: Option<i32>,
+    /// `--- stderr`: jede Zeile des Blocks steht in der Fehlerausgabe -- fuer
+    /// EPRINT, ohne dass das Programm abbrechen muss (das verlangt `fehler`).
+    pub stderr_enthaelt: Vec<String>,
 }
 
 /// Passt die Liste aus `--- system` zu dieser Maschine? `posix` heisst
@@ -433,7 +445,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -487,6 +499,19 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                 };
                 f.dateien.push((datei_name.to_string(), bytes));
             }
+            Abschnitt::Eingabe => {
+                // wie bei datei: Base64 optional, eine Leerzeile am Ende ist der Endumbruch
+                let bytes = if datei_b64 {
+                    let dicht: String = text.split_whitespace().collect();
+                    crate::builtins::b64_decode(&dicht)
+                        .map_err(|e| format!("Fall '{}', --- eingabe: kein gueltiges Base64 ({})", f.name, e))?
+                } else {
+                    text.into_bytes()
+                };
+                f.eingabe = Some(bytes);
+            }
+            Abschnitt::Argumente => f.argumente.extend(puffer.iter().filter(|z| !z.trim().is_empty()).map(|z| z.trim().to_string())),
+            Abschnitt::Stderr => f.stderr_enthaelt.extend(puffer.iter().filter(|z| !z.trim().is_empty()).cloned()),
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
             Abschnitt::Bild => {
                 let bp = f.bild.get_or_insert_with(BildPruefung::default);
@@ -570,6 +595,20 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.bild = Some(BildPruefung { datei: if arg.is_empty() { None } else { Some(arg.to_string()) }, proben: Vec::new() });
                     Abschnitt::Bild
                 }
+                "eingabe" => {
+                    datei_b64 = match arg {
+                        "" => false,
+                        "base64" => true,
+                        other => return Err(format!("Zeile {}: '--- eingabe {}' kenne ich nicht (nur 'base64')", nr + 1, other)),
+                    };
+                    Abschnitt::Eingabe
+                }
+                "argumente" => Abschnitt::Argumente,
+                "stderr" => Abschnitt::Stderr,
+                "rueckgabe" => {
+                    f.rueckgabe = Some(arg.parse::<i32>().map_err(|_| format!("Zeile {}: '--- rueckgabe' braucht eine ganze Zahl, nicht '{}'", nr + 1, arg))?);
+                    Abschnitt::Verzeichnis        // kein Inhalt
+                }
                 "system" => {
                     let liste: Vec<String> = arg.split_whitespace().map(|s| s.to_lowercase()).collect();
                     if liste.is_empty() { return Err(format!("Zeile {}: '--- system' braucht windows, posix, macos oder linux", nr + 1)); }
@@ -585,7 +624,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild, ton, system)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system)", nr + 1, other)),
             };
             continue;
         }
@@ -681,9 +720,19 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
                 return Ergebnis::Fehl(format!("Fehlermeldung sollte '{}' enthalten, war: {}", m, meldung.lines().last().unwrap_or("")));
             }
         }
+    } else if let Some(soll) = fall.rueckgabe {
+        if code != soll {
+            let letzte = glatt(stderr);
+            return Ergebnis::Fehl(format!("Rueckgabewert {}, erwartet {}: {}", code, soll, letzte.lines().last().unwrap_or("(keine Meldung)")));
+        }
     } else if code != 0 {
         let letzte = glatt(stderr);
         return Ergebnis::Fehl(format!("Rueckgabewert {}: {}", code, letzte.lines().last().unwrap_or("(keine Meldung)")));
+    }
+    for z in &fall.stderr_enthaelt {
+        if !stderr.contains(z.as_str()) {
+            return Ergebnis::Fehl(format!("Fehlerausgabe sollte '{}' enthalten, war: {}", z, glatt(stderr).lines().last().unwrap_or("(leer)")));
+        }
     }
     if let Some(e) = &fall.erwartet {
         let e = glatt(e);
@@ -771,6 +820,23 @@ mod tests {
         assert!(wav_lesen(b"nix").unwrap_err().contains("RIFF"));
         assert!(parsen("=== a\nPRINT 1\n--- ton\nkanaele 1\n").unwrap_err().contains("Namen der WAV"));
         assert!(parsen("=== a\nPRINT 1\n--- ton t.wav\nlaut 3\n").unwrap_err().contains("nicht verstanden"));
+    }
+
+    #[test]
+    fn eingabe_argumente_rueckgabe_und_stderr() {
+        let f = parsen("=== a\nPRINT ARG$(0)\n--- argumente\neins\n zwei drei \n--- eingabe\nAnna\nBerta\n\n--- rueckgabe 3\n--- stderr\nmeldung\n--- erwartet\neins\n").unwrap();
+        assert_eq!(f[0].argumente, vec!["eins".to_string(), "zwei drei".to_string()]);
+        assert_eq!(f[0].eingabe.as_deref(), Some(&b"Anna\nBerta\n"[..]));
+        assert_eq!(f[0].rueckgabe, Some(3));
+        assert_eq!(f[0].stderr_enthaelt, vec!["meldung".to_string()]);
+        // Rueckgabewert muss stimmen, stderr muss die Zeile tragen
+        assert_eq!(bewerten(&f[0], 3, "eins\n", "x meldung y\n", false), Ergebnis::Ok);
+        assert!(matches!(bewerten(&f[0], 0, "eins\n", "meldung\n", false), Ergebnis::Fehl(m) if m.contains("erwartet 3")));
+        assert!(matches!(bewerten(&f[0], 3, "eins\n", "", false), Ergebnis::Fehl(m) if m.contains("Fehlerausgabe sollte")));
+        // ohne rueckgabe gilt 0 wie bisher; eingabe base64
+        let g = parsen("=== b\nPRINT 1\n--- eingabe base64\nR3L8/mUK\n").unwrap();
+        assert_eq!(g[0].eingabe.as_deref(), Some(&[0x47u8, 0x72, 0xFC, 0xFE, 0x65, 0x0A][..]));
+        assert!(parsen("=== c\nPRINT 1\n--- rueckgabe drei\n").unwrap_err().contains("ganze Zahl"));
     }
 
     #[test]
