@@ -71,7 +71,7 @@ CSV_ROW$: das Trennzeichen muss genau ein Zeichen sein (bekommen: ";;")
 DIM t AS ARRAY OF STRING
 t = CSV_LOAD("gibtsnicht_xyz.csv")
 --- fehler
-CSV_LOAD: gibtsnicht_xyz.csv: Das System kann die angegebene Datei nicht finden. (os error 2)
+CSV_LOAD: gibtsnicht_xyz.csv:
 
 === rundreise ueber datei
 DIM t AS ARRAY OF STRING

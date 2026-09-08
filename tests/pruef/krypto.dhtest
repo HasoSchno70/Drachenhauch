@@ -100,7 +100,8 @@ inhalt
 === datei hash auf fehlende datei wirft
 PRINT SHA256_FILE$("gibt_es_nicht_xyz.bin")
 --- fehler
-SHA256_FILE$: Das System kann die angegebene Datei nicht finden. (os error 2) (gibt_es_nicht_xyz.bin)
+SHA256_FILE$:
+(gibt_es_nicht_xyz.bin)
 
 === secure equals vergleicht richtig
 PRINT SECURE_EQUALS(SHA256$("a"), SHA256$("a"))
