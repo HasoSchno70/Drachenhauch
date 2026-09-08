@@ -1,0 +1,576 @@
+' Aus test_gui_punkt6.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== senkrechter schieber waechst nach oben (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== senkrechter schieber waechst nach oben (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM s AS GUI_WIDGET : s = GUI_VSLIDER(w, 40, 20, 200, 0, 100, 0)
+PRINT GUI_GET_W(s) ; " " ; GUI_GET_H(s)
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    PRINT "V " + STR$(INT(GUI_VALUE(s)))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 7
+e 3 7 49 219 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 7 49 169 0 0 // Event: test
+e 6 7 49 120 0 0 // Event: test
+e 7 7 49 70 0 0 // Event: test
+e 8 7 49 21 0 0 // Event: test
+e 9 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+14 200
+V 0
+V 0
+V 0
+V 25
+V 49
+V 74
+V 99
+V 99
+V 99
+V 99
+V 99
+V 99
+V 99
+V 99
+V 99
+V 99
+
+=== pfeil hoch erhoeht auch senkrecht
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM s AS GUI_WIDGET : s = GUI_VSLIDER(w, 40, 20, 200, 0, 100, 50)
+GUI_FOCUS(s)
+DIM f AS INTEGER
+FOR f = 1 TO 8
+    GUI_UPDATE()
+    PRINT "V " + STR$(INT(GUI_VALUE(s)))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 265 0 0 0 // Event: test
+e 4 1 265 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=9
+--- erwartet
+V 50
+V 55
+V 55
+V 55
+V 55
+V 55
+V 55
+V 55
+
+=== fortschritt unbestimmt bild und baum headless
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM p AS GUI_WIDGET : p = GUI_PROGRESS(w, 10, 10, 200, 20)
+GUI_PROGRESS_SET(p, "unbestimmt", 1)
+DIM b AS IMAGE : b = GENTEX_CHECKED(40, 20, 10, 10, RED, YELLOW)
+DIM i AS GUI_WIDGET : i = GUI_IMAGE(w, 10, 40, 100, 60, b)
+PRINT GUI_IMAGE_MODE_GET(i)
+GUI_IMAGE_MODE(i, "kacheln")
+PRINT GUI_IMAGE_MODE_GET(i)
+DIM t AS GUI_WIDGET : t = GUI_TREE(w, 10, 110, 200, 100)
+DIM n AS INTEGER : n = GUI_TREE_ADD(t, -1, "Wurzel")
+GUI_TREE_ICON(t, n, b) : GUI_TREE_COLOR(t, n, GREEN)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j ; " " ; INSTR(j, "indeterminate") >= 0 ; " " ; INSTR(j, "kacheln") >= 0
+TRY
+    GUI_IMAGE_MODE(i, "schief")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_TREE_ICON(t, 7, b)
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_PROGRESS_SET(p, "farbe", 1)
+CATCH e3
+    PRINT e3
+END TRY
+GUI_UPDATE() : GUI_DRAW() : FLIP()
+PRINT "gezeichnet"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+strecken
+kacheln
+TRUE TRUE TRUE
+GUI_IMAGE_MODE: 'schief' ist kein Modus -- strecken, einpassen, fuellen, mitte oder kacheln
+GUI_TREE_ICON: ungueltige Knoten-id 7
+GUI_PROGRESS_SET: unbekannter Schluessel 'farbe' -- erwartet unbestimmt
+gezeichnet
+
+=== panel rollt und klemmt
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM pn AS GUI_WIDGET : pn = GUI_PANEL(w, 20, 20, 200, 120, "")
+DIM k1 AS GUI_WIDGET : k1 = GUI_BUTTON(w, "Oben", 30, 30, 100, 26)
+DIM k2 AS GUI_WIDGET : k2 = GUI_BUTTON(w, "Unten", 30, 300, 100, 26)
+GUI_PANEL_ADD(pn, k1) : GUI_PANEL_ADD(pn, k2)
+GUI_UPDATE()
+PRINT GUI_PANEL_SCROLL_GET(pn) ; " " ; GUI_HIT_TEST(40, 40) = k1 ; " " ; GUI_HIT_TEST(40, 310) = k2
+GUI_PANEL_SCROLL(pn, 5000)
+GUI_UPDATE()
+PRINT GUI_PANEL_SCROLL_GET(pn)
+PRINT GUI_HIT_TEST(40, 40) = k1 ; " " ; GUI_HIT_TEST(40, 300 + 13 - GUI_PANEL_SCROLL_GET(pn)) = k2
+PRINT GUI_GET_Y(k2)
+GUI_PANEL_REMOVE(pn, k2)
+GUI_UPDATE()
+PRINT GUI_PANEL_SCROLL_GET(pn) ; " " ; GUI_HIT_TEST(40, 310) = k2
+TRY
+    GUI_PANEL_ADD(pn, pn)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0 TRUE FALSE
+192
+FALSE TRUE
+300
+0 TRUE
+GUI_PANEL_ADD: ein Panel kann sich nicht selbst aufnehmen
+
+=== mausrad ueber dem panel rollt (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== mausrad ueber dem panel rollt (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM pn AS GUI_WIDGET : pn = GUI_PANEL(w, 20, 20, 200, 120, "")
+DIM k1 AS GUI_WIDGET : k1 = GUI_BUTTON(w, "Oben", 30, 30, 100, 26)
+DIM k2 AS GUI_WIDGET : k2 = GUI_BUTTON(w, "Unten", 30, 300, 100, 26)
+GUI_PANEL_ADD(pn, k1) : GUI_PANEL_ADD(pn, k2)
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    PRINT "S " + STR$(GUI_PANEL_SCROLL_GET(pn))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 3
+e 3 7 101 101 0 0 // Event: test
+e 4 8 0 -2 0 0 // Event: test
+e 5 8 0 -2 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=11
+--- erwartet
+S 0
+S 0
+S 80
+S 160
+S 160
+S 160
+S 160
+S 160
+S 160
+S 160
+
+=== ziehen von liste zu liste (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== ziehen von liste zu liste (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM a AS GUI_WIDGET : a = GUI_LISTBOX(w, 20, 20, 160, 110, ["Apfel", "Birne", "Kirsche"])
+DIM b AS GUI_WIDGET : b = GUI_LISTBOX(w, 240, 20, 160, 110, ["Dattel"])
+GUI_DRAGGABLE(a, TRUE) : GUI_DROP_TARGET(a, TRUE) : GUI_DROP_TARGET(b, TRUE)
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_DROPPED(b) THEN PRINT "B " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX()) + " " + STR$(GUI_DROP_SOURCE() = a)
+    IF GUI_DROPPED(a) THEN PRINT "A " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX())
+    IF GUI_DRAGGING() = a THEN PRINT "Z " + GUI_DROP_TEXT()
+    PRINT "L " + GUI_LISTBOX_ITEM(a, 0) + " " + GUI_LISTBOX_ITEM(a, 2)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 7
+e 3 7 61 54 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 7 121 48 0 0 // Event: test
+e 6 7 181 43 0 0 // Event: test
+e 7 7 241 37 0 0 // Event: test
+e 8 7 301 32 0 0 // Event: test
+e 9 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+Z Birne
+L Apfel Kirsche
+Z Birne
+L Apfel Kirsche
+Z Birne
+L Apfel Kirsche
+Z Birne
+L Apfel Kirsche
+B Birne 1 0 TRUE
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+
+=== ziehen in derselben liste sortiert um (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== ziehen in derselben liste sortiert um (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM a AS GUI_WIDGET : a = GUI_LISTBOX(w, 20, 20, 160, 110, ["Apfel", "Birne", "Kirsche"])
+DIM b AS GUI_WIDGET : b = GUI_LISTBOX(w, 240, 20, 160, 110, ["Dattel"])
+GUI_DRAGGABLE(a, TRUE) : GUI_DROP_TARGET(a, TRUE) : GUI_DROP_TARGET(b, TRUE)
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_DROPPED(b) THEN PRINT "B " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX()) + " " + STR$(GUI_DROP_SOURCE() = a)
+    IF GUI_DROPPED(a) THEN PRINT "A " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX())
+    IF GUI_DRAGGING() = a THEN PRINT "Z " + GUI_DROP_TEXT()
+    PRINT "L " + GUI_LISTBOX_ITEM(a, 0) + " " + GUI_LISTBOX_ITEM(a, 2)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 7
+e 3 7 61 32 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 7 61 43 0 0 // Event: test
+e 6 7 61 54 0 0 // Event: test
+e 7 7 61 65 0 0 // Event: test
+e 8 7 61 76 0 0 // Event: test
+e 9 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=17
+--- erwartet
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+A Apfel 0 2
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+L Birne Apfel
+
+=== ein klick ohne bewegung ist kein zug (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== ein klick ohne bewegung ist kein zug (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM a AS GUI_WIDGET : a = GUI_LISTBOX(w, 20, 20, 160, 110, ["Apfel", "Birne", "Kirsche"])
+DIM b AS GUI_WIDGET : b = GUI_LISTBOX(w, 240, 20, 160, 110, ["Dattel"])
+GUI_DRAGGABLE(a, TRUE) : GUI_DROP_TARGET(a, TRUE) : GUI_DROP_TARGET(b, TRUE)
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_DROPPED(b) THEN PRINT "B " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX()) + " " + STR$(GUI_DROP_SOURCE() = a)
+    IF GUI_DROPPED(a) THEN PRINT "A " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX())
+    IF GUI_DRAGGING() = a THEN PRINT "Z " + GUI_DROP_TEXT()
+    PRINT "L " + GUI_LISTBOX_ITEM(a, 0) + " " + GUI_LISTBOX_ITEM(a, 2)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 3
+e 3 7 61 32 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 6 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=13
+--- erwartet
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+
+=== losgelassen neben einer ablage verpufft (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 1 1
+O 1 1
+
+=== losgelassen neben einer ablage verpufft (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM a AS GUI_WIDGET : a = GUI_LISTBOX(w, 20, 20, 160, 110, ["Apfel", "Birne", "Kirsche"])
+DIM b AS GUI_WIDGET : b = GUI_LISTBOX(w, 240, 20, 160, 110, ["Dattel"])
+GUI_DRAGGABLE(a, TRUE) : GUI_DROP_TARGET(a, TRUE) : GUI_DROP_TARGET(b, TRUE)
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF GUI_DROPPED(b) THEN PRINT "B " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX()) + " " + STR$(GUI_DROP_SOURCE() = a)
+    IF GUI_DROPPED(a) THEN PRINT "A " + GUI_DROP_TEXT() + " " + STR$(GUI_DRAG_INDEX()) + " " + STR$(GUI_DROP_INDEX())
+    IF GUI_DRAGGING() = a THEN PRINT "Z " + GUI_DROP_TEXT()
+    PRINT "L " + GUI_LISTBOX_ITEM(a, 0) + " " + GUI_LISTBOX_ITEM(a, 2)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 7
+e 3 7 61 32 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 7 96 99 0 0 // Event: test
+e 6 7 131 166 0 0 // Event: test
+e 7 7 166 233 0 0 // Event: test
+e 8 7 201 301 0 0 // Event: test
+e 9 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=15
+--- erwartet
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+Z Apfel
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+L Apfel Kirsche
+
+=== ziehen ueberlebt die datei
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM a AS GUI_WIDGET : a = GUI_LISTBOX(w, 20, 20, 160, 110, ["Apfel", "Birne", "Kirsche"])
+DIM b AS GUI_WIDGET : b = GUI_LISTBOX(w, 240, 20, 160, 110, ["Dattel"])
+GUI_DRAGGABLE(a, TRUE) : GUI_DROP_TARGET(a, TRUE) : GUI_DROP_TARGET(b, TRUE)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j ; " " ; INSTR(j, "draggable") >= 0 ; " " ; INSTR(j, "drop_target") >= 0
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE TRUE TRUE
+

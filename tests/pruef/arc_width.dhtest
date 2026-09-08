@@ -1,0 +1,18 @@
+' Aus test_arc_width.py uebertragen (1 Faelle, von Hand 2026-09-08 -- Pixelproben als `--- bild`). Format: docs/werkzeuge.md, dhrt test.
+
+=== arc width makes stroke thicker
+' Zwei gleiche Viertelkreise (Radius 50): links duenn, rechts mit Breite 10. Auf der
+' Kurve (Radius 50, t = PI/4) sind beide sichtbar; 4 px nach innen (Radius 46) trifft
+' nur der dicke Strich -- das ist der eigentliche Breiten-Beweis. Magenta = r > 180, g < 80, b > 180.
+SCREEN(320, 240)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    ARC(40, 40, 140, 140, 0.0, 1.5707963, RGB(255, 0, 255))
+    ARC(200, 40, 300, 140, 0.0, 1.5707963, RGB(255, 0, 255), 10)
+    FLIP()
+WEND
+--- bild
+125 55 #FF00FF +-80
+285 55 #FF00FF +-80
+123 58 nicht #FF00FF +-80
+283 58 #FF00FF +-80

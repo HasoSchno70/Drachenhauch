@@ -1,0 +1,147 @@
+' Aus test_gebundene_methoden_gui.py uebertragen (3 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== gui speichert gebundenen handler nicht
+' Eine gebundene Methode kann in keiner `.dhform` stehen: beim Laden gibt
+IMPORT "gui"
+CLASS S
+    SUB klick()
+    END SUB
+END CLASS
+SUB frei()
+END SUB
+SCREEN(320, 200)
+DIM s AS S
+s = NEW S()
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 200, 100)
+DIM a AS GUI_WIDGET
+a = GUI_BUTTON(w, "gebunden", 10, 10, 80, 24)
+GUI_ON_CLICK(a, s.klick)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "frei", 10, 40, 80, 24)
+GUI_ON_CLICK(b, frei)
+PRINT GUI_TO_JSON(w)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+{
+  "title": "T",
+  "x": 10,
+  "y": 10,
+  "w": 200,
+  "h": 100,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": false,
+  "chrome": true,
+  "min_w": 0,
+  "min_h": 0,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "button",
+      "x": 10,
+      "y": 10,
+      "w": 80,
+      "h": 24,
+      "text": "gebunden",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true
+    },
+    {
+      "kind": "button",
+      "x": 10,
+      "y": 40,
+      "w": 80,
+      "h": 24,
+      "text": "frei",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "on_click": "frei"
+    }
+  ],
+  "menus": [],
+  "tabs": [],
+  "active_tab": 0,
+  "default_button": -1,
+  "cancel_button": -1
+}
+
+=== gui klick ruft gebundene methode (1)
+' Der Kern: ein Knopf ruft eine Methode AUF EINER INSTANZ.
+IMPORT "gui"
+SCREEN(320, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 200, 100)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
+
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM fertig AS BOOLEAN
+FOR y = 0 TO 199
+  FOR x = 0 TO 319
+    IF GUI_HIT_TEST(x, y) = b AND NOT fertig THEN
+      PRINT STR$(x + GUI_GET_W(b) / 2); " "; STR$(y + GUI_GET_H(b) / 2)
+      fertig = TRUE
+    END IF
+  NEXT
+NEXT
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+60 54
+
+=== gui klick ruft gebundene methode (2)
+' Der Kern: ein Knopf ruft eine Methode AUF EINER INSTANZ.
+IMPORT "gui"
+SCREEN(320, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+CLASS Steuerung
+    DIM zahl AS INTEGER
+    SUB klick()
+        Self.zahl = Self.zahl + 1
+    END SUB
+END CLASS
+DIM s AS Steuerung
+s = NEW Steuerung()
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 200, 100)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
+
+GUI_ON_CLICK(b, s.klick)
+AUTOMATION_PLAY("klick.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 7
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT s.zahl
+--- datei klick.txt
+# Test-Aufnahme
+c 3
+e 0 7 60 54 0 0 // Event: test
+e 1 6 0 0 0 0 // Event: test
+e 2 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+1
+

@@ -1,0 +1,14 @@
+' Aus test_kontaktbogen.py uebertragen (1 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne umgebungsvariable entsteht nichts
+SCREEN(160, 100, "bogen", 1)
+DIM f AS INTEGER
+FOR f = 0 TO 200
+    CLS(0)
+    BOX(f, 40, f + 8, 48, &HFF0000)
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+

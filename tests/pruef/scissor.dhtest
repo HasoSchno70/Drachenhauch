@@ -1,0 +1,83 @@
+' Aus test_scissor.py uebertragen (6 Faelle, von Hand 2026-09-08 -- Pixelproben als `--- bild`). Format: docs/werkzeuge.md, dhrt test.
+' Die Pixelproben sind so weit wie im pytest-Test: gruen heisst g > 180, r < 80, b < 80,
+' hier als #00FF00 +-80 (Kantenglaettung und Treiber runden verschieden).
+
+=== ausserhalb wird abgeschnitten
+' Ein Kasten von (20,20) bis (220,220), aber nur (50,50)-(150,150) freigegeben.
+SCREEN(320, 240)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    SCISSOR(50, 50, 100, 100)
+    BOX(20, 20, 220, 220, RGB(0, 255, 0))
+    SCISSOR_END()
+    FLIP()
+WEND
+--- bild
+' innerhalb des Clips: gezeichnet
+100 100 #00FF00 +-80
+51 51 #00FF00 +-80
+148 148 #00FF00 +-80
+' ausserhalb: der Kasten reicht dorthin, darf aber nicht sichtbar sein
+30 30 nicht #00FF00 +-80
+200 200 nicht #00FF00 +-80
+100 30 nicht #00FF00 +-80
+
+=== verschachtelte clips schneiden sich
+' Der innere Clip muss mit dem aeusseren GESCHNITTEN werden, nicht ihn ersetzen:
+' aeusserer (50,50)-(150,150), innerer (100,100)-(300,300) -> sichtbar bleibt (100,100)-(150,150).
+SCREEN(320, 240)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    SCISSOR(50, 50, 100, 100)
+    SCISSOR(100, 100, 200, 200)
+    BOX(0, 0, 319, 239, RGB(0, 255, 0))
+    SCISSOR_END()
+    SCISSOR_END()
+    FLIP()
+WEND
+--- bild
+120 120 #00FF00 +-80
+60 60 nicht #00FF00 +-80
+200 200 nicht #00FF00 +-80
+
+=== nach dem ende wieder frei
+SCREEN(320, 240)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    SCISSOR(50, 50, 20, 20)
+    SCISSOR_END()
+    BOX(200, 200, 300, 230, RGB(0, 255, 0))
+    FLIP()
+WEND
+--- bild
+250 215 #00FF00 +-80
+
+=== tiefe wird gezaehlt
+' SCISSOR_DEPTH sagt, wie viele Clips offen sind -- fuer Code, der nicht weiss, ob sein Aufrufer schon einen gesetzt hat.
+SCREEN(64, 48)
+PRINT SCISSOR_DEPTH()
+SCISSOR(0, 0, 10, 10)
+PRINT SCISSOR_DEPTH()
+SCISSOR(0, 0, 5, 5)
+PRINT SCISSOR_DEPTH()
+SCISSOR_END()
+SCISSOR_END()
+PRINT SCISSOR_DEPTH()
+--- erwartet
+0
+1
+2
+0
+
+=== ende ohne anfang ist ein fehler
+' Ein SCISSOR_END zu viel naehme dem umgebenden Code (etwa einem gui-Fenster) seinen Clip weg.
+SCREEN(64, 48)
+SCISSOR_END()
+--- fehler
+kein Clip offen
+
+=== negative masse werden abgelehnt
+SCREEN(64, 48)
+SCISSOR(0, 0, -5, 10)
+--- fehler
+nicht negativ

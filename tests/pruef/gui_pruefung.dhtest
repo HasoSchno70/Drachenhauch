@@ -1,0 +1,256 @@
+' Aus test_gui_pruefung.py uebertragen (7 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== validate prueft alle felder und fokussiert das erste
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+PRINT GUI_VALIDATE(w) ; "|" ; GUI_ERROR(name) ; "|" ; GUI_TEXT(lbl) ; "|" ; GUI_ERROR(plz) ; "|" ; GUI_ERROR(mail) ; "|" ; GUI_ERROR(dd) ; "|" ; GUI_ERROR(cb)
+PRINT GUI_FOCUSED() = name
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2|Der Name fehlt.|Der Name fehlt.||||Bitte zustimmen
+TRUE
+
+=== regeln greifen nacheinander und loesen sich auf
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+GUI_SET_TEXT(name, "A") : GUI_SET_TEXT(plz, "1234") : GUI_SET_TEXT(mail, "x@y") : GUI_DROPDOWN_SET_SELECTED(dd, 1) : GUI_SET_CHECKED(cb, TRUE)
+PRINT GUI_VALIDATE(w) ; "|" ; GUI_ERROR(name) ; "|" ; GUI_ERROR(plz) ; "|" ; GUI_ERROR(mail)
+GUI_SET_TEXT(name, "Anna") : GUI_SET_TEXT(plz, "12345") : GUI_SET_TEXT(mail, "x@y.de")
+PRINT GUI_VALIDATE(w) ; "|" ; GUI_TEXT(lbl) ; "|" ; GUI_ERROR(plz)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3|Bitte 2 bis 40 Zeichen eingeben|PLZ: fuenf Ziffern|Bitte eine gueltige E-Mail-Adresse eingeben
+0||
+
+=== eigene meldung von aussen und zuruecknehmen
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+GUI_SET_ERROR(name, "Nummer schon vergeben")
+PRINT GUI_ERROR(name) ; "|" ; GUI_TEXT(lbl)
+GUI_CLEAR_ERRORS(w)
+PRINT "[" ; GUI_ERROR(name) ; "][" ; GUI_TEXT(lbl) ; "]"
+GUI_SET_TEXT(plz, "12345")
+PRINT "[" ; GUI_VALIDATE_WIDGET(plz) ; "][" ; GUI_VALIDATE_WIDGET(name) ; "]"
+GUI_RULES_CLEAR(name)
+PRINT "[" ; GUI_VALIDATE_WIDGET(name) ; "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+Nummer schon vergeben|Nummer schon vergeben
+[][]
+[][Der Name fehlt.]
+[]
+
+=== zahl bereich und datum
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+DIM menge AS GUI_WIDGET : menge = GUI_TEXTINPUT(w, 10, 210, 100, 28, "")
+GUI_RULE(menge, "ganz") : GUI_RULE(menge, "bereich", 1, 99)
+DIM datum AS GUI_WIDGET : datum = GUI_TEXTINPUT(w, 10, 250, 100, 28, "")
+GUI_RULE(datum, "datum")
+GUI_SET_TEXT(menge, "2,5") : GUI_SET_TEXT(datum, "2026-02-30")
+PRINT GUI_VALIDATE_WIDGET(menge) ; "|" ; GUI_VALIDATE_WIDGET(datum)
+GUI_SET_TEXT(menge, "100") : GUI_SET_TEXT(datum, "2026-02-28")
+PRINT GUI_VALIDATE_WIDGET(menge) ; "|" ; GUI_VALIDATE_WIDGET(datum)
+GUI_SET_TEXT(menge, "99")
+PRINT "[" ; GUI_VALIDATE_WIDGET(menge) ; "]"
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+Bitte eine ganze Zahl eingeben|Bitte ein Datum als JJJJ-MM-TT eingeben
+Bitte einen Wert von 1 bis 99 eingeben|
+[]
+
+=== unsichtbare felder zaehlen nicht
+' Ein Feld auf einem anderen Reiter oder ausgeblendet kann der Nutzer
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+GUI_SET_TEXT(name, "Anna") : GUI_DROPDOWN_SET_SELECTED(dd, 0)
+GUI_SET_VISIBLE(cb, FALSE)
+PRINT GUI_VALIDATE(w)
+GUI_SET_VISIBLE(cb, TRUE)
+PRINT GUI_VALIDATE(w)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0
+1
+
+=== regeln pruefen ihre argumente
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+TRY
+    GUI_RULE(cb, "email")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_RULE(name, "bereich", 5)
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_RULE(name, "muster", "[0-9")
+CATCH e3
+    PRINT e3
+END TRY
+TRY
+    GUI_RULE(name, "farbe")
+CATCH e4
+    PRINT e4
+END TRY
+TRY
+    GUI_ERROR_LABEL(name, plz)
+CATCH e5
+    PRINT e5
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_RULE: an Klappliste und Kaestchen geht nur 'pflicht'
+GUI_RULE: 'bereich' braucht von und bis
+GUI_RULE: ungueltiges Muster '[0-9': error: unclosed character class
+GUI_RULE: 'farbe' ist keine Regel -- pflicht, zahl, ganz, bereich, laenge, email, datum oder muster
+GUI_ERROR_LABEL: das zweite Widget muss eine Beschriftung sein
+
+=== regeln ueberleben die datei
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM name AS GUI_WIDGET : name = GUI_TEXTINPUT(w, 10, 10, 200, 28, "Name")
+DIM plz AS GUI_WIDGET : plz = GUI_TEXTINPUT(w, 10, 50, 200, 28, "PLZ")
+DIM mail AS GUI_WIDGET : mail = GUI_TEXTINPUT(w, 10, 90, 200, 28, "")
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(w, "", 220, 10)
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 10, 130, 200, 28, ["a", "b"])
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "AGB", 10, 170)
+GUI_RULE(name, "pflicht", "Der Name fehlt.")
+GUI_RULE(name, "laenge", 2, 40)
+GUI_RULE(plz, "muster", "[0-9]{5}", "PLZ: fuenf Ziffern")
+GUI_RULE(mail, "email")
+GUI_RULE(dd, "pflicht", "Bitte waehlen")
+GUI_RULE(cb, "pflicht", "Bitte zustimmen")
+GUI_ERROR_LABEL(name, lbl)
+GUI_UPDATE()
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j ; " " ; INSTR(j, "rules") >= 0 ; " " ; INSTR(j, "error_label") >= 0
+PRINT GUI_VALIDATE(w2)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE TRUE TRUE
+2
+

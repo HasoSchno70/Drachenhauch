@@ -1,0 +1,189 @@
+' Aus test_gui_clicked_schalter.py uebertragen (4 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== gui clicked meldet ein kaestchen
+' Das Kaestchen sitzt bei (20,20) im Fenster (10,10) -- die Titelleiste
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 200)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "an", 20, 20, FALSE)
+DIM tg AS GUI_WIDGET : tg = GUI_TOGGLE(w, "kipp", 20, 60, FALSE)
+DIM r1 AS GUI_WIDGET : r1 = GUI_RADIO(w, "g", "eins", 20, 100)
+DIM r2 AS GUI_WIDGET : r2 = GUI_RADIO(w, "g", "zwei", 20, 130)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(cb) THEN n = n + 1
+    PRINT "K " + STR$(n) + " " + STR$(GUI_CHECKED(cb))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 7 36 62 0 0 // Event: test
+e 2 7 36 62 0 0 // Event: test
+e 2 6 0 0 0 0 // Event: test
+e 3 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+K 0 FALSE
+K 0 FALSE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+
+=== gui clicked meldet einen kippschalter
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 200)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "an", 20, 20, FALSE)
+DIM tg AS GUI_WIDGET : tg = GUI_TOGGLE(w, "kipp", 20, 60, FALSE)
+DIM r1 AS GUI_WIDGET : r1 = GUI_RADIO(w, "g", "eins", 20, 100)
+DIM r2 AS GUI_WIDGET : r2 = GUI_RADIO(w, "g", "zwei", 20, 130)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(tg) THEN n = n + 1
+    PRINT "K " + STR$(n) + " " + STR$(GUI_CHECKED(tg))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 7 36 102 0 0 // Event: test
+e 2 7 36 102 0 0 // Event: test
+e 2 6 0 0 0 0 // Event: test
+e 3 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+K 0 FALSE
+K 0 FALSE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+
+=== gui clicked meldet einen radioknopf
+' Und nur beim WECHSEL: ein zweiter Klick auf den schon gewaehlten
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 200)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "an", 20, 20, FALSE)
+DIM tg AS GUI_WIDGET : tg = GUI_TOGGLE(w, "kipp", 20, 60, FALSE)
+DIM r1 AS GUI_WIDGET : r1 = GUI_RADIO(w, "g", "eins", 20, 100)
+DIM r2 AS GUI_WIDGET : r2 = GUI_RADIO(w, "g", "zwei", 20, 130)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(r2) THEN n = n + 1
+    PRINT "K " + STR$(n) + " " + STR$(GUI_CHECKED(r2))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 7 36 172 0 0 // Event: test
+e 2 7 36 172 0 0 // Event: test
+e 2 6 0 0 0 0 // Event: test
+e 3 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+K 0 FALSE
+K 0 FALSE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+K 1 TRUE
+
+=== daneben geklickt meldet nichts
+' Die Gegenprobe: ohne Treffer bleibt der Zaehler bei 0 -- sonst
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 200)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "an", 20, 20, FALSE)
+DIM tg AS GUI_WIDGET : tg = GUI_TOGGLE(w, "kipp", 20, 60, FALSE)
+DIM r1 AS GUI_WIDGET : r1 = GUI_RADIO(w, "g", "eins", 20, 100)
+DIM r2 AS GUI_WIDGET : r2 = GUI_RADIO(w, "g", "zwei", 20, 130)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(cb) THEN n = n + 1
+    PRINT "K " + STR$(n) + " " + STR$(GUI_CHECKED(cb))
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 7 250 200 0 0 // Event: test
+e 2 7 250 200 0 0 // Event: test
+e 2 6 0 0 0 0 // Event: test
+e 3 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+K 0 FALSE
+

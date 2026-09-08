@@ -65,6 +65,143 @@ pub struct Fall {
     /// fuer DIRLIST, RMDIR und alles, was Ordner sehen will.
     pub verzeichnisse: Vec<String>,
     pub umgebung: Vec<(String, String)>,
+    /// `--- bild [datei]`: Punktproben an einem Bild -- ohne Namen am
+    /// Bildschirmfoto nach dem Lauf (der Laeufer setzt DHRT_SCREENSHOT und,
+    /// falls die Umgebung keins nennt, DHRT_FRAMES=2), mit Namen an einer
+    /// Datei, die das Programm selbst geschrieben hat.
+    pub bild: Option<BildPruefung>,
+}
+
+/// Was `--- bild` an einem Bild pruefen soll.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct BildPruefung {
+    pub datei: Option<String>,
+    pub proben: Vec<Probe>,
+}
+
+/// Eine Zeile im `--- bild`-Block.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Probe {
+    /// `groesse B H`
+    Groesse(u32, u32),
+    /// `X Y #RRGGBB [+-N]` bzw. `X Y nicht #RRGGBB [+-N]` -- jeder Kanal darf
+    /// um N abweichen (Kantenglaettung und Treiber runden verschieden).
+    Farbe { x: u32, y: u32, rgb: [u8; 3], toleranz: u8, nicht: bool },
+    /// `X Y = X2 Y2` bzw. `X Y <> X2 Y2` -- zwei Punkte gegeneinander, wenn
+    /// die absolute Farbe egal ist (eine Kante ist da oder nicht).
+    Vergleich { x: u32, y: u32, x2: u32, y2: u32, gleich: bool },
+}
+
+/// Ein dekodiertes Bild, zeilenweise RGB -- wie es der Laeufer aus der
+/// PNG liest. Ohne raylib gibt es hier nichts zu dekodieren, deshalb ist die
+/// Struktur schlicht und der Leser steht in main.rs hinter dem Grafik-Feature.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Bild {
+    pub breite: u32,
+    pub hoehe: u32,
+    pub pixel: Vec<[u8; 3]>,
+}
+
+impl Bild {
+    fn punkt(&self, x: u32, y: u32) -> Result<[u8; 3], String> {
+        if x >= self.breite || y >= self.hoehe {
+            return Err(format!("Punkt ({}, {}) liegt ausserhalb des Bildes ({}x{})", x, y, self.breite, self.hoehe));
+        }
+        Ok(self.pixel[(y * self.breite + x) as usize])
+    }
+}
+
+fn hex_farbe(wort: &str) -> Result<[u8; 3], String> {
+    let h = wort.strip_prefix('#').ok_or_else(|| format!("Farbe '{}' muss mit # beginnen (#RRGGBB oder #RGB)", wort))?;
+    let voll: String = match h.len() {
+        6 => h.to_string(),
+        3 => h.chars().flat_map(|c| [c, c]).collect(),
+        _ => return Err(format!("Farbe '{}' muss #RRGGBB oder #RGB sein", wort)),
+    };
+    let n = u32::from_str_radix(&voll, 16).map_err(|_| format!("Farbe '{}' ist kein Hexwert", wort))?;
+    Ok([(n >> 16) as u8, (n >> 8) as u8, n as u8])
+}
+
+fn zahl(wort: &str, was: &str) -> Result<u32, String> {
+    wort.parse::<u32>().map_err(|_| format!("{} '{}' ist keine ganze Zahl", was, wort))
+}
+
+/// Eine Zeile des `--- bild`-Blocks lesen.
+pub fn probe_parsen(zeile: &str) -> Result<Probe, String> {
+    let w: Vec<&str> = zeile.split_whitespace().collect();
+    match w.as_slice() {
+        ["groesse", b, h] => Ok(Probe::Groesse(zahl(b, "Breite")?, zahl(h, "Hoehe")?)),
+        [x, y, "=", x2, y2] | [x, y, "<>", x2, y2] => Ok(Probe::Vergleich {
+            x: zahl(x, "x")?, y: zahl(y, "y")?, x2: zahl(x2, "x2")?, y2: zahl(y2, "y2")?, gleich: w[2] == "=",
+        }),
+        [x, y, rest @ ..] if !rest.is_empty() => {
+            let (nicht, rest) = match rest {
+                ["nicht", r @ ..] => (true, r),
+                r => (false, r),
+            };
+            let (farbe, toleranz) = match rest {
+                [f] => (hex_farbe(f)?, 0),
+                [f, t] => {
+                    let t = t.strip_prefix("+-").ok_or_else(|| format!("Toleranz '{}' schreibt man +-N", t))?;
+                    (hex_farbe(f)?, zahl(t, "Toleranz")?.min(255) as u8)
+                }
+                _ => return Err(format!("Probe '{}' nicht verstanden", zeile.trim())),
+            };
+            Ok(Probe::Farbe { x: zahl(x, "x")?, y: zahl(y, "y")?, rgb: farbe, toleranz, nicht })
+        }
+        _ => Err(format!("Probe '{}' nicht verstanden (groesse B H | X Y [nicht] #RRGGBB [+-N] | X Y = X2 Y2 | X Y <> X2 Y2)", zeile.trim())),
+    }
+}
+
+fn farbe_text(c: [u8; 3]) -> String { format!("#{:02X}{:02X}{:02X}", c[0], c[1], c[2]) }
+
+fn nah(a: [u8; 3], b: [u8; 3], toleranz: u8) -> bool {
+    (0..3).all(|i| (a[i] as i32 - b[i] as i32).abs() <= toleranz as i32)
+}
+
+/// raylib schreibt seine eigenen Meldungen auf stdout -- etwa `WARNING:
+/// AUTOMATION: ...` beim Abspielen einer Aufnahmedatei, und der Wortlaut
+/// haengt an der Datei und an der raylib-Fassung. Sie sind nicht die Ausgabe
+/// des Programms und zaehlen fuer `--- erwartet`/`--- enthaelt` nicht (die
+/// pytest-Tests filterten dieselben Praefixe).
+pub fn ohne_logzeilen(stdout: &str) -> String {
+    const PRAEFIXE: [&str; 4] = ["INFO: ", "WARNING: ", "TRACE: ", "DEBUG: "];
+    stdout.lines()
+        .filter(|z| !PRAEFIXE.iter().any(|p| z.starts_with(p)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Alle Proben gegen das Bild; die erste, die nicht passt, ist die Meldung.
+pub fn bild_pruefen(p: &BildPruefung, b: &Bild) -> Result<(), String> {
+    for probe in &p.proben {
+        match probe {
+            Probe::Groesse(bw, bh) => {
+                if (b.breite, b.hoehe) != (*bw, *bh) {
+                    return Err(format!("Bild ist {}x{}, erwartet {}x{}", b.breite, b.hoehe, bw, bh));
+                }
+            }
+            Probe::Farbe { x, y, rgb, toleranz, nicht } => {
+                let ist = b.punkt(*x, *y)?;
+                let trifft = nah(ist, *rgb, *toleranz);
+                if trifft == *nicht {
+                    let tol = if *toleranz > 0 { format!(" +-{}", toleranz) } else { String::new() };
+                    return Err(if *nicht {
+                        format!("Punkt ({}, {}) ist {} -- sollte nicht {}{} sein", x, y, farbe_text(ist), farbe_text(*rgb), tol)
+                    } else {
+                        format!("Punkt ({}, {}) ist {}, erwartet {}{}", x, y, farbe_text(ist), farbe_text(*rgb), tol)
+                    });
+                }
+            }
+            Probe::Vergleich { x, y, x2, y2, gleich } => {
+                let (a, c) = (b.punkt(*x, *y)?, b.punkt(*x2, *y2)?);
+                if (a == c) != *gleich {
+                    return Err(format!("Punkt ({}, {}) ist {}, Punkt ({}, {}) ist {} -- erwartet {}", x, y, farbe_text(a), x2, y2, farbe_text(c), if *gleich { "gleich" } else { "verschieden" }));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Was ein Lauf ergeben hat.
@@ -87,7 +224,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild }
 
 /// Eine Sammlung aus ihrem Text lesen.
 pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
@@ -126,6 +263,12 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                 f.dateien.push((datei_name.to_string(), bytes));
             }
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
+            Abschnitt::Bild => {
+                let bp = f.bild.get_or_insert_with(BildPruefung::default);
+                for z in puffer.iter().map(|z| z.trim()).filter(|z| !z.is_empty() && !z.starts_with('\'')) {
+                    bp.proben.push(probe_parsen(z).map_err(|e| format!("Fall '{}', --- bild: {}", f.name, e))?);
+                }
+            }
             Abschnitt::Umgebung => {
                 for z in puffer.iter().filter(|z| !z.trim().is_empty()) {
                     if let Some((k, v)) = z.split_once('=') {
@@ -187,7 +330,12 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                     f.verzeichnisse.push(arg.to_string());
                     Abschnitt::Verzeichnis
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung)", nr + 1, other)),
+                "bild" => {
+                    if f.bild.is_some() { return Err(format!("Zeile {}: '--- bild' gibt es in diesem Fall schon", nr + 1)); }
+                    f.bild = Some(BildPruefung { datei: if arg.is_empty() { None } else { Some(arg.to_string()) }, proben: Vec::new() });
+                    Abschnitt::Bild
+                }
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild)", nr + 1, other)),
             };
             continue;
         }
@@ -269,7 +417,7 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
             return Ergebnis::Uebersprungen("Build ohne Grafik".into());
         }
     }
-    let out = glatt(stdout);
+    let out = glatt(&ohne_logzeilen(stdout));
     if let Some(muster) = &fall.fehler {
         if code == 0 {
             return Ergebnis::Fehl("ein Fehler war erwartet, das Programm lief durch".into());
@@ -319,6 +467,48 @@ mod tests {
         let v = parsen("=== a\nPRINT 1\n--- verzeichnis leer/tief\n--- erwartet\n1\n").unwrap();
         assert_eq!(v[0].verzeichnisse, vec!["leer/tief".to_string()]);
         assert_eq!(v[0].erwartet.as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn raylib_meldungen_zaehlen_nicht_als_ausgabe() {
+        let f = parsen("=== a\nPRINT 1\n--- erwartet\n1\n2\n").unwrap();
+        let out = "WARNING: AUTOMATION: [ev.txt] Issue reading line to buffer\n1\nINFO: IMAGE: Data loaded successfully\n2\n";
+        assert_eq!(bewerten(&f[0], 0, out, "", false), Ergebnis::Ok);
+        assert_eq!(ohne_logzeilen("a\nTRACE: x\nb"), "a\nb");
+        // Eine Leerzeile am Ende eines datei-Blocks ist der Endumbruch der Datei.
+        let f = parsen("=== a\nPRINT 1\n--- datei ev.txt\nc 1\n\n--- erwartet\n1\n").unwrap();
+        assert_eq!(f[0].dateien[0].1, b"c 1\n".to_vec());
+        let f = parsen("=== a\nPRINT 1\n--- datei ev.txt\nc 1\n--- erwartet\n1\n").unwrap();
+        assert_eq!(f[0].dateien[0].1, b"c 1".to_vec());
+    }
+
+    #[test]
+    fn bildproben_lesen_und_pruefen() {
+        let f = parsen("=== a\nSCREEN(4, 4)\n--- bild\ngroesse 4 4\n1 1 #FF0000\n2 2 nicht #F00\n0 0 #102030 +-16\n1 1 <> 0 0\n' Kommentar\n1 1 = 1 1\n").unwrap();
+        let bp = f[0].bild.as_ref().unwrap();
+        assert_eq!(bp.datei, None);
+        assert_eq!(bp.proben.len(), 6);
+        assert_eq!(bp.proben[1], Probe::Farbe { x: 1, y: 1, rgb: [255, 0, 0], toleranz: 0, nicht: false });
+        assert_eq!(bp.proben[2], Probe::Farbe { x: 2, y: 2, rgb: [255, 0, 0], toleranz: 0, nicht: true });
+        assert_eq!(bp.proben[3], Probe::Farbe { x: 0, y: 0, rgb: [16, 32, 48], toleranz: 16, nicht: false });
+        // 4x4: (1,1) rot, sonst (20,40,60)
+        let mut px = vec![[20u8, 40, 60]; 16];
+        px[5] = [255, 0, 0];
+        let b = Bild { breite: 4, hoehe: 4, pixel: px };
+        assert_eq!(bild_pruefen(bp, &b), Ok(()));
+        // Toleranz ueberschritten: (0,0) ist (20,40,60), erwartet (16,32,48) +-8 -> Blau weicht um 12 ab
+        let eng = BildPruefung { datei: None, proben: vec![probe_parsen("0 0 #102030 +-8").unwrap()] };
+        assert!(bild_pruefen(&eng, &b).unwrap_err().contains("erwartet #102030 +-8"));
+        let nicht = BildPruefung { datei: None, proben: vec![probe_parsen("1 1 nicht #FF0000").unwrap()] };
+        assert!(bild_pruefen(&nicht, &b).unwrap_err().contains("sollte nicht"));
+        let raus = BildPruefung { datei: None, proben: vec![probe_parsen("9 0 #000000").unwrap()] };
+        assert!(bild_pruefen(&raus, &b).unwrap_err().contains("ausserhalb"));
+        let gr = BildPruefung { datei: None, proben: vec![Probe::Groesse(5, 4)] };
+        assert!(bild_pruefen(&gr, &b).unwrap_err().contains("erwartet 5x4"));
+        // Datei statt Bildschirmfoto, und Fehler im Block sind Dateifehler
+        assert_eq!(parsen("=== a\nPRINT 1\n--- bild out.png\n0 0 #000\n").unwrap()[0].bild.as_ref().unwrap().datei.as_deref(), Some("out.png"));
+        assert!(parsen("=== a\nPRINT 1\n--- bild\n0 0 rot\n").unwrap_err().contains("muss mit #"));
+        assert!(parsen("=== a\nPRINT 1\n--- bild\nirgendwas\n").unwrap_err().contains("nicht verstanden"));
     }
 
     #[test]

@@ -1,0 +1,175 @@
+' Aus test_image_rotate_exakt.py uebertragen (6 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== cw sortiert die punkte nur um
+' Rechtsdrehung: die linke obere Ecke wandert nach rechts oben, und die
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+zeig(IMAGE_ROTATE_CW(b))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2x4
+141414 FF0000
+141414 141414
+141414 141414
+FF FF00
+
+=== ccw dreht in die andere richtung
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+zeig(IMAGE_ROTATE_CCW(b))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2x4
+FF00 FF
+141414 141414
+141414 141414
+FF0000 141414
+
+=== vier vierteldrehungen geben das original
+' Die schaerfste Zusage: verlustfrei. Wer irgendwo neu abtastet, kommt
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+zeig(IMAGE_ROTATE_CW(IMAGE_ROTATE_CW(IMAGE_ROTATE_CW(IMAGE_ROTATE_CW(b)))))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+4x2
+FF0000 141414 141414 FF00
+141414 141414 141414 FF
+
+=== cw und ccw heben sich auf
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+zeig(IMAGE_ROTATE_CCW(IMAGE_ROTATE_CW(b)))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+4x2
+FF0000 141414 141414 FF00
+141414 141414 141414 FF
+
+=== image rotate verliert die punkte
+' Die Gegenprobe, und der Grund fuer die beiden neuen Befehle:
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+zeig(IMAGE_ROTATE(b, 90.0))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2x4
+0 141414
+0 141414
+0 141414
+0 FE
+
+=== das quellbild bleibt unberuehrt
+' imgfx ist unveraenderlich -- eine Drehung liefert ein NEUES Bild.
+IMPORT "imgfx"
+DIM b AS IMAGE : b = IMAGE_NEW(4, 2, RGB(20, 20, 20))
+IMAGE_DRAW_RECT(b, 0, 0, 1, 1, RGB(255, 0, 0))
+IMAGE_DRAW_RECT(b, 3, 0, 1, 1, RGB(0, 255, 0))
+IMAGE_DRAW_RECT(b, 3, 1, 1, 1, RGB(0, 0, 255))
+
+SUB zeig(i AS IMAGE)
+    PRINT IMAGEWIDTH(i); "x"; IMAGEHEIGHT(i)
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(i) - 1
+        DIM z AS STRING : z = ""
+        DIM x AS INTEGER
+        FOR x = 0 TO IMAGEWIDTH(i) - 1
+            z = z + IIF(x = 0, "", " ") + HEX$(GETPIXEL(i, x, y))
+        NEXT
+        PRINT z
+    NEXT
+END SUB
+DIM r AS IMAGE : r = IMAGE_ROTATE_CW(b)
+zeig(b)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+4x2
+FF0000 141414 141414 FF00
+141414 141414 141414 FF
+

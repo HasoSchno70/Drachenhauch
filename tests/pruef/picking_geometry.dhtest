@@ -1,0 +1,120 @@
+' Aus test_picking_geometry.py uebertragen (12 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== ray hits triangle in front
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_TRI(0.0,0.0,5.0, 0.0,0.0,-1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+5.0
+
+=== unnormalized direction still yields world distance
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_TRI(0.0,0.0,5.0, 0.0,0.0,-2.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+5.0
+
+=== triangle miss and behind the origin
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_TRI(5.0,0.0,5.0, 0.0,0.0,-1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+PRINT RAY_HIT_TRI(0.0,0.0,5.0, 0.0,0.0,1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+PRINT RAY_HIT_TRI(0.0,0.0,5.0, 0.0,0.0,0.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+-1.0
+-1.0
+-1.0
+
+=== triangle is hit from the back too
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_TRI(0.0,0.0,-5.0, 0.0,0.0,1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 0.0,1.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+5.0
+
+=== quad covers both of its triangles
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_QUAD(-0.9,-0.9,5.0, 0.0,0.0,-1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 1.0,1.0,0.0, -1.0,1.0,0.0)
+PRINT RAY_HIT_QUAD(0.9,0.9,5.0, 0.0,0.0,-1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 1.0,1.0,0.0, -1.0,1.0,0.0)
+PRINT RAY_HIT_QUAD(1.5,0.0,5.0, 0.0,0.0,-1.0, -1.0,-1.0,0.0, 1.0,-1.0,0.0, 1.0,1.0,0.0, -1.0,1.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+5.0
+5.0
+-1.0
+
+=== pick matches the ray through the mouse position
+SCREEN(160, 120, "Pick", 1)
+CAMERA3D(0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 45.0)
+PRINT PICK_QUAD(-100.0,-100.0,0.0, 100.0,-100.0,0.0, 100.0,100.0,0.0, -100.0,100.0,0.0)
+PRINT RAY_HIT_QUAD(CAMERA3D_X(), CAMERA3D_Y(), CAMERA3D_Z(), SCREEN_TO_WORLD_DIR_X(MOUSEX(), MOUSEY()), SCREEN_TO_WORLD_DIR_Y(MOUSEX(), MOUSEY()), SCREEN_TO_WORLD_DIR_Z(MOUSEX(), MOUSEY()), -100.0,-100.0,0.0, 100.0,-100.0,0.0, 100.0,100.0,0.0, -100.0,100.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+12.151522636413574
+12.151522636413574
+
+=== pick tri reports a hit on a face in view
+SCREEN(160, 120, "Pick", 1)
+CAMERA3D(0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 45.0)
+PRINT PICK_TRI(-100.0,-100.0,0.0, 100.0,-100.0,0.0, 0.0,100.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+12.151522636413574
+
+=== wrong argument count is reported
+SCREEN(160, 120, "Pick", 1)
+PRINT RAY_HIT_TRI(0.0, 0.0, 5.0)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+RAY_HIT_TRI: erwartet 15 Zahlen, erhalten 3
+
+=== spheres overlap
+IMPORT "physics"
+PRINT PHYSICS_SPHERE_SPHERE(0.0,0.0,0.0, 1.0, 1.5,0.0,0.0, 1.0)
+PRINT PHYSICS_SPHERE_SPHERE(0.0,0.0,0.0, 1.0, 3.0,0.0,0.0, 1.0)
+PRINT PHYSICS_SPHERE_SPHERE(0.0,0.0,0.0, 1.0, 2.0,0.0,0.0, 1.0)
+PRINT PHYSICS_SPHERE_SPHERE(0.0,0.0,0.0, 1.0, 0.0,0.0,5.0, 1.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+FALSE
+FALSE
+
+=== distance3
+IMPORT "physics"
+PRINT PHYSICS_DISTANCE3(0.0,0.0,0.0, 1.0,2.0,2.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet ungefaehr
+3.0
+
+=== point in triangle
+IMPORT "physics"
+PRINT PHYSICS_POINT_TRI(1.0, 1.0, 0.0,0.0, 10.0,0.0, 0.0,10.0)
+PRINT PHYSICS_POINT_TRI(9.0, 9.0, 0.0,0.0, 10.0,0.0, 0.0,10.0)
+PRINT PHYSICS_POINT_TRI(1.0, 1.0, 0.0,10.0, 10.0,0.0, 0.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== pure 3d math needs no window
+IMPORT "physics"
+PRINT PHYSICS_SPHERE_SPHERE(0.0,0.0,0.0, 2.0, 1.0,1.0,1.0, 0.5)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+

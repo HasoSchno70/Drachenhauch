@@ -1,0 +1,75 @@
+' Aus test_runtime_font_delta.py uebertragen (7 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== loadfont size applies via setfont
+SCREEN(320, 120, "t")
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
+b = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 60)
+SETFONT(a)
+PRINT TEXT_WIDTH("WIDTH")
+SETFONT(b)
+PRINT TEXT_WIDTH("WIDTH")
+TEXT_SIZE(30)
+PRINT TEXT_WIDTH("WIDTH")
+--- erwartet
+78
+159
+79
+
+=== drawimagepartex runs
+SCREEN(200, 200, "t")
+DIM t AS IMAGE
+t = LOADIMAGE("C:/Programmieren/Python/GameBasic/circuitrunner/assets/tiles.png")
+DRAWIMAGEPARTEX(t, 64, 0, 32, 32, 10, 10, 128, 128)
+PRINT "OK"
+--- erwartet
+OK
+
+=== delta fixed step headless
+SCREEN(160, 100, "t")
+PRINT DELTA()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet ungefaehr
+0.016666666666666666
+
+=== umlaute mit geladenem font
+SCREEN(320, 120, "t")
+DIM f AS INTEGER
+f = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
+SETFONT(f)
+PRINT TEXT_WIDTH("äöü")
+PRINT TEXT_WIDTH("???")
+--- erwartet
+41
+36
+
+=== umlaute mit eingebauter schrift
+' Ohne eigenen Font springt der Ausweich-Font ein. Auf einem System
+SCREEN(320, 120, "t")
+PRINT TEXT_WIDTH("äöü")
+PRINT TEXT_WIDTH("???")
+--- erwartet
+24
+40
+
+=== reiner ascii text misst wie die eingebaute schrift
+' Der Ausweich-Font darf nur bei Nicht-ASCII greifen: sonst saehe jedes
+SCREEN(320, 120, "t")
+TEXT_SIZE(20)
+PRINT TEXT_WIDTH("IIIIIIIIII")
+PRINT TEXT_WIDTH("HALLO WELT")
+--- erwartet
+78
+130
+
+=== font laden schreibt nicht nach stdout
+' raylib zaehlt beim Laden die gefundenen Glyphen und meldet fehlende
+SCREEN(320, 120, "t")
+DIM f AS INTEGER
+f = LOADFONT("C:/Programmieren/Python/GameBasic/circuitrunner/assets/font.ttf", 30)
+PRINT "OK"
+--- erwartet
+OK
+

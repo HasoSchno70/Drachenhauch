@@ -1,0 +1,71 @@
+' Aus test_image_scale_nn.py uebertragen (4 Faelle, von Hand 2026-09-08 -- Pixelproben als `--- bild`). Format: docs/werkzeuge.md, dhrt test.
+' 2x2-Schachbrett (links oben rot, rechts oben blau) auf 64x64: IMAGE_SCALE_NN haelt harte
+' Kanten, IMAGE_SCALE mischt -- gemessen an einem Punkt dicht an der Blockgrenze (Quelltexel-
+' Mitten liegen bei 16 und 48).
+
+=== nearest neighbour keeps hard edges
+IMPORT "imgfx"
+SCREEN(128, 128, "NN", 1)
+DIM src AS IMAGE
+src = GENTEX_CHECKED(2, 2, 1, 1, &HFF0000, &H0000FF)
+DIM big AS IMAGE
+big = IMAGE_SCALE_NN(src, 64, 64)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAWIMAGE(big, 0, 0)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+24 10 #FF0000
+31 10 #FF0000
+40 10 #0000FF
+
+=== bilinear scale blends the same pixel
+' Gegenprobe: derselbe Punkt traegt mit IMAGE_SCALE eine MISCHFARBE -- weder rein rot noch rein blau.
+' Ohne sie waere nicht belegt, dass der Fall oben ueberhaupt etwas unterscheidet.
+IMPORT "imgfx"
+SCREEN(128, 128, "BI", 1)
+DIM src AS IMAGE
+src = GENTEX_CHECKED(2, 2, 1, 1, &HFF0000, &H0000FF)
+DIM big AS IMAGE
+big = IMAGE_SCALE(src, 64, 64)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    DRAWIMAGE(big, 0, 0)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+31 10 nicht #FF0000
+31 10 nicht #0000FF
+
+=== original stays untouched
+' imgfx ist immutable: das Quellbild behaelt seine Groesse.
+IMPORT "imgfx"
+SCREEN(64, 64, "U", 1)
+DIM src AS IMAGE
+src = GENTEX_CHECKED(2, 2, 1, 1, &HFF0000, &H0000FF)
+DIM big AS IMAGE
+big = IMAGE_SCALE_NN(src, 32, 32)
+PRINT IMAGEWIDTH(src)
+PRINT IMAGEWIDTH(big)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2
+32
+
+=== zero size is rejected
+IMPORT "imgfx"
+SCREEN(64, 64, "E", 1)
+DIM src AS IMAGE
+src = GENTEX_CHECKED(2, 2, 1, 1, &HFF0000, &H0000FF)
+DIM big AS IMAGE
+big = IMAGE_SCALE_NN(src, 0, 16)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+IMAGE_SCALE_NN
