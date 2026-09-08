@@ -1,4 +1,4 @@
-' Aus test_os_builtins.py uebertragen (12 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Aus test_os_builtins.py uebertragen (23 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
 === argc ohne argumente ist null
 PRINT ARGC()
@@ -75,4 +75,102 @@ PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo %DH_FUER_KIND%"))
 --- system windows
 --- erwartet
 weitergereicht
+
+=== argumente hinter doppelstrich
+DIM i AS INTEGER
+PRINT ARGC()
+FOR i = 0 TO ARGC() - 1
+    PRINT ARG$(i)
+NEXT
+--- argumente
+eins
+zwei drei
+--- erwartet
+2
+eins
+zwei drei
+
+=== arg ausserhalb liefert leerstring statt fehler
+PRINT "[" + ARG$(5) + "]"
+PRINT "[" + ARG$(-1) + "]"
+--- erwartet
+[]
+[]
+
+=== exit setzt den rueckgabewert
+PRINT "vorher"
+EXIT(3)
+PRINT "nachher"
+--- rueckgabe 3
+--- erwartet
+vorher
+
+=== exit ohne argument ist null
+PRINT "fertig"
+EXIT()
+--- erwartet
+fertig
+
+=== exit meldet keinen laufzeitfehler
+EXIT(2)
+' EXIT laeuft ueber denselben Kanal wie ein Fehler -- der Nutzer darf davon
+--- rueckgabe 2
+--- erwartet
+
+=== try catch faengt exit nicht
+TRY
+    EXIT(4)
+CATCH e
+    PRINT "gefangen"
+END TRY
+PRINT "danach"
+--- rueckgabe 4
+--- erwartet
+
+=== throw exit sentinel bleibt ein normaler fehler
+TRY
+    THROW "__EXIT__"
+CATCH e
+    PRINT "gefangen: " + e
+END TRY
+' Der Signalkanal ist das Flag, nicht der Text -- ein Programm darf sich
+--- erwartet
+gefangen: __EXIT__
+
+=== exit in einer funktion beendet das ganze programm
+SUB abbrechen()
+    EXIT(5)
+END SUB
+PRINT "start"
+abbrechen()
+PRINT "nie"
+--- rueckgabe 5
+--- erwartet
+start
+
+=== eprint geht nach stderr nicht nach stdout
+PRINT "nutzdaten"
+EPRINT("meldung")
+--- stderr
+meldung
+--- erwartet
+nutzdaten
+
+=== eprint stringifiziert wie print
+EPRINT(42)
+EPRINT(TRUE)
+EPRINT(1.5)
+--- stderr
+42
+TRUE
+1.5
+--- erwartet
+
+=== shell out nimmt stderr nicht in die nutzdaten
+PRINT "[" + TRIM$(SHELL_OUT$("cmd", "/c", "echo fehler 1>&2")) + "]"
+--- system windows
+--- stderr
+fehler 
+--- erwartet
+[]
 

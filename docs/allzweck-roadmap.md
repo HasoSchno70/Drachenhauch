@@ -355,7 +355,7 @@ Mitgezogen: der **Python-Parser** (`drachenhauch/parser.py`, `ast_nodes.py`,
 `tokens.py`) — er dient dem Editor/LSP, und `test_rust_parser_parity.py`
 vergleicht beide ASTs Feld für Feld.
 
-Tests: `tests/test_finally.py` (25). Beispiel: `examples/166_aufraeumen.dh`.
+Tests: `tests/pruef/finally.dhtest` (25). Beispiel: `examples/166_aufraeumen.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Try / Catch / Throw".
 
 ## WP G — Vererbung rund machen (✅ ERLEDIGT 2026-08-17)

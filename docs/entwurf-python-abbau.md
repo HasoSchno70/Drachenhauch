@@ -54,7 +54,9 @@
 > als `--- datei name base64`; Grafik-Tests pruefen Punkte am
 > Bildschirmfoto mit `--- bild`, WAV-Dateien mit `--- ton`, und
 > `--- seriell` laesst die Faelle einer Datei nacheinander laufen. Stand
-> 2026-09-08: 149 Sammlungen mit 2362 Faellen, 117 pytest-Dateien weniger.
+> 2026-09-08: 151 Sammlungen mit 2403 Faellen, 118 pytest-Dateien weniger;
+> Standardeingabe, Argumente, Rueckgabewert und stderr gehen ueber
+> `--- eingabe`, `--- argumente`, `--- rueckgabe`, `--- stderr`.
 > Bleiben in pytest: das Dateisystem (Dateizeiten, Gross/Klein je System),
 > Tests mit fremden Umgebungsvariablen oder Zeitwerten, und Tests, die
 > Quelltext, Bauskripte oder fremde Formate mit einem fremden Leser pruefen.

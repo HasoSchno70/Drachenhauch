@@ -1,0 +1,167 @@
+' Aus test_stdin.py uebertragen (11 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== zeilen von der standardeingabe
+DIM f AS FILE
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT UPPER$(z)
+WEND
+--- eingabe
+birne
+apfel
+
+--- erwartet
+BIRNE
+APFEL
+
+=== leere eingabe laeuft null mal
+DIM f AS FILE
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT UPPER$(z)
+WEND
+PRINT "fertig"
+' Der Fall, an dem eine INPUT-Schleife frueher ewig lief.
+--- eingabe
+
+--- erwartet
+fertig
+
+=== letzte zeile ohne zeilenumbruch
+DIM f AS FILE
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT UPPER$(z)
+WEND
+' Was `echo -n` liefert -- die Zeile darf nicht verlorengehen.
+--- eingabe
+eins
+zwei
+--- erwartet
+EINS
+ZWEI
+
+=== alles auf einmal
+DIM f AS FILE
+f = STDIN()
+PRINT LEN(READALL$(f))
+--- eingabe
+abcd
+--- erwartet
+4
+
+=== nichts geht an stdout verloren
+DIM f AS FILE
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT UPPER$(z)
+WEND
+' Der Punkt einer Kette: was das Programm PRINTet, ist die Nutzlast --
+--- eingabe
+a
+b
+c
+
+--- erwartet
+A
+B
+C
+
+=== zweimal holen liefert dasselbe handle
+DIM f AS FILE
+DIM g AS FILE
+f = STDIN()
+g = STDIN()
+PRINT READLINE(f)
+PRINT READLINE(g)
+' Zwei eigene Handles waeren zwei Lesepuffer auf derselben Leitung: das
+--- eingabe
+eins
+zwei
+
+--- erwartet
+eins
+zwei
+
+=== input und stdin lassen sich mischen
+DIM name AS STRING
+DIM f AS FILE
+DIM z AS STRING
+INPUT "Name: ", name
+PRINT "[" + name + "]"
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT "rest: " + z
+WEND
+' Beide haengen am selben prozessweiten Puffer -- sonst verschluckte
+--- eingabe
+Anna
+zeile1
+zeile2
+
+--- erwartet
+Name: [Anna]
+rest: zeile1
+rest: zeile2
+
+=== kodierung gilt auch hier
+DIM f AS FILE
+f = STDIN("cp1252")
+PRINT READLINE(f)
+--- eingabe base64
+R3L832UK
+--- erwartet
+Grüße
+
+=== rohe bytes von der standardeingabe
+DIM f AS FILE
+DIM b AS BUFFER
+f = STDIN()
+b = READ_BYTES(f, 4)
+PRINT BUFFER_TO_HEX$(b)
+' Damit laesst sich auch ein Binaerstrom durchreichen.
+--- eingabe base64
+AQID/w==
+--- erwartet
+010203ff
+
+=== seek sagt warum es nicht geht
+DIM f AS FILE
+f = STDIN()
+SEEK(f, 0)
+--- eingabe
+a
+
+--- rueckgabe 2
+--- fehler
+SEEK: die Standardeingabe laesst sich nicht zurueckspulen -- was gelesen ist, ist gelesen
+
+=== zaehlen wie ein wc
+DIM f AS FILE
+DIM zeilen AS INTEGER
+DIM zeichen AS INTEGER
+DIM z AS STRING
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    zeilen = zeilen + 1
+    zeichen = zeichen + LEN(z)
+WEND
+PRINT STR$(zeilen) + " " + STR$(zeichen)
+' Das Muster, um das es geht: Eingabe verdichten, Ergebnis nach stdout.
+--- eingabe
+abc
+de
+
+--- erwartet
+2 5
+
