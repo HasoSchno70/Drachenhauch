@@ -68,10 +68,13 @@ pub fn spans(src: &str) -> Vec<(usize, usize, Art)> {
         // Zeichen im Text und beenden sie NICHT. Fehlt das schliessende,
         // endet sie am Zeilenende -- beim Tippen ist das der Normalfall,
         // und den Rest der Datei rot zu faerben waere unbrauchbar.
-        if c == '"' {
+        // `!"..."` traegt Escape-Folgen: dort beendet ein `\"` die Kette nicht.
+        if c == '"' || (c == '!' && i + 1 < n && z[i + 1] == '"') {
             let start = i;
-            i += 1;
+            let escapes = c == '!';
+            i += if escapes { 2 } else { 1 };
             while i < n && z[i] != '\n' {
+                if escapes && z[i] == '\\' && i + 1 < n && z[i + 1] != '\n' { i += 2; continue; }
                 if z[i] == '"' {
                     if i + 1 < n && z[i + 1] == '"' { i += 2; continue; }
                     i += 1;

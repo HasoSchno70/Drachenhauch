@@ -19,6 +19,17 @@
           "match": "(?i)\\bREM\\b.*$"
         },
         {
+          "name": "string.quoted.double.escaped.drachenhauch",
+          "begin": "!\"",
+          "end": "\"|$",
+          "patterns": [
+            {
+              "name": "constant.character.escape.drachenhauch",
+              "match": "\"\"|\\\\."
+            }
+          ]
+        },
+        {
           "name": "string.quoted.double.drachenhauch",
           "begin": "\"",
           "end": "\"|$",
