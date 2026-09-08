@@ -51,9 +51,11 @@
 > pytest-Laeufen je Aufruf Quelltext, Ausgabe und Beilagen mit, und nur was
 > beide Male gleich war, wurde ein Fall. Was Zufall, Uhr oder absolute Pfade
 > enthielt, wurde von Hand zu selbstpruefenden Faellen; Binaerbeilagen gehen
-> als `--- datei name base64`. Bleiben in pytest: alles mit Fenster, Ton oder
-> Eingabe (bis `--- bild` da ist), das Dateisystem (Dateizeiten, Gross/Klein
-> je System) und Tests, die Quelltext oder Bauskripte lesen.
+> als `--- datei name base64`; Grafik-Tests pruefen Punkte am
+> Bildschirmfoto mit `--- bild`. Stand 2026-09-08: 96 Sammlungen mit
+> 1729 Faellen. Bleiben in pytest: Ton und Eingabe-Wiedergabe (seriell),
+> das Dateisystem (Dateizeiten, Gross/Klein je System) und Tests, die
+> Quelltext, Bauskripte oder fremde Formate mit einem fremden Leser pruefen.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python
 soll irgendwann ganz wegfallen, sämtlicher Code läuft über Rust — also über

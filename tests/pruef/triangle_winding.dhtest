@@ -1,0 +1,25 @@
+' Aus test_triangle_winding.py uebertragen (1 Faelle, von Hand 2026-09-08 -- Pixelproben als `--- bild`). Format: docs/werkzeuge.md, dhrt test.
+
+=== triangle polygon winding independent
+' CW-Dreieck und CW-Quadrat wurden frueher weggecullt -- beide Umlaufsinne muessen fuellen.
+SCREEN(320, 240)
+DIM cw[8] AS INTEGER
+cw[0] = 40 : cw[1] = 40 : cw[2] = 100 : cw[3] = 40
+cw[4] = 100 : cw[5] = 100 : cw[6] = 40 : cw[7] = 100
+DIM ccw[8] AS INTEGER
+ccw[0] = 200 : ccw[1] = 40 : ccw[2] = 200 : ccw[3] = 100
+ccw[4] = 260 : ccw[5] = 100 : ccw[6] = 260 : ccw[7] = 40
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    TRIANGLE(180, 150, 260, 150, 220, 200, RGB(255, 0, 255))
+    TRIANGLE(20, 150, 60, 200, 100, 150, RGB(255, 0, 255))
+    POLYGON(cw, RGB(255, 0, 255))
+    POLYGON(ccw, RGB(255, 0, 255))
+    FLIP()
+WEND
+--- bild
+' Centroide: CW-Dreieck (220,167), CCW-Dreieck (60,167), CW-Quadrat (70,70), CCW-Quadrat (230,70)
+220 167 #FF00FF +-80
+60 167 #FF00FF +-80
+70 70 #FF00FF +-80
+230 70 #FF00FF +-80

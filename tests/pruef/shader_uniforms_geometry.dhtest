@@ -1,0 +1,159 @@
+' Aus test_shader_uniforms_geometry.py uebertragen (13 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== shader setters reject bad handles (1)
+SCREEN(64, 64, "B", 1)
+DIM st[2] AS FLOAT
+SHADER_SET_TEXTURE(99, "x", 0)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+SHADER_SET_TEXTURE: ungueltiges IMAGE-Handle 0
+
+=== shader setters reject bad handles (2)
+SCREEN(64, 64, "B", 1)
+DIM st[2] AS FLOAT
+SHADER_SET_ARRAY(99, "x", st)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+SHADER_SET_ARRAY: ungueltiges SHADER-Handle
+
+=== unknown uniform name is not an error
+SCREEN(64, 64, "U", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("u.fs")
+DIM st[2] AS FLOAT
+SHADER_SET_ARRAY(sh, "gibtsnicht", st)
+DIM i AS IMAGE
+i = GENTEX_COLOR(4, 4, 255)
+SHADER_SET_TEXTURE(sh, "auchnicht", i)
+PRINT "ok"
+--- datei u.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() { finalColor = texture(texture0, fragTexCoord); }
+
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+ok
+
+=== empty array is rejected
+SCREEN(64, 64, "E", 1)
+DIM sh AS INTEGER
+sh = 0
+DIM st[0] AS FLOAT
+SHADER_SET_ARRAY(sh, "x", st)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+SHADER_SET_ARRAY: Werte-Array ist leer
+
+=== line intersection
+IMPORT "physics"
+PRINT PHYSICS_LINES_HIT(0.0,0.0, 10.0,10.0, 0.0,10.0, 10.0,0.0)
+PRINT PHYSICS_LINES_X(0.0,0.0, 10.0,10.0, 0.0,10.0, 10.0,0.0)
+PRINT PHYSICS_LINES_Y(0.0,0.0, 10.0,10.0, 0.0,10.0, 10.0,0.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+5.0
+5.0
+
+=== parallel and too short lines do not intersect
+IMPORT "physics"
+PRINT PHYSICS_LINES_HIT(0.0,0.0, 10.0,0.0, 0.0,5.0, 10.0,5.0)
+PRINT PHYSICS_LINES_HIT(0.0,0.0, 1.0,1.0, 9.0,10.0, 10.0,9.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+FALSE
+FALSE
+
+=== intersection point is nan without a hit (1)
+IMPORT "physics"
+PRINT ISNAN(PHYSICS_LINES_X(0.0,0.0, 1.0,1.0, 9.0,10.0, 10.0,9.0))
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+Builtin 'ISNAN' im Rust-Kern noch nicht verfuegbar
+
+=== intersection point is nan without a hit (2)
+IMPORT "physics"
+PRINT PHYSICS_LINES_X(0.0,0.0, 1.0,1.0, 9.0,10.0, 10.0,9.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+nan
+
+=== point on line respects thickness
+IMPORT "physics"
+PRINT PHYSICS_POINT_LINE(5.0,5.2, 0.0,0.0, 10.0,10.0, 1.0)
+PRINT PHYSICS_POINT_LINE(5.0,9.0, 0.0,0.0, 10.0,10.0, 1.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+
+=== circle against line segment
+IMPORT "physics"
+PRINT PHYSICS_CIRCLE_LINE(5.0,7.0, 3.0, 0.0,5.0, 10.0,5.0)
+PRINT PHYSICS_CIRCLE_LINE(5.0,20.0, 3.0, 0.0,5.0, 10.0,5.0)
+PRINT PHYSICS_CIRCLE_LINE(50.0,5.0, 3.0, 0.0,5.0, 10.0,5.0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== point in polygon
+IMPORT "physics"
+DIM xs[4] AS FLOAT
+DIM ys[4] AS FLOAT
+xs[0]=0.0 : ys[0]=0.0
+xs[1]=10.0 : ys[1]=0.0
+xs[2]=10.0 : ys[2]=10.0
+xs[3]=0.0 : ys[3]=10.0
+PRINT PHYSICS_POINT_POLY(5.0, 5.0, xs, ys)
+PRINT PHYSICS_POINT_POLY(15.0, 5.0, xs, ys)
+PRINT PHYSICS_POINT_POLY(5.0, -1.0, xs, ys)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== point in concave polygon
+IMPORT "physics"
+DIM xs[6] AS FLOAT
+DIM ys[6] AS FLOAT
+xs[0]=0.0 : ys[0]=0.0
+xs[1]=10.0 : ys[1]=0.0
+xs[2]=10.0 : ys[2]=4.0
+xs[3]=4.0 : ys[3]=4.0
+xs[4]=4.0 : ys[4]=10.0
+xs[5]=0.0 : ys[5]=10.0
+PRINT PHYSICS_POINT_POLY(8.0, 8.0, xs, ys)
+PRINT PHYSICS_POINT_POLY(2.0, 8.0, xs, ys)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+FALSE
+TRUE
+
+=== polygon argument errors
+IMPORT "physics"
+DIM xs[2] AS FLOAT
+DIM ys[2] AS FLOAT
+PRINT PHYSICS_POINT_POLY(1.0, 1.0, xs, ys)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+PHYSICS_POINT_POLY: Polygon braucht mindestens 3 Punkte
+

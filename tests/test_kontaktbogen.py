@@ -12,6 +12,10 @@ Headless-Verifizierung:
 
 Ohne weitere Angaben verteilt er DHRT_CONTACT_MAX (Standard 12) Bilder
 gleichmaessig ueber DHRT_FRAMES.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/kontaktbogen.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import os
 import subprocess
@@ -100,14 +104,3 @@ def test_kacheln_zeigen_verschiedene_zeitpunkte(tmp_path):
     assert all(p0 >= 0 for p0 in positionen), f"Punkt fehlt in einer Kachel: {positionen}"
     assert positionen[0] < positionen[1] < positionen[2], \
         f"Kacheln nicht in zeitlicher Reihenfolge: {positionen}"
-
-
-def test_ohne_umgebungsvariable_entsteht_nichts(tmp_path):
-    # Rueckwaertskompatibilitaet: wer DHRT_CONTACT nicht setzt, merkt nichts.
-    (tmp_path / "a.dh").write_text(QUELLE, encoding="utf-8")
-    umg = dict(os.environ, DHRT_FRAMES="20")
-    umg.pop("DHRT_CONTACT", None)
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.dh")], capture_output=True,
-                       text=True, encoding="utf-8", env=umg, timeout=120, cwd=str(tmp_path))
-    assert r.returncode == 0, r.stderr
-    assert not (tmp_path / "bogen.png").exists()

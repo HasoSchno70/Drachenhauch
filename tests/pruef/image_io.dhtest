@@ -1,0 +1,307 @@
+' Aus test_image_io.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== neues bild ist ohne farbe vollstaendig durchsichtig
+' Der eigentliche Grund fuer `IMAGE_NEW`: die Farbkonvention deutet
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM a AS IMAGE : a = IMAGE_NEW(8, 8)
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+PRINT GETALPHA(a, 1, 1); " "; GETALPHA(b, 1, 1); " "; HEX$(GETPIXEL(b, 1, 1))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0 255 FF0000
+
+=== clear radiert wirklich statt zu mischen
+' Ein durchsichtiges Rechteck EINZUMISCHEN waere ein Nichts-Tun --
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_CLEAR(b, 2, 2, 3, 3)
+PRINT GETALPHA(b, 3, 3); " "; GETALPHA(b, 0, 0); " "; GETALPHA(b, 5, 5)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0 255 255
+
+=== clear ohne rechteck leert das ganze bild
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_CLEAR(b)
+PRINT GETALPHA(b, 0, 0); " "; GETALPHA(b, 7, 7)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0 0
+
+=== bild in bild zeichnen und mischen
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM z AS IMAGE : z = IMAGE_NEW(16, 16, &H0000FF)
+DIM s AS IMAGE : s = IMAGE_NEW(4, 4, &H00FF00)
+IMAGE_DRAW_IMAGE(z, s, 5, 5)
+PRINT HEX$(GETPIXEL(z, 6, 6)); " "; HEX$(GETPIXEL(z, 1, 1))
+DIM h AS IMAGE : h = IMAGE_NEW(4, 4, RGBA(255, 0, 0, 128))
+IMAGE_DRAW_IMAGE(z, h, 0, 0)
+PRINT GETPIXEL(z, 1, 1) <> &H0000FF
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FF00 FF
+TRUE
+
+=== nur ein ausschnitt der quelle
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM q AS IMAGE : q = IMAGE_NEW(8, 8, &HFF0000)
+DIM z AS IMAGE : z = IMAGE_NEW(8, 8)
+IMAGE_DRAW_IMAGE(z, q, 0, 0, 0, 0, 4, 4)
+PRINT GETALPHA(z, 1, 1); " "; GETALPHA(z, 6, 6)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+255 0
+
+=== getalpha meldet ausserhalb minus eins
+' Gleiche Zusage wie `GETPIXEL` -- sonst waere -1 mal Fehler, mal Farbe.
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFF0000)
+PRINT GETALPHA(b, -1, 0); " "; GETALPHA(b, 0, 9); " "; GETALPHA(b, 3, 3)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+-1 -1 255
+
+=== unbekannte endung wird abgelehnt
+' Die Endung entscheidet ueber das Format. raylib wuerde bei einer
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE(b, "x.xyz")
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+
+=== speichern in ein fehlendes verzeichnis meldet sich
+' Die raylib-Bindung wirft das Erfolgs-Flag weg (`export_image` liefert
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE(b, "gibtsnicht/x.png")
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+
+=== freigeben macht das handle unbenutzbar
+' Der Sinn von `IMAGE_FREE` ist nicht das Freigeben allein, sondern dass
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(16, 16, &HFF0000)
+IMAGE_FREE(b)
+TRY
+    PRINT IMAGEWIDTH(b)
+CATCH e
+    PRINT "breite abgelehnt"
+END TRY
+TRY
+    IMAGE_DRAW_RECT(b, 0, 0, 2, 2, &H00FF00)
+CATCH e
+    PRINT "zeichnen abgelehnt"
+END TRY
+TRY
+    DIM k AS IMAGE : k = IMAGE_COPY(b)
+CATCH e
+    PRINT "kopieren abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breite abgelehnt
+zeichnen abgelehnt
+kopieren abgelehnt
+
+=== die meldung unterscheidet freigegeben von nie dagewesen
+' Zwei verschiedene Fehler. Wer den einen fuer den anderen haelt, sucht
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_FREE(b)
+TRY
+    IMAGE_FREE(b)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    IMAGE_FREE(9999)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+IMAGE_FREE: dieses Bild wurde mit IMAGE_FREE freigegeben
+IMAGE_FREE: ungueltiges IMAGE-Handle 9999
+
+=== getpixel und getalpha bleiben bei minus eins
+' Beide melden Ungueltiges seit jeher mit -1, nicht mit einem Fehler --
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_FREE(b)
+PRINT GETPIXEL(b, 1, 1); " "; GETALPHA(b, 1, 1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+-1 -1
+
+=== ein neues bild bekommt nicht den freien platz
+' Wuerde der Platz neu vergeben, zeigte ein stehengebliebenes Handle
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM a AS IMAGE : a = IMAGE_NEW(8, 8, &HFF0000)
+DIM b AS IMAGE : b = IMAGE_NEW(8, 8, &H00FF00)
+IMAGE_FREE(a)
+DIM c AS IMAGE : c = IMAGE_NEW(8, 8, &H0000FF)
+PRINT (c = a); " "; (c = b)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE FALSE
+
+=== freigeben gibt den speicher wirklich frei
+' Ohne diese Zusage waere der Befehl nur Buchhaltung. Gemessen wird
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b AS IMAGE : b = IMAGE_NEW(256, 256, &HFF0000)
+DIM i AS INTEGER
+DIM h AS IMAGE
+FOR i = 1 TO 1200
+    h = IMAGE_COPY(b)
+    IMAGE_FREE(h)
+NEXT
+PRINT "durch"
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+durch
+
+=== zu wenige zeiten sind ein fehler
+' Stillschweigend die letzte zu wiederholen waere eine Vermutung -- und
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b[3] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+NEXT
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", [100, 200])
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+IMAGE_SAVE_GIF: 3 Bilder, aber nur 2 Zeiten -- je Bild eine Dauer in Millisekunden
+
+=== eine zeit von null wird abgelehnt
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", [100, 0])
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+IMAGE_SAVE_GIF: Zeit 2 ist 0 ms -- muss > 0 sein
+
+=== leerer platz ohne anzahl meldet sich
+' ... und ohne `anzahl` sagt die Meldung, was zu tun ist.
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b[4] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 10)
+    PRINT "angenommen"
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+IMAGE_SAVE_GIF: Platz 2 ist leer -- mit `anzahl` sagen, wie viele Plaetze gelten
+
+=== verschieden grosse bilder werden abgelehnt
+' Ein GIF hat EINE Leinwand. Ein abweichendes Bild waere beschnitten
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+b[1] = IMAGE_NEW(5, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 10)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+
+=== unsinniges tempo wird abgelehnt
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+TRY
+    IMAGE_SAVE_GIF(b, "a.gif", 0)
+    PRINT "angenommen"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+

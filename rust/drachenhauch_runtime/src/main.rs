@@ -736,6 +736,39 @@ fn pruefdateien(wurzel: &std::path::Path, raus: &mut Vec<std::path::PathBuf>) {
 /// Datei (siehe `pruefsammlung.rs`).
 const SAMMLUNG_ENDUNG: &str = ".dhtest";
 
+/// Warum ein Bild fuer `--- bild` nicht zu lesen war: kein raylib im Bau
+/// (dann ist der Fall uebersprungen, nicht falsch) oder die Datei selbst.
+enum BildFehler { KeinGrafikBau, Lesen(String) }
+
+/// Das Bild einer `--- bild`-Probe lesen -- ueber raylib, das PNG/BMP/TGA
+/// ohne Fenster dekodiert. Ohne Grafik-Feature gibt es keinen Decoder, und
+/// dort liefe ein SCREEN-Programm ohnehin nicht.
+#[cfg(feature = "graphics")]
+fn bild_laden(pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler> {
+    use raylib::prelude::*;
+    if !pfad.exists() {
+        return Err(BildFehler::Lesen("nicht geschrieben (kein Bildschirmfoto? IMAGE_SAVE nicht aufgerufen?)".into()));
+    }
+    // raylib meldet jedes geladene Bild als INFO auf stdout -- in der Bilanz
+    // eines Testlaufs ist das Rauschen; ab WARNING wie das Fenster selbst.
+    unsafe { raylib::ffi::SetTraceLogLevel(raylib::consts::TraceLogLevel::LOG_WARNING as i32); }
+    let img = Image::load_image(&pfad.to_string_lossy()).map_err(|e| BildFehler::Lesen(format!("nicht lesbar: {}", e)))?;
+    let (breite, hoehe) = (img.width.max(0) as u32, img.height.max(0) as u32);
+    let mut pixel = Vec::with_capacity((breite * hoehe) as usize);
+    for y in 0..hoehe as i32 {
+        for x in 0..breite as i32 {
+            let c = img.get_color(x, y);
+            pixel.push([c.r, c.g, c.b]);
+        }
+    }
+    Ok(pruefsammlung::Bild { breite, hoehe, pixel })
+}
+
+#[cfg(not(feature = "graphics"))]
+fn bild_laden(_pfad: &std::path::Path) -> Result<pruefsammlung::Bild, BildFehler> {
+    Err(BildFehler::KeinGrafikBau)
+}
+
 /// Eine Pruefsammlung laufen lassen: jeder Fall als eigener `dhrt run` in einem
 /// eigenen Verzeichnis, die Faelle parallel. Liefert (ok, fehl, uebersprungen,
 /// Meldungen der Fehlschlaege und Uebersprungenen).
@@ -784,11 +817,36 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
                     .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
                     .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY");
+                // `--- bild` ohne Namen: das Bildschirmfoto nach dem Lauf. Der
+                // Laeufer nennt die Datei selbst; die Bildzahl darf die Umgebung
+                // des Falls ueberschreiben (unten), sonst zwei Bilder -- das
+                // erste liegt bei doppelter Pufferung noch nicht im Bild.
+                let bild_pfad = f.bild.as_ref().map(|b| match &b.datei {
+                    Some(name) => dir.join(name),
+                    None => dir.join("bild.png"),
+                });
+                if let Some(b) = &f.bild {
+                    if b.datei.is_none() {
+                        cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
+                        cmd.env("DHRT_FRAMES", "2");
+                    }
+                }
                 for (k, v) in &f.umgebung { cmd.env(k, v); }
                 let o = cmd.output().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
-                Ok::<_, String>(pruefsammlung::bewerten(
+                let erg = pruefsammlung::bewerten(
                     f, o.status.code().unwrap_or(-1),
-                    &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik))
+                    &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik);
+                Ok::<_, String>(match (&erg, &f.bild, &bild_pfad) {
+                    (pruefsammlung::Ergebnis::Ok, Some(bp), Some(pfad)) => match bild_laden(pfad) {
+                        Ok(bild) => match pruefsammlung::bild_pruefen(bp, &bild) {
+                            Ok(()) => pruefsammlung::Ergebnis::Ok,
+                            Err(m) => pruefsammlung::Ergebnis::Fehl(m),
+                        },
+                        Err(BildFehler::KeinGrafikBau) => pruefsammlung::Ergebnis::Uebersprungen("Bildpruefung braucht den Grafik-Bau".into()),
+                        Err(BildFehler::Lesen(m)) => pruefsammlung::Ergebnis::Fehl(format!("Bild '{}': {}", pfad.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), m)),
+                    },
+                    _ => erg,
+                })
             })();
             let erg = erg.unwrap_or_else(pruefsammlung::Ergebnis::Fehl);
             let _ = std::fs::remove_dir_all(&dir);

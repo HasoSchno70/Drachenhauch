@@ -1,0 +1,163 @@
+' Aus test_image_text_extras.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== convolve identity keeps the image size
+SCREEN(200, 160, "T", 1)
+DIM k[9] AS FLOAT
+k[4] = 1.0
+DIM a AS IMAGE
+a = GENTEX_COLOR(32, 24, &HFF8800)
+DIM b AS IMAGE
+b = IMAGE_CONVOLVE(a, k)
+PRINT IMAGEWIDTH(b)
+PRINT IMAGEHEIGHT(b)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+32
+24
+
+=== convolve rejects a non square kernel
+SCREEN(200, 160, "T", 1)
+DIM k[6] AS FLOAT
+DIM a AS IMAGE
+a = GENTEX_COLOR(8, 8, 255)
+DIM b AS IMAGE
+b = IMAGE_CONVOLVE(a, k)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), hat aber 6 Werte
+
+=== convolve rejects an even kernel side
+SCREEN(200, 160, "T", 1)
+DIM k[16] AS FLOAT
+DIM a AS IMAGE
+a = GENTEX_COLOR(8, 8, 255)
+DIM b AS IMAGE
+b = IMAGE_CONVOLVE(a, k)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_CONVOLVE: Kern-Seitenlaenge muss ungerade sein (3, 5, 7, ...), ist 4
+
+=== dither accepts only the three real 16bit formats
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_PERLIN(32, 32, 4.0)
+DIM b AS IMAGE
+b = IMAGE_DITHER(a, 5, 6, 5, 0)
+DIM c AS IMAGE
+c = IMAGE_DITHER(a, 5, 5, 5, 1)
+DIM d AS IMAGE
+d = IMAGE_DITHER(a, 4, 4, 4, 4)
+PRINT IMAGEWIDTH(d)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+32
+
+=== dither rejects a combination raylib cannot produce
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_COLOR(8, 8, 255)
+DIM b AS IMAGE
+b = IMAGE_DITHER(a, 2, 2, 2, 0)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_DITHER: nur 5,6,5,0 (RGB565) / 5,5,5,1 (RGB5551) / 4,4,4,4 (RGBA4444) moeglich -- bekam 2,2,2,0
+
+=== palette returns at most the requested number
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_PERLIN(48, 48, 5.0)
+DIM p AS ARRAY OF INTEGER
+p = IMAGE_PALETTE(a, 6)
+PRINT p.length() <= 6
+PRINT p.length() > 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+TRUE
+
+=== palette of a single colour image
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_COLOR(16, 16, &HFF8800)
+DIM p AS ARRAY OF INTEGER
+p = IMAGE_PALETTE(a, 8)
+PRINT p.length()
+PRINT HEX$(p[0])
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+1
+FF8800
+
+=== alpha operations return usable images
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_RADIAL(32, 32, &HFFFFFF, &H000000)
+DIM m AS IMAGE
+m = GENTEX_GRADIENT(32, 32, &HFFFFFF, &H000000, TRUE)
+DIM b AS IMAGE
+b = IMAGE_ALPHA_MASK(a, m)
+DIM c AS IMAGE
+c = IMAGE_ALPHA_PREMULTIPLY(b)
+DIM d AS IMAGE
+d = IMAGE_ALPHA_CROP(c, 0.1)
+PRINT IMAGEWIDTH(b)
+PRINT IMAGEWIDTH(d) <= 32
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+32
+TRUE
+
+=== new texture generators have the requested size
+SCREEN(200, 160, "T", 1)
+DIM a AS IMAGE
+a = GENTEX_CELLULAR(40, 30, 12)
+DIM b AS IMAGE
+b = GENTEX_NOISE(40, 30, 0.2)
+DIM c AS IMAGE
+c = GENTEX_GRADIENT_BOX(40, 30, 0.5, &HFF0000, &H0000FF)
+PRINT IMAGEWIDTH(a)
+PRINT IMAGEHEIGHT(a)
+PRINT IMAGEWIDTH(b)
+PRINT IMAGEWIDTH(c)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+40
+30
+40
+40
+
+=== bitmap font from an image
+SCREEN(200, 160, "T", 1)
+DIM sheet AS IMAGE
+sheet = GENTEX_COLOR(64, 16, &HFFFFFF)
+DIM f AS INTEGER
+f = LOADFONT_IMAGE(sheet, &HFF00FF, 32)
+SETFONT(f)
+TEXT_LINE_SPACING(20)
+CLS(0)
+TEXT(4, 4, "AB")
+FLIP()
+PRINT f >= 0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+
+=== bitmap font rejects a bad image handle
+SCREEN(200, 160, "T", 1)
+DIM f AS INTEGER
+f = LOADFONT_IMAGE(999, &HFF00FF, 32)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+LOADFONT_IMAGE: ungueltiges IMAGE-Handle 999
+

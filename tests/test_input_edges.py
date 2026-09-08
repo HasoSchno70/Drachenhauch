@@ -5,6 +5,10 @@ Echte Eingaben lassen sich headless nicht erzeugen -- geprueft wird daher, dass
 die Builtins existieren, die richtigen Typen mit neutralen Werten liefern
 (niemand haengt sich auf, wenn kein Finger/Pad da ist) und dass der Compiler
 sie kennt. Die Flanken-Logik selbst liegt vollstaendig in raylib.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/input_edges.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import json
 import os
@@ -57,64 +61,3 @@ def test_edge_builtins_are_known_to_the_compiler(tmp_path):
            'PRINT GESTURE_HOLD_TIME(); JOYSTICK_ANY_BUTTON()\n'
            'MOUSE_CURSOR("hand")\nMOUSE_SET_POS(1, 1)\n')
     assert _check(src, tmp_path) == []
-
-
-def test_edges_are_false_without_input(tmp_path):
-    out = _run('SCREEN(64, 64, "T", 1)\n'
-               'PRINT MOUSE_HIT(0)\nPRINT MOUSE_RELEASED(0)\n'
-               'PRINT KEYHIT(32)\nPRINT KEYRELEASED(32)\nPRINT KEYREPEAT(32)\n', tmp_path)
-    assert out.split() == ["FALSE"] * 5
-
-
-def test_held_and_edge_are_separate_builtins(tmp_path):
-    # KEYPRESSED/MOUSEBUTTON bleiben "gehalten" -- die Namen sind historisch und
-    # duerfen ihre Bedeutung nicht aendern, sonst brechen bestehende Programme.
-    out = _run('SCREEN(64, 64, "T", 1)\n'
-               'PRINT KEYPRESSED(32)\nPRINT MOUSEBUTTON(0)\n', tmp_path)
-    assert out.split() == ["FALSE", "FALSE"]
-
-
-def test_mouse_delta_and_position_are_floats(tmp_path):
-    out = _run('SCREEN(64, 64, "T", 1)\n'
-               'PRINT MOUSE_DELTA_X()\nPRINT MOUSE_DELTA_Y()\n', tmp_path)
-    assert out.split() == ["0.0", "0.0"]           # FLOAT, nicht INTEGER
-
-
-def test_mouse_cursor_accepts_known_shapes(tmp_path):
-    shapes = ["default", "arrow", "ibeam", "text", "crosshair", "cross", "hand",
-              "pointer", "resize_ew", "resize_ns", "resize_nwse", "resize_nesw",
-              "resize_all", "move", "not_allowed", "no", "HAND"]
-    src = 'SCREEN(64, 64, "T", 1)\n' + "".join(
-        f'MOUSE_CURSOR("{s}")\n' for s in shapes) + 'PRINT "ok"\n'
-    assert _run(src, tmp_path).strip() == "ok"
-
-
-def test_mouse_cursor_rejects_unknown_shape(tmp_path):
-    p = tmp_path / "bad.dh"
-    p.write_text('SCREEN(64, 64, "T", 1)\nMOUSE_CURSOR("quatsch")\n', encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
-                       encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)
-    assert r.returncode != 0
-    assert "MOUSE_CURSOR" in r.stderr and "quatsch" in r.stderr
-
-
-def test_touch_and_gestures_are_neutral_without_a_touchscreen(tmp_path):
-    out = _run('SCREEN(64, 64, "T", 1)\n'
-               'PRINT TOUCH_COUNT()\nPRINT "[" + GESTURE$() + "]"\n'
-               'PRINT GESTURE_HOLD_TIME()\nPRINT GESTURE_PINCH_ANGLE()\n', tmp_path)
-    assert out.split() == ["0", "[]", "0.0", "0.0"]
-
-
-def test_joystick_any_button_reports_minus_one_when_idle(tmp_path):
-    # raylib meldet UNKNOWN(0) wenn nichts anliegt -- als -1 durchgereicht,
-    # damit 0 nicht faelschlich wie ein echter Knopf aussieht.
-    out = _run('SCREEN(64, 64, "T", 1)\nPRINT JOYSTICK_ANY_BUTTON()\n', tmp_path)
-    assert out.strip() == "-1"
-
-
-def test_joystick_edges_reject_an_invalid_pad(tmp_path):
-    p = tmp_path / "j.dh"
-    p.write_text('SCREEN(64, 64, "T", 1)\nPRINT JOYSTICK_HIT(99, 7)\n', encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
-                       encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)
-    assert r.returncode != 0 and "JOYSTICK_HIT" in r.stderr

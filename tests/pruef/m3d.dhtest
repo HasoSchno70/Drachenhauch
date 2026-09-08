@@ -1,0 +1,244 @@
+' Aus test_m3d.py uebertragen (22 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== vec3 basics
+IMPORT "m3d"
+DIM a AS VEC3
+DIM b AS VEC3
+a = VEC3_NEW(1, 2, 3)
+b = VEC3_NEW(4, 5, 6)
+PRINT a + b
+PRINT b - a
+PRINT a * 2.0
+PRINT 2.0 * a
+PRINT VEC3_DOT(a, b)
+PRINT VEC3_CROSS(VEC3_NEW(1,0,0), VEC3_NEW(0,1,0))
+PRINT VEC3_LENGTH(VEC3_NEW(3, 4, 0))
+PRINT VEC3_X(a)
+PRINT VEC3_Y(a)
+PRINT VEC3_Z(a)
+--- erwartet
+Vec3(5.0, 7.0, 9.0)
+Vec3(3.0, 3.0, 3.0)
+Vec3(2.0, 4.0, 6.0)
+Vec3(2.0, 4.0, 6.0)
+32.0
+Vec3(0.0, 0.0, 1.0)
+5.0
+1.0
+2.0
+3.0
+
+=== vec3 normalize and distance
+IMPORT "m3d"
+PRINT VEC3_NORMALIZE(VEC3_NEW(0, 5, 0))
+PRINT VEC3_DISTANCE(VEC3_NEW(0,0,0), VEC3_NEW(0,0,2))
+PRINT VEC3_NEG(VEC3_NEW(1, -2, 3))
+--- erwartet
+Vec3(0.0, 1.0, 0.0)
+2.0
+Vec3(-1.0, 2.0, -3.0)
+
+=== vec4 basics
+IMPORT "m3d"
+DIM v AS VEC4
+v = VEC4_NEW(1, 2, 3, 4)
+PRINT v
+PRINT VEC4_W(v)
+PRINT VEC4_FROM_VEC3(VEC3_NEW(7, 8, 9), 1.0)
+PRINT VEC4_DOT(VEC4_NEW(1,0,0,0), VEC4_NEW(1,9,9,9))
+--- erwartet
+Vec4(1.0, 2.0, 3.0, 4.0)
+4.0
+Vec4(7.0, 8.0, 9.0, 1.0)
+1.0
+
+=== quat identity rotation is noop
+IMPORT "m3d"
+PRINT QUAT_ROTATE_VEC3(QUAT_IDENTITY(), VEC3_NEW(1, 2, 3))
+--- erwartet
+Vec3(1.0, 2.0, 3.0)
+
+=== quat axis angle rotates x to y
+IMPORT "m3d"
+DIM q AS QUAT
+q = QUAT_FROM_AXIS_ANGLE(0, 0, 1, 1.5707963267948966)
+DIM r AS VEC3
+r = QUAT_ROTATE_VEC3(q, VEC3_NEW(1, 0, 0))
+PRINT f"{ROUND(VEC3_X(r),4)} {ROUND(VEC3_Y(r),4)} {ROUND(VEC3_Z(r),4)}"
+--- erwartet
+0.0 1.0 0.0
+
+=== quat mul operator matches builtin
+IMPORT "m3d"
+DIM a AS QUAT
+DIM b AS QUAT
+a = QUAT_FROM_AXIS_ANGLE(0,0,1, 0.5)
+b = QUAT_FROM_AXIS_ANGLE(0,0,1, 0.7)
+DIM viaop AS QUAT
+DIM viafn AS QUAT
+viaop = a * b
+viafn = QUAT_MUL(a, b)
+PRINT viaop = viafn
+DIM r AS VEC3
+r = QUAT_ROTATE_VEC3(viaop, VEC3_NEW(1, 0, 0))
+PRINT f"{ROUND(VEC3_X(r),4)} {ROUND(VEC3_Y(r),4)}"
+--- erwartet
+TRUE
+0.3624 0.932
+
+=== quat slerp endpoints
+IMPORT "m3d"
+DIM a AS QUAT
+DIM b AS QUAT
+a = QUAT_IDENTITY()
+b = QUAT_FROM_AXIS_ANGLE(0,1,0, 1.0)
+PRINT QUAT_SLERP(a, b, 0.0) = a
+--- erwartet
+TRUE
+
+=== mat4 identity and translate
+IMPORT "m3d"
+PRINT VEC3_TRANSFORM(VEC3_NEW(3, 4, 5), MAT4_IDENTITY())
+PRINT VEC3_TRANSFORM(VEC3_NEW(0, 0, 0), MAT4_TRANSLATE(10, 20, 30))
+PRINT VEC3_TRANSFORM_DIR(VEC3_NEW(1, 0, 0), MAT4_TRANSLATE(10, 20, 30))
+--- erwartet
+Vec3(3.0, 4.0, 5.0)
+Vec3(10.0, 20.0, 30.0)
+Vec3(1.0, 0.0, 0.0)
+
+=== mat4 trs and operator transform
+IMPORT "m3d"
+DIM m AS MAT4
+m = MAT4_TRS(VEC3_NEW(10, 20, 30), QUAT_IDENTITY(), VEC3_NEW(2, 2, 2))
+PRINT m * VEC3_NEW(1, 1, 1)
+PRINT m * VEC4_NEW(0, 0, 0, 1)
+--- erwartet
+Vec3(12.0, 22.0, 32.0)
+Vec4(10.0, 20.0, 30.0, 1.0)
+
+=== mat4 mul operator matches builtin
+IMPORT "m3d"
+DIM x AS MAT4
+DIM y AS MAT4
+x = MAT4_TRANSLATE(5, 0, 0)
+y = MAT4_SCALE(2, 2, 2)
+PRINT (x * y) = MAT4_MUL(x, y)
+--- erwartet
+TRUE
+
+=== mat4 invert roundtrip
+IMPORT "m3d"
+DIM m AS MAT4
+DIM inv AS MAT4
+m = MAT4_MUL(MAT4_TRANSLATE(5, -3, 2), MAT4_SCALE(2, 4, 8))
+inv = MAT4_INVERT(m)
+PRINT VEC3_TRANSFORM(VEC3_TRANSFORM(VEC3_NEW(3, 4, 5), m), inv)
+--- erwartet
+Vec3(3.0, 4.0, 5.0)
+
+=== mat4 get
+IMPORT "m3d"
+DIM m AS MAT4
+m = MAT4_TRANSLATE(7, 8, 9)
+PRINT f"{MAT4_GET(m,0,0)} {MAT4_GET(m,0,3)} {MAT4_GET(m,1,3)} {MAT4_GET(m,2,3)}"
+--- erwartet
+1.0 7.0 8.0 9.0
+
+=== mat4 invert singular raises
+IMPORT "m3d"
+PRINT MAT4_INVERT(MAT4_SCALE(0, 0, 0))
+--- fehler
+MAT4_INVERT: Matrix nicht invertierbar (Determinante 0)
+
+=== type mismatch raises
+IMPORT "m3d"
+PRINT VEC3_X(VEC3_NEW(1,2,3) + VEC3_NEW(1,1,1))
+PRINT VEC3_LENGTH(MAT4_IDENTITY())
+--- fehler
+VEC3_LENGTH: Erwartet VEC3, erhalten MAT4
+
+=== mat4 dim type accepted
+IMPORT "m3d"
+DIM m AS MAT4
+m = MAT4_IDENTITY()
+PRINT MAT4_GET(m, 3, 3)
+--- erwartet
+1.0
+
+=== model instanced arg2 wrong type raises
+IMPORT "m3d"
+MODEL_INSTANCED(0, 5)
+--- fehler
+MODEL_INSTANCED: Arg 2 muss ARRAY OF MAT4 oder TUPLE von MAT4 sein
+
+=== model instanced non mat4 element raises
+IMPORT "m3d"
+MODEL_INSTANCED(0, (MAT4_IDENTITY(), 5))
+--- fehler
+MODEL_INSTANCED: Element 1 ist kein MAT4 (sondern INTEGER)
+
+=== mat4 startet als einheitsmatrix
+IMPORT "m3d"
+DIM m AS MAT4
+DIM v AS VEC3
+v = VEC3_NEW(2.0, 3.0, 4.0)
+PRINT m * v
+--- erwartet
+Vec3(2.0, 3.0, 4.0)
+
+=== mat4 array ist ohne zuweisung benutzbar
+IMPORT "m3d"
+DIM ms[3] AS MAT4
+ms[0] = MAT4_TRANSLATE(1.0, 0.0, 0.0)
+PRINT ms[2] = MAT4_IDENTITY()
+--- erwartet
+TRUE
+
+=== quat und vektoren starten neutral
+IMPORT "m3d"
+DIM q AS QUAT
+DIM v AS VEC3
+DIM w AS VEC4
+PRINT q
+PRINT v
+PRINT w
+--- erwartet
+Quat(0.0, 0.0, 0.0, 1.0)
+Vec3(0.0, 0.0, 0.0)
+Vec4(0.0, 0.0, 0.0, 0.0)
+
+=== instanced nimmt ein farb array
+IMPORT "m3d"
+IMPORT "g3d"
+SCREEN(120, 90, "inst", 1)
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+DIM ms[2] AS MAT4
+DIM cs[2] AS INTEGER
+ms[0] = MAT4_TRANSLATE(-1.2, 0.0, 0.0)
+ms[1] = MAT4_TRANSLATE(1.2, 0.0, 0.0)
+cs[0] = &HFF0000
+cs[1] = &H0000FF
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    CLS(0)
+    CAMERA3D(0, 0, 5, 0, 0, 0, 45)
+    MODEL_INSTANCED(box, ms, cs)
+    FLIP()
+NEXT
+SAVESCREENSHOT("inst.png")
+--- erwartet
+
+=== instanced meldet ein zu kurzes farb array
+IMPORT "m3d"
+IMPORT "g3d"
+SCREEN(64, 64, "inst", 1)
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+DIM ms[3] AS MAT4
+DIM cs[2] AS INTEGER
+CAMERA3D(0, 0, 5, 0, 0, 0, 45)
+MODEL_INSTANCED(box, ms, cs)
+--- fehler
+MODEL_INSTANCED: tint-Array ist kuerzer als die Matrizen (2 < 3)
+

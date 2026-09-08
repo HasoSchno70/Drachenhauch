@@ -1,0 +1,383 @@
+' Aus test_gui_layout.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== null heisst nach inhalt
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "OK", 10, 10, 0, 0)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Ein deutlich laengerer Text", 10, 50, 0, 0)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+PRINT GUI_GET_X(b) ; " " ; GUI_GET_Y(b) ; " " ; GUI_GET_W(b) ; " " ; GUI_GET_H(b)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+10 10 50 32
+10 50 308 32
+
+=== autosize misst sofort und set bounds hebt es auf
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "Knopf mit Text", 10, 10, 30, 10)
+GUI_AUTOSIZE(a)
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+GUI_SET_BOUNDS(a, 10, 10, 30, 10)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+10 10 174 32
+10 10 30 10
+
+=== beschriftung nach inhalt
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "Zwei" + CHR$(10) + "Zeilen", 10, 10)
+GUI_AUTOSIZE(l)
+PRINT GUI_GET_X(l) ; " " ; GUI_GET_Y(l) ; " " ; GUI_GET_W(l) ; " " ; GUI_GET_H(l)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+10 10 58 48
+
+=== zeile gewichte teilen den restplatz
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 10, 10, 400, 40)
+GUI_LAYOUT_SET(z, "abstand", 0)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 40, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 100, 30)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "C", 0, 0, 50, 30)
+GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b, 1) : GUI_LAYOUT_ADD(z, c, 3)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+PRINT GUI_GET_X(b) ; " " ; GUI_GET_Y(b) ; " " ; GUI_GET_W(b) ; " " ; GUI_GET_H(b)
+PRINT GUI_GET_X(c) ; " " ; GUI_GET_Y(c) ; " " ; GUI_GET_W(c) ; " " ; GUI_GET_H(c)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+10 10 40 40
+50 10 90 40
+140 10 270 40
+
+=== leerraum schiebt nach rechts
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 10, 10, 400, 40)
+GUI_LAYOUT_SET(z, "abstand", 0)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 40, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 100, 30)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "C", 0, 0, 50, 30)
+GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_SPACER(z) : GUI_LAYOUT_ADD(z, b)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+PRINT GUI_GET_X(b) ; " " ; GUI_GET_Y(b) ; " " ; GUI_GET_W(b) ; " " ; GUI_GET_H(b)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+10 10 40 40
+310 10 100 40
+
+=== abstand rand und ausrichtung
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 10, 10, 400, 40)
+GUI_LAYOUT_SET(z, "abstand", 0)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 40, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 100, 30)
+DIM c AS GUI_WIDGET : c = GUI_BUTTON(w, "C", 0, 0, 50, 30)
+GUI_LAYOUT_SET(z, "abstand", 8) : GUI_LAYOUT_SET(z, "rand", 5)
+GUI_LAYOUT_SET(z, "dehnen", 0) : GUI_LAYOUT_SET(z, "ausrichtung", 1)
+GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+PRINT GUI_GET_X(b) ; " " ; GUI_GET_Y(b) ; " " ; GUI_GET_W(b) ; " " ; GUI_GET_H(b)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+15 15 40 30
+63 15 100 30
+
+=== spalte stapelt und dehnt quer
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "spalte", 20, 20, 200, 300)
+GUI_LAYOUT_SET(s, "abstand", 4)
+DIM l AS GUI_WIDGET : l = GUI_LABEL(w, "Name", 0, 0)
+DIM t AS GUI_WIDGET : t = GUI_TEXTINPUT(w, 0, 0, 0, 0)
+DIM f AS GUI_WIDGET : f = GUI_TEXTAREA(w, 0, 0, 50, 50)
+GUI_LAYOUT_ADD(s, l) : GUI_LAYOUT_ADD(s, t) : GUI_LAYOUT_ADD(s, f, 1)
+GUI_UPDATE()
+PRINT GUI_GET_X(l) ; " " ; GUI_GET_Y(l) ; " " ; GUI_GET_W(l) ; " " ; GUI_GET_H(l)
+PRINT GUI_GET_X(t) ; " " ; GUI_GET_Y(t) ; " " ; GUI_GET_W(t) ; " " ; GUI_GET_H(t)
+PRINT GUI_GET_X(f) ; " " ; GUI_GET_Y(f) ; " " ; GUI_GET_W(f) ; " " ; GUI_GET_H(f)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+20 20 200 16
+20 40 200 32
+20 76 200 244
+
+=== raster verteilt auf spalten und zeilen
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM r AS GUI_WIDGET : r = GUI_LAYOUT(w, "raster:2", 0, 0, 200, 200)
+GUI_LAYOUT_SET(r, "abstand", 0)
+DIM k1 AS GUI_WIDGET : k1 = GUI_BUTTON(w, "1", 0, 0, 10, 20)
+DIM k2 AS GUI_WIDGET : k2 = GUI_BUTTON(w, "2", 0, 0, 10, 30)
+DIM k3 AS GUI_WIDGET : k3 = GUI_BUTTON(w, "3", 0, 0, 10, 20)
+GUI_LAYOUT_ADD(r, k1) : GUI_LAYOUT_ADD(r, k2) : GUI_LAYOUT_ADD(r, k3)
+GUI_UPDATE()
+PRINT GUI_GET_X(k1) ; " " ; GUI_GET_Y(k1) ; " " ; GUI_GET_W(k1) ; " " ; GUI_GET_H(k1)
+PRINT GUI_GET_X(k2) ; " " ; GUI_GET_Y(k2) ; " " ; GUI_GET_W(k2) ; " " ; GUI_GET_H(k2)
+PRINT GUI_GET_X(k3) ; " " ; GUI_GET_Y(k3) ; " " ; GUI_GET_W(k3) ; " " ; GUI_GET_H(k3)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0 0 100 20
+100 0 100 30
+0 30 100 20
+
+=== geschachtelt und anker am behaelter
+' Eine Spalte mit einer Knopfzeile unten; der Behaelter klebt an allen
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "spalte", 0, 0, 500, 400)
+GUI_SET_ANCHOR(s, "lrtb")
+GUI_LAYOUT_SET(s, "abstand", 0)
+DIM f AS GUI_WIDGET : f = GUI_TEXTAREA(w, 0, 0, 10, 10)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 0, 0, 10, 30)
+GUI_LAYOUT_SET(z, "abstand", 0)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(w, "OK", 0, 0, 80, 30)
+GUI_LAYOUT_SPACER(z) : GUI_LAYOUT_ADD(z, ok)
+GUI_LAYOUT_ADD(s, f, 1) : GUI_LAYOUT_ADD(s, z)
+GUI_UPDATE()
+PRINT GUI_GET_X(ok) ; " " ; GUI_GET_Y(ok) ; " " ; GUI_GET_W(ok) ; " " ; GUI_GET_H(ok)
+PRINT GUI_GET_X(f) ; " " ; GUI_GET_Y(f) ; " " ; GUI_GET_W(f) ; " " ; GUI_GET_H(f)
+GUI_WINDOW_SET_BOUNDS(w, 0, 0, 600, 300)
+GUI_UPDATE()
+GUI_UPDATE()
+PRINT GUI_GET_X(ok) ; " " ; GUI_GET_Y(ok) ; " " ; GUI_GET_W(ok) ; " " ; GUI_GET_H(ok)
+PRINT GUI_GET_X(f) ; " " ; GUI_GET_Y(f) ; " " ; GUI_GET_W(f) ; " " ; GUI_GET_H(f)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+420 370 80 30
+0 0 500 370
+520 270 80 30
+0 0 600 270
+
+=== ein widget steckt in hoechstens einem behaelter
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z1 AS GUI_WIDGET : z1 = GUI_LAYOUT(w, "zeile", 0, 0, 100, 30)
+DIM z2 AS GUI_WIDGET : z2 = GUI_LAYOUT(w, "zeile", 0, 100, 100, 30)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 40, 30)
+GUI_LAYOUT_ADD(z1, a) : GUI_LAYOUT_ADD(z2, a)
+GUI_UPDATE()
+PRINT GUI_GET_X(a) ; " " ; GUI_GET_Y(a) ; " " ; GUI_GET_W(a) ; " " ; GUI_GET_H(a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0 100 40 30
+
+=== kreise und fremde fenster sind fehler
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "spalte", 0, 0, 100, 100)
+DIM r AS GUI_WIDGET : r = GUI_LAYOUT(w, "raster:2", 0, 0, 10, 10)
+GUI_LAYOUT_ADD(s, r)
+TRY
+    GUI_LAYOUT_ADD(r, s)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_LAYOUT_ADD(s, s)
+CATCH e2
+    PRINT e2
+END TRY
+DIM w2 AS GUI_WINDOW : w2 = GUI_WINDOW("B", 10, 10, 100, 100)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w2, "x", 0, 0, 40, 20)
+TRY
+    GUI_LAYOUT_ADD(s, b)
+CATCH e3
+    PRINT e3
+END TRY
+TRY
+    GUI_LAYOUT(w, "kreis", 0, 0, 10, 10)
+CATCH e4
+    PRINT e4
+END TRY
+TRY
+    GUI_LAYOUT_SET(s, "farbe", 1)
+CATCH e5
+    PRINT e5
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_LAYOUT_ADD: das Widget ist ein Behaelter, in dem dieses Layout schon steckt
+GUI_LAYOUT_ADD: ein Layout kann sich nicht selbst aufnehmen
+GUI_LAYOUT_ADD: das Widget gehoert zu einem anderen Fenster
+GUI_LAYOUT: 'kreis' ist keine Art -- zeile, spalte oder raster:N
+GUI_LAYOUT_SET: unbekannter Schluessel 'farbe' -- abstand, rand, ausrichtung, dehnen, rahmen
+
+=== ein behaelter ist luft fuer klicks
+' GUI_HIT_TEST ueber einem Behaelter liefert das Kind darunter -- oder
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 0, 0, 300, 40)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 40, 30)
+GUI_LAYOUT_ADD(z, a)
+GUI_UPDATE()
+PRINT GUI_HIT_TEST(10, 10) = a
+PRINT GUI_HIT_TEST(200, 10) = z
+PRINT GUI_FOCUSED()
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+FALSE
+-1
+
+=== layout ueberlebt die datei
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "raster:3", 0, 0, 300, 100)
+GUI_LAYOUT_SET(s, "abstand", 2) : GUI_LAYOUT_SET(s, "rand", 4) : GUI_LAYOUT_SET(s, "dehnen", 0)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 0, 0)
+GUI_LAYOUT_ADD(s, a, 2) : GUI_LAYOUT_SPACER(s)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j
+PRINT INSTR(j, "raster") >= 0 ; " " ; INSTR(j, "auto_w") >= 0
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE
+TRUE TRUE
+
+=== gewichtetes kind faellt nicht unter sein mindestmass
+' Ohne Mindestmass wird ein gewichteter Knopf in einer engen Zeile zu
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 10, 10, 200, 30)
+GUI_LAYOUT_SET(z, "abstand", 0)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 50, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 50, 30)
+GUI_SET_MIN_SIZE(b, 120, 0)
+GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b, 1)
+GUI_UPDATE()
+PRINT GUI_GET_W(b) ; " " ; GUI_LAYOUT_MIN_W(z) ; " " ; GUI_LAYOUT_MIN_H(z)
+GUI_SET_BOUNDS(z, 10, 10, 100, 30)
+GUI_UPDATE()
+PRINT GUI_GET_X(b) ; " " ; GUI_GET_W(b)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+150 170 30
+60 120
+
+=== mindestmass eines behaelters reicht nach oben
+' Ein Behaelter im Behaelter bringt das Mass seines Inhalts mit -- und
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM s AS GUI_WIDGET : s = GUI_LAYOUT(w, "spalte", 0, 0, 300, 200)
+GUI_LAYOUT_SET(s, "abstand", 10) : GUI_LAYOUT_SET(s, "rand", 5)
+DIM z AS GUI_WIDGET : z = GUI_LAYOUT(w, "zeile", 0, 0, 10, 30)
+GUI_LAYOUT_SET(z, "abstand", 4)
+DIM a AS GUI_WIDGET : a = GUI_BUTTON(w, "A", 0, 0, 80, 30)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "B", 0, 0, 90, 30)
+GUI_LAYOUT_ADD(z, a) : GUI_LAYOUT_ADD(z, b)
+DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 0, 0, 100, 60)
+GUI_SET_MIN_SIZE(t, 0, 80)
+GUI_LAYOUT_ADD(s, z) : GUI_LAYOUT_ADD(s, t, 1)
+GUI_UPDATE()
+PRINT GUI_LAYOUT_MIN_W(s) ; " " ; GUI_LAYOUT_MIN_H(s)
+GUI_SET_BOUNDS(s, 0, 0, 300, 60)
+GUI_UPDATE()
+PRINT GUI_GET_H(t)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+184 130
+80
+
+=== anker schrumpfen nicht unter das mindestmass
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM t AS GUI_WIDGET : t = GUI_TEXTAREA(w, 10, 10, 480, 300)
+GUI_SET_ANCHOR(t, "lrtb") : GUI_SET_MIN_SIZE(t, 200, 100)
+GUI_WINDOW_SET_BOUNDS(w, 0, 0, 150, 120)
+GUI_UPDATE()
+PRINT GUI_GET_W(t) ; " " ; GUI_GET_H(t)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+200 100
+

@@ -1,0 +1,112 @@
+' Aus test_window_and_compress.py uebertragen (12 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== compress roundtrip is exact and shrinks
+DIM s AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 60
+    s = s + "Savegame-Zeile " + STR$(i) + " mit viel Wiederholung. "
+NEXT
+DIM p AS STRING
+p = COMPRESS$(s)
+PRINT DECOMPRESS$(p) = s
+PRINT LEN(p) < LEN(s)
+--- erwartet
+TRUE
+TRUE
+
+=== compress handles empty and unicode
+PRINT DECOMPRESS$(COMPRESS$("")) = ""
+PRINT DECOMPRESS$(COMPRESS$("Grueße äöü ✓ 日本")) = "Grueße äöü ✓ 日本"
+--- erwartet
+TRUE
+TRUE
+
+=== compress output is plain ascii
+DIM p AS STRING
+p = COMPRESS$("hallo welt hallo welt hallo welt")
+DIM i AS INTEGER
+DIM ok AS BOOLEAN
+ok = TRUE
+FOR i = 0 TO LEN(p) - 1
+    IF ASC(MID$(p, i, 1)) > 127 THEN ok = FALSE
+NEXT
+PRINT ok
+--- erwartet
+TRUE
+
+=== decompress rejects garbage
+PRINT DECOMPRESS$("das ist nicht gepackt")
+--- fehler
+DECOMPRESS$: Daten sind nicht mit COMPRESS$ gepackt
+
+=== compress works without a window
+PRINT DECOMPRESS$(COMPRESS$("ohne SCREEN")) 
+--- erwartet
+ohne SCREEN
+
+=== window state queries
+SCREEN(64, 64, "T", 1)
+PRINT WINDOW_MINIMIZED()
+PRINT WINDOW_IS_FULLSCREEN()
+PRINT GET_TIME() >= 0.0
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE
+FALSE
+TRUE
+
+=== window icon accepts an image and rejects a bad handle (1)
+SCREEN(64, 64, "T", 1)
+DIM ico AS IMAGE
+ico = GENTEX_COLOR(32, 32, &HFF00FF)
+WINDOW_ICON(ico)
+WINDOW_OPACITY(0.8)
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ok
+
+=== window icon accepts an image and rejects a bad handle (2)
+SCREEN(64, 64, "T", 1)
+WINDOW_ICON(999)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+WINDOW_ICON: ungueltiges IMAGE-Handle 999
+
+=== window opacity clamps instead of failing
+SCREEN(64, 64, "T", 1)
+WINDOW_OPACITY(-5.0)
+WINDOW_OPACITY(99.0)
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ok
+
+=== openurl only allows http schemes (1)
+SCREEN(64, 64, "T", 1)
+OPENURL("file:///C:/Windows/System32/calc.exe")
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+OPENURL: nur http:// und https:// erlaubt (bekam 'file:///C:/Windows/System32/calc.exe')
+
+=== openurl only allows http schemes (2)
+SCREEN(64, 64, "T", 1)
+OPENURL("cmd /c dir")
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+OPENURL: nur http:// und https:// erlaubt (bekam 'cmd /c dir')
+
+=== openurl only allows http schemes (3)
+SCREEN(64, 64, "T", 1)
+OPENURL("ftp://x/y")
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+OPENURL: nur http:// und https:// erlaubt (bekam 'ftp://x/y')
+

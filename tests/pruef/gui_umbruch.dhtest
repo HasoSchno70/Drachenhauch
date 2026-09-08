@@ -1,0 +1,272 @@
+' Aus test_gui_umbruch.py uebertragen (4 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== view zaehlt mit umbruch weniger logische zeilen
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 200, 150)
+GUI_SET_TEXT(ta, "Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht")
+CLIPBOARD_SET("#")
+GUI_SET_TEXT(ta, "Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht" + CHR$(10) + "zwei" + CHR$(10) + "drei" + CHR$(10) + "vier")
+GUI_UPDATE()
+PRINT GUI_TEXTAREA_VIEW(ta)
+GUI_TEXTAREA_SET(ta, "umbruch", 1)
+GUI_UPDATE()
+PRINT GUI_TEXTAREA_VIEW(ta)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+PRINT INSTR(j, "wrap_text") >= 0 ; " " ; GUI_TO_JSON(GUI_FROM_JSON(j)) = j
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+(0, 5, 0, 102)
+(0, 1, 0, 87)
+TRUE TRUE
+
+=== ende und pfeil runter bleiben in der sichtbaren zeile (1)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 200, 150)
+GUI_SET_TEXT(ta, "Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht")
+CLIPBOARD_SET("#")
+GUI_FOCUS(ta)
+DIM f AS INTEGER
+FOR f = 1 TO 34
+    GUI_UPDATE()
+    PRINT "T " + GUI_TEXT(ta)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 20
+e 4 2 265 0 0 0 // Event: test
+e 5 1 265 0 0 0 // Event: test
+e 7 2 265 0 0 0 // Event: test
+e 8 1 265 0 0 0 // Event: test
+e 10 2 265 0 0 0 // Event: test
+e 11 1 265 0 0 0 // Event: test
+e 13 2 265 0 0 0 // Event: test
+e 14 1 265 0 0 0 // Event: test
+e 16 2 265 0 0 0 // Event: test
+e 17 1 265 0 0 0 // Event: test
+e 19 2 265 0 0 0 // Event: test
+e 20 1 265 0 0 0 // Event: test
+e 22 2 268 0 0 0 // Event: test
+e 23 1 268 0 0 0 // Event: test
+e 26 2 269 0 0 0 // Event: test
+e 27 1 269 0 0 0 // Event: test
+e 28 2 341 0 0 0 // Event: test
+e 29 2 86 0 0 0 // Event: test
+e 30 1 86 0 0 0 // Event: test
+e 31 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=35
+--- erwartet
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht#
+
+=== ende und pfeil runter bleiben in der sichtbaren zeile (2)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 200, 150)
+GUI_SET_TEXT(ta, "Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht")
+CLIPBOARD_SET("#")
+GUI_TEXTAREA_SET(ta, "umbruch", 1)
+GUI_FOCUS(ta)
+DIM f AS INTEGER
+FOR f = 1 TO 34
+    GUI_UPDATE()
+    PRINT "T " + GUI_TEXT(ta)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 20
+e 4 2 265 0 0 0 // Event: test
+e 5 1 265 0 0 0 // Event: test
+e 7 2 265 0 0 0 // Event: test
+e 8 1 265 0 0 0 // Event: test
+e 10 2 265 0 0 0 // Event: test
+e 11 1 265 0 0 0 // Event: test
+e 13 2 265 0 0 0 // Event: test
+e 14 1 265 0 0 0 // Event: test
+e 16 2 265 0 0 0 // Event: test
+e 17 1 265 0 0 0 // Event: test
+e 19 2 265 0 0 0 // Event: test
+e 20 1 265 0 0 0 // Event: test
+e 22 2 268 0 0 0 // Event: test
+e 23 1 268 0 0 0 // Event: test
+e 26 2 269 0 0 0 // Event: test
+e 27 1 269 0 0 0 // Event: test
+e 28 2 341 0 0 0 // Event: test
+e 29 2 86 0 0 0 // Event: test
+e 30 1 86 0 0 0 // Event: test
+e 31 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=35
+--- erwartet
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+
+=== ende und pfeil runter bleiben in der sichtbaren zeile (3)
+IMPORT "gui"
+SCREEN(500, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 400)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 200, 150)
+GUI_SET_TEXT(ta, "Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht")
+CLIPBOARD_SET("#")
+GUI_TEXTAREA_SET(ta, "umbruch", 1)
+GUI_FOCUS(ta)
+DIM f AS INTEGER
+FOR f = 1 TO 34
+    GUI_UPDATE()
+    PRINT "T " + GUI_TEXT(ta)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 20
+e 4 2 265 0 0 0 // Event: test
+e 5 1 265 0 0 0 // Event: test
+e 7 2 265 0 0 0 // Event: test
+e 8 1 265 0 0 0 // Event: test
+e 10 2 265 0 0 0 // Event: test
+e 11 1 265 0 0 0 // Event: test
+e 13 2 265 0 0 0 // Event: test
+e 14 1 265 0 0 0 // Event: test
+e 16 2 265 0 0 0 // Event: test
+e 17 1 265 0 0 0 // Event: test
+e 19 2 265 0 0 0 // Event: test
+e 20 1 265 0 0 0 // Event: test
+e 22 2 268 0 0 0 // Event: test
+e 23 1 268 0 0 0 // Event: test
+e 26 2 264 0 0 0 // Event: test
+e 27 1 264 0 0 0 // Event: test
+e 28 2 341 0 0 0 // Event: test
+e 29 2 86 0 0 0 // Event: test
+e 30 1 86 0 0 0 // Event: test
+e 31 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=35
+--- erwartet
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+T Ein langer Absatz #der in einem schmalen Feld mehrfach umbrechen muss damit man es sieht
+

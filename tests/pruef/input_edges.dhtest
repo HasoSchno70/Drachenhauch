@@ -1,0 +1,101 @@
+' Aus test_input_edges.py uebertragen (8 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== edges are false without input
+SCREEN(64, 64, "T", 1)
+PRINT MOUSE_HIT(0)
+PRINT MOUSE_RELEASED(0)
+PRINT KEYHIT(32)
+PRINT KEYRELEASED(32)
+PRINT KEYREPEAT(32)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE
+FALSE
+FALSE
+FALSE
+FALSE
+
+=== held and edge are separate builtins
+SCREEN(64, 64, "T", 1)
+PRINT KEYPRESSED(32)
+PRINT MOUSEBUTTON(0)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE
+FALSE
+
+=== mouse delta and position are floats
+SCREEN(64, 64, "T", 1)
+PRINT MOUSE_DELTA_X()
+PRINT MOUSE_DELTA_Y()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0.0
+0.0
+
+=== mouse cursor accepts known shapes
+SCREEN(64, 64, "T", 1)
+MOUSE_CURSOR("default")
+MOUSE_CURSOR("arrow")
+MOUSE_CURSOR("ibeam")
+MOUSE_CURSOR("text")
+MOUSE_CURSOR("crosshair")
+MOUSE_CURSOR("cross")
+MOUSE_CURSOR("hand")
+MOUSE_CURSOR("pointer")
+MOUSE_CURSOR("resize_ew")
+MOUSE_CURSOR("resize_ns")
+MOUSE_CURSOR("resize_nwse")
+MOUSE_CURSOR("resize_nesw")
+MOUSE_CURSOR("resize_all")
+MOUSE_CURSOR("move")
+MOUSE_CURSOR("not_allowed")
+MOUSE_CURSOR("no")
+MOUSE_CURSOR("HAND")
+PRINT "ok"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ok
+
+=== mouse cursor rejects unknown shape
+SCREEN(64, 64, "T", 1)
+MOUSE_CURSOR("quatsch")
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+MOUSE_CURSOR: unbekannte Form 'quatsch' -- erwartet default/ibeam/crosshair/hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed
+
+=== touch and gestures are neutral without a touchscreen
+SCREEN(64, 64, "T", 1)
+PRINT TOUCH_COUNT()
+PRINT "[" + GESTURE$() + "]"
+PRINT GESTURE_HOLD_TIME()
+PRINT GESTURE_PINCH_ANGLE()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+0
+[]
+0.0
+0.0
+
+=== joystick any button reports minus one when idle
+SCREEN(64, 64, "T", 1)
+PRINT JOYSTICK_ANY_BUTTON()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+-1
+
+=== joystick edges reject an invalid pad
+SCREEN(64, 64, "T", 1)
+PRINT JOYSTICK_HIT(99, 7)
+--- umgebung
+DHRT_FRAMES=1
+--- fehler
+JOYSTICK_HIT: Joystick-Index 99 - kein Gamepad angeschlossen
+

@@ -118,6 +118,35 @@ Division durch Null
 | `--- datei name base64` | dieselbe Beilage als Bytes — für alles, was kein UTF-8 ist (eine cp1252-Datei, ein ZIP-Archiv, ein Bild); der Block ist Base64 und darf umbrochen sein |
 | `--- verzeichnis name` | ein leeres Verzeichnis neben dem Programm, für `DIRLIST`, `RMDIR` und alles, was Ordner sehen will |
 | `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
+| `--- bild` | Punktproben am **Bildschirmfoto** nach dem Lauf — der Läufer setzt `DHRT_SCREENSHOT` selbst und, wenn die Umgebung keins nennt, `DHRT_FRAMES=2`; `--- bild name.png` prüft stattdessen eine Datei, die das Programm geschrieben hat (`IMAGE_SAVE`) |
+
+Die Zeilen eines `--- bild`-Blocks:
+
+| Probe | Bedeutung |
+|---|---|
+| `groesse 320 240` | Breite und Höhe |
+| `100 100 #00FF00` | der Punkt hat genau diese Farbe (`#RGB` geht auch) |
+| `100 100 #00FF00 +-40` | jeder Kanal darf um 40 abweichen — für Kantenglättung und Treiber, die verschieden runden |
+| `30 30 nicht #00FF00 +-40` | der Punkt hat diese Farbe **nicht** |
+| `99 60 <> 100 60` / `99 60 = 100 60` | zwei Punkte gegeneinander, wenn die absolute Farbe egal ist (eine Kante ist da oder nicht) |
+
+Eine Bildprüfung braucht den Grafik-Bau; ohne raylib gilt der Fall als
+übersprungen, nicht als falsch. Beispiel:
+
+```dhtest
+=== SCISSOR schneidet ab
+SCREEN(320, 240)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(0, 0, 0))
+    SCISSOR(50, 50, 100, 100)
+    BOX(20, 20, 220, 220, RGB(0, 255, 0))
+    SCISSOR_END()
+    FLIP()
+WEND
+--- bild
+100 100 #00FF00 +-80
+30 30 nicht #00FF00 +-80
+```
 
 Ohne Erwartung gilt ein Fall als bestanden, wenn er mit 0 endet. **Jeder
 Fall läuft als eigener Prozess in einem eigenen Verzeichnis**, die Fälle
