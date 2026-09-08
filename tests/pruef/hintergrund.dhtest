@@ -25,6 +25,7 @@ WHILE NOT SHELL_READY(p)
     SLEEP(1)
 WEND
 PRINT TRIM$(SHELL_RESULT$(p))
+--- system windows
 --- erwartet
 hallo
 
@@ -37,6 +38,7 @@ WHILE NOT SHELL_READY(p)
 WEND
 t = SHELL_RESULT$(p)
 PRINT SHELL_CODE()
+--- system windows
 --- erwartet
 7
 
@@ -50,6 +52,7 @@ WEND
 t = SHELL_RESULT$(p)
 PRINT "[" + TRIM$(t) + "]"
 PRINT INSTR(SHELL_ERR$(), "fehler") >= 0
+--- system windows
 --- erwartet
 []
 TRUE
@@ -62,6 +65,7 @@ WHILE NOT SHELL_READY(p)
     runden = runden + 1
 WEND
 PRINT runden > 0
+--- system windows
 --- erwartet
 TRUE
 
@@ -83,6 +87,7 @@ gefangen
 DIM p AS INTEGER
 p = SHELL_START("cmd", "/c", "ping -n 3 127.0.0.1 > nul")
 PRINT SHELL_RESULT$(p)
+--- system windows
 --- fehler
 SHELL_RESULT$: Auftrag 0 ist nicht fertig (oder schon abgeholt) -- erst SHELL_READY(0) abfragen
 
@@ -92,6 +97,7 @@ p = SHELL_START("cmd", "/c", "ping -n 3 127.0.0.1 > nul")
 PRINT SHELL_PENDING()
 SHELL_CANCEL(p)
 PRINT SHELL_PENDING()
+--- system windows
 --- erwartet
 1
 0
@@ -99,6 +105,7 @@ PRINT SHELL_PENDING()
 === blockierendes shell bleibt daneben bestehen
 ' SHELL aus WP A ist unveraendert -- SHELL_START ist ein Zusatz, kein
 PRINT SHELL("cmd", "/c", "exit 4")
+--- system windows
 --- erwartet
 4
 

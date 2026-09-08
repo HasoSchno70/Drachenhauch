@@ -74,6 +74,23 @@ pub struct Fall {
     /// geschrieben hat (`AUDIO_SAVE_WAV`) -- Kanaele, Bittiefe, Abtastrate,
     /// Dauer, Spitze und der Pegel in einem Zeitfenster.
     pub ton: Option<TonPruefung>,
+    /// `--- system windows` (auch `posix`, `macos`, `linux`, mehrere durch
+    /// Leerzeichen): der Fall gilt nur dort, anderswo ist er uebersprungen --
+    /// fuer `SHELL("cmd", "/c", ...)` und alles, was ein Betriebssystem braucht.
+    pub system: Option<Vec<String>>,
+}
+
+/// Passt die Liste aus `--- system` zu dieser Maschine? `posix` heisst
+/// alles ausser Windows.
+pub fn system_passt(systeme: &[String]) -> bool {
+    system_passt_auf(systeme, std::env::consts::OS)
+}
+
+fn system_passt_auf(systeme: &[String], os: &str) -> bool {
+    systeme.iter().any(|s| match s.as_str() {
+        "posix" => os != "windows",
+        andere => andere == os,
+    })
 }
 
 /// Was `--- ton` an einer WAV-Datei pruefen soll.
@@ -553,13 +570,22 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.bild = Some(BildPruefung { datei: if arg.is_empty() { None } else { Some(arg.to_string()) }, proben: Vec::new() });
                     Abschnitt::Bild
                 }
+                "system" => {
+                    let liste: Vec<String> = arg.split_whitespace().map(|s| s.to_lowercase()).collect();
+                    if liste.is_empty() { return Err(format!("Zeile {}: '--- system' braucht windows, posix, macos oder linux", nr + 1)); }
+                    if let Some(u) = liste.iter().find(|s| !["windows", "posix", "macos", "linux"].contains(&s.as_str())) {
+                        return Err(format!("Zeile {}: '--- system {}' kenne ich nicht (windows, posix, macos, linux)", nr + 1, u));
+                    }
+                    f.system = Some(liste);
+                    Abschnitt::Verzeichnis        // kein Inhalt -- wie bei verzeichnis
+                }
                 "ton" => {
                     if arg.is_empty() { return Err(format!("Zeile {}: '--- ton' braucht den Namen der WAV-Datei", nr + 1)); }
                     if f.ton.is_some() { return Err(format!("Zeile {}: '--- ton' gibt es in diesem Fall schon", nr + 1)); }
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild, ton)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild, ton, system)", nr + 1, other)),
             };
             continue;
         }
@@ -637,9 +663,12 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
         if let Some(m) = KEIN_FENSTER.iter().find(|m| stderr.contains(*m) || stdout.contains(*m)) {
             return Ergebnis::Uebersprungen(format!("kein Fenster moeglich ({})", m));
         }
-        if ohne_grafik && stderr.contains("im Rust-Kern noch nicht verfuegbar") {
-            return Ergebnis::Uebersprungen("Build ohne Grafik".into());
-        }
+    }
+    // Ein Bau ohne Grafik/Audio meldet den fehlenden Befehl im Klartext -- auch
+    // dann, wenn das Programm die Meldung selbst faengt und AUSGIBT (`TRY ...
+    // CATCH e : PRINT e`) und mit 0 endet. Die Zeile ist unverwechselbar.
+    if ohne_grafik && (stderr.contains("im Rust-Kern noch nicht verfuegbar") || stdout.contains("im Rust-Kern noch nicht verfuegbar")) {
+        return Ergebnis::Uebersprungen("Build ohne Grafik".into());
     }
     let out = glatt(&ohne_logzeilen(stdout));
     if let Some(muster) = &fall.fehler {
@@ -742,6 +771,20 @@ mod tests {
         assert!(wav_lesen(b"nix").unwrap_err().contains("RIFF"));
         assert!(parsen("=== a\nPRINT 1\n--- ton\nkanaele 1\n").unwrap_err().contains("Namen der WAV"));
         assert!(parsen("=== a\nPRINT 1\n--- ton t.wav\nlaut 3\n").unwrap_err().contains("nicht verstanden"));
+    }
+
+    #[test]
+    fn system_grenzt_einen_fall_ein() {
+        let f = parsen("=== a\nPRINT SHELL(\"cmd\", \"/c\", \"exit 7\")\n--- system windows\n--- erwartet\n7\n").unwrap();
+        assert_eq!(f[0].system.as_deref(), Some(&["windows".to_string()][..]));
+        assert_eq!(f[0].erwartet.as_deref(), Some("7"));
+        let w = vec!["windows".to_string()];
+        assert!(system_passt_auf(&w, "windows") && !system_passt_auf(&w, "linux"));
+        let p = vec!["posix".to_string()];
+        assert!(system_passt_auf(&p, "macos") && system_passt_auf(&p, "linux") && !system_passt_auf(&p, "windows"));
+        assert!(parsen("=== a\nPRINT 1\n--- system amiga\n").unwrap_err().contains("kenne ich nicht"));
+        // Ein Fall ohne --- system gilt ueberall, und die Meldung beim Ueberspringen nennt das System
+        assert_eq!(bewerten(&f[0], 0, "7\n", "", false), Ergebnis::Ok);
     }
 
     #[test]

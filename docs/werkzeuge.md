@@ -118,6 +118,7 @@ Division durch Null
 | `--- datei name base64` | dieselbe Beilage als Bytes — für alles, was kein UTF-8 ist (eine cp1252-Datei, ein ZIP-Archiv, ein Bild); der Block ist Base64 und darf umbrochen sein |
 | `--- verzeichnis name` | ein leeres Verzeichnis neben dem Programm, für `DIRLIST`, `RMDIR` und alles, was Ordner sehen will |
 | `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
+| `--- system windows` | der Fall gilt nur dort (auch `posix`, `macos`, `linux`, mehrere durch Leerzeichen); anderswo zählt er als übersprungen — für `SHELL("cmd", "/c", …)` und alles, was ein Betriebssystem braucht |
 | `--- ton datei.wav` | Proben an einer WAV-Datei, die das Programm geschrieben hat (Kanäle, Bittiefe, Dauer, Spitze, Pegel je Zeitfenster) — siehe unten |
 | `--- bild` | Punktproben am **Bildschirmfoto** nach dem Lauf — der Läufer setzt `DHRT_SCREENSHOT` selbst und, wenn die Umgebung keins nennt, `DHRT_FRAMES=2`; `--- bild name.png` prüft stattdessen eine Datei, die das Programm geschrieben hat (`IMAGE_SAVE`) |
 

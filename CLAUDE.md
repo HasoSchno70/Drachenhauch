@@ -2743,7 +2743,14 @@ Was NICHT umzog, steht als Ausnahmeliste im Sammlungsbauer mit Grund je
 Test: Benutzerordner/DH_PATH (bibliothek), MILLIS-Werte (builtins_uhr),
 Dateiname oder Spalte in einer Meldung, BOM in der Quelle, fremde
 Umgebungsvariablen, gemischtes stdout/stderr, Portamento (Nulldurchgaenge
-zaehlen). Stand danach: 149 Sammlungen mit 2362 Faellen in ~65 s,
+zaehlen). **Zwei Funde aus der ersten CI dieses Schritts:** (1) die
+Shell-Tests riefen `cmd /c` und trugen in pytest `skipif(sys.platform !=
+"win32")` -- dafuer **`--- system windows`** (auch posix/macos/linux):
+der Fall gilt nur dort, anderswo ist er uebersprungen, nicht falsch.
+(2) Ein Bau ohne Audio meldet "im Rust-Kern noch nicht verfuegbar" --
+und ein Fall, der die Meldung mit TRY/CATCH faengt und AUSGIBT, endet mit
+0 und der Meldung auf STDOUT; die Ueberspringregel prueft darum beide
+Kanaele und nicht mehr den Rueckgabewert. Stand danach: 149 Sammlungen mit 2362 Faellen in ~65 s,
 117 pytest-Dateien geloescht. Nicht uebertragbar und darum in pytest geblieben:
 gui_table_frozen_edge (Kantenprobe mit Schwellwert), gui_draw_window und schriften_vorrat (vergleichen zwei Laeufe miteinander), gui_bindung (SQLite-Datei), die 13 image_io-Tests mit Pillow als fremdem Leser fuer PNG/BMP/GIF, drei Shader-Bildproben, der Instancing-Render in m3d, drei Kontaktbogen-Tests und ein Index-Leser in input_edges. Bewusst NICHT umgezogen:
 `test_dateisystem.py` (Dateizeiten, Gross/Klein je System), alles mit Ton

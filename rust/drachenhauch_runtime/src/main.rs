@@ -808,6 +808,11 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
             let dir = wurzel.join(format!("fall_{}", i));
             let _ = std::fs::create_dir_all(&dir);
             let erg = (|| {
+                if let Some(systeme) = &f.system {
+                    if !pruefsammlung::system_passt(systeme) {
+                        return Ok(pruefsammlung::Ergebnis::Uebersprungen(format!("nur unter {}", systeme.join("/"))));
+                    }
+                }
                 std::fs::write(dir.join("fall.dh"), &f.quelle).map_err(|e| e.to_string())?;
                 for name in &f.verzeichnisse { let _ = std::fs::create_dir_all(dir.join(name)); }
                 for (name, inhalt) in &f.dateien {

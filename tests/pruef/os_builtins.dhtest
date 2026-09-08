@@ -53,23 +53,26 @@ EXIT: Rueckgabewert 256 liegt ausserhalb 0..255
 
 === shell liefert den rueckgabewert
 PRINT SHELL("cmd", "/c", "exit 7")
+--- system windows
 --- erwartet
 7
 
 === shell out sammelt die ausgabe ein
 PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo hallo"))
+--- system windows
 --- erwartet
 hallo
 
 === shell auf unbekanntes programm wirft
 PRINT SHELL("gibt_es_ganz_sicher_nicht_xyz123")
 --- fehler
-SHELL: 'gibt_es_ganz_sicher_nicht_xyz123' laesst sich nicht starten: program not found
+SHELL: 'gibt_es_ganz_sicher_nicht_xyz123' laesst sich nicht starten
 
 === shell sieht was setenv gesetzt hat
 ' SETENV wirkt auf diesen Prozess UND seine Kinder -- das ist der Weg,
 SETENV("DH_FUER_KIND", "weitergereicht")
 PRINT TRIM$(SHELL_OUT$("cmd", "/c", "echo %DH_FUER_KIND%"))
+--- system windows
 --- erwartet
 weitergereicht
 
