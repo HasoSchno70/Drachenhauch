@@ -1,0 +1,62 @@
+' Aus test_camera_rotation.py uebertragen (6 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== rotation defaults to zero and is backward compatible
+IMPORT "camera"
+PRINT CAMERA_ROTATION()
+CAMERA_SET(10.0, 20.0, 2.0)
+PRINT CAMERA_S2W_X(0.0)
+PRINT CAMERA_S2W_Y(0.0)
+--- erwartet
+0.0
+10.0
+20.0
+
+=== camera reset also clears rotation
+IMPORT "camera"
+CAMERA_SET_ROTATION(45.0)
+CAMERA_RESET()
+PRINT CAMERA_ROTATION()
+--- erwartet
+0.0
+
+=== camera set optional fourth arg sets rotation
+IMPORT "camera"
+CAMERA_SET(0.0, 0.0, 1.0, 33.0)
+PRINT CAMERA_ROTATION()
+--- erwartet
+33.0
+
+=== rotation 90 degrees matches hand calculation
+IMPORT "camera"
+SCREEN(200, 200, "t")
+CAMERA_RESET()
+CAMERA_SET_ROTATION(90.0)
+PRINT ROUND(CAMERA_S2W_X(0.0, 150.0))
+PRINT ROUND(CAMERA_S2W_Y(150.0, 0.0))
+--- erwartet
+50
+0
+
+=== rotation 180 degrees is point reflection
+IMPORT "camera"
+SCREEN(200, 200, "t")
+CAMERA_RESET()
+CAMERA_SET_ROTATION(180.0)
+PRINT ROUND(CAMERA_S2W_X(200.0, 200.0))
+PRINT ROUND(CAMERA_S2W_Y(200.0, 200.0))
+--- erwartet
+0
+0
+
+=== camera follow leaves rotation untouched
+IMPORT "camera"
+CAMERA_SET_ROTATION(77.0)
+CAMERA_FOLLOW(500.0, 500.0, 200.0, 200.0)
+PRINT CAMERA_X()
+PRINT CAMERA_Y()
+PRINT CAMERA_ROTATION()
+--- erwartet
+400.0
+400.0
+77.0
+

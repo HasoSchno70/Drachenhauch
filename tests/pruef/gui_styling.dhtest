@@ -1,0 +1,352 @@
+' Aus test_gui_styling.py uebertragen (26 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== enabled toggle
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("S", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 120, 30)
+PRINT GUI_ENABLED(b)
+GUI_SET_ENABLED(b, FALSE)
+PRINT GUI_ENABLED(b)
+--- erwartet
+TRUE
+FALSE
+
+=== disabled still hit testable
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("S", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 120, 30)
+GUI_SET_ENABLED(b, FALSE)
+PRINT GUI_HIT_TEST(60, 77) = b
+--- erwartet
+TRUE
+
+=== font setters and roundtrip
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("S", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 120, 30)
+GUI_SET_ENABLED(b, FALSE)
+GUI_SET_FONT_SIZE(b, 24)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_FROM_JSON(GUI_TO_JSON(win))
+PRINT GUI_ENABLED(GUI_WINDOW_WIDGET(w2, 0))
+--- erwartet
+FALSE
+
+=== font size negative raises
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("S", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 120, 30)
+GUI_SET_FONT_SIZE(b, -5)
+--- fehler
+GUI_SET_FONT_SIZE: Groesse muss >= 0 sein
+
+=== corner radius metric
+IMPORT "gui"
+PRINT GUI_METRIC_GET("corner_radius")
+GUI_METRIC_SET("corner_radius", 8)
+PRINT GUI_METRIC_GET("corner_radius")
+--- erwartet
+0
+8
+
+=== set font accepts handle
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("S", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 120, 30)
+GUI_SET_FONT(b, -1)
+PRINT GUI_KIND(b)
+--- erwartet
+button
+
+=== glas themen schalten die plastik ein
+IMPORT "gui"
+GUI_THEME_PRESET("glas_dunkel")
+PRINT GUI_METRIC_GET("gradient")
+PRINT GUI_METRIC_GET("gloss")
+PRINT GUI_METRIC_GET("bevel")
+PRINT GUI_METRIC_GET("corner_radius")
+--- erwartet
+16
+26
+1
+5
+
+=== flache themen bleiben flach
+' Bestehende Themen duerfen sich nicht veraendern -- sonst saehen alle
+IMPORT "gui"
+GUI_THEME_PRESET("dark")
+PRINT GUI_METRIC_GET("gradient") + GUI_METRIC_GET("gloss") + GUI_METRIC_GET("bevel")
+GUI_THEME_PRESET("modern_dark")
+PRINT GUI_METRIC_GET("gradient") + GUI_METRIC_GET("gloss") + GUI_METRIC_GET("bevel")
+--- erwartet
+0
+0
+
+=== beide glas themen gibt es hell und dunkel
+IMPORT "gui"
+GUI_THEME_PRESET("glas_dunkel")
+PRINT GUI_THEME_GET("win_bg")
+GUI_THEME_PRESET("glas_hell")
+PRINT GUI_THEME_GET("win_bg")
+--- erwartet
+2304563
+14870767
+
+=== plastik metriken sind einzeln setzbar
+IMPORT "gui"
+GUI_METRIC_SET("gradient", 30)
+GUI_METRIC_SET("gloss", 50)
+GUI_METRIC_SET("bevel", 1)
+PRINT GUI_METRIC_GET("gradient")
+--- erwartet
+30
+
+=== kippschalter verhaelt sich wie ein kaestchen
+' Der Zustand liegt in `checked` -- damit gelten GUI_CHECKED und
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+DIM t AS GUI_WIDGET
+w = GUI_WINDOW("W", 0, 0, 200, 120)
+t = GUI_TOGGLE(w, "Musik", 10, 10, TRUE)
+PRINT GUI_CHECKED(t)
+GUI_SET_CHECKED(t, FALSE)
+PRINT GUI_CHECKED(t)
+PRINT GUI_KIND(t)
+--- erwartet
+TRUE
+FALSE
+toggle
+
+=== drehregler haelt seinen wert
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+DIM k AS GUI_WIDGET
+w = GUI_WINDOW("W", 0, 0, 200, 200)
+k = GUI_KNOB(w, 10, 10, 80, 0.0, 100.0, 72.0)
+PRINT GUI_VALUE(k)
+GUI_SET_VALUE(k, 30.0)
+PRINT GUI_VALUE(k)
+PRINT GUI_KIND(k)
+--- erwartet
+72.0
+30.0
+knob
+
+=== drehregler lehnt leeren bereich ab
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("W", 0, 0, 200, 200)
+TRY
+    GUI_KNOB(w, 10, 10, 80, 5.0, 5.0, 5.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_KNOB: max muss > min sein
+
+=== runde knoepfe sind schaltbar
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+DIM b AS GUI_WIDGET
+w = GUI_WINDOW("W", 0, 0, 200, 120)
+b = GUI_BUTTON(w, ">", 10, 10, 40, 40)
+GUI_SET_ROUND(b, TRUE)
+GUI_SET_ROUND(b, FALSE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== kippschalter startet ohne vorgabe aus
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+DIM t AS GUI_WIDGET
+w = GUI_WINDOW("W", 0, 0, 200, 120)
+t = GUI_TOGGLE(w, "Aus", 10, 10)
+PRINT GUI_CHECKED(t)
+--- erwartet
+FALSE
+
+=== skin setzen und wieder wegnehmen
+IMPORT "gui"
+SCREEN(200, 120, "S")
+DIM b AS IMAGE
+b = GENTEX_COLOR(32, 32, 16750848)
+GUI_SKIN("button", b, 8)
+GUI_SKIN("button", -1)
+PRINT "ok"
+--- erwartet
+ok
+
+=== skin meldet unbekannte widget art
+IMPORT "gui"
+SCREEN(200, 120, "S")
+DIM b AS IMAGE
+b = GENTEX_COLOR(32, 32, 16750848)
+TRY
+    GUI_SKIN("knopfdruck", b, 8)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+GUI_SKIN: unbekannte Widget-Art 'knopfdruck'
+
+=== skin ueberlebt winzige widgets
+' Ein Widget kleiner als seine Skin-Raender darf zusammenschrumpfen,
+IMPORT "gui"
+SCREEN(200, 120, "S")
+DIM w AS GUI_WINDOW
+DIM b AS IMAGE
+DIM f AS INTEGER
+b = GENTEX_COLOR(48, 48, 16750848)
+w = GUI_WINDOW("W", 5, 5, 180, 100)
+GUI_BUTTON(w, "x", 5, 5, 6, 4)
+GUI_SKIN("button", b, 20)
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "ok"
+--- erwartet
+ok
+
+=== ui glas themen bringen plastik mit
+IMPORT "ui"
+UI_THEME_PRESET("glas_dunkel")
+PRINT UI_METRIC_GET("gradient")
+PRINT UI_METRIC_GET("gloss")
+PRINT UI_METRIC_GET("bevel")
+PRINT UI_METRIC_GET("corner_radius")
+--- erwartet
+16
+26
+1
+5
+
+=== ui flache themen bleiben flach
+' Bestehende ui-Themen duerfen sich nicht veraendern.
+IMPORT "ui"
+UI_THEME_PRESET("dark")
+PRINT UI_METRIC_GET("gradient") + UI_METRIC_GET("gloss") + UI_METRIC_GET("bevel")
+UI_THEME_PRESET("light")
+PRINT UI_METRIC_GET("gradient") + UI_METRIC_GET("gloss") + UI_METRIC_GET("bevel")
+--- erwartet
+0
+0
+
+=== ui theme wechsel setzt die plastik zurueck
+' Ein Preset ist ein KOMPLETTER Look: wer von glas auf flach wechselt,
+IMPORT "ui"
+UI_THEME_PRESET("glas_hell")
+PRINT UI_METRIC_GET("gradient")
+UI_THEME_PRESET("retro")
+PRINT UI_METRIC_GET("gradient")
+--- erwartet
+16
+0
+
+=== ui beide glas themen gibt es
+IMPORT "ui"
+UI_THEME_PRESET("glas_dunkel")
+PRINT UI_THEME_GET("win_bg")
+UI_THEME_PRESET("glas_hell")
+PRINT UI_THEME_GET("win_bg")
+--- erwartet
+2304563
+14870767
+
+=== ui plastik metriken einzeln setzbar
+IMPORT "ui"
+UI_METRIC_SET("gradient", 24)
+UI_METRIC_SET("gloss", 40)
+PRINT UI_METRIC_GET("gradient")
+--- erwartet
+24
+
+=== hover und leave feuern je einmal
+IMPORT "gui"
+SCREEN(300, 200, "E")
+DIM w AS GUI_WINDOW
+DIM b AS GUI_WIDGET
+DIM f AS INTEGER
+w = GUI_WINDOW("W", 10, 10, 280, 160)
+b = GUI_BUTTON(w, "K", 20, 20, 100, 30)
+SUB rein() : PRINT "rein" : END SUB
+SUB raus() : PRINT "raus" : END SUB
+GUI_ON_HOVER(b, rein)
+GUI_ON_LEAVE(b, raus)
+FOR f = 1 TO 8
+    IF f = 2 THEN MOUSE_SET_POS(60, 55)
+    IF f = 5 THEN MOUSE_SET_POS(290, 195)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- erwartet
+rein
+raus
+
+=== fokus und blur folgen dem wechsel
+IMPORT "gui"
+SCREEN(300, 200, "F")
+DIM w AS GUI_WINDOW
+DIM t AS GUI_WIDGET
+DIM u AS GUI_WIDGET
+DIM f AS INTEGER
+w = GUI_WINDOW("W", 10, 10, 280, 160)
+t = GUI_TEXTINPUT(w, 20, 30, 200, 26)
+u = GUI_TEXTINPUT(w, 20, 70, 200, 26)
+SUB fa() : PRINT "A auf" : END SUB
+SUB ba() : PRINT "A zu" : END SUB
+SUB fb() : PRINT "B auf" : END SUB
+GUI_ON_FOCUS(t, fa)
+GUI_ON_BLUR(t, ba)
+GUI_ON_FOCUS(u, fb)
+FOR f = 1 TO 8
+    IF f = 2 THEN GUI_FOCUS(t)
+    IF f = 5 THEN GUI_FOCUS(u)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- erwartet
+A auf
+A zu
+B auf
+
+=== ereignisse ueberleben speichern und laden
+' Der Form-Designer speichert Handler-NAMEN im .dhform; GUI_LOAD stellt
+IMPORT "gui"
+SCREEN(300, 200, "S")
+DIM w AS GUI_WINDOW
+DIM w2 AS GUI_WINDOW
+DIM b AS GUI_WIDGET
+DIM f AS INTEGER
+SUB rein() : PRINT "rein" : END SUB
+w = GUI_WINDOW("W", 10, 10, 280, 160)
+b = GUI_BUTTON(w, "K", 20, 20, 100, 30)
+GUI_ON_HOVER(b, rein)
+w2 = GUI_FROM_JSON(GUI_TO_JSON(w))
+GUI_WINDOW_DESTROY(w)
+FOR f = 1 TO 6
+    IF f = 2 THEN MOUSE_SET_POS(60, 55)
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- erwartet
+rein
+

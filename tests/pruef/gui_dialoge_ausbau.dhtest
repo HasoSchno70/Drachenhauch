@@ -1,0 +1,364 @@
+' Aus test_gui_dialoge_ausbau.py uebertragen (14 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== eigene knoepfe antwort ist die nummer (1)
+' Klick auf den zweiten von drei Knoepfen -> Antwort 2.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "Speichern|Verwerfen|Abbrechen")
+DIM k AS GUI_WIDGET : k = GUI_WINDOW_WIDGET(d, GUI_WINDOW_WIDGET_COUNT(d) - 2)
+DIM np AS GUI_WIDGET : np = GUI_CANVAS(d, 0, 0, 1, 1)
+GUI_UPDATE()
+DIM ox AS INTEGER : ox = GUI_CANVAS_X(np)
+DIM oy AS INTEGER : oy = GUI_CANVAS_Y(np)
+PRINT ox + GUI_GET_X(k) + GUI_GET_W(k) \ 2 ; " " ; oy + GUI_GET_Y(k) + GUI_GET_H(k) \ 2
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+265 192
+
+=== eigene knoepfe antwort ist die nummer (2)
+' Klick auf den zweiten von drei Knoepfen -> Antwort 2.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "Speichern|Verwerfen|Abbrechen")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 4 7 265 192 0 0 // Event: test
+e 5 7 265 192 0 0 // Event: test
+e 5 6 0 0 0 0 // Event: test
+e 6 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 2
+
+=== enter ist der erste esc der letzte (1)
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "Speichern|Verwerfen|Abbrechen")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 256 0 0 0 // Event: test
+e 4 1 256 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 3
+
+=== enter ist der erste esc der letzte (2)
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "Speichern|Verwerfen|Abbrechen")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 257 0 0 0 // Event: test
+e 4 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 1
+
+=== janein bleibt wie es war
+' Die alten Stile liefern weiter 1 und 2 -- und ESC ist Nein.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "Text?", "janein")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 256 0 0 0 // Event: test
+e 4 1 256 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 2
+
+=== zu viele oder leere knoepfe sind ein fehler
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+TRY
+    GUI_DIALOG("F", "x", "a|b|c|d|e|f")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_DIALOG("F", "x", "a||b")
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    GUI_DIALOG("F", "x", "vielleicht")
+CATCH e3
+    PRINT e3
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_DIALOG: ein bis fuenf Knoepfe, getrennt mit |
+GUI_DIALOG: ein Knopf ohne Beschriftung
+GUI_DIALOG: 'vielleicht' ist kein Stil -- moeglich sind "ok" (Vorgabe), "janein" oder eigene Knoepfe mit | getrennt ("Speichern|Verwerfen|Abbrechen")
+
+=== prompt liefert den text mit enter
+' Tippen ueber die Zwischenablage (Strg+V); die Vorgabe ist markiert und
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+CLIPBOARD_SET("Hans")
+DIM d AS GUI_WINDOW : d = GUI_PROMPT("Name", "Wie heisst du?", "Anonym")
+PRINT GUI_DIALOG_TEXT(d)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 16
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d)) + " " + GUI_DIALOG_TEXT(d)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_DIALOG_TEXT(d) ; " " ; GUI_MODAL()
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 2 341 0 0 0 // Event: test
+e 3 2 86 0 0 0 // Event: test
+e 4 1 86 0 0 0 // Event: test
+e 4 1 341 0 0 0 // Event: test
+e 9 2 257 0 0 0 // Event: test
+e 10 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=20
+--- erwartet
+Anonym
+antwort 1 Hans
+Hans FALSE
+
+=== prompt esc ist abbrechen
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_PROMPT("Name", "Wie heisst du?")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 256 0 0 0 // Event: test
+e 4 1 256 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 2
+
+=== prompt mit eigenen knoepfen
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_PROMPT("Name", "Wie?", "", "Weiter|Ueberspringen|Abbruch")
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN PRINT "antwort " + STR$(GUI_ANSWER(d))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 256 0 0 0 // Event: test
+e 4 1 256 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+antwort 3
+
+=== dialog text nur bei prompt
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM d AS GUI_WINDOW : d = GUI_DIALOG("F", "x")
+TRY
+    PRINT GUI_DIALOG_TEXT(d)
+CATCH e
+    PRINT e
+END TRY
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("W", 10, 10, 100, 80)
+TRY
+    PRINT GUI_DIALOG_TEXT(w)
+CATCH e2
+    PRINT e2
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_DIALOG_TEXT: dieser Dialog hat kein Eingabefeld (nur GUI_PROMPT)
+GUI_DIALOG_TEXT: das Fenster ist kein Dialog (GUI_PROMPT)
+
+=== eigenes fenster modal verschluckt klicks daneben
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+GUI_WINDOW_MODAL(m, TRUE)
+PRINT GUI_MODAL()
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN PRINT "traf"
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 2 7 60 50 0 0 // Event: test
+e 3 7 60 50 0 0 // Event: test
+e 3 6 0 0 0 0 // Event: test
+e 4 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+TRUE
+
+=== gegenprobe ohne modal trifft der klick
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 10
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN PRINT "traf"
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 2 7 60 50 0 0 // Event: test
+e 3 7 60 50 0 0 // Event: test
+e 3 6 0 0 0 0 // Event: test
+e 4 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+traf
+
+=== modal aus gibt frei und ein knopf im fenster beendet es nicht
+' Anders als ein Dialog: ein Klick auf einen Knopf im modalen EIGENEN
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+GUI_WINDOW_MODAL(m, TRUE)
+GUI_FOCUS(ok)
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN PRINT "zu " + STR$(GUI_MODAL())
+    IF f = 8 THEN GUI_WINDOW_MODAL(m, FALSE)
+    IF f = 12 THEN PRINT GUI_MODAL()
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 3 2 257 0 0 0 // Event: test
+e 4 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+zu TRUE
+FALSE
+
+=== ausblenden gibt die modalitaet frei
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+DIM m AS GUI_WINDOW : m = GUI_WINDOW("Modal", 250, 150, 200, 120)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(m, "zu", 8, 8, 90, 26)
+GUI_WINDOW_MODAL(m, TRUE)
+DIM f AS INTEGER
+FOR f = 1 TO 6
+    GUI_UPDATE()
+    IF f = 2 THEN GUI_WINDOW_VISIBLE(m, FALSE)
+    IF f = 5 THEN PRINT GUI_MODAL()
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=8
+--- erwartet
+FALSE
+

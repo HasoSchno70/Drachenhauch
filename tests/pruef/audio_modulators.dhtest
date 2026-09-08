@@ -1,0 +1,257 @@
+' Aus test_audio_modulators.py uebertragen (21 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== lfo actually sweeps the filter
+IMPORT "audio"
+DIM n AS SOUND
+n = AUDIO_NOISE(4000)
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(n, -1, 1.0)
+DIM lfo AS AUDIO_MOD
+lfo = AUDIO_LFO_NEW("sine", 2.0, 1.0, 0.0)
+AUDIO_MODULATE("sfx", "filter", lfo, 200.0, 8000.0)
+DIM bands[16] AS FLOAT
+DIM i AS INTEGER
+DIM hoch AS FLOAT
+DIM tief AS FLOAT
+FOR i = 0 TO 40
+    SLEEP(25)
+    AUDIO_FFT(bands)
+    DIM h AS FLOAT
+    h = bands[13] + bands[14] + bands[15]
+    IF h > hoch THEN hoch = h
+    IF i = 0 OR h < tief THEN tief = h
+NEXT
+PRINT (hoch - tief) > 0.45
+--- erwartet
+TRUE
+
+=== without modulation the spectrum stays put
+IMPORT "audio"
+DIM n AS SOUND
+n = AUDIO_NOISE(4000)
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(n, -1, 1.0)
+AUDIO_FILTER("sfx", 2000.0)
+DIM bands[16] AS FLOAT
+DIM i AS INTEGER
+DIM hoch AS FLOAT
+DIM tief AS FLOAT
+FOR i = 0 TO 40
+    SLEEP(25)
+    AUDIO_FFT(bands)
+    DIM h AS FLOAT
+    h = bands[13] + bands[14] + bands[15]
+    IF h > hoch THEN hoch = h
+    IF i = 0 OR h < tief THEN tief = h
+NEXT
+PRINT (hoch - tief) < 0.45
+--- erwartet
+TRUE
+
+=== lfo and tweener can be created and removed
+IMPORT "audio"
+DIM a AS AUDIO_MOD
+a = AUDIO_LFO_NEW("sine", 3.0)
+DIM b AS AUDIO_MOD
+b = AUDIO_TWEENER_NEW(0.5)
+PRINT a >= 0
+PRINT b >= 0
+PRINT a <> b
+AUDIO_MOD_REMOVE(a)
+AUDIO_MOD_REMOVE(b)
+PRINT "ok"
+--- erwartet
+TRUE
+TRUE
+TRUE
+ok
+
+=== all waveforms are accepted
+IMPORT "audio"
+AUDIO_LFO_NEW("sine", 1.0)
+AUDIO_LFO_NEW("sinus", 1.0)
+AUDIO_LFO_NEW("triangle", 1.0)
+AUDIO_LFO_NEW("dreieck", 1.0)
+AUDIO_LFO_NEW("saw", 1.0)
+AUDIO_LFO_NEW("saegezahn", 1.0)
+AUDIO_LFO_NEW("pulse", 1.0)
+AUDIO_LFO_NEW("puls", 1.0)
+AUDIO_LFO_NEW("square", 1.0)
+AUDIO_LFO_NEW("rechteck", 1.0)
+AUDIO_LFO_NEW("SINE", 1.0)
+PRINT "ok"
+--- erwartet
+ok
+
+=== unknown waveform is rejected
+IMPORT "audio"
+AUDIO_LFO_NEW("wobbel", 1.0)
+--- fehler
+AUDIO_LFO: unbekannte Wellenform 'wobbel' -- erwartet sine/triangle/saw/pulse
+
+=== negative frequency is rejected before touching the device
+IMPORT "audio"
+AUDIO_LFO_NEW("sine", -1.0)
+--- fehler
+AUDIO_LFO_NEW: Frequenz darf nicht negativ sein
+
+=== tweener call on an lfo says so
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_LFO_NEW("sine", 2.0)
+AUDIO_TWEENER_TO(m, 1.0, 100.0)
+--- fehler
+AUDIO_TWEENER_TO: dieses Handle ist ein LFO, kein Tweener -- ein LFO schwingt von selbst und faehrt nicht zu einem Ziel
+
+=== lfo call on a tweener says so
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_TWEENER_NEW(0.0)
+AUDIO_LFO_SET(m, 5.0)
+--- fehler
+AUDIO_LFO_SET: dieses Handle ist ein Tweener, kein LFO
+
+=== bad handles are rejected (1)
+IMPORT "audio"
+AUDIO_MOD_REMOVE(99)
+--- fehler
+AUDIO_MOD_REMOVE: ungueltiges AUDIO_MOD-Handle
+
+=== bad handles are rejected (2)
+IMPORT "audio"
+AUDIO_LFO_SET(99, 1.0)
+--- fehler
+AUDIO_LFO_SET: ungueltiges AUDIO_MOD-Handle
+
+=== bad handles are rejected (3)
+IMPORT "audio"
+AUDIO_MODULATE("sfx", "filter", 99, 100.0, 200.0)
+--- fehler
+AUDIO_MODULATE: ungueltiges AUDIO_MOD-Handle
+
+=== unknown modulation target and bus are rejected (1)
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_LFO_NEW("sine", 1.0)
+AUDIO_MODULATE("sfx", "tonhoehe", m, 0.0, 1.0)
+--- fehler
+AUDIO_MODULATE: unbekanntes Ziel 'tonhoehe' -- erwartet volume/pan/filter/resonance/reverb/distortion
+
+=== unknown modulation target and bus are rejected (2)
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_LFO_NEW("sine", 1.0)
+AUDIO_MODULATE("gitarre", "filter", m, 0.0, 1.0)
+--- fehler
+AUDIO_MODULATE: unbekannter Bus 'gitarre' (sfx, music, master)
+
+=== all modulation targets are accepted
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_LFO_NEW("sine", 1.0)
+AUDIO_MODULATE("sfx", "filter", m, 200.0, 4000.0)
+AUDIO_MODULATE("sfx", "resonance", m, 0.0, 10.0)
+AUDIO_MODULATE("music", "reverb", m, 0.0, 1.0)
+AUDIO_MODULATE("master", "distortion", m, 0.0, 12.0)
+PRINT "ok"
+--- erwartet
+ok
+
+=== tweener runs and accepts easings
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_TWEENER_NEW(0.0)
+AUDIO_MODULATE("sfx", "filter", m, 200.0, 8000.0)
+AUDIO_TWEENER_TO(m, 1.0, 20.0, "linear")
+AUDIO_TWEENER_TO(m, 1.0, 20.0, "in")
+AUDIO_TWEENER_TO(m, 1.0, 20.0, "out")
+AUDIO_TWEENER_TO(m, 1.0, 20.0, "inout")
+AUDIO_TWEENER_TO(m, 1.0, 20.0, "")
+PRINT "ok"
+--- erwartet
+ok
+
+=== unknown easing is rejected
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_TWEENER_NEW(0.0)
+AUDIO_TWEENER_TO(m, 1.0, 10.0, "huepfend")
+--- fehler
+AUDIO_TWEENER_TO: unbekanntes Easing 'huepfend' (linear, in, out, inout)
+
+=== volume modulation produces a tremolo
+IMPORT "audio"
+DIM n AS SOUND
+n = AUDIO_NOISE(4000)
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(n, -1, 1.0)
+DIM lfo AS AUDIO_MOD
+lfo = AUDIO_LFO_NEW("sine", 3.0)
+AUDIO_MODULATE("sfx", "volume", lfo, 0.0, 1.0)
+DIM bands[16] AS FLOAT
+DIM i AS INTEGER
+DIM hoch AS FLOAT
+DIM tief AS FLOAT
+FOR i = 0 TO 40
+    SLEEP(25)
+    AUDIO_FFT(bands)
+    DIM s AS FLOAT
+    s = bands[4] + bands[5] + bands[6]
+    IF s > hoch THEN hoch = s
+    IF i = 0 OR s < tief THEN tief = s
+NEXT
+PRINT (hoch - tief) > 1.6
+--- erwartet
+TRUE
+
+=== without volume modulation the level stays put
+IMPORT "audio"
+DIM n AS SOUND
+n = AUDIO_NOISE(4000)
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(n, -1, 1.0)
+DIM bands[16] AS FLOAT
+DIM i AS INTEGER
+DIM hoch AS FLOAT
+DIM tief AS FLOAT
+FOR i = 0 TO 40
+    SLEEP(25)
+    AUDIO_FFT(bands)
+    DIM s AS FLOAT
+    s = bands[4] + bands[5] + bands[6]
+    IF s > hoch THEN hoch = s
+    IF i = 0 OR s < tief THEN tief = s
+NEXT
+PRINT (hoch - tief) < 1.6
+--- erwartet
+TRUE
+
+=== bus panning and auto pan are accepted
+IMPORT "audio"
+AUDIO_BUS_PAN("sfx", -1.0)
+AUDIO_BUS_PAN("music", 0.5)
+AUDIO_BUS_PAN("master", 0.0)
+AUDIO_BUS_PAN("sfx", -9.0)
+AUDIO_BUS_PAN("sfx", 9.0)
+DIM lfo AS AUDIO_MOD
+lfo = AUDIO_LFO_NEW("triangle", 0.5)
+AUDIO_MODULATE("sfx", "pan", lfo, -1.0, 1.0)
+AUDIO_MODULATE("music", "panning", lfo, -0.5, 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== bus pan rejects an unknown bus
+IMPORT "audio"
+AUDIO_BUS_PAN("gitarre", 0.0)
+--- fehler
+AUDIO_BUS_PAN: unbekannter Bus 'gitarre' (sfx, music, master)
+
+=== modulation target list names the new targets
+IMPORT "audio"
+DIM m AS AUDIO_MOD
+m = AUDIO_LFO_NEW("sine", 1.0)
+AUDIO_MODULATE("sfx", "quatsch", m, 0.0, 1.0)
+--- fehler
+AUDIO_MODULATE: unbekanntes Ziel 'quatsch' -- erwartet volume/pan/filter/resonance/reverb/distortion
+

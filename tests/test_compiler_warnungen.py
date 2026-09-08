@@ -18,6 +18,10 @@ Beide Warnungen hier stammen aus echten Stolpersteinen beim Bauen der Demo:
 Beides sind WARNUNGEN, keine Fehler: der Compiler laesst das Programm laufen.
 Ob es dann auch durchlaeuft, haengt beim Argumentzahl-Fall am Builtin.
 Geprueft wird ueber `dhrt --check`, das die Warnungen als JSON ausgibt.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/compiler_warnungen.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import json
 import os
@@ -89,14 +93,6 @@ def test_meldung_verspricht_keine_folgenlosigkeit(tmp_path):
     w = _warnungen(tmp_path, 'PRINT MID$("abc", 1, 2, 99)\n')
     assert any("MID$" in m and "4 Argumente" in m for m in w), w
     assert not any("werden ignoriert" in m for m in w), w
-
-
-def test_ueberzaehliges_argument_bricht_bei_geprueften_builtins_ab(run_gb):
-    """Das Gegenstueck zur Meldung: hier laeuft das Programm eben NICHT
-    weiter. `MID$` liegt in `builtins.rs` und prueft seine Argumentzahl."""
-    from drachenhauch.errors import DHRuntimeError
-    with pytest.raises(DHRuntimeError, match=r"MID\$: erwartet 2\.\.3 Argumente, erhalten 4"):
-        run_gb('PRINT MID$("abc", 1, 2, 99)')
 
 
 def test_variadische_builtins_werden_nicht_gemeldet(tmp_path):
@@ -300,17 +296,6 @@ def test_kommazahl_an_kommazahl_warnt_nicht(tmp_path):
     assert not any("als INTEGER angesagt" in m for m in w), w
 
 
-def test_warnung_blockiert_nicht(tmp_path):
-    """Es bleibt eine Warnung: das Programm laeuft, solange der Wert passt."""
-    f = tmp_path / "lauf.dh"
-    f.write_text("DIM g AS FLOAT" + chr(10) + "g = 1.5" + chr(10)
-                 + "DIM n AS INTEGER" + chr(10) + "n = g * 2.0" + chr(10)
-                 + "PRINT n" + chr(10), encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
-                       text=True, encoding="utf-8", timeout=60)
-    assert r.stdout.strip() == "3", (r.stdout, r.stderr)
-
-
 # ------------------------------------------- Typ, den das Ziel nie annimmt
 #
 # Anders als die Kommazahl-Warnung ist das NICHT wertabhaengig: `s = 5` bei
@@ -452,16 +437,6 @@ def test_unbekannter_typ_bleibt_still(tmp_path):
     ein Fund weniger als ein falscher Alarm."""
     w = _warnungen(tmp_path, 'DIM i AS INTEGER\ni = LEN("abc")\n')
     assert not any("bricht beim Laufen ab" in m for m in w), w
-
-
-def test_meldung_blockiert_die_uebersetzung_nicht(tmp_path):
-    """Es bleibt eine Warnung: alles vor der schlechten Zeile laeuft."""
-    f = tmp_path / "lauf.dh"
-    f.write_text('PRINT "davor"\nDIM s AS STRING\ns = 5\n', encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(f)], capture_output=True,
-                       text=True, encoding="utf-8", timeout=60)
-    assert "davor" in r.stdout, (r.stdout, r.stderr)
-    assert "Erwartet STRING" in (r.stdout + r.stderr), (r.stdout, r.stderr)
 
 
 # ------------------------------------------------- Argumenttyp am Aufruf

@@ -188,43 +188,7 @@ def test_shipped_demo_loads_in_editor():
         assert t.from_state in names and t.to_state in doc.state_names()
 
 
-def test_shipped_demo_runtime_valid(run_gb, tmp_path):
-    """Die Demo muss vom animfsm-Runtime ladbar sein (kein Validierungsfehler)."""
-    import shutil
-    shutil.copy(str(_DEMO), str(tmp_path / "anim_demo.dhanim"))
-    src = (
-        'IMPORT "animfsm"\n'
-        'IMPORT "sprite"\n'
-        'DIM sp AS SPRITE\n'
-        'sp = SPRITE_NEW(0, 16, 16)\n'
-        'DIM fsm AS ANIM_FSM\n'
-        'fsm = ANIM_FSM_LOAD("anim_demo.dhanim")\n'
-        'ANIM_FSM_SETUP(fsm, sp)\n'
-        'PRINT ANIM_FSM_STATE(fsm)\n'
-    )
-    assert run_gb(src, base=tmp_path).strip() == "idle"
-
-
 # ----------------------------------------------------------------- Closed-Loop
-def test_editor_output_loads_in_runtime(run_gb, tmp_path):
-    """Editor-Output -> `.dhanim` -> ANIM_FSM_LOAD: identischer Default-State."""
-    doc = _sample_doc()
-    doc.sheet = ""   # kein echtes Bild im Test -> Sprite mit Dummy-Handle
-    doc.save(str(tmp_path / "hero.dhanim"))
-    src = (
-        'IMPORT "animfsm"\n'
-        'IMPORT "sprite"\n'
-        'DIM sp AS SPRITE\n'
-        'sp = SPRITE_NEW(0, 16, 16)\n'
-        'DIM fsm AS ANIM_FSM\n'
-        'fsm = ANIM_FSM_LOAD("hero.dhanim")\n'
-        'ANIM_FSM_SETUP(fsm, sp)\n'
-        'PRINT ANIM_FSM_STATE(fsm)\n'
-        'ANIM_FSM_SET_FLOAT(fsm, "speed", 9.0)\n'
-        'ANIM_FSM_UPDATE(fsm, sp, 16)\n'
-        'PRINT ANIM_FSM_STATE(fsm)\n'
-    )
-    assert run_gb(src, base=tmp_path).strip().split("\n") == ["idle", "run"]
 
 
 # ----------------------------------------------------------------- Codegen

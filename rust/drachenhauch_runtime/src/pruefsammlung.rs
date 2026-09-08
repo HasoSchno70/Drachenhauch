@@ -70,6 +70,215 @@ pub struct Fall {
     /// falls die Umgebung keins nennt, DHRT_FRAMES=2), mit Namen an einer
     /// Datei, die das Programm selbst geschrieben hat.
     pub bild: Option<BildPruefung>,
+    /// `--- ton datei.wav`: Proben an einer WAV-Datei, die das Programm
+    /// geschrieben hat (`AUDIO_SAVE_WAV`) -- Kanaele, Bittiefe, Abtastrate,
+    /// Dauer, Spitze und der Pegel in einem Zeitfenster.
+    pub ton: Option<TonPruefung>,
+    /// `--- system windows` (auch `posix`, `macos`, `linux`, mehrere durch
+    /// Leerzeichen): der Fall gilt nur dort, anderswo ist er uebersprungen --
+    /// fuer `SHELL("cmd", "/c", ...)` und alles, was ein Betriebssystem braucht.
+    pub system: Option<Vec<String>>,
+}
+
+/// Passt die Liste aus `--- system` zu dieser Maschine? `posix` heisst
+/// alles ausser Windows.
+pub fn system_passt(systeme: &[String]) -> bool {
+    system_passt_auf(systeme, std::env::consts::OS)
+}
+
+fn system_passt_auf(systeme: &[String], os: &str) -> bool {
+    systeme.iter().any(|s| match s.as_str() {
+        "posix" => os != "windows",
+        andere => andere == os,
+    })
+}
+
+/// Was `--- ton` an einer WAV-Datei pruefen soll.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TonPruefung {
+    pub datei: String,
+    pub proben: Vec<TonProbe>,
+}
+
+/// Eine Zeile im `--- ton`-Block. Pegel sind Spitzenwerte je 10-ms-Fenster
+/// des ersten Kanals (die Huellkurve, grob abgetastet -- so massen die
+/// pytest-Tests mit `_huelle`), Amplituden liegen in -1..1.
+#[derive(Debug, Clone, PartialEq)]
+pub enum TonProbe {
+    /// `kanaele N`
+    Kanaele(u16),
+    /// `bits N`
+    Bits(u16),
+    /// `abtastrate N`
+    Abtastrate(u32),
+    /// `dauer S +-T` in Sekunden
+    Dauer(f64, f64),
+    /// `spitze X +-T` -- groesster Betrag ueber alle Kanaele
+    Spitze(f64, f64),
+    /// `pegel VON BIS < X` (jedes Fenster darunter), `pegel VON BIS > X`
+    /// (jedes Fenster darueber), `pegel VON BIS X +-T` (jedes Fenster im Band);
+    /// VON/BIS in Millisekunden, BIS ausschliesslich
+    Pegel { von: u32, bis: u32, art: PegelArt },
+    /// `kanaele gleich` / `kanaele verschieden` -- linker gegen rechten Kanal
+    KanaeleGleich(bool),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PegelArt { Unter(f64), Ueber(f64), Band(f64, f64) }
+
+/// Eine gelesene WAV-Datei: Abtastwerte je Kanal in -1..1.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Wav {
+    pub abtastrate: u32,
+    pub bits: u16,
+    pub kanaele: Vec<Vec<f64>>,
+}
+
+/// RIFF/WAVE lesen: PCM 8 (vorzeichenlos), 16/24/32 (vorzeichenbehaftet) und
+/// 32-Bit-Float. Eigener Leser, weil die Pruefung keine raylib braucht und
+/// die Kanaele GETRENNT sehen muss (`sprache::wav_lesen` mittelt sie).
+pub fn wav_lesen(daten: &[u8]) -> Result<Wav, String> {
+    if daten.len() < 12 || &daten[0..4] != b"RIFF" || &daten[8..12] != b"WAVE" {
+        return Err("kein RIFF/WAVE-Kopf".into());
+    }
+    let u16le = |p: usize| u16::from_le_bytes([daten[p], daten[p + 1]]);
+    let u32le = |p: usize| u32::from_le_bytes([daten[p], daten[p + 1], daten[p + 2], daten[p + 3]]);
+    let (mut format, mut kanaele, mut rate, mut bits) = (0u16, 0u16, 0u32, 0u16);
+    let mut nutz: Option<&[u8]> = None;
+    let mut p = 12;
+    while p + 8 <= daten.len() {
+        let kennung = &daten[p..p + 4];
+        let laenge = u32le(p + 4) as usize;
+        let anfang = p + 8;
+        let ende = (anfang + laenge).min(daten.len());
+        match kennung {
+            b"fmt " => {
+                if ende - anfang < 16 { return Err("fmt-Block zu kurz".into()); }
+                format = u16le(anfang);
+                kanaele = u16le(anfang + 2);
+                rate = u32le(anfang + 4);
+                bits = u16le(anfang + 14);
+                // WAVE_FORMAT_EXTENSIBLE traegt das eigentliche Format im Unterblock
+                if format == 0xFFFE && ende - anfang >= 26 { format = u16le(anfang + 24); }
+            }
+            b"data" => { nutz = Some(&daten[anfang..ende]); }
+            _ => {}
+        }
+        p = anfang + laenge + (laenge & 1);
+    }
+    let nutz = nutz.ok_or("kein data-Block")?;
+    if kanaele == 0 || rate == 0 { return Err("fmt-Block fehlt oder ist leer".into()); }
+    let breite = (bits / 8) as usize;
+    if breite == 0 { return Err(format!("Bittiefe {} nicht lesbar", bits)); }
+    let mut spuren: Vec<Vec<f64>> = vec![Vec::new(); kanaele as usize];
+    let rahmen = nutz.len() / (breite * kanaele as usize);
+    for i in 0..rahmen {
+        for k in 0..kanaele as usize {
+            let o = (i * kanaele as usize + k) * breite;
+            let s = &nutz[o..o + breite];
+            let wert = match (format, bits) {
+                (1, 8) => (s[0] as f64 - 128.0) / 127.0,
+                (1, 16) => i16::from_le_bytes([s[0], s[1]]) as f64 / 32767.0,
+                (1, 24) => (i32::from_le_bytes([0, s[0], s[1], s[2]]) >> 8) as f64 / 8_388_607.0,
+                (1, 32) => i32::from_le_bytes([s[0], s[1], s[2], s[3]]) as f64 / 2_147_483_647.0,
+                (3, 32) => f32::from_le_bytes([s[0], s[1], s[2], s[3]]) as f64,
+                _ => return Err(format!("Format {} mit {} Bit nicht lesbar", format, bits)),
+            };
+            spuren[k].push(wert);
+        }
+    }
+    Ok(Wav { abtastrate: rate, bits, kanaele: spuren })
+}
+
+fn kommazahl(wort: &str, was: &str) -> Result<f64, String> {
+    wort.parse::<f64>().map_err(|_| format!("{} '{}' ist keine Zahl", was, wort))
+}
+
+fn toleranz(wort: &str) -> Result<f64, String> {
+    let t = wort.strip_prefix("+-").ok_or_else(|| format!("Toleranz '{}' schreibt man +-T", wort))?;
+    kommazahl(t, "Toleranz")
+}
+
+/// Eine Zeile des `--- ton`-Blocks lesen.
+pub fn ton_probe_parsen(zeile: &str) -> Result<TonProbe, String> {
+    let w: Vec<&str> = zeile.split_whitespace().collect();
+    match w.as_slice() {
+        ["kanaele", "gleich"] => Ok(TonProbe::KanaeleGleich(true)),
+        ["kanaele", "verschieden"] => Ok(TonProbe::KanaeleGleich(false)),
+        ["kanaele", n] => Ok(TonProbe::Kanaele(zahl(n, "Kanaele")? as u16)),
+        ["bits", n] => Ok(TonProbe::Bits(zahl(n, "Bits")? as u16)),
+        ["abtastrate", n] => Ok(TonProbe::Abtastrate(zahl(n, "Abtastrate")?)),
+        ["dauer", s, t] => Ok(TonProbe::Dauer(kommazahl(s, "Dauer")?, toleranz(t)?)),
+        ["spitze", x, t] => Ok(TonProbe::Spitze(kommazahl(x, "Spitze")?, toleranz(t)?)),
+        ["pegel", von, bis, "<", x] => Ok(TonProbe::Pegel { von: zahl(von, "von")?, bis: zahl(bis, "bis")?, art: PegelArt::Unter(kommazahl(x, "Pegel")?) }),
+        ["pegel", von, bis, ">", x] => Ok(TonProbe::Pegel { von: zahl(von, "von")?, bis: zahl(bis, "bis")?, art: PegelArt::Ueber(kommazahl(x, "Pegel")?) }),
+        ["pegel", von, bis, x, t] => Ok(TonProbe::Pegel { von: zahl(von, "von")?, bis: zahl(bis, "bis")?, art: PegelArt::Band(kommazahl(x, "Pegel")?, toleranz(t)?) }),
+        _ => Err(format!("Probe '{}' nicht verstanden (kanaele N|gleich|verschieden, bits N, abtastrate N, dauer S +-T, spitze X +-T, pegel VON BIS <X | >X | X +-T)", zeile.trim())),
+    }
+}
+
+/// Spitzenpegel je 10-ms-Fenster des ersten Kanals im Bereich [von, bis) ms.
+fn huelle(w: &Wav, von: u32, bis: u32) -> Vec<f64> {
+    let spur = &w.kanaele[0];
+    let fenster = (w.abtastrate as usize / 100).max(1);
+    let (a, b) = (von as usize / 10, bis as usize / 10);
+    (a..b).filter_map(|i| {
+        let s = &spur[(i * fenster).min(spur.len())..((i + 1) * fenster).min(spur.len())];
+        if s.is_empty() { None } else { Some(s.iter().fold(0.0f64, |m, v| m.max(v.abs()))) }
+    }).collect()
+}
+
+/// Alle Proben gegen die WAV; die erste, die nicht passt, ist die Meldung.
+pub fn ton_pruefen(p: &TonPruefung, w: &Wav) -> Result<(), String> {
+    let rahmen = w.kanaele.first().map_or(0, |k| k.len());
+    for probe in &p.proben {
+        match probe {
+            TonProbe::Kanaele(n) => if w.kanaele.len() != *n as usize {
+                return Err(format!("{} Kanaele, erwartet {}", w.kanaele.len(), n));
+            },
+            TonProbe::Bits(n) => if w.bits != *n {
+                return Err(format!("{} Bit, erwartet {}", w.bits, n));
+            },
+            TonProbe::Abtastrate(n) => if w.abtastrate != *n {
+                return Err(format!("Abtastrate {}, erwartet {}", w.abtastrate, n));
+            },
+            TonProbe::Dauer(s, t) => {
+                let ist = rahmen as f64 / w.abtastrate as f64;
+                if (ist - s).abs() > *t {
+                    return Err(format!("Dauer {:.4} s, erwartet {} +-{}", ist, s, t));
+                }
+            }
+            TonProbe::Spitze(x, t) => {
+                let ist = w.kanaele.iter().flatten().fold(0.0f64, |m, v| m.max(v.abs()));
+                if (ist - x).abs() > *t {
+                    return Err(format!("Spitze {:.4}, erwartet {} +-{}", ist, x, t));
+                }
+            }
+            TonProbe::Pegel { von, bis, art } => {
+                let h = huelle(w, *von, *bis);
+                if h.is_empty() {
+                    return Err(format!("Pegel {}..{} ms: kein Fenster (Datei ist {:.3} s lang)", von, bis, rahmen as f64 / w.abtastrate as f64));
+                }
+                let (min, max) = h.iter().fold((f64::MAX, 0.0f64), |(a, b), v| (a.min(*v), b.max(*v)));
+                let fehl = match art {
+                    PegelArt::Unter(x) => (max >= *x).then(|| format!("Pegel {}..{} ms: Spitze {:.4}, sollte unter {} liegen", von, bis, max, x)),
+                    PegelArt::Ueber(x) => (min <= *x).then(|| format!("Pegel {}..{} ms: leisestes Fenster {:.4}, sollte ueber {} liegen", von, bis, min, x)),
+                    PegelArt::Band(x, t) => ((min - x).abs() > *t || (max - x).abs() > *t)
+                        .then(|| format!("Pegel {}..{} ms: Fenster {:.4}..{:.4}, erwartet {} +-{}", von, bis, min, max, x, t)),
+                };
+                if let Some(m) = fehl { return Err(m); }
+            }
+            TonProbe::KanaeleGleich(gleich) => {
+                if w.kanaele.len() < 2 { return Err(format!("nur {} Kanal -- Vergleich braucht zwei", w.kanaele.len())); }
+                let ist_gleich = w.kanaele[0] == w.kanaele[1];
+                if ist_gleich != *gleich {
+                    return Err(if *gleich { "linker und rechter Kanal sind verschieden, erwartet gleich".into() }
+                               else { "linker und rechter Kanal sind gleich, erwartet verschieden".into() });
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Was `--- bild` an einem Bild pruefen soll.
@@ -224,11 +433,27 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton }
+
+/// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
+/// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
+/// Betriebsmittel teilen, das es nur einmal gibt: die Zwischenablage, einen
+/// festen Port, die Soundkarte.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Sammlung {
+    pub seriell: bool,
+    pub faelle: Vec<Fall>,
+}
+
+/// Die Faelle einer Sammlung lesen (ohne den Kopf; siehe `sammlung_parsen`).
+pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
+    sammlung_parsen(text).map(|s| s.faelle)
+}
 
 /// Eine Sammlung aus ihrem Text lesen.
-pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
+pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
     let mut faelle: Vec<Fall> = Vec::new();
+    let mut seriell = false;
     let mut abschnitt = Abschnitt::Quelle;
     let mut puffer: Vec<String> = Vec::new();
     let mut datei_name = String::new();
@@ -269,6 +494,12 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                     bp.proben.push(probe_parsen(z).map_err(|e| format!("Fall '{}', --- bild: {}", f.name, e))?);
                 }
             }
+            Abschnitt::Ton => {
+                let tp = f.ton.get_or_insert_with(TonPruefung::default);
+                for z in puffer.iter().map(|z| z.trim()).filter(|z| !z.is_empty() && !z.starts_with('\'')) {
+                    tp.proben.push(ton_probe_parsen(z).map_err(|e| format!("Fall '{}', --- ton: {}", f.name, e))?);
+                }
+            }
             Abschnitt::Umgebung => {
                 for z in puffer.iter().filter(|z| !z.trim().is_empty()) {
                     if let Some((k, v)) = z.split_once('=') {
@@ -294,7 +525,11 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
             abschnitt = Abschnitt::Quelle;
             continue;
         }
-        if faelle.is_empty() { continue; }           // Kopfkommentar vor dem ersten Fall
+        if faelle.is_empty() {                       // Kopfkommentar vor dem ersten Fall
+            if zeile.trim() == "--- seriell" { seriell = true; }
+            else if zeile.starts_with("--- ") { return Err(format!("Zeile {}: vor dem ersten Fall ist nur '--- seriell' erlaubt", nr + 1)); }
+            continue;
+        }
         if let Some(rest) = zeile.strip_prefix("--- ") {
             let f = faelle.last_mut().unwrap();
             abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?;
@@ -335,7 +570,22 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
                     f.bild = Some(BildPruefung { datei: if arg.is_empty() { None } else { Some(arg.to_string()) }, proben: Vec::new() });
                     Abschnitt::Bild
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild)", nr + 1, other)),
+                "system" => {
+                    let liste: Vec<String> = arg.split_whitespace().map(|s| s.to_lowercase()).collect();
+                    if liste.is_empty() { return Err(format!("Zeile {}: '--- system' braucht windows, posix, macos oder linux", nr + 1)); }
+                    if let Some(u) = liste.iter().find(|s| !["windows", "posix", "macos", "linux"].contains(&s.as_str())) {
+                        return Err(format!("Zeile {}: '--- system {}' kenne ich nicht (windows, posix, macos, linux)", nr + 1, u));
+                    }
+                    f.system = Some(liste);
+                    Abschnitt::Verzeichnis        // kein Inhalt -- wie bei verzeichnis
+                }
+                "ton" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- ton' braucht den Namen der WAV-Datei", nr + 1)); }
+                    if f.ton.is_some() { return Err(format!("Zeile {}: '--- ton' gibt es in diesem Fall schon", nr + 1)); }
+                    f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
+                    Abschnitt::Ton
+                }
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, datei, verzeichnis, umgebung, bild, ton, system)", nr + 1, other)),
             };
             continue;
         }
@@ -347,7 +597,7 @@ pub fn parsen(text: &str) -> Result<Vec<Fall>, String> {
             return Err(format!("Zeile {}: der Fall '{}' hat keinen Quelltext", f.zeile, f.name));
         }
     }
-    Ok(faelle)
+    Ok(Sammlung { seriell, faelle })
 }
 
 /// Leerzeilen am Ende zaehlen nicht, Windows-Umbrueche auch nicht -- in einer
@@ -413,9 +663,12 @@ pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik:
         if let Some(m) = KEIN_FENSTER.iter().find(|m| stderr.contains(*m) || stdout.contains(*m)) {
             return Ergebnis::Uebersprungen(format!("kein Fenster moeglich ({})", m));
         }
-        if ohne_grafik && stderr.contains("im Rust-Kern noch nicht verfuegbar") {
-            return Ergebnis::Uebersprungen("Build ohne Grafik".into());
-        }
+    }
+    // Ein Bau ohne Grafik/Audio meldet den fehlenden Befehl im Klartext -- auch
+    // dann, wenn das Programm die Meldung selbst faengt und AUSGIBT (`TRY ...
+    // CATCH e : PRINT e`) und mit 0 endet. Die Zeile ist unverwechselbar.
+    if ohne_grafik && (stderr.contains("im Rust-Kern noch nicht verfuegbar") || stdout.contains("im Rust-Kern noch nicht verfuegbar")) {
+        return Ergebnis::Uebersprungen("Build ohne Grafik".into());
     }
     let out = glatt(&ohne_logzeilen(stdout));
     if let Some(muster) = &fall.fehler {
@@ -467,6 +720,80 @@ mod tests {
         let v = parsen("=== a\nPRINT 1\n--- verzeichnis leer/tief\n--- erwartet\n1\n").unwrap();
         assert_eq!(v[0].verzeichnisse, vec!["leer/tief".to_string()]);
         assert_eq!(v[0].erwartet.as_deref(), Some("1"));
+    }
+
+    /// Eine WAV von Hand: 16 Bit, `kanaele` Kanaele, `rate` Hz, `werte` je
+    /// Rahmen (ein Wert je Kanal, -1..1).
+    fn wav_bauen(kanaele: u16, rate: u32, werte: &[f64]) -> Vec<u8> {
+        let mut d = Vec::new();
+        let n = werte.len() as u32 * 2;
+        d.extend_from_slice(b"RIFF"); d.extend_from_slice(&(36 + n).to_le_bytes()); d.extend_from_slice(b"WAVE");
+        d.extend_from_slice(b"fmt "); d.extend_from_slice(&16u32.to_le_bytes());
+        d.extend_from_slice(&1u16.to_le_bytes()); d.extend_from_slice(&kanaele.to_le_bytes());
+        d.extend_from_slice(&rate.to_le_bytes()); d.extend_from_slice(&(rate * kanaele as u32 * 2).to_le_bytes());
+        d.extend_from_slice(&(kanaele * 2).to_le_bytes()); d.extend_from_slice(&16u16.to_le_bytes());
+        d.extend_from_slice(b"data"); d.extend_from_slice(&n.to_le_bytes());
+        for v in werte { d.extend_from_slice(&((v * 32767.0).round() as i16).to_le_bytes()); }
+        d
+    }
+
+    #[test]
+    fn tonproben_lesen_und_pruefen() {
+        // 1000 Hz, mono, 100 ms: erste 50 ms still, dann 0.5 -- Fenster sind 10 ms (10 Rahmen)
+        let mut werte = vec![0.0; 50];
+        werte.extend(std::iter::repeat(0.5).take(50));
+        let w = wav_lesen(&wav_bauen(1, 1000, &werte)).unwrap();
+        assert_eq!((w.abtastrate, w.bits, w.kanaele.len(), w.kanaele[0].len()), (1000, 16, 1, 100));
+        let f = parsen("=== a\nPRINT 1\n--- ton t.wav\nkanaele 1\nbits 16\nabtastrate 1000\ndauer 0.1 +-0.001\nspitze 0.5 +-0.01\npegel 0 50 < 0.01\npegel 50 100 > 0.4\npegel 50 100 0.5 +-0.01\n' Kommentar\n").unwrap();
+        let tp = f[0].ton.as_ref().unwrap();
+        assert_eq!(tp.datei, "t.wav");
+        assert_eq!(tp.proben.len(), 8);
+        assert_eq!(ton_pruefen(tp, &w), Ok(()));
+        let falsch = |z: &str| ton_pruefen(&TonPruefung { datei: "t".into(), proben: vec![ton_probe_parsen(z).unwrap()] }, &w).unwrap_err();
+        assert!(falsch("kanaele 2").contains("1 Kanaele, erwartet 2"));
+        assert!(falsch("pegel 0 100 < 0.01").contains("sollte unter"));
+        assert!(falsch("pegel 0 100 > 0.4").contains("leisestes Fenster"));
+        assert!(falsch("dauer 0.2 +-0.01").contains("Dauer 0.1000 s"));
+        assert!(falsch("kanaele gleich").contains("braucht zwei"));
+        // Stereo: verschieden / gleich
+        let st = wav_lesen(&wav_bauen(2, 1000, &[0.1, 0.2, 0.1, 0.2])).unwrap();
+        assert_eq!(st.kanaele.len(), 2);
+        assert_eq!(ton_pruefen(&TonPruefung { datei: "s".into(), proben: vec![TonProbe::KanaeleGleich(false)] }, &st), Ok(()));
+        let gl = wav_lesen(&wav_bauen(2, 1000, &[0.1, 0.1, 0.2, 0.2])).unwrap();
+        assert_eq!(ton_pruefen(&TonPruefung { datei: "s".into(), proben: vec![TonProbe::KanaeleGleich(true)] }, &gl), Ok(()));
+        // 8 Bit ist vorzeichenlos
+        let mut acht = wav_bauen(1, 1000, &[]);
+        acht[34] = 8; acht[32] = 1;          // bits = 8, blockalign = 1
+        let dl = acht.len(); acht.truncate(dl - 4); acht.extend_from_slice(&2u32.to_le_bytes()); acht.extend_from_slice(&[128u8, 255u8]);
+        let w8 = wav_lesen(&acht).unwrap();
+        assert_eq!(w8.bits, 8);
+        assert!((w8.kanaele[0][0]).abs() < 1e-9 && (w8.kanaele[0][1] - 1.0).abs() < 1e-9);
+        assert!(wav_lesen(b"nix").unwrap_err().contains("RIFF"));
+        assert!(parsen("=== a\nPRINT 1\n--- ton\nkanaele 1\n").unwrap_err().contains("Namen der WAV"));
+        assert!(parsen("=== a\nPRINT 1\n--- ton t.wav\nlaut 3\n").unwrap_err().contains("nicht verstanden"));
+    }
+
+    #[test]
+    fn system_grenzt_einen_fall_ein() {
+        let f = parsen("=== a\nPRINT SHELL(\"cmd\", \"/c\", \"exit 7\")\n--- system windows\n--- erwartet\n7\n").unwrap();
+        assert_eq!(f[0].system.as_deref(), Some(&["windows".to_string()][..]));
+        assert_eq!(f[0].erwartet.as_deref(), Some("7"));
+        let w = vec!["windows".to_string()];
+        assert!(system_passt_auf(&w, "windows") && !system_passt_auf(&w, "linux"));
+        let p = vec!["posix".to_string()];
+        assert!(system_passt_auf(&p, "macos") && system_passt_auf(&p, "linux") && !system_passt_auf(&p, "windows"));
+        assert!(parsen("=== a\nPRINT 1\n--- system amiga\n").unwrap_err().contains("kenne ich nicht"));
+        // Ein Fall ohne --- system gilt ueberall, und die Meldung beim Ueberspringen nennt das System
+        assert_eq!(bewerten(&f[0], 0, "7\n", "", false), Ergebnis::Ok);
+    }
+
+    #[test]
+    fn seriell_steht_im_kopf() {
+        let s = sammlung_parsen("' Kopf\n--- seriell\n=== a\nPRINT 1\n").unwrap();
+        assert!(s.seriell);
+        assert_eq!(s.faelle.len(), 1);
+        assert!(!sammlung_parsen("=== a\nPRINT 1\n").unwrap().seriell);
+        assert!(sammlung_parsen("--- erwartet\n1\n=== a\nPRINT 1\n").unwrap_err().contains("nur '--- seriell'"));
     }
 
     #[test]

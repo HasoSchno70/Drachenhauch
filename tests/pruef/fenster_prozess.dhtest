@@ -1,0 +1,52 @@
+' Aus test_fenster_prozess.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== fehler haben klare worte
+SCREEN(240, 160, "Eltern", 1)
+SET_WINDOW_POS(-3000, -3000)
+TRY
+    WINDOW_OPEN("gibtsnicht.dh")
+CATCH e
+    PRINT e
+END TRY
+DIM k AS INTEGER : k = WINDOW_OPEN("kind.dh")
+TRY
+    WINDOW_SEND(k, "a" + CHR$(10) + "b")
+CATCH e2
+    PRINT e2
+END TRY
+TRY
+    PARENT_SEND("x")
+CATCH e3
+    PRINT e3
+END TRY
+WINDOW_CLOSE(k)
+TRY
+    WINDOW_SEND(k, "x")
+CATCH e4
+    PRINT e4
+END TRY
+--- datei kind.dh
+SCREEN(240, 160, "Kind", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    DIM z AS STRING : z = PARENT_RECV$()
+    WHILE z <> ""
+        n = n + 1
+        IF z = "stirb" THEN EXIT(3)
+        IF LEFT$(z, 5) = "datei" THEN WRITEALL("vom_kind.txt", MID$(z, 6))
+        PARENT_SEND("pong " + z)
+        z = PARENT_RECV$()
+    WEND
+    WRITEALL("herz.txt", STR$(MILLIS()))
+    CLS(BLUE) : FLIP()
+WEND
+
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+WINDOW_OPEN: Datei 'gibtsnicht.dh' nicht gefunden (Pfad relativ zum laufenden Programm)
+WINDOW_SEND: eine Nachricht ist EINE Zeile -- kein Zeilenumbruch darin (schick zwei Nachrichten oder JSON)
+PARENT_SEND: dieses Programm wurde nicht mit WINDOW_OPEN gestartet -- es hat keine Eltern (PARENT_ALIVE() sagt das ohne Fehler)
+WINDOW_SEND: Fenster 0 gibt es nicht (mehr)
+

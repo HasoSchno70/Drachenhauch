@@ -52,9 +52,11 @@
 > beide Male gleich war, wurde ein Fall. Was Zufall, Uhr oder absolute Pfade
 > enthielt, wurde von Hand zu selbstpruefenden Faellen; Binaerbeilagen gehen
 > als `--- datei name base64`; Grafik-Tests pruefen Punkte am
-> Bildschirmfoto mit `--- bild`. Stand 2026-09-08: 96 Sammlungen mit
-> 1729 Faellen. Bleiben in pytest: Ton und Eingabe-Wiedergabe (seriell),
-> das Dateisystem (Dateizeiten, Gross/Klein je System) und Tests, die
+> Bildschirmfoto mit `--- bild`, WAV-Dateien mit `--- ton`, und
+> `--- seriell` laesst die Faelle einer Datei nacheinander laufen. Stand
+> 2026-09-08: 149 Sammlungen mit 2362 Faellen, 117 pytest-Dateien weniger.
+> Bleiben in pytest: das Dateisystem (Dateizeiten, Gross/Klein je System),
+> Tests mit fremden Umgebungsvariablen oder Zeitwerten, und Tests, die
 > Quelltext, Bauskripte oder fremde Formate mit einem fremden Leser pruefen.
 
 *Untersuchung, keine Umsetzung.* Die Richtung ist ausgesprochen: Python

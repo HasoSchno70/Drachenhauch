@@ -118,6 +118,8 @@ Division durch Null
 | `--- datei name base64` | dieselbe Beilage als Bytes — für alles, was kein UTF-8 ist (eine cp1252-Datei, ein ZIP-Archiv, ein Bild); der Block ist Base64 und darf umbrochen sein |
 | `--- verzeichnis name` | ein leeres Verzeichnis neben dem Programm, für `DIRLIST`, `RMDIR` und alles, was Ordner sehen will |
 | `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
+| `--- system windows` | der Fall gilt nur dort (auch `posix`, `macos`, `linux`, mehrere durch Leerzeichen); anderswo zählt er als übersprungen — für `SHELL("cmd", "/c", …)` und alles, was ein Betriebssystem braucht |
+| `--- ton datei.wav` | Proben an einer WAV-Datei, die das Programm geschrieben hat (Kanäle, Bittiefe, Dauer, Spitze, Pegel je Zeitfenster) — siehe unten |
 | `--- bild` | Punktproben am **Bildschirmfoto** nach dem Lauf — der Läufer setzt `DHRT_SCREENSHOT` selbst und, wenn die Umgebung keins nennt, `DHRT_FRAMES=2`; `--- bild name.png` prüft stattdessen eine Datei, die das Programm geschrieben hat (`IMAGE_SAVE`) |
 
 Die Zeilen eines `--- bild`-Blocks:
@@ -131,7 +133,23 @@ Die Zeilen eines `--- bild`-Blocks:
 | `99 60 <> 100 60` / `99 60 = 100 60` | zwei Punkte gegeneinander, wenn die absolute Farbe egal ist (eine Kante ist da oder nicht) |
 
 Eine Bildprüfung braucht den Grafik-Bau; ohne raylib gilt der Fall als
-übersprungen, nicht als falsch. Beispiel:
+übersprungen, nicht als falsch.
+
+`--- ton datei.wav` prüft entsprechend eine WAV-Datei, die das Programm mit
+`AUDIO_SAVE_WAV` geschrieben hat — den Läufer liest sie selbst, ohne raylib:
+
+| Probe | Bedeutung |
+|---|---|
+| `kanaele 1` / `bits 16` / `abtastrate 44100` | Kopfdaten der Datei |
+| `dauer 0.5 +-0.005` | Länge in Sekunden |
+| `spitze 0.7 +-0.01` | größter Betrag über alle Kanäle (Amplituden liegen in -1..1) |
+| `pegel 0 300 < 0.01` | jedes 10-ms-Fenster zwischen 0 und 300 ms bleibt unter 0.01 (Stille) |
+| `pegel 300 500 > 0.4` | jedes Fenster darüber (der Ton steht) |
+| `pegel 300 310 0.5 +-0.06` | jedes Fenster im Band (ein Sustain-Pegel) |
+| `kanaele verschieden` / `kanaele gleich` | linker gegen rechten Kanal |
+
+Der Pegel ist der Spitzenwert je 10-ms-Fenster des ersten Kanals — die
+Hüllkurve, grob abgetastet. Beispiel:
 
 ```dhtest
 === SCISSOR schneidet ab
@@ -150,7 +168,9 @@ WEND
 
 Ohne Erwartung gilt ein Fall als bestanden, wenn er mit 0 endet. **Jeder
 Fall läuft als eigener Prozess in einem eigenen Verzeichnis**, die Fälle
-einer Datei parallel; `dhrt test datei.dhtest --filter Text` lässt nur die
+einer Datei parallel — außer die Datei trägt vor dem ersten Fall die Zeile
+`--- seriell`, dann laufen sie nacheinander (für Fälle, die sich die
+Zwischenablage, einen festen Port oder die Soundkarte teilen); `dhrt test datei.dhtest --filter Text` lässt nur die
 Fälle laufen, deren Name den Text enthält. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch; mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein

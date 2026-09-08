@@ -1,0 +1,154 @@
+' Aus test_animfsm.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== default state
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+idle
+
+=== idle to run and back
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+' anfahren -> run
+ANIM_FSM_SET_FLOAT(fsm, "speed", 5.0)
+DIM ch AS BOOLEAN
+ch = ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+IF ch THEN PRINT "changed"
+' stehenbleiben -> idle
+ANIM_FSM_SET_FLOAT(fsm, "speed", 0.0)
+ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+run
+changed
+idle
+
+=== any state trigger jump
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+' aus idle per Any-State-Trigger nach jump
+ANIM_FSM_TRIGGER(fsm, "jump")
+ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+' jump ist one-shot -> nach genug Zeit wait_finished zurueck nach idle
+ANIM_FSM_UPDATE(fsm, sp, 300)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+jump
+idle
+
+=== trigger consumed after update
+' Ein Trigger wirkt nur fuer EIN Update -- danach ist er verbraucht.
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+ANIM_FSM_TRIGGER(fsm, "jump")
+ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+' jump fertig -> idle
+ANIM_FSM_UPDATE(fsm, sp, 300)
+PRINT ANIM_FSM_STATE(fsm)
+' KEIN neuer Trigger: bleibt idle (Trigger war verbraucht)
+ANIM_FSM_UPDATE(fsm, sp, 16)
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+jump
+idle
+idle
+
+=== force state
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+ANIM_FSM_FORCE(fsm, sp, "run")
+PRINT ANIM_FSM_STATE(fsm)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+run
+
+=== get params
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SET_FLOAT(fsm, "speed", 3.5)
+PRINT ANIM_FSM_GET_FLOAT(fsm, "speed")
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+3.5
+
+=== setup registers anims on sprite
+' ANIM_FSM_SETUP registriert die Frame-Ranges als Sprite-Animationen.
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SETUP(fsm, sp)
+' default idle: frames 0..3 -> nach genug Zeit loopt der Frame im Bereich
+PRINT SPRITE_CURRENT_ANIM(sp)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- erwartet
+idle
+
+=== unknown param errors
+IMPORT "animfsm"
+IMPORT "sprite"
+DIM sp AS SPRITE
+sp = SPRITE_NEW(0, 16, 16)
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+ANIM_FSM_SET_FLOAT(fsm, "nope", 1.0)
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}]}
+--- fehler
+ANIM_FSM: unbekannter Parameter 'nope'
+
+=== load validates bad transition
+IMPORT "animfsm"
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("hero.dhanim")
+--- datei hero.dhanim
+{"version": 1, "default": "idle", "params": [{"name": "speed", "type": "float", "default": 0.0}, {"name": "jump", "type": "trigger"}], "states": [{"name": "idle", "anim": "idle", "loop": true, "first": 0, "last": 3, "fps": 6.0}, {"name": "run", "anim": "run", "loop": true, "first": 4, "last": 9, "fps": 12.0}, {"name": "jump", "anim": "jump", "loop": false, "first": 10, "last": 12, "fps": 30.0}], "transitions": [{"from": "idle", "to": "run", "conditions": [{"param": "speed", "op": "gt", "value": 0.1}]}, {"from": "run", "to": "idle", "conditions": [{"param": "speed", "op": "lt", "value": 0.1}]}, {"from": "*", "to": "jump", "conditions": [{"param": "jump", "op": "trigger"}]}, {"from": "jump", "to": "idle", "wait_finished": true, "conditions": []}, {"from": "idle", "to": "ghost", "conditions": []}]}
+--- fehler
+ANIM_FSM_LOAD: Transition zu unbekanntem State 'ghost'
+

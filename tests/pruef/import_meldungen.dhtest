@@ -1,0 +1,123 @@
+' Aus test_import_meldungen.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== funktions kollision nennt beide dateien
+IMPORT "a.dh"
+IMPORT "b.dh"
+PRINT Hilf()
+--- datei a.dh
+FUNCTION Hilf() AS INTEGER
+    RETURN 1
+END FUNCTION
+
+--- datei b.dh
+FUNCTION Hilf() AS INTEGER
+    RETURN 2
+END FUNCTION
+
+--- fehler
+Compile-Fehler: 'hilf' ist schon in a.dh:1 deklariert -- eines von beiden umbenennen
+
+=== klassen kollision nennt beide dateien
+IMPORT "k1.dh"
+IMPORT "k2.dh"
+PRINT 1
+--- datei k1.dh
+CLASS Punkt
+    DIM x AS INTEGER
+END CLASS
+
+--- datei k2.dh
+CLASS Punkt
+    DIM y AS INTEGER
+END CLASS
+
+--- fehler
+Compile-Fehler: Klasse 'punkt' ist schon in k1.dh:1 deklariert -- eine von beiden umbenennen
+
+=== kollision ueber zwei ebenen
+' b.dh zieht c.dh -- die Meldung muss auf c.dh zeigen, nicht auf b.dh.
+IMPORT "a.dh"
+IMPORT "b.dh"
+PRINT 1
+--- datei a.dh
+FUNCTION Doppelt() AS INTEGER
+    RETURN 1
+END FUNCTION
+
+--- datei b.dh
+IMPORT "c.dh"
+
+--- datei c.dh
+FUNCTION Doppelt() AS INTEGER
+    RETURN 2
+END FUNCTION
+
+--- fehler
+Compile-Fehler: 'doppelt' ist schon in a.dh:1 deklariert -- eines von beiden umbenennen
+
+=== warnung zeigt in die datei des nutzers
+' Der Ausgangsbefund: eine Datei mit zwei Zeilen bekam 'main.dh:6'.
+IMPORT "d.dh"
+DIM zaehler AS STRING
+--- datei d.dh
+DIM zaehler AS INTEGER
+zaehler = 1
+
+--- erwartet
+
+=== parse fehler im modul zeigt auf das modul
+PRINT "eins"
+IMPORT "kaputt.dh"
+PRINT "zwei"
+--- datei kaputt.dh
+PRINT 1
+DIM x AS
+PRINT 2
+
+--- fehler
+Parse-Fehler (9): Erwartet Typ
+
+=== compile fehler im modul zeigt auf das modul
+IMPORT "m.dh"
+PRINT F()
+--- datei m.dh
+FUNCTION F() AS INTEGER
+    RETURN GIBTESNICHT(1)
+END FUNCTION
+
+--- fehler
+Builtin 'GIBTESNICHT' im Rust-Kern noch nicht verfuegbar
+
+=== ohne import bleibt die zeile wie gehabt
+PRINT "a"
+PRINT GIBTESNICHT(1)
+--- fehler
+Builtin 'GIBTESNICHT' im Rust-Kern noch nicht verfuegbar
+
+=== mehrere module werden richtig zugeordnet
+' Drei Dateien, drei Warnungen -- jede muss in ihrer eigenen landen.
+IMPORT "e1.dh"
+IMPORT "e2.dh"
+PRINT WEGC(1)
+--- datei e1.dh
+PRINT WEGA(1)
+
+--- datei e2.dh
+PRINT 0
+PRINT WEGB(1)
+
+--- fehler
+Builtin 'WEGA' im Rust-Kern noch nicht verfuegbar
+
+=== bom in einer importierten datei stoert nicht
+' Auch das Modul darf eins haben -- sonst faellt es beim Zusammenfuegen
+IMPORT "m.dh"
+PRINT F()
+--- datei m.dh
+﻿FUNCTION F() AS INTEGER
+    RETURN 5
+END FUNCTION
+
+--- erwartet
+5
+

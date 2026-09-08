@@ -9,6 +9,10 @@ Die drei Pruefsteine aus dem Entwurf, gemessen statt behauptet:
 
 Beide Seiten oeffnen ein Fenster, darum `_BRAUCHT_GRAFIK`; eingespeist wird
 nichts, aber zwei Prozesse und eine Zeitmessung -- darum seriell.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/fenster_prozess.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import os
 import subprocess
@@ -130,17 +134,3 @@ def test_kind_beendet_sich_wenn_die_eltern_weg_sind(tmp_path):
     stand = herz.read_text(encoding="utf-8") if herz.exists() else ""
     time.sleep(1.5)
     assert (herz.read_text(encoding="utf-8") if herz.exists() else "") == stand, "das Kind lebt ohne Eltern weiter"
-
-
-def test_fehler_haben_klare_worte(tmp_path):
-    out = _lauf(tmp_path,
-                'TRY\n    WINDOW_OPEN("gibtsnicht.dh")\nCATCH e\n    PRINT e\nEND TRY\n'
-                'DIM k AS INTEGER : k = WINDOW_OPEN("kind.dh")\n'
-                'TRY\n    WINDOW_SEND(k, "a" + CHR$(10) + "b")\nCATCH e2\n    PRINT e2\nEND TRY\n'
-                'TRY\n    PARENT_SEND("x")\nCATCH e3\n    PRINT e3\nEND TRY\n'
-                'WINDOW_CLOSE(k)\n'
-                'TRY\n    WINDOW_SEND(k, "x")\nCATCH e4\n    PRINT e4\nEND TRY\n')
-    assert "nicht gefunden" in out[0]
-    assert "EINE Zeile" in out[1]
-    assert "keine Eltern" in out[2]
-    assert "gibt es nicht" in out[3]

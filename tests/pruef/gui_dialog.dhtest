@@ -1,0 +1,177 @@
+' Aus test_gui_dialog.py uebertragen (7 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== dialog steht und sperrt
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM d AS GUI_WINDOW
+d = GUI_DIALOG("Frage", "Wirklich?", "janein")
+GUI_UPDATE()
+PRINT GUI_MODAL(); " "; GUI_ANSWER(d)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE 0
+
+=== leertaste beantwortet mit ja
+' Der Fokus liegt beim Öffnen auf dem ersten Knopf -- ein Dialog soll
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM d AS GUI_WINDOW
+d = GUI_DIALOG("Frage", "Wirklich?", "janein")
+AUTOMATION_PLAY("ev.txt")
+DIM antwort AS INTEGER
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) <> 0 THEN antwort = GUI_ANSWER(d)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT antwort; " "; GUI_MODAL()
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 1 2 32 0 0 0 // Event: test
+e 2 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+1 FALSE
+
+=== antwort gilt nur ein bild
+' Wie `GUI_CLICKED`: eine Antwort ist ein Ereignis, kein Zustand. Sonst
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM d AS GUI_WINDOW
+d = GUI_DIALOG("Frage", "Wirklich?", "janein")
+AUTOMATION_PLAY("ev.txt")
+DIM wie_oft AS INTEGER
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    IF GUI_ANSWER(d) = 1 THEN wie_oft = wie_oft + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT wie_oft
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 1 2 32 0 0 0 // Event: test
+e 2 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+1
+
+=== klick trifft den hintergrund ohne dialog
+' Gegenprobe zum nächsten Test: OHNE Dialog löst genau dieser Klick den
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+
+AUTOMATION_PLAY("ev.txt")
+DIM traf AS INTEGER
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN traf = traf + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT traf
+--- datei ev.txt
+# Test-Aufnahme
+c 3
+e 0 7 60 50 0 0 // Event: test
+e 1 6 0 0 0 0 // Event: test
+e 2 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+1
+
+=== dialog verschluckt klicks daneben
+' Der Kern der Modalität.
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Hinten", 4, 4, 200, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "los", 8, 8, 90, 26)
+
+DIM d AS GUI_WINDOW
+d = GUI_DIALOG("Frage", "Wirklich?", "janein")
+
+AUTOMATION_PLAY("ev.txt")
+DIM traf AS INTEGER
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN traf = traf + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT traf
+--- datei ev.txt
+# Test-Aufnahme
+c 3
+e 0 7 60 50 0 0 // Event: test
+e 1 6 0 0 0 0 // Event: test
+e 2 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+0
+
+=== answer auf normales fenster ist fehler
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Normal", 10, 10, 100, 80)
+TRY
+    PRINT GUI_ANSWER(w)
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+
+=== unbekannter stil ist fehler
+IMPORT "gui"
+SCREEN(520, 320, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+
+TRY
+    DIM d AS GUI_WINDOW
+    d = GUI_DIALOG("T", "x", "vielleicht")
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+abgelehnt
+

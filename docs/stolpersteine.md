@@ -74,7 +74,7 @@ user-facing Meldungen nach „Stufe Nx"-Lecks absuchen.
 
 ### C1. `NET_UDP_LAST_FROM` liefert STRING, nicht TUPLE  *(Doku diese Session gefixt)*
 dhrt gibt `"host:port"` als STRING zurück (so auch der Golden-Test
-`tests/test_modules_net.py`), die alte `docs/module-net.md` versprach ein
+`tests/pruef/modules_net.dhtest`), die alte `docs/module-net.md` versprach ein
 `TUPLE (host, port)`. **Doku wurde an die Realität angeglichen.**
 **Optional offen:** Für Ergonomie könnte die Engine stattdessen ein echtes
 Tupel liefern (dann `peer[0]`/`peer[1]` direkt) — würde Test + Doku-Rückbau
@@ -91,7 +91,7 @@ verlangen. Aktuell konsistent, also kein Muss.
 > kein `4.0`-Bruch, Buch unverändert). Stattdessen weist die Fehlermeldung beim Zuweisen
 > eines FLOAT-`/`-Ergebnisses an eine INTEGER-Variable jetzt auf `\` (Ganzzahl-Division)
 > bzw. `INT()/ROUND()` hin — der eigentliche Schmerzpunkt ist damit adressiert, ohne
-> Kompatibilität zu brechen. Test: `tests/test_div_and_float_display.py`.
+> Kompatibilität zu brechen. Test: `tests/pruef/div_and_float_display.dhtest`.
 ```basic
 PRINT 8 / 2     ' 4     (glatt -> INTEGER)
 PRINT 9 / 2     ' 4.5   (nicht glatt -> FLOAT)
@@ -106,7 +106,7 @@ aber ein echter Stolperstein.
 > Allgemeine Float-Ausgabe ist korrekt (kürzeste round-trip-Form) und bleibt. Der einzige
 > echte Wart — f32-gestützte **Audio-Lautstärken** (`0.800000011920929`) — ist gefixt:
 > `AUDIO_BUS_GET_VOLUME`/`AUDIO_GET_VOLUME`/`AUDIO_MUSIC_GET_VOLUME` runden auf 6 Stellen
-> → `0.8`. Test: `tests/test_div_and_float_display.py`. (Analyse unten.)
+> → `0.8`. Test: `tests/pruef/div_and_float_display.dhtest`. (Analyse unten.)
 > **Befund nach Prüfung:** dhrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
 > Darstellung (Rust-Display ≈ Python-`repr`). `0.1+0.2 -> 0.30000000000000004` und
 > `CURVE_SMOOTHERSTEP -> 0.16308000000000003` sind die **kürzest mögliche exakte** Form —

@@ -1,0 +1,11 @@
+' Aus test_check_unbekannte_namen.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== die warnung blockiert nicht
+' Sie ist eine WARNUNG. Ein Programm mit einem Tippfehler in einem
+SUB tuwas()
+    fehlt = 1
+END SUB
+PRINT "ok"
+--- erwartet
+ok
+

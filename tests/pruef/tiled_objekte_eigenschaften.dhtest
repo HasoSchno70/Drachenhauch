@@ -1,0 +1,147 @@
+' Aus test_tiled_objekte_eigenschaften.py uebertragen (12 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== fehler sagen was los ist[DIM o AS INTEGER : o = TILED ADD OBJECT(m, "gibtsnicht", "a", "b", 0, 0, 1, 1)-gibt es nicht]
+' Eine Meldung, die den Fall benennt, statt eines stillen Nichts --
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT(m, "gibtsnicht", "a", "b", 0, 0, 1, 1)
+--- fehler
+TILED_ADD_OBJECT: Ebene 'gibtsnicht' gibt es nicht
+
+=== fehler sagen was los ist[DIM o AS INTEGER : o = TILED ADD OBJECT(m, "Boden", "a", "b", 0, 0, 1, 1)-keine Objekt-Ebene]
+' Eine Meldung, die den Fall benennt, statt eines stillen Nichts --
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT(m, "Boden", "a", "b", 0, 0, 1, 1)
+--- fehler
+TILED_ADD_OBJECT: 'Boden' ist keine Objekt-Ebene
+
+=== fehler sagen was los ist[DIM o AS INTEGER : o = TILED ADD OBJECT LAYER(m, "Boden")-gibt es schon]
+' Eine Meldung, die den Fall benennt, statt eines stillen Nichts --
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "Boden")
+--- fehler
+TILED_ADD_OBJECT_LAYER: 'Boden' gibt es schon
+
+=== fehler sagen was los ist[TILED TILE SET PROP(m, 99, "x", 1)-ausserhalb des Tilesets]
+' Eine Meldung, die den Fall benennt, statt eines stillen Nichts --
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET_PROP(m, 99, "x", 1)
+--- fehler
+TILED_TILE_SET_PROP: GID 99 liegt ausserhalb des Tilesets (0..7)
+
+=== fehler sagen was los ist[TILED TILE SET PROP(m, 3, "", 1)-darf nicht leer sein]
+' Eine Meldung, die den Fall benennt, statt eines stillen Nichts --
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET_PROP(m, 3, "", 1)
+--- fehler
+TILED_TILE_SET_PROP: der Schluessel darf nicht leer sein
+
+=== ein array ist keine eigenschaft
+' Tiled kennt genau vier Arten. Ein ARRAY wuerde beim Speichern still
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(2, 2, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM feld AS ARRAY OF INTEGER : feld = [1, 2]
+TILED_TILE_SET_PROP(m, 1, "x", feld)
+--- fehler
+TILED_TILE_SET_PROP: der Wert muss BOOLEAN, INTEGER, FLOAT oder STRING sein
+
+=== entfernen laesst die dahinter aufruecken
+' Wie bei jeder Liste -- und die einzige Ueberraschung daran: ein
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_REMOVE_OBJECT(m, "s", 1)
+PRINT TILED_OBJECT_COUNT(m, "s")
+PRINT TILED_OBJECT_NAME(m, "s", 0)
+PRINT TILED_OBJECT_NAME(m, "s", 1)
+--- erwartet
+2
+a
+c
+
+=== der namensindex bleibt nach dem entfernen richtig
+' Der Index bildet Name -> Position ab. Bliebe er stehen, zeigte er
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_REMOVE_OBJECT(m, "s", 0)
+TILED_OBJECT_SET_NAME(m, "s", 0, "neu")
+PRINT TILED_OBJECT_NAME(m, "s", 0)
+PRINT TILED_OBJECT_NAME(m, "s", 1)
+PRINT TILED_OBJECT_X(m, "s", 1)
+--- erwartet
+neu
+c
+64.0
+
+=== objekt fehler sagen was los ist[TILED REMOVE OBJECT(m, "s", 9)-gibt es in 's' nicht]
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_REMOVE_OBJECT(m, "s", 9)
+--- fehler
+TILED_REMOVE_OBJECT: Objekt 9 gibt es in 's' nicht
+
+=== objekt fehler sagen was los ist[TILED REMOVE OBJECT(m, "weg", 0)-gibt es nicht]
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_REMOVE_OBJECT(m, "weg", 0)
+--- fehler
+TILED_REMOVE_OBJECT: Ebene 'weg' gibt es nicht
+
+=== objekt fehler sagen was los ist[TILED OBJECT SET RECT(m, "s", 9, 0, 0, 1, 1)-gibt es in 's' nicht]
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_OBJECT_SET_RECT(m, "s", 9, 0, 0, 1, 1)
+--- fehler
+TILED_OBJECT_SET_RECT: Objekt 9 gibt es in 's' nicht
+
+=== objekt fehler sagen was los ist[TILED OBJECT SET NAME(m, "s", -1, "x")-gibt es in 's' nicht]
+IMPORT "tiled"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_OBJECT_SET_NAME(m, "s", -1, "x")
+--- fehler
+TILED_OBJECT_SET_NAME: Objekt -1 gibt es in 's' nicht
+

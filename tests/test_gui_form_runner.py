@@ -7,6 +7,10 @@ Demo examples/105_form_runner.dh manuell verifiziert" -- und in genau dieser
 Luecke sass ein Fehler, der JEDEN vom Form-Designer erzeugten Handler
 unbrauchbar machte. Mit AUTOMATION_PLAY laesst sich ein Klick einspeisen,
 also wird es unten geprueft.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/gui_form_runner.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import json
 
@@ -31,32 +35,6 @@ _FORM = {
 
 def _write_form(tmp_path):
     (tmp_path / "f.dhform").write_text(json.dumps(_FORM), encoding="utf-8")
-
-
-def test_form_loads_structure(run_gb, tmp_path):
-    _write_form(tmp_path)
-    out = run_gb(
-        'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
-        'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n'
-        'PRINT f"{GUI_WINDOW_GET_X(frm)},{GUI_WINDOW_GET_W(frm)}"\n'
-        'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 1))\n'           # textinput
-        'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 5))\n',          # button
-        base=tmp_path)
-    assert out.splitlines() == ["6", "230,360", "textinput", "button"]
-
-
-def test_form_restores_states(run_gb, tmp_path):
-    _write_form(tmp_path)
-    out = run_gb(
-        'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
-        'PRINT GUI_CHECKED(GUI_WINDOW_WIDGET(frm, 2))\n'        # TRUE
-        'PRINT GUI_VALUE(GUI_WINDOW_WIDGET(frm, 3))\n'          # 70.0
-        'PRINT GUI_DROPDOWN_TEXT(GUI_WINDOW_WIDGET(frm, 4))\n'  # Mittel (sel=1)
-        'PRINT GUI_TEXT(GUI_WINDOW_WIDGET(frm, 1))\n',          # "" (Platzhalter, kein Text)
-        base=tmp_path)
-    assert out.splitlines() == ["TRUE", "70.0", "Mittel", ""]
 
 
 # ------------------------------------------------------- Handler feuern lassen

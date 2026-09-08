@@ -1,0 +1,111 @@
+' Aus test_hintergrund.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== fehlende datei wird von sqlite angelegt
+' Gemessen statt angenommen: SQLite legt eine fehlende Datei einfach an.
+IMPORT "db"
+DIM a AS INTEGER
+a = DB_QUERY_START("neu.db", "SELECT * FROM gibtsnicht")
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(1)
+WEND
+TRY
+    PRINT DB_QUERY_RESULT(a)
+CATCH e
+    PRINT "gefangen"
+END TRY
+PRINT FILEEXISTS("neu.db")
+--- erwartet
+gefangen
+TRUE
+
+=== prozess im hintergrund
+DIM p AS INTEGER
+p = SHELL_START("cmd", "/c", "echo hallo")
+WHILE NOT SHELL_READY(p)
+    SLEEP(1)
+WEND
+PRINT TRIM$(SHELL_RESULT$(p))
+--- system windows
+--- erwartet
+hallo
+
+=== rueckgabewert nach dem abholen
+DIM p AS INTEGER
+DIM t AS STRING
+p = SHELL_START("cmd", "/c", "exit 7")
+WHILE NOT SHELL_READY(p)
+    SLEEP(1)
+WEND
+t = SHELL_RESULT$(p)
+PRINT SHELL_CODE()
+--- system windows
+--- erwartet
+7
+
+=== stderr getrennt von stdout
+DIM p AS INTEGER
+DIM t AS STRING
+p = SHELL_START("cmd", "/c", "echo fehler 1>&2")
+WHILE NOT SHELL_READY(p)
+    SLEEP(1)
+WEND
+t = SHELL_RESULT$(p)
+PRINT "[" + TRIM$(t) + "]"
+PRINT INSTR(SHELL_ERR$(), "fehler") >= 0
+--- system windows
+--- erwartet
+[]
+TRUE
+
+=== das programm laeuft waehrend der prozess arbeitet
+DIM p AS INTEGER
+DIM runden AS INTEGER
+p = SHELL_START("cmd", "/c", "ping -n 2 127.0.0.1 > nul")
+WHILE NOT SHELL_READY(p)
+    runden = runden + 1
+WEND
+PRINT runden > 0
+--- system windows
+--- erwartet
+TRUE
+
+=== unbekanntes programm meldet sich beim abholen
+DIM p AS INTEGER
+p = SHELL_START("gibt_es_ganz_sicher_nicht_xyz123")
+WHILE NOT SHELL_READY(p)
+    SLEEP(1)
+WEND
+TRY
+    PRINT SHELL_RESULT$(p)
+CATCH e
+    PRINT "gefangen"
+END TRY
+--- erwartet
+gefangen
+
+=== abholen ohne ready sagt auch hier was fehlt
+DIM p AS INTEGER
+p = SHELL_START("cmd", "/c", "ping -n 3 127.0.0.1 > nul")
+PRINT SHELL_RESULT$(p)
+--- system windows
+--- fehler
+SHELL_RESULT$: Auftrag 0 ist nicht fertig (oder schon abgeholt) -- erst SHELL_READY(0) abfragen
+
+=== pending zaehlt und cancel raeumt auf
+DIM p AS INTEGER
+p = SHELL_START("cmd", "/c", "ping -n 3 127.0.0.1 > nul")
+PRINT SHELL_PENDING()
+SHELL_CANCEL(p)
+PRINT SHELL_PENDING()
+--- system windows
+--- erwartet
+1
+0
+
+=== blockierendes shell bleibt daneben bestehen
+' SHELL aus WP A ist unveraendert -- SHELL_START ist ein Zusatz, kein
+PRINT SHELL("cmd", "/c", "exit 4")
+--- system windows
+--- erwartet
+4
+

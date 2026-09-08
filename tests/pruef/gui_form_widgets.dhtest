@@ -1,0 +1,138 @@
+' Aus test_gui_form_widgets.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== progress value
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM p AS GUI_WIDGET
+p = GUI_PROGRESS(win, 10, 10, 200, 18)
+GUI_SET_VALUE(p, 0.65)
+PRINT GUI_VALUE(p)
+PRINT GUI_KIND(p)
+--- erwartet
+0.65
+progress
+
+=== progress value clamped
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM p AS GUI_WIDGET
+p = GUI_PROGRESS(win, 10, 10, 200, 18)
+GUI_SET_VALUE(p, 5.0)
+PRINT GUI_VALUE(p)
+--- erwartet
+1.0
+
+=== radio mutual exclusion
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM r1 AS GUI_WIDGET
+DIM r2 AS GUI_WIDGET
+DIM r3 AS GUI_WIDGET
+r1 = GUI_RADIO(win, "g", "A", 10, 10)
+r2 = GUI_RADIO(win, "g", "B", 10, 40)
+r3 = GUI_RADIO(win, "g", "C", 10, 70)
+GUI_SET_CHECKED(r2, TRUE)
+PRINT f"{GUI_CHECKED(r1)} {GUI_CHECKED(r2)} {GUI_CHECKED(r3)}"
+PRINT GUI_RADIO_SELECTED(r1)
+GUI_SET_CHECKED(r3, TRUE)
+PRINT f"{GUI_CHECKED(r2)} {GUI_CHECKED(r3)}"
+PRINT GUI_RADIO_SELECTED(r1)
+--- erwartet
+FALSE TRUE FALSE
+1
+FALSE TRUE
+2
+
+=== radio groups are independent
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM a1 AS GUI_WIDGET
+DIM b1 AS GUI_WIDGET
+a1 = GUI_RADIO(win, "ga", "A1", 10, 10)
+b1 = GUI_RADIO(win, "gb", "B1", 10, 40)
+GUI_SET_CHECKED(a1, TRUE)
+GUI_SET_CHECKED(b1, TRUE)
+PRINT f"{GUI_CHECKED(a1)} {GUI_CHECKED(b1)}"
+--- erwartet
+TRUE TRUE
+
+=== radio selected none
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM r AS GUI_WIDGET
+r = GUI_RADIO(win, "g", "A", 10, 10)
+PRINT GUI_RADIO_SELECTED(r)
+--- erwartet
+-1
+
+=== dropdown select
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM it[3] AS STRING
+it[0]="Rot" : it[1]="Gruen" : it[2]="Blau"
+DIM d AS GUI_WIDGET
+d = GUI_DROPDOWN(win, 10, 10, 160, 24, it)
+PRINT f"{GUI_DROPDOWN_SELECTED(d)} {GUI_DROPDOWN_TEXT(d)}"
+GUI_DROPDOWN_SET_SELECTED(d, 2)
+PRINT f"{GUI_DROPDOWN_SELECTED(d)} {GUI_DROPDOWN_TEXT(d)}"
+--- erwartet
+0 Rot
+2 Blau
+
+=== dropdown set items
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM it[2] AS STRING
+it[0]="x" : it[1]="y"
+DIM d AS GUI_WIDGET
+d = GUI_DROPDOWN(win, 10, 10, 160, 24, it)
+DIM it2[3] AS STRING
+it2[0]="a" : it2[1]="b" : it2[2]="c"
+GUI_SET_DROPDOWN(d, it2)
+GUI_DROPDOWN_SET_SELECTED(d, 2)
+PRINT GUI_DROPDOWN_TEXT(d)
+--- erwartet
+c
+
+=== form widgets roundtrip
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM p AS GUI_WIDGET
+p = GUI_PROGRESS(win, 10, 10, 200, 18)
+GUI_SET_VALUE(p, 0.4)
+DIM r AS GUI_WIDGET
+r = GUI_RADIO(win, "g", "A", 10, 40)
+GUI_SET_CHECKED(r, TRUE)
+DIM it[2] AS STRING
+it[0]="x" : it[1]="y"
+DIM d AS GUI_WIDGET
+d = GUI_DROPDOWN(win, 10, 70, 160, 24, it)
+GUI_DROPDOWN_SET_SELECTED(d, 1)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_FROM_JSON(GUI_TO_JSON(win))
+PRINT GUI_VALUE(GUI_WINDOW_WIDGET(w2, 0))
+PRINT GUI_CHECKED(GUI_WINDOW_WIDGET(w2, 1))
+PRINT GUI_DROPDOWN_TEXT(GUI_WINDOW_WIDGET(w2, 2))
+--- erwartet
+0.4
+TRUE
+y
+
+=== wrong kind raises
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("F", 0, 0, 300, 260)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "x", 0, 0, 50, 20)
+PRINT GUI_DROPDOWN_SELECTED(b)
+--- fehler
+GUI_DROPDOWN_SELECTED: Widget ist kein dropdown/listbox
+

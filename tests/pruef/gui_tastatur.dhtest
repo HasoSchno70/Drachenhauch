@@ -1,0 +1,721 @@
+' Aus test_gui_tastatur.py uebertragen (21 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== tab springt auf den knopf leertaste loest aus
+' Der Kern: ohne einen einzigen Mausklick einen Knopf auslösen.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
+DIM traf AS INTEGER
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+    IF GUI_CLICKED(b) THEN traf = traf + 1
+NEXT
+
+PRINT traf
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 4 2 32 0 0 0 // Event: test
+e 5 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+1
+
+=== tab ueberspringt deko
+' Label, Panel und Trennlinie fangen keinen Fokus.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM l AS GUI_WIDGET
+l = GUI_LABEL(w, "Name", 10, 10)
+DIM p AS GUI_WIDGET
+p = GUI_PANEL(w, 10, 30, 100, 40)
+DIM s AS GUI_WIDGET
+s = GUI_SEPARATOR(w, 10, 75, 100)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 90, 80, 24)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT IIF(GUI_FOCUSED() = b, "knopf", "falsch")
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+knopf
+
+=== tab reihenfolge und shift tab rueckwaerts
+' Vorwärts in Anlege-Reihenfolge, Umschalt+Tab zurück.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM a AS GUI_WIDGET
+a = GUI_BUTTON(w, "a", 10, 10, 60, 24)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "b", 10, 40, 60, 24)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+' 1. Tab -> a, 2. Tab -> b, Umschalt+Tab -> zurueck auf a
+PRINT IIF(GUI_FOCUSED() = a, "a", IIF(GUI_FOCUSED() = b, "b", "keins"))
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 3 2 258 0 0 0 // Event: test
+e 4 1 258 0 0 0 // Event: test
+e 5 2 340 0 0 0 // Event: test
+e 5 2 258 0 0 0 // Event: test
+e 6 1 258 0 0 0 // Event: test
+e 6 1 340 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+a
+
+=== leertaste schaltet kaestchen um
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM c AS GUI_WIDGET
+c = GUI_CHECKBOX(w, "aktiv", 10, 10)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_CHECKED(c)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 4 2 32 0 0 0 // Event: test
+e 5 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+TRUE
+
+=== pfeiltaste verstellt den regler
+' Ein Zwanzigstel des Bereichs je Druck -- 0..100 also +5.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM s AS GUI_WIDGET
+s = GUI_SLIDER(w, 10, 10, 120, 0, 100, 50)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT INT(GUI_VALUE(s))
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 4 2 262 0 0 0 // Event: test
+e 5 1 262 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+55
+
+=== klappliste mit tastatur aufklappen und waehlen
+' Enter klappt auf, Pfeil-ab wählt weiter, Enter übernimmt.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM items AS ARRAY OF STRING
+items = SPLIT$("rot|gruen|blau", "|")
+DIM d AS GUI_WIDGET
+d = GUI_DROPDOWN(w, 10, 10, 120, 24, items)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DROPDOWN_TEXT(d)
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 3 2 257 0 0 0 // Event: test
+e 4 1 257 0 0 0 // Event: test
+e 5 2 264 0 0 0 // Event: test
+e 6 1 264 0 0 0 // Event: test
+e 7 2 257 0 0 0 // Event: test
+e 8 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+gruen
+
+=== baum pfeiltasten klappen und waehlen
+' Rechts klappt auf, Ab geht ins Kind -- wie in jedem Dateibaum.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM t AS GUI_WIDGET
+t = GUI_TREE(w, 10, 10, 200, 120)
+DIM wurzel AS INTEGER
+wurzel = GUI_TREE_ADD(t, -1, "Ordner")
+DIM kind AS INTEGER
+kind = GUI_TREE_ADD(t, wurzel, "Datei")
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_TREE_LABEL(t, GUI_TREE_SELECTED(t))
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 3 2 264 0 0 0 // Event: test
+e 4 1 264 0 0 0 // Event: test
+e 5 2 262 0 0 0 // Event: test
+e 6 1 262 0 0 0 // Event: test
+e 7 2 264 0 0 0 // Event: test
+e 8 1 264 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+Datei
+
+=== gui focused ohne fokus ist minus eins
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 10, 80, 24)
+PRINT GUI_FOCUSED()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+-1
+
+=== tabulator rueckt im codefeld ein
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 260, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 140, 80, 24)
+GUI_FOCUS(ta)
+
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT "["; GUI_TEXT(ta); "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 258 0 0 0 // Event: test
+e 3 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+[    ]
+
+=== tabulator wechselt ohne den schalter weiter
+' Gegenprobe: ohne `tab_fuegt_ein` bleibt der Tabulator die
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 260, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 140, 80, 24)
+GUI_FOCUS(ta)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT "["; GUI_TEXT(ta); "]"; IIF(GUI_FOCUSED() = b, " knopf", " woanders")
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 258 0 0 0 // Event: test
+e 3 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+[] knopf
+
+=== tabulator fuellt bis zur naechsten spalte
+' Nicht stur vier Leerzeichen: mitten in der Zeile getippt, muss der
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 260, 120)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 10, 140, 80, 24)
+GUI_FOCUS(ta)
+
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_SET_TEXT(ta, "ab")
+GUI_FOCUS(ta)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT "["; GUI_TEXT(ta); "]"
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 258 0 0 0 // Event: test
+e 3 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+[ab  ]
+
+=== farbwaehler pfeil aendert die farbe
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF0000)
+GUI_FOCUS(cp)
+DIM vorher AS INTEGER
+vorher = GUI_PICKED_COLOR(cp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+' Pfeil links senkt die Saettigung -- Rot wird heller, nicht dunkler.
+PRINT IIF(GUI_PICKED_COLOR(cp) <> vorher, "geaendert", "unveraendert")
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 263 0 0 0 // Event: test
+e 3 1 263 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+geaendert
+
+=== farbwaehler bild ab dreht den farbton
+' Die dritte Achse braucht eine eigene Taste -- die Pfeile sind für
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF0000)
+GUI_FOCUS(cp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+' Ton 0 -> 10 Grad: aus reinem Rot wird ein Rotton mit Gruenanteil.
+PRINT IIF(GUI_PICKED_COLOR(cp) <> &HFF0000, "gedreht", "unveraendert")
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 267 0 0 0 // Event: test
+e 3 1 267 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+gedreht
+
+=== datumswaehler pfeil geht einen tag weiter
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DATE(dp)
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 262 0 0 0 // Event: test
+e 3 1 262 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2026-08-31
+
+=== datumswaehler ab geht eine woche weiter
+' Auf/ab bewegt sich um eine Woche -- so steht die Marke in derselben
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DATE(dp)
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 264 0 0 0 // Event: test
+e 3 1 264 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2026-09-06
+
+=== datumswaehler bild ab blaettert den monat
+' Und klemmt dabei den Tag: der 31. Januar plus ein Monat ist der letzte
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-01-31")
+GUI_FOCUS(dp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DATE(dp)
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 267 0 0 0 // Event: test
+e 3 1 267 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2026-02-28
+
+=== beide stehen im tab zyklus
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 120, 90)
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 140, 10, 150, 120)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT IIF(GUI_FOCUSED() = dp, "datum", "woanders")
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 1 2 258 0 0 0 // Event: test
+e 2 1 258 0 0 0 // Event: test
+e 4 2 258 0 0 0 // Event: test
+e 5 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+datum
+
+=== deckkraft mit pos1 und ende
+' Die Pfeile sind für Sättigung und Helligkeit belegt, Bild auf/ab für
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_COLORPICKER_SET(cp, "alpha", 1)
+GUI_SET_PICKED_COLOR(cp, &HFFFF8800)
+GUI_FOCUS(cp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+' Pos1 senkt die Deckkraft um 16: FF -> EF
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 268 0 0 0 // Event: test
+e 3 1 268 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+#EFFF8800
+
+=== deckkraft ohne streifen unberuehrt
+' Gegenprobe: ohne eingeschalteten Streifen darf die Taste nichts
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM cp AS GUI_WIDGET
+cp = GUI_COLORPICKER(w, 10, 10, 200, 150)
+GUI_SET_PICKED_COLOR(cp, &HFF8800)
+GUI_FOCUS(cp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT COLOR_HEX$(GUI_PICKED_COLOR(cp))
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 268 0 0 0 // Event: test
+e 3 1 268 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+#FF8800
+
+=== umschalt bild springt ein jahr
+' Ohne Jahressprung bräuchte man bis 1985 rund fünfhundert Klicks.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-08-30")
+GUI_FOCUS(dp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DATE(dp)
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 2 2 340 0 0 0 // Event: test
+e 2 2 266 0 0 0 // Event: test
+e 3 1 266 0 0 0 // Event: test
+e 3 1 340 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2025-08-30
+
+=== grenze haelt die taste auf
+' Eine gesperrte Richtung darf die Marke nicht hinausschieben.
+IMPORT "gui"
+SCREEN(360, 240, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 300, 200)
+
+DIM dp AS GUI_WIDGET
+dp = GUI_DATEPICKER(w, 10, 10, 300, 200)
+GUI_SET_DATE(dp, "2026-09-25")
+GUI_DATE_RANGE(dp, "2026-09-05", "2026-09-25")
+GUI_FOCUS(dp)
+
+AUTOMATION_PLAY("ev.txt")
+DIM f AS INTEGER
+FOR f = 0 TO 11
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+
+PRINT GUI_DATE(dp)
+--- datei ev.txt
+# Test-Aufnahme
+c 2
+e 2 2 262 0 0 0 // Event: test
+e 3 1 262 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+2026-09-25
+

@@ -1,0 +1,103 @@
+' Aus test_audio_note_mix.py uebertragen (11 Faelle, von Hand 2026-09-08 -- WAV-Proben als `--- ton`). Format: docs/werkzeuge.md, dhrt test.
+' AUDIO_NOTE und AUDIO_SOUND_NEW/MIX/NORMALIZE -- Noten bauen und Klaenge mischen.
+' Die Huellkurve wird nachgemessen: `pegel` ist der Spitzenwert je 10-ms-Fenster.
+' Nicht uebertragen: das Portamento (zaehlt Nulldurchgaenge, dafuer gibt es keine Probe).
+
+=== die laenge ist dauer plus release
+' 400 ms gehalten + 100 ms Ausklingen
+IMPORT "audio"
+AUDIO_SAVE_WAV(AUDIO_NOTE("square", 220, 400, 0, 0, 1.0, 100, 0.8), "n.wav")
+--- ton n.wav
+dauer 0.5 +-0.005
+
+=== sustain null verstummt obwohl gehalten
+' Das Klavier: Decay auf 0, danach ist NICHTS mehr da, auch wenn die Note noch gehalten wird.
+IMPORT "audio"
+AUDIO_SAVE_WAV(AUDIO_NOTE("triangle", 220, 800, 2, 200, 0.0, 0, 0.8), "n.wav")
+--- ton n.wav
+pegel 10 20 > 0.4
+pegel 400 800 < 0.02
+
+=== sustain pegel bleibt stehen
+' Die Orgel mit halbem Pegel: nach dem Decay bleibt die Note bei 0.5.
+IMPORT "audio"
+AUDIO_SAVE_WAV(AUDIO_NOTE("square", 220, 800, 0, 100, 0.5, 0, 1.0), "n.wav")
+--- ton n.wav
+pegel 300 310 0.505 +-0.055
+pegel 700 710 0.505 +-0.055
+
+=== release faellt auf null
+' 0..200 ms voll, dann linear auf 0 bis 500 ms; Mitte des Ausklingens (350 ms) bei 0.5.
+IMPORT "audio"
+AUDIO_SAVE_WAV(AUDIO_NOTE("square", 220, 200, 0, 0, 1.0, 300, 1.0), "n.wav")
+--- ton n.wav
+pegel 100 110 > 0.9
+pegel 340 350 0.51 +-0.11
+pegel 490 500 < 0.1
+
+=== fehler im klartext (1)
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_NOTE("harfe", 220, 100, 0, 0, 1.0, 0, 1.0)
+--- fehler
+AUDIO_NOTE
+harfe
+
+=== fehler im klartext (2)
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_NOTE("sine", 220, 0, 0, 0, 1.0, 0, 1.0)
+--- fehler
+dauer_ms
+
+=== mischen addiert an der richtigen stelle
+' Mono-Quelle ohne pan bleibt mono, Leinwand 1 s; vor 300 ms Stille, 300..500 ms der Ton, danach Stille.
+IMPORT "audio"
+DIM m AS SOUND
+m = AUDIO_SOUND_NEW(1000)
+AUDIO_SOUND_MIX(m, AUDIO_TONE(440, 200, "square", 0.5), 300)
+AUDIO_SAVE_WAV(m, "m.wav")
+--- ton m.wav
+kanaele 1
+dauer 1.0 +-0.001
+pegel 0 290 < 0.01
+pegel 310 490 > 0.4
+pegel 520 1000 < 0.01
+
+=== ueberlagerung wird nicht geklemmt und normalize holt sie zurueck
+' Zwei gleiche Toene uebereinander ergeben 1.6; NORMALIZE bringt die Spitze auf 1.0 und meldet den Faktor.
+IMPORT "audio"
+DIM m AS SOUND
+m = AUDIO_SOUND_NEW(500)
+DIM t AS SOUND
+t = AUDIO_TONE(440, 400, "square", 0.8)
+AUDIO_SOUND_MIX(m, t, 0)
+AUDIO_SOUND_MIX(m, t, 0)
+PRINT FORMAT$(AUDIO_SOUND_NORMALIZE(m), "%.3f")
+AUDIO_SAVE_WAV(m, "m.wav")
+--- erwartet
+0.625
+--- ton m.wav
+spitze 1.0 +-0.01
+
+=== pan verteilt auf links und rechts
+IMPORT "audio"
+DIM m AS SOUND
+m = AUDIO_SOUND_NEW(400)
+AUDIO_SOUND_MIX(m, AUDIO_TONE(440, 300, "square", 0.5), 0, 1.0, -1.0)
+AUDIO_SAVE_WAV(m, "m.wav")
+--- ton m.wav
+kanaele 2
+kanaele verschieden
+spitze 0.5 +-0.05
+
+=== was ueber das ende ragt faellt weg
+' Kein Fehler -- ein Ausklingen hinter dem letzten Takt ist normal.
+IMPORT "audio"
+DIM m AS SOUND
+m = AUDIO_SOUND_NEW(200)
+AUDIO_SOUND_MIX(m, AUDIO_TONE(440, 1000), 150)
+AUDIO_SOUND_MIX(m, AUDIO_TONE(440, 100), 5000)
+AUDIO_SAVE_WAV(m, "m.wav")
+--- ton m.wav
+dauer 0.2 +-0.005

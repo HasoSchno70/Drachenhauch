@@ -1,0 +1,32 @@
+' Aus test_pruefen.py uebertragen (5 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== erfuellte pruefung laeuft durch
+ASSERT(1 < 2)
+PRINT "weiter"
+--- erwartet
+weiter
+
+=== assert verlangt boolean
+' `ASSERT(anzahl)` waere sonst still 'wahr, weil nicht null' -- eine
+ASSERT(5)
+--- fehler
+ASSERT: erwartet BOOLEAN, erhalten INTEGER -- einen Vergleich schreiben, z.B. ASSERT(anzahl > 0)
+
+=== assert collect verlangt boolean
+ASSERT_COLLECT(1)
+--- fehler
+ASSERT_COLLECT: erwartet BOOLEAN, erhalten INTEGER
+
+=== zaehler starten bei null
+PRINT ASSERT_COUNT()
+PRINT ASSERT_FAILED()
+--- erwartet
+0
+0
+
+=== bilanz ohne pruefungen ist gruen
+PRINT ASSERT_REPORT()
+--- erwartet
+ALLES GRUEN -- 0 Pruefungen
+0
+

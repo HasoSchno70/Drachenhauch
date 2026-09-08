@@ -10,6 +10,10 @@ eine Variable aus einem SCHWESTER-Programm ansprach; `--check` schwieg.
 Der zweite Teil dieser Datei ist der wichtigere: die Faelle, in denen NICHT
 gewarnt werden darf. Eine Pruefung, die bei richtigem Code anschlaegt,
 schaltet man ab -- und dann hat man gar keine.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/check_unbekannte_namen.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import json
 import os
@@ -73,17 +77,6 @@ def test_jeder_name_nur_einmal(tmp_path):
     Zeilen Ausgabe erzeugen."""
     src = 'DIM i AS INTEGER\nFOR i = 0 TO 9\n    PRINT summ\nNEXT\n'
     assert len(_befunde(src, tmp_path)) == 1
-
-
-def test_die_warnung_blockiert_nicht(tmp_path):
-    """Sie ist eine WARNUNG. Ein Programm mit einem Tippfehler in einem
-    Zweig, der nie genommen wird, laeuft weiter -- das war schon immer so
-    und soll sich nicht mit einer Pruefung aendern."""
-    (tmp_path / "s.dh").write_text('SUB tuwas()\n    fehlt = 1\nEND SUB\nPRINT "ok"\n',
-                                   encoding="utf-8")
-    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "s.dh")], capture_output=True,
-                       text=True, encoding="utf-8", timeout=90, cwd=str(tmp_path))
-    assert r.returncode == 0 and "ok" in r.stdout
 
 
 def test_auch_das_ziel_von_input_und_read(tmp_path):

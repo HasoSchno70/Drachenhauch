@@ -1,0 +1,359 @@
+' Aus test_modules_sprite.py uebertragen (28 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== new starts at origin
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+PRINT SPRITE_GET_X(s)
+PRINT SPRITE_GET_Y(s)
+--- erwartet
+0.0
+0.0
+
+=== get size
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+PRINT SPRITE_GET_WIDTH(s)
+PRINT SPRITE_GET_HEIGHT(s)
+--- erwartet
+16
+16
+
+=== new invalid frame size raises
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(1, 1, 1))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 0, 16)
+--- fehler
+SPRITE_NEW: frame_w und frame_h muessen > 0 sein
+
+=== set pos
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 50.0, 75.0)
+PRINT SPRITE_GET_X(s)
+PRINT SPRITE_GET_Y(s)
+--- erwartet
+50.0
+75.0
+
+=== velocity moves position
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 0.0, 0.0)
+SPRITE_SET_VELOCITY(s, 100.0, -50.0)
+SPRITE_UPDATE(s, 1000)
+PRINT SPRITE_GET_X(s)
+PRINT SPRITE_GET_Y(s)
+--- erwartet
+100.0
+-50.0
+
+=== play unknown anim raises
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_PLAY(s, "fly")
+--- fehler
+SPRITE: unbekannte Animation 'fly' (definiert: keine)
+
+=== walk loops
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_ADD_ANIM(s, "walk", 0, 3, 8.0)
+SPRITE_PLAY(s, "walk")
+PRINT SPRITE_GET_FRAME(s)
+SPRITE_UPDATE(s, 125)
+PRINT SPRITE_GET_FRAME(s)
+SPRITE_UPDATE(s, 125)
+PRINT SPRITE_GET_FRAME(s)
+SPRITE_UPDATE(s, 125)
+PRINT SPRITE_GET_FRAME(s)
+SPRITE_UPDATE(s, 125)
+PRINT SPRITE_GET_FRAME(s)
+--- erwartet
+0
+1
+2
+3
+0
+
+=== play once stops at last frame
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_ADD_ANIM(s, "punch", 0, 3, 12.0)
+SPRITE_PLAY_ONCE(s, "punch")
+PRINT SPRITE_IS_FINISHED(s)
+SPRITE_UPDATE(s, 400)
+PRINT SPRITE_GET_FRAME(s)
+PRINT SPRITE_IS_FINISHED(s)
+SPRITE_UPDATE(s, 500)
+PRINT SPRITE_GET_FRAME(s)
+--- erwartet
+FALSE
+3
+TRUE
+3
+
+=== current anim
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_ADD_ANIM(s, "idle", 0, 0, 1.0)
+SPRITE_PLAY(s, "idle")
+PRINT SPRITE_CURRENT_ANIM(s)
+--- erwartet
+idle
+
+=== play same anim is idempotent
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_ADD_ANIM(s, "walk", 0, 3, 8.0)
+SPRITE_PLAY(s, "walk")
+SPRITE_UPDATE(s, 250)
+PRINT SPRITE_GET_FRAME(s)
+SPRITE_PLAY(s, "walk")
+PRINT SPRITE_GET_FRAME(s)
+--- erwartet
+2
+2
+
+=== set frame
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_FRAME(s, 7)
+PRINT SPRITE_GET_FRAME(s)
+--- erwartet
+7
+
+=== add anim invalid range raises
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_ADD_ANIM(s, "bad", 5, 2, 8.0)
+--- fehler
+SPRITE_ADD_ANIM: first >= 0 und last >= first noetig
+
+=== set flip no crash
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_FLIP(s, TRUE, FALSE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== set scale no crash
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_SCALE(s, 2.0, 1.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== set scale negative raises
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_SCALE(s, -1.0, 1.0)
+--- fehler
+SPRITE_SET_SCALE: Skalierung muss > 0 sein
+
+=== tint and clear no crash
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_TINT(s, 16744512)
+SPRITE_TINT_CLEAR(s)
+PRINT "ok"
+--- erwartet
+ok
+
+=== tint out of range raises
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_TINT(s, 16777217)
+--- fehler
+SPRITE_TINT: Farbe muss 0..0xFFFFFF sein
+
+=== scale does not affect get width
+' Scale ist rein visuell - GET_WIDTH/HEIGHT bleiben in Frame-Groesse.
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_SCALE(s, 3.0, 3.0)
+PRINT SPRITE_GET_WIDTH(s)
+PRINT SPRITE_GET_HEIGHT(s)
+--- erwartet
+16
+16
+
+=== collides overlap
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM a AS SPRITE
+a = SPRITE_NEW(img, 16, 16)
+DIM b AS SPRITE
+b = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(a, 0.0, 0.0)
+SPRITE_SET_POS(b, 8.0, 8.0)
+PRINT SPRITE_COLLIDES(a, b)
+--- erwartet
+TRUE
+
+=== collides disjoint
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM a AS SPRITE
+a = SPRITE_NEW(img, 16, 16)
+DIM b AS SPRITE
+b = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(a, 0.0, 0.0)
+SPRITE_SET_POS(b, 100.0, 100.0)
+PRINT SPRITE_COLLIDES(a, b)
+--- erwartet
+FALSE
+
+=== collides touching does not count
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM a AS SPRITE
+a = SPRITE_NEW(img, 16, 16)
+DIM b AS SPRITE
+b = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(a, 0.0, 0.0)
+SPRITE_SET_POS(b, 16.0, 0.0)
+PRINT SPRITE_COLLIDES(a, b)
+--- erwartet
+FALSE
+
+=== collide singular alias
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM a AS SPRITE
+a = SPRITE_NEW(img, 16, 16)
+DIM b AS SPRITE
+b = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(a, 0.0, 0.0)
+SPRITE_SET_POS(b, 8.0, 8.0)
+PRINT SPRITE_COLLIDE(a, b)
+--- erwartet
+TRUE
+
+=== hit box overlap
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 10.0, 10.0)
+PRINT SPRITE_HIT_BOX(s, 20, 20, 10, 10)
+--- erwartet
+TRUE
+
+=== hit box no overlap
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 0.0, 0.0)
+PRINT SPRITE_HIT_BOX(s, 100, 100, 10, 10)
+--- erwartet
+FALSE
+
+=== hit box contained
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 50.0, 50.0)
+PRINT SPRITE_HIT_BOX(s, 0, 0, 200, 200)
+--- erwartet
+TRUE
+
+=== hit point inside
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 10.0, 10.0)
+PRINT SPRITE_HIT_POINT(s, 15, 15)
+--- erwartet
+TRUE
+
+=== hit point outside
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 10.0, 10.0)
+PRINT SPRITE_HIT_POINT(s, 100, 100)
+--- erwartet
+FALSE
+
+=== hit point on corner inclusive exclusive
+' Linke obere Ecke inclusive (HIT), rechte untere exclusive (MISS).
+IMPORT "sprite"
+DIM img AS IMAGE
+img = GENTEX_COLOR(64, 64, RGB(255, 0, 0))
+DIM s AS SPRITE
+s = SPRITE_NEW(img, 16, 16)
+SPRITE_SET_POS(s, 10.0, 10.0)
+PRINT SPRITE_HIT_POINT(s, 10, 10)
+PRINT SPRITE_HIT_POINT(s, 26, 26)
+--- erwartet
+TRUE
+FALSE
+

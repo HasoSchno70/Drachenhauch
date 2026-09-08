@@ -1,0 +1,124 @@
+' Aus test_gui_runtime.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== kind
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 10, 10, 80, 24)
+DIM c AS GUI_WIDGET
+c = GUI_CHECKBOX(win, "x", 10, 50)
+PRINT GUI_KIND(b)
+PRINT GUI_KIND(c)
+--- erwartet
+button
+checkbox
+
+=== bounds get set
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 20, 40, 80, 24)
+PRINT f"{GUI_GET_X(b)},{GUI_GET_Y(b)},{GUI_GET_W(b)},{GUI_GET_H(b)}"
+GUI_SET_BOUNDS(b, 50, 60, 120, 30)
+PRINT f"{GUI_GET_X(b)},{GUI_GET_Y(b)},{GUI_GET_W(b)},{GUI_GET_H(b)}"
+--- erwartet
+20,40,80,24
+50,60,120,30
+
+=== window bounds
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+PRINT f"{GUI_WINDOW_GET_X(win)},{GUI_WINDOW_GET_Y(win)},{GUI_WINDOW_GET_W(win)},{GUI_WINDOW_GET_H(win)}"
+GUI_WINDOW_SET_BOUNDS(win, 0, 0, 640, 480)
+PRINT f"{GUI_WINDOW_GET_W(win)},{GUI_WINDOW_GET_H(win)}"
+--- erwartet
+100,80,300,200
+640,480
+
+=== destroy and count
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM a AS GUI_WIDGET
+DIM b AS GUI_WIDGET
+a = GUI_BUTTON(win, "A", 10, 10, 60, 24)
+b = GUI_BUTTON(win, "B", 10, 50, 60, 24)
+PRINT GUI_WINDOW_WIDGET_COUNT(win)
+GUI_DESTROY(a)
+PRINT GUI_WINDOW_WIDGET_COUNT(win)
+--- erwartet
+2
+1
+
+=== enumerate skips destroyed
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM a AS GUI_WIDGET
+DIM b AS GUI_WIDGET
+a = GUI_BUTTON(win, "A", 10, 10, 60, 24)
+b = GUI_LABEL(win, "B", 10, 50)
+GUI_DESTROY(a)
+PRINT GUI_KIND(GUI_WINDOW_WIDGET(win, 0))
+PRINT GUI_WINDOW_WIDGET(win, 0) = b
+PRINT GUI_WINDOW_WIDGET(win, 1)
+--- erwartet
+label
+TRUE
+-1
+
+=== visible toggle
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 10, 10, 60, 24)
+PRINT GUI_VISIBLE(b)
+GUI_SET_VISIBLE(b, FALSE)
+PRINT GUI_VISIBLE(b)
+--- erwartet
+TRUE
+FALSE
+
+=== hit test
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 50, 60, 120, 30)
+PRINT GUI_HIT_TEST(160, 175) = b
+PRINT GUI_HIT_TEST(5, 5)
+GUI_DESTROY(b)
+PRINT GUI_HIT_TEST(160, 175)
+--- erwartet
+TRUE
+-1
+-1
+
+=== hit test invisible skipped
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(win, "OK", 50, 60, 120, 30)
+GUI_SET_VISIBLE(b, FALSE)
+PRINT GUI_HIT_TEST(160, 175)
+--- erwartet
+-1
+
+=== window destroy
+IMPORT "gui"
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("T", 100, 80, 300, 200)
+DIM w2 AS GUI_WINDOW
+w2 = GUI_WINDOW("T2", 0, 0, 100, 100)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w2, "X", 10, 10, 60, 24)
+GUI_WINDOW_DESTROY(w2)
+PRINT GUI_HIT_TEST(20, 40)
+--- erwartet
+-1
+

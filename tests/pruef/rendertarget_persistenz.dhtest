@@ -1,0 +1,91 @@
+' Aus test_rendertarget_persistenz.py uebertragen (5 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne behalten ist der alte inhalt weg
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64)
+DIM f AS INTEGER
+FOR f = 0 TO 5
+    RENDERTARGET_BEGIN(rt)
+
+    IF f = 0 THEN PLOT(10, 10, &HFF0000)
+    PLOT(40, 10, &H00FF00)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== mit behalten steht der alte inhalt noch da
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64, TRUE)
+DIM f AS INTEGER
+FOR f = 0 TO 5
+    RENDERTARGET_BEGIN(rt)
+
+    IF f = 0 THEN PLOT(10, 10, &HFF0000)
+    PLOT(40, 10, &H00FF00)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== rendertarget clear raeumt ein behaltenes target
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64, TRUE)
+DIM f AS INTEGER
+FOR f = 0 TO 5
+    RENDERTARGET_BEGIN(rt)
+    IF f = 3 THEN RENDERTARGET_CLEAR(rt)
+    IF f = 0 THEN PLOT(10, 10, &HFF0000)
+    PLOT(40, 10, &H00FF00)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== verblassen ueber multiplizieren
+SCREEN(64, 64, "rt", 1)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64, TRUE)
+DIM f AS INTEGER
+FOR f = 0 TO 9
+    RENDERTARGET_BEGIN(rt)
+    BLEND_MODE("mult")
+    BOX(0, 0, 64, 64, RGB(200, 200, 200))
+    BLEND_MODE("alpha")
+    IF f = 0 THEN PLOT(10, 10, &HFF0000)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+
+=== inhalt wird nicht vom fenster massstab verzerrt
+SCREEN(64, 64, "rt", 2)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64)
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    RENDERTARGET_BEGIN(rt)
+    PLOT(50, 50, &HFF0000)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+--- erwartet
+

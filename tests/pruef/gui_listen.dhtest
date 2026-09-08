@@ -1,0 +1,464 @@
+' Aus test_gui_listen.py uebertragen (16 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== eintraege einzeln und auswahl rueckt mit
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+GUI_LISTBOX_SET_SELECTED(lb, 2)
+PRINT GUI_LISTBOX_ADD(lb, "Ananas", 0)
+PRINT GUI_LISTBOX_TEXT(lb)
+GUI_LISTBOX_REMOVE(lb, 0)
+PRINT GUI_LISTBOX_SELECTED(lb) ; " " ; GUI_LISTBOX_COUNT(lb)
+GUI_LISTBOX_MOVE(lb, 3, 0)
+PRINT GUI_LISTBOX_ITEM(lb, 0) ; " " ; GUI_LISTBOX_TEXT(lb)
+GUI_LISTBOX_SET_ITEM(lb, 0, "Feige")
+PRINT GUI_LISTBOX_ITEM(lb, 0)
+GUI_LISTBOX_REMOVE(lb, GUI_LISTBOX_SELECTED(lb))
+PRINT GUI_LISTBOX_SELECTED(lb)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0
+Kirsche
+2 4
+Dattel Kirsche
+Feige
+-1
+
+=== auch die klappliste kann eintraege einzeln
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM dd AS GUI_WIDGET : dd = GUI_DROPDOWN(w, 20, 160, 160, 24, SPLIT$("a|b", "|"))
+GUI_LISTBOX_ADD(dd, "c")
+GUI_LISTBOX_REMOVE(dd, 0)
+PRINT GUI_LISTBOX_COUNT(dd) ; " " ; GUI_LISTBOX_ITEM(dd, 1)
+TRY
+    GUI_LISTBOX_SET(dd, "kaestchen", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+2 c
+GUI_LISTBOX_SET: das Widget ist keine Liste (GUI_LISTBOX)
+
+=== falscher index im klartext
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+TRY
+    GUI_LISTBOX_ITEM(lb, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_LISTBOX_SET(lb, "farbe", 1)
+CATCH e2
+    PRINT e2
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_LISTBOX_ITEM: Eintrag 4 gibt es nicht (die Liste hat 4)
+GUI_LISTBOX_SET: unbekannter Schluessel 'farbe' -- mehrfachauswahl, kaestchen
+
+=== strg klick sammelt umschalt klick spannt (1)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 11 33
+O 11 33
+
+=== strg klick sammelt umschalt klick spannt (2)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+GUI_LISTBOX_SET(lb, "mehrfachauswahl", 1)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 6 OR f = 12 OR f = 19 THEN PRINT STR$(GUI_LISTBOX_SEL_COUNT(lb)) + " " + STR$(GUI_LISTBOX_SEL_ROW(lb, 0)) + " " + STR$(GUI_LISTBOX_SEL_ROW(lb, 1)) + " " + STR$(GUI_LISTBOX_SELECTED(lb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 16
+e 3 7 131 64 0 0 // Event: test
+e 4 7 131 64 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 8 7 131 108 0 0 // Event: test
+e 9 7 131 108 0 0 // Event: test
+e 9 2 341 0 0 0 // Event: test
+e 9 6 0 0 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+e 11 1 341 0 0 0 // Event: test
+e 14 7 131 130 0 0 // Event: test
+e 15 7 131 130 0 0 // Event: test
+e 15 2 340 0 0 0 // Event: test
+e 15 6 0 0 0 0 // Event: test
+e 16 5 0 0 0 0 // Event: test
+e 17 1 340 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1 0 -1 0
+2 0 2 2
+2 2 3 3
+
+=== ohne mehrfachauswahl bleibt es eine zeile (1)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 11 33
+O 11 33
+
+=== ohne mehrfachauswahl bleibt es eine zeile (2)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF f = 12 THEN PRINT STR$(GUI_LISTBOX_SEL_COUNT(lb)) + " " + STR$(GUI_LISTBOX_SELECTED(lb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 10
+e 3 7 131 64 0 0 // Event: test
+e 4 7 131 64 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 8 7 131 108 0 0 // Event: test
+e 9 7 131 108 0 0 // Event: test
+e 9 2 341 0 0 0 // Event: test
+e 9 6 0 0 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+e 11 1 341 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+1 2
+
+=== pfeil setzt die menge auf eine zeile (1)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 11 33
+O 11 33
+
+=== pfeil setzt die menge auf eine zeile (2)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+GUI_LISTBOX_SET(lb, "mehrfachauswahl", 1)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 19 THEN PRINT STR$(GUI_LISTBOX_SEL_COUNT(lb)) + " " + STR$(GUI_LISTBOX_SEL_ROW(lb, 0))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 12
+e 3 7 131 64 0 0 // Event: test
+e 4 7 131 64 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 8 7 131 108 0 0 // Event: test
+e 9 7 131 108 0 0 // Event: test
+e 9 2 341 0 0 0 // Event: test
+e 9 6 0 0 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+e 11 1 341 0 0 0 // Event: test
+e 14 2 264 0 0 0 // Event: test
+e 15 1 264 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1 3
+
+=== klick aufs kaestchen kippt nur den haken (1)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 11 33
+O 11 33
+
+=== klick aufs kaestchen kippt nur den haken (2)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+GUI_LISTBOX_SET(lb, "kaestchen", 1)
+SUB ge()
+    PRINT "change"
+END SUB
+GUI_ON_CHANGE(lb, ge)
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF f = 12 THEN PRINT STR$(IIF(GUI_LISTBOX_CHECKED(lb, 1), 1, 0)) + " " + STR$(GUI_LISTBOX_SELECTED(lb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 3 7 41 86 0 0 // Event: test
+e 4 7 41 86 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 8 7 131 130 0 0 // Event: test
+e 9 7 131 130 0 0 // Event: test
+e 9 6 0 0 0 0 // Event: test
+e 10 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+change
+change
+1 3
+
+=== leertaste kippt den haken der gewaehlten zeile
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+GUI_LISTBOX_SET(lb, "kaestchen", 1)
+GUI_LISTBOX_SET_SELECTED(lb, 2)
+GUI_FOCUS(lb)
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF f = 5 OR f = 12 THEN PRINT GUI_LISTBOX_CHECKED(lb, 2)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 4
+e 4 2 32 0 0 0 // Event: test
+e 5 1 32 0 0 0 // Event: test
+e 9 2 32 0 0 0 // Event: test
+e 10 1 32 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+TRUE
+FALSE
+
+=== doppelklick meldet sich ein bild lang (1)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 2
+    GUI_UPDATE()
+    PRINT "O " + STR$(GUI_CANVAS_X(nullpunkt)) + " " + STR$(GUI_CANVAS_Y(nullpunkt))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+O 11 33
+O 11 33
+
+=== doppelklick meldet sich ein bild lang (2)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM f AS INTEGER
+FOR f = 1 TO 14
+    GUI_UPDATE()
+    IF GUI_DOUBLE_CLICKED(lb) THEN PRINT "doppel " + STR$(GUI_LISTBOX_SELECTED(lb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 7 131 86 0 0 // Event: test
+e 4 7 131 86 0 0 // Event: test
+e 4 6 0 0 0 0 // Event: test
+e 5 5 0 0 0 0 // Event: test
+e 7 6 0 0 0 0 // Event: test
+e 8 5 0 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+doppel 1
+
+=== doppelklick nur fuer listen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "k", 20, 200, 60, 24)
+TRY
+    PRINT GUI_DOUBLE_CLICKED(b)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_DOUBLE_CLICKED: bisher nur fuer Listen (GUI_LISTBOX)
+
+=== zusatz ueberlebt die datei und fehlt ohne zusatz
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(w, 20, 20, 200, 120, SPLIT$("Apfel|Birne|Kirsche|Dattel", "|"))
+DIM j0 AS STRING : j0 = GUI_TO_JSON(w)
+PRINT INSTR(j0, CHR$(34) + "list" + CHR$(34) + ":") >= 0
+GUI_LISTBOX_SET(lb, "kaestchen", 1) : GUI_LISTBOX_SET_CHECKED(lb, 1, TRUE)
+GUI_LISTBOX_SET(lb, "mehrfachauswahl", 1) : GUI_LISTBOX_SELECT(lb, 3, TRUE)
+GUI_LISTBOX_COLOR(lb, 0, 255)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+PRINT GUI_TO_JSON(w2) = j
+DIM lb2 AS GUI_WIDGET : lb2 = GUI_WINDOW_WIDGET(w2, 1)
+PRINT GUI_LISTBOX_CHECKED(lb2, 1) ; " " ; GUI_LISTBOX_IS_SELECTED(lb2, 3) ; " " ; GUI_LISTBOX_SEL_COUNT(lb2)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+FALSE
+TRUE
+TRUE TRUE 1
+

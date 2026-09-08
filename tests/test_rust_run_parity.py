@@ -9,6 +9,10 @@ Verifikation: stdout von `dhrt run` gegen erwartete Ausgaben. Deckt explizit
 den chdir-Effekt ab (relativer Laufzeit-Datei-Zugriff) und den
 `dhrt <datei.dh>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
 der Vergleichspartner Python-Tree-Walker ist seit Stufe B geloescht.)
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/rust_run_parity.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import contextlib
 import io
@@ -46,24 +50,6 @@ def _write(d: Path, name: str, content: str) -> Path:
     p = d / name
     p.write_text(content, encoding="utf-8")
     return p
-
-
-def test_run_with_relative_file_and_imports(tmp_path):
-    # lib.dh (Quellcode-IMPORT), vec2 (Modul-IMPORT), data.txt (relativer
-    # Laufzeit-Zugriff -- beweist chdir).
-    _write(tmp_path, "lib.dh",
-           "FUNCTION tri(n AS INTEGER) AS INTEGER\n  RETURN n * (n + 1) \\ 2\nEND FUNCTION\n")
-    _write(tmp_path, "data.txt", "hallo\nwelt\n")
-    main = _write(tmp_path, "main.dh",
-                  'IMPORT "lib.dh"\nIMPORT "vec2"\n'
-                  'DIM v AS VEC2\nv = VEC2_NEW(3.0, 4.0)\n'
-                  'DIM f AS FILE\nf = OpenFile("data.txt", "r")\n'
-                  'PRINT ReadLine(f)\nCloseFile(f)\n'
-                  'PRINT tri(10)\nPRINT VEC2_LENGTH(v)\n')
-    rc, out = _dhrt(["run", str(main)])
-    assert rc == 0, f"dhrt run Exit {rc}"
-    # Golden (Stufe B): ReadLine="hallo", tri(10)=55, VEC2_LENGTH(3,4)=5.0.
-    assert out == "hallo\n55\n5.0\n"
 
 
 def test_bare_gb_path_autodetect(tmp_path):

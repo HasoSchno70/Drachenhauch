@@ -1,0 +1,258 @@
+' Aus test_gui_massstab.py uebertragen (9 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== massstab wirkt erst auf spaeter angelegtes
+' Ein Wechsel bei bestehenden Fenstern ist ein FEHLER, keine Halbheit.
+IMPORT "gui"
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 100, 100)
+TRY
+    GUI_SCALE(2.0)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== massstab ausserhalb der grenzen
+IMPORT "gui"
+TRY
+    GUI_SCALE(9.0)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== massstab lesbar
+IMPORT "gui"
+PRINT GUI_SCALE_GET()
+GUI_SCALE(1.5)
+PRINT GUI_SCALE_GET()
+--- erwartet
+1.0
+1.5
+
+=== getter bleiben logisch
+' `GUI_GET_*` liefert, was hineingegeben wurde -- sonst wäre
+IMPORT "gui"
+GUI_SCALE(2.0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 20, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 15, 25, 80, 24)
+PRINT GUI_GET_X(b); " "; GUI_GET_Y(b); " "; GUI_GET_W(b); " "; GUI_GET_H(b)
+PRINT GUI_WINDOW_GET_X(w); " "; GUI_WINDOW_GET_W(w)
+GUI_SET_BOUNDS(b, 15, 25, 90, 24)
+PRINT GUI_GET_W(b)
+--- erwartet
+15 25 80 24
+10 300
+90
+
+=== hit test spricht bildschirm pixel (1)
+' Der Beweis, dass INNEN wirklich skaliert wird.
+IMPORT "gui"
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 40, 40, 60, 20)
+' Mitte des Knopfes in LOGISCHEN Koordinaten, plus Titelleiste
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM getroffen AS INTEGER
+FOR y = 0 TO 299
+  FOR x = 0 TO 399
+    IF GUI_HIT_TEST(x, y) = b AND getroffen = 0 THEN
+      PRINT x; " "; y
+      getroffen = 1
+    END IF
+  NEXT
+NEXT
+--- erwartet
+40 62
+
+=== hit test spricht bildschirm pixel (2)
+' Der Beweis, dass INNEN wirklich skaliert wird.
+IMPORT "gui"
+GUI_SCALE(2.0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 40, 40, 60, 20)
+' Mitte des Knopfes in LOGISCHEN Koordinaten, plus Titelleiste
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM getroffen AS INTEGER
+FOR y = 0 TO 299
+  FOR x = 0 TO 399
+    IF GUI_HIT_TEST(x, y) = b AND getroffen = 0 THEN
+      PRINT x; " "; y
+      getroffen = 1
+    END IF
+  NEXT
+NEXT
+--- erwartet
+80 124
+
+=== gespeicherte form ist massstabsfrei (1)
+' Die wichtigste Zusage: `GUI_TO_JSON` schreibt dasselbe, egal bei
+IMPORT "gui"
+
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 20, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 15, 25, 80, 24)
+DIM t AS GUI_WIDGET
+t = GUI_TABLE(w, 10, 60, 200, 100)
+PRINT GUI_TO_JSON(w)
+--- erwartet
+{
+  "title": "T",
+  "x": 10,
+  "y": 20,
+  "w": 300,
+  "h": 200,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": false,
+  "chrome": true,
+  "min_w": 0,
+  "min_h": 0,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "button",
+      "x": 15,
+      "y": 25,
+      "w": 80,
+      "h": 24,
+      "text": "ok",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true
+    },
+    {
+      "kind": "table",
+      "x": 10,
+      "y": 60,
+      "w": 200,
+      "h": 100,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [],
+        "rows": [],
+        "col_widths": null,
+        "selected": -1
+      }
+    }
+  ],
+  "menus": [],
+  "tabs": [],
+  "active_tab": 0,
+  "default_button": -1,
+  "cancel_button": -1
+}
+
+=== gespeicherte form ist massstabsfrei (2)
+' Die wichtigste Zusage: `GUI_TO_JSON` schreibt dasselbe, egal bei
+IMPORT "gui"
+GUI_SCALE(2.0)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 20, 300, 200)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "ok", 15, 25, 80, 24)
+DIM t AS GUI_WIDGET
+t = GUI_TABLE(w, 10, 60, 200, 100)
+PRINT GUI_TO_JSON(w)
+--- erwartet
+{
+  "title": "T",
+  "x": 10,
+  "y": 20,
+  "w": 300,
+  "h": 200,
+  "movable": true,
+  "closable": false,
+  "visible": true,
+  "resizable": false,
+  "chrome": true,
+  "min_w": 0,
+  "min_h": 0,
+  "max_w": 0,
+  "max_h": 0,
+  "widgets": [
+    {
+      "kind": "button",
+      "x": 15,
+      "y": 25,
+      "w": 80,
+      "h": 24,
+      "text": "ok",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true
+    },
+    {
+      "kind": "table",
+      "x": 10,
+      "y": 60,
+      "w": 200,
+      "h": 100,
+      "text": "",
+      "color": -1,
+      "value": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "checked": false,
+      "placeholder": "",
+      "visible": true,
+      "table": {
+        "headers": [],
+        "rows": [],
+        "col_widths": null,
+        "selected": -1
+      }
+    }
+  ],
+  "menus": [],
+  "tabs": [],
+  "active_tab": 0,
+  "default_button": -1,
+  "cancel_button": -1
+}
+
+=== geladene form waechst mit
+' Umgekehrt: eine bei Massstab 1 gebaute Form wird bei Massstab 2
+IMPORT "gui"
+DIM roh AS STRING
+roh = "{""title"":""T"",""x"":10,""y"":20,""w"":300,""h"":200,""widgets"":" + _
+      "[{""kind"":""button"",""x"":15,""y"":25,""w"":80,""h"":24,""text"":""ok""}]}"
+GUI_SCALE(2.0)
+DIM w AS GUI_WINDOW
+w = GUI_FROM_JSON(roh)
+DIM b AS GUI_WIDGET
+b = GUI_WINDOW_WIDGET(w, 0)
+PRINT GUI_GET_X(b); " "; GUI_GET_W(b)
+--- erwartet
+15 80
+

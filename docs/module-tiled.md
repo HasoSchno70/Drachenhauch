@@ -114,7 +114,7 @@ Kachelzahl: nur damit laesst sich die naechste GID ausrechnen.
 **Geschrieben wird echtes Tiled-JSON** — eingebettete Tilesets, `type: "map"`,
 Kacheldaten als Zahlenliste. Nachgeprueft ist das nicht am eigenen Leser, sondern
 an einem **fremden**: `drachenhauch/tilemap/document.py`, dem Datenmodell des
-Qt-Editors `dhtilemap` (`tests/test_tiled_schreiben.py`). Ein Format, das nur sein
+Qt-Editors `dhtilemap` (`tests/pruef/tiled_schreiben.dhtest`). Ein Format, das nur sein
 eigener Schreiber wieder liest, ist nicht geprueft, sondern nur in sich stimmig.
 
 ### Objekt-Ebenen und Eigenschaften anlegen

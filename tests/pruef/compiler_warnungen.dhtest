@@ -1,0 +1,26 @@
+' Aus test_compiler_warnungen.py uebertragen (3 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== ueberzaehliges argument bricht bei geprueften builtins ab
+' Das Gegenstueck zur Meldung: hier laeuft das Programm eben NICHT
+PRINT MID$("abc", 1, 2, 99)
+--- fehler
+MID$: erwartet 2..3 Argumente, erhalten 4
+
+=== warnung blockiert nicht
+' Es bleibt eine Warnung: das Programm laeuft, solange der Wert passt.
+DIM g AS FLOAT
+g = 1.5
+DIM n AS INTEGER
+n = g * 2.0
+PRINT n
+--- erwartet
+3
+
+=== meldung blockiert die uebersetzung nicht
+' Es bleibt eine Warnung: alles vor der schlechten Zeile laeuft.
+PRINT "davor"
+DIM s AS STRING
+s = 5
+--- fehler
+Zuweisung an global: Erwartet STRING, erhalten INTEGER
+

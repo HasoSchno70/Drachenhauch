@@ -3,6 +3,10 @@ LOG_DEBUG/INFO/WARN/ERROR.
 
 Braucht `run_gb_roh` (aus WP A): geprueft werden hier gerade die Dinge, die
 `run_gb` wegabstrahiert -- der Rueckgabewert und die stderr-Ausgabe.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/pruefen.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import pytest
 
@@ -10,9 +14,6 @@ from drachenhauch.errors import DHRuntimeError
 
 
 # ------------------------------------------- Vorgabe: eine Pruefung bricht ab
-
-def test_erfuellte_pruefung_laeuft_durch(run_gb):
-    assert run_gb('ASSERT(1 < 2)\nPRINT "weiter"') == "weiter\n"
 
 
 def test_fehlgeschlagene_pruefung_bricht_ab(run_gb_roh):
@@ -33,13 +34,6 @@ def test_abbruch_nennt_datei_und_zeile(run_gb_roh):
 def test_ohne_meldung_gibt_es_trotzdem_eine(run_gb_roh):
     _, _, err = run_gb_roh('ASSERT(FALSE)')
     assert "Bedingung nicht erfuellt" in err
-
-
-def test_assert_verlangt_boolean(run_gb):
-    """`ASSERT(anzahl)` waere sonst still 'wahr, weil nicht null' -- eine
-    Pruefung, die aus Versehen immer durchgeht, ist schlimmer als keine."""
-    with pytest.raises(DHRuntimeError, match="erwartet BOOLEAN"):
-        run_gb('ASSERT(5)')
 
 
 def test_assert_eq_bricht_ab_und_zeigt_beide_werte(run_gb_roh):
@@ -117,11 +111,6 @@ def test_sammeln_laesst_sich_wieder_ausschalten(run_gb_roh):
     assert code != 0
 
 
-def test_assert_collect_verlangt_boolean(run_gb):
-    with pytest.raises(DHRuntimeError, match="erwartet BOOLEAN"):
-        run_gb('ASSERT_COLLECT(1)')
-
-
 # --------------------------------------------------- ASSERT_EQ und Typen
 
 def test_assert_eq_vergleicht_wie_der_gleichheitsoperator(run_gb_roh):
@@ -138,14 +127,6 @@ def test_assert_eq_vergleicht_wie_der_gleichheitsoperator(run_gb_roh):
 def test_assert_eq_auf_strings_zeigt_beide(run_gb_roh):
     _, _, err = run_gb_roh('ASSERT_COLLECT(TRUE)\nASSERT_EQ("abc", "abd", "Text")')
     assert "Text" in err and "abc" in err and "abd" in err
-
-
-def test_zaehler_starten_bei_null(run_gb):
-    assert run_gb('PRINT ASSERT_COUNT()\nPRINT ASSERT_FAILED()') == "0\n0\n"
-
-
-def test_bilanz_ohne_pruefungen_ist_gruen(run_gb):
-    assert run_gb('PRINT ASSERT_REPORT()') == "ALLES GRUEN -- 0 Pruefungen\n0\n"
 
 
 # ------------------------------------------------------------------- LOG_*

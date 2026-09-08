@@ -1,0 +1,114 @@
+' Aus test_audio_sound_io.py uebertragen (8 Faelle, von Hand 2026-09-08 -- WAV-Proben als `--- ton`). Format: docs/werkzeuge.md, dhrt test.
+' AUDIO_SAVE_WAV und AUDIO_SOUND_WAVE -- Klang als Datei und als Kurve. Die WAV liest
+' der Laeufer selbst (pruefsammlung::wav_lesen); der pytest-Test las sie mit Pythons wave-Modul.
+' Nicht uebertragen: der Groessenvergleich 8 gegen 16 Bit (zwei Dateien in einem Fall).
+
+=== wav ist fuer einen fremden leser gueltig
+' 0 + 40 + 160 ms Huellkurve -> 200 ms; Mono bleibt einkanalig.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+AUDIO_SAVE_WAV(s, "t.wav")
+--- ton t.wav
+abtastrate 44100
+bits 16
+kanaele 1
+dauer 0.2 +-0.01
+
+=== lautstaerke wird nicht zweimal gerechnet
+' Die Lautstaerke aus AUDIO_SFX steckt schon in den Frames -- 0.49 hiesse zweimal gerechnet.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+AUDIO_SAVE_WAV(s, "t.wav")
+--- ton t.wav
+spitze 0.7 +-0.01
+
+=== acht bit klingt noch gleich
+' Dieselbe Kurve, groeber aufgeloest: die Spitze bleibt, die Bittiefe ist 8.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+AUDIO_SAVE_WAV(s, "b.wav", 8)
+--- ton b.wav
+bits 8
+kanaele 1
+spitze 0.7 +-0.02
+
+=== stereo bleibt stereo
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("saw", 500, -300, 0, 60, 200, 0, 0, 0.6, 0.8)
+AUDIO_SAVE_WAV(s, "t.wav")
+--- ton t.wav
+kanaele 2
+kanaele verschieden
+
+=== mono wird nicht unnoetig verdoppelt
+' stereo_width = 0 legt links und rechts denselben Wert -- daraus keine doppelt so grosse Datei machen.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+AUDIO_SAVE_WAV(s, "t.wav")
+--- ton t.wav
+kanaele 1
+
+=== bittiefe muss 8 oder 16 sein
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+TRY
+    AUDIO_SAVE_WAV(s, "t.wav", 24)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt
+
+=== wellenform hat die gewuenschte laenge und form
+' Spitzenwerte, keine Mittelwerte: gemittelt laege fast alles bei 0 und die Anzeige zeigte einen Strich.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+DIM w AS ARRAY OF FLOAT
+w = AUDIO_SOUND_WAVE(s, 64)
+DIM i AS INTEGER
+DIM gross AS INTEGER
+DIM ausserhalb AS INTEGER
+FOR i = 0 TO 63
+    IF ABS(w[i]) > 0.2 THEN gross = gross + 1
+    IF ABS(w[i]) > 1.0 THEN ausserhalb = ausserhalb + 1
+NEXT
+PRINT LEN(w)
+PRINT gross > 40
+PRINT ausserhalb
+--- erwartet
+64
+TRUE
+0
+
+=== wellenform feiner als der klang lang ist
+' Mehr Punkte als Samples: jeder Abschnitt sieht trotzdem mindestens ein Sample.
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 400, 0, 0, 1, 0, 0, 0, 0.9)
+DIM w AS ARRAY OF FLOAT
+w = AUDIO_SOUND_WAVE(s, 90000)
+PRINT LEN(w)
+--- erwartet
+90000
+
+=== anzahl muss sinnvoll sein
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+TRY
+    DIM w AS ARRAY OF FLOAT
+    w = AUDIO_SOUND_WAVE(s, 0)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT "abgelehnt"
+END TRY
+--- erwartet
+abgelehnt

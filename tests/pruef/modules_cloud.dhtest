@@ -1,0 +1,8 @@
+' Aus test_modules_cloud.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== cloud call without configure raises
+IMPORT "cloud"
+PRINT CLOUD_LOAD("p")
+--- fehler
+CLOUD_LOAD: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden
+

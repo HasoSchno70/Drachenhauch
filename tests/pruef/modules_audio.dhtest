@@ -1,0 +1,374 @@
+' Aus test_modules_audio.py uebertragen (25 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== music play stop fade validation
+IMPORT "audio"
+TRY
+    AUDIO_MUSIC_PLAY(-1, -5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_MUSIC_STOP(-1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_MUSIC_PLAY: fade_in_ms muss >= 0 sein
+AUDIO_MUSIC_STOP: fade_out_ms muss >= 0 sein
+
+=== play stop fade validation
+IMPORT "audio"
+TRY
+    AUDIO_PLAY(0, -1, 1.0, -5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_STOP(0, -1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PLAY: fade_in_ms muss >= 0 sein
+AUDIO_STOP: fade_out_ms muss >= 0 sein
+
+=== pan slide validation
+IMPORT "audio"
+TRY
+    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein
+
+=== pitch validation
+IMPORT "audio"
+TRY
+    AUDIO_PITCH(0, 0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_MUSIC_PITCH(-1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PITCH: faktor muss > 0 sein
+AUDIO_MUSIC_PITCH: faktor muss > 0 sein
+
+=== sample type compiles
+IMPORT "audio"
+DIM s AS SAMPLE
+PRINT "sample-typ ok"
+--- erwartet
+sample-typ ok
+
+=== lofi validation
+IMPORT "audio"
+TRY
+    AUDIO_LOFI(TRUE, 99)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_LOFI(TRUE, 8, -1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_LOFI: bits muss 1..16 sein
+AUDIO_LOFI: cutoff_hz muss >= 0 sein
+
+=== bus volume validation
+IMPORT "audio"
+TRY
+    AUDIO_BUS_VOLUME("foo", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    PRINT STR$(AUDIO_BUS_GET_VOLUME("bar"))
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_BUS_VOLUME: unbekannter Bus 'foo' (sfx, music, master, speech)
+AUDIO_BUS_GET_VOLUME: unbekannter Bus 'bar' (sfx, music, master, speech)
+
+=== bus effects validation
+IMPORT "audio"
+TRY
+    AUDIO_FILTER("nope", 1000, 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_REVERB("nope", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_DELAY("nope", 0.5)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_FILTER: unbekannter Bus 'nope' (sfx, music, master)
+AUDIO_REVERB: unbekannter Bus 'nope' (sfx, music, master)
+AUDIO_DELAY: unbekannter Bus 'nope' (sfx, music, master)
+
+=== bus dynamics eq validation
+IMPORT "audio"
+TRY
+    AUDIO_DISTORTION("nope", 0.5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_COMPRESSOR("nope", -18, 4)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_EQ("nope", 100, 3)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_DISTORTION: unbekannter Bus 'nope' (sfx, music, master)
+AUDIO_COMPRESSOR: unbekannter Bus 'nope' (sfx, music, master)
+AUDIO_EQ: unbekannter Bus 'nope' (sfx, music, master)
+
+=== unloadsound is wired
+TRY
+    UNLOADSOUND()
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+UNLOADSOUND: fehlendes Argument 1
+
+=== audio clock type compiles
+IMPORT "audio"
+DIM c AS AUDIO_CLOCK
+PRINT "audio-clock-typ ok"
+--- erwartet
+audio-clock-typ ok
+
+=== audio clock new validation
+IMPORT "audio"
+TRY
+    AUDIO_CLOCK_NEW(0.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_CLOCK_NEW(-2.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_CLOCK_NEW: ticks_per_second muss > 0 sein
+AUDIO_CLOCK_NEW: ticks_per_second muss > 0 sein
+
+=== audio clock set speed validation
+IMPORT "audio"
+TRY
+    AUDIO_CLOCK_SET_SPEED(0, -1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_CLOCK_SET_SPEED: ticks_per_second muss > 0 sein
+
+=== audio play at validation
+IMPORT "audio"
+TRY
+    AUDIO_PLAY_AT(0, 0, -1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PLAY_AT: ticks muss >= 0 sein
+
+=== easing validation on fade builtins
+IMPORT "audio"
+TRY
+    AUDIO_PLAY(0, 0, 1.0, 100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_STOP(0, 100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_MUSIC_PLAY(-1, 100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_MUSIC_STOP(100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PLAY: unbekanntes Easing 'bounce' (linear, in, out, inout)
+AUDIO_STOP: unbekanntes Easing 'bounce' (linear, in, out, inout)
+AUDIO_PAN_SLIDE: unbekanntes Easing 'bounce' (linear, in, out, inout)
+AUDIO_MUSIC_PLAY: unbekanntes Easing 'bounce' (linear, in, out, inout)
+AUDIO_MUSIC_STOP: unbekanntes Easing 'bounce' (linear, in, out, inout)
+
+=== easing defaults to linear when omitted
+IMPORT "audio"
+TRY
+    AUDIO_PLAY(0, -1, 1.0, -5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PLAY: fade_in_ms muss >= 0 sein
+AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein
+
+=== audio listener emitter types compile
+IMPORT "audio"
+DIM l AS AUDIO_LISTENER
+DIM e AS AUDIO_EMITTER
+PRINT "listener/emitter-typ ok"
+--- erwartet
+listener/emitter-typ ok
+
+=== audio emitter new validation
+IMPORT "audio"
+TRY
+    AUDIO_EMITTER_NEW(0, 0.0, 0.0, 0.0, -1.0)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_EMITTER_NEW(0, 0.0, 0.0, 0.0, 10.0, 5.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_EMITTER_NEW: min_dist muss >= 0 sein
+AUDIO_EMITTER_NEW: max_dist muss > min_dist sein
+
+=== audio play on validation
+IMPORT "audio"
+TRY
+    AUDIO_PLAY_ON(0, 0, 0, 1.0, -5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    AUDIO_PLAY_ON(0, 0, 0, 1.0, 100, "bounce")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_PLAY_ON: fade_in_ms muss >= 0 sein
+AUDIO_PLAY_ON: unbekanntes Easing 'bounce' (linear, in, out, inout)
+
+=== music seek validation
+IMPORT "audio"
+TRY
+    AUDIO_MUSIC_SEEK(-1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_MUSIC_SEEK: Position muss >= 0 sein (war -1)
+
+=== music seek ohne musik meldet sich
+' Der Sprung braucht einen laufenden Griff -- den gibt es erst ab PLAY.
+IMPORT "audio"
+TRY
+    AUDIO_MUSIC_SEEK(1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_MUSIC_SEEK: es laeuft keine Musik -- erst AUDIO_MUSIC_PLAY()
+
+=== unloadsound zaehler und tombstone
+' UNLOADSOUND gibt frei, der Handle bleibt gueltig (Tombstone) und ein
+IMPORT "audio"
+DIM t AS SOUND
+DIM v AS SOUND
+t = AUDIO_TONE(440, 30, "square", 0.3)
+PRINT AUDIO_SOUND_COUNT()
+UNLOADSOUND(t)
+PRINT AUDIO_SOUND_COUNT()
+TRY
+    PLAYSOUND(t)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT e
+END TRY
+v = AUDIO_TONE(880, 30, "sine", 0.3)
+PRINT STR$(v) = STR$(t)
+--- erwartet
+1
+0
+PLAYSOUND: Sound 0 wurde freigegeben (UNLOADSOUND)
+FALSE
+
+=== lautstaerke ist linear und wird geklemmt
+' Die Doku sagt '0..1' und (im Anhang) dass Kira intern in Dezibel
+IMPORT "audio"
+DIM t AS SOUND
+DIM ch AS AUDIO_CHANNEL
+t = AUDIO_TONE(440, 50, "sine", 0.3)
+ch = AUDIO_PLAY(t, -1, 1.0)
+AUDIO_VOLUME(ch, 0.25)
+PRINT AUDIO_GET_VOLUME(ch)
+AUDIO_VOLUME(ch, 5.0)
+PRINT AUDIO_GET_VOLUME(ch)
+AUDIO_STOP(ch)
+--- erwartet
+0.25
+1.0
+
+=== loops semantik
+' `0` spielt einmal, `-1` endlos -- gemessen an einem 60-ms-Ton.
+IMPORT "audio"
+DIM t AS SOUND
+DIM ch AS AUDIO_CHANNEL
+t = AUDIO_TONE(440, 60, "sine", 0.2)
+ch = AUDIO_PLAY(t, 0, 0.2)
+SLEEP(250)
+PRINT AUDIO_IS_PLAYING(ch)
+ch = AUDIO_PLAY(t, -1, 0.2)
+SLEEP(250)
+PRINT AUDIO_IS_PLAYING(ch)
+AUDIO_STOP(ch)
+--- erwartet
+FALSE
+TRUE
+
+=== music seek ohne play meldet sich
+' Doku: 'der Aufruf meldet dann einen Fehler, statt stillschweigend
+IMPORT "audio"
+TRY
+    AUDIO_MUSIC_SEEK(10.0)
+    PRINT "kein Fehler"
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+AUDIO_MUSIC_SEEK: es laeuft keine Musik -- erst AUDIO_MUSIC_PLAY()
+

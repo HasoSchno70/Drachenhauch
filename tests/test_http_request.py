@@ -4,6 +4,10 @@ Kopfzeilen, Hintergrund-Anfragen fuer alle Methoden.
 
 Wie `test_modules_html.py` gegen einen lokalen Mock-Server im pytest-Prozess;
 das GB-Programm laeuft im dhrt-Subprozess und macht echte localhost-Anfragen.
+
+Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
+`tests/pruef/http_request.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
+eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
 """
 import contextlib
 import json
@@ -175,19 +179,6 @@ def test_clear_headers_raeumt_auf(run_gb):
     assert _echo(out)["auth"] == ""
 
 
-def test_zeilenumbruch_in_der_kopfzeile_wird_abgelehnt(run_gb):
-    """Header-Injection: ein CRLF im Wert haengt beliebige weitere Kopfzeilen
-    an. Kommt der Wert aus einer Eingabe, ist das eine Luecke."""
-    with pytest.raises(DHRuntimeError, match="Zeilenumbruch"):
-        run_gb('IMPORT "html"\n'
-               'HTTP_SET_HEADER("X-Bad", "a" + CHR$(13) + CHR$(10) + "X-Rein: ja")')
-
-
-def test_kopfzeilen_name_mit_doppelpunkt_wird_abgelehnt(run_gb):
-    with pytest.raises(DHRuntimeError, match="unerlaubte Zeichen"):
-        run_gb('IMPORT "html"\nHTTP_SET_HEADER("X:Y", "z")')
-
-
 def test_kopfzeilen_map_mit_falschem_werttyp_wirft(run_gb):
     with _echo_server() as basis:
         with pytest.raises(DHRuntimeError, match="erwartet STRING"):
@@ -270,12 +261,6 @@ def test_timeout_greift(run_gb):
             run_gb('IMPORT "html"\n'
                    'HTTP_TIMEOUT(1)\n'
                    f'PRINT HTTP_REQUEST("GET", "{basis}/langsam")')
-
-
-@pytest.mark.parametrize("wert", ["0", "601"])
-def test_unsinnige_zeitgrenze_wirft(run_gb, wert):
-    with pytest.raises(DHRuntimeError, match="ausserhalb 1..600"):
-        run_gb(f'IMPORT "html"\nHTTP_TIMEOUT({wert})')
 
 
 # ------------------------------------------------------ Hintergrund-Anfrage

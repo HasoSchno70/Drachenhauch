@@ -90,21 +90,14 @@ def _module_uses_qt(path: str) -> bool:
 _SERIELL = {
     "test_automation.py",
     "test_gui_form_runner.py",
-    "test_gui_tastatur.py",
-    "test_gui_dialog.py",
-    "test_gui_menu_ausbau.py",       # speist Tasten UND Klicks ein
     "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
     "test_speak.py",                 # misst Sprechdauern (SPEAK_WAIT) an der Soundkarte
     "test_ide.py",                   # speist Tasten in die IDE ein (F5/F7)
     "test_pilot_formdesigner.py",    # speist Klicks und Tasten in den Form-Designer ein
     "test_pilot_animfsm.py",         # speist Klicks und Tasten in den Anim-FSM-Editor ein
     "test_pilot_notenblatt.py",      # speist Klicks und Tasten ins Notenblatt ein, spielt Ton
-    "test_gui_listen.py",            # Klicks mit Strg/Umschalt
-    "test_gui_dialoge_ausbau.py",    # Klicks und Tasten in Dialoge
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
-    "test_gui_text_formular.py",
-    "test_audio_modulators.py",
     "test_pilot_sprite_auswahl.py",
     "test_pilot_partikel.py",
     "test_pilot_sfx.py",
@@ -202,7 +195,6 @@ _BRAUCHT_GRAFIK = {
     "test_pilot_notenblatt.py",
     "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
-    "test_audio_modulators.py",
     "test_audio_note_mix.py",
     "test_audio_sound_io.py",
     "test_automation.py",
@@ -212,19 +204,13 @@ _BRAUCHT_GRAFIK = {
     "test_circuitrunner.py",
     "test_examples.py",
     "test_gfx_push_pop.py",
-    "test_gui_dialog.py",
     "test_gui_draw_window.py",
     "test_gui_form_runner.py",
-    "test_gui_menu_ausbau.py",
-    "test_gui_listen.py",
     "test_pilot_rechnungen.py",
     "test_drucken.py",
     "test_fenster_prozess.py",
     "test_gui_bindung.py",
-    "test_gui_dialoge_ausbau.py",
     "test_gui_table_frozen_edge.py",
-    "test_gui_tastatur.py",
-    "test_gui_text_formular.py",
     "test_image_io.py",
     "test_input_edges.py",
     "test_kontaktbogen.py",

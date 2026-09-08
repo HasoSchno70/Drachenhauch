@@ -1,0 +1,59 @@
+' Aus test_gfx_push_pop.py uebertragen (5 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== kamera schrift und stapeltiefe
+IMPORT "camera"
+SCREEN(120, 80, "p", 1)
+PRINT GFX_DEPTH()
+GFX_PUSH()
+CAMERA_SET(120.0, 80.0, 2.0)
+PRINT STR$(INT(CAMERA_X())) + " " + FORMAT$(CAMERA_ZOOM(), "%.1f") + " " + STR$(GFX_DEPTH())
+GFX_POP()
+PRINT STR$(INT(CAMERA_X())) + " " + FORMAT$(CAMERA_ZOOM(), "%.1f") + " " + STR$(GFX_DEPTH())
+--- erwartet
+0
+120 2.0 1
+0 1.0 0
+
+=== pop ohne push meldet sich
+SCREEN(64, 64, "p", 1)
+GFX_POP()
+--- fehler
+GFX_POP: der Stapel ist leer -- zu jedem GFX_POP gehoert ein GFX_PUSH
+
+=== verschachteln geht
+IMPORT "camera"
+SCREEN(64, 64, "p", 1)
+GFX_PUSH()
+CAMERA_SET(10.0, 0.0, 1.0)
+GFX_PUSH()
+CAMERA_SET(99.0, 0.0, 1.0)
+GFX_POP()
+PRINT INT(CAMERA_X())
+GFX_POP()
+PRINT INT(CAMERA_X())
+--- erwartet
+10
+0
+
+=== audio lautstaerke kommt zurueck
+IMPORT "audio"
+SCREEN(64, 64, "p", 1)
+AUDIO_BUS_VOLUME("music", 0.8)
+PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
+AUDIO_PUSH()
+AUDIO_BUS_VOLUME("music", 0.1)
+PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
+AUDIO_POP()
+PRINT FORMAT$(AUDIO_BUS_GET_VOLUME("music"), "%.2f") + " " + STR$(AUDIO_DEPTH())
+--- erwartet
+0.80 0
+0.10 1
+0.80 0
+
+=== audio pop ohne push meldet sich
+IMPORT "audio"
+SCREEN(64, 64, "p", 1)
+AUDIO_POP()
+--- fehler
+AUDIO_POP: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH
+

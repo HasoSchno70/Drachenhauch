@@ -1,0 +1,47 @@
+' Aus test_div_and_float_display.py uebertragen (6 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+
+=== division unchanged
+PRINT 8 / 2
+PRINT 9 / 2
+PRINT 6 / 3
+--- erwartet
+4
+4.5
+2
+
+=== float into integer hints backslash
+DIM x AS INTEGER
+x = 9 / 2
+--- fehler
+Zuweisung an global: FLOAT 4.5 passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \ statt / nehmen, sonst mit INT()/ROUND() runden
+
+=== backslash is the fix
+DIM x AS INTEGER
+x = 9 \ 2
+PRINT x
+--- erwartet
+4
+
+=== general float display unchanged
+PRINT 0.1 + 0.2
+--- erwartet ungefaehr
+0.30000000000000004
+
+=== audio bus volume rounded
+IMPORT "audio"
+AUDIO_BUS_VOLUME("music", 0.8)
+PRINT AUDIO_BUS_GET_VOLUME("music")
+--- erwartet
+0.8
+
+=== audio channel volume rounded
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_TONE(440.0, 100, "sine", 0.5)
+DIM ch AS INTEGER
+ch = AUDIO_PLAY(s)
+AUDIO_SET_VOLUME(ch, 0.35)
+PRINT AUDIO_GET_VOLUME(ch)
+--- erwartet
+0.35
+
