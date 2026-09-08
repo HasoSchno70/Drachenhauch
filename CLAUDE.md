@@ -665,12 +665,12 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 | `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, Pfad-Notation `"user.name"` / `"items.0"` | `JSON_HANDLE` |
 | `db` | SQLite. `DB_OPEN/CLOSE`, `DB_EXEC/QUERY` mit `?`-Binding, `DB_NEXT`, `DB_GET_*`, `DB_BEGIN/COMMIT/ROLLBACK` | `DB_CONN`, `DB_RESULT` |
 | `tween` | **Kein `TWEEN_UPDATE`** (Absicht, keine Luecke): ein Tween rechnet seinen Wert bei jedem Abruf aus `MILLIS()` aus, laeuft also in ECHTER Zeit weiter statt bildgetrieben wie `timer`/`input`/`gui`. Folgen: bei einbrechender Bildrate SPRINGT er statt langsamer zu werden, und unter `AUTOMATION_PLAY` ist er nicht reproduzierbar (`timer` ist es). Werteinterpolation. 13 Easings (`linear`, `out_bounce`, `out_elastic`, …), Pause/Resume/Reverse | `TWEEN` |
-| `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/test_modules_timer.py`. | — |
+| `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/pruef/modules_timer.dhtest`. | — |
 | `imgfx` | `IMAGE_SCALE/ROTATE/FLIP/TINT/COPY` — immutable, geben neues IMAGE zurück. **`IMAGE_SCALE` glaettet bilinear** (raylib `ImageResize`); fuer Pixelgrafik `IMAGE_SCALE_NN` (Nearest-Neighbour, `ImageResizeNN`) — Demo `examples/152_pixelart_skalierung.dh` | — |
 | `particles` | Emitter mit Velocity/Lifetime/Gravity/Color/Size/Fade. `PARTICLE_EMIT/UPDATE/DRAW`. NumPy-vektorisiert. **Render-Modi** `PARTICLE_SET_MODE` (`circle`/`pixel`/`square`/`streak`/`glow` — `glow` wird in `PARTICLE_DRAW` (vm.rs) aktuell identisch zu `circle` gerendert, kein additives Blending im Recording-Modell; fuer echtes additives Leuchten `BLEND_MODE("add")` um die `PARTICLE_DRAW`-Aufrufe legen) + **Farbverlauf** `PARTICLE_SET_COLOR_END` (Start→End ueber die Lebenszeit, z.B. Feuer gelb→rot). | `PARTICLE_SYSTEM` |
 | `physics` | Pure Functions: AABB-/Circle-Collision, Distance, Reflect, Normalize, Ray-Cast (Box+Circle). Kein State. Auch **3D-Mathematik ohne Physik-Welt**: `PHYSICS_SPHERE_SPHERE(x1,y1,z1,r1, x2,y2,z2,r2)` (Kugel-Naeherung), `PHYSICS_DISTANCE3`; dazu `PHYSICS_POINT_TRI(px,py, ax,ay, bx,by, cx,cy)` (Punkt im Dreieck, baryzentrisch — unabhaengig vom Umlaufsinn). Plus **Broadphase** (`PHYSICS_BROAD_NEW/ADD/QUERY/PAIR_A/PAIR_B`): O(n)-Kollisionspaare fuer viele Kreis-Entities (Uniform-Grid, nativ via `gb_native`). | `PHYSICS_BROAD` |
-| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`PHYS3D_ADD_SPHERE(..., dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/test_physics3d.py`. | `PHYS_WORLD` |
-| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`PHYS2D_ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/test_physics2d.py`. | `PHYS2D_WORLD` |
+| `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`PHYS3D_ADD_SPHERE(..., dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in dhrt. Demo `examples/107_physics3d.dh`, Tests `tests/pruef/physics3d.dhtest`. | `PHYS_WORLD` |
+| `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`PHYS2D_ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.dh`, Tests `tests/pruef/physics2d.dhtest`. | `PHYS2D_WORLD` |
 | `camera` | World-Translation+Zoom+**Rotation** für **alle** Drawing-Befehle. `CAMERA_SET/RESET/FOLLOW`, `CAMERA_SET_ROTATION`/`CAMERA_ROTATION`, `CAMERA_S2W_X/Y`. Rotation dreht nur Positionen (um die Bildschirm-Mitte), keine automatische Kontur-Rotation von Formen/Sprites — siehe `docs/module-camera.md`. | — |
 | `sprite` | Animiertes Sheet-basiertes Sprite. Position+Velocity, benannte Animationen mit FPS, `PLAY`/`PLAY_ONCE`, Flip, AABB-Kollision | `SPRITE` |
 | `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.dhanim`-JSON (Editor `dhanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.dh`, Tests `tests/test_animfsm.py`. | `ANIM_FSM` |
@@ -687,7 +687,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 
 **Klang anschauen/sichern** (am SOUND-Handle, gilt also fuer TONE/NOISE/SFX/geladene Dateien): `AUDIO_SOUND_WAVE(sound, anzahl)` -> ARRAY OF FLOAT (je Abschnitt das Sample mit dem GROESSTEN BETRAG samt Vorzeichen -- gemittelt hebt sich eine Schwingung gegen null auf und die Anzeige zeigt einen Strich) und `AUDIO_SAVE_WAV(sound, pfad$[, bits])` (16 signed / 8 unsigned, so will es die WAV-Spezifikation; Mono bleibt einkanalig, Stereo erst wenn sich die Kanaele unterscheiden). **Falle, die erst das Nachmessen zeigte:** die Lautstaerke steckt schon in den Frames (`make_data_mono`), `slot.vol` obendrauf machte aus 0.7 eine 0.49 -- und `slot.vol` ist ohnehin die ABSPIEL-Lautstaerke des letzten AUDIO_PLAY. Gebaut fuer den SFX-Generator `examples/183_sfx_generator.dh`, Tests `tests/test_audio_sound_io.py` (WAVs von Pythons `wave`-Modul gegengelesen -- ein Format, das nur der eigene Schreiber liest, ist nicht geprueft).
 
-| `chart` | **Diagramme.** `CHART_NEW(art$,x,y,b,h)` -> `CHART` mit art$ = `kuchen`/`donut` (Kuchen/Ring), `balken` (senkrecht/waagerecht, gruppiert/gestapelt), `linie`/`flaeche` (Verlaufskurven, gleitendes Fenster fuer Live-Werte), `tacho` (Rundskala mit Zeiger `nadel`/`balken`/`pfeil`, Farbzonen via `CHART_ZONE`). Daten kurz (`CHART_ADD(c,name$,wert[,farbe])`) oder voll (`CHART_SERIES` + `CHART_DATA`/`CHART_PUSH`/`CHART_SET_POINT`); dazu `CHART_GET/COUNT/SERIES_COUNT/LABEL/CLEAR/BOUNDS/STAT`. **Stil ueber vier String-Setter statt ~40 Builtins:** `CHART_SET` (Text), `CHART_SET_NUM` (Zahlen), `CHART_SET_COLOR` (Farben), `CHART_SET_FLAG` (Schalter) -- Schluessel-Tabellen `KEYS_STR/NUM/COLOR/FLAG` in `chart.rs`, unbekannter Schluessel = Fehler, der die gueltigen auflistet. `CHART_THEME` (dunkel/hell/neon/pastell) + `CHART_PALETTE`. **Alpha/Schatten/Verlaeufe:** alle Farben nehmen `RGBA()` (0xAARRGGBB, Alpha 0 = DECKEND -- Helfer `with_alpha`/`scale_rgb` heben das vorher an); `deckkraft`/`flaeche_deckkraft` als globale Regler, `schatten`+`schatten_weich` (gestaffelte Kopien, raylib hat keinen Formen-Weichzeichner) mit `schatten_daten` auch fuer Balken/Segmente/Zeiger, `verlauf` (Hintergrund) und `verlauf_daten` (Balken/Flaeche senkrecht, Kuchen als abgedunkeltes Innenband = Naeherung, kein Radialverlauf). `animation` + `CHART_UPDATE(c, DELTA())` laesst Werte nachziehen -- **ohne Animation zeichnet `draw` direkt die echten Werte** (`anzeige()`), sonst waere CHART_UPDATE auch ohne Animationswunsch Pflicht. Nur `CHART_DRAW` braucht ein Fenster (in `vm.rs`), alles andere ist pure. Neues Zeichen-Primitiv dafuer: `Cmd::Ring` (raylib `draw_ring`) deckt Kuchenstueck/Donut/Tacho-Bogen ab, plus `text_width_at` (Breite bei expliziter Groesse). **Farbe `0` ist SCHWARZ, nicht "Palette"** -- dafuer `-1` bzw. Argument weglassen. **Sechs Arten** (nicht vier): dazu `leiste`/`bar_gauge` (liegende oder stehende Leiste mit wanderndem Marker) und `led`/`lampen` (diskrete Zellen, leuchten bis zum Wert) -- beide einwertig wie der Tacho, teilen sich dessen Farbzonen. Sie setzen `ausrichtung` selbst auf `waagerecht`, weil die Vorgabe `senkrecht` nur fuer Balkendiagramme richtig ist. **Skalen-Farbverlauf** ist eine EIGENE Farbrolle (`skala_von`/`skala_mitte`/`skala_bis`, rot->gelb->gruen je Thema) -- NICHT die Palette: die ist kategorial und ergibt interpoliert einen Regenbogen ohne Richtung. Farbzonen schlagen den Verlauf. **Tacho-Gestaltung:** `zifferblatt` = `ring`/`segmente`/`striche`/`baender`, `blatt_teile`/`blatt_luecke`/`blatt_dicke`, `fassung` (metallischer Ring aus gestaffelten Ringen -- ein Verlauf ENTLANG eines Kreises geht mit `ring` nicht), `CHART_ZONE(..., name$)` beschriftet die Zone entlang des Bogens (untere Haelfte wird gedreht), `wertanzeige` = `aus`/`innen`/`pille`/`blase`/`am_zeiger` (Pille nimmt die Farbe der getroffenen Zone). Der Tacho haengt allein an `wertanzeige` -- ihn zusaetzlich an `werte` zu koppeln liess ihn stumm, weil das per Vorgabe `aus` ist. **Maus:** `CHART_DRAW` wertet sie selbst aus (kein Zusatzaufruf) -> `CHART_HOVER`/`_SERIES`/`_LABEL$`/`_VALUE`, `CHART_CLICKED`/`_SERIES`; Schalter `hover`/`tooltip`, Zahlen `hover_tempo`/`hover_weite`/`hover_glanz`. Damit die Maus nicht neben dem trifft, was zu sehen ist, liegt die Geometrie an EINER Stelle (`kuchen_geom`/`kuchen_stuecke`/`achsen_geom`/`balken_geom`/`legende_abzug`), die Treffertest UND Zeichnen benutzen. Die Hervorhebung mischt gegen WEISS statt RGB zu skalieren -- beim Skalieren klemmt der groesste Kanal bei 255 und hervorgehobenes Orange wurde gelb. **Linien:** `punktform` (kreis/quadrat/raute/dreieck), `treppe`, `strich` (Strichlaenge; Phase laeuft ueber den GANZEN Zug weiter, sonst verdichtet sich das Muster bei engen Stuetzpunkten), `fadenkreuz`. `glatt`+`treppe` schliessen sich aus, die Treppe gewinnt. Doku `docs/module-chart.md`, Demo `examples/154_chart.dh`, Tests `tests/test_modules_chart.py` + Rust-`#[test]`s. | `CHART` |
+| `chart` | **Diagramme.** `CHART_NEW(art$,x,y,b,h)` -> `CHART` mit art$ = `kuchen`/`donut` (Kuchen/Ring), `balken` (senkrecht/waagerecht, gruppiert/gestapelt), `linie`/`flaeche` (Verlaufskurven, gleitendes Fenster fuer Live-Werte), `tacho` (Rundskala mit Zeiger `nadel`/`balken`/`pfeil`, Farbzonen via `CHART_ZONE`). Daten kurz (`CHART_ADD(c,name$,wert[,farbe])`) oder voll (`CHART_SERIES` + `CHART_DATA`/`CHART_PUSH`/`CHART_SET_POINT`); dazu `CHART_GET/COUNT/SERIES_COUNT/LABEL/CLEAR/BOUNDS/STAT`. **Stil ueber vier String-Setter statt ~40 Builtins:** `CHART_SET` (Text), `CHART_SET_NUM` (Zahlen), `CHART_SET_COLOR` (Farben), `CHART_SET_FLAG` (Schalter) -- Schluessel-Tabellen `KEYS_STR/NUM/COLOR/FLAG` in `chart.rs`, unbekannter Schluessel = Fehler, der die gueltigen auflistet. `CHART_THEME` (dunkel/hell/neon/pastell) + `CHART_PALETTE`. **Alpha/Schatten/Verlaeufe:** alle Farben nehmen `RGBA()` (0xAARRGGBB, Alpha 0 = DECKEND -- Helfer `with_alpha`/`scale_rgb` heben das vorher an); `deckkraft`/`flaeche_deckkraft` als globale Regler, `schatten`+`schatten_weich` (gestaffelte Kopien, raylib hat keinen Formen-Weichzeichner) mit `schatten_daten` auch fuer Balken/Segmente/Zeiger, `verlauf` (Hintergrund) und `verlauf_daten` (Balken/Flaeche senkrecht, Kuchen als abgedunkeltes Innenband = Naeherung, kein Radialverlauf). `animation` + `CHART_UPDATE(c, DELTA())` laesst Werte nachziehen -- **ohne Animation zeichnet `draw` direkt die echten Werte** (`anzeige()`), sonst waere CHART_UPDATE auch ohne Animationswunsch Pflicht. Nur `CHART_DRAW` braucht ein Fenster (in `vm.rs`), alles andere ist pure. Neues Zeichen-Primitiv dafuer: `Cmd::Ring` (raylib `draw_ring`) deckt Kuchenstueck/Donut/Tacho-Bogen ab, plus `text_width_at` (Breite bei expliziter Groesse). **Farbe `0` ist SCHWARZ, nicht "Palette"** -- dafuer `-1` bzw. Argument weglassen. **Sechs Arten** (nicht vier): dazu `leiste`/`bar_gauge` (liegende oder stehende Leiste mit wanderndem Marker) und `led`/`lampen` (diskrete Zellen, leuchten bis zum Wert) -- beide einwertig wie der Tacho, teilen sich dessen Farbzonen. Sie setzen `ausrichtung` selbst auf `waagerecht`, weil die Vorgabe `senkrecht` nur fuer Balkendiagramme richtig ist. **Skalen-Farbverlauf** ist eine EIGENE Farbrolle (`skala_von`/`skala_mitte`/`skala_bis`, rot->gelb->gruen je Thema) -- NICHT die Palette: die ist kategorial und ergibt interpoliert einen Regenbogen ohne Richtung. Farbzonen schlagen den Verlauf. **Tacho-Gestaltung:** `zifferblatt` = `ring`/`segmente`/`striche`/`baender`, `blatt_teile`/`blatt_luecke`/`blatt_dicke`, `fassung` (metallischer Ring aus gestaffelten Ringen -- ein Verlauf ENTLANG eines Kreises geht mit `ring` nicht), `CHART_ZONE(..., name$)` beschriftet die Zone entlang des Bogens (untere Haelfte wird gedreht), `wertanzeige` = `aus`/`innen`/`pille`/`blase`/`am_zeiger` (Pille nimmt die Farbe der getroffenen Zone). Der Tacho haengt allein an `wertanzeige` -- ihn zusaetzlich an `werte` zu koppeln liess ihn stumm, weil das per Vorgabe `aus` ist. **Maus:** `CHART_DRAW` wertet sie selbst aus (kein Zusatzaufruf) -> `CHART_HOVER`/`_SERIES`/`_LABEL$`/`_VALUE`, `CHART_CLICKED`/`_SERIES`; Schalter `hover`/`tooltip`, Zahlen `hover_tempo`/`hover_weite`/`hover_glanz`. Damit die Maus nicht neben dem trifft, was zu sehen ist, liegt die Geometrie an EINER Stelle (`kuchen_geom`/`kuchen_stuecke`/`achsen_geom`/`balken_geom`/`legende_abzug`), die Treffertest UND Zeichnen benutzen. Die Hervorhebung mischt gegen WEISS statt RGB zu skalieren -- beim Skalieren klemmt der groesste Kanal bei 255 und hervorgehobenes Orange wurde gelb. **Linien:** `punktform` (kreis/quadrat/raute/dreieck), `treppe`, `strich` (Strichlaenge; Phase laeuft ueber den GANZEN Zug weiter, sonst verdichtet sich das Muster bei engen Stuetzpunkten), `fadenkreuz`. `glatt`+`treppe` schliessen sich aus, die Treppe gewinnt. Doku `docs/module-chart.md`, Demo `examples/154_chart.dh`, Tests `tests/pruef/modules_chart.dhtest` + Rust-`#[test]`s. | `CHART` |
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
 | `midi` | Noten von einem angeschlossenen Instrument lesen und welche hinausschicken. Feature `midi` (Crate `midir`: WinMM/ALSA/CoreMIDI), also nur in `--hardware`-Bauten -- **ausser** `MIDI_NOTE_NAME$`/`MIDI_NOTE_FREQ`, die nur umrechnen und darum ungegatet in `midi.rs` stehen (samt Rust-`#[test]`s; nur so ist der nuetzlichste Teil auch auf einer Maschine ohne Anschluss pruefbar). Auflisten `MIDI_IN_COUNT/NAME$`, oeffnen `MIDI_IN_OPEN` -> `MIDI_IN`, empfangen ueber das Cursor-Muster von `db`/`mqtt` (`MIDI_NEXT` + `MIDI_NOTE/VELOCITY/CHANNEL/IS_NOTE_ON`), senden `MIDI_NOTE_ON/OFF/CC/SEND`. **Zwei Protokoll-Eigenheiten:** die meisten Instrumente schicken Note-AUS als Note-AN mit Anschlag 0 (`MIDI_IS_NOTE_OFF` faengt beide, sonst enden Toene nie), und Kanaele zaehlen nach aussen 1..16 statt 0..15. Die Entschluesselung eingehender Nachrichten arbeitet ueber ROHE BYTES statt ueber den Geraetetyp (`status_von`/`kanal_von`/`ist_note_aus`/... in midi.rs, die `&Eingang`-Fassungen sind Einzeiler darueber) -- haenge sie am Geraet, ist sie ohne Instrument NIRGENDS pruefbar, so ist sie es ueberall: neun ungegatete Rust-`#[test]`s mit erfundenen Nachrichten decken beide Note-aus-Formen, Kanal 1/16, Regler, leere und zu kurze Nachricht ab. Der Rueckruf laeuft auf midirs eigenem Faden in eine Warteschlange mit **1024** Plaetzen; beim Ueberlauf faellt die AELTESTE weg (wer live spielt, will den aktuellen Anschlag). Uhr/Active-Sensing/SysEx werden weggelassen. **Nicht umgesetzt:** SysEx, MIDI-Uhr/Timecode, `.mid`-Dateien, virtuelle Anschluesse. **Der ganze Kreis ist geprueft** -- Tests, die einen VIRTUELLEN Loopback-Port benutzen (loopMIDI, `winget install TobiasErichsen.loopMIDI`; ein Port unter dem Portnamen als Ein- UND Ausgang, genau daran erkannt, sonst uebersprungen). Damit sind Note-an-mit-Anschlag-0 und der 1024er-Deckel samt aelteste-faellt-weg belegt statt behauptet -- ein Keyboard braucht es dafuer nicht. Doku `docs/module-midi.md`, Demo `examples/181_midi.dh`. | `MIDI_IN`, `MIDI_OUT` |
@@ -888,7 +888,7 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   hinab (`globale_unterbloecke`), NICHT in SUB/FUNCTION/CLASS -- die haben
   eigene Plaetze. Nebenertrag: die Kollisions-Erkennung sah bis dahin nur
   Geschwister und liess `CONST Modus` oben + `DIM modus` im Block durch.
-  Doku `docs/stolpersteine.md` H1, Tests `tests/test_name_collision.py`.
+  Doku `docs/stolpersteine.md` H1, Tests `tests/pruef/name_collision.dhtest`.
 - **Eine Variable darf heissen wie ein Builtin, und der Aufruf meint den
   Builtin** (seit 2026-09-04): `DIM deg AS FLOAT : deg = DEG(w)`,
   `len = LEN(s)`. Vorher lief jeder Variablenname vor einer Klammer ueber
@@ -1052,7 +1052,7 @@ bit-identisch.
 
 Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
 Doku-Demo [examples/98_coroutines.dh](examples/98_coroutines.dh), Tests
-`tests/pruef/coroutines.dhtest` (Pruefsammlung fuer `dhrt test`, seit 2026-09-07 -- vorher tests/test_coroutines.py).
+`tests/pruef/coroutines.dhtest` (Pruefsammlung fuer `dhrt test`, seit 2026-09-07 -- vorher tests/pruef/coroutines.dhtest).
 
 ## Input-Mapping (Modul `input`)
 
@@ -1144,7 +1144,7 @@ DO : i = i + 1 : LOOP UNTIL i >= 5
   Schluesselwoerter: `DIM dO AS INTEGER` gibt es in `examples/127_filedialog.dh`,
   und ein neues Keyword haette das gebrochen. `DO` zaehlt nur als Schleife,
   wenn WHILE/UNTIL/Zeilenende folgt. Bedingung oben UND unten ist ein Fehler.
-- Tests: `tests/pruef/sprach_symmetrie.dhtest` (18 Faelle, `dhrt test`; bis 2026-09-07 tests/test_sprach_symmetrie.py).
+- Tests: `tests/pruef/sprach_symmetrie.dhtest` (18 Faelle, `dhrt test`; bis 2026-09-07 tests/pruef/sprach_symmetrie.dhtest).
 
 ## Laufzeit-Typtest: `IS` + `TYPEOF`
 
@@ -1171,7 +1171,7 @@ PRINT t IS NOT NIL   ' TRUE
   anderen Typnamen umschreiben kann (`x IS mathe.Punkt`). Der Compiler prueft
   den Namen und emittiert `__is_typ(wert, "name")`; die Vererbungskette laeuft
   `Vm::try_typtest` (vm.rs) ab -- die kennt nur die VM, darum nicht in
-  builtins.rs. Kein neuer Opcode. Tests: `tests/test_typtest.py`.
+  builtins.rs. Kein neuer Opcode. Tests: `tests/pruef/typtest.dhtest`.
 
 ## Function References (FUNCREF)
 
@@ -2670,24 +2670,60 @@ gemessen 1084 der 3949 pytest-Tests in 79 Dateien (`assert run_gb(src) ==
 "..."`). Dafuer gibt es jetzt **Pruefsammlungen** `*.dhtest`
 (`pruefsammlung.rs`: Parser + Bewertung mit Rust-Tests; Laeufer in
 `main.rs::sammlung_laufen`): `=== Name` beginnt einen Fall, dann der
-Quelltext, dann `--- erwartet` (zeilenweise, Leerzeilen am Blockende und EIN
-Umbruch am Ende zaehlen nicht), `--- enthaelt`, `--- fehler` (Abbruch +
-Teiltext der Meldung), `--- datei name` (Beilage neben dem Programm),
+Quelltext, dann `--- erwartet` (zeilenweise, Leerzeilen am Ende zaehlen
+beiderseits nicht; `--- erwartet ungefaehr` laesst Zahlen um 1e-6
+abweichen -- fuer alles, was `pytest.approx` brauchte, weil libm auf drei
+Systemen in der letzten Stelle anders rundet), `--- enthaelt`, `--- fehler` (Abbruch +
+Teiltext der Meldung), `--- datei name` (Beilage neben dem Programm), `--- verzeichnis name`,
 `--- umgebung`. Jeder Fall ist ein eigener `dhrt run` in einem eigenen
 Verzeichnis, die Faelle einer Datei laufen parallel (bis 8 Faeden);
 `--filter Text` waehlt Faelle. KEIN_FENSTER-Meldungen und (mit
 `DHRT_OHNE_GRAFIK=1`) fehlende Grafik-Builtins heissen "uebersprungen",
 wie in conftest.py. Doku `docs/werkzeuge.md`. **Die Sammlungen liegen unter
 `tests/pruef/`**, `tests/test_dhrt_test.py` ist der CI-Anker (ruft `dhrt
-test tests/pruef`) und prueft das Format am echten Laeufer. Umgezogen und
-aus `tests/` geloescht: `test_coroutines.py`, `test_array_literal.py`,
-`test_chex_literal.py`, `test_sprach_symmetrie.py` (60 Faelle) -- die
-vier, die ein Wegwerf-Umsetzer (nicht im Repo; Python, weil einmalig)
-vollstaendig uebertragen konnte. Regel fuer den weiteren Umzug: **eine
-pytest-Datei wird geloescht, sobald ihre Faelle in einer Sammlung
-liegen** -- nie beides pflegen. Was nicht mechanisch geht (Ausgabe
-zerlegen, Python rechnet nach, Dateien in tmp_path): von Hand, je Bereich,
-wenn er ohnehin angefasst wird.
+test tests/pruef`) und prueft das Format am echten Laeufer. **Umgezogen und
+aus `tests/` geloescht: 73 pytest-Dateien, 74 Sammlungen mit 1540 Faellen**
+(Stand 2026-09-07, `dhrt test tests/pruef` laeuft sie in ~6 s; die 74. ist
+`rekursionstiefe.dhtest`, dessen pytest-Datei mit drei Tests bleibt, die
+`vm.rs`/`build.rs` LESEN statt etwas laufen zu lassen). Der Weg dorthin war
+nicht Quelltext-Umbau, sondern **Aufzeichnung**: ein Wegwerf-Plugin (nicht
+im Repo) hing sich in pytest an `run_gb`/`run_all`, schrieb je Aufruf
+Quelltext, Ausgabe bzw. Fehlermeldung und die Dateien in `tmp_path` mit, und
+ZWEI Laeufe mussten dasselbe liefern -- so fielen `TIME$`, Dateizeiten und
+alles Zufaellige von selbst heraus. Ein Modul zog nur um, wenn JEDER seiner
+Tests bestanden hatte und aufgezeichnet war; Faelle, deren Test mit
+`pytest.approx` oder Vergleichen arbeitete oder lange Kommazahlen ausgibt,
+bekamen `--- erwartet ungefaehr`. **Der dritte Schritt holte die 14 Module
+nach, die beim zweiten liegen blieben** -- drei Ursachen, drei Mittel:
+(1) "kein Aufruf" bei `[tw]/[vm]`-Laeufen war ein Loch des PLUGINS, nicht
+der Tests: die `run_either`-Fixture hielt die urspruengliche `run_gb` fest,
+bevor das Plugin sie umwickelte -- `run_either` mit umwickeln, und
+gleiche Aufrufe aus `[tw]` und `[vm]` (oder `run_gb` + `run_vm`) werden EIN
+Fall. (2) Binaere Beilagen: **`--- datei name base64`** (Block darf
+umbrochen sein; `Fall::dateien` traegt seither `Vec<u8>`) -- fuer die
+cp1252-Dateien von ini/xml/kodierung und die ZIP-Slip-Archive, die Pythons
+`zipfile` mit `../`-Namen baut und dhrt selbst nie schriebe. (3) Zufall
+(`UUID4$`, `RANDOM_BYTES`), Uhr (`TIME$`, `ZEIT_JETZT`) und absolute
+Pfade im Quelltext (zip, csv, tiled) wurden zu SELBSTPRUEFENDEN Faellen: das
+Programm prueft die Eigenschaft (Form per `REGEX_TEST`, Eindeutigkeit ueber
+eine MAP, Pfadende per `RIGHT$`) und gibt TRUE aus; die 256-KB-Datei der
+Hash-Tests entsteht im Programm (`BUFFER_NEW` + `WRITEALL_BYTES`), der
+Erwartungswert stammt weiter von `hashlib`. Bewusst NICHT umgezogen:
+`test_dateisystem.py` (Dateizeiten, Gross/Klein je System), alles mit
+Fenster, Ton oder Eingabe (bleibt pytest, bis `--- bild` da ist), und Tests,
+die Quelltext oder Bauskripte lesen. Regel fuer den weiteren Umzug: **eine pytest-Datei wird geloescht,
+sobald ihre Faelle in einer Sammlung liegen** -- nie beides pflegen; ein
+Verweis in der Doku wandert mit (`dhrt pruef pfade` findet ihn). Ein
+Golden aus einer Aufzeichnung ist STRENGER als der Test davor (er prueft die
+ganze Ausgabe, nicht eine Eigenschaft) -- wer einen solchen Fall aendert,
+aendert die Erwartung bewusst. **Betriebssystem-Fehlertexte sind lokalisiert**
+("Das System kann die angegebene Datei nicht finden" hier, "No such file or
+directory" auf den Laeufern, und der os-error-Code weicht auch ab) -- in
+`--- fehler` steht darum nur der eigene Teil der Meldung (Befehl, Pfad); die
+ersten CI-Laeufe fanden genau zwei solche Faelle unter 1230. Und ein
+Fehlerfall traegt den zufaelligen Namen der pytest-Testdatei
+(`_gbtest_xxx.dh: Compile-Fehler: ...`) -- der Vergleich zweier Laeufe muss
+ihn vorher abschneiden, sonst gilt jeder Compile-Fehler als instabil.
 
 ## Python-Abbau, Weg C: die IDE in Drachenhauch (Stufe 1 bis 3, 2026-09-06)
 

@@ -104,7 +104,7 @@ Spiel (dhrt) — die Fallstrick-Klasse, die mit dem zweiten Pfad verschwand:
       `BOX/RECT/CIRCLE/LINE/TEXT/PLOT/…` sowie der Bild-/Sprite-Tint halb-
       transparent (Standard-Blendmodus „alpha"). `RGBA(_,_,_,0)` → Alpha 1
       (ganz transparent = einfach nicht zeichnen). Tests in
-      `tests/test_builtins_extra.py`.
+      `tests/pruef/builtins_extra.dhtest`.
 - [x] **Math:** `ASIN`/`ACOS` (Domain-Check), `HYPOT`, `DEG`/`RAD`, `LERP`,
       `REMAP`, `FRAC`; Konstante `TAU`. **`E` bewusst weggelassen** — `e` ist
       ein häufiger `CATCH e`-Variablenname; eine gleichnamige Konstante würde
@@ -144,7 +144,7 @@ nativen Runtime; Run-/Export-Pfad läuft über dhrts Rust-Frontend).
 ## Nachtrag „rund machen" (2026-06-06, dhrt-only)
 
 Zweiter Lücken-Sweep gegen die echte Builtin-Liste; alles pur in
-`rust/drachenhauch_runtime/src/builtins.rs` (+ Golden-Tests `tests/test_builtins_extra.py`,
+`rust/drachenhauch_runtime/src/builtins.rs` (+ Golden-Tests `tests/pruef/builtins_extra.dhtest`,
 `builtin_index.json`). Vorher fehlten u.a. `vec2`-Verwandte → siehe Modul `m3d`.
 
 - [x] **Game-Math:** `WRAP(v,lo,hi)`, `PINGPONG(t,len)`, `MOVETOWARD(cur,ziel,maxd)`,
@@ -177,7 +177,7 @@ Abgedeckt durch Bestehendes (nicht neu): `ARRAY_FIND`→`ARRAY_INDEXOF`,
 - [x] **Random:** `WEIGHTED_CHOICE(werte, gewichte)` (Loot-Tabellen).
 - [n] `RANDRANGE` NICHT nötig — `RANDINT(lo,hi)` (inkl.) + `RANDF(lo,hi)` decken es ab.
 
-Tests: `tests/test_print_and_aliases.py`. Beleg, wie wichtig der Abgleich gegen
+Tests: `tests/pruef/print_and_aliases.dhtest`. Beleg, wie wichtig der Abgleich gegen
 `builtins.rs` (nicht den eingefrorenen `builtin_index.json`) ist — Nachtrag 1 hatte
 sonst beinahe `LISTDIR`/`JOINPATH`/`RENAMEFILE` als Dubletten zu `DIRLIST`/
 `PATHJOIN`/`RENAME` eingeführt (korrigiert).

@@ -1,0 +1,263 @@
+' Aus test_modules_geld.py uebertragen (37 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== aus text und anzeige (1)
+IMPORT "geld"
+PRINT GELD_NEU("19,99")
+--- erwartet
+19,99 €
+
+=== aus text und anzeige (2)
+IMPORT "geld"
+PRINT GELD_NEU("1.234,56")
+--- erwartet
+1.234,56 €
+
+=== aus text und anzeige (3)
+IMPORT "geld"
+PRINT GELD_NEU("-19,99")
+--- erwartet
+-19,99 €
+
+=== aus einer zahl ohne die falle (1)
+' 19.99 liegt als FLOAT minimal unter 19,99 -- GELD_NEU rundet die Zahl,
+IMPORT "geld"
+PRINT GELD_CENT(GELD_NEU(19.99))
+--- erwartet
+1999
+
+=== aus einer zahl ohne die falle (2)
+' 19.99 liegt als FLOAT minimal unter 19,99 -- GELD_NEU rundet die Zahl,
+IMPORT "geld"
+PRINT GELD_CENT(GELD_NEU(0.1 + 0.2))
+--- erwartet
+30
+
+=== eine neue variable ist null und nicht nil
+IMPORT "geld"
+DIM leer AS GELD
+PRINT leer
+--- erwartet
+0,00 €
+
+=== aus cent und zurueck (1)
+IMPORT "geld"
+PRINT GELD_AUS_CENT(1999)
+--- erwartet
+19,99 €
+
+=== aus cent und zurueck (2)
+IMPORT "geld"
+PRINT GELD_CENT(GELD_NEU("19,99"))
+--- erwartet
+1999
+
+=== text mit und ohne symbol (1)
+IMPORT "geld"
+PRINT GELD_TEXT$(GELD_NEU("19,99"))
+--- erwartet
+19,99 €
+
+=== text mit und ohne symbol (2)
+IMPORT "geld"
+PRINT GELD_TEXT$(GELD_NEU("19,99"), "CHF")
+--- erwartet
+19,99 CHF
+
+=== text mit und ohne symbol (3)
+IMPORT "geld"
+PRINT GELD_TEXT$(GELD_NEU("19,99"), "")
+--- erwartet
+19,99
+
+=== addieren und abziehen (1)
+IMPORT "geld"
+PRINT GELD_NEU("19,99") + GELD_NEU("0,01")
+--- erwartet
+20,00 €
+
+=== addieren und abziehen (2)
+IMPORT "geld"
+PRINT GELD_NEU("19,99") - GELD_NEU("20,00")
+--- erwartet
+-0,01 €
+
+=== mal menge (1)
+IMPORT "geld"
+PRINT GELD_NEU("19,99") * 3
+--- erwartet
+59,97 €
+
+=== mal menge (2)
+IMPORT "geld"
+PRINT 3 * GELD_NEU("19,99")
+--- erwartet
+59,97 €
+
+=== prozent bleibt exakt (1)
+' 19 % von 72,71 sind 13,8149 -- nicht 13.814899999999998. Gerechnet
+IMPORT "geld"
+PRINT GELD_NEU("72,71") * 0.19
+--- erwartet
+13,8149 €
+
+=== prozent bleibt exakt (2)
+' 19 % von 72,71 sind 13,8149 -- nicht 13.814899999999998. Gerechnet
+IMPORT "geld"
+PRINT GELD_RUNDEN(GELD_NEU("72,71") * 0.19)
+--- erwartet
+13,81 €
+
+=== zwischenergebnisse werden nicht versteckt
+' 0,0551 € als "0,06 €" anzuzeigen waere bequem und irrefuehrend.
+IMPORT "geld"
+PRINT GELD_NEU("0,29") * 0.19
+--- erwartet
+0,0551 €
+
+=== teilen
+IMPORT "geld"
+PRINT GELD_NEU("10,00") / 4
+--- erwartet
+2,50 €
+
+=== betrag durch betrag ist eine zahl
+IMPORT "geld"
+PRINT GELD_NEU("10,00") / GELD_NEU("4,00")
+--- erwartet
+2.5
+
+=== vorzeichen und betrag (1)
+IMPORT "geld"
+PRINT -GELD_NEU("19,99")
+--- erwartet
+-19,99 €
+
+=== vorzeichen und betrag (2)
+IMPORT "geld"
+PRINT GELD_ABS(GELD_NEU("-19,99"))
+--- erwartet
+19,99 €
+
+=== vergleichen ist exakt
+IMPORT "geld"
+DIM a AS GELD
+DIM b AS GELD
+a = GELD_NEU("0,10") + GELD_NEU("0,20")
+b = GELD_NEU("0,30")
+PRINT a = b
+PRINT a < b
+PRINT a >= b
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== in float geht dieselbe rechnung schief
+' Der Gegenbeweis in derselben Sprache -- damit der Test nicht nur
+IMPORT "geld"
+PRINT 0.1 + 0.2 = 0.3
+--- erwartet
+FALSE
+
+=== runden auf stellen (1)
+IMPORT "geld"
+PRINT GELD_RUNDEN(GELD_NEU("0,005"))
+--- erwartet
+0,01 €
+
+=== runden auf stellen (2)
+IMPORT "geld"
+PRINT GELD_RUNDEN(GELD_NEU("-0,005"))
+--- erwartet
+-0,01 €
+
+=== runden auf stellen (3)
+IMPORT "geld"
+PRINT GELD_NEU("0,12345")
+--- erwartet
+0,1235 €
+
+=== runden auf stellen (4)
+IMPORT "geld"
+PRINT GELD_RUNDEN(GELD_NEU("0,12345"), 3)
+--- erwartet
+0,124 €
+
+=== aufteilen verliert keinen cent
+IMPORT "geld"
+DIM t AS ARRAY OF GELD
+DIM s AS GELD
+DIM i AS INTEGER
+t = GELD_TEILEN(GELD_NEU("10,00"), 3)
+s = GELD_AUS_CENT(0)
+FOR i = 0 TO 2
+    PRINT t[i]
+    s = s + t[i]
+NEXT
+PRINT s
+--- erwartet
+3,34 €
+3,33 €
+3,33 €
+10,00 €
+
+=== aufteilen ohne teile
+IMPORT "geld"
+PRINT GELD_TEILEN(GELD_NEU("1,00"), 0)
+--- fehler
+GELD_TEILEN: die Anzahl muss groesser als 0 sein
+
+=== geld und zahl mischen sich nicht
+' Der eigentliche Zweck des Typs.
+IMPORT "geld"
+PRINT GELD_NEU("1,00") + 1.0
+--- fehler
++ : GELD und eine gewoehnliche Zahl mischen sich nicht -- genau dafuer gibt es den Typ. Entweder GELD_NEU(zahl) daraus machen oder mit GELD_ZAHL(betrag) bewusst herausgehen.
+
+=== euro mal euro
+IMPORT "geld"
+PRINT GELD_NEU("1,00") * GELD_NEU("2,00")
+--- fehler
+* : GELD mal GELD ergibt keinen Betrag (Euro mal Euro waeren Quadrat-Euro). Mit einer Zahl multiplizieren.
+
+=== eine zahl landet nicht still in einer geld variablen
+' Anders als bei den uebrigen Modul-Typen ist GELD hier streng -- sonst
+IMPORT "geld"
+DIM x AS GELD
+x = 5
+--- fehler
+Zuweisung an global: Erwartet GELD, erhalten INTEGER -- mit GELD_NEU(5) einen Betrag daraus machen
+
+=== builtin will wirklich geld
+IMPORT "geld"
+PRINT GELD_CENT(5)
+--- fehler
+GELD_CENT: erwartet GELD, erhalten INTEGER -- mit GELD_NEU() einen Betrag daraus machen
+
+=== text ohne betrag
+IMPORT "geld"
+PRINT GELD_NEU("neunzehn")
+--- fehler
+GELD_NEU: "neunzehn" ist kein Betrag -- erlaubt sind Ziffern, ein Vorzeichen und ein Komma (oder Punkt)
+
+=== durch null
+IMPORT "geld"
+PRINT GELD_NEU("1,00") / 0
+--- fehler
+GELD / Zahl: Division durch 0
+
+=== beide wege kommen auf dasselbe
+' CENT/EURO$ (Weg A) und das Modul (Weg C) muessen dieselbe Zahl
+IMPORT "geld"
+DIM a AS INTEGER
+DIM b AS GELD
+a = CENT(19.99) * 3
+b = GELD_NEU(19.99) * 3
+PRINT EURO$(a)
+PRINT b
+PRINT a = GELD_CENT(b)
+--- erwartet
+59,97 €
+59,97 €
+TRUE
+

@@ -91,4 +91,4 @@ für *echte* Dynamik: Stapeln, Werfen, Rollen, Ragdolls, Sandbox.)
 Externer Typ `PHYS2D_WORLD`. Implementierung
 `rust/drachenhauch_runtime/src/physics2d.rs` (pure-Rust, ungated), Demo
 [examples/112_physics2d.dh](../examples/112_physics2d.dh), Tests
-`tests/test_physics2d.py`.
+`tests/pruef/physics2d.dhtest`.

@@ -1,0 +1,769 @@
+' Aus test_modules_chart.py uebertragen (75 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== chart new liefert handle
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+PRINT CHART_COUNT(c)
+--- erwartet
+0
+
+=== chart new kennt deutsche und englische arten
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 10, 10)
+c = CHART_NEW("pie", 0, 0, 10, 10)
+c = CHART_NEW("donut", 0, 0, 10, 10)
+c = CHART_NEW("balken", 0, 0, 10, 10)
+c = CHART_NEW("bar", 0, 0, 10, 10)
+c = CHART_NEW("linie", 0, 0, 10, 10)
+c = CHART_NEW("line", 0, 0, 10, 10)
+c = CHART_NEW("flaeche", 0, 0, 10, 10)
+c = CHART_NEW("area", 0, 0, 10, 10)
+c = CHART_NEW("tacho", 0, 0, 10, 10)
+c = CHART_NEW("gauge", 0, 0, 10, 10)
+PRINT "ok"
+--- erwartet
+ok
+
+=== chart new meldet unbekannte art
+IMPORT "chart"
+DIM c AS CHART
+TRY
+    c = CHART_NEW("torte", 0, 0, 10, 10)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_NEW: unbekannte Art 'torte' (gueltig: kuchen, balken, linie, tacho)
+
+=== chart add und get
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_ADD(c, "Holz", 45.0, 100)
+CHART_ADD(c, "Stein", 30.0, 200)
+PRINT CHART_COUNT(c)
+PRINT CHART_GET(c, 0, 1)
+--- erwartet
+2
+30.0
+
+=== chart data aus array
+IMPORT "chart"
+DIM c AS CHART
+DIM s AS INTEGER
+DIM v[3] AS FLOAT
+c = CHART_NEW("balken", 0, 0, 100, 100)
+s = CHART_SERIES(c, "a", 0)
+v[0] = 1.5
+v[1] = 2.5
+v[2] = 3.5
+CHART_DATA(c, s, v)
+PRINT CHART_COUNT(c)
+PRINT CHART_GET(c, s, 2)
+--- erwartet
+3
+3.5
+
+=== chart push mit fenster laesst vorne herausfallen
+' Gleitendes Fenster fuer Live-Kurven -- der aelteste Wert faellt raus.
+IMPORT "chart"
+DIM c AS CHART
+DIM i AS INTEGER
+c = CHART_NEW("linie", 0, 0, 100, 100)
+CHART_SERIES(c, "s", 0)
+CHART_SET_NUM(c, "fenster", 3)
+FOR i = 0 TO 5
+    CHART_PUSH(c, 0, i)
+NEXT
+PRINT CHART_COUNT(c)
+PRINT CHART_GET(c, 0, 0)
+--- erwartet
+3
+3.0
+
+=== chart stat kennzahlen
+IMPORT "chart"
+DIM c AS CHART
+DIM v[4] AS FLOAT
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SERIES(c, "s", 0)
+v[0] = 2.0
+v[1] = 4.0
+v[2] = 6.0
+v[3] = 8.0
+CHART_DATA(c, 0, v)
+PRINT CHART_STAT(c, 0, "summe")
+PRINT CHART_STAT(c, 0, "mittel")
+PRINT CHART_STAT(c, 0, "min")
+PRINT CHART_STAT(c, 0, "max")
+PRINT CHART_STAT(c, 0, "anzahl")
+--- erwartet
+20.0
+5.0
+2.0
+8.0
+4.0
+
+=== chart value geht ohne series
+' Beim Tacho legt CHART_NEW die Reihe schon an.
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 100, 100)
+CHART_VALUE(c, 42.0)
+PRINT CHART_GET(c, 0, 0)
+--- erwartet
+42.0
+
+=== chart get liefert den echten wert trotz animation
+' CHART_GET meldet immer den gesetzten Wert -- die Animation betrifft
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 100, 100)
+CHART_SET_NUM(c, "animation", 0.5)
+CHART_VALUE(c, 100.0)
+CHART_UPDATE(c, 0.016)
+PRINT CHART_GET(c, 0, 0)
+--- erwartet
+100.0
+
+=== stil setter akzeptieren ihre schluessel[CHART SET-titel-"Hallo"]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET(c, "titel", "Hallo")
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET-legende-"oben"]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET(c, "legende", "oben")
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET-werte-"innen"]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET(c, "werte", "innen")
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET-ausrichtung-"waagerecht"]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET(c, "ausrichtung", "waagerecht")
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET-zeigerform-"pfeil"]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET(c, "zeigerform", "pfeil")
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET NUM-innenradius-0.5]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_NUM(c, "innenradius", 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET NUM-deckkraft-0.5]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_NUM(c, "deckkraft", 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET NUM-schatten weich-6]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_NUM(c, "schatten_weich", 6)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET NUM-flaeche deckkraft-0.2]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_NUM(c, "flaeche_deckkraft", 0.2)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET COLOR-hintergrund-255]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_COLOR(c, "hintergrund", 255)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET COLOR-schatten-128]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_COLOR(c, "schatten", 128)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET COLOR-verlauf ende-255]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_COLOR(c, "verlauf_ende", 255)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET FLAG-stapel-TRUE]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_FLAG(c, "stapel", TRUE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET FLAG-verlauf daten-TRUE]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_FLAG(c, "verlauf_daten", TRUE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== stil setter akzeptieren ihre schluessel[CHART SET FLAG-schatten daten-TRUE]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SET_FLAG(c, "schatten_daten", TRUE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== unbekannter schluessel nennt die gueltigen[CHART SET-"x"]
+' Der Preis der String-Schluessel: der Tippfehler faellt erst zur
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+TRY
+    CHART_SET(c, "gibtsnicht", "x")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET: unbekannte Eigenschaft 'gibtsnicht' (gueltig: titel, einheit, achse_x, achse_y, legende, werte, ausrichtung, zeigerform, zifferblatt, wertanzeige, punktform)
+
+=== unbekannter schluessel nennt die gueltigen[CHART SET NUM-1.0]
+' Der Preis der String-Schluessel: der Tippfehler faellt erst zur
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+TRY
+    CHART_SET_NUM(c, "gibtsnicht", 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET_NUM: unbekannte Eigenschaft 'gibtsnicht' (gueltig: min, max, innenradius, abstand, ecken, rahmen_dicke, polster, gitter, nachkomma, titel_groesse, text_groesse, schrift, start_winkel, end_winkel, striche, unterstriche, linien_dicke, punkt_radius, animation, fenster, schatten, schatten_weich, deckkraft, flaeche_deckkraft, hover_tempo, hover_weite, hover_glanz, glanz, blatt_teile, blatt_luecke, blatt_dicke, fassung, strich)
+
+=== unbekannter schluessel nennt die gueltigen[CHART SET COLOR-255]
+' Der Preis der String-Schluessel: der Tippfehler faellt erst zur
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+TRY
+    CHART_SET_COLOR(c, "gibtsnicht", 255)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET_COLOR: unbekannte Eigenschaft 'gibtsnicht' (gueltig: hintergrund, rahmen, gitter, text, titel, achse, zeiger, flaeche, verlauf, schatten, verlauf_ende, skala_von, skala_mitte, skala_bis)
+
+=== unbekannter schluessel nennt die gueltigen[CHART SET FLAG-TRUE]
+' Der Preis der String-Schluessel: der Tippfehler faellt erst zur
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+TRY
+    CHART_SET_FLAG(c, "gibtsnicht", TRUE)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET_FLAG: unbekannte Eigenschaft 'gibtsnicht' (gueltig: rahmen, gitter_x, gitter_y, prozent, flaeche, punkte, glatt, null_linie, stapel, verlauf, verlauf_daten, schatten_daten, kurz, hover, tooltip, treppe, fadenkreuz)
+
+=== ungueltiger stil wert wird abgelehnt
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+TRY
+    CHART_SET(c, "legende", "schraeg")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET: legende erwartet aus/oben/unten/links/rechts, nicht 'schraeg'
+
+=== theme nennt die verfuegbaren
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_THEME(c, "neon")
+TRY
+    CHART_THEME(c, "quietschbunt")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_THEME: unbekanntes Thema 'quietschbunt' (gueltig: dunkel, hell, neon, pastell)
+
+=== falscher handle typ meldet klartext
+IMPORT "chart"
+TRY
+    PRINT CHART_COUNT(42)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_COUNT erwartet CHART
+
+=== reihe ausserhalb meldet klartext
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balken", 0, 0, 100, 100)
+CHART_SERIES(c, "a", 0)
+TRY
+    CHART_PUSH(c, 7, 1.0)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_PUSH: Reihe 7 gibt es nicht
+
+=== clear leert die daten
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_ADD(c, "a", 1.0, 0)
+CHART_ADD(c, "b", 2.0, 0)
+CHART_CLEAR(c)
+PRINT CHART_COUNT(c)
+--- erwartet
+0
+
+=== zonen sammeln und leeren
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 100, 100)
+CHART_ZONE(c, 50, 80, 16776960)
+CHART_ZONE(c, 80, 100, 16711680)
+CHART_ZONE_CLEAR(c)
+PRINT "ok"
+--- erwartet
+ok
+
+=== null groesse wird abgelehnt
+IMPORT "chart"
+DIM c AS CHART
+TRY
+    c = CHART_NEW("balken", 0, 0, 0, 100)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_NEW: Breite und Hoehe muessen > 0 sein
+
+=== tacho bringt seine reihe schon mit
+' IMPORT "chart" ohne .dh-Endung nimmt immer das eingebaute Modul.
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 10, 10)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== hover abfragen sind ohne zeichnen leer
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_ADD(c, "a", 1.0, 0)
+PRINT CHART_HOVER(c)
+PRINT CHART_HOVER_SERIES(c)
+PRINT CHART_CLICKED(c)
+PRINT "[" + CHART_HOVER_LABEL$(c) + "]"
+PRINT CHART_HOVER_VALUE(c)
+--- erwartet
+-1
+-1
+-1
+[]
+0.0
+
+=== interaktions schalter[hover]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_SET_FLAG(c, "hover", FALSE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== interaktions schalter[tooltip]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_SET_FLAG(c, "tooltip", FALSE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== interaktions zahlen[hover tempo]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_SET_NUM(c, "hover_tempo", 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== interaktions zahlen[hover weite]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_SET_NUM(c, "hover_weite", 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== interaktions zahlen[hover glanz]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("kuchen", 0, 0, 100, 100)
+CHART_SET_NUM(c, "hover_glanz", 0.5)
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt bauarten[ring]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "zifferblatt", "ring")
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt bauarten[segmente]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "zifferblatt", "segmente")
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt bauarten[striche]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "zifferblatt", "striche")
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt bauarten[baender]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "zifferblatt", "baender")
+PRINT "ok"
+--- erwartet
+ok
+
+=== wertanzeige formen[aus]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "wertanzeige", "aus")
+PRINT "ok"
+--- erwartet
+ok
+
+=== wertanzeige formen[innen]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "wertanzeige", "innen")
+PRINT "ok"
+--- erwartet
+ok
+
+=== wertanzeige formen[pille]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "wertanzeige", "pille")
+PRINT "ok"
+--- erwartet
+ok
+
+=== wertanzeige formen[blase]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "wertanzeige", "blase")
+PRINT "ok"
+--- erwartet
+ok
+
+=== wertanzeige formen[am zeiger]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET(c, "wertanzeige", "am_zeiger")
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt meldet unbekannte bauart
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+TRY
+    CHART_SET(c, "zifferblatt", "kringel")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET: zifferblatt erwartet ring/segmente/striche/baender, nicht 'kringel'
+
+=== zone mit namen
+' Der Name wird entlang des Bogens mitgedreht -- hier nur der Aufruf.
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_ZONE(c, 0, 50, 16711680, "SCHLECHT")
+CHART_ZONE(c, 50, 100, 65280)
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt zahlen[blatt teile-24]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET_NUM(c, "blatt_teile", 24)
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt zahlen[blatt luecke-3]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET_NUM(c, "blatt_luecke", 3)
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt zahlen[blatt dicke-0.25]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET_NUM(c, "blatt_dicke", 0.25)
+PRINT "ok"
+--- erwartet
+ok
+
+=== zifferblatt zahlen[fassung-8]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("tacho", 0, 0, 200, 200)
+CHART_SET_NUM(c, "fassung", 8)
+PRINT "ok"
+--- erwartet
+ok
+
+=== lineare anzeigen gibt es[leiste]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("leiste", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== lineare anzeigen gibt es[balkenanzeige]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("balkenanzeige", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== lineare anzeigen gibt es[bar gauge]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("bar_gauge", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== lineare anzeigen gibt es[led]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("led", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== lineare anzeigen gibt es[lampen]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("lampen", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== lineare anzeigen gibt es[zellen]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("zellen", 0, 0, 200, 60)
+PRINT CHART_SERIES_COUNT(c)
+--- erwartet
+1
+
+=== leiste und lampen bringen ihren wert mit
+' Wie der Tacho: CHART_VALUE geht ohne vorheriges CHART_SERIES.
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("leiste", 0, 0, 200, 60)
+CHART_VALUE(c, 42.0)
+PRINT CHART_GET(c, 0, 0)
+--- erwartet
+42.0
+
+=== skalenverlauf ist einstellbar[skala von]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("leiste", 0, 0, 200, 60)
+CHART_SET_COLOR(c, "skala_von", 16711680)
+PRINT "ok"
+--- erwartet
+ok
+
+=== skalenverlauf ist einstellbar[skala mitte]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("leiste", 0, 0, 200, 60)
+CHART_SET_COLOR(c, "skala_mitte", 16711680)
+PRINT "ok"
+--- erwartet
+ok
+
+=== skalenverlauf ist einstellbar[skala bis]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("leiste", 0, 0, 200, 60)
+CHART_SET_COLOR(c, "skala_bis", 16711680)
+PRINT "ok"
+--- erwartet
+ok
+
+=== punktformen[kreis]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET(c, "punktform", "kreis")
+PRINT "ok"
+--- erwartet
+ok
+
+=== punktformen[quadrat]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET(c, "punktform", "quadrat")
+PRINT "ok"
+--- erwartet
+ok
+
+=== punktformen[raute]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET(c, "punktform", "raute")
+PRINT "ok"
+--- erwartet
+ok
+
+=== punktformen[dreieck]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET(c, "punktform", "dreieck")
+PRINT "ok"
+--- erwartet
+ok
+
+=== punktform meldet unbekannte form
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+TRY
+    CHART_SET(c, "punktform", "stern")
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+CHART_SET: punktform erwartet kreis/quadrat/raute/dreieck, nicht 'stern'
+
+=== linien schalter[treppe]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET_FLAG(c, "treppe", TRUE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== linien schalter[fadenkreuz]
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET_FLAG(c, "fadenkreuz", TRUE)
+PRINT "ok"
+--- erwartet
+ok
+
+=== gestrichelte linie
+IMPORT "chart"
+DIM c AS CHART
+c = CHART_NEW("linie", 0, 0, 200, 100)
+CHART_SET_NUM(c, "strich", 8)
+PRINT "ok"
+--- erwartet
+ok
+

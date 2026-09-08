@@ -1,0 +1,209 @@
+' Aus test_builtins_extra.py uebertragen (23 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== rgba packs alpha in high byte
+PRINT RGBA(255, 128, 64, 200)
+--- erwartet
+3372187712
+
+=== alpha extracts and defaults opaque
+PRINT ALPHA(RGBA(10, 20, 30, 128))
+PRINT ALPHA(RGB(10, 20, 30))
+--- erwartet
+128
+255
+
+=== rgb channels ignore alpha byte
+PRINT RED(RGBA(200, 100, 50, 128))
+PRINT GREEN(RGBA(200, 100, 50, 128))
+PRINT BLUE(RGBA(200, 100, 50, 128))
+--- erwartet
+200
+100
+50
+
+=== rgba alpha zero clamped to one
+PRINT ALPHA(RGBA(1, 2, 3, 0))
+--- erwartet
+1
+
+=== rgba out of range errors
+PRINT RGBA(0, 0, 0, 300)
+--- fehler
+RGBA-Werte muessen 0..255 sein
+
+=== rgb still 24bit
+PRINT RGB(255, 128, 64)
+--- erwartet
+16744512
+
+=== wrap
+PRINT WRAP(370, 0, 360)
+PRINT WRAP(-10, 0, 360)
+--- erwartet
+10.0
+350.0
+
+=== pingpong
+PRINT PINGPONG(0.5, 2)
+PRINT PINGPONG(2.5, 2)
+PRINT PINGPONG(3.0, 2)
+--- erwartet
+0.5
+1.5
+1.0
+
+=== movetoward
+PRINT MOVETOWARD(0, 10, 3)
+PRINT MOVETOWARD(0, 2, 5)
+PRINT MOVETOWARD(10, 0, 3)
+--- erwartet
+3.0
+2.0
+7.0
+
+=== smoothstep clamp01 approx log10
+PRINT SMOOTHSTEP(0, 1, 0.5)
+PRINT SMOOTHSTEP(0, 1, -1)
+PRINT CLAMP01(1.7)
+PRINT CLAMP01(-0.3)
+PRINT APPROX(0.1 + 0.2, 0.3)
+PRINT APPROX(1, 2)
+PRINT LOG10(1000)
+--- erwartet ungefaehr
+0.5
+0.0
+1.0
+0.0
+TRUE
+FALSE
+3.0
+
+=== noise deterministic and zero at lattice
+PRINT NOISE(0)
+PRINT NOISE2(3, 5)
+PRINT NOISE2(1.5, 2.5) = NOISE2(1.5, 2.5)
+--- erwartet
+0.0
+0.0
+TRUE
+
+=== noise in range
+DIM i AS INTEGER
+DIM ok AS INTEGER
+ok = 1
+FOR i = 0 TO 200
+    DIM n AS FLOAT
+    n = NOISE2(i * 0.137, i * 0.071)
+    IF n < -1.001 OR n > 1.001 THEN ok = 0
+NEXT
+PRINT ok
+--- erwartet
+1
+
+=== fbm deterministic
+PRINT FBM(1.5, 2.5, 4) = FBM(1.5, 2.5, 4)
+--- erwartet
+TRUE
+
+=== typeof
+DIM s AS STRING
+s = "x"
+PRINT TYPEOF(5)
+PRINT TYPEOF(3.0)
+PRINT TYPEOF(s)
+PRINT TYPEOF(TRUE)
+--- erwartet
+INTEGER
+FLOAT
+STRING
+BOOLEAN
+
+=== type predicates
+PRINT ISNUM(5)
+PRINT ISNUM(3.0)
+PRINT ISINT(5)
+PRINT ISINT(3.0)
+PRINT ISSTR("x")
+PRINT ISBOOL(TRUE)
+PRINT ISINT(TRUE)
+--- erwartet
+TRUE
+TRUE
+TRUE
+FALSE
+TRUE
+TRUE
+FALSE
+
+=== base64 roundtrip
+PRINT BASE64_ENCODE("Hello, World!")
+PRINT BASE64_DECODE("SGVsbG8sIFdvcmxkIQ==")
+PRINT BASE64_DECODE(BASE64_ENCODE("Umlaute: äöü"))
+--- erwartet
+SGVsbG8sIFdvcmxkIQ==
+Hello, World!
+Umlaute: äöü
+
+=== crc32 known value
+PRINT CRC32("hello")
+--- erwartet
+907060870
+
+=== hash deterministic
+PRINT HASH("hello") = HASH("hello")
+PRINT HASH("a") = HASH("b")
+--- erwartet
+TRUE
+FALSE
+
+=== base64 decode invalid raises
+PRINT BASE64_DECODE("@@@@")
+--- fehler
+BASE64_DECODE: ungueltiges Zeichen
+
+=== dirlist
+DIM names AS ARRAY OF STRING
+names = DIRLIST(".")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(names) - 1
+    IF names[i] = "a.txt" OR names[i] = "b.txt" OR names[i] = "sub" THEN PRINT names[i]
+NEXT
+--- datei a.txt
+y
+--- datei b.txt
+x
+--- verzeichnis sub
+--- erwartet
+a.txt
+b.txt
+sub
+
+=== path helpers
+PRINT BASENAME("a/b/c.txt")
+PRINT DIRNAME("a/b/c.txt")
+--- erwartet
+c.txt
+a/b
+
+=== copy rename append
+COPYFILE("src.txt", "dst.txt")
+APPENDFILE("dst.txt", " welt")
+RENAME("dst.txt", "final.txt")
+DIM f AS FILE
+f = OpenFile("final.txt", "r")
+PRINT ReadLine(f)
+CloseFile(f)
+PRINT FILEEXISTS("dst.txt")
+PRINT FILEEXISTS("final.txt")
+--- datei src.txt
+hallo
+--- erwartet
+hallo welt
+FALSE
+TRUE
+
+=== dirlist missing dir raises
+PRINT LEN(DIRLIST("does_not_exist_xyz_123"))
+--- fehler
+DIRLIST: does_not_exist_xyz_123:
+

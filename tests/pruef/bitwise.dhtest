@@ -1,0 +1,254 @@
+' Aus test_bitwise.py uebertragen (34 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== band basic (1)
+PRINT &HF0 BAND &H0F
+PRINT &HFF BAND &H0F
+PRINT &HAA BAND &H55
+--- erwartet
+0
+15
+0
+
+=== band basic (2)
+PRINT &HF0 BAND &H0F
+PRINT &HFF BAND &H0F
+PRINT &HAA BAND &H55
+--- erwartet
+0
+15
+0
+
+=== bor basic (1)
+PRINT &HF0 BOR &H0F
+PRINT 1 BOR 2 BOR 4 BOR 8
+--- erwartet
+255
+15
+
+=== bor basic (2)
+PRINT &HF0 BOR &H0F
+PRINT 1 BOR 2 BOR 4 BOR 8
+--- erwartet
+255
+15
+
+=== bxor basic (1)
+PRINT &HFF BXOR &H0F
+PRINT 5 BXOR 5
+PRINT 5 BXOR 0
+--- erwartet
+240
+0
+5
+
+=== bxor basic (2)
+PRINT &HFF BXOR &H0F
+PRINT 5 BXOR 5
+PRINT 5 BXOR 0
+--- erwartet
+240
+0
+5
+
+=== shl basic (1)
+PRINT 1 SHL 0
+PRINT 1 SHL 8
+PRINT 3 SHL 4
+--- erwartet
+1
+256
+48
+
+=== shl basic (2)
+PRINT 1 SHL 0
+PRINT 1 SHL 8
+PRINT 3 SHL 4
+--- erwartet
+1
+256
+48
+
+=== shr basic (1)
+PRINT 256 SHR 8
+PRINT 255 SHR 4
+PRINT 1 SHR 1
+--- erwartet
+1
+15
+0
+
+=== shr basic (2)
+PRINT 256 SHR 8
+PRINT 255 SHR 4
+PRINT 1 SHR 1
+--- erwartet
+1
+15
+0
+
+=== shift negative count throws (1)
+PRINT 1 SHL -1
+--- fehler
+SHL: Schiebeweite muss 0..63 sein, erhalten -1
+
+=== shift negative count throws (2)
+PRINT 1 SHR -1
+--- fehler
+SHR: Schiebeweite muss 0..63 sein, erhalten -1
+
+=== bnot basic (1)
+PRINT BNOT 0
+PRINT BNOT 5
+--- erwartet
+-1
+-6
+
+=== bnot basic (2)
+PRINT BNOT 0
+PRINT BNOT 5
+--- erwartet
+-1
+-6
+
+=== bnot double application (1)
+PRINT BNOT BNOT 42
+--- erwartet
+42
+
+=== bnot double application (2)
+PRINT BNOT BNOT 42
+--- erwartet
+42
+
+=== bitwise lower than addition (1)
+' `a + b BAND c` parsen als `(a + b) BAND c`, weil + hoehere Praezedenz hat.
+PRINT 5 + 3 BAND 6
+--- erwartet
+0
+
+=== bitwise lower than addition (2)
+' `a + b BAND c` parsen als `(a + b) BAND c`, weil + hoehere Praezedenz hat.
+PRINT 5 + 3 BAND 6
+--- erwartet
+0
+
+=== bitwise higher than comparison (1)
+' `a BAND b = c` parsen als `(a BAND b) = c`.
+IF 12 BAND 4 = 4 THEN PRINT "yes" ELSE PRINT "no"
+--- erwartet
+yes
+
+=== bitwise higher than comparison (2)
+' `a BAND b = c` parsen als `(a BAND b) = c`.
+IF 12 BAND 4 = 4 THEN PRINT "yes" ELSE PRINT "no"
+--- erwartet
+yes
+
+=== bitwise left assoc (1)
+' Alle Bitwise auf einer Ebene, links-assoziativ.
+PRINT 1 BOR 2 BAND 3
+--- erwartet
+3
+
+=== bitwise left assoc (2)
+' Alle Bitwise auf einer Ebene, links-assoziativ.
+PRINT 1 BOR 2 BAND 3
+--- erwartet
+3
+
+=== explicit paren for c style (1)
+' Wer C-Praezedenz will, klammert. (1 BOR (2 BAND 3)) = 3.
+PRINT 1 BOR (2 BAND 3)
+--- erwartet
+3
+
+=== explicit paren for c style (2)
+' Wer C-Praezedenz will, klammert. (1 BOR (2 BAND 3)) = 3.
+PRINT 1 BOR (2 BAND 3)
+--- erwartet
+3
+
+=== band rejects float (1)
+PRINT 1.5 BAND 1
+--- fehler
+BAND erwartet INTEGER, erhalten FLOAT / INTEGER
+
+=== band rejects float (2)
+PRINT 1.5 BAND 1
+--- fehler
+BAND erwartet INTEGER, erhalten FLOAT / INTEGER
+
+=== band rejects bool (1)
+PRINT TRUE BAND 1
+--- fehler
+BAND erwartet INTEGER, erhalten BOOLEAN / INTEGER
+
+=== band rejects bool (2)
+PRINT TRUE BAND 1
+--- fehler
+BAND erwartet INTEGER, erhalten BOOLEAN / INTEGER
+
+=== bnot rejects float (1)
+PRINT BNOT 1.5
+--- fehler
+BNOT erwartet INTEGER
+
+=== bnot rejects float (2)
+PRINT BNOT 1.5
+--- fehler
+BNOT erwartet INTEGER
+
+=== bitwise with variables (1)
+DIM mask AS INTEGER
+DIM flags AS INTEGER
+mask = &HFF
+flags = &HA5
+PRINT flags BAND mask
+PRINT flags SHR 4
+PRINT flags BXOR mask
+--- erwartet
+165
+10
+90
+
+=== bitwise with variables (2)
+DIM mask AS INTEGER
+DIM flags AS INTEGER
+mask = &HFF
+flags = &HA5
+PRINT flags BAND mask
+PRINT flags SHR 4
+PRINT flags BXOR mask
+--- erwartet
+165
+10
+90
+
+=== bitwise in if (1)
+' Praktischer Use-Case: Flag-Pruefung.
+CONST FLAG_READ = 1
+CONST FLAG_WRITE = 2
+CONST FLAG_EXEC = 4
+DIM perms AS INTEGER
+perms = FLAG_READ BOR FLAG_WRITE
+IF perms BAND FLAG_READ <> 0 THEN PRINT "kann lesen"
+IF perms BAND FLAG_WRITE <> 0 THEN PRINT "kann schreiben"
+IF perms BAND FLAG_EXEC <> 0 THEN PRINT "kann ausfuehren"
+--- erwartet
+kann lesen
+kann schreiben
+
+=== bitwise in if (2)
+' Praktischer Use-Case: Flag-Pruefung.
+CONST FLAG_READ = 1
+CONST FLAG_WRITE = 2
+CONST FLAG_EXEC = 4
+DIM perms AS INTEGER
+perms = FLAG_READ BOR FLAG_WRITE
+IF perms BAND FLAG_READ <> 0 THEN PRINT "kann lesen"
+IF perms BAND FLAG_WRITE <> 0 THEN PRINT "kann schreiben"
+IF perms BAND FLAG_EXEC <> 0 THEN PRINT "kann ausfuehren"
+--- erwartet
+kann lesen
+kann schreiben
+

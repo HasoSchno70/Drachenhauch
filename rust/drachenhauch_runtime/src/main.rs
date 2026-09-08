@@ -770,6 +770,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
             let _ = std::fs::create_dir_all(&dir);
             let erg = (|| {
                 std::fs::write(dir.join("fall.dh"), &f.quelle).map_err(|e| e.to_string())?;
+                for name in &f.verzeichnisse { let _ = std::fs::create_dir_all(dir.join(name)); }
                 for (name, inhalt) in &f.dateien {
                     let ziel = dir.join(name);
                     if let Some(eltern) = ziel.parent() { let _ = std::fs::create_dir_all(eltern); }

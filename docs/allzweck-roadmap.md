@@ -153,7 +153,7 @@ Dateien) und ZIP in WP J.
 bestehendem Code plötzlich ein Fehler. `PRINT puffer` zeigt nur die Länge, nicht
 den Inhalt.
 
-Tests: `tests/test_buffer.py` (48). Beispiel: `examples/162_binaerdatei.dh` —
+Tests: `tests/pruef/buffer.dhtest` (48). Beispiel: `examples/162_binaerdatei.dh` —
 liest Breite/Höhe und die Blockliste aus einer echten PNG-Datei ohne
 Bildbibliothek und schreibt/liest ein eigenes Binärformat. Doku:
 `docs/builtins-core.md`, Abschnitt „Bytes (BUFFER)".
@@ -249,7 +249,7 @@ in der Lockfile (über `ureq`/`rustls`). Alles **ungated** — ein
 Konsolenprogramm, das eine Prüfsumme bildet, soll nicht das `http`-Feature
 brauchen.
 
-Tests: `tests/test_krypto.py` (33), gegen die Vektoren aus den Normen
+Tests: `tests/pruef/krypto.dhtest` (33), gegen die Vektoren aus den Normen
 (FIPS 180-4, RFC 1321, RFC 4231) bzw. gegen Pythons `hashlib`/`hmac` — eine
 Prüfsumme, die nur mit sich selbst übereinstimmt, wäre wertlos. Beispiel:
 `examples/164_signatur.dh` (Webhook prüfen, Token würfeln, Datei-Prüfsumme).
@@ -400,7 +400,7 @@ Mitgezogen: der **Python-Parser** (`parser.py`, `ast_nodes.py`) —
 `test_rust_parser_parity.py` vergleicht beide ASTs Feld für Feld, `ClassDecl`
 hat jetzt in beiden ein `abstracts`.
 
-Tests: `tests/test_vererbung.py` (20). Beispiel: `examples/167_vererbung.dh`.
+Tests: `tests/pruef/vererbung.dhtest` (20). Beispiel: `examples/167_vererbung.dh`.
 Doku: `docs/sprache.md`, Abschnitt „Klassen und Strukturen".
 
 ## WP H — Nebenläufigkeit (✅ ERLEDIGT — Hintergrund-Aufträge 2026-08-17, `TASK_*` 2026-08-19)

@@ -1,0 +1,212 @@
+' Aus test_modules_physics.py uebertragen (32 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== box box overlap
+IMPORT "physics"
+PRINT PHYSICS_BOX_BOX(0, 0, 10, 10, 5, 5, 10, 10)
+--- erwartet
+TRUE
+
+=== box box no overlap
+IMPORT "physics"
+PRINT PHYSICS_BOX_BOX(0, 0, 10, 10, 20, 20, 5, 5)
+--- erwartet
+FALSE
+
+=== box box touch edge no overlap
+IMPORT "physics"
+PRINT PHYSICS_BOX_BOX(0, 0, 10, 10, 10, 0, 5, 5)
+--- erwartet
+FALSE
+
+=== circle circle overlap
+IMPORT "physics"
+PRINT PHYSICS_CIRCLE_CIRCLE(0, 0, 5, 6, 0, 5)
+--- erwartet
+TRUE
+
+=== circle circle no overlap
+IMPORT "physics"
+PRINT PHYSICS_CIRCLE_CIRCLE(0, 0, 3, 100, 0, 3)
+--- erwartet
+FALSE
+
+=== circle circle touch
+IMPORT "physics"
+PRINT PHYSICS_CIRCLE_CIRCLE(0, 0, 5, 10, 0, 5)
+--- erwartet
+FALSE
+
+=== box circle circle inside box
+IMPORT "physics"
+PRINT PHYSICS_BOX_CIRCLE(0, 0, 20, 20, 10, 10, 3)
+--- erwartet
+TRUE
+
+=== box circle circle corner overlap
+IMPORT "physics"
+PRINT PHYSICS_BOX_CIRCLE(0, 0, 10, 10, 12, 12, 5)
+--- erwartet
+TRUE
+
+=== box circle no overlap
+IMPORT "physics"
+PRINT PHYSICS_BOX_CIRCLE(0, 0, 10, 10, 100, 100, 5)
+--- erwartet
+FALSE
+
+=== point in box
+IMPORT "physics"
+PRINT PHYSICS_POINT_BOX(5, 5, 0, 0, 10, 10)
+--- erwartet
+TRUE
+
+=== point outside box
+IMPORT "physics"
+PRINT PHYSICS_POINT_BOX(15, 5, 0, 0, 10, 10)
+--- erwartet
+FALSE
+
+=== point on left edge inclusive
+' Linke obere Kante einschliesslich, rechte/untere ausschliesslich.
+IMPORT "physics"
+PRINT PHYSICS_POINT_BOX(0, 0, 0, 0, 10, 10)
+PRINT PHYSICS_POINT_BOX(10, 5, 0, 0, 10, 10)
+--- erwartet
+TRUE
+FALSE
+
+=== point in circle
+IMPORT "physics"
+PRINT PHYSICS_POINT_CIRCLE(3, 4, 0, 0, 5)
+PRINT PHYSICS_POINT_CIRCLE(3, 4, 0, 0, 6)
+--- erwartet
+FALSE
+TRUE
+
+=== distance pythagoras
+IMPORT "physics"
+PRINT PHYSICS_DISTANCE(0, 0, 3, 4)
+--- erwartet
+5.0
+
+=== distance2 squared
+IMPORT "physics"
+PRINT PHYSICS_DISTANCE2(0, 0, 3, 4)
+--- erwartet
+25.0
+
+=== length
+IMPORT "physics"
+PRINT PHYSICS_LENGTH(3, 4)
+--- erwartet
+5.0
+
+=== length zero
+IMPORT "physics"
+PRINT PHYSICS_LENGTH(0, 0)
+--- erwartet
+0.0
+
+=== norm unit vec
+IMPORT "physics"
+PRINT PHYSICS_NORM_X(3, 4)
+PRINT PHYSICS_NORM_Y(3, 4)
+--- erwartet
+0.6
+0.8
+
+=== norm zero vec
+IMPORT "physics"
+PRINT PHYSICS_NORM_X(0, 0)
+PRINT PHYSICS_NORM_Y(0, 0)
+--- erwartet
+0.0
+0.0
+
+=== reflect perpendicular
+' Vektor (1, -1) prallt von horizontaler Wand (Normal 0, 1) ab -> (1, 1).
+IMPORT "physics"
+PRINT PHYSICS_REFLECT_X(1, -1, 0, 1)
+PRINT PHYSICS_REFLECT_Y(1, -1, 0, 1)
+--- erwartet
+1.0
+1.0
+
+=== reflect normal not normalized
+' Normal muss nicht praenormalisiert sein.
+IMPORT "physics"
+PRINT PHYSICS_REFLECT_X(1, -1, 0, 5)
+PRINT PHYSICS_REFLECT_Y(1, -1, 0, 5)
+--- erwartet
+1.0
+1.0
+
+=== reflect zero normal returns input
+' Entartete (0,0)-Normal -> Eingabe-Vektor unveraendert zurueckgeben.
+IMPORT "physics"
+PRINT PHYSICS_REFLECT_X(3, 4, 0, 0)
+PRINT PHYSICS_REFLECT_Y(3, 4, 0, 0)
+--- erwartet
+3.0
+4.0
+
+=== ray box hits
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(0, 5, 10, 0, 5, 0, 10, 10)
+--- erwartet
+0.5
+
+=== ray box misses
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(0, 50, 10, 0, 5, 0, 10, 10)
+--- erwartet
+-1.0
+
+=== ray box starts inside
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(10, 5, 5, 0, 5, 0, 10, 10)
+--- erwartet
+0.0
+
+=== ray box too short
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(0, 5, 4, 0, 5, 0, 10, 10)
+--- erwartet
+-1.0
+
+=== ray box zero direction
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(10, 5, 0, 0, 5, 0, 10, 10)
+--- erwartet
+0.0
+
+=== ray box zero direction outside
+IMPORT "physics"
+PRINT PHYSICS_RAY_BOX(50, 50, 0, 0, 5, 0, 10, 10)
+--- erwartet
+-1.0
+
+=== ray circle hits
+IMPORT "physics"
+PRINT PHYSICS_RAY_CIRCLE(0, 0, 10, 0, 5, 0, 1)
+--- erwartet
+0.4
+
+=== ray circle misses
+IMPORT "physics"
+PRINT PHYSICS_RAY_CIRCLE(0, 0, 10, 0, 5, 100, 1)
+--- erwartet
+-1.0
+
+=== ray circle starts inside
+IMPORT "physics"
+PRINT PHYSICS_RAY_CIRCLE(5, 0, 10, 0, 5, 0, 5)
+--- erwartet ungefaehr
+0.0
+
+=== ray circle zero radius no hit
+IMPORT "physics"
+PRINT PHYSICS_RAY_CIRCLE(0, 0, 10, 0, 5, 0, 0)
+--- erwartet ungefaehr
+0.5
+

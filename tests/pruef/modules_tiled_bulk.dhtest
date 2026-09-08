@@ -1,0 +1,114 @@
+' Aus test_modules_tiled_bulk.py uebertragen (9 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== count gid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_COUNT_GID(m, 0, 1)
+PRINT TILED_COUNT_GID(m, 0, 2)
+PRINT TILED_COUNT_GID(m, 0, 0)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 1, 1, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+3
+1
+20
+
+=== fill rect
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FILL_RECT(m, 0, 1, 1, 2, 2, 5)
+PRINT TILED_COUNT_GID(m, 0, 5)
+PRINT TILED_TILE_AT(m, 0, 1, 1)
+PRINT TILED_TILE_AT(m, 0, 2, 2)
+PRINT TILED_TILE_AT(m, 0, 0, 0)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+4
+4
+5
+5
+0
+
+=== fill rect clamps oob
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FILL_RECT(m, 0, 4, 2, 10, 10, 7)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+4
+
+=== fill rect counts only changed
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FILL_RECT(m, 0, 0, 0, 6, 4, 3)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]}]}
+--- erwartet
+0
+
+=== replace
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_REPLACE(m, 0, 1, 9)
+PRINT TILED_COUNT_GID(m, 0, 9)
+PRINT TILED_COUNT_GID(m, 0, 1)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [1, 2, 1, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+3
+3
+0
+
+=== flood fill basic
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FLOOD_FILL(m, 0, 0, 0, 5)
+PRINT TILED_COUNT_GID(m, 0, 5)
+PRINT TILED_TILE_AT(m, 0, 5, 0)
+PRINT TILED_TILE_AT(m, 0, 3, 0)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0]}]}
+--- erwartet
+12
+12
+0
+1
+
+=== flood fill noop same gid
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FLOOD_FILL(m, 0, 0, 0, 0)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+0
+
+=== flood fill oob start
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FLOOD_FILL(m, 0, 99, 99, 5)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "tilelayer", "name": "g", "width": 6, "height": 4, "data": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}]}
+--- erwartet
+0
+
+=== bulk on object layer raises
+IMPORT "tiled"
+DIM m AS TILED_MAP
+m = TILED_LOAD("m.json")
+PRINT TILED_FLOOD_FILL(m, 0, 0, 0, 5)
+--- datei m.json
+{"type": "map", "width": 6, "height": 4, "tilewidth": 16, "tileheight": 16, "tilesets": [{"firstgid": 1, "name": "t", "tilewidth": 16, "tileheight": 16, "columns": 4, "image": "t.png", "imagewidth": 64, "imageheight": 64}], "layers": [{"type": "objectgroup", "name": "obj", "objects": []}]}
+--- fehler
+TILED_FLOOD_FILL: Layer 0 ('obj') ist kein Tile-Layer
+

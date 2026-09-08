@@ -1,0 +1,45 @@
+' Aus test_if_singleline.py uebertragen (4 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== then colon chain conditional
+' Beide ':'-getrennten Statements nach THEN sind an die Bedingung gebunden.
+DIM x AS INTEGER
+x = 1
+IF x = 2 THEN PRINT "a" : PRINT "b"
+PRINT "after"
+--- erwartet
+after
+
+=== then colon chain runs when true
+DIM x AS INTEGER
+x = 2
+IF x = 2 THEN PRINT "a" : PRINT "b"
+PRINT "after"
+--- erwartet
+a
+b
+after
+
+=== return after colon is conditional
+' Die historische Falle: RETURN nach ':' darf NICHT unbedingt laufen.
+FUNCTION f(d AS INTEGER) AS BOOLEAN
+    IF d > 0 THEN d = d - 1 : RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+PRINT f(5)
+PRINT f(0)
+--- erwartet
+FALSE
+TRUE
+
+=== else colon chain
+' ELSE-Zweig sammelt seine ':'-getrennten Statements ebenfalls vollstaendig.
+DIM x AS INTEGER
+x = 1
+IF x = 1 THEN PRINT "y1" : PRINT "y2" ELSE PRINT "n1" : PRINT "n2"
+IF x = 9 THEN PRINT "y1" : PRINT "y2" ELSE PRINT "n1" : PRINT "n2"
+--- erwartet
+y1
+y2
+n1
+n2
+

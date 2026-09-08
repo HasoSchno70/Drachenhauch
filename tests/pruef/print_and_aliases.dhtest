@@ -1,0 +1,122 @@
+' Aus test_print_and_aliases.py uebertragen (15 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== comma is space
+PRINT "a", "b", "c"
+--- erwartet
+a b c
+
+=== semicolon is no space
+PRINT "a"; "b"; "c"
+--- erwartet
+abc
+
+=== mixed separators
+PRINT "x", 5; "!"
+--- erwartet
+x 5!
+
+=== trailing semicolon suppresses newline
+PRINT "a";
+PRINT "b"
+--- erwartet
+ab
+
+=== trailing comma suppresses newline
+PRINT "a",
+PRINT "b"
+--- erwartet
+ab
+
+=== empty print is blank line
+PRINT "x"
+PRINT
+PRINT "y"
+--- erwartet
+x
+
+y
+
+=== numbers with semicolon
+PRINT 1; "="; 2
+--- erwartet
+1=2
+
+=== print separators in single line if
+IF 1 = 1 THEN PRINT "a"; "b" ELSE PRINT "x"
+--- erwartet
+ab
+
+=== colon after trailing semicolon
+PRINT "a"; : PRINT "b"
+--- erwartet
+ab
+
+=== ltrim rtrim
+PRINT "[" + LTRIM$("  hi  ") + "]"
+PRINT "[" + RTRIM$("  hi  ") + "]"
+--- erwartet
+[hi  ]
+[  hi]
+
+=== count
+PRINT COUNT("banana", "a")
+PRINT COUNT("aaaa", "aa")
+PRINT COUNT("x", "")
+--- erwartet
+3
+2
+0
+
+=== title
+PRINT TITLE$("hello WORLD foo")
+--- erwartet
+Hello World Foo
+
+=== weighted choice forced
+DIM v[3] AS STRING
+DIM w[3] AS INTEGER
+v[0]="a" : v[1]="b" : v[2]="c"
+w[0]=0 : w[1]=0 : w[2]=100
+DIM i AS INTEGER
+FOR i = 1 TO 20
+    PRINT WEIGHTED_CHOICE(v, w)
+NEXT
+--- erwartet
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+c
+
+=== weighted choice zero total raises
+DIM v[2] AS STRING
+DIM w[2] AS INTEGER
+v[0]="a" : v[1]="b"
+w[0]=0 : w[1]=0
+PRINT WEIGHTED_CHOICE(v, w)
+--- fehler
+WEIGHTED_CHOICE: Summe der Gewichte muss > 0 sein
+
+=== weighted choice length mismatch raises
+DIM v[2] AS STRING
+DIM w[3] AS INTEGER
+v[0]="a" : v[1]="b"
+PRINT WEIGHTED_CHOICE(v, w)
+--- fehler
+WEIGHTED_CHOICE: werte und gewichte muessen gleich lang sein
+

@@ -1,0 +1,189 @@
+' Aus test_modules_db.py uebertragen (14 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== open close
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_CLOSE(c)
+DB_EXEC(c, "SELECT 1")
+--- fehler
+DB: ungueltiges/geschlossenes DB_CONN-Handle 0
+
+=== exec insert returns rowcount
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+PRINT DB_EXEC(c, "INSERT INTO t (name, score, dabei) VALUES (?, ?, ?)", "Anna", 100, TRUE)
+--- erwartet
+1
+
+=== query iterate
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_EXEC(c, "INSERT INTO t (name, score, dabei) VALUES (?, ?, ?)", "Anna", 100, TRUE)
+DB_EXEC(c, "INSERT INTO t (name, score, dabei) VALUES (?, ?, ?)", "Bert", 50, TRUE)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT name, score FROM t ORDER BY score DESC")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0) + "=" + STR$(DB_GET_INT(r, 1))
+WEND
+DB_CLOSE_RESULT(r)
+--- erwartet
+Anna=100
+Bert=50
+
+=== get bool
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_EXEC(c, "INSERT INTO t (name, score, dabei) VALUES (?, ?, ?)", "Anna", 1, TRUE)
+DB_EXEC(c, "INSERT INTO t (name, score, dabei) VALUES (?, ?, ?)", "Bert", 0, FALSE)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT name, dabei FROM t ORDER BY name")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0) + "=" + STR$(DB_GET_BOOL(r, 1))
+WEND
+DB_CLOSE_RESULT(r)
+--- erwartet
+Anna=TRUE
+Bert=FALSE
+
+=== null handling
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_EXEC(c, "INSERT INTO t (name, score) VALUES (?, NULL)", "Emil")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT score FROM t WHERE name = ?", "Emil")
+PRINT DB_NEXT(r)
+PRINT DB_IS_NULL(r, 0)
+PRINT DB_GET_INT(r, 0)
+PRINT "[" + DB_GET_STRING(r, 0) + "]"
+DB_CLOSE_RESULT(r)
+--- erwartet
+TRUE
+TRUE
+0
+[]
+
+=== last rowid
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_EXEC(c, "INSERT INTO t (name) VALUES (?)", "X")
+PRINT DB_LAST_ROWID(c)
+DB_EXEC(c, "INSERT INTO t (name) VALUES (?)", "Y")
+PRINT DB_LAST_ROWID(c)
+--- erwartet
+1
+2
+
+=== col count and name
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT id, name, score FROM t")
+PRINT DB_COL_COUNT(r)
+PRINT DB_COL_NAME(r, 0)
+PRINT DB_COL_NAME(r, 1)
+DB_CLOSE_RESULT(r)
+--- erwartet
+3
+id
+name
+
+=== transaction rollback
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_BEGIN(c)
+DB_EXEC(c, "INSERT INTO t (name) VALUES (?)", "ToRollback")
+DB_ROLLBACK(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT COUNT(*) FROM t WHERE name = ?", "ToRollback")
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+DB_CLOSE_RESULT(r)
+--- erwartet
+0
+
+=== transaction commit
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_BEGIN(c)
+DB_EXEC(c, "INSERT INTO t (name) VALUES (?)", "Committed")
+DB_COMMIT(c)
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT COUNT(*) FROM t WHERE name = ?", "Committed")
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+DB_CLOSE_RESULT(r)
+--- erwartet
+1
+
+=== invalid sql raises
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DB_EXEC(c, "DAS IST KEIN SQL")
+--- fehler
+DB_EXEC: near "DAS": syntax error in DAS IST KEIN SQL at offset 0
+
+=== get before next raises
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT 1")
+PRINT DB_GET_INT(r, 0)
+--- fehler
+DB_GET_INT: Keine aktuelle Zeile - DB_NEXT vor dem Lesen aufrufen
+
+=== get int huge real raises instead of saturating
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT 1e20")
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+--- fehler
+DB_GET_INT: Spalte 0 ist float, nicht INTEGER
+
+=== get int normal whole float still works
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT 42.0")
+DB_NEXT(r)
+PRINT DB_GET_INT(r, 0)
+DB_CLOSE_RESULT(r)
+--- erwartet
+42
+
+=== close result frees rows and stays usable
+IMPORT "db"
+DIM c AS DB_CONN
+c = DB_OPEN(":memory:")
+DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, score INTEGER, dabei INTEGER)")
+DIM r AS DB_RESULT
+r = DB_QUERY(c, "SELECT 1")
+DB_CLOSE_RESULT(r)
+PRINT DB_NEXT(r)
+--- fehler
+DB: Result wurde bereits geschlossen
+

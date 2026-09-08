@@ -1,0 +1,277 @@
+' Aus test_modules_astar.py uebertragen (25 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== new creates grid
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+PRINT ASTAR_WIDTH(g)
+PRINT ASTAR_HEIGHT(g)
+--- erwartet
+10
+10
+
+=== new zero dim raises (1)
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(0, 5)
+--- fehler
+ASTAR_NEW: Breite und Hoehe muessen > 0 sein (erhalten 0x5)
+
+=== new zero dim raises (2)
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(5, -1)
+--- fehler
+ASTAR_NEW: Breite und Hoehe muessen > 0 sein (erhalten 5x-1)
+
+=== set wall out of bounds
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 99, 99)
+--- fehler
+ASTAR_SET_WALL: (99, 99) ausserhalb des Grids [10x10]
+
+=== clear removes walls and path
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 1, 1)
+ASTAR_SET_WALL(g, 2, 2)
+PRINT ASTAR_IS_WALL(g, 1, 1)
+ASTAR_CLEAR(g)
+PRINT ASTAR_IS_WALL(g, 1, 1)
+PRINT ASTAR_IS_WALL(g, 2, 2)
+--- erwartet
+TRUE
+FALSE
+FALSE
+
+=== set and query wall
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+PRINT ASTAR_IS_WALL(g, 3, 3)
+ASTAR_SET_WALL(g, 3, 3)
+PRINT ASTAR_IS_WALL(g, 3, 3)
+ASTAR_SET_PASSABLE(g, 3, 3)
+PRINT ASTAR_IS_WALL(g, 3, 3)
+--- erwartet
+FALSE
+TRUE
+FALSE
+
+=== path to self has length one
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+PRINT ASTAR_FIND(g, 3, 3, 3, 3)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+TRUE
+1
+
+=== straight line orthogonal
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+PRINT ASTAR_FIND(g, 0, 0, 5, 0)
+PRINT ASTAR_PATH_LEN(g)
+PRINT ASTAR_PATH_X(g, 0)
+PRINT ASTAR_PATH_Y(g, 0)
+PRINT ASTAR_PATH_X(g, 5)
+PRINT ASTAR_PATH_Y(g, 5)
+--- erwartet
+TRUE
+6
+0
+0
+5
+0
+
+=== path around wall
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 2, 0)
+ASTAR_SET_WALL(g, 2, 1)
+ASTAR_SET_WALL(g, 2, 2)
+ASTAR_SET_WALL(g, 2, 3)
+ASTAR_SET_WALL(g, 2, 4)
+PRINT ASTAR_FIND(g, 0, 0, 5, 0)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+TRUE
+16
+
+=== no path when blocked
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 4, 5)
+ASTAR_SET_WALL(g, 6, 5)
+ASTAR_SET_WALL(g, 5, 4)
+ASTAR_SET_WALL(g, 5, 6)
+ASTAR_SET_WALL(g, 4, 4)
+ASTAR_SET_WALL(g, 6, 4)
+ASTAR_SET_WALL(g, 4, 6)
+ASTAR_SET_WALL(g, 6, 6)
+PRINT ASTAR_FIND(g, 5, 5, 0, 0)
+PRINT ASTAR_PATH_LEN(g)
+PRINT ASTAR_PATH_COST(g)
+--- erwartet
+FALSE
+0
+0.0
+
+=== start on wall no path
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 0, 0)
+PRINT ASTAR_FIND(g, 0, 0, 5, 5)
+--- erwartet
+FALSE
+
+=== end on wall no path
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_WALL(g, 5, 5)
+PRINT ASTAR_FIND(g, 0, 0, 5, 5)
+--- erwartet
+FALSE
+
+=== diagonal finds shorter path
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL(g, TRUE)
+ASTAR_FIND(g, 0, 0, 3, 3)
+PRINT ASTAR_PATH_LEN(g)
+PRINT ASTAR_PATH_COST(g)
+--- erwartet ungefaehr
+4
+4.242640687119286
+
+=== orthogonal only path length
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL(g, FALSE)
+ASTAR_FIND(g, 0, 0, 3, 3)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+7
+
+=== anti cornercutting
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL(g, TRUE)
+ASTAR_SET_WALL(g, 1, 0)
+ASTAR_SET_WALL(g, 0, 1)
+PRINT ASTAR_FIND(g, 0, 0, 1, 1)
+--- erwartet
+FALSE
+
+=== set unknown heuristic raises
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_HEURISTIC(g, "schwurbel")
+--- fehler
+ASTAR_SET_HEURISTIC: unbekannte Heuristik 'schwurbel' (erlaubt: chebyshev, euclid, manhattan)
+
+=== heuristic case insensitive
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_HEURISTIC(g, "MANHATTAN")
+ASTAR_FIND(g, 0, 0, 5, 5)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+11
+
+=== chebyshev with diagonal
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL(g, TRUE)
+ASTAR_SET_DIAGONAL_COST(g, 1)
+ASTAR_SET_HEURISTIC(g, "chebyshev")
+ASTAR_FIND(g, 0, 0, 5, 5)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+6
+
+=== non grid raises
+IMPORT "astar"
+PRINT ASTAR_FIND("nicht ein grid", 0, 0, 1, 1)
+--- fehler
+ASTAR_FIND erwartet ASTAR_GRID
+
+=== diagonal cost must be positive (1)
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL_COST(g, 0)
+--- fehler
+ASTAR_SET_DIAGONAL_COST: cost muss > 0 sein (erhalten 0)
+
+=== diagonal cost must be positive (2)
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_SET_DIAGONAL_COST(g, -1)
+--- fehler
+ASTAR_SET_DIAGONAL_COST: cost muss > 0 sein (erhalten -1)
+
+=== path x y out of bounds
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_FIND(g, 0, 0, 3, 0)
+PRINT ASTAR_PATH_X(g, 99)
+--- fehler
+ASTAR_PATH_X: Index 99 ausserhalb [0..3]
+
+=== clear path resets
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_FIND(g, 0, 0, 3, 0)
+PRINT ASTAR_PATH_LEN(g)
+ASTAR_CLEAR_PATH(g)
+PRINT ASTAR_PATH_LEN(g)
+PRINT ASTAR_PATH_COST(g)
+--- erwartet
+4
+0
+0.0
+
+=== path cost orthogonal
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(10, 10)
+ASTAR_FIND(g, 0, 0, 5, 0)
+PRINT ASTAR_PATH_COST(g)
+--- erwartet ungefaehr
+5.0
+
+=== maze finds path
+IMPORT "astar"
+DIM g AS ASTAR_GRID
+g = ASTAR_NEW(8, 8)
+ASTAR_SET_WALL(g, 3, 0)
+ASTAR_SET_WALL(g, 3, 1)
+ASTAR_SET_WALL(g, 3, 2)
+ASTAR_SET_WALL(g, 3, 3)
+ASTAR_SET_WALL(g, 3, 4)
+ASTAR_SET_WALL(g, 3, 5)
+PRINT ASTAR_FIND(g, 0, 0, 7, 0)
+PRINT ASTAR_PATH_LEN(g)
+--- erwartet
+TRUE
+20
+

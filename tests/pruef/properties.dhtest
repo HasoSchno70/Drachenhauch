@@ -1,0 +1,392 @@
+' Aus test_properties.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== property basic getter setter (1)
+CLASS Box
+    DIM _v AS INTEGER
+
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+
+    PROPERTY SET v(value AS INTEGER)
+        Self._v = value
+    END PROPERTY
+END CLASS
+
+DIM b AS Box
+b = NEW Box()
+b.v = 42
+PRINT b.v
+b.v = 99
+PRINT b.v
+--- erwartet
+42
+99
+
+=== property basic getter setter (2)
+CLASS Box
+    DIM _v AS INTEGER
+
+    PROPERTY GET v() AS INTEGER
+        RETURN Self._v
+    END PROPERTY
+
+    PROPERTY SET v(value AS INTEGER)
+        Self._v = value
+    END PROPERTY
+END CLASS
+
+DIM b AS Box
+b = NEW Box()
+b.v = 42
+PRINT b.v
+b.v = 99
+PRINT b.v
+--- erwartet
+42
+99
+
+=== property with validation (1)
+' Klassischer Use-Case: Setter clampt Werte.
+CLASS HP
+    DIM _value AS INTEGER
+
+    PROPERTY GET value() AS INTEGER
+        RETURN Self._value
+    END PROPERTY
+
+    PROPERTY SET value(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        IF v > 100 THEN v = 100
+        Self._value = v
+    END PROPERTY
+END CLASS
+
+DIM h AS HP
+h = NEW HP()
+h.value = 50
+PRINT h.value
+h.value = 200
+PRINT h.value
+h.value = -10
+PRINT h.value
+--- erwartet
+50
+100
+0
+
+=== property with validation (2)
+' Klassischer Use-Case: Setter clampt Werte.
+CLASS HP
+    DIM _value AS INTEGER
+
+    PROPERTY GET value() AS INTEGER
+        RETURN Self._value
+    END PROPERTY
+
+    PROPERTY SET value(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        IF v > 100 THEN v = 100
+        Self._value = v
+    END PROPERTY
+END CLASS
+
+DIM h AS HP
+h = NEW HP()
+h.value = 50
+PRINT h.value
+h.value = 200
+PRINT h.value
+h.value = -10
+PRINT h.value
+--- erwartet
+50
+100
+0
+
+=== property read only (1)
+' Property mit nur GET -> Setter-Aufruf wirft.
+CLASS Const42
+    PROPERTY GET answer() AS INTEGER
+        RETURN 42
+    END PROPERTY
+END CLASS
+
+DIM c AS Const42
+c = NEW Const42()
+PRINT c.answer
+c.answer = 99
+--- fehler
+Property 'answer' in const42 hat keinen Setter (read-only)
+
+=== property read only (2)
+' Property mit nur GET -> Setter-Aufruf wirft.
+CLASS Const42
+    PROPERTY GET answer() AS INTEGER
+        RETURN 42
+    END PROPERTY
+END CLASS
+
+DIM c AS Const42
+c = NEW Const42()
+PRINT c.answer
+c.answer = 99
+--- fehler
+Property 'answer' in const42 hat keinen Setter (read-only)
+
+=== property write only (1)
+' Property mit nur SET -> Getter-Aufruf wirft.
+CLASS WriteOnly
+    DIM _value AS INTEGER
+
+    PROPERTY SET value(v AS INTEGER)
+        Self._value = v
+    END PROPERTY
+END CLASS
+
+DIM w AS WriteOnly
+w = NEW WriteOnly()
+w.value = 5
+PRINT w.value
+--- fehler
+Property 'value' in writeonly hat keinen Getter
+
+=== property write only (2)
+' Property mit nur SET -> Getter-Aufruf wirft.
+CLASS WriteOnly
+    DIM _value AS INTEGER
+
+    PROPERTY SET value(v AS INTEGER)
+        Self._value = v
+    END PROPERTY
+END CLASS
+
+DIM w AS WriteOnly
+w = NEW WriteOnly()
+w.value = 5
+PRINT w.value
+--- fehler
+Property 'value' in writeonly hat keinen Getter
+
+=== property computed (1)
+' Property kann berechnet sein -- kein einzelnes Backing-Field.
+CLASS Point
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+
+    PROPERTY GET length() AS FLOAT
+        RETURN SQR(Self.x * Self.x + Self.y * Self.y)
+    END PROPERTY
+END CLASS
+
+DIM p AS Point
+p = NEW Point()
+p.x = 3.0
+p.y = 4.0
+PRINT p.length
+--- erwartet
+5.0
+
+=== property computed (2)
+' Property kann berechnet sein -- kein einzelnes Backing-Field.
+CLASS Point
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+
+    PROPERTY GET length() AS FLOAT
+        RETURN SQR(Self.x * Self.x + Self.y * Self.y)
+    END PROPERTY
+END CLASS
+
+DIM p AS Point
+p = NEW Point()
+p.x = 3.0
+p.y = 4.0
+PRINT p.length
+--- erwartet
+5.0
+
+=== property inherited (1)
+' Property in Basisklasse -> auch von Subklasse zugreifbar.
+CLASS Shape
+    DIM _name AS STRING
+
+    PROPERTY GET name() AS STRING
+        RETURN Self._name
+    END PROPERTY
+
+    PROPERTY SET name(v AS STRING)
+        Self._name = "[" + v + "]"
+    END PROPERTY
+END CLASS
+
+CLASS Circle EXTENDS Shape
+    DIM r AS FLOAT
+END CLASS
+
+DIM c AS Circle
+c = NEW Circle()
+c.name = "circle"
+PRINT c.name
+--- erwartet
+[circle]
+
+=== property inherited (2)
+' Property in Basisklasse -> auch von Subklasse zugreifbar.
+CLASS Shape
+    DIM _name AS STRING
+
+    PROPERTY GET name() AS STRING
+        RETURN Self._name
+    END PROPERTY
+
+    PROPERTY SET name(v AS STRING)
+        Self._name = "[" + v + "]"
+    END PROPERTY
+END CLASS
+
+CLASS Circle EXTENDS Shape
+    DIM r AS FLOAT
+END CLASS
+
+DIM c AS Circle
+c = NEW Circle()
+c.name = "circle"
+PRINT c.name
+--- erwartet
+[circle]
+
+=== property setter in method (1)
+' Setter kann aus einer Methode aufgerufen werden.
+CLASS Counter
+    DIM _n AS INTEGER
+
+    PROPERTY GET n() AS INTEGER
+        RETURN Self._n
+    END PROPERTY
+
+    PROPERTY SET n(v AS INTEGER)
+        Self._n = v
+    END PROPERTY
+
+    SUB Increment()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+
+DIM c AS Counter
+c = NEW Counter()
+c.n = 5
+c.Increment()
+c.Increment()
+PRINT c.n
+--- erwartet
+7
+
+=== property setter in method (2)
+' Setter kann aus einer Methode aufgerufen werden.
+CLASS Counter
+    DIM _n AS INTEGER
+
+    PROPERTY GET n() AS INTEGER
+        RETURN Self._n
+    END PROPERTY
+
+    PROPERTY SET n(v AS INTEGER)
+        Self._n = v
+    END PROPERTY
+
+    SUB Increment()
+        Self.n = Self.n + 1
+    END SUB
+END CLASS
+
+DIM c AS Counter
+c = NEW Counter()
+c.n = 5
+c.Increment()
+c.Increment()
+PRINT c.n
+--- erwartet
+7
+
+=== property does not collide with method (1)
+' User-Methode `Get()` mit Pascal-Namen bleibt unbeeinflusst (kein
+CLASS Foo
+    DIM val AS INTEGER
+
+    FUNCTION Get() AS INTEGER
+        RETURN Self.val * 2
+    END FUNCTION
+END CLASS
+
+DIM f AS Foo
+f = NEW Foo()
+f.val = 21
+PRINT f.Get()
+--- erwartet
+42
+
+=== property does not collide with method (2)
+' User-Methode `Get()` mit Pascal-Namen bleibt unbeeinflusst (kein
+CLASS Foo
+    DIM val AS INTEGER
+
+    FUNCTION Get() AS INTEGER
+        RETURN Self.val * 2
+    END FUNCTION
+END CLASS
+
+DIM f AS Foo
+f = NEW Foo()
+f.val = 21
+PRINT f.Get()
+--- erwartet
+42
+
+=== property set and field distinct (1)
+' Property-Name und Backing-Field-Name muessen verschieden sein --
+CLASS Counter
+    DIM _x AS INTEGER
+
+    PROPERTY GET x() AS INTEGER
+        RETURN Self._x
+    END PROPERTY
+
+    PROPERTY SET x(v AS INTEGER)
+        Self._x = v * 10
+    END PROPERTY
+END CLASS
+
+DIM c AS Counter
+c = NEW Counter()
+c.x = 5
+PRINT c.x
+PRINT c._x
+--- erwartet
+50
+50
+
+=== property set and field distinct (2)
+' Property-Name und Backing-Field-Name muessen verschieden sein --
+CLASS Counter
+    DIM _x AS INTEGER
+
+    PROPERTY GET x() AS INTEGER
+        RETURN Self._x
+    END PROPERTY
+
+    PROPERTY SET x(v AS INTEGER)
+        Self._x = v * 10
+    END PROPERTY
+END CLASS
+
+DIM c AS Counter
+c = NEW Counter()
+c.x = 5
+PRINT c.x
+PRINT c._x
+--- erwartet
+50
+50
+

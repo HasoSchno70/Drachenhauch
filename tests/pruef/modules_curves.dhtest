@@ -1,0 +1,168 @@
+' Aus test_modules_curves.py uebertragen (22 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== lerp endpoints
+IMPORT "curves"
+PRINT CURVE_LERP(10.0, 20.0, 0.0)
+PRINT CURVE_LERP(10.0, 20.0, 1.0)
+--- erwartet
+10.0
+20.0
+
+=== lerp midpoint
+IMPORT "curves"
+PRINT CURVE_LERP(0.0, 100.0, 0.5)
+--- erwartet
+50.0
+
+=== smoothstep endpoints
+IMPORT "curves"
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 0.0)
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 1.0)
+--- erwartet
+0.0
+1.0
+
+=== smoothstep midpoint is half
+IMPORT "curves"
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 0.5)
+--- erwartet
+0.5
+
+=== smoothstep clamps below edge0
+IMPORT "curves"
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, -10.0)
+--- erwartet
+0.0
+
+=== smoothstep clamps above edge1
+IMPORT "curves"
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 99.0)
+--- erwartet
+1.0
+
+=== smoothstep zero edge diff returns zero
+' Defensiv: edge0 == edge1 wuerde durch 0 dividieren -> liefert 0.0.
+IMPORT "curves"
+PRINT CURVE_SMOOTHSTEP(5.0, 5.0, 5.0)
+--- erwartet
+0.0
+
+=== smootherstep endpoints
+IMPORT "curves"
+PRINT CURVE_SMOOTHERSTEP(0.0, 1.0, 0.0)
+PRINT CURVE_SMOOTHERSTEP(0.0, 1.0, 1.0)
+--- erwartet
+0.0
+1.0
+
+=== smootherstep midpoint
+IMPORT "curves"
+PRINT CURVE_SMOOTHERSTEP(0.0, 1.0, 0.5)
+--- erwartet
+0.5
+
+=== bezier starts at p0
+IMPORT "curves"
+PRINT CURVE_BEZIER(0.0, 1.0, 5.0, 7.0, 10.0)
+--- erwartet
+1.0
+
+=== bezier ends at p3
+IMPORT "curves"
+PRINT CURVE_BEZIER(1.0, 1.0, 5.0, 7.0, 10.0)
+--- erwartet
+10.0
+
+=== bezier midpoint with aligned handles
+' P0=0, P1=1/3, P2=2/3, P3=1: linear aufgereihte Handles -> B(0.5)=0.5.
+IMPORT "curves"
+PRINT CURVE_BEZIER(0.5, 0.0, 0.33333333333333333, 0.66666666666666667, 1.0)
+--- erwartet
+0.5
+
+=== bezier 2d returns tuple
+IMPORT "curves"
+PRINT CURVE_BEZIER2(0.5, 0.0, 0.0, 1.0, 1.0, 2.0, 1.0, 3.0, 0.0)
+--- erwartet
+(1.5, 0.75)
+
+=== bezier 2d endpoints
+IMPORT "curves"
+PRINT CURVE_BEZIER2(0.0, 10.0, 20.0, 0.0, 0.0, 0.0, 0.0, 30.0, 40.0)
+PRINT CURVE_BEZIER2(1.0, 10.0, 20.0, 0.0, 0.0, 0.0, 0.0, 30.0, 40.0)
+--- erwartet
+(10.0, 20.0)
+(30.0, 40.0)
+
+=== catmull passes through p1
+' Bei t=0 ist CURVE_CATMULL = p1 (mit Default-Tension 0.5).
+IMPORT "curves"
+PRINT CURVE_CATMULL(0.0, 0.0, 5.0, 10.0, 15.0)
+--- erwartet
+5.0
+
+=== catmull passes through p2 at t1
+' Bei t=1 ist CURVE_CATMULL = p2.
+IMPORT "curves"
+PRINT CURVE_CATMULL(1.0, 0.0, 5.0, 10.0, 15.0)
+--- erwartet
+10.0
+
+=== catmull 2d endpoints
+IMPORT "curves"
+PRINT CURVE_CATMULL2(0.0, 0.0, 0.0, 10.0, 10.0, 20.0, 20.0, 30.0, 30.0)
+PRINT CURVE_CATMULL2(1.0, 0.0, 0.0, 10.0, 10.0, 20.0, 20.0, 30.0, 30.0)
+--- erwartet
+(10.0, 10.0)
+(20.0, 20.0)
+
+=== hermite endpoints
+IMPORT "curves"
+PRINT CURVE_HERMITE(0.0, 5.0, 10.0, 0.0, 0.0)
+PRINT CURVE_HERMITE(1.0, 5.0, 10.0, 0.0, 0.0)
+--- erwartet
+5.0
+10.0
+
+=== hermite with zero tangents is smooth
+' Mit m0=m1=0 ist Hermite monoton steigend zwischen p0 und p1.
+IMPORT "curves"
+DIM i AS INTEGER
+FOR i = 0 TO 10
+    PRINT CURVE_HERMITE(i / 10.0, 0.0, 1.0, 0.0, 0.0)
+NEXT
+--- erwartet ungefaehr
+0.0
+0.028000000000000004
+0.10400000000000002
+0.21600000000000003
+0.3520000000000001
+0.5
+0.6480000000000001
+0.7839999999999999
+0.8960000000000001
+0.972
+1.0
+
+=== lerp rejects string
+IMPORT "curves"
+PRINT CURVE_LERP("nope", 1.0, 0.5)
+--- fehler
+CURVE_LERP erwartet Zahl, erhalten STRING
+
+=== bezier rejects bool
+IMPORT "curves"
+PRINT CURVE_BEZIER(TRUE, 0.0, 0.0, 0.0, 0.0)
+--- fehler
+CURVE_BEZIER erwartet Zahl, erhalten BOOLEAN
+
+=== curves in full program
+IMPORT "curves"
+PRINT CURVE_LERP(0.0, 100.0, 0.25)
+PRINT CURVE_SMOOTHSTEP(0.0, 1.0, 0.5)
+PRINT CURVE_BEZIER(0.0, 1.0, 2.0, 3.0, 4.0)
+--- erwartet
+25.0
+0.5
+1.0
+

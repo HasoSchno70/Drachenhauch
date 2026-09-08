@@ -1,0 +1,498 @@
+' Aus test_kodierung.py uebertragen (52 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== cp1252 tabelle stimmt mit python ueberein[128]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+gA==
+--- erwartet
+8364
+
+=== cp1252 tabelle stimmt mit python ueberein[129]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+gQ==
+--- erwartet
+129
+
+=== cp1252 tabelle stimmt mit python ueberein[130]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+gg==
+--- erwartet
+8218
+
+=== cp1252 tabelle stimmt mit python ueberein[131]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+gw==
+--- erwartet
+402
+
+=== cp1252 tabelle stimmt mit python ueberein[132]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+hA==
+--- erwartet
+8222
+
+=== cp1252 tabelle stimmt mit python ueberein[133]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+hQ==
+--- erwartet
+8230
+
+=== cp1252 tabelle stimmt mit python ueberein[134]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+hg==
+--- erwartet
+8224
+
+=== cp1252 tabelle stimmt mit python ueberein[135]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+hw==
+--- erwartet
+8225
+
+=== cp1252 tabelle stimmt mit python ueberein[136]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+iA==
+--- erwartet
+710
+
+=== cp1252 tabelle stimmt mit python ueberein[137]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+iQ==
+--- erwartet
+8240
+
+=== cp1252 tabelle stimmt mit python ueberein[138]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+ig==
+--- erwartet
+352
+
+=== cp1252 tabelle stimmt mit python ueberein[139]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+iw==
+--- erwartet
+8249
+
+=== cp1252 tabelle stimmt mit python ueberein[140]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+jA==
+--- erwartet
+338
+
+=== cp1252 tabelle stimmt mit python ueberein[141]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+jQ==
+--- erwartet
+141
+
+=== cp1252 tabelle stimmt mit python ueberein[142]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+jg==
+--- erwartet
+381
+
+=== cp1252 tabelle stimmt mit python ueberein[143]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+jw==
+--- erwartet
+143
+
+=== cp1252 tabelle stimmt mit python ueberein[144]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+kA==
+--- erwartet
+144
+
+=== cp1252 tabelle stimmt mit python ueberein[145]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+kQ==
+--- erwartet
+8216
+
+=== cp1252 tabelle stimmt mit python ueberein[146]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+kg==
+--- erwartet
+8217
+
+=== cp1252 tabelle stimmt mit python ueberein[147]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+kw==
+--- erwartet
+8220
+
+=== cp1252 tabelle stimmt mit python ueberein[148]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+lA==
+--- erwartet
+8221
+
+=== cp1252 tabelle stimmt mit python ueberein[149]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+lQ==
+--- erwartet
+8226
+
+=== cp1252 tabelle stimmt mit python ueberein[150]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+lg==
+--- erwartet
+8211
+
+=== cp1252 tabelle stimmt mit python ueberein[151]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+lw==
+--- erwartet
+8212
+
+=== cp1252 tabelle stimmt mit python ueberein[152]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+mA==
+--- erwartet
+732
+
+=== cp1252 tabelle stimmt mit python ueberein[153]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+mQ==
+--- erwartet
+8482
+
+=== cp1252 tabelle stimmt mit python ueberein[154]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+mg==
+--- erwartet
+353
+
+=== cp1252 tabelle stimmt mit python ueberein[155]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+mw==
+--- erwartet
+8250
+
+=== cp1252 tabelle stimmt mit python ueberein[156]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+nA==
+--- erwartet
+339
+
+=== cp1252 tabelle stimmt mit python ueberein[157]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+nQ==
+--- erwartet
+157
+
+=== cp1252 tabelle stimmt mit python ueberein[158]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+ng==
+--- erwartet
+382
+
+=== cp1252 tabelle stimmt mit python ueberein[159]
+' Die 32 Bytes, in denen sich cp1252 von latin1 unterscheidet -- jedes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "cp1252")
+PRINT ASC(t[0])
+--- datei b.txt base64
+nw==
+--- erwartet
+376
+
+=== latin1 ist die identitaet auf bytes
+DIM t AS ARRAY OF STRING
+t = READLINES("b.txt", "latin1")
+PRINT t[0]
+--- datei b.txt base64
+5Pb83w==
+--- erwartet
+äöüß
+
+=== excel csv laesst sich lesen
+' Der Fall, um den es geht.
+DIM t AS ARRAY OF STRING
+t = CSV_LOAD("kunden.csv", ";", "cp1252")
+PRINT DIMSIZE(t, 0)
+PRINT t[1, 0]
+PRINT t[2, 1]
+--- datei kunden.csv base64
+TmFtZTtPcnQ7VW1zYXR6Ck38bGxlcjtL9mxuOzEyNTAKU2NocvZkZXI7Tfxuc3Rlcjs4MzAK
+--- erwartet
+3
+Müller
+Münster
+
+=== ohne angabe erklaert die meldung den ausweg
+' Vorher stand da wortwoertlich 'stream did not contain valid UTF-8'.
+DIM t AS ARRAY OF STRING
+t = READLINES("k.csv")
+--- datei k.csv base64
+TmFtZQpN/GxsZXIK
+--- fehler
+READLINES: k.csv: Zeile 2 ist kein UTF-8 (Byte 0xFC an Stelle 6). Kommt die Datei aus Excel oder einem alten Windows-Programm, ist sie meist cp1252 -- dann als letztes Argument "cp1252" mitgeben. Moeglich sind: utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)
+
+=== unbekannte kodierung zaehlt die moeglichen auf
+DIM t AS ARRAY OF STRING
+t = READLINES("k.txt", "klingonisch")
+--- datei k.txt
+a
+--- fehler
+READLINES: Kodierung 'klingonisch' kenne ich nicht -- moeglich sind: utf8, cp1252 (= ansi, windows-1252), latin1 (= iso-8859-1)
+
+=== namen sind nachsichtig[cp1252]
+DIM t AS ARRAY OF STRING
+t = READLINES("k.txt", "cp1252")
+PRINT t[0]
+--- datei k.txt base64
+R3L832UK
+--- erwartet
+Grüße
+
+=== namen sind nachsichtig[CP-1252]
+DIM t AS ARRAY OF STRING
+t = READLINES("k.txt", "CP-1252")
+PRINT t[0]
+--- datei k.txt base64
+R3L832UK
+--- erwartet
+Grüße
+
+=== namen sind nachsichtig[windows-1252]
+DIM t AS ARRAY OF STRING
+t = READLINES("k.txt", "windows-1252")
+PRINT t[0]
+--- datei k.txt base64
+R3L832UK
+--- erwartet
+Grüße
+
+=== namen sind nachsichtig[ANSI]
+DIM t AS ARRAY OF STRING
+t = READLINES("k.txt", "ANSI")
+PRINT t[0]
+--- datei k.txt base64
+R3L832UK
+--- erwartet
+Grüße
+
+=== schreiben erzeugt echte cp1252 bytes
+WRITEALL("raus.txt", "Grüße;Köln", "cp1252")
+--- erwartet
+
+=== hin und zurueck
+WRITEALL("r.txt", "Straße in Köln", "cp1252")
+DIM t AS ARRAY OF STRING
+t = READLINES("r.txt", "cp1252")
+PRINT t[0]
+--- erwartet
+Straße in Köln
+
+=== anhaengen kann die kodierung auch
+WRITEALL("a.txt", "Köln" + CHR$(10), "cp1252")
+APPENDFILE("a.txt", "Münster" + CHR$(10), "cp1252")
+--- erwartet
+
+=== csv save mit kodierung
+DIM t AS ARRAY OF STRING
+t = CSV_PARSE("Müller;Köln", ";")
+CSV_SAVE("k.csv", t, ";", "cp1252")
+--- erwartet
+
+=== zeichen das es nicht gibt ist ein fehler
+' Kein stilles Fragezeichen: eine Rechnung, in der aus dem Euro-Zeichen
+WRITEALL("r.txt", "Preis 5 " + CHR$(8364), "latin1")
+--- fehler
+WRITEALL: das Zeichen '€' (U+20AC) gibt es in latin1 nicht -- die Datei in utf8 schreiben oder das Zeichen ersetzen
+
+=== euro geht in cp1252
+' cp1252 hat das Euro-Zeichen (0x80), latin1 nicht -- genau dafuer gibt
+WRITEALL("r.txt", CHR$(8364), "cp1252")
+--- erwartet
+
+=== openfile liest zeilenweise mit kodierung
+DIM f AS FILE
+DIM z AS STRING
+f = OPENFILE("gross.txt", "r", "cp1252")
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT z
+WEND
+CLOSEFILE(f)
+--- datei gross.txt base64
+TfxsbGVyClNjaHL2ZGVyCldlad8K
+--- erwartet
+Müller
+Schröder
+Weiß
+
+=== openfile schreibt mit kodierung
+DIM f AS FILE
+f = OPENFILE("w.txt", "w", "cp1252")
+WRITELINE(f, "Grüße")
+CLOSEFILE(f)
+--- erwartet
+
+=== readall auf dem handle kann es auch
+DIM f AS FILE
+f = OPENFILE("g.txt", "r", "cp1252")
+PRINT READALL$(f)
+CLOSEFILE(f)
+--- datei g.txt base64
+S/Zsbg==
+--- erwartet
+Köln
+
+=== bom faellt weg
+' Excel schreibt ihn -- sonst hiesse die erste Spalte fuer immer
+DIM t AS ARRAY OF STRING
+t = READLINES("b.csv")
+PRINT LEFT$(t[0], 4)
+--- datei b.csv
+﻿Name;Ort
+--- erwartet
+Name
+
+=== bom faellt auch beim zeilenweisen lesen weg
+DIM f AS FILE
+f = OPENFILE("b.csv", "r")
+PRINT LEFT$(READLINE(f), 4)
+CLOSEFILE(f)
+--- datei b.csv
+﻿Name
+Ort
+--- erwartet
+Name
+
+=== utf8 bleibt die vorgabe
+' Kein bestehendes Programm aendert sein Verhalten.
+DIM t AS ARRAY OF STRING
+t = READLINES("u.txt")
+PRINT t[0]
+PRINT LEN(t[0])
+--- datei u.txt
+Grüße 😀
+--- erwartet
+Grüße 😀
+7
+

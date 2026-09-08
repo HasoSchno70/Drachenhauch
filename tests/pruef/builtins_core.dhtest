@@ -1,0 +1,332 @@
+' Aus test_builtins_core.py uebertragen (50 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== sin cos zero
+PRINT SIN(0.0)
+PRINT COS(0.0)
+--- erwartet
+0.0
+1.0
+
+=== atan2 quadrants
+PRINT ATAN2(1.0, 0.0)
+PRINT ATAN2(0.0, 1.0)
+--- erwartet ungefaehr
+1.5707963267948966
+0.0
+
+=== floor ceil round
+PRINT FLOOR(3.7)
+PRINT CEIL(3.2)
+PRINT ROUND(2.5)
+--- erwartet
+3
+4
+2
+
+=== log one arg
+PRINT LOG(2.718281828459045)
+--- erwartet ungefaehr
+1.0
+
+=== log with base
+PRINT LOG(8, 2)
+--- erwartet ungefaehr
+3.0
+
+=== log negative raises
+PRINT LOG(-1)
+--- fehler
+LOG: Argument muss > 0 sein
+
+=== min max variadic
+PRINT MIN(5, 2, 9, 1, 7)
+PRINT MAX(5, 2, 9, 1, 7)
+--- erwartet
+1
+9
+
+=== min empty raises
+PRINT MIN()
+--- fehler
+MIN: mind. 1 Argument
+
+=== clamp
+PRINT CLAMP(-5, 0, 100)
+PRINT CLAMP(42, 0, 100)
+PRINT CLAMP(150, 0, 100)
+--- erwartet
+0
+42
+100
+
+=== sign
+PRINT SIGN(-3)
+PRINT SIGN(0)
+PRINT SIGN(7.5)
+--- erwartet
+-1
+0
+1
+
+=== sqr negative raises
+PRINT SQR(-1)
+--- fehler
+SQR von negativer Zahl
+
+=== abs
+PRINT ABS(-7)
+PRINT ABS(3.5)
+--- erwartet ungefaehr
+7
+3.5
+
+=== int truncates to floor
+PRINT INT(3.7)
+PRINT INT(-1.5)
+--- erwartet
+3
+-2
+
+=== rgb packing
+PRINT RGB(255, 128, 64)
+--- erwartet
+16744512
+
+=== rgb out of range raises
+PRINT RGB(300, 0, 0)
+--- fehler
+RGB-Werte muessen 0..255 sein
+
+=== rgb nimmt kommazahlen und rundet (1)
+' RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
+PRINT RGB(12.7, 0, 0)
+--- erwartet
+851968
+
+=== rgb nimmt kommazahlen und rundet (2)
+' RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
+PRINT RGB(12.2, 0, 0)
+--- erwartet
+786432
+
+=== rgb nimmt kommazahlen und rundet (3)
+' RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
+PRINT RGBA(0, 0, 0, 200.6)
+--- erwartet
+3372220416
+
+=== rgb nimmt kommazahlen und rundet (4)
+' RGB/RGBA runden eine Kommazahl, statt sie abzulehnen.
+DIM x AS INTEGER
+x = 320
+PRINT RGB(x * 255 / 640, 0, 0)
+--- erwartet
+8388608
+
+=== rgb bereich gilt auch gerundet
+' Gerundet heisst nicht geklemmt -- 255.6 wird 256 und ist zu gross.
+PRINT RGB(255.6, 0, 0)
+--- fehler
+RGB-Werte muessen 0..255 sein
+
+=== sin string raises
+PRINT SIN("nope")
+--- fehler
+SIN erwartet Zahl, erhalten STRING
+
+=== sin bool raises as not number
+PRINT SIN(TRUE)
+--- fehler
+SIN erwartet Zahl, erhalten BOOLEAN
+
+=== arity error message includes received count
+PRINT SIN(1.0, 2.0)
+--- fehler
+SIN: erwartet 1 Argument(e), erhalten 2
+
+=== upper lower aliases
+PRINT UPPER$("hallo")
+PRINT UPPER("hallo")
+PRINT LOWER$("HALLO")
+--- erwartet
+HALLO
+HALLO
+hallo
+
+=== left right mid
+PRINT LEFT$("TestString", 4)
+PRINT RIGHT$("TestString", 6)
+PRINT MID$("TestString", 4, 6)
+PRINT MID$("TestString", 4)
+--- erwartet
+Test
+String
+String
+String
+
+=== left negative clamped
+PRINT "[" + LEFT$("abc", -3) + "]"
+--- erwartet
+[]
+
+=== instr found and missing
+PRINT INSTR("hello world", "world")
+PRINT INSTR("hello", "xyz")
+--- erwartet
+6
+-1
+
+=== replace
+PRINT REPLACE$("a-b-c", "-", "_")
+--- erwartet
+a_b_c
+
+=== trim
+PRINT TRIM$("  hi  ")
+--- erwartet
+hi
+
+=== padl padr with default filler
+PRINT "[" + PADL$("x", 5) + "]"
+PRINT "[" + PADR$("x", 5) + "]"
+--- erwartet
+[    x]
+[x    ]
+
+=== padl with custom filler
+PRINT PADL$("42", 6, "0")
+--- erwartet
+000042
+
+=== repeat
+PRINT REPEAT$("ab", 3)
+--- erwartet
+ababab
+
+=== space
+PRINT "[" + SPACE$(4) + "]"
+--- erwartet
+[    ]
+
+=== hex
+PRINT HEX$(255)
+PRINT HEX$(51966)
+--- erwartet
+FF
+CAFE
+
+=== chr asc roundtrip
+PRINT CHR$(65)
+PRINT ASC("A")
+PRINT ASC("Abc")
+--- erwartet
+A
+65
+65
+
+=== str int
+PRINT STR$(42)
+--- erwartet
+42
+
+=== str float keeps decimal
+PRINT STR$(3.0)
+--- erwartet
+3.0
+
+=== str bool
+PRINT STR$(TRUE)
+PRINT STR$(FALSE)
+--- erwartet
+TRUE
+FALSE
+
+=== val
+PRINT VAL("42")
+PRINT VAL("3.14")
+PRINT VAL("xyz")
+--- erwartet
+42
+3.14
+0
+
+=== old bitwise builtins are gone (1)
+PRINT BITAND(0, 0)
+--- fehler
+Builtin 'BITAND' im Rust-Kern noch nicht verfuegbar
+
+=== old bitwise builtins are gone (2)
+PRINT BITOR(0, 0)
+--- fehler
+Builtin 'BITOR' im Rust-Kern noch nicht verfuegbar
+
+=== old bitwise builtins are gone (3)
+PRINT BITXOR(0, 0)
+--- fehler
+Builtin 'BITXOR' im Rust-Kern noch nicht verfuegbar
+
+=== old bitwise builtins are gone (4)
+PRINT BITNOT(0, 0)
+--- fehler
+Builtin 'BITNOT' im Rust-Kern noch nicht verfuegbar
+
+=== old bitwise builtins are gone (5)
+PRINT SHL(0, 0)
+--- fehler
+Unerwartetes Token SHL
+
+=== old bitwise builtins are gone (6)
+PRINT SHR(0, 0)
+--- fehler
+Unerwartetes Token SHR
+
+=== randomize makes rnd deterministic
+RANDOMIZE(42)
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    PRINT RND(100)
+NEXT
+RANDOMIZE(42)
+FOR i = 0 TO 4
+    PRINT RND(100)
+NEXT
+--- erwartet
+35
+50
+39
+29
+91
+35
+50
+39
+29
+91
+
+=== collides overlapping
+PRINT COLLIDES(0, 0, 10, 10, 5, 5, 10, 10)
+--- erwartet
+TRUE
+
+=== collides disjoint
+PRINT COLLIDES(0, 0, 10, 10, 100, 100, 10, 10)
+--- erwartet
+FALSE
+
+=== collides touching edges dont count
+PRINT COLLIDES(0, 0, 10, 10, 10, 0, 10, 10)
+--- erwartet
+FALSE
+
+=== time date format
+' Die Werte aendern sich, die Form nicht: TIME$ ist hh:mm:ss, DATE$ ist JJJJ-MM-TT.
+DIM t AS STRING : t = TIME$()
+DIM d AS STRING : d = DATE$()
+PRINT LEN(t)
+PRINT MID$(t, 2, 1) + MID$(t, 5, 1)
+PRINT LEN(d)
+PRINT MID$(d, 4, 1) + MID$(d, 7, 1)
+--- erwartet
+8
+::
+10
+--

@@ -1,0 +1,230 @@
+' Aus test_funcref.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== funcref basic (1)
+FUNCTION square(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = square
+PRINT f(5)
+--- erwartet
+25
+
+=== funcref basic (2)
+FUNCTION square(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = square
+PRINT f(5)
+--- erwartet
+25
+
+=== funcref reassign (1)
+FUNCTION square(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION cube(x AS INTEGER) AS INTEGER
+    RETURN x * x * x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = square
+PRINT f(4)
+f = cube
+PRINT f(3)
+--- erwartet
+16
+27
+
+=== funcref reassign (2)
+FUNCTION square(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+
+FUNCTION cube(x AS INTEGER) AS INTEGER
+    RETURN x * x * x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = square
+PRINT f(4)
+f = cube
+PRINT f(3)
+--- erwartet
+16
+27
+
+=== funcref passed as arg (1)
+' FUNCREF als Parameter -- klassischer Higher-Order-Use-Case.
+FUNCTION twice(f AS FUNCREF, x AS INTEGER) AS INTEGER
+    RETURN f(f(x))
+END FUNCTION
+
+FUNCTION inc(x AS INTEGER) AS INTEGER
+    RETURN x + 1
+END FUNCTION
+
+PRINT twice(inc, 5)
+--- erwartet
+7
+
+=== funcref passed as arg (2)
+' FUNCREF als Parameter -- klassischer Higher-Order-Use-Case.
+FUNCTION twice(f AS FUNCREF, x AS INTEGER) AS INTEGER
+    RETURN f(f(x))
+END FUNCTION
+
+FUNCTION inc(x AS INTEGER) AS INTEGER
+    RETURN x + 1
+END FUNCTION
+
+PRINT twice(inc, 5)
+--- erwartet
+7
+
+=== funcref print (1)
+FUNCTION foo(x AS INTEGER) AS INTEGER
+    RETURN x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = foo
+PRINT f
+--- erwartet
+<FUNCREF foo>
+
+=== funcref print (2)
+FUNCTION foo(x AS INTEGER) AS INTEGER
+    RETURN x
+END FUNCTION
+
+DIM f AS FUNCREF
+f = foo
+PRINT f
+--- erwartet
+<FUNCREF foo>
+
+=== funcref no closure locals (1)
+' Lambdas/FuncRefs sehen keine Locals des umgebenden Scopes -- sie
+CONST FACTOR = 10
+
+FUNCTION scale(x AS INTEGER) AS INTEGER
+    RETURN x * FACTOR
+END FUNCTION
+
+DIM f AS FUNCREF
+f = scale
+PRINT f(7)
+--- erwartet
+70
+
+=== funcref no closure locals (2)
+' Lambdas/FuncRefs sehen keine Locals des umgebenden Scopes -- sie
+CONST FACTOR = 10
+
+FUNCTION scale(x AS INTEGER) AS INTEGER
+    RETURN x * FACTOR
+END FUNCTION
+
+DIM f AS FUNCREF
+f = scale
+PRINT f(7)
+--- erwartet
+70
+
+=== funcref compose (1)
+' Kombination: FUNCREF an FUNCREF, beide gleich aufrufbar.
+FUNCTION add1(x AS INTEGER) AS INTEGER
+    RETURN x + 1
+END FUNCTION
+
+FUNCTION mul2(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+
+FUNCTION apply(f AS FUNCREF, g AS FUNCREF, x AS INTEGER) AS INTEGER
+    RETURN g(f(x))
+END FUNCTION
+
+PRINT apply(add1, mul2, 5)
+PRINT apply(mul2, add1, 5)
+--- erwartet
+12
+11
+
+=== funcref compose (2)
+' Kombination: FUNCREF an FUNCREF, beide gleich aufrufbar.
+FUNCTION add1(x AS INTEGER) AS INTEGER
+    RETURN x + 1
+END FUNCTION
+
+FUNCTION mul2(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+
+FUNCTION apply(f AS FUNCREF, g AS FUNCREF, x AS INTEGER) AS INTEGER
+    RETURN g(f(x))
+END FUNCTION
+
+PRINT apply(add1, mul2, 5)
+PRINT apply(mul2, add1, 5)
+--- erwartet
+12
+11
+
+=== funcref rejects non funcref (1)
+DIM f AS FUNCREF
+f = 42
+--- fehler
+Zuweisung an global: Erwartet FUNCREF, erhalten INTEGER
+
+=== funcref rejects non funcref (2)
+DIM f AS FUNCREF
+f = 42
+--- fehler
+Zuweisung an global: Erwartet FUNCREF, erhalten INTEGER
+
+=== calling non callable throws (1)
+' `x()` mit x = 42 wirft.
+DIM x AS INTEGER
+x = 42
+PRINT x()
+--- fehler
+'x' ist eine Variable vom Typ INTEGER und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl 'X' meinst: benenne die Variable um -- eine Variable mit festem Wert-Typ (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine FUNCREF schon.
+
+=== calling non callable throws (2)
+' `x()` mit x = 42 wirft.
+DIM x AS INTEGER
+x = 42
+PRINT x()
+--- fehler
+'x' ist eine Variable vom Typ INTEGER und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl 'X' meinst: benenne die Variable um -- eine Variable mit festem Wert-Typ (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine FUNCREF schon.
+
+=== user var shadows function (1)
+' Eine User-Variable mit gleichem Namen wie eine Function "verschattet"
+FUNCTION foo(x AS INTEGER) AS INTEGER
+    RETURN x
+END FUNCTION
+
+DIM foo AS INTEGER
+foo = 99
+PRINT foo
+--- erwartet
+99
+
+=== user var shadows function (2)
+' Eine User-Variable mit gleichem Namen wie eine Function "verschattet"
+FUNCTION foo(x AS INTEGER) AS INTEGER
+    RETURN x
+END FUNCTION
+
+DIM foo AS INTEGER
+foo = 99
+PRINT foo
+--- erwartet
+99
+

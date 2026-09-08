@@ -1,0 +1,192 @@
+' Aus test_enum.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== compact form auto values
+ENUM State = MENU, PLAYING, PAUSED
+PRINT State.MENU
+PRINT State.PLAYING
+PRINT State.PAUSED
+--- erwartet
+0
+1
+2
+
+=== compact form explicit values
+ENUM Color = RED = 1, GREEN = 2, BLUE = 4
+PRINT Color.RED
+PRINT Color.GREEN
+PRINT Color.BLUE
+--- erwartet
+1
+2
+4
+
+=== compact form mixed values
+' Nach explicit weiterzaehlen ab dem expliziten Wert + 1.
+ENUM E = A, B = 10, C, D = 20, E
+PRINT E.A
+PRINT E.B
+PRINT E.C
+PRINT E.D
+PRINT E.E
+--- erwartet
+0
+10
+11
+20
+21
+
+=== compact form negative value
+ENUM E = LOW = -1, ZERO, ONE
+PRINT E.LOW
+PRINT E.ZERO
+PRINT E.ONE
+--- erwartet
+-1
+0
+1
+
+=== block form auto values
+ENUM Dir
+    NORTH
+    SOUTH
+    EAST
+    WEST
+END ENUM
+PRINT Dir.NORTH
+PRINT Dir.SOUTH
+PRINT Dir.EAST
+PRINT Dir.WEST
+--- erwartet
+0
+1
+2
+3
+
+=== block form explicit values
+ENUM Permission
+    NONE = 0
+    READ = 1
+    WRITE = 2
+    EXEC = 4
+    RW = 3
+END ENUM
+PRINT Permission.NONE
+PRINT Permission.READ
+PRINT Permission.WRITE
+PRINT Permission.EXEC
+PRINT Permission.RW
+--- erwartet
+0
+1
+2
+4
+3
+
+=== keyword member names allowed
+' READ, FILE, DATA, NONE etc. sind GB-Keywords, sollten aber als
+ENUM Tag = NEW, READ, DATA, FILE
+PRINT Tag.NEW
+PRINT Tag.READ
+PRINT Tag.DATA
+PRINT Tag.FILE
+--- erwartet
+0
+1
+2
+3
+
+=== dim as enum works like integer
+ENUM State = MENU, PLAYING
+DIM s AS State
+PRINT s
+s = State.PLAYING
+PRINT s
+--- erwartet
+0
+1
+
+=== dim as enum accepts int assignment
+' ENUM-Wert ist Integer, also ist auch direkter Int-Zuweisung erlaubt.
+ENUM State = MENU, PLAYING
+DIM s AS State
+s = 42
+PRINT s
+--- erwartet
+42
+
+=== enum value in arithmetic
+ENUM E = A = 10, B = 20
+PRINT E.A + E.B
+PRINT E.B - E.A
+--- erwartet
+30
+10
+
+=== enum in select case
+ENUM Mood = HAPPY, SAD, ANGRY
+DIM m AS Mood
+m = Mood.SAD
+SELECT CASE m
+    CASE Mood.HAPPY
+        PRINT "froh"
+    CASE Mood.SAD
+        PRINT "traurig"
+    CASE ELSE
+        PRINT "sonstwas"
+END SELECT
+--- erwartet
+traurig
+
+=== unknown member raises
+ENUM E = A, B
+PRINT E.SCHWURBEL
+--- fehler
+e hat keinen Member 'schwurbel'
+
+=== duplicate member raises
+ENUM E = A, A, B
+--- fehler
+ENUM: Member doppelt deklariert
+
+=== no members raises
+ENUM Empty
+END ENUM
+--- fehler
+ENUM: mindestens ein Member erforderlich
+
+=== non literal value raises
+' ENUM-Member-Werte muessen Compile-Time-Integer-Literale sein - keine
+CONST N AS INTEGER = 5
+ENUM E = A = N
+--- fehler
+ENUM e.a: Wert muss Integer-Literal sein
+
+=== redeclaration with different members raises
+' Tree-Walker: zweite ENUM-Deklaration mit anderen Members -> Fehler.
+ENUM E = A, B
+ENUM E = X, Y
+--- fehler
+ENUM e: Name ist bereits anderweitig vergeben
+
+=== redeclaration idempotent
+' Identische zweite Deklaration ist OK (z.B. via doppeltem IMPORT).
+ENUM E = A, B
+ENUM E = A, B
+PRINT E.A
+--- erwartet
+0
+
+=== tw and vm produce same output
+ENUM Color
+    RED = 1
+    GREEN = 2
+    BLUE = 4
+END ENUM
+DIM c AS Color
+c = Color.GREEN
+PRINT c
+PRINT Color.RED + Color.BLUE
+--- erwartet
+2
+5
+

@@ -1,0 +1,406 @@
+' Aus test_select_case.py uebertragen (28 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== select treewalker[DIM x AS INTEGER\nx = 2\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\n    CASE 2\n        PRINT "zwei"\n    CASE 3\n        PRINT "drei"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-zwei\n]
+DIM x AS INTEGER
+x = 2
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+    CASE 2
+        PRINT "zwei"
+    CASE 3
+        PRINT "drei"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+zwei
+
+=== select treewalker[DIM x AS INTEGER\nx = 3\nSELECT CASE x\n    CASE 1, 2, 3\n        PRINT "klein"\n    CASE 4, 5, 6\n        PRINT "mittel"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-klein\n]
+DIM x AS INTEGER
+x = 3
+SELECT CASE x
+    CASE 1, 2, 3
+        PRINT "klein"
+    CASE 4, 5, 6
+        PRINT "mittel"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+klein
+
+=== select treewalker[DIM x AS INTEGER\nx = 50\nSELECT CASE x\n    CASE 0 TO 10\n        PRINT "winzig"\n    CASE 11 TO 100\n        PRINT "klein"\n    CASE 101 TO 1000\n        PRINT "mittel"\n    CASE ELSE\n        PRINT "gross"\nEND SELECT\n-klein\n]
+DIM x AS INTEGER
+x = 50
+SELECT CASE x
+    CASE 0 TO 10
+        PRINT "winzig"
+    CASE 11 TO 100
+        PRINT "klein"
+    CASE 101 TO 1000
+        PRINT "mittel"
+    CASE ELSE
+        PRINT "gross"
+END SELECT
+--- erwartet
+klein
+
+=== select treewalker[DIM x AS INTEGER\nx = 4\nSELECT CASE x\n    CASE 1, 2 TO 5, 9\n        PRINT "ausgewaehlt"\n    CASE ELSE\n        PRINT "nicht"\nEND SELECT\n-ausgewaehlt\n]
+DIM x AS INTEGER
+x = 4
+SELECT CASE x
+    CASE 1, 2 TO 5, 9
+        PRINT "ausgewaehlt"
+    CASE ELSE
+        PRINT "nicht"
+END SELECT
+--- erwartet
+ausgewaehlt
+
+=== select treewalker[DIM s AS STRING\ns = "hilfe"\nSELECT CASE s\n    CASE "start", "go"\n        PRINT "spiel"\n    CASE "hilfe", "?"\n        PRINT "info"\n    CASE ELSE\n        PRINT "unbekannt"\nEND SELECT\n-info\n]
+DIM s AS STRING
+s = "hilfe"
+SELECT CASE s
+    CASE "start", "go"
+        PRINT "spiel"
+    CASE "hilfe", "?"
+        PRINT "info"
+    CASE ELSE
+        PRINT "unbekannt"
+END SELECT
+--- erwartet
+info
+
+=== select treewalker[DIM x AS INTEGER\nx = 99\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\n    CASE 2 TO 10\n        PRINT "klein"\n    CASE ELSE\n        PRINT "fallback"\nEND SELECT\n-fallback\n]
+DIM x AS INTEGER
+x = 99
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+    CASE 2 TO 10
+        PRINT "klein"
+    CASE ELSE
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+
+=== select treewalker[DIM x AS INTEGER\nx = 99\nPRINT "vor"\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\nEND SELECT\nPRINT "nach"\n-vor\nnach\n]
+DIM x AS INTEGER
+x = 99
+PRINT "vor"
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+END SELECT
+PRINT "nach"
+--- erwartet
+vor
+nach
+
+=== select treewalker[DIM x AS INTEGER\nx = 5\nSELECT CASE x\n    CASE 1 TO 10\n        PRINT "erster"\n    CASE 5\n        PRINT "zweiter (nie)"\nEND SELECT\n-erster\n]
+DIM x AS INTEGER
+x = 5
+SELECT CASE x
+    CASE 1 TO 10
+        PRINT "erster"
+    CASE 5
+        PRINT "zweiter (nie)"
+END SELECT
+--- erwartet
+erster
+
+=== select treewalker[DIM a AS INTEGER\nDIM b AS INTEGER\na = 1\nb = 20\nSELECT CASE a\n    CASE 1\n        SELECT CASE b\n            CASE 0 TO 10\n                PRINT "a=1, b klein"\n            CASE 11 TO 100\n                PRINT "a=1, b mittel"\n        END SELECT\n    CASE 2\n        PRINT "a=2"\nEND SELECT\n-a=1, b mittel\n]
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = 1
+b = 20
+SELECT CASE a
+    CASE 1
+        SELECT CASE b
+            CASE 0 TO 10
+                PRINT "a=1, b klein"
+            CASE 11 TO 100
+                PRINT "a=1, b mittel"
+        END SELECT
+    CASE 2
+        PRINT "a=2"
+END SELECT
+--- erwartet
+a=1, b mittel
+
+=== select treewalker[DIM x AS INTEGER\nx = 150\nSELECT CASE x\n    CASE IS <= 0\n        PRINT "negativ"\n    CASE IS < 100\n        PRINT "klein"\n    CASE IS >= 100\n        PRINT "gross"\nEND SELECT\n-gross\n]
+DIM x AS INTEGER
+x = 150
+SELECT CASE x
+    CASE IS <= 0
+        PRINT "negativ"
+    CASE IS < 100
+        PRINT "klein"
+    CASE IS >= 100
+        PRINT "gross"
+END SELECT
+--- erwartet
+gross
+
+=== select treewalker[DIM x AS INTEGER\nx = 5\nSELECT CASE x\n    CASE IS <> 5\n        PRINT "anders"\n    CASE ELSE\n        PRINT "fuenf"\nEND SELECT\n-fuenf\n]
+DIM x AS INTEGER
+x = 5
+SELECT CASE x
+    CASE IS <> 5
+        PRINT "anders"
+    CASE ELSE
+        PRINT "fuenf"
+END SELECT
+--- erwartet
+fuenf
+
+=== select treewalker[DIM x AS INTEGER\nx = 3\nSELECT CASE x\n    CASE 1, IS > 100\n        PRINT "eins-oder-gross"\n    CASE 2 TO 5, IS = 10\n        PRINT "klein-oder-zehn"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-klein-oder-zehn\n]
+DIM x AS INTEGER
+x = 3
+SELECT CASE x
+    CASE 1, IS > 100
+        PRINT "eins-oder-gross"
+    CASE 2 TO 5, IS = 10
+        PRINT "klein-oder-zehn"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+klein-oder-zehn
+
+=== select vm[DIM x AS INTEGER\nx = 2\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\n    CASE 2\n        PRINT "zwei"\n    CASE 3\n        PRINT "drei"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-zwei\n]
+DIM x AS INTEGER
+x = 2
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+    CASE 2
+        PRINT "zwei"
+    CASE 3
+        PRINT "drei"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+zwei
+
+=== select vm[DIM x AS INTEGER\nx = 3\nSELECT CASE x\n    CASE 1, 2, 3\n        PRINT "klein"\n    CASE 4, 5, 6\n        PRINT "mittel"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-klein\n]
+DIM x AS INTEGER
+x = 3
+SELECT CASE x
+    CASE 1, 2, 3
+        PRINT "klein"
+    CASE 4, 5, 6
+        PRINT "mittel"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+klein
+
+=== select vm[DIM x AS INTEGER\nx = 50\nSELECT CASE x\n    CASE 0 TO 10\n        PRINT "winzig"\n    CASE 11 TO 100\n        PRINT "klein"\n    CASE 101 TO 1000\n        PRINT "mittel"\n    CASE ELSE\n        PRINT "gross"\nEND SELECT\n-klein\n]
+DIM x AS INTEGER
+x = 50
+SELECT CASE x
+    CASE 0 TO 10
+        PRINT "winzig"
+    CASE 11 TO 100
+        PRINT "klein"
+    CASE 101 TO 1000
+        PRINT "mittel"
+    CASE ELSE
+        PRINT "gross"
+END SELECT
+--- erwartet
+klein
+
+=== select vm[DIM x AS INTEGER\nx = 4\nSELECT CASE x\n    CASE 1, 2 TO 5, 9\n        PRINT "ausgewaehlt"\n    CASE ELSE\n        PRINT "nicht"\nEND SELECT\n-ausgewaehlt\n]
+DIM x AS INTEGER
+x = 4
+SELECT CASE x
+    CASE 1, 2 TO 5, 9
+        PRINT "ausgewaehlt"
+    CASE ELSE
+        PRINT "nicht"
+END SELECT
+--- erwartet
+ausgewaehlt
+
+=== select vm[DIM s AS STRING\ns = "hilfe"\nSELECT CASE s\n    CASE "start", "go"\n        PRINT "spiel"\n    CASE "hilfe", "?"\n        PRINT "info"\n    CASE ELSE\n        PRINT "unbekannt"\nEND SELECT\n-info\n]
+DIM s AS STRING
+s = "hilfe"
+SELECT CASE s
+    CASE "start", "go"
+        PRINT "spiel"
+    CASE "hilfe", "?"
+        PRINT "info"
+    CASE ELSE
+        PRINT "unbekannt"
+END SELECT
+--- erwartet
+info
+
+=== select vm[DIM x AS INTEGER\nx = 99\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\n    CASE 2 TO 10\n        PRINT "klein"\n    CASE ELSE\n        PRINT "fallback"\nEND SELECT\n-fallback\n]
+DIM x AS INTEGER
+x = 99
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+    CASE 2 TO 10
+        PRINT "klein"
+    CASE ELSE
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+
+=== select vm[DIM x AS INTEGER\nx = 99\nPRINT "vor"\nSELECT CASE x\n    CASE 1\n        PRINT "eins"\nEND SELECT\nPRINT "nach"\n-vor\nnach\n]
+DIM x AS INTEGER
+x = 99
+PRINT "vor"
+SELECT CASE x
+    CASE 1
+        PRINT "eins"
+END SELECT
+PRINT "nach"
+--- erwartet
+vor
+nach
+
+=== select vm[DIM x AS INTEGER\nx = 5\nSELECT CASE x\n    CASE 1 TO 10\n        PRINT "erster"\n    CASE 5\n        PRINT "zweiter (nie)"\nEND SELECT\n-erster\n]
+DIM x AS INTEGER
+x = 5
+SELECT CASE x
+    CASE 1 TO 10
+        PRINT "erster"
+    CASE 5
+        PRINT "zweiter (nie)"
+END SELECT
+--- erwartet
+erster
+
+=== select vm[DIM a AS INTEGER\nDIM b AS INTEGER\na = 1\nb = 20\nSELECT CASE a\n    CASE 1\n        SELECT CASE b\n            CASE 0 TO 10\n                PRINT "a=1, b klein"\n            CASE 11 TO 100\n                PRINT "a=1, b mittel"\n        END SELECT\n    CASE 2\n        PRINT "a=2"\nEND SELECT\n-a=1, b mittel\n]
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = 1
+b = 20
+SELECT CASE a
+    CASE 1
+        SELECT CASE b
+            CASE 0 TO 10
+                PRINT "a=1, b klein"
+            CASE 11 TO 100
+                PRINT "a=1, b mittel"
+        END SELECT
+    CASE 2
+        PRINT "a=2"
+END SELECT
+--- erwartet
+a=1, b mittel
+
+=== select vm[DIM x AS INTEGER\nx = 150\nSELECT CASE x\n    CASE IS <= 0\n        PRINT "negativ"\n    CASE IS < 100\n        PRINT "klein"\n    CASE IS >= 100\n        PRINT "gross"\nEND SELECT\n-gross\n]
+DIM x AS INTEGER
+x = 150
+SELECT CASE x
+    CASE IS <= 0
+        PRINT "negativ"
+    CASE IS < 100
+        PRINT "klein"
+    CASE IS >= 100
+        PRINT "gross"
+END SELECT
+--- erwartet
+gross
+
+=== select vm[DIM x AS INTEGER\nx = 5\nSELECT CASE x\n    CASE IS <> 5\n        PRINT "anders"\n    CASE ELSE\n        PRINT "fuenf"\nEND SELECT\n-fuenf\n]
+DIM x AS INTEGER
+x = 5
+SELECT CASE x
+    CASE IS <> 5
+        PRINT "anders"
+    CASE ELSE
+        PRINT "fuenf"
+END SELECT
+--- erwartet
+fuenf
+
+=== select vm[DIM x AS INTEGER\nx = 3\nSELECT CASE x\n    CASE 1, IS > 100\n        PRINT "eins-oder-gross"\n    CASE 2 TO 5, IS = 10\n        PRINT "klein-oder-zehn"\n    CASE ELSE\n        PRINT "anders"\nEND SELECT\n-klein-oder-zehn\n]
+DIM x AS INTEGER
+x = 3
+SELECT CASE x
+    CASE 1, IS > 100
+        PRINT "eins-oder-gross"
+    CASE 2 TO 5, IS = 10
+        PRINT "klein-oder-zehn"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+--- erwartet
+klein-oder-zehn
+
+=== subject evaluated once treewalker
+DIM aufrufe AS INTEGER
+aufrufe = 0
+
+FUNCTION zaehl() AS INTEGER
+    aufrufe = aufrufe + 1
+    RETURN 5
+END FUNCTION
+
+SELECT CASE zaehl()
+    CASE 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+        PRINT "match"
+    CASE ELSE
+        PRINT "nope"
+END SELECT
+PRINT "aufrufe=", aufrufe
+--- erwartet
+match
+aufrufe= 1
+
+=== subject evaluated once vm
+DIM aufrufe AS INTEGER
+aufrufe = 0
+
+FUNCTION zaehl() AS INTEGER
+    aufrufe = aufrufe + 1
+    RETURN 5
+END FUNCTION
+
+SELECT CASE zaehl()
+    CASE 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+        PRINT "match"
+    CASE ELSE
+        PRINT "nope"
+END SELECT
+PRINT "aufrufe=", aufrufe
+--- erwartet
+match
+aufrufe= 1
+
+=== select parse error double else
+DIM x AS INTEGER
+x = 1
+SELECT CASE x
+    CASE ELSE
+        PRINT "a"
+    CASE ELSE
+        PRINT "b"
+END SELECT
+--- fehler
+CASE nach CASE ELSE - ELSE muss letzter Fall sein
+
+=== select parse error case after else
+DIM x AS INTEGER
+x = 1
+SELECT CASE x
+    CASE ELSE
+        PRINT "a"
+    CASE 1
+        PRINT "b"
+END SELECT
+--- fehler
+CASE nach CASE ELSE - ELSE muss letzter Fall sein
+

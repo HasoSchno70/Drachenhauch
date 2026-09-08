@@ -1,0 +1,148 @@
+' Aus test_modules_json.py uebertragen (15 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== external type is usable
+' `DIM h AS JSON_HANDLE` kompiliert + laeuft -> dhrt kennt den Typ.
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": 1}")
+PRINT JSON_GET_INT(h, "a")
+--- erwartet
+1
+
+=== parse simple object
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": 1, ""b"": ""x""}")
+PRINT JSON_GET_INT(h, "a")
+PRINT JSON_GET_STRING(h, "b")
+--- erwartet
+1
+x
+
+=== parse nested path
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""u"": {""name"": ""Anna"", ""age"": 30}}")
+PRINT JSON_GET_STRING(h, "u.name")
+PRINT JSON_GET_INT(h, "u.age")
+--- erwartet
+Anna
+30
+
+=== parse array index in path
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""items"": [10, 20, 30]}")
+PRINT JSON_GET_INT(h, "items.0")
+PRINT JSON_GET_INT(h, "items.2")
+--- erwartet
+10
+30
+
+=== get int accepts integer float
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""x"": 5.0}")
+PRINT JSON_GET_INT(h, "x")
+--- erwartet
+5
+
+=== get int rejects non integer float
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""x"": 3.14}")
+PRINT JSON_GET_INT(h, "x")
+--- fehler
+JSON_GET_INT: kein Integer
+
+=== get string rejects number
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""x"": 1}")
+PRINT JSON_GET_STRING(h, "x")
+--- fehler
+JSON_GET_STRING: Pfad 'x' ist kein String
+
+=== has present and missing
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": 1}")
+PRINT JSON_HAS(h, "a")
+PRINT JSON_HAS(h, "b")
+--- erwartet
+TRUE
+FALSE
+
+=== len array object string
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": [1,2,3], ""b"": {""x"": 1, ""y"": 2}, ""c"": ""hi""}")
+PRINT JSON_LEN(h, "a")
+PRINT JSON_LEN(h, "b")
+PRINT JSON_LEN(h, "c")
+--- erwartet
+3
+2
+2
+
+=== type classification
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""i"": 1, ""f"": 1.5, ""s"": ""x"", ""b"": true, ""n"": null, ""a"": [], ""o"": {}}")
+PRINT JSON_TYPE(h, "i")
+PRINT JSON_TYPE(h, "f")
+PRINT JSON_TYPE(h, "s")
+PRINT JSON_TYPE(h, "b")
+PRINT JSON_TYPE(h, "n")
+PRINT JSON_TYPE(h, "a")
+PRINT JSON_TYPE(h, "o")
+PRINT JSON_TYPE(h, "missing")
+--- erwartet
+number
+number
+string
+boolean
+null
+array
+object
+missing
+
+=== stringify roundtrip
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": 1, ""b"": [2, 3]}")
+PRINT JSON_STRINGIFY(h)
+--- erwartet
+{"a":1,"b":[2,3]}
+
+=== pretty indents
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""a"": 1}")
+PRINT JSON_PRETTY(h)
+--- erwartet
+{
+  "a": 1
+}
+
+=== parse invalid raises
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{not valid json")
+--- fehler
+JSON_PARSE: key must be a string at line 1 column 2
+
+=== path into non container raises
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_PARSE("{""x"": 1}")
+PRINT JSON_GET_INT(h, "x.y")
+--- fehler
+JSON_GET_INT: Pfad 'x.y' nicht aufloesbar
+
+=== handle check in get
+IMPORT "json"
+PRINT JSON_GET_STRING("nicht ein handle", "x")
+--- fehler
+JSON_GET_STRING erwartet JSON-Handle (aus JSON_PARSE)
+

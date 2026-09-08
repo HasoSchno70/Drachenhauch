@@ -1,0 +1,133 @@
+' Aus test_modules_timer.py uebertragen (6 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== after fires once then clears
+IMPORT "timer"
+SUB warte(ms AS INTEGER)
+    DIM bis AS INTEGER
+    bis = MILLIS() + ms
+    WHILE MILLIS() < bis
+    WEND
+END SUB
+SUB peng()
+    PRINT "peng"
+END SUB
+DIM id AS INTEGER
+id = TIMER_AFTER(40, peng)
+TIMER_UPDATE()
+PRINT "vorher"
+PRINT TIMER_ACTIVE(id)
+warte(80)
+TIMER_UPDATE()
+PRINT TIMER_ACTIVE(id)
+TIMER_UPDATE()
+PRINT TIMER_COUNT()
+--- erwartet
+vorher
+TRUE
+peng
+FALSE
+0
+
+=== every refires until cancel
+IMPORT "timer"
+SUB warte(ms AS INTEGER)
+    DIM bis AS INTEGER
+    bis = MILLIS() + ms
+    WHILE MILLIS() < bis
+    WEND
+END SUB
+SUB tick()
+    PRINT "tick"
+END SUB
+DIM id AS INTEGER
+id = TIMER_EVERY(20, tick)
+warte(40)
+TIMER_UPDATE()
+warte(40)
+TIMER_UPDATE()
+TIMER_CANCEL(id)
+warte(40)
+TIMER_UPDATE()
+PRINT TIMER_ACTIVE(id)
+TIMER_CANCEL(id)
+TIMER_CANCEL(999)
+--- erwartet
+tick
+tick
+FALSE
+
+=== after zero fires on next update
+IMPORT "timer"
+SUB f()
+    PRINT "jetzt"
+END SUB
+TIMER_AFTER(0, f)
+TIMER_UPDATE()
+--- erwartet
+jetzt
+
+=== cooldown locks and frees
+IMPORT "timer"
+PRINT COOLDOWN("a", 60000)
+PRINT COOLDOWN("a", 60000)
+PRINT COOLDOWN("b", 60000)
+PRINT COOLDOWN("c", 0)
+PRINT COOLDOWN("c", 0)
+TIMER_CLEAR()
+PRINT COOLDOWN("a", 60000)
+--- erwartet
+TRUE
+FALSE
+TRUE
+TRUE
+TRUE
+TRUE
+
+=== validation messages
+IMPORT "timer"
+SUB f()
+END SUB
+TRY
+    TIMER_AFTER(-1, f)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    TIMER_EVERY(0, f)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    TIMER_AFTER(10, 5)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    COOLDOWN("x", -1)
+CATCH e
+    PRINT e
+END TRY
+--- erwartet
+TIMER_AFTER: ms muss >= 0 sein
+TIMER_EVERY: ms muss > 0 sein
+TIMER_AFTER: erwartet FUNCREF (Arg 2)
+COOLDOWN: ms muss >= 0 sein
+
+=== callback may register new timer
+IMPORT "timer"
+SUB zweiter()
+    PRINT "zwei"
+END SUB
+SUB erster()
+    PRINT "eins"
+    TIMER_AFTER(0, zweiter)
+END SUB
+TIMER_AFTER(0, erster)
+TIMER_UPDATE()
+PRINT TIMER_COUNT()
+TIMER_UPDATE()
+--- erwartet
+eins
+1
+zwei
+

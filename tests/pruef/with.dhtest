@@ -1,0 +1,322 @@
+' Aus test_with.py uebertragen (16 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== with basic member assign (1)
+CLASS Player
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM hp AS INTEGER
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+WITH p
+    .x = 10
+    .y = 20
+    .hp = 100
+END WITH
+PRINT p.x, p.y, p.hp
+--- erwartet
+10 20 100
+
+=== with basic member assign (2)
+CLASS Player
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM hp AS INTEGER
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+WITH p
+    .x = 10
+    .y = 20
+    .hp = 100
+END WITH
+PRINT p.x, p.y, p.hp
+--- erwartet
+10 20 100
+
+=== with member in expression (1)
+' `.member` als Read-Expression, nicht nur als Assign-Target.
+CLASS Vec
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+END CLASS
+
+DIM v AS Vec
+v = NEW Vec()
+v.x = 3.0
+v.y = 4.0
+DIM len AS FLOAT
+WITH v
+    len = SQR(.x * .x + .y * .y)
+END WITH
+PRINT len
+--- erwartet
+5.0
+
+=== with member in expression (2)
+' `.member` als Read-Expression, nicht nur als Assign-Target.
+CLASS Vec
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+END CLASS
+
+DIM v AS Vec
+v = NEW Vec()
+v.x = 3.0
+v.y = 4.0
+DIM len AS FLOAT
+WITH v
+    len = SQR(.x * .x + .y * .y)
+END WITH
+PRINT len
+--- erwartet
+5.0
+
+=== with target evaluated once (1)
+' Side-Effects im WITH-Target laufen genau einmal.
+CLASS Box
+    DIM v AS INTEGER
+END CLASS
+
+DIM counter AS INTEGER
+counter = 0
+
+FUNCTION getbox() AS Box
+    counter = counter + 1
+    DIM b AS Box
+    b = NEW Box()
+    b.v = 42
+    RETURN b
+END FUNCTION
+
+WITH getbox()
+    .v = 100
+    .v = .v + 1
+    .v = .v + 1
+END WITH
+PRINT counter
+--- erwartet
+1
+
+=== with target evaluated once (2)
+' Side-Effects im WITH-Target laufen genau einmal.
+CLASS Box
+    DIM v AS INTEGER
+END CLASS
+
+DIM counter AS INTEGER
+counter = 0
+
+FUNCTION getbox() AS Box
+    counter = counter + 1
+    DIM b AS Box
+    b = NEW Box()
+    b.v = 42
+    RETURN b
+END FUNCTION
+
+WITH getbox()
+    .v = 100
+    .v = .v + 1
+    .v = .v + 1
+END WITH
+PRINT counter
+--- erwartet
+1
+
+=== with compound assign (1)
+' `.x += 5` im WITH-Block.
+CLASS Score
+    DIM points AS INTEGER
+END CLASS
+
+DIM s AS Score
+s = NEW Score()
+s.points = 10
+WITH s
+    .points += 5
+    .points *= 2
+END WITH
+PRINT s.points
+--- erwartet
+30
+
+=== with compound assign (2)
+' `.x += 5` im WITH-Block.
+CLASS Score
+    DIM points AS INTEGER
+END CLASS
+
+DIM s AS Score
+s = NEW Score()
+s.points = 10
+WITH s
+    .points += 5
+    .points *= 2
+END WITH
+PRINT s.points
+--- erwartet
+30
+
+=== nested with innermost wins (1)
+' Verschachtelte WITHs -- innerster Block bezieht sich auf eigenes Ziel.
+CLASS Outer
+    DIM tag AS STRING
+    DIM inner AS Inner
+END CLASS
+
+CLASS Inner
+    DIM val AS INTEGER
+END CLASS
+
+DIM o AS Outer
+o = NEW Outer()
+o.inner = NEW Inner()
+WITH o
+    .tag = "outer"
+    WITH .inner
+        .val = 99
+    END WITH
+END WITH
+PRINT o.tag
+PRINT o.inner.val
+--- erwartet
+outer
+99
+
+=== nested with innermost wins (2)
+' Verschachtelte WITHs -- innerster Block bezieht sich auf eigenes Ziel.
+CLASS Outer
+    DIM tag AS STRING
+    DIM inner AS Inner
+END CLASS
+
+CLASS Inner
+    DIM val AS INTEGER
+END CLASS
+
+DIM o AS Outer
+o = NEW Outer()
+o.inner = NEW Inner()
+WITH o
+    .tag = "outer"
+    WITH .inner
+        .val = 99
+    END WITH
+END WITH
+PRINT o.tag
+PRINT o.inner.val
+--- erwartet
+outer
+99
+
+=== with chains subaccess (1)
+' `.inner.x = 1` chained access from WITH-Target.
+CLASS Inner
+    DIM v AS INTEGER
+END CLASS
+
+CLASS Outer
+    DIM inner AS Inner
+END CLASS
+
+DIM o AS Outer
+o = NEW Outer()
+o.inner = NEW Inner()
+WITH o
+    .inner.v = 7
+END WITH
+PRINT o.inner.v
+--- erwartet
+7
+
+=== with chains subaccess (2)
+' `.inner.x = 1` chained access from WITH-Target.
+CLASS Inner
+    DIM v AS INTEGER
+END CLASS
+
+CLASS Outer
+    DIM inner AS Inner
+END CLASS
+
+DIM o AS Outer
+o = NEW Outer()
+o.inner = NEW Inner()
+WITH o
+    .inner.v = 7
+END WITH
+PRINT o.inner.v
+--- erwartet
+7
+
+=== with dotted name invisible to user (1)
+' User-Code kann `__with_0` nicht sehen oder neu deklarieren --
+CLASS P
+    DIM v AS INTEGER
+END CLASS
+
+DIM x AS INTEGER
+x = 999
+DIM p AS P
+p = NEW P()
+WITH p
+    .v = 1
+END WITH
+PRINT x
+--- erwartet
+999
+
+=== with dotted name invisible to user (2)
+' User-Code kann `__with_0` nicht sehen oder neu deklarieren --
+CLASS P
+    DIM v AS INTEGER
+END CLASS
+
+DIM x AS INTEGER
+x = 999
+DIM p AS P
+p = NEW P()
+WITH p
+    .v = 1
+END WITH
+PRINT x
+--- erwartet
+999
+
+=== punkt zuweisung im einzeiligen if
+' `IF ok THEN .hp = 0` in einem WITH-Block.
+CLASS P
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+DIM ok AS BOOLEAN
+ok = TRUE
+WITH p
+    IF ok THEN .hp = 0
+END WITH
+PRINT p.hp
+--- erwartet
+0
+
+=== punkt zuweisung haengt an der bedingung
+' Gegenprobe: bei falscher Bedingung bleibt der Wert stehen.
+CLASS P
+    DIM hp AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+DIM ok AS BOOLEAN
+ok = FALSE
+WITH p
+    IF ok THEN .hp = 0
+END WITH
+PRINT p.hp
+--- erwartet
+5
+

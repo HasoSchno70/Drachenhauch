@@ -1,0 +1,226 @@
+' Aus test_method_syntax.py uebertragen (26 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== string upper lower (1)
+DIM s AS STRING
+s = "Hallo"
+PRINT s.upper()
+PRINT s.lower()
+--- erwartet
+HALLO
+hallo
+
+=== string upper lower (2)
+DIM s AS STRING
+s = "Hallo"
+PRINT s.upper()
+PRINT s.lower()
+--- erwartet
+HALLO
+hallo
+
+=== string length (1)
+PRINT "abc".length()
+PRINT "".length()
+--- erwartet
+3
+0
+
+=== string length (2)
+PRINT "abc".length()
+PRINT "".length()
+--- erwartet
+3
+0
+
+=== string trim (1)
+PRINT "[" + "  hi  ".trim() + "]"
+--- erwartet
+[hi]
+
+=== string trim (2)
+PRINT "[" + "  hi  ".trim() + "]"
+--- erwartet
+[hi]
+
+=== string left right mid (1)
+DIM s AS STRING
+s = "TestString"
+PRINT s.left(4)
+PRINT s.right(6)
+PRINT s.mid(4, 6)
+--- erwartet
+Test
+String
+String
+
+=== string left right mid (2)
+DIM s AS STRING
+s = "TestString"
+PRINT s.left(4)
+PRINT s.right(6)
+PRINT s.mid(4, 6)
+--- erwartet
+Test
+String
+String
+
+=== string indexof (1)
+PRINT "Hello World".indexof("World", 0)
+PRINT "Hello World".indexof("Xyz", 0)
+--- erwartet
+6
+-1
+
+=== string indexof (2)
+PRINT "Hello World".indexof("World", 0)
+PRINT "Hello World".indexof("Xyz", 0)
+--- erwartet
+6
+-1
+
+=== string replace (1)
+PRINT "foo bar".replace("bar", "baz")
+--- erwartet
+foo baz
+
+=== string replace (2)
+PRINT "foo bar".replace("bar", "baz")
+--- erwartet
+foo baz
+
+=== string chained methods (1)
+' Method-Chain: `s.trim().upper()` hintereinander.
+PRINT "  hi  ".trim().upper()
+--- erwartet
+HI
+
+=== string chained methods (2)
+' Method-Chain: `s.trim().upper()` hintereinander.
+PRINT "  hi  ".trim().upper()
+--- erwartet
+HI
+
+=== array length (1)
+DIM a[7] AS INTEGER
+PRINT a.length()
+--- erwartet
+7
+
+=== array length (2)
+DIM a[7] AS INTEGER
+PRINT a.length()
+--- erwartet
+7
+
+=== map methods (1)
+DIM m AS MAP OF STRING
+m.put("name", "Alice")
+m.put("city", "Berlin")
+PRINT m.size()
+PRINT m.has("name")
+PRINT m.get("name")
+PRINT m.has("unknown")
+m.remove("name")
+PRINT m.size()
+m.clear()
+PRINT m.size()
+--- erwartet
+2
+TRUE
+Alice
+FALSE
+1
+0
+
+=== map methods (2)
+DIM m AS MAP OF STRING
+m.put("name", "Alice")
+m.put("city", "Berlin")
+PRINT m.size()
+PRINT m.has("name")
+PRINT m.get("name")
+PRINT m.has("unknown")
+m.remove("name")
+PRINT m.size()
+m.clear()
+PRINT m.size()
+--- erwartet
+2
+TRUE
+Alice
+FALSE
+1
+0
+
+=== map getor default (1)
+DIM m AS MAP OF INTEGER
+m.put("x", 42)
+PRINT m.getor("x", 0)
+PRINT m.getor("y", 99)
+--- erwartet
+42
+99
+
+=== map getor default (2)
+DIM m AS MAP OF INTEGER
+m.put("x", 42)
+PRINT m.getor("x", 0)
+PRINT m.getor("y", 99)
+--- erwartet
+42
+99
+
+=== unknown method throws (1)
+PRINT "abc".unknown_method()
+--- fehler
+STRING hat keine Methode 'unknown_method'
+
+=== unknown method throws (2)
+PRINT "abc".unknown_method()
+--- fehler
+STRING hat keine Methode 'unknown_method'
+
+=== method on int throws (1)
+' `(42).length()` macht keinen Sinn -- klarer Fehler.
+DIM x AS INTEGER
+x = 42
+PRINT x.length()
+--- fehler
+Methodenaufruf '.length' bei nicht-Objekt (INTEGER)
+
+=== method on int throws (2)
+' `(42).length()` macht keinen Sinn -- klarer Fehler.
+DIM x AS INTEGER
+x = 42
+PRINT x.length()
+--- fehler
+Methodenaufruf '.length' bei nicht-Objekt (INTEGER)
+
+=== user class methods unaffected (1)
+' User-Klassen mit eigenen Methoden bleiben unangetastet.
+CLASS Foo
+    FUNCTION upper() AS STRING
+        RETURN "user-upper"
+    END FUNCTION
+END CLASS
+
+DIM f AS Foo
+f = NEW Foo()
+PRINT f.upper()
+--- erwartet
+user-upper
+
+=== user class methods unaffected (2)
+' User-Klassen mit eigenen Methoden bleiben unangetastet.
+CLASS Foo
+    FUNCTION upper() AS STRING
+        RETURN "user-upper"
+    END FUNCTION
+END CLASS
+
+DIM f AS Foo
+f = NEW Foo()
+PRINT f.upper()
+--- erwartet
+user-upper
+

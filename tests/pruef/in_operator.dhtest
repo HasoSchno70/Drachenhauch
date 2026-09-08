@@ -1,0 +1,192 @@
+' Aus test_in_operator.py uebertragen (20 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== in string substring (1)
+PRINT "foo" IN "barfoobaz"
+PRINT "xyz" IN "barfoobaz"
+PRINT "" IN "anything"
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== in string substring (2)
+PRINT "foo" IN "barfoobaz"
+PRINT "xyz" IN "barfoobaz"
+PRINT "" IN "anything"
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== in tuple (1)
+PRINT 5 IN (1, 5, 9)
+PRINT 7 IN (1, 5, 9)
+PRINT "x" IN ("a", "b", "x", "z")
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== in tuple (2)
+PRINT 5 IN (1, 5, 9)
+PRINT 7 IN (1, 5, 9)
+PRINT "x" IN ("a", "b", "x", "z")
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== in array (1)
+DIM nums[3] AS INTEGER
+nums[0] = 10 : nums[1] = 20 : nums[2] = 30
+PRINT 20 IN nums
+PRINT 99 IN nums
+--- erwartet
+TRUE
+FALSE
+
+=== in array (2)
+DIM nums[3] AS INTEGER
+nums[0] = 10 : nums[1] = 20 : nums[2] = 30
+PRINT 20 IN nums
+PRINT 99 IN nums
+--- erwartet
+TRUE
+FALSE
+
+=== in map key (1)
+DIM m AS MAP OF STRING
+m.put("name", "Alice")
+m.put("city", "Berlin")
+PRINT "name" IN m
+PRINT "city" IN m
+PRINT "unknown" IN m
+--- erwartet
+TRUE
+TRUE
+FALSE
+
+=== in map key (2)
+DIM m AS MAP OF STRING
+m.put("name", "Alice")
+m.put("city", "Berlin")
+PRINT "name" IN m
+PRINT "city" IN m
+PRINT "unknown" IN m
+--- erwartet
+TRUE
+TRUE
+FALSE
+
+=== in negation with not (1)
+' Klassisches `NOT (x IN c)` fuer Anti-Mitgliedschaft.
+DIM banned[2] AS STRING
+banned[0] = "spam"
+banned[1] = "scam"
+DIM word AS STRING
+word = "ham"
+IF NOT (word IN banned) THEN
+    PRINT "allowed"
+ELSE
+    PRINT "blocked"
+END IF
+--- erwartet
+allowed
+
+=== in negation with not (2)
+' Klassisches `NOT (x IN c)` fuer Anti-Mitgliedschaft.
+DIM banned[2] AS STRING
+banned[0] = "spam"
+banned[1] = "scam"
+DIM word AS STRING
+word = "ham"
+IF NOT (word IN banned) THEN
+    PRINT "allowed"
+ELSE
+    PRINT "blocked"
+END IF
+--- erwartet
+allowed
+
+=== in in select case (1)
+' `x IN (...)` als Bedingung in IF/SELECT funktioniert.
+DIM x AS INTEGER
+x = 3
+IF x IN (1, 2, 3) THEN
+    PRINT "small"
+ELIF x IN (4, 5, 6) THEN
+    PRINT "medium"
+ELSE
+    PRINT "large"
+END IF
+--- erwartet
+small
+
+=== in in select case (2)
+' `x IN (...)` als Bedingung in IF/SELECT funktioniert.
+DIM x AS INTEGER
+x = 3
+IF x IN (1, 2, 3) THEN
+    PRINT "small"
+ELIF x IN (4, 5, 6) THEN
+    PRINT "medium"
+ELSE
+    PRINT "large"
+END IF
+--- erwartet
+small
+
+=== in string needle not string throws (1)
+' `5 IN "abc"` -- Mismatch, Needle muss String sein.
+PRINT 5 IN "abc"
+--- fehler
+IN bei STRING: linke Seite muss STRING sein, erhalten INTEGER
+
+=== in string needle not string throws (2)
+' `5 IN "abc"` -- Mismatch, Needle muss String sein.
+PRINT 5 IN "abc"
+--- fehler
+IN bei STRING: linke Seite muss STRING sein, erhalten INTEGER
+
+=== in map non string key throws (1)
+DIM m AS MAP OF INTEGER
+m.put("a", 1)
+PRINT 5 IN m
+--- fehler
+IN bei MAP: Key muss STRING sein, erhalten INTEGER
+
+=== in map non string key throws (2)
+DIM m AS MAP OF INTEGER
+m.put("a", 1)
+PRINT 5 IN m
+--- fehler
+IN bei MAP: Key muss STRING sein, erhalten INTEGER
+
+=== in unsupported type throws (1)
+' `5 IN 42` -- weder String, Tuple, Array, noch Map -> Fehler.
+PRINT 5 IN 42
+--- fehler
+IN: rechte Seite muss STRING, TUPLE, ARRAY oder MAP sein, erhalten INTEGER
+
+=== in unsupported type throws (2)
+' `5 IN 42` -- weder String, Tuple, Array, noch Map -> Fehler.
+PRINT 5 IN 42
+--- fehler
+IN: rechte Seite muss STRING, TUPLE, ARRAY oder MAP sein, erhalten INTEGER
+
+=== in chained in complex expression (1)
+' IN kombiniert mit AND/OR.
+DIM x AS INTEGER
+x = 5
+IF x > 0 AND x IN (1, 5, 9) THEN PRINT "match"
+--- erwartet
+match
+
+=== in chained in complex expression (2)
+' IN kombiniert mit AND/OR.
+DIM x AS INTEGER
+x = 5
+IF x > 0 AND x IN (1, 5, 9) THEN PRINT "match"
+--- erwartet
+match
+

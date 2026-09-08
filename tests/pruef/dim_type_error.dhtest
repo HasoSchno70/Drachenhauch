@@ -1,0 +1,35 @@
+' Aus test_dim_type_error.py uebertragen (6 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== dim external type without import hints import
+DIM v AS VEC2
+--- fehler
+Unbekannter Typ 'vec2' -- fehlt IMPORT "vec2"?
+
+=== dim external type shared lists candidates
+DIM m AS TILED_MAP
+--- fehler
+Unbekannter Typ 'tiled_map' -- fehlt ein IMPORT? (z.B. "controller", "tile_collide", "tiled")
+
+=== dim truly unknown type
+DIM x AS FOOBAR
+--- fehler
+Unbekannter Typ 'foobar' (keine Klasse, kein Werttyp, kein importiertes Modul)
+
+=== dim array element external type without import
+DIM a[5] AS VEC2
+--- fehler
+Unbekannter Typ 'vec2' -- fehlt IMPORT "vec2"?
+
+=== no stufe 3e jargon leaks
+DIM v AS VEC2
+--- fehler
+Unbekannter Typ 'vec2' -- fehlt IMPORT "vec2"?
+
+=== dim external type with import works
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_LENGTH(v)
+--- erwartet
+5.0
+

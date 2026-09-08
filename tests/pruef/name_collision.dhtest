@@ -1,0 +1,235 @@
+' Aus test_name_collision.py uebertragen (24 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== var shadows user sub is clear compile error
+' Variable verdeckt gleichnamige SUB -> klare Meldung beim Kompilieren.
+DIM shoot AS INTEGER
+shoot = 1
+SUB Shoot()
+    PRINT "bang"
+END SUB
+Shoot()
+--- fehler
+Namens-Kollision: 'shoot' ist zugleich eine Variable und eine SUB/FUNCTION -- beim Aufruf verdeckt die Variable die Funktion. Benenne eines von beiden um.
+
+=== var shadows builtin call names the builtin
+' Eine FUNCREF-Variable verdeckt einen Builtin -> die Laufzeitmeldung
+DIM box AS FUNCREF
+BOX(0, 0, 10, 10, 255)
+--- fehler
+'box' ist eine Variable vom Typ NIL und kann nicht wie eine Funktion aufgerufen werden. Falls du den eingebauten Befehl 'BOX' meinst: benenne die Variable um -- eine Variable mit festem Wert-Typ (INTEGER, FLOAT, STRING ...) verdeckt einen Befehl nicht, eine FUNCREF schon.
+
+=== typed variable named like builtin calls the builtin
+DIM len AS INTEGER
+len = 5
+PRINT LEN("abc") + len
+--- erwartet
+8
+
+=== funcref variable call still works
+' Regression: eine echte FUNCREF-Variable (kein Namens-Konflikt) bleibt aufrufbar.
+FUNCTION square(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+DIM f AS FUNCREF
+f = square
+PRINT f(5)
+--- erwartet
+25
+
+=== harmless variable named like builtin still works
+' Eine Variable, die nur als Wert benutzt wird (nie als Befehl aufgerufen),
+DIM text AS STRING
+text = "hallo"
+PRINT text
+--- erwartet
+hallo
+
+=== var vs enum is clear compile error
+' Variable kollidiert case-insensitiv mit einem ENUM -> klare Meldung beim
+DIM mode AS INTEGER
+ENUM Mode = A, B
+mode = 1
+--- fehler
+Namens-Kollision: 'mode' ist zugleich ein ENUM und eine Variable -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.
+
+=== enum then var is clear compile error
+' Gleiche Kollision in umgekehrter Reihenfolge (ENUM zuerst).
+ENUM Mode = A, B
+DIM mode AS INTEGER
+--- fehler
+Namens-Kollision: 'mode' ist zugleich eine Variable und ein ENUM -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.
+
+=== var vs const is clear compile error
+CONST X AS INTEGER = 5
+DIM x AS INTEGER
+--- fehler
+Namens-Kollision: 'x' ist zugleich eine Variable und eine CONST -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.
+
+=== dim and for same name still allowed
+' Variable-vs-Variable (DIM + FOR derselbe Name) ist erlaubt -- kein Fehler.
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT i
+NEXT i
+--- erwartet
+1
+2
+3
+
+=== enum with distinct variable name works
+' Ein ENUM und eine ANDERS benannte Variable funktionieren normal.
+ENUM St = X, Y
+DIM s AS INTEGER
+s = St.Y
+PRINT s
+--- erwartet
+1
+
+=== dim darf eine eingebaute konstante verschatten[pi]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+END IF
+--- erwartet
+5
+
+=== dim darf eine eingebaute konstante verschatten[tau]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM tau AS INTEGER
+    tau = 5
+    PRINT tau
+END IF
+--- erwartet
+5
+
+=== dim darf eine eingebaute konstante verschatten[red]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM red AS INTEGER
+    red = 5
+    PRINT red
+END IF
+--- erwartet
+5
+
+=== dim darf eine eingebaute konstante verschatten[green]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM green AS INTEGER
+    green = 5
+    PRINT green
+END IF
+--- erwartet
+5
+
+=== dim darf eine eingebaute konstante verschatten[blue]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM blue AS INTEGER
+    blue = 5
+    PRINT blue
+END IF
+--- erwartet
+5
+
+=== dim darf eine eingebaute konstante verschatten[key space]
+' Oben ging es immer -- in einem Block jetzt auch.
+IF TRUE THEN
+    DIM key_space AS INTEGER
+    key_space = 5
+    PRINT key_space
+END IF
+--- erwartet
+5
+
+=== in jeder blockart[IF TRUE THEN-END IF]
+DIM n AS INTEGER : n = 0
+IF TRUE THEN
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+    n = 1
+END IF
+--- erwartet
+5
+
+=== in jeder blockart[WHILE n < 1-WEND]
+DIM n AS INTEGER : n = 0
+WHILE n < 1
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+    n = 1
+WEND
+--- erwartet
+5
+
+=== in jeder blockart[FOR n = 1 TO 1-NEXT]
+DIM n AS INTEGER : n = 0
+FOR n = 1 TO 1
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+    n = 1
+NEXT
+--- erwartet
+5
+
+=== in jeder blockart[SELECT CASE 1\n    CASE 1-END SELECT]
+DIM n AS INTEGER : n = 0
+SELECT CASE 1
+    CASE 1
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+    n = 1
+END SELECT
+--- erwartet
+5
+
+=== in jeder blockart[TRY-CATCH e\n    PRINT "x"\nEND TRY]
+DIM n AS INTEGER : n = 0
+TRY
+    DIM pi AS INTEGER
+    pi = 5
+    PRINT pi
+    n = 1
+CATCH e
+    PRINT "x"
+END TRY
+--- erwartet
+5
+
+=== unverschattet gilt die konstante weiter
+' Gegenprobe -- verschattet wird nur, wo wirklich ein DIM steht.
+PRINT INT(PI * 100)
+PRINT RED
+PRINT KEY_SPACE
+--- erwartet
+314
+16711680
+32
+
+=== wiederholtes dim setzt den wert nicht zurueck
+' Ein `DIM` in einer Schleife laeuft bei jedem Durchlauf -- es darf den
+DIM n AS INTEGER
+FOR n = 1 TO 3
+    DIM z AS INTEGER
+    z = z + 1
+NEXT
+PRINT z
+--- erwartet
+3
+
+=== kollision wird auch ueber blockgrenzen erkannt
+' Nebenertrag derselben Ursache: die Kollisions-Erkennung sah bis dahin
+CONST Modus = 3
+IF TRUE THEN
+    DIM modus AS INTEGER
+END IF
+--- fehler
+Namens-Kollision: 'modus' ist zugleich eine Variable und eine CONST -- das geht nicht, weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.
+

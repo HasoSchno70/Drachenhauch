@@ -1,0 +1,301 @@
+' Aus test_tuple.py uebertragen (30 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== tuple literal (1)
+DIM t AS TUPLE
+t = (1, 2, 3)
+PRINT t
+--- erwartet
+(1, 2, 3)
+
+=== tuple literal (2)
+DIM t AS TUPLE
+t = (1, 2, 3)
+PRINT t
+--- erwartet
+(1, 2, 3)
+
+=== tuple with mixed types (1)
+DIM t AS TUPLE
+t = (42, "hi", TRUE, 3.5)
+PRINT t
+--- erwartet
+(42, hi, TRUE, 3.5)
+
+=== tuple with mixed types (2)
+DIM t AS TUPLE
+t = (42, "hi", TRUE, 3.5)
+PRINT t
+--- erwartet
+(42, hi, TRUE, 3.5)
+
+=== single paren is grouping not tuple (1)
+' `(5)` bleibt eine normale Klammer-Gruppierung, kein 1-Tupel.
+DIM x AS INTEGER
+x = (5)
+PRINT x
+--- erwartet
+5
+
+=== single paren is grouping not tuple (2)
+' `(5)` bleibt eine normale Klammer-Gruppierung, kein 1-Tupel.
+DIM x AS INTEGER
+x = (5)
+PRINT x
+--- erwartet
+5
+
+=== destructure two (1)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = (10, 20)
+PRINT x, y
+--- erwartet
+10 20
+
+=== destructure two (2)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = (10, 20)
+PRINT x, y
+--- erwartet
+10 20
+
+=== destructure three mixed types (1)
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+(a, b, c) = (5, "hi", 1.5)
+PRINT a
+PRINT b
+PRINT c
+--- erwartet
+5
+hi
+1.5
+
+=== destructure three mixed types (2)
+DIM a AS INTEGER
+DIM b AS STRING
+DIM c AS FLOAT
+(a, b, c) = (5, "hi", 1.5)
+PRINT a
+PRINT b
+PRINT c
+--- erwartet
+5
+hi
+1.5
+
+=== destructure length mismatch throws (1)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = (1, 2, 3)
+--- fehler
+Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+
+=== destructure length mismatch throws (2)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = (1, 2, 3)
+--- fehler
+Tupel-Destructuring: 2 Ziele, aber Tupel hat 3 Element(e)
+
+=== destructure non tuple throws (1)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = 42
+--- fehler
+UNPACK_TUPLE: Erwartet TUPLE, erhalten INTEGER
+
+=== destructure non tuple throws (2)
+DIM x AS INTEGER
+DIM y AS INTEGER
+(x, y) = 42
+--- fehler
+UNPACK_TUPLE: Erwartet TUPLE, erhalten INTEGER
+
+=== function returns tuple (1)
+FUNCTION minmax(a AS INTEGER, b AS INTEGER) AS TUPLE
+    IF a < b THEN
+        RETURN (a, b)
+    ELSE
+        RETURN (b, a)
+    END IF
+END FUNCTION
+
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+(lo, hi) = minmax(7, 3)
+PRINT lo, hi
+(lo, hi) = minmax(2, 9)
+PRINT lo, hi
+--- erwartet
+3 7
+2 9
+
+=== function returns tuple (2)
+FUNCTION minmax(a AS INTEGER, b AS INTEGER) AS TUPLE
+    IF a < b THEN
+        RETURN (a, b)
+    ELSE
+        RETURN (b, a)
+    END IF
+END FUNCTION
+
+DIM lo AS INTEGER
+DIM hi AS INTEGER
+(lo, hi) = minmax(7, 3)
+PRINT lo, hi
+(lo, hi) = minmax(2, 9)
+PRINT lo, hi
+--- erwartet
+3 7
+2 9
+
+=== function three returns (1)
+' Klassischer Use-Case: Vektor-Operation mit zwei oder drei Komponenten.
+FUNCTION reflect(vx AS FLOAT, vy AS FLOAT, nx AS FLOAT, ny AS FLOAT) AS TUPLE
+    DIM dot AS FLOAT
+    dot = vx * nx + vy * ny
+    RETURN (vx - 2.0 * dot * nx, vy - 2.0 * dot * ny)
+END FUNCTION
+
+DIM rx AS FLOAT
+DIM ry AS FLOAT
+(rx, ry) = reflect(3.0, 4.0, 1.0, 0.0)
+PRINT rx, ry
+--- erwartet
+-3.0 4.0
+
+=== function three returns (2)
+' Klassischer Use-Case: Vektor-Operation mit zwei oder drei Komponenten.
+FUNCTION reflect(vx AS FLOAT, vy AS FLOAT, nx AS FLOAT, ny AS FLOAT) AS TUPLE
+    DIM dot AS FLOAT
+    dot = vx * nx + vy * ny
+    RETURN (vx - 2.0 * dot * nx, vy - 2.0 * dot * ny)
+END FUNCTION
+
+DIM rx AS FLOAT
+DIM ry AS FLOAT
+(rx, ry) = reflect(3.0, 4.0, 1.0, 0.0)
+PRINT rx, ry
+--- erwartet
+-3.0 4.0
+
+=== tuple var rejects non tuple (1)
+DIM t AS TUPLE
+t = 42
+--- fehler
+Zuweisung an global: Erwartet TUPLE, erhalten INTEGER
+
+=== tuple var rejects non tuple (2)
+DIM t AS TUPLE
+t = 42
+--- fehler
+Zuweisung an global: Erwartet TUPLE, erhalten INTEGER
+
+=== print paren expr not tuple (1)
+' `PRINT (1 + 2)` soll 3 ausgeben, kein Tupel.
+PRINT (1 + 2)
+--- erwartet
+3
+
+=== print paren expr not tuple (2)
+' `PRINT (1 + 2)` soll 3 ausgeben, kein Tupel.
+PRINT (1 + 2)
+--- erwartet
+3
+
+=== nested tuple in assign (1)
+DIM t AS TUPLE
+t = ((1, 2), (3, 4))
+PRINT t
+--- erwartet
+((1, 2), (3, 4))
+
+=== nested tuple in assign (2)
+DIM t AS TUPLE
+t = ((1, 2), (3, 4))
+PRINT t
+--- erwartet
+((1, 2), (3, 4))
+
+=== call with paren args unaffected (1)
+' `func(a, b)` ist Aufruf mit 2 Args, kein Tupel-Argument.
+FUNCTION add2(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN x + y
+END FUNCTION
+
+PRINT add2(3, 4)
+--- erwartet
+7
+
+=== call with paren args unaffected (2)
+' `func(a, b)` ist Aufruf mit 2 Args, kein Tupel-Argument.
+FUNCTION add2(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN x + y
+END FUNCTION
+
+PRINT add2(3, 4)
+--- erwartet
+7
+
+=== destructuring im einzeiligen if
+FUNCTION zwei() AS TUPLE
+    RETURN (7, 8)
+END FUNCTION
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS BOOLEAN
+
+b = TRUE
+IF b THEN (x, y) = zwei()
+PRINT x; " "; y
+--- erwartet
+7 8
+
+=== destructuring im else zweig
+FUNCTION zwei() AS TUPLE
+    RETURN (7, 8)
+END FUNCTION
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS BOOLEAN
+
+b = FALSE
+IF b THEN (x, y) = (1, 2) ELSE (x, y) = (30, 40)
+PRINT x; " "; y
+--- erwartet
+30 40
+
+=== destructuring mit doppelpunkt verkettet
+' Der Doppelpunkt trennt Anweisungen -- die Zuweisung darf ihn nicht
+FUNCTION zwei() AS TUPLE
+    RETURN (7, 8)
+END FUNCTION
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS BOOLEAN
+
+b = TRUE
+IF b THEN (x, y) = zwei() : x = x + 100
+PRINT x; " "; y
+--- erwartet
+107 8
+
+=== destructuring wird nicht ausgefuehrt wenn falsch
+' Gegenprobe: die Zuweisung haengt wirklich an der Bedingung und laeuft
+FUNCTION zwei() AS TUPLE
+    RETURN (7, 8)
+END FUNCTION
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM b AS BOOLEAN
+
+b = FALSE
+x = 5 : y = 6
+IF b THEN (x, y) = zwei()
+PRINT x; " "; y
+--- erwartet
+5 6
+

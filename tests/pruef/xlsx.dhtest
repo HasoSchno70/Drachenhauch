@@ -1,0 +1,157 @@
+' Aus test_xlsx.py uebertragen (17 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== eine mappe laesst sich oeffnen
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== ohne warnung lesbar
+' Ein strenger Leser meldete `Workbook contains no default style` --
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "hallo")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== text und zahl bleiben verschieden
+' Der Grund, warum CSV hier nicht reicht: dort ist alles Text, und eine
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "01067")
+XLSX_SET_NUM(x, 0, 1, 1234.5)
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== umlaute und sonderzeichen
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "Schrauben & <Müller>")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== mehrere blaetter
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW("Umsatz")
+XLSX_SET(x, 0, 0, "eins")
+XLSX_SHEET(x, "Notizen")
+XLSX_SET(x, 0, 0, "zwei")
+PRINT XLSX_SHEET_COUNT(x)
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+2
+
+=== luecken bleiben leer
+' Nur belegte Zellen werden geschrieben -- eine Auswertung mit einer
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "oben")
+XLSX_SET(x, 10, 3, "weit unten")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== fette kopfzeile
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "Kunde")
+XLSX_SET(x, 0, 1, "Betrag")
+XLSX_SET(x, 1, 0, "normal")
+XLSX_BOLD_ROW(x, 0)
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== zahlenformat
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET_NUM(x, 0, 0, 1234.5)
+XLSX_FORMAT(x, 0, 0, "#,##0.00")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== datum kommt als datum an
+' In Excel ist ein Datum eine Zahl MIT Format -- ohne Format staende
+IMPORT "xlsx"
+IMPORT "zeit"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET_DATE(x, 0, 0, ZEIT_PARSE("2026-08-23 00:00:00"))
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== spaltenbreite
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "lang")
+XLSX_COL_WIDTH(x, 0, 28)
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== gestaltung ueberlebt eine neue zuweisung
+' Sonst muesste man nach jeder Wertaenderung fett und Format neu
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 0, "alt")
+XLSX_BOLD(x, 0, 0)
+XLSX_SET(x, 0, 0, "neu")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== viele spalten heissen richtig
+' Spalte 26 ist AA, nicht BA.
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 26, "AA")
+XLSX_SET(x, 0, 27, "AB")
+XLSX_SAVE(x, "a.xlsx")
+--- erwartet
+
+=== blattname zu lang
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+--- fehler
+XLSX_NEW: Blattname 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' ist laenger als 31 Zeichen -- mehr nimmt Excel nicht
+
+=== blattname mit verbotenem zeichen
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW("Q1/Q2")
+--- fehler
+XLSX_NEW: Blattname 'Q1/Q2' enthaelt '/' -- Excel erlaubt kein []:*?/\
+
+=== zwei blaetter gleichen namens
+' Excel unterscheidet Blattnamen nicht nach Gross- und
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW("Daten")
+XLSX_SHEET(x, "daten")
+--- fehler
+XLSX_SHEET: Es gibt schon ein Blatt 'daten' -- Excel unterscheidet die Namen nicht nach Gross- und Kleinschreibung
+
+=== negative zelle
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, -1, 0, "x")
+--- fehler
+XLSX_SET: Zeile -1 ist negativ
+
+=== jenseits von excels grenzen
+IMPORT "xlsx"
+DIM x AS XLSX
+x = XLSX_NEW()
+XLSX_SET(x, 0, 20000, "x")
+--- fehler
+XLSX_SET: Spalte 20000 liegt jenseits dessen, was Excel kann (bis 16383)
+

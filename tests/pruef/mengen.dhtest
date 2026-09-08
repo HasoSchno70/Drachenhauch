@@ -1,0 +1,110 @@
+' Aus test_mengen.py uebertragen (12 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== doppelte aufnahme zaehlt einmal
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 7)
+SET_ADD(m, 3)
+SET_ADD(m, 7)
+PRINT SET_SIZE(m)
+--- erwartet
+2
+
+=== zugehoerigkeit
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 7)
+PRINT STR$(SET_HAS(m, 7)) + "," + STR$(SET_HAS(m, 9))
+--- erwartet
+TRUE,FALSE
+
+=== entfernen meldet ob es drin war
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 7)
+PRINT SET_REMOVE(m, 7)
+PRINT SET_REMOVE(m, 7)
+PRINT SET_SIZE(m)
+--- erwartet
+TRUE
+FALSE
+0
+
+=== items liefern zahlen bei einer zahlenmenge
+' Die Menge merkt sich die Art -- sonst kaemen hier Zeichenketten
+DIM m AS MAP OF INTEGER
+DIM z AS ARRAY OF INTEGER
+SET_ADD(m, 20)
+SET_ADD(m, 4)
+z = SET_ITEMS(m)
+PRINT z[0] + z[1]
+--- erwartet
+24
+
+=== reihenfolge ist zugesagt
+' Aufnahme-Reihenfolge, nicht Zufall -- das steht so in der Doku und
+DIM m AS MAP OF INTEGER
+DIM z AS ARRAY OF INTEGER
+SET_ADD(m, 30)
+SET_ADD(m, 10)
+SET_ADD(m, 20)
+z = SET_ITEMS(m)
+PRINT STR$(z[0]) + "," + STR$(z[1]) + "," + STR$(z[2])
+--- erwartet
+30,10,20
+
+=== textmenge
+DIM m AS MAP OF INTEGER
+SET_ADD(m, "anna")
+SET_ADD(m, "bert")
+SET_ADD(m, "anna")
+PRINT JOIN$(SET_ITEMS(m), ",")
+--- erwartet
+anna,bert
+
+=== gemischte arten melden
+' Der Fall, der sonst still danebengeht: `5` und `"5"` fallen auf
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 5)
+SET_ADD(m, "5")
+--- fehler
+SET_ADD: diese Menge enthaelt Zahlen, hier kam ein Text. Eine Menge fuehrt eine Elementart -- die erste Aufnahme legt sie fest.
+
+=== auch das nachfragen prueft die art
+' `SET_HAS(zahlen, "5")` ist ein Tippfehler, keine Frage -- stumm FALSE
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 5)
+PRINT SET_HAS(m, "5")
+--- fehler
+SET_HAS: diese Menge enthaelt Zahlen, hier kam ein Text. Eine Menge fuehrt eine Elementart -- die erste Aufnahme legt sie fest.
+
+=== nach clear darf die art wechseln
+' Mit dem letzten Element geht auch die Elementart -- sonst waere eine
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 5)
+SET_CLEAR(m)
+SET_ADD(m, "jetzt text")
+PRINT JOIN$(SET_ITEMS(m), ",")
+--- erwartet
+jetzt text
+
+=== leere menge
+DIM m AS MAP OF INTEGER
+PRINT SET_SIZE(m)
+PRINT SET_HAS(m, 1)
+--- erwartet
+0
+FALSE
+
+=== falscher elementtyp meldet
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 1.5)
+--- fehler
+SET_ADD: Elemente sind INTEGER oder STRING, nicht FLOAT
+
+=== die menge bleibt eine map
+' Kein neuer Typ: MAPSIZE und SET_SIZE sehen dieselbe Sache.
+DIM m AS MAP OF INTEGER
+SET_ADD(m, 1)
+SET_ADD(m, 2)
+PRINT STR$(MAPSIZE(m)) + "," + STR$(SET_SIZE(m))
+--- erwartet
+2,2
+

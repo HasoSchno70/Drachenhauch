@@ -87,7 +87,7 @@ Sprache sind aber Ausgabevergleiche: ein kurzes Programm, eine erwartete
 Ausgabe. Dafür braucht es kein Programm je Datei, sondern eine **Sammlung**
 (seit 2026-09-07, Weg D des [Python-Abbaus](entwurf-python-abbau.md)):
 
-```text
+```dhtest
 ' Kopfkommentar bis zum ersten Fall
 === Zähler liefert drei Werte
 FUNCTION z() AS INTEGER
@@ -110,10 +110,13 @@ Division durch Null
 
 | Abschnitt | Bedeutung |
 |---|---|
-| `--- erwartet` | die Ausgabe, Zeile für Zeile; Leerzeilen am Blockende zählen nicht, ein Zeilenumbruch am Ende auch nicht |
+| `--- erwartet` | die Ausgabe, Zeile für Zeile; Leerzeilen am Ende zählen auf beiden Seiten nicht |
+| `--- erwartet ungefaehr` | wie `erwartet`, aber Zahlen dürfen um 1e-6 abweichen (relativ oder absolut) — für `SIN`, `SQR` und alles, was auf drei Betriebssystemen in der letzten Stelle anders rundet; verglichen wird Wort für Wort, Nicht-Zahlen müssen gleich sein |
 | `--- enthaelt` | jede Zeile des Blocks muss in der Ausgabe vorkommen |
 | `--- fehler` | das Programm muss abbrechen (Rückgabewert ungleich 0), und jede Zeile des Blocks steht in der Meldung |
 | `--- datei name` | eine Beilage, die vor dem Lauf neben dem Programm liegt (JSON, Karte, Text) |
+| `--- datei name base64` | dieselbe Beilage als Bytes — für alles, was kein UTF-8 ist (eine cp1252-Datei, ein ZIP-Archiv, ein Bild); der Block ist Base64 und darf umbrochen sein |
+| `--- verzeichnis name` | ein leeres Verzeichnis neben dem Programm, für `DIRLIST`, `RMDIR` und alles, was Ordner sehen will |
 | `--- umgebung` | `NAME=WERT` je Zeile, etwa `DHRT_FRAMES=1` |
 
 Ohne Erwartung gilt ein Fall als bestanden, wenn er mit 0 endet. **Jeder

@@ -1,0 +1,158 @@
+' Aus test_byref.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== byref swap
+SUB swap(BYREF a AS INTEGER, BYREF b AS INTEGER)
+    DIM tmp AS INTEGER
+    tmp = a
+    a = b
+    b = tmp
+END SUB
+
+DIM x AS INTEGER
+DIM y AS INTEGER
+x = 1
+y = 2
+swap(x, y)
+PRINT x
+PRINT y
+--- erwartet
+2
+1
+
+=== byref with string
+SUB make_upper(BYREF s AS STRING)
+    s = UPPER$(s)
+END SUB
+
+DIM name AS STRING
+name = "anna"
+make_upper(name)
+PRINT name
+--- erwartet
+ANNA
+
+=== byref function returns plus modifies
+' FUNCTION mit BYREF: regulaerer return PLUS Side-Effect.
+FUNCTION divmod(a AS INTEGER, b AS INTEGER, BYREF mod_out AS INTEGER) AS INTEGER
+    mod_out = a MOD b
+    RETURN a \ b
+END FUNCTION
+
+DIM r AS INTEGER
+DIM q AS INTEGER
+q = divmod(17, 5, r)
+PRINT q
+PRINT r
+--- erwartet
+3
+2
+
+=== byref mixed with regular params
+SUB add_to(amount AS INTEGER, BYREF total AS INTEGER)
+    total = total + amount
+END SUB
+
+DIM sum AS INTEGER
+sum = 0
+add_to(5, sum)
+add_to(10, sum)
+add_to(3, sum)
+PRINT sum
+--- erwartet
+18
+
+=== byref with array index
+' BYREF kann auch auf einen Array-Slot zeigen.
+SUB increment(BYREF v AS INTEGER)
+    v = v + 1
+END SUB
+
+DIM arr[3] AS INTEGER
+arr[0] = 10
+arr[1] = 20
+arr[2] = 30
+increment(arr[1])
+PRINT arr[0]
+PRINT arr[1]
+PRINT arr[2]
+--- erwartet
+10
+21
+30
+
+=== byref with class field
+CLASS Point
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+END CLASS
+
+SUB inc(BYREF v AS INTEGER)
+    v = v + 100
+END SUB
+
+DIM p AS Point
+p = NEW Point
+p.x = 1
+p.y = 2
+inc(p.x)
+inc(p.y)
+PRINT p.x
+PRINT p.y
+--- erwartet
+101
+102
+
+=== byref literal argument raises
+' BYREF-Argument muss zuweisbar sein - Literal -> Fehler.
+SUB foo(BYREF x AS INTEGER)
+    x = 5
+END SUB
+foo(42)
+--- fehler
+BYREF-Parameter braucht eine zuweisbare Variable (Identifier, Member oder Index-Access)
+
+=== byref expression argument raises
+' BYREF-Argument muss eine LValue sein - Expression nicht erlaubt.
+SUB foo(BYREF x AS INTEGER)
+    x = 1
+END SUB
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = 1
+b = 2
+foo(a + b)
+--- fehler
+BYREF-Parameter braucht eine zuweisbare Variable (Identifier, Member oder Index-Access)
+
+=== default param treewalker
+FUNCTION greet(name AS STRING, prefix AS STRING = "Hi, ") AS STRING
+    RETURN prefix + name + "!"
+END FUNCTION
+PRINT greet("Anna")
+PRINT greet("Bob", "Hello, ")
+--- erwartet
+Hi, Anna!
+Hello, Bob!
+
+=== default param vm
+FUNCTION greet(name AS STRING, prefix AS STRING = "Hi, ") AS STRING
+    RETURN prefix + name + "!"
+END FUNCTION
+PRINT greet("Anna")
+PRINT greet("Bob", "Hello, ")
+--- erwartet
+Hi, Anna!
+Hello, Bob!
+
+=== default param multiple
+FUNCTION mult(a AS INTEGER, b AS INTEGER = 2, c AS INTEGER = 3) AS INTEGER
+    RETURN a * b * c
+END FUNCTION
+PRINT mult(10)
+PRINT mult(10, 5)
+PRINT mult(10, 5, 4)
+--- erwartet
+60
+150
+200
+

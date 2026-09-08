@@ -1,0 +1,102 @@
+' Aus test_kleinkram.py uebertragen (12 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== enum name liefert den member
+ENUM Zustand = MENUE, SPIELT, PAUSE
+PRINT ENUM_NAME(Zustand, 1)
+--- erwartet
+SPIELT
+
+=== enum name schreibt gross
+' Wie TYPEOF -- damit ein Vergleich nicht davon abhaengt, wie jemand den
+ENUM Kleiner = eins, zwei
+PRINT ENUM_NAME(Kleiner, 0)
+--- erwartet
+EINS
+
+=== enum name ohne treffer ist leer
+' Ein Nachschlagen darf danebengehen: ein gespeicherter Wert aus einer
+ENUM Zustand = MENUE, SPIELT, PAUSE
+PRINT "["; ENUM_NAME(Zustand, 99); "]"
+--- erwartet
+[]
+
+=== enum name mit expliziten werten
+ENUM Recht
+    KEINS = 0
+    LESEN = 4
+    SCHREIBEN = 8
+END ENUM
+PRINT ENUM_NAME(Recht, 8)
+--- erwartet
+SCHREIBEN
+
+=== enum name verlangt ein enum
+PRINT ENUM_NAME(5, 1)
+--- fehler
+ENUM_NAME: erwartet ein ENUM als erstes Argument, bekommen INTEGER
+
+=== schritt auf variable
+DIM i AS INTEGER
+i++
+i++
+PRINT i
+i--
+PRINT i
+--- erwartet
+2
+1
+
+=== schritt auf feld
+CLASS P
+    DIM n AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.n++
+p.n++
+PRINT p.n
+--- erwartet
+2
+
+=== schritt auf array element
+DIM a[3] AS INTEGER
+a[1]++
+a[1]++
+a[1]--
+PRINT a[1]
+--- erwartet
+1
+
+=== schritt hinter dem doppelpunkt
+DIM i AS INTEGER
+i = 1 : i++ : PRINT i
+--- erwartet
+2
+
+=== schritt im einzeiligen if
+DIM i AS INTEGER
+IF TRUE THEN i++
+PRINT i
+--- erwartet
+1
+
+=== ausdruecke mit doppeltem vorzeichen bleiben
+' `++`/`--` sind bewusst KEINE Lexer-Token: `5 - -3` und `5 + +3` sind
+DIM x AS INTEGER
+x = 5 - -3
+PRINT x
+x = 5 + +3
+PRINT x
+--- erwartet
+8
+8
+
+=== schritt ist keine ausdrucksform
+' Bewusst nur eine Anweisung. Der Unterschied zwischen Prae- und Postfix
+DIM i AS INTEGER
+DIM j AS INTEGER
+j = i++
+PRINT j
+--- fehler
+Unerwartetes Token NEWLINE
+

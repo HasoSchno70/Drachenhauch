@@ -1,0 +1,86 @@
+' Aus test_csv.py uebertragen (11 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== gb helfer baut gueltigen ausdruck (1)
+' Erst den Helfer pruefen -- sonst misst der Rest den Helfer mit.
+PRINT "a" + CHR$(34) + "b"
+--- erwartet
+a"b
+
+=== gb helfer baut gueltigen ausdruck (2)
+' Erst den Helfer pruefen -- sonst misst der Rest den Helfer mit.
+PRINT "x" + CHR$(10) + "y"
+--- erwartet
+x
+y
+
+=== trenner im feld ueberlebt
+' Der Fall, an dem SPLIT$ scheitert.
+DIM t AS ARRAY OF STRING
+t = CSV_PARSE("a;" + CHR$(34) + "b; mit Semikolon" + CHR$(34) + ";c", ";")
+PRINT DIMSIZE(t, 1)
+PRINT t[0, 1]
+--- erwartet
+3
+b; mit Semikolon
+
+=== zeilen und spalten
+DIM t AS ARRAY OF STRING
+t = CSV_PARSE("Name;Ort" + CHR$(10) + "Mueller;Berlin" + CHR$(10), ";")
+PRINT STR$(DIMSIZE(t, 0)) + "x" + STR$(DIMSIZE(t, 1))
+--- erwartet
+2x2
+
+=== komma ist die vorgabe
+DIM t AS ARRAY OF STRING
+t = CSV_PARSE("a,b,c")
+PRINT t[0, 2]
+--- erwartet
+c
+
+=== ungleich lange zeilen werden aufgefuellt
+' Ein GB-Array muss rechteckig sein. Aufgefuellt wird auf die BREITESTE
+DIM t AS ARRAY OF STRING
+t = CSV_PARSE("a;b;c" + CHR$(10) + "d", ";")
+PRINT STR$(DIMSIZE(t, 1)) + "|" + t[1, 0] + "|" + t[1, 2] + "|"
+--- erwartet
+3|d||
+
+=== row setzt nur noetige anfuehrungen
+' Unnoetige Anfuehrungszeichen sind erlaubt, machen die Datei aber
+DIM f AS ARRAY OF STRING
+f = SPLIT$("Name|Ort|mit ; drin", "|")
+PRINT CSV_ROW$(f, ";")
+--- erwartet
+Name;Ort;"mit ; drin"
+
+=== format und parse sind umkehrbar
+DIM t AS ARRAY OF STRING
+DIM z AS ARRAY OF STRING
+t = CSV_PARSE("x;" + CHR$(34) + "sagt " + CHR$(34) + CHR$(34) + "hallo" + CHR$(34) + CHR$(34) + CHR$(34) + ";z", ";")
+z = CSV_PARSE(CSV_FORMAT$(t, ";"), ";")
+PRINT z[0, 1]
+--- erwartet
+sagt "hallo"
+
+=== trennzeichen muss ein zeichen sein
+PRINT CSV_ROW$(SPLIT$("a|b", "|"), ";;")
+--- fehler
+CSV_ROW$: das Trennzeichen muss genau ein Zeichen sein (bekommen: ";;")
+
+=== fehlende datei meldet den pfad
+DIM t AS ARRAY OF STRING
+t = CSV_LOAD("gibtsnicht_xyz.csv")
+--- fehler
+CSV_LOAD: gibtsnicht_xyz.csv:
+
+=== rundreise ueber datei
+DIM t AS ARRAY OF STRING
+DIM z AS ARRAY OF STRING
+t = CSV_PARSE("a;" + CHR$(34) + "b; und mehr" + CHR$(34) + ";c" + CHR$(10) + "d;e;f", ";")
+CSV_SAVE("t.csv", t, ";")
+z = CSV_LOAD("t.csv", ";")
+PRINT z[0, 1]
+PRINT z[1, 2]
+--- erwartet
+b; und mehr
+f

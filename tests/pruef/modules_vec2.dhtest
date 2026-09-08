@@ -1,0 +1,316 @@
+' Aus test_modules_vec2.py uebertragen (32 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== vec2 new and print (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT v
+--- erwartet
+Vec2(3.0, 4.0)
+
+=== vec2 new and print (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT v
+--- erwartet
+Vec2(3.0, 4.0)
+
+=== vec2 add (1)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(1.0, 2.0)
+w = VEC2_NEW(3.0, 4.0)
+PRINT v + w
+--- erwartet
+Vec2(4.0, 6.0)
+
+=== vec2 add (2)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(1.0, 2.0)
+w = VEC2_NEW(3.0, 4.0)
+PRINT v + w
+--- erwartet
+Vec2(4.0, 6.0)
+
+=== vec2 sub (1)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(5.0, 8.0)
+w = VEC2_NEW(2.0, 3.0)
+PRINT v - w
+--- erwartet
+Vec2(3.0, 5.0)
+
+=== vec2 sub (2)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(5.0, 8.0)
+w = VEC2_NEW(2.0, 3.0)
+PRINT v - w
+--- erwartet
+Vec2(3.0, 5.0)
+
+=== vec2 scalar mul (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT v * 2.0
+PRINT 2.0 * v
+PRINT v * 0.5
+--- erwartet
+Vec2(6.0, 8.0)
+Vec2(6.0, 8.0)
+Vec2(1.5, 2.0)
+
+=== vec2 scalar mul (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT v * 2.0
+PRINT 2.0 * v
+PRINT v * 0.5
+--- erwartet
+Vec2(6.0, 8.0)
+Vec2(6.0, 8.0)
+Vec2(1.5, 2.0)
+
+=== vec2 scalar div (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(10.0, 20.0)
+PRINT v / 2.0
+--- erwartet
+Vec2(5.0, 10.0)
+
+=== vec2 scalar div (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(10.0, 20.0)
+PRINT v / 2.0
+--- erwartet
+Vec2(5.0, 10.0)
+
+=== vec2 length (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_LENGTH(v)
+--- erwartet
+5.0
+
+=== vec2 length (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_LENGTH(v)
+--- erwartet
+5.0
+
+=== vec2 normalize (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_NORMALIZE(v)
+--- erwartet
+Vec2(0.6, 0.8)
+
+=== vec2 normalize (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_NORMALIZE(v)
+--- erwartet
+Vec2(0.6, 0.8)
+
+=== vec2 dot (1)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(2.0, 3.0)
+w = VEC2_NEW(4.0, -1.0)
+PRINT VEC2_DOT(v, w)
+--- erwartet
+5.0
+
+=== vec2 dot (2)
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(2.0, 3.0)
+w = VEC2_NEW(4.0, -1.0)
+PRINT VEC2_DOT(v, w)
+--- erwartet
+5.0
+
+=== vec2 distance (1)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+a = VEC2_NEW(0.0, 0.0)
+b = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_DISTANCE(a, b)
+--- erwartet
+5.0
+
+=== vec2 distance (2)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+a = VEC2_NEW(0.0, 0.0)
+b = VEC2_NEW(3.0, 4.0)
+PRINT VEC2_DISTANCE(a, b)
+--- erwartet
+5.0
+
+=== vec2 lerp (1)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+a = VEC2_NEW(0.0, 0.0)
+b = VEC2_NEW(10.0, 20.0)
+PRINT VEC2_LERP(a, b, 0.5)
+--- erwartet
+Vec2(5.0, 10.0)
+
+=== vec2 lerp (2)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+a = VEC2_NEW(0.0, 0.0)
+b = VEC2_NEW(10.0, 20.0)
+PRINT VEC2_LERP(a, b, 0.5)
+--- erwartet
+Vec2(5.0, 10.0)
+
+=== vec2 equality (1)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+DIM c AS VEC2
+a = VEC2_NEW(1.0, 2.0)
+b = VEC2_NEW(1.0, 2.0)
+c = VEC2_NEW(1.0, 3.0)
+PRINT a = b
+PRINT a = c
+PRINT a <> c
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== vec2 equality (2)
+IMPORT "vec2"
+DIM a AS VEC2
+DIM b AS VEC2
+DIM c AS VEC2
+a = VEC2_NEW(1.0, 2.0)
+b = VEC2_NEW(1.0, 2.0)
+c = VEC2_NEW(1.0, 3.0)
+PRINT a = b
+PRINT a = c
+PRINT a <> c
+--- erwartet
+TRUE
+FALSE
+TRUE
+
+=== vec2 chained ops (1)
+' Komplexere Ausdruecke -- (v + w) * 2 - v.
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(1.0, 1.0)
+w = VEC2_NEW(2.0, 3.0)
+PRINT (v + w) * 2.0 - v
+--- erwartet
+Vec2(5.0, 7.0)
+
+=== vec2 chained ops (2)
+' Komplexere Ausdruecke -- (v + w) * 2 - v.
+IMPORT "vec2"
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(1.0, 1.0)
+w = VEC2_NEW(2.0, 3.0)
+PRINT (v + w) * 2.0 - v
+--- erwartet
+Vec2(5.0, 7.0)
+
+=== vec2 reflect (1)
+' Reflexion an x-Achse-Normale.
+IMPORT "vec2"
+DIM v AS VEC2
+DIM n AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+n = VEC2_NEW(0.0, 1.0)
+PRINT VEC2_REFLECT(v, n)
+--- erwartet
+Vec2(3.0, -4.0)
+
+=== vec2 reflect (2)
+' Reflexion an x-Achse-Normale.
+IMPORT "vec2"
+DIM v AS VEC2
+DIM n AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+n = VEC2_NEW(0.0, 1.0)
+PRINT VEC2_REFLECT(v, n)
+--- erwartet
+Vec2(3.0, -4.0)
+
+=== vec2 perp (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(1.0, 0.0)
+PRINT VEC2_PERP(v)
+--- erwartet
+Vec2(-0.0, 1.0)
+
+=== vec2 perp (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(1.0, 0.0)
+PRINT VEC2_PERP(v)
+--- erwartet
+Vec2(-0.0, 1.0)
+
+=== vec2 from angle (1)
+' 0 rad == Vec2(1, 0); Pi/2 ~= Vec2(0, 1) (up to floating-point).
+IMPORT "vec2"
+PRINT VEC2_FROM_ANGLE(0.0, 1.0)
+--- erwartet
+Vec2(1.0, 0.0)
+
+=== vec2 from angle (2)
+' 0 rad == Vec2(1, 0); Pi/2 ~= Vec2(0, 1) (up to floating-point).
+IMPORT "vec2"
+PRINT VEC2_FROM_ANGLE(0.0, 1.0)
+--- erwartet
+Vec2(1.0, 0.0)
+
+=== vec2 x y components (1)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.5, -2.0)
+PRINT VEC2_X(v)
+PRINT VEC2_Y(v)
+--- erwartet
+3.5
+-2.0
+
+=== vec2 x y components (2)
+IMPORT "vec2"
+DIM v AS VEC2
+v = VEC2_NEW(3.5, -2.0)
+PRINT VEC2_X(v)
+PRINT VEC2_Y(v)
+--- erwartet
+3.5
+-2.0
+

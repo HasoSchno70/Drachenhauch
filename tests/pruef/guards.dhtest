@@ -1,0 +1,296 @@
+' Aus test_guards.py uebertragen (18 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== guard basic (1)
+DIM x AS INTEGER
+x = 5
+DIM flag AS BOOLEAN
+flag = TRUE
+
+SELECT CASE x
+    CASE 1 TO 10 WHERE flag
+        PRINT "klein und flag"
+    CASE 1 TO 10
+        PRINT "klein ohne flag"
+    CASE ELSE
+        PRINT "gross"
+END SELECT
+--- erwartet
+klein und flag
+
+=== guard basic (2)
+DIM x AS INTEGER
+x = 5
+DIM flag AS BOOLEAN
+flag = TRUE
+
+SELECT CASE x
+    CASE 1 TO 10 WHERE flag
+        PRINT "klein und flag"
+    CASE 1 TO 10
+        PRINT "klein ohne flag"
+    CASE ELSE
+        PRINT "gross"
+END SELECT
+--- erwartet
+klein und flag
+
+=== guard false falls through (1)
+' Guard FALSE -> Match wird verworfen, naechster Case probiert.
+DIM x AS INTEGER
+x = 5
+DIM flag AS BOOLEAN
+flag = FALSE
+
+SELECT CASE x
+    CASE 1 TO 10 WHERE flag
+        PRINT "wins"
+    CASE 1 TO 10
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+
+=== guard false falls through (2)
+' Guard FALSE -> Match wird verworfen, naechster Case probiert.
+DIM x AS INTEGER
+x = 5
+DIM flag AS BOOLEAN
+flag = FALSE
+
+SELECT CASE x
+    CASE 1 TO 10 WHERE flag
+        PRINT "wins"
+    CASE 1 TO 10
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+
+=== guard multiple cases (1)
+' Mehrere Cases mit Guards, plus CASE ohne Guard.
+DIM hp AS INTEGER
+hp = 30
+DIM healed AS BOOLEAN
+healed = TRUE
+
+SELECT CASE hp
+    CASE IS <= 0
+        PRINT "tot"
+    CASE IS <= 50 WHERE healed
+        PRINT "low aber bereits geheilt"
+    CASE IS <= 50
+        PRINT "low ungeheilt"
+    CASE ELSE
+        PRINT "ok"
+END SELECT
+--- erwartet
+low aber bereits geheilt
+
+=== guard multiple cases (2)
+' Mehrere Cases mit Guards, plus CASE ohne Guard.
+DIM hp AS INTEGER
+hp = 30
+DIM healed AS BOOLEAN
+healed = TRUE
+
+SELECT CASE hp
+    CASE IS <= 0
+        PRINT "tot"
+    CASE IS <= 50 WHERE healed
+        PRINT "low aber bereits geheilt"
+    CASE IS <= 50
+        PRINT "low ungeheilt"
+    CASE ELSE
+        PRINT "ok"
+END SELECT
+--- erwartet
+low aber bereits geheilt
+
+=== guard can use subject (1)
+' Die WHERE-Expression kann auf normale Variablen zugreifen --
+DIM x AS INTEGER
+x = 5
+DIM minimum AS INTEGER
+minimum = 3
+
+SELECT CASE x
+    CASE 1 TO 100 WHERE x > minimum
+        PRINT "big enough"
+    CASE 1 TO 100
+        PRINT "in range but too small"
+END SELECT
+--- erwartet
+big enough
+
+=== guard can use subject (2)
+' Die WHERE-Expression kann auf normale Variablen zugreifen --
+DIM x AS INTEGER
+x = 5
+DIM minimum AS INTEGER
+minimum = 3
+
+SELECT CASE x
+    CASE 1 TO 100 WHERE x > minimum
+        PRINT "big enough"
+    CASE 1 TO 100
+        PRINT "in range but too small"
+END SELECT
+--- erwartet
+big enough
+
+=== guard with value match (1)
+DIM cmd AS STRING
+cmd = "save"
+DIM dirty AS BOOLEAN
+dirty = TRUE
+
+SELECT CASE cmd
+    CASE "save" WHERE dirty
+        PRINT "saving..."
+    CASE "save"
+        PRINT "nothing to save"
+    CASE "load"
+        PRINT "loading..."
+END SELECT
+--- erwartet
+saving...
+
+=== guard with value match (2)
+DIM cmd AS STRING
+cmd = "save"
+DIM dirty AS BOOLEAN
+dirty = TRUE
+
+SELECT CASE cmd
+    CASE "save" WHERE dirty
+        PRINT "saving..."
+    CASE "save"
+        PRINT "nothing to save"
+    CASE "load"
+        PRINT "loading..."
+END SELECT
+--- erwartet
+saving...
+
+=== guard with value match clean (1)
+DIM cmd AS STRING
+cmd = "save"
+DIM dirty AS BOOLEAN
+dirty = FALSE
+
+SELECT CASE cmd
+    CASE "save" WHERE dirty
+        PRINT "saving..."
+    CASE "save"
+        PRINT "nothing to save"
+END SELECT
+--- erwartet
+nothing to save
+
+=== guard with value match clean (2)
+DIM cmd AS STRING
+cmd = "save"
+DIM dirty AS BOOLEAN
+dirty = FALSE
+
+SELECT CASE cmd
+    CASE "save" WHERE dirty
+        PRINT "saving..."
+    CASE "save"
+        PRINT "nothing to save"
+END SELECT
+--- erwartet
+nothing to save
+
+=== guard with in operator (1)
+' Praktisch: Guard mit IN-Test.
+DIM tag AS STRING
+tag = "admin"
+DIM cmd AS STRING
+cmd = "delete"
+
+SELECT CASE cmd
+    CASE "delete" WHERE tag IN ("admin", "moderator")
+        PRINT "OK"
+    CASE "delete"
+        PRINT "Permission denied"
+END SELECT
+--- erwartet
+OK
+
+=== guard with in operator (2)
+' Praktisch: Guard mit IN-Test.
+DIM tag AS STRING
+tag = "admin"
+DIM cmd AS STRING
+cmd = "delete"
+
+SELECT CASE cmd
+    CASE "delete" WHERE tag IN ("admin", "moderator")
+        PRINT "OK"
+    CASE "delete"
+        PRINT "Permission denied"
+END SELECT
+--- erwartet
+OK
+
+=== guard uses subject indirectly (1)
+' Subject-Wert kann in Guard via gleichnamige Variable benutzt werden.
+DIM n AS INTEGER
+n = 50
+
+SELECT CASE n
+    CASE 1 TO 100 WHERE n MOD 2 = 0
+        PRINT "gerade in 1-100"
+    CASE 1 TO 100
+        PRINT "ungerade in 1-100"
+END SELECT
+--- erwartet
+gerade in 1-100
+
+=== guard uses subject indirectly (2)
+' Subject-Wert kann in Guard via gleichnamige Variable benutzt werden.
+DIM n AS INTEGER
+n = 50
+
+SELECT CASE n
+    CASE 1 TO 100 WHERE n MOD 2 = 0
+        PRINT "gerade in 1-100"
+    CASE 1 TO 100
+        PRINT "ungerade in 1-100"
+END SELECT
+--- erwartet
+gerade in 1-100
+
+=== guard else still runs when no case matches (1)
+' CASE ELSE bleibt unbeeinflusst -- laeuft, wenn weder Match noch
+DIM x AS INTEGER
+x = 999
+
+SELECT CASE x
+    CASE 1, 2, 3 WHERE TRUE
+        PRINT "small"
+    CASE 100, 200 WHERE TRUE
+        PRINT "med"
+    CASE ELSE
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+
+=== guard else still runs when no case matches (2)
+' CASE ELSE bleibt unbeeinflusst -- laeuft, wenn weder Match noch
+DIM x AS INTEGER
+x = 999
+
+SELECT CASE x
+    CASE 1, 2, 3 WHERE TRUE
+        PRINT "small"
+    CASE 100, 200 WHERE TRUE
+        PRINT "med"
+    CASE ELSE
+        PRINT "fallback"
+END SELECT
+--- erwartet
+fallback
+

@@ -1,0 +1,139 @@
+' Aus test_modules_particles.py uebertragen (14 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+
+=== new starts empty
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(100.0, 200.0)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+0
+
+=== emit increases count
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_EMIT(s, 5)
+PRINT PARTICLE_COUNT(s)
+PARTICLE_EMIT(s, 3)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+5
+8
+
+=== clear
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_EMIT(s, 5)
+PARTICLE_CLEAR(s)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+0
+
+=== update zero dt no change
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_EMIT(s, 5)
+PARTICLE_UPDATE(s, 0)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+5
+
+=== update kills old particles
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_LIFETIME(s, 100, 100)
+PARTICLE_EMIT(s, 5)
+PARTICLE_UPDATE(s, 50)
+PRINT PARTICLE_COUNT(s)
+PARTICLE_UPDATE(s, 100)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+5
+0
+
+=== update kills aged particles
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_LIFETIME(s, 100, 100)
+PARTICLE_EMIT(s, 50)
+PRINT PARTICLE_COUNT(s)
+PARTICLE_UPDATE(s, 200)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+50
+0
+
+=== emit many
+' Massen-Emit funktioniert (frueher numpy-Array-Shape-Check).
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_EMIT(s, 5000)
+PRINT PARTICLE_COUNT(s)
+--- erwartet
+5000
+
+=== set lifetime invalid raises (1)
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_LIFETIME(s, -1, 100)
+--- fehler
+PARTICLE_SET_LIFETIME: ms_min >= 0 und ms_max >= ms_min noetig
+
+=== set lifetime invalid raises (2)
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_LIFETIME(s, 200, 100)
+--- fehler
+PARTICLE_SET_LIFETIME: ms_min >= 0 und ms_max >= ms_min noetig
+
+=== set velocity invalid raises
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_VELOCITY(s, 100.0, 50.0, 0.0, 0.0)
+--- fehler
+PARTICLE_SET_VELOCITY: max muss >= min sein
+
+=== set color out of range raises
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_COLOR(s, 16777217)
+--- fehler
+PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein
+
+=== set size invalid raises
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_SIZE(s, 0, 5)
+--- fehler
+PARTICLE_SET_SIZE: min >= 1 und max >= min noetig
+
+=== emit negative count raises
+IMPORT "particles"
+DIM s AS PARTICLE_SYSTEM
+s = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_EMIT(s, -1)
+--- fehler
+PARTICLE_EMIT: count muss >= 0 sein
+
+=== kommazahlen werden gerundet statt abgelehnt
+IMPORT "particles"
+DIM p AS PARTICLE_SYSTEM
+p = PARTICLE_SYSTEM_NEW(0, 0)
+PARTICLE_SET_SIZE(p, 2.0, 6.4)
+PARTICLE_SET_LIFETIME(p, 100.0, 900.6)
+PARTICLE_EMIT(p, 5.0)
+PARTICLE_UPDATE(p, 16.7)
+PRINT PARTICLE_COUNT(p)
+--- erwartet
+5
+
