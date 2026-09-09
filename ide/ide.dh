@@ -121,6 +121,11 @@ DIM gliederungSchluessel AS STRING : gliederungSchluessel = ""
 DIM hell AS BOOLEAN : hell = FALSE
 DIM codeGroesse AS INTEGER : codeGroesse = 16
 DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
+' Geteilte Ansicht: links ein ZWEITER Reiter, rechts der aktive. Beide sind
+' echte Code-Felder -- nichts wird gespiegelt, es gibt nichts abzugleichen.
+DIM geteilt AS BOOLEAN : geteilt = FALSE
+DIM linkerTab AS INTEGER : linkerTab = -1
+DIM minimapAn AS BOOLEAN : minimapAn = FALSE
 ' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
@@ -198,6 +203,7 @@ END IF
 IF JSON_HAS(konfig, "hell") THEN hell = JSON_GET_BOOL(konfig, "hell")
 IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "schrift")))
 IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
+IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -316,6 +322,10 @@ DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, "Helles Thema")
 GUI_MENU_CHECK(miThema, hell)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 GUI_MENU_SEPARATOR(mAnsicht)
+DIM miGeteilt AS INTEGER : miGeteilt = GUI_MENU_ITEM(mAnsicht, "Geteilte Ansicht", "Alt+G")
+GUI_MENU_CHECK(miGeteilt, FALSE)
+DIM miMinimap AS INTEGER : miMinimap = GUI_MENU_ITEM(mAnsicht, "Uebersichtskarte")
+GUI_MENU_CHECK(miMinimap, FALSE)
 DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
@@ -345,6 +355,10 @@ DIM btnWkBeispiele AS GUI_WIDGET : btnWkBeispiele = GUI_BUTTON(win, "Beispiele a
 DIM lblWkZuletzt AS GUI_WIDGET : lblWkZuletzt = GUI_LABEL(win, "Zuletzt geoeffnet -- Doppelklick oeffnet", 0, 0)
 DIM lstWkZuletzt AS GUI_WIDGET : lstWkZuletzt = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das Programm, F7 debuggt es, Umschalt+F7 prueft. F1 schlaegt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P oeffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kuerzel: Hilfe -> Tastenkuerzel (Strg+F1).", 0, 0)
+' Uebersichtskarte: eine Zeichenflaeche rechts neben dem Code -- gezeichnet
+' wird nach GUI_DRAW, wie bei jeder Leinwand.
+DIM karte AS GUI_WIDGET : karte = GUI_CANVAS(win, 0, 0, 10, 10)
+GUI_SET_VISIBLE(karte, FALSE)
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
 DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
@@ -445,6 +459,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "hell", hell)
     JSON_SET_INT(konfig, "schrift", codeGroesse)
     JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
+    JSON_SET_BOOL(konfig, "karte", minimapAn)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -566,9 +581,24 @@ SUB layout()
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
     DIM ex AS INTEGER : ex = breiteLinks
     DIM ew AS INTEGER : ew = w - breiteLinks - 8
+    ' Die Uebersichtskarte nimmt sich einen Streifen am rechten Rand.
+    DIM kartenB AS INTEGER : kartenB = 0
+    IF minimapAn THEN kartenB = 92
+    GUI_SET_VISIBLE(karte, minimapAn)
+    IF minimapAn THEN GUI_SET_BOUNDS(karte, ex + ew - kartenB, oben, kartenB - 6, mitteH)
+    ew = ew - kartenB
+    ' Geteilt: der linke Reiter bekommt die linke Haelfte, alle anderen die
+    ' rechte -- so hat jede Haelfte ein ECHTES Feld, keine Spiegelung.
+    DIM halbeB AS INTEGER : halbeB = (ew - 6) \ 2
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        GUI_SET_BOUNDS(tabFelder[i], ex, oben, ew, mitteH)
+        IF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl AND i = linkerTab THEN
+            GUI_SET_BOUNDS(tabFelder[i], ex, oben, halbeB, mitteH)
+        ELSEIF geteilt AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
+            GUI_SET_BOUNDS(tabFelder[i], ex + halbeB + 6, oben, ew - halbeB - 6, mitteH)
+        ELSE
+            GUI_SET_BOUNDS(tabFelder[i], ex, oben, ew, mitteH)
+        END IF
     NEXT
     ' Willkommensseite auf derselben Flaeche
     DIM wx AS INTEGER : wx = ex + 40
@@ -643,6 +673,117 @@ SUB umbruchSetzen(an AS BOOLEAN)
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, "Zeilenumbruch an.", "Zeilenumbruch aus."))
     konfigSichern()
+END SUB
+
+' --- Geteilte Ansicht -------------------------------------------------
+' Links ein zweiter Reiter, rechts der aktive. Beide sind ECHTE Code-Felder;
+' zwei Ansichten auf DIESELBE Datei waeren ein Abgleich, den man bei jedem
+' Anschlag fuehren muesste -- und GUI_SET_TEXT leerte dabei jedes Mal den
+' Verlauf und schoebe die Marke ans Ende.
+SUB geteiltSetzen(an AS BOOLEAN)
+    IF an AND tabAnzahl < 2 THEN
+        GUI_SET_TEXT(lblStatus, "Geteilte Ansicht: dafuer braucht es zwei offene Dateien.")
+        RETURN
+    END IF
+    IF NOT an AND linkerTab >= 0 AND linkerTab < tabAnzahl THEN
+        ' Zurueck auf seinen eigenen Reiter -- sonst bliebe das Feld
+        ' ueber allen Reitern stehen.
+        GUI_SET_TAB(tabFelder[linkerTab], linkerTab)
+    END IF
+    geteilt = an
+    IF an THEN
+        linkerTab = IIF(aktiverTab = 0, 1, 0)
+        ' -1 heisst "auf jedem Reiter sichtbar" -- nur so stehen zwei
+        ' Felder gleichzeitig im Bild.
+        GUI_SET_TAB(tabFelder[linkerTab], -1)
+    ELSE
+        linkerTab = -1
+    END IF
+    GUI_MENU_CHECK(miGeteilt, geteilt)
+    layout()
+    GUI_SET_TEXT(lblStatus, IIF(geteilt, "Geteilt: links " + BASENAME(tabPfade[linkerTab]), "Geteilte Ansicht aus."))
+    ' Die Lagen mitschreiben: dass der Befehl LIEF, sagt nichts darueber, ob
+    ' die beiden Felder auch nebeneinander liegen.
+    IF geteilt THEN
+        protokoll("geteilt " + STR$(linkerTab) + " x " + STR$(GUI_GET_X(tabFelder[linkerTab])) + "+" + STR$(GUI_GET_W(tabFelder[linkerTab])) + " " + STR$(GUI_GET_X(tabFelder[aktiverTab])) + "+" + STR$(GUI_GET_W(tabFelder[aktiverTab])))
+    ELSE
+        protokoll("geteilt aus")
+    END IF
+END SUB
+
+' Der linke Reiter darf nicht derselbe sein wie der aktive -- ein Widget
+' kann nicht zweimal im Bild stehen. Beim Wechsel tauschen die beiden.
+SUB geteiltNachziehen(vorher AS INTEGER)
+    IF NOT geteilt THEN RETURN
+    IF linkerTab <> aktiverTab THEN RETURN
+    IF vorher < 0 OR vorher >= tabAnzahl OR vorher = aktiverTab THEN
+        geteiltSetzen(FALSE)
+        RETURN
+    END IF
+    GUI_SET_TAB(tabFelder[linkerTab], linkerTab)
+    linkerTab = vorher
+    GUI_SET_TAB(tabFelder[linkerTab], -1)
+    layout()
+END SUB
+
+' --- Uebersichtskarte --------------------------------------------------
+' Eine Zeile ist ein Strich, so breit wie sie lang ist; der sichtbare
+' Ausschnitt liegt als heller Kasten darueber. Ein Klick springt.
+SUB minimapZeichnen()
+    IF NOT minimapAn THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM cx AS INTEGER : cx = GUI_CANVAS_X(karte)
+    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(karte)
+    DIM cw AS INTEGER : cw = GUI_CANVAS_W(karte)
+    DIM ch AS INTEGER : ch = GUI_CANVAS_H(karte)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM n AS INTEGER : n = LEN(zeilen)
+    IF n = 0 THEN RETURN
+    ' So viele Zeilen wie Platz ist, sonst zusammengefasst: bei 3000 Zeilen
+    ' und 600 Punkten Hoehe steht eine Zeile fuer fuenf.
+    DIM proZeile AS INTEGER : proZeile = MAX(1, (n + ch - 1) \ ch)
+    DIM y AS INTEGER : y = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1 STEP proZeile
+        DIM zt AS STRING : zt = zeilen[i]
+        DIM roh AS STRING : roh = LTRIM$(zt)
+        IF roh <> "" THEN
+            DIM breit AS INTEGER : breit = MIN(cw - 4, LEN(zt) * 2)
+            DIM einzugX AS INTEGER : einzugX = MIN(cw \ 3, (LEN(zt) - LEN(roh)) * 2)
+            DIM f AS INTEGER : f = &H60708A
+            IF LEFT$(roh, 1) = "'" THEN f = F_KOMMENTAR
+            BOX(cx + 2 + einzugX, cy + y, cx + 2 + breit, cy + y, f)
+        END IF
+        y = y + 1
+        IF y >= ch THEN BREAK
+    NEXT
+    ' Der sichtbare Ausschnitt als heller Rahmen.
+    DIM erste AS INTEGER
+    DIM sicht AS INTEGER
+    DIM von AS INTEGER
+    DIM laenge AS INTEGER
+    (erste, sicht, von, laenge) = GUI_TEXTAREA_VIEW(ta)
+    DIM y0 AS INTEGER : y0 = cy + erste \ proZeile
+    DIM y1 AS INTEGER : y1 = cy + MIN(ch, (erste + sicht) \ proZeile)
+    BOX(cx + 1, y0, cx + cw - 2, y1, &H20FFFFFF)
+    RECT(cx + 1, y0, cx + cw - 2, y1, &H60A8C8E0)
+    ' Klick: dorthin springen. Die Leinwand nimmt selbst keine Klicks an,
+    ' der Treffertest ist deshalb von Hand.
+    IF MOUSE_HIT(1) AND MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch THEN
+        DIM ziel AS INTEGER : ziel = (MOUSEY() - cy) * proZeile + 1
+        GUI_TEXTAREA_GOTO(ta, MAX(1, MIN(n, ziel)), 1)
+        GUI_FOCUS(ta)
+        protokoll("karte sprung " + STR$(MAX(1, MIN(n, ziel))))
+    END IF
+END SUB
+
+SUB minimapSetzen(an AS BOOLEAN)
+    minimapAn = an
+    GUI_MENU_CHECK(miMinimap, an)
+    layout()
+    konfigSichern()
+    protokoll("karte " + IIF(an, "an", "aus"))
 END SUB
 
 ' --- Faltung ----------------------------------------------------------
@@ -755,6 +896,9 @@ END FUNCTION
 
 SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
+    ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
+    ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
+    IF geteilt THEN geteiltSetzen(FALSE)
     GUI_DESTROY(tabFelder[i])
     DIM k AS INTEGER
     FOR k = i TO tabAnzahl - 2
@@ -2179,6 +2323,12 @@ paletteEintrag("Weiter", "weiter_d", "F8") : paletteEintrag("Schritt drueber", "
 paletteEintrag("Schritt hinein", "hinein", "F11") : paletteEintrag("Schritt heraus", "heraus", "Umschalt+F11")
 paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
 paletteEintrag("Als eigenstaendiges Programm exportieren", "export", "Strg+F6")
+paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
+paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
+paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
+paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
+paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Uebersichtskarte", "minimap", "")
+paletteEintrag("Zeilenumbruch", "umbruch", "Alt+Z")
 paletteEintrag("Helles Thema", "thema", "") : paletteEintrag("Vollbild", "vollbild", "Alt+Enter")
 paletteEintrag("Schrift groesser", "groesser", "") : paletteEintrag("Schrift kleiner", "kleiner", "")
 paletteEintrag("Ueber ...", "ueber", "") : paletteEintrag("Beenden", "beenden", "Strg+Q")
@@ -2374,6 +2524,8 @@ SUB befehl(k AS STRING)
             konfigSichern()
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
+        CASE "geteilt" : geteiltSetzen(NOT geteilt)
+        CASE "minimap" : minimapSetzen(NOT minimapAn)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
@@ -2472,7 +2624,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
 
     ' Reiterwechsel durch Klick auf die Leiste
     IF tabAnzahl > 0 AND GUI_ACTIVE_TAB(win) <> aktiverTab THEN
+        DIM vorherTab AS INTEGER : vorherTab = aktiverTab
         aktiverTab = GUI_ACTIVE_TAB(win)
+        geteiltNachziehen(vorherTab)
         letzteMarke = ""
         ' Gliederung und faltbare Bloecke gehoeren zum FELD -- ohne das
         ' Zuruecksetzen behielte der neue Reiter die Bloecke des alten.
@@ -2511,6 +2665,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miThema) THEN befehl("thema")
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
     IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
+    IF GUI_CLICKED(miGeteilt) THEN befehl("geteilt")
+    IF GUI_CLICKED(miMinimap) THEN befehl("minimap")
     IF GUI_CLICKED(miFalten) THEN befehl("falten")
     IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")
     IF GUI_CLICKED(miFaltenAuf) THEN befehl("falten_auf")
@@ -2715,6 +2871,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
 
     CLS(&H0B1119)
     GUI_DRAW()
+    minimapZeichnen()
     FLIP()
 WEND
 

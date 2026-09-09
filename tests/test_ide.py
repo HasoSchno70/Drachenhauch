@@ -433,3 +433,45 @@ def test_signaturhilfe_zeigt_den_aufruf_mitten_in_der_argumentliste(tmp_path):
     sig = [z for z in log if z.startswith("signatur ")]
     assert sig and "SCREEN(" in sig[0], log
     assert "Argument" in sig[0], log
+
+
+def test_geteilte_ansicht_zeigt_zwei_dateien_nebeneinander(tmp_path):
+    """Zwei Dateien offen, Alt+G teilt: links der andere Reiter, rechts der
+    aktive. Beide Felder liegen NEBENEINANDER -- gemessen an ihren
+    Rechtecken, nicht am Protokoll allein. Alt+G schaltet wieder aus."""
+    _datei(tmp_path, "PRINT 2\n", name="zwei.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(130, RL_G, RL_LALT) + _taste(180, RL_G, RL_LALT)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="zwei")
+    # "geteilt 0 x <x>+<breite> <x>+<breite>" -- links der Reiter 0, rechts
+    # der aktive. Dass der Befehl LIEF, sagte nichts darueber, ob die Felder
+    # auch nebeneinander liegen.
+    lagen = [z for z in log if z.startswith("geteilt 0 x ")]
+    assert lagen, log
+    links, rechts = lagen[0].split(" x ")[1].split()
+    lx, lb = (int(t) for t in links.split("+"))
+    rx, rb = (int(t) for t in rechts.split("+"))
+    assert lx + lb <= rx, lagen        # linkes Feld endet vor dem rechten
+    assert lb > 100 and rb > 100, lagen
+    assert "geteilt aus" in log, log
+
+
+def test_geteilte_ansicht_braucht_zwei_dateien(tmp_path):
+    """Mit nur einem Reiter gibt es nichts zu teilen -- und die IDE sagt es,
+    statt still nichts zu tun."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=120, events=_taste(40, RL_G, RL_LALT))
+    assert not any(z.startswith("geteilt ") for z in log), log
+
+
+def test_uebersichtskarte_bleibt_gemerkt(tmp_path):
+    """Ueber die Befehlspalette angeschaltet; sie steht danach in der
+    ide.json und ist beim naechsten Start wieder da."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n" * 40)
+    ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="Uebersichtskarte")
+    assert "karte an" in log, log
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["karte"] is True, konfig
