@@ -5344,6 +5344,7 @@ impl<'p> Vm<'p> {
             "gui_window_title" => { self.gui.window_title(gi(a,0,"GUI_WINDOW_TITLE")?, &gs(a,1,"GUI_WINDOW_TITLE")?)?; Value::Nil }
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
+            "gui_window_shown" => Value::Bool(self.gui.window_shown(gi(a,0,"GUI_WINDOW_SHOWN")?)?),
             "gui_window_resizable" => { self.gui.window_resizable(gi(a,0,"GUI_WINDOW_RESIZABLE")?, gbool(a,1,"GUI_WINDOW_RESIZABLE")?)?; Value::Nil }
             "gui_window_scrollable" => { self.gui.window_scrollable(gi(a,0,"GUI_WINDOW_SCROLLABLE")?, gbool(a,1,"GUI_WINDOW_SCROLLABLE")?)?; Value::Nil }
             "gui_tabs" => { self.gui.set_tabs(gi(a,0,"GUI_TABS")?, gstrs(a,1,"GUI_TABS")?)?; Value::Nil }

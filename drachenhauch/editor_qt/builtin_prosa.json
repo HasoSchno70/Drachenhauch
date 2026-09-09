@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1708,
+ "count": 1709,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -736,6 +736,7 @@
   "GUI_WINDOW_SET_BOUNDS": "Fenster bewegen/skalieren/lesen",
   "GUI_WINDOW_SET_MAX_SIZE": "Maximalgröße beim Resizen (0 = keine)",
   "GUI_WINDOW_SET_MIN_SIZE": "Mindestgröße beim Resizen (0 = keine)",
+  "GUI_WINDOW_SHOWN": "BOOLEAN — ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst",
   "GUI_WINDOW_TITLE": "Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle\" / „Datei öffnen\")",
   "GUI_WINDOW_VISIBLE": "Sichtbarkeit setzen",
   "GUI_WINDOW_WIDGET": "n-tes lebendes Widget (Enumeration/Serialisierung), oder -1",

@@ -4545,6 +4545,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_SHOWN",
+   "kind": "core",
+   "signature": "GUI_WINDOW_SHOWN(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_VISIBLE",
    "kind": "core",
    "signature": "GUI_WINDOW_VISIBLE(win, flag)",

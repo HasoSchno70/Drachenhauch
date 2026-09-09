@@ -5393,6 +5393,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.wdg_mut(h, "GUI_SET_TAB")?.tab_page = page;
         Ok(())
     }
+    /// Ist das Fenster gerade sichtbar (GUI_WINDOW_SHOWN)?
+    ///
+    /// Das Gegenstueck zu `GUI_WINDOW_VISIBLE`, das nur setzt. Ohne den
+    /// Getter muss ein Programm sich merken, was es selbst gesetzt hat --
+    /// und liegt daneben, sobald der Nutzer das Fenster ueber sein Kreuz
+    /// schliesst. Ein zerstoertes Fenster ist nicht sichtbar.
+    pub fn window_shown(&self, win: i64) -> Result<bool, String> {
+        self.windows.get(win as usize).map(|w| w.alive && w.visible)
+            .ok_or("GUI_WINDOW_SHOWN: erwartet GUI_WINDOW".into())
+    }
     pub fn active_tab(&self, win: i64) -> Result<i64, String> {
         self.windows.get(win as usize).map(|w| w.active_tab as i64).ok_or("GUI_ACTIVE_TAB: erwartet GUI_WINDOW".into())
     }

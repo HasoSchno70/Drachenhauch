@@ -475,3 +475,36 @@ def test_uebersichtskarte_bleibt_gemerkt(tmp_path):
     assert "karte an" in log, log
     konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
     assert konfig["karte"] is True, konfig
+
+
+def test_git_blame_listet_wer_welche_zeile_geschrieben_hat(tmp_path):
+    """Ein kleines Repository, ein Commit, Strg+Umschalt+B: die Liste unten
+    rechts nennt je Zeile Datum und Person. Gegenprobe: ohne Repository
+    meldet sie nichts."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\nPRINT 3\n")
+    for cmd in (["git", "init", "-q"], ["git", "add", "spiel.dh"],
+                ["git", "-c", "user.name=Test", "-c", "user.email=t@t",
+                 "commit", "-q", "-m", "erst"]):
+        r = subprocess.run(cmd, cwd=str(tmp_path), capture_output=True)
+        if r.returncode != 0:
+            pytest.skip("git nicht verfuegbar: " + r.stderr.decode("utf-8", "replace"))
+    log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
+    assert "blame 3" in log, log
+
+
+def test_git_blame_ohne_repository_sagt_es(tmp_path):
+    """Kein Repository: keine Zeilen, und die IDE haelt nicht an."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
+    assert "blame 0" in log, log
+
+
+def test_handbuch_gesetzt_und_als_quelltext(tmp_path):
+    """F1 oeffnet das Handbuch in der gesetzten Ansicht; ueber die
+    Befehlspalette laesst sich auf den Quelltext umschalten."""
+    quelle = _datei(tmp_path, "SCREEN(320, 240)\n")
+    ev = _taste(30, RL_F1)
+    ev += _taste(80, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(110, RL_V, RL_LCTRL) + _taste(140, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="Handbuch: gesetzt")
+    assert "hbansicht gesetzt" in log, log
+    assert "hbansicht quelltext" in log, log
