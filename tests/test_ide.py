@@ -595,3 +595,38 @@ def _gruppen(werte, luecke):
         else:
             aus[-1].append(v)
     return aus
+
+
+def _repo(tmp_path, inhalt, name="spiel.dh"):
+    """Ein kleines Repository mit einer eingecheckten Datei."""
+    quelle = _datei(tmp_path, inhalt, name=name)
+    for cmd in (["git", "init", "-q"], ["git", "add", name],
+                ["git", "-c", "user.name=Test", "-c", "user.email=t@t",
+                 "commit", "-q", "-m", "erst"]):
+        r = subprocess.run(cmd, cwd=str(tmp_path), capture_output=True)
+        if r.returncode != 0:
+            pytest.skip("git nicht verfuegbar: " + r.stderr.decode("utf-8", "replace"))
+    return quelle
+
+
+def test_git_diff_zeigt_die_aenderungen_der_datei(tmp_path):
+    """Eingecheckt, dann geändert: Strg+Umschalt+D zeigt den Diff. Und die
+    geänderten Zeilen tragen schon vorher eine Marke am Rand -- zwei, nicht
+    vier: `git diff -U0` nennt nur die wirklich geänderten."""
+    quelle = _repo(tmp_path, "PRINT 1\nPRINT 2\nPRINT 3\nPRINT 4\n")
+    quelle.write_text("PRINT 1\nPRINT zwei\nPRINT 3\nPRINT vier\n", encoding="utf-8")
+    log = _ide(tmp_path, quelle, frames=160,
+               events=_taste(50, RL_D, RL_LCTRL, RL_LSHIFT))
+    assert "git rand 2" in log, log
+    diff = [z for z in log if z.startswith("git diff ")]
+    assert diff and int(diff[0].split()[2]) > 5, log
+
+
+def test_git_diff_ohne_aenderung_sagt_es(tmp_path):
+    """Gegenprobe: nichts geändert, also nichts zu zeigen -- und keine
+    Marken am Rand."""
+    quelle = _repo(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=160,
+               events=_taste(50, RL_D, RL_LCTRL, RL_LSHIFT))
+    assert "git diff 0" in log, log
+    assert "git rand 0" in log, log

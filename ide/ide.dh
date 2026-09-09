@@ -135,6 +135,8 @@ DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
 DIM geteilt AS BOOLEAN : geteilt = FALSE
 DIM linkerTab AS INTEGER : linkerTab = -1
 DIM minimapAn AS BOOLEAN : minimapAn = FALSE
+' Geaenderte Zeilen am Rand (git diff -U0), per Vorgabe an.
+DIM gitRandAn AS BOOLEAN : gitRandAn = TRUE
 ' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
@@ -213,6 +215,7 @@ IF JSON_HAS(konfig, "hell") THEN hell = JSON_GET_BOOL(konfig, "hell")
 IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "schrift")))
 IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
+IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -297,6 +300,8 @@ DIM miLesezeichen AS INTEGER : miLesezeichen = GUI_MENU_ITEM(mBearb, "Lesezeiche
 DIM miLzWeiter AS INTEGER : miLzWeiter = GUI_MENU_ITEM(mBearb, "Naechstes Lesezeichen", "F2")
 DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt", "Strg+Umschalt+M")
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
+DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
+DIM miVerlauf AS INTEGER : miVerlauf = GUI_MENU_ITEM(mBearb, "Verlauf dieser Datei (git log)")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
 DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
@@ -337,6 +342,8 @@ DIM miGeteilt AS INTEGER : miGeteilt = GUI_MENU_ITEM(mAnsicht, "Geteilte Ansicht
 GUI_MENU_CHECK(miGeteilt, FALSE)
 DIM miMinimap AS INTEGER : miMinimap = GUI_MENU_ITEM(mAnsicht, "Uebersichtskarte")
 GUI_MENU_CHECK(miMinimap, FALSE)
+DIM miGitRand AS INTEGER : miGitRand = GUI_MENU_ITEM(mAnsicht, "Geaenderte Zeilen am Rand")
+GUI_MENU_CHECK(miGitRand, TRUE)
 DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
@@ -448,7 +455,14 @@ GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
 GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 
-' Befehlspalette: tippen filtert, Enter fuehrt aus. Dasselbe Fenster ist
+' --- git: Aenderungen und Verlauf --------------------------------------
+DIM winGit AS GUI_WINDOW : winGit = GUI_WINDOW("git", 240, 90, 900, 620)
+GUI_WINDOW_VISIBLE(winGit, FALSE)
+GUI_WINDOW_RESIZABLE(winGit, TRUE)
+DIM lblGit AS GUI_WIDGET : lblGit = GUI_LABEL(winGit, "", 8, 8)
+DIM taGit AS GUI_WIDGET : taGit = GUI_TEXTAREA(winGit, 8, 30, 884, 552)
+
+' --- Befehlspalette / Datei-Waehler
 ' auch der Waehler fuer "Datei im Projekt oeffnen" (paletteArt = "datei").
 DIM winPalette AS GUI_WINDOW : winPalette = GUI_WINDOW("Befehle", 400, 80, 440, 340)
 DIM tfPalette AS GUI_WIDGET : tfPalette = GUI_TEXTINPUT(winPalette, 8, 8, 424, 26, "")
@@ -497,6 +511,7 @@ SUB konfigSichern()
     JSON_SET_INT(konfig, "schrift", codeGroesse)
     JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
     JSON_SET_BOOL(konfig, "karte", minimapAn)
+    JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -1333,6 +1348,125 @@ SUB blameZeigen()
     protokoll("blame " + STR$(n))
 END SUB
 
+' `git` fuer die aktive Datei laufen lassen -- leer, wenn es nicht geht.
+' Synchron ueber SHELL_OUT$: eine Datei dauert Millisekunden.
+FUNCTION gitAusgabe$(erst AS STRING, zweit AS STRING, dritt AS STRING) AS STRING
+    IF aktiverTab < 0 THEN RETURN ""
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF pfad = "" THEN RETURN ""
+    TRY
+        IF dritt = "" THEN
+            RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, "--", BASENAME(pfad))
+        END IF
+        RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, dritt, "--", BASENAME(pfad))
+    CATCH e
+        RETURN ""
+    END TRY
+END FUNCTION
+
+' Diff und Verlauf im selben Fenster: es ist dieselbe Frage ("was ist mit
+' dieser Datei passiert?"), nur einmal seit dem letzten Sichern und einmal
+' ueber die Zeit.
+SUB gitZeigen(art AS STRING)
+    IF aktiverTab < 0 OR tabPfade[aktiverTab] = "" THEN
+        GUI_SET_TEXT(lblStatus, "git: die Datei ist noch nicht gesichert.")
+        RETURN
+    END IF
+    DIM text AS STRING
+    IF art = "diff" THEN
+        text = gitAusgabe$("diff", "--no-color", "")
+        IF TRIM$(text) = "" THEN text = gitAusgabe$("diff", "--no-color", "--staged")
+    ELSE
+        text = gitAusgabe$("log", "--no-color", "--pretty=format:%h  %ad  %an%n    %s%n")
+    END IF
+    IF TRIM$(text) = "" THEN
+        GUI_SET_TEXT(lblStatus, IIF(art = "diff", "git diff: keine Aenderungen an dieser Datei.", "git log: kein Verlauf -- liegt sie in einem git-Verzeichnis?"))
+        protokoll("git " + art + " 0")
+        RETURN
+    END IF
+    GUI_SET_TEXT(taGit, text)
+    GUI_WINDOW_TITLE(winGit, IIF(art = "diff", "Aenderungen", "Verlauf") + ": " + BASENAME(tabPfade[aktiverTab]))
+    GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + " Zeilen")
+    GUI_WINDOW_VISIBLE(winGit, TRUE)
+    GUI_FOCUS(taGit)
+    gitFaerben()
+    protokoll("git " + art + " " + STR$(LEN(SPLIT$(text, NL))))
+END SUB
+
+' Ein Diff liest sich nur mit Farbe: Zugaenge gruen, Abgaenge rot, die
+' @@-Koepfe blau. Zeilenweise ueber die Abschnitte, wie im Code-Feld.
+SUB gitFaerben()
+    DIM text AS STRING : text = GUI_TEXT(taGit)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    DIM s AS ARRAY OF INTEGER : s = []
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        DIM farbe AS INTEGER : farbe = -1
+        IF LEFT$(z, 2) = "@@" THEN
+            farbe = &H60B0E0
+        ELSEIF LEFT$(z, 3) = "+++" OR LEFT$(z, 3) = "---" THEN
+            farbe = &H90A0B0
+        ELSEIF LEFT$(z, 1) = "+" THEN
+            farbe = &H70D080
+        ELSEIF LEFT$(z, 1) = "-" THEN
+            farbe = &HE07070
+        ELSEIF LEN(z) >= 7 AND MID$(z, 7, 1) = " " AND LEFT$(z, 1) <> " " THEN
+            farbe = &HE0C060        ' die Kennung einer Uebergabe im Verlauf
+        END IF
+        IF farbe >= 0 AND LEN(z) > 0 THEN
+            ARRAY_PUSH(s, pos) : ARRAY_PUSH(l, LEN(z)) : ARRAY_PUSH(f, farbe)
+        END IF
+        pos = pos + LEN(z) + 1
+    NEXT
+    GUI_TEXTAREA_SPANS(taGit, s, l, f)
+END SUB
+
+' Die geaenderten Zeilen am Rand: `git diff -U0` nennt sie in den
+' @@-Koepfen (`@@ -alt,n +neu,m @@`). Nur die NEUE Seite zaehlt -- was
+' geloescht wurde, steht in der Datei nicht mehr.
+DIM gitZeilen AS ARRAY OF INTEGER : gitZeilen = []
+DIM gitDateiStand AS STRING : gitDateiStand = "-"
+
+SUB gitRandNachziehen(erzwingen AS BOOLEAN)
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF NOT gitRandAn OR pfad = "" THEN
+        IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
+        RETURN
+    END IF
+    ' Nur nach dem Sichern oder Oeffnen neu fragen: ein Prozessstart je
+    ' Bild waere die IDE zum Stillstand gebracht.
+    DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(tabGesichert[aktiverTab]))
+    IF NOT erzwingen AND stand = gitDateiStand THEN RETURN
+    gitDateiStand = stand
+    DIM text AS STRING : text = gitAusgabe$("diff", "--no-color", "-U0")
+    DIM neu AS ARRAY OF INTEGER : neu = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(text, NL)
+        IF LEFT$(z, 2) <> "@@" THEN CONTINUE
+        DIM p AS INTEGER : p = INSTR(z, "+")
+        IF p < 0 THEN CONTINUE
+        DIM rest AS STRING : rest = MID$(z, p + 1, LEN(z))
+        DIM ende AS INTEGER : ende = INSTR(rest, " ")
+        IF ende >= 0 THEN rest = LEFT$(rest, ende)
+        DIM komma AS INTEGER : komma = INSTR(rest, ",")
+        DIM von AS INTEGER : von = INT(VAL(IIF(komma >= 0, LEFT$(rest, komma), rest)))
+        DIM anzahl AS INTEGER : anzahl = 1
+        IF komma >= 0 THEN anzahl = INT(VAL(MID$(rest, komma + 1, LEN(rest))))
+        DIM k AS INTEGER
+        FOR k = 0 TO MIN(anzahl, 2000) - 1
+            ARRAY_PUSH(neu, von + k)
+        NEXT
+    NEXT
+    gitZeilen = neu
+    markenSchluessel = ""
+    protokoll("git rand " + STR$(LEN(neu)))
+END SUB
+
 FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO LEN(hpZeilen) - 1
@@ -1470,6 +1604,11 @@ SUB markenNachziehen()
     NEXT
     FOR i = 0 TO LEN(lzZeilen) - 1
         IF lzDateien[i] = pfad THEN ARRAY_PUSH(zeilen, lzZeilen[i]) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lzZeilen[i])
+    NEXT
+    ' Geaenderte Zeilen ganz zuletzt: sie sind die schwaechste Aussage und
+    ' sollen keinen Haltepunkt zudecken.
+    FOR i = 0 TO LEN(gitZeilen) - 1
+        ARRAY_PUSH(zeilen, gitZeilen[i]) : ARRAY_PUSH(farben, &H50A070) : schl = schl + "g" + STR$(gitZeilen[i])
     NEXT
     IF schl = markenSchluessel THEN RETURN
     markenSchluessel = schl
@@ -2792,6 +2931,9 @@ paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
 paletteEintrag("Als eigenstaendiges Programm exportieren", "export", "Strg+F6")
 paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
 paletteEintrag("Wer hat das geschrieben (git blame)", "blame", "Strg+Umschalt+B")
+paletteEintrag("Was habe ich geaendert (git diff)", "diff", "Strg+Umschalt+D")
+paletteEintrag("Verlauf dieser Datei (git log)", "verlauf", "")
+paletteEintrag("Geaenderte Zeilen am Rand", "git_rand", "")
 paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
@@ -2949,6 +3091,14 @@ SUB befehl(k AS STRING)
         CASE "schnell" : schnellOeffnen()
         CASE "todo" : projektSuchen("TODO", "FIXME")
         CASE "blame" : blameZeigen()
+        CASE "diff" : gitZeigen("diff")
+        CASE "verlauf" : gitZeigen("log")
+        CASE "git_rand"
+            gitRandAn = NOT gitRandAn
+            GUI_MENU_CHECK(miGitRand, gitRandAn)
+            gitDateiStand = "-"
+            gitRandNachziehen(TRUE)
+            konfigSichern()
         CASE "kommentar" : kommentarUmschalten()
         CASE "duplizieren" : zeilenDuplizieren()
         CASE "zeile_weg" : zeilenLoeschen()
@@ -3259,6 +3409,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miSchnell) THEN befehl("schnell")
     IF GUI_CLICKED(miTodo) THEN befehl("todo")
     IF GUI_CLICKED(miBlame) THEN befehl("blame")
+    IF GUI_CLICKED(miDiff) THEN befehl("diff")
+    IF GUI_CLICKED(miVerlauf) THEN befehl("verlauf")
+    IF GUI_CLICKED(miGitRand) THEN befehl("git_rand")
     IF GUI_CLICKED(miKommentar) THEN befehl("kommentar")
     IF GUI_CLICKED(miDuplizieren) THEN befehl("duplizieren")
     IF GUI_CLICKED(miZeileWeg) THEN befehl("zeile_weg")
@@ -3296,6 +3449,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
     werkzeugeAufraeumen()
     IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
+    gitRandNachziehen(FALSE)
 
     ' --- Dialoge auswerten ---
     IF dlgSuche <> 0 THEN
