@@ -1256,6 +1256,7 @@ Zeilen und Spalten zählen ab 1, in Zeichen.
 | `CODE_DEFINITION(quelltext$, zeile, spalte)` | TUPLE (zeile, spalte) | wo das Wort definiert ist; `(-1, -1)` ohne Definition in diesem Text |
 | `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
 | `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden |
+| `CODE_FORMAT$(quelltext$ [, einruecken])` | STRING | der Quelltext formatiert wie durch `dhrt fmt`: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit `einruecken` (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler) |
 
 ```basic
 DIM j AS JSON_HANDLE

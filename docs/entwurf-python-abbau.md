@@ -27,7 +27,12 @@
 > Debugger, und `installer/Drachenhauch-IDE.iss` -- ein Installer ohne
 > Python (33 MB statt 92). Damit ist die Liste aus Abschnitt C bis auf
 > Willkommensseite und Themen abgearbeitet; was der Qt-IDE noch voraus ist,
-> steht in `docs/ide.md` unter "Was noch fehlt".
+> steht in `docs/ide.md` unter "Was noch fehlt". **Stufe 4 (2026-09-09):**
+> Willkommensseite, Sitzung und Einstellungen (`ide.json`), Datei im
+> Projekt oeffnen, die Zeilen-Handgriffe samt Formatieren (`CODE_FORMAT$`),
+> Lesezeichen, Gliederung, bedingte Haltepunkte, Export als Programm,
+> Druckdialog, TODO-Liste, Tastenkuerzel-Uebersicht -- gemessen an den
+> Menues der Qt-IDE; der Rest dort steht jetzt in `docs/ide.md`.
 >
 > **Weg B hat begonnen (gleicher Tag):** der Form-Designer als
 > `examples/197_form_designer.dh` (860 Zeilen gegen 5 055, Faktor 0,17) auf
