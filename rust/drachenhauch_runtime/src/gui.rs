@@ -900,6 +900,14 @@ struct LayoutState {
     rahmen: bool,            // zum Entwickeln sichtbar machen
 }
 
+/// Die Einrueckungs-Regeln eines Textbereichs, aus dem Widget gezogen.
+struct EinzugRegeln {
+    auto_einzug: bool,
+    einzug_anfang: Vec<String>,
+    einzug_ende: Vec<String>,
+    tabbreite: i32,
+}
+
 pub struct Widget {
     kind: Kind,
     x: i32, y: i32, w: i32, h: i32,
@@ -1034,6 +1042,14 @@ pub struct Widget {
     // die eine ist `caret`/`sel_anchor` und bleibt es. Alt+Klick legt eine
     // dazu, ESC raeumt sie weg.
     marken_zusatz: Vec<(i32, i32)>,
+    // Einrueckung beim Zeilenumbruch (nur TextArea). `auto_einzug` uebernimmt
+    // die Einrueckung der laufenden Zeile; die drei Wortlisten machen daraus
+    // eine, die die SPRACHE kennt -- welche Woerter das sind, weiss nur der
+    // Aufrufer. Alle Woerter in Grossbuchstaben.
+    auto_einzug: bool,
+    einzug_anfang: Vec<String>,   // Zeile faengt damit an -> eine Stufe mehr
+    einzug_ende: Vec<String>,     // Zeile endet damit -> eine Stufe mehr
+    einzug_aus: Vec<String>,      // getippt -> die Zeile selbst eine zurueck
     // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
     //
     // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
@@ -1942,6 +1958,33 @@ impl Gui {
         Ok(z)
     }
 
+    /// Woerter, die die Einrueckung steuern (GUI_TEXTAREA_INDENT_WORDS).
+    ///
+    /// Drei Listen, alle ohne Ruecksicht auf Gross/Klein:
+    /// `anfang` -- die Zeile faengt damit an, die naechste rueckt ein
+    /// (`SUB`, `FOR`, `WHILE`); `ende` -- die Zeile endet damit
+    /// (`THEN`; `IF x THEN y = 1` endet nicht darauf und rueckt darum nicht
+    /// ein); `aus` -- wird dieses Wort allein in eine Zeile getippt, rueckt
+    /// sie selbst eine Stufe zurueck (`END`, `NEXT`, `ELSE`).
+    ///
+    /// Zwei Listen fuer "mehr" und nicht eine: `SUB` oeffnet am ANFANG,
+    /// `THEN` am ENDE -- mit einer Liste ruckte auch ein `END SUB` die
+    /// naechste Zeile ein. Welche Woerter das sind, weiss nur der Aufrufer;
+    /// die Laufzeit kennt hier keine Sprache.
+    pub fn textarea_indent_words(&mut self, h: i64, anfang: Vec<String>, ende: Vec<String>,
+                                 aus: Vec<String>) -> Result<(), String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_INDENT_WORDS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_INDENT_WORDS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        let gross = |v: Vec<String>| v.into_iter().map(|s| s.trim().to_uppercase())
+                                      .filter(|s| !s.is_empty()).collect();
+        wd.einzug_anfang = gross(anfang);
+        wd.einzug_ende = gross(ende);
+        wd.einzug_aus = gross(aus);
+        Ok(())
+    }
+
     /// Eine weitere Schreibmarke setzen (GUI_TEXTAREA_ADD_CARET).
     ///
     /// Tippen, Enter, Ruecktaste, Entf, Tabulator und Einfuegen wirken dann
@@ -1993,9 +2036,13 @@ impl Gui {
             // Umbruch an Wortgrenzen -- fuer Notizen und Briefe, nicht fuer
             // Code. Mit Umbruch gibt es keinen waagerechten Versatz mehr.
             "umbruch" | "wrap" => { wd.umbruch = n != 0; if wd.umbruch { wd.scroll_x = 0; } }
+            // Eine neue Zeile faengt mit der Einrueckung der alten an. Das
+            // allein ist sprachfrei; die Woerter, die eine Stufe mehr oder
+            // weniger bedeuten, kommen ueber GUI_TEXTAREA_INDENT_WORDS.
+            "auto_einzug" | "auto_indent" => wd.auto_einzug = n != 0,
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
-                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch", other)),
+                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug", other)),
         }
         Ok(())
     }
@@ -2113,6 +2160,8 @@ impl Gui {
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
             faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
+            auto_einzug: false, einzug_anfang: Vec::new(),
+            einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -6517,6 +6566,59 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
     }
 
+    /// Was ein Textbereich ueber Einrueckung weiss -- herausgeloest, weil der
+    /// Enter-Zweig es in einem Verschluss braucht und dort kein Widget mehr
+    /// ausleihen kann.
+    fn einzug_regeln(w: &Widget) -> EinzugRegeln {
+        EinzugRegeln {
+            auto_einzug: w.auto_einzug,
+            einzug_anfang: w.einzug_anfang.clone(),
+            einzug_ende: w.einzug_ende.clone(),
+            tabbreite: w.tabbreite,
+        }
+    }
+
+    /// Anfang und Ende der Zeile, in der `pos` steht (Zeichen-Indizes).
+    fn zeile_um(chars: &[char], pos: usize) -> (usize, usize) {
+        let pos = pos.min(chars.len());
+        let von = chars[..pos].iter().rposition(|&c| c == '\n').map(|i| i + 1).unwrap_or(0);
+        let bis = chars[pos..].iter().position(|&c| c == '\n').map(|i| pos + i).unwrap_or(chars.len());
+        (von, bis)
+    }
+
+    /// Der Einzug, mit dem eine neue Zeile hinter `pos` anfangen soll.
+    ///
+    /// Grundlage ist die Einrueckung der laufenden Zeile -- das allein ist
+    /// sprachfrei und schon der halbe Nutzen. Eine Stufe mehr gibt es, wenn
+    /// die Zeile mit einem der `einzug_anfang`-Woerter beginnt oder auf eines
+    /// der `einzug_ende`-Woerter endet. Zwei Listen und nicht eine: `SUB`
+    /// oeffnet am ANFANG, `THEN` am ENDE -- mit einer Liste ruckte auch ein
+    /// `END SUB` die naechste Zeile ein.
+    fn neuer_einzug(w: &EinzugRegeln, chars: &[char], pos: usize) -> String {
+        if !w.auto_einzug { return String::new(); }
+        let (von, _) = Self::zeile_um(chars, pos);
+        let mut einzug = String::new();
+        for &c in &chars[von..pos.min(chars.len())] {
+            if c == ' ' || c == '\t' { einzug.push(c); } else { break; }
+        }
+        let bis_marke: String = chars[von..pos.min(chars.len())].iter().collect();
+        let text = bis_marke.trim().to_uppercase();
+        if !text.is_empty() {
+            let wort = |s: &str, w: &str| -> bool {
+                s == w || (s.len() > w.len() && s.starts_with(w)
+                           && !s[w.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
+            };
+            let endet = |s: &str, w: &str| -> bool {
+                s == w || (s.len() > w.len() && s.ends_with(w)
+                           && !s[..s.len() - w.len()].ends_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
+            };
+            let mehr = w.einzug_anfang.iter().any(|k| wort(&text, k))
+                    || w.einzug_ende.iter().any(|k| endet(&text, k));
+            if mehr { einzug.push_str(&" ".repeat(w.tabbreite.max(1) as usize)); }
+        }
+        einzug
+    }
+
     /// Alle Schreibmarken als (caret, anker), die erste ist die fuehrende.
     fn marken(w: &Widget) -> Vec<(i32, i32)> {
         let mut m = vec![(w.caret, w.sel_anchor)];
@@ -6939,12 +7041,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // von vorher, mit mehreren derselbe an jeder Stelle.
         let mut marken: Vec<(i32, i32)> = vec![(caret, anchor)];
         marken.extend(zusatz.iter().copied());
+        // Wurde in diesem Bild Text an den Marken eingesetzt? Danach wird
+        // geprueft, ob die Zeile nun ausrueckt.
+        let mut geschrieben = false;
         if !ctrl {
             let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
             if !typed.is_empty() {
                 Self::an_marken(&mut chars, &mut marken, |_, c, a| {
                     ((c.min(a)) as usize, (c.max(a)) as usize, typed.clone())
                 });
+                geschrieben = true;
             }
         } else {
             // Alles markieren raeumt die weiteren Marken weg: eine Auswahl
@@ -6974,6 +7080,49 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 Self::an_marken(&mut chars, &mut marken, |_, c, a| {
                     ((c.min(a)) as usize, (c.max(a)) as usize, ins.clone())
                 });
+                geschrieben = true;
+            }
+        }
+        // Ausruecken: steht in der Zeile jetzt NUR ein Wort aus der
+        // `aus`-Liste (END, NEXT, ELSE ...), rueckt sie eine Stufe zurueck.
+        // Ohne das waere das Einruecken die halbe Sache -- das schliessende
+        // Wort bliebe unter dem Rumpf stehen.
+        //
+        // Die Bedingung ist "die Zeile IST das Wort", nicht "faengt damit
+        // an": so rueckt sie genau einmal aus, und was danach noch dazukommt
+        // (`END IF`) aendert nichts mehr. Ein eingefuegter Block trifft sie
+        // aus demselben Grund nicht.
+        if geschrieben {
+            let aus = self.windows[wi].widgets[i].einzug_aus.clone();
+            let breite = self.windows[wi].widgets[i].tabbreite.max(1) as usize;
+            if !aus.is_empty() {
+                // Nicht ueber `an_marken`: dort setzt jede Aenderung die Marke
+                // ANS ENDE des Eingesetzten -- hier faellt aber etwas VOR ihr
+                // weg, und sie muss mitrutschen statt an den Zeilenanfang zu
+                // springen. (Genau das hat der Test gezeigt: die naechste
+                // Eingabe landete dann vor der Einrueckung.)
+                //
+                // Die betroffenen Zeilen einmal einsammeln (zwei Marken in
+                // derselben Zeile ruecken sie nur EINmal aus) und von hinten
+                // nach vorn abarbeiten -- dann bleiben die Stellen davor gueltig.
+                let mut zeilen: Vec<usize> = marken.iter()
+                    .map(|m| Self::zeile_um(&chars, m.0.clamp(0, chars.len() as i32) as usize).0)
+                    .collect();
+                zeilen.sort_unstable();
+                zeilen.dedup();
+                zeilen.reverse();
+                for von in zeilen {
+                    let (_, bis) = Self::zeile_um(&chars, von);
+                    let zeile: String = chars[von..bis].iter().collect();
+                    let text = zeile.trim().to_uppercase();
+                    let vorlauf = zeile.chars().take_while(|c| *c == ' ' || *c == '\t').count();
+                    if vorlauf < breite || !aus.iter().any(|k| *k == text) { continue; }
+                    chars.drain(von..von + breite);
+                    for m in marken.iter_mut() {
+                        if (m.0 as usize) >= von + breite { m.0 -= breite as i32; }
+                        if (m.1 as usize) >= von + breite { m.1 -= breite as i32; }
+                    }
+                }
             }
         }
         // Tabulator rueckt ein, statt das Bedienelement zu wechseln --
@@ -6995,10 +7144,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 (lo as usize, (c.max(a)) as usize, " ".repeat(n.max(1) as usize))
             });
         }
-        // Enter = Umbruch (ersetzt evtl. Selektion).
+        // Enter = Umbruch (ersetzt evtl. Selektion), mit der Einrueckung
+        // der laufenden Zeile, wenn das Feld danach verlangt.
         if g.key_pressed(KEY_ENTER) {
-            Self::an_marken(&mut chars, &mut marken, |_, c, a| {
-                ((c.min(a)) as usize, (c.max(a)) as usize, "\n".to_string())
+            let wref = Self::einzug_regeln(&self.windows[wi].widgets[i]);
+            Self::an_marken(&mut chars, &mut marken, |ch, c, a| {
+                let lo = c.min(a);
+                let ein = Self::neuer_einzug(&wref, ch, lo as usize);
+                (lo as usize, (c.max(a)) as usize, format!("\n{}", ein))
             });
         }
         // Backspace / Delete (Selektion hat Vorrang).

@@ -4245,6 +4245,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_INDENT_WORDS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_INSERT",
    "kind": "core",
    "signature": "GUI_TEXTAREA_INSERT(ta, text$)",

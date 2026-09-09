@@ -676,6 +676,17 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
+    ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
+    ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
+    ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
+    GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+    GUI_TEXTAREA_INDENT_WORDS(ta, _
+        ["SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", "FOR", _
+         "WHILE", "REPEAT", "DO", "SELECT", "CASE", "TRY", "WITH", "ELSE", _
+         "ELSEIF", "ELIF", "CATCH", "FINALLY", "ENUM"], _
+        ["THEN"], _
+        ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
+         "CATCH", "FINALLY", "CASE"])
 END SUB
 
 ' Der Umbruch gilt fuer ALLE Reiter, nicht nur den vorderen -- ein Schalter,

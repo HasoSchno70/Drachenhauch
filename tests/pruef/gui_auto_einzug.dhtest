@@ -1,0 +1,277 @@
+' Einrueckung beim Zeilenumbruch (GUI_TEXTAREA_SET "auto_einzug" +
+' GUI_TEXTAREA_INDENT_WORDS). Getippt wird ueber die Zwischenablage
+' (Strg+V): raylibs Wiedergabe legt Tasten in die Tastenwarteschlange, aber
+' keine ZEICHEN in die Zeichenwarteschlange. Format: docs/werkzeuge.md.
+--- seriell
+
+=== ohne den schalter bleibt alles wie zuvor
+' Die Gegenprobe zuerst: ein Textbereich ohne auto_einzug faengt die neue
+' Zeile am linken Rand an.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "    PRINT 1")
+GUI_TEXTAREA_GOTO(ta, 1, 12)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[    PRINT 1|]
+
+=== die neue zeile uebernimmt die einrueckung
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_SET_TEXT(ta, "    PRINT 1")
+GUI_TEXTAREA_GOTO(ta, 1, 12)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[    PRINT 1|    ]
+
+=== ein woerterbuch-anfang rueckt eine stufe weiter ein
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_SET_TEXT(ta, "SUB gruessen()")
+GUI_TEXTAREA_GOTO(ta, 1, 15)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[SUB gruessen()|    ]
+
+=== ein END SUB rueckt die naechste zeile NICHT ein
+' Genau dafuer sind es zwei Listen: mit einer haette "endet auf SUB"
+' auch hier zugeschlagen.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_SET_TEXT(ta, "END SUB")
+GUI_TEXTAREA_GOTO(ta, 1, 8)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[END SUB|]
+
+=== THEN am ende rueckt ein, ein einzeiliges IF nicht
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB"], ["THEN"], ["END"])
+GUI_SET_TEXT(ta, "IF x THEN")
+GUI_TEXTAREA_GOTO(ta, 1, 10)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x THEN|    ]
+
+=== ein einzeiliges IF rueckt nicht ein
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB"], ["THEN"], ["END"])
+GUI_SET_TEXT(ta, "IF x THEN y = 1")
+GUI_TEXTAREA_GOTO(ta, 1, 16)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x THEN y = 1|]
+
+=== ein getipptes END rueckt seine zeile zurueck
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB"], ["THEN"], ["END", "NEXT"])
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "    PRINT 1" + CHR$(10) + "    ")
+GUI_TEXTAREA_GOTO(ta, 3, 5)
+GUI_FOCUS(ta)
+CLIPBOARD_SET("END")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Strg+V
+c 4
+e 4 2 341 0 0 0 // Strg runter
+e 4 2 86 0 0 0 // V runter
+e 6 1 86 0 0 0 // V hoch
+e 6 1 341 0 0 0 // Strg hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[SUB a()|    PRINT 1|END]
+
+=== was danach noch getippt wird, rueckt nicht weiter aus
+' Die Bedingung ist "die Zeile IST das Wort" -- `END IF` faellt nicht mehr
+' darunter, sonst wanderte die Zeile bei jedem Anschlag weiter nach links.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["IF"], ["THEN"], ["END"])
+GUI_SET_TEXT(ta, "IF x THEN" + CHR$(10) + "        ")
+GUI_TEXTAREA_GOTO(ta, 2, 9)
+GUI_FOCUS(ta)
+CLIPBOARD_SET("END")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# zweimal Strg+V: erst END (rueckt aus), dann noch einmal END (kein Wort mehr)
+c 8
+e 4 2 341 0 0 0 //
+e 4 2 86 0 0 0 //
+e 6 1 86 0 0 0 //
+e 6 1 341 0 0 0 //
+e 14 2 341 0 0 0 //
+e 14 2 86 0 0 0 //
+e 16 1 86 0 0 0 //
+e 16 1 341 0 0 0 //
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x THEN|    ENDEND]

@@ -521,3 +521,17 @@ def test_marken_auf_jede_fundstelle_und_tippen_aendert_alle(tmp_path):
     log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="X")
     assert "marken 3" in log, log
     assert quelle.read_text(encoding="utf-8") == "Xhp = 1\nXhp = Xhp + 1\nhpmax = 9\n"
+
+
+# ---------------------------------------------------------------- Stufe 6
+
+def test_neue_zeile_uebernimmt_die_einrueckung_und_rueckt_ein(tmp_path):
+    """Die Marke steht am Ende von `SUB a()`, Enter: die neue Zeile ist eine
+    Stufe eingerückt. Danach `END` über die Zwischenablage -- das rückt sich
+    selbst wieder heraus."""
+    quelle = _datei(tmp_path, "SUB a()")
+    ev = _taste(20, RL_END) + _taste(40, RL_ENTER) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=180, events=ev, zwischenablage="END")
+    assert quelle.read_text(encoding="utf-8") == "SUB a()\nEND\n", (
+        repr(quelle.read_text(encoding="utf-8")), log)

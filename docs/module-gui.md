@@ -1669,6 +1669,34 @@ Kein Constraint-System — für ein Formular reicht das, und man versteht es noc
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
+## Einrückung beim Zeilenumbruch
+
+`GUI_TEXTAREA_SET(ta, "auto_einzug", 1)` lässt eine neue Zeile mit der
+Einrückung der alten anfangen. Das allein ist sprachfrei und schon der halbe
+Nutzen; die Wörter, die eine Stufe mehr oder weniger bedeuten, kommen von
+außen:
+
+```basic
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FUNCTION", "FOR", "WHILE", "IF"], _
+                              ["THEN"], _
+                              ["END", "NEXT", "WEND", "ELSE"])
+```
+
+- **`anfang`** — die Zeile fängt mit dem Wort an, die nächste rückt ein.
+- **`ende`** — die Zeile endet damit. Dafür gibt es eine eigene Liste:
+  `SUB` öffnet am **Anfang**, `THEN` am **Ende** — mit einer Liste rückte
+  auch ein `END SUB` die nächste Zeile ein. Und `IF x THEN y = 1` endet nicht
+  auf `THEN`, rückt also richtigerweise nicht ein.
+- **`aus`** — steht dieses Wort **allein** in einer Zeile, rückt sie selbst
+  eine Stufe zurück. Die Bedingung ist „die Zeile **ist** das Wort", nicht
+  „fängt damit an": so rückt sie genau einmal aus, und was danach noch
+  dazukommt (`END IF`) ändert nichts mehr. Ein eingefügter Block trifft sie
+  aus demselben Grund nicht.
+
+Die Laufzeit kennt hier keine Sprache — dasselbe Prinzip wie bei der
+Faltung. Ein Textbereich ohne `auto_einzug` verhält sich unverändert.
+
 ## Mehrere Schreibmarken im Textbereich
 
 **Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
@@ -2073,7 +2101,7 @@ einem brauchbaren Code-Feld.
 
 | Funktion | Wirkung |
 |---|---|
-| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite` |
+| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite`, `umbruch`, `auto_einzug` |
 | `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |
@@ -2084,6 +2112,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
+| `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
 | `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
 | `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
 | `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine einzige Schreibmarke |
