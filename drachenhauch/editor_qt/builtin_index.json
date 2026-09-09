@@ -4287,6 +4287,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_SWATCHES",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_SWATCH_CLICKED",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SWATCH_CLICKED(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_VIEW",
    "kind": "core",
    "signature": "GUI_TEXTAREA_VIEW(ta)",

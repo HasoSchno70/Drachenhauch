@@ -6028,6 +6028,14 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_folded" => Value::Bool(self.gui.textarea_folded(
                 gi(a, 0, "GUI_TEXTAREA_FOLDED")?, gi(a, 1, "GUI_TEXTAREA_FOLDED")?)?),
+            "gui_textarea_swatches" => {
+                let n = "GUI_TEXTAREA_SWATCHES";
+                if a.len() != 4 { return Err(format!("{}: erwartet (ta, starts, laengen, farben)", n)); }
+                self.gui.textarea_swatches(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?, ganze(&a[3], n)?)?;
+                Value::Nil
+            }
+            "gui_textarea_swatch_clicked" => Value::Int(
+                self.gui.textarea_swatch_clicked(gi(a, 0, "GUI_TEXTAREA_SWATCH_CLICKED")?)?),
             "gui_textarea_indent_words" => {
                 let n = "GUI_TEXTAREA_INDENT_WORDS";
                 if a.len() != 4 { return Err(format!("{}: erwartet (ta, anfang, ende, aus)", n)); }

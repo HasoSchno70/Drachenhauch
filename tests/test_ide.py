@@ -44,6 +44,7 @@ RL_L = 76
 RL_RIGHT, RL_END = 262, 269
 RL_SPACE, RL_LEFT = 32, 263
 RL_T, RL_W = 84, 87
+RL_F3, RL_F12, RL_U = 292, 301, 85
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
@@ -236,6 +237,16 @@ def test_ausdruck_im_angehaltenen_debugger(tmp_path):
 
 
 # ---------------------------------------------------------------- Stufe 4
+
+MAUS_HOCH, MAUS_RUNTER, MAUS_POS = 5, 6, 7
+
+
+def _maus(frame, x, y):
+    """Zeiger hinsetzen und klicken -- die Position braucht zwei Bilder,
+    weil das gui den Druck erst im naechsten sieht."""
+    return [(frame, MAUS_POS, x, y), (frame + 1, MAUS_POS, x, y),
+            (frame + 2, MAUS_RUNTER, 0), (frame + 4, MAUS_HOCH, 0)]
+
 
 def _datei(tmp_path, text, name="spiel.dh"):
     p = tmp_path / name
@@ -693,3 +704,89 @@ def test_faltung_kennt_auch_eingerueckte_bloecke(tmp_path):
     ev = _taste(30, RL_DOWN) + _taste(70, RL_F4)
     log = _ide(tmp_path, quelle, frames=180, events=ev)
     assert "falte 2 zu" in log, log
+
+
+# ---------------------------------------------------------------- Stufe 7
+
+def test_symbolspur_nennt_klasse_und_methode(tmp_path):
+    """Die Marke in der Methode: die Spur über dem Code sagt Datei, Klasse
+    und Methode -- auch wenn der Kopf des Blocks aus dem Bild gerollt ist."""
+    quelle = _datei(tmp_path, "CLASS Held\n    SUB treffer()\n        PRINT 1\n"
+                              "    END SUB\nEND CLASS\n")
+    ev = _taste(30, RL_DOWN) + _taste(50, RL_DOWN)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    spur = [z for z in log if z.startswith("spur ")]
+    assert spur, log
+    assert spur[-1].endswith("class Held  >  treffer"), spur
+
+
+def test_definition_hier_zeigen(tmp_path):
+    """Alt+F12 auf dem Aufruf zeigt die Definition, ohne die Stelle zu
+    verlassen. Gegenprobe: auf einer Zahl gibt es nichts zu zeigen."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n")
+    ev = []
+    for k in range(3):
+        ev += _taste(30 + k * 6, RL_DOWN)
+    ev += _taste(70, RL_F12, RL_LALT)
+    log = _ide(tmp_path, quelle, frames=170, events=ev)
+    assert "peek 1" in log, log
+
+
+def test_eingebaute_befehle_nachschlagen(tmp_path):
+    """Strg+F3 öffnet das Verzeichnis; es kennt weit über tausend Namen --
+    dieselbe Liste, aus der die Vervollständigung schöpft."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=150, events=_taste(40, RL_F3, RL_LCTRL))
+    zeilen = [z for z in log if z.startswith("befehle ")]
+    assert zeilen and int(zeilen[0].split()[1]) > 1000, log
+
+
+def test_einstellungen_stellen_die_schrift_um(tmp_path):
+    """Strg+U öffnet die Einstellungen. Die Schalter wirken sofort -- ein
+    Thema, das man erst nach dem Schließen sieht, wählt man blind."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=150, events=_taste(40, RL_U, RL_LCTRL))
+    assert "einstellungen auf" in log, log
+
+
+def test_automatisch_sichern_nach_der_eingestellten_ruhe(tmp_path):
+    """Mit `autosichern: 1` in der ide.json: eine Zeile eingefügt, kein
+    Strg+S -- und die Datei steht trotzdem auf der Platte. Gegenprobe im
+    selben Text: ohne die Einstellung bleibt sie, wie sie war."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    (tmp_path / "ide.json").write_text(json.dumps({"autosichern": 1}), encoding="utf-8")
+    log = _ide(tmp_path, quelle, frames=240, events=_taste(40, RL_V, RL_LCTRL),
+               zwischenablage="X")
+    assert "auto gesichert" in log, log
+    assert quelle.read_text(encoding="utf-8").startswith("X"), (
+        repr(quelle.read_text(encoding="utf-8")), log)
+
+
+def test_ohne_die_einstellung_wird_nicht_von_selbst_gesichert(tmp_path):
+    """Die Gegenprobe: derselbe Ablauf ohne `autosichern`."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=240, events=_taste(40, RL_V, RL_LCTRL),
+               zwischenablage="X")
+    assert "auto gesichert" not in log, log
+    assert quelle.read_text(encoding="utf-8") == "PRINT 1\n"
+
+
+def test_farbfeld_oeffnet_den_waehler_und_schreibt_zurueck(tmp_path):
+    """Zwei Läufe: der erste sagt, WO das Farbfeld liegt (die Geometrie
+    steht erst zur Laufzeit fest), der zweite klickt darauf und übernimmt.
+    Danach steht eine andere Farbe in der Datei."""
+    from PIL import Image
+    quelle = _datei(tmp_path, "SCREEN(320, 240)\nCLS(&HFF8800)\n")
+    schuss = tmp_path / "bild.png"
+    _ide(tmp_path, quelle, frames=120, screenshot=schuss)
+    im = Image.open(schuss).convert("RGB")
+    punkte = [(x, y) for y in range(60, 200) for x in range(220, 1400)
+              if _nahe(im.getpixel((x, y)), (0xFF, 0x88, 0x00), 20)]
+    assert punkte, "kein Farbfeld im Bild"
+    mx = sum(x for x, _ in punkte) // len(punkte)
+    my = sum(y for _, y in punkte) // len(punkte)
+    # Klick auf das Feld, dann [Uebernehmen] im Waehler
+    ev = _maus(40, mx, my)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert any(z.startswith("farbfeld ") for z in log), (log, mx, my)
