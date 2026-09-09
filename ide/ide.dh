@@ -120,6 +120,12 @@ DIM gliederungSchluessel AS STRING : gliederungSchluessel = ""
 
 DIM hell AS BOOLEAN : hell = FALSE
 DIM codeGroesse AS INTEGER : codeGroesse = 16
+DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
+' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
+' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
+' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
+' durch die Bruecke, obwohl sich nichts geaendert hat.
+DIM faltSchluessel AS STRING : faltSchluessel = ""
 
 ' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
 DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
@@ -159,6 +165,29 @@ IF FILEEXISTS(konfigPfad) THEN
         konfig = JSON_PARSE("{}")     ' eine kaputte Datei ist kein Grund, nicht zu starten
     END TRY
 END IF
+' Sitzung JE PROJEKT. Im Speicher als drei gleich lange Felder, nicht als
+' JSON-Teilbaum: das json-Modul kann einen Teilbaum nicht herausloesen, und
+' ein Pfad als JSON-Schluessel kollidierte ohnehin mit der Punkt-Notation
+' ("mein.spiel" waere zwei Ebenen).
+CONST PROJEKTE_MAX = 12
+DIM projOrdner AS ARRAY OF STRING : projOrdner = []
+DIM projDateien AS ARRAY OF STRING : projDateien = []     ' Pfade, mit | getrennt
+DIM projAktiv AS ARRAY OF INTEGER : projAktiv = []
+IF JSON_HAS(konfig, "projekte") THEN
+    DIM pj AS INTEGER
+    FOR pj = 0 TO JSON_LEN(konfig, "projekte") - 1
+        DIM pp AS STRING : pp = "projekte." + STR$(pj)
+        DIM pfl AS ARRAY OF STRING : pfl = []
+        DIM pd AS INTEGER
+        FOR pd = 0 TO JSON_LEN(konfig, pp + ".sitzung") - 1
+            ARRAY_PUSH(pfl, JSON_GET_STRING(konfig, pp + ".sitzung." + STR$(pd)))
+        NEXT
+        ARRAY_PUSH(projOrdner, JSON_GET_STRING(konfig, pp + ".ordner"))
+        ARRAY_PUSH(projDateien, JOIN$(pfl, "|"))
+        ARRAY_PUSH(projAktiv, JSON_GET_INT(konfig, pp + ".aktiv"))
+    NEXT
+END IF
+
 DIM zuletzt AS ARRAY OF STRING : zuletzt = []
 IF JSON_HAS(konfig, "zuletzt") THEN
     DIM kz AS INTEGER
@@ -168,6 +197,7 @@ IF JSON_HAS(konfig, "zuletzt") THEN
 END IF
 IF JSON_HAS(konfig, "hell") THEN hell = JSON_GET_BOOL(konfig, "hell")
 IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "schrift")))
+IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -281,6 +311,11 @@ DIM miThema AS INTEGER : miThema = GUI_MENU_ITEM(mAnsicht, "Helles Thema")
 GUI_MENU_CHECK(miThema, hell)
 DIM miVollbild AS INTEGER : miVollbild = GUI_MENU_ITEM(mAnsicht, "Vollbild", "Alt+Enter")
 GUI_MENU_SEPARATOR(mAnsicht)
+DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
+GUI_MENU_CHECK(miUmbruch, FALSE)
+DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
+DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
+DIM miFaltenAuf AS INTEGER : miFaltenAuf = GUI_MENU_ITEM(mAnsicht, "Alles aufklappen", "Umschalt+F4")
 DIM miGroesser AS INTEGER : miGroesser = GUI_MENU_ITEM(mAnsicht, "Schrift groesser")
 DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Schrift kleiner")
 
@@ -404,6 +439,7 @@ END SUB
 SUB konfigSichern()
     JSON_SET_BOOL(konfig, "hell", hell)
     JSON_SET_INT(konfig, "schrift", codeGroesse)
+    JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -415,6 +451,42 @@ SUB konfigSichern()
         IF tabPfade[i] <> "" THEN JSON_APPEND_STRING(konfig, "sitzung", tabPfade[i])
     NEXT
     JSON_SET_INT(konfig, "aktiv", aktiverTab)
+    ' Dieselbe Sitzung noch einmal unter dem PROJEKTordner: wer an zwei
+    ' Sachen arbeitet, will beim Wechsel nicht die Reiter der anderen
+    ' wiederfinden. Der laufende Ordner kommt nach vorn, alte fallen hinten
+    ' heraus -- eine Datei, die jeden je besuchten Ordner behaelt, waechst
+    ' fuer immer.
+    DIM offen AS ARRAY OF STRING : offen = []
+    DIM pi AS INTEGER
+    FOR pi = 0 TO tabAnzahl - 1
+        IF tabPfade[pi] <> "" THEN ARRAY_PUSH(offen, tabPfade[pi])
+    NEXT
+    DIM alt AS INTEGER : alt = ARRAY_INDEXOF(projOrdner, projektOrdner)
+    IF alt >= 0 THEN
+        ARRAY_REMOVE_AT(projOrdner, alt) : ARRAY_REMOVE_AT(projDateien, alt) : ARRAY_REMOVE_AT(projAktiv, alt)
+    END IF
+    ARRAY_INSERT(projOrdner, 0, projektOrdner)
+    ARRAY_INSERT(projDateien, 0, JOIN$(offen, "|"))
+    ARRAY_INSERT(projAktiv, 0, aktiverTab)
+    WHILE LEN(projOrdner) > PROJEKTE_MAX
+        DIM letzt AS INTEGER : letzt = LEN(projOrdner) - 1
+        ARRAY_REMOVE_AT(projOrdner, letzt) : ARRAY_REMOVE_AT(projDateien, letzt) : ARRAY_REMOVE_AT(projAktiv, letzt)
+    WEND
+    JSON_SET_JSON(konfig, "projekte", JSON_NEW_ARRAY())
+    DIM pk AS INTEGER
+    FOR pk = 0 TO LEN(projOrdner) - 1
+        DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+        JSON_SET_STRING(e, "ordner", projOrdner[pk])
+        JSON_SET_INT(e, "aktiv", projAktiv[pk])
+        JSON_SET_JSON(e, "sitzung", JSON_NEW_ARRAY())
+        DIM sp AS STRING
+        IF projDateien[pk] <> "" THEN
+            FOR EACH sp IN SPLIT$(projDateien[pk], "|")
+                JSON_APPEND_STRING(e, "sitzung", sp)
+            NEXT
+        END IF
+        JSON_APPEND_JSON(konfig, "projekte", e)
+    NEXT
     TRY
         MKDIR(DIRNAME(konfigPfad))
         WRITEALL(konfigPfad, JSON_STRINGIFY(konfig))
@@ -552,6 +624,43 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "aktive_zeile", 1)
     GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
+    GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
+END SUB
+
+' Der Umbruch gilt fuer ALLE Reiter, nicht nur den vorderen -- ein Schalter,
+' der je Datei etwas anderes tut, ist einer, den man vergisst.
+SUB umbruchSetzen(an AS BOOLEAN)
+    umbruchAn = an
+    GUI_MENU_CHECK(miUmbruch, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(tabFelder[i], "umbruch", IIF(an, 1, 0))
+    NEXT
+    GUI_SET_TEXT(lblStatus, IIF(an, "Zeilenumbruch an.", "Zeilenumbruch aus."))
+    konfigSichern()
+END SUB
+
+' --- Faltung ----------------------------------------------------------
+SUB faltenUmschalten()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zu AS BOOLEAN : zu = GUI_TEXTAREA_FOLD(ta, z)
+    GUI_FOCUS(ta)
+    protokoll("falte " + STR$(z) + IIF(zu, " zu", " auf"))
+END SUB
+
+SUB faltenAlle(zu AS BOOLEAN)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    DIM n AS INTEGER : n = GUI_TEXTAREA_FOLD_ALL(ta, zu)
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, IIF(zu, STR$(n) + " Bloecke zugeklappt.", "Alles aufgeklappt."))
+    protokoll("falten alle " + STR$(n))
 END SUB
 
 FUNCTION dateiLesen(pfad AS STRING) AS STRING
@@ -777,6 +886,24 @@ SUB gliederungFuellen(quelle AS STRING)
             schl = schl + JSON_GET_STRING(j, pk + ".name") + ":" + STR$(JSON_GET_INT(j, pk + ".von")) + ";"
         NEXT
     NEXT
+    ' Dieselben Bloecke sind die faltbaren -- die Laufzeit kennt keine
+    ' Sprache und erfaehrt sie nur so.
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 AND schl <> faltSchluessel THEN
+        faltSchluessel = schl
+        DIM fv AS ARRAY OF INTEGER : fv = []
+        DIM fb AS ARRAY OF INTEGER : fb = []
+        FOR i = 0 TO n - 1
+            DIM pf AS STRING : pf = STR$(i)
+            ARRAY_PUSH(fv, JSON_GET_INT(j, pf + ".von")) : ARRAY_PUSH(fb, JSON_GET_INT(j, pf + ".bis"))
+            DIM mf AS INTEGER
+            FOR mf = 0 TO JSON_LEN(j, pf + ".kinder") - 1
+                DIM pkf AS STRING : pkf = pf + ".kinder." + STR$(mf)
+                ARRAY_PUSH(fv, JSON_GET_INT(j, pkf + ".von")) : ARRAY_PUSH(fb, JSON_GET_INT(j, pkf + ".bis"))
+            NEXT
+        NEXT
+        GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+    END IF
     IF schl = gliederungSchluessel THEN RETURN
     gliederungSchluessel = schl
     gliederungZeilen = zeilen
@@ -2051,6 +2178,10 @@ SUB befehl(k AS STRING)
             IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
             konfigSichern()
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+        CASE "umbruch" : umbruchSetzen(NOT umbruchAn)
+        CASE "falten" : faltenUmschalten()
+        CASE "falten_alle" : faltenAlle(TRUE)
+        CASE "falten_auf" : faltenAlle(FALSE)
         CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 4 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "drucken" : listingDrucken()
@@ -2074,18 +2205,37 @@ layout()
 reiterNeuSetzen()
 baumFuellen()
 zuletztAnzeigen()
-' Die Sitzung von zuletzt: was offen war, ist wieder offen (was es noch gibt).
-IF JSON_HAS(konfig, "sitzung") THEN
+' Die Sitzung von zuletzt: was offen war, ist wieder offen (was es noch
+' gibt). Gefragt wird zuerst nach DIESEM Projekt -- kennt die Datei den
+' Ordner nicht, gilt die zuletzt geschlossene Sitzung, wie bis Stand 4.
+DIM sitzDateien AS ARRAY OF STRING : sitzDateien = []
+DIM sitzAktiv AS INTEGER : sitzAktiv = 0
+DIM sp0 AS INTEGER : sp0 = ARRAY_INDEXOF(projOrdner, startOrdner)
+IF sp0 >= 0 THEN
+    IF projDateien[sp0] <> "" THEN sitzDateien = SPLIT$(projDateien[sp0], "|")
+    sitzAktiv = projAktiv[sp0]
+ELSEIF NOT JSON_HAS(konfig, "projekte") AND JSON_HAS(konfig, "sitzung") THEN
+    ' Nur beim ersten Start nach Stand 4: da gab es die Sitzung nur einmal
+    ' fuer alles. Sobald es Projekte gibt, faengt ein unbekannter Ordner
+    ' LEER an -- sonst schleppte man die Reiter des letzten Projekts mit.
     DIM sz AS INTEGER
     FOR sz = 0 TO JSON_LEN(konfig, "sitzung") - 1
-        DIM sp AS STRING : sp = JSON_GET_STRING(konfig, "sitzung." + STR$(sz))
-        IF FILEEXISTS(sp) AND tabAnzahl < MAX_TABS THEN dateiOeffnen(sp)
+        ARRAY_PUSH(sitzDateien, JSON_GET_STRING(konfig, "sitzung." + STR$(sz)))
     NEXT
-    IF JSON_HAS(konfig, "aktiv") AND tabAnzahl > 0 THEN
-        aktiverTab = MAX(0, MIN(tabAnzahl - 1, JSON_GET_INT(konfig, "aktiv")))
-        reiterNeuSetzen()
-    END IF
+    IF JSON_HAS(konfig, "aktiv") THEN sitzAktiv = JSON_GET_INT(konfig, "aktiv")
 END IF
+DIM sd AS STRING
+FOR EACH sd IN sitzDateien
+    IF FILEEXISTS(sd) AND tabAnzahl < MAX_TABS THEN dateiOeffnen(sd)
+NEXT
+IF tabAnzahl > 0 THEN
+    aktiverTab = MAX(0, MIN(tabAnzahl - 1, sitzAktiv))
+    reiterNeuSetzen()
+END IF
+' Der Projektordner wandert beim Oeffnen mit -- fuer die Sitzung gilt aber
+' der Ordner, in dem der Nutzer STAND.
+IF sp0 >= 0 THEN projektOrdner = startOrdner : baumFuellen()
+IF umbruchAn THEN umbruchSetzen(TRUE)
 ' ARG$ zaehlt ab 0: das erste Wort hinter `--`.
 IF ARGC() >= 1 THEN
     DIM startDatei AS STRING : startDatei = ARG$(0)
@@ -2113,6 +2263,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF tabAnzahl > 0 AND GUI_ACTIVE_TAB(win) <> aktiverTab THEN
         aktiverTab = GUI_ACTIVE_TAB(win)
         letzteMarke = ""
+        ' Gliederung und faltbare Bloecke gehoeren zum FELD -- ohne das
+        ' Zuruecksetzen behielte der neue Reiter die Bloecke des alten.
+        gliederungSchluessel = "" : faltSchluessel = ""
         pruefungFaellig = GET_TIME()
     END IF
 
@@ -2144,6 +2297,10 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miProfil) THEN befehl("profil")
     IF GUI_CLICKED(miThema) THEN befehl("thema")
     IF GUI_CLICKED(miVollbild) THEN befehl("vollbild")
+    IF GUI_CLICKED(miUmbruch) THEN befehl("umbruch")
+    IF GUI_CLICKED(miFalten) THEN befehl("falten")
+    IF GUI_CLICKED(miFaltenAlle) THEN befehl("falten_alle")
+    IF GUI_CLICKED(miFaltenAuf) THEN befehl("falten_auf")
     IF GUI_CLICKED(miUeber) THEN befehl("ueber")
     IF GUI_CLICKED(miHandbuch) THEN befehl("handbuch")
     IF GUI_CLICKED(miDrucken) THEN befehl("drucken")

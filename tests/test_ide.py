@@ -39,9 +39,10 @@ RL_ENTER, RL_DOWN, RL_LSHIFT, RL_LCTRL = 257, 264, 340, 341
 RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
 RL_D, RL_K, RL_O, RL_S = 68, 75, 79, 83
 RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
+RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
 
 
-def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
+def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
     log = tmp_path / "ide.log"
     quelle = IDE
@@ -70,7 +71,8 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
                        # DH_IDE_KONFIG: die Sitzung des Tests bleibt im Testordner --
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
-                                DH_IDE_WURZEL=str(_ROOT), DH_IDE_KONFIG=str(tmp_path / "ide.json")),
+                                DH_IDE_WURZEL=str(_ROOT),
+                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json")),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -320,3 +322,60 @@ def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
     assert konfig["sitzung"] and konfig["sitzung"][0].endswith("spiel.dh"), konfig
     log = _ide(tmp_path, tmp_path / "gibt_es_nicht.dh", frames=60)
     assert any(z.startswith("geoeffnet ") and z.endswith("spiel.dh") for z in log), log
+
+
+# ---------------------------------------------------------------- Stufe 5
+
+def test_falten_klappt_den_block_der_marke_zu(tmp_path):
+    """F4 auf Zeile 1 (`SUB foo()`) klappt den Block zu, ein zweites F4
+    wieder auf. Der Beleg ist das Protokoll -- ob die Zeilen wirklich
+    verschwinden, prueft tests/pruef/gui_faltung.dhtest am Bild."""
+    quelle = _datei(tmp_path, "SUB foo()\n    PRINT 1\n    PRINT 2\nEND SUB\nfoo()\n")
+    # Die faltbaren Bloecke kommen aus der Pruefung (0,6 s nach dem Oeffnen).
+    ev = _taste(70, RL_F4) + _taste(100, RL_F4)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    assert "falte 1 zu" in log, log
+    assert "falte 1 auf" in log, log
+
+
+def test_alles_zuklappen_nimmt_nur_die_aeusseren_bloecke(tmp_path):
+    """Strg+F4 klappt beide SUBs zu (zwei Bloecke), Umschalt+F4 alles auf."""
+    quelle = _datei(tmp_path, "SUB a()\nPRINT 1\nEND SUB\n\nSUB b()\nPRINT 2\nEND SUB\n")
+    ev = _taste(70, RL_F4, RL_LCTRL) + _taste(110, RL_F4, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=170, events=ev)
+    assert "falten alle 2" in log, log
+    assert "falten alle 0" in log, log
+
+
+def test_zeilenumbruch_bleibt_gemerkt(tmp_path):
+    """Alt+Z schaltet den Umbruch an; er steht in der ide.json und gilt beim
+    naechsten Start wieder."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    _ide(tmp_path, quelle, frames=90, events=_taste(30, RL_Z, RL_LALT))
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["umbruch"] is True, konfig
+    _ide(tmp_path, quelle, frames=60)
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["umbruch"] is True, konfig
+
+
+def test_sitzung_haengt_am_projektordner(tmp_path):
+    """Zwei Ordner, je eine Datei, EINE Konfigurationsdatei. Wer wieder im
+    ersten startet, bekommt dessen Reiter -- nicht die des zweiten, die
+    zuletzt offen waren. Das ist zugleich die Gegenprobe: die globale
+    Sitzung (Stand 4) zeigt an dieser Stelle auf zwei.dh."""
+    import json
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    kfg = tmp_path / "ide.json"
+    ea = _datei(tmp_path / "a", "PRINT 1\n", name="eins.dh")
+    eb = _datei(tmp_path / "b", "PRINT 2\n", name="zwei.dh")
+    _ide(tmp_path / "a", ea, frames=60, konfig=kfg)
+    _ide(tmp_path / "b", eb, frames=60, konfig=kfg)
+    stand = json.loads(kfg.read_text(encoding="utf-8"))
+    assert stand["sitzung"][0].endswith("zwei.dh"), stand
+    log = _ide(tmp_path / "a", tmp_path / "a" / "gibt_es_nicht.dh", frames=60, konfig=kfg)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert geoeffnet and geoeffnet[0].endswith("eins.dh"), log
+    assert not any(z.endswith("zwei.dh") for z in geoeffnet), log
