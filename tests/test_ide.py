@@ -40,6 +40,7 @@ RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
 RL_D, RL_K, RL_O, RL_S = 68, 75, 79, 83
 RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
 RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
+RL_L = 76
 RL_RIGHT, RL_END = 262, 269
 
 
@@ -508,3 +509,15 @@ def test_handbuch_gesetzt_und_als_quelltext(tmp_path):
     log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="Handbuch: gesetzt")
     assert "hbansicht gesetzt" in log, log
     assert "hbansicht quelltext" in log, log
+
+
+def test_marken_auf_jede_fundstelle_und_tippen_aendert_alle(tmp_path):
+    """Die Marke steht auf `hp`. Strg+Umschalt+L setzt auf jede Fundstelle
+    eine Marke; ein Strg+V schreibt dann an allen dreien -- und NUR dort,
+    `hpmax` bleibt, wie es war."""
+    quelle = _datei(tmp_path, "hp = 1\nhp = hp + 1\nhpmax = 9\n")
+    ev = _taste(30, RL_L, RL_LCTRL, RL_LSHIFT) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="X")
+    assert "marken 3" in log, log
+    assert quelle.read_text(encoding="utf-8") == "Xhp = 1\nXhp = Xhp + 1\nhpmax = 9\n"

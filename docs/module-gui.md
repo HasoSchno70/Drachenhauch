@@ -1669,6 +1669,27 @@ Kein Constraint-System — für ein Formular reicht das, und man versteht es noc
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
+## Mehrere Schreibmarken im Textbereich
+
+**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
+Programm setzt sie mit `GUI_TEXTAREA_ADD_CARET`. Tippen, Enter, Rücktaste,
+Entf, Tabulator und Einfügen wirken dann an **jeder** Marke, und die Pfeile
+bewegen alle — blieben die weiteren stehen, liefen sie beim ersten
+Tastendruck auseinander.
+
+Alles läuft durch **eine** Stelle (`an_marken`): sie sagt für jede Marke,
+welcher Bereich weicht und was hineinkommt, und arbeitet von **hinten nach
+vorn**. Dann bleiben die Stellen der noch offenen Marken gültig, und es
+braucht keine Buchführung über Verschiebungen. Mit einer einzigen Marke ist
+das genau der Weg von vorher — ein Textbereich ohne Alt+Klick verhält sich
+also unverändert.
+
+Zwei Dinge bleiben bei der **führenden** Marke: Kopieren und Ausschneiden
+(was mehrere Stücke in der Zwischenablage bedeuten sollen, ist außerhalb des
+Programms nicht ausgemacht), und Strg+A räumt die weiteren weg — eine
+Auswahl über alles und daneben noch drei Marken ergäbe kein Bild, das
+jemand im Kopf hätte.
+
 ## Faltung im Textbereich
 
 Ein zugeklappter Block verbirgt seine inneren Zeilen; die Kopfzeile bleibt
@@ -2063,6 +2084,9 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
+| `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
+| `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
+| `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine |
 | `GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)` | welche Blöcke sich falten lassen: zwei gleich lange Felder mit Kopfzeile und letzter Zeile. Was ein Block ist, weiß nur das Programm — die Laufzeit kennt hier keine Sprache |
 | `GUI_TEXTAREA_FOLD(ta, zeile[, an])` → BOOLEAN | den engsten faltbaren Block um `zeile` zuklappen oder aufklappen; ohne `an` umschalten. Liefert, ob danach zugeklappt ist |
 | `GUI_TEXTAREA_FOLD_ALL(ta[, zu])` → INTEGER | alles zuklappen (nur die äußeren Blöcke) oder alles aufklappen; liefert die Zahl der zugeklappten |

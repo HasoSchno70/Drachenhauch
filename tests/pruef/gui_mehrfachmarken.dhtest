@@ -1,0 +1,189 @@
+' Mehrere Schreibmarken im Textbereich (GUI_TEXTAREA_ADD_CARET/CARETS/
+' CLEAR_CARETS). Getippt wird ueber die Zwischenablage (Strg+V): raylibs
+' Wiedergabe legt Tasten in die Tastenwarteschlange, aber keine ZEICHEN in
+' die Zeichenwarteschlange. Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== eine marke ist der stand von vorher
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei")
+PRINT GUI_TEXTAREA_CARETS(ta)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+1
+
+=== eine zweite marke dazu, und wieder weg
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+PRINT GUI_TEXTAREA_ADD_CARET(ta, 2, 1)
+PRINT GUI_TEXTAREA_ADD_CARET(ta, 3, 1)
+' Dieselbe Stelle noch einmal aendert nichts
+PRINT GUI_TEXTAREA_ADD_CARET(ta, 3, 1)
+' Und die fuehrende Marke zaehlt nicht doppelt
+PRINT GUI_TEXTAREA_ADD_CARET(ta, 1, 1)
+GUI_TEXTAREA_CLEAR_CARETS(ta)
+PRINT GUI_TEXTAREA_CARETS(ta)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+2
+3
+3
+3
+1
+
+=== eingefuegt wird an jeder marke
+' Der Kern: drei Marken, EIN Strg+V -- und in jeder Zeile steht das Wort.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_TEXTAREA_ADD_CARET(ta, 2, 1)
+GUI_TEXTAREA_ADD_CARET(ta, 3, 1)
+GUI_FOCUS(ta)
+CLIPBOARD_SET("X ")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT REPLACE$(GUI_TEXT(ta), CHR$(10), " | ")
+    IF n = 30 THEN PRINT GUI_TEXTAREA_CARETS(ta)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Strg+V
+c 4
+e 4 2 341 0 0 0 // Strg runter
+e 4 2 86 0 0 0 // V runter
+e 6 1 86 0 0 0 // V hoch
+e 6 1 341 0 0 0 // Strg hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+X eins | X zwei | X drei
+3
+
+=== die ruecktaste wirkt an jeder marke
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "aXbb" + CHR$(10) + "cXdd")
+GUI_TEXTAREA_GOTO(ta, 1, 3)
+GUI_TEXTAREA_ADD_CARET(ta, 2, 3)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT REPLACE$(GUI_TEXT(ta), CHR$(10), " | ")
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Ruecktaste
+c 2
+e 4 2 259 0 0 0 // Backspace runter
+e 6 1 259 0 0 0 // Backspace hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+abb | cdd
+
+=== ESC raeumt die weiteren marken weg
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_TEXTAREA_ADD_CARET(ta, 2, 1)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    ' Die Wiedergabe setzt beim ERSTEN Ereignis an, egal welche Nummer es
+    ' traegt -- vor dem ersten Bild sind es also noch zwei.
+    IF n = 1 THEN PRINT GUI_TEXTAREA_CARETS(ta)
+    IF n = 30 THEN PRINT GUI_TEXTAREA_CARETS(ta)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# ESC
+c 2
+e 8 2 256 0 0 0 // ESC runter
+e 10 1 256 0 0 0 // ESC hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+2
+1
+
+=== die pfeile bewegen jede marke
+' Ohne das liefen sie beim ersten Tastendruck auseinander: eine Zeile
+' weiter, die andere nicht.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "abc" + CHR$(10) + "def")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_TEXTAREA_ADD_CARET(ta, 2, 1)
+GUI_FOCUS(ta)
+CLIPBOARD_SET("#")
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 40 THEN PRINT REPLACE$(GUI_TEXT(ta), CHR$(10), " | ")
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# zweimal rechts, dann Strg+V
+c 8
+e 4 2 262 0 0 0 // rechts
+e 6 1 262 0 0 0 //
+e 10 2 262 0 0 0 // rechts
+e 12 1 262 0 0 0 //
+e 20 2 341 0 0 0 // Strg
+e 20 2 86 0 0 0 // V
+e 22 1 86 0 0 0 //
+e 22 1 341 0 0 0 //
+--- umgebung
+DHRT_FRAMES=50
+--- erwartet
+ab#c | de#f

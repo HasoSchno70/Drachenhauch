@@ -6028,6 +6028,16 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_folded" => Value::Bool(self.gui.textarea_folded(
                 gi(a, 0, "GUI_TEXTAREA_FOLDED")?, gi(a, 1, "GUI_TEXTAREA_FOLDED")?)?),
+            "gui_textarea_add_caret" => {
+                let n = "GUI_TEXTAREA_ADD_CARET";
+                Value::Int(self.gui.textarea_add_caret(gi(a, 0, n)?, gi(a, 1, n)?,
+                    if a.len() > 2 { gi(a, 2, n)? } else { 1 })?)
+            }
+            "gui_textarea_carets" => Value::Int(self.gui.textarea_carets(gi(a, 0, "GUI_TEXTAREA_CARETS")?)?),
+            "gui_textarea_clear_carets" => {
+                self.gui.textarea_clear_carets(gi(a, 0, "GUI_TEXTAREA_CLEAR_CARETS")?)?;
+                Value::Nil
+            }
             "gui_textarea_folds" => {
                 let z = self.gui.textarea_folds(gi(a, 0, "GUI_TEXTAREA_FOLDS")?)?;
                 let n = z.len() as i64;

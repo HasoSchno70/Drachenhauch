@@ -4173,6 +4173,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_ADD_CARET",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_CARETS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_CARETS(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_CLEAR_CARETS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_CLEAR_CARETS(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_CURSOR",
    "kind": "core",
    "signature": "GUI_TEXTAREA_CURSOR(ta)",

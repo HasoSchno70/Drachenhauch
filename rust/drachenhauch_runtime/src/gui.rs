@@ -1029,6 +1029,11 @@ pub struct Widget {
     // zugeklappt sind; verborgen ist dann `von+1 ..= bis`.
     faltbar: Vec<(usize, usize)>,
     gefaltet: Vec<(usize, usize)>,
+    // Weitere Schreibmarken (nur TextArea), je (caret, anker) in ZEICHEN.
+    // LEER heisst: genau eine Marke, und dann laeuft alles wie zuvor --
+    // die eine ist `caret`/`sel_anchor` und bleibt es. Alt+Klick legt eine
+    // dazu, ESC raeumt sie weg.
+    marken_zusatz: Vec<(i32, i32)>,
     // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
     //
     // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
@@ -1937,6 +1942,34 @@ impl Gui {
         Ok(z)
     }
 
+    /// Eine weitere Schreibmarke setzen (GUI_TEXTAREA_ADD_CARET).
+    ///
+    /// Tippen, Enter, Ruecktaste, Entf, Tabulator und Einfuegen wirken dann
+    /// an JEDER Marke; die Pfeile bewegen alle. Zwei Marken an derselben
+    /// Stelle werden zu einer. Liefert die Zahl der Marken danach.
+    pub fn textarea_add_caret(&mut self, h: i64, zeile: i64, spalte: i64) -> Result<i64, String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_ADD_CARET")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let idx = Self::ta_index(&chars, zeile, spalte) as i32;
+        let w = self.wdg_mut(h, "GUI_TEXTAREA_ADD_CARET")?;
+        if idx != w.caret && !w.marken_zusatz.iter().any(|&(c, _)| c == idx) {
+            w.marken_zusatz.push((idx, idx));
+        }
+        Ok(w.marken_zusatz.len() as i64 + 1)
+    }
+
+    /// Wie viele Schreibmarken das Feld gerade hat (GUI_TEXTAREA_CARETS).
+    pub fn textarea_carets(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ta_wdg(h, "GUI_TEXTAREA_CARETS")?.marken_zusatz.len() as i64 + 1)
+    }
+
+    /// Zurueck auf eine Schreibmarke (GUI_TEXTAREA_CLEAR_CARETS).
+    pub fn textarea_clear_carets(&mut self, h: i64) -> Result<(), String> {
+        self.ta_wdg(h, "GUI_TEXTAREA_CLEAR_CARETS")?;
+        self.wdg_mut(h, "GUI_TEXTAREA_CLEAR_CARETS")?.marken_zusatz.clear();
+        Ok(())
+    }
+
     /// Einstellungen eines Textbereichs (GUI_TEXTAREA_SET).
     ///
     /// EIN Setter mit Schluesselwort statt vier Builtins -- dasselbe Muster
@@ -2079,7 +2112,7 @@ impl Gui {
             marken: Vec::new(),
             scroll_x: 0, zeilennummern: false, aktive_zeile: false,
             tab_fuegt_ein: false, tabbreite: 4,
-            faltbar: Vec::new(), gefaltet: Vec::new(),
+            faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -6484,6 +6517,38 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         (wdg.w - 2 * 5 - gutter - self.sk(8)).max(self.sk(20))
     }
 
+    /// Alle Schreibmarken als (caret, anker), die erste ist die fuehrende.
+    fn marken(w: &Widget) -> Vec<(i32, i32)> {
+        let mut m = vec![(w.caret, w.sel_anchor)];
+        m.extend(w.marken_zusatz.iter().copied());
+        m
+    }
+
+    /// Dieselbe Aenderung an JEDER Marke.
+    ///
+    /// `f` sagt fuer eine Marke, welcher Bereich weicht und was dafuer
+    /// hineinkommt -- Tippen, Enter, Ruecktaste, Entf und Einfuegen sind alle
+    /// von dieser Form. Gearbeitet wird von HINTEN nach vorn: dann bleiben
+    /// die Stellen der noch offenen Marken gueltig, und es braucht keine
+    /// Buchfuehrung ueber Verschiebungen.
+    ///
+    /// Mit einer einzigen Marke ist das genau der Weg von vorher.
+    fn an_marken(chars: &mut Vec<char>, marken: &mut [(i32, i32)],
+                 f: impl Fn(&[char], i32, i32) -> (usize, usize, String)) {
+        let mut reihe: Vec<usize> = (0..marken.len()).collect();
+        reihe.sort_by_key(|&i| std::cmp::Reverse(marken[i].0.min(marken[i].1)));
+        for i in reihe {
+            let (c, a) = marken[i];
+            let (von, bis, ein) = f(chars, c, a);
+            let von = von.min(chars.len());
+            let bis = bis.clamp(von, chars.len());
+            let n = ein.chars().count();
+            chars.splice(von..bis, ein.chars());
+            let neu = (von + n) as i32;
+            marken[i] = (neu, neu);
+        }
+    }
+
     /// Liegt die (1-basierte) Zeile in einem zugeklappten Block?
     ///
     /// Die Kopfzeile selbst bleibt sichtbar -- verborgen ist `von+1 ..= bis`.
@@ -6804,6 +6869,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let caret0 = caret;
         let ctrl = g.key_ctrl();
         let shift = g.key_shift();
+        let alt = g.key_alt();
+        // Weitere Schreibmarken: LEER heisst eine, und dann laeuft alles wie
+        // zuvor. ESC raeumt sie weg -- ohne den Ausweg saehe man nur, dass
+        // ploetzlich an mehreren Stellen etwas passiert.
+        let mut zusatz: Vec<(i32, i32)> = self.windows[wi].widgets[i].marken_zusatz.clone();
+        zusatz.retain(|&(c, a)| c >= 0 && (c as usize) <= chars.len() && a >= 0);
+        if g.key_pressed(KEY_ESC) { zusatz.clear(); }
         if ctrl && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
             self.text_undo(wi, i, g.key_pressed(K_Y) || shift);
             return;
@@ -6846,37 +6918,62 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let off = Self::caret_index_at(g, &sub, target, ms) as usize;
             let idx = (lstart + off) as i32;
             if !self.was_mouse_down {
-                if Self::in_rect(mx, my, (ax, ay, fw, fh)) { caret = idx; anchor = idx; }
-            } else {
+                if Self::in_rect(mx, my, (ax, ay, fw, fh)) {
+                    // Alt+Klick legt eine WEITERE Marke, statt die eine zu
+                    // versetzen -- dieselbe Geste wie in jedem Editor, und
+                    // ohne Alt bleibt alles beim Alten.
+                    if alt && idx != caret && !zusatz.iter().any(|&(c, _)| c == idx) {
+                        zusatz.push((idx, idx));
+                    } else if !alt {
+                        caret = idx; anchor = idx;
+                    }
+                }
+            } else if !alt {
                 caret = idx;   // Ziehen -> Selektion bis hierher
             }
         }
 
         // Zeichen-Eingabe / Strg-Kombis (Selektion wird jeweils ersetzt).
+        // Alle Marken in EINER Liste: die fuehrende zuerst. Jede Aenderung
+        // laeuft ueber `an_marken` -- mit einer Marke ist das genau der Weg
+        // von vorher, mit mehreren derselbe an jeder Stelle.
+        let mut marken: Vec<(i32, i32)> = vec![(caret, anchor)];
+        marken.extend(zusatz.iter().copied());
         if !ctrl {
             let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
             if !typed.is_empty() {
-                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-                for (k, ch) in typed.chars().enumerate() { chars.insert(caret as usize + k, ch); }
-                caret += typed.chars().count() as i32; anchor = caret;
+                Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                    ((c.min(a)) as usize, (c.max(a)) as usize, typed.clone())
+                });
             }
         } else {
-            if g.key_pressed(K_A) { anchor = 0; caret = chars.len() as i32; }
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            // Alles markieren raeumt die weiteren Marken weg: eine Auswahl
+            // ueber ALLES und daneben noch drei Marken ergaebe kein Bild,
+            // das jemand im Kopf haette.
+            if g.key_pressed(K_A) {
+                marken.truncate(1);
+                marken[0] = (chars.len() as i32, 0);
+            }
+            let (lo, hi) = (marken[0].0.min(marken[0].1), marken[0].0.max(marken[0].1));
+            // Kopieren und Ausschneiden nehmen die FUEHRENDE Auswahl -- was
+            // mehrere Stuecke in der Zwischenablage bedeuten sollen, ist
+            // ausserhalb dieses Programms nicht ausgemacht.
             if g.key_pressed(K_C) && lo != hi {
                 g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
             }
             if g.key_pressed(K_X) && lo != hi {
                 g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
-                chars.drain(lo as usize..hi as usize); caret = lo; anchor = lo;
+                let mut nur = vec![marken[0]];
+                Self::an_marken(&mut chars, &mut nur, |_, c, a| {
+                    ((c.min(a)) as usize, (c.max(a)) as usize, String::new())
+                });
+                marken[0] = nur[0];
             }
             if g.key_pressed(K_V) {
-                let ins: Vec<char> = g.clipboard_get().chars().filter(|c| *c == '\n' || !c.is_control()).collect();
-                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-                for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
-                caret += ins.len() as i32; anchor = caret;
+                let ins: String = g.clipboard_get().chars().filter(|c| *c == '\n' || !c.is_control()).collect();
+                Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                    ((c.min(a)) as usize, (c.max(a)) as usize, ins.clone())
+                });
             }
         }
         // Tabulator rueckt ein, statt das Bedienelement zu wechseln --
@@ -6886,39 +6983,46 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let tab_ein = self.windows[wi].widgets[i].tab_fuegt_ein;
         if tab_ein && g.key_pressed(KEY_TAB) {
             let breite = self.windows[wi].widgets[i].tabbreite.max(1);
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
             // Bis zur naechsten Spalte auffuellen, nicht stur `breite`
             // Leerzeichen: sonst steht die Einrueckung schief, sobald man
             // mitten in der Zeile tabbt.
-            let st = Self::line_starts(&chars);
-            let zeilen_start = st.iter().rposition(|&s| s as i32 <= caret).map(|r| st[r]).unwrap_or(0);
-            let spalte = caret - zeilen_start as i32;
-            let n = breite - (spalte % breite);
-            for k in 0..n { chars.insert(caret as usize + k as usize, ' '); }
-            caret += n; anchor = caret;
+            Self::an_marken(&mut chars, &mut marken, |ch, c, a| {
+                let lo = c.min(a);
+                let st = Self::line_starts(ch);
+                let zeilen_start = st.iter().rposition(|&s| s as i32 <= lo).map(|r| st[r]).unwrap_or(0);
+                let spalte = lo - zeilen_start as i32;
+                let n = breite - (spalte % breite);
+                (lo as usize, (c.max(a)) as usize, " ".repeat(n.max(1) as usize))
+            });
         }
         // Enter = Umbruch (ersetzt evtl. Selektion).
         if g.key_pressed(KEY_ENTER) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-            chars.insert(caret as usize, '\n'); caret += 1; anchor = caret;
+            Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                ((c.min(a)) as usize, (c.max(a)) as usize, "\n".to_string())
+            });
         }
         // Backspace / Delete (Selektion hat Vorrang).
         if g.key_pressed(KEY_BACKSPACE) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-            else if caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
-            anchor = caret;
+            Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                let (lo, hi) = (c.min(a), c.max(a));
+                if lo != hi { (lo as usize, hi as usize, String::new()) }
+                else if lo > 0 { (lo as usize - 1, lo as usize, String::new()) }
+                else { (0, 0, String::new()) }
+            });
         }
         if g.key_pressed(KEY_DELETE) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-            else if (caret as usize) < chars.len() { chars.remove(caret as usize); }
-            anchor = caret;
+            let len0 = chars.len();
+            Self::an_marken(&mut chars, &mut marken, |_, c, a| {
+                let (lo, hi) = (c.min(a), c.max(a));
+                if lo != hi { (lo as usize, hi as usize, String::new()) }
+                else if (lo as usize) < len0 { (lo as usize, lo as usize + 1, String::new()) }
+                else { (lo as usize, lo as usize, String::new()) }
+            });
         }
 
         // Navigation (Shift = Selektion erweitern, sonst Anker = Caret).
+        caret = marken[0].0; anchor = marken[0].1;
+        zusatz = marken[1..].to_vec();
         let len = chars.len() as i32;
         caret = caret.clamp(0, len); anchor = anchor.clamp(0, len);
         let starts = Self::line_starts(&chars);
@@ -6926,32 +7030,47 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let wref = &self.windows[wi].widgets[i];
             self.ta_rows(g, wref, &chars, &starts, self.ta_breite(g, wref, starts.len()))
         };
-        let row = Self::ta_row_of(&rows, caret.max(0) as usize);
-        let col = caret - rows[row].1 as i32;
-        if g.key_pressed(KEY_LEFT) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if !shift && lo != hi { caret = lo; } else { caret = (caret - 1).max(0); }
-            if !shift { anchor = caret; }
-        }
-        if g.key_pressed(KEY_RIGHT) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if !shift && lo != hi { caret = hi; } else { caret = (caret + 1).min(len); }
-            if !shift { anchor = caret; }
-        }
+        // Die Pfeile bewegen JEDE Marke -- blieben die weiteren stehen,
+        // liefen sie beim ersten Tastendruck auseinander.
         // Pos1/Ende und Pfeile bewegen sich in SICHTBAREN Zeilen -- bei
         // Umbruch also innerhalb der umgebrochenen, wie in jedem Editor.
-        if g.key_pressed(KEY_HOME) { caret = rows[row].1 as i32; if !shift { anchor = caret; } }
-        if g.key_pressed(KEY_END) { caret = rows[row].2 as i32; if !shift { anchor = caret; } }
-        if g.key_pressed(KEY_UP) && row > 0 {
-            let (_, ps, pe) = rows[row - 1];
-            caret = (ps as i32 + col).min(pe as i32);
-            if !shift { anchor = caret; }
+        let mut alle: Vec<(i32, i32)> = vec![(caret, anchor)];
+        alle.extend(zusatz.iter().copied());
+        for m in alle.iter_mut() {
+            let (mut c, mut a) = (m.0.clamp(0, len), m.1.clamp(0, len));
+            let row = Self::ta_row_of(&rows, c.max(0) as usize);
+            let col = c - rows[row].1 as i32;
+            if g.key_pressed(KEY_LEFT) {
+                let (lo, hi) = (c.min(a), c.max(a));
+                if !shift && lo != hi { c = lo; } else { c = (c - 1).max(0); }
+                if !shift { a = c; }
+            }
+            if g.key_pressed(KEY_RIGHT) {
+                let (lo, hi) = (c.min(a), c.max(a));
+                if !shift && lo != hi { c = hi; } else { c = (c + 1).min(len); }
+                if !shift { a = c; }
+            }
+            if g.key_pressed(KEY_HOME) { c = rows[row].1 as i32; if !shift { a = c; } }
+            if g.key_pressed(KEY_END) { c = rows[row].2 as i32; if !shift { a = c; } }
+            if g.key_pressed(KEY_UP) && row > 0 {
+                let (_, ps, pe) = rows[row - 1];
+                c = (ps as i32 + col).min(pe as i32);
+                if !shift { a = c; }
+            }
+            if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() {
+                let (_, ns, ne) = rows[row + 1];
+                c = (ns as i32 + col).min(ne as i32);
+                if !shift { a = c; }
+            }
+            *m = (c, a);
         }
-        if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() {
-            let (_, ns, ne) = rows[row + 1];
-            caret = (ns as i32 + col).min(ne as i32);
-            if !shift { anchor = caret; }
-        }
+        caret = alle[0].0; anchor = alle[0].1;
+        // Zwei Marken an derselben Stelle sind eine -- ohne das Zusammen-
+        // legen tippte man dort doppelt, sobald zwei aufeinandertreffen.
+        zusatz = alle[1..].to_vec();
+        zusatz.sort();
+        zusatz.dedup_by_key(|m| m.0);
+        zusatz.retain(|&(c, _)| c != caret);
 
         // Vertikal scrollen, damit die Caret-Zeile sichtbar bleibt.
         let starts2 = Self::line_starts(&chars);
@@ -6991,6 +7110,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         w.text = new_text; w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
         w.scroll_x = sx;
+        w.marken_zusatz = zusatz;
         // Links/Rechts und Backspace koennen die Marke in verborgenen Text
         // tragen -- dort waere jede weitere Taste unsichtbar wirksam.
         Self::falte_am_caret_oeffnen(w);
@@ -9841,23 +9961,30 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     // Text bleibt rechts der Nummernspalte.
                     g.push_clip(ax + 2 + gutter, ay + 2, (w - 4 - gutter).max(0), (h - 4).max(0));
                     // Selektion-Highlight pro sichtbarer Zeile (halbtransparenter Akzent).
-                    let lo = caret_anz.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                    let hi = caret_anz.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
-                    if focused && lo != hi && wdg.vorschau.is_empty() {
+                    // Jede Marke hat ihre eigene Auswahl -- die fuehrende
+                    // zuerst, dann die weiteren.
+                    let mut bereiche: Vec<(i32, i32)> = vec![(caret_anz, wdg.sel_anchor)];
+                    bereiche.extend(wdg.marken_zusatz.iter().copied());
+                    if focused && wdg.vorschau.is_empty() {
                         let selbg = self.selection_bg(wdg);
-                        for r in 0..view_lines {
-                            let ri = scroll + r;
-                            if ri < 0 || ri as usize >= rows.len() { continue; }
-                            let (_, rs, re) = rows[ri as usize];
-                            let (lstart, lend) = (rs as i32, re as i32);
-                            let a = lo.max(lstart);
-                            let b = hi.min(lend);
-                            if b < a || (a == b && hi <= lend) { continue; }
-                            let x0 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
-                            let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
-                            if hi > lend { x1 += self.wtext_width(g, wdg, " ").max(self.sk(4)); }   // Auswahl laeuft weiter
-                            let y = ay + pad + r * lh;
-                            g.box_fill(x0, y, x1, y + lh - 2, selbg);
+                        for &(mc, ma) in bereiche.iter() {
+                            let lo = mc.min(ma).clamp(0, chars.len() as i32);
+                            let hi = mc.max(ma).clamp(0, chars.len() as i32);
+                            if lo == hi { continue; }
+                            for r in 0..view_lines {
+                                let ri = scroll + r;
+                                if ri < 0 || ri as usize >= rows.len() { continue; }
+                                let (_, rs, re) = rows[ri as usize];
+                                let (lstart, lend) = (rs as i32, re as i32);
+                                let a = lo.max(lstart);
+                                let b = hi.min(lend);
+                                if b < a || (a == b && hi <= lend) { continue; }
+                                let x0 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..a as usize].iter().collect::<String>());
+                                let mut x1 = tx0 + self.wtext_width(g, wdg, &chars[lstart as usize..b as usize].iter().collect::<String>());
+                                if hi > lend { x1 += self.wtext_width(g, wdg, " ").max(self.sk(4)); }   // Auswahl laeuft weiter
+                                let y = ay + pad + r * lh;
+                                g.box_fill(x0, y, x1, y + lh - 2, selbg);
+                            }
                         }
                     }
                     for r in 0..view_lines {
@@ -9949,6 +10076,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let (chars, caret_anz) = self.anzeige_mit_vorschau(wdg);
                     let starts = Self::line_starts(&chars);
                     let rows = self.ta_rows(g, wdg, &chars, &starts, self.ta_breite(g, wdg, starts.len()));
+                    // Die weiteren Marken zuerst, damit die fuehrende oben
+                    // liegt -- sie steht an derselben Stelle wie sonst.
+                    for &(mc, _) in wdg.marken_zusatz.iter() {
+                        let mc = mc.clamp(0, chars.len() as i32);
+                        let mrow = Self::ta_row_of(&rows, mc as usize);
+                        let ms = rows[mrow].1;
+                        let me = (ms + (mc - ms as i32).max(0) as usize).min(chars.len());
+                        let vorspann: String = chars[ms..me].iter().collect();
+                        let mx = ax + pad + self.ta_gutter(g, wdg, starts.len()) - wdg.scroll_x
+                                 + self.wtext_width(g, wdg, &vorspann);
+                        let my = ay + pad + (mrow as i32 - scroll) * lh;
+                        if my >= ay + 2 && my + lh <= ay + h
+                           && mx >= ax + 2 + self.ta_gutter(g, wdg, starts.len()) {
+                            g.line(mx, my, mx, my + lh - 2, self.th("accent"));
+                        }
+                    }
                     let crow = Self::ta_row_of(&rows, caret_anz.max(0) as usize);
                     let lstart = rows[crow].1;
                     let cend = (lstart + (caret_anz - lstart as i32).max(0) as usize).min(chars.len());

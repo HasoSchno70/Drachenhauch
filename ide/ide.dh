@@ -270,6 +270,7 @@ DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, "Vervollstaendigen"
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definition", "F12")
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen ...", "Umschalt+F6")
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfuegen ...", "Strg+J")
+DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
 GUI_MENU_SEPARATOR(mBearb)
 ' Die Handgriffe im Text. Tab/Umschalt+Tab gehoeren dem Feld selbst (Tab
@@ -1550,6 +1551,49 @@ FUNCTION zeilenHolen(alle AS ARRAY OF STRING, z1 AS INTEGER, z2 AS INTEGER) AS A
     RETURN block
 END FUNCTION
 
+' --- Mehrere Schreibmarken --------------------------------------------
+' Alt+Klick legt eine Marke dazu (das kann der Textbereich selbst), ESC
+' raeumt sie weg. Hier kommt der Griff dazu, den man wirklich braucht: eine
+' Marke auf JEDE Stelle, an der das Wort unter der Marke steht -- danach
+' aendert ein Tippen sie alle auf einmal.
+SUB markenAufFundstellen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN
+        GUI_SET_TEXT(lblStatus, "Unter der Marke steht kein Wort.")
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLEAR_CARETS(ta)
+    ' GUI_TEXTAREA_FIND sucht Teiltexte -- aus `hp` wuerde sonst auch das
+    ' `hp` in `hpmax` eine Marke, und ein Tippen aenderte einen Namen, der
+    ' gar nicht gemeint war. Die Grenzen prueft die IDE selbst.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM erste AS BOOLEAN : erste = TRUE
+    DIM n AS INTEGER : n = 0
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, 1, 1, TRUE)
+    WHILE tz >= 0 AND n < 200
+        DIM zl AS STRING : zl = zeilen[tz - 1]
+        DIM davor AS BOOLEAN : davor = ts > 1 AND istWortzeichen(MID$(zl, ts - 2, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, ts - 1 + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN
+            IF erste THEN
+                GUI_TEXTAREA_GOTO(ta, tz, ts)
+                erste = FALSE
+            ELSE
+                GUI_TEXTAREA_ADD_CARET(ta, tz, ts)
+            END IF
+            n = n + 1
+        END IF
+        (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, tz, ts + LEN(wort), TRUE)
+    WEND
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, STR$(n) + " Marken auf '" + wort + "' -- tippen aendert alle, ESC raeumt sie weg.")
+    protokoll("marken " + STR$(n))
+END SUB
+
 ' --- Umbenennen (Umschalt+F6) ----------------------------------------
 ' Das Umbenennen selbst macht CODE_RENAME$: ganze Woerter, ohne Kommentare
 ' und Zeichenketten. Die IDE fragt nur den neuen Namen und schreibt das
@@ -2592,6 +2636,7 @@ paletteEintrag("Als eigenstaendiges Programm exportieren", "export", "Strg+F6")
 paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
 paletteEintrag("Wer hat das geschrieben (git blame)", "blame", "Strg+Umschalt+B")
 paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
+paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
 paletteEintrag("Geteilte Ansicht", "geteilt", "Alt+G") : paletteEintrag("Uebersichtskarte", "minimap", "")
@@ -2775,6 +2820,7 @@ SUB befehl(k AS STRING)
         CASE "definition" : zurDefinition()
         CASE "umbenennen" : umbenennenFragen()
         CASE "schnipsel" : schnipselWaehlen()
+        CASE "marken" : markenAufFundstellen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
         CASE "stopp" : stoppen()
@@ -2920,6 +2966,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miDefinition) THEN befehl("definition")
     IF GUI_CLICKED(miUmbenennen) THEN befehl("umbenennen")
     IF GUI_CLICKED(miSchnipsel) THEN befehl("schnipsel")
+    IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")
     IF GUI_CLICKED(miStopp) THEN befehl("stopp")
