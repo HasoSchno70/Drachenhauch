@@ -1668,6 +1668,44 @@ Kein Constraint-System — für ein Formular reicht das, und man versteht es noc
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
+## Faltung im Textbereich
+
+Ein zugeklappter Block verbirgt seine inneren Zeilen; die Kopfzeile bleibt
+stehen und trägt dahinter eine Sprechblase („… 12 Zeilen"). In der
+Nummernspalte steht an jeder Kopfzeile ein Dreieck — nach unten offen, nach
+rechts zugeklappt —, und ein Klick darauf schaltet um, ohne die Schreibmarke
+mitzunehmen.
+
+**Welche Zeilen einen Block bilden, sagt das Programm**, nicht die Laufzeit:
+
+```basic
+' Die Blöcke aus CODE_SYMBOLS$ -- von/bis sind schon Zeilennummern
+GUI_TEXTAREA_FOLDABLE(ta, [1, 14, 30], [12, 22, 44])
+GUI_TEXTAREA_FOLD(ta, 14)          ' umschalten
+GUI_TEXTAREA_FOLD_ALL(ta, TRUE)    ' alles zu (nur die äußeren)
+```
+
+Die Laufzeit zählt keine Einrückung und kennt hier keine Sprache — ein
+Textbereich mit YAML, Markdown oder eigenen Abschnitten faltet mit denselben
+zwei Feldern. Ohne faltbare Blöcke kostet die Faltung keinen Platz: die
+Nummernspalte wird nur breiter, wenn es Dreiecke zu zeigen gibt.
+
+Drei Dinge sind nicht offensichtlich:
+
+- **Der engste Block gewinnt.** `GUI_TEXTAREA_FOLD(ta, zeile)` faltet den
+  kleinsten faltbaren Block um die Zeile — sonst nähme eine Methode beim
+  Zuklappen ihre ganze Klasse mit.
+- **Eine Marke im Verborgenen klappt auf.** Klicks und Pfeile laufen über die
+  sichtbaren Zeilen und kommen gar nicht hinein; `GUI_TEXTAREA_GOTO`,
+  Links/Rechts und die Rücktaste können es. Der Block geht dann auf, statt
+  die Marke auszuweichen: bei einem Suchtreffer will man die Fundstelle
+  sehen. Umgekehrt wandert die Marke beim Zuklappen auf die Kopfzeile.
+- **Die Faltung hängt an Zeilennummern.** Eine Änderung darüber schiebt sie
+  mit; wer im Block selbst tippt, klappt ihn auf; `GUI_SET_TEXT` räumt sie
+  weg (der neue Text hat andere Zeilen). Was gerade zugeklappt ist, liest
+  `GUI_TEXTAREA_FOLDS` — genug, um es beim nächsten Öffnen der Datei wieder
+  herzustellen.
+
 ## Zeilenumbruch im Textbereich
 
 Der Textbereich war ein Code-Feld: lange Zeilen rollen waagerecht. Für
@@ -2024,6 +2062,11 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
+| `GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)` | welche Blöcke sich falten lassen: zwei gleich lange Felder mit Kopfzeile und letzter Zeile. Was ein Block ist, weiß nur das Programm — die Laufzeit kennt hier keine Sprache |
+| `GUI_TEXTAREA_FOLD(ta, zeile[, an])` → BOOLEAN | den engsten faltbaren Block um `zeile` zuklappen oder aufklappen; ohne `an` umschalten. Liefert, ob danach zugeklappt ist |
+| `GUI_TEXTAREA_FOLD_ALL(ta[, zu])` → INTEGER | alles zuklappen (nur die äußeren Blöcke) oder alles aufklappen; liefert die Zahl der zugeklappten |
+| `GUI_TEXTAREA_FOLDED(ta, zeile)` → BOOLEAN | ist die Zeile in einem zugeklappten Block verborgen? |
+| `GUI_TEXTAREA_FOLDS(ta)` → ARRAY OF INTEGER | die Kopfzeilen der zugeklappten Blöcke, aufsteigend |
 | `GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])` → (zeile, spalte) | nächster Treffer ab der Stelle, `(-1, -1)` wenn keiner; ohne `genau` ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab `1, 1` suchen |
 
 ```basic

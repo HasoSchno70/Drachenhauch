@@ -4726,6 +4726,17 @@ impl<'p> Vm<'p> {
                 let einruecken = if a.len() > 1 { a[1].truthy() } else { true };
                 Value::str_rc(&crate::formatiere(text, einruecken, "    ").unwrap_or_default())
             }
+            // CODE_RENAME$: ein Symbol im ganzen Text umbenennen. Liefert den
+            // neuen Quelltext, oder LEER, wenn an der Stelle kein Name steht
+            // oder der neue keiner ist -- ein Aufrufer, der das nicht prueft,
+            // schreibt dann nichts, statt die Datei zu leeren.
+            "code_rename$" | "code_rename" => {
+                let text = bi_str(a, 0, "CODE_RENAME$")?;
+                let z = bi_int(a, 1, "CODE_RENAME$")?.max(1) as usize - 1;
+                let s = bi_int(a, 2, "CODE_RENAME$")?.max(1) as usize - 1;
+                let neu = bi_str(a, 3, "CODE_RENAME$")?;
+                Value::str_rc(&crate::lsp::umbenennen(text, z, s, neu).unwrap_or_default())
+            }
             "code_symbols$" | "code_symbols" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
@@ -5242,6 +5253,24 @@ impl<'p> Vm<'p> {
         fn gnum(a: &[Value], i: usize, f: &str) -> R<f64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n as f64), Some(Value::Float(x)) => Ok(*x),
                 _ => Err(format!("{}: erwartet Zahl (Arg {})", f, i + 1)) }
+        }
+        // Ein ARRAY OF INTEGER als Vec -- Marken, Faltbereiche, Spans.
+        fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
+            match v {
+                Value::Array(a) => {
+                    let a = a.borrow();
+                    let mut o = Vec::with_capacity(a.cells.len());
+                    for x in a.cells.iter() {
+                        match x {
+                            Value::Int(i) => o.push(i),
+                            Value::Float(f) => o.push(f as i64),
+                            _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+                        }
+                    }
+                    Ok(o)
+                }
+                _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
+            }
         }
         // FUNCREF-Arg -> Option<Name>; NIL entfernt den Callback.
         fn gfunc(a: &[Value], i: usize, f: &str) -> R<Option<crate::value::Rueckruf>> {
@@ -5973,27 +6002,37 @@ impl<'p> Vm<'p> {
                 Value::Tuple(std::rc::Rc::new(vec![Value::Int(z), Value::Int(s)]))
             }
             "gui_textarea_marks" => {
-                fn ganze(v: &Value, fn_: &str) -> R<Vec<i64>> {
-                    match v {
-                        Value::Array(a) => {
-                            let a = a.borrow();
-                            let mut o = Vec::with_capacity(a.cells.len());
-                            for x in a.cells.iter() {
-                                match x {
-                                    Value::Int(i) => o.push(i),
-                                    Value::Float(f) => o.push(f as i64),
-                                    _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                                }
-                            }
-                            Ok(o)
-                        }
-                        _ => Err(format!("{}: ARRAY OF INTEGER noetig", fn_)),
-                    }
-                }
                 let n = "GUI_TEXTAREA_MARKS";
                 if a.len() != 3 { return Err(format!("{}: erwartet (ta, zeilen, farben)", n)); }
                 self.gui.textarea_marks(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
                 Value::Nil
+            }
+            // ===== Faltung (docs/module-gui.md, Abschnitt Faltung) =====
+            // Welche Zeilen einen Block bilden, sagt der Aufrufer -- die
+            // Laufzeit kennt hier keine Sprache und zaehlt keine Einrueckung.
+            "gui_textarea_foldable" => {
+                let n = "GUI_TEXTAREA_FOLDABLE";
+                if a.len() != 3 { return Err(format!("{}: erwartet (ta, von_zeilen, bis_zeilen)", n)); }
+                self.gui.textarea_foldable(gi(a, 0, n)?, ganze(&a[1], n)?, ganze(&a[2], n)?)?;
+                Value::Nil
+            }
+            "gui_textarea_fold" => {
+                let n = "GUI_TEXTAREA_FOLD";
+                let an = if a.len() > 2 { Some(a[2].truthy()) } else { None };
+                Value::Bool(self.gui.textarea_fold(gi(a, 0, n)?, gi(a, 1, n)?, an)?)
+            }
+            "gui_textarea_fold_all" => {
+                let n = "GUI_TEXTAREA_FOLD_ALL";
+                Value::Int(self.gui.textarea_fold_all(gi(a, 0, n)?, a.len() < 2 || a[1].truthy())?)
+            }
+            "gui_textarea_folded" => Value::Bool(self.gui.textarea_folded(
+                gi(a, 0, "GUI_TEXTAREA_FOLDED")?, gi(a, 1, "GUI_TEXTAREA_FOLDED")?)?),
+            "gui_textarea_folds" => {
+                let z = self.gui.textarea_folds(gi(a, 0, "GUI_TEXTAREA_FOLDS")?)?;
+                let n = z.len() as i64;
+                let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+                for (k, l) in z.into_iter().enumerate() { arr.cells.set(k, Value::Int(l)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
             }
             // Dialog IM Fenster (eigenes Thema, kein OS-Kasten). Braucht die
             // Bildschirmgroesse (Zentrieren) und die Textbreite (das Fenster

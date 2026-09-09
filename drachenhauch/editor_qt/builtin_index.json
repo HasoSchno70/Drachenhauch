@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1746,
+ "count": 1755,
  "builtins": [
   {
    "name": "ABS",
@@ -1794,6 +1794,12 @@
    "name": "CODE_REFERENCES",
    "kind": "core",
    "signature": "CODE_REFERENCES(quelltext$, zeile, spalte) AS ARRAY OF INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "CODE_RENAME$",
+   "kind": "core",
+   "signature": "CODE_RENAME$(quelltext$, zeile, spalte, neu$) AS STRING",
    "module": "dhrt"
   },
   {
@@ -4176,6 +4182,36 @@
    "name": "GUI_TEXTAREA_FIND",
    "kind": "core",
    "signature": "GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FOLD",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FOLD(ta, zeile[, an])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FOLDABLE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FOLDED",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FOLDED(ta, zeile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FOLDS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FOLDS(ta)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_FOLD_ALL",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_FOLD_ALL(ta[, zu])",
    "module": "gui"
   },
   {

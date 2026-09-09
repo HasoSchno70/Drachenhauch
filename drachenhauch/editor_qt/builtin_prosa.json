@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1702,
+ "count": 1708,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -295,6 +295,7 @@
   "CODE_FORMAT$": "STRING — der Quelltext formatiert wie durch dhrt fmt: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit einruecken (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler)",
   "CODE_HOVER$": "STRING — Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht",
   "CODE_REFERENCES": "ARRAY OF INTEGER die Zeilen aller Vorkommen",
+  "CODE_RENAME$": "STRING — der Quelltext mit dem Namen an dieser Stelle überall in neu$ umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder neu$ keiner ist",
   "CODE_SYMBOLS$": "STRING (JSON) die Gliederung: {name, art, von, bis, kinder} — Klassen mit ihren Methoden",
   "COLLIDES": "AABB-Kollision zweier Rechtecke. Berührungen zählen nicht (Kanten gleich → FALSE).",
   "COLOR_FROM_HEX": "#RGB, #RRGGBB, #AARRGGBB — mit oder ohne #, auch 0x/&H",
@@ -676,6 +677,11 @@
   "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als Code-Feld einfärbbar — siehe Code-Feld",
   "GUI_TEXTAREA_CURSOR": "wo die Schreibmarke steht (ab 1, in Zeichen)",
   "GUI_TEXTAREA_FIND": "nächster Treffer ab der Stelle, (-1, -1) wenn keiner; ohne genau ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab 1, 1 suchen",
+  "GUI_TEXTAREA_FOLD": "den engsten faltbaren Block um zeile zuklappen oder aufklappen; ohne an umschalten. Liefert, ob danach zugeklappt ist",
+  "GUI_TEXTAREA_FOLDABLE": "welche Blöcke sich falten lassen: zwei gleich lange Felder mit Kopfzeile und letzter Zeile. Was ein Block ist, weiß nur das Programm — die Laufzeit kennt hier keine Sprache",
+  "GUI_TEXTAREA_FOLDED": "ist die Zeile in einem zugeklappten Block verborgen?",
+  "GUI_TEXTAREA_FOLDS": "die Kopfzeilen der zugeklappten Blöcke, aufsteigend",
+  "GUI_TEXTAREA_FOLD_ALL": "alles zuklappen (nur die äußeren Blöcke) oder alles aufklappen; liefert die Zahl der zugeklappten",
   "GUI_TEXTAREA_GOTO": "Marke setzen, Auswahl aufheben, den Ausschnitt so rollen, dass die Zeile in der Mitte steht",
   "GUI_TEXTAREA_INSERT": "ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, GUI_ON_CHANGE feuert wie beim Tippen",
   "GUI_TEXTAREA_MARKS": "Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text",

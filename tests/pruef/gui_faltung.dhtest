@@ -1,0 +1,378 @@
+' Faltung im Textbereich (GUI_TEXTAREA_FOLDABLE/FOLD/FOLDED/FOLDS/FOLD_ALL)
+' und CODE_RENAME$. Format: docs/werkzeuge.md, dhrt test.
+
+=== zuklappen verbirgt die inneren zeilen, die kopfzeile bleibt
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "  eins" + CHR$(10) + "  zwei" + CHR$(10) + "END SUB" + CHR$(10) + "PRINT 1")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [4])
+PRINT GUI_TEXTAREA_FOLD(ta, 1)
+DIM z AS INTEGER
+FOR z = 1 TO 5
+    PRINT z; " "; GUI_TEXTAREA_FOLDED(ta, z)
+NEXT
+falten(GUI_TEXTAREA_FOLDS(ta))
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+1 FALSE
+2 TRUE
+3 TRUE
+4 TRUE
+5 FALSE
+falten: 1
+
+=== ein zweiter aufruf klappt wieder auf
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "  eins" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [3])
+GUI_TEXTAREA_FOLD(ta, 1)
+PRINT GUI_TEXTAREA_FOLD(ta, 1)
+PRINT GUI_TEXTAREA_FOLDED(ta, 2)
+' mit ausdruecklichem Wert statt Umschalten -- zweimal TRUE bleibt TRUE
+GUI_TEXTAREA_FOLD(ta, 1, TRUE)
+GUI_TEXTAREA_FOLD(ta, 1, TRUE)
+PRINT GUI_TEXTAREA_FOLDED(ta, 2)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE
+FALSE
+TRUE
+
+=== der engste block gewinnt
+' Eine Methode soll sich einzeln zuklappen lassen, ohne die Klasse
+' mitzunehmen -- sonst waere die Faltung in einer Klasse wertlos.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+DIM q AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 8
+    q = q + "zeile " + STR$(i) + CHR$(10)
+NEXT
+GUI_SET_TEXT(ta, q)
+' Klasse 1..8, Methode 3..5
+GUI_TEXTAREA_FOLDABLE(ta, [1, 3], [8, 5])
+GUI_TEXTAREA_FOLD(ta, 4)
+falten(GUI_TEXTAREA_FOLDS(ta))
+PRINT GUI_TEXTAREA_FOLDED(ta, 2); " "; GUI_TEXTAREA_FOLDED(ta, 4); " "; GUI_TEXTAREA_FOLDED(ta, 7)
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+falten: 3
+FALSE TRUE FALSE
+
+=== alles zuklappen nimmt nur die aeusseren bloecke
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+DIM q AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 12
+    q = q + "zeile " + STR$(i) + CHR$(10)
+NEXT
+GUI_SET_TEXT(ta, q)
+GUI_TEXTAREA_FOLDABLE(ta, [1, 3, 9], [7, 5, 12])
+PRINT GUI_TEXTAREA_FOLD_ALL(ta, TRUE)
+falten(GUI_TEXTAREA_FOLDS(ta))
+PRINT GUI_TEXTAREA_FOLD_ALL(ta, FALSE)
+falten(GUI_TEXTAREA_FOLDS(ta))
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+2
+falten: 1 9
+0
+falten:
+
+=== ein sprung in den block klappt ihn auf
+' Sonst spraenge eine Suche an eine Stelle, die man nicht sieht.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "  eins" + CHR$(10) + "  zwei" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [4])
+GUI_TEXTAREA_FOLD(ta, 1)
+PRINT GUI_TEXTAREA_FOLDED(ta, 3)
+GUI_TEXTAREA_GOTO(ta, 3, 1)
+PRINT GUI_TEXTAREA_FOLDED(ta, 3)
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta)
+PRINT z; " "; s
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+FALSE
+3 1
+
+=== die schreibmarke wandert beim zuklappen auf die kopfzeile
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "  eins" + CHR$(10) + "  zwei" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [4])
+GUI_TEXTAREA_GOTO(ta, 3, 3)
+GUI_TEXTAREA_FOLD(ta, 1)
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta)
+PRINT z; " "; s
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+1 1
+
+=== eine unbekannte zeile faltet nichts
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [2])
+PRINT GUI_TEXTAREA_FOLD(ta, 3)
+falten(GUI_TEXTAREA_FOLDS(ta))
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE
+falten:
+
+=== neuer text raeumt die faltung weg
+' Sie haengt an Zeilennummern des ALTEN Textes -- stehen zu lassen hiesse,
+' im neuen etwas anderes zu verbergen.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "  eins" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_FOLDABLE(ta, [1], [3])
+GUI_TEXTAREA_FOLD(ta, 1)
+GUI_SET_TEXT(ta, "ganz" + CHR$(10) + "anders" + CHR$(10) + "jetzt")
+falten(GUI_TEXTAREA_FOLDS(ta))
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+falten:
+
+=== eingefuegte zeilen darueber schieben die falte mit
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "SUB a()" + CHR$(10) + "  x" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_FOLDABLE(ta, [2], [4])
+GUI_TEXTAREA_FOLD(ta, 2)
+falten(GUI_TEXTAREA_FOLDS(ta))
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_TEXTAREA_INSERT(ta, "neu" + CHR$(10) + "noch eine" + CHR$(10))
+falten(GUI_TEXTAREA_FOLDS(ta))
+PRINT GUI_TEXTAREA_FOLDED(ta, 5); " "; GUI_TEXTAREA_FOLDED(ta, 3)
+
+SUB falten(a AS ARRAY OF INTEGER)
+    DIM t AS STRING
+    DIM x AS INTEGER
+    FOR EACH x IN a : t = t + STR$(x) + " " : NEXT
+    PRINT "falten:" + RTRIM$(" " + t)
+END SUB
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+falten: 2
+falten: 4
+TRUE FALSE
+
+=== ein textbereich ohne faltbare bloecke sieht aus wie zuvor
+' Gegenprobe: die Nummernspalte wird nur breiter, wenn es Pfeile gibt --
+' der sichtbare Ausschnitt bleibt also derselbe.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "zeilennummern", 1)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei")
+DIM z0 AS INTEGER
+DIM anz AS INTEGER
+DIM von AS INTEGER
+DIM ohne AS INTEGER
+(z0, anz, von, ohne) = GUI_TEXTAREA_VIEW(ta)
+GUI_TEXTAREA_FOLDABLE(ta, [1], [2])
+DIM mit AS INTEGER
+(z0, anz, von, mit) = GUI_TEXTAREA_VIEW(ta)
+PRINT ohne; " "; mit
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+9 9
+
+=== zugeklappt ruecken die zeilen darunter nach oben (Bild)
+' Der Beleg, dass die Faltung wirklich ZEICHNET, nicht nur zaehlt: die
+' Marke von Zeile 6 liegt bei Reihe 5. Gegenprobe im naechsten Fall.
+IMPORT "gui"
+SCREEN(400, 300, "P", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("P", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 300)
+DIM q AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    q = q + "zeile " + STR$(i) + CHR$(10)
+NEXT
+GUI_SET_TEXT(ta, q)
+GUI_TEXTAREA_MARKS(ta, [6], [&HFF0000])
+GUI_TEXTAREA_FOLDABLE(ta, [1], [4])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 300
+300 140 #4B1B24 +-24
+300 65 nicht #4B1B24 +-24
+
+=== zugeklappt ruecken die zeilen darunter nach oben (Bild, gefaltet)
+IMPORT "gui"
+SCREEN(400, 300, "P", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("P", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 300)
+DIM q AS STRING
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    q = q + "zeile " + STR$(i) + CHR$(10)
+NEXT
+GUI_SET_TEXT(ta, q)
+GUI_TEXTAREA_MARKS(ta, [6], [&HFF0000])
+GUI_TEXTAREA_FOLDABLE(ta, [1], [4])
+GUI_TEXTAREA_FOLD(ta, 1)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 300
+300 65 #4B1B24 +-24
+300 140 nicht #4B1B24 +-24
+
+=== CODE_RENAME laesst kommentare und zeichenketten stehen
+DIM q AS STRING
+q = "DIM zaehler AS INTEGER" + CHR$(10)
+q = q + "zaehler = zaehler + 1   ' zaehler bleibt" + CHR$(10)
+q = q + "PRINT " + CHR$(34) + "zaehler" + CHR$(34)
+PRINT CODE_RENAME$(q, 2, 1, "summe")
+--- erwartet
+DIM summe AS INTEGER
+summe = summe + 1   ' zaehler bleibt
+PRINT "zaehler"
+
+=== CODE_RENAME lehnt einen krummen namen ab
+' Leer statt eines halb umbenannten Textes -- wer das nicht prueft,
+' schreibt dann nichts, statt die Datei zu verderben.
+DIM q AS STRING
+q = "DIM zaehler AS INTEGER"
+PRINT "[" + CODE_RENAME$(q, 1, 5, "2krumm") + "]"
+PRINT "[" + CODE_RENAME$(q, 1, 5, "mit leer") + "]"
+PRINT "[" + CODE_RENAME$(q, 1, 5, "") + "]"
+--- erwartet
+[]
+[]
+[]
+
+=== CODE_RENAME laesst schluesselwoerter in ruhe
+' Die Marke steht schnell einmal auf einem DIM oder PRINT -- daraus einen
+' Namen zu machen ergaebe Buchstabensalat statt eines Programms.
+DIM q AS STRING
+q = "DIM zaehler AS INTEGER"
+PRINT "[" + CODE_RENAME$(q, 1, 2, "x") + "]"
+PRINT "[" + CODE_RENAME$(q, 1, 15, "x") + "]"
+--- erwartet
+[]
+[]
+
+=== CODE_RENAME trifft ganze woerter, nicht teile
+DIM q AS STRING
+q = "DIM hp AS INTEGER" + CHR$(10) + "hpmax = hp + 1" + CHR$(10) + "maxhp = hp"
+PRINT CODE_RENAME$(q, 1, 5, "leben")
+--- erwartet
+DIM leben AS INTEGER
+hpmax = leben + 1
+maxhp = leben
