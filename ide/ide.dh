@@ -38,6 +38,10 @@
 '  Klammernpaar farbig, Vorschlagsliste beim Tippen, git diff/log samt
 '  geaenderten Zeilen am Rand, Suche mit regulaerem Ausdruck, Lesezeichen
 '  ueber Dateien hinweg, Reiter wieder oeffnen, Faltung nach Einrueckung.
+'  Stand 7 dazu: Farbfelder neben &H-Literalen samt Farbwaehler,
+'  Einstellungen an einer Stelle (Strg+U), Verzeichnis der eingebauten
+'  Befehle (Strg+F3), Definition hier zeigen (Alt+F12), Symbolspur ueber
+'  dem Code, automatisch sichern, Schnipsel-Filter vorbelegt.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -3685,7 +3689,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 6 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 7 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()
