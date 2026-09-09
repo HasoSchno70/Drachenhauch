@@ -34,6 +34,10 @@
 '  geteilte Ansicht (Alt+G, zwei Reiter nebeneinander), Uebersichtskarte,
 '  git blame (Strg+Umschalt+B), das Handbuch GESETZT statt roh, mehrere
 '  Schreibmarken (Alt+Klick, Strg+Umschalt+L) und Symbole in den Menues.
+'  Stand 6 dazu: Einrueckung beim Zeilenumbruch, Fundstellen und
+'  Klammernpaar farbig, Vorschlagsliste beim Tippen, git diff/log samt
+'  geaenderten Zeilen am Rand, Suche mit regulaerem Ausdruck, Lesezeichen
+'  ueber Dateien hinweg, Reiter wieder oeffnen, Faltung nach Einrueckung.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -3346,7 +3350,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 5 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 6 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()

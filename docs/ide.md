@@ -16,28 +16,29 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
-## Stand 5 (09.09.2026)
+## Stand 6 (09.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
 | Start | Willkommensseite, solange kein Reiter offen ist: Neu, Öffnen, Beispiele, die zuletzt geöffneten Dateien (Doppelklick), die wichtigsten Kürzel. Die Sitzung kommt beim nächsten Start wieder (offene Dateien, aktiver Reiter), ebenso Thema und Schriftgröße | |
-| Dateien | Neu, Öffnen, Datei im Projekt öffnen (Wähler mit unscharfem Filter: `spred` findet `189_sprite_editor.dh`; dazu die zuletzt geöffneten), Zuletzt geöffnet (Untermenü), Sichern, Sichern unter, Reiter schließen; bis zu 12 Reiter; Rückfrage bei ungesicherten Änderungen; Listing drucken über einen Druckdialog (Drucker, Kopien) oder als PDF neben die Quelle (Courier 9 pt, 66 Zeilen je Seite, Zeilennummern, Kopfzeile mit Seitenzahl) | Strg+N, Strg+O, Strg+Umschalt+O, Strg+S, Strg+W, Strg+Q, Strg+P |
-| Bearbeiten | Suchen, Weitersuchen, Ersetzen (alle Treffer), Gehe zu Zeile, Suche im Projekt (alle `.dh` im Projektordner, Treffer unten rechts, Doppelklick öffnet), TODO/FIXME-Liste (dieselbe Suche), Befehlspalette (tippen filtert, Enter führt aus), Wer hat das geschrieben (`git blame` über die Datei, Datum und Person je Zeile in derselben Liste) | Strg+F, F3, Strg+H, Strg+G, Strg+Umschalt+F, Strg+Umschalt+M, Strg+Umschalt+P, Strg+Umschalt+B |
+| Dateien | Neu, Öffnen, Datei im Projekt öffnen (Wähler mit unscharfem Filter: `spred` findet `189_sprite_editor.dh`; dazu die zuletzt geöffneten), Zuletzt geöffnet (Untermenü), Sichern, Sichern unter, Reiter schließen und wieder öffnen (Strg+Umschalt+T); bis zu 12 Reiter; Rückfrage bei ungesicherten Änderungen; Listing drucken über einen Druckdialog (Drucker, Kopien) oder als PDF neben die Quelle (Courier 9 pt, 66 Zeilen je Seite, Zeilennummern, Kopfzeile mit Seitenzahl) | Strg+N, Strg+O, Strg+Umschalt+O, Strg+S, Strg+W, Strg+Q, Strg+P |
+| Bearbeiten | Suchen, Weitersuchen, Ersetzen (alle Treffer), Gehe zu Zeile, Suche im Projekt (alle `.dh` im Projektordner, Treffer unten rechts, Doppelklick öffnet), wahlweise mit **regulärem Ausdruck** (ein Schalter für Suchen, Ersetzen und Projektsuche), TODO/FIXME-Liste (dieselbe Suche), Befehlspalette (tippen filtert, Enter führt aus) | Strg+F, F3, Strg+H, Strg+G, Strg+Umschalt+F, Strg+Umschalt+M, Strg+Umschalt+P |
+| Git | Wer hat das geschrieben (`git blame`, Datum und Person je Zeile), was habe ich geändert (`git diff` farbig im Fenster), Verlauf dieser Datei (`git log`); die geänderten Zeilen tragen eine Marke am Rand (nach dem Sichern neu gefragt, nicht je Bild) | Strg+Umschalt+B, Strg+Umschalt+D |
 | Schreiben | Umbenennen eines Symbols über die ganze Datei (`CODE_RENAME$`: ganze Wörter, Kommentare und Zeichenketten bleiben; ein krummer Name ändert nichts), Schnipsel einfügen (13 Gerüste, `\|` sagt wohin die Marke gehört, die Einrückung der Zeile wird übernommen), eine Marke auf jede Fundstelle des Wortes — danach ändert ein Tippen alle; Alt+Klick legt eine Marke dazu, ESC räumt sie weg. Signaturhilfe: steht die Marke in einer Argumentliste, zeigt die Statuszeile die Signatur des Aufrufs und die Nummer des Arguments | Umschalt+F6, Strg+J, Strg+Umschalt+L |
-| Zeilen | Alles auf ganzen Zeilen, der Auswahl oder der Zeile der Marke, jeder Handgriff ein eigener Undo-Schritt: Kommentar umschalten, Zeile duplizieren, Zeile löschen, Zeilen nach oben/unten, Ein-/Ausrücken (Tab gehört dem Feld selbst), Dokument formatieren (`CODE_FORMAT$`, derselbe Formatierer wie `dhrt fmt`; bei einem Syntaxfehler bleibt alles stehen), Lesezeichen (blaue Marke) setzen und anspringen | Strg+K, Strg+D, Strg+Umschalt+K, Alt+Hoch/Runter, Alt+Rechts/Links, Umschalt+Alt+F, Strg+F2, F2 |
-| Sprache | Einfärbung des sichtbaren Ausschnitts, Hilfe zum Wort unter der Marke (Statuszeile), Vervollständigung, Zur Definition, Gliederung links unten (SUB/FUNCTION/CLASS mit Methoden, Doppelklick springt) | Strg+Leer, F12 |
+| Zeilen | Alles auf ganzen Zeilen, der Auswahl oder der Zeile der Marke, jeder Handgriff ein eigener Undo-Schritt: Kommentar umschalten, Zeile duplizieren, Zeile löschen, Zeilen nach oben/unten, Ein-/Ausrücken (Tab gehört dem Feld selbst), Dokument formatieren (`CODE_FORMAT$`, derselbe Formatierer wie `dhrt fmt`; bei einem Syntaxfehler bleibt alles stehen). Eine neue Zeile übernimmt die **Einrückung** der alten und rückt hinter `SUB`, `FOR`, `THEN` und den anderen Blockwörtern eine Stufe weiter ein; ein `END` oder `NEXT` allein in einer Zeile rückt sie zurück. Lesezeichen (blaue Marke) setzen und anspringen — vorwärts und rückwärts **über Dateien hinweg**, dazu die Liste aller | Strg+K, Strg+D, Strg+Umschalt+K, Alt+Hoch/Runter, Alt+Rechts/Links, Umschalt+Alt+F, Strg+F2, F2, Umschalt+F2, Alt+F2 |
+| Sprache | Einfärbung des sichtbaren Ausschnitts, dazu jede Fundstelle des Wortes unter der Marke und das zusammengehörende Klammernpaar; Hilfe zum Wort (Statuszeile), Vervollständigung — sie geht beim Tippen ab drei Zeichen von selbst auf, der Fokus bleibt dabei im Code-Feld, Strg+Leer holt sie herein; Zur Definition, Gliederung links unten (SUB/FUNCTION/CLASS mit Methoden, Doppelklick springt) | Strg+Leer, F12 |
 | Prüfen | Fehlerliste unten rechts, 0,6 s nach der letzten Änderung von selbst; Klick springt zur Zeile; Fehlerzeilen tragen eine orange Marke | Umschalt+F7 |
 | Debugger | Haltepunkte (rote Marke) an der Zeile der Schreibmarke, bedingte Haltepunkte (violett; `i = 3`, `hp < 10` — der Ausdruck wird im Programm ausgewertet, gehalten wird nur, wenn er wahr ist); Debuggen läuft bis zum ersten Haltepunkt, ohne Haltepunkte steht es in Zeile 1; die angehaltene Zeile ist gelb markiert, Variablen (lokal und global) stehen unten rechts anstelle der Problemliste, dazu die Schritt-Knöpfe; steht das Programm, wertet die Eingabezeile Ausdrücke aus (`? 2 * 21` → `= 42 (INTEGER)`) | F9, Umschalt+F9, F7, F8 weiter, F10 drüber, F11 hinein, Umschalt+F11 heraus, Umschalt+F5 stopp, Strg+E Ausdruck |
 | Profil | Lauf unter `dhrt profile`; am Ende ein Fenster mit den Zeilen nach Zeit (Anzahl, ms, Anteil, Quelltext), Klick springt zur Zeile | Strg+Umschalt+Y |
 | Ausführen | Starten mit laufender Ausgabe unten links, Eingabezeile für `INPUT`, Stoppen; Export als eigenständiges Programm (`dhrt --export`, nach `<name>_dist/` neben die Quelle, die Ausgabe des Exports läuft unten links mit) | F5, Umschalt+F5, Strg+F6 |
 | Werkzeuge | Die Begleit-Editoren in Drachenhauch (SFX-Generator, Partikel-Editor, Tilemap-Editor, Sprite-Editor, Tracker, Form-Designer, Anim-FSM-Editor, Notenblatt) als eigene Programme; die Beispiele als Projekt öffnen | |
-| Ansicht | Helles/dunkles Thema, Vollbild, Schrift größer/kleiner (10 bis 32 px, bleibt gemerkt); Zeilenumbruch (gilt für alle Reiter); Blöcke falten (die Blöcke kommen aus `CODE_SYMBOLS$`, ein Klick auf das Dreieck in der Nummernspalte tut dasselbe); geteilte Ansicht (zwei Reiter nebeneinander); Übersichtskarte am rechten Rand (ein Strich je Zeile, heller Kasten für den sichtbaren Ausschnitt, Klick springt); die IDE startet maximiert | Alt+Enter, Alt+Z, F4, Strg+F4, Umschalt+F4, Alt+G |
+| Ansicht | Helles/dunkles Thema, Vollbild, Schrift größer/kleiner (10 bis 32 px, bleibt gemerkt); Zeilenumbruch (gilt für alle Reiter); Blöcke falten (die Blöcke kommen aus `CODE_SYMBOLS$` **und aus der Einrückung** -- alles, unter dem etwas tiefer Eingerücktes steht, also auch eine `FOR`-Schleife; ein Klick auf das Dreieck in der Nummernspalte tut dasselbe); geteilte Ansicht (zwei Reiter nebeneinander); Übersichtskarte am rechten Rand (Wort für Wort gezeichnet, heller Kasten für den sichtbaren Ausschnitt, Klick springt); geänderte Zeilen am Rand; die IDE startet maximiert | Alt+Enter, Alt+Z, F4, Strg+F4, Umschalt+F4, Alt+G |
 | Hilfe | Handbuch im Fenster, **gesetzt statt roh**: Überschriften in drei Größen, Absätze umgebrochen, Aufzählungen mit Punkt, Code-Blöcke dicktengleich, Tabellen als Begriffsliste; der Knopf oben rechts schaltet auf den Quelltext. F1 schlägt das Wort unter der Schreibmarke in `docs/` nach und öffnet das Dokument mit den meisten Fundstellen in Codeschrift; Klappliste aller Dokumente, Suche im Dokument; Tastenkürzel-Übersicht | F1, Strg+F1 |
 
 Einstellungen und Sitzung liegen in EINER JSON-Datei im Nutzerprofil
 (`%APPDATA%\Drachenhauch\ide.json`, sonst `~/.config/Drachenhauch/ide.json`):
-`zuletzt`, `sitzung`, `aktiv`, `hell`, `schrift`, `umbruch`, `karte` und
-`projekte` (Sitzung je Ordner, die zwölf letzten — wer an zwei Sachen
+`zuletzt`, `sitzung`, `aktiv`, `hell`, `schrift`, `umbruch`, `karte`,
+`git_rand`, `regex` und `projekte` (Sitzung je Ordner, die zwölf letzten — wer an zwei Sachen
 arbeitet, will beim Wechsel nicht die Reiter der anderen wiederfinden).
 Die Umgebungsvariable
 `DH_IDE_KONFIG` legt einen anderen Ort fest — die Tests brauchen das, sonst
@@ -94,6 +95,10 @@ bekäme. Diese Bausteine kamen mit ihr:
 - **Sichtbarkeit lesen** (`GUI_WINDOW_SHOWN(win)`): ohne den Getter muss ein
   Programm sich merken, was es selbst gesetzt hat, und liegt daneben,
   sobald der Nutzer das Fenster über sein Kreuz schließt.
+- **Einrückung beim Zeilenumbruch** (`GUI_TEXTAREA_SET(ta, "auto_einzug", 1)`
+  + `GUI_TEXTAREA_INDENT_WORDS`): die Laufzeit übernimmt die Einrückung der
+  laufenden Zeile -- das ist sprachfrei; welche Wörter eine Stufe mehr oder
+  weniger bedeuten, sagt die IDE. Dasselbe Prinzip wie bei der Faltung.
 
 Der Debugger ist ein Client von `dhrt debug`: das Kind schreibt Ereignisse
 als JSON-Zeilen auf stdout (`paused` mit Zeile, Tiefe, `locals`, `globals`;
@@ -132,7 +137,9 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `falten alle <anzahl>`, `geteilt <reiter> x <lage>+<breite> <lage>+<breite>`,
 `geteilt aus`, `karte an|aus`, `karte sprung <zeile>`,
 `umbenannt <anzahl> <name>`, `schnipsel <name>`, `signatur <text>`,
-`marken <anzahl>`, `blame <zeilen>`, `hbansicht gesetzt|quelltext`, `ende`. So sieht `tests/test_ide.py`, was sie
+`marken <anzahl>`, `blame <zeilen>`, `hbansicht gesetzt|quelltext`,
+`git diff|log <zeilen>`, `git rand <zeilen>`, `lesezeichen liste <anzahl>`,
+`wieder auf <pfad>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
 
@@ -145,11 +152,19 @@ Zeilenumbruch und Symbole in den Menüs sind alle da. Zwei Bausteine der
 Laufzeit kamen dafür dazu (Faltung und mehrere Schreibmarken im
 Textbereich), dazu `CODE_RENAME$` und `GUI_WINDOW_SHOWN`.
 
-Was gegen die Qt-IDE offen bleibt, ist jetzt kleinteiliger: Faltung nach
-Einrückung statt nach Blöcken (heute faltet nur, was `CODE_SYMBOLS$`
-kennt), Git-Diff und -Verlauf im Fenster (nur `blame` ist da), eine Suche
-mit regulären Ausdrücken, Lesezeichen über Dateien hinweg, und eine
-Übersichtskarte, die den Text zeichnet statt nur seine Länge. Ein
+Auch die Liste aus Stand 5 ist abgearbeitet: Faltung nach Einrückung,
+Git-Diff und -Verlauf, Suche mit regulären Ausdrücken, Lesezeichen über
+Dateien hinweg und eine Übersichtskarte, die Wörter zeigt. Dazu kamen die
+Einrückung beim Zeilenumbruch, die Vorschlagsliste beim Tippen, die
+Hervorhebung von Fundstellen und Klammernpaar und das Wiederöffnen eines
+geschlossenen Reiters.
+
+Offen gegen die Qt-IDE sind jetzt: ein Einstellungsdialog (heute stehen
+alle Schalter im Menü), ein Verzeichnis der eingebauten Befehle zum
+Blättern, eine Vorschau der Definition im Feld (Peek), die Symbolspur
+über dem Editor (Breadcrumbs), automatisches Sichern, Farbfelder neben
+`&H`-Literalen mit Farbwähler, und das Aufklappen eines Schnipsels durch
+Tippen seines Namens (heute über den Wähler). Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis
