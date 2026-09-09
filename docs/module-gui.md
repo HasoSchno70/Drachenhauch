@@ -2086,7 +2086,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
 | `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
 | `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
-| `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine |
+| `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine einzige Schreibmarke |
 | `GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)` | welche Blöcke sich falten lassen: zwei gleich lange Felder mit Kopfzeile und letzter Zeile. Was ein Block ist, weiß nur das Programm — die Laufzeit kennt hier keine Sprache |
 | `GUI_TEXTAREA_FOLD(ta, zeile[, an])` → BOOLEAN | den engsten faltbaren Block um `zeile` zuklappen oder aufklappen; ohne `an` umschalten. Liefert, ob danach zugeklappt ist |
 | `GUI_TEXTAREA_FOLD_ALL(ta[, zu])` → INTEGER | alles zuklappen (nur die äußeren Blöcke) oder alles aufklappen; liefert die Zahl der zugeklappten |

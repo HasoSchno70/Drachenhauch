@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 4)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 5)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -28,6 +28,12 @@
 '  Gliederung links unten, bedingte Haltepunkte (Umschalt+F9), Export als
 '  eigenstaendiges Programm (dhrt --export), Druckdialog mit Druckerwahl,
 '  TODO/FIXME-Liste, Tastenkuerzel-Uebersicht, Schriftgroesse.
+'  Stand 5 dazu: Bloecke falten (F4, die Bloecke aus CODE_SYMBOLS$),
+'  Zeilenumbruch, Sitzung je Projektordner, Umbenennen (Umschalt+F6 ueber
+'  CODE_RENAME$), Schnipsel (Strg+J), Signaturhilfe in der Statuszeile,
+'  geteilte Ansicht (Alt+G, zwei Reiter nebeneinander), Uebersichtskarte,
+'  git blame (Strg+Umschalt+B), das Handbuch GESETZT statt roh, mehrere
+'  Schreibmarken (Alt+Klick, Strg+Umschalt+L) und Symbole in den Menues.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -39,6 +45,7 @@
 IMPORT "gui"
 IMPORT "json"
 IMPORT "pdf"
+IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_*)
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -2844,7 +2851,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 4 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 5 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()
@@ -2862,6 +2869,100 @@ SUB befehl(k AS STRING)
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
     END SELECT
 END SUB
+
+' --- Symbole in den Menues --------------------------------------------
+' Gezeichnet statt geladen: ein Ordner voller PNGs waere eine zweite Sache,
+' die beim Installieren mitkommen muss, und 16x16 aus Rechtecken und
+' Strichen ist keine Kunst. IMAGE_NEW ohne Farbe ist DURCHSICHTIG -- ueber
+' eine Farbe waere das gar nicht auszudruecken, weil Deckkraft 0 als
+' deckend gilt.
+CONST SYM_A = &H2BC4E8        ' Akzent
+CONST SYM_G = &H7E8E9E        ' ruhiges Grau -- liest sich auf hellem UND dunklem Thema
+CONST SYM_R = &HE06060        ' Warnfarbe
+
+FUNCTION symbolBild(art AS STRING) AS IMAGE
+    DIM b AS IMAGE : b = IMAGE_NEW(16, 16)
+    ' Loecher werden GESTOCHEN (IMAGE_CLEAR schreibt Durchsichtigkeit) und
+    ' nicht mit der Hintergrundfarbe uebermalt: die Symbole sollen auf dem
+    ' hellen Thema so aussehen wie auf dem dunklen. Mit einer Farbe waere das
+    ' gar nicht auszudruecken -- Deckkraft 0 gilt in Drachenhauch als deckend.
+    SELECT CASE art
+        CASE "neu"
+            IMAGE_DRAW_RECT(b, 3, 1, 10, 14, SYM_G)
+            IMAGE_CLEAR(b, 4, 2, 8, 12)
+            IMAGE_DRAW_RECT(b, 7, 4, 2, 8, SYM_A) : IMAGE_DRAW_RECT(b, 4, 7, 8, 2, SYM_A)
+        CASE "oeffnen"
+            IMAGE_DRAW_RECT(b, 1, 3, 6, 3, SYM_A)
+            IMAGE_DRAW_RECT(b, 1, 5, 14, 9, SYM_A)
+            IMAGE_CLEAR(b, 3, 8, 10, 4)
+        CASE "sichern"
+            IMAGE_DRAW_RECT(b, 2, 2, 12, 12, SYM_A)
+            ' Schieber und Aufkleber muessen INNEN liegen: reichen sie an den
+            ' Rand, bleiben nur zwei Balken stehen und die Diskette liest sich
+            ' als Buchstabe H.
+            IMAGE_CLEAR(b, 5, 3, 6, 4)
+            IMAGE_CLEAR(b, 4, 10, 8, 3)
+        CASE "suchen"
+            IMAGE_DRAW_CIRCLE(b, 6, 6, 5, SYM_G)
+            IMAGE_CLEAR(b, 4, 4, 5, 5)
+            IMAGE_DRAW_LINE(b, 10, 10, 14, 14, SYM_G)
+            IMAGE_DRAW_LINE(b, 11, 10, 15, 14, SYM_G)
+        CASE "start"
+            ' Ein Dreieck aus senkrechten Strichen -- IMAGE_ hat keines.
+            DIM k AS INTEGER
+            FOR k = 0 TO 6
+                IMAGE_DRAW_RECT(b, 4 + k, 2 + k, 1, 12 - 2 * k, &H60D080)
+            NEXT
+        CASE "stopp"
+            IMAGE_DRAW_RECT(b, 4, 4, 8, 8, SYM_R)
+        CASE "debug"
+            IMAGE_DRAW_CIRCLE(b, 8, 9, 4, SYM_A)
+            IMAGE_DRAW_LINE(b, 2, 6, 5, 8, SYM_A) : IMAGE_DRAW_LINE(b, 14, 6, 11, 8, SYM_A)
+            IMAGE_DRAW_LINE(b, 2, 13, 5, 11, SYM_A) : IMAGE_DRAW_LINE(b, 14, 13, 11, 11, SYM_A)
+        CASE "haltepunkt"
+            IMAGE_DRAW_CIRCLE(b, 8, 8, 5, SYM_R)
+        CASE "pruefen"
+            IMAGE_DRAW_LINE(b, 3, 8, 6, 12, &H60D080)
+            IMAGE_DRAW_LINE(b, 4, 8, 7, 12, &H60D080)
+            IMAGE_DRAW_LINE(b, 6, 12, 13, 4, &H60D080)
+            IMAGE_DRAW_LINE(b, 7, 12, 14, 4, &H60D080)
+        CASE "handbuch"
+            IMAGE_DRAW_RECT(b, 2, 2, 12, 12, SYM_G)
+            IMAGE_CLEAR(b, 3, 3, 4, 10)
+            IMAGE_CLEAR(b, 9, 3, 4, 10)
+        CASE "drucken"
+            IMAGE_DRAW_RECT(b, 4, 1, 8, 4, SYM_G)
+            IMAGE_DRAW_RECT(b, 1, 5, 14, 6, SYM_A)
+            IMAGE_DRAW_RECT(b, 4, 10, 8, 5, SYM_G)
+        CASE "werkzeug"
+            IMAGE_DRAW_CIRCLE(b, 8, 8, 6, SYM_G)
+            IMAGE_CLEAR(b, 6, 6, 5, 5)
+        CASE "export"
+            IMAGE_DRAW_RECT(b, 2, 9, 12, 5, SYM_G)
+            IMAGE_DRAW_RECT(b, 7, 2, 2, 6, SYM_A)
+            IMAGE_DRAW_LINE(b, 4, 5, 8, 1, SYM_A) : IMAGE_DRAW_LINE(b, 12, 5, 8, 1, SYM_A)
+        CASE ELSE
+            IMAGE_DRAW_CIRCLE(b, 8, 8, 3, SYM_G)
+    END SELECT
+    RETURN b
+END FUNCTION
+
+SUB symbol(eintrag AS INTEGER, art AS STRING)
+    GUI_MENU_ICON(eintrag, symbolBild(art))
+END SUB
+
+symbol(miNeu, "neu") : symbol(miOeffnen, "oeffnen") : symbol(miSchnell, "oeffnen")
+symbol(miSichern, "sichern") : symbol(miSichernAls, "sichern")
+symbol(miDrucken, "drucken") : symbol(miPdf, "drucken")
+symbol(miSuchen, "suchen") : symbol(miWeiter, "suchen") : symbol(miErsetzen, "suchen")
+symbol(miProjekt, "suchen") : symbol(miTodo, "suchen") : symbol(miBlame, "handbuch")
+symbol(miStart, "start") : symbol(miStopp, "stopp") : symbol(miPruefen, "pruefen")
+symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingung, "haltepunkt")
+symbol(miExport, "export")
+symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTilemap, "werkzeug")
+symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug")
+symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug")
+symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 
 ' --- Schnipsel: die Geruester, die man staendig tippt -----------------
 ' Der senkrechte Strich sagt, wohin die Schreibmarke danach gehoert.

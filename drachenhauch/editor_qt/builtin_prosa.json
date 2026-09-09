@@ -677,7 +677,7 @@
   "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als Code-Feld einfärbbar — siehe Code-Feld",
   "GUI_TEXTAREA_ADD_CARET": "eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer",
   "GUI_TEXTAREA_CARETS": "wie viele Schreibmarken das Feld gerade hat (mindestens 1)",
-  "GUI_TEXTAREA_CLEAR_CARETS": "zurück auf eine",
+  "GUI_TEXTAREA_CLEAR_CARETS": "zurück auf eine einzige Schreibmarke",
   "GUI_TEXTAREA_CURSOR": "wo die Schreibmarke steht (ab 1, in Zeichen)",
   "GUI_TEXTAREA_FIND": "nächster Treffer ab der Stelle, (-1, -1) wenn keiner; ohne genau ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab 1, 1 suchen",
   "GUI_TEXTAREA_FOLD": "den engsten faltbaren Block um zeile zuklappen oder aufklappen; ohne an umschalten. Liefert, ob danach zugeklappt ist",
