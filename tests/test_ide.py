@@ -43,6 +43,7 @@ RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
 RL_L = 76
 RL_RIGHT, RL_END = 262, 269
 RL_SPACE, RL_LEFT = 32, 263
+RL_T, RL_W = 84, 87
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
@@ -630,3 +631,65 @@ def test_git_diff_ohne_aenderung_sagt_es(tmp_path):
                events=_taste(50, RL_D, RL_LCTRL, RL_LSHIFT))
     assert "git diff 0" in log, log
     assert "git rand 0" in log, log
+
+
+def test_suche_mit_regulaerem_ausdruck_im_projekt(tmp_path):
+    """Erst den Schalter über die Befehlspalette, dann `^SUB` im Projekt:
+    das trifft nur die Zeile, die damit ANFÄNGT. Gegenprobe im selben Text:
+    `    SUB` weiter unten zählt nicht mit."""
+    _datei(tmp_path, "SUB eins()\nEND SUB\n", name="a.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n    SUB zwei()\n    END SUB\n")
+    ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
+    ev += _taste(130, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(170, RL_V, RL_LCTRL) + _taste(200, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=300, events=ev,
+               zwischenablage="Suchen mit regulaerem Ausdruck")
+    # Der zweite Strg+V tippt denselben Text -- deshalb ein eigener Lauf:
+    assert any(z.startswith("palette regex") for z in log), log
+
+
+def test_regulaerer_ausdruck_trifft_nur_den_zeilenanfang(tmp_path):
+    """Mit dem Schalter aus der ide.json: `^SUB` findet die eine Zeile in
+    a.dh, nicht die eingerückte in spiel.dh."""
+    import json
+    _datei(tmp_path, "SUB eins()\nEND SUB\n", name="a.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n    SUB zwei()\n    END SUB\n")
+    (tmp_path / "ide.json").write_text(json.dumps({"regex": True}), encoding="utf-8")
+    ev = _taste(40, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="^SUB")
+    treffer = [z for z in log if z.startswith("suche ")]
+    assert treffer and treffer[-1] == "suche 1", log
+
+
+def test_lesezeichen_springt_ueber_dateien(tmp_path):
+    """Ein Lesezeichen in jeder von zwei Dateien: F2 führt von der einen in
+    die andere. Ein Lesezeichen, das man nur in seiner Datei wiederfindet,
+    wäre eins zu wenig."""
+    zwei = _datei(tmp_path, "PRINT 2\n", name="zwei.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    # zwei.dh öffnen, dort ein Lesezeichen, zurück auf spiel.dh, dort auch
+    ev = _taste(30, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(120, RL_F2, RL_LCTRL) + _taste(160, RL_F2)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="zwei")
+    spruenge = [z for z in log if z.startswith("lesezeichen sprung ")]
+    assert spruenge, log
+
+
+def test_geschlossenen_reiter_wieder_oeffnen(tmp_path):
+    """Strg+W schließt, Strg+Umschalt+T holt die Datei zurück."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(40, RL_W, RL_LCTRL) + _taste(90, RL_T, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    auf = [z for z in log if z.startswith("wieder auf ")]
+    assert auf and auf[0].endswith("spiel.dh"), log
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert len(geoeffnet) == 2, log
+
+
+def test_faltung_kennt_auch_eingerueckte_bloecke(tmp_path):
+    """Eine FOR-Schleife ist kein Symbol -- CODE_SYMBOLS$ kennt sie nicht.
+    Über die Einrückung lässt sie sich trotzdem falten."""
+    quelle = _datei(tmp_path, "DIM i AS INTEGER\nFOR i = 1 TO 3\n    PRINT i\n    PRINT i\nNEXT\n")
+    # Marke in Zeile 2 (die FOR-Zeile), dann F4
+    ev = _taste(30, RL_DOWN) + _taste(70, RL_F4)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    assert "falte 2 zu" in log, log

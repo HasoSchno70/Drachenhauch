@@ -46,6 +46,7 @@ IMPORT "gui"
 IMPORT "json"
 IMPORT "pdf"
 IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_*)
+IMPORT "regex"      ' fuer die Suche mit regulaeren Ausdruecken
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -137,11 +138,15 @@ DIM linkerTab AS INTEGER : linkerTab = -1
 DIM minimapAn AS BOOLEAN : minimapAn = FALSE
 ' Geaenderte Zeilen am Rand (git diff -U0), per Vorgabe an.
 DIM gitRandAn AS BOOLEAN : gitRandAn = TRUE
+' Suche mit regulaerem Ausdruck (Suchen, Ersetzen und Projektsuche).
+DIM regexAn AS BOOLEAN : regexAn = FALSE
+' Zuletzt geschlossene Reiter -- Strg+Umschalt+T holt sie zurueck.
+DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 ' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
 ' durch die Bruecke, obwohl sich nichts geaendert hat.
-DIM faltSchluessel AS STRING : faltSchluessel = ""
+DIM faltSchluessel AS STRING : faltSchluessel = "-"   ' "" waere eine echte Gliederung (Datei ohne SUB)
 
 ' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
 DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
@@ -216,6 +221,7 @@ IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(k
 IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
 IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
+IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -269,6 +275,7 @@ DIM miDrucken AS INTEGER : miDrucken = GUI_MENU_ITEM(mDatei, "Listing drucken", 
 DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Listing als PDF neben die Quelle")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Reiter schliessen", "Strg+W")
+DIM miWiederauf AS INTEGER : miWiederauf = GUI_MENU_ITEM(mDatei, "Geschlossenen Reiter wieder oeffnen", "Strg+Umschalt+T")
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
@@ -298,6 +305,10 @@ DIM miAusruecken AS INTEGER : miAusruecken = GUI_MENU_ITEM(mZeilen, "Ausruecken"
 DIM miFormat AS INTEGER : miFormat = GUI_MENU_ITEM(mBearb, "Dokument formatieren", "Umschalt+Alt+F")
 DIM miLesezeichen AS INTEGER : miLesezeichen = GUI_MENU_ITEM(mBearb, "Lesezeichen setzen/entfernen", "Strg+F2")
 DIM miLzWeiter AS INTEGER : miLzWeiter = GUI_MENU_ITEM(mBearb, "Naechstes Lesezeichen", "F2")
+DIM miLzZurueck AS INTEGER : miLzZurueck = GUI_MENU_ITEM(mBearb, "Voriges Lesezeichen", "Umschalt+F2")
+DIM miLzListe AS INTEGER : miLzListe = GUI_MENU_ITEM(mBearb, "Alle Lesezeichen", "Alt+F2")
+DIM miRegex AS INTEGER : miRegex = GUI_MENU_ITEM(mBearb, "Suchen mit regulaerem Ausdruck")
+GUI_MENU_CHECK(miRegex, FALSE)
 DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt", "Strg+Umschalt+M")
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
 DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
@@ -512,6 +523,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
     JSON_SET_BOOL(konfig, "karte", minimapAn)
     JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
+    JSON_SET_BOOL(konfig, "regex", regexAn)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -812,11 +824,21 @@ SUB minimapZeichnen()
         DIM zt AS STRING : zt = zeilen[i]
         DIM roh AS STRING : roh = LTRIM$(zt)
         IF roh <> "" THEN
-            DIM breit AS INTEGER : breit = MIN(cw - 4, LEN(zt) * 2)
+            ' Wort fuer Wort statt ein Strich je Zeile: so sieht man in der
+            ' Karte, WO in der Datei man ist -- ein gleichmaessiger Balken
+            ' sieht ueberall gleich aus.
             DIM einzugX AS INTEGER : einzugX = MIN(cw \ 3, (LEN(zt) - LEN(roh)) * 2)
-            DIM f AS INTEGER : f = &H60708A
-            IF LEFT$(roh, 1) = "'" THEN f = F_KOMMENTAR
-            BOX(cx + 2 + einzugX, cy + y, cx + 2 + breit, cy + y, f)
+            DIM x AS INTEGER : x = cx + 2 + einzugX
+            DIM grund AS INTEGER : grund = &H60708A
+            IF LEFT$(roh, 1) = "'" THEN grund = F_KOMMENTAR
+            DIM wt AS STRING
+            FOR EACH wt IN SPLIT$(roh, " ")
+                DIM bw AS INTEGER : bw = LEN(wt) * 2
+                IF wt <> "" AND x < cx + cw - 3 THEN
+                    BOX(x, cy + y, MIN(x + bw - 2, cx + cw - 3), cy + y, grund)
+                END IF
+                x = x + bw + 2
+            NEXT
         END IF
         y = y + 1
         IF y >= ch THEN BREAK
@@ -853,7 +875,7 @@ END SUB
 SUB faltenUmschalten()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
@@ -865,7 +887,7 @@ END SUB
 SUB faltenAlle(zu AS BOOLEAN)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
     DIM n AS INTEGER : n = GUI_TEXTAREA_FOLD_ALL(ta, zu)
     GUI_FOCUS(ta)
     GUI_SET_TEXT(lblStatus, IIF(zu, STR$(n) + " Bloecke zugeklappt.", "Alles aufgeklappt."))
@@ -959,6 +981,9 @@ END FUNCTION
 
 SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
+    ' Den Pfad merken: Strg+Umschalt+T holt ihn zurueck. Nur gesicherte
+    ' Dateien -- ein leerer Reiter haette nichts, was wiederzufinden waere.
+    IF tabPfade[i] <> "" THEN ARRAY_PUSH(zuGemacht, tabPfade[i])
     ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
     ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
     IF geteilt THEN geteiltSetzen(FALSE)
@@ -1171,6 +1196,47 @@ SUB pruefen()
 END SUB
 
 ' --- Gliederung: SUB/FUNCTION/CLASS der aktiven Datei (CODE_SYMBOLS$) ---
+' Faltbare Bloecke aus der EINRUECKUNG -- alles, was CODE_SYMBOLS$ nicht
+' kennt: eine FOR-Schleife, ein IF-Zweig, ein von Hand eingerueckter
+' Abschnitt. Ein Block ist eine Zeile, unter der mindestens eine tiefer
+' eingerueckte steht; er endet an der letzten davon.
+'
+' Leerzeilen zaehlen nicht mit (sie haben gar keine Einrueckung), und was
+' die Gliederung schon nennt, kommt nicht doppelt: sonst haette jede
+' Kopfzeile zwei Bereiche, und der engere -- der aus der Einrueckung --
+' gewaenne, obwohl der Block derselbe ist.
+SUB einzugBloecke(quelle AS STRING, fv AS ARRAY OF INTEGER, fb AS ARRAY OF INTEGER)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM n AS INTEGER : n = LEN(zeilen)
+    IF n > 4000 THEN RETURN        ' bei sehr grossen Dateien nicht je Pruefung
+    DIM tiefe[MAX(n, 1)] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF TRIM$(zeilen[i]) = "" THEN
+            tiefe[i] = -1
+        ELSE
+            tiefe[i] = LEN(zeilen[i]) - LEN(LTRIM$(zeilen[i]))
+        END IF
+    NEXT
+    FOR i = 0 TO n - 2
+        IF tiefe[i] < 0 THEN CONTINUE
+        DIM k AS INTEGER : k = i + 1
+        DIM ende AS INTEGER : ende = i
+        WHILE k < n
+            IF tiefe[k] < 0 THEN
+                k = k + 1
+                CONTINUE
+            END IF
+            IF tiefe[k] <= tiefe[i] THEN BREAK
+            ende = k
+            k = k + 1
+        WEND
+        IF ende <= i THEN CONTINUE
+        IF ARRAY_INDEXOF(fv, i + 1) >= 0 THEN CONTINUE
+        ARRAY_PUSH(fv, i + 1) : ARRAY_PUSH(fb, ende + 1)
+    NEXT
+END SUB
+
 SUB gliederungFuellen(quelle AS STRING)
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
     DIM n AS INTEGER : n = JSON_LEN(j, "")
@@ -1206,6 +1272,7 @@ SUB gliederungFuellen(quelle AS STRING)
                 ARRAY_PUSH(fv, JSON_GET_INT(j, pkf + ".von")) : ARRAY_PUSH(fb, JSON_GET_INT(j, pkf + ".bis"))
             NEXT
         NEXT
+        einzugBloecke(quelle, fv, fb)
         GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
     END IF
     IF schl = gliederungSchluessel THEN RETURN
@@ -1263,7 +1330,7 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
             IF treffer >= 500 THEN BREAK
-            IF INSTR(LOWER$(zeilen[i]), klein) >= 0 OR (klein2 <> "" AND INSTR(LOWER$(zeilen[i]), klein2) >= 0) THEN
+            IF passtSuche(zeilen[i], gesucht) OR (zweitens <> "" AND passtSuche(zeilen[i], zweitens)) THEN
                 ARRAY_PUSH(sd, d)
                 ARRAY_PUSH(sz, i + 1)
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
@@ -1558,25 +1625,91 @@ SUB lesezeichenUmschalten()
 END SUB
 
 ' F2: zum naechsten Lesezeichen hinter der Marke, am Ende wieder von vorn.
-SUB lesezeichenWeiter()
+' Lesezeichen der Reihe nach -- ueber DATEIEN hinweg: erst die restlichen
+' in dieser Datei, dann die naechste Datei, die eins hat. Ein Lesezeichen,
+' das man nur in seiner Datei wiederfindet, ist eins zu wenig.
+SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
     IF aktiverTab < 0 THEN RETURN
+    IF LEN(lzZeilen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein Lesezeichen gesetzt -- Strg+F2 setzt eins.")
+        RETURN
+    END IF
     DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    DIM naechste AS INTEGER : naechste = 0
-    DIM erste AS INTEGER : erste = 0
+    ' Alle Marken in EINE Reihenfolge bringen: erst nach Datei, dann nach
+    ' Zeile. So ist "das naechste" auch ueber die Dateigrenze eindeutig.
+    DIM reihe AS ARRAY OF INTEGER : reihe = []
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO LEN(lzZeilen) - 1
+        DIM platz AS INTEGER : platz = LEN(reihe)
+        FOR k = 0 TO LEN(reihe) - 1
+            DIM j AS INTEGER : j = reihe[k]
+            IF lzDateien[j] > lzDateien[i] OR (lzDateien[j] = lzDateien[i] AND lzZeilen[j] > lzZeilen[i]) THEN
+                platz = k
+                BREAK
+            END IF
+        NEXT
+        ARRAY_INSERT(reihe, platz, i)
+    NEXT
+    ' Wo stehen wir in dieser Reihe?
+    DIM hier AS INTEGER : hier = -1
+    FOR k = 0 TO LEN(reihe) - 1
+        DIM m AS INTEGER : m = reihe[k]
+        IF lzDateien[m] < pfad OR (lzDateien[m] = pfad AND lzZeilen[m] <= z) THEN hier = k
+    NEXT
+    DIM ziel AS INTEGER
+    IF vorwaerts THEN
+        ziel = (hier + 1) MOD LEN(reihe)
+    ELSE
+        ziel = hier
+        IF ziel < 0 THEN ziel = 0
+        ' Steht die Marke GENAU auf einem Lesezeichen, ist "zurueck" das
+        ' davor -- sonst kaeme man nie von der Stelle.
+        DIM h AS INTEGER : h = reihe[ziel]
+        IF lzDateien[h] = pfad AND lzZeilen[h] = z THEN ziel = ziel - 1
+        IF ziel < 0 THEN ziel = LEN(reihe) - 1
+    END IF
+    DIM t AS INTEGER : t = reihe[ziel]
+    IF lzDateien[t] <> pfad THEN
+        IF NOT FILEEXISTS(lzDateien[t]) THEN
+            GUI_SET_TEXT(lblStatus, "Die Datei des Lesezeichens gibt es nicht mehr: " + lzDateien[t])
+            RETURN
+        END IF
+        dateiOeffnen(lzDateien[t])
+    END IF
+    GUI_TEXTAREA_GOTO(aktivesFeld(), lzZeilen[t], 1)
+    GUI_FOCUS(aktivesFeld())
+    ' Nur die Zeile ins Protokoll: welche Datei, sagt die "geoeffnet"-Zeile
+    ' davor, wenn der Sprung ueber die Grenze ging.
+    protokoll("lesezeichen sprung " + STR$(lzZeilen[t]))
+END SUB
+
+' Alle Lesezeichen in der Liste unten rechts -- dieselbe wie Suche und
+' blame; ein eigenes Panel fuer dieselbe Frage waere eins zu viel.
+SUB lesezeichenListe()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(lzZeilen) - 1
-        IF lzDateien[i] <> pfad THEN CONTINUE
-        IF erste = 0 OR lzZeilen[i] < erste THEN erste = lzZeilen[i]
-        IF lzZeilen[i] > z AND (naechste = 0 OR lzZeilen[i] < naechste) THEN naechste = lzZeilen[i]
+        ARRAY_PUSH(sd, lzDateien[i]) : ARRAY_PUSH(sz, lzZeilen[i])
+        DIM text AS STRING : text = ""
+        TRY
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(lzDateien[i])
+            IF lzZeilen[i] <= LEN(zeilen) THEN text = TRIM$(zeilen[lzZeilen[i] - 1])
+        CATCH e
+            text = ""
+        END TRY
+        GUI_LISTBOX_ADD(lstProbleme, BASENAME(lzDateien[i]) + ":" + STR$(lzZeilen[i]) + ": " + text)
     NEXT
-    IF naechste = 0 THEN naechste = erste
-    IF naechste = 0 THEN GUI_SET_TEXT(lblStatus, "Kein Lesezeichen in dieser Datei -- Strg+F2 setzt eins.") : RETURN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], naechste, 1)
-    GUI_FOCUS(tabFelder[aktiverTab])
-    protokoll("lesezeichen sprung " + STR$(naechste))
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, STR$(LEN(sz)) + " Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme")
+    protokoll("lesezeichen liste " + STR$(LEN(sz)))
 END SUB
 
 SUB markenNachziehen()
@@ -1785,12 +1918,51 @@ SUB vervollUebernehmen()
 END SUB
 
 ' --- Suchen / Ersetzen / Zeile ----------------------------------------
+' Passt die Zeile? Mit `regexAn` ueber das regex-Modul, sonst als
+' Teiltext ohne Ruecksicht auf Gross/Klein. EINE Stelle fuer Suchen,
+' Ersetzen und die Projektsuche -- liefen sie auseinander, faende die eine
+' etwas anderes als die andere.
+FUNCTION passtSuche(zeile AS STRING, muster AS STRING) AS BOOLEAN
+    IF muster = "" THEN RETURN FALSE
+    IF NOT regexAn THEN RETURN INSTR(LOWER$(zeile), LOWER$(muster)) >= 0
+    TRY
+        RETURN REGEX_TEST(zeile, muster)
+    CATCH e
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
 FUNCTION weitersuchen(abNaechstem AS BOOLEAN) AS BOOLEAN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR suchtext = "" THEN RETURN FALSE
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    IF regexAn THEN
+        ' Zeilenweise: ein regulaerer Ausdruck kann alles Moegliche treffen,
+        ' und GUI_TEXTAREA_FIND kennt nur Teiltexte.
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM n AS INTEGER : n = LEN(zeilen)
+        DIM k AS INTEGER
+        FOR k = 1 TO n
+            DIM zi AS INTEGER : zi = ((z - 1 + k) MOD n) + 1
+            IF passtSuche(zeilen[zi - 1], suchtext) THEN
+                DIM tr AS STRING : tr = ""
+                TRY
+                    tr = REGEX_FIND(zeilen[zi - 1], suchtext)
+                CATCH e
+                    tr = ""
+                END TRY
+                DIM sp AS INTEGER : sp = 1
+                IF tr <> "" THEN sp = INSTR(zeilen[zi - 1], tr) + 1
+                GUI_TEXTAREA_SELECT(ta, zi, sp, zi, sp + MAX(LEN(tr), 1))
+                GUI_FOCUS(ta)
+                RETURN TRUE
+            END IF
+        NEXT
+        GUI_SET_TEXT(lblStatus, "Kein Treffer fuer den Ausdruck: " + suchtext)
+        RETURN FALSE
+    END IF
     IF abNaechstem THEN s = s + 1
     DIM tz AS INTEGER
     DIM ts AS INTEGER
@@ -2922,6 +3094,10 @@ paletteEintrag("Zeilen nach oben", "hoch", "Alt+Hoch") : paletteEintrag("Zeilen 
 paletteEintrag("Einruecken", "einruecken", "Alt+Rechts") : paletteEintrag("Ausruecken", "ausruecken", "Alt+Links")
 paletteEintrag("Dokument formatieren", "format", "Umschalt+Alt+F")
 paletteEintrag("Lesezeichen setzen/entfernen", "lesezeichen", "Strg+F2") : paletteEintrag("Naechstes Lesezeichen", "lz_weiter", "F2")
+paletteEintrag("Voriges Lesezeichen", "lz_zurueck", "Umschalt+F2")
+paletteEintrag("Alle Lesezeichen", "lz_liste", "Alt+F2")
+paletteEintrag("Suchen mit regulaerem Ausdruck", "regex", "")
+paletteEintrag("Geschlossenen Reiter wieder oeffnen", "wiederauf", "Strg+Umschalt+T")
 paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Pruefen", "pruefen", "Umschalt+F7")
 paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
 paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
@@ -3108,7 +3284,22 @@ SUB befehl(k AS STRING)
         CASE "ausruecken" : einruecken(-1)
         CASE "format" : formatieren()
         CASE "lesezeichen" : lesezeichenUmschalten()
-        CASE "lz_weiter" : lesezeichenWeiter()
+        CASE "lz_weiter" : lesezeichenSpringen(TRUE)
+        CASE "lz_zurueck" : lesezeichenSpringen(FALSE)
+        CASE "lz_liste" : lesezeichenListe()
+        CASE "regex"
+            regexAn = NOT regexAn
+            GUI_MENU_CHECK(miRegex, regexAn)
+            GUI_SET_TEXT(lblStatus, IIF(regexAn, "Suche mit regulaerem Ausdruck (z. B. ^SUB .*\\(\\)).", "Suche als Teiltext."))
+            konfigSichern()
+        CASE "wiederauf"
+            IF LEN(zuGemacht) = 0 THEN
+                GUI_SET_TEXT(lblStatus, "Kein geschlossener Reiter zum Wiederholen.")
+            ELSE
+                DIM zurueck AS STRING : zurueck = ARRAY_POP(zuGemacht)
+                IF FILEEXISTS(zurueck) THEN dateiOeffnen(zurueck) ELSE GUI_SET_TEXT(lblStatus, "Gibt es nicht mehr: " + zurueck)
+                protokoll("wieder auf " + zurueck)
+            END IF
         CASE "bedingung" : haltepunktBedingungFragen()
         CASE "export" : exportieren()
         CASE "groesser" : schriftSetzen(codeGroesse + 2)
@@ -3351,7 +3542,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         letzteMarke = ""
         ' Gliederung und faltbare Bloecke gehoeren zum FELD -- ohne das
         ' Zuruecksetzen behielte der neue Reiter die Bloecke des alten.
-        gliederungSchluessel = "" : faltSchluessel = ""
+        gliederungSchluessel = "" : faltSchluessel = "-"
         pruefungFaellig = GET_TIME()
     END IF
 
@@ -3422,6 +3613,10 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miFormat) THEN befehl("format")
     IF GUI_CLICKED(miLesezeichen) THEN befehl("lesezeichen")
     IF GUI_CLICKED(miLzWeiter) THEN befehl("lz_weiter")
+    IF GUI_CLICKED(miLzZurueck) THEN befehl("lz_zurueck")
+    IF GUI_CLICKED(miLzListe) THEN befehl("lz_liste")
+    IF GUI_CLICKED(miRegex) THEN befehl("regex")
+    IF GUI_CLICKED(miWiederauf) THEN befehl("wiederauf")
     IF GUI_CLICKED(miBedingung) THEN befehl("bedingung")
     IF GUI_CLICKED(miExport) THEN befehl("export")
     IF GUI_CLICKED(miGroesser) THEN befehl("groesser")
