@@ -39,9 +39,12 @@ RL_ENTER, RL_DOWN, RL_LSHIFT, RL_LCTRL = 257, 264, 340, 341
 RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
 RL_D, RL_K, RL_O, RL_S = 68, 75, 79, 83
 RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
+RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
+RL_L = 76
+RL_RIGHT, RL_END = 262, 269
 
 
-def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
+def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
     log = tmp_path / "ide.log"
     quelle = IDE
@@ -70,7 +73,8 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
                        # DH_IDE_KONFIG: die Sitzung des Tests bleibt im Testordner --
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
-                                DH_IDE_WURZEL=str(_ROOT), DH_IDE_KONFIG=str(tmp_path / "ide.json")),
+                                DH_IDE_WURZEL=str(_ROOT),
+                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json")),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -320,3 +324,200 @@ def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
     assert konfig["sitzung"] and konfig["sitzung"][0].endswith("spiel.dh"), konfig
     log = _ide(tmp_path, tmp_path / "gibt_es_nicht.dh", frames=60)
     assert any(z.startswith("geoeffnet ") and z.endswith("spiel.dh") for z in log), log
+
+
+# ---------------------------------------------------------------- Stufe 5
+
+def test_falten_klappt_den_block_der_marke_zu(tmp_path):
+    """F4 auf Zeile 1 (`SUB foo()`) klappt den Block zu, ein zweites F4
+    wieder auf. Der Beleg ist das Protokoll -- ob die Zeilen wirklich
+    verschwinden, prueft tests/pruef/gui_faltung.dhtest am Bild."""
+    quelle = _datei(tmp_path, "SUB foo()\n    PRINT 1\n    PRINT 2\nEND SUB\nfoo()\n")
+    # Die faltbaren Bloecke kommen aus der Pruefung (0,6 s nach dem Oeffnen).
+    ev = _taste(70, RL_F4) + _taste(100, RL_F4)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    assert "falte 1 zu" in log, log
+    assert "falte 1 auf" in log, log
+
+
+def test_alles_zuklappen_nimmt_nur_die_aeusseren_bloecke(tmp_path):
+    """Strg+F4 klappt beide SUBs zu (zwei Bloecke), Umschalt+F4 alles auf."""
+    quelle = _datei(tmp_path, "SUB a()\nPRINT 1\nEND SUB\n\nSUB b()\nPRINT 2\nEND SUB\n")
+    ev = _taste(70, RL_F4, RL_LCTRL) + _taste(110, RL_F4, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=170, events=ev)
+    assert "falten alle 2" in log, log
+    assert "falten alle 0" in log, log
+
+
+def test_zeilenumbruch_bleibt_gemerkt(tmp_path):
+    """Alt+Z schaltet den Umbruch an; er steht in der ide.json und gilt beim
+    naechsten Start wieder."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    _ide(tmp_path, quelle, frames=90, events=_taste(30, RL_Z, RL_LALT))
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["umbruch"] is True, konfig
+    _ide(tmp_path, quelle, frames=60)
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["umbruch"] is True, konfig
+
+
+def test_sitzung_haengt_am_projektordner(tmp_path):
+    """Zwei Ordner, je eine Datei, EINE Konfigurationsdatei. Wer wieder im
+    ersten startet, bekommt dessen Reiter -- nicht die des zweiten, die
+    zuletzt offen waren. Das ist zugleich die Gegenprobe: die globale
+    Sitzung (Stand 4) zeigt an dieser Stelle auf zwei.dh."""
+    import json
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    kfg = tmp_path / "ide.json"
+    ea = _datei(tmp_path / "a", "PRINT 1\n", name="eins.dh")
+    eb = _datei(tmp_path / "b", "PRINT 2\n", name="zwei.dh")
+    _ide(tmp_path / "a", ea, frames=60, konfig=kfg)
+    _ide(tmp_path / "b", eb, frames=60, konfig=kfg)
+    stand = json.loads(kfg.read_text(encoding="utf-8"))
+    assert stand["sitzung"][0].endswith("zwei.dh"), stand
+    log = _ide(tmp_path / "a", tmp_path / "a" / "gibt_es_nicht.dh", frames=60, konfig=kfg)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert geoeffnet and geoeffnet[0].endswith("eins.dh"), log
+    assert not any(z.endswith("zwei.dh") for z in geoeffnet), log
+
+
+def test_umbenennen_trifft_die_stellen_und_laesst_text_und_kommentar(tmp_path):
+    """Die Marke steht nach dem Oeffnen in 1,1, also auf `zaehler`.
+    Umschalt+F6, Strg+V tippt den neuen Namen, Enter, Strg+S. Der Kommentar
+    und die Zeichenkette bleiben, wie sie waren -- das ist die Gegenprobe zu
+    einem Suchen-und-Ersetzen."""
+    quelle = _datei(tmp_path, 'zaehler = 1\nzaehler = zaehler + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(100, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="summe")
+    assert any(z.startswith("umbenannt ") and z.endswith(" summe") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == (
+        'summe = 1\nsumme = summe + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
+
+
+def test_umbenennen_lehnt_einen_krummen_namen_ab(tmp_path):
+    """Ein Name faengt nicht mit einer Ziffer an -- die Datei bleibt, wie sie
+    war, statt halb umbenannt zu werden."""
+    quelle = _datei(tmp_path, "zaehler = 1\n")
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(100, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="2krumm")
+    assert not any(z.startswith("umbenannt ") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == "zaehler = 1\n"
+
+
+def test_schnipsel_fuegt_das_geruest_mit_der_einrueckung_ein(tmp_path):
+    """Strg+J oeffnet den Waehler, Strg+V tippt einen Teil des Namens, Enter
+    fuegt ein. Die Marke steht eingerueckt in der Zeile -- deshalb rueckt
+    auch der Schnipsel ein."""
+    quelle = _datei(tmp_path, "IF 1 = 1 THEN\n    \nEND IF\n")
+    ev = _taste(20, RL_DOWN) + _taste(30, RL_END) + _taste(50, RL_J, RL_LCTRL)
+    ev += _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER) + _taste(140, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="while")
+    assert any(z.startswith("schnipsel WHILE") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == "IF 1 = 1 THEN\n    WHILE \n\n    WEND\nEND IF\n"
+
+
+def test_signaturhilfe_zeigt_den_aufruf_mitten_in_der_argumentliste(tmp_path):
+    """Die Marke steht zwischen den Argumenten von SCREEN -- dort steht sie
+    auf einem Komma, und die Hilfe zum Wort schwiege. Gegenprobe: in Zeile 2
+    (ausserhalb jeder Klammer) meldet sie nichts."""
+    quelle = _datei(tmp_path, "SCREEN(800, 600, \"T\", 1)\nPRINT 1\n")
+    # Zeile 1, hinter dem ersten Komma: elfmal nach rechts
+    ev = []
+    for k in range(11):
+        ev += _taste(20 + k * 3, RL_RIGHT)
+    ev += _taste(90, RL_DOWN)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    sig = [z for z in log if z.startswith("signatur ")]
+    assert sig and "SCREEN(" in sig[0], log
+    assert "Argument" in sig[0], log
+
+
+def test_geteilte_ansicht_zeigt_zwei_dateien_nebeneinander(tmp_path):
+    """Zwei Dateien offen, Alt+G teilt: links der andere Reiter, rechts der
+    aktive. Beide Felder liegen NEBENEINANDER -- gemessen an ihren
+    Rechtecken, nicht am Protokoll allein. Alt+G schaltet wieder aus."""
+    _datei(tmp_path, "PRINT 2\n", name="zwei.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(130, RL_G, RL_LALT) + _taste(180, RL_G, RL_LALT)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="zwei")
+    # "geteilt 0 x <x>+<breite> <x>+<breite>" -- links der Reiter 0, rechts
+    # der aktive. Dass der Befehl LIEF, sagte nichts darueber, ob die Felder
+    # auch nebeneinander liegen.
+    lagen = [z for z in log if z.startswith("geteilt 0 x ")]
+    assert lagen, log
+    links, rechts = lagen[0].split(" x ")[1].split()
+    lx, lb = (int(t) for t in links.split("+"))
+    rx, rb = (int(t) for t in rechts.split("+"))
+    assert lx + lb <= rx, lagen        # linkes Feld endet vor dem rechten
+    assert lb > 100 and rb > 100, lagen
+    assert "geteilt aus" in log, log
+
+
+def test_geteilte_ansicht_braucht_zwei_dateien(tmp_path):
+    """Mit nur einem Reiter gibt es nichts zu teilen -- und die IDE sagt es,
+    statt still nichts zu tun."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=120, events=_taste(40, RL_G, RL_LALT))
+    assert not any(z.startswith("geteilt ") for z in log), log
+
+
+def test_uebersichtskarte_bleibt_gemerkt(tmp_path):
+    """Ueber die Befehlspalette angeschaltet; sie steht danach in der
+    ide.json und ist beim naechsten Start wieder da."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n" * 40)
+    ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="Uebersichtskarte")
+    assert "karte an" in log, log
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["karte"] is True, konfig
+
+
+def test_git_blame_listet_wer_welche_zeile_geschrieben_hat(tmp_path):
+    """Ein kleines Repository, ein Commit, Strg+Umschalt+B: die Liste unten
+    rechts nennt je Zeile Datum und Person. Gegenprobe: ohne Repository
+    meldet sie nichts."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\nPRINT 3\n")
+    for cmd in (["git", "init", "-q"], ["git", "add", "spiel.dh"],
+                ["git", "-c", "user.name=Test", "-c", "user.email=t@t",
+                 "commit", "-q", "-m", "erst"]):
+        r = subprocess.run(cmd, cwd=str(tmp_path), capture_output=True)
+        if r.returncode != 0:
+            pytest.skip("git nicht verfuegbar: " + r.stderr.decode("utf-8", "replace"))
+    log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
+    assert "blame 3" in log, log
+
+
+def test_git_blame_ohne_repository_sagt_es(tmp_path):
+    """Kein Repository: keine Zeilen, und die IDE haelt nicht an."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
+    assert "blame 0" in log, log
+
+
+def test_handbuch_gesetzt_und_als_quelltext(tmp_path):
+    """F1 oeffnet das Handbuch in der gesetzten Ansicht; ueber die
+    Befehlspalette laesst sich auf den Quelltext umschalten."""
+    quelle = _datei(tmp_path, "SCREEN(320, 240)\n")
+    ev = _taste(30, RL_F1)
+    ev += _taste(80, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(110, RL_V, RL_LCTRL) + _taste(140, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="Handbuch: gesetzt")
+    assert "hbansicht gesetzt" in log, log
+    assert "hbansicht quelltext" in log, log
+
+
+def test_marken_auf_jede_fundstelle_und_tippen_aendert_alle(tmp_path):
+    """Die Marke steht auf `hp`. Strg+Umschalt+L setzt auf jede Fundstelle
+    eine Marke; ein Strg+V schreibt dann an allen dreien -- und NUR dort,
+    `hpmax` bleibt, wie es war."""
+    quelle = _datei(tmp_path, "hp = 1\nhp = hp + 1\nhpmax = 9\n")
+    ev = _taste(30, RL_L, RL_LCTRL, RL_LSHIFT) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="X")
+    assert "marken 3" in log, log
+    assert quelle.read_text(encoding="utf-8") == "Xhp = 1\nXhp = Xhp + 1\nhpmax = 9\n"

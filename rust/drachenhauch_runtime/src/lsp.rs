@@ -214,6 +214,42 @@ fn ort(uri: &str, zeile: usize, spalte: usize, spalte_ende: usize) -> Value {
         "end": {"line": zeile.saturating_sub(1), "character": spalte_ende.saturating_sub(1)}}})
 }
 
+/// Ein Symbol im ganzen Text umbenennen -- der geaenderte Quelltext, oder
+/// `None`, wenn an der Stelle kein Name steht oder der neue keiner ist.
+///
+/// Ersetzt wird ueber `symbole::fundstellen`, also ohne Kommentare und
+/// Zeichenketten (die Ausdruecke in f-Strings zaehlen mit). Von hinten nach
+/// vorn je Zeile, damit die Spalten der noch offenen Treffer stimmen.
+pub fn umbenennen(text: &str, z0: usize, c0: usize, neu: &str) -> Option<String> {
+    let (wort, _, _) = symbole::wort_bei(text, z0, c0);
+    if wort.is_empty() { return None; }
+    // Ein Schluesselwort umzubenennen macht aus dem Programm Buchstabensalat,
+    // und die Marke steht schnell einmal auf einem: nichts tun, statt es zu
+    // tun. Builtins bleiben erlaubt -- eine eigene Variable darf seit
+    // 2026-09-04 heissen wie eines, und die will man umbenennen koennen.
+    if crate::lexer::keyword(&wort.to_lowercase()).is_some() { return None; }
+    let mut n = neu.chars();
+    match n.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return None,
+    }
+    if !n.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$') { return None; }
+    let mut zeilen: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let mut treffer = symbole::fundstellen(text, &wort);
+    treffer.sort_by(|a, b| b.zeile.cmp(&a.zeile).then(b.spalte.cmp(&a.spalte)));
+    for f in treffer {
+        let Some(zeile) = zeilen.get_mut(f.zeile - 1) else { continue };
+        let zeichen: Vec<char> = zeile.chars().collect();
+        let (von, bis) = (f.spalte - 1, (f.spalte_ende - 1).min(zeichen.len()));
+        if von > zeichen.len() { continue; }
+        let mut aus: String = zeichen[..von].iter().collect();
+        aus.push_str(neu);
+        aus.extend(&zeichen[bis..]);
+        *zeile = aus;
+    }
+    Some(zeilen.join("\n"))
+}
+
 pub fn definition(text: &str, uri: &str, z0: usize, c0: usize) -> Value {
     let (wort, _, _) = symbole::wort_bei(text, z0, c0);
     if wort.is_empty() { return Value::Null; }

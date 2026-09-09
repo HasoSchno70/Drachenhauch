@@ -26,6 +26,7 @@ IMPORT "gui"
 | `GUI_WINDOW_TITLE(win, titel$)` | — | Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle" / „Datei öffnen") |
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
+| `GUI_WINDOW_SHOWN(win)` | BOOLEAN | ist das Fenster gerade sichtbar? Das Gegenstueck zum Setzer -- ohne den Getter muesste ein Programm sich merken, was es selbst gesetzt hat, und laege daneben, sobald der Nutzer das Fenster ueber sein Kreuz schliesst |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | am unteren-rechten Griff größenveränderbar (Default: aus) |
 | `GUI_WINDOW_SCROLLABLE(win, an)` | — | Inhalt scrollt, wenn er höher als das Fenster ist (Mausrad + Scrollbalken). Inhaltshöhe automatisch aus den Widgets. Default: aus |
 | `GUI_WINDOW_CHROME(win, an)` | — | Titelleiste/Rahmen/Buttons zeichnen? Aus = randlos, Inhalt ab oben (damit eine Form das OS-Fenster ausfüllen kann). Default: an |
@@ -1668,6 +1669,65 @@ Kein Constraint-System — für ein Formular reicht das, und man versteht es noc
 Palette-Eintrag mit einem Feld „Layout" je Control. Beispiel:
 [`examples/194_gui_layout.dh`](../examples/194_gui_layout.dh).
 
+## Mehrere Schreibmarken im Textbereich
+
+**Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
+Programm setzt sie mit `GUI_TEXTAREA_ADD_CARET`. Tippen, Enter, Rücktaste,
+Entf, Tabulator und Einfügen wirken dann an **jeder** Marke, und die Pfeile
+bewegen alle — blieben die weiteren stehen, liefen sie beim ersten
+Tastendruck auseinander.
+
+Alles läuft durch **eine** Stelle (`an_marken`): sie sagt für jede Marke,
+welcher Bereich weicht und was hineinkommt, und arbeitet von **hinten nach
+vorn**. Dann bleiben die Stellen der noch offenen Marken gültig, und es
+braucht keine Buchführung über Verschiebungen. Mit einer einzigen Marke ist
+das genau der Weg von vorher — ein Textbereich ohne Alt+Klick verhält sich
+also unverändert.
+
+Zwei Dinge bleiben bei der **führenden** Marke: Kopieren und Ausschneiden
+(was mehrere Stücke in der Zwischenablage bedeuten sollen, ist außerhalb des
+Programms nicht ausgemacht), und Strg+A räumt die weiteren weg — eine
+Auswahl über alles und daneben noch drei Marken ergäbe kein Bild, das
+jemand im Kopf hätte.
+
+## Faltung im Textbereich
+
+Ein zugeklappter Block verbirgt seine inneren Zeilen; die Kopfzeile bleibt
+stehen und trägt dahinter eine Sprechblase („… 12 Zeilen"). In der
+Nummernspalte steht an jeder Kopfzeile ein Dreieck — nach unten offen, nach
+rechts zugeklappt —, und ein Klick darauf schaltet um, ohne die Schreibmarke
+mitzunehmen.
+
+**Welche Zeilen einen Block bilden, sagt das Programm**, nicht die Laufzeit:
+
+```basic
+' Die Blöcke aus CODE_SYMBOLS$ -- von/bis sind schon Zeilennummern
+GUI_TEXTAREA_FOLDABLE(ta, [1, 14, 30], [12, 22, 44])
+GUI_TEXTAREA_FOLD(ta, 14)          ' umschalten
+GUI_TEXTAREA_FOLD_ALL(ta, TRUE)    ' alles zu (nur die äußeren)
+```
+
+Die Laufzeit zählt keine Einrückung und kennt hier keine Sprache — ein
+Textbereich mit YAML, Markdown oder eigenen Abschnitten faltet mit denselben
+zwei Feldern. Ohne faltbare Blöcke kostet die Faltung keinen Platz: die
+Nummernspalte wird nur breiter, wenn es Dreiecke zu zeigen gibt.
+
+Drei Dinge sind nicht offensichtlich:
+
+- **Der engste Block gewinnt.** `GUI_TEXTAREA_FOLD(ta, zeile)` faltet den
+  kleinsten faltbaren Block um die Zeile — sonst nähme eine Methode beim
+  Zuklappen ihre ganze Klasse mit.
+- **Eine Marke im Verborgenen klappt auf.** Klicks und Pfeile laufen über die
+  sichtbaren Zeilen und kommen gar nicht hinein; `GUI_TEXTAREA_GOTO`,
+  Links/Rechts und die Rücktaste können es. Der Block geht dann auf, statt
+  die Marke auszuweichen: bei einem Suchtreffer will man die Fundstelle
+  sehen. Umgekehrt wandert die Marke beim Zuklappen auf die Kopfzeile.
+- **Die Faltung hängt an Zeilennummern.** Eine Änderung darüber schiebt sie
+  mit; wer im Block selbst tippt, klappt ihn auf; `GUI_SET_TEXT` räumt sie
+  weg (der neue Text hat andere Zeilen). Was gerade zugeklappt ist, liest
+  `GUI_TEXTAREA_FOLDS` — genug, um es beim nächsten Öffnen der Datei wieder
+  herzustellen.
+
 ## Zeilenumbruch im Textbereich
 
 Der Textbereich war ein Code-Feld: lange Zeilen rollen waagerecht. Für
@@ -2024,6 +2084,14 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SELECTION_RANGE(ta)` → (z1, s1, z2, s2) | Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll |
 | `GUI_TEXTAREA_INSERT(ta, text$)` | ersetzt die Auswahl bzw. fügt an der Marke ein — ein eigener Undo-Schritt, `GUI_ON_CHANGE` feuert wie beim Tippen |
 | `GUI_TEXTAREA_MARKS(ta, zeilen, farben)` | Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text |
+| `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
+| `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
+| `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine einzige Schreibmarke |
+| `GUI_TEXTAREA_FOLDABLE(ta, von_zeilen, bis_zeilen)` | welche Blöcke sich falten lassen: zwei gleich lange Felder mit Kopfzeile und letzter Zeile. Was ein Block ist, weiß nur das Programm — die Laufzeit kennt hier keine Sprache |
+| `GUI_TEXTAREA_FOLD(ta, zeile[, an])` → BOOLEAN | den engsten faltbaren Block um `zeile` zuklappen oder aufklappen; ohne `an` umschalten. Liefert, ob danach zugeklappt ist |
+| `GUI_TEXTAREA_FOLD_ALL(ta[, zu])` → INTEGER | alles zuklappen (nur die äußeren Blöcke) oder alles aufklappen; liefert die Zahl der zugeklappten |
+| `GUI_TEXTAREA_FOLDED(ta, zeile)` → BOOLEAN | ist die Zeile in einem zugeklappten Block verborgen? |
+| `GUI_TEXTAREA_FOLDS(ta)` → ARRAY OF INTEGER | die Kopfzeilen der zugeklappten Blöcke, aufsteigend |
 | `GUI_TEXTAREA_FIND(ta, text$[, ab_zeile[, ab_spalte[, genau]]])` → (zeile, spalte) | nächster Treffer ab der Stelle, `(-1, -1)` wenn keiner; ohne `genau` ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab `1, 1` suchen |
 
 ```basic

@@ -1257,6 +1257,7 @@ Zeilen und Spalten zählen ab 1, in Zeichen.
 | `CODE_REFERENCES(quelltext$, zeile, spalte)` | ARRAY OF INTEGER | die Zeilen aller Vorkommen |
 | `CODE_SYMBOLS$(quelltext$)` | STRING (JSON) | die Gliederung: `{name, art, von, bis, kinder}` — Klassen mit ihren Methoden |
 | `CODE_FORMAT$(quelltext$ [, einruecken])` | STRING | der Quelltext formatiert wie durch `dhrt fmt`: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit `einruecken` (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler) |
+| `CODE_RENAME$(quelltext$, zeile, spalte, neu$)` | STRING | der Quelltext mit dem Namen an dieser Stelle überall in `neu$` umbenannt — ganze Wörter, ohne Kommentare und Zeichenketten. Leer, wenn dort kein Name steht, es ein Schlüsselwort ist oder `neu$` keiner ist |
 
 ```basic
 DIM j AS JSON_HANDLE

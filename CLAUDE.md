@@ -2873,6 +2873,55 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 5 (2026-09-09):** die Restliste aus `docs/ide.md` abgearbeitet.
+**Zwei Bausteine kamen dafuer in dhrt**, beide im Textbereich und beide so
+gebaut, dass ein Feld OHNE sie sich unveraendert verhaelt: (1) **Faltung**
+(`GUI_TEXTAREA_FOLDABLE/FOLD/FOLD_ALL/FOLDED/FOLDS`) sitzt in `ta_rows` --
+der EINEN Quelle sichtbarer Zeilen, die Zeichnen, Klick, Pfeile,
+Schreibmarke und Scroll schon vorher gemeinsam fragten; eine verborgene
+Zeile faellt dort weg, und damit fuer alle auf einmal. WELCHE Zeilen einen
+Block bilden, sagt der Aufrufer (die IDE nimmt CODE_SYMBOLS$) -- die
+Laufzeit kennt keine Sprache. Der ENGSTE Block gewinnt, eine Marke im
+Verborgenen KLAPPT AUF statt auszuweichen (bei einem Suchtreffer will man
+die Fundstelle sehen), und die Falten wandern bei Aenderungen darueber mit
+(`falten_nachziehen`); GUI_SET_TEXT raeumt sie weg. (2) **Mehrere
+Schreibmarken** (`GUI_TEXTAREA_ADD_CARET/CARETS/CLEAR_CARETS`, Alt+Klick,
+ESC): jede Aenderung laeuft durch EINE Stelle (`an_marken`), die sagt,
+welcher Bereich weicht und was hineinkommt, und von HINTEN nach vorn
+arbeitet -- dann bleiben die Stellen der offenen Marken gueltig und es
+braucht keine Buchfuehrung. Kopieren/Ausschneiden bleiben bei der
+fuehrenden Marke, Strg+A raeumt die weiteren weg. Dazu **CODE_RENAME$**
+(ganze Woerter ueber `symbole::fundstellen`, ohne Kommentare und
+Zeichenketten, Schluesselwoerter abgelehnt -- CODE_REFERENCES haette es
+nicht getan, es wirft die Spalten weg) und **GUI_WINDOW_SHOWN**, das
+fehlende Gegenstueck zu GUI_WINDOW_VISIBLE.
+In der IDE: Faltung (F4/Strg+F4/Umschalt+F4, Dreieck in der
+Nummernspalte), Zeilenumbruch (Alt+Z, gilt fuer ALLE Reiter), **Sitzung je
+Projektordner** (als LISTE von {ordner, sitzung, aktiv}, weil ein Pfad als
+JSON-Schluessel mit der Punkt-Notation kollidiert; die globale Sitzung ist
+nur noch der Weg aus Stand 4 heraus -- sonst schleppte ein unbekannter
+Ordner die Reiter des letzten Projekts mit), Umbenennen (Umschalt+F6),
+Schnipsel (Strg+J, 13 Geruester, `|` als Marken-Platz), Signaturhilfe
+(`aufrufUmDieMarke` laeuft die Zeile rueckwaerts und zaehlt Klammern),
+**geteilte Ansicht** (Alt+G -- zwei REITER nebeneinander ueber
+`GUI_SET_TAB(feld, -1)`, nicht zwei Ansichten auf dieselbe Datei: die
+waeren ein Abgleich bei jedem Anschlag), Uebersichtskarte, git blame
+(Strg+Umschalt+B ueber SHELL_OUT$), das **Handbuch gesetzt** statt roh
+(Tabellen werden zur Begriffsliste -- eine Zeile je Zelle liefe rechts
+hinaus), Marken auf jede Fundstelle (Strg+Umschalt+L) und gezeichnete
+Menue-Symbole (IMAGE_NEW + IMAGE_CLEAR sticht die Loecher, damit sie auf
+beiden Themen liegen).
+**Fallen, die dabei auffielen:** MID$ zaehlt ab 0 und INSTR liefert -1
+(mein Einzug kam um ein Leerzeichen zu kurz); in raylibs Aufnahmeformat ist
+1 = KEY_UP und 2 = KEY_DOWN, vertauscht bleibt nach dem ersten Tastendruck
+alles gedrueckt und jeder weitere Kuerzel-Test schweigt; die Wiedergabe
+setzt beim ERSTEN Ereignis an, egal welche Nummer es traegt;
+GUI_TEXTAREA_FIND sucht Teiltexte (aus `hp` wurde auch das in `hpmax` eine
+Marke); und eine neue Protokollzeile mit demselben ersten Wort brach einen
+gruenen Test aus Stand 3. Tests `tests/pruef/gui_faltung.dhtest` (16, mit
+zwei Bildproben samt Gegenprobe), `tests/pruef/gui_mehrfachmarken.dhtest`
+(6, seriell) und 12 neue in `tests/test_ide.py`.
+
 **Stufe 4 (2026-09-09, die Handgriffe des Alltags):** gemessen an den
 Menues der Qt-IDE statt an der Liste aus dem Entwurf. Willkommensseite
 (auf der Flaeche der Code-Felder, weg mit dem ersten Reiter), Sitzung und
