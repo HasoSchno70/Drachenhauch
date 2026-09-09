@@ -2873,6 +2873,42 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 6 (2026-09-09):** die Liste aus Stufe 5 abgearbeitet, Schwerpunkt
+"beim Schreiben". **Ein Baustein in dhrt**, wieder nach dem Muster der
+Faltung (die Laufzeit kennt keine Sprache, der Aufrufer sagt die Woerter):
+**Einrueckung beim Zeilenumbruch** -- `GUI_TEXTAREA_SET(ta, "auto_einzug",
+1)` uebernimmt die Einrueckung der laufenden Zeile,
+`GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` gibt drei Wortlisten
+dazu. ZWEI Listen fuer "mehr" und nicht eine: `SUB` oeffnet am ANFANG,
+`THEN` am ENDE -- mit einer Liste ruckte auch ein `END SUB` die naechste
+Zeile ein, und `IF x THEN y = 1` rueckt richtigerweise nicht ein. Das
+Ausruecken (`aus`) prueft "die Zeile IST das Wort", nicht "faengt damit
+an": so rueckt sie genau einmal aus, `END IF` aendert nichts mehr, und ein
+eingefuegter Block trifft es nicht. **Falle:** das Ausruecken lief zuerst
+ueber `an_marken`, und das setzt die Marke ANS ENDE des Eingesetzten --
+hier faellt aber etwas VOR ihr weg; die Marke sprang an den Zeilenanfang
+und die naechste Eingabe landete vor der Einrueckung.
+In der IDE dazu: **Fundstellen und Klammernpaar farbig** (ueber dieselben
+GUI_TEXTAREA_SPANS -- der zuletzt genannte Abschnitt gewinnt; dabei kam
+ein Riegel dazu, der laengst haette dasein muessen: `faerben` lief in JEDEM
+Bild durch SYNTAX_SPANS), **Vorschlagsliste beim Tippen** ab drei Zeichen
+mit dem Fokus IM Code-Feld (sonst tippte man in die Liste weiter),
+**git diff und log** farbig im Fenster plus geaenderte Zeilen am Rand (nur
+nach dem Sichern gefragt -- ein Prozessstart je Bild braechte die IDE zum
+Stehen), **Suche mit regulaerem Ausdruck** (Suchen, Ersetzen und
+Projektsuche fragen EINE Stelle `passtSuche`), **Lesezeichen ueber Dateien
+hinweg** samt Rueckwaerts und Liste, **Reiter wieder oeffnen**
+(Strg+Umschalt+T), **Faltung nach Einrueckung** (eine FOR-Schleife ist kein
+Symbol) und eine **Uebersichtskarte, die Woerter zeichnet**.
+**Vier Funde, alle vom Test:** REGEX_TEST nimmt (text, muster) und meldet
+falsch herum einfach FALSE; der Faltschluessel stand auf "" -- das ist die
+echte Gliederung einer Datei ohne SUB, und gerade sie bekam damit nie
+faltbare Bloecke; eine neue Protokollzeile mit dem Dateinamen brach einen
+gruenen Test aus Stand 4; und MID$/INSTR zaehlen ab 0 (siehe Stufe 5).
+Tests `tests/pruef/gui_auto_einzug.dhtest` (8, mit Gegenprobe ohne den
+Schalter) und 10 neue in `tests/test_ide.py`, darunter die Hervorhebung
+AM BILD mit Gegenprobe (`mehr` bleibt aus).
+
 **Stufe 5 (2026-09-09):** die Restliste aus `docs/ide.md` abgearbeitet.
 **Zwei Bausteine kamen dafuer in dhrt**, beide im Textbereich und beide so
 gebaut, dass ein Feld OHNE sie sich unveraendert verhaelt: (1) **Faltung**

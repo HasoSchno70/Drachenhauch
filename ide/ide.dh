@@ -34,6 +34,10 @@
 '  geteilte Ansicht (Alt+G, zwei Reiter nebeneinander), Uebersichtskarte,
 '  git blame (Strg+Umschalt+B), das Handbuch GESETZT statt roh, mehrere
 '  Schreibmarken (Alt+Klick, Strg+Umschalt+L) und Symbole in den Menues.
+'  Stand 6 dazu: Einrueckung beim Zeilenumbruch, Fundstellen und
+'  Klammernpaar farbig, Vorschlagsliste beim Tippen, git diff/log samt
+'  geaenderten Zeilen am Rand, Suche mit regulaerem Ausdruck, Lesezeichen
+'  ueber Dateien hinweg, Reiter wieder oeffnen, Faltung nach Einrueckung.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -46,6 +50,7 @@ IMPORT "gui"
 IMPORT "json"
 IMPORT "pdf"
 IMPORT "imgfx"      ' fuer die gezeichneten Menue-Symbole (IMAGE_NEW/IMAGE_DRAW_*)
+IMPORT "regex"      ' fuer die Suche mit regulaeren Ausdruecken
 
 CONST MAX_TABS = 12
 CONST NL = CHR$(10)
@@ -57,6 +62,8 @@ CONST F_TEXT       = &HE0A060
 CONST F_ZAHL       = &HD07070
 CONST F_SCHLUESSEL = &H2BC4E8
 CONST F_OPERATOR   = &H9AA8B8
+CONST F_FUNDSTELLE = &HFFD070      ' das Wort unter der Marke, ueberall
+CONST F_KLAMMER    = &H70FFA0      ' das zusammengehoerende Klammernpaar
 
 SCREEN(1280, 800, "Drachenhauch", 1)
 WINDOW_RESIZABLE(TRUE)
@@ -133,11 +140,17 @@ DIM umbruchAn AS BOOLEAN : umbruchAn = FALSE
 DIM geteilt AS BOOLEAN : geteilt = FALSE
 DIM linkerTab AS INTEGER : linkerTab = -1
 DIM minimapAn AS BOOLEAN : minimapAn = FALSE
+' Geaenderte Zeilen am Rand (git diff -U0), per Vorgabe an.
+DIM gitRandAn AS BOOLEAN : gitRandAn = TRUE
+' Suche mit regulaerem Ausdruck (Suchen, Ersetzen und Projektsuche).
+DIM regexAn AS BOOLEAN : regexAn = FALSE
+' Zuletzt geschlossene Reiter -- Strg+Umschalt+T holt sie zurueck.
+DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 ' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
 ' durch die Bruecke, obwohl sich nichts geaendert hat.
-DIM faltSchluessel AS STRING : faltSchluessel = ""
+DIM faltSchluessel AS STRING : faltSchluessel = "-"   ' "" waere eine echte Gliederung (Datei ohne SUB)
 
 ' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
 DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
@@ -211,6 +224,8 @@ IF JSON_HAS(konfig, "hell") THEN hell = JSON_GET_BOOL(konfig, "hell")
 IF JSON_HAS(konfig, "schrift") THEN codeGroesse = MAX(10, MIN(32, JSON_GET_INT(konfig, "schrift")))
 IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
+IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
+IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -264,6 +279,7 @@ DIM miDrucken AS INTEGER : miDrucken = GUI_MENU_ITEM(mDatei, "Listing drucken", 
 DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Listing als PDF neben die Quelle")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Reiter schliessen", "Strg+W")
+DIM miWiederauf AS INTEGER : miWiederauf = GUI_MENU_ITEM(mDatei, "Geschlossenen Reiter wieder oeffnen", "Strg+Umschalt+T")
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 
 DIM mBearb AS INTEGER : mBearb = GUI_MENU(win, "Bearbeiten")
@@ -293,8 +309,14 @@ DIM miAusruecken AS INTEGER : miAusruecken = GUI_MENU_ITEM(mZeilen, "Ausruecken"
 DIM miFormat AS INTEGER : miFormat = GUI_MENU_ITEM(mBearb, "Dokument formatieren", "Umschalt+Alt+F")
 DIM miLesezeichen AS INTEGER : miLesezeichen = GUI_MENU_ITEM(mBearb, "Lesezeichen setzen/entfernen", "Strg+F2")
 DIM miLzWeiter AS INTEGER : miLzWeiter = GUI_MENU_ITEM(mBearb, "Naechstes Lesezeichen", "F2")
+DIM miLzZurueck AS INTEGER : miLzZurueck = GUI_MENU_ITEM(mBearb, "Voriges Lesezeichen", "Umschalt+F2")
+DIM miLzListe AS INTEGER : miLzListe = GUI_MENU_ITEM(mBearb, "Alle Lesezeichen", "Alt+F2")
+DIM miRegex AS INTEGER : miRegex = GUI_MENU_ITEM(mBearb, "Suchen mit regulaerem Ausdruck")
+GUI_MENU_CHECK(miRegex, FALSE)
 DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt", "Strg+Umschalt+M")
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
+DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
+DIM miVerlauf AS INTEGER : miVerlauf = GUI_MENU_ITEM(mBearb, "Verlauf dieser Datei (git log)")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
 DIM miStart AS INTEGER : miStart = GUI_MENU_ITEM(mLauf, "Starten", "F5")
@@ -335,6 +357,8 @@ DIM miGeteilt AS INTEGER : miGeteilt = GUI_MENU_ITEM(mAnsicht, "Geteilte Ansicht
 GUI_MENU_CHECK(miGeteilt, FALSE)
 DIM miMinimap AS INTEGER : miMinimap = GUI_MENU_ITEM(mAnsicht, "Uebersichtskarte")
 GUI_MENU_CHECK(miMinimap, FALSE)
+DIM miGitRand AS INTEGER : miGitRand = GUI_MENU_ITEM(mAnsicht, "Geaenderte Zeilen am Rand")
+GUI_MENU_CHECK(miGitRand, TRUE)
 DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
@@ -383,6 +407,25 @@ DIM lstVervoll AS GUI_WIDGET : lstVervoll = GUI_LISTBOX(winVervoll, 6, 6, 300, 2
 GUI_WINDOW_VISIBLE(winVervoll, FALSE)
 DIM vervollPraefixLaenge AS INTEGER : vervollPraefixLaenge = 0
 DIM vervollOffen AS BOOLEAN : vervollOffen = FALSE
+' Was beim Tippen von selbst aufgeht: der Wortanfang, zu dem die Liste
+' zuletzt gezeigt wurde, und der, zu dem sie WEGgeschickt wurde (ESC).
+DIM vervollWort AS STRING : vervollWort = ""
+DIM vervollAus AS STRING : vervollAus = "-"
+
+' Der Wortanfang links der Marke -- so viel wird beim Uebernehmen ersetzt.
+FUNCTION wortAnfang$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM a AS INTEGER : a = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    RETURN MID$(zeile, a, s - 1 - a)
+END FUNCTION
 
 ' Debugger: Variablen und die Schritt-Knoepfe rechts unten IM Hauptfenster,
 ' anstelle der Problemliste, solange der Debugger laeuft. Ein eigenes Fenster
@@ -427,7 +470,14 @@ GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
 GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 
-' Befehlspalette: tippen filtert, Enter fuehrt aus. Dasselbe Fenster ist
+' --- git: Aenderungen und Verlauf --------------------------------------
+DIM winGit AS GUI_WINDOW : winGit = GUI_WINDOW("git", 240, 90, 900, 620)
+GUI_WINDOW_VISIBLE(winGit, FALSE)
+GUI_WINDOW_RESIZABLE(winGit, TRUE)
+DIM lblGit AS GUI_WIDGET : lblGit = GUI_LABEL(winGit, "", 8, 8)
+DIM taGit AS GUI_WIDGET : taGit = GUI_TEXTAREA(winGit, 8, 30, 884, 552)
+
+' --- Befehlspalette / Datei-Waehler
 ' auch der Waehler fuer "Datei im Projekt oeffnen" (paletteArt = "datei").
 DIM winPalette AS GUI_WINDOW : winPalette = GUI_WINDOW("Befehle", 400, 80, 440, 340)
 DIM tfPalette AS GUI_WIDGET : tfPalette = GUI_TEXTINPUT(winPalette, 8, 8, 424, 26, "")
@@ -476,6 +526,8 @@ SUB konfigSichern()
     JSON_SET_INT(konfig, "schrift", codeGroesse)
     JSON_SET_BOOL(konfig, "umbruch", umbruchAn)
     JSON_SET_BOOL(konfig, "karte", minimapAn)
+    JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
+    JSON_SET_BOOL(konfig, "regex", regexAn)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -676,6 +728,17 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
+    ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
+    ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
+    ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
+    GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+    GUI_TEXTAREA_INDENT_WORDS(ta, _
+        ["SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", "FOR", _
+         "WHILE", "REPEAT", "DO", "SELECT", "CASE", "TRY", "WITH", "ELSE", _
+         "ELSEIF", "ELIF", "CATCH", "FINALLY", "ENUM"], _
+        ["THEN"], _
+        ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
+         "CATCH", "FINALLY", "CASE"])
 END SUB
 
 ' Der Umbruch gilt fuer ALLE Reiter, nicht nur den vorderen -- ein Schalter,
@@ -765,11 +828,21 @@ SUB minimapZeichnen()
         DIM zt AS STRING : zt = zeilen[i]
         DIM roh AS STRING : roh = LTRIM$(zt)
         IF roh <> "" THEN
-            DIM breit AS INTEGER : breit = MIN(cw - 4, LEN(zt) * 2)
+            ' Wort fuer Wort statt ein Strich je Zeile: so sieht man in der
+            ' Karte, WO in der Datei man ist -- ein gleichmaessiger Balken
+            ' sieht ueberall gleich aus.
             DIM einzugX AS INTEGER : einzugX = MIN(cw \ 3, (LEN(zt) - LEN(roh)) * 2)
-            DIM f AS INTEGER : f = &H60708A
-            IF LEFT$(roh, 1) = "'" THEN f = F_KOMMENTAR
-            BOX(cx + 2 + einzugX, cy + y, cx + 2 + breit, cy + y, f)
+            DIM x AS INTEGER : x = cx + 2 + einzugX
+            DIM grund AS INTEGER : grund = &H60708A
+            IF LEFT$(roh, 1) = "'" THEN grund = F_KOMMENTAR
+            DIM wt AS STRING
+            FOR EACH wt IN SPLIT$(roh, " ")
+                DIM bw AS INTEGER : bw = LEN(wt) * 2
+                IF wt <> "" AND x < cx + cw - 3 THEN
+                    BOX(x, cy + y, MIN(x + bw - 2, cx + cw - 3), cy + y, grund)
+                END IF
+                x = x + bw + 2
+            NEXT
         END IF
         y = y + 1
         IF y >= ch THEN BREAK
@@ -806,7 +879,7 @@ END SUB
 SUB faltenUmschalten()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
@@ -818,7 +891,7 @@ END SUB
 SUB faltenAlle(zu AS BOOLEAN)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
-    IF faltSchluessel = "" THEN gliederungFuellen(GUI_TEXT(ta))
+    IF faltSchluessel = "-" THEN gliederungFuellen(GUI_TEXT(ta))
     DIM n AS INTEGER : n = GUI_TEXTAREA_FOLD_ALL(ta, zu)
     GUI_FOCUS(ta)
     GUI_SET_TEXT(lblStatus, IIF(zu, STR$(n) + " Bloecke zugeklappt.", "Alles aufgeklappt."))
@@ -912,6 +985,9 @@ END FUNCTION
 
 SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
+    ' Den Pfad merken: Strg+Umschalt+T holt ihn zurueck. Nur gesicherte
+    ' Dateien -- ein leerer Reiter haette nichts, was wiederzufinden waere.
+    IF tabPfade[i] <> "" THEN ARRAY_PUSH(zuGemacht, tabPfade[i])
     ' Die Reiter ruecken auf, der linke der geteilten Ansicht zeigte danach
     ' auf eine andere Datei -- lieber ganz aus als still auf die falsche.
     IF geteilt THEN geteiltSetzen(FALSE)
@@ -971,6 +1047,47 @@ FUNCTION farbeFuer(art AS STRING) AS INTEGER
     RETURN F_GRUND
 END FUNCTION
 
+' Klammer-Gegenstueck IM AUSSCHNITT suchen -- -1, wenn es keins gibt oder
+' es ausserhalb liegt. Der Ausschnitt reicht: was man nicht sieht, muss
+' auch nicht leuchten.
+FUNCTION klammerPartner(s AS STRING, pos AS INTEGER) AS INTEGER
+    DIM auf AS STRING : auf = "([{"
+    DIM zu AS STRING : zu = ")]}"
+    DIM c AS STRING : c = MID$(s, pos, 1)
+    DIM k AS INTEGER : k = INSTR(auf, c)
+    DIM richtung AS INTEGER : richtung = 1
+    DIM partner AS STRING : partner = ""
+    IF k >= 0 THEN
+        partner = MID$(zu, k, 1)
+    ELSE
+        k = INSTR(zu, c)
+        IF k < 0 THEN RETURN -1
+        partner = MID$(auf, k, 1)
+        richtung = -1
+    END IF
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER : i = pos
+    WHILE i >= 0 AND i < LEN(s)
+        DIM d AS STRING : d = MID$(s, i, 1)
+        IF d = c THEN
+            tiefe = tiefe + 1
+        ELSEIF d = partner THEN
+            tiefe = tiefe - 1
+            IF tiefe = 0 THEN RETURN i
+        END IF
+        i = i + richtung
+    WEND
+    RETURN -1
+END FUNCTION
+
+' Ist das Zeichen an dieser Stelle Teil eines Namens?
+FUNCTION wortzeichenAn(s AS STRING, i AS INTEGER) AS BOOLEAN
+    IF i < 0 OR i >= LEN(s) THEN RETURN FALSE
+    RETURN istWortzeichen(MID$(s, i, 1))
+END FUNCTION
+
+DIM faerbSchluessel AS STRING : faerbSchluessel = ""
+
 SUB faerben(ta AS GUI_WIDGET)
     DIM erste AS INTEGER
     DIM zeilen AS INTEGER
@@ -979,19 +1096,70 @@ SUB faerben(ta AS GUI_WIDGET)
     (erste, zeilen, von, laenge) = GUI_TEXTAREA_VIEW(ta)
     DIM q AS STRING : q = GUI_TEXT(ta)
     DIM stueck AS STRING : stueck = MID$(q, von, laenge)
+    DIM cz AS INTEGER
+    DIM cs AS INTEGER
+    (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+    ' Hat sich nichts geaendert, ist auch nichts neu zu rechnen. Ohne den
+    ' Riegel liefen Einfaerbung UND Fundstellensuche in jedem Bild, auch
+    ' wenn das Fenster nur dasteht.
+    DIM schl AS STRING : schl = STR$(von) + ":" + STR$(cz) + ":" + STR$(cs) + ":" + stueck
+    IF schl = faerbSchluessel THEN RETURN
+    faerbSchluessel = schl
     DIM starts AS ARRAY OF INTEGER
     DIM laengen AS ARRAY OF INTEGER
     DIM arten AS ARRAY OF STRING
     (starts, laengen, arten) = SYNTAX_SPANS(stueck)
     DIM n AS INTEGER : n = LEN(starts)
     IF n = 0 THEN RETURN
-    DIM farben[n] AS INTEGER
+    DIM s2 AS ARRAY OF INTEGER : s2 = []
+    DIM l2 AS ARRAY OF INTEGER : l2 = []
+    DIM f2 AS ARRAY OF INTEGER : f2 = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
-        starts[i] = starts[i] + von
-        farben[i] = farbeFuer(arten[i])
+        ARRAY_PUSH(s2, starts[i] + von) : ARRAY_PUSH(l2, laengen[i])
+        ARRAY_PUSH(f2, farbeFuer(arten[i]))
     NEXT
-    GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)
+    ' Das Wort unter der Marke ueberall im Ausschnitt. Erst ab zwei
+    ' Zeichen: ein einzelnes `i` faerbte die halbe Datei.
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF LEN(wort) >= 2 THEN
+        DIM klein AS STRING : klein = LOWER$(stueck)
+        DIM kwort AS STRING : kwort = LOWER$(wort)
+        DIM ab AS INTEGER : ab = 0
+        WHILE ab < LEN(klein)
+            DIM p AS INTEGER : p = INSTR(MID$(klein, ab, LEN(klein)), kwort)
+            IF p < 0 THEN BREAK
+            p = ab + p
+            IF NOT wortzeichenAn(stueck, p - 1) AND NOT wortzeichenAn(stueck, p + LEN(wort)) THEN
+                ARRAY_PUSH(s2, p + von) : ARRAY_PUSH(l2, LEN(wort)) : ARRAY_PUSH(f2, F_FUNDSTELLE)
+            END IF
+            ab = p + LEN(wort)
+        WEND
+    END IF
+    ' Das Klammernpaar um die Marke: erst links davon schauen, dann rechts
+    ' -- so wie man es beim Tippen erwartet, wenn man gerade eine Klammer
+    ' geschrieben hat.
+    DIM sz AS ARRAY OF STRING : sz = SPLIT$(stueck, NL)
+    DIM rel AS INTEGER : rel = cz - 1 - erste
+    IF rel >= 0 AND rel < LEN(sz) THEN
+        DIM markePos AS INTEGER : markePos = cs - 1
+        DIM r AS INTEGER
+        FOR r = 0 TO rel - 1
+            markePos = markePos + LEN(sz[r]) + 1
+        NEXT
+        DIM kp AS INTEGER : kp = markePos - 1
+        DIM gegen AS INTEGER : gegen = -1
+        IF kp >= 0 THEN gegen = klammerPartner(stueck, kp)
+        IF gegen < 0 AND markePos < LEN(stueck) THEN
+            kp = markePos
+            gegen = klammerPartner(stueck, kp)
+        END IF
+        IF gegen >= 0 THEN
+            ARRAY_PUSH(s2, kp + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, F_KLAMMER)
+            ARRAY_PUSH(s2, gegen + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, F_KLAMMER)
+        END IF
+    END IF
+    GUI_TEXTAREA_SPANS(ta, s2, l2, f2)
 END SUB
 
 ' --- Pruefen -----------------------------------------------------------
@@ -1032,6 +1200,47 @@ SUB pruefen()
 END SUB
 
 ' --- Gliederung: SUB/FUNCTION/CLASS der aktiven Datei (CODE_SYMBOLS$) ---
+' Faltbare Bloecke aus der EINRUECKUNG -- alles, was CODE_SYMBOLS$ nicht
+' kennt: eine FOR-Schleife, ein IF-Zweig, ein von Hand eingerueckter
+' Abschnitt. Ein Block ist eine Zeile, unter der mindestens eine tiefer
+' eingerueckte steht; er endet an der letzten davon.
+'
+' Leerzeilen zaehlen nicht mit (sie haben gar keine Einrueckung), und was
+' die Gliederung schon nennt, kommt nicht doppelt: sonst haette jede
+' Kopfzeile zwei Bereiche, und der engere -- der aus der Einrueckung --
+' gewaenne, obwohl der Block derselbe ist.
+SUB einzugBloecke(quelle AS STRING, fv AS ARRAY OF INTEGER, fb AS ARRAY OF INTEGER)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM n AS INTEGER : n = LEN(zeilen)
+    IF n > 4000 THEN RETURN        ' bei sehr grossen Dateien nicht je Pruefung
+    DIM tiefe[MAX(n, 1)] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF TRIM$(zeilen[i]) = "" THEN
+            tiefe[i] = -1
+        ELSE
+            tiefe[i] = LEN(zeilen[i]) - LEN(LTRIM$(zeilen[i]))
+        END IF
+    NEXT
+    FOR i = 0 TO n - 2
+        IF tiefe[i] < 0 THEN CONTINUE
+        DIM k AS INTEGER : k = i + 1
+        DIM ende AS INTEGER : ende = i
+        WHILE k < n
+            IF tiefe[k] < 0 THEN
+                k = k + 1
+                CONTINUE
+            END IF
+            IF tiefe[k] <= tiefe[i] THEN BREAK
+            ende = k
+            k = k + 1
+        WEND
+        IF ende <= i THEN CONTINUE
+        IF ARRAY_INDEXOF(fv, i + 1) >= 0 THEN CONTINUE
+        ARRAY_PUSH(fv, i + 1) : ARRAY_PUSH(fb, ende + 1)
+    NEXT
+END SUB
+
 SUB gliederungFuellen(quelle AS STRING)
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
     DIM n AS INTEGER : n = JSON_LEN(j, "")
@@ -1067,6 +1276,7 @@ SUB gliederungFuellen(quelle AS STRING)
                 ARRAY_PUSH(fv, JSON_GET_INT(j, pkf + ".von")) : ARRAY_PUSH(fb, JSON_GET_INT(j, pkf + ".bis"))
             NEXT
         NEXT
+        einzugBloecke(quelle, fv, fb)
         GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
     END IF
     IF schl = gliederungSchluessel THEN RETURN
@@ -1124,7 +1334,7 @@ SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
         DIM i AS INTEGER
         FOR i = 0 TO LEN(zeilen) - 1
             IF treffer >= 500 THEN BREAK
-            IF INSTR(LOWER$(zeilen[i]), klein) >= 0 OR (klein2 <> "" AND INSTR(LOWER$(zeilen[i]), klein2) >= 0) THEN
+            IF passtSuche(zeilen[i], gesucht) OR (zweitens <> "" AND passtSuche(zeilen[i], zweitens)) THEN
                 ARRAY_PUSH(sd, d)
                 ARRAY_PUSH(sz, i + 1)
                 GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
@@ -1207,6 +1417,125 @@ SUB blameZeigen()
     problemModus = 1
     GUI_SET_TEXT(lblProbleme, "git blame " + BASENAME(pfad) + ": " + STR$(n) + " Zeilen -- Umschalt+F7 zeigt wieder die Probleme")
     protokoll("blame " + STR$(n))
+END SUB
+
+' `git` fuer die aktive Datei laufen lassen -- leer, wenn es nicht geht.
+' Synchron ueber SHELL_OUT$: eine Datei dauert Millisekunden.
+FUNCTION gitAusgabe$(erst AS STRING, zweit AS STRING, dritt AS STRING) AS STRING
+    IF aktiverTab < 0 THEN RETURN ""
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF pfad = "" THEN RETURN ""
+    TRY
+        IF dritt = "" THEN
+            RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, "--", BASENAME(pfad))
+        END IF
+        RETURN SHELL_OUT$("git", "-C", DIRNAME(pfad), erst, zweit, dritt, "--", BASENAME(pfad))
+    CATCH e
+        RETURN ""
+    END TRY
+END FUNCTION
+
+' Diff und Verlauf im selben Fenster: es ist dieselbe Frage ("was ist mit
+' dieser Datei passiert?"), nur einmal seit dem letzten Sichern und einmal
+' ueber die Zeit.
+SUB gitZeigen(art AS STRING)
+    IF aktiverTab < 0 OR tabPfade[aktiverTab] = "" THEN
+        GUI_SET_TEXT(lblStatus, "git: die Datei ist noch nicht gesichert.")
+        RETURN
+    END IF
+    DIM text AS STRING
+    IF art = "diff" THEN
+        text = gitAusgabe$("diff", "--no-color", "")
+        IF TRIM$(text) = "" THEN text = gitAusgabe$("diff", "--no-color", "--staged")
+    ELSE
+        text = gitAusgabe$("log", "--no-color", "--pretty=format:%h  %ad  %an%n    %s%n")
+    END IF
+    IF TRIM$(text) = "" THEN
+        GUI_SET_TEXT(lblStatus, IIF(art = "diff", "git diff: keine Aenderungen an dieser Datei.", "git log: kein Verlauf -- liegt sie in einem git-Verzeichnis?"))
+        protokoll("git " + art + " 0")
+        RETURN
+    END IF
+    GUI_SET_TEXT(taGit, text)
+    GUI_WINDOW_TITLE(winGit, IIF(art = "diff", "Aenderungen", "Verlauf") + ": " + BASENAME(tabPfade[aktiverTab]))
+    GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + " Zeilen")
+    GUI_WINDOW_VISIBLE(winGit, TRUE)
+    GUI_FOCUS(taGit)
+    gitFaerben()
+    protokoll("git " + art + " " + STR$(LEN(SPLIT$(text, NL))))
+END SUB
+
+' Ein Diff liest sich nur mit Farbe: Zugaenge gruen, Abgaenge rot, die
+' @@-Koepfe blau. Zeilenweise ueber die Abschnitte, wie im Code-Feld.
+SUB gitFaerben()
+    DIM text AS STRING : text = GUI_TEXT(taGit)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
+    DIM s AS ARRAY OF INTEGER : s = []
+    DIM l AS ARRAY OF INTEGER : l = []
+    DIM f AS ARRAY OF INTEGER : f = []
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        DIM farbe AS INTEGER : farbe = -1
+        IF LEFT$(z, 2) = "@@" THEN
+            farbe = &H60B0E0
+        ELSEIF LEFT$(z, 3) = "+++" OR LEFT$(z, 3) = "---" THEN
+            farbe = &H90A0B0
+        ELSEIF LEFT$(z, 1) = "+" THEN
+            farbe = &H70D080
+        ELSEIF LEFT$(z, 1) = "-" THEN
+            farbe = &HE07070
+        ELSEIF LEN(z) >= 7 AND MID$(z, 7, 1) = " " AND LEFT$(z, 1) <> " " THEN
+            farbe = &HE0C060        ' die Kennung einer Uebergabe im Verlauf
+        END IF
+        IF farbe >= 0 AND LEN(z) > 0 THEN
+            ARRAY_PUSH(s, pos) : ARRAY_PUSH(l, LEN(z)) : ARRAY_PUSH(f, farbe)
+        END IF
+        pos = pos + LEN(z) + 1
+    NEXT
+    GUI_TEXTAREA_SPANS(taGit, s, l, f)
+END SUB
+
+' Die geaenderten Zeilen am Rand: `git diff -U0` nennt sie in den
+' @@-Koepfen (`@@ -alt,n +neu,m @@`). Nur die NEUE Seite zaehlt -- was
+' geloescht wurde, steht in der Datei nicht mehr.
+DIM gitZeilen AS ARRAY OF INTEGER : gitZeilen = []
+DIM gitDateiStand AS STRING : gitDateiStand = "-"
+
+SUB gitRandNachziehen(erzwingen AS BOOLEAN)
+    IF aktiverTab < 0 THEN RETURN
+    DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
+    IF NOT gitRandAn OR pfad = "" THEN
+        IF LEN(gitZeilen) > 0 THEN gitZeilen = [] : markenSchluessel = ""
+        RETURN
+    END IF
+    ' Nur nach dem Sichern oder Oeffnen neu fragen: ein Prozessstart je
+    ' Bild waere die IDE zum Stillstand gebracht.
+    DIM stand AS STRING : stand = pfad + "|" + STR$(LEN(tabGesichert[aktiverTab]))
+    IF NOT erzwingen AND stand = gitDateiStand THEN RETURN
+    gitDateiStand = stand
+    DIM text AS STRING : text = gitAusgabe$("diff", "--no-color", "-U0")
+    DIM neu AS ARRAY OF INTEGER : neu = []
+    DIM z AS STRING
+    FOR EACH z IN SPLIT$(text, NL)
+        IF LEFT$(z, 2) <> "@@" THEN CONTINUE
+        DIM p AS INTEGER : p = INSTR(z, "+")
+        IF p < 0 THEN CONTINUE
+        DIM rest AS STRING : rest = MID$(z, p + 1, LEN(z))
+        DIM ende AS INTEGER : ende = INSTR(rest, " ")
+        IF ende >= 0 THEN rest = LEFT$(rest, ende)
+        DIM komma AS INTEGER : komma = INSTR(rest, ",")
+        DIM von AS INTEGER : von = INT(VAL(IIF(komma >= 0, LEFT$(rest, komma), rest)))
+        DIM anzahl AS INTEGER : anzahl = 1
+        IF komma >= 0 THEN anzahl = INT(VAL(MID$(rest, komma + 1, LEN(rest))))
+        DIM k AS INTEGER
+        FOR k = 0 TO MIN(anzahl, 2000) - 1
+            ARRAY_PUSH(neu, von + k)
+        NEXT
+    NEXT
+    gitZeilen = neu
+    markenSchluessel = ""
+    protokoll("git rand " + STR$(LEN(neu)))
 END SUB
 
 FUNCTION haltepunktIndex(pfad AS STRING, zeile AS INTEGER) AS INTEGER
@@ -1300,25 +1629,91 @@ SUB lesezeichenUmschalten()
 END SUB
 
 ' F2: zum naechsten Lesezeichen hinter der Marke, am Ende wieder von vorn.
-SUB lesezeichenWeiter()
+' Lesezeichen der Reihe nach -- ueber DATEIEN hinweg: erst die restlichen
+' in dieser Datei, dann die naechste Datei, die eins hat. Ein Lesezeichen,
+' das man nur in seiner Datei wiederfindet, ist eins zu wenig.
+SUB lesezeichenSpringen(vorwaerts AS BOOLEAN)
     IF aktiverTab < 0 THEN RETURN
+    IF LEN(lzZeilen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein Lesezeichen gesetzt -- Strg+F2 setzt eins.")
+        RETURN
+    END IF
     DIM pfad AS STRING : pfad = tabPfade[aktiverTab]
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(tabFelder[aktiverTab])
-    DIM naechste AS INTEGER : naechste = 0
-    DIM erste AS INTEGER : erste = 0
+    ' Alle Marken in EINE Reihenfolge bringen: erst nach Datei, dann nach
+    ' Zeile. So ist "das naechste" auch ueber die Dateigrenze eindeutig.
+    DIM reihe AS ARRAY OF INTEGER : reihe = []
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO LEN(lzZeilen) - 1
+        DIM platz AS INTEGER : platz = LEN(reihe)
+        FOR k = 0 TO LEN(reihe) - 1
+            DIM j AS INTEGER : j = reihe[k]
+            IF lzDateien[j] > lzDateien[i] OR (lzDateien[j] = lzDateien[i] AND lzZeilen[j] > lzZeilen[i]) THEN
+                platz = k
+                BREAK
+            END IF
+        NEXT
+        ARRAY_INSERT(reihe, platz, i)
+    NEXT
+    ' Wo stehen wir in dieser Reihe?
+    DIM hier AS INTEGER : hier = -1
+    FOR k = 0 TO LEN(reihe) - 1
+        DIM m AS INTEGER : m = reihe[k]
+        IF lzDateien[m] < pfad OR (lzDateien[m] = pfad AND lzZeilen[m] <= z) THEN hier = k
+    NEXT
+    DIM ziel AS INTEGER
+    IF vorwaerts THEN
+        ziel = (hier + 1) MOD LEN(reihe)
+    ELSE
+        ziel = hier
+        IF ziel < 0 THEN ziel = 0
+        ' Steht die Marke GENAU auf einem Lesezeichen, ist "zurueck" das
+        ' davor -- sonst kaeme man nie von der Stelle.
+        DIM h AS INTEGER : h = reihe[ziel]
+        IF lzDateien[h] = pfad AND lzZeilen[h] = z THEN ziel = ziel - 1
+        IF ziel < 0 THEN ziel = LEN(reihe) - 1
+    END IF
+    DIM t AS INTEGER : t = reihe[ziel]
+    IF lzDateien[t] <> pfad THEN
+        IF NOT FILEEXISTS(lzDateien[t]) THEN
+            GUI_SET_TEXT(lblStatus, "Die Datei des Lesezeichens gibt es nicht mehr: " + lzDateien[t])
+            RETURN
+        END IF
+        dateiOeffnen(lzDateien[t])
+    END IF
+    GUI_TEXTAREA_GOTO(aktivesFeld(), lzZeilen[t], 1)
+    GUI_FOCUS(aktivesFeld())
+    ' Nur die Zeile ins Protokoll: welche Datei, sagt die "geoeffnet"-Zeile
+    ' davor, wenn der Sprung ueber die Grenze ging.
+    protokoll("lesezeichen sprung " + STR$(lzZeilen[t]))
+END SUB
+
+' Alle Lesezeichen in der Liste unten rechts -- dieselbe wie Suche und
+' blame; ein eigenes Panel fuer dieselbe Frage waere eins zu viel.
+SUB lesezeichenListe()
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(lzZeilen) - 1
-        IF lzDateien[i] <> pfad THEN CONTINUE
-        IF erste = 0 OR lzZeilen[i] < erste THEN erste = lzZeilen[i]
-        IF lzZeilen[i] > z AND (naechste = 0 OR lzZeilen[i] < naechste) THEN naechste = lzZeilen[i]
+        ARRAY_PUSH(sd, lzDateien[i]) : ARRAY_PUSH(sz, lzZeilen[i])
+        DIM text AS STRING : text = ""
+        TRY
+            DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(lzDateien[i])
+            IF lzZeilen[i] <= LEN(zeilen) THEN text = TRIM$(zeilen[lzZeilen[i] - 1])
+        CATCH e
+            text = ""
+        END TRY
+        GUI_LISTBOX_ADD(lstProbleme, BASENAME(lzDateien[i]) + ":" + STR$(lzZeilen[i]) + ": " + text)
     NEXT
-    IF naechste = 0 THEN naechste = erste
-    IF naechste = 0 THEN GUI_SET_TEXT(lblStatus, "Kein Lesezeichen in dieser Datei -- Strg+F2 setzt eins.") : RETURN
-    GUI_TEXTAREA_GOTO(tabFelder[aktiverTab], naechste, 1)
-    GUI_FOCUS(tabFelder[aktiverTab])
-    protokoll("lesezeichen sprung " + STR$(naechste))
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, STR$(LEN(sz)) + " Lesezeichen -- Umschalt+F7 zeigt wieder die Probleme")
+    protokoll("lesezeichen liste " + STR$(LEN(sz)))
 END SUB
 
 SUB markenNachziehen()
@@ -1346,6 +1741,11 @@ SUB markenNachziehen()
     NEXT
     FOR i = 0 TO LEN(lzZeilen) - 1
         IF lzDateien[i] = pfad THEN ARRAY_PUSH(zeilen, lzZeilen[i]) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lzZeilen[i])
+    NEXT
+    ' Geaenderte Zeilen ganz zuletzt: sie sind die schwaechste Aussage und
+    ' sollen keinen Haltepunkt zudecken.
+    FOR i = 0 TO LEN(gitZeilen) - 1
+        ARRAY_PUSH(zeilen, gitZeilen[i]) : ARRAY_PUSH(farben, &H50A070) : schl = schl + "g" + STR$(gitZeilen[i])
     NEXT
     IF schl = markenSchluessel THEN RETURN
     markenSchluessel = schl
@@ -1445,7 +1845,10 @@ SUB hilfeNachziehen()
 END SUB
 
 ' --- Vervollstaendigen -------------------------------------------------
-SUB vervollstaendigen()
+' `fokus` entscheidet, wer danach die Tasten bekommt. Beim Tippen bleibt
+' die Marke im Code-Feld -- sonst tippte man in die Liste weiter; Strg+Leer
+' holt sie dann herein, wenn man etwas auswaehlen will.
+SUB vervollstaendigen(fokus AS BOOLEAN)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     DIM z AS INTEGER
@@ -1475,13 +1878,36 @@ SUB vervollstaendigen()
     GUI_WINDOW_SET_BOUNDS(winVervoll, breiteLinks + 40, 120, 320, 240)
     GUI_WINDOW_VISIBLE(winVervoll, TRUE)
     vervollOffen = TRUE
-    GUI_FOCUS(lstVervoll)
+    vervollWort = wortAnfang$()
+    IF fokus THEN GUI_FOCUS(lstVervoll)
+END SUB
+
+SUB vervollSchliessen()
+    IF NOT vervollOffen THEN RETURN
+    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
+    vervollOffen = FALSE
+    vervollWort = ""
+END SUB
+
+' Beim Tippen von selbst: ab drei Zeichen zeigt die Liste, was passt. Der
+' Fokus bleibt im Code-Feld -- die Liste ist ein Vorschlag, keine Sperre.
+SUB vervollNachziehen()
+    IF aktiverTab < 0 OR paletteOffen THEN RETURN
+    DIM wort AS STRING : wort = wortAnfang$()
+    IF wort = vervollAus THEN RETURN
+    vervollAus = "-"
+    IF LEN(wort) < 3 THEN
+        vervollSchliessen()
+        RETURN
+    END IF
+    IF wort = vervollWort THEN RETURN
+    IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
+    vervollstaendigen(FALSE)
 END SUB
 
 SUB vervollUebernehmen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVervoll)
-    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
-    vervollOffen = FALSE
+    vervollSchliessen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     IF sel >= 0 THEN
@@ -1496,12 +1922,51 @@ SUB vervollUebernehmen()
 END SUB
 
 ' --- Suchen / Ersetzen / Zeile ----------------------------------------
+' Passt die Zeile? Mit `regexAn` ueber das regex-Modul, sonst als
+' Teiltext ohne Ruecksicht auf Gross/Klein. EINE Stelle fuer Suchen,
+' Ersetzen und die Projektsuche -- liefen sie auseinander, faende die eine
+' etwas anderes als die andere.
+FUNCTION passtSuche(zeile AS STRING, muster AS STRING) AS BOOLEAN
+    IF muster = "" THEN RETURN FALSE
+    IF NOT regexAn THEN RETURN INSTR(LOWER$(zeile), LOWER$(muster)) >= 0
+    TRY
+        RETURN REGEX_TEST(zeile, muster)
+    CATCH e
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
 FUNCTION weitersuchen(abNaechstem AS BOOLEAN) AS BOOLEAN
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR suchtext = "" THEN RETURN FALSE
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    IF regexAn THEN
+        ' Zeilenweise: ein regulaerer Ausdruck kann alles Moegliche treffen,
+        ' und GUI_TEXTAREA_FIND kennt nur Teiltexte.
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+        DIM n AS INTEGER : n = LEN(zeilen)
+        DIM k AS INTEGER
+        FOR k = 1 TO n
+            DIM zi AS INTEGER : zi = ((z - 1 + k) MOD n) + 1
+            IF passtSuche(zeilen[zi - 1], suchtext) THEN
+                DIM tr AS STRING : tr = ""
+                TRY
+                    tr = REGEX_FIND(zeilen[zi - 1], suchtext)
+                CATCH e
+                    tr = ""
+                END TRY
+                DIM sp AS INTEGER : sp = 1
+                IF tr <> "" THEN sp = INSTR(zeilen[zi - 1], tr) + 1
+                GUI_TEXTAREA_SELECT(ta, zi, sp, zi, sp + MAX(LEN(tr), 1))
+                GUI_FOCUS(ta)
+                RETURN TRUE
+            END IF
+        NEXT
+        GUI_SET_TEXT(lblStatus, "Kein Treffer fuer den Ausdruck: " + suchtext)
+        RETURN FALSE
+    END IF
     IF abNaechstem THEN s = s + 1
     DIM tz AS INTEGER
     DIM ts AS INTEGER
@@ -2633,6 +3098,10 @@ paletteEintrag("Zeilen nach oben", "hoch", "Alt+Hoch") : paletteEintrag("Zeilen 
 paletteEintrag("Einruecken", "einruecken", "Alt+Rechts") : paletteEintrag("Ausruecken", "ausruecken", "Alt+Links")
 paletteEintrag("Dokument formatieren", "format", "Umschalt+Alt+F")
 paletteEintrag("Lesezeichen setzen/entfernen", "lesezeichen", "Strg+F2") : paletteEintrag("Naechstes Lesezeichen", "lz_weiter", "F2")
+paletteEintrag("Voriges Lesezeichen", "lz_zurueck", "Umschalt+F2")
+paletteEintrag("Alle Lesezeichen", "lz_liste", "Alt+F2")
+paletteEintrag("Suchen mit regulaerem Ausdruck", "regex", "")
+paletteEintrag("Geschlossenen Reiter wieder oeffnen", "wiederauf", "Strg+Umschalt+T")
 paletteEintrag("Starten", "start", "F5") : paletteEintrag("Stoppen", "stopp", "Umschalt+F5") : paletteEintrag("Pruefen", "pruefen", "Umschalt+F7")
 paletteEintrag("Debuggen", "debug", "F7") : paletteEintrag("Haltepunkt setzen/entfernen", "haltepunkt", "F9")
 paletteEintrag("Bedingter Haltepunkt ...", "bedingung", "Umschalt+F9")
@@ -2642,6 +3111,9 @@ paletteEintrag("Profil aufnehmen", "profil", "Strg+Umschalt+Y")
 paletteEintrag("Als eigenstaendiges Programm exportieren", "export", "Strg+F6")
 paletteEintrag("Umbenennen ...", "umbenennen", "Umschalt+F6")
 paletteEintrag("Wer hat das geschrieben (git blame)", "blame", "Strg+Umschalt+B")
+paletteEintrag("Was habe ich geaendert (git diff)", "diff", "Strg+Umschalt+D")
+paletteEintrag("Verlauf dieser Datei (git log)", "verlauf", "")
+paletteEintrag("Geaenderte Zeilen am Rand", "git_rand", "")
 paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
@@ -2799,6 +3271,14 @@ SUB befehl(k AS STRING)
         CASE "schnell" : schnellOeffnen()
         CASE "todo" : projektSuchen("TODO", "FIXME")
         CASE "blame" : blameZeigen()
+        CASE "diff" : gitZeigen("diff")
+        CASE "verlauf" : gitZeigen("log")
+        CASE "git_rand"
+            gitRandAn = NOT gitRandAn
+            GUI_MENU_CHECK(miGitRand, gitRandAn)
+            gitDateiStand = "-"
+            gitRandNachziehen(TRUE)
+            konfigSichern()
         CASE "kommentar" : kommentarUmschalten()
         CASE "duplizieren" : zeilenDuplizieren()
         CASE "zeile_weg" : zeilenLoeschen()
@@ -2808,7 +3288,22 @@ SUB befehl(k AS STRING)
         CASE "ausruecken" : einruecken(-1)
         CASE "format" : formatieren()
         CASE "lesezeichen" : lesezeichenUmschalten()
-        CASE "lz_weiter" : lesezeichenWeiter()
+        CASE "lz_weiter" : lesezeichenSpringen(TRUE)
+        CASE "lz_zurueck" : lesezeichenSpringen(FALSE)
+        CASE "lz_liste" : lesezeichenListe()
+        CASE "regex"
+            regexAn = NOT regexAn
+            GUI_MENU_CHECK(miRegex, regexAn)
+            GUI_SET_TEXT(lblStatus, IIF(regexAn, "Suche mit regulaerem Ausdruck (z. B. ^SUB .*\\(\\)).", "Suche als Teiltext."))
+            konfigSichern()
+        CASE "wiederauf"
+            IF LEN(zuGemacht) = 0 THEN
+                GUI_SET_TEXT(lblStatus, "Kein geschlossener Reiter zum Wiederholen.")
+            ELSE
+                DIM zurueck AS STRING : zurueck = ARRAY_POP(zuGemacht)
+                IF FILEEXISTS(zurueck) THEN dateiOeffnen(zurueck) ELSE GUI_SET_TEXT(lblStatus, "Gibt es nicht mehr: " + zurueck)
+                protokoll("wieder auf " + zurueck)
+            END IF
         CASE "bedingung" : haltepunktBedingungFragen()
         CASE "export" : exportieren()
         CASE "groesser" : schriftSetzen(codeGroesse + 2)
@@ -2823,7 +3318,11 @@ SUB befehl(k AS STRING)
         CASE "ersetzen" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
         CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
         CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
-        CASE "vervoll" : vervollstaendigen()
+        CASE "vervoll"
+            ' Steht die Liste schon (weil sie beim Tippen aufging), holt
+            ' Strg+Leer sie nur nach vorn -- ausgewaehlt wird mit den
+            ' Pfeilen und Enter.
+            IF vervollOffen THEN GUI_FOCUS(lstVervoll) ELSE vervollstaendigen(TRUE)
         CASE "definition" : zurDefinition()
         CASE "umbenennen" : umbenennenFragen()
         CASE "schnipsel" : schnipselWaehlen()
@@ -2851,7 +3350,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 5 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 6 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()
@@ -3047,7 +3546,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         letzteMarke = ""
         ' Gliederung und faltbare Bloecke gehoeren zum FELD -- ohne das
         ' Zuruecksetzen behielte der neue Reiter die Bloecke des alten.
-        gliederungSchluessel = "" : faltSchluessel = ""
+        gliederungSchluessel = "" : faltSchluessel = "-"
         pruefungFaellig = GET_TIME()
     END IF
 
@@ -3105,6 +3604,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miSchnell) THEN befehl("schnell")
     IF GUI_CLICKED(miTodo) THEN befehl("todo")
     IF GUI_CLICKED(miBlame) THEN befehl("blame")
+    IF GUI_CLICKED(miDiff) THEN befehl("diff")
+    IF GUI_CLICKED(miVerlauf) THEN befehl("verlauf")
+    IF GUI_CLICKED(miGitRand) THEN befehl("git_rand")
     IF GUI_CLICKED(miKommentar) THEN befehl("kommentar")
     IF GUI_CLICKED(miDuplizieren) THEN befehl("duplizieren")
     IF GUI_CLICKED(miZeileWeg) THEN befehl("zeile_weg")
@@ -3115,6 +3617,10 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miFormat) THEN befehl("format")
     IF GUI_CLICKED(miLesezeichen) THEN befehl("lesezeichen")
     IF GUI_CLICKED(miLzWeiter) THEN befehl("lz_weiter")
+    IF GUI_CLICKED(miLzZurueck) THEN befehl("lz_zurueck")
+    IF GUI_CLICKED(miLzListe) THEN befehl("lz_liste")
+    IF GUI_CLICKED(miRegex) THEN befehl("regex")
+    IF GUI_CLICKED(miWiederauf) THEN befehl("wiederauf")
     IF GUI_CLICKED(miBedingung) THEN befehl("bedingung")
     IF GUI_CLICKED(miExport) THEN befehl("export")
     IF GUI_CLICKED(miGroesser) THEN befehl("groesser")
@@ -3142,6 +3648,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
     werkzeugeAufraeumen()
     IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
+    gitRandNachziehen(FALSE)
 
     ' --- Dialoge auswerten ---
     IF dlgSuche <> 0 THEN
@@ -3260,7 +3767,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     ' --- Vervollstaendigung: Enter/Doppelklick uebernimmt, ESC schliesst ---
     IF vervollOffen THEN
         IF GUI_DOUBLE_CLICKED(lstVervoll) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstVervoll) THEN vervollUebernehmen()
-        IF KEYHIT(KEY_ESCAPE) THEN GUI_WINDOW_VISIBLE(winVervoll, FALSE) : vervollOffen = FALSE : GUI_FOCUS(aktivesFeld())
+        IF KEYHIT(KEY_ESCAPE) THEN vervollAus = wortAnfang$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
     END IF
 
     ' --- Baum, Probleme, Eingabe ---
@@ -3280,6 +3787,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         faerben(tf)
         markenNachziehen()
         hilfeNachziehen()
+        vervollNachziehen()
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0
             pruefen()

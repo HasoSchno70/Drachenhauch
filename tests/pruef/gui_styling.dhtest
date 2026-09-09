@@ -1,4 +1,10 @@
 ' Aus test_gui_styling.py uebertragen (26 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+'
+' Seriell, weil ZWEI Faelle den Mauszeiger bewegen (MOUSE_SET_POS setzt den
+' echten des Systems, nicht einen je Prozess): parallel zog der eine ihn dem
+' anderen unter dem Knopf weg, und `rein` feuerte ein drittes Mal. Der
+' Fehlschlag kam nur im vollen Lauf und nur manchmal.
+--- seriell
 
 === enabled toggle
 IMPORT "gui"

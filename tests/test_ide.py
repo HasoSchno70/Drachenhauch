@@ -42,9 +42,12 @@ RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
 RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
 RL_L = 76
 RL_RIGHT, RL_END = 262, 269
+RL_SPACE, RL_LEFT = 32, 263
+RL_T, RL_W = 84, 87
 
 
-def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None):
+def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
+         screenshot=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
     log = tmp_path / "ide.log"
     quelle = IDE
@@ -74,7 +77,8 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
                                 DH_IDE_WURZEL=str(_ROOT),
-                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json")),
+                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json"),
+                                **({"DHRT_SCREENSHOT": str(screenshot)} if screenshot else {})),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -521,3 +525,171 @@ def test_marken_auf_jede_fundstelle_und_tippen_aendert_alle(tmp_path):
     log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="X")
     assert "marken 3" in log, log
     assert quelle.read_text(encoding="utf-8") == "Xhp = 1\nXhp = Xhp + 1\nhpmax = 9\n"
+
+
+# ---------------------------------------------------------------- Stufe 6
+
+def test_neue_zeile_uebernimmt_die_einrueckung_und_rueckt_ein(tmp_path):
+    """Die Marke steht am Ende von `SUB a()`, Enter: die neue Zeile ist eine
+    Stufe eingerückt. Danach `END` über die Zwischenablage -- das rückt sich
+    selbst wieder heraus."""
+    quelle = _datei(tmp_path, "SUB a()")
+    ev = _taste(20, RL_END) + _taste(40, RL_ENTER) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=180, events=ev, zwischenablage="END")
+    assert quelle.read_text(encoding="utf-8") == "SUB a()\nEND\n", (
+        repr(quelle.read_text(encoding="utf-8")), log)
+
+
+def test_vervollstaendigung_geht_beim_tippen_von_selbst_auf(tmp_path):
+    """Drei Zeichen über die Zwischenablage getippt (`SCR`), und die Liste
+    steht -- ohne dass der Fokus das Code-Feld verlässt. Strg+Leer holt sie
+    dann herein, Enter übernimmt."""
+    quelle = _datei(tmp_path, "")
+    ev = _taste(30, RL_V, RL_LCTRL) + _taste(80, RL_SPACE, RL_LCTRL)
+    ev += _taste(120, RL_ENTER) + _taste(150, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="SCR")
+    assert any(z.startswith("vervollstaendigt SCREEN") for z in log), log
+    assert quelle.read_text(encoding="utf-8").startswith("SCREEN"), (
+        repr(quelle.read_text(encoding="utf-8")), log)
+
+
+def test_das_wort_unter_der_marke_wird_ueberall_hervorgehoben(tmp_path):
+    """Am Bild geprüft: mit der Marke auf `punkte` tragen ALLE fünf Stellen
+    die Fundstellenfarbe. Gegenprobe im selben Bild -- `mehr` daneben nicht."""
+    quelle = _datei(tmp_path, "DIM punkte AS INTEGER\npunkte = 0\n"
+                              "SUB zaehlen(mehr AS INTEGER)\n"
+                              "    punkte = punkte + mehr\nEND SUB\n")
+    schuss = tmp_path / "bild.png"
+    # Bis in das Wort hinein: hinter dem Zeilenende steht nur die 0.
+    ev = _taste(30, RL_DOWN) + _taste(50, RL_END)
+    for k in range(5):
+        ev += _taste(70 + k * 6, RL_LEFT)
+    _ide(tmp_path, quelle, frames=160, events=ev, screenshot=schuss)
+    from PIL import Image
+    im = Image.open(schuss).convert("RGB")
+    # F_FUNDSTELLE = &HFFD070 -- warmes Gelb, im Bild sonst nirgends.
+    treffer = [(x, y) for y in range(60, 260) for x in range(220, 1200)
+               if _nahe(im.getpixel((x, y)), (0xFF, 0xD0, 0x70), 40)]
+    assert treffer, "keine Fundstellenfarbe im Bild"
+    # `punkte` steht in den Zeilen 1, 2 und 4 -- drei Baender.
+    baender = _gruppen(sorted({y for _, y in treffer}), 3)
+    assert len(baender) == 3, (len(baender), sorted({y for _, y in treffer})[:20])
+    # Und in Zeile 4 (`punkte = punkte + mehr`) zweimal, `mehr` NICHT --
+    # das ist die Gegenprobe: sonst waeren es drei Woerter.
+    letzte = set(baender[-1])
+    woerter = _gruppen(sorted({x for x, y in treffer if y in letzte}), 6)
+    assert len(woerter) == 2, [len(w) and (w[0], w[-1]) for w in woerter]
+
+
+def _nahe(a, b, tol):
+    return all(abs(x - y) <= tol for x, y in zip(a, b))
+
+
+def _gruppen(werte, luecke):
+    """Zusammenhaengende Laeufe: alles, was weiter als `luecke` auseinander
+    liegt, faengt eine neue Gruppe an."""
+    aus = []
+    for v in werte:
+        if not aus or v - aus[-1][-1] > luecke:
+            aus.append([v])
+        else:
+            aus[-1].append(v)
+    return aus
+
+
+def _repo(tmp_path, inhalt, name="spiel.dh"):
+    """Ein kleines Repository mit einer eingecheckten Datei."""
+    quelle = _datei(tmp_path, inhalt, name=name)
+    for cmd in (["git", "init", "-q"], ["git", "add", name],
+                ["git", "-c", "user.name=Test", "-c", "user.email=t@t",
+                 "commit", "-q", "-m", "erst"]):
+        r = subprocess.run(cmd, cwd=str(tmp_path), capture_output=True)
+        if r.returncode != 0:
+            pytest.skip("git nicht verfuegbar: " + r.stderr.decode("utf-8", "replace"))
+    return quelle
+
+
+def test_git_diff_zeigt_die_aenderungen_der_datei(tmp_path):
+    """Eingecheckt, dann geändert: Strg+Umschalt+D zeigt den Diff. Und die
+    geänderten Zeilen tragen schon vorher eine Marke am Rand -- zwei, nicht
+    vier: `git diff -U0` nennt nur die wirklich geänderten."""
+    quelle = _repo(tmp_path, "PRINT 1\nPRINT 2\nPRINT 3\nPRINT 4\n")
+    quelle.write_text("PRINT 1\nPRINT zwei\nPRINT 3\nPRINT vier\n", encoding="utf-8")
+    log = _ide(tmp_path, quelle, frames=160,
+               events=_taste(50, RL_D, RL_LCTRL, RL_LSHIFT))
+    assert "git rand 2" in log, log
+    diff = [z for z in log if z.startswith("git diff ")]
+    assert diff and int(diff[0].split()[2]) > 5, log
+
+
+def test_git_diff_ohne_aenderung_sagt_es(tmp_path):
+    """Gegenprobe: nichts geändert, also nichts zu zeigen -- und keine
+    Marken am Rand."""
+    quelle = _repo(tmp_path, "PRINT 1\n")
+    log = _ide(tmp_path, quelle, frames=160,
+               events=_taste(50, RL_D, RL_LCTRL, RL_LSHIFT))
+    assert "git diff 0" in log, log
+    assert "git rand 0" in log, log
+
+
+def test_suche_mit_regulaerem_ausdruck_im_projekt(tmp_path):
+    """Erst den Schalter über die Befehlspalette, dann `^SUB` im Projekt:
+    das trifft nur die Zeile, die damit ANFÄNGT. Gegenprobe im selben Text:
+    `    SUB` weiter unten zählt nicht mit."""
+    _datei(tmp_path, "SUB eins()\nEND SUB\n", name="a.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n    SUB zwei()\n    END SUB\n")
+    ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
+    ev += _taste(130, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(170, RL_V, RL_LCTRL) + _taste(200, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=300, events=ev,
+               zwischenablage="Suchen mit regulaerem Ausdruck")
+    # Der zweite Strg+V tippt denselben Text -- deshalb ein eigener Lauf:
+    assert any(z.startswith("palette regex") for z in log), log
+
+
+def test_regulaerer_ausdruck_trifft_nur_den_zeilenanfang(tmp_path):
+    """Mit dem Schalter aus der ide.json: `^SUB` findet die eine Zeile in
+    a.dh, nicht die eingerückte in spiel.dh."""
+    import json
+    _datei(tmp_path, "SUB eins()\nEND SUB\n", name="a.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n    SUB zwei()\n    END SUB\n")
+    (tmp_path / "ide.json").write_text(json.dumps({"regex": True}), encoding="utf-8")
+    ev = _taste(40, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="^SUB")
+    treffer = [z for z in log if z.startswith("suche ")]
+    assert treffer and treffer[-1] == "suche 1", log
+
+
+def test_lesezeichen_springt_ueber_dateien(tmp_path):
+    """Ein Lesezeichen in jeder von zwei Dateien: F2 führt von der einen in
+    die andere. Ein Lesezeichen, das man nur in seiner Datei wiederfindet,
+    wäre eins zu wenig."""
+    zwei = _datei(tmp_path, "PRINT 2\n", name="zwei.dh")
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    # zwei.dh öffnen, dort ein Lesezeichen, zurück auf spiel.dh, dort auch
+    ev = _taste(30, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(120, RL_F2, RL_LCTRL) + _taste(160, RL_F2)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="zwei")
+    spruenge = [z for z in log if z.startswith("lesezeichen sprung ")]
+    assert spruenge, log
+
+
+def test_geschlossenen_reiter_wieder_oeffnen(tmp_path):
+    """Strg+W schließt, Strg+Umschalt+T holt die Datei zurück."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(40, RL_W, RL_LCTRL) + _taste(90, RL_T, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    auf = [z for z in log if z.startswith("wieder auf ")]
+    assert auf and auf[0].endswith("spiel.dh"), log
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert len(geoeffnet) == 2, log
+
+
+def test_faltung_kennt_auch_eingerueckte_bloecke(tmp_path):
+    """Eine FOR-Schleife ist kein Symbol -- CODE_SYMBOLS$ kennt sie nicht.
+    Über die Einrückung lässt sie sich trotzdem falten."""
+    quelle = _datei(tmp_path, "DIM i AS INTEGER\nFOR i = 1 TO 3\n    PRINT i\n    PRINT i\nNEXT\n")
+    # Marke in Zeile 2 (die FOR-Zeile), dann F4
+    ev = _taste(30, RL_DOWN) + _taste(70, RL_F4)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    assert "falte 2 zu" in log, log
