@@ -2873,6 +2873,46 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 4 (2026-09-09, die Handgriffe des Alltags):** gemessen an den
+Menues der Qt-IDE statt an der Liste aus dem Entwurf. Willkommensseite
+(auf der Flaeche der Code-Felder, weg mit dem ersten Reiter), Sitzung und
+Einstellungen in `%APPDATA%\Drachenhauch\ide.json` (`zuletzt`, `sitzung`,
+`aktiv`, `hell`, `schrift`; `DH_IDE_KONFIG` uebersteuert -- **die Tests
+MUESSEN es setzen**, sonst schreibt jeder Lauf dem Nutzer eine fremde
+Sitzung), Zuletzt-geoeffnet als Untermenue mit acht festen Eintraegen
+(ein Menue wird Eintraege nicht wieder los, freie werden gesperrt), Datei
+im Projekt oeffnen (Strg+Umschalt+O; dasselbe Fenster wie die Palette,
+`paletteArt`, unscharfer Filter = Teiltext ODER Zeichen der Reihe nach),
+Zeilen-Handgriffe (Kommentar Strg+K, duplizieren Strg+D, loeschen
+Strg+Umschalt+K, Alt+Hoch/Runter, Alt+Rechts/Links -- Tab gehoert dem Feld),
+Formatieren Umschalt+Alt+F, Lesezeichen Strg+F2/F2, Gliederung links
+unten (aus `CODE_SYMBOLS$`, im Pruef-Takt), bedingte Haltepunkte
+Umschalt+F9 (der Kern konnte `conditions` im set-breakpoints-Kommando
+schon, nur die IDE fragte nie), Export Strg+F6 (`dhrt --export` als
+eigener Prozess, Ziel `<name>_dist/`), Druckdialog (PRINTERS, Kopien,
+PDF-Ausweg), TODO/FIXME (die Projektsuche mit zweitem Suchtext),
+Tastenkuerzel-Uebersicht Strg+F1 (aus der Befehlsliste, die Palette und
+Uebersicht teilen), Schriftgroesse. **Drei Bausteine kamen in dhrt:**
+`GUI_TEXTAREA_SELECTION_RANGE(ta)` -> (z1, s1, z2, s2) -- der markierte
+TEXT sagt nicht, WELCHE Zeilen gemeint sind; die Handgriffe schreiben dann
+ueber SELECT + INSERT, damit jeder ein Undo-Schritt bleibt (GUI_SET_TEXT
+leert den Verlauf); `CODE_FORMAT$(quelltext$[, einruecken])` = der Kern
+von `dhrt fmt` (`formatiere` in main.rs, leer bei Syntaxfehler);
+`GUI_WINDOW_TITLE(win, titel$)`. **Fallen:** `GUI_TEXTAREA_SELECT(ta, z,
+1, z, 1000000)` klemmt ans Zeilenende -- so waehlt man eine ganze Zeile
+ohne ihre Laenge zu kennen; endet eine Auswahl in Spalte 1 der naechsten
+Zeile, gehoert die nicht dazu; `formatiere` liefert ohne Endumbruch, die
+IDE haengt ihn wieder an, sonst gilt jede Datei als "geaendert";
+`build_runtime.py` meldet einen Compile-Fehler mit Exit 0 (das Protokoll
+lesen, nicht den Rueckgabewert). Tests `tests/test_ide.py` (7 neue,
+seriell: Kommentar und Duplizieren ueber die gesicherte Datei, Formatieren,
+bedingter Haltepunkt mit Gegenprobe -- GENAU ein Halt statt fuenf --,
+Export laeuft die erzeugte Exe, Gliederung + Waehler, Sitzung ueber zwei
+Laeufe), `tests/pruef/code_format.dhtest`, Auswahlbereich in
+`tests/test_ide_bausteine.py`. Offen gegen die Qt-IDE: Markdown gerendert,
+Faltung, Minimap, geteilter Editor, Mehrfach-Marken, Schnipsel,
+Signaturhilfe, Umbenennen, Git-Blame, Sitzung je Projekt.
+
 ## Sprachserver `dhrt lsp` + VS-Code-Erweiterung
 
 Externe Editor-Unterstuetzung via **LSP** -- und der Server ist die Runtime

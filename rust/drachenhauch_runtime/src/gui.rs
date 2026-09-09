@@ -2008,6 +2008,12 @@ impl Gui {
     pub fn window_movable(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_MOVABLE")?.movable = f; Ok(())
     }
+    /// GUI_WINDOW_TITLE(win, titel$): die Titelleiste nachtraeglich beschriften
+    /// -- ein Fenster, das den Namen des Dokuments traegt, muss ihn wechseln
+    /// koennen, ohne neu gebaut zu werden.
+    pub fn window_title(&mut self, h: i64, titel: &str) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_TITLE")?.title = titel.to_string(); Ok(())
+    }
     pub fn window_closable(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_CLOSABLE")?.closable = f; Ok(())
     }
@@ -6460,6 +6466,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let wd = self.ta_wdg(h, "GUI_TEXTAREA_CURSOR")?;
         let chars: Vec<char> = wd.text.chars().collect();
         Ok(Self::ta_zeile_spalte(&chars, wd.caret.max(0) as usize))
+    }
+
+    /// GUI_TEXTAREA_SELECTION_RANGE: Anfang und Ende der Auswahl als
+    /// (z1, s1, z2, s2), ab 1, geordnet -- ohne Auswahl steht die Marke an
+    /// beiden Enden. Der Text allein (SELECTION$) reicht einem Editor nicht:
+    /// wer ganze Zeilen einrueckt oder auskommentiert, muss wissen, WELCHE.
+    pub fn textarea_selection_range(&self, h: i64) -> Result<(i64, i64, i64, i64), String> {
+        let wd = self.ta_wdg(h, "GUI_TEXTAREA_SELECTION_RANGE")?;
+        let chars: Vec<char> = wd.text.chars().collect();
+        let n = chars.len() as i32;
+        let (lo, hi) = (wd.caret.clamp(0, n).min(wd.sel_anchor.clamp(0, n)), wd.caret.clamp(0, n).max(wd.sel_anchor.clamp(0, n)));
+        let (z1, s1) = Self::ta_zeile_spalte(&chars, lo as usize);
+        let (z2, s2) = Self::ta_zeile_spalte(&chars, hi as usize);
+        Ok((z1, s1, z2, s2))
     }
 
     /// GUI_TEXTAREA_SELECTION$: der markierte Text (leer ohne Auswahl).

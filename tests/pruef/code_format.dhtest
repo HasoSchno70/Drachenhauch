@@ -1,0 +1,30 @@
+' CODE_FORMAT$ -- derselbe Formatierer wie `dhrt fmt`, als Builtin fuer die
+' IDE in Drachenhauch (Umschalt+Alt+F): Schluesselwoerter gross, Bloecke
+' eingerueckt, Leerraum am Zeilenende weg; leer bei einem Syntaxfehler.
+
+=== schluesselwoerter gross und bloecke eingerueckt
+DIM q AS STRING
+q = "dim x as integer" + CHR$(10) + "x = 3" + CHR$(10) + "if x > 1 then" + CHR$(10) + "print x   " + CHR$(10) + "end if"
+PRINT CODE_FORMAT$(q)
+--- erwartet
+DIM x AS INTEGER
+x = 3
+IF x > 1 THEN
+    PRINT x
+END IF
+
+=== ohne einruecken bleibt die einrueckung wie sie war
+DIM q AS STRING
+q = "if x > 1 then" + CHR$(10) + "print x" + CHR$(10) + "end if"
+PRINT CODE_FORMAT$(q, FALSE)
+--- erwartet
+IF x > 1 THEN
+PRINT x
+END IF
+
+=== syntaxfehler gibt leer zurueck statt am code zu ruecken
+PRINT "[" + CODE_FORMAT$("PRINT " + CHR$(34) + "offen") + "]"
+PRINT "[" + CODE_FORMAT$("") + "]"
+--- erwartet
+[]
+[]

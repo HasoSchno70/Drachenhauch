@@ -1779,6 +1779,12 @@
    "module": "dhrt"
   },
   {
+   "name": "CODE_FORMAT$",
+   "kind": "core",
+   "signature": "CODE_FORMAT$(quelltext$ [, einruecken]) AS STRING",
+   "module": "dhrt"
+  },
+  {
    "name": "CODE_HOVER$",
    "kind": "core",
    "signature": "CODE_HOVER$(quelltext$, zeile, spalte) AS STRING",
@@ -4203,6 +4209,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_SELECTION_RANGE",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_SELECTION_RANGE(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_SET",
    "kind": "core",
    "signature": "GUI_TEXTAREA_SET(ta, schluessel$, wert)",
@@ -4458,6 +4470,12 @@
    "name": "GUI_WINDOW_MOVABLE",
    "kind": "core",
    "signature": "GUI_WINDOW_MOVABLE(win, flag)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_TITLE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_TITLE(win, titel$)",
    "module": "gui"
   },
   {

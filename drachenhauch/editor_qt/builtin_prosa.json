@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1699,
+ "count": 1702,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -292,6 +292,7 @@
   "CODE_CHECK$": "STRING (JSON) die Front-End-Kette wie dhrt --check: eine Liste von {zeile, schwere, meldung} mit schwere = fehler/warnung; basis$ = Ordner für IMPORT \"x.dh\" (Vorgabe: das Arbeitsverzeichnis). Zeilen sind die des Puffers, auch bei Importen",
   "CODE_COMPLETE": "ARRAY OF STRING Vorschläge zum Wortanfang links der Stelle: eigene Symbole, Befehle, Schlüsselwörter, Konstanten",
   "CODE_DEFINITION": "TUPLE (zeile, spalte) wo das Wort definiert ist; (-1, -1) ohne Definition in diesem Text",
+  "CODE_FORMAT$": "STRING — der Quelltext formatiert wie durch dhrt fmt: Schlüsselwörter groß, Leerraum am Zeilenende weg, mit einruecken (Vorgabe TRUE) die Blöcke neu eingerückt; leer, wenn sich die Quelle nicht lesen lässt (Syntaxfehler)",
   "CODE_HOVER$": "STRING — Signatur und Beschreibung zum Wort an der Stelle als Markdown; leer, wenn dort kein Wort steht",
   "CODE_REFERENCES": "ARRAY OF INTEGER die Zeilen aller Vorkommen",
   "CODE_SYMBOLS$": "STRING (JSON) die Gliederung: {name, art, von, bis, kinder} — Klassen mit ihren Methoden",
@@ -680,6 +681,7 @@
   "GUI_TEXTAREA_MARKS": "Marken je Zeile: ein Punkt in der Nummernspalte und ein Farbhauch über der Zeile — Haltepunkte, die angehaltene Zeile, Fehlerzeilen. Ersetzt alle bisherigen, zwei leere Felder löschen; die Marken hängen an der Zeilennummer, nicht am Text",
   "GUI_TEXTAREA_SELECT": "einen Bereich markieren, Marke am Ende",
   "GUI_TEXTAREA_SELECTION$": "der markierte Text",
+  "GUI_TEXTAREA_SELECTION_RANGE": "Anfang und Ende der Auswahl (ab 1, geordnet); ohne Auswahl steht die Marke an beiden Enden — damit weiß ein Editor, WELCHE Zeilen er einrücken oder auskommentieren soll",
   "GUI_TEXTAREA_SET": "Textbereich bricht an Wortgrenzen um (Notizen, Briefe)",
   "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
   "GUI_TEXTAREA_VIEW": "welcher Ausschnitt ist gerade zu sehen?",
@@ -728,6 +730,7 @@
   "GUI_WINDOW_SET_BOUNDS": "Fenster bewegen/skalieren/lesen",
   "GUI_WINDOW_SET_MAX_SIZE": "Maximalgröße beim Resizen (0 = keine)",
   "GUI_WINDOW_SET_MIN_SIZE": "Mindestgröße beim Resizen (0 = keine)",
+  "GUI_WINDOW_TITLE": "Titelleiste nachträglich beschriften (Name des Dokuments, „Befehle\" / „Datei öffnen\")",
   "GUI_WINDOW_VISIBLE": "Sichtbarkeit setzen",
   "GUI_WINDOW_WIDGET": "n-tes lebendes Widget (Enumeration/Serialisierung), oder -1",
   "GUI_WINDOW_WIDGET_COUNT": "Anzahl lebender Widgets",

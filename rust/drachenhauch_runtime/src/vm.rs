@@ -4716,6 +4716,16 @@ impl<'p> Vm<'p> {
                 for (k, l) in zeilen.into_iter().enumerate() { arr.cells.set(k, Value::Int(l)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
+            // CODE_FORMAT$(quelltext$[, einruecken]): derselbe Formatierer wie
+            // `dhrt fmt` -- Schluesselwoerter gross, Leerraum am Zeilenende weg,
+            // mit `einruecken` (Vorgabe TRUE) die Bloecke neu eingerueckt. Leer,
+            // wenn sich die Quelle nicht lexen laesst: an kaputtem Code
+            // herumzuruecken hilft niemandem, und die IDE sagt es dann.
+            "code_format$" | "code_format" => {
+                let text = bi_str(a, 0, "CODE_FORMAT$")?;
+                let einruecken = if a.len() > 1 { a[1].truthy() } else { true };
+                Value::str_rc(&crate::formatiere(text, einruecken, "    ").unwrap_or_default())
+            }
             "code_symbols$" | "code_symbols" => {
                 fn um(v: &serde_json::Value) -> serde_json::Value {
                     serde_json::json!({
@@ -5302,6 +5312,7 @@ impl<'p> Vm<'p> {
                 gs(a,0,"GUI_WINDOW")?, gi(a,1,"GUI_WINDOW")? as i32, gi(a,2,"GUI_WINDOW")? as i32,
                 gi(a,3,"GUI_WINDOW")? as i32, gi(a,4,"GUI_WINDOW")? as i32)),
             "gui_window_movable" => { self.gui.window_movable(gi(a,0,"GUI_WINDOW_MOVABLE")?, gbool(a,1,"GUI_WINDOW_MOVABLE")?)?; Value::Nil }
+            "gui_window_title" => { self.gui.window_title(gi(a,0,"GUI_WINDOW_TITLE")?, &gs(a,1,"GUI_WINDOW_TITLE")?)?; Value::Nil }
             "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_resizable" => { self.gui.window_resizable(gi(a,0,"GUI_WINDOW_RESIZABLE")?, gbool(a,1,"GUI_WINDOW_RESIZABLE")?)?; Value::Nil }
@@ -5939,6 +5950,10 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_selection$" | "gui_textarea_selection" =>
                 Value::str_rc(&self.gui.textarea_selection(gi(a, 0, "GUI_TEXTAREA_SELECTION$")?)?),
+            "gui_textarea_selection_range" => {
+                let (z1, s1, z2, s2) = self.gui.textarea_selection_range(gi(a, 0, "GUI_TEXTAREA_SELECTION_RANGE")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(z1), Value::Int(s1), Value::Int(z2), Value::Int(s2)]))
+            }
             "gui_textarea_select" => {
                 let g = self.gfx.as_ref().ok_or("GUI_TEXTAREA_SELECT: vor SCREEN aufgerufen")?;
                 self.gui.textarea_select(g, gi(a, 0, "GUI_TEXTAREA_SELECT")?, gi(a, 1, "GUI_TEXTAREA_SELECT")?,

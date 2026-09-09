@@ -175,12 +175,18 @@ def test_textbereich_marke_auswahl_suchen(tmp_path):
                 '(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z ; " " ; s\n'
                 'GUI_TEXTAREA_SELECT(ta, 1, 6, 2, 5)\n'
                 'PRINT GUI_TEXTAREA_SELECTION$(ta)\n'
+                'DIM z2 AS INTEGER\nDIM s2 AS INTEGER\n'
+                '(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2\n'
+                'GUI_TEXTAREA_SELECT(ta, 2, 5, 1, 6)\n'                        # rueckwaerts markiert: geordnet
+                '(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2\n'
+                'GUI_TEXTAREA_GOTO(ta, 3, 2)\n'                                 # ohne Auswahl: die Marke an beiden Enden
+                '(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2\n'
                 '(z, s) = GUI_TEXTAREA_FIND(ta, "zwei") : PRINT z ; " " ; s\n'
                 '(z, s) = GUI_TEXTAREA_FIND(ta, "zwei", 1, 7) : PRINT z ; " " ; s\n'    # ab hinter dem ersten
                 '(z, s) = GUI_TEXTAREA_FIND(ta, "zwei", 1, 7, TRUE) : PRINT z ; " " ; s\n'  # genau: Zwei zaehlt nicht
                 '(z, s) = GUI_TEXTAREA_FIND(ta, "nix") : PRINT z\n'
                 'WHILE NOT QUITREQUESTED() : GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP() : WEND\n')
-    assert out == ["3 6", "2 3", "3 6", "zwei", "drei", "1 6", "2 6", "-1 -1", "-1"], out
+    assert out == ["3 6", "2 3", "3 6", "zwei", "drei", "1 6 2 5", "1 6 2 5", "3 2 3 2", "1 6", "2 6", "-1 -1", "-1"], out
 
 
 def test_textbereich_einfuegen_ist_ein_undo_schritt(tmp_path):

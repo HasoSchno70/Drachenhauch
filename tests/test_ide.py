@@ -37,7 +37,8 @@ KEY_UP, KEY_DOWN = 1, 2
 RL_F5, RL_F7, RL_F8, RL_F9, RL_F10 = 294, 296, 297, 298, 299
 RL_ENTER, RL_DOWN, RL_LSHIFT, RL_LCTRL = 257, 264, 340, 341
 RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
-RL_F1 = 290
+RL_D, RL_K, RL_O, RL_S = 68, 75, 79, 83
+RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
@@ -66,8 +67,10 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None):
         quelle.write_text(text, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(quelle), "--", str(datei)], capture_output=True,
                        text=True, encoding="utf-8", errors="replace", timeout=180,
+                       # DH_IDE_KONFIG: die Sitzung des Tests bleibt im Testordner --
+                       # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
-                                DH_IDE_WURZEL=str(_ROOT)),
+                                DH_IDE_WURZEL=str(_ROOT), DH_IDE_KONFIG=str(tmp_path / "ide.json")),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -222,3 +225,98 @@ def test_ausdruck_im_angehaltenen_debugger(tmp_path):
     log = _ide(tmp_path, tmp_path / "spiel.dh", frames=260, events=ev, zwischenablage="2 * 21")
     assert "debug pause 1" in log, log
     assert "eval 42" in log, log
+
+
+# ---------------------------------------------------------------- Stufe 4
+
+def _datei(tmp_path, text, name="spiel.dh"):
+    p = tmp_path / name
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_kommentar_umschalten_schreibt_die_zeile_um(tmp_path):
+    """Strg+K vor `PRINT 1` (Marke steht nach dem Oeffnen in 1,1), Strg+S --
+    die Datei hat die Zeile auskommentiert, die zweite nicht."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n")
+    ev = _taste(20, RL_K, RL_LCTRL) + _taste(50, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=120, events=ev)
+    assert "kommentar 1-1" in log, log
+    assert quelle.read_text(encoding="utf-8") == "' PRINT 1\nPRINT 2\n"
+
+
+def test_zeile_duplizieren_und_lesezeichen(tmp_path):
+    """Strg+D verdoppelt die Zeile der Marke. Strg+F2 setzt ein Lesezeichen in
+    Zeile 2 (dort steht die Marke nach dem Duplizieren), F2 springt vom
+    Anfang aus dorthin."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n")
+    ev = _taste(20, RL_D, RL_LCTRL) + _taste(40, RL_F2, RL_LCTRL) + _taste(60, RL_UP) + _taste(80, RL_F2)
+    ev += _taste(100, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    assert "dupliziert 1-1" in log, log
+    assert "lesezeichen 2 an" in log and "lesezeichen sprung 2" in log, log
+    assert quelle.read_text(encoding="utf-8") == "PRINT 1\nPRINT 1\nPRINT 2\n"
+
+
+def test_formatieren_ueber_code_format(tmp_path):
+    """Umschalt+Alt+F: Schluesselwoerter gross, der IF-Block eingerueckt --
+    derselbe Formatierer wie `dhrt fmt`, ueber CODE_FORMAT$ ohne Prozess."""
+    quelle = _datei(tmp_path, "print 1\nif 1 = 1 then\nprint 2\nend if\n")
+    ev = _taste(20, RL_F, RL_LSHIFT, RL_LALT) + _taste(50, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=120, events=ev)
+    assert "formatiert" in log, log
+    assert quelle.read_text(encoding="utf-8") == "PRINT 1\nIF 1 = 1 THEN\n    PRINT 2\nEND IF\n"
+
+
+def test_bedingter_haltepunkt_haelt_nur_wenn_die_bedingung_gilt(tmp_path):
+    """Zweimal Pfeil runter (Zeile 3, `PRINT i`), Umschalt+F9 fragt nach der
+    Bedingung, Strg+V tippt `i = 3`, Enter. F7: der Debugger haelt GENAU
+    einmal in Zeile 3 -- ohne Bedingung hielte er fuenfmal -- und F8 laesst
+    ihn zu Ende laufen, ohne weiteren Halt."""
+    quelle = _datei(tmp_path, "DIM i AS INTEGER\nFOR i = 1 TO 5\nPRINT i\nNEXT\n")
+    ev = _taste(20, RL_DOWN) + _taste(26, RL_DOWN) + _taste(40, RL_F9, RL_LSHIFT)
+    ev += _taste(70, RL_V, RL_LCTRL) + _taste(90, RL_ENTER) + _taste(110, RL_F7) + _taste(260, RL_F8)
+    log = _ide(tmp_path, quelle, frames=420, events=ev, zwischenablage="i = 3")
+    assert "haltepunkt 3 bedingt i = 3" in log, log
+    pausen = [z for z in log if z.startswith("debug pause ")]
+    assert pausen == ["debug pause 3"], log
+    assert "debug beendet" in log, log
+
+
+def test_export_schreibt_ein_eigenstaendiges_programm(tmp_path):
+    """Strg+F6 ruft `dhrt --export`; danach liegt spiel_dist/spiel.exe neben
+    der Quelle, und die Exe laeuft ohne dhrt."""
+    quelle = _datei(tmp_path, 'PRINT "exportiert"\n')
+    log = _ide(tmp_path, quelle, frames=420, events=_taste(20, RL_F6, RL_LCTRL))
+    fertig = [z for z in log if z.startswith("exportiert ")]
+    assert fertig and fertig[0].split()[1] == "0", log
+    exe = tmp_path / "spiel_dist" / ("spiel.exe" if os.name == "nt" else "spiel")
+    assert exe.exists(), sorted(p.name for p in tmp_path.iterdir())
+    r = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60, cwd=str(tmp_path))
+    assert r.stdout.strip() == "exportiert", (r.stdout, r.stderr)
+
+
+def test_gliederung_und_datei_im_projekt_oeffnen(tmp_path):
+    """Die Gliederung zaehlt die SUB der aktiven Datei. Strg+Umschalt+O
+    oeffnet den Waehler, Strg+V tippt einen Teil des Namens, Enter oeffnet
+    die zweite Datei des Projekts."""
+    _datei(tmp_path, "PRINT 2\n", name="anders.dh")
+    quelle = _datei(tmp_path, "SUB foo()\nEND SUB\nfoo()\n")
+    ev = _taste(60, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(90, RL_V, RL_LCTRL) + _taste(110, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="andrs")
+    assert "gliederung 1" in log, log
+    assert any(z.startswith("schnell ") and z.endswith("anders.dh") for z in log), log
+    assert any(z.startswith("geoeffnet ") and z.endswith("anders.dh") for z in log), log
+
+
+def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
+    """Der erste Lauf merkt sich die Datei (zuletzt + Sitzung) in der
+    ide.json; der zweite Lauf ohne gueltige Datei stellt sie wieder her."""
+    import json
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    _ide(tmp_path, quelle, frames=60)
+    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    assert konfig["zuletzt"] and konfig["zuletzt"][0].endswith("spiel.dh"), konfig
+    assert konfig["sitzung"] and konfig["sitzung"][0].endswith("spiel.dh"), konfig
+    log = _ide(tmp_path, tmp_path / "gibt_es_nicht.dh", frames=60)
+    assert any(z.startswith("geoeffnet ") and z.endswith("spiel.dh") for z in log), log
