@@ -42,9 +42,11 @@ RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
 RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
 RL_L = 76
 RL_RIGHT, RL_END = 262, 269
+RL_SPACE, RL_LEFT = 32, 263
 
 
-def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None):
+def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
+         screenshot=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
     log = tmp_path / "ide.log"
     quelle = IDE
@@ -74,7 +76,8 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
                                 DH_IDE_WURZEL=str(_ROOT),
-                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json")),
+                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json"),
+                                **({"DHRT_SCREENSHOT": str(screenshot)} if screenshot else {})),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
@@ -535,3 +538,60 @@ def test_neue_zeile_uebernimmt_die_einrueckung_und_rueckt_ein(tmp_path):
     log = _ide(tmp_path, quelle, frames=180, events=ev, zwischenablage="END")
     assert quelle.read_text(encoding="utf-8") == "SUB a()\nEND\n", (
         repr(quelle.read_text(encoding="utf-8")), log)
+
+
+def test_vervollstaendigung_geht_beim_tippen_von_selbst_auf(tmp_path):
+    """Drei Zeichen über die Zwischenablage getippt (`SCR`), und die Liste
+    steht -- ohne dass der Fokus das Code-Feld verlässt. Strg+Leer holt sie
+    dann herein, Enter übernimmt."""
+    quelle = _datei(tmp_path, "")
+    ev = _taste(30, RL_V, RL_LCTRL) + _taste(80, RL_SPACE, RL_LCTRL)
+    ev += _taste(120, RL_ENTER) + _taste(150, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="SCR")
+    assert any(z.startswith("vervollstaendigt SCREEN") for z in log), log
+    assert quelle.read_text(encoding="utf-8").startswith("SCREEN"), (
+        repr(quelle.read_text(encoding="utf-8")), log)
+
+
+def test_das_wort_unter_der_marke_wird_ueberall_hervorgehoben(tmp_path):
+    """Am Bild geprüft: mit der Marke auf `punkte` tragen ALLE fünf Stellen
+    die Fundstellenfarbe. Gegenprobe im selben Bild -- `mehr` daneben nicht."""
+    quelle = _datei(tmp_path, "DIM punkte AS INTEGER\npunkte = 0\n"
+                              "SUB zaehlen(mehr AS INTEGER)\n"
+                              "    punkte = punkte + mehr\nEND SUB\n")
+    schuss = tmp_path / "bild.png"
+    # Bis in das Wort hinein: hinter dem Zeilenende steht nur die 0.
+    ev = _taste(30, RL_DOWN) + _taste(50, RL_END)
+    for k in range(5):
+        ev += _taste(70 + k * 6, RL_LEFT)
+    _ide(tmp_path, quelle, frames=160, events=ev, screenshot=schuss)
+    from PIL import Image
+    im = Image.open(schuss).convert("RGB")
+    # F_FUNDSTELLE = &HFFD070 -- warmes Gelb, im Bild sonst nirgends.
+    treffer = [(x, y) for y in range(60, 260) for x in range(220, 1200)
+               if _nahe(im.getpixel((x, y)), (0xFF, 0xD0, 0x70), 40)]
+    assert treffer, "keine Fundstellenfarbe im Bild"
+    # `punkte` steht in den Zeilen 1, 2 und 4 -- drei Baender.
+    baender = _gruppen(sorted({y for _, y in treffer}), 3)
+    assert len(baender) == 3, (len(baender), sorted({y for _, y in treffer})[:20])
+    # Und in Zeile 4 (`punkte = punkte + mehr`) zweimal, `mehr` NICHT --
+    # das ist die Gegenprobe: sonst waeren es drei Woerter.
+    letzte = set(baender[-1])
+    woerter = _gruppen(sorted({x for x, y in treffer if y in letzte}), 6)
+    assert len(woerter) == 2, [len(w) and (w[0], w[-1]) for w in woerter]
+
+
+def _nahe(a, b, tol):
+    return all(abs(x - y) <= tol for x, y in zip(a, b))
+
+
+def _gruppen(werte, luecke):
+    """Zusammenhaengende Laeufe: alles, was weiter als `luecke` auseinander
+    liegt, faengt eine neue Gruppe an."""
+    aus = []
+    for v in werte:
+        if not aus or v - aus[-1][-1] > luecke:
+            aus.append([v])
+        else:
+            aus[-1].append(v)
+    return aus

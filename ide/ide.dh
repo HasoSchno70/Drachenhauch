@@ -57,6 +57,8 @@ CONST F_TEXT       = &HE0A060
 CONST F_ZAHL       = &HD07070
 CONST F_SCHLUESSEL = &H2BC4E8
 CONST F_OPERATOR   = &H9AA8B8
+CONST F_FUNDSTELLE = &HFFD070      ' das Wort unter der Marke, ueberall
+CONST F_KLAMMER    = &H70FFA0      ' das zusammengehoerende Klammernpaar
 
 SCREEN(1280, 800, "Drachenhauch", 1)
 WINDOW_RESIZABLE(TRUE)
@@ -383,6 +385,25 @@ DIM lstVervoll AS GUI_WIDGET : lstVervoll = GUI_LISTBOX(winVervoll, 6, 6, 300, 2
 GUI_WINDOW_VISIBLE(winVervoll, FALSE)
 DIM vervollPraefixLaenge AS INTEGER : vervollPraefixLaenge = 0
 DIM vervollOffen AS BOOLEAN : vervollOffen = FALSE
+' Was beim Tippen von selbst aufgeht: der Wortanfang, zu dem die Liste
+' zuletzt gezeigt wurde, und der, zu dem sie WEGgeschickt wurde (ESC).
+DIM vervollWort AS STRING : vervollWort = ""
+DIM vervollAus AS STRING : vervollAus = "-"
+
+' Der Wortanfang links der Marke -- so viel wird beim Uebernehmen ersetzt.
+FUNCTION wortAnfang$() AS STRING
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN ""
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM a AS INTEGER : a = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    RETURN MID$(zeile, a, s - 1 - a)
+END FUNCTION
 
 ' Debugger: Variablen und die Schritt-Knoepfe rechts unten IM Hauptfenster,
 ' anstelle der Problemliste, solange der Debugger laeuft. Ein eigenes Fenster
@@ -982,6 +1003,47 @@ FUNCTION farbeFuer(art AS STRING) AS INTEGER
     RETURN F_GRUND
 END FUNCTION
 
+' Klammer-Gegenstueck IM AUSSCHNITT suchen -- -1, wenn es keins gibt oder
+' es ausserhalb liegt. Der Ausschnitt reicht: was man nicht sieht, muss
+' auch nicht leuchten.
+FUNCTION klammerPartner(s AS STRING, pos AS INTEGER) AS INTEGER
+    DIM auf AS STRING : auf = "([{"
+    DIM zu AS STRING : zu = ")]}"
+    DIM c AS STRING : c = MID$(s, pos, 1)
+    DIM k AS INTEGER : k = INSTR(auf, c)
+    DIM richtung AS INTEGER : richtung = 1
+    DIM partner AS STRING : partner = ""
+    IF k >= 0 THEN
+        partner = MID$(zu, k, 1)
+    ELSE
+        k = INSTR(zu, c)
+        IF k < 0 THEN RETURN -1
+        partner = MID$(auf, k, 1)
+        richtung = -1
+    END IF
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER : i = pos
+    WHILE i >= 0 AND i < LEN(s)
+        DIM d AS STRING : d = MID$(s, i, 1)
+        IF d = c THEN
+            tiefe = tiefe + 1
+        ELSEIF d = partner THEN
+            tiefe = tiefe - 1
+            IF tiefe = 0 THEN RETURN i
+        END IF
+        i = i + richtung
+    WEND
+    RETURN -1
+END FUNCTION
+
+' Ist das Zeichen an dieser Stelle Teil eines Namens?
+FUNCTION wortzeichenAn(s AS STRING, i AS INTEGER) AS BOOLEAN
+    IF i < 0 OR i >= LEN(s) THEN RETURN FALSE
+    RETURN istWortzeichen(MID$(s, i, 1))
+END FUNCTION
+
+DIM faerbSchluessel AS STRING : faerbSchluessel = ""
+
 SUB faerben(ta AS GUI_WIDGET)
     DIM erste AS INTEGER
     DIM zeilen AS INTEGER
@@ -990,19 +1052,70 @@ SUB faerben(ta AS GUI_WIDGET)
     (erste, zeilen, von, laenge) = GUI_TEXTAREA_VIEW(ta)
     DIM q AS STRING : q = GUI_TEXT(ta)
     DIM stueck AS STRING : stueck = MID$(q, von, laenge)
+    DIM cz AS INTEGER
+    DIM cs AS INTEGER
+    (cz, cs) = GUI_TEXTAREA_CURSOR(ta)
+    ' Hat sich nichts geaendert, ist auch nichts neu zu rechnen. Ohne den
+    ' Riegel liefen Einfaerbung UND Fundstellensuche in jedem Bild, auch
+    ' wenn das Fenster nur dasteht.
+    DIM schl AS STRING : schl = STR$(von) + ":" + STR$(cz) + ":" + STR$(cs) + ":" + stueck
+    IF schl = faerbSchluessel THEN RETURN
+    faerbSchluessel = schl
     DIM starts AS ARRAY OF INTEGER
     DIM laengen AS ARRAY OF INTEGER
     DIM arten AS ARRAY OF STRING
     (starts, laengen, arten) = SYNTAX_SPANS(stueck)
     DIM n AS INTEGER : n = LEN(starts)
     IF n = 0 THEN RETURN
-    DIM farben[n] AS INTEGER
+    DIM s2 AS ARRAY OF INTEGER : s2 = []
+    DIM l2 AS ARRAY OF INTEGER : l2 = []
+    DIM f2 AS ARRAY OF INTEGER : f2 = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
-        starts[i] = starts[i] + von
-        farben[i] = farbeFuer(arten[i])
+        ARRAY_PUSH(s2, starts[i] + von) : ARRAY_PUSH(l2, laengen[i])
+        ARRAY_PUSH(f2, farbeFuer(arten[i]))
     NEXT
-    GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)
+    ' Das Wort unter der Marke ueberall im Ausschnitt. Erst ab zwei
+    ' Zeichen: ein einzelnes `i` faerbte die halbe Datei.
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF LEN(wort) >= 2 THEN
+        DIM klein AS STRING : klein = LOWER$(stueck)
+        DIM kwort AS STRING : kwort = LOWER$(wort)
+        DIM ab AS INTEGER : ab = 0
+        WHILE ab < LEN(klein)
+            DIM p AS INTEGER : p = INSTR(MID$(klein, ab, LEN(klein)), kwort)
+            IF p < 0 THEN BREAK
+            p = ab + p
+            IF NOT wortzeichenAn(stueck, p - 1) AND NOT wortzeichenAn(stueck, p + LEN(wort)) THEN
+                ARRAY_PUSH(s2, p + von) : ARRAY_PUSH(l2, LEN(wort)) : ARRAY_PUSH(f2, F_FUNDSTELLE)
+            END IF
+            ab = p + LEN(wort)
+        WEND
+    END IF
+    ' Das Klammernpaar um die Marke: erst links davon schauen, dann rechts
+    ' -- so wie man es beim Tippen erwartet, wenn man gerade eine Klammer
+    ' geschrieben hat.
+    DIM sz AS ARRAY OF STRING : sz = SPLIT$(stueck, NL)
+    DIM rel AS INTEGER : rel = cz - 1 - erste
+    IF rel >= 0 AND rel < LEN(sz) THEN
+        DIM markePos AS INTEGER : markePos = cs - 1
+        DIM r AS INTEGER
+        FOR r = 0 TO rel - 1
+            markePos = markePos + LEN(sz[r]) + 1
+        NEXT
+        DIM kp AS INTEGER : kp = markePos - 1
+        DIM gegen AS INTEGER : gegen = -1
+        IF kp >= 0 THEN gegen = klammerPartner(stueck, kp)
+        IF gegen < 0 AND markePos < LEN(stueck) THEN
+            kp = markePos
+            gegen = klammerPartner(stueck, kp)
+        END IF
+        IF gegen >= 0 THEN
+            ARRAY_PUSH(s2, kp + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, F_KLAMMER)
+            ARRAY_PUSH(s2, gegen + von) : ARRAY_PUSH(l2, 1) : ARRAY_PUSH(f2, F_KLAMMER)
+        END IF
+    END IF
+    GUI_TEXTAREA_SPANS(ta, s2, l2, f2)
 END SUB
 
 ' --- Pruefen -----------------------------------------------------------
@@ -1456,7 +1569,10 @@ SUB hilfeNachziehen()
 END SUB
 
 ' --- Vervollstaendigen -------------------------------------------------
-SUB vervollstaendigen()
+' `fokus` entscheidet, wer danach die Tasten bekommt. Beim Tippen bleibt
+' die Marke im Code-Feld -- sonst tippte man in die Liste weiter; Strg+Leer
+' holt sie dann herein, wenn man etwas auswaehlen will.
+SUB vervollstaendigen(fokus AS BOOLEAN)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     DIM z AS INTEGER
@@ -1486,13 +1602,36 @@ SUB vervollstaendigen()
     GUI_WINDOW_SET_BOUNDS(winVervoll, breiteLinks + 40, 120, 320, 240)
     GUI_WINDOW_VISIBLE(winVervoll, TRUE)
     vervollOffen = TRUE
-    GUI_FOCUS(lstVervoll)
+    vervollWort = wortAnfang$()
+    IF fokus THEN GUI_FOCUS(lstVervoll)
+END SUB
+
+SUB vervollSchliessen()
+    IF NOT vervollOffen THEN RETURN
+    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
+    vervollOffen = FALSE
+    vervollWort = ""
+END SUB
+
+' Beim Tippen von selbst: ab drei Zeichen zeigt die Liste, was passt. Der
+' Fokus bleibt im Code-Feld -- die Liste ist ein Vorschlag, keine Sperre.
+SUB vervollNachziehen()
+    IF aktiverTab < 0 OR paletteOffen THEN RETURN
+    DIM wort AS STRING : wort = wortAnfang$()
+    IF wort = vervollAus THEN RETURN
+    vervollAus = "-"
+    IF LEN(wort) < 3 THEN
+        vervollSchliessen()
+        RETURN
+    END IF
+    IF wort = vervollWort THEN RETURN
+    IF GUI_FOCUSED() <> aktivesFeld() THEN RETURN
+    vervollstaendigen(FALSE)
 END SUB
 
 SUB vervollUebernehmen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVervoll)
-    GUI_WINDOW_VISIBLE(winVervoll, FALSE)
-    vervollOffen = FALSE
+    vervollSchliessen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
     IF sel >= 0 THEN
@@ -2834,7 +2973,11 @@ SUB befehl(k AS STRING)
         CASE "ersetzen" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
         CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
         CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
-        CASE "vervoll" : vervollstaendigen()
+        CASE "vervoll"
+            ' Steht die Liste schon (weil sie beim Tippen aufging), holt
+            ' Strg+Leer sie nur nach vorn -- ausgewaehlt wird mit den
+            ' Pfeilen und Enter.
+            IF vervollOffen THEN GUI_FOCUS(lstVervoll) ELSE vervollstaendigen(TRUE)
         CASE "definition" : zurDefinition()
         CASE "umbenennen" : umbenennenFragen()
         CASE "schnipsel" : schnipselWaehlen()
@@ -3271,7 +3414,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     ' --- Vervollstaendigung: Enter/Doppelklick uebernimmt, ESC schliesst ---
     IF vervollOffen THEN
         IF GUI_DOUBLE_CLICKED(lstVervoll) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstVervoll) THEN vervollUebernehmen()
-        IF KEYHIT(KEY_ESCAPE) THEN GUI_WINDOW_VISIBLE(winVervoll, FALSE) : vervollOffen = FALSE : GUI_FOCUS(aktivesFeld())
+        IF KEYHIT(KEY_ESCAPE) THEN vervollAus = wortAnfang$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
     END IF
 
     ' --- Baum, Probleme, Eingabe ---
@@ -3291,6 +3434,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         faerben(tf)
         markenNachziehen()
         hilfeNachziehen()
+        vervollNachziehen()
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0
             pruefen()
