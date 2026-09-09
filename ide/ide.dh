@@ -209,6 +209,9 @@ DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
 DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM dlgBedingung AS GUI_WINDOW : dlgBedingung = 0
+DIM dlgUmbenennen AS GUI_WINDOW : dlgUmbenennen = 0
+DIM umbenennZeile AS INTEGER : umbenennZeile = 0
+DIM umbenennSpalte AS INTEGER : umbenennSpalte = 0
 DIM bedingungZeile AS INTEGER : bedingungZeile = 0
 DIM schliessenNachDialog AS BOOLEAN : schliessenNachDialog = FALSE
 
@@ -259,6 +262,8 @@ DIM miProjekt AS INTEGER : miProjekt = GUI_MENU_ITEM(mBearb, "Im Projekt suchen 
 GUI_MENU_SEPARATOR(mBearb)
 DIM miVervoll AS INTEGER : miVervoll = GUI_MENU_ITEM(mBearb, "Vervollstaendigen", "Strg+Leer")
 DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definition", "F12")
+DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen ...", "Umschalt+F6")
+DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfuegen ...", "Strg+J")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
 GUI_MENU_SEPARATOR(mBearb)
 ' Die Handgriffe im Text. Tab/Umschalt+Tab gehoeren dem Feld selbst (Tab
@@ -1122,6 +1127,70 @@ SUB markenNachziehen()
 END SUB
 
 ' --- Hilfe zum Wort unter der Marke ----------------------------------
+' Der Aufruf, in dem die Marke gerade steht: rueckwaerts durch die Zeile,
+' Klammern zaehlen. Liefert (name, spalte_des_namens, argumentnummer);
+' name leer heisst: die Marke steht in keiner Argumentliste.
+FUNCTION aufrufUmDieMarke(zeile AS STRING, spalte AS INTEGER) AS TUPLE
+    ' MID$ zaehlt ab 0, `spalte` ab 1: die Marke steht VOR Zeichen spalte-1.
+    ' Erst zaehlen, wie viele Anfuehrungszeichen links von ihr stehen -- eine
+    ' ungerade Zahl heisst: die Marke steht in einer Zeichenkette, und dort
+    ' ist jede Klammer nur ein Zeichen.
+    DIM q AS INTEGER : q = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO spalte - 2
+        IF MID$(zeile, k, 1) = CHR$(34) THEN q = q + 1
+    NEXT
+    IF q MOD 2 = 1 THEN RETURN ("", 0, 0)
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM arg AS INTEGER : arg = 0
+    DIM inText AS BOOLEAN : inText = FALSE
+    DIM i AS INTEGER : i = spalte - 2
+    WHILE i >= 0
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            inText = NOT inText
+        ELSEIF NOT inText THEN
+            IF c = ")" THEN
+                tiefe = tiefe + 1
+            ELSEIF c = "(" THEN
+                IF tiefe = 0 THEN
+                    ' Gefunden: der Name links davon.
+                    DIM e AS INTEGER : e = i - 1
+                    WHILE e >= 0 AND MID$(zeile, e, 1) = " " : e = e - 1 : WEND
+                    DIM a AS INTEGER : a = e
+                    WHILE a >= 0 AND istWortzeichen(MID$(zeile, a, 1)) : a = a - 1 : WEND
+                    IF e > a THEN RETURN (MID$(zeile, a + 1, e - a), a + 2, arg)
+                    RETURN ("", 0, 0)
+                END IF
+                tiefe = tiefe - 1
+            ELSEIF c = "," AND tiefe = 0 THEN
+                arg = arg + 1
+            END IF
+        END IF
+        i = i - 1
+    WEND
+    RETURN ("", 0, 0)
+END FUNCTION
+
+' Signatur des Aufrufs, in dem die Marke steht -- "" wenn keiner.
+FUNCTION signaturHilfe$(ta AS GUI_WIDGET, z AS INTEGER, s AS INTEGER) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN ""
+    DIM name AS STRING
+    DIM spalte AS INTEGER
+    DIM arg AS INTEGER
+    (name, spalte, arg) = aufrufUmDieMarke(zeilen[z - 1], s)
+    IF name = "" THEN RETURN ""
+    DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, spalte)
+    IF md = "" THEN RETURN ""
+    ' Die erste Zeile im Codeblock ist die Signatur.
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, "```", "")
+    DIM erste AS STRING : erste = TRIM$(SPLIT$(TRIM$(md), NL)[0])
+    IF erste = "" THEN RETURN ""
+    RETURN erste + "   -- Argument " + STR$(arg + 1)
+END FUNCTION
+
 SUB hilfeNachziehen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
@@ -1132,6 +1201,15 @@ SUB hilfeNachziehen()
     IF marke = letzteMarke THEN RETURN
     letzteMarke = marke
     GUI_SET_TEXT(lblStatus, "Zeile " + STR$(z) + ", Spalte " + STR$(s))
+    ' Steht die Marke in einer Argumentliste, gilt die Signatur des Aufrufs:
+    ' dort steht sie auf einem Komma oder einer Zahl, und die Hilfe zum Wort
+    ' schwiege genau dann, wenn man sie braucht.
+    DIM sig AS STRING : sig = signaturHilfe$(ta, z, s)
+    IF sig <> "" THEN
+        GUI_SET_TEXT(lblHilfe, sig)
+        protokoll("signatur " + sig)
+        RETURN
+    END IF
     DIM md AS STRING : md = CODE_HOVER$(GUI_TEXT(ta), z, s)
     ' Die Markdown-Zaeune weglassen -- die Beschriftung zeigt Text.
     md = REPLACE$(md, "```drachenhauch" + NL, "")
@@ -1253,6 +1331,119 @@ FUNCTION zeilenHolen(alle AS ARRAY OF STRING, z1 AS INTEGER, z2 AS INTEGER) AS A
     NEXT
     RETURN block
 END FUNCTION
+
+' --- Umbenennen (Umschalt+F6) ----------------------------------------
+' Das Umbenennen selbst macht CODE_RENAME$: ganze Woerter, ohne Kommentare
+' und Zeichenketten. Die IDE fragt nur den neuen Namen und schreibt das
+' Ergebnis als EINEN Undo-Schritt zurueck (Auswahl ueber alles + INSERT --
+' GUI_SET_TEXT leerte den Verlauf).
+SUB umbenennenFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM alt AS STRING : alt = wortUnterMarke$()
+    IF alt = "" THEN
+        GUI_SET_TEXT(lblStatus, "Umbenennen: unter der Marke steht kein Name.")
+        RETURN
+    END IF
+    (umbenennZeile, umbenennSpalte) = GUI_TEXTAREA_CURSOR(ta)
+    dlgUmbenennen = GUI_PROMPT("Umbenennen", "'" + alt + "' ueberall nennen in:", alt)
+END SUB
+
+SUB umbenennenAusfuehren(neu AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM neuText AS STRING : neuText = CODE_RENAME$(q, umbenennZeile, umbenennSpalte, neu)
+    IF neuText = "" THEN
+        GUI_SET_TEXT(lblStatus, "Umbenennen: '" + neu + "' geht nicht -- ein Name faengt mit Buchstabe oder _ an, und Schluesselwoerter bleiben, wie sie sind.")
+        RETURN
+    END IF
+    IF neuText = q THEN
+        GUI_SET_TEXT(lblStatus, "Umbenennen: nichts zu tun.")
+        RETURN
+    END IF
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM letzte AS INTEGER : letzte = LEN(zeilen)
+    GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+    GUI_TEXTAREA_INSERT(ta, neuText)
+    GUI_TEXTAREA_GOTO(ta, umbenennZeile, umbenennSpalte)
+    GUI_FOCUS(ta)
+    ' Die Zahl der Fundstellen sagt CODE_REFERENCES -- am ALTEN Text, denn
+    ' im neuen heisst der Name schon anders.
+    DIM n AS INTEGER : n = LEN(CODE_REFERENCES(q, umbenennZeile, umbenennSpalte))
+    GUI_SET_TEXT(lblStatus, STR$(n) + " Stellen umbenannt in '" + neu + "'.")
+    protokoll("umbenannt " + STR$(n) + " " + neu)
+END SUB
+
+' --- Schnipsel (Strg+J) -----------------------------------------------
+' Vorlagen mit einem Platzhalter `|` fuer die Schreibmarke. Die Einrueckung
+' der laufenden Zeile wird auf jede weitere Zeile uebernommen -- sonst
+' klebte ein eingefuegter Block am linken Rand.
+DIM schnipselNamen AS ARRAY OF STRING : schnipselNamen = []
+DIM schnipselText AS ARRAY OF STRING : schnipselText = []
+
+SUB schnipsel(name AS STRING, text AS STRING)
+    ARRAY_PUSH(schnipselNamen, name) : ARRAY_PUSH(schnipselText, text)
+END SUB
+
+SUB schnipselEinfuegen(nummer AS INTEGER)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR nummer < 0 OR nummer >= LEN(schnipselText) THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM einzug AS STRING : einzug = ""
+    IF z >= 1 AND z <= LEN(zeilen) THEN
+        ' MID$ zaehlt ab 0 -- Zeichen k ist MID$(s, k, 1).
+        DIM k AS INTEGER : k = 0
+        WHILE k < LEN(zeilen[z - 1]) AND MID$(zeilen[z - 1], k, 1) = " "
+            einzug = einzug + " " : k = k + 1
+        WEND
+    END IF
+    ' Eingerueckt wird Zeile fuer Zeile, LEERE ausgenommen: ein blindes
+    ' REPLACE$ machte aus jeder Leerzeile vier Leerzeichen, und die sieht man
+    ' erst im Diff.
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(schnipselText[nummer], NL)
+    DIM zusammen AS ARRAY OF STRING : zusammen = []
+    DIM ri AS INTEGER
+    FOR ri = 0 TO LEN(roh) - 1
+        IF ri = 0 OR roh[ri] = "" THEN
+            ARRAY_PUSH(zusammen, roh[ri])
+        ELSE
+            ARRAY_PUSH(zusammen, einzug + roh[ri])
+        END IF
+    NEXT
+    DIM text AS STRING : text = JOIN$(zusammen, NL)
+    ' Wohin die Marke danach gehoert: der Platzhalter | wird gezaehlt und
+    ' entfernt. Ohne ihn steht sie am Ende, wie nach jedem Einfuegen.
+    ' INSTR zaehlt ab 0 und liefert -1, wenn es den Platzhalter nicht gibt.
+    DIM marke AS INTEGER : marke = INSTR(text, "|")
+    text = REPLACE$(text, "|", "")
+    GUI_TEXTAREA_INSERT(ta, text)
+    IF marke >= 0 THEN
+        DIM vor AS STRING : vor = LEFT$(text, marke)
+        DIM neueZ AS INTEGER : neueZ = z + LEN(SPLIT$(vor, NL)) - 1
+        DIM letzteZ AS STRING : letzteZ = SPLIT$(vor, NL)[LEN(SPLIT$(vor, NL)) - 1]
+        DIM neueS AS INTEGER : neueS = LEN(letzteZ) + 1
+        IF neueZ = z THEN neueS = s + LEN(letzteZ)
+        GUI_TEXTAREA_GOTO(ta, neueZ, neueS)
+    END IF
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, "Schnipsel: " + schnipselNamen[nummer])
+    protokoll("schnipsel " + schnipselNamen[nummer])
+END SUB
+
+SUB schnipselWaehlen()
+    IF aktivesFeld() < 0 THEN RETURN
+    paletteNamen = []
+    paletteKennungen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(schnipselNamen) - 1
+        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i))
+    NEXT
+    waehlerOeffnen("schnipsel", "Schnipsel einfuegen")
+END SUB
 
 SUB zeilenErsetzen(ta AS GUI_WIDGET, z1 AS INTEGER, z2 AS INTEGER, neu AS ARRAY OF STRING)
     GUI_TEXTAREA_SELECT(ta, z1, 1, z2, SPALTE_ENDE)
@@ -2079,7 +2270,9 @@ SUB paletteAusfuehren()
     IF sel < 0 AND LEN(paletteSichtbar) > 0 THEN sel = 0
     paletteSchliessen()
     IF sel < 0 OR sel >= LEN(paletteSichtbar) THEN RETURN
-    IF paletteArt = "datei" THEN
+    IF paletteArt = "schnipsel" THEN
+        schnipselEinfuegen(INT(VAL(paletteSichtbar[sel])))
+    ELSEIF paletteArt = "datei" THEN
         protokoll("schnell " + paletteSichtbar[sel])
         dateiOeffnen(paletteSichtbar[sel])
     ELSE
@@ -2161,6 +2354,8 @@ SUB befehl(k AS STRING)
         CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
         CASE "vervoll" : vervollstaendigen()
         CASE "definition" : zurDefinition()
+        CASE "umbenennen" : umbenennenFragen()
+        CASE "schnipsel" : schnipselWaehlen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
         CASE "stopp" : stoppen()
@@ -2199,6 +2394,22 @@ SUB befehl(k AS STRING)
             IF prozessArt = "debug" AND debugPause THEN GUI_FOCUS(tfEingabe) ELSE GUI_SET_TEXT(lblStatus, "Der Debugger steht gerade nicht -- erst F7 und ein Halt.")
     END SELECT
 END SUB
+
+' --- Schnipsel: die Geruester, die man staendig tippt -----------------
+' Der senkrechte Strich sagt, wohin die Schreibmarke danach gehoert.
+schnipsel("Spielschleife (SCREEN + Bildschleife)", "SCREEN(800, 600, " + CHR$(34) + "Spiel" + CHR$(34) + ", 1)" + NL + "SETFPS(60)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    CLS(BLACK)" + NL + "    |" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("FOR-Schleife", "DIM i AS INTEGER" + NL + "FOR i = 0 TO |" + NL + NL + "NEXT")
+schnipsel("FOR EACH", "DIM e AS STRING" + NL + "FOR EACH e IN |" + NL + NL + "NEXT")
+schnipsel("WHILE", "WHILE |" + NL + NL + "WEND")
+schnipsel("IF ... ELSE", "IF | THEN" + NL + NL + "ELSE" + NL + NL + "END IF")
+schnipsel("SELECT CASE", "SELECT CASE |" + NL + "    CASE 1" + NL + NL + "    CASE ELSE" + NL + NL + "END SELECT")
+schnipsel("SUB", "SUB |()" + NL + NL + "END SUB")
+schnipsel("FUNCTION", "FUNCTION |() AS INTEGER" + NL + "    RETURN 0" + NL + "END FUNCTION")
+schnipsel("CLASS mit Init", "CLASS |" + NL + "    DIM wert AS INTEGER" + NL + NL + "    SUB Init()" + NL + "        Self.wert = 0" + NL + "    END SUB" + NL + "END CLASS")
+schnipsel("TRY ... CATCH", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "END TRY")
+schnipsel("Datei zeilenweise lesen", "DIM zeilen AS ARRAY OF STRING" + NL + "zeilen = READLINES(|)" + NL + "DIM z AS STRING" + NL + "FOR EACH z IN zeilen" + NL + "    PRINT z" + NL + "NEXT")
+schnipsel("gui-Fenster mit Knopf", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + "Fenster" + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + "Los" + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("Sprite mit Animation", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
 
 ' --- Start -------------------------------------------------------------
 layout()
@@ -2283,6 +2494,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miProjekt) THEN befehl("projekt")
     IF GUI_CLICKED(miVervoll) THEN befehl("vervoll")
     IF GUI_CLICKED(miDefinition) THEN befehl("definition")
+    IF GUI_CLICKED(miUmbenennen) THEN befehl("umbenennen")
+    IF GUI_CLICKED(miSchnipsel) THEN befehl("schnipsel")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")
     IF GUI_CLICKED(miStopp) THEN befehl("stopp")
@@ -2435,6 +2648,16 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             projektSuchen(suchtext, "")
         ELSEIF a5 = 2 THEN
             dlgProjekt = 0
+        END IF
+    END IF
+    IF dlgUmbenennen <> 0 THEN
+        DIM a7 AS INTEGER : a7 = GUI_ANSWER(dlgUmbenennen)
+        IF a7 = 1 THEN
+            DIM neuerName AS STRING : neuerName = TRIM$(GUI_DIALOG_TEXT(dlgUmbenennen))
+            dlgUmbenennen = 0
+            umbenennenAusfuehren(neuerName)
+        ELSEIF a7 = 2 THEN
+            dlgUmbenennen = 0
         END IF
     END IF
     IF dlgBedingung <> 0 THEN

@@ -40,6 +40,7 @@ RL_E, RL_F, RL_P, RL_V, RL_Y = 69, 70, 80, 86, 89
 RL_D, RL_K, RL_O, RL_S = 68, 75, 79, 83
 RL_F1, RL_F2, RL_F6, RL_UP, RL_LALT = 290, 291, 295, 265, 342
 RL_F4, RL_Z, RL_B, RL_J, RL_G = 293, 90, 66, 74, 71
+RL_RIGHT, RL_END = 262, 269
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None):
@@ -379,3 +380,56 @@ def test_sitzung_haengt_am_projektordner(tmp_path):
     geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
     assert geoeffnet and geoeffnet[0].endswith("eins.dh"), log
     assert not any(z.endswith("zwei.dh") for z in geoeffnet), log
+
+
+def test_umbenennen_trifft_die_stellen_und_laesst_text_und_kommentar(tmp_path):
+    """Die Marke steht nach dem Oeffnen in 1,1, also auf `zaehler`.
+    Umschalt+F6, Strg+V tippt den neuen Namen, Enter, Strg+S. Der Kommentar
+    und die Zeichenkette bleiben, wie sie waren -- das ist die Gegenprobe zu
+    einem Suchen-und-Ersetzen."""
+    quelle = _datei(tmp_path, 'zaehler = 1\nzaehler = zaehler + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(100, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="summe")
+    assert any(z.startswith("umbenannt ") and z.endswith(" summe") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == (
+        'summe = 1\nsumme = summe + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
+
+
+def test_umbenennen_lehnt_einen_krummen_namen_ab(tmp_path):
+    """Ein Name faengt nicht mit einer Ziffer an -- die Datei bleibt, wie sie
+    war, statt halb umbenannt zu werden."""
+    quelle = _datei(tmp_path, "zaehler = 1\n")
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(100, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="2krumm")
+    assert not any(z.startswith("umbenannt ") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == "zaehler = 1\n"
+
+
+def test_schnipsel_fuegt_das_geruest_mit_der_einrueckung_ein(tmp_path):
+    """Strg+J oeffnet den Waehler, Strg+V tippt einen Teil des Namens, Enter
+    fuegt ein. Die Marke steht eingerueckt in der Zeile -- deshalb rueckt
+    auch der Schnipsel ein."""
+    quelle = _datei(tmp_path, "IF 1 = 1 THEN\n    \nEND IF\n")
+    ev = _taste(20, RL_DOWN) + _taste(30, RL_END) + _taste(50, RL_J, RL_LCTRL)
+    ev += _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER) + _taste(140, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="while")
+    assert any(z.startswith("schnipsel WHILE") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == "IF 1 = 1 THEN\n    WHILE \n\n    WEND\nEND IF\n"
+
+
+def test_signaturhilfe_zeigt_den_aufruf_mitten_in_der_argumentliste(tmp_path):
+    """Die Marke steht zwischen den Argumenten von SCREEN -- dort steht sie
+    auf einem Komma, und die Hilfe zum Wort schwiege. Gegenprobe: in Zeile 2
+    (ausserhalb jeder Klammer) meldet sie nichts."""
+    quelle = _datei(tmp_path, "SCREEN(800, 600, \"T\", 1)\nPRINT 1\n")
+    # Zeile 1, hinter dem ersten Komma: elfmal nach rechts
+    ev = []
+    for k in range(11):
+        ev += _taste(20 + k * 3, RL_RIGHT)
+    ev += _taste(90, RL_DOWN)
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    sig = [z for z in log if z.startswith("signatur ")]
+    assert sig and "SCREEN(" in sig[0], log
+    assert "Argument" in sig[0], log
