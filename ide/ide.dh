@@ -158,6 +158,8 @@ DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 ' bricht mit "Slot leer" ab, und zwar nur beim ZWEITEN Start (beim ersten
 ' steht der Schluessel noch nicht in der Datei).
 DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
+' Einrueckungslinien im Code-Feld (ein Strich je Stufe).
+DIM linienAn AS BOOLEAN : linienAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
 DIM autoSichern AS INTEGER : autoSichern = 0
 DIM autoFaellig AS FLOAT : autoFaellig = -1.0
@@ -242,6 +244,7 @@ IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
 IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
 IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
+IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
@@ -259,6 +262,11 @@ DIM umbenennZeile AS INTEGER : umbenennZeile = 0
 DIM umbenennSpalte AS INTEGER : umbenennSpalte = 0
 DIM bedingungZeile AS INTEGER : bedingungZeile = 0
 DIM schliessenNachDialog AS BOOLEAN : schliessenNachDialog = FALSE
+' Wohin das Ersetzen geht: "feld" (der vordere Reiter) oder "projekt".
+DIM ersetzenZiel AS STRING : ersetzenZiel = "feld"
+DIM dlgProjErsetze AS GUI_WINDOW : dlgProjErsetze = 0
+DIM dlgAusgabeSuche AS GUI_WINDOW : dlgAusgabeSuche = 0
+DIM ausgabeSuchtext AS STRING : ausgabeSuchtext = ""
 
 SUB protokoll(text AS STRING)
     IF logDatei = "" THEN RETURN
@@ -297,6 +305,7 @@ DIM miDrucken AS INTEGER : miDrucken = GUI_MENU_ITEM(mDatei, "Listing drucken", 
 DIM miPdf AS INTEGER : miPdf = GUI_MENU_ITEM(mDatei, "Listing als PDF neben die Quelle")
 GUI_MENU_SEPARATOR(mDatei)
 DIM miSchliessen AS INTEGER : miSchliessen = GUI_MENU_ITEM(mDatei, "Reiter schliessen", "Strg+W")
+DIM miAndereZu AS INTEGER : miAndereZu = GUI_MENU_ITEM(mDatei, "Andere Reiter schliessen", "Strg+Umschalt+W")
 DIM miWiederauf AS INTEGER : miWiederauf = GUI_MENU_ITEM(mDatei, "Geschlossenen Reiter wieder oeffnen", "Strg+Umschalt+T")
 DIM miBeenden AS INTEGER : miBeenden = GUI_MENU_ITEM(mDatei, "Beenden", "Strg+Q")
 
@@ -312,6 +321,9 @@ DIM miDefinition AS INTEGER : miDefinition = GUI_MENU_ITEM(mBearb, "Zur Definiti
 DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen ...", "Umschalt+F6")
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfuegen ...", "Strg+J")
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
+DIM miMarkeNaechste AS INTEGER : miMarkeNaechste = GUI_MENU_ITEM(mBearb, "Marke auf die naechste Fundstelle", "Strg+Umschalt+N")
+DIM miErsProjekt AS INTEGER : miErsProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt ersetzen ...", "Strg+Umschalt+H")
+DIM miAusgabeSuche AS INTEGER : miAusgabeSuche = GUI_MENU_ITEM(mBearb, "Ausgabe durchsuchen ...", "Strg+Umschalt+A")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
 DIM miPeek AS INTEGER : miPeek = GUI_MENU_ITEM(mBearb, "Definition hier zeigen", "Alt+F12")
 DIM miSymbole AS INTEGER : miSymbole = GUI_MENU_ITEM(mBearb, "Symbol im Projekt suchen ...", "Strg+Umschalt+S")
@@ -382,6 +394,8 @@ DIM miGitRand AS INTEGER : miGitRand = GUI_MENU_ITEM(mAnsicht, "Geaenderte Zeile
 GUI_MENU_CHECK(miGitRand, TRUE)
 DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", "Alt+Z")
 GUI_MENU_CHECK(miUmbruch, FALSE)
+DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrueckungslinien")
+GUI_MENU_CHECK(miLinien, linienAn)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
 DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
 DIM miFaltenAuf AS INTEGER : miFaltenAuf = GUI_MENU_ITEM(mAnsicht, "Alles aufklappen", "Umschalt+F4")
@@ -510,11 +524,12 @@ DIM cbKarte AS GUI_WIDGET : cbKarte = GUI_CHECKBOX(winEinst, "Uebersichtskarte",
 DIM cbGit AS GUI_WIDGET : cbGit = GUI_CHECKBOX(winEinst, "Geaenderte Zeilen am Rand", 16, 104, TRUE)
 DIM cbRegex AS GUI_WIDGET : cbRegex = GUI_CHECKBOX(winEinst, "Suche mit regulaerem Ausdruck", 16, 134, FALSE)
 DIM cbVorschlag AS GUI_WIDGET : cbVorschlag = GUI_CHECKBOX(winEinst, "Vorschlagsliste beim Tippen", 16, 164, TRUE)
-DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgroesse", 16, 200)
-DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 196, 90, 10, 32, 16)
-DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ruhe (0 = nie)", 16, 236)
-DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 232, 90, 0, 120, 0)
-DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schliessen", 16, 300, 120, 30)
+DIM cbLinien AS GUI_WIDGET : cbLinien = GUI_CHECKBOX(winEinst, "Einrueckungslinien", 16, 194, TRUE)
+DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgroesse", 16, 230)
+DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 226, 90, 10, 32, 16)
+DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ruhe (0 = nie)", 16, 266)
+DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 262, 90, 0, 120, 0)
+DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schliessen", 16, 320, 120, 30)
 DIM einstOffen AS BOOLEAN : einstOffen = FALSE
 
 ' --- Eingebaute Befehle nachschlagen ----------------------------------
@@ -615,6 +630,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
     JSON_SET_BOOL(konfig, "regex", regexAn)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
+    JSON_SET_BOOL(konfig, "linien", linienAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
@@ -822,6 +838,7 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
     GUI_TEXTAREA_SET(ta, "tabbreite", 4)
     GUI_TEXTAREA_SET(ta, "umbruch", IIF(umbruchAn, 1, 0))
+    GUI_TEXTAREA_SET(ta, "einzugslinien", IIF(linienAn, 1, 0))
     ' Einrueckung beim Umbruch: die Laufzeit uebernimmt die der laufenden
     ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
     ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
@@ -838,6 +855,20 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
          "CATCH", "FINALLY", "CASE"])
 END SUB
 
+' Einrueckungslinien: ein Strich je Stufe, unter dem Text. Wie der Umbruch
+' fuer ALLE Reiter.
+SUB linienSetzen(an AS BOOLEAN)
+    linienAn = an
+    GUI_MENU_CHECK(miLinien, an)
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        GUI_TEXTAREA_SET(tabFelder[i], "einzugslinien", IIF(an, 1, 0))
+    NEXT
+    GUI_SET_TEXT(lblStatus, IIF(an, "Einrueckungslinien an.", "Einrueckungslinien aus."))
+    protokoll("linien " + IIF(an, "an", "aus"))
+    konfigSichern()
+END SUB
+
 ' Der Umbruch gilt fuer ALLE Reiter, nicht nur den vorderen -- ein Schalter,
 ' der je Datei etwas anderes tut, ist einer, den man vergisst.
 SUB umbruchSetzen(an AS BOOLEAN)
@@ -852,6 +883,16 @@ SUB umbruchSetzen(an AS BOOLEAN)
 END SUB
 
 ' --- Einstellungen ----------------------------------------------------
+' Was im Ueber-Kasten steht. Die Fassung kommt von der LAUFZEIT (VERSION$),
+' nicht aus einem Text im Quelltext -- der stand hier auf "Stand 7", als die
+' IDE laengst weiter war.
+FUNCTION ueberText$() AS STRING
+    RETURN "Drachenhauch-IDE -- geschrieben in Drachenhauch." + NL + _
+           "Laufzeit: dhrt " + VERSION$() + NL + _
+           "Handbuch: " + docsOrdner + NL + _
+           "Beispiele: " + beispielOrdner
+END FUNCTION
+
 SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbHell, hell)
     GUI_SET_CHECKED(cbUmbruch, umbruchAn)
@@ -859,6 +900,7 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbGit, gitRandAn)
     GUI_SET_CHECKED(cbRegex, regexAn)
     GUI_SET_CHECKED(cbVorschlag, vorschlagAn)
+    GUI_SET_CHECKED(cbLinien, linienAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
     GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 400)
@@ -882,6 +924,7 @@ SUB einstellungenNachziehen()
         IF NOT vorschlagAn THEN vervollSchliessen()
         konfigSichern()
     END IF
+    IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
     IF INT(GUI_VALUE(spSchrift)) <> codeGroesse THEN schriftSetzen(INT(GUI_VALUE(spSchrift)))
     IF INT(GUI_VALUE(spAuto)) <> autoSichern THEN
         autoSichern = INT(GUI_VALUE(spAuto))
@@ -1189,6 +1232,15 @@ FUNCTION dateiLesen(pfad AS STRING) AS STRING
     RETURN JOIN$(zeilen, NL)
 END FUNCTION
 
+' Derselbe Weg, EINE Schreibweise. Von der Kommandozeile kommt er mit
+' Rueckstrichen, aus PATHJOIN mit Schraegstrichen -- verglichen wurde bis
+' hierher wortwoertlich, und dieselbe Datei bekam aus dem Projektbaum einen
+' ZWEITEN Reiter. Gross/klein bleibt, wie es ist: unter Linux sind es zwei
+' verschiedene Dateien.
+FUNCTION wegGleich$(pfad AS STRING) AS STRING
+    RETURN REPLACE$(pfad, CHR$(92), "/")
+END FUNCTION
+
 SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     IF tabAnzahl >= MAX_TABS THEN
         GUI_SET_TEXT(lblStatus, "Hoechstens " + STR$(MAX_TABS) + " Reiter -- erst einen schliessen.")
@@ -1198,7 +1250,7 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     DIM i AS INTEGER
     IF pfad <> "" THEN
         FOR i = 0 TO tabAnzahl - 1
-            IF tabPfade[i] = pfad THEN
+            IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN
                 aktiverTab = i
                 reiterNeuSetzen()
                 GUI_FOCUS(tabFelder[i])
@@ -1267,6 +1319,23 @@ FUNCTION sichern(i AS INTEGER, alsNeu AS BOOLEAN) AS BOOLEAN
     END IF
     RETURN TRUE
 END FUNCTION
+
+' Alle Reiter ausser dem vorderen zumachen. Von HINTEN nach vorn, damit die
+' Nummern der noch offenen gueltig bleiben -- tabSchliessen rueckt sie auf.
+SUB andereSchliessen()
+    IF aktiverTab < 0 THEN RETURN
+    DIM behalten AS GUI_WIDGET : behalten = tabFelder[aktiverTab]
+    DIM weg AS INTEGER : weg = 0
+    DIM i AS INTEGER
+    FOR i = tabAnzahl - 1 TO 0 STEP -1
+        IF tabFelder[i] <> behalten THEN
+            tabSchliessen(i)
+            weg = weg + 1
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, STR$(weg) + " Reiter geschlossen.")
+    protokoll("andere zu " + STR$(weg))
+END SUB
 
 SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
@@ -1663,7 +1732,7 @@ DIM symSchluessel AS STRING : symSchluessel = "-"
 FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
-        IF tabPfade[i] = pfad THEN RETURN i
+        IF wegGleich$(tabPfade[i]) = wegGleich$(pfad) THEN RETURN i
     NEXT
     RETURN -1
 END FUNCTION
@@ -2547,6 +2616,170 @@ END FUNCTION
 ' raeumt sie weg. Hier kommt der Griff dazu, den man wirklich braucht: eine
 ' Marke auf JEDE Stelle, an der das Wort unter der Marke steht -- danach
 ' aendert ein Tippen sie alle auf einmal.
+' --- Die Ausgabe durchsuchen ------------------------------------------
+' Ein laufendes Programm schreibt hunderte Zeilen; die eine, die man sucht,
+' findet man sonst nur durch Scrollen. Gesucht wird AB der gewaehlten Zeile
+' weiter -- derselbe Aufruf noch einmal ist "weitersuchen".
+SUB ausgabeSuchen(ab AS INTEGER)
+    DIM n AS INTEGER : n = GUI_LISTBOX_COUNT(lstAusgabe)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Die Ausgabe ist leer.")
+        RETURN
+    END IF
+    DIM klein AS STRING : klein = LOWER$(ausgabeSuchtext)
+    DIM i AS INTEGER
+    FOR i = MAX(0, ab) TO n - 1
+        IF INSTR(LOWER$(GUI_LISTBOX_ITEM(lstAusgabe, i)), klein) >= 0 THEN
+            GUI_LISTBOX_SET_SELECTED(lstAusgabe, i)
+            GUI_SET_TEXT(lblStatus, "Ausgabe, Zeile " + STR$(i + 1) + ": " + GUI_LISTBOX_ITEM(lstAusgabe, i))
+            protokoll("ausgabe treffer " + STR$(i + 1))
+            RETURN
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblStatus, "Nicht in der Ausgabe: " + ausgabeSuchtext + " (ab Zeile " + STR$(MAX(0, ab) + 1) + ")")
+    protokoll("ausgabe treffer 0")
+END SUB
+
+' --- Eine Marke auf die NAECHSTE Fundstelle ---------------------------
+' Strg+Umschalt+L setzt sie auf alle auf einmal. Schrittweise ist das
+' andere, oft bessere Werkzeug: man sieht jede Stelle, bevor sie dazukommt.
+DIM mcWort AS STRING : mcWort = ""
+DIM mcZeile AS INTEGER : mcZeile = 0
+DIM mcSpalte AS INTEGER : mcSpalte = 0
+
+' Die naechste Fundstelle ab (vonZ, vonS) als (zeile, spalte), sonst (-1, -1).
+' GANZE Woerter: GUI_TEXTAREA_FIND sucht Teiltexte, und aus `hp` waere sonst
+' auch das in `hpmax` eine Marke.
+FUNCTION naechsteFundstelle(ta AS GUI_WIDGET, wort AS STRING, vonZ AS INTEGER, vonS AS INTEGER) AS TUPLE
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, vonZ, vonS, TRUE)
+    WHILE tz >= 1 AND tz <= LEN(zeilen)
+        DIM zl AS STRING : zl = zeilen[tz - 1]
+        DIM davor AS BOOLEAN : davor = ts > 1 AND istWortzeichen(MID$(zl, ts - 2, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, ts - 1 + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN RETURN (tz, ts)
+        (tz, ts) = GUI_TEXTAREA_FIND(ta, wort, tz, ts + 1, TRUE)
+    WEND
+    RETURN (-1, -1)
+END FUNCTION
+
+SUB markeNaechste()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM wort AS STRING : wort = wortUnterMarke$()
+    IF wort = "" THEN
+        GUI_SET_TEXT(lblStatus, "Unter der Marke steht kein Wort.")
+        RETURN
+    END IF
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    ' Ein anderes Wort faengt von vorn an -- sonst suchte man mitten in der
+    ' Datei weiter nach etwas, das man gerade erst angeklickt hat. Die
+    ' fuehrende Marke rueckt dabei an den ANFANG des Wortes: von dort sucht
+    ' die naechste Runde weiter, und jede Marke steht an derselben Stelle
+    ' ihres Wortes.
+    IF wort <> mcWort THEN
+        mcWort = wort
+        GUI_TEXTAREA_CLEAR_CARETS(ta)
+        DIM anf AS INTEGER : anf = wortSpalte(ta)
+        IF anf > 0 THEN
+            GUI_TEXTAREA_GOTO(ta, z, anf)
+            s = anf
+        END IF
+        mcZeile = z
+        mcSpalte = s
+    END IF
+    DIM vorher AS INTEGER : vorher = GUI_TEXTAREA_CARETS(ta)
+    DIM tz AS INTEGER
+    DIM ts AS INTEGER
+    (tz, ts) = naechsteFundstelle(ta, wort, mcZeile, mcSpalte + 1)
+    ' Nichts mehr dahinter: von vorn.
+    IF tz < 0 THEN (tz, ts) = naechsteFundstelle(ta, wort, 1, 1)
+    IF tz < 0 THEN
+        GUI_SET_TEXT(lblStatus, "'" + wort + "' steht nur an dieser einen Stelle.")
+        mcWort = ""
+        protokoll("marke naechste 0")
+        RETURN
+    END IF
+    mcZeile = tz
+    mcSpalte = ts
+    GUI_TEXTAREA_ADD_CARET(ta, tz, ts)
+    DIM jetzt AS INTEGER : jetzt = GUI_TEXTAREA_CARETS(ta)
+    ' Dieselbe Stelle noch einmal ist keine neue Marke -- dann sind alle
+    ' Fundstellen schon markiert, und das sagen wir, statt stumm zu kreisen.
+    IF jetzt = vorher THEN
+        GUI_SET_TEXT(lblStatus, "Jede Fundstelle von '" + wort + "' hat eine Marke (" + STR$(jetzt) + ").")
+    ELSE
+        GUI_SET_TEXT(lblStatus, STR$(jetzt) + " Marken auf '" + wort + "'.")
+    END IF
+    protokoll("marke naechste " + STR$(jetzt))
+END SUB
+
+' --- Ersetzen im ganzen Projekt ---------------------------------------
+' Wortwoertlich, oder mit regulaerem Ausdruck, wenn der Schalter an ist --
+' dieselbe Wahl wie bei der Suche. Gearbeitet wird auf den DATEIEN; ein
+' Reiter mit ungesicherten Aenderungen bricht ab, statt sie zu ueberschreiben.
+FUNCTION projektErsetzenZaehlen(gesucht AS STRING) AS TUPLE
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM stellen AS INTEGER : stellen = 0
+    DIM wieViele AS INTEGER : wieViele = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(PATHJOIN(projektOrdner, d))
+        DIM hier AS INTEGER : hier = 0
+        DIM z AS STRING
+        FOR EACH z IN zeilen
+            IF passtSuche(z, gesucht) THEN hier = hier + 1
+        NEXT
+        IF hier > 0 THEN
+            stellen = stellen + hier
+            wieViele = wieViele + 1
+        END IF
+    NEXT
+    RETURN (stellen, wieViele)
+END FUNCTION
+
+FUNCTION projektUngesichert() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] <> "" AND GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB projektErsetzenAusfuehren()
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM geaendert AS INTEGER : geaendert = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
+        DIM neu AS STRING
+        IF regexAn THEN
+            neu = REGEX_REPLACE(alt, suchtext, ersatztext)
+        ELSE
+            neu = REPLACE$(alt, suchtext, ersatztext)
+        END IF
+        IF neu = alt THEN CONTINUE
+        WRITEALL(pfad, neu + NL)
+        geaendert = geaendert + 1
+        ' Offene Reiter zeigen sonst den alten Text und schrieben ihn beim
+        ' naechsten Sichern zurueck.
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        IF t >= 0 THEN
+            GUI_SET_TEXT(tabFelder[t], neu)
+            tabGesichert[t] = neu
+            tabLetzterText[t] = ""
+        END IF
+    NEXT
+    reiterNeuSetzen()
+    GUI_SET_TEXT(lblStatus, "Ersetzt in " + STR$(geaendert) + " Datei(en).")
+    protokoll("projekt ersetzt " + STR$(geaendert))
+END SUB
+
 SUB markenAufFundstellen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
@@ -3191,6 +3424,19 @@ FUNCTION wortUnterMarke$() AS STRING
     RETURN MID$(zeile, a, e - a)
 END FUNCTION
 
+FUNCTION wortSpalte(ta AS GUI_WIDGET) AS INTEGER
+    IF ta < 0 THEN RETURN 0
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN 0
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM a AS INTEGER : a = s - 1
+    WHILE a > 0 AND istWortzeichen(MID$(zeile, a - 1, 1)) : a = a - 1 : WEND
+    RETURN a + 1
+END FUNCTION
+
 FUNCTION istWortzeichen(c AS STRING) AS BOOLEAN
     IF c = "" THEN RETURN FALSE
     RETURN c = "_" OR c = "$" OR (c >= "a" AND c <= "z") OR (c >= "A" AND c <= "Z") OR (c >= "0" AND c <= "9")
@@ -3659,6 +3905,11 @@ paletteEintrag("Einstellungen ...", "einstellungen", "Strg+U")
 paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
 paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
 paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
+paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umschalt+H")
+paletteEintrag("Ausgabe durchsuchen ...", "ausgabe_suchen", "Strg+Umschalt+A")
+paletteEintrag("Marke auf die naechste Fundstelle", "marke_naechste", "Strg+Umschalt+N")
+paletteEintrag("Andere Reiter schliessen", "andere_zu", "Strg+Umschalt+W")
+paletteEintrag("Einrueckungslinien", "linien", "")
 paletteEintrag("Gewaehlte Dateien oeffnen", "baum_oeffnen", "Strg+Umschalt+E")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
@@ -3862,7 +4113,15 @@ SUB befehl(k AS STRING)
         CASE "beenden" : beendenAnfragen()
         CASE "suchen" : dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
         CASE "weiter" : weitersuchen(TRUE)
-        CASE "ersetzen" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
+        CASE "ersetzen" : ersetzenZiel = "feld" : dlgSuche = GUI_PROMPT("Ersetzen", "Wonach suchen?", suchtext) : schliessenNachDialog = TRUE
+        CASE "ersetzen_projekt"
+            ersetzenZiel = "projekt"
+            dlgSuche = GUI_PROMPT("Im ganzen Projekt ersetzen", "Wonach suchen?", suchtext)
+            schliessenNachDialog = TRUE
+        CASE "ausgabe_suchen" : dlgAusgabeSuche = GUI_PROMPT("Ausgabe durchsuchen", "Wonach?", ausgabeSuchtext)
+        CASE "marke_naechste" : markeNaechste()
+        CASE "andere_zu" : andereSchliessen()
+        CASE "linien" : linienSetzen(NOT linienAn)
         CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
         CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
         CASE "vervoll"
@@ -3902,7 +4161,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 7 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", ueberText$(), "ok") : protokoll("ueber " + VERSION$())
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()
@@ -4122,6 +4381,11 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miBefehle) THEN befehl("befehle")
     IF GUI_CLICKED(miPeek) THEN befehl("peek")
     IF GUI_CLICKED(miSymbole) THEN befehl("symbole")
+    IF GUI_CLICKED(miErsProjekt) THEN befehl("ersetzen_projekt")
+    IF GUI_CLICKED(miAusgabeSuche) THEN befehl("ausgabe_suchen")
+    IF GUI_CLICKED(miMarkeNaechste) THEN befehl("marke_naechste")
+    IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
+    IF GUI_CLICKED(miLinien) THEN befehl("linien")
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
@@ -4239,7 +4503,31 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     END IF
     IF dlgErsetze <> 0 THEN
         DIM a2 AS INTEGER : a2 = GUI_ANSWER(dlgErsetze)
-        IF a2 = 1 THEN
+        IF a2 = 1 AND ersetzenZiel = "projekt" THEN
+            ersatztext = GUI_DIALOG_TEXT(dlgErsetze)
+            dlgErsetze = 0
+            ersetzenZiel = "feld"
+            ' Gearbeitet wird auf den DATEIEN. Ein Reiter mit ungesicherten
+            ' Aenderungen wuerde sie beim naechsten Sichern ueberschreiben --
+            ' lieber abbrechen und es sagen.
+            IF projektUngesichert() THEN
+                GUI_SET_TEXT(lblStatus, "Erst sichern: ein Reiter hat ungesicherte Aenderungen.")
+                protokoll("projekt ersetzt -1")
+            ELSE
+                DIM pStellen AS INTEGER
+                DIM pDateien AS INTEGER
+                (pStellen, pDateien) = projektErsetzenZaehlen(suchtext)
+                IF pStellen = 0 THEN
+                    GUI_SET_TEXT(lblStatus, "Nicht im Projekt gefunden: " + suchtext)
+                    protokoll("projekt ersetzt 0")
+                ELSE
+                    dlgProjErsetze = GUI_DIALOG("Im ganzen Projekt ersetzen", _
+                        STR$(pStellen) + " Zeile(n) in " + STR$(pDateien) + " Datei(en) enthalten '" + suchtext + "'." + NL + _
+                        "Durch '" + ersatztext + "' ersetzen? Das laesst sich nur ueber git zuruecknehmen.", _
+                        "Ersetzen|Abbrechen")
+                END IF
+            END IF
+        ELSEIF a2 = 1 THEN
             ersatztext = GUI_DIALOG_TEXT(dlgErsetze)
             dlgErsetze = 0
             DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -4259,7 +4547,32 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             GUI_SET_TEXT(lblStatus, STR$(anzahl) + " mal ersetzt.")
             protokoll("ersetzt " + STR$(anzahl))
         ELSEIF a2 = 2 THEN
-            dlgErsetze = 0
+            dlgErsetze = 0 : ersetzenZiel = "feld"
+        END IF
+    END IF
+    IF dlgProjErsetze <> 0 THEN
+        DIM ap AS INTEGER : ap = GUI_ANSWER(dlgProjErsetze)
+        IF ap = 1 THEN
+            dlgProjErsetze = 0
+            projektErsetzenAusfuehren()
+        ELSEIF ap = 2 THEN
+            dlgProjErsetze = 0
+            GUI_SET_TEXT(lblStatus, "Nichts ersetzt.")
+        END IF
+    END IF
+    IF dlgAusgabeSuche <> 0 THEN
+        DIM aa AS INTEGER : aa = GUI_ANSWER(dlgAusgabeSuche)
+        IF aa = 1 THEN
+            DIM neuerText AS STRING : neuerText = GUI_DIALOG_TEXT(dlgAusgabeSuche)
+            dlgAusgabeSuche = 0
+            ' Derselbe Text noch einmal heisst "weitersuchen" -- ein neuer
+            ' faengt oben an.
+            DIM abZeile AS INTEGER : abZeile = 0
+            IF neuerText = ausgabeSuchtext THEN abZeile = GUI_LISTBOX_SELECTED(lstAusgabe) + 1
+            ausgabeSuchtext = neuerText
+            IF ausgabeSuchtext <> "" THEN ausgabeSuchen(abZeile)
+        ELSEIF aa = 2 THEN
+            dlgAusgabeSuche = 0
         END IF
     END IF
     IF dlgZeile <> 0 THEN

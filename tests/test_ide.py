@@ -901,3 +901,105 @@ def test_beim_sammeln_geht_noch_nichts_auf(tmp_path):
     assert not any(z.startswith("baum offen") for z in log), log
     auf = [z for z in log if z.startswith("geoeffnet ")]
     assert auf and all(z.endswith("a_eins.dh") for z in auf), log
+
+
+# ---------------------------------------------------------------- Stufe 9
+
+RL_A, RL_H, RL_N = 65, 72, 78
+
+
+def test_marke_auf_die_naechste_fundstelle(tmp_path):
+    """Strg+Umschalt+N setzt EINE Marke dazu, nicht gleich alle. Die Suche
+    laeuft um: vom letzten Vorkommen geht es wieder oben weiter."""
+    quelle = _datei(tmp_path, "DIM punkte AS INTEGER\nIF a THEN\n"
+                              "    punkte = punkte + 1\nEND IF\nPRINT punkte\n")
+    ev = []
+    for k in range(4):
+        ev += _taste(25 + k * 6, RL_DOWN)
+    ev += _taste(55, RL_END)
+    ev += _taste(75, RL_N, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(105, RL_N, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=190, events=ev)
+    assert "marke naechste 2" in log, log
+    assert "marke naechste 3" in log, log
+
+
+def test_im_ganzen_projekt_ersetzen(tmp_path):
+    """Strg+Umschalt+H fragt nach Suchtext und Ersatz, zaehlt die Stellen
+    und ersetzt erst nach der Rueckfrage -- in ALLEN Dateien des Ordners."""
+    quelle = _datei(tmp_path, "PRINT hallo\n", "a.dh")
+    zweite = _datei(tmp_path, "PRINT hallo\nPRINT hallo\n", "b.dh")
+    ev = _taste(30, RL_H, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(60, RL_V, RL_LCTRL)     # Suchtext aus der Zwischenablage
+    ev += _taste(80, RL_ENTER)
+    ev += _taste(110, RL_ENTER)          # Ersatz leer: die Stelle faellt weg
+    ev += _taste(140, RL_ENTER)          # Rueckfrage bestaetigen
+    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="hallo")
+    assert "projekt ersetzt 2" in log, log
+    assert quelle.read_text(encoding="utf-8").strip() == "PRINT"
+    assert zweite.read_text(encoding="utf-8").count("hallo") == 0
+
+
+def test_projekt_ersetzen_bricht_bei_ungesichertem_ab(tmp_path):
+    """Die Gegenprobe: gearbeitet wird auf den DATEIEN. Hat ein Reiter
+    ungesicherte Aenderungen, wuerde er sie beim naechsten Sichern
+    ueberschreiben -- also bricht es ab und sagt es."""
+    quelle = _datei(tmp_path, "PRINT hallo\n", "a.dh")
+    ev = _taste(30, RL_V, RL_LCTRL)      # etwas tippen: der Reiter ist schmutzig
+    ev += _taste(60, RL_H, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(90, RL_ENTER)
+    ev += _taste(120, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="hallo")
+    assert "projekt ersetzt -1" in log, log
+    assert "hallo" in quelle.read_text(encoding="utf-8")
+
+
+def test_ausgabe_durchsuchen(tmp_path):
+    """F5 laesst das Programm laufen, Strg+Umschalt+A sucht in seiner
+    Ausgabe -- bei hunderten Zeilen der einzige Weg ohne Scrollen."""
+    quelle = _datei(tmp_path, 'PRINT "eins"\nPRINT "zwei"\nPRINT "nadel"\n')
+    ev = _taste(30, RL_F5)
+    ev += _taste(120, RL_A, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(150, RL_V, RL_LCTRL)
+    ev += _taste(175, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=260, events=ev, zwischenablage="nadel")
+    assert "ausgabe treffer 3" in log, log
+
+
+def test_andere_reiter_schliessen(tmp_path):
+    """Drei Dateien offen, Strg+Umschalt+W -- der vordere bleibt."""
+    for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
+        _datei(tmp_path, "PRINT 1\n", name)
+    quelle = tmp_path / "a_eins.dh"
+    ev = _klick_mit(30, 60, 94)
+    ev += _klick_mit(55, 60, 116, RL_LCTRL)
+    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    ev += _taste(110, RL_E, RL_LCTRL, RL_LSHIFT)   # alle drei oeffnen
+    ev += _taste(150, RL_W, RL_LCTRL, RL_LSHIFT)   # andere zumachen
+    log = _ide(tmp_path, quelle, frames=250, events=ev)
+    assert "baum offen 3" in log, log
+    assert "andere zu 2" in log, log
+
+
+def test_ueber_nennt_die_fassung_der_laufzeit(tmp_path):
+    """Der Kasten stand auf 'Stand 7', als die IDE laengst weiter war.
+    Jetzt fragt er die Laufzeit selbst (VERSION$)."""
+    import re
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(40, RL_P, RL_LCTRL, RL_LSHIFT)   # Befehlspalette
+    ev += _taste(70, RL_V, RL_LCTRL)             # "Ueber" tippen
+    ev += _taste(100, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="Ueber ..")
+    zeilen = [z for z in log if z.startswith("ueber ")]
+    assert zeilen and re.match(r"^ueber \d+\.\d+$", zeilen[0]), log
+
+
+def test_einrueckungslinien_lassen_sich_abschalten(tmp_path):
+    """Der Schalter steht unter Ansicht und in den Einstellungen; hier ueber
+    die Befehlspalette, weil er kein Kuerzel hat."""
+    quelle = _datei(tmp_path, "IF a THEN\n    PRINT 1\nEND IF\n")
+    ev = _taste(40, RL_P, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(100, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="Einrueckungslinien")
+    assert "linien aus" in log, log
