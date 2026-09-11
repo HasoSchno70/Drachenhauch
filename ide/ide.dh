@@ -262,6 +262,8 @@ DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM dlgBedingung AS GUI_WINDOW : dlgBedingung = 0
 DIM dlgUmbenennen AS GUI_WINDOW : dlgUmbenennen = 0
+DIM dlgUmbProjekt AS GUI_WINDOW : dlgUmbProjekt = 0
+DIM umbenennWort AS STRING : umbenennWort = ""
 DIM umbenennZeile AS INTEGER : umbenennZeile = 0
 DIM umbenennSpalte AS INTEGER : umbenennSpalte = 0
 DIM bedingungZeile AS INTEGER : bedingungZeile = 0
@@ -326,6 +328,12 @@ DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen .
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfuegen ...", "Strg+J")
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miMarkeNaechste AS INTEGER : miMarkeNaechste = GUI_MENU_ITEM(mBearb, "Marke auf die naechste Fundstelle", "Strg+Umschalt+N")
+DIM miMarkeEnden AS INTEGER : miMarkeEnden = GUI_MENU_ITEM(mBearb, "Marke an jedes Zeilenende der Auswahl", "Strg+Umschalt+I")
+DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
+DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
+DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
+DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, "Doppelte entfernen")
+DIM miZlRand AS INTEGER : miZlRand = GUI_MENU_ITEM(mZeilenWz, "Leerraum am Zeilenende entfernen")
 DIM miErsProjekt AS INTEGER : miErsProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt ersetzen ...", "Strg+Umschalt+H")
 DIM miAusgabeSuche AS INTEGER : miAusgabeSuche = GUI_MENU_ITEM(mBearb, "Ausgabe durchsuchen ...", "Strg+Umschalt+A")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
@@ -353,6 +361,7 @@ GUI_MENU_CHECK(miRegex, FALSE)
 DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt", "Strg+Umschalt+M")
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
 DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
+DIM miVergleich AS INTEGER : miVergleich = GUI_MENU_ITEM(mBearb, "Mit einer anderen Datei vergleichen ...")
 DIM miVerlauf AS INTEGER : miVerlauf = GUI_MENU_ITEM(mBearb, "Verlauf dieser Datei (git log)")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
@@ -2784,6 +2793,179 @@ SUB projektErsetzenAusfuehren()
     protokoll("projekt ersetzt " + STR$(geaendert))
 END SUB
 
+' --- Marke an jedes Zeilenende der Auswahl ----------------------------
+' Der Griff, mit dem man eine Liste in einem Zug umschreibt: markieren,
+' Strg+Umschalt+I, tippen -- und jede Zeile bekommt dasselbe ans Ende.
+SUB markenAnZeilenenden()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    IF z2 <= z1 THEN
+        GUI_SET_TEXT(lblStatus, "Erst mehrere Zeilen markieren.")
+        protokoll("marken enden 0")
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLEAR_CARETS(ta)
+    GUI_TEXTAREA_GOTO(ta, z1, SPALTE_ENDE)
+    DIM z AS INTEGER
+    FOR z = z1 + 1 TO z2
+        GUI_TEXTAREA_ADD_CARET(ta, z, SPALTE_ENDE)
+    NEXT
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, STR$(GUI_TEXTAREA_CARETS(ta)) + " Marken, je eine am Zeilenende.")
+    protokoll("marken enden " + STR$(GUI_TEXTAREA_CARETS(ta)))
+END SUB
+
+' --- Zeilen-Werkzeuge -------------------------------------------------
+' Sortieren, Doppelte entfernen, Leerraum am Ende weg: auf der Auswahl,
+' und ohne Auswahl auf der ganzen Datei -- eine einzelne Zeile zu
+' sortieren ergibt nichts. Geschrieben wird ueber zeilenErsetzen, damit
+' jeder Griff EIN Undo-Schritt bleibt.
+SUB zeilenWerkzeug(art AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM alle AS ARRAY OF STRING : alle = SPLIT$(GUI_TEXT(ta), NL)
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    IF z1 = z2 THEN
+        z1 = 1
+        z2 = LEN(alle)
+    END IF
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(alle, z1, z2)
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM z AS STRING
+    IF art = "sortieren" THEN
+        FOR EACH z IN block
+            ARRAY_PUSH(raus, z)
+        NEXT
+        SORT(raus)
+    ELSEIF art = "doppelte" THEN
+        DIM gesehen AS MAP OF INTEGER : gesehen = {}
+        FOR EACH z IN block
+            IF NOT MAPHAS(gesehen, z) THEN
+                MAPPUT(gesehen, z, 1)
+                ARRAY_PUSH(raus, z)
+            END IF
+        NEXT
+    ELSE
+        FOR EACH z IN block
+            ARRAY_PUSH(raus, RTRIM$(z))
+        NEXT
+    END IF
+    zeilenErsetzen(ta, z1, z2, raus)
+    GUI_SET_TEXT(lblStatus, STR$(LEN(block)) + " Zeilen -> " + STR$(LEN(raus)) + " (" + art + ").")
+    protokoll("zeilen " + art + " " + STR$(LEN(raus)))
+END SUB
+
+' --- Umbenennen im ganzen Projekt -------------------------------------
+' CODE_RENAME$ arbeitet auf EINEM Text und braucht eine Stelle, an der der
+' Name steht. In einer fremden Datei kennen wir sie nicht -- also werden
+' die Fundstellen der Reihe nach probiert, bis eine den Text wirklich
+' aendert. Eine Stelle in einem Kommentar oder in einer Zeichenkette
+' aendert nichts, und dann kommt eben die naechste dran.
+FUNCTION umbenennenInText$(quelle AS STRING, wort AS STRING, neu AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM versuche AS INTEGER : versuche = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM zl AS STRING : zl = zeilen[i]
+        DIM s AS INTEGER : s = INSTR(zl, wort)
+        WHILE s >= 0 AND versuche < 200
+            DIM davor AS BOOLEAN : davor = s > 0 AND istWortzeichen(MID$(zl, s - 1, 1))
+            DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(zl, s + LEN(wort), 1))
+            IF NOT davor AND NOT danach THEN
+                versuche = versuche + 1
+                DIM ergebnis AS STRING : ergebnis = ""
+                TRY
+                    ergebnis = CODE_RENAME$(quelle, i + 1, s + 1, neu)
+                CATCH e
+                    ergebnis = ""
+                END TRY
+                IF ergebnis <> "" AND ergebnis <> quelle THEN RETURN ergebnis
+            END IF
+            s = INSTR(zl, wort, s + 1)
+        WEND
+    NEXT
+    RETURN quelle
+END FUNCTION
+
+SUB umbenennenImProjekt(neu AS STRING)
+    IF projektUngesichert() THEN
+        GUI_SET_TEXT(lblStatus, "Erst sichern: ein Reiter hat ungesicherte Aenderungen.")
+        protokoll("projekt umbenannt -1")
+        RETURN
+    END IF
+    DIM wort AS STRING : wort = umbenennWort
+    IF wort = "" OR neu = "" OR wort = neu THEN RETURN
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM geaendert AS INTEGER : geaendert = 0
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
+        IF INSTR(alt, wort) < 0 THEN CONTINUE
+        DIM frisch AS STRING : frisch = umbenennenInText$(alt, wort, neu)
+        IF frisch = alt THEN CONTINUE
+        WRITEALL(pfad, frisch + NL)
+        geaendert = geaendert + 1
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        IF t >= 0 THEN
+            GUI_SET_TEXT(tabFelder[t], frisch)
+            tabGesichert[t] = frisch
+            tabLetzterText[t] = ""
+        END IF
+    NEXT
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).")
+    protokoll("projekt umbenannt " + STR$(geaendert))
+END SUB
+
+' --- Zwei Dateien vergleichen -----------------------------------------
+' `git diff --no-index` kann das auch fuer Dateien, die gar nicht in einem
+' Verzeichnis unter Versionsverwaltung liegen. Gezeigt wird es im selben
+' Fenster und mit derselben Faerbung wie git diff.
+SUB dateienVergleichen()
+    IF aktiverTab < 0 OR tabPfade[aktiverTab] = "" THEN
+        GUI_SET_TEXT(lblStatus, "Vergleichen: diese Datei ist noch nicht gesichert.")
+        RETURN
+    END IF
+    ' Steht im Projektbaum eine ANDERE Datei gewaehlt, ist sie gemeint --
+    ' sonst fragt der Datei-Dialog. Ein Dialog, den man jedes Mal bekommt,
+    ' auch wenn die Antwort schon dasteht, ist einer zu viel.
+    DIM anderer AS STRING : anderer = ""
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baum)
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(baumDateien) - 1
+        IF baumKnoten[bi] = sel THEN anderer = PATHJOIN(projektOrdner, baumDateien[bi])
+    NEXT
+    IF anderer <> "" AND wegGleich$(anderer) = wegGleich$(tabPfade[aktiverTab]) THEN anderer = ""
+    IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
+    IF anderer = "" THEN RETURN
+    DIM meiner AS STRING : meiner = tabPfade[aktiverTab]
+    DIM text AS STRING : text = ""
+    TRY
+        text = SHELL_OUT$("git", "diff", "--no-index", "--no-color", "--", meiner, anderer)
+    CATCH e
+        text = ""
+    END TRY
+    IF TRIM$(text) = "" THEN
+        GUI_SET_TEXT(lblStatus, "Kein Unterschied zu " + BASENAME(anderer) + ".")
+        protokoll("vergleich 0")
+        RETURN
+    END IF
+    GUI_SET_TEXT(taGit, text)
+    GUI_WINDOW_TITLE(winGit, BASENAME(meiner) + " gegen " + BASENAME(anderer))
+    GUI_SET_TEXT(lblGit, STR$(LEN(SPLIT$(text, NL))) + " Zeilen")
+    GUI_WINDOW_VISIBLE(winGit, TRUE)
+    GUI_FOCUS(taGit)
+    gitFaerben()
+    protokoll("vergleich " + STR$(LEN(SPLIT$(text, NL))))
+END SUB
+
 SUB markenAufFundstellen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
@@ -3912,6 +4094,12 @@ paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
 paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umschalt+H")
 paletteEintrag("Ausgabe durchsuchen ...", "ausgabe_suchen", "Strg+Umschalt+A")
 paletteEintrag("Marke auf die naechste Fundstelle", "marke_naechste", "Strg+Umschalt+N")
+paletteEintrag("Marke an jedes Zeilenende der Auswahl", "marken_enden", "Strg+Umschalt+I")
+paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
+paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
+paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
+paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
+paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schliessen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrueckungslinien", "linien", "")
 paletteEintrag("Gewaehlte Dateien oeffnen", "baum_oeffnen", "Strg+Umschalt+E")
@@ -4124,6 +4312,19 @@ SUB befehl(k AS STRING)
             schliessenNachDialog = TRUE
         CASE "ausgabe_suchen" : dlgAusgabeSuche = GUI_PROMPT("Ausgabe durchsuchen", "Wonach?", ausgabeSuchtext)
         CASE "marke_naechste" : markeNaechste()
+        CASE "marken_enden" : markenAnZeilenenden()
+        CASE "zl_sortieren" : zeilenWerkzeug("sortieren")
+        CASE "zl_doppelte" : zeilenWerkzeug("doppelte")
+        CASE "zl_rand" : zeilenWerkzeug("rand")
+        CASE "vergleichen" : dateienVergleichen()
+        CASE "umb_projekt"
+            umbenennWort = wortUnterMarke$()
+            IF umbenennWort = "" THEN
+                GUI_SET_TEXT(lblStatus, "Unter der Marke steht kein Wort.")
+            ELSE
+                dlgUmbProjekt = GUI_PROMPT("Im ganzen Projekt umbenennen", _
+                    "'" + umbenennWort + "' ueberall im Projektordner ersetzen durch:", umbenennWort)
+            END IF
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
@@ -4388,6 +4589,12 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miErsProjekt) THEN befehl("ersetzen_projekt")
     IF GUI_CLICKED(miAusgabeSuche) THEN befehl("ausgabe_suchen")
     IF GUI_CLICKED(miMarkeNaechste) THEN befehl("marke_naechste")
+    IF GUI_CLICKED(miMarkeEnden) THEN befehl("marken_enden")
+    IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
+    IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
+    IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")
+    IF GUI_CLICKED(miZlDoppelt) THEN befehl("zl_doppelte")
+    IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
     IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
@@ -4552,6 +4759,16 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             protokoll("ersetzt " + STR$(anzahl))
         ELSEIF a2 = 2 THEN
             dlgErsetze = 0 : ersetzenZiel = "feld"
+        END IF
+    END IF
+    IF dlgUmbProjekt <> 0 THEN
+        DIM au AS INTEGER : au = GUI_ANSWER(dlgUmbProjekt)
+        IF au = 1 THEN
+            DIM neuerName AS STRING : neuerName = TRIM$(GUI_DIALOG_TEXT(dlgUmbProjekt))
+            dlgUmbProjekt = 0
+            umbenennenImProjekt(neuerName)
+        ELSEIF au = 2 THEN
+            dlgUmbProjekt = 0
         END IF
     END IF
     IF dlgProjErsetze <> 0 THEN
