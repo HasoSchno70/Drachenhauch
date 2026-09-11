@@ -1,0 +1,160 @@
+' Mehrfachauswahl im Baum (GUI_TREE_SET "mehrfachauswahl" + SEL_COUNT/
+' SEL_NODE/IS_SELECTED/SELECT/CLEAR_SELECTION) -- dieselben Abfragen wie
+' bei Liste und Tabelle. Format: docs/werkzeuge.md, dhrt test.
+
+=== ohne mehrfachauswahl zaehlt die eine zeile
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+PRINT GUI_TREE_SEL_COUNT(tr)
+GUI_TREE_SET_SELECTED(tr, 1)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_SEL_NODE(tr, 0) ; " " ; GUI_TREE_SEL_NODE(tr, 1)
+PRINT GUI_TREE_IS_SELECTED(tr, 1) ; " " ; GUI_TREE_IS_SELECTED(tr, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0
+1 1 -1
+TRUE FALSE
+
+=== auswaehlen und abfragen ueber die befehle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    GUI_TREE_ADD(tr, -1, "knoten " + STR$(i))
+NEXT
+GUI_TREE_SET(tr, "mehrfachauswahl", 1)
+GUI_TREE_SELECT(tr, 0, TRUE)
+GUI_TREE_SELECT(tr, 2, TRUE)
+GUI_TREE_SELECT(tr, 3, TRUE)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_SEL_NODE(tr, 0) ; " " ; GUI_TREE_SEL_NODE(tr, 1) ; " " ; GUI_TREE_SEL_NODE(tr, 2)
+GUI_TREE_SELECT(tr, 2, FALSE)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_IS_SELECTED(tr, 2)
+GUI_TREE_CLEAR_SELECTION(tr)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_SELECTED(tr)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3 0 2 3
+2 FALSE
+0 -1
+
+=== ein gesetzter knoten ist die ganze auswahl
+' Sonst stuende eine Zeile hervorgehoben da, die keiner Abfrage gehoert.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET(tr, "mehrfachauswahl", 1)
+GUI_TREE_SELECT(tr, 0, TRUE)
+GUI_TREE_SELECT(tr, 1, TRUE)
+GUI_TREE_SET_SELECTED(tr, 1)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_SEL_NODE(tr, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 1
+
+=== beim einschalten zaehlt die bisherige auswahl mit
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET_SELECTED(tr, 1)
+GUI_TREE_SET(tr, "mehrfachauswahl", 1)
+PRINT GUI_TREE_SEL_COUNT(tr) ; " " ; GUI_TREE_SEL_NODE(tr, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 1
+
+=== strg+klick sammelt, umschalt+klick spannt
+' Die Lagen kommen aus einer Zeichenflaeche bei (0,0), wie bei der Liste:
+' eine Baumzeile ist 22 Punkte hoch, die erste beginnt bei y = 54.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+DIM i AS INTEGER
+FOR i = 1 TO 4
+    GUI_TREE_ADD(tr, -1, "knoten " + STR$(i))
+NEXT
+GUI_TREE_SET(tr, "mehrfachauswahl", 1)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 6 OR f = 12 OR f = 19 THEN PRINT STR$(GUI_TREE_SEL_COUNT(tr)) + " " + STR$(GUI_TREE_SEL_NODE(tr, 0)) + " " + STR$(GUI_TREE_SEL_NODE(tr, 1)) + " " + STR$(GUI_TREE_SELECTED(tr))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick auf Knoten 0, Strg+Klick auf 2, Umschalt+Klick auf 3
+c 16
+e 3 7 131 64 0 0 // Maus auf Zeile 0
+e 4 7 131 64 0 0 //
+e 4 6 0 0 0 0 // Taste runter
+e 5 5 0 0 0 0 // Taste hoch
+e 8 7 131 108 0 0 // Maus auf Zeile 2
+e 9 7 131 108 0 0 //
+e 9 2 341 0 0 0 // Strg runter
+e 9 6 0 0 0 0 //
+e 10 5 0 0 0 0 //
+e 11 1 341 0 0 0 // Strg hoch
+e 14 7 131 130 0 0 // Maus auf Zeile 3
+e 15 7 131 130 0 0 //
+e 15 2 340 0 0 0 // Umschalt runter
+e 15 6 0 0 0 0 //
+e 16 5 0 0 0 0 //
+e 17 1 340 0 0 0 // Umschalt hoch
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1 0 -1 0
+2 0 2 2
+2 2 3 3
+
+=== eine unbekannte einstellung sagt, was gilt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+TRY
+    GUI_TREE_SET(tr, "zeilenhoehe", 30)
+CATCH e
+    PRINT e
+END TRY
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 160, 100, 60, SPLIT$("a|b", "|"))
+TRY
+    GUI_TREE_SET(lb, "mehrfachauswahl", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_TREE_SET: unbekannte Einstellung 'zeilenhoehe' (gueltig: mehrfachauswahl)
+GUI_TREE_SET: Widget ist kein Baum

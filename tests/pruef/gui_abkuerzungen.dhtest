@@ -1,0 +1,166 @@
+' Abkuerzungen am Tabulator (GUI_TEXTAREA_ABBREV + ABBREV_HIT). Der
+' Tabulator MELDET das Wort links der Marke, statt einzuruecken -- was an
+' seine Stelle kommt, setzt der Aufrufer. Format: docs/werkzeuge.md, dhrt test.
+
+=== der tabulator meldet die abkuerzung und rueckt nicht ein
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_ABBREV(ta, SPLIT$("for|while|sub", "|"))
+GUI_SET_TEXT(ta, "for")
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM gefunden AS INTEGER : gefunden = -9
+DIM danach AS INTEGER : danach = -9
+DIM t AS INTEGER
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    t = GUI_TEXTAREA_ABBREV_HIT(ta)
+    IF gefunden = -9 THEN
+        IF t >= 0 THEN gefunden = t
+    ELSEIF danach = -9 THEN
+        danach = t
+    END IF
+    IF n = 30 THEN PRINT "treffer " + STR$(gefunden)
+    IF n = 30 THEN PRINT "danach " + STR$(danach)
+    IF n = 30 THEN PRINT "text [" + GUI_TEXT(ta) + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+treffer 0
+danach -1
+text [for]
+
+=== ohne die liste rueckt derselbe tabulator ein
+' Die Gegenprobe: dieselbe Datei, nur ohne GUI_TEXTAREA_ABBREV.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_SET_TEXT(ta, "for")
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "treffer " + STR$(GUI_TEXTAREA_ABBREV_HIT(ta))
+    IF n = 30 THEN PRINT "text [" + GUI_TEXT(ta) + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+treffer -1
+text [for ]
+
+=== ein fremdes wort rueckt ein und meldet nichts
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_ABBREV(ta, SPLIT$("for|while", "|"))
+GUI_SET_TEXT(ta, "xyz")
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM gefunden AS INTEGER : gefunden = -9
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_TEXTAREA_ABBREV_HIT(ta) >= 0 THEN gefunden = GUI_TEXTAREA_ABBREV_HIT(ta)
+    IF n = 30 THEN PRINT "treffer " + STR$(gefunden)
+    IF n = 30 THEN PRINT "text [" + GUI_TEXT(ta) + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+treffer -9
+text [xyz ]
+
+=== gross und klein zaehlen nicht
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_ABBREV(ta, SPLIT$("for|while", "|"))
+GUI_SET_TEXT(ta, "  WHILE")
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM gefunden AS INTEGER : gefunden = -9
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_TEXTAREA_ABBREV_HIT(ta) >= 0 THEN gefunden = GUI_TEXTAREA_ABBREV_HIT(ta)
+    IF n = 30 THEN PRINT "treffer " + STR$(gefunden)
+    IF n = 30 THEN PRINT "text [" + GUI_TEXT(ta) + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+treffer 1
+text [  WHILE]
+
+=== ein anderes widget ist ein fehler im klartext
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 20, 20, 200, 24)
+TRY
+    GUI_TEXTAREA_ABBREV(tf, SPLIT$("for", "|"))
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+GUI_TEXTAREA_ABBREV: das Widget ist kein GUI_TEXTAREA

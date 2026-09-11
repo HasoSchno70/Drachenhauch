@@ -5890,6 +5890,12 @@ impl<'p> Vm<'p> {
             "gui_tree_selected" => Value::Int(self.gui.tree_selected(gi(a,0,"GUI_TREE_SELECTED")?)?),
             "gui_tree_set_selected" => { self.gui.tree_set_selected(gi(a,0,"GUI_TREE_SET_SELECTED")?, gi(a,1,"GUI_TREE_SET_SELECTED")?)?; Value::Nil }
             "gui_tree_label" => Value::str_rc(&self.gui.tree_label(gi(a,0,"GUI_TREE_LABEL")?, gi(a,1,"GUI_TREE_LABEL")?)?),
+            "gui_tree_set" => { self.gui.tree_set(gi(a,0,"GUI_TREE_SET")?, &gs(a,1,"GUI_TREE_SET")?, gnum(a,2,"GUI_TREE_SET")?)?; Value::Nil }
+            "gui_tree_sel_count" => Value::Int(self.gui.tree_sel_count(gi(a,0,"GUI_TREE_SEL_COUNT")?)?),
+            "gui_tree_sel_node" => Value::Int(self.gui.tree_sel_node(gi(a,0,"GUI_TREE_SEL_NODE")?, gi(a,1,"GUI_TREE_SEL_NODE")?)?),
+            "gui_tree_is_selected" => Value::Bool(self.gui.tree_is_selected(gi(a,0,"GUI_TREE_IS_SELECTED")?, gi(a,1,"GUI_TREE_IS_SELECTED")?)?),
+            "gui_tree_select" => { self.gui.tree_select(gi(a,0,"GUI_TREE_SELECT")?, gi(a,1,"GUI_TREE_SELECT")?, gbool(a,2,"GUI_TREE_SELECT")?)?; Value::Nil }
+            "gui_tree_clear_selection" => { self.gui.tree_clear_selection(gi(a,0,"GUI_TREE_CLEAR_SELECTION")?)?; Value::Nil }
             "gui_tree_expand" => { self.gui.tree_expand(gi(a,0,"GUI_TREE_EXPAND")?, gi(a,1,"GUI_TREE_EXPAND")?, gbool(a,2,"GUI_TREE_EXPAND")?)?; Value::Nil }
             "gui_update" => {
                 {
@@ -6036,6 +6042,26 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_swatch_clicked" => Value::Int(
                 self.gui.textarea_swatch_clicked(gi(a, 0, "GUI_TEXTAREA_SWATCH_CLICKED")?)?),
+            "gui_textarea_abbrev" => {
+                let n = "GUI_TEXTAREA_ABBREV";
+                if a.len() != 2 { return Err(format!("{}: erwartet (ta, woerter)", n)); }
+                let mut woerter = Vec::new();
+                match &a[1] {
+                    Value::Array(arr) => {
+                        for x in arr.borrow().cells.iter() {
+                            match x {
+                                Value::Str(s) => woerter.push(s.to_string()),
+                                _ => return Err(format!("{}: ARRAY OF STRING noetig", n)),
+                            }
+                        }
+                    }
+                    _ => return Err(format!("{}: ARRAY OF STRING noetig", n)),
+                }
+                self.gui.textarea_abbrev(gi(a, 0, n)?, woerter)?;
+                Value::Nil
+            }
+            "gui_textarea_abbrev_hit" => Value::Int(
+                self.gui.textarea_abbrev_hit(gi(a, 0, "GUI_TEXTAREA_ABBREV_HIT")?)?),
             "gui_textarea_indent_words" => {
                 let n = "GUI_TEXTAREA_INDENT_WORDS";
                 if a.len() != 4 { return Err(format!("{}: erwartet (ta, anfang, ende, aus)", n)); }

@@ -86,6 +86,12 @@ IMPORT "gui"
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
+| `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum; bisher nur `mehrfachauswahl` |
+| `GUI_TREE_SEL_COUNT(tree)` | INTEGER | wie viele Knoten ausgewählt sind |
+| `GUI_TREE_SEL_NODE(tree, i)` | INTEGER | die i-te ausgewählte Knoten-id (-1 = keine mehr) |
+| `GUI_TREE_IS_SELECTED(tree, node)` | BOOLEAN | ist dieser Knoten ausgewählt? |
+| `GUI_TREE_SELECT(tree, node, an)` | — | einen Knoten dazunehmen oder herausnehmen |
+| `GUI_TREE_CLEAR_SELECTION(tree)` | — | Auswahl leeren |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
@@ -2115,6 +2121,8 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
+| `GUI_TEXTAREA_ABBREV(ta, woerter)` | Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel |
+| `GUI_TEXTAREA_ABBREV_HIT(ta)` → INTEGER | welche Abkürzung der Tabulator in diesem Bild getroffen hat (-1 = keine); gilt ein Bild lang wie `GUI_CLICKED` |
 | `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
 | `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
 | `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine einzige Schreibmarke |

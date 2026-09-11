@@ -42,6 +42,9 @@
 '  Einstellungen an einer Stelle (Strg+U), Verzeichnis der eingebauten
 '  Befehle (Strg+F3), Definition hier zeigen (Alt+F12), Symbolspur ueber
 '  dem Code, automatisch sichern, Schnipsel-Filter vorbelegt.
+'  Stand 8 dazu: Schnipsel per Kuerzel und Tabulator, Symbolverzeichnis
+'  ueber alle Dateien des Projekts (Strg+Umschalt+S), Definition und
+'  Vorschau ueber Dateigrenzen, Mehrfachauswahl im Projektbaum.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -276,6 +279,7 @@ DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
 DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
 DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
 DIM miSchnell AS INTEGER : miSchnell = GUI_MENU_ITEM(mDatei, "Datei im Projekt oeffnen ...", "Strg+Umschalt+O")
+DIM miBaumOeffnen AS INTEGER : miBaumOeffnen = GUI_MENU_ITEM(mDatei, "Gewaehlte Dateien oeffnen", "Strg+Umschalt+E")
 ' Zuletzt geoeffnet: acht feste Eintraege, die Texte wechseln -- ein Menue
 ' kann Eintraege nicht wieder loswerden, also werden freie gesperrt.
 CONST ZULETZT_MAX = 8
@@ -310,6 +314,7 @@ DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einf
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
 DIM miPeek AS INTEGER : miPeek = GUI_MENU_ITEM(mBearb, "Definition hier zeigen", "Alt+F12")
+DIM miSymbole AS INTEGER : miSymbole = GUI_MENU_ITEM(mBearb, "Symbol im Projekt suchen ...", "Strg+Umschalt+S")
 DIM miEinstellungen AS INTEGER : miEinstellungen = GUI_MENU_ITEM(mBearb, "Einstellungen ...", "Strg+U")
 GUI_MENU_SEPARATOR(mBearb)
 ' Die Handgriffe im Text. Tab/Umschalt+Tab gehoeren dem Feld selbst (Tab
@@ -391,6 +396,9 @@ DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
 DIM baum AS GUI_WIDGET : baum = GUI_TREE(win, 0, 0, 10, 10)
+' Strg+Klick sammelt, Umschalt+Klick spannt -- damit sich mehrere Dateien
+' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
+GUI_TREE_SET(baum, "mehrfachauswahl", 1)
 DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, "Projekt", 0, 0)
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, "Gliederung", 0, 0)
 DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10, [])
@@ -531,6 +539,7 @@ DIM taPeek AS GUI_WIDGET : taPeek = GUI_TEXTAREA(winPeek, 8, 30, 704, 226)
 DIM btnPeekHin AS GUI_WIDGET : btnPeekHin = GUI_BUTTON(winPeek, "Dorthin springen", 8, 262, 160, 28)
 DIM btnPeekZu AS GUI_WIDGET : btnPeekZu = GUI_BUTTON(winPeek, "Schliessen", 178, 262, 120, 28)
 DIM peekZeile AS INTEGER : peekZeile = 0
+DIM peekPfad AS STRING : peekPfad = ""     ' aus welcher Datei, "" = der vorderen
 
 ' --- Farbe eines &H-Literals aendern ----------------------------------
 ' Ein Klick auf das Farbfeld im Code oeffnet den Waehler; [Uebernehmen]
@@ -817,6 +826,9 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     ' Zeile, die Woerter der SPRACHE kommen von hier. `THEN` steht in der
     ' Ende-Liste, weil `IF x THEN y = 1` sonst auch einruecken wuerde.
     GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+    ' Der Tabulator klappt einen Schnipsel auf, wenn sein Kuerzel links der
+    ' Marke steht -- sonst rueckt er ein wie immer.
+    GUI_TEXTAREA_ABBREV(ta, schnipselAbk)
     GUI_TEXTAREA_INDENT_WORDS(ta, _
         ["SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", "FOR", _
          "WHILE", "REPEAT", "DO", "SELECT", "CASE", "TRY", "WITH", "ELSE", _
@@ -952,9 +964,22 @@ SUB peekZeigen()
     DIM dz AS INTEGER
     DIM ds AS INTEGER
     (dz, ds) = CODE_DEFINITION(q, z, s)
+    peekPfad = ""
     IF dz < 1 THEN
-        GUI_SET_TEXT(lblStatus, "Keine Definition zu '" + wortUnterMarke$() + "' in dieser Datei.")
-        RETURN
+        ' Nicht in dieser Datei -- der Symbolindex sieht das ganze Projekt.
+        DIM k AS INTEGER : k = symbolSuchen(wortUnterMarke$())
+        IF k < 0 THEN
+            GUI_SET_TEXT(lblStatus, "Keine Definition zu '" + wortUnterMarke$() + "' -- auch nicht im Projekt.")
+            RETURN
+        END IF
+        peekPfad = symPfade[k]
+        dz = symZeilen[k]
+        DIM offen AS INTEGER : offen = tabMitPfad(peekPfad)
+        IF offen >= 0 THEN
+            q = GUI_TEXT(tabFelder[offen])
+        ELSE
+            q = dateiLesen(peekPfad)
+        END IF
     END IF
     peekZeile = dz
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
@@ -966,11 +991,13 @@ SUB peekZeigen()
         text = text + PADL$(STR$(i), 5) + "  " + zeilen[i - 1] + NL
     NEXT
     GUI_SET_TEXT(taPeek, text)
-    GUI_SET_TEXT(lblPeek, wortUnterMarke$() + " -- Zeile " + STR$(dz))
+    GUI_SET_TEXT(lblPeek, wortUnterMarke$() + " -- " + IIF(peekPfad = "", "", BASENAME(peekPfad) + ", ") + "Zeile " + STR$(dz))
     GUI_WINDOW_SET_BOUNDS(winPeek, (SCREENWIDTH() - 720) \ 2, 240, 720, 300)
     GUI_WINDOW_VISIBLE(winPeek, TRUE)
     GUI_FOCUS(taPeek)
-    protokoll("peek " + STR$(dz))
+    ' Die Datei steht nur dann dabei, wenn es eine ANDERE ist -- sonst
+    ' haette eine neue Zeilenform die Proben von Stand 7 gebrochen.
+    protokoll("peek " + STR$(dz) + IIF(peekPfad = "", "", " " + BASENAME(peekPfad)))
 END SUB
 
 ' --- Farbwaehler am Literal -------------------------------------------
@@ -1267,13 +1294,25 @@ SUB tabSchliessen(i AS INTEGER)
 END SUB
 
 ' --- Projektbaum -------------------------------------------------------
+DIM baumLetzteWahl AS INTEGER : baumLetzteWahl = -1
 DIM baumDateien AS ARRAY OF STRING
 DIM baumKnoten AS ARRAY OF INTEGER
+DIM baumSchluessel AS STRING : baumSchluessel = "-"
 
 SUB baumFuellen()
+    DIM neue AS ARRAY OF STRING : neue = DIRLIST(projektOrdner, "*.dh")
+    DIM schl AS STRING : schl = projektOrdner + "|" + JOIN$(neue, ";")
+    ' Steht dieselbe Liste schon da, bleibt der Baum, WIE er ist -- ein
+    ' Neuaufbau raeumt die Auswahl weg, und genau die sammelt man gerade
+    ' ein, wenn man mit Strg mehrere Dateien anklickt. (Vorher baute jedes
+    ' Oeffnen den Baum neu auf, und die Mehrfachauswahl kam nie ueber eine
+    ' Datei hinaus.)
+    IF schl = baumSchluessel THEN RETURN
+    baumSchluessel = schl
     GUI_TREE_CLEAR(baum)
+    baumLetzteWahl = -1
     GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
-    baumDateien = DIRLIST(projektOrdner, "*.dh")
+    baumDateien = neue
     DIM n AS INTEGER : n = LEN(baumDateien)
     DIM knoten[MAX(n, 1)] AS INTEGER
     DIM i AS INTEGER
@@ -1283,12 +1322,41 @@ SUB baumFuellen()
     baumKnoten = knoten
 END SUB
 
-DIM baumLetzteWahl AS INTEGER : baumLetzteWahl = -1
+' Alle gewaehlten Dateien oeffnen (Strg+Umschalt+E).
+SUB baumAuswahlOeffnen()
+    DIM n AS INTEGER : n = GUI_TREE_SEL_COUNT(baum)
+    IF n < 1 THEN
+        GUI_SET_TEXT(lblStatus, "Keine Datei gewaehlt -- Strg+Klick sammelt, Umschalt+Klick spannt.")
+        RETURN
+    END IF
+    ' Erst alle Wege einsammeln, dann oeffnen: dateiOeffnen baut den Baum
+    ' neu auf, und mitten in der Schleife waeren Knoten und Auswahl weg.
+    DIM pfade AS ARRAY OF STRING : pfade = []
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM knoten AS INTEGER : knoten = GUI_TREE_SEL_NODE(baum, k)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(baumDateien) - 1
+            IF baumKnoten[i] = knoten THEN ARRAY_PUSH(pfade, PATHJOIN(projektOrdner, baumDateien[i]))
+        NEXT
+    NEXT
+    DIM p AS STRING
+    FOR EACH p IN pfade
+        dateiOeffnen(p)
+    NEXT
+    GUI_SET_TEXT(lblStatus, STR$(LEN(pfade)) + " Datei(en) geoeffnet.")
+    protokoll("baum offen " + STR$(LEN(pfade)))
+END SUB
 
 SUB baumAbfragen()
     DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baum)
     IF sel < 0 OR sel = baumLetzteWahl THEN RETURN
     baumLetzteWahl = sel
+    ' Beim SAMMELN wird nicht geoeffnet -- sonst kaeme mit jedem Strg+Klick
+    ' ein Reiter dazu, den niemand wollte. Geoeffnet wird nur, wenn genau
+    ' eine Zeile gewaehlt ist und es die angeklickte ist (beim Abwaehlen
+    ' zeigt die angeklickte woanders hin als die eine uebriggebliebene).
+    IF GUI_TREE_SEL_COUNT(baum) <> 1 OR GUI_TREE_SEL_NODE(baum, 0) <> sel THEN RETURN
     DIM i AS INTEGER
     FOR i = 0 TO LEN(baumDateien) - 1
         IF baumKnoten[i] = sel THEN dateiOeffnen(PATHJOIN(projektOrdner, baumDateien[i]))
@@ -1579,6 +1647,125 @@ SUB gliederungFuellen(quelle AS STRING)
         GUI_LISTBOX_ADD(lstGliederung, e)
     NEXT
     protokoll("gliederung " + STR$(n))
+END SUB
+
+' --- Verzeichnis der eigenen Symbole ueber ALLE Dateien des Projekts ---
+' Die Gliederung kennt nur die vordere Datei. Ueber das ganze Projekt ist
+' der Index eine eigene Sache, und er wird auf ZURUF gebaut statt je Bild:
+' ein paar hundert Dateien lesen und zerlegen dauert seine Zeit, und der
+' Nutzen faengt erst an, wenn jemand danach fragt.
+DIM symPfade AS ARRAY OF STRING : symPfade = []
+DIM symZeilen AS ARRAY OF INTEGER : symZeilen = []
+DIM symNamen AS ARRAY OF STRING : symNamen = []       ' der blanke Name, fuer die Suche
+DIM symAnzeige AS ARRAY OF STRING : symAnzeige = []   ' was in der Liste steht
+DIM symSchluessel AS STRING : symSchluessel = "-"
+
+FUNCTION tabMitPfad(pfad AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF tabPfade[i] = pfad THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB symbolMerken(pfad AS STRING, anzeige AS STRING, name AS STRING, zeile AS INTEGER)
+    IF name = "" THEN RETURN
+    ARRAY_PUSH(symPfade, pfad)
+    ARRAY_PUSH(symZeilen, zeile)
+    ARRAY_PUSH(symNamen, name)
+    ARRAY_PUSH(symAnzeige, anzeige)
+END SUB
+
+SUB symbolEinerDatei(pfad AS STRING, kurz AS STRING, quelle AS STRING)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = STR$(i)
+        DIM art AS STRING : art = JSON_GET_STRING(j, p + ".art")
+        DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+        DIM zeile AS INTEGER : zeile = JSON_GET_INT(j, p + ".von")
+        symbolMerken(pfad, art + " " + name + "   " + kurz + ":" + STR$(zeile), name, zeile)
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            DIM kn AS STRING : kn = JSON_GET_STRING(j, pk + ".name")
+            DIM kz AS INTEGER : kz = JSON_GET_INT(j, pk + ".von")
+            symbolMerken(pfad, kn + " (" + name + ")   " + kurz + ":" + STR$(kz), kn, kz)
+        NEXT
+    NEXT
+END SUB
+
+SUB symbolIndexBauen(erzwingen AS BOOLEAN)
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM schl AS STRING : schl = projektOrdner + "|" + STR$(LEN(dateien))
+    IF NOT erzwingen AND schl = symSchluessel THEN RETURN
+    symSchluessel = schl
+    symPfade = [] : symZeilen = [] : symNamen = [] : symAnzeige = []
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        ' Ein offener Reiter zaehlt mit dem Stand IM Editor, nicht mit dem auf
+        ' der Platte -- sonst zeigte das Verzeichnis auf Zeilen, die es seit
+        ' der letzten Aenderung nicht mehr gibt.
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        DIM quelle AS STRING : quelle = ""
+        DIM gut AS BOOLEAN : gut = TRUE
+        IF t >= 0 THEN
+            quelle = GUI_TEXT(tabFelder[t])
+        ELSE
+            TRY
+                quelle = dateiLesen(pfad)
+            CATCH e
+                gut = FALSE
+            END TRY
+        END IF
+        IF gut THEN symbolEinerDatei(pfad, d, quelle)
+    NEXT
+    protokoll("symbolindex " + STR$(LEN(symNamen)))
+END SUB
+
+' Den Namen im ganzen Projekt suchen -- die Nummer im Index oder -1.
+FUNCTION symbolSuchen(name AS STRING) AS INTEGER
+    IF name = "" THEN RETURN -1
+    symbolIndexBauen(FALSE)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(symNamen) - 1
+        IF LOWER$(symNamen[i]) = LOWER$(name) THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB symbolAnspringen(nummer AS INTEGER)
+    IF nummer < 0 OR nummer >= LEN(symPfade) THEN RETURN
+    DIM pfad AS STRING : pfad = symPfade[nummer]
+    DIM zeile AS INTEGER : zeile = symZeilen[nummer]
+    IF aktiverTab < 0 OR tabPfade[aktiverTab] <> pfad THEN dateiOeffnen(pfad)
+    IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), zeile, 1)
+    GUI_SET_TEXT(lblStatus, symAnzeige[nummer])
+    protokoll("symbol " + BASENAME(pfad) + " " + STR$(zeile))
+END SUB
+
+SUB symbolVerzeichnis()
+    symbolIndexBauen(TRUE)
+    IF LEN(symNamen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Keine Symbole in " + projektOrdner + ".")
+        RETURN
+    END IF
+    paletteNamen = []
+    paletteKennungen = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(symAnzeige) - 1
+        ARRAY_PUSH(paletteNamen, symAnzeige[i]) : ARRAY_PUSH(paletteKennungen, STR$(i))
+    NEXT
+    waehlerOeffnen("symbol", "Symbole im Projekt (" + STR$(LEN(symNamen)) + ")")
+    ' Wie beim Schnipsel: das Wort unter der Marke fuellt den Filter aus.
+    DIM anfang AS STRING : anfang = wortUnterMarke$()
+    IF anfang <> "" THEN
+        GUI_SET_TEXT(tfPalette, anfang)
+        paletteLetzterFilter = anfang
+        paletteFuellen(anfang)
+    END IF
 END SUB
 
 ' Die Symbolspur zur Marke: welcher Block umschliesst sie? Die Gliederung
@@ -2315,8 +2502,15 @@ SUB zurDefinition()
     DIM dz AS INTEGER
     DIM ds AS INTEGER
     (dz, ds) = CODE_DEFINITION(GUI_TEXT(ta), z, s)
-    IF dz < 0 THEN
-        GUI_SET_TEXT(lblStatus, "Keine Definition in dieser Datei.")
+    IF dz < 1 THEN
+        ' CODE_DEFINITION sieht nur DIESEN Text -- was hier fehlt, steht
+        ' vielleicht in einer anderen Datei des Projekts.
+        DIM k AS INTEGER : k = symbolSuchen(wortUnterMarke$())
+        IF k >= 0 THEN
+            symbolAnspringen(k)
+            RETURN
+        END IF
+        GUI_SET_TEXT(lblStatus, "Keine Definition zu '" + wortUnterMarke$() + "' -- auch nicht im Projekt.")
         RETURN
     END IF
     GUI_TEXTAREA_GOTO(ta, dz, ds)
@@ -2440,17 +2634,30 @@ END SUB
 ' klebte ein eingefuegter Block am linken Rand.
 DIM schnipselNamen AS ARRAY OF STRING : schnipselNamen = []
 DIM schnipselText AS ARRAY OF STRING : schnipselText = []
+' Das kurze Wort, das den Schnipsel am Tabulator aufklappt. Die Laufzeit
+' meldet nur, DASS eines links der Marke steht (GUI_TEXTAREA_ABBREV) --
+' was an seine Stelle kommt, steht hier.
+DIM schnipselAbk AS ARRAY OF STRING : schnipselAbk = []
 
-SUB schnipsel(name AS STRING, text AS STRING)
-    ARRAY_PUSH(schnipselNamen, name) : ARRAY_PUSH(schnipselText, text)
+SUB schnipsel(name AS STRING, abk AS STRING, text AS STRING)
+    ARRAY_PUSH(schnipselNamen, name + "   [" + abk + "]")
+    ARRAY_PUSH(schnipselAbk, abk)
+    ARRAY_PUSH(schnipselText, text)
 END SUB
 
-SUB schnipselEinfuegen(nummer AS INTEGER)
+' `weg` = so viele Zeichen links der Marke weichen (das getippte Kuerzel).
+SUB schnipselEinfuegen(nummer AS INTEGER, weg AS INTEGER = 0)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR nummer < 0 OR nummer >= LEN(schnipselText) THEN RETURN
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    IF weg > 0 AND s - weg >= 1 THEN
+        ' Das Kuerzel markieren -- GUI_TEXTAREA_INSERT ersetzt die Auswahl,
+        ' und die Marke steht danach dort, wo das Wort anfing.
+        GUI_TEXTAREA_SELECT(ta, z, s - weg, z, s)
+        s = s - weg
+    END IF
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
     DIM einzug AS STRING : einzug = ""
     IF z >= 1 AND z <= LEN(zeilen) THEN
@@ -3451,6 +3658,8 @@ paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
 paletteEintrag("Einstellungen ...", "einstellungen", "Strg+U")
 paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
 paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
+paletteEintrag("Symbol im Projekt suchen ...", "symbole", "Strg+Umschalt+S")
+paletteEintrag("Gewaehlte Dateien oeffnen", "baum_oeffnen", "Strg+Umschalt+E")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
@@ -3550,6 +3759,8 @@ SUB paletteAusfuehren()
     IF sel < 0 OR sel >= LEN(paletteSichtbar) THEN RETURN
     IF paletteArt = "schnipsel" THEN
         schnipselEinfuegen(INT(VAL(paletteSichtbar[sel])))
+    ELSEIF paletteArt = "symbol" THEN
+        symbolAnspringen(INT(VAL(paletteSichtbar[sel])))
     ELSEIF paletteArt = "datei" THEN
         protokoll("schnell " + paletteSichtbar[sel])
         dateiOeffnen(paletteSichtbar[sel])
@@ -3665,6 +3876,8 @@ SUB befehl(k AS STRING)
         CASE "einstellungen" : einstellungenZeigen()
         CASE "befehle" : befehleZeigen()
         CASE "peek" : peekZeigen()
+        CASE "symbole" : symbolVerzeichnis()
+        CASE "baum_oeffnen" : baumAuswahlOeffnen()
         CASE "marken" : markenAufFundstellen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
@@ -3804,19 +4017,19 @@ symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 
 ' --- Schnipsel: die Geruester, die man staendig tippt -----------------
 ' Der senkrechte Strich sagt, wohin die Schreibmarke danach gehoert.
-schnipsel("Spielschleife (SCREEN + Bildschleife)", "SCREEN(800, 600, " + CHR$(34) + "Spiel" + CHR$(34) + ", 1)" + NL + "SETFPS(60)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    CLS(BLACK)" + NL + "    |" + NL + "    FLIP()" + NL + "WEND")
-schnipsel("FOR-Schleife", "DIM i AS INTEGER" + NL + "FOR i = 0 TO |" + NL + NL + "NEXT")
-schnipsel("FOR EACH", "DIM e AS STRING" + NL + "FOR EACH e IN |" + NL + NL + "NEXT")
-schnipsel("WHILE", "WHILE |" + NL + NL + "WEND")
-schnipsel("IF ... ELSE", "IF | THEN" + NL + NL + "ELSE" + NL + NL + "END IF")
-schnipsel("SELECT CASE", "SELECT CASE |" + NL + "    CASE 1" + NL + NL + "    CASE ELSE" + NL + NL + "END SELECT")
-schnipsel("SUB", "SUB |()" + NL + NL + "END SUB")
-schnipsel("FUNCTION", "FUNCTION |() AS INTEGER" + NL + "    RETURN 0" + NL + "END FUNCTION")
-schnipsel("CLASS mit Init", "CLASS |" + NL + "    DIM wert AS INTEGER" + NL + NL + "    SUB Init()" + NL + "        Self.wert = 0" + NL + "    END SUB" + NL + "END CLASS")
-schnipsel("TRY ... CATCH", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "END TRY")
-schnipsel("Datei zeilenweise lesen", "DIM zeilen AS ARRAY OF STRING" + NL + "zeilen = READLINES(|)" + NL + "DIM z AS STRING" + NL + "FOR EACH z IN zeilen" + NL + "    PRINT z" + NL + "NEXT")
-schnipsel("gui-Fenster mit Knopf", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + "Fenster" + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + "Los" + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
-schnipsel("Sprite mit Animation", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
+schnipsel("Spielschleife (SCREEN + Bildschleife)", "screen", "SCREEN(800, 600, " + CHR$(34) + "Spiel" + CHR$(34) + ", 1)" + NL + "SETFPS(60)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    CLS(BLACK)" + NL + "    |" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("FOR-Schleife", "for", "DIM i AS INTEGER" + NL + "FOR i = 0 TO |" + NL + NL + "NEXT")
+schnipsel("FOR EACH", "foreach", "DIM e AS STRING" + NL + "FOR EACH e IN |" + NL + NL + "NEXT")
+schnipsel("WHILE", "while", "WHILE |" + NL + NL + "WEND")
+schnipsel("IF ... ELSE", "if", "IF | THEN" + NL + NL + "ELSE" + NL + NL + "END IF")
+schnipsel("SELECT CASE", "select", "SELECT CASE |" + NL + "    CASE 1" + NL + NL + "    CASE ELSE" + NL + NL + "END SELECT")
+schnipsel("SUB", "sub", "SUB |()" + NL + NL + "END SUB")
+schnipsel("FUNCTION", "function", "FUNCTION |() AS INTEGER" + NL + "    RETURN 0" + NL + "END FUNCTION")
+schnipsel("CLASS mit Init", "class", "CLASS |" + NL + "    DIM wert AS INTEGER" + NL + NL + "    SUB Init()" + NL + "        Self.wert = 0" + NL + "    END SUB" + NL + "END CLASS")
+schnipsel("TRY ... CATCH", "try", "TRY" + NL + "    |" + NL + "CATCH e" + NL + "    PRINT " + CHR$(34) + "Fehler: " + CHR$(34) + " + e" + NL + "END TRY")
+schnipsel("Datei zeilenweise lesen", "readlines", "DIM zeilen AS ARRAY OF STRING" + NL + "zeilen = READLINES(|)" + NL + "DIM z AS STRING" + NL + "FOR EACH z IN zeilen" + NL + "    PRINT z" + NL + "NEXT")
+schnipsel("gui-Fenster mit Knopf", "gui", "IMPORT " + CHR$(34) + "gui" + CHR$(34) + NL + "DIM win AS GUI_WINDOW" + NL + "win = GUI_WINDOW(" + CHR$(34) + "Fenster" + CHR$(34) + ", 60, 60, 320, 200)" + NL + "DIM knopf AS GUI_WIDGET" + NL + "knopf = GUI_BUTTON(win, " + CHR$(34) + "Los" + CHR$(34) + ", 20, 20, 100, 30)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    GUI_UPDATE()" + NL + "    IF GUI_CLICKED(knopf) THEN |" + NL + "    CLS(BLACK)" + NL + "    GUI_DRAW()" + NL + "    FLIP()" + NL + "WEND")
+schnipsel("Sprite mit Animation", "sprite", "DIM held AS SPRITE" + NL + "held = SPRITE_NEW(LOADIMAGE(|), 32, 32)" + NL + "SPRITE_ADD_ANIM(held, " + CHR$(34) + "lauf" + CHR$(34) + ", 0, 3, 8.0)" + NL + "SPRITE_PLAY(held, " + CHR$(34) + "lauf" + CHR$(34) + ")")
 
 ' --- Start -------------------------------------------------------------
 layout()
@@ -3908,6 +4121,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miEinstellungen) THEN befehl("einstellungen")
     IF GUI_CLICKED(miBefehle) THEN befehl("befehle")
     IF GUI_CLICKED(miPeek) THEN befehl("peek")
+    IF GUI_CLICKED(miSymbole) THEN befehl("symbole")
+    IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")
@@ -3999,6 +4214,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnPeekZu) THEN GUI_WINDOW_VISIBLE(winPeek, FALSE) : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnPeekHin) THEN
         GUI_WINDOW_VISIBLE(winPeek, FALSE)
+        IF peekPfad <> "" THEN dateiOeffnen(peekPfad)
         IF aktivesFeld() >= 0 AND peekZeile > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), peekZeile, 1)
         GUI_FOCUS(aktivesFeld())
     END IF
@@ -4123,6 +4339,12 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF vervollOffen THEN
         IF GUI_DOUBLE_CLICKED(lstVervoll) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstVervoll) THEN vervollUebernehmen()
         IF KEYHIT(KEY_ESCAPE) THEN vervollAus = wortAnfang$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
+    END IF
+
+    ' --- Der Tabulator hat eine Abkuerzung gemeldet: Schnipsel aufklappen ---
+    IF aktivesFeld() >= 0 THEN
+        DIM ak AS INTEGER : ak = GUI_TEXTAREA_ABBREV_HIT(aktivesFeld())
+        IF ak >= 0 AND ak < LEN(schnipselAbk) THEN schnipselEinfuegen(ak, LEN(schnipselAbk[ak]))
     END IF
 
     ' --- Baum, Probleme, Eingabe ---
