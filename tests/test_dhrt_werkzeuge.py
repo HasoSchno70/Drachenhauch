@@ -368,3 +368,37 @@ def test_doku_ohne_unterbefehl_zeigt_die_uebersicht():
     assert code == 2
     for wort in ("prosa", "grammatik", "referenz"):
         assert wort in out, out
+
+
+# --------------------------------------------------------------- dhrt bild
+
+_GRAFIK = pytest.mark.skipif(
+    os.environ.get("DHRT_OHNE_GRAFIK") == "1", reason="Bau ohne Grafik")
+
+
+@_GRAFIK
+def test_bild_sichert_ein_bild_vom_laufenden_programm(tmp_path):
+    """`dhrt bild quelle.dh ziel.png [bilder]` laesst das Programm laufen und
+    sichert das letzte Bild. Das konnte die Laufzeit ueber DHRT_SCREENSHOT
+    schon; aus einem PROGRAMM heraus kam man dort aber nicht hin, weil
+    PROCESS_START die Variablen dem Kind abnimmt."""
+    from PIL import Image
+    quelle = tmp_path / "p.dh"
+    quelle.write_text('SCREEN(200, 120, "P", 1)\n'
+                      'WHILE NOT QUITREQUESTED()\n'
+                      '    CLS(&H203040)\n'
+                      '    BOX(20, 20, 180, 100, &HFF8800)\n'
+                      '    FLIP()\n'
+                      'WEND\n', encoding="utf-8")
+    ziel = tmp_path / "p.png"
+    r = subprocess.run([str(_DHRT), "bild", str(quelle), str(ziel), "20"],
+                       capture_output=True, text=True, timeout=120)
+    if "KEIN_FENSTER" in (r.stdout + r.stderr):
+        pytest.skip("kein Fenster verfuegbar")
+    assert ziel.exists(), (r.stdout, r.stderr)
+    im = Image.open(ziel).convert("RGB")
+    assert im.size == (200, 120)
+    # Die gemalte Flaeche steht drin -- das Fenster steht dabei ausserhalb
+    # des Bildschirms, gesichert wird der Zeichenpuffer.
+    assert im.getpixel((100, 60)) == (0xFF, 0x88, 0x00)
+    assert im.getpixel((5, 5)) == (0x20, 0x30, 0x40)

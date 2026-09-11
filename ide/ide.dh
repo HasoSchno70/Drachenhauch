@@ -52,6 +52,9 @@
 '  Stand 10 dazu: Spaltenauswahl (Alt+Zug), Marke an jedes Zeilenende
 '  (Strg+Umschalt+I), Zeilen sortieren/entdoppeln/beschneiden, im ganzen
 '  Projekt umbenennen (Strg+Umschalt+F6), zwei Dateien vergleichen.
+'  Stand 11 dazu: Werkzeugleiste mit Sinnbildern unter dem Menue und
+'  Kacheln auf der Willkommensseite -- acht wichtige Beispiele mit einem
+'  BILD davon, erzeugt mit `dhrt bild`, eines nach dem anderen.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -167,6 +170,8 @@ DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
 ' Einrueckungslinien im Code-Feld (ein Strich je Stufe).
 DIM linienAn AS BOOLEAN : linienAn = TRUE
+' Werkzeugleiste mit Sinnbildern unter der Menueleiste.
+DIM leisteAn AS BOOLEAN : leisteAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
 DIM autoSichern AS INTEGER : autoSichern = 0
 DIM autoFaellig AS FLOAT : autoFaellig = -1.0
@@ -252,6 +257,7 @@ IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand
 IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
+IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
@@ -412,6 +418,8 @@ DIM miUmbruch AS INTEGER : miUmbruch = GUI_MENU_ITEM(mAnsicht, "Zeilenumbruch", 
 GUI_MENU_CHECK(miUmbruch, FALSE)
 DIM miLinien AS INTEGER : miLinien = GUI_MENU_ITEM(mAnsicht, "Einrueckungslinien")
 GUI_MENU_CHECK(miLinien, linienAn)
+DIM miLeiste AS INTEGER : miLeiste = GUI_MENU_ITEM(mAnsicht, "Werkzeugleiste")
+GUI_MENU_CHECK(miLeiste, leisteAn)
 DIM miFalten AS INTEGER : miFalten = GUI_MENU_ITEM(mAnsicht, "Block zuklappen/aufklappen", "F4")
 DIM miFaltenAlle AS INTEGER : miFaltenAlle = GUI_MENU_ITEM(mAnsicht, "Alles zuklappen", "Strg+F4")
 DIM miFaltenAuf AS INTEGER : miFaltenAuf = GUI_MENU_ITEM(mAnsicht, "Alles aufklappen", "Umschalt+F4")
@@ -423,6 +431,57 @@ DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, "Handbuch (Wort u
 DIM miKuerzel AS INTEGER : miKuerzel = GUI_MENU_ITEM(mHilfe, "Tastenkuerzel", "Strg+F1")
 DIM miBefehle AS INTEGER : miBefehle = GUI_MENU_ITEM(mHilfe, "Eingebaute Befehle nachschlagen ...", "Strg+F3")
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
+
+' --- Werkzeugleiste ---------------------------------------------------
+' Was man am haeufigsten braucht, als Sinnbild unter dem Menue. Die Bilder
+' kommen von symbolBild -- denselben, die schon in den Menues stehen; sie
+' werden aber erst WEITER UNTEN gesetzt (GUI_SET_ICON), weil die Farben
+' dafuer CONSTs sind, die es hier oben noch nicht gibt.
+DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, 10, 32)
+DIM wzNamen AS ARRAY OF STRING
+wzNamen = ["neu", "oeffnen", "sichern", "|", "start", "stopp", "pruefen", "debug", _
+           "|", "suchen", "handbuch", "einstellungen"]
+DIM wzBefehle AS ARRAY OF STRING
+wzBefehle = ["neu", "oeffnen", "sichern", "", "start", "stopp", "pruefen", "debuggen", _
+             "", "suchen", "handbuch", "einstellungen"]
+DIM wzTipps AS ARRAY OF STRING
+wzTipps = ["Neue Datei (Strg+N)", "Oeffnen (Strg+O)", "Sichern (Strg+S)", "", _
+           "Starten (F5)", "Stoppen (Umschalt+F5)", "Pruefen (Umschalt+F7)", "Debuggen (F7)", "", _
+           "Suchen (Strg+F)", "Handbuch (F1)", "Einstellungen (Strg+U)"]
+DIM wzKnoepfe[16] AS GUI_WIDGET
+DIM wzi AS INTEGER
+FOR wzi = 0 TO LEN(wzNamen) - 1
+    IF wzNamen[wzi] = "|" THEN
+        wzKnoepfe[wzi] = GUI_LABEL(win, "|", 0, 0)
+    ELSE
+        wzKnoepfe[wzi] = GUI_ICON_BUTTON(win, 0, 0, 28, 28, -1)
+        GUI_TOOLTIP(wzKnoepfe[wzi], wzTipps[wzi])
+    END IF
+NEXT
+
+' --- Kacheln mit Vorschaubildern --------------------------------------
+' Acht Beispiele, die zeigen, was die Sprache kann -- mit einem BILD
+' davon, nicht nur mit ihrem Namen. Die Bilder entstehen, indem das
+' Beispiel wirklich laeuft (`dhrt bild`), eines nach dem anderen und
+' unsichtbar; danach liegen sie neben der Sitzung und sind sofort da.
+CONST KACHEL_MAX = 8
+DIM kachelDatei AS ARRAY OF STRING
+kachelDatei = ["09_shapes.dh", "10_pong.dh", "100_2d_extras.dh", "112_physics2d.dh", _
+               "154_chart.dh", "156_gui_alle_widgets.dh", "95_pbr.dh", "119_vortex.dh"]
+DIM kachelName AS ARRAY OF STRING
+kachelName = ["Formen zeichnen", "Pong", "2D-Extras", "Physik", _
+              "Diagramme", "Oberflaechen", "3D mit Licht", "Effekte"]
+DIM kachelBild[KACHEL_MAX] AS GUI_WIDGET
+DIM kachelKnopf[KACHEL_MAX] AS GUI_WIDGET
+DIM kachelTextur[KACHEL_MAX] AS IMAGE
+DIM lblKacheln AS GUI_WIDGET : lblKacheln = GUI_LABEL(win, "Wichtige Beispiele -- ein Klick oeffnet sie", 0, 0)
+DIM kai AS INTEGER
+FOR kai = 0 TO KACHEL_MAX - 1
+    kachelBild[kai] = GUI_IMAGE(win, 0, 0, 10, 10, -1)
+    GUI_IMAGE_MODE(kachelBild[kai], "einpassen")
+    kachelKnopf[kai] = GUI_BUTTON(win, kachelName[kai], 0, 0, 10, 10)
+    GUI_TOOLTIP(kachelKnopf[kai], kachelDatei[kai])
+NEXT
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
 DIM baum AS GUI_WIDGET : baum = GUI_TREE(win, 0, 0, 10, 10)
@@ -631,10 +690,94 @@ DIM tabTitel[MAX_TABS] AS STRING
 DIM breiteLinks AS INTEGER : breiteLinks = 220
 DIM hoeheUnten AS INTEGER : hoeheUnten = 200
 
+' --- Vorschaubilder fuer die Kacheln ----------------------------------
+' Erzeugt wird EINES nach dem anderen, im Hintergrund und nur, solange die
+' Willkommensseite zu sehen ist: acht Beispiele auf einmal zu starten
+' brauchte acht Fenster und die halbe Maschine. `dhrt bild` schiebt sein
+' Fenster dabei aus dem Blick.
+DIM vorschauOrdner AS STRING : vorschauOrdner = PATHJOIN(DIRNAME(konfigPfad), "vorschau")
+DIM vorschauLauf AS INTEGER : vorschauLauf = -1
+DIM vorschauIdx AS INTEGER : vorschauIdx = -1
+DIM vorschauFertig AS INTEGER : vorschauFertig = 0
+' Ist alles da, wird nicht mehr gesucht: acht Dateien in JEDEM Bild
+' nachzusehen waere ein Dutzend Betriebssystem-Aufrufe je Sechzigstel.
+DIM vorschauRuhe AS BOOLEAN : vorschauRuhe = FALSE
+
+FUNCTION vorschauPfad$(i AS INTEGER) AS STRING
+    RETURN PATHJOIN(vorschauOrdner, REPLACE$(kachelDatei[i], ".dh", "") + ".png")
+END FUNCTION
+
+' Das Bild an seine Kachel haengen. Eine alte Textur wird vorher
+' freigegeben -- LOADIMAGE merkt sich den PFAD, und ohne IMAGE_FREE kaeme
+' nach dem Neu-Erzeugen wieder das alte Bild zurueck.
+SUB kachelBildSetzen(i AS INTEGER)
+    IF i < 0 OR i >= KACHEL_MAX THEN RETURN
+    DIM pfad AS STRING : pfad = vorschauPfad$(i)
+    IF NOT FILEEXISTS(pfad) THEN RETURN
+    TRY
+        IF kachelTextur[i] >= 0 THEN IMAGE_FREE(kachelTextur[i])
+        kachelTextur[i] = LOADIMAGE(pfad)
+        GUI_SET_IMAGE(kachelBild[i], kachelTextur[i])
+    CATCH e
+        kachelTextur[i] = -1
+    END TRY
+END SUB
+
+SUB vorschauNachziehen()
+    IF vorschauLauf >= 0 THEN
+        IF PROCESS_RUNNING(vorschauLauf) THEN RETURN
+        PROCESS_CLOSE(vorschauLauf)
+        vorschauLauf = -1
+        kachelBildSetzen(vorschauIdx)
+        vorschauFertig = vorschauFertig + 1
+        protokoll("vorschau fertig " + STR$(vorschauIdx))
+        vorschauIdx = -1
+    END IF
+    IF tabAnzahl > 0 OR vorschauRuhe THEN RETURN      ' nur auf der Willkommensseite
+    DIM i AS INTEGER
+    FOR i = 0 TO KACHEL_MAX - 1
+        IF FILEEXISTS(vorschauPfad$(i)) THEN CONTINUE
+        DIM quelle AS STRING : quelle = PATHJOIN(beispielOrdner, kachelDatei[i])
+        IF NOT FILEEXISTS(quelle) THEN CONTINUE
+        IF NOT DIREXISTS(vorschauOrdner) THEN MKDIR(vorschauOrdner)
+        vorschauLauf = PROCESS_START("dhrt", "bild", quelle, vorschauPfad$(i), "90")
+        vorschauIdx = i
+        GUI_SET_TEXT(lblStatus, "Vorschau: " + kachelName[i] + " ...")
+        protokoll("vorschau " + kachelDatei[i])
+        RETURN
+    NEXT
+    vorschauRuhe = TRUE
+END SUB
+
+' Alle noch einmal: die Bilder werden geloescht, der Rest laeuft von selbst.
+SUB vorschauNeu()
+    DIM i AS INTEGER
+    FOR i = 0 TO KACHEL_MAX - 1
+        IF kachelTextur[i] >= 0 THEN
+            IMAGE_FREE(kachelTextur[i])
+            kachelTextur[i] = -1
+        END IF
+        GUI_SET_IMAGE(kachelBild[i], -1)
+        IF FILEEXISTS(vorschauPfad$(i)) THEN DELETEFILE(vorschauPfad$(i))
+    NEXT
+    vorschauFertig = 0
+    vorschauRuhe = FALSE
+    GUI_SET_TEXT(lblStatus, "Vorschaubilder werden neu erzeugt ...")
+    protokoll("vorschau neu")
+END SUB
+
 SUB willkommenZeigen(an AS BOOLEAN)
     GUI_SET_VISIBLE(lblWkTitel, an) : GUI_SET_VISIBLE(lblWkUnter, an)
     GUI_SET_VISIBLE(btnWkNeu, an) : GUI_SET_VISIBLE(btnWkOeffnen, an) : GUI_SET_VISIBLE(btnWkBeispiele, an)
     GUI_SET_VISIBLE(lblWkZuletzt, an) : GUI_SET_VISIBLE(lstWkZuletzt, an) : GUI_SET_VISIBLE(lblWkKuerzel, an)
+    IF NOT an THEN
+        GUI_SET_VISIBLE(lblKacheln, FALSE)
+        DIM wk AS INTEGER
+        FOR wk = 0 TO KACHEL_MAX - 1
+            GUI_SET_VISIBLE(kachelBild[wk], FALSE)
+            GUI_SET_VISIBLE(kachelKnopf[wk], FALSE)
+        NEXT
+    END IF
 END SUB
 
 ' --- Einstellungen, Sitzung, zuletzt geoeffnet -----------------------
@@ -647,6 +790,7 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "regex", regexAn)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
+    JSON_SET_BOOL(konfig, "leiste", leisteAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
@@ -758,9 +902,27 @@ SUB layout()
     DIM kopf AS INTEGER : kopf = 56
     DIM hi AS INTEGER : hi = h - kopf
     DIM oben AS INTEGER : oben = 4
+    ' Die Werkzeugleiste liegt ueber allem anderen und nimmt sich ihre Hoehe.
+    DIM leisteH AS INTEGER : leisteH = 0
+    IF leisteAn THEN leisteH = 34
+    GUI_SET_VISIBLE(leiste, leisteAn)
+    DIM wzx AS INTEGER : wzx = 8
+    DIM wzk AS INTEGER
+    FOR wzk = 0 TO LEN(wzNamen) - 1
+        GUI_SET_VISIBLE(wzKnoepfe[wzk], leisteAn)
+        IF wzNamen[wzk] = "|" THEN
+            GUI_SET_BOUNDS(wzKnoepfe[wzk], wzx + 4, oben + 5, 2, 22)
+            wzx = wzx + 14
+        ELSE
+            GUI_SET_BOUNDS(wzKnoepfe[wzk], wzx, oben + 3, 28, 28)
+            wzx = wzx + 30
+        END IF
+    NEXT
+    IF leisteAn THEN GUI_SET_BOUNDS(leiste, 4, oben, w - 8, 32)
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
-    DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12
+    DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12 - leisteH
+    oben = oben + leisteH
     ' links: Projektbaum oben, Gliederung darunter
     DIM baumH AS INTEGER : baumH = (mitteH - 22) * 3 \ 5
     GUI_SET_BOUNDS(lblProjekt, 8, oben, breiteLinks - 16, 18)
@@ -802,10 +964,32 @@ SUB layout()
     GUI_SET_BOUNDS(btnWkNeu, wx, oben + 130, 130, 30)
     GUI_SET_BOUNDS(btnWkOeffnen, wx + 140, oben + 130, 150, 30)
     GUI_SET_BOUNDS(btnWkBeispiele, wx + 300, oben + 130, 180, 30)
-    GUI_SET_BOUNDS(lblWkZuletzt, wx, oben + 180, ew - 80, 18)
-    DIM zlH AS INTEGER : zlH = MAX(60, MIN(230, mitteH - 320))
-    GUI_SET_BOUNDS(lstWkZuletzt, wx, oben + 202, MIN(ew - 80, 620), zlH)
-    GUI_SET_BOUNDS(lblWkKuerzel, wx, oben + 214 + zlH, MIN(ew - 80, 620), 18)
+    ' Die Kacheln: vier nebeneinander, so viele Reihen wie Platz ist.
+    GUI_SET_BOUNDS(lblKacheln, wx, oben + 176, ew - 80, 18)
+    DIM kb AS INTEGER : kb = MIN(190, (ew - 80 - 3 * 12) \ 4)
+    DIM khb AS INTEGER : khb = kb * 100 \ 160          ' Bild im Verhaeltnis 16:10
+    DIM kh AS INTEGER : kh = khb + 26
+    DIM reihen AS INTEGER : reihen = 0
+    IF kb >= 110 THEN reihen = MIN(2, MAX(0, (mitteH - 420) \ (kh + 10)))
+    DIM kk AS INTEGER
+    FOR kk = 0 TO KACHEL_MAX - 1
+        DIM sichtbar AS BOOLEAN : sichtbar = tabAnzahl = 0 AND kk < reihen * 4
+        GUI_SET_VISIBLE(kachelBild[kk], sichtbar)
+        GUI_SET_VISIBLE(kachelKnopf[kk], sichtbar)
+        IF sichtbar THEN
+            DIM kx AS INTEGER : kx = wx + (kk MOD 4) * (kb + 12)
+            DIM ky AS INTEGER : ky = oben + 198 + (kk \ 4) * (kh + 10)
+            GUI_SET_BOUNDS(kachelBild[kk], kx, ky, kb, khb)
+            GUI_SET_BOUNDS(kachelKnopf[kk], kx, ky + khb, kb, 24)
+        END IF
+    NEXT
+    GUI_SET_VISIBLE(lblKacheln, tabAnzahl = 0 AND reihen > 0)
+    DIM nachKacheln AS INTEGER : nachKacheln = oben + 198 + reihen * (kh + 10) + 8
+    IF reihen = 0 THEN nachKacheln = oben + 180
+    GUI_SET_BOUNDS(lblWkZuletzt, wx, nachKacheln, ew - 80, 18)
+    DIM zlH AS INTEGER : zlH = MAX(60, MIN(200, oben + mitteH - nachKacheln - 70))
+    GUI_SET_BOUNDS(lstWkZuletzt, wx, nachKacheln + 22, MIN(ew - 80, 620), zlH)
+    GUI_SET_BOUNDS(lblWkKuerzel, wx, nachKacheln + 34 + zlH, MIN(ew - 80, 620), 18)
     GUI_SET_WRAP(lblWkKuerzel, MIN(ew - 80, 620))
     willkommenZeigen(tabAnzahl = 0)
     DIM uy AS INTEGER : uy = oben + mitteH + 4
@@ -4105,6 +4289,8 @@ paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
 paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
 paletteEintrag("Andere Reiter schliessen", "andere_zu", "Strg+Umschalt+W")
 paletteEintrag("Einrueckungslinien", "linien", "")
+paletteEintrag("Werkzeugleiste", "leiste", "")
+paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewaehlte Dateien oeffnen", "baum_oeffnen", "Strg+Umschalt+E")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
@@ -4330,6 +4516,13 @@ SUB befehl(k AS STRING)
             END IF
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
+        CASE "leiste"
+            leisteAn = NOT leisteAn
+            GUI_MENU_CHECK(miLeiste, leisteAn)
+            layout()
+            konfigSichern()
+            protokoll("leiste " + IIF(leisteAn, "an", "aus"))
+        CASE "vorschau_neu" : vorschauNeu()
         CASE "zeile" : dlgZeile = GUI_PROMPT("Gehe zu Zeile", "Zeilennummer:", "")
         CASE "projekt" : dlgProjekt = GUI_PROMPT("Im Projekt suchen", "Wonach (alle .dh in " + BASENAME(projektOrdner) + ")?", suchtext)
         CASE "vervoll"
@@ -4482,6 +4675,22 @@ symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzFo
 symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug")
 symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
 
+' Die Werkzeugleiste bekommt dieselben Sinnbilder -- erst HIER, weil
+' symbolBild die Farb-CONSTs braucht, die weiter oben noch nicht standen.
+DIM wzs AS INTEGER
+FOR wzs = 0 TO LEN(wzNamen) - 1
+    IF wzNamen[wzs] <> "|" THEN GUI_SET_ICON(wzKnoepfe[wzs], symbolBild(wzNamen[wzs]))
+NEXT
+
+' Vorschaubilder, die es schon gibt, sofort zeigen.
+DIM kvs AS INTEGER
+FOR kvs = 0 TO KACHEL_MAX - 1
+    kachelTextur[kvs] = -1
+NEXT
+FOR kvs = 0 TO KACHEL_MAX - 1
+    kachelBildSetzen(kvs)
+NEXT
+
 ' --- Schnipsel: die Geruester, die man staendig tippt -----------------
 ' Der senkrechte Strich sagt, wohin die Schreibmarke danach gehoert.
 schnipsel("Spielschleife (SCREEN + Bildschleife)", "screen", "SCREEN(800, 600, " + CHR$(34) + "Spiel" + CHR$(34) + ", 1)" + NL + "SETFPS(60)" + NL + NL + "WHILE NOT QUITREQUESTED()" + NL + "    CLS(BLACK)" + NL + "    |" + NL + "    FLIP()" + NL + "WEND")
@@ -4600,6 +4809,21 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
     IF GUI_CLICKED(miAndereZu) THEN befehl("andere_zu")
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
+    IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
+    ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
+    DIM wzc AS INTEGER
+    FOR wzc = 0 TO LEN(wzBefehle) - 1
+        IF wzBefehle[wzc] <> "" AND GUI_CLICKED(wzKnoepfe[wzc]) THEN befehl(wzBefehle[wzc])
+    NEXT
+    ' Kacheln: ein Klick oeffnet das Beispiel.
+    DIM kc AS INTEGER
+    FOR kc = 0 TO KACHEL_MAX - 1
+        IF GUI_CLICKED(kachelKnopf[kc]) THEN
+            protokoll("kachel " + kachelDatei[kc])
+            dateiOeffnen(PATHJOIN(beispielOrdner, kachelDatei[kc]))
+        END IF
+    NEXT
+    vorschauNachziehen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")

@@ -48,7 +48,7 @@ RL_F3, RL_F12, RL_U = 292, 301, 85
 
 
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
-         screenshot=None):
+         screenshot=None, wurzel=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
     log = tmp_path / "ide.log"
     quelle = IDE
@@ -77,7 +77,7 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
                        # DH_IDE_KONFIG: die Sitzung des Tests bleibt im Testordner --
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
-                                DH_IDE_WURZEL=str(_ROOT),
+                                DH_IDE_WURZEL=str(wurzel or _ROOT),
                                 DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json"),
                                 **({"DHRT_SCREENSHOT": str(screenshot)} if screenshot else {})),
                        cwd=str(tmp_path))
@@ -797,6 +797,14 @@ def test_farbfeld_oeffnet_den_waehler_und_schreibt_zurueck(tmp_path):
 RL_TAB = 258
 
 
+# Wo die Zeilen des Projektbaums liegen: unter Menue-, Reiter- und
+# Werkzeugleiste, jede Zeile 22 Punkte hoch. Sie stehen HIER an einer
+# Stelle -- als die Werkzeugleiste dazukam, rutschte alles um ihre Hoehe
+# nach unten, und drei Tests klickten daneben.
+def _baum_y(zeile):
+    return 128 + zeile * 22
+
+
 def _klick_mit(frame, x, y, *halten):
     """Klick mit gehaltenen Modifiern -- Strg sammelt im Baum, Umschalt spannt."""
     ev = [(frame, MAUS_POS, x, y), (frame + 1, MAUS_POS, x, y)]
@@ -878,9 +886,9 @@ def test_mehrere_dateien_aus_dem_baum_oeffnen(tmp_path):
     for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
         _datei(tmp_path, "PRINT 1\n", name)
     quelle = tmp_path / "a_eins.dh"
-    ev = _klick_mit(30, 60, 94)
-    ev += _klick_mit(55, 60, 116, RL_LCTRL)
-    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    ev = _klick_mit(30, 60, _baum_y(0))
+    ev += _klick_mit(55, 60, _baum_y(1), RL_LCTRL)
+    ev += _klick_mit(80, 60, _baum_y(2), RL_LCTRL)
     ev += _taste(110, RL_E, RL_LCTRL, RL_LSHIFT)
     log = _ide(tmp_path, quelle, frames=220, events=ev)
     assert "baum offen 3" in log, log
@@ -894,9 +902,9 @@ def test_beim_sammeln_geht_noch_nichts_auf(tmp_path):
     for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
         _datei(tmp_path, "PRINT 1\n", name)
     quelle = tmp_path / "a_eins.dh"
-    ev = _klick_mit(30, 60, 94)
-    ev += _klick_mit(55, 60, 116, RL_LCTRL)
-    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    ev = _klick_mit(30, 60, _baum_y(0))
+    ev += _klick_mit(55, 60, _baum_y(1), RL_LCTRL)
+    ev += _klick_mit(80, 60, _baum_y(2), RL_LCTRL)
     log = _ide(tmp_path, quelle, frames=180, events=ev)
     assert not any(z.startswith("baum offen") for z in log), log
     auf = [z for z in log if z.startswith("geoeffnet ")]
@@ -971,9 +979,9 @@ def test_andere_reiter_schliessen(tmp_path):
     for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
         _datei(tmp_path, "PRINT 1\n", name)
     quelle = tmp_path / "a_eins.dh"
-    ev = _klick_mit(30, 60, 94)
-    ev += _klick_mit(55, 60, 116, RL_LCTRL)
-    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    ev = _klick_mit(30, 60, _baum_y(0))
+    ev += _klick_mit(55, 60, _baum_y(1), RL_LCTRL)
+    ev += _klick_mit(80, 60, _baum_y(2), RL_LCTRL)
     ev += _taste(110, RL_E, RL_LCTRL, RL_LSHIFT)   # alle drei oeffnen
     ev += _taste(150, RL_W, RL_LCTRL, RL_LSHIFT)   # andere zumachen
     log = _ide(tmp_path, quelle, frames=250, events=ev)
@@ -1072,10 +1080,78 @@ def test_zwei_dateien_vergleichen(tmp_path):
     sonst faellt hier ein Datei-Dialog auf, den niemand beantwortet."""
     quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n", "a_eins.dh")
     _datei(tmp_path, "PRINT 1\nPRINT 3\n", "b_zwei.dh")
-    ev = _klick_mit(30, 60, 116)          # b_zwei.dh im Baum waehlen (oeffnet sie)
-    ev += _klick_mit(70, 60, 94)          # zurueck auf a_eins.dh
-    ev += _klick_mit(110, 60, 116, RL_LCTRL)   # b_zwei nur WAEHLEN, nicht oeffnen
+    ev = _klick_mit(30, 60, _baum_y(1))          # b_zwei.dh im Baum waehlen (oeffnet sie)
+    ev += _klick_mit(70, 60, _baum_y(0))          # zurueck auf a_eins.dh
+    ev += _klick_mit(110, 60, _baum_y(1), RL_LCTRL)   # b_zwei nur WAEHLEN, nicht oeffnen
     ev += _palette(150, "Mit einer anderen")
     log = _ide(tmp_path, quelle, frames=320, events=ev, zwischenablage="Mit einer anderen")
     zeilen = [z for z in log if z.startswith("vergleich ")]
     assert zeilen and zeilen[0] != "vergleich 0", log
+
+
+# --------------------------------------------------------------- Stufe 11
+
+def test_werkzeugleiste_startet_das_programm(tmp_path):
+    """Der Knopf in der Leiste ruft denselben Befehl wie sein Menuepunkt.
+    Geklickt wird auf das fuenfte Sinnbild (Starten) -- die Leiste beginnt
+    bei x = 8, jeder Knopf ist 30 breit, dazu ein Trenner von 14."""
+    quelle = _datei(tmp_path, 'PRINT "aus der Leiste"\n')
+    # neu(8) oeffnen(38) sichern(68) |(98..112) start(112)
+    ev = _maus(40, 126, 76)
+    log = _ide(tmp_path, quelle, frames=260, events=ev)
+    assert any(z.startswith("gestartet ") for z in log), log
+    assert "beendet 0" in log, log
+
+
+def test_die_leiste_laesst_sich_abschalten(tmp_path):
+    """Ansicht -> Werkzeugleiste; der Schalter steht in der Sitzung."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _palette(40, "Werkzeugleiste")
+    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="Werkzeugleiste")
+    assert "leiste aus" in log, log
+
+
+def test_kacheln_erzeugen_ihr_vorschaubild(tmp_path):
+    """Ohne Datei steht die Willkommensseite vorn. Fuer jedes Beispiel, das
+    es gibt, laeuft `dhrt bild` einmal im Hintergrund -- und danach liegt
+    das PNG neben der Sitzung. Der Test bringt seinen EIGENEN Beispiel-
+    Ordner mit, sonst liefen die echten acht."""
+    from PIL import Image
+    wurzel = tmp_path / "wurzel"
+    (wurzel / "examples").mkdir(parents=True)
+    (wurzel / "docs").mkdir()
+    # Ohne diese Datei haelt die IDE den Ordner fuer keinen Beispiel-Ordner
+    # und weicht auf die oeffentlichen Dokumente aus -- dann liefe das ECHTE
+    # 09_shapes.dh, und die Vorschau zeigte etwas ganz anderes.
+    (wurzel / "examples" / "183_sfx_generator.dh").write_text("PRINT 1\n", encoding="utf-8")
+    (wurzel / "examples" / "09_shapes.dh").write_text(
+        'SCREEN(200, 120, "P", 1)\n'
+        'WHILE NOT QUITREQUESTED()\n'
+        '    CLS(&H203040)\n'
+        '    BOX(20, 20, 180, 100, &HFF8800)\n'
+        '    FLIP()\n'
+        'WEND\n', encoding="utf-8")
+    log = _ide(tmp_path, "", frames=400, wurzel=wurzel)
+    assert "vorschau 09_shapes.dh" in log, log
+    assert "vorschau fertig 0" in log, log
+    bild = tmp_path / "vorschau" / "09_shapes.png"
+    assert bild.exists(), sorted(p.name for p in tmp_path.iterdir())
+    im = Image.open(bild).convert("RGB")
+    assert im.size == (200, 120)
+    assert _nahe(im.getpixel((100, 60)), (0xFF, 0x88, 0x00), 20), im.getpixel((100, 60))
+
+
+def test_eine_kachel_oeffnet_ihr_beispiel(tmp_path):
+    """Ein Klick auf die Beschriftung unter dem Bild oeffnet die Datei."""
+    wurzel = tmp_path / "wurzel"
+    (wurzel / "examples").mkdir(parents=True)
+    (wurzel / "docs").mkdir()
+    # Ohne diese Datei haelt die IDE den Ordner fuer keinen Beispiel-Ordner
+    # und weicht auf die oeffentlichen Dokumente aus -- dann liefe das ECHTE
+    # 09_shapes.dh, und die Vorschau zeigte etwas ganz anderes.
+    (wurzel / "examples" / "183_sfx_generator.dh").write_text("PRINT 1\n", encoding="utf-8")
+    (wurzel / "examples" / "09_shapes.dh").write_text("PRINT 1\n", encoding="utf-8")
+    # Die erste Kachel: Bild bei y = 198 + Kopf, die Beschriftung darunter.
+    ev = _maus(120, 350, 440)
+    log = _ide(tmp_path, "", frames=260, events=ev, wurzel=wurzel)
+    assert "kachel 09_shapes.dh" in log, log

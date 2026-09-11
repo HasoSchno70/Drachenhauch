@@ -256,6 +256,8 @@ dhrt -- die Drachenhauch-Runtime
   dhrt lsp                     Sprachserver (LSP ueber stdin/stdout, fuer VS Code)
   dhrt doku <prosa|grammatik|referenz>  Doku-Werkzeuge (dhrt doku fuer die Uebersicht)
   dhrt pruef [bloecke|namen|zaehlungen|konstanten|pfade]  Doku gegen die Wirklichkeit
+  dhrt bild <datei> <ziel.png> [bilder]
+                               ein Bild vom laufenden Programm sichern
   dhrt --version               Fassung und eingebaute Bestandteile
   dhrt --help                  diese Uebersicht
 
@@ -352,6 +354,23 @@ fn main() -> ExitCode {
             return pruef::main(&raw[2..]);
         }
         if raw.len() >= 3 && raw[1] == "run" {
+            setze_programm_args(&raw);
+            return run_main(&raw[2]);
+        }
+        // `dhrt bild <quelle.dh> <ziel.png> [bilder]` -- ein Programm N Bilder
+        // lang laufen lassen und das letzte als PNG sichern.
+        //
+        // Das konnte die Laufzeit schon ueber die Umgebungsvariablen
+        // DHRT_FRAMES/DHRT_SCREENSHOT; nur kam man dort aus einem PROGRAMM
+        // heraus nicht hin -- PROCESS_START nimmt sie dem Kind ab, damit ein
+        // gestartetes Spiel nicht nach N Bildern stirbt. Als eigener Befehl
+        // ist es auch die ehrlichere Form: wer ein Bild will, sagt das.
+        if raw.len() >= 4 && raw[1] == "bild" {
+            let bilder = raw.get(4).and_then(|s| s.parse::<u32>().ok()).unwrap_or(90);
+            std::env::set_var("DHRT_FRAMES", bilder.to_string());
+            std::env::set_var("DHRT_SCREENSHOT", &raw[3]);
+            // Aus dem Blick: ein Bild zu machen soll nicht die Arbeit stoeren.
+            std::env::set_var("DHRT_ABSEITS", "1");
             setze_programm_args(&raw);
             return run_main(&raw[2]);
         }
