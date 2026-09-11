@@ -49,6 +49,9 @@
 '  Marke auf die naechste Fundstelle (Strg+Umschalt+N), im ganzen Projekt
 '  ersetzen (Strg+Umschalt+H), andere Reiter schliessen, und ein
 '  Ueber-Kasten, der die Fassung der Laufzeit nennt.
+'  Stand 10 dazu: Spaltenauswahl (Alt+Zug), Marke an jedes Zeilenende
+'  (Strg+Umschalt+I), Zeilen sortieren/entdoppeln/beschneiden, im ganzen
+'  Projekt umbenennen (Strg+Umschalt+F6), zwei Dateien vergleichen.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
