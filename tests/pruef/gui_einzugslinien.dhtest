@@ -1,0 +1,92 @@
+' Einrueckungslinien im Textbereich (GUI_TEXTAREA_SET "einzugslinien").
+' Ein feiner Strich je Stufe, unter dem Text -- und nur ab der zweiten:
+' die erste laege am linken Rand des Textes und waere nur Unruhe.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== eine zweifach eingerueckte zeile bekommt einen strich (Bild)
+IMPORT "gui"
+SCREEN(400, 200, "E", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("E", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_TEXTAREA_SET(ta, "einzugslinien", 1)
+GUI_SET_TEXT(ta, "IF a THEN" + CHR$(10) + "    FOR i" + CHR$(10) + "        PRINT 1" + CHR$(10) + "    NEXT" + CHR$(10) + "END IF")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+34 60 #434C55 +-6
+34 40 nicht #434C55 +-6
+
+=== ohne den schalter steht dort nichts
+' Die Gegenprobe: dieselbe Datei, dieselbe Stelle.
+IMPORT "gui"
+SCREEN(400, 200, "E", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("E", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_SET_TEXT(ta, "IF a THEN" + CHR$(10) + "    FOR i" + CHR$(10) + "        PRINT 1" + CHR$(10) + "    NEXT" + CHR$(10) + "END IF")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+34 60 nicht #434C55 +-6
+
+=== eine leere zeile reisst die linie nicht auf (Bild)
+' Zwischen zwei tief eingerueckten Zeilen steht eine leere. Sie nimmt die
+' kleinere Tiefe ihrer Nachbarn -- sonst haette jeder Absatz ein Loch.
+IMPORT "gui"
+SCREEN(400, 200, "E", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("E", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_TEXTAREA_SET(ta, "einzugslinien", 1)
+GUI_SET_TEXT(ta, "IF a THEN" + CHR$(10) + "        PRINT 1" + CHR$(10) + CHR$(10) + "        PRINT 2" + CHR$(10) + "END IF")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+34 35 #434C55 +-6
+34 60 #434C55 +-6
+34 85 #434C55 +-6
+
+=== ein unbekannter schluessel sagt, was gilt
+IMPORT "gui"
+SCREEN(400, 300, "E", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("E", 10, 10, 360, 260)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 300, 100)
+TRY
+    GUI_TEXTAREA_SET(ta, "einzugslinie", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+einzugslinien

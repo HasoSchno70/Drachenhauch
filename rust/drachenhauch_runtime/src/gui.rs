@@ -1075,6 +1075,9 @@ pub struct Widget {
     // einzuruecken. Was an ihre Stelle kommt, weiss nur der Aufrufer -- die
     // Laufzeit kennt weder Schnipsel noch Sprache.
     abkuerzungen: Vec<String>,
+    // Einrueckungslinien (nur TextArea): ein feiner senkrechter Strich je
+    // Stufe, unter dem Text.
+    einzugslinien: bool,
     // Welche davon in diesem Bild getroffen wurde (-1 = keine). Transient
     // wie `clicked`: ein Tastendruck ist ein Ereignis, kein Zustand.
     abk_treffer: i32,
@@ -2130,9 +2133,14 @@ impl Gui {
             // allein ist sprachfrei; die Woerter, die eine Stufe mehr oder
             // weniger bedeuten, kommen ueber GUI_TEXTAREA_INDENT_WORDS.
             "auto_einzug" | "auto_indent" => wd.auto_einzug = n != 0,
+            // Ein Strich je Einrueckungsstufe. Die Breite einer Stufe haengt
+            // an `tabbreite` -- die Laufzeit misst sie an Leerzeichen, statt
+            // sie zu raten.
+            "einzugslinien" | "indent_guides" => wd.einzugslinien = n != 0,
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
-                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug", other)),
+                 aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
+                 einzugslinien", other)),
         }
         Ok(())
     }
@@ -2253,7 +2261,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
-            abkuerzungen: Vec::new(), abk_treffer: -1,
+            abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -6875,6 +6883,33 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         raus
     }
 
+    /// Wie viele Einrueckungsstufen die (0-basierte) logische Zeile traegt.
+    ///
+    /// Eine LEERE Zeile nimmt die kleinere Tiefe ihrer beiden nicht-leeren
+    /// Nachbarn -- sonst risse die Linie in jedem Absatz auf, und gerade dort
+    /// will man sie sehen. Ein Tabulator zaehlt als eine volle Stufe.
+    fn ta_einzug_tiefe(chars: &[char], starts: &[usize], li: usize, breite: usize) -> usize {
+        let stufen = |i: usize| -> Option<usize> {
+            let von = starts[i];
+            let bis = if i + 1 < starts.len() { starts[i + 1].saturating_sub(1) } else { chars.len() };
+            let mut n = 0usize;
+            for k in von..bis.min(chars.len()) {
+                match chars[k] {
+                    ' ' => n += 1,
+                    '\t' => n += breite,
+                    _ => return Some(n / breite),
+                }
+            }
+            None   // nur Leerraum: die Zeile zaehlt als leer
+        };
+        if let Some(n) = stufen(li) { return n; }
+        let mut vor = 0;
+        for i in (0..li).rev() { if let Some(n) = stufen(i) { vor = n; break; } }
+        let mut nach = 0;
+        for i in li + 1..starts.len() { if let Some(n) = stufen(i) { nach = n; break; } }
+        vor.min(nach)
+    }
+
     /// Liegt die (1-basierte) Zeile in einem zugeklappten Block?
     ///
     /// Die Kopfzeile selbst bleibt sichtbar -- verborgen ist `von+1 ..= bis`.
@@ -10382,6 +10417,26 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     }
                     // Text bleibt rechts der Nummernspalte.
                     g.push_clip(ax + 2 + gutter, ay + 2, (w - 4 - gutter).max(0), (h - 4).max(0));
+                    // Einrueckungslinien, unter allem anderen. Nur die erste
+                    // Zeile eines umgebrochenen Absatzes traegt sie -- der
+                    // Umbruch selbst ist keine Stufe.
+                    if wdg.einzugslinien {
+                        let breite = wdg.tabbreite.max(1) as usize;
+                        let stufe = self.wtext_width(g, wdg, &" ".repeat(breite)).max(1);
+                        let farbe = 0x30_000000 | (fg & 0xFF_FFFF);
+                        for r in 0..view_lines {
+                            let ri = scroll + r;
+                            if ri < 0 || ri as usize >= rows.len() { continue; }
+                            let (li, rs, _) = rows[ri as usize];
+                            if rs != starts[li] { continue; }
+                            let tiefe = Self::ta_einzug_tiefe(&chars, &starts, li, breite);
+                            let y = ay + pad + r * lh;
+                            for k in 1..tiefe {
+                                let x = tx0 + k as i32 * stufe;
+                                g.line(x, y, x, y + lh - 2, farbe);
+                            }
+                        }
+                    }
                     // Selektion-Highlight pro sichtbarer Zeile (halbtransparenter Akzent).
                     // Jede Marke hat ihre eigene Auswahl -- die fuehrende
                     // zuerst, dann die weiteren.
