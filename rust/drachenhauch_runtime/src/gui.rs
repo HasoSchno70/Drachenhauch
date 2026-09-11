@@ -1341,6 +1341,9 @@ pub struct Gui {
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
     // Strg/Umschalt zum Zeitpunkt des Drucks -- handle_press hat kein `g`.
     tasten_mod: (bool, bool),
+    // Hat in diesem Bild ein Menue-Kuerzel gefeuert? Dann gehoert die Taste
+    // dem Menue -- und NICHT zusaetzlich der Navigation im Textfeld.
+    kuerzel_gefeuert: bool,
     // Offene Untermenues unter dem offenen Wurzelmenue: (Menue-Index, x, y)
     // je Ebene. Leer, wenn keine Kette offen ist.
     sub_chain: Vec<(usize, i32, i32)>,
@@ -1452,7 +1455,8 @@ impl Gui {
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
-            open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false), was_right_down: false,
+            open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
+            kuerzel_gefeuert: false, was_right_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
@@ -4036,6 +4040,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if let Some((wi, mi, ii)) = treffer {
             self.open_menu = None; self.context_open = None; self.sub_chain.clear();
+            // Die Taste ist verbraucht. Ohne diesen Merker taete sie ZWEI
+            // Dinge: `Strg+Umschalt+Hoch` feuerte das Kuerzel UND schoebe im
+            // Code-Feld die Auswahl eine Zeile hoch -- der Befehl bekaeme
+            // dann eine andere Auswahl zu sehen, als der Nutzer markiert hat.
+            self.kuerzel_gefeuert = true;
             self.fire_menu_item(wi, mi, ii);
         }
     }
@@ -6016,6 +6025,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let menu_consumed = if self.modal.is_some() { false }
                             else { self.menu_input(mx, my, just_pressed, right_just, g) };
         self.untermenues_folgen(g, mx, my);
+        self.kuerzel_gefeuert = false;
         if !menu_consumed { self.kuerzel_pruefen(g); }
 
         // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
@@ -7279,6 +7289,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let ctrl = g.key_ctrl();
         let shift = g.key_shift();
         let alt = g.key_alt();
+        // Hat ein Menue-Kuerzel dieselbe Taste schon verbraucht? Dann bewegt
+        // sie hier NICHTS mehr (siehe kuerzel_pruefen).
+        let kuerzel_weg = self.kuerzel_gefeuert;
         // Weitere Schreibmarken: LEER heisst eine, und dann laeuft alles wie
         // zuvor. ESC raeumt sie weg -- ohne den Ausweg saehe man nur, dass
         // ploetzlich an mehreren Stellen etwas passiert.
@@ -7568,12 +7581,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             if g.key_pressed(KEY_HOME) { c = rows[row].1 as i32; if !shift { a = c; } }
             if g.key_pressed(KEY_END) { c = rows[row].2 as i32; if !shift { a = c; } }
-            if g.key_pressed(KEY_UP) && row > 0 {
+            if g.key_pressed(KEY_UP) && row > 0 && !kuerzel_weg {
                 let (_, ps, pe) = rows[row - 1];
                 c = (ps as i32 + col).min(pe as i32);
                 if !shift { a = c; }
             }
-            if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() {
+            if g.key_pressed(KEY_DOWN) && row + 1 < rows.len() && !kuerzel_weg {
                 let (_, ns, ne) = rows[row + 1];
                 c = (ns as i32 + col).min(ne as i32);
                 if !shift { a = c; }

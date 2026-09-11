@@ -1155,3 +1155,105 @@ def test_eine_kachel_oeffnet_ihr_beispiel(tmp_path):
     ev = _maus(120, 350, 440)
     log = _ide(tmp_path, "", frames=260, events=ev, wurzel=wurzel)
     assert "kachel 09_shapes.dh" in log, log
+
+
+# --------------------------------------------------------------- Stufe 12
+
+RL_R = 82
+
+
+def test_auswahl_waechst_an_den_bloecken(tmp_path):
+    """Wort, Zeile, der Block darum, dessen Elternblock -- jeder Druck nimmt
+    die naechstgroessere Klammer."""
+    quelle = _datei(tmp_path, "IF a THEN\n    FOR i = 1 TO 3\n"
+                              "        PRINT punkte\n    NEXT\nEND IF\n")
+    ev = _taste(25, RL_DOWN) + _taste(33, RL_DOWN) + _taste(45, RL_END)
+    for k in range(4):
+        ev += _taste(70 + k * 30, RL_UP, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "erweitern Wort" in log, log
+    assert "erweitern Zeile" in log, log
+    assert "erweitern Block 2-3" in log, log
+    assert "erweitern Block 1-4" in log, log
+
+
+def test_auswahl_verkleinern_geht_den_weg_zurueck(tmp_path):
+    quelle = _datei(tmp_path, "IF a THEN\n    PRINT 1\nEND IF\n")
+    ev = _taste(25, RL_DOWN) + _taste(45, RL_END)
+    ev += _taste(70, RL_UP, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(100, RL_UP, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(130, RL_DOWN, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=220, events=ev)
+    assert any(z.startswith("verkleinern ") for z in log), log
+
+
+def test_auswahl_in_ein_unterprogramm_herausloesen(tmp_path):
+    """Die gewaehlten Zeilen wandern in ein neues SUB, an ihrer Stelle steht
+    der Aufruf. Was zugewiesen wird, geht BYREF -- sonst kaeme der Wert nie
+    zurueck. Geprueft an der gesicherten Datei UND daran, dass sie noch
+    uebersetzt."""
+    quelle = _datei(tmp_path,
+                    "SUB rechne()\n"
+                    "    DIM summe AS INTEGER\n"
+                    "    DIM i AS INTEGER\n"
+                    "    summe = 0\n"
+                    "    FOR i = 1 TO 10\n"
+                    "        summe = summe + i\n"
+                    "    NEXT\n"
+                    "    PRINT summe\n"
+                    "END SUB\n"
+                    "rechne()\n")
+    ev = []
+    for k in range(3):
+        ev += _taste(25 + k * 6, RL_DOWN)
+    for k in range(4):
+        ev += _taste(50 + k * 6, RL_DOWN, RL_LSHIFT)
+    ev += _taste(80, RL_R, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(110, RL_V, RL_LCTRL)
+    ev += _taste(140, RL_ENTER)
+    ev += _taste(170, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=260, events=ev, zwischenablage="summiere")
+    assert "herausgeloest summiere 2 0" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB summiere(BYREF summe AS INTEGER, i AS INTEGER)" in text, text
+    assert "    summiere(summe, i)" in text, text
+    r = subprocess.run([str(_DHRT), "--check", str(quelle)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", r.stdout
+
+
+def test_herausloesen_sagt_es_wenn_die_datei_kaputt_geht(tmp_path):
+    """Die Gegenprobe: eine unausgewogene Auswahl (das FOR drin, das NEXT
+    nicht) ergibt Code, der nicht mehr uebersetzt -- und das steht da."""
+    quelle = _datei(tmp_path,
+                    "SUB rechne()\n"
+                    "    DIM summe AS INTEGER\n"
+                    "    DIM i AS INTEGER\n"
+                    "    summe = 0\n"
+                    "    FOR i = 1 TO 10\n"
+                    "        summe = summe + i\n"
+                    "    NEXT\n"
+                    "END SUB\n")
+    ev = []
+    for k in range(3):
+        ev += _taste(25 + k * 6, RL_DOWN)
+    for k in range(3):
+        ev += _taste(50 + k * 6, RL_DOWN, RL_LSHIFT)
+    ev += _taste(80, RL_R, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(110, RL_V, RL_LCTRL)
+    ev += _taste(140, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="halb")
+    zeilen = [z for z in log if z.startswith("herausgeloest ")]
+    assert zeilen and not zeilen[0].endswith(" 0"), log
+
+
+def test_zwei_reiter_nebeneinander_vergleichen(tmp_path):
+    """Die geteilte Ansicht geht an, und in BEIDEN Feldern bekommt die
+    abweichende Zeile eine Marke."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\nPRINT 3\n", "a_eins.dh")
+    _datei(tmp_path, "PRINT 1\nPRINT X\nPRINT 3\n", "b_zwei.dh")
+    ev = _klick_mit(30, 60, _baum_y(1))        # b_zwei oeffnen
+    ev += _palette(70, "Zwei Reiter")
+    log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="Zwei Reiter")
+    assert "reiter vergleich 1 1" in log, log
+    assert any(z.startswith("geteilt 0 ") for z in log), log
