@@ -2873,6 +2873,38 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 11 (2026-09-11):** was der alte Qt-Editor an ANSEHEN hatte --
+eine **Werkzeugleiste mit Sinnbildern** unter dem Menue (neu, oeffnen,
+sichern, starten, stoppen, pruefen, debuggen, suchen, Handbuch,
+Einstellungen; jeder Knopf ruft denselben Befehl wie sein Menuepunkt und
+nennt im Tooltip sein Kuerzel) und **Kacheln mit Bildschirmfotos wichtiger
+Beispiele** auf der Willkommensseite.
+**Der Baustein: `dhrt bild <quelle.dh> <ziel.png> [bilder]`** -- ein
+Programm N Bilder lang laufen lassen und das letzte sichern. Das konnte die
+Laufzeit ueber `DHRT_FRAMES`/`DHRT_SCREENSHOT` laengst; aus einem PROGRAMM
+heraus kam man dort aber nicht hin, weil `PROCESS_START` genau diese
+Variablen dem Kind abnimmt (sonst stuerbe ein gestartetes Spiel nach N
+Bildern). Das Fenster wird dabei aus dem Blick geschoben
+(`DHRT_ABSEITS`, graphics.rs) -- nachgemessen: ein Fenster bei -3000/-3000
+liefert DASSELBE Bild, gesichert wird der Zeichenpuffer und nicht der
+Bildschirm.
+**Drei Stolpersteine, alle vom Test gefunden:**
+(1) `beispielOrdner` faellt auf `%PUBLIC%\Documents\Drachenhauch\examples`
+zurueck, wenn im angegebenen Ordner `183_sfx_generator.dh` fehlt -- ein
+Test mit einem eigenen Beispiel-Ordner bekam still die ECHTEN Beispiele
+(320x240 statt 200x120). Die Markierungsdatei muss mit.
+(2) Die Werkzeugleiste schiebt ALLES um ihre Hoehe nach unten; drei Tests
+klickten danach im Projektbaum daneben. Die Zeilen stehen jetzt an EINER
+Stelle (`_baum_y` in tests/test_ide.py).
+(3) Ein Befehl, der einen Datei-Dialog oeffnet, wenn seine Eingabe fehlt,
+HAENGT im Test (180 s Zeitgrenze) -- der Vergleich nimmt darum die im
+Projektbaum gewaehlte Datei, und der Dialog ist nur der Rueckfall.
+Dazu: `LOADIMAGE` merkt sich den PFAD; ein neu erzeugtes Vorschaubild kaeme
+ohne `IMAGE_FREE` als das alte zurueck.
+Tests: `dhrt bild` in `tests/test_dhrt_werkzeuge.py`, vier neue in
+`tests/test_ide.py` (darunter die Vorschau mit einem eigenen
+Beispiel-Ordner und einer Farbprobe im erzeugten PNG).
+
 **Stufe 10 (2026-09-11):** die erste Stufe OHNE Vorlage -- gegen die
 Qt-IDE war nichts mehr offen, gemessen wird jetzt an dem, was beim
 Schreiben fehlt. **Der Baustein: Spaltenauswahl** im Textbereich

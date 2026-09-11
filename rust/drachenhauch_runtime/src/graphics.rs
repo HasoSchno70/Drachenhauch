@@ -1418,6 +1418,13 @@ impl Graphics {
         if !hidden {
             rl.clear_window_state(WindowState::default().set_window_hidden(true));
         }
+        // `dhrt bild` setzt DHRT_ABSEITS: das Fenster wird aus dem Blick
+        // geschoben, statt fuer eine Sekunde aufzublitzen. Das BILD stimmt
+        // trotzdem -- gesichert wird der Zeichenpuffer, nicht der Bildschirm
+        // (nachgemessen: derselbe Punkt, dieselbe Farbe).
+        if std::env::var("DHRT_ABSEITS").is_ok() {
+            rl.set_window_position(-3000, -3000);
+        }
         rl.set_target_fps(60);
         // Web: die HTML-Leinwand auf die Fenstergroesse bringen.
         //

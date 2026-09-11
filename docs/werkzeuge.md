@@ -28,6 +28,23 @@ fehlt: seriell, usb, bluetooth, wlan (neu bauen mit: python rust/build_runtime.p
 Die Fassung ist dieselbe wie in `pyproject.toml` und
 `drachenhauch/__init__.py`; ein Test hält die drei Angaben zusammen.
 
+## `dhrt bild` — ein Bild vom laufenden Programm
+
+```bash
+dhrt bild examples/112_physics2d.dh vorschau.png 90
+```
+
+Lässt das Programm die angegebene Zahl von Bildern laufen (ohne Angabe 90)
+und sichert das letzte als PNG. Das **Fenster wird dabei aus dem Blick
+geschoben** — ein Bild zu machen soll die Arbeit nicht stören; gesichert
+wird der Zeichenpuffer, nicht der Bildschirm.
+
+Dasselbe konnte die Laufzeit schon über die Umgebungsvariablen
+`DHRT_FRAMES` und `DHRT_SCREENSHOT` (siehe docs/rust-runtime.md). Aus einem
+**Programm** heraus kam man dort aber nicht hin: `PROCESS_START` nimmt sie
+dem Kind ab, damit ein gestartetes Spiel nicht nach N Bildern stirbt. Die
+IDE macht so die Vorschaubilder ihrer Beispiel-Kacheln.
+
 ## `dhrt test` — Prüfprogramme laufen lassen
 
 Die Bausteine gibt es seit WP E (`ASSERT`, `ASSERT_COLLECT`, `ASSERT_REPORT`
