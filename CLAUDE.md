@@ -2873,6 +2873,37 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 7 (2026-09-09):** die Liste aus Stufe 6 abgearbeitet. **Ein
+Baustein in dhrt:** `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` +
+`GUI_TEXTAREA_SWATCH_CLICKED` -- ein kleines Farbquadrat zu einem Stueck
+Text; welche Stelle eine FARBE meint, weiss wieder nur der Aufrufer (die
+IDE sucht `&H`-Literale mit sechs oder acht Stellen). **Die Quadrate
+stehen am ENDE ihrer Zeile**, nicht direkt hinter dem Stueck: dort lagen
+sie bei `CLS(&HFF8800)` genau auf der Klammer -- das hat erst das Bild
+gezeigt. Zwei Fallen vom Test: ein Klick setzte im NAECHSTEN Bild doch
+die Marke (die Taste ist da noch unten, der Zug-Zweig lief) -> das
+Widget merkt sich, dass die Geste auf einem Feld begann; und die
+Rechtecke kommen aus EINER Quelle (`ta_farbfeld_rects`) fuer Zeichnen und
+Treffertest.
+In der IDE dazu: **Einstellungen** (Strg+U, alle Schalter an einer
+Stelle, wirken SOFORT -- ein Thema, das man erst nach dem Schliessen
+sieht, waehlt man blind), **Verzeichnis der eingebauten Befehle**
+(Strg+F3; ohne neuen Baustein -- die Liste ist `CODE_COMPLETE` mit leerem
+Text, die Beschreibung derselbe `CODE_HOVER$` ueber einen Text, der nur
+aus dem Namen besteht), **Definition hier zeigen** (Alt+F12, zehn Zeilen
+ohne die Stelle zu verlassen), **Symbolspur** ueber dem Code,
+**automatisch sichern** (nur was schon einen Namen hat -- sonst kaeme
+mitten im Tippen ein Datei-Dialog) und ein mit dem Wortanfang
+vorbelegter Schnipsel-Filter.
+**Ein Fund, der nur beim ZWEITEN Start auftritt:** eine Einstellung darf
+nicht in eine Variable lesen, die weiter unten angelegt wird -- beim
+ersten Start steht der Schluessel noch nicht in der Datei und die Zeile
+laeuft gar nicht, beim zweiten bricht sie mit "Slot leer" ab. Gefunden
+hat es der Farbfeld-Test, weil er ZWEIMAL laeuft (der erste Lauf sagt,
+wo das Feld liegt -- die Geometrie steht erst zur Laufzeit fest).
+Tests `tests/pruef/gui_farbfelder.dhtest` (5, drei davon Bildproben mit
+Gegenprobe) und 7 neue in `tests/test_ide.py`.
+
 **Stufe 6 (2026-09-09):** die Liste aus Stufe 5 abgearbeitet, Schwerpunkt
 "beim Schreiben". **Ein Baustein in dhrt**, wieder nach dem Muster der
 Faltung (die Laufzeit kennt keine Sprache, der Aufrufer sagt die Woerter):

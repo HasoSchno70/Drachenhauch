@@ -38,6 +38,10 @@
 '  Klammernpaar farbig, Vorschlagsliste beim Tippen, git diff/log samt
 '  geaenderten Zeilen am Rand, Suche mit regulaerem Ausdruck, Lesezeichen
 '  ueber Dateien hinweg, Reiter wieder oeffnen, Faltung nach Einrueckung.
+'  Stand 7 dazu: Farbfelder neben &H-Literalen samt Farbwaehler,
+'  Einstellungen an einer Stelle (Strg+U), Verzeichnis der eingebauten
+'  Befehle (Strg+F3), Definition hier zeigen (Alt+F12), Symbolspur ueber
+'  dem Code, automatisch sichern, Schnipsel-Filter vorbelegt.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -146,6 +150,14 @@ DIM gitRandAn AS BOOLEAN : gitRandAn = TRUE
 DIM regexAn AS BOOLEAN : regexAn = FALSE
 ' Zuletzt geschlossene Reiter -- Strg+Umschalt+T holt sie zurueck.
 DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
+' Vorschlagsliste beim Tippen -- hier oben, weil die Einstellungen ganz am
+' Anfang gelesen werden: eine Zuweisung an eine spaeter angelegte Variable
+' bricht mit "Slot leer" ab, und zwar nur beim ZWEITEN Start (beim ersten
+' steht der Schluessel noch nicht in der Datei).
+DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
+' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
+DIM autoSichern AS INTEGER : autoSichern = 0
+DIM autoFaellig AS FLOAT : autoFaellig = -1.0
 ' Faltung: die Bloecke kommen aus CODE_SYMBOLS$ (dieselbe Quelle wie die
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
@@ -226,6 +238,8 @@ IF JSON_HAS(konfig, "umbruch") THEN umbruchAn = JSON_GET_BOOL(konfig, "umbruch")
 IF JSON_HAS(konfig, "karte") THEN minimapAn = JSON_GET_BOOL(konfig, "karte")
 IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand")
 IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
+IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
+IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell")
 
 ' offene Dialoge (0 = keiner)
@@ -295,6 +309,8 @@ DIM miUmbenennen AS INTEGER : miUmbenennen = GUI_MENU_ITEM(mBearb, "Umbenennen .
 DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einfuegen ...", "Strg+J")
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miPalette AS INTEGER : miPalette = GUI_MENU_ITEM(mBearb, "Befehlspalette ...", "Strg+Umschalt+P")
+DIM miPeek AS INTEGER : miPeek = GUI_MENU_ITEM(mBearb, "Definition hier zeigen", "Alt+F12")
+DIM miEinstellungen AS INTEGER : miEinstellungen = GUI_MENU_ITEM(mBearb, "Einstellungen ...", "Strg+U")
 GUI_MENU_SEPARATOR(mBearb)
 ' Die Handgriffe im Text. Tab/Umschalt+Tab gehoeren dem Feld selbst (Tab
 ' rueckt dort schon ein), darum Alt+Pfeile fuers Ein-/Ausruecken.
@@ -370,6 +386,7 @@ DIM miKleiner AS INTEGER : miKleiner = GUI_MENU_ITEM(mAnsicht, "Schrift kleiner"
 DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
 DIM miHandbuch AS INTEGER : miHandbuch = GUI_MENU_ITEM(mHilfe, "Handbuch (Wort unter der Marke)", "F1")
 DIM miKuerzel AS INTEGER : miKuerzel = GUI_MENU_ITEM(mHilfe, "Tastenkuerzel", "Strg+F1")
+DIM miBefehle AS INTEGER : miBefehle = GUI_MENU_ITEM(mHilfe, "Eingebaute Befehle nachschlagen ...", "Strg+F3")
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
@@ -390,6 +407,9 @@ DIM lstWkZuletzt AS GUI_WIDGET : lstWkZuletzt = GUI_LISTBOX(win, 0, 0, 10, 10, [
 DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das Programm, F7 debuggt es, Umschalt+F7 prueft. F1 schlaegt das Wort unter der Marke im Handbuch nach, Strg+Umschalt+P oeffnet die Befehlspalette, Strg+Umschalt+O eine Datei des Projekts. Alle Kuerzel: Hilfe -> Tastenkuerzel (Strg+F1).", 0, 0)
 ' Uebersichtskarte: eine Zeichenflaeche rechts neben dem Code -- gezeichnet
 ' wird nach GUI_DRAW, wie bei jeder Leinwand.
+' Symbolspur ueber dem Code: Datei > Klasse > Unterprogramm. Sie sagt,
+' WO man ist, wenn der Kopf des Blocks schon aus dem Bild gerollt ist.
+DIM lblSpur AS GUI_WIDGET : lblSpur = GUI_LABEL(win, "", 0, 0)
 DIM karte AS GUI_WIDGET : karte = GUI_CANVAS(win, 0, 0, 10, 10)
 GUI_SET_VISIBLE(karte, FALSE)
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
@@ -470,6 +490,63 @@ GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
 GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 
+' --- Einstellungen ----------------------------------------------------
+' Alle Schalter an EINER Stelle. Sie stehen weiter auch im Menue -- wer
+' den Umbruch sucht, sucht ihn unter Ansicht; wer alles auf einmal sehen
+' will, oeffnet dies hier.
+DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 420, 400)
+GUI_WINDOW_VISIBLE(winEinst, FALSE)
+DIM cbHell AS GUI_WIDGET : cbHell = GUI_CHECKBOX(winEinst, "Helles Thema", 16, 14, FALSE)
+DIM cbUmbruch AS GUI_WIDGET : cbUmbruch = GUI_CHECKBOX(winEinst, "Zeilenumbruch", 16, 44, FALSE)
+DIM cbKarte AS GUI_WIDGET : cbKarte = GUI_CHECKBOX(winEinst, "Uebersichtskarte", 16, 74, FALSE)
+DIM cbGit AS GUI_WIDGET : cbGit = GUI_CHECKBOX(winEinst, "Geaenderte Zeilen am Rand", 16, 104, TRUE)
+DIM cbRegex AS GUI_WIDGET : cbRegex = GUI_CHECKBOX(winEinst, "Suche mit regulaerem Ausdruck", 16, 134, FALSE)
+DIM cbVorschlag AS GUI_WIDGET : cbVorschlag = GUI_CHECKBOX(winEinst, "Vorschlagsliste beim Tippen", 16, 164, TRUE)
+DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgroesse", 16, 200)
+DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 196, 90, 10, 32, 16)
+DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ruhe (0 = nie)", 16, 236)
+DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 232, 90, 0, 120, 0)
+DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schliessen", 16, 300, 120, 30)
+DIM einstOffen AS BOOLEAN : einstOffen = FALSE
+
+' --- Eingebaute Befehle nachschlagen ----------------------------------
+DIM winBefehle AS GUI_WINDOW : winBefehle = GUI_WINDOW("Eingebaute Befehle", 300, 90, 860, 600)
+GUI_WINDOW_VISIBLE(winBefehle, FALSE)
+GUI_WINDOW_RESIZABLE(winBefehle, TRUE)
+DIM tfBefehlFilter AS GUI_WIDGET : tfBefehlFilter = GUI_TEXTINPUT(winBefehle, 8, 8, 300, 26, "Filter ...")
+DIM lblBefehlZahl AS GUI_WIDGET : lblBefehlZahl = GUI_LABEL(winBefehle, "", 316, 12)
+DIM lstBefehle AS GUI_WIDGET : lstBefehle = GUI_LISTBOX(winBefehle, 8, 42, 300, 512, [])
+DIM taBefehlDoku AS GUI_WIDGET : taBefehlDoku = GUI_TEXTAREA(winBefehle, 316, 42, 528, 470)
+DIM btnBefehlEin AS GUI_WIDGET : btnBefehlEin = GUI_BUTTON(winBefehle, "In den Code einfuegen", 316, 522, 200, 30)
+DIM alleBefehle AS ARRAY OF STRING : alleBefehle = []
+DIM gezeigteBefehle AS ARRAY OF STRING : gezeigteBefehle = []
+DIM befehlFilterZuletzt AS STRING : befehlFilterZuletzt = "-"
+DIM befehlWahlZuletzt AS INTEGER : befehlWahlZuletzt = -2
+
+' --- Definition hier zeigen (Peek) -------------------------------------
+DIM winPeek AS GUI_WINDOW : winPeek = GUI_WINDOW("Definition", 380, 260, 720, 300)
+GUI_WINDOW_VISIBLE(winPeek, FALSE)
+DIM lblPeek AS GUI_WIDGET : lblPeek = GUI_LABEL(winPeek, "", 8, 8)
+DIM taPeek AS GUI_WIDGET : taPeek = GUI_TEXTAREA(winPeek, 8, 30, 704, 226)
+DIM btnPeekHin AS GUI_WIDGET : btnPeekHin = GUI_BUTTON(winPeek, "Dorthin springen", 8, 262, 160, 28)
+DIM btnPeekZu AS GUI_WIDGET : btnPeekZu = GUI_BUTTON(winPeek, "Schliessen", 178, 262, 120, 28)
+DIM peekZeile AS INTEGER : peekZeile = 0
+
+' --- Farbe eines &H-Literals aendern ----------------------------------
+' Ein Klick auf das Farbfeld im Code oeffnet den Waehler; [Uebernehmen]
+' schreibt die neue Farbe an genau die Stelle zurueck.
+DIM winFarbe AS GUI_WINDOW : winFarbe = GUI_WINDOW("Farbe", 420, 220, 320, 300)
+GUI_WINDOW_VISIBLE(winFarbe, FALSE)
+DIM cpFarbe AS GUI_WIDGET : cpFarbe = GUI_COLORPICKER(winFarbe, 12, 12, 288, 180)
+DIM lblFarbe AS GUI_WIDGET : lblFarbe = GUI_LABEL(winFarbe, "", 12, 200)
+DIM btnFarbeOk AS GUI_WIDGET : btnFarbeOk = GUI_BUTTON(winFarbe, "Uebernehmen", 12, 226, 140, 30)
+DIM btnFarbeWeg AS GUI_WIDGET : btnFarbeWeg = GUI_BUTTON(winFarbe, "Abbrechen", 162, 226, 120, 30)
+' Welches Literal gerade bearbeitet wird: Anfang und Laenge in ZEICHEN.
+DIM farbStart AS INTEGER : farbStart = -1
+DIM farbLaenge AS INTEGER : farbLaenge = 0
+DIM farbStellen AS ARRAY OF INTEGER : farbStellen = []
+DIM farbLaengen AS ARRAY OF INTEGER : farbLaengen = []
+
 ' --- git: Aenderungen und Verlauf --------------------------------------
 DIM winGit AS GUI_WINDOW : winGit = GUI_WINDOW("git", 240, 90, 900, 620)
 GUI_WINDOW_VISIBLE(winGit, FALSE)
@@ -528,6 +605,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "karte", minimapAn)
     JSON_SET_BOOL(konfig, "git_rand", gitRandAn)
     JSON_SET_BOOL(konfig, "regex", regexAn)
+    JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
+    JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
     DIM p AS STRING
     FOR EACH p IN zuletzt
@@ -649,6 +728,12 @@ SUB layout()
     GUI_SET_BOUNDS(lstGliederung, 8, oben + 52 + baumH, breiteLinks - 16, mitteH - baumH - 52)
     DIM ex AS INTEGER : ex = breiteLinks
     DIM ew AS INTEGER : ew = w - breiteLinks - 8
+    ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
+    DIM spurH AS INTEGER : spurH = 20
+    GUI_SET_BOUNDS(lblSpur, ex + 4, oben, ew - 8, 18)
+    GUI_SET_VISIBLE(lblSpur, tabAnzahl > 0)
+    oben = oben + spurH
+    mitteH = mitteH - spurH
     ' Die Uebersichtskarte nimmt sich einen Streifen am rechten Rand.
     DIM kartenB AS INTEGER : kartenB = 0
     IF minimapAn THEN kartenB = 92
@@ -752,6 +837,179 @@ SUB umbruchSetzen(an AS BOOLEAN)
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, "Zeilenumbruch an.", "Zeilenumbruch aus."))
     konfigSichern()
+END SUB
+
+' --- Einstellungen ----------------------------------------------------
+SUB einstellungenZeigen()
+    GUI_SET_CHECKED(cbHell, hell)
+    GUI_SET_CHECKED(cbUmbruch, umbruchAn)
+    GUI_SET_CHECKED(cbKarte, minimapAn)
+    GUI_SET_CHECKED(cbGit, gitRandAn)
+    GUI_SET_CHECKED(cbRegex, regexAn)
+    GUI_SET_CHECKED(cbVorschlag, vorschlagAn)
+    GUI_SET_VALUE(spSchrift, codeGroesse)
+    GUI_SET_VALUE(spAuto, autoSichern)
+    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 400)
+    GUI_WINDOW_VISIBLE(winEinst, TRUE)
+    einstOffen = TRUE
+    GUI_FOCUS(cbHell)
+    protokoll("einstellungen auf")
+END SUB
+
+' Die Schalter wirken SOFORT, ohne [Uebernehmen]: ein Thema, das man erst
+' nach dem Schliessen sieht, waehlt man blind.
+SUB einstellungenNachziehen()
+    IF NOT einstOffen THEN RETURN
+    IF GUI_CHECKED(cbHell) <> hell THEN befehl("thema")
+    IF GUI_CHECKED(cbUmbruch) <> umbruchAn THEN umbruchSetzen(GUI_CHECKED(cbUmbruch))
+    IF GUI_CHECKED(cbKarte) <> minimapAn THEN minimapSetzen(GUI_CHECKED(cbKarte))
+    IF GUI_CHECKED(cbGit) <> gitRandAn THEN befehl("git_rand")
+    IF GUI_CHECKED(cbRegex) <> regexAn THEN befehl("regex")
+    IF GUI_CHECKED(cbVorschlag) <> vorschlagAn THEN
+        vorschlagAn = GUI_CHECKED(cbVorschlag)
+        IF NOT vorschlagAn THEN vervollSchliessen()
+        konfigSichern()
+    END IF
+    IF INT(GUI_VALUE(spSchrift)) <> codeGroesse THEN schriftSetzen(INT(GUI_VALUE(spSchrift)))
+    IF INT(GUI_VALUE(spAuto)) <> autoSichern THEN
+        autoSichern = INT(GUI_VALUE(spAuto))
+        konfigSichern()
+        protokoll("autosichern " + STR$(autoSichern))
+    END IF
+END SUB
+
+' --- Eingebaute Befehle nachschlagen ----------------------------------
+' Die Liste kommt aus CODE_COMPLETE mit leerem Text: das sind alle Namen,
+' die die Vervollstaendigung ueberhaupt kennt. Die Beschreibung holt
+' derselbe CODE_HOVER$ wie die Statuszeile -- ueber einen Text, der nur
+' aus dem Namen besteht.
+SUB befehleFuellen(filter AS STRING)
+    IF LEN(alleBefehle) = 0 THEN alleBefehle = CODE_COMPLETE("", 1, 1)
+    GUI_LISTBOX_CLEAR(lstBefehle)
+    gezeigteBefehle = []
+    DIM klein AS STRING : klein = LOWER$(filter)
+    DIM b AS STRING
+    FOR EACH b IN alleBefehle
+        IF LEN(gezeigteBefehle) >= 400 THEN BREAK
+        IF klein = "" OR passtUnscharf(b, klein) THEN
+            GUI_LISTBOX_ADD(lstBefehle, b)
+            ARRAY_PUSH(gezeigteBefehle, b)
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblBefehlZahl, STR$(LEN(gezeigteBefehle)) + " von " + STR$(LEN(alleBefehle)))
+    IF LEN(gezeigteBefehle) > 0 THEN GUI_LISTBOX_SET_SELECTED(lstBefehle, 0)
+    befehlWahlZuletzt = -2
+END SUB
+
+SUB befehleZeigen()
+    GUI_SET_TEXT(tfBefehlFilter, "")
+    befehlFilterZuletzt = ""
+    befehleFuellen("")
+    GUI_WINDOW_VISIBLE(winBefehle, TRUE)
+    GUI_FOCUS(tfBefehlFilter)
+    protokoll("befehle " + STR$(LEN(alleBefehle)))
+END SUB
+
+SUB befehleNachziehen()
+    IF NOT GUI_WINDOW_SHOWN(winBefehle) THEN RETURN
+    IF GUI_TEXT(tfBefehlFilter) <> befehlFilterZuletzt THEN
+        befehlFilterZuletzt = GUI_TEXT(tfBefehlFilter)
+        befehleFuellen(befehlFilterZuletzt)
+    END IF
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBefehle)
+    IF sel = befehlWahlZuletzt THEN RETURN
+    befehlWahlZuletzt = sel
+    IF sel < 0 OR sel >= LEN(gezeigteBefehle) THEN RETURN
+    DIM name AS STRING : name = gezeigteBefehle[sel]
+    DIM md AS STRING : md = CODE_HOVER$(name, 1, 1)
+    md = REPLACE$(md, "```drachenhauch" + NL, "")
+    md = REPLACE$(md, "```", "")
+    IF TRIM$(md) = "" THEN md = name + NL + NL + "(keine Beschreibung -- meist ein Schluesselwort der Sprache)"
+    GUI_SET_TEXT(taBefehlDoku, TRIM$(md))
+END SUB
+
+SUB befehlEinfuegen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstBefehle)
+    IF sel < 0 OR sel >= LEN(gezeigteBefehle) THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_WINDOW_VISIBLE(winBefehle, FALSE)
+    GUI_FOCUS(ta)
+    GUI_TEXTAREA_INSERT(ta, gezeigteBefehle[sel])
+    protokoll("befehl eingefuegt " + gezeigteBefehle[sel])
+END SUB
+
+' --- Definition hier zeigen (Peek) -------------------------------------
+' Zehn Zeilen um die Definition, ohne die Datei zu verlassen. Wer doch
+' hin will, hat den Knopf -- das ist F12.
+SUB peekZeigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM dz AS INTEGER
+    DIM ds AS INTEGER
+    (dz, ds) = CODE_DEFINITION(q, z, s)
+    IF dz < 1 THEN
+        GUI_SET_TEXT(lblStatus, "Keine Definition zu '" + wortUnterMarke$() + "' in dieser Datei.")
+        RETURN
+    END IF
+    peekZeile = dz
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
+    DIM von AS INTEGER : von = MAX(1, dz - 1)
+    DIM bis AS INTEGER : bis = MIN(LEN(zeilen), dz + 9)
+    DIM text AS STRING : text = ""
+    DIM i AS INTEGER
+    FOR i = von TO bis
+        text = text + PADL$(STR$(i), 5) + "  " + zeilen[i - 1] + NL
+    NEXT
+    GUI_SET_TEXT(taPeek, text)
+    GUI_SET_TEXT(lblPeek, wortUnterMarke$() + " -- Zeile " + STR$(dz))
+    GUI_WINDOW_SET_BOUNDS(winPeek, (SCREENWIDTH() - 720) \ 2, 240, 720, 300)
+    GUI_WINDOW_VISIBLE(winPeek, TRUE)
+    GUI_FOCUS(taPeek)
+    protokoll("peek " + STR$(dz))
+END SUB
+
+' --- Farbwaehler am Literal -------------------------------------------
+SUB farbfeldNachziehen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM k AS INTEGER : k = GUI_TEXTAREA_SWATCH_CLICKED(ta)
+    IF k < 0 OR k >= LEN(farbStellen) THEN RETURN
+    farbStart = farbStellen[k]
+    farbLaenge = farbLaengen[k]
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM roh AS STRING : roh = MID$(q, farbStart + 2, farbLaenge - 2)
+    IF LEN(roh) = 8 THEN roh = RIGHT$(roh, 6)
+    GUI_SET_PICKED_COLOR(cpFarbe, COLOR_FROM_HEX("#" + roh))
+    GUI_SET_TEXT(lblFarbe, "&H" + roh)
+    GUI_WINDOW_SET_BOUNDS(winFarbe, (SCREENWIDTH() - 320) \ 2, 200, 320, 300)
+    GUI_WINDOW_VISIBLE(winFarbe, TRUE)
+    GUI_FOCUS(cpFarbe)
+    protokoll("farbfeld " + STR$(farbStart))
+END SUB
+
+SUB farbeUebernehmen()
+    GUI_WINDOW_VISIBLE(winFarbe, FALSE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR farbStart < 0 THEN RETURN
+    DIM neu AS STRING : neu = "&H" + UPPER$(RIGHT$(COLOR_HEX$(GUI_PICKED_COLOR(cpFarbe)), 6))
+    ' Aus der Zeichenstelle wieder Zeile und Spalte machen -- GUI_TEXTAREA_SELECT
+    ' rechnet in Zeilen, die Abschnitte in Zeichen.
+    DIM q AS STRING : q = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(LEFT$(q, farbStart), NL)
+    DIM z AS INTEGER : z = LEN(zeilen)
+    DIM s AS INTEGER : s = LEN(zeilen[z - 1]) + 1
+    GUI_TEXTAREA_SELECT(ta, z, s, z, s + farbLaenge)
+    GUI_TEXTAREA_INSERT(ta, neu)
+    GUI_FOCUS(ta)
+    faerbSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, "Farbe: " + neu)
+    protokoll("farbe " + neu)
+    farbStart = -1
 END SUB
 
 ' --- Geteilte Ansicht -------------------------------------------------
@@ -1088,6 +1346,32 @@ END FUNCTION
 
 DIM faerbSchluessel AS STRING : faerbSchluessel = ""
 
+' &H-Literale im Ausschnitt: Anfang, Laenge und Farbe. Sechs oder acht
+' Stellen -- kuerzere Zahlen (`&HFF`) sind keine Farbe, sondern eine Zahl,
+' und ein Feld daneben waere nur Verwirrung.
+SUB farbliteraleSuchen(stueck AS STRING, von AS INTEGER, s AS ARRAY OF INTEGER, _
+                       l AS ARRAY OF INTEGER, f AS ARRAY OF INTEGER)
+    farbStellen = [] : farbLaengen = []
+    DIM ab AS INTEGER : ab = 0
+    WHILE ab < LEN(stueck)
+        DIM p AS INTEGER : p = INSTR(MID$(stueck, ab, LEN(stueck)), "&H")
+        IF p < 0 THEN BREAK
+        p = ab + p
+        DIM k AS INTEGER : k = p + 2
+        WHILE k < LEN(stueck) AND INSTR("0123456789ABCDEFabcdef", MID$(stueck, k, 1)) >= 0
+            k = k + 1
+        WEND
+        DIM stellen AS INTEGER : stellen = k - p - 2
+        IF stellen = 6 OR stellen = 8 THEN
+            DIM roh AS STRING : roh = MID$(stueck, p + 2, stellen)
+            IF stellen = 8 THEN roh = RIGHT$(roh, 6)
+            ARRAY_PUSH(s, p + von) : ARRAY_PUSH(l, k - p) : ARRAY_PUSH(f, COLOR_FROM_HEX("#" + roh))
+            ARRAY_PUSH(farbStellen, p + von) : ARRAY_PUSH(farbLaengen, k - p)
+        END IF
+        ab = MAX(k, p + 2)
+    WEND
+END SUB
+
 SUB faerben(ta AS GUI_WIDGET)
     DIM erste AS INTEGER
     DIM zeilen AS INTEGER
@@ -1160,6 +1444,13 @@ SUB faerben(ta AS GUI_WIDGET)
         END IF
     END IF
     GUI_TEXTAREA_SPANS(ta, s2, l2, f2)
+    ' Farbfelder neben den &H-Literalen -- eine Farbe sieht man nicht, man
+    ' rechnet sie sonst im Kopf aus.
+    DIM fs AS ARRAY OF INTEGER : fs = []
+    DIM fl AS ARRAY OF INTEGER : fl = []
+    DIM ff AS ARRAY OF INTEGER : ff = []
+    farbliteraleSuchen(stueck, von, fs, fl, ff)
+    GUI_TEXTAREA_SWATCHES(ta, fs, fl, ff)
 END SUB
 
 ' --- Pruefen -----------------------------------------------------------
@@ -1288,6 +1579,40 @@ SUB gliederungFuellen(quelle AS STRING)
         GUI_LISTBOX_ADD(lstGliederung, e)
     NEXT
     protokoll("gliederung " + STR$(n))
+END SUB
+
+' Die Symbolspur zur Marke: welcher Block umschliesst sie? Die Gliederung
+' hat schon Anfang und Ende jedes Symbols -- gesucht ist der ENGSTE, der
+' die Zeile enthaelt, samt seinem Elternteil.
+DIM spurSchluessel AS STRING : spurSchluessel = "-"
+
+SUB spurNachziehen()
+    IF aktiverTab < 0 THEN RETURN
+    DIM ta AS GUI_WIDGET : ta = tabFelder[aktiverTab]
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM schl AS STRING : schl = STR$(aktiverTab) + ":" + STR$(z) + ":" + gliederungSchluessel
+    IF schl = spurSchluessel THEN RETURN
+    spurSchluessel = schl
+    DIM datei AS STRING : datei = IIF(tabPfade[aktiverTab] = "", "Unbenannt", BASENAME(tabPfade[aktiverTab]))
+    DIM spur AS STRING : spur = datei
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(GUI_TEXT(ta)))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF z < JSON_GET_INT(j, p + ".von") OR z > JSON_GET_INT(j, p + ".bis") THEN CONTINUE
+        spur = spur + "  >  " + JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name")
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            IF z >= JSON_GET_INT(j, pk + ".von") AND z <= JSON_GET_INT(j, pk + ".bis") THEN
+                spur = spur + "  >  " + JSON_GET_STRING(j, pk + ".name")
+            END IF
+        NEXT
+    NEXT
+    GUI_SET_TEXT(lblSpur, spur)
+    protokoll("spur " + spur)
 END SUB
 
 SUB gliederungAnspringen()
@@ -1892,7 +2217,7 @@ END SUB
 ' Beim Tippen von selbst: ab drei Zeichen zeigt die Liste, was passt. Der
 ' Fokus bleibt im Code-Feld -- die Liste ist ein Vorschlag, keine Sperre.
 SUB vervollNachziehen()
-    IF aktiverTab < 0 OR paletteOffen THEN RETURN
+    IF NOT vorschlagAn OR aktiverTab < 0 OR paletteOffen THEN RETURN
     DIM wort AS STRING : wort = wortAnfang$()
     IF wort = vervollAus THEN RETURN
     vervollAus = "-"
@@ -2177,6 +2502,14 @@ SUB schnipselWaehlen()
         ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i))
     NEXT
     waehlerOeffnen("schnipsel", "Schnipsel einfuegen")
+    ' Der Wortanfang links der Marke fuellt den Filter schon aus: wer `for`
+    ' getippt hat und Strg+J drueckt, hat die FOR-Schleife vor sich.
+    DIM anfang AS STRING : anfang = wortAnfang$()
+    IF anfang <> "" THEN
+        GUI_SET_TEXT(tfPalette, anfang)
+        paletteLetzterFilter = anfang
+        paletteFuellen(anfang)
+    END IF
 END SUB
 
 SUB zeilenErsetzen(ta AS GUI_WIDGET, z1 AS INTEGER, z2 AS INTEGER, neu AS ARRAY OF STRING)
@@ -3115,6 +3448,9 @@ paletteEintrag("Was habe ich geaendert (git diff)", "diff", "Strg+Umschalt+D")
 paletteEintrag("Verlauf dieser Datei (git log)", "verlauf", "")
 paletteEintrag("Geaenderte Zeilen am Rand", "git_rand", "")
 paletteEintrag("Schnipsel einfuegen ...", "schnipsel", "Strg+J")
+paletteEintrag("Einstellungen ...", "einstellungen", "Strg+U")
+paletteEintrag("Eingebaute Befehle nachschlagen ...", "befehle", "Strg+F3")
+paletteEintrag("Definition hier zeigen", "peek", "Alt+F12")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
@@ -3326,6 +3662,9 @@ SUB befehl(k AS STRING)
         CASE "definition" : zurDefinition()
         CASE "umbenennen" : umbenennenFragen()
         CASE "schnipsel" : schnipselWaehlen()
+        CASE "einstellungen" : einstellungenZeigen()
+        CASE "befehle" : befehleZeigen()
+        CASE "peek" : peekZeigen()
         CASE "marken" : markenAufFundstellen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
@@ -3350,7 +3689,7 @@ SUB befehl(k AS STRING)
         CASE "falten" : faltenUmschalten()
         CASE "falten_alle" : faltenAlle(TRUE)
         CASE "falten_auf" : faltenAlle(FALSE)
-        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 6 -- geschrieben in Drachenhauch.", "ok")
+        CASE "ueber" : dlgUeber = GUI_DIALOG("Ueber", "Drachenhauch-IDE, Stand 7 -- geschrieben in Drachenhauch.", "ok")
         CASE "handbuch" : handbuch()
         CASE "hb_ansicht" : handbuchAnsicht(NOT hbGesetzt)
         CASE "drucken" : listingDrucken()
@@ -3566,6 +3905,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miDefinition) THEN befehl("definition")
     IF GUI_CLICKED(miUmbenennen) THEN befehl("umbenennen")
     IF GUI_CLICKED(miSchnipsel) THEN befehl("schnipsel")
+    IF GUI_CLICKED(miEinstellungen) THEN befehl("einstellungen")
+    IF GUI_CLICKED(miBefehle) THEN befehl("befehle")
+    IF GUI_CLICKED(miPeek) THEN befehl("peek")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")
@@ -3649,6 +3991,19 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     werkzeugeAufraeumen()
     IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
     gitRandNachziehen(FALSE)
+    farbfeldNachziehen()
+    einstellungenNachziehen()
+    befehleNachziehen()
+    IF GUI_CLICKED(btnEinstZu) THEN GUI_WINDOW_VISIBLE(winEinst, FALSE) : einstOffen = FALSE : GUI_FOCUS(aktivesFeld())
+    IF GUI_CLICKED(btnBefehlEin) OR GUI_DOUBLE_CLICKED(lstBefehle) THEN befehlEinfuegen()
+    IF GUI_CLICKED(btnPeekZu) THEN GUI_WINDOW_VISIBLE(winPeek, FALSE) : GUI_FOCUS(aktivesFeld())
+    IF GUI_CLICKED(btnPeekHin) THEN
+        GUI_WINDOW_VISIBLE(winPeek, FALSE)
+        IF aktivesFeld() >= 0 AND peekZeile > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), peekZeile, 1)
+        GUI_FOCUS(aktivesFeld())
+    END IF
+    IF GUI_CLICKED(btnFarbeOk) THEN farbeUebernehmen()
+    IF GUI_CLICKED(btnFarbeWeg) THEN GUI_WINDOW_VISIBLE(winFarbe, FALSE) : farbStart = -1 : GUI_FOCUS(aktivesFeld())
 
     ' --- Dialoge auswerten ---
     IF dlgSuche <> 0 THEN
@@ -3782,12 +4137,24 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         IF jetzt <> tabLetzterText[aktiverTab] THEN
             tabLetzterText[aktiverTab] = jetzt
             pruefungFaellig = GET_TIME() + 0.6
+            IF autoSichern > 0 THEN autoFaellig = GET_TIME() + autoSichern
             reiterNeuSetzen()
+        END IF
+        ' Automatisch sichern: erst nach der eingestellten Ruhe, und nur was
+        ' schon einen Namen hat -- fuer einen neuen Reiter kaeme sonst mitten
+        ' im Tippen ein Datei-Dialog.
+        IF autoSichern > 0 AND autoFaellig >= 0.0 AND GET_TIME() >= autoFaellig THEN
+            autoFaellig = -1.0
+            IF tabPfade[aktiverTab] <> "" AND jetzt <> tabGesichert[aktiverTab] THEN
+                sichern(aktiverTab, FALSE)
+                protokoll("auto gesichert")
+            END IF
         END IF
         faerben(tf)
         markenNachziehen()
         hilfeNachziehen()
         vervollNachziehen()
+        spurNachziehen()
         IF pruefungFaellig >= 0.0 AND GET_TIME() >= pruefungFaellig THEN
             pruefungFaellig = -1.0
             pruefen()

@@ -1,0 +1,133 @@
+' Farbfelder im Textbereich (GUI_TEXTAREA_SWATCHES + SWATCH_CLICKED).
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein farbfeld steht hinter seinem stueck (Bild)
+' Der Beleg, dass wirklich gezeichnet wird: das Quadrat liegt am ENDE der
+' Zeile, in seiner Farbe -- direkt hinter dem Stueck laege es auf dem
+' naechsten Zeichen. Gegenprobe: ueber dem Wort steht es nicht.
+IMPORT "gui"
+SCREEN(400, 200, "F", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("F", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_SET_TEXT(ta, "rot")
+GUI_TEXTAREA_SWATCHES(ta, [0], [3], [&HFF0000])
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+54 17 #FF0000 +-30
+20 17 nicht #FF0000 +-30
+
+=== ohne farbfelder ist nichts zu sehen
+' Dieselbe Stelle, dieselbe Datei, nur ohne den Aufruf.
+IMPORT "gui"
+SCREEN(400, 200, "F", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("F", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_SET_TEXT(ta, "rot")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+54 17 nicht #FF0000 +-30
+
+=== ein klick meldet die nummer und laesst die marke stehen
+IMPORT "gui"
+SCREEN(400, 200, "F", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("F", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_SET_TEXT(ta, "rot" + CHR$(10) + "gruen")
+GUI_TEXTAREA_SWATCHES(ta, [0, 4], [3, 5], [&HFF0000, &H00FF00])
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+DIM gesehen AS INTEGER : gesehen = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF GUI_TEXTAREA_SWATCH_CLICKED(ta) >= 0 THEN gesehen = GUI_TEXTAREA_SWATCH_CLICKED(ta)
+    IF n = 25 THEN
+        PRINT "geklickt "; gesehen
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "marke "; z; " "; s
+        PRINT "danach "; GUI_TEXTAREA_SWATCH_CLICKED(ta)
+    END IF
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Maus auf das zweite Farbfeld (Zeile 2, hinter "gruen") und klicken
+c 4
+e 2 7 80 42 0 0 // Maus hin
+e 3 7 80 42 0 0 // und noch einmal
+e 4 6 0 0 0 0 // Taste runter
+e 6 5 0 0 0 0 // Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+geklickt 1
+marke 1 1
+danach -1
+
+=== neuer text raeumt die farbfelder weg
+' Sie haengen an Zeichenstellen des ALTEN Textes.
+IMPORT "gui"
+SCREEN(400, 200, "F", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("F", 0, 0, 400, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 0, 0, 400, 200)
+GUI_SET_TEXT(ta, "rot")
+GUI_TEXTAREA_SWATCHES(ta, [0], [3], [&HFF0000])
+GUI_SET_TEXT(ta, "ganz anders")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H000000)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+groesse 400 200
+54 17 nicht #FF0000 +-30
+
+=== drei ungleich lange listen sind ein fehler
+IMPORT "gui"
+SCREEN(400, 200, "F", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("F", 0, 0, 400, 200)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 300, 100)
+GUI_TEXTAREA_SWATCHES(ta, [0, 5], [3], [&HFF0000])
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+gleich lang

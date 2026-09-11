@@ -1050,6 +1050,17 @@ pub struct Widget {
     einzug_anfang: Vec<String>,   // Zeile faengt damit an -> eine Stufe mehr
     einzug_ende: Vec<String>,     // Zeile endet damit -> eine Stufe mehr
     einzug_aus: Vec<String>,      // getippt -> die Zeile selbst eine zurueck
+    // Farbfelder (nur TextArea): (start, laenge, farbe) in ZEICHEN wie die
+    // Abschnitte. Gezeichnet wird ein kleines Quadrat HINTER dem Stueck --
+    // welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer.
+    farbfelder: Vec<(u32, u32, i64)>,
+    // Welches davon in diesem Bild angeklickt wurde (-1 = keins). Transient
+    // wie `clicked`: ein Klick ist ein Ereignis, kein Zustand.
+    farbfeld_klick: i32,
+    // Der laufende Zug begann auf einem Farbfeld: dann zieht er auch keine
+    // Auswahl. Ohne das setzte das naechste Bild -- die Taste ist noch
+    // unten -- die Marke doch noch ans Feld.
+    farbfeld_zug: bool,
     // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
     //
     // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
@@ -1958,6 +1969,43 @@ impl Gui {
         Ok(z)
     }
 
+    /// Farbfelder im Text (GUI_TEXTAREA_SWATCHES).
+    ///
+    /// Drei gleich lange Listen: Anfang und Laenge des Stueckes in ZEICHEN
+    /// (wie bei den Abschnitten) und die Farbe. Gezeichnet wird ein kleines
+    /// Quadrat HINTER dem Stueck -- der Text bleibt, wie er ist; nichts
+    /// wird verdeckt oder verschoben.
+    ///
+    /// **Welche Stelle im Text eine Farbe meint, weiss nur der Aufrufer.**
+    /// Die IDE sucht dafuer `&H`-Literale; ein anderes Programm faende sie
+    /// woanders. Dieselbe Aufteilung wie bei Faltung und Einrueckung.
+    pub fn textarea_swatches(&mut self, h: i64, starts: Vec<i64>, laengen: Vec<i64>,
+                             farben: Vec<i64>) -> Result<(), String> {
+        if starts.len() != laengen.len() || starts.len() != farben.len() {
+            return Err(format!(
+                "GUI_TEXTAREA_SWATCHES: die drei Listen muessen gleich lang sein \
+                 ({} Starts, {} Laengen, {} Farben)",
+                starts.len(), laengen.len(), farben.len()));
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SWATCHES")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_SWATCHES: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.farbfelder = starts.iter().zip(&laengen).zip(&farben)
+            .filter(|((_, &l), _)| l > 0)
+            .map(|((&s, &l), &c)| (s.max(0) as u32, l as u32, c))
+            .collect();
+        Ok(())
+    }
+
+    /// Welches Farbfeld wurde in diesem Bild angeklickt (GUI_TEXTAREA_SWATCH_CLICKED)?
+    ///
+    /// Die Nummer in der Liste von `GUI_TEXTAREA_SWATCHES`, -1 = keins.
+    /// Gilt genau ein Bild lang, wie `GUI_CLICKED`.
+    pub fn textarea_swatch_clicked(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ta_wdg(h, "GUI_TEXTAREA_SWATCH_CLICKED")?.farbfeld_klick as i64)
+    }
+
     /// Woerter, die die Einrueckung steuern (GUI_TEXTAREA_INDENT_WORDS).
     ///
     /// Drei Listen, alle ohne Ruecksicht auf Gross/Klein:
@@ -2162,6 +2210,7 @@ impl Gui {
             faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
+            farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -3916,8 +3965,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // sonst etwas zurueck, das der Nutzer nie getippt hat.
         w.undo.clear(); w.redo.clear();
         // Die Faltung ebenso: sie haengt an Zeilennummern des alten Textes,
-        // und die decken sich mit dem neuen nur zufaellig.
-        w.gefaltet.clear(); w.faltbar.clear();
+        // und die decken sich mit dem neuen nur zufaellig. Die Farbfelder
+        // haengen an Zeichenstellen -- dasselbe Argument.
+        w.gefaltet.clear(); w.faltbar.clear(); w.farbfelder.clear();
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
@@ -5804,6 +5854,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
+                wdg.farbfeld_klick = -1;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
@@ -6651,6 +6702,48 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    /// Die Rechtecke der Farbfelder im sichtbaren Ausschnitt, je mit ihrer
+    /// Nummer: (index, x, y, kante).
+    ///
+    /// Sie stehen am ENDE ihrer Zeile, nicht direkt hinter dem Stueck: dort
+    /// laege das Quadrat auf dem naechsten Zeichen (bei `CLS(&HFF8800)` genau
+    /// auf der Klammer). Mehrere in einer Zeile reihen sich auf, in der
+    /// Reihenfolge des Textes.
+    ///
+    /// EINE Quelle fuer Zeichnen und Treffertest -- liefen sie auseinander,
+    /// oeffnete ein Klick neben dem Feld den Farbwaehler (oder gar keiner).
+    fn ta_farbfeld_rects(&self, g: &Graphics, wdg: &Widget, ax: i32, ay: i32,
+                         chars: &[char], rows: &[(usize, usize, usize)],
+                         starts_len: usize, view_lines: i32)
+                         -> Vec<(usize, i32, i32, i32)> {
+        let mut raus = Vec::new();
+        if wdg.farbfelder.is_empty() { return raus; }
+        let pad = 5;
+        let lh = self.ta_line_h(g);
+        let gutter = self.ta_gutter(g, wdg, starts_len);
+        let tx0 = ax + pad + gutter - wdg.scroll_x;
+        let kante = (lh - self.sk(6)).max(self.sk(6));
+        let luecke = self.sk(4);
+        // Je sichtbarer Zeile: wie viele Felder stehen dort schon?
+        let mut belegt: std::collections::HashMap<usize, i32> = Default::default();
+        for (k, &(s, l, _)) in wdg.farbfelder.iter().enumerate() {
+            let ende = (s as usize + l as usize).min(chars.len());
+            // In welcher sichtbaren Zeile endet das Stueck?
+            let Some(r) = rows.iter().position(|&(_, von, bis)| ende >= von && ende <= bis)
+                else { continue };
+            let zeile = r as i32 - wdg.scroll;
+            if zeile < 0 || zeile >= view_lines { continue; }
+            let nummer = belegt.entry(r).or_insert(0);
+            let ganze: String = chars[rows[r].1..rows[r].2].iter().collect();
+            let x = tx0 + self.wtext_width(g, wdg, &ganze) + luecke * 2
+                    + *nummer * (kante + luecke);
+            *nummer += 1;
+            let y = ay + pad + zeile * lh + (lh - kante) / 2;
+            raus.push((k, x, y, kante));
+        }
+        raus
+    }
+
     /// Liegt die (1-basierte) Zeile in einem zugeklappten Block?
     ///
     /// Die Kopfzeile selbst bleibt sichtbar -- verborgen ist `von+1 ..= bis`.
@@ -6989,7 +7082,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
         // Maus: Klick (steigende Flanke) setzt Caret+Anker, Ziehen erweitert die
         // Selektion bis zur aktuellen Position.
-        if g.mouse_button(0) {
+        if !g.mouse_button(0) { self.windows[wi].widgets[i].farbfeld_zug = false; }
+        if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
             let starts = Self::line_starts(&chars);
@@ -6997,6 +7091,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let rows = self.ta_rows(g, wref, &chars, &starts, self.ta_breite(g, wref, starts.len()));
             let r = (row as usize).min(rows.len().saturating_sub(1));
             let (rli, lstart, lend) = rows[r];
+            // Klick auf ein Farbfeld meldet sich und laesst die Marke stehen
+            // -- man will die Farbe aendern, nicht dort schreiben.
+            if !self.was_mouse_down && Self::in_rect(mx, my, (ax, ay, fw, fh))
+               && !self.windows[wi].widgets[i].farbfelder.is_empty() {
+                let sicht = ((fh - 2 * pad) / lh).max(1);
+                let treffer = self.ta_farbfeld_rects(g, wref, ax, ay, &chars, &rows,
+                                                     starts.len(), sicht)
+                    .into_iter()
+                    .find(|&(_, fx, fy, kante)| Self::in_rect(mx, my, (fx, fy, kante, kante)));
+                if let Some((k, _, _, _)) = treffer {
+                    self.windows[wi].widgets[i].farbfeld_klick = k as i32;
+                    self.windows[wi].widgets[i].farbfeld_zug = true;
+                    return;
+                }
+            }
             // Klick auf den Faltpfeil klappt um, statt die Marke zu setzen --
             // sonst spraenge sie bei jedem Zuklappen mit.
             if !self.was_mouse_down && Self::in_rect(mx, my, (ax, ay, fw, fh)) {
@@ -10163,6 +10272,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             g.box_fill(bx, y + 1, bx + bw, y + lh - 3, shade(self.wcol(wdg, "bg", "win_bg"), 26));
                             self.wtext(g, wdg, bx + self.sk(5), y, txt, self.th("muted_fg"));
                         }
+                    }
+                    // Farbfelder: ein kleines Quadrat hinter dem Stueck, mit
+                    // Rahmen -- ohne ihn verschwaende ein dunkles Feld im
+                    // dunklen Grund.
+                    for (k, fx, fy, kante) in
+                            self.ta_farbfeld_rects(g, wdg, ax, ay, &chars, &rows, starts.len(), view_lines) {
+                        let farbe = wdg.farbfelder[k].2;
+                        g.box_fill(fx, fy, fx + kante, fy + kante, farbe);
+                        g.rect(fx, fy, fx + kante, fy + kante, self.th("widget_border"));
                     }
                     g.pop_clip();
                     // Nummernspalte: eigener Grund, rechtsbuendige Zahlen,
