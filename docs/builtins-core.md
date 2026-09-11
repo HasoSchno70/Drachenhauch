@@ -1375,6 +1375,7 @@ DH_LOG=debug dhrt run werkzeug.dh
 | `TIMER()` → FLOAT | dieselbe Uhr in Sekunden |
 | `TIME$()` → STRING | aktuelle Uhrzeit `"HH:MM:SS"` |
 | `DATE$()` → STRING | aktuelles Datum `"YYYY-MM-DD"` |
+| `VERSION$()` → STRING | die Fassung der Laufzeit, die gerade läuft (dieselbe Zahl wie `dhrt --version`) |
 | `RND()` → FLOAT | Zufallszahl in `[0, 1)` |
 | `RND(n)` → INTEGER | Zufalls-INT in `[0, n)` |
 | `RANDINT(lo, hi)` → INTEGER | Zufalls-INT in `[lo, hi]` (inklusiv) |

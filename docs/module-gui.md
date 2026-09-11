@@ -2107,7 +2107,7 @@ einem brauchbaren Code-Feld.
 
 | Funktion | Wirkung |
 |---|---|
-| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite`, `umbruch`, `auto_einzug` |
+| `GUI_TEXTAREA_SET(ta, schluessel$, wert)` | `zeilennummern`, `aktive_zeile`, `tab_fuegt_ein`, `tabbreite`, `umbruch`, `auto_einzug`, `einzugslinien` (ein feiner Strich je Einrückungsstufe, unter dem Text; die erste Stufe bleibt frei, sie läge am linken Rand) |
 | `GUI_TEXTAREA_SPANS(ta, starts, laengen, farben)` | Zeichen `start … start+laenge` in `farbe` zeichnen |
 | `SYNTAX_SPANS(quelltext$)` → (starts, laengen, arten) | Drachenhauch-Quelltext zerlegen |
 | `GUI_TEXTAREA_VIEW(ta)` → (erste_zeile, zeilen, start_zeichen, laenge_zeichen) | welcher Ausschnitt ist gerade zu sehen? |

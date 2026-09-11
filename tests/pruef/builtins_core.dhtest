@@ -330,3 +330,12 @@ PRINT MID$(d, 4, 1) + MID$(d, 7, 1)
 ::
 10
 --
+
+=== version ist die fassung der laufzeit
+' Die Zahl aendert sich mit jeder Fassung, die FORM nicht: Jahr.Zaehler.
+DIM v AS STRING : v = VERSION$()
+PRINT REGEX_TEST(v, "^[0-9]+\.[0-9]+$")
+PRINT LEN(v) >= 6
+--- erwartet
+TRUE
+TRUE

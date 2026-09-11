@@ -1067,6 +1067,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let (y, mo, d, _, _, _) = local_datetime();
             Ok(Value::str_rc(&format!("{:04}-{:02}-{:02}", y, mo, d)))
         }
+        // Die Fassung der Laufzeit, die GERADE laeuft -- dieselbe Zahl, die
+        // `dhrt --version` nennt. Ein Programm hatte bisher keinen Weg, sie
+        // zu erfahren; ein fest eingetippter Text im Quelltext veraltet.
+        "version$" | "version" => {
+            arity!(0);
+            let v = env!("CARGO_PKG_VERSION");
+            Ok(Value::str_rc(v.strip_suffix(".0").unwrap_or(v)))
+        }
         "range" => {
             for v in a {
                 if !matches!(v, Value::Int(_)) {
