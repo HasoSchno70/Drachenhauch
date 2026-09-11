@@ -1078,6 +1078,9 @@ pub struct Widget {
     // Einrueckungslinien (nur TextArea): ein feiner senkrechter Strich je
     // Stufe, unter dem Text.
     einzugslinien: bool,
+    // Wo ein Alt-Zug begonnen hat (logische Zeile, Spalte), (-1, -1) = keiner.
+    // Daraus wird beim Ziehen die SPALTENauswahl gebaut.
+    spalten_start: (i32, i32),
     // Welche davon in diesem Bild getroffen wurde (-1 = keine). Transient
     // wie `clicked`: ein Tastendruck ist ein Ereignis, kein Zustand.
     abk_treffer: i32,
@@ -2262,6 +2265,7 @@ impl Gui {
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
+            spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -6883,6 +6887,50 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         raus
     }
 
+    /// Eine Spaltenauswahl als Marken: je Zeile eine, mit ihrer eigenen
+    /// Auswahl von Spalte `ca` bis `cb`. Zeilen, die nicht so weit reichen,
+    /// bekommen eine Marke an ihrem Ende -- sonst faellt beim Tippen mitten
+    /// im Block eine Zeile heraus, und das sieht man erst hinterher.
+    ///
+    /// Gerechnet wird in ZEICHEN je logischer Zeile. Fuer ein Code-Feld mit
+    /// fester Schrittweite ist das genau die Spalte; bei einer proportionalen
+    /// Schrift waere eine Spalte ohnehin keine Laenge.
+    fn spalten_marken(chars: &[char], starts: &[usize], z0: i32, c0: i32, z1: i32, c1: i32)
+                      -> Vec<(i32, i32)> {
+        let (za, zb) = (z0.min(z1).max(0), z0.max(z1));
+        let (ca, cb) = (c0.min(c1).max(0), c0.max(c1));
+        let mut raus = Vec::new();
+        for z in za..=zb {
+            let zi = z as usize;
+            if zi >= starts.len() { break; }
+            let von = starts[zi];
+            let bis = if zi + 1 < starts.len() { starts[zi + 1].saturating_sub(1) } else { chars.len() };
+            let laenge = bis.saturating_sub(von) as i32;
+            let a = von as i32 + ca.min(laenge);
+            let b = von as i32 + cb.min(laenge);
+            raus.push((b, a));   // (Marke, Anker): die Marke steht rechts
+        }
+        raus
+    }
+
+    /// Spaltenauswahl setzen (GUI_TEXTAREA_SELECT_COLUMNS), Zeilen und Spalten
+    /// ab 1. Die erste Zeile traegt die fuehrende Marke, die uebrigen kommen
+    /// als weitere dazu -- getippt wird danach in allen zugleich.
+    pub fn textarea_select_columns(&mut self, h: i64, z1: i64, s1: i64, z2: i64, s2: i64)
+                                   -> Result<i64, String> {
+        let w = self.ta_wdg(h, "GUI_TEXTAREA_SELECT_COLUMNS")?;
+        let chars: Vec<char> = w.text.chars().collect();
+        let starts = Self::line_starts(&chars);
+        let marken = Self::spalten_marken(&chars, &starts,
+            (z1 - 1) as i32, (s1 - 1) as i32, (z2 - 1) as i32, (s2 - 1) as i32);
+        if marken.is_empty() { return Err("GUI_TEXTAREA_SELECT_COLUMNS: leerer Bereich".into()); }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_SELECT_COLUMNS")?;
+        wd.caret = marken[0].0;
+        wd.sel_anchor = marken[0].1;
+        wd.marken_zusatz = marken[1..].to_vec();
+        Ok(marken.len() as i64)
+    }
+
     /// Wie viele Einrueckungsstufen die (0-basierte) logische Zeile traegt.
     ///
     /// Eine LEERE Zeile nimmt die kleinere Tiefe ihrer beiden nicht-leeren
@@ -7248,7 +7296,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
         // Maus: Klick (steigende Flanke) setzt Caret+Anker, Ziehen erweitert die
         // Selektion bis zur aktuellen Position.
-        if !g.mouse_button(0) { self.windows[wi].widgets[i].farbfeld_zug = false; }
+        if !g.mouse_button(0) {
+            self.windows[wi].widgets[i].farbfeld_zug = false;
+            self.windows[wi].widgets[i].spalten_start = (-1, -1);
+        }
         if g.mouse_button(0) && !self.windows[wi].widgets[i].farbfeld_zug {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
             let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
@@ -7304,9 +7355,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     } else if !alt {
                         caret = idx; anchor = idx;
                     }
+                    // Wo ein Alt-Zug anfaengt: ein Klick ohne Bewegung bleibt
+                    // die weitere Marke von oben, ein ZUG macht daraus eine
+                    // Spaltenauswahl.
+                    if alt {
+                        self.windows[wi].widgets[i].spalten_start =
+                            (rli as i32, idx - starts[rli] as i32);
+                    }
                 }
             } else if !alt {
                 caret = idx;   // Ziehen -> Selektion bis hierher
+            } else if self.windows[wi].widgets[i].spalten_start.0 >= 0 {
+                // Alt-Zug: ein RECHTECK statt eines Laufs. Jede Zeile bekommt
+                // ihre eigene Marke samt Auswahl -- getippt wird in allen.
+                let (z0, c0) = self.windows[wi].widgets[i].spalten_start;
+                let marken = Self::spalten_marken(&chars, &starts, z0, c0,
+                                                  rli as i32, idx - starts[rli] as i32);
+                if !marken.is_empty() {
+                    caret = marken[0].0;
+                    anchor = marken[0].1;
+                    zusatz = marken[1..].to_vec();
+                }
             }
         }
 
