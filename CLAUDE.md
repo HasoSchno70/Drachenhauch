@@ -2873,6 +2873,39 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 8 (2026-09-11):** die Liste aus Stufe 7 abgearbeitet. **Zwei
+Bausteine in dhrt**, beide nach dem bekannten Muster (die Laufzeit kennt
+keine Sprache, der Aufrufer sagt die Woerter):
+(1) `GUI_TEXTAREA_ABBREV(ta, woerter)` + `GUI_TEXTAREA_ABBREV_HIT(ta)` --
+steht links der Marke eines der Woerter, MELDET der Tabulator es, statt
+einzuruecken; was an seine Stelle kommt, setzt der Aufrufer. Geprueft wird
+nur im Feld, das den Tabulator ohnehin hat (`tab_fuegt_ein`) -- sonst
+gehoert die Taste dem Fokus-Wechsel, und ein Wort ohne Treffer waere eine
+TOTE Taste. (2) `GUI_TREE_SET(tree, "mehrfachauswahl", 1)` plus
+`SEL_COUNT/SEL_NODE/IS_SELECTED/SELECT/CLEAR_SELECTION` -- dieselben
+Abfragen wie bei Liste und Tabelle; der Baum war die letzte Auswahl-Art
+ohne sie. Strg+Klick sammelt, Umschalt+Klick spannt in der SICHTBAREN
+Reihenfolge (ueber Knoten-Nummern traefe der Bereich bei zugeklappten
+Aesten etwas anderes als das, was man sieht).
+In der IDE dazu: **Schnipsel per Kuerzel** (`for` tippen, Tabulator --
+jeder der 13 hat ein kurzes Wort), **Symbolverzeichnis ueber ALLE Dateien
+des Projekts** (Strg+Umschalt+S; auf Zuruf gebaut, nicht je Bild, und ein
+offener Reiter zaehlt mit dem Stand IM Editor statt mit dem auf der
+Platte), **Zur Definition und Definition hier zeigen ueber Dateigrenzen**
+(derselbe Index -- `CODE_DEFINITION` sieht nur den Text, den man ihm
+gibt) und **Mehrfachauswahl im Projektbaum** samt "Gewaehlte Dateien
+oeffnen" (Strg+Umschalt+E).
+**Der Fund dieser Runde:** jedes Oeffnen baute den Projektbaum neu auf
+(`GUI_TREE_CLEAR`), und das raeumt die Auswahl weg -- die Mehrfachauswahl
+kam damit nie ueber EINE Datei hinaus, weil schon der erste Klick eine
+Datei oeffnet. `baumFuellen` merkt sich jetzt die Dateiliste und laesst den
+Baum stehen, wenn sie dieselbe ist. Beim SAMMELN wird ausserdem nicht
+geoeffnet (nur bei genau einer Auswahl, und wenn es die angeklickte ist),
+sonst kaeme mit jedem Strg+Klick ein Reiter dazu.
+Tests `tests/pruef/gui_abkuerzungen.dhtest` (5, mit Gegenprobe ohne die
+Liste), `tests/pruef/gui_baum_mehrfach.dhtest` (6, Klicks echt
+eingespeist) und 7 neue in `tests/test_ide.py`.
+
 **Stufe 7 (2026-09-09):** die Liste aus Stufe 6 abgearbeitet. **Ein
 Baustein in dhrt:** `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` +
 `GUI_TEXTAREA_SWATCH_CLICKED` -- ein kleines Farbquadrat zu einem Stueck

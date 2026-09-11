@@ -790,3 +790,114 @@ def test_farbfeld_oeffnet_den_waehler_und_schreibt_zurueck(tmp_path):
     ev = _maus(40, mx, my)
     log = _ide(tmp_path, quelle, frames=200, events=ev)
     assert any(z.startswith("farbfeld ") for z in log), (log, mx, my)
+
+
+# ---------------------------------------------------------------- Stufe 8
+
+RL_TAB = 258
+
+
+def _klick_mit(frame, x, y, *halten):
+    """Klick mit gehaltenen Modifiern -- Strg sammelt im Baum, Umschalt spannt."""
+    ev = [(frame, MAUS_POS, x, y), (frame + 1, MAUS_POS, x, y)]
+    ev += [(frame + 1, KEY_DOWN, h) for h in halten]
+    ev += [(frame + 1, MAUS_RUNTER, 0), (frame + 2, MAUS_HOCH, 0)]
+    ev += [(frame + 3, KEY_UP, h) for h in halten]
+    return ev
+
+
+def test_der_tabulator_klappt_einen_schnipsel_auf(tmp_path):
+    """`for` getippt, Tabulator -- und die FOR-Schleife steht da. Geprueft
+    an der gesicherten Datei, nicht nur am Protokoll."""
+    quelle = _datei(tmp_path, "PRINT 1\nfor\n")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_END) + _taste(65, RL_TAB)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert any(z.startswith("schnipsel FOR-Schleife") for z in log), log
+    text = quelle.read_text(encoding="utf-8")
+    assert "DIM i AS INTEGER" in text and "NEXT" in text, repr(text)
+    # Das getippte Kuerzel selbst ist weg -- es wurde ersetzt, nicht ergaenzt.
+    assert "\nfor\n" not in text, repr(text)
+
+
+def test_ohne_kuerzel_rueckt_der_tabulator_ein(tmp_path):
+    """Die Gegenprobe: derselbe Tabulator hinter einem Wort, das kein
+    Kuerzel ist, rueckt ein wie immer."""
+    quelle = _datei(tmp_path, "PRINT 1\nxyz\n")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_END) + _taste(65, RL_TAB)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert not any(z.startswith("schnipsel ") for z in log), log
+    assert "xyz " in quelle.read_text(encoding="utf-8")
+
+
+def test_zur_definition_findet_sie_in_einer_anderen_datei(tmp_path):
+    """F12 auf einem Namen, den DIESE Datei nicht kennt: der Symbolindex
+    sieht das ganze Projekt, die andere Datei geht auf."""
+    quelle = _datei(tmp_path, "gruessen()\n")
+    _datei(tmp_path, "' Helfer\nSUB gruessen()\n    PRINT 1\nEND SUB\n", "helfer.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F12)
+    log = _ide(tmp_path, quelle, frames=190, events=ev)
+    assert any(z.startswith("symbolindex ") for z in log), log
+    assert "symbol helfer.dh 2" in log, log
+
+
+def test_peek_zeigt_eine_definition_aus_einer_anderen_datei(tmp_path):
+    """Alt+F12 auf demselben Namen: die zehn Zeilen kommen aus der anderen
+    Datei, ohne dass der Reiter wechselt."""
+    quelle = _datei(tmp_path, "gruessen()\n")
+    _datei(tmp_path, "' Helfer\nSUB gruessen()\n    PRINT 1\nEND SUB\n", "helfer.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F12, RL_LALT)
+    log = _ide(tmp_path, quelle, frames=190, events=ev)
+    assert "peek 2 helfer.dh" in log, log
+    # Der Reiter bleibt: die Datei wurde NICHT geoeffnet.
+    assert not any(z.startswith("geoeffnet ") and z.endswith("helfer.dh") for z in log), log
+
+
+def test_symbolverzeichnis_springt_zum_gewaehlten(tmp_path):
+    """Strg+Umschalt+S zeigt alle Symbole des Projekts; der Filter ist mit
+    dem Wort unter der Marke vorbelegt, Enter springt hin."""
+    quelle = _datei(tmp_path, "gruessen()\n")
+    _datei(tmp_path, "' Helfer\nSUB gruessen()\n    PRINT 1\nEND SUB\n", "helfer.dh")
+    ev = _taste(50, RL_S, RL_LCTRL, RL_LSHIFT) + _taste(90, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert "symbolindex 1" in log, log
+    assert "symbol helfer.dh 2" in log, log
+
+
+def test_mehrere_dateien_aus_dem_baum_oeffnen(tmp_path):
+    """Strg+Klick sammelt im Projektbaum, Strg+Umschalt+E oeffnet alles
+    Gewaehlte. Die Zeilen liegen fest: der Baum beginnt unter Menue- und
+    Reiterleiste, eine Zeile ist 22 Punkte hoch."""
+    for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
+        _datei(tmp_path, "PRINT 1\n", name)
+    quelle = tmp_path / "a_eins.dh"
+    ev = _klick_mit(30, 60, 94)
+    ev += _klick_mit(55, 60, 116, RL_LCTRL)
+    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    ev += _taste(110, RL_E, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=220, events=ev)
+    assert "baum offen 3" in log, log
+    assert any(z.startswith("geoeffnet ") and z.endswith("c_drei.dh") for z in log), log
+
+
+def test_beim_sammeln_geht_noch_nichts_auf(tmp_path):
+    """Die Gegenprobe: dieselben drei Klicks OHNE das Kuerzel. Nur die
+    zuerst angeklickte Datei ist offen -- Strg+Klick sammelt, es oeffnet
+    nicht. Sonst kaeme mit jedem Klick ein Reiter dazu, den keiner wollte."""
+    for name in ("a_eins.dh", "b_zwei.dh", "c_drei.dh"):
+        _datei(tmp_path, "PRINT 1\n", name)
+    quelle = tmp_path / "a_eins.dh"
+    ev = _klick_mit(30, 60, 94)
+    ev += _klick_mit(55, 60, 116, RL_LCTRL)
+    ev += _klick_mit(80, 60, 138, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    assert not any(z.startswith("baum offen") for z in log), log
+    auf = [z for z in log if z.startswith("geoeffnet ")]
+    assert auf and all(z.endswith("a_eins.dh") for z in auf), log
