@@ -2873,6 +2873,34 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 12 (2026-09-11):** die eigene Restliste abgearbeitet -- **Auswahl
+erweitern** (Strg+Umschalt+Hoch nimmt die naechstgroessere Klammer: Wort,
+Zeile, Block, Elternblock, ganze Datei; Runter geht denselben Weg zurueck,
+ein Stapel merkt sich jede Stufe statt sie neu zu erraten), **Auswahl in
+ein Unterprogramm herausloesen** (Strg+Umschalt+R) und **zwei Reiter
+nebeneinander vergleichen**.
+**Das Herausloesen raet die Parameter nicht:** globale Namen sieht ein SUB
+ohnehin, also sind es genau die LOKALEN des umgebenden Unterprogramms, die
+in den gewaehlten Zeilen vorkommen -- und wer darin auch ZUGEWIESEN wird,
+geht BYREF, sonst kaeme der neue Wert nie zurueck. Danach zaehlt die IDE
+die Fehler nach (`CODE_CHECK$` vorher/nachher): eine unausgewogene Auswahl
+(das FOR drin, das NEXT nicht) ergibt Code, der nicht mehr uebersetzt, und
+das steht in der Statuszeile statt sich beim naechsten Starten zu zeigen.
+Das Vergleichen rechnet die laengste gemeinsame Teilfolge auf ZEILEN (ohne
+git -- die Reiter muessen nicht gesichert sein) und markiert die
+abweichenden Zeilen in BEIDEN Feldern; ueber 1500 Zeilen faellt es auf den
+Zeile-fuer-Zeile-Vergleich zurueck, weil die Tabelle n*m Zellen hat.
+**Der Fund, und er steckt in der LAUFZEIT:** ein Menue-Kuerzel feuerte,
+und der Textbereich verarbeitete DIESELBE Taste noch einmal --
+`Strg+Umschalt+Hoch` loeste den Befehl aus UND schob die Auswahl eine Zeile
+hoch, also sah der Befehl eine andere Auswahl als die markierte. Ein
+Kuerzel, das gefeuert hat, nimmt dem Feld die Taste jetzt weg
+(`kuerzel_gefeuert` in gui.rs). Ein Fall in
+`tests/pruef/gui_menu_ausbau.dhtest` haelt es fest (Kuerzel feuert, die
+Marke bleibt stehen); dazu 5 neue in `tests/test_ide.py` -- das
+Herausloesen geprueft an der gesicherten Datei UND daran, dass sie noch
+uebersetzt.
+
 **Stufe 11 (2026-09-11):** was der alte Qt-Editor an ANSEHEN hatte --
 eine **Werkzeugleiste mit Sinnbildern** unter dem Menue (neu, oeffnen,
 sichern, starten, stoppen, pruefen, debuggen, suchen, Handbuch,

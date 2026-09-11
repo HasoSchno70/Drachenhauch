@@ -16,7 +16,7 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
-## Stand 11 (11.09.2026)
+## Stand 12 (11.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -38,7 +38,10 @@ ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 | Ansicht | Helles/dunkles Thema, Vollbild, Schrift größer/kleiner (10 bis 32 px, bleibt gemerkt); Zeilenumbruch (gilt für alle Reiter); Blöcke falten (die Blöcke kommen aus `CODE_SYMBOLS$` **und aus der Einrückung** -- alles, unter dem etwas tiefer Eingerücktes steht, also auch eine `FOR`-Schleife; ein Klick auf das Dreieck in der Nummernspalte tut dasselbe); geteilte Ansicht (zwei Reiter nebeneinander); Übersichtskarte am rechten Rand (Wort für Wort gezeichnet, heller Kasten für den sichtbaren Ausschnitt, Klick springt); geänderte Zeilen am Rand; die IDE startet maximiert | Alt+Enter, Alt+Z, F4, Strg+F4, Umschalt+F4, Alt+G |
 | Werkzeugleiste | Unter dem Menü eine Reihe **Sinnbilder** für das, was man ständig braucht: neu, öffnen, sichern, starten, stoppen, prüfen, debuggen, suchen, Handbuch, Einstellungen. Jeder Knopf ruft denselben Befehl wie sein Menüpunkt und nennt im Tooltip sein Kürzel; abschaltbar unter Ansicht | — |
 | Kacheln | Auf der Willkommensseite acht wichtige Beispiele **mit einem Bild davon**. Die Bilder entstehen, indem das Beispiel wirklich läuft (`dhrt bild`), eines nach dem anderen im Hintergrund und unsichtbar; danach liegen sie neben der Sitzung und sind sofort da. Ein Klick öffnet das Beispiel | — |
+| Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
+| Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
 | Umbenennen | **Im ganzen Projekt umbenennen** (Strg+Umschalt+F6): der Name unter der Marke, in allen `.dh` des Projektordners. `CODE_RENAME$` lässt Kommentare und Zeichenketten aus, wie beim Umbenennen in einer Datei | Strg+Umschalt+F6 |
+| Vergleichen | **Zwei Reiter nebeneinander**: die geteilte Ansicht geht an, und in beiden Feldern bekommt jede abweichende Zeile eine Marke. Verglichen wird ohne git über die längste gemeinsame Teilfolge auf Zeilen — die Reiter müssen dafür nicht gesichert sein, und genau während man tippt will man es wissen | — |
 | Vergleichen | **Mit einer anderen Datei vergleichen**: `git diff --no-index` im selben Fenster und derselben Färbung wie git diff. Gemeint ist die im Projektbaum gewählte Datei, wenn es eine andere ist — nur sonst fragt der Datei-Dialog | — |
 | Zeilen-Werkzeuge | **Sortieren**, **Doppelte entfernen**, **Leerraum am Zeilenende entfernen** — auf der Auswahl, ohne Auswahl auf der ganzen Datei | — |
 | Ersetzen | **Im ganzen Projekt ersetzen** (Strg+Umschalt+H): zählt erst die Stellen und fragt, dann schreibt es alle `.dh` des Projektordners. Ein Reiter mit unge**sicherten** Änderungen bricht es ab — die würden die Datei beim nächsten Sichern wieder überschreiben | Strg+Umschalt+H |
@@ -179,7 +182,9 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `ueber <fassung>`, `marken enden <anzahl>`, `zeilen <art> <anzahl>`,
 `projekt umbenannt <anzahl>` (-1 = abgebrochen), `vergleich <zeilen>`,
 `leiste an|aus`, `kachel <datei>`, `vorschau <datei>`,
-`vorschau fertig <nummer>`, `vorschau neu`,
+`vorschau fertig <nummer>`, `vorschau neu`, `erweitern <was>`,
+`verkleinern <tiefe>`, `herausgeloest <name> <parameter> <mehr fehler>`,
+`reiter vergleich <links> <rechts>`,
 `befehl eingefuegt <name>`, `einstellungen auf`, `autosichern <s>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
@@ -209,11 +214,11 @@ Auch die Liste aus Stand 7 ist abgearbeitet: Schnipsel per Tippen und
 Tabulator, Mehrfach-Auswahl in der Dateiliste, ein Symbolverzeichnis über
 das ganze Projekt, und Definition und Vorschau über Dateigrenzen hinweg.
 
-Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: die Auswahl am Block entlang erweitern, zwei Reiter
-nebeneinander vergleichen statt in einem Textfenster, und Umbauten am Code,
-die mehr sind als ein Umbenennen (eine Auswahl in ein Unterprogramm
-herauslösen). Ein
+Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen, und mit
+Stand 12 auch die eigene Liste abgearbeitet. Was als Nächstes anstünde:
+eine Vorschau der Änderung vor dem Umbau (statt hinterher die Fehler zu
+zählen), die Parameter eines Unterprogramms umsortieren, und ein
+Schlüsselwort-Gerüst, das beim Tippen mitwächst. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

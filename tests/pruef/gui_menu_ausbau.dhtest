@@ -554,3 +554,47 @@ e 5 1 341 0 0 0 // Event: test
 DHRT_FRAMES=12
 --- erwartet
 
+
+=== ein kuerzel nimmt dem feld die taste
+' Strg+Umschalt+Hoch feuert den Eintrag -- und schiebt die Schreibmarke im
+' Code-Feld NICHT zusaetzlich eine Zeile hoch. Ohne das taete eine Taste
+' zwei Dinge, und ein Befehl, der die Auswahl liest, saehe eine andere.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Bearbeiten")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Erweitern", "Strg+Umschalt+Hoch")
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 40, 300, 150)
+GUI_SET_TEXT(ta, "eins" + CHR$(10) + "zwei" + CHR$(10) + "drei")
+GUI_TEXTAREA_GOTO(ta, 3, 1)
+GUI_FOCUS(ta)
+DIM f AS INTEGER
+DIM z AS INTEGER
+DIM s AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_CLICKED(a) THEN PRINT "kuerzel"
+    IF f = 16 THEN
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "zeile " + STR$(z)
+    END IF
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Strg+Umschalt+Hoch
+c 6
+e 3 2 341 0 0 0 // Strg
+e 3 2 340 0 0 0 // Umschalt
+e 3 2 265 0 0 0 // Hoch
+e 5 1 265 0 0 0 //
+e 5 1 340 0 0 0 //
+e 5 1 341 0 0 0 //
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+kuerzel
+zeile 3

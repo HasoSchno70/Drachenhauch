@@ -55,6 +55,9 @@
 '  Stand 11 dazu: Werkzeugleiste mit Sinnbildern unter dem Menue und
 '  Kacheln auf der Willkommensseite -- acht wichtige Beispiele mit einem
 '  BILD davon, erzeugt mit `dhrt bild`, eines nach dem anderen.
+'  Stand 12 dazu: Auswahl erweitern/verkleinern (Strg+Umschalt+Hoch/Runter),
+'  Auswahl in ein Unterprogramm herausloesen (Strg+Umschalt+R) und zwei
+'  Reiter nebeneinander vergleichen.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -179,7 +182,11 @@ DIM autoFaellig AS FLOAT : autoFaellig = -1.0
 ' Gliederung), die Laufzeit kennt keine Sprache. Der Schluessel merkt sich,
 ' was zuletzt gemeldet wurde -- ohne ihn ginge bei jedem Pruefen ein Feld
 ' durch die Bruecke, obwohl sich nichts geaendert hat.
-DIM faltSchluessel AS STRING : faltSchluessel = "-"   ' "" waere eine echte Gliederung (Datei ohne SUB)
+DIM faltSchluessel AS STRING : faltSchluessel = "-"
+' Dieselben Bloecke bleiben stehen: die Auswahl waechst an ihnen entlang,
+' und das Herausloesen fragt, in welchem Unterprogramm die Marke steht.
+DIM blockVon AS ARRAY OF INTEGER : blockVon = []
+DIM blockBis AS ARRAY OF INTEGER : blockBis = []   ' "" waere eine echte Gliederung (Datei ohne SUB)
 
 ' Suche im Projekt: die Trefferliste teilt sich die Liste mit den Problemen.
 DIM problemModus AS INTEGER : problemModus = 0      ' 0 Probleme, 1 Suche
@@ -272,6 +279,7 @@ DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM dlgBedingung AS GUI_WINDOW : dlgBedingung = 0
 DIM dlgUmbenennen AS GUI_WINDOW : dlgUmbenennen = 0
 DIM dlgUmbProjekt AS GUI_WINDOW : dlgUmbProjekt = 0
+DIM dlgHeraus AS GUI_WINDOW : dlgHeraus = 0
 DIM umbenennWort AS STRING : umbenennWort = ""
 DIM umbenennZeile AS INTEGER : umbenennZeile = 0
 DIM umbenennSpalte AS INTEGER : umbenennSpalte = 0
@@ -338,6 +346,9 @@ DIM miSchnipsel AS INTEGER : miSchnipsel = GUI_MENU_ITEM(mBearb, "Schnipsel einf
 DIM miMarken AS INTEGER : miMarken = GUI_MENU_ITEM(mBearb, "Marke auf jede Fundstelle des Wortes", "Strg+Umschalt+L")
 DIM miMarkeNaechste AS INTEGER : miMarkeNaechste = GUI_MENU_ITEM(mBearb, "Marke auf die naechste Fundstelle", "Strg+Umschalt+N")
 DIM miMarkeEnden AS INTEGER : miMarkeEnden = GUI_MENU_ITEM(mBearb, "Marke an jedes Zeilenende der Auswahl", "Strg+Umschalt+I")
+DIM miHerausloesen AS INTEGER : miHerausloesen = GUI_MENU_ITEM(mBearb, "Auswahl in ein Unterprogramm herausloesen ...", "Strg+Umschalt+R")
+DIM miErweitern AS INTEGER : miErweitern = GUI_MENU_ITEM(mBearb, "Auswahl erweitern", "Strg+Umschalt+Hoch")
+DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl verkleinern", "Strg+Umschalt+Runter")
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
@@ -371,6 +382,7 @@ DIM miTodo AS INTEGER : miTodo = GUI_MENU_ITEM(mBearb, "TODO / FIXME im Projekt"
 DIM miBlame AS INTEGER : miBlame = GUI_MENU_ITEM(mBearb, "Wer hat das geschrieben (git blame)", "Strg+Umschalt+B")
 DIM miDiff AS INTEGER : miDiff = GUI_MENU_ITEM(mBearb, "Was habe ich geaendert (git diff)", "Strg+Umschalt+D")
 DIM miVergleich AS INTEGER : miVergleich = GUI_MENU_ITEM(mBearb, "Mit einer anderen Datei vergleichen ...")
+DIM miReiterVgl AS INTEGER : miReiterVgl = GUI_MENU_ITEM(mBearb, "Zwei Reiter nebeneinander vergleichen")
 DIM miVerlauf AS INTEGER : miVerlauf = GUI_MENU_ITEM(mBearb, "Verlauf dieser Datei (git log)")
 
 DIM mLauf AS INTEGER : mLauf = GUI_MENU(win, "Ausfuehren")
@@ -1906,6 +1918,8 @@ SUB gliederungFuellen(quelle AS STRING)
         NEXT
         einzugBloecke(quelle, fv, fb)
         GUI_TEXTAREA_FOLDABLE(ta, fv, fb)
+        blockVon = fv
+        blockBis = fb
     END IF
     IF schl = gliederungSchluessel THEN RETURN
     gliederungSchluessel = schl
@@ -2523,6 +2537,12 @@ SUB markenNachziehen()
     FOR i = 0 TO LEN(lzZeilen) - 1
         IF lzDateien[i] = pfad THEN ARRAY_PUSH(zeilen, lzZeilen[i]) : ARRAY_PUSH(farben, &H5090E0) : schl = schl + "l" + STR$(lzZeilen[i])
     NEXT
+    ' Der Vergleich zweier Reiter: die abweichenden Zeilen des VORDEREN.
+    IF aktiverTab = diffTabR THEN
+        FOR i = 0 TO LEN(diffRechts) - 1
+            ARRAY_PUSH(zeilen, diffRechts[i]) : ARRAY_PUSH(farben, &HE07070) : schl = schl + "v" + STR$(diffRechts[i])
+        NEXT
+    END IF
     ' Geaenderte Zeilen ganz zuletzt: sie sind die schwaechste Aussage und
     ' sollen keinen Haltepunkt zudecken.
     FOR i = 0 TO LEN(gitZeilen) - 1
@@ -2983,6 +3003,372 @@ END SUB
 ' --- Marke an jedes Zeilenende der Auswahl ----------------------------
 ' Der Griff, mit dem man eine Liste in einem Zug umschreibt: markieren,
 ' Strg+Umschalt+I, tippen -- und jede Zeile bekommt dasselbe ans Ende.
+' --- Die Auswahl am Block entlang erweitern ---------------------------
+' Strg+Umschalt+Hoch nimmt jeweils die naechstgroessere Klammer: das Wort,
+' die Zeile, der Block darum, dessen Elternblock, zuletzt die ganze Datei.
+' Strg+Umschalt+Runter geht denselben Weg zurueck -- dafuer merkt sich ein
+' Stapel jede Stufe, statt sie neu zu erraten.
+DIM erwZ1 AS ARRAY OF INTEGER : erwZ1 = []
+DIM erwS1 AS ARRAY OF INTEGER : erwS1 = []
+DIM erwZ2 AS ARRAY OF INTEGER : erwZ2 = []
+DIM erwS2 AS ARRAY OF INTEGER : erwS2 = []
+
+SUB erweiternMerken(z1 AS INTEGER, s1 AS INTEGER, z2 AS INTEGER, s2 AS INTEGER)
+    ARRAY_PUSH(erwZ1, z1) : ARRAY_PUSH(erwS1, s1)
+    ARRAY_PUSH(erwZ2, z2) : ARRAY_PUSH(erwS2, s2)
+END SUB
+
+' Der engste Block, der die Zeile ENTHAELT und groesser ist als der
+' angegebene Bereich. -1, wenn es keinen mehr gibt.
+FUNCTION blockUm(zeile AS INTEGER, hatZ1 AS INTEGER, hatZ2 AS INTEGER) AS INTEGER
+    DIM beste AS INTEGER : beste = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(blockVon) - 1
+        IF blockVon[i] > zeile OR blockBis[i] < zeile THEN CONTINUE
+        ' Echt groesser als das, was schon markiert ist
+        IF blockVon[i] >= hatZ1 AND blockBis[i] <= hatZ2 THEN CONTINUE
+        IF beste < 0 THEN
+            beste = i
+        ELSEIF blockBis[i] - blockVon[i] < blockBis[beste] - blockVon[beste] THEN
+            beste = i
+        END IF
+    NEXT
+    RETURN beste
+END FUNCTION
+
+SUB auswahlErweitern()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    erweiternMerken(z1, s1, z2, s2)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    DIM was AS STRING : was = ""
+    IF z1 = z2 AND s1 = s2 THEN
+        ' Nichts markiert: das Wort unter der Marke.
+        DIM wort AS STRING : wort = wortUnterMarke$()
+        DIM anf AS INTEGER : anf = wortSpalte(ta)
+        IF wort <> "" AND anf > 0 THEN
+            GUI_TEXTAREA_SELECT(ta, z1, anf, z1, anf + LEN(wort))
+            was = "Wort"
+        ELSE
+            GUI_TEXTAREA_SELECT(ta, z1, 1, z1, SPALTE_ENDE)
+            was = "Zeile"
+        END IF
+    ELSEIF z1 = z2 AND NOT (s1 = 1 AND s2 >= LEN(zeilen[z1 - 1]) + 1) THEN
+        GUI_TEXTAREA_SELECT(ta, z1, 1, z1, SPALTE_ENDE)
+        was = "Zeile"
+    ELSE
+        DIM b AS INTEGER : b = blockUm(z1, z1, z2)
+        IF b >= 0 THEN
+            GUI_TEXTAREA_SELECT(ta, blockVon[b], 1, blockBis[b], SPALTE_ENDE)
+            was = "Block " + STR$(blockVon[b]) + "-" + STR$(blockBis[b])
+        ELSEIF z1 > 1 OR z2 < LEN(zeilen) THEN
+            GUI_TEXTAREA_SELECT(ta, 1, 1, LEN(zeilen), SPALTE_ENDE)
+            was = "ganze Datei"
+        ELSE
+            GUI_SET_TEXT(lblStatus, "Groesser geht es nicht.")
+            protokoll("erweitern ende")
+            RETURN
+        END IF
+    END IF
+    GUI_FOCUS(ta)
+    GUI_SET_TEXT(lblStatus, "Auswahl: " + was)
+    protokoll("erweitern " + was)
+END SUB
+
+SUB auswahlVerkleinern()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR LEN(erwZ1) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Nichts zum Zurueckgehen -- erst erweitern.")
+        RETURN
+    END IF
+    DIM k AS INTEGER : k = LEN(erwZ1) - 1
+    GUI_TEXTAREA_SELECT(ta, erwZ1[k], erwS1[k], erwZ2[k], erwS2[k])
+    ARRAY_POP(erwZ1) : ARRAY_POP(erwS1) : ARRAY_POP(erwZ2) : ARRAY_POP(erwS2)
+    GUI_FOCUS(ta)
+    protokoll("verkleinern " + STR$(LEN(erwZ1)))
+END SUB
+
+' --- Eine Auswahl in ein Unterprogramm herausloesen -------------------
+' Der erste Umbau, der mehr ist als ein Umbenennen. Die gewaehlten Zeilen
+' wandern in ein neues SUB am Dateiende, an ihrer Stelle steht der Aufruf.
+'
+' Was als PARAMETER mitmuss, steht nicht im Raten: globale Namen sieht ein
+' SUB ohnehin, also sind es genau die LOKALEN des umgebenden Unterprogramms,
+' die in den Zeilen vorkommen. Wird so einer darin auch ZUGEWIESEN, geht er
+' BYREF -- sonst kaeme der neue Wert nie zurueck, und das faellt erst beim
+' Laufen auf.
+' Wie viele FEHLER (keine Warnungen) ein Text hat -- fuer die Probe
+' hinterher: ein Umbau, der die Datei kaputt macht, soll das sagen.
+FUNCTION fehlerZahl(quelle AS STRING) AS INTEGER
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(quelle, projektOrdner))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM f AS INTEGER : f = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        IF JSON_GET_STRING(j, STR$(i) + ".schwere") = "fehler" THEN f = f + 1
+    NEXT
+    RETURN f
+END FUNCTION
+
+FUNCTION enthaeltWort(text AS STRING, wort AS STRING) AS BOOLEAN
+    DIM s AS INTEGER : s = INSTR(text, wort)
+    WHILE s >= 0
+        DIM davor AS BOOLEAN : davor = s > 0 AND istWortzeichen(MID$(text, s - 1, 1))
+        DIM danach AS BOOLEAN : danach = istWortzeichen(MID$(text, s + LEN(wort), 1))
+        IF NOT davor AND NOT danach THEN RETURN TRUE
+        s = INSTR(text, wort, s + 1)
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION wirdZugewiesen(zeile AS STRING, wort AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = LTRIM$(zeile)
+    IF LEFT$(t, LEN(wort)) <> wort THEN RETURN FALSE
+    IF istWortzeichen(MID$(t, LEN(wort), 1)) THEN RETURN FALSE     ' laengerer Name
+    DIM k AS INTEGER : k = LEN(wort)
+    ' Index und Feldzugriff gehoeren dazu: `a[i].x = 1` weist `a` zu.
+    WHILE k < LEN(t)
+        DIM c AS STRING : c = MID$(t, k, 1)
+        IF c = "=" THEN RETURN MID$(t, k + 1, 1) <> "="
+        IF c = " " OR c = "[" OR c = "]" OR c = "." OR c = "+" OR c = "-" OR istWortzeichen(c) THEN
+            k = k + 1
+        ELSE
+            RETURN FALSE
+        END IF
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' Das Unterprogramm, das die Zeile umschliesst: (von, bis) oder (-1, -1)
+' fuers Hauptprogramm. Die Bloecke kommen aus CODE_SYMBOLS$ -- dieselbe
+' Quelle wie Gliederung und Faltung.
+FUNCTION umgebendesUnterprogramm(quelle AS STRING, zeile AS INTEGER) AS TUPLE
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM n AS INTEGER : n = JSON_LEN(j, "")
+    DIM bv AS INTEGER : bv = -1
+    DIM bb AS INTEGER : bb = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO n - 1
+        DIM p AS STRING : p = STR$(i)
+        DIM v AS INTEGER : v = JSON_GET_INT(j, p + ".von")
+        DIM b AS INTEGER : b = JSON_GET_INT(j, p + ".bis")
+        IF v <= zeile AND zeile <= b AND (bv < 0 OR b - v < bb - bv) THEN
+            bv = v : bb = b
+        END IF
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            DIM kv AS INTEGER : kv = JSON_GET_INT(j, pk + ".von")
+            DIM kb AS INTEGER : kb = JSON_GET_INT(j, pk + ".bis")
+            IF kv <= zeile AND zeile <= kb AND (bv < 0 OR kb - kv < bb - bv) THEN
+                bv = kv : bb = kb
+            END IF
+        NEXT
+    NEXT
+    RETURN (bv, bb)
+END FUNCTION
+
+SUB herausloesen(name AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR name = "" THEN RETURN
+    DIM z1 AS INTEGER
+    DIM z2 AS INTEGER
+    (z1, z2) = zeilenBereich(ta)
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF z2 < z1 OR z2 > LEN(zeilen) THEN RETURN
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(zeilen, z1, z2)
+    ' Die Parameter: lokale DIMs des umgebenden Unterprogramms, die in den
+    ' gewaehlten Zeilen vorkommen.
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    (uv, ub) = umgebendesUnterprogramm(quelle, z1)
+    DIM pNamen AS ARRAY OF STRING : pNamen = []
+    DIM pTypen AS ARRAY OF STRING : pTypen = []
+    DIM pRef AS ARRAY OF INTEGER : pRef = []
+    DIM i AS INTEGER
+    IF uv > 0 THEN
+        FOR i = uv TO MIN(ub, LEN(zeilen))
+            IF i >= z1 AND i <= z2 THEN CONTINUE          ' die Auswahl selbst nicht
+            DIM t AS STRING : t = TRIM$(zeilen[i - 1])
+            IF LEFT$(UPPER$(t), 4) <> "DIM " THEN CONTINUE
+            DIM rest AS STRING : rest = TRIM$(MID$(t, 4))
+            DIM alsPos AS INTEGER : alsPos = INSTR(UPPER$(rest), " AS ")
+            IF alsPos < 0 THEN CONTINUE
+            DIM pn AS STRING : pn = TRIM$(LEFT$(rest, alsPos))
+            DIM pt AS STRING : pt = TRIM$(MID$(rest, alsPos + 4))
+            DIM dp AS INTEGER : dp = INSTR(pt, ":")
+            IF dp >= 0 THEN pt = TRIM$(LEFT$(pt, dp))
+            IF pn = "" OR INSTR(pn, "[") >= 0 THEN CONTINUE   ' Felder nicht
+            IF ARRAY_INDEXOF(pNamen, pn) >= 0 THEN CONTINUE
+            DIM gebraucht AS BOOLEAN : gebraucht = FALSE
+            DIM zugewiesen AS BOOLEAN : zugewiesen = FALSE
+            DIM bz AS STRING
+            FOR EACH bz IN block
+                IF enthaeltWort(bz, pn) THEN gebraucht = TRUE
+                IF wirdZugewiesen(bz, pn) THEN zugewiesen = TRUE
+            NEXT
+            IF NOT gebraucht THEN CONTINUE
+            ARRAY_PUSH(pNamen, pn) : ARRAY_PUSH(pTypen, pt)
+            ARRAY_PUSH(pRef, IIF(zugewiesen, 1, 0))
+        NEXT
+    END IF
+    ' Kopfzeile und Aufruf bauen.
+    DIM kopf AS STRING : kopf = "SUB " + name + "("
+    DIM ruf AS STRING : ruf = name + "("
+    FOR i = 0 TO LEN(pNamen) - 1
+        IF i > 0 THEN kopf = kopf + ", " : ruf = ruf + ", "
+        IF pRef[i] = 1 THEN kopf = kopf + "BYREF "
+        kopf = kopf + pNamen[i] + " AS " + pTypen[i]
+        ruf = ruf + pNamen[i]
+    NEXT
+    kopf = kopf + ")"
+    ruf = ruf + ")"
+    ' Die Zeilen um ihre gemeinsame Einrueckung nach links, dann vier nach
+    ' rechts: im neuen SUB fangen sie wieder bei null an.
+    DIM tiefe AS INTEGER : tiefe = -1
+    DIM bz2 AS STRING
+    FOR EACH bz2 IN block
+        IF TRIM$(bz2) = "" THEN CONTINUE
+        DIM e AS INTEGER : e = LEN(bz2) - LEN(LTRIM$(bz2))
+        IF tiefe < 0 OR e < tiefe THEN tiefe = e
+    NEXT
+    IF tiefe < 0 THEN tiefe = 0
+    DIM neuSub AS ARRAY OF STRING : neuSub = []
+    ARRAY_PUSH(neuSub, kopf)
+    FOR EACH bz2 IN block
+        IF TRIM$(bz2) = "" THEN
+            ARRAY_PUSH(neuSub, "")
+        ELSE
+            ARRAY_PUSH(neuSub, "    " + MID$(bz2, tiefe))
+        END IF
+    NEXT
+    ARRAY_PUSH(neuSub, "END SUB")
+    ' ERST anhaengen, DANN ersetzen: umgekehrt verschoeben sich die Zeilen
+    ' der Auswahl, und der Aufruf landete mitten im neuen Unterprogramm.
+    DIM n AS INTEGER : n = LEN(zeilen)
+    GUI_TEXTAREA_SELECT(ta, n, 1, n, SPALTE_ENDE)
+    GUI_TEXTAREA_INSERT(ta, zeilen[n - 1] + NL + NL + JOIN$(neuSub, NL))
+    DIM aufruf AS ARRAY OF STRING : aufruf = [LEFT$(block[0], tiefe) + ruf]
+    zeilenErsetzen(ta, z1, z2, aufruf)
+    GUI_TEXTAREA_GOTO(ta, z1, 1)
+    GUI_FOCUS(ta)
+    ' Die Probe: eine unausgewogene Auswahl (das FOR drin, das NEXT nicht)
+    ' ergibt Code, der nicht mehr uebersetzt. Das soll dastehen, statt dass
+    ' man es beim naechsten Starten sucht.
+    DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
+    DIM nachher AS INTEGER : nachher = fehlerZahl(GUI_TEXT(ta))
+    DIM sagen AS STRING
+    sagen = STR$(LEN(block)) + " Zeilen -> SUB " + name + " mit " + _
+            STR$(LEN(pNamen)) + " Parameter(n). Zweimal Strg+Z nimmt es zurueck."
+    IF nachher > vorher THEN
+        sagen = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr als vorher -- " + _
+                "war die Auswahl ausgewogen? Zweimal Strg+Z nimmt es zurueck."
+    END IF
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("herausgeloest " + name + " " + STR$(LEN(pNamen)) + " " + STR$(nachher - vorher))
+END SUB
+
+' --- Zwei Reiter nebeneinander vergleichen ----------------------------
+' `git diff` zeigt den Unterschied als TEXT. Nebeneinander sieht man ihn
+' an der Stelle, an der er steht: die geteilte Ansicht geht an, und in
+' beiden Feldern bekommen die abweichenden Zeilen eine Marke.
+'
+' Verglichen wird ohne git -- die beiden Reiter muessen dafuer nicht
+' gesichert sein, und genau waehrend man tippt will man es wissen. Das
+' Verfahren ist die laengste gemeinsame Teilfolge (LCS): dieselbe Rechnung
+' wie bei diff, nur auf ZEILEN.
+DIM diffLinks AS ARRAY OF INTEGER : diffLinks = []
+DIM diffRechts AS ARRAY OF INTEGER : diffRechts = []
+DIM diffTabL AS INTEGER : diffTabL = -1
+DIM diffTabR AS INTEGER : diffTabR = -1
+
+SUB zeilenVergleichen(a AS ARRAY OF STRING, b AS ARRAY OF STRING)
+    diffLinks = []
+    diffRechts = []
+    DIM n AS INTEGER : n = LEN(a)
+    DIM m AS INTEGER : m = LEN(b)
+    IF n > 1500 OR m > 1500 THEN
+        ' Die Tabelle waere n*m Zellen gross -- bei grossen Dateien lieber
+        ' Zeile fuer Zeile vergleichen als minutenlang rechnen.
+        DIM k AS INTEGER
+        FOR k = 0 TO MAX(n, m) - 1
+            DIM az AS STRING : az = IIF(k < n, a[k], "")
+            DIM bz AS STRING : bz = IIF(k < m, b[k], "")
+            IF az <> bz THEN
+                IF k < n THEN ARRAY_PUSH(diffLinks, k + 1)
+                IF k < m THEN ARRAY_PUSH(diffRechts, k + 1)
+            END IF
+        NEXT
+        RETURN
+    END IF
+    ' lcs[i][j] = Laenge der laengsten gemeinsamen Teilfolge ab i bzw. j.
+    DIM lcs[(n + 1) * (m + 1)] AS INTEGER
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = n - 1 TO 0 STEP -1
+        FOR j = m - 1 TO 0 STEP -1
+            IF a[i] = b[j] THEN
+                lcs[i * (m + 1) + j] = lcs[(i + 1) * (m + 1) + j + 1] + 1
+            ELSE
+                lcs[i * (m + 1) + j] = MAX(lcs[(i + 1) * (m + 1) + j], lcs[i * (m + 1) + j + 1])
+            END IF
+        NEXT
+    NEXT
+    i = 0
+    j = 0
+    WHILE i < n AND j < m
+        IF a[i] = b[j] THEN
+            i = i + 1 : j = j + 1
+        ELSEIF lcs[(i + 1) * (m + 1) + j] >= lcs[i * (m + 1) + j + 1] THEN
+            ARRAY_PUSH(diffLinks, i + 1) : i = i + 1
+        ELSE
+            ARRAY_PUSH(diffRechts, j + 1) : j = j + 1
+        END IF
+    WEND
+    WHILE i < n
+        ARRAY_PUSH(diffLinks, i + 1) : i = i + 1
+    WEND
+    WHILE j < m
+        ARRAY_PUSH(diffRechts, j + 1) : j = j + 1
+    WEND
+END SUB
+
+SUB reiterVergleichen()
+    IF tabAnzahl < 2 THEN
+        GUI_SET_TEXT(lblStatus, "Vergleichen: dafuer braucht es zwei offene Dateien.")
+        protokoll("reiter vergleich 0")
+        RETURN
+    END IF
+    IF NOT geteilt THEN geteiltSetzen(TRUE)
+    IF NOT geteilt THEN RETURN
+    diffTabL = linkerTab
+    diffTabR = aktiverTab
+    IF diffTabL = diffTabR THEN
+        GUI_SET_TEXT(lblStatus, "Vergleichen: rechts einen anderen Reiter waehlen.")
+        RETURN
+    END IF
+    zeilenVergleichen(SPLIT$(GUI_TEXT(tabFelder[diffTabL]), NL), _
+                      SPLIT$(GUI_TEXT(tabFelder[diffTabR]), NL))
+    ' Das linke Feld markieren wir hier -- markenNachziehen kuemmert sich
+    ' nur um das vordere.
+    DIM farbenL AS ARRAY OF INTEGER : farbenL = []
+    DIM x AS INTEGER
+    FOR EACH x IN diffLinks
+        ARRAY_PUSH(farbenL, &HE07070)
+    NEXT
+    GUI_TEXTAREA_MARKS(tabFelder[diffTabL], diffLinks, farbenL)
+    markenSchluessel = ""
+    GUI_SET_TEXT(lblStatus, BASENAME(tabPfade[diffTabL]) + " gegen " + BASENAME(tabPfade[diffTabR]) + _
+                 ": " + STR$(LEN(diffLinks)) + " Zeilen links, " + STR$(LEN(diffRechts)) + " rechts.")
+    protokoll("reiter vergleich " + STR$(LEN(diffLinks)) + " " + STR$(LEN(diffRechts)))
+END SUB
+
 SUB markenAnZeilenenden()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
@@ -4282,8 +4668,12 @@ paletteEintrag("Im ganzen Projekt ersetzen ...", "ersetzen_projekt", "Strg+Umsch
 paletteEintrag("Ausgabe durchsuchen ...", "ausgabe_suchen", "Strg+Umschalt+A")
 paletteEintrag("Marke auf die naechste Fundstelle", "marke_naechste", "Strg+Umschalt+N")
 paletteEintrag("Marke an jedes Zeilenende der Auswahl", "marken_enden", "Strg+Umschalt+I")
+paletteEintrag("Auswahl in ein Unterprogramm herausloesen ...", "herausloesen", "Strg+Umschalt+R")
+paletteEintrag("Auswahl erweitern", "erweitern", "Strg+Umschalt+Hoch")
+paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
+paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
 paletteEintrag("Doppelte Zeilen entfernen", "zl_doppelte", "")
 paletteEintrag("Leerraum am Zeilenende entfernen", "zl_rand", "")
@@ -4502,10 +4892,26 @@ SUB befehl(k AS STRING)
         CASE "ausgabe_suchen" : dlgAusgabeSuche = GUI_PROMPT("Ausgabe durchsuchen", "Wonach?", ausgabeSuchtext)
         CASE "marke_naechste" : markeNaechste()
         CASE "marken_enden" : markenAnZeilenenden()
+        CASE "erweitern" : auswahlErweitern()
+        CASE "herausloesen"
+            DIM hz1 AS INTEGER
+            DIM hz2 AS INTEGER
+            (hz1, hz2) = zeilenBereich(IIF(aktivesFeld() >= 0, aktivesFeld(), -1))
+            IF aktivesFeld() < 0 THEN
+                GUI_SET_TEXT(lblStatus, "Kein Code-Feld offen.")
+            ELSEIF hz2 <= hz1 THEN
+                GUI_SET_TEXT(lblStatus, "Erst mehrere Zeilen markieren.")
+                protokoll("herausgeloest 0")
+            ELSE
+                dlgHeraus = GUI_PROMPT("Herausloesen", _
+                    STR$(hz2 - hz1 + 1) + " Zeilen in ein neues Unterprogramm. Wie soll es heissen?", "teil")
+            END IF
+        CASE "verkleinern" : auswahlVerkleinern()
         CASE "zl_sortieren" : zeilenWerkzeug("sortieren")
         CASE "zl_doppelte" : zeilenWerkzeug("doppelte")
         CASE "zl_rand" : zeilenWerkzeug("rand")
         CASE "vergleichen" : dateienVergleichen()
+        CASE "reiter_vergleich" : reiterVergleichen()
         CASE "umb_projekt"
             umbenennWort = wortUnterMarke$()
             IF umbenennWort = "" THEN
@@ -4802,8 +5208,12 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miAusgabeSuche) THEN befehl("ausgabe_suchen")
     IF GUI_CLICKED(miMarkeNaechste) THEN befehl("marke_naechste")
     IF GUI_CLICKED(miMarkeEnden) THEN befehl("marken_enden")
+    IF GUI_CLICKED(miErweitern) THEN befehl("erweitern")
+    IF GUI_CLICKED(miHerausloesen) THEN befehl("herausloesen")
+    IF GUI_CLICKED(miVerkleinern) THEN befehl("verkleinern")
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
+    IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
     IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")
     IF GUI_CLICKED(miZlDoppelt) THEN befehl("zl_doppelte")
     IF GUI_CLICKED(miZlRand) THEN befehl("zl_rand")
@@ -4986,6 +5396,16 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             protokoll("ersetzt " + STR$(anzahl))
         ELSEIF a2 = 2 THEN
             dlgErsetze = 0 : ersetzenZiel = "feld"
+        END IF
+    END IF
+    IF dlgHeraus <> 0 THEN
+        DIM ah AS INTEGER : ah = GUI_ANSWER(dlgHeraus)
+        IF ah = 1 THEN
+            DIM hname AS STRING : hname = TRIM$(GUI_DIALOG_TEXT(dlgHeraus))
+            dlgHeraus = 0
+            herausloesen(hname)
+        ELSEIF ah = 2 THEN
+            dlgHeraus = 0
         END IF
     END IF
     IF dlgUmbProjekt <> 0 THEN
