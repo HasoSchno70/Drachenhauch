@@ -55,6 +55,9 @@
 '  Stand 11 dazu: Werkzeugleiste mit Sinnbildern unter dem Menue und
 '  Kacheln auf der Willkommensseite -- acht wichtige Beispiele mit einem
 '  BILD davon, erzeugt mit `dhrt bild`, eines nach dem anderen.
+'  Stand 12 dazu: Auswahl erweitern/verkleinern (Strg+Umschalt+Hoch/Runter),
+'  Auswahl in ein Unterprogramm herausloesen (Strg+Umschalt+R) und zwei
+'  Reiter nebeneinander vergleichen.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
