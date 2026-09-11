@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1723,
+ "count": 1724,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1637,6 +1637,7 @@
   "VEC4_X": "FLOAT — einzelne Komponente lesen",
   "VEC4_Y": "FLOAT — einzelne Komponente lesen",
   "VEC4_Z": "FLOAT — einzelne Komponente lesen",
+  "VERSION$": "die Fassung der Laufzeit, die gerade läuft (dieselbe Zahl wie dhrt --version)",
   "WAITKEY": "hält an, bis eine Taste kommt, und liefert ihren Code (-1, wenn das Fenster geschlossen wird)",
   "WEIGHTED_CHOICE": "Element aus werte, gewählt proportional zu gewichte (1D-Arrays gleicher Länge, Gewichte ≥ 0). Loot-Tabellen.",
   "WIFI_AVAILABLE": "BOOLEAN (true wenn Windows + WLAN-Adapter) laesst sich das Modul hier ueberhaupt nutzen?",

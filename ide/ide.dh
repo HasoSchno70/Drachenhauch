@@ -45,6 +45,10 @@
 '  Stand 8 dazu: Schnipsel per Kuerzel und Tabulator, Symbolverzeichnis
 '  ueber alle Dateien des Projekts (Strg+Umschalt+S), Definition und
 '  Vorschau ueber Dateigrenzen, Mehrfachauswahl im Projektbaum.
+'  Stand 9 dazu: Einrueckungslinien, Ausgabe durchsuchen (Strg+Umschalt+A),
+'  Marke auf die naechste Fundstelle (Strg+Umschalt+N), im ganzen Projekt
+'  ersetzen (Strg+Umschalt+H), andere Reiter schliessen, und ein
+'  Ueber-Kasten, der die Fassung der Laufzeit nennt.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).

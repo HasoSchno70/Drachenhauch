@@ -2873,6 +2873,36 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 9 (2026-09-11):** die Restliste gegen die Qt-IDE abgearbeitet --
+gegen sie ist jetzt nichts Benennbares mehr offen. **Der Baustein:**
+`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)` -- ein feiner Strich je
+Einrueckungsstufe, unter dem Text; die Breite einer Stufe wird an
+`tabbreite` Leerzeichen GEMESSEN statt geraten, die erste Stufe bleibt frei
+(ihr Strich laege am linken Rand des Textes), und eine LEERE Zeile nimmt
+die kleinere Tiefe ihrer beiden nicht-leeren Nachbarn -- sonst risse die
+Linie in jedem Absatz auf, und gerade dort will man sie sehen. Dazu
+**`VERSION$()`**: die Fassung der Laufzeit, die gerade laeuft. Ein Programm
+hatte keinen Weg, sie zu erfahren, und ein eingetippter Text veraltet --
+genau so stand der Ueber-Kasten der IDE auf "Stand 7", als sie laengst
+weiter war.
+In der IDE dazu: **Ausgabe durchsuchen** (Strg+Umschalt+A -- bei hunderten
+Zeilen der einzige Weg ohne Scrollen; derselbe Text noch einmal heisst
+weitersuchen), **Marke auf die NAECHSTE Fundstelle** (Strg+Umschalt+N,
+schrittweise statt alle auf einmal, mit Umlauf), **im ganzen Projekt
+ersetzen** (Strg+Umschalt+H: erst zaehlen und fragen, dann schreiben; es
+bricht ab, wenn ein Reiter ungesicherte Aenderungen hat -- die
+ueberschrieben die Datei sonst beim naechsten Sichern), **andere Reiter
+schliessen** und die Einrueckungslinien als Schalter.
+**Der Fund dieser Runde ist aelter als die Stufe:** derselbe Weg kam von
+der Kommandozeile mit Rueckstrichen und aus `PATHJOIN` mit Schraegstrichen,
+verglichen wurde WORTWOERTLICH -- dieselbe Datei bekam aus dem Projektbaum
+einen ZWEITEN Reiter. Jetzt vergleicht `wegGleich$` in einer Schreibweise;
+Gross/klein bleibt, wie es ist, weil das unter Linux zwei verschiedene
+Dateien waeren. Gesehen hat es der Test "andere Reiter schliessen": er
+zaehlte 3 statt 2.
+Tests `tests/pruef/gui_einzugslinien.dhtest` (4, drei Bildproben mit
+Gegenprobe) und 7 neue in `tests/test_ide.py`.
+
 **Stufe 8 (2026-09-11):** die Liste aus Stufe 7 abgearbeitet. **Zwei
 Bausteine in dhrt**, beide nach dem bekannten Muster (die Laufzeit kennt
 keine Sprache, der Aufrufer sagt die Woerter):
