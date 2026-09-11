@@ -2873,6 +2873,32 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 10 (2026-09-11):** die erste Stufe OHNE Vorlage -- gegen die
+Qt-IDE war nichts mehr offen, gemessen wird jetzt an dem, was beim
+Schreiben fehlt. **Der Baustein: Spaltenauswahl** im Textbereich
+(`GUI_TEXTAREA_SELECT_COLUMNS`, mit der Maus Alt gedrueckt halten und
+ziehen) -- ein RECHTECK statt eines Laufs. Sie kostete fast nichts, weil
+die Maschinerie seit den mehreren Schreibmarken dalag: jede Zusatzmarke
+hatte immer schon Marke UND Anker, eine Spaltenauswahl ist also nur eine
+Marke je Zeile mit derselben Spaltenpaarung. Eine Zeile, die nicht so weit
+reicht, bekommt ihre Marke am ENDE statt still herauszufallen -- sonst
+faende man mitten im Block eine Zeile, in der das Getippte fehlt, und zwar
+erst hinterher.
+In der IDE dazu: **Marke an jedes Zeilenende der Auswahl**
+(Strg+Umschalt+I -- damit schreibt man eine Liste in einem Zug um),
+**Zeilen sortieren / Doppelte entfernen / Leerraum am Zeilenende
+entfernen** (auf der Auswahl, ohne Auswahl auf der ganzen Datei),
+**im ganzen Projekt umbenennen** (Strg+Umschalt+F6) und **zwei Dateien
+vergleichen** (`git diff --no-index` im git-Fenster).
+**Der Kniff beim Umbenennen ueber Dateien:** `CODE_RENAME$` arbeitet auf
+EINEM Text und braucht eine Stelle, an der der Name steht -- in einer
+fremden Datei kennt man sie nicht. Statt zu raten, wo ein Vorkommen
+KEIN Kommentar ist, werden die Fundstellen der Reihe nach probiert, bis
+eine den Text wirklich aendert. Eine Stelle im Kommentar aendert nichts,
+und dann kommt eben die naechste dran.
+Tests `tests/pruef/gui_spaltenauswahl.dhtest` (6, mit Alt-Zug ueber echte
+Maus-Ereignisse) und 5 neue in `tests/test_ide.py`.
+
 **Stufe 9 (2026-09-11):** die Restliste gegen die Qt-IDE abgearbeitet --
 gegen sie ist jetzt nichts Benennbares mehr offen. **Der Baustein:**
 `GUI_TEXTAREA_SET(ta, "einzugslinien", 1)` -- ein feiner Strich je

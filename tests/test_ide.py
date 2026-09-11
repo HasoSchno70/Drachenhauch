@@ -1003,3 +1003,79 @@ def test_einrueckungslinien_lassen_sich_abschalten(tmp_path):
     ev += _taste(100, RL_ENTER)
     log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="Einrueckungslinien")
     assert "linien aus" in log, log
+
+
+# --------------------------------------------------------------- Stufe 10
+
+RL_I = 73
+
+
+def _palette(frame, was):
+    """Einen Befehl ueber die Palette ausfuehren: Strg+Umschalt+P, Filter aus
+    der Zwischenablage, Enter."""
+    ev = _taste(frame, RL_P, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(frame + 30, RL_V, RL_LCTRL)
+    ev += _taste(frame + 60, RL_ENTER)
+    return ev
+
+
+def test_zeilen_sortieren(tmp_path):
+    """Ohne Auswahl gilt die ganze Datei -- eine einzelne Zeile zu sortieren
+    ergibt nichts."""
+    quelle = _datei(tmp_path, "' c\n' a\n' b\n")
+    ev = _palette(30, "Zeilen sortieren") + _taste(120, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="Zeilen sortieren")
+    assert "zeilen sortieren 3" in log, log
+    assert quelle.read_text(encoding="utf-8").startswith("' a\n' b\n' c")
+
+
+def test_doppelte_zeilen_entfernen(tmp_path):
+    quelle = _datei(tmp_path, "' a\n' b\n' a\n")
+    ev = _palette(30, "Doppelte") + _taste(120, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="Doppelte Zeilen")
+    assert "zeilen doppelte 2" in log, log
+    assert quelle.read_text(encoding="utf-8").count("' a") == 1
+
+
+def test_marke_an_jedes_zeilenende(tmp_path):
+    """Umschalt+Runter markiert zwei Zeilen, Strg+Umschalt+I setzt je eine
+    Marke ans Ende, und EIN Strg+V schreibt in beide."""
+    quelle = _datei(tmp_path, "eins\nzwei\ndrei\n")
+    ev = _taste(30, RL_DOWN, RL_LSHIFT) + _taste(40, RL_DOWN, RL_LSHIFT)
+    ev += _taste(60, RL_I, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(90, RL_V, RL_LCTRL)
+    ev += _taste(120, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="!")
+    assert "marken enden 2" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert text.startswith("eins!\nzwei!\ndrei"), repr(text)
+
+
+def test_im_ganzen_projekt_umbenennen(tmp_path):
+    """Der Name steht in einer anderen Datei -- umbenannt werden beide."""
+    quelle = _datei(tmp_path, "gruessen()\n", "spiel.dh")
+    helfer = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\n", "helfer.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(75, RL_F6, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(110, RL_V, RL_LCTRL)
+    ev += _taste(140, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="winken")
+    assert "projekt umbenannt 2" in log, log
+    assert "winken()" in quelle.read_text(encoding="utf-8")
+    assert "SUB winken()" in helfer.read_text(encoding="utf-8")
+
+
+def test_zwei_dateien_vergleichen(tmp_path):
+    """Steht im Projektbaum eine andere Datei gewaehlt, ist sie gemeint --
+    sonst faellt hier ein Datei-Dialog auf, den niemand beantwortet."""
+    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n", "a_eins.dh")
+    _datei(tmp_path, "PRINT 1\nPRINT 3\n", "b_zwei.dh")
+    ev = _klick_mit(30, 60, 116)          # b_zwei.dh im Baum waehlen (oeffnet sie)
+    ev += _klick_mit(70, 60, 94)          # zurueck auf a_eins.dh
+    ev += _klick_mit(110, 60, 116, RL_LCTRL)   # b_zwei nur WAEHLEN, nicht oeffnen
+    ev += _palette(150, "Mit einer anderen")
+    log = _ide(tmp_path, quelle, frames=320, events=ev, zwischenablage="Mit einer anderen")
+    zeilen = [z for z in log if z.startswith("vergleich ")]
+    assert zeilen and zeilen[0] != "vergleich 0", log

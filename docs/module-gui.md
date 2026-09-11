@@ -2123,6 +2123,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
 | `GUI_TEXTAREA_ABBREV(ta, woerter)` | Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel |
 | `GUI_TEXTAREA_ABBREV_HIT(ta)` → INTEGER | welche Abkürzung der Tabulator in diesem Bild getroffen hat (-1 = keine); gilt ein Bild lang wie `GUI_CLICKED` |
+| `GUI_TEXTAREA_SELECT_COLUMNS(ta, z1, s1, z2, s2)` → INTEGER | Spaltenauswahl: ein RECHTECK statt eines Laufs. Jede Zeile bekommt ihre eigene Marke samt Auswahl, getippt wird in allen zugleich; eine zu kurze Zeile bekommt ihre Marke am Ende, statt herauszufallen. Mit der Maus: **Alt gedrückt halten und ziehen**. Liefert die Zahl der Marken |
 | `GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])` → INTEGER | eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer |
 | `GUI_TEXTAREA_CARETS(ta)` → INTEGER | wie viele Schreibmarken das Feld gerade hat (mindestens 1) |
 | `GUI_TEXTAREA_CLEAR_CARETS(ta)` | zurück auf eine einzige Schreibmarke |

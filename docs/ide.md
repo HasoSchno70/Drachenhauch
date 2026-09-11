@@ -16,7 +16,7 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
-## Stand 9 (11.09.2026)
+## Stand 10 (11.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -36,6 +36,9 @@ ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 | Ausführen | Starten mit laufender Ausgabe unten links, Eingabezeile für `INPUT`, Stoppen; Export als eigenständiges Programm (`dhrt --export`, nach `<name>_dist/` neben die Quelle, die Ausgabe des Exports läuft unten links mit) | F5, Umschalt+F5, Strg+F6 |
 | Werkzeuge | Die Begleit-Editoren in Drachenhauch (SFX-Generator, Partikel-Editor, Tilemap-Editor, Sprite-Editor, Tracker, Form-Designer, Anim-FSM-Editor, Notenblatt) als eigene Programme; die Beispiele als Projekt öffnen | |
 | Ansicht | Helles/dunkles Thema, Vollbild, Schrift größer/kleiner (10 bis 32 px, bleibt gemerkt); Zeilenumbruch (gilt für alle Reiter); Blöcke falten (die Blöcke kommen aus `CODE_SYMBOLS$` **und aus der Einrückung** -- alles, unter dem etwas tiefer Eingerücktes steht, also auch eine `FOR`-Schleife; ein Klick auf das Dreieck in der Nummernspalte tut dasselbe); geteilte Ansicht (zwei Reiter nebeneinander); Übersichtskarte am rechten Rand (Wort für Wort gezeichnet, heller Kasten für den sichtbaren Ausschnitt, Klick springt); geänderte Zeilen am Rand; die IDE startet maximiert | Alt+Enter, Alt+Z, F4, Strg+F4, Umschalt+F4, Alt+G |
+| Umbenennen | **Im ganzen Projekt umbenennen** (Strg+Umschalt+F6): der Name unter der Marke, in allen `.dh` des Projektordners. `CODE_RENAME$` lässt Kommentare und Zeichenketten aus, wie beim Umbenennen in einer Datei | Strg+Umschalt+F6 |
+| Vergleichen | **Mit einer anderen Datei vergleichen**: `git diff --no-index` im selben Fenster und derselben Färbung wie git diff. Gemeint ist die im Projektbaum gewählte Datei, wenn es eine andere ist — nur sonst fragt der Datei-Dialog | — |
+| Zeilen-Werkzeuge | **Sortieren**, **Doppelte entfernen**, **Leerraum am Zeilenende entfernen** — auf der Auswahl, ohne Auswahl auf der ganzen Datei | — |
 | Ersetzen | **Im ganzen Projekt ersetzen** (Strg+Umschalt+H): zählt erst die Stellen und fragt, dann schreibt es alle `.dh` des Projektordners. Ein Reiter mit unge**sicherten** Änderungen bricht es ab — die würden die Datei beim nächsten Sichern wieder überschreiben | Strg+Umschalt+H |
 | Ausgabe | **Ausgabe durchsuchen** (Strg+Umschalt+A): die Zeilen des laufenden Programms. Derselbe Text noch einmal heißt weitersuchen | Strg+Umschalt+A |
 | Symbole | **Symbol im Projekt suchen** (Strg+Umschalt+S): alle SUB, FUNCTION, CLASS und Methoden über ALLE `.dh` des Projektordners, filterbar; der Filter ist mit dem Wort unter der Marke vorbelegt. Derselbe Index trägt **Zur Definition** und **Definition hier zeigen** über Dateigrenzen: was `CODE_DEFINITION` im eigenen Text nicht findet, steht vielleicht nebenan | Strg+Umschalt+S |
@@ -105,6 +108,11 @@ bekäme. Diese Bausteine kamen mit ihr:
   + `GUI_TEXTAREA_INDENT_WORDS`): die Laufzeit übernimmt die Einrückung der
   laufenden Zeile -- das ist sprachfrei; welche Wörter eine Stufe mehr oder
   weniger bedeuten, sagt die IDE. Dasselbe Prinzip wie bei der Faltung.
+- **Spaltenauswahl** (`GUI_TEXTAREA_SELECT_COLUMNS`, mit der Maus **Alt
+  gedrückt halten und ziehen**): ein Rechteck statt eines Laufs. Jede Zeile
+  bekommt ihre eigene Marke samt Auswahl — die Maschinerie dafür lag seit
+  den mehreren Schreibmarken schon da. Eine zu kurze Zeile bekommt ihre
+  Marke am Ende, statt still herauszufallen.
 - **Einrückungslinien** (`GUI_TEXTAREA_SET(ta, "einzugslinien", 1)`): ein
   feiner Strich je Stufe, unter dem Text. Die Breite einer Stufe wird an
   `tabbreite` Leerzeichen gemessen, und eine leere Zeile nimmt die kleinere
@@ -166,7 +174,8 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `befehle <anzahl>`, `linien an|aus`, `andere zu <anzahl>`,
 `ausgabe treffer <zeile>`, `marke naechste <anzahl>`,
 `projekt ersetzt <anzahl>` (-1 = abgebrochen, ein Reiter war ungesichert),
-`ueber <fassung>`,
+`ueber <fassung>`, `marken enden <anzahl>`, `zeilen <art> <anzahl>`,
+`projekt umbenannt <anzahl>` (-1 = abgebrochen), `vergleich <zeilen>`,
 `befehl eingefuegt <name>`, `einstellungen auf`, `autosichern <s>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
@@ -196,9 +205,12 @@ Auch die Liste aus Stand 7 ist abgearbeitet: Schnipsel per Tippen und
 Tabulator, Mehrfach-Auswahl in der Dateiliste, ein Symbolverzeichnis über
 das ganze Projekt, und Definition und Vorschau über Dateigrenzen hinweg.
 
-Damit ist auch die Liste aus Stand 8 abgearbeitet. Gegen die Qt-IDE ist
-nichts Benennbares mehr offen; was jetzt dazukäme, hätte dort kein
-Gegenstück. Ein
+Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen; Stand 10
+misst sich darum an dem, was beim Schreiben fehlt, nicht mehr an ihr. Was
+als Nächstes anstünde und dort ebenfalls kein Gegenstück hätte: die
+Auswahl am Block entlang erweitern, zwei Reiter nebeneinander vergleichen
+statt in einem Textfenster, und Umbauten am Code, die mehr sind als ein
+Umbenennen (eine Auswahl in ein Unterprogramm herauslösen). Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

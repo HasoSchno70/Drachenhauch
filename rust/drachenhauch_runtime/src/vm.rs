@@ -6060,6 +6060,12 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_abbrev(gi(a, 0, n)?, woerter)?;
                 Value::Nil
             }
+            "gui_textarea_select_columns" => {
+                let n = "GUI_TEXTAREA_SELECT_COLUMNS";
+                if a.len() != 5 { return Err(format!("{}: erwartet (ta, z1, s1, z2, s2)", n)); }
+                Value::Int(self.gui.textarea_select_columns(gi(a,0,n)?, gi(a,1,n)?, gi(a,2,n)?,
+                                                            gi(a,3,n)?, gi(a,4,n)?)?)
+            }
             "gui_textarea_abbrev_hit" => Value::Int(
                 self.gui.textarea_abbrev_hit(gi(a, 0, "GUI_TEXTAREA_ABBREV_HIT")?)?),
             "gui_textarea_indent_words" => {
