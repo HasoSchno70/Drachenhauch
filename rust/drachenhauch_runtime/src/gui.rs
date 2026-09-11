@@ -666,9 +666,19 @@ impl TableState {
 #[derive(Default)]
 pub struct TreeState {
     nodes: Vec<TreeNode>,
-    selected: i32,   // Knoten-id oder -1
+    selected: i32,   // Knoten-id oder -1 (zuletzt angeklickt)
     hover: i32,      // gehoverte Knoten-id oder -1
     scroll: i32,     // vertikaler Pixel-Offset
+    sel: Vec<bool>,  // Mehrfachauswahl je Knoten (nur mit `multi`)
+    multi: bool,
+    anker: i32,      // Knoten-id fuer Umschalt+Klick
+}
+
+impl TreeState {
+    /// Die Auswahl-Liste auf die Knotenzahl bringen. Knoten kommen nur ueber
+    /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR -- ein
+    /// Nachziehen an jedem Abruf kostet also nichts und kann nie zu kurz sein.
+    fn sync(&mut self) { let n = self.nodes.len(); self.sel.resize(n, false); }
 }
 
 #[derive(Default)]
@@ -1061,6 +1071,13 @@ pub struct Widget {
     // Auswahl. Ohne das setzte das naechste Bild -- die Taste ist noch
     // unten -- die Marke doch noch ans Feld.
     farbfeld_zug: bool,
+    // Abkuerzungen (nur TextArea): Woerter, die der Tabulator MELDET statt
+    // einzuruecken. Was an ihre Stelle kommt, weiss nur der Aufrufer -- die
+    // Laufzeit kennt weder Schnipsel noch Sprache.
+    abkuerzungen: Vec<String>,
+    // Welche davon in diesem Bild getroffen wurde (-1 = keine). Transient
+    // wie `clicked`: ein Tastendruck ist ein Ereignis, kein Zustand.
+    abk_treffer: i32,
     // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
     //
     // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
@@ -2006,6 +2023,31 @@ impl Gui {
         Ok(self.ta_wdg(h, "GUI_TEXTAREA_SWATCH_CLICKED")?.farbfeld_klick as i64)
     }
 
+    /// Abkuerzungen, die der Tabulator meldet (GUI_TEXTAREA_ABBREV).
+    ///
+    /// Steht links der Schreibmarke eines dieser Woerter, rueckt der
+    /// Tabulator nicht ein, sondern meldet die Nummer ueber
+    /// `GUI_TEXTAREA_ABBREV_HIT` -- genau ein Bild lang. Gross- und
+    /// Kleinschreibung zaehlen nicht.
+    ///
+    /// Gilt nur in einem Feld, das den Tabulator ohnehin hat
+    /// (`GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)`) -- sonst gehoert die
+    /// Taste dem Fokus-Wechsel, und ein Wort ohne Treffer waere eine tote
+    /// Taste.
+    pub fn textarea_abbrev(&mut self, h: i64, woerter: Vec<String>) -> Result<(), String> {
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_ABBREV")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_ABBREV: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.abkuerzungen = woerter.into_iter().filter(|w| !w.is_empty()).collect();
+        Ok(())
+    }
+
+    /// Welche Abkuerzung der Tabulator in diesem Bild getroffen hat, -1 = keine.
+    pub fn textarea_abbrev_hit(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ta_wdg(h, "GUI_TEXTAREA_ABBREV_HIT")?.abk_treffer as i64)
+    }
+
     /// Woerter, die die Einrueckung steuern (GUI_TEXTAREA_INDENT_WORDS).
     ///
     /// Drei Listen, alle ohne Ruecksicht auf Gross/Klein:
@@ -2211,6 +2253,7 @@ impl Gui {
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
+            abkuerzungen: Vec::new(), abk_treffer: -1,
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
             step: 1.0,
@@ -3172,7 +3215,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     pub fn tree(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Tree, x, y, w, h);
-        wd.tree = Some(Box::new(TreeState { selected: -1, hover: -1, ..Default::default() }));
+        wd.tree = Some(Box::new(TreeState { selected: -1, hover: -1, anker: -1, ..Default::default() }));
         self.add_widget(win, "GUI_TREE", wd)
     }
     /// Knoten anhaengen. parent = -1 (Wurzel) oder eine bestehende Knoten-id.
@@ -3186,11 +3229,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let level = if parent < 0 { 0 } else { t.nodes[parent as usize].level + 1 };
         if parent >= 0 { t.nodes[parent as usize].has_children = true; }
         t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false, icon: -1, color: -1 });
+        t.sync();
         Ok((t.nodes.len() - 1) as i64)
     }
     pub fn tree_clear(&mut self, h: i64) -> Result<(), String> {
         let t = self.tree_mut(h, "GUI_TREE_CLEAR")?;
-        t.nodes.clear(); t.selected = -1; t.hover = -1; t.scroll = 0; Ok(())
+        t.nodes.clear(); t.selected = -1; t.hover = -1; t.scroll = 0;
+        t.sel.clear(); t.anker = -1; Ok(())
     }
     pub fn tree_selected(&self, h: i64) -> Result<i64, String> {
         Ok(self.tree_ref(h, "GUI_TREE_SELECTED")?.selected as i64)
@@ -3199,7 +3244,67 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let t = self.tree_mut(h, "GUI_TREE_SET_SELECTED")?;
         let n = t.nodes.len() as i64;
         t.selected = if node >= 0 && node < n { node as i32 } else { -1 };
+        // Mit Mehrfachauswahl ist ein gesetzter Knoten die GANZE Auswahl --
+        // sonst zeigte der Baum eine Zeile hervorgehoben, die keiner Abfrage
+        // gehoert.
+        if t.multi {
+            t.sync();
+            for s in t.sel.iter_mut() { *s = false; }
+            if t.selected >= 0 { t.sel[t.selected as usize] = true; t.anker = t.selected; }
+        }
         Ok(())
+    }
+    /// Einstellungen am Baum (GUI_TREE_SET). Bisher nur `mehrfachauswahl`.
+    pub fn tree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SET")?;
+        match key.to_lowercase().as_str() {
+            "mehrfachauswahl" | "multi" => {
+                t.multi = wert != 0.0;
+                t.sync();
+                // Beim Einschalten zaehlt die bisherige Auswahl mit, sonst
+                // stuende der Baum nach dem Umschalten scheinbar leer da.
+                if t.multi && t.selected >= 0 && !t.sel.iter().any(|&s| s) {
+                    let k = t.selected as usize;
+                    if k < t.sel.len() { t.sel[k] = true; t.anker = t.selected; }
+                }
+            }
+            _ => return Err(format!(
+                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl)", key)),
+        }
+        Ok(())
+    }
+    /// Wie viele Knoten sind ausgewaehlt (GUI_TREE_SEL_COUNT)?
+    pub fn tree_sel_count(&self, h: i64) -> Result<i64, String> {
+        let t = self.tree_ref(h, "GUI_TREE_SEL_COUNT")?;
+        if !t.multi { return Ok(if t.selected >= 0 { 1 } else { 0 }); }
+        Ok(t.sel.iter().filter(|&&s| s).count() as i64)
+    }
+    /// Die i-te ausgewaehlte Knoten-id (GUI_TREE_SEL_NODE), in Knoten-Reihenfolge.
+    pub fn tree_sel_node(&self, h: i64, i: i64) -> Result<i64, String> {
+        let t = self.tree_ref(h, "GUI_TREE_SEL_NODE")?;
+        if !t.multi { return Ok(if i == 0 { t.selected as i64 } else { -1 }); }
+        Ok(t.sel.iter().enumerate().filter(|(_, &s)| s).map(|(k, _)| k as i64)
+            .nth(i.max(0) as usize).unwrap_or(-1))
+    }
+    pub fn tree_is_selected(&self, h: i64, node: i64) -> Result<bool, String> {
+        let t = self.tree_ref(h, "GUI_TREE_IS_SELECTED")?;
+        if !t.multi { return Ok(node >= 0 && node as i32 == t.selected); }
+        Ok(t.sel.get(node.max(-1) as usize).copied().unwrap_or(false) && node >= 0)
+    }
+    pub fn tree_select(&mut self, h: i64, node: i64, an: bool) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SELECT")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_SELECT: ungueltige Knoten-id {}", node));
+        }
+        t.sync();
+        t.sel[node as usize] = an;
+        if an { t.selected = node as i32; t.anker = node as i32; }
+        Ok(())
+    }
+    pub fn tree_clear_selection(&mut self, h: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_CLEAR_SELECTION")?;
+        for s in t.sel.iter_mut() { *s = false; }
+        t.selected = -1; t.anker = -1; Ok(())
     }
     pub fn tree_label(&self, h: i64, node: i64) -> Result<String, String> {
         let t = self.tree_ref(h, "GUI_TREE_LABEL")?;
@@ -3261,9 +3366,33 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
             let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
         } else {
+            let (ctrl, shift) = self.tasten_mod;
             let changed = {
                 let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
-                if t.selected != ni as i32 { t.selected = ni as i32; true } else { false }
+                let mut ge = t.selected != ni as i32;
+                t.selected = ni as i32;
+                if t.multi {
+                    t.sync();
+                    if ctrl {
+                        let v = t.sel[ni]; t.sel[ni] = !v; t.anker = ni as i32; ge = true;
+                    } else if shift && t.anker >= 0 {
+                        // Der Bereich gilt in der SICHTBAREN Reihenfolge -- ueber
+                        // die Knoten-Nummern traefe er bei zugeklappten Aesten
+                        // etwas anderes, als man vor sich sieht.
+                        let vis = Self::tree_visible(t);
+                        let pa = vis.iter().position(|&n| n as i32 == t.anker);
+                        let pb = vis.iter().position(|&n| n == ni);
+                        if let (Some(pa), Some(pb)) = (pa, pb) {
+                            for s in t.sel.iter_mut() { *s = false; }
+                            for p in pa.min(pb)..=pa.max(pb) { t.sel[vis[p]] = true; }
+                            ge = true;
+                        }
+                    } else {
+                        for s in t.sel.iter_mut() { *s = false; }
+                        t.sel[ni] = true; t.anker = ni as i32; ge = true;
+                    }
+                }
+                ge
             };
             if changed {
                 let f = self.windows[wi].widgets[idx].on_change.clone();
@@ -5085,6 +5214,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     "expanded": n.expanded, "has_children": n.has_children,
                 })).collect::<Vec<_>>(),
                 "selected": t.selected,
+                "multi": t.multi,
             });
         }
         if w.tab_page != -1 { o["tab_page"] = serde_json::json!(w.tab_page); }
@@ -5311,8 +5441,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     }).collect();
                 }
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
+                ts.multi = tj["multi"].as_bool().unwrap_or(false);
             }
-            ts.hover = -1;
+            ts.hover = -1; ts.anker = -1; ts.sync();
             w.tree = Some(Box::new(ts));
         }
         w.tab_page = wj["tab_page"].as_i64().unwrap_or(-1) as i32;
@@ -5854,7 +5985,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
-                wdg.farbfeld_klick = -1;
+                wdg.farbfeld_klick = -1; wdg.abk_treffer = -1;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
@@ -7239,7 +7370,26 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // (GUI_TEXTAREA_SET "tab_fuegt_ein"). Sonst bliebe man in einem
         // Formular im Textfeld haengen und kaeme nicht mehr heraus.
         let tab_ein = self.windows[wi].widgets[i].tab_fuegt_ein;
-        if tab_ein && g.key_pressed(KEY_TAB) {
+        // Steht links der fuehrenden Marke eine bekannte Abkuerzung, MELDET
+        // das Feld sie und rueckt NICHT ein (GUI_TEXTAREA_ABBREV). Der
+        // Aufrufer setzt dann sein Geruest an die Stelle.
+        let mut abk = false;
+        if tab_ein && g.key_pressed(KEY_TAB)
+           && !self.windows[wi].widgets[i].abkuerzungen.is_empty() {
+            let lo = marken[0].0.min(marken[0].1).clamp(0, chars.len() as i32) as usize;
+            let anfang = chars[..lo].iter()
+                .rposition(|c| !(c.is_alphanumeric() || *c == '_'))
+                .map(|p| p + 1).unwrap_or(0);
+            let wort: String = chars[anfang..lo].iter().collect::<String>().to_lowercase();
+            if !wort.is_empty() {
+                if let Some(k) = self.windows[wi].widgets[i].abkuerzungen.iter()
+                    .position(|a| a.to_lowercase() == wort) {
+                    self.windows[wi].widgets[i].abk_treffer = k as i32;
+                    abk = true;
+                }
+            }
+        }
+        if tab_ein && !abk && g.key_pressed(KEY_TAB) {
             let breite = self.windows[wi].widgets[i].tabbreite.max(1);
             // Bis zur naechsten Spalte auffuellen, nicht stur `breite`
             // Leerzeichen: sonst steht die Einrueckung schief, sobald man
@@ -7601,8 +7751,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
 
     /// Baum-Auswahl setzen, on_change feuern, Knoten ins Bild scrollen.
     fn tree_setze_auswahl(&mut self, wi: usize, i: usize, node: i32) {
+        // Ein Pfeil setzt die Menge auf EINEN Knoten -- wie in der Liste.
         let geaendert = match self.windows[wi].widgets[i].tree.as_mut() {
-            Some(t) if t.selected != node => { t.selected = node; true }
+            Some(t) if t.selected != node => {
+                t.selected = node;
+                if t.multi {
+                    t.sync();
+                    for s in t.sel.iter_mut() { *s = false; }
+                    if node >= 0 && (node as usize) < t.sel.len() { t.sel[node as usize] = true; }
+                    t.anker = node;
+                }
+                true
+            }
             _ => false,
         };
         if geaendert {
@@ -10768,7 +10928,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if ry + self.sk(TREE_ROW_H) < ay || ry > ay + h { continue; }
             let node = &t.nodes[ni];
             let indent = node.level * self.sk(TREE_INDENT);
-            if ni as i32 == t.selected {
+            let markiert = if t.multi { t.sel.get(ni).copied().unwrap_or(false) }
+                           else { ni as i32 == t.selected };
+            if markiert {
                 g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(acc, -110));
             } else if ni as i32 == t.hover {
                 g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));

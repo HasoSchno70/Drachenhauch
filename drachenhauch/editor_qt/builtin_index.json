@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1755,
+ "count": 1770,
  "builtins": [
   {
    "name": "ABS",
@@ -4173,6 +4173,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_ABBREV",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_ABBREV(ta, woerter)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_ABBREV_HIT",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_ABBREV_HIT(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_ADD_CARET",
    "kind": "core",
    "signature": "GUI_TEXTAREA_ADD_CARET(ta, zeile[, spalte])",
@@ -4233,12 +4245,6 @@
    "module": "gui"
   },
   {
-   "name": "GUI_TEXTAREA_MARKS",
-   "kind": "core",
-   "signature": "GUI_TEXTAREA_MARKS(ta, zeilen, farben)",
-   "module": "gui"
-  },
-  {
    "name": "GUI_TEXTAREA_GOTO",
    "kind": "core",
    "signature": "GUI_TEXTAREA_GOTO(ta, zeile[, spalte])",
@@ -4254,6 +4260,12 @@
    "name": "GUI_TEXTAREA_INSERT",
    "kind": "core",
    "signature": "GUI_TEXTAREA_INSERT(ta, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA_MARKS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_MARKS(ta, zeilen, farben)",
    "module": "gui"
   },
   {
@@ -4383,6 +4395,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_CLEAR_SELECTION",
+   "kind": "core",
+   "signature": "GUI_TREE_CLEAR_SELECTION(tree)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_COLOR",
    "kind": "core",
    "signature": "GUI_TREE_COLOR(tree, node, farbe)",
@@ -4401,15 +4419,45 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_IS_SELECTED",
+   "kind": "core",
+   "signature": "GUI_TREE_IS_SELECTED(tree, node)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_LABEL",
    "kind": "core",
    "signature": "GUI_TREE_LABEL(tree, node)",
    "module": "gui"
   },
   {
+   "name": "GUI_TREE_SELECT",
+   "kind": "core",
+   "signature": "GUI_TREE_SELECT(tree, node, an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TREE_SELECTED",
    "kind": "core",
    "signature": "GUI_TREE_SELECTED(tree)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SEL_COUNT",
+   "kind": "core",
+   "signature": "GUI_TREE_SEL_COUNT(tree)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SEL_NODE",
+   "kind": "core",
+   "signature": "GUI_TREE_SEL_NODE(tree, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SET",
+   "kind": "core",
+   "signature": "GUI_TREE_SET(tree, key$, wert)",
    "module": "gui"
   },
   {
@@ -4479,12 +4527,6 @@
    "module": "gui"
   },
   {
-   "name": "GUI_WINDOW_DESIGN",
-   "kind": "core",
-   "signature": "GUI_WINDOW_DESIGN(win, flag)",
-   "module": "gui"
-  },
-  {
    "name": "GUI_WINDOW_CLOSABLE",
    "kind": "core",
    "signature": "GUI_WINDOW_CLOSABLE(win, flag)",
@@ -4500,6 +4542,12 @@
    "name": "GUI_WINDOW_DEFAULT",
    "kind": "core",
    "signature": "GUI_WINDOW_DEFAULT(win, knopf)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_DESIGN",
+   "kind": "core",
+   "signature": "GUI_WINDOW_DESIGN(win, flag)",
    "module": "gui"
   },
   {
@@ -4545,12 +4593,6 @@
    "module": "gui"
   },
   {
-   "name": "GUI_WINDOW_TITLE",
-   "kind": "core",
-   "signature": "GUI_WINDOW_TITLE(win, titel$)",
-   "module": "gui"
-  },
-  {
    "name": "GUI_WINDOW_RESIZABLE",
    "kind": "core",
    "signature": "GUI_WINDOW_RESIZABLE(win, flag)",
@@ -4584,6 +4626,12 @@
    "name": "GUI_WINDOW_SHOWN",
    "kind": "core",
    "signature": "GUI_WINDOW_SHOWN(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_TITLE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_TITLE(win, titel$)",
    "module": "gui"
   },
   {
