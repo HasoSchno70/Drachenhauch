@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 20)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 21)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -88,6 +88,9 @@
 '  liegt jetzt eine Folge von Schritten statt einer Textausgabe), das
 '  Umbenennen zieht die Handler in .dhform-Dateien mit, und der
 '  Aufrufer-Baum zeigt die im Profil gemessenen Durchlaeufe.
+'  Stand 21 dazu: den letzten Umbau nachbessern (Strg+Umschalt+G), alle
+'  Umbauten sehen auch Unterordner, und eine gebrauchte Konstante zaehlt
+'  fuer den IMPORT beim Verschieben.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -424,6 +427,7 @@ DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umso
 DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf?", "Umschalt+F12")
 DIM miVerschieben AS INTEGER : miVerschieben = GUI_MENU_ITEM(mBearb, "Unterprogramm verschieben ...", "Strg+Umschalt+V")
 DIM miUmbauZur AS INTEGER : miUmbauZur = GUI_MENU_ITEM(mBearb, "Letzten Umbau zuruecknehmen", "Strg+Umschalt+Z")
+DIM miUmbauNach AS INTEGER : miUmbauNach = GUI_MENU_ITEM(mBearb, "Letzten Umbau nachbessern", "Strg+Umschalt+G")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
 DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, "Doppelte entfernen")
@@ -811,6 +815,11 @@ DIM zurPfade AS ARRAY OF STRING : zurPfade = []
 DIM zurTexte AS ARRAY OF STRING : zurTexte = []
 DIM zurAnzahl AS ARRAY OF INTEGER : zurAnzahl = []
 DIM zurNamen AS ARRAY OF STRING : zurNamen = []
+' Der zuletzt UEBERNOMMENE Umbau, damit er sich nachbessern laesst: die
+' Schritte (`op*`) stehen ohnehin noch, hier die Dateien dazu.
+DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
+DIM umbauNachPfade AS ARRAY OF STRING : umbauNachPfade = []
+DIM umbauNachWas AS STRING : umbauNachWas = ""
 DIM umbauWarnung AS STRING : umbauWarnung = ""
 DIM umbauZeile AS INTEGER : umbauZeile = 0
 DIM umbauSpalte AS INTEGER : umbauSpalte = 1
@@ -1797,8 +1806,39 @@ DIM baumDateien AS ARRAY OF STRING
 DIM baumKnoten AS ARRAY OF INTEGER
 DIM baumSchluessel AS STRING : baumSchluessel = "-"
 
+' Alle Dateien des Projekts mit diesem Muster -- AUCH in Unterordnern.
+'
+' Ein Projekt ist selten ein flacher Ordner; ein Umbau, der `lib/` nicht
+' sieht, laesst die halbe Arbeit liegen. Uebergangen werden Ordner, die mit
+' `.` oder `_` anfangen, dazu `target` und `__pycache__`: dort liegt
+' Erzeugtes, kein Quelltext, und ein Bau-Ordner kann zehntausend Dateien
+' haben.
+FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
+    DIM roh AS ARRAY OF STRING : roh = []
+    TRY
+        roh = DIRLIST_REC(projektOrdner, muster)
+    CATCH e
+        roh = []
+    END TRY
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM d AS STRING
+    FOR EACH d IN roh
+        DIM gut AS BOOLEAN : gut = TRUE
+        DIM teil AS STRING
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(d, "/")
+        DIM ti AS INTEGER
+        FOR ti = 0 TO LEN(teile) - 2          ' der Dateiname selbst zaehlt nicht
+            teil = teile[ti]
+            IF LEFT$(teil, 1) = "." OR LEFT$(teil, 1) = "_" THEN gut = FALSE
+            IF teil = "target" OR teil = "__pycache__" THEN gut = FALSE
+        NEXT
+        IF gut THEN ARRAY_PUSH(raus, d)
+    NEXT
+    RETURN raus
+END FUNCTION
+
 SUB baumFuellen()
-    DIM neue AS ARRAY OF STRING : neue = DIRLIST(projektOrdner, "*.dh")
+    DIM neue AS ARRAY OF STRING : neue = projektDateien("*.dh")
     DIM schl AS STRING : schl = projektOrdner + "|" + JOIN$(neue, ";")
     ' Steht dieselbe Liste schon da, bleibt der Baum, WIE er ist -- ein
     ' Neuaufbau raeumt die Auswahl weg, und genau die sammelt man gerade
@@ -2197,7 +2237,7 @@ SUB symbolEinerDatei(pfad AS STRING, kurz AS STRING, quelle AS STRING)
 END SUB
 
 SUB symbolIndexBauen(erzwingen AS BOOLEAN)
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM schl AS STRING : schl = projektOrdner + "|" + STR$(LEN(dateien))
     IF NOT erzwingen AND schl = symSchluessel THEN RETURN
     symSchluessel = schl
@@ -2332,7 +2372,7 @@ END SUB
 SUB projektSuchen(gesucht AS STRING, zweitens AS STRING)
     IF gesucht = "" THEN RETURN
     GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM sd AS ARRAY OF STRING : sd = []
     DIM sz AS ARRAY OF INTEGER : sz = []
     DIM klein AS STRING : klein = LOWER$(gesucht)
@@ -3325,7 +3365,7 @@ END SUB
 ' dieselbe Wahl wie bei der Suche. Gearbeitet wird auf den DATEIEN; ein
 ' Reiter mit ungesicherten Aenderungen bricht ab, statt sie zu ueberschreiben.
 FUNCTION projektErsetzenZaehlen(gesucht AS STRING) AS TUPLE
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM stellen AS INTEGER : stellen = 0
     DIM wieViele AS INTEGER : wieViele = 0
     DIM d AS STRING
@@ -3353,7 +3393,7 @@ FUNCTION projektUngesichert() AS BOOLEAN
 END FUNCTION
 
 SUB projektErsetzenAusfuehren()
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM geaendert AS INTEGER : geaendert = 0
     umbauLeeren()
     DIM d AS STRING
@@ -4061,7 +4101,7 @@ SUB parameterUebernehmen()
     DIM geaendert AS INTEGER : geaendert = zaehler[0]
     DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -4280,7 +4320,7 @@ SUB verschiebenFragen()
     paletteKennungen = []
     ARRAY_PUSH(paletteNamen, "(neue Datei ...)") : ARRAY_PUSH(paletteKennungen, "*neu*")
     DIM d AS STRING
-    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+    FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad)
@@ -4332,10 +4372,36 @@ SUB verschiebenNach(ziel AS STRING)
     '     Quelle bleiben, muss die ZIELdatei die Quelle importieren. Sonst
     '     wandert das Unterprogramm weg und findet seine Helfer nicht mehr.
     DIM brauchtQuelle AS BOOLEAN : brauchtQuelle = FALSE
+    ' Die Namen, die in der Quelle BLEIBEN: Unterprogramme und Klassen
+    ' (CODE_SYMBOLS$) UND die Konstanten und globalen Variablen ganz oben --
+    ' die kennt CODE_SYMBOLS$ nicht, und `CONST MAXHP` ist genauso ein
+    ' Grund fuer den IMPORT wie ein Unterprogramm.
+    DIM bleibt AS ARRAY OF STRING : bleibt = []
+    DIM symVon AS ARRAY OF INTEGER : symVon = []
+    DIM symBis AS ARRAY OF INTEGER : symBis = []
     DIM sym AS JSON_HANDLE : sym = JSON_PARSE(CODE_SYMBOLS$(neuQuelle))
     DIM si AS INTEGER
     FOR si = 0 TO JSON_LEN(sym, "") - 1
-        DIM sname AS STRING : sname = JSON_GET_STRING(sym, STR$(si) + ".name")
+        DIM sp AS STRING : sp = STR$(si)
+        ARRAY_PUSH(bleibt, JSON_GET_STRING(sym, sp + ".name"))
+        ARRAY_PUSH(symVon, JSON_GET_INT(sym, sp + ".von"))
+        ARRAY_PUSH(symBis, JSON_GET_INT(sym, sp + ".bis"))
+    NEXT
+    ' Nur Zeilen auf OBERSTER Ebene: ein `DIM i` in einem Unterprogramm ist
+    ' dort lokal und kein Grund fuer irgendeinen IMPORT.
+    DIM restZ AS INTEGER
+    FOR restZ = 1 TO LEN(rest)
+        DIM drin AS BOOLEAN : drin = FALSE
+        DIM sk AS INTEGER
+        FOR sk = 0 TO LEN(symVon) - 1
+            IF symVon[sk] <= restZ AND restZ <= symBis[sk] THEN drin = TRUE
+        NEXT
+        IF drin THEN CONTINUE
+        DIM eName AS STRING : eName = einzelzeileName$(neuQuelle, restZ)
+        IF eName <> "" THEN ARRAY_PUSH(bleibt, eName)
+    NEXT
+    DIM sname AS STRING
+    FOR EACH sname IN bleibt
         IF sname = "" OR LOWER$(sname) = LOWER$(verschName) THEN CONTINUE
         DIM bz AS STRING
         FOR EACH bz IN block
@@ -4361,7 +4427,7 @@ SUB verschiebenNach(ziel AS STRING)
     ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch.
     DIM ohneImport AS INTEGER : ohneImport = 0
     DIM d AS STRING
-    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+    FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
         IF wegGleich$(pfad) = wegGleich$(ziel) THEN CONTINUE
@@ -4508,7 +4574,7 @@ SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen A
     IF tiefe > 3 OR name = "" OR aufrZahl >= 200 THEN RETURN
     IF ARRAY_INDEXOF(gesehen, LOWER$(name)) >= 0 THEN RETURN
     ARRAY_PUSH(gesehen, LOWER$(name))
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -4821,7 +4887,7 @@ SUB formulareNachziehen(alt AS STRING, neu AS STRING)
     DIM schluessel AS ARRAY OF STRING
     schluessel = ["on_click", "on_change", "on_focus", "on_blur", "on_enter"]
     DIM d AS STRING
-    FOR EACH d IN DIRLIST(projektOrdner, "*.dhform")
+    FOR EACH d IN projektDateien("*.dhform")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         DIM text AS STRING : text = ""
         TRY
@@ -4851,7 +4917,7 @@ SUB umbenennenImProjekt(neu AS STRING)
     END IF
     DIM wort AS STRING : wort = umbenennWort
     IF wort = "" OR neu = "" OR wort = neu THEN RETURN
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
     umbauLeeren()
     DIM d AS STRING
     FOR EACH d IN dateien
@@ -4959,6 +5025,8 @@ SUB umbauLeeren()
     umbauTabs = [] : umbauPfade = [] : umbauTexte = []
     umbauZeile = 0 : umbauSpalte = 1
     umbauWarnung = ""
+    ' Die Schritte (`op*`) bleiben stehen: sie sind die Grundlage fuers
+    ' Nachbessern, und der naechste Umbau baut sie ohnehin neu.
 END SUB
 
 ' `tab` >= 0 schreibt in den Reiter (Undo bleibt), sonst in die Datei.
@@ -5238,6 +5306,45 @@ SUB umbauZurueck()
     END IF
 END SUB
 
+' Den zuletzt uebernommenen Umbau noch einmal vorlegen.
+'
+' Ein ausgelassener Block laesst sich sonst nur zurueckholen, indem man den
+' ganzen Umbau zuruecknimmt und ihn von vorn macht. Hier stehen dieselben
+' Schritte wieder da, mit derselben Auswahl -- man kippt den einen Block
+' und uebernimmt; gerechnet wird aus den Schritten, nicht aus dem, was
+' gerade in der Datei steht.
+SUB umbauNachbessern()
+    IF LEN(opArt) = 0 OR LEN(umbauNachPfade) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Nachbessern: es liegt kein uebernommener Umbau vor.")
+        protokoll("umbau nachbessern 0")
+        RETURN
+    END IF
+    umbauTabs = [] : umbauPfade = [] : umbauTexte = []
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauNachPfade) - 1
+        ARRAY_PUSH(umbauTabs, umbauNachTabs[k])
+        ARRAY_PUSH(umbauPfade, umbauNachPfade[k])
+        ARRAY_PUSH(umbauTexte, "")
+    NEXT
+    umbauMeldung = "Nachgebessert: " + umbauNachWas
+    umbauProt = "umbau nachgebessert " + STR$(LEN(umbauTexte))
+    umbauWarnung = ""
+    umbauZeile = 0 : umbauSpalte = 1
+    GUI_LISTBOX_CLEAR(lstUmbau)
+    DIM ln AS INTEGER
+    FOR ln = 0 TO LEN(umbauTexte) - 1
+        DIM lname AS STRING : lname = umbauPfade[ln]
+        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = tabTitel[umbauTabs[ln]]
+        GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
+        GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
+    NEXT
+    umbauAnzeigeBauen()
+    GUI_WINDOW_TITLE(winUmbau, "Nachbessern: " + umbauNachWas)
+    GUI_WINDOW_VISIBLE(winUmbau, TRUE)
+    GUI_FOCUS(btnUmbauOk)
+    protokoll("umbau nachbessern " + STR$(LEN(umbauTexte)))
+END SUB
+
 SUB umbauVerwerfen()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
     umbauLeeren()
@@ -5315,6 +5422,14 @@ SUB umbauSchreiben()
     END IF
     reiterNeuSetzen()
     symSchluessel = "-"
+    ' Fuer das Nachbessern merken -- die Schritte selbst bleiben ohnehin
+    ' stehen, nur die Zuordnung zu den Dateien geht mit umbauLeeren weg.
+    umbauNachTabs = [] : umbauNachPfade = [] : umbauNachWas = umbauMeldung
+    DIM nk AS INTEGER
+    FOR nk = 0 TO LEN(umbauTexte) - 1
+        ARRAY_PUSH(umbauNachTabs, umbauTabs[nk])
+        ARRAY_PUSH(umbauNachPfade, umbauPfade[nk])
+    NEXT
     GUI_SET_TEXT(lblStatus, umbauMeldung)
     IF umbauProt <> "" THEN protokoll(umbauProt)
     umbauLeeren()
@@ -5334,7 +5449,7 @@ DIM klsMethoden AS ARRAY OF STRING : klsMethoden = []
 SUB klassenLesen()
     klsName = [] : klsBasis = [] : klsDatei = [] : klsMethoden = []
     DIM d AS STRING
-    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+    FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         DIM quelle AS STRING : quelle = projektQuelle$(pfad)
         IF quelle = "" THEN CONTINUE
@@ -6545,6 +6660,7 @@ paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
 paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
 paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
 paletteEintrag("Letzten Umbau zuruecknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
+paletteEintrag("Letzten Umbau nachbessern", "umbau_nach", "Strg+Umschalt+G")
 paletteEintrag("Geruest beim Tippen", "geruest", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
@@ -6631,7 +6747,7 @@ SUB schnellOeffnen()
     paletteNamen = []
     paletteKennungen = []
     DIM d AS STRING
-    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+    FOR EACH d IN projektDateien("*.dh")
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, PATHJOIN(projektOrdner, d))
     NEXT
     FOR EACH d IN zuletzt
@@ -6804,6 +6920,7 @@ SUB befehl(k AS STRING)
         CASE "aufrufer" : aufruferZeigen()
         CASE "verschieben" : verschiebenFragen()
         CASE "umbau_zurueck" : umbauZurueck()
+        CASE "umbau_nach" : umbauNachbessern()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
@@ -7109,6 +7226,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
     IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
     IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
+    IF GUI_CLICKED(miUmbauNach) THEN befehl("umbau_nach")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
     IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")

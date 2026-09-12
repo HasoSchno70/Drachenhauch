@@ -2873,6 +2873,25 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 21 (2026-09-12):** die drei Punkte nach Stand 20. **Nachbessern**
+(Strg+Umschalt+G): der zuletzt uebernommene Umbau noch einmal, mit
+derselben Blockauswahl -- gerechnet wird aus den SCHRITTEN, nicht aus dem,
+was jetzt in der Datei steht; `umbauLeeren` raeumt die Schritte darum NICHT
+mehr weg. **Unterordner:** alles, was "im ganzen Projekt" heisst, ging
+ueber `DIRLIST` und sah nur den flachen Ordner -- jetzt `projektDateien()`
+(DIRLIST_REC) an 13 Stellen. Uebergangen werden Ordner, die mit `.` oder
+`_` anfangen, dazu `target`/`__pycache__`: dort liegt Erzeugtes, und ein
+Bau-Ordner kann zehntausend Dateien haben. **Der Test-Harnisch musste
+mit:** `tests/test_ide.py` legte seine IDE-Kopie in `tmp_path/_ide`, also
+IN den Projektordner -- mit Unterordnern haette jeder Umbau sie
+mitgenommen; sie liegt jetzt in einem Geschwisterordner. **Konstante zaehlt
+fuer den IMPORT:** beim Verschieben pruefte `brauchtQuelle` nur die Namen
+aus `CODE_SYMBOLS$` -- und das kennt CONST/DIM NICHT. Ein Unterprogramm,
+das `MAXHP` benutzt, wanderte ohne IMPORT und uebersetzte nicht mehr;
+gepruefte werden jetzt auch die CONST-/DIM-Zeilen auf OBERSTER Ebene (die
+Symbolbereiche einmal einsammeln, nicht je Zeile neu parsen). Tests: 4 neue
+in `tests/test_ide.py`.
+
 **Stufe 20 (2026-09-12):** die drei Punkte nach Stand 19. **Bloecke
 auslassen:** hinter der Vorschau liegt jetzt keine Textausgabe mehr,
 sondern eine Folge von SCHRITTEN (`opArt` 0 bleibt / 1 alt / 2 neu, dazu

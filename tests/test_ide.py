@@ -66,11 +66,13 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
         if zwischenablage is not None:
             einschub += 'CLIPBOARD_SET("' + zwischenablage + '")\n'
         text = IDE.read_text(encoding="utf-8").replace('SETFPS(60)\n', einschub, 1)
-        # In einen Unterordner, nicht neben die Testdateien: die Kopie enthaelt
-        # den eingeschobenen Suchtext und staende sonst im Projektbaum und in
-        # den Suchtreffern.
-        (tmp_path / "_ide").mkdir(exist_ok=True)
-        quelle = tmp_path / "_ide" / "ide_test.dh"
+        # NEBEN den Projektordner, nicht hinein: die Kopie enthaelt den
+        # eingeschobenen Suchtext und stuende sonst im Projektbaum, in den
+        # Suchtreffern und -- seit die Umbauten Unterordner sehen -- auch in
+        # jedem Umbau.
+        aussen = tmp_path.parent / (tmp_path.name + "_idekopie")
+        aussen.mkdir(exist_ok=True)
+        quelle = aussen / "ide_test.dh"
         quelle.write_text(text, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(quelle), "--", str(datei)], capture_output=True,
                        text=True, encoding="utf-8", errors="replace", timeout=180,
@@ -2111,3 +2113,78 @@ def test_der_aufrufer_baum_zeigt_die_gemessenen_durchlaeufe(tmp_path):
     assert any(z.startswith("profil ") for z in log), log
     assert "aufrufer 1" in log, log
     assert "aufrufer gemessen 1" in log, log
+
+
+# --------------------------------------------------------------- Stufe 21
+
+def test_ein_umbau_laesst_sich_nachbessern(tmp_path):
+    """Ein ausgelassener Block ließe sich sonst nur zurückholen, indem man
+    den ganzen Umbau zurücknimmt und ihn von vorn macht."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n"
+                    "PRINT 0\n"
+                    "zeichne(3, 4)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)
+    ev += _param_knopf(100, 12, 248, 140, 30)
+    ev += _klick_mit(150, 600, _vs_zeile(9))     # `-zeichne(3, 4)`
+    ev += _klick_mit(190, 643, 681)              # Block auslassen
+    ev += _taste(240, RL_ENTER)                  # uebernehmen (ohne den Block)
+    # Jetzt nachbessern: derselbe Block wieder herein.
+    ev += _taste(290, RL_G, RL_LCTRL, RL_LSHIFT)
+    ev += _klick_mit(330, 600, _vs_zeile(9))
+    ev += _klick_mit(370, 643, 681)              # Block wieder aufnehmen
+    ev += _taste(420, RL_ENTER)
+    ev += _taste(460, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=560, events=ev)
+    assert any(z.startswith("umbau nachbessern ") and not z.endswith(" 0") for z in log), log
+    text = quelle.read_text(encoding="utf-8")
+    assert "zeichne(2, 1)" in text, text
+    assert "zeichne(4, 3)" in text, text          # jetzt doch umgestellt
+
+
+def test_der_umbau_sieht_auch_unterordner(tmp_path):
+    """Ein Projekt ist selten ein flacher Ordner -- ein Umbau, der `lib/`
+    nicht sieht, lässt die halbe Arbeit liegen."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n", "a_spiel.dh")
+    (tmp_path / "lib").mkdir()
+    tief = tmp_path / "lib" / "mehr.dh"
+    tief.write_text("gruessen()\n", encoding="utf-8")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F6, RL_LCTRL, RL_LSHIFT)     # im ganzen Projekt umbenennen
+    ev += _taste(115, RL_V, RL_LCTRL)
+    ev += _taste(145, RL_ENTER)
+    ev += _taste(185, RL_ENTER)                      # Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=290, events=ev, zwischenablage="winken")
+    assert "projekt umbenannt 2" in log, log
+    assert "winken()" in tief.read_text(encoding="utf-8"), tief.read_text()
+
+
+def test_verschieben_nimmt_die_konstante_mit_in_den_import(tmp_path):
+    """`gruessen` braucht `MAXHP`, und das bleibt zurück -- also muss die
+    Zieldatei die Quelle importieren. `CONST` kennt CODE_SYMBOLS$ nicht,
+    darum wurde das vorher übersehen."""
+    quelle = _datei(tmp_path,
+                    "CONST MAXHP = 100\n"
+                    "SUB gruessen()\n"
+                    "    PRINT MAXHP\n"
+                    "END SUB\n"
+                    "PRINT 1\n", "a_spiel.dh")
+    ziel = _datei(tmp_path, "' Helfer\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)   # in `gruessen`
+    ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(110, RL_DOWN) + _taste(130, RL_ENTER)
+    ev += _taste(180, RL_ENTER)
+    ev += _taste(230, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev)
+    assert any(z.startswith("verschieben gruessen ") for z in log), log
+    z = ziel.read_text(encoding="utf-8")
+    assert 'IMPORT "a_spiel.dh"' in z, z
+    r = subprocess.run([str(_DHRT), "--check", str(ziel)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", (r.stdout, z)
