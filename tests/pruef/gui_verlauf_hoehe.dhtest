@@ -1,0 +1,88 @@
+' Die Metrik `verlauf_hoehe`: ueber dieser Hoehe klingt der Verlauf aus.
+' Ein Knopf von 40 Pixeln darf sich woelben, eine Flaeche von 400 bekommt
+' mit derselben Staerke einen Schlagschatten ueber die halbe Hoehe.
+'
+' Geprueft am BILD: zwei Panels nebeneinander, 40 und 400 hoch. Ohne die
+' Metrik hat die hohe Flaeche oben DIESELBE Farbe wie die kleine, mit ihr
+' eine andere -- das ist der ganze Unterschied.
+' Format: docs/werkzeuge.md.
+
+=== ohne die metrik ist der verlauf ueberall gleich stark
+IMPORT "gui"
+SCREEN(500, 500, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM klein AS GUI_WIDGET : klein = GUI_PANEL(w, 20, 20, 120, 40)
+DIM gross AS GUI_WIDGET : gross = GUI_PANEL(w, 200, 20, 120, 400)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+' Die hohe Flaeche zieht ueber ihre ganze Hoehe durch: oben dunkel,
+' unten hell, 23 Stufen Abstand.
+260 30 #29323F +-2
+260 410 #404956 +-2
+--- erwartet
+
+=== mit der metrik wird die hohe flaeche matter
+IMPORT "gui"
+SCREEN(500, 500, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+GUI_METRIC_SET("verlauf_hoehe", 120)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM klein AS GUI_WIDGET : klein = GUI_PANEL(w, 20, 20, 120, 40)
+DIM gross AS GUI_WIDGET : gross = GUI_PANEL(w, 200, 20, 120, 400)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+' Mit der Metrik bleiben davon 6 Stufen -- dieselben zwei Punkte.
+260 30 #343D4A +-2
+260 410 #3A4350 +-2
+--- erwartet
+
+=== die kleine flaeche bleibt, wie sie war
+' Die Gegenprobe zur Gegenprobe: an der KLEINEN aendert die Metrik nichts.
+IMPORT "gui"
+SCREEN(500, 500, "T", 1)
+GUI_THEME_PRESET("glas_dunkel")
+GUI_METRIC_SET("verlauf_hoehe", 120)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 500, 500)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM klein AS GUI_WIDGET : klein = GUI_PANEL(w, 20, 20, 120, 40)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+80 24 <> 80 56
+--- erwartet
+
+=== der schluessel steht im verzeichnis
+IMPORT "gui"
+SCREEN(200, 200, "T", 1)
+GUI_METRIC_SET("verlauf_hoehe", 90)
+PRINT GUI_METRIC_GET("verlauf_hoehe")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+90

@@ -111,6 +111,23 @@ SETFPS(60)
 WINDOW_MAXIMIZE()
 GUI_THEME_PRESET("glas_dunkel")
 
+' Der Feinschliff am Thema -- nach JEDEM Preset, denn ein Preset setzt die
+' Metriken mit.
+'
+' Das Glas-Thema ist fuer Knoepfe und Regler gemacht: kraeftiger Verlauf,
+' deutlicher Glanz. Eine Entwicklungsumgebung besteht aber aus grossen
+' Flaechen -- Code-Feld, Ausgabe, Problemliste, Projektbaum --, und auf
+' denen wirkt derselbe Verlauf wie ein Schlagschatten quer ueber die halbe
+' Hoehe. Darum matter (Verlauf und Glanz herunter) und `verlauf_hoehe`:
+' ueber 120 Pixeln klingt beides aus, ein Knopf woelbt sich weiter.
+SUB themaFeinschliff()
+    GUI_METRIC_SET("gradient", 9)
+    GUI_METRIC_SET("gloss", 12)
+    GUI_METRIC_SET("verlauf_hoehe", 120)
+    GUI_METRIC_SET("shadow", 12)
+END SUB
+themaFeinschliff()
+
 ' Schrift: eine Textschrift fuer die Oberflaeche, eine dicktengleiche fuer den
 ' Code. Geladen in 32 px und in 16 gezeichnet -- so bleibt sie scharf. Ohne
 ' Fund bleibt raylibs Bitmapschrift.
@@ -293,7 +310,7 @@ IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
 IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
-IF hell THEN GUI_THEME_PRESET("glas_hell")
+IF hell THEN GUI_THEME_PRESET("glas_hell") : themaFeinschliff()
 
 ' offene Dialoge (0 = keiner)
 DIM dlgSuche AS GUI_WINDOW : dlgSuche = 0
@@ -6465,6 +6482,7 @@ SUB befehl(k AS STRING)
             hell = NOT hell
             GUI_MENU_CHECK(miThema, hell)
             IF hell THEN GUI_THEME_PRESET("glas_hell") ELSE GUI_THEME_PRESET("glas_dunkel")
+            themaFeinschliff()
             konfigSichern()
         CASE "vollbild" : SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
         CASE "umbruch" : umbruchSetzen(NOT umbruchAn)

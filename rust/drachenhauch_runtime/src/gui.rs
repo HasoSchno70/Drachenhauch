@@ -70,6 +70,11 @@ fn default_metrics() -> HashMap<String, i32> {
         // gloss:    Staerke der Glanzkante ueber der oberen Haelfte, 0..100.
         // bevel:    1 = helle Linie oben, dunkle unten (die Fase).
         ("gradient", 0), ("gloss", 0), ("bevel", 0),
+        // verlauf_hoehe: ab dieser Hoehe klingt der Verlauf aus (0 = nie).
+        // Ein Knopf von 28 Pixeln darf sich woelben; eine Liste von 400
+        // bekommt mit derselben Staerke einen Schlagschatten ueber die halbe
+        // Flaeche -- dieselbe Zahl sieht auf zwei Groessen verschieden aus.
+        ("verlauf_hoehe", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
@@ -5986,11 +5991,25 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.flaeche(g, x1, y1, x2, y2, fill, border, true);
     }
 
+    /// Wie stark Verlauf und Glanz auf DIESER Hoehe noch sein sollen.
+    ///
+    /// `verlauf_hoehe` = 0 heisst: ueberall gleich stark (so war es immer).
+    /// Sonst nimmt die Staerke ab, je hoeher die Flaeche ist -- ein Knopf
+    /// woelbt sich weiter, eine grosse Liste wird matt. Ein Rest bleibt
+    /// stehen, sonst saehe eine hohe Flaeche gar nicht mehr nach Material
+    /// aus.
+    fn verlauf_anteil(&self, hoehe: i32) -> f64 {
+        let vh = self.m("verlauf_hoehe");
+        if vh <= 0 || hoehe <= vh { return 1.0; }
+        (vh as f64 / hoehe as f64).max(0.2)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn flaeche(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32,
                fill: i64, border: i64, tief: bool) {
         let rad = self.m("corner_radius");
-        let grad = self.m("gradient");
+        let anteil = self.verlauf_anteil(y2 - y1);
+        let grad = (self.m("gradient") as f64 * anteil).round() as i32;
         if grad > 0 {
             // Erhaben: hell oben, dunkel unten. Versenkt: genau umgekehrt --
             // so faellt das Licht scheinbar weiter von oben ein, die Flaeche
@@ -6002,7 +6021,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             };
             g.round_gradient(x1, y1, x2, y2, rad, oben, unten);
             if !tief {
-                self.gloss(g, x1, y1, x2, y2, rad);
+                self.gloss(g, x1, y1, x2, y2, rad, anteil);
             }
         } else if rad > 0 {
             g.round_rect(x1, y1, x2, y2, rad, fill, true);
@@ -6020,8 +6039,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Glanzkante: halbdurchsichtiges Weiss ueber der oberen Haelfte, nach
     /// unten ausblendend. Erst das laesst eine Flaeche gewoelbt wirken -- ein
     /// blosser Verlauf sieht weiterhin flach aus.
-    fn gloss(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32) {
-        let s = self.m("gloss");
+    fn gloss(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32,
+             anteil: f64) {
+        let s = (self.m("gloss") as f64 * anteil).round() as i32;
         let h = y2 - y1;
         if s <= 0 || h < 4 {
             return;
@@ -10493,7 +10513,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let gr = self.m("gradient");
                     if gr > 0 {
                         g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, r, shade(bg, gr), shade(bg, -gr));
-                        self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, r);
+                        self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, r, self.verlauf_anteil(h));
                     } else {
                         g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true);
                     }
@@ -10556,7 +10576,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         if self.m("gradient") > 0 {
                             g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, 3,
                                              shade(acc, 26), shade(acc, -22));
-                            self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, 3);
+                            self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, 3, self.verlauf_anteil(h));
                         } else {
                             g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, acc, true);
                         }
