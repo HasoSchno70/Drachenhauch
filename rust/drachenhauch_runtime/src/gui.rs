@@ -6418,10 +6418,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Knopf, Kaestchen und Klappliste waren ohne Maus nicht erreichbar.
         // Ein Code-Feld verlangt den Tabulator fuer sich (siehe
         // edit_textarea) -- dann darf er hier NICHT zusaetzlich den Fokus
-        // weiterschalten, sonst tut eine Taste zwei Dinge.
+        // weiterschalten, sonst tut eine Taste zwei Dinge. Das gilt auch,
+        // wenn es ihn nur MELDET (`tab_meldet`): gemeldet UND den Fokus
+        // weiter waere derselbe Fehler.
         let tab_belegt = self.focus_widget
             .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(|w| w.kind == Kind::TextArea && w.tab_fuegt_ein)
+            .map(|w| w.kind == Kind::TextArea && (w.tab_fuegt_ein || w.tab_meldet))
             .unwrap_or(false);
         if g.key_pressed(KEY_TAB) && !tab_belegt {
             if let Some(top) = self.focus_window {

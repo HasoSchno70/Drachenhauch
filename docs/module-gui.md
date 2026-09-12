@@ -1759,6 +1759,11 @@ Einrücken: `GUI_TEXTAREA_CURSOR` sagt die Spalte, `GUI_TEXTAREA_INSERT`
 setzt die Leerzeichen bis zur nächsten. Ohne den Schalter bleibt alles, wie
 es war.
 
+Das Feld **behält** die Taste damit: der Tabulator schaltet dann nicht
+zusätzlich den Fokus weiter, sonst täte eine Taste zwei Dinge. Ein Feld,
+aus dem man per Tabulator herauskommen soll, setzt den Schalter also
+nicht.
+
 ## Mehrere Schreibmarken im Textbereich
 
 **Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
