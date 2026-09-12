@@ -4203,6 +4203,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_CLOSE_WORDS",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_CURSOR",
    "kind": "core",
    "signature": "GUI_TEXTAREA_CURSOR(ta)",

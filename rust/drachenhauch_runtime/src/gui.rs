@@ -915,6 +915,9 @@ struct EinzugRegeln {
     auto_einzug: bool,
     einzug_anfang: Vec<String>,
     einzug_ende: Vec<String>,
+    einzug_aus: Vec<String>,
+    schluss_oeffner: Vec<String>,
+    schluss_texte: Vec<String>,
     tabbreite: i32,
 }
 
@@ -1060,6 +1063,12 @@ pub struct Widget {
     einzug_anfang: Vec<String>,   // Zeile faengt damit an -> eine Stufe mehr
     einzug_ende: Vec<String>,     // Zeile endet damit -> eine Stufe mehr
     einzug_aus: Vec<String>,      // getippt -> die Zeile selbst eine zurueck
+    // Das mitwachsende Geruest (GUI_TEXTAREA_CLOSE_WORDS): zwei gleich lange
+    // Listen, je ein oeffnendes Wort und die Zeile, die es schliesst
+    // (`IF` -> `END IF`, `FOR` -> `NEXT`). Leer = aus, und dann ist Enter,
+    // was es vorher war.
+    schluss_oeffner: Vec<String>,
+    schluss_texte: Vec<String>,
     // Farbfelder (nur TextArea): (start, laenge, farbe) in ZEICHEN wie die
     // Abschnitte. Gezeichnet wird ein kleines Quadrat HINTER dem Stueck --
     // welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer.
@@ -2085,6 +2094,33 @@ impl Gui {
         Ok(())
     }
 
+    /// Das mitwachsende Geruest (GUI_TEXTAREA_CLOSE_WORDS).
+    ///
+    /// Zwei gleich lange Listen: `oeffner` sind Woerter, mit denen eine Zeile
+    /// anfaengt, `schluesse` die Zeile, die der Umbruch darunter setzt
+    /// (`IF` -> `END IF`, `FOR` -> `NEXT`). Der Abschluss kommt UNTER die
+    /// neue Zeile, die Marke bleibt dazwischen stehen.
+    ///
+    /// Welche Woerter das sind, weiss wieder nur der Aufrufer -- wie bei
+    /// GUI_TEXTAREA_INDENT_WORDS kennt die Laufzeit hier keine Sprache. Die
+    /// Gross-/Kleinschreibung des Abschlusses bleibt, wie sie hereinkommt:
+    /// sie wird GESCHRIEBEN und nicht verglichen.
+    ///
+    /// Zwei leere Listen schalten es ab.
+    pub fn textarea_close_words(&mut self, h: i64, oeffner: Vec<String>,
+                                schluesse: Vec<String>) -> Result<(), String> {
+        if oeffner.len() != schluesse.len() {
+            return Err("GUI_TEXTAREA_CLOSE_WORDS: beide Listen muessen gleich lang sein".into());
+        }
+        let wd = self.wdg_mut(h, "GUI_TEXTAREA_CLOSE_WORDS")?;
+        if wd.kind != Kind::TextArea {
+            return Err("GUI_TEXTAREA_CLOSE_WORDS: das Widget ist kein GUI_TEXTAREA".into());
+        }
+        wd.schluss_oeffner = oeffner.iter().map(|s| s.trim().to_uppercase()).collect();
+        wd.schluss_texte = schluesse;
+        Ok(())
+    }
+
     /// Eine weitere Schreibmarke setzen (GUI_TEXTAREA_ADD_CARET).
     ///
     /// Tippen, Enter, Ruecktaste, Entf, Tabulator und Einfuegen wirken dann
@@ -2267,6 +2303,7 @@ impl Gui {
             faltbar: Vec::new(), gefaltet: Vec::new(), marken_zusatz: Vec::new(),
             auto_einzug: false, einzug_anfang: Vec::new(),
             einzug_ende: Vec::new(), einzug_aus: Vec::new(),
+            schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
             spalten_start: (-1, -1),
@@ -6778,6 +6815,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             auto_einzug: w.auto_einzug,
             einzug_anfang: w.einzug_anfang.clone(),
             einzug_ende: w.einzug_ende.clone(),
+            einzug_aus: w.einzug_aus.clone(),
+            schluss_oeffner: w.schluss_oeffner.clone(),
+            schluss_texte: w.schluss_texte.clone(),
             tabbreite: w.tabbreite,
         }
     }
@@ -6806,21 +6846,99 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if c == ' ' || c == '\t' { einzug.push(c); } else { break; }
         }
         let bis_marke: String = chars[von..pos.min(chars.len())].iter().collect();
-        let text = bis_marke.trim().to_uppercase();
-        if !text.is_empty() {
-            let wort = |s: &str, w: &str| -> bool {
-                s == w || (s.len() > w.len() && s.starts_with(w)
-                           && !s[w.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
-            };
-            let endet = |s: &str, w: &str| -> bool {
-                s == w || (s.len() > w.len() && s.ends_with(w)
-                           && !s[..s.len() - w.len()].ends_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
-            };
-            let mehr = w.einzug_anfang.iter().any(|k| wort(&text, k))
-                    || w.einzug_ende.iter().any(|k| endet(&text, k));
-            if mehr { einzug.push_str(&" ".repeat(w.tabbreite.max(1) as usize)); }
+        if Self::oeffnet(w, &bis_marke.trim().to_uppercase()) {
+            einzug.push_str(&" ".repeat(w.tabbreite.max(1) as usize));
         }
         einzug
+    }
+
+    /// Faengt `s` mit dem Wort `w` an? (Wort heisst: danach kommt kein
+    /// Namenszeichen mehr -- `ENDE` faengt nicht mit `END` an.)
+    fn wort_am_anfang(s: &str, w: &str) -> bool {
+        s == w || (s.len() > w.len() && s.starts_with(w)
+                   && !s[w.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
+    }
+
+    /// Endet `s` auf dem Wort `w`?
+    fn wort_am_ende(s: &str, w: &str) -> bool {
+        s == w || (s.len() > w.len() && s.ends_with(w)
+                   && !s[..s.len() - w.len()].ends_with(|c: char| c.is_ascii_alphanumeric() || c == '_'))
+    }
+
+    /// Oeffnet diese Zeile (GROSS, getrimmt) einen Block?
+    ///
+    /// Dieselbe Frage fuer die Einrueckung und fuer das Geruest -- getrennt
+    /// beantwortet liefen beide auseinander, und `IF x THEN y = 1` bekaeme
+    /// ein `END IF`, obwohl es nicht einmal einrueckt.
+    fn oeffnet(w: &EinzugRegeln, text: &str) -> bool {
+        if text.is_empty() { return false; }
+        w.einzug_anfang.iter().any(|k| Self::wort_am_anfang(text, k))
+            || w.einzug_ende.iter().any(|k| Self::wort_am_ende(text, k))
+    }
+
+    /// Die Zeile, die den eben geoeffneten Block schliesst -- oder None.
+    ///
+    /// Gerufen VOR dem Umbruch, mit der Marke noch in der oeffnenden Zeile.
+    /// Drei Bedingungen, und jede hat ihren Grund:
+    /// * die Zeile oeffnet ueberhaupt einen Block (`oeffnet`) -- sonst
+    ///   bekaeme die einzeilige Form `IF x THEN y = 1` ein `END IF`;
+    /// * hinter der Marke steht nichts mehr -- sonst landete der Rest der
+    ///   Zeile HINTER dem Abschluss;
+    /// * der Block ist nicht schon geschlossen (`bereits_geschlossen`) --
+    ///   sonst saete jedes Enter am Ende einer alten `SUB`-Zeile ein zweites
+    ///   `END SUB`.
+    fn geruest_schluss(w: &EinzugRegeln, chars: &[char], pos: usize) -> Option<String> {
+        if w.schluss_oeffner.is_empty() { return None; }
+        let (von, bis) = Self::zeile_um(chars, pos);
+        if chars[pos.min(bis)..bis].iter().any(|c| !c.is_whitespace()) { return None; }
+        let zeile: String = chars[von..bis].iter().collect();
+        let text = zeile.trim().to_uppercase();
+        if !Self::oeffnet(w, &text) { return None; }
+        // Das laengste passende Wort gewinnt: `DO WHILE` vor `DO`.
+        let mut treffer: Option<usize> = None;
+        for (k, o) in w.schluss_oeffner.iter().enumerate() {
+            if !Self::wort_am_anfang(&text, o) { continue; }
+            if treffer.map_or(true, |t| o.len() > w.schluss_oeffner[t].len()) { treffer = Some(k); }
+        }
+        let k = treffer?;
+        let schluss = w.schluss_texte[k].clone();
+        let einzug: String = zeile.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+        if Self::bereits_geschlossen(w, chars, bis, einzug.chars().count(), &schluss.to_uppercase()) {
+            return None;
+        }
+        Some(einzug + &schluss)
+    }
+
+    /// Steht der Abschluss schon unter der Zeile?
+    ///
+    /// Gegangen wird ab `ab` (Ende der oeffnenden Zeile) nach unten: tiefer
+    /// eingerueckte Zeilen sind der Rumpf, eine Zeile aus der `aus`-Liste auf
+    /// gleicher Hoehe gehoert noch dazu (`ELSE`, `CASE`), alles andere auf
+    /// gleicher oder geringerer Hoehe beendet die Suche. Bei krumm
+    /// eingerueckten Dateien faellt die Antwort auf "nicht geschlossen" --
+    /// ein Abschluss zu viel ist leichter zu sehen als einer zu wenig.
+    fn bereits_geschlossen(w: &EinzugRegeln, chars: &[char], ab: usize,
+                           einzug: usize, schluss: &str) -> bool {
+        let mut i = ab;
+        let mut gesehen = 0;
+        while i < chars.len() && gesehen < 500 {
+            i += 1;                       // ueber den Umbruch
+            if i >= chars.len() { break; }
+            let (von, bis) = Self::zeile_um(chars, i);
+            i = bis;
+            gesehen += 1;
+            let zeile: String = chars[von..bis].iter().collect();
+            let text = zeile.trim().to_uppercase();
+            if text.is_empty() { continue; }
+            let tief = zeile.chars().take_while(|c| *c == ' ' || *c == '\t').count();
+            if tief > einzug { continue; }
+            if tief == einzug {
+                if Self::wort_am_anfang(&text, schluss) { return true; }
+                if w.einzug_aus.iter().any(|k| text == *k) { continue; }
+            }
+            return false;
+        }
+        false
     }
 
     /// Alle Schreibmarken als (caret, anker), die erste ist die fuehrende.
@@ -7524,11 +7642,26 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // der laufenden Zeile, wenn das Feld danach verlangt.
         if g.key_pressed(KEY_ENTER) {
             let wref = Self::einzug_regeln(&self.windows[wi].widgets[i]);
+            // Das Geruest wird VOR dem Umbruch entschieden -- danach steht die
+            // Marke schon in der neuen Zeile, und die oeffnende waere nur noch
+            // rueckwaerts zu finden. Nur bei EINER Marke und ohne Auswahl:
+            // fuenf Abschluesse auf einmal will niemand, und bei einer Auswahl
+            // ist die Zeile nach dem Umbruch eine andere.
+            let geruest = if marken.len() == 1 && marken[0].0 == marken[0].1 {
+                Self::geruest_schluss(&wref, &chars, marken[0].0.clamp(0, chars.len() as i32) as usize)
+            } else { None };
             Self::an_marken(&mut chars, &mut marken, |ch, c, a| {
                 let lo = c.min(a);
                 let ein = Self::neuer_einzug(&wref, ch, lo as usize);
                 (lo as usize, (c.max(a)) as usize, format!("\n{}", ein))
             });
+            if let Some(zeile) = geruest {
+                // Hinter der Marke einsetzen, ohne sie zu bewegen: die Marke
+                // gehoert in die leere Zeile DAZWISCHEN, dort wird getippt.
+                let p = marken[0].0.clamp(0, chars.len() as i32) as usize;
+                let ein: Vec<char> = format!("\n{}", zeile).chars().collect();
+                chars.splice(p..p, ein);
+            }
         }
         // Backspace / Delete (Selektion hat Vorrang).
         if g.key_pressed(KEY_BACKSPACE) {

@@ -1703,6 +1703,47 @@ GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FUNCTION", "FOR", "WHILE", "IF"], _
 Die Laufzeit kennt hier keine Sprache — dasselbe Prinzip wie bei der
 Faltung. Ein Textbereich ohne `auto_einzug` verhält sich unverändert.
 
+## Das Gerüst, das mitwächst
+
+`GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)` setzt beim Zeilenumbruch
+auch gleich die Zeile, die den Block schließt:
+
+```basic
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF", "SUB", "FOR", "WHILE"], _
+                             ["END IF", "END SUB", "NEXT", "WEND"])
+```
+
+Aus `IF x > 0 THEN` plus Enter wird damit
+
+```
+IF x > 0 THEN
+    |
+END IF
+```
+
+mit der Marke in der leeren Zeile. Zwei gleich lange Listen — Wort und
+Abschluss gehören paarweise zusammen; das **längste** passende Wort gewinnt,
+damit `DO WHILE` vor `DO` kommt. Die Schreibweise des Abschlusses bleibt, wie
+sie hereinkommt: er wird geschrieben, nicht verglichen.
+
+Drei Bedingungen, jede mit ihrem Grund:
+
+- Die Zeile muss **einen Block öffnen** — dieselbe Frage, die schon über die
+  Einrückung entscheidet. Ohne sie bekäme `IF x THEN y = 1` ein `END IF`,
+  obwohl es nicht einmal einrückt.
+- Hinter der Marke darf **nichts mehr stehen**, und es darf nichts markiert
+  sein: sonst landete der Rest der Zeile hinter dem Abschluss.
+- Der Block darf **nicht schon geschlossen** sein. Dafür geht die Laufzeit
+  nach unten: tiefer eingerückte Zeilen sind der Rumpf, eine Zeile aus der
+  `aus`-Liste auf gleicher Höhe gehört noch dazu (`ELSE`, `CASE`), alles
+  andere beendet die Suche. Ohne das säte jedes Enter am Ende einer
+  bestehenden `SUB`-Zeile ein zweites `END SUB`. Bei krumm eingerückten
+  Dateien fällt die Antwort auf „nicht geschlossen" — ein Abschluss zu viel
+  ist leichter zu sehen als einer zu wenig.
+
+Bei **mehreren Schreibmarken** bleibt es beim bloßen Umbruch: fünf Abschlüsse
+auf einmal will niemand. Zwei leere Listen schalten es ab.
+
 ## Mehrere Schreibmarken im Textbereich
 
 **Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
@@ -2121,6 +2162,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
+| `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)` | das Gerüst, das mitwächst: öffnet die Zeile einen Block, setzt der Zeilenumbruch die schließende Zeile gleich mit darunter |
 | `GUI_TEXTAREA_ABBREV(ta, woerter)` | Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel |
 | `GUI_TEXTAREA_ABBREV_HIT(ta)` → INTEGER | welche Abkürzung der Tabulator in diesem Bild getroffen hat (-1 = keine); gilt ein Bild lang wie `GUI_CLICKED` |
 | `GUI_TEXTAREA_SELECT_COLUMNS(ta, z1, s1, z2, s2)` → INTEGER | Spaltenauswahl: ein RECHTECK statt eines Laufs. Jede Zeile bekommt ihre eigene Marke samt Auswahl, getippt wird in allen zugleich; eine zu kurze Zeile bekommt ihre Marke am Ende, statt herauszufallen. Mit der Maus: **Alt gedrückt halten und ziehen**. Liefert die Zahl der Marken |

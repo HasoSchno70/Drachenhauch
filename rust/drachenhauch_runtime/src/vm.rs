@@ -6090,6 +6090,28 @@ impl<'p> Vm<'p> {
                 self.gui.textarea_indent_words(gi(a, 0, n)?, texte(&a[1], n)?, texte(&a[2], n)?, texte(&a[3], n)?)?;
                 Value::Nil
             }
+            "gui_textarea_close_words" => {
+                let n = "GUI_TEXTAREA_CLOSE_WORDS";
+                if a.len() != 3 { return Err(format!("{}: erwartet (ta, oeffner, schluesse)", n)); }
+                fn texte(v: &Value, fn_: &str) -> R<Vec<String>> {
+                    match v {
+                        Value::Array(arr) => {
+                            let arr = arr.borrow();
+                            let mut o = Vec::with_capacity(arr.cells.len());
+                            for x in arr.cells.iter() {
+                                match x {
+                                    Value::Str(s) => o.push(s.to_string()),
+                                    _ => return Err(format!("{}: ARRAY OF STRING noetig", fn_)),
+                                }
+                            }
+                            Ok(o)
+                        }
+                        _ => Err(format!("{}: ARRAY OF STRING noetig", fn_)),
+                    }
+                }
+                self.gui.textarea_close_words(gi(a, 0, n)?, texte(&a[1], n)?, texte(&a[2], n)?)?;
+                Value::Nil
+            }
             "gui_textarea_add_caret" => {
                 let n = "GUI_TEXTAREA_ADD_CARET";
                 Value::Int(self.gui.textarea_add_caret(gi(a, 0, n)?, gi(a, 1, n)?,

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1725,
+ "count": 1726,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -680,6 +680,7 @@
   "GUI_TEXTAREA_ADD_CARET": "eine weitere Schreibmarke setzen; liefert, wie viele es danach sind. Zwei an derselben Stelle werden zu einer",
   "GUI_TEXTAREA_CARETS": "wie viele Schreibmarken das Feld gerade hat (mindestens 1)",
   "GUI_TEXTAREA_CLEAR_CARETS": "zurück auf eine einzige Schreibmarke",
+  "GUI_TEXTAREA_CLOSE_WORDS": "das Gerüst, das mitwächst: öffnet die Zeile einen Block, setzt der Zeilenumbruch die schließende Zeile gleich mit darunter",
   "GUI_TEXTAREA_CURSOR": "wo die Schreibmarke steht (ab 1, in Zeichen)",
   "GUI_TEXTAREA_FIND": "nächster Treffer ab der Stelle, (-1, -1) wenn keiner; ohne genau ohne Rücksicht auf Groß/Klein. Kein Umlauf — am Ende noch einmal ab 1, 1 suchen",
   "GUI_TEXTAREA_FOLD": "den engsten faltbaren Block um zeile zuklappen oder aufklappen; ohne an umschalten. Liefert, ob danach zugeklappt ist",
