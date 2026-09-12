@@ -1642,3 +1642,137 @@ def test_der_aufrufer_baum_laeuft_bei_einem_kreis_nicht_weg(tmp_path):
     assert any(z.startswith("aufrufer baum ") for z in log), log
     baum = [int(z.split()[-1]) for z in log if z.startswith("aufrufer baum ")]
     assert baum and baum[0] <= 4, log
+
+
+# --------------------------------------------------------------- Stufe 16
+
+def test_ein_umbau_laesst_sich_in_einem_zug_zuruecknehmen(tmp_path):
+    """Strg+Z im Code-Feld nimmt nur den Reiter zurück, in dem man steht --
+    ein Umbau über zwei Dateien braucht einen Zug für beide."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n", "a_spiel.dh")
+    zweite = _datei(tmp_path, "zeichne(7, 8)\n", "b_mehr.dh")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)                  # Vorschau uebernehmen
+    ev += _taste(200, RL_Z, RL_LCTRL, RL_LSHIFT) # und alles wieder zurueck
+    ev += _taste(250, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=340, events=ev)
+    assert "umbau zurueck 2" in log, log
+    assert "SUB zeichne(x AS INTEGER, y AS INTEGER)" in quelle.read_text(encoding="utf-8")
+    assert zweite.read_text(encoding="utf-8").startswith("zeichne(7, 8)"), zweite.read_text()
+
+
+def test_ohne_umbau_gibt_es_nichts_zurueckzunehmen(tmp_path):
+    """Die Gegenprobe: der Befehl sagt es, statt etwas zu tun."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_Z, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=120, events=ev)
+    assert "umbau zurueck 0" in log, log
+
+
+def test_parameter_einer_methode_ziehen_die_aufrufe_mit(tmp_path):
+    """Eine Methode ist auch nur ein SUB -- aber gerufen wird sie über das
+    Objekt (`held.setze(...)`), und die Definition steht in einer CLASS."""
+    quelle = _datei(tmp_path,
+                    "CLASS Held\n"
+                    "    DIM x AS INTEGER\n"
+                    "    SUB setze(a AS INTEGER, b AS INTEGER)\n"
+                    "        Self.x = a + b\n"
+                    "    END SUB\n"
+                    "END CLASS\n"
+                    "DIM held AS Held\n"
+                    "held = NEW Held()\n"
+                    "held.setze(1, 2)\n")
+    ev = []
+    for k in range(9):
+        ev += _taste(25 + k * 5, RL_DOWN)     # in die Zeile mit dem Aufruf
+    ev += _taste(80, RL_END)
+    for k in range(5):
+        ev += _taste(95 + k * 5, RL_LEFT)     # auf den Methodennamen
+    ev += _taste(130, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(165, 322, 72, 120, 30)
+    ev += _param_knopf(205, 12, 248, 140, 30)
+    ev += _taste(255, RL_ENTER)
+    ev += _taste(295, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=390, events=ev)
+    assert "parameter umgestellt 2 0" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB setze(b AS INTEGER, a AS INTEGER)" in text, text
+    assert "held.setze(2, 1)" in text, text
+
+
+def test_der_aufrufer_baum_findet_auch_methodenaufrufe(tmp_path):
+    """`held.setze(...)` ist ein Aufruf von `setze` -- der Punkt davor macht
+    ihn nicht zu einem anderen Wort."""
+    quelle = _datei(tmp_path,
+                    "CLASS Held\n"
+                    "    DIM x AS INTEGER\n"
+                    "    SUB setze(a AS INTEGER)\n"
+                    "        Self.x = a\n"
+                    "    END SUB\n"
+                    "END CLASS\n"
+                    "SUB start()\n"
+                    "    DIM held AS Held\n"
+                    "    held = NEW Held()\n"
+                    "    held.setze(1)\n"
+                    "END SUB\n"
+                    "start()\n")
+    ev = []
+    for k in range(2):
+        ev += _taste(30 + k * 8, RL_DOWN)     # Zeile 3: SUB setze(...)
+    ev += _taste(60, RL_END)
+    for k in range(16):
+        ev += _taste(75 + k * 4, RL_LEFT)     # auf den Namen
+    ev += _taste(150, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=260, events=ev)
+    assert "aufrufer 1" in log, log
+    assert "aufrufer baum 2" in log, log      # setze <- start <- Hauptprogramm
+
+
+def test_ein_unterprogramm_in_eine_andere_datei_verschieben(tmp_path):
+    """Die Zeilen wandern -- und die Quelle bekommt den IMPORT der Zieldatei,
+    weil sie das Unterprogramm weiter ruft."""
+    quelle = _datei(tmp_path,
+                    "' Gruss\n"
+                    "SUB gruessen()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "gruessen()\n", "a_spiel.dh")
+    ziel = _datei(tmp_path, "' Helfer\nPRINT 9\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)      # in das SUB stellen
+    ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)         # verschieben
+    ev += _taste(115, RL_ENTER)                         # die erste Datei waehlen
+    ev += _taste(165, RL_ENTER)                         # Vorschau uebernehmen
+    ev += _taste(215, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=300, events=ev)
+    assert any(z.startswith("verschieben gruessen ") for z in log), log
+    q = quelle.read_text(encoding="utf-8")
+    z = ziel.read_text(encoding="utf-8")
+    assert "SUB gruessen()" not in q, q
+    assert 'IMPORT "b_helfer.dh"' in q, q
+    assert "SUB gruessen()" in z and "' Gruss" in z, z
+    # Der Beweis ist nicht der Text, sondern dass es noch uebersetzt.
+    r = subprocess.run([str(_DHRT), "--check", str(quelle)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", (r.stdout, q)
+
+
+def test_eine_methode_laesst_sich_nicht_verschieben(tmp_path):
+    """Die Gegenprobe: ohne ihre Klasse wäre sie kein Unterprogramm mehr."""
+    quelle = _datei(tmp_path,
+                    "CLASS Held\n"
+                    "    SUB setze()\n"
+                    "        PRINT 1\n"
+                    "    END SUB\n"
+                    "END CLASS\n", "a_spiel.dh")
+    _datei(tmp_path, "PRINT 9\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)
+    ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=180, events=ev)
+    assert "verschieben 0" in log, log
+    assert "SUB setze()" in quelle.read_text(encoding="utf-8")

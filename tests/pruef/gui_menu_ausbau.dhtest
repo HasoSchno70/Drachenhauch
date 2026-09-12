@@ -598,3 +598,44 @@ DHRT_FRAMES=22
 --- erwartet
 kuerzel
 zeile 3
+
+=== ein gefeuertes kuerzel nimmt dem feld auch die zwischenablage
+' Strg+Umschalt+V als Menue-Kuerzel: das Feld darf daneben NICHT einfuegen.
+' Vorher tat es beides -- der Befehl machte sein Fenster auf, und im Text
+' stand unbemerkt die Zwischenablage.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+CLIPBOARD_SET("#")
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Bearbeiten")
+DIM a AS INTEGER : a = GUI_MENU_ITEM(m, "Verschieben", "Strg+Umschalt+V")
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 40, 320, 180)
+GUI_SET_TEXT(ta, "PRINT 1")
+GUI_TEXTAREA_GOTO(ta, 1, 1)
+GUI_FOCUS(ta)
+DIM traf AS INTEGER : traf = 0
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_CLICKED(a) THEN traf = traf + 1
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "kuerzel " + STR$(traf) + " text [" + GUI_TEXT(ta) + "]"
+--- datei ev.txt
+# Strg+Umschalt+V
+c 6
+e 4 2 341 0 0 0 // Strg runter
+e 4 2 340 0 0 0 // Umschalt runter
+e 5 2 86 0 0 0 // V runter
+e 7 1 86 0 0 0 // V hoch
+e 7 1 340 0 0 0 // Umschalt hoch
+e 7 1 341 0 0 0 // Strg hoch
+--- umgebung
+DHRT_FRAMES=24
+--- erwartet
+kuerzel 1 text [PRINT 1]

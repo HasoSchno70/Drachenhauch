@@ -3839,7 +3839,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
 
-        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
+        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift,
+                               self.kuerzel_gefeuert);
 
         // Versatz nachfuehren, damit die Schreibmarke im Feld bleibt.
         let vor: String = chars[..caret.clamp(0, chars.len() as i32) as usize].iter().collect();
@@ -6768,7 +6769,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
 
-        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
+        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift,
+                               self.kuerzel_gefeuert);
         let enter = g.key_pressed(KEY_ENTER);
 
         // --- Grenzen des Feldes ---
@@ -6830,7 +6832,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// `chars`/`caret`/`anchor` werden an Ort und Stelle geaendert; wer sie
     /// haelt (Widget oder Zelle) entscheidet der Aufrufer.
     fn einzeiler_tasten(g: &mut Graphics, chars: &mut Vec<char>,
-                        caret: &mut i32, anchor: &mut i32, ctrl: bool, shift: bool) {
+                        caret: &mut i32, anchor: &mut i32, ctrl: bool, shift: bool,
+                        kuerzel_weg: bool) {
         // --- Zeichen-Eingabe (nicht bei gedruecktem Strg) ---
         if !ctrl {
             let typed: String = g.pop_text_input().chars()
@@ -6841,7 +6844,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 for (k, ch) in typed.chars().enumerate() { chars.insert(*caret as usize + k, ch); }
                 *caret += typed.chars().count() as i32; *anchor = *caret;
             }
-        } else {
+        } else if !kuerzel_weg {
+            // Hat ein Menue-Kuerzel dieselbe Taste schon verbraucht, gehoert
+            // sie ihm allein (siehe edit_textarea).
             // Strg+A: alles markieren
             if g.key_pressed(K_A) { *anchor = 0; *caret = chars.len() as i32; }
             let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
@@ -7517,7 +7522,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let mut zusatz: Vec<(i32, i32)> = self.windows[wi].widgets[i].marken_zusatz.clone();
         zusatz.retain(|&(c, a)| c >= 0 && (c as usize) <= chars.len() && a >= 0);
         if g.key_pressed(KEY_ESC) { zusatz.clear(); }
-        if ctrl && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
+        if ctrl && !kuerzel_weg && (g.key_pressed(K_Z) || g.key_pressed(K_Y)) {
             self.text_undo(wi, i, g.key_pressed(K_Y) || shift);
             return;
         }
@@ -7628,7 +7633,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 });
                 geschrieben = true;
             }
-        } else {
+        } else if !kuerzel_weg {
+            // Hat ein Menue-Kuerzel dieselbe Taste schon verbraucht, gehoert
+            // sie ihm allein -- `Strg+Umschalt+V` als Kuerzel fuegte sonst
+            // NEBENBEI die Zwischenablage ein, und zwar unsichtbar, weil der
+            // Befehl daneben sein eigenes Fenster aufmacht.
+            //
             // Alles markieren raeumt die weiteren Marken weg: eine Auswahl
             // ueber ALLES und daneben noch drei Marken ergaebe kein Bild,
             // das jemand im Kopf haette.
