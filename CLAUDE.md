@@ -2873,6 +2873,30 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 18 (2026-09-12):** die drei Punkte nach Stand 17 -- und der LOOK.
+**Der Baustein: Metrik `verlauf_hoehe`** (gui.rs `verlauf_anteil`): ueber
+dieser Hoehe nehmen Verlauf UND Glanz im Verhaeltnis ab, ein Fuenftel
+bleibt stehen; 0 = ueberall gleich, also unveraendert fuer jedes bestehende
+Programm. Der Grund: `gradient` ist ein fester Helligkeitsabstand, egal wie
+hoch die Flaeche ist -- ein Knopf von 28 Pixeln darf sich woelben, eine
+Liste von 400 bekommt denselben Abstand ueber die ganze Hoehe und sieht aus
+wie ein Schatten. Genau daran krankte die IDE (Code-Feld, Ausgabe,
+Problemliste, Projektbaum sind alles grosse Flaechen); sie setzt jetzt
+`themaFeinschliff` nach JEDEM Preset -- ein Preset setzt die Metriken mit --
+mit Verlauf 9, Glanz 12, verlauf_hoehe 120, Schatten 12. **Das Verschobene
+nimmt mit, was es braucht:** ruft der Block Unterprogramme, die in der
+Quelle bleiben, importiert die ZIELdatei die Quelle (bisher ging der IMPORT
+nur in die andere Richtung). **Umbau mehrfach zuruecknehmen:** ein Stapel
+von zehn statt eines Standes; drei Felder plus eine Grenzliste
+(`zurAnzahl`), weil es kein Feld von Feldern gibt. Dabei fiel auf, dass ein
+Umbau die MARKE ans Dateiende setzte (Auswahl ueber alles + INSERT) -- der
+naechste Griff traf dann nichts mehr; `parameterUebernehmen` und
+`umbauZurueck` merken sie sich jetzt. **Aufrufer kennen FUNCREF:** ein Name
+OHNE Klammern (`f = malen`, `GUI_ON_CLICK(knopf, malen)`) ist die Stelle,
+an der entschieden wird, dass er spaeter laeuft. Tests
+`tests/pruef/gui_verlauf_hoehe.dhtest` (4, am Bild gemessen) und 4 neue in
+`tests/test_ide.py`.
+
 **Stufe 17 (2026-09-12):** die drei Punkte nach Stand 16. **Klassen
 verschieben:** steht die Marke in einer CLASS, ist die KLASSE die Einheit
 (`klasseUm` statt des alten `inKlasse`, das nur abgelehnt hat) -- eine

@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 17)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 18)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -77,6 +77,10 @@
 '  Stand 17 dazu: auch ganze KLASSEN verschieben, das Verschieben legt die
 '  Zieldatei an, ein Einwand wenn eine Umbenennung eine Ueberschreibung
 '  zerreisst, und die Pfeiltasten waehlen im Datei-/Befehlswaehler.
+'  Stand 18 dazu: eine mattere Oberflaeche (der Verlauf klingt auf grossen
+'  Flaechen aus), das Verschobene nimmt mit was es selbst braucht, der
+'  Umbau laesst sich mehrfach zuruecknehmen, und die Aufrufer-Liste kennt
+'  auch die Weitergabe als FUNCREF.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -777,10 +781,16 @@ DIM umbauProt AS STRING : umbauProt = ""
 ' den Reiter zurueck, in dem man gerade steht; ein Umbau ueber sechs
 ' Dateien waere damit sechsmal zurueckzunehmen, und zwar in sechs Reitern,
 ' die man dafuer erst oeffnen muss.
+' Ein STAPEL, kein einzelner Stand: wer zwei Umbauten hintereinander
+' macht und beide zurueckwill, kaeme mit einem nur bis zur Haelfte.
+' Je Umbau eine Zeile "tab|pfad|text"-Listen, gehalten als drei Felder mit
+' einer Grenzliste (`zurAnzahl`) -- ein Feld von Feldern gibt es nicht.
+CONST ZUR_MAX = 10
 DIM zurTabs AS ARRAY OF INTEGER : zurTabs = []
 DIM zurPfade AS ARRAY OF STRING : zurPfade = []
 DIM zurTexte AS ARRAY OF STRING : zurTexte = []
-DIM zurWas AS STRING : zurWas = ""
+DIM zurAnzahl AS ARRAY OF INTEGER : zurAnzahl = []
+DIM zurNamen AS ARRAY OF STRING : zurNamen = []
 DIM umbauWarnung AS STRING : umbauWarnung = ""
 DIM umbauZeile AS INTEGER : umbauZeile = 0
 DIM umbauSpalte AS INTEGER : umbauSpalte = 1
@@ -4015,6 +4025,12 @@ SUB parameterUebernehmen()
         RETURN
     END IF
     umbauLeeren()
+    ' Die Marke bleibt, wo sie war -- ein Umbau ueber die ganze Datei setzt
+    ' sie sonst ans ENDE, und der naechste Griff traefe nichts mehr.
+    DIM mz AS INTEGER
+    DIM ms AS INTEGER
+    (mz, ms) = GUI_TEXTAREA_CURSOR(ta)
+    umbauZeile = mz : umbauSpalte = ms
     DIM alteZahl AS INTEGER : alteZahl = LEN(paramArgs)
     DIM zaehler AS ARRAY OF INTEGER : zaehler = []
     DIM neu AS STRING
@@ -4232,6 +4248,20 @@ SUB verschiebenNach(ziel AS STRING)
         neuQuelle = mitImport$(neuQuelle, zielName)
     END IF
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuQuelle)
+    ' 1b. Was der Block SELBST braucht: ruft er Unterprogramme, die in der
+    '     Quelle bleiben, muss die ZIELdatei die Quelle importieren. Sonst
+    '     wandert das Unterprogramm weg und findet seine Helfer nicht mehr.
+    DIM brauchtQuelle AS BOOLEAN : brauchtQuelle = FALSE
+    DIM sym AS JSON_HANDLE : sym = JSON_PARSE(CODE_SYMBOLS$(neuQuelle))
+    DIM si AS INTEGER
+    FOR si = 0 TO JSON_LEN(sym, "") - 1
+        DIM sname AS STRING : sname = JSON_GET_STRING(sym, STR$(si) + ".name")
+        IF sname = "" OR LOWER$(sname) = LOWER$(verschName) THEN CONTINUE
+        DIM bz AS STRING
+        FOR EACH bz IN block
+            IF benutztWort(bz, sname) THEN brauchtQuelle = TRUE
+        NEXT
+    NEXT
     ' 2. Das Ziel: der Block ans Ende.
     DIM zielText AS STRING : zielText = ""
     TRY
@@ -4243,6 +4273,9 @@ SUB verschiebenNach(ziel AS STRING)
     DIM zielNeu AS STRING : zielNeu = zielText
     IF TRIM$(zielNeu) <> "" THEN zielNeu = zielNeu + NL
     zielNeu = zielNeu + NL + JOIN$(block, NL)
+    IF brauchtQuelle AND NOT importiert(zielNeu, meinName) THEN
+        zielNeu = mitImport$(zielNeu, meinName)
+    END IF
     DIM zielTab AS INTEGER : zielTab = tabMitPfad(ziel)
     umbauVormerken(zielTab, ziel, zielNeu)
     ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch.
@@ -4312,11 +4345,31 @@ FUNCTION aufrufInZeile(zeile AS STRING, name AS STRING) AS BOOLEAN
                 j = j + 1
             WEND
             IF MID$(zeile, j, 1) = "(" THEN RETURN TRUE
+            ' Ohne Klammern ist es eine FUNCREF: der Name wird als WERT
+            ' weitergegeben (`GUI_ON_CLICK(knopf, malen)`, `f = malen`) und
+            ' spaeter gerufen. Wer wissen will, wie ein Unterprogramm
+            ' erreicht wird, muss genau diese Stelle sehen -- sie ist die
+            ' einzige, an der der Name ueberhaupt vorkommt.
+            IF nameAlsWert(zeile, i, name) THEN RETURN TRUE
             i = j - 1
         END IF
         i = i + 1
     WEND
     RETURN FALSE
+END FUNCTION
+
+' Steht der Name an `i` als WERT da (FUNCREF), nicht als Aufruf?
+'
+' Ausgenommen ist, was ihn nur ERWAEHNT: die eigene Kopfzeile faengt der
+' Aufrufer ab, und nach einem Punkt steht ein Feldname (`held.malen` ohne
+' Klammern ist eine gebundene Methode -- die zaehlt, aber `x.malen` als
+' Feld nicht; das auseinanderzuhalten braucht Typen, die hier keiner hat).
+FUNCTION nameAlsWert(zeile AS STRING, i AS INTEGER, name AS STRING) AS BOOLEAN
+    IF i > 0 AND MID$(zeile, i - 1, 1) = "." THEN RETURN FALSE
+    ' Ein Wort, das nur in einer DIM-Zeile als TYP steht, ist keiner.
+    DIM t AS STRING : t = UPPER$(TRIM$(zeile))
+    IF LEFT$(t, 4) = "DIM " AND INSTR(t, " AS " + UPPER$(name)) >= 0 THEN RETURN FALSE
+    RETURN TRUE
 END FUNCTION
 
 ' Der Name des Unterprogramms, in dem `zeile` steht -- "" fuers
@@ -4883,13 +4936,21 @@ END SUB
 ' Danach ist der Vorrat leer -- zweimal zurueck gaebe es nur mit einem
 ' Stapel, und einer reicht fuer das, was hier schiefgeht.
 SUB umbauZurueck()
-    IF LEN(zurTexte) = 0 THEN
+    IF LEN(zurAnzahl) = 0 THEN
         GUI_SET_TEXT(lblStatus, "Kein Umbau zum Zuruecknehmen.")
         protokoll("umbau zurueck 0")
         RETURN
     END IF
+    ' Der LETZTE Umbau: seine Eintraege stehen am Ende der drei Felder.
+    DIM mz AS INTEGER : mz = 0
+    DIM ms AS INTEGER : ms = 1
+    IF aktivesFeld() >= 0 THEN (mz, ms) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    DIM letzt AS INTEGER : letzt = LEN(zurAnzahl) - 1
+    DIM n AS INTEGER : n = zurAnzahl[letzt]
+    DIM ab AS INTEGER : ab = LEN(zurTexte) - n
+    DIM zurWas AS STRING : zurWas = zurNamen[letzt]
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(zurTexte) - 1
+    FOR k = ab TO ab + n - 1
         IF zurTabs[k] >= 0 AND zurTabs[k] < tabAnzahl THEN
             DIM ta AS GUI_WIDGET : ta = tabFelder[zurTabs[k]]
             DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
@@ -4906,13 +4967,19 @@ SUB umbauZurueck()
             END IF
         END IF
     NEXT
-    DIM n AS INTEGER : n = LEN(zurTexte)
-    zurTabs = [] : zurPfade = [] : zurTexte = []
+    FOR k = 1 TO n
+        ARRAY_POP(zurTabs) : ARRAY_POP(zurPfade) : ARRAY_POP(zurTexte)
+    NEXT
+    ARRAY_POP(zurAnzahl) : ARRAY_POP(zurNamen)
     reiterNeuSetzen()
     symSchluessel = "-"
-    GUI_SET_TEXT(lblStatus, "Zurueckgenommen: " + zurWas + " (" + STR$(n) + " Datei(en))")
+    GUI_SET_TEXT(lblStatus, "Zurueckgenommen: " + zurWas + " (" + STR$(n) + " Datei(en), " + _
+                 STR$(LEN(zurAnzahl)) + " weitere im Vorrat)")
     protokoll("umbau zurueck " + STR$(n))
-    IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+    IF aktivesFeld() >= 0 THEN
+        IF mz > 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), mz, ms)
+        GUI_FOCUS(aktivesFeld())
+    END IF
 END SUB
 
 SUB umbauVerwerfen()
@@ -4927,13 +4994,24 @@ END SUB
 SUB umbauSchreiben()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
     ' Den Stand VOR dem Umbau aufheben, bevor er ueberschrieben wird.
-    zurTabs = [] : zurPfade = [] : zurTexte = [] : zurWas = umbauMeldung
     DIM v AS INTEGER
     FOR v = 0 TO LEN(umbauTexte) - 1
         ARRAY_PUSH(zurTabs, umbauTabs[v])
         ARRAY_PUSH(zurPfade, umbauPfade[v])
         ARRAY_PUSH(zurTexte, umbauAlt$(v))
     NEXT
+    ARRAY_PUSH(zurAnzahl, LEN(umbauTexte))
+    ARRAY_PUSH(zurNamen, umbauMeldung)
+    ' Der aelteste faellt heraus -- ein Vorrat, der mit jedem Umbau waechst,
+    ' haelt irgendwann das ganze Projekt in mehreren Fassungen.
+    WHILE LEN(zurAnzahl) > ZUR_MAX
+        DIM weg AS INTEGER : weg = zurAnzahl[0]
+        DIM k2 AS INTEGER
+        FOR k2 = 1 TO weg
+            ARRAY_REMOVE_AT(zurTabs, 0) : ARRAY_REMOVE_AT(zurPfade, 0) : ARRAY_REMOVE_AT(zurTexte, 0)
+        NEXT
+        ARRAY_REMOVE_AT(zurAnzahl, 0) : ARRAY_REMOVE_AT(zurNamen, 0)
+    WEND
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         IF umbauTabs[k] >= 0 THEN

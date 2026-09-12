@@ -1886,3 +1886,82 @@ def test_ohne_vererbung_gibt_es_keinen_einwand(tmp_path):
     log = _ide(tmp_path, quelle, frames=320, events=ev, zwischenablage="bellen")
     assert "umbau einwand" not in log, log
     assert "SUB bellen()" in quelle.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------- Stufe 18
+
+def test_das_verschobene_nimmt_mit_was_es_selbst_braucht(tmp_path):
+    """`gruessen` ruft `hilf`, und `hilf` bleibt zurück -- also muss die
+    ZIELdatei die Quelle importieren. Sonst wandert das Unterprogramm weg
+    und findet seinen Helfer nicht mehr."""
+    quelle = _datei(tmp_path,
+                    "SUB hilf()\n"
+                    "    PRINT 9\n"
+                    "END SUB\n"
+                    "SUB gruessen()\n"
+                    "    hilf()\n"
+                    "END SUB\n"
+                    "PRINT 1\n", "a_spiel.dh")
+    ziel = _datei(tmp_path, "' Helfer\n", "b_helfer.dh")
+    ev = []
+    for k in range(4):
+        ev += _taste(30 + k * 8, RL_DOWN)          # in `gruessen`
+    ev += _taste(80, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(115, RL_DOWN) + _taste(135, RL_ENTER)
+    ev += _taste(185, RL_ENTER)
+    ev += _taste(235, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=330, events=ev)
+    assert any(z.startswith("verschieben gruessen ") for z in log), log
+    z = ziel.read_text(encoding="utf-8")
+    assert "SUB gruessen()" in z, z
+    assert 'IMPORT "a_spiel.dh"' in z, z
+    r = subprocess.run([str(_DHRT), "--check", str(ziel)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", (r.stdout, z)
+
+
+def test_zwei_umbauten_lassen_sich_nacheinander_zuruecknehmen(tmp_path):
+    """Ein Stapel, kein einzelner Stand: wer zweimal umbaut und beides
+    zurückwill, käme mit einem nur bis zur Hälfte."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n")
+    # Zweimal umsortieren, dann zweimal zurück -- am Ende steht das Original.
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)
+    ev += _param_knopf(100, 12, 248, 140, 30)
+    ev += _taste(150, RL_ENTER)
+    ev += _taste(190, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(225, 322, 72, 120, 30)
+    ev += _param_knopf(265, 12, 248, 140, 30)
+    ev += _taste(315, RL_ENTER)
+    ev += _taste(355, RL_Z, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(395, RL_Z, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(435, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=520, events=ev)
+    zurueck = [z for z in log if z.startswith("umbau zurueck ")]
+    assert zurueck == ["umbau zurueck 1", "umbau zurueck 1"], log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB zeichne(x AS INTEGER, y AS INTEGER)" in text, text
+    assert "zeichne(1, 2)" in text, text
+
+
+def test_die_aufrufer_liste_findet_auch_eine_funcref(tmp_path):
+    """`f = malen` ruft nichts -- aber genau dort wird entschieden, dass
+    `malen` später läuft. Wer wissen will, wie ein Unterprogramm erreicht
+    wird, muss diese Stelle sehen."""
+    quelle = _datei(tmp_path,
+                    "SUB malen()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "DIM f AS FUNCREF\n"
+                    "f = malen\n"
+                    "f()\n")
+    ev = []
+    for k in range(5):
+        ev += _taste(30 + k * 6, RL_RIGHT)     # auf `malen` in der Kopfzeile
+    ev += _taste(90, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert "aufrufer 1" in log, log
