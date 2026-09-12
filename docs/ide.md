@@ -52,7 +52,7 @@ kann, steht darunter vollständig, ohne Stände.
 | Dateiliste | Strg+Klick sammelt im Projektbaum, Umschalt+Klick spannt einen Bereich; **Gewaehlte Dateien oeffnen** macht aus allen Reiter. Beim Sammeln geht noch nichts auf — sonst käme mit jedem Klick ein Reiter dazu, den niemand wollte | Strg+Umschalt+E |
 | Einstellungen | Strg+U zeigt alle Schalter an einer Stelle (Thema, Umbruch, Karte, geänderte Zeilen, reguläre Ausdrücke, Vorschlagsliste, Einrückungslinien, Gerüst beim Tippen, Vorschau vor dem Umbau, Schriftgröße, automatisches Sichern). Sie wirken **sofort**, ohne Übernehmen — ein Thema, das man erst nach dem Schließen sieht, wählt man blind; im Menü stehen sie weiter dort, wo man sie sucht | Strg+U |
 | Zeilen | Alles auf ganzen Zeilen, der Auswahl oder der Zeile der Marke, jeder Handgriff ein eigener Undo-Schritt: Kommentar umschalten, Zeile duplizieren, Zeile löschen, Zeilen nach oben/unten, Ein-/Ausrücken (Tab gehört dem Feld selbst), Dokument formatieren (`CODE_FORMAT$`, derselbe Formatierer wie `dhrt fmt`; bei einem Syntaxfehler bleibt alles stehen), Schnipsel einfügen (Strg+J füllt den Filter mit dem Wortanfang links der Marke: wer `for` getippt hat, hat die FOR-Schleife vor sich; **oder einfach `for` tippen und Tabulator** — jeder Schnipsel hat ein kurzes Wort, das ihn aufklappt), automatisch sichern nach einstellbarer Ruhe. Eine neue Zeile übernimmt die **Einrückung** der alten und rückt hinter `SUB`, `FOR`, `THEN` und den anderen Blockwörtern eine Stufe weiter ein; ein `END` oder `NEXT` allein in einer Zeile rückt sie zurück. Und das **Gerüst wächst mit**: hinter `IF x > 0 THEN` setzt der Zeilenumbruch das `END IF` gleich mit darunter, die Marke bleibt dazwischen (`CASE`, `ELSE` und `ELSEIF` nicht — sie rücken ein, schließen aber nichts; abschaltbar). Lesezeichen (blaue Marke) setzen und anspringen — vorwärts und rückwärts **über Dateien hinweg**, dazu die Liste aller | Strg+K, Strg+D, Strg+Umschalt+K, Alt+Hoch/Runter, Alt+Rechts/Links, Umschalt+Alt+F, Strg+F2, F2, Umschalt+F2, Alt+F2 |
-| Sprache | Einfärbung des sichtbaren Ausschnitts, dazu jede Fundstelle des Wortes unter der Marke, das zusammengehörende Klammernpaar und ein **Farbfeld** neben jedem `&H`-Literal (ein Klick darauf öffnet den Farbwähler und schreibt die neue Farbe an die Stelle zurück); eine **Symbolspur** über dem Code sagt, in welcher Klasse und welchem Unterprogramm man steht; **Definition hier zeigen** (Alt+F12) blendet zehn Zeilen um die Definition ein, ohne die Stelle zu verlassen; Hilfe zum Wort (Statuszeile), Vervollständigung — sie geht beim Tippen ab drei Zeichen von selbst auf, der Fokus bleibt dabei im Code-Feld, Strg+Leer holt sie herein; Zur Definition, Gliederung links unten (SUB/FUNCTION/CLASS mit Methoden, Doppelklick springt) | Strg+Leer, F12 |
+| Sprache | Einfärbung des sichtbaren Ausschnitts, dazu jede Fundstelle des Wortes unter der Marke, das zusammengehörende Klammernpaar und ein **Farbfeld** neben jedem `&H`-Literal (ein Klick darauf öffnet den Farbwähler und schreibt die neue Farbe an die Stelle zurück); eine **Symbolspur** über dem Code sagt, in welcher Klasse und welchem Unterprogramm man steht; **Definition hier zeigen** (Alt+F12) blendet zehn Zeilen um die Definition ein, ohne die Stelle zu verlassen; Hilfe zum Wort (Statuszeile), Vervollständigung — sie geht beim Tippen ab drei Zeichen von selbst auf, der Fokus bleibt dabei im Code-Feld, Strg+Leer holt sie herein, und hat der Name eine **Signatur**, kommt sie als Gerüst mit: aus `CIRC` wird `CIRCLE(x, y, r)` mit markiertem `x`, der **Tabulator** geht zum nächsten Argument; Zur Definition, Gliederung links unten (SUB/FUNCTION/CLASS mit Methoden, Doppelklick springt) | Strg+Leer, F12 |
 | Prüfen | Fehlerliste unten rechts, 0,6 s nach der letzten Änderung von selbst; Klick springt zur Zeile; Fehlerzeilen tragen eine orange Marke | Umschalt+F7 |
 | Debugger | Haltepunkte (rote Marke) an der Zeile der Schreibmarke, bedingte Haltepunkte (violett; `i = 3`, `hp < 10` — der Ausdruck wird im Programm ausgewertet, gehalten wird nur, wenn er wahr ist); Debuggen läuft bis zum ersten Haltepunkt, ohne Haltepunkte steht es in Zeile 1; die angehaltene Zeile ist gelb markiert, Variablen (lokal und global) stehen unten rechts anstelle der Problemliste, dazu die Schritt-Knöpfe; steht das Programm, wertet die Eingabezeile Ausdrücke aus (`? 2 * 21` → `= 42 (INTEGER)`) | F9, Umschalt+F9, F7, F8 weiter, F10 drüber, F11 hinein, Umschalt+F11 heraus, Umschalt+F5 stopp, Strg+E Ausdruck |
 | Profil | Lauf unter `dhrt profile`; am Ende ein Fenster mit den Zeilen nach Zeit (Anzahl, ms, Anteil, Quelltext), Klick springt zur Zeile | Strg+Umschalt+Y |
@@ -62,8 +62,9 @@ kann, steht darunter vollständig, ohne Stände.
 | Werkzeugleiste | Unter dem Menü eine Reihe **Sinnbilder** für das, was man ständig braucht: neu, öffnen, sichern, starten, stoppen, prüfen, debuggen, suchen, Handbuch, Einstellungen. Jeder Knopf ruft denselben Befehl wie sein Menüpunkt und nennt im Tooltip sein Kürzel; abschaltbar unter Ansicht | — |
 | Kacheln | Auf der Willkommensseite acht wichtige Beispiele **mit einem Bild davon**. Die Bilder entstehen, indem das Beispiel wirklich läuft (`dhrt bild`), eines nach dem anderen im Hintergrund und unsichtbar; danach liegen sie neben der Sitzung und sind sofort da. Ein Klick öffnet das Beispiel | — |
 | Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
-| Umbauen | **Parameter umsortieren** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke in eine andere Reihenfolge bringen — und **die Aufrufe ziehen mit**. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
+| Umbauen | **Parameter umsortieren** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke in eine andere Reihenfolge bringen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
 | Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und Parameter-Umsortieren zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U | — |
+| Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts, in derselben Liste wie die Projektsuche. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
 | Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
 | Umbenennen | **Im ganzen Projekt umbenennen** (Strg+Umschalt+F6): der Name unter der Marke, in allen `.dh` des Projektordners. `CODE_RENAME$` lässt Kommentare und Zeichenketten aus, wie beim Umbenennen in einer Datei | Strg+Umschalt+F6 |
 | Vergleichen | **Zwei Reiter nebeneinander**: die geteilte Ansicht geht an, und in beiden Feldern bekommt jede abweichende Zeile eine Marke. Verglichen wird ohne git über die längste gemeinsame Teilfolge auf Zeilen — die Reiter müssen dafür nicht gesichert sein, und genau während man tippt will man es wissen | — |
@@ -236,7 +237,9 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `geruest an|aus`, `umbau schalter an|aus`,
 `umbau vorschau <dateien> <weniger> <mehr>`, `umbau verworfen`,
 `parameter <anzahl>` (0 = keins gefunden),
-`parameter umgestellt <stellen> <uebergangen>`,
+`parameter umgestellt <stellen> <uebergangen>` (-1 = abgebrochen, ein
+anderer Reiter war ungesichert), `aufrufer <anzahl>`,
+`platzhalter <nummer> von <anzahl>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
@@ -269,11 +272,16 @@ Auch die Liste aus Stand 12 ist abgearbeitet: die Vorschau vor dem Umbau
 (statt hinterher die Fehler zu zählen), das Umsortieren der Parameter samt
 Aufrufen und das Schlüsselwort-Gerüst, das beim Tippen mitwächst.
 
+Auch die Liste aus Stand 13 ist abgearbeitet: der Umbau über
+Dateigrenzen, die Liste der Aufrufer und die Signatur-Platzhalter.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: den Umbau auch über Dateigrenzen hinweg (Parameter
-umsortieren sieht heute nur die offene Datei), eine Liste der Aufrufer
-eines Unterprogramms, und ein Gerüst, das beim Tippen nicht nur schließt,
-sondern auch die Argumente einer Signatur als Platzhalter setzt. Ein
+Nächstes anstünde: ein Unterprogramm samt Aufrufen **umbenennen** über das
+ganze Projekt gibt es zwar, aber ohne die Prüfung, ob der neue Name dort
+schon vergeben ist; ein Parameter ließe sich auch **hinzufügen oder
+entfernen** (mit einem Vorgabewert an jeder Aufrufstelle); und die
+Aufrufer-Liste könnte als **Baum** zeigen, wer die Aufrufer wiederum ruft.
+Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

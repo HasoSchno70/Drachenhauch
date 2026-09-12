@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 13)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 14)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -62,6 +62,10 @@
 '  Ersetzen und Parameter zeigen erst den Unterschied und fragen),
 '  Parameter umsortieren samt Aufrufen (Strg+Umschalt+U) und das Geruest,
 '  das beim Tippen mitwaechst (`IF ... THEN` + Enter setzt das END IF).
+'  Stand 14 dazu: Parameter umsortieren geht durch das GANZE Projekt,
+'  "Wer ruft das auf?" (Umschalt+F12) listet die Aufrufstellen, und die
+'  Vervollstaendigung setzt die Argumente einer Signatur als Platzhalter
+'  (der Tabulator geht zum naechsten).
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
