@@ -1253,7 +1253,8 @@ IF GUI_RICHTEXT_LINK$(rt) <> "" THEN oeffne(GUI_RICHTEXT_LINK$(rt))
 Verstanden wird ein Ausschnitt von Markdown: `#`, `##`, `###`, Absätze,
 `- ` und `1. ` (auch verschachtelt, je zwei Leerzeichen eine Stufe),
 ` ``` `-Blöcke, `| Tabellen |`, `> Zitate`, `---`, dazu `**fett**`,
-`*kursiv*`, `` `code` `` und `[Text](Ziel)`. **Was er nicht kennt, steht als
+`*kursiv*`, `` `code` `` und Verweise in eckigen Klammern mit dem Ziel in
+runden dahinter. **Was er nicht kennt, steht als
 Text da** -- ein Dokument darf an einer unbekannten Zeile nicht
 verschwinden.
 

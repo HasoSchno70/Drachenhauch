@@ -48,8 +48,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 22 | Der Projektbaum zeigt die Unterordner; ein Umbau lässt sich **vorab prüfen**; eine neu angelegte Datei bekommt einen Reiter |
 | 23 | Der Baum zeigt auch Formulare, Daten und Bilder; ein laufender Umbau lässt sich **abbrechen**; das Prüfen nennt die **Fehler** |
 | 24 | Der Projektbaum ist ein **Widget der Laufzeit** (`GUI_FILETREE`): er liest den Ordner selbst, zeigt eine neue Datei von selbst und klappt auf Klick auf; dazu Häkchen im Baum und **Reiter im Fenster** |
+| 25 | Das Handbuch ist **gesetzt vom Widget** (`GUI_RICHTEXT`, mit anklickbaren Verweisen); Häkchen im Baum schränken das Projekt ein; ohne Vorschau wird trotzdem geprüft; auch Verschieben und Parameter sammeln in Schritten |
 
-## Was sie heute kann (Stand 24, 12.09.2026)
+## Was sie heute kann (Stand 25, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -59,7 +60,7 @@ kann, steht darunter vollständig, ohne Stände.
 | Git | Wer hat das geschrieben (`git blame`, Datum und Person je Zeile), was habe ich geändert (`git diff` farbig im Fenster), Verlauf dieser Datei (`git log`); die geänderten Zeilen tragen eine Marke am Rand (nach dem Sichern neu gefragt, nicht je Bild) | Strg+Umschalt+B, Strg+Umschalt+D |
 | Schreiben | Umbenennen eines Symbols über die ganze Datei (`CODE_RENAME$`: ganze Wörter, Kommentare und Zeichenketten bleiben; ein krummer Name ändert nichts) — und die **Formulare ziehen mit**: eine `.dhform` nennt ihre Rückrufe beim Namen, und wer das Unterprogramm umbenennt und die Datei stehen lässt, hat einen Knopf, der nichts mehr tut, Schnipsel einfügen (13 Gerüste, `\|` sagt wohin die Marke gehört, die Einrückung der Zeile wird übernommen), eine Marke auf jede Fundstelle des Wortes — danach ändert ein Tippen alle; Alt+Klick legt eine Marke dazu, ESC räumt sie weg. Signaturhilfe: steht die Marke in einer Argumentliste, zeigt die Statuszeile die Signatur des Aufrufs und die Nummer des Arguments | Umschalt+F6, Strg+J, Strg+Umschalt+L |
 | Reiter | Jeder Reiter hat ein **Kreuz**, die mittlere Maustaste schließt ihn auch. Trägt er ungesicherte Änderungen, wird gefragt (Sichern / Verwerfen / Abbrechen) — das galt vorher nur beim Beenden, Strg+W nahm sie wortlos mit. **Andere Reiter schließen** lässt nur den vorderen stehen | Strg+W, Strg+Umschalt+W |
-| Dateiliste | Der Projektbaum ist seit Stand 24 ein `GUI_FILETREE`: er liest den Ordner selbst und nur die Äste, die offen sind. Ordner stehen oben und klappen auf Klick auf; eine Datei, die ein anderes Programm anlegt, steht nach spätestens zwei Sekunden da. Strg+Klick sammelt, Umschalt+Klick spannt einen Bereich; **Gewaehlte Dateien oeffnen** macht aus allen Reiter. Beim Sammeln geht noch nichts auf — sonst käme mit jedem Klick ein Reiter dazu, den niemand wollte | Strg+Umschalt+E |
+| Dateiliste | **Häkchen schränken das Projekt ein**: ist etwas angehakt, arbeitet jeder Umbau (und die Projektsuche) nur auf dieser Menge — die Beschriftung über dem Baum sagt es, `Datei → Haken im Projektbaum entfernen` räumt sie ab. Der Projektbaum ist seit Stand 24 ein `GUI_FILETREE`: er liest den Ordner selbst und nur die Äste, die offen sind. Ordner stehen oben und klappen auf Klick auf; eine Datei, die ein anderes Programm anlegt, steht nach spätestens zwei Sekunden da. Strg+Klick sammelt, Umschalt+Klick spannt einen Bereich; **Gewaehlte Dateien oeffnen** macht aus allen Reiter. Beim Sammeln geht noch nichts auf — sonst käme mit jedem Klick ein Reiter dazu, den niemand wollte | Strg+Umschalt+E |
 | Einstellungen | Strg+U zeigt alle Schalter an einer Stelle (Thema, Umbruch, Karte, geänderte Zeilen, reguläre Ausdrücke, Vorschlagsliste, Einrückungslinien, Gerüst beim Tippen, Vorschau vor dem Umbau, Schriftgröße, automatisches Sichern). Sie wirken **sofort**, ohne Übernehmen — ein Thema, das man erst nach dem Schließen sieht, wählt man blind; im Menü stehen sie weiter dort, wo man sie sucht | Strg+U |
 | Zeilen | Alles auf ganzen Zeilen, der Auswahl oder der Zeile der Marke, jeder Handgriff ein eigener Undo-Schritt: Kommentar umschalten, Zeile duplizieren, Zeile löschen, Zeilen nach oben/unten, Ein-/Ausrücken (Tab gehört dem Feld selbst), Dokument formatieren (`CODE_FORMAT$`, derselbe Formatierer wie `dhrt fmt`; bei einem Syntaxfehler bleibt alles stehen), Schnipsel einfügen (Strg+J füllt den Filter mit dem Wortanfang links der Marke: wer `for` getippt hat, hat die FOR-Schleife vor sich; **oder einfach `for` tippen und Tabulator** — jeder Schnipsel hat ein kurzes Wort, das ihn aufklappt), automatisch sichern nach einstellbarer Ruhe. Eine neue Zeile übernimmt die **Einrückung** der alten und rückt hinter `SUB`, `FOR`, `THEN` und den anderen Blockwörtern eine Stufe weiter ein; ein `END` oder `NEXT` allein in einer Zeile rückt sie zurück. Und das **Gerüst wächst mit**: hinter `IF x > 0 THEN` setzt der Zeilenumbruch das `END IF` gleich mit darunter, die Marke bleibt dazwischen (`CASE`, `ELSE` und `ELSEIF` nicht — sie rücken ein, schließen aber nichts; abschaltbar). Lesezeichen (blaue Marke) setzen und anspringen — vorwärts und rückwärts **über Dateien hinweg**, dazu die Liste aller | Strg+K, Strg+D, Strg+Umschalt+K, Alt+Hoch/Runter, Alt+Rechts/Links, Umschalt+Alt+F, Strg+F2, F2, Umschalt+F2, Alt+F2 |
 | Sprache | Einfärbung des sichtbaren Ausschnitts, dazu jede Fundstelle des Wortes unter der Marke, das zusammengehörende Klammernpaar und ein **Farbfeld** neben jedem `&H`-Literal (ein Klick darauf öffnet den Farbwähler und schreibt die neue Farbe an die Stelle zurück); eine **Symbolspur** über dem Code sagt, in welcher Klasse und welchem Unterprogramm man steht; **Definition hier zeigen** (Alt+F12) blendet zehn Zeilen um die Definition ein, ohne die Stelle zu verlassen; Hilfe zum Wort (Statuszeile), Vervollständigung — sie geht beim Tippen ab drei Zeichen von selbst auf, der Fokus bleibt dabei im Code-Feld, Strg+Leer holt sie herein, und hat der Name eine **Signatur**, kommt sie als Gerüst mit: aus `CIRC` wird `CIRCLE(x, y, r)` mit markiertem `x`, der **Tabulator** geht zum nächsten Argument; Zur Definition, Gliederung links unten (SUB/FUNCTION/CLASS mit Methoden, Doppelklick springt) | Strg+Leer, F12 |
@@ -89,7 +90,7 @@ kann, steht darunter vollständig, ohne Stände.
 | Ersetzen | **Im ganzen Projekt ersetzen** (Strg+Umschalt+H): zählt erst die Stellen und fragt, dann schreibt es alle `.dh` des Projektordners. Ein Reiter mit unge**sicherten** Änderungen bricht es ab — die würden die Datei beim nächsten Sichern wieder überschreiben | Strg+Umschalt+H |
 | Ausgabe | **Ausgabe durchsuchen** (Strg+Umschalt+A): die Zeilen des laufenden Programms. Derselbe Text noch einmal heißt weitersuchen | Strg+Umschalt+A |
 | Symbole | **Symbol im Projekt suchen** (Strg+Umschalt+S): alle SUB, FUNCTION, CLASS und Methoden über ALLE `.dh` des Projektordners, filterbar; der Filter ist mit dem Wort unter der Marke vorbelegt. Derselbe Index trägt **Zur Definition** und **Definition hier zeigen** über Dateigrenzen: was `CODE_DEFINITION` im eigenen Text nicht findet, steht vielleicht nebenan | Strg+Umschalt+S |
-| Hilfe | **Eingebaute Befehle nachschlagen** (Strg+F3): alle Namen, die die Vervollständigung kennt, mit Signatur und Beschreibung, filterbar, mit Knopf zum Einfügen. Handbuch im Fenster, **gesetzt statt roh**: Überschriften in drei Größen, Absätze umgebrochen, Aufzählungen mit Punkt, Code-Blöcke dicktengleich, Tabellen als Begriffsliste; der Knopf oben rechts schaltet auf den Quelltext. F1 schlägt das Wort unter der Schreibmarke in `docs/` nach und öffnet das Dokument mit den meisten Fundstellen in Codeschrift; Klappliste aller Dokumente, Suche im Dokument; Tastenkürzel-Übersicht | F1, Strg+F1 |
+| Hilfe | **Eingebaute Befehle nachschlagen** (Strg+F3): alle Namen, die die Vervollständigung kennt, mit Signatur und Beschreibung, filterbar, mit Knopf zum Einfügen. Handbuch im Fenster, **gesetzt statt roh** — seit Stand 25 vom Widget der Laufzeit (`GUI_RICHTEXT`): Überschriften in drei Größen, Absätze umgebrochen, Aufzählungen mit Punkt, Code-Blöcke dicktengleich, Tabellen mit **Spalten**, fett und kursiv, und **anklickbare Verweise** (ein Verweis auf ein anderes Dokument öffnet es, eine Sprungmarke rollt im selben); der Knopf oben rechts schaltet auf den Quelltext. F1 schlägt das Wort unter der Schreibmarke in `docs/` nach und öffnet das Dokument mit den meisten Fundstellen in Codeschrift; Klappliste aller Dokumente, Suche im Dokument; Tastenkürzel-Übersicht | F1, Strg+F1 |
 
 Einstellungen und Sitzung liegen in EINER JSON-Datei im Nutzerprofil
 (`%APPDATA%\Drachenhauch\ide.json`, sonst `~/.config/Drachenhauch/ide.json`):
@@ -357,13 +358,19 @@ dem nächsten Öffnen), und ein **Klick auf einen Ordner** klappt ihn um
 statt nur das schmale Dreieck. Dafür sind Ordner jetzt **zu**, bis jemand
 hineinsieht — der Baum liest sonst einen Ordner, in den niemand schaut.
 
+Auch die Liste aus Stand 24 ist abgearbeitet: alle vier Umbauten sammeln
+in Schritten, ein Umbau wird auch **ohne Vorschau** geprüft (und macht sie
+auf, wenn er Fehler dazubringt), und die **Häkchen** im Baum sind das
+Mittel, einen Umbau auf eine selbst gewählte Menge von Dateien zu
+beschränken.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: nur die beiden **projektweiten** Umbauten sammeln in
-Schritten, das Verschieben und die Parameter nicht; ein Umbau lässt sich
-nicht **ohne Vorschau prüfen** — man muss ihn erst aufmachen; und der
-Projektbaum kann seit Stand 24 Häkchen, die IDE benutzt sie noch nicht
-(ein Umbau über eine selbst gewählte Menge von Dateien wäre der Fall
-dafür). Ein
+Nächstes anstünde: die gesetzte Ansicht des Handbuchs kennt **keine
+Textauswahl** (kopieren geht nur im Quelltext, und dafür ist der Knopf
+oben rechts da); die Suche im gesetzten Handbuch springt zur ersten
+Fundstelle **ab der aktuellen Stelle**, kennt aber kein Zurück; und beim
+Verschieben gibt es weiterhin **kein Rückgängig über Dateigrenzen** außer
+dem einen Schritt, den `umbauZurueck` hält. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis
