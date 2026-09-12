@@ -2873,6 +2873,22 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Reiter schliessen (2026-09-12, Fund des Nutzers):** ein Reiter war mit
+der MAUS gar nicht zu schliessen, nur mit Strg+W -- die Reiterleiste der
+Laufzeit hatte kein Kreuz. Neu `GUI_TABS_CLOSABLE(win, an)` +
+`GUI_TAB_CLOSED(win)` (transient wie GUI_CLICKED; Kreuz oder MITTLERE
+Maustaste, wie im Browser). **Geschlossen wird NICHTS** -- an einem Reiter
+haengen die Widgets des Programms, und vielleicht will es vorher fragen.
+Geometrie aus EINER Quelle (`tab_kreuz_rect`, unskaliert wie TABBAR_H
+selbst), sonst schloesse ein Klick neben dem Kreuz einen Reiter. Dabei
+fielen zwei aeltere Fehler auf: Strg+W nahm ungesicherte Aenderungen
+WORTLOS mit (jetzt `tabSchliessenFragen` mit Sichern/Verwerfen/Abbrechen),
+und beim Schliessen eines Reiters LINKS vom aktiven ruecken die uebrigen
+auf -- `aktiverTab` zeigte danach auf die Datei daneben (mit Strg+W nie
+aufgefallen, weil es immer den vorderen schliesst). Tests
+`tests/pruef/gui_reiter_kreuz.dhtest` (5, mit Gegenprobe) und 4 in
+`tests/test_ide.py`.
+
 **Stufe 14 (2026-09-12):** die drei Punkte nach Stand 13.
 **Der Baustein: `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` +
 `GUI_TEXTAREA_TAB_HIT(ta)`** -- der Tabulator gehoert damit ganz dem

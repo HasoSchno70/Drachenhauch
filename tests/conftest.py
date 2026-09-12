@@ -102,6 +102,12 @@ _SERIELL = {
     "test_pilot_partikel.py",
     "test_pilot_sfx.py",
     "test_profiler.py",
+    # Laesst `dhrt test tests/pruef` laufen, und darin stecken die Sammlungen
+    # mit eingespeisten Tasten und Klicks (AUTOMATION_PLAY). Innerhalb des
+    # Laeufers gehen die `--- seriell`-Dateien nacheinander -- gegen die
+    # Fenster der ANDEREN xdist-Arbeiter hilft das nicht, und dann faellt
+    # sporadisch ein Fall um, der einzeln gruen ist.
+    "test_dhrt_test.py",
 }
 
 

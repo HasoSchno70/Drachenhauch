@@ -1,0 +1,162 @@
+' Reiter mit Kreuz (GUI_TABS_CLOSABLE / GUI_TAB_CLOSED). Die Laufzeit
+' schliesst NICHTS -- sie meldet nur, welches Kreuz getroffen wurde.
+' Format: docs/werkzeuge.md.
+--- seriell
+
+=== ohne den schalter meldet nichts
+' Die Gegenprobe: derselbe Klick an derselben Stelle meldet NICHTS.
+' Dass dabei der zweite Reiter aktiv wird, gehoert dazu -- ohne Kreuze
+' sind die Reiter schmaler, und die Stelle liegt dann schon im naechsten.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS INTEGER : zu = -9
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TAB_CLOSED(w) >= 0 THEN zu = GUI_TAB_CLOSED(w)
+    n = n + 1
+    IF n = 30 THEN PRINT "zu " + STR$(zu) + " aktiv " + STR$(GUI_ACTIVE_TAB(w))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Klick auf die Stelle, an der das Kreuz des ersten Reiters saesse
+# (ohne den Schalter steht dort nichts, der Reiter schaltet nur um)
+c 4
+e 4 7 69 36 0 0 // Maus hin
+e 5 7 69 36 0 0 // Maus hin
+e 6 6 0 0 0 0 // Taste runter
+e 8 5 0 0 0 0 // Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+zu -9 aktiv 1
+
+=== ein klick aufs kreuz meldet den reiter
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+GUI_TABS_CLOSABLE(w, TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS INTEGER : zu = -9
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TAB_CLOSED(w) >= 0 THEN zu = GUI_TAB_CLOSED(w)
+    n = n + 1
+    IF n = 30 THEN PRINT "zu " + STR$(zu) + " aktiv " + STR$(GUI_ACTIVE_TAB(w))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Klick aufs Kreuz des ersten Reiters
+c 4
+e 4 7 69 36 0 0 // Maus hin
+e 5 7 69 36 0 0 // Maus hin
+e 6 6 0 0 0 0 // Taste runter
+e 8 5 0 0 0 0 // Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+zu 0 aktiv 0
+
+=== ein klick neben das kreuz schaltet um
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+GUI_TABS_CLOSABLE(w, TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS INTEGER : zu = -9
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TAB_CLOSED(w) >= 0 THEN zu = GUI_TAB_CLOSED(w)
+    n = n + 1
+    IF n = 30 THEN PRINT "zu " + STR$(zu) + " aktiv " + STR$(GUI_ACTIVE_TAB(w))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Klick auf die Beschriftung des ZWEITEN Reiters
+c 4
+e 4 7 100 36 0 0 // Maus hin
+e 5 7 100 36 0 0 // Maus hin
+e 6 6 0 0 0 0 // Taste runter
+e 8 5 0 0 0 0 // Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+zu -9 aktiv 1
+
+=== die mittlere taste meldet von ueberall auf dem reiter
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+GUI_TABS_CLOSABLE(w, TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM zu AS INTEGER : zu = -9
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TAB_CLOSED(w) >= 0 THEN zu = GUI_TAB_CLOSED(w)
+    n = n + 1
+    IF n = 30 THEN PRINT "zu " + STR$(zu) + " aktiv " + STR$(GUI_ACTIVE_TAB(w))
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Mittlere Taste auf der Beschriftung des zweiten Reiters
+c 4
+e 4 7 100 36 0 0 // Maus hin
+e 5 7 100 36 0 0 // Maus hin
+e 6 6 2 0 0 0 // mittlere Taste runter
+e 8 5 2 0 0 0 // mittlere Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+zu 1 aktiv 0
+
+=== die meldung gilt genau ein bild
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 580, 380)
+GUI_TABS(w, ["eins", "zwei"])
+GUI_TABS_CLOSABLE(w, TRUE)
+AUTOMATION_PLAY("ev.txt")
+DIM bilder AS INTEGER : bilder = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TAB_CLOSED(w) >= 0 THEN bilder = bilder + 1
+    n = n + 1
+    IF n = 30 THEN PRINT "bilder " + STR$(bilder)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Klick aufs Kreuz, Taste laenger gehalten
+c 4
+e 4 7 69 36 0 0 // Maus hin
+e 5 7 69 36 0 0 // Maus hin
+e 6 6 0 0 0 0 // Taste runter
+e 20 5 0 0 0 0 // Taste hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+bilder 1

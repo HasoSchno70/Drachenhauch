@@ -1469,3 +1469,51 @@ def test_parameter_umsortieren_geht_durch_das_ganze_projekt(tmp_path):
     assert "parameter umgestellt 3 0" in log, log
     assert "SUB zeichne(y AS INTEGER, x AS INTEGER)" in quelle.read_text(encoding="utf-8")
     assert "zeichne(8, 7)" in zweite.read_text(encoding="utf-8")
+
+
+def test_ein_klick_aufs_kreuz_schliesst_den_reiter(tmp_path):
+    """Ohne Kreuz war ein Reiter mit der Maus gar nicht zu schließen.
+    Geschlossen wird der ANGEKLICKTE, nicht der vordere -- und der aktive
+    bleibt danach derselbe, obwohl die Reiter aufrücken."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_eins.dh")
+    _datei(tmp_path, "PRINT 2\n", "b_zwei.dh")
+    ev = _klick_mit(30, 60, _baum_y(1))          # b_zwei oeffnen, wird aktiv
+    ev += _klick_mit(80, 85, 40)                 # Kreuz des ERSTEN Reiters
+    log = _ide(tmp_path, quelle, frames=170, events=ev)
+    assert "geschlossen 0" in log, log
+    spuren = [z for z in log if z.startswith("spur ")]
+    assert spuren and "b_zwei" in spuren[-1], log
+
+
+def test_die_mittlere_taste_schliesst_den_reiter(tmp_path):
+    """Wie im Browser: mittlere Taste irgendwo auf dem Reiter."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_eins.dh")
+    _datei(tmp_path, "PRINT 2\n", "b_zwei.dh")
+    ev = _klick_mit(30, 60, _baum_y(1))
+    ev += [(80, MAUS_POS, 140, 40), (81, MAUS_POS, 140, 40),
+           (81, MAUS_RUNTER, 2), (83, MAUS_HOCH, 2)]
+    log = _ide(tmp_path, quelle, frames=170, events=ev)
+    assert "geschlossen 1" in log, log
+
+
+def test_ein_geaenderter_reiter_fragt_vor_dem_schliessen(tmp_path):
+    """ESC bricht ab -- der Reiter bleibt, und die Datei auch."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_V, RL_LCTRL)              # tippen: der Reiter ist schmutzig
+    ev += _taste(70, RL_W, RL_LCTRL)             # schliessen
+    ev += _taste(110, RL_ESC)                    # Abbrechen
+    log = _ide(tmp_path, quelle, frames=190, events=ev, zwischenablage="X")
+    assert not any(z.startswith("geschlossen") for z in log), log
+    assert quelle.read_text(encoding="utf-8") == "PRINT 1\n", quelle.read_text()
+
+
+def test_der_geaenderte_reiter_laesst_sich_sichernd_schliessen(tmp_path):
+    """Enter drückt den ersten Knopf: Sichern -- danach ist der Reiter zu
+    und das Getippte steht in der Datei."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_V, RL_LCTRL)
+    ev += _taste(70, RL_W, RL_LCTRL)
+    ev += _taste(110, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=190, events=ev, zwischenablage="X")
+    assert "geschlossen 0" in log, log
+    assert quelle.read_text(encoding="utf-8").startswith("XPRINT 1"), quelle.read_text()

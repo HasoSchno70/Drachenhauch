@@ -1186,6 +1186,13 @@ pub struct Window {
     // (oder tab_page == -1 = immer sichtbar) werden gezeigt/bedient.
     tabs: Vec<String>,
     active_tab: i32,
+    // Reiter mit Kreuz (GUI_TABS_CLOSABLE). Geschlossen wird NICHT von der
+    // Laufzeit -- sie meldet nur, welches Kreuz getroffen wurde
+    // (`tab_zu`, transient). Was ein geschlossener Reiter bedeutet, weiss
+    // nur das Programm: es haengt sein Widget daran, und vielleicht will es
+    // vorher fragen.
+    tabs_closable: bool,
+    tab_zu: i32,
     // Standard-Knopf (Enter) und Abbrechen-Knopf (ESC) -- Widget-Index im
     // Fenster oder -1. Was jedes Formular braucht und was sonst jedes
     // Programm selbst mit KEYHIT nachbaute, ohne den Fokus zu beachten.
@@ -1364,6 +1371,7 @@ pub struct Gui {
     // je Ebene. Leer, wenn keine Kette offen ist.
     sub_chain: Vec<(usize, i32, i32)>,
     was_right_down: bool,                    // Rechtsklick-Flankenerkennung
+    was_mitte_down: bool,                    // Mittelklick-Flankenerkennung (Reiter zu)
     scroll_drag: Option<usize>,              // Fenster, dessen Inhalts-Scrollbar gezogen wird
     active_table: Option<(usize, usize)>,
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
@@ -1472,7 +1480,7 @@ impl Gui {
             drag: None, drop: None, cursors: true, cursor_form: None,
             editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, sub_chain: Vec::new(), tasten_mod: (false, false),
-            kuerzel_gefeuert: false, was_right_down: false,
+            kuerzel_gefeuert: false, was_right_down: false, was_mitte_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
@@ -1584,7 +1592,7 @@ impl Gui {
             close_clicked: false, alive: true, dlg: false, answer: 0,
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
-            tabs: Vec::new(), active_tab: 0,
+            tabs: Vec::new(), active_tab: 0, tabs_closable: false, tab_zu: -1,
             default_btn: -1, cancel_btn: -1,
         });
         self.z_order.push(idx);
@@ -5553,6 +5561,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             "max_w": self.unsk(win.max_w), "max_h": self.unsk(win.max_h),
             "widgets": widgets,
             "menus": menus, "tabs": win.tabs, "active_tab": win.active_tab,
+            "tabs_closable": win.tabs_closable,
             "default_button": win.default_btn, "cancel_button": win.cancel_btn,
         });
         serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
@@ -5610,6 +5619,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             self.windows[wi].tabs = ts.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
         }
         self.windows[wi].active_tab = v["active_tab"].as_i64().unwrap_or(0) as i32;
+        self.windows[wi].tabs_closable = v["tabs_closable"].as_bool().unwrap_or(false);
         let n = self.windows[wi].widgets.len() as i64;
         let knopf = |k: &str| -> i32 {
             let i = v[k].as_i64().unwrap_or(-1);
@@ -5698,14 +5708,31 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn tab_slots(&self, g: &Graphics, wi: usize) -> Vec<(usize, i32, i32)> {
         let win = &self.windows[wi];
         let pad = self.m("pad");
+        let kreuz = self.tab_kreuz_w(wi);
         let mut x = win.x + pad;
         let mut out = Vec::new();
         for (ti, label) in win.tabs.iter().enumerate() {
-            let wl = self.ctext_width(g, label) + pad * 3;
+            let wl = self.ctext_width(g, label) + pad * 3 + kreuz;
             out.push((ti, x, x + wl));
             x += wl + 2;
         }
         out
+    }
+
+    /// Wie viel Platz das Kreuz am Reiter braucht (0, wenn es keins gibt).
+    fn tab_kreuz_w(&self, wi: usize) -> i32 {
+        if self.windows[wi].tabs_closable { 18 } else { 0 }
+    }
+
+    /// Das Rechteck des Kreuzes eines Reiters: (x, y, kante).
+    ///
+    /// EINE Quelle fuer Zeichnen und Treffertest -- liefen sie auseinander,
+    /// schloesse ein Klick neben dem Kreuz einen Reiter (oder gar keiner).
+    /// Unskaliert wie die Reiterleiste selbst (TABBAR_H).
+    fn tab_kreuz_rect(&self, wi: usize, x1: i32, by: i32) -> (i32, i32, i32) {
+        let k = 9;
+        let w = self.tab_kreuz_w(wi);
+        (x1 - w + (w - k) / 2, by + (TABBAR_H - k) / 2, k)
     }
     /// Inhaltshoehe = unterster Widget-Rand (+Rand). Basis fuer den Scrollbereich.
     fn content_height(&self, win: usize) -> i32 {
@@ -5748,6 +5775,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     pub fn active_tab(&self, win: i64) -> Result<i64, String> {
         self.windows.get(win as usize).map(|w| w.active_tab as i64).ok_or("GUI_ACTIVE_TAB: erwartet GUI_WINDOW".into())
     }
+    /// Reiter mit Kreuz (GUI_TABS_CLOSABLE).
+    ///
+    /// Die Laufzeit schliesst NICHTS -- sie meldet nur, welches Kreuz
+    /// getroffen wurde. Was ein geschlossener Reiter bedeutet, weiss nur das
+    /// Programm: an ihm haengen seine Widgets, und vielleicht will es vorher
+    /// fragen, ob Ungesichertes verloren gehen darf.
+    pub fn tabs_closable(&mut self, win: i64, an: bool) -> Result<(), String> {
+        let w = self.windows.get_mut(win as usize).ok_or("GUI_TABS_CLOSABLE: erwartet GUI_WINDOW")?;
+        w.tabs_closable = an;
+        Ok(())
+    }
+
+    /// Welcher Reiter in diesem Bild geschlossen werden soll (-1 = keiner).
+    ///
+    /// Transient wie `GUI_CLICKED`: ein Klick ist ein Ereignis. Getroffen
+    /// wird ueber das Kreuz oder die mittlere Maustaste.
+    pub fn tab_closed(&self, win: i64) -> Result<i64, String> {
+        self.windows.get(win as usize).map(|w| w.tab_zu as i64)
+            .ok_or("GUI_TAB_CLOSED: erwartet GUI_WINDOW".into())
+    }
+
     pub fn set_active_tab(&mut self, win: i64, i: i32) -> Result<(), String> {
         let w = self.windows.get_mut(win as usize).ok_or("GUI_SET_ACTIVE_TAB: erwartet GUI_WINDOW")?;
         if i >= 0 && (i as usize) < w.tabs.len() { w.active_tab = i; }
@@ -6057,11 +6105,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let just_released = !is_down && self.was_mouse_down;
         let right_down = g.mouse_button(1);
         let right_just = right_down && !self.was_right_down;
+        // Mittlere Taste: nur die Reiter benutzen sie (Reiter zu).
+        let mitte_just = g.mouse_button(2) && !self.was_mitte_down;
+        self.was_mitte_down = g.mouse_button(2);
 
         // Transiente Flags ruecksetzen -- die Dialog-Antwort gehoert dazu:
         // sie ist ein Ereignis, kein Zustand (siehe Window::answer).
         for win in self.windows.iter_mut() {
             win.answer = 0;
+            win.tab_zu = -1;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
@@ -6125,6 +6177,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        // Mittlere Taste auf einem Reiter: zu. So kennt man es aus jedem
+        // Browser, und es ist der schnellste Weg, wenn das Kreuz klein ist.
+        if mitte_just {
+            for &wi in self.z_order.clone().iter().rev() {
+                if !self.windows[wi].alive || !self.windows[wi].visible { continue; }
+                if !self.windows[wi].tabs_closable || self.tabbar_h(wi) == 0 { continue; }
+                let by = self.windows[wi].y
+                    + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
+                    + self.menubar_h(wi);
+                if my < by || my >= by + TABBAR_H { continue; }
+                if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
+                    self.windows[wi].tab_zu = ti as i32;
+                    break;
+                }
+            }
+        }
         // Klick auf einen Reiter (Tab) wechselt die Seite (konsumiert den Klick).
         let mut tab_consumed = false;
         if just_pressed && !menu_consumed && !scroll_consumed {
@@ -6134,8 +6202,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
                     + self.menubar_h(wi);
                 if my < by || my >= by + TABBAR_H { continue; }
-                if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
-                    self.windows[wi].active_tab = ti as i32;
+                if let Some((ti, _, x1)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
+                    // Das Kreuz schliesst, statt umzuschalten -- und die
+                    // MITTLERE Taste tut es von ueberall auf dem Reiter aus
+                    // (so kennt man es aus jedem Browser).
+                    let (kx, ky, k) = self.tab_kreuz_rect(wi, x1, by);
+                    let aufs_kreuz = self.windows[wi].tabs_closable
+                        && mx >= kx - 3 && mx < kx + k + 3 && my >= ky - 3 && my < ky + k + 3;
+                    if aufs_kreuz {
+                        self.windows[wi].tab_zu = ti as i32;
+                    } else {
+                        self.windows[wi].active_tab = ti as i32;
+                    }
                     tab_consumed = true;
                     break;
                 }
@@ -10283,6 +10361,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let fg = if active { self.th("text_fg") } else { self.th("muted_fg") };
                 let th14 = self.ctext_height(g);
                 self.ctext(g, x0 + pad, by + (tboff - th14) / 2, win.tabs[ti].clone(), fg);
+                if win.tabs_closable {
+                    // Zwei Striche statt eines Zeichens: ein `x` aus der
+                    // Schrift sitzt je nach Zeichensatz anders und ist bei
+                    // 9 Pixeln kaum als Kreuz zu erkennen.
+                    let (kx, ky, k) = self.tab_kreuz_rect(wi, x1, by);
+                    let kf = if active { fg } else { self.th("muted_fg") };
+                    g.line(kx, ky, kx + k - 1, ky + k - 1, kf);
+                    g.line(kx + k - 1, ky, kx, ky + k - 1, kf);
+                }
             }
         }
         let coff = toff + mboff + tboff;   // Inhalts-Oberkante inkl. Menue + Reiter
