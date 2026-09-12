@@ -1,0 +1,215 @@
+' Reiter INNERHALB eines Fensters (GUI_TABCONTROL). Bis Stand 24 gab es sie
+' nur AM Fenster (GUI_TABS) -- ein Karteikasten in einer Ecke des Fensters
+' war damit nicht zu bauen. Geprueft wird, was ein Programm davon sieht: die
+' Seite, die Sichtbarkeit der Kinder, der Klick auf einen Kopf und die
+' Tastatur. Format: docs/werkzeuge.md, dhrt test.
+
+=== seiten anlegen und umschalten
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+PRINT GUI_TABCONTROL_ADD(tc, "Allgemein") ; " " ; GUI_TABCONTROL_ADD(tc, "Farben")
+PRINT GUI_TABCONTROL_COUNT(tc) ; " " ; GUI_TABCONTROL_PAGE(tc)
+GUI_TABCONTROL_SET_PAGE(tc, 1)
+PRINT GUI_TABCONTROL_PAGE(tc) ; " " ; GUI_TABCONTROL_TITLE$(tc, 1)
+GUI_TABCONTROL_SET_TITLE(tc, 1, "Klaenge")
+PRINT GUI_TABCONTROL_TITLE$(tc, 1)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0 1
+2 0
+1 Farben
+Klaenge
+
+=== ein kind zeigt sich nur auf seiner seite
+' Geprueft am Treffertest: was nicht da ist, nimmt auch keinen Klick an.
+' (GUI_VISIBLE bleibt TRUE -- das Widget ist nicht ausgeblendet, seine Seite
+' liegt nur hinten.)
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "A", 40, 80, 80, 30)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "B", 40, 80, 80, 30)
+GUI_TABCONTROL_ADD_WIDGET(tc, b1, 0)
+GUI_TABCONTROL_ADD_WIDGET(tc, b2, 1)
+GUI_UPDATE()
+' Die beiden liegen uebereinander -- getroffen wird der der vorderen Seite.
+PRINT GUI_HIT_TEST(80, 130) = b1 ; " " ; GUI_HIT_TEST(80, 130) = b2
+GUI_TABCONTROL_SET_PAGE(tc, 1)
+GUI_UPDATE()
+PRINT GUI_HIT_TEST(80, 130) = b1 ; " " ; GUI_HIT_TEST(80, 130) = b2
+PRINT GUI_VISIBLE(b1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE FALSE
+FALSE TRUE
+TRUE
+
+=== ein klick auf den kopf blaettert um
+' Der erste Kopf beginnt bei x = 31 (Fenster 10 + Widget 20 + Rand) und ist
+' 4 * 8 + 20 = 52 breit, der zweite schliesst bei 85 an. Geklickt wird oben
+' in den Kopf (y = 58), nicht in die Flaeche darunter.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 8 OR f = 19 THEN PRINT GUI_TABCONTROL_PAGE(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick auf den zweiten Kopf, danach wieder auf den ersten
+c 16
+e 3 7 100 58 0 0
+e 4 7 100 58 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 14 7 50 58 0 0
+e 15 7 50 58 0 0
+e 15 6 0 0 0 0
+e 16 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1
+0
+
+=== die flaeche unter den koepfen gehoert den kindern
+' Ein Klick dorthin darf NICHT umblaettern -- sonst waere jeder Knopf auf
+' einer Seite zugleich ein Reiterklick.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 19 THEN PRINT GUI_TABCONTROL_PAGE(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick tief in die Flaeche, wo der zweite Kopf waere, wenn es dort einen gaebe
+c 16
+e 3 7 145 140 0 0
+e 4 7 145 140 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+0
+
+=== eine seite entfernen laesst die kinder zurueck
+' Zerstoert werden sie NICHT -- das waere eine Entscheidung des Programms.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "A", 40, 80, 80, 30)
+GUI_TABCONTROL_ADD_WIDGET(tc, b1, 0)
+GUI_TABCONTROL_SET_PAGE(tc, 1)
+GUI_UPDATE()
+PRINT GUI_HIT_TEST(80, 130) = b1
+GUI_TABCONTROL_REMOVE(tc, 0)
+GUI_UPDATE()
+PRINT GUI_TABCONTROL_COUNT(tc) ; " " ; GUI_TABCONTROL_PAGE(tc) ; " " ; GUI_TABCONTROL_TITLE$(tc, 0)
+PRINT GUI_HIT_TEST(80, 130) = b1
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+FALSE
+1 0 zwei
+TRUE
+
+=== eine seite, die es nicht gibt, sagt es
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "A", 40, 80, 80, 30)
+TRY
+    GUI_TABCONTROL_ADD_WIDGET(tc, b1, 3)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_TABCONTROL_ADD(b1, "geht nicht")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+Seite 3 gibt es nicht
+kein Reiterwerk
+
+=== pfeile blaettern, wenn das reiterwerk den fokus hat
+' Ohne Tastatur waere es das einzige Bedienelement, das man nur mit der Maus
+' erreicht.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(w, 20, 20, 300, 200)
+GUI_TABCONTROL_ADD(tc, "eins")
+GUI_TABCONTROL_ADD(tc, "zwei")
+GUI_TABCONTROL_ADD(tc, "drei")
+GUI_FOCUS(tc)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 8 OR f = 19 THEN PRINT GUI_TABCONTROL_PAGE(tc)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# zweimal rechts, einmal links
+c 16
+e 3 2 262 0 0 0
+e 4 1 262 0 0 0
+e 5 2 262 0 0 0
+e 6 1 262 0 0 0
+e 14 2 263 0 0 0
+e 15 1 263 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+2
+1

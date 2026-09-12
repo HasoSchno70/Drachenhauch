@@ -230,7 +230,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
-    Layout,
+    Layout, TabControl,
 }
 
 impl Kind {
@@ -245,7 +245,7 @@ impl Kind {
             Kind::Toolbar => "toolbar", Kind::Tree => "tree",
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
-            Kind::Layout => "layout",
+            Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -259,7 +259,7 @@ impl Kind {
             "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
-            "layout" => Kind::Layout,
+            "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
             _ => return None,
         })
     }
@@ -283,6 +283,7 @@ impl Kind {
 }
 
 const DROPDOWN_ITEM_H: i32 = 22;
+const TC_KOPF_H: i32 = 26;        // Hoehe der Reiterkoepfe im Fenster
 const TREE_ROW_H: i32 = 22;       // Hoehe einer Baum-Zeile
 const TREE_INDENT: i32 = 16;      // Einrueckung pro Ebene
 const TREE_TOGGLE_W: i32 = 16;    // Breite der Auf-/Zuklapp-Flaeche
@@ -677,13 +678,22 @@ pub struct TreeState {
     sel: Vec<bool>,  // Mehrfachauswahl je Knoten (nur mit `multi`)
     multi: bool,
     anker: i32,      // Knoten-id fuer Umschalt+Klick
+    kaestchen: bool,      // Haken-Spalte (wie bei der Liste)
+    checks: Vec<bool>,    // Haken je Knoten (nur mit `kaestchen`)
+    datei: Option<Box<DateiBaum>>,   // nur beim Dateibaum (GUI_FILETREE)
 }
 
 impl TreeState {
     /// Die Auswahl-Liste auf die Knotenzahl bringen. Knoten kommen nur ueber
     /// GUI_TREE_ADD dazu, verschwinden nur mit GUI_TREE_CLEAR -- ein
     /// Nachziehen an jedem Abruf kostet also nichts und kann nie zu kurz sein.
-    fn sync(&mut self) { let n = self.nodes.len(); self.sel.resize(n, false); }
+    /// Beim DATEIbaum wird die Liste dagegen neu gebaut, sobald sich ein Ordner
+    /// oeffnet; dort haengen Auswahl und Haken am WEG, nicht an der Nummer.
+    fn sync(&mut self) {
+        let n = self.nodes.len();
+        self.sel.resize(n, false);
+        self.checks.resize(n, false);
+    }
 }
 
 #[derive(Default)]
@@ -695,6 +705,114 @@ struct TreeNode {
     has_children: bool,
     icon: i64,    // Textur-Handle, -1 = keins
     color: i64,   // Textfarbe, -1 = Thema
+}
+
+/// Der DATEIbaum (GUI_FILETREE): ein Baum, der seine Knoten selbst aus dem
+/// Dateisystem holt. Gelesen wird nur, was zu sehen ist -- die Wurzel und jeder
+/// AUFGEKLAPPTE Ordner; ein Projekt mit einem `target`-Ordner darin kostet
+/// damit nichts, solange niemand hineinsieht.
+///
+/// **Knoten-Nummern sind hier fluechtig.** Die Liste wird neu gebaut, sobald
+/// sich ein Ordner oeffnet oder die Platte neu gelesen wird -- Auswahl, Haken
+/// und aufgeklappte Aeste haengen deshalb am WEG (relativ zur Wurzel, immer mit
+/// `/`), nicht an der Nummer. Nach aussen spricht dieses Widget darum auch nur
+/// ueber Wege.
+#[derive(Default)]
+struct DateiBaum {
+    wurzel: String,
+    muster: Vec<String>,      // Dateien: "*.dh" usw.; leer = alle
+    ausnahmen: Vec<String>,   // uebergangene Namen (Muster), Ordner wie Dateien
+    ordner_zuerst: bool,
+    verborgene: bool,         // Namen, die mit "." anfangen
+    nur_ordner: bool,
+    offen: Vec<String>,       // aufgeklappte Ordner (Wege)
+    gehakt: Vec<String>,      // angehakte Wege (mit `kaestchen`) -- ueberleben das Zuklappen
+    pfade: Vec<String>,       // je Knoten sein Weg
+    ordner: Vec<bool>,        // je Knoten: Ordner?
+    aktiviert: String,        // Doppelklick auf eine Datei -- ein Bild lang
+    bild_ordner: i64,         // Sinnbilder, -1 = keins
+    bild_datei: i64,
+    klick_klappt: bool,       // ein Klick auf einen Ordner klappt ihn auf/zu
+    auffrischen: f64,         // Sekunden zwischen zwei Blicken auf die Platte, 0 = nie
+    naechste: f64,            // Zeitpunkt des naechsten Blicks
+}
+
+impl DateiBaum {
+    /// Weg -> Knoten-Nummer (-1, wenn er gerade nicht sichtbar ist).
+    fn knoten(&self, pfad: &str) -> i32 {
+        self.pfade.iter().position(|p| p == pfad).map(|i| i as i32).unwrap_or(-1)
+    }
+    fn uebergangen(&self, name: &str) -> bool {
+        if !self.verborgene && name.starts_with('.') { return true; }
+        self.ausnahmen.iter().any(|m| crate::builtins::passt_muster(name, m))
+    }
+    fn passt_datei(&self, name: &str) -> bool {
+        self.muster.is_empty() || self.muster.iter().any(|m| crate::builtins::passt_muster(name, m))
+    }
+}
+
+/// Die Knotenliste neu aus dem Dateisystem bauen. Auswahl kommt ueber den WEG
+/// zurueck (was zugeklappt wurde, faellt aus der Auswahl -- wie in jedem
+/// Dateimanager), die Haken stehen ohnehin in `gehakt` und ueberleben es.
+fn dateibaum_neu(t: &mut TreeState) {
+    let Some(mut d) = t.datei.take() else { return };
+    let wahl = if t.selected >= 0 { d.pfade.get(t.selected as usize).cloned() } else { None };
+    let sel_wege: Vec<String> = d.pfade.iter().enumerate()
+        .filter(|(i, _)| t.sel.get(*i).copied().unwrap_or(false))
+        .map(|(_, p)| p.clone()).collect();
+    let (mut nodes, mut pfade, mut ordner) = (Vec::new(), Vec::new(), Vec::new());
+    dateibaum_sammeln(&d, "", -1, 0, &mut nodes, &mut pfade, &mut ordner);
+    d.pfade = pfade; d.ordner = ordner;
+    t.nodes = nodes;
+    t.sel = vec![false; t.nodes.len()];
+    t.checks = d.pfade.iter().map(|p| d.gehakt.iter().any(|g| g == p)).collect();
+    t.selected = wahl.as_deref().map(|w| d.knoten(w)).unwrap_or(-1);
+    for w in sel_wege { let k = d.knoten(&w); if k >= 0 { t.sel[k as usize] = true; } }
+    t.anker = t.selected;
+    t.datei = Some(d);
+}
+
+/// Einen Ordner lesen und (rekursiv fuer aufgeklappte) Knoten anhaengen.
+/// Ein Ordner, den das System nicht hergibt, liefert nichts -- eine Meldung
+/// waere hier falsch: ein Baum zeichnet jedes Bild neu, und ein gesperrter
+/// Ordner unterwegs wuerde ihn zum Abbruch bringen statt ihn stumm zu lassen.
+fn dateibaum_sammeln(d: &DateiBaum, rel: &str, eltern: i32, ebene: i32,
+                     nodes: &mut Vec<TreeNode>, pfade: &mut Vec<String>, ordner: &mut Vec<bool>) {
+    let mut voll = std::path::PathBuf::from(&d.wurzel);
+    if !rel.is_empty() { for t in rel.split('/') { voll.push(t); } }
+    let Ok(eintraege) = std::fs::read_dir(&voll) else { return };
+    let mut liste: Vec<(String, bool)> = Vec::new();
+    for e in eintraege.flatten() {
+        let name = e.file_name().to_string_lossy().to_string();
+        if d.uebergangen(&name) { continue; }
+        let ist_ordner = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+        if !ist_ordner && (d.nur_ordner || !d.passt_datei(&name)) { continue; }
+        liste.push((name, ist_ordner));
+    }
+    liste.sort_by(|a, b| {
+        if d.ordner_zuerst && a.1 != b.1 { return b.1.cmp(&a.1); }
+        a.0.to_lowercase().cmp(&b.0.to_lowercase()).then(a.0.cmp(&b.0))
+    });
+    for (name, ist_ordner) in liste {
+        let weg = if rel.is_empty() { name.clone() } else { format!("{}/{}", rel, name) };
+        let auf = ist_ordner && d.offen.iter().any(|o| o == &weg);
+        if eltern >= 0 { nodes[eltern as usize].has_children = true; }
+        nodes.push(TreeNode {
+            label: name, parent: eltern, level: ebene, expanded: auf,
+            // JEDER Ordner bekommt sein Dreieck, auch ein leerer: was darin
+            // liegt, weiss man erst, wenn man hineinsieht -- und einmal
+            // vorsorglich hineinzusehen ist genau das, was der Baum vermeidet.
+            has_children: ist_ordner,
+            icon: if ist_ordner { d.bild_ordner } else { d.bild_datei },
+            color: -1,
+        });
+        pfade.push(weg.clone());
+        ordner.push(ist_ordner);
+        if auf {
+            let k = (nodes.len() - 1) as i32;
+            dateibaum_sammeln(d, &weg, k, ebene + 1, nodes, pfade, ordner);
+        }
+    }
 }
 
 /// Eine Pruefregel an einem Formularfeld (GUI_RULE). `a`/`b` sind Zahlen
@@ -815,6 +933,19 @@ struct PanelState {
     kinder: Vec<usize>,   // Widget-Indizes im selben Fenster
     scroll: i32,
     inhalt_h: i32,        // unterster Kindrand + Rand, je Bild gemessen
+}
+
+/// Reiter INNERHALB eines Fensters (Kind::TabControl). Die Beschriftungen
+/// stehen in `Widget::items`, die aktive Seite in `Widget::sel`; hier liegt
+/// nur, welches Kind auf welche Seite gehoert.
+///
+/// Die Kinder BEHALTEN ihre Lage im Fenster -- eine Seite blendet sie nur
+/// ein oder aus (`widget_shown`), genau wie die Reiter des Fensters es mit
+/// `tab_page` tun. Nichts wird verschoben, ein Layout auf einer Seite
+/// rechnet also weiter mit denselben Koordinaten.
+#[derive(Default)]
+struct TabCtlState {
+    kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
 }
 
 /// Ein laufender Zug: beginnt mit dem Druck auf ein ziehbares Widget, wird
@@ -959,6 +1090,12 @@ pub struct Widget {
     /// je Bild aus den Panel-Kindern gesetzt -- auch durch Layouts hindurch,
     /// damit ein Behaelter im Panel seine Kinder mitnimmt.
     panel_von: i32,
+    /// Reiter IM Fenster (Kind::TabControl): die Kinder je Seite. Am KIND
+    /// stehen `tc_von` (Widget-Index des Reiterwerks, -1 = keins) und
+    /// `tc_seite` -- je Bild gesetzt, wie beim rollenden Panel.
+    tabctl: Option<Box<TabCtlState>>,
+    tc_von: i32,
+    tc_seite: i32,
     vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
     unbestimmt: bool,    // Progress: laufendes Band statt Wert
     bildmodus: u8,       // Image: 0 strecken, 1 einpassen, 2 fuellen, 3 mitte, 4 kacheln
@@ -2314,7 +2451,7 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
-            panel: None, panel_von: -1, vert: false, unbestimmt: false, bildmodus: 0,
+            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
             umbruch: false, bind: String::new(), form: String::new(),
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
@@ -3355,8 +3492,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if k < t.sel.len() { t.sel[k] = true; t.anker = t.selected; }
                 }
             }
+            "kaestchen" | "checkboxes" => { t.kaestchen = wert != 0.0; t.sync(); }
             _ => return Err(format!(
-                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl)", key)),
+                "GUI_TREE_SET: unbekannte Einstellung '{}' (gueltig: mehrfachauswahl, kaestchen)", key)),
         }
         Ok(())
     }
@@ -3405,7 +3543,397 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if node < 0 || node >= t.nodes.len() as i64 {
             return Err(format!("GUI_TREE_EXPAND: ungueltige Knoten-id {}", node));
         }
-        t.nodes[node as usize].expanded = flag; Ok(())
+        t.nodes[node as usize].expanded = flag;
+        // Beim Dateibaum entscheidet die Liste der offenen Wege, was gelesen
+        // wird -- das Flag am Knoten allein waere beim naechsten Neuaufbau weg.
+        if t.datei.is_some() {
+            let weg = t.datei.as_ref().unwrap().pfade.get(node as usize).cloned();
+            if let Some(w) = weg { Self::ft_offen_setzen(t, &w, flag); dateibaum_neu(t); }
+        }
+        Ok(())
+    }
+    pub fn tree_checked(&self, h: i64, node: i64) -> Result<bool, String> {
+        let t = self.tree_ref(h, "GUI_TREE_CHECKED")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_CHECKED: ungueltige Knoten-id {}", node));
+        }
+        Ok(t.checks.get(node as usize).copied().unwrap_or(false))
+    }
+    pub fn tree_set_checked(&mut self, h: i64, node: i64, an: bool) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SET_CHECKED")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_SET_CHECKED: ungueltige Knoten-id {}", node));
+        }
+        t.sync();
+        t.checks[node as usize] = an;
+        Self::ft_haken_merken(t, node as usize, an);
+        Ok(())
+    }
+
+    // --- Dateibaum (GUI_FILETREE) -------------------------------------------
+    /// Ein Baum, der seine Knoten selbst von der Platte holt. Er benutzt die
+    /// Darstellung und den Treffertest des Baums -- neu ist nur, WOHER die
+    /// Knoten kommen und dass nach aussen Wege stehen, wo sonst Nummern stehen.
+    pub fn filetree(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, wurzel: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Tree, x, y, w, h);
+        let d = DateiBaum {
+            wurzel: Self::ft_weg_normal(&wurzel),
+            ordner_zuerst: true,
+            bild_ordner: -1, bild_datei: -1,
+            ..Default::default()
+        };
+        let mut ts = TreeState { selected: -1, hover: -1, anker: -1, ..Default::default() };
+        ts.datei = Some(Box::new(d));
+        dateibaum_neu(&mut ts);
+        wd.tree = Some(Box::new(ts));
+        self.add_widget(win, "GUI_FILETREE", wd)
+    }
+    fn ft_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
+        let t = self.tree_mut(h, fn_)?;
+        if t.datei.is_none() { return Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)); }
+        Ok(t)
+    }
+    fn ft_ref(&self, h: i64, fn_: &str) -> Result<(&TreeState, &DateiBaum), String> {
+        let t = self.tree_ref(h, fn_)?;
+        match t.datei.as_deref() {
+            Some(d) => Ok((t, d)),
+            None => Err(format!("{}: Widget ist kein Dateibaum (GUI_FILETREE)", fn_)),
+        }
+    }
+    /// Rueckstriche zu Schraegstrichen, kein Trennzeichen am Ende -- in EINER
+    /// Schreibweise laesst sich vergleichen, in zweien zeigt derselbe Ordner
+    /// zweimal auf verschiedene Aeste.
+    fn ft_weg_normal(p: &str) -> String {
+        let s = p.replace('\\', "/");
+        let s = s.trim_end_matches('/').to_string();
+        if s.is_empty() { p.replace('\\', "/") } else { s }
+    }
+    /// Ein Weg von aussen: absolut (unterhalb der Wurzel) oder schon relativ.
+    fn ft_rel(d: &DateiBaum, pfad: &str) -> String {
+        let p = Self::ft_weg_normal(pfad);
+        let w = format!("{}/", d.wurzel);
+        if p.len() > w.len() && p[..w.len()].eq_ignore_ascii_case(&w) { p[w.len()..].to_string() }
+        else if p.eq_ignore_ascii_case(&d.wurzel) { String::new() }
+        else { p }
+    }
+    /// Ein Weg nach aussen: immer der volle, in der Schreibweise des Systems.
+    fn ft_abs(d: &DateiBaum, rel: &str) -> String {
+        if rel.is_empty() { return d.wurzel.clone(); }
+        let mut p = std::path::PathBuf::from(&d.wurzel);
+        for t in rel.split('/') { p.push(t); }
+        p.to_string_lossy().to_string()
+    }
+    fn ft_offen_setzen(t: &mut TreeState, weg: &str, an: bool) {
+        let Some(d) = t.datei.as_mut() else { return };
+        let da = d.offen.iter().position(|o| o == weg);
+        match (an, da) {
+            (true, None) => d.offen.push(weg.to_string()),
+            (false, Some(i)) => { d.offen.remove(i); }
+            _ => {}
+        }
+    }
+    fn ft_haken_merken(t: &mut TreeState, node: usize, an: bool) {
+        let Some(d) = t.datei.as_mut() else { return };
+        let Some(weg) = d.pfade.get(node).cloned() else { return };
+        let da = d.gehakt.iter().position(|g| g == &weg);
+        match (an, da) {
+            (true, None) => d.gehakt.push(weg),
+            (false, Some(i)) => { d.gehakt.remove(i); }
+            _ => {}
+        }
+    }
+    /// GUI_FILETREE_SET(ft, key$, wert).
+    pub fn filetree_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_SET")?;
+        let an = wert != 0.0;
+        match key.to_lowercase().as_str() {
+            "ordner_zuerst" | "dirs_first" => t.datei.as_mut().unwrap().ordner_zuerst = an,
+            "verborgene" | "hidden" => t.datei.as_mut().unwrap().verborgene = an,
+            "nur_ordner" | "dirs_only" => t.datei.as_mut().unwrap().nur_ordner = an,
+            // Wie im Datei-Bereich einer Entwicklungsumgebung: ein Klick auf
+            // einen Ordner klappt ihn um. Ohne das tut ein Klick auf eine
+            // Ordnerzeile scheinbar nichts -- nur das schmale Dreieck wirkt.
+            "klick_klappt" | "click_expands" => t.datei.as_mut().unwrap().klick_klappt = an,
+            "mehrfachauswahl" | "multi" => { t.multi = an; t.sync(); }
+            "kaestchen" | "checkboxes" => t.kaestchen = an,
+            // In MILLISEKUNDEN, wie ueberall sonst -- innen in Sekunden, weil
+            // die Uhr der Grafik so zaehlt.
+            "auffrischen" | "refresh" => {
+                t.datei.as_mut().unwrap().auffrischen = (wert.max(0.0)) / 1000.0;
+                t.datei.as_mut().unwrap().naechste = 0.0;
+            }
+            _ => return Err(format!("GUI_FILETREE_SET: unbekannte Einstellung '{}' (gueltig: \
+                ordner_zuerst, verborgene, nur_ordner, mehrfachauswahl, kaestchen, auffrischen)", key)),
+        }
+        dateibaum_neu(t);
+        Ok(())
+    }
+    /// Welche Dateien der Baum zeigt: Muster mit `;` getrennt, leer = alle.
+    pub fn filetree_filter(&mut self, h: i64, muster: &str) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_FILTER")?;
+        t.datei.as_mut().unwrap().muster = Self::ft_liste(muster);
+        dateibaum_neu(t); Ok(())
+    }
+    /// Was der Baum ueberspringt -- Namen oder Muster, mit `;` getrennt, fuer
+    /// Ordner UND Dateien (`target;__pycache__;_*`).
+    pub fn filetree_skip(&mut self, h: i64, namen: &str) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_SKIP")?;
+        t.datei.as_mut().unwrap().ausnahmen = Self::ft_liste(namen);
+        dateibaum_neu(t); Ok(())
+    }
+    fn ft_liste(s: &str) -> Vec<String> {
+        s.split(';').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect()
+    }
+    pub fn filetree_set_root(&mut self, h: i64, pfad: String) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_SET_ROOT")?;
+        let d = t.datei.as_mut().unwrap();
+        // Eine neue Wurzel ist ein neuer Baum: offene Aeste und Haken zeigen
+        // auf Wege, die es dort nicht gibt.
+        d.wurzel = Self::ft_weg_normal(&pfad);
+        d.offen.clear(); d.gehakt.clear();
+        t.selected = -1; t.anker = -1; t.scroll = 0;
+        dateibaum_neu(t); Ok(())
+    }
+    pub fn filetree_root(&self, h: i64) -> Result<String, String> {
+        Ok(self.ft_ref(h, "GUI_FILETREE_ROOT")?.1.wurzel.clone())
+    }
+    pub fn filetree_refresh(&mut self, h: i64) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_REFRESH")?;
+        dateibaum_neu(t); Ok(())
+    }
+    pub fn filetree_selected(&self, h: i64) -> Result<String, String> {
+        let (t, d) = self.ft_ref(h, "GUI_FILETREE_SELECTED")?;
+        if t.selected < 0 { return Ok(String::new()); }
+        Ok(d.pfade.get(t.selected as usize).map(|p| Self::ft_abs(d, p)).unwrap_or_default())
+    }
+    /// Ein Doppelklick auf eine Datei -- ein Bild lang, wie GUI_CLICKED.
+    pub fn filetree_activated(&self, h: i64) -> Result<String, String> {
+        let (_, d) = self.ft_ref(h, "GUI_FILETREE_ACTIVATED")?;
+        if d.aktiviert.is_empty() { return Ok(String::new()); }
+        Ok(Self::ft_abs(d, &d.aktiviert))
+    }
+    /// Leerer Weg = die Auswahl.
+    pub fn filetree_is_dir(&self, h: i64, pfad: &str) -> Result<bool, String> {
+        let (t, d) = self.ft_ref(h, "GUI_FILETREE_IS_DIR")?;
+        let k = if pfad.is_empty() { t.selected } else { d.knoten(&Self::ft_rel(d, pfad)) };
+        if k < 0 { return Ok(false); }
+        Ok(d.ordner.get(k as usize).copied().unwrap_or(false))
+    }
+    pub fn filetree_select(&mut self, h: i64, pfad: &str) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_SELECT")?;
+        let rel = Self::ft_rel(t.datei.as_ref().unwrap(), pfad);
+        if rel.is_empty() {
+            t.selected = -1; t.anker = -1;
+            for s in t.sel.iter_mut() { *s = false; }
+            return Ok(());
+        }
+        // Die Vorfahren aufklappen: auf einen Weg zeigen, der zugeklappt ist,
+        // hiesse sonst, eine Auswahl zu setzen, die niemand sieht.
+        let teile: Vec<&str> = rel.split('/').collect();
+        let mut bisher = String::new();
+        for t2 in teile.iter().take(teile.len().saturating_sub(1)) {
+            if !bisher.is_empty() { bisher.push('/'); }
+            bisher.push_str(t2);
+            Self::ft_offen_setzen(t, &bisher, true);
+        }
+        dateibaum_neu(t);
+        let k = t.datei.as_ref().unwrap().knoten(&rel);
+        t.selected = k; t.anker = k;
+        for s in t.sel.iter_mut() { *s = false; }
+        if k >= 0 { t.sync(); t.sel[k as usize] = true; }
+        Ok(())
+    }
+    pub fn filetree_expand(&mut self, h: i64, pfad: &str, an: bool) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_EXPAND")?;
+        let rel = Self::ft_rel(t.datei.as_ref().unwrap(), pfad);
+        Self::ft_offen_setzen(t, &rel, an);
+        dateibaum_neu(t); Ok(())
+    }
+    /// Sichtbare Knoten -- in der Reihenfolge, in der sie dastehen.
+    pub fn filetree_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ft_ref(h, "GUI_FILETREE_COUNT")?.1.pfade.len() as i64)
+    }
+    pub fn filetree_path(&self, h: i64, i: i64) -> Result<String, String> {
+        let (_, d) = self.ft_ref(h, "GUI_FILETREE_PATH")?;
+        Ok(d.pfade.get(i.max(-1) as usize).filter(|_| i >= 0).map(|p| Self::ft_abs(d, p)).unwrap_or_default())
+    }
+    pub fn filetree_sel_count(&self, h: i64) -> Result<i64, String> {
+        let (t, _) = self.ft_ref(h, "GUI_FILETREE_SEL_COUNT")?;
+        if !t.multi { return Ok(if t.selected >= 0 { 1 } else { 0 }); }
+        Ok(t.sel.iter().filter(|&&s| s).count() as i64)
+    }
+    pub fn filetree_sel_path(&self, h: i64, i: i64) -> Result<String, String> {
+        let (t, d) = self.ft_ref(h, "GUI_FILETREE_SEL_PATH")?;
+        let k = if !t.multi { if i == 0 { t.selected as i64 } else { -1 } }
+                else { t.sel.iter().enumerate().filter(|(_, &s)| s).map(|(k, _)| k as i64)
+                        .nth(i.max(0) as usize).unwrap_or(-1) };
+        if k < 0 { return Ok(String::new()); }
+        Ok(d.pfade.get(k as usize).map(|p| Self::ft_abs(d, p)).unwrap_or_default())
+    }
+    pub fn filetree_checked(&self, h: i64, pfad: &str) -> Result<bool, String> {
+        let (_, d) = self.ft_ref(h, "GUI_FILETREE_CHECKED")?;
+        let rel = Self::ft_rel(d, pfad);
+        Ok(d.gehakt.iter().any(|g| g == &rel))
+    }
+    pub fn filetree_set_checked(&mut self, h: i64, pfad: &str, an: bool) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_SET_CHECKED")?;
+        let rel = Self::ft_rel(t.datei.as_ref().unwrap(), pfad);
+        let d = t.datei.as_mut().unwrap();
+        let da = d.gehakt.iter().position(|g| g == &rel);
+        match (an, da) {
+            (true, None) => d.gehakt.push(rel),
+            (false, Some(i)) => { d.gehakt.remove(i); }
+            _ => {}
+        }
+        dateibaum_neu(t); Ok(())
+    }
+    /// Angehakt zaehlt AUCH, was gerade zugeklappt ist -- ein Haken ist eine
+    /// Entscheidung, und die verschwindet nicht, weil man einen Ast zumacht.
+    pub fn filetree_checked_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.ft_ref(h, "GUI_FILETREE_CHECKED_COUNT")?.1.gehakt.len() as i64)
+    }
+    pub fn filetree_checked_path(&self, h: i64, i: i64) -> Result<String, String> {
+        let (_, d) = self.ft_ref(h, "GUI_FILETREE_CHECKED_PATH")?;
+        Ok(d.gehakt.get(i.max(-1) as usize).filter(|_| i >= 0).map(|p| Self::ft_abs(d, p)).unwrap_or_default())
+    }
+    pub fn filetree_icons(&mut self, h: i64, ordner: i64, datei: i64) -> Result<(), String> {
+        let t = self.ft_mut(h, "GUI_FILETREE_ICONS")?;
+        let d = t.datei.as_mut().unwrap();
+        d.bild_ordner = ordner.max(-1); d.bild_datei = datei.max(-1);
+        dateibaum_neu(t); Ok(())
+    }
+
+    // --- Reiter im Fenster (GUI_TABCONTROL) ---------------------------------
+    /// Bis Stand 24 gab es Reiter nur AM FENSTER (GUI_TABS): ein Einstellungs-
+    /// kasten mit zwei Karteikarten in einer Ecke des Fensters liess sich
+    /// damit nicht bauen. Das Reiterwerk ist ein Widget wie jedes andere; die
+    /// Kinder bekommen ihre Seite zugewiesen und werden sonst genauso
+    /// angelegt und verortet wie ohne Reiter.
+    pub fn tabcontrol(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::TabControl, x, y, w, h);
+        wd.tabctl = Some(Box::new(TabCtlState::default()));
+        wd.sel = 0;
+        self.add_widget(win, "GUI_TABCONTROL", wd)
+    }
+    fn tc_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        Ok(w)
+    }
+    fn tc_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        Ok(w)
+    }
+    /// Eine Seite anhaengen -- liefert ihre Nummer.
+    pub fn tabcontrol_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_ADD")?;
+        w.items.push(titel);
+        if w.sel < 0 { w.sel = 0; }
+        Ok((w.items.len() - 1) as i64)
+    }
+    pub fn tabcontrol_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tc_ref(h, "GUI_TABCONTROL_COUNT")?.items.len() as i64)
+    }
+    pub fn tabcontrol_page(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tc_ref(h, "GUI_TABCONTROL_PAGE")?.sel as i64)
+    }
+    pub fn tabcontrol_set_page(&mut self, h: i64, seite: i64) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_SET_PAGE")?;
+        if seite < 0 || seite >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht", seite));
+        }
+        w.sel = seite as i32; Ok(())
+    }
+    pub fn tabcontrol_title(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.tc_ref(h, "GUI_TABCONTROL_TITLE")?;
+        Ok(w.items.get(i.max(-1) as usize).filter(|_| i >= 0).cloned().unwrap_or_default())
+    }
+    pub fn tabcontrol_set_title(&mut self, h: i64, i: i64, titel: String) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_SET_TITLE")?;
+        if i < 0 || i >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht", i));
+        }
+        w.items[i as usize] = titel; Ok(())
+    }
+    /// Ein Widget auf eine Seite legen. Es behaelt seine Lage im Fenster --
+    /// gezeigt wird es, solange seine Seite vorn ist.
+    pub fn tabcontrol_add_widget(&mut self, h: i64, kind: i64, seite: i64) -> Result<(), String> {
+        let (tw, ti) = Self::dec_widget(h);
+        let (kw, ki) = Self::dec_widget(kind);
+        self.tc_ref(h, "GUI_TABCONTROL_ADD_WIDGET")?;
+        self.wdg(kind, "GUI_TABCONTROL_ADD_WIDGET")?;
+        if tw != kw { return Err("GUI_TABCONTROL_ADD_WIDGET: Widget gehoert in ein anderes Fenster".into()); }
+        if ti == ki { return Err("GUI_TABCONTROL_ADD_WIDGET: das Reiterwerk kann nicht sein eigenes Kind sein".into()); }
+        let n = self.tc_ref(h, "GUI_TABCONTROL_ADD_WIDGET")?.items.len() as i64;
+        if seite < 0 || seite >= n {
+            return Err(format!("GUI_TABCONTROL_ADD_WIDGET: Seite {} gibt es nicht (erst GUI_TABCONTROL_ADD)", seite));
+        }
+        let w = self.tc_mut(h, "GUI_TABCONTROL_ADD_WIDGET")?;
+        let st = w.tabctl.get_or_insert_with(|| Box::new(TabCtlState::default()));
+        st.kinder.retain(|&(k, _)| k != ki);
+        st.kinder.push((ki, seite as i32));
+        Ok(())
+    }
+    /// Eine Seite entfernen. Die Kinder darauf gehoeren danach zu keiner Seite
+    /// mehr (sie sind wieder immer sichtbar) -- sie zu ZERSTOEREN waere eine
+    /// Entscheidung, die dem Programm gehoert.
+    pub fn tabcontrol_remove(&mut self, h: i64, i: i64) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_REMOVE")?;
+        if i < 0 || i >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_REMOVE: Seite {} gibt es nicht", i));
+        }
+        w.items.remove(i as usize);
+        if let Some(st) = w.tabctl.as_mut() {
+            st.kinder.retain(|&(_, s)| s != i as i32);
+            for (_, s) in st.kinder.iter_mut() { if *s > i as i32 { *s -= 1; } }
+        }
+        let n = w.items.len() as i32;
+        w.sel = w.sel.min(n - 1).max(if n > 0 { 0 } else { -1 });
+        Ok(())
+    }
+
+    /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
+    ///
+    /// EINE Quelle fuer Zeichnen und Treffertest. Die Breite wird an der
+    /// ZEICHENZAHL geschaetzt, nicht gemessen -- der Treffertest laeuft in
+    /// `handle_press`, und dort gibt es keine Grafik. Eine zweite, genauere
+    /// Rechnung beim Zeichnen waere der sicherste Weg, Klick und Beschriftung
+    /// auseinander laufen zu lassen.
+    fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+        let mut x = ax;
+        let mut out = Vec::new();
+        for (i, t) in wdg.items.iter().enumerate() {
+            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20);
+            out.push((i, x, x + b));
+            x += b + 2;
+        }
+        out
+    }
+    /// Je Bild: welches Kind auf welcher Seite liegt (wie panel_pass).
+    fn tabctl_pass(&mut self) {
+        for wi in 0..self.windows.len() {
+            let n = self.windows[wi].widgets.len();
+            for i in 0..n { self.windows[wi].widgets[i].tc_von = -1; self.windows[wi].widgets[i].tc_seite = -1; }
+            for p in 0..n {
+                let kinder = match self.windows[wi].widgets[p].tabctl.as_ref() {
+                    Some(st) => st.kinder.clone(),
+                    None => continue,
+                };
+                for (k, seite) in kinder {
+                    // Durch Behaelter hindurch, damit ein Layout auf einer
+                    // Seite seine Kinder mitnimmt -- dieselbe Sammlung wie
+                    // beim rollenden Panel.
+                    let mut menge = Vec::new();
+                    self.panel_sammeln(wi, k, &mut menge, 0);
+                    for &m in &menge {
+                        if m == p { continue; }
+                        let w = &mut self.windows[wi].widgets[m];
+                        w.tc_von = p as i32; w.tc_seite = seite;
+                    }
+                }
+            }
+        }
     }
 
     /// Sichtbare Knoten (id-Liste) in Anzeigereihenfolge: Vorfahren-expanded.
@@ -3449,9 +3977,38 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let has_children = t.nodes[ni].has_children;
         let toggle_x = ax + 4 + level * self.sk(TREE_INDENT);
         let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + self.sk(TREE_TOGGLE_W);
-        if on_toggle {
+        let kaestchen = t.kaestchen;
+        let (kx, ks) = self.tree_kast(ax, level);
+        // Ein Klick aufs Kaestchen kippt NUR den Haken -- die Auswahl bleibt,
+        // wie bei der Liste; sonst waehlte man beim Abhaken jedes Mal um.
+        let auf_kasten = kaestchen && !on_toggle && mx >= kx && mx < kx + ks;
+        let dbl = self.dbl_click;
+        if auf_kasten {
+            let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+            t.sync();
+            let v = !t.checks[ni];
+            t.checks[ni] = v;
+            Self::ft_haken_merken(t, ni, v);
+            let f = self.windows[wi].widgets[idx].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+            return;
+        }
+        let klick_klappt = t.datei.as_ref().map(|d| d.klick_klappt).unwrap_or(false);
+        if on_toggle || (has_children && (dbl || klick_klappt)) {
             let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
             let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
+            // Beim Dateibaum entscheidet der WEG, was offen ist -- die Nummern
+            // gelten nur bis zum naechsten Neuaufbau, und der kommt sofort.
+            // Die Auswahl wird VOR dem Neuaufbau gesetzt, damit sie ihn
+            // ueberlebt (sie wird dabei in einen Weg uebersetzt).
+            if t.datei.is_some() {
+                let weg = t.datei.as_ref().unwrap().pfade.get(ni).cloned();
+                if let Some(w) = weg {
+                    if klick_klappt && !on_toggle { t.selected = ni as i32; }
+                    Self::ft_offen_setzen(t, &w, !e);
+                    dateibaum_neu(t);
+                }
+            }
         } else {
             let (ctrl, shift) = self.tasten_mod;
             let changed = {
@@ -3481,11 +4038,45 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 ge
             };
+            // Doppelklick auf eine DATEI ist das Oeffnen -- ein Ereignis, kein
+            // Zustand: es steht ein Bild lang und wird dann zurueckgesetzt.
+            if dbl {
+                let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+                if let Some(d) = t.datei.as_mut() {
+                    if let Some(w) = d.pfade.get(ni).cloned() { d.aktiviert = w; }
+                }
+            }
             if changed {
                 let f = self.windows[wi].widgets[idx].on_change.clone();
                 if let Some(f) = f { self.pending.push(f); }
             }
         }
+    }
+
+    /// Dateibaeume mit eingestelltem Takt neu von der Platte lesen. Ohne das
+    /// zeigt ein Baum eine frisch angelegte Datei erst, wenn ihn jemand von
+    /// Hand auffrischt -- und darauf zu kommen ist niemandes Aufgabe.
+    fn dateibaeume_auffrischen(&mut self, jetzt: f64) {
+        for win in self.windows.iter_mut() {
+            if !win.alive || !win.visible { continue; }
+            for wdg in win.widgets.iter_mut() {
+                let Some(t) = wdg.tree.as_mut() else { continue };
+                let takt = match t.datei.as_ref() {
+                    Some(d) if d.auffrischen > 0.0 && jetzt >= d.naechste => d.auffrischen,
+                    _ => continue,
+                };
+                t.datei.as_mut().unwrap().naechste = jetzt + takt;
+                dateibaum_neu(t);
+            }
+        }
+    }
+
+    /// Lage und Groesse des Kaestchens in einer Baumzeile -- EINE Quelle fuer
+    /// Zeichnen und Treffertest; laufen sie auseinander, kippt der Haken neben
+    /// dem, was man anklickt.
+    fn tree_kast(&self, ax: i32, level: i32) -> (i32, i32) {
+        let x = ax + 4 + level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W) + 2;
+        (x, (self.sk(TREE_ROW_H) - 6).max(8))
     }
 
     fn table_geom(&self, wi: usize, idx: usize) -> TGeom {
@@ -4247,7 +4838,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree) {
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
@@ -5309,6 +5900,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 "selected": t.selected,
                 "multi": t.multi,
             });
+            if t.kaestchen { o["tree"]["kaestchen"] = serde_json::json!(true); }
+            // Ein Dateibaum speichert seine EINSTELLUNGEN, nicht seine Knoten:
+            // die stehen auf der Platte, und wer die Datei woanders oeffnet,
+            // haette sonst eine Liste von Namen, die es dort nicht gibt.
+            if let Some(d) = t.datei.as_ref() {
+                o["tree"]["nodes"] = serde_json::json!([]);
+                o["filetree"] = serde_json::json!({
+                    "wurzel": d.wurzel, "muster": d.muster, "ausnahmen": d.ausnahmen,
+                    "ordner_zuerst": d.ordner_zuerst, "verborgene": d.verborgene,
+                    "nur_ordner": d.nur_ordner, "offen": d.offen,
+                });
+            }
+        }
+        if let Some(st) = &w.tabctl {
+            o["tabctl"] = serde_json::json!({
+                "kinder": st.kinder.iter().map(|&(k, s)| serde_json::json!([k, s])).collect::<Vec<_>>(),
+                "seite": w.sel,
+            });
         }
         if w.tab_page != -1 { o["tab_page"] = serde_json::json!(w.tab_page); }
         o
@@ -5535,9 +6144,38 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
                 ts.multi = tj["multi"].as_bool().unwrap_or(false);
+                ts.kaestchen = tj["kaestchen"].as_bool().unwrap_or(false);
+            }
+            if let Some(fj) = wj.get("filetree") {
+                let liste = |k: &str| fj[k].as_array().map(|a| a.iter()
+                    .filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>()).unwrap_or_default();
+                ts.datei = Some(Box::new(DateiBaum {
+                    wurzel: fj["wurzel"].as_str().unwrap_or("").to_string(),
+                    muster: liste("muster"), ausnahmen: liste("ausnahmen"), offen: liste("offen"),
+                    ordner_zuerst: fj["ordner_zuerst"].as_bool().unwrap_or(true),
+                    verborgene: fj["verborgene"].as_bool().unwrap_or(false),
+                    nur_ordner: fj["nur_ordner"].as_bool().unwrap_or(false),
+                    bild_ordner: -1, bild_datei: -1,
+                    ..Default::default()
+                }));
+                ts.selected = -1;
+                dateibaum_neu(&mut ts);
             }
             ts.hover = -1; ts.anker = -1; ts.sync();
             w.tree = Some(Box::new(ts));
+        }
+        if kind == Kind::TabControl {
+            let mut st = TabCtlState::default();
+            if let Some(tj) = wj.get("tabctl") {
+                if let Some(ks) = tj["kinder"].as_array() {
+                    st.kinder = ks.iter().filter_map(|e| {
+                        let a = e.as_array()?;
+                        Some((a.first()?.as_i64()? as usize, a.get(1)?.as_i64()? as i32))
+                    }).collect();
+                }
+                w.sel = tj["seite"].as_i64().unwrap_or(0) as i32;
+            }
+            w.tabctl = Some(Box::new(st));
         }
         w.tab_page = wj["tab_page"].as_i64().unwrap_or(-1) as i32;
         w.anchor = wj["anchor"].as_str().map(Self::anchor_mask).unwrap_or(5);
@@ -5708,7 +6346,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     /// Ist das Widget aktuell sichtbar/bedienbar? (Tab-Seite beruecksichtigt)
     fn widget_shown(&self, win: usize, w: &Widget) -> bool {
-        w.alive && w.visible && (w.tab_page < 0 || w.tab_page == self.windows[win].active_tab)
+        if !(w.alive && w.visible) { return false; }
+        if w.tab_page >= 0 && w.tab_page != self.windows[win].active_tab { return false; }
+        // Reiter IM Fenster: nur die vordere Seite ist da -- fuer das
+        // Zeichnen wie fuer jeden Treffertest, die beide hier fragen.
+        if w.tc_von >= 0 {
+            match self.windows[win].widgets.get(w.tc_von as usize) {
+                Some(tc) => return tc.sel == w.tc_seite && tc.alive && tc.visible,
+                None => return true,
+            }
+        }
+        true
     }
     /// Layout der Reiter: (page_idx, x_links_abs, x_rechts_abs).
     fn tab_slots(&self, g: &Graphics, wi: usize) -> Vec<(usize, i32, i32)> {
@@ -6140,16 +6788,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
-                if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
+                if let Some(t) = wdg.tree.as_mut() {
+                    t.hover = -1;
+                    if let Some(d) = t.datei.as_mut() { d.aktiviert.clear(); }
+                }
             }
             for m in win.menus.iter_mut() {
                 for it in m.items.iter_mut() { it.clicked = false; }
             }
         }
         self.drop = None;
+        self.dateibaeume_auffrischen(g.get_time());
         self.umbruch_layout(g);
         self.layout_pass(g);
         self.panel_pass();
+        self.tabctl_pass();
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -8134,6 +8787,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if node < 0 { return; }
         if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
             if let Some(n) = t.nodes.get_mut(node as usize) { n.expanded = offen; }
+            // Dateibaum: der Weg entscheidet, nicht die Nummer (siehe DateiBaum).
+            if t.datei.is_some() {
+                let weg = t.datei.as_ref().unwrap().pfade.get(node as usize).cloned();
+                if let Some(w) = weg { Self::ft_offen_setzen(t, &w, offen); dateibaum_neu(t); }
+            }
         }
     }
 
@@ -8184,7 +8842,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// bei den Textfeldern, ein Formular liess sich also nicht abschicken, ohne
     /// zur Maus zu greifen.
     fn widget_keys(&mut self, wi: usize, i: usize, kind: Kind, g: &mut Graphics) {
-        let ausloesen = g.key_pressed(KEY_SPACE) || g.key_pressed(KEY_ENTER);
+        let (leertaste, enter) = (g.key_pressed(KEY_SPACE), g.key_pressed(KEY_ENTER));
+        let ausloesen = leertaste || enter;
         let (auf, ab) = (g.key_pressed(KEY_UP), g.key_pressed(KEY_DOWN));
         let (links, rechts) = (g.key_pressed(KEY_LEFT), g.key_pressed(KEY_RIGHT));
         match kind {
@@ -8322,6 +8981,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.dp_setze(wi, i, neu);
                 }
             }
+            Kind::TabControl => {
+                // Links/rechts blaettert -- wie in jedem Karteikasten.
+                let d = rechts as i32 - links as i32;
+                if d != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    let n = w.items.len() as i32;
+                    if n > 0 {
+                        let neu = (w.sel + d).clamp(0, n - 1);
+                        if neu != w.sel {
+                            w.sel = neu;
+                            let f = w.on_change.clone();
+                            if let Some(f) = f { self.pending.push(f); }
+                        }
+                    }
+                }
+            }
             Kind::Tree => {
                 let (vis, sel, hat_kinder, offen, eltern) = {
                     let t = match self.windows[wi].widgets[i].tree.as_ref() {
@@ -8352,8 +9027,26 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 } else if links {
                     if hat_kinder && offen { self.tree_setze_offen(wi, i, sel, false); }
                     else if eltern >= 0 { ziel = Some(eltern); }
+                } else if leertaste && sel >= 0
+                          && self.windows[wi].widgets[i].tree.as_ref().map(|t| t.kaestchen).unwrap_or(false) {
+                    // Mit Kaestchen gehoert die LEERTASTE dem Haken, Enter dem
+                    // Auf- und Zuklappen -- eine Taste fuer beides liesse den
+                    // Haken jedes Mal nebenbei kippen.
+                    if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+                        t.sync();
+                        let v = !t.checks[sel as usize];
+                        t.checks[sel as usize] = v;
+                        Self::ft_haken_merken(t, sel as usize, v);
+                    }
                 } else if ausloesen && hat_kinder {
                     self.tree_setze_offen(wi, i, sel, !offen);
+                } else if enter && sel >= 0 {
+                    // Enter auf einer Datei ist das Oeffnen (GUI_FILETREE_ACTIVATED$).
+                    if let Some(t) = self.windows[wi].widgets[i].tree.as_mut() {
+                        if let Some(d) = t.datei.as_mut() {
+                            if let Some(w) = d.pfade.get(sel as usize).cloned() { d.aktiviert = w; }
+                        }
+                    }
                 }
                 if let Some(z) = ziel { self.tree_setze_auswahl(wi, i, z); }
             }
@@ -8568,6 +9261,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
             Kind::Table => self.table_press(win, i, mx, my),
             Kind::Tree => self.tree_press(win, i, mx, my),
+            Kind::TabControl => {
+                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
+                let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
+                    .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, _)| k as i32);
+                if let Some(k) = treffer {
+                    let w = &mut self.windows[win].widgets[i];
+                    if w.sel != k {
+                        w.sel = k;
+                        let f = w.on_change.clone();
+                        if let Some(f) = f { self.pending.push(f); }
+                    }
+                }
+            }
             Kind::Radio => {
                 let was = self.windows[win].widgets[i].checked;
                 self.select_radio(win, i);
@@ -9997,6 +10704,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         o.set_label(kn.label.clone());
                         o.set_level(kn.level as usize + 1);
                         o.set_selected(t.selected == k as i32);
+                        if t.kaestchen {
+                            o.set_toggled(if t.checks.get(k).copied().unwrap_or(false) { Toggled::True } else { Toggled::False });
+                        }
                         if kn.has_children {
                             o.set_expanded(kn.expanded);
                             o.add_action(if kn.expanded { Action::Collapse } else { Action::Expand });
@@ -10018,6 +10728,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::DatePicker => {
                 let mut n = Node::new(Role::DateInput);
                 n.set_value(format!("{:04}-{:02}-{:02}", w.datum[0], w.datum[1], w.datum[2]));
+                n
+            }
+            Kind::TabControl => {
+                let n = Node::new(Role::TabList);
+                let kopf = self.sk(TC_KOPF_H);
+                for (k, x0, x1) in self.tc_koepfe(x, w) {
+                    let mut t = Node::new(Role::Tab);
+                    t.set_label(w.items[k].clone());
+                    t.set_selected(w.sel == k as i32);
+                    t.set_bounds(Self::a11y_rect(x0, y, x1 - x0, kopf));
+                    t.add_action(Action::Click);
+                    let id2 = NodeId(ids::teil(wi, i, k));
+                    nodes.push((id2, t));
+                    kinder.push(id2);
+                }
                 n
             }
             Kind::GroupBox | Kind::Panel => { let mut n = Node::new(Role::Group); if !w.text.is_empty() { n.set_label(w.text.clone()); } n }
@@ -11122,6 +11847,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
                 }
             }
+            Kind::TabControl => {
+                // Koepfe oben, darunter die Flaeche -- die Kinder zeichnet die
+                // Schleife danach ganz normal, sie liegen nur auf einer Seite.
+                let kopf = self.sk(TC_KOPF_H);
+                self.fbox_w(g, wdg.kind, ax, ay + kopf, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
+                let acc = self.acc_col(wdg);
+                g.push_clip(ax, ay, w, kopf);
+                for (i, x0, x1) in self.tc_koepfe(ax, wdg) {
+                    let aktiv = i as i32 == wdg.sel;
+                    let bg = if aktiv { self.wcol(wdg, "bg", "widget_bg") } else { shade(self.th("win_bg"), -10) };
+                    g.box_fill(x0, ay + 2, x1 - 1, ay + kopf - 1, bg);
+                    g.rect(x0, ay + 2, x1 - 1, ay + kopf - 1, self.wcol(wdg, "border", "widget_border"));
+                    if aktiv { g.box_fill(x0, ay + kopf - 3, x1 - 1, ay + kopf - 1, acc); }
+                    let fg = if aktiv { self.txt_col(wdg) } else { self.th("muted_fg") };
+                    let th = self.wsize(g, wdg);
+                    self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
+                               wdg.items[i].clone(), fg);
+                }
+                g.pop_clip();
+            }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
@@ -11366,6 +12112,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             let mut lx = tx + self.sk(TREE_TOGGLE_W) + 2;
+            if t.kaestchen {
+                // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken.
+                let (bx, cs) = self.tree_kast(ax, node.level);
+                let by = ry + (self.sk(TREE_ROW_H) - cs) / 2;
+                g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
+                if t.checks.get(ni).copied().unwrap_or(false) {
+                    g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
+                }
+                lx = bx + cs + 3;
+            }
             if hat_icon {
                 // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine
                 // eines hat -- sonst staenden die Namen versetzt.

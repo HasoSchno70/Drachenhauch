@@ -581,10 +581,14 @@ FOR kai = 0 TO KACHEL_MAX - 1
 NEXT
 
 ' Bereiche -- die Masse setzt `layout` bei jeder Groessenaenderung.
-DIM baum AS GUI_WIDGET : baum = GUI_TREE(win, 0, 0, 10, 10)
+' Der Projektbaum ist seit Stand 24 ein DATEIbaum der Laufzeit: er liest
+' seinen Ordner selbst, und zwar nur die Aeste, die offen sind. Vorher stand
+' hier eine Buchfuehrung aus Dateiliste und Knoten-Nummern, die bei jedem
+' Aufbau auseinanderlaufen konnte.
+DIM baum AS GUI_WIDGET : baum = GUI_FILETREE(win, 0, 0, 10, 10, ".")
 ' Strg+Klick sammelt, Umschalt+Klick spannt -- damit sich mehrere Dateien
 ' auf einmal oeffnen lassen (Datei -> Gewaehlte Dateien oeffnen).
-GUI_TREE_SET(baum, "mehrfachauswahl", 1)
+GUI_FILETREE_SET(baum, "mehrfachauswahl", 1)
 DIM lblProjekt AS GUI_WIDGET : lblProjekt = GUI_LABEL(win, "Projekt", 0, 0)
 DIM lblGliederung AS GUI_WIDGET : lblGliederung = GUI_LABEL(win, "Gliederung", 0, 0)
 DIM lstGliederung AS GUI_WIDGET : lstGliederung = GUI_LISTBOX(win, 0, 0, 10, 10, [])
@@ -1830,10 +1834,7 @@ SUB tabSchliessen(i AS INTEGER)
 END SUB
 
 ' --- Projektbaum -------------------------------------------------------
-DIM baumLetzteWahl AS INTEGER : baumLetzteWahl = -1
-DIM baumDateien AS ARRAY OF STRING
-DIM baumKnoten AS ARRAY OF INTEGER
-DIM baumSchluessel AS STRING : baumSchluessel = "-"
+DIM baumLetzteWahl AS STRING : baumLetzteWahl = ""
 
 ' Alle Dateien des Projekts mit diesem Muster -- AUCH in Unterordnern.
 '
@@ -1869,9 +1870,21 @@ END FUNCTION
 ' Was im Projektbaum steht. Quelltext zuerst, dann was dazugehoert --
 ' Formulare und Sprites bearbeitet man mit den Werkzeugen, Daten liest man
 ' nach, und ein Bild will man wenigstens ansehen koennen.
-DIM baumMuster AS ARRAY OF STRING
-baumMuster = ["*.dh", "*.dhform", "*.dhsprite", "*.dhanim", "*.dhtest", _
-              "*.json", "*.md", "*.txt", "*.csv", "*.ini", "*.png", "*.wav", "*.ogg"]
+CONST BAUM_MUSTER = "*.dh;*.dhform;*.dhsprite;*.dhanim;*.dhtest;*.json;*.md;*.txt;*.csv;*.ini;*.png;*.wav;*.ogg"
+' Uebergangen wird, wo Erzeugtes liegt: ein Bau-Ordner kann zehntausend
+' Dateien haben. Namen, die mit `.` anfangen, laesst der Baum von sich aus
+' weg (Einstellung `verborgene`).
+CONST BAUM_AUSNAHMEN = "target;__pycache__;_*"
+GUI_FILETREE_FILTER(baum, BAUM_MUSTER)
+GUI_FILETREE_SKIP(baum, BAUM_AUSNAHMEN)
+' Alle zwei Sekunden nachsehen: eine Datei, die ein anderes Programm
+' anlegt (oder der Export), steht damit von selbst im Baum. Bis Stand 23
+' sah man sie erst nach dem naechsten Oeffnen.
+GUI_FILETREE_SET(baum, "auffrischen", 2000)
+' Ein Klick auf einen Ordner klappt ihn um -- das schmale Dreieck allein zu
+' treffen ist eine Zumutung, und ein Klick, der scheinbar nichts tut, sieht
+' nach einem Fehler aus.
+GUI_FILETREE_SET(baum, "klick_klappt", 1)
 
 ' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
 ' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
@@ -1883,78 +1896,33 @@ FUNCTION istText(pfad AS STRING) AS BOOLEAN
 END FUNCTION
 
 SUB baumFuellen()
-    ' Nicht nur .dh: neben dem Quelltext liegen Formulare, Sprites, Karten
-    ' und Daten, und wer sie nicht sieht, sucht sie im Dateimanager.
-    DIM neue AS ARRAY OF STRING : neue = []
-    DIM muster AS STRING
-    FOR EACH muster IN baumMuster
-        DIM gefunden AS STRING
-        FOR EACH gefunden IN projektDateien(muster)
-            ARRAY_PUSH(neue, gefunden)
-        NEXT
-    NEXT
-    SORT(neue)
-    DIM schl AS STRING : schl = projektOrdner + "|" + JOIN$(neue, ";")
-    ' Steht dieselbe Liste schon da, bleibt der Baum, WIE er ist -- ein
-    ' Neuaufbau raeumt die Auswahl weg, und genau die sammelt man gerade
-    ' ein, wenn man mit Strg mehrere Dateien anklickt. (Vorher baute jedes
-    ' Oeffnen den Baum neu auf, und die Mehrfachauswahl kam nie ueber eine
-    ' Datei hinaus.)
-    IF schl = baumSchluessel THEN RETURN
-    baumSchluessel = schl
-    GUI_TREE_CLEAR(baum)
-    baumLetzteWahl = -1
+    ' Der Baum holt sich die Namen selbst -- hier steht nur noch, WO er
+    ' suchen soll. Ein Wurzelwechsel raeumt Auswahl und offene Aeste weg,
+    ' ein Auffrischen laesst beide stehen: sonst verloere man beim Oeffnen
+    ' einer Datei gerade die Mehrfachauswahl, die man einsammelt.
+    IF wegGleich$(GUI_FILETREE_ROOT$(baum)) <> wegGleich$(projektOrdner) THEN
+        GUI_FILETREE_SET_ROOT(baum, projektOrdner)
+        baumLetzteWahl = ""
+    ELSE
+        GUI_FILETREE_REFRESH(baum)
+    END IF
     GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
-    baumDateien = neue
-    DIM n AS INTEGER : n = LEN(baumDateien)
-    DIM knoten[MAX(n, 1)] AS INTEGER
-    ' Unterordner als AESTE, nicht als Praefix im Namen: seit die Umbauten
-    ' sie sehen, gehoeren sie auch in den Baum. Die Ordner-Knoten werden
-    ' unterwegs angelegt und gemerkt, damit `lib/a.dh` und `lib/b.dh` unter
-    ' DEMSELBEN `lib` landen.
-    DIM ordPfad AS ARRAY OF STRING : ordPfad = []
-    DIM ordKnoten AS ARRAY OF INTEGER : ordKnoten = []
-    DIM i AS INTEGER
-    FOR i = 0 TO n - 1
-        DIM teile AS ARRAY OF STRING : teile = SPLIT$(baumDateien[i], "/")
-        DIM eltern AS INTEGER : eltern = -1
-        DIM bisher AS STRING : bisher = ""
-        DIM t AS INTEGER
-        FOR t = 0 TO LEN(teile) - 2
-            bisher = bisher + teile[t] + "/"
-            DIM k AS INTEGER : k = ARRAY_INDEXOF(ordPfad, bisher)
-            IF k < 0 THEN
-                eltern = GUI_TREE_ADD(baum, eltern, teile[t])
-                ' Aufgeklappt: ein Projektbaum, der seine Ordner zuhaelt,
-                ' zeigt beim Oeffnen weniger als vorher.
-                GUI_TREE_EXPAND(baum, eltern, TRUE)
-                ARRAY_PUSH(ordPfad, bisher) : ARRAY_PUSH(ordKnoten, eltern)
-            ELSE
-                eltern = ordKnoten[k]
-            END IF
-        NEXT
-        knoten[i] = GUI_TREE_ADD(baum, eltern, teile[LEN(teile) - 1])
-    NEXT
-    baumKnoten = knoten
 END SUB
 
 ' Alle gewaehlten Dateien oeffnen (Strg+Umschalt+E).
 SUB baumAuswahlOeffnen()
-    DIM n AS INTEGER : n = GUI_TREE_SEL_COUNT(baum)
+    DIM n AS INTEGER : n = GUI_FILETREE_SEL_COUNT(baum)
     IF n < 1 THEN
         GUI_SET_TEXT(lblStatus, "Keine Datei gewaehlt -- Strg+Klick sammelt, Umschalt+Klick spannt.")
         RETURN
     END IF
-    ' Erst alle Wege einsammeln, dann oeffnen: dateiOeffnen baut den Baum
-    ' neu auf, und mitten in der Schleife waeren Knoten und Auswahl weg.
+    ' Erst alle Wege einsammeln, dann oeffnen: dateiOeffnen frischt den Baum
+    ' auf, und ein Ordner darin ist keine Datei.
     DIM pfade AS ARRAY OF STRING : pfade = []
     DIM k AS INTEGER
     FOR k = 0 TO n - 1
-        DIM knoten AS INTEGER : knoten = GUI_TREE_SEL_NODE(baum, k)
-        DIM i AS INTEGER
-        FOR i = 0 TO LEN(baumDateien) - 1
-            IF baumKnoten[i] = knoten THEN ARRAY_PUSH(pfade, PATHJOIN(projektOrdner, baumDateien[i]))
-        NEXT
+        DIM p0 AS STRING : p0 = GUI_FILETREE_SEL_PATH$(baum, k)
+        IF p0 <> "" AND NOT GUI_FILETREE_IS_DIR(baum, p0) THEN ARRAY_PUSH(pfade, p0)
     NEXT
     DIM p AS STRING
     FOR EACH p IN pfade
@@ -1965,18 +1933,18 @@ SUB baumAuswahlOeffnen()
 END SUB
 
 SUB baumAbfragen()
-    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baum)
-    IF sel < 0 OR sel = baumLetzteWahl THEN RETURN
-    baumLetzteWahl = sel
+    DIM weg AS STRING : weg = GUI_FILETREE_SELECTED$(baum)
+    IF weg = "" OR weg = baumLetzteWahl THEN RETURN
+    baumLetzteWahl = weg
+    ' Ein Ordner ist kein Reiter -- ein Klick darauf klappt ihn auf, mehr
+    ' soll er nicht tun.
+    IF GUI_FILETREE_IS_DIR(baum) THEN RETURN
     ' Beim SAMMELN wird nicht geoeffnet -- sonst kaeme mit jedem Strg+Klick
     ' ein Reiter dazu, den niemand wollte. Geoeffnet wird nur, wenn genau
     ' eine Zeile gewaehlt ist und es die angeklickte ist (beim Abwaehlen
     ' zeigt die angeklickte woanders hin als die eine uebriggebliebene).
-    IF GUI_TREE_SEL_COUNT(baum) <> 1 OR GUI_TREE_SEL_NODE(baum, 0) <> sel THEN RETURN
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(baumDateien) - 1
-        IF baumKnoten[i] = sel THEN dateiOeffnen(PATHJOIN(projektOrdner, baumDateien[i]))
-    NEXT
+    IF GUI_FILETREE_SEL_COUNT(baum) <> 1 OR GUI_FILETREE_SEL_PATH$(baum, 0) <> weg THEN RETURN
+    dateiOeffnen(weg)
 END SUB
 
 ' --- Einfaerben (nur der sichtbare Ausschnitt) ------------------------
@@ -5082,12 +5050,8 @@ SUB dateienVergleichen()
     ' Steht im Projektbaum eine ANDERE Datei gewaehlt, ist sie gemeint --
     ' sonst fragt der Datei-Dialog. Ein Dialog, den man jedes Mal bekommt,
     ' auch wenn die Antwort schon dasteht, ist einer zu viel.
-    DIM anderer AS STRING : anderer = ""
-    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baum)
-    DIM bi AS INTEGER
-    FOR bi = 0 TO LEN(baumDateien) - 1
-        IF baumKnoten[bi] = sel THEN anderer = PATHJOIN(projektOrdner, baumDateien[bi])
-    NEXT
+    DIM anderer AS STRING : anderer = GUI_FILETREE_SELECTED$(baum)
+    IF anderer <> "" AND GUI_FILETREE_IS_DIR(baum) THEN anderer = ""
     IF anderer <> "" AND wegGleich$(anderer) = wegGleich$(tabPfade[aktiverTab]) THEN anderer = ""
     IF anderer = "" THEN anderer = FILE_OPEN_DIALOG("Womit vergleichen?", "dh")
     IF anderer = "" THEN RETURN

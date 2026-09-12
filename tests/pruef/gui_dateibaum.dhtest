@@ -1,0 +1,368 @@
+' Der Dateibaum (GUI_FILETREE) -- ein Baum, der seine Knoten selbst von der
+' Platte holt. Geprueft wird, was nach aussen sichtbar ist: welche Wege er
+' zeigt, was die Einstellungen daran aendern, dass Auswahl und Haken am WEG
+' haengen und nicht an der Knotennummer, und dass ein Klick waehlt, ein
+' Doppelklick oeffnet. Format: docs/werkzeuge.md, dhrt test.
+
+=== der baum liest den ordner selbst
+' Ordner zuerst, dann die Dateien -- und was in `lib` liegt, wird gar nicht
+' erst gelesen, solange der Ast zu ist.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM i AS INTEGER
+PRINT GUI_FILETREE_COUNT(ft)
+FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+    PRINT BASENAME(GUI_FILETREE_PATH$(ft, i))
+NEXT
+--- datei projekt/b.dh
+PRINT 1
+--- datei projekt/a.dh
+PRINT 2
+--- datei projekt/lib/c.dh
+PRINT 3
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+lib
+a.dh
+b.dh
+
+=== aufklappen holt die kinder nach
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_FILETREE_EXPAND(ft, "lib", TRUE)
+DIM i AS INTEGER
+PRINT GUI_FILETREE_COUNT(ft)
+FOR i = 0 TO GUI_FILETREE_COUNT(ft) - 1
+    PRINT BASENAME(GUI_FILETREE_PATH$(ft, i))
+NEXT
+GUI_FILETREE_EXPAND(ft, "lib", FALSE)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/lib/c.dh
+PRINT 2
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+lib
+c.dh
+a.dh
+2
+
+=== der filter entscheidet, was zu sehen ist
+' Ordner bleiben immer stehen -- was darin liegt, weiss man erst, wenn man
+' hineinsieht.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_FILTER(ft, "*.dh")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_FILTER(ft, "*.dh;*.json")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SET(ft, "nur_ordner", 1)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/daten.json
+{}
+--- datei projekt/liesmich.md
+Text
+--- verzeichnis projekt/lib
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+4
+2
+3
+1
+
+=== uebergangen wird, was man nicht sehen will
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SKIP(ft, "target;_*")
+PRINT GUI_FILETREE_COUNT(ft)
+GUI_FILETREE_SET(ft, "verborgene", 1)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/target/gebaut.dh
+PRINT 2
+--- datei projekt/_alt/x.dh
+PRINT 3
+--- datei projekt/.git/kopf
+ref
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+3
+1
+2
+
+=== auswahl und haken haengen am weg, nicht an der nummer
+' Ein aufgeklappter Ordner DAVOR schiebt jede Nummer dahinter -- an der
+' Auswahl darf das nichts aendern.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_TREE_SET(ft, "kaestchen", 1)
+GUI_FILETREE_SELECT(ft, "bbb/zwei.dh")
+GUI_FILETREE_SET_CHECKED(ft, "bbb/zwei.dh", TRUE)
+PRINT BASENAME(GUI_FILETREE_SELECTED$(ft)) ; " " ; GUI_FILETREE_IS_DIR(ft)
+GUI_FILETREE_EXPAND(ft, "aaa", TRUE)
+PRINT BASENAME(GUI_FILETREE_SELECTED$(ft)) ; " " ; GUI_FILETREE_CHECKED(ft, "bbb/zwei.dh")
+' Zugeklappt faellt die Auswahl weg (wie in jedem Dateimanager) -- der HAKEN
+' bleibt, er war eine Entscheidung.
+GUI_FILETREE_EXPAND(ft, "bbb", FALSE)
+PRINT "[" ; GUI_FILETREE_SELECTED$(ft) ; "]" ; " " ; GUI_FILETREE_CHECKED_COUNT(ft)
+PRINT BASENAME(GUI_FILETREE_CHECKED_PATH$(ft, 0))
+--- datei projekt/aaa/eins.dh
+PRINT 1
+--- datei projekt/bbb/zwei.dh
+PRINT 2
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+zwei.dh FALSE
+zwei.dh TRUE
+[] 1
+zwei.dh
+
+=== ein ordner meldet sich als ordner
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+PRINT GUI_FILETREE_IS_DIR(ft, "lib") ; " " ; GUI_FILETREE_IS_DIR(ft, "a.dh")
+GUI_FILETREE_SELECT(ft, "lib")
+PRINT GUI_FILETREE_IS_DIR(ft) ; " " ; BASENAME(GUI_FILETREE_ROOT$(ft))
+--- datei projekt/a.dh
+PRINT 1
+--- verzeichnis projekt/lib
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+TRUE FALSE
+TRUE projekt
+
+=== eine neue wurzel ist ein neuer baum
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "eins")
+PRINT GUI_FILETREE_COUNT(ft) ; " " ; BASENAME(GUI_FILETREE_PATH$(ft, 0))
+GUI_FILETREE_SET_ROOT(ft, "zwei")
+PRINT GUI_FILETREE_COUNT(ft) ; " " ; BASENAME(GUI_FILETREE_PATH$(ft, 0))
+--- datei eins/a.dh
+PRINT 1
+--- datei zwei/b.dh
+PRINT 2
+--- datei zwei/c.dh
+PRINT 3
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 a.dh
+2 b.dh
+
+=== auffrischen zeigt eine neue datei von selbst
+' Ohne Takt bleibt der Baum stehen -- das ist die Gegenprobe unten.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+GUI_FILETREE_SET(ft, "auffrischen", 10)
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    IF f = 3 THEN WRITEALL("projekt/neu.dh", "PRINT 9")
+    GUI_UPDATE()
+    IF f = 2 OR f = 12 THEN PRINT GUI_FILETREE_COUNT(ft)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei projekt/a.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+1
+2
+
+=== ohne takt bleibt der baum stehen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM f AS INTEGER
+FOR f = 1 TO 12
+    IF f = 3 THEN WRITEALL("projekt/neu.dh", "PRINT 9")
+    GUI_UPDATE()
+    IF f = 12 THEN PRINT GUI_FILETREE_COUNT(ft)
+    GUI_DRAW()
+    FLIP()
+NEXT
+GUI_FILETREE_REFRESH(ft)
+PRINT GUI_FILETREE_COUNT(ft)
+--- datei projekt/a.dh
+PRINT 1
+--- umgebung
+DHRT_FRAMES=14
+--- erwartet
+1
+2
+
+=== ein klick waehlt, ein doppelklick oeffnet
+' Die Lagen wie im Baum-Test: eine Zeile ist 22 Punkte hoch, die erste
+' beginnt bei y = 54. Zeile 0 ist `a.dh`, Zeile 1 `b.dh`.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(w, 20, 20, 200, 200, "projekt")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_FILETREE_ACTIVATED$(ft) <> "" THEN PRINT "auf: " + BASENAME(GUI_FILETREE_ACTIVATED$(ft))
+    IF f = 7 THEN PRINT "gewaehlt: " + BASENAME(GUI_FILETREE_SELECTED$(ft))
+    IF f = 20 THEN PRINT "zuletzt: " + BASENAME(GUI_FILETREE_SELECTED$(ft))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei projekt/a.dh
+PRINT 1
+--- datei projekt/b.dh
+PRINT 2
+--- datei ev.txt
+# Klick auf Zeile 0, dann Doppelklick auf Zeile 1
+c 16
+e 3 7 131 64 0 0
+e 4 7 131 64 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 10 7 131 86 0 0
+e 11 7 131 86 0 0
+e 11 6 0 0 0 0
+e 12 5 0 0 0 0
+e 13 6 0 0 0 0
+e 14 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+gewaehlt: a.dh
+auf: b.dh
+zuletzt: b.dh
+
+=== ein klick aufs kaestchen kippt nur den haken
+' Gegenprobe im Fall selbst: die Auswahl steht danach immer noch auf der
+' Zeile davor -- sonst waehlte man beim Abhaken jedes Mal um.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET(tr, "kaestchen", 1)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 8 OR f = 19 THEN PRINT STR$(GUI_TREE_SELECTED(tr)) + " " + STR$(GUI_TREE_CHECKED(tr, 0)) + " " + STR$(GUI_TREE_CHECKED(tr, 1))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick auf Zeile 0 (Text), dann aufs Kaestchen von Zeile 1
+c 16
+e 3 7 160 64 0 0
+e 4 7 160 64 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+e 14 7 60 86 0 0
+e 15 7 60 86 0 0
+e 15 6 0 0 0 0
+e 16 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+0 FALSE FALSE
+0 FALSE TRUE
+
+=== haken setzen und abfragen ueber die befehle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+GUI_TREE_ADD(tr, -1, "eins")
+GUI_TREE_ADD(tr, -1, "zwei")
+GUI_TREE_SET(tr, "kaestchen", 1)
+PRINT GUI_TREE_CHECKED(tr, 0)
+GUI_TREE_SET_CHECKED(tr, 0, TRUE)
+PRINT GUI_TREE_CHECKED(tr, 0) ; " " ; GUI_TREE_CHECKED(tr, 1)
+GUI_TREE_SET_CHECKED(tr, 0, FALSE)
+PRINT GUI_TREE_CHECKED(tr, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+FALSE
+TRUE FALSE
+FALSE
+
+=== ein baum ohne datei ist kein dateibaum
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tr AS GUI_WIDGET : tr = GUI_TREE(w, 20, 20, 200, 120)
+TRY
+    PRINT GUI_FILETREE_COUNT(tr)
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_FILETREE_SET(tr, "quatsch", 1)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+ist kein Dateibaum

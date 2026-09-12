@@ -115,6 +115,12 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("splitter",  "Trenner",      160,  6, _ZEIGEN),
     PaletteSpec("colorpicker", "Farbwaehler", 200, 150, ("on_change",) + _ZEIGEN + _FOKUS),
     PaletteSpec("datepicker", "Datumswaehler", 200, 180, ("on_change",) + _ZEIGEN + _FOKUS),
+    # Reiter IM Fenster: die Beschriftungen stehen in `items` wie bei der
+    # Liste. WELCHES Control auf welche Seite gehoert, stellt der Designer
+    # nicht ein (siehe docs/form-designer.md) -- ein Programm, das es setzt,
+    # verliert es beim Oeffnen und Speichern aber nicht: `tabctl` laeuft als
+    # unbekanntes Feld durch.
+    PaletteSpec("tabcontrol", "Reiter", 240, 160, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
 ]
 
 # Arten, deren Konstruktor die Groesse SELBST bestimmt -- danach muss
@@ -1451,6 +1457,10 @@ class FormDoc:
             # gewollt und darf nicht durch ein eingefrorenes Datum ersetzt werden.
             if isinstance(d, str) and d:
                 out.append(f"GUI_SET_DATE({var}, {_gb_str(d)})")
+        elif k == "tabcontrol":
+            out.append(f"{var} = GUI_TABCONTROL(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            for it in c.items:
+                out.append(f"GUI_TABCONTROL_ADD({var}, {_gb_str(it)})")
         elif k in ("dropdown", "listbox"):
             iv = var + "_items"
             out.append(f"DIM {iv}[{len(c.items)}] AS STRING")   # 1D ARRAY OF STRING

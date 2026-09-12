@@ -86,12 +86,37 @@ IMPORT "gui"
 | `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
 | `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
 | `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
-| `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum; bisher nur `mehrfachauswahl` |
+| `GUI_TREE_SET(tree, key$, wert)` | — | Einstellung am Baum: `mehrfachauswahl`, `kaestchen` |
 | `GUI_TREE_SEL_COUNT(tree)` | INTEGER | wie viele Knoten ausgewählt sind |
 | `GUI_TREE_SEL_NODE(tree, i)` | INTEGER | die i-te ausgewählte Knoten-id (-1 = keine mehr) |
 | `GUI_TREE_IS_SELECTED(tree, node)` | BOOLEAN | ist dieser Knoten ausgewählt? |
 | `GUI_TREE_SELECT(tree, node, an)` | — | einen Knoten dazunehmen oder herausnehmen |
 | `GUI_TREE_CLEAR_SELECTION(tree)` | — | Auswahl leeren |
+| `GUI_TREE_CHECKED(tree, node)` | BOOLEAN | ist der Haken an diesem Knoten gesetzt (nur mit `kaestchen`)? |
+| `GUI_TREE_SET_CHECKED(tree, node, an)` | — | Haken setzen oder wegnehmen |
+| `GUI_FILETREE(win, x, y, w, h, wurzel$ = ".")` | GUI_WIDGET | Dateibaum: holt seine Knoten selbst von der Platte, jeden Ordner erst beim Aufklappen |
+| `GUI_FILETREE_SET(ft, key$, wert)` | — | `ordner_zuerst`, `verborgene`, `nur_ordner`, `mehrfachauswahl`, `kaestchen`, `klick_klappt`, `auffrischen` (Millisekunden, 0 = nie) |
+| `GUI_FILETREE_FILTER(ft, muster$)` | — | welche Dateien er zeigt (`*.dh;*.md`, leer = alle) |
+| `GUI_FILETREE_SKIP(ft, namen$)` | — | Namen oder Muster, die er überspringt — Ordner wie Dateien (`target;__pycache__;_*`) |
+| `GUI_FILETREE_SET_ROOT(ft, pfad$)` / `GUI_FILETREE_ROOT$(ft)` | — / STRING | Wurzelordner setzen und lesen |
+| `GUI_FILETREE_REFRESH(ft)` | — | jetzt neu von der Platte lesen |
+| `GUI_FILETREE_SELECTED$(ft)` | STRING | voller Weg der Auswahl (leer = keine) |
+| `GUI_FILETREE_SELECT(ft, pfad$)` | — | einen Weg auswählen; die Ordner darüber klappen dafür auf |
+| `GUI_FILETREE_ACTIVATED$(ft)` | STRING | was in diesem Bild per Doppelklick oder Enter geöffnet wurde (leer = nichts) |
+| `GUI_FILETREE_IS_DIR(ft, pfad$ = "")` | BOOLEAN | ist das ein Ordner? Ohne Weg gilt die Auswahl |
+| `GUI_FILETREE_EXPAND(ft, pfad$, an)` | — | einen Ordner auf- oder zuklappen |
+| `GUI_FILETREE_COUNT(ft)` / `GUI_FILETREE_PATH$(ft, i)` | INTEGER / STRING | die sichtbaren Zeilen zählen und lesen |
+| `GUI_FILETREE_SEL_COUNT(ft)` / `GUI_FILETREE_SEL_PATH$(ft, i)` | INTEGER / STRING | die Mehrfachauswahl zählen und lesen |
+| `GUI_FILETREE_CHECKED(ft, pfad$)` / `GUI_FILETREE_SET_CHECKED(ft, pfad$, an)` | BOOLEAN / — | Haken an einem Weg lesen und setzen |
+| `GUI_FILETREE_CHECKED_COUNT(ft)` / `GUI_FILETREE_CHECKED_PATH$(ft, i)` | INTEGER / STRING | alle angehakten Wege, auch die gerade zugeklappten |
+| `GUI_FILETREE_ICONS(ft, ordnerbild, dateibild)` | — | Sinnbilder für Ordner und Dateien (-1 = keins) |
+| `GUI_TABCONTROL(win, x, y, w, h)` | GUI_WIDGET | Reiter **innerhalb** eines Fensters (Karteikasten) |
+| `GUI_TABCONTROL_ADD(tc, titel$)` | INTEGER | eine Seite anhängen, liefert ihre Nummer |
+| `GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)` | — | ein Widget auf eine Seite legen; es behält seine Lage im Fenster |
+| `GUI_TABCONTROL_PAGE(tc)` / `GUI_TABCONTROL_SET_PAGE(tc, seite)` | INTEGER / — | vordere Seite lesen und setzen |
+| `GUI_TABCONTROL_COUNT(tc)` | INTEGER | wie viele Seiten es gibt |
+| `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
+| `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
@@ -1117,6 +1142,102 @@ Ein Klick auf das Dreieck links klappt einen Knoten auf/zu (oder per
 liefert die id des gewählten Knotens (`-1` = keiner), `GUI_TREE_LABEL` dessen
 Text. `GUI_ON_CHANGE(tree, …)` feuert bei Auswahländerung. Das Mausrad scrollt
 lange Bäume. Beispiel: [examples/137_gui_tree.dh](../examples/137_gui_tree.dh).
+
+## Der Dateibaum
+
+Einen Ordner zu zeigen war bis Stand 24 Handarbeit: alle Dateien holen,
+sortieren, die Ordner-Knoten daraus bauen, und dann eine Buchführung
+mitschleppen, die Knoten-Nummern gegen Dateinamen hält. `GUI_FILETREE` macht
+das selbst.
+
+```basic
+DIM ft AS GUI_WIDGET : ft = GUI_FILETREE(win, 10, 10, 260, 500, "C:/Projekt")
+GUI_FILETREE_FILTER(ft, "*.dh;*.json")        ' leer = alle Dateien
+GUI_FILETREE_SKIP(ft, "target;__pycache__")   ' Ordner wie Dateien
+GUI_FILETREE_SET(ft, "klick_klappt", 1)       ' Klick auf einen Ordner öffnet ihn
+GUI_FILETREE_SET(ft, "auffrischen", 2000)     ' alle zwei Sekunden nachsehen
+
+' jeden Frame:
+IF GUI_FILETREE_ACTIVATED$(ft) <> "" THEN oeffne(GUI_FILETREE_ACTIVATED$(ft))
+```
+
+**Gelesen wird nur, was zu sehen ist** — die Wurzel und jeder aufgeklappte
+Ordner. Ein Projekt mit einem `target`-Ordner darin kostet damit nichts,
+solange niemand hineinsieht; und dass jeder Ordner sein Dreieck bekommt, auch
+ein leerer, folgt daraus: was darin liegt, weiß man erst, wenn man
+hineinsieht, und einmal vorsorglich hineinzusehen ist genau das, was der Baum
+vermeidet.
+
+**Nach außen spricht dieses Widget über WEGE, nicht über Knoten-Nummern.**
+Die Knotenliste entsteht bei jedem Aufklappen neu, eine Nummer wäre also nur
+bis zur nächsten Bewegung gültig. Die Auswahl kommt über ihren Weg zurück;
+was zugeklappt wird, fällt aus der Auswahl heraus (wie in jedem
+Dateimanager). Ein **Haken** dagegen bleibt: er war eine Entscheidung, und
+`GUI_FILETREE_CHECKED_COUNT` zählt auch die Wege mit, die gerade hinter einem
+zugeklappten Ordner liegen.
+
+Ein Weg darf von außen voll oder relativ zur Wurzel kommen; heraus kommt
+immer der volle, in der Schreibweise des Systems. `verborgene` ist aus, also
+fehlt alles, dessen Name mit `.` anfängt.
+
+**`auffrischen` ist der Unterschied zwischen einem Baum, der stimmt, und
+einem, den man von Hand anstoßen muss.** Eine Datei, die ein anderes Programm
+anlegt, steht sonst erst da, wenn das Programm zufällig `GUI_FILETREE_REFRESH`
+ruft. Der Takt zählt in Millisekunden; 0 heißt „nie von selbst".
+
+## Häkchen im Baum
+
+`GUI_TREE_SET(tree, "kaestchen", 1)` stellt jeder Zeile ein Kästchen voran —
+dieselbe Bedienung wie bei der Liste: **ein Klick aufs Kästchen kippt nur den
+Haken**, die Auswahl bleibt, sonst wählte man beim Abhaken jedes Mal um. Mit
+Tastatur gehört die **Leertaste** dem Haken und Enter dem Auf- und Zuklappen;
+eine Taste für beides ließe den Haken bei jedem Blättern nebenbei kippen.
+
+Ein Haken an einem Ordner gilt **nur für ihn** — er färbt seine Kinder nicht
+mit. Wer „alles darunter" braucht, läuft die Kinder selbst ab: ob ein
+zugeklappter Ordner seine ungesehenen Dateien mitnimmt, ist eine Frage, die
+das Programm beantworten muss, nicht die Laufzeit.
+
+## Reiter im Fenster
+
+Reiter gab es nur **am Fenster** (`GUI_TABS`). Ein Karteikasten in einer Ecke
+— Einstellungen mit drei Karten, eine Werkzeugspalte mit zwei Ansichten —
+ließ sich damit nicht bauen.
+
+```basic
+DIM tc AS GUI_WIDGET : tc = GUI_TABCONTROL(win, 20, 20, 300, 220)
+GUI_TABCONTROL_ADD(tc, "Allgemein")
+GUI_TABCONTROL_ADD(tc, "Farben")
+DIM feld AS GUI_WIDGET : feld = GUI_TEXTINPUT(win, 40, 70, 200, 26)
+GUI_TABCONTROL_ADD_WIDGET(tc, feld, 0)        ' zeigt sich nur auf Seite 0
+```
+
+Die Kinder **behalten ihre Lage im Fenster** — eine Seite blendet sie nur ein
+oder aus, genau wie die Fenster-Reiter es tun. Nichts wird verschoben, ein
+Layout-Behälter auf einer Seite rechnet mit denselben Koordinaten weiter. Ein
+Behälter nimmt seine Kinder mit auf die Seite.
+
+Die **Breite der Köpfe** wird an der Zeichenzahl geschätzt, nicht gemessen:
+der Treffertest läuft an einer Stelle, an der es keine Grafik gibt, und eine
+zweite, genauere Rechnung beim Zeichnen wäre der sicherste Weg, Klick und
+Beschriftung auseinander laufen zu lassen. Bei sehr langen Beschriftungen
+steht der Text deshalb etwas enger im Kopf, als er dürfte.
+
+## Was es (noch) nicht gibt
+
+Damit man nicht danach sucht — diese Bedienelemente fehlen der `gui`, und
+zwar bewusst als Liste, nicht als Versehen:
+
+* **Zeitwähler** (Gegenstück zu `GUI_DATEPICKER`). Drei Zahlenfelder tun es
+  heute; ein eigenes Widget wäre hübscher.
+* **Gesetzter Text** (Markdown, fett/kursiv, Überschriften). Ein `GUI_LABEL`
+  bricht um, mehr nicht — wer ein Handbuch anzeigt, setzt es selbst (die IDE
+  tut genau das).
+* **Aufklapp-Gruppen** (Akkordeon) und **Assistenten** mit Zurück/Weiter.
+  Beides ist aus Knöpfen, Panels und dem Reiterwerk zu bauen.
+* **Pfadleiste** (Brotkrumen) und **Statusleiste mit Feldern** — aus
+  Beschriftungen in einem Layout-Behälter.
+* **Baum mit Spalten** (Tabelle und Baum in einem).
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 

@@ -2209,10 +2209,12 @@ def test_der_projektbaum_zeigt_unterordner(tmp_path):
     quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
     (tmp_path / "lib").mkdir()
     (tmp_path / "lib" / "mehr.dh").write_text("PRINT 2\n", encoding="utf-8")
-    # Zeile 0 ist `a_spiel.dh`, Zeile 1 der Ordner `lib`, Zeile 2 die Datei
-    # darin (der Baum klappt beim Anlegen auf).
-    ev = _klick_mit(40, 60, _baum_y(2))
-    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    # Seit Stand 24 ist der Baum ein GUI_FILETREE: Ordner stehen oben und
+    # sind zu, bis jemand hineinsieht. Zeile 0 ist also `lib`, ein Klick
+    # klappt ihn auf, danach ist Zeile 1 die Datei darin.
+    ev = _klick_mit(40, 60, _baum_y(0))
+    ev += _klick_mit(80, 60, _baum_y(1))
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
     geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
     assert any(z.endswith("mehr.dh") for z in geoeffnet), log
 
@@ -2308,3 +2310,35 @@ def test_ein_umbau_laesst_sich_abbrechen(tmp_path):
     log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="winken")
     assert "umbau abgebrochen" in log, log
     assert "gruessen()" in quelle.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------- Stufe 24
+
+def test_der_baum_zeigt_eine_neue_datei_von_selbst(tmp_path):
+    """Bis Stand 23 stand eine frisch angelegte Datei erst nach dem nächsten
+    Öffnen im Baum. Der Dateibaum der Laufzeit sieht alle zwei Sekunden
+    nach: hier legt das gestartete Programm `b_neu.dh` an, und danach lässt
+    sie sich im Baum anklicken, ohne dass jemand den Baum angefasst hat."""
+    quelle = _datei(tmp_path, 'WRITEALL("b_neu.dh", "PRINT 2")\n', "a_spiel.dh")
+    ev = _taste(20, RL_F5)                       # starten -> legt b_neu.dh an
+    ev += _klick_mit(300, 60, _baum_y(1))        # zweite Zeile = die neue Datei
+    log = _ide(tmp_path, quelle, frames=380, events=ev)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert any(z.endswith("b_neu.dh") for z in geoeffnet), log
+
+
+def test_ein_klick_auf_einen_ordner_klappt_ihn_um(tmp_path):
+    """Nur das schmale Dreieck zu treffen ist eine Zumutung -- und ein
+    Klick, der scheinbar nichts tut, sieht nach einem Fehler aus. Die
+    Gegenprobe steckt im Test: nach dem zweiten Klick auf denselben Ordner
+    ist die Datei darin wieder weg, die Zeile darunter ist die Quelldatei."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "mehr.dh").write_text("PRINT 2\n", encoding="utf-8")
+    ev = _klick_mit(40, 60, _baum_y(0))          # lib auf
+    ev += _klick_mit(80, 60, _baum_y(0))         # lib wieder zu
+    ev += _klick_mit(120, 60, _baum_y(1))        # jetzt wieder a_spiel.dh
+    log = _ide(tmp_path, quelle, frames=220, events=ev)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert not any(z.endswith("mehr.dh") for z in geoeffnet), log
+    assert any(z.endswith("a_spiel.dh") for z in geoeffnet), log
