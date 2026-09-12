@@ -50,7 +50,12 @@ RL_F3, RL_F12, RL_U = 292, 301, 85
 def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=None,
          screenshot=None, wurzel=None):
     """Die IDE mit `datei` starten, N Bilder laufen lassen, Protokoll liefern."""
-    log = tmp_path / "ide.log"
+    # Alles, was der Test selbst braucht, liegt NEBEN dem Projektordner:
+    # seit der Baum auch .json und .txt zeigt, stuenden Protokoll, Sitzung
+    # und Aufnahme sonst mitten in der Dateiliste.
+    aussen = tmp_path.parent / (tmp_path.name + "_idekopie")
+    aussen.mkdir(exist_ok=True)
+    log = aussen / "ide.log"
     quelle = IDE
     if events is not None:
         # Die Aufnahme muss NEBEN der IDE-Quelle liegen? Nein: AUTOMATION_PLAY
@@ -61,17 +66,14 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
         for frame, typ, *params in ev:
             p = (list(params) + [0, 0, 0, 0])[:4]
             zeilen.append(f"e {frame} {typ} {p[0]} {p[1]} {p[2]} {p[3]} // Event: test")
-        (tmp_path / "ev.txt").write_text("\n".join(zeilen) + "\n", encoding="utf-8")
-        einschub = 'SETFPS(60)\nAUTOMATION_PLAY("' + (tmp_path / "ev.txt").as_posix() + '")\n'
+        (aussen / "ev.txt").write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+        einschub = 'SETFPS(60)\nAUTOMATION_PLAY("' + (aussen / "ev.txt").as_posix() + '")\n'
         if zwischenablage is not None:
             einschub += 'CLIPBOARD_SET("' + zwischenablage + '")\n'
         text = IDE.read_text(encoding="utf-8").replace('SETFPS(60)\n', einschub, 1)
-        # NEBEN den Projektordner, nicht hinein: die Kopie enthaelt den
-        # eingeschobenen Suchtext und stuende sonst im Projektbaum, in den
-        # Suchtreffern und -- seit die Umbauten Unterordner sehen -- auch in
-        # jedem Umbau.
-        aussen = tmp_path.parent / (tmp_path.name + "_idekopie")
-        aussen.mkdir(exist_ok=True)
+        # Die Kopie enthaelt den eingeschobenen Suchtext und stuende sonst
+        # im Projektbaum, in den Suchtreffern und -- seit die Umbauten
+        # Unterordner sehen -- auch in jedem Umbau.
         quelle = aussen / "ide_test.dh"
         quelle.write_text(text, encoding="utf-8")
     r = subprocess.run([str(_DHRT), "run", str(quelle), "--", str(datei)], capture_output=True,
@@ -80,7 +82,7 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
                        # sonst schriebe jeder Lauf in die echte ide.json des Nutzers.
                        env=dict(os.environ, DHRT_FRAMES=str(frames), DH_IDE_LOG=str(log),
                                 DH_IDE_WURZEL=str(wurzel or _ROOT),
-                                DH_IDE_KONFIG=str(konfig or tmp_path / "ide.json"),
+                                DH_IDE_KONFIG=str(konfig or aussen / "ide.json"),
                                 **({"DHRT_SCREENSHOT": str(screenshot)} if screenshot else {})),
                        cwd=str(tmp_path))
     assert r.returncode == 0, (r.stdout, r.stderr)
@@ -2241,3 +2243,59 @@ def test_eine_neu_angelegte_datei_bekommt_einen_reiter(tmp_path):
     assert "umbau neue datei 1" in log, log
     geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
     assert any(z.endswith("gruss.dh") for z in geoeffnet), log
+
+
+# --------------------------------------------------------------- Stufe 23
+
+def test_der_baum_zeigt_auch_ein_formular(tmp_path):
+    """Neben dem Quelltext liegen Formulare, Karten und Daten -- wer sie
+    nicht sieht, sucht sie im Dateimanager."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
+    form = tmp_path / "b_maske.dhform"
+    form.write_text('{\n "title": "F"\n}\n', encoding="utf-8")
+    ev = _klick_mit(40, 60, _baum_y(1))          # der zweite Eintrag
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert any(z.endswith("b_maske.dhform") for z in geoeffnet), log
+    # Eine .dhform ist kein Drachenhauch -- der Uebersetzer bleibt aussen vor.
+    assert not any(z.startswith("geprueft ") and not z.endswith(" 0") for z in log), log
+
+
+def test_das_pruefen_nennt_die_fehler(tmp_path):
+    """Eine Zahl sagt einem nicht, ob man den Block wieder aufnehmen muss
+    oder etwas anderes vergessen hat. Hier wird ein Parameter entfernt und
+    der Block AM AUFRUF ausgelassen -- der Aufruf übergibt dann eins zu
+    wenig."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "PRINT 0\n"
+                    "zeichne(1, 2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 152, 120, 30)    # - Parameter (der erste)
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen -> Vorschau
+    ev += _klick_mit(150, 600, _vs_zeile(8))     # der Block am Aufruf
+    ev += _klick_mit(190, 643, 681)              # auslassen
+    ev += _klick_mit(230, 823, 681)              # Pruefen
+    log = _ide(tmp_path, quelle, frames=340, events=ev)
+    geprueft = [z for z in log if z.startswith("umbau geprueft ")]
+    assert geprueft and geprueft[-1] != "umbau geprueft 0", log
+    # Geprueft heisst nicht geschrieben.
+    assert "zeichne(1, 2)" in quelle.read_text(encoding="utf-8")
+
+
+def test_ein_umbau_laesst_sich_abbrechen(tmp_path):
+    """ESC, solange gesammelt wird -- danach ist nichts geändert."""
+    quelle = _datei(tmp_path, "gruessen()\n", "a_spiel.dh")
+    _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\n", "b_helfer.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F6, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(115, RL_V, RL_LCTRL)
+    ev += _taste(145, RL_ENTER)                  # Sammeln laeuft los
+    ev += _taste(146, RL_ESC)                    # und wird sofort abgebrochen
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="winken")
+    assert "umbau abgebrochen" in log, log
+    assert "gruessen()" in quelle.read_text(encoding="utf-8")

@@ -2873,6 +2873,27 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 23 (2026-09-12):** die drei Punkte nach Stand 22. **Der Baum zeigt
+auch Begleitdateien** (`.dhform`, `.dhsprite`, `.json`, `.md`, `.csv`,
+`.png` ...). Was der Editor nicht bearbeiten kann, geht per `OPENDOC` ans
+System; `pruefen` bleibt bei `.dh` (eine `.json` durch den Uebersetzer zu
+schicken fuellt die Liste mit Meldungen ueber etwas, das kein Programm
+ist). **Dabei fiel ein Fehler auf, den Stand 22 erst scharf gemacht hat:**
+`dateiOeffnen` setzte `projektOrdner = DIRNAME(pfad)` -- ein Klick auf eine
+Datei im Unterordner machte den UNTERordner zum Projekt, und der Baum zeigte
+danach die halbe Arbeit nicht mehr. Der Ordner wandert jetzt nur noch, wenn
+die Datei ausserhalb liegt. **Umbau in Schritten:** die beiden
+projektweiten Umbauten (Umbenennen, Ersetzen) sammeln je Bild 25 Dateien
+(`laufSchritt` aus der Hauptschleife), die Statuszeile zaehlt mit, ESC
+bricht ab -- in EINEM Bild erledigt stuende die IDE bei vierhundert Dateien
+so lange, dass man sie fuer haengend haelt, und abbrechen laesst sich
+nichts, was gar nicht zum Zeichnen kommt. **Das Pruefen nennt die Fehler**
+(`umbauBefunde`, oben im Unterschied) statt nur ihrer Zahl. **Der
+Test-Harnisch musste wieder mit:** `ide.json`, `ide.log` und `ev.txt` lagen
+IM Projektordner -- seit der Baum auch `.json`/`.txt` zeigt, standen sie
+mitten in der Dateiliste; jetzt liegen sie im Geschwisterordner. Tests:
+3 neue in `tests/test_ide.py`.
+
 **Stufe 22 (2026-09-12):** die drei Punkte nach Stand 21. **Projektbaum mit
 Unterordnern:** die Ordner-Knoten entstehen unterwegs und werden gemerkt
 (`ordPfad`/`ordKnoten`), damit zwei Dateien aus demselben Unterordner unter
