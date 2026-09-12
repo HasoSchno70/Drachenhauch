@@ -5926,6 +5926,17 @@ impl<'p> Vm<'p> {
             "gui_filetree_set_checked" => { self.gui.filetree_set_checked(gi(a,0,"GUI_FILETREE_SET_CHECKED")?, &gs(a,1,"GUI_FILETREE_SET_CHECKED")?, gbool(a,2,"GUI_FILETREE_SET_CHECKED")?)?; Value::Nil }
             "gui_filetree_checked_count" => Value::Int(self.gui.filetree_checked_count(gi(a,0,"GUI_FILETREE_CHECKED_COUNT")?)?),
             "gui_filetree_checked_path$" | "gui_filetree_checked_path" => Value::str_rc(&self.gui.filetree_checked_path(gi(a,0,"GUI_FILETREE_CHECKED_PATH")?, gi(a,1,"GUI_FILETREE_CHECKED_PATH")?)?),
+            // --- Reiter im Fenster ---
+            "gui_tabcontrol" => Value::Int(self.gui.tabcontrol(gi(a,0,"GUI_TABCONTROL")?, gi(a,1,"GUI_TABCONTROL")? as i32,
+                gi(a,2,"GUI_TABCONTROL")? as i32, gi(a,3,"GUI_TABCONTROL")? as i32, gi(a,4,"GUI_TABCONTROL")? as i32)?),
+            "gui_tabcontrol_add" => Value::Int(self.gui.tabcontrol_add(gi(a,0,"GUI_TABCONTROL_ADD")?, gs(a,1,"GUI_TABCONTROL_ADD")?)?),
+            "gui_tabcontrol_count" => Value::Int(self.gui.tabcontrol_count(gi(a,0,"GUI_TABCONTROL_COUNT")?)?),
+            "gui_tabcontrol_page" => Value::Int(self.gui.tabcontrol_page(gi(a,0,"GUI_TABCONTROL_PAGE")?)?),
+            "gui_tabcontrol_set_page" => { self.gui.tabcontrol_set_page(gi(a,0,"GUI_TABCONTROL_SET_PAGE")?, gi(a,1,"GUI_TABCONTROL_SET_PAGE")?)?; Value::Nil }
+            "gui_tabcontrol_title$" | "gui_tabcontrol_title" => Value::str_rc(&self.gui.tabcontrol_title(gi(a,0,"GUI_TABCONTROL_TITLE")?, gi(a,1,"GUI_TABCONTROL_TITLE")?)?),
+            "gui_tabcontrol_set_title" => { self.gui.tabcontrol_set_title(gi(a,0,"GUI_TABCONTROL_SET_TITLE")?, gi(a,1,"GUI_TABCONTROL_SET_TITLE")?, gs(a,2,"GUI_TABCONTROL_SET_TITLE")?)?; Value::Nil }
+            "gui_tabcontrol_add_widget" => { self.gui.tabcontrol_add_widget(gi(a,0,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,1,"GUI_TABCONTROL_ADD_WIDGET")?, gi(a,2,"GUI_TABCONTROL_ADD_WIDGET")?)?; Value::Nil }
+            "gui_tabcontrol_remove" => { self.gui.tabcontrol_remove(gi(a,0,"GUI_TABCONTROL_REMOVE")?, gi(a,1,"GUI_TABCONTROL_REMOVE")?)?; Value::Nil }
             "gui_filetree_icons" => { self.gui.filetree_icons(gi(a,0,"GUI_FILETREE_ICONS")?, gi(a,1,"GUI_FILETREE_ICONS")?, gi(a,2,"GUI_FILETREE_ICONS")?)?; Value::Nil }
             "gui_update" => {
                 {

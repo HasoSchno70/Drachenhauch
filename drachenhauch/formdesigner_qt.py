@@ -279,6 +279,25 @@ def _preview_neu(qp: QPainter, kind: str, r: QRect, *, fg, muted, accent, border
         qp.setPen(QPen(QColor(255, 255, 255), 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
         qp.drawEllipse(QRect(feld.right() - 8, feld.top() + 4, 6, 6))
 
+    elif kind == "tabcontrol":
+        # Koepfe oben, darunter die Flaeche -- was auf einer Seite liegt,
+        # zeigt der Entwurf nicht: die Controls stehen dort, wo sie stehen.
+        kopf = min(26, h)
+        flaeche(QRect(x, y + kopf, w, max(0, h - kopf)), win_bg)
+        tx = x
+        for i, t in enumerate(items or ["Seite 1"]):
+            bw = 8 * len(str(t)) + 20
+            kr = QRect(tx, y + 2, bw, kopf - 2)
+            qp.fillRect(kr, face if i == 0 else title_bg)
+            qp.setPen(border); qp.setBrush(Qt.BrushStyle.NoBrush); qp.drawRect(kr)
+            if i == 0:
+                qp.fillRect(QRect(tx, y + kopf - 3, bw, 3), accent)
+            qp.setPen(fg if i == 0 else muted)
+            qp.drawText(kr, al.AlignCenter, str(t))
+            tx += bw + 2
+            if tx > x + w:
+                break
+
     elif kind == "datepicker":
         flaeche(r, tief=True)
         kopf = QRect(x, y, w, min(16, h))

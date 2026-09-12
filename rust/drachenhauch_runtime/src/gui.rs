@@ -230,7 +230,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
-    Layout,
+    Layout, TabControl,
 }
 
 impl Kind {
@@ -245,7 +245,7 @@ impl Kind {
             Kind::Toolbar => "toolbar", Kind::Tree => "tree",
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
-            Kind::Layout => "layout",
+            Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -259,7 +259,7 @@ impl Kind {
             "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
-            "layout" => Kind::Layout,
+            "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
             _ => return None,
         })
     }
@@ -283,6 +283,7 @@ impl Kind {
 }
 
 const DROPDOWN_ITEM_H: i32 = 22;
+const TC_KOPF_H: i32 = 26;        // Hoehe der Reiterkoepfe im Fenster
 const TREE_ROW_H: i32 = 22;       // Hoehe einer Baum-Zeile
 const TREE_INDENT: i32 = 16;      // Einrueckung pro Ebene
 const TREE_TOGGLE_W: i32 = 16;    // Breite der Auf-/Zuklapp-Flaeche
@@ -934,6 +935,19 @@ struct PanelState {
     inhalt_h: i32,        // unterster Kindrand + Rand, je Bild gemessen
 }
 
+/// Reiter INNERHALB eines Fensters (Kind::TabControl). Die Beschriftungen
+/// stehen in `Widget::items`, die aktive Seite in `Widget::sel`; hier liegt
+/// nur, welches Kind auf welche Seite gehoert.
+///
+/// Die Kinder BEHALTEN ihre Lage im Fenster -- eine Seite blendet sie nur
+/// ein oder aus (`widget_shown`), genau wie die Reiter des Fensters es mit
+/// `tab_page` tun. Nichts wird verschoben, ein Layout auf einer Seite
+/// rechnet also weiter mit denselben Koordinaten.
+#[derive(Default)]
+struct TabCtlState {
+    kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
+}
+
 /// Ein laufender Zug: beginnt mit dem Druck auf ein ziehbares Widget, wird
 /// nach 5 px Bewegung `aktiv` -- vorher ist es ein Klick.
 struct DragState {
@@ -1076,6 +1090,12 @@ pub struct Widget {
     /// je Bild aus den Panel-Kindern gesetzt -- auch durch Layouts hindurch,
     /// damit ein Behaelter im Panel seine Kinder mitnimmt.
     panel_von: i32,
+    /// Reiter IM Fenster (Kind::TabControl): die Kinder je Seite. Am KIND
+    /// stehen `tc_von` (Widget-Index des Reiterwerks, -1 = keins) und
+    /// `tc_seite` -- je Bild gesetzt, wie beim rollenden Panel.
+    tabctl: Option<Box<TabCtlState>>,
+    tc_von: i32,
+    tc_seite: i32,
     vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
     unbestimmt: bool,    // Progress: laufendes Band statt Wert
     bildmodus: u8,       // Image: 0 strecken, 1 einpassen, 2 fuellen, 3 mitte, 4 kacheln
@@ -2431,7 +2451,7 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
-            panel: None, panel_von: -1, vert: false, unbestimmt: false, bildmodus: 0,
+            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
             umbruch: false, bind: String::new(), form: String::new(),
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
@@ -3783,6 +3803,139 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         dateibaum_neu(t); Ok(())
     }
 
+    // --- Reiter im Fenster (GUI_TABCONTROL) ---------------------------------
+    /// Bis Stand 24 gab es Reiter nur AM FENSTER (GUI_TABS): ein Einstellungs-
+    /// kasten mit zwei Karteikarten in einer Ecke des Fensters liess sich
+    /// damit nicht bauen. Das Reiterwerk ist ein Widget wie jedes andere; die
+    /// Kinder bekommen ihre Seite zugewiesen und werden sonst genauso
+    /// angelegt und verortet wie ohne Reiter.
+    pub fn tabcontrol(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::TabControl, x, y, w, h);
+        wd.tabctl = Some(Box::new(TabCtlState::default()));
+        wd.sel = 0;
+        self.add_widget(win, "GUI_TABCONTROL", wd)
+    }
+    fn tc_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        Ok(w)
+    }
+    fn tc_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::TabControl { return Err(format!("{}: Widget ist kein Reiterwerk (GUI_TABCONTROL)", fn_)); }
+        Ok(w)
+    }
+    /// Eine Seite anhaengen -- liefert ihre Nummer.
+    pub fn tabcontrol_add(&mut self, h: i64, titel: String) -> Result<i64, String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_ADD")?;
+        w.items.push(titel);
+        if w.sel < 0 { w.sel = 0; }
+        Ok((w.items.len() - 1) as i64)
+    }
+    pub fn tabcontrol_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tc_ref(h, "GUI_TABCONTROL_COUNT")?.items.len() as i64)
+    }
+    pub fn tabcontrol_page(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tc_ref(h, "GUI_TABCONTROL_PAGE")?.sel as i64)
+    }
+    pub fn tabcontrol_set_page(&mut self, h: i64, seite: i64) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_SET_PAGE")?;
+        if seite < 0 || seite >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_SET_PAGE: Seite {} gibt es nicht", seite));
+        }
+        w.sel = seite as i32; Ok(())
+    }
+    pub fn tabcontrol_title(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.tc_ref(h, "GUI_TABCONTROL_TITLE")?;
+        Ok(w.items.get(i.max(-1) as usize).filter(|_| i >= 0).cloned().unwrap_or_default())
+    }
+    pub fn tabcontrol_set_title(&mut self, h: i64, i: i64, titel: String) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_SET_TITLE")?;
+        if i < 0 || i >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_SET_TITLE: Seite {} gibt es nicht", i));
+        }
+        w.items[i as usize] = titel; Ok(())
+    }
+    /// Ein Widget auf eine Seite legen. Es behaelt seine Lage im Fenster --
+    /// gezeigt wird es, solange seine Seite vorn ist.
+    pub fn tabcontrol_add_widget(&mut self, h: i64, kind: i64, seite: i64) -> Result<(), String> {
+        let (tw, ti) = Self::dec_widget(h);
+        let (kw, ki) = Self::dec_widget(kind);
+        self.tc_ref(h, "GUI_TABCONTROL_ADD_WIDGET")?;
+        self.wdg(kind, "GUI_TABCONTROL_ADD_WIDGET")?;
+        if tw != kw { return Err("GUI_TABCONTROL_ADD_WIDGET: Widget gehoert in ein anderes Fenster".into()); }
+        if ti == ki { return Err("GUI_TABCONTROL_ADD_WIDGET: das Reiterwerk kann nicht sein eigenes Kind sein".into()); }
+        let n = self.tc_ref(h, "GUI_TABCONTROL_ADD_WIDGET")?.items.len() as i64;
+        if seite < 0 || seite >= n {
+            return Err(format!("GUI_TABCONTROL_ADD_WIDGET: Seite {} gibt es nicht (erst GUI_TABCONTROL_ADD)", seite));
+        }
+        let w = self.tc_mut(h, "GUI_TABCONTROL_ADD_WIDGET")?;
+        let st = w.tabctl.get_or_insert_with(|| Box::new(TabCtlState::default()));
+        st.kinder.retain(|&(k, _)| k != ki);
+        st.kinder.push((ki, seite as i32));
+        Ok(())
+    }
+    /// Eine Seite entfernen. Die Kinder darauf gehoeren danach zu keiner Seite
+    /// mehr (sie sind wieder immer sichtbar) -- sie zu ZERSTOEREN waere eine
+    /// Entscheidung, die dem Programm gehoert.
+    pub fn tabcontrol_remove(&mut self, h: i64, i: i64) -> Result<(), String> {
+        let w = self.tc_mut(h, "GUI_TABCONTROL_REMOVE")?;
+        if i < 0 || i >= w.items.len() as i64 {
+            return Err(format!("GUI_TABCONTROL_REMOVE: Seite {} gibt es nicht", i));
+        }
+        w.items.remove(i as usize);
+        if let Some(st) = w.tabctl.as_mut() {
+            st.kinder.retain(|&(_, s)| s != i as i32);
+            for (_, s) in st.kinder.iter_mut() { if *s > i as i32 { *s -= 1; } }
+        }
+        let n = w.items.len() as i32;
+        w.sel = w.sel.min(n - 1).max(if n > 0 { 0 } else { -1 });
+        Ok(())
+    }
+
+    /// Die Koepfe eines Reiterwerks: (Seite, x links, x rechts), absolut.
+    ///
+    /// EINE Quelle fuer Zeichnen und Treffertest. Die Breite wird an der
+    /// ZEICHENZAHL geschaetzt, nicht gemessen -- der Treffertest laeuft in
+    /// `handle_press`, und dort gibt es keine Grafik. Eine zweite, genauere
+    /// Rechnung beim Zeichnen waere der sicherste Weg, Klick und Beschriftung
+    /// auseinander laufen zu lassen.
+    fn tc_koepfe(&self, ax: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+        let mut x = ax;
+        let mut out = Vec::new();
+        for (i, t) in wdg.items.iter().enumerate() {
+            let b = self.sk(8) * t.chars().count() as i32 + self.sk(20);
+            out.push((i, x, x + b));
+            x += b + 2;
+        }
+        out
+    }
+    /// Je Bild: welches Kind auf welcher Seite liegt (wie panel_pass).
+    fn tabctl_pass(&mut self) {
+        for wi in 0..self.windows.len() {
+            let n = self.windows[wi].widgets.len();
+            for i in 0..n { self.windows[wi].widgets[i].tc_von = -1; self.windows[wi].widgets[i].tc_seite = -1; }
+            for p in 0..n {
+                let kinder = match self.windows[wi].widgets[p].tabctl.as_ref() {
+                    Some(st) => st.kinder.clone(),
+                    None => continue,
+                };
+                for (k, seite) in kinder {
+                    // Durch Behaelter hindurch, damit ein Layout auf einer
+                    // Seite seine Kinder mitnimmt -- dieselbe Sammlung wie
+                    // beim rollenden Panel.
+                    let mut menge = Vec::new();
+                    self.panel_sammeln(wi, k, &mut menge, 0);
+                    for &m in &menge {
+                        if m == p { continue; }
+                        let w = &mut self.windows[wi].widgets[m];
+                        w.tc_von = p as i32; w.tc_seite = seite;
+                    }
+                }
+            }
+        }
+    }
+
     /// Sichtbare Knoten (id-Liste) in Anzeigereihenfolge: Vorfahren-expanded.
     fn tree_visible(t: &TreeState) -> Vec<usize> {
         let mut out = Vec::new();
@@ -4685,7 +4838,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree) {
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
@@ -5760,6 +5913,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 });
             }
         }
+        if let Some(st) = &w.tabctl {
+            o["tabctl"] = serde_json::json!({
+                "kinder": st.kinder.iter().map(|&(k, s)| serde_json::json!([k, s])).collect::<Vec<_>>(),
+                "seite": w.sel,
+            });
+        }
         if w.tab_page != -1 { o["tab_page"] = serde_json::json!(w.tab_page); }
         o
     }
@@ -6005,6 +6164,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             ts.hover = -1; ts.anker = -1; ts.sync();
             w.tree = Some(Box::new(ts));
         }
+        if kind == Kind::TabControl {
+            let mut st = TabCtlState::default();
+            if let Some(tj) = wj.get("tabctl") {
+                if let Some(ks) = tj["kinder"].as_array() {
+                    st.kinder = ks.iter().filter_map(|e| {
+                        let a = e.as_array()?;
+                        Some((a.first()?.as_i64()? as usize, a.get(1)?.as_i64()? as i32))
+                    }).collect();
+                }
+                w.sel = tj["seite"].as_i64().unwrap_or(0) as i32;
+            }
+            w.tabctl = Some(Box::new(st));
+        }
         w.tab_page = wj["tab_page"].as_i64().unwrap_or(-1) as i32;
         w.anchor = wj["anchor"].as_str().map(Self::anchor_mask).unwrap_or(5);
         w.bx = w.x; w.by = w.y; w.bw = w.w; w.bh = w.h;   // Anchor-Basis = Design-Rechteck
@@ -6174,7 +6346,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     /// Ist das Widget aktuell sichtbar/bedienbar? (Tab-Seite beruecksichtigt)
     fn widget_shown(&self, win: usize, w: &Widget) -> bool {
-        w.alive && w.visible && (w.tab_page < 0 || w.tab_page == self.windows[win].active_tab)
+        if !(w.alive && w.visible) { return false; }
+        if w.tab_page >= 0 && w.tab_page != self.windows[win].active_tab { return false; }
+        // Reiter IM Fenster: nur die vordere Seite ist da -- fuer das
+        // Zeichnen wie fuer jeden Treffertest, die beide hier fragen.
+        if w.tc_von >= 0 {
+            match self.windows[win].widgets.get(w.tc_von as usize) {
+                Some(tc) => return tc.sel == w.tc_seite && tc.alive && tc.visible,
+                None => return true,
+            }
+        }
+        true
     }
     /// Layout der Reiter: (page_idx, x_links_abs, x_rechts_abs).
     fn tab_slots(&self, g: &Graphics, wi: usize) -> Vec<(usize, i32, i32)> {
@@ -6620,6 +6802,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.umbruch_layout(g);
         self.layout_pass(g);
         self.panel_pass();
+        self.tabctl_pass();
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -8798,6 +8981,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.dp_setze(wi, i, neu);
                 }
             }
+            Kind::TabControl => {
+                // Links/rechts blaettert -- wie in jedem Karteikasten.
+                let d = rechts as i32 - links as i32;
+                if d != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    let n = w.items.len() as i32;
+                    if n > 0 {
+                        let neu = (w.sel + d).clamp(0, n - 1);
+                        if neu != w.sel {
+                            w.sel = neu;
+                            let f = w.on_change.clone();
+                            if let Some(f) = f { self.pending.push(f); }
+                        }
+                    }
+                }
+            }
             Kind::Tree => {
                 let (vis, sel, hat_kinder, offen, eltern) = {
                     let t = match self.windows[wi].widgets[i].tree.as_ref() {
@@ -9062,6 +9261,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
             Kind::Table => self.table_press(win, i, mx, my),
             Kind::Tree => self.tree_press(win, i, mx, my),
+            Kind::TabControl => {
+                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
+                let treffer = self.tc_koepfe(ax, &self.windows[win].widgets[i])
+                    .into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, _)| k as i32);
+                if let Some(k) = treffer {
+                    let w = &mut self.windows[win].widgets[i];
+                    if w.sel != k {
+                        w.sel = k;
+                        let f = w.on_change.clone();
+                        if let Some(f) = f { self.pending.push(f); }
+                    }
+                }
+            }
             Kind::Radio => {
                 let was = self.windows[win].widgets[i].checked;
                 self.select_radio(win, i);
@@ -10517,6 +10730,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 n.set_value(format!("{:04}-{:02}-{:02}", w.datum[0], w.datum[1], w.datum[2]));
                 n
             }
+            Kind::TabControl => {
+                let n = Node::new(Role::TabList);
+                let kopf = self.sk(TC_KOPF_H);
+                for (k, x0, x1) in self.tc_koepfe(x, w) {
+                    let mut t = Node::new(Role::Tab);
+                    t.set_label(w.items[k].clone());
+                    t.set_selected(w.sel == k as i32);
+                    t.set_bounds(Self::a11y_rect(x0, y, x1 - x0, kopf));
+                    t.add_action(Action::Click);
+                    let id2 = NodeId(ids::teil(wi, i, k));
+                    nodes.push((id2, t));
+                    kinder.push(id2);
+                }
+                n
+            }
             Kind::GroupBox | Kind::Panel => { let mut n = Node::new(Role::Group); if !w.text.is_empty() { n.set_label(w.text.clone()); } n }
             Kind::Image => Node::new(Role::Image),
             Kind::Canvas => Node::new(Role::Canvas),
@@ -11618,6 +11846,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     g.box_fill(ax + 8, ay, ax + 8 + tw.min(w - 16), ay + 13, self.th("win_bg"));
                     self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
                 }
+            }
+            Kind::TabControl => {
+                // Koepfe oben, darunter die Flaeche -- die Kinder zeichnet die
+                // Schleife danach ganz normal, sie liegen nur auf einer Seite.
+                let kopf = self.sk(TC_KOPF_H);
+                self.fbox_w(g, wdg.kind, ax, ay + kopf, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
+                let acc = self.acc_col(wdg);
+                g.push_clip(ax, ay, w, kopf);
+                for (i, x0, x1) in self.tc_koepfe(ax, wdg) {
+                    let aktiv = i as i32 == wdg.sel;
+                    let bg = if aktiv { self.wcol(wdg, "bg", "widget_bg") } else { shade(self.th("win_bg"), -10) };
+                    g.box_fill(x0, ay + 2, x1 - 1, ay + kopf - 1, bg);
+                    g.rect(x0, ay + 2, x1 - 1, ay + kopf - 1, self.wcol(wdg, "border", "widget_border"));
+                    if aktiv { g.box_fill(x0, ay + kopf - 3, x1 - 1, ay + kopf - 1, acc); }
+                    let fg = if aktiv { self.txt_col(wdg) } else { self.th("muted_fg") };
+                    let th = self.wsize(g, wdg);
+                    self.wtext(g, wdg, x0 + self.sk(10), ay + 2 + (kopf - 2 - th).max(0) / 2,
+                               wdg.items[i].clone(), fg);
+                }
+                g.pop_clip();
             }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),

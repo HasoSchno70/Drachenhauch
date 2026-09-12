@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1799,
+ "count": 1808,
  "builtins": [
   {
    "name": "ABS",
@@ -4020,6 +4020,60 @@
    "name": "GUI_SUBMENU",
    "kind": "core",
    "signature": "GUI_SUBMENU(menu, label$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL(win, x, y, w, h) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_ADD",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_ADD(tc, titel$) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_ADD_WIDGET",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_ADD_WIDGET(tc, wdg, seite)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_COUNT",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_COUNT(tc) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_PAGE",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_PAGE(tc) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_REMOVE",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_REMOVE(tc, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_SET_PAGE",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_SET_PAGE(tc, seite)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_SET_TITLE",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_SET_TITLE(tc, i, titel$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABCONTROL_TITLE$",
+   "kind": "core",
+   "signature": "GUI_TABCONTROL_TITLE$(tc, i) AS STRING",
    "module": "gui"
   },
   {
