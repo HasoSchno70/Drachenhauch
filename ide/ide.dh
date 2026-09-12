@@ -679,11 +679,12 @@ DIM lblHbStand AS GUI_WIDGET : lblHbStand = GUI_LABEL(winHandbuch, "", 8, 40)
 DIM taHandbuch AS GUI_WIDGET : taHandbuch = GUI_TEXTAREA(winHandbuch, 8, 60, 964, 620)
 ' Gesetzt statt roh: die Leinwand liegt auf derselben Flaeche wie das
 ' Textfeld, immer nur eine von beiden ist sichtbar.
-DIM cvHandbuch AS GUI_WIDGET : cvHandbuch = GUI_CANVAS(winHandbuch, 8, 60, 964, 620)
+' Gesetzt wird seit Stand 25 vom Widget der Laufzeit -- davor malte die IDE
+' den Text selbst auf eine Zeichenflaeche und konnte dabei weder fett noch
+' Tabellenspalten noch anklickbare Verweise.
+DIM rtHandbuch AS GUI_WIDGET : rtHandbuch = GUI_RICHTEXT(winHandbuch, 8, 60, 964, 620, "")
 DIM btnHbAnsicht AS GUI_WIDGET : btnHbAnsicht = GUI_BUTTON(winHandbuch, "Quelltext", 824, 40, 80, 22)
 DIM hbGesetzt AS BOOLEAN : hbGesetzt = TRUE
-DIM hbScroll AS INTEGER : hbScroll = 0
-DIM hbZeilen AS ARRAY OF STRING : hbZeilen = []
 GUI_TEXTAREA_SET(taHandbuch, "umbruch", 1)
 GUI_WINDOW_VISIBLE(winHandbuch, FALSE)
 GUI_WINDOW_CLOSABLE(winProfil, TRUE)
@@ -6366,186 +6367,32 @@ SUB handbuchDokumente()
 END SUB
 
 ' --- Handbuch gesetzt statt roh ---------------------------------------
-' Markdown im Bild: Ueberschriften gross, Aufzaehlungen mit Punkt,
-' Code-Bloecke in der dicktengleichen Schrift auf dunklem Grund, Tabellen
-' in Spalten. Kein vollstaendiger Markdown-Setzer -- gerade genug fuer die
-' Dokumente in docs/, und was er nicht kennt, zeigt er als Text.
-FUNCTION mdInline$(z AS STRING) AS STRING
-    ' Auszeichnungen fallen weg: fett und kursiv kann die Zeichenroutine
-    ' nicht mitten im Text, und ** im Fliesstext liest sich schlechter als
-    ' gar keine Auszeichnung.
-    z = REPLACE$(z, "**", "")
-    z = REPLACE$(z, "`", "")
-    ' [Text](Ziel) -> Text: der Pfad hilft im Bild niemandem.
-    DIM auf AS INTEGER : auf = INSTR(z, "](")
-    WHILE auf > 0
-        DIM anfang AS INTEGER : anfang = -1
-        DIM i AS INTEGER
-        FOR i = auf - 1 TO 0 STEP -1
-            IF MID$(z, i, 1) = "[" THEN
-                anfang = i
-                BREAK
-            END IF
-        NEXT
-        DIM zu AS INTEGER : zu = INSTR(MID$(z, auf, LEN(z)), ")")
-        IF anfang < 0 OR zu < 0 THEN BREAK
-        z = LEFT$(z, anfang) + MID$(z, anfang + 1, auf - anfang - 1) + MID$(z, auf + zu + 1, LEN(z))
-        auf = INSTR(z, "](")
-    WEND
-    RETURN z
-END FUNCTION
+' Das Setzen macht seit Stand 25 `GUI_RICHTEXT`. Was hier stand, waren 180
+' Zeilen, die Ueberschriften, Aufzaehlungen, Codebloecke und Tabellen selbst
+' auf eine Zeichenflaeche malten -- samt der Einschraenkungen, die im
+' Kommentar dazu standen: fett und kursiv fielen weg, ein Verweis wurde zu
+' Text, und eine Tabelle wurde zur Begriffsliste, weil Spalten einen zweiten
+' Durchlauf gebraucht haetten. Das Widget kann alle drei.
 
-' Eine Zeile auf `breite` umbrechen -- als Feld der Teilzeilen.
-FUNCTION mdUmbruch(z AS STRING, breite AS INTEGER) AS ARRAY OF STRING
-    DIM raus AS ARRAY OF STRING : raus = []
-    IF z = "" THEN
-        ARRAY_PUSH(raus, "")
-        RETURN raus
-    END IF
-    DIM zeile AS STRING : zeile = ""
-    DIM wort AS STRING
-    FOR EACH wort IN SPLIT$(z, " ")
-        DIM neu AS STRING : neu = IIF(zeile = "", wort, zeile + " " + wort)
-        IF TEXT_WIDTH(neu) > breite AND zeile <> "" THEN
-            ARRAY_PUSH(raus, zeile)
-            zeile = wort
-        ELSE
-            zeile = neu
-        END IF
-    NEXT
-    ARRAY_PUSH(raus, zeile)
-    RETURN raus
-END FUNCTION
-
-SUB handbuchSetzen()
-    IF NOT hbGesetzt OR NOT GUI_WINDOW_SHOWN(winHandbuch) THEN RETURN
-    DIM cx AS INTEGER : cx = GUI_CANVAS_X(cvHandbuch)
-    DIM cy AS INTEGER : cy = GUI_CANVAS_Y(cvHandbuch)
-    DIM cw AS INTEGER : cw = GUI_CANVAS_W(cvHandbuch)
-    DIM ch AS INTEGER : ch = GUI_CANVAS_H(cvHandbuch)
-    BOX(cx, cy, cx + cw, cy + ch, IIF(hell, &HF4F6F8, &H121A22))
-    SCISSOR(cx, cy, cw, ch)
-    DIM grund AS INTEGER : grund = IIF(hell, &H203040, &HD8E4F0)
-    DIM leise AS INTEGER : leise = IIF(hell, &H607080, &H90A0B0)
-    DIM x0 AS INTEGER : x0 = cx + 16
-    DIM breite AS INTEGER : breite = cw - 40
-    DIM y AS INTEGER : y = cy + 12 - hbScroll
-    DIM imCode AS BOOLEAN : imCode = FALSE
-    DIM i AS INTEGER
-    FOR i = 0 TO LEN(hbZeilen) - 1
-        DIM roh AS STRING : roh = hbZeilen[i]
-        DIM z AS STRING : z = RTRIM$(roh)
-        IF LEFT$(TRIM$(z), 3) = "```" THEN
-            imCode = NOT imCode
-            y = y + 6
-            CONTINUE
-        END IF
-        ' Alles ausserhalb des Fensters ueberspringen -- ein Dokument mit
-        ' 2000 Zeilen darf nicht 2000 Textaufrufe je Bild kosten.
-        IF y > cy + ch THEN BREAK
-        IF imCode THEN
-            IF y + 20 >= cy THEN
-                BOX(x0 - 8, y - 2, cx + cw - 16, y + 19, IIF(hell, &HE8ECF0, &H1A2430))
-                IF codeFont >= 0 THEN SETFONT(codeFont)
-                TEXT_SIZE(15)
-                TEXT(x0, y, z, &H8BD0E8)
-                IF uiFont >= 0 THEN SETFONT(uiFont)
-            END IF
-            y = y + 21
-            CONTINUE
-        END IF
-        DIM t AS STRING : t = TRIM$(z)
-        IF t = "" THEN
-            y = y + 10
-            CONTINUE
-        END IF
-        IF LEFT$(t, 4) = "### " THEN
-            TEXT_SIZE(19) : IF y + 26 >= cy THEN TEXT(x0, y + 8, mdInline$(MID$(t, 4, LEN(t))), grund)
-            y = y + 36 : TEXT_SIZE(16)
-        ELSEIF LEFT$(t, 3) = "## " THEN
-            TEXT_SIZE(23)
-            IF y + 34 >= cy THEN
-                TEXT(x0, y + 12, mdInline$(MID$(t, 3, LEN(t))), &H2BC4E8)
-                LINE(x0, y + 40, cx + cw - 16, y + 40, IIF(hell, &HD0D8E0, &H2A3644))
-            END IF
-            y = y + 50 : TEXT_SIZE(16)
-        ELSEIF LEFT$(t, 2) = "# " THEN
-            TEXT_SIZE(28) : IF y + 40 >= cy THEN TEXT(x0, y + 12, mdInline$(MID$(t, 2, LEN(t))), &H2BC4E8)
-            y = y + 56 : TEXT_SIZE(16)
-        ELSEIF LEFT$(t, 3) = "---" AND TRIM$(REPLACE$(t, "-", "")) = "" THEN
-            IF y >= cy THEN LINE(x0, y + 8, cx + cw - 16, y + 8, leise)
-            y = y + 18
-        ELSEIF LEFT$(t, 1) = "|" THEN
-            ' Tabelle: die Trennzeile weglassen, den Rest dicktengleich --
-            ' Spalten auszurechnen waere ein zweiter Durchlauf durch das
-            ' ganze Dokument, und die Zellen sind ohnehin lang.
-            IF TRIM$(REPLACE$(REPLACE$(REPLACE$(t, "|", ""), "-", ""), ":", "")) = "" THEN
-                y = y + 4
-                CONTINUE
-            END IF
-            ' Eine Zeile je Zelle waere zu breit -- die Tabellen in docs/
-            ' sind fuer eine Textdatei gesetzt, nicht fuer 900 Punkte. Also
-            ' wie eine Begriffsliste: die erste Zelle als Stichwort, der
-            ' Rest darunter umgebrochen.
-            DIM innen AS STRING : innen = TRIM$(t)
-            IF LEFT$(innen, 1) = "|" THEN innen = MID$(innen, 1, LEN(innen))
-            IF RIGHT$(innen, 1) = "|" THEN innen = LEFT$(innen, LEN(innen) - 1)
-            DIM zellen AS ARRAY OF STRING : zellen = SPLIT$(innen, "|")
-            IF LEN(zellen) > 0 AND TRIM$(zellen[0]) <> "" THEN
-                IF y + 20 >= cy THEN
-                    IF codeFont >= 0 THEN SETFONT(codeFont)
-                    TEXT_SIZE(14)
-                    TEXT(x0, y, mdInline$(TRIM$(zellen[0])), &H8BD0E8)
-                    IF uiFont >= 0 THEN SETFONT(uiFont)
-                    TEXT_SIZE(16)
-                END IF
-                y = y + 20
-            END IF
-            DIM rest AS ARRAY OF STRING : rest = []
-            DIM zi AS INTEGER
-            FOR zi = 1 TO LEN(zellen) - 1
-                IF TRIM$(zellen[zi]) <> "" THEN ARRAY_PUSH(rest, TRIM$(zellen[zi]))
-            NEXT
-            IF LEN(rest) > 0 THEN
-                DIM rt AS ARRAY OF STRING : rt = mdUmbruch(mdInline$(JOIN$(rest, "  --  ")), breite - 24)
-                DIM rk AS INTEGER
-                FOR rk = 0 TO LEN(rt) - 1
-                    IF y + 20 >= cy AND y <= cy + ch THEN TEXT(x0 + 24, y, rt[rk], grund)
-                    y = y + 21
-                NEXT
-            END IF
-            y = y + 4
-        ELSE
-            DIM einzug AS INTEGER : einzug = 0
-            DIM punkt AS BOOLEAN : punkt = FALSE
-            IF LEFT$(t, 2) = "- " OR LEFT$(t, 2) = "* " THEN
-                einzug = 18 : punkt = TRUE
-                t = MID$(t, 2, LEN(t))
-            ELSEIF LEFT$(t, 2) = "> " THEN
-                einzug = 14
-                t = MID$(t, 2, LEN(t))
-            END IF
-            DIM teile AS ARRAY OF STRING : teile = mdUmbruch(mdInline$(TRIM$(t)), breite - einzug)
-            DIM k AS INTEGER
-            FOR k = 0 TO LEN(teile) - 1
-                IF y + 20 >= cy AND y <= cy + ch THEN
-                    IF k = 0 AND punkt THEN CIRCLE(x0 + 6, y + 9, 3, leise)
-                    TEXT(x0 + einzug, y, teile[k], grund)
-                END IF
-                y = y + 21
-            NEXT
-        END IF
-    NEXT
-    SCISSOR_END()
-    ' Rollen mit dem Rad, solange die Maus ueber der Flaeche steht.
-    IF MOUSEX() >= cx AND MOUSEX() < cx + cw AND MOUSEY() >= cy AND MOUSEY() < cy + ch THEN
-        IF MOUSEWHEEL() <> 0 THEN hbScroll = MAX(0, hbScroll - MOUSEWHEEL() * 60)
-    END IF
+' Zu der Stelle rollen, an der die QUELLZEILE `zeile` gesetzt wurde --
+' gesucht wird nach ihrem Inhalt, denn Zeilennummern kennt der Satz nicht.
+SUB hbZuZeile(zeile AS INTEGER)
+    GUI_RICHTEXT_SCROLL(rtHandbuch, 0)
+    IF zeile <= 1 THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(taHandbuch), NL)
+    IF zeile - 1 >= LEN(zeilen) THEN RETURN
+    ' Ein Wort reicht nicht (zu haeufig), die ganze Zeile trifft nach dem
+    ' Umbruch womoeglich keine gesetzte Zeile -- die ersten Woerter sind der
+    ' Kompromiss, der in der Praxis trifft.
+    DIM roh AS STRING : roh = TRIM$(REPLACE$(REPLACE$(zeilen[zeile - 1], "#", ""), "*", ""))
+    IF LEN(roh) > 40 THEN roh = LEFT$(roh, 40)
+    IF TRIM$(roh) = "" THEN RETURN
+    GUI_RICHTEXT_FIND(rtHandbuch, TRIM$(roh), -1)
 END SUB
 
 SUB handbuchAnsicht(gesetzt AS BOOLEAN)
     hbGesetzt = gesetzt
-    GUI_SET_VISIBLE(cvHandbuch, gesetzt)
+    GUI_SET_VISIBLE(rtHandbuch, gesetzt)
     GUI_SET_VISIBLE(taHandbuch, NOT gesetzt)
     GUI_SET_TEXT(btnHbAnsicht, IIF(gesetzt, "Quelltext", "Gesetzt"))
     protokoll("hbansicht " + IIF(gesetzt, "gesetzt", "quelltext"))
@@ -6565,10 +6412,12 @@ SUB handbuchZeigen(datei AS STRING, zeile AS INTEGER)
     GUI_SET_TEXT(lblHbStand, datei)
     GUI_WINDOW_VISIBLE(winHandbuch, TRUE)
     GUI_TEXTAREA_GOTO(taHandbuch, MAX(zeile, 1), 1)
-    hbZeilen = SPLIT$(GUI_TEXT(taHandbuch), NL)
-    ' Die gesetzte Ansicht kennt keine Zeilennummern -- 21 Punkte je Zeile
-    ' ist die Naeherung, die eine Fundstelle ins Bild bringt.
-    hbScroll = MAX(0, (MAX(zeile, 1) - 3) * 21)
+    GUI_RICHTEXT_SET_TEXT(rtHandbuch, GUI_TEXT(taHandbuch))
+    ' Die gesetzte Ansicht kennt keine Zeilennummern: gerollt wird zu dem,
+    ' was in der Zeile STEHT. Das trifft die Stelle genauer als jede
+    ' Umrechnung Zeile -> Punkte, denn wie hoch eine Zeile gesetzt wird,
+    ' weiss nur der Satz.
+    hbZuZeile(MAX(zeile, 1))
     handbuchAnsicht(hbGesetzt)
     GUI_FOCUS(taHandbuch)            ' holt das Fenster nach vorn
     protokoll("handbuch " + datei + " " + STR$(zeile))
@@ -6616,6 +6465,35 @@ SUB handbuch()
     handbuchZeigen(besteDatei, besteZeile)
 END SUB
 
+' Einem Verweis im Handbuch folgen. Ein Dokument oeffnet das Handbuch, eine
+' Sprungmarke rollt im selben, alles andere sagt nur, wohin es zeigt -- ein
+' Klick, der wortlos nichts tut, sieht nach einem Fehler aus.
+SUB handbuchVerweis(ziel AS STRING)
+    DIM z AS STRING : z = ziel
+    ' `docs/ide.md#abschnitt` -- die Marke abtrennen.
+    DIM marke AS STRING : marke = ""
+    DIM r AS INTEGER : r = INSTR(z, "#")
+    IF r >= 0 THEN
+        marke = MID$(z, r + 1, LEN(z))
+        z = LEFT$(z, r)
+    END IF
+    IF z = "" THEN
+        ' Nur eine Marke: im selben Dokument suchen. Die Marken von Markdown
+        ' sind kleingeschrieben und mit Strichen -- gesucht wird nach der
+        ' Ueberschrift, also mit Leerzeichen.
+        GUI_RICHTEXT_FIND(rtHandbuch, REPLACE$(marke, "-", " "), -1)
+        RETURN
+    END IF
+    DIM name AS STRING : name = BASENAME(z)
+    IF RIGHT$(LOWER$(name), 3) = ".md" AND FILEEXISTS(PATHJOIN(docsOrdner, name)) THEN
+        handbuchZeigen(name, 1)
+        IF marke <> "" THEN GUI_RICHTEXT_FIND(rtHandbuch, REPLACE$(marke, "-", " "), -1)
+        RETURN
+    END IF
+    GUI_SET_TEXT(lblHbStand, "Verweis: " + ziel)
+    protokoll("hbverweis " + ziel)
+END SUB
+
 SUB handbuchSuchen()
     DIM gesucht AS STRING : gesucht = GUI_TEXT(tfHbSuche)
     IF gesucht = "" THEN RETURN
@@ -6629,7 +6507,9 @@ SUB handbuchSuchen()
     IF tz < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + "' nicht in diesem Dokument") : RETURN
     GUI_TEXTAREA_GOTO(taHandbuch, tz, ts)
     GUI_TEXTAREA_SELECT(taHandbuch, tz, ts, tz, ts + LEN(gesucht))
-    hbScroll = MAX(0, (tz - 3) * 21)
+    ' In der gesetzten Ansicht suchen heisst: das Widget rollt selbst zur
+    ' Fundstelle (es allein kennt seinen Satz).
+    GUI_RICHTEXT_FIND(rtHandbuch, gesucht, GUI_RICHTEXT_SCROLL_GET(rtHandbuch))
     GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + " -- Zeile " + STR$(tz))
 END SUB
 
@@ -7510,6 +7390,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     END IF
     IF GUI_CLICKED(btnHbSuche) OR GUI_ENTERED(tfHbSuche) THEN handbuchSuchen()
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
+    IF GUI_RICHTEXT_LINK$(rtHandbuch) <> "" THEN handbuchVerweis(GUI_RICHTEXT_LINK$(rtHandbuch))
     werkzeugeAufraeumen()
     IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
     gitRandNachziehen(FALSE)
@@ -7826,11 +7707,10 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     CLS(&H0B1119)
     GUI_DRAW()
     minimapZeichnen()
-    handbuchSetzen()
     ' Das Handbuch-Fenster liegt ueber der Leinwand des Hauptfensters und
     ' waere sonst von ihr verdeckt -- GUI_DRAW zeichnet Fenster und
     ' Zeichenflaechen in EINEM Durchgang, das Gemalte kommt danach.
-    IF GUI_WINDOW_SHOWN(winHandbuch) THEN GUI_DRAW_TOP()
+    IF GUI_WINDOW_SHOWN(winHandbuch) THEN GUI_DRAW_WINDOW(winHandbuch) : GUI_DRAW_TOP()
     FLIP()
 WEND
 

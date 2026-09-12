@@ -2342,3 +2342,26 @@ def test_ein_klick_auf_einen_ordner_klappt_ihn_um(tmp_path):
     geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
     assert not any(z.endswith("mehr.dh") for z in geoeffnet), log
     assert any(z.endswith("a_spiel.dh") for z in geoeffnet), log
+
+
+# --------------------------------------------------------------- Stufe 25
+
+def test_ein_verweis_im_handbuch_oeffnet_das_dokument(tmp_path):
+    """Das Handbuch ist seit Stand 25 GESETZT vom Widget der Laufzeit -- und
+    damit sind Verweise anklickbar. Vorher wurden sie zu Text, weil der
+    hand gemalte Satz keine Stelle kannte, an der man klicken kann."""
+    wurzel = tmp_path / "wurzel"
+    (wurzel / "docs").mkdir(parents=True)
+    (wurzel / "examples").mkdir()
+    (wurzel / "docs" / "aaa.md").write_text(
+        "Zum [zweiten Dokument](bbb.md) geht es hier; das Wort nadel steht auch darin.\n",
+        encoding="utf-8")
+    (wurzel / "docs" / "bbb.md").write_text("Das zweite Dokument.\n", encoding="utf-8")
+    quelle = _datei(tmp_path, "nadel = 1\n")
+    # F1 sucht das Wort unter der Marke und oeffnet aaa.md; der Verweis ist
+    # das zweite Wort der ersten (und einzigen) gesetzten Zeile.
+    ev = _taste(40, RL_F1)
+    ev += _klick_mit(90, 260, 162)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, wurzel=wurzel)
+    assert any(z.startswith("handbuch aaa.md") for z in log), log
+    assert any(z.startswith("handbuch bbb.md") for z in log), log
