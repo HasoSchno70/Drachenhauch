@@ -38,8 +38,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 12 | Auswahl erweitern/verkleinern, Auswahl in ein Unterprogramm herauslösen, zwei Reiter nebeneinander vergleichen |
 | 13 | Vorschau vor dem Umbau, Parameter umsortieren samt Aufrufen, Gerüst beim Tippen (`END IF` kommt mit) |
 | 14 | Parameter umsortieren **im ganzen Projekt**, Aufrufer eines Unterprogramms auflisten, Signatur-Platzhalter bei der Vervollständigung |
+| 15 | Einwand, wenn der neue Name schon vergeben ist; Parameter hinzufügen und entfernen; die Aufrufer als **Baum** |
 
-## Was sie heute kann (Stand 14, 12.09.2026)
+## Was sie heute kann (Stand 15, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -62,9 +63,9 @@ kann, steht darunter vollständig, ohne Stände.
 | Werkzeugleiste | Unter dem Menü eine Reihe **Sinnbilder** für das, was man ständig braucht: neu, öffnen, sichern, starten, stoppen, prüfen, debuggen, suchen, Handbuch, Einstellungen. Jeder Knopf ruft denselben Befehl wie sein Menüpunkt und nennt im Tooltip sein Kürzel; abschaltbar unter Ansicht | — |
 | Kacheln | Auf der Willkommensseite acht wichtige Beispiele **mit einem Bild davon**. Die Bilder entstehen, indem das Beispiel wirklich läuft (`dhrt bild`), eines nach dem anderen im Hintergrund und unsichtbar; danach liegen sie neben der Sitzung und sind sofort da. Ein Klick öffnet das Beispiel | — |
 | Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
-| Umbauen | **Parameter umsortieren** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke in eine andere Reihenfolge bringen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
-| Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und Parameter-Umsortieren zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U | — |
-| Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts, in derselben Liste wie die Projektsuche. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
+| Umbauen | **Parameter umsortieren, hinzufügen, entfernen** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke umstellen, einen neuen aufnehmen (`hp AS INTEGER = 0` — der Teil hinter dem `=` kommt an jede Aufrufstelle) oder einen wegnehmen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
+| Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
+| Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts. Als **Baum**: unter jedem Aufruf stehen die Aufrufer des Unterprogramms, in dem er steht, drei Ebenen tief; ein Klick springt hin. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
 | Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
 | Umbenennen | **Im ganzen Projekt umbenennen** (Strg+Umschalt+F6): der Name unter der Marke, in allen `.dh` des Projektordners. `CODE_RENAME$` lässt Kommentare und Zeichenketten aus, wie beim Umbenennen in einer Datei | Strg+Umschalt+F6 |
 | Vergleichen | **Zwei Reiter nebeneinander**: die geteilte Ansicht geht an, und in beiden Feldern bekommt jede abweichende Zeile eine Marke. Verglichen wird ohne git über die längste gemeinsame Teilfolge auf Zeilen — die Reiter müssen dafür nicht gesichert sein, und genau während man tippt will man es wissen | — |
@@ -239,7 +240,9 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `parameter <anzahl>` (0 = keins gefunden),
 `parameter umgestellt <stellen> <uebergangen>` (-1 = abgebrochen, ein
 anderer Reiter war ungesichert), `aufrufer <anzahl>`,
-`platzhalter <nummer> von <anzahl>`,
+`platzhalter <nummer> von <anzahl>`, `umbau einwand`,
+`parameter neu <deklaration>`, `parameter weg <nummer>`,
+`aufrufer baum <knoten>`, `aufrufer sprung <zeile>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
@@ -275,13 +278,16 @@ Aufrufen und das Schlüsselwort-Gerüst, das beim Tippen mitwächst.
 Auch die Liste aus Stand 13 ist abgearbeitet: der Umbau über
 Dateigrenzen, die Liste der Aufrufer und die Signatur-Platzhalter.
 
+Auch die Liste aus Stand 14 ist abgearbeitet: der Einwand beim Umbenennen
+auf einen vergebenen Namen, das Hinzufügen und Entfernen von Parametern,
+und die Aufrufer als Baum.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: ein Unterprogramm samt Aufrufen **umbenennen** über das
-ganze Projekt gibt es zwar, aber ohne die Prüfung, ob der neue Name dort
-schon vergeben ist; ein Parameter ließe sich auch **hinzufügen oder
-entfernen** (mit einem Vorgabewert an jeder Aufrufstelle); und die
-Aufrufer-Liste könnte als **Baum** zeigen, wer die Aufrufer wiederum ruft.
-Ein
+Nächstes anstünde: ein Unterprogramm in eine **andere Datei** verschieben
+(samt der Frage, ob die Aufrufer sie schon importieren); die Umbauten
+kennen nur Unterprogramme, nicht **Klassen und ihre Methoden**; und ein
+Umbau, der schon geschrieben ist, ließe sich **in einem Zug zurücknehmen**
+statt Datei für Datei. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

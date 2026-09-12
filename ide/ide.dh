@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 14)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 15)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -66,6 +66,10 @@
 '  "Wer ruft das auf?" (Umschalt+F12) listet die Aufrufstellen, und die
 '  Vervollstaendigung setzt die Argumente einer Signatur als Platzhalter
 '  (der Tabulator geht zum naechsten).
+'  Stand 15 dazu: ein Einwand, wenn der neue Name im Projekt schon
+'  vergeben ist; Parameter hinzufuegen und entfernen (der Wert hinter dem
+'  Gleichheitszeichen kommt an jede Aufrufstelle); und die Aufrufer als
+'  BAUM -- unter jedem Aufruf stehen die Aufrufer seines Unterprogramms.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -292,6 +296,8 @@ DIM dlgEingabe AS GUI_WINDOW : dlgEingabe = 0
 DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
 ' Rueckfrage beim Schliessen EINES Reiters (dlgSchliessen fragt beim Beenden).
 DIM dlgTabZu AS GUI_WINDOW : dlgTabZu = 0
+' Der Prompt fuer einen neuen Parameter (Punkt B aus Stand 15).
+DIM dlgParamNeu AS GUI_WINDOW : dlgParamNeu = 0
 DIM tabZuIndex AS INTEGER : tabZuIndex = -1
 DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
@@ -698,9 +704,19 @@ DIM lblParam AS GUI_WIDGET : lblParam = GUI_LABEL(winParam, "", 12, 10)
 DIM lstParam AS GUI_WIDGET : lstParam = GUI_LISTBOX(winParam, 12, 36, 300, 200, [])
 DIM btnParamHoch AS GUI_WIDGET : btnParamHoch = GUI_BUTTON(winParam, "Nach oben", 322, 36, 120, 30)
 DIM btnParamRunter AS GUI_WIDGET : btnParamRunter = GUI_BUTTON(winParam, "Nach unten", 322, 72, 120, 30)
+DIM btnParamPlus AS GUI_WIDGET : btnParamPlus = GUI_BUTTON(winParam, "+ Parameter", 322, 116, 120, 30)
+DIM btnParamMinus AS GUI_WIDGET : btnParamMinus = GUI_BUTTON(winParam, "- Parameter", 322, 152, 120, 30)
 DIM btnParamOk AS GUI_WIDGET : btnParamOk = GUI_BUTTON(winParam, "Uebernehmen", 12, 248, 140, 30)
 DIM btnParamWeg AS GUI_WIDGET : btnParamWeg = GUI_BUTTON(winParam, "Abbrechen", 162, 248, 120, 30)
 GUI_WINDOW_CANCEL(winParam, btnParamWeg)
+
+' --- Wer ruft das auf: der Baum ---------------------------------------
+DIM winAufruf AS GUI_WINDOW : winAufruf = GUI_WINDOW("Aufrufer", 300, 120, 760, 520)
+GUI_WINDOW_VISIBLE(winAufruf, FALSE)
+GUI_WINDOW_RESIZABLE(winAufruf, TRUE)
+DIM lblAufruf AS GUI_WIDGET : lblAufruf = GUI_LABEL(winAufruf, "", 10, 10)
+DIM baumAufruf AS GUI_WIDGET : baumAufruf = GUI_TREE(winAufruf, 10, 36, 736, 440)
+DIM aufrDirekt AS INTEGER : aufrDirekt = 0
 
 ' --- Vorschau vor dem Umbau ------------------------------------------
 ' Ein Umbau schreibt in Dateien, die man nicht alle offen hat. Bis Stand 12
@@ -725,6 +741,10 @@ DIM umbauPfade AS ARRAY OF STRING : umbauPfade = []
 DIM umbauTexte AS ARRAY OF STRING : umbauTexte = []
 DIM umbauMeldung AS STRING : umbauMeldung = ""
 DIM umbauProt AS STRING : umbauProt = ""
+' Ein Einwand gegen den Umbau (leer = keiner). Er steht OBEN in der
+' Vorschau und schaltet sie ein, auch wenn sie abgeschaltet ist: wer einen
+' Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht.
+DIM umbauWarnung AS STRING : umbauWarnung = ""
 DIM umbauZeile AS INTEGER : umbauZeile = 0
 DIM umbauSpalte AS INTEGER : umbauSpalte = 1
 
@@ -3665,7 +3685,13 @@ END FUNCTION
 ' es auch von einem Aufruf aus), sonst das Unterprogramm um die Marke.
 DIM paramName AS STRING : paramName = ""
 DIM paramArgs AS ARRAY OF STRING : paramArgs = []
+' Welche Argumente die neue Liste hat: >= 0 ist die Nummer des alten,
+' negativ steht fuer einen NEUEN Parameter (-1 = der erste in paramNeuDecl).
 DIM paramFolge AS ARRAY OF INTEGER : paramFolge = []
+' Je neuem Parameter die Deklaration (fuer die Definition) und der Wert
+' (fuer jede Aufrufstelle) -- `hp AS INTEGER = 0` und `0`.
+DIM paramNeuDecl AS ARRAY OF STRING : paramNeuDecl = []
+DIM paramNeuWert AS ARRAY OF STRING : paramNeuWert = []
 
 FUNCTION defStelle(quelle AS STRING, name AS STRING) AS INTEGER
     IF name = "" THEN RETURN -1
@@ -3722,27 +3748,27 @@ SUB parameterFragen()
     END IF
     DIM pvon AS ARRAY OF INTEGER : pvon = []
     DIM pbis AS ARRAY OF INTEGER : pbis = []
-    IF argsZerlegen(quelle, auf, pvon, pbis) < 0 OR LEN(pvon) < 2 THEN
-        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: '" + name + "' hat weniger als zwei Parameter.")
+    ' Auch ohne Parameter aufmachen: mit [+ Parameter] ist das der Weg, dem
+    ' Unterprogramm seinen ersten zu geben.
+    IF argsZerlegen(quelle, auf, pvon, pbis) < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Parameter: bei '" + name + "' fehlt die schliessende Klammer.")
         protokoll("parameter 0")
         RETURN
     END IF
     paramName = name
-    paramArgs = [] : paramFolge = []
-    GUI_LISTBOX_CLEAR(lstParam)
+    paramArgs = [] : paramFolge = [] : paramNeuDecl = [] : paramNeuWert = []
     DIM k AS INTEGER
     FOR k = 0 TO LEN(pvon) - 1
         DIM stueck AS STRING : stueck = TRIM$(MID$(quelle, pvon[k], pbis[k] - pvon[k]))
         ARRAY_PUSH(paramArgs, stueck)
         ARRAY_PUSH(paramFolge, k)
-        GUI_LISTBOX_ADD(lstParam, stueck)
     NEXT
+    parameterListe()
     GUI_LISTBOX_SET_SELECTED(lstParam, 0)
     ' Immer an dieselbe Stelle: ein Fenster, das dort aufgeht, wo man es
     ' zuletzt hingeschoben hat, sucht man beim naechsten Mal.
     GUI_WINDOW_SET_BOUNDS(winParam, 420, 200, 460, 320)
     GUI_WINDOW_TITLE(winParam, "Parameter von " + name)
-    GUI_SET_TEXT(lblParam, STR$(LEN(paramArgs)) + " Parameter -- die Aufrufe ziehen mit.")
     GUI_WINDOW_VISIBLE(winParam, TRUE)
     GUI_FOCUS(lstParam)
     protokoll("parameter " + STR$(LEN(paramArgs)))
@@ -3754,8 +3780,7 @@ SUB parameterSchieben(richtung AS INTEGER)
     IF sel < 0 OR ziel < 0 OR ziel >= LEN(paramFolge) THEN RETURN
     DIM h AS INTEGER : h = paramFolge[sel]
     paramFolge[sel] = paramFolge[ziel] : paramFolge[ziel] = h
-    GUI_LISTBOX_SET_ITEM(lstParam, sel, paramArgs[paramFolge[sel]])
-    GUI_LISTBOX_SET_ITEM(lstParam, ziel, paramArgs[paramFolge[ziel]])
+    parameterListe()
     GUI_LISTBOX_SET_SELECTED(lstParam, ziel)
 END SUB
 
@@ -3787,13 +3812,26 @@ SUB aufrufStellen(quelle AS STRING, name AS STRING, stellen AS ARRAY OF INTEGER)
     WEND
 END SUB
 
-' Die Argumente aller Aufrufe von `name` in `quelle` umstellen.
+' Die Argumente aller Aufrufe von `name` in `quelle` umbauen.
+'
+' `folge` sagt, woraus die neue Liste besteht: eine Zahl >= 0 ist die
+' Nummer des alten Arguments, eine negative steht fuer einen NEUEN
+' Parameter -- `-1` meint `neuDecl[0]`/`neuWert[0]`, `-2` den naechsten.
+' Zwei Texte je neuem Parameter, weil die DEFINITION eine Deklaration
+' braucht (`hp AS INTEGER = 0`) und der Aufruf einen Wert (`0`).
+'
+' `alteZahl` ist die Zahl der Parameter VORHER: nur Aufrufe mit genau so
+' vielen Argumenten werden angefasst.
 ' `zaehler` kommt gefuellt zurueck: [0] geaenderte Stellen, [1] uebergangene.
 FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF INTEGER, _
-                          zaehler AS ARRAY OF INTEGER) AS STRING
+                          neuDecl AS ARRAY OF STRING, neuWert AS ARRAY OF STRING, _
+                          alteZahl AS INTEGER, zaehler AS ARRAY OF INTEGER) AS STRING
     DIM neu AS STRING : neu = quelle
     DIM stellen AS ARRAY OF INTEGER : stellen = []
     aufrufStellen(quelle, name, stellen)
+    ' Die Definition ist fuer den Sucher ein Aufruf wie jeder andere -- nur
+    ' bekommt sie die Deklarationen statt der Werte.
+    DIM defAuf AS INTEGER : defAuf = defStelle(quelle, name)
     DIM geaendert AS INTEGER : geaendert = 0
     DIM uebergangen AS INTEGER : uebergangen = 0
     DIM k AS INTEGER
@@ -3806,7 +3844,7 @@ FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF IN
         ' Nur Aufrufe mit genau so vielen Argumenten: wer einen Vorgabewert
         ' weglaesst oder mit Namen uebergibt (`x: 1`), meint eine andere
         ' Zuordnung -- die still umzustellen waere schlimmer als es zu lassen.
-        IF zu < 0 OR LEN(avon) <> LEN(folge) THEN
+        IF zu < 0 OR LEN(avon) <> alteZahl THEN
             IF zu >= 0 AND LEN(avon) > 0 THEN uebergangen = uebergangen + 1
             CONTINUE
         END IF
@@ -3821,9 +3859,15 @@ FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF IN
             uebergangen = uebergangen + 1
             CONTINUE
         END IF
+        DIM istDef AS BOOLEAN : istDef = stellen[s] = defAuf
         DIM neuArgs AS ARRAY OF STRING : neuArgs = []
         FOR k = 0 TO LEN(folge) - 1
-            ARRAY_PUSH(neuArgs, randWeg$(stuecke[folge[k]]))
+            IF folge[k] >= 0 THEN
+                ARRAY_PUSH(neuArgs, randWeg$(stuecke[folge[k]]))
+            ELSE
+                DIM j AS INTEGER : j = -folge[k] - 1
+                ARRAY_PUSH(neuArgs, IIF(istDef, neuDecl[j], neuWert[j]))
+            END IF
         NEXT
         neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
         geaendert = geaendert + 1
@@ -3842,17 +3886,69 @@ FUNCTION andererUngesichert(ausser AS INTEGER) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Die Liste im Fenster neu aus `paramFolge` aufbauen.
+SUB parameterListe()
+    GUI_LISTBOX_CLEAR(lstParam)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(paramFolge) - 1
+        IF paramFolge[k] >= 0 THEN
+            GUI_LISTBOX_ADD(lstParam, paramArgs[paramFolge[k]])
+        ELSE
+            GUI_LISTBOX_ADD(lstParam, paramNeuDecl[-paramFolge[k] - 1] + "   [neu]")
+        END IF
+    NEXT
+    GUI_SET_TEXT(lblParam, STR$(LEN(paramFolge)) + " Parameter (vorher " + _
+                 STR$(LEN(paramArgs)) + ") -- die Aufrufe ziehen mit.")
+END SUB
+
+' Einen neuen Parameter aufnehmen. `text` ist eine Deklaration mit Wert,
+' also `hp AS INTEGER = 0`: die Definition bekommt sie ganz, jede
+' Aufrufstelle nur den Teil hinter dem Gleichheitszeichen.
+SUB parameterNeu(text AS STRING)
+    DIM t AS STRING : t = TRIM$(text)
+    DIM gl AS INTEGER : gl = INSTR(t, "=")
+    IF t = "" OR gl < 0 OR TRIM$(MID$(t, gl + 1)) = "" THEN
+        GUI_SET_TEXT(lblStatus, "Neuer Parameter: bitte in der Form 'hp AS INTEGER = 0' -- " + _
+                     "der Wert hinter dem = kommt an jede Aufrufstelle.")
+        RETURN
+    END IF
+    ARRAY_PUSH(paramNeuDecl, t)
+    ARRAY_PUSH(paramNeuWert, TRIM$(MID$(t, gl + 1)))
+    ARRAY_PUSH(paramFolge, -LEN(paramNeuDecl))
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, LEN(paramFolge) - 1)
+    GUI_FOCUS(lstParam)
+    protokoll("parameter neu " + t)
+END SUB
+
+SUB parameterWeg()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
+    IF sel < 0 OR sel >= LEN(paramFolge) THEN RETURN
+    IF LEN(paramFolge) <= 1 THEN
+        GUI_SET_TEXT(lblStatus, "Der letzte Parameter bleibt -- ein Unterprogramm ganz ohne " + _
+                     "Klammerinhalt waere ein anderer Umbau.")
+        RETURN
+    END IF
+    ARRAY_REMOVE_AT(paramFolge, sel)
+    parameterListe()
+    GUI_LISTBOX_SET_SELECTED(lstParam, MIN(sel, LEN(paramFolge) - 1))
+    GUI_FOCUS(lstParam)
+    protokoll("parameter weg " + STR$(sel))
+END SUB
+
 SUB parameterUebernehmen()
     GUI_WINDOW_VISIBLE(winParam, FALSE)
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR paramName = "" THEN RETURN
-    DIM gleich AS BOOLEAN : gleich = TRUE
+    DIM gleich AS BOOLEAN : gleich = LEN(paramFolge) = LEN(paramArgs)
     DIM k AS INTEGER
-    FOR k = 0 TO LEN(paramFolge) - 1
-        IF paramFolge[k] <> k THEN gleich = FALSE
-    NEXT
     IF gleich THEN
-        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: nichts umgestellt.")
+        FOR k = 0 TO LEN(paramFolge) - 1
+            IF paramFolge[k] <> k THEN gleich = FALSE
+        NEXT
+    END IF
+    IF gleich THEN
+        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: nichts geaendert.")
         GUI_FOCUS(ta)
         RETURN
     END IF
@@ -3866,8 +3962,11 @@ SUB parameterUebernehmen()
         RETURN
     END IF
     umbauLeeren()
+    DIM alteZahl AS INTEGER : alteZahl = LEN(paramArgs)
     DIM zaehler AS ARRAY OF INTEGER : zaehler = []
-    DIM neu AS STRING : neu = parameterInText$(GUI_TEXT(ta), paramName, paramFolge, zaehler)
+    DIM neu AS STRING
+    neu = parameterInText$(GUI_TEXT(ta), paramName, paramFolge, paramNeuDecl, paramNeuWert, _
+                           alteZahl, zaehler)
     DIM geaendert AS INTEGER : geaendert = zaehler[0]
     DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
@@ -3879,13 +3978,15 @@ SUB parameterUebernehmen()
         DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
         IF INSTR(alt, paramName) < 0 THEN CONTINUE
         DIM z2 AS ARRAY OF INTEGER : z2 = []
-        DIM frisch AS STRING : frisch = parameterInText$(alt, paramName, paramFolge, z2)
+        DIM frisch AS STRING
+        frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
+                                  alteZahl, z2)
         geaendert = geaendert + z2[0]
         uebergangen = uebergangen + z2[1]
         IF frisch <> alt THEN umbauVormerken(-1, pfad, frisch)
     NEXT
     DIM sagen AS STRING
-    sagen = "Parameter von " + paramName + " umgestellt -- " + STR$(geaendert) + " Stelle(n) in " + _
+    sagen = "Parameter von " + paramName + ": " + STR$(geaendert) + " Stelle(n) in " + _
             STR$(LEN(umbauTexte)) + " Datei(en)."
     IF uebergangen > 0 THEN
         sagen = sagen + " " + STR$(uebergangen) + " Aufruf(e) uebergangen (andere Zahl von " + _
@@ -3900,6 +4001,11 @@ END SUB
 ' Unterprogramm unter der Marke GERUFEN wird, ueber alle Dateien des
 ' Projekts. Die Definition selbst steht nicht dabei -- sie ist kein Aufruf,
 ' und wer sie sucht, hat F12.
+'
+' Als BAUM, nicht als Liste: unter jedem Aufruf stehen die Aufrufer des
+' Unterprogramms, in dem er steht. Wer wissen will, wie eine Funktion
+' ueberhaupt erreicht wird, sieht es damit in einem Bild statt in vier
+' Suchen.
 '
 ' Gesucht wird ZEILENweise: in Drachenhauch enden Kommentar und
 ' Zeichenkette an der Zeile, also ist eine Zeile fuer sich vollstaendig zu
@@ -3930,6 +4036,80 @@ FUNCTION aufrufInZeile(zeile AS STRING, name AS STRING) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Der Name des Unterprogramms, in dem `zeile` steht -- "" fuers
+' Hauptprogramm.
+FUNCTION unterprogrammName$(quelle AS STRING, zeile AS INTEGER) AS STRING
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    (uv, ub) = umgebendesUnterprogramm(quelle, zeile)
+    IF uv < 1 THEN RETURN ""
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF uv > LEN(zeilen) THEN RETURN ""
+    DIM t AS STRING : t = TRIM$(zeilen[uv - 1])
+    DIM gross AS STRING : gross = UPPER$(t)
+    DIM ab AS INTEGER : ab = -1
+    IF LEFT$(gross, 4) = "SUB " THEN ab = 4
+    IF LEFT$(gross, 9) = "FUNCTION " THEN ab = 9
+    IF ab < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+    DIM kl AS INTEGER : kl = INSTR(rest, "(")
+    IF kl <= 0 THEN RETURN ""
+    RETURN TRIM$(LEFT$(rest, kl))
+END FUNCTION
+
+' Der Quelltext einer Projektdatei -- aus dem REITER, wenn sie offen ist.
+FUNCTION projektQuelle$(pfad AS STRING) AS STRING
+    DIM t AS INTEGER : t = tabMitPfad(pfad)
+    IF t >= 0 THEN RETURN GUI_TEXT(tabFelder[t])
+    DIM q AS STRING : q = ""
+    TRY
+        q = dateiLesen(pfad)
+    CATCH e
+        q = ""
+    END TRY
+    RETURN q
+END FUNCTION
+
+' Je Knoten des Baums die Datei und die Zeile, zu der er gehoert.
+DIM aufrKnoten AS ARRAY OF INTEGER : aufrKnoten = []
+DIM aufrDateien AS ARRAY OF STRING : aufrDateien = []
+DIM aufrZeilen AS ARRAY OF INTEGER : aufrZeilen = []
+DIM aufrWahl AS INTEGER : aufrWahl = -1
+DIM aufrZahl AS INTEGER : aufrZahl = 0
+
+' Die Aufrufer von `name` unter `eltern` haengen, und darunter wieder deren
+' Aufrufer. `gesehen` bricht Kreise auf: ruft A das B und B das A, kaeme man
+' sonst nicht heraus. Ein Name steht darum hoechstens EINMAL im Baum.
+SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen AS ARRAY OF STRING)
+    IF tiefe > 3 OR name = "" OR aufrZahl >= 200 THEN RETURN
+    IF ARRAY_INDEXOF(gesehen, LOWER$(name)) >= 0 THEN RETURN
+    ARRAY_PUSH(gesehen, LOWER$(name))
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM quelle AS STRING : quelle = projektQuelle$(pfad)
+        IF quelle = "" OR INSTR(quelle, name) < 0 THEN CONTINUE
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF aufrZahl >= 200 THEN BREAK
+            IF NOT aufrufInZeile(zeilen[i], name) THEN CONTINUE
+            DIM ober AS STRING : ober = unterprogrammName$(quelle, i + 1)
+            DIM wo AS STRING : wo = IIF(ober = "", "Hauptprogramm", ober)
+            DIM knoten AS INTEGER
+            knoten = GUI_TREE_ADD(baumAufruf, eltern, d + ":" + STR$(i + 1) + _
+                                  "  (" + wo + ")   " + TRIM$(zeilen[i]))
+            ARRAY_PUSH(aufrKnoten, knoten)
+            ARRAY_PUSH(aufrDateien, pfad)
+            ARRAY_PUSH(aufrZeilen, i + 1)
+            aufrZahl = aufrZahl + 1
+            IF tiefe = 0 THEN aufrDirekt = aufrDirekt + 1
+            aufruferAeste(ober, knoten, tiefe + 1, gesehen)
+        NEXT
+    NEXT
+END SUB
+
 SUB aufruferZeigen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 THEN RETURN
@@ -3939,45 +4119,43 @@ SUB aufruferZeigen()
         protokoll("aufrufer 0")
         RETURN
     END IF
-    GUI_LISTBOX_CLEAR(lstProbleme)
-    DIM sd AS ARRAY OF STRING : sd = []
-    DIM sz AS ARRAY OF INTEGER : sz = []
-    DIM treffer AS INTEGER : treffer = 0
-    DIM inDateien AS INTEGER : inDateien = 0
-    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        ' Der offene Reiter zaehlt mit dem Stand IM Editor, nicht mit dem
-        ' auf der Platte -- sonst sucht man in etwas, das man gerade
-        ' umgeschrieben hat.
-        DIM t AS INTEGER : t = tabMitPfad(pfad)
-        DIM zeilen AS ARRAY OF STRING
-        IF t >= 0 THEN
-            zeilen = SPLIT$(GUI_TEXT(tabFelder[t]), NL)
-        ELSE
-            zeilen = READLINES(pfad)
-        END IF
-        DIM vorher AS INTEGER : vorher = treffer
-        DIM i AS INTEGER
-        FOR i = 0 TO LEN(zeilen) - 1
-            IF treffer >= 500 THEN BREAK
-            IF aufrufInZeile(zeilen[i], name) THEN
-                ARRAY_PUSH(sd, d)
-                ARRAY_PUSH(sz, i + 1)
-                GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
-                treffer = treffer + 1
-            END IF
-        NEXT
-        IF treffer > vorher THEN inDateien = inDateien + 1
+    GUI_TREE_CLEAR(baumAufruf)
+    aufrKnoten = [] : aufrDateien = [] : aufrZeilen = []
+    aufrZahl = 0 : aufrDirekt = 0 : aufrWahl = -1
+    DIM gesehen AS ARRAY OF STRING : gesehen = []
+    aufruferAeste(name, -1, 0, gesehen)
+    GUI_WINDOW_TITLE(winAufruf, "Wer ruft " + name + " auf?")
+    DIM sagen AS STRING
+    IF aufrZahl = 0 THEN
+        sagen = "Niemand ruft '" + name + "' -- jedenfalls nicht in diesem Projektordner."
+    ELSE
+        sagen = STR$(aufrDirekt) + " Aufruf(e) unmittelbar, " + STR$(aufrZahl) + _
+                " Knoten im Baum. Ein Klick springt hin."
+    END IF
+    GUI_SET_TEXT(lblAufruf, sagen)
+    GUI_WINDOW_VISIBLE(winAufruf, TRUE)
+    GUI_FOCUS(baumAufruf)
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("aufrufer " + STR$(aufrDirekt))
+    protokoll("aufrufer baum " + STR$(aufrZahl))
+END SUB
+
+' Ein Klick im Baum springt zur Stelle. Wie beim Projektbaum ueber die
+' Auswahl, nicht ueber einen Knopf -- ein Knopf mehr fuer etwas, das der
+' Klick schon meint.
+SUB aufruferAbfragen()
+    IF NOT GUI_WINDOW_SHOWN(winAufruf) THEN RETURN
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(baumAufruf)
+    IF sel < 0 OR sel = aufrWahl THEN RETURN
+    aufrWahl = sel
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aufrKnoten) - 1
+        IF aufrKnoten[i] <> sel THEN CONTINUE
+        dateiOeffnen(aufrDateien[i])
+        IF aktivesFeld() >= 0 THEN GUI_TEXTAREA_GOTO(aktivesFeld(), aufrZeilen[i], 1)
+        protokoll("aufrufer sprung " + STR$(aufrZeilen[i]))
+        RETURN
     NEXT
-    sucheDateien = sd
-    sucheZeilen = sz
-    problemModus = 1
-    GUI_SET_TEXT(lblProbleme, "Wer ruft '" + name + "' auf: " + STR$(treffer) + " Stelle(n) in " + _
-                 STR$(inDateien) + " Datei(en) -- Umschalt+F7 zeigt wieder die Probleme")
-    GUI_SET_TEXT(lblStatus, STR$(treffer) + " Aufruf(e) von '" + name + "'.")
-    protokoll("aufrufer " + STR$(treffer))
 END SUB
 
 ' --- Zwei Reiter nebeneinander vergleichen ----------------------------
@@ -4171,6 +4349,25 @@ FUNCTION umbenennenInText$(quelle AS STRING, wort AS STRING, neu AS STRING) AS S
     RETURN quelle
 END FUNCTION
 
+' Gibt es `name` im Projekt schon als SUB, FUNCTION, CLASS oder Methode?
+' Liefert die Fundstelle als Text ("helfer.dh:12") oder "".
+'
+' Geprueft wird gegen den Symbolindex, nicht gegen den Uebersetzer: zwei
+' Unterprogramme desselben Namens sind kein Uebersetzungsfehler, das
+' zweite verdeckt das erste einfach. Genau das will man beim Umbenennen
+' vorher wissen.
+FUNCTION nameVergeben$(name AS STRING) AS STRING
+    symbolIndexBauen(TRUE)
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(symNamen) - 1
+        IF LOWER$(symNamen[i]) = klein THEN
+            RETURN BASENAME(symPfade[i]) + ":" + STR$(symZeilen[i])
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
 SUB umbenennenImProjekt(neu AS STRING)
     IF projektUngesichert() THEN
         GUI_SET_TEXT(lblStatus, "Erst sichern: ein Reiter hat ungesicherte Aenderungen.")
@@ -4191,6 +4388,10 @@ SUB umbenennenImProjekt(neu AS STRING)
         umbauVormerken(-1, pfad, frisch)
     NEXT
     DIM geaendert AS INTEGER : geaendert = LEN(umbauTexte)
+    DIM schon AS STRING : schon = nameVergeben$(neu)
+    IF schon <> "" THEN
+        umbauWarnung = "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
+    END IF
     umbauStarten("'" + wort + "' -> '" + neu + "' im Projekt", _
                  "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).", _
                  "projekt umbenannt " + STR$(geaendert))
@@ -4284,6 +4485,7 @@ END SUB
 SUB umbauLeeren()
     umbauTabs = [] : umbauPfade = [] : umbauTexte = []
     umbauZeile = 0 : umbauSpalte = 1
+    umbauWarnung = ""
 END SUB
 
 ' `tab` >= 0 schreibt in den Reiter (Undo bleibt), sonst in die Datei.
@@ -4353,7 +4555,7 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     END IF
     umbauMeldung = meldung
     umbauProt = prot
-    IF NOT vorschauAn THEN
+    IF NOT vorschauAn AND umbauWarnung = "" THEN
         umbauSchreiben()
         RETURN
     END IF
@@ -4370,14 +4572,20 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
         plus = plus + LEN(diffRechts)
         ARRAY_PUSH(stuecke, "--- " + BASENAME(name) + NL + d)
     NEXT
-    GUI_SET_TEXT(taUmbau, JOIN$(stuecke, NL + NL))
+    DIM kopf AS STRING : kopf = ""
+    IF umbauWarnung <> "" THEN kopf = "@@ " + umbauWarnung + NL + NL
+    GUI_SET_TEXT(taUmbau, kopf + JOIN$(stuecke, NL + NL))
     diffFaerben(taUmbau)
     GUI_WINDOW_TITLE(winUmbau, "Vorschau: " + titel)
-    GUI_SET_TEXT(lblUmbau, STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
-                 " Zeilen weniger, " + STR$(plus) + " mehr -- Enter uebernimmt, ESC verwirft.")
+    DIM zeile AS STRING
+    zeile = STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
+            " Zeilen weniger, " + STR$(plus) + " mehr -- Enter uebernimmt, ESC verwirft."
+    IF umbauWarnung <> "" THEN zeile = umbauWarnung + "  |  " + zeile
+    GUI_SET_TEXT(lblUmbau, zeile)
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
     protokoll("umbau vorschau " + STR$(LEN(umbauTexte)) + " " + STR$(minus) + " " + STR$(plus))
+    IF umbauWarnung <> "" THEN protokoll("umbau einwand")
 END SUB
 
 SUB umbauVerwerfen()
@@ -4459,6 +4667,10 @@ SUB umbenennenAusfuehren(neu AS STRING)
     umbauLeeren()
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
     umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
+    DIM schon AS STRING : schon = nameVergeben$(neu)
+    IF schon <> "" THEN
+        umbauWarnung = "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
+    END IF
     umbauStarten("Umbenennen in '" + neu + "'", _
                  STR$(n) + " Stellen umbenannt in '" + neu + "'.", _
                  "umbenannt " + STR$(n) + " " + neu)
@@ -6093,6 +6305,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         END IF
     NEXT
     vorschauNachziehen()
+    aufruferAbfragen()
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
@@ -6195,6 +6408,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnUmbauWeg) THEN umbauVerwerfen()
     IF GUI_CLICKED(btnParamHoch) THEN parameterSchieben(-1)
     IF GUI_CLICKED(btnParamRunter) THEN parameterSchieben(1)
+    IF GUI_CLICKED(btnParamPlus) THEN dlgParamNeu = GUI_PROMPT("Neuer Parameter", _
+        "Deklaration mit Wert -- der Teil hinter dem = kommt an jede Aufrufstelle:", "hp AS INTEGER = 0")
+    IF GUI_CLICKED(btnParamMinus) THEN parameterWeg()
     IF GUI_CLICKED(btnParamOk) THEN parameterUebernehmen()
     IF GUI_CLICKED(btnParamWeg) THEN GUI_WINDOW_VISIBLE(winParam, FALSE) : GUI_FOCUS(aktivesFeld())
 
@@ -6335,6 +6551,17 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             dlgSchliessen = 0 : beenden = TRUE
         ELSEIF a4 = 3 THEN
             dlgSchliessen = 0
+        END IF
+    END IF
+    IF dlgParamNeu <> 0 THEN
+        DIM ap AS INTEGER : ap = GUI_ANSWER(dlgParamNeu)
+        IF ap = 1 THEN
+            DIM ptext AS STRING : ptext = GUI_DIALOG_TEXT(dlgParamNeu)
+            dlgParamNeu = 0
+            parameterNeu(ptext)
+        ELSEIF ap <> 0 THEN
+            dlgParamNeu = 0
+            GUI_FOCUS(lstParam)
         END IF
     END IF
     IF dlgTabZu <> 0 THEN
