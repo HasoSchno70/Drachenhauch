@@ -2875,8 +2875,8 @@ Pfade um ("more than one script filename"); PowerShell nehmen.
 
 **Stufe 22 (2026-09-12):** die drei Punkte nach Stand 21. **Projektbaum mit
 Unterordnern:** die Ordner-Knoten entstehen unterwegs und werden gemerkt
-(`ordPfad`/`ordKnoten`), damit `lib/a.dh` und `lib/b.dh` unter DEMSELBEN
-`lib` landen; aufgeklappt, weil ein Baum, der seine Ordner zuhaelt, beim
+(`ordPfad`/`ordKnoten`), damit zwei Dateien aus demselben Unterordner unter
+DEMSELBEN Knoten landen; aufgeklappt, weil ein Baum, der seine Ordner zuhaelt, beim
 Oeffnen weniger zeigt als vorher. **Umbau vorab pruefen:** `dhrt --check`
 lief bis dahin erst auf dem ERGEBNIS -- also erst, nachdem die Dateien schon
 anders aussahen; jetzt ueber die Texte, die geschrieben WUERDEN, mit der
