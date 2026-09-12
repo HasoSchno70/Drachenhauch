@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 19)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 20)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -84,6 +84,10 @@
 '  Stand 19 dazu: in der Vorschau einzelne Dateien abwaehlen, ein Einwand
 '  wenn der Name im Ziel schon steht, und auch CONST-/DIM-Zeilen lassen
 '  sich verschieben.
+'  Stand 20 dazu: in der Vorschau einzelne BLOECKE auslassen (dahinter
+'  liegt jetzt eine Folge von Schritten statt einer Textausgabe), das
+'  Umbenennen zieht die Handler in .dhform-Dateien mit, und der
+'  Aufrufer-Baum zeigt die im Profil gemessenen Durchlaeufe.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -166,6 +170,11 @@ DIM aktiverTab AS INTEGER : aktiverTab = -1
 
 DIM prozess AS INTEGER : prozess = -1
 DIM prozessDatei AS STRING : prozessDatei = ""
+' Der letzte Profillauf: welche Datei, und wie oft jede Zeile lief. Die
+' Aufrufer-Liste haengt die Zahl an ihre Zeilen.
+DIM profDatei AS STRING : profDatei = ""
+DIM profZeilen AS ARRAY OF INTEGER : profZeilen = []
+DIM profAnzahl AS ARRAY OF INTEGER : profAnzahl = []
 DIM pruefungFaellig AS FLOAT : pruefungFaellig = -1.0
 DIM letzteMarke AS STRING : letzteMarke = ""
 DIM suchtext AS STRING : suchtext = ""
@@ -752,6 +761,7 @@ GUI_WINDOW_RESIZABLE(winAufruf, TRUE)
 DIM lblAufruf AS GUI_WIDGET : lblAufruf = GUI_LABEL(winAufruf, "", 10, 10)
 DIM baumAufruf AS GUI_WIDGET : baumAufruf = GUI_TREE(winAufruf, 10, 36, 736, 440)
 DIM aufrDirekt AS INTEGER : aufrDirekt = 0
+DIM aufrGemessen AS INTEGER : aufrGemessen = 0
 
 ' --- Vorschau vor dem Umbau ------------------------------------------
 ' Ein Umbau schreibt in Dateien, die man nicht alle offen hat. Bis Stand 12
@@ -769,6 +779,8 @@ DIM lstUmbau AS GUI_WIDGET : lstUmbau = GUI_LISTBOX(winUmbau, 8, 30, 220, 508, [
 DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 236, 30, 656, 508)
 DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Uebernehmen", 8, 546, 140, 30)
 DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
+DIM btnUmbauBlock AS GUI_WIDGET
+btnUmbauBlock = GUI_BUTTON(winUmbau, "Block auslassen / aufnehmen", 288, 546, 230, 30)
 GUI_LISTBOX_SET(lstUmbau, "kaestchen", 1)
 GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
 GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
@@ -2491,6 +2503,8 @@ SUB diffFaerben(ta AS GUI_WIDGET)
             farbe = &H70D080
         ELSEIF LEFT$(z, 1) = "-" THEN
             farbe = &HE07070
+        ELSEIF LEFT$(z, 1) = "~" THEN
+            farbe = &H707880        ' ausgelassen: steht da, zaehlt nicht
         ELSEIF LEN(z) >= 7 AND MID$(z, 7, 1) = " " AND LEFT$(z, 1) <> " " THEN
             farbe = &HE0C060        ' die Kennung einer Uebergabe im Verlauf
         END IF
@@ -4508,8 +4522,10 @@ SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen A
             DIM ober AS STRING : ober = unterprogrammName$(quelle, i + 1)
             DIM wo AS STRING : wo = IIF(ober = "", "Hauptprogramm", ober)
             DIM knoten AS INTEGER
+            DIM oft AS STRING : oft = laufZahl$(pfad, i + 1)
+            IF oft <> "" THEN aufrGemessen = aufrGemessen + 1
             knoten = GUI_TREE_ADD(baumAufruf, eltern, d + ":" + STR$(i + 1) + _
-                                  "  (" + wo + ")   " + TRIM$(zeilen[i]))
+                                  "  (" + wo + ")" + oft + "   " + TRIM$(zeilen[i]))
             ARRAY_PUSH(aufrKnoten, knoten)
             ARRAY_PUSH(aufrDateien, pfad)
             ARRAY_PUSH(aufrZeilen, i + 1)
@@ -4519,6 +4535,18 @@ SUB aufruferAeste(name AS STRING, eltern AS INTEGER, tiefe AS INTEGER, gesehen A
         NEXT
     NEXT
 END SUB
+
+' Wie oft diese Zeile im letzten Profillauf gelaufen ist -- "  [12x]" oder
+' "". Ohne Profillauf steht nichts da; eine Null waere eine Aussage, die
+' niemand gemessen hat.
+FUNCTION laufZahl$(pfad AS STRING, zeile AS INTEGER) AS STRING
+    IF profDatei = "" OR wegGleich$(pfad) <> wegGleich$(profDatei) THEN RETURN ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(profZeilen) - 1
+        IF profZeilen[i] = zeile THEN RETURN "  [" + STR$(profAnzahl[i]) + "x]"
+    NEXT
+    RETURN ""
+END FUNCTION
 
 SUB aufruferZeigen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
@@ -4531,7 +4559,7 @@ SUB aufruferZeigen()
     END IF
     GUI_TREE_CLEAR(baumAufruf)
     aufrKnoten = [] : aufrDateien = [] : aufrZeilen = []
-    aufrZahl = 0 : aufrDirekt = 0 : aufrWahl = -1
+    aufrZahl = 0 : aufrDirekt = 0 : aufrWahl = -1 : aufrGemessen = 0
     DIM gesehen AS ARRAY OF STRING : gesehen = []
     aufruferAeste(name, -1, 0, gesehen)
     GUI_WINDOW_TITLE(winAufruf, "Wer ruft " + name + " auf?")
@@ -4548,6 +4576,7 @@ SUB aufruferZeigen()
     GUI_SET_TEXT(lblStatus, sagen)
     protokoll("aufrufer " + STR$(aufrDirekt))
     protokoll("aufrufer baum " + STR$(aufrZahl))
+    IF aufrGemessen > 0 THEN protokoll("aufrufer gemessen " + STR$(aufrGemessen))
 END SUB
 
 ' Ein Klick im Baum springt zur Stelle. Wie beim Projektbaum ueber die
@@ -4778,6 +4807,42 @@ FUNCTION nameVergeben$(name AS STRING) AS STRING
     RETURN ""
 END FUNCTION
 
+' Formulare mitziehen: eine `.dhform` nennt ihre Rueckrufe beim NAMEN
+' ("on_click": "malen"), und GUI_LOAD sucht sie spaeter unter genau dem.
+' Wer das Unterprogramm umbenennt und die Datei stehen laesst, hat einen
+' Knopf, der nichts mehr tut -- ohne Fehlermeldung, denn der Name wird
+' erst beim Klicken gesucht.
+'
+' Ersetzt wird im TEXT, nicht ueber das json-Modul: ein neu geschriebenes
+' JSON haette eine andere Form, und die Vorschau zeigte die ganze Datei als
+' geaendert statt der einen Zeile.
+SUB formulareNachziehen(alt AS STRING, neu AS STRING)
+    IF alt = "" OR neu = "" OR alt = neu THEN RETURN
+    DIM schluessel AS ARRAY OF STRING
+    schluessel = ["on_click", "on_change", "on_focus", "on_blur", "on_enter"]
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(projektOrdner, "*.dhform")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM text AS STRING : text = ""
+        TRY
+            text = JOIN$(READLINES(pfad), NL)
+        CATCH e
+            text = ""
+        END TRY
+        IF text = "" THEN CONTINUE
+        DIM frisch AS STRING : frisch = text
+        DIM k AS STRING
+        FOR EACH k IN schluessel
+            DIM q AS STRING : q = CHR$(34)
+            frisch = REPLACE$(frisch, q + k + q + ": " + q + alt + q, _
+                                      q + k + q + ": " + q + neu + q)
+            frisch = REPLACE$(frisch, q + k + q + ":" + q + alt + q, _
+                                      q + k + q + ":" + q + neu + q)
+        NEXT
+        IF frisch <> text THEN umbauVormerken(tabMitPfad(pfad), pfad, frisch)
+    NEXT
+END SUB
+
 SUB umbenennenImProjekt(neu AS STRING)
     IF projektUngesichert() THEN
         GUI_SET_TEXT(lblStatus, "Erst sichern: ein Reiter hat ungesicherte Aenderungen.")
@@ -4797,6 +4862,7 @@ SUB umbenennenImProjekt(neu AS STRING)
         IF frisch = alt THEN CONTINUE
         umbauVormerken(-1, pfad, frisch)
     NEXT
+    formulareNachziehen(wort, neu)
     DIM geaendert AS INTEGER : geaendert = LEN(umbauTexte)
     umbauWarnung = umbenennEinwand$(wort, neu)
     umbauStarten("'" + wort + "' -> '" + neu + "' im Projekt", _
@@ -4914,53 +4980,170 @@ FUNCTION umbauAlt$(k AS INTEGER) AS STRING
     RETURN t
 END FUNCTION
 
-' Ein Unterschied als Text: geaenderte Zeilen mit `-`/`+`, zwei Zeilen
-' Zusammenhang darum, Ausgelassenes als `...`. Der Vergleich ist derselbe
-' wie beim Nebeneinander (zeilenVergleichen, LCS auf Zeilen) -- zwei
-' Verfahren fuer dieselbe Frage zeigten irgendwann Verschiedenes.
-FUNCTION diffText$(a AS ARRAY OF STRING, b AS ARRAY OF STRING) AS STRING
+' --- Der Unterschied als Folge von SCHRITTEN --------------------------
+' Bis Stand 19 war die Vorschau ein Text: schoen zu lesen, aber nichts, an
+' dem sich etwas abwaehlen liesse. Jetzt steht dahinter eine Liste von
+' Schritten -- je Zeile "bleibt", "faellt weg" oder "kommt dazu" --, und
+' zusammenhaengende Aenderungen bilden einen BLOCK. Ein ausgelassener Block
+' liefert beim Zusammenbauen die ALTE Zeile statt der neuen; der Text der
+' Datei entsteht also aus denselben Schritten, die man sieht.
+DIM opDatei AS ARRAY OF INTEGER : opDatei = []
+DIM opArt AS ARRAY OF INTEGER : opArt = []       ' 0 bleibt, 1 alt, 2 neu
+DIM opText AS ARRAY OF STRING : opText = []
+DIM opHunk AS ARRAY OF INTEGER : opHunk = []     ' -1 = kein Block
+DIM hunkAus AS ARRAY OF INTEGER : hunkAus = []   ' 1 = ausgelassen
+DIM zeigHunk AS ARRAY OF INTEGER : zeigHunk = [] ' je ANGEZEIGTER Zeile
+
+SUB opsLeeren()
+    opDatei = [] : opArt = [] : opText = [] : opHunk = []
+    hunkAus = [] : zeigHunk = []
+END SUB
+
+' Die Schritte einer Datei anhaengen und ihre Bloecke nummerieren.
+SUB opsBauen(k AS INTEGER, a AS ARRAY OF STRING, b AS ARRAY OF STRING)
+    DIM erste AS INTEGER : erste = LEN(opArt)
     zeilenVergleichen(a, b)
-    DIM roh AS ARRAY OF STRING : roh = []
-    DIM ist AS ARRAY OF INTEGER : ist = []       ' 1 = geaendert, 0 = Zusammenhang
     DIM i AS INTEGER : i = 0
     DIM j AS INTEGER : j = 0
     DIM li AS INTEGER : li = 0
     DIM ri AS INTEGER : ri = 0
     WHILE i < LEN(a) OR j < LEN(b)
         IF li < LEN(diffLinks) AND i < LEN(a) AND diffLinks[li] = i + 1 THEN
-            ARRAY_PUSH(roh, "-" + a[i]) : ARRAY_PUSH(ist, 1)
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 1) : ARRAY_PUSH(opText, a[i])
+            ARRAY_PUSH(opHunk, -1)
             i = i + 1 : li = li + 1
         ELSEIF ri < LEN(diffRechts) AND j < LEN(b) AND diffRechts[ri] = j + 1 THEN
-            ARRAY_PUSH(roh, "+" + b[j]) : ARRAY_PUSH(ist, 1)
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 2) : ARRAY_PUSH(opText, b[j])
+            ARRAY_PUSH(opHunk, -1)
             j = j + 1 : ri = ri + 1
         ELSEIF i < LEN(a) AND j < LEN(b) THEN
-            ARRAY_PUSH(roh, " " + a[i]) : ARRAY_PUSH(ist, 0)
+            ARRAY_PUSH(opDatei, k) : ARRAY_PUSH(opArt, 0) : ARRAY_PUSH(opText, a[i])
+            ARRAY_PUSH(opHunk, -1)
             i = i + 1 : j = j + 1
         ELSE
             BREAK
         END IF
     WEND
-    ' Zusammenhang nur nahe an einer Aenderung: ein Unterschied von drei
-    ' Zeilen in einer Datei mit tausend soll drei Zeilen lang zu lesen sein.
-    DIM raus AS ARRAY OF STRING : raus = []
-    DIM luecke AS BOOLEAN : luecke = FALSE
-    DIM k AS INTEGER
-    FOR k = 0 TO LEN(roh) - 1
-        DIM nah AS BOOLEAN : nah = FALSE
-        DIM d AS INTEGER
-        FOR d = MAX(0, k - 2) TO MIN(LEN(roh) - 1, k + 2)
-            IF ist[d] = 1 THEN nah = TRUE
-        NEXT
-        IF nah THEN
-            IF luecke THEN ARRAY_PUSH(raus, "@@ ...")
-            luecke = FALSE
-            ARRAY_PUSH(raus, roh[k])
-        ELSE
-            luecke = TRUE
+    ' Jeder zusammenhaengende Lauf geaenderter Schritte ist ein Block.
+    DIM h AS INTEGER : h = -1
+    DIM n AS INTEGER
+    FOR n = erste TO LEN(opArt) - 1
+        IF opArt[n] = 0 THEN
+            h = -1
+            CONTINUE
         END IF
+        IF h < 0 THEN
+            ARRAY_PUSH(hunkAus, 0)
+            h = LEN(hunkAus) - 1
+        END IF
+        opHunk[n] = h
+    NEXT
+END SUB
+
+' Der Text einer Datei, wie er mit der jetzigen Auswahl aussaehe.
+FUNCTION umbauTextAus$(k AS INTEGER) AS STRING
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM n AS INTEGER
+    FOR n = 0 TO LEN(opDatei) - 1
+        IF opDatei[n] <> k THEN CONTINUE
+        DIM aus AS BOOLEAN : aus = opHunk[n] >= 0 AND hunkAus[opHunk[n]] = 1
+        IF opArt[n] = 0 THEN ARRAY_PUSH(raus, opText[n])
+        IF opArt[n] = 1 AND aus THEN ARRAY_PUSH(raus, opText[n])
+        IF opArt[n] = 2 AND NOT aus THEN ARRAY_PUSH(raus, opText[n])
     NEXT
     RETURN JOIN$(raus, NL)
 END FUNCTION
+
+' Die Anzeige neu bauen -- und mit ihr die Texte, die geschrieben wuerden.
+' Beides aus derselben Quelle: was man sieht, ist was man bekommt.
+SUB umbauAnzeigeBauen()
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
+    zeigHunk = []
+    DIM minus AS INTEGER : minus = 0
+    DIM plus AS INTEGER : plus = 0
+    DIM ausgelassen AS INTEGER : ausgelassen = 0
+    DIM h AS INTEGER
+    FOR h = 0 TO LEN(hunkAus) - 1
+        IF hunkAus[h] = 1 THEN ausgelassen = ausgelassen + 1
+    NEXT
+    IF umbauWarnung <> "" THEN
+        ARRAY_PUSH(zeilen, "@@ " + umbauWarnung) : ARRAY_PUSH(zeigHunk, -1)
+        ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauTexte) - 1
+        umbauTexte[k] = umbauTextAus$(k)
+        DIM name AS STRING : name = umbauPfade[k]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        IF k > 0 THEN
+            ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+        END IF
+        ARRAY_PUSH(zeilen, "--- " + BASENAME(name)) : ARRAY_PUSH(zeigHunk, -1)
+        ' Zusammenhang nur nahe an einer Aenderung: ein Unterschied von drei
+        ' Zeilen in einer Datei mit tausend soll drei Zeilen lang zu lesen sein.
+        DIM luecke AS BOOLEAN : luecke = FALSE
+        DIM n AS INTEGER
+        FOR n = 0 TO LEN(opDatei) - 1
+            IF opDatei[n] <> k THEN CONTINUE
+            DIM nah AS BOOLEAN : nah = FALSE
+            DIM d AS INTEGER
+            FOR d = MAX(0, n - 2) TO MIN(LEN(opArt) - 1, n + 2)
+                IF opDatei[d] = k AND opArt[d] <> 0 THEN nah = TRUE
+            NEXT
+            IF NOT nah THEN
+                luecke = TRUE
+                CONTINUE
+            END IF
+            IF luecke THEN
+                ARRAY_PUSH(zeilen, "@@ ...") : ARRAY_PUSH(zeigHunk, -1)
+                luecke = FALSE
+            END IF
+            DIM aus AS BOOLEAN : aus = opHunk[n] >= 0 AND hunkAus[opHunk[n]] = 1
+            DIM vor AS STRING : vor = " "
+            IF opArt[n] = 1 THEN vor = "-"
+            IF opArt[n] = 2 THEN vor = "+"
+            ' Ein ausgelassener Block traegt eine Tilde: er steht noch da,
+            ' zaehlt aber nicht mehr mit.
+            IF aus AND opArt[n] <> 0 THEN vor = "~"
+            IF opArt[n] = 1 AND NOT aus THEN minus = minus + 1
+            IF opArt[n] = 2 AND NOT aus THEN plus = plus + 1
+            ARRAY_PUSH(zeilen, vor + opText[n]) : ARRAY_PUSH(zeigHunk, opHunk[n])
+        NEXT
+    NEXT
+    GUI_SET_TEXT(taUmbau, JOIN$(zeilen, NL))
+    diffFaerben(taUmbau)
+    DIM zeile AS STRING
+    zeile = STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
+            " Zeilen weniger, " + STR$(plus) + " mehr"
+    IF ausgelassen > 0 THEN zeile = zeile + ", " + STR$(ausgelassen) + " Block/Bloecke ausgelassen"
+    zeile = zeile + " -- Enter uebernimmt, ESC verwirft."
+    IF umbauWarnung <> "" THEN zeile = umbauWarnung + "  |  " + zeile
+    GUI_SET_TEXT(lblUmbau, zeile)
+END SUB
+
+' Den Block unter der Marke auslassen oder wieder aufnehmen.
+SUB umbauBlockKippen()
+    IF NOT GUI_WINDOW_SHOWN(winUmbau) THEN RETURN
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(taUmbau)
+    IF z < 1 OR z > LEN(zeigHunk) THEN RETURN
+    DIM h AS INTEGER : h = zeigHunk[z - 1]
+    IF h < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Auslassen: erst auf eine geaenderte Zeile stellen.")
+        protokoll("umbau block -1")
+        RETURN
+    END IF
+    hunkAus[h] = 1 - hunkAus[h]
+    umbauAnzeigeBauen()
+    GUI_TEXTAREA_GOTO(taUmbau, z, 1)
+    ' Der Fokus geht auf den Knopf, NICHT zurueck in die Anzeige: dort waere
+    ' Enter ein Zeilenumbruch im Unterschied statt des Uebernehmens. Die
+    ' Marke bleibt trotzdem stehen, ein zweiter Klick auf den Knopf nimmt
+    ' den Block wieder auf.
+    GUI_FOCUS(btnUmbauOk)
+    protokoll("umbau block " + STR$(h) + " " + IIF(hunkAus[h] = 1, "aus", "an"))
+END SUB
 
 SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     IF LEN(umbauTexte) = 0 THEN
@@ -4974,21 +5157,11 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
         umbauSchreiben()
         RETURN
     END IF
-    DIM stuecke AS ARRAY OF STRING : stuecke = []
-    DIM minus AS INTEGER : minus = 0
-    DIM plus AS INTEGER : plus = 0
+    opsLeeren()
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
-        DIM alt AS STRING : alt = umbauAlt$(k)
-        DIM name AS STRING : name = umbauPfade[k]
-        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
-        DIM d AS STRING : d = diffText$(SPLIT$(alt, NL), SPLIT$(umbauTexte[k], NL))
-        minus = minus + LEN(diffLinks)
-        plus = plus + LEN(diffRechts)
-        ARRAY_PUSH(stuecke, "--- " + BASENAME(name) + NL + d)
+        opsBauen(k, SPLIT$(umbauAlt$(k), NL), SPLIT$(umbauTexte[k], NL))
     NEXT
-    DIM kopf AS STRING : kopf = ""
-    IF umbauWarnung <> "" THEN kopf = "@@ " + umbauWarnung + NL + NL
     GUI_LISTBOX_CLEAR(lstUmbau)
     DIM ln AS INTEGER
     FOR ln = 0 TO LEN(umbauTexte) - 1
@@ -4997,17 +5170,18 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
         GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
         GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
     NEXT
-    GUI_SET_TEXT(taUmbau, kopf + JOIN$(stuecke, NL + NL))
-    diffFaerben(taUmbau)
+    umbauAnzeigeBauen()
     GUI_WINDOW_TITLE(winUmbau, "Vorschau: " + titel)
-    DIM zeile AS STRING
-    zeile = STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
-            " Zeilen weniger, " + STR$(plus) + " mehr -- Enter uebernimmt, ESC verwirft."
-    IF umbauWarnung <> "" THEN zeile = umbauWarnung + "  |  " + zeile
-    GUI_SET_TEXT(lblUmbau, zeile)
     GUI_WINDOW_VISIBLE(winUmbau, TRUE)
     GUI_FOCUS(btnUmbauOk)
-    protokoll("umbau vorschau " + STR$(LEN(umbauTexte)) + " " + STR$(minus) + " " + STR$(plus))
+    DIM pm AS INTEGER : pm = 0
+    DIM pp AS INTEGER : pp = 0
+    DIM po AS INTEGER
+    FOR po = 0 TO LEN(opArt) - 1
+        IF opArt[po] = 1 THEN pm = pm + 1
+        IF opArt[po] = 2 THEN pp = pp + 1
+    NEXT
+    protokoll("umbau vorschau " + STR$(LEN(umbauTexte)) + " " + STR$(pm) + " " + STR$(pp))
     IF umbauWarnung <> "" THEN protokoll("umbau einwand")
 END SUB
 
@@ -5300,6 +5474,7 @@ SUB umbenennenAusfuehren(neu AS STRING)
     umbauLeeren()
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
     umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
+    formulareNachziehen(umbenennWort, neu)
     umbauWarnung = umbenennEinwand$(umbenennWort, neu)
     umbauStarten("Umbenennen in '" + neu + "'", _
                  STR$(n) + " Stellen umbenannt in '" + neu + "'.", _
@@ -5786,6 +5961,14 @@ SUB profilAnzeigen(zeile AS STRING)
         ARRAY_PUSH(pz, zl[i])
     NEXT
     profilZeilen = pz
+    ' Fuer die Aufrufer-Liste aufheben: WIE OFT eine Zeile gelaufen ist.
+    ' Wer wissen will, welcher Weg der heisse ist, sieht es dann im Baum,
+    ' statt Aufrufstellen und Profil im Kopf zusammenzubringen.
+    profDatei = prozessDatei
+    profZeilen = [] : profAnzahl = []
+    FOR i = 0 TO n - 1
+        ARRAY_PUSH(profZeilen, zl[i]) : ARRAY_PUSH(profAnzahl, za[i])
+    NEXT
     GUI_SET_TEXT(lblProfil, BASENAME(prozessDatei) + ": " + FORMAT$(gesamt * 1000.0, "%.2f") + " ms gesamt, " + STR$(n) + " Zeilen gemessen")
     IF JSON_HAS(j, "error") THEN ausgabe("-- Fehler in Zeile " + STR$(JSON_GET_INT(j, "error_line")) + ": " + JSON_GET_STRING(j, "error"))
     GUI_WINDOW_VISIBLE(winProfil, TRUE)
@@ -7049,6 +7232,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnFarbeWeg) THEN GUI_WINDOW_VISIBLE(winFarbe, FALSE) : farbStart = -1 : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnUmbauOk) THEN umbauSchreiben()
     IF GUI_CLICKED(btnUmbauWeg) THEN umbauVerwerfen()
+    IF GUI_CLICKED(btnUmbauBlock) THEN umbauBlockKippen()
     ' Enter und ESC gelten auch, wenn die Marke in der Dateiliste steht --
     ' eine Liste nimmt die Taste sonst fuer sich, und der Standard-Knopf
     ' kommt nicht mehr dran. Wer gerade etwas abgewaehlt hat, steht aber

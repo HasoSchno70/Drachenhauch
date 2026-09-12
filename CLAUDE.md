@@ -2873,6 +2873,27 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 20 (2026-09-12):** die drei Punkte nach Stand 19. **Bloecke
+auslassen:** hinter der Vorschau liegt jetzt keine Textausgabe mehr,
+sondern eine Folge von SCHRITTEN (`opArt` 0 bleibt / 1 alt / 2 neu, dazu
+`opHunk`); ein zusammenhaengender Lauf geaenderter Schritte ist ein Block,
+und ein ausgelassener liefert beim Zusammenbauen die ALTE Zeile. **Der Text
+der Datei entsteht aus denselben Schritten, die man sieht** --
+`umbauAnzeigeBauen` schreibt `umbauTexte[k]` neu und baut die Anzeige, also
+kann beides nicht auseinanderlaufen. Falle: nach dem Kippen geht der Fokus
+auf den KNOPF, nicht in die Anzeige -- dort waere Enter ein Zeilenumbruch im
+Unterschied statt des Uebernehmens. **Formulare ziehen mit:** eine
+`.dhform` nennt ihre Rueckrufe beim NAMEN (`"on_click": "malen"`), und
+GUI_LOAD sucht sie spaeter unter genau dem -- wer umbenennt und die Datei
+stehen laesst, hat einen Knopf, der nichts mehr tut, ohne Fehlermeldung.
+Ersetzt wird im TEXT und nicht ueber das json-Modul: ein neu geschriebenes
+JSON haette eine andere Form, und die Vorschau zeigte die ganze Datei als
+geaendert statt der einen Zeile. **Aufrufer zeigen die Durchlaeufe:** nach
+einem Profillauf steht an jeder Stelle `[12x]` (`profDatei`/`profZeilen`/
+`profAnzahl` aus `profilAnzeigen`); ohne Lauf steht dort NICHTS -- eine Null
+waere eine Aussage, die niemand gemessen hat. Tests: 4 neue in
+`tests/test_ide.py`.
+
 **Stufe 19 (2026-09-12):** die drei Punkte nach Stand 18. **Abwaehlen in
 der Vorschau:** links die betroffenen Dateien mit Kaestchen
 (`GUI_LISTBOX_SET "kaestchen"`). Gefiltert wird GANZ OBEN in

@@ -2028,3 +2028,86 @@ def test_eine_konstante_laesst_sich_verschieben(tmp_path):
     assert "CONST MAXHP" not in q, q
     assert 'IMPORT "b_werte.dh"' in q, q
     assert "CONST MAXHP = 100" in ziel.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------- Stufe 20
+
+
+# --------------------------------------------------------------- Stufe 20
+
+# Das Vorschau-Fenster steht bei (240, 90), der Unterschied beginnt bei
+# (476, 150); eine Zeile ist 22 Pixel hoch.
+def _vs_zeile(nr):
+    """Bildschirm-y der nr-ten Zeile im Unterschied (1 = die erste)."""
+    return 160 + (nr - 1) * 22
+
+
+def test_in_der_vorschau_laesst_sich_ein_block_auslassen(tmp_path):
+    """Die Vorschau ist keine Textausgabe mehr, sondern eine Folge von
+    Schritten -- ein ausgelassener Block liefert die ALTE Zeile zurück."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n"
+                    "PRINT 0\n"
+                    "zeichne(3, 4)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen -> Vorschau
+    ev += _klick_mit(150, 600, _vs_zeile(9))     # auf `-zeichne(3, 4)`
+    ev += _klick_mit(190, 643, 681)              # Block auslassen
+    ev += _taste(240, RL_ENTER)                  # uebernehmen
+    ev += _taste(280, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=380, events=ev)
+    assert any(z.startswith("umbau block ") and z.endswith(" aus") for z in log), log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB zeichne(y AS INTEGER, x AS INTEGER)" in text, text
+    assert "zeichne(2, 1)" in text, text
+    # Der ausgelassene Block steht noch, wie er war.
+    assert "zeichne(3, 4)" in text, text
+
+
+def test_umbenennen_zieht_den_handler_im_formular_mit(tmp_path):
+    """Eine `.dhform` nennt ihre Rückrufe beim NAMEN. Wer das Unterprogramm
+    umbenennt und die Datei stehen lässt, hat einen Knopf, der nichts mehr
+    tut -- ohne Fehlermeldung, denn der Name wird erst beim Klicken gesucht."""
+    quelle = _datei(tmp_path, "SUB malen()\n    PRINT 1\nEND SUB\nmalen()\n", "a_spiel.dh")
+    form = tmp_path / "b_maske.dhform"
+    form.write_text('{\n "title": "F",\n "widgets": [\n  {\n   "kind": "button",\n'
+                    '   "on_click": "malen"\n  }\n ]\n}\n', encoding="utf-8")
+    ev = []
+    for k in range(4):
+        ev += _taste(30 + k * 8, RL_RIGHT)     # auf `malen`
+    ev += _taste(80, RL_F6, RL_LSHIFT)
+    ev += _taste(115, RL_V, RL_LCTRL)
+    ev += _taste(145, RL_ENTER)
+    ev += _taste(185, RL_ENTER)                # Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=280, events=ev, zwischenablage="zeichnen")
+    text = form.read_text(encoding="utf-8")
+    assert '"on_click": "zeichnen"' in text, text
+    # Der Rest der Datei blieb Zeichen fuer Zeichen, wie er war.
+    assert '"kind": "button"' in text, text
+
+
+def test_der_aufrufer_baum_zeigt_die_gemessenen_durchlaeufe(tmp_path):
+    """Nach einem Profillauf steht an jeder Aufrufstelle, wie oft sie
+    gelaufen ist -- ohne Lauf steht dort nichts, eine Null wäre eine
+    Aussage, die niemand gemessen hat."""
+    quelle = _datei(tmp_path,
+                    "SUB tick()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "DIM i AS INTEGER\n"
+                    "FOR i = 1 TO 3\n"
+                    "    tick()\n"
+                    "NEXT\n")
+    ev = _taste(30, RL_Y, RL_LCTRL, RL_LSHIFT)   # Profil aufnehmen
+    ev += _taste(160, RL_ESC)                    # Profilfenster zu
+    for k in range(4):
+        ev += _taste(190 + k * 8, RL_RIGHT)      # auf `tick` in Zeile 1
+    ev += _taste(240, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=360, events=ev)
+    assert any(z.startswith("profil ") for z in log), log
+    assert "aufrufer 1" in log, log
+    assert "aufrufer gemessen 1" in log, log
