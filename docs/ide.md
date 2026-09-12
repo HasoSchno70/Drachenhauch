@@ -45,8 +45,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 19 | In der Vorschau einzelne Dateien abwählen; Einwand, wenn der Name im Ziel schon steht; Konstanten und globale Variablen verschieben |
 | 20 | In der Vorschau einzelne **Blöcke** auslassen; Umbenennen zieht die Handler in `.dhform` mit; die Aufrufer zeigen die gemessenen Durchläufe |
 | 21 | Den letzten Umbau **nachbessern**; die Umbauten sehen **Unterordner**; eine gebrauchte Konstante zählt für den `IMPORT` |
+| 22 | Der Projektbaum zeigt die Unterordner; ein Umbau lässt sich **vorab prüfen**; eine neu angelegte Datei bekommt einen Reiter |
 
-## Was sie heute kann (Stand 21, 12.09.2026)
+## Was sie heute kann (Stand 22, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -73,6 +74,7 @@ kann, steht darunter vollständig, ohne Stände.
 | Umbauen | **In der Vorschau abwählen**: links stehen die betroffenen Dateien mit Kästchen — was man abwählt, bleibt stehen. Ein Umbau über zwölf Dateien ist selten in allen zwölf gemeint, und „alles oder nichts" hieße dann: von Hand nacharbeiten. Feiner geht es mit **Block auslassen**: die Marke auf eine geänderte Zeile, und der zusammenhängende Block bleibt, wie er war (er steht dann grau mit `~` da). Dahinter liegt keine Textausgabe mehr, sondern eine Folge von Schritten — der Text der Datei entsteht aus denselben Schritten, die man sieht | — |
 | Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, oder zerreißt die Umbenennung eine **Überschreibung** (dieselbe Methode steht in der Oberklasse oder in einer erbenden Klasse — gerufen würde von da an die andere Fassung, ohne Fehlermeldung), geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
 | Umbauen | **Verschieben** (Strg+Umschalt+V): ein Unterprogramm oder eine ganze **Klasse** wandert in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es benutzt, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Steht die Marke in einer Klasse, ist die **Klasse** gemeint — eine Methode allein wäre ohne sie kein Unterprogramm mehr. Der erste Eintrag im Wähler legt eine **neue Datei** an. Und es geht in beide Richtungen: braucht das Verschobene etwas, das zurückbleibt, importiert die **Zieldatei** die Quelle. Steht die Marke auf einer `CONST`- oder `DIM`-Zeile, ist **die Zeile** die Einheit. Hat das Ziel den Namen schon, sagt die Vorschau es — zwei gleichen Namens in einer Datei sind kein Übersetzungsfehler, der zweite gewinnt einfach | Strg+Umschalt+V |
+| Umbauen | **Prüfen** in der Vorschau: `dhrt --check` läuft über die Texte, die geschrieben **würden**, mit der Blockauswahl von jetzt. Wer einen Block auslässt und damit etwas kaputt macht, sieht es vor dem Schreiben. Nur auf Verlangen — ein Umbau über zwölf Dateien bräuchte sonst zwölf Übersetzungsläufe, ehe man den Unterschied überhaupt zu sehen bekommt | — |
 | Umbauen | **Letzten Umbau nachbessern** (Strg+Umschalt+G): dieselben Schritte noch einmal, mit derselben Auswahl. Ein ausgelassener Block ließe sich sonst nur zurückholen, indem man den ganzen Umbau zurücknimmt und ihn von vorn macht; gerechnet wird aus den Schritten, nicht aus dem, was gerade in der Datei steht | Strg+Umschalt+G |
 | Umbauen | **Umbau zurücknehmen** (Strg+Umschalt+Z): Strg+Z im Code-Feld nimmt nur den Reiter zurück, in dem man steht — ein Umbau über sechs Dateien wäre damit sechsmal zurückzunehmen, und zwar in sechs Reitern, die man dafür erst öffnen muss. Die letzten zehn liegen auf einem **Stapel**, jeder Druck nimmt einen weiter zurück | Strg+Umschalt+Z |
 | Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts. Als **Baum**: unter jedem Aufruf stehen die Aufrufer des Unterprogramms, in dem er steht, drei Ebenen tief; ein Klick springt hin. Gezählt wird auch, wo der Name **ohne Klammern** weitergegeben wird (`f = malen`) — dort wird entschieden, dass er später läuft. Gab es einen Profillauf, steht an jeder Stelle, **wie oft** sie gelaufen ist; ohne Lauf steht dort nichts, eine Null wäre eine Aussage, die niemand gemessen hat. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
@@ -257,6 +259,7 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `umbau zurueck <dateien>`, `umbau abgewaehlt alles`,
 `umbau block <nummer> aus|an` (-1 = keine geänderte Zeile),
 `umbau nachbessern <dateien>` (0 = keiner da), `umbau nachgebessert <dateien>`,
+`umbau geprueft <fehler>`, `umbau neue datei <anzahl>`,
 `aufrufer gemessen <anzahl>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
@@ -323,16 +326,20 @@ Auch die Liste aus Stand 20 ist abgearbeitet: das Nachbessern, die
 Unterordner und die gebrauchte Konstante.
 
 **Wo die Umbauten suchen.** Alles, was „im ganzen Projekt" heißt, geht seit
-Stand 21 auch durch die Unterordner. Übergangen werden Ordner, die mit `.`
+Stand 21 auch durch die Unterordner, und seit Stand 22 zeigt der
+Projektbaum sie als Äste. Übergangen werden Ordner, die mit `.`
 oder `_` anfangen, dazu `target` und `__pycache__`: dort liegt Erzeugtes,
 kein Quelltext, und ein Bau-Ordner kann zehntausend Dateien haben.
 
+Auch die Liste aus Stand 21 ist abgearbeitet: die Unterordner im Baum, das
+Prüfen vor dem Schreiben und der Reiter für eine neu angelegte Datei.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: der Projektbaum zeigt die **Unterordner** nicht, obwohl
-die Umbauten sie jetzt sehen; ein Umbau lässt sich nicht **vorab prüfen**
-(`dhrt --check` läuft erst auf dem Ergebnis, nicht auf der Auswahl); und
-eine Datei, die ein Umbau **anlegt**, taucht in keinem Reiter auf — man
-muss sie von Hand öffnen. Ein
+Nächstes anstünde: der Projektbaum kennt **keine anderen Dateien** als
+`.dh` (ein Formular oder eine Grafik daneben sieht man nicht); ein Umbau
+lässt sich nicht **abbrechen**, während er läuft (bei vielen Dateien steht
+die IDE so lange); und das Prüfen sagt **wie viele** Fehler, aber nicht
+**welche** — dafür müsste die Fehlerliste sie aufnehmen. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

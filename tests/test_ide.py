@@ -2188,3 +2188,56 @@ def test_verschieben_nimmt_die_konstante_mit_in_den_import(tmp_path):
     r = subprocess.run([str(_DHRT), "--check", str(ziel)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     assert r.stdout.strip() == "[]", (r.stdout, z)
+
+
+# --------------------------------------------------------------- Stufe 22
+
+def test_der_projektbaum_zeigt_unterordner(tmp_path):
+    """Seit die Umbauten Unterordner sehen, gehören sie auch in den Baum --
+    als Ast, nicht als Präfix im Namen."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
+    (tmp_path / "lib").mkdir()
+    (tmp_path / "lib" / "mehr.dh").write_text("PRINT 2\n", encoding="utf-8")
+    # Zeile 0 ist `a_spiel.dh`, Zeile 1 der Ordner `lib`, Zeile 2 die Datei
+    # darin (der Baum klappt beim Anlegen auf).
+    ev = _klick_mit(40, 60, _baum_y(2))
+    log = _ide(tmp_path, quelle, frames=160, events=ev)
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert any(z.endswith("mehr.dh") for z in geoeffnet), log
+
+
+def test_der_umbau_laesst_sich_vorab_pruefen(tmp_path):
+    """`dhrt --check` lief bisher erst auf dem Ergebnis -- also erst,
+    nachdem die Dateien schon anders aussahen."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen -> Vorschau
+    ev += _klick_mit(150, 823, 681)              # Pruefen
+    log = _ide(tmp_path, quelle, frames=240, events=ev)
+    assert "umbau geprueft 0" in log, log
+    # Geprueft heisst NICHT geschrieben.
+    assert "SUB zeichne(x AS INTEGER, y AS INTEGER)" in quelle.read_text(encoding="utf-8")
+
+
+def test_eine_neu_angelegte_datei_bekommt_einen_reiter(tmp_path):
+    """Sonst hat der Umbau etwas angelegt, das niemand sieht."""
+    quelle = _datei(tmp_path,
+                    "SUB gruessen()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "gruessen()\n", "a_spiel.dh")
+    ev = _taste(30, RL_DOWN)
+    ev += _taste(60, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(100, RL_ENTER)                  # (neue Datei ...)
+    ev += _taste(140, RL_V, RL_LCTRL)
+    ev += _taste(175, RL_ENTER)
+    ev += _taste(225, RL_ENTER)                  # Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=330, events=ev, zwischenablage="gruss")
+    assert "umbau neue datei 1" in log, log
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert any(z.endswith("gruss.dh") for z in geoeffnet), log

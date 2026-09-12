@@ -2873,6 +2873,21 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 22 (2026-09-12):** die drei Punkte nach Stand 21. **Projektbaum mit
+Unterordnern:** die Ordner-Knoten entstehen unterwegs und werden gemerkt
+(`ordPfad`/`ordKnoten`), damit zwei Dateien aus demselben Unterordner unter
+DEMSELBEN Knoten landen; aufgeklappt, weil ein Baum, der seine Ordner zuhaelt, beim
+Oeffnen weniger zeigt als vorher. **Umbau vorab pruefen:** `dhrt --check`
+lief bis dahin erst auf dem ERGEBNIS -- also erst, nachdem die Dateien schon
+anders aussahen; jetzt ueber die Texte, die geschrieben WUERDEN, mit der
+Blockauswahl von jetzt. Nur auf Verlangen (ein Umbau ueber zwoelf Dateien
+braeuchte sonst zwoelf Uebersetzungslaeufe, ehe man den Unterschied sieht),
+und `.dhform` wird ausgenommen -- das ist JSON, da meldete der Uebersetzer
+jede Zeile. **Neu angelegte Datei bekommt einen Reiter:** erkannt am
+Vorher-Stand aus dem Rueckname-Vorrat (leer = die Datei gab es nicht). Vorn
+bleibt aber der Reiter, an dem man gearbeitet hat -- sonst schriebe die
+gemerkte Marke in eine fremde Datei. Tests: 3 neue in `tests/test_ide.py`.
+
 **Stufe 21 (2026-09-12):** die drei Punkte nach Stand 20. **Nachbessern**
 (Strg+Umschalt+G): der zuletzt uebernommene Umbau noch einmal, mit
 derselben Blockauswahl -- gerechnet wird aus den SCHRITTEN, nicht aus dem,
