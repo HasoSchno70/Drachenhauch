@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 22)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 23)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -94,6 +94,10 @@
 '  Stand 22 dazu: der Projektbaum zeigt die Unterordner als Aeste, der
 '  Umbau laesst sich in der Vorschau pruefen, bevor er geschrieben ist,
 '  und eine neu angelegte Datei bekommt einen Reiter.
+'  Stand 23 dazu: der Baum zeigt auch Formulare, Daten und Bilder (was der
+'  Editor nicht kann, geht ans System), ein Umbau ueber das ganze Projekt
+'  sammelt in Schritten und laesst sich mit ESC abbrechen, und das Pruefen
+'  nennt die Fehler statt nur ihrer Zahl.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -826,6 +830,9 @@ DIM umbauNachTabs AS ARRAY OF INTEGER : umbauNachTabs = []
 DIM umbauNachPfade AS ARRAY OF STRING : umbauNachPfade = []
 DIM umbauNachWas AS STRING : umbauNachWas = ""
 DIM umbauWarnung AS STRING : umbauWarnung = ""
+' Was das Pruefen gefunden hat -- je Zeile "datei:zeile: meldung". Steht
+' oben im Unterschied, damit man nicht zwischen Zahl und Ursache raten muss.
+DIM umbauBefunde AS ARRAY OF STRING : umbauBefunde = []
 DIM umbauZeile AS INTEGER : umbauZeile = 0
 DIM umbauSpalte AS INTEGER : umbauSpalte = 1
 
@@ -1705,8 +1712,25 @@ SUB dateiOeffnen(pfad AS STRING)
         GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + pfad)
         RETURN
     END IF
+    ' Was der Editor nicht bearbeiten kann, gibt er ans System weiter --
+    ' ein PNG im Code-Feld waere Kauderwelsch.
+    IF NOT istText(pfad) THEN
+        TRY
+            OPENDOC(pfad)
+            GUI_SET_TEXT(lblStatus, "Mit dem Programm des Systems geoeffnet: " + BASENAME(pfad))
+        CATCH e
+            GUI_SET_TEXT(lblStatus, "Laesst sich nicht oeffnen: " + BASENAME(pfad))
+        END TRY
+        protokoll("extern " + BASENAME(pfad))
+        RETURN
+    END IF
     tabOeffnen(pfad, dateiLesen(pfad))
-    projektOrdner = DIRNAME(pfad)
+    ' Der Projektordner wandert NUR, wenn die Datei ausserhalb liegt. Sonst
+    ' machte ein Klick auf `lib/mehr.dh` den Unterordner zum Projekt, und
+    ' der Baum zeigte danach die halbe Arbeit nicht mehr.
+    IF LEFT$(wegGleich$(pfad), LEN(wegGleich$(projektOrdner))) <> wegGleich$(projektOrdner) THEN
+        projektOrdner = DIRNAME(pfad)
+    END IF
     baumFuellen()
     zuletztMerken(pfad)
     GUI_SET_TEXT(lblStatus, pfad)
@@ -1842,8 +1866,34 @@ FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
     RETURN raus
 END FUNCTION
 
+' Was im Projektbaum steht. Quelltext zuerst, dann was dazugehoert --
+' Formulare und Sprites bearbeitet man mit den Werkzeugen, Daten liest man
+' nach, und ein Bild will man wenigstens ansehen koennen.
+DIM baumMuster AS ARRAY OF STRING
+baumMuster = ["*.dh", "*.dhform", "*.dhsprite", "*.dhanim", "*.dhtest", _
+              "*.json", "*.md", "*.txt", "*.csv", "*.ini", "*.png", "*.wav", "*.ogg"]
+
+' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
+' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
+FUNCTION istText(pfad AS STRING) AS BOOLEAN
+    DIM e AS STRING : e = LOWER$(pfad)
+    IF RIGHT$(e, 4) = ".png" OR RIGHT$(e, 4) = ".wav" OR RIGHT$(e, 4) = ".ogg" THEN RETURN FALSE
+    IF RIGHT$(e, 9) = ".dhsprite" THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
 SUB baumFuellen()
-    DIM neue AS ARRAY OF STRING : neue = projektDateien("*.dh")
+    ' Nicht nur .dh: neben dem Quelltext liegen Formulare, Sprites, Karten
+    ' und Daten, und wer sie nicht sieht, sucht sie im Dateimanager.
+    DIM neue AS ARRAY OF STRING : neue = []
+    DIM muster AS STRING
+    FOR EACH muster IN baumMuster
+        DIM gefunden AS STRING
+        FOR EACH gefunden IN projektDateien(muster)
+            ARRAY_PUSH(neue, gefunden)
+        NEXT
+    NEXT
+    SORT(neue)
     DIM schl AS STRING : schl = projektOrdner + "|" + JOIN$(neue, ";")
     ' Steht dieselbe Liste schon da, bleibt der Baum, WIE er ist -- ein
     ' Neuaufbau raeumt die Auswahl weg, und genau die sammelt man gerade
@@ -2094,6 +2144,14 @@ SUB pruefen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF problemModus = 0 THEN GUI_LISTBOX_CLEAR(lstProbleme)
     IF ta < 0 THEN RETURN
+    ' Nur Drachenhauch pruefen: eine .json oder .md durch den Uebersetzer
+    ' zu schicken fuellt die Liste mit Meldungen ueber etwas, das gar kein
+    ' Programm ist.
+    IF tabPfade[aktiverTab] <> "" AND LOWER$(RIGHT$(tabPfade[aktiverTab], 3)) <> ".dh" THEN
+        GUI_SET_TEXT(lblProbleme, "Probleme: -- (" + BASENAME(tabPfade[aktiverTab]) + _
+                     " ist kein Drachenhauch)")
+        RETURN
+    END IF
     DIM basis AS STRING : basis = projektOrdner
     IF tabPfade[aktiverTab] <> "" THEN basis = DIRNAME(tabPfade[aktiverTab])
     DIM j AS JSON_HANDLE
@@ -3421,28 +3479,7 @@ FUNCTION projektUngesichert() AS BOOLEAN
 END FUNCTION
 
 SUB projektErsetzenAusfuehren()
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    DIM geaendert AS INTEGER : geaendert = 0
-    umbauLeeren()
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
-        DIM neu AS STRING
-        IF regexAn THEN
-            neu = REGEX_REPLACE(alt, suchtext, ersatztext)
-        ELSE
-            neu = REPLACE$(alt, suchtext, ersatztext)
-        END IF
-        IF neu = alt THEN CONTINUE
-        ' Offene Reiter zieht umbauSchreiben mit nach -- sie zeigten sonst
-        ' den alten Text und schrieben ihn beim naechsten Sichern zurueck.
-        umbauVormerken(-1, pfad, neu)
-    NEXT
-    geaendert = LEN(umbauTexte)
-    umbauStarten("'" + suchtext + "' -> '" + ersatztext + "' im Projekt", _
-                 "Ersetzt in " + STR$(geaendert) + " Datei(en).", _
-                 "projekt ersetzt " + STR$(geaendert))
+    laufStarten("ersetzen", suchtext, ersatztext)
 END SUB
 
 ' --- Marke an jedes Zeilenende der Auswahl ----------------------------
@@ -4937,6 +4974,91 @@ SUB formulareNachziehen(alt AS STRING, neu AS STRING)
     NEXT
 END SUB
 
+' --- Ein Umbau, der ueber viele Dateien geht, laeuft in Schritten -------
+' Das Sammeln der Aenderungen liest jede Datei des Projekts und laesst den
+' Umbenenner darueber laufen. In EINEM Bild erledigt, steht die IDE so
+' lange -- bei vierhundert Dateien lange genug, dass man sie fuer haengend
+' haelt, und abbrechen kann man nichts, was gar nicht erst zum Zeichnen
+' kommt.
+'
+' Darum je Bild ein Haeppchen: die Statuszeile zaehlt mit, ESC bricht ab.
+' Am Ende steht dieselbe Vorschau wie zuvor.
+CONST LAUF_PRO_BILD = 25
+DIM laufArt AS STRING : laufArt = ""      ' "" = nichts laeuft
+DIM laufDateien AS ARRAY OF STRING : laufDateien = []
+DIM laufIndex AS INTEGER : laufIndex = 0
+DIM laufAlt AS STRING : laufAlt = ""
+DIM laufNeu AS STRING : laufNeu = ""
+
+SUB laufStarten(art AS STRING, alt AS STRING, neu AS STRING)
+    laufArt = art
+    laufAlt = alt
+    laufNeu = neu
+    laufDateien = projektDateien("*.dh")
+    laufIndex = 0
+    umbauLeeren()
+    GUI_SET_TEXT(lblStatus, "Sammle ... 0 von " + STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
+END SUB
+
+SUB laufAbbrechen()
+    IF laufArt = "" THEN RETURN
+    laufArt = ""
+    umbauLeeren()
+    GUI_SET_TEXT(lblStatus, "Abgebrochen -- nichts geaendert.")
+    protokoll("umbau abgebrochen")
+END SUB
+
+' Ein Haeppchen; am Ende die Vorschau. Wird je Bild aus der Hauptschleife
+' gerufen.
+SUB laufSchritt()
+    IF laufArt = "" THEN RETURN
+    DIM bis AS INTEGER : bis = MIN(laufIndex + LAUF_PRO_BILD, LEN(laufDateien))
+    DIM i AS INTEGER
+    FOR i = laufIndex TO bis - 1
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, laufDateien[i])
+        DIM alt AS STRING : alt = ""
+        TRY
+            alt = JOIN$(READLINES(pfad), NL)
+        CATCH e
+            alt = ""
+        END TRY
+        IF alt = "" THEN CONTINUE
+        DIM frisch AS STRING : frisch = alt
+        IF laufArt = "umbenennen" THEN
+            IF INSTR(alt, laufAlt) < 0 THEN CONTINUE
+            frisch = umbenennenInText$(alt, laufAlt, laufNeu)
+        ELSEIF regexAn THEN
+            frisch = REGEX_REPLACE(alt, laufAlt, laufNeu)
+        ELSE
+            frisch = REPLACE$(alt, laufAlt, laufNeu)
+        END IF
+        ' Auf die PLATTE, nicht in den Reiter: beide Umbauten arbeiten auf
+        ' den Dateien (sie brechen vorher ab, wenn ein Reiter ungesichert
+        ' ist), und umbauSchreiben zieht einen offenen Reiter nach.
+        IF frisch <> alt THEN umbauVormerken(-1, pfad, frisch)
+    NEXT
+    laufIndex = bis
+    IF laufIndex < LEN(laufDateien) THEN
+        GUI_SET_TEXT(lblStatus, "Sammle ... " + STR$(laufIndex) + " von " + _
+                     STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
+        RETURN
+    END IF
+    ' Fertig gesammelt -- ab hier wie bisher.
+    DIM art AS STRING : art = laufArt
+    laufArt = ""
+    IF art = "umbenennen" THEN
+        formulareNachziehen(laufAlt, laufNeu)
+        umbauWarnung = umbenennEinwand$(laufAlt, laufNeu)
+        umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
+                     "'" + laufAlt + "' -> '" + laufNeu + "' in " + STR$(LEN(umbauTexte)) + " Datei(en).", _
+                     "projekt umbenannt " + STR$(LEN(umbauTexte)))
+    ELSE
+        umbauStarten("'" + laufAlt + "' -> '" + laufNeu + "' im Projekt", _
+                     "Ersetzt in " + STR$(LEN(umbauTexte)) + " Datei(en).", _
+                     "projekt ersetzt " + STR$(LEN(umbauTexte)))
+    END IF
+END SUB
+
 SUB umbenennenImProjekt(neu AS STRING)
     IF projektUngesichert() THEN
         GUI_SET_TEXT(lblStatus, "Erst sichern: ein Reiter hat ungesicherte Aenderungen.")
@@ -4945,23 +5067,7 @@ SUB umbenennenImProjekt(neu AS STRING)
     END IF
     DIM wort AS STRING : wort = umbenennWort
     IF wort = "" OR neu = "" OR wort = neu THEN RETURN
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    umbauLeeren()
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
-        IF INSTR(alt, wort) < 0 THEN CONTINUE
-        DIM frisch AS STRING : frisch = umbenennenInText$(alt, wort, neu)
-        IF frisch = alt THEN CONTINUE
-        umbauVormerken(-1, pfad, frisch)
-    NEXT
-    formulareNachziehen(wort, neu)
-    DIM geaendert AS INTEGER : geaendert = LEN(umbauTexte)
-    umbauWarnung = umbenennEinwand$(wort, neu)
-    umbauStarten("'" + wort + "' -> '" + neu + "' im Projekt", _
-                 "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).", _
-                 "projekt umbenannt " + STR$(geaendert))
+    laufStarten("umbenennen", wort, neu)
 END SUB
 
 ' --- Zwei Dateien vergleichen -----------------------------------------
@@ -5053,6 +5159,7 @@ SUB umbauLeeren()
     umbauTabs = [] : umbauPfade = [] : umbauTexte = []
     umbauZeile = 0 : umbauSpalte = 1
     umbauWarnung = ""
+    umbauBefunde = []
     ' Die Schritte (`op*`) bleiben stehen: sie sind die Grundlage fuers
     ' Nachbessern, und der naechste Umbau baut sie ohnehin neu.
 END SUB
@@ -5164,6 +5271,13 @@ SUB umbauAnzeigeBauen()
     NEXT
     IF umbauWarnung <> "" THEN
         ARRAY_PUSH(zeilen, "@@ " + umbauWarnung) : ARRAY_PUSH(zeigHunk, -1)
+        ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
+    END IF
+    DIM bf AS STRING
+    FOR EACH bf IN umbauBefunde
+        ARRAY_PUSH(zeilen, "@@ " + bf) : ARRAY_PUSH(zeigHunk, -1)
+    NEXT
+    IF LEN(umbauBefunde) > 0 THEN
         ARRAY_PUSH(zeilen, "") : ARRAY_PUSH(zeigHunk, -1)
     END IF
     DIM k AS INTEGER
@@ -5385,7 +5499,7 @@ END SUB
 ' sehen bekommt.
 SUB umbauPruefen()
     IF LEN(umbauTexte) = 0 THEN RETURN
-    DIM kaputt AS ARRAY OF STRING : kaputt = []
+    umbauBefunde = []
     DIM summe AS INTEGER : summe = 0
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
@@ -5394,18 +5508,27 @@ SUB umbauPruefen()
         ' Nur .dh: eine .dhform ist JSON, da hat der Uebersetzer nichts zu
         ' suchen (und meldete jede Zeile als Fehler).
         IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
-        DIM n AS INTEGER : n = fehlerZahl(umbauTexte[k])
-        IF n > 0 THEN
-            ARRAY_PUSH(kaputt, BASENAME(name) + ": " + STR$(n))
-            summe = summe + n
-        END IF
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_CHECK$(umbauTexte[k], projektOrdner))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "") - 1
+            DIM pp AS STRING : pp = STR$(i)
+            IF JSON_GET_STRING(j, pp + ".schwere") <> "fehler" THEN CONTINUE
+            ' WELCHER Fehler, nicht nur wie viele: eine Zahl sagt einem
+            ' nicht, ob man den Block wieder aufnehmen muss oder etwas
+            ' anderes vergessen hat.
+            ARRAY_PUSH(umbauBefunde, BASENAME(name) + ":" + _
+                       STR$(JSON_GET_INT(j, pp + ".zeile")) + ": " + _
+                       JSON_GET_STRING(j, pp + ".meldung"))
+            summe = summe + 1
+        NEXT
     NEXT
     DIM sagen AS STRING
     IF summe = 0 THEN
         sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauTexte)) + " Datei(en)."
     ELSE
-        sagen = "Geprueft: " + STR$(summe) + " Fehler -- " + JOIN$(kaputt, ", ")
+        sagen = "Geprueft: " + STR$(summe) + " Fehler -- sie stehen oben im Unterschied."
     END IF
+    umbauAnzeigeBauen()
     GUI_SET_TEXT(lblUmbau, sagen)
     GUI_SET_TEXT(lblStatus, sagen)
     protokoll("umbau geprueft " + STR$(summe))
@@ -7337,6 +7460,11 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     NEXT
     vorschauNachziehen()
     aufruferAbfragen()
+    ' Ein Umbau, der noch sammelt, bekommt sein Haeppchen -- und ESC bricht
+    ' ihn ab, solange er laeuft.
+    IF laufArt <> "" THEN
+        IF KEYHIT(KEY_ESCAPE) THEN laufAbbrechen() ELSE laufSchritt()
+    END IF
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
