@@ -2873,6 +2873,28 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 17 (2026-09-12):** die drei Punkte nach Stand 16. **Klassen
+verschieben:** steht die Marke in einer CLASS, ist die KLASSE die Einheit
+(`klasseUm` statt des alten `inKlasse`, das nur abgelehnt hat) -- eine
+Methode allein waere ohne ihre Klasse kein Unterprogramm mehr. Dabei musste
+die IMPORT-Frage von `aufrufInZeile` auf **`benutztWort`** umgestellt
+werden: eine Klasse wird nicht nur mit `NEW Tier(` benutzt, sondern auch
+als `DIM t AS Tier` -- der Aufruf-Test haette die Datei fuer
+importfrei gehalten, und sie haette nicht mehr uebersetzt. **Verschieben
+legt die Zieldatei an** (erster Eintrag im Waehler); dafuer musste
+`umbauAlt$` eine Datei aushalten, die es noch NICHT gibt (leerer
+Vorher-Stand statt Abbruch). **Einwand bei Vererbung:** heisst eine Methode
+in der Oberklasse genauso, ist die Umbenennung in EINER Klasse keine
+Umbenennung, sondern eine Trennung -- ohne Uebersetzungsfehler, gerufen
+wird von da an die Fassung der Oberklasse. `klassenLesen` liest Name,
+`EXTENDS`-Basis (nur im TEXT der Kopfzeile, `CODE_SYMBOLS$` kennt sie
+nicht) und Methoden aller Projektklassen; gefragt wird **nicht an der
+Marke**, welche Klasse gemeint ist (die steht vielleicht auf einem Aufruf),
+sondern welche Klassen eine Methode dieses Namens haben. Nebenbei: die
+**Pfeiltasten waehlen im Waehler** -- seit Stand 4 kam man ohne Maus nur an
+den ersten Eintrag, wer den zweiten wollte, musste ihn wegfiltern. Tests:
+6 neue in `tests/test_ide.py`.
+
 **Stufe 16 (2026-09-12):** die drei Punkte nach Stand 15 -- und ein
 LAUFZEIT-Fehler, den der eigene Test fand. **Unterprogramm verschieben**
 (Strg+Umschalt+V): die Zeilen wandern in eine andere Datei des Projekts,

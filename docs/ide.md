@@ -40,14 +40,15 @@ kann, steht darunter vollständig, ohne Stände.
 | 14 | Parameter umsortieren **im ganzen Projekt**, Aufrufer eines Unterprogramms auflisten, Signatur-Platzhalter bei der Vervollständigung |
 | 15 | Einwand, wenn der neue Name schon vergeben ist; Parameter hinzufügen und entfernen; die Aufrufer als **Baum** |
 | 16 | Unterprogramm in eine andere Datei verschieben (samt IMPORT); Umbauten auch für Methoden; einen geschriebenen Umbau in einem Zug zurücknehmen |
+| 17 | Klassen verschieben; Verschieben legt die Zieldatei an; Einwand, wenn eine Umbenennung eine Überschreibung zerreißt; Pfeiltasten im Wähler |
 
-## Was sie heute kann (Stand 16, 12.09.2026)
+## Was sie heute kann (Stand 17, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
 | Start | Willkommensseite, solange kein Reiter offen ist: Neu, Öffnen, Beispiele, die zuletzt geöffneten Dateien (Doppelklick), die wichtigsten Kürzel. Die Sitzung kommt beim nächsten Start wieder (offene Dateien, aktiver Reiter), ebenso Thema und Schriftgröße | |
 | Dateien | Neu, Öffnen, Datei im Projekt öffnen (Wähler mit unscharfem Filter: `spred` findet `189_sprite_editor.dh`; dazu die zuletzt geöffneten), Zuletzt geöffnet (Untermenü), Sichern, Sichern unter, Reiter schließen und wieder öffnen (Strg+Umschalt+T); bis zu 12 Reiter; Rückfrage bei ungesicherten Änderungen; Listing drucken über einen Druckdialog (Drucker, Kopien) oder als PDF neben die Quelle (Courier 9 pt, 66 Zeilen je Seite, Zeilennummern, Kopfzeile mit Seitenzahl) | Strg+N, Strg+O, Strg+Umschalt+O, Strg+S, Strg+W, Strg+Q, Strg+P |
-| Bearbeiten | Suchen, Weitersuchen, Ersetzen (alle Treffer), Gehe zu Zeile, Suche im Projekt (alle `.dh` im Projektordner, Treffer unten rechts, Doppelklick öffnet), wahlweise mit **regulärem Ausdruck** (ein Schalter für Suchen, Ersetzen und Projektsuche), TODO/FIXME-Liste (dieselbe Suche), Befehlspalette (tippen filtert, Enter führt aus) | Strg+F, F3, Strg+H, Strg+G, Strg+Umschalt+F, Strg+Umschalt+M, Strg+Umschalt+P |
+| Bearbeiten | Suchen, Weitersuchen, Ersetzen (alle Treffer), Gehe zu Zeile, Suche im Projekt (alle `.dh` im Projektordner, Treffer unten rechts, Doppelklick öffnet), wahlweise mit **regulärem Ausdruck** (ein Schalter für Suchen, Ersetzen und Projektsuche), TODO/FIXME-Liste (dieselbe Suche), Befehlspalette (tippen filtert, **Pfeile** wählen, Enter führt aus) | Strg+F, F3, Strg+H, Strg+G, Strg+Umschalt+F, Strg+Umschalt+M, Strg+Umschalt+P |
 | Git | Wer hat das geschrieben (`git blame`, Datum und Person je Zeile), was habe ich geändert (`git diff` farbig im Fenster), Verlauf dieser Datei (`git log`); die geänderten Zeilen tragen eine Marke am Rand (nach dem Sichern neu gefragt, nicht je Bild) | Strg+Umschalt+B, Strg+Umschalt+D |
 | Schreiben | Umbenennen eines Symbols über die ganze Datei (`CODE_RENAME$`: ganze Wörter, Kommentare und Zeichenketten bleiben; ein krummer Name ändert nichts), Schnipsel einfügen (13 Gerüste, `\|` sagt wohin die Marke gehört, die Einrückung der Zeile wird übernommen), eine Marke auf jede Fundstelle des Wortes — danach ändert ein Tippen alle; Alt+Klick legt eine Marke dazu, ESC räumt sie weg. Signaturhilfe: steht die Marke in einer Argumentliste, zeigt die Statuszeile die Signatur des Aufrufs und die Nummer des Arguments | Umschalt+F6, Strg+J, Strg+Umschalt+L |
 | Reiter | Jeder Reiter hat ein **Kreuz**, die mittlere Maustaste schließt ihn auch. Trägt er ungesicherte Änderungen, wird gefragt (Sichern / Verwerfen / Abbrechen) — das galt vorher nur beim Beenden, Strg+W nahm sie wortlos mit. **Andere Reiter schließen** lässt nur den vorderen stehen | Strg+W, Strg+Umschalt+W |
@@ -65,8 +66,8 @@ kann, steht darunter vollständig, ohne Stände.
 | Kacheln | Auf der Willkommensseite acht wichtige Beispiele **mit einem Bild davon**. Die Bilder entstehen, indem das Beispiel wirklich läuft (`dhrt bild`), eines nach dem anderen im Hintergrund und unsichtbar; danach liegen sie neben der Sitzung und sind sofort da. Ein Klick öffnet das Beispiel | — |
 | Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
 | Umbauen | **Parameter umsortieren, hinzufügen, entfernen** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke umstellen, einen neuen aufnehmen (`hp AS INTEGER = 0` — der Teil hinter dem `=` kommt an jede Aufrufstelle) oder einen wegnehmen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
-| Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
-| Umbauen | **Unterprogramm verschieben** (Strg+Umschalt+V): die Zeilen wandern in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es ruft, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Eine **Methode** lässt sich nicht verschieben, ohne ihre Klasse wäre sie kein Unterprogramm mehr | Strg+Umschalt+V |
+| Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, oder zerreißt die Umbenennung eine **Überschreibung** (dieselbe Methode steht in der Oberklasse oder in einer erbenden Klasse — gerufen würde von da an die andere Fassung, ohne Fehlermeldung), geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
+| Umbauen | **Verschieben** (Strg+Umschalt+V): ein Unterprogramm oder eine ganze **Klasse** wandert in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es benutzt, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Steht die Marke in einer Klasse, ist die **Klasse** gemeint — eine Methode allein wäre ohne sie kein Unterprogramm mehr. Der erste Eintrag im Wähler legt eine **neue Datei** an | Strg+Umschalt+V |
 | Umbauen | **Letzten Umbau zurücknehmen** (Strg+Umschalt+Z): Strg+Z im Code-Feld nimmt nur den Reiter zurück, in dem man steht — ein Umbau über sechs Dateien wäre damit sechsmal zurückzunehmen, und zwar in sechs Reitern, die man dafür erst öffnen muss | Strg+Umschalt+Z |
 | Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts. Als **Baum**: unter jedem Aufruf stehen die Aufrufer des Unterprogramms, in dem er steht, drei Ebenen tief; ein Klick springt hin. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
 | Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
@@ -291,12 +292,16 @@ Auch die Liste aus Stand 15 ist abgearbeitet: das Verschieben in eine
 andere Datei samt IMPORT, die Umbauten für Methoden (die Marke darf dafür
 auch **in** der Argumentliste stehen) und das Zurücknehmen in einem Zug.
 
+Auch die Liste aus Stand 16 ist abgearbeitet: Klassen verschieben, das
+Anlegen der Zieldatei und der Einwand bei einer zerrissenen Überschreibung.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: eine **Klasse** verschieben oder umbenennen (heute geht
-nur, was ein Unterprogramm ist); das Verschieben legt keine **neue Datei**
-an, das Ziel muss es schon geben; und der Umbau kennt keine
-**Vererbung** — wer eine Methode umbenennt, die eine Oberklasse vorgibt,
-bekommt keinen Einwand. Ein
+Nächstes anstünde: das Verschieben nimmt **nicht mit, was das Verschobene
+selbst braucht** (ruft es ein zweites Unterprogramm derselben Datei, muss
+man den Import von Hand nachtragen); ein Umbau lässt sich nur **einmal**
+zurücknehmen, nicht mehrfach; und die Aufrufer-Liste kennt keine
+**FUNCREF** — wer ein Unterprogramm als Wert weitergibt, taucht dort nicht
+auf. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

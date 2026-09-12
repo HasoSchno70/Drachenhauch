@@ -1776,3 +1776,107 @@ def test_eine_methode_laesst_sich_nicht_verschieben(tmp_path):
     log = _ide(tmp_path, quelle, frames=180, events=ev)
     assert "verschieben 0" in log, log
     assert "SUB setze()" in quelle.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------- Stufe 17
+
+def test_eine_klasse_verschieben(tmp_path):
+    """Steht die Marke in einer Klasse, ist die KLASSE gemeint -- eine
+    Methode allein wäre ohne sie kein Unterprogramm mehr."""
+    quelle = _datei(tmp_path,
+                    "CLASS Held\n"
+                    "    DIM x AS INTEGER\n"
+                    "    SUB setze()\n"
+                    "        Self.x = 1\n"
+                    "    END SUB\n"
+                    "END CLASS\n"
+                    "DIM h AS Held\n"
+                    "h = NEW Held()\n", "a_spiel.dh")
+    ziel = _datei(tmp_path, "' Helfer\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)      # in die Klasse
+    ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(115, RL_DOWN) + _taste(130, RL_ENTER)  # zweite Zeile = b_helfer.dh
+    ev += _taste(180, RL_ENTER)                         # Vorschau uebernehmen
+    ev += _taste(230, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev)
+    assert any(z.startswith("verschieben Held ") for z in log), log
+    q = quelle.read_text(encoding="utf-8")
+    z = ziel.read_text(encoding="utf-8")
+    assert "CLASS Held" not in q, q
+    assert 'IMPORT "b_helfer.dh"' in q, q      # `DIM h AS Held` braucht sie
+    assert "CLASS Held" in z, z
+    r = subprocess.run([str(_DHRT), "--check", str(quelle)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", (r.stdout, q)
+
+
+def test_verschieben_legt_die_zieldatei_an(tmp_path):
+    """Der erste Eintrag im Wähler ist eine neue Datei -- sonst wäre der
+    erste Umzug ein Umweg über Datei/Neu und Sichern."""
+    quelle = _datei(tmp_path,
+                    "SUB gruessen()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "gruessen()\n", "a_spiel.dh")
+    ev = _taste(30, RL_DOWN)
+    ev += _taste(60, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(100, RL_ENTER)                  # (neue Datei ...)
+    ev += _taste(140, RL_V, RL_LCTRL)            # Name aus der Zwischenablage
+    ev += _taste(175, RL_ENTER)
+    ev += _taste(225, RL_ENTER)                  # Vorschau uebernehmen
+    ev += _taste(275, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=370, events=ev, zwischenablage="gruss")
+    assert any(z.startswith("verschieben gruessen ") for z in log), log
+    neu = tmp_path / "gruss.dh"
+    assert neu.exists(), sorted(p.name for p in tmp_path.iterdir())
+    assert "SUB gruessen()" in neu.read_text(encoding="utf-8")
+    assert 'IMPORT "gruss.dh"' in quelle.read_text(encoding="utf-8")
+
+
+def test_umbenennen_warnt_bei_einer_ueberschreibung(tmp_path):
+    """`ruf` gibt es in Tier UND in Hund. Wer nur eine umbenennt, zerreißt
+    die Überschreibung -- ohne Fehlermeldung, denn gerufen wird von da an
+    die Fassung der Oberklasse."""
+    quelle = _datei(tmp_path,
+                    "CLASS Tier\n"
+                    "    SUB ruf()\n"
+                    "        PRINT 1\n"
+                    "    END SUB\n"
+                    "END CLASS\n", "a_tier.dh")
+    _datei(tmp_path,
+           "CLASS Hund EXTENDS Tier\n"
+           "    SUB ruf()\n"
+           "        PRINT 2\n"
+           "    END SUB\n"
+           "END CLASS\n", "b_hund.dh")
+    # Zeile 2 ist `    SUB ruf()` -- acht Schritte nach rechts stehen auf `ruf`.
+    ev = _taste(30, RL_DOWN)
+    for k in range(8):
+        ev += _taste(45 + k * 5, RL_RIGHT)
+    ev += _taste(100, RL_F6, RL_LSHIFT)
+    ev += _taste(125, RL_V, RL_LCTRL)
+    ev += _taste(155, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="bellen")
+    assert "umbau einwand" in log, log
+    assert "SUB ruf()" in quelle.read_text(encoding="utf-8")
+
+
+def test_ohne_vererbung_gibt_es_keinen_einwand(tmp_path):
+    """Die Gegenprobe: dieselbe Methode, aber keine zweite Klasse dazu."""
+    quelle = _datei(tmp_path,
+                    "CLASS Tier\n"
+                    "    SUB ruf()\n"
+                    "        PRINT 1\n"
+                    "    END SUB\n"
+                    "END CLASS\n", "a_tier.dh")
+    ev = _taste(30, RL_DOWN)
+    for k in range(8):
+        ev += _taste(45 + k * 5, RL_RIGHT)
+    ev += _taste(100, RL_F6, RL_LSHIFT)
+    ev += _taste(125, RL_V, RL_LCTRL)
+    ev += _taste(155, RL_ENTER)
+    ev += _taste(195, RL_ENTER)                # Vorschau uebernehmen
+    ev += _taste(235, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev, zwischenablage="bellen")
+    assert "umbau einwand" not in log, log
+    assert "SUB bellen()" in quelle.read_text(encoding="utf-8")

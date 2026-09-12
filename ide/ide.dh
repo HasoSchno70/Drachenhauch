@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 16)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 17)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -74,6 +74,9 @@
 '  (Strg+Umschalt+V, samt dem IMPORT fuer jeden Aufrufer), die Umbauten
 '  auch fuer Methoden, und den letzten Umbau in EINEM Zug zuruecknehmen
 '  (Strg+Umschalt+Z).
+'  Stand 17 dazu: auch ganze KLASSEN verschieben, das Verschieben legt die
+'  Zieldatei an, ein Einwand wenn eine Umbenennung eine Ueberschreibung
+'  zerreisst, und die Pfeiltasten waehlen im Datei-/Befehlswaehler.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -302,6 +305,8 @@ DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
 DIM dlgTabZu AS GUI_WINDOW : dlgTabZu = 0
 ' Der Prompt fuer einen neuen Parameter (Punkt B aus Stand 15).
 DIM dlgParamNeu AS GUI_WINDOW : dlgParamNeu = 0
+' Der Prompt fuer die neue Zieldatei beim Verschieben.
+DIM dlgVerschNeu AS GUI_WINDOW : dlgVerschNeu = 0
 DIM tabZuIndex AS INTEGER : tabZuIndex = -1
 DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
@@ -4068,16 +4073,44 @@ FUNCTION mitImport$(quelle AS STRING, datei AS STRING) AS STRING
     RETURN JOIN$(zeilen, NL)
 END FUNCTION
 
-' Steht die Zeile in einer CLASS? Eine Methode laesst sich nicht
-' verschieben -- ohne ihre Klasse ist sie kein Unterprogramm mehr.
-FUNCTION inKlasse(quelle AS STRING, zeile AS INTEGER) AS BOOLEAN
+' Die CLASS, in der `zeile` steht: (name, von, bis) -- ("", 0, 0), wenn
+' keine. Eine Methode allein laesst sich nicht verschieben; ihre KLASSE
+' sehr wohl, und die ist dann gemeint.
+FUNCTION klasseUm(quelle AS STRING, zeile AS INTEGER) AS TUPLE
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(j, "") - 1
         DIM p AS STRING : p = STR$(i)
         IF LOWER$(JSON_GET_STRING(j, p + ".art")) <> "class" THEN CONTINUE
-        IF JSON_GET_INT(j, p + ".von") <= zeile AND zeile <= JSON_GET_INT(j, p + ".bis") THEN RETURN TRUE
+        DIM v AS INTEGER : v = JSON_GET_INT(j, p + ".von")
+        DIM b AS INTEGER : b = JSON_GET_INT(j, p + ".bis")
+        IF v <= zeile AND zeile <= b THEN RETURN (JSON_GET_STRING(j, p + ".name"), v, b)
     NEXT
+    RETURN ("", 0, 0)
+END FUNCTION
+
+' Kommt `name` in der Zeile als ganzes Wort vor, ausserhalb von Kommentar
+' und Zeichenkette?
+'
+' Fuer die IMPORT-Frage ist das die richtige: eine Klasse wird nicht nur
+' mit `NEW Tier(` benutzt, sondern auch als `DIM t AS Tier` -- und ein
+' Unterprogramm kann als FUNCREF ohne Klammern dastehen.
+FUNCTION benutztWort(zeile AS STRING, name AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(zeile)
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(zeile) AND MID$(zeile, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            RETURN FALSE
+        ELSEIF wortAn(zeile, i, name) THEN
+            RETURN TRUE
+        END IF
+        i = i + 1
+    WEND
     RETURN FALSE
 END FUNCTION
 
@@ -4092,51 +4125,53 @@ SUB verschiebenFragen()
     DIM z AS INTEGER
     DIM sp AS INTEGER
     (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    ' Steht die Marke in einer KLASSE, ist die Klasse gemeint -- eine
+    ' Methode allein waere ohne sie kein Unterprogramm mehr.
+    DIM kName AS STRING
+    DIM kVon AS INTEGER
+    DIM kBis AS INTEGER
+    (kName, kVon, kBis) = klasseUm(quelle, z)
     DIM uv AS INTEGER
     DIM ub AS INTEGER
-    (uv, ub) = umgebendesUnterprogramm(quelle, z)
-    ' Nicht IM Unterprogramm, aber auf seinem Namen? Dann ist es gemeint.
-    IF uv < 1 THEN
-        DIM wort AS STRING : wort = wortUnterMarke$()
-        DIM auf AS INTEGER : auf = defStelle(quelle, wort)
-        IF auf >= 0 THEN
-            DIM bis AS INTEGER : bis = 1 + LEN(SPLIT$(LEFT$(quelle, auf), NL)) - 1
-            (uv, ub) = umgebendesUnterprogramm(quelle, bis)
+    IF kName <> "" THEN
+        verschName = kName : verschVon = kVon : verschBis = kBis
+    ELSE
+        (uv, ub) = umgebendesUnterprogramm(quelle, z)
+        ' Nicht IM Unterprogramm, aber auf seinem Namen? Dann ist es gemeint.
+        IF uv < 1 THEN
+            DIM wort AS STRING : wort = wortUnterMarke$()
+            DIM auf AS INTEGER : auf = defStelle(quelle, wort)
+            IF auf >= 0 THEN
+                DIM bis AS INTEGER : bis = 1 + LEN(SPLIT$(LEFT$(quelle, auf), NL)) - 1
+                (uv, ub) = umgebendesUnterprogramm(quelle, bis)
+            END IF
+        END IF
+        IF uv < 1 THEN
+            GUI_SET_TEXT(lblStatus, "Verschieben: erst in ein SUB, eine FUNCTION oder eine CLASS stellen.")
+            protokoll("verschieben 0")
+            RETURN
+        END IF
+        verschName = unterprogrammName$(quelle, uv)
+        verschVon = uv
+        verschBis = ub
+        IF verschName = "" THEN
+            GUI_SET_TEXT(lblStatus, "Verschieben: hier steht kein Unterprogramm mit Namen.")
+            protokoll("verschieben 0")
+            RETURN
         END IF
     END IF
-    IF uv < 1 THEN
-        GUI_SET_TEXT(lblStatus, "Verschieben: erst in ein SUB oder eine FUNCTION stellen.")
-        protokoll("verschieben 0")
-        RETURN
-    END IF
-    IF inKlasse(quelle, uv) THEN
-        GUI_SET_TEXT(lblStatus, "Verschieben: eine Methode gehoert zu ihrer Klasse -- " + _
-                     "ohne sie waere sie kein Unterprogramm mehr.")
-        protokoll("verschieben 0")
-        RETURN
-    END IF
-    verschName = unterprogrammName$(quelle, uv)
-    verschVon = uv
-    verschBis = ub
-    IF verschName = "" THEN
-        GUI_SET_TEXT(lblStatus, "Verschieben: hier steht kein Unterprogramm mit Namen.")
-        protokoll("verschieben 0")
-        RETURN
-    END IF
-    ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser.
+    ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser, und
+    ' ganz oben eine neue. Ohne die waere der erste Umzug in eine frische
+    ' Datei ein Umweg ueber Datei/Neu und Sichern.
     paletteNamen = []
     paletteKennungen = []
+    ARRAY_PUSH(paletteNamen, "(neue Datei ...)") : ARRAY_PUSH(paletteKennungen, "*neu*")
     DIM d AS STRING
     FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
         ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad)
     NEXT
-    IF LEN(paletteNamen) = 0 THEN
-        GUI_SET_TEXT(lblStatus, "Verschieben: im Projektordner liegt keine zweite .dh-Datei.")
-        protokoll("verschieben 0")
-        RETURN
-    END IF
     waehlerOeffnen("verschieben", verschName + " verschieben nach ...")
 END SUB
 
@@ -4174,14 +4209,20 @@ SUB verschiebenNach(ziel AS STRING)
     DIM ruftNoch AS BOOLEAN : ruftNoch = FALSE
     DIM zl AS STRING
     FOR EACH zl IN rest
-        IF aufrufInZeile(zl, verschName) THEN ruftNoch = TRUE
+        IF benutztWort(zl, verschName) THEN ruftNoch = TRUE
     NEXT
     IF ruftNoch AND NOT importiert(neuQuelle, zielName) THEN
         neuQuelle = mitImport$(neuQuelle, zielName)
     END IF
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuQuelle)
     ' 2. Das Ziel: der Block ans Ende.
-    DIM zielText AS STRING : zielText = JOIN$(READLINES(ziel), NL)
+    DIM zielText AS STRING : zielText = ""
+    TRY
+        zielText = JOIN$(READLINES(ziel), NL)
+    CATCH e
+        ' Eine neue Datei -- sie entsteht beim Uebernehmen.
+        zielText = "' " + BASENAME(ziel)
+    END TRY
     DIM zielNeu AS STRING : zielNeu = zielText
     IF TRIM$(zielNeu) <> "" THEN zielNeu = zielNeu + NL
     zielNeu = zielNeu + NL + JOIN$(block, NL)
@@ -4199,7 +4240,7 @@ SUB verschiebenNach(ziel AS STRING)
         DIM ruft AS BOOLEAN : ruft = FALSE
         DIM az AS STRING
         FOR EACH az IN SPLIT$(andere, NL)
-            IF aufrufInZeile(az, verschName) THEN ruft = TRUE
+            IF benutztWort(az, verschName) THEN ruft = TRUE
         NEXT
         IF NOT ruft OR importiert(andere, zielName) THEN CONTINUE
         umbauVormerken(tabMitPfad(pfad), pfad, mitImport$(andere, zielName))
@@ -4613,10 +4654,7 @@ SUB umbenennenImProjekt(neu AS STRING)
         umbauVormerken(-1, pfad, frisch)
     NEXT
     DIM geaendert AS INTEGER : geaendert = LEN(umbauTexte)
-    DIM schon AS STRING : schon = nameVergeben$(neu)
-    IF schon <> "" THEN
-        umbauWarnung = "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
-    END IF
+    umbauWarnung = umbenennEinwand$(wort, neu)
     umbauStarten("'" + wort + "' -> '" + neu + "' im Projekt", _
                  "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).", _
                  "projekt umbenannt " + STR$(geaendert))
@@ -4721,7 +4759,15 @@ END SUB
 ' Der Text eines Eintrags, wie er JETZT ist -- das, wogegen verglichen wird.
 FUNCTION umbauAlt$(k AS INTEGER) AS STRING
     IF umbauTabs[k] >= 0 THEN RETURN GUI_TEXT(tabFelder[umbauTabs[k]])
-    RETURN dateiLesen(umbauPfade[k])
+    ' Eine Datei, die es noch NICHT gibt, ist ein leerer Vorher-Stand --
+    ' beim Verschieben in eine neue Datei entsteht sie erst beim Uebernehmen.
+    DIM t AS STRING : t = ""
+    TRY
+        t = dateiLesen(umbauPfade[k])
+    CATCH e
+        t = ""
+    END TRY
+    RETURN t
 END FUNCTION
 
 ' Ein Unterschied als Text: geaenderte Zeilen mit `-`/`+`, zwei Zeilen
@@ -4903,6 +4949,123 @@ SUB umbauSchreiben()
     umbauLeeren()
 END SUB
 
+' --- Vererbung: wer eine Ueberschreibung umbenennt, zerreisst sie -------
+' Heisst eine Methode in der Oberklasse genauso, ist die Umbenennung in
+' EINER Klasse keine Umbenennung, sondern eine Trennung: die Ueberschreibung
+' greift nicht mehr, und zwar ohne Uebersetzungsfehler -- gerufen wird von
+' da an die Fassung der Oberklasse. Genau darum steht es in der Vorschau.
+DIM klsName AS ARRAY OF STRING : klsName = []
+DIM klsBasis AS ARRAY OF STRING : klsBasis = []
+DIM klsDatei AS ARRAY OF STRING : klsDatei = []
+DIM klsMethoden AS ARRAY OF STRING : klsMethoden = []
+
+' Alle Klassen des Projekts einlesen: Name, Oberklasse, Methoden.
+SUB klassenLesen()
+    klsName = [] : klsBasis = [] : klsDatei = [] : klsMethoden = []
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        DIM quelle AS STRING : quelle = projektQuelle$(pfad)
+        IF quelle = "" THEN CONTINUE
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+        DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+        DIM i AS INTEGER
+        FOR i = 0 TO JSON_LEN(j, "") - 1
+            DIM p AS STRING : p = STR$(i)
+            IF LOWER$(JSON_GET_STRING(j, p + ".art")) <> "class" THEN CONTINUE
+            DIM name AS STRING : name = JSON_GET_STRING(j, p + ".name")
+            DIM von AS INTEGER : von = JSON_GET_INT(j, p + ".von")
+            ' Die Oberklasse steht nur im TEXT der Kopfzeile -- CODE_SYMBOLS$
+            ' kennt sie nicht.
+            DIM basis AS STRING : basis = ""
+            IF von >= 1 AND von <= LEN(zeilen) THEN
+                DIM kopf AS STRING : kopf = UPPER$(zeilen[von - 1])
+                DIM ex AS INTEGER : ex = INSTR(kopf, " EXTENDS ")
+                IF ex >= 0 THEN basis = TRIM$(MID$(zeilen[von - 1], ex + 9))
+            END IF
+            DIM mm AS STRING : mm = "|"
+            DIM m AS INTEGER
+            FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+                mm = mm + LOWER$(JSON_GET_STRING(j, p + ".kinder." + STR$(m) + ".name")) + "|"
+            NEXT
+            ARRAY_PUSH(klsName, name) : ARRAY_PUSH(klsBasis, basis)
+            ARRAY_PUSH(klsDatei, d) : ARRAY_PUSH(klsMethoden, mm)
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION klasseIndex(name AS STRING) AS INTEGER
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(klsName) - 1
+        IF LOWER$(klsName[i]) = klein THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Welche ANDERE Klasse derselben Familie hat eine Methode dieses Namens?
+' Geliefert wird "Tier (helfer.dh)" oder "". Gegangen wird nach oben ueber
+' EXTENDS und nach unten ueber alle, die davon erben -- eine Umbenennung
+' zerreisst die Verbindung in beide Richtungen gleichermassen.
+FUNCTION familieHatMethode$(klasse AS STRING, methode AS STRING) AS STRING
+    DIM ziel AS STRING : ziel = "|" + LOWER$(methode) + "|"
+    ' nach oben
+    DIM oben AS STRING : oben = klasse
+    DIM runde AS INTEGER : runde = 0
+    WHILE runde < 20
+        runde = runde + 1
+        DIM k AS INTEGER : k = klasseIndex(oben)
+        IF k < 0 OR klsBasis[k] = "" THEN BREAK
+        oben = klsBasis[k]
+        DIM o AS INTEGER : o = klasseIndex(oben)
+        IF o < 0 THEN BREAK
+        IF INSTR(klsMethoden[o], ziel) >= 0 THEN RETURN klsName[o] + " (" + klsDatei[o] + ")"
+    WEND
+    ' nach unten: alles, was (ueber Zwischenstufen) von `klasse` erbt
+    DIM unten AS ARRAY OF STRING : unten = [LOWER$(klasse)]
+    DIM gewachsen AS BOOLEAN : gewachsen = TRUE
+    DIM tiefe AS INTEGER : tiefe = 0
+    WHILE gewachsen AND tiefe < 20
+        gewachsen = FALSE
+        tiefe = tiefe + 1
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(klsName) - 1
+            IF klsBasis[i] = "" THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klsBasis[i])) < 0 THEN CONTINUE
+            IF ARRAY_INDEXOF(unten, LOWER$(klsName[i])) >= 0 THEN CONTINUE
+            ARRAY_PUSH(unten, LOWER$(klsName[i]))
+            gewachsen = TRUE
+            IF INSTR(klsMethoden[i], ziel) >= 0 THEN RETURN klsName[i] + " (" + klsDatei[i] + ")"
+        NEXT
+    WEND
+    RETURN ""
+END FUNCTION
+
+' Der Einwand zum Umbenennen von `wort` an der Marke -- "" wenn keiner.
+' Zwei Fragen: gibt es den neuen Namen schon, und zerreisst die Umbenennung
+' eine Ueberschreibung?
+FUNCTION umbenennEinwand$(alt AS STRING, neu AS STRING) AS STRING
+    DIM schon AS STRING : schon = nameVergeben$(neu)
+    IF schon <> "" THEN
+        RETURN "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
+    END IF
+    ' Nach der Klasse wird nicht an der MARKE gefragt -- die steht vielleicht
+    ' auf einem Aufruf, und der kann ueberall stehen. Gefragt wird, WELCHE
+    ' Klassen eine Methode dieses Namens haben.
+    klassenLesen()
+    DIM ziel AS STRING : ziel = "|" + LOWER$(alt) + "|"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(klsName) - 1
+        IF INSTR(klsMethoden[i], ziel) < 0 THEN CONTINUE
+        DIM wo AS STRING : wo = familieHatMethode$(klsName[i], alt)
+        IF wo = "" THEN CONTINUE
+        RETURN "Achtung: '" + alt + "' gibt es in " + klsName[i] + " UND in " + wo + _
+               " -- wird nur eine umbenannt, greift die Ueberschreibung nicht mehr, " + _
+               "und zwar ohne Fehlermeldung."
+    NEXT
+    RETURN ""
+END FUNCTION
+
 ' --- Umbenennen (Umschalt+F6) ----------------------------------------
 ' Das Umbenennen selbst macht CODE_RENAME$: ganze Woerter, ohne Kommentare
 ' und Zeichenketten. Die IDE fragt nur den neuen Namen und schreibt das
@@ -4917,6 +5080,7 @@ SUB umbenennenFragen()
         RETURN
     END IF
     (umbenennZeile, umbenennSpalte) = GUI_TEXTAREA_CURSOR(ta)
+    umbenennWort = alt
     dlgUmbenennen = GUI_PROMPT("Umbenennen", "'" + alt + "' ueberall nennen in:", alt)
 END SUB
 
@@ -4939,10 +5103,7 @@ SUB umbenennenAusfuehren(neu AS STRING)
     umbauLeeren()
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
     umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
-    DIM schon AS STRING : schon = nameVergeben$(neu)
-    IF schon <> "" THEN
-        umbauWarnung = "Achtung: '" + neu + "' gibt es im Projekt schon (" + schon + ")."
-    END IF
+    umbauWarnung = umbenennEinwand$(umbenennWort, neu)
     umbauStarten("Umbenennen in '" + neu + "'", _
                  STR$(n) + " Stellen umbenannt in '" + neu + "'.", _
                  "umbenannt " + STR$(n) + " " + neu)
@@ -6117,7 +6278,11 @@ SUB paletteAusfuehren()
     ELSEIF paletteArt = "symbol" THEN
         symbolAnspringen(INT(VAL(paletteSichtbar[sel])))
     ELSEIF paletteArt = "verschieben" THEN
-        verschiebenNach(paletteSichtbar[sel])
+        IF paletteSichtbar[sel] = "*neu*" THEN
+            dlgVerschNeu = GUI_PROMPT("Neue Datei", "Wie soll sie heissen?", "helfer.dh")
+        ELSE
+            verschiebenNach(paletteSichtbar[sel])
+        END IF
     ELSEIF paletteArt = "datei" THEN
         protokoll("schnell " + paletteSichtbar[sel])
         dateiOeffnen(paletteSichtbar[sel])
@@ -6833,6 +6998,19 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             dlgSchliessen = 0
         END IF
     END IF
+    IF dlgVerschNeu <> 0 THEN
+        DIM av AS INTEGER : av = GUI_ANSWER(dlgVerschNeu)
+        IF av = 1 THEN
+            DIM vname AS STRING : vname = TRIM$(GUI_DIALOG_TEXT(dlgVerschNeu))
+            dlgVerschNeu = 0
+            IF vname <> "" THEN
+                IF LOWER$(RIGHT$(vname, 3)) <> ".dh" THEN vname = vname + ".dh"
+                verschiebenNach(PATHJOIN(projektOrdner, vname))
+            END IF
+        ELSEIF av <> 0 THEN
+            dlgVerschNeu = 0
+        END IF
+    END IF
     IF dlgParamNeu <> 0 THEN
         DIM ap AS INTEGER : ap = GUI_ANSWER(dlgParamNeu)
         IF ap = 1 THEN
@@ -6894,6 +7072,16 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         IF GUI_TEXT(tfPalette) <> paletteLetzterFilter THEN
             paletteLetzterFilter = GUI_TEXT(tfPalette)
             paletteFuellen(paletteLetzterFilter)
+        END IF
+        ' Die Pfeile bewegen die LISTE, auch wenn die Marke im Filterfeld
+        ' steht -- sonst kommt man ohne Maus nur an den ersten Eintrag, und
+        ' wer den zweiten will, muss ihn erst wegfiltern.
+        DIM pn AS INTEGER : pn = LEN(paletteSichtbar)
+        IF pn > 0 AND (KEYHIT(KEY_DOWN) OR KEYHIT(KEY_UP)) THEN
+            DIM ps AS INTEGER : ps = GUI_LISTBOX_SELECTED(lstPalette)
+            IF ps < 0 THEN ps = 0
+            IF KEYHIT(KEY_DOWN) THEN ps = MIN(ps + 1, pn - 1) ELSE ps = MAX(ps - 1, 0)
+            GUI_LISTBOX_SET_SELECTED(lstPalette, ps)
         END IF
         IF GUI_ENTERED(tfPalette) OR GUI_DOUBLE_CLICKED(lstPalette) OR (KEYHIT(KEY_RETURN) AND GUI_FOCUSED() = lstPalette) THEN paletteAusfuehren()
         IF KEYHIT(KEY_ESCAPE) THEN paletteSchliessen()
