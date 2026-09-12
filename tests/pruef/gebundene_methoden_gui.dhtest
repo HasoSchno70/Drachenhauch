@@ -75,6 +75,7 @@ DHRT_FRAMES=1
   "menus": [],
   "tabs": [],
   "active_tab": 0,
+  "tabs_closable": false,
   "default_button": -1,
   "cancel_button": -1
 }

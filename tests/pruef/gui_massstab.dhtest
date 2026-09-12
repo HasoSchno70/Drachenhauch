@@ -165,6 +165,7 @@ PRINT GUI_TO_JSON(w)
   "menus": [],
   "tabs": [],
   "active_tab": 0,
+  "tabs_closable": false,
   "default_button": -1,
   "cancel_button": -1
 }
@@ -237,6 +238,7 @@ PRINT GUI_TO_JSON(w)
   "menus": [],
   "tabs": [],
   "active_tab": 0,
+  "tabs_closable": false,
   "default_button": -1,
   "cancel_button": -1
 }
