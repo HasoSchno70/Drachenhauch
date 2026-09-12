@@ -28,7 +28,7 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 
 - **Links — Formulare + Controls:** oben der **Formular-Navigator** (alle im
   Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
-  Startformular), darunter die **grafische Palette aller 24 Widget-Arten** der
+  Startformular), darunter die **grafische Palette aller 25 Widget-Arten** der
   Laufzeit (Button, Label, Checkbox, Radio, Slider, TextInput, TextArea,
   Zahlenfeld, Drehknopf, Umschalter, Dropdown, ListBox, Baum, ProgressBar,
   Image, Tabelle, Canvas, Panel, GroupBox, Separator, Trenner,
@@ -183,8 +183,12 @@ Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 **Felder, die der Designer nicht darstellt, reicht er unverändert durch.** Die
 `gui`-Laufzeit kennt mehr als der Inspector anbietet — auf Fenster-Ebene
 `chrome`, `menus`, `tabs`/`active_tab`, pro Widget `tab_page` und `font`.
-Bei den *Arten* gibt es diese Lücke seit 2026-08-31 nicht mehr: alle 24 lassen
-sich ablegen, zeichnen und exportieren.
+Bei den *Arten* gibt es diese Lücke seit 2026-08-31 nicht mehr: alle 25 lassen
+sich ablegen, zeichnen und exportieren. Beim **Reiterwerk** (`tabcontrol`, seit
+2026-09-12) stellt der Designer die Beschriftungen ein, nicht aber, welches
+Control auf welche Seite gehört — ein Programm, das das gesetzt hat, verliert
+es beim Öffnen und Speichern trotzdem nicht: `tabctl` läuft als unbekanntes
+Feld durch.
 Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt sich also im
 Designer öffnen und nachjustieren, ohne dass Menüs, Reiter oder Tabellendaten
 verloren gehen; bearbeiten lassen sie sich dort aber nicht (sie werden auf der

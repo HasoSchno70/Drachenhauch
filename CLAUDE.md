@@ -2873,6 +2873,40 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 24 (2026-09-12):** kein Punkt aus der eigenen Liste, sondern die
+Frage des Nutzers -- der Dateibaum gehoert in die LAUFZEIT, und welche
+Widgets fehlen sonst noch? **`GUI_FILETREE`** (gui.rs `DateiBaum` am
+`TreeState`, Zeichnen und Treffertest bleiben die des Baums): liest die
+Wurzel und jeden AUFGEKLAPPTEN Ordner selbst, ein `target`-Ordner kostet
+also nichts, solange niemand hineinsieht -- und jeder Ordner bekommt sein
+Dreieck, auch ein leerer, weil einmal vorsorglich hineinzusehen genau das
+waere, was der Baum vermeidet. **Nach aussen spricht er ueber WEGE, nicht
+ueber Knoten-Nummern**: die Liste entsteht bei jedem Aufklappen neu
+(`dateibaum_neu`), Auswahl kommt ueber den Weg zurueck, Zugeklapptes faellt
+aus der Auswahl (wie in jedem Dateimanager) -- ein HAKEN dagegen ueberlebt
+es, er war eine Entscheidung (`gehakt: Vec<String>`). Einstellungen:
+`GUI_FILETREE_FILTER/SKIP` (Muster mit `;`, Ordner wie Dateien),
+`ordner_zuerst`, `verborgene`, `nur_ordner`, `mehrfachauswahl`,
+`kaestchen`, `klick_klappt` und `auffrischen` (ms; ohne den Takt zeigt ein
+Baum eine frisch angelegte Datei erst, wenn jemand ihn anstoesst -- und
+darauf zu kommen ist niemandes Aufgabe). Dazu **Haken im Baum**
+(`GUI_TREE_SET "kaestchen"` + `GUI_TREE_CHECKED/SET_CHECKED`) -- er war die
+letzte Auswahl-Art ohne sie; Klick aufs Kaestchen kippt NUR den Haken, mit
+Tastatur gehoert die Leertaste dem Haken und Enter dem Aufklappen. Und
+**`GUI_TABCONTROL`**: Reiter INNERHALB eines Fensters (bisher nur am
+Fenster) -- die Kinder behalten ihre Lage, eine Seite blendet sie nur ein
+und aus (`tc_von`/`tc_seite`, je Bild in `tabctl_pass` gesetzt wie beim
+rollenden Panel; `widget_shown` ist die eine Stelle, die es durchsetzt).
+Die Kopfbreite wird an der ZEICHENZAHL geschaetzt, nicht gemessen: der
+Treffertest laeuft in `handle_press`, und dort gibt es keine Grafik. Die
+IDE benutzt den Dateibaum (ihre Buchfuehrung aus Dateiliste, Knoten-Nummern
+und Schluessel ist weg); im Form-Designer ist das Reiterwerk Palette,
+Vorschau und GB-Code, die Seiten-Zuordnung der Controls aber nicht.
+`docs/module-gui.md` sagt am Ende, was der gui weiter FEHLT (Zeitwaehler,
+gesetzter Text, Akkordeon, Pfadleiste, Baum mit Spalten). Tests
+`tests/pruef/gui_dateibaum.dhtest` (13), `tests/pruef/gui_reiterwerk.dhtest`
+(7), zwei neue in `tests/test_ide.py`.
+
 **Stufe 23 (2026-09-12):** die drei Punkte nach Stand 22. **Der Baum zeigt
 auch Begleitdateien** (`.dhform`, `.dhsprite`, `.json`, `.md`, `.csv`,
 `.png` ...). Was der Editor nicht bearbeiten kann, geht per `OPENDOC` ans
