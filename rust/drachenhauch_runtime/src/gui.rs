@@ -4130,7 +4130,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let ni = vis[row as usize];
         let level = t.nodes[ni].level;
         let has_children = t.nodes[ni].has_children;
-        let toggle_x = ax + 4 + level * self.sk(TREE_INDENT);
+        let kast_w = self.tree_kast_w(t);
+        let toggle_x = ax + 4 + kast_w + level * self.sk(TREE_INDENT);
         let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + self.sk(TREE_TOGGLE_W);
         let kaestchen = t.kaestchen;
         let (kx, ks) = self.tree_kast(ax, level);
@@ -4692,8 +4693,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Zeichnen und Treffertest; laufen sie auseinander, kippt der Haken neben
     /// dem, was man anklickt.
     fn tree_kast(&self, ax: i32, level: i32) -> (i32, i32) {
-        let x = ax + 4 + level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W) + 2;
-        (x, (self.sk(TREE_ROW_H) - 6).max(8))
+        (ax + 2 + level * self.sk(TREE_INDENT), (self.sk(TREE_ROW_H) - 6).max(8))
+    }
+
+    /// Wie viel Platz die Kaestchen-Spalte wegnimmt (0, wenn es keine gibt).
+    ///
+    /// Sie steht GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck. Zwischen Dreieck
+    /// und Namen lag sie genau dort, wo man eine Zeile anklickt, um sie zu
+    /// oeffnen -- ein Klick auf den Namen setzte dann einen Haken statt die
+    /// Datei aufzumachen. Aufgefallen ist es an einem Test aus Stand 24, der
+    /// eine Datei im Unterordner oeffnet.
+    fn tree_kast_w(&self, t: &TreeState) -> i32 {
+        if t.kaestchen { (self.sk(TREE_ROW_H) - 6).max(8) + 4 } else { 0 }
     }
 
     fn table_geom(&self, wi: usize, idx: usize) -> TGeom {
@@ -12913,8 +12924,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             } else if ni as i32 == t.hover {
                 g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
             }
-            // Auf-/Zuklapp-Dreieck (nur bei Kindknoten).
-            let tx = ax + 4 + indent;
+            // Auf-/Zuklapp-Dreieck (nur bei Kindknoten), hinter der
+            // Kaestchen-Spalte.
+            let tx = ax + 4 + self.tree_kast_w(t) + indent;
             let cy = ry + self.sk(TREE_ROW_H) / 2;
             if node.has_children {
                 let cx = tx + self.sk(TREE_TOGGLE_W) / 2;
@@ -12928,14 +12940,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             let mut lx = tx + self.sk(TREE_TOGGLE_W) + 2;
             if t.kaestchen {
-                // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken.
+                // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken --
+                // aber GANZ LINKS, vor dem Dreieck (siehe tree_kast_w).
                 let (bx, cs) = self.tree_kast(ax, node.level);
                 let by = ry + (self.sk(TREE_ROW_H) - cs) / 2;
                 g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
                 if t.checks.get(ni).copied().unwrap_or(false) {
                     g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
                 }
-                lx = bx + cs + 3;
             }
             if hat_icon {
                 // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine

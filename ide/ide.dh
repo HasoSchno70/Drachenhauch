@@ -391,6 +391,7 @@ DIM miNeu AS INTEGER : miNeu = GUI_MENU_ITEM(mDatei, "Neu", "Strg+N")
 DIM miOeffnen AS INTEGER : miOeffnen = GUI_MENU_ITEM(mDatei, "Oeffnen ...", "Strg+O")
 DIM miSchnell AS INTEGER : miSchnell = GUI_MENU_ITEM(mDatei, "Datei im Projekt oeffnen ...", "Strg+Umschalt+O")
 DIM miBaumOeffnen AS INTEGER : miBaumOeffnen = GUI_MENU_ITEM(mDatei, "Gewaehlte Dateien oeffnen", "Strg+Umschalt+E")
+DIM miHakenWeg AS INTEGER : miHakenWeg = GUI_MENU_ITEM(mDatei, "Haken im Projektbaum entfernen")
 ' Zuletzt geoeffnet: acht feste Eintraege, die Texte wechseln -- ein Menue
 ' kann Eintraege nicht wieder loswerden, also werden freie gesperrt.
 CONST ZULETZT_MAX = 8
@@ -1836,6 +1837,7 @@ END SUB
 
 ' --- Projektbaum -------------------------------------------------------
 DIM baumLetzteWahl AS STRING : baumLetzteWahl = ""
+DIM hakenStand AS INTEGER : hakenStand = 0
 
 ' Alle Dateien des Projekts mit diesem Muster -- AUCH in Unterordnern.
 '
@@ -1865,7 +1867,23 @@ FUNCTION projektDateien(muster AS STRING) AS ARRAY OF STRING
         NEXT
         IF gut THEN ARRAY_PUSH(raus, d)
     NEXT
-    RETURN raus
+    ' Sind im Baum Dateien ANGEHAKT, ist das Projekt genau diese Auswahl.
+    ' Eine Umbenennung soll man auf drei Dateien beschraenken koennen, ohne
+    ' dafuer einen zweiten Ordner anzulegen -- und weil ALLES hier durchgeht
+    ' (Umbauten, Projektsuche, Symbolverzeichnis), gilt die Einschraenkung
+    ' ueberall gleich. Damit sie niemandem entgeht, sagt die Beschriftung
+    ' ueber dem Baum, wie viele angehakt sind.
+    IF GUI_FILETREE_CHECKED_COUNT(baum) = 0 THEN RETURN raus
+    DIM gewaehlt AS ARRAY OF STRING : gewaehlt = []
+    DIM hi AS INTEGER
+    FOR hi = 0 TO GUI_FILETREE_CHECKED_COUNT(baum) - 1
+        ARRAY_PUSH(gewaehlt, wegGleich$(GUI_FILETREE_CHECKED_PATH$(baum, hi)))
+    NEXT
+    DIM nur AS ARRAY OF STRING : nur = []
+    FOR EACH d IN raus
+        IF ARRAY_INDEXOF(gewaehlt, wegGleich$(PATHJOIN(projektOrdner, d))) >= 0 THEN ARRAY_PUSH(nur, d)
+    NEXT
+    RETURN nur
 END FUNCTION
 
 ' Was im Projektbaum steht. Quelltext zuerst, dann was dazugehoert --
@@ -1886,6 +1904,8 @@ GUI_FILETREE_SET(baum, "auffrischen", 2000)
 ' treffen ist eine Zumutung, und ein Klick, der scheinbar nichts tut, sieht
 ' nach einem Fehler aus.
 GUI_FILETREE_SET(baum, "klick_klappt", 1)
+' Haken am Baum: was angehakt ist, IST das Projekt (siehe projektDateien).
+GUI_FILETREE_SET(baum, "kaestchen", 1)
 
 ' Laesst sich die Datei im Editor bearbeiten? Alles andere geht an das
 ' Programm des Systems (ein PNG im Code-Feld waere Kauderwelsch).
@@ -1907,7 +1927,18 @@ SUB baumFuellen()
     ELSE
         GUI_FILETREE_REFRESH(baum)
     END IF
-    GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
+    projektBeschriften()
+END SUB
+
+' Was ueber dem Baum steht. Angehakte Dateien schraenken JEDEN Umbau ein --
+' das darf man nicht uebersehen, also steht es dort, wo man ohnehin hinsieht.
+SUB projektBeschriften()
+    DIM n AS INTEGER : n = GUI_FILETREE_CHECKED_COUNT(baum)
+    IF n = 0 THEN
+        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner))
+    ELSE
+        GUI_SET_TEXT(lblProjekt, BASENAME(projektOrdner) + " -- nur " + STR$(n) + " angehakt")
+    END IF
 END SUB
 
 ' Alle gewaehlten Dateien oeffnen (Strg+Umschalt+E).
@@ -1933,7 +1964,29 @@ SUB baumAuswahlOeffnen()
     protokoll("baum offen " + STR$(LEN(pfade)))
 END SUB
 
+' Alle Haken abraeumen -- das Projekt ist danach wieder der ganze Ordner.
+SUB hakenEntfernen()
+    DIM n AS INTEGER : n = GUI_FILETREE_CHECKED_COUNT(baum)
+    ' Von HINTEN nach vorn: jedes Abhaken nimmt einen Weg aus der Liste,
+    ' vorwaerts uebersprungen man damit jeden zweiten.
+    DIM i AS INTEGER
+    FOR i = n - 1 TO 0 STEP -1
+        GUI_FILETREE_SET_CHECKED(baum, GUI_FILETREE_CHECKED_PATH$(baum, i), FALSE)
+    NEXT
+    hakenStand = 0
+    projektBeschriften()
+    GUI_SET_TEXT(lblStatus, STR$(n) + " Haken entfernt -- der Umbau geht wieder ueber das ganze Projekt.")
+    protokoll("haken weg " + STR$(n))
+END SUB
+
 SUB baumAbfragen()
+    ' Die Haken entscheiden, was "das Projekt" heisst -- das gehoert sofort
+    ' in die Beschriftung, nicht erst beim naechsten Neuaufbau des Baums.
+    IF GUI_FILETREE_CHECKED_COUNT(baum) <> hakenStand THEN
+        hakenStand = GUI_FILETREE_CHECKED_COUNT(baum)
+        projektBeschriften()
+        protokoll("haken " + STR$(hakenStand))
+    END IF
     DIM weg AS STRING : weg = GUI_FILETREE_SELECTED$(baum)
     IF weg = "" OR weg = baumLetzteWahl THEN RETURN
     baumLetzteWahl = weg
@@ -4135,30 +4188,14 @@ SUB parameterUebernehmen()
     DIM geaendert AS INTEGER : geaendert = zaehler[0]
     DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
-    DIM dateien AS ARRAY OF STRING : dateien = projektDateien("*.dh")
-    DIM d AS STRING
-    FOR EACH d IN dateien
-        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
-        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
-        IF INSTR(alt, paramName) < 0 THEN CONTINUE
-        DIM z2 AS ARRAY OF INTEGER : z2 = []
-        DIM frisch AS STRING
-        frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
-                                  alteZahl, z2)
-        geaendert = geaendert + z2[0]
-        uebergangen = uebergangen + z2[1]
-        IF frisch <> alt THEN umbauVormerken(-1, pfad, frisch)
-    NEXT
-    DIM sagen AS STRING
-    sagen = "Parameter von " + paramName + ": " + STR$(geaendert) + " Stelle(n) in " + _
-            STR$(LEN(umbauTexte)) + " Datei(en)."
-    IF uebergangen > 0 THEN
-        sagen = sagen + " " + STR$(uebergangen) + " Aufruf(e) uebergangen (andere Zahl von " + _
-                "Argumenten oder mit Namen uebergeben)."
-    END IF
-    umbauStarten("Parameter von " + paramName, sagen, _
-                 "parameter umgestellt " + STR$(geaendert) + " " + STR$(uebergangen))
+    ' Die uebrigen Dateien sammelt der Schritt-Laeufer (ESC bricht ab) --
+    ' bei vierhundert Dateien steht die IDE sonst lange genug, dass man sie
+    ' fuer haengend haelt. Die Zaehler dieser Datei gehen als Startwert mit.
+    laufZahl = alteZahl
+    laufStarten("parameter", paramName, "")
+    laufGeaendert = geaendert
+    laufUebergangen = uebergangen
+    GUI_FOCUS(ta)
 END SUB
 
 ' --- Ein Unterprogramm in eine andere Datei verschieben ---------------
@@ -4458,24 +4495,6 @@ SUB verschiebenNach(ziel AS STRING)
     END IF
     DIM zielTab AS INTEGER : zielTab = tabMitPfad(ziel)
     umbauVormerken(zielTab, ziel, zielNeu)
-    ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch.
-    DIM ohneImport AS INTEGER : ohneImport = 0
-    DIM d AS STRING
-    FOR EACH d IN projektDateien("*.dh")
-        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
-        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
-        IF wegGleich$(pfad) = wegGleich$(ziel) THEN CONTINUE
-        DIM andere AS STRING : andere = projektQuelle$(pfad)
-        IF andere = "" THEN CONTINUE
-        DIM ruft AS BOOLEAN : ruft = FALSE
-        DIM az AS STRING
-        FOR EACH az IN SPLIT$(andere, NL)
-            IF benutztWort(az, verschName) THEN ruft = TRUE
-        NEXT
-        IF NOT ruft OR importiert(andere, zielName) THEN CONTINUE
-        umbauVormerken(tabMitPfad(pfad), pfad, mitImport$(andere, zielName))
-        ohneImport = ohneImport + 1
-    NEXT
     ' Gibt es den Namen im ZIEL schon? Dann verdeckt einer den anderen --
     ' und zwar ohne Uebersetzungsfehler, der zweite gewinnt einfach. Das
     ' merkt man erst, wenn das Falsche laeuft.
@@ -4492,12 +4511,12 @@ SUB verschiebenNach(ziel AS STRING)
         umbauWarnung = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr in " + meinName + _
                        " -- benutzt das Unterprogramm etwas, das nur dort steht?"
     END IF
-    DIM sagen AS STRING
-    sagen = verschName + " (" + STR$(LEN(block)) + " Zeilen) nach " + zielName + _
-            ", " + STR$(LEN(umbauTexte)) + " Datei(en) betroffen."
-    IF ohneImport > 0 THEN sagen = sagen + " " + STR$(ohneImport) + " davon bekommen den IMPORT dazu."
-    umbauStarten(verschName + " nach " + zielName, sagen, _
-                 "verschieben " + verschName + " " + STR$(LEN(block)) + " " + STR$(ohneImport))
+    ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch --
+    '    gesammelt in Schritten (ESC bricht ab), wie bei den beiden anderen
+    '    projektweiten Umbauten. Der Rest der Meldung entsteht dort.
+    laufZiel = ziel
+    laufBlock = LEN(block)
+    laufStarten("verschieben", verschName, "")
 END SUB
 
 ' --- Wer ruft das auf? (Umschalt+F12) ---------------------------------
@@ -4958,6 +4977,13 @@ DIM laufDateien AS ARRAY OF STRING : laufDateien = []
 DIM laufIndex AS INTEGER : laufIndex = 0
 DIM laufAlt AS STRING : laufAlt = ""
 DIM laufNeu AS STRING : laufNeu = ""
+' Was die beiden anderen Arten (Parameter, Verschieben) unterwegs brauchen:
+' das Ziel, die alte Parameterzahl und die Zaehler.
+DIM laufZiel AS STRING : laufZiel = ""
+DIM laufBlock AS INTEGER : laufBlock = 0
+DIM laufZahl AS INTEGER : laufZahl = 0
+DIM laufGeaendert AS INTEGER : laufGeaendert = 0
+DIM laufUebergangen AS INTEGER : laufUebergangen = 0
 
 SUB laufStarten(art AS STRING, alt AS STRING, neu AS STRING)
     laufArt = art
@@ -4965,7 +4991,13 @@ SUB laufStarten(art AS STRING, alt AS STRING, neu AS STRING)
     laufNeu = neu
     laufDateien = projektDateien("*.dh")
     laufIndex = 0
-    umbauLeeren()
+    laufGeaendert = 0
+    laufUebergangen = 0
+    ' NICHT `umbauLeeren` bei den Arten, die schon etwas vorgemerkt haben:
+    ' Parameter und Verschieben legen die eigene Datei (und die Zieldatei)
+    ' VOR dem Sammeln hin -- dort steht der Stand aus dem Reiter, den die
+    ' Platte gar nicht kennt.
+    IF art = "umbenennen" OR art = "ersetzen" THEN umbauLeeren()
     GUI_SET_TEXT(lblStatus, "Sammle ... 0 von " + STR$(LEN(laufDateien)) + " Dateien (ESC bricht ab)")
 END SUB
 
@@ -4993,7 +5025,23 @@ SUB laufSchritt()
         END TRY
         IF alt = "" THEN CONTINUE
         DIM frisch AS STRING : frisch = alt
-        IF laufArt = "umbenennen" THEN
+        IF laufArt = "parameter" THEN
+            ' Die eigene Datei ist schon vorgemerkt (dort steht der Stand
+            ' AUS DEM REITER, nicht der von der Platte).
+            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+            IF INSTR(alt, paramName) < 0 THEN CONTINUE
+            DIM z2 AS ARRAY OF INTEGER : z2 = []
+            frisch = parameterInText$(alt, paramName, paramFolge, paramNeuDecl, paramNeuWert, _
+                                      laufZahl, z2)
+            laufGeaendert = laufGeaendert + z2[0]
+            laufUebergangen = laufUebergangen + z2[1]
+        ELSEIF laufArt = "verschieben" THEN
+            IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+            IF wegGleich$(pfad) = wegGleich$(laufZiel) THEN CONTINUE
+            IF NOT benutztWort(alt, verschName) THEN CONTINUE
+            frisch = mitImport$(alt, BASENAME(laufZiel))
+            IF frisch <> alt THEN laufGeaendert = laufGeaendert + 1
+        ELSEIF laufArt = "umbenennen" THEN
             IF INSTR(alt, laufAlt) < 0 THEN CONTINUE
             frisch = umbenennenInText$(alt, laufAlt, laufNeu)
         ELSEIF regexAn THEN
@@ -5015,6 +5063,29 @@ SUB laufSchritt()
     ' Fertig gesammelt -- ab hier wie bisher.
     DIM art AS STRING : art = laufArt
     laufArt = ""
+    IF art = "parameter" THEN
+        DIM psagen AS STRING
+        psagen = "Parameter von " + paramName + ": " + STR$(laufGeaendert) + " Stelle(n) in " + _
+                 STR$(LEN(umbauTexte)) + " Datei(en)."
+        IF laufUebergangen > 0 THEN
+            psagen = psagen + " " + STR$(laufUebergangen) + " Aufruf(e) uebergangen (andere Zahl " + _
+                     "von Argumenten oder mit Namen uebergeben)."
+        END IF
+        umbauStarten("Parameter von " + paramName, psagen, _
+                     "parameter umgestellt " + STR$(laufGeaendert) + " " + STR$(laufUebergangen))
+        RETURN
+    END IF
+    IF art = "verschieben" THEN
+        DIM vsagen AS STRING
+        vsagen = verschName + " (" + STR$(laufBlock) + " Zeilen) nach " + BASENAME(laufZiel) + _
+                 ", " + STR$(LEN(umbauTexte)) + " Datei(en) betroffen."
+        IF laufGeaendert > 0 THEN
+            vsagen = vsagen + " " + STR$(laufGeaendert) + " davon bekommen den IMPORT dazu."
+        END IF
+        umbauStarten(verschName + " nach " + BASENAME(laufZiel), vsagen, _
+                     "verschieben " + verschName + " " + STR$(laufBlock) + " " + STR$(laufGeaendert))
+        RETURN
+    END IF
     IF art = "umbenennen" THEN
         formulareNachziehen(laufAlt, laufNeu)
         umbauWarnung = umbenennEinwand$(laufAlt, laufNeu)
@@ -5329,8 +5400,19 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     umbauMeldung = meldung
     umbauProt = prot
     IF NOT vorschauAn AND umbauWarnung = "" THEN
-        umbauSchreiben()
-        RETURN
+        ' Ohne Vorschau wird trotzdem GEPRUEFT -- nur eben still. Bis Stand
+        ' 24 ging der Umbau ungesehen durch, und ob er die Uebersetzung
+        ' kaputt macht, sah man beim naechsten Starten. Bleibt alles heil,
+        ' wird geschrieben; kommen Fehler dazu, geht die Vorschau doch auf,
+        ' mit den Meldungen oben. Sie erscheint dann genau dann, wenn sie
+        ' etwas zu sagen hat.
+        DIM schlimm AS INTEGER : schlimm = umbauNeueFehler()
+        IF schlimm = 0 THEN
+            umbauSchreiben()
+            RETURN
+        END IF
+        umbauWarnung = "Der Umbau bringt " + STR$(schlimm) + " Fehler DAZU -- darum diese Vorschau."
+        protokoll("umbau einwand still " + STR$(schlimm))
     END IF
     opsLeeren()
     DIM k AS INTEGER
@@ -5464,6 +5546,43 @@ END SUB
 ' sehen bekommt.
 SUB umbauPruefen()
     IF LEN(umbauTexte) = 0 THEN RETURN
+    DIM summe AS INTEGER : summe = umbauZaehlen()
+    DIM sagen AS STRING
+    IF summe = 0 THEN
+        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauTexte)) + " Datei(en)."
+    ELSE
+        sagen = "Geprueft: " + STR$(summe) + " Fehler -- sie stehen oben im Unterschied."
+    END IF
+    umbauAnzeigeBauen()
+    GUI_SET_TEXT(lblUmbau, sagen)
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("umbau geprueft " + STR$(summe))
+END SUB
+
+' Wie viele Fehler der Umbau DAZUBRINGT -- je Datei vorher gegen nachher.
+'
+' Nicht die absolute Zahl: eine Datei, die schon nicht uebersetzt, wuerde
+' sonst jeden Umbau in die Vorschau zwingen, obwohl er nichts damit zu tun
+' hat. Der stille Weg fragt darum hier, der Knopf in der Vorschau zaehlt
+' weiter absolut -- dort will man LESEN, was im Argen liegt.
+FUNCTION umbauNeueFehler() AS INTEGER
+    DIM summe AS INTEGER : summe = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauTexte) - 1
+        DIM name AS STRING : name = umbauPfade[k]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
+        DIM vorher AS INTEGER : vorher = fehlerZahl(umbauAlt$(k))
+        DIM nachher AS INTEGER : nachher = fehlerZahl(umbauTexte[k])
+        IF nachher > vorher THEN summe = summe + (nachher - vorher)
+    NEXT
+    RETURN summe
+END FUNCTION
+
+' Die Texte, die geschrieben WUERDEN, durch den Uebersetzer schicken --
+' liefert die Zahl der Fehler und fuellt `umbauBefunde`. Zwei Aufrufer: der
+' Knopf in der Vorschau und der stille Weg ohne sie.
+FUNCTION umbauZaehlen() AS INTEGER
     umbauBefunde = []
     DIM summe AS INTEGER : summe = 0
     DIM k AS INTEGER
@@ -5487,17 +5606,8 @@ SUB umbauPruefen()
             summe = summe + 1
         NEXT
     NEXT
-    DIM sagen AS STRING
-    IF summe = 0 THEN
-        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauTexte)) + " Datei(en)."
-    ELSE
-        sagen = "Geprueft: " + STR$(summe) + " Fehler -- sie stehen oben im Unterschied."
-    END IF
-    umbauAnzeigeBauen()
-    GUI_SET_TEXT(lblUmbau, sagen)
-    GUI_SET_TEXT(lblStatus, sagen)
-    protokoll("umbau geprueft " + STR$(summe))
-END SUB
+    RETURN summe
+END FUNCTION
 
 SUB umbauVerwerfen()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
@@ -6726,6 +6836,7 @@ paletteEintrag("Einrueckungslinien", "linien", "")
 paletteEintrag("Werkzeugleiste", "leiste", "")
 paletteEintrag("Vorschaubilder neu erzeugen", "vorschau_neu", "")
 paletteEintrag("Gewaehlte Dateien oeffnen", "baum_oeffnen", "Strg+Umschalt+E")
+paletteEintrag("Haken im Projektbaum entfernen", "haken_weg", "")
 paletteEintrag("Marke auf jede Fundstelle des Wortes", "marken", "Strg+Umschalt+L")
 paletteEintrag("Block zuklappen/aufklappen", "falten", "F4")
 paletteEintrag("Alles zuklappen", "falten_alle", "Strg+F4") : paletteEintrag("Alles aufklappen", "falten_auf", "Umschalt+F4")
@@ -7000,6 +7111,7 @@ SUB befehl(k AS STRING)
         CASE "peek" : peekZeigen()
         CASE "symbole" : symbolVerzeichnis()
         CASE "baum_oeffnen" : baumAuswahlOeffnen()
+        CASE "haken_weg" : hakenEntfernen()
         CASE "marken" : markenAufFundstellen()
         CASE "palette" : paletteOeffnen()
         CASE "start" : starten()
@@ -7310,6 +7422,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         IF KEYHIT(KEY_ESCAPE) THEN laufAbbrechen() ELSE laufSchritt()
     END IF
     IF GUI_CLICKED(miBaumOeffnen) THEN befehl("baum_oeffnen")
+    IF GUI_CLICKED(miHakenWeg) THEN befehl("haken_weg")
     IF GUI_CLICKED(miMarken) THEN befehl("marken")
     IF GUI_CLICKED(miPalette) THEN befehl("palette")
     IF GUI_CLICKED(miStart) THEN befehl("start")

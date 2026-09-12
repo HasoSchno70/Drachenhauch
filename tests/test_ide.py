@@ -2365,3 +2365,69 @@ def test_ein_verweis_im_handbuch_oeffnet_das_dokument(tmp_path):
     log = _ide(tmp_path, quelle, frames=200, events=ev, wurzel=wurzel)
     assert any(z.startswith("handbuch aaa.md") for z in log), log
     assert any(z.startswith("handbuch bbb.md") for z in log), log
+
+
+def test_haken_im_baum_schraenken_das_projekt_ein(tmp_path):
+    """Der Baum kann seit Stand 24 Haken -- die IDE benutzt sie jetzt: was
+    angehakt ist, IST das Projekt. Hier wird `b_zwei.dh` angehakt und dann
+    im Projekt umbenannt; `c_drei.dh` bleibt unberührt."""
+    quelle = _datei(tmp_path, "gruessen()\n", "a_eins.dh")
+    zwei = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\n", "b_zwei.dh")
+    drei = _datei(tmp_path, "gruessen()\n", "c_drei.dh")
+    # Das Kästchen der zweiten Zeile. Es steht GANZ LINKS im Baum, vor dem
+    # Auf-/Zuklapp-Dreieck -- zwischen Dreieck und Namen lag es dort, wo man
+    # klickt, um eine Datei zu öffnen.
+    ev = _klick_mit(30, 14, _baum_y(1))
+    ev += _taste(70, RL_END)
+    for k in range(3):
+        ev += _taste(85 + k * 6, RL_LEFT)
+    ev += _taste(120, RL_F6, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(155, RL_V, RL_LCTRL)
+    ev += _taste(190, RL_ENTER)
+    ev += _taste(260, RL_ENTER)                  # Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=380, events=ev, zwischenablage="winken")
+    assert "haken 1" in log, log
+    assert "winken" in zwei.read_text(encoding="utf-8"), zwei.read_text(encoding="utf-8")
+    # Die nicht angehakte Datei bleibt, wie sie war -- das ist die Gegenprobe.
+    assert "gruessen()" in drei.read_text(encoding="utf-8")
+
+
+def test_ohne_vorschau_wird_trotzdem_geprueft(tmp_path):
+    """Ist die Vorschau abgeschaltet, ging ein Umbau bis Stand 24 ungesehen
+    durch. Jetzt läuft die Prüfung still mit -- und wenn Fehler dazukommen,
+    geht die Vorschau doch auf, statt kaputten Code zu schreiben."""
+    # Der zweite Aufruf übergibt seine Argumente mit NAMEN -- den lässt der
+    # Umbau stehen (er weiß nicht, was gemeint ist), und danach gibt es den
+    # Parameter `x` nicht mehr. Genau das soll die stille Prüfung finden.
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n"
+                    "zeichne(x: 3, y: 4)\n")
+    konfig = tmp_path.parent / (tmp_path.name + "_idekopie") / "ide.json"
+    konfig.parent.mkdir(exist_ok=True)
+    konfig.write_text('{"umbau_vorschau": false}', encoding="utf-8")
+    # Einen Parameter entfernen: der benannte Aufruf zeigt danach ins Leere.
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 152, 120, 30)    # - Parameter
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    log = _ide(tmp_path, quelle, frames=340, events=ev, konfig=konfig)
+    assert any(z.startswith("umbau einwand still ") for z in log), log
+    # Geschrieben wurde nichts -- die Vorschau steht noch offen.
+    assert "SUB zeichne(x AS INTEGER, y AS INTEGER)" in quelle.read_text(encoding="utf-8")
+
+
+def test_auch_das_verschieben_sammelt_in_schritten(tmp_path):
+    """Bis Stand 24 sammelten nur die beiden projektweiten Umbauten in
+    Schritten. ESC bricht jetzt auch das Verschieben ab."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n", "a_spiel.dh")
+    _datei(tmp_path, "PRINT 2\n", "b_ziel.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)   # in das SUB stellen
+    ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)      # verschieben
+    # Der erste Eintrag im Waehler ist "(neue Datei ...)" -- einen weiter.
+    ev += _taste(105, RL_DOWN) + _taste(125, RL_ENTER)
+    ev += _taste(126, RL_ESC)                        # und sofort abbrechen
+    log = _ide(tmp_path, quelle, frames=260, events=ev)
+    assert "umbau abgebrochen" in log, log
+    assert "SUB gruessen()" in quelle.read_text(encoding="utf-8")

@@ -117,6 +117,17 @@ IMPORT "gui"
 | `GUI_TABCONTROL_COUNT(tc)` | INTEGER | wie viele Seiten es gibt |
 | `GUI_TABCONTROL_TITLE$(tc, i)` / `GUI_TABCONTROL_SET_TITLE(tc, i, titel$)` | STRING / — | Beschriftung einer Seite lesen und setzen |
 | `GUI_TABCONTROL_REMOVE(tc, i)` | — | eine Seite entfernen; ihre Kinder bleiben als Widgets bestehen |
+| `GUI_RICHTEXT(win, x, y, w, h, text$ = "")` | GUI_WIDGET | **gesetzter Text**: Markdown wird gesetzt statt nur angezeigt |
+| `GUI_RICHTEXT_SET_TEXT(rt, text$)` | — | neuen Markdown-Quelltext setzen (`GUI_SET_TEXT` tut dasselbe) |
+| `GUI_RICHTEXT_SET(rt, key$, wert)` | — | `groesse` (Grundschrift) und `codeschrift` (FONT-Handle für Codeblöcke) |
+| `GUI_RICHTEXT_LINK$(rt)` | STRING | welcher Verweis in diesem Bild angeklickt wurde (leer = keiner) |
+| `GUI_RICHTEXT_FIND(rt, text$, ab = -1)` | INTEGER | zur ersten Fundstelle rollen; liefert deren y oder -1 |
+| `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | Blickversatz setzen und lesen |
+| `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | wie hoch der Satz geworden ist |
+| `GUI_TIMEPICKER(win, x, y, w = 0, h = 0)` | GUI_WIDGET | Uhrzeit: Felder mit Pfeilen für Stunde, Minute und (auf Wunsch) Sekunde |
+| `GUI_TIME$(tp)` | STRING | die Uhrzeit als `HH:MM:SS` — wie `TIME$()`, auch ohne Sekundenfeld |
+| `GUI_SET_TIME(tp, zeit$)` | — | Uhrzeit setzen (`HH:MM` oder `HH:MM:SS`; krumme Werte sind ein Fehler) |
+| `GUI_TIMEPICKER_SET(tp, key$, wert)` | — | `sekunden` (drittes Feld) und `schritt` (Schrittweite der Minute) |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
@@ -1223,16 +1234,84 @@ zweite, genauere Rechnung beim Zeichnen wäre der sicherste Weg, Klick und
 Beschriftung auseinander laufen zu lassen. Bei sehr langen Beschriftungen
 steht der Text deshalb etwas enger im Kopf, als er dürfte.
 
+## Gesetzter Text
+
+Text ANZEIGEN konnte die `gui` immer -- eine Beschriftung bricht um, ein
+Textbereich rollt. Was fehlte, war Text mit GESTALT: Überschriften, fette
+Stellen, Aufzählungen, Codeblöcke, Tabellen, Verweise. Wer ein Handbuch
+zeigen wollte, malte es selbst auf eine Zeichenfläche (die IDE tat das mit
+180 Zeilen).
+
+```basic
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(win, 10, 10, 600, 400, READALL$("docs/ide.md"))
+GUI_RICHTEXT_SET(rt, "codeschrift", monoFont)
+
+' jeden Frame:
+IF GUI_RICHTEXT_LINK$(rt) <> "" THEN oeffne(GUI_RICHTEXT_LINK$(rt))
+```
+
+Verstanden wird ein Ausschnitt von Markdown: `#`, `##`, `###`, Absätze,
+`- ` und `1. ` (auch verschachtelt, je zwei Leerzeichen eine Stufe),
+` ``` `-Blöcke, `| Tabellen |`, `> Zitate`, `---`, dazu `**fett**`,
+`*kursiv*`, `` `code` `` und `[Text](Ziel)`. **Was er nicht kennt, steht als
+Text da** -- ein Dokument darf an einer unbekannten Zeile nicht
+verschwinden.
+
+**Aufeinander folgende Zeilen sind EIN Absatz**, wie in Markdown. Das ist
+keine Formsache: Dokumente sind oft von Hand auf 76 Spalten umbrochen, und
+Zeile für Zeile gesetzt ergäben sie einen ausgefransten Block, der bei jeder
+Fensterbreite gleich schlecht aussieht.
+
+**Gesetzt wird in `GUI_UPDATE`, nicht beim Zeichnen.** Nur dort kommen die
+Grafik (zum Messen) und der Schreibzugriff zusammen; so kostet ein Dokument
+mit zweitausend Zeilen seinen Satz **einmal** statt in jedem Bild. Neu
+gesetzt wird, wenn sich Quelle, Breite, Schriftgröße oder Maßstab ändern --
+eine Größenänderung des Fensters bricht also neu um, ein Bild ohne
+Änderung kostet nichts.
+
+**Fett ist ein zweiter Zug um einen Punkt versetzt, kursiv ist gedämpft.**
+Aus einer Schrift lässt sich keine zweite Strichstärke rechnen, und eine
+fette Schriftdatei mitzuliefern ist nicht Sache der Laufzeit. Eine
+Auszeichnung, die man nicht sieht, wäre schlimmer als eine, die anders
+aussieht als erwartet.
+
+Eine **Tabellenspalte** wird nie unter ihr breitestes WORT gestaucht: ein
+Wort bricht nicht um, es liefe sonst in die Nachbarspalte hinein und klebte
+an deren Text. Passt die Tabelle trotzdem nicht, laufen die Spalten über --
+sie abzuschneiden versteckte die letzte, und die trägt oft die Erklärung.
+
+**Nicht dabei:** Text markieren und kopieren, Bilder, Aufzählungen mit
+eigener Nummerierung, verschachtelte Tabellen, HTML.
+
+## Uhrzeit
+
+Das Gegenstück zum Datumswähler:
+
+```basic
+DIM tp AS GUI_WIDGET : tp = GUI_TIMEPICKER(win, 20, 20)
+GUI_SET_TIME(tp, "07:30")
+GUI_TIMEPICKER_SET(tp, "schritt", 5)      ' die Minute in Fuenferschritten
+PRINT GUI_TIME$(tp)                        ' "07:30:00"
+```
+
+**Nach außen gilt EIN Format, `HH:MM:SS` wie `TIME$()`** -- auch wenn das
+Sekundenfeld gar nicht dasteht; hinein darf `HH:MM`. Zwei Formate wären
+dieselbe Stolperfalle, die beim Datum vermieden wurde. Eine krumme Angabe
+ist ein **Fehler**, kein stilles 00:00: man sähe es sonst erst an dem, was
+das Programm daraus macht.
+
+An der Grenze läuft der Wert **um** statt anzuschlagen -- wer von 00
+rückwärts dreht, will 23 sehen. Die obere Hälfte eines Feldes zählt hoch,
+die untere runter (dieselbe Geste wie am Zahlenfeld); mit der Tastatur
+wählen Links/Rechts das Feld und Hoch/Runter den Wert.
+
 ## Was es (noch) nicht gibt
 
 Damit man nicht danach sucht — diese Bedienelemente fehlen der `gui`, und
-zwar bewusst als Liste, nicht als Versehen:
+zwar bewusst als Liste, nicht als Versehen. (Zeitwähler und gesetzter Text
+standen hier bis Stand 25 und sind jetzt gebaut — die Liste wird kürzer,
+nicht länger.)
 
-* **Zeitwähler** (Gegenstück zu `GUI_DATEPICKER`). Drei Zahlenfelder tun es
-  heute; ein eigenes Widget wäre hübscher.
-* **Gesetzter Text** (Markdown, fett/kursiv, Überschriften). Ein `GUI_LABEL`
-  bricht um, mehr nicht — wer ein Handbuch anzeigt, setzt es selbst (die IDE
-  tut genau das).
 * **Aufklapp-Gruppen** (Akkordeon) und **Assistenten** mit Zurück/Weiter.
   Beides ist aus Knöpfen, Panels und dem Reiterwerk zu bauen.
 * **Pfadleiste** (Brotkrumen) und **Statusleiste mit Feldern** — aus
