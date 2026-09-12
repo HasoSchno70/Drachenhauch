@@ -1476,17 +1476,27 @@ Themen umschalten.
 gewölbten Look ein: senkrechter Verlauf auf jeder Fläche, Glanzkante über der
 oberen Hälfte, feine Fase oben und unten.
 
-Das steckt in drei **Metriken**, nicht in Farben — so ist ein Thema ein
-kompletter Look statt zweier Dinge, die man von Hand kombinieren muss:
+Das steckt in vier **Metriken**, nicht in Farben — so ist ein Thema ein
+kompletter Look statt mehrerer Dinge, die man von Hand kombinieren muss:
 
 | Metrik | Bedeutung |
 |---|---|
 | `gradient` | Helligkeitsabstand oben/unten; 0 = flach |
 | `gloss` | Stärke der Glanzkante, 0…100 |
 | `bevel` | 1 = helle Linie oben, dunkle unten |
+| `verlauf_hoehe` | ab dieser Höhe klingt beides aus; 0 = überall gleich |
 
 Einzeln setzbar über `GUI_METRIC_SET`. Alle **bestehenden** Themen stehen
 weiterhin auf 0 — schon geschriebene Programme sehen unverändert aus.
+
+**Warum die vierte.** `gradient` ist ein fester Helligkeitsabstand, egal wie
+hoch die Fläche ist. Ein Knopf von 28 Pixeln darf sich damit wölben; eine
+Liste von 400 bekommt denselben Abstand über die ganze Höhe und sieht aus,
+als läge ein Schatten darüber. `verlauf_hoehe` sagt, ab wann es weniger
+wird: darüber nimmt die Stärke im Verhältnis ab, ein Fünftel bleibt stehen,
+damit eine hohe Fläche nicht ganz nach Papier aussieht.
+`GUI_METRIC_SET("verlauf_hoehe", 120)` ist ein guter Anfang für eine
+Oberfläche mit großen Listen und Textfeldern.
 
 **Erhaben und versenkt.** Knöpfe, Panels und Auswahlfelder sind erhaben
 (hell oben → dunkel unten, mit Glanz). Eingabefelder, Listen und der
