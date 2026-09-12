@@ -2873,6 +2873,44 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 13 (2026-09-12):** die drei Punkte, die nach Stand 12 anstanden.
+**Der Baustein: `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)`** -- das
+Geruest, das beim Tippen mitwaechst: `IF x > 0 THEN` plus Enter setzt das
+`END IF` gleich mit darunter, die Marke bleibt dazwischen. Drei
+Bedingungen, jede mit ihrem Grund: (1) die Zeile muss einen Block OEFFNEN,
+und zwar nach DERSELBEN Frage, die schon ueber die Einrueckung entscheidet
+(dafuer `oeffnet` aus `neuer_einzug` herausgeloest) -- getrennt beantwortet
+bekaeme die einzeilige Form `IF x THEN y = 1` ein `END IF`, obwohl sie
+nicht einmal einrueckt; (2) hinter der Marke darf nichts stehen, sonst
+landet der Rest der Zeile HINTER dem Abschluss; (3) der Block darf nicht
+schon geschlossen sein (`bereits_geschlossen` geht nach unten: tiefer
+Eingerruecktes ist der Rumpf, eine Zeile aus der `aus`-Liste auf gleicher
+Hoehe gehoert noch dazu) -- ohne das saete jedes Enter am Ende einer
+bestehenden SUB-Zeile ein zweites `END SUB`. Bei mehreren Marken bleibt es
+beim blossen Umbruch. In der IDE stehen die Paare (`CASE`/`ELSE`/`ELSEIF`
+fehlen mit Absicht -- sie ruecken ein, schliessen aber nichts; `REPEAT`
+bekommt `UNTIL TRUE`, weil ein nacktes `UNTIL` nicht uebersetzt).
+**Vorschau vor dem Umbau** (Einstellung, per Vorgabe an): bis dahin zeigte
+die IDE HINTERHER, wie viele Fehler dazugekommen sind -- die Antwort auf
+die falsche Frage. Jeder Umbau geht jetzt durch EINE Stelle
+(`umbauVormerken` + `umbauStarten`) mit zwei Schreibwegen: in den Reiter
+(Auswahl + INSERT = EIN Undo-Schritt; das Herausloesen brauchte vorher
+zwei) oder auf die Platte samt Nachziehen offener Reiter. Der Unterschied
+kommt aus derselben LCS-Rechnung wie das Nebeneinander, gefaerbt wie
+`git diff` (`gitFaerben` zu `diffFaerben(ta)` verallgemeinert).
+**Parameter umsortieren** (Strg+Umschalt+U) ist der erste Umbau, der die
+AUFRUFE mitziehen muss -- die Reihenfolge der Argumente IST die Bedeutung,
+ein vergessener Aufruf uebergibt stumm das Falsche. Gearbeitet wird auf dem
+GANZEN Text (ein Aufruf darf ueber mehrere Zeilen gehen), die Argumente
+werden als Textstuecke vertauscht; die Definition braucht keinen
+Sonderfall, `SUB name(` sieht fuer den Sucher aus wie ein Aufruf. Ein
+Aufruf mit anderer Argumentzahl (weggelassener Vorgabewert) oder mit
+BENANNTEN Argumenten wird uebergangen und gezaehlt -- ihn still
+umzustellen waere schlimmer als es zu lassen. Tests
+`tests/pruef/gui_geruest.dhtest` (10, mit Gegenprobe ohne die Listen) und
+6 neue in `tests/test_ide.py`; die Knopflagen des Parameter-Fensters
+rechnet der Test aus der festen Fensterlage plus `title_h` = 30 (Glas).
+
 **Stufe 12 (2026-09-11):** die eigene Restliste abgearbeitet -- **Auswahl
 erweitern** (Strg+Umschalt+Hoch nimmt die naechstgroessere Klammer: Wort,
 Zeile, Block, Elternblock, ganze Datei; Runter geht denselben Weg zurueck,

@@ -1,0 +1,324 @@
+' Das mitwachsende Geruest (GUI_TEXTAREA_CLOSE_WORDS): oeffnet die Zeile
+' einen Block, setzt der Zeilenumbruch die schliessende Zeile gleich mit
+' darunter. Enter kommt ueber die Wiedergabe herein (raylibs Tastencode 257).
+' Format: docs/werkzeuge.md.
+--- seriell
+
+=== ohne die listen bleibt enter was es war
+' Die Gegenprobe zuerst: derselbe Ablauf ohne CLOSE_WORDS.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_SET_TEXT(ta, "IF x > 0 THEN")
+GUI_TEXTAREA_GOTO(ta, 1, 14)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x > 0 THEN|    ]
+
+=== der abschluss kommt mit, die marke bleibt dazwischen
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF", "SUB", "FOR"], ["END IF", "END SUB", "NEXT"])
+GUI_SET_TEXT(ta, "IF x > 0 THEN")
+GUI_TEXTAREA_GOTO(ta, 1, 14)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN
+        PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+        DIM z AS INTEGER
+        DIM s AS INTEGER
+        (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        PRINT "Marke " + STR$(z) + ":" + STR$(s)
+    END IF
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x > 0 THEN|    |END IF]
+Marke 2:5
+
+=== die einzeilige form bekommt keinen abschluss
+' `IF x THEN y = 1` endet nicht auf THEN, rueckt also nicht ein -- und
+' bekommt aus demselben Grund kein END IF.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF"], ["END IF"])
+GUI_SET_TEXT(ta, "IF x > 0 THEN y = 1")
+GUI_TEXTAREA_GOTO(ta, 1, 20)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x > 0 THEN y = 1|]
+
+=== was schon geschlossen ist bekommt keinen zweiten abschluss
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR"], ["THEN"], ["END", "NEXT"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["SUB"], ["END SUB"])
+GUI_SET_TEXT(ta, "SUB a()" + CHR$(10) + "    PRINT 1" + CHR$(10) + "END SUB")
+GUI_TEXTAREA_GOTO(ta, 1, 8)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[SUB a()|    |    PRINT 1|END SUB]
+
+=== eine else-zeile dazwischen zaehlt noch zum block
+' ELSE steht in der `aus`-Liste: auf gleicher Hoehe gehoert es noch zum
+' offenen Block, die Suche nach dem Abschluss geht darueber hinweg.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB", "FOR", "ELSE"], ["THEN"], ["END", "NEXT", "ELSE"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF"], ["END IF"])
+GUI_SET_TEXT(ta, "IF x THEN" + CHR$(10) + "    a = 1" + CHR$(10) + "ELSE" + _
+                 CHR$(10) + "    a = 2" + CHR$(10) + "END IF")
+GUI_TEXTAREA_GOTO(ta, 1, 10)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF x THEN|    |    a = 1|ELSE|    a = 2|END IF]
+
+=== der abschluss steht so tief wie die oeffnende zeile
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["FOR"], ["THEN"], ["END", "NEXT"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["FOR"], ["NEXT"])
+GUI_SET_TEXT(ta, "        FOR i = 0 TO 3")
+GUI_TEXTAREA_GOTO(ta, 1, 23)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[        FOR i = 0 TO 3|            |        NEXT]
+
+=== steht hinter der marke noch text gibt es kein geruest
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["SUB"], ["THEN"], ["END"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["SUB"], ["END SUB"])
+GUI_SET_TEXT(ta, "SUB a(x AS INTEGER)")
+GUI_TEXTAREA_GOTO(ta, 1, 7)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[SUB a(|    x AS INTEGER)]
+
+=== das laengste wort gewinnt
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
+GUI_TEXTAREA_INDENT_WORDS(ta, ["DO"], [], ["LOOP"])
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["DO", "DO WHILE"], ["LOOP UNTIL x", "LOOP"])
+GUI_SET_TEXT(ta, "DO WHILE x < 3")
+GUI_TEXTAREA_GOTO(ta, 1, 15)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[DO WHILE x < 3|    |LOOP]
+
+=== bei mehreren marken bleibt es beim umbruch
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF"], ["END IF"])
+GUI_SET_TEXT(ta, "IF a THEN" + CHR$(10) + "IF b THEN")
+GUI_TEXTAREA_GOTO(ta, 1, 10)
+GUI_TEXTAREA_ADD_CARET(ta, 2, 10)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + REPLACE$(GUI_TEXT(ta), CHR$(10), "|") + "]"
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Enter
+c 2
+e 4 2 257 0 0 0 // Enter runter
+e 6 1 257 0 0 0 // Enter hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[IF a THEN||IF b THEN|]
+
+=== ungleich lange listen sind ein fehler
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_CLOSE_WORDS(ta, ["IF", "FOR"], ["END IF"])
+--- fehler
+GUI_TEXTAREA_CLOSE_WORDS: beide Listen muessen gleich lang sein
