@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 21)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 22)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -91,6 +91,9 @@
 '  Stand 21 dazu: den letzten Umbau nachbessern (Strg+Umschalt+G), alle
 '  Umbauten sehen auch Unterordner, und eine gebrauchte Konstante zaehlt
 '  fuer den IMPORT beim Verschieben.
+'  Stand 22 dazu: der Projektbaum zeigt die Unterordner als Aeste, der
+'  Umbau laesst sich in der Vorschau pruefen, bevor er geschrieben ist,
+'  und eine neu angelegte Datei bekommt einen Reiter.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -785,6 +788,8 @@ DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Uebernehmen", 
 DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
 DIM btnUmbauBlock AS GUI_WIDGET
 btnUmbauBlock = GUI_BUTTON(winUmbau, "Block auslassen / aufnehmen", 288, 546, 230, 30)
+DIM btnUmbauPruef AS GUI_WIDGET
+btnUmbauPruef = GUI_BUTTON(winUmbau, "Pruefen", 528, 546, 110, 30)
 GUI_LISTBOX_SET(lstUmbau, "kaestchen", 1)
 GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
 GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
@@ -1853,9 +1858,32 @@ SUB baumFuellen()
     baumDateien = neue
     DIM n AS INTEGER : n = LEN(baumDateien)
     DIM knoten[MAX(n, 1)] AS INTEGER
+    ' Unterordner als AESTE, nicht als Praefix im Namen: seit die Umbauten
+    ' sie sehen, gehoeren sie auch in den Baum. Die Ordner-Knoten werden
+    ' unterwegs angelegt und gemerkt, damit `lib/a.dh` und `lib/b.dh` unter
+    ' DEMSELBEN `lib` landen.
+    DIM ordPfad AS ARRAY OF STRING : ordPfad = []
+    DIM ordKnoten AS ARRAY OF INTEGER : ordKnoten = []
     DIM i AS INTEGER
     FOR i = 0 TO n - 1
-        knoten[i] = GUI_TREE_ADD(baum, -1, baumDateien[i])
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(baumDateien[i], "/")
+        DIM eltern AS INTEGER : eltern = -1
+        DIM bisher AS STRING : bisher = ""
+        DIM t AS INTEGER
+        FOR t = 0 TO LEN(teile) - 2
+            bisher = bisher + teile[t] + "/"
+            DIM k AS INTEGER : k = ARRAY_INDEXOF(ordPfad, bisher)
+            IF k < 0 THEN
+                eltern = GUI_TREE_ADD(baum, eltern, teile[t])
+                ' Aufgeklappt: ein Projektbaum, der seine Ordner zuhaelt,
+                ' zeigt beim Oeffnen weniger als vorher.
+                GUI_TREE_EXPAND(baum, eltern, TRUE)
+                ARRAY_PUSH(ordPfad, bisher) : ARRAY_PUSH(ordKnoten, eltern)
+            ELSE
+                eltern = ordKnoten[k]
+            END IF
+        NEXT
+        knoten[i] = GUI_TREE_ADD(baum, eltern, teile[LEN(teile) - 1])
     NEXT
     baumKnoten = knoten
 END SUB
@@ -5345,6 +5373,44 @@ SUB umbauNachbessern()
     protokoll("umbau nachbessern " + STR$(LEN(umbauTexte)))
 END SUB
 
+' Den Umbau pruefen, BEVOR er geschrieben ist.
+'
+' Bis Stand 21 lief `dhrt --check` erst auf dem Ergebnis -- also erst,
+' nachdem die Dateien schon anders aussahen. Hier laeuft er ueber die
+' Texte, die geschrieben WUERDEN, mit der Blockauswahl von jetzt: wer einen
+' Block auslaesst und damit etwas kaputt macht, sieht es vor dem Schreiben.
+'
+' Gerechnet wird nur auf Verlangen: ein Umbau ueber zwoelf Dateien braeuchte
+' sonst zwoelf Uebersetzungslaeufe, ehe man den Unterschied ueberhaupt zu
+' sehen bekommt.
+SUB umbauPruefen()
+    IF LEN(umbauTexte) = 0 THEN RETURN
+    DIM kaputt AS ARRAY OF STRING : kaputt = []
+    DIM summe AS INTEGER : summe = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauTexte) - 1
+        DIM name AS STRING : name = umbauPfade[k]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        ' Nur .dh: eine .dhform ist JSON, da hat der Uebersetzer nichts zu
+        ' suchen (und meldete jede Zeile als Fehler).
+        IF LOWER$(RIGHT$(name, 3)) <> ".dh" THEN CONTINUE
+        DIM n AS INTEGER : n = fehlerZahl(umbauTexte[k])
+        IF n > 0 THEN
+            ARRAY_PUSH(kaputt, BASENAME(name) + ": " + STR$(n))
+            summe = summe + n
+        END IF
+    NEXT
+    DIM sagen AS STRING
+    IF summe = 0 THEN
+        sagen = "Geprueft: kein Fehler in " + STR$(LEN(umbauTexte)) + " Datei(en)."
+    ELSE
+        sagen = "Geprueft: " + STR$(summe) + " Fehler -- " + JOIN$(kaputt, ", ")
+    END IF
+    GUI_SET_TEXT(lblUmbau, sagen)
+    GUI_SET_TEXT(lblStatus, sagen)
+    protokoll("umbau geprueft " + STR$(summe))
+END SUB
+
 SUB umbauVerwerfen()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
     umbauLeeren()
@@ -5415,6 +5481,27 @@ SUB umbauSchreiben()
             END IF
         END IF
     NEXT
+    ' Eine Datei, die es vorher nicht gab, bekommt einen Reiter: sonst hat
+    ' der Umbau etwas angelegt, das niemand sieht, und man sucht es im
+    ' Projektbaum.
+    DIM neuDa AS INTEGER : neuDa = 0
+    DIM warTab AS INTEGER : warTab = aktiverTab
+    DIM nk2 AS INTEGER
+    FOR nk2 = 0 TO LEN(umbauTexte) - 1
+        IF umbauTabs[nk2] >= 0 OR umbauPfade[nk2] = "" THEN CONTINUE
+        IF zurTexte[LEN(zurTexte) - LEN(umbauTexte) + nk2] <> "" THEN CONTINUE
+        dateiOeffnen(umbauPfade[nk2])
+        neuDa = neuDa + 1
+    NEXT
+    IF neuDa > 0 THEN
+        ' Vorn bleibt, woran man gearbeitet hat -- die neue Datei liegt
+        ' daneben. Sonst schriebe die Marke unten in eine fremde Datei.
+        IF warTab >= 0 AND warTab < tabAnzahl THEN
+            aktiverTab = warTab
+            GUI_SET_ACTIVE_TAB(win, aktiverTab)
+        END IF
+        protokoll("umbau neue datei " + STR$(neuDa))
+    END IF
     DIM feld AS GUI_WIDGET : feld = aktivesFeld()
     IF feld >= 0 THEN
         IF umbauZeile > 0 THEN GUI_TEXTAREA_GOTO(feld, umbauZeile, umbauSpalte)
@@ -7351,6 +7438,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnUmbauOk) THEN umbauSchreiben()
     IF GUI_CLICKED(btnUmbauWeg) THEN umbauVerwerfen()
     IF GUI_CLICKED(btnUmbauBlock) THEN umbauBlockKippen()
+    IF GUI_CLICKED(btnUmbauPruef) THEN umbauPruefen()
     ' Enter und ESC gelten auch, wenn die Marke in der Dateiliste steht --
     ' eine Liste nimmt die Taste sonst fuer sich, und der Standard-Knopf
     ' kommt nicht mehr dran. Wer gerade etwas abgewaehlt hat, steht aber
