@@ -731,6 +731,7 @@ struct DateiBaum {
     aktiviert: String,        // Doppelklick auf eine Datei -- ein Bild lang
     bild_ordner: i64,         // Sinnbilder, -1 = keins
     bild_datei: i64,
+    klick_klappt: bool,       // ein Klick auf einen Ordner klappt ihn auf/zu
     auffrischen: f64,         // Sekunden zwischen zwei Blicken auf die Platte, 0 = nie
     naechste: f64,            // Zeitpunkt des naechsten Blicks
 }
@@ -3629,6 +3630,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             "ordner_zuerst" | "dirs_first" => t.datei.as_mut().unwrap().ordner_zuerst = an,
             "verborgene" | "hidden" => t.datei.as_mut().unwrap().verborgene = an,
             "nur_ordner" | "dirs_only" => t.datei.as_mut().unwrap().nur_ordner = an,
+            // Wie im Datei-Bereich einer Entwicklungsumgebung: ein Klick auf
+            // einen Ordner klappt ihn um. Ohne das tut ein Klick auf eine
+            // Ordnerzeile scheinbar nichts -- nur das schmale Dreieck wirkt.
+            "klick_klappt" | "click_expands" => t.datei.as_mut().unwrap().klick_klappt = an,
             "mehrfachauswahl" | "multi" => { t.multi = an; t.sync(); }
             "kaestchen" | "checkboxes" => t.kaestchen = an,
             // In MILLISEKUNDEN, wie ueberall sonst -- innen in Sekunden, weil
@@ -3835,14 +3840,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if let Some(f) = f { self.pending.push(f); }
             return;
         }
-        if on_toggle || (dbl && has_children) {
+        let klick_klappt = t.datei.as_ref().map(|d| d.klick_klappt).unwrap_or(false);
+        if on_toggle || (has_children && (dbl || klick_klappt)) {
             let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
             let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
             // Beim Dateibaum entscheidet der WEG, was offen ist -- die Nummern
             // gelten nur bis zum naechsten Neuaufbau, und der kommt sofort.
+            // Die Auswahl wird VOR dem Neuaufbau gesetzt, damit sie ihn
+            // ueberlebt (sie wird dabei in einen Weg uebersetzt).
             if t.datei.is_some() {
                 let weg = t.datei.as_ref().unwrap().pfade.get(ni).cloned();
-                if let Some(w) = weg { Self::ft_offen_setzen(t, &w, !e); dateibaum_neu(t); }
+                if let Some(w) = weg {
+                    if klick_klappt && !on_toggle { t.selected = ni as i32; }
+                    Self::ft_offen_setzen(t, &w, !e);
+                    dateibaum_neu(t);
+                }
             }
         } else {
             let (ctrl, shift) = self.tasten_mod;
