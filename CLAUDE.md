@@ -2873,6 +2873,28 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 15 (2026-09-12):** die drei Punkte nach Stand 14 -- und die erste
+Stufe OHNE neuen Laufzeit-Baustein; alles ging mit dem, was schon da war.
+**Einwand statt stiller Umbau:** wer auf einen Namen umbenennt, den es im
+Projekt schon gibt (`nameVergeben$` fragt den Symbolindex, nicht den
+Uebersetzer -- zwei Unterprogramme desselben Namens sind KEIN
+Uebersetzungsfehler, das zweite verdeckt das erste), bekommt den Einwand
+OBEN in der Vorschau; `umbauWarnung` schaltet die Vorschau dafuer ein,
+auch wenn sie abgeschaltet ist -- wer einen Einwand nur in die Statuszeile
+schreibt, hat ihn nicht vorgebracht. **Parameter hinzufuegen und
+entfernen:** `paramFolge` ist jetzt kein reiner Tausch mehr, sondern sagt
+je Platz, WOHER er kommt (>= 0 = altes Argument, negativ = neuer
+Parameter). Zwei Texte je neuem Parameter, weil die DEFINITION eine
+Deklaration braucht (`hp AS INTEGER = 0`) und der Aufruf einen Wert (`0`)
+-- und die Definition erkennt `parameterInText$` daran, dass ihre Stelle
+die von `defStelle` ist; sonst bliebe sie der Sonderfall, den sie bisher
+gerade nicht war. `alteZahl` (die Parameterzahl VORHER) entscheidet, welche
+Aufrufe angefasst werden -- vorher war das `LEN(folge)`, was beim
+Hinzufuegen jeden Aufruf uebergangen haette. **Aufrufer als Baum:** unter
+jedem Aufruf die Aufrufer seines Unterprogramms, drei Ebenen tief; ein
+Name steht hoechstens EINMAL im Baum (`gesehen`), sonst kaeme man bei
+A ruft B ruft A nicht heraus. Tests: 8 neue in `tests/test_ide.py`.
+
 **Reiter schliessen (2026-09-12, Fund des Nutzers):** ein Reiter war mit
 der MAUS gar nicht zu schliessen, nur mit Strg+W -- die Reiterleiste der
 Laufzeit hatte kein Kreuz. Neu `GUI_TABS_CLOSABLE(win, an)` +

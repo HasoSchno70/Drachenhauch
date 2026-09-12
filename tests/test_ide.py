@@ -1517,3 +1517,128 @@ def test_der_geaenderte_reiter_laesst_sich_sichernd_schliessen(tmp_path):
     log = _ide(tmp_path, quelle, frames=190, events=ev, zwischenablage="X")
     assert "geschlossen 0" in log, log
     assert quelle.read_text(encoding="utf-8").startswith("XPRINT 1"), quelle.read_text()
+
+
+# --------------------------------------------------------------- Stufe 15
+
+def test_umbenennen_warnt_wenn_der_name_schon_vergeben_ist(tmp_path):
+    """`gruessen` soll `winken` heissen -- aber `winken` gibt es schon. Der
+    Einwand steht in der Vorschau, und die geht auf, damit man ihn sieht."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n", "a_spiel.dh")
+    _datei(tmp_path, "SUB winken()\n    PRINT 2\nEND SUB\n", "b_mehr.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F6, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(115, RL_V, RL_LCTRL)
+    ev += _taste(145, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="winken")
+    assert "umbau einwand" in log, log
+    # Nicht uebernommen: die Vorschau steht noch offen
+    assert "projekt umbenannt" not in " ".join(log), log
+    assert "SUB gruessen()" in quelle.read_text(encoding="utf-8")
+
+
+def test_umbenennen_auf_einen_freien_namen_hat_keinen_einwand(tmp_path):
+    """Die Gegenprobe: derselbe Ablauf mit einem Namen, den es nicht gibt."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n", "a_spiel.dh")
+    _datei(tmp_path, "SUB winken()\n    PRINT 2\nEND SUB\n", "b_mehr.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)
+    ev += _taste(80, RL_F6, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(115, RL_V, RL_LCTRL)
+    ev += _taste(145, RL_ENTER)
+    ev += _taste(185, RL_ENTER)          # die Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=290, events=ev, zwischenablage="nicken")
+    assert "umbau einwand" not in log, log
+    assert "projekt umbenannt 1" in log, log
+    assert "SUB nicken()" in quelle.read_text(encoding="utf-8")
+
+
+def test_einen_parameter_hinzufuegen_setzt_ihn_an_jeder_aufrufstelle(tmp_path):
+    """[+ Parameter] mit `hp AS INTEGER = 0`: die Definition bekommt die
+    Deklaration, jeder Aufruf den Wert dahinter."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER)\n"
+                    "    PRINT x\n"
+                    "END SUB\n"
+                    "zeichne(1)\n"
+                    "zeichne(2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 116, 120, 30)    # + Parameter
+    ev += _taste(110, RL_V, RL_LCTRL)            # Text aus der Zwischenablage
+    ev += _taste(145, RL_ENTER)                  # Prompt bestaetigen
+    ev += _param_knopf(180, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(230, RL_ENTER)                  # Vorschau uebernehmen
+    ev += _taste(270, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=360, events=ev, zwischenablage="hp AS INTEGER = 0")
+    assert any(z.startswith("parameter neu ") for z in log), log
+    assert "parameter umgestellt 3 0" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB zeichne(x AS INTEGER, hp AS INTEGER = 0)" in text, text
+    assert "zeichne(1, 0)" in text and "zeichne(2, 0)" in text, text
+
+
+def test_einen_parameter_entfernen_nimmt_das_argument_ueberall_weg(tmp_path):
+    """[- Parameter] auf dem ersten: Definition und Aufrufe verlieren ihn."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 152, 120, 30)    # - Parameter (der erste ist gewaehlt)
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)
+    ev += _taste(190, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "parameter weg 0" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB zeichne(y AS INTEGER)" in text, text
+    assert "zeichne(2)" in text, text
+
+
+def test_der_aufrufer_baum_zeigt_auch_die_aufrufer_der_aufrufer(tmp_path):
+    """`tief` wird von `mitte` gerufen, `mitte` von `oben` -- der Baum hat
+    darum mehr Knoten als es unmittelbare Aufrufe gibt."""
+    quelle = _datei(tmp_path,
+                    "SUB tief()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n"
+                    "SUB mitte()\n"
+                    "    tief()\n"
+                    "END SUB\n"
+                    "SUB oben()\n"
+                    "    mitte()\n"
+                    "END SUB\n"
+                    "oben()\n")
+    # Die Marke steht in 1,1 -- vier Schritte nach rechts stehen auf `tief`.
+    ev = []
+    for k in range(4):
+        ev += _taste(35 + k * 8, RL_RIGHT)
+    ev += _taste(95, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert "aufrufer 1" in log, log          # tief() wird einmal unmittelbar gerufen
+    assert "aufrufer baum 3" in log, log     # plus mitte() und oben()
+
+
+def test_der_aufrufer_baum_laeuft_bei_einem_kreis_nicht_weg(tmp_path):
+    """Ruft A das B und B das A, käme man ohne Abbruch nicht heraus. Ein
+    Name steht darum höchstens einmal im Baum."""
+    quelle = _datei(tmp_path,
+                    "SUB a()\n"
+                    "    b()\n"
+                    "END SUB\n"
+                    "SUB b()\n"
+                    "    a()\n"
+                    "END SUB\n"
+                    "a()\n")
+    ev = []
+    for k in range(4):
+        ev += _taste(35 + k * 8, RL_RIGHT)
+    ev += _taste(95, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert any(z.startswith("aufrufer baum ") for z in log), log
+    baum = [int(z.split()[-1]) for z in log if z.startswith("aufrufer baum ")]
+    assert baum and baum[0] <= 4, log
