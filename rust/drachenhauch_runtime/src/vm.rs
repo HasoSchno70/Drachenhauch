@@ -5900,6 +5900,33 @@ impl<'p> Vm<'p> {
             "gui_tree_select" => { self.gui.tree_select(gi(a,0,"GUI_TREE_SELECT")?, gi(a,1,"GUI_TREE_SELECT")?, gbool(a,2,"GUI_TREE_SELECT")?)?; Value::Nil }
             "gui_tree_clear_selection" => { self.gui.tree_clear_selection(gi(a,0,"GUI_TREE_CLEAR_SELECTION")?)?; Value::Nil }
             "gui_tree_expand" => { self.gui.tree_expand(gi(a,0,"GUI_TREE_EXPAND")?, gi(a,1,"GUI_TREE_EXPAND")?, gbool(a,2,"GUI_TREE_EXPAND")?)?; Value::Nil }
+            "gui_tree_checked" => Value::Bool(self.gui.tree_checked(gi(a,0,"GUI_TREE_CHECKED")?, gi(a,1,"GUI_TREE_CHECKED")?)?),
+            "gui_tree_set_checked" => { self.gui.tree_set_checked(gi(a,0,"GUI_TREE_SET_CHECKED")?, gi(a,1,"GUI_TREE_SET_CHECKED")?, gbool(a,2,"GUI_TREE_SET_CHECKED")?)?; Value::Nil }
+            // --- Dateibaum ---
+            "gui_filetree" => Value::Int(self.gui.filetree(gi(a,0,"GUI_FILETREE")?, gi(a,1,"GUI_FILETREE")? as i32,
+                gi(a,2,"GUI_FILETREE")? as i32, gi(a,3,"GUI_FILETREE")? as i32, gi(a,4,"GUI_FILETREE")? as i32,
+                if a.len() > 5 { gs(a,5,"GUI_FILETREE")? } else { ".".to_string() })?),
+            "gui_filetree_set" => { self.gui.filetree_set(gi(a,0,"GUI_FILETREE_SET")?, &gs(a,1,"GUI_FILETREE_SET")?, gnum(a,2,"GUI_FILETREE_SET")?)?; Value::Nil }
+            "gui_filetree_filter" => { self.gui.filetree_filter(gi(a,0,"GUI_FILETREE_FILTER")?, &gs(a,1,"GUI_FILETREE_FILTER")?)?; Value::Nil }
+            "gui_filetree_skip" => { self.gui.filetree_skip(gi(a,0,"GUI_FILETREE_SKIP")?, &gs(a,1,"GUI_FILETREE_SKIP")?)?; Value::Nil }
+            "gui_filetree_set_root" => { self.gui.filetree_set_root(gi(a,0,"GUI_FILETREE_SET_ROOT")?, gs(a,1,"GUI_FILETREE_SET_ROOT")?)?; Value::Nil }
+            "gui_filetree_root$" | "gui_filetree_root" => Value::str_rc(&self.gui.filetree_root(gi(a,0,"GUI_FILETREE_ROOT")?)?),
+            "gui_filetree_refresh" => { self.gui.filetree_refresh(gi(a,0,"GUI_FILETREE_REFRESH")?)?; Value::Nil }
+            "gui_filetree_selected$" | "gui_filetree_selected" => Value::str_rc(&self.gui.filetree_selected(gi(a,0,"GUI_FILETREE_SELECTED")?)?),
+            "gui_filetree_activated$" | "gui_filetree_activated" => Value::str_rc(&self.gui.filetree_activated(gi(a,0,"GUI_FILETREE_ACTIVATED")?)?),
+            "gui_filetree_is_dir" => Value::Bool(self.gui.filetree_is_dir(gi(a,0,"GUI_FILETREE_IS_DIR")?,
+                &if a.len() > 1 { gs(a,1,"GUI_FILETREE_IS_DIR")? } else { String::new() })?),
+            "gui_filetree_select" => { self.gui.filetree_select(gi(a,0,"GUI_FILETREE_SELECT")?, &gs(a,1,"GUI_FILETREE_SELECT")?)?; Value::Nil }
+            "gui_filetree_expand" => { self.gui.filetree_expand(gi(a,0,"GUI_FILETREE_EXPAND")?, &gs(a,1,"GUI_FILETREE_EXPAND")?, gbool(a,2,"GUI_FILETREE_EXPAND")?)?; Value::Nil }
+            "gui_filetree_count" => Value::Int(self.gui.filetree_count(gi(a,0,"GUI_FILETREE_COUNT")?)?),
+            "gui_filetree_path$" | "gui_filetree_path" => Value::str_rc(&self.gui.filetree_path(gi(a,0,"GUI_FILETREE_PATH")?, gi(a,1,"GUI_FILETREE_PATH")?)?),
+            "gui_filetree_sel_count" => Value::Int(self.gui.filetree_sel_count(gi(a,0,"GUI_FILETREE_SEL_COUNT")?)?),
+            "gui_filetree_sel_path$" | "gui_filetree_sel_path" => Value::str_rc(&self.gui.filetree_sel_path(gi(a,0,"GUI_FILETREE_SEL_PATH")?, gi(a,1,"GUI_FILETREE_SEL_PATH")?)?),
+            "gui_filetree_checked" => Value::Bool(self.gui.filetree_checked(gi(a,0,"GUI_FILETREE_CHECKED")?, &gs(a,1,"GUI_FILETREE_CHECKED")?)?),
+            "gui_filetree_set_checked" => { self.gui.filetree_set_checked(gi(a,0,"GUI_FILETREE_SET_CHECKED")?, &gs(a,1,"GUI_FILETREE_SET_CHECKED")?, gbool(a,2,"GUI_FILETREE_SET_CHECKED")?)?; Value::Nil }
+            "gui_filetree_checked_count" => Value::Int(self.gui.filetree_checked_count(gi(a,0,"GUI_FILETREE_CHECKED_COUNT")?)?),
+            "gui_filetree_checked_path$" | "gui_filetree_checked_path" => Value::str_rc(&self.gui.filetree_checked_path(gi(a,0,"GUI_FILETREE_CHECKED_PATH")?, gi(a,1,"GUI_FILETREE_CHECKED_PATH")?)?),
+            "gui_filetree_icons" => { self.gui.filetree_icons(gi(a,0,"GUI_FILETREE_ICONS")?, gi(a,1,"GUI_FILETREE_ICONS")?, gi(a,2,"GUI_FILETREE_ICONS")?)?; Value::Nil }
             "gui_update" => {
                 {
                     let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
