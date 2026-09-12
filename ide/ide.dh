@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 15)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 16)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -70,6 +70,10 @@
 '  vergeben ist; Parameter hinzufuegen und entfernen (der Wert hinter dem
 '  Gleichheitszeichen kommt an jede Aufrufstelle); und die Aufrufer als
 '  BAUM -- unter jedem Aufruf stehen die Aufrufer seines Unterprogramms.
+'  Stand 16 dazu: ein Unterprogramm in eine andere Datei verschieben
+'  (Strg+Umschalt+V, samt dem IMPORT fuer jeden Aufrufer), die Umbauten
+'  auch fuer Methoden, und den letzten Umbau in EINEM Zug zuruecknehmen
+'  (Strg+Umschalt+Z).
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -380,6 +384,8 @@ DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl ve
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
 DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umsortieren ...", "Strg+Umschalt+U")
 DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf?", "Umschalt+F12")
+DIM miVerschieben AS INTEGER : miVerschieben = GUI_MENU_ITEM(mBearb, "Unterprogramm verschieben ...", "Strg+Umschalt+V")
+DIM miUmbauZur AS INTEGER : miUmbauZur = GUI_MENU_ITEM(mBearb, "Letzten Umbau zuruecknehmen", "Strg+Umschalt+Z")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
 DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, "Doppelte entfernen")
@@ -744,6 +750,15 @@ DIM umbauProt AS STRING : umbauProt = ""
 ' Ein Einwand gegen den Umbau (leer = keiner). Er steht OBEN in der
 ' Vorschau und schaltet sie ein, auch wenn sie abgeschaltet ist: wer einen
 ' Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht.
+' Was VOR dem letzten geschriebenen Umbau in den Dateien stand -- damit
+' er sich in EINEM Zug zuruecknehmen laesst. Strg+Z im Code-Feld nimmt nur
+' den Reiter zurueck, in dem man gerade steht; ein Umbau ueber sechs
+' Dateien waere damit sechsmal zurueckzunehmen, und zwar in sechs Reitern,
+' die man dafuer erst oeffnen muss.
+DIM zurTabs AS ARRAY OF INTEGER : zurTabs = []
+DIM zurPfade AS ARRAY OF STRING : zurPfade = []
+DIM zurTexte AS ARRAY OF STRING : zurTexte = []
+DIM zurWas AS STRING : zurWas = ""
 DIM umbauWarnung AS STRING : umbauWarnung = ""
 DIM umbauZeile AS INTEGER : umbauZeile = 0
 DIM umbauSpalte AS INTEGER : umbauSpalte = 1
@@ -3721,11 +3736,27 @@ SUB parameterFragen()
     DIM quelle AS STRING : quelle = GUI_TEXT(ta)
     DIM name AS STRING : name = wortUnterMarke$()
     DIM auf AS INTEGER : auf = defStelle(quelle, name)
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
     IF auf < 0 THEN
-        ' Nicht auf einem Namen: dann das Unterprogramm, in dem die Marke steht.
-        DIM z AS INTEGER
-        DIM sp AS INTEGER
-        (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+        ' Steht die Marke IN der Argumentliste, ist der Aufruf gemeint --
+        ' dieselbe Frage, die auch die Signaturhilfe stellt. Gerade bei einer
+        ' Methode steht man oft mitten in den Klammern.
+        DIM zeilenM AS ARRAY OF STRING : zeilenM = SPLIT$(quelle, NL)
+        IF z >= 1 AND z <= LEN(zeilenM) THEN
+            DIM rufName AS STRING
+            DIM rufSp AS INTEGER
+            DIM rufArg AS INTEGER
+            (rufName, rufSp, rufArg) = aufrufUmDieMarke(zeilenM[z - 1], sp)
+            IF rufName <> "" THEN
+                name = rufName
+                auf = defStelle(quelle, name)
+            END IF
+        END IF
+    END IF
+    IF auf < 0 THEN
+        ' Immer noch nichts: dann das Unterprogramm, in dem die Marke steht.
         DIM uv AS INTEGER
         DIM ub AS INTEGER
         (uv, ub) = umgebendesUnterprogramm(quelle, z)
@@ -3994,6 +4025,200 @@ SUB parameterUebernehmen()
     END IF
     umbauStarten("Parameter von " + paramName, sagen, _
                  "parameter umgestellt " + STR$(geaendert) + " " + STR$(uebergangen))
+END SUB
+
+' --- Ein Unterprogramm in eine andere Datei verschieben ---------------
+' Der Umbau ueber DATEIgrenzen: die Zeilen wandern, und die Aufrufer
+' bekommen den IMPORT dazu, den sie dafuer brauchen. In Drachenhauch
+' fuegt `IMPORT "datei.dh"` den Text ein -- wer das Unterprogramm ruft,
+' muss die Datei also nennen, in der es jetzt steht. Ohne diesen Teil
+' waere das Verschieben ein Umbau, der die Uebersetzung kaputt macht.
+DIM verschName AS STRING : verschName = ""
+DIM verschVon AS INTEGER : verschVon = 0
+DIM verschBis AS INTEGER : verschBis = 0
+
+' Nennt `quelle` die Datei `datei` schon in einem IMPORT?
+FUNCTION importiert(quelle AS STRING, datei AS STRING) AS BOOLEAN
+    DIM klein AS STRING : klein = LOWER$(datei)
+    DIM zl AS STRING
+    FOR EACH zl IN SPLIT$(quelle, NL)
+        DIM t AS STRING : t = LOWER$(TRIM$(zl))
+        IF LEFT$(t, 7) <> "import " THEN CONTINUE
+        IF INSTR(t, klein) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Einen IMPORT einsetzen: hinter den letzten vorhandenen, sonst vor die
+' erste Zeile, die kein Kommentar und nicht leer ist. Ganz oben waere
+' falsch -- dort steht bei fast jeder Datei der Kopfkommentar.
+FUNCTION mitImport$(quelle AS STRING, datei AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM letzterImport AS INTEGER : letzterImport = -1
+    DIM ersteEchte AS INTEGER : ersteEchte = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = TRIM$(zeilen[i])
+        IF LEFT$(LOWER$(t), 7) = "import " THEN letzterImport = i
+        IF ersteEchte < 0 AND t <> "" AND LEFT$(t, 1) <> "'" THEN ersteEchte = i
+    NEXT
+    DIM wo AS INTEGER : wo = letzterImport + 1
+    IF letzterImport < 0 THEN wo = MAX(ersteEchte, 0)
+    ARRAY_INSERT(zeilen, wo, "IMPORT " + CHR$(34) + datei + CHR$(34))
+    RETURN JOIN$(zeilen, NL)
+END FUNCTION
+
+' Steht die Zeile in einer CLASS? Eine Methode laesst sich nicht
+' verschieben -- ohne ihre Klasse ist sie kein Unterprogramm mehr.
+FUNCTION inKlasse(quelle AS STRING, zeile AS INTEGER) AS BOOLEAN
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF LOWER$(JSON_GET_STRING(j, p + ".art")) <> "class" THEN CONTINUE
+        IF JSON_GET_INT(j, p + ".von") <= zeile AND zeile <= JSON_GET_INT(j, p + ".bis") THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB verschiebenFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR tabPfade[aktiverTab] = "" THEN
+        GUI_SET_TEXT(lblStatus, "Verschieben: diese Datei ist noch nicht gesichert.")
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM z AS INTEGER
+    DIM sp AS INTEGER
+    (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+    DIM uv AS INTEGER
+    DIM ub AS INTEGER
+    (uv, ub) = umgebendesUnterprogramm(quelle, z)
+    ' Nicht IM Unterprogramm, aber auf seinem Namen? Dann ist es gemeint.
+    IF uv < 1 THEN
+        DIM wort AS STRING : wort = wortUnterMarke$()
+        DIM auf AS INTEGER : auf = defStelle(quelle, wort)
+        IF auf >= 0 THEN
+            DIM bis AS INTEGER : bis = 1 + LEN(SPLIT$(LEFT$(quelle, auf), NL)) - 1
+            (uv, ub) = umgebendesUnterprogramm(quelle, bis)
+        END IF
+    END IF
+    IF uv < 1 THEN
+        GUI_SET_TEXT(lblStatus, "Verschieben: erst in ein SUB oder eine FUNCTION stellen.")
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    IF inKlasse(quelle, uv) THEN
+        GUI_SET_TEXT(lblStatus, "Verschieben: eine Methode gehoert zu ihrer Klasse -- " + _
+                     "ohne sie waere sie kein Unterprogramm mehr.")
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    verschName = unterprogrammName$(quelle, uv)
+    verschVon = uv
+    verschBis = ub
+    IF verschName = "" THEN
+        GUI_SET_TEXT(lblStatus, "Verschieben: hier steht kein Unterprogramm mit Namen.")
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser.
+    paletteNamen = []
+    paletteKennungen = []
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad)
+    NEXT
+    IF LEN(paletteNamen) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Verschieben: im Projektordner liegt keine zweite .dh-Datei.")
+        protokoll("verschieben 0")
+        RETURN
+    END IF
+    waehlerOeffnen("verschieben", verschName + " verschieben nach ...")
+END SUB
+
+SUB verschiebenNach(ziel AS STRING)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR verschName = "" THEN RETURN
+    IF andererUngesichert(aktiverTab) THEN
+        GUI_SET_TEXT(lblStatus, "Erst sichern: ein anderer Reiter hat ungesicherte Aenderungen.")
+        protokoll("verschieben -1")
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF verschBis > LEN(zeilen) THEN RETURN
+    DIM block AS ARRAY OF STRING : block = zeilenHolen(zeilen, verschVon, verschBis)
+    ' Kommentarzeilen unmittelbar davor gehoeren dazu -- sie beschreiben
+    ' das Unterprogramm, und allein zurueckgelassen beschreiben sie nichts.
+    DIM kopf AS INTEGER : kopf = verschVon
+    WHILE kopf > 1 AND LEFT$(TRIM$(zeilen[kopf - 2]), 1) = "'"
+        kopf = kopf - 1
+    WEND
+    IF kopf < verschVon THEN block = zeilenHolen(zeilen, kopf, verschBis)
+    DIM zielName AS STRING : zielName = BASENAME(ziel)
+    DIM meinName AS STRING : meinName = BASENAME(tabPfade[aktiverTab])
+    umbauLeeren()
+    ' 1. Die Quelle: die Zeilen heraus, und wenn sie das Unterprogramm noch
+    '    ruft, den IMPORT der Zieldatei hinein.
+    DIM rest AS ARRAY OF STRING : rest = []
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(zeilen)
+        IF i >= kopf AND i <= verschBis THEN CONTINUE
+        ARRAY_PUSH(rest, zeilen[i - 1])
+    NEXT
+    DIM neuQuelle AS STRING : neuQuelle = JOIN$(rest, NL)
+    DIM ruftNoch AS BOOLEAN : ruftNoch = FALSE
+    DIM zl AS STRING
+    FOR EACH zl IN rest
+        IF aufrufInZeile(zl, verschName) THEN ruftNoch = TRUE
+    NEXT
+    IF ruftNoch AND NOT importiert(neuQuelle, zielName) THEN
+        neuQuelle = mitImport$(neuQuelle, zielName)
+    END IF
+    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuQuelle)
+    ' 2. Das Ziel: der Block ans Ende.
+    DIM zielText AS STRING : zielText = JOIN$(READLINES(ziel), NL)
+    DIM zielNeu AS STRING : zielNeu = zielText
+    IF TRIM$(zielNeu) <> "" THEN zielNeu = zielNeu + NL
+    zielNeu = zielNeu + NL + JOIN$(block, NL)
+    DIM zielTab AS INTEGER : zielTab = tabMitPfad(ziel)
+    umbauVormerken(zielTab, ziel, zielNeu)
+    ' 3. Alle anderen Dateien, die es rufen, brauchen den IMPORT auch.
+    DIM ohneImport AS INTEGER : ohneImport = 0
+    DIM d AS STRING
+    FOR EACH d IN DIRLIST(projektOrdner, "*.dh")
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        IF wegGleich$(pfad) = wegGleich$(ziel) THEN CONTINUE
+        DIM andere AS STRING : andere = projektQuelle$(pfad)
+        IF andere = "" THEN CONTINUE
+        DIM ruft AS BOOLEAN : ruft = FALSE
+        DIM az AS STRING
+        FOR EACH az IN SPLIT$(andere, NL)
+            IF aufrufInZeile(az, verschName) THEN ruft = TRUE
+        NEXT
+        IF NOT ruft OR importiert(andere, zielName) THEN CONTINUE
+        umbauVormerken(tabMitPfad(pfad), pfad, mitImport$(andere, zielName))
+        ohneImport = ohneImport + 1
+    NEXT
+    ' Die Probe wie beim Herausloesen: wird es dadurch schlimmer, soll das
+    ' dastehen, bevor jemand es beim naechsten Starten sucht.
+    DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
+    DIM nachher AS INTEGER : nachher = fehlerZahl(neuQuelle)
+    IF nachher > vorher THEN
+        umbauWarnung = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr in " + meinName + _
+                       " -- benutzt das Unterprogramm etwas, das nur dort steht?"
+    END IF
+    DIM sagen AS STRING
+    sagen = verschName + " (" + STR$(LEN(block)) + " Zeilen) nach " + zielName + _
+            ", " + STR$(LEN(umbauTexte)) + " Datei(en) betroffen."
+    IF ohneImport > 0 THEN sagen = sagen + " " + STR$(ohneImport) + " davon bekommen den IMPORT dazu."
+    umbauStarten(verschName + " nach " + zielName, sagen, _
+                 "verschieben " + verschName + " " + STR$(LEN(block)) + " " + STR$(ohneImport))
 END SUB
 
 ' --- Wer ruft das auf? (Umschalt+F12) ---------------------------------
@@ -4588,6 +4813,45 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     IF umbauWarnung <> "" THEN protokoll("umbau einwand")
 END SUB
 
+' Den zuletzt geschriebenen Umbau in EINEM Zug zurueckschreiben.
+'
+' Geschrieben wird auf denselben zwei Wegen wie beim Umbau selbst: in den
+' Reiter ueber Auswahl + INSERT (ein Undo-Schritt), sonst auf die Platte.
+' Danach ist der Vorrat leer -- zweimal zurueck gaebe es nur mit einem
+' Stapel, und einer reicht fuer das, was hier schiefgeht.
+SUB umbauZurueck()
+    IF LEN(zurTexte) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Kein Umbau zum Zuruecknehmen.")
+        protokoll("umbau zurueck 0")
+        RETURN
+    END IF
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(zurTexte) - 1
+        IF zurTabs[k] >= 0 AND zurTabs[k] < tabAnzahl THEN
+            DIM ta AS GUI_WIDGET : ta = tabFelder[zurTabs[k]]
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+            DIM letzte AS INTEGER : letzte = LEN(zeilen)
+            GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+            GUI_TEXTAREA_INSERT(ta, zurTexte[k])
+        ELSEIF zurPfade[k] <> "" THEN
+            WRITEALL(zurPfade[k], zurTexte[k] + NL)
+            DIM t AS INTEGER : t = tabMitPfad(zurPfade[k])
+            IF t >= 0 THEN
+                GUI_SET_TEXT(tabFelder[t], zurTexte[k])
+                tabGesichert[t] = zurTexte[k]
+                tabLetzterText[t] = ""
+            END IF
+        END IF
+    NEXT
+    DIM n AS INTEGER : n = LEN(zurTexte)
+    zurTabs = [] : zurPfade = [] : zurTexte = []
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, "Zurueckgenommen: " + zurWas + " (" + STR$(n) + " Datei(en))")
+    protokoll("umbau zurueck " + STR$(n))
+    IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+END SUB
+
 SUB umbauVerwerfen()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
     umbauLeeren()
@@ -4599,6 +4863,14 @@ END SUB
 
 SUB umbauSchreiben()
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    ' Den Stand VOR dem Umbau aufheben, bevor er ueberschrieben wird.
+    zurTabs = [] : zurPfade = [] : zurTexte = [] : zurWas = umbauMeldung
+    DIM v AS INTEGER
+    FOR v = 0 TO LEN(umbauTexte) - 1
+        ARRAY_PUSH(zurTabs, umbauTabs[v])
+        ARRAY_PUSH(zurPfade, umbauPfade[v])
+        ARRAY_PUSH(zurTexte, umbauAlt$(v))
+    NEXT
     DIM k AS INTEGER
     FOR k = 0 TO LEN(umbauTexte) - 1
         IF umbauTabs[k] >= 0 THEN
@@ -5730,6 +6002,8 @@ paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
 paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
 paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
+paletteEintrag("Unterprogramm verschieben ...", "verschieben", "Strg+Umschalt+V")
+paletteEintrag("Letzten Umbau zuruecknehmen", "umbau_zurueck", "Strg+Umschalt+Z")
 paletteEintrag("Geruest beim Tippen", "geruest", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
@@ -5842,6 +6116,8 @@ SUB paletteAusfuehren()
         schnipselEinfuegen(INT(VAL(paletteSichtbar[sel])))
     ELSEIF paletteArt = "symbol" THEN
         symbolAnspringen(INT(VAL(paletteSichtbar[sel])))
+    ELSEIF paletteArt = "verschieben" THEN
+        verschiebenNach(paletteSichtbar[sel])
     ELSEIF paletteArt = "datei" THEN
         protokoll("schnell " + paletteSichtbar[sel])
         dateiOeffnen(paletteSichtbar[sel])
@@ -5981,6 +6257,8 @@ SUB befehl(k AS STRING)
             END IF
         CASE "parameter" : parameterFragen()
         CASE "aufrufer" : aufruferZeigen()
+        CASE "verschieben" : verschiebenFragen()
+        CASE "umbau_zurueck" : umbauZurueck()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
@@ -6283,6 +6561,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
     IF GUI_CLICKED(miParameter) THEN befehl("parameter")
     IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
+    IF GUI_CLICKED(miVerschieben) THEN befehl("verschieben")
+    IF GUI_CLICKED(miUmbauZur) THEN befehl("umbau_zurueck")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
     IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")

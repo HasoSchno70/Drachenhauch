@@ -39,8 +39,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 13 | Vorschau vor dem Umbau, Parameter umsortieren samt Aufrufen, Gerüst beim Tippen (`END IF` kommt mit) |
 | 14 | Parameter umsortieren **im ganzen Projekt**, Aufrufer eines Unterprogramms auflisten, Signatur-Platzhalter bei der Vervollständigung |
 | 15 | Einwand, wenn der neue Name schon vergeben ist; Parameter hinzufügen und entfernen; die Aufrufer als **Baum** |
+| 16 | Unterprogramm in eine andere Datei verschieben (samt IMPORT); Umbauten auch für Methoden; einen geschriebenen Umbau in einem Zug zurücknehmen |
 
-## Was sie heute kann (Stand 15, 12.09.2026)
+## Was sie heute kann (Stand 16, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -65,6 +66,8 @@ kann, steht darunter vollständig, ohne Stände.
 | Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
 | Umbauen | **Parameter umsortieren, hinzufügen, entfernen** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke umstellen, einen neuen aufnehmen (`hp AS INTEGER = 0` — der Teil hinter dem `=` kommt an jede Aufrufstelle) oder einen wegnehmen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
 | Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
+| Umbauen | **Unterprogramm verschieben** (Strg+Umschalt+V): die Zeilen wandern in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es ruft, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Eine **Methode** lässt sich nicht verschieben, ohne ihre Klasse wäre sie kein Unterprogramm mehr | Strg+Umschalt+V |
+| Umbauen | **Letzten Umbau zurücknehmen** (Strg+Umschalt+Z): Strg+Z im Code-Feld nimmt nur den Reiter zurück, in dem man steht — ein Umbau über sechs Dateien wäre damit sechsmal zurückzunehmen, und zwar in sechs Reitern, die man dafür erst öffnen muss | Strg+Umschalt+Z |
 | Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts. Als **Baum**: unter jedem Aufruf stehen die Aufrufer des Unterprogramms, in dem er steht, drei Ebenen tief; ein Klick springt hin. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
 | Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
 | Umbenennen | **Im ganzen Projekt umbenennen** (Strg+Umschalt+F6): der Name unter der Marke, in allen `.dh` des Projektordners. `CODE_RENAME$` lässt Kommentare und Zeichenketten aus, wie beim Umbenennen in einer Datei | Strg+Umschalt+F6 |
@@ -243,6 +246,8 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `platzhalter <nummer> von <anzahl>`, `umbau einwand`,
 `parameter neu <deklaration>`, `parameter weg <nummer>`,
 `aufrufer baum <knoten>`, `aufrufer sprung <zeile>`,
+`verschieben <name> <zeilen> <imports>` (0 = ging nicht),
+`umbau zurueck <dateien>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
@@ -282,12 +287,16 @@ Auch die Liste aus Stand 14 ist abgearbeitet: der Einwand beim Umbenennen
 auf einen vergebenen Namen, das Hinzufügen und Entfernen von Parametern,
 und die Aufrufer als Baum.
 
+Auch die Liste aus Stand 15 ist abgearbeitet: das Verschieben in eine
+andere Datei samt IMPORT, die Umbauten für Methoden (die Marke darf dafür
+auch **in** der Argumentliste stehen) und das Zurücknehmen in einem Zug.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: ein Unterprogramm in eine **andere Datei** verschieben
-(samt der Frage, ob die Aufrufer sie schon importieren); die Umbauten
-kennen nur Unterprogramme, nicht **Klassen und ihre Methoden**; und ein
-Umbau, der schon geschrieben ist, ließe sich **in einem Zug zurücknehmen**
-statt Datei für Datei. Ein
+Nächstes anstünde: eine **Klasse** verschieben oder umbenennen (heute geht
+nur, was ein Unterprogramm ist); das Verschieben legt keine **neue Datei**
+an, das Ziel muss es schon geben; und der Umbau kennt keine
+**Vererbung** — wer eine Methode umbenennt, die eine Oberklasse vorgibt,
+bekommt keinen Einwand. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

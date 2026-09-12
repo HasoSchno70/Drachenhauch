@@ -2873,6 +2873,31 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 16 (2026-09-12):** die drei Punkte nach Stand 15 -- und ein
+LAUFZEIT-Fehler, den der eigene Test fand. **Unterprogramm verschieben**
+(Strg+Umschalt+V): die Zeilen wandern in eine andere Datei des Projekts,
+samt den Kommentarzeilen darueber (allein zurueckgelassen beschreiben sie
+nichts), und JEDE Datei, die es ruft, bekommt den `IMPORT` der Zieldatei --
+in Drachenhauch fuegt IMPORT den Text ein, ohne diesen Teil waere das
+Verschieben ein Umbau, der die Uebersetzung kaputt macht (der Test prueft
+darum mit `dhrt --check`, nicht am Text). Eine METHODE laesst sich nicht
+verschieben (`inKlasse`). **Umbauten fuer Methoden:** ging fast schon --
+`held.setze(` findet der Sucher, weil der Punkt kein Wortzeichen ist; was
+fehlte, war die Marke IN der Argumentliste (`parameterFragen` fragt jetzt
+`aufrufUmDieMarke`, dieselbe Frage wie die Signaturhilfe). **Letzten Umbau
+zuruecknehmen** (Strg+Umschalt+Z): `umbauSchreiben` hebt den Vorher-Stand
+auf; Strg+Z im Feld nimmt nur EINEN Reiter zurueck, ein Umbau ueber sechs
+Dateien waere sonst sechsmal zurueckzunehmen, in sechs Reitern, die man
+dafuer erst oeffnen muesste. **Der Laufzeit-Fund:** ein Menue-Kuerzel
+feuerte, und der Textbereich verarbeitete dieselbe Taste NOCH EINMAL --
+`Strg+Umschalt+V` machte sein Fenster auf UND fuegte unbemerkt die
+Zwischenablage ein (im Test stand danach ein `#` mitten im verschobenen
+Block). `kuerzel_gefeuert` galt seit Stufe 12 nur fuer die Navigation, nicht
+fuer den Strg-Block (A/C/X/V) und nicht fuer Strg+Z/Y -- also haette auch
+das neue Strg+Umschalt+Z nebenbei ein Redo ausgeloest. Gegenprobe gefahren
+(Waechter entfernt -> Test rot). Tests: `tests/pruef/gui_menu_ausbau.dhtest`
+(+1) und 7 neue in `tests/test_ide.py`.
+
 **Stufe 15 (2026-09-12):** die drei Punkte nach Stand 14 -- und die erste
 Stufe OHNE neuen Laufzeit-Baustein; alles ging mit dem, was schon da war.
 **Einwand statt stiller Umbau:** wer auf einen Namen umbenennt, den es im
