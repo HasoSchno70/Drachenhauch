@@ -1375,3 +1375,25 @@ def test_ohne_vorschau_schreibt_der_umbau_gleich(tmp_path):
     assert not any(z.startswith("umbau vorschau ") for z in log), log
     assert any(z.startswith("umbenannt ") for z in log), log
     assert quelle.read_text(encoding="utf-8").startswith("summe = 1"), quelle.read_text()
+
+
+def test_parameter_haelt_einen_aufruf_ueber_zwei_zeilen_heil(tmp_path):
+    """Ein Aufruf mit `_` am Zeilenende: die Stuecke werden vertauscht, der
+    Fortsetzungsstrich bleibt am Zeilenende stehen -- sonst uebersetzte die
+    Datei danach nicht mehr."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, _\n"
+                    "        2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)
+    ev += _taste(190, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "parameter umgestellt 2 0" in log, log
+    r = subprocess.run([str(_DHRT), "--check", str(quelle)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.stdout.strip() == "[]", (r.stdout, quelle.read_text(encoding="utf-8"))

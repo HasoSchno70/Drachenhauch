@@ -3393,6 +3393,23 @@ END SUB
 ' Die Definition selbst braucht keinen Sonderfall: `SUB name(` sieht fuer
 ' den Sucher aus wie ein Aufruf, und ihre "Argumente" sind die Parameter.
 
+' Leerzeichen und Tabulatoren an den Enden weg -- ZEILENUMBRUECHE aber
+' nicht. Ein Argument darf ueber mehrere Zeilen gehen, und dann steht vor
+' dem Umbruch ein `_`; naehme man den Umbruch weg, stuende der
+' Fortsetzungsstrich mitten in der Zeile und die Datei uebersetzte nicht
+' mehr. TRIM$ kann das nicht, es nimmt jeden Leerraum.
+FUNCTION randWeg$(s AS STRING) AS STRING
+    DIM a AS INTEGER : a = 0
+    DIM b AS INTEGER : b = LEN(s)
+    WHILE a < b AND (MID$(s, a, 1) = " " OR MID$(s, a, 1) = CHR$(9))
+        a = a + 1
+    WEND
+    WHILE b > a AND (MID$(s, b - 1, 1) = " " OR MID$(s, b - 1, 1) = CHR$(9))
+        b = b - 1
+    WEND
+    RETURN MID$(s, a, b - a)
+END FUNCTION
+
 ' Steht an `i` (0-basiert) das Wort `wort`, und zwar als ganzes Wort?
 FUNCTION wortAn(text AS STRING, i AS INTEGER, wort AS STRING) AS BOOLEAN
     IF MID$(text, i, LEN(wort)) <> wort THEN RETURN FALSE
@@ -3617,7 +3634,7 @@ SUB parameterUebernehmen()
         END IF
         DIM neuArgs AS ARRAY OF STRING : neuArgs = []
         FOR k = 0 TO LEN(paramFolge) - 1
-            ARRAY_PUSH(neuArgs, TRIM$(stuecke[paramFolge[k]]))
+            ARRAY_PUSH(neuArgs, randWeg$(stuecke[paramFolge[k]]))
         NEXT
         neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
         geaendert = geaendert + 1
