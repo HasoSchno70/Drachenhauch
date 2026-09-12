@@ -1746,10 +1746,11 @@ def test_ein_unterprogramm_in_eine_andere_datei_verschieben(tmp_path):
     ziel = _datei(tmp_path, "' Helfer\nPRINT 9\n", "b_helfer.dh")
     ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)      # in das SUB stellen
     ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)         # verschieben
-    ev += _taste(115, RL_ENTER)                         # die erste Datei waehlen
-    ev += _taste(165, RL_ENTER)                         # Vorschau uebernehmen
-    ev += _taste(215, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=300, events=ev)
+    # Der erste Eintrag im Waehler ist "(neue Datei ...)" -- einen weiter.
+    ev += _taste(105, RL_DOWN) + _taste(125, RL_ENTER)
+    ev += _taste(175, RL_ENTER)                         # Vorschau uebernehmen
+    ev += _taste(225, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev)
     assert any(z.startswith("verschieben gruessen ") for z in log), log
     q = quelle.read_text(encoding="utf-8")
     z = ziel.read_text(encoding="utf-8")
@@ -1762,20 +1763,25 @@ def test_ein_unterprogramm_in_eine_andere_datei_verschieben(tmp_path):
     assert r.stdout.strip() == "[]", (r.stdout, q)
 
 
-def test_eine_methode_laesst_sich_nicht_verschieben(tmp_path):
-    """Die Gegenprobe: ohne ihre Klasse wäre sie kein Unterprogramm mehr."""
+def test_die_marke_in_einer_methode_verschiebt_die_ganze_klasse(tmp_path):
+    """Eine Methode allein wäre ohne ihre Klasse kein Unterprogramm mehr --
+    gemeint ist darum die Klasse, auch wenn die Marke tief in ihr steht."""
     quelle = _datei(tmp_path,
                     "CLASS Held\n"
                     "    SUB setze()\n"
                     "        PRINT 1\n"
                     "    END SUB\n"
                     "END CLASS\n", "a_spiel.dh")
-    _datei(tmp_path, "PRINT 9\n", "b_helfer.dh")
-    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)
+    ziel = _datei(tmp_path, "' Helfer\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN) + _taste(45, RL_DOWN)      # in die Methode
     ev += _taste(75, RL_V, RL_LCTRL, RL_LSHIFT)
-    log = _ide(tmp_path, quelle, frames=180, events=ev)
-    assert "verschieben 0" in log, log
-    assert "SUB setze()" in quelle.read_text(encoding="utf-8")
+    ev += _taste(105, RL_DOWN) + _taste(125, RL_ENTER)  # b_helfer.dh
+    ev += _taste(175, RL_ENTER)
+    ev += _taste(225, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev)
+    assert any(z.startswith("verschieben Held ") for z in log), log
+    assert "CLASS Held" not in quelle.read_text(encoding="utf-8")
+    assert "CLASS Held" in ziel.read_text(encoding="utf-8")
 
 
 # --------------------------------------------------------------- Stufe 17
