@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 5)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 13)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -58,6 +58,10 @@
 '  Stand 12 dazu: Auswahl erweitern/verkleinern (Strg+Umschalt+Hoch/Runter),
 '  Auswahl in ein Unterprogramm herausloesen (Strg+Umschalt+R) und zwei
 '  Reiter nebeneinander vergleichen.
+'  Stand 13 dazu: Vorschau vor dem Umbau (Umbenennen, Herausloesen,
+'  Ersetzen und Parameter zeigen erst den Unterschied und fragen),
+'  Parameter umsortieren samt Aufrufen (Strg+Umschalt+U) und das Geruest,
+'  das beim Tippen mitwaechst (`IF ... THEN` + Enter setzt das END IF).
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -1226,7 +1230,7 @@ SUB einstellungenNachziehen()
     IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
         vorschauAn = GUI_CHECKED(cbVorschau)
         konfigSichern()
-        protokoll("umbau vorschau " + IIF(vorschauAn, "an", "aus"))
+        protokoll("umbau schalter " + IIF(vorschauAn, "an", "aus"))
     END IF
     IF INT(GUI_VALUE(spSchrift)) <> codeGroesse THEN schriftSetzen(INT(GUI_VALUE(spSchrift)))
     IF INT(GUI_VALUE(spAuto)) <> autoSichern THEN
