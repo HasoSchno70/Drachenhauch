@@ -42,8 +42,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 16 | Unterprogramm in eine andere Datei verschieben (samt IMPORT); Umbauten auch für Methoden; einen geschriebenen Umbau in einem Zug zurücknehmen |
 | 17 | Klassen verschieben; Verschieben legt die Zieldatei an; Einwand, wenn eine Umbenennung eine Überschreibung zerreißt; Pfeiltasten im Wähler |
 | 18 | Mattere Oberfläche (der Verlauf klingt auf großen Flächen aus); das Verschobene nimmt mit, was es braucht; mehrfach zurücknehmen; Aufrufer kennen FUNCREF |
+| 19 | In der Vorschau einzelne Dateien abwählen; Einwand, wenn der Name im Ziel schon steht; Konstanten und globale Variablen verschieben |
 
-## Was sie heute kann (Stand 18, 12.09.2026)
+## Was sie heute kann (Stand 19, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -67,8 +68,9 @@ kann, steht darunter vollständig, ohne Stände.
 | Kacheln | Auf der Willkommensseite acht wichtige Beispiele **mit einem Bild davon**. Die Bilder entstehen, indem das Beispiel wirklich läuft (`dhrt bild`), eines nach dem anderen im Hintergrund und unsichtbar; danach liegen sie neben der Sitzung und sind sofort da. Ein Klick öffnet das Beispiel | — |
 | Umbauen | **Auswahl in ein Unterprogramm herauslösen** (Strg+Umschalt+R): die gewählten Zeilen wandern in ein neues `SUB` am Dateiende, an ihrer Stelle steht der Aufruf. Was als Parameter mitmuss, steht nicht im Raten — globale Namen sieht ein SUB ohnehin, also sind es genau die **lokalen** des umgebenden Unterprogramms, die in den Zeilen vorkommen; wer darin auch zugewiesen wird, geht **BYREF**. Danach zählt die IDE die Fehler nach und sagt es, wenn die Auswahl nicht ausgewogen war | Strg+Umschalt+R |
 | Umbauen | **Parameter umsortieren, hinzufügen, entfernen** (Strg+Umschalt+U): die Parameter des Unterprogramms unter der Marke umstellen, einen neuen aufnehmen (`hp AS INTEGER = 0` — der Teil hinter dem `=` kommt an jede Aufrufstelle) oder einen wegnehmen — und **die Aufrufe ziehen mit**, in **allen** `.dh` des Projektordners. Die Reihenfolge der Argumente ist die Bedeutung; ein vergessener Aufruf übergibt stumm das Falsche. Ein Aufruf, der eine andere Zahl von Argumenten übergibt (weggelassener Vorgabewert) oder sie **benennt**, wird übergangen und gezählt — dort heißt die Reihenfolge etwas anderes | Strg+Umschalt+U |
+| Umbauen | **In der Vorschau abwählen**: links stehen die betroffenen Dateien mit Kästchen — was man abwählt, bleibt stehen. Ein Umbau über zwölf Dateien ist selten in allen zwölf gemeint, und „alles oder nichts" hieße dann: von Hand nacharbeiten | — |
 | Umbauen | **Vorschau vor dem Umbau**: Umbenennen, Im-Projekt-Umbenennen, Im-Projekt-Ersetzen, Herauslösen und die Parameter-Umbauten zeigen erst den Unterschied und fragen (Enter übernimmt, ESC verwirft). Abschaltbar unter Strg+U — **außer wenn es einen Einwand gibt**: gibt es den neuen Namen im Projekt schon, oder zerreißt die Umbenennung eine **Überschreibung** (dieselbe Methode steht in der Oberklasse oder in einer erbenden Klasse — gerufen würde von da an die andere Fassung, ohne Fehlermeldung), geht die Vorschau auf und sagt es oben. Wer einen Einwand nur in die Statuszeile schreibt, hat ihn nicht vorgebracht | — |
-| Umbauen | **Verschieben** (Strg+Umschalt+V): ein Unterprogramm oder eine ganze **Klasse** wandert in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es benutzt, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Steht die Marke in einer Klasse, ist die **Klasse** gemeint — eine Methode allein wäre ohne sie kein Unterprogramm mehr. Der erste Eintrag im Wähler legt eine **neue Datei** an. Und es geht in beide Richtungen: braucht das Verschobene etwas, das zurückbleibt, importiert die **Zieldatei** die Quelle | Strg+Umschalt+V |
+| Umbauen | **Verschieben** (Strg+Umschalt+V): ein Unterprogramm oder eine ganze **Klasse** wandert in eine andere Datei des Projekts, samt den Kommentarzeilen darüber — und jede Datei, die es benutzt, bekommt den `IMPORT` der Zieldatei dazu. In Drachenhauch fügt `IMPORT` den Text ein; ohne diesen Teil wäre das Verschieben ein Umbau, der die Übersetzung kaputt macht. Steht die Marke in einer Klasse, ist die **Klasse** gemeint — eine Methode allein wäre ohne sie kein Unterprogramm mehr. Der erste Eintrag im Wähler legt eine **neue Datei** an. Und es geht in beide Richtungen: braucht das Verschobene etwas, das zurückbleibt, importiert die **Zieldatei** die Quelle. Steht die Marke auf einer `CONST`- oder `DIM`-Zeile, ist **die Zeile** die Einheit. Hat das Ziel den Namen schon, sagt die Vorschau es — zwei gleichen Namens in einer Datei sind kein Übersetzungsfehler, der zweite gewinnt einfach | Strg+Umschalt+V |
 | Umbauen | **Umbau zurücknehmen** (Strg+Umschalt+Z): Strg+Z im Code-Feld nimmt nur den Reiter zurück, in dem man steht — ein Umbau über sechs Dateien wäre damit sechsmal zurückzunehmen, und zwar in sechs Reitern, die man dafür erst öffnen muss. Die letzten zehn liegen auf einem **Stapel**, jeder Druck nimmt einen weiter zurück | Strg+Umschalt+Z |
 | Aufrufe | **Wer ruft das auf?** (Umschalt+F12): die Gegenrichtung zu F12 — alle Stellen, an denen das Unterprogramm unter der Marke gerufen wird, über alle Dateien des Projekts. Als **Baum**: unter jedem Aufruf stehen die Aufrufer des Unterprogramms, in dem er steht, drei Ebenen tief; ein Klick springt hin. Gezählt wird auch, wo der Name **ohne Klammern** weitergegeben wird (`f = malen`) — dort wird entschieden, dass er später läuft. Die Definition steht nicht dabei, sie ist kein Aufruf | Umschalt+F12 |
 | Auswahl | **Erweitern** nimmt die nächstgrößere Klammer: Wort, Zeile, Block, Elternblock, ganze Datei. **Verkleinern** geht denselben Weg zurück — ein Stapel merkt sich jede Stufe, statt sie neu zu erraten | Strg+Umschalt+Hoch / Runter |
@@ -249,7 +251,7 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `parameter neu <deklaration>`, `parameter weg <nummer>`,
 `aufrufer baum <knoten>`, `aufrufer sprung <zeile>`,
 `verschieben <name> <zeilen> <imports>` (0 = ging nicht),
-`umbau zurueck <dateien>`,
+`umbau zurueck <dateien>`, `umbau abgewaehlt alles`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
@@ -303,11 +305,17 @@ Verlauf des Glas-Themas ist für Knöpfe gemacht, und auf den großen Flächen
 einer Entwicklungsumgebung sah er aus wie ein Schatten quer über die halbe
 Höhe. Die neue Metrik `verlauf_hoehe` lässt ihn über 120 Pixeln ausklingen.
 
+Auch die Liste aus Stand 18 ist abgearbeitet: der Einwand beim verdeckten
+Namen, das Verschieben von Konstanten und globalen Variablen, und das
+Abwählen in der Vorschau.
+
 Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: der Umbau fragt nicht, ob ein Name im Ziel **verdeckt**
-wird (zwei Dateien mit demselben Unterprogramm); das Verschieben kennt
-keine **Konstanten und globalen Variablen**; und die Vorschau zeigt den
-Unterschied, aber man kann darin nichts **einzeln abwählen**. Ein
+Nächstes anstünde: in der Vorschau lässt sich eine **Datei** abwählen, aber
+keine **einzelne Zeile**; ein Umbau kennt keine `.dhform`- und
+`.dhsprite`-Dateien (wer ein Unterprogramm umbenennt, das ein Formular als
+Handler nennt, bekommt keinen Einwand); und die Aufrufer-Liste zeigt nicht,
+**wie oft** eine Stelle durchlaufen wird — dafür bräuchte es den Profiler.
+Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis

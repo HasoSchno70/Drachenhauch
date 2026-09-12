@@ -2873,6 +2873,23 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 19 (2026-09-12):** die drei Punkte nach Stand 18. **Abwaehlen in
+der Vorschau:** links die betroffenen Dateien mit Kaestchen
+(`GUI_LISTBOX_SET "kaestchen"`). Gefiltert wird GANZ OBEN in
+`umbauSchreiben` -- vor dem Ausblenden des Fensters (die Kaestchen sitzen
+darin, `GUI_WINDOW_SHOWN` ist danach FALSE) und vor dem Vorrat zum
+Zuruecknehmen, sonst schriebe ein Strg+Umschalt+Z eine Datei zurueck, die
+gar nicht geaendert wurde. Dabei der Fund: **eine Liste nimmt Enter fuer
+sich**, der Standard-Knopf kommt dann nicht mehr dran -- wer gerade
+abgewaehlt hat, steht aber genau dort; Enter und ESC werden fuer den
+Listen-Fokus eigens abgefragt (dasselbe Muster wie in der Befehlspalette).
+**Einwand, wenn der Name im Ziel schon steht** (`symbolInDatei$`): zwei
+gleichen Namens in einer Datei sind KEIN Uebersetzungsfehler, der zweite
+gewinnt -- das merkt man erst, wenn das Falsche laeuft. **CONST/DIM
+verschieben:** steht die Marke auf so einer Zeile auf oberster Ebene, ist
+DIE ZEILE die Einheit (`einzelzeileName$`); in einem Unterprogramm zaehlt
+sie nicht, dort ist sie lokal. Tests: 3 neue in `tests/test_ide.py`.
+
 **Stufe 18 (2026-09-12):** die drei Punkte nach Stand 17 -- und der LOOK.
 **Der Baustein: Metrik `verlauf_hoehe`** (gui.rs `verlauf_anteil`): ueber
 dieser Hoehe nehmen Verlauf UND Glanz im Verhaeltnis ab, ein Fuenftel
