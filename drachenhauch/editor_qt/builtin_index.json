@@ -4323,6 +4323,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TEXTAREA_TAB_HIT",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA_TAB_HIT(ta)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TEXTAREA_VIEW",
    "kind": "core",
    "signature": "GUI_TEXTAREA_VIEW(ta)",

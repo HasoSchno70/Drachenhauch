@@ -16,7 +16,30 @@ relativer Dateiname meint eine Datei dort. Das ist nicht selbstverständlich:
 Damit ein Programm den Ort des Aufrufers trotzdem kennt, hinterlegt `dhrt`
 ihn vorher in der Umgebungsvariable `DHRT_START_DIR`.
 
-## Stand 13 (12.09.2026)
+## Die Stände im Überblick
+
+Gewachsen ist sie in Ständen, einer je Runde. Die Tabelle sagt, was in
+welchem dazukam — für die Frage „wann kam eigentlich …?"; was sie **heute**
+kann, steht darunter vollständig, ohne Stände.
+
+| Stand | Was dazukam |
+|---|---|
+| 1 | Reiter, Projektbaum, Einfärbung, Fehlerliste, Hilfe zum Wort, Vervollständigung, Suchen/Ersetzen, Starten mit Ausgabe |
+| 2 | Debugger, Profil, Suche im Projekt, Befehlspalette, Marken in der Nummernspalte, echte Schriften |
+| 3 | Handbuch im Fenster, Drucken und PDF, Werkzeuge-Menü, Ausdrücke im Debugger, Installer ohne Python |
+| 4 | Willkommensseite, Sitzung und Einstellungen in einer Datei, Datei im Projekt öffnen, die Handgriffe auf Zeilen, Lesezeichen, Gliederung, bedingte Haltepunkte, Export |
+| 5 | Falten, mehrere Schreibmarken, geteilte Ansicht, Übersichtskarte, git blame, Umbenennen, Schnipsel, Signaturhilfe, Sitzung je Projekt |
+| 6 | Einrückung beim Zeilenumbruch, Fundstellen und Klammernpaar farbig, Vorschlagsliste beim Tippen, git diff/log, Suche mit regulärem Ausdruck |
+| 7 | Einstellungsdialog, Befehlsverzeichnis, Definition hier zeigen, Symbolspur, automatisches Sichern, Farbfelder mit Farbwähler |
+| 8 | Schnipsel per Kürzel und Tabulator, Symbolverzeichnis über das Projekt, Definition über Dateigrenzen, Mehrfachauswahl im Projektbaum |
+| 9 | Einrückungslinien, Ausgabe durchsuchen, im ganzen Projekt ersetzen, andere Reiter schließen, Über-Kasten |
+| 10 | Spaltenauswahl, Zeilen-Werkzeuge, im ganzen Projekt umbenennen, zwei Dateien vergleichen |
+| 11 | Werkzeugleiste mit Sinnbildern, Kacheln mit Vorschaubildern der Beispiele |
+| 12 | Auswahl erweitern/verkleinern, Auswahl in ein Unterprogramm herauslösen, zwei Reiter nebeneinander vergleichen |
+| 13 | Vorschau vor dem Umbau, Parameter umsortieren samt Aufrufen, Gerüst beim Tippen (`END IF` kommt mit) |
+| 14 | Parameter umsortieren **im ganzen Projekt**, Aufrufer eines Unterprogramms auflisten, Signatur-Platzhalter bei der Vervollständigung |
+
+## Was sie heute kann (Stand 14, 12.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|

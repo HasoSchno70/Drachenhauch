@@ -1,0 +1,146 @@
+' Der Tabulator, wenn er mehr als eines bedeutet: mit
+' GUI_TEXTAREA_SET(ta, "tab_meldet", 1) rueckt das Feld nicht mehr ein und
+' sieht nicht nach Abkuerzungen, sondern MELDET ihn nur
+' (GUI_TEXTAREA_TAB_HIT). Format: docs/werkzeuge.md.
+--- seriell
+
+=== ohne den schalter rueckt der tabulator ein
+' Die Gegenprobe zuerst.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_SET_TEXT(ta, "abc")
+GUI_TEXTAREA_GOTO(ta, 1, 4)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM gemeldet AS INTEGER : gemeldet = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TEXTAREA_TAB_HIT(ta) THEN gemeldet = gemeldet + 1
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + GUI_TEXT(ta) + "] gemeldet " + STR$(gemeldet)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[abc ] gemeldet 0
+
+=== mit dem schalter meldet es nur
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tab_meldet", 1)
+GUI_SET_TEXT(ta, "abc")
+GUI_TEXTAREA_GOTO(ta, 1, 4)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM gemeldet AS INTEGER : gemeldet = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TEXTAREA_TAB_HIT(ta) THEN gemeldet = gemeldet + 1
+    n = n + 1
+    IF n = 30 THEN PRINT "[" + GUI_TEXT(ta) + "] gemeldet " + STR$(gemeldet)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+[abc] gemeldet 1
+
+=== die meldung gilt genau ein bild
+' Gedrueckt wird EINMAL -- gemeldet auch. Ein Tastendruck ist ein
+' Ereignis, kein Zustand.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tab_meldet", 1)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM gemeldet AS INTEGER : gemeldet = 0
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TEXTAREA_TAB_HIT(ta) THEN gemeldet = gemeldet + 1
+    n = n + 1
+    IF n = 34 THEN PRINT "gemeldet " + STR$(gemeldet)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator zweimal
+c 4
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+e 20 2 258 0 0 0 // Tab runter
+e 22 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=44
+--- erwartet
+gemeldet 2
+
+=== eine abkuerzung meldet dann nicht mehr
+' Mit dem Schalter sieht das Feld gar nicht mehr nach Abkuerzungen -- der
+' Aufrufer fragt seine Liste selbst ab, in seiner Reihenfolge.
+IMPORT "gui"
+SCREEN(600, 400, "T", 1)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 5, 5, 580, 380)
+DIM ta AS GUI_WIDGET
+ta = GUI_TEXTAREA(w, 10, 10, 500, 200)
+GUI_TEXTAREA_SET(ta, "tab_fuegt_ein", 1)
+GUI_TEXTAREA_SET(ta, "tab_meldet", 1)
+GUI_TEXTAREA_ABBREV(ta, ["for", "while"])
+GUI_SET_TEXT(ta, "for")
+GUI_TEXTAREA_GOTO(ta, 1, 4)
+GUI_FOCUS(ta)
+AUTOMATION_PLAY("ev.txt")
+DIM abk AS INTEGER : abk = -2
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_TEXTAREA_TAB_HIT(ta) THEN abk = GUI_TEXTAREA_ABBREV_HIT(ta)
+    n = n + 1
+    IF n = 30 THEN PRINT "abkuerzung " + STR$(abk)
+    CLS(&H101820)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Tabulator
+c 2
+e 4 2 258 0 0 0 // Tab runter
+e 6 1 258 0 0 0 // Tab hoch
+--- umgebung
+DHRT_FRAMES=40
+--- erwartet
+abkuerzung -1
