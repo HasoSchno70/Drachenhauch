@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1726,
+ "count": 1727,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -700,6 +700,7 @@
   "GUI_TEXTAREA_SPANS": "Zeichen start … start+laenge in farbe zeichnen",
   "GUI_TEXTAREA_SWATCHES": "Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht &H-Literale",
   "GUI_TEXTAREA_SWATCH_CLICKED": "welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie GUI_CLICKED, die Schreibmarke bleibt dabei stehen",
+  "GUI_TEXTAREA_TAB_HIT": "wurde der Tabulator in diesem Bild gedrückt? Nur mit GUI_TEXTAREA_SET(ta, \"tab_meldet\", 1) — dann rückt das Feld nicht ein und sieht nicht nach Abkürzungen, sondern meldet nur",
   "GUI_TEXTAREA_VIEW": "welcher Ausschnitt ist gerade zu sehen?",
   "GUI_TEXTINPUT": "GUI_WIDGET — einzeiliges Eingabefeld (Caret + Selektion, Strg+Z/Y)",
   "GUI_TEXTINPUT_SET": "passwort, nur_lesen, maxlaenge, zahlen (0 frei, 1 ganze Zahl, 2 Kommazahl)",

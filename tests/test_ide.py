@@ -1397,3 +1397,75 @@ def test_parameter_haelt_einen_aufruf_ueber_zwei_zeilen_heil(tmp_path):
     r = subprocess.run([str(_DHRT), "--check", str(quelle)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     assert r.stdout.strip() == "[]", (r.stdout, quelle.read_text(encoding="utf-8"))
+
+
+# --------------------------------------------------------------- Stufe 14
+
+def test_vervollstaendigung_setzt_die_argumente_als_platzhalter(tmp_path):
+    """`CIRC` getippt, Strg+Leer, Enter -- da steht `CIRCLE(x, y, r)`, und
+    `x` ist markiert: das erste Tippen ersetzt es."""
+    quelle = _datei(tmp_path, "CIRC\n")
+    ev = _taste(30, RL_END) + _taste(50, RL_SPACE, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(110, RL_V, RL_LCTRL)          # tippt ueber den Platzhalter
+    ev += _taste(150, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="10")
+    assert "platzhalter 1 von 3" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert text.startswith("CIRCLE(10, y, r)"), repr(text)
+
+
+def test_der_tabulator_geht_zum_naechsten_platzhalter(tmp_path):
+    """Nach der Vervollständigung springt der Tabulator von Argument zu
+    Argument -- und das Tippen trifft das zweite."""
+    quelle = _datei(tmp_path, "CIRC\n")
+    ev = _taste(30, RL_END) + _taste(50, RL_SPACE, RL_LCTRL) + _taste(80, RL_ENTER)
+    ev += _taste(110, RL_TAB)                  # zum zweiten Argument
+    ev += _taste(140, RL_V, RL_LCTRL)
+    ev += _taste(180, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=270, events=ev, zwischenablage="20")
+    assert "platzhalter 2 von 3" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert text.startswith("CIRCLE(x, 20, r)"), repr(text)
+
+
+def test_der_tabulator_rueckt_weiter_ein_wenn_kein_platzhalter_ansteht(tmp_path):
+    """Die Gegenprobe zum dreifachen Tabulator: ohne Platzhalter und ohne
+    Kürzel rückt er ein wie immer -- bis zur nächsten Spalte."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(30, RL_END) + _taste(60, RL_TAB) + _taste(100, RL_S, RL_LCTRL)
+    _ide(tmp_path, quelle, frames=190, events=ev)
+    text = quelle.read_text(encoding="utf-8")
+    assert text.startswith("PRINT 1 \n"), repr(text)
+
+
+def test_wer_ruft_das_auf_listet_die_stellen_im_projekt(tmp_path):
+    """Umschalt+F12 auf dem Namen: alle Aufrufe, auch die in der anderen
+    Datei -- die Definition selbst steht nicht dabei."""
+    quelle = _datei(tmp_path, "SUB gruessen()\n    PRINT 1\nEND SUB\ngruessen()\n", "a_spiel.dh")
+    _datei(tmp_path, "gruessen()\n' gruessen() im Kommentar zaehlt nicht\ngruessen()\n", "b_mehr.dh")
+    ev = _taste(30, RL_END)
+    for k in range(3):
+        ev += _taste(45 + k * 6, RL_LEFT)     # in den Namen hinein
+    ev += _taste(80, RL_F12, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=190, events=ev)
+    assert "aufrufer 3" in log, log
+
+
+def test_parameter_umsortieren_geht_durch_das_ganze_projekt(tmp_path):
+    """Die Definition steht in der einen Datei, ein Aufruf in der anderen --
+    die Vorschau zeigt beide, und beide werden geschrieben."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n", "a_spiel.dh")
+    zweite = _datei(tmp_path, "zeichne(7, 8)\n", "b_mehr.dh")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)                  # die Vorschau uebernehmen
+    ev += _taste(190, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "parameter umgestellt 3 0" in log, log
+    assert "SUB zeichne(y AS INTEGER, x AS INTEGER)" in quelle.read_text(encoding="utf-8")
+    assert "zeichne(8, 7)" in zweite.read_text(encoding="utf-8")

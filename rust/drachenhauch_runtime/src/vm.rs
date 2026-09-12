@@ -6068,6 +6068,8 @@ impl<'p> Vm<'p> {
             }
             "gui_textarea_abbrev_hit" => Value::Int(
                 self.gui.textarea_abbrev_hit(gi(a, 0, "GUI_TEXTAREA_ABBREV_HIT")?)?),
+            "gui_textarea_tab_hit" => Value::Bool(
+                self.gui.textarea_tab_hit(gi(a, 0, "GUI_TEXTAREA_TAB_HIT")?)?),
             "gui_textarea_indent_words" => {
                 let n = "GUI_TEXTAREA_INDENT_WORDS";
                 if a.len() != 4 { return Err(format!("{}: erwartet (ta, anfang, ende, aus)", n)); }

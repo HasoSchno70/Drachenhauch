@@ -1744,6 +1744,26 @@ Drei Bedingungen, jede mit ihrem Grund:
 Bei **mehreren Schreibmarken** bleibt es beim bloßen Umbruch: fünf Abschlüsse
 auf einmal will niemand. Zwei leere Listen schalten es ab.
 
+## Der Tabulator, wenn er mehr als eines bedeutet
+
+`GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` gibt den Tabulator ganz dem
+Aufrufer: das Feld rückt nicht ein, sieht nicht nach Abkürzungen, sondern
+**meldet** ihn über `GUI_TEXTAREA_TAB_HIT(ta)` — transient wie
+`GUI_CLICKED`, ein Tastendruck ist ein Ereignis.
+
+Der Grund ist die Reihenfolge. Wer im selben Feld drei Bedeutungen für den
+Tabulator hat — zum nächsten Platzhalter springen, ein Schnipsel aufklappen,
+sonst einrücken — kann sie nur selbst der Reihe nach abfragen; die Laufzeit
+entschiede die ersten beiden vorher. Dann gehört ihm aber auch das
+Einrücken: `GUI_TEXTAREA_CURSOR` sagt die Spalte, `GUI_TEXTAREA_INSERT`
+setzt die Leerzeichen bis zur nächsten. Ohne den Schalter bleibt alles, wie
+es war.
+
+Das Feld **behält** die Taste damit: der Tabulator schaltet dann nicht
+zusätzlich den Fokus weiter, sonst täte eine Taste zwei Dinge. Ein Feld,
+aus dem man per Tabulator herauskommen soll, setzt den Schalter also
+nicht.
+
 ## Mehrere Schreibmarken im Textbereich
 
 **Alt+Klick** legt eine weitere Schreibmarke, **ESC** räumt sie weg; ein
@@ -2162,6 +2182,7 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
+| `GUI_TEXTAREA_TAB_HIT(ta)` | wurde der Tabulator in diesem Bild gedrückt? Nur mit `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` — dann rückt das Feld nicht ein und sieht nicht nach Abkürzungen, sondern meldet nur |
 | `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)` | das Gerüst, das mitwächst: öffnet die Zeile einen Block, setzt der Zeilenumbruch die schließende Zeile gleich mit darunter |
 | `GUI_TEXTAREA_ABBREV(ta, woerter)` | Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel |
 | `GUI_TEXTAREA_ABBREV_HIT(ta)` → INTEGER | welche Abkürzung der Tabulator in diesem Bild getroffen hat (-1 = keine); gilt ein Bild lang wie `GUI_CLICKED` |

@@ -1093,6 +1093,13 @@ pub struct Widget {
     // Welche davon in diesem Bild getroffen wurde (-1 = keine). Transient
     // wie `clicked`: ein Tastendruck ist ein Ereignis, kein Zustand.
     abk_treffer: i32,
+    // Der Tabulator gehoert ganz dem Aufrufer (GUI_TEXTAREA_SET "tab_meldet"):
+    // das Feld rueckt dann nicht ein und sieht auch nicht nach Abkuerzungen,
+    // es MELDET nur. Wer im selben Feld drei Bedeutungen fuer den Tabulator
+    // hat (Platzhalter, Schnipsel, Einruecken), kann sie sonst nicht der
+    // Reihe nach abfragen -- die Laufzeit entschiede die ersten zwei selbst.
+    tab_meldet: bool,
+    tab_treffer: bool,          // transient wie abk_treffer
     // Nur ColorPicker: Farbton (Grad), Saettigung, Hellwert.
     //
     // HSV und nicht RGB, weil der Farbton bei Schwarz und die Saettigung bei
@@ -2067,6 +2074,14 @@ impl Gui {
         Ok(self.ta_wdg(h, "GUI_TEXTAREA_ABBREV_HIT")?.abk_treffer as i64)
     }
 
+    /// Wurde der Tabulator in diesem Bild gedrueckt (GUI_TEXTAREA_TAB_HIT)?
+    ///
+    /// Nur mit `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)`; ohne den Schalter ist
+    /// es immer FALSE, und der Tabulator tut, was er vorher tat.
+    pub fn textarea_tab_hit(&self, h: i64) -> Result<bool, String> {
+        Ok(self.ta_wdg(h, "GUI_TEXTAREA_TAB_HIT")?.tab_treffer)
+    }
+
     /// Woerter, die die Einrueckung steuern (GUI_TEXTAREA_INDENT_WORDS).
     ///
     /// Drei Listen, alle ohne Ruecksicht auf Gross/Klein:
@@ -2180,10 +2195,15 @@ impl Gui {
             // an `tabbreite` -- die Laufzeit misst sie an Leerzeichen, statt
             // sie zu raten.
             "einzugslinien" | "indent_guides" => wd.einzugslinien = n != 0,
+            // Der Tabulator gehoert ganz dem Aufrufer: das Feld rueckt nicht
+            // ein, sieht nicht nach Abkuerzungen, sondern MELDET ihn nur
+            // (GUI_TEXTAREA_TAB_HIT). Fuer Felder, in denen der Tabulator
+            // mehrere Bedeutungen hat und der Aufrufer die Reihenfolge kennt.
+            "tab_meldet" | "tab_reports" => wd.tab_meldet = n != 0,
             other => return Err(format!(
                 "GUI_TEXTAREA_SET: '{}' unbekannt -- moeglich sind zeilennummern, \
                  aktive_zeile, tab_fuegt_ein, tabbreite, umbruch, auto_einzug, \
-                 einzugslinien", other)),
+                 einzugslinien, tab_meldet", other)),
         }
         Ok(())
     }
@@ -2306,6 +2326,7 @@ impl Gui {
             schluss_oeffner: Vec::new(), schluss_texte: Vec::new(),
             farbfelder: Vec::new(), farbfeld_klick: -1, farbfeld_zug: false,
             abkuerzungen: Vec::new(), abk_treffer: -1, einzugslinien: false,
+            tab_meldet: false, tab_treffer: false,
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
@@ -6043,7 +6064,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             win.answer = 0;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
-                wdg.farbfeld_klick = -1; wdg.abk_treffer = -1;
+                wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
                 if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
@@ -6397,10 +6418,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Knopf, Kaestchen und Klappliste waren ohne Maus nicht erreichbar.
         // Ein Code-Feld verlangt den Tabulator fuer sich (siehe
         // edit_textarea) -- dann darf er hier NICHT zusaetzlich den Fokus
-        // weiterschalten, sonst tut eine Taste zwei Dinge.
+        // weiterschalten, sonst tut eine Taste zwei Dinge. Das gilt auch,
+        // wenn es ihn nur MELDET (`tab_meldet`): gemeldet UND den Fokus
+        // weiter waere derselbe Fehler.
         let tab_belegt = self.focus_widget
             .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(|w| w.kind == Kind::TextArea && w.tab_fuegt_ein)
+            .map(|w| w.kind == Kind::TextArea && (w.tab_fuegt_ein || w.tab_meldet))
             .unwrap_or(false);
         if g.key_pressed(KEY_TAB) && !tab_belegt {
             if let Some(top) = self.focus_window {
@@ -7604,7 +7627,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // aber nur, wenn das Feld ausdruecklich danach verlangt hat
         // (GUI_TEXTAREA_SET "tab_fuegt_ein"). Sonst bliebe man in einem
         // Formular im Textfeld haengen und kaeme nicht mehr heraus.
-        let tab_ein = self.windows[wi].widgets[i].tab_fuegt_ein;
+        // Gehoert der Tabulator ganz dem Aufrufer, MELDET das Feld ihn nur.
+        // Dann faellt beides weg: das Nachsehen nach Abkuerzungen und das
+        // Einruecken -- der Aufrufer macht es selbst, in SEINER Reihenfolge.
+        let tab_ein = self.windows[wi].widgets[i].tab_fuegt_ein
+                      && !self.windows[wi].widgets[i].tab_meldet;
+        if self.windows[wi].widgets[i].tab_meldet && g.key_pressed(KEY_TAB) {
+            self.windows[wi].widgets[i].tab_treffer = true;
+        }
         // Steht links der fuehrenden Marke eine bekannte Abkuerzung, MELDET
         // das Feld sie und rueckt NICHT ein (GUI_TEXTAREA_ABBREV). Der
         // Aufrufer setzt dann sein Geruest an die Stelle.

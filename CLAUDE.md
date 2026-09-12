@@ -2873,6 +2873,39 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 14 (2026-09-12):** die drei Punkte nach Stand 13.
+**Der Baustein: `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` +
+`GUI_TEXTAREA_TAB_HIT(ta)`** -- der Tabulator gehoert damit ganz dem
+Aufrufer: das Feld rueckt nicht ein, sieht nicht nach Abkuerzungen, es
+MELDET nur (transient wie GUI_CLICKED). Der Grund ist die REIHENFOLGE: wer
+im selben Feld drei Bedeutungen hat (zum naechsten Platzhalter, Schnipsel
+aufklappen, sonst einruecken), kann sie nur selbst der Reihe nach abfragen
+-- die Laufzeit entschiede die ersten beiden vorher. Dann gehoert ihm aber
+auch das Einruecken (`GUI_TEXTAREA_CURSOR` sagt die Spalte). Ohne den
+Schalter bleibt alles wie zuvor. **Signatur-Platzhalter:** die
+Vervollstaendigung setzt aus `CIRC` ein `CIRCLE(x, y, r)` mit markiertem
+`x`; die Namen kommen aus `CODE_HOVER$` (Optionales ab `[` faellt weg,
+`*args` und `6..8 Argumente` geben keine). **Gemerkt wird dafuer NICHTS als
+ein Schalter** -- wo der naechste Platzhalter steht, rechnet der Sprung
+jedes Mal neu aus dem Text (`aufrufUmDieMarke` + `argsZerlegen`); eine
+Buchfuehrung ueber Stellen liefe beim ersten Tippen auseinander, und genau
+tippen will man ja. Nebenbei gerade gezogen: der Tabulator ERSETZTE eine
+Auswahl durch Leerzeichen, jetzt rueckt er einen markierten Block ein.
+**Parameter umsortieren geht durch das GANZE Projekt** -- die Vorschau aus
+Stand 13 konnte mehrere Dateien laengst, es wurde ihr nur keine gegeben;
+die Umstell-Logik liegt dafuer in `parameterInText$` (Text rein, Text
+raus). Ein anderer Reiter mit ungesicherten Aenderungen bricht ab (auf der
+Platte staende sonst ein anderer Text als im Editor).
+**"Wer ruft das auf?" (Umschalt+F12)** ist die Gegenrichtung zu F12: alle
+Aufrufstellen ueber alle Dateien des Projekts, in der Liste der
+Projektsuche; die Definition steht nicht dabei. Gesucht wird ZEILENweise,
+weil Kommentar und Zeichenkette in Drachenhauch an der Zeile enden -- damit
+ist eine Zeile fuer sich vollstaendig zu lesen und die Umrechnung
+Zeichenstelle -> Zeilennummer faellt weg. Tests
+`tests/pruef/gui_tab_meldet.dhtest` (4, mit Gegenprobe) und 5 neue in
+`tests/test_ide.py`. **docs/ide.md hat jetzt eine Uebersichtstabelle der
+Staende** -- welcher Stand was brachte, gefolgt von dem, was sie HEUTE kann.
+
 **Stufe 13 (2026-09-12):** die drei Punkte, die nach Stand 12 anstanden.
 **Der Baustein: `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)`** -- das
 Geruest, das beim Tippen mitwaechst: `IF x > 0 THEN` plus Enter setzt das
