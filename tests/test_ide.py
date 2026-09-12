@@ -252,6 +252,14 @@ def _maus(frame, x, y):
             (frame + 2, MAUS_RUNTER, 0), (frame + 4, MAUS_HOCH, 0)]
 
 
+def _aussen(tmp_path):
+    """Wo der Harnisch seine eigenen Dateien ablegt -- NEBEN dem
+    Projektordner, seit der Baum auch .json und .txt zeigt."""
+    d = tmp_path.parent / (tmp_path.name + "_idekopie")
+    d.mkdir(exist_ok=True)
+    return d
+
+
 def _datei(tmp_path, text, name="spiel.dh"):
     p = tmp_path / name
     p.write_text(text, encoding="utf-8")
@@ -338,7 +346,7 @@ def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
     import json
     quelle = _datei(tmp_path, "PRINT 1\n")
     _ide(tmp_path, quelle, frames=60)
-    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
     assert konfig["zuletzt"] and konfig["zuletzt"][0].endswith("spiel.dh"), konfig
     assert konfig["sitzung"] and konfig["sitzung"][0].endswith("spiel.dh"), konfig
     log = _ide(tmp_path, tmp_path / "gibt_es_nicht.dh", frames=60)
@@ -374,10 +382,10 @@ def test_zeilenumbruch_bleibt_gemerkt(tmp_path):
     import json
     quelle = _datei(tmp_path, "PRINT 1\n")
     _ide(tmp_path, quelle, frames=90, events=_taste(30, RL_Z, RL_LALT))
-    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
     assert konfig["umbruch"] is True, konfig
     _ide(tmp_path, quelle, frames=60)
-    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
     assert konfig["umbruch"] is True, konfig
 
 
@@ -389,7 +397,7 @@ def test_sitzung_haengt_am_projektordner(tmp_path):
     import json
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
-    kfg = tmp_path / "ide.json"
+    kfg = _aussen(tmp_path) / "ide.json"
     ea = _datei(tmp_path / "a", "PRINT 1\n", name="eins.dh")
     eb = _datei(tmp_path / "b", "PRINT 2\n", name="zwei.dh")
     _ide(tmp_path / "a", ea, frames=60, konfig=kfg)
@@ -495,7 +503,7 @@ def test_uebersichtskarte_bleibt_gemerkt(tmp_path):
     ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
     log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="Uebersichtskarte")
     assert "karte an" in log, log
-    konfig = json.loads((tmp_path / "ide.json").read_text(encoding="utf-8"))
+    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
     assert konfig["karte"] is True, konfig
 
 
@@ -674,7 +682,7 @@ def test_regulaerer_ausdruck_trifft_nur_den_zeilenanfang(tmp_path):
     import json
     _datei(tmp_path, "SUB eins()\nEND SUB\n", name="a.dh")
     quelle = _datei(tmp_path, "PRINT 1\n    SUB zwei()\n    END SUB\n")
-    (tmp_path / "ide.json").write_text(json.dumps({"regex": True}), encoding="utf-8")
+    (_aussen(tmp_path) / "ide.json").write_text(json.dumps({"regex": True}), encoding="utf-8")
     ev = _taste(40, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER)
     log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="^SUB")
     treffer = [z for z in log if z.startswith("suche ")]
@@ -765,7 +773,7 @@ def test_automatisch_sichern_nach_der_eingestellten_ruhe(tmp_path):
     selben Text: ohne die Einstellung bleibt sie, wie sie war."""
     import json
     quelle = _datei(tmp_path, "PRINT 1\n")
-    (tmp_path / "ide.json").write_text(json.dumps({"autosichern": 1}), encoding="utf-8")
+    (_aussen(tmp_path) / "ide.json").write_text(json.dumps({"autosichern": 1}), encoding="utf-8")
     log = _ide(tmp_path, quelle, frames=240, events=_taste(40, RL_V, RL_LCTRL),
                zwischenablage="X")
     assert "auto gesichert" in log, log
@@ -1146,7 +1154,8 @@ def test_kacheln_erzeugen_ihr_vorschaubild(tmp_path):
     log = _ide(tmp_path, "", frames=400, wurzel=wurzel)
     assert "vorschau 09_shapes.dh" in log, log
     assert "vorschau fertig 0" in log, log
-    bild = tmp_path / "vorschau" / "09_shapes.png"
+    # Die Bilder liegen neben der Sitzung, also beim Harnisch nebenan.
+    bild = _aussen(tmp_path) / "vorschau" / "09_shapes.png"
     assert bild.exists(), sorted(p.name for p in tmp_path.iterdir())
     im = Image.open(bild).convert("RGB")
     assert im.size == (200, 120)
