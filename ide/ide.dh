@@ -363,6 +363,7 @@ DIM miErweitern AS INTEGER : miErweitern = GUI_MENU_ITEM(mBearb, "Auswahl erweit
 DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl verkleinern", "Strg+Umschalt+Runter")
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
 DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umsortieren ...", "Strg+Umschalt+U")
+DIM miAufrufer AS INTEGER : miAufrufer = GUI_MENU_ITEM(mBearb, "Wer ruft das auf?", "Umschalt+F12")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
 DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, "Doppelte entfernen")
@@ -1111,7 +1112,11 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
     GUI_TEXTAREA_SET(ta, "auto_einzug", 1)
     ' Der Tabulator klappt einen Schnipsel auf, wenn sein Kuerzel links der
     ' Marke steht -- sonst rueckt er ein wie immer.
-    GUI_TEXTAREA_ABBREV(ta, schnipselAbk)
+    ' Der Tabulator gehoert seit Stand 14 der IDE: er hat drei Bedeutungen
+    ' (zum naechsten Platzhalter, Schnipsel aufklappen, einruecken), und nur
+    ' sie kennt die Reihenfolge. Darum `tab_meldet` statt GUI_TEXTAREA_ABBREV
+    ' -- das Feld entschiede sonst die ersten beiden selbst.
+    GUI_TEXTAREA_SET(ta, "tab_meldet", 1)
     GUI_TEXTAREA_INDENT_WORDS(ta, _
         ["SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", "FOR", _
          "WHILE", "REPEAT", "DO", "SELECT", "CASE", "TRY", "WITH", "ELSE", _
@@ -2807,6 +2812,148 @@ SUB vervollNachziehen()
     vervollstaendigen(FALSE)
 END SUB
 
+' --- Signatur-Platzhalter und der dreifache Tabulator ------------------
+' Wer `CIRCLE` vervollstaendigt, bekommt `CIRCLE(x, y, r)` mit `x`
+' markiert: tippen ersetzt es, Tabulator geht zum naechsten. Die Namen
+' stehen in der Signatur -- dieselbe, die die Statuszeile zeigt.
+'
+' Gemerkt wird dafuer NICHTS als ein Schalter. Wo der naechste Platzhalter
+' steht, rechnet der Sprung jedes Mal neu aus dem Text: eine Buchfuehrung
+' ueber Stellen liefe beim ersten Tippen auseinander, und genau tippen
+' will man ja.
+DIM platzhalterAn AS BOOLEAN : platzhalterAn = FALSE
+
+' Die Argumentnamen einer Signatur, oder ein leeres Feld.
+' Optionales (alles ab `[`) faellt weg -- ein Platzhalter, den man meist
+' wieder loescht, ist keiner.
+FUNCTION signaturArgs(quelle AS STRING, z AS INTEGER, s AS INTEGER) AS ARRAY OF STRING
+    DIM leer AS ARRAY OF STRING : leer = []
+    DIM md AS STRING : md = ""
+    TRY
+        md = CODE_HOVER$(quelle, z, s)
+    CATCH e
+        RETURN leer
+    END TRY
+    IF md = "" THEN RETURN leer
+    ' Die erste Zeile im Code-Block ist die Signatur.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(md, NL)
+    DIM sig AS STRING : sig = ""
+    DIM zl AS STRING
+    FOR EACH zl IN zeilen
+        IF LEFT$(zl, 3) = "```" OR TRIM$(zl) = "" THEN CONTINUE
+        sig = TRIM$(zl)
+        BREAK
+    NEXT
+    DIM auf AS INTEGER : auf = INSTR(sig, "(")
+    DIM zu AS INTEGER : zu = INSTR(sig, ")")
+    IF auf < 0 OR zu < auf THEN RETURN leer
+    DIM innen AS STRING : innen = MID$(sig, auf + 1, zu - auf - 1)
+    DIM opt AS INTEGER : opt = INSTR(innen, "[")
+    IF opt >= 0 THEN innen = LEFT$(innen, opt)
+    IF TRIM$(innen) = "" THEN RETURN leer
+    ' `NAME(*args)` und `NAME(6..8 Argumente)` sind keine Namen.
+    IF INSTR(innen, "*") >= 0 OR INSTR(innen, "Argumente") >= 0 THEN RETURN leer
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM stueck AS STRING
+    FOR EACH stueck IN SPLIT$(innen, ",")
+        DIM t AS STRING : t = TRIM$(stueck)
+        IF LEFT$(UPPER$(t), 6) = "BYREF " THEN t = TRIM$(MID$(t, 6))
+        DIM als AS INTEGER : als = INSTR(UPPER$(t), " AS ")
+        IF als >= 0 THEN t = TRIM$(LEFT$(t, als))
+        DIM gl AS INTEGER : gl = INSTR(t, "=")
+        IF gl >= 0 THEN t = TRIM$(LEFT$(t, gl))
+        IF t = "" THEN RETURN leer
+        ARRAY_PUSH(raus, t)
+    NEXT
+    RETURN raus
+END FUNCTION
+
+' Den naechsten Platzhalter des Aufrufs um die Marke markieren.
+' FALSE heisst: hier ist keiner mehr, der Tabulator soll etwas anderes tun.
+FUNCTION platzhalterSprung() AS BOOLEAN
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN FALSE
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+    IF z < 1 OR z > LEN(zeilen) THEN RETURN FALSE
+    DIM zeile AS STRING : zeile = zeilen[z - 1]
+    DIM name AS STRING
+    DIM sp AS INTEGER
+    DIM arg AS INTEGER
+    (name, sp, arg) = aufrufUmDieMarke(zeile, s)
+    IF name = "" THEN RETURN FALSE
+    ' `sp` ist die 1-basierte Spalte des Namens, `argsZerlegen` rechnet
+    ' 0-basiert -- die Klammer steht hinter dem Namen.
+    DIM auf AS INTEGER : auf = sp - 1 + LEN(name)
+    WHILE auf < LEN(zeile) AND MID$(zeile, auf, 1) = " "
+        auf = auf + 1
+    WEND
+    IF MID$(zeile, auf, 1) <> "(" THEN RETURN FALSE
+    DIM von AS ARRAY OF INTEGER : von = []
+    DIM bis AS ARRAY OF INTEGER : bis = []
+    DIM zu AS INTEGER : zu = argsZerlegen(zeile, auf, von, bis)
+    IF zu < 0 THEN RETURN FALSE
+    DIM k AS INTEGER : k = arg + 1
+    IF k >= LEN(von) THEN
+        ' Hinter dem letzten: die Marke hinter die Klammer, Schalter aus.
+        GUI_TEXTAREA_GOTO(ta, z, zu + 2)
+        RETURN FALSE
+    END IF
+    GUI_TEXTAREA_SELECT(ta, z, randLinks(zeile, von[k]) + 1, z, bis[k] + 1)
+    protokoll("platzhalter " + STR$(k + 1) + " von " + STR$(LEN(von)))
+    RETURN TRUE
+END FUNCTION
+
+' Der erste Nicht-Leerraum ab `p` (0-basiert) -- damit die Markierung nicht
+' das Leerzeichen hinter dem Komma mitnimmt.
+FUNCTION randLinks(zeile AS STRING, p AS INTEGER) AS INTEGER
+    DIM i AS INTEGER : i = p
+    WHILE i < LEN(zeile) AND (MID$(zeile, i, 1) = " " OR MID$(zeile, i, 1) = CHR$(9))
+        i = i + 1
+    WEND
+    RETURN i
+END FUNCTION
+
+' Der Tabulator, alle drei Bedeutungen in ihrer Reihenfolge.
+SUB tabulator()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    ' 1. Steht ein Platzhalter an, geht es zum naechsten.
+    IF platzhalterAn THEN
+        IF platzhalterSprung() THEN RETURN
+        platzhalterAn = FALSE
+    END IF
+    ' 2. Eine Abkuerzung links der Marke klappt ihren Schnipsel auf.
+    DIM wort AS STRING : wort = LOWER$(wortAnfang$())
+    IF wort <> "" THEN
+        DIM k AS INTEGER : k = ARRAY_INDEXOF(schnipselAbk, wort)
+        IF k >= 0 THEN
+            schnipselEinfuegen(k, LEN(schnipselAbk[k]))
+            RETURN
+        END IF
+    END IF
+    ' 3. Sonst einruecken. Mehrere Zeilen markiert: der ganze Block --
+    ' frueher ersetzte der Tabulator die Auswahl durch Leerzeichen.
+    DIM z1 AS INTEGER
+    DIM s1 AS INTEGER
+    DIM z2 AS INTEGER
+    DIM s2 AS INTEGER
+    (z1, s1, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta)
+    IF z2 > z1 THEN
+        einruecken(1)
+        RETURN
+    END IF
+    ' Bis zur naechsten Spalte, nicht stur vier Leerzeichen: sonst steht die
+    ' Einrueckung schief, sobald man mitten in der Zeile tabbt.
+    DIM z AS INTEGER
+    DIM s AS INTEGER
+    (z, s) = GUI_TEXTAREA_CURSOR(ta)
+    DIM n AS INTEGER : n = 4 - ((s - 1) MOD 4)
+    GUI_TEXTAREA_INSERT(ta, SPACE$(n))
+END SUB
+
 SUB vervollUebernehmen()
     DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstVervoll)
     vervollSchliessen()
@@ -2816,9 +2963,24 @@ SUB vervollUebernehmen()
         DIM z AS INTEGER
         DIM s AS INTEGER
         (z, s) = GUI_TEXTAREA_CURSOR(ta)
+        DIM name AS STRING : name = GUI_LISTBOX_ITEM(lstVervoll, sel)
         GUI_TEXTAREA_SELECT(ta, z, s - vervollPraefixLaenge, z, s)
-        GUI_TEXTAREA_INSERT(ta, GUI_LISTBOX_ITEM(lstVervoll, sel))
-        protokoll("vervollstaendigt " + GUI_LISTBOX_ITEM(lstVervoll, sel))
+        GUI_TEXTAREA_INSERT(ta, name)
+        protokoll("vervollstaendigt " + name)
+        ' Hat der Name eine Signatur mit Argumenten, kommt sie als Geruest
+        ' mit -- und der erste Platzhalter ist markiert.
+        DIM nz AS INTEGER
+        DIM ns AS INTEGER
+        (nz, ns) = GUI_TEXTAREA_CURSOR(ta)
+        DIM args AS ARRAY OF STRING : args = signaturArgs(GUI_TEXT(ta), nz, MAX(1, ns - 1))
+        IF LEN(args) > 0 THEN
+            GUI_TEXTAREA_INSERT(ta, "(" + JOIN$(args, ", ") + ")")
+            GUI_TEXTAREA_SELECT(ta, nz, ns + 1, nz, ns + 1 + LEN(args[0]))
+            platzhalterAn = TRUE
+            GUI_SET_TEXT(lblStatus, name + ": " + STR$(LEN(args)) + _
+                         " Argument(e) -- tippen ersetzt, Tabulator geht zum naechsten.")
+            protokoll("platzhalter 1 von " + STR$(LEN(args)))
+        END IF
     END IF
     GUI_FOCUS(ta)
 END SUB
@@ -3567,24 +3729,10 @@ SUB parameterSchieben(richtung AS INTEGER)
     GUI_LISTBOX_SET_SELECTED(lstParam, ziel)
 END SUB
 
-SUB parameterUebernehmen()
-    GUI_WINDOW_VISIBLE(winParam, FALSE)
-    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
-    IF ta < 0 OR paramName = "" THEN RETURN
-    DIM gleich AS BOOLEAN : gleich = TRUE
-    DIM k AS INTEGER
-    FOR k = 0 TO LEN(paramFolge) - 1
-        IF paramFolge[k] <> k THEN gleich = FALSE
-    NEXT
-    IF gleich THEN
-        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: nichts umgestellt.")
-        GUI_FOCUS(ta)
-        RETURN
-    END IF
-    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
-    DIM neu AS STRING : neu = quelle
-    ' Von HINTEN nach vorn ersetzen: dann bleiben die Stellen davor gueltig.
-    DIM stellen AS ARRAY OF INTEGER : stellen = []
+' Alle Stellen, an denen `name` als AUFRUF steht (Name, dann `(`) --
+' geliefert werden die 0-basierten Stellen der oeffnenden Klammer.
+' Zeichenketten und Kommentare bleiben aussen vor.
+SUB aufrufStellen(quelle AS STRING, name AS STRING, stellen AS ARRAY OF INTEGER)
     DIM i AS INTEGER : i = 0
     WHILE i < LEN(quelle)
         DIM c AS STRING : c = MID$(quelle, i, 1)
@@ -3597,8 +3745,8 @@ SUB parameterUebernehmen()
             WHILE i < LEN(quelle) AND MID$(quelle, i, 1) <> NL
                 i = i + 1
             WEND
-        ELSEIF wortAn(quelle, i, paramName) THEN
-            DIM j AS INTEGER : j = i + LEN(paramName)
+        ELSEIF wortAn(quelle, i, name) THEN
+            DIM j AS INTEGER : j = i + LEN(name)
             WHILE j < LEN(quelle) AND MID$(quelle, j, 1) = " "
                 j = j + 1
             WEND
@@ -3607,9 +3755,20 @@ SUB parameterUebernehmen()
         END IF
         i = i + 1
     WEND
+END SUB
+
+' Die Argumente aller Aufrufe von `name` in `quelle` umstellen.
+' `zaehler` kommt gefuellt zurueck: [0] geaenderte Stellen, [1] uebergangene.
+FUNCTION parameterInText$(quelle AS STRING, name AS STRING, folge AS ARRAY OF INTEGER, _
+                          zaehler AS ARRAY OF INTEGER) AS STRING
+    DIM neu AS STRING : neu = quelle
+    DIM stellen AS ARRAY OF INTEGER : stellen = []
+    aufrufStellen(quelle, name, stellen)
     DIM geaendert AS INTEGER : geaendert = 0
     DIM uebergangen AS INTEGER : uebergangen = 0
+    DIM k AS INTEGER
     DIM s AS INTEGER
+    ' Von HINTEN nach vorn ersetzen: dann bleiben die Stellen davor gueltig.
     FOR s = LEN(stellen) - 1 TO 0 STEP -1
         DIM avon AS ARRAY OF INTEGER : avon = []
         DIM abis AS ARRAY OF INTEGER : abis = []
@@ -3617,7 +3776,7 @@ SUB parameterUebernehmen()
         ' Nur Aufrufe mit genau so vielen Argumenten: wer einen Vorgabewert
         ' weglaesst oder mit Namen uebergibt (`x: 1`), meint eine andere
         ' Zuordnung -- die still umzustellen waere schlimmer als es zu lassen.
-        IF zu < 0 OR LEN(avon) <> LEN(paramFolge) THEN
+        IF zu < 0 OR LEN(avon) <> LEN(folge) THEN
             IF zu >= 0 AND LEN(avon) > 0 THEN uebergangen = uebergangen + 1
             CONTINUE
         END IF
@@ -3633,22 +3792,162 @@ SUB parameterUebernehmen()
             CONTINUE
         END IF
         DIM neuArgs AS ARRAY OF STRING : neuArgs = []
-        FOR k = 0 TO LEN(paramFolge) - 1
-            ARRAY_PUSH(neuArgs, randWeg$(stuecke[paramFolge[k]]))
+        FOR k = 0 TO LEN(folge) - 1
+            ARRAY_PUSH(neuArgs, randWeg$(stuecke[folge[k]]))
         NEXT
         neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
         geaendert = geaendert + 1
     NEXT
+    ARRAY_PUSH(zaehler, geaendert)
+    ARRAY_PUSH(zaehler, uebergangen)
+    RETURN neu
+END FUNCTION
+
+' Hat ein ANDERER Reiter als `ausser` ungesicherte Aenderungen?
+FUNCTION andererUngesichert(ausser AS INTEGER) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        IF i <> ausser AND tabPfade[i] <> "" AND GUI_TEXT(tabFelder[i]) <> tabGesichert[i] THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+SUB parameterUebernehmen()
+    GUI_WINDOW_VISIBLE(winParam, FALSE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR paramName = "" THEN RETURN
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(paramFolge) - 1
+        IF paramFolge[k] <> k THEN gleich = FALSE
+    NEXT
+    IF gleich THEN
+        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: nichts umgestellt.")
+        GUI_FOCUS(ta)
+        RETURN
+    END IF
+    ' Ein Unterprogramm wird selten nur in seiner eigenen Datei gerufen --
+    ' der Umbau geht darum durch ALLE .dh des Projektordners. Dort steht
+    ' aber nur, was gesichert ist.
+    IF andererUngesichert(aktiverTab) THEN
+        GUI_SET_TEXT(lblStatus, "Erst sichern: ein anderer Reiter hat ungesicherte Aenderungen.")
+        protokoll("parameter umgestellt -1 0")
+        GUI_FOCUS(ta)
+        RETURN
+    END IF
     umbauLeeren()
+    DIM zaehler AS ARRAY OF INTEGER : zaehler = []
+    DIM neu AS STRING : neu = parameterInText$(GUI_TEXT(ta), paramName, paramFolge, zaehler)
+    DIM geaendert AS INTEGER : geaendert = zaehler[0]
+    DIM uebergangen AS INTEGER : uebergangen = zaehler[1]
     umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
+        DIM alt AS STRING : alt = JOIN$(READLINES(pfad), NL)
+        IF INSTR(alt, paramName) < 0 THEN CONTINUE
+        DIM z2 AS ARRAY OF INTEGER : z2 = []
+        DIM frisch AS STRING : frisch = parameterInText$(alt, paramName, paramFolge, z2)
+        geaendert = geaendert + z2[0]
+        uebergangen = uebergangen + z2[1]
+        IF frisch <> alt THEN umbauVormerken(-1, pfad, frisch)
+    NEXT
     DIM sagen AS STRING
-    sagen = "Parameter von " + paramName + " umgestellt -- " + STR$(geaendert) + " Stelle(n)."
+    sagen = "Parameter von " + paramName + " umgestellt -- " + STR$(geaendert) + " Stelle(n) in " + _
+            STR$(LEN(umbauTexte)) + " Datei(en)."
     IF uebergangen > 0 THEN
         sagen = sagen + " " + STR$(uebergangen) + " Aufruf(e) uebergangen (andere Zahl von " + _
                 "Argumenten oder mit Namen uebergeben)."
     END IF
     umbauStarten("Parameter von " + paramName, sagen, _
                  "parameter umgestellt " + STR$(geaendert) + " " + STR$(uebergangen))
+END SUB
+
+' --- Wer ruft das auf? (Umschalt+F12) ---------------------------------
+' Die Gegenrichtung zu "Zur Definition": alle Stellen, an denen das
+' Unterprogramm unter der Marke GERUFEN wird, ueber alle Dateien des
+' Projekts. Die Definition selbst steht nicht dabei -- sie ist kein Aufruf,
+' und wer sie sucht, hat F12.
+'
+' Gesucht wird ZEILENweise: in Drachenhauch enden Kommentar und
+' Zeichenkette an der Zeile, also ist eine Zeile fuer sich vollstaendig zu
+' lesen. Das spart die Umrechnung von Zeichenstelle zu Zeilennummer.
+FUNCTION aufrufInZeile(zeile AS STRING, name AS STRING) AS BOOLEAN
+    DIM t AS STRING : t = UPPER$(TRIM$(zeile))
+    IF LEFT$(t, 4) = "SUB " OR LEFT$(t, 9) = "FUNCTION " THEN RETURN FALSE
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(zeile)
+        DIM c AS STRING : c = MID$(zeile, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(zeile) AND MID$(zeile, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            RETURN FALSE
+        ELSEIF wortAn(zeile, i, name) THEN
+            DIM j AS INTEGER : j = i + LEN(name)
+            WHILE j < LEN(zeile) AND MID$(zeile, j, 1) = " "
+                j = j + 1
+            WEND
+            IF MID$(zeile, j, 1) = "(" THEN RETURN TRUE
+            i = j - 1
+        END IF
+        i = i + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+SUB aufruferZeigen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM name AS STRING : name = wortUnterMarke$()
+    IF name = "" THEN
+        GUI_SET_TEXT(lblStatus, "Wer ruft das auf: unter der Marke steht kein Name.")
+        protokoll("aufrufer 0")
+        RETURN
+    END IF
+    GUI_LISTBOX_CLEAR(lstProbleme)
+    DIM sd AS ARRAY OF STRING : sd = []
+    DIM sz AS ARRAY OF INTEGER : sz = []
+    DIM treffer AS INTEGER : treffer = 0
+    DIM inDateien AS INTEGER : inDateien = 0
+    DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
+    DIM d AS STRING
+    FOR EACH d IN dateien
+        DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
+        ' Der offene Reiter zaehlt mit dem Stand IM Editor, nicht mit dem
+        ' auf der Platte -- sonst sucht man in etwas, das man gerade
+        ' umgeschrieben hat.
+        DIM t AS INTEGER : t = tabMitPfad(pfad)
+        DIM zeilen AS ARRAY OF STRING
+        IF t >= 0 THEN
+            zeilen = SPLIT$(GUI_TEXT(tabFelder[t]), NL)
+        ELSE
+            zeilen = READLINES(pfad)
+        END IF
+        DIM vorher AS INTEGER : vorher = treffer
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            IF treffer >= 500 THEN BREAK
+            IF aufrufInZeile(zeilen[i], name) THEN
+                ARRAY_PUSH(sd, d)
+                ARRAY_PUSH(sz, i + 1)
+                GUI_LISTBOX_ADD(lstProbleme, d + ":" + STR$(i + 1) + ": " + TRIM$(zeilen[i]))
+                treffer = treffer + 1
+            END IF
+        NEXT
+        IF treffer > vorher THEN inDateien = inDateien + 1
+    NEXT
+    sucheDateien = sd
+    sucheZeilen = sz
+    problemModus = 1
+    GUI_SET_TEXT(lblProbleme, "Wer ruft '" + name + "' auf: " + STR$(treffer) + " Stelle(n) in " + _
+                 STR$(inDateien) + " Datei(en) -- Umschalt+F7 zeigt wieder die Probleme")
+    GUI_SET_TEXT(lblStatus, STR$(treffer) + " Aufruf(e) von '" + name + "'.")
+    protokoll("aufrufer " + STR$(treffer))
 END SUB
 
 ' --- Zwei Reiter nebeneinander vergleichen ----------------------------
@@ -5188,6 +5487,7 @@ paletteEintrag("Auswahl erweitern", "erweitern", "Strg+Umschalt+Hoch")
 paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
 paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
+paletteEintrag("Wer ruft das auf?", "aufrufer", "Umschalt+F12")
 paletteEintrag("Geruest beim Tippen", "geruest", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
@@ -5438,6 +5738,7 @@ SUB befehl(k AS STRING)
                     "'" + umbenennWort + "' ueberall im Projektordner ersetzen durch:", umbenennWort)
             END IF
         CASE "parameter" : parameterFragen()
+        CASE "aufrufer" : aufruferZeigen()
         CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
@@ -5732,6 +6033,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miVerkleinern) THEN befehl("verkleinern")
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
     IF GUI_CLICKED(miParameter) THEN befehl("parameter")
+    IF GUI_CLICKED(miAufrufer) THEN befehl("aufrufer")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
     IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")
@@ -6048,11 +6350,8 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
         IF KEYHIT(KEY_ESCAPE) THEN vervollAus = wortAnfang$() : vervollSchliessen() : GUI_FOCUS(aktivesFeld())
     END IF
 
-    ' --- Der Tabulator hat eine Abkuerzung gemeldet: Schnipsel aufklappen ---
-    IF aktivesFeld() >= 0 THEN
-        DIM ak AS INTEGER : ak = GUI_TEXTAREA_ABBREV_HIT(aktivesFeld())
-        IF ak >= 0 AND ak < LEN(schnipselAbk) THEN schnipselEinfuegen(ak, LEN(schnipselAbk[ak]))
-    END IF
+    ' --- Der Tabulator: drei Bedeutungen, eine Reihenfolge ---
+    IF aktivesFeld() >= 0 AND GUI_TEXTAREA_TAB_HIT(aktivesFeld()) THEN tabulator()
 
     ' --- Baum, Probleme, Eingabe ---
     baumAbfragen()
