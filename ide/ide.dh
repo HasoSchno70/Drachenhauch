@@ -1,5 +1,5 @@
 ' ============================================================
-'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 18)
+'  DRACHENHAUCH -- die IDE in Drachenhauch (Weg C, Stand 19)
 ' ============================================================
 '  Eine Entwicklungsumgebung, geschrieben in der Sprache, die sie
 '  bedient. Sie soll die Qt-IDE abloesen; bis sie gleichzieht, bleibt
@@ -81,6 +81,9 @@
 '  Flaechen aus), das Verschobene nimmt mit was es selbst braucht, der
 '  Umbau laesst sich mehrfach zuruecknehmen, und die Aufrufer-Liste kennt
 '  auch die Weitergabe als FUNCREF.
+'  Stand 19 dazu: in der Vorschau einzelne Dateien abwaehlen, ein Einwand
+'  wenn der Name im Ziel schon steht, und auch CONST-/DIM-Zeilen lassen
+'  sich verschieben.
 '
 '  Ordner: docs/ und examples/ liegen neben ide/ (Repo wie Installation);
 '  DH_IDE_WURZEL uebersteuert das (Tests, verschobene Kopien).
@@ -759,9 +762,14 @@ DIM winUmbau AS GUI_WINDOW : winUmbau = GUI_WINDOW("Vorschau", 240, 90, 900, 620
 GUI_WINDOW_VISIBLE(winUmbau, FALSE)
 GUI_WINDOW_RESIZABLE(winUmbau, TRUE)
 DIM lblUmbau AS GUI_WIDGET : lblUmbau = GUI_LABEL(winUmbau, "", 8, 8)
-DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 8, 30, 884, 508)
+' Links die betroffenen Dateien mit Kaestchen: was man abwaehlt, bleibt
+' stehen. Ein Umbau ueber zwoelf Dateien ist selten in allen zwoelf
+' gemeint, und "alles oder nichts" heisst dann: von Hand nacharbeiten.
+DIM lstUmbau AS GUI_WIDGET : lstUmbau = GUI_LISTBOX(winUmbau, 8, 30, 220, 508, [])
+DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 236, 30, 656, 508)
 DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Uebernehmen", 8, 546, 140, 30)
 DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
+GUI_LISTBOX_SET(lstUmbau, "kaestchen", 1)
 GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
 GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
 ' Der anstehende Umbau: je Eintrag ein Reiter ODER eine Datei auf der Platte.
@@ -4147,6 +4155,51 @@ FUNCTION benutztWort(zeile AS STRING, name AS STRING) AS BOOLEAN
     RETURN FALSE
 END FUNCTION
 
+' Der Name, den eine CONST- oder DIM-Zeile auf oberster Ebene anlegt --
+' "" wenn die Zeile keine ist. Eine Zeile in einem Unterprogramm zaehlt
+' nicht: die ist dort lokal und woanders sinnlos.
+FUNCTION einzelzeileName$(quelle AS STRING, zeile AS INTEGER) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    IF zeile < 1 OR zeile > LEN(zeilen) THEN RETURN ""
+    DIM t AS STRING : t = TRIM$(zeilen[zeile - 1])
+    DIM gross AS STRING : gross = UPPER$(t)
+    DIM ab AS INTEGER : ab = -1
+    IF LEFT$(gross, 6) = "CONST " THEN ab = 6
+    IF LEFT$(gross, 4) = "DIM " THEN ab = 4
+    IF ab < 0 THEN RETURN ""
+    DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+    ' Der Name endet am ersten Zeichen, das keines mehr ist.
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(rest) AND istWortzeichen(MID$(rest, i, 1))
+        i = i + 1
+    WEND
+    RETURN LEFT$(rest, i)
+END FUNCTION
+
+' Hat `quelle` ein Symbol namens `name`? Geliefert wird "SUB gruessen"
+' oder "", damit die Meldung sagen kann, WAS dort steht.
+FUNCTION symbolInDatei$(quelle AS STRING, name AS STRING) AS STRING
+    IF quelle = "" OR name = "" THEN RETURN ""
+    DIM klein AS STRING : klein = LOWER$(name)
+    DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(quelle))
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(j, "") - 1
+        DIM p AS STRING : p = STR$(i)
+        IF LOWER$(JSON_GET_STRING(j, p + ".name")) = klein THEN
+            RETURN JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name")
+        END IF
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
+            DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
+            IF LOWER$(JSON_GET_STRING(j, pk + ".name")) = klein THEN
+                RETURN JSON_GET_STRING(j, pk + ".name") + " (in " + _
+                       JSON_GET_STRING(j, p + ".name") + ")"
+            END IF
+        NEXT
+    NEXT
+    RETURN ""
+END FUNCTION
+
 SUB verschiebenFragen()
     DIM ta AS GUI_WIDGET : ta = aktivesFeld()
     IF ta < 0 OR tabPfade[aktiverTab] = "" THEN
@@ -4164,6 +4217,7 @@ SUB verschiebenFragen()
     DIM kVon AS INTEGER
     DIM kBis AS INTEGER
     (kName, kVon, kBis) = klasseUm(quelle, z)
+    verschName = ""
     DIM uv AS INTEGER
     DIM ub AS INTEGER
     IF kName <> "" THEN
@@ -4179,18 +4233,30 @@ SUB verschiebenFragen()
                 (uv, ub) = umgebendesUnterprogramm(quelle, bis)
             END IF
         END IF
+        ' Auch eine CONST- oder DIM-Zeile ganz oben laesst sich verschieben:
+        ' die Einheit ist dann DIE ZEILE. Sie gehoert oft zu dem, was man
+        ' gerade woanders hinlegt, und von Hand kopiert man sie nach.
         IF uv < 1 THEN
-            GUI_SET_TEXT(lblStatus, "Verschieben: erst in ein SUB, eine FUNCTION oder eine CLASS stellen.")
+            DIM eName AS STRING : eName = einzelzeileName$(quelle, z)
+            IF eName <> "" THEN
+                verschName = eName : verschVon = z : verschBis = z
+            END IF
+        END IF
+        IF uv < 1 AND verschName = "" THEN
+            GUI_SET_TEXT(lblStatus, "Verschieben: erst in ein SUB, eine FUNCTION, eine CLASS " + _
+                         "oder auf eine CONST-/DIM-Zeile stellen.")
             protokoll("verschieben 0")
             RETURN
         END IF
-        verschName = unterprogrammName$(quelle, uv)
-        verschVon = uv
-        verschBis = ub
-        IF verschName = "" THEN
-            GUI_SET_TEXT(lblStatus, "Verschieben: hier steht kein Unterprogramm mit Namen.")
-            protokoll("verschieben 0")
-            RETURN
+        IF uv >= 1 THEN
+            verschName = unterprogrammName$(quelle, uv)
+            verschVon = uv
+            verschBis = ub
+            IF verschName = "" THEN
+                GUI_SET_TEXT(lblStatus, "Verschieben: hier steht kein Unterprogramm mit Namen.")
+                protokoll("verschieben 0")
+                RETURN
+            END IF
         END IF
     END IF
     ' Die Zieldatei waehlen -- alle .dh des Projekts ausser dieser, und
@@ -4296,6 +4362,14 @@ SUB verschiebenNach(ziel AS STRING)
         umbauVormerken(tabMitPfad(pfad), pfad, mitImport$(andere, zielName))
         ohneImport = ohneImport + 1
     NEXT
+    ' Gibt es den Namen im ZIEL schon? Dann verdeckt einer den anderen --
+    ' und zwar ohne Uebersetzungsfehler, der zweite gewinnt einfach. Das
+    ' merkt man erst, wenn das Falsche laeuft.
+    DIM dort AS STRING : dort = symbolInDatei$(zielText, verschName)
+    IF dort <> "" THEN
+        umbauWarnung = "Achtung: " + zielName + " hat schon " + dort + _
+                       " -- danach stehen zwei gleichen Namens in einer Datei."
+    END IF
     ' Die Probe wie beim Herausloesen: wird es dadurch schlimmer, soll das
     ' dastehen, bevor jemand es beim naechsten Starten sucht.
     DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
@@ -4915,6 +4989,14 @@ SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
     NEXT
     DIM kopf AS STRING : kopf = ""
     IF umbauWarnung <> "" THEN kopf = "@@ " + umbauWarnung + NL + NL
+    GUI_LISTBOX_CLEAR(lstUmbau)
+    DIM ln AS INTEGER
+    FOR ln = 0 TO LEN(umbauTexte) - 1
+        DIM lname AS STRING : lname = umbauPfade[ln]
+        IF lname = "" AND umbauTabs[ln] >= 0 THEN lname = tabTitel[umbauTabs[ln]]
+        GUI_LISTBOX_ADD(lstUmbau, BASENAME(lname))
+        GUI_LISTBOX_SET_CHECKED(lstUmbau, ln, TRUE)
+    NEXT
     GUI_SET_TEXT(taUmbau, kopf + JOIN$(stuecke, NL + NL))
     diffFaerben(taUmbau)
     GUI_WINDOW_TITLE(winUmbau, "Vorschau: " + titel)
@@ -4992,7 +5074,27 @@ SUB umbauVerwerfen()
 END SUB
 
 SUB umbauSchreiben()
+    ' ZUERST das Abgewaehlte heraus -- vor dem Ausblenden des Fensters (die
+    ' Kaestchen sitzen darin) und vor dem Vorrat zum Zuruecknehmen, sonst
+    ' schriebe ein Strg+Umschalt+Z eine Datei zurueck, die gar nicht
+    ' geaendert wurde.
+    IF GUI_WINDOW_SHOWN(winUmbau) THEN
+        DIM ab AS INTEGER
+        FOR ab = LEN(umbauTexte) - 1 TO 0 STEP -1
+            IF NOT GUI_LISTBOX_CHECKED(lstUmbau, ab) THEN
+                ARRAY_REMOVE_AT(umbauTabs, ab) : ARRAY_REMOVE_AT(umbauPfade, ab)
+                ARRAY_REMOVE_AT(umbauTexte, ab)
+            END IF
+        NEXT
+    END IF
     GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    IF LEN(umbauTexte) = 0 THEN
+        GUI_SET_TEXT(lblStatus, "Alles abgewaehlt -- nichts geaendert.")
+        protokoll("umbau abgewaehlt alles")
+        umbauLeeren()
+        IF aktivesFeld() >= 0 THEN GUI_FOCUS(aktivesFeld())
+        RETURN
+    END IF
     ' Den Stand VOR dem Umbau aufheben, bevor er ueberschrieben wird.
     DIM v AS INTEGER
     FOR v = 0 TO LEN(umbauTexte) - 1
@@ -6947,6 +7049,14 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnFarbeWeg) THEN GUI_WINDOW_VISIBLE(winFarbe, FALSE) : farbStart = -1 : GUI_FOCUS(aktivesFeld())
     IF GUI_CLICKED(btnUmbauOk) THEN umbauSchreiben()
     IF GUI_CLICKED(btnUmbauWeg) THEN umbauVerwerfen()
+    ' Enter und ESC gelten auch, wenn die Marke in der Dateiliste steht --
+    ' eine Liste nimmt die Taste sonst fuer sich, und der Standard-Knopf
+    ' kommt nicht mehr dran. Wer gerade etwas abgewaehlt hat, steht aber
+    ' genau dort.
+    IF GUI_WINDOW_SHOWN(winUmbau) AND GUI_FOCUSED() = lstUmbau THEN
+        IF KEYHIT(KEY_RETURN) THEN umbauSchreiben()
+        IF KEYHIT(KEY_ESCAPE) THEN umbauVerwerfen()
+    END IF
     IF GUI_CLICKED(btnParamHoch) THEN parameterSchieben(-1)
     IF GUI_CLICKED(btnParamRunter) THEN parameterSchieben(1)
     IF GUI_CLICKED(btnParamPlus) THEN dlgParamNeu = GUI_PROMPT("Neuer Parameter", _

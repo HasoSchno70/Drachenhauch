@@ -1965,3 +1965,66 @@ def test_die_aufrufer_liste_findet_auch_eine_funcref(tmp_path):
     ev += _taste(90, RL_F12, RL_LSHIFT)
     log = _ide(tmp_path, quelle, frames=200, events=ev)
     assert "aufrufer 1" in log, log
+
+
+# --------------------------------------------------------------- Stufe 19
+
+# Das Vorschau-Fenster steht fest bei (240, 90); die Titelleiste des
+# Glas-Themas ist 30 hoch, die Liste beginnt bei (8, 30) im Inhalt.
+VS_X, VS_Y = 240, 120
+
+
+def test_in_der_vorschau_laesst_sich_eine_datei_abwaehlen(tmp_path):
+    """Ein Umbau über zwölf Dateien ist selten in allen zwölf gemeint --
+    was man abwählt, bleibt stehen."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n", "a_spiel.dh")
+    zweite = _datei(tmp_path, "zeichne(7, 8)\n", "b_mehr.dh")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _klick_mit(150, VS_X + 18, VS_Y + 62)  # Kaestchen der zweiten Datei
+    ev += _taste(190, RL_ENTER)                  # uebernehmen
+    ev += _taste(230, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=320, events=ev)
+    assert "SUB zeichne(y AS INTEGER, x AS INTEGER)" in quelle.read_text(encoding="utf-8")
+    # Die abgewaehlte Datei blieb, wie sie war.
+    assert zweite.read_text(encoding="utf-8").startswith("zeichne(7, 8)"), zweite.read_text()
+
+
+def test_verschieben_warnt_wenn_der_name_im_ziel_schon_steht(tmp_path):
+    """Zwei gleichen Namens in einer Datei sind kein Übersetzungsfehler --
+    der zweite gewinnt einfach. Das merkt man erst, wenn das Falsche läuft."""
+    quelle = _datei(tmp_path,
+                    "SUB gruessen()\n"
+                    "    PRINT 1\n"
+                    "END SUB\n", "a_spiel.dh")
+    _datei(tmp_path, "SUB gruessen()\n    PRINT 2\nEND SUB\n", "b_helfer.dh")
+    ev = _taste(30, RL_DOWN)
+    ev += _taste(60, RL_V, RL_LCTRL, RL_LSHIFT)
+    ev += _taste(100, RL_DOWN) + _taste(120, RL_ENTER)
+    log = _ide(tmp_path, quelle, frames=230, events=ev)
+    assert "umbau einwand" in log, log
+    assert "SUB gruessen()" in quelle.read_text(encoding="utf-8")
+
+
+def test_eine_konstante_laesst_sich_verschieben(tmp_path):
+    """Die Einheit ist dann DIE ZEILE -- von Hand kopiert man sie sonst
+    hinterher."""
+    quelle = _datei(tmp_path,
+                    "CONST MAXHP = 100\n"
+                    "PRINT MAXHP\n", "a_spiel.dh")
+    ziel = _datei(tmp_path, "' Werte\n", "b_werte.dh")
+    ev = _taste(60, RL_V, RL_LCTRL, RL_LSHIFT)   # Marke steht in Zeile 1
+    ev += _taste(100, RL_DOWN) + _taste(120, RL_ENTER)
+    ev += _taste(170, RL_ENTER)
+    ev += _taste(220, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=310, events=ev)
+    assert any(z.startswith("verschieben MAXHP ") for z in log), log
+    q = quelle.read_text(encoding="utf-8")
+    assert "CONST MAXHP" not in q, q
+    assert 'IMPORT "b_werte.dh"' in q, q
+    assert "CONST MAXHP = 100" in ziel.read_text(encoding="utf-8")
