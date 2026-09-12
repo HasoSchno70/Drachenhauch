@@ -173,6 +173,12 @@ DIM zuGemacht AS ARRAY OF STRING : zuGemacht = []
 DIM vorschlagAn AS BOOLEAN : vorschlagAn = TRUE
 ' Einrueckungslinien im Code-Feld (ein Strich je Stufe).
 DIM linienAn AS BOOLEAN : linienAn = TRUE
+' Das Geruest, das beim Tippen mitwaechst: `IF ... THEN` und Enter setzen
+' das `END IF` gleich mit (GUI_TEXTAREA_CLOSE_WORDS).
+DIM geruestAn AS BOOLEAN : geruestAn = TRUE
+' Vorschau vor dem Umbau: Umbenennen, Herausloesen und Parameter-Umsortieren
+' zeigen erst den Unterschied und fragen, statt gleich zu schreiben.
+DIM vorschauAn AS BOOLEAN : vorschauAn = TRUE
 ' Werkzeugleiste mit Sinnbildern unter der Menueleiste.
 DIM leisteAn AS BOOLEAN : leisteAn = TRUE
 ' Automatisch sichern: Sekunden ohne Anschlag, 0 = aus.
@@ -264,6 +270,8 @@ IF JSON_HAS(konfig, "git_rand") THEN gitRandAn = JSON_GET_BOOL(konfig, "git_rand
 IF JSON_HAS(konfig, "regex") THEN regexAn = JSON_GET_BOOL(konfig, "regex")
 IF JSON_HAS(konfig, "vorschlag") THEN vorschlagAn = JSON_GET_BOOL(konfig, "vorschlag")
 IF JSON_HAS(konfig, "linien") THEN linienAn = JSON_GET_BOOL(konfig, "linien")
+IF JSON_HAS(konfig, "geruest") THEN geruestAn = JSON_GET_BOOL(konfig, "geruest")
+IF JSON_HAS(konfig, "umbau_vorschau") THEN vorschauAn = JSON_GET_BOOL(konfig, "umbau_vorschau")
 IF JSON_HAS(konfig, "leiste") THEN leisteAn = JSON_GET_BOOL(konfig, "leiste")
 IF JSON_HAS(konfig, "autosichern") THEN autoSichern = MAX(0, MIN(120, JSON_GET_INT(konfig, "autosichern")))
 IF hell THEN GUI_THEME_PRESET("glas_hell")
@@ -350,6 +358,7 @@ DIM miHerausloesen AS INTEGER : miHerausloesen = GUI_MENU_ITEM(mBearb, "Auswahl 
 DIM miErweitern AS INTEGER : miErweitern = GUI_MENU_ITEM(mBearb, "Auswahl erweitern", "Strg+Umschalt+Hoch")
 DIM miVerkleinern AS INTEGER : miVerkleinern = GUI_MENU_ITEM(mBearb, "Auswahl verkleinern", "Strg+Umschalt+Runter")
 DIM miUmbProjekt AS INTEGER : miUmbProjekt = GUI_MENU_ITEM(mBearb, "Im ganzen Projekt umbenennen ...", "Strg+Umschalt+F6")
+DIM miParameter AS INTEGER : miParameter = GUI_MENU_ITEM(mBearb, "Parameter umsortieren ...", "Strg+Umschalt+U")
 DIM mZeilenWz AS INTEGER : mZeilenWz = GUI_SUBMENU(mBearb, "Zeilen")
 DIM miZlSort AS INTEGER : miZlSort = GUI_MENU_ITEM(mZeilenWz, "Sortieren")
 DIM miZlDoppelt AS INTEGER : miZlDoppelt = GUI_MENU_ITEM(mZeilenWz, "Doppelte entfernen")
@@ -603,7 +612,7 @@ GUI_WINDOW_CLOSABLE(winProfil, TRUE)
 ' Alle Schalter an EINER Stelle. Sie stehen weiter auch im Menue -- wer
 ' den Umbruch sucht, sucht ihn unter Ansicht; wer alles auf einmal sehen
 ' will, oeffnet dies hier.
-DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 420, 400)
+DIM winEinst AS GUI_WINDOW : winEinst = GUI_WINDOW("Einstellungen", 400, 150, 420, 460)
 GUI_WINDOW_VISIBLE(winEinst, FALSE)
 DIM cbHell AS GUI_WIDGET : cbHell = GUI_CHECKBOX(winEinst, "Helles Thema", 16, 14, FALSE)
 DIM cbUmbruch AS GUI_WIDGET : cbUmbruch = GUI_CHECKBOX(winEinst, "Zeilenumbruch", 16, 44, FALSE)
@@ -612,11 +621,13 @@ DIM cbGit AS GUI_WIDGET : cbGit = GUI_CHECKBOX(winEinst, "Geaenderte Zeilen am R
 DIM cbRegex AS GUI_WIDGET : cbRegex = GUI_CHECKBOX(winEinst, "Suche mit regulaerem Ausdruck", 16, 134, FALSE)
 DIM cbVorschlag AS GUI_WIDGET : cbVorschlag = GUI_CHECKBOX(winEinst, "Vorschlagsliste beim Tippen", 16, 164, TRUE)
 DIM cbLinien AS GUI_WIDGET : cbLinien = GUI_CHECKBOX(winEinst, "Einrueckungslinien", 16, 194, TRUE)
-DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgroesse", 16, 230)
-DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 226, 90, 10, 32, 16)
-DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ruhe (0 = nie)", 16, 266)
-DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 262, 90, 0, 120, 0)
-DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schliessen", 16, 320, 120, 30)
+DIM cbGeruest AS GUI_WIDGET : cbGeruest = GUI_CHECKBOX(winEinst, "Geruest beim Tippen (END IF, NEXT ...)", 16, 224, TRUE)
+DIM cbVorschau AS GUI_WIDGET : cbVorschau = GUI_CHECKBOX(winEinst, "Vorschau vor dem Umbau", 16, 254, TRUE)
+DIM lblSchrift AS GUI_WIDGET : lblSchrift = GUI_LABEL(winEinst, "Schriftgroesse", 16, 290)
+DIM spSchrift AS GUI_WIDGET : spSchrift = GUI_SPINNER(winEinst, 200, 286, 90, 10, 32, 16)
+DIM lblAuto AS GUI_WIDGET : lblAuto = GUI_LABEL(winEinst, "Sichern nach ... s Ruhe (0 = nie)", 16, 326)
+DIM spAuto AS GUI_WIDGET : spAuto = GUI_SPINNER(winEinst, 260, 322, 90, 0, 120, 0)
+DIM btnEinstZu AS GUI_WIDGET : btnEinstZu = GUI_BUTTON(winEinst, "Schliessen", 16, 380, 120, 30)
 DIM einstOffen AS BOOLEAN : einstOffen = FALSE
 
 ' --- Eingebaute Befehle nachschlagen ----------------------------------
@@ -664,6 +675,43 @@ GUI_WINDOW_VISIBLE(winGit, FALSE)
 GUI_WINDOW_RESIZABLE(winGit, TRUE)
 DIM lblGit AS GUI_WIDGET : lblGit = GUI_LABEL(winGit, "", 8, 8)
 DIM taGit AS GUI_WIDGET : taGit = GUI_TEXTAREA(winGit, 8, 30, 884, 552)
+
+' --- Parameter umsortieren --------------------------------------------
+DIM winParam AS GUI_WINDOW : winParam = GUI_WINDOW("Parameter", 420, 200, 460, 320)
+GUI_WINDOW_VISIBLE(winParam, FALSE)
+DIM lblParam AS GUI_WIDGET : lblParam = GUI_LABEL(winParam, "", 12, 10)
+DIM lstParam AS GUI_WIDGET : lstParam = GUI_LISTBOX(winParam, 12, 36, 300, 200, [])
+DIM btnParamHoch AS GUI_WIDGET : btnParamHoch = GUI_BUTTON(winParam, "Nach oben", 322, 36, 120, 30)
+DIM btnParamRunter AS GUI_WIDGET : btnParamRunter = GUI_BUTTON(winParam, "Nach unten", 322, 72, 120, 30)
+DIM btnParamOk AS GUI_WIDGET : btnParamOk = GUI_BUTTON(winParam, "Uebernehmen", 12, 248, 140, 30)
+DIM btnParamWeg AS GUI_WIDGET : btnParamWeg = GUI_BUTTON(winParam, "Abbrechen", 162, 248, 120, 30)
+GUI_WINDOW_CANCEL(winParam, btnParamWeg)
+
+' --- Vorschau vor dem Umbau ------------------------------------------
+' Ein Umbau schreibt in Dateien, die man nicht alle offen hat. Bis Stand 12
+' zeigte die IDE hinterher, wie viele Fehler dazugekommen sind -- das ist
+' die Antwort auf die falsche Frage: gefragt ist, was sich AENDERT, und
+' zwar bevor es geschrieben ist.
+DIM winUmbau AS GUI_WINDOW : winUmbau = GUI_WINDOW("Vorschau", 240, 90, 900, 620)
+GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+GUI_WINDOW_RESIZABLE(winUmbau, TRUE)
+DIM lblUmbau AS GUI_WIDGET : lblUmbau = GUI_LABEL(winUmbau, "", 8, 8)
+DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 8, 30, 884, 508)
+DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Uebernehmen", 8, 546, 140, 30)
+DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
+GUI_WINDOW_DEFAULT(winUmbau, btnUmbauOk)
+GUI_WINDOW_CANCEL(winUmbau, btnUmbauWeg)
+' Der anstehende Umbau: je Eintrag ein Reiter ODER eine Datei auf der Platte.
+' Reiter werden ueber Auswahl+INSERT geschrieben (EIN Undo-Schritt), Dateien
+' geschrieben und der offene Reiter nachgezogen -- genau die zwei Wege, die
+' es vorher schon gab.
+DIM umbauTabs AS ARRAY OF INTEGER : umbauTabs = []
+DIM umbauPfade AS ARRAY OF STRING : umbauPfade = []
+DIM umbauTexte AS ARRAY OF STRING : umbauTexte = []
+DIM umbauMeldung AS STRING : umbauMeldung = ""
+DIM umbauProt AS STRING : umbauProt = ""
+DIM umbauZeile AS INTEGER : umbauZeile = 0
+DIM umbauSpalte AS INTEGER : umbauSpalte = 1
 
 ' --- Befehlspalette / Datei-Waehler
 ' auch der Waehler fuer "Datei im Projekt oeffnen" (paletteArt = "datei").
@@ -802,6 +850,8 @@ SUB konfigSichern()
     JSON_SET_BOOL(konfig, "regex", regexAn)
     JSON_SET_BOOL(konfig, "vorschlag", vorschlagAn)
     JSON_SET_BOOL(konfig, "linien", linienAn)
+    JSON_SET_BOOL(konfig, "geruest", geruestAn)
+    JSON_SET_BOOL(konfig, "umbau_vorschau", vorschauAn)
     JSON_SET_BOOL(konfig, "leiste", leisteAn)
     JSON_SET_INT(konfig, "autosichern", autoSichern)
     JSON_SET_JSON(konfig, "zuletzt", JSON_PARSE("[]"))
@@ -1065,6 +1115,39 @@ SUB feldEinrichten(ta AS GUI_WIDGET)
         ["THEN"], _
         ["END", "NEXT", "WEND", "UNTIL", "LOOP", "ELSE", "ELSEIF", "ELIF", _
          "CATCH", "FINALLY", "CASE"])
+    geruestSetzenAn(ta)
+END SUB
+
+' Das Geruest, das mitwaechst: wer `IF x > 0 THEN` schreibt und Enter
+' drueckt, bekommt das `END IF` gleich mit und steht dazwischen.
+'
+' Die Paare stehen HIER und nicht in der Laufzeit -- sie kennt keine
+' Sprache. `CASE`, `ELSE` und `ELSEIF` fehlen mit Absicht: sie ruecken zwar
+' ein, schliessen aber nichts, ihr `END` gehoert dem `SELECT` bzw. `IF`
+' darueber. `REPEAT` bekommt `UNTIL TRUE`, weil ein nacktes `UNTIL` nicht
+' uebersetzt -- ein Geruest, das den Fehlerstrich anwirft, ist keins.
+SUB geruestSetzenAn(ta AS GUI_WIDGET)
+    IF NOT geruestAn THEN
+        GUI_TEXTAREA_CLOSE_WORDS(ta, [], [])
+        RETURN
+    END IF
+    GUI_TEXTAREA_CLOSE_WORDS(ta, _
+        ["IF", "SUB", "FUNCTION", "CLASS", "STRUCT", "PROPERTY", "OPERATOR", _
+         "FOR", "WHILE", "REPEAT", "DO", "SELECT", "TRY", "WITH", "ENUM"], _
+        ["END IF", "END SUB", "END FUNCTION", "END CLASS", "END STRUCT", _
+         "END PROPERTY", "END OPERATOR", "NEXT", "WEND", "UNTIL TRUE", "LOOP", _
+         "END SELECT", "END TRY", "END WITH", "END ENUM"])
+END SUB
+
+SUB geruestSetzen(an AS BOOLEAN)
+    geruestAn = an
+    DIM i AS INTEGER
+    FOR i = 0 TO tabAnzahl - 1
+        geruestSetzenAn(tabFelder[i])
+    NEXT
+    konfigSichern()
+    GUI_SET_TEXT(lblStatus, IIF(an, "Geruest beim Tippen an.", "Geruest beim Tippen aus."))
+    protokoll("geruest " + IIF(an, "an", "aus"))
 END SUB
 
 ' Einrueckungslinien: ein Strich je Stufe, unter dem Text. Wie der Umbruch
@@ -1113,9 +1196,11 @@ SUB einstellungenZeigen()
     GUI_SET_CHECKED(cbRegex, regexAn)
     GUI_SET_CHECKED(cbVorschlag, vorschlagAn)
     GUI_SET_CHECKED(cbLinien, linienAn)
+    GUI_SET_CHECKED(cbGeruest, geruestAn)
+    GUI_SET_CHECKED(cbVorschau, vorschauAn)
     GUI_SET_VALUE(spSchrift, codeGroesse)
     GUI_SET_VALUE(spAuto, autoSichern)
-    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 400)
+    GUI_WINDOW_SET_BOUNDS(winEinst, (SCREENWIDTH() - 420) \ 2, 150, 420, 460)
     GUI_WINDOW_VISIBLE(winEinst, TRUE)
     einstOffen = TRUE
     GUI_FOCUS(cbHell)
@@ -1137,6 +1222,12 @@ SUB einstellungenNachziehen()
         konfigSichern()
     END IF
     IF GUI_CHECKED(cbLinien) <> linienAn THEN linienSetzen(GUI_CHECKED(cbLinien))
+    IF GUI_CHECKED(cbGeruest) <> geruestAn THEN geruestSetzen(GUI_CHECKED(cbGeruest))
+    IF GUI_CHECKED(cbVorschau) <> vorschauAn THEN
+        vorschauAn = GUI_CHECKED(cbVorschau)
+        konfigSichern()
+        protokoll("umbau vorschau " + IIF(vorschauAn, "an", "aus"))
+    END IF
     IF INT(GUI_VALUE(spSchrift)) <> codeGroesse THEN schriftSetzen(INT(GUI_VALUE(spSchrift)))
     IF INT(GUI_VALUE(spAuto)) <> autoSichern THEN
         autoSichern = INT(GUI_VALUE(spAuto))
@@ -2262,7 +2353,13 @@ END SUB
 ' Ein Diff liest sich nur mit Farbe: Zugaenge gruen, Abgaenge rot, die
 ' @@-Koepfe blau. Zeilenweise ueber die Abschnitte, wie im Code-Feld.
 SUB gitFaerben()
-    DIM text AS STRING : text = GUI_TEXT(taGit)
+    diffFaerben(taGit)
+END SUB
+
+' Dieselbe Faerbung fuer das git-Fenster und die Umbau-Vorschau: ein
+' Unterschied sieht ueberall gleich aus, sonst muss man ihn zweimal lernen.
+SUB diffFaerben(ta AS GUI_WIDGET)
+    DIM text AS STRING : text = GUI_TEXT(ta)
     DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(text, NL)
     DIM s AS ARRAY OF INTEGER : s = []
     DIM l AS ARRAY OF INTEGER : l = []
@@ -2288,7 +2385,7 @@ SUB gitFaerben()
         END IF
         pos = pos + LEN(z) + 1
     NEXT
-    GUI_TEXTAREA_SPANS(taGit, s, l, f)
+    GUI_TEXTAREA_SPANS(ta, s, l, f)
 END SUB
 
 ' Die geaenderten Zeilen am Rand: `git diff -U0` nennt sie in den
@@ -2973,6 +3070,7 @@ END FUNCTION
 SUB projektErsetzenAusfuehren()
     DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
     DIM geaendert AS INTEGER : geaendert = 0
+    umbauLeeren()
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -2984,20 +3082,14 @@ SUB projektErsetzenAusfuehren()
             neu = REPLACE$(alt, suchtext, ersatztext)
         END IF
         IF neu = alt THEN CONTINUE
-        WRITEALL(pfad, neu + NL)
-        geaendert = geaendert + 1
-        ' Offene Reiter zeigen sonst den alten Text und schrieben ihn beim
-        ' naechsten Sichern zurueck.
-        DIM t AS INTEGER : t = tabMitPfad(pfad)
-        IF t >= 0 THEN
-            GUI_SET_TEXT(tabFelder[t], neu)
-            tabGesichert[t] = neu
-            tabLetzterText[t] = ""
-        END IF
+        ' Offene Reiter zieht umbauSchreiben mit nach -- sie zeigten sonst
+        ' den alten Text und schrieben ihn beim naechsten Sichern zurueck.
+        umbauVormerken(-1, pfad, neu)
     NEXT
-    reiterNeuSetzen()
-    GUI_SET_TEXT(lblStatus, "Ersetzt in " + STR$(geaendert) + " Datei(en).")
-    protokoll("projekt ersetzt " + STR$(geaendert))
+    geaendert = LEN(umbauTexte)
+    umbauStarten("'" + suchtext + "' -> '" + ersatztext + "' im Projekt", _
+                 "Ersetzt in " + STR$(geaendert) + " Datei(en).", _
+                 "projekt ersetzt " + STR$(geaendert))
 END SUB
 
 ' --- Marke an jedes Zeilenende der Auswahl ----------------------------
@@ -3249,29 +3341,293 @@ SUB herausloesen(name AS STRING)
         END IF
     NEXT
     ARRAY_PUSH(neuSub, "END SUB")
-    ' ERST anhaengen, DANN ersetzen: umgekehrt verschoeben sich die Zeilen
-    ' der Auswahl, und der Aufruf landete mitten im neuen Unterprogramm.
-    DIM n AS INTEGER : n = LEN(zeilen)
-    GUI_TEXTAREA_SELECT(ta, n, 1, n, SPALTE_ENDE)
-    GUI_TEXTAREA_INSERT(ta, zeilen[n - 1] + NL + NL + JOIN$(neuSub, NL))
-    DIM aufruf AS ARRAY OF STRING : aufruf = [LEFT$(block[0], tiefe) + ruf]
-    zeilenErsetzen(ta, z1, z2, aufruf)
-    GUI_TEXTAREA_GOTO(ta, z1, 1)
-    GUI_FOCUS(ta)
+    ' Der neue Text am Stueck: an der Stelle der Auswahl der Aufruf, am Ende
+    ' das Unterprogramm. Nicht zwei Aenderungen hintereinander im Feld --
+    ' die Vorschau will EINEN Text zum Vergleichen, und ein Strg+Z nimmt ihn
+    ' dann auch in einem Zug zurueck (frueher brauchte es zwei).
+    DIM neuZeilen AS ARRAY OF STRING : neuZeilen = []
+    DIM zi AS INTEGER
+    FOR zi = 1 TO LEN(zeilen)
+        IF zi = z1 THEN ARRAY_PUSH(neuZeilen, LEFT$(block[0], tiefe) + ruf)
+        IF zi >= z1 AND zi <= z2 THEN CONTINUE
+        ARRAY_PUSH(neuZeilen, zeilen[zi - 1])
+    NEXT
+    ARRAY_PUSH(neuZeilen, "")
+    DIM sz AS STRING
+    FOR EACH sz IN neuSub
+        ARRAY_PUSH(neuZeilen, sz)
+    NEXT
+    DIM neuText AS STRING : neuText = JOIN$(neuZeilen, NL)
     ' Die Probe: eine unausgewogene Auswahl (das FOR drin, das NEXT nicht)
     ' ergibt Code, der nicht mehr uebersetzt. Das soll dastehen, statt dass
     ' man es beim naechsten Starten sucht.
     DIM vorher AS INTEGER : vorher = fehlerZahl(quelle)
-    DIM nachher AS INTEGER : nachher = fehlerZahl(GUI_TEXT(ta))
+    DIM nachher AS INTEGER : nachher = fehlerZahl(neuText)
     DIM sagen AS STRING
     sagen = STR$(LEN(block)) + " Zeilen -> SUB " + name + " mit " + _
-            STR$(LEN(pNamen)) + " Parameter(n). Zweimal Strg+Z nimmt es zurueck."
+            STR$(LEN(pNamen)) + " Parameter(n). Strg+Z nimmt es zurueck."
     IF nachher > vorher THEN
         sagen = "Achtung: " + STR$(nachher - vorher) + " Fehler mehr als vorher -- " + _
-                "war die Auswahl ausgewogen? Zweimal Strg+Z nimmt es zurueck."
+                "war die Auswahl ausgewogen? Strg+Z nimmt es zurueck."
     END IF
-    GUI_SET_TEXT(lblStatus, sagen)
-    protokoll("herausgeloest " + name + " " + STR$(LEN(pNamen)) + " " + STR$(nachher - vorher))
+    umbauLeeren()
+    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauZeile = z1 : umbauSpalte = 1
+    umbauStarten("Herausloesen nach SUB " + name, sagen, _
+                 "herausgeloest " + name + " " + STR$(LEN(pNamen)) + " " + STR$(nachher - vorher))
+END SUB
+
+' --- Die Parameter eines Unterprogramms umsortieren -------------------
+' Der zweite Umbau, der mehr ist als ein Umbenennen -- und der erste, der
+' die AUFRUFE mitziehen muss: die Reihenfolge der Argumente ist die
+' Bedeutung, ein vergessener Aufruf uebergibt stumm das Falsche.
+'
+' Gearbeitet wird auf dem GANZEN Text, nicht Zeile fuer Zeile: ein Aufruf
+' darf ueber mehrere Zeilen gehen (`_` am Ende), und die Argumente werden
+' als Textstuecke VERTAUSCHT -- was zwischen ihnen steht, bleibt stehen.
+'
+' Die Definition selbst braucht keinen Sonderfall: `SUB name(` sieht fuer
+' den Sucher aus wie ein Aufruf, und ihre "Argumente" sind die Parameter.
+
+' Steht an `i` (0-basiert) das Wort `wort`, und zwar als ganzes Wort?
+FUNCTION wortAn(text AS STRING, i AS INTEGER, wort AS STRING) AS BOOLEAN
+    IF MID$(text, i, LEN(wort)) <> wort THEN RETURN FALSE
+    IF i > 0 AND istWortzeichen(MID$(text, i - 1, 1)) THEN RETURN FALSE
+    IF istWortzeichen(MID$(text, i + LEN(wort), 1)) THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Die Argumente eines Aufrufs, dessen `(` an `auf` steht: je Argument
+' Anfang und Ende (0-basiert, Ende ausschliesslich) in `von`/`bis`.
+' Liefert die Stelle der schliessenden Klammer, oder -1, wenn sie fehlt.
+'
+' Zeichenketten und Kommentare werden uebersprungen -- ein Komma in
+' `PRINT "a, b"` ist keine Argumentgrenze.
+FUNCTION argsZerlegen(text AS STRING, auf AS INTEGER, von AS ARRAY OF INTEGER, _
+                      bis AS ARRAY OF INTEGER) AS INTEGER
+    DIM tiefe AS INTEGER : tiefe = 1
+    DIM start AS INTEGER : start = auf + 1
+    DIM i AS INTEGER : i = auf + 1
+    DIM leer AS BOOLEAN : leer = TRUE          ' bisher nur Leerraum gesehen
+    WHILE i < LEN(text)
+        DIM c AS STRING : c = MID$(text, i, 1)
+        IF c = CHR$(34) THEN
+            DIM esc AS BOOLEAN : esc = i > 0 AND MID$(text, i - 1, 1) = "!"
+            i = i + 1
+            WHILE i < LEN(text) AND MID$(text, i, 1) <> CHR$(34)
+                IF esc AND MID$(text, i, 1) = "\" THEN i = i + 1
+                i = i + 1
+            WEND
+            leer = FALSE
+        ELSEIF c = "'" THEN
+            WHILE i < LEN(text) AND MID$(text, i, 1) <> NL
+                i = i + 1
+            WEND
+            CONTINUE
+        ELSEIF c = "(" OR c = "[" OR c = "{" THEN
+            tiefe = tiefe + 1 : leer = FALSE
+        ELSEIF c = ")" OR c = "]" OR c = "}" THEN
+            tiefe = tiefe - 1
+            IF tiefe = 0 THEN
+                IF NOT leer THEN
+                    ARRAY_PUSH(von, start) : ARRAY_PUSH(bis, i)
+                END IF
+                RETURN i
+            END IF
+            leer = FALSE
+        ELSEIF c = "," AND tiefe = 1 THEN
+            ARRAY_PUSH(von, start) : ARRAY_PUSH(bis, i)
+            start = i + 1
+            leer = TRUE
+        ELSEIF c <> " " AND c <> CHR$(9) AND c <> NL AND c <> "_" THEN
+            leer = FALSE
+        END IF
+        i = i + 1
+    WEND
+    RETURN -1
+END FUNCTION
+
+' Der Name des Unterprogramms, dessen Parameter gemeint sind, und die
+' Stelle seiner oeffnenden Klammer. Erst das Wort unter der Marke (so geht
+' es auch von einem Aufruf aus), sonst das Unterprogramm um die Marke.
+DIM paramName AS STRING : paramName = ""
+DIM paramArgs AS ARRAY OF STRING : paramArgs = []
+DIM paramFolge AS ARRAY OF INTEGER : paramFolge = []
+
+FUNCTION defStelle(quelle AS STRING, name AS STRING) AS INTEGER
+    IF name = "" THEN RETURN -1
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+    DIM pos AS INTEGER : pos = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM t AS STRING : t = UPPER$(TRIM$(zeilen[i]))
+        DIM kopf AS BOOLEAN : kopf = LEFT$(t, 4) = "SUB " OR LEFT$(t, 9) = "FUNCTION "
+        IF kopf THEN
+            DIM s AS INTEGER : s = INSTR(zeilen[i], name)
+            WHILE s >= 0
+                IF wortAn(zeilen[i], s, name) AND INSTR(MID$(zeilen[i], s + LEN(name)), "(") = 0 THEN
+                    RETURN pos + s + LEN(name)
+                END IF
+                s = INSTR(zeilen[i], name, s + 1)
+            WEND
+        END IF
+        pos = pos + LEN(zeilen[i]) + 1
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB parameterFragen()
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM name AS STRING : name = wortUnterMarke$()
+    DIM auf AS INTEGER : auf = defStelle(quelle, name)
+    IF auf < 0 THEN
+        ' Nicht auf einem Namen: dann das Unterprogramm, in dem die Marke steht.
+        DIM z AS INTEGER
+        DIM sp AS INTEGER
+        (z, sp) = GUI_TEXTAREA_CURSOR(ta)
+        DIM uv AS INTEGER
+        DIM ub AS INTEGER
+        (uv, ub) = umgebendesUnterprogramm(quelle, z)
+        IF uv > 0 THEN
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(quelle, NL)
+            DIM t AS STRING : t = TRIM$(zeilen[uv - 1])
+            DIM ab AS INTEGER : ab = IIF(LEFT$(UPPER$(t), 4) = "SUB ", 4, 9)
+            DIM rest AS STRING : rest = TRIM$(MID$(t, ab))
+            DIM kl AS INTEGER : kl = INSTR(rest, "(")
+            IF kl > 0 THEN
+                name = TRIM$(LEFT$(rest, kl))
+                auf = defStelle(quelle, name)
+            END IF
+        END IF
+    END IF
+    IF auf < 0 THEN
+        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: erst auf ein SUB oder eine FUNCTION stellen.")
+        protokoll("parameter 0")
+        RETURN
+    END IF
+    DIM pvon AS ARRAY OF INTEGER : pvon = []
+    DIM pbis AS ARRAY OF INTEGER : pbis = []
+    IF argsZerlegen(quelle, auf, pvon, pbis) < 0 OR LEN(pvon) < 2 THEN
+        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: '" + name + "' hat weniger als zwei Parameter.")
+        protokoll("parameter 0")
+        RETURN
+    END IF
+    paramName = name
+    paramArgs = [] : paramFolge = []
+    GUI_LISTBOX_CLEAR(lstParam)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(pvon) - 1
+        DIM stueck AS STRING : stueck = TRIM$(MID$(quelle, pvon[k], pbis[k] - pvon[k]))
+        ARRAY_PUSH(paramArgs, stueck)
+        ARRAY_PUSH(paramFolge, k)
+        GUI_LISTBOX_ADD(lstParam, stueck)
+    NEXT
+    GUI_LISTBOX_SET_SELECTED(lstParam, 0)
+    ' Immer an dieselbe Stelle: ein Fenster, das dort aufgeht, wo man es
+    ' zuletzt hingeschoben hat, sucht man beim naechsten Mal.
+    GUI_WINDOW_SET_BOUNDS(winParam, 420, 200, 460, 320)
+    GUI_WINDOW_TITLE(winParam, "Parameter von " + name)
+    GUI_SET_TEXT(lblParam, STR$(LEN(paramArgs)) + " Parameter -- die Aufrufe ziehen mit.")
+    GUI_WINDOW_VISIBLE(winParam, TRUE)
+    GUI_FOCUS(lstParam)
+    protokoll("parameter " + STR$(LEN(paramArgs)))
+END SUB
+
+SUB parameterSchieben(richtung AS INTEGER)
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstParam)
+    DIM ziel AS INTEGER : ziel = sel + richtung
+    IF sel < 0 OR ziel < 0 OR ziel >= LEN(paramFolge) THEN RETURN
+    DIM h AS INTEGER : h = paramFolge[sel]
+    paramFolge[sel] = paramFolge[ziel] : paramFolge[ziel] = h
+    GUI_LISTBOX_SET_ITEM(lstParam, sel, paramArgs[paramFolge[sel]])
+    GUI_LISTBOX_SET_ITEM(lstParam, ziel, paramArgs[paramFolge[ziel]])
+    GUI_LISTBOX_SET_SELECTED(lstParam, ziel)
+END SUB
+
+SUB parameterUebernehmen()
+    GUI_WINDOW_VISIBLE(winParam, FALSE)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 OR paramName = "" THEN RETURN
+    DIM gleich AS BOOLEAN : gleich = TRUE
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(paramFolge) - 1
+        IF paramFolge[k] <> k THEN gleich = FALSE
+    NEXT
+    IF gleich THEN
+        GUI_SET_TEXT(lblStatus, "Parameter umsortieren: nichts umgestellt.")
+        GUI_FOCUS(ta)
+        RETURN
+    END IF
+    DIM quelle AS STRING : quelle = GUI_TEXT(ta)
+    DIM neu AS STRING : neu = quelle
+    ' Von HINTEN nach vorn ersetzen: dann bleiben die Stellen davor gueltig.
+    DIM stellen AS ARRAY OF INTEGER : stellen = []
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(quelle)
+        DIM c AS STRING : c = MID$(quelle, i, 1)
+        IF c = CHR$(34) THEN
+            i = i + 1
+            WHILE i < LEN(quelle) AND MID$(quelle, i, 1) <> CHR$(34)
+                i = i + 1
+            WEND
+        ELSEIF c = "'" THEN
+            WHILE i < LEN(quelle) AND MID$(quelle, i, 1) <> NL
+                i = i + 1
+            WEND
+        ELSEIF wortAn(quelle, i, paramName) THEN
+            DIM j AS INTEGER : j = i + LEN(paramName)
+            WHILE j < LEN(quelle) AND MID$(quelle, j, 1) = " "
+                j = j + 1
+            WEND
+            IF MID$(quelle, j, 1) = "(" THEN ARRAY_PUSH(stellen, j)
+            i = j - 1
+        END IF
+        i = i + 1
+    WEND
+    DIM geaendert AS INTEGER : geaendert = 0
+    DIM uebergangen AS INTEGER : uebergangen = 0
+    DIM s AS INTEGER
+    FOR s = LEN(stellen) - 1 TO 0 STEP -1
+        DIM avon AS ARRAY OF INTEGER : avon = []
+        DIM abis AS ARRAY OF INTEGER : abis = []
+        DIM zu AS INTEGER : zu = argsZerlegen(quelle, stellen[s], avon, abis)
+        ' Nur Aufrufe mit genau so vielen Argumenten: wer einen Vorgabewert
+        ' weglaesst oder mit Namen uebergibt (`x: 1`), meint eine andere
+        ' Zuordnung -- die still umzustellen waere schlimmer als es zu lassen.
+        IF zu < 0 OR LEN(avon) <> LEN(paramFolge) THEN
+            IF zu >= 0 AND LEN(avon) > 0 THEN uebergangen = uebergangen + 1
+            CONTINUE
+        END IF
+        DIM benannt AS BOOLEAN : benannt = FALSE
+        DIM stuecke AS ARRAY OF STRING : stuecke = []
+        FOR k = 0 TO LEN(avon) - 1
+            DIM roh AS STRING : roh = MID$(quelle, avon[k], abis[k] - avon[k])
+            IF INSTR(roh, ":") >= 0 THEN benannt = TRUE
+            ARRAY_PUSH(stuecke, roh)
+        NEXT
+        IF benannt THEN
+            uebergangen = uebergangen + 1
+            CONTINUE
+        END IF
+        DIM neuArgs AS ARRAY OF STRING : neuArgs = []
+        FOR k = 0 TO LEN(paramFolge) - 1
+            ARRAY_PUSH(neuArgs, TRIM$(stuecke[paramFolge[k]]))
+        NEXT
+        neu = LEFT$(neu, avon[0]) + JOIN$(neuArgs, ", ") + MID$(neu, abis[LEN(abis) - 1])
+        geaendert = geaendert + 1
+    NEXT
+    umbauLeeren()
+    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neu)
+    DIM sagen AS STRING
+    sagen = "Parameter von " + paramName + " umgestellt -- " + STR$(geaendert) + " Stelle(n)."
+    IF uebergangen > 0 THEN
+        sagen = sagen + " " + STR$(uebergangen) + " Aufruf(e) uebergangen (andere Zahl von " + _
+                "Argumenten oder mit Namen uebergeben)."
+    END IF
+    umbauStarten("Parameter von " + paramName, sagen, _
+                 "parameter umgestellt " + STR$(geaendert) + " " + STR$(uebergangen))
 END SUB
 
 ' --- Zwei Reiter nebeneinander vergleichen ----------------------------
@@ -3474,7 +3830,7 @@ SUB umbenennenImProjekt(neu AS STRING)
     DIM wort AS STRING : wort = umbenennWort
     IF wort = "" OR neu = "" OR wort = neu THEN RETURN
     DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(projektOrdner, "*.dh")
-    DIM geaendert AS INTEGER : geaendert = 0
+    umbauLeeren()
     DIM d AS STRING
     FOR EACH d IN dateien
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
@@ -3482,19 +3838,12 @@ SUB umbenennenImProjekt(neu AS STRING)
         IF INSTR(alt, wort) < 0 THEN CONTINUE
         DIM frisch AS STRING : frisch = umbenennenInText$(alt, wort, neu)
         IF frisch = alt THEN CONTINUE
-        WRITEALL(pfad, frisch + NL)
-        geaendert = geaendert + 1
-        DIM t AS INTEGER : t = tabMitPfad(pfad)
-        IF t >= 0 THEN
-            GUI_SET_TEXT(tabFelder[t], frisch)
-            tabGesichert[t] = frisch
-            tabLetzterText[t] = ""
-        END IF
+        umbauVormerken(-1, pfad, frisch)
     NEXT
-    reiterNeuSetzen()
-    symSchluessel = "-"
-    GUI_SET_TEXT(lblStatus, "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).")
-    protokoll("projekt umbenannt " + STR$(geaendert))
+    DIM geaendert AS INTEGER : geaendert = LEN(umbauTexte)
+    umbauStarten("'" + wort + "' -> '" + neu + "' im Projekt", _
+                 "'" + wort + "' -> '" + neu + "' in " + STR$(geaendert) + " Datei(en).", _
+                 "projekt umbenannt " + STR$(geaendert))
 END SUB
 
 ' --- Zwei Dateien vergleichen -----------------------------------------
@@ -3577,6 +3926,153 @@ SUB markenAufFundstellen()
     protokoll("marken " + STR$(n))
 END SUB
 
+' --- Der Umbau: erst zeigen, dann schreiben ---------------------------
+' Jeder Umbau geht diesen Weg: die neuen Texte vormerken (umbauVormerken),
+' dann `umbauStarten`. Ist die Vorschau an, zeigt sie den Unterschied und
+' fragt; ist sie aus, wird gleich geschrieben. Eine Stelle, an der ein
+' Umbau ankommt, und keine zwei Wege, die auseinanderlaufen koennen.
+SUB umbauLeeren()
+    umbauTabs = [] : umbauPfade = [] : umbauTexte = []
+    umbauZeile = 0 : umbauSpalte = 1
+END SUB
+
+' `tab` >= 0 schreibt in den Reiter (Undo bleibt), sonst in die Datei.
+SUB umbauVormerken(tab AS INTEGER, pfad AS STRING, neu AS STRING)
+    ARRAY_PUSH(umbauTabs, tab) : ARRAY_PUSH(umbauPfade, pfad) : ARRAY_PUSH(umbauTexte, neu)
+END SUB
+
+' Der Text eines Eintrags, wie er JETZT ist -- das, wogegen verglichen wird.
+FUNCTION umbauAlt$(k AS INTEGER) AS STRING
+    IF umbauTabs[k] >= 0 THEN RETURN GUI_TEXT(tabFelder[umbauTabs[k]])
+    RETURN dateiLesen(umbauPfade[k])
+END FUNCTION
+
+' Ein Unterschied als Text: geaenderte Zeilen mit `-`/`+`, zwei Zeilen
+' Zusammenhang darum, Ausgelassenes als `...`. Der Vergleich ist derselbe
+' wie beim Nebeneinander (zeilenVergleichen, LCS auf Zeilen) -- zwei
+' Verfahren fuer dieselbe Frage zeigten irgendwann Verschiedenes.
+FUNCTION diffText$(a AS ARRAY OF STRING, b AS ARRAY OF STRING) AS STRING
+    zeilenVergleichen(a, b)
+    DIM roh AS ARRAY OF STRING : roh = []
+    DIM ist AS ARRAY OF INTEGER : ist = []       ' 1 = geaendert, 0 = Zusammenhang
+    DIM i AS INTEGER : i = 0
+    DIM j AS INTEGER : j = 0
+    DIM li AS INTEGER : li = 0
+    DIM ri AS INTEGER : ri = 0
+    WHILE i < LEN(a) OR j < LEN(b)
+        IF li < LEN(diffLinks) AND i < LEN(a) AND diffLinks[li] = i + 1 THEN
+            ARRAY_PUSH(roh, "-" + a[i]) : ARRAY_PUSH(ist, 1)
+            i = i + 1 : li = li + 1
+        ELSEIF ri < LEN(diffRechts) AND j < LEN(b) AND diffRechts[ri] = j + 1 THEN
+            ARRAY_PUSH(roh, "+" + b[j]) : ARRAY_PUSH(ist, 1)
+            j = j + 1 : ri = ri + 1
+        ELSEIF i < LEN(a) AND j < LEN(b) THEN
+            ARRAY_PUSH(roh, " " + a[i]) : ARRAY_PUSH(ist, 0)
+            i = i + 1 : j = j + 1
+        ELSE
+            BREAK
+        END IF
+    WEND
+    ' Zusammenhang nur nahe an einer Aenderung: ein Unterschied von drei
+    ' Zeilen in einer Datei mit tausend soll drei Zeilen lang zu lesen sein.
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM luecke AS BOOLEAN : luecke = FALSE
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(roh) - 1
+        DIM nah AS BOOLEAN : nah = FALSE
+        DIM d AS INTEGER
+        FOR d = MAX(0, k - 2) TO MIN(LEN(roh) - 1, k + 2)
+            IF ist[d] = 1 THEN nah = TRUE
+        NEXT
+        IF nah THEN
+            IF luecke THEN ARRAY_PUSH(raus, "@@ ...")
+            luecke = FALSE
+            ARRAY_PUSH(raus, roh[k])
+        ELSE
+            luecke = TRUE
+        END IF
+    NEXT
+    RETURN JOIN$(raus, NL)
+END FUNCTION
+
+SUB umbauStarten(titel AS STRING, meldung AS STRING, prot AS STRING)
+    IF LEN(umbauTexte) = 0 THEN
+        GUI_SET_TEXT(lblStatus, titel + ": nichts zu tun.")
+        umbauLeeren()
+        RETURN
+    END IF
+    umbauMeldung = meldung
+    umbauProt = prot
+    IF NOT vorschauAn THEN
+        umbauSchreiben()
+        RETURN
+    END IF
+    DIM stuecke AS ARRAY OF STRING : stuecke = []
+    DIM minus AS INTEGER : minus = 0
+    DIM plus AS INTEGER : plus = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauTexte) - 1
+        DIM alt AS STRING : alt = umbauAlt$(k)
+        DIM name AS STRING : name = umbauPfade[k]
+        IF name = "" AND umbauTabs[k] >= 0 THEN name = tabTitel[umbauTabs[k]]
+        DIM d AS STRING : d = diffText$(SPLIT$(alt, NL), SPLIT$(umbauTexte[k], NL))
+        minus = minus + LEN(diffLinks)
+        plus = plus + LEN(diffRechts)
+        ARRAY_PUSH(stuecke, "--- " + BASENAME(name) + NL + d)
+    NEXT
+    GUI_SET_TEXT(taUmbau, JOIN$(stuecke, NL + NL))
+    diffFaerben(taUmbau)
+    GUI_WINDOW_TITLE(winUmbau, "Vorschau: " + titel)
+    GUI_SET_TEXT(lblUmbau, STR$(LEN(umbauTexte)) + " Datei(en), " + STR$(minus) + _
+                 " Zeilen weniger, " + STR$(plus) + " mehr -- Enter uebernimmt, ESC verwirft.")
+    GUI_WINDOW_VISIBLE(winUmbau, TRUE)
+    GUI_FOCUS(btnUmbauOk)
+    protokoll("umbau vorschau " + STR$(LEN(umbauTexte)) + " " + STR$(minus) + " " + STR$(plus))
+END SUB
+
+SUB umbauVerwerfen()
+    GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    umbauLeeren()
+    GUI_SET_TEXT(lblStatus, "Umbau verworfen -- nichts geaendert.")
+    protokoll("umbau verworfen")
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta >= 0 THEN GUI_FOCUS(ta)
+END SUB
+
+SUB umbauSchreiben()
+    GUI_WINDOW_VISIBLE(winUmbau, FALSE)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(umbauTexte) - 1
+        IF umbauTabs[k] >= 0 THEN
+            ' In den Reiter: Auswahl ueber alles + INSERT. GUI_SET_TEXT
+            ' leerte den Verlauf -- so nimmt EIN Strg+Z den Umbau zurueck.
+            DIM ta AS GUI_WIDGET : ta = tabFelder[umbauTabs[k]]
+            DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(GUI_TEXT(ta), NL)
+            DIM letzte AS INTEGER : letzte = LEN(zeilen)
+            GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
+            GUI_TEXTAREA_INSERT(ta, umbauTexte[k])
+        ELSE
+            WRITEALL(umbauPfade[k], umbauTexte[k] + NL)
+            DIM t AS INTEGER : t = tabMitPfad(umbauPfade[k])
+            IF t >= 0 THEN
+                GUI_SET_TEXT(tabFelder[t], umbauTexte[k])
+                tabGesichert[t] = umbauTexte[k]
+                tabLetzterText[t] = ""
+            END IF
+        END IF
+    NEXT
+    DIM feld AS GUI_WIDGET : feld = aktivesFeld()
+    IF feld >= 0 THEN
+        IF umbauZeile > 0 THEN GUI_TEXTAREA_GOTO(feld, umbauZeile, umbauSpalte)
+        GUI_FOCUS(feld)
+    END IF
+    reiterNeuSetzen()
+    symSchluessel = "-"
+    GUI_SET_TEXT(lblStatus, umbauMeldung)
+    IF umbauProt <> "" THEN protokoll(umbauProt)
+    umbauLeeren()
+END SUB
+
 ' --- Umbenennen (Umschalt+F6) ----------------------------------------
 ' Das Umbenennen selbst macht CODE_RENAME$: ganze Woerter, ohne Kommentare
 ' und Zeichenketten. Die IDE fragt nur den neuen Namen und schreibt das
@@ -3607,17 +4103,15 @@ SUB umbenennenAusfuehren(neu AS STRING)
         GUI_SET_TEXT(lblStatus, "Umbenennen: nichts zu tun.")
         RETURN
     END IF
-    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(q, NL)
-    DIM letzte AS INTEGER : letzte = LEN(zeilen)
-    GUI_TEXTAREA_SELECT(ta, 1, 1, letzte, LEN(zeilen[letzte - 1]) + 1)
-    GUI_TEXTAREA_INSERT(ta, neuText)
-    GUI_TEXTAREA_GOTO(ta, umbenennZeile, umbenennSpalte)
-    GUI_FOCUS(ta)
     ' Die Zahl der Fundstellen sagt CODE_REFERENCES -- am ALTEN Text, denn
     ' im neuen heisst der Name schon anders.
     DIM n AS INTEGER : n = LEN(CODE_REFERENCES(q, umbenennZeile, umbenennSpalte))
-    GUI_SET_TEXT(lblStatus, STR$(n) + " Stellen umbenannt in '" + neu + "'.")
-    protokoll("umbenannt " + STR$(n) + " " + neu)
+    umbauLeeren()
+    umbauVormerken(aktiverTab, tabPfade[aktiverTab], neuText)
+    umbauZeile = umbenennZeile : umbauSpalte = umbenennSpalte
+    umbauStarten("Umbenennen in '" + neu + "'", _
+                 STR$(n) + " Stellen umbenannt in '" + neu + "'.", _
+                 "umbenannt " + STR$(n) + " " + neu)
 END SUB
 
 ' --- Schnipsel (Strg+J) -----------------------------------------------
@@ -4672,6 +5166,8 @@ paletteEintrag("Auswahl in ein Unterprogramm herausloesen ...", "herausloesen", 
 paletteEintrag("Auswahl erweitern", "erweitern", "Strg+Umschalt+Hoch")
 paletteEintrag("Auswahl verkleinern", "verkleinern", "Strg+Umschalt+Runter")
 paletteEintrag("Im ganzen Projekt umbenennen ...", "umb_projekt", "Strg+Umschalt+F6")
+paletteEintrag("Parameter umsortieren ...", "parameter", "Strg+Umschalt+U")
+paletteEintrag("Geruest beim Tippen", "geruest", "")
 paletteEintrag("Mit einer anderen Datei vergleichen ...", "vergleichen", "")
 paletteEintrag("Zwei Reiter nebeneinander vergleichen", "reiter_vergleich", "")
 paletteEintrag("Zeilen sortieren", "zl_sortieren", "")
@@ -4920,6 +5416,8 @@ SUB befehl(k AS STRING)
                 dlgUmbProjekt = GUI_PROMPT("Im ganzen Projekt umbenennen", _
                     "'" + umbenennWort + "' ueberall im Projektordner ersetzen durch:", umbenennWort)
             END IF
+        CASE "parameter" : parameterFragen()
+        CASE "geruest" : geruestSetzen(NOT geruestAn)
         CASE "andere_zu" : andereSchliessen()
         CASE "linien" : linienSetzen(NOT linienAn)
         CASE "leiste"
@@ -5212,6 +5710,7 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miHerausloesen) THEN befehl("herausloesen")
     IF GUI_CLICKED(miVerkleinern) THEN befehl("verkleinern")
     IF GUI_CLICKED(miUmbProjekt) THEN befehl("umb_projekt")
+    IF GUI_CLICKED(miParameter) THEN befehl("parameter")
     IF GUI_CLICKED(miVergleich) THEN befehl("vergleichen")
     IF GUI_CLICKED(miReiterVgl) THEN befehl("reiter_vergleich")
     IF GUI_CLICKED(miZlSort) THEN befehl("zl_sortieren")
@@ -5332,6 +5831,12 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     END IF
     IF GUI_CLICKED(btnFarbeOk) THEN farbeUebernehmen()
     IF GUI_CLICKED(btnFarbeWeg) THEN GUI_WINDOW_VISIBLE(winFarbe, FALSE) : farbStart = -1 : GUI_FOCUS(aktivesFeld())
+    IF GUI_CLICKED(btnUmbauOk) THEN umbauSchreiben()
+    IF GUI_CLICKED(btnUmbauWeg) THEN umbauVerwerfen()
+    IF GUI_CLICKED(btnParamHoch) THEN parameterSchieben(-1)
+    IF GUI_CLICKED(btnParamRunter) THEN parameterSchieben(1)
+    IF GUI_CLICKED(btnParamOk) THEN parameterUebernehmen()
+    IF GUI_CLICKED(btnParamWeg) THEN GUI_WINDOW_VISIBLE(winParam, FALSE) : GUI_FOCUS(aktivesFeld())
 
     ' --- Dialoge auswerten ---
     IF dlgSuche <> 0 THEN

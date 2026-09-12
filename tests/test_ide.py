@@ -405,8 +405,10 @@ def test_umbenennen_trifft_die_stellen_und_laesst_text_und_kommentar(tmp_path):
     einem Suchen-und-Ersetzen."""
     quelle = _datei(tmp_path, 'zaehler = 1\nzaehler = zaehler + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
     ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    ev += _taste(100, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="summe")
+    ev += _taste(100, RL_ENTER)          # die Vorschau uebernehmen
+    ev += _taste(140, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=210, events=ev, zwischenablage="summe")
+    assert any(z.startswith("umbau vorschau ") for z in log), log
     assert any(z.startswith("umbenannt ") and z.endswith(" summe") for z in log), log
     assert quelle.read_text(encoding="utf-8") == (
         'summe = 1\nsumme = summe + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
@@ -545,9 +547,13 @@ def test_neue_zeile_uebernimmt_die_einrueckung_und_rueckt_ein(tmp_path):
     Stufe eingerückt. Danach `END` über die Zwischenablage -- das rückt sich
     selbst wieder heraus."""
     quelle = _datei(tmp_path, "SUB a()")
+    # Ohne das Geruest aus Stufe 13: sonst stuende hinter der neuen Zeile
+    # auch noch sein `END SUB`, und dieser Test handelt von der Einrueckung.
+    kfg = tmp_path / "ohne_geruest.json"
+    kfg.write_text('{"geruest": false}', encoding="utf-8")
     ev = _taste(20, RL_END) + _taste(40, RL_ENTER) + _taste(70, RL_V, RL_LCTRL)
     ev += _taste(110, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=180, events=ev, zwischenablage="END")
+    log = _ide(tmp_path, quelle, frames=180, events=ev, zwischenablage="END", konfig=kfg)
     assert quelle.read_text(encoding="utf-8") == "SUB a()\nEND\n", (
         repr(quelle.read_text(encoding="utf-8")), log)
 
@@ -942,7 +948,8 @@ def test_im_ganzen_projekt_ersetzen(tmp_path):
     ev += _taste(80, RL_ENTER)
     ev += _taste(110, RL_ENTER)          # Ersatz leer: die Stelle faellt weg
     ev += _taste(140, RL_ENTER)          # Rueckfrage bestaetigen
-    log = _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="hallo")
+    ev += _taste(180, RL_ENTER)          # die Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=270, events=ev, zwischenablage="hallo")
     assert "projekt ersetzt 2" in log, log
     assert quelle.read_text(encoding="utf-8").strip() == "PRINT"
     assert zweite.read_text(encoding="utf-8").count("hallo") == 0
@@ -1069,7 +1076,8 @@ def test_im_ganzen_projekt_umbenennen(tmp_path):
     ev += _taste(75, RL_F6, RL_LCTRL, RL_LSHIFT)
     ev += _taste(110, RL_V, RL_LCTRL)
     ev += _taste(140, RL_ENTER)
-    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="winken")
+    ev += _taste(180, RL_ENTER)          # die Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=280, events=ev, zwischenablage="winken")
     assert "projekt umbenannt 2" in log, log
     assert "winken()" in quelle.read_text(encoding="utf-8")
     assert "SUB winken()" in helfer.read_text(encoding="utf-8")
@@ -1211,8 +1219,9 @@ def test_auswahl_in_ein_unterprogramm_herausloesen(tmp_path):
     ev += _taste(80, RL_R, RL_LCTRL, RL_LSHIFT)
     ev += _taste(110, RL_V, RL_LCTRL)
     ev += _taste(140, RL_ENTER)
-    ev += _taste(170, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=260, events=ev, zwischenablage="summiere")
+    ev += _taste(180, RL_ENTER)          # die Vorschau uebernehmen
+    ev += _taste(220, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=310, events=ev, zwischenablage="summiere")
     assert "herausgeloest summiere 2 0" in log, log
     text = quelle.read_text(encoding="utf-8")
     assert "SUB summiere(BYREF summe AS INTEGER, i AS INTEGER)" in text, text
@@ -1242,7 +1251,8 @@ def test_herausloesen_sagt_es_wenn_die_datei_kaputt_geht(tmp_path):
     ev += _taste(80, RL_R, RL_LCTRL, RL_LSHIFT)
     ev += _taste(110, RL_V, RL_LCTRL)
     ev += _taste(140, RL_ENTER)
-    log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="halb")
+    ev += _taste(180, RL_ENTER)          # die Vorschau uebernehmen
+    log = _ide(tmp_path, quelle, frames=290, events=ev, zwischenablage="halb")
     zeilen = [z for z in log if z.startswith("herausgeloest ")]
     assert zeilen and not zeilen[0].endswith(" 0"), log
 
@@ -1257,3 +1267,111 @@ def test_zwei_reiter_nebeneinander_vergleichen(tmp_path):
     log = _ide(tmp_path, quelle, frames=250, events=ev, zwischenablage="Zwei Reiter")
     assert "reiter vergleich 1 1" in log, log
     assert any(z.startswith("geteilt 0 ") for z in log), log
+
+
+# --------------------------------------------------------------- Stufe 13
+
+RL_ESC = 256
+# Das Parameter-Fenster geht immer an derselben Stelle auf (420, 200), die
+# Titelleiste des Glas-Themas ist 30 Pixel hoch. Widget-Koordinaten zaehlen
+# ab dem INHALT darunter.
+PARAM_X, PARAM_Y = 420, 230
+
+
+def _param_knopf(frame, x, y, w, h):
+    """Klick in die Mitte eines Knopfes des Parameter-Fensters."""
+    return _klick_mit(frame, PARAM_X + x + w // 2, PARAM_Y + y + h // 2)
+
+
+def test_das_geruest_setzt_den_abschluss_gleich_mit(tmp_path):
+    """`IF x > 0 THEN` getippt und Enter -- das END IF steht da, und die
+    Marke dazwischen. Geprueft an der gesicherten Datei."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    ev = _taste(25, RL_END) + _taste(45, RL_ENTER) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(100, RL_ENTER) + _taste(140, RL_S, RL_LCTRL)
+    _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="IF x > 0 THEN")
+    text = quelle.read_text(encoding="utf-8")
+    assert text.startswith("PRINT 1\nIF x > 0 THEN\n    \nEND IF"), repr(text)
+
+
+def test_ohne_das_geruest_bleibt_enter_was_es_war(tmp_path):
+    """Die Gegenprobe ueber die Einstellung: derselbe Ablauf ohne Geruest
+    laesst die Zeile allein."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    kfg = tmp_path / "aus.json"
+    kfg.write_text('{"geruest": false}', encoding="utf-8")
+    ev = _taste(25, RL_END) + _taste(45, RL_ENTER) + _taste(70, RL_V, RL_LCTRL)
+    ev += _taste(100, RL_ENTER) + _taste(140, RL_S, RL_LCTRL)
+    _ide(tmp_path, quelle, frames=230, events=ev, zwischenablage="IF x > 0 THEN", konfig=kfg)
+    text = quelle.read_text(encoding="utf-8")
+    assert "END IF" not in text, repr(text)
+    assert text.startswith("PRINT 1\nIF x > 0 THEN\n"), repr(text)
+
+
+def test_die_vorschau_verwirft_den_umbau_auf_esc(tmp_path):
+    """Die Gegenprobe zur Vorschau: ESC, und die Datei bleibt, wie sie war
+    -- auch nach dem Sichern."""
+    quelle = _datei(tmp_path, "zaehler = 1\nzaehler = zaehler + 1\n")
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(100, RL_ESC)            # die Vorschau verwerfen
+    ev += _taste(140, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=210, events=ev, zwischenablage="summe")
+    assert "umbau verworfen" in log, log
+    assert not any(z.startswith("umbenannt ") for z in log), log
+    assert quelle.read_text(encoding="utf-8").startswith("zaehler = 1"), quelle.read_text()
+
+
+def test_parameter_umsortieren_zieht_die_aufrufe_mit(tmp_path):
+    """Strg+Umschalt+U, den ersten Parameter nach unten, uebernehmen, die
+    Vorschau bestaetigen: Definition UND Aufruf stehen umgestellt da."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)                  # die Vorschau uebernehmen
+    ev += _taste(190, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "parameter 2" in log, log
+    assert "parameter umgestellt 2 0" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "SUB zeichne(y AS INTEGER, x AS INTEGER)" in text, text
+    assert "zeichne(2, 1)" in text, text
+
+
+def test_parameter_laesst_einen_aufruf_mit_anderer_zahl_in_ruhe(tmp_path):
+    """Wer einen Vorgabewert weglaesst, meint eine andere Zuordnung -- der
+    Aufruf bleibt stehen, und die Zahl steht im Protokoll."""
+    quelle = _datei(tmp_path,
+                    "SUB zeichne(x AS INTEGER, y AS INTEGER = 0)\n"
+                    "    PRINT x + y\n"
+                    "END SUB\n"
+                    "zeichne(1, 2)\n"
+                    "zeichne(7)\n")
+    ev = _taste(25, RL_U, RL_LCTRL, RL_LSHIFT)
+    ev += _param_knopf(60, 322, 72, 120, 30)     # Nach unten
+    ev += _param_knopf(100, 12, 248, 140, 30)    # Uebernehmen
+    ev += _taste(150, RL_ENTER)
+    ev += _taste(190, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=280, events=ev)
+    assert "parameter umgestellt 2 1" in log, log
+    text = quelle.read_text(encoding="utf-8")
+    assert "zeichne(2, 1)" in text, text
+    assert "zeichne(7)" in text, text
+
+
+def test_ohne_vorschau_schreibt_der_umbau_gleich(tmp_path):
+    """Die zweite Gegenprobe: mit abgeschalteter Vorschau geht es den
+    kurzen Weg -- ein Enter weniger, und die Datei ist umbenannt."""
+    quelle = _datei(tmp_path, "zaehler = 1\nzaehler = zaehler + 1\n")
+    kfg = tmp_path / "ohne_vorschau.json"
+    kfg.write_text('{"umbau_vorschau": false}', encoding="utf-8")
+    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _ide(tmp_path, quelle, frames=190, events=ev, zwischenablage="summe", konfig=kfg)
+    assert not any(z.startswith("umbau vorschau ") for z in log), log
+    assert any(z.startswith("umbenannt ") for z in log), log
+    assert quelle.read_text(encoding="utf-8").startswith("summe = 1"), quelle.read_text()
