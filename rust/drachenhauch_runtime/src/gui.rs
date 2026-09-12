@@ -230,7 +230,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
-    Layout, TabControl, RichText,
+    Layout, TabControl, RichText, TimePicker,
 }
 
 impl Kind {
@@ -246,7 +246,7 @@ impl Kind {
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
             Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
-            Kind::RichText => "richtext",
+            Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -261,7 +261,7 @@ impl Kind {
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
             "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
-            "richtext" => Kind::RichText,
+            "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             _ => return None,
         })
     }
@@ -1407,6 +1407,10 @@ pub struct Widget {
     alpha_an: bool,
     // Nur DatePicker: Jahr, Monat (1..12), Tag.
     datum: [i32; 3],
+    /// Uhrzeit (Kind::TimePicker): Stunde, Minute, Sekunde -- und ob die
+    /// Sekunden ueberhaupt dastehen.
+    zeit: [i32; 3],
+    zeit_sek: bool,
     // Grenzen (leer = keine) und erster Tag der Woche (0 = Montag).
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
@@ -2630,6 +2634,7 @@ impl Gui {
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
+            zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0,
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
@@ -4203,6 +4208,103 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    // --- Uhrzeit (GUI_TIMEPICKER) -------------------------------------------
+    /// Das Gegenstueck zum Datumswaehler. Drei Felder mit Pfeilen: Stunde,
+    /// Minute und (auf Wunsch) Sekunde.
+    ///
+    /// **Nach aussen gilt EIN Format, `HH:MM:SS` wie `TIME$()`** -- auch wenn
+    /// die Sekunden gar nicht dastehen. Zwei Formate waeren dieselbe
+    /// Stolperfalle, die beim Datum vermieden wurde; hinein darf `HH:MM`.
+    pub fn timepicker(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::TimePicker, x, y, self.tp_breite(w, false), if h > 0 { h } else { self.sk(34) });
+        wd.zeit = [12, 0, 0];
+        wd.sel = 1;   // die Minute ist das, was man meistens dreht
+        wd.step = 1.0;
+        self.add_widget(win, "GUI_TIMEPICKER", wd)
+    }
+    /// Breite, die drei bzw. zwei Felder brauchen (0 = Vorgabe).
+    fn tp_breite(&self, w: i32, sek: bool) -> i32 {
+        if w > 0 { return w; }
+        self.sk(if sek { 150 } else { 104 })
+    }
+    fn tp_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::TimePicker { return Err(format!("{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)", fn_)); }
+        Ok(w)
+    }
+    pub fn time_get(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_TIME")?;
+        if w.kind != Kind::TimePicker { return Err("GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)".into()); }
+        Ok(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]))
+    }
+    pub fn set_time(&mut self, h: i64, t: &str) -> Result<(), String> {
+        let teile: Vec<&str> = t.trim().split(':').collect();
+        if teile.len() < 2 || teile.len() > 3 {
+            return Err(format!("GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)", t));
+        }
+        let mut z = [0i32; 3];
+        for (k, teil) in teile.iter().enumerate() {
+            z[k] = teil.trim().parse::<i32>()
+                .map_err(|_| format!("GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)", t))?;
+        }
+        if z[0] > 23 || z[1] > 59 || z[2] > 59 || z.iter().any(|&x| x < 0) {
+            return Err(format!("GUI_SET_TIME: '{}' liegt ausserhalb von 00:00:00 bis 23:59:59", t));
+        }
+        self.tp_mut(h, "GUI_SET_TIME")?.zeit = z;
+        Ok(())
+    }
+    pub fn timepicker_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let breite_vorgabe = self.tp_breite(0, false);
+        let breite_sek = self.tp_breite(0, true);
+        let w = self.tp_mut(h, "GUI_TIMEPICKER_SET")?;
+        match key.to_lowercase().as_str() {
+            "sekunden" | "seconds" => {
+                let an = wert != 0.0;
+                // Die Breite wandert mit, solange sie die Vorgabe ist -- wer
+                // sie selbst gesetzt hat, behaelt seine.
+                if w.zeit_sek != an && (w.w == breite_vorgabe || w.w == breite_sek) {
+                    w.w = if an { breite_sek } else { breite_vorgabe };
+                    w.bw = w.w; w.nat_w = w.w;
+                }
+                w.zeit_sek = an;
+            }
+            // Schrittweite der MINUTE (5 heisst: in Fuenferschritten).
+            "schritt" | "step" => w.step = wert.max(1.0),
+            _ => return Err(format!(
+                "GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)", key)),
+        }
+        Ok(())
+    }
+    /// Lage der Felder: (x des ersten, Breite eines Feldes, Zahl der Felder).
+    /// EINE Quelle fuer Zeichnen und Treffertest.
+    fn tp_geom(&self, w: &Widget, ax: i32, breite: i32) -> (i32, i32, usize) {
+        let n = if w.zeit_sek { 3 } else { 2 };
+        let luecke = self.sk(10);
+        let fw = ((breite - luecke * (n as i32 - 1)) / n as i32).max(self.sk(24));
+        (ax, fw + luecke, n)
+    }
+    /// Einen Teil der Uhrzeit verstellen (mit Ueberlauf in den naechsten).
+    fn tp_dreh(&mut self, wi: usize, i: usize, teil: usize, richtung: i32) {
+        let w = &mut self.windows[wi].widgets[i];
+        let schritt = if teil == 1 { w.step.max(1.0) as i32 } else { 1 };
+        let grenze = if teil == 0 { 24 } else { 60 };
+        let neu = w.zeit[teil] + richtung * schritt;
+        // Umlaufen statt anschlagen: wer von 00 aus rueckwaerts dreht, will
+        // 23 sehen und nicht dasselbe noch einmal.
+        w.zeit[teil] = ((neu % grenze) + grenze) % grenze;
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    fn tp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let (ax, ay, breite, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (x0, schritt, n) = self.tp_geom(&self.windows[wi].widgets[i], ax, breite);
+        let teil = (((mx - x0) / schritt.max(1)) as usize).min(n - 1);
+        self.windows[wi].widgets[i].sel = teil as i32;
+        // Obere Haelfte hoch, untere runter -- dieselbe Geste wie am Zahlenfeld.
+        let hoch = my < ay + h / 2;
+        self.tp_dreh(wi, i, teil, if hoch { 1 } else { -1 });
+    }
+
     // --- Gesetzter Text (GUI_RICHTEXT) --------------------------------------
     /// Ein Widget, das Markdown SETZT. Bis Stand 25 blieb einem Programm nur,
     /// den Text selbst auf eine Zeichenflaeche zu malen -- die IDE tat das
@@ -5361,7 +5463,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl | Kind::RichText) {
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl | Kind::RichText | Kind::TimePicker) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
@@ -6436,6 +6538,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 });
             }
         }
+        if w.kind == Kind::TimePicker {
+            o["time"] = serde_json::json!(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]));
+            if w.zeit_sek { o["seconds"] = serde_json::json!(true); }
+        }
         if let Some(r) = &w.rich {
             // Die QUELLE gehoert in die Datei, nicht der Satz: der haengt an
             // Breite, Schrift und Massstab und entsteht beim Laden neu.
@@ -6693,6 +6799,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             ts.hover = -1; ts.anker = -1; ts.sync();
             w.tree = Some(Box::new(ts));
+        }
+        if kind == Kind::TimePicker {
+            w.zeit_sek = wj["seconds"].as_bool().unwrap_or(false);
+            if let Some(t) = wj["time"].as_str() {
+                let teile: Vec<i32> = t.split(':').filter_map(|x| x.parse().ok()).collect();
+                for (k, v) in teile.iter().take(3).enumerate() { w.zeit[k] = (*v).clamp(0, 59); }
+                w.zeit[0] = w.zeit[0].clamp(0, 23);
+            }
         }
         if kind == Kind::RichText {
             let rj = wj.get("rich");
@@ -9533,6 +9647,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.dp_setze(wi, i, neu);
                 }
             }
+            Kind::TimePicker => {
+                let n = if self.windows[wi].widgets[i].zeit_sek { 3 } else { 2 };
+                let seit = rechts as i32 - links as i32;
+                if seit != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.sel = (w.sel + seit).clamp(0, n as i32 - 1);
+                }
+                let d = auf as i32 - ab as i32;
+                if d != 0 {
+                    let teil = self.windows[wi].widgets[i].sel.clamp(0, n as i32 - 1) as usize;
+                    self.tp_dreh(wi, i, teil, d);
+                }
+            }
             Kind::RichText => {
                 let d = ab as i32 - auf as i32;
                 if d != 0 {
@@ -9819,6 +9946,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.cp_zieh(win, i, mx, my);
             }
             Kind::DatePicker => self.dp_press(win, i, mx, my),
+            Kind::TimePicker => self.tp_press(win, i, mx, my),
             Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
             Kind::Table => self.table_press(win, i, mx, my),
             Kind::Tree => self.tree_press(win, i, mx, my),
@@ -11319,6 +11447,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 n
             }
+            Kind::TimePicker => {
+                let mut n = Node::new(Role::TimeInput);
+                n.set_value(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]));
+                n.add_action(Action::Increment);
+                n.add_action(Action::Decrement);
+                n
+            }
             Kind::RichText => {
                 let mut n = Node::new(Role::Document);
                 if let Some(r) = w.rich.as_ref() { n.set_value(r.quelle.clone()); }
@@ -12448,6 +12583,36 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.pop_clip();
             }
             Kind::RichText => self.draw_richtext(g, wi, idx),
+            Kind::TimePicker => {
+                let (x0, schritt, n) = self.tp_geom(wdg, ax, w);
+                let acc = self.acc_col(wdg);
+                let fg = self.txt_col(wdg);
+                let fw = schritt - self.sk(10);
+                for k in 0..n {
+                    let fx = x0 + k as i32 * schritt;
+                    self.fbox_tief(g, fx, ay, fx + fw - 1, ay + h - 1,
+                                   self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+                    if wdg.sel == k as i32 {
+                        g.rect(fx, ay, fx + fw - 1, ay + h - 1, acc);
+                    }
+                    let txt = format!("{:02}", wdg.zeit[k]);
+                    let tw = self.wtext_width(g, wdg, &txt);
+                    let th = self.wsize(g, wdg);
+                    self.wtext(g, wdg, fx + (fw - tw) / 2 - self.sk(5), ay + (h - th).max(0) / 2, txt, fg);
+                    // Pfeile rechts im Feld: oben hoch, unten runter.
+                    let px = fx + fw - self.sk(9);
+                    let (o, u) = (ay + h / 4, ay + h * 3 / 4);
+                    g.line(px - 3, o + 2, px, o - 2, fg);
+                    g.line(px, o - 2, px + 3, o + 2, fg);
+                    g.line(px - 3, u - 2, px, u + 2, fg);
+                    g.line(px, u + 2, px + 3, u - 2, fg);
+                    if k + 1 < n {
+                        let cx = fx + fw + self.sk(3);
+                        g.box_fill(cx, ay + h / 2 - self.sk(4), cx + 1, ay + h / 2 - self.sk(3), fg);
+                        g.box_fill(cx, ay + h / 2 + self.sk(2), cx + 1, ay + h / 2 + self.sk(3), fg);
+                    }
+                }
+            }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),

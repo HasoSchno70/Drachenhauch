@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1816,
+ "count": 1820,
  "builtins": [
   {
    "name": "ABS",
@@ -4017,6 +4017,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_TIME",
+   "kind": "core",
+   "signature": "GUI_SET_TIME(tp, zeit$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_VALUE",
    "kind": "core",
    "signature": "GUI_SET_VALUE(wdg, value)",
@@ -4608,6 +4614,24 @@
    "name": "GUI_THEME_SET",
    "kind": "core",
    "signature": "GUI_THEME_SET(key, color)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIME$",
+   "kind": "core",
+   "signature": "GUI_TIME$(tp) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIMEPICKER",
+   "kind": "core",
+   "signature": "GUI_TIMEPICKER(win, x, y, w = 0, h = 0) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIMEPICKER_SET",
+   "kind": "core",
+   "signature": "GUI_TIMEPICKER_SET(tp, key$, wert)",
    "module": "gui"
   },
   {
