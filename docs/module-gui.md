@@ -1744,6 +1744,19 @@ Drei Bedingungen, jede mit ihrem Grund:
 Bei **mehreren Schreibmarken** bleibt es beim bloßen Umbruch: fünf Abschlüsse
 auf einmal will niemand. Zwei leere Listen schalten es ab.
 
+## Reiter schließen
+
+`GUI_TABS_CLOSABLE(win, TRUE)` gibt jedem Reiter ein Kreuz; `GUI_TAB_CLOSED(win)`
+sagt, welcher weg soll (-1 = keiner), transient wie `GUI_CLICKED`. Getroffen
+wird über das Kreuz oder — wie im Browser — über die **mittlere** Maustaste
+irgendwo auf dem Reiter.
+
+**Geschlossen wird nichts.** Was ein geschlossener Reiter bedeutet, weiß nur
+das Programm: an ihm hängen seine Widgets, und vielleicht will es erst
+fragen, ob Ungesichertes verloren gehen darf. Ein Klick neben das Kreuz
+schaltet um wie zuvor; ohne den Schalter ändert sich gar nichts, die Reiter
+sind dann nur schmaler.
+
 ## Der Tabulator, wenn er mehr als eines bedeutet
 
 `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` gibt den Tabulator ganz dem
@@ -2182,6 +2195,8 @@ einem brauchbaren Code-Feld.
 | `GUI_TEXTAREA_SWATCHES(ta, starts, laengen, farben)` | Farbfelder: ein kleines Quadrat hinter dem Stueck. Welche Stelle im Text eine Farbe MEINT, weiss nur der Aufrufer -- die IDE sucht `&H`-Literale |
 | `GUI_TEXTAREA_SWATCH_CLICKED(ta)` → INTEGER | welches Farbfeld in diesem Bild angeklickt wurde (-1 = keins); gilt ein Bild lang wie `GUI_CLICKED`, die Schreibmarke bleibt dabei stehen |
 | `GUI_TEXTAREA_INDENT_WORDS(ta, anfang, ende, aus)` | drei Wortlisten für die Einrückung: die Zeile fängt damit an, sie endet damit, oder das Wort allein in einer Zeile rückt sie zurück |
+| `GUI_TABS_CLOSABLE(win, an)` | jeder Reiter bekommt ein Kreuz. Geschlossen wird nichts — die Laufzeit meldet nur, welches getroffen wurde |
+| `GUI_TAB_CLOSED(win)` | welcher Reiter in diesem Bild geschlossen werden soll (-1 = keiner). Trifft das Kreuz oder die mittlere Maustaste |
 | `GUI_TEXTAREA_TAB_HIT(ta)` | wurde der Tabulator in diesem Bild gedrückt? Nur mit `GUI_TEXTAREA_SET(ta, "tab_meldet", 1)` — dann rückt das Feld nicht ein und sieht nicht nach Abkürzungen, sondern meldet nur |
 | `GUI_TEXTAREA_CLOSE_WORDS(ta, oeffner, schluesse)` | das Gerüst, das mitwächst: öffnet die Zeile einen Block, setzt der Zeilenumbruch die schließende Zeile gleich mit darunter |
 | `GUI_TEXTAREA_ABBREV(ta, woerter)` | Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel |

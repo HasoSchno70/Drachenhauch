@@ -290,6 +290,9 @@ DIM dlgErsetze AS GUI_WINDOW : dlgErsetze = 0
 DIM dlgZeile AS GUI_WINDOW : dlgZeile = 0
 DIM dlgEingabe AS GUI_WINDOW : dlgEingabe = 0
 DIM dlgSchliessen AS GUI_WINDOW : dlgSchliessen = 0
+' Rueckfrage beim Schliessen EINES Reiters (dlgSchliessen fragt beim Beenden).
+DIM dlgTabZu AS GUI_WINDOW : dlgTabZu = 0
+DIM tabZuIndex AS INTEGER : tabZuIndex = -1
 DIM dlgUeber AS GUI_WINDOW : dlgUeber = 0
 DIM dlgProjekt AS GUI_WINDOW : dlgProjekt = 0
 DIM dlgBedingung AS GUI_WINDOW : dlgBedingung = 0
@@ -318,6 +321,9 @@ END SUB
 ' --- Hauptfenster ------------------------------------------------------
 DIM win AS GUI_WINDOW
 win = GUI_WINDOW("Drachenhauch", 0, 0, SCREENWIDTH(), SCREENHEIGHT())
+' Jeder Reiter bekommt ein Kreuz -- ohne das war ein Reiter mit der MAUS
+' gar nicht zu schliessen, nur mit Strg+W. Die mittlere Taste tut es auch.
+GUI_TABS_CLOSABLE(win, TRUE)
 GUI_WINDOW_CHROME(win, FALSE)
 GUI_WINDOW_MOVABLE(win, FALSE)
 
@@ -1653,6 +1659,22 @@ SUB andereSchliessen()
     protokoll("andere zu " + STR$(weg))
 END SUB
 
+' Einen Reiter schliessen -- mit Rueckfrage, wenn er Ungesichertes
+' traegt. Vorher nahm Strg+W die Aenderungen wortlos mit; beim Kreuz
+' faellt das noch mehr ins Gewicht, weil man es aus Versehen trifft.
+SUB tabSchliessenFragen(i AS INTEGER)
+    IF i < 0 OR i >= tabAnzahl THEN RETURN
+    IF GUI_TEXT(tabFelder[i]) = tabGesichert[i] THEN
+        tabSchliessen(i)
+        RETURN
+    END IF
+    tabZuIndex = i
+    DIM wie AS STRING : wie = "Unbenannt"
+    IF tabPfade[i] <> "" THEN wie = BASENAME(tabPfade[i])
+    dlgTabZu = GUI_DIALOG("Schliessen", wie + " hat ungesicherte Aenderungen.", _
+                          "Sichern|Verwerfen|Abbrechen")
+END SUB
+
 SUB tabSchliessen(i AS INTEGER)
     IF i < 0 OR i >= tabAnzahl THEN RETURN
     ' Den Pfad merken: Strg+Umschalt+T holt ihn zurueck. Nur gesicherte
@@ -1671,11 +1693,15 @@ SUB tabSchliessen(i AS INTEGER)
         GUI_SET_TAB(tabFelder[k], k)
     NEXT
     tabAnzahl = tabAnzahl - 1
+    ' Faellt ein Reiter LINKS vom aktiven weg, ruecken die anderen auf --
+    ' dieselbe Nummer meinte danach die Datei daneben. Mit Strg+W fiel das
+    ' nie auf (es schliesst immer den vorderen), mit dem Kreuz sofort.
+    IF i < aktiverTab THEN aktiverTab = aktiverTab - 1
     IF aktiverTab >= tabAnzahl THEN aktiverTab = tabAnzahl - 1
     reiterNeuSetzen()
     layout()
     GUI_LISTBOX_CLEAR(lstProbleme)
-    protokoll("geschlossen")
+    protokoll("geschlossen " + STR$(i))
 END SUB
 
 ' --- Projektbaum -------------------------------------------------------
@@ -5701,7 +5727,7 @@ SUB befehl(k AS STRING)
         CASE "kuerzel" : kuerzelZeigen()
         CASE "sichern" : sichern(aktiverTab, FALSE)
         CASE "sichern_unter" : sichern(aktiverTab, TRUE)
-        CASE "schliessen" : tabSchliessen(aktiverTab)
+        CASE "schliessen" : tabSchliessenFragen(aktiverTab)
         CASE "beenden" : beendenAnfragen()
         CASE "suchen" : dlgSuche = GUI_PROMPT("Suchen", "Wonach?", suchtext)
         CASE "weiter" : weitersuchen(TRUE)
@@ -5994,6 +6020,13 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF WINDOW_RESIZED() OR SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
         warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
         layout()
+    END IF
+
+    ' Ein Kreuz am Reiter (oder die mittlere Taste) schliesst ihn. VOR dem
+    ' Reiterwechsel abfragen: das Schliessen ruecken die Reiter auf, und der
+    ' Vergleich mit GUI_ACTIVE_TAB weiter unten meinte danach einen anderen.
+    IF GUI_TAB_CLOSED(win) >= 0 AND dlgTabZu = 0 THEN
+        tabSchliessenFragen(GUI_TAB_CLOSED(win))
     END IF
 
     ' Reiterwechsel durch Klick auf die Leiste
@@ -6302,6 +6335,17 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             dlgSchliessen = 0 : beenden = TRUE
         ELSEIF a4 = 3 THEN
             dlgSchliessen = 0
+        END IF
+    END IF
+    IF dlgTabZu <> 0 THEN
+        DIM a5 AS INTEGER : a5 = GUI_ANSWER(dlgTabZu)
+        IF a5 = 1 THEN
+            dlgTabZu = 0
+            IF sichern(tabZuIndex, FALSE) THEN tabSchliessen(tabZuIndex)
+        ELSEIF a5 = 2 THEN
+            dlgTabZu = 0 : tabSchliessen(tabZuIndex)
+        ELSEIF a5 = 3 THEN
+            dlgTabZu = 0
         END IF
     END IF
     IF dlgUeber <> 0 THEN

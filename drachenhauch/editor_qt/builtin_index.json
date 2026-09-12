@@ -3897,6 +3897,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABS_CLOSABLE",
+   "kind": "core",
+   "signature": "GUI_TABS_CLOSABLE(win, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TAB_CLOSED",
+   "kind": "core",
+   "signature": "GUI_TAB_CLOSED(win)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE",
    "kind": "core",
    "signature": "GUI_TABLE(5..7 Argumente)",

@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1727,
+ "count": 1729,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -673,6 +673,8 @@
   "GUI_TABLE_VIEW_COUNT": "INTEGER — wie viele Zeilen sind gerade SICHTBAR? (nach Filtern)",
   "GUI_TABLE_VIEW_ROW": "INTEGER — welche Datenzeile steht an sichtbarer Stelle i? -- Sortieren und Filtern stellen die Daten nicht um",
   "GUI_TABS": "Reiter-Leiste anlegen (labels = ARRAY/TUPLE von Strings); aktiver Reiter → 0",
+  "GUI_TABS_CLOSABLE": "jeder Reiter bekommt ein Kreuz. Geschlossen wird nichts — die Laufzeit meldet nur, welches getroffen wurde",
+  "GUI_TAB_CLOSED": "welcher Reiter in diesem Bild geschlossen werden soll (-1 = keiner). Trifft das Kreuz oder die mittlere Maustaste",
   "GUI_TEXT": "STRING — Text (Label/Button/TextInput)",
   "GUI_TEXTAREA": "GUI_WIDGET — mehrzeiliges Textfeld (ENTER = neue Zeile, scrollt senkrecht und waagerecht, Pfeile, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V). Als Code-Feld einfärbbar — siehe Code-Feld",
   "GUI_TEXTAREA_ABBREV": "Abkürzungen: steht eines dieser Wörter links der Marke, meldet der Tabulator es, statt einzurücken. Was an seine Stelle kommt, setzt der Aufrufer — die Laufzeit kennt keine Schnipsel",

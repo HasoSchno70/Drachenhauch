@@ -5350,6 +5350,9 @@ impl<'p> Vm<'p> {
             "gui_tabs" => { self.gui.set_tabs(gi(a,0,"GUI_TABS")?, gstrs(a,1,"GUI_TABS")?)?; Value::Nil }
             "gui_set_tab" => { self.gui.set_widget_tab(gi(a,0,"GUI_SET_TAB")?, gi(a,1,"GUI_SET_TAB")? as i32)?; Value::Nil }
             "gui_active_tab" => Value::Int(self.gui.active_tab(gi(a,0,"GUI_ACTIVE_TAB")?)?),
+            "gui_tabs_closable" => { let n_ = "GUI_TABS_CLOSABLE";
+                self.gui.tabs_closable(gi(a,0,n_)?, gbool(a,1,n_)?)?; Value::Nil }
+            "gui_tab_closed" => Value::Int(self.gui.tab_closed(gi(a,0,"GUI_TAB_CLOSED")?)?),
             "gui_set_active_tab" => { self.gui.set_active_tab(gi(a,0,"GUI_SET_ACTIVE_TAB")?, gi(a,1,"GUI_SET_ACTIVE_TAB")? as i32)?; Value::Nil }
             "gui_window_chrome" => { self.gui.window_chrome(gi(a,0,"GUI_WINDOW_CHROME")?, gbool(a,1,"GUI_WINDOW_CHROME")?)?; Value::Nil }
             "gui_window_design" => { self.gui.window_design(gi(a,0,"GUI_WINDOW_DESIGN")?, gbool(a,1,"GUI_WINDOW_DESIGN")?)?; Value::Nil }
