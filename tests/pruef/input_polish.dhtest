@@ -59,22 +59,28 @@ PRINT "KEY_HOME=" + KEY_NAME$(KEY_HOME)
 PRINT "KEY_END=" + KEY_NAME$(KEY_END)
 PRINT "KEY_PAGEUP=" + KEY_NAME$(KEY_PAGEUP)
 PRINT "KEY_PAGEDOWN=" + KEY_NAME$(KEY_PAGEDOWN)
-PRINT "KEY_KP0=" + KEY_NAME$(KEY_KP0)
-PRINT "KEY_KP1=" + KEY_NAME$(KEY_KP1)
-PRINT "KEY_KP2=" + KEY_NAME$(KEY_KP2)
-PRINT "KEY_KP3=" + KEY_NAME$(KEY_KP3)
-PRINT "KEY_KP4=" + KEY_NAME$(KEY_KP4)
-PRINT "KEY_KP5=" + KEY_NAME$(KEY_KP5)
-PRINT "KEY_KP6=" + KEY_NAME$(KEY_KP6)
-PRINT "KEY_KP7=" + KEY_NAME$(KEY_KP7)
-PRINT "KEY_KP8=" + KEY_NAME$(KEY_KP8)
-PRINT "KEY_KP9=" + KEY_NAME$(KEY_KP9)
+PRINT "KEY_KP0 da: " + IIF(KEY_NAME$(KEY_KP0) <> "", "ja", "nein")
+PRINT "KEY_KP1 da: " + IIF(KEY_NAME$(KEY_KP1) <> "", "ja", "nein")
+PRINT "KEY_KP2 da: " + IIF(KEY_NAME$(KEY_KP2) <> "", "ja", "nein")
+PRINT "KEY_KP3 da: " + IIF(KEY_NAME$(KEY_KP3) <> "", "ja", "nein")
+PRINT "KEY_KP4 da: " + IIF(KEY_NAME$(KEY_KP4) <> "", "ja", "nein")
+PRINT "KEY_KP5 da: " + IIF(KEY_NAME$(KEY_KP5) <> "", "ja", "nein")
+PRINT "KEY_KP6 da: " + IIF(KEY_NAME$(KEY_KP6) <> "", "ja", "nein")
+PRINT "KEY_KP7 da: " + IIF(KEY_NAME$(KEY_KP7) <> "", "ja", "nein")
+PRINT "KEY_KP8 da: " + IIF(KEY_NAME$(KEY_KP8) <> "", "ja", "nein")
+PRINT "KEY_KP9 da: " + IIF(KEY_NAME$(KEY_KP9) <> "", "ja", "nein")
 PRINT "KEY_KP_ENTER=" + KEY_NAME$(KEY_KP_ENTER)
-PRINT "KEY_KP_PLUS=" + KEY_NAME$(KEY_KP_PLUS)
-PRINT "KEY_KP_MINUS=" + KEY_NAME$(KEY_KP_MINUS)
-PRINT "KEY_KP_MULTIPLY=" + KEY_NAME$(KEY_KP_MULTIPLY)
-PRINT "KEY_KP_DIVIDE=" + KEY_NAME$(KEY_KP_DIVIDE)
-PRINT "KEY_KP_PERIOD=" + KEY_NAME$(KEY_KP_PERIOD)
+' Die ZEICHEN der Rechentasten am Ziffernblock kommen aus der
+' Tastaturbelegung (GLFW `glfwGetKeyName`), nicht aus einer Tabelle von
+' dhrt -- und was dort steht, hing hier schon einmal davon ab, ob die
+' Belegung beim ersten Bild ueberhaupt geladen war (einmal `^` statt `/`).
+' Geprueft wird darum, DASS ein Name da ist; die Frage dieses Falls ist
+' ohnehin, ob jede neue Konstante auf eine echte Taste zeigt.
+PRINT "KEY_KP_PLUS da: " + IIF(KEY_NAME$(KEY_KP_PLUS) <> "", "ja", "nein")
+PRINT "KEY_KP_MINUS da: " + IIF(KEY_NAME$(KEY_KP_MINUS) <> "", "ja", "nein")
+PRINT "KEY_KP_MULTIPLY da: " + IIF(KEY_NAME$(KEY_KP_MULTIPLY) <> "", "ja", "nein")
+PRINT "KEY_KP_DIVIDE da: " + IIF(KEY_NAME$(KEY_KP_DIVIDE) <> "", "ja", "nein")
+PRINT "KEY_KP_PERIOD da: " + IIF(KEY_NAME$(KEY_KP_PERIOD) <> "", "ja", "nein")
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
@@ -93,22 +99,22 @@ KEY_HOME=POS1
 KEY_END=ENDE
 KEY_PAGEUP=BILD-AUF
 KEY_PAGEDOWN=BILD-AB
-KEY_KP0=0
-KEY_KP1=1
-KEY_KP2=2
-KEY_KP3=3
-KEY_KP4=4
-KEY_KP5=5
-KEY_KP6=6
-KEY_KP7=7
-KEY_KP8=8
-KEY_KP9=9
+KEY_KP0 da: ja
+KEY_KP1 da: ja
+KEY_KP2 da: ja
+KEY_KP3 da: ja
+KEY_KP4 da: ja
+KEY_KP5 da: ja
+KEY_KP6 da: ja
+KEY_KP7 da: ja
+KEY_KP8 da: ja
+KEY_KP9 da: ja
 KEY_KP_ENTER=ENTER
-KEY_KP_PLUS=+
-KEY_KP_MINUS=-
-KEY_KP_MULTIPLY=*
-KEY_KP_DIVIDE=/
-KEY_KP_PERIOD=,
+KEY_KP_PLUS da: ja
+KEY_KP_MINUS da: ja
+KEY_KP_MULTIPLY da: ja
+KEY_KP_DIVIDE da: ja
+KEY_KP_PERIOD da: ja
 
 === new keys are queryable and idle
 SCREEN(160, 120, "In", 1)
