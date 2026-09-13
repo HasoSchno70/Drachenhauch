@@ -1799,11 +1799,12 @@ class _Inspector(QWidget):
         self.t_resize = QCheckBox("Spaltenbreiten ziehbar"); self.t_resize.setChecked(True)
         self.t_reorder = QCheckBox("Spalten verschiebbar")
         self.t_multi = QCheckBox("Mehrfachauswahl")
+        self.t_zellen = QCheckBox("Zellmodus (Gitter)")
         self.t_edit = QLineEdit(); self.t_edit.setPlaceholderText("bearbeitbare Spalten, z.B. 1, 2")
         self._t_felder = (self.t_headers, self.t_widths, self.t_rowh, self.t_headh,
                           self.t_frozen, self.t_zebra, self.t_grid, self.t_filter,
                           self.t_sort, self.t_resize, self.t_reorder, self.t_multi,
-                          self.t_edit)
+                          self.t_zellen, self.t_edit)
         self.vmin = QDoubleSpinBox(); self.vmax = QDoubleSpinBox(); self.vval = QDoubleSpinBox()
         for s in (self.vmin, self.vmax, self.vval):
             s.setRange(-1e6, 1e6)
@@ -1890,7 +1891,7 @@ class _Inspector(QWidget):
         self._add("Feste Spalten", self.t_frozen)
         self._add("Bearbeitbar", self.t_edit)
         for _cb in (self.t_zebra, self.t_grid, self.t_filter, self.t_sort,
-                    self.t_resize, self.t_reorder, self.t_multi):
+                    self.t_resize, self.t_reorder, self.t_multi, self.t_zellen):
             self._add("", _cb)
 
         self._section("Zustand")
@@ -1930,7 +1931,7 @@ class _Inspector(QWidget):
         for _w in (self.t_rowh, self.t_headh, self.t_frozen):
             _w.valueChanged.connect(self._apply)
         for _w in (self.t_zebra, self.t_grid, self.t_filter, self.t_sort,
-                   self.t_resize, self.t_reorder, self.t_multi):
+                   self.t_resize, self.t_reorder, self.t_multi, self.t_zellen):
             _w.toggled.connect(self._apply)
         self.visible.toggled.connect(self._apply)
         for s in (self.sx, self.sy, self.sw, self.sh, self.vmin, self.vmax, self.vval):
@@ -2044,6 +2045,7 @@ class _Inspector(QWidget):
         self.t_resize.setChecked(bool(tj.get("resizable_cols", True)))
         self.t_reorder.setChecked(bool(tj.get("reorderable", False)))
         self.t_multi.setChecked(bool(tj.get("multi", False)))
+        self.t_zellen.setChecked(bool(tj.get("zellmodus", False)))
         self.t_edit.setText(", ".join(str(i) for i, an in enumerate(tj.get("col_edit") or []) if an))
 
     def _tabelle_schreiben(self, c: Control):
@@ -2069,6 +2071,11 @@ class _Inspector(QWidget):
         tj["resizable_cols"] = self.t_resize.isChecked()
         tj["reorderable"] = self.t_reorder.isChecked()
         tj["multi"] = self.t_multi.isChecked()
+        # Wie die Laufzeit: nur schreiben, was vom Standard abweicht.
+        if self.t_zellen.isChecked():
+            tj["zellmodus"] = True
+        else:
+            tj.pop("zellmodus", None)
         spalten = self._zahlen(self.t_edit.text())
         if spalten:
             n = max(spalten) + 1

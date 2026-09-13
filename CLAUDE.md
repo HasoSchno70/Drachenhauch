@@ -2873,6 +2873,41 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 30 (2026-09-13):** die Frage des Nutzers -- gibt es ein
+Gitter-Steuerelement? Halb: `GUI_TABLE` konnte sortieren, filtern und Zellen
+per Doppelklick bearbeiten, aber es gab keine aktuelle Zelle, keinen Bereich,
+keine Zwischenablage, keine Zahlen- oder Auswahlspalten -- und **eine Tabelle
+mit Fokus nahm ueberhaupt keine Taste an** (`table_keys` kannte nur Editor und
+Filter; die Pfeile bewegten nicht einmal die Zeilenauswahl). Jetzt ist das
+Gitter ein **Zellmodus derselben Tabelle** (`TableState::zellmodus`,
+`GUI_TABLE_SET "zellmodus"`, `GUI_GRID` legt eine an), damit Sortieren,
+Filter, feste Spalten und Zellarten nicht doppelt entstehen. Aktuelle Zelle
+und Anker sind DATENzeile/-spalte (`cur_r/cur_c`, `ber_r/ber_c`), der
+Bereich ist das Rechteck in der SICHTBAREN Reihenfolge (`bereich()`), ueber
+Datenzeilen waere er nach dem Sortieren ein Flickenteppich. Tastatur
+`table_nav_keys` (Pfeile/Bild/Pos1/Ende, Umschalt = Bereich, Tab mit
+Zeilenumbruch, Tippen ERSETZT, Enter/F2 bearbeitet, Entf leert, Leertaste
+kippt Haken, Strg+A/C/X/V); in der Bearbeitung ruecken Enter und Tab weiter
+(`table_schritt`, unter der letzten Zeile mit `zeilen_anhaengen` eine neue).
+**Tab gehoert dem Gitter** (`tab_belegt`), hinaus mit Strg+Tab. Kopiert wird
+Tabulator-Text; eingefuegt nach den Regeln der Spalte (`zelle_schreiben`:
+gesperrt oder unpassend = uebergangen, nicht halb geschrieben;
+`GUI_TABLE_PASTE` zaehlt). `GUI_TABLE_COL_TYPE` (text/ganz/zahl/auswahl --
+Zahlen filtern beim Tippen mit `zahl_erlaubt` wie das Textfeld) und
+`GUI_TABLE_COL_CHOICES` (Auswahlliste in der oberen Schicht, `wahl_geom` =
+eine Quelle fuer Zeichnen und Klick). `GUI_TABLE_SET_CURRENT` rollt ueber
+`sicht_holen` + `tabellen_pass`, weil ein Setter keine Geometrie hat.
+`.dhform` `zellmodus`/`zeilen_anhaengen`/`col_type`/`col_choices`; Designer
+Kaestchen "Zellmodus" + Codegen. Die IDE: das Profil ist ein Gitter
+(Strg+C kopiert Zeilen). **Stolperstein, vom Gitter aufgedeckt:**
+`IF GUI_TABLE_CLICKED(tblProfil) THEN` -- das Builtin liefert -1 fuer
+"keins", und -1 ist WAHR; `profilAnspringen` lief seit Stufe 2 in jedem Bild
+und nagelte nach dem ersten Klick ins Profil die Marke fest. Sichtbar wurde
+es erst, als Pfeile im Gitter eine Zeile waehlten und ein fremder Test
+(Aufrufer-Baum) rot wurde; `--check` sagt dazu nichts. Die uebrigen
+-1-Builtins in IDE und Beispielen vergleichen alle mit `>= 0`. Tests `tests/pruef/gui_gitter.dhtest` (6, darunter
+die Pfeiltasten in einer gewoehnlichen Tabelle), ein Rust-Test.
+
 **Stufe 29 (2026-09-13):** das Handbuch bedienbar, als Ausbau von
 `GUI_RICHTEXT`. **Auswahl** (`RichState` anker/marke/hat_auswahl): eine
 Stelle ist (Zeile, Zeichen im ZEILENTEXT) -- `rt_zeilentext` fuegt die Laeufe

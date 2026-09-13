@@ -53,8 +53,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 27 | **Knopfarten** und **komfortable Listen** in der Laufzeit; die Befehlspalette zeigt Kürzel und Ordner als Zusatztext rechts, die Hauptknöpfe der Dialoge sind hervorgehoben, der Debugger-Stopp ist rot |
 | 28 | **Statusleiste mit Feldern** (Meldung, Stelle der Marke, Umbruch — die beiden rechten anklickbar), die Symbolspur ist eine **Pfadleiste** (ein Klick springt zum Block), und die Werkzeugleiste legt, was nicht passt, in ein **»-Menü** |
 | 29 | Im **gesetzten Handbuch** markieren (Ziehen, Doppelklick = Wort, Strg+A) und kopieren (Strg+C); die Suche geht **weiter und zurück** mit Umlauf, markiert die Fundstelle und hebt **alle Fundstellen** hervor |
+| 30 | Die Tabelle der Laufzeit kann **Gitter** (`GUI_GRID`, Zellmodus: aktuelle Zelle, Bereich, Tippen bearbeitet, Strg+C/V als Tabulator-Text, Zahlen- und Auswahlspalten); das **Profil** ist ein Gitter, seine Zeilen lassen sich markieren und kopieren |
 
-## Was sie heute kann (Stand 29, 13.09.2026)
+## Was sie heute kann (Stand 30, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
