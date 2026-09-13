@@ -1394,6 +1394,8 @@ class FormDoc:
                     ("spalten_ziehbar", "resizable_cols", True),
                     ("spalten_verschiebbar", "reorderable", False),
                     ("mehrfachauswahl", "multi", False),
+                    ("zellmodus", "zellmodus", False),
+                    ("zeilen_anhaengen", "zeilen_anhaengen", False),
                     ("feste_spalten", "frozen", 0)):
                 wert = tj.get(feld, standard)
                 if wert != standard:
