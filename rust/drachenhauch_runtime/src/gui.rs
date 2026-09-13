@@ -1372,6 +1372,17 @@ struct ListState {
     checks: Vec<bool>,    // Haken je Eintrag (nur mit `kaestchen`)
     colors: Vec<i64>,     // Textfarbe je Eintrag, -1 = Thema
     sel: Vec<bool>,       // Mehrfachauswahl je Eintrag
+    // --- Stufe 27: was eine Liste komfortabel macht -------------------------
+    daten: Vec<String>,   // unsichtbarer Wert je Eintrag (eine ID, ein Pfad)
+    details: Vec<String>, // Zusatztext rechts, gedaempft (Kuerzel, Zeilennummer)
+    tips: Vec<String>,    // Tooltip je Eintrag
+    aus: Vec<bool>,       // gesperrt: sichtbar, aber nicht waehlbar
+    kopf: Vec<bool>,      // Gruppenkopf: nicht waehlbar, gliedert die Liste
+    filter: String,       // Teiltext; leer = alles sichtbar
+    leer_text: String,    // Hinweis, wenn nichts zu sehen ist
+    hover: i32,           // Eintrag unter der Maus (je Bild neu, fuer den Tooltip)
+    tipp: String,         // Tipp-Puffer fuer "tippen springt"
+    tipp_zeit: f64,
     multi: bool,
     kaestchen: bool,
     anker: i32,           // Anker fuer Umschalt+Klick
@@ -1384,24 +1395,117 @@ impl ListState {
         self.checks.resize(n, false);
         self.colors.resize(n, -1);
         self.sel.resize(n, false);
+        self.daten.resize(n, String::new());
+        self.details.resize(n, String::new());
+        self.tips.resize(n, String::new());
+        self.aus.resize(n, false);
+        self.kopf.resize(n, false);
     }
     fn einfuegen(&mut self, pos: usize) {
         self.icons.insert(pos, -1);
         self.checks.insert(pos, false);
         self.colors.insert(pos, -1);
         self.sel.insert(pos, false);
+        self.daten.insert(pos, String::new());
+        self.details.insert(pos, String::new());
+        self.tips.insert(pos, String::new());
+        self.aus.insert(pos, false);
+        self.kopf.insert(pos, false);
     }
     fn entfernen(&mut self, pos: usize) {
         self.icons.remove(pos);
         self.checks.remove(pos);
         self.colors.remove(pos);
         self.sel.remove(pos);
+        self.daten.remove(pos);
+        self.details.remove(pos);
+        self.tips.remove(pos);
+        self.aus.remove(pos);
+        self.kopf.remove(pos);
+    }
+    /// Einen Eintrag von `a` nach `b` tragen -- alles, was an ihm haengt, reist mit.
+    fn tragen(&mut self, a: usize, b: usize) {
+        fn zug<T>(v: &mut Vec<T>, a: usize, b: usize) { let x = v.remove(a); v.insert(b, x); }
+        zug(&mut self.icons, a, b); zug(&mut self.checks, a, b); zug(&mut self.colors, a, b);
+        zug(&mut self.sel, a, b); zug(&mut self.daten, a, b); zug(&mut self.details, a, b);
+        zug(&mut self.tips, a, b); zug(&mut self.aus, a, b); zug(&mut self.kopf, a, b);
+    }
+    /// Nach einer Umordnung: jeder Vektor in der Reihenfolge `ord` (alte Plaetze).
+    fn umordnen(&mut self, ord: &[usize]) {
+        fn nach<T: Clone>(v: &mut Vec<T>, ord: &[usize]) { *v = ord.iter().map(|&k| v[k].clone()).collect(); }
+        nach(&mut self.icons, ord); nach(&mut self.checks, ord); nach(&mut self.colors, ord);
+        nach(&mut self.sel, ord); nach(&mut self.daten, ord); nach(&mut self.details, ord);
+        nach(&mut self.tips, ord); nach(&mut self.aus, ord); nach(&mut self.kopf, ord);
+    }
+    fn waehlbar(&self, k: usize) -> bool {
+        !self.aus.get(k).copied().unwrap_or(false) && !self.kopf.get(k).copied().unwrap_or(false)
     }
     fn ist_leer(&self) -> bool {
         !self.multi && !self.kaestchen && self.icons.iter().all(|&i| i < 0)
             && self.colors.iter().all(|&c| c < 0) && !self.checks.iter().any(|&c| c)
+            && self.daten.iter().all(|s| s.is_empty()) && self.details.iter().all(|s| s.is_empty())
+            && self.tips.iter().all(|s| s.is_empty()) && !self.aus.iter().any(|&x| x)
+            && !self.kopf.iter().any(|&x| x) && self.leer_text.is_empty()
     }
 }
+
+/// Die SICHTBAREN Eintraege einer Liste, in Anzeigereihenfolge (Datenzeilen).
+/// EINE Quelle fuer Zeichnen, Klick, Tastatur, Rollen und Bildschirmleser --
+/// wie `view` bei der Tabelle. Ein Gruppenkopf bleibt stehen, solange in seiner
+/// Gruppe etwas zum Filter passt; sonst stuende er ueber einer leeren Gruppe.
+fn liste_ansicht(items: &[String], l: Option<&ListState>) -> Vec<usize> {
+    let filter = match l { Some(l) if !l.filter.is_empty() => l.filter.to_lowercase(), _ => return (0..items.len()).collect() };
+    let l = l.unwrap();
+    let passt = |k: usize| items[k].to_lowercase().contains(&filter)
+        || l.details.get(k).map(|d| d.to_lowercase().contains(&filter)).unwrap_or(false);
+    let mut out = Vec::new();
+    let mut kopf: Option<usize> = None;
+    for k in 0..items.len() {
+        if l.kopf.get(k).copied().unwrap_or(false) { kopf = Some(k); continue; }
+        if passt(k) {
+            if let Some(kp) = kopf.take() { out.push(kp); }
+            out.push(k);
+        }
+    }
+    out
+}
+
+/// Zwei Eintraege vergleichen wie ein Mensch: Zahlen nach Wert ("Datei 9" vor
+/// "Datei 10"), sonst ohne Ruecksicht auf Gross/klein.
+fn natuerlich_vergleichen(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (a, b) = (a.to_lowercase(), b.to_lowercase());
+    let (mut ia, mut ib) = (a.chars().peekable(), b.chars().peekable());
+    loop {
+        match (ia.peek().copied(), ib.peek().copied()) {
+            (None, None) => return Ordering::Equal,
+            (None, _) => return Ordering::Less,
+            (_, None) => return Ordering::Greater,
+            (Some(x), Some(y)) if x.is_ascii_digit() && y.is_ascii_digit() => {
+                let mut na = String::new(); while let Some(c) = ia.peek().copied().filter(|c| c.is_ascii_digit()) { na.push(c); ia.next(); }
+                let mut nb = String::new(); while let Some(c) = ib.peek().copied().filter(|c| c.is_ascii_digit()) { nb.push(c); ib.next(); }
+                let (za, zb) = (na.trim_start_matches('0'), nb.trim_start_matches('0'));
+                let o = za.len().cmp(&zb.len()).then_with(|| za.cmp(zb));
+                if o != Ordering::Equal { return o; }
+            }
+            (Some(x), Some(y)) => {
+                if x != y { return x.cmp(&y); }
+                ia.next(); ib.next();
+            }
+        }
+    }
+}
+
+/// Lesbare Schrift auf einem Grund: dunkel auf hellem, weiss auf dunklem.
+/// Gewichtet wie das Auge (Gruen zaehlt am meisten) -- ein gelber Knopf mit
+/// weisser Schrift ist sonst unlesbar, obwohl sein Rotanteil niedrig ist.
+fn lesbar_auf(bg: i64) -> i64 {
+    let (r, g, b) = (((bg >> 16) & 0xFF) as f64, ((bg >> 8) & 0xFF) as f64, (bg & 0xFF) as f64);
+    if 0.299 * r + 0.587 * g + 0.114 * b > 160.0 { 0x1C2026 } else { 0xFFFFFF }
+}
+
+/// Knopfarten (GUI_BUTTON_VARIANT). Index = Wert im Widget-Feld `variante`.
+pub const KNOPF_ARTEN: &[&str] = &["standard", "primaer", "erfolg", "warnung", "gefahr", "umriss", "flach", "link"];
 
 /// Ein Layout-Behaelter: unsichtbar, verteilt seine Kinder in jedem
 /// GUI_UPDATE neu. Kinder sind Widget-Indizes desselben Fensters; -1 ist ein
@@ -1511,6 +1615,8 @@ pub struct Widget {
     visible: bool,
     /// Rund statt eckig zeichnen (Transport-Knoepfe, Werkzeug-Kreise).
     rund: bool,
+    /// Knopfart (Index in KNOPF_ARTEN): 0 = standard, 1 = primaer, ...
+    variante: u8,
     // Formular-Widgets: `group` = Radio-Gruppe; `items` = Dropdown-/ListBox-
     // Eintraege; `sel` = ausgewaehlter Index (Dropdown), -1 = keiner.
     group: String,
@@ -2848,7 +2954,7 @@ impl Gui {
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
             on_hover: None, on_leave: None, on_focus: None, on_blur: None,
             was_hovered: false, was_focused: false,
-            alive: true, visible: true, rund: false,
+            alive: true, visible: true, rund: false, variante: 0,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
@@ -3408,6 +3514,8 @@ impl Gui {
         if let Some(l) = w.list.as_mut() {
             let n = items.len();
             l.icons = vec![-1; n]; l.checks = vec![false; n]; l.colors = vec![-1; n]; l.sel = vec![false; n];
+            l.daten = vec![String::new(); n]; l.details = vec![String::new(); n]; l.tips = vec![String::new(); n];
+            l.aus = vec![false; n]; l.kopf = vec![false; n];
             l.anker = -1;
         }
         w.items = items; w.value = 0.0; Ok(())
@@ -3486,10 +3594,7 @@ impl Gui {
         let t = w.items.remove(a); w.items.insert(b, t);
         if let Some(l) = w.list.as_mut() {
             l.sync(w.items.len());
-            let ic = l.icons.remove(a); l.icons.insert(b, ic);
-            let ch = l.checks.remove(a); l.checks.insert(b, ch);
-            let co = l.colors.remove(a); l.colors.insert(b, co);
-            let se = l.sel.remove(a); l.sel.insert(b, se);
+            l.tragen(a, b);
         }
         if w.sel == a as i32 { w.sel = b as i32; }
         else if a < b && w.sel > a as i32 && w.sel <= b as i32 { w.sel -= 1; }
@@ -3579,6 +3684,185 @@ impl Gui {
     /// Breite der Kaestchen-Spalte einer Liste (0 ohne Kaestchen).
     fn list_box_w(&self, w: &Widget) -> i32 {
         if w.list.as_ref().map(|l| l.kaestchen).unwrap_or(false) { self.sk(DROPDOWN_ITEM_H) } else { 0 }
+    }
+
+    // ---- Stufe 27: was eine Liste komfortabel macht -----------------------
+
+    fn list_ref(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::ListBox { return Err(format!("{}: das Widget ist keine Liste (GUI_LISTBOX)", fn_)); }
+        Ok(w)
+    }
+    /// Unsichtbarer Wert je Eintrag -- die ID einer Datenbankzeile, ein Pfad.
+    /// Der TEXT ist fuer Menschen und aendert sich; der Wert bleibt.
+    pub fn list_set_data(&mut self, h: i64, i: i64, wert: String) -> Result<(), String> {
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_SET_DATA")?, i, "GUI_LISTBOX_SET_DATA")?;
+        self.list_mut(h, "GUI_LISTBOX_SET_DATA")?.daten[p] = wert; Ok(())
+    }
+    pub fn list_data(&self, h: i64, i: i64) -> Result<String, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_DATA")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_DATA")?;
+        Ok(w.list.as_ref().and_then(|l| l.daten.get(p).cloned()).unwrap_or_default())
+    }
+    /// Der erste Eintrag mit diesem Wert, -1 = keiner.
+    pub fn list_find_data(&self, h: i64, wert: &str) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_FIND_DATA")?;
+        Ok(w.list.as_ref().and_then(|l| l.daten.iter().position(|d| d == wert)).map(|p| p as i64).unwrap_or(-1))
+    }
+    pub fn list_detail(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_DETAIL")?, i, "GUI_LISTBOX_DETAIL")?;
+        self.list_mut(h, "GUI_LISTBOX_DETAIL")?.details[p] = text; Ok(())
+    }
+    pub fn list_tip(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_TIP")?, i, "GUI_LISTBOX_TIP")?;
+        self.list_mut(h, "GUI_LISTBOX_TIP")?.tips[p] = text; Ok(())
+    }
+    /// Einen Eintrag sperren: er bleibt sichtbar, laesst sich aber weder
+    /// anklicken noch mit der Tastatur erreichen. Ist er gerade gewaehlt, faellt
+    /// die Wahl weg -- sonst meldete GUI_LISTBOX_SELECTED etwas, das man nicht
+    /// waehlen darf.
+    pub fn list_enable(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_ENABLE")?, i, "GUI_LISTBOX_ENABLE")?;
+        let l = self.list_mut(h, "GUI_LISTBOX_ENABLE")?;
+        l.aus[p] = !an;
+        if !an { l.sel[p] = false; }
+        let w = self.wdg_mut(h, "GUI_LISTBOX_ENABLE")?;
+        if !an && w.sel == p as i32 { w.sel = -1; }
+        Ok(())
+    }
+    pub fn list_enabled(&self, h: i64, i: i64) -> Result<bool, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_ENABLED")?;
+        let p = Self::list_idx(w, i, "GUI_LISTBOX_ENABLED")?;
+        Ok(w.list.as_ref().map(|l| !l.aus.get(p).copied().unwrap_or(false)).unwrap_or(true))
+    }
+    /// Einen Eintrag zum Gruppenkopf machen: er gliedert die Liste, ist nicht
+    /// waehlbar, und Sortieren arbeitet INNERHALB der Gruppen.
+    pub fn list_header(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_HEADER")?, i, "GUI_LISTBOX_HEADER")?;
+        let l = self.list_mut(h, "GUI_LISTBOX_HEADER")?;
+        l.kopf[p] = an;
+        if an { l.sel[p] = false; }
+        let w = self.wdg_mut(h, "GUI_LISTBOX_HEADER")?;
+        if an && w.sel == p as i32 { w.sel = -1; }
+        Ok(())
+    }
+    /// Filter: nur Eintraege, deren Text (oder Zusatztext) den Teiltext
+    /// enthaelt, ohne Ruecksicht auf Gross/klein. Die Eintraege bleiben, wo
+    /// sie sind -- alle Nummern nach aussen sind weiter DATENzeilen.
+    pub fn list_filter(&mut self, h: i64, text: String) -> Result<(), String> {
+        let l = self.list_mut(h, "GUI_LISTBOX_FILTER")?;
+        if l.filter == text { return Ok(()); }
+        l.filter = text;
+        self.wdg_mut(h, "GUI_LISTBOX_FILTER")?.value = 0.0;
+        Ok(())
+    }
+    pub fn list_get_filter(&self, h: i64) -> Result<String, String> {
+        Ok(self.list_ref(h, "GUI_LISTBOX_GET_FILTER")?.list.as_ref().map(|l| l.filter.clone()).unwrap_or_default())
+    }
+    pub fn list_view_count(&self, h: i64) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_VIEW_COUNT")?;
+        Ok(liste_ansicht(&w.items, w.list.as_deref()).len() as i64)
+    }
+    /// Die k-te SICHTBARE Zeile als Datenzeile, -1 wenn es sie nicht gibt.
+    pub fn list_view_row(&self, h: i64, k: i64) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_VIEW_ROW")?;
+        Ok(liste_ansicht(&w.items, w.list.as_deref()).get(k.max(0) as usize).filter(|_| k >= 0).map(|&x| x as i64).unwrap_or(-1))
+    }
+    pub fn list_placeholder(&mut self, h: i64, text: String) -> Result<(), String> {
+        self.list_mut(h, "GUI_LISTBOX_PLACEHOLDER")?.leer_text = text; Ok(())
+    }
+    /// Sortieren -- natuerlich ("Datei 9" vor "Datei 10"), und INNERHALB der
+    /// Gruppen, wenn es Gruppenkoepfe gibt: sonst risse Sortieren die Koepfe
+    /// von ihren Eintraegen weg. Alles, was an einem Eintrag haengt, reist mit,
+    /// und die Auswahl meint danach denselben Eintrag.
+    pub fn list_sort(&mut self, h: i64, absteigend: bool) -> Result<(), String> {
+        self.list_mut(h, "GUI_LISTBOX_SORT")?;
+        let w = self.wdg_mut(h, "GUI_LISTBOX_SORT")?;
+        let n = w.items.len();
+        let kopf: Vec<bool> = w.list.as_ref().map(|l| l.kopf.clone()).unwrap_or_else(|| vec![false; n]);
+        let mut ord: Vec<usize> = Vec::with_capacity(n);
+        let mut k = 0;
+        while k < n {
+            if kopf[k] { ord.push(k); k += 1; continue; }
+            let start = k;
+            while k < n && !kopf[k] { k += 1; }
+            let mut gruppe: Vec<usize> = (start..k).collect();
+            gruppe.sort_by(|&a, &b| {
+                let o = natuerlich_vergleichen(&w.items[a], &w.items[b]);
+                if absteigend { o.reverse() } else { o }
+            });
+            ord.extend(gruppe);
+        }
+        let alt_items = w.items.clone();
+        w.items = ord.iter().map(|&k| alt_items[k].clone()).collect();
+        if let Some(l) = w.list.as_mut() { l.umordnen(&ord); l.anker = -1; }
+        if w.sel >= 0 { w.sel = ord.iter().position(|&k| k as i32 == w.sel).map(|p| p as i32).unwrap_or(-1); }
+        Ok(())
+    }
+    /// Der naechste Eintrag ab `ab` (einschliesslich), dessen Text den
+    /// Teiltext enthaelt -- ohne Ruecksicht auf Gross/klein; -1 = keiner.
+    pub fn list_find(&self, h: i64, text: &str, ab: i64) -> Result<i64, String> {
+        let w = self.list_ref(h, "GUI_LISTBOX_FIND")?;
+        let t = text.to_lowercase();
+        Ok(w.items.iter().enumerate().skip(ab.max(0) as usize)
+            .find(|(_, s)| s.to_lowercase().contains(&t)).map(|(k, _)| k as i64).unwrap_or(-1))
+    }
+    /// So rollen, dass der Eintrag zu sehen ist (liegt er im Filter verborgen,
+    /// passiert nichts).
+    pub fn list_scroll_to(&mut self, h: i64, i: i64) -> Result<(), String> {
+        let (wi, idx) = Self::dec_widget(h);
+        let p = Self::list_idx(self.list_ref(h, "GUI_LISTBOX_SCROLL_TO")?, i, "GUI_LISTBOX_SCROLL_TO")? as i32;
+        self.liste_rollen_zu(wi, idx, p);
+        Ok(())
+    }
+    /// Welche Datenzeile liegt auf Hoehe `my`? -1 = keine.
+    fn liste_zeile(&self, wi: usize, i: usize, my: i32) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        let (_, ay, _, _) = self.abs_rect(wi, w);
+        let r = (my - ay + w.value as i32).div_euclid(self.sk(DROPDOWN_ITEM_H));
+        let ansicht = liste_ansicht(&w.items, w.list.as_deref());
+        if r < 0 || r as usize >= ansicht.len() { return -1; }
+        ansicht[r as usize] as i32
+    }
+
+    // --- Knopfarten ---
+    /// GUI_BUTTON_VARIANT(knopf, art$): standard, primaer, erfolg, warnung,
+    /// gefahr, umriss, flach, link. Die Farben kommen aus dem Thema (primaer =
+    /// Akzent) bzw. aus einer festen, lesbaren Reihe -- und die TEXTfarbe wird
+    /// danach gewaehlt, wie hell der Grund ist.
+    pub fn set_button_variant(&mut self, h: i64, art: &str) -> Result<(), String> {
+        let a = art.trim().to_lowercase();
+        let k = KNOPF_ARTEN.iter().position(|x| *x == a).ok_or_else(|| format!(
+            "GUI_BUTTON_VARIANT: Knopfart '{}' gibt es nicht -- bekannt sind: {}", art, KNOPF_ARTEN.join(", ")))?;
+        let w = self.wdg_mut(h, "GUI_BUTTON_VARIANT")?;
+        if w.kind != Kind::Button { return Err("GUI_BUTTON_VARIANT: Widget ist kein Knopf".into()); }
+        w.variante = k as u8; Ok(())
+    }
+    pub fn button_variant(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_BUTTON_VARIANT$")?;
+        Ok(KNOPF_ARTEN[w.variante.min(KNOPF_ARTEN.len() as u8 - 1) as usize].to_string())
+    }
+    /// Grundfarbe eines gefuellten Knopfes -- eigene Farbe vor Knopfart; None =
+    /// die Farbe des Themas.
+    fn knopf_grund(&self, w: &Widget) -> Option<i64> {
+        if let Some(c) = w.ov.get("bg") { return Some(*c); }
+        match w.variante {
+            1 => Some(self.wcol(w, "accent", "accent")),
+            2 => Some(0x2E9E5B),
+            3 => Some(0xD98E1F),
+            4 => Some(0xC94A3F),
+            _ => None,
+        }
+    }
+    /// Textfarbe eines Knopfes: eigene vor lesbarer vor Thema.
+    fn knopf_text(&self, w: &Widget) -> i64 {
+        if !w.enabled { return self.th("muted_fg"); }
+        if let Some(c) = w.ov.get("fg") { return *c; }
+        match w.variante {
+            5 | 7 => self.wcol(w, "accent", "accent"),
+            6 => self.th("text_fg"),
+            _ => match self.knopf_grund(w) { Some(bg) => lesbar_auf(bg), None => self.th("text_fg") },
+        }
     }
 
     // --- Tabelle ---
@@ -5966,8 +6250,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     pub fn set_color(&mut self, h: i64, role: String, color: i64) -> Result<(), String> {
-        if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent") {
-            return Err("GUI_SET_COLOR: role muss bg/fg/border/accent sein".into());
+        if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed") {
+            return Err("GUI_SET_COLOR: role muss bg/fg/border/accent/hover/pressed sein".into());
         }
         let w = self.wdg_mut(h, "GUI_SET_COLOR")?;
         if color == -1 { w.ov.remove(&role); } else { w.ov.insert(role, color); }
@@ -6011,8 +6295,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Benannten Style anlegen/erweitern: `prop` in bg/fg/border/accent (Farbe),
     /// font (Handle), font_size (px). Inkrementell aufrufbar.
     pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {
-        if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "font" | "font_size") {
-            return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/font/font_size sein".into());
+        if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "hover" | "pressed" | "font" | "font_size") {
+            return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein".into());
         }
         if prop == "font_size" && value < 0 { return Err("GUI_STYLE_SET: font_size muss >= 0 sein".into()); }
         self.styles.entry(name).or_default().insert(prop, value);
@@ -6880,6 +7164,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if l.checks.iter().any(|&c| c) { lo.insert("checked".into(), serde_json::json!(l.checks)); }
                 if l.colors.iter().any(|&c| c >= 0) { lo.insert("colors".into(), serde_json::json!(l.colors)); }
                 if l.multi && l.sel.iter().any(|&x| x) { lo.insert("selected".into(), serde_json::json!(l.sel)); }
+                if l.daten.iter().any(|s| !s.is_empty()) { lo.insert("daten".into(), serde_json::json!(l.daten)); }
+                if l.details.iter().any(|s| !s.is_empty()) { lo.insert("details".into(), serde_json::json!(l.details)); }
+                if l.tips.iter().any(|s| !s.is_empty()) { lo.insert("tips".into(), serde_json::json!(l.tips)); }
+                if l.aus.iter().any(|&x| x) { lo.insert("gesperrt".into(), serde_json::json!(l.aus)); }
+                if l.kopf.iter().any(|&x| x) { lo.insert("koepfe".into(), serde_json::json!(l.kopf)); }
+                if !l.leer_text.is_empty() { lo.insert("leer_text".into(), serde_json::json!(l.leer_text)); }
                 o["list"] = serde_json::Value::Object(lo);
             }
         }
@@ -7024,6 +7314,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             o["rich"] = rj;
         }
         if !w.sinnbild.is_empty() { o["symbol"] = serde_json::json!(w.sinnbild); }
+        if w.variante > 0 { o["variant"] = serde_json::json!(KNOPF_ARTEN[w.variante as usize]); }
         if let Some(l) = &w.leiste {
             // Textur-Handles gehoeren NICHT in die Datei (sie gelten nur in
             // diesem Lauf) -- ein Eintrag mit Bild steht darum ohne Bild da.
@@ -7159,6 +7450,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if let Some(a) = lj.get("selected").and_then(|v| v.as_array()) {
                 for (k, v) in a.iter().enumerate().take(n) { l.sel[k] = v.as_bool().unwrap_or(false); }
             }
+            let texte = |name: &str, ziel: &mut Vec<String>| {
+                if let Some(a) = lj.get(name).and_then(|v| v.as_array()) {
+                    for (k, v) in a.iter().enumerate().take(n) { ziel[k] = v.as_str().unwrap_or("").to_string(); }
+                }
+            };
+            texte("daten", &mut l.daten);
+            texte("details", &mut l.details);
+            texte("tips", &mut l.tips);
+            let schalter = |name: &str, ziel: &mut Vec<bool>| {
+                if let Some(a) = lj.get(name).and_then(|v| v.as_array()) {
+                    for (k, v) in a.iter().enumerate().take(n) { ziel[k] = v.as_bool().unwrap_or(false); }
+                }
+            };
+            schalter("gesperrt", &mut l.aus);
+            schalter("koepfe", &mut l.kopf);
+            l.leer_text = lj.get("leer_text").and_then(|v| v.as_str()).unwrap_or("").to_string();
             w.list = Some(Box::new(l));
         }
         // Farbe als "#RRGGBB" -- lesbar in der Datei und nicht als Zahl, die
@@ -7308,6 +7615,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 code_font: -1,
                 ..Default::default()
             }));
+        }
+        if let Some(v) = wj["variant"].as_str() {
+            if kind == Kind::Button {
+                if let Some(k) = KNOPF_ARTEN.iter().position(|x| *x == v) { w.variante = k as u8; }
+            }
         }
         if let Some(s) = wj["symbol"].as_str() {
             if kind == Kind::Button { if let Ok(n) = sinnbild_pruefen(s, "GUI_LOAD") { w.sinnbild = n; } }
@@ -7954,6 +8266,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
+                if let Some(l) = wdg.list.as_mut() { l.hover = -1; }
                 wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
@@ -8077,7 +8390,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
                     if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
-                    if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
+                    if kind == Kind::ListBox {
+                        self.listbox_wheel(top, i, r.3, g);
+                        let k = self.liste_zeile(top, i, my);
+                        if let Some(l) = self.windows[top].widgets[i].list.as_mut() { l.hover = k; }
+                    }
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
@@ -8145,14 +8462,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let leisten_tip = w.leiste.as_ref()
                     .and_then(|l| l.eintraege.get(l.hover.max(0) as usize).filter(|_| l.hover >= 0))
                     .map(|e| !e.tip.is_empty()).unwrap_or(false);
-                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip) { found = Some((top, i)); }
+                let listen_tip = w.list.as_ref()
+                    .and_then(|l| l.tips.get(l.hover.max(0) as usize).filter(|_| l.hover >= 0))
+                    .map(|t| !t.is_empty()).unwrap_or(false);
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip) { found = Some((top, i)); }
             }
             found
         });
         // Innerhalb einer Werkzeugleiste zaehlt ein anderer KNOPF als ein
         // anderes Widget -- sonst stuende der Tipp des vorigen Knopfes weiter
         // da, sobald man einmal verweilt hat.
-        let teil = tip_cur.and_then(|(wi, i)| self.windows[wi].widgets[i].leiste.as_ref().map(|l| l.hover)).unwrap_or(-1);
+        let teil = tip_cur.and_then(|(wi, i)| {
+            let w = &self.windows[wi].widgets[i];
+            w.leiste.as_ref().map(|l| l.hover).or_else(|| w.list.as_ref().map(|l| l.hover))
+        }).unwrap_or(-1);
         if teil != self.hover_teil {
             self.hover_teil = teil;
             self.hover_frame = self.frame_count;
@@ -9775,7 +10098,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if wheel == 0 { return; }
         let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
-        let max_scroll = (w.items.len() as i32 * zeile_h - h).max(0);
+        let zeilen = liste_ansicht(&w.items, w.list.as_deref()).len() as i32;
+        let max_scroll = (zeilen * zeile_h - h).max(0);
         let nv = (w.value as i32 - wheel as i32 * zeile_h).clamp(0, max_scroll);
         w.value = nv as f64;
     }
@@ -9963,8 +10287,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn liste_bewegen(&mut self, wi: usize, i: usize, d: i32) {
         let n = self.windows[wi].widgets[i].items.len() as i32;
         if n == 0 { return; }
+        // Gelaufen wird ueber die SICHTBAREN, WAEHLBAREN Eintraege: ein Pfeil
+        // ueberspringt Koepfe und gesperrte, und was der Filter verbirgt, ist
+        // auch fuer die Tastatur nicht da.
+        let wahl: Vec<usize> = {
+            let w = &self.windows[wi].widgets[i];
+            let l = w.list.as_deref();
+            liste_ansicht(&w.items, l).into_iter().filter(|&k| l.map(|l| l.waehlbar(k)).unwrap_or(true)).collect()
+        };
+        if wahl.is_empty() { return; }
         let w = &mut self.windows[wi].widgets[i];
-        let neu = (w.sel + d).clamp(0, n - 1);
+        let neu = match wahl.iter().position(|&k| k as i32 == w.sel) {
+            Some(p) => wahl[(p as i32 + d).clamp(0, wahl.len() as i32 - 1) as usize] as i32,
+            None => if d >= 0 { wahl[0] as i32 } else { wahl[wahl.len() - 1] as i32 },
+        };
         if neu != w.sel {
             w.sel = neu;
             if let Some(l) = w.list.as_mut() {
@@ -9978,11 +10314,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Die gewaehlte Zeile einer ListBox in den sichtbaren Bereich scrollen --
     /// ohne das wandert die Auswahl beim Tippen aus dem Bild heraus.
     fn liste_sichtbar(&mut self, wi: usize, i: usize) {
+        let sel = self.windows[wi].widgets[i].sel;
+        self.liste_rollen_zu(wi, i, sel);
+    }
+    /// So rollen, dass die Datenzeile `k` zu sehen ist -- gerechnet an ihrem
+    /// Platz in der ANSICHT (mit Filter steht sie woanders als in den Daten).
+    fn liste_rollen_zu(&mut self, wi: usize, i: usize, k: i32) {
         let h = self.windows[wi].widgets[i].h;
         let zeile_h = self.sk(DROPDOWN_ITEM_H);   // vor dem mut-Zugriff
         let w = &mut self.windows[wi].widgets[i];
-        if w.sel < 0 { return; }
-        let oben = w.sel * zeile_h;
+        if k < 0 { return; }
+        let pos = match liste_ansicht(&w.items, w.list.as_deref()).iter().position(|&x| x as i32 == k) {
+            Some(p) => p as i32,
+            None => return,
+        };
+        let oben = pos * zeile_h;
         let unten = oben + zeile_h;
         let sicht = w.value as i32;
         let neu = if oben < sicht { oben }
@@ -10049,6 +10395,50 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// kann, auch ohne Maus bedienbar -- vorher endete die Tastaturbedienung
     /// bei den Textfeldern, ein Formular liess sich also nicht abschicken, ohne
     /// zur Maus zu greifen.
+    /// "Tippen springt": Buchstaben waehlen den naechsten Eintrag, der so
+    /// anfaengt. Getippte Zeichen innerhalb einer Sekunde bilden EIN Wort
+    /// ("ki" -> "Kirsche"); dieselbe Taste mehrmals laeuft durch alle, die mit
+    /// diesem Buchstaben beginnen. Zeichen kommen aus der Tipp-Warteschlange;
+    /// ist sie leer, zaehlen die Buchstaben- und Zifferntasten selbst (die
+    /// Wiedergabe einer Aufnahme fuellt nur Tasten, keine Zeichen).
+    fn liste_tippen(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let mut s = g.pop_text_input();
+        s.retain(|c| !c.is_control() && c != ' ');
+        if s.is_empty() && !g.key_ctrl() {
+            for c in (b'a'..=b'z').chain(b'0'..=b'9') {
+                if g.key_pressed(c as i64) { s.push(c as char); }
+            }
+        }
+        if s.is_empty() { return; }
+        let jetzt = g.get_time();
+        let (tipp, wahl, sel) = {
+            let w = &mut self.windows[wi].widgets[i];
+            let n = w.items.len();
+            let l = w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() }));
+            l.sync(n);
+            if jetzt - l.tipp_zeit > 1.0 { l.tipp.clear(); }
+            l.tipp_zeit = jetzt;
+            l.tipp.push_str(&s.to_lowercase());
+            let wahl: Vec<usize> = liste_ansicht(&w.items, Some(l)).into_iter().filter(|&k| l.waehlbar(k)).collect();
+            (l.tipp.clone(), wahl, w.sel)
+        };
+        if wahl.is_empty() { return; }
+        let erster = tipp.chars().next().unwrap();
+        let wiederholt = tipp.chars().all(|c| c == erster);
+        let such: String = if wiederholt { erster.to_string() } else { tipp };
+        let pos = wahl.iter().position(|&k| k as i32 == sel);
+        // Ein neues Wort sucht ab der AKTUELLEN Zeile (sie passt vielleicht
+        // schon), ein wiederholter Buchstabe ab der naechsten.
+        let start = match pos { Some(p) if wiederholt => p + 1, Some(p) => p, None => 0 };
+        let items = &self.windows[wi].widgets[i].items;
+        let treffer = (0..wahl.len()).map(|d| wahl[(start + d) % wahl.len()])
+            .find(|&k| items[k].to_lowercase().starts_with(&such));
+        if let Some(k) = treffer {
+            self.a11y_eintrag_waehlen(wi, i, k);
+            self.liste_sichtbar(wi, i);
+        }
+    }
+
     fn widget_keys(&mut self, wi: usize, i: usize, kind: Kind, g: &mut Graphics) {
         let (leertaste, enter) = (g.key_pressed(KEY_SPACE), g.key_pressed(KEY_ENTER));
         let ausloesen = leertaste || enter;
@@ -10130,8 +10520,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             Kind::ListBox => {
-                let d = ab as i32 - auf as i32;
+                let seite = (self.windows[wi].widgets[i].h / self.sk(DROPDOWN_ITEM_H)).max(1) - 1;
+                let mut d = ab as i32 - auf as i32;
+                if g.key_pressed(KEY_PAGEDOWN) { d += seite.max(1); }
+                if g.key_pressed(KEY_PAGEUP) { d -= seite.max(1); }
                 if d != 0 { self.liste_bewegen(wi, i, d); self.liste_sichtbar(wi, i); }
+                // Enter ist der Doppelklick der Tastatur -- "oeffnen" soll ohne
+                // Maus gehen, und das Programm fragt dafuer schon GUI_DOUBLE_CLICKED.
+                if enter && self.windows[wi].widgets[i].sel >= 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.list.get_or_insert_with(|| Box::new(ListState { anker: -1, ..Default::default() })).doppel = true;
+                }
+                self.liste_tippen(wi, i, g);
                 if g.key_pressed(KEY_HOME) { let n = self.windows[wi].widgets[i].items.len() as i32; self.liste_bewegen(wi, i, -n); self.liste_sichtbar(wi, i); }
                 if g.key_pressed(KEY_END) { let n = self.windows[wi].widgets[i].items.len() as i32; self.liste_bewegen(wi, i, n); self.liste_sichtbar(wi, i); }
                 // Leertaste kippt den Haken der gewaehlten Zeile.
@@ -10541,11 +10941,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             Kind::Dropdown => self.open_dropdown = Some((win, i)),
             Kind::ListBox => {
-                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
-                let scroll = self.windows[win].widgets[i].value as i32;
-                let row = (my - ay + scroll) / self.sk(DROPDOWN_ITEM_H);
+                let (ax, _, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let row = self.liste_zeile(win, i, my);
                 let n = self.windows[win].widgets[i].items.len() as i32;
                 if row < 0 || row >= n { return; }
+                // Koepfe und gesperrte Eintraege nehmen keinen Klick an.
+                let ansicht: Vec<usize> = {
+                    let w = &self.windows[win].widgets[i];
+                    if w.list.as_ref().map(|l| !l.waehlbar(row as usize)).unwrap_or(false) { return; }
+                    liste_ansicht(&w.items, w.list.as_deref())
+                };
                 let box_w = self.list_box_w(&self.windows[win].widgets[i]);
                 let (ctrl, shift) = self.tasten_mod;
                 let dbl = self.dbl_click;
@@ -10568,8 +10973,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                             l.sel[row as usize] = !l.sel[row as usize];
                             l.anker = row;
                         } else if shift && l.anker >= 0 {
-                            let (a, b) = (l.anker.min(row), l.anker.max(row));
-                            for k in 0..n { l.sel[k as usize] = k >= a && k <= b; }
+                            // Gespannt wird in der SICHTBAREN Reihenfolge, ueber
+                            // waehlbare Eintraege -- wie bei der Tabelle.
+                            let pa = ansicht.iter().position(|&k| k as i32 == l.anker);
+                            let pb = ansicht.iter().position(|&k| k as i32 == row);
+                            for k in 0..n as usize { l.sel[k] = false; }
+                            if let (Some(pa), Some(pb)) = (pa, pb) {
+                                for &k in &ansicht[pa.min(pb)..=pa.max(pb)] {
+                                    if l.waehlbar(k) { l.sel[k] = true; }
+                                }
+                            }
                         } else {
                             for k in 0..n { l.sel[k as usize] = k == row; }
                             l.anker = row;
@@ -11305,6 +11718,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn tip_text(&self, wi: usize, i: usize) -> Option<String> {
         let w = self.windows.get(wi)?.widgets.get(i)?;
         if !w.fehler.is_empty() { return Some(w.fehler.clone()); }
+        if let Some(l) = w.list.as_ref() {
+            if l.hover >= 0 {
+                if let Some(t) = l.tips.get(l.hover as usize).filter(|t| !t.is_empty()) {
+                    return Some(t.clone());
+                }
+            }
+        }
         if let Some(l) = w.leiste.as_ref() {
             if l.hover >= 0 {
                 if let Some(e) = l.eintraege.get(l.hover as usize).filter(|e| !e.tip.is_empty()) {
@@ -11890,13 +12310,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let l = w.list.as_ref();
                 if l.map_or(false, |l| l.multi) { n.set_multiselectable(); }
                 let zh = self.sk(DROPDOWN_ITEM_H);
-                for (k, item) in w.items.iter().enumerate().take(4000) {
+                for (r, k) in liste_ansicht(&w.items, l.map(|b| &**b)).into_iter().enumerate().take(4000) {
+                    let item = &w.items[k];
                     let mut o = Node::new(Role::ListBoxOption);
-                    o.set_label(item.clone());
+                    let detail = l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty());
+                    o.set_label(match detail { Some(d) => format!("{}, {}", item, d), None => item.clone() });
+                    if let Some(l) = l { if !l.waehlbar(k) { o.set_disabled(); } }
+                    if let Some(t) = l.and_then(|l| l.tips.get(k)).filter(|t| !t.is_empty()) { o.set_description(t.clone()); }
                     let gewaehlt = match l { Some(l) if l.multi => l.sel.get(k).copied().unwrap_or(false), _ => w.sel == k as i32 };
                     o.set_selected(gewaehlt);
                     if let Some(l) = l { if l.kaestchen { o.set_toggled(if l.checks.get(k).copied().unwrap_or(false) { Toggled::True } else { Toggled::False }); } }
-                    o.set_bounds(Self::a11y_rect(x, y + k as i32 * zh - w.value as i32, bw, zh));
+                    o.set_bounds(Self::a11y_rect(x, y + r as i32 * zh - w.value as i32, bw, zh));
                     o.add_action(Action::Click);
                     let oid = NodeId(ids::teil(wi, i, k));
                     nodes.push((oid, o));
@@ -12213,6 +12637,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn a11y_eintrag_waehlen(&mut self, wi: usize, i: usize, k: usize) {
         let n = self.windows[wi].widgets[i].items.len();
         if k >= n { return; }
+        if self.windows[wi].widgets[i].list.as_ref().map(|l| !l.waehlbar(k)).unwrap_or(false) { return; }
         let w = &mut self.windows[wi].widgets[i];
         let vorher = w.sel;
         w.sel = k as i32;
@@ -12608,13 +13033,49 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     }
                     g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r,
                                  self.wcol(wdg, "border", "widget_border"), false);
+                } else if matches!(wdg.variante, 5 | 6 | 7) {
+                    // Umriss, flach, Verweis: der Knopf hat KEINE eigene Flaeche --
+                    // sie tritt hervor, wenn man ihn beruehrt.
+                    let acc = self.wcol(wdg, "accent", "accent");
+                    let rad = self.m("corner_radius").min(self.sk(6));
+                    let aktiv = (pressed || wdg.hovered) && wdg.enabled;
+                    match wdg.variante {
+                        5 => {
+                            if aktiv {
+                                let a: i64 = if pressed { 0x50 } else { 0x2C };
+                                g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, (a << 24) | (acc & 0xFF_FFFF), true);
+                            }
+                            let rc = if wdg.enabled { self.wcol(wdg, "border", "accent") } else { self.th("widget_border") };
+                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, rc, false);
+                            g.round_rect(ax + 1, ay + 1, ax + w - 2, ay + h - 2, (rad - 1).max(0), rc, false);
+                        }
+                        6 => {
+                            if aktiv {
+                                let bg = self.wcol(wdg, "bg", "widget_bg");
+                                let f = if pressed { shade(bg, -12) } else { shade(bg, 16) };
+                                g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, f, true);
+                            }
+                        }
+                        _ => {}
+                    }
                 } else {
-                    let mut bg = self.wcol(wdg, "bg", "widget_bg");
-                    if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
+                    // Gefuellter Knopf: Grundfarbe aus eigener Farbe oder Knopfart,
+                    // sonst das Thema. Ueberfahren und Druecken nehmen eigene
+                    // Farben (Rollen hover/pressed), sonst hell/dunkel vom Grund.
+                    let grund = self.knopf_grund(wdg);
+                    let mut bg = grund.unwrap_or_else(|| self.th("widget_bg"));
+                    if !wdg.enabled && grund.is_some() { bg = mischen(bg, self.th("widget_bg"), 0.65); }
+                    if pressed && wdg.enabled {
+                        bg = wdg.ov.get("pressed").copied().unwrap_or(shade(bg, -30));
+                    } else if wdg.hovered && wdg.enabled {
+                        bg = wdg.ov.get("hover").copied().unwrap_or(shade(bg, if grund.is_some() { 18 } else { 30 }));
+                    }
                     // Der Standard-Knopf traegt den Akzent als Rahmen -- man
                     // soll sehen, was Enter tun wird.
-                    let rahmen = if self.windows[wi].default_btn == idx as i32 {
+                    let rahmen = if self.windows[wi].default_btn == idx as i32 && wdg.variante != 1 {
                         self.wcol(wdg, "accent", "accent")
+                    } else if let (Some(gr), None) = (grund, wdg.ov.get("border")) {
+                        shade(gr, -40)
                     } else { self.wcol(wdg, "border", "widget_border") };
                     self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, rahmen);
                 }
@@ -12627,7 +13088,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let ix = if icon_only { ax + (w - isz) / 2 } else { ax + pad };
                     if !wdg.sinnbild.is_empty() {
                         let s = if icon_only { isz.min(self.sk(24)) } else { isz.min(self.sk(18)) };
-                        let c = if wdg.enabled { mischen(self.th("text_fg"), self.th("muted_fg"), 0.25) } else { self.th("muted_fg") };
+                        let c = if wdg.variante > 0 || wdg.ov.contains_key("bg") || wdg.ov.contains_key("fg") { self.knopf_text(wdg) }
+                                else if wdg.enabled { mischen(self.th("text_fg"), self.th("muted_fg"), 0.25) } else { self.th("muted_fg") };
                         sinnbild(g, &wdg.sinnbild, ix + (isz - s) / 2, iy + (isz - s) / 2, s, c, !wdg.enabled);
                     } else {
                         g.draw_image_rect(wdg.sel as i64, ix, iy, isz, isz);
@@ -12652,7 +13114,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if beschnitten {
                         g.push_clip(ax + links, ay + 1, frei, (h - 2).max(0));
                     }
-                    self.wtext(g, wdg, tx, ty, wdg.text.clone(), self.txt_col(wdg));
+                    let tc = self.knopf_text(wdg);
+                    self.wtext(g, wdg, tx, ty, wdg.text.clone(), tc);
+                    if wdg.variante == 7 && wdg.enabled && (wdg.hovered || pressed) {
+                        let ul = ty + sz + self.sk(1);
+                        g.line(tx, ul, tx + tw.min(frei), ul, tc);
+                    }
                     if beschnitten {
                         g.pop_clip();
                     }
@@ -13147,6 +13614,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
                 let acc = self.acc_col(wdg);
+                let muted = self.th("muted_fg");
                 let scroll = wdg.value as i32;
                 let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
                 let ih = self.sk(DROPDOWN_ITEM_H);
@@ -13154,17 +13622,40 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let l = wdg.list.as_deref();
                 let hat_icon = l.map(|l| l.icons.iter().any(|&i| i >= 0)).unwrap_or(false);
                 let icon_w = if hat_icon { ih } else { 0 };
+                let ansicht = liste_ansicht(&wdg.items, l);
                 g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
-                for (k, it) in wdg.items.iter().enumerate() {
-                    let iy = ay + k as i32 * ih - scroll;
+                if ansicht.is_empty() {
+                    // Leer ist eine Aussage: "keine Treffer" statt einer Flaeche,
+                    // die aussieht, als sei die Liste kaputt.
+                    if let Some(t) = l.map(|l| l.leer_text.clone()).filter(|t| !t.is_empty()) {
+                        let tw = self.wtext_width(g, wdg, &t);
+                        self.wtext(g, wdg, ax + ((w - tw) / 2).max(pad), ay + self.sk(10), t, muted);
+                    }
+                }
+                for (r, &k) in ansicht.iter().enumerate() {
+                    let it = &wdg.items[k];
+                    let iy = ay + r as i32 * ih - scroll;
                     if iy + ih < ay || iy > ay + h { continue; }
+                    let kopf = l.map(|l| l.kopf.get(k).copied().unwrap_or(false)).unwrap_or(false);
+                    let aus = l.map(|l| l.aus.get(k).copied().unwrap_or(false)).unwrap_or(false);
+                    if kopf {
+                        // Gruppenkopf: gedaempfte, fette Schrift und eine Linie --
+                        // er gliedert, er ist kein Eintrag.
+                        let ty = iy + (ih - self.wsize(g, wdg)).max(0) / 2;
+                        let kc = mischen(acc, fg, 0.35);
+                        self.wtext(g, wdg, ax + pad, ty, it.clone(), kc);
+                        self.wtext(g, wdg, ax + pad + 1, ty, it.clone(), kc);
+                        let tw = self.wtext_width(g, wdg, it) + self.sk(8);
+                        g.line(ax + pad + tw, iy + ih / 2, ax + w - pad, iy + ih / 2, self.wcol(wdg, "border", "widget_border"));
+                        continue;
+                    }
                     let gewaehlt = match l {
                         Some(l) if l.multi => l.sel.get(k).copied().unwrap_or(false),
                         _ => k as i32 == wdg.sel,
                     };
                     if gewaehlt {
                         g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(acc, -110));
-                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + ih {
+                    } else if wdg.enabled && !aus && mx >= ax && mx < ax + w && my >= iy && my < iy + ih {
                         g.box_fill(ax + 1, iy, ax + w - 2, iy + ih - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
                     }
                     let mut tx = ax + pad;
@@ -13185,8 +13676,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                         g.draw_image_rect(ic, tx, iy + 2, isz, isz);
                     }
                     tx += icon_w + if icon_w > 0 { 2 } else { 0 };
-                    let farbe = l.and_then(|l| l.colors.get(k).copied()).filter(|&c| c >= 0).unwrap_or(fg);
-                    self.wtext(g, wdg, tx, iy + (ih - self.wsize(g, wdg)).max(0) / 2, it.clone(), farbe);
+                    // Auf der Auswahl folgt die Schrift dem GRUND: im hellen Thema
+                    // stand dunkle Schrift auf dunkelblauer Zeile, und die gewaehlte
+                    // Zeile war die einzige, die man nicht lesen konnte.
+                    let fg = if gewaehlt { lesbar_auf(shade(acc, -110)) } else { fg };
+                    let farbe = if aus { muted } else if gewaehlt { fg } else { l.and_then(|l| l.colors.get(k).copied()).filter(|&c| c >= 0).unwrap_or(fg) };
+                    let ty = iy + (ih - self.wsize(g, wdg)).max(0) / 2;
+                    // Zusatztext rechtsbuendig; der Haupttext endet vor ihm,
+                    // statt darunter weiterzulaufen.
+                    let detail = l.and_then(|l| l.details.get(k)).filter(|d| !d.is_empty());
+                    let rechts = match detail {
+                        Some(d) => {
+                            let dw = self.wtext_width(g, wdg, d);
+                            let dx = ax + w - pad - dw;
+                            self.wtext(g, wdg, dx, ty, d.clone(), if gewaehlt { mischen(fg, muted, 0.4) } else { muted });
+                            dx - self.sk(10)
+                        }
+                        None => ax + w - 2,
+                    };
+                    g.push_clip(tx, iy, (rechts - tx).max(0), ih);
+                    self.wtext(g, wdg, tx, ty, it.clone(), farbe);
+                    g.pop_clip();
                 }
                 g.pop_clip();
             }

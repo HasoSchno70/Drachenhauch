@@ -5473,6 +5473,31 @@ impl<'p> Vm<'p> {
             "gui_listbox_sel_count" => Value::Int(self.gui.list_sel_count(gi(a,0,"GUI_LISTBOX_SEL_COUNT")?)?),
             "gui_listbox_sel_row" => Value::Int(self.gui.list_sel_row(gi(a,0,"GUI_LISTBOX_SEL_ROW")?, gi(a,1,"GUI_LISTBOX_SEL_ROW")?)?),
             "gui_listbox_clear_selection" => { self.gui.list_clear_selection(gi(a,0,"GUI_LISTBOX_CLEAR_SELECTION")?)?; Value::Nil }
+            // --- Stufe 27: Listen komfortabel, Knopfarten ---
+            "gui_listbox_set_data" => { self.gui.list_set_data(gi(a,0,"GUI_LISTBOX_SET_DATA")?, gi(a,1,"GUI_LISTBOX_SET_DATA")?, gs(a,2,"GUI_LISTBOX_SET_DATA")?)?; Value::Nil }
+            "gui_listbox_data$" | "gui_listbox_data" => Value::str_rc(&self.gui.list_data(gi(a,0,"GUI_LISTBOX_DATA")?, gi(a,1,"GUI_LISTBOX_DATA")?)?),
+            "gui_listbox_find_data" => Value::Int(self.gui.list_find_data(gi(a,0,"GUI_LISTBOX_FIND_DATA")?, &gs(a,1,"GUI_LISTBOX_FIND_DATA")?)?),
+            "gui_listbox_detail" => { self.gui.list_detail(gi(a,0,"GUI_LISTBOX_DETAIL")?, gi(a,1,"GUI_LISTBOX_DETAIL")?, gs(a,2,"GUI_LISTBOX_DETAIL")?)?; Value::Nil }
+            "gui_listbox_tip" => { self.gui.list_tip(gi(a,0,"GUI_LISTBOX_TIP")?, gi(a,1,"GUI_LISTBOX_TIP")?, gs(a,2,"GUI_LISTBOX_TIP")?)?; Value::Nil }
+            "gui_listbox_enable" => { self.gui.list_enable(gi(a,0,"GUI_LISTBOX_ENABLE")?, gi(a,1,"GUI_LISTBOX_ENABLE")?, gbool(a,2,"GUI_LISTBOX_ENABLE")?)?; Value::Nil }
+            "gui_listbox_enabled" => Value::Bool(self.gui.list_enabled(gi(a,0,"GUI_LISTBOX_ENABLED")?, gi(a,1,"GUI_LISTBOX_ENABLED")?)?),
+            "gui_listbox_header" => { self.gui.list_header(gi(a,0,"GUI_LISTBOX_HEADER")?, gi(a,1,"GUI_LISTBOX_HEADER")?, gbool(a,2,"GUI_LISTBOX_HEADER")?)?; Value::Nil }
+            "gui_listbox_filter" => { self.gui.list_filter(gi(a,0,"GUI_LISTBOX_FILTER")?, gs(a,1,"GUI_LISTBOX_FILTER")?)?; Value::Nil }
+            "gui_listbox_get_filter$" | "gui_listbox_get_filter" => Value::str_rc(&self.gui.list_get_filter(gi(a,0,"GUI_LISTBOX_GET_FILTER")?)?),
+            "gui_listbox_view_count" => Value::Int(self.gui.list_view_count(gi(a,0,"GUI_LISTBOX_VIEW_COUNT")?)?),
+            "gui_listbox_view_row" => Value::Int(self.gui.list_view_row(gi(a,0,"GUI_LISTBOX_VIEW_ROW")?, gi(a,1,"GUI_LISTBOX_VIEW_ROW")?)?),
+            "gui_listbox_placeholder" => { self.gui.list_placeholder(gi(a,0,"GUI_LISTBOX_PLACEHOLDER")?, gs(a,1,"GUI_LISTBOX_PLACEHOLDER")?)?; Value::Nil }
+            "gui_listbox_sort" => {
+                let ab = if a.len() > 1 { gbool(a,1,"GUI_LISTBOX_SORT")? } else { false };
+                self.gui.list_sort(gi(a,0,"GUI_LISTBOX_SORT")?, ab)?; Value::Nil
+            }
+            "gui_listbox_find" => {
+                let ab = if a.len() > 2 { gi(a,2,"GUI_LISTBOX_FIND")? } else { 0 };
+                Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
+            }
+            "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
+            "gui_button_variant" => { self.gui.set_button_variant(gi(a,0,"GUI_BUTTON_VARIANT")?, &gs(a,1,"GUI_BUTTON_VARIANT")?)?; Value::Nil }
+            "gui_button_get_variant$" | "gui_button_get_variant" => Value::str_rc(&self.gui.button_variant(gi(a,0,"GUI_BUTTON_GET_VARIANT")?)?),
             "gui_double_clicked" => Value::Bool(self.gui.double_clicked(gi(a,0,"GUI_DOUBLE_CLICKED")?)?),
             "gui_layout" => Value::Int(self.gui.layout_new(gi(a,0,"GUI_LAYOUT")?, &gs(a,1,"GUI_LAYOUT")?,
                 gi(a,2,"GUI_LAYOUT")? as i32, gi(a,3,"GUI_LAYOUT")? as i32, gi(a,4,"GUI_LAYOUT")? as i32, gi(a,5,"GUI_LAYOUT")? as i32)?),
