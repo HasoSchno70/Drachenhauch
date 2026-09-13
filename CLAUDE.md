@@ -2875,6 +2875,27 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 39 (2026-09-13):** SFX- und Partikel-Pilot ohne Python --
+`tests/pruef/werkzeug_sfx.dhtest` und `werkzeug_partikel.dhtest` (je 8), dazu
+`tests/pruef/builtin_registrierung.dhtest` fuer die 14 kleinen pytest-Dateien,
+die nur fragten, ob Fenster-/Monitor-/Dialogbefehle im Verzeichnis stehen
+(68 Namen ueber `CODE_COMPLETE`, mit Gegenprobe). 16 pytest-Dateien geloescht.
+**Neues Formatstueck `--- einschub nach MARKE`** (mehrere erlaubt): die
+Piloten brauchen ZWEI Stellen -- oben Helfer, in der Bildschleife hinter
+`FLIP()` die Messung. Die pytest-Fassung las die Klicklagen aus einem ersten
+Lauf; hier schreibt der Einschub im dritten Bild, wenn die Geometrie
+(`GUI_CANVAS_X - GUI_GET_X`) feststeht, die Aufnahme selbst und spielt sie ab,
+und `prProbe(k)` schreibt je Bild nach `_programm/probe.txt` (geprueft mit
+`--- inhalt`). **Falle:** die Wiedergabe setzt beim ERSTEN Ereignis an, nicht
+bei Bild 0 -- ohne ein Ereignis in Bild 0 lief alles 6 Bilder frueher als die
+Proben, und die Faelle mit Klicks fielen scheinbar grundlos (die Zuege
+dagegen nicht, weil ihre Probe spaet genug lag). Gegenprobe ohne
+`AUTOMATION_PLAY`: in beiden Sammlungen fallen 6 von 8, die uebrigen zwei
+haben keine Eingaben. Beim ersten Versuch waren es beim Partikel-Piloten nur
+5 -- "zurueck nimmt den ganzen zug zurueck" pruefte (wie schon in pytest) nur
+den Endstand, und "wie vorher" stimmt auch, wenn nie gezogen wurde; er misst
+jetzt auch den Stand nach dem Zug. Rust-Test `weitere_einschuebe`.
+
 **Stufe 38 (2026-09-13):** der letzte Fall -- `tests/test_ide.py` ist
 geloescht. Das PDF-Listing hing an PyMuPDF, weil das pdf-Modul jede Seite mit
 FlateDecode packt und Drachenhauch nur `COMPRESS$`/`DECOMPRESS$` hatte (Text
