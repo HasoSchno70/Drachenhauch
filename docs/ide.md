@@ -52,8 +52,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 26 | Die **Werkzeugleiste ist ein Widget** der Laufzeit (`GUI_TOOLBAR` mit Einträgen, gezeichnete Sinnbilder in Leistengröße, Trenner, Lücke, kippbare Knöpfe); Menüs und Leiste tragen dieselben Sinnbilder, die handgemalten 16-Punkt-Bilder sind weg |
 | 27 | **Knopfarten** und **komfortable Listen** in der Laufzeit; die Befehlspalette zeigt Kürzel und Ordner als Zusatztext rechts, die Hauptknöpfe der Dialoge sind hervorgehoben, der Debugger-Stopp ist rot |
 | 28 | **Statusleiste mit Feldern** (Meldung, Stelle der Marke, Umbruch — die beiden rechten anklickbar), die Symbolspur ist eine **Pfadleiste** (ein Klick springt zum Block), und die Werkzeugleiste legt, was nicht passt, in ein **»-Menü** |
+| 29 | Im **gesetzten Handbuch** markieren (Ziehen, Doppelklick = Wort, Strg+A) und kopieren (Strg+C); die Suche geht **weiter und zurück** mit Umlauf, markiert die Fundstelle und hebt **alle Fundstellen** hervor |
 
-## Was sie heute kann (Stand 28, 13.09.2026)
+## Was sie heute kann (Stand 29, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -241,6 +242,7 @@ mit: `bereit`, `geoeffnet <pfad>`, `geprueft <anzahl>`, `gestartet <pfad>`,
 `geteilt aus`, `karte an|aus`, `karte sprung <zeile>`,
 `umbenannt <anzahl> <name>`, `schnipsel <name>`, `signatur <text>`,
 `marken <anzahl>`, `blame <zeilen>`, `hbansicht gesetzt|quelltext`,
+`hbsuche <y> <anzahl> <markierter text>`,
 `git diff|log <zeilen>`, `git rand <zeilen>`, `lesezeichen liste <anzahl>`,
 `wieder auf <pfad>`, `spur <pfad>`, `peek <zeile> [<datei>]`,
 `symbolindex <anzahl>`, `symbol <datei> <zeile>`, `baum offen <anzahl>`,
@@ -367,13 +369,12 @@ auf, wenn er Fehler dazubringt), und die **Häkchen** im Baum sind das
 Mittel, einen Umbau auf eine selbst gewählte Menge von Dateien zu
 beschränken.
 
-Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Was als
-Nächstes anstünde: die gesetzte Ansicht des Handbuchs kennt **keine
-Textauswahl** (kopieren geht nur im Quelltext, und dafür ist der Knopf
-oben rechts da); die Suche im gesetzten Handbuch springt zur ersten
-Fundstelle **ab der aktuellen Stelle**, kennt aber kein Zurück; und beim
-Verschieben gibt es weiterhin **kein Rückgängig über Dateigrenzen** außer
-dem einen Schritt, den `umbauZurueck` hält. Ein
+Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Seit
+Stand 29 lässt sich im gesetzten Handbuch **markieren und kopieren**, und
+die Suche geht **weiter und zurück** (Enter / Umschalt+Enter, zwei Knöpfe),
+markiert die Fundstelle und hebt alle anderen hervor. Was als Nächstes
+anstünde: beim Verschieben gibt es weiterhin **kein Rückgängig über
+Dateigrenzen** außer den Schritten, die `umbauZurueck` hält. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis
