@@ -607,6 +607,7 @@ DIM lblWkTitel AS GUI_WIDGET : lblWkTitel = GUI_LABEL(win, "Drachenhauch", 0, 0)
 GUI_SET_FONT_SIZE(lblWkTitel, 34)
 DIM lblWkUnter AS GUI_WIDGET : lblWkUnter = GUI_LABEL(win, "BASIC fuer Spiele -- mit Pascal-strikter Typisierung und OOP. Diese IDE ist selbst in Drachenhauch geschrieben.", 0, 0)
 DIM btnWkNeu AS GUI_WIDGET : btnWkNeu = GUI_BUTTON(win, "Neue Datei", 0, 0, 130, 30)
+GUI_BUTTON_VARIANT(btnWkNeu, "primaer")
 DIM btnWkOeffnen AS GUI_WIDGET : btnWkOeffnen = GUI_BUTTON(win, "Datei oeffnen ...", 0, 0, 150, 30)
 DIM btnWkBeispiele AS GUI_WIDGET : btnWkBeispiele = GUI_BUTTON(win, "Beispiele als Projekt", 0, 0, 180, 30)
 DIM lblWkZuletzt AS GUI_WIDGET : lblWkZuletzt = GUI_LABEL(win, "Zuletzt geoeffnet -- Doppelklick oeffnet", 0, 0)
@@ -664,6 +665,7 @@ DIM btnDrueber AS GUI_WIDGET : btnDrueber = GUI_BUTTON(win, "Drueber (F10)", 0, 
 DIM btnHinein AS GUI_WIDGET : btnHinein = GUI_BUTTON(win, "Hinein (F11)", 0, 0, 104, 26)
 DIM btnHeraus AS GUI_WIDGET : btnHeraus = GUI_BUTTON(win, "Heraus", 0, 0, 70, 26)
 DIM btnStoppD AS GUI_WIDGET : btnStoppD = GUI_BUTTON(win, "Stopp", 0, 0, 60, 26)
+GUI_BUTTON_VARIANT(btnStoppD, "gefahr")
 DIM tblVars AS GUI_WIDGET : tblVars = GUI_TABLE(win, 0, 0, 10, 10)
 GUI_TABLE_HEADERS(tblVars, ["Name", "Typ", "Wert", "Bereich"])
 GUI_TABLE_COL_WIDTHS(tblVars, [140, 90, 260, 70])
@@ -740,6 +742,7 @@ GUI_WINDOW_VISIBLE(winPeek, FALSE)
 DIM lblPeek AS GUI_WIDGET : lblPeek = GUI_LABEL(winPeek, "", 8, 8)
 DIM taPeek AS GUI_WIDGET : taPeek = GUI_TEXTAREA(winPeek, 8, 30, 704, 226)
 DIM btnPeekHin AS GUI_WIDGET : btnPeekHin = GUI_BUTTON(winPeek, "Dorthin springen", 8, 262, 160, 28)
+GUI_BUTTON_VARIANT(btnPeekHin, "primaer")
 DIM btnPeekZu AS GUI_WIDGET : btnPeekZu = GUI_BUTTON(winPeek, "Schliessen", 178, 262, 120, 28)
 DIM peekZeile AS INTEGER : peekZeile = 0
 DIM peekPfad AS STRING : peekPfad = ""     ' aus welcher Datei, "" = der vorderen
@@ -752,6 +755,7 @@ GUI_WINDOW_VISIBLE(winFarbe, FALSE)
 DIM cpFarbe AS GUI_WIDGET : cpFarbe = GUI_COLORPICKER(winFarbe, 12, 12, 288, 180)
 DIM lblFarbe AS GUI_WIDGET : lblFarbe = GUI_LABEL(winFarbe, "", 12, 200)
 DIM btnFarbeOk AS GUI_WIDGET : btnFarbeOk = GUI_BUTTON(winFarbe, "Uebernehmen", 12, 226, 140, 30)
+GUI_BUTTON_VARIANT(btnFarbeOk, "primaer")
 DIM btnFarbeWeg AS GUI_WIDGET : btnFarbeWeg = GUI_BUTTON(winFarbe, "Abbrechen", 162, 226, 120, 30)
 ' Welches Literal gerade bearbeitet wird: Anfang und Laenge in ZEICHEN.
 DIM farbStart AS INTEGER : farbStart = -1
@@ -776,6 +780,7 @@ DIM btnParamRunter AS GUI_WIDGET : btnParamRunter = GUI_BUTTON(winParam, "Nach u
 DIM btnParamPlus AS GUI_WIDGET : btnParamPlus = GUI_BUTTON(winParam, "+ Parameter", 322, 116, 120, 30)
 DIM btnParamMinus AS GUI_WIDGET : btnParamMinus = GUI_BUTTON(winParam, "- Parameter", 322, 152, 120, 30)
 DIM btnParamOk AS GUI_WIDGET : btnParamOk = GUI_BUTTON(winParam, "Uebernehmen", 12, 248, 140, 30)
+GUI_BUTTON_VARIANT(btnParamOk, "primaer")
 DIM btnParamWeg AS GUI_WIDGET : btnParamWeg = GUI_BUTTON(winParam, "Abbrechen", 162, 248, 120, 30)
 GUI_WINDOW_CANCEL(winParam, btnParamWeg)
 
@@ -803,6 +808,7 @@ DIM lblUmbau AS GUI_WIDGET : lblUmbau = GUI_LABEL(winUmbau, "", 8, 8)
 DIM lstUmbau AS GUI_WIDGET : lstUmbau = GUI_LISTBOX(winUmbau, 8, 30, 220, 508, [])
 DIM taUmbau AS GUI_WIDGET : taUmbau = GUI_TEXTAREA(winUmbau, 236, 30, 656, 508)
 DIM btnUmbauOk AS GUI_WIDGET : btnUmbauOk = GUI_BUTTON(winUmbau, "Uebernehmen", 8, 546, 140, 30)
+GUI_BUTTON_VARIANT(btnUmbauOk, "primaer")
 DIM btnUmbauWeg AS GUI_WIDGET : btnUmbauWeg = GUI_BUTTON(winUmbau, "Abbrechen", 158, 546, 120, 30)
 DIM btnUmbauBlock AS GUI_WIDGET
 btnUmbauBlock = GUI_BUTTON(winUmbau, "Block auslassen / aufnehmen", 288, 546, 230, 30)
@@ -864,6 +870,8 @@ DIM befehlKennungen AS ARRAY OF STRING : befehlKennungen = []
 DIM befehlKuerzel AS ARRAY OF STRING : befehlKuerzel = []
 DIM paletteNamen AS ARRAY OF STRING : paletteNamen = []
 DIM paletteKennungen AS ARRAY OF STRING : paletteKennungen = []
+' Zusatztext je Eintrag (Kuerzel, Ordner) -- rechts in der Liste, nicht an den Namen gehaengt.
+DIM paletteDetails AS ARRAY OF STRING : paletteDetails = []
 DIM paletteSichtbar AS ARRAY OF STRING : paletteSichtbar = []
 
 ' Druckdialog: Drucker waehlen, Kopien, oder doch als PDF.
@@ -874,6 +882,7 @@ DIM ddDrucker AS GUI_WIDGET : ddDrucker = GUI_DROPDOWN(winDruck, 90, 10, 296, 26
 DIM lblKopien AS GUI_WIDGET : lblKopien = GUI_LABEL(winDruck, "Kopien", 12, 50)
 DIM spKopien AS GUI_WIDGET : spKopien = GUI_SPINNER(winDruck, 90, 46, 90, 1, 9, 1)
 DIM btnDruckOk AS GUI_WIDGET : btnDruckOk = GUI_BUTTON(winDruck, "Drucken", 12, 96, 110, 28)
+GUI_BUTTON_VARIANT(btnDruckOk, "primaer")
 DIM btnDruckPdf AS GUI_WIDGET : btnDruckPdf = GUI_BUTTON(winDruck, "Als PDF neben die Quelle", 130, 96, 180, 28)
 DIM btnDruckWeg AS GUI_WIDGET : btnDruckWeg = GUI_BUTTON(winDruck, "Abbrechen", 318, 96, 70, 28)
 GUI_WINDOW_DEFAULT(winDruck, btnDruckOk)
@@ -2401,9 +2410,10 @@ SUB symbolVerzeichnis()
     END IF
     paletteNamen = []
     paletteKennungen = []
+    paletteDetails = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(symAnzeige) - 1
-        ARRAY_PUSH(paletteNamen, symAnzeige[i]) : ARRAY_PUSH(paletteKennungen, STR$(i))
+        ARRAY_PUSH(paletteNamen, symAnzeige[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("symbol", "Symbole im Projekt (" + STR$(LEN(symNamen)) + ")")
     ' Wie beim Schnipsel: das Wort unter der Marke fuellt den Filter aus.
@@ -4388,12 +4398,13 @@ SUB verschiebenFragen()
     ' Datei ein Umweg ueber Datei/Neu und Sichern.
     paletteNamen = []
     paletteKennungen = []
-    ARRAY_PUSH(paletteNamen, "(neue Datei ...)") : ARRAY_PUSH(paletteKennungen, "*neu*")
+    paletteDetails = []
+    ARRAY_PUSH(paletteNamen, "(neue Datei ...)") : ARRAY_PUSH(paletteKennungen, "*neu*") : ARRAY_PUSH(paletteDetails, "")
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
         DIM pfad AS STRING : pfad = PATHJOIN(projektOrdner, d)
         IF wegGleich$(pfad) = wegGleich$(tabPfade[aktiverTab]) THEN CONTINUE
-        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad)
+        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, pfad) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("verschieben", verschName + " verschieben nach ...")
 END SUB
@@ -5956,9 +5967,10 @@ SUB schnipselWaehlen()
     IF aktivesFeld() < 0 THEN RETURN
     paletteNamen = []
     paletteKennungen = []
+    paletteDetails = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(schnipselNamen) - 1
-        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i))
+        ARRAY_PUSH(paletteNamen, schnipselNamen[i]) : ARRAY_PUSH(paletteKennungen, STR$(i)) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     waehlerOeffnen("schnipsel", "Schnipsel einfuegen")
     ' Der Wortanfang links der Marke fuellt den Filter schon aus: wer `for`
@@ -6874,8 +6886,9 @@ SUB paletteFuellen(filter AS STRING)
     DIM klein AS STRING : klein = LOWER$(filter)
     DIM i AS INTEGER
     FOR i = 0 TO LEN(paletteNamen) - 1
-        IF passtUnscharf(paletteNamen[i], klein) THEN
-            GUI_LISTBOX_ADD(lstPalette, paletteNamen[i])
+        IF passtUnscharf(paletteNamen[i] + " " + paletteDetails[i], klein) THEN
+            DIM pz AS INTEGER : pz = GUI_LISTBOX_ADD(lstPalette, paletteNamen[i])
+            IF paletteDetails[i] <> "" THEN GUI_LISTBOX_DETAIL(lstPalette, pz, paletteDetails[i])
             ARRAY_PUSH(sichtbar, paletteKennungen[i])
         END IF
     NEXT
@@ -6897,11 +6910,11 @@ END SUB
 SUB paletteOeffnen()
     paletteNamen = []
     paletteKennungen = []
+    paletteDetails = []
     DIM i AS INTEGER
     FOR i = 0 TO LEN(befehlNamen) - 1
         DIM n AS STRING : n = befehlNamen[i]
-        IF befehlKuerzel[i] <> "" THEN n = n + "   " + befehlKuerzel[i]
-        ARRAY_PUSH(paletteNamen, n) : ARRAY_PUSH(paletteKennungen, befehlKennungen[i])
+        ARRAY_PUSH(paletteNamen, n) : ARRAY_PUSH(paletteKennungen, befehlKennungen[i]) : ARRAY_PUSH(paletteDetails, befehlKuerzel[i])
     NEXT
     waehlerOeffnen("befehl", "Befehle")
 END SUB
@@ -6910,13 +6923,14 @@ END SUB
 SUB schnellOeffnen()
     paletteNamen = []
     paletteKennungen = []
+    paletteDetails = []
     DIM d AS STRING
     FOR EACH d IN projektDateien("*.dh")
-        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, PATHJOIN(projektOrdner, d))
+        ARRAY_PUSH(paletteNamen, d) : ARRAY_PUSH(paletteKennungen, PATHJOIN(projektOrdner, d)) : ARRAY_PUSH(paletteDetails, "")
     NEXT
     FOR EACH d IN zuletzt
         IF ARRAY_INDEXOF(paletteKennungen, d) < 0 THEN
-            ARRAY_PUSH(paletteNamen, BASENAME(d) + "   (" + DIRNAME(d) + ")") : ARRAY_PUSH(paletteKennungen, d)
+            ARRAY_PUSH(paletteNamen, BASENAME(d)) : ARRAY_PUSH(paletteKennungen, d) : ARRAY_PUSH(paletteDetails, DIRNAME(d))
         END IF
     NEXT
     waehlerOeffnen("datei", "Datei oeffnen: " + BASENAME(projektOrdner))

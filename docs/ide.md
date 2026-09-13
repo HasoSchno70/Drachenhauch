@@ -50,8 +50,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 24 | Der Projektbaum ist ein **Widget der Laufzeit** (`GUI_FILETREE`): er liest den Ordner selbst, zeigt eine neue Datei von selbst und klappt auf Klick auf; dazu Häkchen im Baum und **Reiter im Fenster** |
 | 25 | Das Handbuch ist **gesetzt vom Widget** (`GUI_RICHTEXT`, mit anklickbaren Verweisen); Häkchen im Baum schränken das Projekt ein; ohne Vorschau wird trotzdem geprüft; auch Verschieben und Parameter sammeln in Schritten |
 | 26 | Die **Werkzeugleiste ist ein Widget** der Laufzeit (`GUI_TOOLBAR` mit Einträgen, gezeichnete Sinnbilder in Leistengröße, Trenner, Lücke, kippbare Knöpfe); Menüs und Leiste tragen dieselben Sinnbilder, die handgemalten 16-Punkt-Bilder sind weg |
+| 27 | **Knopfarten** und **komfortable Listen** in der Laufzeit; die Befehlspalette zeigt Kürzel und Ordner als Zusatztext rechts, die Hauptknöpfe der Dialoge sind hervorgehoben, der Debugger-Stopp ist rot |
 
-## Was sie heute kann (Stand 26, 13.09.2026)
+## Was sie heute kann (Stand 27, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|

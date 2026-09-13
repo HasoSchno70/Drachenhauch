@@ -29,7 +29,7 @@ DIM win AS GUI_WINDOW
 win = GUI_WINDOW("W", 50, 40, 320, 260)
 GUI_STYLE_SET("s", "blarg", 1)
 --- fehler
-GUI_STYLE_SET: prop muss bg/fg/border/accent/font/font_size sein
+GUI_STYLE_SET: prop muss bg/fg/border/accent/hover/pressed/font/font_size sein
 
 === listbox select
 IMPORT "gui"

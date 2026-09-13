@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1837,
+ "count": 1855,
  "builtins": [
   {
    "name": "ABS",
@@ -2919,6 +2919,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_BUTTON_GET_VARIANT$",
+   "kind": "core",
+   "signature": "GUI_BUTTON_GET_VARIANT$(knopf) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BUTTON_VARIANT",
+   "kind": "core",
+   "signature": "GUI_BUTTON_VARIANT(knopf, art$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CANVAS",
    "kind": "core",
    "signature": "GUI_CANVAS(win, x, y, w, h)",
@@ -3519,6 +3531,60 @@
    "module": "gui"
   },
   {
+   "name": "GUI_LISTBOX_DATA$",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_DATA$(lb, i) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_DETAIL",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_DETAIL(lb, i, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_ENABLE",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_ENABLE(lb, i, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_ENABLED",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_ENABLED(lb, i) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_FILTER",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_FILTER(lb, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_FIND",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_FIND(lb, text$ [, ab]) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_FIND_DATA",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_FIND_DATA(lb, wert$) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_GET_FILTER$",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_GET_FILTER$(lb) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_HEADER",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_HEADER(lb, i, an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_ICON",
    "kind": "core",
    "signature": "GUI_LISTBOX_ICON(lb, i, bild)",
@@ -3543,9 +3609,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_LISTBOX_PLACEHOLDER",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_PLACEHOLDER(lb, text$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_REMOVE",
    "kind": "core",
    "signature": "GUI_LISTBOX_REMOVE(lb, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_SCROLL_TO",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_SCROLL_TO(lb, i)",
    "module": "gui"
   },
   {
@@ -3585,6 +3663,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_LISTBOX_SET_DATA",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_SET_DATA(lb, i, wert$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_SET_ITEM",
    "kind": "core",
    "signature": "GUI_LISTBOX_SET_ITEM(lb, i, text$)",
@@ -3597,9 +3681,33 @@
    "module": "gui"
   },
   {
+   "name": "GUI_LISTBOX_SORT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_SORT(lb [, absteigend])",
+   "module": "gui"
+  },
+  {
    "name": "GUI_LISTBOX_TEXT",
    "kind": "core",
    "signature": "GUI_LISTBOX_TEXT(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_TIP",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_TIP(lb, i, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_VIEW_COUNT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_VIEW_COUNT(lb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_VIEW_ROW",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_VIEW_ROW(lb, k) AS INTEGER",
    "module": "gui"
   },
   {

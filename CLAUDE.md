@@ -2873,6 +2873,38 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 27 (2026-09-13):** zwei Fragen des Nutzers -- koennen Knoepfe
+mehrere Farben haben, und hat die Liste Funktionen, die sie komfortabel
+machen? Beides war nur halb da. **Knoepfe:** `GUI_SET_COLOR` gab es, aber
+nur EINE Grundfarbe, Ueberfahren/Druecken pauschal +-30, und die Schrift
+blieb weiss -- ein gelber Knopf war unlesbar. Neu `GUI_BUTTON_VARIANT` /
+`GUI_BUTTON_GET_VARIANT$` (`KNOPF_ARTEN`: standard, primaer = Akzent,
+erfolg, warnung, gefahr, umriss, flach, link), Rollen `hover`/`pressed` fuer
+`GUI_SET_COLOR` und `GUI_STYLE_SET`, und **die Schrift folgt dem Grund**
+(`lesbar_auf`, gewichtet wie das Auge), solange `fg` nicht gesetzt ist;
+eine eigene Farbe gewinnt vor der Art. **Listen** (`ListState`, alles je
+Eintrag ueber `sync`/`einfuegen`/`entfernen`/`tragen`/`umordnen`
+gleich lang): unsichtbarer Wert (`SET_DATA/DATA$/FIND_DATA`), Zusatztext
+rechts (`DETAIL`), Tooltip je Eintrag (`TIP`, `hover_teil` wie bei der
+Leiste), gesperrte Eintraege (`ENABLE`) und Gruppenkoepfe (`HEADER`) --
+beide weder anklickbar noch mit Pfeilen erreichbar --, Filter
+(`FILTER/GET_FILTER$/VIEW_COUNT/VIEW_ROW`, Kopf bleibt, solange seine
+Gruppe etwas zeigt), Leer-Hinweis (`PLACEHOLDER`), natuerliches Sortieren
+INNERHALB der Gruppen (`SORT`, `natuerlich_vergleichen`), `FIND`,
+`SCROLL_TO`, Bild auf/ab, **Enter meldet GUI_DOUBLE_CLICKED**, und
+**Tippen springt** (`liste_tippen`: Zeichen aus der Tipp-Warteschlange,
+ersatzweise die Buchstabentasten -- die Wiedergabe einer Aufnahme fuellt nur
+Tasten). **Eine Quelle `liste_ansicht`** fuer Zeichnen, Klick, Tastatur,
+Rad, Tooltip und Bildschirmleser -- wie `view` bei der Tabelle; nach aussen
+bleiben alle Nummern Eintragsnummern. **Stolperstein, gleich beseitigt:**
+im hellen Thema war die GEWAEHLTE Zeile unlesbar (dunkle Schrift auf
+dunkelblauer Auswahl) -- gesehen nur im Bild; die Schrift einer gewaehlten
+Zeile folgt jetzt ihrem Grund. Die IDE nutzt beides: Palette mit
+Zusatztext (Kuerzel/Ordner rechts statt angehaengt), Uebernehmen/Drucken/
+Neue Datei als `primaer`, Debugger-Stopp als `gefahr`. Tests
+`tests/pruef/gui_liste_komfort.dhtest` (9), `tests/pruef/gui_knopfarten.dhtest`
+(3, darunter eine Bildprobe).
+
 **Stufe 26 (2026-09-13):** der Hinweis des Nutzers -- die Werkzeugleiste
 der IDE sah nicht schoen aus und war keine Laufzeit-gui. Beides stimmte:
 `GUI_TOOLBAR` war ein dekorativer Streifen, die IDE legte zwoelf

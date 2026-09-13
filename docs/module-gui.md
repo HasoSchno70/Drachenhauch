@@ -61,6 +61,8 @@ IMPORT "gui"
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
+| `GUI_BUTTON_VARIANT(knopf, art$)` | — | Knopfart: `standard`, `primaer`, `erfolg`, `warnung`, `gefahr`, `umriss`, `flach`, `link` |
+| `GUI_BUTTON_GET_VARIANT$(knopf)` | STRING | die Knopfart als Name |
 | `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | Knopf mit Icon (Textur-Handle oder Name eines eingebauten Sinnbilds); ohne Text = flacher Toolbar-Button |
 | `GUI_SET_ICON(button, tex)` | — | Icon eines Buttons setzen/ersetzen (-1 entfernt) |
 | `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | Werkzeugleiste: mit Einträgen (`GUI_TOOLBAR_ADD`) verteilt, zeichnet und meldet sie ihre Knöpfe selbst; ohne Einträge ein flacher Streifen |
@@ -171,7 +173,7 @@ IMPORT "gui"
 | `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
 | `GUI_THEME_PRESET(name$)` | — | Look: dark/light/retro/contrast + **modern_dark/modern_light** (rund + Schatten) |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
-| `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent; -1 entfernt) |
+| `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent, bei Knöpfen auch hover/pressed; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
 **Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
@@ -235,6 +237,22 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_LISTBOX_ICON(lb, i, bild)` / `GUI_LISTBOX_COLOR(lb, i, farbe)` | — | Sinnbild und Textfarbe je Eintrag (-1 = keins / Thema) |
 | `GUI_LISTBOX_CHECKED(lb, i)` / `GUI_LISTBOX_SET_CHECKED(lb, i, an)` | BOOLEAN / — | Haken je Eintrag (mit `kaestchen`) |
 | `GUI_LISTBOX_IS_SELECTED(lb, i)` / `GUI_LISTBOX_SELECT(lb, i, an)` / `GUI_LISTBOX_SEL_COUNT(lb)` / `GUI_LISTBOX_SEL_ROW(lb, k)` / `GUI_LISTBOX_CLEAR_SELECTION(lb)` | — | Mehrfachauswahl wie bei der Tabelle |
+| `GUI_LISTBOX_SET_DATA(lb, i, wert$)` | — | unsichtbarer Wert je Eintrag (eine ID, ein Pfad) |
+| `GUI_LISTBOX_DATA$(lb, i)` | STRING | den unsichtbaren Wert eines Eintrags lesen |
+| `GUI_LISTBOX_FIND_DATA(lb, wert$)` | INTEGER | erster Eintrag mit diesem Wert, -1 = keiner |
+| `GUI_LISTBOX_DETAIL(lb, i, text$)` | — | Zusatztext rechts im Eintrag, gedämpft (Kürzel, Größe, Zeilennummer) |
+| `GUI_LISTBOX_TIP(lb, i, text$)` | — | Tooltip je Eintrag |
+| `GUI_LISTBOX_ENABLE(lb, i, an)` | — | Eintrag sperren: sichtbar, aber weder anklickbar noch mit Pfeilen erreichbar |
+| `GUI_LISTBOX_ENABLED(lb, i)` | BOOLEAN | ob ein Eintrag wählbar ist |
+| `GUI_LISTBOX_HEADER(lb, i, an)` | — | Eintrag zum Gruppenkopf machen: gliedert, ist nicht wählbar |
+| `GUI_LISTBOX_FILTER(lb, text$)` | — | nur Einträge zeigen, deren Text oder Zusatztext den Teiltext enthält (leer = alle) |
+| `GUI_LISTBOX_GET_FILTER$(lb)` | STRING | der aktuelle Filter |
+| `GUI_LISTBOX_VIEW_COUNT(lb)` | INTEGER | Zahl der sichtbaren Zeilen |
+| `GUI_LISTBOX_VIEW_ROW(lb, k)` | INTEGER | die k-te sichtbare Zeile als Eintragsnummer, -1 = keine |
+| `GUI_LISTBOX_PLACEHOLDER(lb, text$)` | — | Hinweis, der erscheint, wenn nichts zu sehen ist |
+| `GUI_LISTBOX_SORT(lb[, absteigend])` | — | natürlich sortieren („Datei 9“ vor „Datei 10“), innerhalb der Gruppen |
+| `GUI_LISTBOX_FIND(lb, text$[, ab])` | INTEGER | nächster Eintrag ab `ab`, der den Teiltext enthält, -1 = keiner |
+| `GUI_LISTBOX_SCROLL_TO(lb, i)` | — | so rollen, dass der Eintrag zu sehen ist |
 | `GUI_DOUBLE_CLICKED(lb)` | BOOLEAN | Doppelklick auf einen Eintrag, ein Bild lang |
 | `GUI_IMAGE(win, x, y, w, h, image)` | GUI_WIDGET | Bild oder Symbol im Fenster |
 | `GUI_SET_IMAGE(widget, image)` | — | Bild austauschen |
@@ -762,6 +780,56 @@ Zeile, ein Pfeil setzt die Menge auf eine Zeile. Ohne Mehrfachauswahl liefern di
 Abfragen die eine gewählte Zeile. `GUI_DOUBLE_CLICKED(lb)` gilt ein Bild lang wie
 `GUI_CLICKED`. Haken, Farben, Auswahl und die beiden Schalter stehen in der `.dhform`
 (`list`), Sinnbilder als Textur-Handles nicht.
+
+### Listen komfortabel
+
+```basic
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(win, 20, 40, 260, 220, ["Obst", "Apfel", "Birne", "Gemüse", "Mais"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)                ' Gruppenköpfe
+GUI_LISTBOX_HEADER(lb, 3, TRUE)
+GUI_LISTBOX_SET_DATA(lb, 1, "artikel-17")      ' unsichtbar: die ID der Datenbankzeile
+GUI_LISTBOX_DETAIL(lb, 1, "1,20 €")            ' Zusatztext rechts
+GUI_LISTBOX_TIP(lb, 1, "aus der Region")
+GUI_LISTBOX_ENABLE(lb, 2, FALSE)               ' ausverkauft: sichtbar, nicht wählbar
+GUI_LISTBOX_PLACEHOLDER(lb, "Keine Treffer")
+GUI_LISTBOX_SORT(lb)                           ' natürlich, innerhalb der Gruppen
+
+GUI_LISTBOX_FILTER(lb, "ap")                   ' etwa je Bild aus einem Suchfeld
+IF GUI_DOUBLE_CLICKED(lb) THEN PRINT GUI_LISTBOX_DATA$(lb, GUI_LISTBOX_SELECTED(lb))
+```
+
+Was eine Liste im Alltag braucht, kann sie seit Stand 27 selbst:
+
+* **Ein unsichtbarer Wert je Eintrag** (`SET_DATA`/`DATA$`/`FIND_DATA`). Der
+  Text ist für Menschen und ändert sich; eine gemerkte Nummer stimmt nach
+  dem ersten Einfügen nicht mehr. Der Wert reist mit, wenn der Eintrag
+  verschoben, einsortiert oder davor etwas eingefügt wird.
+* **Zusatztext rechts** (`DETAIL`), gedämpft und rechtsbündig; der Haupttext
+  endet vor ihm, statt darunter weiterzulaufen.
+* **Gesperrte Einträge** und **Gruppenköpfe** sind sichtbar, aber weder
+  anklickbar noch mit den Pfeilen erreichbar — ein Pfeil springt über sie
+  hinweg. Wird ein gewählter Eintrag gesperrt, fällt die Wahl weg.
+* **Filter**: nur, was den Teiltext im Text oder Zusatztext enthält, ohne
+  Rücksicht auf Groß/klein. Ein Gruppenkopf bleibt stehen, solange in seiner
+  Gruppe etwas passt. **Die Einträge bleiben, wo sie sind**: alle Nummern
+  nach außen sind weiter Eintragsnummern, die sichtbare Reihenfolge liefern
+  `VIEW_COUNT`/`VIEW_ROW` (wie bei der Tabelle). Ist nichts zu sehen, steht
+  der Hinweis aus `PLACEHOLDER` da statt einer leeren Fläche.
+* **Sortieren** ist natürlich — „Datei 9“ vor „Datei 10“, Groß/klein egal —
+  und bleibt innerhalb der Gruppen; sonst risse es die Köpfe von ihren
+  Einträgen. Die Auswahl meint danach denselben Eintrag.
+* **Tastatur**: Bild auf/ab blättern, **Enter** meldet `GUI_DOUBLE_CLICKED`
+  (öffnen ohne Maus), und **Tippen springt**: Buchstaben wählen den nächsten
+  Eintrag, der so anfängt; was innerhalb einer Sekunde getippt wird, ist ein
+  Wort („ki“ → „Kirsche“), dieselbe Taste mehrmals läuft durch alle mit
+  diesem Anfang.
+* **Suchen** (`FIND`) und **hinrollen** (`SCROLL_TO`) vom Programm aus.
+
+Ein Bildschirmleser sieht nur die sichtbaren Einträge, gesperrte als
+gesperrt, und den Zusatztext als Teil des Namens. Werte, Zusatztexte,
+Tooltips, Köpfe, gesperrte Einträge und der Hinweis stehen in der
+`.dhform`; der Filter nicht — er ist ein Blick, kein Inhalt.
 
 ### Image — Bild/Icon im UI
 
@@ -1466,6 +1534,40 @@ DIM warn AS GUI_WIDGET
 warn = GUI_BUTTON(win, "Löschen", 20, 100, 100, 30)
 GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' nur dieser Button ist rot
 ```
+
+Für Knöpfe gibt es zwei Rollen mehr: `"hover"` (unter der Maus) und
+`"pressed"` (gedrückt); ohne sie wird der Grund heller bzw. dunkler. Und die
+**Schriftfarbe folgt dem Grund**, solange `"fg"` nicht gesetzt ist: auf einem
+hellen Knopf dunkel, auf einem dunklen weiß — vorher blieb sie weiß, und ein
+gelber Knopf war unlesbar.
+
+**Knopfarten** statt Farben von Hand:
+
+```basic
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "OK", 20, 200, 100, 30)
+DIM loeschen AS GUI_WIDGET : loeschen = GUI_BUTTON(win, "Löschen", 130, 200, 100, 30)
+DIM mehr AS GUI_WIDGET : mehr = GUI_BUTTON(win, "Mehr ...", 240, 200, 100, 30)
+GUI_BUTTON_VARIANT(ok, "primaer")       ' Akzentfarbe des Themas
+GUI_BUTTON_VARIANT(loeschen, "gefahr")  ' rot
+GUI_BUTTON_VARIANT(mehr, "umriss")      ' nur Rand, Fläche erst unter der Maus
+PRINT GUI_BUTTON_GET_VARIANT$(ok)       ' primaer
+```
+
+| Art | Aussehen |
+|---|---|
+| `standard` | wie bisher: Farbe des Themas |
+| `primaer` | Akzentfarbe des Themas — für die eine Hauptaktion eines Fensters |
+| `erfolg` | grün |
+| `warnung` | orange |
+| `gefahr` | rot — für Löschen, Verwerfen, Abbrechen eines Laufs |
+| `umriss` | kein Grund, doppelter Rand in Akzentfarbe |
+| `flach` | keine Fläche, bis die Maus darüber ist (Werkzeugknopf mit Text) |
+| `link` | nur Text in Akzentfarbe, unterstrichen unter der Maus |
+
+Eine eigene Farbe (`GUI_SET_COLOR(.., "bg", ..)`) gewinnt vor der Art. Der
+Standard-Knopf eines Fensters (`GUI_WINDOW_DEFAULT`) trägt weiter seinen
+Akzentrahmen — außer er ist schon `primaer`, dann sagt die Fläche es. Die
+Art steht in der `.dhform` als `variant`.
 
 `GUI_RESET()` setzt Theme **und** Metriken wieder auf die Defaults zurück
 (und löscht alle Fenster/Widgets).
