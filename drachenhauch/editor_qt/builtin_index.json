@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1820,
+ "count": 1837,
  "builtins": [
   {
    "name": "ABS",
@@ -4644,6 +4644,108 @@
    "name": "GUI_TOOLBAR",
    "kind": "core",
    "signature": "GUI_TOOLBAR(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_ADD",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_ADD(tb, sinnbild, tip$ = \"\", text$ = \"\") AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_CHECKABLE",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_CHECKABLE(tb, eintrag, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_CHECKED",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_CHECKED(tb, eintrag) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_CLEAR",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_CLEAR(tb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_CLICKED",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_CLICKED(tb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_COUNT",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_COUNT(tb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_ENABLE",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_ENABLE(tb, eintrag, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_ENABLED",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_ENABLED(tb, eintrag) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_ITEM_W",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_ITEM_W(tb, eintrag) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_ITEM_X",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_ITEM_X(tb, eintrag) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SEPARATOR",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SEPARATOR(tb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SET",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SET(tb, schluessel$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SET_CHECKED",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SET_CHECKED(tb, eintrag, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SET_ICON",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SET_ICON(tb, eintrag, sinnbild)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SET_TEXT",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SET_TEXT(tb, eintrag, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SET_TIP",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SET_TIP(tb, eintrag, tip$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_SPACER",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_SPACER(tb) AS INTEGER",
    "module": "gui"
   },
   {

@@ -61,9 +61,26 @@ IMPORT "gui"
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
-| `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | Knopf mit Icon (Textur-Handle); ohne Text = flacher Toolbar-Button |
+| `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | Knopf mit Icon (Textur-Handle oder Name eines eingebauten Sinnbilds); ohne Text = flacher Toolbar-Button |
 | `GUI_SET_ICON(button, tex)` | — | Icon eines Buttons setzen/ersetzen (-1 entfernt) |
-| `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | flacher Werkzeugleisten-Streifen (Deko, für Icon-Button-Reihe) |
+| `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | Werkzeugleiste: mit Einträgen (`GUI_TOOLBAR_ADD`) verteilt, zeichnet und meldet sie ihre Knöpfe selbst; ohne Einträge ein flacher Streifen |
+| `GUI_TOOLBAR_ADD(tb, sinnbild[, tip$[, text$]])` | INTEGER | Knopf anhängen — `sinnbild` ist der Name eines eingebauten Sinnbilds oder ein Bild; liefert die Nummer des Eintrags |
+| `GUI_TOOLBAR_SEPARATOR(tb)` | INTEGER | senkrechter Trenner als Eintrag |
+| `GUI_TOOLBAR_SPACER(tb)` | INTEGER | Lücke, die den Rest der Leiste nach rechts schiebt |
+| `GUI_TOOLBAR_CLICKED(tb)` | INTEGER | Nummer des Knopfes, der in diesem Bild geklickt wurde, sonst -1 |
+| `GUI_TOOLBAR_COUNT(tb)` | INTEGER | Zahl der Einträge (Trenner und Lücken zählen mit) |
+| `GUI_TOOLBAR_CLEAR(tb)` | — | alle Einträge entfernen |
+| `GUI_TOOLBAR_ENABLE(tb, eintrag, an)` | — | Knopf sperren oder freigeben |
+| `GUI_TOOLBAR_ENABLED(tb, eintrag)` | BOOLEAN | ob ein Knopf bedienbar ist |
+| `GUI_TOOLBAR_CHECKABLE(tb, eintrag, an)` | — | Knopf kippbar machen: ein Klick schaltet ihn ein und aus |
+| `GUI_TOOLBAR_SET_CHECKED(tb, eintrag, an)` | — | kippbaren Knopf ein- oder ausschalten |
+| `GUI_TOOLBAR_CHECKED(tb, eintrag)` | BOOLEAN | ob ein kippbarer Knopf eingeschaltet ist |
+| `GUI_TOOLBAR_SET_ICON(tb, eintrag, sinnbild)` | — | Sinnbild eines Eintrags wechseln (Name oder Bild) |
+| `GUI_TOOLBAR_SET_TIP(tb, eintrag, tip$)` | — | Tooltip eines Eintrags |
+| `GUI_TOOLBAR_SET_TEXT(tb, eintrag, text$)` | — | Beschriftung eines Eintrags |
+| `GUI_TOOLBAR_SET(tb, schluessel$, wert)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
+| `GUI_TOOLBAR_ITEM_X(tb, eintrag)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`) |
+| `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | Breite eines Eintrags |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
 | `GUI_SET_ALIGN(wdg, wie$)` | — | Text links, `mitte` oder `rechts` ausrichten (Beschriftung, Knopf, Textfeld) |
 | `GUI_SET_WRAP(label, breite)` | — | Beschriftung bei `breite` Pixeln an Wortgrenzen umbrechen (0 = aus); die Höhe folgt dem Text |
@@ -172,7 +189,7 @@ IMPORT "gui"
 | `GUI_MENU_ENABLE(item, an)` | — | Eintrag sperren (grau, kein Klick, kein Kürzel) oder freigeben |
 | `GUI_MENU_CHECK(item, an)` | — | macht den Eintrag zum **Häkchen-Eintrag** und setzt ihn; ein Klick kippt ihn danach selbst |
 | `GUI_MENU_CHECKED(item)` | BOOLEAN | Zustand des Häkchens |
-| `GUI_MENU_ICON(item, bild)` | — | Sinnbild links vom Text (Textur-Handle wie bei `GUI_ICON_BUTTON`, -1 entfernt) |
+| `GUI_MENU_ICON(item, bild)` | — | Sinnbild links vom Text (Name eines eingebauten Sinnbilds oder Textur-Handle wie bei `GUI_ICON_BUTTON`, -1 entfernt) |
 | `GUI_MENU_TEXT(item, label$)` | — | Beschriftung ändern („Pause" / „Weiter") |
 
 Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.dh`](../examples/129_gui_menu.dh).
@@ -636,11 +653,72 @@ GUI_SET_ICON(bRun, icOther)                                        ' Icon wechse
 ```
 
 `GUI_ICON_BUTTON` ist ein **ganz normaler Button** (`GUI_CLICKED`/`GUI_ON_CLICK`)
-mit einem Bild. `tex` ist ein Textur-Handle aus `LOADIMAGE` oder `GENTEX_*`.
+mit einem Bild. `tex` ist ein Textur-Handle aus `LOADIMAGE` oder `GENTEX_*` —
+oder der **Name eines eingebauten Sinnbilds** (siehe unten).
 **Ohne** Text wird der Button flach gezeichnet (Fläche nur bei Hover/Klick) und
 das Icon mittig — der klassische Toolbar-Look; **mit** Text steht das Icon links,
-der Text rechts (normale Button-Optik). `GUI_TOOLBAR` ist nur ein dekorativer
-Streifen als Hintergrund — die Icon-Buttons legst du selbst darauf.
+der Text rechts (normale Button-Optik).
+
+### Werkzeugleiste mit Einträgen
+
+```basic
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, 800, 36)
+GUI_TOOLBAR_ADD(tb, "neu", "Neue Datei (Strg+N)")         ' 0
+GUI_TOOLBAR_ADD(tb, "sichern", "Sichern (Strg+S)")        ' 1
+GUI_TOOLBAR_SEPARATOR(tb)                                 ' 2
+GUI_TOOLBAR_ADD(tb, "start", "Starten (F5)")              ' 3
+GUI_TOOLBAR_ADD(tb, "umbruch", "Zeilenumbruch")           ' 4
+GUI_TOOLBAR_CHECKABLE(tb, 4, TRUE)
+GUI_TOOLBAR_SPACER(tb)                                    ' 5 -- schiebt den Rest nach rechts
+GUI_TOOLBAR_ADD(tb, "einstellungen", "Einstellungen")     ' 6
+
+' je Bild, nach GUI_UPDATE:
+SELECT CASE GUI_TOOLBAR_CLICKED(tb)
+    CASE 0 : PRINT "neue Datei"
+    CASE 3 : PRINT "starten"
+    CASE 4 : PRINT "Umbruch "; GUI_TOOLBAR_CHECKED(tb, 4)
+END SELECT
+```
+
+Bis Stand 25 war `GUI_TOOLBAR` nur ein Streifen, auf den ein Programm
+Icon-Knöpfe legte und bei jeder Größenänderung von Hand verschob — mit
+Bildern, die für eine Größe gemalt waren und für die Leiste gestreckt
+wurden. Jetzt **verteilt die Leiste ihre Einträge selbst**: Knöpfe sind so
+breit wie die Leiste hoch (minus 6 Punkte), Trenner 11, eine Lücke nimmt
+den übrigen Platz. Die Nummer eines Eintrags ist die Reihenfolge des
+Anlegens, Trenner und Lücken zählen mit.
+
+**Eingebaute Sinnbilder** werden in der Größe gezeichnet, in der sie
+gebraucht werden — als Striche auf einem 16er-Raster, nicht als gestrecktes
+Pixelbild —, alle mit derselben Strichstärke und in der Textfarbe des
+Themas. Starten, Stoppen, Prüfen und Haltepunkt tragen ihre eigene Farbe.
+Dieselben Namen nehmen `GUI_ICON_BUTTON`, `GUI_SET_ICON` und
+`GUI_MENU_ICON`, damit Menü und Leiste gleich aussehen:
+
+`neu`, `datei`, `oeffnen`, `sichern`, `drucken`, `export`, `import`,
+`rueckgaengig`, `wiederholen`, `ausschneiden`, `kopieren`, `einfuegen`,
+`suchen`, `start`, `stopp`, `pause`, `debug`, `haltepunkt`, `pruefen`,
+`profil`, `handbuch`, `einstellungen`, `werkzeug`, `umbruch`, `info`,
+`warnung`, `plus`, `minus`, `schliessen`, `links`, `rechts`, `hoch`,
+`runter`, `menue`, `aktualisieren`.
+
+Ein unbekannter Name ist ein **Fehler**, der die bekannten aufzählt — ein
+still leerer Knopf fiele erst auf, wenn jemand ihn sucht. Wer ein eigenes
+Bild will, gibt statt des Namens ein Textur-Handle.
+
+Ein Knopf zeigt seine Fläche nur, wenn er etwas zu sagen hat: unter der
+Maus, gedrückt oder eingeschaltet (ein Hauch Akzent, damit zwei
+eingeschaltete nebeneinander noch wie Knöpfe aussehen). Ein Klick zählt,
+wenn die Taste auf **demselben** Knopf wieder hochgeht; wegziehen nimmt den
+Druck zurück. `GUI_TOOLBAR_CLICKED` meldet ihn genau ein Bild lang,
+`GUI_CLICKED(tb)` und `GUI_ON_CLICK` feuern ebenfalls. Trenner, Lücken und
+gesperrte Knöpfe nehmen keinen Klick an. Jeder Eintrag hat seinen eigenen
+Tooltip, und ein Bildschirmleser sieht die Knöpfe als Knöpfe.
+
+**Ohne Einträge bleibt die Leiste der Streifen, der sie war**, und nimmt
+keine Klicks an — Knöpfe, die ein älteres Programm darauf legt, treffen
+weiter. In der `.dhform` stehen die Einträge unter `leiste` (Bilder nicht —
+Textur-Handles gelten nur in diesem Lauf).
 
 ## ListBox, Image, Canvas
 
@@ -1318,6 +1396,8 @@ nicht länger.)
 * **Pfadleiste** (Brotkrumen) und **Statusleiste mit Feldern** — aus
   Beschriftungen in einem Layout-Behälter.
 * **Baum mit Spalten** (Tabelle und Baum in einem).
+* **Überlauf der Werkzeugleiste**: was nicht mehr hineinpasst, wird
+  abgeschnitten statt in ein »-Menü am Ende zu wandern.
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 
