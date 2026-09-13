@@ -694,8 +694,11 @@ GUI_WINDOW_VISIBLE(winProfil, FALSE)
 DIM winHandbuch AS GUI_WINDOW : winHandbuch = GUI_WINDOW("Handbuch", 200, 60, 980, 720)
 GUI_WINDOW_CLOSABLE(winHandbuch, TRUE)
 DIM ddDoku AS GUI_WIDGET : ddDoku = GUI_DROPDOWN(winHandbuch, 8, 8, 420, 26, [])
-DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 436, 8, 380, 26, "")
-DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Suchen", 824, 8, 80, 26)
+DIM tfHbSuche AS GUI_WIDGET : tfHbSuche = GUI_TEXTINPUT(winHandbuch, 436, 8, 292, 26, "")
+DIM btnHbZurueck AS GUI_WIDGET : btnHbZurueck = GUI_BUTTON(winHandbuch, "Zurueck", 736, 8, 80, 26)
+DIM btnHbSuche AS GUI_WIDGET : btnHbSuche = GUI_BUTTON(winHandbuch, "Weiter", 824, 8, 80, 26)
+GUI_TOOLTIP(btnHbZurueck, "Vorige Fundstelle (Umschalt+Enter)")
+GUI_TOOLTIP(btnHbSuche, "Naechste Fundstelle (Enter)")
 DIM lblHbStand AS GUI_WIDGET : lblHbStand = GUI_LABEL(winHandbuch, "", 8, 40)
 DIM taHandbuch AS GUI_WIDGET : taHandbuch = GUI_TEXTAREA(winHandbuch, 8, 60, 964, 620)
 ' Gesetzt statt roh: die Leinwand liegt auf derselben Flaeche wie das
@@ -6640,22 +6643,65 @@ SUB handbuchVerweis(ziel AS STRING)
     protokoll("hbverweis " + ziel)
 END SUB
 
-SUB handbuchSuchen()
+' Weiter- und zuruecksuchen, mit Umlauf. In der gesetzten Ansicht sucht das
+' Widget selbst (es allein kennt seinen Satz), markiert die Fundstelle und
+' hebt alle anderen schwach hervor -- seit Stand 29; davor rollte es nur zur
+' ersten, und wer die dritte wollte, musste scrollen.
+SUB handbuchSuchen(vorwaerts AS BOOLEAN)
     DIM gesucht AS STRING : gesucht = GUI_TEXT(tfHbSuche)
-    IF gesucht = "" THEN RETURN
+    IF gesucht = "" THEN GUI_RICHTEXT_MARK_ALL(rtHandbuch, "") : RETURN
+    IF hbGesetzt THEN
+        DIM anzahl AS INTEGER : anzahl = GUI_RICHTEXT_MARK_ALL(rtHandbuch, gesucht)
+        DIM y AS INTEGER
+        IF vorwaerts THEN
+            y = GUI_RICHTEXT_FIND_NEXT(rtHandbuch, gesucht)
+        ELSE
+            y = GUI_RICHTEXT_FIND_PREV(rtHandbuch, gesucht)
+        END IF
+        IF y < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + "' nicht in diesem Dokument") : RETURN
+        GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + " -- " + STR$(anzahl) + " Fundstellen")
+        protokoll("hbsuche " + STR$(y) + " " + STR$(anzahl) + " " + GUI_RICHTEXT_SELECTION$(rtHandbuch))
+        RETURN
+    END IF
     DIM z AS INTEGER
     DIM s AS INTEGER
     (z, s) = GUI_TEXTAREA_CURSOR(taHandbuch)
-    DIM tz AS INTEGER
+    DIM tz AS INTEGER : tz = -1
     DIM ts AS INTEGER
-    (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, z, s + 1)
-    IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+    IF vorwaerts THEN
+        (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, z, s + 1)
+        IF tz < 0 THEN (tz, ts) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+    ELSE
+        ' Rueckwaerts: die letzte Fundstelle VOR der Auswahl, sonst die letzte
+        ' ueberhaupt. GUI_TEXTAREA_FIND kennt nur eine Richtung.
+        DIM az AS INTEGER
+        DIM as1 AS INTEGER
+        DIM ez AS INTEGER
+        DIM es AS INTEGER
+        (az, as1, ez, es) = GUI_TEXTAREA_SELECTION_RANGE(taHandbuch)
+        IF az < 0 THEN az = z : as1 = s
+        DIM fz AS INTEGER
+        DIM fs AS INTEGER
+        DIM lz AS INTEGER : lz = -1
+        DIM ls AS INTEGER
+        (fz, fs) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, 1, 1)
+        DIM erste AS BOOLEAN : erste = TRUE
+        WHILE fz > 0
+            IF NOT erste AND fz = lz AND fs = ls THEN BREAK
+            erste = FALSE
+            IF fz < az OR (fz = az AND fs < as1) THEN tz = fz : ts = fs
+            lz = fz : ls = fs
+            DIM nz AS INTEGER
+            DIM ns AS INTEGER
+            (nz, ns) = GUI_TEXTAREA_FIND(taHandbuch, gesucht, fz, fs + 1)
+            IF nz < fz OR (nz = fz AND ns <= fs) THEN BREAK
+            fz = nz : fs = ns
+        WEND
+        IF tz < 0 THEN tz = lz : ts = ls
+    END IF
     IF tz < 0 THEN GUI_SET_TEXT(lblHbStand, "'" + gesucht + "' nicht in diesem Dokument") : RETURN
     GUI_TEXTAREA_GOTO(taHandbuch, tz, ts)
     GUI_TEXTAREA_SELECT(taHandbuch, tz, ts, tz, ts + LEN(gesucht))
-    ' In der gesetzten Ansicht suchen heisst: das Widget rollt selbst zur
-    ' Fundstelle (es allein kennt seinen Satz).
-    GUI_RICHTEXT_FIND(rtHandbuch, gesucht, GUI_RICHTEXT_SCROLL_GET(rtHandbuch))
     GUI_SET_TEXT(lblHbStand, docNamen[docLetzteWahl] + " -- Zeile " + STR$(tz))
 END SUB
 
@@ -7471,7 +7517,9 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_DROPDOWN_SELECTED(ddDoku) <> docLetzteWahl AND GUI_DROPDOWN_SELECTED(ddDoku) >= 0 THEN
         handbuchZeigen(docNamen[GUI_DROPDOWN_SELECTED(ddDoku)], 1)
     END IF
-    IF GUI_CLICKED(btnHbSuche) OR GUI_ENTERED(tfHbSuche) THEN handbuchSuchen()
+    IF GUI_ENTERED(tfHbSuche) THEN handbuchSuchen(NOT (KEYPRESSED(KEY_LSHIFT) OR KEYPRESSED(KEY_RSHIFT)))
+    IF GUI_CLICKED(btnHbSuche) THEN handbuchSuchen(TRUE)
+    IF GUI_CLICKED(btnHbZurueck) THEN handbuchSuchen(FALSE)
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
     IF GUI_RICHTEXT_LINK$(rtHandbuch) <> "" THEN handbuchVerweis(GUI_RICHTEXT_LINK$(rtHandbuch))
     werkzeugeAufraeumen()
