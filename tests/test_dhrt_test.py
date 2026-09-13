@@ -34,14 +34,21 @@ _DHRT = _dhrt()
 pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
-def _test(*args, cwd=None):
+def _test(*args, cwd=None, timeout=600):
     return subprocess.run([str(_DHRT), "test", *args], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=600, cwd=cwd)
+                          encoding="utf-8", errors="replace", timeout=timeout, cwd=cwd)
 
 
 def test_alle_sammlungen_unter_tests_pruef_sind_gruen():
-    """Der Anker: was aus pytest umgezogen ist, laeuft hier weiter mit."""
-    r = _test(str(PRUEF))
+    """Der Anker: was aus pytest umgezogen ist, laeuft hier weiter mit.
+
+    Die Zeitgrenze ist hier hoeher als bei den Formattests: seit Stufe 34-36
+    liegen die IDE-Faelle in Sammlungen, und die laufen in ECHTZEIT (60 Bilder
+    je Sekunde, nacheinander wegen der Zwischenablage) -- gemessen 780 s fuer
+    alles zusammen auf der Entwicklermaschine, die alte Grenze von 600 s riss.
+    Ein Bau ohne Grafik ueberspringt die Fenster-Faelle; wie lange die CI
+    dafuer braucht, ist hier nicht gemessen."""
+    r = _test(str(PRUEF), timeout=1800)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "Faelle" in r.stdout and " fehl" in r.stdout, r.stdout
     assert " 0 fehl" in r.stdout, r.stdout

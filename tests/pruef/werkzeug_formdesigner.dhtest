@@ -180,10 +180,11 @@ WRITEALL("code.dh", gbCode$())
 DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "code.dh")
 DIM bis AS INTEGER : bis = MILLIS() + 60000
 DIM befund AS STRING : befund = ""
-WHILE MILLIS() < bis
+DIM stille AS INTEGER : stille = 0
+WHILE MILLIS() < bis AND stille < 5
     DIM z AS STRING : z = PROCESS_READ$(pc)
-    IF z <> "" THEN befund = befund + z
-    IF z = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+    IF z <> "" THEN befund = befund + z : stille = 0
+    IF z = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
 WEND
 PRINT "check " + befund
 DIM pb AS INTEGER : pb = PROCESS_START("dhrt", "bild", "code.dh", "code.png", "3")

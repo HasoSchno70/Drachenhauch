@@ -2875,6 +2875,30 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 36 (2026-09-13):** die Staende 13 bis 25 der IDE ohne Python -- 58
+Faelle nach `tests/pruef/werkzeug_ide_13_25.dhtest`; in `tests/test_ide.py`
+bleiben **9 Sonderfaelle** (PDF-Listing mit PyMuPDF, Sitzung/Umbruch/Sitzung
+je Projekt mit zwei IDE-Laeufen, git blame und zweimal git diff mit
+Repository, die Hervorhebung als Farbbaender im Bild, das Farbfeld mit einem
+Messlauf vorab). Hinzu kamen keine Formatstuecke, nur Lagen: das
+Parameter-Fenster (Knoepfe ab 420/230), das Vorschau-Fenster (Kaestchen der
+Dateien, Zeilen des Unterschieds ab y = 160 je 22, [Block auslassen] und
+[Pruefen] bei y = 681), die mittlere Maustaste auf einem Reiter, Beilagen in
+Unterordnern (eine Datei unter lib/ im Fallordner) und eine eigene
+Doku-Wurzel fuers Handbuch.
+Verschobene und umgebaute Dateien gehen im `nachher`-Programm durch
+`dhrt --check`. **Stolperstein beim Schreiben:** ein erwarteter Dateianfang
+mit Zeilenumbruch stand als Zeichenkette im Leseprogramm -- ein Umbruch in
+einer Zeichenkette ist ein Lexer-Fehler; der Text kommt jetzt ueber
+`CHR$(10)` (wie `"` ueber `CHR$(34)`). Gegenprobe ohne `AUTOMATION_PLAY`:
+56 der 58 Faelle fallen; die zwei uebrigen ("ein geaenderter Reiter fragt
+vor dem Schliessen", "ein Klick auf einen Ordner klappt ihn um") pruefen,
+dass NICHTS passiert -- in pytest genauso schwach. **Nebenfund der vollen
+Pruefung:** `dhrt test tests/pruef` braucht mit den IDE-Sammlungen 780 s
+(sie laufen in Echtzeit und nacheinander), der Anker in
+`tests/test_dhrt_test.py` gab nur 600 s und riss im seriellen Durchgang --
+er hat jetzt 1800 s, die Formattests daneben bleiben bei 600.
+
 **Stufe 35 (2026-09-13):** die Staende 6 bis 12 der IDE ohne Python -- 43
 Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
 (eigene Datei, `--- seriell`; die Laeufer nehmen seriell markierte Dateien

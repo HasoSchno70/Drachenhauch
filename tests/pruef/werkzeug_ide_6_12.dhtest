@@ -4249,10 +4249,11 @@ PRINT "aufruf " ; INSTR(tx, "    summiere(summe, i)") >= 0
 DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "spiel.dh")
 DIM bis AS INTEGER : bis = MILLIS() + 60000
 DIM befund AS STRING : befund = ""
-WHILE MILLIS() < bis
+DIM stille AS INTEGER : stille = 0
+WHILE MILLIS() < bis AND stille < 5
     DIM zz AS STRING : zz = PROCESS_READ$(pc)
-    IF zz <> "" THEN befund = befund + zz
-    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+    IF zz <> "" THEN befund = befund + zz : stille = 0
+    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
 WEND
 PRINT "check " + TRIM$(befund)
 --- erwartet

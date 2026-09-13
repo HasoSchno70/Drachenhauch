@@ -190,7 +190,10 @@ Seit Stufe 34 auch die IDE (`tests/pruef/werkzeug_ide.dhtest`, Stände 1 bis 5):
 das `nachher`-Programm liest ihr Protokoll mit `READLINES` und prüft genaue
 Zeilen, Reihenfolgen und Zählungen — `--- inhalt` sucht nur Teiltexte, und
 `geprueft 1` stünde auch in `geprueft 10`. Die Stände 6 bis 12 folgen in
-`tests/pruef/werkzeug_ide_6_12.dhtest`; eine Voreinstellung der IDE kommt dort
+`tests/pruef/werkzeug_ide_6_12.dhtest`, 13 bis 25 in
+`tests/pruef/werkzeug_ide_13_25.dhtest` (ein Text mit Anführungszeichen oder
+Zeilenumbruch kommt dort über `CHR$(34)`/`CHR$(10)` ins Leseprogramm — in
+einer Zeichenkette ist beides nicht erlaubt); eine Voreinstellung der IDE kommt dort
 als Beilage `ide.json` in `_programm/`. **Falle:** ein Werkzeug, das aus einem
 relativen Pfad weitere Pfade ableitet und sie an ein Kind weiterreicht
 (`dhrt bild` wechselt ins Verzeichnis seiner Quelle), braucht den Pfad absolut

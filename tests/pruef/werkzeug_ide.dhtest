@@ -17,10 +17,11 @@
 DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", GETENV$("IDE_QUELLE"))
 DIM bis AS INTEGER : bis = MILLIS() + 120000
 DIM befund AS STRING : befund = ""
-WHILE MILLIS() < bis
+DIM stille AS INTEGER : stille = 0
+WHILE MILLIS() < bis AND stille < 5
     DIM zz AS STRING : zz = PROCESS_READ$(pc)
-    IF zz <> "" THEN befund = befund + zz
-    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+    IF zz <> "" THEN befund = befund + zz : stille = 0
+    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
 WEND
 PRINT "check " + TRIM$(befund) ; " " ; PROCESS_CODE(pc)
 --- umgebung
@@ -1409,10 +1410,11 @@ PRINT "export 0 " ; LEFT$(erste$("exportiert "), 12) = "exportiert 0"
 DIM px AS INTEGER : px = PROCESS_START("spiel_dist/spiel.exe")
 DIM bx AS INTEGER : bx = MILLIS() + 60000
 DIM ax AS STRING : ax = ""
-WHILE MILLIS() < bx
+DIM stille AS INTEGER : stille = 0
+WHILE MILLIS() < bx AND stille < 5
     DIM zx AS STRING : zx = PROCESS_READ$(px)
-    IF zx <> "" THEN ax = ax + zx
-    IF zx = "" AND NOT PROCESS_RUNNING(px) THEN BREAK
+    IF zx <> "" THEN ax = ax + zx : stille = 0
+    IF zx = "" AND NOT PROCESS_RUNNING(px) THEN stille = stille + 1 : SLEEP(30)
 WEND
 PRINT "die exe sagt " + TRIM$(REPLACE$(ax, CHR$(13), ""))
 --- erwartet
