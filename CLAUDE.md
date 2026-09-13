@@ -2875,6 +2875,21 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 38 (2026-09-13):** der letzte Fall -- `tests/test_ide.py` ist
+geloescht. Das PDF-Listing hing an PyMuPDF, weil das pdf-Modul jede Seite mit
+FlateDecode packt und Drachenhauch nur `COMPRESS$`/`DECOMPRESS$` hatte (Text
+rein, Base64 raus, rohes Deflate ohne zlib-Kopf). Neu, allgemein statt fuer
+den einen Test: **`BUFFER_DEFLATE(b [, format$])` / `BUFFER_INFLATE(b [,
+format$])`** auf rohen Bytes, Vorgabe `"zlib"` (PDF, PNG, Netz), `"roh"` wie in
+ZIP; kaputte Daten und ein unbekanntes Format sind Fehler, entpackt wird
+hoechstens 512 MB (`decompress_to_vec_zlib_with_limit`). Der Fall in
+`tests/pruef/werkzeug_ide_sonderfaelle.dhtest` schreibt die 140 Zeilen im
+`--- vorher`, zaehlt die Seitenobjekte (`/Type /Page /Parent` -- `/Type /Page`
+allein traefe auch `/Pages`) und entpackt die Inhaltsstroeme. **Falle:** die
+Suche nach `stream\n` muss HINTER dem letzten `endstream` weitergehen, sonst
+trifft sie `endstream\nendobj`. Tests `tests/pruef/buffer.dhtest` (+4, darunter
+ein von Pythons `zlib` gepackter Strom als fremder Schreiber).
+
 **Stufe 37 (2026-09-13):** die Sonderfaelle der IDE ohne Python -- und dafuer
 drei neue Formatstuecke. Was in `tests/test_ide.py` blieb, brauchte mehr als
 EINEN Lauf: zwei IDE-Laeufe hintereinander (Sitzung, Umbruch, Sitzung je

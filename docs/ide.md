@@ -279,15 +279,16 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `umbau geprueft <fehler>`, `umbau neue datei <anzahl>`,
 `umbau abgebrochen`, `extern <datei>`,
 `aufrufer gemessen <anzahl>`,
-`auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sieht `tests/test_ide.py`, was sie
+`auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sehen die Prüfsammlungen, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
 Python, die Stände 6 bis 12 `tests/pruef/werkzeug_ide_6_12.dhtest`, die
 Stände 13 bis 25 `tests/pruef/werkzeug_ide_13_25.dhtest`, was mehrere Läufe,
 ein git-Repository oder eine Bildmessung braucht
 `tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, die Bausteine einzeln
-`tests/pruef/ide_bausteine.dhtest`. In `tests/test_ide.py` bleibt nur das
-PDF-Listing (das pdf-Modul packt seine Seiten).
+`tests/pruef/ide_bausteine.dhtest`. Seit Stand 38 ist keiner der Fälle mehr
+in pytest: auch das PDF-Listing liegt in den Sonderfällen, seine gepackten
+Seiten entpackt `BUFFER_INFLATE`.
 
 ## Was noch fehlt
 

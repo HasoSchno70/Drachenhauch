@@ -92,7 +92,6 @@ _SERIELL = {
     "test_gui_form_runner.py",
     "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
     "test_speak.py",                 # misst Sprechdauern (SPEAK_WAIT) an der Soundkarte
-    "test_ide.py",                   # speist Tasten in die IDE ein (F5/F7)
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
     "test_pilot_sprite_auswahl.py",
@@ -191,7 +190,6 @@ _NUR_WINDOWS = {
 
 _BRAUCHT_GRAFIK = {
     "test_speak.py",
-    "test_ide.py",
     "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
     "test_audio_note_mix.py",
