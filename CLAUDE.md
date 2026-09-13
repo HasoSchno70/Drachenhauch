@@ -38,7 +38,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2103 | 0,54 |
-> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 860 | 0,17 |
+> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1327 | 0,26 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
 > | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1449 | 0,85 |
 >
@@ -2872,6 +2872,27 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 `%PUBLIC%\Documents\Drachenhauch\examples`. **Falle:** ISCC-Schalter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
+
+**Stufe 31 (2026-09-13):** der Hinweis des Nutzers -- er hatte in Stufe 30
+eine Aenderung am Qt-Designer gesehen; **Python soll komplett wegfallen**.
+Stufe 30 hatte das Kaestchen "Zellmodus" noch in `formdesigner_qt.py`
+eingebaut; das ist die letzte Aenderung dort. Die neuen Faehigkeiten landen
+jetzt im Designer in Drachenhauch (`examples/197_form_designer.dh`):
+**Palette** mit allen 30 Arten der Laufzeit (vorher 25 -- dieselbe Drift wie
+beim Qt-Designer 2026-08-31, jetzt mit Test gegen `Kind::from_str`) und dem
+**Gitter** (Palettenart `grid`, geschrieben als `table` mit `zellmodus` und
+`col_edit`); **Felder je Art** im Inspektor (`artFeld`/`artSichtbar`/
+`artFuellen`/`artUebernehmen`: Eintraege, Spalten, Breiten, Bearbeitbar,
+Spaltenarten, Auswahl, Zellmodus, Min/Max/Wert -- Listen mit Semikolon; eine
+Spalte mit Auswahlliste wird zur Auswahlspalte, sonst wirkte die Liste beim
+Laden nicht); **GB-Code** (Strg+G, `gbCode$`/`gbControl`): jedes Control
+als Aufruf, ohne `GUI_LOAD`, Texte mit Umbruch als `!"..."`, sich selbst
+messende Konstruktoren mit `GUI_SET_BOUNDS` hinterher, das Bild
+uebersprungen. Die IDE: **eine `.dhform` oeffnet den Designer** (`werkzeugMit`,
+`dhrt run 197 -- datei`), als Text ueber die Befehlspalette ("Formular als
+Text oeffnen"). Tests: vier neue in `tests/test_pilot_formdesigner.py` --
+lesen mit `json`, nicht mit dem Qt-Modell; der GB-Code-Test legt JEDE Art an
+und laesst den Code durch `--check` und einen Lauf; zwei in `tests/test_ide.py`.
 
 **Stufe 30 (2026-09-13):** die Frage des Nutzers -- gibt es ein
 Gitter-Steuerelement? Halb: `GUI_TABLE` konnte sortieren, filtern und Zellen
