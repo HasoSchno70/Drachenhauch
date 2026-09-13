@@ -1,0 +1,1627 @@
+' Der sechste Pilot, die Rechnungsverwaltung (examples/196_rechnungen.dh),
+' bedient wie von Hand -- ohne Python (Stufe 41, bis dahin
+' tests/test_pilot_rechnungen.py). Die fremden Leser sind ersetzt: die Datenbank
+' liest das db-Modul, das PDF entpackt BUFFER_INFLATE, die CSV READLINES, und
+' die Eltern des Rechnungsfensters spielt das net-Modul.
+'
+' Einschuebe: hinter GUI_WINDOW_CHROME ein 1x1-Nullpunkt (Fenster- in
+' Bildschirmlagen), hinter GUI_FOCUS(tfKName) der Startzustand (Reiter,
+' Zwischenablage), hinter FLIP() Bildzaehler und Probe. Die Knopflagen verteilt
+' ein Layout-Behaelter erst zur Laufzeit -- die Aufnahme entsteht darum im
+' dritten Bild (`prFall`) und beginnt mit einem Ereignis in Bild 0.
+' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
+--- seriell
+
+=== erster start legt die datenbank mit beispieldaten an
+' Drei Kunden, vier Artikel, zwei Rechnungen, Waehrung EUR -- gelesen mit dem
+' db-Modul (bis Stufe 41 Pythons sqlite3). Ein zweiter Start legt nichts doppelt an.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+prSchreib("kZeilen " + STR$(GUI_TABLE_ROW_COUNT(tKunden)) + " seite " + STR$(GUI_ACTIVE_TAB(win)) + " kundeId " + STR$(kundeId))
+
+--- umgebung
+DHRT_FRAMES=2
+--- inhalt _programm/probe.txt
+|kZeilen 3 seite 0 kundeId -1|
+
+--- nochmal
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+PRINT zahl("SELECT COUNT(*) FROM kunden")
+PRINT zahl("SELECT COUNT(*) FROM artikel")
+PRINT zahl("SELECT COUNT(*) FROM rechnungen")
+PRINT text$("SELECT wert FROM einstellungen WHERE key = 'waehrung'")
+--- erwartet
+3
+4
+2
+EUR
+
+=== geld wird in cent gerechnet
+' INT(19.99 * 100) ist 1998 -- darum rechnet der Pilot mit Cent-Zahlen.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 2 THEN prMerke("G " + geld$(1999) + "/" + STR$(centVon("19,99")) + "/" + STR$(centVon("1.234,56")) + "/" + STR$(centVon("12.5")) + "/" + STR$(centVon("abc")) + "/" + geld$(123456789) + "/" + geld$(-5))
+prSchreib("")
+
+--- umgebung
+DHRT_FRAMES=4
+--- inhalt _programm/probe.txt
+|G 19,99 EUR/1999/123456/1250/-1/1.234.567,89 EUR/-0,05 EUR|
+
+=== kunde anlegen landet in der datenbank
+' Name ueber die Zwischenablage getippt (Strg+V), dann [Speichern].
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, prMx(tfKName), prMy(tfKName))
+    prTaste(7, 86, 341)
+    prKlick(12, prMx(bKSpeichern), prMy(bKSpeichern))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+CLIPBOARD_SET("Testkunde GmbH")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("kZeilen " + STR$(GUI_TABLE_ROW_COUNT(tKunden)) + " angelegt " + prJa$(kundeId > 0) + " gespeichert " + prJa$(INSTR(GUI_TEXT(lblStatus), "gespeichert") >= 0))
+
+--- umgebung
+DHRT_FRAMES=26
+--- inhalt _programm/probe.txt
+|kZeilen 4 angelegt ja gespeichert ja|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+PRINT zahl("SELECT COUNT(*) FROM kunden WHERE name = 'Testkunde GmbH'")
+--- erwartet
+1
+
+=== ohne namen wird nicht gespeichert
+' Pflichtfeld: [Speichern] ohne Namen meldet den Fehler und schreibt nichts.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, prMx(bKSpeichern), prMy(bKSpeichern))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("kFehler " + GUI_TEXT(lKFehler))
+
+--- umgebung
+DHRT_FRAMES=14
+--- inhalt _programm/probe.txt
+|kFehler Der Name fehlt.|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+PRINT zahl("SELECT COUNT(*) FROM kunden")
+--- erwartet
+3
+
+=== eine dreistellige plz wird abgelehnt
+' Name da, aber PLZ "123" -- die Zwischenablage wechselt zwischen den zwei Strg+V.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, prMx(tfKName), prMy(tfKName))
+    prTaste(7, 86, 341)
+    prKlick(12, prMx(tfKPlz), prMy(tfKPlz))
+    prTaste(16, 86, 341)
+    prKlick(21, prMx(bKSpeichern), prMy(bKSpeichern))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+CLIPBOARD_SET("Kurz")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prBild = 14 THEN CLIPBOARD_SET("123")
+prSchreib("fuenf ziffern gemeldet " + prJa$(INSTR(GUI_TEXT(lKFehler), "fuenf Ziffern") >= 0))
+
+--- umgebung
+DHRT_FRAMES=32
+--- inhalt _programm/probe.txt
+|fuenf ziffern gemeldet ja|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+PRINT zahl("SELECT COUNT(*) FROM kunden")
+--- erwartet
+3
+
+=== wechsel mit aenderung fragt nach und esc bricht ab
+' Eine Eingabe, dann ein Klick auf einen anderen Kunden: die Rueckfrage steht
+' offen, ESC bricht ab -- die Eingabe bleibt, und man bleibt beim neuen Kunden.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, prMx(tfKName), prMy(tfKName))
+    prTaste(7, 86, 341)
+    prKlick(12, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
+    prTaste(18, 256, 0)
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+CLIPBOARD_SET("Geaendert")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF GUI_MODAL() THEN prMerke("rueckfrage stand offen")
+prSchreib("modal " + prJa$(GUI_MODAL()) + " kName " + GUI_TEXT(tfKName) + " kundeId " + STR$(kundeId) + " kSel " + STR$(GUI_TABLE_SELECTED(tKunden)))
+
+--- umgebung
+DHRT_FRAMES=32
+--- inhalt _programm/probe.txt
+|rueckfrage stand offen|
+|modal nein kName Geaendert kundeId -1 kSel -1|
+
+=== ohne aenderung wechselt der klick sofort
+' Gegenprobe zum Fall davor: ohne Eingabe kommt keine Rueckfrage.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tKunden) + 60, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tKunden) + 52)
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF GUI_MODAL() THEN prMerke("rueckfrage stand offen")
+prSchreib("gewechselt " + prJa$(kundeId > 0) + " kSel " + STR$(GUI_TABLE_SELECTED(tKunden)) + " modal " + prJa$(GUI_MODAL()))
+
+--- umgebung
+DHRT_FRAMES=18
+--- inhalt _programm/probe.txt
+|gewechselt ja kSel 0 modal nein|
+
+--- ohne _programm/probe.txt
+|rueckfrage stand offen|
+
+=== fenster groesser laesst formular und tabelle mitgehen
+' 280 breiter, 220 hoeher: die Tabelle waechst (lrtb), der rechts klebende
+' Behaelter mit den Knoepfen rueckt um die volle Breite nach.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 2 THEN
+    prA = GUI_GET_W(tKunden) : prB = GUI_GET_H(tKunden)
+    prC = GUI_GET_X(bKSpeichern) : prD = GUI_GET_X(bKNeu)
+END IF
+IF prBild = 4 THEN GUI_WINDOW_SET_BOUNDS(win, 0, 0, 1400, 900)
+prSchreib("breiter " + STR$(GUI_GET_W(tKunden) - prA) + " hoeher " + STR$(GUI_GET_H(tKunden) - prB) + " speichern " + STR$(GUI_GET_X(bKSpeichern) - prC) + " neu " + STR$(GUI_GET_X(bKNeu) - prD))
+
+--- umgebung
+DHRT_FRAMES=8
+--- inhalt _programm/probe.txt
+|breiter 280 hoeher 220 speichern 280 neu 280|
+
+=== das pdf zeigt was in der datenbank steht
+' Zeile 0 der Liste ist 2026-0002 (absteigend) -- Anna Berger, 2 x Fachbuch.
+' Die Seiten sind gepackt (FlateDecode); gelesen wird mit BUFFER_INFLATE statt
+' mit PyMuPDF.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(8, prMx(bRPdf), prMy(bRPdf))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+GUI_SET_ACTIVE_TAB(win, 2)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("brutto " + GUI_TEXT(vSBrutto))
+
+--- umgebung
+DHRT_FRAMES=24
+--- inhalt _programm/probe.txt
+|brutto 85,39 EUR|
+
+--- nachher
+DIM pdf AS BUFFER : pdf = READALL_BYTES("_programm/rechnung_2026-0002.pdf")
+DIM auf AS BUFFER : auf = BUFFER_FROM_STRING("stream" + CHR$(10))
+DIM zu AS BUFFER : zu = BUFFER_FROM_STRING(CHR$(10) + "endstream")
+DIM alles AS STRING : alles = ""
+DIM a AS INTEGER : a = BUFFER_INDEXOF(pdf, auf, 0)
+WHILE a >= 0
+    DIM e AS INTEGER : e = BUFFER_INDEXOF(pdf, zu, a)
+    alles = alles + BUFFER_TO_STRING$(BUFFER_INFLATE(BUFFER_SLICE(pdf, a + 7, e)))
+    a = BUFFER_INDEXOF(pdf, auf, e + 10)
+WEND
+DIM w AS ARRAY OF STRING
+w = SPLIT$("Rechnung 2026-0002|Anna Berger|Fachbuch Drachenhauch|79,80 EUR|5,59 EUR|85,39 EUR|Drachenhauch Software|Zahlbar innerhalb von 14 Tagen", "|")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(w) - 1
+    PRINT w[i] ; ": " ; INSTR(alles, "(" + w[i]) >= 0 OR INSTR(alles, w[i] + ")") >= 0
+NEXT
+--- erwartet
+Rechnung 2026-0002: TRUE
+Anna Berger: TRUE
+Fachbuch Drachenhauch: TRUE
+79,80 EUR: TRUE
+5,59 EUR: TRUE
+85,39 EUR: TRUE
+Drachenhauch Software: TRUE
+Zahlbar innerhalb von 14 Tagen: TRUE
+
+=== position hinzufuegen und speichern
+' Die Artikel-Auswahl steht auf dem ersten Eintrag: "Anfahrt (pauschal)", 19,99 zu 19 %.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(8, prMx(bPAdd), prMy(bPAdd))
+    prKlick(13, prMx(bRSpeichern), prMy(bRSpeichern))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+GUI_SET_ACTIVE_TAB(win, 2)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("posAnz " + STR$(posAnz) + " brutto " + GUI_TEXT(vSBrutto) + " gespeichert " + prJa$(INSTR(GUI_TEXT(lblStatus), "gespeichert") >= 0))
+
+--- umgebung
+DHRT_FRAMES=28
+--- inhalt _programm/probe.txt
+|posAnz 2 brutto 109,18 EUR gespeichert ja|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT bezeichnung, menge, preis_cent, mwst FROM positionen WHERE rechnung_id = 2 ORDER BY id")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0) ; " " ; DB_GET_INT(r, 1) ; " " ; DB_GET_INT(r, 2) ; " " ; DB_GET_INT(r, 3)
+WEND
+--- erwartet
+Fachbuch Drachenhauch 2 3990 7
+Anfahrt (pauschal) 1 1999 19
+
+=== neue rechnung ohne position wird abgelehnt
+' Eine Rechnung ohne Position ist keine -- gemeldet, nicht geschrieben.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, prMx(bRSpeichern), prMy(bRSpeichern))
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+GUI_SET_ACTIVE_TAB(win, 2)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("rFehler " + GUI_TEXT(lRFehler))
+
+--- umgebung
+DHRT_FRAMES=14
+--- inhalt _programm/probe.txt
+|rFehler Eine Rechnung ohne Position ist keine.|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+PRINT zahl("SELECT COUNT(*) FROM rechnungen")
+--- erwartet
+2
+
+=== rechnung loeschen fragt und enter bestaetigt
+' [Loeschen] fragt, Enter bestaetigt; die Positionen gehen mit.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prKlick(3, GUI_CANVAS_X(nullpunkt) + GUI_GET_X(tRech) + 40, GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(tRech) + 52)
+    prKlick(8, prMx(bRLoeschen), prMy(bRLoeschen))
+    prTaste(14, 257, 0)
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach GUI_FOCUS(tfKName)
+GUI_SET_ACTIVE_TAB(win, 2)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF GUI_MODAL() THEN prMerke("rueckfrage stand offen")
+prSchreib("rechIdAkt " + STR$(rechIdAkt) + " geloescht " + prJa$(INSTR(GUI_TEXT(lblStatus), "geloescht") >= 0))
+
+--- umgebung
+DHRT_FRAMES=30
+--- inhalt _programm/probe.txt
+|rueckfrage stand offen|
+|rechIdAkt -1 geloescht ja|
+
+--- nachher
+IMPORT "db"
+DIM db AS DB_CONN : db = DB_OPEN("_programm/rechnungen.db")
+FUNCTION zahl(sql AS STRING) AS INTEGER
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM n AS INTEGER : n = -1
+    IF DB_NEXT(r) THEN n = DB_GET_INT(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN n
+END FUNCTION
+FUNCTION text$(sql AS STRING) AS STRING
+    DIM r AS DB_RESULT : r = DB_QUERY(db, sql)
+    DIM s AS STRING : s = ""
+    IF DB_NEXT(r) THEN s = DB_GET_STRING(r, 0)
+    DB_CLOSE_RESULT(r)
+    RETURN s
+END FUNCTION
+DIM r AS DB_RESULT : r = DB_QUERY(db, "SELECT nummer FROM rechnungen ORDER BY nummer")
+WHILE DB_NEXT(r)
+    PRINT DB_GET_STRING(r, 0)
+WEND
+PRINT zahl("SELECT COUNT(*) FROM positionen WHERE rechnung_id = 2")
+--- erwartet
+2026-0001
+0
+
+=== csv-export per kuerzel
+' Strg+E schreibt rechnungen.csv; gelesen Zeile fuer Zeile, Felder an ';'.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+SUB prFall()
+    prTaste(3, 69, 341)
+    prAbspielen()
+END SUB
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+prSchreib("")
+
+--- umgebung
+DHRT_FRAMES=18
+--- nachher
+DIM z AS ARRAY OF STRING : z = READLINES("_programm/rechnungen.csv")
+PRINT z[0]
+PRINT z[1]
+DIM f AS ARRAY OF STRING : f = SPLIT$(z[2], ";")
+PRINT f[0] ; " " ; f[5] ; " " ; f[6]
+--- erwartet
+Nummer;Datum;Kunde;Netto;MwSt;Brutto;Status
+2026-0001;2026-08-14;Muellerbau GmbH;304,99;57,95;362,94;bezahlt
+2026-0002 85,39 offen
+
+=== rechnungsfenster meldet sich bei fremden eltern
+' Pruefstein 3 aus entwurf-native-fenster.md: das Kind (196_rechnung_fenster.dh)
+' laeuft als eigener Prozess auf derselben Datenbank. Die Eltern spielt das
+' Nachher-Programm ueber das net-Modul -- ein Teilnehmer, der WINDOW_OPEN nicht
+' kennt: es lauscht, reicht den Port in der Umgebung weiter, liest "offen 2"
+' und beendet das Kind, indem es die Verbindung schliesst. Allein gestartet
+' laeuft das Kind ebenfalls. Der Hauptlauf legt nur die Datenbank an und merkt
+' sich, wo das Kind liegt.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+DIM prA AS INTEGER : prA = 0
+DIM prB AS INTEGER : prB = 0
+DIM prC AS INTEGER : prC = 0
+DIM prD AS INTEGER : prD = 0
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prTaste(f AS INTEGER, code AS INTEGER, modifier AS INTEGER)
+    IF modifier > 0 THEN prE(f, 2, modifier, 0)
+    prE(f + 1, 2, code, 0)
+    prE(f + 2, 1, code, 0)
+    IF modifier > 0 THEN prE(f + 3, 1, modifier, 0)
+END SUB
+FUNCTION prMx(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_X(nullpunkt) + GUI_GET_X(w) + GUI_GET_W(w) \ 2
+END FUNCTION
+FUNCTION prMy(w AS GUI_WIDGET) AS INTEGER
+    RETURN GUI_CANVAS_Y(nullpunkt) + GUI_GET_Y(w) + GUI_GET_H(w) \ 2
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/196_rechnungen.dh nach SETFPS(60)
+--- einschub nach GUI_WINDOW_CHROME(win, FALSE)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(win, 0, 0, 1, 1)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 1 THEN WRITEALL("kind.txt", ARG$(0))
+prSchreib("")
+
+--- umgebung
+DHRT_FRAMES=2
+--- argumente
+{sammlung}/../../examples/196_rechnung_fenster.dh
+--- nachher
+IMPORT "net"
+DIM kind AS STRING : kind = TRIM$(READLINES("_programm/kind.txt")[0])
+DIM dbPfad AS STRING : dbPfad = CWD$() + "/_programm/rechnungen.db"
+' Allein (ohne Eltern): laeuft, bis es beendet wird.
+DIM allein AS INTEGER : allein = PROCESS_START("dhrt", "run", kind, "--", dbPfad, "1")
+SLEEP(2500)
+PRINT "allein laeuft " ; PROCESS_RUNNING(allein)
+PROCESS_KILL(allein)
+' Mit fremden Eltern.
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(48123, "127.0.0.1")
+SETENV("DHRT_ELTERN_PORT", "48123")
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", kind, "--", dbPfad, "2")
+DIM sock AS NET_SOCKET
+DIM bis AS INTEGER : bis = MILLIS() + 20000
+WHILE IS_NIL(sock) AND MILLIS() < bis
+    sock = NET_TCP_ACCEPT(lst)
+    IF IS_NIL(sock) THEN SLEEP(20)
+WEND
+PRINT "verbunden " ; NOT IS_NIL(sock)
+DIM zeile AS STRING : zeile = ""
+bis = MILLIS() + 10000
+WHILE INSTR(zeile, CHR$(10)) < 0 AND MILLIS() < bis
+    zeile = zeile + NET_RECV(sock, 1024)
+    SLEEP(20)
+WEND
+PRINT "meldung " ; TRIM$(zeile)
+PRINT "laeuft mit eltern " ; PROCESS_RUNNING(pc)
+NET_CLOSE(sock)
+NET_CLOSE(lst)
+bis = MILLIS() + 10000
+WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
+    SLEEP(50)
+WEND
+PRINT "beendet sich ohne verbindung " ; NOT PROCESS_RUNNING(pc)
+IF PROCESS_RUNNING(pc) THEN PROCESS_KILL(pc)
+--- erwartet
+allein laeuft TRUE
+verbunden TRUE
+meldung offen 2
+laeuft mit eltern TRUE
+beendet sich ohne verbindung TRUE
+
