@@ -688,6 +688,10 @@ DIM tblProfil AS GUI_WIDGET : tblProfil = GUI_TABLE(winProfil, 8, 30, 624, 396)
 GUI_TABLE_HEADERS(tblProfil, ["Zeile", "Anzahl", "ms", "Anteil", "Quelltext"])
 GUI_TABLE_COL_WIDTHS(tblProfil, [60, 80, 80, 70, 320])
 GUI_TABLE_SET(tblProfil, "sortierbar", 1)
+' Seit Stand 30 ein Gitter: Zellen und Bereiche waehlen, Strg+C kopiert sie als
+' Tabulator-Text -- das Profil laesst sich so in eine Tabellenkalkulation holen.
+' Bearbeitbar ist keine Spalte, Tippen tut also nichts.
+GUI_TABLE_SET(tblProfil, "zellmodus", 1)
 GUI_WINDOW_VISIBLE(winProfil, FALSE)
 
 ' Handbuch: Klappliste der Dokumente, Suche im Dokument, Text mit Umbruch.
