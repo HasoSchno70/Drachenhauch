@@ -2884,7 +2884,8 @@ Messlauf vorab). Hinzu kamen keine Formatstuecke, nur Lagen: das
 Parameter-Fenster (Knoepfe ab 420/230), das Vorschau-Fenster (Kaestchen der
 Dateien, Zeilen des Unterschieds ab y = 160 je 22, [Block auslassen] und
 [Pruefen] bei y = 681), die mittlere Maustaste auf einem Reiter, Beilagen in
-Unterordnern (`lib/mehr.dh`) und eine eigene Doku-Wurzel fuers Handbuch.
+Unterordnern (eine Datei unter lib/ im Fallordner) und eine eigene
+Doku-Wurzel fuers Handbuch.
 Verschobene und umgebaute Dateien gehen im `nachher`-Programm durch
 `dhrt --check`. **Stolperstein beim Schreiben:** ein erwarteter Dateianfang
 mit Zeilenumbruch stand als Zeichenkette im Leseprogramm -- ein Umbruch in
