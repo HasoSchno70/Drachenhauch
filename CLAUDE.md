@@ -2875,6 +2875,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 43 (2026-09-13):** der Sprite-Pilot ohne Python -- und damit hat
+KEIN Werkzeug in Drachenhauch mehr einen pytest-Test.
+`tests/pruef/werkzeug_sprite.dhtest` (41 Faelle), die pytest-Datei
+`test_pilot_sprite_auswahl.py` geloescht. Kein neues Formatstueck; die
+zweizeiligen Ersetzungen der pytest-Fassung (`GUI_WINDOW_VISIBLE(winGr, FALSE)`
+plus `DIM grOffen`, weil die erste Zeile dreimal vorkommt) ersetzen jetzt die
+EINDEUTIGE `DIM ...Offen`-Zeile durch den Zusatz plus sie selbst. Fremde Leser
+ersetzt: Pillow (GIF-Zeiten) durch die Bytes (Graphic Control Extension
+`21 F9 04`, Verzoegerung in Hundertstelsekunden), `_parse_gpl` der Qt-Fassung
+durch dieselben Regeln in Drachenhauch, `_write_gpl` durch eine Beilage in
+genau seinem Format; ob erzeugter Code, eine Maschine oder ein Atlas laeuft,
+sagt `dhrt bild` ueber seinen Rueckgabewert (`PROCESS_CODE`) -- ein Atlas-Schluessel,
+den es nicht gibt, beendet ihn mit Fehler, das ist die Gegenprobe. Ein
+Programm, das nur schreibt statt ausgibt (Zustand der Maschine), geht in eine
+Datei, weil `dhrt bild` die Ausgabe nicht weiterreicht. Gegenprobe ohne
+`AUTOMATION_PLAY`: 40 von 41 fallen, der uebrige hat keine Eingaben. **Zwei
+Faelle waren schon in pytest wertlos:** "drehen tauscht breite und hoehe" lief
+auf dem 32x32-Start-Sprite, wo ein Tausch nicht auffaellt -- jetzt erst ueber
+"Groesse aendern" auf 48x40; und "namen kommen ueber den streifen zurueck"
+merkt sich jetzt den Stand nach dem Export. Weitere Zwischenstaende (Punkt
+links oben vor der Wandlung, Bereich vor [Neu]) stehen jeweils als eigene
+Probe-Zeile, damit ein Endstand nicht zufaellig stimmt.
+
 **Stufe 42 (2026-09-13):** der Tilemap-Pilot ohne Python --
 `tests/pruef/werkzeug_tilemap.dhtest` (32 Faelle), die pytest-Datei
 `test_pilot_tilemap.py` geloescht. **Neues Formatstueck `--- ersetzen ALT`**: der Rest der Kopfzeile
