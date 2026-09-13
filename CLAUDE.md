@@ -2875,6 +2875,23 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 40 (2026-09-13):** der Tracker-Pilot ohne Python --
+`tests/pruef/werkzeug_tracker.dhtest` (17 Faelle), `tests/test_pilot_tracker.py`
+geloescht. Ohne neues Formatstueck: ein Einschub hinter `FLIP()` schreibt je
+Bild `probe.txt`, ein zweiter hinter `bildNr = bildNr + 1` ruft die
+Unterprogramme des Piloten (`zelleSetzen`, `ladeDatei`, `wavRendern`,
+`gbCodeSichern`). Die drei fremden Leser sind ersetzt: die Datei liest das
+json-Modul mit genau den Schluesseln, die `drachenhauch.tracker.Song` liest
+(`patterns.N.data.KANAL.REIHE`, leer = `null`); die zwei Dateien der
+Qt-Fassung sind Beilagen, einmal mit `Song.save_json` geschrieben und auf eine
+Zeile gepackt; die Mono-WAV prueft `--- ton`, die Stereo-WAV ein
+`--- nachher` ueber ihre Bytes (RIFF, `BUFFER_GET_I16`), weil `--- ton` keinen
+Pegel je Kanal kennt; der GB-Code geht durch `PROCESS_START("dhrt",
+"--check", ...)` und einen Start. Nur der Klick-Fall braucht die Geometrie des
+Fensters und schreibt seine Aufnahme darum im dritten Bild selbst.
+Gegenprobe ohne `AUTOMATION_PLAY`: alle 9 Faelle mit Eingaben fallen, die
+uebrigen 8 rufen den Piloten direkt und brauchen keine.
+
 **Stufe 39 (2026-09-13):** SFX- und Partikel-Pilot ohne Python --
 `tests/pruef/werkzeug_sfx.dhtest` und `werkzeug_partikel.dhtest` (je 8), dazu
 `tests/pruef/builtin_registrierung.dhtest` fuer die 14 kleinen pytest-Dateien,

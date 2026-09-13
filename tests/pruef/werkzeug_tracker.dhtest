@@ -1,0 +1,948 @@
+' Der Tracker-Pilot (examples/190_tracker.dh), bedient wie von Hand -- ohne
+' Python (Stufe 40, bis dahin tests/test_pilot_tracker.py). Der erste Pilot mit
+' einer Zeitachse; geprueft an drei Ergebnissen, die Drachenhauch selbst liest:
+' die Datei (json-Modul, Schluessel wie die Qt-Fassung sie liest), die WAV
+' (`--- ton` bzw. ihre Bytes) und der GB-Code (`dhrt --check` und ein Start).
+'
+' Der Quelltext des Falls steht hinter SETFPS(60): Fenster aus dem Bild, die
+' Aufnahme (falls es eine gibt) und Helfer. Der Einschub hinter FLIP() schreibt
+' je Bild _programm/probe.txt; ein Einschub hinter `bildNr = bildNr + 1` ruft
+' Unterprogramme des Piloten direkt. Jede Aufnahme beginnt mit einem Ereignis in
+' Bild 0 -- die Wiedergabe setzt beim ersten Ereignis an.
+' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
+--- seriell
+
+=== die werkzeugleisten ueberlappen nicht und passen ins fenster
+' Im ersten Bild lagen 'Stereo' und 'Amiga' uebereinander, und der letzte Knopf
+' jeder Leiste war abgeschnitten -- gesehen nur im BILD. Geprueft werden die
+' RECHTECKE aller 35 Widgets paarweise und gegen den Fensterrand (1400).
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 2 THEN
+    DIM prW[34] AS GUI_WIDGET
+    prW[0] = bNeu
+    prW[1] = bAuf
+    prW[2] = bSpei
+    prW[3] = bSpeiAls
+    prW[4] = spBpm
+    prW[5] = spKan
+    prW[6] = bPlayPat
+    prW[7] = bPlaySong
+    prW[8] = bStop
+    prW[9] = bZur
+    prW[10] = bVor
+    prW[11] = bWav
+    prW[12] = cbStereo
+    prW[13] = cbAmiga
+    prW[14] = bCode
+    prW[15] = lblPat
+    prW[16] = ddPat
+    prW[17] = lblRows
+    prW[18] = spRows
+    prW[19] = bPatNeu
+    prW[20] = bPatDup
+    prW[21] = bPatDel
+    prW[22] = bPatLeer
+    prW[23] = lblOkt
+    prW[24] = spOkt
+    prW[25] = lblZelle
+    prW[26] = spVol
+    prW[27] = lblSlide
+    prW[28] = spSlide
+    prW[29] = lblFx
+    prW[30] = ddFx
+    prW[31] = spFxp
+    prW[32] = ddZInst
+    prW[33] = bOff
+    DIM a AS INTEGER
+    DIM b AS INTEGER
+    DIM ueber AS INTEGER : ueber = 0
+    DIM rand AS INTEGER : rand = 0
+    FOR a = 0 TO 33
+        IF GUI_GET_X(prW[a]) + GUI_GET_W(prW[a]) > 1400 - 8 THEN rand = rand + 1
+        FOR b = a + 1 TO 33
+            IF GUI_GET_X(prW[a]) < GUI_GET_X(prW[b]) + GUI_GET_W(prW[b]) AND GUI_GET_X(prW[b]) < GUI_GET_X(prW[a]) + GUI_GET_W(prW[a]) AND GUI_GET_Y(prW[a]) < GUI_GET_Y(prW[b]) + GUI_GET_H(prW[b]) AND GUI_GET_Y(prW[b]) < GUI_GET_Y(prW[a]) + GUI_GET_H(prW[a]) THEN ueber = ueber + 1
+        NEXT
+    NEXT
+    prMerke("ueberlappungen " + STR$(ueber))
+    prMerke("ueber den rand " + STR$(rand))
+END IF
+prSchreib("")
+
+--- umgebung
+DHRT_FRAMES=4
+--- inhalt _programm/probe.txt
+|ueberlappungen 0|
+|ueber den rand 0|
+
+=== die tastatur setzt noten und rueckt weiter
+' Z = C der gewaehlten Oktave (4 -> MIDI 60), Q = eine Oktave hoeher; nach jeder
+' Note eine Reihe weiter.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]) + " curR " + STR$(curR) + " dirty " + prJa$(dirty))
+
+--- umgebung
+DHRT_FRAMES=40
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 5
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 81 0 0 0
+e 13 1 81 0 0 0
+
+--- inhalt _programm/probe.txt
+|n00 60 n01 72 curR 2 dirty ja|
+
+=== null setzt note aus und entf loescht
+' 0 schreibt OFF (-1), Entf leert die Zelle (-2).
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("n01 " + STR$(note[patAkt, 0, 1]) + " n00 " + STR$(note[patAkt, 0, 0]))
+
+--- umgebung
+DHRT_FRAMES=45
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 11
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 48 0 0 0
+e 13 1 48 0 0 0
+e 20 2 265 0 0 0
+e 21 1 265 0 0 0
+e 26 2 265 0 0 0
+e 27 1 265 0 0 0
+e 32 2 261 0 0 0
+e 33 1 261 0 0 0
+
+--- inhalt _programm/probe.txt
+|n01 -1 n00 -2|
+
+=== ein klick setzt den cursor
+' Die Zelle (1,5) liegt an einer Stelle, die erst das Fenster kennt -- die
+' Aufnahme entsteht darum im dritten Bild aus GUI_CANVAS_X/Y des Gitters.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr = 3 THEN
+    DIM x AS INTEGER : x = GUI_CANVAS_X(gitter) + 40 + 1 * 118 + 59
+    DIM y AS INTEGER : y = GUI_CANVAS_Y(gitter) + 24 + 5 * 20 + 10
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c 7" + CHR$(10)
+    t = t + "e 0 7 0 0 0 0" + CHR$(10)
+    t = t + "e 5 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 7 " + STR$(x) + " " + STR$(y) + " 0 0" + CHR$(10)
+    t = t + "e 6 6 0 0 0 0" + CHR$(10)
+    t = t + "e 7 5 0 0 0 0" + CHR$(10)
+    t = t + "e 14 2 90 0 0 0" + CHR$(10)
+    t = t + "e 15 1 90 0 0 0" + CHR$(10)
+    WRITEALL("klick.txt", t)
+    AUTOMATION_PLAY("klick.txt")
+END IF
+prSchreib("n10 " + STR$(note[patAkt, 1, 0]) + " n11 " + STR$(note[patAkt, 1, 1]) + " curC " + STR$(curC) + " curR " + STR$(curR))
+
+--- umgebung
+DHRT_FRAMES=36
+--- inhalt _programm/probe.txt
+|n10 -2 n11 -2 curC 1 curR 6|
+
+=== am anfang gibt es nichts zurueckzunehmen
+' Der Startstand ist Schritt 1 von 1.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("uPos " + STR$(uPos) + " uAnz " + STR$(uAnz))
+
+--- umgebung
+DHRT_FRAMES=3
+--- inhalt _programm/probe.txt
+|uPos 1 uAnz 1|
+
+=== strg z nimmt eine note zurueck und strg y holt sie
+' Nach Strg+Z ist nur die letzte Note weg, der Vor-Weg bleibt (uAnz 3); gefragt
+' wird nach dem ZUSTAND, nicht nach einer Bildnummer.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF note[patAkt, 0, 0] = 60 AND note[patAkt, 0, 1] = -2 AND uAnz = 3 THEN prEinmal("zwischen", "uPos " + STR$(uPos))
+prSchreib("n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]) + " uPos " + STR$(uPos))
+
+--- umgebung
+DHRT_FRAMES=60
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 19
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 81 0 0 0
+e 13 1 81 0 0 0
+e 24 2 341 0 0 0
+e 25 2 341 0 0 0
+e 25 2 90 0 0 0
+e 26 2 341 0 0 0
+e 26 1 90 0 0 0
+e 27 2 341 0 0 0
+e 28 1 341 0 0 0
+e 40 2 341 0 0 0
+e 41 2 341 0 0 0
+e 41 2 89 0 0 0
+e 42 2 341 0 0 0
+e 42 1 89 0 0 0
+e 43 2 341 0 0 0
+e 44 1 341 0 0 0
+
+--- inhalt _programm/probe.txt
+|zwischen uPos 2|
+|n00 60 n01 72 uPos 3|
+
+=== ein rueckgaengig laesst den cursor stehen
+' Der Verlauf stellt den Song wieder her -- die Arbeitsstelle gehoert nicht dazu.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("curC " + STR$(curC) + " curR " + STR$(curR))
+
+--- umgebung
+DHRT_FRAMES=45
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 14
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 81 0 0 0
+e 13 1 81 0 0 0
+e 19 2 262 0 0 0
+e 20 1 262 0 0 0
+e 28 2 341 0 0 0
+e 29 2 341 0 0 0
+e 29 2 90 0 0 0
+e 30 2 341 0 0 0
+e 30 1 90 0 0 0
+e 31 2 341 0 0 0
+e 32 1 341 0 0 0
+
+--- inhalt _programm/probe.txt
+|curC 1 curR 2|
+
+=== block kopieren und einfuegen
+' Umschalt+Pfeil waehlt einen Block, Strg+C/Strg+V setzen ihn in Kanal 2.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF selAn AND curR = 1 THEN prMerke("auswahl gesehen")
+prSchreib("n10 " + STR$(note[patAkt, 1, 0]) + " n11 " + STR$(note[patAkt, 1, 1]) + " n00 " + STR$(note[patAkt, 0, 0]) + " n01 " + STR$(note[patAkt, 0, 1]))
+
+--- umgebung
+DHRT_FRAMES=75
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 32
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 81 0 0 0
+e 13 1 81 0 0 0
+e 20 2 268 0 0 0
+e 21 1 268 0 0 0
+e 26 2 340 0 0 0
+e 27 2 340 0 0 0
+e 27 2 264 0 0 0
+e 28 2 340 0 0 0
+e 28 1 264 0 0 0
+e 29 2 340 0 0 0
+e 30 1 340 0 0 0
+e 34 2 341 0 0 0
+e 35 2 341 0 0 0
+e 35 2 67 0 0 0
+e 36 2 341 0 0 0
+e 36 1 67 0 0 0
+e 37 2 341 0 0 0
+e 38 1 341 0 0 0
+e 42 2 262 0 0 0
+e 43 1 262 0 0 0
+e 48 2 268 0 0 0
+e 49 1 268 0 0 0
+e 56 2 341 0 0 0
+e 57 2 341 0 0 0
+e 57 2 86 0 0 0
+e 58 2 341 0 0 0
+e 58 1 86 0 0 0
+e 59 2 341 0 0 0
+e 60 1 341 0 0 0
+
+--- inhalt _programm/probe.txt
+|auswahl gesehen|
+|n10 60 n11 72 n00 60 n01 72|
+
+=== transponieren laesst das schlagzeug in ruhe
+' Block ueber alle vier Kanaele in Reihe 0, dann Strg+Umschalt+Auf: der Ton-Kanal
+' steigt eine Oktave, der Schlag im Drum-Kanal bleibt, was er war.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("n00 " + STR$(note[patAkt, 0, 0]))
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    zelleSetzen(0, 0, 0, 60) : zelleSetzen(0, 3, 0, 60)
+    prMerke("drum3 " + STR$(note[0, 3, 0]))
+END IF
+IF bildNr = 40 THEN prMerke("drum40 " + STR$(note[0, 3, 0]))
+
+--- umgebung
+DHRT_FRAMES=45
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 36
+e 0 7 0 0 0 0
+e 6 2 268 0 0 0
+e 7 1 268 0 0 0
+e 12 2 340 0 0 0
+e 13 2 340 0 0 0
+e 13 2 262 0 0 0
+e 14 2 340 0 0 0
+e 14 1 262 0 0 0
+e 15 2 340 0 0 0
+e 16 1 340 0 0 0
+e 18 2 340 0 0 0
+e 19 2 340 0 0 0
+e 19 2 262 0 0 0
+e 20 2 340 0 0 0
+e 20 1 262 0 0 0
+e 21 2 340 0 0 0
+e 22 1 340 0 0 0
+e 24 2 340 0 0 0
+e 25 2 340 0 0 0
+e 25 2 262 0 0 0
+e 26 2 340 0 0 0
+e 26 1 262 0 0 0
+e 27 2 340 0 0 0
+e 28 1 340 0 0 0
+e 30 2 341 0 0 0
+e 30 2 340 0 0 0
+e 31 2 341 0 0 0
+e 31 2 340 0 0 0
+e 31 2 265 0 0 0
+e 32 2 341 0 0 0
+e 32 2 340 0 0 0
+e 32 1 265 0 0 0
+e 33 2 341 0 0 0
+e 33 2 340 0 0 0
+e 34 1 341 0 0 0
+e 34 1 340 0 0 0
+
+--- inhalt _programm/probe.txt
+|drum3 60|
+|drum40 60|
+|n00 72|
+
+=== die datei hat das format der qt-fassung
+' Strg+S schreibt song.json. Gelesen wird mit dem json-Modul, Schluessel fuer
+' Schluessel wie `drachenhauch.tracker.Song` sie liest (dort bis Stufe 40 der
+' fremde Leser): data[kanal][reihe], leere Plaetze als null.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 2 THEN dateiPfad = "song.json"
+
+--- umgebung
+DHRT_FRAMES=40
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 12
+e 0 7 0 0 0 0
+e 5 2 90 0 0 0
+e 6 1 90 0 0 0
+e 12 2 81 0 0 0
+e 13 1 81 0 0 0
+e 24 2 341 0 0 0
+e 25 2 341 0 0 0
+e 25 2 83 0 0 0
+e 26 2 341 0 0 0
+e 26 1 83 0 0 0
+e 27 2 341 0 0 0
+e 28 1 341 0 0 0
+
+--- nachher
+IMPORT "json"
+FUNCTION ti(h AS JSON_HANDLE, p AS STRING) AS STRING
+    IF JSON_TYPE(h, p) = "null" THEN RETURN "null"
+    RETURN STR$(JSON_GET_INT(h, p))
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/song.json")
+PRINT JSON_GET_STRING(h, "format")
+PRINT JSON_GET_INT(h, "channels") ; " " ; JSON_GET_INT(h, "bpm")
+PRINT ti(h, "patterns.0.data.0.0") ; " " ; ti(h, "patterns.0.data.0.1") ; " " ; ti(h, "patterns.0.data.0.2")
+PRINT ti(h, "patterns.0.data.1.0")
+PRINT JSON_LEN(h, "instruments")
+PRINT JSON_GET_STRING(h, "instruments.0.name") ; "|" ; JSON_GET_STRING(h, "instruments.1.name")
+PRINT ti(h, "channel_inst.0") ; " " ; ti(h, "channel_inst.1") ; " " ; ti(h, "channel_inst.2") ; " " ; ti(h, "channel_inst.3")
+PRINT JSON_GET_INT(h, "instruments.0.env_decay_ms") ; " " ; JSON_GET_STRING(h, "instruments.0.waveform")
+--- erwartet
+dhtracker-song
+4 120
+60 72 null
+null
+18
+Fluegel (Piano)|E-Piano
+0 4 7 14
+700 triangle
+
+=== eine datei der qt-fassung kommt mit allen spalten an
+' Die Beilage hat `Song.save_json` der Qt-Fassung geschrieben (6 Kanaele, 140 BPM,
+' zwei Patterns, Reihenfolge 0 1 0; Note 64 mit Lautstaerke 9, Slide -3, Arpeggio
+' 0x47 und Instrument 5), hier nur auf eine Zeile gepackt.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib(STR$(kanaele) + " " + STR$(bpm) + " " + STR$(patAnz) + " " + STR$(orderAnz) + " | " + STR$(note[patAkt, 0, 0]) + " " + STR$(vol[patAkt, 0, 0]) + " " + STR$(slide[patAkt, 0, 0]) + " " + STR$(fx[patAkt, 0, 0]) + " " + STR$(fxp[patAkt, 0, 0]) + " " + STR$(inst[patAkt, 0, 0]) + " | " + STR$(instAnz))
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN ladeDatei("qt.json")
+
+--- umgebung
+DHRT_FRAMES=8
+--- datei _programm/qt.json
+{"format":"dhtracker-song","version":1,"bpm":140,"channels":6,"waves":["square","saw","triangle","square","square"],"patterns":[{"name":"P1","rows":16,"channels":6,"data":[[64,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"vol":[[9,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"slide":[[-3,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"fx":[[1,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"fxp":[[71,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"inst":[[5,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]},{"name":"Refrain","rows":8,"channels":6,"data":[[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null]]}],"order":[0,1,0],"instruments":[{"name":"Fluegel (Piano)","kind":"synth","default_vol":15,"pan":0.0,"waveform":"triangle","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":2,"env_decay_ms":700,"env_sustain":0.0,"env_release_ms":200,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":6.0},{"name":"E-Piano","kind":"synth","default_vol":15,"pan":0.0,"waveform":"sine","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":2,"env_decay_ms":450,"env_sustain":0.3,"env_release_ms":220,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":8.0},{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":6,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":70,"vib_depth":0.06,"vib_speed":6.0,"detune_cents":5.0},{"name":"Kirchenorgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"saw","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":14,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":140,"vib_depth":0.04,"vib_speed":5.0,"detune_cents":10.0},{"name":"Streicher","kind":"synth","default_vol":15,"pan":0.0,"waveform":"saw","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":140,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":280,"vib_depth":0.05,"vib_speed":5.0,"detune_cents":14.0},{"name":"Synth-Pad","kind":"synth","default_vol":15,"pan":0.0,"waveform":"triangle","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":220,"env_decay_ms":0,"env_sustain":0.85,"env_release_ms":420,"vib_depth":0.03,"vib_speed":4.0,"detune_cents":18.0},{"name":"Bass","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":2,"env_decay_ms":140,"env_sustain":0.55,"env_release_ms":80,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Synth-Bass","kind":"synth","default_vol":15,"pan":0.0,"waveform":"saw","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":2,"env_decay_ms":120,"env_sustain":0.5,"env_release_ms":70,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":6.0},{"name":"Lead","kind":"synth","default_vol":15,"pan":0.0,"waveform":"saw","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":2,"env_decay_ms":0,"env_sustain":0.9,"env_release_ms":90,"vib_depth":0.05,"vib_speed":6.0,"detune_cents":4.0},{"name":"Pluck","kind":"synth","default_vol":15,"pan":0.0,"waveform":"triangle","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":1,"env_decay_ms":220,"env_sustain":0.0,"env_release_ms":130,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":4.0},{"name":"Glocke","kind":"synth","default_vol":15,"pan":0.0,"waveform":"sine","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":1,"env_decay_ms":900,"env_sustain":0.0,"env_release_ms":320,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":10.0},{"name":"Marimba","kind":"synth","default_vol":15,"pan":0.0,"waveform":"sine","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":1,"env_decay_ms":260,"env_sustain":0.0,"env_release_ms":130,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Chip-Square","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":1,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":20,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Chip-Saw","kind":"synth","default_vol":15,"pan":0.0,"waveform":"saw","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":1,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":20,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Kick","kind":"synth","default_vol":15,"pan":0.0,"waveform":"sine","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":90,"env_sustain":0.0,"env_release_ms":30,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Snare","kind":"synth","default_vol":15,"pan":0.0,"waveform":"noise","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":140,"env_sustain":0.0,"env_release_ms":40,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"HiHat","kind":"synth","default_vol":15,"pan":0.0,"waveform":"noise","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":40,"env_sustain":0.0,"env_release_ms":20,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Tom","kind":"synth","default_vol":15,"pan":0.0,"waveform":"sine","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":160,"env_sustain":0.0,"env_release_ms":40,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0}],"channel_inst":[2,null,null,null,null,null]}
+
+--- inhalt _programm/probe.txt
+|6 140 2 3 | 64 9 -3 1 71 5 | 18|
+
+=== der rundweg erhaelt effekte und reihenfolge
+' Qt schreibt (Beilage), der Pilot liest UND schreibt: nichts darf unterwegs
+' verloren gehen -- Reihenfolge, Vibrato mit Parameter, Kanal-Lautstaerke.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN ladeDatei("qt.json")
+IF bildNr = 5 THEN dateiPfad = "zurueck.json" : speichern(FALSE)
+
+--- umgebung
+DHRT_FRAMES=8
+--- datei _programm/qt.json
+{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,67,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[36,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"vol":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,12,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"fx":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,2,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]],"fxp":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,82,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]},{"name":"P2","rows":16,"channels":4,"data":[[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[1,0],"channel_vol":[1.0,1.0,0.5,1.0]}
+
+--- nachher
+IMPORT "json"
+FUNCTION ti(h AS JSON_HANDLE, p AS STRING) AS STRING
+    IF JSON_TYPE(h, p) = "null" THEN RETURN "null"
+    RETURN STR$(JSON_GET_INT(h, p))
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/zurueck.json")
+PRINT ti(h, "order.0") ; " " ; ti(h, "order.1") ; " " ; JSON_LEN(h, "order")
+PRINT JSON_LEN(h, "patterns")
+PRINT ti(h, "patterns.0.data.1.3") ; " " ; ti(h, "patterns.0.vol.1.3")
+PRINT ti(h, "patterns.0.fx.1.3") ; " " ; ti(h, "patterns.0.fxp.1.3")
+PRINT ti(h, "patterns.0.data.3.0")
+PRINT JSON_GET_FLOAT(h, "channel_vol.2")
+--- erwartet
+1 0 2
+2
+67 12
+2 82
+36
+0.5
+
+=== die wav hat die laenge des songs und die noten darin
+' 16 Reihen x 125 ms + 800 ms Nachlauf = 2,8 s, ohne Stereo-Haken mono,
+' normalisiert; Klang bei 0 und bei 1000 ms (Reihe 8), am Ende Stille.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    zelleSetzen(0, 0, 0, 60) : zelleSetzen(0, 0, 8, 67)
+    wavRendern("out.wav")
+END IF
+
+--- umgebung
+DHRT_FRAMES=6
+--- ton _programm/out.wav
+kanaele 1
+dauer 2.8 +-0.02
+spitze 1.0 +-0.02
+pegel 20 40 > 0.3
+pegel 1020 1040 > 0.3
+pegel 2700 2750 < 0.05
+
+=== stereo und amiga-pan legen den ersten kanal nach links
+' Zwei Kanaele, links mehr als dreimal so laut wie rechts -- gelesen aus den
+' Bytes der WAV (RIFF-Kopf, 16 Bit), nicht mit Pythons `wave`.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    zelleSetzen(0, 0, 0, 60)
+    renderStereo = TRUE : renderAmiga = TRUE
+    wavRendern("out.wav")
+END IF
+
+--- umgebung
+DHRT_FRAMES=6
+--- nachher
+DIM w AS BUFFER : w = READALL_BYTES("_programm/out.wav")
+DIM fmt AS INTEGER : fmt = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, fmt + 10)
+DIM bits AS INTEGER : bits = BUFFER_GET_U16(w, fmt + 22)
+DIM dat AS INTEGER : dat = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data"))
+DIM laenge AS INTEGER : laenge = BUFFER_GET_U32(w, dat + 4)
+PRINT "kanaele " ; kan ; " bits " ; bits
+DIM links AS INTEGER : links = 0
+DIM rechts AS INTEGER : rechts = 0
+DIM i AS INTEGER
+DIM s AS INTEGER
+FOR i = dat + 8 TO dat + 8 + laenge - 4 STEP 4
+    s = ABS(BUFFER_GET_I16(w, i))
+    IF s > links THEN links = s
+    s = ABS(BUFFER_GET_I16(w, i + 2))
+    IF s > rechts THEN rechts = s
+NEXT
+PRINT "links mehr als dreimal so laut " ; links > 3 * rechts
+--- erwartet
+kanaele 2 bits 16
+links mehr als dreimal so laut TRUE
+
+=== der gb-code laeuft durch check und startet
+' Uebersetzen allein bewiese nichts -- er muss STARTEN. Lautstaerke 9/15 wird 60 %,
+' der Drum-Kanal schreibt einen Schlag, keine Frequenz.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    zelleSetzen(0, 0, 0, 60) : vol[0, 0, 0] = 9 : slide[0, 0, 0] = 2
+    zelleSetzen(0, 3, 4, 60)
+    gbCodeSichern("song_gb.dh")
+END IF
+
+--- umgebung
+DHRT_FRAMES=6
+--- nachher
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM z AS ARRAY OF STRING : z = READLINES("_programm/song_gb.dh")
+DIM code AS STRING : code = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    code = code + z[i] + CHR$(10)
+NEXT
+PRINT "lautstaerke " ; INSTR(code, "trkV0[0] = 60") >= 0
+PRINT "slide und sfx " ; INSTR(code, "trkSl0[0] =") >= 0 AND INSTR(code, "AUDIO_SFX(") >= 0
+PRINT "drum schlag " ; INSTR(code, "trk3[4] = 1") >= 0
+DIM befund AS STRING : befund = TRIM$(lesen$(PROCESS_START("dhrt", "--check", "_programm/song_gb.dh")))
+PRINT "check sauber " ; befund = "" OR befund = "[]"
+WRITEALL("lauf.dh", code + "DIM t AS INTEGER" + CHR$(10) + "FOR t = 1 TO 3" + CHR$(10) + "    TRACKER_UPDATE(130.0)" + CHR$(10) + "NEXT" + CHR$(10) + "PRINT trkRow" + CHR$(10))
+DIM aus AS STRING : aus = TRIM$(lesen$(PROCESS_START("dhrt", "run", "lauf.dh")))
+PRINT "gestartet, reihe " ; RIGHT$(aus, 1)
+--- erwartet
+lautstaerke TRUE
+slide und sfx TRUE
+drum schlag TRUE
+check sauber TRUE
+gestartet, reihe 3
+
+=== die leertaste startet die uhr und stoppt sie wieder
+' 120 BPM = eine Reihe je 125 ms = alle 7,5 Bilder; zwischen Bild 10 und 110
+' muss der Kopf mindestens Reihe 8 erreichen, sonst laeuft die Uhr nicht in
+' echter Zeit. Danach steht alles still (Kopf -1).
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr > 10 AND bildNr < 110 THEN
+    IF NOT spielt THEN prMerke("stand zwischendurch still")
+    IF kopfRow > prMax THEN prMax = kopfRow
+END IF
+prSchreib("kopf bis 8 " + prJa$(prMax >= 8) + " ende spielt " + prJa$(spielt) + " kopf " + STR$(kopfRow))
+
+--- umgebung
+DHRT_FRAMES=150
+--- datei _programm/ev.txt
+# Test-Aufnahme
+c 5
+e 0 7 0 0 0 0
+e 5 2 32 0 0 0
+e 6 1 32 0 0 0
+e 120 2 32 0 0 0
+e 121 1 32 0 0 0
+
+--- inhalt _programm/probe.txt
+|kopf bis 8 ja ende spielt nein kopf -1|
+
+--- ohne _programm/probe.txt
+|stand zwischendurch still|
+
+=== ein geplantes pattern zeigt sich im song-modus
+' Song-Modus mit zwei Patterns: die Anzeige folgt dem Kopf.
+SET_WINDOW_POS(-3000, -3000)
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+DIM prFlag AS STRING : prFlag = ""
+DIM prMax AS INTEGER : prMax = -1
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prEinmal(schluessel AS STRING, z AS STRING)
+    IF INSTR(prFlag, "|" + schluessel + " ") < 0 THEN prFlag = prFlag + "|" + schluessel + " " + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+FUNCTION prJa$(b AS BOOLEAN) AS STRING
+    RETURN IIF(b, "ja", "nein")
+END FUNCTION
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach FLIP()
+IF bildNr > 10 THEN prMerke("pattern " + STR$(patAkt))
+prSchreib("")
+
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    patternNeu(FALSE) : reihenSetzen(1)
+    order[1] = 1 : orderAnz = 2
+    patternWaehlen(0) : reihenSetzen(1)
+    starten(TRUE)
+END IF
+
+--- umgebung
+DHRT_FRAMES=120
+--- inhalt _programm/probe.txt
+|pattern 0|
+|pattern 1|
+
