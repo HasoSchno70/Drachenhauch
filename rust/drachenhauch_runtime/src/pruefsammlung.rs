@@ -122,6 +122,12 @@ pub struct Fall {
     /// misst dann je Bild und kann erst dort, mit fertiger Fenstergeometrie,
     /// die Aufnahme schreiben und abspielen.
     pub einschuebe: Vec<(String, String)>,
+    /// `--- ersetzen ALT`: ALT muss GENAU EINMAL im Programm stehen und wird
+    /// durch den Block ersetzt (Platzhalter `{sammlung}`/`{fall}` gelten).
+    /// Fuer einen Dateidialog, den keine Aufnahme erreicht, oder das Ablesen
+    /// eines Eingabefeldes -- ersetzt wird genau dieser Aufruf, alles dahinter
+    /// bleibt der echte Code.
+    pub ersetzungen: Vec<(String, String)>,
 }
 
 /// Ein Schritt zwischen Hauptlauf und `--- nachher`.
@@ -146,6 +152,17 @@ pub fn streichen_zeile(programm: &str, zeile: &str) -> Result<String, String> {
     }
     if !gefunden { return Err(format!("die zu streichende Zeile '{}' steht nicht im Programm", ziel)); }
     Ok(aus)
+}
+
+/// `alt` durch `neu` ersetzen -- nur, wenn `alt` GENAU EINMAL vorkommt. Zweimal
+/// waere eine Vermutung darueber, welche Stelle gemeint ist; keinmal hiesse,
+/// der Fall prueft ein Programm, das es so nicht mehr gibt.
+pub fn ersetzen_einmal(programm: &str, alt: &str, neu: &str) -> Result<String, String> {
+    match programm.matches(alt).count() {
+        1 => Ok(programm.replacen(alt, neu, 1)),
+        0 => Err(format!("der zu ersetzende Text '{}' steht nicht im Programm", alt)),
+        n => Err(format!("der zu ersetzende Text '{}' steht {}-mal im Programm -- nicht eindeutig", alt, n)),
+    }
 }
 
 /// Den Quelltext eines Falls in ein vorhandenes Programm einschieben: hinter
@@ -541,7 +558,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher, Vorher, Zwischen, Nochmal, Einschub }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher, Vorher, Zwischen, Nochmal, Einschub, Ersetzen }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -613,6 +630,8 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             Abschnitt::Vorher => f.vorher = Some(text),
             // `datei_name` traegt hier die Marke aus `--- einschub nach MARKE`.
             Abschnitt::Einschub => f.einschuebe.push((datei_name.to_string(), text.trim_end().to_string())),
+            // `datei_name` traegt hier den alten Text aus `--- ersetzen ALT`.
+            Abschnitt::Ersetzen => f.ersetzungen.push((datei_name.to_string(), text.trim_end().to_string())),
             Abschnitt::Zwischen => f.schritte.push(Schritt::Zwischen(text)),
             // `datei_name` traegt hier den Ordner aus `--- nochmal in ORDNER`.
             Abschnitt::Nochmal => f.schritte.push(Schritt::Nochmal {
@@ -741,6 +760,11 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     Abschnitt::Vorher
                 }
                 "zwischen" => Abschnitt::Zwischen,
+                "ersetzen" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- ersetzen' braucht den Text, der ersetzt werden soll", nr + 1)); }
+                    datei_name = arg.to_string();
+                    Abschnitt::Ersetzen
+                }
                 "einschub" => {
                     match arg.strip_prefix("nach ") {
                         Some(m) if !m.trim().is_empty() => datei_name = m.trim().to_string(),
@@ -782,7 +806,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, einschub, streichen, vorher, zwischen, nochmal, nachher, inhalt, ohne)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, einschub, ersetzen, streichen, vorher, zwischen, nochmal, nachher, inhalt, ohne)", nr + 1, other)),
             };
             continue;
         }
@@ -939,6 +963,16 @@ mod tests {
         assert_eq!(f.nachher.as_deref(), Some("PRINT \"danach\""));
         assert!(parsen("=== x\nPRINT 1\n--- nochmal b\n").unwrap_err().contains("nochmal in ORDNER"));
         assert!(parsen("=== x\nPRINT 1\n--- vorher\nPRINT 1\n--- vorher\nPRINT 2\n").unwrap_err().contains("schon"));
+    }
+
+    #[test]
+    fn ersetzen_genau_einmal() {
+        let f = parsen("=== ed\n--- programm x.dh\n--- ersetzen FILE_OPEN_DIALOG(\"Karte\", \"json\")\n\"{fall}/k.json\"\n\n--- erwartet\n1\n").unwrap();
+        assert_eq!(f[0].ersetzungen, vec![("FILE_OPEN_DIALOG(\"Karte\", \"json\")".to_string(), "\"{fall}/k.json\"".to_string())]);
+        assert!(parsen("=== a\nPRINT 1\n--- ersetzen\nX\n").is_err());
+        assert_eq!(ersetzen_einmal("a = D()\nb = 1\n", "D()", "\"x\"").unwrap(), "a = \"x\"\nb = 1\n");
+        assert!(ersetzen_einmal("D() D()", "D()", "1").unwrap_err().contains("2-mal"));
+        assert!(ersetzen_einmal("x", "D()", "1").unwrap_err().contains("nicht im Programm"));
     }
 
     #[test]

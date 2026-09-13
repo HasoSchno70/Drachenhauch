@@ -1,0 +1,4894 @@
+' Der Tilemap-Pilot (examples/187_tilemap_editor.dh), bedient wie von Hand --
+' ohne Python (Stufe 42, bis dahin tests/test_pilot_tilemap.py). Die Karte liest
+' das json-Modul mit denselben Fragen, die das Qt-Modell stellte (Punkt = Breite
+' und Hoehe 0, Eigenschaften am ersten Tileset, GID -> Tileset mit der groessten
+' firstgid <= gid); das Bild des erzeugten Renderers macht `dhrt bild`, gezaehlt
+' wird mit GETPIXEL statt mit PIL.
+'
+' `--- ersetzen` (neu in Stufe 42) setzt, was keine Aufnahme erreicht: das
+' Vollbild (feste Lage), den Tileset-Pfad (die Kopie liegt woanders), die
+' Dateidialoge (feste Pfade) und das Ablesen der Eingabefelder. Die Aufnahme
+' entsteht im dritten Bild mit echten Lagen und beginnt mit einem Ereignis in
+' Bild 0. In der Aufnahme: 8 Mausrad, 7 Mauslage, 6/5 Taste runter/hoch,
+' 2/1 Taste runter/hoch.
+--- seriell
+
+=== gb-code bringt karte und tileset mit
+' Alle drei Dateien unter demselben Namen. Fehlt eine, zeigt der Code ins Leere --
+' und das faellt erst beim Starten auf.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=26
+--- nachher
+DIM z AS ARRAY OF STRING : z = READLINES("_programm/raus.dh")
+DIM code AS STRING : code = ""
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    code = code + z[i] + CHR$(10)
+NEXT
+PRINT FILEEXISTS("_programm/raus.dh") ; " " ; FILEEXISTS("_programm/raus.json") ; " " ; FILEEXISTS("_programm/raus_1.png")
+PRINT INSTR(code, "LOADIMAGE(" + CHR$(34) + "raus_" + CHR$(34) + " + STR$(ti + 1) + " + CHR$(34) + ".png" + CHR$(34) + ")") >= 0
+PRINT INSTR(code, "TILED_LOAD(" + CHR$(34) + "raus.json" + CHR$(34) + ")") >= 0
+--- erwartet
+TRUE TRUE TRUE
+TRUE
+TRUE
+
+=== der erzeugte renderer zeigt eine leere karte als einen farbton
+' Gestartet und sein BILD angesehen (dhrt bild): eine leere Karte ist nur
+' Hintergrund. Gegenprobe im naechsten Fall.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=26
+--- nachher
+FUNCTION rendern$() AS STRING
+    ' Den erzeugten Renderer starten und sein Bild sichern (dhrt bild).
+    DIM ziel AS STRING : ziel = CWD$() + "/gerendert.png"
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "bild", CWD$() + "/_programm/raus.dh", ziel, "4")
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
+        SLEEP(50)
+    WEND
+    RETURN ziel
+END FUNCTION
+FUNCTION farben(pfad AS STRING) AS INTEGER
+    DIM img AS IMAGE : img = LOADIMAGE(pfad)
+    DIM m AS MAP OF INTEGER : m = {}
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 0 TO IMAGEWIDTH(img) - 1 STEP 4
+        FOR y = 0 TO IMAGEHEIGHT(img) - 1 STEP 4
+            MAPPUT(m, STR$(GETPIXEL(img, x, y)), 1)
+        NEXT
+    NEXT
+    RETURN LEN(MAPKEYS(m))
+END FUNCTION
+PRINT "farben " ; farben(rendern$())
+--- erwartet
+farben 1
+
+=== der erzeugte renderer zeichnet eine gemalte kachel
+' Uebersetzen wuerde nichts beweisen: ein Renderer, der sein Tileset nicht findet
+' oder die gid falsch aufloest, uebersetzt genauso und zeigt einen leeren Schirm.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, 320 + zell() * 2, 60 + zell() * 2)
+    prKlick(10, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=32
+--- nachher
+FUNCTION rendern$() AS STRING
+    ' Den erzeugten Renderer starten und sein Bild sichern (dhrt bild).
+    DIM ziel AS STRING : ziel = CWD$() + "/gerendert.png"
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "bild", CWD$() + "/_programm/raus.dh", ziel, "4")
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
+        SLEEP(50)
+    WEND
+    RETURN ziel
+END FUNCTION
+FUNCTION farben(pfad AS STRING) AS INTEGER
+    DIM img AS IMAGE : img = LOADIMAGE(pfad)
+    DIM m AS MAP OF INTEGER : m = {}
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 0 TO IMAGEWIDTH(img) - 1 STEP 4
+        FOR y = 0 TO IMAGEHEIGHT(img) - 1 STEP 4
+            MAPPUT(m, STR$(GETPIXEL(img, x, y)), 1)
+        NEXT
+    NEXT
+    RETURN LEN(MAPKEYS(m))
+END FUNCTION
+PRINT "mehr als eine farbe " ; farben(rendern$()) > 1
+--- erwartet
+mehr als eine farbe TRUE
+
+=== das solid-kaestchen setzt die eigenschaft
+' Genau `solid` fragt tile_collide ab -- der haeufigste Fall, mit eigenem Schalter.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{solid: bool TRUE}
+
+=== abwaehlen entfernt solid statt es auf false zu setzen
+' Sobald irgendeine Kachel ein `solid` traegt, gilt "nur die mit solid = TRUE" --
+' ein zurueckgelassenes FALSE hielte diesen Schalter umgelegt.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prKlick(28, GUI_GET_X(cbSolid) + 8, GUI_GET_Y(cbSolid) + 8)
+    prKlick(34, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=56
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{}
+
+=== der wert 5 wird int
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (INTEGER). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "5")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: int 5}
+
+=== der wert 2.5 wird float
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (FLOAT -- am Punkt erkannt). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "2.5")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: float 2.5}
+
+=== der wert true wird bool
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (BOOLEAN). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "true")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: bool TRUE}
+
+=== der wert falsch wird bool
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (auch deutsch). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "falsch")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: bool FALSE}
+
+=== der wert stein wird string
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (alles andere bleibt Text). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "stein")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: string "stein"}
+
+=== der wert -3 wird int
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (Vorzeichen nur ganz vorn). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "-3")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: int -3}
+
+=== der wert 1-2 wird string
+' Tiled kennt vier Arten, ein Eingabefeld kann sie nicht erfragen -- also wird
+' gedeutet (also ist das KEINE Zahl). Ersetzt ist nur das ABLESEN der beiden Felder.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "wert"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "1-2")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=30
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{wert: string "1-2"}
+
+=== eigenschaft aus der liste entfernen
+' [Weg] nimmt die in der Liste gewaehlte.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(9, GUI_GET_X(lstProp) + 40, GUI_GET_Y(lstProp) + 10)
+    prKlick(15, GUI_GET_X(bPropWeg) + 40, GUI_GET_Y(bPropWeg) + 14)
+    prKlick(21, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "damage"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "7")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=42
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT props$(0, 0)
+--- erwartet
+{}
+
+=== die eigenschaften gehoeren der gewaehlten kachel
+' Sie haengen am Tileset, nicht an einem Kartenfeld -- ohne diesen Fall koennte
+' der Kasten stumpf immer Kachel 0 beschreiben.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(9, GUI_GET_X(bPropSetz) + 50, GUI_GET_Y(bPropSetz) + 14)
+    prKlick(15, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("gewaehlt " + STR$(gewaehlt))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM sk AS STRING : sk = TRIM$(GUI_TEXT(edKey))
+DIM sk AS STRING : sk = "art"
+
+--- ersetzen eigenschaftSetzen(pg, sk, GUI_TEXT(edWert))
+eigenschaftSetzen(pg, sk, "wasser")
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=36
+--- inhalt _programm/probe.txt
+|gewaehlt 1|
+
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT "kachel 1 " ; props$(0, 1)
+PRINT "kachel 0 " ; props$(0, 0)
+--- erwartet
+kachel 1 {art: string "wasser"}
+kachel 0 {}
+
+=== am anfang ist die ebene eine kachelebene
+' Gegenprobe zum naechsten Fall.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+
+    prStart = prBild
+END SUB
+SUB prProbe()
+    prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "held"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"spawn", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=8
+--- inhalt _programm/probe.txt
+|istObj 0 ebenen 1 objAnz -1 objSel -1|
+
+=== objekt-ebene anlegen schaltet den block um
+' Welcher Block zu sehen ist, entscheidet die Art der Ebene.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "held"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"spawn", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=26
+--- inhalt _programm/probe.txt
+|istObj 1 ebenen 2 objAnz 0 objSel -1|
+
+=== ziehen legt ein rechteck an
+' Gelesen aus der gesicherten Karte, mit Name, Typ und Rechteck.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(32))
+    prKlick(20, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "held"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"spawn", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=46
+--- inhalt _programm/probe.txt
+objAnz 1
+
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT objekte$("spawns")
+--- erwartet
+held/spawn 16,16 32x16
+
+=== klicken ohne zug legt einen punkt an
+' In Tiled ist ein Objekt mit Breite und Hoehe 0 ein PUNKT.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prKlick(10, prKx(32), prKy(32))
+    prKlick(18, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "marke"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"trigger", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=42
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT objekte$("spawns")
+--- erwartet
+marke/trigger 32,32 0x0
+
+=== klick auf ein objekt waehlt es statt ein neues anzulegen
+' Sonst legte jeder Versuch, eins anzufassen, ein weiteres darueber.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(48))
+    prKlick(20, prKx(32), prKy(32))
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "held"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"spawn", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=42
+--- inhalt _programm/probe.txt
+|istObj 1 ebenen 2 objAnz 1 objSel 0|
+
+=== entf entfernt das gewaehlte objekt
+' Nach dem Ziehen ist das neue Objekt gewaehlt; Entf nimmt es heraus.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prZiehen(10, prKx(16), prKy(16), prKx(48), prKy(48))
+    prE(20, 2, 261, 0)
+    prE(21, 1, 261, 0)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("istObj " + STR$(IIF(istObjEbene(), 1, 0)) + " ebenen " + STR$(TILED_LAYER_COUNT(karte)) + " objAnz " + STR$(IIF(istObjEbene(), TILED_OBJECT_COUNT(karte, ebenenName$()), -1)) + " objSel " + STR$(objSel))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "held"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"spawn", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=42
+--- inhalt _programm/probe.txt
+|istObj 1 ebenen 2 objAnz 0 objSel -1|
+
+=== die objekte landen in der datei
+' Der ganze Weg: zwei anlegen, sichern, gelesen mit Name, Typ und Lage.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bObjEbene) + 70, GUI_GET_Y(bObjEbene) + 14)
+    prZiehen(10, prKx(0), prKy(0), prKx(16), prKy(16))
+    prZiehen(20, prKx(32), prKy(32), prKx(64), prKy(48))
+    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen DIM on2 AS STRING : on2 = TRIM$(GUI_TEXT(edName))
+DIM on2 AS STRING : on2 = "spawns"
+
+--- ersetzen DIM nm3 AS STRING : nm3 = TRIM$(GUI_TEXT(edObjName))
+DIM nm3 AS STRING : nm3 = "gegner"
+
+--- ersetzen TRIM$(GUI_TEXT(edObjTyp)), nx, ny, nw, nh)
+"feind", nx, ny, nw, nh)
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=56
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT objekte$("spawns")
+--- erwartet
+gegner/feind 0,0 16x16; gegner/feind 32,32 32x16
+
+=== am anfang gibt es nur das eingebaute tileset
+' Gegenprobe zum naechsten Fall: die firstgid steht bei 1.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+
+    prStart = prBild
+END SUB
+SUB prProbe()
+    prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{sammlung}/../../examples/assets/tiles.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=8
+--- inhalt _programm/probe.txt
+|tsAnz 1 tsAkt 0 basisGid 1|
+
+=== ein zweites tileset haengt sich hinter das erste
+' Die firstgid vergibt die LAUFZEIT. 8x4 Kacheln im eingebauten -> das zweite
+' beginnt bei 33, und die Palette zeigt es.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{sammlung}/../../examples/assets/tiles.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=26
+--- inhalt _programm/probe.txt
+|tsAnz 2 tsAkt 1 basisGid 33|
+
+=== kacheln beider tilesets stehen in derselben ebene
+' Die GID wird aufgeloest wie in Tiled (groesste firstgid <= gid).
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, prKx(16), prKy(16))
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(24, prKx(80), prKy(16))
+    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{sammlung}/../../examples/assets/tiles.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=52
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT JSON_LEN(h, "tilesets")
+PRINT "links " ; tsVon$(gid(0, 1, 1)) ; " rechts " ; tsVon$(gid(0, 5, 1))
+--- erwartet
+2
+links (0, 0) rechts (1, 1)
+
+=== die pipette schaltet das tileset um
+' Ohne das zeigte die Palette die aufgenommene Kachel nicht -- und der naechste
+' Strich malte eine andere.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, prKx(16), prKy(16))
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prE(16, 2, 73, 0)
+    prE(17, 1, 73, 0)
+    prKlick(22, prKx(16), prKy(16))
+    prAbspielen()
+END SUB
+SUB prProbe()
+    IF tsAkt = 1 THEN prMerke("zweites tileset war aktiv")
+    prSchreib("tsAnz " + STR$(tsAnz) + " tsAkt " + STR$(tsAkt) + " basisGid " + STR$(basisGid()))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{sammlung}/../../examples/assets/tiles.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=46
+--- inhalt _programm/probe.txt
+|zweites tileset war aktiv|
+tsAkt 0 basisGid 1|
+
+=== der erzeugte renderer zeichnet beide tilesets
+' Ein Blatt je Tileset, jede GID einzeln aufgeloest -- mit nur einem Blatt bliebe
+' die zweite Kachel leer, und der Code uebersetzte genauso.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, prKx(16), prKy(16))
+    prKlick(9, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prKlick(18, GUI_CANVAS_X(palette) + 48, GUI_CANVAS_Y(palette) + 16)
+    prKlick(24, prKx(80), prKy(16))
+    prKlick(30, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{sammlung}/../../examples/assets/tiles.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=52
+--- nachher
+FUNCTION rendern$() AS STRING
+    ' Den erzeugten Renderer starten und sein Bild sichern (dhrt bild).
+    DIM ziel AS STRING : ziel = CWD$() + "/gerendert.png"
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "bild", CWD$() + "/_programm/raus.dh", ziel, "4")
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(pc) AND MILLIS() < bis
+        SLEEP(50)
+    WEND
+    RETURN ziel
+END FUNCTION
+FUNCTION farben(pfad AS STRING) AS INTEGER
+    DIM img AS IMAGE : img = LOADIMAGE(pfad)
+    DIM m AS MAP OF INTEGER : m = {}
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR x = 0 TO IMAGEWIDTH(img) - 1 STEP 4
+        FOR y = 0 TO IMAGEHEIGHT(img) - 1 STEP 4
+            MAPPUT(m, STR$(GETPIXEL(img, x, y)), 1)
+        NEXT
+    NEXT
+    RETURN LEN(MAPKEYS(m))
+END FUNCTION
+PRINT FILEEXISTS("_programm/raus_1.png") ; " " ; FILEEXISTS("_programm/raus_2.png")
+DIM img AS IMAGE : img = LOADIMAGE(rendern$())
+DIM grund AS INTEGER : grund = GETPIXEL(img, 300, 300)
+DIM links AS INTEGER : links = GETPIXEL(img, 24, 24)
+DIM rechts AS INTEGER : rechts = GETPIXEL(img, 88, 24)
+PRINT "links gemalt " ; links <> grund
+PRINT "rechts gemalt " ; rechts <> grund
+PRINT "verschieden " ; links <> rechts
+--- erwartet
+TRUE TRUE
+links gemalt TRUE
+rechts gemalt TRUE
+verschieden TRUE
+
+=== ein grosses tileset laesst sich rollen
+' Die Palette ist ein Ausschnitt fester Groesse; ein 10x6-Tileset (im Vorher-
+' Programm angelegt) waere ohne Rollen zur Haelfte unerreichbar.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prE(12, 8, 0, -1)
+    prE(14, 8, 0, -1)
+    prKlick(18, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("gewaehlt " + STR$(gewaehlt))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{fall}/gross.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=40
+--- vorher
+DIM b AS IMAGE : b = IMAGE_NEW(160, 96, RGB(40, 200, 60))
+IMAGE_SAVE(b, "gross.png")
+
+--- inhalt _programm/probe.txt
+|gewaehlt 20|
+
+=== umschalt rollt die palette zur seite
+' Ein breites Tileset braucht die zweite Richtung -- sonst waeren die Spalten ab 8
+' nicht anzuklicken.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bTsNeu) + 16, GUI_GET_Y(bTsNeu) + 13)
+    prE(10, 7, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prE(12, 2, 340, 0)
+    prE(14, 2, 340, 0)
+    prE(16, 2, 340, 0)
+    prE(14, 8, 0, -1)
+    prE(16, 8, 0, -1)
+    prE(18, 1, 340, 0)
+    prKlick(22, GUI_CANVAS_X(palette) + 8, GUI_CANVAS_Y(palette) + 8)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("gewaehlt " + STR$(gewaehlt))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- ersetzen FILE_OPEN_DIALOG("Tileset hinzufuegen", "png")
+"{fall}/gross.png"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=44
+--- vorher
+DIM b AS IMAGE : b = IMAGE_NEW(160, 96, RGB(40, 200, 60))
+IMAGE_SAVE(b, "gross.png")
+
+--- inhalt _programm/probe.txt
+|gewaehlt 2|
+
+=== eine ebene laesst sich nach hinten holen
+' Die Reihenfolge IST die Zeichenreihenfolge -- die erste liegt hinten.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
+    prKlick(10, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
+    prKlick(18, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("ebene " + STR$(ebene))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=40
+--- inhalt _programm/probe.txt
+|ebene 0|
+
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT ebenen$()
+--- erwartet
+Ebene 2, Boden
+
+=== und wieder nach vorne
+' Die aktive Ebene folgt ihrer Ebene.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
+    prKlick(10, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
+    prKlick(16, GUI_GET_X(bEbVorne) + 60, GUI_GET_Y(bEbVorne) + 14)
+    prKlick(24, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("ebene " + STR$(ebene))
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=46
+--- inhalt _programm/probe.txt
+|ebene 1|
+
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT ebenen$()
+--- erwartet
+Boden, Ebene 2
+
+=== die kacheln bleiben bei ihrer ebene
+' Eine Ebene, die beim Umstellen ihren Inhalt verloere, fiele an der Liste nicht auf.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, prKx(16), prKy(16))
+    prKlick(10, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
+    prKlick(18, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
+    prKlick(26, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=48
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT ebenen$()
+PRINT "neue ebene " ; gid(0, 1, 1) ; " boden " ; gid(1, 1, 1)
+--- erwartet
+Ebene 2, Boden
+neue ebene 0 boden 1
+
+=== rueckgaengig trifft nach dem umsortieren noch seine ebene
+' Ein Verlaufsschritt merkt sich die NUMMER seiner Ebene; ohne Umnummerieren
+' schriebe Strg+Z danach eine leere Flaeche ueber die Kachel von 'Boden'.
+DIM prBild AS INTEGER : prBild = 0
+DIM prStart AS INTEGER : prStart = -1
+DIM prF AS ARRAY OF INTEGER : prF = []
+DIM prZ AS ARRAY OF STRING : prZ = []
+DIM prFlag AS STRING : prFlag = ""
+SUB prE(f AS INTEGER, typ AS INTEGER, a AS INTEGER, b AS INTEGER)
+    ARRAY_PUSH(prF, f)
+    ARRAY_PUSH(prZ, STR$(typ) + " " + STR$(a) + " " + STR$(b) + " 0 0")
+END SUB
+SUB prKlick(f AS INTEGER, x AS INTEGER, y AS INTEGER)
+    prE(f, 7, x, y)
+    prE(f + 1, 7, x, y)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 5, 0, 0)
+END SUB
+SUB prZiehen(f AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, x2 AS INTEGER, y2 AS INTEGER)
+    prE(f, 7, x1, y1)
+    prE(f + 1, 7, x1, y1)
+    prE(f + 1, 6, 0, 0)
+    prE(f + 2, 7, x2, y2)
+    prE(f + 2, 6, 0, 0)
+    prE(f + 3, 7, x2, y2)
+    prE(f + 4, 5, 0, 0)
+END SUB
+FUNCTION prKx(px AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_X(leinwand) + px * zoom
+END FUNCTION
+FUNCTION prKy(py AS INTEGER) AS INTEGER
+    RETURN GUI_CANVAS_Y(leinwand) + py * zoom
+END FUNCTION
+SUB prAbspielen()
+    ' Ein Ereignis in Bild 0 -- die Wiedergabe setzt beim ERSTEN an.
+    prE(0, 7, 0, 0)
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    DIM weiter AS BOOLEAN
+    DIM tf AS INTEGER
+    DIM tz AS STRING
+    FOR i = 1 TO LEN(prF) - 1
+        j = i
+        weiter = TRUE
+        WHILE weiter
+            weiter = FALSE
+            IF j > 0 THEN
+                IF prF[j - 1] > prF[j] THEN
+                    tf = prF[j] : prF[j] = prF[j - 1] : prF[j - 1] = tf
+                    tz = prZ[j] : prZ[j] = prZ[j - 1] : prZ[j - 1] = tz
+                    j = j - 1
+                    weiter = TRUE
+                END IF
+            END IF
+        WEND
+    NEXT
+    DIM t AS STRING : t = "# Test-Aufnahme" + CHR$(10) + "c " + STR$(LEN(prF)) + CHR$(10)
+    FOR i = 0 TO LEN(prF) - 1
+        t = t + "e " + STR$(prF[i]) + " " + prZ[i] + CHR$(10)
+    NEXT
+    WRITEALL("ev.txt", t)
+    AUTOMATION_PLAY("ev.txt")
+    prStart = prBild
+END SUB
+SUB prMerke(z AS STRING)
+    IF INSTR(prFlag, "|" + z + "|") < 0 THEN prFlag = prFlag + "|" + z + "|" + CHR$(10)
+END SUB
+SUB prSchreib(z AS STRING)
+    IF z = "" THEN
+        WRITEALL("probe.txt", prFlag)
+    ELSE
+        WRITEALL("probe.txt", prFlag + "|" + z + "|" + CHR$(10))
+    END IF
+END SUB
+SUB prFall()
+    prKlick(3, prKx(16), prKy(16))
+    prKlick(10, GUI_GET_X(bEbNeu) + 40, GUI_GET_Y(bEbNeu) + 14)
+    prKlick(16, prKx(48), prKy(16))
+    prKlick(24, GUI_GET_X(bEbHinten) + 60, GUI_GET_Y(bEbHinten) + 14)
+    prE(32, 2, 341, 0)
+    prE(33, 2, 90, 0)
+    prE(34, 1, 90, 0)
+    prE(36, 1, 341, 0)
+    prKlick(42, GUI_GET_X(bCode) + 52, GUI_GET_Y(bCode) + 16)
+    prAbspielen()
+END SUB
+SUB prProbe()
+    prSchreib("")
+END SUB
+--- programm ../../examples/187_tilemap_editor.dh nach SETFPS(60)
+--- ersetzen SET_FULLSCREEN(TRUE)
+SET_WINDOW_POS(-3000, -3000)
+
+--- ersetzen "assets/editor_tileset.png"
+"{sammlung}/../../examples/assets/editor_tileset.png"
+
+--- ersetzen FILE_SAVE_DIALOG("GB-Code sichern", "karte.dh", "dh")
+"raus.dh"
+
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN prFall()
+IF prStart >= 0 THEN prProbe()
+
+--- umgebung
+DHRT_FRAMES=64
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/raus.json")
+FUNCTION props$(ts AS INTEGER, id AS INTEGER) AS STRING
+    DIM p AS STRING : p = "tilesets." + STR$(ts) + ".tiles"
+    DIM r AS STRING : r = ""
+    IF NOT JSON_HAS(h, p) THEN RETURN "{}"
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        IF JSON_GET_INT(h, p + "." + STR$(i) + ".id") = id AND JSON_HAS(h, p + "." + STR$(i) + ".properties") THEN
+            DIM q AS STRING : q = p + "." + STR$(i) + ".properties"
+            FOR k = 0 TO JSON_LEN(h, q) - 1
+                DIM e AS STRING : e = q + "." + STR$(k)
+                DIM typ AS STRING : typ = JSON_GET_STRING(h, e + ".type")
+                DIM w AS STRING
+                IF typ = "int" THEN w = STR$(JSON_GET_INT(h, e + ".value"))
+                IF typ = "float" THEN w = STR$(JSON_GET_FLOAT(h, e + ".value"))
+                IF typ = "bool" THEN w = STR$(JSON_GET_BOOL(h, e + ".value"))
+                IF typ = "string" THEN w = CHR$(34) + JSON_GET_STRING(h, e + ".value") + CHR$(34)
+                IF r <> "" THEN r = r + ", "
+                r = r + JSON_GET_STRING(h, e + ".name") + ": " + typ + " " + w
+            NEXT
+        END IF
+    NEXT
+    RETURN "{" + r + "}"
+END FUNCTION
+FUNCTION ebenen$() AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF r <> "" THEN r = r + ", "
+        r = r + JSON_GET_STRING(h, "layers." + STR$(i) + ".name")
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION gid(e AS INTEGER, x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM w AS INTEGER : w = JSON_GET_INT(h, "layers." + STR$(e) + ".width")
+    RETURN JSON_GET_INT(h, "layers." + STR$(e) + ".data." + STR$(y * w + x))
+END FUNCTION
+FUNCTION tsVon$(g AS INTEGER) AS STRING
+    ' Wie Tiled: das Tileset mit der GROESSTEN firstgid <= gid.
+    DIM best AS INTEGER : best = -1
+    DIM bestFg AS INTEGER : bestFg = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets") - 1
+        DIM fg AS INTEGER : fg = JSON_GET_INT(h, "tilesets." + STR$(i) + ".firstgid")
+        IF fg <= g AND fg > bestFg THEN best = i : bestFg = fg
+    NEXT
+    RETURN "(" + STR$(best) + ", " + STR$(g - bestFg) + ")"
+END FUNCTION
+FUNCTION objekte$(ebene AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER
+    DIM k AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        DIM l AS STRING : l = "layers." + STR$(i)
+        IF JSON_GET_STRING(h, l + ".name") = ebene AND JSON_HAS(h, l + ".objects") THEN
+            FOR k = 0 TO JSON_LEN(h, l + ".objects") - 1
+                DIM o AS STRING : o = l + ".objects." + STR$(k)
+                IF r <> "" THEN r = r + "; "
+                r = r + JSON_GET_STRING(h, o + ".name") + "/" + JSON_GET_STRING(h, o + ".type") + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".x"))) + "," + STR$(INT(JSON_GET_FLOAT(h, o + ".y"))) + " " + _
+                    STR$(INT(JSON_GET_FLOAT(h, o + ".width"))) + "x" + STR$(INT(JSON_GET_FLOAT(h, o + ".height")))
+            NEXT
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+PRINT ebenen$()
+PRINT "zurueckgenommen " ; gid(0, 3, 1) ; " boden " ; gid(1, 1, 1)
+--- erwartet
+Ebene 2, Boden
+zurueckgenommen 0 boden 1
+

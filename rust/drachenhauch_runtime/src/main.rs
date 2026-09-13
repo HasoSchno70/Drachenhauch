@@ -844,12 +844,18 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                 // Einschub nach `_programm/` kopiert -- ein Ordner mit `_`
                 // vorn, den die Werkzeuge beim Durchsuchen des Projekts
                 // uebergehen; der Fallordner selbst ist dann das "Projekt".
+                // Mit Schraegstrichen: Windows versteht sie, und in einer
+                // JSON-Beilage waere `C:\Programme` eine kaputte Escape-Folge.
+                let (s_text, f_text) = (sammlung_dir.to_string_lossy().replace('\\', "/"), dir.to_string_lossy().replace('\\', "/"));
                 let quelle_pfad = match &f.programm {
                     Some(p) => {
                         let orig = sammlung_dir.join(p);
                         let mut text = std::fs::read_to_string(&orig)
                             .map_err(|e| format!("--- programm {}: nicht lesbar ({})", p, e))?;
                         for s in &f.streichen { text = pruefsammlung::streichen_zeile(&text, s)?; }
+                        for (alt, neu) in &f.ersetzungen {
+                            text = pruefsammlung::ersetzen_einmal(&text, alt, &pruefsammlung::platzhalter(neu, &s_text, &f_text))?;
+                        }
                         let mut neu = pruefsammlung::einschieben(&text, f.nach.as_deref(), &f.quelle)?;
                         for (marke, einschub) in &f.einschuebe {
                             neu = pruefsammlung::einschieben(&neu, Some(marke), einschub)?;
@@ -866,9 +872,6 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         dir.join("fall.dh")
                     }
                 };
-                // Mit Schraegstrichen: Windows versteht sie, und in einer
-                // JSON-Beilage waere `C:\Programme` eine kaputte Escape-Folge.
-                let (s_text, f_text) = (sammlung_dir.to_string_lossy().replace('\\', "/"), dir.to_string_lossy().replace('\\', "/"));
                 for name in &f.verzeichnisse { let _ = std::fs::create_dir_all(dir.join(name)); }
                 for (name, inhalt) in &f.dateien {
                     let ziel = dir.join(name);
