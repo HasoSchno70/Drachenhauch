@@ -2875,6 +2875,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 42 (2026-09-13):** der Tilemap-Pilot ohne Python --
+`tests/pruef/werkzeug_tilemap.dhtest` (32 Faelle), die pytest-Datei
+`test_pilot_tilemap.py` geloescht. **Neues Formatstueck `--- ersetzen ALT`**: der Rest der Kopfzeile
+muss GENAU EINMAL im Programm stehen und wird durch den Block ersetzt
+(`{sammlung}`/`{fall}` gelten; `pruefsammlung::ersetzen_einmal`, Rust-Test
+`ersetzen_genau_einmal`). Die pytest-Fassung ersetzte Text in der Kopie --
+das Vollbild, die Dateidialoge (keine Aufnahme erreicht einen nativen Dialog),
+das Ablesen der Eingabefelder und den relativen Tileset-Pfad (die Kopie liegt
+in `_programm/`). Die Platzhalter werden dafuer jetzt VOR der Programmkopie
+berechnet. Die fremden Leser sind ersetzt: das Qt-Modell `TileMapDoc` durch das
+json-Modul mit denselben Fragen (Punkt = Breite und Hoehe 0, Eigenschaften am
+ersten Tileset, GID -> Tileset mit der groessten `firstgid <= gid`), PIL durch
+`dhrt bild` + `GETPIXEL` beim erzeugten Renderer und durch `IMAGE_NEW` +
+`IMAGE_SAVE` im `--- vorher` fuer das grosse Tileset. Die zwei pytest-Tests mit
+je zwei Laeufen (Renderer leer/gemalt, solid setzen/entfernen) sind je zwei
+Faelle, die Startzustaende von Ebene und Tileset eigene Gegenproben.
+**Stolperstein:** eine MAP laesst sich nicht per Index beschreiben
+(`m[k] = 1` ist "Index-Zuweisung an Nicht-Array") -- `MAPPUT`. Gegenprobe ohne
+`AUTOMATION_PLAY`: 30 von 32 fallen, die zwei ohne Eingaben nicht. Im ersten
+Anlauf waren es 29 -- "die pipette schaltet das tileset um" pruefte (schon in
+pytest) nur den Endstand `tsAkt 0`, der ohne jede Eingabe auch stimmt; er
+merkt sich jetzt, dass das zweite Tileset zwischendurch aktiv war.
+
 **Stufe 41 (2026-09-13):** der Rechnungen-Pilot ohne Python --
 `tests/pruef/werkzeug_rechnungen.dhtest` (14 Faelle; die zwei Pruefungen, die
 in pytest je EIN Test mit zwei Laeufen waren, sind jetzt je zwei Faelle),
