@@ -1,0 +1,97 @@
+' Knopfarten (GUI_BUTTON_VARIANT, Stufe 27): bis dahin hatten alle Knoepfe
+' die Farbe des Themas, und eine eigene Farbe (GUI_SET_COLOR "bg") liess die
+' Schrift weiss -- auf einem hellen Knopf unlesbar. Geprueft wird der Name
+' der Art, die Fehler, das Speichern und am BILD die Flaeche.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die art setzen und lesen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "OK", 10, 10, 80, 30)
+PRINT GUI_BUTTON_GET_VARIANT$(b)
+GUI_BUTTON_VARIANT(b, "Primaer")
+PRINT GUI_BUTTON_GET_VARIANT$(b)
+GUI_BUTTON_VARIANT(b, "gefahr")
+DIM text AS STRING : text = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(text)
+PRINT GUI_BUTTON_GET_VARIANT$(GUI_WINDOW_WIDGET(w2, 0))
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+standard
+primaer
+gefahr
+
+=== eine unbekannte art sagt, welche es gibt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "OK", 10, 10, 80, 30)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 10, 60, 80, 60, ["x"])
+TRY
+    GUI_BUTTON_VARIANT(b, "knallrot")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_BUTTON_VARIANT(lb, "primaer")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_SET_COLOR(b, "glanz", RED)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+Knopfart 'knallrot' gibt es nicht
+bekannt sind: standard, primaer, erfolg, warnung, gefahr, umriss, flach, link
+kein Knopf
+hover/pressed
+
+=== gefuellte arten haben ihre farbe, umriss und flach keine flaeche
+' Am BILD, im flachen dunklen Thema. Gefahr ist rot, Erfolg gruen; ein
+' Umriss-Knopf hat innen den Fenstergrund, aber einen Rand; ein flacher Knopf
+' ist ohne Maus gar nicht zu sehen.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "", 10, 10, 120, 40)
+GUI_BUTTON_VARIANT(b1, "gefahr")
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "", 140, 10, 120, 40)
+GUI_BUTTON_VARIANT(b2, "erfolg")
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "", 10, 70, 120, 40)
+GUI_BUTTON_VARIANT(b3, "umriss")
+DIM b4 AS GUI_WIDGET : b4 = GUI_BUTTON(w, "", 140, 70, 120, 40)
+GUI_BUTTON_VARIANT(b4, "flach")
+DIM b5 AS GUI_WIDGET : b5 = GUI_BUTTON(w, "", 10, 130, 120, 40)
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+30 30 #C94A3F +-45
+160 30 #2E9E5B +-45
+30 90 = 350 250
+10 90 <> 350 250
+200 90 = 350 250
+' Gegenprobe: der Standard-Knopf ist NICHT unsichtbar.
+30 150 <> 350 250
+--- erwartet

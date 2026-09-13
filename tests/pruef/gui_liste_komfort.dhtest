@@ -1,0 +1,263 @@
+' Listen komfortabel (Stufe 27): unsichtbare Daten je Eintrag, Zusatztext,
+' Tooltip, gesperrte Eintraege, Gruppenkoepfe, Filter, Sortieren, Suchen,
+' Enter und "tippen springt". Geprueft wird, was ein Programm davon sieht.
+' Format: docs/werkzeuge.md, dhrt test.
+'
+' Lage: Fenster (10, 10), Liste bei (20, 20) -> absolut x = 30, y = 54
+' (Titelleiste 24); eine Zeile ist 22 Punkte hoch, Zeile r hat ihre Mitte
+' bei y = 65 + 22 * r. Jede Aufnahme endet mit einer LEERZEILE -- sonst
+' verliert raylibs Leser die letzte Zeile.
+
+=== daten je eintrag bleiben am eintrag
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Anna", "Bert", "Carla"])
+GUI_LISTBOX_SET_DATA(lb, 0, "k17")
+GUI_LISTBOX_SET_DATA(lb, 2, "k3")
+PRINT GUI_LISTBOX_DATA$(lb, 0) ; " [" ; GUI_LISTBOX_DATA$(lb, 1) ; "] " ; GUI_LISTBOX_FIND_DATA(lb, "k3")
+' Verschieben und Einfuegen nehmen den Wert mit.
+GUI_LISTBOX_MOVE(lb, 2, 0)
+GUI_LISTBOX_ADD(lb, "Dora", 0)
+PRINT GUI_LISTBOX_ITEM(lb, 1) ; " " ; GUI_LISTBOX_DATA$(lb, 1) ; " " ; GUI_LISTBOX_FIND_DATA(lb, "k17")
+PRINT GUI_LISTBOX_FIND_DATA(lb, "gibtsnicht")
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+k17 [] 2
+Carla k3 2
+-1
+
+=== sortieren ist natuerlich und bleibt in den gruppen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 200, ["Obst", "kirsche", "Apfel", "Datei 10", "Gemuese", "Zwiebel", "Datei 9", "Datei 10"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)
+GUI_LISTBOX_HEADER(lb, 4, TRUE)
+GUI_LISTBOX_SET_DATA(lb, 2, "apfel-id")
+GUI_LISTBOX_SET_SELECTED(lb, 1)
+GUI_LISTBOX_SORT(lb)
+DIM i AS INTEGER
+DIM zeile AS STRING : zeile = ""
+FOR i = 0 TO GUI_LISTBOX_COUNT(lb) - 1
+    zeile = zeile + GUI_LISTBOX_ITEM(lb, i) + "|"
+NEXT
+PRINT zeile
+' Die Auswahl meint weiter "kirsche", der Wert reist mit dem Apfel.
+PRINT GUI_LISTBOX_TEXT(lb) ; " " ; GUI_LISTBOX_FIND_DATA(lb, "apfel-id")
+GUI_LISTBOX_SORT(lb, TRUE)
+PRINT GUI_LISTBOX_ITEM(lb, 1) ; " " ; GUI_LISTBOX_ITEM(lb, 5)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+Obst|Apfel|Datei 10|kirsche|Gemuese|Datei 9|Datei 10|Zwiebel|
+kirsche 1
+kirsche Zwiebel
+
+=== der filter zeigt koepfe nur ueber passenden gruppen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 200, ["Obst", "Apfel", "Birne", "Gemuese", "Mais", "Paprika"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)
+GUI_LISTBOX_HEADER(lb, 3, TRUE)
+GUI_LISTBOX_DETAIL(lb, 4, "gelb")
+PRINT GUI_LISTBOX_VIEW_COUNT(lb)
+GUI_LISTBOX_FILTER(lb, "PA")
+PRINT GUI_LISTBOX_GET_FILTER$(lb) ; " " ; GUI_LISTBOX_VIEW_COUNT(lb) ; " " ; GUI_LISTBOX_VIEW_ROW(lb, 0) ; " " ; GUI_LISTBOX_VIEW_ROW(lb, 1)
+' Der Zusatztext zaehlt mit: "gelb" findet den Mais.
+GUI_LISTBOX_FILTER(lb, "gelb")
+PRINT GUI_LISTBOX_VIEW_COUNT(lb) ; " " ; GUI_LISTBOX_VIEW_ROW(lb, 1)
+GUI_LISTBOX_FILTER(lb, "gibtsnicht")
+GUI_LISTBOX_PLACEHOLDER(lb, "Keine Treffer")
+PRINT GUI_LISTBOX_VIEW_COUNT(lb) ; " " ; GUI_LISTBOX_VIEW_ROW(lb, 0)
+GUI_LISTBOX_FILTER(lb, "")
+PRINT GUI_LISTBOX_VIEW_COUNT(lb)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+6
+PA 2 3 5
+2 4
+0 -1
+6
+
+=== koepfe und gesperrte eintraege nehmen keinen klick an
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Obst", "Apfel", "Birne", "Kirsche"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)
+GUI_LISTBOX_ENABLE(lb, 2, FALSE)
+PRINT GUI_LISTBOX_ENABLED(lb, 2) ; " " ; GUI_LISTBOX_ENABLED(lb, 1)
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 8 OR f = 18 OR f = 28 THEN PRINT GUI_LISTBOX_SELECTED(lb)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# erst der Kopf (Zeile 0), dann der gesperrte (Zeile 2), dann Kirsche (Zeile 3)
+c 30
+e 3 7 80 65 0 0
+e 4 7 80 65 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 12 7 80 109 0 0
+e 13 7 80 109 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+e 22 7 80 131 0 0
+e 23 7 80 131 0 0
+e 23 6 0 0 0 0
+e 25 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+FALSE TRUE
+-1
+-1
+3
+
+=== pfeile ueberspringen koepfe und gesperrte, enter oeffnet
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Obst", "Apfel", "Birne", "Kirsche"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)
+GUI_LISTBOX_ENABLE(lb, 2, FALSE)
+GUI_FOCUS(lb)
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 8 OR f = 16 THEN PRINT GUI_LISTBOX_SELECTED(lb)
+    IF GUI_DOUBLE_CLICKED(lb) THEN PRINT "offen " + GUI_LISTBOX_TEXT(lb)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Runter (Apfel), Runter (Kirsche -- Birne ist gesperrt), dann Enter
+c 30
+e 3 2 264 0 0 0
+e 4 1 264 0 0 0
+e 11 2 264 0 0 0
+e 12 1 264 0 0 0
+e 20 2 257 0 0 0
+e 21 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+1
+3
+offen Kirsche
+
+=== tippen springt zum eintrag
+' Dieselbe Taste zweimal laeuft weiter zum naechsten, der so anfaengt.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Apfel", "Birne", "Kirsche", "Kiwi", "Mango"])
+GUI_FOCUS(lb)
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    IF f = 8 OR f = 16 THEN PRINT GUI_LISTBOX_TEXT(lb)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 20
+e 3 2 75 0 0 0
+e 4 1 75 0 0 0
+e 11 2 75 0 0 0
+e 12 1 75 0 0 0
+
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+Kirsche
+Kiwi
+
+=== suchen findet ab einer stelle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Rot", "Gruen", "Dunkelrot", "Blau"])
+PRINT GUI_LISTBOX_FIND(lb, "ROT") ; " " ; GUI_LISTBOX_FIND(lb, "rot", 1) ; " " ; GUI_LISTBOX_FIND(lb, "gelb")
+GUI_LISTBOX_SCROLL_TO(lb, 3)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0 2 -1
+
+=== alles steht in der datei
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 20, 200, 150, ["Obst", "Apfel", "Birne"])
+GUI_LISTBOX_HEADER(lb, 0, TRUE)
+GUI_LISTBOX_ENABLE(lb, 2, FALSE)
+GUI_LISTBOX_SET_DATA(lb, 1, "a1")
+GUI_LISTBOX_DETAIL(lb, 1, "rot")
+GUI_LISTBOX_TIP(lb, 1, "ein Apfel")
+GUI_LISTBOX_PLACEHOLDER(lb, "leer")
+DIM text AS STRING : text = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(text)
+DIM lb2 AS GUI_WIDGET : lb2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT GUI_LISTBOX_DATA$(lb2, 1) ; " " ; GUI_LISTBOX_ENABLED(lb2, 2) ; " " ; GUI_LISTBOX_FIND_DATA(lb2, "a1")
+GUI_LISTBOX_FILTER(lb2, "rot")
+PRINT GUI_LISTBOX_VIEW_COUNT(lb2)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+a1 FALSE 1
+2
+
+=== eine falsche liste sagt es
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "A", 10, 10, 80, 30)
+DIM lb AS GUI_WIDGET : lb = GUI_LISTBOX(w, 20, 60, 200, 100, ["x"])
+TRY
+    GUI_LISTBOX_SET_DATA(b, 0, "x")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_LISTBOX_DETAIL(lb, 5, "x")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+keine Liste
+Eintrag 5 gibt es nicht
