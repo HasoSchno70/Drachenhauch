@@ -108,6 +108,25 @@ pub struct Fall {
     /// gelten dann fuer SEINE Ausgabe. So prueft die Laufzeit selbst
     /// (ANIM_FSM_LOAD, JSON_*) statt eines fremden Lesers in Python.
     pub nachher: Option<String>,
+    /// `--- vorher`: ein Hilfsprogramm VOR dem Hauptlauf, im Fallordner --
+    /// etwa ein git-Repository anlegen (`PROCESS_START("git", ...)`).
+    pub vorher: Option<String>,
+    /// `--- zwischen` und `--- nochmal`, in der Reihenfolge der Datei: nach dem
+    /// Hauptlauf und vor `--- nachher`. So laesst sich pruefen, was ein Werkzeug
+    /// ueber einen Neustart hinweg behaelt, oder aus dem Bild eines ersten
+    /// Laufs die Klicklage fuer den zweiten ausrechnen.
+    pub schritte: Vec<Schritt>,
+}
+
+/// Ein Schritt zwischen Hauptlauf und `--- nachher`.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Schritt {
+    /// `--- zwischen`: ein Hilfsprogramm in Drachenhauch im Fallordner.
+    Zwischen(String),
+    /// `--- nochmal [in ORDNER]`: das Programm noch einmal, mit der Umgebung
+    /// des Falls; die Zeilen des Blocks sind seine Argumente. Ohne `in` im
+    /// Fallordner, sonst in diesem Unterordner (er wird angelegt).
+    Nochmal { ordner: Option<String>, argumente: Vec<String> },
 }
 
 /// Die erste Zeile, die (ohne Leerraum am Rand) `zeile` ist, entfernen.
@@ -516,7 +535,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher, Vorher, Zwischen, Nochmal }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -585,6 +604,13 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             Abschnitt::Stderr => f.stderr_enthaelt.extend(puffer.iter().filter(|z| !z.trim().is_empty()).cloned()),
             // `datei_b64` traegt hier "ohne" -- derselbe Merker fuer die Art des Blocks.
             Abschnitt::Nachher => f.nachher = Some(text),
+            Abschnitt::Vorher => f.vorher = Some(text),
+            Abschnitt::Zwischen => f.schritte.push(Schritt::Zwischen(text)),
+            // `datei_name` traegt hier den Ordner aus `--- nochmal in ORDNER`.
+            Abschnitt::Nochmal => f.schritte.push(Schritt::Nochmal {
+                ordner: if datei_name.is_empty() { None } else { Some(datei_name.to_string()) },
+                argumente: puffer.iter().filter(|z| !z.trim().is_empty()).map(|z| z.trim().to_string()).collect(),
+            }),
             Abschnitt::Inhalt => f.inhalte.push((datei_name.to_string(),
                 puffer.iter().filter(|z| !z.trim().is_empty()).cloned().collect(), datei_b64)),
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
@@ -702,6 +728,20 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     if f.nachher.is_some() { return Err(format!("Zeile {}: '--- nachher' gibt es in diesem Fall schon", nr + 1)); }
                     Abschnitt::Nachher
                 }
+                "vorher" => {
+                    if f.vorher.is_some() { return Err(format!("Zeile {}: '--- vorher' gibt es in diesem Fall schon", nr + 1)); }
+                    Abschnitt::Vorher
+                }
+                "zwischen" => Abschnitt::Zwischen,
+                "nochmal" => {
+                    datei_name = if arg.is_empty() { String::new() } else {
+                        match arg.strip_prefix("in ") {
+                            Some(o) if !o.trim().is_empty() => o.trim().to_string(),
+                            _ => return Err(format!("Zeile {}: '--- nochmal {}' kenne ich nicht (nur 'nochmal' oder 'nochmal in ORDNER')", nr + 1, arg)),
+                        }
+                    };
+                    Abschnitt::Nochmal
+                }
                 "inhalt" | "ohne" => {
                     if arg.is_empty() { return Err(format!("Zeile {}: '--- {}' braucht einen Dateinamen", nr + 1, wort)); }
                     datei_name = arg.to_string();
@@ -727,7 +767,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, streichen, nachher, inhalt, ohne)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, streichen, vorher, zwischen, nochmal, nachher, inhalt, ohne)", nr + 1, other)),
             };
             continue;
         }
@@ -856,6 +896,35 @@ mod tests {
     use super::*;
 
     const BEISPIEL: &str = "' Kopf\n=== eins\nPRINT 1\n--- erwartet\n1\n=== zwei\nPRINT 1 \\ 0\n--- fehler\nDivision\n=== drei\nPRINT \"a\"\nPRINT \"b\"\n--- enthaelt\nb\n--- datei karte.json\n{\"x\": 1}\n--- umgebung\nDHRT_FRAMES=1\n";
+
+    #[test]
+    fn vorher_zwischen_nochmal_in_ihrer_reihenfolge() {
+        let s = parsen(concat!(
+            "=== zwei laeufe\n",
+            "PRINT 1\n",
+            "--- vorher\n",
+            "PRINT \"vor\"\n",
+            "--- nochmal in b\n",
+            "zwei.dh\n",
+            "--- zwischen\n",
+            "PRINT \"mitte\"\n",
+            "--- nochmal\n",
+            "--- nachher\n",
+            "PRINT \"danach\"\n",
+            "--- erwartet\n",
+            "danach\n",
+        )).unwrap();
+        let f = &s[0];
+        assert_eq!(f.vorher.as_deref(), Some("PRINT \"vor\""));
+        assert_eq!(f.schritte, vec![
+            Schritt::Nochmal { ordner: Some("b".into()), argumente: vec!["zwei.dh".into()] },
+            Schritt::Zwischen("PRINT \"mitte\"".into()),
+            Schritt::Nochmal { ordner: None, argumente: vec![] },
+        ]);
+        assert_eq!(f.nachher.as_deref(), Some("PRINT \"danach\""));
+        assert!(parsen("=== x\nPRINT 1\n--- nochmal b\n").unwrap_err().contains("nochmal in ORDNER"));
+        assert!(parsen("=== x\nPRINT 1\n--- vorher\nPRINT 1\n--- vorher\nPRINT 2\n").unwrap_err().contains("schon"));
+    }
 
     #[test]
     fn streichen_und_nachher() {

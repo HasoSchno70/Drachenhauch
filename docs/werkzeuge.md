@@ -147,6 +147,9 @@ Division durch Null
 | `--- ohne datei` | keine Zeile des Blocks steht darin (eine Datei, die es nicht gibt, enthält auch nichts) |
 | `--- streichen ZEILE` | nur mit `--- programm`: die erste Zeile, die genau so lautet, fällt aus der Kopie weg (z. B. `WINDOW_MAXIMIZE()`, damit Klicks feste Lagen treffen); fehlt sie, ist der Fall ein Fehler. Mehrere Blöcke erlaubt |
 | `--- nachher` | ein zweites Programm, das nach dem Lauf im Fallordner läuft — seine Ausgabe wird statt der des Hauptlaufs mit `erwartet`/`enthaelt`/`fehler` verglichen. Damit liest Drachenhauch selbst, was ein Werkzeug gesichert hat (`JSON_*`, `ANIM_FSM_LOAD`, `PROCESS_START("dhrt", "--check", …)`). Der Hauptlauf muss vorher sauber enden; höchstens einer je Fall |
+| `--- vorher` | ein Hilfsprogramm in Drachenhauch **vor** dem Hauptlauf, im Fallordner — etwa ein git-Repository anlegen (`PROCESS_START("git", …)`) oder eine Datei vorbereiten, die erst nach einem Commit geändert sein soll; es muss sauber enden. Höchstens einer je Fall |
+| `--- zwischen` | ein Hilfsprogramm **nach** dem Hauptlauf und vor `--- nachher`, im Fallordner — etwa aus dem Bildschirmfoto des ersten Laufs eine Klicklage messen und die Aufnahme für den nächsten schreiben, oder eine Aufnahme wieder löschen |
+| `--- nochmal [in ORDNER]` | das Programm **noch einmal**, mit der Umgebung des Falls; die Zeilen des Blocks sind seine Argumente. Ohne `in` im Fallordner, sonst in diesem Unterordner (er wird angelegt) — für alles, was ein Werkzeug über einen Neustart hinweg behält. `--- zwischen` und `--- nochmal` laufen in der Reihenfolge der Datei; ohne `--- nachher` gelten die Erwartungen dem letzten Lauf |
 
 In `--- umgebung`, `--- argumente` und in Text-Beilagen (`--- datei` ohne
 `base64`) stehen zwei Platzhalter bereit: `{sammlung}` ist der Ordner der

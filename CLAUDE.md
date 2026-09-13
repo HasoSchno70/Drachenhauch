@@ -2875,6 +2875,39 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 37 (2026-09-13):** die Sonderfaelle der IDE ohne Python -- und dafuer
+drei neue Formatstuecke. Was in `tests/test_ide.py` blieb, brauchte mehr als
+EINEN Lauf: zwei IDE-Laeufe hintereinander (Sitzung, Umbruch, Sitzung je
+Projektordner), ein git-Repository VOR dem Lauf oder eine Messung im
+Bildschirmfoto. **`--- vorher`** laesst vor dem Hauptlauf ein Hilfsprogramm in
+Drachenhauch im Fallordner laufen (das Repository: `PROCESS_START("git", ...)`
+init/config/add/commit, danach `WRITEALL` fuer die Aenderung), **`--- zwischen`**
+eins nach dem Hauptlauf (aus dem Foto des ersten Laufs die Mitte des Farbfelds
+messen und die Aufnahme fuer den zweiten schreiben, oder eine Aufnahme mit
+`DELETEFILE` wegnehmen), **`--- nochmal [in ORDNER]`** startet das Programm
+erneut mit der Umgebung des Falls (Blockzeilen = Argumente, ohne `in` im
+Fallordner). `--- zwischen` und `--- nochmal` laufen in der Reihenfolge der
+Datei (`Fall::schritte`), ohne `--- nachher` gilt die Erwartung dem letzten
+Lauf. Im Laeufer geht jeder Programmlauf durch EINEN Aufbau (`befehl`), sonst
+liefe ein zweiter mit anderer Bildzahl; Hilfsprogramme durch `hilfslauf`. Der
+Einschub spielt die Aufnahme nur ab, wenn es sie gibt
+(`IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")`). Die Hervorhebung
+zaehlt ihre Farbbaender jetzt in Drachenhauch (`LOADIMAGE` + `GETPIXEL` gehen
+ohne Fenster). Neue Sammlung `tests/pruef/werkzeug_ide_sonderfaelle.dhtest` (8);
+in `tests/test_ide.py` bleibt **nur das PDF-Listing** -- das pdf-Modul packt
+seine Seiten mit FlateDecode, ein Leser in Drachenhauch saehe den Text nicht.
+**Zwei Gegenproben:** ohne `AUTOMATION_PLAY` fallen alle 6 Faelle mit Aufnahme;
+ohne die `--- nochmal`-Bloecke fallen auch die beiden Sitzungsfaelle, die gar
+keine Aufnahme haben. **Der Fund dieser Stufe kam aus der CI von Stufe 36:**
+auf macOS lieferte "ide uebersetzt ohne befund" `check  0` statt
+`check [] 0`. Die Leseschleife auf `PROCESS_READ$` brach ab, sobald EINE
+Abfrage leer war und der Prozess nicht mehr lief -- das Kind kann aber schon
+beendet sein, bevor sein Lesefaden die letzte Zeile abgelegt hat. Alle 71
+solchen Schleifen in sechs Sammlungen lesen jetzt bis zu fuenf leeren Abfragen
+im Abstand von 30 ms. **Stolperstein:** `EPRINT "text"` ohne Klammern ist ein
+Parse-Fehler, `EPRINT("text")` geht. Rust-Test
+`vorher_zwischen_nochmal_in_ihrer_reihenfolge`.
+
 **Stufe 36 (2026-09-13):** die Staende 13 bis 25 der IDE ohne Python -- 58
 Faelle nach `tests/pruef/werkzeug_ide_13_25.dhtest`; in `tests/test_ide.py`
 bleiben **9 Sonderfaelle** (PDF-Listing mit PyMuPDF, Sitzung/Umbruch/Sitzung
