@@ -90,6 +90,56 @@ pub struct Fall {
     /// `--- stderr`: jede Zeile des Blocks steht in der Fehlerausgabe -- fuer
     /// EPRINT, ohne dass das Programm abbrechen muss (das verlangt `fehler`).
     pub stderr_enthaelt: Vec<String>,
+    /// `--- programm pfad [nach MARKE]`: der Fall laeuft ein VORHANDENES
+    /// Programm (Pfad relativ zur Sammlung) -- die IDE, ein Editor. Der
+    /// Quelltext des Falls wird hinter der ersten Zeile MARKE eingeschoben
+    /// (ohne Marke davor); so kommt `AUTOMATION_PLAY` hinein, oder ein Aufruf
+    /// der Unterprogramme, die geprueft werden sollen.
+    pub programm: Option<String>,
+    pub nach: Option<String>,
+    /// `--- inhalt datei` / `--- ohne datei`: nach dem Lauf stehen diese Zeilen
+    /// in der Datei (bzw. keine davon) -- fuer Protokolle und gesicherte Dateien.
+    pub inhalte: Vec<(String, Vec<String>, bool)>,
+}
+
+/// Den Quelltext eines Falls in ein vorhandenes Programm einschieben: hinter
+/// der ersten Zeile, die (ohne Leerraum am Rand) MARKE ist, ohne Marke an den
+/// Anfang. Eine Marke, die es nicht gibt, ist ein Fehler -- sonst liefe das
+/// Programm ohne den Einschub und der Fall pruefte etwas anderes als gedacht.
+pub fn einschieben(programm: &str, nach: Option<&str>, einschub: &str) -> Result<String, String> {
+    if einschub.trim().is_empty() { return Ok(programm.to_string()); }
+    let marke = match nach {
+        None => return Ok(format!("{}\n{}", einschub, programm)),
+        Some(m) => m.trim(),
+    };
+    let mut aus = String::with_capacity(programm.len() + einschub.len() + 2);
+    let mut gefunden = false;
+    for z in programm.split_inclusive('\n') {
+        aus.push_str(z);
+        if !gefunden && z.trim() == marke {
+            gefunden = true;
+            if !z.ends_with('\n') { aus.push('\n'); }
+            aus.push_str(einschub);
+            aus.push('\n');
+        }
+    }
+    if !gefunden { return Err(format!("die Marke '{}' steht nicht im Programm", marke)); }
+    Ok(aus)
+}
+
+/// `{sammlung}` und `{fall}` in Umgebung und Argumenten ersetzen.
+pub fn platzhalter(text: &str, sammlung: &str, fall: &str) -> String {
+    text.replace("{sammlung}", sammlung).replace("{fall}", fall)
+}
+
+/// Die Proben aus `--- inhalt`/`--- ohne` an einem Dateitext.
+pub fn inhalt_pruefen(datei: &str, text: &str, zeilen: &[String], ohne: bool) -> Result<(), String> {
+    for z in zeilen {
+        let da = text.contains(z.as_str());
+        if ohne && da { return Err(format!("'{}' sollte NICHT in {} stehen", z, datei)); }
+        if !ohne && !da { return Err(format!("'{}' sollte in {} stehen", z, datei)); }
+    }
+    Ok(())
 }
 
 /// Passt die Liste aus `--- system` zu dieser Maschine? `posix` heisst
@@ -445,7 +495,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -512,6 +562,9 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             }
             Abschnitt::Argumente => f.argumente.extend(puffer.iter().filter(|z| !z.trim().is_empty()).map(|z| z.trim().to_string())),
             Abschnitt::Stderr => f.stderr_enthaelt.extend(puffer.iter().filter(|z| !z.trim().is_empty()).cloned()),
+            // `datei_b64` traegt hier "ohne" -- derselbe Merker fuer die Art des Blocks.
+            Abschnitt::Inhalt => f.inhalte.push((datei_name.to_string(),
+                puffer.iter().filter(|z| !z.trim().is_empty()).cloned().collect(), datei_b64)),
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
             Abschnitt::Bild => {
                 let bp = f.bild.get_or_insert_with(BildPruefung::default);
@@ -605,6 +658,25 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                 }
                 "argumente" => Abschnitt::Argumente,
                 "stderr" => Abschnitt::Stderr,
+                "programm" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- programm' braucht einen Pfad", nr + 1)); }
+                    // `arg` ist schon beschnitten -- ein "nach" ohne Marke steht dann am Ende.
+                    if arg.ends_with(" nach") { return Err(format!("Zeile {}: hinter 'nach' fehlt die Marke", nr + 1)); }
+                    let (pfad, marke) = match arg.split_once(" nach ") {
+                        Some((p, m)) => (p.trim(), Some(m.trim().to_string())),
+                        None => (arg, None),
+                    };
+                    if marke.as_deref() == Some("") { return Err(format!("Zeile {}: hinter 'nach' fehlt die Marke", nr + 1)); }
+                    f.programm = Some(pfad.to_string());
+                    f.nach = marke;
+                    Abschnitt::Verzeichnis        // kein Inhalt
+                }
+                "inhalt" | "ohne" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- {}' braucht einen Dateinamen", nr + 1, wort)); }
+                    datei_name = arg.to_string();
+                    datei_b64 = wort == "ohne";
+                    Abschnitt::Inhalt
+                }
                 "rueckgabe" => {
                     f.rueckgabe = Some(arg.parse::<i32>().map_err(|_| format!("Zeile {}: '--- rueckgabe' braucht eine ganze Zahl, nicht '{}'", nr + 1, arg))?);
                     Abschnitt::Verzeichnis        // kein Inhalt
@@ -624,7 +696,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, inhalt, ohne)", nr + 1, other)),
             };
             continue;
         }
@@ -632,7 +704,8 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
     }
     if let Some(f) = faelle.last_mut() { abschliessen(f, abschnitt, &mut puffer, &datei_name, datei_b64)?; }
     for f in &faelle {
-        if f.quelle.trim().is_empty() {
+        // Ein Fall mit `--- programm` darf ohne eigenen Quelltext sein.
+        if f.quelle.trim().is_empty() && f.programm.is_none() {
             return Err(format!("Zeile {}: der Fall '{}' hat keinen Quelltext", f.zeile, f.name));
         }
     }
@@ -752,6 +825,35 @@ mod tests {
     use super::*;
 
     const BEISPIEL: &str = "' Kopf\n=== eins\nPRINT 1\n--- erwartet\n1\n=== zwei\nPRINT 1 \\ 0\n--- fehler\nDivision\n=== drei\nPRINT \"a\"\nPRINT \"b\"\n--- enthaelt\nb\n--- datei karte.json\n{\"x\": 1}\n--- umgebung\nDHRT_FRAMES=1\n";
+
+    #[test]
+    fn programm_einschub_und_dateiproben() {
+        let f = parsen("=== ide\nAUTOMATION_PLAY(\"ev.txt\")\n--- programm ../../ide/ide.dh nach SETFPS(60)\n--- umgebung\nDH_IDE_WURZEL={sammlung}/../..\n--- inhalt _programm/ide.log\nbereit\n\n--- ohne _programm/ide.log\nfehler\n=== leer\n--- programm werkzeug.dh\n").unwrap();
+        assert_eq!(f[0].programm.as_deref(), Some("../../ide/ide.dh"));
+        assert_eq!(f[0].nach.as_deref(), Some("SETFPS(60)"));
+        assert_eq!(f[0].quelle, "AUTOMATION_PLAY(\"ev.txt\")");
+        assert_eq!(f[0].inhalte, vec![
+            ("_programm/ide.log".to_string(), vec!["bereit".to_string()], false),
+            ("_programm/ide.log".to_string(), vec!["fehler".to_string()], true)]);
+        assert_eq!(f[1].programm.as_deref(), Some("werkzeug.dh"));
+        assert!(f[1].nach.is_none());
+        // Ohne --- programm bleibt ein leerer Fall ein Fehler.
+        assert!(parsen("=== a\n--- erwartet\n1\n").is_err());
+        assert!(parsen("=== a\n--- programm x.dh nach \n").is_err());
+
+        let p = "IMPORT \"gui\"\r\nSETFPS(60)\r\nPRINT 1\r\n";
+        assert_eq!(einschieben(p, Some("SETFPS(60)"), "X").unwrap(), "IMPORT \"gui\"\r\nSETFPS(60)\r\nX\nPRINT 1\r\n");
+        assert_eq!(einschieben(p, None, "X").unwrap(), format!("X\n{}", p));
+        assert_eq!(einschieben(p, Some("GIBTS(0)"), "").unwrap(), p);
+        assert!(einschieben(p, Some("GIBTS(0)"), "X").unwrap_err().contains("GIBTS(0)"));
+        // nur die ERSTE Marke
+        assert_eq!(einschieben("A\nA\n", Some("A"), "X").unwrap(), "A\nX\nA\n");
+
+        assert_eq!(platzhalter("{sammlung}/x {fall}", "S", "F"), "S/x F");
+        assert!(inhalt_pruefen("d", "bereit\nende", &["bereit".into()], false).is_ok());
+        assert!(inhalt_pruefen("d", "bereit", &["ende".into()], false).unwrap_err().contains("sollte in d"));
+        assert!(inhalt_pruefen("d", "bereit", &["bereit".into()], true).unwrap_err().contains("NICHT"));
+    }
 
     #[test]
     fn liest_faelle_und_abschnitte() {

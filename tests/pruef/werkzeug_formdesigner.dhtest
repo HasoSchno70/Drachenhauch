@@ -1,0 +1,383 @@
+' Der Form-Designer in Drachenhauch (examples/197_form_designer.dh) -- ohne
+' Python geprueft. Bis Stufe 32 stand das in tests/test_pilot_formdesigner.py.
+'
+' Zwei Arten von Faellen:
+' - mit ECHTEN Klicks: der Einschub hinter SETFPS(60) spielt eine Aufnahme ab
+'   (Beilage _programm/ev.txt -- der Designer laeuft in _programm/, also
+'   liegen dort auch Aufnahme und Protokoll);
+' - ueber seine Unterprogramme: der Einschub hinter protokoll("bereit") ruft
+'   Inspektor, GB-Code oder Sichern direkt und endet mit EXIT(0).
+' Die gesicherte Datei liegt im Fallordner (das Argument ist relativ zum Ort
+' des Aufrufers). Format: docs/werkzeuge.md, dhrt test.
+'
+' Lagen: Palette-Zeile 0 bei y = 26 + 56 + 2 + 11 = 95, die Form ab (270, 60).
+' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
+--- seriell
+
+=== ablegen und sichern
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=120
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+# Palette 'Button', auf die Form bei (250,180) -> Raster 248,184, Strg+S
+c 12
+e 20 7 60 95 0 0
+e 21 7 60 95 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 520 240 0 0
+e 41 7 520 240 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 70 2 341 0 0 0
+e 70 2 83 0 0 0
+e 72 1 83 0 0 0
+e 72 1 341 0 0 0
+
+--- inhalt _programm/fd.log
+palette button
+neu button 248 184
+gesichert
+--- inhalt neu.dhform
+"kind": "button"
+"name": "button1"
+"x": 248
+"y": 184
+"w": 100
+"h": 28
+"text": "Button"
+
+=== verschieben und zweimal rueckgaengig
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=200
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+# ablegen bei (100,100) -> 104,104; 80 px nach rechts ziehen; Strg+Z, Strg+Z, Strg+S
+c 29
+e 20 7 60 95 0 0
+e 21 7 60 95 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 370 160 0 0
+e 41 7 370 160 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 70 7 410 170 0 0
+e 71 7 410 170 0 0
+e 71 6 0 0 0 0
+e 72 7 423 170 0 0
+e 73 7 436 170 0 0
+e 74 7 450 170 0 0
+e 75 7 463 170 0 0
+e 76 7 476 170 0 0
+e 77 7 490 170 0 0
+e 79 5 0 0 0 0
+e 110 2 341 0 0 0
+e 110 2 90 0 0 0
+e 112 1 90 0 0 0
+e 112 1 341 0 0 0
+e 130 2 341 0 0 0
+e 130 2 90 0 0 0
+e 132 1 90 0 0 0
+e 132 1 341 0 0 0
+e 150 2 341 0 0 0
+e 150 2 83 0 0 0
+e 152 1 83 0 0 0
+
+--- inhalt _programm/fd.log
+neu button 104 104
+bewegt 0 184 104 100 28
+rueckgaengig 1
+rueckgaengig 0
+--- ohne neu.dhform
+"kind"
+
+=== f5 schreibt das laufprogramm
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=200
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+# ablegen, Strg+S, F5
+c 14
+e 20 7 60 95 0 0
+e 21 7 60 95 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 370 160 0 0
+e 41 7 370 160 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 70 2 341 0 0 0
+e 70 2 83 0 0 0
+e 72 1 83 0 0 0
+e 72 1 341 0 0 0
+e 90 2 294 0 0 0
+e 92 1 294 0 0 0
+
+--- inhalt _programm/fd.log
+gestartet
+--- inhalt neu_lauf.dh
+GUI_LOAD("neu.dhform")
+GUI_WINDOW_CHROME(frm, FALSE)
+
+=== eine bestehende form bleibt vollstaendig
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+settings.dhform
+--- umgebung
+DHRT_FRAMES=80
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+# nur Strg+S
+c 4
+e 20 2 341 0 0 0
+e 20 2 83 0 0 0
+e 22 1 83 0 0 0
+e 22 1 341 0 0 0
+
+--- datei settings.dhform
+{"title": "Einstellungen", "x": 230, "y": 120, "w": 360, "h": 250, "movable": true, "closable": true, "visible": true,
+ "code": {"on_save": "PRINT \"gesichert\""},
+ "menus": [{"label": "Datei", "in_bar": true, "items": [{"label": "Ende"}]}],
+ "widgets": [
+  {"kind": "label", "x": 20, "y": 40, "w": 70, "h": 16, "text": "Name:", "color": 16777215},
+  {"kind": "textinput", "x": 95, "y": 36, "w": 225, "h": 26, "placeholder": "dein Name"},
+  {"kind": "checkbox", "x": 20, "y": 78, "w": 16, "h": 16, "text": "Sound an", "checked": true, "on_change": "on_sound"},
+  {"kind": "label", "x": 20, "y": 112, "w": 80, "h": 16, "text": "Lautstaerke", "color": 16777215},
+  {"kind": "slider", "x": 120, "y": 112, "w": 200, "h": 14, "min": 0.0, "max": 100.0, "value": 70.0, "on_change": "on_volume"},
+  {"kind": "label", "x": 20, "y": 146, "w": 100, "h": 16, "text": "Schwierigkeit", "color": 16777215},
+  {"kind": "dropdown", "x": 140, "y": 142, "w": 180, "h": 24, "items": ["Einfach", "Mittel", "Schwer"], "sel": 1, "on_change": "on_diff"},
+  {"kind": "button", "x": 20, "y": 196, "w": 145, "h": 32, "text": "Speichern", "on_click": "on_save"},
+  {"kind": "button", "x": 175, "y": 196, "w": 145, "h": 32, "text": "Abbrechen", "on_click": "on_cancel"}
+ ]}
+--- inhalt _programm/fd.log
+geladen 9
+gesichert
+--- inhalt settings.dhform
+PRINT \"gesichert\"
+"label": "Datei"
+"label": "Ende"
+"Schwierigkeit"
+"Abbrechen"
+
+=== gb-code baut jedes control ohne gui_load
+' Ein Formular mit JEDER Art der Laufzeit. Der Code muss uebersetzen UND
+' laufen -- eine Signatur, die nicht passt, faellt erst dort auf.
+WRITEALL("code.dh", gbCode$())
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "code.dh")
+DIM bis AS INTEGER : bis = MILLIS() + 60000
+DIM befund AS STRING : befund = ""
+WHILE MILLIS() < bis
+    DIM z AS STRING : z = PROCESS_READ$(pc)
+    IF z <> "" THEN befund = befund + z
+    IF z = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+WEND
+PRINT "check " + befund
+DIM pb AS INTEGER : pb = PROCESS_START("dhrt", "bild", "code.dh", "code.png", "3")
+bis = MILLIS() + 60000
+WHILE PROCESS_RUNNING(pb) AND MILLIS() < bis
+WEND
+PRINT "lauf " + STR$(PROCESS_CODE(pb)) + " " + STR$(FILEEXISTS("code.png"))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+alles.dhform
+--- datei alles.dhform
+{"title": "Alles", "x": 0, "y": 0, "w": 480, "h": 400, "code": {"klick": "PRINT \"geklickt\""}, "widgets": [
+ {"kind": "button", "name": "button1", "x": 8, "y": 8, "w": 80, "h": 50, "text": "Los", "on_click": "klick", "tooltip": "sagt \"hallo\""},
+ {"kind": "label", "name": "label1", "x": 98, "y": 8, "w": 80, "h": 50},
+ {"kind": "checkbox", "name": "checkbox1", "x": 188, "y": 8, "w": 80, "h": 50},
+ {"kind": "slider", "name": "slider1", "x": 278, "y": 8, "w": 80, "h": 50},
+ {"kind": "textinput", "name": "textinput1", "x": 368, "y": 8, "w": 80, "h": 50},
+ {"kind": "panel", "name": "panel1", "x": 8, "y": 68, "w": 80, "h": 50},
+ {"kind": "table", "name": "table1", "x": 98, "y": 68, "w": 80, "h": 50, "table": {"headers": ["A", "B", "C"], "col_widths": [30, 30, 30], "zellmodus": true, "col_edit": [true, false, true], "col_type": ["text", "ganz", "auswahl"], "col_choices": [[], [], ["Rot", "Gruen"]]}},
+ {"kind": "radio", "name": "radio1", "x": 188, "y": 68, "w": 80, "h": 50},
+ {"kind": "dropdown", "name": "dropdown1", "x": 278, "y": 68, "w": 80, "h": 50, "items": ["eins", "zwei"]},
+ {"kind": "progress", "name": "progress1", "x": 368, "y": 68, "w": 80, "h": 50},
+ {"kind": "listbox", "name": "listbox1", "x": 8, "y": 128, "w": 80, "h": 50, "items": ["eins", "zwei"]},
+ {"kind": "image", "name": "image1", "x": 98, "y": 128, "w": 80, "h": 50},
+ {"kind": "canvas", "name": "canvas1", "x": 188, "y": 128, "w": 80, "h": 50},
+ {"kind": "separator", "name": "separator1", "x": 278, "y": 128, "w": 80, "h": 50},
+ {"kind": "groupbox", "name": "groupbox1", "x": 368, "y": 128, "w": 80, "h": 50},
+ {"kind": "textarea", "name": "textarea1", "x": 8, "y": 188, "w": 80, "h": 50},
+ {"kind": "spinner", "name": "spinner1", "x": 98, "y": 188, "w": 80, "h": 50},
+ {"kind": "splitter", "name": "splitter1", "x": 188, "y": 188, "w": 80, "h": 50},
+ {"kind": "toolbar", "name": "toolbar1", "x": 278, "y": 188, "w": 80, "h": 50},
+ {"kind": "tree", "name": "tree1", "x": 368, "y": 188, "w": 80, "h": 50},
+ {"kind": "toggle", "name": "toggle1", "x": 8, "y": 248, "w": 80, "h": 50},
+ {"kind": "knob", "name": "knob1", "x": 98, "y": 248, "w": 80, "h": 50},
+ {"kind": "colorpicker", "name": "colorpicker1", "x": 188, "y": 248, "w": 80, "h": 50},
+ {"kind": "datepicker", "name": "datepicker1", "x": 278, "y": 248, "w": 80, "h": 50},
+ {"kind": "layout", "name": "layout1", "x": 368, "y": 248, "w": 80, "h": 50},
+ {"kind": "tabcontrol", "name": "tabcontrol1", "x": 8, "y": 308, "w": 80, "h": 50},
+ {"kind": "richtext", "name": "richtext1", "x": 98, "y": 308, "w": 80, "h": 50, "text": "# Titel\n\nZeile"},
+ {"kind": "timepicker", "name": "timepicker1", "x": 188, "y": 308, "w": 80, "h": 50},
+ {"kind": "statusbar", "name": "statusbar1", "x": 278, "y": 308, "w": 80, "h": 50},
+ {"kind": "breadcrumb", "name": "breadcrumb1", "x": 368, "y": 308, "w": 80, "h": 50}
+]}
+--- enthaelt
+check []
+lauf 0 TRUE
+--- inhalt _programm/code.dh
+GUI_TABLE_SET(table1, "zellmodus", 1)
+GUI_TABLE_COL_CHOICES(table1, 2, ["Rot", "Gruen"])
+GUI_ON_CLICK(button1, klick)
+PRINT "geklickt"
+image1' uebersprungen
+GUI_RICHTEXT(frm, 98, 308, 80, 50, !"# Titel\n\nZeile")
+--- ohne _programm/code.dh
+GUI_LOAD(
+
+=== inspektor schreibt spalten und zellmodus
+auswahl = 0
+inspektorFuellen()
+GUI_SET_TEXT(aSpalten, "Name; Menge; Farbe")
+GUI_SET_CHECKED(cbZellen, TRUE)
+inspektorUebernehmen()
+PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.table"))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+t.dhform
+--- datei t.dhform
+{"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [{"kind": "table", "name": "table1", "x": 16, "y": 16, "w": 320, "h": 140}]}
+--- enthaelt
+"headers":["Name","Menge","Farbe"]
+"zellmodus":true
+
+=== inspektor laesst die gittereinstellungen stehen
+' Waehlen und Uebernehmen ohne Aenderung: alles laeuft durch die Felder und
+' kommt gleich wieder heraus.
+auswahl = 0
+inspektorFuellen()
+inspektorUebernehmen()
+PRINT JSON_STRINGIFY(teilbaum(doc, "widgets.0.table"))
+EXIT(0)
+--- programm ../../examples/197_form_designer.dh nach protokoll("bereit")
+--- argumente
+t.dhform
+--- datei t.dhform
+{"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [{"kind": "table", "name": "table1", "x": 16, "y": 16, "w": 320, "h": 140,
+ "table": {"headers": ["A", "B", "C"], "col_widths": [80, 60, 90], "zellmodus": true, "col_edit": [true, false, true], "col_type": ["text", "ganz", "auswahl"], "col_choices": [[], [], ["Rot", "Gruen"]]}}]}
+--- enthaelt
+"headers":["A","B","C"]
+"col_widths":[80,60,90]
+"zellmodus":true
+"col_edit":[true,false,true]
+"col_type":["text","ganz","auswahl"]
+"col_choices":[[],[],["Rot","Gruen"]]
+
+=== die palette kennt jede art der laufzeit
+' Der Designer bot 25 Arten an, die Laufzeit kann 30 -- dieselbe Drift, die
+' der Qt-Designer 2026-08-31 hatte. Gemessen an Kind::from_str in gui.rs.
+DIM Q AS STRING : Q = CHR$(34)
+DIM arten AS ARRAY OF STRING : arten = []
+DIM teile AS ARRAY OF STRING
+DIM k AS INTEGER
+DIM zeile AS STRING
+DIM drin AS BOOLEAN : drin = FALSE
+FOR EACH zeile IN READLINES(ARG$(0))
+    IF "fn from_str(s: &str) -> Option<Kind>" IN zeile THEN drin = TRUE
+    IF drin AND "_ => return None" IN zeile THEN drin = FALSE
+    IF drin THEN
+        teile = SPLIT$(zeile, Q)
+        FOR k = 1 TO LEN(teile) - 2 STEP 2
+            IF LEFT$(TRIM$(teile[k + 1]), 8) = "=> Kind:" THEN ARRAY_PUSH(arten, teile[k])
+        NEXT
+    END IF
+NEXT
+DIM palette AS ARRAY OF STRING : palette = []
+FOR EACH zeile IN READLINES(ARG$(1))
+    IF LEFT$(zeile, 9) = "palette(" + Q THEN
+        teile = SPLIT$(zeile, Q)
+        ARRAY_PUSH(palette, teile[1])
+    END IF
+NEXT
+DIM fehlen AS STRING : fehlen = ""
+DIM a AS STRING
+FOR EACH a IN arten
+    IF ARRAY_INDEXOF(palette, a) < 0 THEN fehlen = fehlen + " " + a
+NEXT
+PRINT "arten " + STR$(LEN(arten))
+PRINT "fehlen[" + fehlen + "]"
+PRINT "gitter " + STR$(ARRAY_INDEXOF(palette, "grid") >= 0)
+--- argumente
+{sammlung}/../../rust/drachenhauch_runtime/src/gui.rs
+{sammlung}/../../examples/197_form_designer.dh
+--- erwartet
+arten 30
+fehlen[]
+gitter TRUE
+
+=== entwurfsmodus nimmt den widgets die eingabe
+' GUI_WINDOW_DESIGN: ein Klick auf den Knopf loest NICHTS aus, GUI_HIT_TEST
+' findet ihn trotzdem. Gegenprobe im naechsten Fall.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Ok", 20, 20, 100, 30)
+GUI_WINDOW_DESIGN(w, TRUE)
+DIM f AS INTEGER
+DIM traf AS BOOLEAN : traf = FALSE
+FOR f = 1 TO 8
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN traf = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT traf ; " " ; GUI_HIT_TEST(60, 35) = b
+--- datei ev.txt
+c 4
+e 2 7 60 35 0 0
+e 3 7 60 35 0 0
+e 3 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+FALSE TRUE
+
+=== ohne entwurfsmodus trifft derselbe klick
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Ok", 20, 20, 100, 30)
+GUI_WINDOW_DESIGN(w, FALSE)
+DIM f AS INTEGER
+DIM traf AS BOOLEAN : traf = FALSE
+FOR f = 1 TO 8
+    GUI_UPDATE()
+    IF GUI_CLICKED(b) THEN traf = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+NEXT
+PRINT traf ; " " ; GUI_HIT_TEST(60, 35) = b
+--- datei ev.txt
+c 4
+e 2 7 60 35 0 0
+e 3 7 60 35 0 0
+e 3 6 0 0 0 0
+e 5 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=10
+--- erwartet
+TRUE TRUE

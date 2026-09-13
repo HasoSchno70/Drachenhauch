@@ -805,6 +805,14 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
     if faelle.is_empty() { return Ok((0, 0, 0, Vec::new())); }
     let ohne_grafik = std::env::var("DHRT_OHNE_GRAFIK").is_ok();
     let stamm = pfad.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| "sammlung".into());
+    // Ordner der Sammlung, absolut: `--- programm` ist relativ dazu, und
+    // `{sammlung}` meint ihn -- der Fall laeuft in einem ANDEREN Ordner.
+    let sammlung_dir = {
+        let eltern = pfad.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+        if eltern.is_absolute() { eltern } else {
+            std::env::current_dir().map(|c| c.join(&eltern)).unwrap_or(eltern)
+        }
+    };
     let wurzel = std::env::temp_dir().join(format!("dhrt_test_{}_{}", std::process::id(), stamm));
     let _ = std::fs::create_dir_all(&wurzel);
     let faelle = Arc::new(faelle);
@@ -819,7 +827,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
     let mut griffe = Vec::new();
     for _ in 0..faeden {
         let (faelle, naechster, ergebnisse) = (faelle.clone(), naechster.clone(), ergebnisse.clone());
-        let (exe, wurzel) = (exe.to_path_buf(), wurzel.clone());
+        let (exe, wurzel, sammlung_dir) = (exe.to_path_buf(), wurzel.clone(), sammlung_dir.clone());
         griffe.push(std::thread::spawn(move || loop {
             let i = { let mut n = naechster.lock().unwrap(); let i = *n; *n += 1; i };
             if i >= faelle.len() { break; }
@@ -832,7 +840,29 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         return Ok(pruefsammlung::Ergebnis::Uebersprungen(format!("nur unter {}", systeme.join("/"))));
                     }
                 }
-                std::fs::write(dir.join("fall.dh"), &f.quelle).map_err(|e| e.to_string())?;
+                // Ein vorhandenes Programm (`--- programm`) wird mit dem
+                // Einschub nach `_programm/` kopiert -- ein Ordner mit `_`
+                // vorn, den die Werkzeuge beim Durchsuchen des Projekts
+                // uebergehen; der Fallordner selbst ist dann das "Projekt".
+                let quelle_pfad = match &f.programm {
+                    Some(p) => {
+                        let orig = sammlung_dir.join(p);
+                        let text = std::fs::read_to_string(&orig)
+                            .map_err(|e| format!("--- programm {}: nicht lesbar ({})", p, e))?;
+                        let neu = pruefsammlung::einschieben(&text, f.nach.as_deref(), &f.quelle)?;
+                        let pdir = dir.join("_programm");
+                        let _ = std::fs::create_dir_all(&pdir);
+                        let name = orig.file_name().map(|n| n.to_os_string()).unwrap_or_else(|| "programm.dh".into());
+                        let ziel = pdir.join(name);
+                        std::fs::write(&ziel, neu).map_err(|e| e.to_string())?;
+                        ziel
+                    }
+                    None => {
+                        std::fs::write(dir.join("fall.dh"), &f.quelle).map_err(|e| e.to_string())?;
+                        dir.join("fall.dh")
+                    }
+                };
+                let (s_text, f_text) = (sammlung_dir.to_string_lossy().into_owned(), dir.to_string_lossy().into_owned());
                 for name in &f.verzeichnisse { let _ = std::fs::create_dir_all(dir.join(name)); }
                 for (name, inhalt) in &f.dateien {
                     let ziel = dir.join(name);
@@ -840,8 +870,13 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     std::fs::write(&ziel, inhalt).map_err(|e| e.to_string())?;
                 }
                 let mut cmd = std::process::Command::new(&exe);
-                cmd.arg("run").arg(dir.join("fall.dh"));
-                if !f.argumente.is_empty() { cmd.arg("--").args(&f.argumente); }
+                cmd.arg("run").arg(&quelle_pfad);
+                // Der Fallordner ist der Ort des Aufrufers (DHRT_START_DIR) --
+                // ein Werkzeug, das ein Projekt oeffnet, sieht dann ihn.
+                cmd.current_dir(&dir);
+                if !f.argumente.is_empty() {
+                    cmd.arg("--").args(f.argumente.iter().map(|a| pruefsammlung::platzhalter(a, &s_text, &f_text)));
+                }
                 cmd.stdin(if f.eingabe.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() })
                     .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped())
                     // Ein Fall ist ein Programm fuer sich: was die Umgebung des
@@ -863,7 +898,7 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         cmd.env("DHRT_FRAMES", "2");
                     }
                 }
-                for (k, v) in &f.umgebung { cmd.env(k, v); }
+                for (k, v) in &f.umgebung { cmd.env(k, pruefsammlung::platzhalter(v, &s_text, &f_text)); }
                 let mut kind = cmd.spawn().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
                 if let Some(bytes) = &f.eingabe {
                     // Die Eingabe ganz hineinschreiben und das Ende schliessen --
@@ -889,6 +924,22 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         Err(BildFehler::Lesen(m)) => pruefsammlung::Ergebnis::Fehl(format!("Bild '{}': {}", pfad.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), m)),
                     },
                     _ => erg,
+                };
+                // `--- inhalt`/`--- ohne`: Dateien, die das Programm geschrieben hat.
+                let erg = match erg {
+                    pruefsammlung::Ergebnis::Ok => {
+                        let mut e = pruefsammlung::Ergebnis::Ok;
+                        for (name, zeilen, ohne) in &f.inhalte {
+                            let r = match std::fs::read(dir.join(name)) {
+                                Err(_) if *ohne => Ok(()),
+                                Err(_) => Err(format!("Datei '{}' wurde nicht geschrieben", name)),
+                                Ok(b) => pruefsammlung::inhalt_pruefen(name, &String::from_utf8_lossy(&b), zeilen, *ohne),
+                            };
+                            if let Err(m) = r { e = pruefsammlung::Ergebnis::Fehl(m); break; }
+                        }
+                        e
+                    }
+                    andere => andere,
                 };
                 // `--- ton datei.wav`: die WAV liest der Laeufer selbst (kein raylib noetig).
                 Ok::<_, String>(match (&erg, &f.ton) {

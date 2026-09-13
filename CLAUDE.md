@@ -2607,7 +2607,7 @@ sonst waren Strg+S/F5 nach dem ersten Ablegen tot; (3) `JSON_TYPE` sagt nur
 `number` -- beim Kopieren eines Teilbaums eine ganze Zahl ganz lassen, sonst
 liest `GUI_FROM_JSON` aus `48.0` kein x mehr; (4) `CONST RASTER` und
 `FUNCTION raster` kollidieren (Namen sind schreibungsunabhaengig). Tests
-`tests/test_pilot_formdesigner.py` (echte Klicks ueber die Wiedergabe:
+`tests/pruef/werkzeug_formdesigner.dhtest` (seit Stufe 32; bis dahin test_pilot_formdesigner.py -- echte Klicks ueber die Wiedergabe:
 Palette -> Form -> Strg+S, Datei gelesen mit `FormDoc.load`, dem Modell des
 Qt-Designers; Ziehen + zweimal Strg+Z; F5-Laufprogramm uebersetzt;
 Entwurfsmodus mit Gegenprobe). In der IDE unter Werkzeuge, im Installer
@@ -2873,6 +2873,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 32 (2026-09-13):** Werkzeuge ohne Python pruefen. Die Tests der
+Drachenhauch-Werkzeuge (IDE, Form-Designer, Anim-FSM, Notenblatt) hingen an
+pytest, weil nur Python ein VORHANDENES Programm mit eingeschobener Aufnahme
+starten und danach seine Dateien lesen konnte. `.dhtest` kann das jetzt:
+**`--- programm pfad [nach MARKE]`** (Pfad relativ zur Sammlung; der
+Quelltext des Falls wird hinter der ersten Zeile MARKE eingeschoben,
+`pruefsammlung::einschieben`, eine fehlende Marke ist ein Fehler), **`---
+inhalt datei`** / **`--- ohne datei`** (Zeilen in einer Datei nach dem Lauf)
+und die Platzhalter **`{sammlung}`/`{fall}`** in Umgebung und Argumenten. Der
+Laeufer kopiert das Programm nach `_programm/` im Fallordner (ein `_`-Ordner,
+den die Werkzeuge beim Durchsuchen uebergehen) und startet das Kind JETZT MIT
+dem Fallordner als Arbeitsordner -- er ist damit `DHRT_START_DIR`, also das
+"Projekt" eines Werkzeugs. Zwei Wege je Werkzeug: echte Klicks (Einschub
+`AUTOMATION_PLAY` hinter `SETFPS(60)`) oder direkt ueber seine
+Unterprogramme (Einschub hinter der Bereit-Zeile, endet mit `EXIT(0)`) --
+der zweite prueft die Logik ohne Bildschirmlagen. **Als Beleg umgezogen:**
+test_pilot_formdesigner.py -> `tests/pruef/werkzeug_formdesigner.dhtest`
+(10 Faelle; der GB-Code-Fall ruft `gbCode$()`, laesst `dhrt --check` und
+`dhrt bild` als Prozesse laufen; der Palette-Fall liest gui.rs mit
+`READLINES`). Stolperstein beim Schreiben: `READALL$` nimmt ein FILE-Handle,
+keinen Pfad -- fuer Pfade `READLINES`. Rust-Test
+`programm_einschub_und_dateiproben`.
+
 **Stufe 31 (2026-09-13):** der Hinweis des Nutzers -- er hatte in Stufe 30
 eine Aenderung am Qt-Designer gesehen; **Python soll komplett wegfallen**.
 Stufe 30 hatte das Kaestchen "Zellmodus" noch in `formdesigner_qt.py`
@@ -2890,7 +2913,7 @@ als Aufruf, ohne `GUI_LOAD`, Texte mit Umbruch als `!"..."`, sich selbst
 messende Konstruktoren mit `GUI_SET_BOUNDS` hinterher, das Bild
 uebersprungen. Die IDE: **eine `.dhform` oeffnet den Designer** (`werkzeugMit`,
 `dhrt run 197 -- datei`), als Text ueber die Befehlspalette ("Formular als
-Text oeffnen"). Tests: vier neue in `tests/test_pilot_formdesigner.py` --
+Text oeffnen"). Tests: vier neue in test_pilot_formdesigner.py (seit Stufe 32 in `tests/pruef/werkzeug_formdesigner.dhtest`) --
 lesen mit `json`, nicht mit dem Qt-Modell; der GB-Code-Test legt JEDE Art an
 und laesst den Code durch `--check` und einen Lauf; zwei in `tests/test_ide.py`.
 
