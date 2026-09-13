@@ -531,31 +531,39 @@ DIM miBefehle AS INTEGER : miBefehle = GUI_MENU_ITEM(mHilfe, "Eingebaute Befehle
 DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
 
 ' --- Werkzeugleiste ---------------------------------------------------
-' Was man am haeufigsten braucht, als Sinnbild unter dem Menue. Die Bilder
-' kommen von symbolBild -- denselben, die schon in den Menues stehen; sie
-' werden aber erst WEITER UNTEN gesetzt (GUI_SET_ICON), weil die Farben
-' dafuer CONSTs sind, die es hier oben noch nicht gibt.
-DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, 10, 32)
-DIM wzNamen AS ARRAY OF STRING
-wzNamen = ["neu", "oeffnen", "sichern", "|", "start", "stopp", "pruefen", "debug", _
-           "|", "suchen", "handbuch", "einstellungen"]
-DIM wzBefehle AS ARRAY OF STRING
-wzBefehle = ["neu", "oeffnen", "sichern", "", "start", "stopp", "pruefen", "debuggen", _
-             "", "suchen", "handbuch", "einstellungen"]
-DIM wzTipps AS ARRAY OF STRING
-wzTipps = ["Neue Datei (Strg+N)", "Oeffnen (Strg+O)", "Sichern (Strg+S)", "", _
-           "Starten (F5)", "Stoppen (Umschalt+F5)", "Pruefen (Umschalt+F7)", "Debuggen (F7)", "", _
-           "Suchen (Strg+F)", "Handbuch (F1)", "Einstellungen (Strg+U)"]
-DIM wzKnoepfe[16] AS GUI_WIDGET
-DIM wzi AS INTEGER
-FOR wzi = 0 TO LEN(wzNamen) - 1
-    IF wzNamen[wzi] = "|" THEN
-        wzKnoepfe[wzi] = GUI_LABEL(win, "|", 0, 0)
-    ELSE
-        wzKnoepfe[wzi] = GUI_ICON_BUTTON(win, 0, 0, 28, 28, -1)
-        GUI_TOOLTIP(wzKnoepfe[wzi], wzTipps[wzi])
-    END IF
-NEXT
+' Was man am haeufigsten braucht, als Sinnbild unter dem Menue. Seit Stand
+' 26 ist das EIN Widget der Laufzeit: die Leiste verteilt ihre Knoepfe
+' selbst und zeichnet die Sinnbilder in ihrer Groesse -- vorher lagen hier
+' zwoelf Einzelknoepfe mit 16-Punkt-Bildern, die krumm auf 20 gestreckt
+' wurden, und ein Text-"|" als Trenner. Der Befehl je Eintrag steht in
+' wzBefehle unter derselben Nummer.
+DIM leiste AS GUI_WIDGET : leiste = GUI_TOOLBAR(win, 0, 0, 10, 34)
+DIM wzBefehle AS ARRAY OF STRING : wzBefehle = []
+SUB wzKnopf(sinnbild AS STRING, tip AS STRING, bef AS STRING)
+    GUI_TOOLBAR_ADD(leiste, sinnbild, tip)
+    ARRAY_PUSH(wzBefehle, bef)
+END SUB
+SUB wzTrenner()
+    GUI_TOOLBAR_SEPARATOR(leiste)
+    ARRAY_PUSH(wzBefehle, "")
+END SUB
+wzKnopf("neu", "Neue Datei (Strg+N)", "neu")
+wzKnopf("oeffnen", "Oeffnen (Strg+O)", "oeffnen")
+wzKnopf("sichern", "Sichern (Strg+S)", "sichern")
+wzTrenner()
+wzKnopf("start", "Starten (F5)", "start")
+wzKnopf("stopp", "Stoppen (Umschalt+F5)", "stopp")
+wzKnopf("debug", "Debuggen (F7)", "debuggen")
+wzKnopf("pruefen", "Pruefen (Umschalt+F7)", "pruefen")
+wzTrenner()
+wzKnopf("suchen", "Suchen (Strg+F)", "suchen")
+wzKnopf("umbruch", "Zeilenumbruch (Alt+Z)", "umbruch")
+DIM wzUmbruch AS INTEGER : wzUmbruch = LEN(wzBefehle) - 1
+GUI_TOOLBAR_CHECKABLE(leiste, wzUmbruch, TRUE)
+GUI_TOOLBAR_SPACER(leiste)
+ARRAY_PUSH(wzBefehle, "")
+wzKnopf("handbuch", "Handbuch (F1)", "handbuch")
+wzKnopf("einstellungen", "Einstellungen (Strg+U)", "einstellungen")
 
 ' --- Kacheln mit Vorschaubildern --------------------------------------
 ' Acht Beispiele, die zeigen, was die Sprache kann -- mit einem BILD
@@ -1097,19 +1105,7 @@ SUB layout()
     DIM leisteH AS INTEGER : leisteH = 0
     IF leisteAn THEN leisteH = 34
     GUI_SET_VISIBLE(leiste, leisteAn)
-    DIM wzx AS INTEGER : wzx = 8
-    DIM wzk AS INTEGER
-    FOR wzk = 0 TO LEN(wzNamen) - 1
-        GUI_SET_VISIBLE(wzKnoepfe[wzk], leisteAn)
-        IF wzNamen[wzk] = "|" THEN
-            GUI_SET_BOUNDS(wzKnoepfe[wzk], wzx + 4, oben + 5, 2, 22)
-            wzx = wzx + 14
-        ELSE
-            GUI_SET_BOUNDS(wzKnoepfe[wzk], wzx, oben + 3, 28, 28)
-            wzx = wzx + 30
-        END IF
-    NEXT
-    IF leisteAn THEN GUI_SET_BOUNDS(leiste, 4, oben, w - 8, 32)
+    IF leisteAn THEN GUI_SET_BOUNDS(leiste, 0, oben - 4, w, 36)
     DIM statusH AS INTEGER : statusH = 24
     DIM eingabeH AS INTEGER : eingabeH = 30
     DIM mitteH AS INTEGER : mitteH = hi - oben - hoeheUnten - statusH - eingabeH - 12 - leisteH
@@ -1302,6 +1298,9 @@ END SUB
 SUB umbruchSetzen(an AS BOOLEAN)
     umbruchAn = an
     GUI_MENU_CHECK(miUmbruch, an)
+    ' Der Knopf in der Leiste kippt sich beim Klick selbst -- gesetzt wird er
+    ' trotzdem hier, damit Menue, Kuerzel und Einstellungen ihn mitnehmen.
+    GUI_TOOLBAR_SET_CHECKED(leiste, wzUmbruch, an)
     DIM i AS INTEGER
     FOR i = 0 TO tabAnzahl - 1
         GUI_TEXTAREA_SET(tabFelder[i], "umbruch", IIF(an, 1, 0))
@@ -7157,91 +7156,19 @@ SUB befehl(k AS STRING)
 END SUB
 
 ' --- Symbole in den Menues --------------------------------------------
-' Gezeichnet statt geladen: ein Ordner voller PNGs waere eine zweite Sache,
-' die beim Installieren mitkommen muss, und 16x16 aus Rechtecken und
-' Strichen ist keine Kunst. IMAGE_NEW ohne Farbe ist DURCHSICHTIG -- ueber
-' eine Farbe waere das gar nicht auszudruecken, weil Deckkraft 0 als
-' deckend gilt.
-CONST SYM_A = &H2BC4E8        ' Akzent
-CONST SYM_G = &H7E8E9E        ' ruhiges Grau -- liest sich auf hellem UND dunklem Thema
-CONST SYM_R = &HE06060        ' Warnfarbe
-
-FUNCTION symbolBild(art AS STRING) AS IMAGE
-    DIM b AS IMAGE : b = IMAGE_NEW(16, 16)
-    ' Loecher werden GESTOCHEN (IMAGE_CLEAR schreibt Durchsichtigkeit) und
-    ' nicht mit der Hintergrundfarbe uebermalt: die Symbole sollen auf dem
-    ' hellen Thema so aussehen wie auf dem dunklen. Mit einer Farbe waere das
-    ' gar nicht auszudruecken -- Deckkraft 0 gilt in Drachenhauch als deckend.
-    SELECT CASE art
-        CASE "neu"
-            IMAGE_DRAW_RECT(b, 3, 1, 10, 14, SYM_G)
-            IMAGE_CLEAR(b, 4, 2, 8, 12)
-            IMAGE_DRAW_RECT(b, 7, 4, 2, 8, SYM_A) : IMAGE_DRAW_RECT(b, 4, 7, 8, 2, SYM_A)
-        CASE "oeffnen"
-            IMAGE_DRAW_RECT(b, 1, 3, 6, 3, SYM_A)
-            IMAGE_DRAW_RECT(b, 1, 5, 14, 9, SYM_A)
-            IMAGE_CLEAR(b, 3, 8, 10, 4)
-        CASE "sichern"
-            IMAGE_DRAW_RECT(b, 2, 2, 12, 12, SYM_A)
-            ' Schieber und Aufkleber muessen INNEN liegen: reichen sie an den
-            ' Rand, bleiben nur zwei Balken stehen und die Diskette liest sich
-            ' als Buchstabe H.
-            IMAGE_CLEAR(b, 5, 3, 6, 4)
-            IMAGE_CLEAR(b, 4, 10, 8, 3)
-        CASE "suchen"
-            IMAGE_DRAW_CIRCLE(b, 6, 6, 5, SYM_G)
-            IMAGE_CLEAR(b, 4, 4, 5, 5)
-            IMAGE_DRAW_LINE(b, 10, 10, 14, 14, SYM_G)
-            IMAGE_DRAW_LINE(b, 11, 10, 15, 14, SYM_G)
-        CASE "start"
-            ' Ein Dreieck aus senkrechten Strichen -- IMAGE_ hat keines.
-            DIM k AS INTEGER
-            FOR k = 0 TO 6
-                IMAGE_DRAW_RECT(b, 4 + k, 2 + k, 1, 12 - 2 * k, &H60D080)
-            NEXT
-        CASE "stopp"
-            IMAGE_DRAW_RECT(b, 4, 4, 8, 8, SYM_R)
-        CASE "debug"
-            IMAGE_DRAW_CIRCLE(b, 8, 9, 4, SYM_A)
-            IMAGE_DRAW_LINE(b, 2, 6, 5, 8, SYM_A) : IMAGE_DRAW_LINE(b, 14, 6, 11, 8, SYM_A)
-            IMAGE_DRAW_LINE(b, 2, 13, 5, 11, SYM_A) : IMAGE_DRAW_LINE(b, 14, 13, 11, 11, SYM_A)
-        CASE "haltepunkt"
-            IMAGE_DRAW_CIRCLE(b, 8, 8, 5, SYM_R)
-        CASE "pruefen"
-            IMAGE_DRAW_LINE(b, 3, 8, 6, 12, &H60D080)
-            IMAGE_DRAW_LINE(b, 4, 8, 7, 12, &H60D080)
-            IMAGE_DRAW_LINE(b, 6, 12, 13, 4, &H60D080)
-            IMAGE_DRAW_LINE(b, 7, 12, 14, 4, &H60D080)
-        CASE "handbuch"
-            IMAGE_DRAW_RECT(b, 2, 2, 12, 12, SYM_G)
-            IMAGE_CLEAR(b, 3, 3, 4, 10)
-            IMAGE_CLEAR(b, 9, 3, 4, 10)
-        CASE "drucken"
-            IMAGE_DRAW_RECT(b, 4, 1, 8, 4, SYM_G)
-            IMAGE_DRAW_RECT(b, 1, 5, 14, 6, SYM_A)
-            IMAGE_DRAW_RECT(b, 4, 10, 8, 5, SYM_G)
-        CASE "werkzeug"
-            IMAGE_DRAW_CIRCLE(b, 8, 8, 6, SYM_G)
-            IMAGE_CLEAR(b, 6, 6, 5, 5)
-        CASE "export"
-            IMAGE_DRAW_RECT(b, 2, 9, 12, 5, SYM_G)
-            IMAGE_DRAW_RECT(b, 7, 2, 2, 6, SYM_A)
-            IMAGE_DRAW_LINE(b, 4, 5, 8, 1, SYM_A) : IMAGE_DRAW_LINE(b, 12, 5, 8, 1, SYM_A)
-        CASE ELSE
-            IMAGE_DRAW_CIRCLE(b, 8, 8, 3, SYM_G)
-    END SELECT
-    RETURN b
-END FUNCTION
-
+' Seit Stand 26 dieselben eingebauten Sinnbilder wie in der Werkzeugleiste
+' (GUI_MENU_ICON mit einem NAMEN). Bis dahin malte die IDE hier 16x16-Bilder
+' aus Rechtecken -- in eigenen Farben, die zu keinem Thema passten, und in
+' einer Groesse, die die Leiste krumm strecken musste.
 SUB symbol(eintrag AS INTEGER, art AS STRING)
-    GUI_MENU_ICON(eintrag, symbolBild(art))
+    GUI_MENU_ICON(eintrag, art)
 END SUB
 
 symbol(miNeu, "neu") : symbol(miOeffnen, "oeffnen") : symbol(miSchnell, "oeffnen")
 symbol(miSichern, "sichern") : symbol(miSichernAls, "sichern")
-symbol(miDrucken, "drucken") : symbol(miPdf, "drucken")
+symbol(miDrucken, "drucken") : symbol(miPdf, "export")
 symbol(miSuchen, "suchen") : symbol(miWeiter, "suchen") : symbol(miErsetzen, "suchen")
-symbol(miProjekt, "suchen") : symbol(miTodo, "suchen") : symbol(miBlame, "handbuch")
+symbol(miProjekt, "suchen") : symbol(miTodo, "suchen") : symbol(miBlame, "info")
 symbol(miStart, "start") : symbol(miStopp, "stopp") : symbol(miPruefen, "pruefen")
 symbol(miDebug, "debug") : symbol(miHaltepunkt, "haltepunkt") : symbol(miBedingung, "haltepunkt")
 symbol(miExport, "export")
@@ -7249,13 +7176,7 @@ symbol(miWzSfx, "werkzeug") : symbol(miWzPartikel, "werkzeug") : symbol(miWzTile
 symbol(miWzSprite, "werkzeug") : symbol(miWzTracker, "werkzeug") : symbol(miWzForm, "werkzeug")
 symbol(miWzAnim, "werkzeug") : symbol(miWzNoten, "werkzeug")
 symbol(miHandbuch, "handbuch") : symbol(miKuerzel, "handbuch")
-
-' Die Werkzeugleiste bekommt dieselben Sinnbilder -- erst HIER, weil
-' symbolBild die Farb-CONSTs braucht, die weiter oben noch nicht standen.
-DIM wzs AS INTEGER
-FOR wzs = 0 TO LEN(wzNamen) - 1
-    IF wzNamen[wzs] <> "|" THEN GUI_SET_ICON(wzKnoepfe[wzs], symbolBild(wzNamen[wzs]))
-NEXT
+symbol(miUmbruch, "umbruch") : symbol(miLeiste, "menue")
 
 ' Vorschaubilder, die es schon gibt, sofort zeigen.
 DIM kvs AS INTEGER
@@ -7402,10 +7323,13 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(miLinien) THEN befehl("linien")
     IF GUI_CLICKED(miLeiste) THEN befehl("leiste")
     ' Werkzeugleiste: jeder Knopf ruft denselben Befehl wie sein Menuepunkt.
-    DIM wzc AS INTEGER
-    FOR wzc = 0 TO LEN(wzBefehle) - 1
-        IF wzBefehle[wzc] <> "" AND GUI_CLICKED(wzKnoepfe[wzc]) THEN befehl(wzBefehle[wzc])
-    NEXT
+    DIM wzc AS INTEGER : wzc = GUI_TOOLBAR_CLICKED(leiste)
+    IF wzc >= 0 THEN
+        IF wzBefehle[wzc] <> "" THEN
+            protokoll("leistenknopf " + wzBefehle[wzc])
+            befehl(wzBefehle[wzc])
+        END IF
+    END IF
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO KACHEL_MAX - 1

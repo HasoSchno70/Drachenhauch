@@ -10,6 +10,7 @@ Braucht ein Fenster und speist Tasten ein -- `_BRAUCHT_GRAFIK` und `_SERIELL`.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -1111,16 +1112,39 @@ def test_zwei_dateien_vergleichen(tmp_path):
 
 # --------------------------------------------------------------- Stufe 11
 
+# Die Werkzeugleiste ist seit Stand 26 EIN Widget der Laufzeit (GUI_TOOLBAR
+# mit Eintraegen): 36 hoch ab dem Inhalt (56 Punkte unter Menue und Reitern),
+# Knoepfe 30 breit mit 2 Punkten Luft, Trenner 11, erster Eintrag bei x = 4.
+def _leiste_x(*breiten):
+    """Mitte des Eintrags nach den genannten Vorgaengern (30 = Knopf, 11 = Trenner)."""
+    return 4 + sum(b + 2 for b in breiten) + 15
+
+
+LEISTE_Y = 56 + 18
+
+
 def test_werkzeugleiste_startet_das_programm(tmp_path):
     """Der Knopf in der Leiste ruft denselben Befehl wie sein Menuepunkt.
-    Geklickt wird auf das fuenfte Sinnbild (Starten) -- die Leiste beginnt
-    bei x = 8, jeder Knopf ist 30 breit, dazu ein Trenner von 14."""
+    Geklickt wird auf Starten: neu, oeffnen, sichern, Trenner, dann start."""
     quelle = _datei(tmp_path, 'PRINT "aus der Leiste"\n')
-    # neu(8) oeffnen(38) sichern(68) |(98..112) start(112)
-    ev = _maus(40, 126, 76)
+    ev = _maus(40, _leiste_x(30, 30, 30, 11), LEISTE_Y)
     log = _ide(tmp_path, quelle, frames=260, events=ev)
+    assert "leistenknopf start" in log, log
     assert any(z.startswith("gestartet ") for z in log), log
     assert "beendet 0" in log, log
+
+
+def test_der_umbruch_knopf_kippt_mit_dem_menue(tmp_path):
+    """Der Knopf fuer den Zeilenumbruch ist kippbar: ein Klick schaltet den
+    Umbruch ein, das Menue zieht mit -- und die Einstellung steht danach in
+    der Konfiguration, wie beim Weg ueber Alt+Z."""
+    quelle = _datei(tmp_path, "PRINT 1\n")
+    # neu oeffnen sichern | start stopp debug pruefen | suchen UMBRUCH
+    x = _leiste_x(30, 30, 30, 11, 30, 30, 30, 30, 11, 30)
+    log = _ide(tmp_path, quelle, frames=160, events=_maus(40, x, LEISTE_Y))
+    assert "leistenknopf umbruch" in log, log
+    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
+    assert konfig.get("umbruch") is True, konfig
 
 
 def test_die_leiste_laesst_sich_abschalten(tmp_path):
