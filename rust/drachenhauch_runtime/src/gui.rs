@@ -230,7 +230,7 @@ pub enum Kind {
     Toggle, Knob,
     Toolbar, Tree,
     ColorPicker, DatePicker,
-    Layout, TabControl,
+    Layout, TabControl, RichText, TimePicker,
 }
 
 impl Kind {
@@ -246,6 +246,7 @@ impl Kind {
             Kind::Toggle => "toggle", Kind::Knob => "knob",
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
             Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
+            Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -260,6 +261,7 @@ impl Kind {
             "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
             "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
+            "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
             _ => return None,
         })
     }
@@ -948,6 +950,151 @@ struct TabCtlState {
     kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
 }
 
+/// Gesetzter Text (Kind::RichText): ein Widget, das Markdown SETZT statt es
+/// nur anzuzeigen -- Ueberschriften, Absaetze mit Umbruch, Aufzaehlungen,
+/// Codebloecke, Tabellen mit echten Spalten, Zitate, Linien und Verweise.
+///
+/// **Gesetzt wird in GUI_UPDATE, nicht beim Zeichnen.** Nur dort kommen
+/// Graphics (zum Messen) und der Schreibzugriff zusammen, und nur so kostet
+/// ein Dokument mit zweitausend Zeilen seinen Satz EINMAL statt in jedem
+/// Bild. Neu gesetzt wird, wenn sich Quelle, Breite, Schriftgroesse oder
+/// Massstab geaendert haben -- `stand` haelt genau das fest.
+#[derive(Default)]
+struct RichState {
+    quelle: String,
+    zeilen: Vec<RtZeile>,
+    inhalt_h: i32,
+    stand: (usize, i32, i32, i32),   // (Quelllaenge, Breite, Basisgroesse, Massstab*100)
+    scroll: i32,
+    basis: i32,          // 0 = Groesse des Widgets/Themas
+    code_font: i64,      // -1 = dieselbe Schrift wie der Fliesstext
+    ziele: Vec<String>,  // Verweise, von den Laeufen ueber ihren Index benannt
+    geklickt: String,    // in diesem Bild angeklickter Verweis (transient)
+}
+
+/// Eine gesetzte Zeile. `grund` faerbt die ganze Zeile (Codeblock), `linie`
+/// ist ein waagerechter Strich (`---`), `balken` der senkrechte Strich eines
+/// Zitats.
+#[derive(Default, Clone)]
+struct RtZeile {
+    y: i32,
+    h: i32,
+    grund: bool,
+    linie: bool,
+    balken: i32,      // x des Zitatstrichs, -1 = keiner
+    laeufe: Vec<RtLauf>,
+}
+
+/// Ein Stueck Text mit eigener Gestalt. `rolle`: 0 Text, 1 gedaempft,
+/// 2 Akzent (Ueberschrift/Verweis), 3 Code. `link` = Index in `ziele`, -1 = keiner.
+#[derive(Default, Clone)]
+struct RtLauf {
+    x: i32,
+    breite: i32,
+    text: String,
+    groesse: i32,
+    rolle: u8,
+    fett: bool,
+    code: bool,
+    link: i32,
+}
+
+/// Ein Wort mit seiner Gestalt -- die Zwischenform zwischen Auszeichnung und
+/// Satz. Umgebrochen wird an Wortgrenzen, also ist das Wort die Einheit.
+#[derive(Clone)]
+struct RtWort {
+    text: String,
+    fett: bool,
+    code: bool,
+    rolle: u8,
+    link: i32,
+    /// Kein Leerzeichen davor -- `**fett**bar` ist EIN Wort in zwei
+    /// Gestalten, und eine Luecke dazwischen saehe aus wie ein Tippfehler.
+    kleben: bool,
+}
+
+/// Eine Zeile Markdown in Woerter mit Gestalt zerlegen: `**fett**`,
+/// `*kursiv*`, `` `code` `` und `[Text](Ziel)`.
+///
+/// **Kursiv wird gedaempft, nicht geneigt**, und fett zeichnet die
+/// Zeichenroutine zweimal um einen Punkt versetzt: raylib kann aus einer
+/// Schrift keine zweite Strichstaerke rechnen, und eine fette Schriftdatei
+/// mitzuliefern ist nicht Sache der Laufzeit. Das steht so auch in der Doku
+/// -- eine Auszeichnung, die man nicht sieht, waere schlimmer als eine, die
+/// anders aussieht als erwartet.
+fn rt_inline(z: &str, grund_rolle: u8, ziele: &mut Vec<String>) -> Vec<RtWort> {
+    let zeichen: Vec<char> = z.chars().collect();
+    let mut raus: Vec<RtWort> = Vec::new();
+    let (mut fett, mut kursiv, mut code) = (false, false, false);
+    let mut link = -1i32;
+    let mut puffer = String::new();
+    // Ob der zuletzt verarbeitete Text mit einer Luecke endete. Das
+    // Leerzeichen VOR einer Auszeichnung steht am Ende des vorigen Puffers
+    // und faellt beim Zerlegen weg -- ohne diesen Merker wuerde aus
+    // `Ein **fetter** Anfang` ein `Einfetter Anfang`.
+    let mut letzte_luecke = true;
+    let mut i = 0usize;
+    // Was sich angesammelt hat, als Woerter anhaengen.
+    macro_rules! spuelen {
+        ($raus:expr, $puffer:expr) => {
+            if !$puffer.is_empty() {
+                let rolle = if link >= 0 { 2 } else if code { 3 } else if kursiv { 1 } else { grund_rolle };
+                let anhaengen = !$puffer.starts_with(' ') && !$raus.is_empty() && !letzte_luecke;
+                letzte_luecke = $puffer.ends_with(' ');
+                let mut erstes = true;
+                for w in $puffer.split(' ') {
+                    if w.is_empty() { continue; }
+                    $raus.push(RtWort { text: w.to_string(), fett, code, rolle, link,
+                                        kleben: erstes && anhaengen });
+                    erstes = false;
+                }
+                $puffer.clear();
+            }
+        };
+    }
+    while i < zeichen.len() {
+        let rest: String = zeichen[i..].iter().collect();
+        if rest.starts_with("**") && !code {
+            spuelen!(raus, puffer); fett = !fett; i += 2; continue;
+        }
+        if (zeichen[i] == '*' || zeichen[i] == '_') && !code {
+            // Ein `_` MITTEN im Wort ist ein Namensteil (`gui_update`), keine
+            // Auszeichnung -- sonst faerbte jeder Bezeichner den halben Absatz.
+            let am_rand = i == 0 || zeichen[i - 1] == ' ' || zeichen[i - 1] == '(';
+            let schliesst = kursiv;
+            if am_rand || schliesst {
+                spuelen!(raus, puffer); kursiv = !kursiv; i += 1; continue;
+            }
+        }
+        if zeichen[i] == '`' {
+            spuelen!(raus, puffer); code = !code; i += 1; continue;
+        }
+        if zeichen[i] == '[' && !code {
+            // [Text](Ziel) -- nur, wenn beides vollstaendig dasteht.
+            if let Some(zu) = zeichen[i..].iter().position(|&c| c == ']') {
+                if zeichen.get(i + zu + 1) == Some(&'(') {
+                    if let Some(ende) = zeichen[i + zu + 2..].iter().position(|&c| c == ')') {
+                        spuelen!(raus, puffer);
+                        let text: String = zeichen[i + 1..i + zu].iter().collect();
+                        let ziel: String = zeichen[i + zu + 2..i + zu + 2 + ende].iter().collect();
+                        ziele.push(ziel);
+                        link = ziele.len() as i32 - 1;
+                        puffer.push_str(&text);
+                        spuelen!(raus, puffer);
+                        link = -1;
+                        i += zu + 2 + ende + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        puffer.push(zeichen[i]);
+        i += 1;
+    }
+    spuelen!(raus, puffer);
+    raus
+}
+
 /// Ein laufender Zug: beginnt mit dem Druck auf ein ziehbares Widget, wird
 /// nach 5 px Bewegung `aktiv` -- vorher ist es ein Klick.
 struct DragState {
@@ -1096,6 +1243,8 @@ pub struct Widget {
     tabctl: Option<Box<TabCtlState>>,
     tc_von: i32,
     tc_seite: i32,
+    /// Gesetzter Text (Kind::RichText).
+    rich: Option<Box<RichState>>,
     vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
     unbestimmt: bool,    // Progress: laufendes Band statt Wert
     bildmodus: u8,       // Image: 0 strecken, 1 einpassen, 2 fuellen, 3 mitte, 4 kacheln
@@ -1258,6 +1407,10 @@ pub struct Widget {
     alpha_an: bool,
     // Nur DatePicker: Jahr, Monat (1..12), Tag.
     datum: [i32; 3],
+    /// Uhrzeit (Kind::TimePicker): Stunde, Minute, Sekunde -- und ob die
+    /// Sekunden ueberhaupt dastehen.
+    zeit: [i32; 3],
+    zeit_sek: bool,
     // Grenzen (leer = keine) und erster Tag der Woche (0 = Montag).
     datum_min: Option<[i32; 3]>,
     datum_max: Option<[i32; 3]>,
@@ -2451,7 +2604,8 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
-            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1, vert: false, unbestimmt: false, bildmodus: 0,
+            panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1,
+            rich: None, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
             umbruch: false, bind: String::new(), form: String::new(),
             min_w: 0, min_h: 0, nat_w: w, nat_h: h, regeln: Vec::new(), fehler: String::new(), fehler_label: -1,
@@ -2480,6 +2634,7 @@ impl Gui {
             spalten_start: (-1, -1),
             hsv: [0.0, 1.0, 1.0], alpha: 255, alpha_an: false,
             datum: [2000, 1, 1], datum_min: None, datum_max: None, wochenbeginn: 0,
+            zeit: [12, 0, 0], zeit_sek: false,
             step: 1.0,
             align: -1, wrap: false, passwort: false, nur_lesen: false, maxlaenge: 0, zahlen: 0,
             entered: false, on_enter: None, undo: Vec::new(), redo: Vec::new(), undo_zeit: -10.0,
@@ -3975,7 +4130,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let ni = vis[row as usize];
         let level = t.nodes[ni].level;
         let has_children = t.nodes[ni].has_children;
-        let toggle_x = ax + 4 + level * self.sk(TREE_INDENT);
+        let kast_w = self.tree_kast_w(t);
+        let toggle_x = ax + 4 + kast_w + level * self.sk(TREE_INDENT);
         let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + self.sk(TREE_TOGGLE_W);
         let kaestchen = t.kaestchen;
         let (kx, ks) = self.tree_kast(ax, level);
@@ -4053,6 +4209,468 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    // --- Uhrzeit (GUI_TIMEPICKER) -------------------------------------------
+    /// Das Gegenstueck zum Datumswaehler. Drei Felder mit Pfeilen: Stunde,
+    /// Minute und (auf Wunsch) Sekunde.
+    ///
+    /// **Nach aussen gilt EIN Format, `HH:MM:SS` wie `TIME$()`** -- auch wenn
+    /// die Sekunden gar nicht dastehen. Zwei Formate waeren dieselbe
+    /// Stolperfalle, die beim Datum vermieden wurde; hinein darf `HH:MM`.
+    pub fn timepicker(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::TimePicker, x, y, self.tp_breite(w, false), if h > 0 { h } else { self.sk(34) });
+        wd.zeit = [12, 0, 0];
+        wd.sel = 1;   // die Minute ist das, was man meistens dreht
+        wd.step = 1.0;
+        self.add_widget(win, "GUI_TIMEPICKER", wd)
+    }
+    /// Breite, die drei bzw. zwei Felder brauchen (0 = Vorgabe).
+    fn tp_breite(&self, w: i32, sek: bool) -> i32 {
+        if w > 0 { return w; }
+        self.sk(if sek { 150 } else { 104 })
+    }
+    fn tp_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::TimePicker { return Err(format!("{}: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)", fn_)); }
+        Ok(w)
+    }
+    pub fn time_get(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_TIME")?;
+        if w.kind != Kind::TimePicker { return Err("GUI_TIME: Widget ist kein Uhrzeitwaehler (GUI_TIMEPICKER)".into()); }
+        Ok(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]))
+    }
+    pub fn set_time(&mut self, h: i64, t: &str) -> Result<(), String> {
+        let teile: Vec<&str> = t.trim().split(':').collect();
+        if teile.len() < 2 || teile.len() > 3 {
+            return Err(format!("GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)", t));
+        }
+        let mut z = [0i32; 3];
+        for (k, teil) in teile.iter().enumerate() {
+            z[k] = teil.trim().parse::<i32>()
+                .map_err(|_| format!("GUI_SET_TIME: '{}' ist keine Uhrzeit (HH:MM oder HH:MM:SS)", t))?;
+        }
+        if z[0] > 23 || z[1] > 59 || z[2] > 59 || z.iter().any(|&x| x < 0) {
+            return Err(format!("GUI_SET_TIME: '{}' liegt ausserhalb von 00:00:00 bis 23:59:59", t));
+        }
+        self.tp_mut(h, "GUI_SET_TIME")?.zeit = z;
+        Ok(())
+    }
+    pub fn timepicker_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let breite_vorgabe = self.tp_breite(0, false);
+        let breite_sek = self.tp_breite(0, true);
+        let w = self.tp_mut(h, "GUI_TIMEPICKER_SET")?;
+        match key.to_lowercase().as_str() {
+            "sekunden" | "seconds" => {
+                let an = wert != 0.0;
+                // Die Breite wandert mit, solange sie die Vorgabe ist -- wer
+                // sie selbst gesetzt hat, behaelt seine.
+                if w.zeit_sek != an && (w.w == breite_vorgabe || w.w == breite_sek) {
+                    w.w = if an { breite_sek } else { breite_vorgabe };
+                    w.bw = w.w; w.nat_w = w.w;
+                }
+                w.zeit_sek = an;
+            }
+            // Schrittweite der MINUTE (5 heisst: in Fuenferschritten).
+            "schritt" | "step" => w.step = wert.max(1.0),
+            _ => return Err(format!(
+                "GUI_TIMEPICKER_SET: unbekannte Einstellung '{}' (gueltig: sekunden, schritt)", key)),
+        }
+        Ok(())
+    }
+    /// Lage der Felder: (x des ersten, Breite eines Feldes, Zahl der Felder).
+    /// EINE Quelle fuer Zeichnen und Treffertest.
+    fn tp_geom(&self, w: &Widget, ax: i32, breite: i32) -> (i32, i32, usize) {
+        let n = if w.zeit_sek { 3 } else { 2 };
+        let luecke = self.sk(10);
+        let fw = ((breite - luecke * (n as i32 - 1)) / n as i32).max(self.sk(24));
+        (ax, fw + luecke, n)
+    }
+    /// Einen Teil der Uhrzeit verstellen (mit Ueberlauf in den naechsten).
+    fn tp_dreh(&mut self, wi: usize, i: usize, teil: usize, richtung: i32) {
+        let w = &mut self.windows[wi].widgets[i];
+        let schritt = if teil == 1 { w.step.max(1.0) as i32 } else { 1 };
+        let grenze = if teil == 0 { 24 } else { 60 };
+        let neu = w.zeit[teil] + richtung * schritt;
+        // Umlaufen statt anschlagen: wer von 00 aus rueckwaerts dreht, will
+        // 23 sehen und nicht dasselbe noch einmal.
+        w.zeit[teil] = ((neu % grenze) + grenze) % grenze;
+        let f = w.on_change.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    fn tp_press(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let (ax, ay, breite, h) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let (x0, schritt, n) = self.tp_geom(&self.windows[wi].widgets[i], ax, breite);
+        let teil = (((mx - x0) / schritt.max(1)) as usize).min(n - 1);
+        self.windows[wi].widgets[i].sel = teil as i32;
+        // Obere Haelfte hoch, untere runter -- dieselbe Geste wie am Zahlenfeld.
+        let hoch = my < ay + h / 2;
+        self.tp_dreh(wi, i, teil, if hoch { 1 } else { -1 });
+    }
+
+    // --- Gesetzter Text (GUI_RICHTEXT) --------------------------------------
+    /// Ein Widget, das Markdown SETZT. Bis Stand 25 blieb einem Programm nur,
+    /// den Text selbst auf eine Zeichenflaeche zu malen -- die IDE tat das
+    /// mit 180 Zeilen und konnte dabei weder fett noch Tabellenspalten noch
+    /// anklickbare Verweise.
+    pub fn richtext(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, text: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::RichText, x, y, w, h);
+        wd.rich = Some(Box::new(RichState { quelle: text, code_font: -1, ..Default::default() }));
+        self.add_widget(win, "GUI_RICHTEXT", wd)
+    }
+    fn rt_mut(&mut self, h: i64, fn_: &str) -> Result<&mut RichState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::RichText { return Err(format!("{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)", fn_)); }
+        Ok(w.rich.as_mut().unwrap())
+    }
+    fn rt_ref(&self, h: i64, fn_: &str) -> Result<&RichState, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::RichText { return Err(format!("{}: Widget ist kein gesetzter Text (GUI_RICHTEXT)", fn_)); }
+        Ok(w.rich.as_ref().unwrap())
+    }
+    pub fn richtext_set_text(&mut self, h: i64, text: String) -> Result<(), String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_SET_TEXT")?;
+        r.quelle = text;
+        r.scroll = 0;
+        // Der Satz gehoert zum ALTEN Text -- `stand` zuruecksetzen heisst
+        // "beim naechsten GUI_UPDATE neu setzen".
+        r.stand = (usize::MAX, 0, 0, 0);
+        Ok(())
+    }
+    pub fn richtext_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_SET")?;
+        match key.to_lowercase().as_str() {
+            "groesse" | "size" => { r.basis = wert.max(0.0) as i32; r.stand = (usize::MAX, 0, 0, 0); }
+            "codeschrift" | "code_font" => { r.code_font = wert as i64; r.stand = (usize::MAX, 0, 0, 0); }
+            _ => return Err(format!(
+                "GUI_RICHTEXT_SET: unbekannte Einstellung '{}' (gueltig: groesse, codeschrift)", key)),
+        }
+        Ok(())
+    }
+    pub fn richtext_scroll(&mut self, h: i64, y: i64) -> Result<(), String> {
+        let hoehe = self.wdg(h, "GUI_RICHTEXT_SCROLL")?.h;
+        let r = self.rt_mut(h, "GUI_RICHTEXT_SCROLL")?;
+        let max = (r.inhalt_h - hoehe).max(0);
+        r.scroll = (y as i32).clamp(0, max);
+        Ok(())
+    }
+    pub fn richtext_scroll_get(&self, h: i64) -> Result<i64, String> {
+        Ok(self.rt_ref(h, "GUI_RICHTEXT_SCROLL_GET")?.scroll as i64)
+    }
+    pub fn richtext_height(&self, h: i64) -> Result<i64, String> {
+        Ok(self.rt_ref(h, "GUI_RICHTEXT_HEIGHT")?.inhalt_h as i64)
+    }
+    /// Der in diesem Bild angeklickte Verweis -- transient wie GUI_CLICKED.
+    pub fn richtext_link(&self, h: i64) -> Result<String, String> {
+        Ok(self.rt_ref(h, "GUI_RICHTEXT_LINK")?.geklickt.clone())
+    }
+    /// Zur ersten Zeile rollen, die `text` enthaelt (ohne Ruecksicht auf
+    /// Gross/klein); liefert deren y oder -1. Ohne das muesste ein Programm,
+    /// das im Dokument sucht, den Satz selbst nachrechnen.
+    pub fn richtext_find(&mut self, h: i64, text: &str, ab: i64) -> Result<i64, String> {
+        let hoehe = self.wdg(h, "GUI_RICHTEXT_FIND")?.h;
+        let r = self.rt_mut(h, "GUI_RICHTEXT_FIND")?;
+        let nadel = text.to_lowercase();
+        if nadel.is_empty() { return Ok(-1); }
+        let treffer = r.zeilen.iter().find(|z| {
+            z.y > ab as i32 && z.laeufe.iter().any(|l| l.text.to_lowercase().contains(&nadel))
+        }).map(|z| z.y);
+        match treffer {
+            Some(y) => {
+                let max = (r.inhalt_h - hoehe).max(0);
+                r.scroll = (y - 20).clamp(0, max);
+                Ok(y as i64)
+            }
+            None => Ok(-1),
+        }
+    }
+
+    /// Je Bild: jeden gesetzten Text neu setzen, dessen Quelle, Breite oder
+    /// Schriftgroesse sich geaendert hat. Alles andere bleibt stehen.
+    fn rt_pass(&mut self, g: &Graphics) {
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].kind != Kind::RichText { continue; }
+                let (breite, basis, quell_len) = {
+                    let w = &self.windows[wi].widgets[i];
+                    let r = w.rich.as_ref().unwrap();
+                    let b = if r.basis > 0 { r.basis } else { self.wsize(g, w) };
+                    (w.w, b, r.quelle.chars().count())
+                };
+                let stand = (quell_len, breite, basis, (self.scale * 100.0) as i32);
+                if self.windows[wi].widgets[i].rich.as_ref().unwrap().stand == stand { continue; }
+                self.rt_setzen(g, wi, i, breite, basis);
+                let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
+                r.stand = stand;
+            }
+        }
+    }
+
+    /// Markdown setzen: die Quelle in Zeilen mit Laeufen verwandeln.
+    ///
+    /// Bewusst KEIN vollstaendiger Markdown-Setzer -- Ueberschriften,
+    /// Absaetze, Aufzaehlungen, Codebloecke, Tabellen, Zitate, Linien und
+    /// Verweise. Was er nicht kennt, steht als Text da; ein Dokument darf an
+    /// einer unbekannten Zeile nicht verschwinden.
+    fn rt_setzen(&mut self, g: &Graphics, wi: usize, idx: usize, breite: i32, basis: i32) {
+        let quelle = self.windows[wi].widgets[idx].rich.as_ref().unwrap().quelle.clone();
+        let code_font = self.windows[wi].widgets[idx].rich.as_ref().unwrap().code_font;
+        let font = self.wfont(g, &self.windows[wi].widgets[idx]);
+        let rand = self.sk(12);
+        let innen = (breite - rand * 2 - self.sk(8)).max(self.sk(40));
+        let mut zeilen: Vec<RtZeile> = Vec::new();
+        let mut ziele: Vec<String> = Vec::new();
+        let mut y = rand;
+        let (h1, h2, h3) = (basis + self.sk(12), basis + self.sk(7), basis + self.sk(3));
+        let breite_von = |s: &str, gr: i32, code: bool| {
+            g.text_width_in(s, gr, if code && code_font >= 0 { code_font } else { font })
+        };
+        // Woerter zu Zeilen flechten -- die eine Stelle, an der umgebrochen
+        // wird; Absatz, Aufzaehlung und Zitat gehen alle hier durch.
+        let absatz = |woerter: &[RtWort], x0: i32, gr: i32, weite: i32,
+                          y: &mut i32, zeilen: &mut Vec<RtZeile>, balken: i32| {
+            let zh = gr + self.sk(6);
+            let leer = breite_von(" ", gr, false);
+            let mut zeile = RtZeile { y: *y, h: zh, grund: false, linie: false, balken, laeufe: Vec::new() };
+            let mut x = x0;
+            for w in woerter {
+                let bw = breite_von(&w.text, gr, w.code);
+                let luecke = if zeile.laeufe.is_empty() || w.kleben { 0 } else { leer };
+                if x + luecke + bw > x0 + weite && !zeile.laeufe.is_empty() {
+                    zeilen.push(zeile.clone());
+                    *y += zh;
+                    zeile = RtZeile { y: *y, h: zh, grund: false, linie: false, balken, laeufe: Vec::new() };
+                    x = x0;
+                }
+                let lx = x + if zeile.laeufe.is_empty() { 0 } else { luecke };
+                zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: w.text.clone(), groesse: gr,
+                                           rolle: w.rolle, fett: w.fett, code: w.code, link: w.link });
+                x = lx + bw;
+            }
+            if !zeile.laeufe.is_empty() { zeilen.push(zeile); *y += zh; }
+        };
+        let roh: Vec<&str> = quelle.lines().collect();
+        let mut i = 0usize;
+        let mut im_code = false;
+        while i < roh.len() {
+            let z = roh[i].trim_end();
+            let t = z.trim_start();
+            if t.starts_with("```") {
+                im_code = !im_code;
+                y += self.sk(4);
+                i += 1;
+                continue;
+            }
+            if im_code {
+                let gr = (basis - 1).max(8);
+                let zh = gr + self.sk(7);
+                zeilen.push(RtZeile { y, h: zh, grund: true, linie: false, balken: -1,
+                    laeufe: vec![RtLauf { x: rand + self.sk(6), breite: breite_von(z, gr, true),
+                        text: z.to_string(), groesse: gr, rolle: 3, fett: false, code: true, link: -1 }] });
+                y += zh;
+                i += 1;
+                continue;
+            }
+            if t.is_empty() { y += self.sk(8); i += 1; continue; }
+            // Ueberschriften
+            let (stufe, rest) = if let Some(r) = t.strip_prefix("### ") { (3, r) }
+                                else if let Some(r) = t.strip_prefix("## ") { (2, r) }
+                                else if let Some(r) = t.strip_prefix("# ") { (1, r) }
+                                else { (0, t) };
+            if stufe > 0 {
+                let gr = match stufe { 1 => h1, 2 => h2, _ => h3 };
+                y += self.sk(if stufe == 1 { 10 } else { 8 });
+                let mut w = rt_inline(rest, 2, &mut ziele);
+                for x in w.iter_mut() { x.fett = true; x.rolle = 2; }
+                absatz(&w, rand, gr, innen, &mut y, &mut zeilen, -1);
+                // Ein Strich unter der zweiten Ebene -- er gliedert lange
+                // Dokumente, ohne dass man die Ueberschrift lesen muss.
+                if stufe <= 2 {
+                    zeilen.push(RtZeile { y, h: self.sk(6), grund: false, linie: true, balken: -1, laeufe: Vec::new() });
+                    y += self.sk(6);
+                }
+                y += self.sk(4);
+                i += 1;
+                continue;
+            }
+            // Waagerechte Linie
+            if t.len() >= 3 && t.chars().all(|c| c == '-' || c == '*' || c == '_') {
+                zeilen.push(RtZeile { y: y + self.sk(4), h: self.sk(12), grund: false, linie: true, balken: -1, laeufe: Vec::new() });
+                y += self.sk(12);
+                i += 1;
+                continue;
+            }
+            // Tabelle: alle zusammenhaengenden Zeilen mit `|` auf einmal --
+            // die Spaltenbreiten stehen erst fest, wenn man ALLE Zellen
+            // gemessen hat.
+            if t.starts_with('|') {
+                let mut roh_zeilen: Vec<Vec<String>> = Vec::new();
+                while i < roh.len() && roh[i].trim_start().starts_with('|') {
+                    let zz = roh[i].trim().trim_matches('|');
+                    let zellen: Vec<String> = zz.split('|').map(|c| c.trim().to_string()).collect();
+                    // Die Trennzeile (`|---|---|`) traegt keinen Inhalt.
+                    let nur_striche = zellen.iter().all(|c| !c.is_empty()
+                        && c.chars().all(|ch| ch == '-' || ch == ':'));
+                    if !nur_striche { roh_zeilen.push(zellen); }
+                    i += 1;
+                }
+                y += self.rt_tabelle(&roh_zeilen, rand, basis, innen, y, &mut zeilen, &mut ziele, &breite_von);
+                continue;
+            }
+            // Zitat
+            if let Some(r) = t.strip_prefix("> ") {
+                let w = rt_inline(r, 1, &mut ziele);
+                absatz(&w, rand + self.sk(14), basis, innen - self.sk(14), &mut y, &mut zeilen, rand + self.sk(4));
+                i += 1;
+                continue;
+            }
+            // Aufzaehlung (auch verschachtelt: je zwei Leerzeichen eine Stufe)
+            let tiefe = ((z.len() - t.len()) / 2).min(4) as i32;
+            let punkt = t.starts_with("- ") || t.starts_with("* ") || t.starts_with("+ ");
+            let nummer = t.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+                         && t.contains(". ") && t.split_once(". ").map(|(a, _)| a.chars().all(|c| c.is_ascii_digit())).unwrap_or(false);
+            if punkt || nummer {
+                let (marke, rest) = if punkt { ("\u{2022}".to_string(), &t[2..]) }
+                                    else { let (a, b) = t.split_once(". ").unwrap(); (format!("{}.", a), b) };
+                let ein = rand + tiefe * self.sk(16);
+                let mw = breite_von(&marke, basis, false);
+                let zh = basis + self.sk(6);
+                let start = zeilen.len();
+                let w = rt_inline(rest, 0, &mut ziele);
+                absatz(&w, ein + mw + self.sk(6), basis, innen - (ein - rand) - mw - self.sk(6), &mut y, &mut zeilen, -1);
+                // Die Marke gehoert in die ERSTE Zeile des Eintrags -- der Rest
+                // rueckt darunter ein, sonst laeuft der Text um die Marke herum.
+                if let Some(erste) = zeilen.get_mut(start) {
+                    erste.laeufe.insert(0, RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
+                                                    rolle: 1, fett: false, code: false, link: -1 });
+                } else {
+                    zeilen.push(RtZeile { y, h: zh, grund: false, linie: false, balken: -1,
+                        laeufe: vec![RtLauf { x: ein, breite: mw, text: marke, groesse: basis,
+                            rolle: 1, fett: false, code: false, link: -1 }] });
+                    y += zh;
+                }
+                i += 1;
+                continue;
+            }
+            // Fliesstext: aufeinander folgende Zeilen sind EIN Absatz.
+            //
+            // Das ist die Regel von Markdown, und sie ist hier keine
+            // Formsache: die Dokumente in `docs/` sind von Hand auf 76
+            // Spalten umbrochen. Zeile fuer Zeile gesetzt ergaeben sie einen
+            // ausgefransten Block, der bei jeder Fensterbreite gleich
+            // schlecht aussieht -- als Absatz bricht der Satz dort um, wo
+            // Platz ist.
+            let mut absatz_text = String::new();
+            while i < roh.len() {
+                let zz = roh[i].trim();
+                if zz.is_empty() || zz.starts_with("```") || zz.starts_with('|') || zz.starts_with("> ")
+                    || zz.starts_with("- ") || zz.starts_with("* ") || zz.starts_with("+ ")
+                    || zz.starts_with('#')
+                    || (zz.len() >= 3 && zz.chars().all(|c| c == '-' || c == '*' || c == '_'))
+                    || (zz.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) && zz.contains(". "))
+                {
+                    break;
+                }
+                if !absatz_text.is_empty() { absatz_text.push(' '); }
+                absatz_text.push_str(zz);
+                i += 1;
+            }
+            if absatz_text.is_empty() { i += 1; continue; }
+            let w = rt_inline(&absatz_text, 0, &mut ziele);
+            absatz(&w, rand, basis, innen, &mut y, &mut zeilen, -1);
+            y += self.sk(4);
+        }
+        let r = self.windows[wi].widgets[idx].rich.as_mut().unwrap();
+        r.inhalt_h = y + rand;
+        r.zeilen = zeilen;
+        r.ziele = ziele;
+        let max = (r.inhalt_h - self.windows[wi].widgets[idx].h).max(0);
+        let r = self.windows[wi].widgets[idx].rich.as_mut().unwrap();
+        r.scroll = r.scroll.clamp(0, max);
+    }
+
+    /// Eine Tabelle setzen: Spaltenbreiten aus dem Inhalt, dann Zelle fuer
+    /// Zelle. Liefert die gebrauchte Hoehe.
+    ///
+    /// Die erste Zeile ist der Kopf (fett). Passt die Tabelle nicht in die
+    /// Breite, werden die Spalten ANTEILIG gestaucht -- sie abzuschneiden
+    /// verstecke die letzte Spalte, und die traegt oft die Erklaerung.
+    #[allow(clippy::too_many_arguments)]
+    fn rt_tabelle(&self, roh: &[Vec<String>], x0: i32, basis: i32, innen: i32, y0: i32,
+                  zeilen: &mut Vec<RtZeile>, ziele: &mut Vec<String>,
+                  breite_von: &dyn Fn(&str, i32, bool) -> i32) -> i32 {
+        if roh.is_empty() { return 0; }
+        let spalten = roh.iter().map(|z| z.len()).max().unwrap_or(0);
+        if spalten == 0 { return 0; }
+        let luecke = self.sk(10);
+        let mut breiten = vec![0i32; spalten];
+        for z in roh {
+            for (c, zelle) in z.iter().enumerate() {
+                let roh_text = zelle.replace("**", "").replace('`', "");
+                breiten[c] = breiten[c].max(breite_von(&roh_text, basis, false).min(innen / 2));
+            }
+        }
+        // Unter das BREITESTE WORT darf keine Spalte gestaucht werden -- ein
+        // Wort bricht nicht um, es liefe sonst in die Nachbarspalte hinein
+        // und klebte an deren Text (im Bild zuerst gesehen:
+        // "GUI_WIDGETsetzt Markdown").
+        let mut mindest = vec![self.sk(24); spalten];
+        for z in roh {
+            for (c, zelle) in z.iter().enumerate() {
+                for wort in zelle.replace("**", "").replace('`', "").split(' ') {
+                    mindest[c] = mindest[c].max(breite_von(wort, basis, false).min(innen / 3));
+                }
+            }
+        }
+        let summe: i32 = breiten.iter().sum::<i32>() + luecke * (spalten as i32 - 1);
+        if summe > innen && summe > 0 {
+            let f = innen as f64 / summe as f64;
+            for (c, b) in breiten.iter_mut().enumerate() { *b = ((*b as f64 * f) as i32).max(mindest[c]); }
+        }
+        let mut y = y0 + self.sk(4);
+        for (ri, z) in roh.iter().enumerate() {
+            let zeile_start = zeilen.len();
+            let mut hoechste = y;
+            let mut x = x0;
+            for (c, zelle) in z.iter().enumerate() {
+                let mut yz = y;
+                let mut w = rt_inline(zelle, 0, ziele);
+                if ri == 0 { for x2 in w.iter_mut() { x2.fett = true; } }
+                let zh = basis + self.sk(6);
+                let mut zeile = RtZeile { y: yz, h: zh, grund: false, linie: false, balken: -1, laeufe: Vec::new() };
+                let mut cx = x;
+                let leer = breite_von(" ", basis, false);
+                for wort in &w {
+                    let bw = breite_von(&wort.text, basis, wort.code);
+                    let l = if zeile.laeufe.is_empty() || wort.kleben { 0 } else { leer };
+                    if cx + l + bw > x + breiten[c] && !zeile.laeufe.is_empty() {
+                        zeilen.push(zeile.clone());
+                        yz += zh;
+                        zeile = RtZeile { y: yz, h: zh, grund: false, linie: false, balken: -1, laeufe: Vec::new() };
+                        cx = x;
+                    }
+                    let lx = cx + if zeile.laeufe.is_empty() { 0 } else { l };
+                    zeile.laeufe.push(RtLauf { x: lx, breite: bw, text: wort.text.clone(), groesse: basis,
+                                               rolle: wort.rolle, fett: wort.fett, code: wort.code, link: wort.link });
+                    cx = lx + bw;
+                }
+                if !zeile.laeufe.is_empty() { zeilen.push(zeile); yz += zh; }
+                hoechste = hoechste.max(yz);
+                x += breiten[c] + luecke;
+            }
+            // Die Zellen einer Zeile stehen als EIGENE Zeilen im Satz (jede
+            // Spalte bricht fuer sich um); zusammengehalten werden sie
+            // dadurch, dass die naechste Zeile erst unter der hoechsten
+            // beginnt.
+            let _ = zeile_start;
+            if ri == 0 {
+                zeilen.push(RtZeile { y: hoechste + self.sk(2), h: self.sk(4), grund: false,
+                                      linie: true, balken: -1, laeufe: Vec::new() });
+                hoechste += self.sk(6);
+            }
+            y = hoechste + self.sk(2);
+        }
+        y + self.sk(6) - y0
+    }
+
     /// Dateibaeume mit eingestelltem Takt neu von der Platte lesen. Ohne das
     /// zeigt ein Baum eine frisch angelegte Datei erst, wenn ihn jemand von
     /// Hand auffrischt -- und darauf zu kommen ist niemandes Aufgabe.
@@ -4075,8 +4693,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Zeichnen und Treffertest; laufen sie auseinander, kippt der Haken neben
     /// dem, was man anklickt.
     fn tree_kast(&self, ax: i32, level: i32) -> (i32, i32) {
-        let x = ax + 4 + level * self.sk(TREE_INDENT) + self.sk(TREE_TOGGLE_W) + 2;
-        (x, (self.sk(TREE_ROW_H) - 6).max(8))
+        (ax + 2 + level * self.sk(TREE_INDENT), (self.sk(TREE_ROW_H) - 6).max(8))
+    }
+
+    /// Wie viel Platz die Kaestchen-Spalte wegnimmt (0, wenn es keine gibt).
+    ///
+    /// Sie steht GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck. Zwischen Dreieck
+    /// und Namen lag sie genau dort, wo man eine Zeile anklickt, um sie zu
+    /// oeffnen -- ein Klick auf den Namen setzte dann einen Haken statt die
+    /// Datei aufzumachen. Aufgefallen ist es an einem Test aus Stand 24, der
+    /// eine Datei im Unterordner oeffnet.
+    fn tree_kast_w(&self, t: &TreeState) -> i32 {
+        if t.kaestchen { (self.sk(TREE_ROW_H) - 6).max(8) + 4 } else { 0 }
     }
 
     fn table_geom(&self, wi: usize, idx: usize) -> TGeom {
@@ -4784,6 +5412,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
+        // Beim gesetzten Text ist der Text die QUELLE -- sonst setzte
+        // GUI_SET_TEXT dort etwas, das nie zu sehen ist.
+        if w.kind == Kind::RichText {
+            let t = w.text.clone();
+            if let Some(r) = w.rich.as_mut() {
+                r.quelle = t; r.scroll = 0; r.stand = (usize::MAX, 0, 0, 0);
+            }
+        }
         Ok(())
     }
     pub fn set_tooltip(&mut self, h: i64, t: String) -> Result<(), String> {
@@ -4838,7 +5474,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
     pub fn on_change(&mut self, h: i64, func: Option<Rueckruf>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl) {
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree | Kind::TabControl | Kind::RichText | Kind::TimePicker) {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
@@ -5913,6 +6549,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 });
             }
         }
+        if w.kind == Kind::TimePicker {
+            o["time"] = serde_json::json!(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]));
+            if w.zeit_sek { o["seconds"] = serde_json::json!(true); }
+        }
+        if let Some(r) = &w.rich {
+            // Die QUELLE gehoert in die Datei, nicht der Satz: der haengt an
+            // Breite, Schrift und Massstab und entsteht beim Laden neu.
+            let mut rj = serde_json::json!({ "quelle": r.quelle });
+            if r.basis > 0 { rj["groesse"] = serde_json::json!(r.basis); }
+            o["rich"] = rj;
+        }
         if let Some(st) = &w.tabctl {
             o["tabctl"] = serde_json::json!({
                 "kinder": st.kinder.iter().map(|&(k, s)| serde_json::json!([k, s])).collect::<Vec<_>>(),
@@ -6163,6 +6810,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             ts.hover = -1; ts.anker = -1; ts.sync();
             w.tree = Some(Box::new(ts));
+        }
+        if kind == Kind::TimePicker {
+            w.zeit_sek = wj["seconds"].as_bool().unwrap_or(false);
+            if let Some(t) = wj["time"].as_str() {
+                let teile: Vec<i32> = t.split(':').filter_map(|x| x.parse().ok()).collect();
+                for (k, v) in teile.iter().take(3).enumerate() { w.zeit[k] = (*v).clamp(0, 59); }
+                w.zeit[0] = w.zeit[0].clamp(0, 23);
+            }
+        }
+        if kind == Kind::RichText {
+            let rj = wj.get("rich");
+            w.rich = Some(Box::new(RichState {
+                quelle: rj.and_then(|r| r["quelle"].as_str()).unwrap_or("").to_string(),
+                basis: rj.and_then(|r| r["groesse"].as_i64()).unwrap_or(0) as i32,
+                code_font: -1,
+                ..Default::default()
+            }));
         }
         if kind == Kind::TabControl {
             let mut st = TabCtlState::default();
@@ -6792,6 +7456,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     t.hover = -1;
                     if let Some(d) = t.datei.as_mut() { d.aktiviert.clear(); }
                 }
+                if let Some(r) = wdg.rich.as_mut() { r.geklickt.clear(); }
             }
             for m in win.menus.iter_mut() {
                 for it in m.items.iter_mut() { it.clicked = false; }
@@ -6799,6 +7464,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         self.drop = None;
         self.dateibaeume_auffrischen(g.get_time());
+        self.rt_pass(g);
         self.umbruch_layout(g);
         self.layout_pass(g);
         self.panel_pass();
@@ -6906,6 +7572,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.windows[top].widgets[i].hovered = true;
                     if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
                     if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
+                    if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
                 }
@@ -8582,6 +9249,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.value = nv as f64;
     }
 
+    /// Mausrad ueber gesetztem Text.
+    fn richtext_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
+        let wheel = g.pop_mouse_wheel();
+        if wheel == 0 { return; }
+        let schritt = self.sk(48);
+        let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
+        let max = (r.inhalt_h - h).max(0);
+        r.scroll = (r.scroll - wheel as i32 * schritt).clamp(0, max);
+    }
+
     fn drag_slider(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
         let (ax, ay, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let w = &mut self.windows[wi].widgets[i];
@@ -8981,6 +9658,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     self.dp_setze(wi, i, neu);
                 }
             }
+            Kind::TimePicker => {
+                let n = if self.windows[wi].widgets[i].zeit_sek { 3 } else { 2 };
+                let seit = rechts as i32 - links as i32;
+                if seit != 0 {
+                    let w = &mut self.windows[wi].widgets[i];
+                    w.sel = (w.sel + seit).clamp(0, n as i32 - 1);
+                }
+                let d = auf as i32 - ab as i32;
+                if d != 0 {
+                    let teil = self.windows[wi].widgets[i].sel.clamp(0, n as i32 - 1) as usize;
+                    self.tp_dreh(wi, i, teil, d);
+                }
+            }
+            Kind::RichText => {
+                let d = ab as i32 - auf as i32;
+                if d != 0 {
+                    let hoehe = self.windows[wi].widgets[i].h;
+                    let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
+                    let max = (r.inhalt_h - hoehe).max(0);
+                    r.scroll = (r.scroll + d * 40).clamp(0, max);
+                }
+            }
             Kind::TabControl => {
                 // Links/rechts blaettert -- wie in jedem Karteikasten.
                 let d = rechts as i32 - links as i32;
@@ -9258,9 +9957,23 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.cp_zieh(win, i, mx, my);
             }
             Kind::DatePicker => self.dp_press(win, i, mx, my),
+            Kind::TimePicker => self.tp_press(win, i, mx, my),
             Kind::TextInput | Kind::TextArea => {}   // Caret setzt die Editier-Routine
             Kind::Table => self.table_press(win, i, mx, my),
             Kind::Tree => self.tree_press(win, i, mx, my),
+            Kind::RichText => {
+                let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let ziel = {
+                    let r = self.windows[win].widgets[i].rich.as_ref().unwrap();
+                    Self::rt_link_unter(r, mx - ax, my - ay + r.scroll)
+                };
+                if let Some(z) = ziel {
+                    let r = self.windows[win].widgets[i].rich.as_mut().unwrap();
+                    r.geklickt = z;
+                    let f = self.windows[win].widgets[i].on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
             Kind::TabControl => {
                 let (ax, ay, _, _) = self.abs_rect(win, &self.windows[win].widgets[i]);
                 if my >= ay + self.sk(TC_KOPF_H) { return; }   // unter den Koepfen gehoert die Flaeche den Kindern
@@ -10745,6 +11458,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 n
             }
+            Kind::TimePicker => {
+                let mut n = Node::new(Role::TimeInput);
+                n.set_value(format!("{:02}:{:02}:{:02}", w.zeit[0], w.zeit[1], w.zeit[2]));
+                n.add_action(Action::Increment);
+                n.add_action(Action::Decrement);
+                n
+            }
+            Kind::RichText => {
+                let mut n = Node::new(Role::Document);
+                if let Some(r) = w.rich.as_ref() { n.set_value(r.quelle.clone()); }
+                n
+            }
             Kind::GroupBox | Kind::Panel => { let mut n = Node::new(Role::Group); if !w.text.is_empty() { n.set_label(w.text.clone()); } n }
             Kind::Image => Node::new(Role::Image),
             Kind::Canvas => Node::new(Role::Canvas),
@@ -11868,6 +12593,37 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 g.pop_clip();
             }
+            Kind::RichText => self.draw_richtext(g, wi, idx),
+            Kind::TimePicker => {
+                let (x0, schritt, n) = self.tp_geom(wdg, ax, w);
+                let acc = self.acc_col(wdg);
+                let fg = self.txt_col(wdg);
+                let fw = schritt - self.sk(10);
+                for k in 0..n {
+                    let fx = x0 + k as i32 * schritt;
+                    self.fbox_tief(g, fx, ay, fx + fw - 1, ay + h - 1,
+                                   self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+                    if wdg.sel == k as i32 {
+                        g.rect(fx, ay, fx + fw - 1, ay + h - 1, acc);
+                    }
+                    let txt = format!("{:02}", wdg.zeit[k]);
+                    let tw = self.wtext_width(g, wdg, &txt);
+                    let th = self.wsize(g, wdg);
+                    self.wtext(g, wdg, fx + (fw - tw) / 2 - self.sk(5), ay + (h - th).max(0) / 2, txt, fg);
+                    // Pfeile rechts im Feld: oben hoch, unten runter.
+                    let px = fx + fw - self.sk(9);
+                    let (o, u) = (ay + h / 4, ay + h * 3 / 4);
+                    g.line(px - 3, o + 2, px, o - 2, fg);
+                    g.line(px, o - 2, px + 3, o + 2, fg);
+                    g.line(px - 3, u - 2, px, u + 2, fg);
+                    g.line(px, u + 2, px + 3, u - 2, fg);
+                    if k + 1 < n {
+                        let cx = fx + fw + self.sk(3);
+                        g.box_fill(cx, ay + h / 2 - self.sk(4), cx + 1, ay + h / 2 - self.sk(3), fg);
+                        g.box_fill(cx, ay + h / 2 + self.sk(2), cx + 1, ay + h / 2 + self.sk(3), fg);
+                    }
+                }
+            }
             Kind::Table => self.draw_table(g, wi, idx),
             Kind::Tree => self.draw_tree(g, wi, idx),
             Kind::ColorPicker => self.draw_colorpicker(g, wdg, ax, ay, w, h),
@@ -12073,6 +12829,76 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    /// Welcher Verweis liegt an dieser Stelle (Koordinaten relativ zum
+    /// INHALT, also mit Scroll)? EINE Quelle fuer Klick und Mauszeiger.
+    fn rt_link_unter(r: &RichState, x: i32, y: i32) -> Option<String> {
+        for z in r.zeilen.iter() {
+            if y < z.y || y >= z.y + z.h { continue; }
+            for l in z.laeufe.iter() {
+                if l.link >= 0 && x >= l.x && x < l.x + l.breite {
+                    return r.ziele.get(l.link as usize).cloned();
+                }
+            }
+        }
+        None
+    }
+
+    /// Gesetzten Text zeichnen. Nur die Zeilen im Bild -- ein Dokument mit
+    /// zweitausend Zeilen darf nicht zweitausend Textaufrufe je Bild kosten.
+    fn draw_richtext(&self, g: &mut Graphics, wi: usize, idx: usize) {
+        let wdg = &self.windows[wi].widgets[idx];
+        let (ax, ay, w, h) = self.abs_rect(wi, wdg);
+        self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
+            self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+        let r = wdg.rich.as_ref().unwrap();
+        let fg = self.txt_col(wdg);
+        let leise = self.th("muted_fg");
+        let acc = self.acc_col(wdg);
+        let code_grund = shade(self.wcol(wdg, "bg", "widget_bg"), 14);
+        let font = self.wfont(g, wdg);
+        let cfont = if r.code_font >= 0 { r.code_font } else { font };
+        g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
+        for z in r.zeilen.iter() {
+            let zy = ay + z.y - r.scroll;
+            if zy + z.h < ay { continue; }
+            if zy > ay + h { break; }
+            if z.grund {
+                g.box_fill(ax + self.sk(6), zy - 1, ax + w - self.sk(7), zy + z.h - 2, code_grund);
+            }
+            if z.linie {
+                let ly = zy + z.h / 2;
+                g.line(ax + self.sk(12), ly, ax + w - self.sk(13), ly, shade(leise, -40));
+            }
+            if z.balken >= 0 {
+                g.box_fill(ax + z.balken, zy, ax + z.balken + self.sk(2), zy + z.h - 1, acc);
+            }
+            for l in z.laeufe.iter() {
+                let farbe = match l.rolle { 1 => leise, 2 => acc, 3 => shade(acc, 40), _ => fg };
+                let f = if l.code { cfont } else { font };
+                g.text_styled(ax + l.x, zy, l.text.clone(), farbe, f, l.groesse);
+                // Fett gibt es nur als ZWEITER Zug um einen Punkt versetzt --
+                // aus einer Schrift laesst sich keine zweite Strichstaerke
+                // rechnen, und eine fette Datei mitzuliefern ist nicht Sache
+                // der Laufzeit.
+                if l.fett { g.text_styled(ax + l.x + 1, zy, l.text.clone(), farbe, f, l.groesse); }
+                if l.link >= 0 {
+                    g.line(ax + l.x, zy + l.groesse + 2, ax + l.x + l.breite, zy + l.groesse + 2, acc);
+                }
+            }
+        }
+        g.pop_clip();
+        // Rollbalken, sobald es mehr gibt als hineinpasst -- ohne ihn sieht
+        // ein langes Dokument aus wie ein kurzes.
+        if r.inhalt_h > h {
+            let sw = self.sk(4);
+            let anteil = (h as f64 / r.inhalt_h as f64).min(1.0);
+            let griff = ((h - 4) as f64 * anteil) as i32;
+            let oben = ((h - 4 - griff) as f64
+                * (r.scroll as f64 / (r.inhalt_h - h) as f64).clamp(0.0, 1.0)) as i32;
+            g.box_fill(ax + w - sw - 2, ay + 2 + oben, ax + w - 3, ay + 2 + oben + griff, shade(leise, -20));
+        }
+    }
+
     fn draw_tree(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let wdg = &self.windows[wi].widgets[idx];
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
@@ -12098,8 +12924,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             } else if ni as i32 == t.hover {
                 g.box_fill(ax + 1, ry, ax + w - 2, ry + self.sk(TREE_ROW_H) - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
             }
-            // Auf-/Zuklapp-Dreieck (nur bei Kindknoten).
-            let tx = ax + 4 + indent;
+            // Auf-/Zuklapp-Dreieck (nur bei Kindknoten), hinter der
+            // Kaestchen-Spalte.
+            let tx = ax + 4 + self.tree_kast_w(t) + indent;
             let cy = ry + self.sk(TREE_ROW_H) / 2;
             if node.has_children {
                 let cx = tx + self.sk(TREE_TOGGLE_W) / 2;
@@ -12113,14 +12940,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             let mut lx = tx + self.sk(TREE_TOGGLE_W) + 2;
             if t.kaestchen {
-                // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken.
+                // Kaestchen wie bei der Liste: Rahmen, gefuellt mit Haken --
+                // aber GANZ LINKS, vor dem Dreieck (siehe tree_kast_w).
                 let (bx, cs) = self.tree_kast(ax, node.level);
                 let by = ry + (self.sk(TREE_ROW_H) - cs) / 2;
                 g.rect(bx, by, bx + cs - 1, by + cs - 1, self.wcol(wdg, "border", "widget_border"));
                 if t.checks.get(ni).copied().unwrap_or(false) {
                     g.box_fill(bx + 2, by + 2, bx + cs - 3, by + cs - 3, acc);
                 }
-                lx = bx + cs + 3;
             }
             if hat_icon {
                 // Platz fuer das Sinnbild bekommt JEDE Zeile, sobald eine

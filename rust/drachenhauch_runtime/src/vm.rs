@@ -5926,6 +5926,26 @@ impl<'p> Vm<'p> {
             "gui_filetree_set_checked" => { self.gui.filetree_set_checked(gi(a,0,"GUI_FILETREE_SET_CHECKED")?, &gs(a,1,"GUI_FILETREE_SET_CHECKED")?, gbool(a,2,"GUI_FILETREE_SET_CHECKED")?)?; Value::Nil }
             "gui_filetree_checked_count" => Value::Int(self.gui.filetree_checked_count(gi(a,0,"GUI_FILETREE_CHECKED_COUNT")?)?),
             "gui_filetree_checked_path$" | "gui_filetree_checked_path" => Value::str_rc(&self.gui.filetree_checked_path(gi(a,0,"GUI_FILETREE_CHECKED_PATH")?, gi(a,1,"GUI_FILETREE_CHECKED_PATH")?)?),
+            // --- Uhrzeit ---
+            "gui_timepicker" => Value::Int(self.gui.timepicker(gi(a,0,"GUI_TIMEPICKER")?, gi(a,1,"GUI_TIMEPICKER")? as i32,
+                gi(a,2,"GUI_TIMEPICKER")? as i32,
+                if a.len() > 3 { gi(a,3,"GUI_TIMEPICKER")? as i32 } else { 0 },
+                if a.len() > 4 { gi(a,4,"GUI_TIMEPICKER")? as i32 } else { 0 })?),
+            "gui_time$" | "gui_time" => Value::str_rc(&self.gui.time_get(gi(a,0,"GUI_TIME")?)?),
+            "gui_set_time" => { self.gui.set_time(gi(a,0,"GUI_SET_TIME")?, &gs(a,1,"GUI_SET_TIME")?)?; Value::Nil }
+            "gui_timepicker_set" => { self.gui.timepicker_set(gi(a,0,"GUI_TIMEPICKER_SET")?, &gs(a,1,"GUI_TIMEPICKER_SET")?, gnum(a,2,"GUI_TIMEPICKER_SET")?)?; Value::Nil }
+            // --- Gesetzter Text ---
+            "gui_richtext" => Value::Int(self.gui.richtext(gi(a,0,"GUI_RICHTEXT")?, gi(a,1,"GUI_RICHTEXT")? as i32,
+                gi(a,2,"GUI_RICHTEXT")? as i32, gi(a,3,"GUI_RICHTEXT")? as i32, gi(a,4,"GUI_RICHTEXT")? as i32,
+                if a.len() > 5 { gs(a,5,"GUI_RICHTEXT")? } else { String::new() })?),
+            "gui_richtext_set_text" => { self.gui.richtext_set_text(gi(a,0,"GUI_RICHTEXT_SET_TEXT")?, gs(a,1,"GUI_RICHTEXT_SET_TEXT")?)?; Value::Nil }
+            "gui_richtext_set" => { self.gui.richtext_set(gi(a,0,"GUI_RICHTEXT_SET")?, &gs(a,1,"GUI_RICHTEXT_SET")?, gnum(a,2,"GUI_RICHTEXT_SET")?)?; Value::Nil }
+            "gui_richtext_scroll" => { self.gui.richtext_scroll(gi(a,0,"GUI_RICHTEXT_SCROLL")?, gi(a,1,"GUI_RICHTEXT_SCROLL")?)?; Value::Nil }
+            "gui_richtext_scroll_get" => Value::Int(self.gui.richtext_scroll_get(gi(a,0,"GUI_RICHTEXT_SCROLL_GET")?)?),
+            "gui_richtext_height" => Value::Int(self.gui.richtext_height(gi(a,0,"GUI_RICHTEXT_HEIGHT")?)?),
+            "gui_richtext_link$" | "gui_richtext_link" => Value::str_rc(&self.gui.richtext_link(gi(a,0,"GUI_RICHTEXT_LINK")?)?),
+            "gui_richtext_find" => Value::Int(self.gui.richtext_find(gi(a,0,"GUI_RICHTEXT_FIND")?, &gs(a,1,"GUI_RICHTEXT_FIND")?,
+                if a.len() > 2 { gi(a,2,"GUI_RICHTEXT_FIND")? } else { -1 })?),
             // --- Reiter im Fenster ---
             "gui_tabcontrol" => Value::Int(self.gui.tabcontrol(gi(a,0,"GUI_TABCONTROL")?, gi(a,1,"GUI_TABCONTROL")? as i32,
                 gi(a,2,"GUI_TABCONTROL")? as i32, gi(a,3,"GUI_TABCONTROL")? as i32, gi(a,4,"GUI_TABCONTROL")? as i32)?),

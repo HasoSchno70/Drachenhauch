@@ -1566,7 +1566,7 @@ def test_palette_zeigt_alle_arten(tmp_path):
     from drachenhauch.formdesigner import PALETTE
     _app()
     win = FormDesigner(tmp_path)
-    assert win.palette.count() == len(PALETTE) == 26
+    assert win.palette.count() == len(PALETTE) == 28
     win.close()
 
 

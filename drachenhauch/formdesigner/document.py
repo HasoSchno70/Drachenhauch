@@ -121,6 +121,10 @@ PALETTE: list[PaletteSpec] = [
     # verliert es beim Oeffnen und Speichern aber nicht: `tabctl` laeuft als
     # unbekanntes Feld durch.
     PaletteSpec("tabcontrol", "Reiter", 240, 160, ("on_change",) + _ZEIGEN + _FOKUS, has_items=True),
+    # Gesetzter Text: der Markdown-Quelltext steht in `text`, wie bei jedem
+    # anderen Control auch -- der Designer muss ihn also nicht eigens kennen.
+    PaletteSpec("richtext", "Gesetzter Text", 260, 160, ("on_click",) + _ZEIGEN + _FOKUS, has_text=True),
+    PaletteSpec("timepicker", "Uhrzeit", 104, 34, ("on_change",) + _ZEIGEN + _FOKUS),
 ]
 
 # Arten, deren Konstruktor die Groesse SELBST bestimmt -- danach muss
@@ -1457,6 +1461,15 @@ class FormDoc:
             # gewollt und darf nicht durch ein eingefrorenes Datum ersetzt werden.
             if isinstance(d, str) and d:
                 out.append(f"GUI_SET_DATE({var}, {_gb_str(d)})")
+        elif k == "richtext":
+            out.append(f"{var} = GUI_RICHTEXT(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.text)})")
+        elif k == "timepicker":
+            out.append(f"{var} = GUI_TIMEPICKER(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            t = c.extra.get("time")
+            if isinstance(t, str) and t:
+                out.append(f"GUI_SET_TIME({var}, {_gb_str(t)})")
+            if c.extra.get("seconds"):
+                out.append(f'GUI_TIMEPICKER_SET({var}, "sekunden", 1)')
         elif k == "tabcontrol":
             out.append(f"{var} = GUI_TABCONTROL(frm, {c.x}, {c.y}, {c.w}, {c.h})")
             for it in c.items:

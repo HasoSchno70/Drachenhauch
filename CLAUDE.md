@@ -2873,6 +2873,41 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 25 (2026-09-12):** zwei Widgets aus der eigenen Lueckenliste -- und
+damit ist sie um zwei Punkte KUERZER geworden, nicht laenger.
+**`GUI_RICHTEXT`** setzt Markdown, statt es anzuzeigen (Ueberschriften,
+Absaetze mit Umbruch, Aufzaehlungen verschachtelt und nummeriert,
+Codebloecke, Tabellen mit echten Spalten, Zitate, Linien, Verweise; was er
+nicht kennt, steht als Text da). **Gesetzt wird in GUI_UPDATE** (`rt_pass`
+-> `rt_setzen`), nicht beim Zeichnen: nur dort kommen Graphics zum Messen
+und Schreibzugriff zusammen, und so kostet ein Dokument mit 2000 Zeilen
+seinen Satz EINMAL; neu gesetzt wird nur bei geaenderter Quelle, Breite,
+Schriftgroesse oder Massstab (`stand`). **Aufeinander folgende Zeilen sind
+EIN Absatz** (Markdown-Regel) -- die Dokumente in `docs/` sind auf 76
+Spalten umbrochen, Zeile fuer Zeile gesetzt ergaeben sie einen
+ausgefransten Block. Fett = zweiter Zug um einen Punkt versetzt (aus einer
+Schrift laesst sich keine Strichstaerke rechnen), kursiv = gedaempft.
+**Zwei Fehler zeigte erst das gerenderte BILD:** das Leerzeichen VOR einer
+Auszeichnung ging verloren (`Ein **fetter** Anfang` -> `Einfetter Anfang`:
+es steht am Ende des vorigen Stuecks und fiel beim Zerlegen weg), und eine
+gestauchte Tabellenspalte lief in ihre Nachbarin (unter das breiteste WORT
+darf keine Spalte gestaucht werden). Dazu **`GUI_TIMEPICKER`**: nach aussen
+EIN Format `HH:MM:SS` wie `TIME$()`, auch ohne Sekundenfeld; an der Grenze
+laeuft es um; die Minute hat eine Schrittweite. **Die IDE setzt ihr
+Handbuch damit** -- 180 Zeilen Handarbeit weniger, und Verweise sind jetzt
+anklickbar (Dokument oder Sprungmarke). Dazu ihre drei offenen Punkte:
+**Haken im Baum schraenken das Projekt ein** (eine Stelle,
+`projektDateien`, also gilt es fuer Umbauten, Suche und Symbolverzeichnis
+gleich; die Beschriftung ueber dem Baum sagt es), **ohne Vorschau wird
+trotzdem geprueft** (gezaehlt wird der ZUWACHS je Datei -- eine Datei, die
+schon nicht uebersetzt, wuerde sonst jeden Umbau in die Vorschau zwingen),
+und **alle vier Umbauten sammeln in Schritten**. **Der Stolperstein dieser
+Runde, gefunden von einem Test aus Stand 24:** das Baum-Kaestchen sass
+zwischen Dreieck und Namen, also dort, wo man klickt, um eine Datei zu
+oeffnen -- es steht jetzt GANZ LINKS (`tree_kast_w`). Tests
+`tests/pruef/gui_gesetzter_text.dhtest` (7), `tests/pruef/gui_uhrzeit.dhtest`
+(6), vier neue in `tests/test_ide.py`.
+
 **Stufe 24 (2026-09-12):** kein Punkt aus der eigenen Liste, sondern die
 Frage des Nutzers -- der Dateibaum gehoert in die LAUFZEIT, und welche
 Widgets fehlen sonst noch? **`GUI_FILETREE`** (gui.rs `DateiBaum` am

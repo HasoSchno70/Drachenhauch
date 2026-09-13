@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1808,
+ "count": 1820,
  "builtins": [
   {
    "name": "ABS",
@@ -3801,6 +3801,54 @@
    "module": "gui"
   },
   {
+   "name": "GUI_RICHTEXT",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT(win, x, y, w, h, text$ = \"\") AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_FIND",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_FIND(rt, text$, ab = -1) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_HEIGHT",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_HEIGHT(rt) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_LINK$",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_LINK$(rt) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_SCROLL",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_SCROLL(rt, y)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_SCROLL_GET",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_SCROLL_GET(rt) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_SET",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_SET(rt, key$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RICHTEXT_SET_TEXT",
+   "kind": "core",
+   "signature": "GUI_RICHTEXT_SET_TEXT(rt, text$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_RULE",
    "kind": "core",
    "signature": "GUI_RULE(2..5 Argumente)",
@@ -3966,6 +4014,12 @@
    "name": "GUI_SET_TEXT",
    "kind": "core",
    "signature": "GUI_SET_TEXT(wdg, text)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_TIME",
+   "kind": "core",
+   "signature": "GUI_SET_TIME(tp, zeit$)",
    "module": "gui"
   },
   {
@@ -4560,6 +4614,24 @@
    "name": "GUI_THEME_SET",
    "kind": "core",
    "signature": "GUI_THEME_SET(key, color)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIME$",
+   "kind": "core",
+   "signature": "GUI_TIME$(tp) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIMEPICKER",
+   "kind": "core",
+   "signature": "GUI_TIMEPICKER(win, x, y, w = 0, h = 0) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TIMEPICKER_SET",
+   "kind": "core",
+   "signature": "GUI_TIMEPICKER_SET(tp, key$, wert)",
    "module": "gui"
   },
   {

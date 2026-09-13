@@ -279,6 +279,36 @@ def _preview_neu(qp: QPainter, kind: str, r: QRect, *, fg, muted, accent, border
         qp.setPen(QPen(QColor(255, 255, 255), 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
         qp.drawEllipse(QRect(feld.right() - 8, feld.top() + 4, 6, 6))
 
+    elif kind == "richtext":
+        # Vorschau des Satzes: eine Ueberschrift, zwei Textzeilen, ein
+        # Codeblock. Der ECHTE Satz entsteht erst in der Laufzeit -- ihn hier
+        # nachzubauen waere eine zweite Fassung, die frueher oder spaeter
+        # anders aussieht als die erste.
+        flaeche(r, tief=True)
+        qp.setPen(accent)
+        qp.drawText(QRect(x + 8, y + 6, max(0, w - 16), 14), al.AlignLeft, text or "Ueberschrift")
+        qp.setPen(muted)
+        for i in range(max(0, min(3, (h - 60) // 12))):
+            qp.drawLine(x + 8, y + 30 + i * 12, r.right() - (8 if i < 2 else max(10, w // 3)), y + 30 + i * 12)
+        if h > 80:
+            kb = QRect(x + 8, y + h - 34, max(0, w - 16), 24)
+            qp.fillRect(kb, sunk)
+            qp.setPen(accent)
+            qp.drawText(kb.adjusted(6, 0, 0, 0), al.AlignVCenter, "CODE")
+
+    elif kind == "timepicker":
+        n = 3 if datum else 2
+        luecke = 10
+        fw = max(10, (w - luecke * (n - 1)) // n)
+        for i in range(n):
+            fx = x + i * (fw + luecke)
+            fr = QRect(fx, y, fw, h)
+            _fill_surface(qp, fr, sunk, border, rad, -grad, 0)
+            qp.setPen(fg)
+            qp.drawText(fr.adjusted(0, 0, -8, 0), al.AlignCenter, ("12", "30", "00")[i])
+            if i + 1 < n:
+                qp.drawText(QRect(fx + fw, y, luecke, h), al.AlignCenter, ":")
+
     elif kind == "tabcontrol":
         # Koepfe oben, darunter die Flaeche -- was auf einer Seite liegt,
         # zeigt der Entwurf nicht: die Controls stehen dort, wo sie stehen.

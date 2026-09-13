@@ -1,0 +1,179 @@
+' Gesetzter Text (GUI_RICHTEXT): Markdown wird gesetzt, nicht angezeigt.
+' Geprueft wird, was ein Programm davon sieht -- die Hoehe des Satzes, das
+' Rollen, der angeklickte Verweis, die Suche im Dokument -- und am BILD,
+' dass eine Ueberschrift groesser steht als der Fliesstext und ein
+' Codeblock seinen eigenen Grund hat. Format: docs/werkzeuge.md, dhrt test.
+
+=== der satz waechst mit dem text
+' Ein leerer Text ist so hoch wie sein Rand; je mehr Absaetze, desto hoeher.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 300, 100, "")
+GUI_UPDATE()
+DIM leer AS INTEGER : leer = GUI_RICHTEXT_HEIGHT(rt)
+GUI_RICHTEXT_SET_TEXT(rt, "# Titel" + NL + NL + "Ein Absatz." + NL)
+GUI_UPDATE()
+DIM mit AS INTEGER : mit = GUI_RICHTEXT_HEIGHT(rt)
+PRINT leer < 40 ; " " ; mit > leer + 40
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE TRUE
+
+=== ein langer absatz bricht um
+' Derselbe Text in einem schmalen Widget braucht mehr Hoehe als in einem
+' breiten -- das ist der Umbruch, und ohne ihn waere der Satz keiner.
+IMPORT "gui"
+SCREEN(700, 400, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 660, 360)
+DIM lang AS STRING : lang = ""
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    lang = lang + "Wort" + STR$(i) + " "
+NEXT
+DIM schmal AS GUI_WIDGET : schmal = GUI_RICHTEXT(w, 10, 10, 160, 100, lang)
+DIM breit AS GUI_WIDGET : breit = GUI_RICHTEXT(w, 200, 10, 440, 100, lang)
+GUI_UPDATE()
+PRINT GUI_RICHTEXT_HEIGHT(schmal) > GUI_RICHTEXT_HEIGHT(breit)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE
+
+=== rollen bleibt im rahmen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM text AS STRING : text = ""
+DIM i AS INTEGER
+FOR i = 1 TO 60
+    text = text + "Zeile " + STR$(i) + NL + NL
+NEXT
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 300, 100, text)
+GUI_UPDATE()
+GUI_RICHTEXT_SCROLL(rt, 40)
+PRINT GUI_RICHTEXT_SCROLL_GET(rt)
+' Ueber das Ende hinaus geht nicht -- sonst schaut man auf Weiss und haelt
+' das Dokument fuer zu Ende.
+GUI_RICHTEXT_SCROLL(rt, 999999)
+PRINT GUI_RICHTEXT_SCROLL_GET(rt) = GUI_RICHTEXT_HEIGHT(rt) - 100
+GUI_RICHTEXT_SCROLL(rt, -5)
+PRINT GUI_RICHTEXT_SCROLL_GET(rt)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+40
+TRUE
+0
+
+=== suchen rollt zur fundstelle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM text AS STRING : text = ""
+DIM i AS INTEGER
+FOR i = 1 TO 40
+    text = text + "Fuellzeile " + STR$(i) + NL + NL
+NEXT
+text = text + "Die Nadel steht hier." + NL
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 300, 100, text)
+GUI_UPDATE()
+DIM y AS INTEGER : y = GUI_RICHTEXT_FIND(rt, "nadel")
+PRINT y > 100 ; " " ; GUI_RICHTEXT_SCROLL_GET(rt) > 0
+' Was es nicht gibt, meldet -1 und laesst die Stelle stehen.
+DIM vorher AS INTEGER : vorher = GUI_RICHTEXT_SCROLL_GET(rt)
+PRINT GUI_RICHTEXT_FIND(rt, "gibtesnicht") ; " " ; GUI_RICHTEXT_SCROLL_GET(rt) = vorher
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE TRUE
+-1 TRUE
+
+=== ein klick auf einen verweis meldet sein ziel
+' Der erste Absatz steht oben links; der Verweis ist das erste Wort.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 20, 20, 300, 200, "[Handbuch](docs/ide.md) lesen.")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_RICHTEXT_LINK$(rt) <> "" THEN PRINT "Ziel: " + GUI_RICHTEXT_LINK$(rt)
+    IF f = 19 THEN PRINT "[" + GUI_RICHTEXT_LINK$(rt) + "]"
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Klick auf das erste Wort (Verweis), danach weiter rechts ins Leere
+c 16
+e 3 7 50 68 0 0
+e 4 7 50 68 0 0
+e 4 6 0 0 0 0
+e 5 5 0 0 0 0
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+Ziel: docs/ide.md
+[]
+
+=== ueberschrift und codeblock sehen anders aus als fliesstext
+' Am BILD: die Ueberschrift ist hoeher (sie faerbt eine Zeile weiter oben
+' als der Fliesstext je koennte), und der Codeblock hat seinen eigenen
+' Grund. Gegenprobe: eine Stelle neben dem Codeblock hat ihn nicht.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 0, 0, 380, 260, "```" + NL + "PRINT 1" + NL + "```" + NL)
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+' Der Codeblock liegt links oben und ist heller als der Grund daneben.
+20 45 <> 20 200
+--- erwartet
+
+=== ein widget ohne gesetzten text sagt es
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "A", 10, 10, 80, 30)
+TRY
+    PRINT GUI_RICHTEXT_HEIGHT(b)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+kein gesetzter Text

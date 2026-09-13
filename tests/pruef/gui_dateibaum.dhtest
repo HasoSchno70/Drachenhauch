@@ -307,14 +307,15 @@ FOR f = 1 TO 20
     FLIP()
 NEXT
 --- datei ev.txt
-# Klick auf Zeile 0 (Text), dann aufs Kaestchen von Zeile 1
+# Klick auf Zeile 0 (Text), dann aufs Kaestchen von Zeile 1 -- es steht
+# GANZ LINKS, vor dem Auf-/Zuklapp-Dreieck (ax + 2, 16 breit).
 c 16
 e 3 7 160 64 0 0
 e 4 7 160 64 0 0
 e 4 6 0 0 0 0
 e 5 5 0 0 0 0
-e 14 7 60 86 0 0
-e 15 7 60 86 0 0
+e 14 7 36 86 0 0
+e 15 7 36 86 0 0
 e 15 6 0 0 0 0
 e 16 5 0 0 0 0
 --- umgebung
