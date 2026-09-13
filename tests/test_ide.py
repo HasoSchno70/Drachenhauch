@@ -2418,13 +2418,13 @@ def test_die_suche_im_handbuch_geht_weiter_und_zurueck(tmp_path):
         "Die erste nadel.\n\nDie zweite nadel.\n\nDie dritte nadel.\n", encoding="utf-8")
     quelle = _datei(tmp_path, "nadel = 1\n")
     ev = _taste(40, RL_F1)
-    # Suchfeld: Fenster bei (200, 60), Titel 30, Feld bei (436, 8).
+    # F1 traegt das Wort selbst ins Suchfeld ein; der Klick gibt ihm nur den
+    # Fokus. Fenster bei (200, 60), Titel 30, Feld bei (436, 8).
     ev += _klick_mit(70, 700, 110)
-    ev += _taste(80, RL_V, RL_LCTRL)
     ev += _taste(100, RL_ENTER)
     ev += _taste(120, RL_ENTER)
     ev += _taste(140, RL_ENTER, RL_LSHIFT)
-    log = _ide(tmp_path, quelle, frames=200, events=ev, wurzel=wurzel, zwischenablage="nadel")
+    log = _ide(tmp_path, quelle, frames=200, events=ev, wurzel=wurzel)
     treffer = [z.split(" ", 3) for z in log if z.startswith("hbsuche ")]
     assert len(treffer) == 3, log
     ys = [int(t[1]) for t in treffer]
