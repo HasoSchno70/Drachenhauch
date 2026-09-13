@@ -2893,7 +2893,11 @@ einer Zeichenkette ist ein Lexer-Fehler; der Text kommt jetzt ueber
 `CHR$(10)` (wie `"` ueber `CHR$(34)`). Gegenprobe ohne `AUTOMATION_PLAY`:
 56 der 58 Faelle fallen; die zwei uebrigen ("ein geaenderter Reiter fragt
 vor dem Schliessen", "ein Klick auf einen Ordner klappt ihn um") pruefen,
-dass NICHTS passiert -- in pytest genauso schwach.
+dass NICHTS passiert -- in pytest genauso schwach. **Nebenfund der vollen
+Pruefung:** `dhrt test tests/pruef` braucht mit den IDE-Sammlungen 780 s
+(sie laufen in Echtzeit und nacheinander), der Anker in
+`tests/test_dhrt_test.py` gab nur 600 s und riss im seriellen Durchgang --
+er hat jetzt 1800 s, die Formattests daneben bleiben bei 600.
 
 **Stufe 35 (2026-09-13):** die Staende 6 bis 12 der IDE ohne Python -- 43
 Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
