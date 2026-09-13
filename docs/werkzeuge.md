@@ -189,7 +189,12 @@ liest ein `--- nachher`-Programm — beim Anim-Editor die Laufzeit selbst
 Seit Stufe 34 auch die IDE (`tests/pruef/werkzeug_ide.dhtest`, Stände 1 bis 5):
 das `nachher`-Programm liest ihr Protokoll mit `READLINES` und prüft genaue
 Zeilen, Reihenfolgen und Zählungen — `--- inhalt` sucht nur Teiltexte, und
-`geprueft 1` stünde auch in `geprueft 10`.
+`geprueft 1` stünde auch in `geprueft 10`. Die Stände 6 bis 12 folgen in
+`tests/pruef/werkzeug_ide_6_12.dhtest`; eine Voreinstellung der IDE kommt dort
+als Beilage `_programm/ide.json`. **Falle:** ein Werkzeug, das aus einem
+relativen Pfad weitere Pfade ableitet und sie an ein Kind weiterreicht
+(`dhrt bild` wechselt ins Verzeichnis seiner Quelle), braucht den Pfad absolut
+— dafür `{fall}` in `--- umgebung`.
 
 Die Zeilen eines `--- bild`-Blocks:
 
