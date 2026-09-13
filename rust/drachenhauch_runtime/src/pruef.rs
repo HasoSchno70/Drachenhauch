@@ -272,6 +272,7 @@ pub const GEDULDETE_PFADE: &[(&str, &str)] = &[
     ("vscode-drachenhauch/build_grammar.py", "Grammatik-Generator, 2026-09-06 durch `dhrt doku grammatik` abgeloest"),
     ("drachenhauch/doku.py", "Quelltext-Referenz, 2026-09-06 durch `dhrt doku referenz` abgeloest"),
     ("tests/test_ide.py", "IDE-Tests, bis Stufe 38 (2026-09-13) nach tests/pruef/werkzeug_ide*.dhtest gezogen"),
+    ("tests/test_pilot_tracker.py", "Tracker-Pilot, in Stufe 40 (2026-09-13) nach tests/pruef/werkzeug_tracker.dhtest gezogen"),
 ];
 
 /// Alle Dateien und Verzeichnisse des Repos (ohne target/, __pycache__,

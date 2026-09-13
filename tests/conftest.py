@@ -212,7 +212,6 @@ _BRAUCHT_GRAFIK = {
     "test_m3d.py",
     "test_modules_audio.py",
     "test_pilot_tilemap.py",
-    "test_pilot_tracker.py",
     "test_pilot_sprite_auswahl.py",
     "test_shader_uniforms_geometry.py",
 }
