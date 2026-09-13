@@ -1,0 +1,244 @@
+' Die Bausteine der IDE in Drachenhauch, jeder fuer sich: Prozesse mit
+' laufender Ausgabe (PROCESS_*), Hover/Vervollstaendigung aus dhrt (CODE_*,
+' dieselben Funktionen wie `dhrt lsp`) und die Befehle des Textbereichs
+' (Marke, Auswahl, Suchen, Einfuegen). Die IDE selbst pruefen
+' tests/pruef/werkzeug_ide.dhtest und tests/test_ide.py. Bis Stufe 34 stand
+' das in tests/test_ide_bausteine.py.
+'
+' Die Textbereich-Befehle brauchen ein Fenster (GOTO rechnet mit der
+' Zeilenhoehe); es liegt ausserhalb des Schirms.
+
+=== prozess liefert ausgabe waehrend er laeuft
+' Das Kind druckt drei Zeilen mit Pausen; der Elternprozess liest sie
+' STUECKWEISE -- SHELL_START haette alles erst am Ende geliefert.
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "kind.dh")
+DIM runden AS INTEGER : runden = 0
+DIM teile AS INTEGER : teile = 0
+DIM alles AS STRING : alles = ""
+WHILE PROCESS_RUNNING(p) AND runden < 400
+    DIM t AS STRING : t = PROCESS_READ$(p)
+    IF t <> "" THEN teile = teile + 1 : alles = alles + t
+    SLEEP(20) : runden = runden + 1
+WEND
+alles = alles + PROCESS_READ$(p)
+PRINT teile >= 2
+PRINT TRIM$(REPLACE$(alles, CHR$(13), ""))
+PRINT PROCESS_CODE(p)
+PROCESS_CLOSE(p)
+--- datei kind.dh
+PRINT "eins"
+SLEEP(300)
+PRINT "zwei"
+SLEEP(300)
+PRINT "drei"
+--- erwartet
+TRUE
+eins
+zwei
+drei
+0
+
+=== prozess eingabe und rueckgabewert
+' "? " ist die INPUT-Aufforderung.
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "frage.dh")
+PROCESS_WRITE(p, "Welt" + CHR$(10))
+DIM runden AS INTEGER : runden = 0
+WHILE PROCESS_RUNNING(p) AND runden < 400 : SLEEP(20) : runden = runden + 1 : WEND
+PRINT TRIM$(REPLACE$(PROCESS_READ$(p), CHR$(13), ""))
+PRINT PROCESS_CODE(p)
+--- datei frage.dh
+DIM n AS STRING
+INPUT n
+PRINT "hallo " + n
+EXIT(3)
+--- erwartet
+? hallo Welt
+3
+
+=== prozess kill
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", "ewig.dh")
+SLEEP(200)
+PRINT PROCESS_RUNNING(p)
+PROCESS_KILL(p)
+PRINT PROCESS_RUNNING(p)
+PRINT PROCESS_CODE(p)
+--- datei ewig.dh
+WHILE TRUE : SLEEP(50) : WEND
+--- erwartet
+TRUE
+FALSE
+-1
+
+=== prozess mit unbekanntem programm
+PROCESS_START("gibt_es_nicht_xyz")
+--- fehler
+PROCESS_START: 'gibt_es_nicht_xyz' laesst sich nicht starten
+
+=== code check meldet zeilen des puffers
+PRINT CODE_CHECK$("PRINT 1" + CHR$(10) + "DIM x AS" + CHR$(10))
+PRINT CODE_CHECK$("PRINT 1")
+--- erwartet
+[{"zeile":2,"schwere":"fehler","meldung":"Erwartet Typ"}]
+[]
+
+=== code check loest import am ordner auf
+' Mit dem Ordner findet die Pruefung helfer.dh -- gemeldet wird nur Zeile 3.
+PRINT CODE_CHECK$("IMPORT " + CHR$(34) + "helfer.dh" + CHR$(34) + CHR$(10) + "gruss()" + CHR$(10) + "DIM x AS", CWD$())
+--- datei helfer.dh
+SUB gruss()
+END SUB
+--- erwartet
+[{"zeile":3,"schwere":"fehler","meldung":"Erwartet Typ"}]
+
+=== code hover complete definition references
+DIM q AS STRING : q = REPLACE$("' Spieler-Klasse\n' Zweite Zeile.\nCLASS Player\n    SUB Init()\n    END SUB\nEND CLASS\nFUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM r AS INTEGER\nr = add(1, 2)\nr = add(3, 4)\n", "\n", CHR$(10))
+PRINT INSTR(CODE_HOVER$(q, 11, 6), "FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER") >= 0
+PRINT INSTR(CODE_HOVER$(q, 3, 8), "Spieler-Klasse") >= 0
+PRINT INSTR(UPPER$(CODE_HOVER$("x = ABS(1)", 1, 6)), "ABS") >= 0
+PRINT CODE_HOVER$("   ", 1, 2) = ""
+DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(q + "Pl", 13, 3)
+PRINT v[0]
+PRINT LEN(CODE_COMPLETE("PRI", 1, 4)) > 0
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = CODE_DEFINITION(q, 11, 6)
+PRINT z ; " " ; s
+(z, s) = CODE_DEFINITION("PRINT 1", 1, 2)
+PRINT z
+DIM r AS ARRAY OF INTEGER : r = CODE_REFERENCES(q, 7, 11)
+PRINT LEN(r); " "; r[0]; " "; r[1]; " "; r[2]
+--- erwartet
+TRUE
+TRUE
+TRUE
+TRUE
+Player
+TRUE
+7 10
+-1
+3 7 11 12
+
+=== code symbols verschachtelt
+DIM q AS STRING : q = REPLACE$("' Spieler-Klasse\n' Zweite Zeile.\nCLASS Player\n    SUB Init()\n    END SUB\nEND CLASS\nFUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n    RETURN a + b\nEND FUNCTION\nDIM r AS INTEGER\nr = add(1, 2)\nr = add(3, 4)\n", "\n", CHR$(10))
+PRINT CODE_SYMBOLS$(q)
+--- erwartet
+[{"name":"Player","art":"class","von":3,"bis":6,"kinder":[{"name":"Init","art":"function","von":4,"bis":5,"kinder":[]}]},{"name":"add","art":"function","von":7,"bis":9,"kinder":[]}]
+
+=== textbereich marke auswahl suchen
+' Nach SET_TEXT steht die Marke am Ende; GOTO klemmt; eine rueckwaerts
+' markierte Auswahl kommt geordnet zurueck; ohne Auswahl steht die Marke an
+' beiden Enden; FIND mit TRUE unterscheidet Gross/Klein.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_SET_TEXT(ta, "eins zwei" + CHR$(10) + "drei Zwei" + CHR$(10) + "fuenf")
+GUI_UPDATE()
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z ; " " ; s
+GUI_TEXTAREA_GOTO(ta, 2, 3)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z ; " " ; s
+GUI_TEXTAREA_GOTO(ta, 99, 99)
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z ; " " ; s
+GUI_TEXTAREA_SELECT(ta, 1, 6, 2, 5)
+PRINT GUI_TEXTAREA_SELECTION$(ta)
+DIM z2 AS INTEGER
+DIM s2 AS INTEGER
+(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2
+GUI_TEXTAREA_SELECT(ta, 2, 5, 1, 6)
+(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2
+GUI_TEXTAREA_GOTO(ta, 3, 2)
+(z, s, z2, s2) = GUI_TEXTAREA_SELECTION_RANGE(ta) : PRINT z ; " " ; s ; " " ; z2 ; " " ; s2
+(z, s) = GUI_TEXTAREA_FIND(ta, "zwei") : PRINT z ; " " ; s
+(z, s) = GUI_TEXTAREA_FIND(ta, "zwei", 1, 7) : PRINT z ; " " ; s
+(z, s) = GUI_TEXTAREA_FIND(ta, "zwei", 1, 7, TRUE) : PRINT z ; " " ; s
+(z, s) = GUI_TEXTAREA_FIND(ta, "nix") : PRINT z
+WHILE NOT QUITREQUESTED() : GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP() : WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+3 6
+2 3
+3 6
+zwei
+drei
+1 6 2 5
+1 6 2 5
+3 2 3 2
+1 6
+2 6
+-1 -1
+-1
+
+=== textbereich einfuegen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_SET_TEXT(ta, "eins zwei" + CHR$(10) + "drei Zwei" + CHR$(10) + "fuenf")
+GUI_UPDATE()
+GUI_TEXTAREA_SELECT(ta, 1, 1, 1, 5)
+GUI_TEXTAREA_INSERT(ta, "EINS")
+PRINT GUI_TEXT(ta)
+DIM z AS INTEGER
+DIM s AS INTEGER
+(z, s) = GUI_TEXTAREA_CURSOR(ta) : PRINT z ; " " ; s
+GUI_TEXTAREA_GOTO(ta, 3, 6)
+GUI_TEXTAREA_INSERT(ta, " sechs")
+PRINT GUI_TEXT(ta)
+WHILE NOT QUITREQUESTED() : GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP() : WEND
+--- umgebung
+DHRT_FRAMES=6
+--- erwartet
+EINS zwei
+drei Zwei
+fuenf
+1 5
+EINS zwei
+drei Zwei
+fuenf sechs
+
+=== textbereich marken
+' Marken haengen an Zeilen; leere Felder loeschen; ungleiche Laengen sind
+' ein Fehler. Ob sie zu sehen sind, sagt das Bild (docs/ide.md).
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_SET_TEXT(ta, "eins zwei" + CHR$(10) + "drei Zwei" + CHR$(10) + "fuenf")
+GUI_UPDATE()
+GUI_TEXTAREA_MARKS(ta, [1, 3], [&HE05050, &HFFD040])
+GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
+GUI_TEXTAREA_MARKS(ta, [], [])
+PRINT "ok"
+TRY
+    GUI_TEXTAREA_MARKS(ta, [1, 2], [1])
+CATCH e
+    PRINT e
+END TRY
+WHILE NOT QUITREQUESTED() : GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP() : WEND
+--- umgebung
+DHRT_FRAMES=6
+--- enthaelt
+ok
+gleich lang
+
+=== textbereich befehle nur fuer textareas
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(w, 10, 10, 360, 200)
+GUI_SET_TEXT(ta, "eins zwei" + CHR$(10) + "drei Zwei" + CHR$(10) + "fuenf")
+GUI_UPDATE()
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 0, 250, 40, 20)
+GUI_TEXTAREA_GOTO(b, 1, 1)
+--- umgebung
+DHRT_FRAMES=3
+--- fehler
+GUI_TEXTAREA_GOTO: das Widget ist kein GUI_TEXTAREA
+

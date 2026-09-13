@@ -186,6 +186,10 @@ Seit Stufe 33 laufen so auch der Anim-FSM-Editor und das Notenblatt
 die Kopie ohne `WINDOW_MAXIMIZE()` (`--- streichen`), und was gesichert wurde,
 liest ein `--- nachher`-Programm — beim Anim-Editor die Laufzeit selbst
 (laden, aufsetzen, ein Schritt), beim Tracker-Export ein festes Gitter.
+Seit Stufe 34 auch die IDE (`tests/pruef/werkzeug_ide.dhtest`, Stände 1 bis 5):
+das `nachher`-Programm liest ihr Protokoll mit `READLINES` und prüft genaue
+Zeilen, Reihenfolgen und Zählungen — `--- inhalt` sucht nur Teiltexte, und
+`geprueft 1` stünde auch in `geprueft 10`.
 
 Die Zeilen eines `--- bild`-Blocks:
 

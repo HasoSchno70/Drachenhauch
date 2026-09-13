@@ -1,10 +1,13 @@
 """Die IDE in Drachenhauch (`ide/ide.dh`, Weg C aus docs/entwurf-python-abbau.md).
 
-Stand 1: Reiter mit Code-Feldern, Projektbaum, Fehlerliste, Hilfe zum Wort,
-Vervollstaendigung, Suchen/Ersetzen, Starten mit laufender Ausgabe. Geprueft
-wird ueber die Protokolldatei, die die IDE mit `DH_IDE_LOG` schreibt -- so
-sieht der Test, was sie getan hat, ohne ins Bild zu schauen -- und ueber
-Tasten, die eingespeist werden (F5 startet, F7 prueft).
+Geprueft wird ueber die Protokolldatei, die die IDE mit `DH_IDE_LOG` schreibt --
+so sieht der Test, was sie getan hat, ohne ins Bild zu schauen -- und ueber
+Tasten, die eingespeist werden.
+
+Die Faelle der Staende 1 bis 5 stehen seit Stufe 34 in
+`tests/pruef/werkzeug_ide.dhtest` (ohne Python). Hier geblieben sind aus
+diesen Staenden nur die, die zwei IDE-Laeufe hintereinander brauchen
+(Sitzung, Umbruch), ein git-Repository oder einen fremden PDF-Leser.
 
 Braucht ein Fenster und speist Tasten ein -- `_BRAUCHT_GRAFIK` und `_SERIELL`.
 """
@@ -90,48 +93,6 @@ def _ide(tmp_path, datei, frames=90, events=None, zwischenablage=None, konfig=No
     return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
 
 
-def test_ide_uebersetzt_ohne_befund():
-    r = subprocess.run([str(_DHRT), "--check", str(IDE)], capture_output=True, text=True,
-                       encoding="utf-8", timeout=120)
-    assert r.returncode == 0 and r.stdout.strip() == "[]", r.stdout
-
-
-def test_ide_oeffnet_datei_und_prueft(tmp_path):
-    (tmp_path / "spiel.dh").write_text('PRINT "hallo"\nDIM x AS\n', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "spiel.dh")
-    assert log[0] == "bereit" or "bereit" in log, log
-    assert any(z.startswith("geoeffnet ") and z.endswith("spiel.dh") for z in log), log
-    # Die Pruefung laeuft 0,6 s nach dem Oeffnen von selbst -- und findet den Fehler.
-    assert "geprueft 1" in log, log
-    assert log[-1] == "ende"
-
-
-def test_relativer_name_meint_den_ort_des_nutzers(tmp_path):
-    """`dhrt run` wechselt ins Verzeichnis der IDE; `spiel.dh` meint trotzdem
-    die Datei dort, wo der Nutzer steht (DHRT_START_DIR), und der Projektbaum
-    zeigt diesen Ordner -- nicht ide/."""
-    (tmp_path / "spiel.dh").write_text('PRINT 1\n', encoding="utf-8")
-    log = _ide(tmp_path, "spiel.dh")
-    assert any(z.startswith("geoeffnet ") and z.endswith("spiel.dh") for z in log), log
-    projekt = [z for z in log if z.startswith("projekt ")]
-    assert projekt and Path(projekt[0][8:]).resolve() == tmp_path.resolve(), log
-
-
-def test_f5_startet_das_programm_und_zeigt_das_ende(tmp_path):
-    (tmp_path / "spiel.dh").write_text('PRINT "hallo aus dem Spiel"\n', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=240,
-               events=[(20, KEY_DOWN, RL_F5), (22, KEY_UP, RL_F5)])
-    assert any(z.startswith("gestartet ") for z in log), log
-    assert "beendet 0" in log, log
-
-
-def test_f7_prueft_auf_tastendruck(tmp_path):
-    (tmp_path / "gut.dh").write_text('PRINT 1\n', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "gut.dh", frames=120,
-               events=_taste(60, RL_F7, RL_LSHIFT))
-    assert log.count("geprueft 0") >= 2, log
-
-
 def _taste(frame, code, *halten):
     """Eine Taste (mit gehaltenen Modifiern) druecken und wieder loslassen --
     eine eingespeiste Taste bleibt sonst bis zum Ende gedrueckt."""
@@ -141,70 +102,7 @@ def _taste(frame, code, *halten):
     return ev
 
 
-# ---------------------------------------------------------------- Stufe 2
-
-def test_debugger_haelt_am_haltepunkt_und_schreitet(tmp_path):
-    """Pfeil runter + F9 setzt den Haltepunkt in Zeile 2, F7 startet den
-    Debugger: er haelt NICHT in Zeile 1 (dort steht kein Haltepunkt), sondern
-    in 2; F10 schreitet nach 3; F8 laesst ihn zu Ende laufen."""
-    (tmp_path / "spiel.dh").write_text('PRINT 1\nPRINT 2\nPRINT 3', encoding="utf-8")
-    ev = _taste(20, RL_DOWN) + _taste(30, RL_F9) + _taste(40, RL_F7)
-    ev += _taste(160, RL_F10) + _taste(260, RL_F8)
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=420, events=ev)
-    assert "haltepunkt 2 an" in log, log
-    assert "debug gestartet" in log, log
-    pausen = [z for z in log if z.startswith("debug pause ")]
-    assert pausen[:2] == ["debug pause 2", "debug pause 3"], log
-    assert "debug beendet" in log, log
-
-
-def test_debugger_ohne_haltepunkt_steht_in_zeile_eins(tmp_path):
-    (tmp_path / "spiel.dh").write_text('PRINT 1\nPRINT 2', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=200, events=_taste(20, RL_F7))
-    assert "debug pause 1" in log, log
-    assert "debug beendet" not in log, log     # steht noch, als die Bilder ausgehen
-
-
-def test_profil_zeigt_gemessene_zeilen(tmp_path):
-    (tmp_path / "spiel.dh").write_text('DIM i AS INTEGER\nFOR i = 1 TO 200\n    PRINT i\nNEXT\n', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=300, events=_taste(20, RL_Y, RL_LCTRL, RL_LSHIFT))
-    assert "profil gestartet" in log, log
-    profil = [z for z in log if z.startswith("profil ") and z != "profil gestartet"]
-    assert profil and int(profil[0].split()[1]) >= 3, log
-
-
-def test_suche_im_projekt_findet_ueber_dateien(tmp_path):
-    # Das Suchwort darf NICHT in der IDE selbst vorkommen -- ihre Testkopie
-    # liegt im selben Ordner und wuerde mitgezaehlt.
-    (tmp_path / "a.dh").write_text('PRINT "Xyzzy"\nPRINT "nix"\n', encoding="utf-8")
-    (tmp_path / "b.dh").write_text('DIM xyzzy AS INTEGER\n', encoding="utf-8")
-    # Strg+Umschalt+F oeffnet die Frage, Strg+V tippt den Suchtext, Enter sucht.
-    ev = _taste(20, RL_F, RL_LCTRL, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    log = _ide(tmp_path, tmp_path / "a.dh", frames=150, events=ev, zwischenablage="xyzzy")
-    assert "suche 2" in log, log
-
-
-def test_befehlspalette_fuehrt_den_getippten_befehl_aus(tmp_path):
-    (tmp_path / "spiel.dh").write_text('PRINT 1\n', encoding="utf-8")
-    ev = _taste(20, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=ev, zwischenablage="profil")
-    assert "palette profil" in log, log
-    assert "profil gestartet" in log, log
-
-
 # ---------------------------------------------------------------- Stufe 3
-
-def test_f1_schlaegt_das_wort_unter_der_marke_im_handbuch_nach(tmp_path):
-    """Die Marke steht nach dem Oeffnen auf 1,1 -- vor `SPRITE_NEW`. F1 sucht
-    das Wort in docs/ und oeffnet das Dokument mit den meisten Fundstellen in
-    Codeschrift: das Sprite-Modul, nicht irgendeines, das das Wort erwaehnt."""
-    (tmp_path / "spiel.dh").write_text('SPRITE_NEW(1, 2, 3)\n', encoding="utf-8")
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=_taste(30, RL_F1))
-    treffer = [z for z in log if z.startswith("handbuch ")]
-    assert treffer, log
-    datei, zeile = treffer[0].split()[1], int(treffer[0].split()[2])
-    assert datei == "module-sprite.md" and zeile >= 1, log
-
 
 def test_listing_als_pdf_neben_der_quelle(tmp_path):
     fitz = pytest.importorskip("fitz")
@@ -221,24 +119,6 @@ def test_listing_als_pdf_neben_der_quelle(tmp_path):
     text = doc[0].get_text()
     assert "spiel.dh" in text and "Seite 1" in text and "Zeile 1 mit" in text, text[:300]
     assert "Zeile 140" in doc[2].get_text()
-
-
-def test_werkzeug_startet_aus_dem_menue(tmp_path):
-    (tmp_path / "spiel.dh").write_text('PRINT 1\n', encoding="utf-8")
-    ev = _taste(20, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=150, events=ev, zwischenablage="Werkzeug: SFX")
-    assert "werkzeug 183_sfx_generator.dh" in log, log
-
-
-def test_ausdruck_im_angehaltenen_debugger(tmp_path):
-    """F7 haelt in Zeile 1 (kein Haltepunkt); Strg+E holt die Eingabezeile,
-    Strg+V tippt den Ausdruck, Enter schickt ihn als `eval` -- die Antwort des
-    Kindes landet im Protokoll."""
-    (tmp_path / "spiel.dh").write_text('DIM a AS INTEGER\na = 20\nPRINT a\n', encoding="utf-8")
-    ev = _taste(20, RL_F7) + _taste(120, RL_E, RL_LCTRL) + _taste(140, RL_V, RL_LCTRL) + _taste(160, RL_ENTER)
-    log = _ide(tmp_path, tmp_path / "spiel.dh", frames=260, events=ev, zwischenablage="2 * 21")
-    assert "debug pause 1" in log, log
-    assert "eval 42" in log, log
 
 
 # ---------------------------------------------------------------- Stufe 4
@@ -267,80 +147,6 @@ def _datei(tmp_path, text, name="spiel.dh"):
     return p
 
 
-def test_kommentar_umschalten_schreibt_die_zeile_um(tmp_path):
-    """Strg+K vor `PRINT 1` (Marke steht nach dem Oeffnen in 1,1), Strg+S --
-    die Datei hat die Zeile auskommentiert, die zweite nicht."""
-    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n")
-    ev = _taste(20, RL_K, RL_LCTRL) + _taste(50, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=120, events=ev)
-    assert "kommentar 1-1" in log, log
-    assert quelle.read_text(encoding="utf-8") == "' PRINT 1\nPRINT 2\n"
-
-
-def test_zeile_duplizieren_und_lesezeichen(tmp_path):
-    """Strg+D verdoppelt die Zeile der Marke. Strg+F2 setzt ein Lesezeichen in
-    Zeile 2 (dort steht die Marke nach dem Duplizieren), F2 springt vom
-    Anfang aus dorthin."""
-    quelle = _datei(tmp_path, "PRINT 1\nPRINT 2\n")
-    ev = _taste(20, RL_D, RL_LCTRL) + _taste(40, RL_F2, RL_LCTRL) + _taste(60, RL_UP) + _taste(80, RL_F2)
-    ev += _taste(100, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=160, events=ev)
-    assert "dupliziert 1-1" in log, log
-    assert "lesezeichen 2 an" in log and "lesezeichen sprung 2" in log, log
-    assert quelle.read_text(encoding="utf-8") == "PRINT 1\nPRINT 1\nPRINT 2\n"
-
-
-def test_formatieren_ueber_code_format(tmp_path):
-    """Umschalt+Alt+F: Schluesselwoerter gross, der IF-Block eingerueckt --
-    derselbe Formatierer wie `dhrt fmt`, ueber CODE_FORMAT$ ohne Prozess."""
-    quelle = _datei(tmp_path, "print 1\nif 1 = 1 then\nprint 2\nend if\n")
-    ev = _taste(20, RL_F, RL_LSHIFT, RL_LALT) + _taste(50, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=120, events=ev)
-    assert "formatiert" in log, log
-    assert quelle.read_text(encoding="utf-8") == "PRINT 1\nIF 1 = 1 THEN\n    PRINT 2\nEND IF\n"
-
-
-def test_bedingter_haltepunkt_haelt_nur_wenn_die_bedingung_gilt(tmp_path):
-    """Zweimal Pfeil runter (Zeile 3, `PRINT i`), Umschalt+F9 fragt nach der
-    Bedingung, Strg+V tippt `i = 3`, Enter. F7: der Debugger haelt GENAU
-    einmal in Zeile 3 -- ohne Bedingung hielte er fuenfmal -- und F8 laesst
-    ihn zu Ende laufen, ohne weiteren Halt."""
-    quelle = _datei(tmp_path, "DIM i AS INTEGER\nFOR i = 1 TO 5\nPRINT i\nNEXT\n")
-    ev = _taste(20, RL_DOWN) + _taste(26, RL_DOWN) + _taste(40, RL_F9, RL_LSHIFT)
-    ev += _taste(70, RL_V, RL_LCTRL) + _taste(90, RL_ENTER) + _taste(110, RL_F7) + _taste(260, RL_F8)
-    log = _ide(tmp_path, quelle, frames=420, events=ev, zwischenablage="i = 3")
-    assert "haltepunkt 3 bedingt i = 3" in log, log
-    pausen = [z for z in log if z.startswith("debug pause ")]
-    assert pausen == ["debug pause 3"], log
-    assert "debug beendet" in log, log
-
-
-def test_export_schreibt_ein_eigenstaendiges_programm(tmp_path):
-    """Strg+F6 ruft `dhrt --export`; danach liegt spiel_dist/spiel.exe neben
-    der Quelle, und die Exe laeuft ohne dhrt."""
-    quelle = _datei(tmp_path, 'PRINT "exportiert"\n')
-    log = _ide(tmp_path, quelle, frames=420, events=_taste(20, RL_F6, RL_LCTRL))
-    fertig = [z for z in log if z.startswith("exportiert ")]
-    assert fertig and fertig[0].split()[1] == "0", log
-    exe = tmp_path / "spiel_dist" / ("spiel.exe" if os.name == "nt" else "spiel")
-    assert exe.exists(), sorted(p.name for p in tmp_path.iterdir())
-    r = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60, cwd=str(tmp_path))
-    assert r.stdout.strip() == "exportiert", (r.stdout, r.stderr)
-
-
-def test_gliederung_und_datei_im_projekt_oeffnen(tmp_path):
-    """Die Gliederung zaehlt die SUB der aktiven Datei. Strg+Umschalt+O
-    oeffnet den Waehler, Strg+V tippt einen Teil des Namens, Enter oeffnet
-    die zweite Datei des Projekts."""
-    _datei(tmp_path, "PRINT 2\n", name="anders.dh")
-    quelle = _datei(tmp_path, "SUB foo()\nEND SUB\nfoo()\n")
-    ev = _taste(60, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(90, RL_V, RL_LCTRL) + _taste(110, RL_ENTER)
-    log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="andrs")
-    assert "gliederung 1" in log, log
-    assert any(z.startswith("schnell ") and z.endswith("anders.dh") for z in log), log
-    assert any(z.startswith("geoeffnet ") and z.endswith("anders.dh") for z in log), log
-
-
 def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
     """Der erste Lauf merkt sich die Datei (zuletzt + Sitzung) in der
     ide.json; der zweite Lauf ohne gueltige Datei stellt sie wieder her."""
@@ -355,27 +161,6 @@ def test_sitzung_und_zuletzt_geoeffnet_ueberleben_den_neustart(tmp_path):
 
 
 # ---------------------------------------------------------------- Stufe 5
-
-def test_falten_klappt_den_block_der_marke_zu(tmp_path):
-    """F4 auf Zeile 1 (`SUB foo()`) klappt den Block zu, ein zweites F4
-    wieder auf. Der Beleg ist das Protokoll -- ob die Zeilen wirklich
-    verschwinden, prueft tests/pruef/gui_faltung.dhtest am Bild."""
-    quelle = _datei(tmp_path, "SUB foo()\n    PRINT 1\n    PRINT 2\nEND SUB\nfoo()\n")
-    # Die faltbaren Bloecke kommen aus der Pruefung (0,6 s nach dem Oeffnen).
-    ev = _taste(70, RL_F4) + _taste(100, RL_F4)
-    log = _ide(tmp_path, quelle, frames=160, events=ev)
-    assert "falte 1 zu" in log, log
-    assert "falte 1 auf" in log, log
-
-
-def test_alles_zuklappen_nimmt_nur_die_aeusseren_bloecke(tmp_path):
-    """Strg+F4 klappt beide SUBs zu (zwei Bloecke), Umschalt+F4 alles auf."""
-    quelle = _datei(tmp_path, "SUB a()\nPRINT 1\nEND SUB\n\nSUB b()\nPRINT 2\nEND SUB\n")
-    ev = _taste(70, RL_F4, RL_LCTRL) + _taste(110, RL_F4, RL_LSHIFT)
-    log = _ide(tmp_path, quelle, frames=170, events=ev)
-    assert "falten alle 2" in log, log
-    assert "falten alle 0" in log, log
-
 
 def test_zeilenumbruch_bleibt_gemerkt(tmp_path):
     """Alt+Z schaltet den Umbruch an; er steht in der ide.json und gilt beim
@@ -411,103 +196,6 @@ def test_sitzung_haengt_am_projektordner(tmp_path):
     assert not any(z.endswith("zwei.dh") for z in geoeffnet), log
 
 
-def test_umbenennen_trifft_die_stellen_und_laesst_text_und_kommentar(tmp_path):
-    """Die Marke steht nach dem Oeffnen in 1,1, also auf `zaehler`.
-    Umschalt+F6, Strg+V tippt den neuen Namen, Enter, Strg+S. Der Kommentar
-    und die Zeichenkette bleiben, wie sie waren -- das ist die Gegenprobe zu
-    einem Suchen-und-Ersetzen."""
-    quelle = _datei(tmp_path, 'zaehler = 1\nzaehler = zaehler + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
-    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    ev += _taste(100, RL_ENTER)          # die Vorschau uebernehmen
-    ev += _taste(140, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=210, events=ev, zwischenablage="summe")
-    assert any(z.startswith("umbau vorschau ") for z in log), log
-    assert any(z.startswith("umbenannt ") and z.endswith(" summe") for z in log), log
-    assert quelle.read_text(encoding="utf-8") == (
-        'summe = 1\nsumme = summe + 1   \' zaehler bleibt\nPRINT "zaehler"\n')
-
-
-def test_umbenennen_lehnt_einen_krummen_namen_ab(tmp_path):
-    """Ein Name faengt nicht mit einer Ziffer an -- die Datei bleibt, wie sie
-    war, statt halb umbenannt zu werden."""
-    quelle = _datei(tmp_path, "zaehler = 1\n")
-    ev = _taste(20, RL_F6, RL_LSHIFT) + _taste(50, RL_V, RL_LCTRL) + _taste(70, RL_ENTER)
-    ev += _taste(100, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=170, events=ev, zwischenablage="2krumm")
-    assert not any(z.startswith("umbenannt ") for z in log), log
-    assert quelle.read_text(encoding="utf-8") == "zaehler = 1\n"
-
-
-def test_schnipsel_fuegt_das_geruest_mit_der_einrueckung_ein(tmp_path):
-    """Strg+J oeffnet den Waehler, Strg+V tippt einen Teil des Namens, Enter
-    fuegt ein. Die Marke steht eingerueckt in der Zeile -- deshalb rueckt
-    auch der Schnipsel ein."""
-    quelle = _datei(tmp_path, "IF 1 = 1 THEN\n    \nEND IF\n")
-    ev = _taste(20, RL_DOWN) + _taste(30, RL_END) + _taste(50, RL_J, RL_LCTRL)
-    ev += _taste(80, RL_V, RL_LCTRL) + _taste(110, RL_ENTER) + _taste(140, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="while")
-    assert any(z.startswith("schnipsel WHILE") for z in log), log
-    assert quelle.read_text(encoding="utf-8") == "IF 1 = 1 THEN\n    WHILE \n\n    WEND\nEND IF\n"
-
-
-def test_signaturhilfe_zeigt_den_aufruf_mitten_in_der_argumentliste(tmp_path):
-    """Die Marke steht zwischen den Argumenten von SCREEN -- dort steht sie
-    auf einem Komma, und die Hilfe zum Wort schwiege. Gegenprobe: in Zeile 2
-    (ausserhalb jeder Klammer) meldet sie nichts."""
-    quelle = _datei(tmp_path, "SCREEN(800, 600, \"T\", 1)\nPRINT 1\n")
-    # Zeile 1, hinter dem ersten Komma: elfmal nach rechts
-    ev = []
-    for k in range(11):
-        ev += _taste(20 + k * 3, RL_RIGHT)
-    ev += _taste(90, RL_DOWN)
-    log = _ide(tmp_path, quelle, frames=160, events=ev)
-    sig = [z for z in log if z.startswith("signatur ")]
-    assert sig and "SCREEN(" in sig[0], log
-    assert "Argument" in sig[0], log
-
-
-def test_geteilte_ansicht_zeigt_zwei_dateien_nebeneinander(tmp_path):
-    """Zwei Dateien offen, Alt+G teilt: links der andere Reiter, rechts der
-    aktive. Beide Felder liegen NEBENEINANDER -- gemessen an ihren
-    Rechtecken, nicht am Protokoll allein. Alt+G schaltet wieder aus."""
-    _datei(tmp_path, "PRINT 2\n", name="zwei.dh")
-    quelle = _datei(tmp_path, "PRINT 1\n")
-    ev = _taste(30, RL_O, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(80, RL_ENTER)
-    ev += _taste(130, RL_G, RL_LALT) + _taste(180, RL_G, RL_LALT)
-    log = _ide(tmp_path, quelle, frames=240, events=ev, zwischenablage="zwei")
-    # "geteilt 0 x <x>+<breite> <x>+<breite>" -- links der Reiter 0, rechts
-    # der aktive. Dass der Befehl LIEF, sagte nichts darueber, ob die Felder
-    # auch nebeneinander liegen.
-    lagen = [z for z in log if z.startswith("geteilt 0 x ")]
-    assert lagen, log
-    links, rechts = lagen[0].split(" x ")[1].split()
-    lx, lb = (int(t) for t in links.split("+"))
-    rx, rb = (int(t) for t in rechts.split("+"))
-    assert lx + lb <= rx, lagen        # linkes Feld endet vor dem rechten
-    assert lb > 100 and rb > 100, lagen
-    assert "geteilt aus" in log, log
-
-
-def test_geteilte_ansicht_braucht_zwei_dateien(tmp_path):
-    """Mit nur einem Reiter gibt es nichts zu teilen -- und die IDE sagt es,
-    statt still nichts zu tun."""
-    quelle = _datei(tmp_path, "PRINT 1\n")
-    log = _ide(tmp_path, quelle, frames=120, events=_taste(40, RL_G, RL_LALT))
-    assert not any(z.startswith("geteilt ") for z in log), log
-
-
-def test_uebersichtskarte_bleibt_gemerkt(tmp_path):
-    """Ueber die Befehlspalette angeschaltet; sie steht danach in der
-    ide.json und ist beim naechsten Start wieder da."""
-    import json
-    quelle = _datei(tmp_path, "PRINT 1\n" * 40)
-    ev = _taste(30, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(60, RL_V, RL_LCTRL) + _taste(90, RL_ENTER)
-    log = _ide(tmp_path, quelle, frames=160, events=ev, zwischenablage="Uebersichtskarte")
-    assert "karte an" in log, log
-    konfig = json.loads((_aussen(tmp_path) / "ide.json").read_text(encoding="utf-8"))
-    assert konfig["karte"] is True, konfig
-
-
 def test_git_blame_listet_wer_welche_zeile_geschrieben_hat(tmp_path):
     """Ein kleines Repository, ein Commit, Strg+Umschalt+B: die Liste unten
     rechts nennt je Zeile Datum und Person. Gegenprobe: ohne Repository
@@ -521,36 +209,6 @@ def test_git_blame_listet_wer_welche_zeile_geschrieben_hat(tmp_path):
             pytest.skip("git nicht verfuegbar: " + r.stderr.decode("utf-8", "replace"))
     log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
     assert "blame 3" in log, log
-
-
-def test_git_blame_ohne_repository_sagt_es(tmp_path):
-    """Kein Repository: keine Zeilen, und die IDE haelt nicht an."""
-    quelle = _datei(tmp_path, "PRINT 1\n")
-    log = _ide(tmp_path, quelle, frames=140, events=_taste(40, RL_B, RL_LCTRL, RL_LSHIFT))
-    assert "blame 0" in log, log
-
-
-def test_handbuch_gesetzt_und_als_quelltext(tmp_path):
-    """F1 oeffnet das Handbuch in der gesetzten Ansicht; ueber die
-    Befehlspalette laesst sich auf den Quelltext umschalten."""
-    quelle = _datei(tmp_path, "SCREEN(320, 240)\n")
-    ev = _taste(30, RL_F1)
-    ev += _taste(80, RL_P, RL_LCTRL, RL_LSHIFT) + _taste(110, RL_V, RL_LCTRL) + _taste(140, RL_ENTER)
-    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="Handbuch: gesetzt")
-    assert "hbansicht gesetzt" in log, log
-    assert "hbansicht quelltext" in log, log
-
-
-def test_marken_auf_jede_fundstelle_und_tippen_aendert_alle(tmp_path):
-    """Die Marke steht auf `hp`. Strg+Umschalt+L setzt auf jede Fundstelle
-    eine Marke; ein Strg+V schreibt dann an allen dreien -- und NUR dort,
-    `hpmax` bleibt, wie es war."""
-    quelle = _datei(tmp_path, "hp = 1\nhp = hp + 1\nhpmax = 9\n")
-    ev = _taste(30, RL_L, RL_LCTRL, RL_LSHIFT) + _taste(70, RL_V, RL_LCTRL)
-    ev += _taste(110, RL_S, RL_LCTRL)
-    log = _ide(tmp_path, quelle, frames=200, events=ev, zwischenablage="X")
-    assert "marken 3" in log, log
-    assert quelle.read_text(encoding="utf-8") == "Xhp = 1\nXhp = Xhp + 1\nhpmax = 9\n"
 
 
 # ---------------------------------------------------------------- Stufe 6

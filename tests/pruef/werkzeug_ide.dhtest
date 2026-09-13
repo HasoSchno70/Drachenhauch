@@ -1,0 +1,2588 @@
+' Die IDE in Drachenhauch (ide/ide.dh), Staende 1 bis 5 -- ohne Python
+' geprueft. Bis Stufe 34 standen diese Faelle in tests/test_ide.py; was dort
+' bleibt, braucht zwei Laeufe hintereinander (Sitzung), ein git-Repository
+' oder einen fremden PDF-Leser.
+'
+' Die IDE laeuft als Kopie in _programm/ (der Projektbaum uebergeht Ordner mit
+' `_`), der Fallordner ist ihr Projekt. Aufnahme, Protokoll und Sitzung liegen
+' in _programm/; ein Einschub hinter SETFPS(60) spielt die Aufnahme ab und
+' legt, wo noetig, den Text in die Zwischenablage -- getippt wird mit Strg+V,
+' weil die Wiedergabe keine Zeichen einspeist. Darum laufen die Faelle
+' nacheinander. Gelesen wird danach mit `--- nachher`: das Protokoll
+' zeilenweise (genau, nicht als Teiltext), gesicherte Dateien als |Zeile|.
+' In der Aufnahme: 2 Taste runter, 1 hoch.
+--- seriell
+
+=== ide uebersetzt ohne befund
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", GETENV$("IDE_QUELLE"))
+DIM bis AS INTEGER : bis = MILLIS() + 120000
+DIM befund AS STRING : befund = ""
+WHILE MILLIS() < bis
+    DIM zz AS STRING : zz = PROCESS_READ$(pc)
+    IF zz <> "" THEN befund = befund + zz
+    IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+WEND
+PRINT "check " + TRIM$(befund) ; " " ; PROCESS_CODE(pc)
+--- umgebung
+IDE_QUELLE={sammlung}/../../ide/ide.dh
+--- erwartet
+check [] 0
+
+=== oeffnet datei und prueft
+' Die Pruefung laeuft 0,6 s nach dem Oeffnen von selbst und findet den Fehler.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=90
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "hallo"
+DIM x AS
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "bereit " ; hat("bereit")
+PRINT "geoeffnet " ; endet("geoeffnet ", "spiel.dh")
+PRINT "geprueft 1 " ; hat("geprueft 1")
+PRINT "ende zuletzt " ; L[LEN(L) - 1] = "ende"
+--- erwartet
+bereit TRUE
+geoeffnet TRUE
+geprueft 1 TRUE
+ende zuletzt TRUE
+
+=== relativer name meint den ort des nutzers
+' `dhrt run` wechselt ins Verzeichnis der IDE; `spiel.dh` meint trotzdem die
+' Datei dort, wo der Nutzer steht (DHRT_START_DIR), und der Projektbaum zeigt
+' diesen Ordner -- nicht _programm/. Verglichen werden die letzten zwei
+' Pfadteile: derselbe Ordner kommt einmal mit 8.3-Kurznamen (HANSGA~1) und
+' einmal mit langem Namen an.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=90
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "geoeffnet " ; endet("geoeffnet ", "spiel.dh")
+DIM pj AS STRING : pj = MID$(erste$("projekt "), 8)
+FUNCTION norm$(x AS STRING) AS STRING
+    DIM y AS STRING : y = LOWER$(REPLACE$(x, "\", "/"))
+    IF RIGHT$(y, 1) = "/" THEN y = LEFT$(y, LEN(y) - 1)
+    DIM t AS ARRAY OF STRING : t = SPLIT$(y, "/")
+    IF LEN(t) < 2 THEN RETURN y
+    RETURN t[LEN(t) - 2] + "/" + t[LEN(t) - 1]
+END FUNCTION
+PRINT "projekt ist der fallordner " ; norm$(pj) = norm$(CWD$())
+--- erwartet
+geoeffnet TRUE
+projekt ist der fallordner TRUE
+
+=== f5 startet das programm
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "hallo aus dem Spiel"
+--- datei _programm/ev.txt
+c 2
+e 20 2 294 0 0 0
+e 22 1 294 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "gestartet " ; erste$("gestartet ") <> ""
+PRINT "beendet 0 " ; hat("beendet 0")
+--- erwartet
+gestartet TRUE
+beendet 0 TRUE
+
+=== umschalt f7 prueft auf tastendruck
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 4
+e 60 2 340 0 0 0
+e 60 2 296 0 0 0
+e 62 1 296 0 0 0
+e 62 1 340 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "zweimal geprueft " ; zahl("geprueft 0") >= 2
+--- erwartet
+zweimal geprueft TRUE
+
+=== debugger haelt am haltepunkt und schreitet
+' Pfeil runter + F9 setzt den Haltepunkt in Zeile 2, F7 startet den Debugger:
+' er haelt NICHT in Zeile 1, sondern in 2; F10 schreitet nach 3; F8 laesst ihn
+' zu Ende laufen.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=420
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+PRINT 3
+--- datei _programm/ev.txt
+c 10
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 30 2 298 0 0 0
+e 32 1 298 0 0 0
+e 40 2 296 0 0 0
+e 42 1 296 0 0 0
+e 160 2 299 0 0 0
+e 162 1 299 0 0 0
+e 260 2 297 0 0 0
+e 262 1 297 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "haltepunkt 2 an " ; hat("haltepunkt 2 an")
+PRINT "debug gestartet " ; hat("debug gestartet")
+PRINT "pausen 2 dann 3 " ; LEFT$(alle$("debug pause "), 27) = "debug pause 2|debug pause 3"
+PRINT "debug beendet " ; hat("debug beendet")
+--- erwartet
+haltepunkt 2 an TRUE
+debug gestartet TRUE
+pausen 2 dann 3 TRUE
+debug beendet TRUE
+
+=== debugger ohne haltepunkt steht in zeile eins
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+--- datei _programm/ev.txt
+c 2
+e 20 2 296 0 0 0
+e 22 1 296 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "debug pause 1 " ; hat("debug pause 1")
+PRINT "noch nicht beendet " ; NOT hat("debug beendet")
+--- erwartet
+debug pause 1 TRUE
+noch nicht beendet TRUE
+
+=== profil zeigt gemessene zeilen
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=300
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM i AS INTEGER
+FOR i = 1 TO 200
+    PRINT i
+NEXT
+--- datei _programm/ev.txt
+c 6
+e 20 2 341 0 0 0
+e 20 2 340 0 0 0
+e 20 2 89 0 0 0
+e 22 1 89 0 0 0
+e 22 1 341 0 0 0
+e 22 1 340 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "profil gestartet " ; hat("profil gestartet")
+DIM pr AS STRING : pr = ""
+DIM ip AS INTEGER
+FOR ip = 0 TO LEN(L) - 1
+    IF LEFT$(L[ip], 7) = "profil " AND L[ip] <> "profil gestartet" AND pr = "" THEN pr = L[ip]
+NEXT
+DIM tp AS ARRAY OF STRING : tp = SPLIT$(pr + " 0 0", " ")
+PRINT "mindestens drei zeilen " ; VAL(tp[1]) >= 3
+--- erwartet
+profil gestartet TRUE
+mindestens drei zeilen TRUE
+
+=== suche im projekt findet ueber dateien
+' Strg+Umschalt+F oeffnet die Frage, Strg+V tippt den Suchtext, Enter sucht.
+' Die IDE-Kopie mit dem Suchtext liegt in _programm/ und zaehlt nicht mit.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("xyzzy")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+a.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei a.dh
+PRINT "Xyzzy"
+PRINT "nix"
+--- datei b.dh
+DIM xyzzy AS INTEGER
+--- datei _programm/ev.txt
+c 12
+e 20 2 341 0 0 0
+e 20 2 340 0 0 0
+e 20 2 70 0 0 0
+e 22 1 70 0 0 0
+e 22 1 341 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "suche 2 " ; hat("suche 2")
+--- erwartet
+suche 2 TRUE
+
+=== befehlspalette fuehrt den getippten befehl aus
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("profil")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 12
+e 20 2 341 0 0 0
+e 20 2 340 0 0 0
+e 20 2 80 0 0 0
+e 22 1 80 0 0 0
+e 22 1 341 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "palette profil " ; hat("palette profil")
+PRINT "profil gestartet " ; hat("profil gestartet")
+--- erwartet
+palette profil TRUE
+profil gestartet TRUE
+
+=== f1 schlaegt das wort im handbuch nach
+' Die Marke steht nach dem Oeffnen vor `SPRITE_NEW`. F1 oeffnet das Dokument
+' mit den meisten Fundstellen in Codeschrift -- das Sprite-Modul.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SPRITE_NEW(1, 2, 3)
+--- datei _programm/ev.txt
+c 2
+e 30 2 290 0 0 0
+e 32 1 290 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+DIM tb AS ARRAY OF STRING : tb = SPLIT$(erste$("handbuch ") + " x 0", " ")
+PRINT "dokument " ; tb[1] ; " " ; VAL(tb[2]) >= 1
+--- erwartet
+dokument module-sprite.md TRUE
+
+=== werkzeug startet aus dem menue
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("Werkzeug: SFX")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 12
+e 20 2 341 0 0 0
+e 20 2 340 0 0 0
+e 20 2 80 0 0 0
+e 22 1 80 0 0 0
+e 22 1 341 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "werkzeug 183_sfx_generator.dh " ; hat("werkzeug 183_sfx_generator.dh")
+--- erwartet
+werkzeug 183_sfx_generator.dh TRUE
+
+=== ausdruck im angehaltenen debugger
+' F7 haelt in Zeile 1; Strg+E holt die Eingabezeile, Strg+V tippt den Ausdruck,
+' Enter schickt ihn als `eval`.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("2 * 21")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM a AS INTEGER
+a = 20
+PRINT a
+--- datei _programm/ev.txt
+c 12
+e 20 2 296 0 0 0
+e 22 1 296 0 0 0
+e 120 2 341 0 0 0
+e 120 2 69 0 0 0
+e 122 1 69 0 0 0
+e 122 1 341 0 0 0
+e 140 2 341 0 0 0
+e 140 2 86 0 0 0
+e 142 1 86 0 0 0
+e 142 1 341 0 0 0
+e 160 2 257 0 0 0
+e 162 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "debug pause 1 " ; hat("debug pause 1")
+PRINT "eval 42 " ; hat("eval 42")
+--- erwartet
+debug pause 1 TRUE
+eval 42 TRUE
+
+=== kommentar umschalten schreibt die zeile um
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+--- datei _programm/ev.txt
+c 8
+e 20 2 341 0 0 0
+e 20 2 75 0 0 0
+e 22 1 75 0 0 0
+e 22 1 341 0 0 0
+e 50 2 341 0 0 0
+e 50 2 83 0 0 0
+e 52 1 83 0 0 0
+e 52 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "kommentar 1-1 " ; hat("kommentar 1-1")
+zeige("spiel.dh")
+--- erwartet
+kommentar 1-1 TRUE
+|' PRINT 1|
+|PRINT 2|
+
+=== zeile duplizieren und lesezeichen
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+--- datei _programm/ev.txt
+c 16
+e 20 2 341 0 0 0
+e 20 2 68 0 0 0
+e 22 1 68 0 0 0
+e 22 1 341 0 0 0
+e 40 2 341 0 0 0
+e 40 2 291 0 0 0
+e 42 1 291 0 0 0
+e 42 1 341 0 0 0
+e 60 2 265 0 0 0
+e 62 1 265 0 0 0
+e 80 2 291 0 0 0
+e 82 1 291 0 0 0
+e 100 2 341 0 0 0
+e 100 2 83 0 0 0
+e 102 1 83 0 0 0
+e 102 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "dupliziert 1-1 " ; hat("dupliziert 1-1")
+PRINT "lesezeichen 2 an " ; hat("lesezeichen 2 an")
+PRINT "lesezeichen sprung 2 " ; hat("lesezeichen sprung 2")
+zeige("spiel.dh")
+--- erwartet
+dupliziert 1-1 TRUE
+lesezeichen 2 an TRUE
+lesezeichen sprung 2 TRUE
+|PRINT 1|
+|PRINT 1|
+|PRINT 2|
+
+=== formatieren ueber code format
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+print 1
+if 1 = 1 then
+print 2
+end if
+--- datei _programm/ev.txt
+c 10
+e 20 2 340 0 0 0
+e 20 2 342 0 0 0
+e 20 2 70 0 0 0
+e 22 1 70 0 0 0
+e 22 1 340 0 0 0
+e 22 1 342 0 0 0
+e 50 2 341 0 0 0
+e 50 2 83 0 0 0
+e 52 1 83 0 0 0
+e 52 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "formatiert " ; hat("formatiert")
+zeige("spiel.dh")
+--- erwartet
+formatiert TRUE
+|PRINT 1|
+|IF 1 = 1 THEN|
+|    PRINT 2|
+|END IF|
+
+=== bedingter haltepunkt haelt nur wenn die bedingung gilt
+' Ohne Bedingung hielte der Debugger fuenfmal in Zeile 3.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("i = 3")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=420
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+DIM i AS INTEGER
+FOR i = 1 TO 5
+PRINT i
+NEXT
+--- datei _programm/ev.txt
+c 18
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 26 2 264 0 0 0
+e 28 1 264 0 0 0
+e 40 2 340 0 0 0
+e 40 2 298 0 0 0
+e 42 1 298 0 0 0
+e 42 1 340 0 0 0
+e 70 2 341 0 0 0
+e 70 2 86 0 0 0
+e 72 1 86 0 0 0
+e 72 1 341 0 0 0
+e 90 2 257 0 0 0
+e 92 1 257 0 0 0
+e 110 2 296 0 0 0
+e 112 1 296 0 0 0
+e 260 2 297 0 0 0
+e 262 1 297 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "haltepunkt 3 bedingt i = 3 " ; hat("haltepunkt 3 bedingt i = 3")
+PRINT "genau ein halt " ; alle$("debug pause ") = "debug pause 3"
+PRINT "debug beendet " ; hat("debug beendet")
+--- erwartet
+haltepunkt 3 bedingt i = 3 TRUE
+genau ein halt TRUE
+debug beendet TRUE
+
+=== export schreibt ein eigenstaendiges programm
+' Strg+F6 ruft `dhrt --export`; danach liegt spiel_dist/spiel.exe neben der
+' Quelle, und die Exe laeuft ohne dhrt.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=420
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "exportiert"
+--- datei _programm/ev.txt
+c 4
+e 20 2 341 0 0 0
+e 20 2 295 0 0 0
+e 22 1 295 0 0 0
+e 22 1 341 0 0 0
+
+--- system windows
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "export 0 " ; LEFT$(erste$("exportiert "), 12) = "exportiert 0"
+DIM px AS INTEGER : px = PROCESS_START("spiel_dist/spiel.exe")
+DIM bx AS INTEGER : bx = MILLIS() + 60000
+DIM ax AS STRING : ax = ""
+WHILE MILLIS() < bx
+    DIM zx AS STRING : zx = PROCESS_READ$(px)
+    IF zx <> "" THEN ax = ax + zx
+    IF zx = "" AND NOT PROCESS_RUNNING(px) THEN BREAK
+WEND
+PRINT "die exe sagt " + TRIM$(REPLACE$(ax, CHR$(13), ""))
+--- erwartet
+export 0 TRUE
+die exe sagt exportiert
+
+=== gliederung und datei im projekt oeffnen
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("andrs")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SUB foo()
+END SUB
+foo()
+--- datei anders.dh
+PRINT 2
+--- datei _programm/ev.txt
+c 12
+e 60 2 341 0 0 0
+e 60 2 340 0 0 0
+e 60 2 79 0 0 0
+e 62 1 79 0 0 0
+e 62 1 341 0 0 0
+e 62 1 340 0 0 0
+e 90 2 341 0 0 0
+e 90 2 86 0 0 0
+e 92 1 86 0 0 0
+e 92 1 341 0 0 0
+e 110 2 257 0 0 0
+e 112 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "gliederung 1 " ; hat("gliederung 1")
+PRINT "schnell " ; endet("schnell ", "anders.dh")
+PRINT "geoeffnet " ; endet("geoeffnet ", "anders.dh")
+--- erwartet
+gliederung 1 TRUE
+schnell TRUE
+geoeffnet TRUE
+
+=== falten klappt den block der marke zu
+' Ob die Zeilen wirklich verschwinden, prueft gui_faltung.dhtest am Bild.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SUB foo()
+    PRINT 1
+    PRINT 2
+END SUB
+foo()
+--- datei _programm/ev.txt
+c 4
+e 70 2 293 0 0 0
+e 72 1 293 0 0 0
+e 100 2 293 0 0 0
+e 102 1 293 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "falte 1 zu " ; hat("falte 1 zu")
+PRINT "falte 1 auf " ; hat("falte 1 auf")
+--- erwartet
+falte 1 zu TRUE
+falte 1 auf TRUE
+
+=== alles zuklappen nimmt nur die aeusseren bloecke
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SUB a()
+PRINT 1
+END SUB
+
+SUB b()
+PRINT 2
+END SUB
+--- datei _programm/ev.txt
+c 8
+e 70 2 341 0 0 0
+e 70 2 293 0 0 0
+e 72 1 293 0 0 0
+e 72 1 341 0 0 0
+e 110 2 340 0 0 0
+e 110 2 293 0 0 0
+e 112 1 293 0 0 0
+e 112 1 340 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "falten alle 2 " ; hat("falten alle 2")
+PRINT "falten alle 0 " ; hat("falten alle 0")
+--- erwartet
+falten alle 2 TRUE
+falten alle 0 TRUE
+
+=== umbenennen laesst text und kommentar
+' Umschalt+F6, neuer Name, Enter, Vorschau uebernehmen, Strg+S. Kommentar und
+' Zeichenkette bleiben -- die Gegenprobe zu Suchen-und-Ersetzen.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("summe")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=210
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+zaehler = 1
+zaehler = zaehler + 1   ' zaehler bleibt
+PRINT "zaehler"
+--- datei _programm/ev.txt
+c 16
+e 20 2 340 0 0 0
+e 20 2 295 0 0 0
+e 22 1 295 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+e 100 2 257 0 0 0
+e 102 1 257 0 0 0
+e 140 2 341 0 0 0
+e 140 2 83 0 0 0
+e 142 1 83 0 0 0
+e 142 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "vorschau " ; erste$("umbau vorschau ") <> ""
+PRINT "umbenannt " ; endet("umbenannt ", " summe")
+zeige("spiel.dh")
+--- erwartet
+vorschau TRUE
+umbenannt TRUE
+|summe = 1|
+|summe = summe + 1   ' zaehler bleibt|
+|PRINT "zaehler"|
+
+=== umbenennen lehnt einen krummen namen ab
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("2krumm")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=170
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+zaehler = 1
+--- datei _programm/ev.txt
+c 14
+e 20 2 340 0 0 0
+e 20 2 295 0 0 0
+e 22 1 295 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+e 100 2 341 0 0 0
+e 100 2 83 0 0 0
+e 102 1 83 0 0 0
+e 102 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "nicht umbenannt " ; erste$("umbenannt ") = ""
+zeige("spiel.dh")
+--- erwartet
+nicht umbenannt TRUE
+|zaehler = 1|
+
+=== schnipsel fuegt das geruest mit der einrueckung ein
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("while")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=220
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+IF 1 = 1 THEN
+    
+END IF
+--- datei _programm/ev.txt
+c 18
+e 20 2 264 0 0 0
+e 22 1 264 0 0 0
+e 30 2 269 0 0 0
+e 32 1 269 0 0 0
+e 50 2 341 0 0 0
+e 50 2 74 0 0 0
+e 52 1 74 0 0 0
+e 52 1 341 0 0 0
+e 80 2 341 0 0 0
+e 80 2 86 0 0 0
+e 82 1 86 0 0 0
+e 82 1 341 0 0 0
+e 110 2 257 0 0 0
+e 112 1 257 0 0 0
+e 140 2 341 0 0 0
+e 140 2 83 0 0 0
+e 142 1 83 0 0 0
+e 142 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "schnipsel " ; erste$("schnipsel WHILE") <> ""
+zeige("spiel.dh")
+--- erwartet
+schnipsel TRUE
+|IF 1 = 1 THEN|
+|    WHILE |
+||
+|    WEND|
+|END IF|
+
+=== signaturhilfe mitten in der argumentliste
+' Die Marke steht hinter dem ersten Komma von SCREEN -- auf einem Komma, wo die
+' Hilfe zum Wort schwiege.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SCREEN(800, 600, "T", 1)
+PRINT 1
+--- datei _programm/ev.txt
+c 24
+e 20 2 262 0 0 0
+e 22 1 262 0 0 0
+e 23 2 262 0 0 0
+e 25 1 262 0 0 0
+e 26 2 262 0 0 0
+e 28 1 262 0 0 0
+e 29 2 262 0 0 0
+e 31 1 262 0 0 0
+e 32 2 262 0 0 0
+e 34 1 262 0 0 0
+e 35 2 262 0 0 0
+e 37 1 262 0 0 0
+e 38 2 262 0 0 0
+e 40 1 262 0 0 0
+e 41 2 262 0 0 0
+e 43 1 262 0 0 0
+e 44 2 262 0 0 0
+e 46 1 262 0 0 0
+e 47 2 262 0 0 0
+e 49 1 262 0 0 0
+e 50 2 262 0 0 0
+e 52 1 262 0 0 0
+e 90 2 264 0 0 0
+e 92 1 264 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+DIM sg AS STRING : sg = erste$("signatur ")
+PRINT "signatur " ; INSTR(sg, "SCREEN(") >= 0 AND INSTR(sg, "Argument") >= 0
+--- erwartet
+signatur TRUE
+
+=== geteilte ansicht zeigt zwei dateien nebeneinander
+' Gemessen an den Rechtecken der beiden Felder im Protokoll
+' ("geteilt 0 x <x>+<breite> <x>+<breite>"), nicht nur daran, dass der Befehl lief.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("zwei")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=240
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei zwei.dh
+PRINT 2
+--- datei _programm/ev.txt
+c 20
+e 30 2 341 0 0 0
+e 30 2 340 0 0 0
+e 30 2 79 0 0 0
+e 32 1 79 0 0 0
+e 32 1 341 0 0 0
+e 32 1 340 0 0 0
+e 60 2 341 0 0 0
+e 60 2 86 0 0 0
+e 62 1 86 0 0 0
+e 62 1 341 0 0 0
+e 80 2 257 0 0 0
+e 82 1 257 0 0 0
+e 130 2 342 0 0 0
+e 130 2 71 0 0 0
+e 132 1 71 0 0 0
+e 132 1 342 0 0 0
+e 180 2 342 0 0 0
+e 180 2 71 0 0 0
+e 182 1 71 0 0 0
+e 182 1 342 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+DIM gt AS STRING : gt = erste$("geteilt 0 x ")
+DIM gz AS ARRAY OF STRING : gz = SPLIT$(MID$(gt, 12) + " 0+0 0+0", " ")
+DIM gl AS ARRAY OF STRING : gl = SPLIT$(gz[0], "+")
+DIM gr AS ARRAY OF STRING : gr = SPLIT$(gz[1], "+")
+PRINT "nebeneinander " ; VAL(gl[0]) + VAL(gl[1]) <= VAL(gr[0]) AND VAL(gl[1]) > 100 AND VAL(gr[1]) > 100
+PRINT "geteilt aus " ; hat("geteilt aus")
+--- erwartet
+nebeneinander TRUE
+geteilt aus TRUE
+
+=== geteilte ansicht braucht zwei dateien
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=120
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 4
+e 40 2 342 0 0 0
+e 40 2 71 0 0 0
+e 42 1 71 0 0 0
+e 42 1 342 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "nicht geteilt " ; erste$("geteilt ") = ""
+--- erwartet
+nicht geteilt TRUE
+
+=== uebersichtskarte bleibt gemerkt
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("Uebersichtskarte")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+PRINT 1
+--- datei _programm/ev.txt
+c 12
+e 30 2 341 0 0 0
+e 30 2 340 0 0 0
+e 30 2 80 0 0 0
+e 32 1 80 0 0 0
+e 32 1 341 0 0 0
+e 32 1 340 0 0 0
+e 60 2 341 0 0 0
+e 60 2 86 0 0 0
+e 62 1 86 0 0 0
+e 62 1 341 0 0 0
+e 90 2 257 0 0 0
+e 92 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "karte an " ; hat("karte an")
+IMPORT "json"
+DIM kh AS JSON_HANDLE : kh = JSON_LOAD("_programm/ide.json")
+PRINT "karte gemerkt " ; JSON_GET_BOOL(kh, "karte")
+--- erwartet
+karte an TRUE
+karte gemerkt TRUE
+
+=== git blame ohne repository sagt es
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=140
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 6
+e 40 2 341 0 0 0
+e 40 2 340 0 0 0
+e 40 2 66 0 0 0
+e 42 1 66 0 0 0
+e 42 1 341 0 0 0
+e 42 1 340 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "blame 0 " ; hat("blame 0")
+--- erwartet
+blame 0 TRUE
+
+=== handbuch gesetzt und als quelltext
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("Handbuch: gesetzt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=220
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+SCREEN(320, 240)
+--- datei _programm/ev.txt
+c 14
+e 30 2 290 0 0 0
+e 32 1 290 0 0 0
+e 80 2 341 0 0 0
+e 80 2 340 0 0 0
+e 80 2 80 0 0 0
+e 82 1 80 0 0 0
+e 82 1 341 0 0 0
+e 82 1 340 0 0 0
+e 110 2 341 0 0 0
+e 110 2 86 0 0 0
+e 112 1 86 0 0 0
+e 112 1 341 0 0 0
+e 140 2 257 0 0 0
+e 142 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "hbansicht gesetzt " ; hat("hbansicht gesetzt")
+PRINT "hbansicht quelltext " ; hat("hbansicht quelltext")
+--- erwartet
+hbansicht gesetzt TRUE
+hbansicht quelltext TRUE
+
+=== marken auf jede fundstelle und tippen aendert alle
+' `hpmax` bleibt, wie es war.
+AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("X")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+hp = 1
+hp = hp + 1
+hpmax = 9
+--- datei _programm/ev.txt
+c 14
+e 30 2 341 0 0 0
+e 30 2 340 0 0 0
+e 30 2 76 0 0 0
+e 32 1 76 0 0 0
+e 32 1 341 0 0 0
+e 32 1 340 0 0 0
+e 70 2 341 0 0 0
+e 70 2 86 0 0 0
+e 72 1 86 0 0 0
+e 72 1 341 0 0 0
+e 110 2 341 0 0 0
+e 110 2 83 0 0 0
+e 112 1 83 0 0 0
+e 112 1 341 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(z AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+PRINT "marken 3 " ; hat("marken 3")
+zeige("spiel.dh")
+--- erwartet
+marken 3 TRUE
+|Xhp = 1|
+|Xhp = Xhp + 1|
+|hpmax = 9|
+

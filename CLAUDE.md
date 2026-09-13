@@ -2821,8 +2821,8 @@ Ort des Aufrufers hinterlegt dhrt seit 2026-09-06 als `DHRT_START_DIR`
 ihn fuer Projektbaum und relatives Argument; `ARG$` ist 0-basiert (`ARG$(0)` = erstes Argument nach `--`);
 `GUI_WINDOW_VISIBLE` hat keinen Getter -> eigenes Flag fuer das
 Vervollstaendigungs-Fenster; eine Wiedergabe-Taste bleibt gedrueckt, bis
-KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/test_ide_bausteine.py`
-(Bausteine einzeln, Fenster ausserhalb des Schirms) und `tests/test_ide.py`
+KEY_UP kommt (F5 = 294, F7 = 296). Tests: `tests/pruef/ide_bausteine.dhtest`
+(Bausteine einzeln, Fenster ausserhalb des Schirms; bis Stufe 34 pytest) und `tests/test_ide.py`
 (die IDE ueber `DH_IDE_LOG` + `AUTOMATION_PLAY`, seriell). Offen: Debugger/
 Profiler-Fenster, Suche im Projekt, Befehlspalette, Handbuch, Drucken,
 Installer ohne PyInstaller -- dann Weg B (Editoren), D nebenher.
@@ -2874,6 +2874,28 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 `%PUBLIC%\Documents\Drachenhauch\examples`. **Falle:** ISCC-Schalter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
+
+**Stufe 34 (2026-09-13):** die IDE selbst, erster grosser Teil ohne
+Python -- ohne neues Formatstueck, alles mit dem aus Stufe 32/33.
+test_ide_bausteine.py ist geloescht (12 Faelle in
+`tests/pruef/ide_bausteine.dhtest`: PROCESS_*, CODE_* als Golden der
+JSON-Ausgabe, Textbereich-Befehle), aus `tests/test_ide.py` sind die 31 Faelle
+der Staende 1 bis 5 nach `tests/pruef/werkzeug_ide.dhtest` gezogen (110
+bleiben). **Das Protokoll liest ein `--- nachher`-Programm**
+(`READLINES("_programm/ide.log")` + `hat`/`zahl`/`erste$`/`alle$`/`endet`),
+nicht `--- inhalt` -- das sucht Teiltexte, und `geprueft 1` stuende auch in
+`geprueft 10`; Reihenfolgen ("erst Halt in 2, dann 3") und Zaehlungen gehen
+nur so. Gesicherte Dateien kommen als `|Zeile|` in die Erwartung (ein
+Leerzeichen am Zeilenende bleibt sichtbar). In pytest blieb, was ZWEI
+IDE-Laeufe hintereinander braucht (Sitzung, Umbruch gemerkt -- `nachher`
+erbt die Umgebung des Falls nicht, und `PROCESS_START` nimmt dem Kind
+`DHRT_FRAMES`), ein git-Repository oder PyMuPDF. **Stolperstein:** derselbe
+Fallordner kam als `DHRT_START_DIR` mit 8.3-Kurznamen (`HANSGA~1`) und aus
+`CWD$()` mit langem Namen an -- verglichen werden die letzten zwei
+Pfadteile. Gegenprobe ohne `AUTOMATION_PLAY`: 26 der 28 Faelle mit Aufnahme
+fallen; die zwei uebrigen ("geteilte Ansicht braucht zwei Dateien",
+"krummer Name") erwarten, dass NICHTS passiert, und waren schon in pytest so
+schwach.
 
 **Stufe 33 (2026-09-13):** die naechsten zwei Werkzeuge ohne Python --
 `test_pilot_animfsm.py` und `test_pilot_notenblatt.py` sind geloescht, ihre
@@ -3732,7 +3754,7 @@ seriell: Kommentar und Duplizieren ueber die gesicherte Datei, Formatieren,
 bedingter Haltepunkt mit Gegenprobe -- GENAU ein Halt statt fuenf --,
 Export laeuft die erzeugte Exe, Gliederung + Waehler, Sitzung ueber zwei
 Laeufe), `tests/pruef/code_format.dhtest`, Auswahlbereich in
-`tests/test_ide_bausteine.py`. Offen gegen die Qt-IDE: Markdown gerendert,
+`tests/pruef/ide_bausteine.dhtest`. Offen gegen die Qt-IDE: Markdown gerendert,
 Faltung, Minimap, geteilter Editor, Mehrfach-Marken, Schnipsel,
 Signaturhilfe, Umbenennen, Git-Blame, Sitzung je Projekt.
 

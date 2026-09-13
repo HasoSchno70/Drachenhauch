@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn kind_laeuft_und_liefert_ausgabe() {
         // Ein Programm, das es auf jedem System gibt (im Testlauf ist "dhrt"
-        // die Test-Exe, nicht die Runtime -- die prueft tests/test_ide_bausteine.py).
+        // die Test-Exe, nicht die Runtime -- die prueft tests/pruef/ide_bausteine.dhtest).
         let (prog, args): (&str, Vec<String>) = if cfg!(windows) {
             ("cmd", vec!["/c".into(), "echo hallo".into()])
         } else {
