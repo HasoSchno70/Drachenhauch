@@ -100,6 +100,27 @@ pub struct Fall {
     /// `--- inhalt datei` / `--- ohne datei`: nach dem Lauf stehen diese Zeilen
     /// in der Datei (bzw. keine davon) -- fuer Protokolle und gesicherte Dateien.
     pub inhalte: Vec<(String, Vec<String>, bool)>,
+    /// `--- streichen ZEILE`: diese Zeile fehlt in der Kopie des Programms
+    /// (etwa `WINDOW_MAXIMIZE()`, damit Klicklagen fest sind).
+    pub streichen: Vec<String>,
+    /// `--- nachher`: ein zweites Programm, das NACH dem ersten im Fallordner
+    /// laeuft und liest, was es geschrieben hat -- `erwartet`/`enthaelt`
+    /// gelten dann fuer SEINE Ausgabe. So prueft die Laufzeit selbst
+    /// (ANIM_FSM_LOAD, JSON_*) statt eines fremden Lesers in Python.
+    pub nachher: Option<String>,
+}
+
+/// Die erste Zeile, die (ohne Leerraum am Rand) `zeile` ist, entfernen.
+pub fn streichen_zeile(programm: &str, zeile: &str) -> Result<String, String> {
+    let ziel = zeile.trim();
+    let mut aus = String::with_capacity(programm.len());
+    let mut gefunden = false;
+    for z in programm.split_inclusive('\n') {
+        if !gefunden && z.trim() == ziel { gefunden = true; continue; }
+        aus.push_str(z);
+    }
+    if !gefunden { return Err(format!("die zu streichende Zeile '{}' steht nicht im Programm", ziel)); }
+    Ok(aus)
 }
 
 /// Den Quelltext eines Falls in ein vorhandenes Programm einschieben: hinter
@@ -495,7 +516,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -563,6 +584,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             Abschnitt::Argumente => f.argumente.extend(puffer.iter().filter(|z| !z.trim().is_empty()).map(|z| z.trim().to_string())),
             Abschnitt::Stderr => f.stderr_enthaelt.extend(puffer.iter().filter(|z| !z.trim().is_empty()).cloned()),
             // `datei_b64` traegt hier "ohne" -- derselbe Merker fuer die Art des Blocks.
+            Abschnitt::Nachher => f.nachher = Some(text),
             Abschnitt::Inhalt => f.inhalte.push((datei_name.to_string(),
                 puffer.iter().filter(|z| !z.trim().is_empty()).cloned().collect(), datei_b64)),
             Abschnitt::Verzeichnis => {}      // der Name stand in der Kopfzeile, Inhalt gibt es keinen
@@ -671,6 +693,15 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.nach = marke;
                     Abschnitt::Verzeichnis        // kein Inhalt
                 }
+                "streichen" => {
+                    if arg.is_empty() { return Err(format!("Zeile {}: '--- streichen' braucht die Zeile, die fehlen soll", nr + 1)); }
+                    f.streichen.push(arg.to_string());
+                    Abschnitt::Verzeichnis        // kein Inhalt
+                }
+                "nachher" => {
+                    if f.nachher.is_some() { return Err(format!("Zeile {}: '--- nachher' gibt es in diesem Fall schon", nr + 1)); }
+                    Abschnitt::Nachher
+                }
                 "inhalt" | "ohne" => {
                     if arg.is_empty() { return Err(format!("Zeile {}: '--- {}' braucht einen Dateinamen", nr + 1, wort)); }
                     datei_name = arg.to_string();
@@ -696,7 +727,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, inhalt, ohne)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, streichen, nachher, inhalt, ohne)", nr + 1, other)),
             };
             continue;
         }
@@ -825,6 +856,19 @@ mod tests {
     use super::*;
 
     const BEISPIEL: &str = "' Kopf\n=== eins\nPRINT 1\n--- erwartet\n1\n=== zwei\nPRINT 1 \\ 0\n--- fehler\nDivision\n=== drei\nPRINT \"a\"\nPRINT \"b\"\n--- enthaelt\nb\n--- datei karte.json\n{\"x\": 1}\n--- umgebung\nDHRT_FRAMES=1\n";
+
+    #[test]
+    fn streichen_und_nachher() {
+        let f = parsen("=== ed\nAUTOMATION_PLAY(\"ev.txt\")\n--- programm ../../examples/198.dh nach SETFPS(60)\n--- streichen WINDOW_MAXIMIZE()\n--- nachher\nPRINT 1\nPRINT 2\n\n--- erwartet\n1\n2\n").unwrap();
+        assert_eq!(f[0].streichen, vec!["WINDOW_MAXIMIZE()".to_string()]);
+        assert_eq!(f[0].nachher.as_deref().map(str::trim_end), Some("PRINT 1\nPRINT 2"));
+        assert_eq!(f[0].erwartet.as_deref(), Some("1\n2"));
+        assert!(parsen("=== a\nPRINT 1\n--- streichen\n").is_err());
+        assert!(parsen("=== a\nPRINT 1\n--- nachher\nPRINT 1\n--- nachher\nPRINT 2\n").is_err());
+        let p = "SETFPS(60)\r\nWINDOW_MAXIMIZE()\r\nPRINT 1\r\n";
+        assert_eq!(streichen_zeile(p, "WINDOW_MAXIMIZE()").unwrap(), "SETFPS(60)\r\nPRINT 1\r\n");
+        assert!(streichen_zeile(p, "GIBTS()").unwrap_err().contains("GIBTS()"));
+    }
 
     #[test]
     fn programm_einschub_und_dateiproben() {

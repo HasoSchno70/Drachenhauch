@@ -145,11 +145,15 @@ Division durch Null
 | `--- programm pfad [nach MARKE]` | der Fall läuft ein **vorhandenes Programm** (Pfad relativ zur Sammlung — die IDE, ein Editor); sein Quelltext wird hinter der ersten Zeile `MARKE` eingeschoben, ohne Marke davor. Das Programm läuft als Kopie in `_programm/` im Fallordner; der Fallordner selbst ist der Ort des Aufrufers (`DHRT_START_DIR`) |
 | `--- inhalt datei` | nach dem Lauf steht jede Zeile des Blocks in dieser Datei (Protokoll, gesicherte Datei; Pfad relativ zum Fallordner) |
 | `--- ohne datei` | keine Zeile des Blocks steht darin (eine Datei, die es nicht gibt, enthält auch nichts) |
+| `--- streichen ZEILE` | nur mit `--- programm`: die erste Zeile, die genau so lautet, fällt aus der Kopie weg (z. B. `WINDOW_MAXIMIZE()`, damit Klicks feste Lagen treffen); fehlt sie, ist der Fall ein Fehler. Mehrere Blöcke erlaubt |
+| `--- nachher` | ein zweites Programm, das nach dem Lauf im Fallordner läuft — seine Ausgabe wird statt der des Hauptlaufs mit `erwartet`/`enthaelt`/`fehler` verglichen. Damit liest Drachenhauch selbst, was ein Werkzeug gesichert hat (`JSON_*`, `ANIM_FSM_LOAD`, `PROCESS_START("dhrt", "--check", …)`). Der Hauptlauf muss vorher sauber enden; höchstens einer je Fall |
 
-In `--- umgebung` und `--- argumente` stehen zwei Platzhalter bereit:
-`{sammlung}` ist der Ordner der `.dhtest`-Datei, `{fall}` der Fallordner —
-für ein Werkzeug, das einen absoluten Pfad braucht (`DH_IDE_WURZEL`), oder
-für einen Fall, der eine Datei des Projekts liest.
+In `--- umgebung`, `--- argumente` und in Text-Beilagen (`--- datei` ohne
+`base64`) stehen zwei Platzhalter bereit: `{sammlung}` ist der Ordner der
+`.dhtest`-Datei, `{fall}` der Fallordner — beide mit Schrägstrichen, damit
+sie auch in einer JSON-Beilage gültig bleiben. Für ein Werkzeug, das einen
+absoluten Pfad braucht (`DH_IDE_WURZEL`, das Sprite-Blatt einer `.dhanim`),
+oder für einen Fall, der eine Datei des Projekts liest.
 
 **Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
 Form-Designers in `tests/pruef/werkzeug_formdesigner.dhtest`. Zwei Wege
@@ -176,6 +180,12 @@ neu button 248 184
 --- inhalt neu.dhform
 "kind": "button"
 ```
+
+Seit Stufe 33 laufen so auch der Anim-FSM-Editor und das Notenblatt
+(`tests/pruef/werkzeug_animfsm.dhtest`, `tests/pruef/werkzeug_notenblatt.dhtest`):
+die Kopie ohne `WINDOW_MAXIMIZE()` (`--- streichen`), und was gesichert wurde,
+liest ein `--- nachher`-Programm — beim Anim-Editor die Laufzeit selbst
+(laden, aufsetzen, ein Schritt), beim Tracker-Export ein festes Gitter.
 
 Die Zeilen eines `--- bild`-Blocks:
 
