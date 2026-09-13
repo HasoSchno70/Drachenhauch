@@ -328,6 +328,40 @@ def _preview_neu(qp: QPainter, kind: str, r: QRect, *, fg, muted, accent, border
             if tx > x + w:
                 break
 
+    elif kind == "statusbar":
+        # Streifen mit Oberkante, der Text als erstes Feld, rechts zwei
+        # angedeutete Felder -- welche es werden, setzt das Programm.
+        qp.fillRect(r, win_bg)
+        qp.setPen(border)
+        qp.drawLine(x, y, r.right(), y)
+        qp.setPen(fg)
+        qp.drawText(QRect(x + 8, y, max(0, w - 150), h), al.AlignLeft | al.AlignVCenter, text or "Bereit.")
+        qp.setPen(muted)
+        for i, t in enumerate(("Zeile 1", "UTF-8")):
+            fx = r.right() - 140 + i * 70
+            if fx > x + 40:
+                qp.drawLine(fx, y + 5, fx, y + h - 5)
+                qp.drawText(QRect(fx + 6, y, 64, h), al.AlignLeft | al.AlignVCenter, t)
+
+    elif kind == "breadcrumb":
+        # Teile mit Winkeln dazwischen, der letzte kraeftiger.
+        teile = [str(t) for t in (items or ["projekt", "quelle", "datei.dh"])]
+        tx = x + 4
+        for i, t in enumerate(teile):
+            letzter = i == len(teile) - 1
+            qp.setPen(fg if letzter else muted)
+            bw = 7 * len(t) + 8
+            qp.drawText(QRect(tx, y, bw, h), al.AlignLeft | al.AlignVCenter, t)
+            tx += bw
+            if not letzter:
+                qp.setPen(muted)
+                my = y + h // 2
+                qp.drawLine(tx + 3, my - 3, tx + 6, my)
+                qp.drawLine(tx + 6, my, tx + 3, my + 3)
+                tx += 12
+            if tx > x + w:
+                break
+
     elif kind == "datepicker":
         flaeche(r, tief=True)
         kopf = QRect(x, y, w, min(16, h))

@@ -2873,6 +2873,33 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 28 (2026-09-13):** drei Punkte aus der eigenen Lueckenliste der
+gui, alle drei Leisten. **`GUI_STATUSBAR`** (gui.rs `StatusState`, Kind
+`statusbar`): Felder mit fester Breite oder Anteil am Rest (`sb_geom`),
+Ausrichtung, Tooltip, klickbar (`GUI_STATUSBAR_CLICKED`); **`GUI_SET_TEXT`
+meint Feld 0**, damit eine Beschriftung als Statuszeile ohne Umschreiben
+ersetzbar ist. Der Anlass steckte in der IDE: jeder Pfeil schrieb "Zeile,
+Spalte" in dieselbe Beschriftung und loeschte damit die letzte Meldung.
+**`GUI_BREADCRUMB`** (`PfadState`, Kind `breadcrumb`): Teile mit
+unsichtbarem Wert, Winkel dazwischen, der letzte kraeftiger; passt nicht
+alles, fallen die VORDEREN Teile unter ein "..." (`pf_geom`, vom letzten
+Teil rueckwaerts), dessen Tooltip den ganzen Pfad nennt. Breiten misst
+`leisten_pass` in GUI_UPDATE, der Klick liest dieselbe Zahl.
+`GUI_BREADCRUMB_SET` mit demselben Pfad aendert nichts -- ein Programm setzt
+ihn gern je Bild, und die Messung ginge sonst jedes Mal verloren.
+**Ueberlauf der Werkzeugleiste** (`tb_layout` liefert jetzt sichtbare,
+versteckte Eintraege und den >>-Knopf): was nicht passt, steht in einem
+Menue (`leiste_popup`, gezeichnet in `draw_top`, Klick zuerst in
+`handle_press`); Luecken fallen weg, ein Trenner an der Bruchstelle
+verschwindet. Die IDE: Statusleiste mit Meldung | Zeile/Spalte (Klick = Gehe
+zu Zeile) | Umbruch (Klick = umschalten); die Symbolspur ist eine Pfadleiste
+(Wert = Zeile des Blocks, Klick springt, `pfad sprung N`) -- die
+Protokollzeile `spur ...` blieb, zwei Tests lesen ihr letztes Element.
+**Stolperstein beim Schreiben der Tests:** `--- nicht enthaelt` gibt es im
+dhtest-Format nicht; eine Gegenprobe gehoert in `--- erwartet` mit
+Ausgaben ohne Bildnummer. Tests `tests/pruef/gui_leisten.dhtest` (7),
+ein Rust-Test, einer in `tests/test_ide.py`; Form-Designer-Palette 30.
+
 **Stufe 27 (2026-09-13):** zwei Fragen des Nutzers -- koennen Knoepfe
 mehrere Farben haben, und hat die Liste Funktionen, die sie komfortabel
 machen? Beides war nur halb da. **Knoepfe:** `GUI_SET_COLOR` gab es, aber

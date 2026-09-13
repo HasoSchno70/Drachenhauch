@@ -739,6 +739,22 @@ def test_symbolspur_nennt_klasse_und_methode(tmp_path):
     assert spur[-1].endswith("class Held  >  treffer"), spur
 
 
+# --------------------------------------------------------------- Stufe 28
+
+def test_ein_klick_in_die_pfadleiste_springt_zum_block(tmp_path):
+    """Die Symbolspur ist seit Stand 28 eine Pfadleiste: jeder Teil traegt die
+    Zeile seines Blocks, ein Klick springt dorthin. Die Leiste liegt ueber
+    dem Code -- links bei breiteLinks (220), in der Hoehe unter Menue,
+    Reitern und Werkzeugleiste (93..113). Geklickt wird der erste Teil, die
+    Datei; er springt nach Zeile 1."""
+    quelle = _datei(tmp_path, "CLASS Held\n    SUB treffer()\n        PRINT 1\n"
+                              "    END SUB\nEND CLASS\n")
+    ev = _taste(30, RL_DOWN) + _taste(50, RL_DOWN) + _maus(90, 232, 103)
+    log = _ide(tmp_path, quelle, frames=200, events=ev)
+    assert any(z.startswith("spur ") and z.endswith("treffer") for z in log), log
+    assert "pfad sprung 1" in log, log
+
+
 def test_definition_hier_zeigen(tmp_path):
     """Alt+F12 auf dem Aufruf zeigt die Definition, ohne die Stelle zu
     verlassen. Gegenprobe: auf einer Zahl gibt es nichts zu zeigen."""

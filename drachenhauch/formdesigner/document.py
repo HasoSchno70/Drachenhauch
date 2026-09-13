@@ -125,6 +125,11 @@ PALETTE: list[PaletteSpec] = [
     # anderen Control auch -- der Designer muss ihn also nicht eigens kennen.
     PaletteSpec("richtext", "Gesetzter Text", 260, 160, ("on_click",) + _ZEIGEN + _FOKUS, has_text=True),
     PaletteSpec("timepicker", "Uhrzeit", 104, 34, ("on_change",) + _ZEIGEN + _FOKUS),
+    # Leisten: die Statusleiste nimmt ihren Text als erstes Feld, die
+    # Pfadleiste ihre Teile als `items` -- weitere Felder und die Werte je Teil
+    # setzt das Programm.
+    PaletteSpec("statusbar", "Statusleiste", 320, 24, ("on_click",) + _ZEIGEN, has_text=True),
+    PaletteSpec("breadcrumb", "Pfadleiste", 280, 24, ("on_click",) + _ZEIGEN, has_items=True),
 ]
 
 # Arten, deren Konstruktor die Groesse SELBST bestimmt -- danach muss
@@ -1474,6 +1479,12 @@ class FormDoc:
             out.append(f"{var} = GUI_TABCONTROL(frm, {c.x}, {c.y}, {c.w}, {c.h})")
             for it in c.items:
                 out.append(f"GUI_TABCONTROL_ADD({var}, {_gb_str(it)})")
+        elif k == "statusbar":
+            out.append(f"{var} = GUI_STATUSBAR(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.text)})")
+        elif k == "breadcrumb":
+            out.append(f"{var} = GUI_BREADCRUMB(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            for it in c.items:
+                out.append(f"GUI_BREADCRUMB_ADD({var}, {_gb_str(it)})")
         elif k in ("dropdown", "listbox"):
             iv = var + "_items"
             out.append(f"DIM {iv}[{len(c.items)}] AS STRING")   # 1D ARRAY OF STRING

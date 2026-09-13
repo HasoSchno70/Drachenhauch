@@ -51,8 +51,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 25 | Das Handbuch ist **gesetzt vom Widget** (`GUI_RICHTEXT`, mit anklickbaren Verweisen); Häkchen im Baum schränken das Projekt ein; ohne Vorschau wird trotzdem geprüft; auch Verschieben und Parameter sammeln in Schritten |
 | 26 | Die **Werkzeugleiste ist ein Widget** der Laufzeit (`GUI_TOOLBAR` mit Einträgen, gezeichnete Sinnbilder in Leistengröße, Trenner, Lücke, kippbare Knöpfe); Menüs und Leiste tragen dieselben Sinnbilder, die handgemalten 16-Punkt-Bilder sind weg |
 | 27 | **Knopfarten** und **komfortable Listen** in der Laufzeit; die Befehlspalette zeigt Kürzel und Ordner als Zusatztext rechts, die Hauptknöpfe der Dialoge sind hervorgehoben, der Debugger-Stopp ist rot |
+| 28 | **Statusleiste mit Feldern** (Meldung, Stelle der Marke, Umbruch — die beiden rechten anklickbar), die Symbolspur ist eine **Pfadleiste** (ein Klick springt zum Block), und die Werkzeugleiste legt, was nicht passt, in ein **»-Menü** |
 
-## Was sie heute kann (Stand 27, 13.09.2026)
+## Was sie heute kann (Stand 28, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -268,7 +269,7 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `umbau geprueft <fehler>`, `umbau neue datei <anzahl>`,
 `umbau abgebrochen`, `extern <datei>`,
 `aufrufer gemessen <anzahl>`,
-`auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `ende`. So sieht `tests/test_ide.py`, was sie
+`auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
 
