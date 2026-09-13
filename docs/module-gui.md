@@ -83,6 +83,26 @@ IMPORT "gui"
 | `GUI_TOOLBAR_SET(tb, schluessel$, wert)` | — | `beschriftung` (0/1: Text neben dem Sinnbild), `symbolgroesse` (Punkte, 0 = aus der Höhe) |
 | `GUI_TOOLBAR_ITEM_X(tb, eintrag)` | INTEGER | linke Kante eines Eintrags im Fenster (wie `GUI_GET_X`) |
 | `GUI_TOOLBAR_ITEM_W(tb, eintrag)` | INTEGER | Breite eines Eintrags |
+| `GUI_TOOLBAR_OVERFLOW(tb)` | INTEGER | wie viele Knöpfe gerade im »-Menü stehen (0 = alles passt) |
+| `GUI_STATUSBAR(win, x, y, w, h[, text$])` | GUI_WIDGET | Statusleiste; `text$` ist das erste Feld |
+| `GUI_STATUSBAR_ADD(sb, text$, breite[, ausrichtung$])` | INTEGER | Feld anhängen: `breite` in Punkten, 0 = teilt sich den Rest; `links`/`mitte`/`rechts` |
+| `GUI_STATUSBAR_SET(sb, feld, text$)` | — | Text eines Feldes (`GUI_SET_TEXT` meint Feld 0) |
+| `GUI_STATUSBAR_TEXT$(sb, feld)` | STRING | Text eines Feldes |
+| `GUI_STATUSBAR_TIP(sb, feld, tip$)` | — | Tooltip eines Feldes |
+| `GUI_STATUSBAR_CLICKABLE(sb, feld, an)` | — | Feld anklickbar machen |
+| `GUI_STATUSBAR_CLICKED(sb)` | INTEGER | Nummer des Feldes, das in diesem Bild geklickt wurde, sonst -1 |
+| `GUI_STATUSBAR_COUNT(sb)` | INTEGER | Zahl der Felder |
+| `GUI_STATUSBAR_FIELD_X(sb, feld)` | INTEGER | linke Kante eines Feldes im Fenster |
+| `GUI_STATUSBAR_FIELD_W(sb, feld)` | INTEGER | Breite eines Feldes |
+| `GUI_BREADCRUMB(win, x, y, w, h)` | GUI_WIDGET | Pfadleiste (Brotkrumen) |
+| `GUI_BREADCRUMB_ADD(bc, text$[, wert$])` | INTEGER | Teil anhängen, mit unsichtbarem Wert |
+| `GUI_BREADCRUMB_SET(bc, teile)` | — | alle Teile auf einmal (ARRAY OF STRING); derselbe Pfad noch einmal ändert nichts |
+| `GUI_BREADCRUMB_CLEAR(bc)` | — | alle Teile entfernen |
+| `GUI_BREADCRUMB_COUNT(bc)` | INTEGER | Zahl der Teile |
+| `GUI_BREADCRUMB_CLICKED(bc)` | INTEGER | Nummer des Teils, der in diesem Bild geklickt wurde, sonst -1 |
+| `GUI_BREADCRUMB_TEXT$(bc, teil)` | STRING | Text eines Teils |
+| `GUI_BREADCRUMB_DATA$(bc, teil)` | STRING | unsichtbarer Wert eines Teils |
+| `GUI_BREADCRUMB_FIRST_VISIBLE(bc)` | INTEGER | erster sichtbarer Teil; die davor stehen unter „…“ |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
 | `GUI_SET_ALIGN(wdg, wie$)` | — | Text links, `mitte` oder `rechts` ausrichten (Beschriftung, Knopf, Textfeld) |
 | `GUI_SET_WRAP(label, breite)` | — | Beschriftung bei `breite` Pixeln an Wortgrenzen umbrechen (0 = aus); die Höhe folgt dem Text |
@@ -737,6 +757,51 @@ Tooltip, und ein Bildschirmleser sieht die Knöpfe als Knöpfe.
 keine Klicks an — Knöpfe, die ein älteres Programm darauf legt, treffen
 weiter. In der `.dhform` stehen die Einträge unter `leiste` (Bilder nicht —
 Textur-Handles gelten nur in diesem Lauf).
+
+**Passt nicht alles hinein**, wandern die hinteren Knöpfe in ein **»-Menü**
+am rechten Ende: so viele wie neben den »-Knopf passen, bleiben stehen,
+Lücken fallen weg, und ein Trenner an der Bruchstelle verschwindet. Ein Klick
+auf einen Eintrag im Menü ist derselbe Klick wie auf den Knopf
+(`GUI_TOOLBAR_CLICKED`), gesperrte stehen gedämpft da, eingeschaltete in der
+Akzentfarbe. `GUI_TOOLBAR_OVERFLOW` sagt, wie viele gerade im Menü stehen.
+
+### Statusleiste und Pfadleiste
+
+```basic
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(win, 0, 560, 800, 24, "Bereit.")
+DIM fPos AS INTEGER : fPos = GUI_STATUSBAR_ADD(sb, "Zeile 1", 140, "mitte")
+GUI_STATUSBAR_CLICKABLE(sb, fPos, TRUE)
+GUI_STATUSBAR_TIP(sb, fPos, "Gehe zu Zeile")
+
+DIM pf AS GUI_WIDGET : pf = GUI_BREADCRUMB(win, 0, 0, 800, 22)
+GUI_BREADCRUMB_ADD(pf, "spiel.dh", "1")
+GUI_BREADCRUMB_ADD(pf, "class Held", "12")
+
+' je Bild:
+GUI_SET_TEXT(sb, "Gesichert.")                     ' Feld 0
+IF GUI_STATUSBAR_CLICKED(sb) = fPos THEN PRINT "Gehe zu Zeile"
+IF GUI_BREADCRUMB_CLICKED(pf) >= 0 THEN PRINT GUI_BREADCRUMB_DATA$(pf, GUI_BREADCRUMB_CLICKED(pf))
+```
+
+Eine **Statusleiste** hat Felder: feste Breiten zuerst, der Rest geht an die
+Felder mit Breite 0. Bis dahin schrieb ein Programm alles in eine
+Beschriftung — und die Stelle der Schreibmarke überschrieb bei jedem Pfeil
+die letzte Meldung. `GUI_SET_TEXT` und `GUI_TEXT` meinen das erste Feld, eine
+Beschriftung als Statuszeile lässt sich also ohne Umschreiben ersetzen.
+Klickbare Felder heben sich unter der Maus ab und melden sich über
+`GUI_STATUSBAR_CLICKED`; ein Bildschirmleser hört die Felder als Status und
+die klickbaren als Knöpfe.
+
+Eine **Pfadleiste** zeigt Teile mit einem Winkel dazwischen; der letzte ist
+„wo man steht“ und steht kräftiger da. Jeder Teil trägt einen unsichtbaren
+Wert (einen Pfad, eine Zeilennummer). **Passt nicht alles hinein, fallen die
+vorderen Teile unter ein „…“** — das Ende eines Pfades ist das, was man
+braucht; der Tooltip über dem „…“ nennt den ganzen Pfad, und ein
+Bildschirmleser bekommt ihn ohnehin vollständig. Die Breiten werden in
+`GUI_UPDATE` gemessen, der Klick liest dieselbe Zahl.
+
+Beide stehen in der `.dhform` (`status` mit Feldern, `pfad` mit Teilen und
+Werten); im Form-Designer liegen sie in der Palette.
 
 ## ListBox, Image, Canvas
 
@@ -1461,11 +1526,10 @@ nicht länger.)
 
 * **Aufklapp-Gruppen** (Akkordeon) und **Assistenten** mit Zurück/Weiter.
   Beides ist aus Knöpfen, Panels und dem Reiterwerk zu bauen.
-* **Pfadleiste** (Brotkrumen) und **Statusleiste mit Feldern** — aus
-  Beschriftungen in einem Layout-Behälter.
 * **Baum mit Spalten** (Tabelle und Baum in einem).
-* **Überlauf der Werkzeugleiste**: was nicht mehr hineinpasst, wird
-  abgeschnitten statt in ein »-Menü am Ende zu wandern.
+
+(Pfadleiste, Statusleiste mit Feldern und der Überlauf der Werkzeugleiste
+standen hier bis Stand 27 und sind jetzt gebaut.)
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 

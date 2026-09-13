@@ -1,0 +1,233 @@
+' Leisten (Stufe 28): Statusleiste mit Feldern, Pfadleiste (Brotkrumen) und
+' der Ueberlauf der Werkzeugleiste. Geprueft wird, was ein Programm davon
+' sieht -- Lage, Klick, Text, Speichern -- samt Gegenproben.
+' Format: docs/werkzeuge.md, dhrt test.
+'
+' Lage: Fenster (10, 10), Titelleiste 24 -> ein Widget bei (x, y) liegt
+' absolut bei (x + 10, y + 34). Jede Aufnahme endet mit einer LEERZEILE.
+
+=== statusfelder teilen sich die breite
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 20, 20, 300, 24, "Bereit.")
+PRINT GUI_STATUSBAR_ADD(sb, "Zeile 1", 80, "rechts") ; " " ; GUI_STATUSBAR_ADD(sb, "UTF-8", 60)
+PRINT GUI_STATUSBAR_COUNT(sb)
+PRINT GUI_STATUSBAR_FIELD_X(sb, 0) ; " " ; GUI_STATUSBAR_FIELD_W(sb, 0)
+PRINT GUI_STATUSBAR_FIELD_X(sb, 1) ; " " ; GUI_STATUSBAR_FIELD_W(sb, 1)
+PRINT GUI_STATUSBAR_FIELD_X(sb, 2) ; " " ; GUI_STATUSBAR_FIELD_W(sb, 2)
+' GUI_SET_TEXT meint das erste Feld -- eine Statuszeile aus einer
+' Beschriftung laesst sich so ohne Umschreiben ersetzen.
+GUI_SET_TEXT(sb, "Gesichert.")
+GUI_STATUSBAR_SET(sb, 1, "Zeile 7")
+PRINT GUI_STATUSBAR_TEXT$(sb, 0) ; " | " ; GUI_STATUSBAR_TEXT$(sb, 1) ; " | " ; GUI_TEXT(sb)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+1 2
+3
+20 160
+180 80
+260 60
+Gesichert. | Zeile 7 | Gesichert.
+
+=== nur ein klickbares feld meldet den klick
+' Feld 1 liegt absolut bei 190..270, Feld 2 bei 270..330; y-Mitte 66.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 20, 20, 300, 24, "Bereit.")
+GUI_STATUSBAR_ADD(sb, "Zeile 1", 80)
+GUI_STATUSBAR_ADD(sb, "UTF-8", 60)
+GUI_STATUSBAR_CLICKABLE(sb, 1, TRUE)
+GUI_STATUSBAR_TIP(sb, 1, "Gehe zu Zeile")
+DIM f AS INTEGER
+FOR f = 1 TO 26
+    GUI_UPDATE()
+    IF GUI_STATUSBAR_CLICKED(sb) >= 0 THEN PRINT "Feld " + STR$(GUI_STATUSBAR_CLICKED(sb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "Ende"
+--- datei ev.txt
+# erst auf Feld 2 (nicht klickbar), dann auf Feld 1
+c 20
+e 3 7 300 66 0 0
+e 4 7 300 66 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 12 7 230 66 0 0
+e 13 7 230 66 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=28
+--- erwartet
+Feld 1
+Ende
+
+=== eine falsche angabe sagt es
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 20, 20, 300, 24)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "A", 10, 60, 80, 30)
+TRY
+    GUI_STATUSBAR_ADD(sb, "x", 40, "oben")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_STATUSBAR_SET(sb, 4, "x")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_BREADCRUMB_ADD(b, "x")
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+Ausrichtung 'oben' gibt es nicht
+Feld 4 gibt es nicht
+keine Pfadleiste
+
+=== die pfadleiste klappt vorn ein, wenn es eng wird
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM bc AS GUI_WIDGET : bc = GUI_BREADCRUMB(w, 20, 60, 320, 24)
+GUI_BREADCRUMB_ADD(bc, "projekt", "/p")
+GUI_BREADCRUMB_ADD(bc, "quelle", "/p/q")
+GUI_BREADCRUMB_ADD(bc, "spiel.dh", "/p/q/spiel.dh")
+GUI_UPDATE()
+PRINT GUI_BREADCRUMB_COUNT(bc) ; " " ; GUI_BREADCRUMB_FIRST_VISIBLE(bc) ; " " ; GUI_BREADCRUMB_DATA$(bc, 1)
+GUI_SET_BOUNDS(bc, 20, 60, 110, 24)
+GUI_UPDATE()
+DIM erster AS INTEGER : erster = GUI_BREADCRUMB_FIRST_VISIBLE(bc)
+PRINT erster > 0 ; " " ; erster <= 2
+' Derselbe Pfad noch einmal gesetzt aendert nichts; ein anderer ersetzt ihn.
+GUI_BREADCRUMB_SET(bc, ["a", "b"])
+PRINT GUI_BREADCRUMB_COUNT(bc) ; " [" ; GUI_BREADCRUMB_DATA$(bc, 0) ; "] " ; GUI_BREADCRUMB_TEXT$(bc, 1)
+--- umgebung
+DHRT_FRAMES=3
+--- erwartet
+3 0 /p/q
+TRUE TRUE
+2 [] b
+
+=== ein klick auf einen teil meldet ihn
+' Der erste Teil beginnt absolut bei x = 32; y-Mitte 106.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM bc AS GUI_WIDGET : bc = GUI_BREADCRUMB(w, 20, 60, 320, 24)
+GUI_BREADCRUMB_ADD(bc, "projekt", "/p")
+GUI_BREADCRUMB_ADD(bc, "spiel.dh", "/p/spiel.dh")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_BREADCRUMB_CLICKED(bc) >= 0 THEN PRINT "Teil " + GUI_BREADCRUMB_DATA$(bc, GUI_BREADCRUMB_CLICKED(bc)) + " " + STR$(GUI_CLICKED(bc))
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+c 8
+e 3 7 44 106 0 0
+e 4 7 44 106 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- enthaelt
+Teil /p TRUE
+
+=== zu viele knoepfe wandern ins menue
+' Leiste 120 breit: drei Knoepfe passen neben den >>-Knopf (absolut
+' 124..146, y-Mitte 171), zwei wandern ins Menue. Das Menue klappt unter
+' dem >>-Knopf auf, rechtsbuendig, mindestens 160 breit -- es beginnt also
+' bei x = 0; seine erste Zeile ist 188..214.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 120, 120, 34)
+GUI_TOOLBAR_ADD(tb, "neu", "neu")
+GUI_TOOLBAR_ADD(tb, "oeffnen", "oeffnen")
+GUI_TOOLBAR_ADD(tb, "sichern", "sichern")
+GUI_TOOLBAR_ADD(tb, "start", "start")
+GUI_TOOLBAR_ADD(tb, "stopp", "stopp")
+PRINT GUI_TOOLBAR_OVERFLOW(tb)
+DIM f AS INTEGER
+FOR f = 1 TO 24
+    GUI_UPDATE()
+    IF GUI_TOOLBAR_CLICKED(tb) >= 0 THEN PRINT "geklickt " + STR$(GUI_TOOLBAR_CLICKED(tb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+GUI_SET_BOUNDS(tb, 20, 120, 320, 34)
+PRINT GUI_TOOLBAR_OVERFLOW(tb)
+--- datei ev.txt
+# erst der >>-Knopf, dann die erste Zeile des Menues
+c 20
+e 3 7 135 171 0 0
+e 4 7 135 171 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 12 7 60 201 0 0
+e 13 7 60 201 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+2
+geklickt 3
+0
+
+=== leisten ueberleben das speichern
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM sb AS GUI_WIDGET : sb = GUI_STATUSBAR(w, 20, 200, 300, 24, "Bereit.")
+GUI_STATUSBAR_ADD(sb, "Zeile 1", 80, "mitte")
+GUI_STATUSBAR_CLICKABLE(sb, 1, TRUE)
+DIM bc AS GUI_WIDGET : bc = GUI_BREADCRUMB(w, 20, 20, 300, 24)
+GUI_BREADCRUMB_ADD(bc, "a", "wert-a")
+GUI_BREADCRUMB_ADD(bc, "b")
+DIM text AS STRING : text = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(text)
+DIM sb2 AS GUI_WIDGET : sb2 = GUI_WINDOW_WIDGET(w2, 0)
+DIM bc2 AS GUI_WIDGET : bc2 = GUI_WINDOW_WIDGET(w2, 1)
+PRINT GUI_KIND(sb2) ; " " ; GUI_STATUSBAR_COUNT(sb2) ; " " ; GUI_STATUSBAR_TEXT$(sb2, 1) ; " " ; GUI_STATUSBAR_FIELD_W(sb2, 1)
+PRINT GUI_KIND(bc2) ; " " ; GUI_BREADCRUMB_COUNT(bc2) ; " " ; GUI_BREADCRUMB_DATA$(bc2, 0)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+statusbar 2 Zeile 1 80
+breadcrumb 2 wert-a

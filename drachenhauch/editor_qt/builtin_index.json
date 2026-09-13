@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1855,
+ "count": 1875,
  "builtins": [
   {
    "name": "ABS",
@@ -2913,6 +2913,60 @@
    "module": "gui"
   },
   {
+   "name": "GUI_BREADCRUMB",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB(win, x, y, w, h) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_ADD",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_ADD(bc, text$ [, wert$]) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_CLEAR",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_CLEAR(bc)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_CLICKED",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_CLICKED(bc) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_COUNT",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_COUNT(bc) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_DATA$",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_DATA$(bc, teil) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_FIRST_VISIBLE",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_FIRST_VISIBLE(bc) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_SET",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_SET(bc, teile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_BREADCRUMB_TEXT$",
+   "kind": "core",
+   "signature": "GUI_BREADCRUMB_TEXT$(bc, teil) AS STRING",
+   "module": "gui"
+  },
+  {
    "name": "GUI_BUTTON",
    "kind": "core",
    "signature": "GUI_BUTTON(win, text, x, y, w, h)",
@@ -4173,6 +4227,66 @@
    "module": "gui"
   },
   {
+   "name": "GUI_STATUSBAR",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR(win, x, y, w, h [, text$]) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_ADD",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_ADD(sb, text$, breite [, ausrichtung$]) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_CLICKABLE",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_CLICKABLE(sb, feld, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_CLICKED",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_CLICKED(sb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_COUNT",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_COUNT(sb) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_FIELD_W",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_FIELD_W(sb, feld) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_FIELD_X",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_FIELD_X(sb, feld) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_SET",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_SET(sb, feld, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_TEXT$",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_TEXT$(sb, feld) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STATUSBAR_TIP",
+   "kind": "core",
+   "signature": "GUI_STATUSBAR_TIP(sb, feld, tip$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_STYLE_SET",
    "kind": "core",
    "signature": "GUI_STYLE_SET(name$, prop$, wert)",
@@ -4812,6 +4926,12 @@
    "name": "GUI_TOOLBAR_ITEM_X",
    "kind": "core",
    "signature": "GUI_TOOLBAR_ITEM_X(tb, eintrag) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR_OVERFLOW",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR_OVERFLOW(tb) AS INTEGER",
    "module": "gui"
   },
   {

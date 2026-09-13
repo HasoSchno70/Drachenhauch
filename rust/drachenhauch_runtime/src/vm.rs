@@ -5496,6 +5496,38 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
             }
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
+            // --- Stufe 28: Statusleiste, Pfadleiste, Ueberlauf ---
+            "gui_statusbar" => {
+                let t = if a.len() > 5 { gs(a,5,"GUI_STATUSBAR")? } else { String::new() };
+                Value::Int(self.gui.statusbar(gi(a,0,"GUI_STATUSBAR")?, gi(a,1,"GUI_STATUSBAR")? as i32,
+                    gi(a,2,"GUI_STATUSBAR")? as i32, gi(a,3,"GUI_STATUSBAR")? as i32, gi(a,4,"GUI_STATUSBAR")? as i32, t)?)
+            }
+            "gui_statusbar_add" => {
+                let ausr = if a.len() > 3 { gs(a,3,"GUI_STATUSBAR_ADD")? } else { String::new() };
+                Value::Int(self.gui.statusbar_add(gi(a,0,"GUI_STATUSBAR_ADD")?, gs(a,1,"GUI_STATUSBAR_ADD")?, gi(a,2,"GUI_STATUSBAR_ADD")?, &ausr)?)
+            }
+            "gui_statusbar_set" => { self.gui.statusbar_set(gi(a,0,"GUI_STATUSBAR_SET")?, gi(a,1,"GUI_STATUSBAR_SET")?, gs(a,2,"GUI_STATUSBAR_SET")?)?; Value::Nil }
+            "gui_statusbar_text$" | "gui_statusbar_text" => Value::str_rc(&self.gui.statusbar_text(gi(a,0,"GUI_STATUSBAR_TEXT")?, gi(a,1,"GUI_STATUSBAR_TEXT")?)?),
+            "gui_statusbar_tip" => { self.gui.statusbar_tip(gi(a,0,"GUI_STATUSBAR_TIP")?, gi(a,1,"GUI_STATUSBAR_TIP")?, gs(a,2,"GUI_STATUSBAR_TIP")?)?; Value::Nil }
+            "gui_statusbar_clickable" => { self.gui.statusbar_clickable(gi(a,0,"GUI_STATUSBAR_CLICKABLE")?, gi(a,1,"GUI_STATUSBAR_CLICKABLE")?, gbool(a,2,"GUI_STATUSBAR_CLICKABLE")?)?; Value::Nil }
+            "gui_statusbar_clicked" => Value::Int(self.gui.statusbar_clicked(gi(a,0,"GUI_STATUSBAR_CLICKED")?)?),
+            "gui_statusbar_count" => Value::Int(self.gui.statusbar_count(gi(a,0,"GUI_STATUSBAR_COUNT")?)?),
+            "gui_statusbar_field_x" => Value::Int(self.gui.statusbar_field_rect(gi(a,0,"GUI_STATUSBAR_FIELD_X")?, gi(a,1,"GUI_STATUSBAR_FIELD_X")?)?.0),
+            "gui_statusbar_field_w" => Value::Int(self.gui.statusbar_field_rect(gi(a,0,"GUI_STATUSBAR_FIELD_W")?, gi(a,1,"GUI_STATUSBAR_FIELD_W")?)?.1),
+            "gui_breadcrumb" => Value::Int(self.gui.breadcrumb(gi(a,0,"GUI_BREADCRUMB")?, gi(a,1,"GUI_BREADCRUMB")? as i32,
+                gi(a,2,"GUI_BREADCRUMB")? as i32, gi(a,3,"GUI_BREADCRUMB")? as i32, gi(a,4,"GUI_BREADCRUMB")? as i32)?),
+            "gui_breadcrumb_add" => {
+                let wert = if a.len() > 2 { gs(a,2,"GUI_BREADCRUMB_ADD")? } else { String::new() };
+                Value::Int(self.gui.breadcrumb_add(gi(a,0,"GUI_BREADCRUMB_ADD")?, gs(a,1,"GUI_BREADCRUMB_ADD")?, wert)?)
+            }
+            "gui_breadcrumb_set" => { self.gui.breadcrumb_set(gi(a,0,"GUI_BREADCRUMB_SET")?, gstrs(a,1,"GUI_BREADCRUMB_SET")?)?; Value::Nil }
+            "gui_breadcrumb_clear" => { self.gui.breadcrumb_clear(gi(a,0,"GUI_BREADCRUMB_CLEAR")?)?; Value::Nil }
+            "gui_breadcrumb_count" => Value::Int(self.gui.breadcrumb_count(gi(a,0,"GUI_BREADCRUMB_COUNT")?)?),
+            "gui_breadcrumb_clicked" => Value::Int(self.gui.breadcrumb_clicked(gi(a,0,"GUI_BREADCRUMB_CLICKED")?)?),
+            "gui_breadcrumb_text$" | "gui_breadcrumb_text" => Value::str_rc(&self.gui.breadcrumb_text(gi(a,0,"GUI_BREADCRUMB_TEXT")?, gi(a,1,"GUI_BREADCRUMB_TEXT")?)?),
+            "gui_breadcrumb_data$" | "gui_breadcrumb_data" => Value::str_rc(&self.gui.breadcrumb_data(gi(a,0,"GUI_BREADCRUMB_DATA")?, gi(a,1,"GUI_BREADCRUMB_DATA")?)?),
+            "gui_breadcrumb_first_visible" => Value::Int(self.gui.breadcrumb_first_visible(gi(a,0,"GUI_BREADCRUMB_FIRST_VISIBLE")?)?),
+            "gui_toolbar_overflow" => Value::Int(self.gui.toolbar_overflow(gi(a,0,"GUI_TOOLBAR_OVERFLOW")?)?),
             "gui_button_variant" => { self.gui.set_button_variant(gi(a,0,"GUI_BUTTON_VARIANT")?, &gs(a,1,"GUI_BUTTON_VARIANT")?)?; Value::Nil }
             "gui_button_get_variant$" | "gui_button_get_variant" => Value::str_rc(&self.gui.button_variant(gi(a,0,"GUI_BUTTON_GET_VARIANT")?)?),
             "gui_double_clicked" => Value::Bool(self.gui.double_clicked(gi(a,0,"GUI_DOUBLE_CLICKED")?)?),

@@ -231,6 +231,7 @@ pub enum Kind {
     Toolbar, Tree,
     ColorPicker, DatePicker,
     Layout, TabControl, RichText, TimePicker,
+    StatusBar, Breadcrumb,
 }
 
 impl Kind {
@@ -247,6 +248,7 @@ impl Kind {
             Kind::ColorPicker => "colorpicker", Kind::DatePicker => "datepicker",
             Kind::Layout => "layout", Kind::TabControl => "tabcontrol",
             Kind::RichText => "richtext", Kind::TimePicker => "timepicker",
+            Kind::StatusBar => "statusbar", Kind::Breadcrumb => "breadcrumb",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -262,6 +264,7 @@ impl Kind {
             "colorpicker" => Kind::ColorPicker, "datepicker" => Kind::DatePicker,
             "layout" => Kind::Layout, "tabcontrol" => Kind::TabControl,
             "richtext" => Kind::RichText, "timepicker" => Kind::TimePicker,
+            "statusbar" => Kind::StatusBar, "breadcrumb" => Kind::Breadcrumb,
             _ => return None,
         })
     }
@@ -274,7 +277,8 @@ impl Kind {
     fn fokussierbar(self) -> bool {
         !matches!(self,
             Kind::Label | Kind::Panel | Kind::Separator | Kind::GroupBox
-            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas | Kind::Layout)
+            | Kind::Toolbar | Kind::Progress | Kind::Image | Kind::Canvas | Kind::Layout
+            | Kind::StatusBar | Kind::Breadcrumb)
     }
 
     /// Widgets, die Text entgegennehmen -- dort darf die Leertaste NICHT
@@ -984,6 +988,45 @@ struct LeisteState {
     symbol: i32,      // Sinnbildgroesse in Punkten, 0 = aus der Hoehe
 }
 
+/// Ein Feld der Statusleiste.
+#[derive(Clone)]
+struct StatusFeld {
+    text: String,
+    tip: String,
+    breite: i32,      // logische Punkte, 0 = teilt sich den Rest
+    ausr: u8,         // 0 links, 1 mitte, 2 rechts
+    klickbar: bool,
+}
+
+/// Statusleiste mit Feldern (Kind::StatusBar). Bis Stand 27 schrieb ein
+/// Programm alles in EINE Beschriftung -- die Meldung "Gesichert." und die
+/// Stelle der Schreibmarke ueberschrieben sich gegenseitig, und die IDE
+/// verlor jede Meldung beim naechsten Pfeil.
+struct StatusState {
+    felder: Vec<StatusFeld>,
+    hover: i32,
+    geklickt: i32,
+}
+
+impl Default for StatusState {
+    fn default() -> Self { StatusState { felder: Vec::new(), hover: -1, geklickt: -1 } }
+}
+
+/// Pfadleiste (Brotkrumen, Kind::Breadcrumb): anklickbare Teile mit einem
+/// unsichtbaren Wert je Teil. Passt nicht alles hinein, fallen die VORDEREN
+/// Teile unter ein "..." -- das Ende eines Pfades ist das, wo man steht.
+struct PfadState {
+    texte: Vec<String>,
+    daten: Vec<String>,
+    breiten: Vec<i32>,  // gemessen in GUI_UPDATE (0 = noch nicht gemessen)
+    hover: i32,         // Teil unter der Maus, -2 = das "...", -1 = nichts
+    geklickt: i32,
+}
+
+impl Default for PfadState {
+    fn default() -> Self { PfadState { texte: Vec::new(), daten: Vec::new(), breiten: Vec::new(), hover: -1, geklickt: -1 } }
+}
+
 impl Default for LeisteState {
     fn default() -> Self {
         LeisteState { eintraege: Vec::new(), hover: -1, gedrueckt: -1, geklickt: -1, mit_text: false, symbol: 0 }
@@ -1575,6 +1618,9 @@ pub struct Widget {
     tc_seite: i32,
     /// Werkzeugleiste mit eigenen Eintraegen (Kind::Toolbar).
     leiste: Option<Box<LeisteState>>,
+    /// Statusleiste (Kind::StatusBar) und Pfadleiste (Kind::Breadcrumb).
+    status: Option<Box<StatusState>>,
+    pfad: Option<Box<PfadState>>,
     /// Eingebautes Sinnbild eines Knopfes ("" = keins; sonst gewinnt es
     /// vor dem Textur-Handle in `sel`).
     sinnbild: String,
@@ -2050,6 +2096,8 @@ pub struct Gui {
     /// Knopf einer Werkzeugleiste unter der Maus (-1 = keiner) -- ein Wechsel
     /// startet den Tooltip-Verweil neu, wie ein Wechsel des Widgets.
     hover_teil: i32,
+    /// Offenes Ueberlauf-Menue einer Werkzeugleiste (Fenster, Widget).
+    leiste_popup: Option<(usize, usize)>,
     hover_x: i32, hover_y: i32,
     // Anzeige-Massstab (GUI_SCALE). Multipliziert JEDE Laengenangabe, die in
     // die GUI hineingeht: Fenster-/Widget-Geometrie beim Anlegen, die
@@ -2123,7 +2171,7 @@ impl Gui {
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
-            hover_w: None, hover_frame: 0, hover_teil: -1, hover_x: 0, hover_y: 0,
+            hover_w: None, hover_frame: 0, hover_teil: -1, leiste_popup: None, hover_x: 0, hover_y: 0,
             scale: 1.0,
             menu_cursor: None, alt_allein: false, tip_fokus: None, tip_fokus_frame: 0,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0, screenreader: false,
@@ -2947,7 +2995,7 @@ impl Gui {
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1,
-            leiste: None, sinnbild: String::new(),
+            leiste: None, status: None, pfad: None, sinnbild: String::new(),
             rich: None, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
             umbruch: false, bind: String::new(), form: String::new(),
@@ -3401,12 +3449,62 @@ impl Gui {
         }
     }
 
+    /// Die SICHTBAREN Eintraege einer Werkzeugleiste (siehe `tb_layout`).
+    fn tb_geom(&self, ax: i32, ay: i32, w: i32, h: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+        self.tb_layout(ax, ay, w, h, wdg).0
+    }
+    /// Wie viele Eintraege gerade im Ueberlauf-Menue stehen (0 = alles passt).
+    pub fn toolbar_overflow(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_TOOLBAR_OVERFLOW")?;
+        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_OVERFLOW: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)".into()); }
+        let (wi, i) = Self::dec_widget(h);
+        let (ax, ay, bw, bh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        Ok(self.tb_layout(ax, ay, bw, bh, w).1.iter().filter(|&&k| w.leiste.as_ref().map(|l| l.eintraege[k].art == 0).unwrap_or(false)).count() as i64)
+    }
+    /// Liegt (mx, my) auf dem >>-Knopf einer Werkzeugleiste?
+    fn tb_chevron_hit(&self, wi: usize, i: usize, mx: i32, my: i32) -> bool {
+        let w = &self.windows[wi].widgets[i];
+        let (ax, ay, bw, bh) = self.abs_rect(wi, w);
+        match self.tb_layout(ax, ay, bw, bh, w).2 {
+            Some((x0, x1)) => mx >= x0 && mx < x1 && my >= ay && my < ay + bh,
+            None => false,
+        }
+    }
+    /// Das Ueberlauf-Menue: (x, y, Breite, Zeilen als (Eintrag, y oben, y unten)).
+    /// Die Breite wird wie die Knoepfe an der Zeichenzahl geschaetzt -- der
+    /// Treffertest hat keine Grafik.
+    fn tb_popup_geom(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, Vec<(usize, i32, i32)>)> {
+        let w = self.windows.get(wi)?.widgets.get(i)?;
+        if !w.alive || !self.widget_shown(wi, w) { return None; }
+        let l = w.leiste.as_ref()?;
+        let (ax, ay, bw, bh) = self.abs_rect(wi, w);
+        let (_, versteckt, chev) = self.tb_layout(ax, ay, bw, bh, w);
+        let (_, cx1) = chev?;
+        let zeile = self.sk(26);
+        let mut breite = self.sk(160);
+        let mut y = ay + bh;
+        let mut zeilen = Vec::new();
+        for &k in &versteckt {
+            let e = &l.eintraege[k];
+            if e.art == 2 { continue; }
+            let hoch = if e.art == 1 { self.sk(9) } else { zeile };
+            let name = if !e.text.is_empty() { &e.text } else if !e.tip.is_empty() { &e.tip } else { &e.symbol };
+            breite = breite.max(self.sk(8) * name.chars().count() as i32 + self.sk(48));
+            zeilen.push((k, y, y + hoch));
+            y += hoch;
+        }
+        if zeilen.is_empty() { return None; }
+        let px = (cx1 - breite).max(0);
+        Some((px, ay + bh, breite, zeilen))
+    }
+
     /// Die Eintraege einer Werkzeugleiste: (Eintrag, x links, x rechts),
-    /// absolut. EINE Quelle fuer Zeichnen, Treffertest, Tooltip und
-    /// Barrierefreiheit. Beschriftungen werden wie beim Reiterwerk an der
-    /// ZEICHENZAHL geschaetzt -- der Treffertest hat keine Grafik.
-    fn tb_geom(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
-        let l = match wdg.leiste.as_ref() { Some(l) => l, None => return Vec::new() };
+    /// absolut, dazu die Eintraege, die NICHT hineinpassen, und der >>-Knopf.
+    /// EINE Quelle fuer Zeichnen, Treffertest, Tooltip und Barrierefreiheit.
+    /// Passt alles, bleibt die Liste der versteckten leer und es gibt keinen
+    /// Knopf. Beschriftungen zaehlen, sobald `leisten_pass` sie gemessen hat.
+    fn tb_layout(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Vec<usize>, Option<(i32, i32)>) {
+        let l = match wdg.leiste.as_ref() { Some(l) => l, None => return (Vec::new(), Vec::new(), None) };
         let rand = self.sk(4);
         let luft = self.sk(2);
         let knopf = (h - self.sk(6)).max(self.sk(12));
@@ -3433,22 +3531,259 @@ impl Gui {
         // endete ein rechtsbuendiger Knopf zwei Punkte vor dem Rand.
         let fest: i32 = l.eintraege.iter().map(|e| breite(e) + luft).sum::<i32>() - if l.eintraege.is_empty() { 0 } else { luft };
         let luecken = l.eintraege.iter().filter(|e| e.art == 2).count() as i32;
-        let rest = (w - 2 * rand - fest).max(0);
-        let mut x = ax + rand;
-        let mut out = Vec::with_capacity(l.eintraege.len());
-        let mut verteilt = 0;
-        let mut nr = 0;
-        for (k, e) in l.eintraege.iter().enumerate() {
-            let mut b = breite(e);
-            if e.art == 2 && luecken > 0 {
-                nr += 1;
-                b = if nr == luecken { rest - verteilt } else { rest / luecken };
-                verteilt += b;
+        if fest <= w - 2 * rand {
+            let rest = (w - 2 * rand - fest).max(0);
+            let mut x = ax + rand;
+            let mut out = Vec::with_capacity(l.eintraege.len());
+            let mut verteilt = 0;
+            let mut nr = 0;
+            for (k, e) in l.eintraege.iter().enumerate() {
+                let mut b = breite(e);
+                if e.art == 2 && luecken > 0 {
+                    nr += 1;
+                    b = if nr == luecken { rest - verteilt } else { rest / luecken };
+                    verteilt += b;
+                }
+                out.push((k, x, x + b));
+                x += b + luft;
             }
-            out.push((k, x, x + b));
-            x += b + luft;
+            return (out, Vec::new(), None);
         }
-        out
+        // Zu eng: von vorn so viele, wie neben dem >>-Knopf Platz haben; alles
+        // danach wandert ins Menue. Luecken fallen weg -- es ist ohnehin kein
+        // Platz uebrig, den sie verteilen koennten.
+        let chev = knopf.min(self.sk(22)).max(self.sk(16));
+        let grenze = ax + w - rand - chev - luft;
+        let mut x = ax + rand;
+        let mut out = Vec::new();
+        let mut versteckt = Vec::new();
+        let mut voll = false;
+        for (k, e) in l.eintraege.iter().enumerate() {
+            if e.art == 2 { continue; }
+            let b = breite(e);
+            if !voll && x + b <= grenze {
+                out.push((k, x, x + b));
+                x += b + luft;
+            } else {
+                voll = true;
+                versteckt.push(k);
+            }
+        }
+        // Ein Trenner am Ende der sichtbaren Reihe oder am Anfang des Menues
+        // saehe aus wie ein Fehler.
+        while out.last().map(|&(k, _, _)| l.eintraege[k].art == 1).unwrap_or(false) { out.pop(); }
+        while versteckt.first().map(|&k| l.eintraege[k].art == 1).unwrap_or(false) { versteckt.remove(0); }
+        let cx = ax + w - rand - chev;
+        (out, versteckt, Some((cx, cx + chev)))
+    }
+
+    // --- Statusleiste (GUI_STATUSBAR) ---------------------------------------
+    pub fn statusbar(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, text: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::StatusBar, x, y, w, h);
+        wd.text = text.clone();
+        wd.status = Some(Box::new(StatusState {
+            felder: vec![StatusFeld { text, tip: String::new(), breite: 0, ausr: 0, klickbar: false }],
+            ..Default::default()
+        }));
+        self.add_widget(win, "GUI_STATUSBAR", wd)
+    }
+    fn sb_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Widget, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::StatusBar { return Err(format!("{}: Widget ist keine Statusleiste (GUI_STATUSBAR)", fn_)); }
+        if w.status.is_none() { w.status = Some(Box::new(StatusState::default())); }
+        Ok(w)
+    }
+    fn sb_feld(&mut self, h: i64, i: i64, fn_: &str) -> Result<&mut StatusFeld, String> {
+        let w = self.sb_mut(h, fn_)?;
+        let s = w.status.as_mut().unwrap();
+        let n = s.felder.len();
+        s.felder.get_mut(i.max(0) as usize).filter(|_| i >= 0)
+            .ok_or_else(|| format!("{}: Feld {} gibt es nicht ({} Felder)", fn_, i, n))
+    }
+    fn ausrichtung_lesen(a: &str, fn_: &str) -> Result<u8, String> {
+        Ok(match a.trim().to_lowercase().as_str() {
+            "" | "links" | "left" => 0,
+            "mitte" | "center" => 1,
+            "rechts" | "right" => 2,
+            _ => return Err(format!("{}: Ausrichtung '{}' gibt es nicht -- links, mitte, rechts", fn_, a)),
+        })
+    }
+    /// Ein Feld anhaengen: `breite` in Punkten, 0 = teilt sich den Rest.
+    pub fn statusbar_add(&mut self, h: i64, text: String, breite: i64, ausr: &str) -> Result<i64, String> {
+        let a = Self::ausrichtung_lesen(ausr, "GUI_STATUSBAR_ADD")?;
+        if breite < 0 { return Err("GUI_STATUSBAR_ADD: Breite muss >= 0 sein (0 = teilt sich den Rest)".into()); }
+        let s = self.sb_mut(h, "GUI_STATUSBAR_ADD")?.status.as_mut().unwrap();
+        s.felder.push(StatusFeld { text, tip: String::new(), breite: breite as i32, ausr: a, klickbar: false });
+        Ok(s.felder.len() as i64 - 1)
+    }
+    pub fn statusbar_set(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
+        self.sb_feld(h, i, "GUI_STATUSBAR_SET")?.text = text.clone();
+        if i == 0 { self.wdg_mut(h, "GUI_STATUSBAR_SET")?.text = text; }
+        Ok(())
+    }
+    pub fn statusbar_text(&mut self, h: i64, i: i64) -> Result<String, String> {
+        Ok(self.sb_feld(h, i, "GUI_STATUSBAR_TEXT")?.text.clone())
+    }
+    pub fn statusbar_tip(&mut self, h: i64, i: i64, tip: String) -> Result<(), String> {
+        self.sb_feld(h, i, "GUI_STATUSBAR_TIP")?.tip = tip; Ok(())
+    }
+    pub fn statusbar_clickable(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        self.sb_feld(h, i, "GUI_STATUSBAR_CLICKABLE")?.klickbar = an; Ok(())
+    }
+    pub fn statusbar_clicked(&mut self, h: i64) -> Result<i64, String> {
+        Ok(self.sb_mut(h, "GUI_STATUSBAR_CLICKED")?.status.as_ref().unwrap().geklickt as i64)
+    }
+    pub fn statusbar_count(&mut self, h: i64) -> Result<i64, String> {
+        Ok(self.sb_mut(h, "GUI_STATUSBAR_COUNT")?.status.as_ref().unwrap().felder.len() as i64)
+    }
+    pub fn statusbar_field_rect(&self, h: i64, i: i64) -> Result<(i64, i64), String> {
+        let w = self.wdg(h, "GUI_STATUSBAR_FIELD_X")?;
+        if w.kind != Kind::StatusBar { return Err("GUI_STATUSBAR_FIELD_X: Widget ist keine Statusleiste (GUI_STATUSBAR)".into()); }
+        match self.sb_geom(w.x, w.w, w).iter().find(|&&(k, _, _)| k as i64 == i) {
+            Some(&(_, x0, x1)) => Ok((self.unsk(x0) as i64, self.unsk(x1 - x0) as i64)),
+            None => Err(format!("GUI_STATUSBAR_FIELD_X: Feld {} gibt es nicht", i)),
+        }
+    }
+    /// Die Felder: (Feld, x links, x rechts). Feste Breiten zuerst, der Rest
+    /// wird unter den Feldern mit Breite 0 geteilt.
+    fn sb_geom(&self, ax: i32, w: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+        let s = match wdg.status.as_ref() { Some(s) => s, None => return Vec::new() };
+        let fest: i32 = s.felder.iter().map(|f| self.sk(f.breite)).sum();
+        let flex = s.felder.iter().filter(|f| f.breite == 0).count() as i32;
+        let rest = (w - fest).max(0);
+        let mut x = ax;
+        let mut nr = 0;
+        let mut verteilt = 0;
+        s.felder.iter().enumerate().map(|(k, f)| {
+            let b = if f.breite > 0 { self.sk(f.breite) } else {
+                nr += 1;
+                let b = if nr == flex { rest - verteilt } else { rest / flex.max(1) };
+                verteilt += b;
+                b
+            };
+            let r = (k, x, x + b);
+            x += b;
+            r
+        }).collect()
+    }
+    fn sb_treffer(&self, wi: usize, i: usize, mx: i32) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        let (ax, _, bw, _) = self.abs_rect(wi, w);
+        self.sb_geom(ax, bw, w).into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, _)| k as i32).unwrap_or(-1)
+    }
+
+    // --- Pfadleiste (GUI_BREADCRUMB) ----------------------------------------
+    pub fn breadcrumb(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Breadcrumb, x, y, w, h);
+        wd.pfad = Some(Box::new(PfadState::default()));
+        self.add_widget(win, "GUI_BREADCRUMB", wd)
+    }
+    fn pf_mut(&mut self, h: i64, fn_: &str) -> Result<&mut PfadState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Breadcrumb { return Err(format!("{}: Widget ist keine Pfadleiste (GUI_BREADCRUMB)", fn_)); }
+        Ok(w.pfad.get_or_insert_with(|| Box::new(PfadState::default())))
+    }
+    fn pf_idx(p: &PfadState, i: i64, fn_: &str) -> Result<usize, String> {
+        if i < 0 || i as usize >= p.texte.len() { return Err(format!("{}: Teil {} gibt es nicht ({} Teile)", fn_, i, p.texte.len())); }
+        Ok(i as usize)
+    }
+    pub fn breadcrumb_add(&mut self, h: i64, text: String, wert: String) -> Result<i64, String> {
+        let p = self.pf_mut(h, "GUI_BREADCRUMB_ADD")?;
+        p.texte.push(text); p.daten.push(wert); p.breiten.push(0);
+        Ok(p.texte.len() as i64 - 1)
+    }
+    pub fn breadcrumb_set(&mut self, h: i64, texte: Vec<String>) -> Result<(), String> {
+        let p = self.pf_mut(h, "GUI_BREADCRUMB_SET")?;
+        // Ein unveraenderter Pfad bleibt, wie er ist -- sonst ginge je Bild
+        // die Messung verloren, und ein Programm setzt ihn gern je Bild.
+        if p.texte == texte { return Ok(()); }
+        let n = texte.len();
+        p.texte = texte; p.daten = vec![String::new(); n]; p.breiten = vec![0; n];
+        Ok(())
+    }
+    pub fn breadcrumb_clear(&mut self, h: i64) -> Result<(), String> {
+        let p = self.pf_mut(h, "GUI_BREADCRUMB_CLEAR")?;
+        p.texte.clear(); p.daten.clear(); p.breiten.clear(); Ok(())
+    }
+    pub fn breadcrumb_count(&mut self, h: i64) -> Result<i64, String> {
+        Ok(self.pf_mut(h, "GUI_BREADCRUMB_COUNT")?.texte.len() as i64)
+    }
+    pub fn breadcrumb_clicked(&mut self, h: i64) -> Result<i64, String> {
+        Ok(self.pf_mut(h, "GUI_BREADCRUMB_CLICKED")?.geklickt as i64)
+    }
+    pub fn breadcrumb_text(&mut self, h: i64, i: i64) -> Result<String, String> {
+        let p = self.pf_mut(h, "GUI_BREADCRUMB_TEXT")?;
+        Ok(p.texte[Self::pf_idx(p, i, "GUI_BREADCRUMB_TEXT")?].clone())
+    }
+    pub fn breadcrumb_data(&mut self, h: i64, i: i64) -> Result<String, String> {
+        let p = self.pf_mut(h, "GUI_BREADCRUMB_DATA")?;
+        Ok(p.daten[Self::pf_idx(p, i, "GUI_BREADCRUMB_DATA")?].clone())
+    }
+    /// Der erste Teil, der zu sehen ist -- davor steht das "...".
+    pub fn breadcrumb_first_visible(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_BREADCRUMB_FIRST_VISIBLE")?;
+        if w.kind != Kind::Breadcrumb { return Err("GUI_BREADCRUMB_FIRST_VISIBLE: Widget ist keine Pfadleiste (GUI_BREADCRUMB)".into()); }
+        let (geo, _) = self.pf_geom(w.x, w.w, w);
+        Ok(geo.first().map(|&(k, _, _)| k as i64).unwrap_or(0))
+    }
+    /// Die sichtbaren Teile (Teil, x links, x rechts) und das "..." davor,
+    /// falls die vorderen nicht hineinpassen.
+    fn pf_geom(&self, ax: i32, w: i32, wdg: &Widget) -> (Vec<(usize, i32, i32)>, Option<(i32, i32)>) {
+        let p = match wdg.pfad.as_ref() { Some(p) => p, None => return (Vec::new(), None) };
+        let n = p.texte.len();
+        if n == 0 { return (Vec::new(), None); }
+        let rand = self.sk(2);
+        let innen = self.sk(12);
+        let trenn = self.sk(16);
+        let breite = |k: usize| -> i32 {
+            let t = p.breiten.get(k).copied().filter(|&b| b > 0)
+                .unwrap_or_else(|| self.sk(8) * p.texte[k].chars().count() as i32);
+            t + innen
+        };
+        let gesamt: i32 = (0..n).map(breite).sum::<i32>() + trenn * (n as i32 - 1);
+        let mut erster = 0;
+        let mut punkte = None;
+        if gesamt > w - 2 * rand {
+            // Vom LETZTEN Teil rueckwaerts, solange es neben das "..." passt;
+            // der letzte steht immer da, auch wenn er selbst zu breit ist.
+            let pw = self.sk(24);
+            let platz = w - 2 * rand - pw - trenn;
+            erster = n - 1;
+            let mut belegt = breite(n - 1);
+            while erster > 0 {
+                let dazu = breite(erster - 1) + trenn;
+                if belegt + dazu > platz { break; }
+                belegt += dazu;
+                erster -= 1;
+            }
+            if erster > 0 { punkte = Some((ax + rand, ax + rand + pw)); }
+        }
+        let mut x = match punkte { Some((_, x1)) => x1 + trenn, None => ax + rand };
+        let mut out = Vec::new();
+        for k in erster..n {
+            let b = breite(k);
+            out.push((k, x, x + b));
+            x += b + trenn;
+        }
+        (out, punkte)
+    }
+    /// Ein Teil der Pfadleiste ist geklickt worden (Maus und Hilfsprogramm).
+    fn pf_klick(&mut self, wi: usize, i: usize, k: i32) {
+        let w = &mut self.windows[wi].widgets[i];
+        let n = w.pfad.as_ref().map(|p| p.texte.len()).unwrap_or(0);
+        if k < 0 || k as usize >= n { return; }
+        if let Some(p) = w.pfad.as_mut() { p.geklickt = k; }
+        w.clicked = true;
+        let f = w.on_click.clone();
+        if let Some(f) = f { self.pending.push(f); }
+    }
+    /// Welcher Teil liegt unter der Maus? -2 = das "...", -1 = keiner.
+    fn pf_treffer(&self, wi: usize, i: usize, mx: i32) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        let (ax, _, bw, _) = self.abs_rect(wi, w);
+        let (geo, punkte) = self.pf_geom(ax, bw, w);
+        if let Some((x0, x1)) = punkte { if mx >= x0 && mx < x1 { return -2; } }
+        geo.into_iter().find(|&(_, x0, x1)| mx >= x0 && mx < x1).map(|(k, _, _)| k as i32).unwrap_or(-1)
     }
     /// Welcher KNOPF liegt unter der Maus? -1 = keiner (Trenner, Luecke, daneben).
     fn tb_treffer(&self, wi: usize, i: usize, mx: i32, my: i32) -> i32 {
@@ -4782,9 +5117,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// dann schreiben -- das Messen braucht `&self`.
     fn leisten_pass(&mut self, g: &Graphics) {
         let mut messung: Vec<(usize, usize, usize, i32)> = Vec::new();
+        let mut pfade: Vec<(usize, usize, Vec<i32>)> = Vec::new();
         for (wi, win) in self.windows.iter().enumerate() {
             if !win.alive { continue; }
             for (i, w) in win.widgets.iter().enumerate() {
+                if let Some(p) = w.pfad.as_ref() {
+                    pfade.push((wi, i, p.texte.iter().map(|t| self.wtext_width(g, w, t)).collect()));
+                }
                 if let Some(l) = w.leiste.as_ref() {
                     for (k, e) in l.eintraege.iter().enumerate() {
                         if !e.text.is_empty() {
@@ -4793,6 +5132,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     }
                 }
             }
+        }
+        for (wi, i, b) in pfade {
+            if let Some(p) = self.windows[wi].widgets[i].pfad.as_mut() { p.breiten = b; }
         }
         for (wi, i, k, b) in messung {
             if let Some(e) = self.windows[wi].widgets[i].leiste.as_mut().and_then(|l| l.eintraege.get_mut(k)) {
@@ -6157,6 +6499,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
         // Beim gesetzten Text ist der Text die QUELLE -- sonst setzte
         // GUI_SET_TEXT dort etwas, das nie zu sehen ist.
+        // Bei der Statusleiste ist der Text das ERSTE Feld -- ein Programm, das
+        // bisher eine Beschriftung als Statuszeile nahm, muss so nichts
+        // umschreiben.
+        if w.kind == Kind::StatusBar {
+            let t = w.text.clone();
+            if let Some(f) = w.status.as_mut().and_then(|s| s.felder.first_mut()) { f.text = t; }
+        }
         if w.kind == Kind::RichText {
             let t = w.text.clone();
             if let Some(r) = w.rich.as_mut() {
@@ -7315,6 +7664,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if !w.sinnbild.is_empty() { o["symbol"] = serde_json::json!(w.sinnbild); }
         if w.variante > 0 { o["variant"] = serde_json::json!(KNOPF_ARTEN[w.variante as usize]); }
+        if let Some(s) = &w.status {
+            o["status"] = serde_json::json!({
+                "felder": s.felder.iter().map(|f| {
+                    let mut fj = serde_json::json!({ "text": f.text, "breite": f.breite });
+                    if !f.tip.is_empty() { fj["tip"] = serde_json::json!(f.tip); }
+                    if f.ausr > 0 { fj["ausrichtung"] = serde_json::json!(["links", "mitte", "rechts"][f.ausr as usize]); }
+                    if f.klickbar { fj["klickbar"] = serde_json::json!(true); }
+                    fj
+                }).collect::<Vec<_>>(),
+            });
+        }
+        if let Some(p) = &w.pfad {
+            o["pfad"] = serde_json::json!({ "texte": p.texte, "daten": p.daten });
+        }
         if let Some(l) = &w.leiste {
             // Textur-Handles gehoeren NICHT in die Datei (sie gelten nur in
             // diesem Lauf) -- ein Eintrag mit Bild steht darum ohne Bild da.
@@ -7623,6 +7986,33 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         if let Some(s) = wj["symbol"].as_str() {
             if kind == Kind::Button { if let Ok(n) = sinnbild_pruefen(s, "GUI_LOAD") { w.sinnbild = n; } }
+        }
+        if kind == Kind::StatusBar {
+            let mut s = StatusState::default();
+            for fj in wj.get("status").and_then(|v| v["felder"].as_array()).map(|a| a.as_slice()).unwrap_or(&[]) {
+                s.felder.push(StatusFeld {
+                    text: fj["text"].as_str().unwrap_or("").to_string(),
+                    tip: fj["tip"].as_str().unwrap_or("").to_string(),
+                    breite: fj["breite"].as_i64().unwrap_or(0).max(0) as i32,
+                    ausr: Self::ausrichtung_lesen(fj["ausrichtung"].as_str().unwrap_or(""), "GUI_LOAD").unwrap_or(0),
+                    klickbar: fj["klickbar"].as_bool().unwrap_or(false),
+                });
+            }
+            if s.felder.is_empty() {
+                s.felder.push(StatusFeld { text: w.text.clone(), tip: String::new(), breite: 0, ausr: 0, klickbar: false });
+            }
+            w.status = Some(Box::new(s));
+        }
+        if kind == Kind::Breadcrumb {
+            let mut p = PfadState::default();
+            if let Some(pj) = wj.get("pfad") {
+                p.texte = pj["texte"].as_array().map(|a| a.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect()).unwrap_or_default();
+                let n = p.texte.len();
+                p.daten = pj["daten"].as_array().map(|a| a.iter().map(|v| v.as_str().unwrap_or("").to_string()).collect()).unwrap_or_default();
+                p.daten.resize(n, String::new());
+                p.breiten = vec![0; n];
+            }
+            w.pfad = Some(Box::new(p));
         }
         if kind == Kind::Toolbar {
             if let Some(lj) = wj.get("leiste") {
@@ -8267,6 +8657,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
                 if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
                 if let Some(l) = wdg.list.as_mut() { l.hover = -1; }
+                if let Some(s) = wdg.status.as_mut() { s.hover = -1; s.geklickt = -1; }
+                if let Some(p) = wdg.pfad.as_mut() { p.hover = -1; p.geklickt = -1; }
                 wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
@@ -8398,6 +8790,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
+                    if kind == Kind::StatusBar {
+                        let k = self.sb_treffer(top, i, mx);
+                        if let Some(s) = self.windows[top].widgets[i].status.as_mut() { s.hover = k; }
+                    }
+                    if kind == Kind::Breadcrumb {
+                        let k = self.pf_treffer(top, i, mx);
+                        if let Some(p) = self.windows[top].widgets[i].pfad.as_mut() { p.hover = k; }
+                    }
                     if kind == Kind::Toolbar {
                         let k = self.tb_treffer(top, i, mx, my);
                         if let Some(l) = self.windows[top].widgets[i].leiste.as_mut() { l.hover = k; }
@@ -8465,7 +8865,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let listen_tip = w.list.as_ref()
                     .and_then(|l| l.tips.get(l.hover.max(0) as usize).filter(|_| l.hover >= 0))
                     .map(|t| !t.is_empty()).unwrap_or(false);
-                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip) { found = Some((top, i)); }
+                let status_tip = w.status.as_ref()
+                    .and_then(|s| s.felder.get(s.hover.max(0) as usize).filter(|_| s.hover >= 0))
+                    .map(|f| !f.tip.is_empty()).unwrap_or(false);
+                let pfad_tip = w.pfad.as_ref().map(|p| p.hover == -2).unwrap_or(false);
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip || listen_tip || status_tip || pfad_tip) { found = Some((top, i)); }
             }
             found
         });
@@ -8475,6 +8879,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let teil = tip_cur.and_then(|(wi, i)| {
             let w = &self.windows[wi].widgets[i];
             w.leiste.as_ref().map(|l| l.hover).or_else(|| w.list.as_ref().map(|l| l.hover))
+                .or_else(|| w.status.as_ref().map(|s| s.hover)).or_else(|| w.pfad.as_ref().map(|p| p.hover))
         }).unwrap_or(-1);
         if teil != self.hover_teil {
             self.hover_teil = teil;
@@ -10730,6 +11135,25 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 .map(|r| Self::in_rect(mx, my, r)).unwrap_or(false);
             if !drin { self.table_end_edit(ew, ei, true); }
         }
+        // Offenes Ueberlauf-Menue einer Werkzeugleiste: ein Klick darauf fuehrt
+        // den Eintrag aus, ein Klick daneben schliesst es -- auf dem >>-Knopf
+        // selbst NUR schliessen, sonst ginge es im selben Klick wieder auf.
+        if let Some((lw, li)) = self.leiste_popup.take() {
+            if let Some((px, py, pw, zeilen)) = self.tb_popup_geom(lw, li) {
+                let ph = zeilen.last().map(|z| z.2 - py).unwrap_or(0);
+                if Self::in_rect(mx, my, (px, py, pw, ph)) {
+                    let k = zeilen.iter().find(|z| my >= z.1 && my < z.2).map(|z| z.0);
+                    let knopf = k.filter(|&k| self.windows[lw].widgets[li].leiste.as_ref()
+                        .map(|l| l.eintraege[k].art == 0 && !l.eintraege[k].aus).unwrap_or(false));
+                    match knopf {
+                        Some(k) => self.tb_klick(lw, li, k as i32),
+                        None => self.leiste_popup = Some((lw, li)),   // Trenner/gesperrt: offen lassen
+                    }
+                    return;
+                }
+                if self.tb_chevron_hit(lw, li, mx, my) { return; }
+            }
+        }
         // Offenes Dropdown hat Vorrang: das Popup liegt ueber allem und reicht
         // evtl. ueber den Fensterrand hinaus (topmost_at wuerde es verfehlen).
         if let Some((dw, di)) = self.open_dropdown {
@@ -10843,6 +11267,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
         match kind {
             Kind::Button => self.press_origin = Some((win, i)),
+            Kind::StatusBar => {
+                let k = self.sb_treffer(win, i, mx);
+                let w = &mut self.windows[win].widgets[i];
+                let klickbar = w.status.as_ref().and_then(|s| s.felder.get(k.max(0) as usize)).map(|f| k >= 0 && f.klickbar).unwrap_or(false);
+                if klickbar {
+                    if let Some(s) = w.status.as_mut() { s.geklickt = k; }
+                    w.clicked = true;
+                    let f = w.on_click.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
+            Kind::Breadcrumb => {
+                let k = self.pf_treffer(win, i, mx);
+                if k >= 0 { self.pf_klick(win, i, k); }
+            }
+            Kind::Toolbar if self.tb_chevron_hit(win, i, mx, my) => {
+                self.leiste_popup = Some((win, i));
+            }
             Kind::Toolbar => {
                 let k = self.tb_treffer(win, i, mx, my);
                 let aus = self.windows[win].widgets[i].leiste.as_ref()
@@ -11666,6 +12108,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("accent"), false);
             self.ctext(g, bx + pad, by + pad / 2, text, self.th("text_fg"));
         }
+        // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
+        if let Some((lw, li)) = self.leiste_popup {
+            if self.windows.get(lw).map(|w| w.alive && w.visible).unwrap_or(false) {
+                self.draw_leisten_popup(g, lw, li);
+            }
+        }
         // Tooltip ganz zuletzt, wenn die Maus lange genug ruht.
         self.draw_tooltip(g);
     }
@@ -11718,6 +12166,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn tip_text(&self, wi: usize, i: usize) -> Option<String> {
         let w = self.windows.get(wi)?.widgets.get(i)?;
         if !w.fehler.is_empty() { return Some(w.fehler.clone()); }
+        if let Some(s) = w.status.as_ref() {
+            if s.hover >= 0 {
+                if let Some(f) = s.felder.get(s.hover as usize).filter(|f| !f.tip.is_empty()) {
+                    return Some(f.tip.clone());
+                }
+            }
+        }
+        // Ueber dem "..." einer Pfadleiste: der ganze Pfad, der dort fehlt.
+        if let Some(p) = w.pfad.as_ref() {
+            if p.hover == -2 { return Some(p.texte.join("  >  ")); }
+        }
         if let Some(l) = w.list.as_ref() {
             if l.hover >= 0 {
                 if let Some(t) = l.tips.get(l.hover as usize).filter(|t| !t.is_empty()) {
@@ -12464,6 +12923,43 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 n
             }
             Kind::Splitter => { let mut n = Node::new(Role::Splitter); n.set_orientation(if w.group == "v" { Orientation::Vertical } else { Orientation::Horizontal }); n }
+            Kind::StatusBar => {
+                let mut n = Node::new(Role::Status);
+                if let Some(s) = w.status.as_ref() {
+                    n.set_value(s.felder.iter().map(|f| f.text.as_str()).filter(|t| !t.is_empty()).collect::<Vec<_>>().join(", "));
+                    for (k, x0, x1) in self.sb_geom(x, bw, w) {
+                        let f = &s.felder[k];
+                        if !f.klickbar { continue; }
+                        let mut t = Node::new(Role::Button);
+                        t.set_label(if f.tip.is_empty() { f.text.clone() } else { format!("{} ({})", f.text, f.tip) });
+                        t.add_action(Action::Click);
+                        t.set_bounds(Self::a11y_rect(x0, y, x1 - x0, bh));
+                        let id2 = NodeId(ids::teil(wi, i, k));
+                        nodes.push((id2, t));
+                        kinder.push(id2);
+                    }
+                }
+                n
+            }
+            Kind::Breadcrumb => {
+                let n = Node::new(Role::Navigation);
+                if let Some(p) = w.pfad.as_ref() {
+                    // Alle Teile, auch die unter dem "..." -- ein Bildschirmleser
+                    // braucht den ganzen Pfad, nicht den, der gerade hineinpasst.
+                    let (geo, punkte) = self.pf_geom(x, bw, w);
+                    for (k, t) in p.texte.iter().enumerate() {
+                        let mut o = Node::new(Role::Link);
+                        o.set_label(t.clone());
+                        o.add_action(Action::Click);
+                        let r = geo.iter().find(|g| g.0 == k).map(|g| (g.1, g.2)).or(punkte).unwrap_or((x, x));
+                        o.set_bounds(Self::a11y_rect(r.0, y, (r.1 - r.0).max(1), bh));
+                        let id2 = NodeId(ids::teil(wi, i, k));
+                        nodes.push((id2, o));
+                        kinder.push(id2);
+                    }
+                }
+                n
+            }
             Kind::Separator | Kind::Layout => Node::new(Role::GenericContainer),
         };
         n.set_bounds(Self::a11y_rect(x, y, bw, bh));
@@ -12541,6 +13037,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if !shown || !enabled { return; }
                 match (kind, req.action) {
                     (Kind::Toolbar, Action::Click) => self.tb_klick(wi, i, k as i32),
+                    (Kind::Breadcrumb, Action::Click) => self.pf_klick(wi, i, k as i32),
+                    (Kind::StatusBar, Action::Click) => {
+                        let w = &mut self.windows[wi].widgets[i];
+                        if w.status.as_ref().and_then(|s| s.felder.get(k)).map(|f| f.klickbar).unwrap_or(false) {
+                            if let Some(s) = w.status.as_mut() { s.geklickt = k as i32; }
+                            w.clicked = true;
+                            let f = w.on_click.clone();
+                            if let Some(f) = f { self.pending.push(f); }
+                        }
+                    }
                     (Kind::ListBox | Kind::Dropdown, Action::Click) => self.a11y_eintrag_waehlen(wi, i, k),
                     (Kind::Tree, Action::Click) => {
                         let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tree.as_mut() { Some(t) if k < t.nodes.len() && t.selected != k as i32 => { t.selected = k as i32; true } _ => false } };
@@ -12955,7 +13461,60 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
         }
+        // Der >>-Knopf, wenn nicht alles hineinpasst.
+        if let (_, versteckt, Some((cx0, cx1))) = self.tb_layout(ax, ay, w, h, wdg) {
+            if !versteckt.is_empty() {
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                let offen = self.leiste_popup == Some((wi, idx));
+                if offen || (mx >= cx0 && mx < cx1 && my >= iy && my < iy + ih) {
+                    let f = shade(self.th("widget_bg"), if offen { -10 } else { 8 });
+                    g.round_rect(cx0, iy, cx1 - 1, iy + ih - 1, rad, f, true);
+                    g.round_rect(cx0, iy, cx1 - 1, iy + ih - 1, rad, self.th("widget_border"), false);
+                }
+                let s = ((cx1 - cx0) * 2 / 3).max(self.sk(8));
+                let sy = iy + (ih - s) / 2;
+                let sx = cx0 + (cx1 - cx0 - s) / 2;
+                sinnbild(g, "rechts", sx - s / 5, sy, s, ruhig, false);
+                sinnbild(g, "rechts", sx + s / 5, sy, s, ruhig, false);
+            }
+        }
         g.pop_clip();
+    }
+
+    /// Das Ueberlauf-Menue einer Werkzeugleiste -- wie ein Kontextmenue:
+    /// Sinnbild, Name, gesperrte gedaempft, eingeschaltete in Akzentfarbe.
+    fn draw_leisten_popup(&self, g: &mut Graphics, wi: usize, i: usize) {
+        let (px, py, pw, zeilen) = match self.tb_popup_geom(wi, i) { Some(x) => x, None => return };
+        let l = match self.windows[wi].widgets[i].leiste.as_ref() { Some(l) => l, None => return };
+        let ph = zeilen.last().map(|z| z.2 - py).unwrap_or(0);
+        let rad = self.m("corner_radius").min(6);
+        g.round_rect(px + 2, py + 3, px + pw + 1, py + ph + 2, rad.max(2), (0x55i64 << 24) as i64, true);
+        g.round_rect(px, py, px + pw - 1, py + ph - 1, rad, self.th("widget_bg"), true);
+        g.round_rect(px, py, px + pw - 1, py + ph - 1, rad, self.th("widget_border"), false);
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        let acc = self.th("accent");
+        let ruhig = mischen(self.th("text_fg"), self.th("muted_fg"), 0.25);
+        for (k, y0, y1) in zeilen {
+            let e = &l.eintraege[k];
+            if e.art == 1 {
+                let my_ = (y0 + y1) / 2;
+                g.line(px + self.sk(8), my_, px + pw - self.sk(8), my_, self.th("widget_border"));
+                continue;
+            }
+            if !e.aus && mx >= px && mx < px + pw && my >= y0 && my < y1 {
+                g.box_fill(px + 1, y0, px + pw - 2, y1 - 1, shade(self.th("widget_bg"), 22));
+            }
+            let c = if e.aus { self.th("muted_fg") } else if e.an { acc } else { ruhig };
+            let s = self.sk(16);
+            if !e.symbol.is_empty() {
+                sinnbild(g, &e.symbol, px + self.sk(8), y0 + (y1 - y0 - s) / 2, s, c, e.aus);
+            } else if e.bild >= 0 {
+                g.draw_image_rect(e.bild, px + self.sk(8), y0 + (y1 - y0 - s) / 2, s, s);
+            }
+            let name = if !e.text.is_empty() { e.text.clone() } else if !e.tip.is_empty() { e.tip.clone() } else { e.symbol.clone() };
+            let tc = if e.aus { self.th("muted_fg") } else if e.an { acc } else { self.th("text_fg") };
+            self.ctext(g, px + self.sk(32), y0 + (y1 - y0 - self.ctext_height(g)) / 2, name, tc);
+        }
     }
 
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
@@ -13725,6 +14284,71 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
                 g.line(ax, ay + h - 1, ax + w - 1, ay + h - 1, self.th("win_border"));
                 self.draw_leiste(g, wi, idx, wdg, ax, ay, w, h);
+            }
+            Kind::StatusBar => {
+                // Streifen mit einer Oberkante; die Felder durch feine Striche
+                // getrennt. Ein klickbares Feld hebt sich unter der Maus ab.
+                let bg = shade(self.th("win_bg"), 6);
+                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
+                g.line(ax, ay, ax + w - 1, ay, self.th("win_border"));
+                if let Some(s) = wdg.status.as_ref() {
+                    let acc = self.acc_col(wdg);
+                    let haupt = self.txt_col(wdg);
+                    let neben = mischen(haupt, self.th("muted_fg"), 0.35);
+                    let pad = self.sk(8);
+                    let sz = self.wsize(g, wdg);
+                    for (n, (k, x0, x1)) in self.sb_geom(ax, w, wdg).into_iter().enumerate() {
+                        let f = &s.felder[k];
+                        let ueber = f.klickbar && wdg.enabled && s.hover == k as i32;
+                        if ueber { g.box_fill(x0 + 1, ay + 1, x1 - 2, ay + h - 1, shade(bg, 14)); }
+                        if n > 0 { g.line(x0, ay + self.sk(5), x0, ay + h - self.sk(5), self.th("win_border")); }
+                        if f.text.is_empty() { continue; }
+                        let tw = self.wtext_width(g, wdg, &f.text);
+                        let innen = (x1 - x0 - 2 * pad).max(0);
+                        let tx = match f.ausr { 1 => x0 + pad + ((innen - tw) / 2).max(0), 2 => x0 + pad + (innen - tw).max(0), _ => x0 + pad };
+                        let fc = if ueber { acc } else if k == 0 { haupt } else { neben };
+                        g.push_clip(x0 + pad / 2, ay, (x1 - x0 - pad).max(0), h);
+                        self.wtext(g, wdg, tx, ay + (h - sz).max(0) / 2, f.text.clone(), fc);
+                        g.pop_clip();
+                    }
+                }
+            }
+            Kind::Breadcrumb => {
+                // Teile als flache Knoepfe, dazwischen ein Winkel. Der letzte ist
+                // "wo man steht" und steht kraeftiger da.
+                if let Some(p) = wdg.pfad.as_ref() {
+                    let (geo, punkte) = self.pf_geom(ax, w, wdg);
+                    let acc = self.acc_col(wdg);
+                    let haupt = self.txt_col(wdg);
+                    let neben = mischen(haupt, self.th("muted_fg"), 0.45);
+                    let muted = self.th("muted_fg");
+                    let sz = self.wsize(g, wdg);
+                    let rad = self.m("corner_radius").min(self.sk(5));
+                    let ty = ay + (h - sz).max(0) / 2;
+                    let trenn = self.sk(16);
+                    let ws = self.sk(9);
+                    let winkel = |g: &mut Graphics, x: i32| sinnbild(g, "rechts", x + (trenn - ws) / 2, ay + (h - ws) / 2, ws, muted, false);
+                    g.push_clip(ax, ay, w, h);
+                    if let Some((px0, px1)) = punkte {
+                        if p.hover == -2 { g.round_rect(px0, ay + 2, px1 - 1, ay + h - 3, rad, shade(self.th("widget_bg"), 8), true); }
+                        let tw = self.wtext_width(g, wdg, "...");
+                        self.wtext(g, wdg, px0 + (px1 - px0 - tw) / 2, ty, "...".to_string(), neben);
+                        winkel(g, px1);
+                    }
+                    let letzter = p.texte.len().saturating_sub(1);
+                    for (n, &(k, x0, x1)) in geo.iter().enumerate() {
+                        let ueber = wdg.enabled && p.hover == k as i32;
+                        if ueber {
+                            g.round_rect(x0, ay + 2, x1 - 1, ay + h - 3, rad, shade(self.th("widget_bg"), 8), true);
+                        }
+                        let tx = x0 + self.sk(6);
+                        let fc = if ueber { acc } else if k == letzter { haupt } else { neben };
+                        self.wtext(g, wdg, tx, ty, p.texte[k].clone(), fc);
+                        if k == letzter { self.wtext(g, wdg, tx + 1, ty, p.texte[k].clone(), fc); }
+                        if n + 1 < geo.len() { winkel(g, x1); }
+                    }
+                    g.pop_clip();
+                }
             }
             Kind::GroupBox => {
                 // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
@@ -14924,6 +15548,48 @@ mod tests {
         assert_eq!(l2.eintraege[2].symbol, "start");
         assert!(l2.eintraege[0].an && l2.eintraege[4].aus);
         assert_eq!(l2.eintraege[3].art, 2);
+    }
+
+    // Stufe 28: Statusleiste, Pfadleiste, Ueberlauf der Werkzeugleiste --
+    // ohne Grafik ueber die Geometrie-Quellen.
+    #[test]
+    fn statusleiste_pfadleiste_ueberlauf() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 600, 200);
+        // Statusleiste: feste Felder zuerst, der Rest geht an Breite 0.
+        let sb = g.statusbar(win, 0, 0, 500, 24, "Bereit.".into()).unwrap();
+        assert_eq!(g.statusbar_add(sb, "Zeile 1".into(), 120, "rechts").unwrap(), 1);
+        assert_eq!(g.statusbar_add(sb, "".into(), 0, "").unwrap(), 2);
+        assert!(g.statusbar_add(sb, "".into(), 0, "oben").is_err());
+        let (sw, si) = Gui::dec_widget(sb);
+        let geo = { let w = &g.windows[sw].widgets[si]; g.sb_geom(0, 500, w) };
+        assert_eq!(geo, vec![(0, 0, 190), (1, 190, 310), (2, 310, 500)]);
+        g.set_text(sb, "Gesichert.".into()).unwrap();
+        assert_eq!(g.statusbar_text(sb, 0).unwrap(), "Gesichert.");
+        // Pfadleiste: passt alles, kein "..."; zu eng, fallen die vorderen weg.
+        let pf = g.breadcrumb(win, 0, 40, 400, 24).unwrap();
+        g.breadcrumb_set(pf, vec!["projekt".into(), "quelle".into(), "spiel.dh".into()]).unwrap();
+        let (pw, pi) = Gui::dec_widget(pf);
+        g.windows[pw].widgets[pi].pfad.as_mut().unwrap().breiten = vec![60, 60, 60];
+        let (geo, punkte) = { let w = &g.windows[pw].widgets[pi]; g.pf_geom(0, 400, w) };
+        assert!(punkte.is_none());
+        assert_eq!(geo.len(), 3);
+        let (geo, punkte) = { let w = &g.windows[pw].widgets[pi]; g.pf_geom(0, 190, w) };
+        assert!(punkte.is_some());
+        assert_eq!(geo.last().unwrap().0, 2);
+        assert!(geo[0].0 >= 1);
+        // Werkzeugleiste: zu eng -> versteckte Eintraege und ein >>-Knopf.
+        let tb = g.toolbar(win, 0, 80, 120, 34).unwrap();
+        for s in ["neu", "oeffnen", "sichern", "start", "stopp"] {
+            g.toolbar_add(tb, Some(s.into()), -1, s.into(), String::new()).unwrap();
+        }
+        let (tw, ti) = Gui::dec_widget(tb);
+        let (sicht, versteckt, chev) = { let w = &g.windows[tw].widgets[ti]; g.tb_layout(0, 80, 120, 34, w) };
+        assert!(chev.is_some());
+        assert_eq!(sicht.len() + versteckt.len(), 5);
+        assert!(!versteckt.is_empty());
+        let (_, versteckt, chev) = { let w = &g.windows[tw].widgets[ti]; g.tb_layout(0, 80, 600, 34, w) };
+        assert!(versteckt.is_empty() && chev.is_none());
     }
 
     // Jedes Sinnbild der Liste hat eine eigene Zeichnung -- ein Name, der in
