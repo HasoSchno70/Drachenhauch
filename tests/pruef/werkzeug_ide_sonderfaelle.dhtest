@@ -1,0 +1,1152 @@
+' Die Sonderfaelle der IDE (ide/ide.dh) -- ohne Python geprueft. Bis Stufe 37
+' standen sie in tests/test_ide.py, weil sie mehr als EINEN Lauf brauchen:
+' zwei IDE-Laeufe hintereinander (Sitzung, Umbruch, Sitzung je Projektordner),
+' ein git-Repository VOR dem Lauf oder eine Messung im Bildschirmfoto. Dafuer
+' die Bloecke `--- vorher`, `--- zwischen` und `--- nochmal [in ORDNER]`
+' (docs/werkzeuge.md). In pytest bleibt nur das PDF-Listing -- das pdf-Modul
+' packt seine Seiten, ein Drachenhauch-Leser saehe den Text darin nicht.
+'
+' Der Einschub spielt die Aufnahme nur ab, wenn es sie gibt: ein zweiter Lauf
+' ohne sie laeuft ohne Eingaben, und beim Farbfeld schreibt sie erst das
+' `--- zwischen`. Das Protokoll haengt an, alle Laeufe stehen darin.
+' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
+--- seriell
+
+=== sitzung und zuletzt geoeffnet ueberleben den neustart
+' Der erste Lauf merkt sich die Datei (zuletzt + Sitzung) in der ide.json;
+' der zweite Lauf mit einer Datei, die es nicht gibt, stellt sie wieder her.
+' Das Protokoll haengt an -- beide Laeufe stehen darin.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nochmal
+gibt_es_nicht.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+IMPORT "json"
+DIM kh AS JSON_HANDLE : kh = JSON_LOAD("_programm/ide.json")
+PRINT "zuletzt " ; RIGHT$(JSON_GET_STRING(kh, "zuletzt.0"), 8) = "spiel.dh"
+PRINT "sitzung " ; RIGHT$(JSON_GET_STRING(kh, "sitzung.0"), 8) = "spiel.dh"
+PRINT "zweimal geoeffnet " ; zahl("geoeffnet ") = 2
+PRINT "zweites oeffnen ist spiel.dh " ; RIGHT$(letzte$("geoeffnet "), 8) = "spiel.dh"
+--- erwartet
+zuletzt TRUE
+sitzung TRUE
+zweimal geoeffnet TRUE
+zweites oeffnen ist spiel.dh TRUE
+
+=== zeilenumbruch bleibt gemerkt
+' Alt+Z im ersten Lauf; das `--- zwischen` nimmt die Aufnahme weg, damit der
+' zweite Lauf den Umbruch nicht wieder ausschaltet -- und danach steht er noch.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=90
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 4
+e 30 2 342 0 0 0
+e 30 2 90 0 0 0
+e 32 1 90 0 0 0
+e 32 1 342 0 0 0
+
+--- zwischen
+DELETEFILE("_programm/ev.txt")
+--- nochmal
+spiel.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+IMPORT "json"
+DIM kh AS JSON_HANDLE : kh = JSON_LOAD("_programm/ide.json")
+PRINT "umbruch gemerkt " ; JSON_HAS(kh, "umbruch") AND JSON_GET_BOOL(kh, "umbruch")
+PRINT "zweimal gestartet " ; zahl("bereit") = 2
+--- erwartet
+umbruch gemerkt TRUE
+zweimal gestartet TRUE
+
+=== sitzung haengt am projektordner
+' Drei Laeufe, EINE ide.json (sie liegt in _programm/, alle Laeufe sehen sie):
+' im Fallordner mit eins.dh, im Unterordner b mit zwei.dh, dann wieder im
+' Fallordner. Der dritte bekommt die Reiter SEINES Ordners, nicht die zuletzt
+' offenen -- zugleich die Gegenprobe zur globalen Sitzung aus Stand 4.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+eins.dh
+--- umgebung
+DHRT_FRAMES=60
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei eins.dh
+PRINT 1
+--- datei b/zwei.dh
+PRINT 2
+--- nochmal in b
+zwei.dh
+--- nochmal
+gibt_es_nicht.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+PRINT "drei laeufe " ; zahl("bereit") = 3
+DIM gl AS STRING : gl = letzte$("geoeffnet ")
+PRINT "zuletzt eins.dh " ; RIGHT$(gl, 7) = "eins.dh"
+DIM zi AS INTEGER
+DIM zweiNach AS BOOLEAN : zweiNach = FALSE
+DIM dritter AS BOOLEAN : dritter = FALSE
+DIM laeufe AS INTEGER : laeufe = 0
+FOR zi = 0 TO LEN(L) - 1
+    IF L[zi] = "bereit" THEN laeufe = laeufe + 1
+    IF laeufe = 3 AND LEFT$(L[zi], 10) = "geoeffnet " AND RIGHT$(L[zi], 7) = "zwei.dh" THEN zweiNach = TRUE
+NEXT
+PRINT "zwei.dh nicht im dritten lauf " ; NOT zweiNach
+--- erwartet
+drei laeufe TRUE
+zuletzt eins.dh TRUE
+zwei.dh nicht im dritten lauf TRUE
+
+=== git blame listet wer welche zeile geschrieben hat
+' Das Repository legt `--- vorher` an (git init/add/commit).
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=140
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+PRINT 3
+--- datei _programm/ev.txt
+c 6
+e 40 2 341 0 0 0
+e 40 2 340 0 0 0
+e 40 2 66 0 0 0
+e 42 1 66 0 0 0
+e 42 1 341 0 0 0
+e 42 1 340 0 0 0
+
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING, e AS STRING, f AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF f <> "" THEN
+        p = PROCESS_START("git", a, b, c, d, e, f)
+    ELSEIF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+IF git("init", "-q", "", "", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "", "", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "", "", "") <> 0 THEN EXIT(5)
+IF git("add", "spiel.dh", "", "", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst", "", "") <> 0 THEN EXIT(7)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+PRINT "blame 3 " ; hat("blame 3")
+--- erwartet
+blame 3 TRUE
+
+=== git diff zeigt die aenderungen der datei
+' Eingecheckt, dann geaendert: zwei geaenderte Zeilen am Rand (`git diff -U0`),
+' und Strg+Umschalt+D zeigt den Unterschied.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+PRINT 2
+PRINT 3
+PRINT 4
+--- datei _programm/ev.txt
+c 6
+e 50 2 341 0 0 0
+e 50 2 340 0 0 0
+e 50 2 68 0 0 0
+e 52 1 68 0 0 0
+e 52 1 341 0 0 0
+e 52 1 340 0 0 0
+
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING, e AS STRING, f AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF f <> "" THEN
+        p = PROCESS_START("git", a, b, c, d, e, f)
+    ELSEIF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+IF git("init", "-q", "", "", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "", "", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "", "", "") <> 0 THEN EXIT(5)
+IF git("add", "spiel.dh", "", "", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst", "", "") <> 0 THEN EXIT(7)
+WRITEALL("spiel.dh", "PRINT 1" + CHR$(10) + "PRINT zwei" + CHR$(10) + "PRINT 3" + CHR$(10) + "PRINT vier" + CHR$(10))
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+PRINT "git rand 2 " ; hat("git rand 2")
+DIM gd AS ARRAY OF STRING : gd = SPLIT$(erste$("git diff ") + " 0 0", " ")
+PRINT "diff mit zeilen " ; erste$("git diff ") <> "" AND VAL(gd[2]) > 5
+--- erwartet
+git rand 2 TRUE
+diff mit zeilen TRUE
+
+=== git diff ohne aenderung sagt es
+' Die Gegenprobe: nichts geaendert.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 6
+e 50 2 341 0 0 0
+e 50 2 340 0 0 0
+e 50 2 68 0 0 0
+e 52 1 68 0 0 0
+e 52 1 341 0 0 0
+e 52 1 340 0 0 0
+
+--- vorher
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING, d AS STRING, e AS STRING, f AS STRING) AS INTEGER
+    DIM p AS INTEGER
+    IF f <> "" THEN
+        p = PROCESS_START("git", a, b, c, d, e, f)
+    ELSEIF d <> "" THEN
+        p = PROCESS_START("git", a, b, c, d)
+    ELSEIF c <> "" THEN
+        p = PROCESS_START("git", a, b, c)
+    ELSE
+        p = PROCESS_START("git", a, b)
+    END IF
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    WHILE PROCESS_RUNNING(p) AND MILLIS() < bis
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+IF git("init", "-q", "", "", "", "") <> 0 THEN EXIT(3)
+IF git("config", "user.name", "Test", "", "", "") <> 0 THEN EXIT(4)
+IF git("config", "user.email", "t@t", "", "", "") <> 0 THEN EXIT(5)
+IF git("add", "spiel.dh", "", "", "", "") <> 0 THEN EXIT(6)
+IF git("commit", "-q", "-m", "erst", "", "") <> 0 THEN EXIT(7)
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+PRINT "git diff 0 " ; hat("git diff 0")
+PRINT "git rand 0 " ; hat("git rand 0")
+--- erwartet
+git diff 0 TRUE
+git rand 0 TRUE
+
+=== das wort unter der marke wird ueberall hervorgehoben
+' Am Bild: mit der Marke auf `punkte` tragen alle Stellen die Fundstellenfarbe
+' &HFFD070 -- drei Zeilen (1, 2, 4), in Zeile 4 zwei Woerter, `mehr` NICHT.
+' Das Leseprogramm liest das Bildschirmfoto selbst (LOADIMAGE + GETPIXEL).
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=160
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DHRT_SCREENSHOT={fall}/bild.png
+--- datei spiel.dh
+DIM punkte AS INTEGER
+punkte = 0
+SUB zaehlen(mehr AS INTEGER)
+    punkte = punkte + mehr
+END SUB
+--- datei _programm/ev.txt
+c 14
+e 30 2 264 0 0 0
+e 32 1 264 0 0 0
+e 50 2 269 0 0 0
+e 52 1 269 0 0 0
+e 70 2 263 0 0 0
+e 72 1 263 0 0 0
+e 76 2 263 0 0 0
+e 78 1 263 0 0 0
+e 82 2 263 0 0 0
+e 84 1 263 0 0 0
+e 88 2 263 0 0 0
+e 90 1 263 0 0 0
+e 94 2 263 0 0 0
+e 96 1 263 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+FUNCTION nahe(c AS INTEGER, r AS INTEGER, g AS INTEGER, b AS INTEGER, tol AS INTEGER) AS BOOLEAN
+    IF c < 0 THEN RETURN FALSE
+    DIM cr AS INTEGER : cr = (c SHR 16) BAND 255
+    DIM cg AS INTEGER : cg = (c SHR 8) BAND 255
+    DIM cb AS INTEGER : cb = c BAND 255
+    RETURN ABS(cr - r) <= tol AND ABS(cg - g) <= tol AND ABS(cb - b) <= tol
+END FUNCTION
+DIM bild AS IMAGE : bild = LOADIMAGE("bild.png")
+' Zeilen (y), in denen die Fundstellenfarbe &HFFD070 vorkommt
+DIM hatY[260] AS BOOLEAN
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 60 TO 259
+    FOR x = 220 TO 1199
+        IF nahe(GETPIXEL(bild, x, y), 255, 208, 112, 40) THEN
+            hatY[y] = TRUE
+            BREAK
+        END IF
+    NEXT
+NEXT
+' zusammenhaengende Baender (Luecke > 3 beginnt ein neues)
+DIM baender AS INTEGER : baender = 0
+DIM letztesY AS INTEGER : letztesY = -100
+DIM bandVon AS INTEGER : bandVon = 0
+DIM bandBis AS INTEGER : bandBis = 0
+FOR y = 60 TO 259
+    IF hatY[y] THEN
+        IF y - letztesY > 3 THEN
+            baender = baender + 1
+            bandVon = y
+        END IF
+        bandBis = y
+        letztesY = y
+    END IF
+NEXT
+PRINT "drei baender " ; baender = 3
+' im letzten Band: Woerter nach x (Luecke > 6)
+DIM hatX[1200] AS BOOLEAN
+FOR y = bandVon TO bandBis
+    FOR x = 220 TO 1199
+        IF nahe(GETPIXEL(bild, x, y), 255, 208, 112, 40) THEN hatX[x] = TRUE
+    NEXT
+NEXT
+DIM woerter AS INTEGER : woerter = 0
+DIM letztesX AS INTEGER : letztesX = -100
+FOR x = 220 TO 1199
+    IF hatX[x] THEN
+        IF x - letztesX > 6 THEN woerter = woerter + 1
+        letztesX = x
+    END IF
+NEXT
+PRINT "zwei woerter in zeile 4 " ; woerter = 2
+--- erwartet
+drei baender TRUE
+zwei woerter in zeile 4 TRUE
+
+=== farbfeld oeffnet den waehler
+' Zwei Laeufe: der erste liefert das Bildschirmfoto, das `--- zwischen` sucht
+' darin das Farbfeld (&HFF8800) und schreibt eine Aufnahme mit einem Klick
+' auf seine Mitte, der zweite Lauf spielt sie ab.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=200
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+DHRT_SCREENSHOT={fall}/bild.png
+--- datei spiel.dh
+SCREEN(320, 240)
+CLS(&HFF8800)
+--- zwischen
+FUNCTION nahe(c AS INTEGER, r AS INTEGER, g AS INTEGER, b AS INTEGER, tol AS INTEGER) AS BOOLEAN
+    IF c < 0 THEN RETURN FALSE
+    DIM cr AS INTEGER : cr = (c SHR 16) BAND 255
+    DIM cg AS INTEGER : cg = (c SHR 8) BAND 255
+    DIM cb AS INTEGER : cb = c BAND 255
+    RETURN ABS(cr - r) <= tol AND ABS(cg - g) <= tol AND ABS(cb - b) <= tol
+END FUNCTION
+DIM bild AS IMAGE : bild = LOADIMAGE("bild.png")
+DIM x AS INTEGER
+DIM y AS INTEGER
+DIM sx AS INTEGER : sx = 0
+DIM sy AS INTEGER : sy = 0
+DIM n AS INTEGER : n = 0
+FOR y = 60 TO 199
+    FOR x = 220 TO 1399
+        IF nahe(GETPIXEL(bild, x, y), 255, 136, 0, 20) THEN
+            sx = sx + x : sy = sy + y : n = n + 1
+        END IF
+    NEXT
+NEXT
+IF n = 0 THEN
+    EPRINT("kein Farbfeld im Bild")
+    EXIT(2)
+END IF
+DIM mx AS INTEGER : mx = sx \ n
+DIM my AS INTEGER : my = sy \ n
+' Klick auf das Feld (Lage, Lage, Druck, Loslassen) -- raylibs Aufnahmeformat
+DIM t AS STRING : t = "c 4" + CHR$(10)
+t = t + "e 40 7 " + STR$(mx) + " " + STR$(my) + " 0 0" + CHR$(10)
+t = t + "e 41 7 " + STR$(mx) + " " + STR$(my) + " 0 0" + CHR$(10)
+t = t + "e 42 6 0 0 0 0" + CHR$(10)
+t = t + "e 44 5 0 0 0 0" + CHR$(10)
+WRITEALL("_programm/ev.txt", t + CHR$(10))
+--- nochmal
+spiel.dh
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION zahl(p AS STRING) AS INTEGER
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION erste$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION letzte$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = LEN(L) - 1 TO 0 STEP -1
+        IF LEFT$(L[i], LEN(p)) = p THEN RETURN L[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION endet(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p AND RIGHT$(L[i], LEN(e)) = e THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+FUNCTION alleEnden(p AS STRING, e AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            n = n + 1
+            IF RIGHT$(L[i], LEN(e)) <> e THEN RETURN FALSE
+        END IF
+    NEXT
+    RETURN n > 0
+END FUNCTION
+FUNCTION inhalt$(datei AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(z) - 1
+        r = r + z[i] + CHR$(10)
+    NEXT
+    RETURN r
+END FUNCTION
+SUB zeige(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES(datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        PRINT "|" + z[i] + "|"
+    NEXT
+END SUB
+FUNCTION alle$(p AS STRING) AS STRING
+    DIM i AS INTEGER
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(L) - 1
+        IF LEFT$(L[i], LEN(p)) = p THEN
+            IF r <> "" THEN r = r + "|"
+            r = r + L[i]
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+FUNCTION pruefe$(datei AS STRING) AS STRING
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", datei)
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM befund AS STRING : befund = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN befund = befund + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN TRIM$(befund)
+END FUNCTION
+FUNCTION steht(datei AS STRING, t AS STRING) AS BOOLEAN
+    RETURN INSTR(inhalt$(datei), t) >= 0
+END FUNCTION
+PRINT "farbfeld " ; erste$("farbfeld ") <> ""
+--- erwartet
+farbfeld TRUE
+
