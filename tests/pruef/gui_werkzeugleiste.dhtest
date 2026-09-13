@@ -1,0 +1,307 @@
+' Die Werkzeugleiste mit eigenen Eintraegen (GUI_TOOLBAR_ADD). Bis Stand 25
+' war GUI_TOOLBAR nur ein Streifen, auf den ein Programm Knoepfe legte und von
+' Hand verschob. Geprueft wird, was ein Programm davon sieht: Nummern, Lage,
+' Klick, Kippen, Sperren, Speichern -- und am BILD, dass ein Sinnbild wirklich
+' gezeichnet wird. Format: docs/werkzeuge.md, dhrt test.
+'
+' Lage im Fenster (10, 10): die Leiste bei (20, 20) liegt absolut bei
+' x = 30, y = 54 (Titelleiste 24). Ein Knopf ist so breit wie die Leiste
+' hoch minus 6, dazwischen 2 Punkte Luft, ein Trenner ist 11 breit, der erste
+' Eintrag beginnt 4 Punkte nach dem Rand.
+'
+' STOLPERSTEIN: jede Aufnahme (ev.txt) endet mit einer LEERZEILE. Ohne sie
+' schreibt der Laeufer die Beilage ohne Zeilenumbruch am Ende, und raylibs
+' Leser verliert die letzte Zeile -- hier das Loslassen. Zwei Faelle
+' ("Trenner", "Wegziehen") waren dadurch gruen, ohne je geklickt zu haben:
+' dort sollte ohnehin nichts passieren.
+
+=== eintraege anlegen und ihre lage
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+PRINT GUI_TOOLBAR_ADD(tb, "neu", "Neue Datei") ; " " ; GUI_TOOLBAR_ADD(tb, "sichern")
+PRINT GUI_TOOLBAR_SEPARATOR(tb) ; " " ; GUI_TOOLBAR_ADD(tb, "start", "Starten")
+PRINT GUI_TOOLBAR_SPACER(tb) ; " " ; GUI_TOOLBAR_ADD(tb, "einstellungen")
+PRINT GUI_TOOLBAR_COUNT(tb) ; " " ; GUI_TOOLBAR_CLICKED(tb)
+PRINT GUI_TOOLBAR_ITEM_X(tb, 0) ; " " ; GUI_TOOLBAR_ITEM_W(tb, 0)
+PRINT GUI_TOOLBAR_ITEM_X(tb, 1) ; " " ; GUI_TOOLBAR_ITEM_X(tb, 2) ; " " ; GUI_TOOLBAR_ITEM_W(tb, 2)
+PRINT GUI_TOOLBAR_ITEM_X(tb, 3)
+' Die Luecke schiebt den letzten Knopf an den rechten Rand.
+PRINT GUI_TOOLBAR_ITEM_X(tb, 5) + GUI_TOOLBAR_ITEM_W(tb, 5)
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+0 1
+2 3
+4 5
+6 -1
+24 28
+54 84 11
+97
+316
+
+=== ein klick meldet seinen eintrag genau ein bild lang
+' Knopf 1 liegt absolut bei 30 + 34 .. 30 + 62, also Mitte x = 78.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+GUI_TOOLBAR_ADD(tb, "neu")
+GUI_TOOLBAR_ADD(tb, "oeffnen")
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_TOOLBAR_CLICKED(tb) >= 0 THEN PRINT "Bild " + STR$(f) + ": " + STR$(GUI_TOOLBAR_CLICKED(tb)) + " " + STR$(GUI_CLICKED(tb))
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "Ende " + STR$(GUI_TOOLBAR_CLICKED(tb))
+--- datei ev.txt
+# Klick auf den zweiten Knopf
+c 16
+e 3 7 78 71 0 0
+e 4 7 78 71 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- enthaelt
+: 1 TRUE
+Ende -1
+
+=== trenner und gesperrte knoepfe nehmen keinen klick an
+' Der Trenner liegt bei 30 + 64 .. 30 + 75 (Mitte 99), Knopf 2 dahinter bei
+' 30 + 77 .. 30 + 105 (Mitte 121) -- gesperrt.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+GUI_TOOLBAR_ADD(tb, "neu")
+GUI_TOOLBAR_ADD(tb, "oeffnen")
+GUI_TOOLBAR_SEPARATOR(tb)
+GUI_TOOLBAR_ADD(tb, "start")
+GUI_TOOLBAR_ENABLE(tb, 3, FALSE)
+PRINT GUI_TOOLBAR_ENABLED(tb, 3) ; " " ; GUI_TOOLBAR_ENABLED(tb, 0)
+DIM treffer AS INTEGER : treffer = 0
+DIM f AS INTEGER
+FOR f = 1 TO 24
+    GUI_UPDATE()
+    IF GUI_TOOLBAR_CLICKED(tb) >= 0 THEN treffer = treffer + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT treffer
+--- datei ev.txt
+# erst auf den Trenner, dann auf den gesperrten Knopf
+c 22
+e 3 7 99 71 0 0
+e 4 7 99 71 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 10 7 121 71 0 0
+e 11 7 121 71 0 0
+e 11 6 0 0 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+FALSE TRUE
+0
+
+=== ein kippbarer knopf kippt beim klick
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+GUI_TOOLBAR_ADD(tb, "umbruch", "Zeilenumbruch")
+GUI_TOOLBAR_CHECKABLE(tb, 0, TRUE)
+PRINT GUI_TOOLBAR_CHECKED(tb, 0)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF f = 10 OR f = 19 THEN PRINT GUI_TOOLBAR_CHECKED(tb, 0)
+    GUI_DRAW()
+    FLIP()
+NEXT
+GUI_TOOLBAR_SET_CHECKED(tb, 0, FALSE)
+PRINT GUI_TOOLBAR_CHECKED(tb, 0)
+--- datei ev.txt
+# zweimal auf den Knopf (Mitte x = 48)
+c 20
+e 3 7 48 71 0 0
+e 4 7 48 71 0 0
+e 4 6 0 0 0 0
+e 6 5 0 0 0 0
+e 12 7 48 71 0 0
+e 13 7 48 71 0 0
+e 13 6 0 0 0 0
+e 15 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+FALSE
+TRUE
+FALSE
+FALSE
+
+=== wegziehen nimmt den druck zurueck
+' Wie bei jedem Knopf: die Taste geht auf Knopf 0 herunter und neben ihm
+' wieder hoch -- das ist kein Klick.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+GUI_TOOLBAR_ADD(tb, "neu")
+GUI_TOOLBAR_ADD(tb, "oeffnen")
+DIM treffer AS INTEGER : treffer = 0
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    IF GUI_TOOLBAR_CLICKED(tb) >= 0 THEN treffer = treffer + 1
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT treffer
+--- datei ev.txt
+c 16
+e 3 7 48 71 0 0
+e 4 7 48 71 0 0
+e 4 6 0 0 0 0
+e 6 7 250 71 0 0
+e 7 7 250 71 0 0
+e 8 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+0
+
+=== ein unbekanntes sinnbild sagt, welche es gibt
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+TRY
+    GUI_TOOLBAR_ADD(tb, "diskette")
+CATCH e
+    PRINT e
+END TRY
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "A", 10, 100, 80, 30)
+TRY
+    GUI_TOOLBAR_ADD(b, "neu")
+CATCH e
+    PRINT e
+END TRY
+TRY
+    GUI_TOOLBAR_SET_CHECKED(tb, 7, TRUE)
+CATCH e
+    PRINT e
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- enthaelt
+Sinnbild 'diskette' gibt es nicht
+bekannt sind: neu, datei, oeffnen, sichern
+keine Werkzeugleiste
+Eintrag 7 gibt es nicht
+
+=== die eintraege ueberleben das speichern
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+GUI_TOOLBAR_ADD(tb, "sichern", "Sichern", "Sichern")
+GUI_TOOLBAR_SEPARATOR(tb)
+GUI_TOOLBAR_ADD(tb, "umbruch", "Umbruch")
+GUI_TOOLBAR_CHECKABLE(tb, 2, TRUE)
+GUI_TOOLBAR_SET_CHECKED(tb, 2, TRUE)
+GUI_TOOLBAR_ENABLE(tb, 0, FALSE)
+GUI_TOOLBAR_SET(tb, "beschriftung", 1)
+DIM text AS STRING : text = GUI_TO_JSON(w)
+GUI_WINDOW_DESTROY(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(text)
+DIM tb2 AS GUI_WIDGET : tb2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT GUI_KIND(tb2) ; " " ; GUI_TOOLBAR_COUNT(tb2)
+PRINT GUI_TOOLBAR_CHECKED(tb2, 2) ; " " ; GUI_TOOLBAR_ENABLED(tb2, 0)
+' Mit Beschriftung ist der erste Knopf breiter als hoch.
+PRINT GUI_TOOLBAR_ITEM_W(tb2, 0) > 28
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+toolbar 3
+TRUE FALSE
+TRUE
+
+=== ohne eintraege bleibt die leiste luft fuer klicks
+' Alte Programme legen Knoepfe AUF den Streifen -- die muessen weiter treffen.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 20, 20, 300, 34)
+DIM b AS GUI_WIDGET : b = GUI_ICON_BUTTON(w, 24, 23, 28, 28, -1)
+GUI_UPDATE()
+PRINT GUI_ENABLED(tb) ; " " ; GUI_HIT_TEST(44, 71) = b
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FALSE TRUE
+
+=== sinnbilder werden gezeichnet
+' Am BILD: in der Mitte des Start-Knopfes steht das gruene Dreieck, im Stopp
+' daneben das rote Viereck; ein Knopf mit Sinnbild-NAMEN (GUI_ICON_BUTTON)
+' zeichnet genauso. Gegenprobe: der leere Streifen rechts hat keines.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("dark")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 0, 0, 400, 300)
+GUI_WINDOW_CHROME(w, FALSE)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(w, 0, 0, 400, 40)
+GUI_TOOLBAR_ADD(tb, "start")
+GUI_TOOLBAR_ADD(tb, "stopp")
+DIM kn AS GUI_WIDGET : kn = GUI_ICON_BUTTON(w, 20, 100, 40, 40, "haltepunkt")
+DIM f AS INTEGER
+FOR f = 1 TO 3
+    GUI_UPDATE()
+    CLS(BLACK)
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+' Start: Knopf 4..38, Mitte 21; Stopp: 40..74, Mitte 57; y-Mitte 20.
+19 20 #4CC38A +-40
+57 20 #E0605A +-40
+40 120 #E0605A +-40
+300 20 = 350 20
+--- erwartet

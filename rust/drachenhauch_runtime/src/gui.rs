@@ -950,6 +950,232 @@ struct TabCtlState {
     kinder: Vec<(usize, i32)>,   // (Widget-Index, Seite)
 }
 
+/// Ein Eintrag der Werkzeugleiste (Kind::Toolbar).
+#[derive(Clone)]
+struct LeistenEintrag {
+    art: u8,          // 0 Knopf, 1 Trenner, 2 Luecke (schiebt den Rest nach rechts)
+    symbol: String,   // eingebautes Sinnbild, "" = keins
+    bild: i64,        // Textur-Handle, -1 = keins
+    tip: String,
+    text: String,
+    aus: bool,        // gesperrt
+    kippbar: bool,
+    an: bool,
+    /// Gemessene Breite der Beschriftung (0 = noch nicht gemessen). Gemessen
+    /// wird in GUI_UPDATE (`leisten_pass`), weil der Treffertest keine Grafik
+    /// hat -- geschaetzt lief ein "Sichern" in den naechsten Knopf hinein,
+    /// und das hat erst das gerenderte BILD gezeigt.
+    text_b: i32,
+}
+
+/// Werkzeugleiste mit EIGENEN Eintraegen. Bis Stand 25 war `GUI_TOOLBAR` nur
+/// ein Streifen, auf den das Programm Knoepfe legte und von Hand verschob --
+/// mit Bildern, die fuer 16 Punkte gemalt waren und krumm auf 20 gestreckt
+/// wurden, und einem Text-`|` als Trenner. Jetzt verteilt die Leiste ihre
+/// Eintraege selbst, zeichnet eingebaute Sinnbilder in IHRER Groesse (als
+/// Striche, nicht als gestrecktes Pixelbild) und meldet, welcher geklickt
+/// wurde. Ohne Eintraege bleibt sie der Streifen, der sie war.
+struct LeisteState {
+    eintraege: Vec<LeistenEintrag>,
+    hover: i32,       // Eintrag unter der Maus (je Bild neu)
+    gedrueckt: i32,   // Eintrag, auf dem die Taste herunterging
+    geklickt: i32,    // Eintrag, der in DIESEM Bild geklickt wurde (transient)
+    mit_text: bool,   // Beschriftung neben dem Sinnbild
+    symbol: i32,      // Sinnbildgroesse in Punkten, 0 = aus der Hoehe
+}
+
+impl Default for LeisteState {
+    fn default() -> Self {
+        LeisteState { eintraege: Vec::new(), hover: -1, gedrueckt: -1, geklickt: -1, mit_text: false, symbol: 0 }
+    }
+}
+
+/// Die eingebauten Sinnbilder. EINE Liste fuer Pruefung, Fehlermeldung und
+/// Doku -- ein Name, den `sinnbild` nicht zeichnet, darf hier nicht stehen.
+pub const SINNBILDER: &[&str] = &[
+    "neu", "datei", "oeffnen", "sichern", "drucken", "export", "import",
+    "rueckgaengig", "wiederholen", "ausschneiden", "kopieren", "einfuegen",
+    "suchen", "start", "stopp", "pause", "debug", "haltepunkt", "pruefen",
+    "profil", "handbuch", "einstellungen", "werkzeug", "umbruch", "info",
+    "warnung", "plus", "minus", "schliessen", "links", "rechts", "hoch",
+    "runter", "menue", "aktualisieren",
+];
+
+fn sinnbild_pruefen(name: &str, fn_: &str) -> Result<String, String> {
+    let n = name.trim().to_lowercase();
+    if SINNBILDER.contains(&n.as_str()) { return Ok(n); }
+    Err(format!("{}: Sinnbild '{}' gibt es nicht -- bekannt sind: {}", fn_, name, SINNBILDER.join(", ")))
+}
+
+/// Ein eingebautes Sinnbild zeichnen, in einem Quadrat der Seite `s` bei
+/// (x, y). Gerechnet wird auf einem 16er-Raster, gezogen wird mit Strichen
+/// in der ECHTEN Groesse -- so bleibt ein Sinnbild bei 14 wie bei 28 Punkten
+/// scharf, und alle haben dieselbe Strichstaerke. `c` ist die Farbe; Starten,
+/// Stoppen und Haltepunkt tragen ihre eigene, solange `gesperrt` nicht gilt.
+fn sinnbild(g: &mut Graphics, name: &str, x: i32, y: i32, s: i32, c: i64, gesperrt: bool) {
+    let f = s as f64 / 16.0;
+    let px = |v: f64| x + (v * f).round() as i32;
+    let py = |v: f64| y + (v * f).round() as i32;
+    let t = (s as f64 / 10.0).max(1.4);
+    let gruen = if gesperrt { c } else { 0x4CC38A };
+    let rot = if gesperrt { c } else { 0xE0605A };
+    let zug = |g: &mut Graphics, pts: &[(f64, f64)], w: f64, c: i64| {
+        for p in pts.windows(2) {
+            g.line_thick(px(p[0].0), py(p[0].1), px(p[1].0), py(p[1].1), w, c);
+        }
+    };
+    let kreis = |g: &mut Graphics, cx: f64, cy: f64, r: f64, w: f64, c: i64| {
+        let ro = (r * f).round() as i32;
+        let ri = (ro - w.round() as i32).max(0);
+        g.ring(px(cx), py(cy), ri, ro, 0.0, 360.0, c, true);
+    };
+    let bogen = |g: &mut Graphics, cx: f64, cy: f64, r: f64, von: f64, bis: f64, w: f64, c: i64| {
+        let ro = (r * f).round() as i32;
+        let ri = (ro - w.round() as i32).max(0);
+        g.ring(px(cx), py(cy), ri, ro, von, bis, c, true);
+    };
+    match name {
+        "neu" | "datei" => {
+            zug(g, &[(3.5, 1.5), (9.5, 1.5), (12.5, 4.5), (12.5, 14.5), (3.5, 14.5), (3.5, 1.5)], t, c);
+            zug(g, &[(9.5, 1.5), (9.5, 4.5), (12.5, 4.5)], t, c);
+            if name == "neu" {
+                zug(g, &[(8.0, 7.0), (8.0, 12.0)], t, c);
+                zug(g, &[(5.5, 9.5), (10.5, 9.5)], t, c);
+            } else {
+                zug(g, &[(5.5, 8.0), (10.5, 8.0)], t, c);
+                zug(g, &[(5.5, 11.0), (10.5, 11.0)], t, c);
+            }
+        }
+        "oeffnen" => {
+            zug(g, &[(1.5, 13.5), (1.5, 3.0), (6.0, 3.0), (7.5, 4.5), (13.0, 4.5), (13.0, 6.5)], t, c);
+            zug(g, &[(1.5, 13.5), (4.0, 7.0), (15.0, 7.0), (12.5, 13.5), (1.5, 13.5)], t, c);
+        }
+        "sichern" => {
+            zug(g, &[(2.0, 2.0), (11.5, 2.0), (14.0, 4.5), (14.0, 14.0), (2.0, 14.0), (2.0, 2.0)], t, c);
+            zug(g, &[(5.0, 2.0), (5.0, 6.0), (10.5, 6.0), (10.5, 2.0)], t, c);
+            zug(g, &[(5.0, 14.0), (5.0, 10.0), (11.0, 10.0), (11.0, 14.0)], t, c);
+        }
+        "drucken" => {
+            zug(g, &[(4.5, 5.5), (4.5, 1.5), (11.5, 1.5), (11.5, 5.5)], t, c);
+            zug(g, &[(4.5, 11.5), (1.5, 11.5), (1.5, 5.5), (14.5, 5.5), (14.5, 11.5), (11.5, 11.5)], t, c);
+            zug(g, &[(4.5, 9.0), (4.5, 14.5), (11.5, 14.5), (11.5, 9.0), (4.5, 9.0)], t, c);
+        }
+        "export" | "import" => {
+            zug(g, &[(2.0, 9.5), (2.0, 14.0), (14.0, 14.0), (14.0, 9.5)], t, c);
+            zug(g, &[(8.0, 2.0), (8.0, 10.5)], t, c);
+            if name == "export" {
+                zug(g, &[(4.5, 5.5), (8.0, 2.0), (11.5, 5.5)], t, c);
+            } else {
+                zug(g, &[(4.5, 7.0), (8.0, 10.5), (11.5, 7.0)], t, c);
+            }
+        }
+        "rueckgaengig" | "wiederholen" => {
+            let links = name == "rueckgaengig";
+            // Bogen ueber oben; der Pfeil sitzt am freien Ende.
+            bogen(g, 8.0, 9.5, 5.5, 180.0, 405.0, t, c);
+            if links {
+                g.triangle(px(0.5), py(8.0), px(6.0), py(8.0), px(3.0), py(12.5), c);
+            } else {
+                g.triangle(px(10.0), py(8.0), px(15.5), py(8.0), px(13.0), py(12.5), c);
+            }
+            let _ = links;
+        }
+        "ausschneiden" => {
+            kreis(g, 4.5, 12.0, 2.6, t, c);
+            kreis(g, 11.5, 12.0, 2.6, t, c);
+            zug(g, &[(5.8, 9.8), (11.5, 1.5)], t, c);
+            zug(g, &[(10.2, 9.8), (4.5, 1.5)], t, c);
+        }
+        "kopieren" => {
+            zug(g, &[(5.5, 5.5), (14.0, 5.5), (14.0, 14.5), (5.5, 14.5), (5.5, 5.5)], t, c);
+            zug(g, &[(2.0, 10.5), (2.0, 1.5), (10.5, 1.5)], t, c);
+        }
+        "einfuegen" => {
+            zug(g, &[(5.5, 3.0), (2.5, 3.0), (2.5, 14.5), (13.5, 14.5), (13.5, 3.0), (10.5, 3.0)], t, c);
+            g.round_rect(px(5.5), py(1.0), px(10.5), py(5.0), (f * 1.0).round() as i32, c, true);
+        }
+        "suchen" => {
+            kreis(g, 6.5, 6.5, 5.0, t, c);
+            zug(g, &[(10.2, 10.2), (14.5, 14.5)], t * 1.4, c);
+        }
+        "start" => g.triangle(px(4.0), py(2.0), px(4.0), py(14.0), px(14.0), py(8.0), gruen),
+        "stopp" => g.round_rect(px(3.0), py(3.0), px(13.0), py(13.0), (f * 1.5).round() as i32, rot, true),
+        "pause" => {
+            g.round_rect(px(3.5), py(2.5), px(6.5), py(13.5), 1, c, true);
+            g.round_rect(px(9.5), py(2.5), px(12.5), py(13.5), 1, c, true);
+        }
+        "debug" => {
+            g.circle(px(8.0), py(9.5), (4.2 * f).round() as i32, c);
+            g.circle(px(8.0), py(4.2), (2.3 * f).round() as i32, c);
+            zug(g, &[(1.5, 6.0), (4.5, 8.0)], t, c);
+            zug(g, &[(14.5, 6.0), (11.5, 8.0)], t, c);
+            zug(g, &[(1.0, 10.5), (4.0, 10.5)], t, c);
+            zug(g, &[(15.0, 10.5), (12.0, 10.5)], t, c);
+            zug(g, &[(1.5, 15.0), (4.5, 12.5)], t, c);
+            zug(g, &[(14.5, 15.0), (11.5, 12.5)], t, c);
+        }
+        "haltepunkt" => g.circle(px(8.0), py(8.0), (5.5 * f).round() as i32, rot),
+        "pruefen" => zug(g, &[(2.5, 8.5), (6.5, 12.5), (13.5, 3.5)], t * 1.2, gruen),
+        "profil" => {
+            g.box_fill(px(2.0), py(9.0), px(4.5), py(14.0), c);
+            g.box_fill(px(6.75), py(5.0), px(9.25), py(14.0), c);
+            g.box_fill(px(11.5), py(2.0), px(14.0), py(14.0), c);
+        }
+        "handbuch" => {
+            zug(g, &[(8.0, 4.5), (8.0, 14.0)], t, c);
+            zug(g, &[(8.0, 4.5), (4.5, 3.0), (1.5, 3.0), (1.5, 12.5), (4.5, 12.5), (8.0, 14.0)], t, c);
+            zug(g, &[(8.0, 4.5), (11.5, 3.0), (14.5, 3.0), (14.5, 12.5), (11.5, 12.5), (8.0, 14.0)], t, c);
+        }
+        "einstellungen" => {
+            for k in 0..8 {
+                let a = k as f64 * std::f64::consts::FRAC_PI_4;
+                let (ca, sa) = (a.cos(), a.sin());
+                zug(g, &[(8.0 + ca * 4.0, 8.0 + sa * 4.0), (8.0 + ca * 7.0, 8.0 + sa * 7.0)], t * 1.3, c);
+            }
+            kreis(g, 8.0, 8.0, 5.0, (2.6 * f).max(t), c);
+        }
+        "werkzeug" => {
+            zug(g, &[(3.0, 13.0), (9.0, 7.0)], t * 1.6, c);
+            bogen(g, 10.5, 5.5, 4.0, 90.0, 360.0, t, c);
+        }
+        "umbruch" => {
+            zug(g, &[(1.5, 3.0), (14.5, 3.0)], t, c);
+            zug(g, &[(1.5, 8.0), (12.0, 8.0)], t, c);
+            bogen(g, 12.0, 10.5, 2.5, 270.0, 450.0, t, c);
+            zug(g, &[(12.0, 13.0), (7.5, 13.0)], t, c);
+            g.triangle(px(5.0), py(13.0), px(8.0), py(10.5), px(8.0), py(15.5), c);
+            zug(g, &[(1.5, 13.0), (3.5, 13.0)], t, c);
+        }
+        "info" => {
+            kreis(g, 8.0, 8.0, 7.0, t, c);
+            zug(g, &[(8.0, 7.0), (8.0, 12.0)], t * 1.2, c);
+            g.circle(px(8.0), py(4.3), (1.1 * f).round().max(1.0) as i32, c);
+        }
+        "warnung" => {
+            zug(g, &[(8.0, 1.5), (15.0, 14.5), (1.0, 14.5), (8.0, 1.5)], t, c);
+            zug(g, &[(8.0, 6.0), (8.0, 10.0)], t * 1.2, c);
+            g.circle(px(8.0), py(12.3), (1.0 * f).round().max(1.0) as i32, c);
+        }
+        "plus" => { zug(g, &[(8.0, 2.5), (8.0, 13.5)], t * 1.2, c); zug(g, &[(2.5, 8.0), (13.5, 8.0)], t * 1.2, c); }
+        "minus" => zug(g, &[(2.5, 8.0), (13.5, 8.0)], t * 1.2, c),
+        "schliessen" => { zug(g, &[(3.0, 3.0), (13.0, 13.0)], t * 1.2, c); zug(g, &[(13.0, 3.0), (3.0, 13.0)], t * 1.2, c); }
+        "links" => zug(g, &[(10.5, 2.5), (5.0, 8.0), (10.5, 13.5)], t * 1.2, c),
+        "rechts" => zug(g, &[(5.5, 2.5), (11.0, 8.0), (5.5, 13.5)], t * 1.2, c),
+        "hoch" => zug(g, &[(2.5, 10.5), (8.0, 5.0), (13.5, 10.5)], t * 1.2, c),
+        "runter" => zug(g, &[(2.5, 5.5), (8.0, 11.0), (13.5, 5.5)], t * 1.2, c),
+        "menue" => {
+            zug(g, &[(2.0, 3.5), (14.0, 3.5)], t * 1.2, c);
+            zug(g, &[(2.0, 8.0), (14.0, 8.0)], t * 1.2, c);
+            zug(g, &[(2.0, 12.5), (14.0, 12.5)], t * 1.2, c);
+        }
+        "aktualisieren" => {
+            bogen(g, 8.0, 8.0, 6.0, 0.0, 290.0, t, c);
+            g.triangle(px(10.0), py(0.5), px(15.5), py(3.0), px(11.0), py(7.0), c);
+        }
+        _ => g.circle(px(8.0), py(8.0), (3.0 * f).round() as i32, c),
+    }
+}
+
 /// Gesetzter Text (Kind::RichText): ein Widget, das Markdown SETZT statt es
 /// nur anzuzeigen -- Ueberschriften, Absaetze mit Umbruch, Aufzaehlungen,
 /// Codebloecke, Tabellen mit echten Spalten, Zitate, Linien und Verweise.
@@ -1243,6 +1469,11 @@ pub struct Widget {
     tabctl: Option<Box<TabCtlState>>,
     tc_von: i32,
     tc_seite: i32,
+    /// Werkzeugleiste mit eigenen Eintraegen (Kind::Toolbar).
+    leiste: Option<Box<LeisteState>>,
+    /// Eingebautes Sinnbild eines Knopfes ("" = keins; sonst gewinnt es
+    /// vor dem Textur-Handle in `sel`).
+    sinnbild: String,
     /// Gesetzter Text (Kind::RichText).
     rich: Option<Box<RichState>>,
     vert: bool,          // Slider: senkrecht (GUI_VSLIDER), Wert waechst nach oben
@@ -1518,6 +1749,8 @@ struct MenuItem {
     an: bool,
     // Sinnbild (Textur-Handle) links vom Text, -1 = keins.
     icon: i64,
+    // Eingebautes Sinnbild ("" = keins) -- gewinnt vor `icon`.
+    sym: String,
     // Untermenue: Index in `Window::menus`, -1 = keins.
     sub: i32,
 }
@@ -1526,7 +1759,7 @@ impl MenuItem {
     fn neu(label: String, separator: bool) -> MenuItem {
         MenuItem { label, separator, enabled: !separator, clicked: false,
                    kuerzel: String::new(), k_mods: 0, k_code: 0,
-                   haken: false, an: false, icon: -1, sub: -1 }
+                   haken: false, an: false, icon: -1, sym: String::new(), sub: -1 }
     }
 }
 
@@ -1708,6 +1941,9 @@ pub struct Gui {
     // TOOLTIP_DELAY ruhenden Frames zeigt draw() den Hilfetext.
     hover_w: Option<(usize, usize)>,
     hover_frame: i64,
+    /// Knopf einer Werkzeugleiste unter der Maus (-1 = keiner) -- ein Wechsel
+    /// startet den Tooltip-Verweil neu, wie ein Wechsel des Widgets.
+    hover_teil: i32,
     hover_x: i32, hover_y: i32,
     // Anzeige-Massstab (GUI_SCALE). Multipliziert JEDE Laengenangabe, die in
     // die GUI hineingeht: Fenster-/Widget-Geometrie beim Anlegen, die
@@ -1781,7 +2017,7 @@ impl Gui {
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
-            hover_w: None, hover_frame: 0, hover_x: 0, hover_y: 0,
+            hover_w: None, hover_frame: 0, hover_teil: -1, hover_x: 0, hover_y: 0,
             scale: 1.0,
             menu_cursor: None, alt_allein: false, tip_fokus: None, tip_fokus_frame: 0,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0, screenreader: false,
@@ -2605,6 +2841,7 @@ impl Gui {
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None, list: None,
             layout: None, auto_w: false, auto_h: false,
             panel: None, panel_von: -1, tabctl: None, tc_von: -1, tc_seite: -1,
+            leiste: None, sinnbild: String::new(),
             rich: None, vert: false, unbestimmt: false, bildmodus: 0,
             ziehbar: false, ablage: false, abgelegt: false,
             umbruch: false, bind: String::new(), form: String::new(),
@@ -2930,14 +3167,206 @@ impl Gui {
     pub fn set_icon(&mut self, h: i64, tex: i64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_ICON")?;
         if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
-        w.sel = tex as i32; Ok(())
+        w.sel = tex as i32; w.sinnbild.clear(); Ok(())
     }
-    /// Werkzeugleiste: flacher Streifen als Hintergrund fuer eine Reihe Icon-
-    /// Buttons (dekorativ, nicht interaktiv -- Buttons liegen darueber).
+    /// Eingebautes Sinnbild auf einen Knopf -- `""` nimmt es wieder weg.
+    pub fn set_icon_symbol(&mut self, h: i64, name: &str) -> Result<(), String> {
+        let n = if name.is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_SET_ICON")? };
+        let w = self.wdg_mut(h, "GUI_SET_ICON")?;
+        if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
+        w.sinnbild = n; Ok(())
+    }
+    /// Werkzeugleiste: ohne Eintraege ein flacher Streifen (so war sie immer),
+    /// mit Eintraegen (GUI_TOOLBAR_ADD) eine Leiste, die ihre Knoepfe selbst
+    /// verteilt, zeichnet und meldet.
     pub fn toolbar(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Toolbar, x, y, w, h);
         wd.enabled = false;
         self.add_widget(win, "GUI_TOOLBAR", wd)
+    }
+    fn tb_mut(&mut self, h: i64, fn_: &str) -> Result<&mut LeisteState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Toolbar { return Err(format!("{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)", fn_)); }
+        Ok(w.leiste.get_or_insert_with(|| Box::new(LeisteState::default())))
+    }
+    fn tb_ref(&self, h: i64, fn_: &str) -> Result<Option<&LeisteState>, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Toolbar { return Err(format!("{}: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)", fn_)); }
+        Ok(w.leiste.as_deref())
+    }
+    fn tb_eintrag(&mut self, h: i64, i: i64, fn_: &str) -> Result<&mut LeistenEintrag, String> {
+        let l = self.tb_mut(h, fn_)?;
+        let n = l.eintraege.len();
+        l.eintraege.get_mut(i.max(0) as usize).filter(|_| i >= 0)
+            .ok_or_else(|| format!("{}: Eintrag {} gibt es nicht ({} Eintraege)", fn_, i, n))
+    }
+    fn tb_anhaengen(&mut self, h: i64, e: LeistenEintrag, fn_: &str) -> Result<i64, String> {
+        let l = self.tb_mut(h, fn_)?;
+        l.eintraege.push(e);
+        let n = l.eintraege.len() as i64 - 1;
+        // Mit Eintraegen nimmt die Leiste Klicks an -- ohne bleibt sie Deko,
+        // damit Knoepfe, die ein altes Programm DARAUF legt, weiter treffen.
+        self.wdg_mut(h, fn_)?.enabled = true;
+        Ok(n)
+    }
+    /// Einen Knopf anhaengen -- `bild` ist ein eingebautes Sinnbild (Name)
+    /// oder ein Textur-Handle (-1 = keins). Liefert die Nummer des Eintrags.
+    pub fn toolbar_add(&mut self, h: i64, symbol: Option<String>, bild: i64, tip: String, text: String) -> Result<i64, String> {
+        let symbol = match symbol {
+            Some(s) if !s.is_empty() => sinnbild_pruefen(&s, "GUI_TOOLBAR_ADD")?,
+            _ => String::new(),
+        };
+        let e = LeistenEintrag { art: 0, symbol, bild: bild.max(-1), tip, text, aus: false, kippbar: false, an: false, text_b: 0 };
+        self.tb_anhaengen(h, e, "GUI_TOOLBAR_ADD")
+    }
+    fn tb_leer(art: u8) -> LeistenEintrag {
+        LeistenEintrag { art, symbol: String::new(), bild: -1, tip: String::new(), text: String::new(), aus: false, kippbar: false, an: false, text_b: 0 }
+    }
+    pub fn toolbar_separator(&mut self, h: i64) -> Result<i64, String> {
+        self.tb_anhaengen(h, Self::tb_leer(1), "GUI_TOOLBAR_SEPARATOR")
+    }
+    pub fn toolbar_spacer(&mut self, h: i64) -> Result<i64, String> {
+        self.tb_anhaengen(h, Self::tb_leer(2), "GUI_TOOLBAR_SPACER")
+    }
+    pub fn toolbar_clicked(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tb_ref(h, "GUI_TOOLBAR_CLICKED")?.map(|l| l.geklickt as i64).unwrap_or(-1))
+    }
+    pub fn toolbar_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tb_ref(h, "GUI_TOOLBAR_COUNT")?.map(|l| l.eintraege.len() as i64).unwrap_or(0))
+    }
+    pub fn toolbar_clear(&mut self, h: i64) -> Result<(), String> {
+        let l = self.tb_mut(h, "GUI_TOOLBAR_CLEAR")?;
+        l.eintraege.clear(); l.hover = -1; l.gedrueckt = -1; l.geklickt = -1;
+        self.wdg_mut(h, "GUI_TOOLBAR_CLEAR")?.enabled = false;
+        Ok(())
+    }
+    pub fn toolbar_enable(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        self.tb_eintrag(h, i, "GUI_TOOLBAR_ENABLE")?.aus = !an; Ok(())
+    }
+    pub fn toolbar_enabled(&mut self, h: i64, i: i64) -> Result<bool, String> {
+        Ok(!self.tb_eintrag(h, i, "GUI_TOOLBAR_ENABLED")?.aus)
+    }
+    pub fn toolbar_checkable(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let e = self.tb_eintrag(h, i, "GUI_TOOLBAR_CHECKABLE")?;
+        if e.art != 0 { return Err(format!("GUI_TOOLBAR_CHECKABLE: Eintrag {} ist kein Knopf", i)); }
+        e.kippbar = an; if !an { e.an = false; } Ok(())
+    }
+    pub fn toolbar_set_checked(&mut self, h: i64, i: i64, an: bool) -> Result<(), String> {
+        let e = self.tb_eintrag(h, i, "GUI_TOOLBAR_SET_CHECKED")?;
+        if !e.kippbar { return Err(format!("GUI_TOOLBAR_SET_CHECKED: Eintrag {} ist nicht kippbar (erst GUI_TOOLBAR_CHECKABLE)", i)); }
+        e.an = an; Ok(())
+    }
+    pub fn toolbar_checked(&mut self, h: i64, i: i64) -> Result<bool, String> {
+        Ok(self.tb_eintrag(h, i, "GUI_TOOLBAR_CHECKED")?.an)
+    }
+    pub fn toolbar_set_icon(&mut self, h: i64, i: i64, symbol: Option<String>, bild: i64) -> Result<(), String> {
+        let symbol = match symbol {
+            Some(s) if !s.is_empty() => sinnbild_pruefen(&s, "GUI_TOOLBAR_SET_ICON")?,
+            _ => String::new(),
+        };
+        let e = self.tb_eintrag(h, i, "GUI_TOOLBAR_SET_ICON")?;
+        e.symbol = symbol; e.bild = if e.symbol.is_empty() { bild.max(-1) } else { -1 }; Ok(())
+    }
+    pub fn toolbar_set_tip(&mut self, h: i64, i: i64, tip: String) -> Result<(), String> {
+        self.tb_eintrag(h, i, "GUI_TOOLBAR_SET_TIP")?.tip = tip; Ok(())
+    }
+    pub fn toolbar_set_text(&mut self, h: i64, i: i64, text: String) -> Result<(), String> {
+        self.tb_eintrag(h, i, "GUI_TOOLBAR_SET_TEXT")?.text = text; Ok(())
+    }
+    /// Einstellungen: `beschriftung` (0/1, Text neben dem Sinnbild),
+    /// `symbolgroesse` (Punkte, 0 = aus der Hoehe).
+    pub fn toolbar_set(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let l = self.tb_mut(h, "GUI_TOOLBAR_SET")?;
+        match key.to_lowercase().as_str() {
+            "beschriftung" | "text" => l.mit_text = wert != 0.0,
+            "symbolgroesse" | "symbol" => l.symbol = (wert as i32).clamp(0, 64),
+            _ => return Err(format!("GUI_TOOLBAR_SET: unbekannte Einstellung '{}' -- bekannt sind: beschriftung, symbolgroesse", key)),
+        }
+        Ok(())
+    }
+    /// Lage eines Eintrags (x, Breite) in logischen Koordinaten, wie GUI_GET_X.
+    pub fn toolbar_item_rect(&self, h: i64, i: i64) -> Result<(i64, i64), String> {
+        let w = self.wdg(h, "GUI_TOOLBAR_ITEM_X")?;
+        if w.kind != Kind::Toolbar { return Err("GUI_TOOLBAR_ITEM_X: Widget ist keine Werkzeugleiste (GUI_TOOLBAR)".into()); }
+        let geo = self.tb_geom(w.x, w.y, w.w, w.h, w);
+        match geo.iter().find(|&&(k, _, _)| k as i64 == i) {
+            Some(&(_, x0, x1)) => Ok((self.unsk(x0) as i64, self.unsk(x1 - x0) as i64)),
+            None => Err(format!("GUI_TOOLBAR_ITEM_X: Eintrag {} gibt es nicht", i)),
+        }
+    }
+
+    /// Die Eintraege einer Werkzeugleiste: (Eintrag, x links, x rechts),
+    /// absolut. EINE Quelle fuer Zeichnen, Treffertest, Tooltip und
+    /// Barrierefreiheit. Beschriftungen werden wie beim Reiterwerk an der
+    /// ZEICHENZAHL geschaetzt -- der Treffertest hat keine Grafik.
+    fn tb_geom(&self, ax: i32, _ay: i32, w: i32, h: i32, wdg: &Widget) -> Vec<(usize, i32, i32)> {
+        let l = match wdg.leiste.as_ref() { Some(l) => l, None => return Vec::new() };
+        let rand = self.sk(4);
+        let luft = self.sk(2);
+        let knopf = (h - self.sk(6)).max(self.sk(12));
+        let breite = |e: &LeistenEintrag| -> i32 {
+            match e.art {
+                1 => self.sk(11),
+                2 => 0,
+                _ => {
+                    let hat_bild = !e.symbol.is_empty() || e.bild >= 0;
+                    // Ein Knopf ohne Bild zeigt seinen Text immer -- sonst
+                    // stuende dort eine leere Flaeche.
+                    if !e.text.is_empty() && (l.mit_text || !hat_bild) {
+                        // Gemessen, sobald ein GUI_UPDATE gelaufen ist; vorher
+                        // (etwa fuer GUI_TOOLBAR_ITEM_X gleich nach dem Anlegen)
+                        // grosszuegig geschaetzt.
+                        let tw = if e.text_b > 0 { e.text_b } else { self.sk(8) * e.text.chars().count() as i32 };
+                        let tb = tw + self.sk(10);
+                        if hat_bild { knopf + tb - self.sk(4) } else { tb.max(knopf) }
+                    } else { knopf }
+                }
+            }
+        };
+        // Luft steht ZWISCHEN Eintraegen, nicht hinter dem letzten -- sonst
+        // endete ein rechtsbuendiger Knopf zwei Punkte vor dem Rand.
+        let fest: i32 = l.eintraege.iter().map(|e| breite(e) + luft).sum::<i32>() - if l.eintraege.is_empty() { 0 } else { luft };
+        let luecken = l.eintraege.iter().filter(|e| e.art == 2).count() as i32;
+        let rest = (w - 2 * rand - fest).max(0);
+        let mut x = ax + rand;
+        let mut out = Vec::with_capacity(l.eintraege.len());
+        let mut verteilt = 0;
+        let mut nr = 0;
+        for (k, e) in l.eintraege.iter().enumerate() {
+            let mut b = breite(e);
+            if e.art == 2 && luecken > 0 {
+                nr += 1;
+                b = if nr == luecken { rest - verteilt } else { rest / luecken };
+                verteilt += b;
+            }
+            out.push((k, x, x + b));
+            x += b + luft;
+        }
+        out
+    }
+    /// Welcher KNOPF liegt unter der Maus? -1 = keiner (Trenner, Luecke, daneben).
+    fn tb_treffer(&self, wi: usize, i: usize, mx: i32, my: i32) -> i32 {
+        let w = &self.windows[wi].widgets[i];
+        let (ax, ay, bw, bh) = self.abs_rect(wi, w);
+        if my < ay || my >= ay + bh { return -1; }
+        let l = match w.leiste.as_ref() { Some(l) => l, None => return -1 };
+        self.tb_geom(ax, ay, bw, bh, w).into_iter()
+            .find(|&(k, x0, x1)| mx >= x0 && mx < x1 && l.eintraege[k].art == 0)
+            .map(|(k, _, _)| k as i32).unwrap_or(-1)
+    }
+    /// Ein Knopf ist geklickt worden -- auf demselben Weg fuer Maus und
+    /// Hilfsprogramm. Gesperrte Knoepfe tun nichts.
+    fn tb_klick(&mut self, wi: usize, i: usize, k: i32) {
+        let w = &mut self.windows[wi].widgets[i];
+        let ok = match w.leiste.as_mut().and_then(|l| l.eintraege.get_mut(k.max(0) as usize)) {
+            Some(e) if k >= 0 && e.art == 0 && !e.aus => { if e.kippbar { e.an = !e.an; } true }
+            _ => false,
+        };
+        if !ok { return; }
+        if let Some(l) = w.leiste.as_mut() { l.geklickt = k; }
+        w.clicked = true;
+        let f = w.on_click.clone();
+        if let Some(f) = f { self.pending.push(f); }
     }
     pub fn canvas(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let wd = Self::blank(Kind::Canvas, x, y, w, h);
@@ -4064,6 +4493,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             x += b + 2;
         }
         out
+    }
+    /// Je Bild: die Beschriftungen der Werkzeugleisten messen. Erst messen,
+    /// dann schreiben -- das Messen braucht `&self`.
+    fn leisten_pass(&mut self, g: &Graphics) {
+        let mut messung: Vec<(usize, usize, usize, i32)> = Vec::new();
+        for (wi, win) in self.windows.iter().enumerate() {
+            if !win.alive { continue; }
+            for (i, w) in win.widgets.iter().enumerate() {
+                if let Some(l) = w.leiste.as_ref() {
+                    for (k, e) in l.eintraege.iter().enumerate() {
+                        if !e.text.is_empty() {
+                            messung.push((wi, i, k, self.wtext_width(g, w, &e.text)));
+                        }
+                    }
+                }
+            }
+        }
+        for (wi, i, k, b) in messung {
+            if let Some(e) = self.windows[wi].widgets[i].leiste.as_mut().and_then(|l| l.eintraege.get_mut(k)) {
+                e.text_b = b;
+            }
+        }
     }
     /// Je Bild: welches Kind auf welcher Seite liegt (wie panel_pass).
     fn tabctl_pass(&mut self) {
@@ -5281,7 +5732,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// GUI_MENU_ICON(item, bild) -- Textur-Handle wie bei GUI_ICON_BUTTON, -1 entfernt.
     pub fn menu_icon(&mut self, h: i64, tex: i64) -> Result<(), String> {
         let it = self.item_mut(h, "GUI_MENU_ICON")?;
-        it.icon = tex.max(-1); Ok(())
+        it.icon = tex.max(-1); it.sym.clear(); Ok(())
+    }
+    /// GUI_MENU_ICON(item, "sichern") -- ein eingebautes Sinnbild, dasselbe
+    /// wie in der Werkzeugleiste. So sehen Menue und Leiste gleich aus, ohne
+    /// dass das Programm Bilder malen muss.
+    pub fn menu_icon_symbol(&mut self, h: i64, name: &str) -> Result<(), String> {
+        let n = if name.is_empty() { String::new() } else { sinnbild_pruefen(name, "GUI_MENU_ICON")? };
+        let it = self.item_mut(h, "GUI_MENU_ICON")?;
+        it.sym = n; it.icon = -1; Ok(())
     }
     /// GUI_MENU_TEXT(item, label$) -- Beschriftung aendern ("Pause" / "Weiter").
     pub fn menu_text(&mut self, h: i64, label: String) -> Result<(), String> {
@@ -5973,6 +6432,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 "label": it.label, "separator": it.separator, "enabled": it.enabled,
             });
             if !it.kuerzel.is_empty() { o["shortcut"] = serde_json::json!(it.kuerzel); }
+            if !it.sym.is_empty() { o["symbol"] = serde_json::json!(it.sym); }
             if it.haken { o["checkable"] = serde_json::json!(true); o["checked"] = serde_json::json!(it.an); }
             if it.sub >= 0 {
                 if let Some(sm) = win.menus.get(it.sub as usize) {
@@ -5995,6 +6455,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             if itj["checkable"].as_bool().unwrap_or(false) {
                 it.haken = true; it.an = itj["checked"].as_bool().unwrap_or(false);
+            }
+            if let Some(s) = itj["symbol"].as_str() {
+                if let Ok(n) = sinnbild_pruefen(s, "GUI_LOAD") { it.sym = n; }
             }
             if let Some(sub) = itj["items"].as_array() {
                 let smi = win.menus.len();
@@ -6560,6 +7023,24 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if r.basis > 0 { rj["groesse"] = serde_json::json!(r.basis); }
             o["rich"] = rj;
         }
+        if !w.sinnbild.is_empty() { o["symbol"] = serde_json::json!(w.sinnbild); }
+        if let Some(l) = &w.leiste {
+            // Textur-Handles gehoeren NICHT in die Datei (sie gelten nur in
+            // diesem Lauf) -- ein Eintrag mit Bild steht darum ohne Bild da.
+            o["leiste"] = serde_json::json!({
+                "eintraege": l.eintraege.iter().map(|e| {
+                    let mut ej = serde_json::json!({ "art": match e.art { 1 => "trenner", 2 => "luecke", _ => "knopf" } });
+                    if !e.symbol.is_empty() { ej["symbol"] = serde_json::json!(e.symbol); }
+                    if !e.tip.is_empty() { ej["tip"] = serde_json::json!(e.tip); }
+                    if !e.text.is_empty() { ej["text"] = serde_json::json!(e.text); }
+                    if e.aus { ej["gesperrt"] = serde_json::json!(true); }
+                    if e.kippbar { ej["kippbar"] = serde_json::json!(true); ej["an"] = serde_json::json!(e.an); }
+                    ej
+                }).collect::<Vec<_>>(),
+                "beschriftung": l.mit_text,
+                "symbolgroesse": l.symbol,
+            });
+        }
         if let Some(st) = &w.tabctl {
             o["tabctl"] = serde_json::json!({
                 "kinder": st.kinder.iter().map(|&(k, s)| serde_json::json!([k, s])).collect::<Vec<_>>(),
@@ -6827,6 +7308,29 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 code_font: -1,
                 ..Default::default()
             }));
+        }
+        if let Some(s) = wj["symbol"].as_str() {
+            if kind == Kind::Button { if let Ok(n) = sinnbild_pruefen(s, "GUI_LOAD") { w.sinnbild = n; } }
+        }
+        if kind == Kind::Toolbar {
+            if let Some(lj) = wj.get("leiste") {
+                let mut l = LeisteState::default();
+                for ej in lj["eintraege"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {
+                    let art = match ej["art"].as_str().unwrap_or("knopf") { "trenner" => 1, "luecke" => 2, _ => 0 };
+                    let mut e = Self::tb_leer(art);
+                    if let Some(s) = ej["symbol"].as_str() { if let Ok(n) = sinnbild_pruefen(s, "GUI_LOAD") { e.symbol = n; } }
+                    e.tip = ej["tip"].as_str().unwrap_or("").to_string();
+                    e.text = ej["text"].as_str().unwrap_or("").to_string();
+                    e.aus = ej["gesperrt"].as_bool().unwrap_or(false);
+                    e.kippbar = ej["kippbar"].as_bool().unwrap_or(false);
+                    e.an = e.kippbar && ej["an"].as_bool().unwrap_or(false);
+                    l.eintraege.push(e);
+                }
+                l.mit_text = lj["beschriftung"].as_bool().unwrap_or(false);
+                l.symbol = lj["symbolgroesse"].as_i64().unwrap_or(0) as i32;
+                if !l.eintraege.is_empty() { w.enabled = true; }
+                w.leiste = Some(Box::new(l));
+            }
         }
         if kind == Kind::TabControl {
             let mut st = TabCtlState::default();
@@ -7449,6 +7953,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             win.tab_zu = -1;
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false; wdg.entered = false; wdg.abgelegt = false;
+                if let Some(l) = wdg.leiste.as_mut() { l.hover = -1; l.geklickt = -1; }
                 wdg.farbfeld_klick = -1; wdg.abk_treffer = -1; wdg.tab_treffer = false;
                 if let Some(l) = wdg.list.as_mut() { l.doppel = false; }
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
@@ -7469,6 +7974,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.layout_pass(g);
         self.panel_pass();
         self.tabctl_pass();
+        self.leisten_pass(g);
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         // Menues sind waehrend eines Dialogs gesperrt (siehe handle_press).
@@ -7575,6 +8081,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     if kind == Kind::RichText { self.richtext_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                     if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
+                    if kind == Kind::Toolbar {
+                        let k = self.tb_treffer(top, i, mx, my);
+                        if let Some(l) = self.windows[top].widgets[i].leiste.as_mut() { l.hover = k; }
+                    }
                 }
             }
             // Mausrad ueber einem rollenden Panel -- NACH den Kindern, damit
@@ -7632,10 +8142,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let mut found = None;
             for i in 0..self.windows[top].widgets.len() {
                 let w = &self.windows[top].widgets[i];
-                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty()) { found = Some((top, i)); }
+                let leisten_tip = w.leiste.as_ref()
+                    .and_then(|l| l.eintraege.get(l.hover.max(0) as usize).filter(|_| l.hover >= 0))
+                    .map(|e| !e.tip.is_empty()).unwrap_or(false);
+                if w.hovered && (!w.tooltip.is_empty() || !w.fehler.is_empty() || leisten_tip) { found = Some((top, i)); }
             }
             found
         });
+        // Innerhalb einer Werkzeugleiste zaehlt ein anderer KNOPF als ein
+        // anderes Widget -- sonst stuende der Tipp des vorigen Knopfes weiter
+        // da, sobald man einmal verweilt hat.
+        let teil = tip_cur.and_then(|(wi, i)| self.windows[wi].widgets[i].leiste.as_ref().map(|l| l.hover)).unwrap_or(-1);
+        if teil != self.hover_teil {
+            self.hover_teil = teil;
+            self.hover_frame = self.frame_count;
+        }
         if mx != self.hover_x || my != self.hover_y || is_down {
             // Die Maus uebernimmt: der Tastatur-Tooltip und der
             // Tastatur-Menuecursor treten zurueck.
@@ -7772,6 +8293,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
         // Loslassen -> Button-Klick bestaetigen.
         if just_released {
+            if let Some((wi, i)) = self.press_origin.filter(|&(wi, i)| self.windows[wi].widgets[i].kind == Kind::Toolbar) {
+                // Geklickt ist, wenn die Taste auf DEMSELBEN Knopf wieder
+                // hochgeht -- wie bei jedem Knopf laesst sich ein Druck durch
+                // Wegziehen zuruecknehmen.
+                let k = self.tb_treffer(wi, i, mx, my);
+                let d = self.windows[wi].widgets[i].leiste.as_ref().map(|l| l.gedrueckt).unwrap_or(-1);
+                if let Some(l) = self.windows[wi].widgets[i].leiste.as_mut() { l.gedrueckt = -1; }
+                if k >= 0 && k == d { self.tb_klick(wi, i, k); }
+                self.press_origin = None;
+            }
             if let Some((wi, i)) = self.press_origin {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
                 let w = &mut self.windows[wi].widgets[i];
@@ -7955,7 +8486,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if it.separator { continue; }
                 wlbl = wlbl.max(self.ctext_width(g, &it.label));
                 if !it.kuerzel.is_empty() { wk = wk.max(self.ctext_width(g, &it.kuerzel)); }
-                if it.haken || it.icon >= 0 { links = self.sk(22); }
+                if it.haken || it.icon >= 0 || !it.sym.is_empty() { links = self.sk(22); }
                 if it.sub >= 0 { pfeil = self.sk(16); }
             }
         }
@@ -9912,6 +10443,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         self.focus_widget = if kind.fokussierbar() { Some((win, i)) } else { None };
         match kind {
             Kind::Button => self.press_origin = Some((win, i)),
+            Kind::Toolbar => {
+                let k = self.tb_treffer(win, i, mx, my);
+                let aus = self.windows[win].widgets[i].leiste.as_ref()
+                    .and_then(|l| l.eintraege.get(k.max(0) as usize)).map(|e| e.aus).unwrap_or(true);
+                if k >= 0 && !aus {
+                    if let Some(l) = self.windows[win].widgets[i].leiste.as_mut() { l.gedrueckt = k; }
+                    self.press_origin = Some((win, i));
+                }
+            }
             Kind::Checkbox => {
                 let w = &mut self.windows[win].widgets[i];
                 w.checked = !w.checked;
@@ -10765,6 +11305,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     fn tip_text(&self, wi: usize, i: usize) -> Option<String> {
         let w = self.windows.get(wi)?.widgets.get(i)?;
         if !w.fehler.is_empty() { return Some(w.fehler.clone()); }
+        if let Some(l) = w.leiste.as_ref() {
+            if l.hover >= 0 {
+                if let Some(e) = l.eintraege.get(l.hover as usize).filter(|e| !e.tip.is_empty()) {
+                    return Some(e.tip.clone());
+                }
+            }
+        }
         if !w.tooltip.is_empty() { return Some(w.tooltip.clone()); }
         None
     }
@@ -11473,7 +12020,25 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             Kind::GroupBox | Kind::Panel => { let mut n = Node::new(Role::Group); if !w.text.is_empty() { n.set_label(w.text.clone()); } n }
             Kind::Image => Node::new(Role::Image),
             Kind::Canvas => Node::new(Role::Canvas),
-            Kind::Toolbar => Node::new(Role::Toolbar),
+            Kind::Toolbar => {
+                let n = Node::new(Role::Toolbar);
+                if let Some(l) = w.leiste.as_ref() {
+                    for (k, x0, x1) in self.tb_geom(x, y, bw, bh, w) {
+                        let e = &l.eintraege[k];
+                        if e.art != 0 { continue; }
+                        let mut t = Node::new(Role::Button);
+                        let name = if !e.text.is_empty() { e.text.clone() } else if !e.tip.is_empty() { e.tip.clone() } else { e.symbol.clone() };
+                        t.set_label(name);
+                        if e.aus { t.set_disabled(); } else { t.add_action(Action::Click); }
+                        if e.kippbar { t.set_toggled(if e.an { accesskit::Toggled::True } else { accesskit::Toggled::False }); }
+                        t.set_bounds(Self::a11y_rect(x0, y, x1 - x0, bh));
+                        let id2 = NodeId(ids::teil(wi, i, k));
+                        nodes.push((id2, t));
+                        kinder.push(id2);
+                    }
+                }
+                n
+            }
             Kind::Splitter => { let mut n = Node::new(Role::Splitter); n.set_orientation(if w.group == "v" { Orientation::Vertical } else { Orientation::Horizontal }); n }
             Kind::Separator | Kind::Layout => Node::new(Role::GenericContainer),
         };
@@ -11551,6 +12116,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 let (kind, shown, enabled) = { let w = &self.windows[wi].widgets[i]; (w.kind, self.widget_shown(wi, w), w.enabled) };
                 if !shown || !enabled { return; }
                 match (kind, req.action) {
+                    (Kind::Toolbar, Action::Click) => self.tb_klick(wi, i, k as i32),
                     (Kind::ListBox | Kind::Dropdown, Action::Click) => self.a11y_eintrag_waehlen(wi, i, k),
                     (Kind::Tree, Action::Click) => {
                         let ok = { let w = &mut self.windows[wi].widgets[i]; match w.tree.as_mut() { Some(t) if k < t.nodes.len() && t.selected != k as i32 => { t.selected = k as i32; true } _ => false } };
@@ -11734,7 +12300,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let th14 = self.ctext_height(g);
             let ty = iy + (ih - th14) / 2;
             let tx = px + pad + 4 + links;
-            if it.icon >= 0 {
+            if !it.sym.is_empty() {
+                let isz = (ih - 8).min(self.sk(16));
+                let c = if it.enabled { mischen(self.th("text_fg"), self.th("muted_fg"), 0.25) } else { self.th("muted_fg") };
+                sinnbild(g, &it.sym, px + pad + 2, iy + (ih - isz) / 2, isz, c, !it.enabled);
+            } else if it.icon >= 0 {
                 let isz = (ih - 6).min(self.sk(18));
                 g.draw_image_rect(it.icon, px + pad + 2, iy + (ih - isz) / 2, isz, isz);
             } else if it.haken && it.an {
@@ -11894,6 +12464,75 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    /// Die Eintraege einer Werkzeugleiste. Ein Knopf zeigt seine Flaeche nur,
+    /// wenn er etwas zu sagen hat -- unter der Maus, gedrueckt oder
+    /// eingeschaltet; sonst steht das Sinnbild frei auf dem Streifen.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_leiste(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget, ax: i32, ay: i32, w: i32, h: i32) {
+        let l = match wdg.leiste.as_ref() { Some(l) if !l.eintraege.is_empty() => l, _ => return };
+        let gedrueckt = if self.press_origin == Some((wi, idx)) { l.gedrueckt } else { -1 };
+        let rad = self.m("corner_radius").min(self.sk(5));
+        let iy = ay + self.sk(3);
+        let ih = (h - self.sk(6)).max(self.sk(12));
+        let acc = self.th("accent");
+        let bg = self.th("win_bg");
+        let ruhig = mischen(self.th("text_fg"), self.th("muted_fg"), 0.25);
+        g.push_clip(ax, ay, w, h);
+        for (k, x0, x1) in self.tb_geom(ax, ay, w, h, wdg) {
+            let e = &l.eintraege[k];
+            match e.art {
+                1 => {
+                    let mx = (x0 + x1) / 2;
+                    let (y1, y2) = (iy + self.sk(4), iy + ih - self.sk(4));
+                    g.line(mx, y1, mx, y2, self.th("win_border"));
+                    g.line(mx + 1, y1, mx + 1, y2, shade(bg, 18));
+                }
+                2 => {}
+                _ => {
+                    let (bx1, by1, bx2, by2) = (x0, iy, x1 - 1, iy + ih - 1);
+                    let hover = l.hover == k as i32 && !e.aus;
+                    let druck = gedrueckt == k as i32 && hover;
+                    if druck {
+                        let f = shade(self.th("widget_bg"), -14);
+                        g.round_gradient(bx1, by1, bx2, by2, rad, shade(f, -6), shade(f, 4));
+                        g.round_rect(bx1, by1, bx2, by2, rad, self.th("widget_border"), false);
+                    } else if e.an {
+                        // Eingeschaltet: ein Hauch Akzent statt einer Flaeche --
+                        // zwei eingeschaltete Knoepfe nebeneinander sollen noch
+                        // wie Knoepfe aussehen, nicht wie ein Balken.
+                        let a = if hover { 0x60 } else { 0x40 };
+                        g.round_rect(bx1, by1, bx2, by2, rad, (a << 24) | (acc & 0xFF_FFFF), true);
+                        g.round_rect(bx1, by1, bx2, by2, rad, mischen(acc, bg, 0.35), false);
+                    } else if hover {
+                        let f = shade(self.th("widget_bg"), 8);
+                        g.round_gradient(bx1, by1, bx2, by2, rad, shade(f, 10), shade(f, -6));
+                        self.gloss(g, bx1, by1, bx2, by2, rad, 0.6);
+                        g.round_rect(bx1, by1, bx2, by2, rad, self.th("widget_border"), false);
+                    }
+                    let c = if e.aus { self.th("muted_fg") } else if e.an { acc } else { ruhig };
+                    let hat_bild = !e.symbol.is_empty() || e.bild >= 0;
+                    let s = if l.symbol > 0 { self.sk(l.symbol) } else { (ih - self.sk(10)).clamp(self.sk(12), self.sk(22)) };
+                    let mit_text = !e.text.is_empty() && (l.mit_text || !hat_bild);
+                    let v = if druck { 1 } else { 0 };
+                    let sx = if mit_text { x0 + (ih - s) / 2 } else { x0 + (x1 - x0 - s) / 2 };
+                    let sy = iy + (ih - s) / 2 + v;
+                    if !e.symbol.is_empty() {
+                        sinnbild(g, &e.symbol, sx + v, sy, s, c, e.aus);
+                    } else if e.bild >= 0 {
+                        g.draw_image_rect(e.bild, sx + v, sy, s, s);
+                    }
+                    if mit_text {
+                        let tx = if hat_bild { x0 + ih - self.sk(4) } else { x0 + self.sk(5) };
+                        let sz = self.wsize(g, wdg);
+                        let tc = if e.aus { self.th("muted_fg") } else { self.th("text_fg") };
+                        self.wtext(g, wdg, tx + v, iy + (ih - sz) / 2 + v, e.text.clone(), tc);
+                    }
+                }
+            }
+        }
+        g.pop_clip();
+    }
+
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
         let pad = self.m("pad");
@@ -11942,7 +12581,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             Kind::Button => {
-                let has_icon = wdg.sel >= 0;
+                let has_icon = wdg.sel >= 0 || !wdg.sinnbild.is_empty();
                 let icon_only = has_icon && wdg.text.is_empty();
                 let pressed = self.press_origin == Some((wi, idx));
                 if icon_only {
@@ -11986,7 +12625,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if has_icon {
                     let iy = ay + (h - isz) / 2;
                     let ix = if icon_only { ax + (w - isz) / 2 } else { ax + pad };
-                    g.draw_image_rect(wdg.sel as i64, ix, iy, isz, isz);
+                    if !wdg.sinnbild.is_empty() {
+                        let s = if icon_only { isz.min(self.sk(24)) } else { isz.min(self.sk(18)) };
+                        let c = if wdg.enabled { mischen(self.th("text_fg"), self.th("muted_fg"), 0.25) } else { self.th("muted_fg") };
+                        sinnbild(g, &wdg.sinnbild, ix + (isz - s) / 2, iy + (isz - s) / 2, s, c, !wdg.enabled);
+                    } else {
+                        g.draw_image_rect(wdg.sel as i64, ix, iy, isz, isz);
+                    }
                 }
                 if !wdg.text.is_empty() {
                     // Beschriftung mittig -- vorher klebte sie am linken Rand.
@@ -12559,9 +13204,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.line(ax, my, ax + w - 1, my, self.th("widget_border"));
             }
             Kind::Toolbar => {
-                // Flacher Streifen + dezente Unterkante.
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, shade(self.th("win_bg"), 8));
+                // Streifen: ein ruhiger Verlauf wie eine Flaeche, aber ohne
+                // Rahmen ringsum -- nur die Unterkante trennt ihn vom Inhalt.
+                let bg = self.th("win_bg");
+                let grad = (self.m("gradient") as f64 * self.verlauf_anteil(h) * 0.6).round() as i32;
+                if grad > 0 {
+                    g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, 0, shade(bg, 8 + grad), shade(bg, 4 - grad / 2));
+                } else {
+                    g.box_fill(ax, ay, ax + w - 1, ay + h - 1, shade(bg, 8));
+                }
                 g.line(ax, ay + h - 1, ax + w - 1, ay + h - 1, self.th("win_border"));
+                self.draw_leiste(g, wi, idx, wdg, ax, ay, w, h);
             }
             Kind::GroupBox => {
                 // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
@@ -13716,7 +14369,63 @@ mod tests {
         let tb = g.toolbar(win, 0, 0, 200, 32).unwrap();
         let (tw, ti) = Gui::dec_widget(tb);
         assert!(matches!(g.windows[tw].widgets[ti].kind, Kind::Toolbar));
-        assert!(!g.windows[tw].widgets[ti].enabled);                     // dekorativ
+        assert!(!g.windows[tw].widgets[ti].enabled);                     // ohne Eintraege dekorativ
+    }
+
+    // Werkzeugleiste mit Eintraegen: Geometrie, Klick, Kippen, Sperren,
+    // Speichern -- ohne Grafik ueber tb_geom/tb_klick.
+    #[test]
+    fn werkzeugleiste_mit_eintraegen() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 400, 200);
+        let tb = g.toolbar(win, 0, 0, 300, 34).unwrap();
+        let (tw, ti) = Gui::dec_widget(tb);
+        assert_eq!(g.toolbar_add(tb, Some("neu".into()), -1, "Neu".into(), String::new()).unwrap(), 0);
+        assert_eq!(g.toolbar_separator(tb).unwrap(), 1);
+        assert_eq!(g.toolbar_add(tb, Some("START".into()), -1, "Start".into(), String::new()).unwrap(), 2);
+        assert_eq!(g.toolbar_spacer(tb).unwrap(), 3);
+        assert_eq!(g.toolbar_add(tb, Some("einstellungen".into()), -1, String::new(), String::new()).unwrap(), 4);
+        assert!(g.windows[tw].widgets[ti].enabled);
+        assert!(g.toolbar_add(tb, Some("gibtsnicht".into()), -1, String::new(), String::new()).unwrap_err().contains("bekannt sind"));
+        // Geometrie: Knoepfe sind so breit wie hoch (h - 6), die Luecke nimmt
+        // den Rest, der letzte Knopf endet am rechten Rand (minus 4).
+        let geo = { let w = &g.windows[tw].widgets[ti]; g.tb_geom(0, 0, 300, 34, w) };
+        assert_eq!((geo[0].1, geo[0].2), (4, 32));
+        assert_eq!(geo[1].2 - geo[1].1, 11);
+        assert_eq!(geo[4].2, 300 - 4);
+        // Klick, Kippen, Sperren.
+        g.tb_klick(tw, ti, 2);
+        assert_eq!(g.toolbar_clicked(tb).unwrap(), 2);
+        g.tb_klick(tw, ti, 1);                                  // Trenner: nichts
+        assert_eq!(g.toolbar_clicked(tb).unwrap(), 2);
+        g.toolbar_checkable(tb, 0, true).unwrap();
+        g.tb_klick(tw, ti, 0);
+        assert!(g.toolbar_checked(tb, 0).unwrap());
+        g.toolbar_enable(tb, 4, false).unwrap();
+        g.windows[tw].widgets[ti].leiste.as_mut().unwrap().geklickt = -1;
+        g.tb_klick(tw, ti, 4);
+        assert_eq!(g.toolbar_clicked(tb).unwrap(), -1);
+        assert!(g.toolbar_set_checked(tb, 2, true).is_err());   // nicht kippbar
+        // Rundweg ueber JSON.
+        let j = g.widget_json(&g.windows[tw].widgets[ti]);
+        let w2 = Gui::widget_from_json(&j).unwrap();
+        let l2 = w2.leiste.as_ref().unwrap();
+        assert_eq!(l2.eintraege.len(), 5);
+        assert_eq!(l2.eintraege[2].symbol, "start");
+        assert!(l2.eintraege[0].an && l2.eintraege[4].aus);
+        assert_eq!(l2.eintraege[3].art, 2);
+    }
+
+    // Jedes Sinnbild der Liste hat eine eigene Zeichnung -- ein Name, der in
+    // den Rueckfall faellt, waere ein Punkt statt eines Bildes.
+    #[test]
+    fn jedes_sinnbild_ist_gezeichnet() {
+        let quelle = include_str!("gui.rs");
+        let start = quelle.find("fn sinnbild(g: &mut Graphics").unwrap();
+        let rumpf = &quelle[start..start + quelle[start..].find("\n}\n").unwrap()];
+        for n in SINNBILDER {
+            assert!(rumpf.contains(&format!("\"{}\"", n)), "Sinnbild {} hat keinen Zweig", n);
+        }
     }
 
     // Tree-Modell (ohne Graphics): Knoten anlegen, Sichtbarkeit folgt expanded,

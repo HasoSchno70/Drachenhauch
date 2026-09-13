@@ -2873,6 +2873,39 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 26 (2026-09-13):** der Hinweis des Nutzers -- die Werkzeugleiste
+der IDE sah nicht schoen aus und war keine Laufzeit-gui. Beides stimmte:
+`GUI_TOOLBAR` war ein dekorativer Streifen, die IDE legte zwoelf
+`GUI_ICON_BUTTON` darauf, schob sie in `layout()` von Hand, nahm ein
+Text-`|` als Trenner und 16-Punkt-Bilder aus `IMAGE_DRAW_RECT`, die das
+Zeichnen krumm auf 20 Punkte streckte -- jede in einer anderen Farbe.
+**Jetzt hat die Leiste Eintraege** (`GUI_TOOLBAR_ADD/SEPARATOR/SPACER/
+CLICKED/ENABLE/CHECKABLE/SET_CHECKED/SET_ICON/SET_TIP/SET_TEXT/SET/
+ITEM_X/ITEM_W/COUNT/CLEAR`, gui.rs `LeisteState`): sie verteilt sie selbst
+(`tb_geom` = EINE Quelle fuer Zeichnen, Treffertest, Tooltip und a11y),
+ein Klick zaehlt beim Loslassen auf DEMSELBEN Knopf, Trenner/Luecken/
+gesperrte nehmen keinen an, jeder Eintrag hat seinen Tooltip (`hover_teil`
+startet den Verweil neu), kippbare Knoepfe tragen einen Hauch Akzent.
+**Eingebaute Sinnbilder** (`SINNBILDER`, 35 Namen, `fn sinnbild`): Striche
+auf einem 16er-Raster in der ECHTEN Groesse, eine Strichstaerke fuer alle,
+Textfarbe des Themas, eigene Farbe nur fuer start/stopp/pruefen/haltepunkt;
+ein unbekannter Name ist ein Fehler mit der Liste. Dieselben Namen nehmen
+`GUI_ICON_BUTTON`, `GUI_SET_ICON` und `GUI_MENU_ICON` -- die IDE hat
+`symbolBild` samt `SYM_*`-Farben geloescht, Menue und Leiste sehen gleich
+aus. **Ohne Eintraege bleibt die Leiste Deko und Luft fuer Klicks**, sonst
+traefen die Knoepfe alter Programme (136, 156, 187, 189) nicht mehr.
+**Zwei Funde, beide erst im Lauf:** (1) Beschriftungen an der Zeichenzahl
+zu schaetzen (wie beim Reiterwerk) liess "Sichern" in den naechsten Knopf
+laufen -- gesehen nur im BILD; jetzt misst `leisten_pass` in GUI_UPDATE
+(`text_b`), der Treffertest liest dieselbe Zahl. (2) **Eine
+`--- datei`-Beilage ohne Leerzeile am Ende wird ohne Zeilenumbruch
+geschrieben, und raylibs Aufnahme-Leser verliert die LETZTE Zeile** --
+meist das Loslassen. Zwei Faelle ("Trenner", "Wegziehen") waren dadurch
+gruen, ohne je geklickt zu haben, weil dort ohnehin nichts passieren
+sollte; `docs/werkzeuge.md` sagt es jetzt. Tests
+`tests/pruef/gui_werkzeugleiste.dhtest` (9, darunter eine Bildprobe),
+2 Rust-Tests, 2 in `tests/test_ide.py`.
+
 **Stufe 25 (2026-09-12):** zwei Widgets aus der eigenen Lueckenliste -- und
 damit ist sie um zwei Punkte KUERZER geworden, nicht laenger.
 **`GUI_RICHTEXT`** setzt Markdown, statt es anzuzeigen (Ueberschriften,

@@ -5246,6 +5246,15 @@ impl<'p> Vm<'p> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s.to_string()),
                 _ => Err(format!("{}: erwartet STRING (Arg {})", f, i + 1)) }
         }
+        /// Ein Sinnbild: der Name eines eingebauten (STRING) oder ein Bild
+        /// (Textur-Handle, -1 = keins).
+        fn gsym(a: &[Value], i: usize, f: &str) -> R<(Option<String>, i64)> {
+            match a.get(i) {
+                Some(Value::Str(s)) => Ok((Some(s.to_string()), -1)),
+                Some(Value::Int(n)) => Ok((None, *n)),
+                _ => Err(format!("{}: erwartet den Namen eines Sinnbilds (STRING) oder ein Bild (Arg {})", f, i + 1)),
+            }
+        }
         fn gbool(a: &[Value], i: usize, f: &str) -> R<bool> {
             match a.get(i) { Some(Value::Bool(b)) => Ok(*b),
                 _ => Err(format!("{}: erwartet BOOLEAN (Arg {})", f, i + 1)) }
@@ -5634,11 +5643,46 @@ impl<'p> Vm<'p> {
             "gui_set_image" => { self.gui.set_image(gi(a,0,"GUI_SET_IMAGE")?, gi(a,1,"GUI_SET_IMAGE")?)?; Value::Nil }
             "gui_icon_button" => {
                 let text = if a.len() >= 7 { gs(a,6,"GUI_ICON_BUTTON")? } else { String::new() };
-                Value::Int(self.gui.icon_button(gi(a,0,"GUI_ICON_BUTTON")?, gi(a,1,"GUI_ICON_BUTTON")? as i32,
+                let (sym, tex) = gsym(a,5,"GUI_ICON_BUTTON")?;
+                let h = self.gui.icon_button(gi(a,0,"GUI_ICON_BUTTON")?, gi(a,1,"GUI_ICON_BUTTON")? as i32,
                     gi(a,2,"GUI_ICON_BUTTON")? as i32, gi(a,3,"GUI_ICON_BUTTON")? as i32, gi(a,4,"GUI_ICON_BUTTON")? as i32,
-                    gi(a,5,"GUI_ICON_BUTTON")?, text)?)
+                    tex, text)?;
+                if let Some(s) = sym { self.gui.set_icon_symbol(h, &s)?; }
+                Value::Int(h)
             }
-            "gui_set_icon" => { self.gui.set_icon(gi(a,0,"GUI_SET_ICON")?, gi(a,1,"GUI_SET_ICON")?)?; Value::Nil }
+            "gui_set_icon" => {
+                match gsym(a,1,"GUI_SET_ICON")? {
+                    (Some(s), _) => self.gui.set_icon_symbol(gi(a,0,"GUI_SET_ICON")?, &s)?,
+                    (None, t) => self.gui.set_icon(gi(a,0,"GUI_SET_ICON")?, t)?,
+                }
+                Value::Nil
+            }
+            // --- Werkzeugleiste mit Eintraegen ---
+            "gui_toolbar_add" => {
+                let (sym, tex) = gsym(a,1,"GUI_TOOLBAR_ADD")?;
+                let tip = if a.len() > 2 { gs(a,2,"GUI_TOOLBAR_ADD")? } else { String::new() };
+                let text = if a.len() > 3 { gs(a,3,"GUI_TOOLBAR_ADD")? } else { String::new() };
+                Value::Int(self.gui.toolbar_add(gi(a,0,"GUI_TOOLBAR_ADD")?, sym, tex, tip, text)?)
+            }
+            "gui_toolbar_separator" => Value::Int(self.gui.toolbar_separator(gi(a,0,"GUI_TOOLBAR_SEPARATOR")?)?),
+            "gui_toolbar_spacer" => Value::Int(self.gui.toolbar_spacer(gi(a,0,"GUI_TOOLBAR_SPACER")?)?),
+            "gui_toolbar_clicked" => Value::Int(self.gui.toolbar_clicked(gi(a,0,"GUI_TOOLBAR_CLICKED")?)?),
+            "gui_toolbar_count" => Value::Int(self.gui.toolbar_count(gi(a,0,"GUI_TOOLBAR_COUNT")?)?),
+            "gui_toolbar_clear" => { self.gui.toolbar_clear(gi(a,0,"GUI_TOOLBAR_CLEAR")?)?; Value::Nil }
+            "gui_toolbar_enable" => { self.gui.toolbar_enable(gi(a,0,"GUI_TOOLBAR_ENABLE")?, gi(a,1,"GUI_TOOLBAR_ENABLE")?, gbool(a,2,"GUI_TOOLBAR_ENABLE")?)?; Value::Nil }
+            "gui_toolbar_enabled" => Value::Bool(self.gui.toolbar_enabled(gi(a,0,"GUI_TOOLBAR_ENABLED")?, gi(a,1,"GUI_TOOLBAR_ENABLED")?)?),
+            "gui_toolbar_checkable" => { self.gui.toolbar_checkable(gi(a,0,"GUI_TOOLBAR_CHECKABLE")?, gi(a,1,"GUI_TOOLBAR_CHECKABLE")?, gbool(a,2,"GUI_TOOLBAR_CHECKABLE")?)?; Value::Nil }
+            "gui_toolbar_set_checked" => { self.gui.toolbar_set_checked(gi(a,0,"GUI_TOOLBAR_SET_CHECKED")?, gi(a,1,"GUI_TOOLBAR_SET_CHECKED")?, gbool(a,2,"GUI_TOOLBAR_SET_CHECKED")?)?; Value::Nil }
+            "gui_toolbar_checked" => Value::Bool(self.gui.toolbar_checked(gi(a,0,"GUI_TOOLBAR_CHECKED")?, gi(a,1,"GUI_TOOLBAR_CHECKED")?)?),
+            "gui_toolbar_set_icon" => {
+                let (sym, tex) = gsym(a,2,"GUI_TOOLBAR_SET_ICON")?;
+                self.gui.toolbar_set_icon(gi(a,0,"GUI_TOOLBAR_SET_ICON")?, gi(a,1,"GUI_TOOLBAR_SET_ICON")?, sym, tex)?; Value::Nil
+            }
+            "gui_toolbar_set_tip" => { self.gui.toolbar_set_tip(gi(a,0,"GUI_TOOLBAR_SET_TIP")?, gi(a,1,"GUI_TOOLBAR_SET_TIP")?, gs(a,2,"GUI_TOOLBAR_SET_TIP")?)?; Value::Nil }
+            "gui_toolbar_set_text" => { self.gui.toolbar_set_text(gi(a,0,"GUI_TOOLBAR_SET_TEXT")?, gi(a,1,"GUI_TOOLBAR_SET_TEXT")?, gs(a,2,"GUI_TOOLBAR_SET_TEXT")?)?; Value::Nil }
+            "gui_toolbar_set" => { self.gui.toolbar_set(gi(a,0,"GUI_TOOLBAR_SET")?, &gs(a,1,"GUI_TOOLBAR_SET")?, gnum(a,2,"GUI_TOOLBAR_SET")?)?; Value::Nil }
+            "gui_toolbar_item_x" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_X")?, gi(a,1,"GUI_TOOLBAR_ITEM_X")?)?.0),
+            "gui_toolbar_item_w" => Value::Int(self.gui.toolbar_item_rect(gi(a,0,"GUI_TOOLBAR_ITEM_W")?, gi(a,1,"GUI_TOOLBAR_ITEM_W")?)?.1),
             "gui_toolbar" => Value::Int(self.gui.toolbar(gi(a,0,"GUI_TOOLBAR")?, gi(a,1,"GUI_TOOLBAR")? as i32,
                 gi(a,2,"GUI_TOOLBAR")? as i32, gi(a,3,"GUI_TOOLBAR")? as i32, gi(a,4,"GUI_TOOLBAR")? as i32)?),
             "gui_canvas" => Value::Int(self.gui.canvas(gi(a,0,"GUI_CANVAS")?, gi(a,1,"GUI_CANVAS")? as i32,
@@ -5664,7 +5708,13 @@ impl<'p> Vm<'p> {
             "gui_menu_enable" => { self.gui.menu_enable(gi(a,0,"GUI_MENU_ENABLE")?, gbool(a,1,"GUI_MENU_ENABLE")?)?; Value::Nil }
             "gui_menu_check" => { self.gui.menu_check(gi(a,0,"GUI_MENU_CHECK")?, gbool(a,1,"GUI_MENU_CHECK")?)?; Value::Nil }
             "gui_menu_checked" => Value::Bool(self.gui.menu_checked(gi(a,0,"GUI_MENU_CHECKED")?)?),
-            "gui_menu_icon" => { self.gui.menu_icon(gi(a,0,"GUI_MENU_ICON")?, gi(a,1,"GUI_MENU_ICON")?)?; Value::Nil }
+            "gui_menu_icon" => {
+                match gsym(a,1,"GUI_MENU_ICON")? {
+                    (Some(s), _) => self.gui.menu_icon_symbol(gi(a,0,"GUI_MENU_ICON")?, &s)?,
+                    (None, t) => self.gui.menu_icon(gi(a,0,"GUI_MENU_ICON")?, t)?,
+                }
+                Value::Nil
+            }
             "gui_menu_text" => { self.gui.menu_text(gi(a,0,"GUI_MENU_TEXT")?, gs(a,1,"GUI_MENU_TEXT")?.to_string())?; Value::Nil }
             "gui_menu_separator" => { self.gui.add_menu_separator(gi(a,0,"GUI_MENU_SEPARATOR")?)?; Value::Nil }
             "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
