@@ -2407,6 +2407,31 @@ def test_ein_verweis_im_handbuch_oeffnet_das_dokument(tmp_path):
     assert any(z.startswith("handbuch bbb.md") for z in log), log
 
 
+def test_die_suche_im_handbuch_geht_weiter_und_zurueck(tmp_path):
+    """Seit Stand 29 markiert die Suche im gesetzten Handbuch die Fundstelle,
+    zaehlt alle und geht mit Enter weiter, mit Umschalt+Enter zurueck --
+    davor rollte sie nur zur ersten ab der aktuellen Stelle."""
+    wurzel = tmp_path / "wurzel"
+    (wurzel / "docs").mkdir(parents=True)
+    (wurzel / "examples").mkdir()
+    (wurzel / "docs" / "aaa.md").write_text(
+        "Die erste nadel.\n\nDie zweite nadel.\n\nDie dritte nadel.\n", encoding="utf-8")
+    quelle = _datei(tmp_path, "nadel = 1\n")
+    ev = _taste(40, RL_F1)
+    # F1 traegt das Wort selbst ins Suchfeld ein; der Klick gibt ihm nur den
+    # Fokus. Fenster bei (200, 60), Titel 30, Feld bei (436, 8).
+    ev += _klick_mit(70, 700, 110)
+    ev += _taste(100, RL_ENTER)
+    ev += _taste(120, RL_ENTER)
+    ev += _taste(140, RL_ENTER, RL_LSHIFT)
+    log = _ide(tmp_path, quelle, frames=200, events=ev, wurzel=wurzel)
+    treffer = [z.split(" ", 3) for z in log if z.startswith("hbsuche ")]
+    assert len(treffer) == 3, log
+    ys = [int(t[1]) for t in treffer]
+    assert all(t[2] == "3" and t[3] == "nadel" for t in treffer), treffer
+    assert ys[1] > ys[0] and ys[2] == ys[0], ys
+
+
 def test_haken_im_baum_schraenken_das_projekt_ein(tmp_path):
     """Der Baum kann seit Stand 24 Haken -- die IDE benutzt sie jetzt: was
     angehakt ist, IST das Projekt. Hier wird `b_zwei.dh` angehakt und dann

@@ -1,0 +1,139 @@
+' Gesetzter Text bedienbar (Stufe 29): Suche vorwaerts und rueckwaerts mit
+' Umlauf (die Fundstelle wird markiert), alle Fundstellen zaehlen, alles
+' waehlen, mit der Maus markieren, Strg+A/Strg+C. Geprueft wird der Text der
+' Auswahl -- er haengt nicht an Schriftmassen, anders als eine Lage.
+' Format: docs/werkzeuge.md, dhrt test.
+'
+' Die Faelle mit Tasten laufen nacheinander: Strg+C schreibt in DIE
+' Zwischenablage, und die gibt es nur einmal.
+--- seriell
+
+=== weiter und zurueck mit umlauf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 320, 200, "Ein Hund." + NL + NL + "Zwei Hunde und ein Hund.")
+GUI_UPDATE()
+DIM y1 AS INTEGER : y1 = GUI_RICHTEXT_FIND_NEXT(rt, "hund")
+PRINT GUI_RICHTEXT_SELECTION$(rt) ; " " ; y1 >= 0
+DIM y2 AS INTEGER : y2 = GUI_RICHTEXT_FIND_NEXT(rt, "hund")
+DIM y3 AS INTEGER : y3 = GUI_RICHTEXT_FIND_NEXT(rt, "hund")
+PRINT y2 > y1 ; " " ; y3 = y2
+' Hinter der letzten geht es vorn weiter.
+PRINT GUI_RICHTEXT_FIND_NEXT(rt, "hund") = y1
+' Zurueck von der ersten landet bei der letzten.
+PRINT GUI_RICHTEXT_FIND_PREV(rt, "hund") = y3
+PRINT GUI_RICHTEXT_MARK_ALL(rt, "HUND") ; " " ; GUI_RICHTEXT_MARK_ALL(rt, "")
+' Ueber eine Wortgrenze hinweg -- gesucht wird im Zeilentext, nicht je Wort.
+GUI_RICHTEXT_FIND_NEXT(rt, "zwei hunde")
+PRINT GUI_RICHTEXT_SELECTION$(rt)
+PRINT GUI_RICHTEXT_FIND_NEXT(rt, "katze")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+Hund TRUE
+TRUE TRUE
+TRUE
+TRUE
+3 0
+Zwei Hunde
+-1
+
+=== alles waehlen und wieder aufheben
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 10, 10, 320, 200, "# Titel" + NL + NL + "Ein **fetter** Absatz.")
+GUI_UPDATE()
+GUI_RICHTEXT_SELECT_ALL(rt)
+PRINT GUI_RICHTEXT_SELECTION$(rt)
+GUI_RICHTEXT_CLEAR_SELECTION(rt)
+PRINT "[" + GUI_RICHTEXT_SELECTION$(rt) + "]"
+' Neuer Text raeumt die Auswahl weg -- ihre Stellen zeigten in den alten Satz.
+GUI_RICHTEXT_SELECT_ALL(rt)
+GUI_RICHTEXT_SET_TEXT(rt, "anders")
+PRINT "[" + GUI_RICHTEXT_SELECTION$(rt) + "]"
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+Titel
+Ein fetter Absatz.
+[]
+[]
+
+=== mit der maus ueber alles gezogen ist alles markiert
+' Von oben links IM Widget (vor der ersten Zeile) bis unten rechts (hinter
+' der letzten): das ist geometriefrei alles -- Gegenprobe ist SELECT_ALL.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM nullpunkt AS GUI_WIDGET : nullpunkt = GUI_CANVAS(w, 0, 0, 1, 1)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 20, 20, 300, 150, "Erste Zeile." + NL + NL + "Zweite Zeile.")
+DIM f AS INTEGER
+FOR f = 1 TO 24
+    GUI_UPDATE()
+    IF f = 22 THEN
+        DIM gezogen AS STRING : gezogen = GUI_RICHTEXT_SELECTION$(rt)
+        GUI_RICHTEXT_SELECT_ALL(rt)
+        PRINT gezogen = GUI_RICHTEXT_SELECTION$(rt) ; " " ; LEN(gezogen) > 10
+    END IF
+    GUI_DRAW()
+    FLIP()
+NEXT
+--- datei ev.txt
+# Druck oben links im Widget, Zug nach unten rechts, loslassen
+c 20
+e 3 7 32 55 0 0
+e 4 7 32 55 0 0
+e 4 6 0 0 0 0
+e 7 7 200 120 0 0
+e 10 7 318 202 0 0
+e 13 5 0 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+TRUE TRUE
+
+=== strg a und strg c kopieren den text
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM NL AS STRING : NL = CHR$(10)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM rt AS GUI_WIDGET : rt = GUI_RICHTEXT(w, 20, 20, 300, 150, "Kopier *mich*.")
+CLIPBOARD_SET("vorher")
+GUI_FOCUS(rt)
+DIM f AS INTEGER
+FOR f = 1 TO 24
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT CLIPBOARD_GET()
+--- datei ev.txt
+# Strg halten, A, C, Strg los (341 = Strg links, 65 = A, 67 = C)
+c 20
+e 3 2 341 0 0 0
+e 4 2 65 0 0 0
+e 5 1 65 0 0 0
+e 8 2 67 0 0 0
+e 9 1 67 0 0 0
+e 11 1 341 0 0 0
+
+--- umgebung
+DHRT_FRAMES=26
+--- erwartet
+Kopier mich.

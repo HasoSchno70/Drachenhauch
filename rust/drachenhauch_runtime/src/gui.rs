@@ -1239,6 +1239,19 @@ struct RichState {
     code_font: i64,      // -1 = dieselbe Schrift wie der Fliesstext
     ziele: Vec<String>,  // Verweise, von den Laeufen ueber ihren Index benannt
     geklickt: String,    // in diesem Bild angeklickter Verweis (transient)
+    // --- Stufe 29: Auswahl und Suche ---------------------------------------
+    // Eine Stelle ist (Zeile, Zeichen im ZEILENTEXT) -- der Zeilentext ist
+    // die Laeufe einer Zeile, mit Leerzeichen, wo zwischen ihnen eine Luecke
+    // steht (`rt_zeilentext`). Damit findet die Suche auch zwei Woerter, und
+    // Kopieren liefert lesbaren Text statt aneinandergeklebter Woerter.
+    anker: (usize, usize),
+    marke: (usize, usize),
+    hat_auswahl: bool,
+    ziehen: bool,         // Maustaste haengt, die Marke folgt ihr
+    anker_neu: bool,      // der Anker ist beim naechsten Durchgang zu messen
+    druck: (i32, i32),    // Druckpunkt relativ zum INHALT (mit Scroll)
+    doppel: bool,         // der Druck war ein Doppelklick -> ein Wort waehlen
+    nadel: String,        // GUI_RICHTEXT_MARK_ALL, klein geschrieben; leer = aus
 }
 
 /// Eine gesetzte Zeile. `grund` faerbt die ganze Zeile (Codeblock), `linie`
@@ -5407,6 +5420,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let r = self.rt_mut(h, "GUI_RICHTEXT_SET_TEXT")?;
         r.quelle = text;
         r.scroll = 0;
+        r.hat_auswahl = false;
+        r.ziehen = false;
         // Der Satz gehoert zum ALTEN Text -- `stand` zuruecksetzen heisst
         // "beim naechsten GUI_UPDATE neu setzen".
         r.stand = (usize::MAX, 0, 0, 0);
@@ -5460,6 +5475,193 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
     }
 
+    /// Die markierte Stelle als Text; Zeilen durch Umbruch getrennt.
+    pub fn richtext_selection(&self, h: i64) -> Result<String, String> {
+        Ok(Self::rt_auswahl_text(self.rt_ref(h, "GUI_RICHTEXT_SELECTION")?))
+    }
+    pub fn richtext_select_all(&mut self, h: i64) -> Result<(), String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_SELECT_ALL")?;
+        Self::rt_alles(r);
+        Ok(())
+    }
+    pub fn richtext_clear_selection(&mut self, h: i64) -> Result<(), String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_CLEAR_SELECTION")?;
+        r.hat_auswahl = false; r.ziehen = false;
+        Ok(())
+    }
+    /// Die naechste (bzw. vorige) Fundstelle ab der Auswahl, mit Umlauf am
+    /// Ende. Sie wird MARKIERT und ins Bild gerollt; geliefert wird das y
+    /// ihrer Zeile oder -1. Gesucht wird im Zeilentext, also auch ueber
+    /// Wortgrenzen hinweg ("Gehe zu").
+    pub fn richtext_find_step(&mut self, h: i64, text: &str, vorwaerts: bool) -> Result<i64, String> {
+        let fn_ = if vorwaerts { "GUI_RICHTEXT_FIND_NEXT" } else { "GUI_RICHTEXT_FIND_PREV" };
+        let hoehe = self.wdg(h, fn_)?.h;
+        let r = self.rt_mut(h, fn_)?;
+        let nadel: Vec<char> = text.to_lowercase().chars().collect();
+        if nadel.is_empty() || r.zeilen.is_empty() { return Ok(-1); }
+        let texte: Vec<Vec<char>> = r.zeilen.iter().map(|z| Self::rt_zeilentext(z).0.to_lowercase().chars().collect()).collect();
+        let mut treffer: Vec<(usize, usize)> = Vec::new();
+        for (zi, t) in texte.iter().enumerate() {
+            if t.len() < nadel.len() { continue; }
+            for c in 0..=(t.len() - nadel.len()) {
+                if t[c..c + nadel.len()] == nadel[..] { treffer.push((zi, c)); }
+            }
+        }
+        if treffer.is_empty() { return Ok(-1); }
+        let ((a_z, a_c), (e_z, e_c)) = if r.hat_auswahl { Self::rt_bereich(r) } else { ((0, 0), (0, 0)) };
+        let wahl = if vorwaerts {
+            // Ab dem ANFANG der Auswahl + 1: so kommt man bei einer Fundstelle,
+            // die schon markiert ist, zur naechsten -- und ohne Auswahl zur ersten.
+            let ab = if r.hat_auswahl { (a_z, a_c + 1) } else { (0, 0) };
+            treffer.iter().copied().find(|&t| t >= ab).unwrap_or(treffer[0])
+        } else {
+            let vor = if r.hat_auswahl { (a_z, a_c) } else { (e_z, e_c) };
+            treffer.iter().rev().copied().find(|&t| t < vor || !r.hat_auswahl).unwrap_or(*treffer.last().unwrap())
+        };
+        r.anker = wahl;
+        r.marke = (wahl.0, wahl.1 + nadel.len());
+        r.hat_auswahl = true;
+        r.ziehen = false;
+        let z = &r.zeilen[wahl.0];
+        let max = (r.inhalt_h - hoehe).max(0);
+        if z.y < r.scroll || z.y + z.h > r.scroll + hoehe {
+            r.scroll = (z.y - 20).clamp(0, max);
+        }
+        Ok(z.y as i64)
+    }
+    /// Alle Fundstellen hervorheben (leer = keine); liefert ihre Zahl.
+    pub fn richtext_mark_all(&mut self, h: i64, text: &str) -> Result<i64, String> {
+        let r = self.rt_mut(h, "GUI_RICHTEXT_MARK_ALL")?;
+        r.nadel = text.to_lowercase();
+        if r.nadel.is_empty() { return Ok(0); }
+        let n = r.zeilen.iter().map(|z| Self::rt_zeilentext(z).0.to_lowercase().matches(r.nadel.as_str()).count()).sum::<usize>();
+        Ok(n as i64)
+    }
+
+    /// Der Text einer gesetzten Zeile und, je Lauf, sein erstes Zeichen darin.
+    /// Zwischen zwei Laeufen steht ein Leerzeichen, wenn eine Luecke dazwischen
+    /// liegt -- `**fett**bar` ist ein Wort in zwei Gestalten und bleibt eins.
+    fn rt_zeilentext(z: &RtZeile) -> (String, Vec<usize>) {
+        let mut s = String::new();
+        let mut starts = Vec::with_capacity(z.laeufe.len());
+        let mut n = 0usize;
+        let mut ende = i32::MIN;
+        for l in z.laeufe.iter() {
+            if !s.is_empty() && l.x > ende { s.push(' '); n += 1; }
+            starts.push(n);
+            s.push_str(&l.text);
+            n += l.text.chars().count();
+            ende = l.x + l.breite;
+        }
+        (s, starts)
+    }
+    /// Anfang und Ende der Auswahl, geordnet.
+    fn rt_bereich(r: &RichState) -> ((usize, usize), (usize, usize)) {
+        if r.anker <= r.marke { (r.anker, r.marke) } else { (r.marke, r.anker) }
+    }
+    fn rt_alles(r: &mut RichState) {
+        if r.zeilen.is_empty() { r.hat_auswahl = false; return; }
+        let letzte = r.zeilen.len() - 1;
+        r.anker = (0, 0);
+        r.marke = (letzte, Self::rt_zeilentext(&r.zeilen[letzte]).0.chars().count());
+        r.hat_auswahl = true;
+        r.ziehen = false;
+    }
+    fn rt_auswahl_text(r: &RichState) -> String {
+        if !r.hat_auswahl || r.zeilen.is_empty() { return String::new(); }
+        let ((az, ac), (ez, ec)) = Self::rt_bereich(r);
+        let mut out: Vec<String> = Vec::new();
+        for zi in az..=ez.min(r.zeilen.len() - 1) {
+            let t: Vec<char> = Self::rt_zeilentext(&r.zeilen[zi]).0.chars().collect();
+            let von = if zi == az { ac.min(t.len()) } else { 0 };
+            let bis = if zi == ez { ec.min(t.len()) } else { t.len() };
+            // Leerzeilen des Satzes (Abstand unter einer Ueberschrift) sind
+            // Luft, kein Text -- kopiert ergaeben sie Luecken an Stellen, an
+            // denen man keine sieht.
+            if t.is_empty() { continue; }
+            out.push(t[von..bis.max(von)].iter().collect());
+        }
+        out.join("\n")
+    }
+    /// Welche Stelle liegt unter (x, y) -- relativ zum Inhalt, mit Scroll?
+    /// Ueber der ersten Zeile ist es ihr Anfang, unter der letzten ihr Ende;
+    /// in einer Zeile das Zeichen, dessen Mitte der Maus am naechsten liegt.
+    fn rt_stelle_unter(&self, g: &Graphics, w: &Widget, r: &RichState, x: i32, y: i32) -> (usize, usize) {
+        if r.zeilen.is_empty() { return (0, 0); }
+        let letzte = r.zeilen.len() - 1;
+        if y < r.zeilen[0].y { return (0, 0); }
+        let zi = match r.zeilen.iter().position(|z| y >= z.y && y < z.y + z.h) {
+            Some(zi) => zi,
+            None => {
+                if y >= r.zeilen[letzte].y + r.zeilen[letzte].h {
+                    return (letzte, Self::rt_zeilentext(&r.zeilen[letzte]).0.chars().count());
+                }
+                // In einer Luecke zwischen zwei Zeilen: die darunter.
+                r.zeilen.iter().position(|z| z.y > y).unwrap_or(letzte)
+            }
+        };
+        let z = &r.zeilen[zi];
+        let (text, starts) = Self::rt_zeilentext(z);
+        let font = self.wfont(g, w);
+        let cfont = if r.code_font >= 0 { r.code_font } else { font };
+        for (k, l) in z.laeufe.iter().enumerate() {
+            if x < l.x { return (zi, starts[k]); }
+            if x < l.x + l.breite {
+                let f = if l.code { cfont } else { font };
+                let zeichen: Vec<char> = l.text.chars().collect();
+                let mut vorher = 0;
+                for c in 1..=zeichen.len() {
+                    let b = g.text_width_in(&zeichen[..c].iter().collect::<String>(), l.groesse, f);
+                    if x - l.x < (vorher + b) / 2 { return (zi, starts[k] + c - 1); }
+                    vorher = b;
+                }
+                return (zi, starts[k] + zeichen.len());
+            }
+        }
+        (zi, text.chars().count())
+    }
+    /// Je Bild: eine laufende Auswahl mit der Maus nachziehen. Hier und nicht
+    /// im Druck, weil nur hier Grafik zum Messen greifbar ist.
+    fn rt_auswahl_pass(&mut self, g: &Graphics, is_down: bool, mx: i32, my: i32) {
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                let (ziehen, anker_neu, doppel) = match self.windows[wi].widgets[i].rich.as_ref() {
+                    Some(r) if self.windows[wi].widgets[i].kind == Kind::RichText => (r.ziehen, r.anker_neu, r.doppel),
+                    _ => continue,
+                };
+                if !ziehen { continue; }
+                let (ax, ay, _, _) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+                let (anker, marke) = {
+                    let w = &self.windows[wi].widgets[i];
+                    let r = w.rich.as_ref().unwrap();
+                    let anker = if anker_neu { self.rt_stelle_unter(g, w, r, r.druck.0, r.druck.1) } else { r.anker };
+                    (anker, self.rt_stelle_unter(g, w, r, mx - ax, my - ay + r.scroll))
+                };
+                let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
+                r.anker = anker;
+                r.marke = marke;
+                r.anker_neu = false;
+                if doppel {
+                    // Doppelklick: das Wort um die Stelle.
+                    let t: Vec<char> = Self::rt_zeilentext(&r.zeilen[anker.0.min(r.zeilen.len().saturating_sub(1))]).0.chars().collect();
+                    let ist_wort = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+                    let mut von = anker.1.min(t.len());
+                    let mut bis = von;
+                    while von > 0 && ist_wort(t[von - 1]) { von -= 1; }
+                    while bis < t.len() && ist_wort(t[bis]) { bis += 1; }
+                    r.anker = (anker.0, von);
+                    r.marke = (anker.0, bis);
+                    r.hat_auswahl = bis > von;
+                    r.ziehen = false;
+                    r.doppel = false;
+                    continue;
+                }
+                r.hat_auswahl = r.anker != r.marke;
+                if !is_down { r.ziehen = false; }
+            }
+        }
+    }
+
     /// Je Bild: jeden gesetzten Text neu setzen, dessen Quelle, Breite oder
     /// Schriftgroesse sich geaendert hat. Alles andere bleibt stehen.
     fn rt_pass(&mut self, g: &Graphics) {
@@ -5477,6 +5679,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 self.rt_setzen(g, wi, i, breite, basis);
                 let r = self.windows[wi].widgets[i].rich.as_mut().unwrap();
                 r.stand = stand;
+                // Die Stellen einer Auswahl zeigen in den ALTEN Satz.
+                r.hat_auswahl = false;
+                r.ziehen = false;
             }
         }
     }
@@ -6510,6 +6715,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let t = w.text.clone();
             if let Some(r) = w.rich.as_mut() {
                 r.quelle = t; r.scroll = 0; r.stand = (usize::MAX, 0, 0, 0);
+                r.hat_auswahl = false; r.ziehen = false;
             }
         }
         Ok(())
@@ -9015,6 +9221,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             self.handle_press(mx, my);
             self.dbl_click = false;
         }
+        self.rt_auswahl_pass(g, is_down, mx, my);
         // Farbwaehler weiterziehen, auch ausserhalb seiner Flaeche.
         if let Some((cw, ci, _)) = self.cp_drag {
             if is_down { self.cp_zieh(cw, ci, mx, my); } else { self.cp_drag = None; }
@@ -11015,6 +11222,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let max = (r.inhalt_h - hoehe).max(0);
                     r.scroll = (r.scroll + d * 40).clamp(0, max);
                 }
+                // Strg+A waehlt alles, Strg+C kopiert die Auswahl -- was man in
+                // einem Dokument eben tut, bevor man es woanders einfuegt.
+                if g.key_ctrl() && g.key_pressed(b'a' as i64) {
+                    Self::rt_alles(self.windows[wi].widgets[i].rich.as_mut().unwrap());
+                }
+                if g.key_ctrl() && g.key_pressed(b'c' as i64) {
+                    let t = Self::rt_auswahl_text(self.windows[wi].widgets[i].rich.as_ref().unwrap());
+                    if !t.is_empty() { g.clipboard_set(&t); }
+                }
             }
             Kind::TabControl => {
                 // Links/rechts blaettert -- wie in jedem Karteikasten.
@@ -11349,6 +11565,17 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     let r = self.windows[win].widgets[i].rich.as_ref().unwrap();
                     Self::rt_link_unter(r, mx - ax, my - ay + r.scroll)
                 };
+                // Ein Druck beginnt eine Auswahl -- gemessen wird im naechsten
+                // Durchgang (`rt_auswahl_pass`), hier gibt es keine Grafik.
+                {
+                    let dbl = self.dbl_click;
+                    let r = self.windows[win].widgets[i].rich.as_mut().unwrap();
+                    r.druck = (mx - ax, my - ay + r.scroll);
+                    r.ziehen = true;
+                    r.anker_neu = true;
+                    r.doppel = dbl;
+                    r.hat_auswahl = false;
+                }
                 if let Some(z) = ziel {
                     let r = self.windows[win].widgets[i].rich.as_mut().unwrap();
                     r.geklickt = z;
@@ -14645,7 +14872,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let font = self.wfont(g, wdg);
         let cfont = if r.code_font >= 0 { r.code_font } else { font };
         g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
-        for z in r.zeilen.iter() {
+        for (zi, z) in r.zeilen.iter().enumerate() {
             let zy = ay + z.y - r.scroll;
             if zy + z.h < ay { continue; }
             if zy > ay + h { break; }
@@ -14658,6 +14885,54 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             if z.balken >= 0 {
                 g.box_fill(ax + z.balken, zy, ax + z.balken + self.sk(2), zy + z.h - 1, acc);
+            }
+            // Fundstellen (schwach) und Auswahl (Akzent) UNTER den Text: je
+            // Lauf der Teil, der in den Bereich faellt, an seinen Zeichen gemessen.
+            let hat_nadel = !r.nadel.is_empty();
+            if r.hat_auswahl || hat_nadel {
+                let (text, starts) = Self::rt_zeilentext(z);
+                let mut bereiche: Vec<(usize, usize, i64)> = Vec::new();
+                if hat_nadel {
+                    let klein: Vec<char> = text.to_lowercase().chars().collect();
+                    let nadel: Vec<char> = r.nadel.chars().collect();
+                    if klein.len() >= nadel.len() {
+                        for c in 0..=(klein.len() - nadel.len()) {
+                            if klein[c..c + nadel.len()] == nadel[..] { bereiche.push((c, c + nadel.len(), (0x48i64 << 24) | 0xE8B83A)); }
+                        }
+                    }
+                }
+                if r.hat_auswahl {
+                    let ((az, ac), (ez, ec)) = Self::rt_bereich(r);
+                    if zi >= az && zi <= ez {
+                        let n = text.chars().count();
+                        let von = if zi == az { ac } else { 0 };
+                        let bis = if zi == ez { ec } else { n };
+                        // Ueber eine Zeile hinaus markiert bis zu ihrem Ende.
+                        if bis > von || (zi < ez && von == n) { bereiche.push((von, bis.max(von), (0x70i64 << 24) | (acc & 0xFF_FFFF))); }
+                    }
+                }
+                for (von, bis, farbe) in bereiche {
+                    for (k, l) in z.laeufe.iter().enumerate() {
+                        let s = starts[k];
+                        let len = l.text.chars().count();
+                        let (a, b) = (von.max(s), bis.min(s + len));
+                        if a >= b { continue; }
+                        let f = if l.code { cfont } else { font };
+                        let zeichen: Vec<char> = l.text.chars().collect();
+                        let x0 = g.text_width_in(&zeichen[..a - s].iter().collect::<String>(), l.groesse, f);
+                        let x1 = g.text_width_in(&zeichen[..b - s].iter().collect::<String>(), l.groesse, f);
+                        g.box_fill(ax + l.x + x0, zy, ax + l.x + x1.max(x0 + 1), zy + z.h - 2, farbe);
+                    }
+                    // Das Leerzeichen zwischen zwei Laeufen gehoert mit dazu --
+                    // sonst saehe eine Auswahl ueber drei Woerter aus wie drei.
+                    for k in 1..z.laeufe.len() {
+                        let s = starts[k];
+                        if s == 0 || s - 1 < von || s - 1 >= bis { continue; }
+                        let (vl, l) = (&z.laeufe[k - 1], &z.laeufe[k]);
+                        let x0 = vl.x + vl.breite;
+                        if l.x > x0 { g.box_fill(ax + x0, zy, ax + l.x, zy + z.h - 2, farbe); }
+                    }
+                }
             }
             for l in z.laeufe.iter() {
                 let farbe = match l.rolle { 1 => leise, 2 => acc, 3 => shade(acc, 40), _ => fg };

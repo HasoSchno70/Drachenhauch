@@ -2873,6 +2873,28 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 29 (2026-09-13):** das Handbuch bedienbar, als Ausbau von
+`GUI_RICHTEXT`. **Auswahl** (`RichState` anker/marke/hat_auswahl): eine
+Stelle ist (Zeile, Zeichen im ZEILENTEXT) -- `rt_zeilentext` fuegt die Laeufe
+einer Zeile zusammen, mit Leerzeichen, wo eine Luecke zwischen ihnen liegt
+(`**fett**bar` bleibt ein Wort). Damit findet die Suche ueber Wortgrenzen
+und Kopiertes ist lesbar; Leerzeilen des Satzes kommen beim Kopieren nicht
+mit. **Der Druck misst nichts** -- `handle_press` hat keine Grafik; er merkt
+Druckpunkt und Doppelklick, `rt_auswahl_pass` (in `update` direkt nach dem
+Druck) misst Anker und Marke und zieht nach, solange die Taste haengt
+(Doppelklick = Wort um die Stelle). Strg+A/Strg+C im `widget_keys`-Zweig,
+`GUI_RICHTEXT_SELECTION$/SELECT_ALL/CLEAR_SELECTION`. **Suche:**
+`GUI_RICHTEXT_FIND_NEXT/PREV` (ab ANFANG der Auswahl + 1 bzw. vor ihr, mit
+Umlauf; markiert und rollt ins Bild), `GUI_RICHTEXT_MARK_ALL` (schwacher
+Hauch unter jeder Fundstelle, liefert die Zahl). Neu setzen (Text, Breite)
+hebt die Auswahl auf. Gezeichnet wird je Lauf der Teil im Bereich, an seinen
+Zeichen gemessen, dazu die Luecke zwischen zwei Laeufen -- sonst saehe eine
+Auswahl ueber drei Woerter aus wie drei. Die IDE: Weiter/Zurueck-Knoepfe,
+Enter/Umschalt+Enter, Zahl der Fundstellen, Protokoll `hbsuche`. Tests
+`tests/pruef/gui_gesetzter_text_auswahl.dhtest` (4, der Mauszug
+geometriefrei: von vor der ersten bis hinter die letzte Zeile = alles, gegen
+SELECT_ALL), einer in `tests/test_ide.py`.
+
 **Stufe 28 (2026-09-13):** drei Punkte aus der eigenen Lueckenliste der
 gui, alle drei Leisten. **`GUI_STATUSBAR`** (gui.rs `StatusState`, Kind
 `statusbar`): Felder mit fester Breite oder Anteil am Rest (`sb_geom`),
