@@ -2880,7 +2880,7 @@ Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
 (eigene Datei, `--- seriell`; die Laeufer nehmen seriell markierte Dateien
 nacheinander, die Zwischenablage bleibt also ungeteilt), 67 bleiben. Neu im
 Umgang, nicht im Format: eine **Voreinstellung der IDE** (`regex`,
-`autosichern`, `geruest`) kommt als Beilage `_programm/ide.json`, weil
+`autosichern`, `geruest`) kommt als Beilage `ide.json` in `_programm/`, weil
 `DH_IDE_KONFIG` relativ zu ihr zeigt; **Mausklicks** auf Projektbaum und
 Werkzeugleiste treffen dieselben festen Lagen wie in pytest (die Kopie laeuft
 dort wie hier MIT `WINDOW_MAXIMIZE`); das **Vorschaubild einer Kachel** prueft
