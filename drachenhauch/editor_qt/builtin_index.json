@@ -1023,6 +1023,12 @@
    "module": "dhrt"
   },
   {
+   "name": "BUFFER_DEFLATE",
+   "kind": "core",
+   "signature": "BUFFER_DEFLATE(puffer [, format]) AS BUFFER",
+   "module": "dhrt"
+  },
+  {
    "name": "BUFFER_FILL",
    "kind": "core",
    "signature": "BUFFER_FILL(puffer, byte)",
@@ -1098,6 +1104,12 @@
    "name": "BUFFER_INDEXOF",
    "kind": "core",
    "signature": "BUFFER_INDEXOF(puffer, nadel [, ab]) AS INTEGER",
+   "module": "dhrt"
+  },
+  {
+   "name": "BUFFER_INFLATE",
+   "kind": "core",
+   "signature": "BUFFER_INFLATE(puffer [, format]) AS BUFFER",
    "module": "dhrt"
   },
   {

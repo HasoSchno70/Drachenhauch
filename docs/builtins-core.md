@@ -992,6 +992,20 @@ kein Text sein sollen, ist `BUFFER_TO_HEX$` das richtige Werkzeug.
 `BUFFER_FROM_BASE64` liefert **rohe Bytes** — im Unterschied zu `BASE64_DECODE`,
 das gültiges UTF-8 verlangt und sonst wirft.
 
+### Packen
+
+| Funktion | Zweck |
+|---|---|
+| `BUFFER_DEFLATE(b [, format$])` → BUFFER | Bytes mit Deflate packen (`"zlib"` Vorgabe, `"roh"`) |
+| `BUFFER_INFLATE(b [, format$])` → BUFFER | gepackte Bytes entpacken (`"zlib"` Vorgabe, `"roh"`) |
+
+Anders als `COMPRESS$`/`DECOMPRESS$` (Text rein, Base64 raus) arbeiten die
+beiden auf **rohen Bytes**. Die Vorgabe `"zlib"` ist das Format mit Kopf und
+Prüfsumme, in dem Deflate in PDF-Seiten (`/FlateDecode`), PNG-Bildern und
+vielen Netzprotokollen steckt; `"roh"` ist der nackte Strom (so liegt er in
+ZIP-Archiven). Kaputte Daten sind ein Fehler; entpackt wird höchstens 512 MB,
+damit wenige Kilobyte nicht den Speicher sprengen.
+
 ### Zahlen packen
 
 | Funktion | Zweck |

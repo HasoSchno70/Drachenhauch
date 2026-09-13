@@ -3,8 +3,8 @@
 ' zwei IDE-Laeufe hintereinander (Sitzung, Umbruch, Sitzung je Projektordner),
 ' ein git-Repository VOR dem Lauf oder eine Messung im Bildschirmfoto. Dafuer
 ' die Bloecke `--- vorher`, `--- zwischen` und `--- nochmal [in ORDNER]`
-' (docs/werkzeuge.md). In pytest bleibt nur das PDF-Listing -- das pdf-Modul
-' packt seine Seiten, ein Drachenhauch-Leser saehe den Text darin nicht.
+' (docs/werkzeuge.md). Seit Stufe 38 auch das PDF-Listing: die gepackten
+' Seiten entpackt BUFFER_INFLATE, tests/test_ide.py gibt es nicht mehr.
 '
 ' Der Einschub spielt die Aufnahme nur ab, wenn es sie gibt: ein zweiter Lauf
 ' ohne sie laeuft ohne Eingaben, und beim Farbfeld schreibt sie erst das
@@ -1149,4 +1149,87 @@ END FUNCTION
 PRINT "farbfeld " ; erste$("farbfeld ") <> ""
 --- erwartet
 farbfeld TRUE
+
+=== listing als pdf neben der quelle
+' Befehlspalette (Strg+Umschalt+P), "pdf" per Strg+V, Enter. 140 Zeilen bei
+' 66 je Seite sind drei Seiten. Das pdf-Modul packt jede Seite (FlateDecode);
+' gelesen wird mit BUFFER_INFLATE, nicht mit PyMuPDF.
+IF FILEEXISTS("ev.txt") THEN AUTOMATION_PLAY("ev.txt")
+CLIPBOARD_SET("pdf")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- vorher
+DIM t AS STRING : t = ""
+DIM i AS INTEGER
+FOR i = 1 TO 140
+    t = t + "PRINT " + CHR$(34) + "Zeile " + STR$(i) + " mit Umlaut ae oe ue" + CHR$(34) + CHR$(10)
+NEXT
+WRITEALL("spiel.dh", t)
+--- datei _programm/ev.txt
+c 12
+e 20 2 341 0 0 0
+e 20 2 340 0 0 0
+e 20 2 80 0 0 0
+e 22 1 80 0 0 0
+e 22 1 341 0 0 0
+e 22 1 340 0 0 0
+e 50 2 341 0 0 0
+e 50 2 86 0 0 0
+e 52 1 86 0 0 0
+e 52 1 341 0 0 0
+e 70 2 257 0 0 0
+e 72 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM protokoll AS BOOLEAN : protokoll = FALSE
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 4) = "pdf " THEN protokoll = TRUE
+NEXT
+PRINT "protokoll " ; protokoll
+PRINT "datei " ; FILEEXISTS("spiel.pdf")
+DIM pdf AS BUFFER : pdf = READALL_BYTES("spiel.pdf")
+' Seiten zaehlen: jedes Seitenobjekt traegt "/Type /Page /Parent"
+DIM seite AS BUFFER : seite = BUFFER_FROM_STRING("/Type /Page /Parent")
+DIM n AS INTEGER : n = 0
+DIM p AS INTEGER : p = BUFFER_INDEXOF(pdf, seite)
+WHILE p >= 0
+    n = n + 1
+    p = BUFFER_INDEXOF(pdf, seite, p + 1)
+WEND
+PRINT "seiten " ; n
+' Inhaltsstroeme in Seitenreihenfolge entpacken. Gesucht wird hinter dem
+' letzten "endstream" weiter -- sonst traefe "stream\n" in "endstream\nendobj".
+DIM auf AS BUFFER : auf = BUFFER_FROM_STRING("stream" + CHR$(10))
+DIM zu AS BUFFER : zu = BUFFER_FROM_STRING(CHR$(10) + "endstream")
+DIM texte AS ARRAY OF STRING : texte = []
+DIM ab AS INTEGER : ab = 0
+DIM a AS INTEGER : a = BUFFER_INDEXOF(pdf, auf, ab)
+WHILE a >= 0
+    DIM e AS INTEGER : e = BUFFER_INDEXOF(pdf, zu, a)
+    ARRAY_PUSH(texte, BUFFER_TO_STRING$(BUFFER_INFLATE(BUFFER_SLICE(pdf, a + 7, e))))
+    ab = e + 10
+    a = BUFFER_INDEXOF(pdf, auf, ab)
+WEND
+PRINT "stroeme " ; LEN(texte)
+PRINT "kopf " ; INSTR(texte[0], "spiel.dh") >= 0 AND INSTR(texte[0], "Seite 1") >= 0
+PRINT "erste zeile " ; INSTR(texte[0], "Zeile 1 mit") >= 0
+PRINT "letzte zeile " ; INSTR(texte[2], "Zeile 140 mit") >= 0
+PRINT "nicht auf seite 1 " ; INSTR(texte[0], "Zeile 140") < 0
+--- erwartet
+protokoll TRUE
+datei TRUE
+seiten 3
+stroeme 3
+kopf TRUE
+erste zeile TRUE
+letzte zeile TRUE
+nicht auf seite 1 TRUE
 
