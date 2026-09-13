@@ -142,6 +142,40 @@ Division durch Null
 | `--- system windows` | der Fall gilt nur dort (auch `posix`, `macos`, `linux`, mehrere durch Leerzeichen); anderswo zählt er als übersprungen — für `SHELL("cmd", "/c", …)` und alles, was ein Betriebssystem braucht |
 | `--- ton datei.wav` | Proben an einer WAV-Datei, die das Programm geschrieben hat (Kanäle, Bittiefe, Dauer, Spitze, Pegel je Zeitfenster) — siehe unten |
 | `--- bild` | Punktproben am **Bildschirmfoto** nach dem Lauf — der Läufer setzt `DHRT_SCREENSHOT` selbst und, wenn die Umgebung keins nennt, `DHRT_FRAMES=2`; `--- bild name.png` prüft stattdessen eine Datei, die das Programm geschrieben hat (`IMAGE_SAVE`) |
+| `--- programm pfad [nach MARKE]` | der Fall läuft ein **vorhandenes Programm** (Pfad relativ zur Sammlung — die IDE, ein Editor); sein Quelltext wird hinter der ersten Zeile `MARKE` eingeschoben, ohne Marke davor. Das Programm läuft als Kopie in `_programm/` im Fallordner; der Fallordner selbst ist der Ort des Aufrufers (`DHRT_START_DIR`) |
+| `--- inhalt datei` | nach dem Lauf steht jede Zeile des Blocks in dieser Datei (Protokoll, gesicherte Datei; Pfad relativ zum Fallordner) |
+| `--- ohne datei` | keine Zeile des Blocks steht darin (eine Datei, die es nicht gibt, enthält auch nichts) |
+
+In `--- umgebung` und `--- argumente` stehen zwei Platzhalter bereit:
+`{sammlung}` ist der Ordner der `.dhtest`-Datei, `{fall}` der Fallordner —
+für ein Werkzeug, das einen absoluten Pfad braucht (`DH_IDE_WURZEL`), oder
+für einen Fall, der eine Datei des Projekts liest.
+
+**Werkzeuge ohne Python prüfen** (seit Stufe 32): so laufen die Tests des
+Form-Designers in `tests/pruef/werkzeug_formdesigner.dhtest`. Zwei Wege
+nebeneinander — echte Klicks über eine Aufnahme (Einschub
+`AUTOMATION_PLAY("ev.txt")` hinter `SETFPS(60)`, Beilage
+`--- datei _programm/ev.txt`), oder direkt über die Unterprogramme des
+Werkzeugs (Einschub hinter der Zeile, an der es bereit ist; der Einschub
+ruft, gibt aus und endet mit `EXIT(0)`). Der zweite Weg prüft die Logik ohne
+Bildschirmlagen und ist darum der robustere, wo es nicht um die Maus geht.
+
+```dhtest
+=== ablegen und sichern
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/197_form_designer.dh nach SETFPS(60)
+--- argumente
+neu.dhform
+--- umgebung
+DHRT_FRAMES=120
+DH_FORM_LOG=fd.log
+--- datei _programm/ev.txt
+...
+--- inhalt _programm/fd.log
+neu button 248 184
+--- inhalt neu.dhform
+"kind": "button"
+```
 
 Die Zeilen eines `--- bild`-Blocks:
 
