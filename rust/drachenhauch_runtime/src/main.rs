@@ -850,7 +850,10 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         let mut text = std::fs::read_to_string(&orig)
                             .map_err(|e| format!("--- programm {}: nicht lesbar ({})", p, e))?;
                         for s in &f.streichen { text = pruefsammlung::streichen_zeile(&text, s)?; }
-                        let neu = pruefsammlung::einschieben(&text, f.nach.as_deref(), &f.quelle)?;
+                        let mut neu = pruefsammlung::einschieben(&text, f.nach.as_deref(), &f.quelle)?;
+                        for (marke, einschub) in &f.einschuebe {
+                            neu = pruefsammlung::einschieben(&neu, Some(marke), einschub)?;
+                        }
                         let pdir = dir.join("_programm");
                         let _ = std::fs::create_dir_all(&pdir);
                         let name = orig.file_name().map(|n| n.to_os_string()).unwrap_or_else(|| "programm.dh".into());
