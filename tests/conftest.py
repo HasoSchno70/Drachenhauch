@@ -191,7 +191,6 @@ _NUR_WINDOWS = {
 
 _BRAUCHT_GRAFIK = {
     "test_speak.py",
-    "test_ide_bausteine.py",
     "test_ide.py",
     "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
