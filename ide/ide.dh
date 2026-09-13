@@ -617,7 +617,7 @@ DIM lblWkKuerzel AS GUI_WIDGET : lblWkKuerzel = GUI_LABEL(win, "F5 startet das P
 ' wird nach GUI_DRAW, wie bei jeder Leinwand.
 ' Symbolspur ueber dem Code: Datei > Klasse > Unterprogramm. Sie sagt,
 ' WO man ist, wenn der Kopf des Blocks schon aus dem Bild gerollt ist.
-DIM lblSpur AS GUI_WIDGET : lblSpur = GUI_LABEL(win, "", 0, 0)
+DIM lblSpur AS GUI_WIDGET : lblSpur = GUI_BREADCRUMB(win, 0, 0, 10, 20)
 DIM karte AS GUI_WIDGET : karte = GUI_CANVAS(win, 0, 0, 10, 10)
 GUI_SET_VISIBLE(karte, FALSE)
 DIM lblAusgabe AS GUI_WIDGET : lblAusgabe = GUI_LABEL(win, "Ausgabe", 0, 0)
@@ -625,7 +625,17 @@ DIM lstAusgabe AS GUI_WIDGET : lstAusgabe = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblProbleme AS GUI_WIDGET : lblProbleme = GUI_LABEL(win, "Probleme", 0, 0)
 DIM lstProbleme AS GUI_WIDGET : lstProbleme = GUI_LISTBOX(win, 0, 0, 10, 10, [])
 DIM lblHilfe AS GUI_WIDGET : lblHilfe = GUI_LABEL(win, "", 0, 0)
-DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(win, "Bereit.", 0, 0)
+' Statusleiste mit Feldern (seit Stand 28): links die Meldung, rechts die
+' Stelle der Marke und der Umbruch -- beide anklickbar. Bis dahin schrieb
+' die IDE alles in EINE Beschriftung, und jeder Pfeil ueberschrieb die
+' letzte Meldung mit "Zeile, Spalte". GUI_SET_TEXT meint weiter das erste Feld.
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_STATUSBAR(win, 0, 0, 10, 24, "Bereit.")
+DIM sfPos AS INTEGER : sfPos = GUI_STATUSBAR_ADD(lblStatus, "Zeile 1, Spalte 1", 150, "mitte")
+GUI_STATUSBAR_CLICKABLE(lblStatus, sfPos, TRUE)
+GUI_STATUSBAR_TIP(lblStatus, sfPos, "Gehe zu Zeile (Strg+G)")
+DIM sfUmbruch AS INTEGER : sfUmbruch = GUI_STATUSBAR_ADD(lblStatus, "Umbruch aus", 110, "mitte")
+GUI_STATUSBAR_CLICKABLE(lblStatus, sfUmbruch, TRUE)
+GUI_STATUSBAR_TIP(lblStatus, sfUmbruch, "Zeilenumbruch an/aus (Alt+Z)")
 DIM tfEingabe AS GUI_WIDGET : tfEingabe = GUI_TEXTINPUT(win, 0, 0, 10, 26, "Eingabe fuer das laufende Programm -- Enter schickt")
 DIM btnEingabe AS GUI_WIDGET : btnEingabe = GUI_BUTTON(win, "Senden", 0, 0, 80, 26)
 
@@ -1129,7 +1139,7 @@ SUB layout()
     DIM ew AS INTEGER : ew = w - breiteLinks - 8
     ' Die Spur steht ueber dem Code und nimmt sich 20 Punkte von seiner Hoehe.
     DIM spurH AS INTEGER : spurH = 20
-    GUI_SET_BOUNDS(lblSpur, ex + 4, oben, ew - 8, 18)
+    GUI_SET_BOUNDS(lblSpur, ex, oben - 1, ew, 20)
     GUI_SET_VISIBLE(lblSpur, tabAnzahl > 0)
     oben = oben + spurH
     mitteH = mitteH - spurH
@@ -1208,7 +1218,7 @@ SUB layout()
     DIM ey AS INTEGER : ey = hi - statusH - eingabeH - 4
     GUI_SET_BOUNDS(tfEingabe, 8, ey, w - 108, 26)
     GUI_SET_BOUNDS(btnEingabe, w - 92, ey, 84, 26)
-    GUI_SET_BOUNDS(lblStatus, 8, hi - statusH, w - 16, 18)
+    GUI_SET_BOUNDS(lblStatus, 0, hi - statusH, w, statusH)
 END SUB
 
 ' --- Reiter ------------------------------------------------------------
@@ -1315,6 +1325,7 @@ SUB umbruchSetzen(an AS BOOLEAN)
         GUI_TEXTAREA_SET(tabFelder[i], "umbruch", IIF(an, 1, 0))
     NEXT
     GUI_SET_TEXT(lblStatus, IIF(an, "Zeilenumbruch an.", "Zeilenumbruch aus."))
+    GUI_STATUSBAR_SET(lblStatus, sfUmbruch, IIF(an, "Umbruch an", "Umbruch aus"))
     konfigSichern()
 END SUB
 
@@ -2441,22 +2452,36 @@ SUB spurNachziehen()
     spurSchluessel = schl
     DIM datei AS STRING : datei = IIF(tabPfade[aktiverTab] = "", "Unbenannt", BASENAME(tabPfade[aktiverTab]))
     DIM spur AS STRING : spur = datei
+    ' Die Pfadleiste bekommt je Teil die ZEILE seines Blocks als Wert --
+    ' ein Klick springt dorthin (pfadAnspringen).
+    GUI_BREADCRUMB_CLEAR(lblSpur)
+    GUI_BREADCRUMB_ADD(lblSpur, datei, "1")
     DIM j AS JSON_HANDLE : j = JSON_PARSE(CODE_SYMBOLS$(GUI_TEXT(ta)))
     DIM i AS INTEGER
     FOR i = 0 TO JSON_LEN(j, "") - 1
         DIM p AS STRING : p = STR$(i)
         IF z < JSON_GET_INT(j, p + ".von") OR z > JSON_GET_INT(j, p + ".bis") THEN CONTINUE
         spur = spur + "  >  " + JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name")
+        GUI_BREADCRUMB_ADD(lblSpur, JSON_GET_STRING(j, p + ".art") + " " + JSON_GET_STRING(j, p + ".name"), STR$(JSON_GET_INT(j, p + ".von")))
         DIM m AS INTEGER
         FOR m = 0 TO JSON_LEN(j, p + ".kinder") - 1
             DIM pk AS STRING : pk = p + ".kinder." + STR$(m)
             IF z >= JSON_GET_INT(j, pk + ".von") AND z <= JSON_GET_INT(j, pk + ".bis") THEN
                 spur = spur + "  >  " + JSON_GET_STRING(j, pk + ".name")
+                GUI_BREADCRUMB_ADD(lblSpur, JSON_GET_STRING(j, pk + ".name"), STR$(JSON_GET_INT(j, pk + ".von")))
             END IF
         NEXT
     NEXT
-    GUI_SET_TEXT(lblSpur, spur)
     protokoll("spur " + spur)
+END SUB
+
+' Ein Klick in die Pfadleiste: an den Anfang des Blocks springen.
+SUB pfadAnspringen(zeile AS INTEGER)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_TEXTAREA_GOTO(ta, MAX(1, zeile), 1)
+    GUI_FOCUS(ta)
+    protokoll("pfad sprung " + STR$(zeile))
 END SUB
 
 SUB gliederungAnspringen()
@@ -3009,7 +3034,7 @@ SUB hilfeNachziehen()
     DIM marke AS STRING : marke = STR$(z) + ":" + STR$(s)
     IF marke = letzteMarke THEN RETURN
     letzteMarke = marke
-    GUI_SET_TEXT(lblStatus, "Zeile " + STR$(z) + ", Spalte " + STR$(s))
+    GUI_STATUSBAR_SET(lblStatus, sfPos, "Zeile " + STR$(z) + ", Spalte " + STR$(s))
     ' Steht die Marke in einer Argumentliste, gilt die Signatur des Aufrufs:
     ' dort steht sie auf einem Komma oder einer Zahl, und die Hilfe zum Wort
     ' schwiege genau dann, wenn man sie braucht.
@@ -7344,6 +7369,13 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
             befehl(wzBefehle[wzc])
         END IF
     END IF
+    ' Statusleiste und Pfadleiste: ein Klick ist derselbe Befehl wie sein Kuerzel.
+    DIM sfk AS INTEGER : sfk = GUI_STATUSBAR_CLICKED(lblStatus)
+    IF sfk >= 0 THEN protokoll("statusfeld " + STR$(sfk))
+    IF sfk = sfPos THEN befehl("zeile")
+    IF sfk = sfUmbruch THEN befehl("umbruch")
+    DIM spk AS INTEGER : spk = GUI_BREADCRUMB_CLICKED(lblSpur)
+    IF spk >= 0 THEN pfadAnspringen(INT(VAL(GUI_BREADCRUMB_DATA$(lblSpur, spk))))
     ' Kacheln: ein Klick oeffnet das Beispiel.
     DIM kc AS INTEGER
     FOR kc = 0 TO KACHEL_MAX - 1
