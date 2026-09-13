@@ -93,7 +93,6 @@ _SERIELL = {
     "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
     "test_speak.py",                 # misst Sprechdauern (SPEAK_WAIT) an der Soundkarte
     "test_ide.py",                   # speist Tasten in die IDE ein (F5/F7)
-    "test_pilot_formdesigner.py",    # speist Klicks und Tasten in den Form-Designer ein
     "test_pilot_animfsm.py",         # speist Klicks und Tasten in den Anim-FSM-Editor ein
     "test_pilot_notenblatt.py",      # speist Klicks und Tasten ins Notenblatt ein, spielt Ton
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
@@ -196,7 +195,6 @@ _BRAUCHT_GRAFIK = {
     "test_speak.py",
     "test_ide_bausteine.py",
     "test_ide.py",
-    "test_pilot_formdesigner.py",
     "test_pilot_animfsm.py",
     "test_pilot_notenblatt.py",
     "test_schriften_vorrat.py",
