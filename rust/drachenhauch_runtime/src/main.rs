@@ -879,21 +879,6 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     };
                     std::fs::write(&ziel, &inhalt).map_err(|e| e.to_string())?;
                 }
-                let mut cmd = std::process::Command::new(&exe);
-                cmd.arg("run").arg(&quelle_pfad);
-                // Der Fallordner ist der Ort des Aufrufers (DHRT_START_DIR) --
-                // ein Werkzeug, das ein Projekt oeffnet, sieht dann ihn.
-                cmd.current_dir(&dir);
-                if !f.argumente.is_empty() {
-                    cmd.arg("--").args(f.argumente.iter().map(|a| pruefsammlung::platzhalter(a, &s_text, &f_text)));
-                }
-                cmd.stdin(if f.eingabe.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() })
-                    .stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped())
-                    // Ein Fall ist ein Programm fuer sich: was die Umgebung des
-                    // Laeufers an Bildzahl oder Foto vorgibt, gilt nicht fuer ihn.
-                    .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                    .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
-                    .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY");
                 // `--- bild` ohne Namen: das Bildschirmfoto nach dem Lauf. Der
                 // Laeufer nennt die Datei selbst; die Bildzahl darf die Umgebung
                 // des Falls ueberschreiben (unten), sonst zwei Bilder -- das
@@ -902,13 +887,60 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     Some(name) => dir.join(name),
                     None => dir.join("bild.png"),
                 });
-                if let Some(b) = &f.bild {
-                    if b.datei.is_none() {
-                        cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
-                        cmd.env("DHRT_FRAMES", "2");
+                // Ein Lauf des Programms im Ordner `cwd` mit diesen Argumenten und
+                // der Umgebung des Falls. Der Hauptlauf und jedes `--- nochmal`
+                // gehen hierueber -- sie unterscheiden sich NUR in Ordner und
+                // Argumenten, sonst liefe der zweite Lauf mit anderer Bildzahl.
+                let befehl = |cwd: &std::path::Path, argumente: &[String]| {
+                    let mut cmd = std::process::Command::new(&exe);
+                    cmd.arg("run").arg(&quelle_pfad);
+                    // Der Fallordner ist der Ort des Aufrufers (DHRT_START_DIR) --
+                    // ein Werkzeug, das ein Projekt oeffnet, sieht dann ihn.
+                    cmd.current_dir(cwd);
+                    if !argumente.is_empty() {
+                        cmd.arg("--").args(argumente.iter().map(|a| pruefsammlung::platzhalter(a, &s_text, &f_text)));
+                    }
+                    cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped())
+                        // Ein Fall ist ein Programm fuer sich: was die Umgebung des
+                        // Laeufers an Bildzahl oder Foto vorgibt, gilt nicht fuer ihn.
+                        .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
+                        .env_remove("DHRT_CONTACT").env_remove("DHRT_CONTACT_MAX")
+                        .env_remove("DHRT_CONTACT_COLS").env_remove("DHRT_CONTACT_EVERY");
+                    if let Some(b) = &f.bild {
+                        if b.datei.is_none() {
+                            cmd.env("DHRT_SCREENSHOT", dir.join("bild.png"));
+                            cmd.env("DHRT_FRAMES", "2");
+                        }
+                    }
+                    for (k, v) in &f.umgebung { cmd.env(k, pruefsammlung::platzhalter(v, &s_text, &f_text)); }
+                    cmd
+                };
+                // Ein Hilfsprogramm in Drachenhauch (`--- vorher`, `--- zwischen`,
+                // `--- nachher`): im Fallordner, OHNE die Umgebung des Falls.
+                let hilfslauf = |name: &str, quelle: &str| -> Result<(i32, String, String), String> {
+                    std::fs::write(dir.join(name), quelle).map_err(|e| e.to_string())?;
+                    let o = std::process::Command::new(&exe)
+                        .arg("run").arg(dir.join(name))
+                        .current_dir(&dir)
+                        .stdin(std::process::Stdio::null())
+                        .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
+                        .output().map_err(|e| format!("{}: Start fehlgeschlagen: {}", name, e))?;
+                    Ok((o.status.code().unwrap_or(-1),
+                        String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned()))
+                };
+                // Ein Zwischenlauf muss nur sauber enden; ein fehlendes Fenster
+                // heisst weiter "uebersprungen", nicht "falsch".
+                let nur_lauf = pruefsammlung::Fall { name: f.name.clone(), ..Default::default() };
+                if let Some(vq) = &f.vorher {
+                    let (c, o, e) = hilfslauf("vorher.dh", vq)?;
+                    match pruefsammlung::bewerten(&nur_lauf, c, &o, &e, ohne_grafik) {
+                        pruefsammlung::Ergebnis::Ok => {}
+                        pruefsammlung::Ergebnis::Fehl(m) => return Ok(pruefsammlung::Ergebnis::Fehl(format!("--- vorher: {}", m))),
+                        andere => return Ok(andere),
                     }
                 }
-                for (k, v) in &f.umgebung { cmd.env(k, pruefsammlung::platzhalter(v, &s_text, &f_text)); }
+                let mut cmd = befehl(&dir, &f.argumente);
+                cmd.stdin(if f.eingabe.is_some() { std::process::Stdio::piped() } else { std::process::Stdio::null() });
                 let mut kind = cmd.spawn().map_err(|e| format!("Start fehlgeschlagen: {}", e))?;
                 if let Some(bytes) = &f.eingabe {
                     // Die Eingabe ganz hineinschreiben und das Ende schliessen --
@@ -921,29 +953,45 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     }
                 }
                 let o = kind.wait_with_output().map_err(|e| format!("Lauf fehlgeschlagen: {}", e))?;
-                let (code, out, err) = (o.status.code().unwrap_or(-1),
+                let (mut code, mut out, mut err) = (o.status.code().unwrap_or(-1),
                     String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned());
+                // Mit Schritten oder `--- nachher` muss der Hauptlauf nur sauber
+                // enden (fehlendes Fenster = uebersprungen); die Erwartungen
+                // gelten dem letzten Lauf bzw. dem Leseprogramm.
+                if f.nachher.is_some() || !f.schritte.is_empty() {
+                    match pruefsammlung::bewerten(&nur_lauf, code, &out, &err, ohne_grafik) {
+                        pruefsammlung::Ergebnis::Ok => {}
+                        andere => return Ok(andere),
+                    }
+                    for (k, schritt) in f.schritte.iter().enumerate() {
+                        let (c, o, e, was) = match schritt {
+                            pruefsammlung::Schritt::Zwischen(q) => {
+                                let (c, o, e) = hilfslauf(&format!("zwischen_{}.dh", k + 1), q)?;
+                                (c, o, e, "zwischen")
+                            }
+                            pruefsammlung::Schritt::Nochmal { ordner, argumente } => {
+                                let cwd = match ordner { Some(o) => dir.join(o), None => dir.clone() };
+                                let _ = std::fs::create_dir_all(&cwd);
+                                let o = befehl(&cwd, argumente).stdin(std::process::Stdio::null()).output()
+                                    .map_err(|e| format!("--- nochmal: Start fehlgeschlagen: {}", e))?;
+                                (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).into_owned(),
+                                 String::from_utf8_lossy(&o.stderr).into_owned(), "nochmal")
+                            }
+                        };
+                        match pruefsammlung::bewerten(&nur_lauf, c, &o, &e, ohne_grafik) {
+                            pruefsammlung::Ergebnis::Ok => {}
+                            pruefsammlung::Ergebnis::Fehl(m) => return Ok(pruefsammlung::Ergebnis::Fehl(
+                                format!("--- {} ({}. Schritt): {}", was, k + 1, m))),
+                            andere => return Ok(andere),
+                        }
+                        if was == "nochmal" { code = c; out = o; err = e; }
+                    }
+                }
                 let erg = match &f.nachher {
                     None => pruefsammlung::bewerten(f, code, &out, &err, ohne_grafik),
-                    // `--- nachher`: das erste Programm muss nur durchlaufen
-                    // (fehlendes Fenster = uebersprungen); die Erwartungen
-                    // gelten dem zweiten, das seine Dateien liest.
                     Some(nq) => {
-                        let nur_lauf = pruefsammlung::Fall { name: f.name.clone(), ..Default::default() };
-                        match pruefsammlung::bewerten(&nur_lauf, code, &out, &err, ohne_grafik) {
-                            pruefsammlung::Ergebnis::Ok => {
-                                std::fs::write(dir.join("nachher.dh"), nq).map_err(|e| e.to_string())?;
-                                let o2 = std::process::Command::new(&exe)
-                                    .arg("run").arg(dir.join("nachher.dh"))
-                                    .current_dir(&dir)
-                                    .stdin(std::process::Stdio::null())
-                                    .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
-                                    .output().map_err(|e| format!("--- nachher: Start fehlgeschlagen: {}", e))?;
-                                pruefsammlung::bewerten(f, o2.status.code().unwrap_or(-1),
-                                    &String::from_utf8_lossy(&o2.stdout), &String::from_utf8_lossy(&o2.stderr), ohne_grafik)
-                            }
-                            andere => andere,
-                        }
+                        let (c, o, e) = hilfslauf("nachher.dh", nq)?;
+                        pruefsammlung::bewerten(f, c, &o, &e, ohne_grafik)
                     }
                 };
                 let erg = match (&erg, &f.bild, &bild_pfad) {
