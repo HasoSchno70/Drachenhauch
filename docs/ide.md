@@ -54,8 +54,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 28 | **Statusleiste mit Feldern** (Meldung, Stelle der Marke, Umbruch — die beiden rechten anklickbar), die Symbolspur ist eine **Pfadleiste** (ein Klick springt zum Block), und die Werkzeugleiste legt, was nicht passt, in ein **»-Menü** |
 | 29 | Im **gesetzten Handbuch** markieren (Ziehen, Doppelklick = Wort, Strg+A) und kopieren (Strg+C); die Suche geht **weiter und zurück** mit Umlauf, markiert die Fundstelle und hebt **alle Fundstellen** hervor |
 | 30 | Die Tabelle der Laufzeit kann **Gitter** (`GUI_GRID`, Zellmodus: aktuelle Zelle, Bereich, Tippen bearbeitet, Strg+C/V als Tabulator-Text, Zahlen- und Auswahlspalten); das **Profil** ist ein Gitter, seine Zeilen lassen sich markieren und kopieren |
+| 31 | Eine **`.dhform` öffnet den Form-Designer in Drachenhauch** (als Text über die Befehlspalette); der Designer kennt alle 30 Arten und das Gitter, zeigt Felder je Art (Einträge, Spalten, Zellmodus, bearbeitbare Spalten, Spaltenarten, Min/Max/Wert) und schreibt **GB-Code ohne `GUI_LOAD`** (Strg+G) |
 
-## Was sie heute kann (Stand 30, 13.09.2026)
+## Was sie heute kann (Stand 31, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|

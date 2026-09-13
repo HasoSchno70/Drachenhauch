@@ -2300,16 +2300,31 @@ def test_eine_neu_angelegte_datei_bekommt_einen_reiter(tmp_path):
 
 def test_der_baum_zeigt_auch_ein_formular(tmp_path):
     """Neben dem Quelltext liegen Formulare, Karten und Daten -- wer sie
-    nicht sieht, sucht sie im Dateimanager."""
+    nicht sieht, sucht sie im Dateimanager. Ein Formular oeffnet seit Stand
+    31 den Form-Designer in Drachenhauch, nicht sein JSON im Reiter."""
     quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
     form = tmp_path / "b_maske.dhform"
     form.write_text('{\n "title": "F"\n}\n', encoding="utf-8")
     ev = _klick_mit(40, 60, _baum_y(1))          # der zweite Eintrag
     log = _ide(tmp_path, quelle, frames=160, events=ev)
+    assert "werkzeug 197_form_designer.dh b_maske.dhform" in log, log
     geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
-    assert any(z.endswith("b_maske.dhform") for z in geoeffnet), log
+    assert not any(z.endswith("b_maske.dhform") for z in geoeffnet), log
     # Eine .dhform ist kein Drachenhauch -- der Uebersetzer bleibt aussen vor.
     assert not any(z.startswith("geprueft ") and not z.endswith(" 0") for z in log), log
+
+
+def test_ein_formular_laesst_sich_auch_als_text_oeffnen(tmp_path):
+    """Wer doch ins JSON will (Handlernamen von Hand), nimmt die
+    Befehlspalette -- sie oeffnet das zuletzt gewaehlte Formular als Text."""
+    quelle = _datei(tmp_path, "PRINT 1\n", "a_spiel.dh")
+    form = tmp_path / "b_maske.dhform"
+    form.write_text('{\n "title": "F"\n}\n', encoding="utf-8")
+    ev = _klick_mit(40, 60, _baum_y(1))
+    ev += _palette(100, "Formular als Text")
+    log = _ide(tmp_path, quelle, frames=220, events=ev, zwischenablage="Formular als Text")
+    geoeffnet = [z for z in log if z.startswith("geoeffnet ")]
+    assert any(z.endswith("b_maske.dhform") for z in geoeffnet), log
 
 
 def test_das_pruefen_nennt_die_fehler(tmp_path):

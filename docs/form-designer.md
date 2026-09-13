@@ -226,9 +226,11 @@ anschließendes Speichern die Projektdatei überschrieben).
 
 Seit 2026-09-06 gibt es den Designer auch **in Drachenhauch selbst** (Weg B
 aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der erste der vier
-Editoren ohne Piloten). 860 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
-1 536 Modell), Faktor 0,17 — mit demselben Vorbehalt wie bei allen
-Piloten: der Faktor misst, wie viel weggelassen ist (siehe unten).
+Editoren ohne Piloten). 1 329 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
+1 536 Modell), Faktor 0,26 (beim ersten Stand 860 Zeilen, 0,17; seit Stand
+31 mit Feldern je Art und GB-Code) — mit demselben Vorbehalt wie bei allen
+Piloten: der Faktor misst, wie viel weggelassen ist (siehe unten). Die
+Qt-Fassung wird nicht mehr erweitert; Python soll ganz wegfallen.
 
 ```
 dhrt run examples/197_form_designer.dh [-- formular.dhform]
@@ -251,17 +253,43 @@ unverändert mit durch. Geprüft gegen den **fremden Leser**: der Test
 sichert mit Strg+S und liest die Datei mit `FormDoc.load`, dem Modell des
 Qt-Designers.
 
-Kann: Palette aller 25 Arten (anklicken, dann auf die Form klicken), Ziehen,
-acht Griffe, Raster 8 px, Entf, Strg+D, Pfeile, Nach vorn/hinten, Strg+Z/Y,
-Inspektor (Name, Lage, Text, Tooltip, Anker, `on_click`/`on_change`/
-`on_enter`, aktiviert; ohne Auswahl: Titel, Größe, größenveränderbar,
-Thema), F5 erzeugt `<name>_lauf.dh` mit denselben Handler-Rümpfen wie
-`generate_runner` und startet es. Aus der IDE in Drachenhauch: Menü
-Werkzeuge.
+Kann: Palette aller 30 Arten der Laufzeit und dazu das **Gitter** (eine
+Tabelle im Zellmodus, alle Spalten bearbeitbar), anklicken, dann auf die
+Form klicken; Ziehen, acht Griffe, Raster 8 px, Entf, Strg+D, Pfeile, Nach
+vorn/hinten, Strg+Z/Y, Inspektor (Name, Lage, Text, Tooltip, Anker,
+`on_click`/`on_change`/`on_enter`, aktiviert; ohne Auswahl: Titel, Größe,
+größenveränderbar, Thema), F5 erzeugt `<name>_lauf.dh` mit denselben
+Handler-Rümpfen wie `generate_runner` und startet es. Aus der IDE in
+Drachenhauch: Menü Werkzeuge — und seit Stand 31 **öffnet ein Klick auf eine
+`.dhform` im Projektbaum den Designer** mit dieser Datei.
+
+**Felder je Art** (seit Stand 31, sichtbar nur bei der passenden Art; Listen
+mit Semikolon, weil ein Komma zu oft in einem Eintrag selbst steht):
+
+| Art | Felder |
+|---|---|
+| Klappliste, Liste | Einträge (`Rot; Grün; Blau`) |
+| Tabelle, Gitter | Spalten, Breiten, Bearbeitbar (`0; 2` oder `alle`), Spaltenarten (`text; ganz; zahl; auswahl`), Auswahl (`2 = Rot\|Grün`), Kästchen Zellmodus |
+| Regler, Fortschritt, Zahlenfeld, Drehknopf | Min, Max, Wert |
+
+Eine Spalte mit Auswahlliste wird dabei **zur Auswahlspalte**, auch wenn es
+unter Spaltenarten nicht steht — beim Laden wirkte die Liste sonst nicht.
+
+**GB-Code** (Strg+G, seit Stand 31): `<name>_code.dh` baut das Formular
+Aufruf für Aufruf — Konstruktor je Control, Kopf, Breiten, Zellmodus,
+bearbeitbare Spalten, Spaltenarten und Auswahllisten der Tabelle, Datum und
+Uhrzeit, gesperrt, Anker, Tooltip und die Handler samt Rümpfen aus `code`;
+ohne `GUI_LOAD` und ohne die `.dhform` zur Laufzeit. Die Konstruktoren, die
+sich selbst messen (Beschriftung, Kästchen, Regler …), bekommen ein
+`GUI_SET_BOUNDS` hinterher, sonst ginge die Größe aus dem Designer verloren.
+Übersprungen wird nur das Bild (die `.dhform` kennt keine Bildquelle); Menüs
+baut der Code nicht nach und sagt es in einem Kommentar. Der Test legt ein
+Formular mit **jeder** Art an und prüft den erzeugten Code mit `dhrt --check`
+und einem Lauf.
 
 Noch nicht: Mehrfachauswahl und Ausrichten, Layout-/Panel-Zuordnung,
 Regeln und Bindung im Inspektor, Menü-Editor, Code-Editor für Handler
-(der Rumpf steht im `code`-Feld und wird durchgereicht), GB-Code-Export,
+(der Rumpf steht im `code`-Feld und wird durchgereicht),
 Mehrformular-Projekte. Zwei Fallen beim Bau: eine Liste meldet kein
 `GUI_CLICKED` (die Auswahl ist das Ereignis), und ein neu gebautes Fenster
 nimmt den Fokus — Kürzel gelten im Fenster mit Fokus, ohne Zurückgeben

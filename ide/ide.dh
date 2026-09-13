@@ -1739,9 +1739,21 @@ SUB tabOeffnen(pfad AS STRING, inhalt AS STRING)
     protokoll("geoeffnet " + pfad)
 END SUB
 
+' Eine .dhform oeffnet seit Stand 31 den Form-Designer in Drachenhauch
+' (examples/197_form_designer.dh) -- als Text nur auf ausdruecklichen Wunsch
+' (Befehlspalette), weil man ein Formular sonst im JSON statt am Bild baut.
+DIM letzteForm AS STRING : letzteForm = ""
+DIM formAlsText AS BOOLEAN : formAlsText = FALSE
+
 SUB dateiOeffnen(pfad AS STRING)
     IF NOT FILEEXISTS(pfad) THEN
         GUI_SET_TEXT(lblStatus, "Gibt es nicht: " + pfad)
+        RETURN
+    END IF
+    IF LOWER$(RIGHT$(pfad, 7)) = ".dhform" AND NOT formAlsText THEN
+        letzteForm = pfad
+        werkzeugMit("197_form_designer.dh", pfad)
+        GUI_SET_TEXT(lblStatus, "Im Form-Designer geoeffnet: " + BASENAME(pfad) + " -- als Text: Befehlspalette, 'Formular als Text oeffnen'")
         RETURN
     END IF
     ' Was der Editor nicht bearbeiten kann, gibt er ans System weiter --
@@ -6821,15 +6833,36 @@ END SUB
 
 ' --- Werkzeuge: die Begleit-Editoren in Drachenhauch --------------------
 SUB werkzeugStarten(datei AS STRING)
+    werkzeugMit(datei, "")
+END SUB
+
+' Ein Werkzeug mit einer Datei starten (`dhrt run werkzeug -- datei`).
+SUB werkzeugMit(datei AS STRING, arg AS STRING)
     DIM pfad AS STRING : pfad = PATHJOIN(beispielOrdner, datei)
     IF NOT FILEEXISTS(pfad) THEN
         GUI_SET_TEXT(lblStatus, "Nicht gefunden: " + pfad)
         protokoll("werkzeug fehlt " + datei)
         RETURN
     END IF
-    ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
-    GUI_SET_TEXT(lblStatus, "Gestartet: " + datei)
-    protokoll("werkzeug " + datei)
+    IF arg = "" THEN
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad))
+        GUI_SET_TEXT(lblStatus, "Gestartet: " + datei)
+        protokoll("werkzeug " + datei)
+    ELSE
+        ARRAY_PUSH(werkzeuge, PROCESS_START("dhrt", "run", pfad, "--", arg))
+        protokoll("werkzeug " + datei + " " + BASENAME(arg))
+    END IF
+END SUB
+
+' Befehlspalette: das zuletzt im Designer geoeffnete Formular als Text.
+SUB formularAlsText()
+    IF letzteForm = "" THEN
+        GUI_SET_TEXT(lblStatus, "Noch kein Formular geoeffnet -- erst eine .dhform im Projektbaum waehlen.")
+        RETURN
+    END IF
+    formAlsText = TRUE
+    dateiOeffnen(letzteForm)
+    formAlsText = FALSE
 END SUB
 
 SUB werkzeugeAufraeumen()
@@ -6933,6 +6966,7 @@ paletteEintrag("Schrift groesser", "groesser", "") : paletteEintrag("Schrift kle
 paletteEintrag("Ueber ...", "ueber", "") : paletteEintrag("Beenden", "beenden", "Strg+Q")
 paletteEintrag("Handbuch: gesetzt oder Quelltext", "hb_ansicht", "")
 paletteEintrag("Handbuch", "handbuch", "F1") : paletteEintrag("Tastenkuerzel", "kuerzel", "Strg+F1")
+paletteEintrag("Formular als Text oeffnen", "form_text", "")
 paletteEintrag("Listing drucken ...", "drucken", "Strg+P")
 paletteEintrag("Listing als PDF neben die Quelle", "pdf", "")
 paletteEintrag("Werkzeug: SFX-Generator", "wz_sfx", "") : paletteEintrag("Werkzeug: Partikel-Editor", "wz_partikel", "")
@@ -7236,6 +7270,7 @@ SUB befehl(k AS STRING)
         CASE "wz_sprite" : werkzeugStarten("189_sprite_editor.dh")
         CASE "wz_tracker" : werkzeugStarten("190_tracker.dh")
         CASE "wz_form" : werkzeugStarten("197_form_designer.dh")
+        CASE "form_text" : formularAlsText()
         CASE "wz_anim" : werkzeugStarten("198_anim_fsm_editor.dh")
         CASE "wz_noten" : werkzeugStarten("199_notenblatt.dh")
         CASE "beispiele" : beispieleOeffnen()

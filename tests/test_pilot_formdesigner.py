@@ -38,6 +38,7 @@ pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nic
 KEY_UP, KEY_DOWN = 1, 2
 MOUSE_BUTTON_UP, MOUSE_BUTTON_DOWN, MOUSE_POSITION = 5, 6, 7
 RL_F5, RL_LCTRL, RL_S, RL_Z, RL_DELETE = 294, 341, 83, 90, 261
+RL_V = 86
 
 # Lagen aus dem Quelltext des Designers: Palette links (Menueleiste 26 px,
 # Liste ab Inhalts-y 56, Zeilen 22 px), die Form ab (PAL_B + 40, 60).
@@ -68,7 +69,9 @@ def _taste(frame, code, *halten):
     return ev
 
 
-def _designer(tmp_path, form, frames, events):
+def _designer(tmp_path, form, frames, events, zwischenablage=None, fest=False):
+    """`fest`: ohne WINDOW_MAXIMIZE, damit der Inspektor bei einer festen
+    Lage steht (SCREEN 1280 breit, Inspektor ab 1280 - INSP_B)."""
     log = tmp_path / "fd.log"
     ev = sorted(events, key=lambda e: e[0])
     zeilen = ["# Test-Aufnahme", f"c {len(ev)}"]
@@ -76,8 +79,12 @@ def _designer(tmp_path, form, frames, events):
         p = (list(params) + [0, 0, 0, 0])[:4]
         zeilen.append(f"e {frame} {typ} {p[0]} {p[1]} {p[2]} {p[3]} // Event: test")
     (tmp_path / "ev.txt").write_text("\n".join(zeilen) + "\n", encoding="utf-8")
-    text = DESIGNER.read_text(encoding="utf-8").replace(
-        'SETFPS(60)\n', 'SETFPS(60)\nAUTOMATION_PLAY("' + (tmp_path / "ev.txt").as_posix() + '")\n', 1)
+    einschub = 'SETFPS(60)\nAUTOMATION_PLAY("' + (tmp_path / "ev.txt").as_posix() + '")\n'
+    if zwischenablage is not None:
+        einschub += 'CLIPBOARD_SET("' + zwischenablage + '")\n'
+    text = DESIGNER.read_text(encoding="utf-8").replace('SETFPS(60)\n', einschub, 1)
+    if fest:
+        text = text.replace("WINDOW_MAXIMIZE()\n", "", 1)
     (tmp_path / "_fd").mkdir(exist_ok=True)
     quelle = tmp_path / "_fd" / "designer_test.dh"
     quelle.write_text(text, encoding="utf-8")
@@ -163,6 +170,118 @@ def test_bestehende_form_bleibt_vollstaendig(tmp_path):
     assert nachher["code"] == {"on_save": 'PRINT "gesichert"'}
     assert nachher["menus"][0]["label"] == "Datei"
     assert [w["kind"] for w in nachher["widgets"]] == [w["kind"] for w in d["widgets"]]
+
+
+# ---------------------------------------------------------------- Stand 31
+
+INSP_X = 1280 - 330          # Inspektor bei festem Fenster (fest=True)
+RL_G = 71
+
+
+def _insp_zeile(zeile):
+    """Mitte eines Inspektor-Eingabefelds in Zeile `zeile` (y = 36 + zeile*34)."""
+    return INSP_X + 180, 36 + zeile * 34 + 13
+
+
+def test_palette_kennt_jede_art_der_laufzeit():
+    """Der Designer in Drachenhauch bot 25 Arten an, die Laufzeit kann 30 --
+    dieselbe Drift, die der Qt-Designer 2026-08-31 hatte. Gemessen wird gegen
+    `Kind::from_str` in gui.rs."""
+    import re
+    gui = (_ROOT / "rust" / "drachenhauch_runtime" / "src" / "gui.rs").read_text(encoding="utf-8")
+    block = gui[gui.index("fn from_str(s: &str) -> Option<Kind>"):]
+    block = block[:block.index("_ => return None")]
+    arten = set(re.findall(r'"(\w+)" => Kind::', block))
+    palette = set(re.findall(r'^palette\("(\w+)"', DESIGNER.read_text(encoding="utf-8"), re.M))
+    assert len(arten) == 30, arten
+    assert arten <= palette, arten - palette
+    assert "grid" in palette
+
+
+def test_gb_code_baut_jedes_control_ohne_gui_load(tmp_path):
+    """Strg+G schreibt <name>_code.dh: jedes Control als eigener Aufruf. Die
+    Probe ist die Uebersetzung UND ein Lauf -- eine Signatur, die nicht
+    passt, faellt erst dort auf. Ein Formular mit JEDER Art der Laufzeit."""
+    import json
+    import re
+    gui = (_ROOT / "rust" / "drachenhauch_runtime" / "src" / "gui.rs").read_text(encoding="utf-8")
+    block = gui[gui.index("fn from_str(s: &str) -> Option<Kind>"):]
+    arten = sorted(set(re.findall(r'"(\w+)" => Kind::', block[:block.index("_ => return None")])))
+    widgets = []
+    for n, art in enumerate(arten):
+        w = {"kind": art, "name": f"{art}1", "x": 8 + (n % 5) * 90, "y": 8 + (n // 5) * 60, "w": 80, "h": 50}
+        if art == "button":
+            w.update(text="Los", on_click="klick", tooltip='sagt "hallo"')
+        if art == "richtext":
+            w["text"] = "# Titel\n\nZeile"
+        if art == "table":
+            w["table"] = {"headers": ["A", "B", "C"], "col_widths": [30, 30, 30], "zellmodus": True,
+                          "col_edit": [True, False, True], "col_type": ["text", "ganz", "auswahl"],
+                          "col_choices": [[], [], ["Rot", "Gruen"]]}
+        if art in ("dropdown", "listbox"):
+            w["items"] = ["eins", "zwei"]
+        widgets.append(w)
+    form = tmp_path / "alles.dhform"
+    form.write_text(json.dumps({"title": "Alles", "x": 0, "y": 0, "w": 480, "h": 400,
+                                "code": {"klick": 'PRINT "geklickt"'}, "widgets": widgets}),
+                    encoding="utf-8")
+    log = _designer(tmp_path, form, 80, _taste(20, RL_G, RL_LCTRL))
+    assert any(z.startswith("gbcode ") for z in log), log
+    code = tmp_path / "alles_code.dh"
+    text = code.read_text(encoding="utf-8")
+    assert "GUI_LOAD(" not in text, text
+    assert 'GUI_TABLE_SET(table1, "zellmodus", 1)' in text, text
+    assert 'GUI_TABLE_COL_CHOICES(table1, 2, ["Rot", "Gruen"])' in text, text
+    assert "GUI_ON_CLICK(button1, klick)" in text and 'PRINT "geklickt"' in text, text
+    assert "image1' uebersprungen" in text, text
+    r = subprocess.run([str(_DHRT), "--check", str(code)], capture_output=True, text=True,
+                       encoding="utf-8", timeout=120)
+    assert r.stdout.strip() == "[]", (r.stdout, text)
+    r = subprocess.run([str(_DHRT), "run", str(code)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=120,
+                       env=dict(os.environ, DHRT_FRAMES="3"), cwd=str(tmp_path))
+    assert r.returncode == 0, (r.stdout, r.stderr)
+
+
+def test_inspektor_schreibt_spalten_und_zellmodus(tmp_path):
+    """Eine Tabelle waehlen, im Inspektor die Spalten eintragen (Strg+V),
+    das Kaestchen Zellmodus anhaken, Uebernehmen, Strg+S."""
+    import json
+    form = tmp_path / "t.dhform"
+    form.write_text(json.dumps({"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+        {"kind": "table", "name": "table1", "x": 16, "y": 16, "w": 320, "h": 140}]}), encoding="utf-8")
+    ev = _klick(20, FORM_X + 100, FORM_Y + 80)                 # Tabelle waehlen
+    ev += _klick(40, *_insp_zeile(12))                          # Feld Spalten
+    ev += _taste(50, RL_V, RL_LCTRL)
+    ev += _klick(70, INSP_X + 108, 36 + 17 * 34 + 8)            # Zellmodus
+    ev += _klick(90, INSP_X + 170, 36 + 18 * 34 + 14)           # Uebernehmen
+    ev += _taste(110, RL_S, RL_LCTRL)
+    log = _designer(tmp_path, form, 150, ev, zwischenablage="Name; Menge; Farbe", fest=True)
+    assert "uebernommen" in log, log
+    tj = json.loads(form.read_text(encoding="utf-8"))["widgets"][0]["table"]
+    assert tj["headers"] == ["Name", "Menge", "Farbe"], tj
+    assert tj.get("zellmodus") is True, tj
+
+
+def test_inspektor_laesst_die_gittereinstellungen_stehen(tmp_path):
+    """Waehlen und Uebernehmen ohne Aenderung: Bearbeitbar, Spaltenarten und
+    Auswahllisten laufen durch die Felder und kommen gleich wieder heraus."""
+    import json
+    tabelle = {"headers": ["A", "B", "C"], "col_widths": [80, 60, 90], "zellmodus": True,
+               "col_edit": [True, False, True], "col_type": ["text", "ganz", "auswahl"],
+               "col_choices": [[], [], ["Rot", "Gruen"]]}
+    form = tmp_path / "t.dhform"
+    form.write_text(json.dumps({"title": "T", "x": 0, "y": 0, "w": 480, "h": 360, "widgets": [
+        {"kind": "table", "name": "table1", "x": 16, "y": 16, "w": 320, "h": 140, "table": tabelle}]}),
+        encoding="utf-8")
+    ev = _klick(20, FORM_X + 100, FORM_Y + 80)
+    ev += _klick(40, INSP_X + 170, 36 + 18 * 34 + 14)
+    ev += _taste(60, RL_S, RL_LCTRL)
+    log = _designer(tmp_path, form, 100, ev, fest=True)
+    assert "uebernommen" in log, log
+    tj = json.loads(form.read_text(encoding="utf-8"))["widgets"][0]["table"]
+    for k, v in tabelle.items():
+        assert tj.get(k) == v, (k, tj)
 
 
 # ---------------------------------------------------------- Laufzeit-Baustein
