@@ -274,6 +274,7 @@ pub const GEDULDETE_PFADE: &[(&str, &str)] = &[
     ("tests/test_ide.py", "IDE-Tests, bis Stufe 38 (2026-09-13) nach tests/pruef/werkzeug_ide*.dhtest gezogen"),
     ("tests/test_pilot_tracker.py", "Tracker-Pilot, in Stufe 40 (2026-09-13) nach tests/pruef/werkzeug_tracker.dhtest gezogen"),
     ("tests/test_pilot_rechnungen.py", "Rechnungen-Pilot, in Stufe 41 (2026-09-13) nach tests/pruef/werkzeug_rechnungen.dhtest gezogen"),
+    ("tests/test_pilot_sprite_auswahl.py", "Sprite-Pilot, in Stufe 43 (2026-09-13) nach tests/pruef/werkzeug_sprite.dhtest gezogen"),
 ];
 
 /// Alle Dateien und Verzeichnisse des Repos (ohne target/, __pycache__,
