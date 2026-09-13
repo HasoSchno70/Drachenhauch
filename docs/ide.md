@@ -60,8 +60,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 34 | Die **IDE selbst** wird zum großen Teil ohne Python geprüft: die Bausteine (`PROCESS_*`, `CODE_*`, Textbereich) und die Fälle der Stände 1 bis 5 stehen in Prüfsammlungen; das Protokoll liest ein `--- nachher`-Programm Zeile für Zeile |
 | 35 | Auch die **Stände 6 bis 12** der IDE werden ohne Python geprüft (Einrückung, Vervollständigung, Lesezeichen, Symbolspur, Einstellungen, Schnipsel, Projektbaum, Ersetzen und Umbenennen im Projekt, Werkzeugleiste, Kacheln samt Vorschaubild, Auswahl erweitern, Herauslösen) |
 | 36 | Auch die **Stände 13 bis 25** werden ohne Python geprüft (Gerüst, Vorschau vor dem Umbau, Parameter umsortieren, hinzufügen und entfernen, Platzhalter, Aufrufer-Baum, Reiter schließen, Verschieben samt IMPORT, Umbau zurücknehmen und nachbessern, Blöcke auslassen, Formular-Handler, Dateibaum, gesetztes Handbuch, Haken im Baum) |
+| 37 | Auch die **Sonderfälle** laufen ohne Python: die Prüfsammlungen können vor dem Lauf ein Hilfsprogramm laufen lassen (`--- vorher`, etwa ein git-Repository), zwischen den Läufen eins (`--- zwischen`, etwa eine Klicklage aus dem Bildschirmfoto messen) und das Programm noch einmal starten (`--- nochmal [in ORDNER]`, Sitzung über einen Neustart). Die Hervorhebung wird im Bild gezählt; in pytest bleibt nur das PDF-Listing |
 
-## Was sie heute kann (Stand 36, 13.09.2026)
+## Was sie heute kann (Stand 37, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -282,8 +283,11 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
 Python, die Stände 6 bis 12 `tests/pruef/werkzeug_ide_6_12.dhtest`, die
-Stände 13 bis 25 `tests/pruef/werkzeug_ide_13_25.dhtest`, die Bausteine einzeln
-`tests/pruef/ide_bausteine.dhtest`.
+Stände 13 bis 25 `tests/pruef/werkzeug_ide_13_25.dhtest`, was mehrere Läufe,
+ein git-Repository oder eine Bildmessung braucht
+`tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, die Bausteine einzeln
+`tests/pruef/ide_bausteine.dhtest`. In `tests/test_ide.py` bleibt nur das
+PDF-Listing (das pdf-Modul packt seine Seiten).
 
 ## Was noch fehlt
 
