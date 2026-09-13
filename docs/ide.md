@@ -56,8 +56,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 30 | Die Tabelle der Laufzeit kann **Gitter** (`GUI_GRID`, Zellmodus: aktuelle Zelle, Bereich, Tippen bearbeitet, Strg+C/V als Tabulator-Text, Zahlen- und Auswahlspalten); das **Profil** ist ein Gitter, seine Zeilen lassen sich markieren und kopieren |
 | 31 | Eine **`.dhform` öffnet den Form-Designer in Drachenhauch** (als Text über die Befehlspalette); der Designer kennt alle 30 Arten und das Gitter, zeigt Felder je Art (Einträge, Spalten, Zellmodus, bearbeitbare Spalten, Spaltenarten, Min/Max/Wert) und schreibt **GB-Code ohne `GUI_LOAD`** (Strg+G) |
 | 32 | Die Prüfsammlungen können **vorhandene Programme** prüfen (`--- programm pfad nach MARKE`, `--- inhalt`/`--- ohne datei`) — die Tests des Form-Designers laufen **ohne Python** |
+| 33 | Auch **Anim-FSM-Editor und Notenblatt** werden ohne Python geprüft: `--- streichen` nimmt `WINDOW_MAXIMIZE()` aus der Kopie, `--- nachher` lässt ein Drachenhauch-Programm lesen, was gesichert wurde, und Platzhalter gelten auch in Beilagen |
 
-## Was sie heute kann (Stand 32, 13.09.2026)
+## Was sie heute kann (Stand 33, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|

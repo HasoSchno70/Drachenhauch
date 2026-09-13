@@ -847,8 +847,9 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                 let quelle_pfad = match &f.programm {
                     Some(p) => {
                         let orig = sammlung_dir.join(p);
-                        let text = std::fs::read_to_string(&orig)
+                        let mut text = std::fs::read_to_string(&orig)
                             .map_err(|e| format!("--- programm {}: nicht lesbar ({})", p, e))?;
+                        for s in &f.streichen { text = pruefsammlung::streichen_zeile(&text, s)?; }
                         let neu = pruefsammlung::einschieben(&text, f.nach.as_deref(), &f.quelle)?;
                         let pdir = dir.join("_programm");
                         let _ = std::fs::create_dir_all(&pdir);
@@ -862,12 +863,21 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                         dir.join("fall.dh")
                     }
                 };
-                let (s_text, f_text) = (sammlung_dir.to_string_lossy().into_owned(), dir.to_string_lossy().into_owned());
+                // Mit Schraegstrichen: Windows versteht sie, und in einer
+                // JSON-Beilage waere `C:\Programme` eine kaputte Escape-Folge.
+                let (s_text, f_text) = (sammlung_dir.to_string_lossy().replace('\\', "/"), dir.to_string_lossy().replace('\\', "/"));
                 for name in &f.verzeichnisse { let _ = std::fs::create_dir_all(dir.join(name)); }
                 for (name, inhalt) in &f.dateien {
                     let ziel = dir.join(name);
                     if let Some(eltern) = ziel.parent() { let _ = std::fs::create_dir_all(eltern); }
-                    std::fs::write(&ziel, inhalt).map_err(|e| e.to_string())?;
+                    // Platzhalter auch in Text-Beilagen -- eine Datei, die auf
+                    // ein Bild im Projekt zeigt, braucht einen absoluten Pfad.
+                    let inhalt: std::borrow::Cow<[u8]> = match std::str::from_utf8(inhalt) {
+                        Ok(t) if t.contains("{sammlung}") || t.contains("{fall}") =>
+                            std::borrow::Cow::Owned(pruefsammlung::platzhalter(t, &s_text, &f_text).into_bytes()),
+                        _ => std::borrow::Cow::Borrowed(inhalt),
+                    };
+                    std::fs::write(&ziel, &inhalt).map_err(|e| e.to_string())?;
                 }
                 let mut cmd = std::process::Command::new(&exe);
                 cmd.arg("run").arg(&quelle_pfad);
@@ -911,9 +921,31 @@ fn sammlung_laufen(exe: &std::path::Path, pfad: &std::path::Path, filter: Option
                     }
                 }
                 let o = kind.wait_with_output().map_err(|e| format!("Lauf fehlgeschlagen: {}", e))?;
-                let erg = pruefsammlung::bewerten(
-                    f, o.status.code().unwrap_or(-1),
-                    &String::from_utf8_lossy(&o.stdout), &String::from_utf8_lossy(&o.stderr), ohne_grafik);
+                let (code, out, err) = (o.status.code().unwrap_or(-1),
+                    String::from_utf8_lossy(&o.stdout).into_owned(), String::from_utf8_lossy(&o.stderr).into_owned());
+                let erg = match &f.nachher {
+                    None => pruefsammlung::bewerten(f, code, &out, &err, ohne_grafik),
+                    // `--- nachher`: das erste Programm muss nur durchlaufen
+                    // (fehlendes Fenster = uebersprungen); die Erwartungen
+                    // gelten dem zweiten, das seine Dateien liest.
+                    Some(nq) => {
+                        let nur_lauf = pruefsammlung::Fall { name: f.name.clone(), ..Default::default() };
+                        match pruefsammlung::bewerten(&nur_lauf, code, &out, &err, ohne_grafik) {
+                            pruefsammlung::Ergebnis::Ok => {
+                                std::fs::write(dir.join("nachher.dh"), nq).map_err(|e| e.to_string())?;
+                                let o2 = std::process::Command::new(&exe)
+                                    .arg("run").arg(dir.join("nachher.dh"))
+                                    .current_dir(&dir)
+                                    .stdin(std::process::Stdio::null())
+                                    .env_remove("DHRT_FRAMES").env_remove("DHRT_SCREENSHOT")
+                                    .output().map_err(|e| format!("--- nachher: Start fehlgeschlagen: {}", e))?;
+                                pruefsammlung::bewerten(f, o2.status.code().unwrap_or(-1),
+                                    &String::from_utf8_lossy(&o2.stdout), &String::from_utf8_lossy(&o2.stderr), ohne_grafik)
+                            }
+                            andere => andere,
+                        }
+                    }
+                };
                 let erg = match (&erg, &f.bild, &bild_pfad) {
                     (pruefsammlung::Ergebnis::Ok, Some(bp), Some(pfad)) => match bild_laden(pfad) {
                         Ok(bild) => match pruefsammlung::bild_pruefen(bp, &bild) {
