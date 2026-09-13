@@ -32,6 +32,7 @@ const KEY_SPACE: i64 = 32;
 const KEY_ESC: i64 = 27;
 const KEY_PAGEUP: i64 = 1073741899;
 const KEY_PAGEDOWN: i64 = 1073741902;
+const KEY_F2: i64 = 1073741883;
 const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
@@ -487,6 +488,31 @@ pub struct TableState {
     /// Zeilennummern, die das Programm sich gemerkt hat, ploetzlich auf etwas
     /// anderes. Alle Zeilenangaben nach aussen bleiben Datenzeilen.
     view: Vec<usize>,
+
+    // --- Gitter (Stufe 30) ---------------------------------------------------
+    /// Zellmodus: eine AKTUELLE ZELLE statt einer gewaehlten Zeile, Bereich
+    /// mit Umschalt, Tippen bearbeitet, Strg+C/V als Tabulator-Text. Per
+    /// Vorgabe aus -- eine Tabelle, die Zeilen zeigt, bleibt, was sie war.
+    zellmodus: bool,
+    /// Aktuelle Zelle als DATENzeile/-spalte (-1 = keine) und der Anker des
+    /// Bereichs. Der Bereich ist das Rechteck zwischen beiden in der
+    /// SICHTBAREN Reihenfolge.
+    cur_r: i32, cur_c: i32,
+    ber_r: i32, ber_c: i32,
+    /// Maus zieht gerade einen Bereich auf.
+    zell_zug: bool,
+    /// Enter unter der letzten Zeile und Einfuegen ueber das Ende hinaus
+    /// haengen Zeilen an.
+    zeilen_anhaengen: bool,
+    /// Spaltenart fuer die Eingabe: 0 Text, 1 ganze Zahl, 2 Zahl, 3 Auswahl.
+    col_typ: Vec<u8>,
+    /// Eintraege je Auswahlspalte.
+    col_wahl: Vec<Vec<String>>,
+    /// Markierter Eintrag der offenen Auswahlliste (-1 = keine offen).
+    wahl_pos: i32,
+    /// Die aktuelle Zelle soll beim naechsten Durchgang ins Bild gerollt
+    /// werden (gesetzt von Stellen, an denen die Geometrie nicht greifbar ist).
+    sicht_holen: bool,
 }
 
 impl Default for TableState {
@@ -507,6 +533,9 @@ impl Default for TableState {
             sort_col: -1, sort_desc: false, sortable: true,
             filters: vec![], filter_row: false, filter_focus: -1,
             view: vec![],
+            zellmodus: false, cur_r: -1, cur_c: -1, ber_r: -1, ber_c: -1, zell_zug: false,
+            zeilen_anhaengen: false, col_typ: vec![], col_wahl: vec![], wahl_pos: -1,
+            sicht_holen: false,
         }
     }
 }
@@ -669,6 +698,147 @@ impl TableState {
             Some(cell) if cell.align >= 0 => cell.align,
             _ => ca,
         }
+    }
+
+    // --- Gitter --------------------------------------------------------------
+
+    fn col_typ_of(&self, c: usize) -> u8 {
+        *self.col_typ.get(c).unwrap_or(&0)
+    }
+    /// Anzeige-Position der Datenspalte `c` (-1 = keine).
+    fn pos_of(&self, c: i32) -> i32 {
+        if c < 0 { return -1; }
+        self.order().iter().position(|&x| x as i32 == c).map(|p| p as i32).unwrap_or(-1)
+    }
+    /// Passt `s` in die Spalte `c`? Leer passt immer -- eine Zelle zu leeren
+    /// ist keine falsche Eingabe.
+    fn wert_ok(&self, c: usize, s: &str) -> bool {
+        let s = s.trim();
+        if s.is_empty() { return true; }
+        match self.col_typ_of(c) {
+            1 => s.parse::<i64>().is_ok(),
+            2 => s.replace(',', ".").parse::<f64>().is_ok(),
+            3 => self.col_wahl.get(c).map(|w| w.iter().any(|x| x == s)).unwrap_or(false),
+            _ => true,
+        }
+    }
+    /// Der Zellbereich als (Ansichtszeile von, bis, Position von, bis). Ein
+    /// Rechteck ist er nur in der SICHTBAREN Reihenfolge -- ueber Datenzeilen
+    /// waere er bei sortierter Tabelle ein Flickenteppich.
+    fn bereich(&self) -> Option<(usize, usize, usize, usize)> {
+        let (vc, pc) = (self.view_of(self.cur_r), self.pos_of(self.cur_c));
+        if vc < 0 || pc < 0 { return None; }
+        let (mut va, mut pa) = (self.view_of(self.ber_r), self.pos_of(self.ber_c));
+        if va < 0 || pa < 0 { va = vc; pa = pc; }
+        Some((va.min(vc) as usize, va.max(vc) as usize, pa.min(pc) as usize, pa.max(pc) as usize))
+    }
+    /// Eine Zelle als Text fuer die Zwischenablage. Tabulator und Umbruch im
+    /// Inhalt werden zu Leerzeichen -- sie sind dort die Trenner.
+    fn zell_text(&self, r: usize, c: usize) -> String {
+        let s = match self.cell(r, c) {
+            Some(x) if x.kind == CellKind::Check => (if x.value >= 0.5 { "1" } else { "0" }).to_string(),
+            Some(x) if x.kind == CellKind::Bar => zahl_kurz(x.value),
+            Some(x) => x.text.clone(),
+            None => String::new(),
+        };
+        s.replace(['\t', '\n', '\r'], " ")
+    }
+    /// Der Bereich als Text: Zellen durch Tabulator, Zeilen durch Umbruch --
+    /// das Format, das jede Tabellenkalkulation beim Einfuegen versteht.
+    fn bereich_text(&self) -> String {
+        let (v1, v2, p1, p2) = match self.bereich() { Some(b) => b, None => return String::new() };
+        let order = self.order();
+        let mut zeilen = Vec::new();
+        for vi in v1..=v2 {
+            let r = match self.view.get(vi) { Some(&r) => r, None => continue };
+            let z: Vec<String> = (p1..=p2).map(|p| self.zell_text(r, order[p])).collect();
+            zeilen.push(z.join("\t"));
+        }
+        zeilen.join("\n")
+    }
+    /// Einen Text in eine Zelle schreiben, nach den Regeln der Spalte. Gesperrte
+    /// Spalten und unpassende Werte werden UEBERGANGEN, nicht halb geschrieben;
+    /// eine Hakenzelle nimmt 1/0/ja/nein. Liefert, ob geschrieben wurde.
+    fn zelle_schreiben(&mut self, r: usize, c: usize, s: &str) -> bool {
+        if !self.col_editable(c) || r >= self.rows.len() { return false; }
+        let kind = self.cell(r, c).map(|x| x.kind).unwrap_or(CellKind::Text);
+        match kind {
+            CellKind::Check => {
+                let v = match s.trim().to_lowercase().as_str() {
+                    "1" | "ja" | "true" | "wahr" | "x" => 1.0,
+                    "0" | "nein" | "false" | "falsch" | "" => 0.0,
+                    _ => return false,
+                };
+                if let Some(x) = self.cell_mut(r, c) { x.value = v; }
+                true
+            }
+            CellKind::Text => {
+                let s = s.trim_end_matches('\r');
+                if !self.wert_ok(c, s) { return false; }
+                let neu = if self.col_typ_of(c) == 0 { s.to_string() } else { s.trim().to_string() };
+                if let Some(x) = self.cell_mut(r, c) { x.text = neu; }
+                true
+            }
+            _ => false,
+        }
+    }
+    /// Neue leere Zeile anhaengen; liefert ihre Datenzeile.
+    fn zeile_anhaengen(&mut self) -> usize {
+        self.rows.push(Vec::new());
+        self.row_fg.push(-1);
+        self.row_bg.push(-1);
+        self.rows.len() - 1
+    }
+    /// Tabulator-Text ab der aktuellen Zelle einfuegen. Liefert die Zahl der
+    /// geschriebenen Zellen; der Bereich zeigt danach das Eingefuegte.
+    fn einfuegen_text(&mut self, text: &str) -> i64 {
+        let order = self.order();
+        if order.is_empty() { return 0; }
+        let vc = self.view_of(self.cur_r).max(0) as usize;
+        let pc = self.pos_of(self.cur_c).max(0) as usize;
+        let mut zeilen: Vec<&str> = text.split('\n').collect();
+        if zeilen.last().map(|z| z.trim_end_matches('\r').is_empty()).unwrap_or(false) { zeilen.pop(); }
+        let mut ziele: Vec<usize> = Vec::new();
+        for i in 0..zeilen.len() {
+            if let Some(&r) = self.view.get(vc + i) { ziele.push(r); }
+            else if self.zeilen_anhaengen { ziele.push(self.zeile_anhaengen()); }
+            else { break; }
+        }
+        let mut n = 0;
+        let mut breite = 1;
+        for (i, &r) in ziele.iter().enumerate() {
+            let zellen: Vec<&str> = zeilen[i].trim_end_matches('\r').split('\t').collect();
+            breite = breite.max(zellen.len());
+            for (j, s) in zellen.iter().enumerate() {
+                if let Some(&c) = order.get(pc + j) {
+                    if self.zelle_schreiben(r, c, s) { n += 1; }
+                }
+            }
+        }
+        if let (Some(&erste), Some(&letzte)) = (ziele.first(), ziele.last()) {
+            self.ber_r = erste as i32;
+            self.ber_c = order[pc] as i32;
+            self.cur_r = letzte as i32;
+            self.cur_c = order[(pc + breite - 1).min(order.len() - 1)] as i32;
+            self.selected = self.cur_r;
+        }
+        self.rebuild_view();
+        self.sicht_holen = true;
+        n
+    }
+    /// Alle bearbeitbaren Zellen des Bereichs leeren.
+    fn bereich_leeren(&mut self) -> i64 {
+        let (v1, v2, p1, p2) = match self.bereich() { Some(b) => b, None => return 0 };
+        let order = self.order();
+        let rows: Vec<usize> = (v1..=v2).filter_map(|v| self.view.get(v).copied()).collect();
+        let mut n = 0;
+        for r in rows {
+            for p in p1..=p2 {
+                if self.zelle_schreiben(r, order[p], "") { n += 1; }
+            }
+        }
+        if n > 0 { self.rebuild_view(); }
+        n
     }
 }
 
@@ -4456,6 +4626,11 @@ impl Gui {
             "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
             "feste_spalten" | "frozen" => t.frozen = n.max(0),
             "spalten_verschiebbar" | "reorderable" => t.reorderable = n != 0,
+            "zellmodus" | "cells" => {
+                t.zellmodus = n != 0;
+                if !t.zellmodus { t.ber_r = -1; t.ber_c = -1; }
+            }
+            "zeilen_anhaengen" | "append_rows" => t.zeilen_anhaengen = n != 0,
             "mehrfachauswahl" | "multi_select" => {
                 t.multi = n != 0;
                 // Beim Einschalten die bisherige Einzelauswahl uebernehmen,
@@ -4467,9 +4642,147 @@ impl Gui {
             }
             _ => return Err(format!(
                 "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, \
+zellmodus, zeilen_anhaengen", key)),
         }
         Ok(())
+    }
+
+    // --- Gitter (Stufe 30) ---------------------------------------------------
+
+    /// Eine Tabelle, die als Gitter anfaengt: Zellmodus, jede Spalte
+    /// bearbeitbar, `zeilen` leere Zeilen.
+    #[allow(clippy::too_many_arguments)]
+    pub fn grid(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32,
+                headers: Vec<String>, zeilen: i64) -> Result<i64, String> {
+        if !(0..=100_000).contains(&zeilen) {
+            return Err(format!("GUI_GRID: Zeilenzahl {} ausserhalb 0..100000", zeilen));
+        }
+        let t = self.table(win, x, y, w, h)?;
+        let n = headers.len();
+        let ts = self.tbl_mut(t, "GUI_GRID")?;
+        ts.headers = headers;
+        ts.zellmodus = true;
+        ts.col_edit = vec![true; n];
+        for _ in 0..zeilen {
+            ts.rows.push((0..n).map(|_| Cell::text(String::new())).collect());
+            ts.row_fg.push(-1);
+            ts.row_bg.push(-1);
+        }
+        ts.rebuild_view();
+        Ok(t)
+    }
+    pub fn table_current(&self, h: i64, spalte: bool) -> Result<i64, String> {
+        let t = self.tbl_ref(h, if spalte { "GUI_TABLE_CURRENT_COL" } else { "GUI_TABLE_CURRENT_ROW" })?;
+        Ok(if spalte { t.cur_c } else { t.cur_r } as i64)
+    }
+    fn zelle_pruefen(t: &TableState, r: i64, c: i64, fn_: &str) -> Result<(), String> {
+        if r < 0 || r >= t.rows.len() as i64 || c < 0 || c >= t.n_cols() as i64 {
+            return Err(format!("{}: Zelle ({}, {}) gibt es nicht -- {} Zeilen, {} Spalten",
+                               fn_, r, c, t.rows.len(), t.n_cols()));
+        }
+        Ok(())
+    }
+    pub fn table_set_current(&mut self, h: i64, r: i64, c: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SET_CURRENT")?;
+        if r == -1 && c == -1 {
+            t.cur_r = -1; t.cur_c = -1; t.ber_r = -1; t.ber_c = -1;
+            return Ok(());
+        }
+        Self::zelle_pruefen(t, r, c, "GUI_TABLE_SET_CURRENT")?;
+        t.cur_r = r as i32; t.cur_c = c as i32;
+        t.ber_r = t.cur_r; t.ber_c = t.cur_c;
+        t.selected = t.cur_r;
+        t.sicht_holen = true;
+        Ok(())
+    }
+    /// (Anker-Zeile, Anker-Spalte, Zeile, Spalte) -- alles Datenangaben.
+    pub fn table_range(&self, h: i64) -> Result<(i64, i64, i64, i64), String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_RANGE")?;
+        if t.cur_r < 0 { return Ok((-1, -1, -1, -1)); }
+        let (ar, ac) = if t.ber_r >= 0 { (t.ber_r, t.ber_c) } else { (t.cur_r, t.cur_c) };
+        Ok((ar as i64, ac as i64, t.cur_r as i64, t.cur_c as i64))
+    }
+    pub fn table_select_range(&mut self, h: i64, ar: i64, ac: i64, r: i64, c: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SELECT_RANGE")?;
+        Self::zelle_pruefen(t, ar, ac, "GUI_TABLE_SELECT_RANGE")?;
+        Self::zelle_pruefen(t, r, c, "GUI_TABLE_SELECT_RANGE")?;
+        t.ber_r = ar as i32; t.ber_c = ac as i32;
+        t.cur_r = r as i32; t.cur_c = c as i32;
+        t.selected = t.cur_r;
+        t.sicht_holen = true;
+        Ok(())
+    }
+    pub fn table_copy(&self, h: i64) -> Result<String, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_COPY$")?.bereich_text())
+    }
+    pub fn table_paste(&mut self, h: i64, text: &str) -> Result<i64, String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_PASTE")?;
+        if t.cur_r < 0 || t.view_of(t.cur_r) < 0 {
+            // Ohne aktuelle Zelle ab oben links -- auch in ein leeres Gitter.
+            t.cur_r = t.data_row(0);
+            t.cur_c = t.order().first().map(|&c| c as i32).unwrap_or(-1);
+        }
+        Ok(t.einfuegen_text(text))
+    }
+    pub fn table_col_type(&mut self, h: i64, c: i64, art: &str) -> Result<(), String> {
+        let typ = match art.to_lowercase().as_str() {
+            "text" => 0,
+            "ganz" | "ganzzahl" | "int" | "integer" => 1,
+            "zahl" | "float" | "number" => 2,
+            "auswahl" | "liste" | "choice" => 3,
+            _ => return Err(format!("GUI_TABLE_COL_TYPE: '{}' unbekannt -- text, ganz, zahl, auswahl", art)),
+        };
+        let t = self.tbl_mut(h, "GUI_TABLE_COL_TYPE")?;
+        if !(0..1000).contains(&c) { return Err(format!("GUI_TABLE_COL_TYPE: Spalte {} ausserhalb 0..999", c)); }
+        let c = c as usize;
+        if t.col_typ.len() <= c { t.col_typ.resize(c + 1, 0); }
+        t.col_typ[c] = typ;
+        Ok(())
+    }
+    pub fn table_col_choices(&mut self, h: i64, c: i64, eintraege: Vec<String>) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_COL_CHOICES")?;
+        if !(0..1000).contains(&c) { return Err(format!("GUI_TABLE_COL_CHOICES: Spalte {} ausserhalb 0..999", c)); }
+        let c = c as usize;
+        if t.col_wahl.len() <= c { t.col_wahl.resize(c + 1, Vec::new()); }
+        t.col_wahl[c] = eintraege;
+        // Eine Liste ohne Art waere wirkungslos -- sie macht die Spalte zur Auswahl.
+        if t.col_typ.len() <= c { t.col_typ.resize(c + 1, 0); }
+        t.col_typ[c] = 3;
+        Ok(())
+    }
+
+    /// Die aktuelle Zelle ins Bild rollen.
+    fn tabelle_zeigen(&mut self, wi: usize, i: usize) {
+        let gm = self.table_geom(wi, i);
+        let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
+        t.sicht_holen = false;
+        let vi = t.view_of(t.cur_r);
+        if vi >= 0 && gm.row_h > 0 {
+            let y = vi * gm.row_h;
+            if y < t.scroll_y { t.scroll_y = y; }
+            if y + gm.row_h > t.scroll_y + gm.body_h { t.scroll_y = y + gm.row_h - gm.body_h; }
+            t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y.max(0));
+        }
+        let p = t.pos_of(t.cur_c);
+        if p >= 0 && (p as usize) >= gm.frozen && (p as usize) < gm.col_widths.len() {
+            let x: i32 = gm.col_widths[..p as usize].iter().sum();
+            let w = gm.col_widths[p as usize];
+            if x - t.scroll_x < gm.frozen_w { t.scroll_x = x - gm.frozen_w; }
+            if x + w - t.scroll_x > gm.body_w { t.scroll_x = x + w - gm.body_w; }
+            t.scroll_x = t.scroll_x.clamp(0, gm.max_scroll_x.max(0));
+        }
+    }
+    /// Je Bild: Tabellen, deren aktuelle Zelle ein Aufruf ohne Geometrie
+    /// gesetzt hat, rollen sie jetzt ins Bild.
+    fn tabellen_pass(&mut self) {
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                if self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.sicht_holen).unwrap_or(false) {
+                    self.tabelle_zeigen(wi, i);
+                }
+            }
+        }
     }
     pub fn table_get_opt(&self, h: i64, key: &str) -> Result<f64, String> {
         let ms = self.scale;
@@ -4486,10 +4799,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             "feste_spalten" | "frozen" => t.frozen as f64,
             "spalten_verschiebbar" | "reorderable" => if t.reorderable { 1.0 } else { 0.0 },
             "mehrfachauswahl" | "multi_select" => if t.multi { 1.0 } else { 0.0 },
+            "zellmodus" | "cells" => if t.zellmodus { 1.0 } else { 0.0 },
+            "zeilen_anhaengen" | "append_rows" => if t.zeilen_anhaengen { 1.0 } else { 0.0 },
             "spalten" | "columns" => t.n_cols() as f64,
             _ => return Err(format!(
                 "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, spalten", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, \
+zellmodus, zeilen_anhaengen, spalten", key)),
         })
     }
 
@@ -6056,6 +6372,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // wuerde sonst beim Hovern die falsche Zeile hervorheben.
             t.hover_row = if hv >= 0 && hv < gm.n_rows as i32 { t.data_row(hv) } else { -1 };
         }
+        // Bereich mit der Maus aufziehen: die aktuelle Zelle folgt, der Anker
+        // bleibt, wo der Druck war.
+        if t.zell_zug {
+            if g.mouse_button(0) {
+                let c = Self::col_at(&gm, mx);
+                if over && t.hover_row >= 0 && c >= 0 && t.edit_row < 0 {
+                    t.cur_r = t.hover_row;
+                    t.cur_c = c;
+                    t.selected = t.cur_r;
+                }
+            } else {
+                t.zell_zug = false;
+            }
+        }
     }
 
     fn table_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
@@ -6150,6 +6480,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // Knopf in Spalte 3 nicht von einem Haken in Spalte 1 trennen.
             let hc = Self::col_at(&gm, mx);
             self.windows[wi].widgets[idx].tbl.as_mut().unwrap().hover_col = hc;
+            // Im Zellmodus setzt der Druck die aktuelle Zelle -- mit Umschalt
+            // bleibt der Anker stehen und der Bereich waechst.
+            let (_, shift) = self.tasten_mod;
+            {
+                let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+                if t.zellmodus && hc >= 0 {
+                    t.cur_r = hr;
+                    t.cur_c = hc;
+                    if !shift || t.ber_r < 0 { t.ber_r = hr; t.ber_c = hc; }
+                    t.zell_zug = true;
+                }
+            }
             // Doppelklick auf eine bearbeitbare Textzelle -> Bearbeiten.
             if self.dbl_click && hc >= 0 {
                 self.table_begin_edit(wi, idx, hr, hc);
@@ -6169,6 +6511,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let art = t.cell(r as usize, c as usize).map(|x| x.kind).unwrap_or(CellKind::Text);
         if art != CellKind::Text { return; }
         t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.clone()).unwrap_or_default();
+        // Eine Auswahlspalte bekommt statt des Eingabefelds ihre Liste; ohne
+        // Eintraege gibt es nichts zu waehlen.
+        if t.col_typ_of(c as usize) == 3 {
+            let w = t.col_wahl.get(c as usize).cloned().unwrap_or_default();
+            if w.is_empty() { t.edit_text.clear(); return; }
+            t.wahl_pos = w.iter().position(|x| *x == t.edit_text).map(|p| p as i32).unwrap_or(0);
+        }
         t.edit_caret = t.edit_text.chars().count() as i32;
         // Beim Oeffnen alles markiert -- so ersetzt das erste Tippen den
         // bisherigen Inhalt, statt ihn zu verlaengern. Genau das erwartet man,
@@ -6194,10 +6543,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             let (r, c) = (t.edit_row as usize, t.edit_col as usize);
             if uebernehmen {
                 let neu = std::mem::take(&mut t.edit_text);
-                if let Some(cell) = t.cell_mut(r, c) {
-                    if cell.text != neu { cell.text = neu; geaendert = true; }
+                // Eine Zahlenspalte laesst beim Tippen Zwischenstaende wie "-"
+                // zu; uebernommen wird nur, was wirklich passt.
+                if t.wert_ok(c, &neu) {
+                    let neu = if t.col_typ_of(c) == 0 { neu } else { neu.trim().to_string() };
+                    if let Some(cell) = t.cell_mut(r, c) {
+                        if cell.text != neu { cell.text = neu; geaendert = true; }
+                    }
                 }
             }
+            t.wahl_pos = -1;
             t.edit_row = -1;
             t.edit_col = -1;
             t.edit_text.clear();
@@ -6273,10 +6628,291 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// sonst landeten die Zeichen in einem Filterfeld, das vorher den Fokus
     /// hatte.
     fn table_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
-        let bearbeitet = self.windows[wi].widgets[i].tbl.as_ref()
-            .map(|t| t.edit_row >= 0).unwrap_or(false);
-        if bearbeitet { self.table_edit_keys(wi, i, g); }
-        else { self.table_filter_keys(wi, i, g); }
+        let (bearbeitet, wahl, filter) = self.windows[wi].widgets[i].tbl.as_ref()
+            .map(|t| (t.edit_row >= 0, t.edit_row >= 0 && t.col_typ_of(t.edit_col.max(0) as usize) == 3,
+                      t.filter_row && t.filter_focus >= 0))
+            .unwrap_or((false, false, false));
+        if wahl { self.table_wahl_keys(wi, i, g); }
+        else if bearbeitet { self.table_edit_keys(wi, i, g); }
+        else if filter { self.table_filter_keys(wi, i, g); }
+        else { self.table_nav_keys(wi, i, g); }
+    }
+
+    /// Weiterruecken nach dem Bestaetigen: `dv` Zeilen, `dp` Zellen (am
+    /// Zeilenende in die naechste Zeile). Unter der letzten Zeile haengt
+    /// `anhaengen` eine neue an, wenn die Tabelle es erlaubt.
+    fn table_schritt(&mut self, wi: usize, i: usize, dv: i32, dp: i32, anhaengen: bool) {
+        let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
+        let order = t.order();
+        let (nv, np) = (t.view.len() as i32, order.len() as i32);
+        if nv == 0 || np == 0 { return; }
+        let mut vi = t.view_of(t.cur_r).max(0);
+        let mut p = t.pos_of(t.cur_c).max(0);
+        if dp > 0 { p += 1; if p >= np { p = 0; vi += 1; } }
+        if dp < 0 { p -= 1; if p < 0 { p = np - 1; vi -= 1; } }
+        vi += dv;
+        if vi < 0 { vi = 0; p = 0; }
+        if vi >= nv {
+            if anhaengen && t.zeilen_anhaengen {
+                let r = t.zeile_anhaengen();
+                t.rebuild_view();
+                vi = t.view_of(r as i32);
+                if vi < 0 { return; }
+            } else {
+                vi = nv - 1;
+                if dp != 0 { p = np - 1; }
+            }
+        }
+        let r = t.data_row(vi);
+        t.cur_r = r;
+        t.cur_c = order[p as usize] as i32;
+        t.ber_r = t.cur_r;
+        t.ber_c = t.cur_c;
+        t.selected = r;
+        t.sicht_holen = true;
+    }
+
+    /// Tastatur der Tabelle, wenn nichts bearbeitet wird. Ohne Zellmodus
+    /// bewegen Pfeile, Bild und Pos1/Ende die gewaehlte Zeile -- das fehlte
+    /// bis Stufe 30 ganz: eine Tabelle mit Fokus nahm keine Taste an.
+    fn table_nav_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        if self.kuerzel_gefeuert { return; }
+        let gm = self.table_geom(wi, i);
+        let seite = (gm.body_h / gm.row_h.max(1)).max(1);
+        let (ctrl, shift) = (g.key_ctrl(), g.key_shift());
+        let (nv, np) = (gm.n_rows as i32, gm.n_cols as i32);
+        let zm = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.zellmodus).unwrap_or(false);
+
+        if !zm {
+            if nv == 0 { return; }
+            let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+            let vi = t.view_of(t.selected);
+            let neu = if g.key_repeat(KEY_DOWN) { vi + 1 }
+                else if g.key_repeat(KEY_UP) { if vi < 0 { 0 } else { vi - 1 } }
+                else if g.key_repeat(KEY_PAGEDOWN) { vi + seite }
+                else if g.key_repeat(KEY_PAGEUP) { (vi - seite).max(0) }
+                else if g.key_pressed(KEY_HOME) { 0 }
+                else if g.key_pressed(KEY_END) { nv - 1 }
+                else { return };
+            let neu = neu.clamp(0, nv - 1);
+            if neu == vi { return; }
+            let r = t.data_row(neu);
+            t.auswahl_setzen(r);
+            t.cur_r = r;
+            self.tabelle_zeigen(wi, i);
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+            return;
+        }
+        if np == 0 { return; }
+
+        // --- Bewegen -------------------------------------------------------
+        let mut ziel: Option<(i32, i32, bool)> = None;   // (Ansichtszeile, Position, Bereich erweitern)
+        {
+            let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+            let hatte = t.view_of(t.cur_r) >= 0 && t.pos_of(t.cur_c) >= 0;
+            let vc = t.view_of(t.cur_r).max(0);
+            let pc = t.pos_of(t.cur_c).max(0);
+            if nv > 0 {
+                if ctrl && g.key_pressed(K_A) {
+                    t.ber_r = t.data_row(0);
+                    t.ber_c = gm.order[0] as i32;
+                    ziel = Some((nv - 1, np - 1, true));
+                }
+                else if g.key_repeat(KEY_DOWN) { ziel = Some((if hatte { vc + 1 } else { 0 }, pc, shift)); }
+                else if g.key_repeat(KEY_UP) { ziel = Some((vc - 1, pc, shift)); }
+                else if g.key_repeat(KEY_RIGHT) { ziel = Some((vc, if hatte { pc + 1 } else { 0 }, shift)); }
+                else if g.key_repeat(KEY_LEFT) { ziel = Some((vc, pc - 1, shift)); }
+                else if g.key_repeat(KEY_PAGEDOWN) { ziel = Some((vc + seite, pc, shift)); }
+                else if g.key_repeat(KEY_PAGEUP) { ziel = Some((vc - seite, pc, shift)); }
+                else if g.key_pressed(KEY_HOME) { ziel = Some((if ctrl { 0 } else { vc }, 0, shift)); }
+                else if g.key_pressed(KEY_END) { ziel = Some((if ctrl { nv - 1 } else { vc }, np - 1, shift)); }
+            }
+        }
+        if nv > 0 && !ctrl && g.key_repeat(KEY_TAB) {
+            let hatte = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.view_of(t.cur_r) >= 0).unwrap_or(false);
+            if hatte { self.table_schritt(wi, i, 0, if shift { -1 } else { 1 }, false); }
+            else { ziel = Some((0, 0, false)); }
+            if hatte { self.tabelle_zeigen(wi, i); return; }
+        }
+        if let Some((v, p, erweitern)) = ziel {
+            let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+            let (v, p) = (v.clamp(0, nv - 1), p.clamp(0, np - 1));
+            t.cur_r = t.data_row(v);
+            t.cur_c = gm.order[p as usize] as i32;
+            if !erweitern || t.ber_r < 0 { t.ber_r = t.cur_r; t.ber_c = t.cur_c; }
+            t.selected = t.cur_r;
+            self.tabelle_zeigen(wi, i);
+            return;
+        }
+
+        // --- Zwischenablage -------------------------------------------------
+        if ctrl && (g.key_pressed(K_C) || g.key_pressed(K_X)) {
+            let text = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.bereich_text()).unwrap_or_default();
+            if !text.is_empty() { g.clipboard_set(&text); }
+            if g.key_pressed(K_X) {
+                let n = self.windows[wi].widgets[i].tbl.as_mut().map(|t| t.bereich_leeren()).unwrap_or(0);
+                if n > 0 { let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
+            }
+            return;
+        }
+        if ctrl && g.key_pressed(K_V) {
+            let text = g.clipboard_get();
+            let n = {
+                let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+                if t.view_of(t.cur_r) < 0 {
+                    t.cur_r = t.data_row(0);
+                    t.cur_c = gm.order[0] as i32;
+                }
+                t.einfuegen_text(&text)
+            };
+            if n > 0 { let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
+            return;
+        }
+        if nv == 0 { return; }
+
+        // --- Zelle bearbeiten, leeren, Haken kippen ---------------------------
+        let (r, c, art, darf, typ) = {
+            let t = self.windows[wi].widgets[i].tbl.as_ref().unwrap();
+            if t.view_of(t.cur_r) < 0 || t.cur_c < 0 { return; }
+            let (r, c) = (t.cur_r as usize, t.cur_c as usize);
+            (r, c, t.cell(r, c).map(|x| x.kind).unwrap_or(CellKind::Text), t.col_editable(c), t.col_typ_of(c))
+        };
+        if g.key_pressed(KEY_ENTER) || g.key_pressed(KEY_F2) {
+            if darf && art == CellKind::Text { self.table_begin_edit(wi, i, r as i32, c as i32); }
+            else if g.key_pressed(KEY_ENTER) { self.table_schritt(wi, i, 1, 0, false); self.tabelle_zeigen(wi, i); }
+            return;
+        }
+        if g.key_pressed(KEY_DELETE) || g.key_pressed(KEY_BACKSPACE) {
+            let n = self.windows[wi].widgets[i].tbl.as_mut().map(|t| t.bereich_leeren()).unwrap_or(0);
+            if n > 0 { let f = self.windows[wi].widgets[i].on_change.clone(); if let Some(f) = f { self.pending.push(f); } }
+            return;
+        }
+        if art == CellKind::Check && g.key_pressed(KEY_SPACE) {
+            let _ = g.pop_text_input();
+            {
+                let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+                if let Some(x) = t.cell_mut(r, c) { x.value = if x.value >= 0.5 { 0.0 } else { 1.0 }; }
+            }
+            let f = self.windows[wi].widgets[i].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+            return;
+        }
+        // Tippen beginnt die Bearbeitung und ERSETZT den Inhalt -- wie in jeder
+        // Tabellenkalkulation. Die Wiedergabe einer Aufnahme fuellt nur Tasten,
+        // darum ersatzweise Buchstaben und Ziffern von dort.
+        let mut s = g.pop_text_input();
+        s.retain(|ch| !ch.is_control());
+        if s.is_empty() && !ctrl {
+            for k in (b'a'..=b'z').chain(b'0'..=b'9').chain([b'-', b',', b'.']) {
+                if g.key_pressed(k as i64) { s.push(k as char); }
+            }
+        }
+        if s.is_empty() || ctrl || !darf || art != CellKind::Text { return; }
+        if typ == 3 {
+            self.table_begin_edit(wi, i, r as i32, c as i32);
+            self.table_wahl_springen(wi, i, &s);
+            return;
+        }
+        if (typ == 1 || typ == 2) && !zahl_erlaubt(&s, typ) { return; }
+        self.table_begin_edit(wi, i, r as i32, c as i32);
+        if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
+            if t.edit_row >= 0 {
+                t.edit_text = s;
+                t.edit_caret = t.edit_text.chars().count() as i32;
+                t.edit_anchor = t.edit_caret;
+                t.edit_maus_sperre = false;
+            }
+        }
+    }
+
+    /// In der offenen Auswahlliste zum naechsten Eintrag mit diesem Anfang.
+    fn table_wahl_springen(&mut self, wi: usize, i: usize, s: &str) {
+        let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
+        if t.edit_row < 0 { return; }
+        let w = t.col_wahl.get(t.edit_col as usize).cloned().unwrap_or_default();
+        let n = w.len();
+        let ch = match s.chars().next() { Some(c) => c.to_lowercase().to_string(), None => return };
+        if n == 0 { return; }
+        let ab = (t.wahl_pos.max(0) as usize + 1) % n;
+        if let Some(k) = (0..n).map(|d| (ab + d) % n).find(|&k| w[k].to_lowercase().starts_with(&ch)) {
+            t.wahl_pos = k as i32;
+            t.edit_text = w[k].clone();
+        }
+    }
+
+    /// Tasten der offenen Auswahlliste.
+    fn table_wahl_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let (ctrl, shift) = (g.key_ctrl(), g.key_shift());
+        let (zm, w) = {
+            let t = match self.windows[wi].widgets[i].tbl.as_ref() { Some(t) => t, None => return };
+            (t.zellmodus, t.col_wahl.get(t.edit_col.max(0) as usize).cloned().unwrap_or_default())
+        };
+        let n = w.len() as i32;
+        if n == 0 || g.key_pressed(KEY_ESC) { self.table_end_edit(wi, i, false); return; }
+        {
+            let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
+            let mut pos = t.wahl_pos.clamp(0, n - 1);
+            if g.key_repeat(KEY_DOWN) { pos = (pos + 1).min(n - 1); }
+            if g.key_repeat(KEY_UP) { pos = (pos - 1).max(0); }
+            if g.key_pressed(KEY_HOME) { pos = 0; }
+            if g.key_pressed(KEY_END) { pos = n - 1; }
+            t.wahl_pos = pos;
+            t.edit_text = w[pos as usize].clone();
+        }
+        let mut s = g.pop_text_input();
+        s.retain(|ch| !ch.is_control() && ch != ' ');
+        if s.is_empty() && !ctrl {
+            for k in (b'a'..=b'z').chain(b'0'..=b'9') {
+                if g.key_pressed(k as i64) { s.push(k as char); }
+            }
+        }
+        if !s.is_empty() { self.table_wahl_springen(wi, i, &s); }
+        let enter = g.key_pressed(KEY_ENTER);
+        let tab = zm && !ctrl && g.key_pressed(KEY_TAB);
+        if enter || tab {
+            self.table_end_edit(wi, i, true);
+            if zm {
+                if enter { self.table_schritt(wi, i, 1, 0, true); }
+                else { self.table_schritt(wi, i, 0, if shift { -1 } else { 1 }, false); }
+            }
+        }
+    }
+
+    /// Rechteck der offenen Auswahlliste unter der Zelle: (x, y, b, h, erster
+    /// gezeigter Eintrag, gezeigte Zeilen, Zeilenhoehe). EINE Quelle fuer
+    /// Zeichnen und Klick.
+    fn wahl_geom(&self, wi: usize, i: usize) -> Option<(i32, i32, i32, i32, usize, usize, i32)> {
+        let t = self.windows.get(wi)?.widgets.get(i)?.tbl.as_ref()?;
+        if t.edit_row < 0 || t.col_typ_of(t.edit_col.max(0) as usize) != 3 { return None; }
+        let w = t.col_wahl.get(t.edit_col as usize)?;
+        if w.is_empty() { return None; }
+        let (x, y, cw, ch) = self.edit_cell_rect(wi, i)?;
+        let zh = ch.max(self.sk(18));
+        let zeigen = w.len().min(8);
+        let erster = (t.wahl_pos.max(0) as usize + 1).saturating_sub(zeigen).min(w.len() - zeigen);
+        Some((x, y + ch, cw.max(self.sk(90)), zh * zeigen as i32 + 2, erster, zeigen, zh))
+    }
+
+    fn draw_wahl_popup(&self, g: &mut Graphics, wi: usize, i: usize) {
+        let (px, py, pw, ph, erster, zeigen, zh) = match self.wahl_geom(wi, i) { Some(x) => x, None => return };
+        let wdg = &self.windows[wi].widgets[i];
+        let t = wdg.tbl.as_ref().unwrap();
+        let w = &t.col_wahl[t.edit_col as usize];
+        let acc = self.th("accent");
+        g.box_fill(px + 3, py + 3, px + pw + 2, py + ph + 2, 0x40i64 << 24);
+        g.box_fill(px, py, px + pw - 1, py + ph - 1, self.th("widget_bg"));
+        g.rect(px, py, px + pw - 1, py + ph - 1, self.th("widget_border"));
+        let schrift = self.wsize(g, wdg);
+        for k in 0..zeigen {
+            let idx = erster + k;
+            let y = py + 1 + k as i32 * zh;
+            if idx as i32 == t.wahl_pos {
+                g.box_fill(px + 1, y, px + pw - 2, y + zh - 1, (150i64 << 24) | (shade(acc, -110) & 0xFFFFFF));
+            }
+            self.wtext(g, wdg, px + self.sk(TBL_PADDING), y + (zh - schrift).max(0) / 2,
+                       w[idx].clone(), self.th("text_fg"));
+        }
     }
 
     /// Tippen in die Zelle, die gerade bearbeitet wird.
@@ -6309,8 +6945,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let shift = g.key_shift();
         // Enter/ESC zuerst -- danach ist die Bearbeitung vorbei und alles
         // Weitere waere Arbeit an einem Zustand, den es nicht mehr gibt.
-        if g.key_pressed(KEY_ENTER) { self.table_end_edit(wi, i, true); return; }
+        // Im Zellmodus rueckt Enter eine Zeile tiefer und Tab eine Zelle
+        // weiter, wie in jeder Tabellenkalkulation.
+        let (zm, typ) = self.windows[wi].widgets[i].tbl.as_ref()
+            .map(|t| (t.zellmodus, t.col_typ_of(t.edit_col.max(0) as usize))).unwrap_or((false, 0));
+        if g.key_pressed(KEY_ENTER) {
+            self.table_end_edit(wi, i, true);
+            if zm { self.table_schritt(wi, i, 1, 0, true); }
+            return;
+        }
         if g.key_pressed(27) { self.table_end_edit(wi, i, false); return; }
+        if zm && !ctrl && g.key_pressed(KEY_TAB) {
+            self.table_end_edit(wi, i, true);
+            self.table_schritt(wi, i, 0, if shift { -1 } else { 1 }, false);
+            return;
+        }
 
         let rect = self.edit_cell_rect(wi, i);
         let (rx, rw) = rect.map(|(x, _, w, _)| (x, w)).unwrap_or((0, 0));
@@ -6345,8 +6994,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
 
+        let (alt, alt_caret, alt_anchor) = (chars.clone(), caret, anchor);
         Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift,
                                self.kuerzel_gefeuert);
+        // Zahlenspalten nehmen nur, was eine Zahl werden kann -- dieselbe
+        // Regel wie im Textfeld mit `zahlen`.
+        if (typ == 1 || typ == 2) && !zahl_erlaubt(&chars.iter().collect::<String>(), typ) {
+            chars = alt; caret = alt_caret; anchor = alt_anchor;
+        }
 
         // Versatz nachfuehren, damit die Schreibmarke im Feld bleibt.
         let vor: String = chars[..caret.clamp(0, chars.len() as i32) as usize].iter().collect();
@@ -7831,6 +8486,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if t.reorderable { tj["reorderable"] = serde_json::json!(true); }
             if t.multi { tj["multi"] = serde_json::json!(true); }
             if t.col_edit.iter().any(|&x| x) { tj["col_edit"] = serde_json::json!(t.col_edit); }
+            if t.zellmodus { tj["zellmodus"] = serde_json::json!(true); }
+            if t.zeilen_anhaengen { tj["zeilen_anhaengen"] = serde_json::json!(true); }
+            if t.col_typ.iter().any(|&x| x != 0) {
+                let namen: Vec<&str> = t.col_typ.iter()
+                    .map(|&x| match x { 1 => "ganz", 2 => "zahl", 3 => "auswahl", _ => "text" }).collect();
+                tj["col_type"] = serde_json::json!(namen);
+            }
+            if t.col_wahl.iter().any(|w| !w.is_empty()) { tj["col_choices"] = serde_json::json!(t.col_wahl); }
             if t.row_fg.iter().any(|&x| x >= 0) { tj["row_fg"] = serde_json::json!(t.row_fg); }
             if t.row_bg.iter().any(|&x| x >= 0) { tj["row_bg"] = serde_json::json!(t.row_bg); }
             o["table"] = tj;
@@ -8113,6 +8776,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if let Some(v) = tj["multi"].as_bool() { ts.multi = v; }
                 if let Some(a) = tj["col_edit"].as_array() {
                     ts.col_edit = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect();
+                }
+                if let Some(v) = tj["zellmodus"].as_bool() { ts.zellmodus = v; }
+                if let Some(v) = tj["zeilen_anhaengen"].as_bool() { ts.zeilen_anhaengen = v; }
+                if let Some(a) = tj["col_type"].as_array() {
+                    ts.col_typ = a.iter().map(|x| match x.as_str().unwrap_or("") {
+                        "ganz" => 1, "zahl" => 2, "auswahl" => 3, _ => 0 }).collect();
+                }
+                if let Some(a) = tj["col_choices"].as_array() {
+                    ts.col_wahl = a.iter().map(|w| w.as_array().map(|w| w.iter()
+                        .filter_map(|s| s.as_str().map(String::from)).collect()).unwrap_or_default()).collect();
                 }
                 for (schluessel, ziel) in [("row_fg", true), ("row_bg", false)] {
                     if let Some(a) = tj[schluessel].as_array() {
@@ -9222,6 +9895,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             self.dbl_click = false;
         }
         self.rt_auswahl_pass(g, is_down, mx, my);
+        self.tabellen_pass();
         // Farbwaehler weiterziehen, auch ausserhalb seiner Flaeche.
         if let Some((cw, ci, _)) = self.cp_drag {
             if is_down { self.cp_zieh(cw, ci, mx, my); } else { self.cp_drag = None; }
@@ -9306,9 +9980,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // weiterschalten, sonst tut eine Taste zwei Dinge. Das gilt auch,
         // wenn es ihn nur MELDET (`tab_meldet`): gemeldet UND den Fokus
         // weiter waere derselbe Fehler.
+        // Ein Gitter im Zellmodus nimmt den Tabulator ebenfalls (Zelle weiter);
+        // hinaus kommt man mit Strg+Tab.
+        let strg = g.key_ctrl();
         let tab_belegt = self.focus_widget
             .and_then(|(w, i)| self.windows.get(w).and_then(|win| win.widgets.get(i)))
-            .map(|w| w.kind == Kind::TextArea && (w.tab_fuegt_ein || w.tab_meldet))
+            .map(|w| (w.kind == Kind::TextArea && (w.tab_fuegt_ein || w.tab_meldet))
+                || (w.kind == Kind::Table && !strg && w.tbl.as_ref().map(|t| t.zellmodus).unwrap_or(false)))
             .unwrap_or(false);
         if g.key_pressed(KEY_TAB) && !tab_belegt {
             if let Some(top) = self.focus_window {
@@ -11347,6 +12025,18 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // die Schreibmarke bzw. beginnt eine Markierung. Ohne diese Ausnahme
         // koennte man im eigenen Text nicht klicken, ohne ihn zu schliessen.
         if let Some((ew, ei)) = self.editing_table {
+            // Klick in die offene Auswahlliste waehlt den Eintrag.
+            if let Some((px, py, pw, ph, erster, _, zh)) = self.wahl_geom(ew, ei) {
+                if Self::in_rect(mx, my, (px, py, pw, ph)) {
+                    let k = erster + ((my - py - 1) / zh.max(1)).max(0) as usize;
+                    if let Some(t) = self.windows[ew].widgets[ei].tbl.as_mut() {
+                        let w = t.col_wahl.get(t.edit_col.max(0) as usize).cloned().unwrap_or_default();
+                        if k < w.len() { t.wahl_pos = k as i32; t.edit_text = w[k].clone(); }
+                    }
+                    self.table_end_edit(ew, ei, true);
+                    return;
+                }
+            }
             let drin = self.edit_cell_rect(ew, ei)
                 .map(|r| Self::in_rect(mx, my, r)).unwrap_or(false);
             if !drin { self.table_end_edit(ew, ei, true); }
@@ -12334,6 +13024,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("widget_bg"), true);
             g.round_rect(bx, by, bx + tw + pad * 2 - 1, by + th + pad - 1, rad, self.th("accent"), false);
             self.ctext(g, bx + pad, by + pad / 2, text, self.th("text_fg"));
+        }
+        // Offene Auswahlliste einer Gitterzelle -- sie reicht gern ueber den
+        // Tabellenrand hinaus.
+        if let Some((ew, ei)) = self.editing_table {
+            if self.windows.get(ew).map(|w| w.alive && w.visible).unwrap_or(false) {
+                self.draw_wahl_popup(g, ew, ei);
+            }
         }
         // Ueberlauf-Menue einer Werkzeugleiste -- ueber allen Fenstern.
         if let Some((lw, li)) = self.leiste_popup {
@@ -15247,6 +15944,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         }
 
         // Body.
+        // Zellmodus: Bereich und aktuelle Zelle statt der ganzen Zeile.
+        let ber = if t.zellmodus { t.bereich() } else { None };
+        let ber_gross = ber.map(|(v1, v2, p1, p2)| v1 != v2 || p1 != p2).unwrap_or(false);
+        let cur_p = if t.zellmodus { gm.order.iter().position(|&c| c as i32 == t.cur_c) } else { None };
+        let gefokust = self.focus_widget == Some((wi, idx));
         g.push_clip(body_x, body_y, body_w, body_h);
         let first = (t.scroll_y / gm.row_h).max(0);
         let last = ((t.scroll_y + body_h) / gm.row_h + 1).min(gm.n_rows as i32);
@@ -15281,10 +15983,22 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             // Halbdurchsichtig ueber die Zellflaechen: eine eigene Zellfarbe
             // bleibt sichtbar, die Auswahl aber auch. Alpha steckt im
             // hoechsten Byte (0xAARRGGBB).
-            if t.ist_gewaehlt(ri as i32) {
+            if let (Some((v1, v2, p1, p2)), true) = (ber, ber_gross) {
+                if (r as usize) >= v1 && (r as usize) <= v2 {
+                    for p in p1..=p2.min(gm.n_cols.saturating_sub(1)) {
+                        let (cx, cw) = (Self::col_x(&gm, p), gm.col_widths[p]);
+                        let (kx, kw) = Self::col_clip(&gm, p);
+                        g.push_clip(kx, row_y, kw, gm.row_h);
+                        g.box_fill(cx, row_y, cx + cw - 1, row_y + gm.row_h - 1,
+                                   (110i64 << 24) | (sel_bg & 0xFFFFFF));
+                        g.pop_clip();
+                    }
+                }
+            }
+            if !t.zellmodus && t.ist_gewaehlt(ri as i32) {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (150i64 << 24) | (sel_bg & 0xFFFFFF));
-            } else if ri as i32 == t.hover_row {
+            } else if ri as i32 == t.hover_row && !t.zellmodus {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (110i64 << 24) | (hover_bg & 0xFFFFFF));
             }
@@ -15308,6 +16022,20 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
             if t.grid {
                 g.line(body_x, row_y + gm.row_h - 1, body_x + body_w - 1, row_y + gm.row_h - 1, grid_c);
+            }
+            // Rahmen um die aktuelle Zelle, NACH dem Gitter -- sonst schnitte
+            // eine Gitterlinie ihn durch. Ohne Fokus gedaempft: man soll sehen,
+            // wo man war, aber nicht glauben, die Tasten kaemen hier an.
+            if let Some(p) = cur_p {
+                if ri as i32 == t.cur_r && t.edit_row < 0 {
+                    let (cx, cw) = (Self::col_x(&gm, p), gm.col_widths[p]);
+                    let (kx, kw) = Self::col_clip(&gm, p);
+                    let farbe = if gefokust { accent } else { shade(border, 30) };
+                    g.push_clip(kx, row_y, kw, gm.row_h);
+                    g.rect(cx, row_y, cx + cw - 1, row_y + gm.row_h - 1, farbe);
+                    g.rect(cx + 1, row_y + 1, cx + cw - 2, row_y + gm.row_h - 2, farbe);
+                    g.pop_clip();
+                }
             }
         }
         if gm.frozen > 0 && t.scroll_x > 0 {
@@ -15353,6 +16081,16 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         let schrift = self.wsize(g, wdg);
 
         // Wird DIESE Zelle gerade bearbeitet? Dann ein Eingabefeld statt Text.
+        if t.edit_row == r as i32 && t.edit_col == c as i32 && t.col_typ_of(c) == 3 {
+            // Auswahlspalte: der gewaehlte Eintrag und ein Pfeil -- die Liste
+            // selbst liegt in der oberen Schicht (draw_wahl_popup).
+            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3, self.th("field_bg"), accent);
+            self.wtext(g, wdg, cx + 5, cy + (ch - schrift).max(0) / 2, t.edit_text.clone(), fg_thema);
+            let (px, py) = (cx + cw - 12, cy + ch / 2);
+            g.line(px - 4, py - 2, px, py + 2, accent);
+            g.line(px, py + 2, px + 4, py - 2, accent);
+            return;
+        }
         if t.edit_row == r as i32 && t.edit_col == c as i32 {
             self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
                            self.th("field_bg"), accent);
@@ -15916,6 +16654,30 @@ mod tests {
 
     // Tabellen-Layout: 14 Zeilen ueberlaufen -> vertikale Scrollbar, korrekte
     // Body-Hoehe + Scroll-Maximum.
+    #[test]
+    fn gitter_einfuegen_und_kopieren() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 360, 250);
+        let t = g.grid(win, 0, 0, 300, 200, vec!["A".into(), "B".into()], 1).unwrap();
+        g.table_col_type(t, 1, "zahl").unwrap();
+        g.table_set_current(t, 0, 0).unwrap();
+        // Ohne Anhaengen endet das Einfuegen an der letzten Zeile.
+        assert_eq!(g.table_paste(t, "x\t1,5\ny\t2\n").unwrap(), 2);
+        assert_eq!(g.table_row_count(t).unwrap(), 1);
+        g.table_set_opt(t, "zeilen_anhaengen", 1.0).unwrap();
+        g.table_set_current(t, 0, 0).unwrap();
+        // "q" passt nicht in die Zahlenspalte und wird uebergangen.
+        assert_eq!(g.table_paste(t, "p\tq\r\nr\t2").unwrap(), 3);
+        assert_eq!(g.table_row_count(t).unwrap(), 2);
+        assert_eq!(g.table_range(t).unwrap(), (0, 0, 1, 1));
+        assert_eq!(g.table_copy(t).unwrap(), "p\t1,5\nr\t2");
+        let n = g.windows[0].widgets[0].tbl.as_mut().unwrap().bereich_leeren();
+        assert_eq!(n, 4);
+        assert_eq!(g.table_get_cell(t, 1, 1).unwrap(), "");
+        assert!(g.table_set_current(t, 5, 0).is_err());
+        assert!(g.table_col_type(t, 0, "quatsch").is_err());
+    }
+
     #[test]
     fn table_geom_overflow_needs_vscroll() {
         let mut g = Gui::new();

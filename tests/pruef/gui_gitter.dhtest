@@ -1,0 +1,223 @@
+' Gitter (Stufe 30): die Tabelle im Zellmodus -- aktuelle Zelle, Bereich,
+' Tippen bearbeitet, Enter/Tab ruecken weiter, Strg+C/V als Tabulator-Text,
+' Zahlen- und Auswahlspalten; dazu die Pfeiltasten in einer gewoehnlichen
+' Tabelle, die bis Stufe 30 gar keine Taste annahm.
+' Format: docs/werkzeuge.md, dhrt test.
+'
+' Nacheinander: die Faelle mit Tasten teilen sich die Zwischenablage.
+--- seriell
+
+=== einfuegen mit spaltenarten und anhaengen
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[3] AS STRING
+kopf[0] = "Name" : kopf[1] = "Menge" : kopf[2] = "Farbe"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf, 2)
+GUI_TABLE_COL_TYPE(gt, 1, "ganz")
+DIM farben[2] AS STRING
+farben[0] = "Rot" : farben[1] = "Gruen"
+GUI_TABLE_COL_CHOICES(gt, 2, farben)
+DIM T9 AS STRING : T9 = CHR$(9)
+DIM NL AS STRING : NL = CHR$(10)
+DIM daten AS STRING
+daten = "a" + T9 + "5" + T9 + "Rot" + NL + "b" + T9 + "x" + T9 + "Lila" + NL + "c" + T9 + "7" + T9 + "Gruen"
+GUI_TABLE_SET_CURRENT(gt, 0, 0)
+' Zeile 1: "x" ist keine ganze Zahl, "Lila" steht nicht in der Liste -- beide
+' uebergangen. Zeile 2 gibt es nicht, und Anhaengen ist aus.
+PRINT GUI_TABLE_PASTE(gt, daten) ; " " ; GUI_TABLE_ROW_COUNT(gt)
+PRINT GUI_TABLE_GET_CELL(gt, 1, 0) + "[" + GUI_TABLE_GET_CELL(gt, 1, 1) + "]"
+GUI_TABLE_SET(gt, "zeilen_anhaengen", 1)
+GUI_TABLE_SET_CURRENT(gt, 0, 0)
+PRINT GUI_TABLE_PASTE(gt, daten) ; " " ; GUI_TABLE_ROW_COUNT(gt)
+DIM ar AS INTEGER
+DIM ac AS INTEGER
+DIM zr AS INTEGER
+DIM zc AS INTEGER
+(ar, ac, zr, zc) = GUI_TABLE_RANGE(gt)
+PRINT STR$(ar) + "," + STR$(ac) + " bis " + STR$(zr) + "," + STR$(zc)
+GUI_TABLE_SELECT_RANGE(gt, 0, 0, 2, 1)
+PRINT REPLACE$(REPLACE$(GUI_TABLE_COPY$(gt), T9, "|"), NL, "/")
+PRINT GUI_TABLE_GET(gt, "zellmodus")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+4 2
+b[]
+7 3
+0,0 bis 2,2
+a|5/b|/c|7
+1.0
+
+=== unbekannte spaltenart ist ein fehler
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[1] AS STRING
+kopf[0] = "A"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf)
+GUI_TABLE_COL_TYPE(gt, 0, "datum")
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+GUI_TABLE_COL_TYPE: 'datum' unbekannt
+
+=== tippen bearbeitet und enter und tab ruecken weiter
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[3] AS STRING
+kopf[0] = "A" : kopf[1] = "B" : kopf[2] = "C"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf, 3)
+GUI_TABLE_COL_TYPE(gt, 1, "ganz")
+GUI_FOCUS(gt)
+GUI_TABLE_SET_CURRENT(gt, 0, 0)
+DIM f AS INTEGER
+FOR f = 1 TO 30
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT "[" + GUI_TABLE_GET_CELL(gt, 0, 1) + "] " + STR$(GUI_TABLE_CURRENT_ROW(gt)) + "," + STR$(GUI_TABLE_CURRENT_COL(gt))
+PRINT "[" + GUI_TABLE_GET_CELL(gt, 1, 1) + "]"
+--- datei ev.txt
+# Rechts, "5", Enter (eine Zeile tiefer), "k" in die Zahlenspalte (abgelehnt), Tab
+c 10
+e 3 2 262 0 0 0
+e 4 1 262 0 0 0
+e 6 2 53 0 0 0
+e 7 1 53 0 0 0
+e 9 2 257 0 0 0
+e 10 1 257 0 0 0
+e 12 2 75 0 0 0
+e 13 1 75 0 0 0
+e 15 2 258 0 0 0
+e 16 1 258 0 0 0
+
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+[5] 1,2
+[]
+
+=== strg a strg c und entf
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[2] AS STRING
+kopf[0] = "A" : kopf[1] = "B"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf, 2)
+GUI_TABLE_SET_CELL(gt, 0, 0, "a") : GUI_TABLE_SET_CELL(gt, 0, 1, "b")
+GUI_TABLE_SET_CELL(gt, 1, 0, "c") : GUI_TABLE_SET_CELL(gt, 1, 1, "d")
+CLIPBOARD_SET("vorher")
+GUI_FOCUS(gt)
+GUI_TABLE_SET_CURRENT(gt, 0, 0)
+DIM f AS INTEGER
+FOR f = 1 TO 26
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT REPLACE$(REPLACE$(CLIPBOARD_GET(), CHR$(9), "|"), CHR$(10), "/")
+PRINT "[" + GUI_TABLE_GET_CELL(gt, 1, 1) + "]"
+--- datei ev.txt
+# Strg+A, Strg+C, Strg los, Entf
+c 8
+e 3 2 341 0 0 0
+e 4 2 65 0 0 0
+e 5 1 65 0 0 0
+e 7 2 67 0 0 0
+e 8 1 67 0 0 0
+e 10 1 341 0 0 0
+e 13 2 261 0 0 0
+e 14 1 261 0 0 0
+
+--- umgebung
+DHRT_FRAMES=28
+--- erwartet
+a|b/c|d
+[]
+
+=== auswahlspalte mit enter pfeil enter
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[1] AS STRING
+kopf[0] = "Farbe"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(w, 10, 10, 340, 200, kopf, 2)
+DIM farben[3] AS STRING
+farben[0] = "Rot" : farben[1] = "Gruen" : farben[2] = "Blau"
+GUI_TABLE_COL_CHOICES(gt, 0, farben)
+GUI_FOCUS(gt)
+GUI_TABLE_SET_CURRENT(gt, 0, 0)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TABLE_GET_CELL(gt, 0, 0) ; " " ; GUI_TABLE_CURRENT_ROW(gt) ; " " ; GUI_TABLE_EDITING_ROW(gt)
+--- datei ev.txt
+# Enter oeffnet die Liste, Pfeil runter, Enter waehlt und rueckt weiter
+c 6
+e 3 2 257 0 0 0
+e 4 1 257 0 0 0
+e 6 2 264 0 0 0
+e 7 1 264 0 0 0
+e 9 2 257 0 0 0
+e 10 1 257 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+Gruen 1 -1
+
+=== pfeiltasten in einer gewoehnlichen tabelle
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 380, 280)
+DIM kopf[1] AS STRING
+kopf[0] = "Name"
+DIM zeilen[3, 1] AS STRING
+zeilen[0, 0] = "eins" : zeilen[1, 0] = "zwei" : zeilen[2, 0] = "drei"
+DIM tb AS GUI_WIDGET : tb = GUI_TABLE(w, 10, 10, 340, 200, kopf, zeilen)
+GUI_FOCUS(tb)
+DIM f AS INTEGER
+FOR f = 1 TO 20
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+NEXT
+PRINT GUI_TABLE_SELECTED(tb) ; " " ; GUI_TABLE_GET(tb, "zellmodus")
+--- datei ev.txt
+# Pfeil runter, runter, Ende, hoch
+c 8
+e 3 2 264 0 0 0
+e 4 1 264 0 0 0
+e 6 2 264 0 0 0
+e 7 1 264 0 0 0
+e 9 2 269 0 0 0
+e 10 1 269 0 0 0
+e 12 2 265 0 0 0
+e 13 1 265 0 0 0
+
+--- umgebung
+DHRT_FRAMES=22
+--- erwartet
+1 0.0

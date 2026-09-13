@@ -298,6 +298,7 @@ Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialo
 | `GUI_TABLE_CLICKED_COL(tbl)` | INTEGER | welche Spalte wurde angeklickt? -- fuer Zellen der Art `knopf` |
 | `GUI_TABLE_VIEW_COUNT(tbl)` | INTEGER | wie viele Zeilen sind gerade SICHTBAR? (nach Filtern) |
 | `GUI_TABLE_VIEW_ROW(tbl, i)` | INTEGER | welche **Datenzeile** steht an sichtbarer Stelle `i`? -- Sortieren und Filtern stellen die Daten nicht um |
+| `GUI_GRID(win, x, y, w, h, headers, zeilen = 0)` | GUI_WIDGET | **Gitter**: Tabelle im Zellmodus -- aktuelle Zelle, Bereich, Tippen bearbeitet, Strg+C/V als Tabulator-Text |
 
 `stil$` beschriftet die Knöpfe: `"ok"` (Vorgabe) zeigt **OK/Abbrechen**,
 `"janein"` zeigt **Ja/Nein**. Der Unterschied ist nicht kosmetisch — bei einer
@@ -1239,6 +1240,71 @@ hätte derselbe Klick die Markierung sofort wieder aufgehoben.)
 > vorher `GUI_TABLE_EDITING_ROW(tbl) < 0` ab — sonst beendet dieselbe Taste
 > das Programm, mit der man eine Eingabe zurücknehmen will (so macht es die
 > Demo).
+
+### Gitter: Zellmodus
+
+Eine Tabelle zeigt Zeilen; ein **Gitter** bearbeitet Zellen. Beides ist
+dasselbe Widget. `GUI_GRID` legt eine Tabelle an, die als Gitter anfängt
+(Zellmodus, jede Spalte bearbeitbar, leere Zeilen), und
+`GUI_TABLE_SET(tbl, "zellmodus", 1)` macht jede vorhandene Tabelle dazu —
+Sortieren, Filter, feste Spalten und Zellarten bleiben, wie sie sind.
+
+```basic
+DIM kopf[3] AS STRING
+kopf[0] = "Artikel" : kopf[1] = "Menge" : kopf[2] = "Farbe"
+DIM gt AS GUI_WIDGET : gt = GUI_GRID(win, 10, 10, 400, 240, kopf, 5)
+GUI_TABLE_COL_TYPE(gt, 1, "ganz")              ' nur ganze Zahlen
+GUI_TABLE_COL_CHOICES(gt, 2, farben)           ' Auswahlliste
+GUI_TABLE_SET(gt, "zeilen_anhaengen", 1)       ' Enter unter der letzten Zeile legt eine an
+```
+
+Bedienung wie in einer Tabellenkalkulation:
+
+| Taste | Wirkung |
+|---|---|
+| Pfeile, `Bild`, `Pos1`/`Ende` | aktuelle Zelle bewegen (`Strg+Pos1/Ende` = erste/letzte Zelle) |
+| Umschalt + Bewegung, Maus ziehen, Umschalt+Klick | Bereich aufziehen |
+| `Tab` / `Umschalt+Tab` | eine Zelle weiter / zurück, am Zeilenende in die nächste Zeile; **`Strg+Tab`** verlässt das Gitter |
+| Tippen | bearbeitet die Zelle und **ersetzt** den Inhalt |
+| `Enter` / `F2` | Zelle bearbeiten; in der Bearbeitung übernimmt `Enter` und rückt eine Zeile tiefer |
+| `Entf` / `Rücktaste` | Bereich leeren (nur bearbeitbare Zellen) |
+| `Leertaste` | Hakenzelle umschalten |
+| `Strg+A` / `Strg+C` / `Strg+X` / `Strg+V` | alles wählen / Bereich kopieren / ausschneiden / ab der Zelle einfügen |
+
+Kopiert wird **Tabulator-Text** (Zellen durch Tabulator, Zeilen durch
+Umbruch) — genau das, was jede Tabellenkalkulation beim Einfügen versteht und
+beim Kopieren liefert. Beim Einfügen gilt die Spalte: eine gesperrte Spalte
+oder ein Wert, der nicht passt (Buchstaben in einer Zahlenspalte, ein Eintrag,
+der nicht in der Auswahl steht), wird **übergangen**, nicht halb geschrieben;
+`GUI_TABLE_PASTE` sagt, wie viele Zellen es wirklich wurden.
+
+**Der Bereich ist ein Rechteck in der sichtbaren Reihenfolge** — nach dem
+Sortieren also das, was man sieht, nicht das, was in den Datenzeilen
+nebeneinander läge. Nach außen bleiben alle Angaben Datenzeilen und
+Datenspalten, wie überall bei der Tabelle.
+
+| Built-in | Rückgabe | Wirkung |
+|---|---|---|
+| `GUI_GRID(win, x, y, w, h, headers, zeilen = 0)` | GUI_WIDGET | Tabelle im Zellmodus, alle Spalten bearbeitbar |
+| `GUI_TABLE_CURRENT_ROW(tbl)` / `GUI_TABLE_CURRENT_COL(tbl)` | INTEGER | aktuelle Zelle (-1 = keine) |
+| `GUI_TABLE_SET_CURRENT(tbl, zeile, spalte)` | — | aktuelle Zelle setzen und ins Bild rollen (`-1, -1` = keine) |
+| `GUI_TABLE_RANGE(tbl)` | TUPLE | `(anker_zeile, anker_spalte, zeile, spalte)` des Bereichs |
+| `GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)` | — | Bereich setzen |
+| `GUI_TABLE_COPY$(tbl)` | STRING | Bereich als Tabulator-Text |
+| `GUI_TABLE_PASTE(tbl, text$)` | INTEGER | Tabulator-Text ab der aktuellen Zelle einfügen; Zahl der geschriebenen Zellen |
+| `GUI_TABLE_COL_TYPE(tbl, spalte, art$)` | — | `text`, `ganz`, `zahl` oder `auswahl` |
+| `GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)` | — | Einträge einer Auswahlspalte (macht sie zur Auswahl) |
+
+Eine **Zahlenspalte** nimmt beim Tippen nur, was eine Zahl werden kann
+(`-` als Zwischenstand, bei `zahl` ein Komma oder Punkt); übernommen wird nur
+eine echte Zahl. Eine **Auswahlspalte** öffnet statt des Eingabefelds ihre
+Liste unter der Zelle: Pfeile wählen, ein Buchstabe springt, `Enter` oder
+Klick übernimmt. Die Liste liegt in der oberen Schicht — über einer
+Zeichenfläche braucht sie wie ein Tooltip `GUI_DRAW_TOP()`.
+
+**Auch ohne Zellmodus** bewegen jetzt Pfeile, `Bild` und `Pos1`/`Ende` die
+gewählte Zeile, sobald die Tabelle den Fokus hat. Bis Stufe 30 nahm eine
+Tabelle mit Fokus überhaupt keine Taste an.
 
 ### Zeilennummern: Daten oder Ansicht?
 

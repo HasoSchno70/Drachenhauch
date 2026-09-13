@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1881,
+ "count": 1891,
  "builtins": [
   {
    "name": "ABS",
@@ -3441,6 +3441,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_GRID",
+   "kind": "core",
+   "signature": "GUI_GRID(win, x, y, w, h, headers, zeilen = 0) AS GUI_WIDGET",
+   "module": "gui"
+  },
+  {
    "name": "GUI_GROUPBOX",
    "kind": "core",
    "signature": "GUI_GROUPBOX(win, x, y, w, h[, titel$])",
@@ -4467,6 +4473,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_COL_CHOICES",
+   "kind": "core",
+   "signature": "GUI_TABLE_COL_CHOICES(tbl, spalte, eintraege)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_COL_EDIT",
    "kind": "module",
    "signature": "GUI_TABLE_COL_EDIT(tbl, spalte, an)",
@@ -4479,9 +4491,33 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_COL_TYPE",
+   "kind": "core",
+   "signature": "GUI_TABLE_COL_TYPE(tbl, spalte, art$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_COL_WIDTHS",
    "kind": "core",
    "signature": "GUI_TABLE_COL_WIDTHS(wdg, widths)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_COPY$",
+   "kind": "core",
+   "signature": "GUI_TABLE_COPY$(tbl) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_CURRENT_COL",
+   "kind": "core",
+   "signature": "GUI_TABLE_CURRENT_COL(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_CURRENT_ROW",
+   "kind": "core",
+   "signature": "GUI_TABLE_CURRENT_ROW(tbl) AS INTEGER",
    "module": "gui"
   },
   {
@@ -4545,6 +4581,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_PASTE",
+   "kind": "core",
+   "signature": "GUI_TABLE_PASTE(tbl, text$) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_RANGE",
+   "kind": "core",
+   "signature": "GUI_TABLE_RANGE(tbl) AS TUPLE",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_REMOVE_ROW",
    "kind": "module",
    "signature": "GUI_TABLE_REMOVE_ROW(tbl, zeile)",
@@ -4587,6 +4635,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_SELECT_RANGE",
+   "kind": "core",
+   "signature": "GUI_TABLE_SELECT_RANGE(tbl, anker_zeile, anker_spalte, zeile, spalte)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_SEL_COUNT",
    "kind": "module",
    "signature": "GUI_TABLE_SEL_COUNT(tbl) AS INTEGER",
@@ -4608,6 +4662,12 @@
    "name": "GUI_TABLE_SET_CELL",
    "kind": "module",
    "signature": "GUI_TABLE_SET_CELL(tbl, zeile, spalte, text$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SET_CURRENT",
+   "kind": "core",
+   "signature": "GUI_TABLE_SET_CURRENT(tbl, zeile, spalte)",
    "module": "gui"
   },
   {

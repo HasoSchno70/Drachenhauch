@@ -5951,6 +5951,24 @@ impl<'p> Vm<'p> {
                 }
                 Value::Int(h)
             }
+            // --- Stufe 30: Gitter ---
+            "gui_grid" => {
+                let n = if a.len() > 6 { gi(a,6,"GUI_GRID")? } else { 0 };
+                Value::Int(self.gui.grid(gi(a,0,"GUI_GRID")?, gi(a,1,"GUI_GRID")? as i32, gi(a,2,"GUI_GRID")? as i32,
+                    gi(a,3,"GUI_GRID")? as i32, gi(a,4,"GUI_GRID")? as i32, gstrs(a,5,"GUI_GRID")?, n)?)
+            }
+            "gui_table_current_row" => Value::Int(self.gui.table_current(gi(a,0,"GUI_TABLE_CURRENT_ROW")?, false)?),
+            "gui_table_current_col" => Value::Int(self.gui.table_current(gi(a,0,"GUI_TABLE_CURRENT_COL")?, true)?),
+            "gui_table_set_current" => { self.gui.table_set_current(gi(a,0,"GUI_TABLE_SET_CURRENT")?, gi(a,1,"GUI_TABLE_SET_CURRENT")?, gi(a,2,"GUI_TABLE_SET_CURRENT")?)?; Value::Nil }
+            "gui_table_range" => {
+                let (ar, ac, r, c) = self.gui.table_range(gi(a,0,"GUI_TABLE_RANGE")?)?;
+                Value::Tuple(std::rc::Rc::new(vec![Value::Int(ar), Value::Int(ac), Value::Int(r), Value::Int(c)]))
+            }
+            "gui_table_select_range" => { self.gui.table_select_range(gi(a,0,"GUI_TABLE_SELECT_RANGE")?, gi(a,1,"GUI_TABLE_SELECT_RANGE")?, gi(a,2,"GUI_TABLE_SELECT_RANGE")?, gi(a,3,"GUI_TABLE_SELECT_RANGE")?, gi(a,4,"GUI_TABLE_SELECT_RANGE")?)?; Value::Nil }
+            "gui_table_copy$" | "gui_table_copy" => Value::str_rc(&self.gui.table_copy(gi(a,0,"GUI_TABLE_COPY$")?)?),
+            "gui_table_paste" => Value::Int(self.gui.table_paste(gi(a,0,"GUI_TABLE_PASTE")?, &gs(a,1,"GUI_TABLE_PASTE")?)?),
+            "gui_table_col_type" => { self.gui.table_col_type(gi(a,0,"GUI_TABLE_COL_TYPE")?, gi(a,1,"GUI_TABLE_COL_TYPE")?, &gs(a,2,"GUI_TABLE_COL_TYPE")?)?; Value::Nil }
+            "gui_table_col_choices" => { self.gui.table_col_choices(gi(a,0,"GUI_TABLE_COL_CHOICES")?, gi(a,1,"GUI_TABLE_COL_CHOICES")?, gstrs(a,2,"GUI_TABLE_COL_CHOICES")?)?; Value::Nil }
             "gui_table_headers" => { self.gui.table_set_headers(gi(a,0,"GUI_TABLE_HEADERS")?, gstrs(a,1,"GUI_TABLE_HEADERS")?)?; Value::Nil }
             "gui_table_rows" => { self.gui.table_set_rows(gi(a,0,"GUI_TABLE_ROWS")?, gstrs2(a,1,"GUI_TABLE_ROWS")?)?; Value::Nil }
             "gui_table_col_widths" => { self.gui.table_set_col_widths(gi(a,0,"GUI_TABLE_COL_WIDTHS")?, gints_opt(a,1,"GUI_TABLE_COL_WIDTHS")?)?; Value::Nil }
