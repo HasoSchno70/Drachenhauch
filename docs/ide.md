@@ -57,8 +57,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 31 | Eine **`.dhform` öffnet den Form-Designer in Drachenhauch** (als Text über die Befehlspalette); der Designer kennt alle 30 Arten und das Gitter, zeigt Felder je Art (Einträge, Spalten, Zellmodus, bearbeitbare Spalten, Spaltenarten, Min/Max/Wert) und schreibt **GB-Code ohne `GUI_LOAD`** (Strg+G) |
 | 32 | Die Prüfsammlungen können **vorhandene Programme** prüfen (`--- programm pfad nach MARKE`, `--- inhalt`/`--- ohne datei`) — die Tests des Form-Designers laufen **ohne Python** |
 | 33 | Auch **Anim-FSM-Editor und Notenblatt** werden ohne Python geprüft: `--- streichen` nimmt `WINDOW_MAXIMIZE()` aus der Kopie, `--- nachher` lässt ein Drachenhauch-Programm lesen, was gesichert wurde, und Platzhalter gelten auch in Beilagen |
+| 34 | Die **IDE selbst** wird zum großen Teil ohne Python geprüft: die Bausteine (`PROCESS_*`, `CODE_*`, Textbereich) und die Fälle der Stände 1 bis 5 stehen in Prüfsammlungen; das Protokoll liest ein `--- nachher`-Programm Zeile für Zeile |
 
-## Was sie heute kann (Stand 33, 13.09.2026)
+## Was sie heute kann (Stand 34, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -277,7 +278,8 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `aufrufer gemessen <anzahl>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
-prüft). Die Bausteine einzeln prüft `tests/test_ide_bausteine.py`.
+prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
+Python, die Bausteine einzeln `tests/pruef/ide_bausteine.dhtest`.
 
 ## Was noch fehlt
 
