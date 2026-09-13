@@ -5496,6 +5496,13 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.list_find(gi(a,0,"GUI_LISTBOX_FIND")?, &gs(a,1,"GUI_LISTBOX_FIND")?, ab)?)
             }
             "gui_listbox_scroll_to" => { self.gui.list_scroll_to(gi(a,0,"GUI_LISTBOX_SCROLL_TO")?, gi(a,1,"GUI_LISTBOX_SCROLL_TO")?)?; Value::Nil }
+            // --- Stufe 29: gesetzter Text -- Auswahl und Suche ---
+            "gui_richtext_selection$" | "gui_richtext_selection" => Value::str_rc(&self.gui.richtext_selection(gi(a,0,"GUI_RICHTEXT_SELECTION")?)?),
+            "gui_richtext_select_all" => { self.gui.richtext_select_all(gi(a,0,"GUI_RICHTEXT_SELECT_ALL")?)?; Value::Nil }
+            "gui_richtext_clear_selection" => { self.gui.richtext_clear_selection(gi(a,0,"GUI_RICHTEXT_CLEAR_SELECTION")?)?; Value::Nil }
+            "gui_richtext_find_next" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_NEXT")?, &gs(a,1,"GUI_RICHTEXT_FIND_NEXT")?, true)?),
+            "gui_richtext_find_prev" => Value::Int(self.gui.richtext_find_step(gi(a,0,"GUI_RICHTEXT_FIND_PREV")?, &gs(a,1,"GUI_RICHTEXT_FIND_PREV")?, false)?),
+            "gui_richtext_mark_all" => Value::Int(self.gui.richtext_mark_all(gi(a,0,"GUI_RICHTEXT_MARK_ALL")?, &gs(a,1,"GUI_RICHTEXT_MARK_ALL")?)?),
             // --- Stufe 28: Statusleiste, Pfadleiste, Ueberlauf ---
             "gui_statusbar" => {
                 let t = if a.len() > 5 { gs(a,5,"GUI_STATUSBAR")? } else { String::new() };

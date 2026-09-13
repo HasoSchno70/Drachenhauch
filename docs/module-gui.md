@@ -163,6 +163,12 @@ IMPORT "gui"
 | `GUI_RICHTEXT_FIND(rt, text$, ab = -1)` | INTEGER | zur ersten Fundstelle rollen; liefert deren y oder -1 |
 | `GUI_RICHTEXT_SCROLL(rt, y)` / `GUI_RICHTEXT_SCROLL_GET(rt)` | — / INTEGER | Blickversatz setzen und lesen |
 | `GUI_RICHTEXT_HEIGHT(rt)` | INTEGER | wie hoch der Satz geworden ist |
+| `GUI_RICHTEXT_SELECTION$(rt)` | STRING | der markierte Text, Zeilen durch Umbruch getrennt (leer = keine Auswahl) |
+| `GUI_RICHTEXT_SELECT_ALL(rt)` | — | alles markieren (wie Strg+A) |
+| `GUI_RICHTEXT_CLEAR_SELECTION(rt)` | — | Auswahl aufheben |
+| `GUI_RICHTEXT_FIND_NEXT(rt, text$)` | INTEGER | nächste Fundstelle ab der Auswahl markieren und ins Bild rollen, mit Umlauf; y der Zeile oder -1 |
+| `GUI_RICHTEXT_FIND_PREV(rt, text$)` | INTEGER | vorige Fundstelle, mit Umlauf; y der Zeile oder -1 |
+| `GUI_RICHTEXT_MARK_ALL(rt, text$)` | INTEGER | alle Fundstellen schwach hervorheben (leer = aus); liefert ihre Zahl |
 | `GUI_TIMEPICKER(win, x, y, w = 0, h = 0)` | GUI_WIDGET | Uhrzeit: Felder mit Pfeilen für Stunde, Minute und (auf Wunsch) Sekunde |
 | `GUI_TIME$(tp)` | STRING | die Uhrzeit als `HH:MM:SS` — wie `TIME$()`, auch ohne Sekundenfeld |
 | `GUI_SET_TIME(tp, zeit$)` | — | Uhrzeit setzen (`HH:MM` oder `HH:MM:SS`; krumme Werte sind ein Fehler) |
@@ -1492,8 +1498,30 @@ Wort bricht nicht um, es liefe sonst in die Nachbarspalte hinein und klebte
 an deren Text. Passt die Tabelle trotzdem nicht, laufen die Spalten über --
 sie abzuschneiden versteckte die letzte, und die trägt oft die Erklärung.
 
-**Nicht dabei:** Text markieren und kopieren, Bilder, Aufzählungen mit
-eigener Nummerierung, verschachtelte Tabellen, HTML.
+**Markieren und Suchen.** Ziehen mit der Maus markiert, ein Doppelklick
+nimmt das Wort, Strg+A alles, Strg+C kopiert. Eine Stelle ist dabei (Zeile,
+Zeichen im **Zeilentext**) -- die Wörter einer gesetzten Zeile, mit einem
+Leerzeichen, wo zwischen ihnen Platz ist. Deshalb findet die Suche auch
+`Zwei Hunde` über die Wortgrenze, und Kopiertes ist lesbarer Text statt
+aneinandergeklebter Wörter; die Leerzeilen, die der Satz unter einer
+Überschrift einschiebt, kommen nicht mit. `FIND_NEXT` sucht ab dem ANFANG
+der Auswahl plus eins -- so kommt man von einer markierten Fundstelle zur
+nächsten und ohne Auswahl zur ersten.
+
+```basic
+anzahl = GUI_RICHTEXT_MARK_ALL(rt, suche$)     ' alle schwach hervorheben
+IF GUI_RICHTEXT_FIND_NEXT(rt, suche$) < 0 THEN PRINT "nicht gefunden"
+PRINT GUI_RICHTEXT_SELECTION$(rt)              ' die markierte Fundstelle
+```
+
+Gemessen wird die Stelle unter der Maus erst im nächsten `GUI_UPDATE`: der
+Druck kommt an einer Stelle an, an der es keine Grafik zum Messen gibt, und
+eine geschätzte Stelle wäre bei Proportionalschrift sichtbar daneben. Ein
+neuer Text (oder ein neuer Satz nach einer Größenänderung) hebt die Auswahl
+auf -- ihre Stellen zeigten in den alten Satz.
+
+**Nicht dabei:** Bilder, Aufzählungen mit eigener Nummerierung,
+verschachtelte Tabellen, HTML, Umschalt+Klick zum Erweitern einer Auswahl.
 
 ## Uhrzeit
 
