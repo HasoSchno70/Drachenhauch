@@ -248,10 +248,12 @@ Ansicht: jede Änderung schreibt ins JSON und baut die Ansicht neu
 (`GUI_FROM_JSON`). Sichern ist `JSON_PRETTY`, Laden `JSON_LOAD`,
 Rückgängig ein JSON-Text je Stand — und alles, was die Laufzeit kennt und
 der Inspektor nicht zeigt (Menüs, Reiter, Tabellendaten, `code`), läuft
-unverändert mit durch. Geprüft gegen den **fremden Leser**: der Test
-(`tests/test_pilot_formdesigner.py`) legt per echtem Klick einen Button ab,
-sichert mit Strg+S und liest die Datei mit `FormDoc.load`, dem Modell des
-Qt-Designers.
+unverändert mit durch. Geprüft wird **ohne Python**
+(`tests/pruef/werkzeug_formdesigner.dhtest`, seit Stufe 32; vorher
+`test_pilot_formdesigner.py` mit dem Modell des Qt-Designers als Leser): ein
+Fall legt per echtem Klick einen Button ab, sichert mit Strg+S und prüft die
+gesicherte Datei; andere rufen Inspektor und GB-Code direkt auf und lassen den
+erzeugten Code durch `dhrt --check` und einen Lauf.
 
 Kann: Palette aller 30 Arten der Laufzeit und dazu das **Gitter** (eine
 Tabelle im Zellmodus, alle Spalten bearbeitbar), anklicken, dann auf die
