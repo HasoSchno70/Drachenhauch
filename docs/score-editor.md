@@ -147,12 +147,12 @@ schlimmer als eine schlichte Form.
 (4 Zeilen je Beat, Patterns zu 64 Zeilen, Akkord → höchste Note, Staccato
 halbiert mit mindestens einer Zeile, `NOTE_OFF` am Ende wenn die Zelle frei
 ist, Kürzung an der Pattern-Grenze, mindestens vier Kanäle, Drum-Kanal
-leer) — und der Test hält ihn daran fest: `tests/test_pilot_notenblatt.py`
-lässt den Piloten das Demo-Stück `examples/notenblatt_demo.json` exportieren
-(Akkord, Staccato, Note über die 64-Zeilen-Grenze, zwei Spuren) und
-vergleicht das Gitter Zelle für Zelle mit `to_tracker_song`. Die Stück-Datei
-liest `ScoreDoc.load_json`, das Tracker-Projekt `Song.load_json` — drei
-fremde Leser.
+leer) — und der Test hält ihn daran fest:
+`tests/pruef/werkzeug_notenblatt.dhtest` lässt den Piloten das Demo-Stück
+`examples/notenblatt_demo.json` exportieren (Akkord, Staccato, Note über die
+64-Zeilen-Grenze, zwei Spuren) und vergleicht das Gitter Zelle für Zelle mit
+einem festen Stand, den `to_tracker_song` einmal geliefert hat. Stück-Datei
+und Tracker-Projekt liest danach ein Drachenhauch-Programm (`JSON_*`).
 
 Noch nicht: der Transponier-Dialog beim Schlüsselwechsel (es wird
 verschoben und gesagt), mehr als acht Spuren, ein Klick auf eine Note eines

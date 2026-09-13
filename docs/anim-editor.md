@@ -110,10 +110,10 @@ den gewählten Zustand oder Übergang, alles `gui`-Fenster.
 
 **Das Modell ist das `.dhanim`-JSON** (json-Modul), Rückgängig ein JSON-Text
 je Stand; was der Inspektor nicht kennt, läuft unverändert mit durch.
-Geprüft wird die Datei von **zwei fremden Lesern**
-(`tests/test_pilot_animfsm.py`): dem Modell des Qt-Editors (`AnimDoc.load`)
-und der Laufzeit selbst — `ANIM_FSM_LOAD`, `ANIM_FSM_SETUP`, ein Schritt,
-Zustandsname vergleichen. Dass die JSON gültig ist, wäre die schwächere
+Geprüft wird die Datei ohne Python
+(`tests/pruef/werkzeug_animfsm.dhtest`): echte Klicks über eine Aufnahme,
+danach liest ein Drachenhauch-Programm das JSON und die Laufzeit selbst —
+`ANIM_FSM_LOAD`, `ANIM_FSM_SETUP`, ein Schritt, Zustandsname vergleichen. Dass die JSON gültig ist, wäre die schwächere
 Aussage: ein Übergang zu einem gelöschten Zustand lädt nicht, und genau das
 prüft der Test nach `Entf`.
 

@@ -1,0 +1,743 @@
+' Das Notenblatt in Drachenhauch (examples/199_notenblatt.dh) -- ohne Python
+' geprueft. Bis Stufe 33 stand das in tests/test_pilot_notenblatt.py.
+'
+' Echte Klicks ueber eine Aufnahme; die Kopie laeuft ohne WINDOW_MAXIMIZE
+' (1280 x 800): Blatt ab x = 250, Spur i beginnt bei y = 104 + i * 190, Beat
+' b bei x = 326 + 64 b. Was der Editor sichert, liest danach ein Programm in
+' Drachenhauch (--- nachher, JSON_*).
+'
+' Der Tracker-Export wird Zelle fuer Zelle mit einem festen Gitter verglichen.
+' Es stammt aus score/convert.py (to_tracker_song) am Demo-Stueck, einmal
+' aufgezeichnet, als pytest es noch gegen den Python-Konverter pruefte: Akkord
+' (-> hoechste Note), Staccato (halbe Dauer), eine Note ueber die
+' 64-Zeilen-Grenze (gekuerzt), NOTE_OFF (-1), zwei Spuren.
+--- seriell
+
+=== klick setzt eine viertelnote auf die mittellinie
+' Mittellinie im Violinschluessel = H4 (MIDI 71); Beat 2, Viertel (Vorgabe).
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=90
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 8
+e 20 7 454 162 0 0
+e 21 7 454 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 50 2 341 0 0 0
+e 50 2 83 0 0 0
+e 52 1 83 0 0 0
+e 52 1 341 0 0 0
+
+--- inhalt _programm/score.log
+note 0 2 71 1
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+PRINT "spuren " ; JSON_LEN(h, "tracks") ; " " ; JSON_GET_STRING(h, "tracks.0.clef")
+noten(h, 0)
+--- erwartet
+spuren 1 treble
+note 2 1 71
+
+=== zweiter klick entfernt und rechtsklick auch
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=180
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 20
+e 20 7 454 162 0 0
+e 21 7 454 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 50 7 454 162 0 0
+e 51 7 454 162 0 0
+e 51 6 0 0 0 0
+e 53 5 0 0 0 0
+e 80 7 582 148 0 0
+e 81 7 582 148 0 0
+e 81 6 0 0 0 0
+e 83 5 0 0 0 0
+e 110 7 582 148 0 0
+e 111 7 582 148 0 0
+e 111 6 1 0 0 0
+e 113 5 1 0 0 0
+e 140 2 341 0 0 0
+e 140 2 83 0 0 0
+e 142 1 83 0 0 0
+e 142 1 341 0 0 0
+
+--- inhalt _programm/score.log
+entfernt 0 2
+note 0 4 74 1
+entfernt 0 4
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+PRINT "noten " ; JSON_LEN(h, "tracks.0.notes")
+--- erwartet
+noten 0
+
+=== ziehen verschiebt und strg z holt zurueck
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=150
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 22
+e 20 7 454 162 0 0
+e 21 7 454 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 50 7 454 162 0 0
+e 51 7 454 162 0 0
+e 51 6 0 0 0 0
+e 52 7 475 159 0 0
+e 53 7 496 157 0 0
+e 54 7 518 155 0 0
+e 55 7 539 152 0 0
+e 56 7 560 150 0 0
+e 57 7 582 148 0 0
+e 59 5 0 0 0 0
+e 90 2 341 0 0 0
+e 90 2 90 0 0 0
+e 92 1 90 0 0 0
+e 92 1 341 0 0 0
+e 110 2 341 0 0 0
+e 110 2 83 0 0 0
+e 112 1 83 0 0 0
+e 112 1 341 0 0 0
+
+--- inhalt _programm/score.log
+bewegt 0 4 74
+rueckgaengig 1
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+noten(h, 0)
+--- erwartet
+note 2 1 71
+
+=== modus pause und bindebogen ueber die klappliste
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=230
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 40
+e 20 7 326 162 0 0
+e 21 7 326 162 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 454 162 0 0
+e 41 7 454 162 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 60 7 394 46 0 0
+e 61 7 394 46 0 0
+e 61 6 0 0 0 0
+e 63 5 0 0 0 0
+e 70 7 394 91 0 0
+e 71 7 394 91 0 0
+e 71 6 0 0 0 0
+e 73 5 0 0 0 0
+e 90 7 582 162 0 0
+e 91 7 582 162 0 0
+e 91 6 0 0 0 0
+e 93 5 0 0 0 0
+e 110 7 394 46 0 0
+e 111 7 394 46 0 0
+e 111 6 0 0 0 0
+e 113 5 0 0 0 0
+e 120 7 394 113 0 0
+e 121 7 394 113 0 0
+e 121 6 0 0 0 0
+e 123 5 0 0 0 0
+e 140 7 326 162 0 0
+e 141 7 326 162 0 0
+e 141 6 0 0 0 0
+e 143 5 0 0 0 0
+e 160 7 454 162 0 0
+e 161 7 454 162 0 0
+e 161 6 0 0 0 0
+e 163 5 0 0 0 0
+e 190 2 341 0 0 0
+e 190 2 83 0 0 0
+e 192 1 83 0 0 0
+e 192 1 341 0 0 0
+
+--- inhalt _programm/score.log
+pause 0 4 1
+bogen 0 0 2
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+noten(h, 0)
+PRINT "boegen " ; JSON_LEN(h, "tracks.0.slurs") ; " " ; zahl$(JSON_GET_FLOAT(h, "tracks.0.slurs.0.0")) ; " " ; zahl$(JSON_GET_FLOAT(h, "tracks.0.slurs.0.1"))
+--- erwartet
+note 0 1 71
+note 2 1 71
+note 4 1 pause
+boegen 1 0 2
+
+=== zweite spur und instrument
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.json
+--- umgebung
+DHRT_FRAMES=140
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 20
+e 20 7 895 46 0 0
+e 21 7 895 46 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 454 352 0 0
+e 41 7 454 352 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 60 7 125 198 0 0
+e 61 7 125 198 0 0
+e 61 6 0 0 0 0
+e 63 5 0 0 0 0
+e 70 7 125 441 0 0
+e 71 7 125 441 0 0
+e 71 6 0 0 0 0
+e 73 5 0 0 0 0
+e 100 2 341 0 0 0
+e 100 2 83 0 0 0
+e 102 1 83 0 0 0
+e 102 1 341 0 0 0
+
+--- inhalt _programm/score.log
+spur 2
+note 1 2 71 1
+instrument 0 Glocke
+gesichert
+--- nachher
+IMPORT "json"
+FUNCTION zahl$(f AS FLOAT) AS STRING
+    IF f = INT(f) THEN RETURN STR$(INT(f))
+    RETURN STR$(f)
+END FUNCTION
+SUB noten(h AS JSON_HANDLE, spur AS INTEGER)
+    DIM p AS STRING : p = "tracks." + STR$(spur) + ".notes"
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, p) - 1
+        DIM q AS STRING : q = p + "." + STR$(i)
+        DIM ton AS STRING : ton = "pause"
+        DIM pause AS BOOLEAN : pause = FALSE
+        IF JSON_HAS(h, q + ".rest") THEN pause = JSON_GET_BOOL(h, q + ".rest")
+        IF NOT pause THEN ton = STR$(JSON_GET_INT(h, q + ".pitch"))
+        PRINT "note " + zahl$(JSON_GET_FLOAT(h, q + ".start")) + " " + zahl$(JSON_GET_FLOAT(h, q + ".dur")) + " " + ton
+    NEXT
+END SUB
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.json")
+PRINT JSON_GET_STRING(h, "tracks.0.name") ; "|" ; JSON_GET_STRING(h, "tracks.1.name")
+PRINT JSON_GET_STRING(h, "tracks.0.instrument.name") ; " " ; JSON_GET_INT(h, "tracks.0.instrument.env_decay_ms")
+noten(h, 1)
+--- erwartet
+Stimme 1|Stimme 2
+Glocke 900
+note 2 1 71
+
+=== tracker export liefert das gitter des konverters
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+demo.json
+--- umgebung
+DHRT_FRAMES=80
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 4
+e 20 2 341 0 0 0
+e 20 2 84 0 0 0
+e 22 1 84 0 0 0
+e 22 1 341 0 0 0
+
+--- datei demo.json
+{
+ "format": "dhscore-song",
+ "version": 1,
+ "bpm": 100,
+ "time_sig": [
+  4,
+  4
+ ],
+ "tracks": [
+  {
+   "name": "Melodie",
+   "clef": "treble",
+   "instrument": {
+    "name": "Fluegel (Piano)",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "triangle",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 700,
+    "env_sustain": 0.0,
+    "env_release_ms": 200,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 6.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 1.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 2.0,
+     "dur": 0.5,
+     "pitch": 76
+    },
+    {
+     "start": 2.5,
+     "dur": 0.5,
+     "pitch": 77
+    },
+    {
+     "start": 3.0,
+     "dur": 1.0,
+     "pitch": 79,
+     "staccato": true
+    },
+    {
+     "start": 4.0,
+     "dur": 2.0,
+     "pitch": 76
+    },
+    {
+     "start": 6.0,
+     "dur": 1.0,
+     "pitch": 72,
+     "fingering": 1
+    },
+    {
+     "start": 7.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 76
+    },
+    {
+     "start": 9.0,
+     "dur": 4.0,
+     "pitch": 74
+    },
+    {
+     "start": 13.0,
+     "dur": 1.0,
+     "pitch": 73
+    },
+    {
+     "start": 14.0,
+     "dur": 4.0,
+     "pitch": 72
+    }
+   ],
+   "slurs": [
+    [
+     0.0,
+     1.0
+    ]
+   ]
+  },
+  {
+   "name": "Bass",
+   "clef": "bass",
+   "instrument": {
+    "name": "Bass",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "square",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 140,
+    "env_sustain": 0.55,
+    "env_release_ms": 80,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 0.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 2.0,
+     "pitch": 48
+    },
+    {
+     "start": 2.0,
+     "dur": 2.0,
+     "pitch": 43
+    },
+    {
+     "start": 4.0,
+     "dur": 4.0,
+     "pitch": 48
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "rest": true,
+     "accidental": 0
+    },
+    {
+     "start": 12.0,
+     "dur": 2.0,
+     "pitch": 50
+    }
+   ]
+  }
+ ]
+}
+--- inhalt _programm/score.log
+tracker
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("demo_tracker.json")
+DIM folge AS STRING : folge = ""
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "order") - 1
+    IF i > 0 THEN folge = folge + ","
+    folge = folge + STR$(JSON_GET_INT(h, "order." + STR$(i)))
+NEXT
+PRINT "bpm " + STR$(JSON_GET_INT(h, "bpm")) + " kanaele " + STR$(JSON_GET_INT(h, "channels")) + " muster " + STR$(JSON_LEN(h, "patterns")) + " folge " + folge
+FOR i = 0 TO JSON_LEN(h, "patterns") - 1
+    DIM pp AS STRING : pp = "patterns." + STR$(i)
+    PRINT "muster " + STR$(i) + " zeilen " + STR$(JSON_GET_INT(h, pp + ".rows"))
+    DIM c AS INTEGER
+    FOR c = 0 TO JSON_LEN(h, pp + ".data") - 1
+        DIM r AS INTEGER
+        FOR r = 0 TO JSON_LEN(h, pp + ".data." + STR$(c)) - 1
+            DIM zp AS STRING : zp = pp + ".data." + STR$(c) + "." + STR$(r)
+            IF JSON_TYPE(h, zp) <> "null" THEN PRINT "  " + STR$(c) + " " + STR$(r) + " " + STR$(JSON_GET_INT(h, zp))
+        NEXT
+    NEXT
+NEXT
+DIM ki AS STRING : ki = ""
+FOR i = 0 TO JSON_LEN(h, "channel_inst") - 1
+    IF i > 0 THEN ki = ki + ","
+    IF JSON_TYPE(h, "channel_inst." + STR$(i)) = "null" THEN ki = ki + "None" ELSE ki = ki + STR$(JSON_GET_INT(h, "channel_inst." + STR$(i)))
+NEXT
+PRINT "kanalinst " + ki
+DIM namen AS STRING : namen = ""
+FOR i = 0 TO JSON_LEN(h, "instruments") - 1
+    IF i > 0 THEN namen = namen + "|"
+    namen = namen + JSON_GET_STRING(h, "instruments." + STR$(i) + ".name")
+NEXT
+PRINT "inst " + namen
+--- erwartet
+bpm 100 kanaele 4 muster 2 folge 0,1
+muster 0 zeilen 64
+  0 0 72
+  0 4 74
+  0 8 76
+  0 10 77
+  0 12 79
+  0 14 -1
+  0 16 76
+  0 24 72
+  0 28 74
+  0 32 76
+  0 36 74
+  0 52 73
+  0 56 72
+  1 0 48
+  1 8 43
+  1 16 48
+  1 32 -1
+  1 48 50
+  1 56 -1
+muster 1 zeilen 8
+kanalinst 0,1,None,None
+inst Fluegel (Piano)|Bass
+
+=== leertaste spielt das stueck
+' 18 Ereignisse, eines ist eine Pause.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/199_notenblatt.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+demo.json
+--- umgebung
+DHRT_FRAMES=60
+DH_SCORE_LOG=score.log
+--- datei _programm/ev.txt
+c 2
+e 20 2 32 0 0 0
+e 22 1 32 0 0 0
+
+--- datei demo.json
+{
+ "format": "dhscore-song",
+ "version": 1,
+ "bpm": 100,
+ "time_sig": [
+  4,
+  4
+ ],
+ "tracks": [
+  {
+   "name": "Melodie",
+   "clef": "treble",
+   "instrument": {
+    "name": "Fluegel (Piano)",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "triangle",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 700,
+    "env_sustain": 0.0,
+    "env_release_ms": 200,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 6.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 1.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 2.0,
+     "dur": 0.5,
+     "pitch": 76
+    },
+    {
+     "start": 2.5,
+     "dur": 0.5,
+     "pitch": 77
+    },
+    {
+     "start": 3.0,
+     "dur": 1.0,
+     "pitch": 79,
+     "staccato": true
+    },
+    {
+     "start": 4.0,
+     "dur": 2.0,
+     "pitch": 76
+    },
+    {
+     "start": 6.0,
+     "dur": 1.0,
+     "pitch": 72,
+     "fingering": 1
+    },
+    {
+     "start": 7.0,
+     "dur": 1.0,
+     "pitch": 74
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 72
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "pitch": 76
+    },
+    {
+     "start": 9.0,
+     "dur": 4.0,
+     "pitch": 74
+    },
+    {
+     "start": 13.0,
+     "dur": 1.0,
+     "pitch": 73
+    },
+    {
+     "start": 14.0,
+     "dur": 4.0,
+     "pitch": 72
+    }
+   ],
+   "slurs": [
+    [
+     0.0,
+     1.0
+    ]
+   ]
+  },
+  {
+   "name": "Bass",
+   "clef": "bass",
+   "instrument": {
+    "name": "Bass",
+    "kind": "synth",
+    "default_vol": 15,
+    "pan": 0.0,
+    "waveform": "square",
+    "loop_mode": "none",
+    "loop_start": 0,
+    "loop_end": 0,
+    "env_attack_ms": 2,
+    "env_decay_ms": 140,
+    "env_sustain": 0.55,
+    "env_release_ms": 80,
+    "vib_depth": 0.0,
+    "vib_speed": 0.0,
+    "detune_cents": 0.0
+   },
+   "notes": [
+    {
+     "start": 0.0,
+     "dur": 2.0,
+     "pitch": 48
+    },
+    {
+     "start": 2.0,
+     "dur": 2.0,
+     "pitch": 43
+    },
+    {
+     "start": 4.0,
+     "dur": 4.0,
+     "pitch": 48
+    },
+    {
+     "start": 8.0,
+     "dur": 1.0,
+     "rest": true,
+     "accidental": 0
+    },
+    {
+     "start": 12.0,
+     "dur": 2.0,
+     "pitch": 50
+    }
+   ]
+  }
+ ]
+}
+--- inhalt _programm/score.log
+geladen 2 18
+spielt 17
+

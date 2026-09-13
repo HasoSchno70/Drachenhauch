@@ -1,0 +1,1073 @@
+' Der Anim-FSM-Editor in Drachenhauch (examples/198_anim_fsm_editor.dh) --
+' ohne Python geprueft. Bis Stufe 33 stand das in tests/test_pilot_animfsm.py.
+'
+' Echte Klicks ueber eine Aufnahme (Einschub hinter SETFPS(60)); die Kopie
+' laeuft ohne WINDOW_MAXIMIZE, damit die Lagen fest sind (1280 x 800:
+' Graph-Ursprung 290/20, Inspektor ab x = 940). Was der Editor sichert, liest
+' danach die LAUFZEIT (--- nachher: JSON_* und ANIM_FSM_LOAD plus ein Schritt
+' der Maschine) -- dass die JSON gueltig ist, waere die schwaechere Aussage;
+' ein Uebergang zu einem geloeschten Zustand laedt nicht.
+' In der Aufnahme: 7 Mauslage, 6 Taste runter, 5 hoch, 2 Taste runter, 1 hoch.
+--- seriell
+
+=== doppelklick legt einen zustand an
+' Doppelklick auf freie Flaeche (700,500) -> (700-290-75, 500-20-25) aufs Raster.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+neu.dhanim
+--- umgebung
+DHRT_FRAMES=100
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 12
+e 20 7 700 500 0 0
+e 21 7 700 500 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 26 7 700 500 0 0
+e 27 7 700 500 0 0
+e 27 6 0 0 0 0
+e 29 5 0 0 0 0
+e 60 2 341 0 0 0
+e 60 2 83 0 0 0
+e 62 1 83 0 0 0
+e 62 1 341 0 0 0
+
+--- inhalt _programm/anim.log
+neu-datei
+zustand state 336 456
+gesichert
+--- nachher
+IMPORT "json"
+IMPORT "animfsm"
+IMPORT "sprite"
+FUNCTION zustand$(datei AS STRING, speed AS FLOAT, schritt AS BOOLEAN) AS STRING
+    DIM sp AS SPRITE : sp = SPRITE_NEW(0, 16, 16)
+    DIM fsm AS ANIM_FSM : fsm = ANIM_FSM_LOAD(datei)
+    ANIM_FSM_SETUP(fsm, sp)
+    IF schritt THEN
+        ANIM_FSM_SET_FLOAT(fsm, "speed", speed)
+        ANIM_FSM_UPDATE(fsm, sp, 16)
+    END IF
+    RETURN ANIM_FSM_STATE(fsm)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("neu.dhanim")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "states") - 1
+    DIM p AS STRING : p = "states." + STR$(i)
+    PRINT JSON_GET_STRING(h, p + ".name") ; " " ; JSON_GET_INT(h, p + ".x") ; " " ; JSON_GET_INT(h, p + ".y") ; " " ; JSON_GET_INT(h, p + ".first") ; " " ; JSON_GET_INT(h, p + ".last")
+NEXT
+PRINT "laufzeit " + zustand$("neu.dhanim", 0.0, FALSE)
+--- erwartet
+state 336 456 0 0
+laufzeit state
+
+=== rechte maustaste zieht einen uebergang
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=100
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 14
+e 20 7 485 221 0 0
+e 21 7 485 221 0 0
+e 21 6 1 0 0 0
+e 22 7 510 247 0 0
+e 23 7 535 274 0 0
+e 24 7 561 301 0 0
+e 25 7 586 327 0 0
+e 26 7 611 354 0 0
+e 27 7 637 381 0 0
+e 29 5 1 0 0 0
+e 60 2 341 0 0 0
+e 60 2 83 0 0 0
+e 62 1 83 0 0 0
+e 62 1 341 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+geladen 4 5
+verbunden idle fall
+gesichert
+--- nachher
+IMPORT "json"
+IMPORT "animfsm"
+IMPORT "sprite"
+FUNCTION zustand$(datei AS STRING, speed AS FLOAT, schritt AS BOOLEAN) AS STRING
+    DIM sp AS SPRITE : sp = SPRITE_NEW(0, 16, 16)
+    DIM fsm AS ANIM_FSM : fsm = ANIM_FSM_LOAD(datei)
+    ANIM_FSM_SETUP(fsm, sp)
+    IF schritt THEN
+        ANIM_FSM_SET_FLOAT(fsm, "speed", speed)
+        ANIM_FSM_UPDATE(fsm, sp, 16)
+    END IF
+    RETURN ANIM_FSM_STATE(fsm)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("held.dhanim")
+DIM n AS INTEGER : n = JSON_LEN(h, "transitions")
+DIM p AS STRING : p = "transitions." + STR$(n - 1)
+DIM warten AS BOOLEAN : warten = FALSE
+IF JSON_HAS(h, p + ".wait_finished") THEN warten = JSON_GET_BOOL(h, p + ".wait_finished")
+PRINT n ; " " ; JSON_GET_STRING(h, p + ".from") ; " " ; JSON_GET_STRING(h, p + ".to") ; " " ; JSON_LEN(h, p + ".conditions") ; " " ; warten
+' Ohne Bedingung feuert der neue Uebergang sofort.
+PRINT "laufzeit " + zustand$("held.dhanim", 0.0, TRUE)
+--- erwartet
+6 idle fall 0 FALSE
+laufzeit fall
+
+=== ziehen und rueckgaengig
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=120
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 18
+e 20 7 485 221 0 0
+e 21 7 485 221 0 0
+e 21 6 0 0 0 0
+e 22 7 498 221 0 0
+e 23 7 511 221 0 0
+e 24 7 525 221 0 0
+e 25 7 538 221 0 0
+e 26 7 551 221 0 0
+e 27 7 565 221 0 0
+e 29 5 0 0 0 0
+e 60 2 341 0 0 0
+e 60 2 90 0 0 0
+e 62 1 90 0 0 0
+e 62 1 341 0 0 0
+e 80 2 341 0 0 0
+e 80 2 83 0 0 0
+e 82 1 83 0 0 0
+e 82 1 341 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+bewegt idle 200 176
+rueckgaengig 4 5
+gesichert
+--- nachher
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("held.dhanim")
+PRINT JSON_GET_STRING(h, "states.0.name") ; " " ; JSON_GET_INT(h, "states.0.x") ; " " ; JSON_GET_INT(h, "states.0.y")
+--- erwartet
+idle 120 176
+
+=== entf loescht den zustand samt seinen uebergaengen
+' fall haengt an zwei Uebergaengen (jump -> fall, fall -> idle).
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=100
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 10
+e 20 7 637 381 0 0
+e 21 7 637 381 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 2 261 0 0 0
+e 42 1 261 0 0 0
+e 60 2 341 0 0 0
+e 60 2 83 0 0 0
+e 62 1 83 0 0 0
+e 62 1 341 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+gewaehlt zustand fall
+geloescht zustand fall 3 3
+gesichert
+--- nachher
+IMPORT "json"
+IMPORT "animfsm"
+IMPORT "sprite"
+FUNCTION zustand$(datei AS STRING, speed AS FLOAT, schritt AS BOOLEAN) AS STRING
+    DIM sp AS SPRITE : sp = SPRITE_NEW(0, 16, 16)
+    DIM fsm AS ANIM_FSM : fsm = ANIM_FSM_LOAD(datei)
+    ANIM_FSM_SETUP(fsm, sp)
+    IF schritt THEN
+        ANIM_FSM_SET_FLOAT(fsm, "speed", speed)
+        ANIM_FSM_UPDATE(fsm, sp, 16)
+    END IF
+    RETURN ANIM_FSM_STATE(fsm)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("held.dhanim")
+DIM i AS INTEGER
+DIM namen AS STRING : namen = ""
+FOR i = 0 TO JSON_LEN(h, "states") - 1
+    namen = namen + JSON_GET_STRING(h, "states." + STR$(i) + ".name") + " "
+NEXT
+DIM mitFall AS INTEGER : mitFall = 0
+FOR i = 0 TO JSON_LEN(h, "transitions") - 1
+    DIM p AS STRING : p = "transitions." + STR$(i)
+    IF JSON_GET_STRING(h, p + ".from") = "fall" OR JSON_GET_STRING(h, p + ".to") = "fall" THEN mitFall = mitFall + 1
+NEXT
+PRINT TRIM$(namen)
+PRINT "mit fall " ; mitFall
+' Stuende noch ein Uebergang zu fall, laedt die Laufzeit die Datei nicht.
+PRINT "laufzeit " + zustand$("held.dhanim", 0.0, FALSE)
+--- erwartet
+idle run jump
+mit fall 0
+laufzeit idle
+
+=== bedingung am pfeil hinzufuegen
+' Klick auf den Pfeil idle -> run waehlt ihn, [+ Bedingung] haengt eine an.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=110
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 12
+e 20 7 641 230 0 0
+e 21 7 641 230 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 40 7 1013 309 0 0
+e 41 7 1013 309 0 0
+e 41 6 0 0 0 0
+e 43 5 0 0 0 0
+e 70 2 341 0 0 0
+e 70 2 83 0 0 0
+e 72 1 83 0 0 0
+e 72 1 341 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+gewaehlt uebergang 0
+bedingung 2
+gesichert
+--- nachher
+IMPORT "json"
+IMPORT "animfsm"
+IMPORT "sprite"
+FUNCTION zustand$(datei AS STRING, speed AS FLOAT, schritt AS BOOLEAN) AS STRING
+    DIM sp AS SPRITE : sp = SPRITE_NEW(0, 16, 16)
+    DIM fsm AS ANIM_FSM : fsm = ANIM_FSM_LOAD(datei)
+    ANIM_FSM_SETUP(fsm, sp)
+    IF schritt THEN
+        ANIM_FSM_SET_FLOAT(fsm, "speed", speed)
+        ANIM_FSM_UPDATE(fsm, sp, 16)
+    END IF
+    RETURN ANIM_FSM_STATE(fsm)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("held.dhanim")
+PRINT JSON_GET_STRING(h, "transitions.0.from") ; " " ; JSON_GET_STRING(h, "transitions.0.to")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "transitions.0.conditions") - 1
+    DIM p AS STRING : p = "transitions.0.conditions." + STR$(i)
+    PRINT JSON_GET_STRING(h, p + ".param") ; " " ; JSON_GET_STRING(h, p + ".op") ; " " ; INT(JSON_GET_FLOAT(h, p + ".value"))
+NEXT
+' Beide Bedingungen gelten: speed 10 -> run, speed 1 -> idle.
+PRINT "speed 10 " + zustand$("held.dhanim", 10.0, TRUE)
+PRINT "speed 1 " + zustand$("held.dhanim", 1.0, TRUE)
+--- erwartet
+idle run
+speed gt 5
+speed gt 0
+speed 10 run
+speed 1 idle
+
+=== parameter anlegen
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=90
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 8
+e 20 7 28 348 0 0
+e 21 7 28 348 0 0
+e 21 6 0 0 0 0
+e 23 5 0 0 0 0
+e 50 2 341 0 0 0
+e 50 2 83 0 0 0
+e 52 1 83 0 0 0
+e 52 1 341 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+parameter param
+gesichert
+--- nachher
+IMPORT "json"
+IMPORT "animfsm"
+IMPORT "sprite"
+FUNCTION zustand$(datei AS STRING, speed AS FLOAT, schritt AS BOOLEAN) AS STRING
+    DIM sp AS SPRITE : sp = SPRITE_NEW(0, 16, 16)
+    DIM fsm AS ANIM_FSM : fsm = ANIM_FSM_LOAD(datei)
+    ANIM_FSM_SETUP(fsm, sp)
+    IF schritt THEN
+        ANIM_FSM_SET_FLOAT(fsm, "speed", speed)
+        ANIM_FSM_UPDATE(fsm, sp, 16)
+    END IF
+    RETURN ANIM_FSM_STATE(fsm)
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_LOAD("held.dhanim")
+DIM p AS STRING : p = "params." + STR$(JSON_LEN(h, "params") - 1)
+PRINT JSON_GET_STRING(h, p + ".name") ; " " ; JSON_GET_STRING(h, p + ".type") ; " " ; INT(JSON_GET_FLOAT(h, p + ".default"))
+PRINT "laufzeit " + zustand$("held.dhanim", 0.0, FALSE)
+--- erwartet
+param float 0
+laufzeit idle
+
+=== f5 schreibt die vorschau und sie laeuft
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../examples/198_anim_fsm_editor.dh nach SETFPS(60)
+--- streichen WINDOW_MAXIMIZE()
+--- argumente
+held.dhanim
+--- umgebung
+DHRT_FRAMES=90
+DH_ANIM_LOG=anim.log
+--- datei _programm/ev.txt
+c 2
+e 20 2 294 0 0 0
+e 22 1 294 0 0 0
+
+--- datei held.dhanim
+{
+  "version": 1,
+  "sheet": "{sammlung}/../../examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    {
+      "name": "speed",
+      "type": "float",
+      "default": 0.0
+    },
+    {
+      "name": "grounded",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "jump",
+      "type": "trigger"
+    }
+  ],
+  "states": [
+    {
+      "name": "idle",
+      "anim": "idle",
+      "loop": true,
+      "first": 0,
+      "last": 0,
+      "fps": 2.0,
+      "x": 120,
+      "y": 176
+    },
+    {
+      "name": "run",
+      "anim": "run",
+      "loop": true,
+      "first": 0,
+      "last": 3,
+      "fps": 10.0,
+      "x": 432,
+      "y": 176
+    },
+    {
+      "name": "jump",
+      "anim": "jump",
+      "loop": false,
+      "first": 2,
+      "last": 3,
+      "fps": 8.0,
+      "x": 272,
+      "y": 40
+    },
+    {
+      "name": "fall",
+      "anim": "fall",
+      "loop": true,
+      "first": 1,
+      "last": 1,
+      "fps": 1.0,
+      "x": 272,
+      "y": 336
+    }
+  ],
+  "transitions": [
+    {
+      "from": "idle",
+      "to": "run",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "gt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "run",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "speed",
+          "op": "lt",
+          "value": 5.0
+        }
+      ]
+    },
+    {
+      "from": "*",
+      "to": "jump",
+      "conditions": [
+        {
+          "param": "jump",
+          "op": "trigger"
+        }
+      ]
+    },
+    {
+      "from": "jump",
+      "to": "fall",
+      "wait_finished": true,
+      "conditions": []
+    },
+    {
+      "from": "fall",
+      "to": "idle",
+      "conditions": [
+        {
+          "param": "grounded",
+          "op": "is_true"
+        }
+      ]
+    }
+  ]
+}
+--- inhalt _programm/anim.log
+gestartet
+--- inhalt held_vorschau.dh
+ANIM_FSM_LOAD("held.dhanim")
+UI_SLIDER
+UI_BUTTON
+hero_walk.png
+--- nachher
+' Nicht nur uebersetzen: ein paar Bilder laufen lassen -- ob das Blatt
+' geladen und die Maschine aufgesetzt wird, zeigt erst der Lauf.
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "held_vorschau.dh")
+DIM bis AS INTEGER : bis = MILLIS() + 60000
+DIM befund AS STRING : befund = ""
+WHILE MILLIS() < bis
+    DIM z AS STRING : z = PROCESS_READ$(pc)
+    IF z <> "" THEN befund = befund + z
+    IF z = "" AND NOT PROCESS_RUNNING(pc) THEN BREAK
+WEND
+PRINT "check " + TRIM$(befund)
+DIM pb AS INTEGER : pb = PROCESS_START("dhrt", "bild", "held_vorschau.dh", "v.png", "5")
+bis = MILLIS() + 60000
+WHILE PROCESS_RUNNING(pb) AND MILLIS() < bis
+WEND
+PRINT "lauf " ; PROCESS_CODE(pb)
+--- erwartet
+check []
+lauf 0
+
