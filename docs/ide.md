@@ -58,8 +58,9 @@ kann, steht darunter vollständig, ohne Stände.
 | 32 | Die Prüfsammlungen können **vorhandene Programme** prüfen (`--- programm pfad nach MARKE`, `--- inhalt`/`--- ohne datei`) — die Tests des Form-Designers laufen **ohne Python** |
 | 33 | Auch **Anim-FSM-Editor und Notenblatt** werden ohne Python geprüft: `--- streichen` nimmt `WINDOW_MAXIMIZE()` aus der Kopie, `--- nachher` lässt ein Drachenhauch-Programm lesen, was gesichert wurde, und Platzhalter gelten auch in Beilagen |
 | 34 | Die **IDE selbst** wird zum großen Teil ohne Python geprüft: die Bausteine (`PROCESS_*`, `CODE_*`, Textbereich) und die Fälle der Stände 1 bis 5 stehen in Prüfsammlungen; das Protokoll liest ein `--- nachher`-Programm Zeile für Zeile |
+| 35 | Auch die **Stände 6 bis 12** der IDE werden ohne Python geprüft (Einrückung, Vervollständigung, Lesezeichen, Symbolspur, Einstellungen, Schnipsel, Projektbaum, Ersetzen und Umbenennen im Projekt, Werkzeugleiste, Kacheln samt Vorschaubild, Auswahl erweitern, Herauslösen) |
 
-## Was sie heute kann (Stand 34, 13.09.2026)
+## Was sie heute kann (Stand 35, 13.09.2026)
 
 | Bereich | Was geht | Kürzel |
 |---|---|---|
@@ -279,7 +280,8 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sieht `tests/test_ide.py`, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
-Python, die Bausteine einzeln `tests/pruef/ide_bausteine.dhtest`.
+Python, die Stände 6 bis 12 `tests/pruef/werkzeug_ide_6_12.dhtest`, die
+Bausteine einzeln `tests/pruef/ide_bausteine.dhtest`.
 
 ## Was noch fehlt
 

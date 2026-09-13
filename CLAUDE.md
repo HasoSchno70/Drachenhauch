@@ -2875,6 +2875,30 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 35 (2026-09-13):** die Staende 6 bis 12 der IDE ohne Python -- 43
+Faelle aus `tests/test_ide.py` nach `tests/pruef/werkzeug_ide_6_12.dhtest`
+(eigene Datei, `--- seriell`; die Laeufer nehmen seriell markierte Dateien
+nacheinander, die Zwischenablage bleibt also ungeteilt), 67 bleiben. Neu im
+Umgang, nicht im Format: eine **Voreinstellung der IDE** (`regex`,
+`autosichern`, `geruest`) kommt als Beilage `ide.json` in `_programm/`, weil
+`DH_IDE_KONFIG` relativ zu ihr zeigt; **Mausklicks** auf Projektbaum und
+Werkzeugleiste treffen dieselben festen Lagen wie in pytest (die Kopie laeuft
+dort wie hier MIT `WINDOW_MAXIMIZE`); das **Vorschaubild einer Kachel** prueft
+`--- bild _programm/vorschau/09_shapes.png` statt Pillow; der
+**herausgeloeste Code** geht im `nachher`-Programm durch
+`PROCESS_START("dhrt", "--check", ...)`. **Stolperstein:** mit relativem
+`DH_IDE_KONFIG=ide.json` lag das Vorschaubild nicht neben der Sitzung --
+die IDE leitet den Vorschau-Ordner aus dem Konfig-Ordner ab und reicht den
+relativen Pfad an `dhrt bild` weiter, und das wechselt ins Verzeichnis des
+BEISPIELS; das Bild landete unter `wurzel/examples/vorschau/`. pytest gab
+einen absoluten Pfad und sah es nie. Der Fall setzt `{fall}/_programm/ide.json`.
+In pytest geblieben: die zwei git-diff-Faelle (Repository), die Hervorhebung
+(zaehlt Farbbaender im Bild) und das Farbfeld (erster Lauf misst die Lage).
+Gegenprobe ohne `AUTOMATION_PLAY`: 40 der 42 Faelle mit Aufnahme fallen; die
+zwei uebrigen ("beim Sammeln geht noch nichts auf", "ohne die Einstellung
+wird nicht gesichert") erwarten, dass nichts passiert -- in pytest genauso
+schwach.
+
 **Stufe 34 (2026-09-13):** die IDE selbst, erster grosser Teil ohne
 Python -- ohne neues Formatstueck, alles mit dem aus Stufe 32/33.
 test_ide_bausteine.py ist geloescht (12 Faelle in
