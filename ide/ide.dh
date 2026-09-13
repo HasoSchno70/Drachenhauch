@@ -7527,7 +7527,10 @@ WHILE NOT QUITREQUESTED() AND NOT beenden
     IF GUI_CLICKED(btnHbAnsicht) THEN handbuchAnsicht(NOT hbGesetzt)
     IF GUI_RICHTEXT_LINK$(rtHandbuch) <> "" THEN handbuchVerweis(GUI_RICHTEXT_LINK$(rtHandbuch))
     werkzeugeAufraeumen()
-    IF GUI_TABLE_CLICKED(tblProfil) THEN profilAnspringen()
+    ' GUI_TABLE_CLICKED liefert die Zeile oder -1 -- und -1 ist WAHR. Bis
+    ' Stand 30 lief profilAnspringen darum in jedem Bild und nagelte die
+    ' Marke nach dem ersten Klick ins Profil auf dessen Zeile fest.
+    IF GUI_TABLE_CLICKED(tblProfil) >= 0 THEN profilAnspringen()
     gitRandNachziehen(FALSE)
     farbfeldNachziehen()
     einstellungenNachziehen()
