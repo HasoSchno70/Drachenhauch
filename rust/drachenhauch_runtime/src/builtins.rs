@@ -3361,6 +3361,41 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             Ok(neuer_buffer(b64_decode(need_str(&a[0], "BUFFER_FROM_BASE64")?)?))
         }
+        // --- Packen: DEFLATE auf rohen Bytes ---
+        // Anders als COMPRESS$/DECOMPRESS$ (Text rein, Base64 raus) arbeiten
+        // diese beiden auf Bytes und sprechen per Vorgabe das ZLIB-Format --
+        // so steckt Deflate in PDF-Seiten (FlateDecode), PNG und vielen
+        // Netzprotokollen; "roh" ist der nackte Strom ohne Kopf und Pruefsumme.
+        "buffer_deflate" | "buffer_inflate" => {
+            let gross = name.to_uppercase();
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("{}: erwartet 1..2 Argumente (puffer [, \"zlib\"/\"roh\"]), erhalten {}", gross, a.len()));
+            }
+            let zlib = if a.len() == 2 {
+                match need_str(&a[1], &gross)?.to_lowercase().as_str() {
+                    "zlib" => true,
+                    "roh" | "raw" => false,
+                    anders => return err(format!("{}: unbekanntes Format \"{}\" (erlaubt: \"zlib\", \"roh\")", gross, anders)),
+                }
+            } else { true };
+            let b = buf_h(&a[0], &gross)?.borrow().clone();
+            if name == "buffer_deflate" {
+                let aus = if zlib { miniz_oxide::deflate::compress_to_vec_zlib(&b, 6) }
+                          else { miniz_oxide::deflate::compress_to_vec(&b, 6) };
+                return Ok(neuer_buffer(aus));
+            }
+            // Obergrenze gegen eine "Zip-Bombe": wenige Kilobyte koennen sich
+            // auf Gigabytes entpacken und den Speicher sprengen.
+            const GRENZE: usize = 512 * 1024 * 1024;
+            let r = if zlib { miniz_oxide::inflate::decompress_to_vec_zlib_with_limit(&b, GRENZE) }
+                    else { miniz_oxide::inflate::decompress_to_vec_with_limit(&b, GRENZE) };
+            match r {
+                Ok(v) => Ok(neuer_buffer(v)),
+                Err(e) if e.status == miniz_oxide::inflate::TINFLStatus::HasMoreOutput =>
+                    err(format!("{}: entpackt groesser als 512 MB -- abgebrochen", gross)),
+                Err(_) => err(format!("{}: keine gueltigen {}-Daten", gross, if zlib { "zlib" } else { "Deflate" })),
+            }
+        }
         // --- Zahlen packen/lesen ---
         "buffer_get_i16" | "buffer_get_u16" | "buffer_get_i32" | "buffer_get_u32"
         | "buffer_get_i64" | "buffer_get_f32" | "buffer_get_f64" => {

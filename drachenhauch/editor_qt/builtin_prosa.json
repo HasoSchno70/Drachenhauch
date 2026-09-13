@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1844,
+ "count": 1846,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -169,6 +169,7 @@
   "BT_SERVICES": "STRING (multi-line UUIDs) welche Dienste bietet das Geraet an?",
   "BT_WRITE": "Wert eines Merkmals schreiben",
   "BUFFER_CONCAT": "neuer Puffer aus beiden",
+  "BUFFER_DEFLATE": "Bytes mit Deflate packen (\"zlib\" Vorgabe, \"roh\")",
   "BUFFER_FILL": "alles mit einem Byte füllen",
   "BUFFER_FROM_HEX": "Hex-Text (\"deadbeef\")",
   "BUFFER_FROM_STRING": "Text als UTF-8-Bytes",
@@ -181,6 +182,7 @@
   "BUFFER_GET_U16": "Ganzzahl lesen",
   "BUFFER_GET_U32": "Ganzzahl lesen",
   "BUFFER_INDEXOF": "erste Fundstelle, sonst -1",
+  "BUFFER_INFLATE": "gepackte Bytes entpacken (\"zlib\" Vorgabe, \"roh\")",
   "BUFFER_LEN": "Länge in Bytes",
   "BUFFER_NEW": "neuer Puffer, mit Nullen gefüllt",
   "BUFFER_RESIZE": "wächst mit Nullen, schrumpft durch Abschneiden",

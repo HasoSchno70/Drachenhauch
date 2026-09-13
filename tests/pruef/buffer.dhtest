@@ -384,3 +384,41 @@ PRINT "alle gleich"
 256
 alle gleich
 
+=== deflate und inflate gehen hin und zurueck
+' Stufe 38: zlib per Vorgabe, "roh" ohne Kopf -- beide Wege, alle Bytewerte.
+DIM b AS BUFFER
+DIM i AS INTEGER
+b = BUFFER_NEW(1000)
+FOR i = 0 TO 999
+    BUFFER_SET(b, i, i MOD 256)
+NEXT
+DIM z AS BUFFER : z = BUFFER_DEFLATE(b)
+DIM r AS BUFFER : r = BUFFER_DEFLATE(b, "roh")
+PRINT BUFFER_TO_HEX$(BUFFER_SLICE(z, 0, 1))
+PRINT BUFFER_LEN(z) - BUFFER_LEN(r)
+PRINT BUFFER_TO_HEX$(BUFFER_INFLATE(z)) = BUFFER_TO_HEX$(b)
+PRINT BUFFER_TO_HEX$(BUFFER_INFLATE(r, "roh")) = BUFFER_TO_HEX$(b)
+PRINT BUFFER_LEN(BUFFER_INFLATE(BUFFER_DEFLATE(BUFFER_NEW(0))))
+--- erwartet
+78
+6
+TRUE
+TRUE
+0
+
+=== inflate liest einen fremden zlib-strom
+' Gepackt von Pythons zlib.compress(b"Hallo Drachenhauch")
+PRINT BUFFER_TO_STRING$(BUFFER_INFLATE(BUFFER_FROM_HEX("789cf348ccc9c95770294a4cce48cdcb482c4dce00003e6406cf")))
+--- erwartet
+Hallo Drachenhauch
+
+=== inflate lehnt kaputte daten ab
+PRINT BUFFER_LEN(BUFFER_INFLATE(BUFFER_FROM_STRING("kein zlib")))
+--- fehler
+BUFFER_INFLATE: keine gueltigen zlib-Daten
+
+=== deflate kennt nur zwei formate
+PRINT BUFFER_LEN(BUFFER_DEFLATE(BUFFER_NEW(3), "gzip"))
+--- fehler
+BUFFER_DEFLATE: unbekanntes Format "gzip"
+
