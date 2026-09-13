@@ -2641,7 +2641,7 @@ Inspektor gibt dessen Fenster den Fokus, und Kuerzel galten nur im
 Fokus-Fenster -- `fokusZurueck` nach jedem Knopf, sonst war Strg+S nach
 `+ Bedingung` stumm (der Test sah es: die Datei blieb alt). Seit die Kuerzel
 in allen Fenstern gelten (siehe Menues unten), ist der Umweg wieder draussen.
-Tests `tests/test_pilot_animfsm.py` (8, seriell): Doppelklick, Rechtsziehen,
+Tests `tests/pruef/werkzeug_animfsm.dhtest` (7, seriell; bis Stufe 33 pytest): Doppelklick, Rechtsziehen,
 Ziehen + Strg+Z, Entf (der Laufzeit-Leser ist hier die Pruefung -- ein
 stehengebliebener Uebergang laedt nicht), Bedingung ueber den Inspektor
 mit Wirkungsprobe (speed 10 -> run, speed 1 -> idle), Parameter, F5-Vorschau
@@ -2671,7 +2671,9 @@ Dateiargument. Drei fremde Leser: `ScoreDoc.load_json`, `Song.load_json`,
 `to_tracker_song`. **Fallen:** `STEP` ist ein Schluesselwort (kein `CONST
 STEP`); `GUI_MODAL()` liefert einen Wahrheitswert, kein Handle; Klapplisten
 in Tests: Eintrag k liegt bei y + 24 + k * 22 + 11 unter dem Feld. Tests
-`tests/test_pilot_notenblatt.py` (8, seriell). Schluesselwechsel rueckt die
+`tests/pruef/werkzeug_notenblatt.dhtest` (7, seriell; seit Stufe 33 ohne
+Python -- das Tracker-Gitter ist dort ein fester, von `to_tracker_song`
+aufgezeichneter Stand). Schluesselwechsel rueckt die
 Noten ohne Dialog um Oktaven heran und sagt es (Strg+Z nimmt es zurueck).
 
 ## Python-Abbau, Weg D: Pruefsammlungen fuer `dhrt test` (2026-09-07)
@@ -2872,6 +2874,27 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 `%PUBLIC%\Documents\Drachenhauch\examples`. **Falle:** ISCC-Schalter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
+
+**Stufe 33 (2026-09-13):** die naechsten zwei Werkzeuge ohne Python --
+`test_pilot_animfsm.py` und `test_pilot_notenblatt.py` sind geloescht, ihre
+Faelle stehen in `tests/pruef/werkzeug_animfsm.dhtest` und
+`tests/pruef/werkzeug_notenblatt.dhtest` (je 7). Dafuer drei Stuecke im
+Format: **`--- streichen ZEILE`** nimmt die erste genau so lautende Zeile aus
+der Programmkopie (`WINDOW_MAXIMIZE()` -- sonst treffen die Klicks keine
+festen Lagen; fehlt die Zeile, ist der Fall ein Fehler), **`--- nachher`**
+laesst nach dem Lauf ein zweites Programm im Fallordner laufen, dessen
+Ausgabe statt der des Hauptlaufs verglichen wird (erst wird der Hauptlauf mit
+leerer Erwartung bewertet, damit ein fehlendes Fenster weiter "uebersprungen"
+heisst), und **Platzhalter in Text-Beilagen**, mit Schraegstrichen -- ein
+Rueckstrich im Pfad waere in einer JSON-Beilage ein Escape. Die Leser der
+Qt-Modelle (`AnimDoc`, `ScoreDoc`, `Song`) ersetzt Drachenhauch selbst:
+`JSON_*` plus `ANIM_FSM_LOAD` und ein Schritt der Maschine; `to_tracker_song`
+ist ein fester, einmal aufgezeichneter Stand des Gitters. Die Gegenprobe
+(ohne `AUTOMATION_PLAY`) laesst alle 14 Faelle fallen. **Zwei
+Stolpersteine:** `PROCESS_READ$` liefert die Zeile MIT Umbruch (ohne
+`TRIM$` steht eine Leerzeile in der Ausgabe), und `PRINT` einer
+zusammengesetzten Namensliste traegt das letzte Leerzeichen mit.
+Rust-Test `streichen_und_nachher`.
 
 **Stufe 32 (2026-09-13):** Werkzeuge ohne Python pruefen. Die Tests der
 Drachenhauch-Werkzeuge (IDE, Form-Designer, Anim-FSM, Notenblatt) hingen an
