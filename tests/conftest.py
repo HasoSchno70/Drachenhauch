@@ -95,8 +95,6 @@ _SERIELL = {
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
     "test_pilot_sprite_auswahl.py",
-    "test_pilot_partikel.py",
-    "test_pilot_sfx.py",
     "test_profiler.py",
     # Laesst `dhrt test tests/pruef` laufen, und darin stecken die Sammlungen
     # mit eingespeisten Tasten und Klicks (AUTOMATION_PLAY). Innerhalb des
@@ -214,8 +212,6 @@ _BRAUCHT_GRAFIK = {
     "test_m3d.py",
     "test_modules_audio.py",
     "test_pilot_tilemap.py",
-    "test_pilot_partikel.py",
-    "test_pilot_sfx.py",
     "test_pilot_tracker.py",
     "test_pilot_sprite_auswahl.py",
     "test_shader_uniforms_geometry.py",

@@ -116,6 +116,12 @@ pub struct Fall {
     /// ueber einen Neustart hinweg behaelt, oder aus dem Bild eines ersten
     /// Laufs die Klicklage fuer den zweiten ausrechnen.
     pub schritte: Vec<Schritt>,
+    /// `--- einschub nach MARKE`: ein WEITERER Einschub hinter einer anderen
+    /// Zeile des Programms (mehrere erlaubt). Der Quelltext des Falls steht
+    /// meist oben (Hilfsfunktionen, DIM); ein Einschub in der Bildschleife
+    /// misst dann je Bild und kann erst dort, mit fertiger Fenstergeometrie,
+    /// die Aufnahme schreiben und abspielen.
+    pub einschuebe: Vec<(String, String)>,
 }
 
 /// Ein Schritt zwischen Hauptlauf und `--- nachher`.
@@ -535,7 +541,7 @@ pub const KEIN_FENSTER: &[&str] = &[
 ];
 
 #[derive(PartialEq, Clone, Copy)]
-enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher, Vorher, Zwischen, Nochmal }
+enum Abschnitt { Quelle, Erwartet, Enthaelt, Fehler, Datei, Verzeichnis, Umgebung, Bild, Ton, Eingabe, Argumente, Stderr, Inhalt, Nachher, Vorher, Zwischen, Nochmal, Einschub }
 
 /// Eine gelesene Sammlung: ihre Faelle und ob sie NACHEINANDER laufen muessen
 /// (`--- seriell` im Kopf, vor dem ersten Fall) -- fuer Faelle, die sich ein
@@ -605,6 +611,8 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
             // `datei_b64` traegt hier "ohne" -- derselbe Merker fuer die Art des Blocks.
             Abschnitt::Nachher => f.nachher = Some(text),
             Abschnitt::Vorher => f.vorher = Some(text),
+            // `datei_name` traegt hier die Marke aus `--- einschub nach MARKE`.
+            Abschnitt::Einschub => f.einschuebe.push((datei_name.to_string(), text.trim_end().to_string())),
             Abschnitt::Zwischen => f.schritte.push(Schritt::Zwischen(text)),
             // `datei_name` traegt hier den Ordner aus `--- nochmal in ORDNER`.
             Abschnitt::Nochmal => f.schritte.push(Schritt::Nochmal {
@@ -733,6 +741,13 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     Abschnitt::Vorher
                 }
                 "zwischen" => Abschnitt::Zwischen,
+                "einschub" => {
+                    match arg.strip_prefix("nach ") {
+                        Some(m) if !m.trim().is_empty() => datei_name = m.trim().to_string(),
+                        _ => return Err(format!("Zeile {}: '--- einschub' braucht 'nach MARKE'", nr + 1)),
+                    }
+                    Abschnitt::Einschub
+                }
                 "nochmal" => {
                     datei_name = if arg.is_empty() { String::new() } else {
                         match arg.strip_prefix("in ") {
@@ -767,7 +782,7 @@ pub fn sammlung_parsen(text: &str) -> Result<Sammlung, String> {
                     f.ton = Some(TonPruefung { datei: arg.to_string(), proben: Vec::new() });
                     Abschnitt::Ton
                 }
-                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, streichen, vorher, zwischen, nochmal, nachher, inhalt, ohne)", nr + 1, other)),
+                other => return Err(format!("Zeile {}: unbekannter Abschnitt '--- {}' (erwartet, enthaelt, fehler, stderr, rueckgabe, datei, verzeichnis, umgebung, eingabe, argumente, bild, ton, system, programm, einschub, streichen, vorher, zwischen, nochmal, nachher, inhalt, ohne)", nr + 1, other)),
             };
             continue;
         }
@@ -924,6 +939,15 @@ mod tests {
         assert_eq!(f.nachher.as_deref(), Some("PRINT \"danach\""));
         assert!(parsen("=== x\nPRINT 1\n--- nochmal b\n").unwrap_err().contains("nochmal in ORDNER"));
         assert!(parsen("=== x\nPRINT 1\n--- vorher\nPRINT 1\n--- vorher\nPRINT 2\n").unwrap_err().contains("schon"));
+    }
+
+    #[test]
+    fn weitere_einschuebe() {
+        let f = parsen("=== ed\nDIM n AS INTEGER\n--- programm x.dh nach SETFPS(60)\n--- einschub nach FLIP()\nn = n + 1\nPRINT n\n\n--- einschub nach WEND\nPRINT 0\n--- erwartet\n1\n").unwrap();
+        assert_eq!(f[0].einschuebe, vec![("FLIP()".to_string(), "n = n + 1\nPRINT n".to_string()),
+                                         ("WEND".to_string(), "PRINT 0".to_string())]);
+        assert!(parsen("=== a\nPRINT 1\n--- einschub\nX\n").is_err());
+        assert!(parsen("=== a\nPRINT 1\n--- einschub nach \nX\n").is_err());
     }
 
     #[test]

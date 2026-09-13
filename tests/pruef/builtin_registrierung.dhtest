@@ -1,0 +1,49 @@
+' Befehle, die nur mit echtem Fenster, Monitor oder Nutzer etwas tun (Menues,
+' Dateidialoge, Monitore, Fensterzustand, Shader) -- geprueft wird hier nur,
+' dass sie im eingebauten Befehlsverzeichnis stehen. Fehlt einer, bietet die
+' IDE ihn nicht an und `dhrt --check` meldet ihn als unbekannt. Ihr Verhalten
+' pruefen die Beispiele (examples/120..137). Bis Stufe 39 standen diese Listen
+' in 14 kleinen pytest-Dateien (tests/test_gui_*_builtin*.py u. a.).
+'
+' CODE_COMPLETE liefert zu einem Wortanfang die passenden Namen -- mit dem
+' ganzen Namen als Anfang muss er selbst darunter sein. Ausgegeben wird nur,
+' was FEHLT.
+
+=== fenster- und grafikbefehle stehen im verzeichnis
+FUNCTION bekannt(name AS STRING) AS BOOLEAN
+    DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(name, 1, LEN(name) + 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        IF UPPER$(v[i]) = UPPER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("GUI_WINDOW_SCROLLABLE GUI_TOOLTIP GUI_SPINNER GUI_SPLITTER " + _
+    "GUI_TABS GUI_SET_TAB GUI_ACTIVE_TAB GUI_SET_ACTIVE_TAB " + _
+    "GUI_TEXTAREA GUI_MESSAGE GUI_CONFIRM " + _
+    "GUI_ICON_BUTTON GUI_SET_ICON GUI_TOOLBAR " + _
+    "GUI_TREE GUI_TREE_ADD GUI_TREE_CLEAR GUI_TREE_SELECTED GUI_TREE_SET_SELECTED GUI_TREE_LABEL GUI_TREE_EXPAND " + _
+    "GUI_MENU GUI_CONTEXT GUI_MENU_ITEM GUI_MENU_SEPARATOR " + _
+    "FILE_OPEN_DIALOG FILE_SAVE_DIALOG FOLDER_DIALOG " + _
+    "SCREEN_TRANSPARENT WINDOW_UNDECORATED WINDOW_TOPMOST WINDOW_PASSTHROUGH " + _
+    "IMAGE_CROP IMAGE_RESIZE_CANVAS IMAGE_BLUR IMAGE_BRIGHTNESS IMAGE_CONTRAST IMAGE_GRAYSCALE " + _
+    "IMAGE_INVERT IMAGE_REPLACE_COLOR IMAGE_DRAW_LINE IMAGE_DRAW_CIRCLE IMAGE_DRAW_RECT IMAGE_DRAW_TEXT " + _
+    "MONITOR_COUNT CURRENT_MONITOR MONITOR_WIDTH MONITOR_HEIGHT MONITOR_REFRESH MONITOR_NAME " + _
+    "MONITOR_X MONITOR_Y SET_WINDOW_MONITOR WINDOW_X WINDOW_Y SET_WINDOW_POS SCREEN_NATIVE " + _
+    "DELTA FPS SETFPS SET_FULLSCREEN SETWINDOWTITLE SAVESCREENSHOT " + _
+    "SHADER_LOAD SHADER_SET SHADER_SET2 SHADER_SET3 POSTFX", " ")
+DIM i AS INTEGER
+DIM n AS INTEGER : n = 0
+FOR i = 0 TO LEN(namen) - 1
+    IF namen[i] <> "" THEN
+        n = n + 1
+        IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
+    END IF
+NEXT
+PRINT STR$(n) + " geprueft"
+' Gegenprobe: ein Name, den es nicht gibt, ist auch nicht bekannt.
+PRINT "erfunden bekannt: " ; bekannt("GUI_GIBT_ES_NICHT")
+--- erwartet
+68 geprueft
+erfunden bekannt: FALSE
