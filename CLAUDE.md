@@ -2899,7 +2899,13 @@ eine Quelle fuer Zeichnen und Klick). `GUI_TABLE_SET_CURRENT` rollt ueber
 `sicht_holen` + `tabellen_pass`, weil ein Setter keine Geometrie hat.
 `.dhform` `zellmodus`/`zeilen_anhaengen`/`col_type`/`col_choices`; Designer
 Kaestchen "Zellmodus" + Codegen. Die IDE: das Profil ist ein Gitter
-(Strg+C kopiert Zeilen). Tests `tests/pruef/gui_gitter.dhtest` (6, darunter
+(Strg+C kopiert Zeilen). **Stolperstein, vom Gitter aufgedeckt:**
+`IF GUI_TABLE_CLICKED(tblProfil) THEN` -- das Builtin liefert -1 fuer
+"keins", und -1 ist WAHR; `profilAnspringen` lief seit Stufe 2 in jedem Bild
+und nagelte nach dem ersten Klick ins Profil die Marke fest. Sichtbar wurde
+es erst, als Pfeile im Gitter eine Zeile waehlten und ein fremder Test
+(Aufrufer-Baum) rot wurde; `--check` sagt dazu nichts. Die uebrigen
+-1-Builtins in IDE und Beispielen vergleichen alle mit `>= 0`. Tests `tests/pruef/gui_gitter.dhtest` (6, darunter
 die Pfeiltasten in einer gewoehnlichen Tabelle), ein Rust-Test.
 
 **Stufe 29 (2026-09-13):** das Handbuch bedienbar, als Ausbau von
