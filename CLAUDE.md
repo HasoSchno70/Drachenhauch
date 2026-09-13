@@ -2875,6 +2875,25 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 41 (2026-09-13):** der Rechnungen-Pilot ohne Python --
+`tests/pruef/werkzeug_rechnungen.dhtest` (14 Faelle; die zwei Pruefungen, die
+in pytest je EIN Test mit zwei Laeufen waren, sind jetzt je zwei Faelle),
+`tests/test_pilot_rechnungen.py` geloescht. Die vier fremden Leser sind
+ersetzt: Pythons `sqlite3` durch das db-Modul im `--- nachher`, PyMuPDF durch
+`BUFFER_INFLATE` ueber die Inhaltsstroeme, das `csv`-Modul durch `READLINES`
+und die Python-Eltern des Rechnungsfensters durch das net-Modul
+(`NET_TCP_LISTEN` + `SETENV("DHRT_ELTERN_PORT")` + `PROCESS_START`) -- ein
+Teilnehmer, der `WINDOW_OPEN` nicht kennt, wie vorher. Der Pfad des Kindes
+kommt ueber `--- argumente {sammlung}/...` in den Hauptlauf, der ihn in eine
+Datei schreibt: ein `--- nachher` kennt die Sammlung nicht. Einen Befehl, der
+den vom System gewaehlten Port nennt, gibt es nicht -- der Fall lauscht auf
+einem festen (48123), die Sammlung laeuft seriell. Einschuebe: ein
+1x1-Nullpunkt hinter `GUI_WINDOW_CHROME` (Fenster- in Bildschirmlagen), der
+Startzustand hinter `GUI_FOCUS(tfKName)`, Aufnahme und Probe hinter `FLIP()`.
+Alle 14 Faelle waren beim ersten Lauf gruen -- die Gegenprobe ohne
+`AUTOMATION_PLAY` laesst alle 10 mit Eingaben fallen; die uebrigen 4 (erster
+Start, Geldrechnung, Fenstergroesse, Rechnungsfenster) brauchen keine.
+
 **Stufe 40 (2026-09-13):** der Tracker-Pilot ohne Python --
 `tests/pruef/werkzeug_tracker.dhtest` (17 Faelle), `tests/test_pilot_tracker.py`
 geloescht. Ohne neues Formatstueck: ein Einschub hinter `FLIP()` schreibt je

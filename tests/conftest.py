@@ -201,7 +201,6 @@ _BRAUCHT_GRAFIK = {
     "test_gfx_push_pop.py",
     "test_gui_draw_window.py",
     "test_gui_form_runner.py",
-    "test_pilot_rechnungen.py",
     "test_drucken.py",
     "test_fenster_prozess.py",
     "test_gui_bindung.py",

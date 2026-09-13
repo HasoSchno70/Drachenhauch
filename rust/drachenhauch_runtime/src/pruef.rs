@@ -273,6 +273,7 @@ pub const GEDULDETE_PFADE: &[(&str, &str)] = &[
     ("drachenhauch/doku.py", "Quelltext-Referenz, 2026-09-06 durch `dhrt doku referenz` abgeloest"),
     ("tests/test_ide.py", "IDE-Tests, bis Stufe 38 (2026-09-13) nach tests/pruef/werkzeug_ide*.dhtest gezogen"),
     ("tests/test_pilot_tracker.py", "Tracker-Pilot, in Stufe 40 (2026-09-13) nach tests/pruef/werkzeug_tracker.dhtest gezogen"),
+    ("tests/test_pilot_rechnungen.py", "Rechnungen-Pilot, in Stufe 41 (2026-09-13) nach tests/pruef/werkzeug_rechnungen.dhtest gezogen"),
 ];
 
 /// Alle Dateien und Verzeichnisse des Repos (ohne target/, __pycache__,
