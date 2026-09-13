@@ -2877,7 +2877,7 @@ Pfade um ("more than one script filename"); PowerShell nehmen.
 
 **Stufe 34 (2026-09-13):** die IDE selbst, erster grosser Teil ohne
 Python -- ohne neues Formatstueck, alles mit dem aus Stufe 32/33.
-`tests/test_ide_bausteine.py` ist geloescht (12 Faelle in
+test_ide_bausteine.py ist geloescht (12 Faelle in
 `tests/pruef/ide_bausteine.dhtest`: PROCESS_*, CODE_* als Golden der
 JSON-Ausgabe, Textbereich-Befehle), aus `tests/test_ide.py` sind die 31 Faelle
 der Staende 1 bis 5 nach `tests/pruef/werkzeug_ide.dhtest` gezogen (110
