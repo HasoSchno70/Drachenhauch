@@ -212,8 +212,10 @@ DIM miVorn AS INTEGER : miVorn = GUI_MENU_ITEM(mBearb, "Nach vorn")
 DIM miHinten AS INTEGER : miHinten = GUI_MENU_ITEM(mBearb, "Nach hinten")
 
 DIM lblPalette AS GUI_WIDGET : lblPalette = GUI_LABEL(winPal, "Palette -- anklicken, dann auf die Form", 8, 34)
-DIM lstPalette AS GUI_WIDGET : lstPalette = GUI_LISTBOX(winPal, 8, 56, PAL_B - 16, 690, palName)
-DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winPal, "Bereit.", 8, 752)
+' Die Liste laesst unten Platz fuer zwei Zeilen Status -- eine Meldung mit
+' Pfad bricht um und stand sonst halb unter dem Fensterrand.
+DIM lstPalette AS GUI_WIDGET : lstPalette = GUI_LISTBOX(winPal, 8, 56, PAL_B - 16, 664, palName)
+DIM lblStatus AS GUI_WIDGET : lblStatus = GUI_LABEL(winPal, "Bereit.", 8, 726)
 GUI_SET_WRAP(lblStatus, PAL_B - 16)
 DIM palScharf AS INTEGER : palScharf = -1
 

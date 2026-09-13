@@ -38,7 +38,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
 > | Tracker (`examples/190_tracker.dh`) | 3911 | 2103 | 0,54 |
-> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1327 | 0,26 |
+> | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1329 | 0,26 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
 > | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1449 | 0,85 |
 >

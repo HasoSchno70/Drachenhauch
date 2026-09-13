@@ -226,7 +226,7 @@ anschließendes Speichern die Projektdatei überschrieben).
 
 Seit 2026-09-06 gibt es den Designer auch **in Drachenhauch selbst** (Weg B
 aus [entwurf-python-abbau.md](entwurf-python-abbau.md), der erste der vier
-Editoren ohne Piloten). 1 327 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
+Editoren ohne Piloten). 1 329 Zeilen gegen 5 055 der Qt-Fassung (3 519 UI +
 1 536 Modell), Faktor 0,26 (beim ersten Stand 860 Zeilen, 0,17; seit Stand
 31 mit Feldern je Art und GB-Code) — mit demselben Vorbehalt wie bei allen
 Piloten: der Faktor misst, wie viel weggelassen ist (siehe unten). Die
