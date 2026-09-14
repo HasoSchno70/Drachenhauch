@@ -537,7 +537,7 @@ als Ausgangspunkt:
       Kommando-Kanal des Debuggers. Eine Debug-Sitzung mit `INPUT` lief danach
       aus dem Tritt. Beide Wächter deckten nur den Profiler ab, nicht den
       Debugger (`flush_and_prompt`, `read_input_line` in `vm.rs`). Behoben,
-      zwei Tests in `tests/test_dhrt_debug.py` halten es fest
+      zwei Faelle in `tests/pruef/dhrt_debug.dhtest` halten es fest
 
 ## Python-Parser entfernt (✅ ERLEDIGT 2026-08-19)
 

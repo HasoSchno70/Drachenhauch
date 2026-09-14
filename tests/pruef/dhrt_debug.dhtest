@@ -1,0 +1,172 @@
+' Der Debugger `dhrt debug`: Kommandos als JSON-Zeilen auf stdin, Ereignisse
+' (paused/output/eval-result/error/finished) als JSON-Zeilen auf stdout.
+' Bis Stufe 52 (2026-09-14) tests/test_dhrt_debug.py; hier treibt
+' _hilfen/debugsitzung.dh die Sitzung per PROCESS_START und liest die
+' Ereignisse mit dem json-Modul.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== haltepunkt globale auswertung stopp
+IMPORT "sitzung.dh"
+sitzung("d.dh", ["{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "set-breakpoints" + CHR$(34) + "," + CHR$(34) + "lines" + CHR$(34) + ":[3]}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "continue" + CHR$(34) + "}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "eval" + CHR$(34) + "," + CHR$(34) + "expr" + CHR$(34) + ":" + CHR$(34) + "x * 2" + CHR$(34) + "}", _
+    "{" + CHR$(34) + "cmd" + CHR$(34) + ":" + CHR$(34) + "stop" + CHR$(34) + "}"])
+' Erster Halt vor Zeile 1, dann am Haltepunkt mit x = 5
+PRINT art$(0); " "; feld$(0, "line")
+DIM h3 AS INTEGER : h3 = ersteMit("paused", 3)
+PRINT h3 >= 0; " "; paar$(h3, "globals", "x")
+DIM ev AS INTEGER : ev = ersteMit("eval-result", 0)
+PRINT feld$(ev, "value"); " "; feld$(ev, "type")
+DIM letzt AS INTEGER : letzt = LEN(ereignisse) - 1
+PRINT art$(letzt); " "; feld$(letzt, "reason")
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 5
+PRINT x
+
+--- erwartet
+paused 1
+TRUE 5
+10 INTEGER
+finished stopped
+
+=== lokale einer funktion beim namen
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "set-breakpoints" + q + "," + q + "lines" + q + ":[4]}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "eval" + q + "," + q + "expr" + q + ":" + q + "a + b" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"])
+' Halt auf RETURN b: b ist schon gesetzt, Tiefe 2 = in der Funktion
+DIM h4 AS INTEGER : h4 = ersteMit("paused", 4)
+PRINT h4 >= 0; " "; feld$(h4, "depth")
+PRINT paar$(h4, "locals", "a"); " "; paar$(h4, "locals", "b")
+PRINT feld$(ersteMit("eval-result", 0), "value")
+PRINT art$(LEN(ereignisse) - 1)
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+  DIM b AS INTEGER
+  b = a + 1
+  RETURN b
+END FUNCTION
+DIM r AS INTEGER
+r = f(10)
+PRINT r
+
+--- erwartet
+TRUE 2
+10 11
+21
+finished
+
+=== schritt ueber geht zeile fuer zeile
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+sitzung("d.dh", ["{" + q + "cmd" + q + ":" + q + "step-over" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "step-over" + q + "}", _
+    "{" + q + "cmd" + q + ":" + q + "stop" + q + "}"])
+DIM i AS INTEGER
+DIM n AS INTEGER : n = 0
+FOR i = 0 TO LEN(ereignisse) - 1
+    IF art$(i) = "paused" AND n < 3 THEN
+        PRINT feld$(i, "line")
+        n = n + 1
+    END IF
+NEXT
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM x AS INTEGER
+x = 1
+x = 2
+x = 3
+
+--- erwartet
+1
+2
+3
+
+=== input zerstoert das protokoll nicht
+' Waehrend einer Sitzung gehoert stdin dem Kommando-Protokoll und stdout den
+' Ereignissen. INPUT schrieb seinen Prompt frueher ROH mitten ins JSON und
+' stahl dem Debugger eine Kommandozeile; jetzt geht der Prompt als output
+' hinaus und INPUT bekommt eine leere Zeile.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter, weiter])
+' Jede Zeile war JSON -- sonst haette JSON_PARSE schon abgebrochen.
+PRINT INSTR(ausgaben$(), "vorher" + CHR$(10)) >= 0
+PRINT INSTR(ausgaben$(), "Zahl: ") >= 0
+' Leere Eingabe bei einem INTEGER-Ziel: sauberer Fehler an der INPUT-Zeile
+PRINT feld$(ersteMit("error", 0), "line")
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM n AS INTEGER
+PRINT "vorher"
+INPUT "Zahl: ", n
+PRINT "nachher"
+
+--- erwartet
+TRUE
+TRUE
+3
+
+=== input auf string liefert leerstring
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter])
+PRINT INSTR(ausgaben$(), "[]") >= 0
+PRINT ersteMit("error", 0)
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM s AS STRING
+INPUT "Name: ", s
+PRINT "[" + s + "]"
+
+--- erwartet
+TRUE
+-1
+
+=== stdin handle stiehlt dem debugger nichts
+' Dieselbe Sperre wie bei INPUT, fuer STDIN(): das Programm bekommt einen Strom,
+' der sofort zu Ende ist -- die Filterschleife laeuft null mal, statt die
+' Sitzung aus dem Tritt zu bringen.
+IMPORT "sitzung.dh"
+DIM q AS STRING : q = CHR$(34)
+DIM weiter AS STRING : weiter = "{" + q + "cmd" + q + ":" + q + "continue" + q + "}"
+sitzung("d.dh", [weiter, weiter, weiter])
+DIM aus AS STRING : aus = ausgaben$()
+PRINT INSTR(aus, "vorher") >= 0; " "; INSTR(aus, "nachher") >= 0
+PRINT INSTR(aus, "gelesen:") >= 0
+PRINT ersteMit("error", 0)
+--- datei sitzung.dh
+IMPORT "{sammlung}/_hilfen/debugsitzung.dh"
+
+--- datei d.dh
+DIM f AS FILE
+DIM z AS STRING
+PRINT "vorher"
+f = STDIN()
+WHILE NOT ENDOFFILE(f)
+    z = READLINE(f)
+    PRINT "gelesen: " + z
+WEND
+PRINT "nachher"
+
+--- erwartet
+TRUE TRUE
+FALSE
+-1
