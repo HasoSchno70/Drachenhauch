@@ -1,0 +1,291 @@
+' DAT/CCL -> JSON-Konverter fuer CIRCUIT RUNNER.
+'
+' Liest das originale Chip's-Challenge-Bin-Levelformat (.dat/.ccl, wie es Tile
+' World / CCEdit nutzen, das auf Fansites verbreitet ist) und schreibt ein
+' selbstbeschreibendes JSON-Set, das die Engine direkt laedt.
+'
+'     dhrt run circuitrunner/convert_dat.dh -- pfad/zu/CHIPS.dat [ausgabe.json]
+'
+' Ohne Ausgabe landet das Set in levels/<name>.json neben diesem Programm.
+' Format-Referenz: www.seasip.info/ccfile.html . Die Tile-Codes (0x00..0x6F)
+' sind in der Engine 1:1 die Zellen-Indizes im Tileset (siehe make_tiles).
+'
+' JSON-Set-Schema:
+'     { "name": "...", "ruleset": "ms|lynx",
+'       "levels": [ {
+'           "title","number","time","chips","hint","password",
+'           "width"=32,"height"=32,
+'           "upper": "<2048 Hex-Zeichen>", "lower": "<2048 Hex-Zeichen>",
+'           "traps":   "bx,by,tx,ty;...",
+'           "cloners": "bx,by,mx,my;...",
+'           "monsters":"x,y;..." } ] }
+'
+' Bis 2026-09-14 convert_dat.py; die Ausgabe ist Byte fuer Byte dieselbe.
+IMPORT "json"
+
+CONST W = 32
+CONST H = 32
+CONST N = 1024
+
+' dhrt wechselt ins Verzeichnis dieses Programms -- relative Argumente meint
+' der Aufrufer aber von dort, wo er steht.
+DIM programmOrdner AS STRING : programmOrdner = CWD$()
+
+FUNCTION vomAufrufer$(pfad AS STRING) AS STRING
+    IF pfad = "" THEN RETURN ""
+    IF LEFT$(pfad, 1) = "/" OR LEFT$(pfad, 1) = CHR$(92) OR MID$(pfad, 1, 1) = ":" THEN RETURN pfad
+    DIM start AS STRING : start = GETENV$("DHRT_START_DIR")
+    IF start = "" THEN RETURN pfad
+    RETURN start + "/" + pfad
+END FUNCTION
+
+DIM daten AS BUFFER
+DIM pos AS INTEGER : pos = 0
+
+FUNCTION u8() AS INTEGER
+    DIM v AS INTEGER : v = BUFFER_GET(daten, pos)
+    pos = pos + 1
+    RETURN v
+END FUNCTION
+
+FUNCTION u16() AS INTEGER
+    DIM v AS INTEGER : v = BUFFER_GET_U16(daten, pos)
+    pos = pos + 2
+    RETURN v
+END FUNCTION
+
+FUNCTION u32() AS INTEGER
+    DIM v AS INTEGER : v = BUFFER_GET_U32(daten, pos)
+    pos = pos + 4
+    RETURN v
+END FUNCTION
+
+FUNCTION stueck(n AS INTEGER) AS BUFFER
+    DIM ende AS INTEGER : ende = pos + n
+    IF ende > BUFFER_LEN(daten) THEN ende = BUFFER_LEN(daten)
+    DIM b AS BUFFER : b = BUFFER_SLICE(daten, pos, ende)
+    pos = pos + n
+    RETURN b
+END FUNCTION
+
+FUNCTION rleDecode(roh AS BUFFER) AS ARRAY OF INTEGER
+    ' RLE -> 1024 Tile-Codes. 0xFF,count,tile = count Wiederholungen.
+    ' Achtung: eine lokale `n` verdeckte hier die Konstante N -- Namen sind
+    ' schreibungsunabhaengig, und die Schleife lief dann nie.
+    DIM aus[N] AS INTEGER
+    DIM gefuellt AS INTEGER : gefuellt = 0
+    DIM i AS INTEGER : i = 0
+    WHILE i < BUFFER_LEN(roh) AND gefuellt < N
+        DIM b AS INTEGER : b = BUFFER_GET(roh, i)
+        IF b = &HFF THEN
+            DIM anzahl AS INTEGER : anzahl = BUFFER_GET(roh, i + 1)
+            DIM kachel AS INTEGER : kachel = BUFFER_GET(roh, i + 2)
+            DIM k AS INTEGER
+            FOR k = 1 TO anzahl
+                IF gefuellt < N THEN aus[gefuellt] = kachel
+                gefuellt = gefuellt + 1
+            NEXT
+            i = i + 3
+        ELSE
+            aus[gefuellt] = b
+            gefuellt = gefuellt + 1
+            i = i + 1
+        END IF
+    WEND
+    ' der Rest bleibt 0 -- auf 1024 aufgefuellt bzw. gekappt
+    RETURN aus
+END FUNCTION
+
+FUNCTION hexText$(kacheln AS ARRAY OF INTEGER) AS STRING
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kacheln) - 1
+        s = s + RIGHT$("0" + UPPER$(HEX$(kacheln[i] BAND 255)), 2)
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION cText$(b AS BUFFER) AS STRING
+    ' Bis zum ersten Nullbyte, Latin-1 gelesen.
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO BUFFER_LEN(b) - 1
+        DIM c AS INTEGER : c = BUFFER_GET(b, i)
+        IF c = 0 THEN BREAK
+        s = s + CHR$(c)
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION liste$(werte AS ARRAY OF INTEGER, jeEintrag AS INTEGER) AS STRING
+    ' Flache Werte -> "a,b,c,d;a,b,c,d"
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(werte) - 1
+        IF i > 0 THEN
+            IF i MOD jeEintrag = 0 THEN s = s + ";" ELSE s = s + ","
+        END IF
+        s = s + STR$(werte[i])
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION levelLesen() AS JSON_HANDLE
+    DIM groesse AS INTEGER : groesse = u16()
+    DIM ende AS INTEGER : ende = pos + groesse
+    DIM nummer AS INTEGER : nummer = u16()
+    DIM zeit AS INTEGER : zeit = u16()
+    DIM chips AS INTEGER : chips = u16()
+    DIM detail AS INTEGER : detail = u16()
+    DIM oben AS ARRAY OF INTEGER : oben = rleDecode(stueck(u16()))
+    DIM unten AS ARRAY OF INTEGER : unten = rleDecode(stueck(u16()))
+    ' optionale Felder
+    DIM optLaenge AS INTEGER : optLaenge = u16()
+    DIM optEnde AS INTEGER : optEnde = pos + optLaenge
+    DIM titel AS STRING : titel = ""
+    DIM hinweis AS STRING : hinweis = ""
+    DIM passwort AS STRING : passwort = ""
+    DIM fallen AS ARRAY OF INTEGER : fallen = []
+    DIM kloner AS ARRAY OF INTEGER : kloner = []
+    DIM monster AS ARRAY OF INTEGER : monster = []
+    WHILE pos < optEnde
+        DIM art AS INTEGER : art = u8()
+        DIM laenge AS INTEGER : laenge = u8()
+        DIM nutz AS BUFFER : nutz = stueck(laenge)
+        DIM o AS INTEGER
+        IF art = &H03 THEN
+            titel = cText$(nutz)
+        ELSEIF art = &H07 THEN
+            hinweis = cText$(nutz)
+        ELSEIF art = &H06 THEN
+            ' Passwort, XOR 0x99; robust gegen einen (un)verschluesselten
+            ' Abschluss: nur druckbares ASCII bleibt
+            DIM ent AS BUFFER : ent = BUFFER_NEW(BUFFER_LEN(nutz))
+            FOR o = 0 TO BUFFER_LEN(nutz) - 1
+                BUFFER_SET(ent, o, BUFFER_GET(nutz, o) BXOR &H99)
+            NEXT
+            DIM roh AS STRING : roh = cText$(ent)
+            passwort = ""
+            FOR o = 0 TO LEN(roh) - 1
+                DIM z AS STRING : z = MID$(roh, o, 1)
+                IF ASC(z) >= 32 AND ASC(z) < 127 THEN passwort = passwort + z
+            NEXT
+        ELSEIF art = &H08 THEN
+            passwort = cText$(nutz)
+        ELSEIF art = &H04 THEN
+            ' Fallen: Datensaetze zu 10 Bytes, die ersten acht sind 4 x u16
+            o = 0
+            WHILE o + 10 <= BUFFER_LEN(nutz)
+                DIM f AS INTEGER
+                FOR f = 0 TO 3
+                    ARRAY_PUSH(fallen, BUFFER_GET_U16(nutz, o + f * 2))
+                NEXT
+                o = o + 10
+            WEND
+        ELSEIF art = &H05 THEN
+            ' Klon-Maschinen: Datensaetze zu 8 Bytes
+            o = 0
+            WHILE o + 8 <= BUFFER_LEN(nutz)
+                DIM g AS INTEGER
+                FOR g = 0 TO 3
+                    ARRAY_PUSH(kloner, BUFFER_GET_U16(nutz, o + g * 2))
+                NEXT
+                o = o + 8
+            WEND
+        ELSEIF art = &H0A THEN
+            ' Monster-Bewegungsliste, x,y als Bytes
+            o = 0
+            WHILE o + 2 <= BUFFER_LEN(nutz)
+                ARRAY_PUSH(monster, BUFFER_GET(nutz, o))
+                ARRAY_PUSH(monster, BUFFER_GET(nutz, o + 1))
+                o = o + 2
+            WEND
+        END IF
+        ' andere Felder werden uebergangen
+    WEND
+    pos = ende     ' robust gegen Restbytes
+
+    IF titel = "" THEN titel = "Level " + STR$(nummer)
+    DIM lv AS JSON_HANDLE : lv = JSON_PARSE("{}")
+    JSON_SET_STRING(lv, "title", titel)
+    JSON_SET_INT(lv, "number", nummer)
+    JSON_SET_INT(lv, "time", zeit)
+    JSON_SET_INT(lv, "chips", chips)
+    JSON_SET_STRING(lv, "hint", hinweis)
+    JSON_SET_STRING(lv, "password", passwort)
+    JSON_SET_INT(lv, "width", W)
+    JSON_SET_INT(lv, "height", H)
+    JSON_SET_STRING(lv, "upper", hexText$(oben))
+    JSON_SET_STRING(lv, "lower", hexText$(unten))
+    JSON_SET_STRING(lv, "traps", liste$(fallen, 4))
+    JSON_SET_STRING(lv, "cloners", liste$(kloner, 4))
+    JSON_SET_STRING(lv, "monsters", liste$(monster, 2))
+    RETURN lv
+END FUNCTION
+
+FUNCTION stamm$(pfad AS STRING) AS STRING
+    DIM datei AS STRING : datei = BASENAME(pfad)
+    DIM i AS INTEGER
+    FOR i = LEN(datei) - 1 TO 1 STEP -1
+        IF MID$(datei, i, 1) = "." THEN RETURN LEFT$(datei, i)
+    NEXT
+    RETURN datei
+END FUNCTION
+
+FUNCTION umwandeln(pfad AS STRING) AS JSON_HANDLE
+    daten = READALL_BYTES(pfad)
+    pos = 0
+    DIM regeln AS STRING
+    DIM magie AS INTEGER : magie = u32()
+    IF magie = &H0102AAAC THEN
+        regeln = "lynx"
+    ELSEIF magie = &H0002AAAC THEN
+        regeln = "ms"
+    ELSE
+        ' Manche CCL haben fuehrende Metadaten -> nach der Kennung suchen
+        DIM stelle AS INTEGER : stelle = BUFFER_INDEXOF(daten, BUFFER_FROM_HEX("ACAA0200"))
+        IF stelle < 0 THEN stelle = BUFFER_INDEXOF(daten, BUFFER_FROM_HEX("ACAA0201"))
+        IF stelle < 0 THEN THROW "Keine gueltige CC-Datei (Magic 0x" + RIGHT$("0000000" + UPPER$(HEX$(magie)), 8) + ")."
+        pos = stelle
+        magie = u32()
+        IF magie = &H0102AAAC THEN regeln = "lynx" ELSE regeln = "ms"
+    END IF
+    DIM anzahl AS INTEGER : anzahl = u16()
+    DIM set AS JSON_HANDLE : set = JSON_PARSE("{}")
+    JSON_SET_STRING(set, "name", stamm$(pfad))
+    JSON_SET_STRING(set, "ruleset", regeln)
+    JSON_SET_JSON(set, "levels", JSON_PARSE("[]"))
+    DIM i AS INTEGER
+    FOR i = 1 TO anzahl
+        IF pos >= BUFFER_LEN(daten) THEN BREAK
+        JSON_APPEND_JSON(set, "levels", levelLesen())
+    NEXT
+    RETURN set
+END FUNCTION
+
+IF ARGC() < 1 THEN
+    PRINT "DAT/CCL -> JSON-Konverter fuer CIRCUIT RUNNER"
+    PRINT "    dhrt run circuitrunner/convert_dat.dh -- pfad/zu/CHIPS.dat [ausgabe.json]"
+    EXIT(1)
+END IF
+DIM quelle AS STRING : quelle = vomAufrufer$(ARG$(0))
+IF NOT FILEEXISTS(quelle) THEN
+    PRINT "Nicht gefunden: " + ARG$(0)
+    EXIT(1)
+END IF
+DIM ziel AS STRING
+IF ARGC() > 1 THEN
+    ziel = vomAufrufer$(ARG$(1))
+ELSE
+    ziel = programmOrdner + "/levels/" + stamm$(quelle) + ".json"
+END IF
+IF DIRNAME(ziel) <> "" AND NOT DIREXISTS(DIRNAME(ziel)) THEN MKDIR(DIRNAME(ziel))
+DIM ergebnis AS JSON_HANDLE
+TRY
+    ergebnis = umwandeln(quelle)
+CATCH e
+    EPRINT(e)
+    EXIT(1)
+END TRY
+WRITEALL(ziel, JSON_STRINGIFY(ergebnis))
+PRINT JSON_GET_STRING(ergebnis, "name") + ": " + STR$(JSON_LEN(ergebnis, "levels")) + " Level (" + JSON_GET_STRING(ergebnis, "ruleset") + ") -> " + ziel
