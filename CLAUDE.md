@@ -2876,6 +2876,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 48 (2026-09-14):** die HTTP- und Cloud-Tests ohne Python -- und
+dafuer ein Byte-Weg im net-Modul. `test_modules_html.py` (13), `test_http_request.py`
+(29 mit den sechs Methoden) und `test_modules_cloud.py` (9) sind geloescht. Ihre
+Mock-Server liefen als Faden im pytest-Prozess; ein Drachenhauch-Programm kann
+neben einem blockierenden `HTTP_GET` nichts bedienen. Darum startet jeder Fall
+den **Gegenserver `tests/pruef/_hilfen/gegenserver.dh`** als Kind
+(`PROCESS_START`, Pfad ueber `--- argumente {sammlung}/_hilfen/...`): Modi
+routen/abbruch/langsam/echo/cloud, freier Port in eine Datei im Fallordner,
+mehrere Verbindungen zugleich (zwei langsame Abrufe in 322 statt 600 ms), und
+nach 30 s ohne Verbindung beendet er sich selbst -- ein abgebrochenes
+Pruefprogramm kann ihn nicht mehr beenden. **Der Fund dabei:** `NET_SEND` und
+`NET_RECV` konnten nur UTF-8 -- ein Rumpf mit 00 FF oder eine Antwort mit rohen
+Bytes liess sich in Drachenhauch weder senden noch empfangen. Neu nimmt
+`NET_SEND` einen BUFFER, und `NET_RECV_BYTES` liefert einen; ein von `NET_RECV`
+zurueckgehaltenes angefangenes Zeichen gibt es zuerst heraus (Loopback-Tests in
+`modules_net.dhtest`). Die Programme zog der Generator aus dem Syntaxbaum
+(f-Strings mit `{base}` werden `basis + "..."`, der Servermodus kommt aus dem
+`with`), lief sie und verglich die Ausgaben mit den pytest-Zusagen, bevor sie
+Erwartung wurden; Port und lokalisierte Fehlertexte stehen nur als Teilaussage.
+Gegenprobe ohne Server: 46 von 51 fallen -- der zunaechst gruen gebliebene
+Zeitgrenzen-Fall prueft jetzt, dass der Fehler nach rund einer Sekunde kommt
+und nicht sofort. Offen in pytest: `test_smtp.py` (braucht einen SMTP-Gegenserver).
+
 **Stufe 47 (2026-09-14):** die beiden `--check`-Dateien ohne Python --
 `test_check_unbekannte_namen.py` (21 Faelle) und `test_compiler_warnungen.py`
 (55) geloescht, ihre Faelle stehen in den gleichnamigen Sammlungen. Jeder Fall
