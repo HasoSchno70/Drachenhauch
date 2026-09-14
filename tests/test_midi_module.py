@@ -4,14 +4,13 @@ Drachenhauch bringt Tracker, Sampler, sfxr-Synth, Notenblatt-Editor und
 Kira-Busse mit; bis hierher konnte kein angeschlossenes Keyboard etwas davon
 ansteuern.
 
-Was hier wie geprueft wird:
+Was hier geprueft wird -- seit Stufe 52 (2026-09-14) nur noch, was ein Geraet
+oder das `midi`-Feature braucht. Registrierung, Handle-Typen, die Umrechner
+(`MIDI_NOTE_NAME$`, `MIDI_NOTE_FREQ`) und "Auflistung oder klare Meldung"
+stehen in `tests/pruef/modules_midi.dhtest`.
 
-* **Die Umrechner** (`MIDI_NOTE_NAME$`, `MIDI_NOTE_FREQ`) brauchen kein Geraet
-  und stehen darum in JEDEM Bau -- sie werden ganz normal per `run_gb`
-  geprueft, auch in der posix-CI ohne das `midi`-Feature.
 * **Die Geraete-Befehle** haengen am Feature. Der Bau sagt selbst, ob er sie
-  hat (`dhrt --version`); je nachdem wird die Auflistung geprueft ODER die
-  klare Meldung, dass der Bau sie nicht enthaelt.
+  hat (`dhrt --version`).
 * **Der ganze Kreis** -- senden, durch das Betriebssystem, wieder empfangen --
   wird geprueft, sobald ein VIRTUELLER Loopback-Port da ist (unter Windows
   z.B. loopMIDI). Ein solcher Port erscheint unter demselben Namen als Ein-
@@ -57,76 +56,7 @@ def _hat_midi() -> bool:
     return False
 
 
-# ------------------------------------------------------- Verdrahtung
-
-def test_midi_ist_ein_bekanntes_modul():
-    from drachenhauch.modules import is_known_module
-    assert is_known_module("midi")
-
-
-def test_builtins_sind_registriert():
-    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
-    erwartet = {
-        "midi_in_count", "midi_out_count", "midi_in_name$", "midi_out_name$",
-        "midi_in_open", "midi_out_open", "midi_in_close", "midi_out_close",
-        "midi_next", "midi_pending", "midi_status", "midi_channel",
-        "midi_data1", "midi_data2", "midi_is_note_on", "midi_is_note_off",
-        "midi_is_cc", "midi_note", "midi_velocity", "midi_cc_number",
-        "midi_cc_value", "midi_note_on", "midi_note_off", "midi_cc",
-        "midi_send", "midi_note_name$", "midi_note_freq",
-    }
-    assert erwartet <= builtin_names_lower()
-
-
-def test_handle_typen_lassen_sich_deklarieren(run_gb):
-    out = run_gb("""
-IMPORT "midi"
-DIM ein AS MIDI_IN
-DIM aus AS MIDI_OUT
-PRINT "ok"
-""")
-    assert out == "ok\n"
-
-
-# ------------------------------------------- Umrechner (ohne Geraet)
-
-def test_notenname(run_gb):
-    out = run_gb("""
-IMPORT "midi"
-PRINT MIDI_NOTE_NAME$(60); " "; MIDI_NOTE_NAME$(69); " "; MIDI_NOTE_NAME$(71)
-""")
-    # 71 ist im deutschen Sprachraum H, nicht B.
-    assert out == "C4 A4 H4\n"
-
-
-def test_notenname_ausserhalb_des_protokolls_ist_leer(run_gb):
-    """MIDI kennt 0..127. Ausserhalb lieber nichts sagen als raten."""
-    out = run_gb('IMPORT "midi"\nPRINT "["; MIDI_NOTE_NAME$(200); "]"\n')
-    assert out == "[]\n"
-
-
-def test_notenfrequenz(run_gb):
-    out = run_gb("""
-IMPORT "midi"
-PRINT MIDI_NOTE_FREQ(69)
-PRINT MIDI_NOTE_FREQ(81)
-""")
-    assert out == "440.0\n880.0\n"
-
-
 # --------------------------------------------------- Geraete-Befehle
-
-@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
-def test_auflistung_oder_klare_meldung(run_gb):
-    """Mit dem Feature muss die Auflistung antworten, ohne es eine klare
-    Meldung kommen -- lautlos ins Leere laufen darf keiner der beiden."""
-    quelle = 'IMPORT "midi"\nPRINT MIDI_OUT_COUNT() >= 0\n'
-    if _hat_midi():
-        assert run_gb(quelle) == "TRUE\n"
-    else:
-        with pytest.raises(DHRuntimeError, match="MIDI_OUT_COUNT"):
-            run_gb(quelle)
-
 
 @pytest.mark.skipif(not _hat_midi(), reason="Bau ohne das midi-Feature")
 def test_unbekannter_anschluss_wird_benannt(run_gb):

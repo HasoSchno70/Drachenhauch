@@ -1,0 +1,101 @@
+' Modul `midi`: der Teil, der kein Geraet braucht. Bis Stufe 52 (2026-09-14)
+' in tests/test_midi_module.py; dort bleiben die Faelle mit einem echten oder
+' virtuellen MIDI-Anschluss (Senden, Loopback-Kreis, Pufferdeckel).
+' Die Umrechner (MIDI_NOTE_NAME$, MIDI_NOTE_FREQ) stehen in JEDEM Bau, die
+' Geraetebefehle haengen am Feature `midi`.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die befehle stehen im verzeichnis
+FUNCTION bekannt(name AS STRING) AS BOOLEAN
+    DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(name, 1, LEN(name) + 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        IF UPPER$(v[i]) = UPPER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("MIDI_IN_COUNT MIDI_OUT_COUNT MIDI_IN_NAME$ MIDI_OUT_NAME$ " + _
+    "MIDI_IN_OPEN MIDI_OUT_OPEN MIDI_IN_CLOSE MIDI_OUT_CLOSE " + _
+    "MIDI_NEXT MIDI_PENDING MIDI_STATUS MIDI_CHANNEL " + _
+    "MIDI_DATA1 MIDI_DATA2 MIDI_IS_NOTE_ON MIDI_IS_NOTE_OFF " + _
+    "MIDI_IS_CC MIDI_NOTE MIDI_VELOCITY MIDI_CC_NUMBER " + _
+    "MIDI_CC_VALUE MIDI_NOTE_ON MIDI_NOTE_OFF MIDI_CC " + _
+    "MIDI_SEND MIDI_NOTE_NAME$ MIDI_NOTE_FREQ", " ")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
+NEXT
+PRINT STR$(LEN(namen)) + " geprueft"
+--- erwartet
+27 geprueft
+
+=== handle typen lassen sich deklarieren
+IMPORT "midi"
+DIM ein AS MIDI_IN
+DIM aus AS MIDI_OUT
+PRINT "ok"
+--- erwartet
+ok
+
+=== notenname
+' 71 ist im deutschen Sprachraum H, nicht B.
+IMPORT "midi"
+PRINT MIDI_NOTE_NAME$(60); " "; MIDI_NOTE_NAME$(69); " "; MIDI_NOTE_NAME$(71)
+--- erwartet
+C4 A4 H4
+
+=== notenname ausserhalb des protokolls ist leer
+' MIDI kennt 0..127 -- ausserhalb lieber nichts sagen als raten.
+IMPORT "midi"
+PRINT "["; MIDI_NOTE_NAME$(200); "]"
+--- erwartet
+[]
+
+=== notenfrequenz
+IMPORT "midi"
+PRINT MIDI_NOTE_FREQ(69)
+PRINT MIDI_NOTE_FREQ(81)
+--- erwartet
+440.0
+880.0
+
+=== auflistung oder klare meldung
+' Mit dem Feature muss die Auflistung antworten, ohne es eine klare Meldung
+' kommen -- lautlos ins Leere laufen darf keiner der beiden. Welcher Bau das
+' ist, sagt `dhrt --version` in seiner dabei-Zeile.
+IMPORT "midi"
+DIM v AS INTEGER : v = PROCESS_START("dhrt", "--version")
+DIM text AS STRING : text = ""
+DIM leer AS INTEGER : leer = 0
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MILLIS() - t0 < 15000 AND leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(v)
+    IF teil <> "" THEN
+        text = text + teil
+        leer = 0
+    ELSEIF NOT PROCESS_RUNNING(v) THEN
+        leer = leer + 1
+    END IF
+    SLEEP(20)
+WEND
+DIM mitMidi AS BOOLEAN : mitMidi = FALSE
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(text, CHR$(13), ""), CHR$(10))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    IF LEFT$(zeilen[i], 6) = "dabei:" THEN
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(MID$(zeilen[i], 6, LEN(zeilen[i])), ",")
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(teile) - 1
+            IF TRIM$(teile[k]) = "midi" THEN mitMidi = TRUE
+        NEXT
+    END IF
+NEXT
+TRY
+    DIM n AS INTEGER : n = MIDI_OUT_COUNT()
+    PRINT "antwortet: "; mitMidi AND n >= 0
+CATCH e
+    PRINT "antwortet: "; (NOT mitMidi) AND INSTR(e, "MIDI_OUT_COUNT") >= 0
+END TRY
+--- erwartet
+antwortet: TRUE
