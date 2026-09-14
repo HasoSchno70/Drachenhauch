@@ -2,8 +2,9 @@
 ' ein Werkzeug: der Fall steht als Einschub hinter dem Kommentar der
 ' Hauptschleife, laeuft also nach allem Laden und vor der ersten Runde, und
 ' endet mit EXIT(0). Bis Stufe 53 (2026-09-14) in tests/test_circuitrunner.py,
-' das die Engine-Quelle vor der Schleife abschnitt; dort bleiben die Tests der
-' Python-Werkzeuge convert_dat.py und make_demo_levels.py.
+' das die Engine-Quelle vor der Schleife abschnitt. Dahinter die Werkzeuge
+' (convert_dat, make_demo_levels, download_sfx, download_music), seit sie
+' 2026-09-14 von Python nach Drachenhauch gezogen sind.
 '
 ' Die Engine laedt `assets/...` relativ -- `--- ersetzen` wechselt darum in den
 ' Ordner des Spiels und legt die Sicherung in den Fallordner, sonst schriebe
@@ -213,3 +214,349 @@ IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
 
 --- erwartet
 POS 6 5
+
+=== konverter liest ein dat im rundweg
+' Bis 2026-09-14 tests/test_circuitrunner.py gegen convert_dat.py. Die .dat
+' schreibt der Fall selbst (RLE und Kopf nach seasip.info/ccfile.html) -- ein
+' zweiter, unabhaengiger Schreiber, nicht der Leser des Werkzeugs.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION rle(t AS ARRAY OF INTEGER) AS BUFFER
+    DIM aus AS BUFFER : aus = BUFFER_NEW(0)
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(t)
+        DIM j AS INTEGER : j = i
+        WHILE j < LEN(t)
+            IF t[j] <> t[i] OR j - i >= 255 THEN BREAK
+            j = j + 1
+        WEND
+        DIM b AS BUFFER
+        IF j - i >= 4 OR t[i] = &HFF THEN
+            b = BUFFER_NEW(3)
+            BUFFER_SET(b, 0, &HFF) : BUFFER_SET(b, 1, j - i) : BUFFER_SET(b, 2, t[i])
+            i = j
+        ELSE
+            b = BUFFER_NEW(1)
+            BUFFER_SET(b, 0, t[i])
+            i = i + 1
+        END IF
+        aus = BUFFER_CONCAT(aus, b)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION u16(v AS INTEGER) AS BUFFER
+    DIM b AS BUFFER : b = BUFFER_NEW(2)
+    BUFFER_SET_U16(b, 0, v)
+    RETURN b
+END FUNCTION
+FUNCTION feld(art AS INTEGER, inhalt AS BUFFER) AS BUFFER
+    DIM k AS BUFFER : k = BUFFER_NEW(2)
+    BUFFER_SET(k, 0, art) : BUFFER_SET(k, 1, BUFFER_LEN(inhalt))
+    RETURN BUFFER_CONCAT(k, inhalt)
+END FUNCTION
+DIM oben[1024] AS INTEGER
+DIM unten[1024] AS INTEGER
+DIM x AS INTEGER
+FOR x = 0 TO 31
+    oben[x] = 1 : oben[31 * 32 + x] = 1 : oben[x * 32] = 1 : oben[x * 32 + 31] = 1
+NEXT
+oben[1 * 32 + 1] = &H6C
+oben[2 * 32 + 2] = 2 : oben[2 * 32 + 3] = 2 : oben[2 * 32 + 4] = 2
+oben[5 * 32 + 5] = &H15
+' Passwort ABCD mit Abschluss, XOR 0x99
+DIM pw AS BUFFER : pw = BUFFER_FROM_STRING("ABCD" + CHR$(0))
+DIM i AS INTEGER
+FOR i = 0 TO BUFFER_LEN(pw) - 1
+    BUFFER_SET(pw, i, BUFFER_GET(pw, i) BXOR &H99)
+NEXT
+DIM opt AS BUFFER
+opt = BUFFER_CONCAT(feld(3, BUFFER_FROM_STRING("TEST ROOM" + CHR$(0))), feld(6, pw))
+opt = BUFFER_CONCAT(opt, feld(7, BUFFER_FROM_STRING("hi" + CHR$(0))))
+DIM up AS BUFFER : up = rle(oben)
+DIM lo AS BUFFER : lo = rle(unten)
+DIM rumpf AS BUFFER
+rumpf = BUFFER_CONCAT(BUFFER_CONCAT(u16(1), u16(0)), BUFFER_CONCAT(u16(3), u16(1)))
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_CONCAT(u16(BUFFER_LEN(up)), up))
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_CONCAT(u16(BUFFER_LEN(lo)), lo))
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_CONCAT(u16(BUFFER_LEN(opt)), opt))
+DIM kopf AS BUFFER : kopf = BUFFER_NEW(6)
+BUFFER_SET_U32(kopf, 0, &H0002AAAC) : BUFFER_SET_U16(kopf, 4, 1)
+WRITEALL_BYTES("test.dat", BUFFER_CONCAT(kopf, BUFFER_CONCAT(u16(BUFFER_LEN(rumpf)), rumpf)))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/test.dat", CWD$() + "/test.json")
+' Der Fallordner steht als FALL in der Ausgabe -- sein Pfad wechselt je Lauf.
+PRINT REPLACE$(TRIM$(lauf$(p)), CWD$(), "FALL")
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("test.json")
+PRINT JSON_GET_STRING(h, "ruleset"); " "; JSON_LEN(h, "levels")
+PRINT JSON_GET_STRING(h, "levels.0.title"); "|"; JSON_GET_INT(h, "levels.0.chips"); "|"; JSON_GET_STRING(h, "levels.0.password"); "|"; JSON_GET_STRING(h, "levels.0.hint")
+DIM hex AS STRING : hex = JSON_GET_STRING(h, "levels.0.upper")
+PRINT LEN(hex); " "; LEN(JSON_GET_STRING(h, "levels.0.lower"))
+PRINT MID$(hex, (1 * 32 + 1) * 2, 2); " "; MID$(hex, (5 * 32 + 5) * 2, 2)
+DIM chips AS INTEGER : chips = 0
+FOR i = 0 TO 1023
+    IF MID$(hex, i * 2, 2) = "02" THEN chips = chips + 1
+NEXT
+PRINT "chips im gitter "; chips
+--- argumente
+{sammlung}/../../circuitrunner/convert_dat.dh
+--- erwartet
+test: 1 Level (ms) -> FALL/test.json
+ms 1
+TEST ROOM|3|ABCD|hi
+2048 2048
+6C 15
+chips im gitter 3
+
+=== konverter erkennt das lynx-format
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+' Ein leeres Level: beide Schichten als je ein RLE-Lauf von 255 + 255 + 255 + 255 + 4 Nullen
+DIM lauf AS BUFFER : lauf = BUFFER_FROM_HEX("FFFF00FFFF00FFFF00FFFF00FF0400")
+DIM rumpf AS BUFFER : rumpf = BUFFER_FROM_HEX("0100000000000100")
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_CONCAT(BUFFER_FROM_HEX("0F00"), lauf))
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_CONCAT(BUFFER_FROM_HEX("0F00"), lauf))
+rumpf = BUFFER_CONCAT(rumpf, BUFFER_FROM_HEX("0000"))
+DIM laenge AS BUFFER : laenge = BUFFER_NEW(2)
+BUFFER_SET_U16(laenge, 0, BUFFER_LEN(rumpf))
+WRITEALL_BYTES("lynx.dat", BUFFER_CONCAT(BUFFER_FROM_HEX("ACAA02010100"), BUFFER_CONCAT(laenge, rumpf)))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/lynx.dat", CWD$() + "/lynx.json")
+DIM aus AS STRING : aus = lauf$(p)
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("lynx.json")
+PRINT JSON_GET_STRING(h, "ruleset"); " "; JSON_GET_STRING(h, "levels.0.title")
+--- argumente
+{sammlung}/../../circuitrunner/convert_dat.dh
+--- erwartet
+lynx Level 1
+
+=== konverter lehnt eine fremde datei ab
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+WRITEALL("kaputt.dat", "das ist keine Chip's-Challenge-Datei")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/kaputt.dat", CWD$() + "/kaputt.json")
+PRINT TRIM$(lauf$(p))
+PRINT "rueckgabe "; PROCESS_CODE(p); ", datei "; FILEEXISTS("kaputt.json")
+DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/gibtsnicht.dat")
+PRINT REPLACE$(TRIM$(lauf$(q)), CWD$(), "FALL"); " / "; PROCESS_CODE(q)
+DIM r AS INTEGER : r = PROCESS_START("dhrt", "run", ARG$(0))
+PRINT INSTR(lauf$(r), "convert_dat.dh -- pfad") >= 0; " / "; PROCESS_CODE(r)
+--- argumente
+{sammlung}/../../circuitrunner/convert_dat.dh
+--- erwartet
+Keine gueltige CC-Datei (Magic 0x20736164).
+rueckgabe 1, datei FALSE
+Nicht gefunden: FALL/gibtsnicht.dat / 1
+TRUE / 1
+
+=== demo-level entsprechen dem schema
+' Fuenf Level, je 1024 Kacheln als Hex, genau ein Spielerstart, mindestens ein
+' Ausgang, und der Chipzaehler stimmt mit dem Gitter.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION kachel(hex AS STRING, i AS INTEGER) AS INTEGER
+    ' Zwei Hex-Zeichen -> Zahl. Nicht ueber VAL: VAL("&HFF") ist 0.
+    DIM ziffern AS STRING : ziffern = "0123456789ABCDEF"
+    RETURN INSTR(ziffern, UPPER$(MID$(hex, i * 2, 1))) * 16 + INSTR(ziffern, UPPER$(MID$(hex, i * 2 + 1, 1)))
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/demo.json")
+PRINT REPLACE$(TRIM$(lauf$(p)), CWD$(), "FALL")
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_LOAD("demo.json")
+DIM n AS INTEGER : n = JSON_LEN(h, "levels")
+PRINT "level "; n >= 5
+DIM k AS INTEGER
+FOR k = 0 TO n - 1
+    DIM hex AS STRING : hex = JSON_GET_STRING(h, "levels." + STR$(k) + ".upper")
+    DIM spieler AS INTEGER : spieler = 0
+    DIM ausgang AS BOOLEAN : ausgang = FALSE
+    DIM chips AS INTEGER : chips = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO 1023
+        DIM t AS INTEGER : t = kachel(hex, i)
+        IF t >= &H6C AND t <= &H6F THEN spieler = spieler + 1
+        IF t = &H15 OR t = &H39 OR t = &H3A OR t = &H3B THEN ausgang = TRUE
+        IF t = 2 THEN chips = chips + 1
+    NEXT
+    PRINT JSON_GET_STRING(h, "levels." + STR$(k) + ".title"); ": "; LEN(hex) = 2048 AND LEN(JSON_GET_STRING(h, "levels." + STR$(k) + ".lower")) = 2048; " "; spieler = 1; " "; ausgang; " "; JSON_GET_INT(h, "levels." + STR$(k) + ".chips") = chips
+NEXT
+--- argumente
+{sammlung}/../../circuitrunner/make_demo_levels.dh
+--- erwartet
+5 Demo-Level (alle validiert) -> FALL/demo.json
+level TRUE
+BOOT UP: TRUE TRUE TRUE TRUE
+LOCKED: TRUE TRUE TRUE TRUE
+FLOODED: TRUE TRUE TRUE TRUE
+SLIPPERY: TRUE TRUE TRUE TRUE
+INFESTED: TRUE TRUE TRUE TRUE
+
+=== demo-level sind die eingecheckten
+' Was der Bauer schreibt, ist Byte fuer Byte levels/circuit_runner.json -- die
+' Datei, die bis 2026-09-14 make_demo_levels.py erzeugt hat. Wer ein Demo-Level
+' aendert, erzeugt die Datei neu und checkt beides ein.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/demo.json")
+DIM aus AS STRING : aus = lauf$(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("demo.json")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../circuitrunner/make_demo_levels.dh
+{sammlung}/../../circuitrunner/levels/circuit_runner.json
+--- erwartet
+TRUE
+
+=== soundeffekte kommen von der richtigen adresse
+' Ein Gegenserver im echo-Modus spiegelt den Pfad jeder Anfrage -- jede
+' heruntergeladene Datei sagt also, welche Adresse das Werkzeug gebaut hat.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+IMPORT "json"
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "echo", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM port AS STRING : port = TRIM$(READLINES("port.txt")[0])
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(1), "--", "http://127.0.0.1:" + port + "/sfx/", CWD$() + "/sfx")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(lauf$(p), CHR$(13), ""), CHR$(10))
+PRINT "rueckgabe "; PROCESS_CODE(p); ", zeilen "; LEN(zeilen) - 1
+PRINT JSON_GET_STRING(JSON_LOAD("sfx/step.wav"), "pfad")
+PRINT JSON_GET_STRING(JSON_LOAD("sfx/blocked.wav"), "pfad")
+PRINT READLINES("sfx/CREDITS.txt")[4]
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../../circuitrunner/download_sfx.dh
+--- erwartet
+rueckgabe 0, zeilen 8
+/sfx/tick_001.wav
+/sfx/back_002.wav
+step.wav  <-  tick_001.wav
+
+=== musik kommt mit kodierten namen
+' Die Dateinamen enthalten Leerzeichen und eckige Klammern -- sie gehen wie bei
+' Pythons urllib.parse.quote als %20, %5B, %5D hinaus.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+IMPORT "json"
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "echo", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM port AS STRING : port = TRIM$(READLINES("port.txt")[0])
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(1), "--", "http://127.0.0.1:" + port + "/musik/", CWD$() + "/musik")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT JSON_GET_STRING(JSON_LOAD("musik/title.ogg"), "pfad")
+PRINT READLINES("musik/CREDITS.txt")[2]
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../../circuitrunner/download_music.dh
+--- erwartet
+rueckgabe 0
+/musik/Juhani%20Junkala%20%5BRetro%20Game%20Music%20Pack%5D%20Title%20Screen.ogg
+Quelle: https://archive.org/details/JuhaniJunkalafiveactionchiptunes

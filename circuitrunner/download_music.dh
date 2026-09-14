@@ -1,0 +1,77 @@
+' Laedt die Hintergrundmusik fuer CIRCUIT RUNNER herunter.
+'
+' Quelle: Juhani Junkala, "5 action chiptunes" / Retro Game Music Pack, Lizenz
+' CC0 1.0 (Public Domain -- keine Attribution noetig). Bezogen vom Internet
+' Archive (kanonische CC0-Veroeffentlichung), als nahtlos loopende OGGs.
+'
+' Die OGGs sind ~1 MB und CC0, daher direkt mit eingecheckt -- dieses Programm
+' dient der Reproduzierbarkeit. Aufruf:
+'
+'     dhrt run circuitrunner/download_music.dh [-- quell-adresse [zielordner]]
+'
+' Die beiden Argumente sind fuer Pruefungen (ein Gegenserver statt des Archivs).
+' Bis 2026-09-14 download_music.py.
+IMPORT "html"
+
+CONST EINTRAG = "JuhaniJunkalafiveactionchiptunes"
+DIM basis AS STRING : basis = "https://archive.org/download/" + EINTRAG + "/"
+DIM ordner AS STRING : ordner = CWD$() + "/assets/music"
+IF ARGC() > 0 THEN basis = ARG$(0)
+IF ARGC() > 1 THEN ordner = ARG$(1)
+
+' Ziel-Name -> Quelldatei (CC0). Die Engine rotiert level1..3 pro Level.
+DIM namen AS ARRAY OF STRING
+namen = ["title", "level1", "level2", "level3", "ending"]
+DIM quellen AS ARRAY OF STRING
+quellen = ["Juhani Junkala [Retro Game Music Pack] Title Screen.ogg", _
+    "Juhani Junkala [Retro Game Music Pack] Level 1.ogg", _
+    "Juhani Junkala [Retro Game Music Pack] Level 2.ogg", _
+    "Juhani Junkala [Retro Game Music Pack] Level 3.ogg", _
+    "Juhani Junkala [Retro Game Music Pack] Ending.ogg"]
+
+FUNCTION prozent$(s AS STRING) AS STRING
+    ' Wie Pythons urllib.parse.quote: Buchstaben, Ziffern und _.-~/ bleiben,
+    ' alles andere als %XX (die Namen hier sind reines ASCII).
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        DIM z AS STRING : z = MID$(s, i, 1)
+        DIM c AS INTEGER : c = ASC(z)
+        IF (c >= 48 AND c <= 57) OR (c >= 65 AND c <= 90) OR (c >= 97 AND c <= 122) OR INSTR("_.-~/", z) >= 0 THEN
+            aus = aus + z
+        ELSE
+            aus = aus + "%" + RIGHT$("0" + UPPER$(HEX$(c)), 2)
+        END IF
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION breit$(s AS STRING, n AS INTEGER) AS STRING
+    IF LEN(s) >= n THEN RETURN s
+    RETURN s + SPACE$(n - LEN(s))
+END FUNCTION
+
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+DIM gut AS INTEGER : gut = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    DIM ziel AS STRING : ziel = ordner + "/" + namen[i] + ".ogg"
+    TRY
+        HTTP_DOWNLOAD(basis + prozent$(quellen[i]), ziel)
+        PRINT "  " + breit$(namen[i], 6) + " <- " + quellen[i] + "  (" + STR$(FILESIZE(ziel) \ 1024) + " KB)"
+        gut = gut + 1
+    CATCH e
+        PRINT "  FEHLER " + namen[i] + ": " + e
+    END TRY
+NEXT
+DIM nachweis AS STRING
+nachweis = "Hintergrundmusik: Juhani Junkala -- '5 action chiptunes' / Retro Game Music Pack" + CHR$(10) + _
+    "Lizenz: CC0 1.0 (Public Domain). Keine Attribution noetig." + CHR$(10) + _
+    "Quelle: https://archive.org/details/" + EINTRAG + CHR$(10) + _
+    "Autor:  https://juhanijunkala.com" + CHR$(10) + CHR$(10)
+FOR i = 0 TO LEN(namen) - 1
+    nachweis = nachweis + namen[i] + ".ogg  <-  " + quellen[i] + CHR$(10)
+NEXT
+WRITEALL(ordner + "/CREDITS.txt", nachweis)
+PRINT STR$(gut) + "/" + STR$(LEN(namen)) + " Tracks in " + ordner
+IF gut = LEN(namen) THEN EXIT(0) ELSE EXIT(1)

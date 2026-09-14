@@ -1,0 +1,303 @@
+' Demo-Level-Bauer fuer CIRCUIT RUNNER (ASCII -> JSON-Set) mit Validierung.
+'
+' Schreibt levels/circuit_runner.json im selben Schema, das auch convert_dat
+' erzeugt. Ein Zeichen = eine 32x32-Map-Zelle; nicht belegte Zellen werden mit
+' Wand aufgefuellt.
+'
+' Validierung (verhindert unloesbare Level): von der Spieler-Startzelle aus ein
+' Flood-Fill (harte Waende blockieren, Tueren/Wasser/Force/etc. passierbar,
+' Sockel = geschlossen). Pruefung:
+'   - jeder Chip / Schluessel ist erreichbar,
+'   - der Ausgang ist OHNE Sockel NICHT erreichbar, MIT offenem Sockel schon
+'     (d. h. der Sockel sperrt den Ausgang -> Chips sammeln ist noetig).
+' Bei Verstoss: Meldung mit Levelname auf stderr, Rueckgabe 1, keine Datei.
+'
+'     dhrt run circuitrunner/make_demo_levels.dh [-- ausgabe.json]
+'
+' Bis 2026-09-14 make_demo_levels.py; die Ausgabe ist Byte fuer Byte dieselbe.
+IMPORT "json"
+
+CONST W = 32
+CONST H = 32
+
+DIM programmOrdner AS STRING : programmOrdner = CWD$()
+
+' Zeichen -> Kachel. Ueber eine Zeichenkette statt einer MAP: Gross und klein
+' meinen verschiedene Kacheln (O Sockel, o Saugstiefel; B Block, b Knopf ...).
+DIM kachelZeichen AS STRING : kachelZeichen = " .#+~^_:,XO?*VH@udlimn12345678wfsogrbcM"
+DIM kachelCodes AS ARRAY OF INTEGER
+kachelCodes = [&H00, &H00, &H01, &H02, &H03, &H04, &H0C, &H0B, &H2D, &H15, &H22, &H2F, &H2A, &H2B, &H21, &H29, _
+    &H12, &H0D, &H14, &H13, &H25, &H26, &H16, &H17, &H18, &H19, &H64, &H65, &H66, &H67, _
+    &H68, &H69, &H6A, &H6B, &H23, &H24, &H27, &H28, &H31]
+' Figuren: Spieler, Block, Kaefer/Panzer/Gleiter/Zaehne/Laeufer/Klecks/Pantoffeltier
+DIM figurZeichen AS STRING : figurZeichen = "PBaTLtzkp"
+DIM figurCodes AS ARRAY OF INTEGER
+figurCodes = [&H6C, &H0A, &H40, &H4C, &H50, &H54, &H58, &H5C, &H60]
+
+FUNCTION hart(t AS INTEGER) AS BOOLEAN
+    ' Wand/Unsichtbar/Versteckt/WandSO/BlauWand/ToggleZu/Kloner
+    RETURN t = &H01 OR t = &H05 OR t = &H2C OR t = &H30 OR t = &H1F OR t = &H25 OR t = &H31
+END FUNCTION
+
+FUNCTION erreichbar(oben AS ARRAY OF INTEGER, sockelOffen AS BOOLEAN) AS ARRAY OF BOOLEAN
+    DIM gesehen[W * H] AS BOOLEAN
+    DIM start AS INTEGER : start = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO W * H - 1
+        IF oben[i] >= &H6C AND oben[i] <= &H6F AND start < 0 THEN start = i
+    NEXT
+    IF start < 0 THEN RETURN gesehen
+    DIM stapel AS ARRAY OF INTEGER : stapel = [start]
+    gesehen[start] = TRUE
+    DIM dx AS ARRAY OF INTEGER : dx = [1, -1, 0, 0]
+    DIM dy AS ARRAY OF INTEGER : dy = [0, 0, 1, -1]
+    WHILE LEN(stapel) > 0
+        DIM c AS INTEGER : c = ARRAY_POP(stapel)
+        DIM x AS INTEGER : x = c MOD W
+        DIM y AS INTEGER : y = c \ W
+        DIM r AS INTEGER
+        FOR r = 0 TO 3
+            DIM nx AS INTEGER : nx = x + dx[r]
+            DIM ny AS INTEGER : ny = y + dy[r]
+            IF nx >= 0 AND nx < W AND ny >= 0 AND ny < H THEN
+                DIM n AS INTEGER : n = ny * W + nx
+                DIM t AS INTEGER : t = oben[n]
+                DIM gesperrt AS BOOLEAN : gesperrt = hart(t) OR (t = &H22 AND NOT sockelOffen)
+                IF NOT gesehen[n] AND NOT gesperrt THEN
+                    gesehen[n] = TRUE
+                    ARRAY_PUSH(stapel, n)
+                END IF
+            END IF
+        NEXT
+    WEND
+    RETURN gesehen
+END FUNCTION
+
+FUNCTION stellen$(liste AS ARRAY OF INTEGER) AS STRING
+    ' [(x, y), ...] wie Pythons Liste
+    DIM s AS STRING : s = "["
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(liste) - 1
+        IF i > 0 THEN s = s + ", "
+        s = s + "(" + STR$(liste[i] MOD W) + ", " + STR$(liste[i] \ W) + ")"
+    NEXT
+    RETURN s + "]"
+END FUNCTION
+
+SUB pruefen(titel AS STRING, oben AS ARRAY OF INTEGER)
+    DIM zu AS ARRAY OF BOOLEAN : zu = erreichbar(oben, FALSE)
+    DIM offen AS ARRAY OF BOOLEAN : offen = erreichbar(oben, TRUE)
+    DIM chipsFern AS ARRAY OF INTEGER : chipsFern = []
+    DIM schluesselFern AS ARRAY OF INTEGER : schluesselFern = []
+    DIM ausgaenge AS ARRAY OF INTEGER : ausgaenge = []
+    DIM sockel AS ARRAY OF INTEGER : sockel = []
+    DIM i AS INTEGER
+    FOR i = 0 TO W * H - 1
+        DIM t AS INTEGER : t = oben[i]
+        IF t = &H02 AND NOT zu[i] THEN ARRAY_PUSH(chipsFern, i)
+        IF t >= &H64 AND t <= &H67 AND NOT zu[i] THEN ARRAY_PUSH(schluesselFern, i)
+        IF t = &H15 OR t = &H39 OR t = &H3A OR t = &H3B THEN ARRAY_PUSH(ausgaenge, i)
+        IF t = &H22 THEN ARRAY_PUSH(sockel, i)
+    NEXT
+    IF LEN(chipsFern) > 0 THEN THROW titel + ": " + STR$(LEN(chipsFern)) + " Chip(s) unerreichbar @ " + stellen$(chipsFern)
+    IF LEN(schluesselFern) > 0 THEN THROW titel + ": " + STR$(LEN(schluesselFern)) + " Schluessel unerreichbar @ " + stellen$(schluesselFern)
+    IF LEN(ausgaenge) = 0 THEN THROW titel + ": kein Ausgang"
+    IF LEN(sockel) = 0 THEN THROW titel + ": kein Sockel"
+    ' Sockel muss erreichbar sein (er selbst oder ein Nachbar)
+    DIM sockelDa AS BOOLEAN : sockelDa = FALSE
+    FOR i = 0 TO LEN(sockel) - 1
+        DIM s AS INTEGER : s = sockel[i]
+        IF zu[s] THEN sockelDa = TRUE
+        IF s + 1 < W * H THEN
+            IF zu[s + 1] THEN sockelDa = TRUE
+        END IF
+        IF s - 1 >= 0 THEN
+            IF zu[s - 1] THEN sockelDa = TRUE
+        END IF
+        IF s + W < W * H THEN
+            IF zu[s + W] THEN sockelDa = TRUE
+        END IF
+        IF s - W >= 0 THEN
+            IF zu[s - W] THEN sockelDa = TRUE
+        END IF
+    NEXT
+    IF NOT sockelDa THEN THROW titel + ": Sockel nicht erreichbar"
+    ' Ausgang: ohne Sockel NICHT, mit offenem Sockel schon erreichbar
+    DIM ohne AS BOOLEAN : ohne = FALSE
+    DIM mit AS BOOLEAN : mit = FALSE
+    FOR i = 0 TO LEN(ausgaenge) - 1
+        IF zu[ausgaenge[i]] THEN ohne = TRUE
+        IF offen[ausgaenge[i]] THEN mit = TRUE
+    NEXT
+    IF ohne THEN THROW titel + ": Ausgang ohne Sockel erreichbar (Chips waeren sinnlos)"
+    IF NOT mit THEN THROW titel + ": Ausgang auch mit offenem Sockel nicht erreichbar"
+END SUB
+
+FUNCTION hexText$(t AS ARRAY OF INTEGER) AS STRING
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        s = s + RIGHT$("0" + UPPER$(HEX$(t[i] BAND 255)), 2)
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION level(titel AS STRING, zeilen AS ARRAY OF STRING, hinweis AS STRING, monster AS STRING) AS JSON_HANDLE
+    DIM oben[W * H] AS INTEGER
+    DIM unten[W * H] AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO W * H - 1
+        oben[i] = &H01
+    NEXT
+    DIM chips AS INTEGER : chips = 0
+    DIM y AS INTEGER
+    FOR y = 0 TO LEN(zeilen) - 1
+        DIM x AS INTEGER
+        FOR x = 0 TO LEN(zeilen[y]) - 1
+            IF x < W AND y < H THEN
+                DIM zeichen AS STRING : zeichen = MID$(zeilen[y], x, 1)
+                DIM idx AS INTEGER : idx = y * W + x
+                DIM f AS INTEGER : f = INSTR(figurZeichen, zeichen)
+                DIM k AS INTEGER : k = INSTR(kachelZeichen, zeichen)
+                IF f >= 0 THEN
+                    oben[idx] = figurCodes[f]
+                    unten[idx] = &H00
+                ELSEIF k >= 0 THEN
+                    oben[idx] = kachelCodes[k]
+                    unten[idx] = &H00
+                    IF kachelCodes[k] = &H02 THEN chips = chips + 1
+                ELSE
+                    oben[idx] = &H00
+                END IF
+            END IF
+        NEXT
+    NEXT
+    pruefen(titel, oben)
+    DIM lv AS JSON_HANDLE : lv = JSON_PARSE("{}")
+    JSON_SET_STRING(lv, "title", titel)
+    JSON_SET_INT(lv, "number", 0)
+    JSON_SET_INT(lv, "time", 0)
+    JSON_SET_INT(lv, "chips", chips)
+    JSON_SET_STRING(lv, "hint", hinweis)
+    JSON_SET_STRING(lv, "password", "")
+    JSON_SET_INT(lv, "width", W)
+    JSON_SET_INT(lv, "height", H)
+    JSON_SET_STRING(lv, "upper", hexText$(oben))
+    JSON_SET_STRING(lv, "lower", hexText$(unten))
+    JSON_SET_STRING(lv, "traps", "")
+    JSON_SET_STRING(lv, "cloners", "")
+    JSON_SET_STRING(lv, "monsters", monster)
+    RETURN lv
+END FUNCTION
+
+' ============================================================ LEVELS
+' Ausgangs-Tasche (Sockel oben offen zum Raum, Exit darunter eingemauert):
+'   Zeile r-1 (...) x7='.'   Raum-Zugang
+'   Zeile r     #O#          Sockel
+'   Zeile r+1   #X#          Exit (nur ueber Sockel erreichbar)
+FUNCTION alleLevel() AS ARRAY OF JSON_HANDLE
+    DIM aus AS ARRAY OF JSON_HANDLE : aus = []
+
+    ' --- 1: BOOT UP -- Tutorial
+    ARRAY_PUSH(aus, level("BOOT UP", [ _
+        "###############", _
+        "#P...........#", _
+        "#..+..+..+.+.#", _
+        "#............#", _
+        "#..+..+..+.+.#", _
+        "#............#", _
+        "#.....+......#", _
+        "#.....#O#....#", _
+        "#.....#X#....#", _
+        "###############"], _
+        "Sammle alle Chips. Der Sockel oeffnet sich erst, wenn keiner mehr da ist -- dann fuehrt er zum Ausgang.", ""))
+
+    ' --- 2: LOCKED -- Schluessel & Tueren
+    ARRAY_PUSH(aus, level("LOCKED", [ _
+        "###############", _
+        "#P..5...6...+.#", _
+        "#.+.........+.#", _
+        "#####1###2#####", _
+        "#.+.......+.7.#", _
+        "#...........+#", _
+        "#.....+......#", _
+        "#.....#O#....#", _
+        "#.....#X#....#", _
+        "###############"], _
+        "Schluessel oeffnen gleichfarbige Tueren. Hinter den Tueren liegen weitere Chips und der Ausgang.", ""))
+
+    ' --- 3: FLOODED -- Wasser + Bloecke + Flossen
+    ARRAY_PUSH(aus, level("FLOODED", [ _
+        "###############", _
+        "#P..w......+..#", _
+        "#.+.........+.#", _
+        "#.~~~~~~~~~~~.#", _
+        "#.~~B~~B~~B~~.#", _
+        "#.~~~~~~~~~~~.#", _
+        "#.+.........+.#", _
+        "#.....+......#", _
+        "#.....#O#....#", _
+        "#.....#X#....#", _
+        "###############"], _
+        "Floesse (Bloecke) ins Wasser schieben macht begehbaren Boden. Flossen schuetzen vorm Ertrinken.", ""))
+
+    ' --- 4: SLIPPERY -- Eis + Force-Boeden + Saugstiefel
+    ARRAY_PUSH(aus, level("SLIPPERY", [ _
+        "###############", _
+        "#P..o......+..#", _
+        "#.iiiiiiiii..#", _
+        "#.+.........+#", _
+        "#.________..#", _
+        "#...........+#", _
+        "#.dddddddddd.#", _
+        "#.+...+......#", _
+        "#.....#O#....#", _
+        "#.....#X#....#", _
+        "###############"], _
+        "Eis rutscht bis zur Wand. Force-Boeden schieben in Pfeilrichtung -- Saugstiefel machen dich immun.", ""))
+
+    ' --- 5: INFESTED -- Monster + Feuer + Bomben
+    ARRAY_PUSH(aus, level("INFESTED", [ _
+        "###############", _
+        "#P..f......+..#", _
+        "#.^^^^^^^^^^.#", _
+        "#.+.......+..#", _
+        "#..a....p...+#", _
+        "#.+.........+#", _
+        "#.*..+..+..*.#", _
+        "#.....+......#", _
+        "#.....#O#....#", _
+        "#.....#X#....#", _
+        "###############"], _
+        "Feuer-Stiefel schuetzen vor Flammen. Beruehre keine Roboter und keine Bomben.", "3,4;8,4"))
+
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aus) - 1
+        JSON_SET_INT(aus[i], "number", i + 1)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+DIM ziel AS STRING : ziel = programmOrdner + "/levels/circuit_runner.json"
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
+    IF NOT (LEFT$(ziel, 1) = "/" OR LEFT$(ziel, 1) = CHR$(92) OR MID$(ziel, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ziel = GETENV$("DHRT_START_DIR") + "/" + ziel
+END IF
+DIM stufen AS ARRAY OF JSON_HANDLE
+TRY
+    stufen = alleLevel()
+CATCH e
+    EPRINT(e)
+    EXIT(1)
+END TRY
+DIM set AS JSON_HANDLE : set = JSON_PARSE("{}")
+JSON_SET_STRING(set, "name", "Circuit Runner")
+JSON_SET_STRING(set, "ruleset", "ms")
+JSON_SET_JSON(set, "levels", JSON_PARSE("[]"))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(stufen) - 1
+    JSON_APPEND_JSON(set, "levels", stufen[i])
+NEXT
+IF NOT DIREXISTS(DIRNAME(ziel)) THEN MKDIR(DIRNAME(ziel))
+WRITEALL(ziel, JSON_STRINGIFY(set))
+PRINT STR$(LEN(stufen)) + " Demo-Level (alle validiert) -> " + ziel
