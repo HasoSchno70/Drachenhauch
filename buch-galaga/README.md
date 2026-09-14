@@ -58,8 +58,10 @@ Schiff (`player.png`), drei mehrfarbige Gegner (`bug0/1/2.png`, je 2 Frames
 Flügelschlag — eine Reihe pro Farbfamilie: violett-cyan, rot-gelb, blau-türkis),
 der Schuss (`bullet.png`) und die Bombe (`bomb.png`, 2 Frames). Jedes gibt es
 zusätzlich als `.dhsprite` — **öffne sie in `dhsprites` und gestalte sie nach
-deinem Geschmack um.** Erzeugt werden sie reproduzierbar von
-[`assets/make_sprites.py`](assets/make_sprites.py).
+deinem Geschmack um.** Erzeugt werden die PNGs reproduzierbar von
+[`assets/make_sprites.dh`](assets/make_sprites.dh)
+(`dhrt run buch-galaga/assets/make_sprites.dh`); die `.dhsprite`-Dateien
+schreibt es nicht mehr neu, die eingecheckten bleiben zum Bearbeiten liegen.
 
 > Die drei Gegner teilen sich **dieselbe Form**, aber je eine eigene Farbfamilie
 > (Flügel/Körper/Augen) — so sind die Reihen klar unterscheidbar und trotzdem

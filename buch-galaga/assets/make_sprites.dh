@@ -1,0 +1,133 @@
+' Erzeugt die Sprites fuer das Galaga-Buch.
+'
+' Zeichnet Pixel-Art aus Buchstabenrastern und schreibt je Sprite ein PNG-Sheet
+' (Einzelbilder nebeneinander, fuers Spiel); preview.png zur Sichtkontrolle.
+'
+'     dhrt run buch-galaga/assets/make_sprites.dh [-- zielordner]
+'
+' Bis 2026-09-14 make_sprites.py -- die PNGs sind Punkt fuer Punkt dieselben.
+' Die .dhsprite-Dateien daneben (das Format des Qt-Sprite-Editors) schreibt es
+' nicht mehr; die eingecheckten bleiben zum Bearbeiten liegen.
+IMPORT "imgfx"
+
+DIM ordner AS STRING : ordner = CWD$() + "/sprites"
+IF ARGC() > 0 THEN
+    ordner = ARG$(0)
+    IF NOT (LEFT$(ordner, 1) = "/" OR LEFT$(ordner, 1) = CHR$(92) OR MID$(ordner, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ordner = GETENV$("DHRT_START_DIR") + "/" + ordner
+END IF
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+
+' Palette: Zeichen -> Farbe; "." ist durchsichtig
+DIM palZeichen AS STRING : palZeichen = "WCYRBGOPD"
+DIM palFarbe AS ARRAY OF INTEGER
+palFarbe = [&HECF0FF, &H46B4FF, &HFAD246, &HE44040, &H465AB4, &H5ADC78, &HF59632, &HBE64F0, &H1E2846]
+
+DIM PLAYER AS ARRAY OF STRING
+PLAYER = ["................", ".......WW.......", "......WWWW......", "......WCCW......", _
+    "......WCCW......", ".....WWCCWW.....", ".....WCYYCW.....", "....WWCYYCWW....", _
+    "...WWCCCCCCWW...", "..WW.WCCCCW.WW..", "..W..WRCCRW..W..", ".....WRCCRW.....", _
+    "......RRRR......", ".......RR.......", "................", "................"]
+' Gegner-Vorlage: EINE Form, aber Regionen -- so wird derselbe Bug pro Reihe in
+' einer eigenen mehrfarbigen Familie eingefaerbt (Reihen klar unterscheidbar).
+'   w = Fluegel   b = Koerper   e = Auge   # = dunkle Kante   . = transparent
+DIM BUG_A AS ARRAY OF STRING
+BUG_A = ["................", "...w........w...", "....w......w....", "....ww....ww....", _
+    "...wwwwwwwwww...", "..wweewweewwww..", "..wweewweewwww..", "..wwwwbbbbwwww..", _
+    ".wwwwwbbbbwwwww.", "ww.wwwbbbbwww.ww", "......wbbw......", ".....wwbbww.....", _
+    "......#..#......", "................", "................", "................"]
+DIM BUG_B AS ARRAY OF STRING
+BUG_B = ["................", "...w........w...", "....w......w....", "....ww....ww....", _
+    "...wwwwwwwwww...", "..wweewweewwww..", "..wweewweewwww..", "..wwwwbbbbwwww..", _
+    "...wwwbbbbwww...", ".wwwwwbbbbwwwww.", "ww....wbbw....ww", "......wwbbww....", _
+    "......#..#......", "................", "................", "................"]
+' Drei Farb-Familien (Fluegel / Koerper / Auge / Kante), je vier Farben in der
+' Reihenfolge von "wbe#": violett-cyan / rot-gelb / blau-tuerkis.
+DIM bugThema AS ARRAY OF INTEGER
+bugThema = [&HBE64F0, &HECF0FF, &H46B4FF, &H3C1E5A, _
+    &HE44040, &HFAD246, &HECF0FF, &H5A1818, _
+    &H4678D2, &H5ADCC8, &HECF0FF, &H182850]
+DIM BULLET AS ARRAY OF STRING
+BULLET = ["..CC..", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", "..CC.."]
+DIM BOMB_A AS ARRAY OF STRING
+BOMB_A = ["..RR..", ".RYYR.", "RYOOYR", "RYOOYR", ".RYYR.", "..RR.."]
+DIM BOMB_B AS ARRAY OF STRING
+BOMB_B = ["..OO..", ".OWWO.", "OWYYWO", "OWYYWO", ".OWWO.", "..OO.."]
+
+' Alle Einzelbilder in Reihenfolge -- fuer preview.png
+DIM teile[16] AS IMAGE
+DIM teilZahl AS INTEGER : teilZahl = 0
+
+FUNCTION bildAus(raster AS ARRAY OF STRING, b AS INTEGER, h AS INTEGER, thema AS INTEGER, name AS STRING) AS IMAGE
+    IF LEN(raster) <> h THEN THROW name + ": " + STR$(LEN(raster)) + " Zeilen != " + STR$(h)
+    DIM bild AS IMAGE : bild = IMAGE_NEW(b, h)
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO h - 1
+        IF LEN(raster[y]) <> b THEN THROW name + " z" + STR$(y) + ": Breite " + STR$(LEN(raster[y])) + " != " + STR$(b)
+        FOR x = 0 TO b - 1
+            DIM ch AS STRING : ch = MID$(raster[y], x, 1)
+            IF ch <> "." THEN
+                DIM farbe AS INTEGER
+                IF thema >= 0 THEN
+                    farbe = bugThema[thema * 4 + INSTR("wbe#", ch)]
+                ELSE
+                    farbe = palFarbe[INSTR(palZeichen, ch)]
+                END IF
+                IMAGE_FILL_RECT(bild, x, y, x, y, farbe, 255)
+            END IF
+        NEXT
+    NEXT
+    RETURN bild
+END FUNCTION
+
+SUB sichern(name AS STRING, bilder AS ARRAY OF IMAGE, anzahl AS INTEGER, b AS INTEGER, h AS INTEGER)
+    DIM blatt AS IMAGE : blatt = IMAGE_NEW(b * anzahl, h)
+    DIM i AS INTEGER
+    FOR i = 0 TO anzahl - 1
+        IMAGE_DRAW_IMAGE(blatt, bilder[i], i * b, 0)
+        teile[teilZahl] = bilder[i]
+        teilZahl = teilZahl + 1
+    NEXT
+    IMAGE_SAVE(blatt, ordner + "/" + name + ".png")
+END SUB
+
+DIM paar[2] AS IMAGE
+paar[0] = bildAus(PLAYER, 16, 16, -1, "player")
+sichern("player", paar, 1, 16, 16)
+DIM k AS INTEGER
+FOR k = 0 TO 2
+    paar[0] = bildAus(BUG_A, 16, 16, k, "bug" + STR$(k))
+    paar[1] = bildAus(BUG_B, 16, 16, k, "bug" + STR$(k))
+    sichern("bug" + STR$(k), paar, 2, 16, 16)
+NEXT
+paar[0] = bildAus(BULLET, 6, 8, -1, "bullet")
+sichern("bullet", paar, 1, 6, 8)
+paar[0] = bildAus(BOMB_A, 6, 6, -1, "bomb")
+paar[1] = bildAus(BOMB_B, 6, 6, -1, "bomb")
+sichern("bomb", paar, 2, 6, 6)
+
+' preview.png: alle Einzelbilder achtfach nebeneinander, mit Luecken
+CONST MASS = 8
+CONST LUECKE = 3
+DIM gesamtB AS INTEGER : gesamtB = LUECKE * (teilZahl + 1)
+DIM hoechste AS INTEGER : hoechste = 0
+DIM i AS INTEGER
+FOR i = 0 TO teilZahl - 1
+    gesamtB = gesamtB + IMAGEWIDTH(teile[i])
+    hoechste = MAX(hoechste, IMAGEHEIGHT(teile[i]))
+NEXT
+DIM vorschau AS IMAGE : vorschau = IMAGE_NEW(gesamtB * MASS, (hoechste + 2 * LUECKE) * MASS, &H141822)
+DIM px AS INTEGER : px = LUECKE
+FOR i = 0 TO teilZahl - 1
+    DIM gross AS IMAGE : gross = IMAGE_SCALE_NN(teile[i], IMAGEWIDTH(teile[i]) * MASS, IMAGEHEIGHT(teile[i]) * MASS)
+    IMAGE_DRAW_IMAGE(vorschau, gross, px * MASS, LUECKE * MASS)
+    px = px + IMAGEWIDTH(teile[i]) + LUECKE
+NEXT
+IMAGE_SAVE(vorschau, ordner + "/preview.png")
+
+PRINT "OK -> " + ordner
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner)
+SORT(dateien)
+FOR i = 0 TO LEN(dateien) - 1
+    PRINT "   " + dateien[i]
+NEXT
