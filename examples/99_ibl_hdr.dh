@@ -6,7 +6,7 @@
 ' LIGHT_ENV-Naeherung -- Chrom-Kugeln zeigen die Skybox. Fehlt das .hdr, faellt
 ' die Demo auf das analytische LIGHT_ENV zurueck (sichtbar, aber kein Panorama).
 '
-' Asset einmalig holen:  py examples/assets/download_hdri.py
+' Asset einmalig holen:  dhrt run examples/assets/download_hdri.dh
 ' (kloofendal_43d_clear, Poly Haven, CC0 -- liegt nicht im Repo)
 
 IMPORT "g3d"
@@ -23,7 +23,7 @@ IF FILEEXISTS("assets/ibl_env.hdr") THEN
     SKYBOX(TRUE)                                ' HDR-Umgebung als 3D-Hintergrund
 ELSE
     LIGHT_ENV(&H6090E0, &H201810, 1.0)
-    PRINT "Kein assets/ibl_env.hdr -- analytisches LIGHT_ENV (download_hdri.py)"
+    PRINT "Kein assets/ibl_env.hdr -- analytisches LIGHT_ENV (download_hdri.dh)"
 END IF
 
 DIM COLS AS INTEGER

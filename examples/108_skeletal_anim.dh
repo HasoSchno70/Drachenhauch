@@ -11,7 +11,7 @@
 '
 ' Danach das Modell wie gewohnt mit MODEL/MODEL_EX zeichnen.
 '
-' Modell holen (einmalig, CC0):  py examples\assets\download_robot.py
+' Modell holen (einmalig, CC0):  dhrt run examples/assets/download_robot.dh
 ' SPACE = naechste Animation. ESC = beenden.
 
 IMPORT "g3d"

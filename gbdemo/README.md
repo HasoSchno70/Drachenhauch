@@ -121,7 +121,7 @@ durchschalten:
 | 8 | Cyber Spider | 10 | 1:03 |
 
 Die kurzen Stücke loopen; der Ablaufplan läuft davon unbeirrt weiter. Herkunft und Bezugsskript: `assets/CREDITS.txt` bzw.
-`download_music.py`.
+`download_music.dh`.
 
 ## Stolpersteine, die hier gelernt wurden
 

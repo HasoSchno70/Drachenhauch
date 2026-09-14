@@ -1,0 +1,21 @@
+' Laedt das HDR-Environment fuer examples/99_ibl_hdr.dh.
+'
+' Die .hdr (~1-2 MB, equirectangular 1k) liegt bewusst NICHT im Git-Repo.
+' Dieses Programm holt sie einmalig von Poly Haven:
+'
+'     dhrt run examples/assets/download_hdri.dh
+'
+' Asset:  "kloofendal_43d_clear" (Outdoor, klarer Himmel -- gut fuer
+'         Metall-Reflexionen / Chrom-Kugeln im IBL-Demo)
+' Quelle: https://polyhaven.com/a/kloofendal_43d_clear
+' Lizenz: CC0 1.0 (Public Domain) -- keine Namensnennung erforderlich.
+'
+' Falls die direkte CDN-Adresse nicht mehr stimmt: auf polyhaven.com das Asset
+' oeffnen, 1k .hdr herunterladen und als examples/assets/ibl_env.hdr ablegen.
+' Bis 2026-09-14 download_hdri.py.
+IMPORT "_laden.dh"
+
+EXIT(herunterladen("https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_43d_clear_1k.hdr", _
+    CWD$() + "/ibl_env.hdr", 100000, _
+    "Manuell von https://polyhaven.com/a/kloofendal_43d_clear laden (1k .hdr) und als examples/assets/ibl_env.hdr ablegen.", _
+    "HDRI: Poly Haven, CC0."))

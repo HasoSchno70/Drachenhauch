@@ -1,0 +1,73 @@
+' Laedt die Musikmodule fuer die Drachenhauch-Demo herunter.
+'
+' Quelle: The Mod Archive, Rubrik "Public Domain" -- dort listet die Seite
+' ausschliesslich Module, deren Urheber sie gemeinfrei gestellt haben. Alle
+' Stuecke stammen von Drozerix, der sein gesamtes Werk gemeinfrei
+' veroeffentlicht.
+'
+' Die Module sind zusammen ~0,6 MB und gemeinfrei, liegen also mit im Repo --
+' dieses Programm dient der Reproduzierbarkeit und dem Nachweis der Herkunft.
+'
+'     dhrt run gbdemo/download_music.dh [-- basisadresse [zielordner]]
+'
+' Ein anderes Stueck einsetzen: Modul-Nummer von der Detailseite ablesen
+' (modarchive.org/index.php?request=view_by_moduleid&query=<nr>), unten
+' eintragen, Programm laufen lassen, in gbdemo.dh MUSIK umstellen.
+' Bis 2026-09-14 download_music.py.
+IMPORT "html"
+
+' Zielname -> Modul-Nummer bei modarchive.org (alle "Public Domain", Drozerix)
+DIM namen AS ARRAY OF STRING
+namen = ["stardust_jam.mod", "silicon_dancer.mod", "neon_techno.mod", "mecanum_overdrive.xm", _
+    "assembly.xm", "keygen_wraith.xm", "building_energy.xm", "cyber_spider.xm"]
+' stardust_jam ~6:24 (darauf ist die Demo geschnitten), silicon_dancer ~4:05,
+' neon_techno ~3:58, mecanum_overdrive ~2:57 (4 Kanaele), assembly ~1:55,
+' keygen_wraith ~1:33 (6 Kanaele, BPM 240), building_energy ~1:29 (24 Kanaele),
+' cyber_spider ~1:03 (10 Kanaele)
+DIM nummern AS ARRAY OF INTEGER
+nummern = [201039, 209692, 178172, 175349, 209551, 207854, 185456, 192354]
+
+DIM basis AS STRING : basis = "https://api.modarchive.org/downloads.php?moduleid="
+DIM ordner AS STRING : ordner = CWD$() + "/assets/music"
+IF ARGC() > 0 THEN basis = ARG$(0)
+IF ARGC() > 1 THEN ordner = ARG$(1)
+
+' Grobpruefung, damit eine Fehlerseite nicht als Modul im Repo landet:
+' XM beginnt mit "Extended Module: ", MOD traegt bei 1080 seine Kennung.
+FUNCTION istModul(b AS BUFFER) AS BOOLEAN
+    DIM n AS INTEGER : n = BUFFER_LEN(b)
+    IF n >= 17 THEN
+        IF BUFFER_TO_STRING$(BUFFER_SLICE(b, 0, 17)) = "Extended Module: " THEN RETURN TRUE
+    END IF
+    IF n > 1084 THEN
+        DIM kennung AS STRING : kennung = BUFFER_TO_STRING$(BUFFER_SLICE(b, 1080, 1084))
+        IF kennung IN ("M.K.", "M!K!", "4CHN", "6CHN", "8CHN") THEN RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+DIM fehler AS INTEGER : fehler = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    DIM ziel AS STRING : ziel = ordner + "/" + namen[i]
+    DIM teil AS STRING : teil = ziel + ".teil"
+    TRY
+        HTTP_DOWNLOAD(basis + STR$(nummern[i]), teil)
+    CATCH e
+        PRINT "  FEHLER " + namen[i] + ": " + e
+        fehler = fehler + 1
+        CONTINUE
+    END TRY
+    DIM daten AS BUFFER : daten = READALL_BYTES(teil)
+    DELETEFILE(teil)
+    IF NOT istModul(daten) THEN
+        PRINT "  FEHLER " + namen[i] + ": sieht nicht nach einem Modul aus (" + STR$(BUFFER_LEN(daten)) + " Bytes)"
+        fehler = fehler + 1
+        CONTINUE
+    END IF
+    WRITEALL_BYTES(ziel, daten)
+    PRINT "  ok " + namen[i] + " (" + STR$(BUFFER_LEN(daten) \ 1024) + " KB)"
+NEXT
+IF fehler > 0 THEN EXIT(1)
+EXIT(0)

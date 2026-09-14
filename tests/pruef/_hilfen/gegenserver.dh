@@ -174,7 +174,9 @@ SUB antworten(c AS NET_SOCKET, kopfteil AS STRING, rumpf AS BUFFER)
             JSON_SET_STRING(o, "ctype", kopf$(kopfteil, "Content-Type"))
             JSON_SET_STRING(o, "eigen", kopf$(kopfteil, "X-Eigen"))
             JSON_SET_STRING(o, "rumpf_hex", BUFFER_TO_HEX$(rumpf))
-            sendenText(c, 200, "Content-Type: application/json" + CRLF, JSON_STRINGIFY(o))
+            ' Ein Pfad ab /xm bekommt die Kennung eines XM-Moduls vorangestellt --
+            ' damit gbdemo/download_music.dh ein "Modul" annimmt.
+            sendenText(c, 200, "Content-Type: application/json" + CRLF, IIF(LEFT$(pfad, 3) = "/xm", "Extended Module: ", "") + JSON_STRINGIFY(o))
         END IF
     ELSEIF modus = "cloud" THEN
         cloud(c, methode, pfad, query, kopfteil, rumpf)

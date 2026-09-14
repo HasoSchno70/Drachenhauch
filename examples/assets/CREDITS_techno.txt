@@ -12,4 +12,4 @@ CC0 = Gemeinfrei: keine Namensnennung erforderlich. Wir nennen den Autor
 trotzdem aus Hoeflichkeit. Die Datei (~3.4 MB, Stereo, 44.1 kHz OGG Vorbis)
 liegt nicht im Repo; einmalig holen mit:
 
-    py examples/assets/download_techno.py
+    dhrt run examples/assets/download_techno.dh

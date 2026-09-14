@@ -1,0 +1,65 @@
+' Laedt die freien Assets fuer das Kamin-Feuer-Demo:
+'
+'     dhrt run fireplace/assets/download.dh
+'
+' Holt einmalig (liegen NICHT im Git-Repo):
+'   * fireplace.jpg -- Steinkamin-Innenansicht (Schloss Chillon)
+'       Quelle: Wikimedia Commons, Autor "CEllen", Lizenz CC BY-SA 4.0
+'       https://commons.wikimedia.org/wiki/File:Chillon_Castle_interior_view_with_the_fireplace.jpg
+'   * fire.ogg -- knisterndes Lagerfeuer (Loop-tauglich, ~1 min)
+'       Quelle: Wikimedia Commons / Freesound, Autor "Glaneur de sons", Lizenz CC BY 3.0
+'       https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg
+'
+' Beide Lizenzen verlangen Namensnennung -> siehe CREDITS.txt. Das Demo laeuft
+' auch OHNE die Dateien (prozeduraler Ersatz-Kamin, stummes Feuer). Wind
+' (assets/wind.mp3) ist optional und selbst beizulegen (z.B. Pixabay).
+'
+' Vier Argumente sind fuer Pruefungen da (ein Gegenserver statt Wikimedia):
+'     [-- adresse_bild adresse_ton [zielordner [mindestbytes]]]
+' Bis 2026-09-14 download.py.
+IMPORT "html"
+
+DIM adressen AS ARRAY OF STRING
+adressen = ["https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/Chillon_Castle_interior_view_with_the_fireplace.jpg/1280px-Chillon_Castle_interior_view_with_the_fireplace.jpg", _
+    "https://upload.wikimedia.org/wikipedia/commons/b/b1/Campfire_sound_ambience.ogg"]
+DIM namen AS ARRAY OF STRING : namen = ["fireplace.jpg", "fire.ogg"]
+DIM ordner AS STRING : ordner = CWD$()
+DIM mindest AS INTEGER : mindest = 50000
+IF ARGC() > 1 THEN
+    adressen[0] = ARG$(0)
+    adressen[1] = ARG$(1)
+END IF
+IF ARGC() > 2 THEN ordner = ARG$(2)
+IF ARGC() > 3 THEN mindest = VAL(ARG$(3))
+
+FUNCTION holen(url AS STRING, ziel AS STRING, name AS STRING, mindest AS INTEGER) AS BOOLEAN
+    IF FILEEXISTS(ziel) THEN
+        IF FILESIZE(ziel) > mindest THEN
+            PRINT "Schon vorhanden: " + name + " (" + STR$(FILESIZE(ziel) \ 1024) + " KB)"
+            RETURN TRUE
+        END IF
+    END IF
+    PRINT "Lade " + name + " ..."
+    TRY
+        HTTP_DOWNLOAD(url, ziel)
+    CATCH e
+        PRINT "  FEHLER: " + e
+        RETURN FALSE
+    END TRY
+    DIM gut AS BOOLEAN : gut = FILESIZE(ziel) > mindest
+    PRINT "  " + IIF(gut, "OK", "ZU KLEIN") + " (" + STR$(FILESIZE(ziel) \ 1024) + " KB)"
+    RETURN gut
+END FUNCTION
+
+DIM alle AS BOOLEAN : alle = TRUE
+DIM i AS INTEGER
+FOR i = 0 TO 1
+    IF NOT holen(adressen[i], ordner + "/" + namen[i], namen[i], mindest) THEN alle = FALSE
+NEXT
+PRINT ""
+IF alle THEN
+    PRINT "Alle Assets da. Lizenzen siehe CREDITS.txt (Namensnennung noetig)."
+    EXIT(0)
+END IF
+PRINT "Mind. ein Download fehlte -- Demo nutzt dann den prozeduralen Ersatz."
+EXIT(1)

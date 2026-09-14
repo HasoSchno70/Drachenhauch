@@ -1306,7 +1306,7 @@ snd_level   = AUDIO_SFX("square", 440.0,  520.0, 0, 70, 150, 0.0, 0.0, 0.30)
 snd_boss    = AUDIO_SFX("saw",     70.0,   60.0, 10, 320, 380, 8.0, 5.0, 0.55)
 
 ' Optionaler animierter Roboter-Boss (Skelett-Animation, GLTF). Faellt sauber
-' auf die Glueh-Kugel zurueck, wenn das Modell fehlt (via download_robot.py holen).
+' auf die Glueh-Kugel zurueck, wenn das Modell fehlt (via download_robot.dh holen).
 use_robot = FALSE
 IF FILEEXISTS(ROBOT_PATH) THEN
     boss_model = LOADMODEL(ROBOT_PATH)

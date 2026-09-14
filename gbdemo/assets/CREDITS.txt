@@ -9,13 +9,13 @@ building_energy.xm, cyber_spider.xm
     Drozerix
     Bezogen ueber The Mod Archive (modarchive.org), Rubrik "Public Domain".
     Lizenz: Public Domain -- gemeinfrei, keine Auflagen.
-    Reproduzierbar via gbdemo/download_music.py (Modul-Nummern dort).
+    Reproduzierbar via gbdemo/download_music.dh (Modul-Nummern dort).
 
 HDR-UMGEBUNG (assets/ibl_env.hdr)
 ---------------------------------
     Poly Haven (polyhaven.com), Lizenz CC0 1.0 -- gemeinfrei.
     Uebernommen aus examples/assets/ (Bezugsskript dort:
-    examples/assets/download_hdri.py).
+    examples/assets/download_hdri.dh).
 
 SCHRIFT (assets/font.ttf)
 -------------------------
