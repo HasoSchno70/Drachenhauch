@@ -2973,9 +2973,23 @@ mit `READLINES(pfad, "latin1")`, als UTF-8 waere die Datei nicht lesbar. Tests
 `--- ersetzen` unloesbar gemachter Level, der nicht geschrieben werden darf;
 Gegenprobe: geaenderter Titel, Loeser sagt immer "ok", Sortierung ohne
 Set-Nummer -- 3 von 3 fallen).
-Noch Python bei den Spielen: die PIL-Bildgeneratoren (`make_editor_tileset.py`,
-Buch-Sprites, Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy) und
-der Flask-`cloudserver`.
+**Tileset des Tilemap-Editors (selber Tag):** `examples/assets/make_editor_tileset.dh`
+statt der PIL-Fassung. Das Rauschen kommt aus demselben nachgebauten
+`random.Random(20260604)` wie beim Zupf-Sample, dazu `randrange`/`randint`
+ueber `getrandbits` mit Verwerfen -- alle Kacheln mit Rauschen sind Punkt fuer
+Punkt die alten. **PIL nimmt bei einer Ellipse beide Randpunkte des Rechtecks
+mit**: mit dem Radius als halbem Mittelpunktabstand wichen 479 Punkte ab, mit
+einer Zugabe von 0.4 (gefuellt) bzw. 0.5 (Ring) nur noch 82, und 25 von 32
+Kacheln sind gleich. Der Rest liegt in Vielecken, dem abgerundeten Fass und dem
+Holzring -- PIL rastert dort anders als `leinwand.rs`. Das Blatt ist mit dem
+neuen Programm neu geschrieben; die Tilemap-Pruefungen zaehlen nur Farben
+gegeneinander und haengen nicht an den alten Punkten. Test
+`tests/pruef/werkzeug_beispiel_bilder.dhtest` (Punkt fuer Punkt gegen das
+eingecheckte Blatt; Gegenprobe mit Zugabe 0.0 fuer gefuellte Ellipsen: 193
+Punkte weichen ab, der Fall faellt).
+Noch Python bei den Spielen: die PIL-Bildgeneratoren (Buch-Sprites,
+Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy) und der
+Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
