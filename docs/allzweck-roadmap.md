@@ -452,7 +452,7 @@ Vorgabewert. Das ist keine Beschränkung, die man nebenbei einführt.
 Beides ist eine eigene Entscheidung, keine Fleißarbeit — darum bleibt der Punkt
 offen und ehrlich als offen markiert.
 
-Tests: `tests/test_hintergrund.py` (17), darunter der Beleg, dass ein Auftrag
+Tests: `tests/pruef/hintergrund.dhtest` (17), darunter der Beleg, dass ein Auftrag
 die offene Transaktion des Programms **nicht** sieht (eigene Verbindung).
 Beispiel: `examples/168_hintergrund.dh` — Abfrage und Prozess laufen, die
 Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,

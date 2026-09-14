@@ -57,3 +57,389 @@ AUDIO_POP()
 --- fehler
 AUDIO_POP: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH
 
+=== das bild ist nach pop wieder identisch[LIGHT_AMBIENT(&HFF0000, 1.0)]
+' Zweimal dasselbe zeichnen, dazwischen den Zustand verstellen und zurueckholen
+' -- Punkt fuer Punkt verglichen. Die Zeile "wirkte" ist die Kontrolle: ohne
+' sie waere der Fall auch gruen, wenn die Stoerung gar nichts getan haette.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "g3d"
+SCREEN(160, 120, "p", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H203040, 0.5)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+DIM kugel AS INTEGER
+kugel = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(kugel)
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        CAMERA3D(0, 1, 4, 0, 0, 0, 45)
+        MODEL(kugel, 0, 0, 0, 1.0, &HD0D0D0)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+LIGHT_AMBIENT(&HFF0000, 1.0)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== das bild ist nach pop wieder identisch[LIGHT_FOG(&HFF0000, 0.5)]
+' Zweimal dasselbe zeichnen, dazwischen den Zustand verstellen und zurueckholen
+' -- Punkt fuer Punkt verglichen. Die Zeile "wirkte" ist die Kontrolle: ohne
+' sie waere der Fall auch gruen, wenn die Stoerung gar nichts getan haette.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "g3d"
+SCREEN(160, 120, "p", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H203040, 0.5)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+DIM kugel AS INTEGER
+kugel = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(kugel)
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        CAMERA3D(0, 1, 4, 0, 0, 0, 45)
+        MODEL(kugel, 0, 0, 0, 1.0, &HD0D0D0)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+LIGHT_FOG(&HFF0000, 0.5)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== das bild ist nach pop wieder identisch[LIGHT_DIRECTIONAL(1.0, 0.0, 0.0, &HFF0000)]
+' Zweimal dasselbe zeichnen, dazwischen den Zustand verstellen und zurueckholen
+' -- Punkt fuer Punkt verglichen. Die Zeile "wirkte" ist die Kontrolle: ohne
+' sie waere der Fall auch gruen, wenn die Stoerung gar nichts getan haette.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "g3d"
+SCREEN(160, 120, "p", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H203040, 0.5)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+DIM kugel AS INTEGER
+kugel = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(kugel)
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        CAMERA3D(0, 1, 4, 0, 0, 0, 45)
+        MODEL(kugel, 0, 0, 0, 1.0, &HD0D0D0)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+LIGHT_DIRECTIONAL(1.0, 0.0, 0.0, &HFF0000)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== das bild ist nach pop wieder identisch[LIGHT_ENV(&HFF0000, &HFF0000, 2.0)]
+' Zweimal dasselbe zeichnen, dazwischen den Zustand verstellen und zurueckholen
+' -- Punkt fuer Punkt verglichen. Die Zeile "wirkte" ist die Kontrolle: ohne
+' sie waere der Fall auch gruen, wenn die Stoerung gar nichts getan haette.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "g3d"
+SCREEN(160, 120, "p", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H203040, 0.5)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+DIM kugel AS INTEGER
+kugel = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(kugel)
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        CAMERA3D(0, 1, 4, 0, 0, 0, 45)
+        MODEL(kugel, 0, 0, 0, 1.0, &HD0D0D0)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+LIGHT_ENV(&HFF0000, &HFF0000, 2.0)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== der posteffekt wird beim pop abgeloest
+' Der Post-Effekt liegt ueber ALLEM -- bleibt er nach dem POP haengen, faerbt der
+' Shader einer verlassenen Szene den Rest der Demo ein.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+SCREEN(160, 120, "p", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("rot.fs")
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        BOX(30, 30, 130, 90, &H40C0FF)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+POSTFX(sh)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- datei rot.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+out vec4 finalColor;
+void main() { finalColor = vec4(1.0, 0.0, 0.0, 1.0); }
+
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== ein zusaetzliches licht wird beim pop abgeschaltet
+' Eine Szene darf ein Licht HINZUFUEGEN. POP muss es wieder ausschalten, sonst
+' leuchtet es in der naechsten Szene weiter.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "g3d"
+SCREEN(160, 120, "p", 1)
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H203040, 0.4)
+DIM kugel AS INTEGER
+kugel = MESH_SPHERE(1.0, 24, 24)
+MODEL_LIT(kugel)
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        CAMERA3D(0, 1, 4, 0, 0, 0, 45)
+        MODEL(kugel, 0, 0, 0, 1.0, &HD0D0D0)
+        FLIP()
+    NEXT
+END SUB
+zeichne()
+SAVESCREENSHOT("vorher.png")
+GFX_PUSH()
+LIGHT_POINT(2.0, 2.0, 2.0, &HFF0000)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+zeichne()
+SAVESCREENSHOT("nachher.png")
+--- nachher
+FUNCTION gleich(pa AS STRING, pb AS STRING) AS BOOLEAN
+    DIM a AS IMAGE : a = LOADIMAGE(pa)
+    DIM b AS IMAGE : b = LOADIMAGE(pb)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            IF GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN RETURN FALSE
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+PRINT "wirkte "; NOT gleich("vorher.png", "waehrend.png")
+PRINT "gleich "; gleich("vorher.png", "nachher.png")
+--- erwartet
+wirkte TRUE
+gleich TRUE
+
+=== der filter wirkt nach audio pop nicht mehr
+' Am KLANG gemessen: ein Tiefpass schneidet die Hoehen weg, nach AUDIO_POP muessen
+' sie zurueck sein. MITTELWERT, nicht Spitze -- eine Spitze faengt die
+' ungefilterten Augenblicke direkt nach dem Umschalten mit ein.
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "audio"
+SCREEN(64, 64, "p", 1)
+DIM spek[32] AS FLOAT
+DIM rauschen AS SOUND
+rauschen = AUDIO_NOISE(4000, 0.7)
+FUNCTION hoehen() AS FLOAT
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM summe AS FLOAT : summe = 0.0
+    DIM n AS INTEGER : n = 0
+    WHILE MILLIS() - t0 < 900
+        FLIP()
+        AUDIO_FFT(spek)
+        DIM s AS FLOAT : s = 0.0
+        DIM k AS INTEGER
+        FOR k = 20 TO 31
+            s = s + spek[k]
+        NEXT
+        summe = summe + s
+        n = n + 1
+    WEND
+    RETURN summe / n
+END FUNCTION
+AUDIO_PLAY(rauschen, -1, 0.9)
+DIM offen AS FLOAT : offen = hoehen()
+AUDIO_PUSH()
+AUDIO_FILTER("sfx", 300, 0.0)
+DIM gefiltert AS FLOAT : gefiltert = hoehen()
+AUDIO_POP()
+DIM danach AS FLOAT : danach = hoehen()
+PRINT "filter wirkt "; gefiltert < offen * 0.3
+PRINT "nach pop zurueck "; danach > offen * 0.7
+--- erwartet
+filter wirkt TRUE
+nach pop zurueck TRUE
+
+=== eine laufende modulation wird beim audio pop abgeloest
+' AUDIO_MODULATE schreibt denselben Kira-Parameter wie die Setter -- das
+' Zurueckschreiben beim POP loest sie ab. Gemessen an der SCHWANKUNG der Hoehen,
+' nach einer Sekunde Vorlauf (sonst faellt das Einschwingen in die Messung).
+' (Bis Stufe 46 in test_gfx_push_pop.py.)
+IMPORT "audio"
+SCREEN(64, 64, "p", 1)
+DIM spek[32] AS FLOAT
+DIM rauschen AS SOUND
+rauschen = AUDIO_NOISE(8000, 0.7)
+FUNCTION streuung() AS FLOAT
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM mini AS FLOAT : mini = 999.0
+    DIM maxi AS FLOAT : maxi = 0.0
+    WHILE MILLIS() - t0 < 1400
+        FLIP()
+        AUDIO_FFT(spek)
+        DIM s AS FLOAT : s = 0.0
+        DIM k AS INTEGER
+        FOR k = 20 TO 31
+            s = s + spek[k]
+        NEXT
+        IF s < mini THEN mini = s
+        IF s > maxi THEN maxi = s
+    WEND
+    RETURN maxi - mini
+END FUNCTION
+AUDIO_PLAY(rauschen, -1, 0.9)
+DIM t AS INTEGER : t = MILLIS()
+WHILE MILLIS() - t < 1000
+    FLIP()
+WEND
+AUDIO_PUSH()
+DIM lfo AS AUDIO_MOD
+lfo = AUDIO_LFO_NEW("sine", 1.5)
+AUDIO_MODULATE("sfx", "filter", lfo, 200.0, 12000.0)
+DIM mitLfo AS FLOAT : mitLfo = streuung()
+AUDIO_POP()
+DIM ohne AS FLOAT : ohne = streuung()
+PRINT "modulation abgeloest "; ohne < mitLfo * 0.5
+--- erwartet
+modulation abgeloest TRUE

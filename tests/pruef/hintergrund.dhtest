@@ -109,3 +109,243 @@ PRINT SHELL("cmd", "/c", "exit 4")
 --- erwartet
 4
 
+=== die abfrage laeuft und liefert dieselben zeilen
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM auftrag AS INTEGER
+DIM erg AS INTEGER
+DIM n AS INTEGER
+auftrag = DB_QUERY_START("d.db", "SELECT a FROM zahlen")
+WHILE NOT DB_QUERY_READY(auftrag)
+    SLEEP(1)
+WEND
+erg = DB_QUERY_RESULT(auftrag)
+WHILE DB_NEXT(erg)
+    n = n + 1
+WEND
+PRINT n
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 2000 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+2000
+
+=== das programm kommt waehrenddessen zum zug
+' Die Schleife laeuft weiter, waehrend die Abfrage arbeitet -- vorher hielt
+' DB_QUERY alles an.
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM auftrag AS INTEGER
+DIM runden AS INTEGER
+auftrag = DB_QUERY_START("d.db", "SELECT a, b FROM zahlen WHERE a % ? = 0", 3)
+WHILE NOT DB_QUERY_READY(auftrag)
+    runden = runden + 1
+WEND
+PRINT runden > 0
+PRINT DB_QUERY_PENDING()
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 20000 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+TRUE
+1
+
+=== parameter werden gebunden
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM auftrag AS INTEGER
+DIM erg AS INTEGER
+auftrag = DB_QUERY_START("d.db", "SELECT b FROM zahlen WHERE a = ?", 42)
+WHILE NOT DB_QUERY_READY(auftrag)
+    SLEEP(1)
+WEND
+erg = DB_QUERY_RESULT(auftrag)
+PRINT DB_NEXT(erg)
+PRINT DB_GET_STRING(erg, 0)
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 100 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+TRUE
+zeile 42
+
+=== mehrere auftraege gleichzeitig
+' Die Nummern bleiben gueltig, auch wenn der zweite zuerst abgeholt wird.
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM a1 AS INTEGER
+DIM a2 AS INTEGER
+DIM e AS INTEGER
+DIM n AS INTEGER
+a1 = DB_QUERY_START("d.db", "SELECT a FROM zahlen WHERE a < 100")
+a2 = DB_QUERY_START("d.db", "SELECT a FROM zahlen WHERE a < 10")
+PRINT DB_QUERY_PENDING()
+WHILE NOT DB_QUERY_READY(a2)
+    SLEEP(1)
+WEND
+e = DB_QUERY_RESULT(a2)
+WHILE DB_NEXT(e)
+    n = n + 1
+WEND
+PRINT n
+WHILE NOT DB_QUERY_READY(a1)
+    SLEEP(1)
+WEND
+e = DB_QUERY_RESULT(a1)
+n = 0
+WHILE DB_NEXT(e)
+    n = n + 1
+WEND
+PRINT n
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 500 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+2
+10
+100
+
+=== zweimal abholen sagt was fehlt
+' Ueber das zweite Abholen ist die Meldung ohne jede Zeitannahme zu erreichen
+' ("ohne READY abholen" war ein Wettlauf, den Linux verlor).
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM a AS INTEGER
+a = DB_QUERY_START("d.db", "SELECT a FROM zahlen")
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(1)
+WEND
+PRINT DB_QUERY_RESULT(a)
+PRINT DB_QUERY_RESULT(a)
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 10 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- fehler
+erst DB_QUERY_READY
+
+=== kaputtes sql meldet sich beim abholen
+' Der Fehler entsteht auf dem Auftrags-Faden und wird beim Abholen geworfen.
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM a AS INTEGER
+a = DB_QUERY_START("d.db", "SELECT quatsch FROM gibtsnicht")
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(1)
+WEND
+TRY
+    PRINT DB_QUERY_RESULT(a)
+CATCH e
+    PRINT "gefangen"
+END TRY
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 10 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+gefangen
+
+=== abbrechen gibt den platz frei
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM a AS INTEGER
+a = DB_QUERY_START("d.db", "SELECT a FROM zahlen")
+DB_QUERY_CANCEL(a)
+PRINT DB_QUERY_PENDING()
+PRINT DB_QUERY_READY(a)
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 100 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+0
+FALSE
+
+=== die eigene verbindung sieht nur festgeschriebenes
+' Dokumentierte Grenze: der Auftrag oeffnet seine EIGENE Verbindung.
+' (Bis Stufe 46 in test_hintergrund.py.)
+IMPORT "db"
+DIM c AS DB_CONN
+DIM a AS INTEGER
+DIM e AS INTEGER
+DIM n AS INTEGER
+c = DB_OPEN("d.db")
+DB_BEGIN(c)
+DB_EXEC(c, "INSERT INTO zahlen VALUES (999, 'neu')")
+a = DB_QUERY_START("d.db", "SELECT a FROM zahlen WHERE a = 999")
+WHILE NOT DB_QUERY_READY(a)
+    SLEEP(1)
+WEND
+e = DB_QUERY_RESULT(a)
+WHILE DB_NEXT(e)
+    n = n + 1
+WEND
+PRINT n
+DB_ROLLBACK(c)
+DB_CLOSE(c)
+--- vorher
+IMPORT "db"
+DIM c AS DB_CONN : c = DB_OPEN("d.db")
+DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
+DB_BEGIN(c)
+DIM i AS INTEGER
+FOR i = 0 TO 10 - 1
+    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
+NEXT
+DB_COMMIT(c)
+DB_CLOSE(c)
+--- erwartet
+0
