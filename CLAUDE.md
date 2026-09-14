@@ -2876,6 +2876,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 51 (2026-09-14):** Webserver, MQTT und INPUT ohne Python --
+`test_httpd.py` (16), `test_mqtt_module.py` (4) und `test_input_stdin.py` (4)
+sind geloescht. **httpd mit vertauschten Rollen:** in pytest war dhrt der
+Server und Python der Client; jetzt ist der Server die Beilage `srv.dh` als
+Kind (Port ueber `EPRINT("PORT=...")`), und der Fall ist der Client ueber
+`tests/pruef/_hilfen/httpklient.dh` -- ROH ueber das net-Modul, weil ein
+fertiger Client `/../geheim.txt` wegnormalisiert haette (`httpd.dhtest`, 16).
+**MQTT:** `_hilfen/mqttbroker.dh` ersetzt den Python-Broker (CONNACK,
+PINGRESP, SUBACK, PUBLISH zurueck an den Absender) mit NET_RECV_BYTES und
+Puffern (`modules_mqtt.dhtest`, 2; die neun Befehlsnamen stehen in
+`builtin_registrierung.dhtest`). **INPUT:** drei Faelle mit `--- eingabe` in
+`stdin.dhtest`; pytest ging dafuer ueber `dhrun.py`. Der leere INPUT auf eine
+Zahl ist ein Laufzeitfehler -- der Fall prueft Abbruch UND dass der Prompt
+vorher dastand. **Zwei Stolpersteine beim Schreiben:** (1) `PROCESS_ERR$`
+liefert, was im Puffer liegt, also auch MEHRERE Zeilen -- bricht ein Server
+gleich nach der Portzeile ab, steht seine Meldung in derselben Portion, und
+`VAL` darauf ist 0; der Klient zerlegt jetzt in Zeilen und wartet nach dem
+Ende fuenf leere Abfragen ab. (2) Ein SUBACK aus `BUFFER_NEW(5)` traegt den
+Rueckgabecode 0 schon -- ein angehaengtes weiteres 0-Byte las der Client als
+Paket vom Typ 0, und die Nachricht kam nie an. Gegenprobe ohne Server bzw.
+Broker: 16 von 16 und 1 von 2 fallen (der uebrige prueft den Fehler ohne
+Broker).
+
 **Stufe 50 (2026-09-14):** zwei grosse Golden-Dateien, die beim Umzug von
 2026-09-08 stehen geblieben waren -- `test_language_extensions.py` (59 Tests)
 und `test_dhrt_builtins.py` (34, einige mit mehreren Laeufen) sind geloescht.
