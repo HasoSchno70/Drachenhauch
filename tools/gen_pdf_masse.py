@@ -8,7 +8,8 @@ setzt. Ein Byte ohne Zeichen (in cp1252 unbelegt oder ohne Glyphe) steht als 0
 und ist beim Messen ein Fehler statt einer Schaetzung.
 
 Aufruf: .venv\\Scripts\\python.exe tools\\gen_pdf_masse.py
-Gegenprobe: tests/test_pdf.py misst PDF_TEXT_WIDTH gegen PyMuPDF.
+Gegenprobe: tests/pruef/pdf.dhtest vergleicht PDF_TEXT_WIDTH mit Werten, die
+PyMuPDF geliefert hat.
 """
 from __future__ import annotations
 

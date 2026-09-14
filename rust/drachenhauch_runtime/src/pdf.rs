@@ -296,7 +296,7 @@ impl Dokument {
 /// die Bauart der Schrift. Fuer Helvetica und Times (je vier Schnitte) liegen
 /// die Schriftmasse in `pdf_masse.rs`: **nicht aus dem Gedaechtnis**, sondern
 /// von `tools/gen_pdf_masse.py` aus PyMuPDFs Base-14-Metriken erzeugt und in
-/// `tests/test_pdf.py` gegen PyMuPDF nachgemessen. Lange stand hier, eine
+/// `tests/pruef/pdf.dhtest` gegen PyMuPDFs Werte nachgemessen. Lange stand hier, eine
 /// geschaetzte Breite sei schlimmer als keine -- das galt, solange es nur
 /// die Schaetzung gab. Ohne die Masse liess sich in einer Rechnung kein
 /// Betrag rechtsbuendig setzen (sechster Pilot, 2026-09-05).
