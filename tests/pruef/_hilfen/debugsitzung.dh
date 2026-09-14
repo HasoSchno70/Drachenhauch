@@ -1,0 +1,79 @@
+' Eine Sitzung mit `dhrt debug` fuer dhrt_debug.dhtest: die Kommandos gehen als
+' JSON-Zeilen auf stdin (danach wird es geschlossen, wie ein Skript), die
+' Ereignisse kommen als JSON-Zeilen von stdout zurueck.
+IMPORT "json"
+
+DIM ereignisse AS ARRAY OF STRING : ereignisse = []
+
+SUB sitzung(datei AS STRING, kommandos AS ARRAY OF STRING)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "debug", CWD$() + "/" + datei)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kommandos) - 1
+        PROCESS_WRITE(p, kommandos[i] + CHR$(10))
+    NEXT
+    PROCESS_CLOSE_INPUT(p)
+    ' Ein Aufruf kann mehrere Zeilen liefern; eine angefangene Zeile bleibt
+    ' stehen, bis ihr Ende da ist.
+    DIM rest AS STRING : rest = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            rest = rest + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    IF PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(rest, CHR$(13), ""), CHR$(10))
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF TRIM$(zeilen[i]) <> "" THEN ARRAY_PUSH(ereignisse, TRIM$(zeilen[i]))
+    NEXT
+END SUB
+
+FUNCTION art$(i AS INTEGER) AS STRING
+    RETURN JSON_GET_STRING(JSON_PARSE(ereignisse[i]), "event")
+END FUNCTION
+
+FUNCTION feld$(i AS INTEGER, pfad AS STRING) AS STRING
+    ' Ein Feld als Text; "" wenn es fehlt.
+    DIM h AS JSON_HANDLE : h = JSON_PARSE(ereignisse[i])
+    IF NOT JSON_HAS(h, pfad) THEN RETURN ""
+    IF JSON_TYPE(h, pfad) = "number" THEN RETURN STR$(JSON_GET_INT(h, pfad))
+    RETURN JSON_GET_STRING(h, pfad)
+END FUNCTION
+
+FUNCTION paar$(i AS INTEGER, liste AS STRING, name AS STRING) AS STRING
+    ' Wert aus einer Liste von {name, value} (globals/locals).
+    DIM h AS JSON_HANDLE : h = JSON_PARSE(ereignisse[i])
+    IF NOT JSON_HAS(h, liste) THEN RETURN ""
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(h, liste) - 1
+        IF JSON_GET_STRING(h, liste + "." + STR$(k) + ".name") = name THEN RETURN JSON_GET_STRING(h, liste + "." + STR$(k) + ".value")
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION ersteMit(ereignis AS STRING, zeile AS INTEGER) AS INTEGER
+    ' Das erste Ereignis dieser Art (mit dieser Zeile, 0 = egal); -1 wenn keins.
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ereignisse) - 1
+        IF art$(i) = ereignis THEN
+            IF zeile = 0 OR feld$(i, "line") = STR$(zeile) THEN RETURN i
+        END IF
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION ausgaben$() AS STRING
+    ' Alle output-Texte hintereinander.
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(ereignisse) - 1
+        IF art$(i) = "output" THEN aus = aus + feld$(i, "text")
+    NEXT
+    RETURN aus
+END FUNCTION

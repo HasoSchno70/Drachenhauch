@@ -2876,6 +2876,25 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 52 (2026-09-14):** Debugger, VM-Haertung und der geraetefreie Teil
+von MIDI ohne Python -- `test_dhrt_debug.py` (6) und `test_vm_hardening.py` (2)
+sind geloescht, aus `test_midi_module.py` sind sieben Tests gezogen. **Debugger:**
+`tests/pruef/_hilfen/debugsitzung.dh` startet `dhrt debug` per PROCESS_START,
+schreibt die JSON-Kommandos, schliesst stdin und liest die Ereignisse mit dem
+json-Modul (`art$`, `feld$`, `paar$` fuer globals/locals, `ersteMit`,
+`ausgaben$`); `tests/pruef/dhrt_debug.dhtest` (6). **VM-Haertung:** das Geruest
+kommt von `dhrt --dumpbc`, `JSON_SET_JSON` setzt `main.code` auf ADD mit leerem
+Stapel, der Fall startet es als `.dhc` und prueft Rueckgabe, Meldung und dass
+kein Panic kam (`vm_haertung.dhtest`, 2). **MIDI:** Registrierung, Handle-Typen,
+Notennamen, Frequenzen und "Auflistung oder klare Meldung" -- der Bau sagt in
+der `dabei:`-Zeile von `dhrt --version`, ob er das Feature hat
+(`modules_midi.dhtest`, 6). In pytest bleiben nur die Faelle mit echtem oder
+virtuellem Anschluss (Wertebereiche mit Feature, Senden, Loopback-Kreis,
+Pufferdeckel). Alle 14 Faelle liefen beim ersten Mal -- Gegenprobe mit
+kaputten Kopien (Debugger startet `run` statt `debug`, gueltiger statt
+kaputter Bytecode, andere Notennummern plus ein erfundener Befehlsname):
+14 von 14 fallen.
+
 **Stufe 51 (2026-09-14):** Webserver, MQTT und INPUT ohne Python --
 `test_httpd.py` (16), `test_mqtt_module.py` (4) und `test_input_stdin.py` (4)
 sind geloescht. **httpd mit vertauschten Rollen:** in pytest war dhrt der
