@@ -67,7 +67,7 @@ Spiel (dhrt) — die Fallstrick-Klasse, die mit dem zweiten Pfad verschwand:
 ## WP1 — Array-Power (✅ ERLEDIGT 2026-06-05, **dhrt-only**)
 > Ab dieser WP gilt die neue Direktive: neue Builtins NUR noch in dhrt (Rust),
 > der Python-Tree-Walker (`interpreter.py`) wird nicht mehr erweitert. Tests =
-> dhrt-Golden (`tests/test_dhrt_builtins.py`, läuft via `dhrt --runsrc`).
+> dhrt-Golden (heute `tests/pruef/dhrt_builtins.dhtest`, laeuft via `dhrt test`).
 > Editor-Metadaten (Completion/Grammar/Hover) via `BUILTIN_DOCS`.
 - [x] **Dynamische Arrays:** `ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`
       (1D, mutieren IN PLACE: `values` + `dims=[len]` + `strides=[1]`).
