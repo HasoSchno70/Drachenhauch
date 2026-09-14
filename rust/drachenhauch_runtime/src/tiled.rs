@@ -68,6 +68,10 @@ pub struct TiledTileset {
 }
 
 pub struct TiledObject {
+    /// Kennung in der ganzen KARTE (nicht je Ebene) -- so vergibt Tiled sie,
+    /// und `nextobjectid` muss darueber liegen, sonst legt Tiled beim
+    /// Bearbeiten ein zweites Objekt mit derselben Kennung an.
+    pub id: i64,
     pub name: String,
     pub type_: String,
     pub x: f64,
@@ -98,6 +102,8 @@ pub struct TiledMap {
     pub tilesets: Vec<TiledTileset>, // nach first_gid sortiert
     pub layers: Vec<TiledLayer>,
     pub layer_by_name: HashMap<String, usize>,
+    /// Die Kennung fuer das naechste neue Objekt (Tileds `nextobjectid`).
+    pub next_object_id: i64,
 }
 
 impl TiledMap {
@@ -355,6 +361,8 @@ fn parse_object(o: &J) -> TiledObject {
         }
     };
     TiledObject {
+        // 0 = keine (gueltige) Kennung; `load` vergibt dann eine.
+        id: jint(o, "id", 0),
         name: jstr(o, "name", ""),
         type_,
         x: jfloat(o, "x", 0.0),
@@ -482,6 +490,7 @@ pub fn load(path: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
         tilesets: Vec::new(),
         layers: Vec::new(),
         layer_by_name: HashMap::new(),
+        next_object_id: 1,
     };
 
     if let Some(tsets) = data.get("tilesets").and_then(|v| v.as_array()) {
@@ -521,7 +530,36 @@ pub fn load(path: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
             m.layers.push(l);
         }
     }
+    kennungen_ordnen(&mut m, jint(&data, "nextobjectid", 1));
     Ok(Rc::new(RefCell::new(m)))
+}
+
+/// Objekt-Kennungen nach dem Laden eindeutig machen und `next_object_id`
+/// dahinter setzen.
+///
+/// Eine fehlende oder doppelte Kennung bekommt eine neue: TILED_SAVE schrieb
+/// bis 2026-09-14 je EBENE ab 1, zwei Objektebenen hatten also beide ein
+/// Objekt 1 -- solche Dateien sollen beim naechsten Sichern heil werden.
+fn kennungen_ordnen(m: &mut TiledMap, naechste_aus_datei: i64) {
+    let mut gesehen = std::collections::HashSet::new();
+    let mut hoechste = 0;
+    for l in &m.layers {
+        for o in &l.objects {
+            if o.id > 0 && gesehen.insert(o.id) { hoechste = hoechste.max(o.id); }
+        }
+    }
+    let mut naechste = naechste_aus_datei.max(hoechste + 1);
+    let mut vergeben = std::collections::HashSet::new();
+    for l in &mut m.layers {
+        for o in &mut l.objects {
+            if o.id <= 0 || !vergeben.insert(o.id) {
+                o.id = naechste;
+                vergeben.insert(naechste);
+                naechste += 1;
+            }
+        }
+    }
+    m.next_object_id = naechste;
 }
 
 /// Eine leere Karte anlegen (TILED_NEW).
@@ -536,6 +574,7 @@ pub fn neu(w: i64, h: i64, tw: i64, th: i64) -> Result<Rc<RefCell<TiledMap>>, St
     Ok(Rc::new(RefCell::new(TiledMap {
         width: w, height: h, tile_w: tw, tile_h: th,
         tilesets: Vec::new(), layers: Vec::new(), layer_by_name: HashMap::new(),
+        next_object_id: 1,
     })))
 }
 
@@ -685,9 +724,12 @@ pub fn objekt_anhaengen(m: &Rc<RefCell<TiledMap>>, ebene: &str, name: &str, typ:
                         x: f64, y: f64, w: f64, h: f64) -> Result<i64, String> {
     let mut map = m.borrow_mut();
     let li = objekt_ebene(&map, ebene, "TILED_ADD_OBJECT")?;
+    let id = map.next_object_id;
+    map.next_object_id += 1;
     let l = &mut map.layers[li];
     let idx = l.objects.len();
     l.objects.push(TiledObject {
+        id,
         name: name.to_string(), type_: typ.to_string(),
         x, y, width: w, height: h, properties: HashMap::new(),
     });
@@ -853,6 +895,42 @@ pub fn tileset_anhaengen(m: &Rc<RefCell<TiledMap>>, bild: &str, kacheln: i64)
     Ok(idx as i64)
 }
 
+/// Eigenschaften in Tileds Listenform, nach NAMEN sortiert.
+///
+/// Sortiert aus demselben Grund wie `TILED_TILE_PROP_KEYS`: die Ablage ist
+/// eine HashMap, und ohne Ordnung kaeme dieselbe Karte bei jedem Sichern in
+/// anderer Reihenfolge heraus -- jeder Vergleich zweier Staende waere Rauschen.
+fn eigenschaften_json(props: &HashMap<String, PropVal>) -> Vec<J> {
+    let mut namen: Vec<&String> = props.keys().collect();
+    namen.sort();
+    namen.into_iter().map(|k| {
+        let v = &props[k];
+        serde_json::json!({
+            "name": k,
+            "type": match v { PropVal::Bool(_) => "bool", PropVal::Int(_) => "int",
+                              PropVal::Float(_) => "float", PropVal::Str(_) => "string" },
+            "value": match v {
+                PropVal::Bool(b) => J::from(*b),
+                PropVal::Int(i) => J::from(*i),
+                PropVal::Float(f) => J::from(*f),
+                PropVal::Str(s) => J::from(s.clone()),
+            },
+        })
+    }).collect()
+}
+
+/// Die Kacheln MIT Eigenschaften eines Tilesets, nach Kachelnummer sortiert
+/// -- die Ablage ist eine HashMap, und dieselbe Karte zweimal gesichert gaebe
+/// sonst zwei verschiedene Dateien.
+fn kacheln_json(t: &TiledTileset) -> Vec<J> {
+    let mut ids: Vec<&i64> = t.tile_properties.keys().collect();
+    ids.sort();
+    ids.into_iter().map(|id| serde_json::json!({
+        "id": id,
+        "properties": eigenschaften_json(&t.tile_properties[id]),
+    })).collect()
+}
+
 /// Die Karte als Tiled-JSON schreiben (TILED_SAVE).
 ///
 /// Erzeugt genau die Form, die `load` wieder liest -- eingebettete Tilesets,
@@ -870,20 +948,7 @@ pub fn speichern(m: &Rc<RefCell<TiledMap>>, pfad: &str) -> Result<(), String> {
         "tileheight": map.tile_h,
         // Nur Kacheln MIT Eigenschaften auflisten -- Tiled macht es genauso,
         // und bei 2000 Kacheln waere alles andere eine unlesbare Datei.
-        "tiles": t.tile_properties.iter().map(|(id, props)| serde_json::json!({
-            "id": id,
-            "properties": props.iter().map(|(k, v)| serde_json::json!({
-                "name": k,
-                "type": match v { PropVal::Bool(_) => "bool", PropVal::Int(_) => "int",
-                                  PropVal::Float(_) => "float", PropVal::Str(_) => "string" },
-                "value": match v {
-                    PropVal::Bool(b) => J::from(*b),
-                    PropVal::Int(i) => J::from(*i),
-                    PropVal::Float(f) => J::from(*f),
-                    PropVal::Str(s) => J::from(s.clone()),
-                },
-            })).collect::<Vec<_>>(),
-        })).collect::<Vec<_>>(),
+        "tiles": kacheln_json(t),
     })).collect();
 
     let layers: Vec<J> = map.layers.iter().enumerate().map(|(i, l)| {
@@ -896,21 +961,11 @@ pub fn speichern(m: &Rc<RefCell<TiledMap>>, pfad: &str) -> Result<(), String> {
         });
         if l.kind == "object" {
             o["type"] = J::from("objectgroup");
-            o["objects"] = J::from(l.objects.iter().enumerate().map(|(oi, ob)| serde_json::json!({
-                "id": oi + 1, "name": ob.name, "type": ob.type_,
+            o["objects"] = J::from(l.objects.iter().map(|ob| serde_json::json!({
+                "id": ob.id, "name": ob.name, "type": ob.type_,
                 "x": ob.x, "y": ob.y, "width": ob.width, "height": ob.height,
                 "visible": true, "rotation": 0,
-                "properties": ob.properties.iter().map(|(k, v)| serde_json::json!({
-                    "name": k,
-                    "type": match v { PropVal::Bool(_) => "bool", PropVal::Int(_) => "int",
-                                      PropVal::Float(_) => "float", PropVal::Str(_) => "string" },
-                    "value": match v {
-                        PropVal::Bool(b) => J::from(*b),
-                        PropVal::Int(i) => J::from(*i),
-                        PropVal::Float(f) => J::from(*f),
-                        PropVal::Str(s) => J::from(s.clone()),
-                    },
-                })).collect::<Vec<_>>(),
+                "properties": eigenschaften_json(&ob.properties),
             })).collect::<Vec<_>>());
         } else {
             o["type"] = J::from("tilelayer");
@@ -931,7 +986,9 @@ pub fn speichern(m: &Rc<RefCell<TiledMap>>, pfad: &str) -> Result<(), String> {
         "width": map.width, "height": map.height,
         "tilewidth": map.tile_w, "tileheight": map.tile_h,
         "nextlayerid": map.layers.len() + 1,
-        "nextobjectid": 1,
+        // Ueber JEDER vergebenen Kennung -- Tiled vergibt daraus die naechste.
+        "nextobjectid": map.layers.iter().flat_map(|l| l.objects.iter())
+            .map(|o| o.id + 1).fold(map.next_object_id, i64::max),
         "tilesets": tilesets,
         "layers": layers,
     });
@@ -970,4 +1027,97 @@ pub fn flood_fill(tiles: &mut [i64], width: i64, height: i64, tx: i64, ty: i64, 
         stack.push((cx, cy - 1));
     }
     n
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tempdatei(name: &str) -> String {
+        let d = std::env::temp_dir()
+            .join(std::format!("dh_tiled_{}_{}", std::process::id(), name));
+        d.to_string_lossy().into_owned()
+    }
+
+    fn beispielkarte() -> Rc<RefCell<TiledMap>> {
+        let m = neu(4, 3, 16, 16).unwrap();
+        tileset_anhaengen(&m, "kacheln.png", 8).unwrap();
+        kachel_eigenschaft(&m, 3, "solid", Some(PropVal::Bool(true))).unwrap();
+        kachel_eigenschaft(&m, 3, "damage", Some(PropVal::Int(5))).unwrap();
+        kachel_eigenschaft(&m, 4, "reibung", Some(PropVal::Float(0.5))).unwrap();
+        for k in ["z", "a", "m", "b", "q"] {
+            kachel_eigenschaft(&m, 6, k, Some(PropVal::Int(1))).unwrap();
+        }
+        objekt_ebene_anhaengen(&m, "spawns").unwrap();
+        objekt_ebene_anhaengen(&m, "trigger").unwrap();
+        objekt_anhaengen(&m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0).unwrap();
+        let i2 = objekt_anhaengen(&m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0).unwrap();
+        objekt_anhaengen(&m, "trigger", "tuer", "", 0.0, 0.0, 16.0, 16.0).unwrap();
+        objekt_eigenschaft(&m, "spawns", i2, "leben", Some(PropVal::Int(3))).unwrap();
+        objekt_eigenschaft(&m, "spawns", i2, "boss", Some(PropVal::Bool(true))).unwrap();
+        m
+    }
+
+    fn lesen(pfad: &str) -> J {
+        serde_json::from_str(&std::fs::read_to_string(pfad).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn nextobjectid_liegt_ueber_allen_kennungen() {
+        let pfad = tempdatei("next.json");
+        speichern(&beispielkarte(), &pfad).unwrap();
+        let j = lesen(&pfad);
+        let _ = std::fs::remove_file(&pfad);
+        assert_eq!(j["nextobjectid"], 4);
+        // Kennungen gelten fuer die ganze Karte, nicht je Ebene.
+        assert_eq!(j["layers"][0]["objects"][0]["id"], 1);
+        assert_eq!(j["layers"][0]["objects"][1]["id"], 2);
+        assert_eq!(j["layers"][1]["objects"][0]["id"], 3);
+    }
+
+    #[test]
+    fn zweimal_gesichert_ist_dieselbe_datei() {
+        let m = beispielkarte();
+        let (a, b) = (tempdatei("a.json"), tempdatei("b.json"));
+        speichern(&m, &a).unwrap();
+        speichern(&m, &b).unwrap();
+        let ta = std::fs::read_to_string(&a).unwrap();
+        let tb = std::fs::read_to_string(&b).unwrap();
+        let j = lesen(&a);
+        let _ = std::fs::remove_file(&a);
+        let _ = std::fs::remove_file(&b);
+        assert_eq!(ta, tb);
+        // Und zwar sortiert, nicht zufaellig gleich.
+        let namen: Vec<&str> = j["tilesets"][0]["tiles"][2]["properties"].as_array().unwrap()
+            .iter().map(|p| p["name"].as_str().unwrap()).collect();
+        assert_eq!(namen, ["a", "b", "m", "q", "z"]);
+        let ids: Vec<i64> = j["tilesets"][0]["tiles"].as_array().unwrap()
+            .iter().map(|t| t["id"].as_i64().unwrap()).collect();
+        assert_eq!(ids, [2, 3, 5]);
+        let op: Vec<&str> = j["layers"][0]["objects"][1]["properties"].as_array().unwrap()
+            .iter().map(|p| p["name"].as_str().unwrap()).collect();
+        assert_eq!(op, ["boss", "leben"]);
+    }
+
+    #[test]
+    fn geladene_karte_vergibt_weiter_und_heilt_doppelte() {
+        // So schrieb TILED_SAVE frueher: je Ebene ab 1, nextobjectid 1.
+        let pfad = tempdatei("alt.json");
+        std::fs::write(&pfad, r#"{"type":"map","width":2,"height":2,"tilewidth":16,
+            "tileheight":16,"nextobjectid":1,"tilesets":[],"layers":[
+            {"type":"objectgroup","name":"a","objects":[{"id":1,"name":"x"},{"id":7,"name":"y"}]},
+            {"type":"objectgroup","name":"b","objects":[{"id":1,"name":"z"},{"name":"ohne"}]}]}"#)
+            .unwrap();
+        let m = load(&pfad).unwrap();
+        let _ = std::fs::remove_file(&pfad);
+        {
+            let map = m.borrow();
+            let ids: Vec<i64> = map.layers.iter().flat_map(|l| l.objects.iter())
+                .map(|o| o.id).collect();
+            assert_eq!(ids, [1, 7, 8, 9]);
+            assert_eq!(map.next_object_id, 10);
+        }
+        objekt_anhaengen(&m, "a", "neu", "", 0.0, 0.0, 1.0, 1.0).unwrap();
+        assert_eq!(m.borrow().layers[0].objects[2].id, 10);
+    }
 }

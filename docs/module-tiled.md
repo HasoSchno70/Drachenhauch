@@ -161,6 +161,13 @@ Ein `TILED_TILE_REMOVE_PROP`, das die letzte Eigenschaft einer Kachel nimmt,
 entfernt auch ihren Eintrag ganz: `TILED_SAVE` fuehrt jede Kachel auf, die einen
 hat, und eine mit leerer Liste waere Rauschen in der Datei.
 
+`TILED_SAVE` schreibt Eigenschaften **nach Namen sortiert** und die Kacheln
+nach Nummer — dieselbe Karte zweimal gesichert ergibt dieselbe Datei. Die
+Objekt-Kennungen gelten fuer die **ganze Karte** (nicht je Ebene), und
+`nextobjectid` liegt ueber allen, damit Tiled beim Bearbeiten keine doppelten
+vergibt. Eine geladene Datei mit fehlenden oder doppelten Kennungen bekommt
+neue.
+
 **Grenzen:** `TILED_NEW` legt nur orthogonale, endliche Karten an (kein
 isometrisch, kein `infinite`). Objekte sind immer Rechtecke — Polygone,
 Ellipsen und Punkte (Tiled: `"point": true`) lassen sich nicht anlegen, ein
