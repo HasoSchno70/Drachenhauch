@@ -477,6 +477,47 @@ PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$
 --- erwartet
 TRUE
 
+=== kachelsatz wird gezeichnet
+' make_tiles.dh schreibt tiles.json Byte fuer Byte wie die eingecheckte Datei
+' (die hat bis 2026-09-14 make_tiles.py geschrieben), dazu ein Blatt aus
+' 16 x 14 Zellen zu 64 Punkten: belegte Zellen decken, freie bleiben leer.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/kacheln")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT INSTR(aus, "201 Kacheln") >= 0
+DIM neu AS BUFFER : neu = READALL_BYTES("kacheln/tiles.json")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+PRINT FILEEXISTS("kacheln/_contact.png")
+DIM b AS IMAGE : b = LOADIMAGE("kacheln/tiles.png")
+PRINT IMAGEWIDTH(b); " "; IMAGEHEIGHT(b)
+' 0x00 Boden deckt ganz, 0x20 gibt es nicht, 0x40 Kaefer hat einen Rand
+PRINT GETALPHA(b, 32, 32); " "; GETALPHA(b, 32, 2 * 64 + 32); " "; GETALPHA(b, 1, 4 * 64 + 1); " "; GETALPHA(b, 32, 4 * 64 + 35)
+--- argumente
+{sammlung}/../../circuitrunner/make_tiles.dh
+{sammlung}/../../circuitrunner/assets/tiles.json
+--- erwartet
+TRUE
+TRUE
+TRUE
+1024 896
+255 0 0 255
+
 === soundeffekte kommen von der richtigen adresse
 ' Ein Gegenserver im echo-Modus spiegelt den Pfad jeder Anfrage -- jede
 ' heruntergeladene Datei sagt also, welche Adresse das Werkzeug gebaut hat.

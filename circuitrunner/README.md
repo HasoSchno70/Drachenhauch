@@ -96,18 +96,24 @@ dhrt run circuitrunner\make_demo_levels.dh     # -> levels/circuit_runner.json
 
 ## Grafik (64×64, supersampled)
 
-Alle Kacheln werden **programmatisch** erzeugt (`make_tiles.py`, PIL) in ein
-Master-Sheet `assets/tiles.png` (16×8 Zellen à 64 px; intern 4× supersampled
-und kantengeglättet gezeichnet — detailliert/farbig statt flach 8-bit), in dem
-die **Zellen-Position dem Tile-Code entspricht** (0x00–0x7F). Die Engine
-zeichnet jede Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
+Alle Kacheln werden **programmatisch** erzeugt (`make_tiles.dh`) in ein
+Master-Sheet `assets/tiles.png` (16×14 Zellen à 64 px; intern 4× supersampled
+auf 256 × 256 gezeichnet und verkleinert — detailliert/farbig statt flach
+8-bit), in dem die **Zellen-Position dem Tile-Code entspricht**. Die Engine
+zeichnet jede Kachel/Figur per `DRAWIMAGEPART(sheet, code)`. Dazu schreibt es
+`assets/tiles.json` (Code → Name) und `assets/_contact.png` (Kontaktbogen
+zum Nachsehen).
 
 ```
-py circuitrunner\make_tiles.py
+dhrt run circuitrunner/make_tiles.dh
 ```
 
-Zusätzlich wird `assets/tiles.dhsprite` exportiert (**im Sprite-Editor
-`dhsprites` zu öffnen und bearbeiten** — jede Kachel ein benannter Frame). Die
+Bis 2026-09-14 war das `make_tiles.py` mit PIL. Die Drachenhauch-Fassung
+zeichnet dieselbe Szene mit denselben Koordinaten und Farben, pixelgleich ist
+das Bild aber nicht: je Kachel weicht die Deckung um höchstens 6 % ab, und der
+weiche Schein um Schlüssel, Stiefel und Figuren ist etwas kräftiger (PIL
+verwischte ihn gegen durchsichtiges Schwarz). Eine `tiles.dhsprite` entsteht
+nicht mehr — das war das Format des Qt-Sprite-Editors. Die
 HUD-Icons zeichnet die Engine direkt aus dem Sheet (`DRAWIMAGEPARTEX`), skaliert
 in nativer Auflösung — keine separaten Icon-Dateien.
 
@@ -155,7 +161,7 @@ bewegen sich halb so schnell wie die übrigen Monster.
 Wasser-Wellen, Feuer-Flackern, scrollende Force-Rollbänder, pulsierender Ausgang,
 Teleporter-Wirbel, Bomben-Funke, energetische Toggle-Wände, Sockel-Energiekern,
 Cloner-Maschine, **flackernder Dieb sowie schimmernde Schlüssel und Stiefel**
-(pulsierender Glow-Halo + Funkeln). Neue animierte Kachel: in `make_tiles.py`
+(pulsierender Glow-Halo + Funkeln). Neue animierte Kachel: in `make_tiles.dh`
 einen `frame`-Parameter ergänzen und in die `anim`-Liste aufnehmen (Frames ab
 Zelle 160), dann `anim_base()` in der Engine erweitern.
 
@@ -164,7 +170,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 | Datei | Zweck |
 |---|---|
 | `circuitrunner.dh` | die Spiel-Engine (Drachenhauch) |
-| `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.dhsprite` |
+| `make_tiles.dh` | Tileset-Generator → `assets/tiles.png`, `tiles.json`, `_contact.png` |
 | `convert_dat.dh` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
 | `make_demo_levels.dh` | ASCII → `levels/circuit_runner.json` (5 Demos) |
 | `download_sfx.dh`, `download_music.dh` | Soundeffekte und Musik neu laden |

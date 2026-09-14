@@ -1,0 +1,1284 @@
+' Tileset-Generator fuer CIRCUIT RUNNER -- 64x64, supersampled + geschattet.
+'
+' Erzeugt ein Master-Sheet assets/tiles.png (16 Spalten x 14 Zeilen, je 64 px),
+' Zellen-Position = Chip's-Challenge-Tile-Code (0x00..0xDB). Jede Kachel wird in
+' vierfacher Aufloesung (256 x 256) mit Formen und Verlaeufen gezeichnet und dann
+' auf 64 px verkleinert -- detailliert und farbig, aber weiter im klaren
+' Sprite-Stil. Dazu assets/tiles.json (Code -> Name) und assets/_contact.png
+' (Kontaktbogen der ersten 160 Zellen mit ihrer Nummer).
+'
+'     dhrt run circuitrunner/make_tiles.dh [-- zielordner]
+'
+' Bis 2026-09-14 make_tiles.py (PIL). Pixelgleich ist das Ergebnis nicht -- PIL
+' rastert und verkleinert anders --, gezeichnet wird aber dieselbe Szene mit
+' denselben Koordinaten und Farben. Eine .dhsprite schreibt es nicht mehr: das
+' alte Format war das des Qt-Editors, und der Sprite-Editor in Drachenhauch
+' fasst 16 Einzelbilder, nicht 201.
+IMPORT "imgfx"
+IMPORT "json"
+
+CONST S = 64          ' finale Kantenlaenge
+CONST SUPER = 4       ' Supersampling-Faktor
+CONST ARBEIT = 256    ' Arbeits-Kantenlaenge
+
+DIM programmOrdner AS STRING : programmOrdner = CWD$()
+
+' ------------------------------------------------------------------ Farben
+' Eine Farbe ist hier EINE Zahl mit echter Deckkraft im obersten Byte
+' (0 = durchsichtig) -- anders als sonst in Drachenhauch, wo 0 dort "deckend"
+' heisst. Die Zeichenhelfer geben Farbe und Deckkraft getrennt weiter.
+FUNCTION farbe(r AS INTEGER, g AS INTEGER, b AS INTEGER, a AS INTEGER) AS INTEGER
+    RETURN (a SHL 24) BOR (r SHL 16) BOR (g SHL 8) BOR b
+END FUNCTION
+FUNCTION rgbTeil(c AS INTEGER) AS INTEGER
+    RETURN c BAND &HFFFFFF
+END FUNCTION
+FUNCTION deck(c AS INTEGER) AS INTEGER
+    RETURN (c SHR 24) BAND 255
+END FUNCTION
+FUNCTION kanal(c AS INTEGER, k AS INTEGER) AS INTEGER
+    ' k: 0 = rot, 1 = gruen, 2 = blau, 3 = Deckkraft
+    IF k = 3 THEN RETURN deck(c)
+    RETURN (c SHR (16 - 8 * k)) BAND 255
+END FUNCTION
+FUNCTION mischen(a AS INTEGER, b AS INTEGER, t AS FLOAT) AS INTEGER
+    DIM u AS FLOAT : u = t
+    IF u < 0.0 THEN u = 0.0
+    IF u > 1.0 THEN u = 1.0
+    DIM erg[4] AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        erg[k] = INT(kanal(a, k) + (kanal(b, k) - kanal(a, k)) * u)
+    NEXT
+    RETURN farbe(erg[0], erg[1], erg[2], erg[3])
+END FUNCTION
+FUNCTION mitDeck(c AS INTEGER, a AS INTEGER) AS INTEGER
+    RETURN farbe(kanal(c, 0), kanal(c, 1), kanal(c, 2), a)
+END FUNCTION
+
+DIM LEER AS INTEGER : LEER = 0
+DIM OL AS INTEGER : OL = farbe(10, 13, 20, 255)
+DIM FLOOR_T AS INTEGER : FLOOR_T = farbe(44, 54, 74, 255)
+DIM FLOOR AS INTEGER : FLOOR = farbe(32, 40, 56, 255)
+DIM FLOOR_B AS INTEGER : FLOOR_B = farbe(22, 28, 40, 255)
+DIM FLOOR_L AS INTEGER : FLOOR_L = farbe(60, 74, 98, 255)
+DIM TRACE AS INTEGER : TRACE = farbe(54, 120, 120, 110)
+DIM WALL_T AS INTEGER : WALL_T = farbe(150, 166, 196, 255)
+DIM WALL AS INTEGER : WALL = farbe(104, 120, 150, 255)
+DIM WALL_B AS INTEGER : WALL_B = farbe(62, 74, 100, 255)
+DIM WALL_D AS INTEGER : WALL_D = farbe(40, 50, 70, 255)
+DIM STEEL AS INTEGER : STEEL = farbe(130, 142, 166, 255)
+DIM WATER_T AS INTEGER : WATER_T = farbe(96, 180, 255, 255)
+DIM WATER_B AS INTEGER : WATER_B = farbe(20, 64, 158, 255)
+DIM WATER_FOAM AS INTEGER : WATER_FOAM = farbe(200, 236, 255, 255)
+DIM FIRE_Y AS INTEGER : FIRE_Y = farbe(255, 234, 130, 255)
+DIM FIRE_O AS INTEGER : FIRE_O = farbe(255, 150, 40, 255)
+DIM FIRE_R AS INTEGER : FIRE_R = farbe(224, 64, 24, 255)
+DIM FIRE_D AS INTEGER : FIRE_D = farbe(150, 28, 16, 255)
+DIM ICE_T AS INTEGER : ICE_T = farbe(236, 250, 255, 255)
+DIM ICE AS INTEGER : ICE = farbe(176, 224, 248, 255)
+DIM ICE_B AS INTEGER : ICE_B = farbe(108, 170, 214, 255)
+DIM ICE_D AS INTEGER : ICE_D = farbe(74, 130, 176, 255)
+DIM DIRT_T AS INTEGER : DIRT_T = farbe(158, 120, 78, 255)
+DIM DIRT AS INTEGER : DIRT = farbe(124, 92, 58, 255)
+DIM DIRT_B AS INTEGER : DIRT_B = farbe(88, 64, 40, 255)
+DIM GRAVEL AS INTEGER : GRAVEL = farbe(110, 112, 122, 255)
+DIM GRAVEL_T AS INTEGER : GRAVEL_T = farbe(148, 150, 160, 255)
+DIM GRAVEL_B AS INTEGER : GRAVEL_B = farbe(78, 80, 90, 255)
+DIM GOLD_T AS INTEGER : GOLD_T = farbe(255, 232, 150, 255)
+DIM GOLD AS INTEGER : GOLD = farbe(242, 196, 70, 255)
+DIM GOLD_B AS INTEGER : GOLD_B = farbe(176, 130, 30, 255)
+DIM CHIPG_T AS INTEGER : CHIPG_T = farbe(150, 255, 198, 255)
+DIM CHIPG AS INTEGER : CHIPG = farbe(60, 214, 130, 255)
+DIM CHIPG_B AS INTEGER : CHIPG_B = farbe(24, 140, 84, 255)
+DIM CHIPG_D AS INTEGER : CHIPG_D = farbe(14, 92, 58, 255)
+DIM NEON AS INTEGER : NEON = farbe(110, 248, 240, 255)
+DIM NEON_B AS INTEGER : NEON_B = farbe(24, 150, 156, 255)
+DIM NEON_D AS INTEGER : NEON_D = farbe(16, 90, 100, 255)
+DIM MAG_T AS INTEGER : MAG_T = farbe(255, 170, 240, 255)
+DIM MAG AS INTEGER : MAG = farbe(236, 84, 206, 255)
+DIM MAG_B AS INTEGER : MAG_B = farbe(150, 36, 124, 255)
+DIM PURP_T AS INTEGER : PURP_T = farbe(190, 168, 255, 255)
+DIM PURP AS INTEGER : PURP = farbe(132, 104, 214, 255)
+DIM PURP_B AS INTEGER : PURP_B = farbe(78, 58, 150, 255)
+DIM WHITE AS INTEGER : WHITE = farbe(245, 248, 252, 255)
+DIM BLACK AS INTEGER : BLACK = farbe(16, 18, 26, 255)
+DIM SHINE AS INTEGER : SHINE = farbe(255, 255, 255, 235)
+DIM OUTL AS INTEGER : OUTL = farbe(10, 12, 20, 255)
+
+' Schluessel-/Tuer-Farbsaetze: (hell, mittel, dunkel, tief)
+FUNCTION satz(name AS STRING, k AS INTEGER) AS INTEGER
+    SELECT CASE name
+        CASE "blue"
+            IF k = 0 THEN RETURN farbe(150, 196, 255, 255)
+            IF k = 1 THEN RETURN farbe(74, 138, 252, 255)
+            IF k = 2 THEN RETURN farbe(38, 86, 196, 255)
+            RETURN farbe(22, 52, 134, 255)
+        CASE "red"
+            IF k = 0 THEN RETURN farbe(255, 156, 150, 255)
+            IF k = 1 THEN RETURN farbe(236, 78, 76, 255)
+            IF k = 2 THEN RETURN farbe(176, 40, 40, 255)
+            RETURN farbe(118, 24, 26, 255)
+        CASE "green"
+            IF k = 0 THEN RETURN farbe(158, 248, 176, 255)
+            IF k = 1 THEN RETURN farbe(70, 210, 100, 255)
+            IF k = 2 THEN RETURN farbe(40, 150, 64, 255)
+            RETURN farbe(24, 100, 44, 255)
+    END SELECT
+    IF k = 0 THEN RETURN farbe(255, 240, 150, 255)
+    IF k = 1 THEN RETURN farbe(248, 212, 60, 255)
+    IF k = 2 THEN RETURN farbe(192, 158, 32, 255)
+    RETURN farbe(132, 104, 20, 255)
+END FUNCTION
+
+FUNCTION vier(frame AS INTEGER, a AS FLOAT, b AS FLOAT, c AS FLOAT, d AS FLOAT) AS FLOAT
+    SELECT CASE frame MOD 4
+        CASE 0
+            RETURN a
+        CASE 1
+            RETURN b
+        CASE 2
+            RETURN c
+    END SELECT
+    RETURN d
+END FUNCTION
+
+FUNCTION puls(frame AS INTEGER) AS FLOAT
+    RETURN vier(frame, 0.0, 0.5, 1.0, 0.5)
+END FUNCTION
+
+' ------------------------------------------------------------------ Leinwand
+' Gezeichnet wird auf `lw` (256 x 256), gedacht wird in 64er-Einheiten: jeder
+' Helfer rechnet mit SUPER hoch, wie `P._s` in der Python-Fassung.
+DIM lw AS IMAGE
+
+SUB neu(grund AS INTEGER)
+    lw = IMAGE_NEW(ARBEIT, ARBEIT)
+    IF deck(grund) > 0 THEN IMAGE_FILL_RECT(lw, 0, 0, ARBEIT - 1, ARBEIT - 1, rgbTeil(grund), deck(grund))
+END SUB
+
+SUB neuAuf(basis AS IMAGE)
+    ' Eine fertige Kachel als Grund -- ohne Glaettung hochskaliert.
+    lw = IMAGE_SCALE_NN(basis, ARBEIT, ARBEIT)
+    IMAGE_FREE(basis)
+END SUB
+
+SUB zGV(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, oben AS INTEGER, unten AS INTEGER)
+    IMAGE_GRADIENT(lw, x0 * SUPER, y0 * SUPER, x1 * SUPER, y1 * SUPER, rgbTeil(oben), rgbTeil(unten), TRUE, deck(oben), deck(unten))
+END SUB
+
+SUB zGH(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, links AS INTEGER, rechts AS INTEGER)
+    IMAGE_GRADIENT(lw, x0 * SUPER, y0 * SUPER, x1 * SUPER, y1 * SUPER, rgbTeil(links), rgbTeil(rechts), FALSE, deck(links), deck(rechts))
+END SUB
+
+SUB zRect(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, c AS INTEGER)
+    IMAGE_FILL_RECT(lw, x0 * SUPER, y0 * SUPER, x1 * SUPER, y1 * SUPER, rgbTeil(c), deck(c))
+END SUB
+
+SUB zRRect(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, rad AS FLOAT, c AS INTEGER)
+    IMAGE_FILL_ROUNDRECT(lw, x0 * SUPER, y0 * SUPER, x1 * SUPER, y1 * SUPER, rad * SUPER, rgbTeil(c), deck(c))
+END SUB
+
+SUB zDisc(cx AS FLOAT, cy AS FLOAT, r AS FLOAT, c AS INTEGER)
+    IMAGE_FILL_ELLIPSE(lw, cx * SUPER, cy * SUPER, r * SUPER, r * SUPER, rgbTeil(c), deck(c))
+END SUB
+
+SUB zRing(cx AS FLOAT, cy AS FLOAT, r AS FLOAT, bw AS FLOAT, c AS INTEGER)
+    IMAGE_RING(lw, cx * SUPER, cy * SUPER, r * SUPER, INT(bw * SUPER), rgbTeil(c), deck(c))
+END SUB
+
+SUB zFrame(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, c AS INTEGER, bw AS FLOAT)
+    IMAGE_FRAME(lw, x0 * SUPER, y0 * SUPER, x1 * SUPER, y1 * SUPER, INT(bw * SUPER), rgbTeil(c), deck(c))
+END SUB
+
+' Punkte als Text "x y x y ..." -- fuer feste Zuege lesbarer als zwei Felder.
+SUB punkteLesen(p AS STRING, BYREF xs AS ARRAY OF FLOAT, BYREF ys AS ARRAY OF FLOAT)
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(TRIM$(p), " ")
+    xs = []
+    ys = []
+    DIM i AS INTEGER
+    DIM n AS INTEGER : n = 0
+    FOR i = 0 TO LEN(teile) - 1
+        IF teile[i] <> "" THEN
+            IF n MOD 2 = 0 THEN ARRAY_PUSH(xs, VAL(teile[i]) * SUPER) ELSE ARRAY_PUSH(ys, VAL(teile[i]) * SUPER)
+            n = n + 1
+        END IF
+    NEXT
+END SUB
+
+SUB zLinie(p AS STRING, c AS INTEGER, bw AS FLOAT)
+    DIM xs AS ARRAY OF FLOAT
+    DIM ys AS ARRAY OF FLOAT
+    punkteLesen(p, xs, ys)
+    IMAGE_POLYLINE(lw, xs, ys, INT(bw * SUPER), rgbTeil(c), deck(c))
+END SUB
+
+SUB zPoly(p AS STRING, c AS INTEGER)
+    DIM xs AS ARRAY OF FLOAT
+    DIM ys AS ARRAY OF FLOAT
+    punkteLesen(p, xs, ys)
+    IMAGE_FILL_POLY(lw, xs, ys, rgbTeil(c), deck(c))
+END SUB
+
+FUNCTION pt$(x AS FLOAT, y AS FLOAT) AS STRING
+    RETURN STR$(x) + " " + STR$(y) + " "
+END FUNCTION
+
+FUNCTION fertig(glanz AS BOOLEAN) AS IMAGE
+    ' Weicher Schein hinter der Kachel, dann auf 64 px verkleinern.
+    DIM klein AS IMAGE
+    IF glanz THEN
+        DIM g AS IMAGE : g = IMAGE_BLUR(lw, 5)
+        IMAGE_DRAW_IMAGE(g, lw, 0, 0)
+        klein = IMAGE_SCALE(g, S, S)
+        IMAGE_FREE(g)
+    ELSE
+        klein = IMAGE_SCALE(lw, S, S)
+    END IF
+    IMAGE_FREE(lw)
+    RETURN klein
+END FUNCTION
+
+' ====================================================== TERRAIN
+FUNCTION t_floor() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, FLOOR_T, FLOOR_B)
+    zRRect(2, 2, S - 3, S - 3, 6, FLOOR)
+    zFrame(2, 2, S - 3, S - 3, FLOOR_L, 1)
+    ' dezente Leiterbahnen + Loetpunkte
+    zLinie("10 14 10 40 28 40", TRACE, 1.4)
+    zLinie("50 20 40 20 40 50", TRACE, 1.4)
+    zDisc(10, 14, 1.8, NEON_D) : zDisc(40, 50, 1.8, NEON_D) : zDisc(28, 40, 1.6, NEON_D)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_wall() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, WALL_T, WALL_B)
+    zRRect(3, 3, S - 4, S - 4, 7, WALL)
+    zGV(5, 5, S - 6, 30, mischen(WALL, WALL_T, 0.5), WALL)
+    zFrame(3, 3, S - 4, S - 4, WALL_T, 1.5)
+    zLinie(pt$(3, S - 5) + pt$(S - 4, S - 5), WALL_D, 2)
+    ' Mittelfuge (Kreuz)
+    zRect(S \ 2 - 1, 8, S \ 2 + 1, S - 9, WALL_D)
+    zRect(8, S \ 2 - 1, S - 9, S \ 2 + 1, WALL_D)
+    ' Nieten mit Glanz
+    DIM nx AS ARRAY OF INTEGER : nx = [12, S - 12, 12, S - 12]
+    DIM ny AS ARRAY OF INTEGER : ny = [12, 12, S - 12, S - 12]
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        zDisc(nx[i], ny[i], 3.2, WALL_D) : zDisc(nx[i], ny[i], 2.4, STEEL) : zDisc(nx[i] - 0.7, ny[i] - 0.7, 1.0, WALL_T)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_chip() AS IMAGE
+    neuAuf(t_floor())
+    zDisc(32, 32, 22, farbe(16, 60, 44, 130))
+    zRRect(14, 14, 50, 50, 4, CHIPG_D)
+    zGV(16, 16, 48, 48, CHIPG_T, CHIPG_B)
+    zRRect(22, 22, 42, 42, 3, CHIPG_D)
+    zRRect(24, 24, 40, 40, 2, mischen(CHIPG, CHIPG_T, 0.4))
+    zRect(27, 27, 37, 37, CHIPG_B)
+    ' Gold-Beinchen
+    DIM i AS INTEGER
+    FOR i = 18 TO 46 STEP 6
+        zRRect(8, i - 1, 14, i + 1, 1, GOLD) : zRRect(50, i - 1, 56, i + 1, 1, GOLD)
+        zRRect(i - 1, 8, i + 1, 14, 1, GOLD) : zRRect(i - 1, 50, i + 1, 56, 1, GOLD)
+    NEXT
+    zDisc(28, 28, 2, SHINE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_water(frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, WATER_T, WATER_B)
+    DIM hoehen AS ARRAY OF INTEGER : hoehen = [10, 24, 40, 54]
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        DIM c AS INTEGER : c = mischen(WATER_FOAM, WATER_T, 0.2 + k * 0.15)
+        DIM zug AS STRING : zug = ""
+        DIM x AS FLOAT : x = -8.0
+        WHILE x <= S + 8
+            DIM wy AS FLOAT : wy = hoehen[k] + SIN((x + frame * 8) * (2 * PI / 32) + k) * 3
+            zug = zug + pt$(x, wy)
+            x = x + 5
+        WEND
+        zLinie(zug, c, 1.8)
+    NEXT
+    DIM bob AS FLOAT : bob = SIN(frame * 1.5708) * 2
+    zDisc(16, 16 + bob, 3, WATER_FOAM) : zDisc(44, 30 - bob, 2, WATER_FOAM) : zDisc(28, 48 + bob, 2.4, WATER_FOAM)
+    zGV(0, 0, S, 6, WATER_B, WATER_T)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+SUB flamme(cx AS FLOAT, basisY AS FLOAT, bw AS FLOAT, hh AS FLOAT, c AS INTEGER)
+    zPoly(pt$(cx - bw, basisY) + pt$(cx - bw * 0.5, basisY - hh * 0.55) + _
+          pt$(cx - bw * 0.2, basisY - hh * 0.2) + pt$(cx, basisY - hh) + _
+          pt$(cx + bw * 0.2, basisY - hh * 0.2) + pt$(cx + bw * 0.5, basisY - hh * 0.55) + _
+          pt$(cx + bw, basisY), c)
+END SUB
+
+FUNCTION t_fire(frame AS INTEGER) AS IMAGE
+    neuAuf(t_floor())
+    zDisc(32, 40, 22, farbe(120, 40, 12, 120))
+    DIM fl AS FLOAT : fl = vier(frame, 1.0, 0.84, 1.14, 0.92)
+    DIM sx AS FLOAT : sx = vier(frame, 0, -2, 1, -1)
+    DIM fw AS FLOAT : fw = vier(frame, 1.0, 0.9, 1.1, 0.95)
+    flamme(32, 54, 17, 40 * fl, FIRE_D)
+    flamme(24 + sx, 54, 8, 26 * fw, FIRE_R) : flamme(40 - sx, 54, 9, 30 * fl, FIRE_R)
+    flamme(32 + sx, 54, 11, 34 * fl, FIRE_O)
+    flamme(32 + sx, 52, 6, 22 * fw, FIRE_Y)
+    zDisc(32 + sx, 46, 4, FIRE_Y)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_ice() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, ICE_T, ICE_B)
+    zRRect(2, 2, S - 3, S - 3, 7, ICE)
+    zGV(4, 4, S - 5, 28, mischen(ICE, ICE_T, 0.55), ICE)
+    zFrame(2, 2, S - 3, S - 3, ICE_T, 1.4)
+    zLinie(pt$(3, S - 5) + pt$(S - 4, S - 5), ICE_D, 2)
+    ' zarte Frost-Streifen statt harter Risse
+    DIM frost AS INTEGER : frost = mischen(ICE_T, WHITE, 0.55)
+    DIM starts AS ARRAY OF INTEGER : starts = [2, 20, 38]
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        zLinie(pt$(starts[i], 58) + pt$(starts[i] + 30, 6), frost, 1.1)
+    NEXT
+    DIM riss AS INTEGER : riss = mischen(ICE_D, ICE, 0.5)
+    zLinie("18 22 27 32 23 44", riss, 1.0)
+    zLinie("42 18 49 30", riss, 1.0)
+    zPoly("40 9 52 12 44 22", SHINE)
+    zDisc(47, 14, 2.0, WHITE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_ice_corner(zu AS STRING) AS IMAGE
+    neuAuf(t_ice())
+    DIM schiene AS INTEGER : schiene = mischen(ICE_B, ICE_D, 0.55)
+    DIM hell AS INTEGER : hell = ICE_T
+    DIM rw AS FLOAT : rw = 7
+    DIM kanten AS STRING
+    DIM cx AS FLOAT
+    DIM cy AS FLOAT
+    DIM a0 AS INTEGER
+    SELECT CASE zu
+        CASE "NW"
+            kanten = "NW" : cx = 0 : cy = 0 : a0 = 0
+        CASE "NE"
+            kanten = "NE" : cx = S : cy = 0 : a0 = 90
+        CASE "SE"
+            kanten = "SE" : cx = S : cy = S : a0 = 180
+        CASE ELSE
+            kanten = "SW" : cx = 0 : cy = S : a0 = 270
+    END SELECT
+    DIM i AS INTEGER
+    FOR i = 0 TO 1
+        SELECT CASE MID$(kanten, i, 1)
+            CASE "N"
+                zRect(0, 0, S, rw, schiene) : zLinie(pt$(0, rw) + pt$(S, rw), hell, 1.4)
+            CASE "S"
+                zRect(0, S - rw, S, S, schiene) : zLinie(pt$(0, S - rw) + pt$(S, S - rw), hell, 1.4)
+            CASE "W"
+                zRect(0, 0, rw, S, schiene) : zLinie(pt$(rw, 0) + pt$(rw, S), hell, 1.4)
+            CASE ELSE
+                zRect(S - rw, 0, S, S, schiene) : zLinie(pt$(S - rw, 0) + pt$(S - rw, S), hell, 1.4)
+        END SELECT
+    NEXT
+    ' gerundeter Innen-Bumper am Eck mit glaenzender Gleitkante
+    zDisc(cx, cy, 31, schiene)
+    zDisc(cx, cy, 27, mischen(ICE, ICE_T, 0.45))
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        DIM rr AS FLOAT : rr = IIF(k = 0, 30.0, 28.0)
+        DIM c AS INTEGER : c = IIF(k = 0, hell, SHINE)
+        DIM bw AS FLOAT : bw = IIF(k = 0, 2.2, 1.3)
+        DIM zug AS STRING : zug = ""
+        DIM grad AS INTEGER
+        FOR grad = a0 TO a0 + 90 STEP 3
+            DIM rad AS FLOAT : rad = grad * PI / 180.0
+            zug = zug + pt$(cx + rr * COS(rad), cy + rr * SIN(rad))
+        NEXT
+        zLinie(zug, c, bw)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_dirt() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, DIRT_T, DIRT_B)
+    zRRect(2, 2, S - 3, S - 3, 6, DIRT)
+    DIM px AS ARRAY OF INTEGER : px = [14, 40, 26, 48, 12, 34]
+    DIM py AS ARRAY OF INTEGER : py = [18, 22, 40, 46, 48, 12]
+    DIM pr AS ARRAY OF INTEGER : pr = [4, 5, 4, 4, 3, 3]
+    DIM i AS INTEGER
+    FOR i = 0 TO 5
+        zDisc(px[i], py[i], pr[i], DIRT_B) : zDisc(px[i] - 1, py[i] - 1, pr[i] * 0.5, DIRT_T)
+    NEXT
+    zFrame(2, 2, S - 3, S - 3, mischen(DIRT_T, WHITE, 0.2), 1)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_gravel() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, GRAVEL_T, GRAVEL_B)
+    zRRect(2, 2, S - 3, S - 3, 6, GRAVEL)
+    DIM px AS ARRAY OF INTEGER : px = [12, 30, 48, 18, 40, 54, 26, 12]
+    DIM py AS ARRAY OF INTEGER : py = [14, 12, 20, 32, 36, 44, 50, 48]
+    DIM pr AS ARRAY OF INTEGER : pr = [4, 5, 4, 5, 5, 4, 5, 3]
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        zDisc(px[i], py[i], pr[i], mischen(GRAVEL, GRAVEL_B, 0.5)) : zDisc(px[i] - 1, py[i] - 1, pr[i] * 0.55, GRAVEL_T)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+SUB pfeil(dx AS INTEGER, dy AS INTEGER, cx AS FLOAT, cy AS FLOAT, c AS INTEGER, ln AS FLOAT)
+    DIM sg AS INTEGER
+    IF dx <> 0 THEN
+        sg = IIF(dx > 0, 1, -1)
+        zLinie(pt$(cx - sg * ln, cy) + pt$(cx + sg * ln * 0.3, cy), c, 3)
+        zPoly(pt$(cx + sg * ln, cy) + pt$(cx + sg * (ln - 7), cy - 6) + pt$(cx + sg * (ln - 7), cy + 6), c)
+    ELSE
+        sg = IIF(dy > 0, 1, -1)
+        zLinie(pt$(cx, cy - sg * ln) + pt$(cx, cy + sg * ln * 0.3), c, 3)
+        zPoly(pt$(cx, cy + sg * ln) + pt$(cx - 6, cy + sg * (ln - 7)) + pt$(cx + 6, cy + sg * (ln - 7)), c)
+    END IF
+END SUB
+
+FUNCTION t_force(dx AS INTEGER, dy AS INTEGER, frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, PURP_T, PURP_B)
+    zRRect(2, 2, S - 3, S - 3, 6, PURP)
+    zFrame(2, 2, S - 3, S - 3, PURP_T, 1.5)
+    DIM sp AS FLOAT : sp = 20.0
+    DIM versatz AS FLOAT : versatz = (frame MOD 4) * sp / 4.0
+    DIM hell AS INTEGER : hell = mischen(PURP_T, WHITE, 0.4)
+    DIM i AS INTEGER
+    FOR i = -1 TO 4
+        DIM lage AS FLOAT : lage = i * sp + versatz
+        DIM sg AS INTEGER
+        IF dy <> 0 THEN
+            sg = IIF(dy > 0, 1, -1)
+            DIM cy AS FLOAT : cy = IIF(dy > 0, lage, S - lage)
+            zLinie(pt$(18, cy - sg * 7) + pt$(32, cy + sg * 7) + pt$(46, cy - sg * 7), hell, 3.5)
+        ELSE
+            sg = IIF(dx > 0, 1, -1)
+            DIM cx AS FLOAT : cx = IIF(dx > 0, lage, S - lage)
+            zLinie(pt$(cx - sg * 7, 18) + pt$(cx + sg * 7, 32) + pt$(cx - sg * 7, 46), hell, 3.5)
+        END IF
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_force_random(frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, PURP_T, PURP_B)
+    zRRect(2, 2, S - 3, S - 3, 6, PURP)
+    zFrame(2, 2, S - 3, S - 3, PURP_T, 1.5)
+    DIM ddx AS ARRAY OF INTEGER : ddx = [0, 1, 0, -1]
+    DIM ddy AS ARRAY OF INTEGER : ddy = [-1, 0, 1, 0]
+    pfeil(ddx[frame MOD 4], ddy[frame MOD 4], 32, 32, mischen(PURP_T, WHITE, 0.35), 11)
+    zDisc(32, 32, 3.4, WHITE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_exit(frame AS INTEGER) AS IMAGE
+    neu(BLACK)
+    DIM r AS INTEGER
+    FOR r = 30 TO 3 STEP -3
+        DIM t AS FLOAT : t = r / 30.0
+        DIM c AS INTEGER
+        IF ((r \ 3) + frame) MOD 2 = 0 THEN c = mischen(WHITE, NEON, 1 - t) ELSE c = farbe(12, 24, 34, 255)
+        zRing(32, 32, r, 2.4, c)
+    NEXT
+    zDisc(32, 32, 4, WHITE)
+    zFrame(2, 2, S - 3, S - 3, NEON_B, 2)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_socket(frame AS INTEGER) AS IMAGE
+    neuAuf(t_floor())
+    zRRect(8, 8, S - 9, S - 9, 6, farbe(34, 40, 56, 255))
+    zFrame(8, 8, S - 9, S - 9, farbe(54, 64, 86, 255), 2)
+    zRRect(22, 16, 42, 48, 3, STEEL)
+    zGV(24, 18, 40, 46, mischen(STEEL, WHITE, 0.2), farbe(70, 78, 98, 255))
+    DIM i AS INTEGER
+    FOR i = 20 TO 46 STEP 7
+        zRRect(14, i - 1, 20, i + 1, 1, GOLD) : zRRect(44, i - 1, 50, i + 1, 1, GOLD)
+    NEXT
+    ' pulsierender Energiekern
+    DIM pu AS FLOAT : pu = puls(frame)
+    zDisc(32, 32, 5 + pu * 4, farbe(60, 214, 130, INT(60 + pu * 90)))
+    zDisc(32, 32, 4, CHIPG) : zDisc(30, 30, 1.6, CHIPG_T)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_door(name AS STRING) AS IMAGE
+    DIM lt AS INTEGER : lt = satz(name, 0)
+    DIM md AS INTEGER : md = satz(name, 1)
+    DIM dk AS INTEGER : dk = satz(name, 2)
+    DIM dp AS INTEGER : dp = satz(name, 3)
+    neu(LEER)
+    zGV(0, 0, S, S, lt, dk)
+    zRRect(3, 3, S - 4, S - 4, 8, md)
+    zFrame(3, 3, S - 4, S - 4, lt, 2)
+    zGV(6, 6, S - 7, 26, mischen(md, lt, 0.55), md)
+    zRRect(10, 10, S - 11, S - 11, 5, dk)
+    zRRect(12, 12, S - 13, S - 13, 4, md)
+    ' Schloss / Reide-Platte
+    zDisc(32, 28, 7, GOLD_B) : zDisc(32, 28, 5.4, GOLD) : zDisc(30.5, 26.5, 2, GOLD_T)
+    zRRect(30, 28, 34, 42, 1.5, GOLD) : zDisc(32, 28, 2.2, dp)
+    zLinie(pt$(4, 32) + pt$(S - 5, 32), mischen(dk, OL, 0.4), 1.4)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_blue_wall() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, satz("blue", 0), satz("blue", 2))
+    zRRect(4, 4, S - 5, S - 5, 7, satz("blue", 3))
+    zFrame(4, 4, S - 5, S - 5, satz("blue", 0), 2)
+    zDisc(32, 32, 10, satz("blue", 1)) : zDisc(28, 28, 4, satz("blue", 0))
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_block() AS IMAGE
+    neu(LEER)
+    zGV(0, 0, S, S, farbe(176, 138, 92, 255), DIRT_B)
+    zRRect(3, 3, S - 4, S - 4, 6, DIRT)
+    zFrame(3, 3, S - 4, S - 4, farbe(200, 162, 110, 255), 2)
+    zLinie(pt$(3, S - 5) + pt$(S - 4, S - 5), DIRT_B, 2.5)
+    ' Metallbeschlag (Diagonalen + Mittelplatte)
+    zLinie(pt$(8, 8) + pt$(S - 8, S - 8), DIRT_B, 2) : zLinie(pt$(S - 8, 8) + pt$(8, S - 8), DIRT_B, 2)
+    zRRect(24, 24, 40, 40, 3, farbe(150, 116, 76, 255))
+    zFrame(24, 24, 40, 40, DIRT_B, 1)
+    DIM nx AS ARRAY OF INTEGER : nx = [10, S - 10, 10, S - 10]
+    DIM ny AS ARRAY OF INTEGER : ny = [10, 10, S - 10, S - 10]
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        zDisc(nx[i], ny[i], 2.4, DIRT_B) : zDisc(nx[i] - 0.6, ny[i] - 0.6, 1, farbe(210, 170, 120, 255))
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_button(knopf AS INTEGER, licht AS INTEGER) AS IMAGE
+    neuAuf(t_floor())
+    zDisc(32, 33, 16, farbe(20, 24, 36, 255))
+    zDisc(32, 32, 13, mischen(knopf, OL, 0.35))
+    zDisc(32, 32, 11, knopf)
+    zDisc(32, 31, 9, mischen(knopf, licht, 0.4))
+    zDisc(27, 27, 3.5, licht)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_toggle(offen AS BOOLEAN, frame AS INTEGER) AS IMAGE
+    DIM pu AS FLOAT : pu = puls(frame)
+    IF offen THEN
+        neuAuf(t_floor())
+        zFrame(4, 4, S - 5, S - 5, farbe(90, 230, 130, INT(70 + pu * 120)), 3)
+        zDisc(32, 32, 3 + pu * 2.5, farbe(90, 230, 130, INT(110 + pu * 90)))
+        RETURN fertig(FALSE)
+    END IF
+    neu(LEER)
+    zGV(0, 0, S, S, farbe(96, 220, 140, 255), farbe(44, 120, 78, 255))
+    zRRect(3, 3, S - 4, S - 4, 6, farbe(60, 150, 96, 255))
+    zFrame(3, 3, S - 4, S - 4, mischen(farbe(130, 240, 160, 255), WHITE, pu * 0.5), 2)
+    DIM gitter AS INTEGER : gitter = mischen(farbe(44, 110, 72, 255), farbe(120, 240, 160, 255), pu)
+    DIM k AS INTEGER
+    FOR k = 10 TO S - 7 STEP 10
+        zLinie(pt$(5, k) + pt$(S - 6, k), gitter, 1.4)
+    NEXT
+    FOR k = 10 TO S - 7 STEP 10
+        zLinie(pt$(k, 5) + pt$(k, S - 6), gitter, 1.4)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_teleport(frame AS INTEGER) AS IMAGE
+    neu(BLACK)
+    ' nach innen wandernde Ringe = Sog
+    DIM r AS INTEGER
+    FOR r = 28 TO 3 STEP -3
+        DIM c AS INTEGER
+        IF ((r \ 3) + frame) MOD 2 = 0 THEN c = mischen(WHITE, MAG, r / 28.0) ELSE c = farbe(30, 10, 30, 255)
+        zRing(32, 32, r, 2.4, c)
+    NEXT
+    ' rotierende Wirbel-Arme
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        DIM a AS FLOAT : a = (frame / 4.0 + k / 2.0) * 2 * PI
+        DIM arme AS ARRAY OF INTEGER : arme = [10, 18, 25]
+        DIM j AS INTEGER
+        FOR j = 0 TO 2
+            zDisc(32 + COS(a + arme[j] * 0.16) * arme[j], 32 + SIN(a + arme[j] * 0.16) * arme[j], 2.0, MAG_T)
+        NEXT
+    NEXT
+    zDisc(32, 32, 4, WHITE)
+    zFrame(2, 2, S - 3, S - 3, MAG_B, 2)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_bomb(frame AS INTEGER) AS IMAGE
+    neuAuf(t_floor())
+    zDisc(31, 38, 17, farbe(8, 10, 16, 255))
+    zDisc(31, 38, 15, farbe(30, 34, 46, 255))
+    zDisc(31, 38, 14, BLACK)
+    zDisc(24, 31, 5, farbe(78, 86, 104, 255)) : zDisc(22, 29, 2, farbe(140, 148, 166, 255))
+    zLinie("38 22 44 14 48 16", farbe(160, 130, 80, 255), 2.4)
+    ' zuckender, spritzender Funke
+    DIM sr AS FLOAT : sr = vier(frame, 3.2, 2.4, 4.2, 2.8)
+    DIM jx AS FLOAT : jx = vier(frame, 0, 1.5, -1, 1)
+    DIM jy AS FLOAT : jy = vier(frame, 0, -1, 1.5, -1.5)
+    zDisc(48 + jx, 15 + jy, sr + 1.6, FIRE_R)
+    zDisc(48 + jx, 15 + jy, sr, FIRE_O)
+    zDisc(48 + jx, 15 + jy, sr * 0.5, FIRE_Y)
+    IF frame MOD 2 = 0 THEN
+        zDisc(52, 11, 1.3, FIRE_Y) : zDisc(44, 9, 1.0, FIRE_O)
+    END IF
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_trap() AS IMAGE
+    neuAuf(t_floor())
+    zRRect(6, 6, S - 7, S - 7, 4, farbe(22, 26, 36, 255))
+    zFrame(6, 6, S - 7, S - 7, farbe(60, 68, 88, 255), 2)
+    DIM x AS INTEGER
+    FOR x = 10 TO S - 9 STEP 7
+        zPoly(pt$(x, 10) + pt$(x + 4, 10) + pt$(x + 2, 18), STEEL)
+        zPoly(pt$(x, S - 10) + pt$(x + 4, S - 10) + pt$(x + 2, S - 18), STEEL)
+    NEXT
+    zRRect(12, 26, S - 13, 38, 2, BLACK)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION t_hint() AS IMAGE
+    neuAuf(t_floor())
+    zRRect(8, 8, S - 9, S - 9, 6, farbe(40, 48, 66, 255))
+    zFrame(8, 8, S - 9, S - 9, farbe(66, 78, 104, 255), 2)
+    ' "?" geschwungen
+    zLinie("24 22 32 18 40 24 34 32 32 38", NEON, 4)
+    zDisc(32, 46, 2.6, NEON)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_thief(frame AS INTEGER) AS IMAGE
+    neuAuf(t_floor())
+    DIM pu AS FLOAT : pu = puls(frame)
+    zDisc(32, 26, 14, farbe(44, 50, 70, 255))
+    zDisc(32, 22, 11, farbe(60, 68, 92, 255))
+    zRRect(18, 24, 46, 32, 3, BLACK)
+    DIM auge AS INTEGER : auge = mischen(NEON_D, NEON, pu)
+    zDisc(25, 28, 2.4 + pu * 0.9, auge) : zDisc(39, 28, 2.4 + pu * 0.9, auge)
+    zPoly("18 40 46 40 52 58 12 58", farbe(54, 60, 82, 255))
+    zDisc(32, 48, 3 + pu * 1.6, mischen(MAG_B, MAG, pu))
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_cloner(frame AS INTEGER) AS IMAGE
+    DIM pu AS FLOAT : pu = puls(frame)
+    neu(LEER)
+    zGV(0, 0, S, S, farbe(66, 74, 100, 255), farbe(34, 38, 54, 255))
+    zRRect(3, 3, S - 4, S - 4, 6, farbe(50, 56, 78, 255))
+    zFrame(3, 3, S - 4, S - 4, STEEL, 2)
+    zRRect(14, 14, S - 15, S - 15, 4, farbe(18, 20, 30, 255))
+    zRRect(22, 22, 42, 42, 3, MAG_B)
+    zGV(24, 24, 40, 40, mischen(MAG_T, WHITE, pu * 0.6), MAG)
+    ' Eck-LEDs umlaufend blinken
+    DIM lx AS ARRAY OF INTEGER : lx = [10, S - 10, S - 10, 10]
+    DIM ly AS ARRAY OF INTEGER : ly = [10, 10, S - 10, S - 10]
+    DIM j AS INTEGER
+    FOR j = 0 TO 3
+        zDisc(lx[j], ly[j], 2.4, IIF(j = frame MOD 4, NEON, NEON_D))
+    NEXT
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION t_thin_wall(seiten AS STRING) AS IMAGE
+    neuAuf(t_floor())
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(seiten) - 1
+        SELECT CASE MID$(seiten, i, 1)
+            CASE "N"
+                zGV(0, 0, S, 9, WALL_T, WALL)
+            CASE "S"
+                zGV(0, S - 9, S, S, WALL, WALL_B)
+            CASE "W"
+                zGH(0, 0, 9, S, WALL_T, WALL)
+            CASE "E"
+                zGH(S - 9, 0, S, S, WALL, WALL_B)
+        END SELECT
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+' ====================================================== ITEMS
+' Pulsierender Schimmer HINTER einem Pickup
+SUB schimmer(c AS INTEGER, frame AS INTEGER, cx AS FLOAT, cy AS FLOAT, r0 AS FLOAT)
+    DIM pu AS FLOAT : pu = puls(frame)
+    zDisc(cx, cy, r0 + pu * 4, mitDeck(c, INT(26 + pu * 48)))
+END SUB
+
+FUNCTION i_key(name AS STRING, frame AS INTEGER) AS IMAGE
+    DIM lt AS INTEGER : lt = satz(name, 0)
+    DIM md AS INTEGER : md = satz(name, 1)
+    DIM dk AS INTEGER : dk = satz(name, 2)
+    neu(LEER)
+    schimmer(lt, frame, 32, 30, 14)
+    ' Schaft
+    zGH(28, 28, 36, 56, lt, dk)
+    zRect(28, 28, 36, 56, md)
+    zGH(28, 28, 30, 56, lt, lt)
+    zRect(28, 28, 30, 56, lt)
+    zRect(34, 28, 36, 56, dk)
+    ' Reide -- Ring oben, das Loch wird durchsichtig gestanzt
+    zDisc(32, 18, 14, dk) : zDisc(32, 18, 12, md) : zDisc(31, 16, 9, lt)
+    zDisc(32, 18, 7, LEER)
+    zRing(32, 18, 8.5, 2.2, dk)
+    zDisc(27, 13, 2.4, SHINE)
+    ' Bart unten rechts
+    zRect(36, 44, 44, 48, md) : zRect(36, 44, 44, 46, lt)
+    zRect(36, 52, 41, 56, md) : zRect(36, 52, 41, 54, lt)
+    zDisc(32, 56, 4, md) : zDisc(30, 55, 1.6, lt)
+    ' wanderndes Funkeln
+    zDisc(vier(frame, 27, 37, 40, 29), vier(frame, 13, 18, 50, 44), 1.8, SHINE)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+SUB stiefelGrund(lt AS INTEGER, md AS INTEGER, dk AS INTEGER)
+    ' Seitenansicht-Stiefel, Zehe rechts -- mit Umriss
+    zRRect(16, 6, 38, 40, 5, OUTL)
+    zRRect(16, 35, 53, 53, 6, OUTL)
+    zRRect(13, 49, 55, 59, 3, OUTL)
+    ' Schaft
+    zGV(19, 9, 35, 38, lt, dk) : zRRect(19, 9, 35, 38, 4, md)
+    zRRect(18, 7, 36, 16, 3, lt)
+    zRect(19, 9, 22, 38, dk)
+    ' Fuss + Zehe
+    zGV(19, 37, 51, 51, md, dk) : zRRect(19, 37, 51, 51, 5, md)
+    zGV(20, 37, 50, 42, mischen(md, lt, 0.45), md)
+    ' Sohle mit Profil
+    zRRect(15, 51, 53, 58, 2, dk)
+    DIM sx AS INTEGER
+    FOR sx = 20 TO 50 STEP 6
+        zRect(sx, 52, sx + 1, 57, OUTL)
+    NEXT
+    ' Schnuerung
+    DIM y AS INTEGER
+    FOR y = 18 TO 34 STEP 5
+        zLinie(pt$(23, y) + pt$(33, y), lt, 1.4)
+        zDisc(22, y, 1.1, OUTL) : zDisc(34, y, 1.1, OUTL)
+    NEXT
+    zDisc(25, 13, 2, SHINE)
+END SUB
+
+FUNCTION boot_flippers(frame AS INTEGER) AS IMAGE
+    DIM lt AS INTEGER : lt = satz("blue", 0)
+    DIM md AS INTEGER : md = satz("blue", 1)
+    DIM dk AS INTEGER : dk = satz("blue", 2)
+    neu(LEER)
+    schimmer(lt, frame, 32, 33, 15)
+    DIM k AS INTEGER
+    FOR k = 0 TO 1
+        DIM cx AS FLOAT : cx = IIF(k = 0, 38.0, 26.0)
+        DIM sh AS INTEGER : sh = IIF(k = 0, dk, md)
+        DIM hell AS INTEGER : hell = IIF(k = 0, md, lt)
+        zPoly(pt$(cx - 10, 6) + pt$(cx + 10, 6) + pt$(cx + 18, 57) + pt$(cx - 18, 57), OUTL)
+        zPoly(pt$(cx - 8, 8) + pt$(cx + 8, 8) + pt$(cx + 15, 54) + pt$(cx - 15, 54), sh)
+        zGV(cx - 7, 9, cx + 7, 22, hell, sh)
+        zLinie(pt$(cx, 24) + pt$(cx, 52), IIF(k = 0, mischen(sh, lt, 0.4), lt), 2)
+        DIM ry AS INTEGER
+        FOR ry = 32 TO 48 STEP 8
+            zLinie(pt$(cx - 11, ry) + pt$(cx + 13, ry), mischen(sh, OUTL, 0.4), 1.2)
+        NEXT
+    NEXT
+    zDisc(22, 14, 2.4, SHINE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION boot_fire(frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    schimmer(FIRE_O, frame, 32, 33, 15)
+    stiefelGrund(farbe(255, 150, 110, 255), farbe(214, 72, 52, 255), farbe(150, 40, 28, 255))
+    ' Flammen-Emblem am Schaft
+    zPoly("27 14 22 24 32 24", FIRE_O) : zPoly("27 17 24 24 30 24", FIRE_Y)
+    zDisc(27, 23, 1.4, WHITE)
+    ' gluehende Sohle
+    zGV(16, 51, 52, 54, FIRE_O, FIRE_R)
+    zDisc(24, 55, 1.8, FIRE_Y) : zDisc(34, 55, 1.8, FIRE_Y) : zDisc(44, 55, 1.8, FIRE_Y)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION boot_ice(frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    schimmer(ICE, frame, 32, 33, 15)
+    stiefelGrund(ICE_T, farbe(188, 220, 240, 255), farbe(120, 162, 200, 255))
+    zDisc(28, 20, 2.4, WHITE)
+    ' Schlittschuh-Kufe
+    zRRect(13, 56, 55, 60, 2, OUTL)
+    zRRect(14, 57, 54, 60, 1.5, farbe(224, 240, 252, 255))
+    zPoly("50 57 55 52 55 57", STEEL)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION boot_suction(frame AS INTEGER) AS IMAGE
+    neu(LEER)
+    schimmer(PURP, frame, 32, 33, 15)
+    stiefelGrund(PURP_T, farbe(150, 124, 216, 255), farbe(96, 72, 168, 255))
+    DIM sx AS INTEGER
+    FOR sx = 24 TO 44 STEP 10
+        zDisc(sx, 56, 3.6, OUTL) : zDisc(sx, 55, 3.2, farbe(84, 64, 150, 255))
+        zDisc(sx, 55, 1.6, farbe(44, 32, 88, 255))
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+' ====================================================== FIGUREN
+SUB kugel(cx AS FLOAT, cy AS FLOAT, r AS FLOAT, lt AS INTEGER, md AS INTEGER, dk AS INTEGER, umriss AS BOOLEAN)
+    IF umriss THEN zDisc(cx, cy, r + 1.5, OUTL)
+    zDisc(cx, cy, r, dk)
+    zDisc(cx, cy, r - 1.0, md)
+    zDisc(cx + r * 0.42, cy + r * 0.46, r * 0.5, mischen(dk, md, 0.45))
+    zDisc(cx - r * 0.30, cy - r * 0.34, r * 0.55, mischen(md, lt, 0.6))
+    zDisc(cx - r * 0.42, cy - r * 0.44, r * 0.24, lt)
+    zDisc(cx - r * 0.5, cy - r * 0.52, r * 0.1, WHITE)
+END SUB
+
+FUNCTION b_bug() AS IMAGE
+    neu(LEER)
+    DIM ly AS INTEGER
+    FOR ly = 26 TO 45 STEP 9
+        DIM y AS INTEGER : y = IIF(ly = 44, 45, ly)
+        zLinie(pt$(13, y + 3) + pt$(24, y), OUTL, 2) : zLinie(pt$(51, y + 3) + pt$(40, y), OUTL, 2)
+    NEXT
+    kugel(32, 35, 20, farbe(255, 120, 120, 255), farbe(226, 70, 70, 255), farbe(140, 32, 32, 255), TRUE)
+    zLinie("32 17 32 54", farbe(120, 24, 24, 255), 2)
+    zDisc(24, 30, 2.2, farbe(150, 30, 30, 255)) : zDisc(40, 30, 2.2, farbe(150, 30, 30, 255))
+    zDisc(22, 42, 2.2, farbe(150, 30, 30, 255)) : zDisc(42, 42, 2.2, farbe(150, 30, 30, 255))
+    zLinie("26 18 20 7", OUTL, 2) : zLinie("38 18 44 7", OUTL, 2)
+    zDisc(20, 7, 2.2, farbe(226, 70, 70, 255)) : zDisc(44, 7, 2.2, farbe(226, 70, 70, 255))
+    DIM ex AS INTEGER
+    FOR ex = 25 TO 39 STEP 14
+        zDisc(ex, 27, 3, WHITE) : zDisc(ex, 28, 1.5, OL) : zDisc(ex - 1, 26, 0.8, WHITE)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION b_fireball() AS IMAGE
+    neu(LEER)
+    zDisc(32, 35, 21, farbe(96, 24, 10, 255))
+    kugel(32, 35, 18, FIRE_Y, FIRE_O, FIRE_R, FALSE)
+    DIM fx AS ARRAY OF INTEGER : fx = [32, 21, 43]
+    DIM fh AS ARRAY OF INTEGER : fh = [5, 15, 15]
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        zPoly(pt$(fx[i], fh[i]) + pt$(fx[i] - 5, fh[i] + 13) + pt$(fx[i] + 5, fh[i] + 13), FIRE_O)
+        zPoly(pt$(fx[i], fh[i] + 3) + pt$(fx[i] - 2.5, fh[i] + 12) + pt$(fx[i] + 2.5, fh[i] + 12), FIRE_Y)
+    NEXT
+    zDisc(28, 31, 4, FIRE_Y) : zDisc(27, 30, 1.8, WHITE)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION b_ball() AS IMAGE
+    neu(LEER)
+    kugel(32, 34, 21, MAG_T, MAG, MAG_B, TRUE)
+    zLinie("18 30 30 23", farbe(255, 200, 245, 200), 2)
+    zDisc(24, 26, 4.5, farbe(255, 210, 248, 255)) : zDisc(23, 25, 2, WHITE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION b_tank() AS IMAGE
+    neu(LEER)
+    zRRect(7, 13, 57, 55, 7, OUTL)
+    zGV(10, 16, 54, 52, farbe(120, 146, 210, 255), farbe(44, 62, 116, 255))
+    zRRect(10, 16, 54, 52, 5, farbe(86, 108, 178, 255))
+    zGV(12, 18, 52, 28, farbe(150, 172, 224, 255), farbe(86, 108, 178, 255))
+    DIM tx AS INTEGER
+    FOR tx = 11 TO 53 STEP 42
+        zRRect(tx - 4, 15, tx + 4, 53, 3, OUTL)
+        DIM ty AS INTEGER
+        FOR ty = 19 TO 50 STEP 7
+            zRect(tx - 3, ty, tx + 3, ty + 3, STEEL)
+        NEXT
+    NEXT
+    zRRect(20, 24, 44, 45, 5, farbe(40, 58, 110, 255))
+    zRRect(29, 1, 35, 22, 2, OUTL) : zRRect(30, 2, 34, 21, 1, STEEL)
+    zDisc(32, 35, 6.5, OUTL) : zDisc(32, 35, 5, NEON) : zDisc(30, 33, 2, WHITE)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION b_glider() AS IMAGE
+    neu(LEER)
+    zPoly("32 4 52 54 32 43 12 54", OUTL)
+    zPoly("32 8 48 51 32 41 16 51", farbe(60, 200, 196, 255))
+    zPoly("32 10 32 40 45 49", farbe(38, 156, 156, 255))
+    zLinie("32 9 32 41", NEON, 2)
+    zDisc(32, 22, 3.6, WHITE) : zDisc(32, 22, 1.8, NEON_B)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION b_teeth() AS IMAGE
+    neu(LEER)
+    kugel(32, 28, 21, PURP_T, PURP, PURP_B, TRUE)
+    zDisc(24, 24, 3.4, WHITE) : zDisc(25, 25, 1.7, OL)
+    zLinie("20 18 28 21", PURP_B, 2)
+    zDisc(40, 24, 3.4, WHITE) : zDisc(39, 25, 1.7, OL)
+    zLinie("36 18 44 21", PURP_B, 2)
+    zRRect(15, 37, 49, 50, 3, OUTL)
+    zRRect(16, 38, 48, 49, 2, farbe(42, 22, 52, 255))
+    DIM x AS INTEGER
+    FOR x = 18 TO 45 STEP 6
+        zPoly(pt$(x, 38) + pt$(x + 5, 38) + pt$(x + 2.5, 45), WHITE)
+        zPoly(pt$(x + 3, 49) + pt$(x + 8, 49) + pt$(x + 5, 42), farbe(220, 210, 230, 255))
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION b_walker() AS IMAGE
+    neu(LEER)
+    DIM a AS INTEGER
+    FOR a = 0 TO 315 STEP 45
+        DIM rad AS FLOAT : rad = a * PI / 180.0
+        zPoly(pt$(32 + COS(rad + 0.32) * 17, 32 + SIN(rad + 0.32) * 17) + _
+              pt$(32 + COS(rad - 0.32) * 17, 32 + SIN(rad - 0.32) * 17) + _
+              pt$(32 + COS(rad) * 27, 32 + SIN(rad) * 27), farbe(74, 82, 104, 255))
+    NEXT
+    zDisc(32, 32, 19, OUTL)
+    zDisc(32, 32, 17, farbe(96, 104, 124, 255))
+    zDisc(32, 32, 14.5, STEEL)
+    zDisc(26, 26, 6, farbe(200, 210, 228, 255))
+    zDisc(32, 32, 6.5, OUTL) : zDisc(32, 32, 5, NEON) : zDisc(30, 30, 1.8, WHITE)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION b_blob() AS IMAGE
+    neu(LEER)
+    DIM gruen AS INTEGER : gruen = farbe(78, 204, 104, 255)
+    zDisc(32, 37, 20, OUTL) : zDisc(20, 32, 8, OUTL) : zDisc(46, 33, 7, OUTL)
+    zDisc(32, 37, 18, gruen)
+    zDisc(20, 32, 6.5, gruen) : zDisc(46, 33, 5.5, gruen)
+    zDisc(40, 44, 7, farbe(40, 150, 70, 255))
+    zDisc(28, 31, 9, farbe(130, 236, 150, 255)) : zDisc(24, 27, 4, farbe(190, 252, 200, 255))
+    DIM ex AS INTEGER
+    FOR ex = 26 TO 35 STEP 9
+        zDisc(ex, 35, 3.2, WHITE) : zDisc(ex, 36, 1.6, OL) : zDisc(ex - 1, 34, 0.7, WHITE)
+    NEXT
+    zDisc(32, 55, 2.4, gruen) : zDisc(32, 58, 1.3, gruen)
+    RETURN fertig(TRUE)
+END FUNCTION
+
+FUNCTION b_paramecium() AS IMAGE
+    neu(LEER)
+    DIM lt AS INTEGER : lt = satz("yellow", 0)
+    DIM md AS INTEGER : md = satz("yellow", 1)
+    DIM dk AS INTEGER : dk = satz("yellow", 2)
+    DIM y AS INTEGER
+    FOR y = 13 TO 55 STEP 5
+        zLinie(pt$(20, y) + pt$(11, y - 2), OUTL, 1.4) : zLinie(pt$(44, y) + pt$(53, y - 2), OUTL, 1.4)
+    NEXT
+    zRRect(20, 8, 44, 58, 11, OUTL)
+    DIM i AS INTEGER : i = 0
+    FOR y = 14 TO 55 STEP 9
+        DIM c AS INTEGER : c = IIF(i MOD 2 = 0, md, dk)
+        zDisc(32, y, 9, c) : zDisc(29, y - 2, 3.5, mischen(c, lt, 0.6))
+        i = i + 1
+    NEXT
+    zDisc(32, 13, 9, lt)
+    DIM ex AS INTEGER
+    FOR ex = 28 TO 36 STEP 8
+        zDisc(ex, 11, 2.6, WHITE) : zDisc(ex, 12, 1.1, OL) : zDisc(ex - 0.8, 10, 0.6, WHITE)
+    NEXT
+    RETURN fertig(FALSE)
+END FUNCTION
+
+' ---- Spieler (4 Richtungen + Geh-Bilder) -- Neon-Circuit-Android
+DIM PB_T AS INTEGER : PB_T = farbe(160, 208, 255, 255)
+DIM PB AS INTEGER : PB = farbe(88, 156, 238, 255)
+DIM PB_M AS INTEGER : PB_M = farbe(58, 118, 202, 255)
+DIM PB_D AS INTEGER : PB_D = farbe(40, 86, 158, 255)
+DIM PB_OUT AS INTEGER : PB_OUT = farbe(18, 44, 96, 255)
+DIM PHE AS INTEGER : PHE = farbe(200, 216, 240, 255)
+DIM PHE_D AS INTEGER : PHE_D = farbe(140, 154, 182, 255)
+DIM PVIS AS INTEGER : PVIS = farbe(14, 22, 38, 255)
+DIM PLEG AS INTEGER : PLEG = farbe(56, 106, 184, 255)
+DIM PFOOT AS INTEGER : PFOOT = farbe(28, 62, 116, 255)
+DIM PNE AS INTEGER : PNE = farbe(120, 244, 236, 255)
+DIM PNE_D AS INTEGER : PNE_D = farbe(38, 150, 150, 255)
+
+SUB beine(schritt AS INTEGER)
+    DIM lx AS ARRAY OF INTEGER
+    IF schritt = 0 THEN lx = [20, 36] ELSE lx = [16, 40]
+    DIM i AS INTEGER
+    FOR i = 0 TO 1
+        zRRect(lx[i], 47, lx[i] + 8, 60, 3, PB_OUT)
+        zGV(lx[i] + 1, 47, lx[i] + 7, 58, PB, PB_D)
+        zRRect(lx[i] + 1, 47, lx[i] + 7, 58, 2, PLEG)
+        zRRect(lx[i], 56, lx[i] + 8, 60, 1, PFOOT)
+        zDisc(lx[i] + 4, 51, 1.1, PNE_D)
+    NEXT
+END SUB
+
+SUB rumpf()
+    zRRect(11, 20, 53, 54, 9, PB_OUT)
+    zGV(14, 23, 50, 52, PB_T, PB_D)
+    zRRect(14, 23, 50, 52, 7, PB)
+    zGV(18, 25, 46, 34, mischen(PB, PB_T, 0.6), PB)
+    zRect(14, 23, 18, 52, PB_M)
+    ' Schulterpolster
+    zRRect(6, 24, 17, 46, 5, PB_OUT) : zRRect(7, 25, 16, 45, 4, PB_M)
+    zRRect(47, 24, 58, 46, 5, PB_OUT) : zRRect(48, 25, 57, 45, 4, PB_M)
+    ' Neon-Schaltbahnen
+    zLinie("32 24 32 32", PNE_D, 1.4)
+    zLinie("21 45 28 45", PNE_D, 1.2) : zLinie("36 45 43 45", PNE_D, 1.2)
+END SUB
+
+SUB helm(kuppel AS INTEGER)
+    zDisc(32, 17, 15, PB_OUT)
+    zDisc(32, 17, 13.5, kuppel)
+    zDisc(27, 12, 4.5, mischen(kuppel, WHITE, 0.5))
+END SUB
+
+FUNCTION player_front(schritt AS INTEGER) AS IMAGE
+    neu(LEER) : beine(schritt) : rumpf()
+    helm(PHE)
+    zRRect(18, 12, 46, 23, 5, PB_OUT)
+    zRRect(19, 13, 45, 22, 4, PVIS)
+    zRRect(20, 14, 44, 17, 2, mischen(PVIS, PNE, 0.30))
+    zDisc(25, 18, 2.7, PNE) : zDisc(39, 18, 2.7, PNE)
+    zDisc(24, 16, 1.3, WHITE)
+    zDisc(32, 38, 6, PB_OUT)
+    zDisc(32, 38, 4.6, PNE_D) : zDisc(32, 38, 3, PNE) : zDisc(30.5, 36.5, 1.4, WHITE)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION player_back(schritt AS INTEGER) AS IMAGE
+    neu(LEER) : beine(schritt) : rumpf()
+    helm(PHE_D)
+    zRRect(29, 3, 35, 15, 2, PB_OUT) : zDisc(32, 4, 2.8, PNE)
+    zRRect(22, 28, 42, 48, 4, PB_OUT) : zGV(24, 30, 40, 46, PB_M, PB_D)
+    zRRect(24, 30, 40, 46, 3, PB_M)
+    zLinie("32 31 32 45", PNE_D, 1.4) : zDisc(32, 38, 2.4, PNE_D)
+    RETURN fertig(FALSE)
+END FUNCTION
+
+FUNCTION player_side(schritt AS INTEGER, links AS BOOLEAN) AS IMAGE
+    neu(LEER)
+    IF schritt = 0 THEN
+        zRRect(27, 47, 37, 60, 3, PB_OUT) : zGV(28, 47, 36, 58, PB, PB_D)
+        zRRect(28, 47, 36, 58, 2, PLEG) : zRRect(27, 56, 37, 60, 1, PFOOT)
+    ELSE
+        DIM lx AS INTEGER
+        FOR lx = 20 TO 37 STEP 17
+            zRRect(lx, 47, lx + 9, 60, 3, PB_OUT)
+            zRRect(lx + 1, 47, lx + 8, 58, 2, PLEG) : zRRect(lx, 56, lx + 9, 60, 1, PFOOT)
+        NEXT
+    END IF
+    zRRect(19, 20, 45, 54, 8, PB_OUT)
+    zGV(22, 23, 42, 52, PB_T, PB_D) : zRRect(22, 23, 42, 52, 6, PB)
+    zRect(22, 23, 26, 52, PB_M)
+    zRRect(39, 27, 50, 45, 5, PB_OUT) : zRRect(40, 28, 49, 44, 4, PB_M)
+    helm(PHE)
+    zRRect(33, 12, 49, 23, 4, PB_OUT) : zRRect(34, 13, 48, 22, 3, PVIS)
+    zRRect(35, 14, 47, 17, 2, mischen(PVIS, PNE, 0.30))
+    zDisc(43, 18, 2.7, PNE) : zDisc(40, 15, 1.2, WHITE)
+    zDisc(31, 38, 5, PB_OUT) : zDisc(31, 38, 3.4, PNE_D) : zDisc(31, 38, 2, PNE)
+    DIM bild AS IMAGE : bild = fertig(FALSE)
+    IF links THEN
+        DIM gespiegelt AS IMAGE : gespiegelt = IMAGE_FLIP(bild, TRUE, FALSE)
+        IMAGE_FREE(bild)
+        RETURN gespiegelt
+    END IF
+    RETURN bild
+END FUNCTION
+
+' ====================================================== ZUSAMMENBAU
+DIM zellen[256] AS IMAGE
+DIM belegt[256] AS BOOLEAN
+
+SUB setzen(code AS INTEGER, bild AS IMAGE)
+    zellen[code] = bild
+    belegt[code] = TRUE
+END SUB
+
+SUB vierRichtungen(basis AS INTEGER, bild AS IMAGE)
+    ' wie PILs rotate(90/180/270): gegen den Uhrzeigersinn, verlustfrei
+    DIM r90 AS IMAGE : r90 = IMAGE_ROTATE_CCW(bild)
+    DIM r180 AS IMAGE : r180 = IMAGE_ROTATE_CCW(r90)
+    DIM r270 AS IMAGE : r270 = IMAGE_ROTATE_CCW(r180)
+    setzen(basis, bild) : setzen(basis + 1, r90) : setzen(basis + 2, r180) : setzen(basis + 3, r270)
+END SUB
+
+FUNCTION namen() AS ARRAY OF STRING
+    DIM n[256] AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO 255
+        n[i] = "?"
+    NEXT
+    DIM feste AS ARRAY OF STRING
+    feste = SPLIT$("00 floor|01 wall|02 chip|03 water|04 fire|05 invwall|06 wallN|07 wallW|08 wallS|09 wallE|" + _
+        "0A block|0B dirt|0C ice|0D force_S|0E cblockN|0F cblockW|10 cblockS|11 cblockE|" + _
+        "12 force_N|13 force_E|14 force_W|15 exit|16 door_blue|17 door_red|18 door_green|19 door_yellow|" + _
+        "1A ice_SE|1B ice_SW|1C ice_NW|1D ice_NE|1E blueblock_F|1F blueblock_W|21 thief|22 socket|" + _
+        "23 btn_green|24 btn_red|25 toggle_closed|26 toggle_open|27 btn_brown|28 btn_blue|29 teleport|2A bomb|" + _
+        "2B trap|2C hiddenwall|2D gravel|2E passonce|2F hint|30 wallSE|31 cloner|32 force_rand|" + _
+        "39 exit2|3A exit3|3B exit4|64 key_blue|65 key_red|66 key_green|67 key_yellow|" + _
+        "68 flippers|69 fireboots|6A iceskates|6B suction", "|")
+    FOR i = 0 TO LEN(feste) - 1
+        DIM teil AS ARRAY OF STRING : teil = SPLIT$(feste[i], " ")
+        n[hexZahl(teil[0])] = teil[1]
+    NEXT
+    DIM reihen AS ARRAY OF STRING
+    reihen = SPLIT$("3C swim|40 bug|44 fireball|48 ball|4C tank|50 glider|54 teeth|58 walker|5C blob|60 paramecium|6C chip|70 chipwalk", "|")
+    FOR i = 0 TO LEN(reihen) - 1
+        DIM r AS ARRAY OF STRING : r = SPLIT$(reihen[i], " ")
+        DIM d AS INTEGER
+        FOR d = 0 TO 3
+            n[hexZahl(r[0]) + d] = r[1] + "_" + MID$("NWSE", d, 1)
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+
+FUNCTION hexZahl(h AS STRING) AS INTEGER
+    ' VAL("&H..") ist 0 -- Hex-Text von Hand.
+    DIM z AS STRING : z = "0123456789ABCDEF"
+    DIM wert AS INTEGER : wert = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(h) - 1
+        wert = wert * 16 + INSTR(z, UPPER$(MID$(h, i, 1)))
+    NEXT
+    RETURN wert
+END FUNCTION
+
+FUNCTION hex2$(v AS INTEGER) AS STRING
+    RETURN RIGHT$("0" + UPPER$(HEX$(v)), 2)
+END FUNCTION
+
+DIM ziel AS STRING : ziel = programmOrdner + "/assets"
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
+    IF NOT (LEFT$(ziel, 1) = "/" OR LEFT$(ziel, 1) = CHR$(92) OR MID$(ziel, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ziel = GETENV$("DHRT_START_DIR") + "/" + ziel
+END IF
+IF NOT DIREXISTS(ziel) THEN MKDIR(ziel)
+
+setzen(&H00, t_floor()) : setzen(&H01, t_wall()) : setzen(&H02, t_chip())
+setzen(&H05, t_floor())
+setzen(&H06, t_thin_wall("N")) : setzen(&H07, t_thin_wall("W"))
+setzen(&H08, t_thin_wall("S")) : setzen(&H09, t_thin_wall("E"))
+setzen(&H0A, t_block()) : setzen(&H0B, t_dirt()) : setzen(&H0C, t_ice())
+setzen(&H0E, t_block()) : setzen(&H0F, t_block()) : setzen(&H10, t_block()) : setzen(&H11, t_block())
+setzen(&H16, t_door("blue")) : setzen(&H17, t_door("red"))
+setzen(&H18, t_door("green")) : setzen(&H19, t_door("yellow"))
+setzen(&H1A, t_ice_corner("NW")) : setzen(&H1B, t_ice_corner("NE"))
+setzen(&H1C, t_ice_corner("SE")) : setzen(&H1D, t_ice_corner("SW"))
+setzen(&H1E, t_blue_wall()) : setzen(&H1F, t_blue_wall())
+setzen(&H23, t_button(satz("green", 1), satz("green", 0))) : setzen(&H24, t_button(satz("red", 1), satz("red", 0)))
+setzen(&H27, t_button(DIRT, DIRT_T)) : setzen(&H28, t_button(satz("blue", 1), satz("blue", 0)))
+setzen(&H2B, t_trap())
+setzen(&H2C, t_floor()) : setzen(&H2D, t_gravel()) : setzen(&H2E, t_floor())
+setzen(&H2F, t_hint()) : setzen(&H30, t_thin_wall("SE"))
+setzen(&H39, t_exit(0)) : setzen(&H3A, t_exit(0)) : setzen(&H3B, t_exit(0))
+
+DIM i AS INTEGER
+FOR i = 0 TO 3
+    DIM ruhe AS IMAGE
+    DIM geh AS IMAGE
+    SELECT CASE i
+        CASE 0
+            ruhe = player_back(0) : geh = player_back(1)
+        CASE 1
+            ruhe = player_side(0, TRUE) : geh = player_side(1, TRUE)
+        CASE 2
+            ruhe = player_front(0) : geh = player_front(1)
+        CASE ELSE
+            ruhe = player_side(0, FALSE) : geh = player_side(1, FALSE)
+    END SELECT
+    setzen(&H3C + i, ruhe) : setzen(&H6C + i, ruhe) : setzen(&H70 + i, geh)
+NEXT
+vierRichtungen(&H40, b_bug()) : vierRichtungen(&H44, b_fireball()) : vierRichtungen(&H48, b_ball())
+vierRichtungen(&H4C, b_tank()) : vierRichtungen(&H50, b_glider()) : vierRichtungen(&H54, b_teeth())
+vierRichtungen(&H58, b_walker()) : vierRichtungen(&H5C, b_blob()) : vierRichtungen(&H60, b_paramecium())
+
+' --- Animations-Bilder ab Zeile 8: je animierte Kachel 4 Bilder; die Engine
+' zeigt anim_base(code)+anim_frame. Das erste ersetzt auch die Kachel selbst.
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    DIM erstes AS BOOLEAN : erstes = (f = 0)
+    DIM b AS IMAGE
+    b = t_water(f) : setzen(128 + f, b) : IF erstes THEN setzen(&H03, b)
+    b = t_fire(f) : setzen(132 + f, b) : IF erstes THEN setzen(&H04, b)
+    b = t_force(0, 1, f) : setzen(136 + f, b) : IF erstes THEN setzen(&H0D, b)
+    b = t_force(0, -1, f) : setzen(140 + f, b) : IF erstes THEN setzen(&H12, b)
+    b = t_force(1, 0, f) : setzen(144 + f, b) : IF erstes THEN setzen(&H13, b)
+    b = t_force(-1, 0, f) : setzen(148 + f, b) : IF erstes THEN setzen(&H14, b)
+    b = t_force_random(f) : setzen(152 + f, b) : IF erstes THEN setzen(&H32, b)
+    b = t_exit(f) : setzen(156 + f, b) : IF erstes THEN setzen(&H15, b)
+    b = t_teleport(f) : setzen(160 + f, b) : IF erstes THEN setzen(&H29, b)
+    b = t_bomb(f) : setzen(164 + f, b) : IF erstes THEN setzen(&H2A, b)
+    b = t_toggle(FALSE, f) : setzen(168 + f, b) : IF erstes THEN setzen(&H25, b)
+    b = t_toggle(TRUE, f) : setzen(172 + f, b) : IF erstes THEN setzen(&H26, b)
+    b = t_socket(f) : setzen(176 + f, b) : IF erstes THEN setzen(&H22, b)
+    b = t_cloner(f) : setzen(180 + f, b) : IF erstes THEN setzen(&H31, b)
+    b = t_thief(f) : setzen(184 + f, b) : IF erstes THEN setzen(&H21, b)
+    b = i_key("blue", f) : setzen(188 + f, b) : IF erstes THEN setzen(&H64, b)
+    b = i_key("red", f) : setzen(192 + f, b) : IF erstes THEN setzen(&H65, b)
+    b = i_key("green", f) : setzen(196 + f, b) : IF erstes THEN setzen(&H66, b)
+    b = i_key("yellow", f) : setzen(200 + f, b) : IF erstes THEN setzen(&H67, b)
+    b = boot_flippers(f) : setzen(204 + f, b) : IF erstes THEN setzen(&H68, b)
+    b = boot_fire(f) : setzen(208 + f, b) : IF erstes THEN setzen(&H69, b)
+    b = boot_ice(f) : setzen(212 + f, b) : IF erstes THEN setzen(&H6A, b)
+    b = boot_suction(f) : setzen(216 + f, b) : IF erstes THEN setzen(&H6B, b)
+NEXT
+
+' --- Sheet
+CONST SPALTEN = 16
+DIM hoechster AS INTEGER : hoechster = 0
+DIM anzahl AS INTEGER : anzahl = 0
+FOR i = 0 TO 255
+    IF belegt[i] THEN
+        hoechster = i
+        anzahl = anzahl + 1
+    END IF
+NEXT
+DIM zeilen AS INTEGER : zeilen = hoechster \ SPALTEN + 1
+DIM blatt AS IMAGE : blatt = IMAGE_NEW(SPALTEN * S, zeilen * S)
+FOR i = 0 TO 255
+    IF belegt[i] THEN IMAGE_DRAW_IMAGE(blatt, zellen[i], (i MOD SPALTEN) * S, (i \ SPALTEN) * S)
+NEXT
+IMAGE_SAVE(blatt, ziel + "/tiles.png")
+
+' --- tiles.json: dieselbe Datei wie bisher (eingerueckt wie json.dumps(indent=2))
+DIM nam AS ARRAY OF STRING : nam = namen()
+DIM js AS JSON_HANDLE : js = JSON_PARSE("{}")
+JSON_SET_STRING(js, "image", "tiles.png")
+JSON_SET_INT(js, "tile", S)
+JSON_SET_INT(js, "cols", SPALTEN)
+DIM codes AS JSON_HANDLE : codes = JSON_PARSE("{}")
+FOR i = 0 TO 255
+    IF belegt[i] THEN JSON_SET_STRING(codes, "0x" + hex2$(i), nam[i])
+NEXT
+JSON_SET_JSON(js, "codes", codes)
+WRITEALL(ziel + "/tiles.json", JSON_PRETTY(js))
+
+' --- Kontaktbogen der ersten 160 Zellen mit Nummer (zur Kontrolle von Hand)
+CONST GROSS = 2
+DIM zelle AS INTEGER : zelle = S * GROSS
+DIM rand AS INTEGER : rand = 4
+DIM beschr AS INTEGER : beschr = 11
+DIM bogen AS IMAGE : bogen = IMAGE_NEW(SPALTEN * (zelle + rand) + rand, 10 * (zelle + beschr + rand) + rand, &H181C26)
+FOR i = 0 TO 159
+    DIM bx AS INTEGER : bx = rand + (i MOD SPALTEN) * (zelle + rand)
+    DIM by AS INTEGER : by = rand + (i \ SPALTEN) * (zelle + beschr + rand)
+    IMAGE_FRAME(bogen, bx, by, bx + zelle, by + zelle, 1, &H2E3444)
+    IF belegt[i] THEN
+        DIM vergr AS IMAGE : vergr = IMAGE_SCALE_NN(zellen[i], zelle, zelle)
+        IMAGE_DRAW_IMAGE(bogen, vergr, bx, by)
+        IMAGE_FREE(vergr)
+    END IF
+    IMAGE_DRAW_TEXT(bogen, bx + 1, by + zelle + 1, hex2$(i), 10, &H96A0B4)
+NEXT
+IMAGE_SAVE(bogen, ziel + "/_contact.png")
+
+PRINT "tiles.png (" + STR$(SPALTEN) + "x" + STR$(zeilen) + " a " + STR$(S) + "px, SS=" + STR$(SUPER) + ") -- " + STR$(anzahl) + " Kacheln"
+PRINT "fertig."
