@@ -7,3 +7,113 @@ PRINT 1 \ 0
 --- fehler
 Integer-Division durch 0
 
+=== der compiler schreibt echte zeilen
+' `dhrt --dumpbc` -> main.lines ist nicht mehr alles Null, und nur echte
+' Quellzeilen kommen vor.
+' (Bis Stufe 44 in test_dhrt_profile.py.)
+IMPORT "json"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_PARSE(lesen$(PROCESS_START("dhrt", "--dumpbc", "p.dh")))
+DIM nichtnull AS BOOLEAN : nichtnull = FALSE
+DIM fremd AS BOOLEAN : fremd = FALSE
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "main.lines") - 1
+    DIM z AS INTEGER : z = JSON_GET_INT(h, "main.lines." + STR$(i))
+    IF z <> 0 THEN nichtnull = TRUE
+    IF NOT (z = 0 OR z = 1 OR z = 2 OR z = 3 OR z = 4 OR z = 6) THEN fremd = TRUE
+NEXT
+PRINT "echte zeilen " ; nichtnull ; " fremde " ; fremd
+--- datei p.dh
+DIM total AS INTEGER
+total = 0
+FOR i = 1 TO 1000
+    total = total + i
+NEXT
+PRINT "sum=" + STR$(total)
+
+--- erwartet
+echte zeilen TRUE fremde FALSE
+
+=== dhrt profile zaehlt je zeile
+' FOR-Kopf 1001-mal (1000 Durchlaeufe + 1 Abbruch), Rumpf 1000-mal.
+' (Bis Stufe 44 in test_dhrt_profile.py.)
+IMPORT "json"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM h AS JSON_HANDLE : h = JSON_PARSE(jsonZeile$(PROCESS_START("dhrt", "profile", "p.dh")))
+PRINT "ausgabe " ; REPLACE$(JSON_GET_STRING(h, "output"), CHR$(13), "") = "sum=500500" + CHR$(10)
+PRINT "zeit " ; JSON_GET_FLOAT(h, "total_time") >= 0.0 ; " angehalten " ; JSON_GET_BOOL(h, "stopped")
+DIM i AS INTEGER
+DIM z3 AS INTEGER : z3 = -1
+DIM z4 AS INTEGER : z4 = -1
+FOR i = 0 TO JSON_LEN(h, "lines") - 1
+    DIM l AS STRING : l = "lines." + STR$(i)
+    IF JSON_GET_INT(h, l + ".line") = 3 THEN z3 = JSON_GET_INT(h, l + ".count")
+    IF JSON_GET_INT(h, l + ".line") = 4 THEN z4 = JSON_GET_INT(h, l + ".count")
+NEXT
+PRINT "zeile 3 " ; z3 ; " zeile 4 " ; z4
+--- datei p.dh
+DIM total AS INTEGER
+total = 0
+FOR i = 1 TO 1000
+    total = total + i
+NEXT
+PRINT "sum=" + STR$(total)
+
+--- erwartet
+ausgabe TRUE
+zeit TRUE angehalten FALSE
+zeile 3 1001 zeile 4 1000

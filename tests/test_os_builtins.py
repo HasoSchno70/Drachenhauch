@@ -5,55 +5,13 @@ Golden-Tests gegen die native Runtime. Was hier geprueft wird, laesst sich mit
 `run_gb` NICHT pruefen (es wirft bei Exit != 0 und verwirft stderr) -- darum
 `run_gb_roh`, das `(code, stdout, stderr)` liefert und Argumente durchreicht.
 
-Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
-`tests/pruef/os_builtins.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
-eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
-
-Die uebertragbaren Tests liegen seit 2026-09-08 als Pruefsammlung in
-`tests/pruef/os_builtins.dhtest` (dhrt test); hier bleiben nur die, die ein Bild,
-eine geschriebene Datei oder den Quelltext mit einem fremden Leser pruefen.
+Die uebertragbaren Tests liegen als Pruefsammlung in
+`tests/pruef/os_builtins.dhtest` (dhrt test; ARGC ohne `--`, GETENV$ und CWD$
+seit Stufe 44). Hier bleiben zwei, die dort nicht gehen: die Reihenfolge von
+PRINT und EPRINT in EINER Datei (ein Kind ueber PROCESS_START hat getrennte
+Kanaele) und SHELL_OUT$ mit der eigenen Exe (SHELL kennt `dhrt` nicht als
+Namen der laufenden Laufzeit, anders als PROCESS_START).
 """
-import os
-import sys
-
-import pytest
-
-from drachenhauch.errors import DHRuntimeError
-
-
-# --------------------------------------------------------------- Argumente
-
-
-def test_ohne_doppelstrich_bekommt_das_programm_keine_argumente(dhrt_pfad, tmp_path):
-    """Die `--`-Konvention ist der Kern des Entwurfs: ohne sie koennte dhrt sich
-    keine eigenen Schalter mehr zulegen, ohne bestehende Programme zu brechen."""
-    import subprocess
-    quelle = tmp_path / "argc.dh"
-    quelle.write_text("PRINT ARGC()", encoding="utf-8")
-    r = subprocess.run([dhrt_pfad, "run", str(quelle), "ohne", "trenner"],
-                       capture_output=True, text=True, encoding="utf-8", timeout=60)
-    assert r.returncode == 0
-    assert (r.stdout or "").replace("\r\n", "\n") == "0\n"
-
-
-# --------------------------------------------------------------- Umgebung
-
-
-def test_getenv_sieht_die_umgebung_des_aufrufers(run_gb, monkeypatch):
-    monkeypatch.setenv("DH_VON_AUSSEN", "durchgereicht")
-    assert run_gb('PRINT GETENV$("DH_VON_AUSSEN")') == "durchgereicht\n"
-
-
-# ------------------------------------------------- Arbeitsverzeichnis
-
-def test_cwd_ist_das_verzeichnis_der_quelldatei(run_gb, tmp_path):
-    # dhrt chdirt beim Start ins Datei-Verzeichnis (relative Asset-Pfade) --
-    # CWD$() muss genau das zeigen, sonst ueberrascht es.
-    out = run_gb("PRINT CWD$()", base=tmp_path).strip()
-    assert os.path.realpath(out) == os.path.realpath(str(tmp_path))
-
-
-# ------------------------------------------------------------------- EXIT
 
 
 # ----------------------------------------------------------------- EPRINT

@@ -112,3 +112,37 @@ CATCH e
 END TRY
 --- erwartet
 abgelehnt
+
+=== acht bit ist kleiner und klingt noch gleich
+' Dieselbe Kurve, nur groeber aufgeloest -- gelesen aus den Bytes der WAV:
+' 8 Bit ist laut Spezifikation VORZEICHENLOS, 16 Bit vorzeichenbehaftet.
+' (Bis Stufe 44 in test_audio_sound_io.py.)
+IMPORT "audio"
+DIM s AS SOUND
+s = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0, 0, 0.7)
+AUDIO_SAVE_WAV(s, "a.wav")
+AUDIO_SAVE_WAV(s, "b.wav", 8)
+--- nachher
+DIM a AS BUFFER : a = READALL_BYTES("a.wav")
+DIM b AS BUFFER : b = READALL_BYTES("b.wav")
+DIM fa AS INTEGER : fa = BUFFER_INDEXOF(a, BUFFER_FROM_STRING("fmt "))
+DIM fb AS INTEGER : fb = BUFFER_INDEXOF(b, BUFFER_FROM_STRING("fmt "))
+DIM ka AS INTEGER : ka = BUFFER_GET_U16(a, fa + 10)
+DIM kb AS INTEGER : kb = BUFFER_GET_U16(b, fb + 10)
+DIM d16 AS INTEGER : d16 = BUFFER_INDEXOF(a, BUFFER_FROM_STRING("data")) + 8
+DIM d8 AS INTEGER : d8 = BUFFER_INDEXOF(b, BUFFER_FROM_STRING("data")) + 8
+PRINT "kleiner " ; BUFFER_LEN(b) * 1.9 < BUFFER_LEN(a)
+PRINT "bits " ; BUFFER_GET_U16(b, fb + 22)
+DIM n AS INTEGER : n = BUFFER_GET_U32(b, d8 - 4) \ kb
+DIM abw AS FLOAT : abw = 0.0
+DIM i AS INTEGER
+FOR i = 0 TO n - 1
+    DIM s16 AS FLOAT : s16 = BUFFER_GET_I16(a, d16 + i * 2 * ka) / 32767.0
+    DIM s8 AS FLOAT : s8 = (BUFFER_GET(b, d8 + i * kb) - 128.0) / 127.0
+    IF ABS(s16 - s8) > abw THEN abw = ABS(s16 - s8)
+NEXT
+PRINT "dieselbe kurve " ; abw < 0.02
+--- erwartet
+kleiner TRUE
+bits 8
+dieselbe kurve TRUE

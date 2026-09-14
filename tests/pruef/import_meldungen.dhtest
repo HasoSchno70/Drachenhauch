@@ -121,3 +121,54 @@ END FUNCTION
 --- erwartet
 5
 
+=== kollision ohne import nennt jetzt auch eine zeile
+' Vorher stand da gar keine Zeile -- jetzt beide Deklarationen.
+' (Bis Stufe 44 in test_import_meldungen.py.)
+FUNCTION F() AS INTEGER
+    RETURN 1
+END FUNCTION
+FUNCTION F() AS INTEGER
+    RETURN 2
+END FUNCTION
+--- fehler
+fall.dh:6
+fall.dh:3
+
+=== ein bom in der hauptdatei stoert nicht
+' Windows-Editoren schreiben UTF-8 gern mit Byte-Reihenfolge-Markierung; der
+' Lexer meldete dafuer ein unsichtbares Zeichen in Zeile 1.
+' (Bis Stufe 44 in test_import_meldungen.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+PRINT TRIM$(lesen$(PROCESS_START("dhrt", "run", "main.dh")))
+--- datei main.dh base64
+77u/UFJJTlQgNDIK
+
+--- erwartet
+42

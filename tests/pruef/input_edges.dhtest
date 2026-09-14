@@ -99,3 +99,50 @@ DHRT_FRAMES=1
 --- fehler
 JOYSTICK_HIT: Joystick-Index 99 - kein Gamepad angeschlossen
 
+=== die flanken-befehle kennt der compiler
+' `--check` warnt bei Befehlen, die dhrt nicht kennt -- der eingebettete
+' Index muss die neuen Namen also enthalten.
+' (Bis Stufe 44 in test_input_edges.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM befund AS STRING : befund = TRIM$(lesen$(PROCESS_START("dhrt", "--check", "c.dh")))
+PRINT "sauber " ; befund = "" OR befund = "[]"
+--- datei c.dh
+SCREEN(64, 64, "T", 1)
+PRINT MOUSE_HIT(0); MOUSE_RELEASED(0); KEYHIT(32); KEYRELEASED(32)
+PRINT KEYREPEAT(32); MOUSE_ON_SCREEN(); MOUSE_DELTA_X(); MOUSE_DELTA_Y()
+PRINT TOUCH_COUNT(); TOUCH_X(0); TOUCH_Y(0); TOUCH_ID(0)
+PRINT GESTURE$(); GESTURE_DRAG_X(); GESTURE_DRAG_Y(); GESTURE_DRAG_ANGLE()
+PRINT GESTURE_PINCH_X(); GESTURE_PINCH_Y(); GESTURE_PINCH_ANGLE()
+PRINT GESTURE_HOLD_TIME(); JOYSTICK_ANY_BUTTON()
+MOUSE_CURSOR("hand")
+MOUSE_SET_POS(1, 1)
+
+--- erwartet
+sauber TRUE

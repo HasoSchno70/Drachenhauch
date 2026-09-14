@@ -101,3 +101,45 @@ AUDIO_SOUND_MIX(m, AUDIO_TONE(440, 100), 5000)
 AUDIO_SAVE_WAV(m, "m.wav")
 --- ton m.wav
 dauer 0.2 +-0.005
+
+=== slide endet auf der zieltonhoehe
+' Portamento um eine Oktave: am Ende der gehaltenen Zeit schwingt die Note
+' doppelt so schnell wie am Anfang -- gezaehlt an den Nulldurchgaengen.
+' (Bis Stufe 44 in test_audio_note_mix.py.)
+IMPORT "audio"
+AUDIO_SAVE_WAV(AUDIO_NOTE("sine", 200, 1000, 0, 0, 1.0, 0, 1.0, 0, 0, 0, 12), "n.wav")
+--- nachher
+FUNCTION hz(w AS BUFFER, d AS INTEGER, kan AS INTEGER, sr AS INTEGER, von AS INTEGER, bis AS INTEGER) AS FLOAT
+    DIM a AS INTEGER : a = sr * von \ 1000
+    DIM e AS INTEGER : e = sr * bis \ 1000
+    DIM kreuz AS INTEGER : kreuz = 0
+    DIM vorher AS BOOLEAN : vorher = BUFFER_GET_I16(w, d + a * 2 * kan) < 0
+    DIM i AS INTEGER
+    FOR i = a + 1 TO e - 1
+        DIM neg AS BOOLEAN : neg = BUFFER_GET_I16(w, d + i * 2 * kan) < 0
+        IF neg <> vorher THEN kreuz = kreuz + 1
+        vorher = neg
+    NEXT
+    RETURN kreuz / 2.0 / ((bis - von) / 1000.0)
+END FUNCTION
+DIM w AS BUFFER : w = READALL_BYTES("n.wav")
+DIM f AS INTEGER : f = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("fmt "))
+DIM kan AS INTEGER : kan = BUFFER_GET_U16(w, f + 10)
+DIM sr AS INTEGER : sr = BUFFER_GET_U32(w, f + 12)
+DIM d AS INTEGER : d = BUFFER_INDEXOF(w, BUFFER_FROM_STRING("data")) + 8
+DIM anfang AS FLOAT : anfang = hz(w, d, kan, sr, 20, 120)
+DIM ende AS FLOAT : ende = hz(w, d, kan, sr, 880, 980)
+PRINT "anfang um 200 hz " ; anfang > 190 AND anfang < 225
+PRINT "ende um 400 hz " ; ende > 370 AND ende < 420
+--- erwartet
+anfang um 200 hz TRUE
+ende um 400 hz TRUE
+
+=== in sich selbst mischen ist ein fehler
+' (Bis Stufe 44 in test_audio_note_mix.py.)
+IMPORT "audio"
+DIM m AS SOUND
+m = AUDIO_SOUND_NEW(200)
+AUDIO_SOUND_MIX(m, m, 0)
+--- fehler
+derselbe

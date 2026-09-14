@@ -54,3 +54,43 @@ NEXT
 2
 2
 
+=== check bleibt still
+' Kein Fehlalarm fuer den Alltagsfall `deg = DEG(x)`.
+' (Bis Stufe 44 in test_variable_wie_builtin.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM befund AS STRING : befund = TRIM$(lesen$(PROCESS_START("dhrt", "--check", "d.dh")))
+PRINT "sauber " ; befund = "" OR befund = "[]"
+--- datei d.dh
+DIM deg AS FLOAT
+deg = DEG(1.0)
+PRINT deg
+
+--- erwartet
+sauber TRUE
