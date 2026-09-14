@@ -165,3 +165,33 @@ de
 --- erwartet
 2 5
 
+=== eine zweite kodierung ist ein fehler
+' Still wirkungslos waere schlimmer als ein Fehler.
+' (Bis Stufe 44 in test_stdin.py.)
+DIM f AS FILE
+DIM g AS FILE
+f = STDIN()
+g = STDIN("cp1252")
+--- eingabe
+a
+
+--- fehler
+schon mit einer anderen Kodierung
+
+=== tell auf der standardeingabe ist ein fehler
+' (Bis Stufe 44 in test_stdin.py.)
+DIM f AS FILE
+f = STDIN()
+PRINT TELL(f)
+--- eingabe
+a
+
+--- fehler
+keine Position
+
+=== eine unbekannte kodierung der standardeingabe
+' (Bis Stufe 44 in test_stdin.py.)
+DIM f AS FILE
+f = STDIN("klingonisch")
+--- fehler
+kenne ich nicht

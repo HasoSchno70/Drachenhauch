@@ -322,7 +322,7 @@ Reflexionen/Mirror-Effekte.
 > dieses Namens ruft weiter die Variable (dort könnte sie gemeint sein);
 > die Meldung sagt das jetzt dazu. Die FOR-EACH-Laufvariable läuft gar
 > nicht über diesen Weg und verdeckt nicht. Tests
-> `tests/test_variable_wie_builtin.py`.
+> `tests/pruef/variable_wie_builtin.dhtest`.
 
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 

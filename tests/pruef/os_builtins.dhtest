@@ -174,3 +174,91 @@ fehler
 --- erwartet
 []
 
+=== ohne doppelstrich bekommt das programm keine argumente
+' Die `--`-Konvention ist der Kern: ohne sie koennte dhrt sich keine eigenen
+' Schalter mehr zulegen, ohne bestehende Programme zu brechen.
+' (Bis Stufe 44 in test_os_builtins.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+PRINT TRIM$(lesen$(PROCESS_START("dhrt", "run", "argc.dh", "ohne", "trenner")))
+--- datei argc.dh
+PRINT ARGC()
+
+--- erwartet
+0
+
+=== getenv sieht die umgebung des aufrufers
+' (Bis Stufe 44 in test_os_builtins.py.)
+PRINT GETENV$("DH_VON_AUSSEN")
+--- umgebung
+DH_VON_AUSSEN=durchgereicht
+--- erwartet
+durchgereicht
+
+=== cwd ist das verzeichnis der quelldatei
+' dhrt wechselt beim Start ins Verzeichnis der Datei (relative Asset-Pfade) --
+' CWD$() zeigt genau das, nicht den Ort des Aufrufers.
+' (Bis Stufe 44 in test_os_builtins.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    ' Alles, was der Prozess ausgibt -- mehrere leere Abfragen abwarten, der
+    ' Lesefaden kann nach dem Ende noch nachliefern.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+FUNCTION jsonZeile$(pc AS INTEGER) AS STRING
+    ' Die Zeile, die mit { beginnt -- davor darf das Programm ausgegeben haben.
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN
+            stille = 0
+            IF LEFT$(TRIM$(zz), 1) = "{" THEN r = TRIM$(zz)
+        END IF
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM aus AS STRING : aus = REPLACE$(TRIM$(lesen$(PROCESS_START("dhrt", "run", "unter/wo.dh"))), "\", "/")
+PRINT "im unterordner " ; RIGHT$(aus, 6) = "/unter"
+PRINT "nicht beim aufrufer " ; aus <> REPLACE$(CWD$(), "\", "/")
+--- datei unter/wo.dh
+PRINT CWD$()
+
+--- erwartet
+im unterordner TRUE
+nicht beim aufrufer TRUE

@@ -204,3 +204,25 @@ PDF_TEXT(p, 20, 25, "Posten (2 Stueck) \ Rest")
 PDF_SAVE(p, "a.pdf")
 --- erwartet
 
+=== zweimal dasselbe ergibt dieselbe datei
+' Kein Erstellungsdatum im Dokument: zwei Laeufe, mehr als eine Sekunde
+' auseinander, schreiben Byte fuer Byte dieselbe Datei.
+' (Bis Stufe 44 in test_pdf.py.)
+IMPORT "pdf"
+DIM p AS PDF
+p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "gleich")
+IF FILEEXISTS("a.pdf") THEN
+    SLEEP(1100)
+    PDF_SAVE(p, "b.pdf")
+ELSE
+    PDF_SAVE(p, "a.pdf")
+END IF
+--- nochmal
+
+--- nachher
+PRINT "beide da " ; FILEEXISTS("a.pdf") AND FILEEXISTS("b.pdf")
+PRINT "gleich " ; BUFFER_TO_HEX$(READALL_BYTES("a.pdf")) = BUFFER_TO_HEX$(READALL_BYTES("b.pdf"))
+--- erwartet
+beide da TRUE
+gleich TRUE

@@ -474,7 +474,7 @@ Hauptschleife dreht sich 692 mal weiter. Doku: `docs/module-db.md`,
 > zeigen auf die Datei, die der Nutzer vor sich hat — statt in die gemergte
 > Quelle. Dafür liefert `preprocess` eine Zeilen-Herkunftstabelle mit, die
 > zugleich Schritt 1 des Bauwegs für I.1 ist. Tests:
-> `tests/test_import_meldungen.py` (9).
+> `tests/pruef/import_meldungen.dhtest`.
 
 `IMPORT "datei.dh"` ist textuelles Inkludieren in einen flachen globalen
 Namensraum, in dem bereits **1316 Builtins** liegen. `IMPORT ... AS alias` ist
