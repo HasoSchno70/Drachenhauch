@@ -189,12 +189,10 @@ _BRAUCHT_GRAFIK = {
     "test_buch_tippspiel.py",
     "test_circuitrunner.py",
     "test_examples.py",
-    "test_gfx_push_pop.py",
     "test_gui_draw_window.py",
     "test_drucken.py",
     "test_gui_bindung.py",
     "test_gui_table_frozen_edge.py",
-    "test_image_io.py",
 }
 
 

@@ -305,3 +305,443 @@ DHRT_FRAMES=2
 --- erwartet
 abgelehnt
 
+=== ein gespeichertes png liest ein fremder leser
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(6, 4, &H0000FF)
+IMAGE_DRAW_RECT(b, 1, 1, 2, 2, &H00FF00)
+IMAGE_SAVE(b, "raus.png")
+DIM kb AS BUFFER : kb = READALL_BYTES("raus.png")
+PRINT "png "; BUFFER_GET(kb, 1) = 80 AND BUFFER_GET(kb, 2) = 78 AND BUFFER_GET(kb, 3) = 71
+DIM g AS IMAGE : g = LOADIMAGE("raus.png")
+PRINT IMAGEWIDTH(g); " "; IMAGEHEIGHT(g)
+PRINT GETPIXEL(g, 2, 2) = &H00FF00; " "; GETALPHA(g, 2, 2)
+PRINT GETPIXEL(g, 5, 3) = &H0000FF; " "; GETALPHA(g, 5, 3)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+png TRUE
+6 4
+TRUE 255
+TRUE 255
+
+=== die durchsichtigkeit uebersteht das speichern
+' Was radiert wurde, muss in der Datei als Alpha 0 stehen.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4)
+IMAGE_DRAW_RECT(b, 0, 0, 2, 2, &HFF0000)
+IMAGE_SAVE(b, "alpha.png")
+DIM g AS IMAGE : g = LOADIMAGE("alpha.png")
+PRINT GETPIXEL(g, 0, 0) = &HFF0000; " "; GETALPHA(g, 0, 0)
+PRINT GETALPHA(g, 3, 3)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE 255
+0
+
+=== bmp geht auch
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(4, 4, &H00FF00)
+IMAGE_SAVE(b, "raus.bmp")
+DIM kb AS BUFFER : kb = READALL_BYTES("raus.bmp")
+PRINT "bmp "; BUFFER_GET(kb, 0) = 66 AND BUFFER_GET(kb, 1) = 77
+DIM g AS IMAGE : g = LOADIMAGE("raus.bmp")
+PRINT GETPIXEL(g, 1, 1) = &H00FF00
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+bmp TRUE
+TRUE
+
+=== freigeben wirft das bild aus dem pfad cache
+' Bliebe der Eintrag stehen, bekaeme der naechste LOADIMAGE fuer denselben Pfad
+' ein freigegebenes Bild -- ohne jeden Hinweis.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM q AS IMAGE : q = IMAGE_NEW(8, 8, &HFF0000)
+IMAGE_SAVE(q, "x.png")
+DIM a AS IMAGE : a = LOADIMAGE("x.png")
+IMAGE_FREE(a)
+DIM b AS IMAGE : b = LOADIMAGE("x.png")
+PRINT IMAGEWIDTH(b); " "; (b = a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+8 FALSE
+
+=== das gif hat die bilder und das tempo
+' 8 Bilder/s -> 100/8 = 12,5 -> 13 Hundertstel -> 130 ms; Schleife 0 = endlos.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[3] AS IMAGE
+DIM f AS ARRAY OF INTEGER : f = [&HE84B4B, &H4BE87A, &H2BC4E8]
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8)
+    IMAGE_DRAW_RECT(b[i], i * 2, 1, 2, 6, f[i])
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 8)
+gb = READALL_BYTES("a.gif")
+PRINT "kopf "; BUFFER_GET(gb, 0) = 71 AND BUFFER_GET(gb, 1) = 73 AND BUFFER_GET(gb, 2) = 70
+PRINT "masse "; BUFFER_GET(gb, 6); " "; BUFFER_GET(gb, 8)
+PRINT "bilder "; zaehle("21F904")
+PRINT "dauern "; dauern$()
+PRINT "schleife "; schleife$()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+kopf TRUE
+masse 8 8
+bilder 3
+dauern 130 130 130
+schleife 0
+
+=== jedes bild kann seine eigene dauer haben
+' Der dritte Parameter ist ZWEIERLEI: eine Zahl sind Bilder je Sekunde fuer
+' alle, ein FELD ist die Dauer je Bild in Millisekunden.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[3] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+b[2] = IMAGE_NEW(8, 8, RGB(0, 0, 255))
+IMAGE_SAVE_GIF(b, "a.gif", [1000, 80, 500])
+gb = READALL_BYTES("a.gif")
+PRINT dauern$()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+1000 80 500
+
+=== eine zahl gilt weiter fuer alle
+' Die Gegenprobe zum Fall darueber.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[3] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(8, 8, RGB(i * 100, 0, 0))
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+gb = READALL_BYTES("a.gif")
+PRINT dauern$()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+100 100 100
+
+=== sehr kurze zeiten werden angehoben
+' Unter 2 Hundertstel nehmen die meisten Betrachter still ihre eigene Dauer.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(8, 8, RGB(255, 0, 0))
+b[1] = IMAGE_NEW(8, 8, RGB(0, 255, 0))
+IMAGE_SAVE_GIF(b, "a.gif", [5, 1000])
+gb = READALL_BYTES("a.gif")
+PRINT dauern$()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+20 1000
+
+=== wenige farben bleiben exakt
+' Die Farbtafel wird EXAKT gebaut; beide Farben stehen Byte fuer Byte darin,
+' das erste Bild liest raylibs GIF-Leser.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[2] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HE84B4B)
+b[1] = IMAGE_NEW(4, 4, &H2BC4E8)
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+gb = READALL_BYTES("a.gif")
+PRINT "tafel "; zaehle("E84B4B") > 0; " "; zaehle("2BC4E8") > 0
+DIM g AS IMAGE : g = LOADIMAGE("a.gif")
+PRINT "erstes bild "; GETPIXEL(g, 1, 1) = &HE84B4B; " "; GETALPHA(g, 1, 1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+tafel TRUE TRUE
+erstes bild TRUE 255
+
+=== die durchsichtigkeit kommt mit
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(6, 6)
+IMAGE_DRAW_RECT(b[0], 0, 0, 3, 3, &HFF0000)
+IMAGE_SAVE_GIF(b, "a.gif", 10)
+DIM g AS IMAGE : g = LOADIMAGE("a.gif")
+PRINT GETPIXEL(g, 1, 1) = &HFF0000; " "; GETALPHA(g, 1, 1)
+PRINT GETALPHA(g, 5, 5)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+TRUE 255
+0
+
+=== anzahl begrenzt ein festes feld
+' DIM b[16] mit drei belegten Plaetzen ist der Normalfall.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[16] AS IMAGE
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    b[i] = IMAGE_NEW(4, 4, &HFF0000)
+NEXT
+IMAGE_SAVE_GIF(b, "a.gif", 10, TRUE, 3)
+gb = READALL_BYTES("a.gif")
+PRINT zaehle("21F904")
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+3
+
+=== wiederholen laesst sich abschalten
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM gb AS BUFFER
+FUNCTION zaehle(hex AS STRING) AS INTEGER
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX(hex)
+    DIM z AS INTEGER : z = 0
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        z = z + 1
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN z
+END FUNCTION
+FUNCTION dauern$() AS STRING
+    ' Graphic Control Extension: 21 F9 04, Schalter, Verzoegerung (Hundertstel, LE)
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_HEX("21F904")
+    DIM r AS STRING : r = ""
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, nadel)
+    WHILE p >= 0
+        r = r + STR$((BUFFER_GET(gb, p + 4) + BUFFER_GET(gb, p + 5) * 256) * 10) + " "
+        p = BUFFER_INDEXOF(gb, nadel, p + 1)
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION schleife$() AS STRING
+    ' NETSCAPE2.0, dann 03 01 und die Wiederholzahl (0 = endlos)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(gb, BUFFER_FROM_STRING("NETSCAPE2.0"))
+    IF p < 0 THEN RETURN "keine"
+    RETURN STR$(BUFFER_GET(gb, p + 13) + BUFFER_GET(gb, p + 14) * 256)
+END FUNCTION
+DIM b[1] AS IMAGE
+b[0] = IMAGE_NEW(4, 4, &HFF0000)
+IMAGE_SAVE_GIF(b, "a.gif", 10, FALSE)
+gb = READALL_BYTES("a.gif")
+PRINT schleife$()
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+keine
+
+=== viele farben werden zusammengefasst
+' Ueber 255 Farben kann GIF nicht -- der Zweig darf nicht abstuerzen.
+' (Bis Stufe 46 in test_image_io.py.)
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b[1] AS IMAGE
+b[0] = GENTEX_PERLIN(48, 48, 8.0)
+IMAGE_SAVE_GIF(b, "a.gif", 5)
+DIM g AS IMAGE : g = LOADIMAGE("a.gif")
+PRINT IMAGEWIDTH(g); " "; IMAGEHEIGHT(g)
+DIM farben AS MAP OF INTEGER
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO 47
+    FOR x = 0 TO 47
+        MAPPUT(farben, HEX$(GETPIXEL(g, x, y)), 1)
+    NEXT
+NEXT
+PRINT "hoechstens 256 "; LEN(MAPKEYS(farben)) <= 256
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+48 48
+hoechstens 256 TRUE
