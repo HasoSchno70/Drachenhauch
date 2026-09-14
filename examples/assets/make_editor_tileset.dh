@@ -1,0 +1,390 @@
+' Erzeugt ein 16x16-Tileset fuer den Tilemap-Editor (examples/187_tilemap_editor.dh).
+'
+' 8 Spalten x 4 Reihen = 32 Tiles, 128x64 px, mit Alpha. Pixel-Art-Stil,
+' deterministisch (fester Seed). Ausgabe: editor_tileset.png neben diesem
+' Programm.
+'
+' Tile-Reihenfolge (lokale ID = Zeile*8 + Spalte; gid = ID+1):
+'   Reihe 0  Boden:     grass dirt stone sand water brick wood snow
+'   Reihe 1  Varianten: grass2 darkdirt cobble gravel deepwater metal log ice
+'   Reihe 2  Objekte:   coin heart star key gem bush flower mushroom
+'   Reihe 3  Deko:      treetop trunk rock crate barrel sign ladder spikes
+'
+'     dhrt run examples/assets/make_editor_tileset.dh [-- zieldatei]
+'
+' Bis 2026-09-14 make_editor_tileset.py (PIL). Rechtecke, gerade Linien,
+' Einzelpunkte und das Rauschen (Pythons random.Random(20260604), unten
+' nachgebaut) sind Punkt fuer Punkt dieselben; Ellipsen und Vielecke rastert
+' PIL anders als die Bild-Befehle der Laufzeit, dort weichen einzelne
+' Randpunkte ab.
+IMPORT "imgfx"
+
+DIM ziel AS STRING : ziel = CWD$() + "/editor_tileset.png"
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
+    IF NOT (LEFT$(ziel, 1) = "/" OR LEFT$(ziel, 1) = CHR$(92) OR MID$(ziel, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ziel = GETENV$("DHRT_START_DIR") + "/" + ziel
+END IF
+
+CONST KACHEL = 16
+CONST SPALTEN = 8
+CONST REIHEN = 4
+
+' ----- Pythons Zufall (MT19937, random.Random(n)) ------------------------
+CONST MT_N = 624
+CONST MT_M = 397
+DIM mt[624] AS INTEGER
+DIM mti AS INTEGER : mti = MT_N + 1
+
+SUB mtStart(s AS INTEGER)
+    mt[0] = s BAND &HFFFFFFFF
+    DIM i AS INTEGER
+    FOR i = 1 TO MT_N - 1
+        mt[i] = (1812433253 * (mt[i - 1] BXOR (mt[i - 1] SHR 30)) + i) BAND &HFFFFFFFF
+    NEXT
+    mti = MT_N
+END SUB
+
+SUB mtSaat(schluessel AS INTEGER)
+    ' random.seed(n) fuer eine ganze Zahl unter 2^32: init_by_array mit [n]
+    mtStart(19650218)
+    DIM i AS INTEGER : i = 1
+    DIM k AS INTEGER
+    FOR k = 1 TO MT_N
+        mt[i] = ((mt[i] BXOR ((mt[i - 1] BXOR (mt[i - 1] SHR 30)) * 1664525)) + schluessel) BAND &HFFFFFFFF
+        i = i + 1
+        IF i >= MT_N THEN
+            mt[0] = mt[MT_N - 1]
+            i = 1
+        END IF
+    NEXT
+    FOR k = 1 TO MT_N - 1
+        mt[i] = ((mt[i] BXOR ((mt[i - 1] BXOR (mt[i - 1] SHR 30)) * 1566083941)) - i) BAND &HFFFFFFFF
+        i = i + 1
+        IF i >= MT_N THEN
+            mt[0] = mt[MT_N - 1]
+            i = 1
+        END IF
+    NEXT
+    mt[0] = &H80000000
+END SUB
+
+FUNCTION mtWort() AS INTEGER
+    DIM y AS INTEGER
+    IF mti >= MT_N THEN
+        DIM kk AS INTEGER
+        FOR kk = 0 TO MT_N - 1
+            y = (mt[kk] BAND &H80000000) BOR (mt[(kk + 1) MOD MT_N] BAND &H7FFFFFFF)
+            mt[kk] = mt[(kk + MT_M) MOD MT_N] BXOR (y SHR 1)
+            IF (y BAND 1) = 1 THEN mt[kk] = mt[kk] BXOR &H9908B0DF
+        NEXT
+        mti = 0
+    END IF
+    y = mt[mti]
+    mti = mti + 1
+    y = y BXOR (y SHR 11)
+    y = y BXOR ((y SHL 7) BAND &H9D2C5680)
+    y = y BXOR ((y SHL 15) BAND &HEFC60000)
+    y = y BXOR (y SHR 18)
+    RETURN y
+END FUNCTION
+
+FUNCTION unter(n AS INTEGER) AS INTEGER
+    ' random._randbelow(n): getrandbits(n.bit_length()) mit Verwerfen
+    DIM k AS INTEGER : k = 0
+    DIM v AS INTEGER : v = n
+    WHILE v > 0
+        k = k + 1
+        v = v SHR 1
+    WEND
+    DIM r AS INTEGER : r = mtWort() SHR (32 - k)
+    WHILE r >= n
+        r = mtWort() SHR (32 - k)
+    WEND
+    RETURN r
+END FUNCTION
+
+FUNCTION zufallBis(n AS INTEGER) AS INTEGER            ' randrange(n)
+    RETURN unter(n)
+END FUNCTION
+
+FUNCTION zufallVon(a AS INTEGER, b AS INTEGER) AS INTEGER   ' randrange(a, b)
+    RETURN a + unter(b - a)
+END FUNCTION
+
+FUNCTION zufallZwischen(a AS INTEGER, b AS INTEGER) AS INTEGER   ' randint(a, b)
+    RETURN a + unter(b + 1 - a)
+END FUNCTION
+
+mtSaat(20260604)
+
+' ----- Zeichnen ----------------------------------------------------------
+DIM bild AS IMAGE : bild = IMAGE_NEW(SPALTEN * KACHEL, REIHEN * KACHEL)
+
+FUNCTION rgb(r AS INTEGER, g AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN (r SHL 16) BOR (g SHL 8) BOR b
+END FUNCTION
+
+FUNCTION eng(v AS INTEGER) AS INTEGER
+    RETURN MAX(0, MIN(255, v))
+END FUNCTION
+
+SUB punkt(x AS INTEGER, y AS INTEGER, c AS INTEGER)
+    IMAGE_FILL_RECT(bild, x, y, x, y, c, 255)
+END SUB
+
+SUB flaeche(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, c AS INTEGER)
+    IMAGE_FILL_RECT(bild, x0, y0, x1, y1, c, 255)
+END SUB
+
+SUB fuellen(ox AS INTEGER, oy AS INTEGER, c AS INTEGER)
+    flaeche(ox, oy, ox + KACHEL - 1, oy + KACHEL - 1, c)
+END SUB
+
+SUB umriss(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, c AS INTEGER)
+    IMAGE_FRAME(bild, x0, y0, x1, y1, 1, c, 255)
+END SUB
+
+SUB kasten(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, innen AS INTEGER, rand AS INTEGER)
+    flaeche(x0, y0, x1, y1, innen)
+    umriss(x0, y0, x1, y1, rand)
+END SUB
+
+SUB linie(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, c AS INTEGER)
+    ' Bresenham -- fuer waagerechte, senkrechte und 45-Grad-Linien dieselben
+    ' Punkte wie PIL
+    DIM dx AS INTEGER : dx = ABS(x1 - x0)
+    DIM dy AS INTEGER : dy = -ABS(y1 - y0)
+    DIM sx AS INTEGER : sx = IIF(x0 < x1, 1, -1)
+    DIM sy AS INTEGER : sy = IIF(y0 < y1, 1, -1)
+    DIM fehler AS INTEGER : fehler = dx + dy
+    DIM x AS INTEGER : x = x0
+    DIM y AS INTEGER : y = y0
+    WHILE TRUE
+        punkt(x, y, c)
+        IF x = x1 AND y = y1 THEN BREAK
+        DIM e2 AS INTEGER : e2 = 2 * fehler
+        IF e2 >= dy THEN
+            fehler = fehler + dy
+            x = x + sx
+        END IF
+        IF e2 <= dx THEN
+            fehler = fehler + dx
+            y = y + sy
+        END IF
+    WEND
+END SUB
+
+' PIL nimmt bei einer Ellipse beide Randpunkte des Rechtecks mit -- der Radius
+' ist also bis zu eine halbe Punktbreite groesser als der Abstand der
+' Mittelpunkte. Gemessen am alten Blatt: gefuellte Ellipsen treffen PIL mit
+' 0.4 Punkt fuer Punkt, Ringe mit 0.5 (bei 0.0 wichen 479 Punkte ab).
+CONST ZUGABE_FLAECHE = 0.4
+CONST ZUGABE_RING = 0.5
+
+SUB ellipseVoll(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, c AS INTEGER)
+    IMAGE_FILL_ELLIPSE(bild, (x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 2.0 + ZUGABE_FLAECHE, (y1 - y0) / 2.0 + ZUGABE_FLAECHE, c, 255)
+END SUB
+
+SUB ellipseMitRand(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, innen AS INTEGER, rand AS INTEGER)
+    ellipseVoll(x0, y0, x1, y1, rand)
+    ellipseVoll(x0 + 1, y0 + 1, x1 - 1, y1 - 1, innen)
+END SUB
+
+SUB kreisRand(x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, breite AS INTEGER, c AS INTEGER)
+    IMAGE_RING(bild, (x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 2.0 + ZUGABE_RING, breite, c, 255)
+END SUB
+
+SUB vieleck(xs AS ARRAY OF FLOAT, ys AS ARRAY OF FLOAT, innen AS INTEGER, rand AS INTEGER, mitRand AS BOOLEAN)
+    IMAGE_FILL_POLY(bild, xs, ys, innen, 255)
+    IF mitRand THEN
+        DIM rx AS ARRAY OF FLOAT : rx = []
+        DIM ry AS ARRAY OF FLOAT : ry = []
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(xs) - 1
+            ARRAY_PUSH(rx, xs[i])
+            ARRAY_PUSH(ry, ys[i])
+        NEXT
+        ARRAY_PUSH(rx, xs[0])
+        ARRAY_PUSH(ry, ys[0])
+        IMAGE_POLYLINE(bild, rx, ry, 1, rand, 255)
+    END IF
+END SUB
+
+SUB rauschen(ox AS INTEGER, oy AS INTEGER, r AS INTEGER, g AS INTEGER, b AS INTEGER, menge AS INTEGER, n AS INTEGER)
+    ' Streut leicht aufgehellte/abgedunkelte Pixel ein.
+    DIM i AS INTEGER
+    FOR i = 1 TO n
+        DIM x AS INTEGER : x = zufallBis(KACHEL)
+        DIM y AS INTEGER : y = zufallBis(KACHEL)
+        DIM k AS INTEGER : k = zufallZwischen(-menge, menge)
+        punkt(ox + x, oy + y, rgb(eng(r + k), eng(g + k), eng(b + k)))
+    NEXT
+END SUB
+
+' ---------------------------------------------------------- Reihe 0: Boden
+SUB gras(ox AS INTEGER, oy AS INTEGER, tr AS INTEGER, tg AS INTEGER, tb AS INTEGER, br AS INTEGER, bg AS INTEGER, bb AS INTEGER)
+    fuellen(ox, oy, rgb(br, bg, bb))
+    rauschen(ox, oy, br, bg, bb, 18, 40)
+    flaeche(ox, oy, ox + KACHEL - 1, oy + 4, rgb(tr, tg, tb))
+    DIM i AS INTEGER
+    FOR i = 1 TO 26
+        DIM x AS INTEGER : x = zufallBis(KACHEL)
+        punkt(ox + x, oy + zufallZwischen(0, 4), rgb(tr - 20, tg - 20, tb - 10))
+    NEXT
+    ' Grashalme
+    FOR i = 1 TO 5
+        punkt(ox + zufallVon(1, KACHEL - 1), oy + 5, rgb(70, 150, 60))
+    NEXT
+END SUB
+
+SUB eben(ox AS INTEGER, oy AS INTEGER, r AS INTEGER, g AS INTEGER, b AS INTEGER, menge AS INTEGER)
+    fuellen(ox, oy, rgb(r, g, b))
+    rauschen(ox, oy, r, g, b, menge, 40)
+END SUB
+
+SUB wasser(ox AS INTEGER, oy AS INTEGER, r AS INTEGER, g AS INTEGER, b AS INTEGER)
+    fuellen(ox, oy, rgb(r, g, b))
+    DIM xx AS INTEGER
+    DIM yy AS INTEGER
+    FOR yy = 0 TO KACHEL - 1
+        FOR xx = 0 TO KACHEL - 1
+            IF (xx + yy) MOD 6 = 0 THEN punkt(ox + xx, oy + yy, rgb(r + 30, g + 30, b + 25))
+        NEXT
+    NEXT
+END SUB
+
+SUB ziegel(ox AS INTEGER, oy AS INTEGER)
+    fuellen(ox, oy, rgb(170, 70, 55))
+    rauschen(ox, oy, 170, 70, 55, 12, 40)
+    DIM fuge AS INTEGER : fuge = rgb(90, 40, 30)
+    linie(ox, oy, ox + KACHEL - 1, oy, fuge)
+    linie(ox, oy + 8, ox + KACHEL - 1, oy + 8, fuge)
+    ' versetzte Fugen
+    linie(ox + 8, oy, ox + 8, oy + 7, fuge)
+    linie(ox, oy + 8, ox, oy + 15, fuge)
+    linie(ox + 12, oy + 8, ox + 12, oy + 15, fuge)
+END SUB
+
+SUB holz(ox AS INTEGER, oy AS INTEGER)
+    fuellen(ox, oy, rgb(150, 110, 65))
+    rauschen(ox, oy, 150, 110, 65, 14, 40)
+    DIM yy AS INTEGER
+    FOR yy = 3 TO 15 STEP 4
+        linie(ox, oy + yy, ox + KACHEL - 1, oy + yy, rgb(115, 80, 45))
+    NEXT
+END SUB
+
+gras(0, 0, 86, 170, 70, 120, 90, 55)                   ' grass
+eben(16, 0, 135, 95, 58, 16)                           ' dirt
+eben(32, 0, 130, 130, 138, 16)                         ' stone
+eben(48, 0, 220, 200, 130, 16)                         ' sand
+wasser(64, 0, 58, 110, 200)                            ' water
+ziegel(80, 0)                                          ' brick
+holz(96, 0)                                            ' wood
+eben(112, 0, 235, 240, 248, 10)                        ' snow
+
+' ---------------------------------------------------------- Reihe 1: Varianten
+gras(0, 16, 70, 150, 60, 105, 78, 48)                  ' grass2
+eben(16, 16, 98, 70, 42, 16)                           ' dark dirt
+' cobble -- die Kreise am rechten und unteren Rand ragen wie bei PIL in die
+' Nachbarkacheln hinein
+eben(32, 16, 120, 120, 128, 16)
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+FOR cx = 0 TO 15 STEP 5
+    FOR cy = 0 TO 15 STEP 5
+        kreisRand(32 + cx, 16 + cy, 32 + cx + 4, 16 + cy + 4, 1, rgb(80, 80, 88))
+    NEXT
+NEXT
+eben(48, 16, 150, 145, 130, 22)                        ' gravel
+wasser(64, 16, 36, 70, 150)                            ' deep water
+' metal
+eben(80, 16, 140, 145, 155, 8)
+umriss(80, 16, 95, 31, rgb(90, 95, 105))
+punkt(82, 18, rgb(60, 65, 75)) : punkt(93, 18, rgb(60, 65, 75))
+punkt(82, 29, rgb(60, 65, 75)) : punkt(93, 29, rgb(60, 65, 75))
+' log (end grain)
+fuellen(96, 16, rgb(150, 110, 65))
+ellipseMitRand(98, 18, 109, 29, rgb(170, 130, 80), rgb(110, 80, 45))
+kreisRand(101, 21, 106, 26, 1, rgb(110, 80, 45))
+eben(112, 16, 180, 220, 240, 8)                        ' ice
+
+' ---------------------------------------------------------- Reihe 2: Objekte
+' coin
+ellipseMitRand(3, 34, 12, 45, rgb(245, 205, 60), rgb(180, 140, 20))
+linie(7, 36, 7, 43, rgb(180, 140, 20))
+' heart
+ellipseVoll(19, 35, 24, 40, rgb(220, 60, 70))
+ellipseVoll(24, 35, 29, 40, rgb(220, 60, 70))
+vieleck([19.0, 29.0, 24.0], [38.0, 38.0, 45.0], rgb(220, 60, 70), 0, FALSE)
+' star
+DIM sx AS ARRAY OF FLOAT : sx = []
+DIM sy AS ARRAY OF FLOAT : sy = []
+DIM si AS INTEGER
+FOR si = 0 TO 9
+    DIM winkel AS FLOAT : winkel = -PI / 2 + si * PI / 5
+    DIM radius AS FLOAT : radius = IIF(si MOD 2 = 0, 6.0, 2.6)
+    ARRAY_PUSH(sx, 40 + radius * COS(winkel))
+    ARRAY_PUSH(sy, 40 + radius * SIN(winkel))
+NEXT
+vieleck(sx, sy, rgb(250, 220, 90), rgb(200, 160, 30), TRUE)
+' key
+kreisRand(50, 37, 56, 43, 2, rgb(230, 200, 90))
+IMAGE_POLYLINE(bild, [56.0, 61.0], [40.0, 40.0], 2, rgb(230, 200, 90), 255)
+linie(60, 40, 60, 43, rgb(230, 200, 90))
+' gem
+vieleck([72.0, 77.0, 72.0, 67.0], [34.0, 39.0, 46.0, 39.0], rgb(90, 210, 200), rgb(40, 130, 130), TRUE)
+linie(67, 39, 77, 39, rgb(40, 130, 130))
+' bush
+ellipseVoll(82, 37, 90, 45, rgb(60, 140, 60))
+ellipseVoll(86, 37, 94, 45, rgb(60, 140, 60))
+ellipseVoll(84, 34, 92, 42, rgb(60, 140, 60))
+' flower
+linie(104, 40, 104, 46, rgb(60, 140, 60))
+ellipseVoll(99, 36, 103, 40, rgb(230, 110, 170))
+ellipseVoll(105, 36, 109, 40, rgb(230, 110, 170))
+ellipseVoll(102, 33, 106, 37, rgb(230, 110, 170))
+ellipseVoll(102, 39, 106, 43, rgb(230, 110, 170))
+ellipseVoll(102, 36, 106, 40, rgb(250, 220, 90))
+' mushroom
+flaeche(118, 40, 121, 45, rgb(230, 220, 200))
+ellipseVoll(115, 36, 124, 42, rgb(210, 60, 60))
+punkt(118, 38, rgb(245, 245, 245)) : punkt(121, 38, rgb(245, 245, 245)) : punkt(119, 40, rgb(245, 245, 245))
+
+' ---------------------------------------------------------- Reihe 3: Deko
+' treetop
+ellipseMitRand(1, 49, 14, 62, rgb(50, 130, 55), rgb(35, 95, 40))
+rauschen(0, 48, 50, 130, 55, 18, 20)
+' trunk
+IMAGE_FILL_RECT(bild, 16, 48, 31, 63, 0, 0)
+kasten(21, 48, 26, 63, rgb(120, 80, 45), rgb(85, 55, 30))
+' rock
+vieleck([35.0, 37.0, 41.0, 45.0, 44.0], [61.0, 54.0, 52.0, 57.0, 61.0], rgb(140, 140, 148), rgb(90, 90, 98), TRUE)
+' crate
+kasten(49, 49, 62, 62, rgb(165, 120, 65), rgb(95, 65, 35))
+linie(49, 49, 62, 62, rgb(95, 65, 35))
+linie(62, 49, 49, 62, rgb(95, 65, 35))
+' barrel
+IMAGE_FILL_ROUNDRECT(bild, 67, 49, 76, 62, 3, rgb(95, 60, 30), 255)
+IMAGE_FILL_ROUNDRECT(bild, 68, 50, 75, 61, 2, rgb(150, 100, 55), 255)
+linie(67, 52, 76, 52, rgb(95, 60, 30))
+linie(67, 56, 76, 56, rgb(95, 60, 30))
+linie(67, 59, 76, 59, rgb(95, 60, 30))
+' sign
+flaeche(87, 54, 88, 63, rgb(110, 75, 40))
+kasten(82, 50, 93, 56, rgb(175, 135, 80), rgb(110, 75, 40))
+' ladder
+linie(101, 48, 101, 63, rgb(150, 110, 65))
+linie(106, 48, 106, 63, rgb(150, 110, 65))
+linie(101, 50, 106, 50, rgb(150, 110, 65))
+linie(101, 55, 106, 55, rgb(150, 110, 65))
+linie(101, 60, 106, 60, rgb(150, 110, 65))
+' spikes
+DIM zi AS INTEGER
+FOR zi = 0 TO 3
+    DIM bx AS FLOAT : bx = 112 + zi * 4
+    vieleck([bx, bx + 2, bx + 4], [63.0, 53.0, 63.0], rgb(170, 175, 185), rgb(110, 115, 125), TRUE)
+NEXT
+
+IMAGE_SAVE(bild, ziel)
+PRINT "geschrieben: " + ziel + "  (128x64, 32 Tiles a 16px)"
