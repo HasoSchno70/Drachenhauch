@@ -28,7 +28,7 @@ Maschine (Windows 11) und docs.rs.
 
 | | Befehle | Grenze |
 |---|---|---|
-| Seiten setzen | `pdf`-Modul: `PDF_NEW/PAGE/FONT/COLOR/TEXT/TEXT_WIDTH/LINE/RECT/RECT_FILL/SAVE`, 14 Standardschriften, Millimeter von oben, Textbreite für Helvetica/Times/Courier | **keine Bilder**, keine eingebetteten Schriften (nur WinAnsi), keine Tabellenhilfe |
+| Seiten setzen | `pdf`-Modul: `PDF_NEW/PAGE/FONT/COLOR/TEXT/TEXT_WIDTH/LINE/RECT/RECT_FILL/SAVE`, 14 Standardschriften, Millimeter von oben, Textbreite für Helvetica/Times/Courier (Stand beim Entwurf; seit 2026-09-14 schreibt krilla mit eingebetteten DejaVu-Schriften und Unicode) | **keine Bilder**, keine Tabellenhilfe |
 | Tabellen | `xlsx`-Modul | ist eine Mappe, keine Seite |
 | Bildschirm sichern | `SAVESCREENSHOT`, `IMAGE_SAVE` (png/bmp/jpg/tga) | eine Datei, kein Papier |
 | Fremde Programme | `SHELL`, `SHELL_START`, `SHELL_OUT$` | beliebig — also auch gefährlich; keine Hilfe beim Finden des richtigen |
