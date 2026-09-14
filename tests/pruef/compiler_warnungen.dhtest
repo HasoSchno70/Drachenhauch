@@ -24,3 +24,3223 @@ s = 5
 --- fehler
 Zuweisung an global: Erwartet STRING, erhalten INTEGER
 
+=== zu viele argumente werden gemeldet
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [PLOTS|5 Argumente]: "; eine$("PLOTS|5 Argumente")
+--- datei w.dh
+SCREEN(64, 64, "a", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+PLOTS(xs, ys, &HFF0000, 2, 9)
+
+--- erwartet
+eine meldung mit [PLOTS|5 Argumente]: TRUE
+
+=== zu wenige argumente werden gemeldet
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [MID$|Argument]: "; eine$("MID$|Argument")
+--- datei w.dh
+PRINT MID$("abc")
+
+--- erwartet
+eine meldung mit [MID$|Argument]: TRUE
+
+=== richtige aufrufe schweigen
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Argument]: "; eine$("Argument")
+--- datei w.dh
+SCREEN(64, 64, "a", 1)
+DIM xs[3] AS INTEGER
+DIM ys[3] AS INTEGER
+PLOTS(xs, ys, &HFF0000)
+PLOTS(xs, ys, &HFF0000, 2)
+LINE(0, 0, 10, 10)
+LINE(0, 0, 10, 10, &HFFFFFF)
+PRINT MID$("abc", 1)
+PRINT MID$("abc", 1, 2)
+
+--- erwartet
+eine meldung mit [Argument]: FALSE
+
+=== meldung verspricht keine folgenlosigkeit
+' Die Warnung sagte frueher "ueberzaehlige werden ignoriert" -- fuer die
+' 661 Builtins mit `arity!`-Pruefung ist das schlicht falsch (siehe den
+' Test darunter). Der Compiler kann die beiden Faelle nicht auseinander
+' halten, also sagt die Meldung die Folge nicht mehr voraus.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [MID$|4 Argumente]: "; eine$("MID$|4 Argumente")
+PRINT "eine meldung mit [werden ignoriert]: "; eine$("werden ignoriert")
+--- datei w.dh
+PRINT MID$("abc", 1, 2, 99)
+
+--- erwartet
+eine meldung mit [MID$|4 Argumente]: TRUE
+eine meldung mit [werden ignoriert]: FALSE
+
+=== variadische builtins werden nicht gemeldet
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Argument]: "; eine$("Argument")
+--- datei w.dh
+PRINT PATHJOIN("a", "b")
+PRINT PATHJOIN("a", "b", "c", "d")
+
+--- erwartet
+eine meldung mit [Argument]: FALSE
+
+=== variadische signatur meldet lesbar
+' `...`-Signaturen liefern usize::MAX als Obergrenze. Die stand frueher
+' ausgeschrieben in der Meldung: "erwartet werden 2 bis 18446744073709551615".
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [mindestens 2]: "; eine$("mindestens 2")
+PRINT "eine meldung mit [18446744073709551615]: "; eine$("18446744073709551615")
+--- datei w.dh
+PRINT PATHJOIN("a")
+
+--- erwartet
+eine meldung mit [mindestens 2]: TRUE
+eine meldung mit [18446744073709551615]: FALSE
+
+=== falscher 3d aufruf wird gemeldet
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [CUBE|7]: "; eine$("CUBE|7")
+PRINT "eine meldung mit [LIGHT_POINT|4]: "; eine$("LIGHT_POINT|4")
+PRINT "eine meldung mit [GENTEX_PERLIN|3]: "; eine$("GENTEX_PERLIN|3")
+--- datei w.dh
+SCREEN(64, 64)
+CUBE(0, 0, 0, 1, 1, 1)
+LIGHT_POINT(1, 2, 3)
+GENTEX_PERLIN(64, 64)
+
+--- erwartet
+eine meldung mit [CUBE|7]: TRUE
+eine meldung mit [LIGHT_POINT|4]: TRUE
+eine meldung mit [GENTEX_PERLIN|3]: TRUE
+
+=== richtiger 3d aufruf schweigt
+' Gegenprobe -- eine zu enge Signatur waere schlimmer als gar keine:
+' sie erzeugte Falsch-Alarme in fremdem Code.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Argument]: "; eine$("Argument")
+--- datei w.dh
+SCREEN(64, 64)
+CAMERA3D(9, 7, 9, 0, 1, 0, 45)
+CUBE(0, 0, 0, 1, 1, 1, &HFF0000)
+SPHERE(0, 2, 0, 0.5, &H00FF00)
+CYLINDER(2, 0, 0, 0.0, 0.5, 1.0, &H0000FF)
+LIGHT_ENABLE()
+LIGHT_POINT(3, 4, 5, &HFFFFFF)
+LIGHT_SET_ENABLED(0)
+LIGHT_SET_ENABLED(0, TRUE)
+SKYBOX()
+SKYBOX(TRUE)
+GENTEX_GRADIENT(64, 64, &H000000, &HFFFFFF)
+GENTEX_GRADIENT(64, 64, &H000000, &HFFFFFF, TRUE)
+
+--- erwartet
+eine meldung mit [Argument]: FALSE
+
+=== modul builtin ohne import warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [VEC2_LENGTH|vec2]: "; eine$("VEC2_LENGTH|vec2")
+--- datei w.dh
+PRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))
+
+--- erwartet
+eine meldung mit [VEC2_LENGTH|vec2]: TRUE
+
+=== mit import schweigt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [IMPORT]: "; eine$("IMPORT")
+--- datei w.dh
+IMPORT "vec2"
+PRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))
+
+--- erwartet
+eine meldung mit [IMPORT]: FALSE
+
+=== aliasierter import schweigt
+' `IMPORT "json" AS j` -- der Compiler bildet `J_PARSE` auf `json_parse`
+' zurueck, das Modul gilt als importiert.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [IMPORT]: "; eine$("IMPORT")
+--- datei w.dh
+IMPORT "json" AS j
+DIM h AS J_HANDLE
+h = J_PARSE("[1, 2]")
+PRINT J_GET_INT(h, "0")
+
+--- erwartet
+eine meldung mit [IMPORT]: FALSE
+
+=== core builtins brauchen keinen import
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [IMPORT]: "; eine$("IMPORT")
+--- datei w.dh
+SCREEN(64, 64)
+PRINT LEN("abc")
+PRINT ABS(-3)
+CLS(0)
+
+--- erwartet
+eine meldung mit [IMPORT]: FALSE
+
+=== nur eine meldung je modul
+' Sonst stuenden bei 50 AUDIO_-Aufrufen 50 gleichlautende Meldungen.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "meldungen mit [vec2]: "; wieviele("vec2")
+--- datei w.dh
+PRINT VEC2_X(VEC2_NEW(1.0, 2.0))
+PRINT VEC2_Y(VEC2_NEW(1.0, 2.0))
+PRINT VEC2_LENGTH(VEC2_NEW(3.0, 4.0))
+
+--- erwartet
+meldungen mit [vec2]: 1
+
+=== import in eingebundener datei zaehlt
+' Der Preprocessor sammelt IMPORTs rekursiv -- steht die Zeile im
+' eingebundenen Helfer, gilt das Modul auch fuer die Hauptdatei.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [IMPORT]: "; eine$("IMPORT")
+--- datei w.dh
+IMPORT "helfer.dh"
+PRINT laenge(3.0, 4.0)
+
+--- datei helfer.dh
+IMPORT "vec2"
+
+FUNCTION laenge(x AS FLOAT, y AS FLOAT) AS FLOAT
+  RETURN VEC2_LENGTH(VEC2_NEW(x, y))
+END FUNCTION
+
+--- erwartet
+eine meldung mit [IMPORT]: FALSE
+
+=== lokale variable verdeckt konstante
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [verdeckt|hoehe]: "; eine$("verdeckt|hoehe")
+--- datei w.dh
+CONST HOEHE AS INTEGER = 720
+
+SUB stolpert()
+    DIM hoehe AS FLOAT
+    hoehe = 0.6
+END SUB
+
+stolpert()
+
+--- erwartet
+eine meldung mit [verdeckt|hoehe]: TRUE
+
+=== anderer name wird nicht gemeldet
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [verdeckt]: "; eine$("verdeckt")
+--- datei w.dh
+CONST HOEHE AS INTEGER = 720
+
+SUB sauber()
+    DIM hoch AS FLOAT
+    hoch = 0.6
+END SUB
+
+sauber()
+
+--- erwartet
+eine meldung mit [verdeckt]: FALSE
+
+=== gleicher name im hauptprogramm ist kein verdecken
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [verdeckt]: "; eine$("verdeckt")
+--- datei w.dh
+CONST GRENZE AS INTEGER = 10
+
+SUB nutzt()
+    PRINT GRENZE
+END SUB
+
+nutzt()
+
+--- erwartet
+eine meldung mit [verdeckt]: FALSE
+
+=== division an ganzzahl warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt]: "; eine$("als INTEGER angesagt")
+PRINT "eine meldung mit [\]: "; eine$("\")
+--- datei w.dh
+DIM n AS INTEGER
+n = 7 / 2
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt]: TRUE
+eine meldung mit [\]: TRUE
+
+=== komma literal an ganzzahl warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt|INT()]: "; eine$("als INTEGER angesagt|INT()")
+--- datei w.dh
+DIM n AS INTEGER
+n = 3.5
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt|INT()]: TRUE
+
+=== float variable an ganzzahl warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt]: "; eine$("als INTEGER angesagt")
+--- datei w.dh
+DIM f AS FLOAT
+f = 1.5
+DIM n AS INTEGER
+n = f
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt]: TRUE
+
+=== ganzzahlige division warnt nicht
+' Der empfohlene Weg darf nicht selbst angemeckert werden.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt]: "; eine$("als INTEGER angesagt")
+--- datei w.dh
+DIM n AS INTEGER
+n = 7 \ 2
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt]: FALSE
+
+=== ganzzahl rechnung warnt nicht
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt]: "; eine$("als INTEGER angesagt")
+--- datei w.dh
+DIM i AS INTEGER
+i = 2
+DIM n AS INTEGER
+n = i * 2 + 3
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt]: FALSE
+
+=== kommazahl an kommazahl warnt nicht
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt]: "; eine$("als INTEGER angesagt")
+--- datei w.dh
+DIM f AS FLOAT
+f = 7 / 2
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt]: FALSE
+
+=== zahl an text warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als STRING angesagt|INTEGER]: "; eine$("als STRING angesagt|INTEGER")
+PRINT "eine meldung mit [STR$()]: "; eine$("STR$()")
+--- datei w.dh
+DIM s AS STRING
+s = 5
+
+--- erwartet
+eine meldung mit [als STRING angesagt|INTEGER]: TRUE
+eine meldung mit [STR$()]: TRUE
+
+=== text an zahl warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als INTEGER angesagt|VAL()]: "; eine$("als INTEGER angesagt|VAL()")
+--- datei w.dh
+DIM i AS INTEGER
+i = "text"
+
+--- erwartet
+eine meldung mit [als INTEGER angesagt|VAL()]: TRUE
+
+=== boolean an zahl warnt
+' BOOLEAN ist in Drachenhauch keine Zahl -- die Laufzeit lehnt es ab.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [erhalten BOOLEAN]: "; eine$("erhalten BOOLEAN")
+--- datei w.dh
+DIM b AS BOOLEAN
+b = TRUE
+DIM i AS INTEGER
+i = b
+
+--- erwartet
+eine meldung mit [erhalten BOOLEAN]: TRUE
+
+=== vergleich an text warnt
+' Ein Vergleich liefert BOOLEAN -- auch ohne Variable dazwischen.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als STRING angesagt|BOOLEAN]: "; eine$("als STRING angesagt|BOOLEAN")
+--- datei w.dh
+DIM i AS INTEGER
+DIM s AS STRING
+s = i > 3
+
+--- erwartet
+eine meldung mit [als STRING angesagt|BOOLEAN]: TRUE
+
+=== richtige zuweisungen schweigen
+' Alles hier ist gueltig -- inklusive der beiden STRING-Operatoren.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [bricht beim Laufen ab]: "; eine$("bricht beim Laufen ab")
+--- datei w.dh
+DIM s AS STRING
+DIM i AS INTEGER
+DIM f AS FLOAT
+DIM b AS BOOLEAN
+i = 3
+f = i * 2
+s = "a" + "b"
+s = "-" * 40
+b = i > 3
+b = NOT b
+
+--- erwartet
+eine meldung mit [bricht beim Laufen ab]: FALSE
+
+=== parametertyp wird erkannt
+' Der Typ eines Parameters steht in der Signatur -- ohne DIM davor.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [als STRING angesagt]: "; eine$("als STRING angesagt")
+--- datei w.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+    DIM s AS STRING
+    s = a
+    RETURN a
+END FUNCTION
+PRINT f(1)
+
+--- erwartet
+eine meldung mit [als STRING angesagt]: TRUE
+
+=== globaler typ gilt auch in der funktion
+' Funktionen werden VOR dem Hauptprogramm uebersetzt -- die Typen der
+' Globals muessen trotzdem schon feststehen.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit ['titel'|als STRING angesagt]: "; eine$("'titel'|als STRING angesagt")
+--- datei w.dh
+DIM titel AS STRING
+
+SUB setze()
+    titel = 42
+END SUB
+
+setze()
+
+--- erwartet
+eine meldung mit ['titel'|als STRING angesagt]: TRUE
+
+=== feld ueber objekt warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit ['p.name']: "; eine$("'p.name'")
+--- datei w.dh
+CLASS P
+    DIM name AS STRING
+END CLASS
+DIM p AS P
+p = NEW P()
+p.name = 5
+
+--- erwartet
+eine meldung mit ['p.name']: TRUE
+
+=== eigenes feld in der methode warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit ['Self.name']: "; eine$("'Self.name'")
+--- datei w.dh
+CLASS P
+    DIM name AS STRING
+    SUB Init()
+        Self.name = 5
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+
+--- erwartet
+eine meldung mit ['Self.name']: TRUE
+
+=== property bleibt still
+' Ein Setter darf einen anderen Typ nehmen als das Feld dahinter.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [bricht beim Laufen ab]: "; eine$("bricht beim Laufen ab")
+--- datei w.dh
+CLASS P
+    DIM _hp AS STRING
+    PROPERTY GET hp() AS INTEGER
+        RETURN VAL(Self._hp)
+    END PROPERTY
+    PROPERTY SET hp(v AS INTEGER)
+        Self._hp = STR$(v)
+    END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+p.hp = 5
+
+--- erwartet
+eine meldung mit [bricht beim Laufen ab]: FALSE
+
+=== referenztypen bleiben still
+' Klassen/MAP reicht die Laufzeit durch -- eine Meldung 'bricht ab' waere
+' schlicht unwahr, egal wie sinnvoll die Zuweisung ist.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [bricht beim Laufen ab]: "; eine$("bricht beim Laufen ab")
+--- datei w.dh
+CLASS A
+    DIM x AS INTEGER
+END CLASS
+CLASS B
+    DIM y AS INTEGER
+END CLASS
+DIM a AS A
+a = NEW B()
+
+--- erwartet
+eine meldung mit [bricht beim Laufen ab]: FALSE
+
+=== unbekannter typ bleibt still
+' Rueckgabetypen von Builtins werden bewusst nicht hergeleitet -- lieber
+' ein Fund weniger als ein falscher Alarm.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [bricht beim Laufen ab]: "; eine$("bricht beim Laufen ab")
+--- datei w.dh
+DIM i AS INTEGER
+i = LEN("abc")
+
+--- erwartet
+eine meldung mit [bricht beim Laufen ab]: FALSE
+
+=== falscher argumenttyp warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Parameter 'a'|erhalten STRING]: "; eine$("Parameter 'a'|erhalten STRING")
+--- datei w.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+    RETURN a
+END FUNCTION
+DIM s AS STRING
+s = "x"
+PRINT f(s)
+
+--- erwartet
+eine meldung mit [Parameter 'a'|erhalten STRING]: TRUE
+
+=== falscher typ bei named arg warnt
+' Named-Args werden ueber den Namen zugeordnet, nicht ueber die Stelle.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Parameter 'text']: "; eine$("Parameter 'text'")
+--- datei w.dh
+SUB zeichne(text AS STRING, x AS INTEGER)
+    PRINT text
+END SUB
+zeichne(x: 1, text: 5)
+
+--- erwartet
+eine meldung mit [Parameter 'text']: TRUE
+
+=== methode wird geprueft
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [P.setze|Parameter 'n']: "; eine$("P.setze|Parameter 'n'")
+--- datei w.dh
+CLASS P
+    SUB setze(n AS STRING)
+        PRINT n
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+p.setze(42)
+
+--- erwartet
+eine meldung mit [P.setze|Parameter 'n']: TRUE
+
+=== implizite methode wird geprueft
+' `b(42)` ohne `Self.` innerhalb derselben Klasse.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [P.b|Parameter 'n']: "; eine$("P.b|Parameter 'n'")
+--- datei w.dh
+CLASS P
+    SUB a()
+        b(42)
+    END SUB
+    SUB b(n AS STRING)
+        PRINT n
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+
+--- erwartet
+eine meldung mit [P.b|Parameter 'n']: TRUE
+
+=== richtige aufrufe bleiben still
+' INTEGER an einen FLOAT-Parameter ist gueltig (und haeufig).
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Parameter]: "; eine$("Parameter")
+--- datei w.dh
+FUNCTION f(a AS INTEGER, b AS FLOAT) AS FLOAT
+    RETURN a + b
+END FUNCTION
+DIM i AS INTEGER
+i = 2
+PRINT f(i, 1.5)
+PRINT f(3, 4)
+
+--- erwartet
+eine meldung mit [Parameter]: FALSE
+
+=== variadischer rest wird nicht geprueft
+' Der Sammel-Parameter bekommt ein TUPLE, nicht den Typ der Einzelwerte.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [Parameter]: "; eine$("Parameter")
+--- datei w.dh
+SUB log(stufe AS STRING, ...rest)
+    PRINT stufe
+END SUB
+log("INFO", 5, TRUE, "x")
+
+--- erwartet
+eine meldung mit [Parameter]: FALSE
+
+=== tippfehler im feldnamen warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied 'anzhal']: "; eine$("kein Mitglied 'anzhal'")
+PRINT "eine meldung mit [Meintest du 'anzahl'?]: "; eine$("Meintest du 'anzahl'?")
+--- datei w.dh
+CLASS P
+    DIM anzahl AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+PRINT p.anzhal
+
+--- erwartet
+eine meldung mit [kein Mitglied 'anzhal']: TRUE
+eine meldung mit [Meintest du 'anzahl'?]: TRUE
+
+=== unbekannte methode warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied 'gibtsnicht']: "; eine$("kein Mitglied 'gibtsnicht'")
+--- datei w.dh
+CLASS P
+    SUB tu()
+    END SUB
+END CLASS
+DIM p AS P
+p = NEW P()
+p.gibtsNicht()
+
+--- erwartet
+eine meldung mit [kein Mitglied 'gibtsnicht']: TRUE
+
+=== kindmethode ueber basistyp bleibt still
+' Der Fall, um den es geht: `t` ist als Tier angesagt, haelt aber einen
+' Hund -- `t.belle()` ist gueltig und muss still bleiben.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied]: "; eine$("kein Mitglied")
+--- datei w.dh
+CLASS Tier
+    SUB laut()
+    END SUB
+END CLASS
+CLASS Hund EXTENDS Tier
+    SUB belle()
+        PRINT "wau"
+    END SUB
+END CLASS
+DIM t AS Tier
+t = NEW Hund()
+t.belle()
+
+--- erwartet
+eine meldung mit [kein Mitglied]: FALSE
+
+=== geerbtes feld bleibt still
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied]: "; eine$("kein Mitglied")
+--- datei w.dh
+CLASS Basis
+    DIM hp AS INTEGER
+END CLASS
+CLASS Kind EXTENDS Basis
+END CLASS
+DIM k AS Kind
+k = NEW Kind()
+PRINT k.hp
+
+--- erwartet
+eine meldung mit [kein Mitglied]: FALSE
+
+=== property zaehlt als mitglied
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied]: "; eine$("kein Mitglied")
+--- datei w.dh
+CLASS P
+    DIM _h AS INTEGER
+    PROPERTY GET hp() AS INTEGER
+        RETURN Self._h
+    END PROPERTY
+END CLASS
+DIM p AS P
+p = NEW P()
+PRINT p.hp
+
+--- erwartet
+eine meldung mit [kein Mitglied]: FALSE
+
+=== container methoden bleiben still
+' STRING/MAP/ARRAY haben ihre eigene Methoden-Tabelle, keine Klasse.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied]: "; eine$("kein Mitglied")
+--- datei w.dh
+DIM s AS STRING
+s = "abc"
+PRINT s.upper()
+DIM m AS MAP OF INTEGER
+PRINT m.size()
+
+--- erwartet
+eine meldung mit [kein Mitglied]: FALSE
+
+=== schreibender zugriff wird auch geprueft
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein Mitglied 'anzhal']: "; eine$("kein Mitglied 'anzhal'")
+--- datei w.dh
+CLASS P
+    DIM anzahl AS INTEGER
+END CLASS
+DIM p AS P
+p = NEW P()
+p.anzhal = 5
+
+--- erwartet
+eine meldung mit [kein Mitglied 'anzhal']: TRUE
+
+=== falscher rueckgabetyp warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [hinter RETURN|erhalten STRING]: "; eine$("hinter RETURN|erhalten STRING")
+--- datei w.dh
+FUNCTION f() AS INTEGER
+    RETURN "text"
+END FUNCTION
+PRINT f()
+
+--- erwartet
+eine meldung mit [hinter RETURN|erhalten STRING]: TRUE
+
+=== fehlendes return warnt
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN|NIL]: "; eine$("kein einziges RETURN|NIL")
+--- datei w.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+    PRINT a
+END FUNCTION
+PRINT f(1)
+
+--- erwartet
+eine meldung mit [kein einziges RETURN|NIL]: TRUE
+
+=== return in einem zweig reicht[1]
+' Keine Pfad-Analyse: wo es ueberhaupt ein RETURN gibt, wird geschwiegen.
+' Wer hier falsch urteilt, meldet richtigen Code.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN]: "; eine$("kein einziges RETURN")
+--- datei w.dh
+FUNCTION f(a AS INTEGER) AS INTEGER
+    IF a > 0 THEN
+        RETURN 1
+    END IF
+    RETURN 0
+END FUNCTION
+PRINT f(1)
+
+--- erwartet
+eine meldung mit [kein einziges RETURN]: FALSE
+
+=== return in einem zweig reicht[2]
+' Keine Pfad-Analyse: wo es ueberhaupt ein RETURN gibt, wird geschwiegen.
+' Wer hier falsch urteilt, meldet richtigen Code.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN]: "; eine$("kein einziges RETURN")
+--- datei w.dh
+FUNCTION g(a AS INTEGER) AS STRING
+    SELECT CASE a
+        CASE 1
+            RETURN "eins"
+        CASE ELSE
+            RETURN "?"
+    END SELECT
+END FUNCTION
+PRINT g(1)
+
+--- erwartet
+eine meldung mit [kein einziges RETURN]: FALSE
+
+=== funktion die immer wirft bleibt still
+' Sie kommt nie ans Ende und braucht darum kein RETURN.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN]: "; eine$("kein einziges RETURN")
+--- datei w.dh
+FUNCTION f() AS INTEGER
+    THROW "nicht umgesetzt"
+END FUNCTION
+PRINT 1
+
+--- erwartet
+eine meldung mit [kein einziges RETURN]: FALSE
+
+=== coroutine bleibt still
+' Ihr RETURN ist laut Sprachdoku freiwillig.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN]: "; eine$("kein einziges RETURN")
+--- datei w.dh
+FUNCTION zaehler() AS INTEGER
+    YIELD 1
+    YIELD 2
+END FUNCTION
+DIM c AS COROUTINE
+c = zaehler()
+PRINT CORO_RESUME(c)
+
+--- erwartet
+eine meldung mit [kein einziges RETURN]: FALSE
+
+=== abstrakte methode bleibt still
+' Sie ist absichtlich nur angekuendigt.
+' (Bis Stufe 47 in test_compiler_warnungen.py.)
+IMPORT "json"
+' dhrt --check als Kind; jede Zusage fragt die Meldungstexte.
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "w.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM meldungen AS ARRAY OF STRING : meldungen = []
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    ARRAY_PUSH(meldungen, JSON_GET_STRING(h, "b." + STR$(i) + ".message"))
+NEXT
+' "A|B": gibt es EINE Meldung, die A und B enthaelt?
+FUNCTION eine$(teile AS STRING) AS STRING
+    DIM t AS ARRAY OF STRING : t = SPLIT$(teile, "|")
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        DIM alle AS BOOLEAN : alle = TRUE
+        FOR k = 0 TO LEN(t) - 1
+            IF INSTR(meldungen[j], t[k]) < 0 THEN alle = FALSE
+        NEXT
+        IF alle THEN RETURN "TRUE"
+    NEXT
+    RETURN "FALSE"
+END FUNCTION
+FUNCTION wieviele(teil AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(meldungen) - 1
+        IF INSTR(meldungen[j], teil) >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "eine meldung mit [kein einziges RETURN]: "; eine$("kein einziges RETURN")
+--- datei w.dh
+CLASS Form
+    ABSTRACT FUNCTION flaeche() AS FLOAT
+    SUB zeige()
+        PRINT flaeche()
+    END SUB
+END CLASS
+CLASS Kreis EXTENDS Form
+    FUNCTION flaeche() AS FLOAT
+        RETURN 3.14
+    END FUNCTION
+END CLASS
+DIM k AS Kreis
+k = NEW Kreis()
+k.zeige()
+
+--- erwartet
+eine meldung mit [kein einziges RETURN]: FALSE
