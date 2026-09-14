@@ -2876,6 +2876,24 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 49 (2026-09-14):** die letzte der Restdateien aus Stufe 44 bis 48 --
+`test_smtp.py` ist geloescht, ihre 18 Tests stehen in `tests/pruef/smtp.dhtest`
+(jetzt 26 Faelle). Zwei Helfer unter `tests/pruef/_hilfen/`: **`smtpserver.dh`**,
+der `_MiniServer` in Drachenhauch (eine Verbindung; Faehigkeiten, Anmeldung und
+Empfaenger ueber Argumente; Befehle nach `befehle.txt`, die Nachricht nach
+`daten.txt`, beides VOR der Antwort geschrieben), gestartet ueber
+`smtpstart.dh` (`starten`/`befehl`/`daten$`/`beenden`); und **`mime.dh`** statt
+Pythons `email`-Modul -- Kopfzeilen entfaltet, RFC-2047-Woerter dekodiert
+(Leerraum zwischen zwei Woertern faellt weg), Teile nach der Grenze aus dem
+Parameter, Rumpf als Bytes. Eingebunden wird beides ueber eine zweizeilige
+Beilage mit `IMPORT "{sammlung}/_hilfen/..."` -- Platzhalter gelten in
+Text-Beilagen, im Quelltext nicht. **Der Fund:** ein langer Umlaut-Betreff
+wurde zu Zeilen mit 81 Zeichen gefaltet; RFC 2047 erlaubt fuer eine Zeile mit
+kodierten Woertern 76, und `kodiere_wort` rechnete nur die 75 fuer das Wort,
+nicht den Feldnamen davor. Pythons Leser nahm es klaglos -- der Fall prueft
+jetzt die Zeilenlaenge, `smtp.rs` schneidet 39 statt 45 Bytes je Wort
+(Rust-Test `gefaltete_betreffzeilen_bleiben_unter_76_zeichen`).
+
 **Stufe 48 (2026-09-14):** die HTTP- und Cloud-Tests ohne Python -- und
 dafuer ein Byte-Weg im net-Modul. `test_modules_html.py` (13), `test_http_request.py`
 (29 mit den sechs Methoden) und `test_modules_cloud.py` (9) sind geloescht. Ihre
