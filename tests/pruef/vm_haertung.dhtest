@@ -1,0 +1,73 @@
+' VM-Haertung: ein kaputter `.dhc` (Stack-Unterlauf) muss eine saubere
+' Laufzeit-Meldung liefern statt eines Rust-Panics. Frueher poppte die
+' Dispatch-Schleife mit `unwrap()`, jetzt ueber den Fehlerweg.
+' Bis Stufe 52 (2026-09-14) tests/test_vm_hardening.py; das gueltige Geruest
+' kommt weiter von `dhrt --dumpbc`, umgebaut mit dem json-Modul.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== stack unterlauf ist ein sauberer fehler kein panic
+IMPORT "json"
+FUNCTION lauf$(p AS INTEGER, fehler AS BOOLEAN) AS STRING
+    ' Die ganze Ausgabe eines Kindes (stdout oder stderr), bis es endet.
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING
+        IF fehler THEN teil = PROCESS_ERR$(p) ELSE teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+WRITEALL("tiny.dh", "PRINT 1 + 2" + CHR$(10))
+DIM d AS INTEGER : d = PROCESS_START("dhrt", "--dumpbc", CWD$() + "/tiny.dh")
+DIM h AS JSON_HANDLE : h = JSON_PARSE(lauf$(d, FALSE))
+' main: ADD (Op 20) auf leerem Stapel -> Unterlauf, danach HALT (99)
+JSON_SET_JSON(h, "main.constants", JSON_PARSE("[]"))
+JSON_SET_JSON(h, "main.code", JSON_PARSE("[[20, null], [99, null]]"))
+JSON_SET_JSON(h, "main.lines", JSON_PARSE("[1, 1]"))
+' NICHT .dh -- sonst naehme dhrt den Quelltext-Weg
+WRITEALL("corrupt.dhc", JSON_STRINGIFY(h))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", CWD$() + "/corrupt.dhc")
+DIM aus AS STRING : aus = lauf$(p, FALSE)
+aus = aus + lauf$(p, TRUE)
+PRINT "code ungleich 0: "; PROCESS_CODE(p) <> 0
+PRINT "unsere meldung: "; INSTR(aus, "Stack underflow") >= 0
+PRINT "kein panic: "; INSTR(LOWER$(aus), "panicked") < 0 AND INSTR(aus, "RUST_BACKTRACE") < 0
+--- erwartet
+code ungleich 0: TRUE
+unsere meldung: TRUE
+kein panic: TRUE
+
+=== ein gueltiges dhc laeuft unveraendert
+IMPORT "json"
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+WRITEALL("tiny.dh", "PRINT 1 + 2" + CHR$(10))
+DIM d AS INTEGER : d = PROCESS_START("dhrt", "--dumpbc", CWD$() + "/tiny.dh")
+DIM h AS JSON_HANDLE : h = JSON_PARSE(lauf$(d))
+WRITEALL("ok.dhc", JSON_STRINGIFY(h))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", CWD$() + "/ok.dhc")
+PRINT TRIM$(lauf$(p)); " "; PROCESS_CODE(p)
+--- erwartet
+3 0
