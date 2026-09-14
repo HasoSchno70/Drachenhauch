@@ -16,8 +16,9 @@ IMPORT "net"
 | `NET_LISTENER_PORT(lst)` | INTEGER | tatsaechlicher Port (nach LISTEN 0) |
 | `NET_TCP_ACCEPT(lst)` | NET_SOCKET \| NIL | non-blocking: NIL wenn niemand verbindet |
 | `NET_TCP_CONNECT(host, port)` | NET_SOCKET | Client-Verbindung (5s DNS-Timeout + 5s Connect-Timeout) |
-| `NET_SEND(sock, text)` | INTEGER | gesendete Bytes |
+| `NET_SEND(sock, text)` | INTEGER | gesendete Bytes; statt Text geht auch ein `BUFFER` (rohe Bytes) |
 | `NET_RECV(sock, max_bytes)` | STRING | leer wenn nichts da (non-blocking) |
+| `NET_RECV_BYTES(sock, max_bytes)` | BUFFER | rohe Bytes ohne UTF-8-Dekodierung, leer wenn nichts da -- fuer Binaerprotokolle |
 | `NET_PEER_ADDR(sock)` | STRING | Remote-IP |
 | `NET_PEER_PORT(sock)` | INTEGER | Remote-Port |
 | `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE sobald die Gegenseite geschlossen hat oder ein Recv/Send fehlgeschlagen ist |
@@ -194,6 +195,21 @@ Zeichen wird also NIE als kaputtes Zeichen (`�`) sichtbar, unabhaengig von
 `max_bytes` oder Netzwerk-Timing. (Bei UDP stellt sich das Problem praktisch
 nicht: ein Datagramm kommt immer komplett-oder-gar-nicht an; nur ein zu
 klein gewaehltes `max_bytes` kann ein Datagramm abschneiden.)
+
+## Bytes statt Text
+
+`NET_SEND` und `NET_RECV` sprechen UTF-8. Fuer alles andere -- ein Bild, eine
+gepackte Datei, ein Geraet mit eigenem Format, eine HTTP-Antwort mit rohen
+Bytes -- nimmt `NET_SEND` einen `BUFFER`, und `NET_RECV_BYTES` liefert einen.
+Wer beides mischt, verliert nichts: was `NET_RECV` als angefangenes
+Mehrbyte-Zeichen zurueckgehalten hat, gibt `NET_RECV_BYTES` zuerst heraus.
+
+```basic
+DIM b AS BUFFER : b = BUFFER_FROM_HEX("00fffe0a")
+NET_SEND(sock, b)
+DIM roh AS BUFFER : roh = NET_RECV_BYTES(sock, 4096)
+PRINT BUFFER_TO_HEX$(roh)
+```
 
 ## IPv6
 

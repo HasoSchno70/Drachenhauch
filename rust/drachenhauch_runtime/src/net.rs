@@ -195,6 +195,46 @@ pub fn recv(s: &mut NetSock, n: i64) -> Result<String, String> {
     }
 }
 
+/// Rohe Bytes senden -- fuer Binaerprotokolle und Daten, die kein UTF-8 sind
+/// (ein Bild, eine gepackte Datei, ein Geraet mit eigenem Format).
+pub fn send_bytes(s: &mut NetSock, bytes: &[u8]) -> Result<i64, String> {
+    match s.stream.write(bytes) {
+        Ok(n) => Ok(n as i64),
+        Err(ref e) if would_block(e) => Ok(0),
+        Err(e) => {
+            s.connected = false;
+            Err(format!("NET_SEND: {}", e))
+        }
+    }
+}
+
+/// Rohe Bytes empfangen, ohne UTF-8-Dekodierung. Was ein vorheriges NET_RECV
+/// als angefangenes Mehrbyte-Zeichen zurueckgehalten hat, kommt ZUERST -- sonst
+/// ginge beim Wechsel von Text auf Bytes ein Stueck des Stroms verloren.
+pub fn recv_bytes(s: &mut NetSock, n: i64) -> Result<Vec<u8>, String> {
+    if n <= 0 {
+        return Err("NET_RECV_BYTES: max_bytes muss > 0 sein".into());
+    }
+    if n > MAX_READ_BYTES {
+        return Err(format!("NET_RECV_BYTES: max_bytes {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
+    let mut raus = std::mem::take(&mut s.pending);
+    if raus.len() >= n as usize {
+        s.pending = raus.split_off(n as usize);
+        return Ok(raus);
+    }
+    let mut buf = vec![0u8; n as usize - raus.len()];
+    match s.stream.read(&mut buf) {
+        Ok(0) => { s.connected = false; Ok(raus) }
+        Ok(got) => { raus.extend_from_slice(&buf[..got]); Ok(raus) }
+        Err(ref e) if would_block(e) => Ok(raus),
+        Err(e) => {
+            s.connected = false;
+            if raus.is_empty() { Err(format!("NET_RECV_BYTES: {}", e)) } else { Ok(raus) }
+        }
+    }
+}
+
 pub fn is_connected(s: &NetSock) -> bool {
     s.connected
 }
