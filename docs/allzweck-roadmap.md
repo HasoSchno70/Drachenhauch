@@ -300,7 +300,7 @@ zahlen soll — der Test auf das erste Byte des Namens hält die Kosten für all
 anderen Builtins bei einem Byte-Vergleich. `LOG_*` teilt sich `flush_out` mit
 `EPRINT`/`SHELL` aus WP A.
 
-Tests: `tests/test_pruefen.py` (27). Beispiel: `examples/165_pruefen.dh`.
+Tests: `tests/pruef/pruefen.dhtest`. Beispiel: `examples/165_pruefen.dh`.
 Doku: `docs/builtins-core.md`, Abschnitt „Prüfen und Melden".
 
 ## WP F — Fehler, die man behandeln kann (✅ ERLEDIGT 2026-08-17)

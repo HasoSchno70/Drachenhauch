@@ -197,4 +197,4 @@ CAMERA3D_VIEW(MAT4_LOOKAT(VEC3_NEW(5,5,5), VEC3_ZERO(), VEC3_NEW(0,1,0)))
 
 Demos: [examples/103_m3d.dh](../examples/103_m3d.dh) (MODEL_MATRIX),
 [examples/104_instancing.dh](../examples/104_instancing.dh) (MODEL_INSTANCED).
-Tests: [tests/test_m3d.py](../tests/test_m3d.py).
+Tests: [tests/pruef/m3d.dhtest](../tests/pruef/m3d.dhtest).

@@ -168,7 +168,7 @@ laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
 das **ohne** chdir läuft — Dev-/Parity-Einstieg).
 
 Gate: stdout von `dhrt run` == Python-Tree-Walker mit demselben chdir
-([`tests/test_rust_run_parity.py`](../tests/test_rust_run_parity.py), 2 Tests:
+([`tests/pruef/rust_run_parity.dhtest`](../tests/pruef/rust_run_parity.dhtest), 2 Tests:
 relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
 `dhrt <datei.dh>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
