@@ -1,0 +1,57 @@
+' Die Bild-Erzeuger der Beispiele (bis 2026-09-14 PIL-Skripte): was sie
+' zeichnen, ist Punkt fuer Punkt das eingecheckte Bild. Verglichen werden
+' Farbe und Deckkraft jedes Punkts, nicht die PNG-Bytes -- die haengen am
+' Packer und muessen auf einem anderen System nicht gleich ausfallen.
+
+=== editor-tileset ist das eingecheckte
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/tileset.png")
+DIM aus AS STRING : aus = lauf$(p)
+' Ein Bau ohne Grafik kann nicht zeichnen: die Meldung des Kindes
+' weiterreichen, dann heisst der Fall "uebersprungen" statt falsch.
+IF NOT FILEEXISTS("tileset.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p); ", "; RIGHT$(aus, 25)
+DIM neu AS IMAGE : neu = LOADIMAGE("tileset.png")
+DIM alt AS IMAGE : alt = LOADIMAGE(ARG$(1))
+PRINT IMAGEWIDTH(neu); "x"; IMAGEHEIGHT(neu)
+DIM abweichend AS INTEGER : abweichend = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR y = 0 TO IMAGEHEIGHT(alt) - 1
+    FOR x = 0 TO IMAGEWIDTH(alt) - 1
+        DIM da AS INTEGER : da = GETALPHA(alt, x, y)
+        IF da <> GETALPHA(neu, x, y) THEN
+            abweichend = abweichend + 1
+        ELSEIF da > 0 AND GETPIXEL(alt, x, y) <> GETPIXEL(neu, x, y) THEN
+            abweichend = abweichend + 1
+        END IF
+    NEXT
+NEXT
+PRINT "abweichende Punkte "; abweichend
+--- argumente
+{sammlung}/../../examples/assets/make_editor_tileset.dh
+{sammlung}/../../examples/assets/editor_tileset.png
+--- erwartet
+rueckgabe 0, (128x64, 32 Tiles a 16px)
+128x64
+abweichende Punkte 0
