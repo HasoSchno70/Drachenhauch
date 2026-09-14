@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1847,
+ "count": 1848,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1183,7 +1183,8 @@
   "NET_PEER_ADDR": "STRING — Remote-IP",
   "NET_PEER_PORT": "INTEGER — Remote-Port",
   "NET_RECV": "STRING — leer wenn nichts da (non-blocking)",
-  "NET_SEND": "INTEGER — gesendete Bytes",
+  "NET_RECV_BYTES": "BUFFER — rohe Bytes ohne UTF-8-Dekodierung, leer wenn nichts da -- fuer Binaerprotokolle",
+  "NET_SEND": "INTEGER — gesendete Bytes; statt Text geht auch ein BUFFER (rohe Bytes)",
   "NET_SET_TIMEOUT": "0 = non-blocking (Vorgabe), > 0 = Timeout in ms, < 0 = vollblockierend",
   "NET_TCP_ACCEPT": "NET_SOCKET \\ — NIL non-blocking: NIL wenn niemand verbindet",
   "NET_TCP_CONNECT": "NET_SOCKET — Client-Verbindung (5s DNS-Timeout + 5s Connect-Timeout)",

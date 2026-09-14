@@ -3108,7 +3108,21 @@ impl<'p> Vm<'p> {
                 self.tcp_socks.push(Some(s));
                 Value::Int((self.tcp_socks.len() - 1) as i64)
             }
-            "net_send" => { let i = bi_int(a, 0, "NET_SEND")?; let t = bi_str(a, 1, "NET_SEND")?.to_string(); Value::Int(net::send(self.net_sock_mut(i)?, &t)?) }
+            "net_send" => {
+                let i = bi_int(a, 0, "NET_SEND")?;
+                // Text oder ein BUFFER -- Bytes, die kein UTF-8 sind, liessen sich
+                // sonst gar nicht verschicken.
+                match a.get(1) {
+                    Some(Value::Buffer(b)) => { let bytes = b.borrow().clone(); Value::Int(net::send_bytes(self.net_sock_mut(i)?, &bytes)?) }
+                    _ => { let t = bi_str(a, 1, "NET_SEND")?.to_string(); Value::Int(net::send(self.net_sock_mut(i)?, &t)?) }
+                }
+            }
+            "net_recv_bytes" => {
+                let i = bi_int(a, 0, "NET_RECV_BYTES")?;
+                let n = bi_int(a, 1, "NET_RECV_BYTES")?;
+                let bytes = net::recv_bytes(self.net_sock_mut(i)?, n)?;
+                Value::Buffer(std::rc::Rc::new(std::cell::RefCell::new(bytes)))
+            }
             "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(&net::recv(self.net_sock_mut(i)?, n)?) }
             "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?)?.peer_host),
             "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?)?.peer_port),

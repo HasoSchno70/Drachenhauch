@@ -308,3 +308,78 @@ NET_CLOSE_LISTENER(l)
 TRUE
 TRUE
 
+=== rohe bytes gehen hin und zurueck
+' NET_SEND nimmt einen BUFFER, NET_RECV_BYTES liefert einen -- auch Bytes, die kein
+' UTF-8 sind (00 FF FE), kommen unveraendert an.
+IMPORT "net"
+FUNCTION warteBytes(s AS NET_SOCKET, soll AS INTEGER) AS BUFFER
+    DIM r AS BUFFER : r = BUFFER_NEW(0)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE BUFFER_LEN(r) < soll AND MILLIS() - t0 < 5000
+        r = BUFFER_CONCAT(r, NET_RECV_BYTES(s, 1024))
+        SLEEP(5)
+    WEND
+    RETURN r
+END FUNCTION
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM cli AS NET_SOCKET : cli = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+DIM srv AS NET_SOCKET
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE srv = NIL AND MILLIS() - t0 < 5000
+    srv = NET_TCP_ACCEPT(lst)
+WEND
+PRINT "gesendet "; NET_SEND(cli, BUFFER_FROM_HEX("00fffe0a"))
+PRINT "empfangen "; BUFFER_TO_HEX$(warteBytes(srv, 4))
+PRINT "leer wenn nichts da "; BUFFER_LEN(NET_RECV_BYTES(srv, 16))
+NET_CLOSE(cli)
+NET_CLOSE(srv)
+NET_CLOSE_LISTENER(lst)
+--- erwartet
+gesendet 4
+empfangen 00fffe0a
+leer wenn nichts da 0
+
+=== ein angefangenes zeichen geht beim wechsel auf bytes nicht verloren
+' "ä" ist C3 A4. Kommt nur C3 an, haelt NET_RECV es zurueck -- NET_RECV_BYTES
+' muss es als Erstes herausgeben.
+IMPORT "net"
+FUNCTION warteBytes(s AS NET_SOCKET, soll AS INTEGER) AS BUFFER
+    DIM r AS BUFFER : r = BUFFER_NEW(0)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE BUFFER_LEN(r) < soll AND MILLIS() - t0 < 5000
+        r = BUFFER_CONCAT(r, NET_RECV_BYTES(s, 1024))
+        SLEEP(5)
+    WEND
+    RETURN r
+END FUNCTION
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM cli AS NET_SOCKET : cli = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+DIM srv AS NET_SOCKET
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE srv = NIL AND MILLIS() - t0 < 5000
+    srv = NET_TCP_ACCEPT(lst)
+WEND
+NET_SEND(cli, BUFFER_FROM_HEX("41c3"))
+DIM txt AS STRING : txt = ""
+t0 = MILLIS()
+WHILE txt = "" AND MILLIS() - t0 < 5000
+    txt = NET_RECV(srv, 16)
+    SLEEP(5)
+WEND
+PRINT "text "; txt
+NET_SEND(cli, BUFFER_FROM_HEX("a442"))
+PRINT "bytes "; BUFFER_TO_HEX$(warteBytes(srv, 3))
+NET_CLOSE(cli)
+NET_CLOSE(srv)
+NET_CLOSE_LISTENER(lst)
+--- erwartet
+text A
+bytes c3a442
+
+=== recv bytes braucht eine positive groesse
+IMPORT "net"
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+DIM cli AS NET_SOCKET : cli = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))
+PRINT NET_RECV_BYTES(cli, 0)
+--- fehler
+NET_RECV_BYTES: max_bytes muss > 0 sein

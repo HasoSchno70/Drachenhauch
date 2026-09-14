@@ -7257,9 +7257,15 @@
    "module": "net"
   },
   {
+   "name": "NET_RECV_BYTES",
+   "kind": "core",
+   "signature": "NET_RECV_BYTES(sock, max_bytes) AS BUFFER",
+   "module": "net"
+  },
+  {
    "name": "NET_SEND",
    "kind": "core",
-   "signature": "NET_SEND(sock, text)",
+   "signature": "NET_SEND(sock, text_oder_puffer)",
    "module": "net"
   },
   {

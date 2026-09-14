@@ -6,3 +6,316 @@ PRINT CLOUD_LOAD("p")
 --- fehler
 CLOUD_LOAD: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden
 
+=== cloud save and load roundtrip
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+PRINT CLOUD_SAVE("spieler1", "{""gold"": 42}")
+PRINT CLOUD_LOAD("spieler1")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+{"gold": 42}
+
+=== cloud load not found returns empty no error
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+PRINT "["; CLOUD_LOAD("niemand"); "]"
+PRINT "["; CLOUD_LAST_ERROR$(); "]"
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+[]
+[]
+
+=== cloud save overwrites
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+CLOUD_SAVE("p", "v1")
+CLOUD_SAVE("p", "v2")
+PRINT CLOUD_LOAD("p")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+v2
+
+=== cloud wrong api key fails gracefully
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "geheim"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "falsch")
+PRINT "["; CLOUD_LOAD("p"); "]"
+PRINT CLOUD_LAST_ERROR$() <> ""
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+[]
+TRUE
+
+=== cloud correct api key works
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "geheim"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "geheim")
+CLOUD_SAVE("p", "ok")
+PRINT CLOUD_LOAD("p")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+ok
+
+=== leaderboard submit and fetch sorted desc
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+LEADERBOARD_SUBMIT("hs", "anna", 100)
+LEADERBOARD_SUBMIT("hs", "bert", 250)
+LEADERBOARD_SUBMIT("hs", "carla", 50)
+DIM top AS ARRAY OF TUPLE
+top = LEADERBOARD_FETCH("hs", 10)
+PRINT LEN(top)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(top) - 1
+    PRINT top[i][0]; " "; top[i][1]
+NEXT
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+3
+bert 250.0
+anna 100.0
+carla 50.0
+
+=== leaderboard keeps only best score
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+PRINT LEADERBOARD_SUBMIT("hs", "anna", 100)
+PRINT LEADERBOARD_SUBMIT("hs", "anna", 50)
+PRINT LEADERBOARD_SUBMIT("hs", "anna", 300)
+DIM top AS ARRAY OF TUPLE
+top = LEADERBOARD_FETCH("hs", 5)
+PRINT top[0][1]
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+FALSE
+TRUE
+300.0
+
+=== leaderboard best low mode
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+LEADERBOARD_SUBMIT("speedrun", "anna", 61.2, TRUE)
+LEADERBOARD_SUBMIT("speedrun", "anna", 58.9, TRUE)
+DIM top AS ARRAY OF TUPLE
+top = LEADERBOARD_FETCH("speedrun", 5, TRUE)
+PRINT top[0][1]
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+58.9
+
+=== leaderboard fetch empty board
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_cloud.py.)
+IMPORT "cloud"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("cloud", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+CLOUD_CONFIGURE(basis, "")
+DIM top AS ARRAY OF TUPLE
+top = LEADERBOARD_FETCH("leer", 10)
+PRINT LEN(top)
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+0
