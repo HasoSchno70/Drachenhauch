@@ -79,6 +79,44 @@ nebeneinander braucht, braucht zwei Bilder (`IMAGE_COPY`).
 | `IMAGE_DITHER(bild, r, g, b, a)` | IMAGE — Farbtiefe senken und den Fehler verteilen. **Nur 5,6,5,0 / 5,5,5,1 / 4,4,4,4** — alles andere wird abgelehnt, weil raylib sonst ein unbrauchbares Format liefert |
 | `IMAGE_PALETTE(bild, max)` | ARRAY OF INTEGER — die häufigsten Farben des Bildes |
 
+### Formen mit Kommazahlen und Deckkraft
+
+Die Befehle oben kennen nur ganze Zahlen, gefuellte Kreise und Linien von
+einem Punkt Breite -- und jeder laedt die Textur neu hoch. Wer eine Grafik aus
+vielen Formen **herstellt** (Kacheln, Symbole, Knoepfe), braucht mehr: ein
+gefuelltes Vieleck, eine dicke Linie, abgerundete Ecken, einen Ring, einen
+Verlauf. Dafuer diese acht (gebaut fuer den Kachel-Generator des Circuit
+Runners, `circuitrunner/make_tiles.dh`):
+
+| Funktion | Wirkung |
+|---|---|
+| `IMAGE_FILL_RECT(bild, x0, y0, x1, y1, farbe [, deckkraft])` | Rechteck von Ecke zu Ecke, beide Grenzen eingeschlossen |
+| `IMAGE_FRAME(bild, x0, y0, x1, y1, breite, farbe [, deckkraft])` | Rahmen der Breite `breite`, nach innen gezeichnet |
+| `IMAGE_FILL_ROUNDRECT(bild, x0, y0, x1, y1, radius, farbe [, deckkraft])` | Rechteck mit abgerundeten Ecken |
+| `IMAGE_FILL_ELLIPSE(bild, cx, cy, rx, ry, farbe [, deckkraft])` | gefuellte Ellipse um `cx, cy`; mit `rx = ry` ein Kreis |
+| `IMAGE_RING(bild, cx, cy, r, breite, farbe [, deckkraft])` | Kreisring vom Radius `r` nach innen |
+| `IMAGE_FILL_POLY(bild, xs, ys, farbe [, deckkraft])` | gefuelltes Vieleck aus zwei Feldern mit den Eckpunkten, auch konkav |
+| `IMAGE_POLYLINE(bild, xs, ys, breite, farbe [, deckkraft])` | Linienzug der Breite `breite` mit runden Gelenken |
+| `IMAGE_GRADIENT(bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])` | Verlauf im Rechteck, per Vorgabe von oben nach unten; mischt Farbe und Deckkraft |
+
+**Geschrieben wird UEBER, nicht gemischt.** Ein Punkt bekommt genau die Farbe
+und Deckkraft, die der Befehl nennt -- mit `deckkraft` 0 stanzt man ein Loch
+in eine Flaeche. Ohne `deckkraft` gilt die Farbe wie ueberall (`&Hrrggbb` ist
+deckend, `RGBA` mit Deckkraft 1..255). Die Deckkraft ist ein eigenes Argument,
+weil sich "vollstaendig durchsichtig" als Farbe nicht schreiben laesst: das
+oberste Byte 0 heisst deckend. Wer mischen will, zeichnet in ein eigenes Bild
+und legt es mit `IMAGE_DRAW_IMAGE` darueber.
+
+**Koordinaten sind Kommazahlen, ein Punkt sitzt auf seiner ganzzahligen
+Stelle**, Grenzen gelten einschliesslich. Es gibt keine Kantenglaettung -- wer
+weiche Kanten will, zeichnet in doppelter oder vierfacher Groesse und
+verkleinert mit `IMAGE_SCALE`. Was ueber den Bildrand hinausgeht, faellt weg.
+
+**Hochgeladen wird erst beim naechsten `FLIP`**, nicht je Aufruf: tausend
+Formen in ein Bild kosten also einmal Hochladen statt tausendmal. Gelesen
+(`GETPIXEL`, `IMAGE_SAVE`, `IMAGE_DRAW_IMAGE`, `IMAGE_SCALE` ...) wird ohnehin
+das Bild selbst und nicht die Textur -- das sieht den neuen Stand sofort.
+
 ## Bilder anlegen, zusammensetzen und speichern
 
 Diese fuenf machen aus einem IMAGE etwas, das ein Programm nicht nur anzeigen,
@@ -110,6 +148,13 @@ IMAGE_DRAW_IMAGE(fertig, unten, 0, 0)
 IMAGE_DRAW_IMAGE(fertig, oben, 0, 0)
 IMAGE_SAVE(fertig, "ebenen.png")
 ```
+
+**Gemischt wird richtig, auch wenn das Ziel halbdurchsichtig ist**
+("ueber"-Regel nach Porter-Duff): Orange mit Deckkraft 60 ueber Orange mit
+Deckkraft 59 bleibt Orange und hat danach Deckkraft 105. Bis 2026-09-14 lief
+`IMAGE_DRAW_IMAGE` ueber raylibs `ImageDraw`, und das machte daraus ein Gruen
+(Rot 0x01) -- sichtbar als gruenlicher Schein um jede weich gezeichnete Form.
+Ueber deckendem Grund ist das Ergebnis dasselbe wie vorher.
 
 **Warum `IMAGE_NEW` und nicht `GENTEX_COLOR`:** ein vollstaendig durchsichtiges
 Bild laesst sich ueber eine **Farbe** gar nicht ausdruecken. Die Farbkonvention
