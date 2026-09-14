@@ -2959,9 +2959,23 @@ Zwischenwerte richtig; Pythons `int()` rundet Richtung null, `INT` ab.
 uebersetzt nicht, und eine MAP laesst sich nicht mit `m[schluessel]` lesen --
 `MAPGET`. Tests `tests/pruef/werkzeug_beispiel_assets.dhtest` (2; Gegenprobe
 mit einer anderen Periode bzw. Saat 43: beide fallen).
+**Level-Werkzeuge von Pyramid Pusher (selber Tag):**
+`pyramid_pusher/levels/_authoring/make_levels.dh` (die 12 eigenen Level samt
+Loeser, der jeden Level vor dem Schreiben per Breitensuche ueber Schiebezuege
+prueft) und `convert_skinner.dh` (366 Skinner-Level ins Titel-vor-Brett-Format,
+sortiert nach Sammlung, roemischer Set-Nummer und Levelnummer, mit
+`SORT(feld, vergleich)`, das stabil ist wie Pythons `sort`). Beide schreiben die
+eingecheckten `.xsb` Byte fuer Byte; in `02_skinner_classics.xsb` aendert sich
+nur die Kopfzeile, die das Werkzeug nennt. Die Quelle traegt 40 Latin-1-Bytes (je ein
+`é` = 0xE9 in den 40 Copyright-Zeilen, die das Werkzeug ueberspringt) -- gelesen
+mit `READLINES(pfad, "latin1")`, als UTF-8 waere die Datei nicht lesbar. Tests
+`tests/pruef/werkzeug_pyramid_levels.dhtest` (3, darunter ein per
+`--- ersetzen` unloesbar gemachter Level, der nicht geschrieben werden darf;
+Gegenprobe: geaenderter Titel, Loeser sagt immer "ok", Sortierung ohne
+Set-Nummer -- 3 von 3 fallen).
 Noch Python bei den Spielen: die PIL-Bildgeneratoren (`make_editor_tileset.py`,
-Buch-Sprites, Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy), die
-Level-Autorenwerkzeuge von Pyramid Pusher und der Flask-`cloudserver`.
+Buch-Sprites, Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy) und
+der Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

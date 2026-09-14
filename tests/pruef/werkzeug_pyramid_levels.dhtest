@@ -1,0 +1,132 @@
+' Die Level-Werkzeuge von Pyramid Pusher (bis 2026-09-14 je ein .py): was sie
+' schreiben, ist Byte fuer Byte die eingecheckte .xsb-Datei.
+
+=== eigene level sind die eingecheckten
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/01.xsb")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(lauf$(p), CHR$(10))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 2
+    PRINT zeilen[i]
+NEXT
+DIM letzte AS STRING : letzte = zeilen[LEN(zeilen) - 1]
+PRINT LEFT$(letzte, 13); "..."; RIGHT$(letzte, 26)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("01.xsb")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../pyramid_pusher/levels/_authoring/make_levels.dh
+{sammlung}/../../pyramid_pusher/levels/01_pyramid_pusher.xsb
+--- erwartet
+  [OK ]  1. Die erste Kammer   ok
+  [OK ]  2. Nach oben          ok
+  [OK ]  3. Zwei Saeulen       ok
+  [OK ]  4. Die Ecke           ok
+  [OK ]  5. Schiebereih        ok
+  [OK ]  6. Doppelpack         ok
+  [OK ]  7. Der Korridor       ok
+  [OK ]  8. Vier Ziele         ok
+  [OK ]  9. Um die Wand        ok
+  [OK ] 10. Das Lager          ok
+  [OK ] 11. Verschachtelt      ok
+  [OK ] 12. Die Grabkammer     ok
+
+Geschrieben: ...  (12 Level, alle loesbar)
+rueckgabe 0
+TRUE
+
+=== ein unloesbarer level wird nicht geschrieben
+' Die Kiste der ersten Kammer steht an der linken Wand -- sie kann nur noch
+' auf und ab, das Ziel liegt rechts. Die Suche muss das merken.
+--- programm ../../pyramid_pusher/levels/_authoring/make_levels.dh
+--- ersetzen # @$. #
+#$@ . #
+--- erwartet
+  [FAIL]  1. Die erste Kammer   unloesbar (durchsucht)
+  [OK ]  2. Nach oben          ok
+  [OK ]  3. Zwei Saeulen       ok
+  [OK ]  4. Die Ecke           ok
+  [OK ]  5. Schiebereih        ok
+  [OK ]  6. Doppelpack         ok
+  [OK ]  7. Der Korridor       ok
+  [OK ]  8. Vier Ziele         ok
+  [OK ]  9. Um die Wand        ok
+  [OK ] 10. Das Lager          ok
+  [OK ] 11. Verschachtelt      ok
+  [OK ] 12. Die Grabkammer     ok
+
+!! Mindestens ein Level ist nicht loesbar -- NICHT geschrieben.
+--- rueckgabe 1
+
+=== skinner-sammlung ist die eingecheckte
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", ARG$(1), CWD$() + "/02.xsb")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(lauf$(p), CHR$(10))
+PRINT LEFT$(zeilen[0], 21)
+DIM i AS INTEGER
+FOR i = 1 TO LEN(zeilen) - 1
+    PRINT zeilen[i]
+NEXT
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("02.xsb")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(2))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../pyramid_pusher/levels/_authoring/convert_skinner.dh
+{sammlung}/../../pyramid_pusher/levels/_authoring/source/skinner_arranged.txt
+{sammlung}/../../pyramid_pusher/levels/02_skinner_classics.xsb
+--- erwartet
+366 gueltige Level ->
+     65  Sasquatch VII
+     45  Sasquatch VIIII
+     43  Sasquatch II
+     39  Sasquatch VIII
+     36  Sasquatch I
+     24  Sasquatch III
+     21  Microban IIII
+     20  Sasquatch V
+     17  Microban I
+     15  Microban II
+     13  Sasquatch VI
+     11  Sasquatch IIII
+      8  Sasquatch XI
+      7  Microban III
+      1  Microban V
+      1  Sasquatch X
+rueckgabe 0
+TRUE

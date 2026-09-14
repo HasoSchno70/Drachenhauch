@@ -1,0 +1,247 @@
+' Erzeugt + VALIDIERT den gebuendelten Original-Level-Satz fuer Pyramid Pusher.
+'
+' Alle Level hier sind selbst entworfen (frei verwendbar). Ein kleiner
+' Sokoban-Loeser (Breitensuche ueber Schiebezuege) prueft JEDEN Level auf
+' Loesbarkeit, bevor er geschrieben wird -- so landet garantiert kein
+' unloesbarer Level im Spiel.
+'
+' Format = Standard-XSB:  # Wand   (Leer) Boden   @ Spieler   $ Kiste
+'                         . Ziel   * Kiste-auf-Ziel   + Spieler-auf-Ziel
+' Level durch Leerzeile getrennt; ';' beginnt eine Titel-/Kommentarzeile.
+'
+'     dhrt run pyramid_pusher/levels/_authoring/make_levels.dh [-- zieldatei]
+'
+' Bis 2026-09-14 make_levels.py; die geschriebene Datei ist dieselbe.
+
+' (Titel, Level-Zeilen mit | getrennt) -- bewusste Schwierigkeitskurve.
+DIM titel AS ARRAY OF STRING : titel = []
+DIM bretter AS ARRAY OF STRING : bretter = []
+SUB level(t AS STRING, zeilen AS STRING)
+    ARRAY_PUSH(titel, t)
+    ARRAY_PUSH(bretter, zeilen)
+END SUB
+level("Die erste Kammer", "#######|#     #|# @$. #|#     #|#######")
+level("Nach oben", "#####|#.  #|#$  #|#@  #|#####")
+level("Zwei Saeulen", "######|#.  .#|#$  $#|#  @ #|######")
+level("Die Ecke", "#######|#@    #|# $## #|# . # #|#   # #|#######")
+level("Schiebereih", "########|#@ $ . #|########|")
+level("Doppelpack", "#######|#  .  #|# $$@ #|#  .  #|#######")
+level("Der Korridor", "#########|#. $ @  #|#########")
+level("Vier Ziele", "#######|#.   .#|# $ $ #|#  @  #|# $ $ #|#.   .#|#######")
+level("Um die Wand", "#######|#  @  #|# # # #|#.$ $.#|#######")
+level("Das Lager", "########|#  #   #|# $$ . #|# @ #. #|#  ##  #|########")
+level("Verschachtelt", "#######|#.    #|#.$$ @#|#.$   #|#  #  #|#######")
+level("Die Grabkammer", "########|#   . ##|# $$$ @#|## . . #| # ### #| #     #| #######")
+
+' ----- Loeser -------------------------------------------------------------
+' Ein Feld ist y * B + x. Die Level sind klein; B = 64 reicht weit.
+CONST B = 64
+DIM wand[B * B] AS BOOLEAN
+DIM ziel[B * B] AS BOOLEAN
+DIM kiste[B * B] AS BOOLEAN
+DIM gesehen[B * B] AS BOOLEAN
+DIM zielListe AS ARRAY OF INTEGER
+
+FUNCTION liste$(a AS ARRAY OF INTEGER) AS STRING
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(a) - 1
+        IF i > 0 THEN s = s + ","
+        s = s + STR$(a[i])
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION ausListe(s AS STRING) AS ARRAY OF INTEGER
+    DIM a AS ARRAY OF INTEGER : a = []
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(s, ",")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        ARRAY_PUSH(a, VAL(teile[i]))
+    NEXT
+    RETURN a
+END FUNCTION
+
+' Alle vom Spieler erreichbaren Felder bei den Kisten in `kiste[]`; liefert die
+' kleinste Feldnummer (Normalisierung) und laesst `gesehen[]` gefuellt.
+DIM erreicht AS ARRAY OF INTEGER
+FUNCTION erreichbar(spieler AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(erreicht) - 1
+        gesehen[erreicht[i]] = FALSE
+    NEXT
+    erreicht = [spieler]
+    gesehen[spieler] = TRUE
+    DIM kleinstes AS INTEGER : kleinstes = spieler
+    DIM kopf AS INTEGER : kopf = 0
+    DIM schritte AS ARRAY OF INTEGER : schritte = [1, -1, B, -B]
+    WHILE kopf < LEN(erreicht)
+        DIM p AS INTEGER : p = erreicht[kopf]
+        kopf = kopf + 1
+        DIM d AS INTEGER
+        FOR d = 0 TO 3
+            DIM n AS INTEGER : n = p + schritte[d]
+            IF NOT gesehen[n] AND NOT wand[n] AND NOT kiste[n] THEN
+                gesehen[n] = TRUE
+                ARRAY_PUSH(erreicht, n)
+                IF n < kleinstes THEN kleinstes = n
+            END IF
+        NEXT
+    WEND
+    RETURN kleinstes
+END FUNCTION
+
+' Einfache Eck-Deadlock-Erkennung (Kiste nicht auf Ziel, in Ecke)
+FUNCTION tot(k AS INTEGER) AS BOOLEAN
+    IF ziel[k] THEN RETURN FALSE
+    DIM oben AS BOOLEAN : oben = wand[k - B]
+    DIM unten AS BOOLEAN : unten = wand[k + B]
+    DIM links AS BOOLEAN : links = wand[k - 1]
+    DIM rechts AS BOOLEAN : rechts = wand[k + 1]
+    RETURN (oben AND links) OR (oben AND rechts) OR (unten AND links) OR (unten AND rechts)
+END FUNCTION
+
+SUB kistenSetzen(boxen AS ARRAY OF INTEGER, an AS BOOLEAN)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(boxen) - 1
+        kiste[boxen[i]] = an
+    NEXT
+END SUB
+
+FUNCTION loesbar$(zeilen AS ARRAY OF STRING) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO B * B - 1
+        wand[i] = FALSE
+        ziel[i] = FALSE
+        kiste[i] = FALSE
+        gesehen[i] = FALSE
+    NEXT
+    erreicht = []
+    zielListe = []
+    DIM boxen AS ARRAY OF INTEGER : boxen = []
+    DIM spieler AS INTEGER : spieler = -1
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    ' ein Rand von einem Feld rundherum, damit Nachbarn nie aus dem Feld fallen
+    FOR y = 0 TO LEN(zeilen) - 1
+        FOR x = 0 TO LEN(zeilen[y]) - 1
+            DIM c AS STRING : c = MID$(zeilen[y], x, 1)
+            DIM p AS INTEGER : p = (y + 1) * B + x + 1
+            IF c = "#" THEN
+                wand[p] = TRUE
+            ELSEIF INSTR(".+*", c) >= 0 THEN
+                ziel[p] = TRUE
+                ARRAY_PUSH(zielListe, p)
+            END IF
+            IF INSTR("$*", c) >= 0 THEN ARRAY_PUSH(boxen, p)
+            IF INSTR("@+", c) >= 0 THEN spieler = p
+        NEXT
+    NEXT
+    IF spieler < 0 THEN RETURN "kein Spieler"
+    IF LEN(boxen) <> LEN(zielListe) THEN RETURN "#Kisten(" + STR$(LEN(boxen)) + ") != #Ziele(" + STR$(LEN(zielListe)) + ")"
+    IF LEN(boxen) = 0 THEN RETURN "keine Kiste"
+    SORT(boxen)
+    SORT(zielListe)
+    DIM zielText AS STRING : zielText = liste$(zielListe)
+    IF liste$(boxen) = zielText THEN RETURN "schon geloest"
+
+    DIM bekannt AS MAP OF BOOLEAN
+    kistenSetzen(boxen, TRUE)
+    MAPPUT(bekannt, STR$(erreichbar(spieler)) + ":" + liste$(boxen), TRUE)
+    kistenSetzen(boxen, FALSE)
+    DIM qSpieler AS ARRAY OF INTEGER : qSpieler = [spieler]
+    DIM qKisten AS ARRAY OF STRING : qKisten = [liste$(boxen)]
+    DIM kopf AS INTEGER : kopf = 0
+    DIM schritte AS ARRAY OF INTEGER : schritte = [1, -1, B, -B]
+    WHILE kopf < LEN(qSpieler)
+        DIM sp AS INTEGER : sp = qSpieler[kopf]
+        DIM kt AS STRING : kt = qKisten[kopf]
+        kopf = kopf + 1
+        IF kopf > 400000 THEN RETURN "Zustandslimit (zu komplex fuer Quick-Check)"
+        IF kt = zielText THEN RETURN "ok"
+        DIM ks AS ARRAY OF INTEGER : ks = ausListe(kt)
+        kistenSetzen(ks, TRUE)
+        erreichbar(sp)
+        ' Die Erreichbarkeit fuer DIESEN Zustand festhalten, bevor sie beim
+        ' Normalisieren der Nachfolger ueberschrieben wird.
+        DIM hier AS MAP OF BOOLEAN
+        hier = {}
+        FOR i = 0 TO LEN(erreicht) - 1
+            MAPPUT(hier, STR$(erreicht[i]), TRUE)
+        NEXT
+        DIM j AS INTEGER
+        FOR j = 0 TO LEN(ks) - 1
+            DIM k AS INTEGER : k = ks[j]
+            DIM d AS INTEGER
+            FOR d = 0 TO 3
+                DIM seite AS INTEGER : seite = k - schritte[d]
+                DIM hin AS INTEGER : hin = k + schritte[d]
+                IF NOT MAPHAS(hier, STR$(seite)) THEN CONTINUE
+                IF wand[hin] OR kiste[hin] THEN CONTINUE
+                IF tot(hin) THEN CONTINUE
+                DIM nb AS ARRAY OF INTEGER : nb = []
+                DIM m AS INTEGER
+                FOR m = 0 TO LEN(ks) - 1
+                    IF m = j THEN ARRAY_PUSH(nb, hin) ELSE ARRAY_PUSH(nb, ks[m])
+                NEXT
+                SORT(nb)
+                kistenSetzen(ks, FALSE)
+                kistenSetzen(nb, TRUE)
+                DIM schluessel AS STRING : schluessel = STR$(erreichbar(k)) + ":" + liste$(nb)
+                kistenSetzen(nb, FALSE)
+                kistenSetzen(ks, TRUE)
+                IF MAPHAS(bekannt, schluessel) THEN CONTINUE
+                MAPPUT(bekannt, schluessel, TRUE)
+                ARRAY_PUSH(qSpieler, k)
+                ARRAY_PUSH(qKisten, liste$(nb))
+            NEXT
+        NEXT
+        kistenSetzen(ks, FALSE)
+    WEND
+    RETURN "unloesbar (durchsucht)"
+END FUNCTION
+
+' ----- Ausgabe -----------------------------------------------------------
+DIM zieldatei AS STRING : zieldatei = DIRNAME(CWD$()) + "/01_pyramid_pusher.xsb"
+IF ARGC() > 0 THEN
+    zieldatei = ARG$(0)
+    IF NOT (LEFT$(zieldatei, 1) = "/" OR LEFT$(zieldatei, 1) = CHR$(92) OR MID$(zieldatei, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN zieldatei = GETENV$("DHRT_START_DIR") + "/" + zieldatei
+END IF
+
+DIM aus AS STRING
+aus = "; ============================================" + CHR$(10) + _
+    "; Pyramid Pusher -- Kampagne 'Sandstein'" + CHR$(10) + _
+    "; Original-Level (frei verwendbar)." + CHR$(10) + _
+    "; Eigene Saetze: weitere .xsb in diesen Ordner legen." + CHR$(10) + _
+    "; ============================================" + CHR$(10)
+DIM alleGut AS BOOLEAN : alleGut = TRUE
+DIM nr AS INTEGER
+FOR nr = 0 TO LEN(titel) - 1
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(bretter[nr], "|")
+    DIM koerper AS ARRAY OF STRING : koerper = []
+    DIM z AS INTEGER
+    FOR z = 0 TO LEN(roh) - 1
+        IF roh[z] <> "" THEN ARRAY_PUSH(koerper, roh[z])
+    NEXT
+    DIM befund AS STRING : befund = loesbar$(koerper)
+    DIM stand AS STRING : stand = IIF(befund = "ok", "OK ", "FAIL")
+    DIM nummer AS STRING : nummer = STR$(nr + 1)
+    IF LEN(nummer) < 2 THEN nummer = " " + nummer
+    DIM name AS STRING : name = titel[nr]
+    IF LEN(name) < 18 THEN name = name + SPACE$(18 - LEN(name))
+    PRINT "  [" + stand + "] " + nummer + ". " + name + " " + befund
+    IF befund <> "ok" THEN alleGut = FALSE
+    aus = aus + CHR$(10) + "; " + STR$(nr + 1) + ". " + titel[nr]
+    FOR z = 0 TO LEN(koerper) - 1
+        aus = aus + CHR$(10) + koerper[z]
+    NEXT
+    aus = aus + CHR$(10)
+NEXT
+IF NOT alleGut THEN
+    PRINT ""
+    PRINT "!! Mindestens ein Level ist nicht loesbar -- NICHT geschrieben."
+    EXIT(1)
+END IF
+WRITEALL(zieldatei, aus)
+PRINT ""
+PRINT "Geschrieben: " + zieldatei + "  (" + STR$(LEN(titel)) + " Level, alle loesbar)"
