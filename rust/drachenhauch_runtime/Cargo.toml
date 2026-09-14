@@ -30,6 +30,19 @@ rustc-hash = "2"
 # Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
 # koennen (raylibs CompressData haengt dagegen am graphics-Feature).
 miniz_oxide = "0.8"
+# PDF-Modul (PDF_*): krilla schreibt das PDF samt eingebetteter, auf die
+# benutzten Zeichen beschnittener Schriften (CID-Fonts mit ToUnicode) --
+# vorher standen hier 440 Zeilen Handarbeit, die nur die vierzehn
+# Standardschriften und cp1252 konnten. Pure-Rust. `simple-text` bringt die
+# Textformung (rustybuzz); Bilder brauchen wir (noch) nicht.
+krilla = { version = "0.8.2", default-features = false, features = ["simple-text"] }
+# Die eingebauten Schriften des PDF-Moduls: DejaVu Sans/Serif/Sans Mono in je
+# vier Schnitten (freie Lizenz, deckt Latein, Griechisch, Kyrillisch und viele
+# Zeichen wie Pfeile und Haken ab). Der Linker nimmt nur die zwoelf benutzten.
+dejavu = "2.37"
+# Dieselbe Textformung wie krillas draw_text -- damit PDF_TEXT_WIDTH genau
+# das misst, was gezeichnet wird (samt Unterschneidung).
+rustybuzz = "0.20"
 # Animierte GIFs schreiben (IMAGE_SAVE_GIF). raylib kann sie nur LESEN.
 # Pure-Rust (LZW ueber weezl, Farbreduktion ueber color_quant), keine
 # C-Toolchain -> ungated wie die anderen reinen Rust-Crates.

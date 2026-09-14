@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1846,
+ "count": 1847,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1228,6 +1228,7 @@
   "PDF_CLOSE": "Speicher freigeben",
   "PDF_COLOR": "RGB(…) — gilt für Text, Striche und Flächen",
   "PDF_FONT": "Schrift und Größe",
+  "PDF_FONT_LOAD": "eine eigene TrueType-/OpenType-Schrift laden, danach unter name$ für PDF_FONT da",
   "PDF_LINE": "Linie zeichnen",
   "PDF_LINE_WIDTH": "Strichstärke",
   "PDF_NEW": "a3…a6, letter, legal; hoch/quer",
@@ -1241,7 +1242,7 @@
   "PDF_RECT_FILL": "Umriss / Fläche",
   "PDF_SAVE": "schreiben",
   "PDF_TEXT": "Text setzen",
-  "PDF_TEXT_WIDTH": "Breite in mm (siehe unten)",
+  "PDF_TEXT_WIDTH": "Breite in mm, in der aktuellen Schrift und Größe",
   "PDF_TITLE": "Titel in den Dokument-Angaben",
   "PHYS2D_ADD_BOX": "Rechteck (Halb-Extents), Restitution bounce 0..1",
   "PHYS2D_ADD_CIRCLE": "Kreis-Körper",

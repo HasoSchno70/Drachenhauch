@@ -3537,11 +3537,22 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "PDF_FONT")?;
                 let name = bi_str(a, 1, "PDF_FONT")?.to_string();
                 let gr = bi_num(a, 2, "PDF_FONT")?;
-                let idx = pdf::schrift_index(&name).ok_or_else(|| format!(
-                    "PDF_FONT: Schrift '{}' gibt es nicht. Ohne Einbetten stehen die \
-                     vierzehn Standardschriften zur Verfuegung: {}", name, pdf::schriftnamen()))?;
+                let d = self.pdf_d(i)?;
+                let idx = d.schrift_suchen(&name).map_err(|e| format!("PDF_FONT: {}", e))?;
                 if gr <= 0.0 { return Err(format!("PDF_FONT: Schriftgroesse {} ist nicht positiv", gr)); }
-                self.pdf_d(i)?.setze_schrift(idx, gr);
+                d.setze_schrift(idx, gr);
+                Value::Nil
+            }
+            // PDF_FONT_LOAD(p, pfad$, name$): eine eigene TrueType-/OpenType-
+            // Schrift, danach unter `name` fuer PDF_FONT da.
+            "pdf_font_load" => {
+                let i = bi_int(a, 0, "PDF_FONT_LOAD")?;
+                let pfad = bi_str(a, 1, "PDF_FONT_LOAD")?.to_string();
+                let name = bi_str(a, 2, "PDF_FONT_LOAD")?.to_string();
+                let daten = std::fs::read(&pfad)
+                    .map_err(|e| format!("PDF_FONT_LOAD: {}: {}", pfad, e))?;
+                self.pdf_d(i)?.schrift_laden(&name, daten)
+                    .map_err(|e| format!("PDF_FONT_LOAD: {}", e))?;
                 Value::Nil
             }
             "pdf_color" => {
@@ -3564,18 +3575,13 @@ impl<'p> Vm<'p> {
                 let i = bi_int(a, 0, "PDF_TEXT")?;
                 let (x, y) = (bi_num(a, 1, "PDF_TEXT")?, bi_num(a, 2, "PDF_TEXT")?);
                 let t = bi_str(a, 3, "PDF_TEXT")?.to_string();
-                self.pdf_d(i)?.text(x, y, &t)?;
+                self.pdf_d(i)?.text(x, y, &t).map_err(|e| format!("PDF_TEXT: {}", e))?;
                 Value::Nil
             }
             "pdf_text_width" => {
                 let i = bi_int(a, 0, "PDF_TEXT_WIDTH")?;
                 let t = bi_str(a, 1, "PDF_TEXT_WIDTH")?.to_string();
-                let d = self.pdf_d(i)?;
-                let (schrift, groesse) = (d.schrift_index(), d.groesse_pt);
-                match pdf::zeichenbreite(schrift, groesse, &t) {
-                    Ok(b) => Value::Float(b),
-                    Err(e) => return Err(e),
-                }
+                Value::Float(self.pdf_d(i)?.textbreite(&t).map_err(|e| format!("PDF_TEXT_WIDTH: {}", e))?)
             }
             "pdf_line" => {
                 let i = bi_int(a, 0, "PDF_LINE")?;
@@ -3595,7 +3601,7 @@ impl<'p> Vm<'p> {
             "pdf_save" => {
                 let i = bi_int(a, 0, "PDF_SAVE")?;
                 let pfad = bi_str(a, 1, "PDF_SAVE")?.to_string();
-                let bytes = self.pdf_d(i)?.bauen();
+                let bytes = self.pdf_d(i)?.bauen().map_err(|e| format!("PDF_SAVE: {}", e))?;
                 std::fs::write(&pfad, &bytes)
                     .map_err(|e| format!("PDF_SAVE: {}: {}", pfad, e))?;
                 Value::Nil
