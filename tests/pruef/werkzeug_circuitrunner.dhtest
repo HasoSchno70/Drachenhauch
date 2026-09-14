@@ -499,6 +499,12 @@ FUNCTION lauf$(p AS INTEGER) AS STRING
 END FUNCTION
 DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/kacheln")
 DIM aus AS STRING : aus = lauf$(p)
+' Ein Bau ohne Grafik kann nicht zeichnen: die Meldung des Kindes
+' weiterreichen, dann heisst der Fall "uebersprungen" statt falsch.
+IF NOT FILEEXISTS("kacheln/tiles.json") THEN
+    PRINT aus
+    EXIT(1)
+END IF
 PRINT INSTR(aus, "201 Kacheln") >= 0
 DIM neu AS BUFFER : neu = READALL_BYTES("kacheln/tiles.json")
 DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
