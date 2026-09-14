@@ -154,7 +154,7 @@ def test_kein_beispiel_meldet_einen_unbekannten_namen():
     Dateien mit null Treffern.
 
     Die Gegenprobe -- dass die Warnung ueberhaupt anschlaegt -- steht in
-    tests/test_check_unbekannte_namen.py; ohne sie waere ein stummgeschaltetes
+    tests/pruef/check_unbekannte_namen.dhtest; ohne sie waere ein stummgeschaltetes
     Feature hier ebenfalls gruen.
     """
     from drachenhauch.editor_qt import tempdateien

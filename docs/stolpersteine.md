@@ -301,7 +301,7 @@ Reflexionen/Mirror-Effekte.
 > `CONST` innerhalb einer SUB. Er ist deshalb inzwischen ein Test
 > (`tests/test_dhrt_check.py`), nicht mehr ein Aufruf von Hand.
 >
-> Tests: `tests/test_check_unbekannte_namen.py`, `tests/test_dhrt_check.py`.
+> Tests: `tests/pruef/check_unbekannte_namen.dhtest`, `tests/test_dhrt_check.py`.
 
 ---
 

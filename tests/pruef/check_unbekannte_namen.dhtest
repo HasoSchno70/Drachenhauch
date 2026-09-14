@@ -9,3 +9,1022 @@ PRINT "ok"
 --- erwartet
 ok
 
+=== ein tippfehler beim schreiben
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = ["Meintest du 'zaehler'?"]
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM zaehler AS INTEGER
+zaehlr = 1
+
+--- erwartet
+zeile 2 warning
+  Meintest du 'zaehler'?: TRUE
+befunde 1 rueckgabe 0
+
+=== ein tippfehler beim lesen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = ["Meintest du 'punkte'?"]
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM punkte AS INTEGER
+PRINT punke
+
+--- erwartet
+zeile 2 warning
+  Meintest du 'punkte'?: TRUE
+befunde 1 rueckgabe 0
+
+=== auch tief in einer sub
+' Der eigentliche Anlass: eine SUB, die nie aufgerufen wird.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB tuwas()
+    fehlt = TRUE
+END SUB
+PRINT "start"
+
+--- erwartet
+zeile 2 warning
+befunde 1 rueckgabe 0
+
+=== jeder name nur einmal
+' Ein falsch geschriebener Name in einer Schleife soll nicht zwanzig
+' Zeilen Ausgabe erzeugen.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM i AS INTEGER
+FOR i = 0 TO 9
+    PRINT summ
+NEXT
+
+--- erwartet
+zeile 3 warning
+befunde 1 rueckgabe 0
+
+=== auch das ziel von input
+' INPUT emittiert INPUT_NAME statt STORE_NAME und lief anfangs an der
+' Erfassung vorbei.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+INPUT punkte
+
+--- erwartet
+zeile 1 warning
+befunde 1 rueckgabe 0
+
+=== auch das ziel von read
+' READ geht nicht ueber store_var (Zwischenspeicher fuer Feld- und Index-Ziele).
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DATA 1, 2
+DIM ok AS INTEGER
+READ ok, punte
+
+--- erwartet
+zeile 3 warning
+befunde 1 rueckgabe 0
+
+=== vorbelegte konstanten sind keine befunde
+' Farben, Tasten, PI und TAU laufen ueber denselben Weg wie ein unbekannter Name --
+' ohne die Ausnahme waere jedes KEYHIT(KEY_SPACE) ein Befund.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM f AS INTEGER
+f = RED
+PRINT PI + TAU
+IF KEYHIT(KEY_SPACE) OR KEYHIT(KEY_LSHIFT) THEN PRINT WHITE
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== dim mit groesse zaehlt als deklaration
+' DIM x[N] AS T laeuft im Compiler ueber einen eigenen Zweig -- die erste Fassung
+' uebersah ihn (243 Falschmeldungen ueber die Beispiele).
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+CONST N = 4
+DIM feld[N] AS INTEGER
+DIM gitter[N, N] AS STRING
+feld[0] = 1
+gitter[0, 0] = "x"
+PRINT feld[0]; gitter[0, 0]
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== alle dim formen zaehlen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM a AS ARRAY OF INTEGER
+DIM m AS MAP OF STRING
+DIM t AS TUPLE
+DIM s AS STRING
+a = [1, 2]
+MAPPUT(m, "k", "v")
+t = (1, 2)
+s = "x"
+PRINT LEN(a); MAPGET(m, "k"); s
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== parameter und lokale zaehlen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+FUNCTION doppelt(wert AS INTEGER) AS INTEGER
+    DIM h AS INTEGER : h = wert * 2
+    RETURN h
+END FUNCTION
+PRINT doppelt(3)
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== schleifen und catch variablen zaehlen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+FOR i = 0 TO 2
+    PRINT i
+NEXT
+FOR EACH w IN (1, 2)
+    PRINT w
+NEXT
+TRY
+    THROW "x"
+CATCH e
+    PRINT e
+END TRY
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== klassen felder und self zaehlen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+CLASS Held
+    DIM hp AS INTEGER
+    SUB Init()
+        Self.hp = 10
+    END SUB
+    FUNCTION lebt() AS BOOLEAN
+        RETURN hp > 0
+    END FUNCTION
+END CLASS
+DIM h AS Held
+h = NEW Held()
+PRINT h.lebt()
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== ein enum und seine mitglieder zaehlen
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+ENUM Zustand = RUHT, LAEUFT
+DIM z AS Zustand
+z = Zustand.LAEUFT
+PRINT z
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== eine funktion als funcref ist kein befund
+' Ein blosser Funktionsname in Ausdrucks-Position ist eine FUNCREF.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+FUNCTION quadrat(x AS INTEGER) AS INTEGER
+    RETURN x * x
+END FUNCTION
+DIM f AS FUNCREF
+f = quadrat
+PRINT f(4)
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== ein spaeteres dim zaehlt auch
+' Geprueft wird ERST am Ende -- in einer SUB, die oben steht, ist ein spaeteres DIM
+' der Normalfall.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB zeig()
+    PRINT spaeter
+END SUB
+DIM spaeter AS STRING
+spaeter = "da"
+zeig()
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== ein name aus einer anderen funktion ist ein befund
+' hilf ist in b nicht sichtbar. Die Meldung sagt ausdruecklich, dass es den Namen
+' GIBT -- sonst sucht man einen Tippfehler, den es nicht gibt.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = ["nicht sichtbar", "nirgends im Programm"]
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB a()
+    DIM hilf AS INTEGER : hilf = 1
+    PRINT hilf
+END SUB
+SUB b()
+    PRINT hilf
+END SUB
+a()
+
+--- erwartet
+zeile 6 warning
+  nicht sichtbar: TRUE
+  nirgends im Programm: FALSE
+befunde 1 rueckgabe 0
+
+=== dasselbe zwischen zwei methoden
+' Jede Methode ist ein eigener Bereich.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = ["nicht sichtbar"]
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+CLASS K
+    SUB eins()
+        DIM merk AS INTEGER
+        merk = 1
+    END SUB
+    SUB zwei()
+        PRINT merk
+    END SUB
+END CLASS
+DIM k AS K
+k = NEW K()
+k.eins()
+
+--- erwartet
+zeile 7 warning
+  nicht sichtbar: TRUE
+befunde 1 rueckgabe 0
+
+=== der vorschlag kennt die eigenen lokalen
+' Gegenprobe zur Bereichs-Trennung: ein Tippfehler auf eine LOKALE Variable
+' muss sie weiterhin vorschlagen.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = ["Meintest du 'zaehler'?"]
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB a()
+    DIM zaehler AS INTEGER
+    zaehlr = 1
+END SUB
+PRINT 1
+
+--- erwartet
+zeile 3 warning
+  Meintest du 'zaehler'?: TRUE
+befunde 1 rueckgabe 0
+
+=== input und read auf deklarierte namen schweigen
+' Gegenprobe zu den INPUT-/READ-Faellen.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+DIM punkte AS INTEGER
+INPUT punkte
+DATA 1
+READ punkte
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== ein globales dim ist in jeder funktion sichtbar
+' Was oben deklariert ist, gilt ueberall -- auch in einer SUB darueber und auch
+' wenn das DIM in einem IF-Block sitzt.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB zeige()
+    PRINT punkte + bonus
+END SUB
+DIM punkte AS INTEGER
+IF TRUE THEN
+    DIM bonus AS INTEGER
+END IF
+zeige()
+
+--- erwartet
+befunde 0 rueckgabe 0
+
+=== ein spaeteres dim in derselben funktion schweigt
+' Bewusst still: das Netz unter der Bereichs-Trennung, weil der Compiler linear
+' uebersetzt.
+' (Bis Stufe 47 in test_check_unbekannte_namen.py.)
+DIM such AS ARRAY OF STRING : such = []
+IMPORT "json"
+' dhrt --check als Kind; gezaehlt werden nur die Befunde mit dem Satz, den BEIDE
+' Fassungen der Warnung tragen (sonst uebersaehe die Messung die halbe Warnung).
+CONST MARKE = "Beim Laufen bricht diese Zeile ab"
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "--check", "s.dh")
+DIM roh AS STRING : roh = TRIM$(lesen$(pc))
+IF roh = "" THEN roh = "[]"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{" + CHR$(34) + "b" + CHR$(34) + ":" + roh + "}")
+DIM n AS INTEGER : n = 0
+DIM i AS INTEGER
+DIM k AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "b") - 1
+    DIM msg AS STRING : msg = JSON_GET_STRING(h, "b." + STR$(i) + ".message")
+    IF INSTR(msg, MARKE) >= 0 THEN
+        n = n + 1
+        PRINT "zeile "; JSON_GET_INT(h, "b." + STR$(i) + ".line"); " "; JSON_GET_STRING(h, "b." + STR$(i) + ".severity")
+        FOR k = 0 TO LEN(such) - 1
+            PRINT "  "; such[k]; ": "; INSTR(msg, such[k]) >= 0
+        NEXT
+    END IF
+NEXT
+PRINT "befunde "; n; " rueckgabe "; PROCESS_CODE(pc)
+--- datei s.dh
+SUB a()
+    t = 1
+    DIM t AS INTEGER
+END SUB
+PRINT 1
+
+--- erwartet
+befunde 0 rueckgabe 0
