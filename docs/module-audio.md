@@ -711,7 +711,7 @@ END IF
 
 [examples/114_chiptune.dh](../examples/114_chiptune.dh) — **4-Kanal-Chiptune-Demo im C64/Amiga-Stil**: ein komplettes Musikstueck ohne Audio-Dateien. Lead (Square + Vibrato via `AUDIO_SFX`, rechts gepannt), Akkord-Arpeggio (links), Square-Bass und Drums (Kick = Sinus-Pitch-Drop, Snare/HiHat = `AUDIO_NOISE`) laufen parallel auf dem Mixer; ein frame-basierter Pattern-Player (wie der dhtracker-Export) spielt alle 125 ms eine Reihe. Dazu VU-Meter pro Kanal, echtes `AUDIO_FFT`-Spektrum und Sinus-Scroller.
 
-[examples/115_modplayer.dh](../examples/115_modplayer.dh) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
+[examples/115_modplayer.dh](../examples/115_modplayer.dh) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.dh`).
 
 [examples/190_tracker.dh](../examples/190_tracker.dh) — **der Tracker in Drachenhauch**: Noten aus `AUDIO_NOTE`, Wiedergabe über `AUDIO_CLOCK`/`AUDIO_PLAY_AT` (zwei Reihen voraus geplant, gestoppt wird durch Entfernen der Uhr), WAV-Export über `AUDIO_SOUND_NEW/MIX/NORMALIZE`.
 

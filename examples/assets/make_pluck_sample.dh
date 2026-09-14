@@ -1,0 +1,150 @@
+' Erzeugt ein kurzes, frei verwendbares Pluck-/Saiten-Sample (WAV) fuer die
+' SAMPLE_PLAY-Demo examples/116_sampler.dh.
+'
+' Karplus-Strong-aehnlicher Zupf-Klang bei ~220 Hz (A3), das in der Demo per
+' SAMPLE_PLAY ueber die ganze Klaviatur resampled wird (Amiga/Paula-Prinzip:
+' hoehere Note = schneller abgespielt). Selbst generiert -> gemeinfrei.
+'
+'     dhrt run examples/assets/make_pluck_sample.dh [-- zieldatei]
+'
+' Ergebnis: examples/assets/pluck.wav -- Byte fuer Byte dieselbe Datei, die bis
+' 2026-09-14 make_pluck_sample.py geschrieben hat. Dafuer steht unten Pythons
+' Zufallsgenerator (Mersenne Twister, random.seed(42) und random.random())
+' nachgebaut: mit RND kaeme ein anderes Rauschen und damit eine andere Datei.
+
+DIM ziel AS STRING : ziel = CWD$() + "/pluck.wav"
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
+    IF NOT (LEFT$(ziel, 1) = "/" OR LEFT$(ziel, 1) = CHR$(92) OR MID$(ziel, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ziel = GETENV$("DHRT_START_DIR") + "/" + ziel
+END IF
+
+' ----- Mersenne Twister (MT19937) wie in CPython --------------------------
+CONST MT_N = 624
+CONST MT_M = 397
+DIM mt[624] AS INTEGER
+DIM mti AS INTEGER : mti = MT_N + 1
+
+SUB mtStart(s AS INTEGER)
+    mt[0] = s BAND &HFFFFFFFF
+    DIM i AS INTEGER
+    FOR i = 1 TO MT_N - 1
+        mt[i] = (1812433253 * (mt[i - 1] BXOR (mt[i - 1] SHR 30)) + i) BAND &HFFFFFFFF
+    NEXT
+    mti = MT_N
+END SUB
+
+SUB mtSaat(schluessel AS INTEGER)
+    ' random.seed(n) fuer eine kleine ganze Zahl: init_by_array mit [n]
+    mtStart(19650218)
+    DIM i AS INTEGER : i = 1
+    DIM k AS INTEGER
+    FOR k = 1 TO MT_N
+        mt[i] = ((mt[i] BXOR ((mt[i - 1] BXOR (mt[i - 1] SHR 30)) * 1664525)) + schluessel) BAND &HFFFFFFFF
+        i = i + 1
+        IF i >= MT_N THEN
+            mt[0] = mt[MT_N - 1]
+            i = 1
+        END IF
+    NEXT
+    FOR k = 1 TO MT_N - 1
+        mt[i] = ((mt[i] BXOR ((mt[i - 1] BXOR (mt[i - 1] SHR 30)) * 1566083941)) - i) BAND &HFFFFFFFF
+        i = i + 1
+        IF i >= MT_N THEN
+            mt[0] = mt[MT_N - 1]
+            i = 1
+        END IF
+    NEXT
+    mt[0] = &H80000000
+END SUB
+
+FUNCTION mtWort() AS INTEGER
+    DIM y AS INTEGER
+    IF mti >= MT_N THEN
+        DIM kk AS INTEGER
+        FOR kk = 0 TO MT_N - 1
+            y = (mt[kk] BAND &H80000000) BOR (mt[(kk + 1) MOD MT_N] BAND &H7FFFFFFF)
+            mt[kk] = mt[(kk + MT_M) MOD MT_N] BXOR (y SHR 1)
+            IF (y BAND 1) = 1 THEN mt[kk] = mt[kk] BXOR &H9908B0DF
+        NEXT
+        mti = 0
+    END IF
+    y = mt[mti]
+    mti = mti + 1
+    y = y BXOR (y SHR 11)
+    y = y BXOR ((y SHL 7) BAND &H9D2C5680)
+    y = y BXOR ((y SHL 15) BAND &HEFC60000)
+    y = y BXOR (y SHR 18)
+    RETURN y
+END FUNCTION
+
+FUNCTION zufall() AS FLOAT
+    ' random.random(): 53 Bit aus zwei 32-Bit-Worten
+    DIM a AS INTEGER : a = mtWort() SHR 5
+    DIM b AS INTEGER : b = mtWort() SHR 6
+    RETURN (a * 67108864.0 + b) * (1.0 / 9007199254740992.0)
+END FUNCTION
+
+FUNCTION ganz(x AS FLOAT) AS INTEGER
+    ' Pythons int(): Richtung null, nicht abrunden
+    IF x < 0 THEN RETURN -INT(-x)
+    RETURN INT(x)
+END FUNCTION
+
+' ----- Klang -------------------------------------------------------------
+CONST SR = 22050
+DIM n AS INTEGER : n = ganz(SR * 0.5)
+DIM periode AS INTEGER : periode = ganz(SR / 220.0)
+
+' Karplus-Strong: Rausch-Burst in einen Ringpuffer, dann gleitender Mittelwert.
+mtSaat(42)
+DIM ring[periode] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO periode - 1
+    ring[i] = -1.0 + (1.0 - -1.0) * zufall()
+NEXT
+DIM klang[n] AS FLOAT
+DIM idx AS INTEGER : idx = 0
+FOR i = 0 TO n - 1
+    DIM cur AS FLOAT : cur = ring[idx]
+    DIM nxt AS FLOAT : nxt = ring[(idx + 1) MOD periode]
+    DIM wert AS FLOAT : wert = 0.4 * cur + 0.6 * nxt   ' einfacher Tiefpass
+    wert = wert * 0.999                                ' leichte Daempfung
+    ring[idx] = wert
+    klang[i] = cur
+    idx = (idx + 1) MOD periode
+NEXT
+
+' Global ausklingen lassen (Huellkurve)
+FOR i = 0 TO n - 1
+    DIM env AS FLOAT : env = MIN(1.0, i / (SR * 0.005))   ' 5 ms Attack
+    env = env * EXP(-3.0 * i / n)                          ' exponentieller Decay
+    klang[i] = klang[i] * env
+NEXT
+
+DIM spitze AS FLOAT : spitze = 0.0
+FOR i = 0 TO n - 1
+    IF ABS(klang[i]) > spitze THEN spitze = ABS(klang[i])
+NEXT
+spitze = MAX(0.000001, spitze)
+
+' ----- WAV (PCM, mono, 16 Bit) -------------------------------------------
+DIM puffer AS BUFFER : puffer = BUFFER_NEW(44 + 2 * n)
+BUFFER_SET(puffer, 0, ASC("R")) : BUFFER_SET(puffer, 1, ASC("I")) : BUFFER_SET(puffer, 2, ASC("F")) : BUFFER_SET(puffer, 3, ASC("F"))
+BUFFER_SET_U32(puffer, 4, 36 + 2 * n)
+BUFFER_SET(puffer, 8, ASC("W")) : BUFFER_SET(puffer, 9, ASC("A")) : BUFFER_SET(puffer, 10, ASC("V")) : BUFFER_SET(puffer, 11, ASC("E"))
+BUFFER_SET(puffer, 12, ASC("f")) : BUFFER_SET(puffer, 13, ASC("m")) : BUFFER_SET(puffer, 14, ASC("t")) : BUFFER_SET(puffer, 15, ASC(" "))
+BUFFER_SET_U32(puffer, 16, 16)
+BUFFER_SET_U16(puffer, 20, 1)              ' PCM
+BUFFER_SET_U16(puffer, 22, 1)              ' mono
+BUFFER_SET_U32(puffer, 24, SR)
+BUFFER_SET_U32(puffer, 28, SR * 2)
+BUFFER_SET_U16(puffer, 32, 2)
+BUFFER_SET_U16(puffer, 34, 16)
+BUFFER_SET(puffer, 36, ASC("d")) : BUFFER_SET(puffer, 37, ASC("a")) : BUFFER_SET(puffer, 38, ASC("t")) : BUFFER_SET(puffer, 39, ASC("a"))
+BUFFER_SET_U32(puffer, 40, 2 * n)
+FOR i = 0 TO n - 1
+    DIM v AS FLOAT : v = klang[i] / spitze * 0.85
+    BUFFER_SET_I16(puffer, 44 + 2 * i, ganz(MAX(-1.0, MIN(1.0, v)) * 32767))
+NEXT
+WRITEALL_BYTES(ziel, puffer)
+PRINT "pluck.wav: " + STR$(n) + " Frames @ " + STR$(SR) + " Hz, Grundton 220.0 Hz"

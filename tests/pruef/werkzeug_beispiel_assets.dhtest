@@ -1,0 +1,70 @@
+' Die Asset-Erzeuger der Beispiele (bis 2026-09-14 je ein .py): was sie
+' schreiben, ist Byte fuer Byte die eingecheckte Datei.
+
+=== demo-mod ist das eingecheckte
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/demo.mod")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("demo.mod")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../examples/assets/make_demo_mod.dh
+{sammlung}/../../examples/assets/demo.mod
+--- erwartet
+demo.mod geschrieben: 3876 Bytes, 2 Patterns, Order [0, 1, 0, 1]
+rueckgabe 0
+TRUE
+
+=== zupf-sample ist das eingecheckte
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/pluck.wav")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("pluck.wav")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../examples/assets/make_pluck_sample.dh
+{sammlung}/../../examples/assets/pluck.wav
+--- erwartet
+pluck.wav: 11025 Frames @ 22050 Hz, Grundton 220.0 Hz
+rueckgabe 0
+TRUE
