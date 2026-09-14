@@ -210,7 +210,7 @@ ersetzt der geteilte Helfer `http_antwort` den vorher viermal wortgleichen
 Block; mit `HTTP_BYTES` kam eine fünfte Sache dazu, die jeder Pfad tun muss.
 `Abrufe::start` nimmt jetzt eine `Anfrage` statt nur einer URL.
 
-Tests: `tests/test_http_request.py` (33, gegen einen lokalen Spiegel-Server,
+Tests: `tests/pruef/http_request.dhtest` (gegen einen Spiegel-Server in Drachenhauch,
 der zurückmeldet was ankam — am Rückgabewert allein sähe man nicht, ob eine
 Kopfzeile rausging). Beispiel: `examples/163_rest_api.dh` gegen httpbin.org.
 Doku: `docs/module-html.md`.

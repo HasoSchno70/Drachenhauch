@@ -123,3 +123,475 @@ PRINT HTML_GET_ATTR("<a title=""A &amp; B"">link</a>", "title")
 --- erwartet
 A & B
 
+=== http get returns body
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("routen", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+PRINT HTTP_GET(basis + "/hello")
+PRINT HTTP_STATUS()
+PRINT HTTP_HEADER("X-Demo")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+Hello world
+200
+yes
+
+=== http get 404 raises with status set
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("routen", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+TRY
+    PRINT HTTP_GET(basis + "/nope")
+CATCH e
+    PRINT "fehler: "; e
+END TRY
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- enthaelt
+fehler: HTTP 404
+
+=== http post sends body
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("routen", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+PRINT HTTP_POST(basis + "/echo", "name=Anna&age=30")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+echo: name=Anna&age=30
+
+=== http download writes file
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("routen", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+PRINT HTTP_DOWNLOAD(basis + "/file", "dl.bin")
+PRINT BUFFER_TO_HEX$(READALL_BYTES("dl.bin"))
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+7
+00010274657374
+
+=== http get truncated body raises instead of returning partial
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("abbruch", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+TRY
+    PRINT HTTP_GET(basis + "/x")
+CATCH e
+    PRINT "fehler: "; e
+END TRY
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- enthaelt
+fehler: HTTP-Fehler beim Lesen des Response-Body
+
+=== http download truncated body raises and removes partial file
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("abbruch", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+TRY
+    HTTP_DOWNLOAD(basis + "/x", "dl.bin")
+CATCH e
+    PRINT "fehler: "; e
+END TRY
+PRINT "datei da "; FILEEXISTS("dl.bin")
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- enthaelt
+fehler: HTTP_DOWNLOAD: Verbindung beim Lesen abgebrochen
+datei da FALSE
+
+=== http get start blockiert nicht
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM h AS INTEGER : h = HTTP_GET_START(basis + "/x")
+DIM runden AS INTEGER : runden = 0
+WHILE NOT HTTP_READY(h)
+    runden = runden + 1
+WEND
+PRINT HTTP_RESULT(h)
+PRINT HTTP_STATUS()
+PRINT HTTP_HEADER("X-Demo")
+PRINT runden > 100
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+spaet aber da
+200
+async
+TRUE
+
+=== http ready darf mehrfach gefragt werden
+' Ein Programm fragt pro Bild nach -- nach dem ersten True darf die
+' Antwort nicht verbraucht sein.
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM h AS INTEGER : h = HTTP_GET_START(basis + "/x")
+WHILE NOT HTTP_READY(h) : WEND
+PRINT HTTP_READY(h)
+PRINT HTTP_READY(h)
+PRINT HTTP_RESULT(h)
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+TRUE
+spaet aber da
+
+=== zwei abrufe laufen gleichzeitig
+' Zwei Abrufe zu je 0,3 s zusammen deutlich unter 0,6 s -- sonst haetten
+' sie nacheinander gewartet.
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM a AS INTEGER : a = HTTP_GET_START(basis + "/a")
+DIM b AS INTEGER : b = HTTP_GET_START(basis + "/b")
+PRINT HTTP_PENDING()
+WHILE HTTP_PENDING() > 0
+    IF HTTP_READY(a) THEN PRINT "a: " + HTTP_RESULT(a)
+    IF HTTP_READY(b) THEN PRINT "b: " + HTTP_RESULT(b)
+WEND
+PRINT MILLIS() - t0 < 550
+PRINT HTTP_PENDING()
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- enthaelt
+2
+a: spaet aber da
+b: spaet aber da
+TRUE
+0
+
+=== http result vor ready meldet klartext
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+TRY
+    DIM h AS INTEGER : h = HTTP_GET_START(basis + "/x")
+    PRINT HTTP_RESULT(h)
+CATCH e
+    PRINT "fehler: "; e
+END TRY
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+fehler: HTTP_RESULT: Abruf 0 ist nicht fertig (oder schon abgeholt) -- erst HTTP_READY(0) abfragen
+
+=== http cancel gibt platz frei
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM h AS INTEGER : h = HTTP_GET_START(basis + "/x")
+PRINT HTTP_URL$(h) = basis + "/x"
+HTTP_CANCEL(h)
+PRINT HTTP_PENDING()
+PRINT HTTP_READY(h)
+HTTP_CANCEL(h)
+PRINT "ende"
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+0
+FALSE
+ende
+
+=== nummern werden nicht neu vergeben
+' Nach dem Abholen darf die Nummer nicht an einen neuen Abruf gehen --
+' sonst holt ein Programm die Antwort eines fremden Abrufs ab.
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("langsam", "300", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+DIM a AS INTEGER : a = HTTP_GET_START(basis + "/a")
+WHILE NOT HTTP_READY(a) : WEND
+DIM weg AS STRING : weg = HTTP_RESULT(a)
+DIM b AS INTEGER : b = HTTP_GET_START(basis + "/b")
+PRINT a <> b
+HTTP_CANCEL(b)
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- erwartet
+TRUE
+
+=== fehler kommt erst beim abholen
+' Ein 404 laesst HTTP_GET_START durchgehen -- gemeldet wird beim
+' Abholen, dort wo das Programm damit umgehen kann.
+' Gegenserver: tests/pruef/_hilfen/gegenserver.dh (Bis Stufe 48 in test_modules_html.py.)
+IMPORT "html"
+FUNCTION starten$(modus AS STRING, verz AS STRING, schl AS STRING) AS STRING
+    ' Gegenserver als Kind: ARG$(0) ist sein Pfad, er schreibt seinen Port in
+    ' diesen Ordner. Rueckgabe "basis|prozess".
+    DIM portdatei AS STRING : portdatei = CWD$() + "/port.txt"
+    IF FILEEXISTS(portdatei) THEN DELETEFILE(portdatei)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", modus, verz, schl, portdatei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS(portdatei) THEN
+            DIM z AS ARRAY OF STRING : z = READLINES(portdatei)
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN "http://127.0.0.1:" + TRIM$(z[0]) + "|" + STR$(p)
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN "|" + STR$(p)
+END FUNCTION
+DIM srv AS ARRAY OF STRING : srv = SPLIT$(starten$("routen", "0", "-"), "|")
+DIM basis AS STRING : basis = srv[0]
+TRY
+    DIM h AS INTEGER : h = HTTP_GET_START(basis + "/nope")
+    WHILE NOT HTTP_READY(h) : WEND
+    PRINT HTTP_RESULT(h)
+CATCH e
+    PRINT "fehler: "; e
+END TRY
+PROCESS_KILL(VAL(srv[1]))
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+--- enthaelt
+fehler: HTTP 404

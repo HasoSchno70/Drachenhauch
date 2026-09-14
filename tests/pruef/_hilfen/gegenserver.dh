@@ -1,0 +1,217 @@
+' Ein HTTP-Gegenserver fuer Pruefungen, in Drachenhauch.
+' Aufruf: dhrt run gegenserver.dh -- MODUS VERZOEGERUNG_MS API_SCHLUESSEL PORTDATEI
+' (Schluessel "-" = keiner). Er lauscht auf einem freien Port und schreibt ihn in
+' die Portdatei; nach 30 s ohne neue Verbindung beendet er sich selbst -- ein
+' Pruefprogramm, das mit einem Fehler abbricht, kann ihn nicht mehr beenden. Mehrere
+' Verbindungen gleichzeitig (eine langsame Antwort haelt die naechste nicht auf).
+' Rumpf und Antwort laufen als Bytes (NET_RECV_BYTES / NET_SEND mit BUFFER).
+'   routen   GET /hello, GET /file, POST /echo, sonst 404
+'   abbruch  verspricht 1000000 Bytes und schliesst nach ein paar
+'   langsam  antwortet nach der Verzoegerung mit "spaet aber da"
+'   echo     spiegelt Methode, Pfad, Kopfzeilen und Rumpf als JSON; /rohe-bytes
+'   cloud    der REST-Vertrag von cloudserver/server.py (Speicherstaende, Bestenliste)
+IMPORT "net"
+IMPORT "json"
+
+DIM modus AS STRING : modus = ARG$(0)
+DIM verzoegerung AS INTEGER : verzoegerung = 0
+DIM schluessel AS STRING : schluessel = ""
+IF ARGC() > 1 THEN verzoegerung = VAL(ARG$(1))
+IF ARGC() > 2 THEN schluessel = ARG$(2)
+IF schluessel = "-" THEN schluessel = ""
+DIM portdatei AS STRING : portdatei = "port.txt"
+IF ARGC() > 3 THEN portdatei = ARG$(3)
+DIM CRLF AS STRING : CRLF = CHR$(13) + CHR$(10)
+DIM trenner AS BUFFER : trenner = BUFFER_FROM_STRING(CRLF + CRLF)
+
+DIM saves AS MAP OF STRING
+DIM scores AS MAP OF FLOAT
+
+FUNCTION kopf$(kopfteil AS STRING, name AS STRING) AS STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(kopfteil, CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = TRIM$(zeilen[i])
+        DIM p AS INTEGER : p = INSTR(z, ":")
+        IF p > 0 THEN
+            IF LOWER$(LEFT$(z, p)) = LOWER$(name) THEN RETURN TRIM$(MID$(z, p + 1, LEN(z)))
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB senden(c AS NET_SOCKET, code AS INTEGER, extra AS STRING, koerper AS BUFFER)
+    NET_SEND(c, "HTTP/1.1 " + STR$(code) + " X" + CRLF + extra + "Content-Length: " + STR$(BUFFER_LEN(koerper)) + CRLF + "Connection: close" + CRLF + CRLF)
+    IF BUFFER_LEN(koerper) > 0 THEN NET_SEND(c, koerper)
+    SLEEP(20)
+    NET_CLOSE(c)
+END SUB
+
+SUB sendenText(c AS NET_SOCKET, code AS INTEGER, extra AS STRING, text AS STRING)
+    senden(c, code, extra, BUFFER_FROM_STRING(text))
+END SUB
+
+FUNCTION abfrage$(query AS STRING, name AS STRING, vorgabe AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(query, "&")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF LEFT$(teile[i], LEN(name) + 1) = name + "=" THEN RETURN MID$(teile[i], LEN(name) + 1, LEN(teile[i]))
+    NEXT
+    RETURN vorgabe
+END FUNCTION
+
+SUB cloud(c AS NET_SOCKET, methode AS STRING, pfad AS STRING, query AS STRING, kopfteil AS STRING, rumpf AS BUFFER)
+    DIM json AS STRING : json = "Content-Type: application/json" + CRLF
+    IF schluessel <> "" AND kopf$(kopfteil, "X-Api-Key") <> schluessel THEN
+        sendenText(c, 401, json, "{" + CHR$(34) + "error" + CHR$(34) + ": " + CHR$(34) + "unauthorized" + CHR$(34) + "}")
+        RETURN
+    END IF
+    DIM roh AS ARRAY OF STRING : roh = SPLIT$(pfad, "/")
+    DIM t AS ARRAY OF STRING : t = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(roh) - 1
+        IF roh[i] <> "" THEN ARRAY_PUSH(t, roh[i])
+    NEXT
+    DIM antwort AS JSON_HANDLE : antwort = JSON_NEW_OBJECT()
+    IF LEN(t) = 2 AND t[0] = "save" AND methode = "GET" THEN
+        IF NOT MAPHAS(saves, t[1]) THEN
+            sendenText(c, 404, json, "{" + CHR$(34) + "error" + CHR$(34) + ": " + CHR$(34) + "not_found" + CHR$(34) + "}")
+            RETURN
+        END IF
+        JSON_SET_STRING(antwort, "data", MAPGET(saves, t[1]))
+        JSON_SET_INT(antwort, "updated_at", 0)
+        sendenText(c, 200, json, JSON_STRINGIFY(antwort))
+    ELSEIF LEN(t) = 2 AND t[0] = "save" AND methode = "POST" THEN
+        DIM b AS JSON_HANDLE : b = JSON_PARSE(BUFFER_TO_STRING$(rumpf))
+        MAPPUT(saves, t[1], JSON_GET_STRING(b, "data"))
+        JSON_SET_BOOL(antwort, "ok", TRUE)
+        sendenText(c, 200, json, JSON_STRINGIFY(antwort))
+    ELSEIF LEN(t) = 3 AND t[0] = "leaderboard" AND t[2] = "submit" THEN
+        DIM s AS JSON_HANDLE : s = JSON_PARSE(BUFFER_TO_STRING$(rumpf))
+        DIM name AS STRING : name = JSON_GET_STRING(s, "name")
+        DIM wert AS FLOAT : wert = JSON_GET_FLOAT(s, "score")
+        DIM best AS STRING : best = "high"
+        IF JSON_HAS(s, "best") THEN best = JSON_GET_STRING(s, "best")
+        DIM k AS STRING : k = t[1] + "|" + name
+        DIM besser AS BOOLEAN : besser = NOT MAPHAS(scores, k)
+        IF NOT besser THEN
+            IF best = "high" THEN besser = wert > MAPGET(scores, k) ELSE besser = wert < MAPGET(scores, k)
+        END IF
+        IF besser THEN MAPPUT(scores, k, wert)
+        JSON_SET_BOOL(antwort, "ok", TRUE)
+        JSON_SET_BOOL(antwort, "updated", besser)
+        sendenText(c, 200, json, JSON_STRINGIFY(antwort))
+    ELSEIF LEN(t) = 3 AND t[0] = "leaderboard" AND t[2] = "top" THEN
+        DIM n AS INTEGER : n = VAL(abfrage$(query, "n", "10"))
+        DIM absteigend AS BOOLEAN : absteigend = abfrage$(query, "order", "desc") = "desc"
+        DIM namen AS ARRAY OF STRING : namen = []
+        DIM werte AS ARRAY OF FLOAT : werte = []
+        DIM alle AS ARRAY OF STRING : alle = MAPKEYS(scores)
+        FOR i = 0 TO LEN(alle) - 1
+            IF LEFT$(alle[i], LEN(t[1]) + 1) = t[1] + "|" THEN
+                ARRAY_PUSH(namen, MID$(alle[i], LEN(t[1]) + 1, LEN(alle[i])))
+                ARRAY_PUSH(werte, MAPGET(scores, alle[i]))
+            END IF
+        NEXT
+        ' Auswahl sortieren
+        DIM a AS INTEGER
+        DIM z AS INTEGER
+        FOR a = 0 TO LEN(namen) - 1
+            FOR z = a + 1 TO LEN(namen) - 1
+                DIM tauschen AS BOOLEAN
+                IF absteigend THEN tauschen = werte[z] > werte[a] ELSE tauschen = werte[z] < werte[a]
+                IF tauschen THEN
+                    DIM hw AS FLOAT : hw = werte[a] : werte[a] = werte[z] : werte[z] = hw
+                    DIM hn AS STRING : hn = namen[a] : namen[a] = namen[z] : namen[z] = hn
+                END IF
+            NEXT
+        NEXT
+        DIM text AS STRING : text = "{" + CHR$(34) + "entries" + CHR$(34) + ": ["
+        FOR i = 0 TO MIN(n, LEN(namen)) - 1
+            IF i > 0 THEN text = text + ", "
+            text = text + "{" + CHR$(34) + "name" + CHR$(34) + ": " + CHR$(34) + namen[i] + CHR$(34) + ", " + CHR$(34) + "score" + CHR$(34) + ": " + STR$(werte[i]) + "}"
+        NEXT
+        sendenText(c, 200, json, text + "]}")
+    ELSE
+        sendenText(c, 404, json, "{" + CHR$(34) + "error" + CHR$(34) + ": " + CHR$(34) + "not_found" + CHR$(34) + "}")
+    END IF
+END SUB
+
+SUB antworten(c AS NET_SOCKET, kopfteil AS STRING, rumpf AS BUFFER)
+    DIM erste AS ARRAY OF STRING : erste = SPLIT$(LEFT$(kopfteil, INSTR(kopfteil, CHR$(13))), " ")
+    DIM methode AS STRING : methode = erste[0]
+    DIM ziel AS STRING : ziel = erste[1]
+    DIM pfad AS STRING : pfad = ziel
+    DIM query AS STRING : query = ""
+    IF INSTR(ziel, "?") >= 0 THEN
+        pfad = LEFT$(ziel, INSTR(ziel, "?"))
+        query = MID$(ziel, INSTR(ziel, "?") + 1, LEN(ziel))
+    END IF
+    IF modus = "routen" THEN
+        IF methode = "GET" AND pfad = "/hello" THEN
+            sendenText(c, 200, "X-Demo: yes" + CRLF, "Hello world")
+        ELSEIF methode = "GET" AND pfad = "/file" THEN
+            senden(c, 200, "", BUFFER_CONCAT(BUFFER_FROM_HEX("000102"), BUFFER_FROM_STRING("test")))
+        ELSEIF methode = "POST" AND pfad = "/echo" THEN
+            sendenText(c, 200, "", "echo: " + BUFFER_TO_STRING$(rumpf))
+        ELSE
+            senden(c, 404, "", BUFFER_NEW(0))
+        END IF
+    ELSEIF modus = "abbruch" THEN
+        NET_SEND(c, "HTTP/1.1 200 OK" + CRLF + "Content-Length: 1000000" + CRLF + CRLF + "nur ein paar bytes")
+        SLEEP(50)
+        NET_CLOSE(c)
+    ELSEIF modus = "langsam" THEN
+        sendenText(c, 200, "X-Demo: async" + CRLF, "spaet aber da")
+    ELSEIF modus = "echo" THEN
+        IF pfad = "/rohe-bytes" THEN
+            senden(c, 200, "Content-Type: application/octet-stream" + CRLF, BUFFER_FROM_HEX("00fffe0a"))
+        ELSE
+            DIM o AS JSON_HANDLE : o = JSON_NEW_OBJECT()
+            JSON_SET_STRING(o, "methode", methode)
+            JSON_SET_STRING(o, "pfad", ziel)
+            JSON_SET_STRING(o, "auth", kopf$(kopfteil, "Authorization"))
+            JSON_SET_STRING(o, "ctype", kopf$(kopfteil, "Content-Type"))
+            JSON_SET_STRING(o, "eigen", kopf$(kopfteil, "X-Eigen"))
+            JSON_SET_STRING(o, "rumpf_hex", BUFFER_TO_HEX$(rumpf))
+            sendenText(c, 200, "Content-Type: application/json" + CRLF, JSON_STRINGIFY(o))
+        END IF
+    ELSEIF modus = "cloud" THEN
+        cloud(c, methode, pfad, query, kopfteil, rumpf)
+    END IF
+END SUB
+
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+WRITEALL(portdatei, STR$(NET_LISTENER_PORT(lst)))
+DIM letzte AS INTEGER : letzte = MILLIS()
+DIM socks AS ARRAY OF NET_SOCKET : socks = []
+DIM daten AS ARRAY OF BUFFER : daten = []
+DIM seit AS ARRAY OF INTEGER : seit = []
+DIM fertig AS ARRAY OF BOOLEAN : fertig = []
+WHILE TRUE
+    DIM neu AS NET_SOCKET : neu = NET_TCP_ACCEPT(lst)
+    IF MILLIS() - letzte > 30000 THEN EXIT(0)
+    WHILE neu <> NIL
+        letzte = MILLIS()
+        ARRAY_PUSH(socks, neu)
+        ARRAY_PUSH(daten, BUFFER_NEW(0))
+        ARRAY_PUSH(seit, MILLIS())
+        ARRAY_PUSH(fertig, FALSE)
+        neu = NET_TCP_ACCEPT(lst)
+    WEND
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(socks) - 1
+        IF fertig[i] THEN CONTINUE
+        daten[i] = BUFFER_CONCAT(daten[i], NET_RECV_BYTES(socks[i], 65536))
+        DIM ende AS INTEGER : ende = BUFFER_INDEXOF(daten[i], trenner)
+        IF ende < 0 THEN CONTINUE
+        DIM kopfteil AS STRING : kopfteil = BUFFER_TO_STRING$(BUFFER_SLICE(daten[i], 0, ende))
+        DIM laenge AS INTEGER : laenge = 0
+        IF kopf$(kopfteil, "Content-Length") <> "" THEN laenge = VAL(kopf$(kopfteil, "Content-Length"))
+        IF BUFFER_LEN(daten[i]) < ende + 4 + laenge THEN CONTINUE
+        IF MILLIS() - seit[i] < verzoegerung THEN CONTINUE
+        antworten(socks[i], kopfteil, BUFFER_SLICE(daten[i], ende + 4, ende + 4 + laenge))
+        fertig[i] = TRUE
+    NEXT
+    SLEEP(2)
+WEND
