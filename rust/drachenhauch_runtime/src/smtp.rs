@@ -167,14 +167,17 @@ pub fn kodiere_wort(s: &str) -> String {
     if s.is_ascii() {
         return s.to_string();
     }
-    // 75 = Grenze fuer das ganze Wort; "=?UTF-8?B?" + "?=" sind 12 Zeichen,
-    // base64 macht aus 3 Bytes 4 -- also 45 Bytes je Stueck (60 Zeichen).
+    // Zwei Grenzen: das Wort hoechstens 75 Zeichen, die ZEILE mit kodierten
+    // Woertern hoechstens 76 (RFC 2047, 2) -- und die erste Zeile traegt noch
+    // den Feldnamen ("Subject: " = 9). "=?UTF-8?B?" + "?=" sind 12 Zeichen,
+    // base64 macht aus 3 Bytes 4: 39 Bytes je Stueck = 52 Zeichen, Wort 64,
+    // Zeile 73. Mit 45 Bytes waren es 81 -- Pythons email-Modul las das klaglos.
     let mut teile: Vec<String> = Vec::new();
     let mut puffer: Vec<u8> = Vec::new();
     for z in s.chars() {
         let mut b = [0u8; 4];
         let bytes = z.encode_utf8(&mut b).as_bytes();
-        if puffer.len() + bytes.len() > 45 {
+        if puffer.len() + bytes.len() > 39 {
             teile.push(format!("=?UTF-8?B?{}?=", b64_encode(&puffer)));
             puffer.clear();
         }
@@ -642,6 +645,15 @@ mod tests {
         let roh = &w[10..w.len() - 2];
         let zurueck = crate::builtins::b64_decode(roh).unwrap();
         assert_eq!(String::from_utf8(zurueck).unwrap(), "Grüße");
+    }
+
+    #[test]
+    fn gefaltete_betreffzeilen_bleiben_unter_76_zeichen() {
+        let lang: String = std::iter::repeat('ä').take(60).collect();
+        let kopf = format!("Subject: {}", kodiere_wort(&lang));
+        for zeile in kopf.split("\r\n") {
+            assert!(zeile.len() <= 76, "{} Zeichen: {}", zeile.len(), zeile);
+        }
     }
 
     #[test]

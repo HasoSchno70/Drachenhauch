@@ -1,0 +1,147 @@
+' Ein kleiner MIME-Leser fuer smtp.dhtest: Kopfzeilen (entfaltet, RFC-2047-Woerter
+' dekodiert), Teile einer multipart-Nachricht, Rumpf als Bytes. Er liest nur, was
+' er braucht -- aber nach den Regeln der RFCs, nicht nach dem, was SMTP_MESSAGE$
+' zufaellig schreibt: Faltung mit Leerzeichen ODER Tabulator, Grenze aus dem
+' Parameter, Leerraum zwischen zwei kodierten Woertern faellt weg.
+
+FUNCTION mimeKopfteil$(nachricht AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(nachricht, CHR$(13), "")
+    DIM p AS INTEGER : p = INSTR(t, CHR$(10) + CHR$(10))
+    IF p < 0 THEN RETURN t
+    RETURN LEFT$(t, p)
+END FUNCTION
+
+FUNCTION mimeRumpf$(nachricht AS STRING) AS STRING
+    DIM t AS STRING : t = REPLACE$(nachricht, CHR$(13), "")
+    DIM p AS INTEGER : p = INSTR(t, CHR$(10) + CHR$(10))
+    IF p < 0 THEN RETURN ""
+    RETURN MID$(t, p + 2, LEN(t))
+END FUNCTION
+
+FUNCTION mimeHat(nachricht AS STRING, name AS STRING) AS BOOLEAN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(mimeKopfteil$(nachricht), CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        IF UPPER$(LEFT$(zeilen[i], LEN(name) + 1)) = UPPER$(name) + ":" THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION mimeKopf$(nachricht AS STRING, name AS STRING) AS STRING
+    ' Roh, aber entfaltet: eine Fortsetzungszeile beginnt mit Leerraum.
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(mimeKopfteil$(nachricht), CHR$(10))
+    DIM wert AS STRING : wert = ""
+    DIM drin AS BOOLEAN : drin = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        IF drin THEN
+            IF LEFT$(z, 1) = " " OR LEFT$(z, 1) = CHR$(9) THEN
+                wert = wert + z
+                CONTINUE
+            END IF
+            RETURN TRIM$(wert)
+        END IF
+        IF UPPER$(LEFT$(z, LEN(name) + 1)) = UPPER$(name) + ":" THEN
+            wert = MID$(z, LEN(name) + 1, LEN(z))
+            drin = TRUE
+        END IF
+    NEXT
+    RETURN TRIM$(wert)
+END FUNCTION
+
+FUNCTION mimeWoerter$(wert AS STRING) AS STRING
+    ' =?zeichensatz?B|Q?text?= dekodieren; Leerraum ZWISCHEN zwei Woertern faellt weg.
+    DIM aus AS STRING : aus = ""
+    DIM rest AS STRING : rest = wert
+    DIM warWort AS BOOLEAN : warWort = FALSE
+    WHILE rest <> ""
+        DIM a AS INTEGER : a = INSTR(rest, "=?")
+        IF a < 0 THEN
+            aus = aus + rest
+            BREAK
+        END IF
+        DIM davor AS STRING : davor = LEFT$(rest, a)
+        IF NOT (warWort AND TRIM$(davor) = "") THEN aus = aus + davor
+        rest = MID$(rest, a + 2, LEN(rest))
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(rest, "?")
+        DIM art AS STRING : art = UPPER$(teile[1])
+        DIM text AS STRING : text = teile[2]
+        ' Das Ende liegt HINTER Zeichensatz, Art und Text, nicht am ersten "?=".
+        DIM e AS INTEGER : e = LEN(teile[0]) + 1 + LEN(teile[1]) + 1 + LEN(text)
+        rest = MID$(rest, e + 2, LEN(rest))
+        IF art = "B" THEN
+            aus = aus + BUFFER_TO_STRING$(BUFFER_FROM_BASE64(text))
+        ELSE
+            aus = aus + REPLACE$(text, "_", " ")
+        END IF
+        warWort = TRUE
+    WEND
+    RETURN aus
+END FUNCTION
+
+FUNCTION mimeArt$(teil AS STRING) AS STRING
+    DIM w AS STRING : w = mimeKopf$(teil, "Content-Type")
+    IF w = "" THEN RETURN "text/plain"
+    DIM p AS INTEGER : p = INSTR(w, ";")
+    IF p >= 0 THEN w = LEFT$(w, p)
+    RETURN LOWER$(TRIM$(w))
+END FUNCTION
+
+FUNCTION mimeParameter$(wert AS STRING, name AS STRING) AS STRING
+    DIM stuecke AS ARRAY OF STRING : stuecke = SPLIT$(wert, ";")
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(stuecke) - 1
+        DIM s AS STRING : s = TRIM$(stuecke[i])
+        IF LOWER$(LEFT$(s, LEN(name) + 1)) = LOWER$(name) + "=" THEN
+            s = MID$(s, LEN(name) + 1, LEN(s))
+            IF LEFT$(s, 1) = CHR$(34) THEN s = MID$(s, 1, LEN(s) - 2)
+            RETURN s
+        END IF
+    NEXT
+    RETURN ""
+END FUNCTION
+
+FUNCTION mimeTeile(nachricht AS STRING) AS ARRAY OF STRING
+    ' Die Blaetter einer (auch verschachtelten) multipart-Nachricht, in Reihenfolge.
+    DIM aus AS ARRAY OF STRING : aus = []
+    IF LEFT$(mimeArt$(nachricht), 10) <> "multipart/" THEN
+        ARRAY_PUSH(aus, nachricht)
+        RETURN aus
+    END IF
+    DIM grenze AS STRING : grenze = "--" + mimeParameter$(mimeKopf$(nachricht, "Content-Type"), "boundary")
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(mimeRumpf$(nachricht), CHR$(10))
+    DIM teil AS STRING : teil = ""
+    DIM drin AS BOOLEAN : drin = FALSE
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        IF z = grenze OR z = grenze + "--" THEN
+            IF drin THEN
+                DIM innen AS ARRAY OF STRING : innen = mimeTeile(teil)
+                DIM k AS INTEGER
+                FOR k = 0 TO LEN(innen) - 1
+                    ARRAY_PUSH(aus, innen[k])
+                NEXT
+            END IF
+            IF z = grenze + "--" THEN BREAK
+            teil = ""
+            drin = TRUE
+        ELSEIF drin THEN
+            teil = teil + z + CHR$(10)
+        END IF
+    NEXT
+    RETURN aus
+END FUNCTION
+
+FUNCTION mimeInhalt(teil AS STRING) AS BUFFER
+    DIM rumpf AS STRING : rumpf = mimeRumpf$(teil)
+    IF LOWER$(mimeKopf$(teil, "Content-Transfer-Encoding")) = "base64" THEN
+        RETURN BUFFER_FROM_BASE64(REPLACE$(REPLACE$(rumpf, CHR$(10), ""), " ", ""))
+    END IF
+    RETURN BUFFER_FROM_STRING(rumpf)
+END FUNCTION
+
+FUNCTION mimeDateiname$(teil AS STRING) AS STRING
+    RETURN mimeParameter$(mimeKopf$(teil, "Content-Disposition"), "filename")
+END FUNCTION

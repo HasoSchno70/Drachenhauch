@@ -1,4 +1,15 @@
-' Aus test_smtp.py uebertragen (8 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
+' Aus test_smtp.py uebertragen (8 Faelle aufgezeichnet 2026-09-08, der Rest 2026-09-14).
+' Format: docs/werkzeuge.md, dhrt test.
+'
+' Zwei Arten von Fall, und beide braucht es:
+' * Die NACHRICHT holt SMTP_MESSAGE$ ab, gelesen wird sie von _hilfen/mime.dh --
+'   einem Leser nach den RFC-Regeln (Faltung, RFC-2047-Woerter, Grenzen aus dem
+'   Parameter), nicht nach dem, was der Erzeuger zufaellig schreibt.
+' * Das PROTOKOLL laeuft gegen _hilfen/smtpserver.dh, einen SMTP-Server als
+'   eigenen Prozess, der Befehle und Daten mitschreibt. Damit ist nachweisbar,
+'   was im UMSCHLAG steht -- etwa die Blindkopie, die in den Kopfzeilen fehlt.
+' Nicht abgedeckt: TLS (ein Handschlag braucht ein Zertifikat, dem der Client
+' traut). Alles darueber ist derselbe Code; steht so in docs/module-smtp.md.
 
 === umbruch im betreff wird abgelehnt
 IMPORT "smtp"
@@ -75,3 +86,477 @@ SMTP_SUBJECT(m, "x")
 --- fehler
 SMTP: ungueltiges/geschlossenes SMTP-Handle 0
 
+=== eine einfache nachricht
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+PRINT mimeKopf$(n, "From")
+PRINT mimeKopf$(n, "To")
+PRINT mimeWoerter$(mimeKopf$(n, "Subject"))
+PRINT mimeArt$(n)
+PRINT BUFFER_TO_STRING$(mimeInhalt(n))
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+ich@beispiel.de
+du@beispiel.de
+Test
+text/plain
+Hallo
+
+=== umlaute im betreff kommen an
+' Der Leser dekodiert das RFC-2047-Wort selbst -- genau darum geht es.
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_TEXT(m, "Hallo")
+SMTP_SUBJECT(m, "Grüsse zum Monatsabschluß")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+PRINT INSTR(mimeKopf$(n, "Subject"), "ü") < 0
+PRINT mimeWoerter$(mimeKopf$(n, "Subject"))
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+TRUE
+Grüsse zum Monatsabschluß
+
+=== ein langer umlaut-betreff wird richtig gefaltet
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM lang AS STRING : lang = ""
+DIM i AS INTEGER
+FOR i = 1 TO 60
+    lang = lang + "ä"
+NEXT
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_TEXT(m, "Hallo")
+SMTP_SUBJECT(m, lang)
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+' Gefaltet heisst: keine Kopfzeile ueber 78 Zeichen, und trotzdem kommt alles an.
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(mimeKopfteil$(n), CHR$(10))
+DIM laengste AS INTEGER : laengste = 0
+FOR i = 0 TO LEN(zeilen) - 1
+    IF LEN(zeilen[i]) > laengste THEN laengste = LEN(zeilen[i])
+NEXT
+PRINT laengste <= 78
+PRINT mimeWoerter$(mimeKopf$(n, "Subject")) = lang
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+TRUE
+TRUE
+
+=== anzeigename wird uebernommen
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+PRINT mimeKopf$(SMTP_MESSAGE$(m), "From")
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+Abteilung Zahlen <ich@beispiel.de>
+
+=== text und html ergeben zwei teile
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+SMTP_HTML(m, "<b>Hallo</b>")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+PRINT mimeArt$(n)
+DIM t AS ARRAY OF STRING : t = mimeTeile(n)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(t) - 1
+    PRINT mimeArt$(t[i]); " "; BUFFER_TO_STRING$(mimeInhalt(t[i]))
+NEXT
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+multipart/alternative
+text/plain Hallo
+text/html <b>Hallo</b>
+
+=== anhang kommt unveraendert an
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+' Bytes schreiben, nicht Text: sonst prueft der Fall am Ende die Zeilenenden.
+DIM roh AS BUFFER : roh = BUFFER_FROM_STRING("a;b" + CHR$(10) + "1;2" + CHR$(10))
+WRITEALL_BYTES("zahlen.csv", roh)
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+SMTP_ATTACH(m, "zahlen.csv")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+PRINT mimeArt$(n)
+DIM t AS ARRAY OF STRING : t = mimeTeile(n)
+DIM anzahl AS INTEGER : anzahl = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(t) - 1
+    IF mimeDateiname$(t[i]) <> "" THEN
+        anzahl = anzahl + 1
+        PRINT mimeDateiname$(t[i])
+        PRINT BUFFER_TO_BASE64$(mimeInhalt(t[i])) = BUFFER_TO_BASE64$(roh)
+    END IF
+NEXT
+PRINT anzahl
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+multipart/mixed
+zahlen.csv
+TRUE
+1
+
+=== anhang bekommt seine art aus der endung
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+WRITEALL_BYTES("bericht.pdf", BUFFER_FROM_STRING("%PDF-1.4 nicht echt"))
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+SMTP_ATTACH(m, "bericht.pdf")
+DIM t AS ARRAY OF STRING : t = mimeTeile(SMTP_MESSAGE$(m))
+DIM i AS INTEGER
+FOR i = 0 TO LEN(t) - 1
+    IF mimeDateiname$(t[i]) <> "" THEN PRINT mimeDateiname$(t[i]); " "; mimeArt$(t[i])
+NEXT
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+bericht.pdf application/pdf
+
+=== binaerer anhang ueberlebt
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+' Jeder Bytewert, achtmal -- auch 0, CR, LF und alles ueber 127.
+DIM roh AS BUFFER : roh = BUFFER_NEW(256 * 8)
+DIM i AS INTEGER
+FOR i = 0 TO 256 * 8 - 1
+    BUFFER_SET(roh, i, i MOD 256)
+NEXT
+WRITEALL_BYTES("roh.bin", roh)
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+SMTP_ATTACH(m, "roh.bin")
+DIM t AS ARRAY OF STRING : t = mimeTeile(SMTP_MESSAGE$(m))
+FOR i = 0 TO LEN(t) - 1
+    IF mimeDateiname$(t[i]) <> "" THEN
+        DIM an AS BUFFER : an = mimeInhalt(t[i])
+        PRINT BUFFER_LEN(an); " "; BUFFER_TO_BASE64$(an) = BUFFER_TO_BASE64$(roh)
+    END IF
+NEXT
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+2048 TRUE
+
+=== blindkopie steht nicht in den kopfzeilen
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+SMTP_BCC(m, "heimlich@beispiel.de")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+PRINT mimeHat(n, "Bcc")
+PRINT INSTR(n, "heimlich") < 0
+PRINT mimeHat(n, "To")
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+FALSE
+TRUE
+TRUE
+
+=== jede nachricht hat datum und kennung
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_FROM(m, "ich@beispiel.de")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Test")
+SMTP_TEXT(m, "Hallo")
+DIM n AS STRING : n = SMTP_MESSAGE$(m)
+' RFC 5322: "Mon, 14 Sep 2026 16:18:41 +0000"
+PRINT REGEX_TEST(mimeKopf$(n, "Date"), "^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} [+-]\d{4}$")
+DIM id AS STRING : id = mimeKopf$(n, "Message-ID")
+PRINT LEFT$(id, 1) = "<" AND RIGHT$(id, 13) = "@beispiel.de>"
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- erwartet
+TRUE
+TRUE
+
+=== senden gegen einen echten server
+IMPORT "smtp"
+IMPORT "mime_leser.dh"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_SEND(m)
+PRINT "raus"
+PRINT befehl("MAIL FROM:<ich@beispiel.de>")
+PRINT befehl("RCPT TO:<du@beispiel.de>")
+PRINT befehl("DATA"); " "; befehl("QUIT")
+DIM d AS STRING : d = daten$()
+PRINT mimeKopf$(d, "Subject")
+PRINT BUFFER_TO_STRING$(mimeInhalt(d))
+beenden()
+--- datei mime_leser.dh
+IMPORT "{sammlung}/_hilfen/mime.dh"
+
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+raus
+TRUE
+TRUE
+TRUE TRUE
+Auswertung August
+Anbei die Zahlen.
+
+=== die blindkopie steht im umschlag
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_BCC(m, "heimlich@beispiel.de")
+SMTP_SEND(m)
+PRINT befehl("RCPT TO:<heimlich@beispiel.de>")
+' In der Nachricht selbst darf sie nicht stehen.
+PRINT LEN(daten$()) > 0 AND INSTR(daten$(), "heimlich") < 0
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+TRUE
+TRUE
+
+=== anmeldung mit plain
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_LOGIN(m, "hans", "geheim")
+SMTP_SEND(m)
+DIM b AS ARRAY OF STRING : b = READLINES("befehle.txt")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(b) - 1
+    IF UPPER$(LEFT$(b[i], 10)) = "AUTH PLAIN" THEN
+        DIM w AS ARRAY OF STRING : w = SPLIT$(TRIM$(b[i]), " ")
+        ' Nullbyte, Name, Nullbyte, Kennwort -- die Nullen sichtbar gemacht
+        PRINT REPLACE$(BUFFER_TO_STRING$(BUFFER_FROM_BASE64(w[2])), CHR$(0), "|")
+    END IF
+NEXT
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+|hans|geheim
+
+=== anmeldung mit login wenn plain fehlt
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH LOGIN", "1", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_LOGIN(m, "hans", "geheim")
+SMTP_SEND(m)
+DIM b AS ARRAY OF STRING : b = READLINES("befehle.txt")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(b) - 3
+    IF TRIM$(b[i]) = "AUTH LOGIN" THEN
+        PRINT "AUTH LOGIN"
+        PRINT BUFFER_TO_STRING$(BUFFER_FROM_BASE64(TRIM$(b[i + 1])))
+        PRINT BUFFER_TO_STRING$(BUFFER_FROM_BASE64(TRIM$(b[i + 2])))
+    END IF
+NEXT
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+AUTH LOGIN
+hans
+geheim
+
+=== falsches kennwort wird gemeldet
+' Der Wortlaut des Servers muss durchkommen -- sonst raet der Anwender.
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "0", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_LOGIN(m, "hans", "falsch")
+TRY
+    SMTP_SEND(m)
+    PRINT "raus"
+CATCH e
+    PRINT INSTR(e, "535") >= 0 AND INSTR(e, "falsch") >= 0
+END TRY
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+TRUE
+
+=== ohne anmeldung wird nicht angemeldet
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "1"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+SMTP_SEND(m)
+DIM b AS ARRAY OF STRING : b = READLINES("befehle.txt")
+DIM auth AS INTEGER : auth = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(b) - 1
+    IF UPPER$(LEFT$(b[i], 4)) = "AUTH" THEN auth = auth + 1
+NEXT
+' Und gesendet wurde trotzdem -- sonst waere die 0 billig.
+PRINT auth; " "; befehl("QUIT")
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+0 TRUE
+
+=== server ohne starttls sagt es deutlich
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "1"), "starttls")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+TRY
+    SMTP_SEND(m)
+    PRINT "raus"
+CATCH e
+    PRINT INSTR(e, "kein STARTTLS") >= 0
+END TRY
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+TRUE
+
+=== ein abgelehnter empfaenger ist ein fehler
+' Ein Tippfehler in der Adresse darf nicht als "verschickt" durchgehen.
+IMPORT "smtp"
+IMPORT "gegen.dh"
+DIM m AS SMTP
+m = SMTP_NEW()
+SMTP_SERVER(m, "127.0.0.1", starten("AUTH PLAIN LOGIN", "1", "0"), "keine")
+SMTP_FROM(m, "ich@beispiel.de", "Abteilung Zahlen")
+SMTP_TO(m, "du@beispiel.de")
+SMTP_SUBJECT(m, "Auswertung August")
+SMTP_TEXT(m, "Anbei die Zahlen.")
+TRY
+    SMTP_SEND(m)
+    PRINT "raus"
+CATCH e
+    PRINT INSTR(e, "550") >= 0 AND INSTR(e, "du@beispiel.de") >= 0
+END TRY
+beenden()
+--- datei gegen.dh
+IMPORT "{sammlung}/_hilfen/smtpstart.dh"
+
+--- argumente
+{sammlung}/_hilfen/smtpserver.dh
+--- erwartet
+TRUE

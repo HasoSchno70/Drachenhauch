@@ -195,7 +195,8 @@ jobs:
       # `smtp` gehoert dazu, obwohl es hier wie eine Zugabe aussieht: die
       # Feature-Liste muss den Modulen folgen, die `tests/` abfragt. Fehlt
       # eines, laeuft dhrt zwar, aber jeder Aufruf des Moduls meldet "ohne das
-      # Feature gebaut" -- 26 Fehler in `tests/test_smtp.py`, die es nur auf
+      # Feature gebaut" -- 26 Fehler in `tests/test_smtp.py` (heute
+      # `tests/pruef/smtp.dhtest`), die es nur auf
       # posix gab, weil der Windows-Job ueber `build_runtime.py` baut und das
       # Skript den ganzen Daten-Tier mitnimmt. Wer hier ein Feature ergaenzt,
       # gleicht am besten gegen `feats` in `rust/build_runtime.py` ab.
