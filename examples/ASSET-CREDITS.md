@@ -12,8 +12,8 @@ Generator-Skripten) und damit frei – auch kommerziell – verwendbar:
   – darunter der eigenständige Plattformer-Satz in `platformer/` und der Spieler
   `assets/player.*` („Twilight"-Thema, bewusst nicht an Marken/Werke angelehnt).
 - Shader: `assets/shaders/*.fs` (bloom, crt, vignette).
-- Audio: `assets/demo.mod` (ProTracker-MOD, `make_demo_mod.py`),
-  `assets/*.wav` (`make_pluck_sample.py` u. a.), `assets/sfx_*.ogg`,
+- Audio: `assets/demo.mod` (ProTracker-MOD, `make_demo_mod.dh`),
+  `assets/*.wav` (`make_pluck_sample.dh` u. a.), `assets/sfx_*.ogg`,
   `assets/ambient.ogg` – über die eingebauten Sound-Werkzeuge erzeugt.
 
 ## Gemeinfrei (CC0 1.0) – keine Pflichten, Nennung aus Höflichkeit

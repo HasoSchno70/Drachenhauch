@@ -8,7 +8,7 @@
 '   PLAYMUSIC("song.mod", -1, 1.0)   ' loopt; oder AUDIO_MUSIC_LOAD/_PLAY
 '
 ' Diese Demo spielt ein mitgeliefertes, selbst generiertes Modul
-' (assets/demo.mod, gemeinfrei -- Generator: assets/make_demo_mod.py).
+' (assets/demo.mod, gemeinfrei -- Generator: assets/make_demo_mod.dh).
 ' Du kannst auch ein EIGENES .mod/.xm ins Fenster ziehen (Drag & Drop) --
 ' z.B. von modarchive.org. Visualisiert wird mit echtem AUDIO_FFT.
 '

@@ -1,0 +1,180 @@
+' Erzeugt ein kleines, frei verwendbares ProTracker-MOD (M.K., 4 Kanaele)
+' fuer die Modul-Player-Demo examples/115_modplayer.dh.
+'
+' Selbst generiert -> gemeinfrei. Vier Kanaele im Amiga-Stil:
+'   Kanal 1  BASS    (Square, tief)
+'   Kanal 2  CHORD   (Square-Akkordton)
+'   Kanal 3  LEAD    (Square-Melodie)
+'   Kanal 4  PERC    (kurzes Noise-Sample)
+'
+'     dhrt run examples/assets/make_demo_mod.dh [-- zieldatei]
+'
+' Ergebnis: examples/assets/demo.mod -- Byte fuer Byte dieselbe Datei, die bis
+' 2026-09-14 make_demo_mod.py geschrieben hat.
+
+DIM ziel AS STRING : ziel = CWD$() + "/demo.mod"
+IF ARGC() > 0 THEN
+    ziel = ARG$(0)
+    IF NOT (LEFT$(ziel, 1) = "/" OR LEFT$(ziel, 1) = CHR$(92) OR MID$(ziel, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN ziel = GETENV$("DHRT_START_DIR") + "/" + ziel
+END IF
+
+DIM aus AS ARRAY OF INTEGER : aus = []
+
+SUB bytes(b AS ARRAY OF INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b) - 1
+        ARRAY_PUSH(aus, b[i])
+    NEXT
+END SUB
+
+SUB text(s AS STRING, breite AS INTEGER)
+    ' ASCII-Text, mit Nullbytes auf `breite` aufgefuellt
+    DIM i AS INTEGER
+    FOR i = 0 TO breite - 1
+        IF i < LEN(s) THEN ARRAY_PUSH(aus, ASC(MID$(s, i, 1))) ELSE ARRAY_PUSH(aus, 0)
+    NEXT
+END SUB
+
+SUB wort(w AS INTEGER)
+    ' 16 Bit, hoeherwertiges Byte zuerst
+    ARRAY_PUSH(aus, (w SHR 8) BAND 255)
+    ARRAY_PUSH(aus, w BAND 255)
+END SUB
+
+' ----- Samples (signed 8-bit) -------------------------------------------
+FUNCTION rechteck(laenge AS INTEGER, hoch AS INTEGER, tast AS FLOAT) AS ARRAY OF INTEGER
+    DIM periode AS INTEGER : periode = MAX(2, laenge)
+    DIM d AS ARRAY OF INTEGER : d = []
+    DIM i AS INTEGER
+    FOR i = 0 TO laenge - 1
+        IF (i MOD periode) < periode * tast THEN ARRAY_PUSH(d, hoch BAND 255) ELSE ARRAY_PUSH(d, (-hoch) BAND 255)
+    NEXT
+    RETURN d
+END FUNCTION
+
+FUNCTION rauschen(laenge AS INTEGER) AS ARRAY OF INTEGER
+    ' deterministisches "Rauschen" (LCG) fuer Percussion
+    DIM s AS INTEGER : s = &H1234
+    DIM d AS ARRAY OF INTEGER : d = []
+    DIM i AS INTEGER
+    FOR i = 0 TO laenge - 1
+        s = (s * 1103515245 + 12345) BAND &H7FFFFFFF
+        ARRAY_PUSH(d, (((s SHR 16) MOD 160) - 80) BAND 255)
+    NEXT
+    RETURN d
+END FUNCTION
+
+DIM snamen AS ARRAY OF STRING : snamen = ["bass", "chord", "lead", "perc"]
+DIM schleife AS ARRAY OF BOOLEAN : schleife = [TRUE, TRUE, TRUE, FALSE]
+DIM s0 AS ARRAY OF INTEGER : s0 = rechteck(64, 78, 0.5)
+DIM s1 AS ARRAY OF INTEGER : s1 = rechteck(48, 55, 0.25)    ' duenner (Pulsbreite 25%)
+DIM s2 AS ARRAY OF INTEGER : s2 = rechteck(32, 64, 0.5)
+DIM s3 AS ARRAY OF INTEGER : s3 = rauschen(600)
+
+' Ein Feld von Feldern gibt es nicht -- die vier Samples liegen einzeln.
+FUNCTION sdaten(k AS INTEGER) AS ARRAY OF INTEGER
+    SELECT CASE k
+        CASE 0
+            RETURN s0
+        CASE 1
+            RETURN s1
+        CASE 2
+            RETURN s2
+    END SELECT
+    RETURN s3
+END FUNCTION
+
+
+' ----- Perioden (ProTracker, finetune 0) --------------------------------
+DIM PER AS MAP OF INTEGER
+PER = {"C2": 428, "D2": 381, "E2": 339, "F2": 320, "G2": 285, "A2": 254, "B2": 226, _
+    "C3": 214, "D3": 190, "E3": 170, "F3": 160, "G3": 143, "A3": 127, "B3": 113, _
+    "C1": 856, "E1": 678, "G1": 570, "A1": 508, "F1": 720, "D1": 762}
+
+' ----- Song: 2 Patterns, in der Order 0,1,0,1 ---------------------------
+' je 64 Reihen. Akkordfolge Am - F - C - G (8 Reihen je Akkord).
+' Eine Zelle ist Note (leer = keine) plus Sample-Nummer, abgelegt je Pattern
+' flach als Reihe * 4 + Kanal.
+DIM zNote[2 * 64 * 4] AS STRING
+DIM zSample[2 * 64 * 4] AS INTEGER
+
+SUB zelle(pat AS INTEGER, reihe AS INTEGER, kanal AS INTEGER, note AS STRING, smp AS INTEGER)
+    DIM k AS INTEGER : k = (pat * 64 + reihe) * 4 + kanal
+    zNote[k] = note
+    zSample[k] = smp
+END SUB
+
+SUB pattern(pat AS INTEGER, bass AS ARRAY OF STRING, akkord AS ARRAY OF STRING, melodie AS ARRAY OF STRING)
+    DIM blk AS INTEGER
+    FOR blk = 0 TO 7                       ' 8 Bloecke je 8 Reihen
+        DIM b AS INTEGER : b = blk * 8
+        ' Bass: Grundton auf Reihe 0 und 4 des Blocks
+        zelle(pat, b + 0, 0, bass[blk], 1)
+        zelle(pat, b + 4, 0, bass[blk], 1)
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            ' Chord: Akkordton auf 0, 2, 4, 6
+            zelle(pat, b + 2 * k, 1, akkord[blk], 2)
+            ' Lead: kleine Melodie, jede 2. Reihe
+            zelle(pat, b + 2 * k, 2, melodie[(blk + k) MOD LEN(melodie)], 3)
+            ' Perc: Hits auf 0, 2, 4, 6
+            zelle(pat, b + 2 * k, 3, "C3", 4)
+        NEXT
+    NEXT
+END SUB
+
+pattern(0, ["A1", "A1", "F1", "F1", "C2", "C2", "G1", "G1"], _
+    ["A2", "A2", "F2", "F2", "C3", "C3", "G2", "G2"], _
+    ["A3", "C3", "E3", "C3", "A3", "G3"])
+pattern(1, ["A1", "A1", "F1", "F1", "C2", "C2", "E1", "E1"], _
+    ["A2", "C3", "F2", "A2", "C3", "E3", "G2", "B2"], _
+    ["E3", "D3", "C3", "B2", "A2", "C3"])
+DIM reihenfolge AS ARRAY OF INTEGER : reihenfolge = [0, 1, 0, 1]
+
+' ----- MOD zusammenbauen -------------------------------------------------
+text("GB DEMO MODULE", 20)
+DIM i AS INTEGER
+FOR i = 0 TO 30
+    IF i < 4 THEN
+        DIM worte AS INTEGER : worte = LEN(sdaten(i)) \ 2
+        text(snamen[i], 22)
+        wort(worte)
+        bytes([0, 64])                     ' finetune 0, volume 64
+        wort(0)                            ' Wiederholung ab
+        wort(IIF(schleife[i], worte, 1))   ' Wiederholungslaenge
+    ELSE
+        text("", 22)
+        wort(0)
+        bytes([0, 0])
+        wort(0)
+        wort(1)
+    END IF
+NEXT
+
+bytes([LEN(reihenfolge), 127])
+FOR i = 0 TO 127
+    IF i < LEN(reihenfolge) THEN ARRAY_PUSH(aus, reihenfolge[i]) ELSE ARRAY_PUSH(aus, 0)
+NEXT
+text("M.K.", 4)
+
+FOR i = 0 TO 2 * 64 * 4 - 1
+    IF zNote[i] = "" THEN
+        bytes([0, 0, 0, 0])
+    ELSE
+        DIM periode AS INTEGER : periode = MAPGET(PER, zNote[i])
+        DIM smp AS INTEGER : smp = zSample[i]
+        bytes([(smp BAND &HF0) BOR ((periode SHR 8) BAND &H0F), periode BAND 255, (smp BAND &H0F) SHL 4, 0])
+    END IF
+NEXT
+
+FOR i = 0 TO 3
+    bytes(sdaten(i))
+    IF LEN(sdaten(i)) MOD 2 = 1 THEN ARRAY_PUSH(aus, 0)   ' gerade Laenge (Worte)
+NEXT
+
+DIM puffer AS BUFFER : puffer = BUFFER_NEW(LEN(aus))
+FOR i = 0 TO LEN(aus) - 1
+    BUFFER_SET(puffer, i, aus[i])
+NEXT
+WRITEALL_BYTES(ziel, puffer)
+PRINT "demo.mod geschrieben: " + STR$(LEN(aus)) + " Bytes, 2 Patterns, Order [0, 1, 0, 1]"
