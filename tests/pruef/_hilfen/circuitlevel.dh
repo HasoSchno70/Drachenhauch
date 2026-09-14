@@ -1,0 +1,55 @@
+' Level-Sets fuer werkzeug_circuitrunner.dhtest: ein 32x32-Gitter als Feld,
+' als Hex-Text (zwei Zeichen je Kachel, wie im JSON-Format der Engine) und ein
+' Set, das nach `synth.json` im Fallordner geschrieben wird. Die Namen beginnen
+' mit `pr`, weil der Einschub mitten in der Engine steht und deren Globale
+' nicht verdecken darf.
+IMPORT "json"
+
+FUNCTION prHex$(t AS ARRAY OF INTEGER) AS STRING
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(t) - 1
+        s = s + RIGHT$("0" + LOWER$(HEX$(t[i])), 2)
+    NEXT
+    RETURN s
+END FUNCTION
+
+FUNCTION prLeer() AS ARRAY OF INTEGER
+    DIM t[1024] AS INTEGER
+    RETURN t
+END FUNCTION
+
+FUNCTION prSet(name AS STRING) AS JSON_HANDLE
+    DIM h AS JSON_HANDLE : h = JSON_PARSE("{}")
+    JSON_SET_STRING(h, "name", name)
+    JSON_SET_STRING(h, "ruleset", "ms")
+    JSON_SET_JSON(h, "levels", JSON_PARSE("[]"))
+    RETURN h
+END FUNCTION
+
+SUB prLevel(h AS JSON_HANDLE, titel AS STRING, nummer AS INTEGER, zeit AS INTEGER, hinweis AS STRING, pw AS STRING, oben AS ARRAY OF INTEGER, unten AS ARRAY OF INTEGER, monster AS STRING)
+    DIM lv AS JSON_HANDLE : lv = JSON_PARSE("{}")
+    JSON_SET_STRING(lv, "title", titel)
+    JSON_SET_INT(lv, "number", nummer)
+    JSON_SET_INT(lv, "time", zeit)
+    JSON_SET_INT(lv, "chips", 0)
+    JSON_SET_STRING(lv, "hint", hinweis)
+    JSON_SET_STRING(lv, "password", pw)
+    JSON_SET_INT(lv, "width", 32)
+    JSON_SET_INT(lv, "height", 32)
+    JSON_SET_STRING(lv, "upper", prHex$(oben))
+    JSON_SET_STRING(lv, "lower", prHex$(unten))
+    JSON_SET_STRING(lv, "traps", "")
+    JSON_SET_STRING(lv, "cloners", "")
+    JSON_SET_STRING(lv, "monsters", monster)
+    JSON_APPEND_JSON(h, "levels", lv)
+END SUB
+
+FUNCTION prSynth$() AS STRING
+    ' Der Fallordner ist der Ordner, aus dem das Programm gestartet wurde.
+    RETURN GETENV$("DHRT_START_DIR") + "/synth.json"
+END FUNCTION
+
+SUB prSchreiben(h AS JSON_HANDLE)
+    WRITEALL(prSynth$(), JSON_STRINGIFY(h))
+END SUB

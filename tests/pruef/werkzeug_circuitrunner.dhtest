@@ -1,0 +1,215 @@
+' Die CIRCUIT-RUNNER-Engine (circuitrunner/circuitrunner.dh), angesteuert wie
+' ein Werkzeug: der Fall steht als Einschub hinter dem Kommentar der
+' Hauptschleife, laeuft also nach allem Laden und vor der ersten Runde, und
+' endet mit EXIT(0). Bis Stufe 53 (2026-09-14) in tests/test_circuitrunner.py,
+' das die Engine-Quelle vor der Schleife abschnitt; dort bleiben die Tests der
+' Python-Werkzeuge convert_dat.py und make_demo_levels.py.
+'
+' Die Engine laedt `assets/...` relativ -- `--- ersetzen` wechselt darum in den
+' Ordner des Spiels und legt die Sicherung in den Fallordner, sonst schriebe
+' ein Lauf ueber die echte circuitrunner.save. Die Level baut
+' _hilfen/circuitlevel.dh und schreibt sie nach synth.json im Fallordner.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== monster ziehen in der reihenfolge der liste
+' Vier Kaefer; die 0x0A-Liste nennt nur drei in NICHT-Lesereihenfolge. Die
+' Engine muss sie so laden und den ungelisteten in Lesereihenfolge anhaengen.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[2 * 32 + 5] = &H42
+prOben[5 * 32 + 3] = &H42
+prOben[5 * 32 + 8] = &H42
+prOben[10 * 32 + 10] = &H42
+prOben[15 * 32 + 15] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("ReorderTest")
+prLevel(prH, "Reorder", 1, 0, "", "ABCD", prOben, prUnten, "8,5;5,2;3,5")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+load_level(0)
+PRINT "NMOB=" + STR$(nmob)
+DIM prK AS INTEGER
+FOR prK = 0 TO nmob - 1
+    PRINT "M " + STR$(mob_x[prK]) + " " + STR$(mob_y[prK])
+NEXT
+EXIT(0)
+--- programm ../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
+
+--- erwartet
+NMOB=4
+M 8 5
+M 5 2
+M 3 5
+M 10 10
+
+=== bestzeit passwort und fortschritt werden gesichert
+' Bestzeit (schneller ueberschreibt, langsamer nicht), Passwort ohne Ruecksicht
+' auf gross/klein, Fortschritt = Level + 1, und die Sicherung liegt auf der Platte.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[5 * 32 + 5] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("Test Set!")
+prLevel(prH, "L0", 1, 0, "", "WXYZ", prOben, prUnten, "")
+prLevel(prH, "L1", 2, 0, "", "ABCD", prOben, prUnten, "")
+prLevel(prH, "L2", 3, 0, "", "QWER", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+cur_setkey = set_key("Test Set!")
+PRINT "setkey: " + LEFT$(cur_setkey, 9)
+cur_level = 1
+load_level(1)
+start_ms = MILLIS() - 30000
+record_win()
+DIM prB1 AS INTEGER : prB1 = best_for(1)
+DIM prR1 AS BOOLEAN : prR1 = new_record
+start_ms = MILLIS() - 50000
+record_win()
+DIM prB2 AS INTEGER : prB2 = best_for(1)
+DIM prR2 AS BOOLEAN : prR2 = new_record
+start_ms = MILLIS() - 10000
+record_win()
+DIM prB3 AS INTEGER : prB3 = best_for(1)
+DIM prR3 AS BOOLEAN : prR3 = new_record
+PRINT "erster sieg rund 30 s: " + STR$(prB1 >= 29 AND prB1 <= 31) + " rekord " + STR$(prR1)
+PRINT "langsamer bleibt: " + STR$(prB2 = prB1) + " rekord " + STR$(prR2)
+PRINT "schneller ersetzt: " + STR$(prB3 <= 11) + " rekord " + STR$(prR3)
+PRINT "passwort abcd: " + STR$(find_password("abcd")) + " unbekannt: " + STR$(find_password("ZZZZ"))
+PRINT "fortschritt: " + STR$(SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0))
+PRINT "sicherung da: " + STR$(FILEEXISTS(GETENV$("DHRT_START_DIR") + "/circuitrunner.save"))
+EXIT(0)
+--- programm ../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
+
+--- erwartet
+setkey: test_set_
+erster sieg rund 30 s: TRUE rekord TRUE
+langsamer bleibt: TRUE rekord FALSE
+schneller ersetzt: TRUE rekord TRUE
+passwort abcd: 1 unbekannt: -1
+fortschritt: 2
+sicherung da: TRUE
+
+=== zeitbonus im getimten level
+' Mit Zeitlimit ist der Bestwert die VERBLIEBENE Zeit, hoeher ist besser.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[5 * 32 + 5] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("Timed")
+prLevel(prH, "T", 1, 200, "", "ABCD", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+cur_setkey = set_key("Timed")
+cur_level = 0
+load_level(0)
+start_ms = MILLIS() - 30000
+record_win()
+DIM prB1 AS INTEGER : prB1 = best_for(0)
+DIM prR1 AS BOOLEAN : prR1 = new_record
+start_ms = MILLIS() - 50000
+record_win()
+DIM prB2 AS INTEGER : prB2 = best_for(0)
+DIM prR2 AS BOOLEAN : prR2 = new_record
+start_ms = MILLIS() - 10000
+record_win()
+DIM prB3 AS INTEGER : prB3 = best_for(0)
+DIM prR3 AS BOOLEAN : prR3 = new_record
+PRINT "170 uebrig: " + STR$(prB1 >= 169 AND prB1 <= 171) + " rekord " + STR$(prR1)
+PRINT "150 ist schlechter: " + STR$(prB2 = prB1) + " rekord " + STR$(prR2)
+PRINT "190 ist besser: " + STR$(prB3 >= 189 AND prB3 <= 191) + " rekord " + STR$(prR3)
+EXIT(0)
+--- programm ../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
+
+--- erwartet
+170 uebrig: TRUE rekord TRUE
+150 ist schlechter: TRUE rekord FALSE
+190 ist besser: TRUE rekord TRUE
+
+=== hinweisstein unter dem spieler
+' Startet der Spieler auf einem Hinweisstein (unten 0x2F), muss tat() ihn
+' melden -- sonst erscheint das Hinweisband beim Spielen nicht.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[5 * 32 + 5] = &H15
+prUnten[1 * 32 + 1] = &H2F
+DIM prH AS JSON_HANDLE : prH = prSet("Hint")
+prLevel(prH, "H", 1, 0, "Pass auf das Wasser auf!", "ABCD", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+cur_setkey = set_key("Hint")
+load_level(0)
+PRINT "tat: " + STR$(tat(px, py))
+PRINT "hinweis da: " + STR$(LEN(lvl_hint) > 0)
+EXIT(0)
+--- programm ../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
+
+--- erwartet
+tat: 47
+hinweis da: TRUE
+
+=== monster ziehen im spielertempo
+' Ein Feuerball im freien Korridor zieht je world_tick einen Schritt geradeaus:
+' Start (3,5), drei Ticks nach rechts -> (6,5). Bei Halbtempo waere x < 6.
+IMPORT "circuit.dh"
+DIM prOben AS ARRAY OF INTEGER : prOben = prLeer()
+DIM prUnten AS ARRAY OF INTEGER : prUnten = prLeer()
+prOben[1 * 32 + 1] = &H6C
+prOben[5 * 32 + 3] = &H47
+prOben[1 * 32 + 30] = &H15
+DIM prH AS JSON_HANDLE : prH = prSet("SpeedTest")
+prLevel(prH, "Speed", 1, 0, "", "ABCD", prOben, prUnten, "")
+prSchreiben(prH)
+js = JSON_LOAD(prSynth$())
+nlevels = JSON_LEN(js, "levels")
+load_level(0)
+state = "play"
+DIM prT AS INTEGER
+FOR prT = 0 TO 2
+    want_dir = -1
+    world_tick()
+NEXT
+PRINT "POS " + STR$(mob_x[0]) + " " + STR$(mob_y[0])
+EXIT(0)
+--- programm ../../circuitrunner/circuitrunner.dh nach '  HAUPTSCHLEIFE
+--- ersetzen CONST SAVEPATH = "circuitrunner.save"
+CONST SAVEPATH = "{fall}/circuitrunner.save"
+CHDIR("{sammlung}/../../circuitrunner")
+
+--- datei _programm/circuit.dh
+IMPORT "{sammlung}/_hilfen/circuitlevel.dh"
+
+--- erwartet
+POS 6 5
