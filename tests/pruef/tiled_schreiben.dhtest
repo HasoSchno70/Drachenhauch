@@ -297,3 +297,85 @@ PRINT n
 --- erwartet
 6
 
+
+=== nextobjectid und kennungen gelten fuer die ganze karte
+' Tiled vergibt ein neues Objekt unter `nextobjectid` -- stand dort 1,
+' obwohl es Objekte 1 und 2 gab, legte Tiled beim Bearbeiten Doppelte an.
+' Und die Kennungen zaehlen ueber ALLE Ebenen, nicht je Ebene ab 1.
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM o2 AS INTEGER : o2 = TILED_ADD_OBJECT_LAYER(m, "trigger")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+DIM i3 AS INTEGER : i3 = TILED_ADD_OBJECT(m, "trigger", "tuer", "", 0.0, 0.0, 16.0, 16.0)
+TILED_SAVE(m, "karte.json")
+DIM j AS JSON_HANDLE : j = JSON_LOAD("karte.json")
+PRINT JSON_GET_INT(j, "nextobjectid"); " "; JSON_GET_INT(j, "layers.0.objects.0.id"); " "; _
+      JSON_GET_INT(j, "layers.0.objects.1.id"); " "; JSON_GET_INT(j, "layers.1.objects.0.id")
+' Geladen und erweitert: das neue Objekt bekommt die naechste Kennung.
+DIM m2 AS TILED_MAP : m2 = TILED_LOAD("karte.json")
+DIM i4 AS INTEGER : i4 = TILED_ADD_OBJECT(m2, "trigger", "falle", "", 8.0, 8.0, 4.0, 4.0)
+TILED_SAVE(m2, "karte2.json")
+DIM j2 AS JSON_HANDLE : j2 = JSON_LOAD("karte2.json")
+PRINT JSON_GET_INT(j2, "nextobjectid"); " "; JSON_GET_INT(j2, "layers.1.objects.1.id")
+--- erwartet
+4 1 2 3
+5 4
+
+=== zweimal gesichert ist dieselbe datei
+' Eigenschaften nach Namen, Kacheln nach Nummer -- die Ablage ist eine
+' HashMap, und ohne Ordnung gab dieselbe Karte bei jedem Sichern eine andere
+' Datei. Geprueft wird auch die ORDNUNG selbst, nicht nur die Gleichheit.
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+TILED_TILE_SET_PROP(m, 6, "zeta", 1)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "damage", 5)
+TILED_TILE_SET_PROP(m, 3, "art", "stein")
+TILED_TILE_SET_PROP(m, 4, "reibung", 0.5)
+TILED_TILE_SET_PROP(m, 1, "alpha", 2)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "leben", 3)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "boss", TRUE)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "ziel", "tor")
+TILED_SAVE(m, "a.json")
+TILED_SAVE(m, "b.json")
+DIM za AS ARRAY OF STRING : za = READLINES("a.json")
+DIM zb AS ARRAY OF STRING : zb = READLINES("b.json")
+DIM gleich AS BOOLEAN : gleich = LEN(za) = LEN(zb)
+DIM k AS INTEGER
+IF gleich THEN
+    FOR k = 0 TO LEN(za) - 1
+        IF za[k] <> zb[k] THEN gleich = FALSE
+    NEXT
+END IF
+PRINT gleich
+DIM j AS JSON_HANDLE : j = JSON_LOAD("a.json")
+DIM s AS STRING
+s = ""
+FOR k = 0 TO JSON_LEN(j, "tilesets.0.tiles") - 1
+    s = s + STR$(JSON_GET_INT(j, "tilesets.0.tiles." + STR$(k) + ".id")) + " "
+NEXT
+PRINT TRIM$(s)
+s = ""
+FOR k = 0 TO JSON_LEN(j, "tilesets.0.tiles.1.properties") - 1
+    s = s + JSON_GET_STRING(j, "tilesets.0.tiles.1.properties." + STR$(k) + ".name") + " "
+NEXT
+PRINT TRIM$(s)
+s = ""
+FOR k = 0 TO JSON_LEN(j, "layers.0.objects.1.properties") - 1
+    s = s + JSON_GET_STRING(j, "layers.0.objects.1.properties." + STR$(k) + ".name") + " "
+NEXT
+PRINT TRIM$(s)
+--- erwartet
+TRUE
+0 2 3 5
+art damage solid
+boss leben ziel
