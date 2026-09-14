@@ -2947,10 +2947,21 @@ kaputten Kopien -- Mindestgroesse ignoriert, Namen vertauscht, Kennung nicht
 geprueft: 3 von 3 fallen). **Stolperstein beim Testschreiben:** in
 `PRINT PROCESS_CODE(p); lauf$(p)` wird der Rueckgabewert VOR dem Warten gelesen
 (-1), und die Ausgabe eines Kindes endet mit einem Umbruch, den `PRINT` doppelt.
+**Asset-Erzeuger der Beispiele (selber Tag):** `examples/assets/make_demo_mod.dh`
+und `make_pluck_sample.dh` schreiben Byte fuer Byte das eingecheckte `demo.mod`
+und `pluck.wav` (vorher gegen die Ausgabe der `.py`-Fassungen geprueft, beide
+gleich). Das Zupf-Sample braucht dafuer **Pythons Zufall nachgebaut**: MT19937
+mit `random.seed(42)` (init_by_array mit `[42]`) und `random.random()` (53 Bit
+aus zwei Worten) -- mit `RND` kaeme ein anderes Rauschen. 64-Bit-Ganzzahlen
+reichen fuer alle Multiplikationen, `BAND &HFFFFFFFF` maskiert auch negative
+Zwischenwerte richtig; Pythons `int()` rundet Richtung null, `INT` ab.
+**Zwei Stolpersteine:** ein Feld von Feldern (`DIM a[4] AS ARRAY OF INTEGER`)
+uebersetzt nicht, und eine MAP laesst sich nicht mit `m[schluessel]` lesen --
+`MAPGET`. Tests `tests/pruef/werkzeug_beispiel_assets.dhtest` (2; Gegenprobe
+mit einer anderen Periode bzw. Saat 43: beide fallen).
 Noch Python bei den Spielen: die PIL-Bildgeneratoren (`make_editor_tileset.py`,
 Buch-Sprites, Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy), die
-Level-Autorenwerkzeuge von Pyramid Pusher, `make_demo_mod.py`,
-`make_pluck_sample.py` und der Flask-`cloudserver`.
+Level-Autorenwerkzeuge von Pyramid Pusher und der Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
