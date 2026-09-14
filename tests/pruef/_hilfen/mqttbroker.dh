@@ -1,0 +1,111 @@
+' Ein MQTT-3.1.1-Broker fuer modules_mqtt.dhtest, in Drachenhauch und ohne
+' Code mit dem Rust-Client zu teilen -- gerade gross genug fuer einen Rundweg:
+' CONNECT -> CONNACK, PINGREQ -> PINGRESP, SUBSCRIBE -> SUBACK, jedes PUBLISH
+' geht an denselben Client zurueck, DISCONNECT beendet. Eine Verbindung.
+' Aufruf: dhrt run mqttbroker.dh -- PORTDATEI
+' Nach 30 s ohne Verbindung beendet er sich selbst.
+IMPORT "net"
+
+DIM lst AS NET_LISTENER : lst = NET_TCP_LISTEN(0, "127.0.0.1")
+WRITEALL(ARG$(0), STR$(NET_LISTENER_PORT(lst)))
+
+DIM c AS NET_SOCKET
+DIM t0 AS INTEGER : t0 = MILLIS()
+c = NET_TCP_ACCEPT(lst)
+WHILE c = NIL
+    IF MILLIS() - t0 > 30000 THEN EXIT(0)
+    SLEEP(5)
+    c = NET_TCP_ACCEPT(lst)
+WEND
+
+DIM puf AS BUFFER : puf = BUFFER_NEW(0)
+
+FUNCTION bytes(a AS INTEGER, b AS INTEGER, c3 AS INTEGER, d AS INTEGER, n AS INTEGER) AS BUFFER
+    ' Die ersten n der vier Bytes als Puffer.
+    DIM p AS BUFFER : p = BUFFER_NEW(n)
+    IF n > 0 THEN BUFFER_SET(p, 0, a)
+    IF n > 1 THEN BUFFER_SET(p, 1, b)
+    IF n > 2 THEN BUFFER_SET(p, 2, c3)
+    IF n > 3 THEN BUFFER_SET(p, 3, d)
+    RETURN p
+END FUNCTION
+
+FUNCTION kopflaenge(p AS BUFFER) AS INTEGER
+    ' Laenge des festen Kopfs (Typbyte + Restlaenge, 7 Bit je Byte);
+    ' -1, wenn die Restlaenge noch nicht vollstaendig da ist.
+    DIM i AS INTEGER : i = 1
+    WHILE i < BUFFER_LEN(p)
+        IF (BUFFER_GET(p, i) BAND 128) = 0 THEN RETURN i + 1
+        i = i + 1
+    WEND
+    RETURN -1
+END FUNCTION
+
+FUNCTION restlaenge(p AS BUFFER) AS INTEGER
+    DIM wert AS INTEGER : wert = 0
+    DIM faktor AS INTEGER : faktor = 1
+    DIM i AS INTEGER : i = 1
+    WHILE i < BUFFER_LEN(p)
+        DIM b AS INTEGER : b = BUFFER_GET(p, i)
+        wert = wert + (b BAND 127) * faktor
+        faktor = faktor * 128
+        IF (b BAND 128) = 0 THEN RETURN wert
+        i = i + 1
+    WEND
+    RETURN -1
+END FUNCTION
+
+FUNCTION paket() AS BUFFER
+    ' Das naechste vollstaendige Paket; ein leerer Puffer, wenn die
+    ' Verbindung weg ist.
+    DIM t AS INTEGER : t = MILLIS()
+    WHILE MILLIS() - t < 15000
+        IF BUFFER_LEN(puf) >= 2 THEN
+            DIM kl AS INTEGER : kl = kopflaenge(puf)
+            IF kl > 0 THEN
+                DIM ganz AS INTEGER : ganz = kl + restlaenge(puf)
+                IF BUFFER_LEN(puf) >= ganz THEN
+                    DIM p AS BUFFER : p = BUFFER_SLICE(puf, 0, ganz)
+                    puf = BUFFER_SLICE(puf, ganz, BUFFER_LEN(puf))
+                    RETURN p
+                END IF
+            END IF
+        END IF
+        DIM neu AS BUFFER : neu = NET_RECV_BYTES(c, 65536)
+        IF BUFFER_LEN(neu) > 0 THEN
+            puf = BUFFER_CONCAT(puf, neu)
+        ELSEIF NOT NET_IS_CONNECTED(c) THEN
+            RETURN BUFFER_NEW(0)
+        ELSE
+            SLEEP(2)
+        END IF
+    WEND
+    RETURN BUFFER_NEW(0)
+END FUNCTION
+
+DIM p AS BUFFER : p = paket()
+IF BUFFER_LEN(p) = 0 THEN EXIT(0)
+' CONNECT: der Inhalt ist hier gleich -- angenommen.
+NET_SEND(c, bytes(&H20, 2, 0, 0, 4))
+WHILE TRUE
+    p = paket()
+    IF BUFFER_LEN(p) = 0 THEN BREAK
+    DIM art AS INTEGER : art = BUFFER_GET(p, 0) SHR 4
+    DIM kl AS INTEGER : kl = kopflaenge(p)
+    IF art = 12 THEN
+        NET_SEND(c, bytes(&HD0, 0, 0, 0, 2))
+    ELSEIF art = 8 THEN
+        ' SUBACK mit der Paketnummer aus dem SUBSCRIBE und QoS 0 -- das
+        ' fuenfte Byte (Rueckgabecode 0) steht schon im neuen Puffer; ein
+        ' angehaengtes weiteres liest der Client als Paket vom Typ 0.
+        NET_SEND(c, bytes(&H90, 3, BUFFER_GET(p, kl), BUFFER_GET(p, kl + 1), 5))
+    ELSEIF art = 3 THEN
+        ' Zurueck an den Absender, als QoS-0-PUBLISH
+        BUFFER_SET(p, 0, &H30)
+        NET_SEND(c, p)
+    ELSEIF art = 14 THEN
+        BREAK
+    END IF
+WEND
+NET_CLOSE(c)
+EXIT(0)
