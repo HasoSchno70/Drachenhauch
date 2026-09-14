@@ -2,7 +2,7 @@
 StandardFirmata). Die eigentliche Protokoll-Logik (Bit-Packing, Nachrichten-
 Parsing) wird in Rust getestet (rust/drachenhauch_runtime/src/firmata.rs, `cargo test`)
 -- hier nur Registrierung + IMPORT/Typ-Verdrahtung, analog zu
-test_joystick_rumble_no_gamepad_graceful_error in test_language_extensions.py.
+"joystick rumble no gamepad graceful error" in tests/pruef/sprach_erweiterungen.dhtest.
 Kein echtes Arduino noetig (wie bei serial/usb/bt/wifi gibt es dafuer keine
 run_gb-Golden-Tests in diesem Projekt).
 """

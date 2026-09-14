@@ -1,0 +1,431 @@
+' Befehle, die nur dhrt kennt: Feld-Aggregate und dynamische Felder, Zeichenketten,
+' funktions-lokale Plaetze, Dateien, SORT mit Vergleichsfunktion, FLT, NUMFMT$.
+' Bis Stufe 50 (2026-09-14) tests/test_dhrt_builtins.py; erzeugt wie
+' sprach_erweiterungen.dhtest. Format: docs/werkzeuge.md, dhrt test.
+
+=== array sum avg min max int
+DIM a[3] AS INTEGER
+a[0]=5 : a[1]=9 : a[2]=1
+PRINT ARRAY_SUM(a), ARRAY_AVG(a), ARRAY_MIN(a), ARRAY_MAX(a)
+--- erwartet
+15 5.0 1 9
+
+=== array aggregate float
+DIM f[3] AS FLOAT
+f[0]=1.5 : f[1]=2.5 : f[2]=4.0
+PRINT ARRAY_SUM(f), ARRAY_MIN(f), ARRAY_MAX(f)
+PRINT ARRAY_AVG(f)
+--- erwartet
+8.0 1.5 4.0
+2.6666666666666665
+
+=== array fill coerces int to float
+DIM b[3] AS INTEGER
+ARRAY_FILL(b, 7)
+PRINT b[0], b[1], b[2]
+DIM f[2] AS FLOAT
+ARRAY_FILL(f, 9)
+PRINT f[0], f[1]
+--- erwartet
+7 7 7
+9.0 9.0
+
+=== array copy is independent
+DIM a[3] AS INTEGER
+a[0]=5 : a[1]=9 : a[2]=1
+DIM c AS ARRAY OF INTEGER
+c = ARRAY_COPY(a)
+c[0] = 100
+PRINT a[0], c[0]
+--- erwartet
+5 100
+
+=== array avg empty errors
+PRINT "before"
+DIM a[0] AS INTEGER
+PRINT ARRAY_AVG(a)
+PRINT "after"
+--- fehler
+ARRAY_AVG: Array ist leer
+--- erwartet
+before
+
+=== array push pop
+DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+PRINT ARRAY_PUSH(a, 40), a[3], LEN(a)
+PRINT ARRAY_POP(a), LEN(a)
+--- erwartet
+4 40 4
+40 3
+
+=== array insert remove at
+DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+PRINT ARRAY_INSERT(a, 1, 99)
+PRINT a[0], a[1], a[2], a[3]
+PRINT ARRAY_REMOVE_AT(a, 1)
+PRINT a[0], a[1], a[2], LEN(a)
+--- erwartet
+4
+10 99 20 30
+99
+10 20 30 3
+
+=== redim grow and shrink
+DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+REDIM(a, 5)
+PRINT LEN(a), a[2], a[3], a[4]
+REDIM(a, 2)
+PRINT LEN(a), a[0], a[1]
+--- erwartet
+5 30 0 0
+2 10 20
+
+=== array push string and index in new range
+DIM s[1] AS STRING
+s[0] = "hi"
+ARRAY_PUSH(s, "there")
+PRINT s[0], s[1], LEN(s)
+--- erwartet
+hi there 2
+
+=== array pop empty errors
+PRINT "before"
+DIM a[1] AS INTEGER
+PRINT ARRAY_POP(a)
+PRINT ARRAY_POP(a)
+PRINT "after"
+--- fehler
+ARRAY_POP: Array ist leer
+--- erwartet
+before
+0
+
+=== string trim reverse
+PRINT "[" + LTRIM$("  hi  ") + "]"
+PRINT "[" + RTRIM$("  hi  ") + "]"
+PRINT REVERSE$("hello")
+--- erwartet
+[hi  ]
+[  hi]
+olleh
+
+=== string predicates
+PRINT STARTSWITH("hello world", "hello"), STARTSWITH("hello", "x")
+PRINT ENDSWITH("hello world", "world"), ENDSWITH("hello", "x")
+PRINT CONTAINS("hello world", "o w"), CONTAINS("abc", "z")
+--- erwartet
+TRUE FALSE
+TRUE FALSE
+TRUE FALSE
+
+=== string bin oct
+PRINT BIN$(10), BIN$(-10), OCT$(64), OCT$(-64)
+--- erwartet
+1010 -1010 100 -100
+
+=== string isnumeric tryval
+PRINT ISNUMERIC("42"), ISNUMERIC("3.14"), ISNUMERIC("1e5"), ISNUMERIC("abc"), ISNUMERIC("")
+PRINT TRYVAL("42", -1), TRYVAL("3.5", -1), TRYVAL("oops", -1), TRYVAL("  7  ", 0)
+--- erwartet
+TRUE TRUE TRUE FALSE FALSE
+42 3.5 -1 7
+
+=== function local scope no global leak
+' Frueher kompilierte dhrts Rust-Compiler skalare DIMs und FOR-Variablen in
+' Funktionen als GLOBALE Namen statt funktions-lokale Slots. Dann korrumpierte
+' ein gleichnamiges Local einer aufgerufenen Funktion die FOR-Schleifenvariable
+' -> Endlosschleife (z.B. die Cybermatic-3D-Demo hing). Hier: `fb` hat ein
+' lokales `k`, `scn` eine FOR-`k`-Schleife, die `fb` aufruft. Muss terminieren.
+FUNCTION fb(i AS INTEGER) AS INTEGER
+DIM k AS INTEGER
+k = i * 10
+RETURN k
+END FUNCTION
+SUB scn()
+DIM seg AS INTEGER
+FOR seg = 0 TO 2
+DIM k AS INTEGER
+FOR k = 0 TO 2
+DIM c AS INTEGER
+c = fb(seg)
+NEXT
+PRINT "seg=" + STR$(seg) + " k=" + STR$(k)
+NEXT
+END SUB
+scn()
+PRINT "done"
+--- erwartet
+seg=0 k=3
+seg=1 k=3
+seg=2 k=3
+done
+
+=== function local shadows global loop var
+' Ein funktions-lokales `i` (DIM/FOR) muss einen gleichnamigen Top-Level-
+' Global SHADOWEN. Frueher schrieb das Local faelschlich das GLOBAL -> die
+' aufrufende FOR-Schleife brach ab/hing (so hing 64_showcase.dh / Variadic-
+' Logger in einer FOR i-Schleife).
+SUB inner()
+DIM i AS INTEGER
+FOR i = 0 TO 1
+NEXT
+END SUB
+DIM i AS INTEGER
+DIM tot AS INTEGER
+tot = 0
+FOR i = 0 TO 2
+inner()
+tot = tot + i
+NEXT
+PRINT tot
+--- erwartet
+3
+
+=== function local same name as other function
+' Zwei Funktionen mit gleichnamigem Local duerfen sich nicht beeinflussen.
+FUNCTION a() AS INTEGER
+DIM x AS INTEGER
+x = 111
+RETURN x
+END FUNCTION
+FUNCTION b() AS INTEGER
+DIM x AS INTEGER
+x = a()
+x = x + 1
+RETURN x
+END FUNCTION
+PRINT b()
+--- erwartet
+112
+
+=== function local array isolated
+' Lokale Arrays gleichen Namens in zwei Funktionen duerfen sich nicht
+' teilen (frueher: DECLARE_ARRAY_NAME global statt DECLARE_ARRAY_LOCAL).
+FUNCTION makeit() AS INTEGER
+DIM tmp[3] AS INTEGER
+tmp[0] = 99
+RETURN tmp[0]
+END FUNCTION
+SUB use()
+DIM tmp[3] AS INTEGER
+tmp[0] = 1 : tmp[1] = 2 : tmp[2] = 3
+DIM x AS INTEGER
+x = makeit()
+PRINT tmp[0], tmp[1], tmp[2]
+END SUB
+use()
+PRINT "done"
+--- erwartet
+1 2 3
+done
+
+=== function local struct isolated
+' Lokale STRUCT-Instanzen gleichen Namens in zwei Funktionen isoliert.
+STRUCT Pt
+DIM x AS INTEGER
+DIM y AS INTEGER
+END STRUCT
+FUNCTION other() AS INTEGER
+DIM p AS Pt
+p.x = 99
+RETURN p.x
+END FUNCTION
+SUB use()
+DIM p AS Pt
+p.x = 5 : p.y = 7
+DIM z AS INTEGER
+z = other()
+PRINT p.x, p.y
+END SUB
+use()
+PRINT "done"
+--- erwartet
+5 7
+done
+
+=== pathjoin
+PRINT PATHJOIN("assets", "img", "x.png")
+PRINT PATHJOIN("a/", "b")
+PRINT PATHJOIN("", "sub", "data.txt")
+--- erwartet
+assets/img/x.png
+a/b
+sub/data.txt
+
+=== aliases sgn sqrt
+PRINT SGN(-5), SGN(0), SGN(3)
+PRINT SQRT(16.0), SQRT(2.0)
+--- erwartet
+-1 0 1
+4.0 1.4142135623730951
+
+=== array join method
+DIM names[3] AS STRING
+names[0]="Anna" : names[1]="Bert" : names[2]="Cilly"
+PRINT names.join(", ")
+--- erwartet
+Anna, Bert, Cilly
+
+=== sort ascending and descending flag
+DIM x[5] AS INTEGER
+x[0]=3 : x[1]=1 : x[2]=9 : x[3]=2 : x[4]=7
+SORT(x)
+PRINT x[0], x[1], x[2], x[3], x[4]
+SORT(x, TRUE)
+PRINT x[0], x[1], x[2], x[3], x[4]
+--- erwartet
+1 2 3 7 9
+9 7 3 2 1
+
+=== sort string descending
+DIM s[3] AS STRING
+s[0]="banana" : s[1]="apple" : s[2]="cherry"
+SORT(s, TRUE)
+PRINT s[0], s[1], s[2]
+--- erwartet
+cherry banana apple
+
+=== sort with comparator funcref
+FUNCTION desc(a AS INTEGER, b AS INTEGER) AS INTEGER
+RETURN b - a
+END FUNCTION
+DIM x[5] AS INTEGER
+x[0]=3 : x[1]=1 : x[2]=9 : x[3]=2 : x[4]=7
+SORT(x, desc)
+PRINT x[0], x[1], x[2], x[3], x[4]
+DIM f AS FUNCREF
+f = desc
+DIM y[3] AS INTEGER
+y[0]=5 : y[1]=8 : y[2]=2
+SORT(y, f)
+PRINT y[0], y[1], y[2]
+--- erwartet
+9 7 3 2 1
+8 5 2
+
+=== sort comparator stable by distance
+FUNCTION bydist(a AS INTEGER, b AS INTEGER) AS INTEGER
+RETURN ABS(a - 5) - ABS(b - 5)
+END FUNCTION
+DIM y[5] AS INTEGER
+y[0]=3 : y[1]=1 : y[2]=9 : y[3]=2 : y[4]=7
+SORT(y, bydist)
+PRINT y[0], y[1], y[2], y[3], y[4]
+--- erwartet
+3 7 2 1 9
+
+=== flt int to float 1
+' FLT lief frueher nur im Tree-Walker; jetzt auch nativ (Stolperstein G1).
+PRINT FLT(7)
+--- erwartet
+7.0
+
+=== flt int to float 2
+PRINT FLT(7) / 2
+--- erwartet
+3.5
+
+=== flt int to float 3
+PRINT FLT(2.5)
+--- erwartet
+2.5
+
+=== numfmt below 1000 no suffix 1
+PRINT NUMFMT$(42)
+--- erwartet
+42.00
+
+=== numfmt below 1000 no suffix 2
+PRINT NUMFMT$(999)
+--- erwartet
+999.00
+
+=== numfmt below 1000 no suffix 3
+PRINT NUMFMT$(0)
+--- erwartet
+0.00
+
+=== numfmt suffix tiers 1
+PRINT NUMFMT$(1000)
+--- erwartet
+1.00K
+
+=== numfmt suffix tiers 2
+PRINT NUMFMT$(1234)
+--- erwartet
+1.23K
+
+=== numfmt suffix tiers 3
+PRINT NUMFMT$(1234567)
+--- erwartet
+1.23M
+
+=== numfmt suffix tiers 4
+PRINT NUMFMT$(1500000000)
+--- erwartet
+1.50B
+
+=== numfmt suffix tiers 5
+PRINT NUMFMT$(1000000000000000000.0)
+--- erwartet
+1.00Qi
+
+=== numfmt rounding overflow bumps tier 1
+PRINT NUMFMT$(999999)
+--- erwartet
+1.00M
+
+=== numfmt rounding overflow bumps tier 2
+PRINT NUMFMT$(999995)
+--- erwartet
+1.00M
+
+=== numfmt custom decimals 1
+PRINT NUMFMT$(1234, 0)
+--- erwartet
+1K
+
+=== numfmt custom decimals 2
+PRINT NUMFMT$(1234567, 1)
+--- erwartet
+1.2M
+
+=== numfmt negative
+PRINT NUMFMT$(-2500)
+--- erwartet
+-2.50K
+
+=== numfmt scientific fallback beyond decillion
+PRINT NUMFMT$(POW(10.0, 40))
+--- erwartet
+1.00e40
+
+=== file and dir ops
+' Frueher mit pytests tmp_path; hier der Fallordner selbst.
+DIM base AS STRING
+base = REPLACE$(CWD$(), CHR$(92), "/")
+MKDIR(PATHJOIN(base, "sub"))
+PRINT DIREXISTS(PATHJOIN(base, "sub"))
+WRITEALL(PATHJOIN(base, "sub/data.txt"), "line1" + CHR$(10) + "line2" + CHR$(10) + "line3")
+PRINT FILESIZE(PATHJOIN(base, "sub/data.txt"))
+DIM lines AS ARRAY OF STRING
+lines = READLINES(PATHJOIN(base, "sub/data.txt"))
+PRINT LEN(lines), lines[0], lines[2]
+WRITEALL(PATHJOIN(base, "sub/b.txt"), "x")
+DIM entries AS ARRAY OF STRING
+entries = DIRLIST(PATHJOIN(base, "sub"))
+PRINT LEN(entries), entries[0], entries[1]
+RENAME(PATHJOIN(base, "sub/b.txt"), PATHJOIN(base, "sub/c.txt"))
+PRINT FILEEXISTS(PATHJOIN(base, "sub/b.txt")), FILEEXISTS(PATHJOIN(base, "sub/c.txt"))
+DELETEFILE(PATHJOIN(base, "sub/c.txt"))
+PRINT FILEEXISTS(PATHJOIN(base, "sub/c.txt"))
+--- erwartet
+TRUE
+17
+3 line1 line3
+2 b.txt data.txt
+FALSE TRUE
+FALSE

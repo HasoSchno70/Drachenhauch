@@ -2876,6 +2876,24 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 50 (2026-09-14):** zwei grosse Golden-Dateien, die beim Umzug von
+2026-09-08 stehen geblieben waren -- `test_language_extensions.py` (59 Tests)
+und `test_dhrt_builtins.py` (34, einige mit mehreren Laeufen) sind geloescht.
+Neu `tests/pruef/sprach_erweiterungen.dhtest` (52 Faelle) und
+`tests/pruef/dhrt_builtins.dhtest` (44); die drei Tests, die nur das
+Befehlsverzeichnis fragten (TIMER, JOYSTICK_*, INKEY$/WAITKEY), sind ein Fall in
+`builtin_registrierung.dhtest`. Ein Generator zog Quelltext und Zusagen aus dem
+Syntaxbaum, liess jedes Programm laufen, pruefte `==`/`in`/`raises` am echten
+Lauf und nahm erst dann die GANZE Ausgabe als Erwartung -- strenger als die
+Teiltext-Zusagen davor. Zwei Zusagen waren nicht zu uebernehmen: das
+Python-Suchmuster `Parameter|Argument` (die Meldung heisst `foo: Parameter 'a'
+fehlt`), und ein unterminierter f-String meldet mit folgendem Zeilenumbruch
+etwas anderes als am Dateiende -- in einer Sammlung folgt immer einer, der Fall
+prueft nur `f-String`. Die drei doppelten `vm`-Faelle (einst der Python-VM-Pfad)
+fielen weg. Gegenprobe mit `EXIT(0)` als erster Zeile jedes Falls: 91 von 98
+fallen; die 7 uebrigen sind die Lexer-, Parser- und Compile-Fehler, die vor
+jeder Zeile des Programms abbrechen.
+
 **Stufe 49 (2026-09-14):** die letzte der Restdateien aus Stufe 44 bis 48 --
 `test_smtp.py` ist geloescht, ihre 18 Tests stehen in `tests/pruef/smtp.dhtest`
 (jetzt 26 Faelle). Zwei Helfer unter `tests/pruef/_hilfen/`: **`smtpserver.dh`**,
