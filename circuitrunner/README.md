@@ -169,8 +169,9 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 | `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |
 | `levels/*.json` | Level-Sets (im Menü wählbar) |
 
-Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema +
-dhrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
+Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema der
+Python-Werkzeuge) und `tests/pruef/werkzeug_circuitrunner.dhtest` (die Engine
+selbst: Monster-Reihenfolge/-Tempo, Bestzeiten, Passwort, Hinweissteine).
 
 ## Grenzen / Ideen
 

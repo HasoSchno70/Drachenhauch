@@ -187,7 +187,6 @@ _BRAUCHT_GRAFIK = {
     "test_beispiel_sqlite_tabelle.py",
     "test_beispiele_gui_enden.py",
     "test_buch_tippspiel.py",
-    "test_circuitrunner.py",
     "test_examples.py",
     "test_gui_draw_window.py",
     "test_drucken.py",
@@ -288,7 +287,7 @@ _DHRT = _find_dhrt()
 # Eine Liste betroffener Dateien zu pflegen waere falsch: als Merkmal bot sich
 # `SCREEN(` im Quelltext der Testdatei an, aber fuenf der 25 Dateien enthalten
 # es gar nicht -- sie starten BEISPIELE von der Platte, die ihrerseits ein
-# Fenster oeffnen (test_examples, test_circuitrunner, ...). Eine Heuristik auf
+# Fenster oeffnen (test_examples, test_buch_tippspiel, ...). Eine Heuristik auf
 # dem Testtext kann das prinzipiell nicht sehen.
 #
 # Deshalb an der echten Signatur ansetzen, in zwei Stufen:

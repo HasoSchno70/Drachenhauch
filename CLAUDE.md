@@ -2876,6 +2876,29 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
+Engine-Tests aus `test_circuitrunner.py` stehen in
+`tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei
+Tests der Python-Werkzeuge `convert_dat.py` und `make_demo_levels.py`, und die
+Datei steht nicht mehr in `_BRAUCHT_GRAFIK`. pytest hatte die Engine-Quelle
+vor `WHILE NOT QUITREQUESTED()` abgeschnitten und in einem Ordner mit den
+Assets laufen lassen; jetzt nimmt jeder Fall die Engine per `--- programm`,
+schiebt sich hinter den Kommentar der Hauptschleife und endet mit `EXIT(0)`.
+**Zwei Stellen, die das brauchte:** die Engine laedt `assets/...` relativ, und
+ihre Programmkopie liegt in `_programm/` -- `--- ersetzen` auf `CONST
+SAVEPATH` wechselt darum per `CHDIR` in den Ordner des Spiels UND legt die
+Sicherung in den Fallordner (sonst schriebe jeder Lauf ueber die echte
+`circuitrunner.save`; ihr Datum ist nachgesehen unveraendert). Die Level baut
+`tests/pruef/_hilfen/circuitlevel.dh` mit dem json-Modul und schreibt sie in
+den Fallordner (`DHRT_START_DIR`); seine Namen beginnen mit `pr`, weil der
+Einschub mitten in der Engine steht und deren Globale nicht verdecken darf.
+Eingebunden wird er ueber eine Beilage in `_programm/`, weil ein relativer
+IMPORT dort aufgeloest wird, wo die Quelle liegt. Die Zeiten sind
+Wahrheitswerte in der Ausgabe (30 s +-1). Alle fuenf liefen beim ersten Mal --
+Gegenprobe gegen eine Engine-Kopie, in der `reorder_monsters`,
+`find_password`, `world_tick`, `tat` und `best_for` sofort zurueckkehren:
+5 von 5 fallen.
+
 **Stufe 52 (2026-09-14):** Debugger, VM-Haertung und der geraetefreie Teil
 von MIDI ohne Python -- `test_dhrt_debug.py` (6) und `test_vm_hardening.py` (2)
 sind geloescht, aus `test_midi_module.py` sind sieben Tests gezogen. **Debugger:**
