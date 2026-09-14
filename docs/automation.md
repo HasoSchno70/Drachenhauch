@@ -102,7 +102,7 @@ gehaltene Taste kostet **ein Ereignis pro Frame**, sehr lange Aufnahmen laufen
 also irgendwann voll (raylib hört dann still auf mitzuschreiben).
 
 **Grenze der Prüfung:** die Wiedergabe ist automatisiert getestet
-([tests/test_automation.py](../tests/test_automation.py) schreibt
+([tests/pruef/automation.dhtest](../tests/pruef/automation.dhtest) schreibt
 Aufnahmedateien selbst und prüft, dass `KEYPRESSED`/`MOUSEX`/`MOUSE_HIT` genau
 die aufgezeichneten Werte liefern). Für die Aufnahme ist geprüft, dass echte
 Eingabe erfasst und im richtigen Format geschrieben wird — die Runde

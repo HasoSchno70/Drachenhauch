@@ -242,3 +242,12 @@ MODEL_INSTANCED(box, ms, cs)
 --- fehler
 MODEL_INSTANCED: tint-Array ist kuerzer als die Matrizen (2 < 3)
 
+=== die instancing-demo rendert ohne fenster
+' Echter Render-Pfad durch DrawMeshInstanced: die Demo laeuft zwei Bilder und
+' schreibt ein Bildschirmfoto.
+' (Bis Stufe 45 in test_m3d.py.)
+--- programm ../../examples/104_instancing.dh
+--- umgebung
+DHRT_FRAMES=2
+--- bild
+0 0 = 0 0

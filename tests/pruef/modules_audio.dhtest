@@ -372,3 +372,39 @@ END TRY
 --- erwartet
 AUDIO_MUSIC_SEEK: es laeuft keine Musik -- erst AUDIO_MUSIC_PLAY()
 
+=== music seek springt wirklich
+' Position vor und nach dem Sprung. Ein Sprung wirkt erst nach ~0,3-0,4 s (der
+' gepufferte Vorlauf des Streams) -- darum 800 ms. Zwei Abfragen vorher, weil
+' "noch am Anfang" allein auch dann stimmt, wenn gar nichts spielt.
+' (Bis Stufe 45 in test_modules_audio.py.)
+IMPORT "audio"
+AUDIO_MUSIC_LOAD(ARG$(0))
+AUDIO_MUSIC_PLAY()
+SLEEP(300)
+PRINT "laeuft " ; AUDIO_MUSIC_POSITION() > 0.1
+PRINT "am anfang " ; AUDIO_MUSIC_POSITION() < 2.0
+AUDIO_MUSIC_SEEK(5.0)
+SLEEP(800)
+PRINT "nach dem sprung " ; AUDIO_MUSIC_POSITION() > 4.0
+--- argumente
+{sammlung}/../../examples/assets/ambient.ogg
+--- erwartet
+laeuft TRUE
+am anfang TRUE
+nach dem sprung TRUE
+
+=== music seek auf einem modul sagt es klar
+' MOD/XM haben keine Sekunden-Achse -- das muss der Aufrufer erfahren.
+' (Bis Stufe 45 in test_modules_audio.py.)
+IMPORT "audio"
+AUDIO_MUSIC_LOAD(ARG$(0))
+AUDIO_MUSIC_PLAY()
+TRY
+    AUDIO_MUSIC_SEEK(5.0)
+CATCH e
+    PRINT e
+END TRY
+--- argumente
+{sammlung}/../../examples/assets/demo.mod
+--- enthaelt
+MOD-/XM-Musik laesst sich nicht auf eine Sekunde setzen
