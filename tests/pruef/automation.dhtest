@@ -205,3 +205,50 @@ TRUE TRUE TRUE
 TRUE TRUE TRUE
 TRUE TRUE TRUE
 
+=== eine aufnahme schreibt eine lesbare datei
+' Die Kopfzeile passt zu der Zahl, die AUTOMATION_STOP meldet. Nicht auf "c 0"
+' pruefen: liegt der Mauszeiger im Fenster, stehen zwei Ereignisse drin.
+' (Bis Stufe 45 in test_automation.py.)
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_RECORD("out.txt")
+PRINT "aufnahme laeuft " ; AUTOMATION_RECORDING()
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    FLIP()
+NEXT
+DIM n AS INTEGER : n = AUTOMATION_STOP()
+PRINT "aufnahme danach " ; AUTOMATION_RECORDING()
+DIM z AS ARRAY OF STRING : z = READLINES("out.txt")
+DIM kopf AS BOOLEAN : kopf = FALSE
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    IF LEFT$(TRIM$(z[i]), LEN("c " + STR$(n))) = "c " + STR$(n) THEN kopf = TRUE
+NEXT
+PRINT "kopfzeile passt " ; kopf ; " zahl ab null " ; n >= 0
+--- umgebung
+DHRT_FRAMES=12
+--- enthaelt
+aufnahme laeuft TRUE
+aufnahme danach FALSE
+kopfzeile passt TRUE zahl ab null TRUE
+
+=== eine aufgenommene datei laesst sich abspielen
+' Geprueft wird die BEZIEHUNG, nicht eine feste Zahl: wie viele Ereignisse in zwei
+' Bildern anfallen, haengt am Mausstand des Rechners.
+' (Bis Stufe 45 in test_automation.py.)
+SCREEN(160, 120, "Auto", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_RECORD("rt.txt")
+FLIP()
+FLIP()
+DIM a AS INTEGER : a = AUTOMATION_STOP()
+DIM b AS INTEGER : b = AUTOMATION_PLAY("rt.txt")
+DIM l AS BOOLEAN : l = AUTOMATION_PLAYING()
+PRINT "gleiche zahl " ; a = b
+PRINT "wiedergabe genau dann " ; l = (a > 0)
+--- umgebung
+DHRT_FRAMES=12
+--- enthaelt
+gleiche zahl TRUE
+wiedergabe genau dann TRUE

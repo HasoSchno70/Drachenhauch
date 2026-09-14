@@ -157,3 +157,94 @@ DHRT_FRAMES=1
 --- fehler
 PHYSICS_POINT_POLY: Polygon braucht mindestens 3 Punkte
 
+=== ein shader-array kommt in der gpu an
+' Summe 0.5 auf Weiss -> Grau 127. Ohne gesetztes Array waere die Summe 0 (schwarz),
+' der Fall ist also trennscharf.
+' (Bis Stufe 45 in test_shader_uniforms_geometry.py.)
+SCREEN(120, 90, "A", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("a.fs")
+DIM st[4] AS FLOAT
+st[0] = 0.125 : st[1] = 0.125 : st[2] = 0.125 : st[3] = 0.125
+SHADER_SET_ARRAY(sh, "stufen", st)
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    CLS(&HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- datei a.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+uniform float stufen[4];
+out vec4 finalColor;
+void main() {
+  float s = stufen[0] + stufen[1] + stufen[2] + stufen[3];
+  finalColor = vec4(texture(texture0, fragTexCoord).rgb * s, 1.0);
+}
+
+--- bild
+60 45 #808080 +-8
+
+=== ein zweiter sampler kommt in der gpu an
+' SetShaderValueTexture wirkt auf das GERADE AKTIVE Programm -- ausserhalb von
+' BeginShaderMode bliebe der Sampler schwarz.
+' (Bis Stufe 45 in test_shader_uniforms_geometry.py.)
+SCREEN(120, 90, "M", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("m.fs")
+DIM m AS IMAGE
+m = GENTEX_COLOR(64, 64, &H808080)
+SHADER_SET_TEXTURE(sh, "maske", m)
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    CLS(&HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- datei m.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+uniform sampler2D maske;
+out vec4 finalColor;
+void main() {
+  float m = texture(maske, fragTexCoord).r;
+  finalColor = vec4(texture(texture0, fragTexCoord).rgb * m, 1.0);
+}
+
+--- bild
+60 45 #808080 +-8
+
+=== eine matrix kommt in der gpu an
+' Die Verschiebung 0.5 steht in probe[3][0] -- ohne gesetzte Matrix waere sie 0.
+' (Bis Stufe 45 in test_shader_uniforms_geometry.py.)
+IMPORT "m3d"
+SCREEN(120, 90, "M4", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("t.fs")
+DIM m AS MAT4
+m = MAT4_TRS(VEC3_NEW(0.5, 0.0, 0.0), QUAT_IDENTITY(), VEC3_NEW(1.0, 1.0, 1.0))
+SHADER_SET_MATRIX(sh, "probe", m)
+POSTFX(sh)
+WHILE NOT QUITREQUESTED()
+    CLS(&HFFFFFF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- datei t.fs
+#version 330
+in vec2 fragTexCoord;
+uniform sampler2D texture0;
+uniform mat4 probe;
+out vec4 finalColor;
+void main() {
+  finalColor = vec4(texture(texture0, fragTexCoord).rgb * probe[3][0], 1.0);
+}
+
+--- bild
+60 45 #808080 +-8

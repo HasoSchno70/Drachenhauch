@@ -1,3 +1,4 @@
+--- seriell
 ' Aus test_fenster_prozess.py uebertragen (1 Faelle, aufgezeichnet 2026-09-08). Format: docs/werkzeuge.md, dhrt test.
 
 === fehler haben klare worte
@@ -50,3 +51,162 @@ WINDOW_SEND: eine Nachricht ist EINE Zeile -- kein Zeilenumbruch darin (schick z
 PARENT_SEND: dieses Programm wurde nicht mit WINDOW_OPEN gestartet -- es hat keine Eltern (PARENT_ALIVE() sagt das ohne Fehler)
 WINDOW_SEND: Fenster 0 gibt es nicht (mehr)
 
+=== tausend nachrichten in einem schub
+' Der Kanal selbst ist schnell: 1000 Nachrichten gehen in unter einer Sekunde hin
+' und zurueck. Eine EINZELNE Runde kostet ein Bild des Kindes (es liest seine Post
+' einmal je Bild) -- unter 200 ms. Eine vor der Verbindung gesendete Zeile kommt an.
+' (Bis Stufe 45 in test_fenster_prozess.py.)
+SCREEN(240, 160, "Eltern", 1)
+SET_WINDOW_POS(-3000, -3000)
+PRINT "eltern haben eltern " ; PARENT_ALIVE()
+DIM k AS INTEGER : k = WINDOW_OPEN("kind.dh", "eins", 2)
+WINDOW_SEND(k, "hallo")
+DIM antwort AS STRING : antwort = ""
+DIM t0 AS FLOAT : t0 = MILLIS()
+WHILE antwort = "" AND MILLIS() - t0 < 10000
+    antwort = WINDOW_RECV$(k)
+WEND
+PRINT "erste antwort " ; antwort
+DIM i AS INTEGER
+t0 = MILLIS()
+FOR i = 1 TO 1000
+    WINDOW_SEND(k, STR$(i))
+NEXT
+DIM n AS INTEGER : n = 0
+WHILE n < 1000 AND MILLIS() - t0 < 10000
+    antwort = WINDOW_RECV$(k)
+    IF antwort <> "" THEN n = n + 1
+WEND
+DIM schub AS FLOAT : schub = MILLIS() - t0
+PRINT "schub vollstaendig " ; n = 1000 AND antwort = "pong 1000"
+PRINT "schub unter einer sekunde " ; schub < 1000
+t0 = MILLIS()
+WINDOW_SEND(k, "einzeln") : antwort = ""
+WHILE antwort = "" AND MILLIS() - t0 < 5000
+    antwort = WINDOW_RECV$(k)
+WEND
+PRINT "runde " ; antwort ; " unter 200 ms " ; MILLIS() - t0 < 200
+PRINT "kind lebt " ; WINDOW_ALIVE(k)
+--- umgebung
+DHRT_FRAMES=1
+--- datei kind.dh
+SCREEN(240, 160, "Kind", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    DIM z AS STRING : z = PARENT_RECV$()
+    WHILE z <> ""
+        n = n + 1
+        IF z = "stirb" THEN EXIT(3)
+        IF LEFT$(z, 5) = "datei" THEN WRITEALL("vom_kind.txt", MID$(z, 6))
+        PARENT_SEND("pong " + z)
+        z = PARENT_RECV$()
+    WEND
+    WRITEALL("herz.txt", STR$(MILLIS()))
+    CLS(BLUE) : FLIP()
+WEND
+
+--- enthaelt
+eltern haben eltern FALSE
+erste antwort pong hallo
+schub vollstaendig TRUE
+schub unter einer sekunde TRUE
+runde pong einzeln unter 200 ms TRUE
+kind lebt TRUE
+
+=== das kind stirbt und die eltern leben weiter
+' Stirbt das Kind, erfaehrt es das Hauptprogramm und laeuft weiter.
+' (Bis Stufe 45 in test_fenster_prozess.py.)
+SCREEN(240, 160, "Eltern", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM k AS INTEGER : k = WINDOW_OPEN("kind.dh")
+WINDOW_SEND(k, "hallo")
+DIM antwort AS STRING : antwort = ""
+DIM t0 AS FLOAT : t0 = MILLIS()
+WHILE antwort = "" AND MILLIS() - t0 < 10000
+    antwort = WINDOW_RECV$(k)
+WEND
+WINDOW_SEND(k, "stirb")
+DIM t1 AS FLOAT : t1 = MILLIS()
+WHILE WINDOW_ALIVE(k) AND MILLIS() - t1 < 10000
+WEND
+PRINT "kind tot " ; NOT WINDOW_ALIVE(k)
+TRY
+    WINDOW_SEND(k, "noch da?")
+    PRINT "gesendet"
+CATCH e
+    PRINT "Fehler beim Senden"
+END TRY
+PRINT "eltern laufen weiter"
+--- umgebung
+DHRT_FRAMES=1
+--- datei kind.dh
+SCREEN(240, 160, "Kind", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    DIM z AS STRING : z = PARENT_RECV$()
+    WHILE z <> ""
+        n = n + 1
+        IF z = "stirb" THEN EXIT(3)
+        IF LEFT$(z, 5) = "datei" THEN WRITEALL("vom_kind.txt", MID$(z, 6))
+        PARENT_SEND("pong " + z)
+        z = PARENT_RECV$()
+    WEND
+    WRITEALL("herz.txt", STR$(MILLIS()))
+    CLS(BLUE) : FLIP()
+WEND
+
+--- enthaelt
+kind tot TRUE
+eltern laufen weiter
+
+=== das kind beendet sich wenn die eltern weg sind
+' Kein Zombie-Fenster: das Kind schreibt je Bild einen Herzschlag, und der muss nach
+' dem Ende der Eltern aufhoeren (zwei Messungen 1,5 s auseinander, gleich).
+' (Bis Stufe 45 in test_fenster_prozess.py.)
+SCREEN(240, 160, "Eltern", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM k AS INTEGER : k = WINDOW_OPEN("kind.dh")
+WINDOW_SEND(k, "datei angekommen")
+DIM antwort AS STRING : antwort = ""
+DIM t0 AS FLOAT : t0 = MILLIS()
+WHILE antwort = "" AND MILLIS() - t0 < 10000
+    antwort = WINDOW_RECV$(k)
+WEND
+PRINT antwort
+PRINT "eltern gehen"
+--- umgebung
+DHRT_FRAMES=1
+--- datei kind.dh
+SCREEN(240, 160, "Kind", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM n AS INTEGER : n = 0
+WHILE NOT QUITREQUESTED()
+    DIM z AS STRING : z = PARENT_RECV$()
+    WHILE z <> ""
+        n = n + 1
+        IF z = "stirb" THEN EXIT(3)
+        IF LEFT$(z, 5) = "datei" THEN WRITEALL("vom_kind.txt", MID$(z, 6))
+        PARENT_SEND("pong " + z)
+        z = PARENT_RECV$()
+    WEND
+    WRITEALL("herz.txt", STR$(MILLIS()))
+    CLS(BLUE) : FLIP()
+WEND
+
+--- nachher
+FUNCTION herz$() AS STRING
+    IF NOT FILEEXISTS("herz.txt") THEN RETURN ""
+    DIM z AS ARRAY OF STRING : z = READLINES("herz.txt")
+    IF LEN(z) = 0 THEN RETURN ""
+    RETURN z[0]
+END FUNCTION
+PRINT "vom kind " ; READLINES("vom_kind.txt")[0]
+SLEEP(1000)
+DIM stand AS STRING : stand = herz$()
+SLEEP(1500)
+PRINT "herz steht still " ; herz$() = stand
+--- erwartet
+vom kind angekommen
+herz steht still TRUE
