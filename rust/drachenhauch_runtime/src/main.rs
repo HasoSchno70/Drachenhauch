@@ -32,7 +32,6 @@ mod kodierung;
 mod ini;
 mod xml;
 mod pdf;
-mod pdf_masse;
 mod xlsx;
 mod gifschreiber;
 mod geld;

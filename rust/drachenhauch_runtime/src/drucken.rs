@@ -14,8 +14,8 @@
 //!
 //! - **Windows:** GDI ueber das `windows`-Crate (das ohnehin im Baum liegt):
 //!   `CreateDC` auf den Drucker, `StartDoc`/`StartPage`, Text mit den
-//!   GDI-Geschwistern der Standardschriften (Helvetica -> Arial, Times ->
-//!   Times New Roman, Courier -> Courier New), Linien und Rechtecke; der
+//!   GDI-Geschwistern der eingebauten Schriften (sans -> Arial, serif ->
+//!   Times New Roman, mono -> Courier New), Linien und Rechtecke; der
 //!   Treiber rastert. Millimeter werden ueber `GetDeviceCaps` in
 //!   Geraeteeinheiten gerechnet, der nicht druckbare Rand (`PHYSICALOFFSET`)
 //!   abgezogen -- unsere Masse gelten ab Papierkante, GDIs ab dem druckbaren
@@ -75,10 +75,11 @@ pub fn drucken(doc: &Dokument, drucker: &str, kopien: i64, zieldatei: &str) -> R
 /// GDI-Schrift zu einer Standardschrift des pdf-Moduls: (Name, fett, kursiv).
 pub fn gdi_schrift(programmname: &str) -> (&'static str, bool, bool) {
     let n = programmname.to_ascii_lowercase();
-    let face = if n.starts_with("times") { "Times New Roman" }
-               else if n.starts_with("courier") { "Courier New" }
-               else if n.starts_with("symbol") { "Symbol" }
-               else if n.starts_with("zapf") { "Wingdings" }
+    // Die eingebauten Schriften sind DejaVu; auf dem Drucker nehmen ihre
+    // Windows-Geschwister den Platz ein. Eine mit PDF_FONT_LOAD geladene
+    // Schrift kennt GDI nicht -- sie wird Arial.
+    let face = if n.starts_with("serif") || n.starts_with("times") { "Times New Roman" }
+               else if n.starts_with("mono") || n.starts_with("courier") { "Courier New" }
                else { "Arial" };
     (face, n.contains("fett"), n.contains("kursiv"))
 }
@@ -180,7 +181,7 @@ mod plattform {
                 for op in &seite.ops {
                     match op {
                         Op::Text { x, y, text, schrift, groesse_pt, farbe: f } => {
-                            let (face, fett, kursiv) = gdi_schrift(crate::pdf::schrift_programmname(*schrift));
+                            let (face, fett, kursiv) = gdi_schrift(&doc.schrift_name(*schrift));
                             let hoehe = -((groesse_pt / 72.0 * dpi_y).round() as i32);
                             let facew = wide(face);
                             let font = CreateFontW(hoehe, 0, 0, 0, if fett { FW_BOLD.0 as i32 } else { FW_NORMAL.0 as i32 },
@@ -260,7 +261,7 @@ mod plattform {
     }
 
     pub fn drucken(doc: &Dokument, drucker: &str, kopien: u32, zieldatei: &str) -> Result<(), String> {
-        let bytes = doc.bauen();
+        let bytes = doc.bauen().map_err(|e| format!("PDF_PRINT: {}", e))?;
         if !zieldatei.is_empty() {
             // Ohne GDI ist die Zieldatei die PDF selbst -- so laeuft derselbe
             // Aufruf auf jedem System.
@@ -287,6 +288,9 @@ mod tests {
         assert_eq!(gdi_schrift("helvetica-fett-kursiv"), ("Arial", true, true));
         assert_eq!(gdi_schrift("times-kursiv"), ("Times New Roman", false, true));
         assert_eq!(gdi_schrift("courier-fett"), ("Courier New", true, false));
+        assert_eq!(gdi_schrift("serif-kursiv"), ("Times New Roman", false, true));
+        assert_eq!(gdi_schrift("mono"), ("Courier New", false, false));
+        assert_eq!(gdi_schrift("hausschrift"), ("Arial", false, false));
     }
 
     #[test]

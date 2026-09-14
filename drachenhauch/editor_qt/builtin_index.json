@@ -7539,6 +7539,12 @@
    "module": "pdf"
   },
   {
+   "name": "PDF_FONT_LOAD",
+   "kind": "core",
+   "signature": "PDF_FONT_LOAD(p: PDF, pfad$, name$)",
+   "module": "pdf"
+  },
+  {
    "name": "PDF_LINE",
    "kind": "core",
    "signature": "PDF_LINE(p: PDF, x1, y1, x2, y2)",
