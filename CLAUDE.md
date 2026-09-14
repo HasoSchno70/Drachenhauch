@@ -3000,8 +3000,20 @@ Breite vergroessert (4x und 3x) -- der Test vergroessert genauso und vergleicht
 dann. Tests zwei Faelle in `tests/pruef/werkzeug_beispiel_bilder.dhtest`
 (Gegenprobe: eine geaenderte Palettenfarbe bzw. ein Punkt im Schiff -- beide
 fallen).
-Noch Python bei den Spielen: die PIL-Bildgeneratoren (Platformer-Sprites,
-Pyramid Pushers `gen_art.py` mit numpy) und der Flask-`cloudserver`.
+**Plattformer-Sprites (selber Tag):** `examples/platformer/make_sprites.dh`
+statt der PIL-Fassung. Die Pixel-Leinwand (Punkte, Rechtecke, Kreisformel
+`dx²+dy² <= r²+0.4r`, Umriss ueber vier Nachbarn) ist mit Pythons `int()`
+(Richtung null) nachgebaut -- alle acht Figurenstreifen, der 16x16-Spieler-Atlas
+und beide JSON-Dateien sind gleich (Pythons `write_text` schrieb unter Windows
+CRLF, git haelt LF). **PIL verkleinert 32->16 mit dem Punkt (2x+1, 2y+1),
+`IMAGE_SCALE_NN` mit (2x, 2y)** -- der Atlas tastet darum von Hand ab. Im
+Master-Sheet weichen nur Stern (85 Punkte) und Fahne (9) ab, beide PIL-Vielecke;
+ein nachgebautes Pillow-Scanline mit acht Varianten traf keinen genau, und im
+Bild sind es einzelne Randpunkte. GIFs (je Bild 120 ms) und der Kontaktbogen
+(Schrift der Laufzeit) sind neu geschrieben, die `.dhsprite`-Dateien nicht mehr.
+Test `tests/pruef/werkzeug_platformer_sprites.dhtest`.
+Noch Python bei den Spielen: Pyramid Pushers `gen_art.py` (PIL + numpy) und der
+Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
