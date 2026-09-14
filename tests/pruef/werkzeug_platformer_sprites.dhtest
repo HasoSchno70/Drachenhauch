@@ -1,0 +1,109 @@
+' Der Sprite-Generator des Plattformer-Beispiels (bis 2026-09-14
+' make_sprites.py mit PIL). Die PNGs werden Punkt fuer Punkt mit den
+' eingecheckten verglichen (Farbe + Deckkraft), die JSON-Dateien Byte fuer
+' Byte; bei den GIFs zaehlt, wie viele Bilder sie tragen und wie lange eines
+' steht.
+
+=== plattformer-sprites sind die eingecheckten
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+FUNCTION abweichend(pfadA AS STRING, pfadB AS STRING) AS INTEGER
+    DIM a AS IMAGE : a = LOADIMAGE(pfadA)
+    DIM b AS IMAGE : b = LOADIMAGE(pfadB)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN -1
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            DIM da AS INTEGER : da = GETALPHA(a, x, y)
+            IF da <> GETALPHA(b, x, y) THEN
+                n = n + 1
+            ELSEIF da > 0 AND GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+FUNCTION bytegleich(pfadA AS STRING, pfadB AS STRING) AS BOOLEAN
+    DIM a AS BUFFER : a = READALL_BYTES(pfadA)
+    DIM b AS BUFFER : b = READALL_BYTES(pfadB)
+    RETURN BUFFER_LEN(a) = BUFFER_LEN(b) AND BUFFER_TO_HEX$(a) = BUFFER_TO_HEX$(b)
+END FUNCTION
+FUNCTION gifBilder$(pfad AS STRING) AS STRING
+    ' Graphic Control Extension 21 F9 04: je Bild eine, die Dauer steht in
+    ' Hundertstelsekunden in den zwei Bytes nach dem Merkmals-Byte.
+    DIM hexText AS STRING : hexText = UPPER$(BUFFER_TO_HEX$(READALL_BYTES(pfad)))
+    DIM zahl AS INTEGER : zahl = 0
+    DIM dauer AS STRING : dauer = ""
+    DIM ab AS INTEGER : ab = 0
+    WHILE TRUE
+        DIM stelle AS INTEGER : stelle = INSTR(MID$(hexText, ab, LEN(hexText)), "21F904")
+        IF stelle < 0 THEN BREAK
+        stelle = ab + stelle
+        IF stelle MOD 2 = 0 THEN
+            zahl = zahl + 1
+            IF dauer = "" THEN dauer = MID$(hexText, stelle + 8, 4)
+        END IF
+        ab = stelle + 2
+    WEND
+    RETURN STR$(zahl) + " Bilder, Dauer " + dauer
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/plat", CWD$() + "/assets")
+DIM aus AS STRING : aus = lauf$(p)
+' Ein Bau ohne Grafik kann nicht zeichnen: die Meldung des Kindes
+' weiterreichen, dann heisst der Fall "uebersprungen" statt falsch.
+IF NOT FILEEXISTS("plat/_contact.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM figuren AS ARRAY OF STRING : figuren = ["player", "walker", "guard", "snapper", "glider", "coin", "itembox", "water"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(figuren) - 1
+    PRINT figuren[i]; ".png "; abweichend("plat/" + figuren[i] + ".png", ARG$(1) + "/" + figuren[i] + ".png"); ", gif "; gifBilder$("plat/" + figuren[i] + ".gif")
+NEXT
+PRINT "sheet.png "; abweichend("plat/sheet.png", ARG$(1) + "/sheet.png")
+PRINT "sheet.json "; bytegleich("plat/sheet.json", ARG$(1) + "/sheet.json")
+PRINT "player.png "; abweichend("assets/player.png", ARG$(2) + "/player.png")
+PRINT "player_atlas.json "; bytegleich("assets/player_atlas.json", ARG$(2) + "/player_atlas.json")
+--- argumente
+{sammlung}/../../examples/platformer/make_sprites.dh
+{sammlung}/../../examples/platformer
+{sammlung}/../../examples/assets
+--- erwartet
+  8 animierte Figuren (.png + .gif)
+  Master-Sheet: sheet.png (10x5 = 44 Sprites) + sheet.json
+  Kontaktbogen: _contact.png
+fertig.
+rueckgabe 0
+player.png 0, gif 8 Bilder, Dauer 0C00
+walker.png 0, gif 3 Bilder, Dauer 0C00
+guard.png 0, gif 3 Bilder, Dauer 0C00
+snapper.png 0, gif 2 Bilder, Dauer 0C00
+glider.png 0, gif 2 Bilder, Dauer 0C00
+coin.png 0, gif 4 Bilder, Dauer 0C00
+itembox.png 0, gif 3 Bilder, Dauer 0C00
+water.png 0, gif 2 Bilder, Dauer 0C00
+sheet.png 0
+sheet.json TRUE
+player.png 0
+player_atlas.json TRUE

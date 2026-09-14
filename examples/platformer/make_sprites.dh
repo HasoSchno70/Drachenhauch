@@ -1,0 +1,765 @@
+' Sprite-Generator fuer einen generischen Plattformer-Satz -- 32x32, prozedural.
+'
+' Eigenstaendiges "Twilight"-Thema (violetter Held, schiefer-violette Gegner,
+' Stahl-Cyan-Roehren, Kristall-Item-Boxen) -- bewusst NICHT an Nintendo-Marken/
+' -Figuren angelehnt, damit der Satz kommerziell nutzbar ist.
+'
+' Zeichnet Spieler, Gegner, Tiles, Items und Deko auf einer kleinen
+' Pixel-Leinwand (harte Kanten, begrenzte Palette = Pixelart-Look) und schreibt:
+' - pro animierter Figur einen Streifen <name>.png + ein bewegtes <name>.gif,
+' - ein Master-Spritesheet sheet.png + sheet.json (ATLAS_LOAD-Manifest) mit ALLEN
+'   benannten Sprites in einem Raster,
+' - einen 16x16-Spieler-Atlas ../assets/player.png + player_atlas.json,
+' - _contact.png zur Begutachtung.
+'
+'     dhrt run examples/platformer/make_sprites.dh [-- zielordner [assetsordner]]
+'
+' Bis 2026-09-14 make_sprites.py (PIL). Die PNGs sind Punkt fuer Punkt dieselben
+' bis auf Stern und Fahne, die PIL als Vieleck rastert; die JSON-Dateien sind
+' Byte fuer Byte gleich. Die .dhsprite-Dateien (Format des Qt-Sprite-Editors)
+' schreibt das Programm nicht mehr, und im Kontaktbogen steht die Schrift der
+' Laufzeit statt der von PIL.
+IMPORT "imgfx"
+IMPORT "json"
+
+DIM ordner AS STRING : ordner = CWD$()
+DIM assetsOrdner AS STRING : assetsOrdner = DIRNAME(CWD$()) + "/assets"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+IF ARGC() > 0 THEN ordner = vomAufrufer$(ARG$(0))
+IF ARGC() > 1 THEN assetsOrdner = vomAufrufer$(ARG$(1))
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+IF NOT DIREXISTS(assetsOrdner) THEN MKDIR(assetsOrdner)
+
+CONST S = 32          ' Sprite-Kantenlaenge
+CONST T = -1          ' durchsichtig: Zeichnen damit tut nichts
+
+' ----------------------------------------------------------------- Farben
+' Eigenstaendige "Twilight"-Palette (bewusst NICHT die Mario-Farben): Held =
+' violette Kapuze + tuerkise Montur, Gegner = schiefer-violett, Panzer/Roehre =
+' Stahl-Cyan, Item-Box = Kristall. Siehe examples/ASSET-CREDITS.md.
+CONST OL = &H1A121C
+CONST RED = &H9648C8
+CONST RED_D = &H622C8A
+CONST RED_H = &HC48AEA
+CONST SKIN = &HFCCEA8
+CONST SKIN_D = &HD49C74
+CONST BLUE = &H22A29C
+CONST BLUE_D = &H126C68
+CONST BLUE_H = &H68D4CA
+CONST BROWN = &H6C5E84
+CONST BROWN_D = &H42385A
+CONST BROWN_L = &H988AB2
+CONST STEEL = &H4AACB2
+CONST STEEL_D = &H267078
+CONST STEEL_H = &H94E0DC
+CONST CRYST = &H60C4E6
+CONST CRYST_D = &H2C7EAA
+CONST CRYST_H = &HBEEEFC
+CONST YEL = &HFAD048
+CONST YEL_D = &HC49628
+CONST WHITE = &HFAFAFA
+CONST GREEN = &H48B848
+CONST GREEN_D = &H24742C
+CONST GREEN_H = &H8CE078
+CONST ORANGE = &HF09024
+CONST ORANGE_D = &HB46010
+CONST GRAY = &HB4B4C0
+CONST GRAY_D = &H707080
+CONST GRAY_H = &HE0E0E8
+CONST WATER = &H3C84F4
+CONST WATER_D = &H2460C8
+CONST WATER_H = &H96C8FC
+CONST BRICK = &HC4602C
+CONST BRICK_D = &H843C1A
+CONST BRICK_M = &H602C12      ' Mortar
+CONST DIRT = &HC47438
+CONST DIRT_D = &H965224
+
+' ----------------------------------------------------------------- Leinwand
+' Winzige Pixel-Zeichenflaeche (keine Kantenglaettung). Koordinaten werden wie
+' Pythons int() Richtung null abgeschnitten.
+FUNCTION ganz(v AS FLOAT) AS INTEGER
+    IF v < 0 THEN RETURN -INT(-v)
+    RETURN INT(v)
+END FUNCTION
+
+SUB setz(c AS IMAGE, x AS FLOAT, y AS FLOAT, farbe AS INTEGER)
+    IF farbe = T THEN RETURN
+    DIM xi AS INTEGER : xi = ganz(x)
+    DIM yi AS INTEGER : yi = ganz(y)
+    IF xi < 0 OR yi < 0 OR xi >= IMAGEWIDTH(c) OR yi >= IMAGEHEIGHT(c) THEN RETURN
+    IMAGE_FILL_RECT(c, xi, yi, xi, yi, farbe, 255)
+END SUB
+
+SUB rect(c AS IMAGE, x0 AS FLOAT, y0 AS FLOAT, x1 AS FLOAT, y1 AS FLOAT, farbe AS INTEGER)
+    IF farbe = T THEN RETURN
+    DIM xa AS INTEGER : xa = MAX(0, ganz(x0))
+    DIM xb AS INTEGER : xb = MIN(IMAGEWIDTH(c) - 1, ganz(x1))
+    DIM ya AS INTEGER : ya = MAX(0, ganz(y0))
+    DIM yb AS INTEGER : yb = MIN(IMAGEHEIGHT(c) - 1, ganz(y1))
+    IF xa > xb OR ya > yb THEN RETURN
+    IMAGE_FILL_RECT(c, xa, ya, xb, yb, farbe, 255)
+END SUB
+
+SUB hline(c AS IMAGE, x0 AS FLOAT, x1 AS FLOAT, y AS FLOAT, farbe AS INTEGER)
+    rect(c, x0, y, x1, y, farbe)
+END SUB
+
+SUB vline(c AS IMAGE, x AS FLOAT, y0 AS FLOAT, y1 AS FLOAT, farbe AS INTEGER)
+    rect(c, x, y0, x, y1, farbe)
+END SUB
+
+SUB disc(c AS IMAGE, cx AS FLOAT, cy AS FLOAT, r AS FLOAT, farbe AS INTEGER)
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = ganz(cy - r) TO ganz(cy + r)
+        FOR x = ganz(cx - r) TO ganz(cx + r)
+            IF (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r + r * 0.4 THEN setz(c, x, y, farbe)
+        NEXT
+    NEXT
+END SUB
+
+SUB bevel(c AS IMAGE, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, basis AS INTEGER, hell AS INTEGER, dunkel AS INTEGER)
+    rect(c, x0, y0, x1, y1, basis)
+    hline(c, x0, x1, y0, hell)
+    vline(c, x0, y0, y1, hell)
+    hline(c, x0, x1, y1, dunkel)
+    vline(c, x1, y0, y1, dunkel)
+END SUB
+
+SUB umriss(c AS IMAGE, farbe AS INTEGER)
+    ' Jeder durchsichtige Punkt mit einem gedeckten Nachbarn wird Umriss --
+    ' gefragt wird das Bild VOR dem Umriss, nicht das halb umrandete.
+    DIM b AS INTEGER : b = IMAGEWIDTH(c)
+    DIM h AS INTEGER : h = IMAGEHEIGHT(c)
+    DIM deck[b * h] AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            deck[y * b + x] = GETALPHA(c, x, y)
+        NEXT
+    NEXT
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            IF deck[y * b + x] = 0 THEN
+                DIM rand AS BOOLEAN : rand = FALSE
+                IF x + 1 < b THEN rand = rand OR deck[y * b + x + 1] > 0
+                IF x > 0 THEN rand = rand OR deck[y * b + x - 1] > 0
+                IF y + 1 < h THEN rand = rand OR deck[(y + 1) * b + x] > 0
+                IF y > 0 THEN rand = rand OR deck[(y - 1) * b + x] > 0
+                IF rand THEN IMAGE_FILL_RECT(c, x, y, x, y, farbe, 255)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION rad(grad AS FLOAT) AS FLOAT
+    ' wie math.radians: grad * (pi / 180)
+    RETURN grad * (PI / 180.0)
+END FUNCTION
+
+' ============================================================ HELD
+SUB schuh(c AS IMAGE, x AS INTEGER, y AS INTEGER)
+    rect(c, x, y, x + 5, y + 1, BROWN) : rect(c, x, y + 1, x + 6, y + 2, BROWN_D)
+END SUB
+
+SUB arm(c AS IMAGE, x AS INTEGER, y AS INTEGER, hoch AS BOOLEAN)
+    IF hoch THEN
+        rect(c, x, y - 4, x + 2, y, RED) : disc(c, x + 1, y - 5, 2, SKIN)
+    ELSE
+        rect(c, x, y, x + 2, y + 4, RED) : disc(c, x + 1, y + 5, 2, SKIN)
+    END IF
+END SUB
+
+SUB heldKopf(c AS IMAGE, cx AS INTEGER, y AS INTEGER, tot AS BOOLEAN)
+    rect(c, cx - 7, y + 2, cx - 1, y + 3, RED)
+    rect(c, cx - 7, y + 1, cx + 5, y + 4, RED)
+    rect(c, cx - 5, y, cx + 4, y + 1, RED)
+    hline(c, cx - 3, cx + 2, y - 1, RED)
+    rect(c, cx - 6, y + 1, cx + 4, y + 1, RED_H)
+    disc(c, cx, y + 2, 2, WHITE)
+    setz(c, cx, y + 2, RED) : setz(c, cx - 1, y + 1, RED) : setz(c, cx + 1, y + 3, RED)
+    rect(c, cx - 5, y + 4, cx + 5, y + 11, SKIN)
+    rect(c, cx + 4, y + 5, cx + 5, y + 11, SKIN_D)
+    rect(c, cx - 6, y + 4, cx - 4, y + 10, BROWN)
+    rect(c, cx + 5, y + 5, cx + 6, y + 8, BROWN)
+    IF tot THEN
+        setz(c, cx, y + 6, OL) : setz(c, cx + 1, y + 5, OL)
+        setz(c, cx + 1, y + 6, OL) : setz(c, cx, y + 5, OL)
+    ELSE
+        rect(c, cx, y + 5, cx + 1, y + 7, WHITE)
+        vline(c, cx + 1, y + 5, y + 7, OL)
+    END IF
+    disc(c, cx + 4, y + 8, 2, SKIN) : disc(c, cx + 5, y + 8, 1, SKIN_D)
+    ' Kein Schnurrbart (Differenzierung): nur ein kleiner, neutraler Mund.
+    hline(c, cx - 2, cx + 1, y + 10, SKIN_D)
+END SUB
+
+SUB heldKoerper(c AS IMAGE, cx AS INTEGER, y AS INTEGER, geduckt AS BOOLEAN)
+    DIM h AS INTEGER : h = IIF(geduckt, 5, 9)
+    rect(c, cx - 7, y, cx + 7, y + 2, RED)
+    rect(c, cx - 6, y + 1, cx + 6, y + h, BLUE)
+    rect(c, cx - 6, y + 1, cx - 5, y + h, BLUE_D)
+    rect(c, cx + 5, y + 1, cx + 6, y + h, BLUE_H)
+    vline(c, cx - 3, y - 1, y + 2, BLUE) : vline(c, cx + 3, y - 1, y + 2, BLUE)
+    disc(c, cx - 3, y + 3, 1, YEL) : disc(c, cx + 3, y + 3, 1, YEL)
+END SUB
+
+SUB heldBeine(c AS IMAGE, cx AS INTEGER, y AS INTEGER, bein AS STRING)
+    SELECT CASE bein
+        CASE "stride_l"
+            rect(c, cx - 7, y, cx - 3, y + 4, BLUE) : schuh(c, cx - 9, y + 4)
+            rect(c, cx + 1, y, cx + 4, y + 3, BLUE) : schuh(c, cx + 2, y + 3)
+        CASE "stride_r"
+            rect(c, cx - 4, y, cx - 1, y + 3, BLUE) : schuh(c, cx - 7, y + 3)
+            rect(c, cx + 3, y, cx + 7, y + 4, BLUE) : schuh(c, cx + 4, y + 4)
+        CASE "tuck"
+            rect(c, cx - 6, y, cx - 2, y + 2, BLUE) : schuh(c, cx - 9, y + 1)
+            rect(c, cx + 2, y, cx + 6, y + 2, BLUE) : schuh(c, cx + 4, y + 1)
+        CASE ELSE
+            rect(c, cx - 5, y, cx - 1, y + 4, BLUE) : schuh(c, cx - 8, y + 4)
+            rect(c, cx + 1, y, cx + 5, y + 4, BLUE) : schuh(c, cx + 3, y + 4)
+    END SELECT
+END SUB
+
+FUNCTION held(bein AS STRING, armHoch AS BOOLEAN, lehne AS INTEGER, geduckt AS BOOLEAN, tot AS BOOLEAN) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM cx AS INTEGER : cx = 16 + lehne
+    IF geduckt THEN
+        heldKopf(c, cx, 9, tot)
+        heldKoerper(c, cx, 18, TRUE)
+        rect(c, cx - 7, 26, cx - 1, 28, BLUE) : rect(c, cx + 1, 26, cx + 7, 28, BLUE)
+        schuh(c, cx - 9, 28) : schuh(c, cx + 3, 28)
+        umriss(c, OL)
+        RETURN c
+    END IF
+    DIM oben AS INTEGER : oben = 4
+    heldKopf(c, cx, oben, tot)
+    heldKoerper(c, cx, oben + 9, FALSE)
+    IF armHoch THEN
+        arm(c, cx + 7, oben + 8, TRUE) : arm(c, cx - 10, oben + 12, FALSE)
+    ELSEIF tot THEN
+        arm(c, cx + 8, oben + 9, TRUE) : arm(c, cx - 11, oben + 9, TRUE)
+    ELSEIF lehne > 0 THEN
+        arm(c, cx - 12, oben + 11, FALSE) : arm(c, cx + 7, oben + 13, FALSE)
+    ELSE
+        arm(c, cx - 10, oben + 12, FALSE) : arm(c, cx + 7, oben + 12, FALSE)
+    END IF
+    heldBeine(c, cx, oben + 20, bein)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+' ============================================================ GEGNER
+FUNCTION laeufer(schritt AS INTEGER, platt AS BOOLEAN) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    IF platt THEN
+        disc(c, 16, 24, 13, BROWN)
+        rect(c, 3, 24, 28, 27, BROWN)
+        rect(c, 3, 26, 28, 28, BROWN_D)
+        rect(c, 8, 22, 12, 25, WHITE) : rect(c, 19, 22, 23, 25, WHITE)
+        rect(c, 10, 22, 12, 24, OL) : rect(c, 19, 22, 21, 24, OL)
+        umriss(c, OL)
+        RETURN c
+    END IF
+    disc(c, 16, 12, 11, BROWN)              ' Pilzkopf
+    rect(c, 6, 12, 26, 17, BROWN)
+    rect(c, 6, 15, 26, 18, BROWN_D)         ' Unterkante Schatten
+    disc(c, 16, 9, 9, BROWN_L)              ' heller Scheitel
+    rect(c, 8, 11, 13, 16, WHITE) : rect(c, 19, 11, 24, 16, WHITE)       ' Augen
+    rect(c, 10, 12, 12, 15, OL) : rect(c, 19, 12, 21, 15, OL)
+    rect(c, 8, 9, 14, 11, BROWN_D) : rect(c, 18, 9, 24, 11, BROWN_D)     ' boese Brauen
+    setz(c, 13, 11, BROWN_D) : setz(c, 19, 11, BROWN_D)
+    hline(c, 12, 20, 18, OL) : setz(c, 11, 17, OL) : setz(c, 21, 17, OL) ' Mund
+    IF schritt = 0 THEN                     ' Fuesse (Schritt)
+        rect(c, 6, 24, 13, 27, BROWN_D) : rect(c, 19, 24, 26, 27, BROWN_D)
+    ELSE
+        rect(c, 8, 24, 15, 27, BROWN_D) : rect(c, 17, 24, 24, 27, BROWN_D)
+    END IF
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION waechter(schritt AS INTEGER, nurPanzer AS BOOLEAN) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    IF nurPanzer THEN
+        disc(c, 16, 18, 12, STEEL)
+        disc(c, 16, 18, 12, STEEL_D)
+        disc(c, 16, 19, 9, STEEL)
+        rect(c, 4, 18, 28, 24, YEL) : rect(c, 4, 22, 28, 25, YEL_D)
+        disc(c, 10, 16, 2, STEEL_D) : disc(c, 16, 16, 2, STEEL_D) : disc(c, 22, 16, 2, STEEL_D)
+        umriss(c, OL)
+        RETURN c
+    END IF
+    ' Kopf
+    disc(c, 22, 8, 5, YEL) : rect(c, 20, 6, 26, 11, YEL)
+    rect(c, 24, 5, 27, 8, YEL_D)
+    rect(c, 23, 6, 24, 8, WHITE) : vline(c, 24, 6, 8, OL)   ' Auge
+    rect(c, 26, 9, 28, 11, ORANGE)                          ' Schnabel
+    ' Panzer
+    disc(c, 13, 17, 10, STEEL)
+    disc(c, 13, 17, 10, STEEL_D)
+    disc(c, 13, 18, 7, STEEL)
+    disc(c, 9, 14, 2, STEEL_H) : disc(c, 16, 14, 2, STEEL_H) : disc(c, 12, 19, 2, STEEL_H)
+    rect(c, 4, 20, 22, 25, YEL) : rect(c, 4, 23, 22, 26, YEL_D)   ' Bauchrand
+    IF schritt = 0 THEN                                     ' Fuesse
+        rect(c, 6, 26, 11, 29, ORANGE_D) : rect(c, 15, 26, 20, 29, ORANGE_D)
+    ELSE
+        rect(c, 8, 26, 13, 29, ORANGE_D) : rect(c, 16, 26, 21, 29, ORANGE_D)
+    END IF
+    disc(c, 22, 18, 3, YEL) : disc(c, 22, 18, 3, YEL_D)     ' Arm
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION schnapper(offen AS BOOLEAN) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    ' Stiel
+    rect(c, 14, 16, 18, 31, GREEN) : rect(c, 14, 16, 15, 31, GREEN_D)
+    rect(c, 17, 16, 18, 31, GREEN_H)
+    disc(c, 11, 22, 2, GREEN_H) : disc(c, 21, 26, 2, GREEN_H)   ' Blaetter
+    ' Kopf mit weissen Punkten
+    disc(c, 16, 10, 9, RED)
+    disc(c, 16, 10, 9, RED_D)
+    disc(c, 16, 9, 7, RED)
+    disc(c, 12, 6, 1, WHITE) : disc(c, 20, 6, 1, WHITE) : disc(c, 11, 11, 1, WHITE)
+    disc(c, 21, 11, 1, WHITE) : disc(c, 16, 4, 1, WHITE)
+    IF offen THEN
+        rect(c, 10, 9, 22, 13, WHITE)       ' offenes Maul
+        DIM tx AS INTEGER
+        FOR tx = 11 TO 21 STEP 3
+            vline(c, tx, 9, 10, RED_D) : vline(c, tx, 12, 13, RED_D)   ' Zaehne
+        NEXT
+        rect(c, 11, 10, 21, 12, &H280C0C)
+    ELSE
+        hline(c, 10, 22, 11, RED_D)         ' geschlossen
+    END IF
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION flieger(schlag AS INTEGER) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM wy AS INTEGER : wy = IIF(schlag = 0, 6, 12)
+    DIM wx AS INTEGER
+    FOR wx = 2 TO 24 STEP 22                ' Fluegel
+        disc(c, wx + 3, wy + 2, 4, WHITE)
+        rect(c, wx, wy, wx + 6, wy + 4, WHITE)
+        setz(c, wx + 3, wy + 2, GRAY)
+    NEXT
+    IMAGE_DRAW_IMAGE(c, laeufer(schlag, FALSE), 0, 0)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+' ============================================================ TILES
+FUNCTION boden() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 0, 0, 31, 31, DIRT)
+    rect(c, 0, 0, 31, 6, GREEN)             ' Gras oben
+    rect(c, 0, 5, 31, 7, GREEN_D)
+    DIM x AS INTEGER
+    FOR x = 2 TO 31 STEP 6
+        vline(c, x, 0, 4, GREEN_H)
+    NEXT
+    disc(c, 6, 12, 1, DIRT_D) : disc(c, 20, 16, 1, DIRT_D) : disc(c, 12, 24, 1, DIRT_D)
+    disc(c, 26, 26, 1, DIRT_D) : disc(c, 3, 20, 1, DIRT_D)
+    rect(c, 0, 0, 0, 31, GREEN_H) : rect(c, 0, 8, 0, 31, DIRT_D)
+    rect(c, 31, 0, 31, 31, BROWN_D)
+    RETURN c
+END FUNCTION
+
+FUNCTION ziegel() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 0, 0, 31, 31, BRICK)
+    rect(c, 0, 0, 31, 1, &HE68C5A)
+    DIM y AS INTEGER
+    FOR y = 0 TO 24 STEP 8                  ' Mortar-Reihen
+        hline(c, 0, 31, y, BRICK_M)
+    NEXT
+    ' vertikale Fugen versetzt
+    vline(c, 0, 1, 7, BRICK_M) : vline(c, 16, 1, 7, BRICK_M)
+    vline(c, 8, 9, 15, BRICK_M) : vline(c, 24, 9, 15, BRICK_M)
+    vline(c, 0, 17, 23, BRICK_M) : vline(c, 16, 17, 23, BRICK_M)
+    vline(c, 8, 25, 31, BRICK_M) : vline(c, 24, 25, 31, BRICK_M)
+    rect(c, 0, 0, 1, 31, &HE68C5A) : rect(c, 30, 0, 31, 31, BRICK_D)
+    RETURN c
+END FUNCTION
+
+FUNCTION itemBox(frame AS INTEGER) AS IMAGE
+    ' Kristall-Item-Box (kein gelber "?"-Block): Cyan-Kristall + Diamant-Symbol.
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM basis AS INTEGER : basis = IIF(frame MOD 3 = 1, CRYST_H, CRYST)
+    bevel(c, 0, 0, 31, 31, basis, CRYST_H, CRYST_D)
+    rect(c, 2, 2, 29, 29, basis)
+    bevel(c, 1, 1, 30, 30, basis, CRYST_H, CRYST_D)
+    disc(c, 3, 3, 1, CRYST_D) : disc(c, 28, 3, 1, CRYST_D)     ' Nieten
+    disc(c, 3, 28, 1, CRYST_D) : disc(c, 28, 28, 1, CRYST_D)
+    DIM i AS INTEGER
+    FOR i = 0 TO 7                          ' Diamant-Symbol (Raute) statt "?"
+        hline(c, 16 - i, 16 + i, 8 + i, WHITE)
+        hline(c, 16 - i, 16 + i, 24 - i, WHITE)
+    NEXT
+    FOR i = 0 TO 5
+        hline(c, 16 - i, 16 + i, 10 + i, CRYST_D)
+        hline(c, 16 - i, 16 + i, 22 - i, CRYST_D)
+    NEXT
+    vline(c, 15, 13, 19, CRYST_H)           ' Glanz
+    RETURN c
+END FUNCTION
+
+FUNCTION itemBoxLeer() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    bevel(c, 0, 0, 31, 31, BROWN, BROWN_L, BROWN_D)
+    rect(c, 2, 2, 29, 29, BROWN_D)
+    bevel(c, 2, 2, 29, 29, BROWN, BROWN_L, BROWN_D)
+    disc(c, 4, 4, 1, BROWN_D) : disc(c, 27, 4, 1, BROWN_D)
+    disc(c, 4, 27, 1, BROWN_D) : disc(c, 27, 27, 1, BROWN_D)
+    RETURN c
+END FUNCTION
+
+FUNCTION fest() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    bevel(c, 0, 0, 31, 31, GRAY, GRAY_H, GRAY_D)
+    rect(c, 3, 3, 28, 28, GRAY)
+    bevel(c, 3, 3, 28, 28, GRAY, GRAY_H, GRAY_D)
+    hline(c, 3, 28, 15, GRAY_D)
+    RETURN c
+END FUNCTION
+
+SUB rohr(c AS IMAGE, x0 AS INTEGER, x1 AS INTEGER, lippe AS BOOLEAN)
+    rect(c, x0, 0, x1, 31, STEEL)
+    rect(c, x0, 0, x0 + 1, 31, STEEL_H)
+    rect(c, x1 - 1, 0, x1, 31, STEEL_D)
+    rect(c, x0 + 4, 0, x0 + 5, 31, STEEL_H)
+    IF lippe THEN
+        rect(c, x0, 0, x1, 7, STEEL)
+        rect(c, x0, 0, x1, 1, STEEL_H)
+        rect(c, x0, 6, x1, 7, STEEL_D)
+        rect(c, x0, 7, x1, 8, OL)
+    END IF
+END SUB
+
+FUNCTION rohrStueck(x0 AS INTEGER, x1 AS INTEGER, lippe AS BOOLEAN, randX AS INTEGER, randFarbe AS INTEGER) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rohr(c, x0, x1, lippe)
+    IF randX >= 0 THEN rect(c, randX, 0, randX + 1, 7, randFarbe)
+    RETURN c
+END FUNCTION
+
+FUNCTION muenze(frame AS INTEGER) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM breiten AS ARRAY OF INTEGER : breiten = [9, 6, 2, 6]
+    DIM w AS INTEGER : w = breiten[frame MOD 4]
+    DIM y AS INTEGER
+    FOR y = 4 TO 27
+        ' Ellipse: Halbbreite skaliert mit w/9
+        DIM hw AS INTEGER : hw = 0
+        IF ABS(y - 16) <= 13 THEN hw = ganz(w * POW(1 - POW((y - 16) / 13.0, 2), 0.5))
+        IF hw > 0 THEN hline(c, 16 - hw, 16 + hw, y, YEL)
+    NEXT
+    IF w >= 6 THEN
+        rect(c, 14, 10, 17, 22, YEL_D)      ' Praegung
+        vline(c, 15, 11, 21, &HFFF0A0)
+    END IF
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION pilz() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    disc(c, 16, 13, 12, RED)                ' Kappe
+    rect(c, 4, 13, 28, 17, RED) : rect(c, 4, 16, 28, 18, RED_D)
+    disc(c, 9, 9, 3, WHITE) : disc(c, 22, 10, 3, WHITE) : disc(c, 16, 16, 2, WHITE)
+    rect(c, 9, 18, 23, 29, SKIN)            ' Stiel
+    rect(c, 9, 18, 11, 29, SKIN_D)
+    rect(c, 13, 22, 15, 26, OL) : rect(c, 18, 22, 20, 26, OL)   ' Augen
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION feuerblume() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 15, 16, 17, 31, GREEN) : rect(c, 15, 16, 15, 31, GREEN_D)
+    disc(c, 9, 22, 3, GREEN_H) : disc(c, 23, 24, 3, GREEN_H)
+    DIM a AS INTEGER
+    FOR a = 0 TO 300 STEP 60
+        disc(c, 16 + 7 * COS(rad(a)), 11 + 7 * SIN(rad(a)), 3, ORANGE)
+    NEXT
+    disc(c, 16, 11, 5, YEL) : disc(c, 16, 11, 3, WHITE)
+    setz(c, 15, 10, OL) : setz(c, 18, 12, OL)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION stern() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM xs AS ARRAY OF FLOAT : xs = []
+    DIM ys AS ARRAY OF FLOAT : ys = []
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        ARRAY_PUSH(xs, 16 + 13 * COS(rad(-90 + i * 72)))
+        ARRAY_PUSH(ys, 16 + 13 * SIN(rad(-90 + i * 72)))
+        ARRAY_PUSH(xs, 16 + 6 * COS(rad(-90 + 36 + i * 72)))
+        ARRAY_PUSH(ys, 16 + 6 * SIN(rad(-90 + 36 + i * 72)))
+    NEXT
+    IMAGE_FILL_POLY(c, xs, ys, YEL, 255)
+    rect(c, 12, 14, 14, 18, OL) : rect(c, 18, 14, 20, 18, OL)   ' Augen
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION leben() AS IMAGE
+    ' "Leben"-Item: Herz (statt gruener 1-Up-Pilz -> klar eigenstaendig).
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    disc(c, 11, 12, 6, &HEC608C) : disc(c, 21, 12, 6, &HEC608C)
+    DIM y AS INTEGER
+    FOR y = 10 TO 27
+        DIM hw AS INTEGER : hw = ganz((27 - y) * 0.95)
+        IF hw > 0 THEN hline(c, 16 - hw, 16 + hw, y, &HEC608C)
+    NEXT
+    disc(c, 10, 11, 2, &HFCA8C4) : disc(c, 20, 11, 2, &HFCA8C4)   ' Glanz
+    vline(c, 9, 13, 16, &HB03460) : vline(c, 23, 13, 16, &HB03460)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION wasserOben(frame AS INTEGER) AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 0, 6, 31, 31, WATER)
+    DIM versatz AS INTEGER : versatz = IIF(frame = 0, 0, 3)
+    DIM x AS INTEGER
+    FOR x = 0 TO 24 STEP 8
+        disc(c, (x + versatz) MOD 32, 6, 3, WATER_H)
+    NEXT
+    rect(c, 0, 9, 31, 31, WATER)
+    FOR x = 2 TO 31 STEP 9
+        hline(c, x, x + 3, 14 + frame * 2, WATER_H)
+    NEXT
+    rect(c, 0, 28, 31, 31, WATER_D)
+    RETURN c
+END FUNCTION
+
+FUNCTION wasser() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 0, 0, 31, 31, WATER)
+    hline(c, 6, 9, 8, WATER_H) : hline(c, 20, 23, 14, WATER_H)
+    hline(c, 12, 15, 22, WATER_H) : hline(c, 26, 29, 26, WATER_H)
+    rect(c, 0, 28, 31, 31, WATER_D)
+    RETURN c
+END FUNCTION
+
+FUNCTION wolke() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    disc(c, 11, 18, 6, WHITE) : disc(c, 20, 16, 7, WHITE) : disc(c, 26, 19, 5, WHITE)
+    rect(c, 8, 18, 27, 24, WHITE)
+    rect(c, 8, 22, 27, 24, &HD2E0F8)
+    umriss(c, &H7896D2)
+    RETURN c
+END FUNCTION
+
+FUNCTION busch() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    disc(c, 9, 22, 6, GREEN) : disc(c, 18, 19, 7, GREEN) : disc(c, 25, 23, 5, GREEN)
+    rect(c, 4, 23, 28, 30, GREEN)
+    rect(c, 4, 27, 28, 30, GREEN_D)
+    DIM x AS INTEGER
+    FOR x = 4 TO 27 STEP 5
+        disc(c, x, 20, 1, GREEN_H)
+    NEXT
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION huegel() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    DIM y AS INTEGER
+    FOR y = 8 TO 31
+        DIM hw AS INTEGER : hw = ganz((y - 6) * 0.9)
+        hline(c, 16 - hw, 16 + hw, y, GREEN)
+    NEXT
+    rect(c, 0, 30, 31, 31, GREEN_D)
+    disc(c, 12, 26, 1, GREEN_D) : disc(c, 20, 28, 1, GREEN_D)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+FUNCTION fahne() AS IMAGE
+    DIM c AS IMAGE : c = IMAGE_NEW(S, S)
+    rect(c, 15, 1, 16, 31, GRAY) : vline(c, 15, 1, 31, GRAY_H)
+    disc(c, 15, 2, 2, YEL)
+    IMAGE_FILL_POLY(c, [16.0, 4.0, 16.0], [4.0, 9.0, 14.0], GREEN, 255)
+    disc(c, 9, 9, 1, WHITE)
+    umriss(c, OL)
+    RETURN c
+END FUNCTION
+
+' ----------------------------------------------------------------- Zusammenbau
+' Alle benannten Sprites in Reihenfolge; die animierten Figuren belegen je
+' einen zusammenhaengenden Bereich.
+DIM alle[64] AS IMAGE
+DIM alleName[64] AS STRING
+DIM anzahl AS INTEGER : anzahl = 0
+DIM figName AS ARRAY OF STRING : figName = []
+DIM figStart AS ARRAY OF INTEGER : figStart = []
+DIM figZahl AS ARRAY OF INTEGER : figZahl = []
+
+SUB figur(name AS STRING)
+    ARRAY_PUSH(figName, name)
+    ARRAY_PUSH(figStart, anzahl)
+    ARRAY_PUSH(figZahl, 0)
+END SUB
+
+SUB bild(name AS STRING, img AS IMAGE)
+    alle[anzahl] = img
+    alleName[anzahl] = name
+    anzahl = anzahl + 1
+END SUB
+
+SUB frame(name AS STRING, img AS IMAGE)
+    DIM f AS INTEGER : f = LEN(figName) - 1
+    bild(figName[f] + "_" + name, img)
+    figZahl[f] = figZahl[f] + 1
+END SUB
+
+figur("player")
+frame("idle", held("idle", FALSE, 0, FALSE, FALSE))
+frame("run0", held("stride_l", FALSE, 0, FALSE, FALSE))
+frame("run1", held("tuck", FALSE, 0, FALSE, FALSE))
+frame("run2", held("stride_r", FALSE, 0, FALSE, FALSE))
+frame("jump", held("tuck", TRUE, 0, FALSE, FALSE))
+frame("skid", held("stride_r", FALSE, 3, FALSE, FALSE))
+frame("duck", held("idle", FALSE, 0, TRUE, FALSE))
+frame("dead", held("idle", FALSE, 0, FALSE, TRUE))
+figur("walker")
+frame("walk0", laeufer(0, FALSE))
+frame("walk1", laeufer(1, FALSE))
+frame("squash", laeufer(0, TRUE))
+figur("guard")
+frame("walk0", waechter(0, FALSE))
+frame("walk1", waechter(1, FALSE))
+frame("shell", waechter(0, TRUE))
+figur("snapper")
+frame("open", schnapper(TRUE))
+frame("closed", schnapper(FALSE))
+figur("glider")
+frame("fly0", flieger(0))
+frame("fly1", flieger(1))
+figur("coin")
+frame("c0", muenze(0))
+frame("c1", muenze(1))
+frame("c2", muenze(2))
+frame("c3", muenze(3))
+figur("itembox")
+frame("q0", itemBox(0))
+frame("q1", itemBox(1))
+frame("q2", itemBox(0))
+figur("water")
+frame("w0", wasserOben(0))
+frame("w1", wasserOben(1))
+
+bild("ground", boden())
+bild("brick", ziegel())
+bild("itembox_used", itemBoxLeer())
+bild("solid", fest())
+bild("tube_tl", rohrStueck(2, 31, TRUE, 0, STEEL_H))
+bild("tube_tr", rohrStueck(0, 29, TRUE, 30, STEEL_D))
+bild("tube_bl", rohrStueck(2, 31, FALSE, -1, 0))
+bild("tube_br", rohrStueck(0, 29, FALSE, -1, 0))
+bild("water_body", wasser())
+bild("grow", pilz())
+bild("bolt", feuerblume())
+bild("shard", stern())
+bild("life", leben())
+bild("cloud", wolke())
+bild("bush", busch())
+bild("hill", huegel())
+bild("flag", fahne())
+
+' ----------------------------------------------------------------- Export
+' 1) Pro animierte Figur: Streifen + bewegtes GIF (vierfach, 120 ms je Bild)
+DIM f AS INTEGER
+DIM i AS INTEGER
+FOR f = 0 TO LEN(figName) - 1
+    DIM n AS INTEGER : n = figZahl[f]
+    DIM streifen AS IMAGE : streifen = IMAGE_NEW(S * n, S)
+    DIM gifBilder[8] AS IMAGE
+    DIM dauern AS ARRAY OF INTEGER : dauern = []
+    FOR i = 0 TO n - 1
+        IMAGE_DRAW_IMAGE(streifen, alle[figStart[f] + i], i * S, 0)
+        gifBilder[i] = IMAGE_SCALE_NN(alle[figStart[f] + i], S * 4, S * 4)
+        ARRAY_PUSH(dauern, 120)
+    NEXT
+    IMAGE_SAVE(streifen, ordner + "/" + figName[f] + ".png")
+    IMAGE_SAVE_GIF(gifBilder, ordner + "/" + figName[f] + ".gif", dauern, TRUE, n)
+NEXT
+
+' 2) Master-Atlas: ALLE benannten Sprites in ein Raster
+CONST SPALTEN = 10
+DIM reihen AS INTEGER : reihen = (anzahl + SPALTEN - 1) \ SPALTEN
+DIM blatt AS IMAGE : blatt = IMAGE_NEW(SPALTEN * S, reihen * S)
+DIM js AS JSON_HANDLE : js = JSON_PARSE("{}")
+JSON_SET_STRING(js, "image", "sheet.png")
+DIM spr AS JSON_HANDLE : spr = JSON_PARSE("{}")
+FOR i = 0 TO anzahl - 1
+    DIM bx AS INTEGER : bx = (i MOD SPALTEN) * S
+    DIM by AS INTEGER : by = (i \ SPALTEN) * S
+    IMAGE_DRAW_IMAGE(blatt, alle[i], bx, by)
+    JSON_SET_JSON(spr, alleName[i], JSON_PARSE("[" + STR$(bx) + ", " + STR$(by) + ", " + STR$(S) + ", " + STR$(S) + "]"))
+NEXT
+JSON_SET_JSON(js, "sprites", spr)
+IMAGE_SAVE(blatt, ordner + "/sheet.png")
+WRITEALL(ordner + "/sheet.json", JSON_PRETTY(js))
+
+' 2b) Standalone-Spieler-Atlas fuer examples/77_tiled_platformer.dh
+'     (5 Frames: idle/walk_a/walk_b/jump/hit), generisch benannt. Dort ist die
+'     Welt 16er-gerastert -> Frames auf 16x16 verkleinern. PIL nimmt dabei den
+'     Punkt (2x+1, 2y+1), raylibs IMAGE_SCALE_NN den Punkt (2x, 2y) -- darum
+'     von Hand.
+CONST PS = 16
+DIM quelle AS ARRAY OF STRING : quelle = ["idle", "run0", "run2", "jump", "skid"]
+DIM ziel AS ARRAY OF STRING : ziel = ["player_idle", "player_walk_a", "player_walk_b", "player_jump", "player_hit"]
+DIM spieler AS IMAGE : spieler = IMAGE_NEW(LEN(quelle) * PS, PS)
+DIM pjs AS JSON_HANDLE : pjs = JSON_PARSE("{}")
+JSON_SET_STRING(pjs, "image", "player.png")
+DIM pspr AS JSON_HANDLE : pspr = JSON_PARSE("{}")
+FOR i = 0 TO LEN(quelle) - 1
+    DIM src AS IMAGE : src = alle[ARRAY_INDEXOF(alleName, "player_" + quelle[i])]
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO PS - 1
+        FOR x = 0 TO PS - 1
+            DIM a AS INTEGER : a = GETALPHA(src, 2 * x + 1, 2 * y + 1)
+            IF a > 0 THEN IMAGE_FILL_RECT(spieler, i * PS + x, y, i * PS + x, y, GETPIXEL(src, 2 * x + 1, 2 * y + 1), a)
+        NEXT
+    NEXT
+    JSON_SET_JSON(pspr, ziel[i], JSON_PARSE("[" + STR$(i * PS) + ", 0, " + STR$(PS) + ", " + STR$(PS) + "]"))
+NEXT
+JSON_SET_JSON(pjs, "sprites", pspr)
+IMAGE_SAVE(spieler, assetsOrdner + "/player.png")
+WRITEALL(assetsOrdner + "/player_atlas.json", JSON_PRETTY(pjs))
+
+' 3) Kontaktbogen (zum Begutachten)
+CONST MASS = 4
+DIM zelle AS INTEGER : zelle = S * MASS
+DIM rand AS INTEGER : rand = 6
+DIM beschr AS INTEGER : beschr = 12
+DIM bogen AS IMAGE : bogen = IMAGE_NEW(SPALTEN * (zelle + rand) + rand, reihen * (zelle + beschr + rand) + rand, &H1E222E)
+FOR i = 0 TO anzahl - 1
+    DIM cxp AS INTEGER : cxp = rand + (i MOD SPALTEN) * (zelle + rand)
+    DIM cyp AS INTEGER : cyp = rand + (i \ SPALTEN) * (zelle + beschr + rand)
+    IMAGE_DRAW_IMAGE(bogen, IMAGE_SCALE_NN(alle[i], zelle, zelle), cxp, cyp)
+    IMAGE_DRAW_TEXT(bogen, cxp, cyp + zelle + 1, alleName[i], 10, &HD2DCEB)
+NEXT
+IMAGE_SAVE(bogen, ordner + "/_contact.png")
+
+PRINT "  " + STR$(LEN(figName)) + " animierte Figuren (.png + .gif)"
+PRINT "  Master-Sheet: sheet.png (" + STR$(SPALTEN) + "x" + STR$(reihen) + " = " + STR$(anzahl) + " Sprites) + sheet.json"
+PRINT "  Kontaktbogen: _contact.png"
+PRINT "fertig."

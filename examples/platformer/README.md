@@ -1,7 +1,7 @@
 # Plattformer-Sprites (32x32, "Twilight"-Thema)
 
-Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Plattformer (eigenstaendiges "Twilight"-Thema, nicht an Nintendo angelehnt), prozedural gebaut über das Datenmodell des Sprite-Editors
-(`drachenhauch.spriteeditor.document.SpriteDoc`). Alle Sprites sind **32×32 Pixel**.
+Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Plattformer (eigenstaendiges "Twilight"-Thema, nicht an Nintendo angelehnt), prozedural gezeichnet von
+`make_sprites.dh`. Alle Sprites sind **32×32 Pixel**.
 
 ## Master-Spritesheet
 
@@ -12,9 +12,10 @@ Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Platt
 
 ## Figuren (animiert)
 
-Pro Figur: `.dhsprite` (im Editor `dhsprites` bearbeitbar) + `.png`
-(horizontaler Strip für `SPRITE_NEW(sheet, 32, 32)`) + `.gif` (Vorschau).
-Im Master-Sheet heißen die Frames `<figur>_<frame>`.
+Pro Figur: `.png` (horizontaler Strip für `SPRITE_NEW(sheet, 32, 32)`) +
+`.gif` (Vorschau). Die `.dhsprite`-Dateien daneben (Format des Qt-Sprite-Editors
+`dhsprites`) stammen aus der früheren Python-Fassung des Generators und werden
+nicht mehr neu geschrieben. Im Master-Sheet heißen die Frames `<figur>_<frame>`.
 
 | Datei | Frames | Animationen |
 |---|---|---|
@@ -37,18 +38,18 @@ Im Master-Sheet heißen die Frames `<figur>_<frame>`.
 
 ## Neu generieren / anpassen
 
-Alle Sprites werden in `make_sprites.py` mit einer kleinen Pixel-Canvas
+Alle Sprites werden in `make_sprites.dh` auf einer kleinen Pixel-Leinwand
 prozedural gezeichnet (harte Kanten, feste Palette). Ändern und neu bauen:
 
 ```
-py examples/platformer/make_sprites.py
+dhrt run examples/platformer/make_sprites.dh
 ```
 
-Oder eine `.dhsprite` direkt im Editor öffnen und pixeln:
-
-```
-dhsprites examples/platformer/hero.dhsprite
-```
+Das schreibt die Streifen, GIFs, `sheet.png`/`sheet.json`, `_contact.png` und
+den 16×16-Spieler-Atlas `../assets/player.png` + `player_atlas.json` (für
+`examples/77_tiled_platformer.dh`). Bis 2026-09-14 war das `make_sprites.py`
+mit PIL; die JSON-Dateien und alle Figuren sind seither dieselben, nur Stern
+und Fahne rastert die Laufzeit an einzelnen Randpunkten anders.
 
 ## Demo
 

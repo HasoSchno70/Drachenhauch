@@ -39,4 +39,4 @@ CC0 erlaubt jede Nutzung inkl. kommerziell, ohne Namensnennung.
 Eigenständiger, prozedural erzeugter Sprite-/Tile-Satz im „Twilight"-Thema
 (violetter Spieler, schiefer-violette Gegner, Stahl-Cyan-Röhren, Kristall-Boxen),
 **bewusst nicht an Nintendo-Marken/-Figuren angelehnt** → frei, auch kommerziell,
-verwendbar. Generiert über `platformer/make_sprites.py`. Siehe `platformer/README.md`.
+verwendbar. Generiert über `platformer/make_sprites.dh`. Siehe `platformer/README.md`.
