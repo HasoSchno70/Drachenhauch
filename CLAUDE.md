@@ -2909,6 +2909,29 @@ abgerundete Rechtecke, Ringe und Verlaeufe auf 256x256 und skaliert mit
 LANCZOS; die Bild-Befehle der Laufzeit koennen davon nur Kreise, Rechtecke und
 1-px-Linien, und jeder Aufruf laedt die Textur neu hoch.
 
+**Teil 2 (selber Tag): `make_tiles.dh` und acht neue Bild-Befehle.** Statt die
+Formen in Drachenhauch Punkt fuer Punkt nachzubauen, zeichnen jetzt
+`IMAGE_FILL_RECT`, `IMAGE_FRAME`, `IMAGE_FILL_ROUNDRECT`, `IMAGE_FILL_ELLIPSE`,
+`IMAGE_RING`, `IMAGE_FILL_POLY`, `IMAGE_POLYLINE` und `IMAGE_GRADIENT` direkt in
+die Bildpunkte (`leinwand.rs`, 13 Rust-Tests): Kommazahlen, optionale Deckkraft
+0..255 (die Farbe allein kann "durchsichtig" nicht ausdruecken), und sie
+UEBERSCHREIBEN wie PILs ImageDraw auf RGBA. Hochgeladen wird die Textur erst
+beim FLIP (`Graphics::image_leinwand` + `tex_veraltet`), nicht je Aufruf --
+gezeichnet wird ohnehin nur dort aus der Textur. **Der Fund dabei:
+`IMAGE_DRAW_IMAGE` mischte ueber halbdurchsichtigem Ziel falsch** -- raylibs
+`ImageDraw` machte aus Orange (Deckkraft 60 ueber 59) ein Gruen mit Rot 0x01,
+sichtbar als gruenlicher Schein um Schluessel und Stiefel. Es mischt jetzt
+selbst nach Porter-Duff (`Leinwand::bild_ueber`); ueber deckendem Grund aendert
+sich nichts, `image_io` und `werkzeug_sprite` blieben gruen. **Verglichen wurde
+Zelle fuer Zelle mit dem alten Blatt:** `tiles.json` ist byte-gleich, die
+Deckung weicht je Kachel um hoechstens 6 % ab, die mittlere Farbe nur bei den
+Kacheln mit weichem Schein (bis 35 je Kanal -- PIL verwischt gegen
+durchsichtiges Schwarz und dunkelt den Rand ab, raylibs Weichzeichner nicht).
+`tiles.dhsprite` entsteht nicht mehr (das Format des Qt-Sprite-Editors) und ist
+mit `make_tiles.py` geloescht. Tests `tests/pruef/image_formen.dhtest` (7,
+Gegenprobe ohne die Aufrufe: 7 von 7 fallen) und ein Fall "kachelsatz wird
+gezeichnet" in `werkzeug_circuitrunner.dhtest`.
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei
