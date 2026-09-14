@@ -1,0 +1,58 @@
+' Laedt die Soundeffekte fuer CIRCUIT RUNNER herunter.
+'
+' Quelle: Kenney "Interface Sounds" (https://kenney.nl/assets/interface-sounds),
+' Lizenz CC0 1.0 (Public Domain -- keine Attribution noetig, frei nutz- und
+' weiterverteilbar). Bezogen ueber den jsDelivr-CDN-Spiegel des GitHub-Repos
+' Calinou/kenney-interface-sounds.
+'
+' Die WAVs sind klein und CC0, daher direkt mit eingecheckt -- dieses Programm
+' dient der Reproduzierbarkeit / zum Aktualisieren. Aufruf:
+'
+'     dhrt run circuitrunner/download_sfx.dh [-- quell-adresse [zielordner]]
+'
+' Die beiden Argumente sind fuer Pruefungen (ein Gegenserver statt des CDN).
+' Bis 2026-09-14 download_sfx.py.
+IMPORT "html"
+
+DIM basis AS STRING
+basis = "https://cdn.jsdelivr.net/gh/Calinou/kenney-interface-sounds@master/addons/kenney_interface_sounds/"
+DIM ordner AS STRING : ordner = CWD$() + "/assets/sfx"
+IF ARGC() > 0 THEN basis = ARG$(0)
+IF ARGC() > 1 THEN ordner = ARG$(1)
+
+' Spiel-Ereignis -> Kenney-Quelldatei (CC0)
+DIM namen AS ARRAY OF STRING
+namen = ["step", "chip", "door", "block", "die", "win", "blocked"]
+DIM quellen AS ARRAY OF STRING
+quellen = ["tick_001.wav", "confirmation_001.wav", "toggle_001.wav", "drop_001.wav", _
+    "glitch_002.wav", "maximize_009.wav", "back_002.wav"]
+
+FUNCTION breit$(s AS STRING, n AS INTEGER) AS STRING
+    IF LEN(s) >= n THEN RETURN s
+    RETURN s + SPACE$(n - LEN(s))
+END FUNCTION
+
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+DIM gut AS INTEGER : gut = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    DIM ziel AS STRING : ziel = ordner + "/" + namen[i] + ".wav"
+    TRY
+        HTTP_DOWNLOAD(basis + quellen[i], ziel)
+        PRINT "  " + breit$(namen[i], 8) + " <- " + breit$(quellen[i], 22) + " (" + STR$(FILESIZE(ziel)) + " B)"
+        gut = gut + 1
+    CATCH e
+        PRINT "  FEHLER " + namen[i] + ": " + e
+    END TRY
+NEXT
+' Lizenz-/Quellnachweis ablegen
+DIM nachweis AS STRING
+nachweis = "Soundeffekte: Kenney 'Interface Sounds' -- https://kenney.nl/assets/interface-sounds" + CHR$(10) + _
+    "Lizenz: CC0 1.0 (Public Domain). Keine Attribution noetig." + CHR$(10) + _
+    "Spiegel: https://github.com/Calinou/kenney-interface-sounds" + CHR$(10) + CHR$(10)
+FOR i = 0 TO LEN(namen) - 1
+    nachweis = nachweis + namen[i] + ".wav  <-  " + quellen[i] + CHR$(10)
+NEXT
+WRITEALL(ordner + "/CREDITS.txt", nachweis)
+PRINT STR$(gut) + "/" + STR$(LEN(namen)) + " Sounds in " + ordner
+IF gut = LEN(namen) THEN EXIT(0) ELSE EXIT(1)
