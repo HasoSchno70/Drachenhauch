@@ -1,0 +1,211 @@
+' Erzeugt die Sprites, die die Programme aus Teil IV benutzen.
+'
+' Warum ein Programm und nicht einfach ein paar PNG-Dateien: Damit sie
+' reproduzierbar sind. Wer eine Figur aendern will, aendert hier zwei Zeichen
+' und laesst das Programm neu laufen -- statt in einem Bildprogramm zu suchen,
+' wie die Farbe von damals hiess.
+'
+' Die Pixel stehen als Buchstabenraster da, eine Zeile je Bildzeile. Ein Punkt
+' ist durchsichtig. Die Zuordnung Buchstabe -> Farbe steht in der Palette.
+'
+' Gezeichnet wird 16x16 und mit Faktor 2 auf 32x32 vergroessert -- mit harten
+' Kanten, damit die Pixel Pixel bleiben. Das Ergebnis sieht im 640x400-Fenster
+' nach Pixelgrafik aus und ist gross genug, um es zu treffen.
+'
+' Das Buch bringt seinen Lesern in Kapitel 20 bei, Sprites im mitgelieferten
+' Editor selbst zu malen. Dieses Programm ist nur der Weg, wie die
+' Beispielfiguren des Buchs selbst entstanden sind.
+'
+'     dhrt run buch-einstieg/assets/mach_sprites.dh [-- zielordner]
+'
+' Ohne Argument landen die Sprites neben diesem Programm und in jedem
+' Kapitelverzeichnis, das sie braucht, die Lehrbilder in buch/images. Mit
+' Zielordner kommt alles nur dorthin (fuer Pruefungen).
+' Bis 2026-09-14 mach_sprites.py -- die Bilder sind Punkt fuer Punkt dieselben.
+IMPORT "imgfx"
+
+CONST FAKTOR = 2
+DIM hier AS STRING : hier = CWD$()
+
+' Wohin die fertigen Sprites gelegt werden. Neben assets/ auch in jedes
+' Kapitelverzeichnis, das sie braucht -- denn ein Dateiname ohne Pfad zeigt
+' auf das Verzeichnis des PROGRAMMS (siehe Kapitel 18). Im Buch soll schlicht
+' LOADIMAGE("schiff.png") stehen und kein Pfad-Gestruepp.
+DIM wurzel AS STRING : wurzel = DIRNAME(hier)
+DIM ziele AS ARRAY OF STRING
+ziele = [hier, wurzel + "/code/kap19", wurzel + "/code/kap21", wurzel + "/code/kap22", wurzel + "/code/kap23"]
+DIM bilderOrdner AS STRING : bilderOrdner = wurzel + "/buch/images"
+IF ARGC() > 0 THEN
+    DIM eigen AS STRING : eigen = ARG$(0)
+    IF NOT (LEFT$(eigen, 1) = "/" OR LEFT$(eigen, 1) = CHR$(92) OR MID$(eigen, 1, 1) = ":") AND GETENV$("DHRT_START_DIR") <> "" THEN eigen = GETENV$("DHRT_START_DIR") + "/" + eigen
+    IF NOT DIREXISTS(eigen) THEN MKDIR(eigen)
+    ziele = [eigen]
+    bilderOrdner = eigen
+END IF
+
+' Palette: Zeichen -> Farbe; "." ist durchsichtig
+DIM palZeichen AS STRING : palZeichen = ".WCBRGDAYO"
+DIM palFarbe AS ARRAY OF INTEGER
+palFarbe = [0, &HEBF5FF, &H5FBEF0, &H285AA0, &HFF8C3C, &H78D278, &H32823C, &H1E1E28, &HFFD750, &HC8961E]
+' W helles Weiss (Kanten), C Cyan (Rumpf), B dunkles Blau (Schatten),
+' R Orange (Antrieb), G Gruen (Gegner), D dunkles Gruen, A fast Schwarz (Augen),
+' Y Gold (Muenze), O dunkles Gold
+
+DIM SCHIFF AS ARRAY OF STRING
+SCHIFF = ["................", ".......WW.......", "......WCCW......", "......WCCW......", _
+    ".....WCCCCW.....", ".....WCCCCW.....", "....WCCCCCCW....", "....WCBBBBCW....", _
+    "...WCCBBBBCCW...", "...WCCCCCCCCW...", "..WCCCCCCCCCCW..", "..WCCCCCCCCCCW..", _
+    ".WCCW.WCCW.WCCW.", ".WCCW.WCCW.WCCW.", "..RR...RR...RR..", "...R....R....R.."]
+
+DIM GEGNER_A AS ARRAY OF STRING
+GEGNER_A = ["................", "..G..........G..", "...G........G...", "..GGGGGGGGGGGG..", _
+    ".GGG.GGGGGG.GGG.", "GGGGGGGGGGGGGGGG", "GAAGGGGGGGGGGAAG", "GAAGGGGGGGGGGAAG", _
+    "GGGGGGGGGGGGGGGG", "GGG.DDDDDDDD.GGG", "GGG.D......D.GGG", "GG..D......D..GG", _
+    ".G..DD....DD..G.", "....D......D....", "...DD......DD...", "................"]
+
+DIM GEGNER_B AS ARRAY OF STRING
+GEGNER_B = ["................", "..G..........G..", "..GG........GG..", "..GGGGGGGGGGGG..", _
+    ".GGG.GGGGGG.GGG.", "GGGGGGGGGGGGGGGG", "GAAGGGGGGGGGGAAG", "GAAGGGGGGGGGGAAG", _
+    "GGGGGGGGGGGGGGGG", ".GG.DDDDDDDD.GG.", "..G.D......D.G..", "....D......D....", _
+    "...DD......DD...", "...D........D...", "..DD........DD..", "................"]
+
+' Vier Stufen einer sich drehenden Muenze: von voll bis zur Kante.
+DIM MUENZE0 AS ARRAY OF STRING
+MUENZE0 = ["................", "................", "....YYYYYYYY....", "...YYOOOOOOYY...", _
+    "..YYOOOOOOOOYY..", "..YOOOYYYYOOOY..", "..YOOYYOOYYOOY..", "..YOOYOOOOYOOY..", _
+    "..YOOYOOOOYOOY..", "..YOOYYOOYYOOY..", "..YOOOYYYYOOOY..", "..YYOOOOOOOOYY..", _
+    "...YYOOOOOOYY...", "....YYYYYYYY....", "................", "................"]
+DIM MUENZE1 AS ARRAY OF STRING
+MUENZE1 = ["................", "................", ".....YYYYYY.....", "....YYOOOOYY....", _
+    "....YOOOOOOY....", "....YOOYYOOY....", "....YOYOOYOY....", "....YOYOOYOY....", _
+    "....YOYOOYOY....", "....YOYOOYOY....", "....YOOYYOOY....", "....YOOOOOOY....", _
+    "....YYOOOOYY....", ".....YYYYYY.....", "................", "................"]
+DIM MUENZE2 AS ARRAY OF STRING
+MUENZE2 = ["................", "................", "......YYYY......", "......YOOY......", _
+    "......YOOY......", "......YOOY......", "......YOOY......", "......YOOY......", _
+    "......YOOY......", "......YOOY......", "......YOOY......", "......YOOY......", _
+    "......YOOY......", "......YYYY......", "................", "................"]
+DIM MUENZE3 AS ARRAY OF STRING
+MUENZE3 = ["................", "................", ".......YY.......", ".......YY.......", _
+    ".......YY.......", ".......YY.......", ".......YY.......", ".......YY.......", _
+    ".......YY.......", ".......YY.......", ".......YY.......", ".......YY.......", _
+    ".......YY.......", ".......YY.......", "................", "................"]
+
+SUB pruefe(name AS STRING, raster AS ARRAY OF STRING)
+    ' Ein Vertipper im Pixelraster faellt sonst erst im Bild auf.
+    IF LEN(raster) <> 16 THEN
+        EPRINT(name + ": " + STR$(LEN(raster)) + " Zeilen, erwartet 16")
+        EXIT(1)
+    END IF
+    DIM n AS INTEGER
+    FOR n = 0 TO 15
+        IF LEN(raster[n]) <> 16 THEN
+            EPRINT(name + ", Zeile " + STR$(n) + ": " + STR$(LEN(raster[n])) + " Zeichen, erwartet 16")
+            EXIT(1)
+        END IF
+        DIM i AS INTEGER
+        FOR i = 0 TO 15
+            IF INSTR(palZeichen, MID$(raster[n], i, 1)) < 0 THEN
+                EPRINT(name + ", Zeile " + STR$(n) + ": unbekanntes Zeichen '" + MID$(raster[n], i, 1) + "'")
+                EXIT(1)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION bildAus(raster AS ARRAY OF STRING) AS IMAGE
+    DIM klein AS IMAGE : klein = IMAGE_NEW(16, 16)
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO 15
+        FOR x = 0 TO 15
+            DIM k AS INTEGER : k = INSTR(palZeichen, MID$(raster[y], x, 1))
+            IF k > 0 THEN IMAGE_FILL_RECT(klein, x, y, x, y, palFarbe[k], 255)
+        NEXT
+    NEXT
+    RETURN IMAGE_SCALE_NN(klein, 16 * FAKTOR, 16 * FAKTOR)
+END FUNCTION
+
+' Mehrere Bilder nebeneinander -- ein Streifen, aus dem DRAWIMAGEPART einzelne
+' Felder schneidet. So braucht ein Programm eine Datei statt vier.
+FUNCTION streifen2(a AS ARRAY OF STRING, b AS ARRAY OF STRING) AS IMAGE
+    DIM aus AS IMAGE : aus = IMAGE_NEW(32 * 2, 32)
+    IMAGE_DRAW_IMAGE(aus, bildAus(a), 0, 0)
+    IMAGE_DRAW_IMAGE(aus, bildAus(b), 32, 0)
+    RETURN aus
+END FUNCTION
+
+FUNCTION streifen4(a AS ARRAY OF STRING, b AS ARRAY OF STRING, c AS ARRAY OF STRING, d AS ARRAY OF STRING) AS IMAGE
+    DIM aus AS IMAGE : aus = IMAGE_NEW(32 * 4, 32)
+    IMAGE_DRAW_IMAGE(aus, bildAus(a), 0, 0)
+    IMAGE_DRAW_IMAGE(aus, bildAus(b), 32, 0)
+    IMAGE_DRAW_IMAGE(aus, bildAus(c), 64, 0)
+    IMAGE_DRAW_IMAGE(aus, bildAus(d), 96, 0)
+    RETURN aus
+END FUNCTION
+
+' Das Pixelraster einer Figur als Lehrbild: jedes Pixel ein Kaestchen,
+' dazwischen ein Gitter. So sieht man beim Lesen, dass Pixelgrafik nichts
+' weiter ist als ein Karopapier, auf dem einzelne Felder Farbe bekommen.
+FUNCTION rasterBild(raster AS ARRAY OF STRING, zelle AS INTEGER) AS IMAGE
+    DIM n AS INTEGER : n = LEN(raster)
+    DIM im AS IMAGE : im = IMAGE_NEW(n * zelle + 1, n * zelle + 1, &H141A2C)
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO n - 1
+        FOR x = 0 TO n - 1
+            DIM k AS INTEGER : k = INSTR(palZeichen, MID$(raster[y], x, 1))
+            IF k > 0 THEN IMAGE_FILL_RECT(im, x * zelle + 1, y * zelle + 1, x * zelle + zelle - 1, y * zelle + zelle - 1, palFarbe[k], 255)
+        NEXT
+    NEXT
+    DIM i AS INTEGER
+    FOR i = 0 TO n
+        IMAGE_FILL_RECT(im, i * zelle, 0, i * zelle, n * zelle, &H374464, 255)
+        IMAGE_FILL_RECT(im, 0, i * zelle, n * zelle, i * zelle, &H374464, 255)
+    NEXT
+    RETURN im
+END FUNCTION
+
+pruefe("SCHIFF", SCHIFF)
+pruefe("GEGNER_A", GEGNER_A)
+pruefe("GEGNER_B", GEGNER_B)
+pruefe("MUENZE[0]", MUENZE0)
+pruefe("MUENZE[1]", MUENZE1)
+pruefe("MUENZE[2]", MUENZE2)
+pruefe("MUENZE[3]", MUENZE3)
+
+DIM namen AS ARRAY OF STRING : namen = ["schiff.png", "gegner.png", "muenze.png"]
+DIM fertig[3] AS IMAGE
+fertig[0] = bildAus(SCHIFF)
+fertig[1] = streifen2(GEGNER_A, GEGNER_B)
+fertig[2] = streifen4(MUENZE0, MUENZE1, MUENZE2, MUENZE3)
+
+DIM z AS INTEGER
+DIM i AS INTEGER
+FOR z = 0 TO LEN(ziele) - 1
+    IF NOT DIREXISTS(ziele[z]) THEN CONTINUE
+    FOR i = 0 TO 2
+        IMAGE_SAVE(fertig[i], ziele[z] + "/" + namen[i])
+    NEXT
+    PRINT "  -> " + ziele[z]
+NEXT
+FOR i = 0 TO 2
+    DIM name AS STRING : name = namen[i]
+    IF LEN(name) < 12 THEN name = name + SPACE$(12 - LEN(name))
+    PRINT "  " + name + " " + STR$(IMAGEWIDTH(fertig[i])) + "x" + STR$(IMAGEHEIGHT(fertig[i]))
+NEXT
+
+' Lehrbilder fuers Buch -- direkt nach buch/images/, wo shoot.py auch
+' hinschreibt. Sie zeigen die Figuren als Karopapier statt als Sprite.
+IF DIREXISTS(bilderOrdner) THEN
+    IMAGE_SAVE(rasterBild(SCHIFF, 24), bilderOrdner + "/kap20_raster_schiff.png")
+    PRINT "  kap20_raster_schiff.png"
+    ' zwei Raster nebeneinander, 30 Punkte Luecke
+    DIM links AS IMAGE : links = rasterBild(GEGNER_A, 18)
+    DIM rechts AS IMAGE : rechts = rasterBild(GEGNER_B, 18)
+    DIM paar AS IMAGE : paar = IMAGE_NEW(IMAGEWIDTH(links) + 30 + IMAGEWIDTH(rechts), MAX(IMAGEHEIGHT(links), IMAGEHEIGHT(rechts)), &H141A2C)
+    IMAGE_DRAW_IMAGE(paar, links, 0, 0)
+    IMAGE_DRAW_IMAGE(paar, rechts, IMAGEWIDTH(links) + 30, 0)
+    IMAGE_SAVE(paar, bilderOrdner + "/kap21_zwei_frames.png")
+    PRINT "  kap21_zwei_frames.png"
+END IF

@@ -55,3 +55,136 @@ PRINT "abweichende Punkte "; abweichend
 rueckgabe 0, (128x64, 32 Tiles a 16px)
 128x64
 abweichende Punkte 0
+
+=== galaga-sprites sind die eingecheckten
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION abweichend(pfadA AS STRING, pfadB AS STRING) AS INTEGER
+    DIM a AS IMAGE : a = LOADIMAGE(pfadA)
+    DIM b AS IMAGE : b = LOADIMAGE(pfadB)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN -1
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            DIM da AS INTEGER : da = GETALPHA(a, x, y)
+            IF da <> GETALPHA(b, x, y) THEN
+                n = n + 1
+            ELSEIF da > 0 AND GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/sprites")
+DIM aus AS STRING : aus = lauf$(p)
+' Ein Bau ohne Grafik kann nicht zeichnen: die Meldung des Kindes
+' weiterreichen, dann heisst der Fall "uebersprungen" statt falsch.
+IF NOT FILEEXISTS("sprites/preview.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM namen AS ARRAY OF STRING : namen = ["player", "bug0", "bug1", "bug2", "bullet", "bomb", "preview"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    PRINT namen[i]; " "; abweichend("sprites/" + namen[i] + ".png", ARG$(1) + "/" + namen[i] + ".png")
+NEXT
+--- argumente
+{sammlung}/../../buch-galaga/assets/make_sprites.dh
+{sammlung}/../../buch-galaga/assets/sprites
+--- erwartet
+rueckgabe 0
+player 0
+bug0 0
+bug1 0
+bug2 0
+bullet 0
+bomb 0
+preview 0
+
+=== einstieg-sprites und lehrbilder sind die eingecheckten
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+FUNCTION abweichend(pfadA AS STRING, pfadB AS STRING) AS INTEGER
+    DIM a AS IMAGE : a = LOADIMAGE(pfadA)
+    DIM b AS IMAGE : b = LOADIMAGE(pfadB)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN -1
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            DIM da AS INTEGER : da = GETALPHA(a, x, y)
+            IF da <> GETALPHA(b, x, y) THEN
+                n = n + 1
+            ELSEIF da > 0 AND GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/raus")
+DIM aus AS STRING : aus = lauf$(p)
+IF NOT FILEEXISTS("raus/kap21_zwei_frames.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM sprites AS ARRAY OF STRING : sprites = ["schiff.png", "gegner.png", "muenze.png"]
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    PRINT sprites[i]; " "; abweichend("raus/" + sprites[i], ARG$(1) + "/" + sprites[i])
+NEXT
+' Die Lehrbilder im Buch hat make_book.py (prepare_images) fuer den Druck
+' aufbereitet: ganzzahlig mit harten Kanten vergroessert, bis die Breite
+' mindestens 1500 Punkte hat. Dieselbe Vergroesserung hier, dann Punkt fuer Punkt.
+DIM lehr AS ARRAY OF STRING : lehr = ["kap20_raster_schiff.png", "kap21_zwei_frames.png"]
+FOR i = 0 TO 1
+    DIM roh AS IMAGE : roh = LOADIMAGE("raus/" + lehr[i])
+    DIM faktor AS INTEGER : faktor = (1500 + IMAGEWIDTH(roh) - 1) \ IMAGEWIDTH(roh)
+    IMAGE_SAVE(IMAGE_SCALE_NN(roh, IMAGEWIDTH(roh) * faktor, IMAGEHEIGHT(roh) * faktor), "raus/druck_" + lehr[i])
+    PRINT lehr[i]; " x"; faktor; " "; abweichend("raus/druck_" + lehr[i], ARG$(2) + "/" + lehr[i])
+NEXT
+--- argumente
+{sammlung}/../../buch-einstieg/assets/mach_sprites.dh
+{sammlung}/../../buch-einstieg/assets
+{sammlung}/../../buch-einstieg/buch/images
+--- erwartet
+rueckgabe 0
+schiff.png 0
+gegner.png 0
+muenze.png 0
+kap20_raster_schiff.png x4 0
+kap21_zwei_frames.png x3 0

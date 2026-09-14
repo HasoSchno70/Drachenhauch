@@ -2987,9 +2987,21 @@ gegeneinander und haengen nicht an den alten Punkten. Test
 `tests/pruef/werkzeug_beispiel_bilder.dhtest` (Punkt fuer Punkt gegen das
 eingecheckte Blatt; Gegenprobe mit Zugabe 0.0 fuer gefuellte Ellipsen: 193
 Punkte weichen ab, der Fall faellt).
-Noch Python bei den Spielen: die PIL-Bildgeneratoren (Buch-Sprites,
-Platformer-Sprites, Pyramid Pushers `gen_art.py` mit numpy) und der
-Flask-`cloudserver`.
+**Buch-Sprites (selber Tag):** `buch-galaga/assets/make_sprites.dh` und
+`buch-einstieg/assets/mach_sprites.dh` zeichnen ihre Buchstabenraster Punkt fuer
+Punkt wie die PIL-Fassungen -- dort gibt es keine Ellipsen, nur Einzelpunkte,
+harte Vergroesserung und Einsetzen, also ist alles gleich (Galaga: sechs Sheets
+plus `preview.png`; Einstieg: drei Sprites plus zwei Lehrbilder). Galagas
+`.dhsprite`-Dateien (Format des Qt-Sprite-Editors) schreibt das neue Programm
+nicht mehr, die eingecheckten bleiben liegen. **Die Lehrbilder im Einstiegsbuch
+sind nicht die Ausgabe des Werkzeugs:** `make_book.py` (`prepare_images`) hat
+sie fuer den Druck auf RGB gebracht und ganzzahlig auf mindestens 1500 Punkte
+Breite vergroessert (4x und 3x) -- der Test vergroessert genauso und vergleicht
+dann. Tests zwei Faelle in `tests/pruef/werkzeug_beispiel_bilder.dhtest`
+(Gegenprobe: eine geaenderte Palettenfarbe bzw. ein Punkt im Schiff -- beide
+fallen).
+Noch Python bei den Spielen: die PIL-Bildgeneratoren (Platformer-Sprites,
+Pyramid Pushers `gen_art.py` mit numpy) und der Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
