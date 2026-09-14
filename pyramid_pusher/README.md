@@ -95,7 +95,7 @@ liefert den Kammer-Titel.
 - `02_skinner_classics.xsb` — **366 klassische Level von David W. Skinner**
   (*Microban I–V*, *Sasquatch I–XI*), frei verteilbar bei Namensnennung. Aus dem
   öffentlichen sourcecode.se-Spiegel geholt und ins Titel-vor-Brett-Format
-  konvertiert (`levels/_authoring/convert_skinner.py`, Rohdaten unter
+  konvertiert (`levels/_authoring/convert_skinner.dh`, Rohdaten unter
   `levels/_authoring/source/`).
 - `03_bonus_demo.xsb` — 4 Demo-Kammern für die Bonus-Mechaniken (Loch/Eis/
   Schalter+Tür), lösungsgeprüft (`_test_bonus.dh`). Codes: **BILA, DILA, FILA,
@@ -139,7 +139,7 @@ Der Autoren-Satz wird mit einem eingebauten **Sokoban-Solver** auf Lösbarkeit
 geprüft, bevor er geschrieben wird:
 
 ```
-.venv\Scripts\python.exe pyramid_pusher\levels\_authoring\make_levels.py
+dhrt run pyramid_pusher/levels/_authoring/make_levels.dh
 ```
 
 ## Tests (headless, ohne Grafik)

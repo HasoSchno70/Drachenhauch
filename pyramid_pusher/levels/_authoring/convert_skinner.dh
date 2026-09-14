@@ -1,0 +1,221 @@
+' Konvertiert die frei verteilbare Skinner-Sokoban-Sammlung (Titel-Kommentar
+' STEHT HINTER dem Brett) in das von Pyramid Pusher bevorzugte XSB-Format
+' (Titel-Kommentar VOR dem Brett) und validiert grob jedes Level.
+'
+' Quelle: David W. Skinner (Microban u.a.), frei verteilbar bei Namensnennung.
+'         Roh-Datei: source/skinner_arranged.txt (von raw.githubusercontent.com /
+'         KevinWang15/js-responsive-sokoban, sourcecode.se-Spiegel).
+'
+'     dhrt run pyramid_pusher/levels/_authoring/convert_skinner.dh [-- quelle [ziel]]
+'
+' Bis 2026-09-14 convert_skinner.py; bis auf die Zeile im Kopf, die das
+' Werkzeug nennt, schreibt es dieselbe Datei.
+IMPORT "regex"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+DIM quelle AS STRING : quelle = CWD$() + "/source/skinner_arranged.txt"
+DIM zieldatei AS STRING : zieldatei = DIRNAME(CWD$()) + "/02_skinner_classics.xsb"
+IF ARGC() > 0 THEN quelle = vomAufrufer$(ARG$(0))
+IF ARGC() > 1 THEN zieldatei = vomAufrufer$(ARG$(1))
+
+FUNCTION istBrett(z AS STRING) AS BOOLEAN
+    DIM zeichen AS STRING : zeichen = "#$.@*+"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeichen) - 1
+        IF INSTR(z, MID$(zeichen, i, 1)) >= 0 THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION titelSauber$(c AS STRING) AS STRING
+    DIM t AS STRING : t = c
+    WHILE LEFT$(t, 1) = ";"
+        t = MID$(t, 1, LEN(t))
+    WEND
+    t = TRIM$(t)
+    RETURN REGEX_REPLACE(t, "\s*R--?\d+\s*$", "")      ' Schwierigkeits-Suffix weg
+END FUNCTION
+
+FUNCTION gueltig(zeilen AS ARRAY OF STRING) AS BOOLEAN
+    DIM kisten AS INTEGER : kisten = 0
+    DIM ziele AS INTEGER : ziele = 0
+    DIM spieler AS INTEGER : spieler = 0
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        FOR j = 0 TO LEN(zeilen[i]) - 1
+            DIM c AS STRING : c = MID$(zeilen[i], j, 1)
+            IF INSTR("$*", c) >= 0 THEN kisten = kisten + 1
+            IF INSTR(".+*", c) >= 0 THEN ziele = ziele + 1
+            IF INSTR("@+", c) >= 0 THEN spieler = spieler + 1
+        NEXT
+    NEXT
+    RETURN spieler = 1 AND kisten = ziele AND kisten >= 1
+END FUNCTION
+
+' Gefundene Level: Titel ("" = keiner) und die Brettzeilen, mit Umbruch verbunden.
+DIM lvTitel AS ARRAY OF STRING : lvTitel = []
+DIM lvBrett AS ARRAY OF STRING : lvBrett = []
+
+DIM akt AS ARRAY OF STRING : akt = []
+DIM titel AS STRING : titel = ""
+DIM hatTitel AS BOOLEAN : hatTitel = FALSE
+DIM inKommentaren AS BOOLEAN : inKommentaren = FALSE
+
+SUB abschliessen()
+    IF LEN(akt) > 0 THEN
+        DIM mitWand AS BOOLEAN : mitWand = FALSE
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(akt) - 1
+            IF INSTR(akt[i], "#") >= 0 THEN mitWand = TRUE
+        NEXT
+        IF mitWand AND gueltig(akt) THEN
+            ARRAY_PUSH(lvTitel, titel)
+            DIM brett AS STRING : brett = akt[0]
+            FOR i = 1 TO LEN(akt) - 1
+                brett = brett + CHR$(10) + akt[i]
+            NEXT
+            ARRAY_PUSH(lvBrett, brett)
+        END IF
+    END IF
+    akt = []
+    titel = ""
+    hatTitel = FALSE
+    inKommentaren = FALSE
+END SUB
+
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(quelle, "latin1")
+DIM z AS INTEGER
+FOR z = 0 TO LEN(zeilen) - 1
+    DIM ln AS STRING : ln = REPLACE$(zeilen[z], CHR$(13), "")
+    IF istBrett(ln) THEN
+        IF inKommentaren THEN abschliessen()        ' Kommentare beendeten das vorige Brett
+        ARRAY_PUSH(akt, ln)
+    ELSEIF LEFT$(TRIM$(ln), 1) = ";" THEN
+        IF LEN(akt) > 0 THEN
+            inKommentaren = TRUE
+            IF NOT hatTitel AND INSTR(LOWER$(ln), "copyright") < 0 THEN
+                titel = titelSauber$(ln)
+                hatTitel = TRUE
+            END IF
+        END IF
+    ELSEIF LEN(akt) > 0 AND inKommentaren THEN      ' Leerzeile / sonstiges
+        abschliessen()
+    END IF
+NEXT
+abschliessen()
+
+' Nach Sammlung -> Set-Nummer -> Level-Nummer sortieren, damit zusammen-
+' haengende Kapitel-Bloecke entstehen (Microban I, II, ... Sasquatch I, ...).
+FUNCTION roemisch(s AS STRING) AS INTEGER
+    ' Skinner nutzt additive roemische Zahlen
+    DIM summe AS INTEGER : summe = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(s) - 1
+        SELECT CASE MID$(s, i, 1)
+            CASE "I"
+                summe = summe + 1
+            CASE "V"
+                summe = summe + 5
+            CASE "X"
+                summe = summe + 10
+            CASE "L"
+                summe = summe + 50
+            CASE "C"
+                summe = summe + 100
+        END SELECT
+    NEXT
+    RETURN summe
+END FUNCTION
+
+DIM anzahl AS INTEGER : anzahl = LEN(lvTitel)
+DIM s1[anzahl] AS INTEGER
+DIM s2[anzahl] AS INTEGER
+DIM s3[anzahl] AS INTEGER
+DIM reihe AS ARRAY OF INTEGER : reihe = []
+DIM i AS INTEGER
+FOR i = 0 TO anzahl - 1
+    ARRAY_PUSH(reihe, i)
+    DIM t AS STRING : t = lvTitel[i]
+    DIM trenn AS INTEGER : trenn = INSTR(t, " / ")
+    IF trenn >= 0 THEN
+        DIM links AS STRING : links = LEFT$(t, trenn)
+        DIM rechts AS STRING : rechts = MID$(t, trenn + 3, LEN(t))
+        DIM leer AS INTEGER : leer = -1
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(links) - 1
+            IF MID$(links, k, 1) = " " THEN leer = k
+        NEXT
+        DIM name AS STRING : name = links
+        DIM rn AS STRING : rn = ""
+        IF leer >= 0 THEN
+            name = LEFT$(links, leer)
+            rn = MID$(links, leer + 1, LEN(links))
+        END IF
+        s1[i] = 50
+        IF name = "Microban" THEN s1[i] = 0
+        IF name = "Sasquatch" THEN s1[i] = 1
+        s2[i] = roemisch(rn)
+        s3[i] = 9000                                   ' benannte Bonuslevel ans Set-Ende
+        DIM treffer AS STRING : treffer = REGEX_FIND(TRIM$(rechts), "^Level\s+\d+")
+        IF treffer <> "" THEN s3[i] = VAL(REGEX_FIND(treffer, "\d+"))
+    ELSE
+        s1[i] = 99
+        s2[i] = 0
+        s3[i] = 0
+    END IF
+NEXT
+
+FUNCTION vergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF s1[a] <> s1[b] THEN RETURN s1[a] - s1[b]
+    IF s2[a] <> s2[b] THEN RETURN s2[a] - s2[b]
+    RETURN s3[a] - s3[b]
+END FUNCTION
+SORT(reihe, vergleich)
+
+DIM aus AS STRING
+aus = "; ============================================" + CHR$(10) + _
+    "; Klassische Sokoban-Level  --  David W. Skinner" + CHR$(10) + _
+    "; (Microban u.a.), frei verteilbar bei Namensnennung." + CHR$(10) + _
+    "; Quelle: sourcecode.se-Sammlung. Aus dem After-Comment-" + CHR$(10) + _
+    "; Format konvertiert (convert_skinner.dh)." + CHR$(10) + _
+    "; ============================================" + CHR$(10)
+' Statistik je Sammlung, in der Reihenfolge des ersten Auftretens
+DIM satzName AS ARRAY OF STRING : satzName = []
+DIM satzZahl AS ARRAY OF INTEGER : satzZahl = []
+FOR i = 0 TO anzahl - 1
+    DIM lv AS INTEGER : lv = reihe[i]
+    DIM tt AS STRING : tt = lvTitel[lv]
+    aus = aus + CHR$(10) + "; " + IIF(tt <> "", tt, "Skinner / Level " + STR$(i + 1))
+    aus = aus + CHR$(10) + lvBrett[lv] + CHR$(10)
+    DIM satz AS STRING : satz = IIF(tt <> "", tt, "?")
+    IF INSTR(satz, " / ") >= 0 THEN satz = LEFT$(satz, INSTR(satz, " / "))
+    DIM gefunden AS INTEGER : gefunden = ARRAY_INDEXOF(satzName, satz)
+    IF gefunden < 0 THEN
+        ARRAY_PUSH(satzName, satz)
+        ARRAY_PUSH(satzZahl, 1)
+    ELSE
+        satzZahl[gefunden] = satzZahl[gefunden] + 1
+    END IF
+NEXT
+WRITEALL(zieldatei, aus)
+PRINT STR$(anzahl) + " gueltige Level -> " + zieldatei
+
+DIM folge AS ARRAY OF INTEGER : folge = []
+FOR i = 0 TO LEN(satzName) - 1
+    ARRAY_PUSH(folge, i)
+NEXT
+FUNCTION haeufiger(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN satzZahl[b] - satzZahl[a]
+END FUNCTION
+SORT(folge, haeufiger)
+FOR i = 0 TO LEN(folge) - 1
+    DIM zahl AS STRING : zahl = STR$(satzZahl[folge[i]])
+    IF LEN(zahl) < 4 THEN zahl = SPACE$(4 - LEN(zahl)) + zahl
+    PRINT "   " + zahl + "  " + satzName[folge[i]]
+NEXT
