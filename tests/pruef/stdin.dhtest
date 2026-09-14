@@ -195,3 +195,41 @@ DIM f AS FILE
 f = STDIN("klingonisch")
 --- fehler
 kenne ich nicht
+
+=== input liest eine ganze zahl
+' (Bis Stufe 51 in test_input_stdin.py, dort ueber dhrun.py.)
+DIM n AS INTEGER
+INPUT "Zahl? ", n
+PRINT n * 2
+--- eingabe
+21
+
+--- erwartet
+Zahl? 42
+
+=== mehrere inputs lesen je eine zeile
+DIM a AS INTEGER
+DIM b AS INTEGER
+INPUT "A? ", a
+INPUT "B? ", b
+PRINT a + b
+--- eingabe
+10
+5
+
+--- erwartet
+A? B? 15
+
+=== der prompt steht vor dem warten
+' Die Editor-Konsole zeigt, was ankommt: der Prompt MUSS vor dem Lesen
+' erscheinen, sonst sieht man nichts und das Programm scheint zu haengen.
+' Hier bleibt die Eingabe leer -- das Lesen scheitert, der Prompt ist trotzdem da.
+DIM x AS INTEGER
+INPUT "Bitte: ", x
+PRINT x
+--- eingabe
+
+--- fehler
+passt nicht zu INTEGER
+--- enthaelt
+Bitte:

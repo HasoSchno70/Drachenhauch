@@ -1,0 +1,74 @@
+' Modul `mqtt` (MQTT-3.1.1-Client, QoS 0). Bis Stufe 51 (2026-09-14)
+' tests/test_mqtt_module.py mit einem Test-Broker in Python; hier laeuft der
+' Broker _hilfen/mqttbroker.dh als eigener Prozess (Pfad ueber `--- argumente`)
+' und teilt keinen Code mit dem Rust-Client. Die Byte-Logik selbst pruefen die
+' Rust-Tests in mqtt.rs; hier der Weg durch die echte VM.
+' Die Registrierung der Befehle steht in builtin_registrierung.dhtest.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== verbindungsaufbau ohne broker ist ein fangbarer fehler
+' Kein Broker am Port -- schon der TCP-Aufbau scheitert, also kein Warten auf
+' CONNACK; der Fehler muss sich fangen lassen statt abzustuerzen.
+IMPORT "mqtt"
+DIM h AS MQTT_HANDLE
+TRY
+    h = MQTT_CONNECT("127.0.0.1", 18999, "gb-test")
+    PRINT "verbunden"
+CATCH e
+    PRINT INSTR(e, "MQTT_CONNECT") >= 0
+END TRY
+--- erwartet
+TRUE
+
+=== veroeffentlichen und abonnieren im rundweg
+IMPORT "mqtt"
+DIM brokerProzess AS INTEGER
+FUNCTION brokerStarten() AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    brokerProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/port.txt")
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT("127.0.0.1", brokerStarten(), "gb-e2e-test", 30)
+PRINT "connected: ", MQTT_IS_CONNECTED(h)
+
+MQTT_SUBSCRIBE(h, "sensors/temp")
+MQTT_PUBLISH(h, "sensors/temp", "21.5")
+
+DIM tries AS INTEGER
+DIM got AS BOOLEAN
+got = FALSE
+FOR tries = 1 TO 40
+    MQTT_UPDATE(h)
+    IF MQTT_NEXT_MESSAGE(h) THEN
+        PRINT "topic: ", MQTT_MESSAGE_TOPIC(h)
+        PRINT "payload: ", MQTT_MESSAGE_PAYLOAD(h)
+        got = TRUE
+        BREAK
+    END IF
+    SLEEP(25)
+NEXT
+PRINT "got message: ", got
+
+MQTT_DISCONNECT(h)
+PRINT "connected after disconnect: ", MQTT_IS_CONNECTED(h)
+IF PROCESS_RUNNING(brokerProzess) THEN PROCESS_KILL(brokerProzess)
+--- argumente
+{sammlung}/_hilfen/mqttbroker.dh
+--- erwartet
+connected:  TRUE
+topic:  sensors/temp
+payload:  21.5
+got message:  TRUE
+connected after disconnect:  FALSE

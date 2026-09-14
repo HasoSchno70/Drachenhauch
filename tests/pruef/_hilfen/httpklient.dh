@@ -1,0 +1,113 @@
+' HTTP-Gegenseite fuer httpd.dhtest: startet den Server des Falls als Kind,
+' holt den Port aus seiner Fehlerausgabe (`EPRINT("PORT=...")`) und spricht
+' mit ihm ROH ueber das net-Modul -- ein fertiger HTTP-Client normalisierte
+' `/../` weg, und genau das soll beim Server ankommen.
+IMPORT "net"
+
+DIM srvProzess AS INTEGER : srvProzess = -1
+DIM srvAusgabe AS STRING : srvAusgabe = ""
+DIM srvFehler AS STRING : srvFehler = ""
+DIM CRLF AS STRING : CRLF = CHR$(13) + CHR$(10)
+
+FUNCTION serverStarten(datei AS STRING) AS INTEGER
+    ' Rueckgabe der Port; 0, wenn keiner gemeldet wurde.
+    srvProzess = PROCESS_START("dhrt", "run", CWD$() + "/" + datei)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM leer AS INTEGER : leer = 0
+    WHILE MILLIS() - t0 < 15000
+        ' Ein Aufruf kann mehrere Zeilen liefern -- bricht der Server gleich
+        ' nach der Portzeile ab, steht seine Meldung in derselben Portion.
+        DIM z AS STRING : z = PROCESS_ERR$(srvProzess)
+        DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(z, CHR$(13), ""), CHR$(10))
+        DIM port AS INTEGER : port = 0
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            DIM zl AS STRING : zl = TRIM$(zeilen[i])
+            IF LEFT$(zl, 5) = "PORT=" AND port = 0 THEN
+                port = VAL(MID$(zl, 5, LEN(zl)))
+            ELSEIF zl <> "" THEN
+                srvFehler = srvFehler + zl + CHR$(10)
+            END IF
+        NEXT
+        IF port > 0 THEN RETURN port
+        ' Ein beendetes Kind kann seine letzte Zeile noch im Lesefaden haben --
+        ' erst nach fuenf leeren Abfragen aufgeben.
+        IF z = "" AND NOT PROCESS_RUNNING(srvProzess) THEN leer = leer + 1
+        IF leer >= 5 THEN RETURN 0
+        SLEEP(20)
+    WEND
+    RETURN 0
+END FUNCTION
+
+FUNCTION roh$(port AS INTEGER, anfrage AS STRING) AS STRING
+    ' Die ganze Antwort, bis der Server die Verbindung schliesst.
+    DIM c AS NET_SOCKET : c = NET_TCP_CONNECT("127.0.0.1", port)
+    NET_SEND(c, anfrage)
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 10000 AND leer < 5
+        DIM teil AS STRING : teil = NET_RECV(c, 65536)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT NET_IS_CONNECTED(c) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(10)
+    WEND
+    NET_CLOSE(c)
+    RETURN aus
+END FUNCTION
+
+FUNCTION holen$(port AS INTEGER, methode AS STRING, pfad AS STRING, kopfzeilen AS STRING, rumpf AS STRING) AS STRING
+    ' kopfzeilen: je Zeile "Name: Wert", mit CHR$(10) getrennt.
+    DIM a AS STRING : a = methode + " " + pfad + " HTTP/1.1" + CRLF + "Host: 127.0.0.1" + CRLF + "Connection: close" + CRLF
+    IF kopfzeilen <> "" THEN
+        DIM k AS ARRAY OF STRING : k = SPLIT$(kopfzeilen, CHR$(10))
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(k) - 1
+            IF k[i] <> "" THEN a = a + k[i] + CRLF
+        NEXT
+    END IF
+    IF rumpf <> "" OR methode = "POST" THEN a = a + "Content-Length: " + STR$(LEN(rumpf)) + CRLF
+    RETURN roh$(port, a + CRLF + rumpf)
+END FUNCTION
+
+FUNCTION status(antwort AS STRING) AS INTEGER
+    DIM w AS ARRAY OF STRING : w = SPLIT$(antwort, " ")
+    IF LEN(w) < 2 THEN RETURN 0
+    RETURN VAL(w[1])
+END FUNCTION
+
+FUNCTION rumpf$(antwort AS STRING) AS STRING
+    DIM p AS INTEGER : p = INSTR(antwort, CRLF + CRLF)
+    IF p < 0 THEN RETURN ""
+    RETURN MID$(antwort, p + 4, LEN(antwort))
+END FUNCTION
+
+FUNCTION kopf$(antwort AS STRING, name AS STRING) AS STRING
+    DIM p AS INTEGER : p = INSTR(antwort, CRLF + CRLF)
+    IF p < 0 THEN p = LEN(antwort)
+    DIM z AS ARRAY OF STRING : z = SPLIT$(LEFT$(antwort, p), CRLF)
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(z) - 1
+        IF UPPER$(LEFT$(z[i], LEN(name) + 1)) = UPPER$(name) + ":" THEN RETURN TRIM$(MID$(z[i], LEN(name) + 1, LEN(z[i])))
+    NEXT
+    RETURN ""
+END FUNCTION
+
+SUB serverEnde()
+    ' Wartet, bis der Server endet, und sammelt seine Ausgabe und Fehler.
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000 AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(srvProzess)
+        DIM e AS STRING : e = PROCESS_ERR$(srvProzess)
+        IF a <> "" THEN srvAusgabe = srvAusgabe + a
+        IF e <> "" THEN srvFehler = srvFehler + e
+        IF a = "" AND e = "" AND NOT PROCESS_RUNNING(srvProzess) THEN leer = leer + 1
+        SLEEP(30)
+    WEND
+    IF PROCESS_RUNNING(srvProzess) THEN PROCESS_KILL(srvProzess)
+END SUB

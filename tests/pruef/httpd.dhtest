@@ -1,0 +1,423 @@
+' Modul `httpd` -- ein kleiner Webserver. Bis Stufe 51 (2026-09-14)
+' tests/test_httpd.py; dort war dhrt der Server und Python der Client. Hier ist
+' der Server die Beilage `srv.dh` (sie meldet ihren Port mit EPRINT, weil PRINT
+' gepuffert waere) und laeuft als Kind; der Fall selbst ist der Client und
+' spricht ueber _hilfen/httpklient.dh ROH ueber das net-Modul -- ein fertiger
+' HTTP-Client normalisierte `/../` weg.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== antwortet ueberhaupt
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "GET", "/", "", "")
+PRINT status(a)
+PRINT rumpf$(a)
+PRINT kopf$(a, "Content-Type")
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+DIM n AS INTEGER
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", "hallo")
+HTTPD_STOP(s)
+
+--- erwartet
+200
+hallo
+text/plain
+
+=== methode und pfad
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/mess/raum", "", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", HTTPD_METHOD$(s) + " " + HTTPD_PATH$(s))
+HTTPD_STOP(s)
+
+--- erwartet
+GET /mess/raum
+
+=== abfrage wird aufgeloest
+' %20 und + gehoeren zurueckuebersetzt -- sonst steht die Prozent-Schreibweise
+' im Programm.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/x?raum=Wohn%20zimmer&grad=21", "", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", "[" + HTTPD_QUERY$(s, "raum") + "]")
+HTTPD_STOP(s)
+
+--- erwartet
+[Wohn zimmer]
+
+=== fehlende abfrage ist leer
+' Was in einer Adresse steht, ist Benutzereingabe -- wie bei ARG$ ist ein
+' Leerstring die richtige Antwort, kein Fehler.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/x", "", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", "[" + HTTPD_QUERY$(s, "gibtsnicht") + "]")
+HTTPD_STOP(s)
+
+--- erwartet
+[]
+
+=== rumpf und kopfzeile
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "POST", "/", "X-Test: wert", "a=1&b=2"))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", HTTPD_BODY$(s) + "|" + HTTPD_HEADER$(s, "X-Test"))
+HTTPD_STOP(s)
+
+--- erwartet
+a=1&b=2|wert
+
+=== kopfzeilen ohne ruecksicht auf gross klein
+' HTTP schreibt sie mal so, mal so.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/", "User-Agent: Drachenhauch-Test", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", HTTPD_HEADER$(s, "USER-AGENT"))
+HTTPD_STOP(s)
+
+--- erwartet
+Drachenhauch-Test
+
+=== statuscode kommt durch
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "GET", "/", "", "")
+PRINT status(a); " "; rumpf$(a)
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 404, "text/plain", "weg")
+HTTPD_STOP(s)
+
+--- erwartet
+404 weg
+
+=== mehrere anfragen nacheinander
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    PRINT rumpf$(holen$(port, "GET", "/" + STR$(i), "", ""))
+NEXT
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+DIM n AS INTEGER
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE n < 3
+    IF HTTPD_ACCEPT(s) THEN
+        HTTPD_SEND(s, 200, "text/plain", "nr" + STR$(n))
+        n = n + 1
+    END IF
+    SLEEP(5)
+WEND
+HTTPD_STOP(s)
+
+--- erwartet
+nr0
+nr1
+nr2
+
+=== send dir liefert die startseite
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "GET", "/", "", "")
+PRINT status(a)
+PRINT rumpf$(a)
+PRINT LEFT$(kopf$(a, "Content-Type"), 9)
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei web/index.html
+<h1>Start</h1>
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+PRINT HTTPD_SEND_DIR(s, "web")
+HTTPD_STOP(s)
+
+--- erwartet
+200
+<h1>Start</h1>
+text/html
+
+=== send dir liefert aus unterordnern
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/unter/a.txt", "", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei web/unter/a.txt
+tief
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+PRINT HTTPD_SEND_DIR(s, "web")
+HTTPD_STOP(s)
+
+--- erwartet
+tief
+
+=== send dir laesst niemanden hinaus
+' Der eigentliche Grund, warum es SEND_DIR gibt: die naheliegende Handarbeit
+' (HTTPD_SEND_FILE(s, 200, "web" + HTTPD_PATH$(s))) laesst sich mit
+' /../geheim.txt aus dem Ordner herausfuehren -- dieselbe Lehre wie bei der
+' Zip-Slip-Pruefung in ZIP_EXTRACT.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "GET", "/../geheim.txt", "", "")
+PRINT status(a)
+PRINT INSTR(a, "GEHEIM") < 0
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei geheim.txt
+GEHEIM
+--- datei web/index.html
+<h1>Start</h1>
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+PRINT HTTPD_SEND_DIR(s, "web")
+HTTPD_STOP(s)
+
+--- erwartet
+403
+TRUE
+
+=== send dir meldet fehlende dateien als 404
+' Eine fehlende Datei ist der Alltag eines Servers und darf das Programm nicht
+' anhalten -- der Rueckgabewert sagt es trotzdem.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT status(holen$(port, "GET", "/gibtsnicht.html", "", ""))
+serverEnde()
+PRINT "server: " + TRIM$(srvAusgabe)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei web/index.html
+<h1>Start</h1>
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+PRINT HTTPD_SEND_DIR(s, "web")
+HTTPD_STOP(s)
+
+--- erwartet
+404
+server: FALSE
+
+=== send file liefert eine bestimmte datei
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/egal", "", ""))
+serverEnde()
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei web/unter/a.txt
+tief
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND_FILE(s, 200, "web/unter/a.txt")
+HTTPD_STOP(s)
+
+--- erwartet
+tief
+
+=== abfragen ohne anfrage erklaeren sich
+' Wer HTTPD_PATH$ vor HTTPD_ACCEPT ruft, soll das erfahren.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT port > 0
+serverEnde()
+PRINT INSTR(srvFehler, "erst HTTPD_ACCEPT") >= 0
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+PRINT HTTPD_PATH$(s)
+
+--- erwartet
+TRUE
+TRUE
+
+=== senden ohne anfrage erklaert sich
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+PRINT port > 0
+serverEnde()
+PRINT INSTR(srvFehler, "keine Anfrage") >= 0
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+HTTPD_SEND(s, 200, "text/plain", "x")
+
+--- erwartet
+TRUE
+TRUE
+
+=== belegter port meldet sich
+' Zwei Server auf demselben Port -- der zweite muss es sagen.
+IMPORT "klient.dh"
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM p2 AS INTEGER : p2 = PROCESS_START("dhrt", "run", CWD$() + "/zweit.dh", "--", STR$(port))
+DIM fehler AS STRING : fehler = ""
+DIM leer AS INTEGER : leer = 0
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE MILLIS() - t0 < 15000 AND leer < 5
+    DIM e AS STRING : e = PROCESS_ERR$(p2)
+    IF e <> "" THEN fehler = fehler + e
+    IF e = "" AND NOT PROCESS_RUNNING(p2) THEN leer = leer + 1
+    SLEEP(30)
+WEND
+PRINT PROCESS_CODE(p2) <> 0
+PRINT INSTR(fehler, "nicht belegbar") >= 0
+PROCESS_KILL(srvProzess)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(0)
+EPRINT("PORT=" + STR$(HTTPD_PORT(s)))
+WHILE NOT HTTPD_ACCEPT(s)
+    SLEEP(5)
+WEND
+HTTPD_SEND(s, 200, "text/plain", "x")
+HTTPD_STOP(s)
+
+--- datei zweit.dh
+IMPORT "httpd"
+DIM t AS HTTPD
+t = HTTPD_START(VAL(ARG$(0)))
+
+--- erwartet
+TRUE
+TRUE
