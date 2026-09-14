@@ -25,3 +25,32 @@ hallo
 55
 5.0
 
+=== dhrt mit einer datei ohne run
+' `dhrt <datei.dh>` ohne `run` wird wie `run` behandelt: Quelltext uebersetzen und ins
+' Verzeichnis der Datei wechseln -- die Datei liegt deshalb in einem Unterordner.
+' (Bis Stufe 45 in test_rust_run_parity.py.)
+FUNCTION lesen$(pc AS INTEGER) AS STRING
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM r AS STRING : r = ""
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM zz AS STRING : zz = PROCESS_READ$(pc)
+        IF zz <> "" THEN r = r + zz : stille = 0
+        IF zz = "" AND NOT PROCESS_RUNNING(pc) THEN stille = stille + 1 : SLEEP(30)
+    WEND
+    RETURN r
+END FUNCTION
+PRINT REPLACE$(TRIM$(lesen$(PROCESS_START("dhrt", "unter/prog.dh"))), CHR$(13), "")
+--- datei unter/data.txt
+zeile1
+
+--- datei unter/prog.dh
+DIM f AS FILE
+f = OpenFile("data.txt", "r")
+PRINT ReadLine(f)
+CloseFile(f)
+PRINT 6 * 7
+
+--- erwartet
+zeile1
+42

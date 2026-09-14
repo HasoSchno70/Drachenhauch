@@ -500,3 +500,8 @@ END FUNCTION
 --- fehler
 Namensraum-Fehler: e kennt keine Klasse gibtsnicht.
 
+=== private vor etwas anderem meldet
+' (Bis Stufe 45 in test_namensraeume.py.)
+PRIVATE PRINT 1
+--- fehler
+PRIVATE steht vor

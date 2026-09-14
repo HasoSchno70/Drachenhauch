@@ -7,7 +7,7 @@
 > im Schub hin und zurück ~60 ms; eine **einzelne** Runde kostet ein bis drei
 > Bilder des Kindes (17–50 ms), weil es seine Post einmal je Bild liest — der
 > Kanal ist nicht der Engpass, die Bildschleife ist es; das Kind stirbt, die
-> Eltern leben (`tests/test_fenster_prozess.py`); die Rechnungsverwaltung
+> Eltern leben (`tests/pruef/fenster_prozess.dhtest`); die Rechnungsverwaltung
 > öffnet eine Rechnung im zweiten Fenster in 64 Zeilen (`196_rechnung_fenster.dh`).
 > Wege C und D bleiben ungebaut; Fall a (geteilte Bilder und Objekte) bleibt
 > ein Nicht-Ziel.

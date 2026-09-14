@@ -31,3 +31,75 @@ TRUE
 70.0
 Mittel
 
+=== der handler aus der datei feuert
+' Ein eingespeister Klick auf den Knopf eines geladenen Formulars ruft den
+' Handler, den die Datei beim Namen nennt.
+' (Bis Stufe 45 in test_gui_form_runner.py.)
+IMPORT "gui"
+SCREEN(200, 120, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM frm AS GUI_WINDOW
+frm = GUI_LOAD("f.dhform")
+GUI_WINDOW_CHROME(frm, FALSE)
+AUTOMATION_PLAY("klick.txt")
+SUB aufok()
+    PRINT "GEFEUERT"
+END SUB
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=10
+--- datei f.dhform
+{"title": "T", "x": 0, "y": 0, "w": 200, "h": 120, "chrome": false, "visible": true, "widgets": [{"kind": "button", "x": 20, "y": 20, "w": 100, "h": 28, "text": "OK", "on_click": "aufok"}]}
+
+--- datei klick.txt
+# Klick
+c 4
+e 0 7 70 34 0 0
+e 1 7 70 34 0 0
+e 2 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- enthaelt
+GEFEUERT
+
+=== der handler feuert auch mit grossbuchstaben
+' Der Compiler legt Funktionsnamen KLEIN ab, der Form-Designer schreibt
+' `btn1Click` -- der Lookup fand den erzeugten SUB deshalb nie, und damit war
+' kein einziger automatisch erzeugter Handler benutzbar.
+' (Bis Stufe 45 in test_gui_form_runner.py.)
+IMPORT "gui"
+SCREEN(200, 120, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM frm AS GUI_WINDOW
+frm = GUI_LOAD("f.dhform")
+GUI_WINDOW_CHROME(frm, FALSE)
+AUTOMATION_PLAY("klick.txt")
+SUB btn1Click()
+    PRINT "GEFEUERT"
+END SUB
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=10
+--- datei f.dhform
+{"title": "T", "x": 0, "y": 0, "w": 200, "h": 120, "chrome": false, "visible": true, "widgets": [{"kind": "button", "x": 20, "y": 20, "w": 100, "h": 28, "text": "OK", "on_click": "btn1Click"}]}
+
+--- datei klick.txt
+# Klick
+c 4
+e 0 7 70 34 0 0
+e 1 7 70 34 0 0
+e 2 6 0 0 0 0
+e 4 5 0 0 0 0
+
+--- enthaelt
+GEFEUERT

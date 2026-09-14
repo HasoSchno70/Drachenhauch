@@ -145,3 +145,349 @@ TILED_OBJECT_SET_NAME(m, "s", -1, "x")
 --- fehler
 TILED_OBJECT_SET_NAME: Objekt -1 gibt es in 's' nicht
 
+=== ein fremder leser sieht die objekt ebene
+' Gelesen mit dem json-Modul nach den Regeln des Tiled-Formats, nicht mit dem
+' tiled-Modul, das die Datei geschrieben hat.
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET(m, 0, 1, 1, 3)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "damage", 5)
+TILED_TILE_SET_PROP(m, 4, "reibung", 0.5)
+TILED_TILE_SET_PROP(m, 5, "art", "wasser")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "leben", 3)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "boss", TRUE)
+TILED_SAVE(m, "karte.json")
+DIM h AS JSON_HANDLE
+FUNCTION wert$(pfad AS STRING) AS STRING
+    DIM art AS STRING : art = JSON_TYPE(h, pfad)
+    IF art = "boolean" THEN RETURN STR$(JSON_GET_BOOL(h, pfad))
+    IF art = "string" THEN RETURN JSON_GET_STRING(h, pfad)
+    RETURN STR$(JSON_GET_FLOAT(h, pfad))
+END FUNCTION
+FUNCTION props$(pfad AS STRING) AS STRING
+    ' sortiert: die Reihenfolge in der Datei ist nicht festgelegt
+    DIM teile AS ARRAY OF STRING
+    teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(i)
+        ARRAY_PUSH(teile, JSON_GET_STRING(h, q + ".name") + "=" + wert$(q + ".value") + ":" + JSON_GET_STRING(h, q + ".type"))
+    NEXT
+    SORT(teile)
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(teile) - 1
+        r = r + teile[i] + " "
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION objektEbene$() AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF JSON_GET_STRING(h, "layers." + STR$(i) + ".type") = "objectgroup" THEN RETURN "layers." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION objekt$(name AS STRING) AS STRING
+    DIM eb AS STRING : eb = objektEbene$()
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, eb + ".objects") - 1
+        IF JSON_GET_STRING(h, eb + ".objects." + STR$(i) + ".name") = name THEN RETURN eb + ".objects." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION kachel$(id AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets.0.tiles") - 1
+        IF JSON_GET_INT(h, "tilesets.0.tiles." + STR$(i) + ".id") = id THEN RETURN "tilesets.0.tiles." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+h = JSON_LOAD("karte.json")
+DIM eb AS STRING : eb = objektEbene$()
+DIM zahl AS INTEGER : zahl = 0
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "layers") - 1
+    IF JSON_GET_STRING(h, "layers." + STR$(i) + ".type") = "objectgroup" THEN zahl = zahl + 1
+NEXT
+PRINT "objekt ebenen "; zahl; " "; JSON_GET_STRING(h, eb + ".name")
+PRINT "objekte "; JSON_LEN(h, eb + ".objects")
+DIM held AS STRING : held = objekt$("held")
+PRINT "held "; JSON_GET_FLOAT(h, held + ".x"); " "; JSON_GET_FLOAT(h, held + ".y"); " "; JSON_GET_FLOAT(h, held + ".width"); " "; JSON_GET_FLOAT(h, held + ".height"); " "; JSON_GET_STRING(h, held + ".type")
+PRINT "gegner da "; objekt$("gegner") <> ""
+--- erwartet
+objekt ebenen 1 spawns
+objekte 2
+held 32.0 48.0 16.0 16.0 spawn
+gegner da TRUE
+
+=== ein fremder leser sieht die objekt eigenschaften
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET(m, 0, 1, 1, 3)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "damage", 5)
+TILED_TILE_SET_PROP(m, 4, "reibung", 0.5)
+TILED_TILE_SET_PROP(m, 5, "art", "wasser")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "leben", 3)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "boss", TRUE)
+TILED_SAVE(m, "karte.json")
+DIM h AS JSON_HANDLE
+FUNCTION wert$(pfad AS STRING) AS STRING
+    DIM art AS STRING : art = JSON_TYPE(h, pfad)
+    IF art = "boolean" THEN RETURN STR$(JSON_GET_BOOL(h, pfad))
+    IF art = "string" THEN RETURN JSON_GET_STRING(h, pfad)
+    RETURN STR$(JSON_GET_FLOAT(h, pfad))
+END FUNCTION
+FUNCTION props$(pfad AS STRING) AS STRING
+    ' sortiert: die Reihenfolge in der Datei ist nicht festgelegt
+    DIM teile AS ARRAY OF STRING
+    teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(i)
+        ARRAY_PUSH(teile, JSON_GET_STRING(h, q + ".name") + "=" + wert$(q + ".value") + ":" + JSON_GET_STRING(h, q + ".type"))
+    NEXT
+    SORT(teile)
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(teile) - 1
+        r = r + teile[i] + " "
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION objektEbene$() AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF JSON_GET_STRING(h, "layers." + STR$(i) + ".type") = "objectgroup" THEN RETURN "layers." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION objekt$(name AS STRING) AS STRING
+    DIM eb AS STRING : eb = objektEbene$()
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, eb + ".objects") - 1
+        IF JSON_GET_STRING(h, eb + ".objects." + STR$(i) + ".name") = name THEN RETURN eb + ".objects." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION kachel$(id AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets.0.tiles") - 1
+        IF JSON_GET_INT(h, "tilesets.0.tiles." + STR$(i) + ".id") = id THEN RETURN "tilesets.0.tiles." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+h = JSON_LOAD("karte.json")
+PRINT props$(objekt$("gegner") + ".properties")
+--- erwartet
+boss=TRUE:bool leben=3.0:int
+
+=== ein fremder leser sieht die kachel eigenschaften
+' BOOLEAN, INTEGER, FLOAT und STRING gehen ohne Typangabe hinein -- der Wert
+' traegt seinen Typ schon mit sich. Lokale Nummern: firstgid 1, gid 3 -> 2.
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET(m, 0, 1, 1, 3)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "damage", 5)
+TILED_TILE_SET_PROP(m, 4, "reibung", 0.5)
+TILED_TILE_SET_PROP(m, 5, "art", "wasser")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "leben", 3)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "boss", TRUE)
+TILED_SAVE(m, "karte.json")
+DIM h AS JSON_HANDLE
+FUNCTION wert$(pfad AS STRING) AS STRING
+    DIM art AS STRING : art = JSON_TYPE(h, pfad)
+    IF art = "boolean" THEN RETURN STR$(JSON_GET_BOOL(h, pfad))
+    IF art = "string" THEN RETURN JSON_GET_STRING(h, pfad)
+    RETURN STR$(JSON_GET_FLOAT(h, pfad))
+END FUNCTION
+FUNCTION props$(pfad AS STRING) AS STRING
+    ' sortiert: die Reihenfolge in der Datei ist nicht festgelegt
+    DIM teile AS ARRAY OF STRING
+    teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(i)
+        ARRAY_PUSH(teile, JSON_GET_STRING(h, q + ".name") + "=" + wert$(q + ".value") + ":" + JSON_GET_STRING(h, q + ".type"))
+    NEXT
+    SORT(teile)
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(teile) - 1
+        r = r + teile[i] + " "
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION objektEbene$() AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF JSON_GET_STRING(h, "layers." + STR$(i) + ".type") = "objectgroup" THEN RETURN "layers." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION objekt$(name AS STRING) AS STRING
+    DIM eb AS STRING : eb = objektEbene$()
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, eb + ".objects") - 1
+        IF JSON_GET_STRING(h, eb + ".objects." + STR$(i) + ".name") = name THEN RETURN eb + ".objects." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION kachel$(id AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets.0.tiles") - 1
+        IF JSON_GET_INT(h, "tilesets.0.tiles." + STR$(i) + ".id") = id THEN RETURN "tilesets.0.tiles." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+h = JSON_LOAD("karte.json")
+PRINT "2: "; props$(kachel$(2) + ".properties")
+PRINT "3: "; props$(kachel$(3) + ".properties")
+PRINT "4: "; props$(kachel$(4) + ".properties")
+--- erwartet
+2: damage=5.0:int solid=TRUE:bool
+3: reibung=0.5:float
+4: art=wasser:string
+
+=== die laufzeit liest ihr eigenes ergebnis zurueck
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 3, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "kacheln.png", 8)
+DIM e AS INTEGER : e = TILED_ADD_LAYER(m, "Boden")
+TILED_TILE_SET(m, 0, 1, 1, 3)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "damage", 5)
+TILED_TILE_SET_PROP(m, 4, "reibung", 0.5)
+TILED_TILE_SET_PROP(m, 5, "art", "wasser")
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "spawns")
+DIM i1 AS INTEGER : i1 = TILED_ADD_OBJECT(m, "spawns", "held", "spawn", 32.0, 48.0, 16.0, 16.0)
+DIM i2 AS INTEGER : i2 = TILED_ADD_OBJECT(m, "spawns", "gegner", "spawn", 64.0, 16.0, 8.0, 8.0)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "leben", 3)
+TILED_OBJECT_SET_PROP(m, "spawns", i2, "boss", TRUE)
+TILED_SAVE(m, "karte.json")
+DIM n AS TILED_MAP : n = TILED_LOAD("karte.json")
+PRINT TILED_TILE_PROP_BOOL(n, 3, "solid")
+PRINT TILED_TILE_PROP_INT(n, 3, "damage")
+PRINT TILED_TILE_PROP_STRING(n, 5, "art")
+PRINT TILED_OBJECT_COUNT(n, "spawns")
+PRINT TILED_OBJECT_PROP_INT(n, "spawns", 1, "leben")
+PRINT TILED_OBJECT_NAME(n, "spawns", 0)
+--- erwartet
+TRUE
+5
+wasser
+2
+3
+held
+
+=== entfernen raeumt die kachel ganz aus der datei
+' Eine Kachel ohne Eigenschaften darf nicht mit leerer Liste in der Datei
+' stehen bleiben -- ein leerer Eintrag waere Rauschen.
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(2, 2, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+TILED_TILE_SET_PROP(m, 2, "solid", TRUE)
+TILED_TILE_SET_PROP(m, 3, "solid", TRUE)
+TILED_TILE_REMOVE_PROP(m, 2, "solid")
+TILED_SAVE(m, "k.json")
+DIM h AS JSON_HANDLE : h = JSON_LOAD("k.json")
+DIM i AS INTEGER
+PRINT "kacheln "; JSON_LEN(h, "tilesets.0.tiles")
+FOR i = 0 TO JSON_LEN(h, "tilesets.0.tiles") - 1
+    PRINT "id "; JSON_GET_INT(h, "tilesets.0.tiles." + STR$(i) + ".id")
+NEXT
+--- erwartet
+kacheln 1
+id 2
+
+=== name typ und rechteck lassen sich aendern
+' (Bis Stufe 46 in test_tiled_objekte_eigenschaften.py.)
+IMPORT "tiled"
+IMPORT "json"
+DIM m AS TILED_MAP : m = TILED_NEW(4, 4, 16, 16)
+DIM t AS INTEGER : t = TILED_ADD_TILESET(m, "k.png", 4)
+DIM o AS INTEGER : o = TILED_ADD_OBJECT_LAYER(m, "s")
+DIM a1 AS INTEGER : a1 = TILED_ADD_OBJECT(m, "s", "a", "spawn", 0, 0, 16, 16)
+DIM a2 AS INTEGER : a2 = TILED_ADD_OBJECT(m, "s", "b", "spawn", 32, 0, 16, 16)
+DIM a3 AS INTEGER : a3 = TILED_ADD_OBJECT(m, "s", "c", "spawn", 64, 0, 16, 16)
+TILED_OBJECT_SET_NAME(m, "s", 2, "cc")
+TILED_OBJECT_SET_TYPE(m, "s", 2, "trigger")
+TILED_OBJECT_SET_RECT(m, "s", 2, 10.5, 20.5, 8, 4)
+TILED_SAVE(m, "karte.json")
+DIM h AS JSON_HANDLE
+FUNCTION wert$(pfad AS STRING) AS STRING
+    DIM art AS STRING : art = JSON_TYPE(h, pfad)
+    IF art = "boolean" THEN RETURN STR$(JSON_GET_BOOL(h, pfad))
+    IF art = "string" THEN RETURN JSON_GET_STRING(h, pfad)
+    RETURN STR$(JSON_GET_FLOAT(h, pfad))
+END FUNCTION
+FUNCTION props$(pfad AS STRING) AS STRING
+    ' sortiert: die Reihenfolge in der Datei ist nicht festgelegt
+    DIM teile AS ARRAY OF STRING
+    teile = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, pfad) - 1
+        DIM q AS STRING : q = pfad + "." + STR$(i)
+        ARRAY_PUSH(teile, JSON_GET_STRING(h, q + ".name") + "=" + wert$(q + ".value") + ":" + JSON_GET_STRING(h, q + ".type"))
+    NEXT
+    SORT(teile)
+    DIM r AS STRING : r = ""
+    FOR i = 0 TO LEN(teile) - 1
+        r = r + teile[i] + " "
+    NEXT
+    RETURN TRIM$(r)
+END FUNCTION
+FUNCTION objektEbene$() AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "layers") - 1
+        IF JSON_GET_STRING(h, "layers." + STR$(i) + ".type") = "objectgroup" THEN RETURN "layers." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION objekt$(name AS STRING) AS STRING
+    DIM eb AS STRING : eb = objektEbene$()
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, eb + ".objects") - 1
+        IF JSON_GET_STRING(h, eb + ".objects." + STR$(i) + ".name") = name THEN RETURN eb + ".objects." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+FUNCTION kachel$(id AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "tilesets.0.tiles") - 1
+        IF JSON_GET_INT(h, "tilesets.0.tiles." + STR$(i) + ".id") = id THEN RETURN "tilesets.0.tiles." + STR$(i)
+    NEXT
+    RETURN ""
+END FUNCTION
+h = JSON_LOAD("karte.json")
+DIM cc AS STRING : cc = objekt$("cc")
+PRINT JSON_GET_STRING(h, cc + ".type"); " "; JSON_GET_FLOAT(h, cc + ".x"); " "; JSON_GET_FLOAT(h, cc + ".y"); " "; JSON_GET_FLOAT(h, cc + ".width"); " "; JSON_GET_FLOAT(h, cc + ".height")
+PRINT "c weg "; objekt$("c") = ""
+--- erwartet
+trigger 10.5 20.5 8.0 4.0
+c weg TRUE

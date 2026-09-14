@@ -12,3 +12,73 @@ NEXT
 DHRT_FRAMES=20
 --- erwartet
 
+=== der bogen hat die erwartete kachelzahl
+' 3 Spalten x 2 Zeilen, Kacheln 160 breit (unter der Verkleinerungsgrenze) + Raender:
+' 3 * 160 + 4 * 8 = 512 breit, 2 * (100 + 18) + 3 * 8 = 260 hoch.
+' (Bis Stufe 45 in test_kontaktbogen.py.)
+SCREEN(160, 100, "bogen", 1)
+DIM f AS INTEGER
+FOR f = 0 TO 200
+    CLS(0)
+    BOX(f, 40, f + 8, 48, &HFF0000)
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=60
+DHRT_CONTACT=bogen.png
+DHRT_CONTACT_MAX=6
+DHRT_CONTACT_COLS=3
+--- bild bogen.png
+groesse 512 260
+
+=== die spaltenzahl wirkt
+' Sechs Spalten, eine einzige Zeile: 6 * 160 + 7 * 8 = 1016 breit, 118 + 16 = 134 hoch.
+' (Bis Stufe 45 in test_kontaktbogen.py.)
+SCREEN(160, 100, "bogen", 1)
+DIM f AS INTEGER
+FOR f = 0 TO 200
+    CLS(0)
+    BOX(f, 40, f + 8, 48, &HFF0000)
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=60
+DHRT_CONTACT=bogen.png
+DHRT_CONTACT_MAX=6
+DHRT_CONTACT_COLS=6
+--- bild bogen.png
+groesse 1016 134
+
+=== die kacheln zeigen verschiedene zeitpunkte
+' Der wandernde Punkt steht in jeder Kachel weiter rechts -- sonst waeren alle
+' Bilder aus demselben Augenblick. Gemessen in Zeile 44 jeder Kachel.
+' (Bis Stufe 45 in test_kontaktbogen.py.)
+SCREEN(160, 100, "bogen", 1)
+DIM f AS INTEGER
+FOR f = 0 TO 200
+    CLS(0)
+    BOX(f, 40, f + 8, 48, &HFF0000)
+    FLIP()
+NEXT
+--- umgebung
+DHRT_FRAMES=90
+DHRT_CONTACT=bogen.png
+DHRT_CONTACT_MAX=3
+DHRT_CONTACT_COLS=3
+--- nachher
+DIM img AS IMAGE : img = LOADIMAGE("bogen.png")
+DIM pos[3] AS INTEGER
+DIM sp AS INTEGER
+DIM x AS INTEGER
+FOR sp = 0 TO 2
+    DIM x0 AS INTEGER : x0 = 8 + sp * (160 + 8)
+    pos[sp] = -1
+    FOR x = x0 TO x0 + 159
+        IF pos[sp] < 0 AND ((GETPIXEL(img, x, 8 + 44) SHR 16) BAND 255) > 120 THEN pos[sp] = x - x0
+    NEXT
+NEXT
+PRINT "in jeder kachel " ; pos[0] >= 0 AND pos[1] >= 0 AND pos[2] >= 0
+PRINT "zeitlich geordnet " ; pos[0] < pos[1] AND pos[1] < pos[2]
+--- erwartet
+in jeder kachel TRUE
+zeitlich geordnet TRUE

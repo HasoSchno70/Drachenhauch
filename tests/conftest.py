@@ -63,14 +63,14 @@ def _module_uses_qt(path: str) -> bool:
 # Einige Dateien vertragen das nicht, und zwar nicht aus Zufall: sie haengen
 # an etwas, das es auf der Maschine nur EINMAL gibt.
 #
-#   test_automation.py        raylibs AUTOMATION_* schreibt die ECHTE Eingabe
+#   (Eingabe-Aufzeichnung)    raylibs AUTOMATION_* schreibt die ECHTE Eingabe
 #                             mit und speist sie wieder ein. Jede fremde
 #                             Mausbewegung landet in der Aufnahme -- auch die
 #                             eines Menschen, der waehrenddessen am Rechner
 #                             sitzt (seriell nachgestellt: fuenf Fehlschlaege
 #                             hintereinander waehrend ich die Maus bewegte,
-#                             danach im Leerlauf wieder gruen).
-#   test_gui_form_runner.py   speist einen Klick ein -- dasselbe Nadeloehr.
+#                             danach im Leerlauf wieder gruen). Die Faelle
+#                             dazu liegen inzwischen in tests/pruef/.
 #   test_gui_dialog.py        ebenso (Klick auf einen Dialog, mit Gegenprobe).
 #   test_gui_tastatur.py      speist TASTEN ein -- dasselbe Nadeloehr, nur von
 #                             der anderen Seite: wer waehrenddessen tippt,
@@ -85,8 +85,6 @@ def _module_uses_qt(path: str) -> bool:
 # Mal andere Tests -- das Streumuster ist das Erkennungszeichen fuer geteilte
 # Betriebsmittel.
 _SERIELL = {
-    "test_automation.py",
-    "test_gui_form_runner.py",
     "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
     "test_speak.py",                 # misst Sprechdauern (SPEAK_WAIT) an der Soundkarte
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
@@ -186,24 +184,15 @@ _BRAUCHT_GRAFIK = {
     "test_speak.py",
     "test_schriften_vorrat.py",
     "test_gui_barrierefreiheit.py",
-    "test_automation.py",
     "test_beispiel_sqlite_tabelle.py",
     "test_beispiele_gui_enden.py",
     "test_buch_tippspiel.py",
     "test_circuitrunner.py",
     "test_examples.py",
-    "test_gfx_push_pop.py",
     "test_gui_draw_window.py",
-    "test_gui_form_runner.py",
     "test_drucken.py",
-    "test_fenster_prozess.py",
     "test_gui_bindung.py",
     "test_gui_table_frozen_edge.py",
-    "test_image_io.py",
-    "test_kontaktbogen.py",
-    "test_m3d.py",
-    "test_modules_audio.py",
-    "test_shader_uniforms_geometry.py",
 }
 
 

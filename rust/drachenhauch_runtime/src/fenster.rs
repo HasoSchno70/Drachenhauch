@@ -14,7 +14,7 @@
 //! Port, reichen ihn dem Kind in der Umgebung (`DHRT_ELTERN_PORT`), das Kind
 //! verbindet sich beim ersten `PARENT_*`-Aufruf. Gemessen ist eine Runde
 //! Eltern -> Kind -> Eltern auf dieser Strecke ein Bruchteil einer
-//! Millisekunde (siehe tests/test_fenster_prozess.py).
+//! Millisekunde (siehe tests/pruef/fenster_prozess.dhtest).
 //!
 //! Zwei Regeln, die man nicht sieht:
 //! - **Eine Nachricht ist eine Zeile.** Ein Zeilenumbruch darin ist ein Fehler,

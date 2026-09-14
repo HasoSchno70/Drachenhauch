@@ -130,3 +130,373 @@ FEHL  Zeile 2: Text: erhalten abc, erwartet abd
 LOG_ERROR("nicht mal das")
 --- erwartet
 
+=== der abbruch nennt datei und zeile
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+PRINT "abgebrochen " ; lauf("a.dh") <> 0
+PRINT "zeile " ; INSTR(prErr, ":3:") >= 0 ; " meldung " ; INSTR(prErr, "hier") >= 0
+--- datei a.dh
+PRINT "a"
+PRINT "b"
+ASSERT(FALSE, "hier")
+
+--- erwartet
+abgebrochen TRUE
+zeile TRUE meldung TRUE
+
+=== ohne meldung gibt es trotzdem eine
+' (Bis Stufe 45 in test_pruefen.py.)
+ASSERT(FALSE)
+--- fehler
+Bedingung nicht erfuellt
+
+=== das sammeln laesst sich wieder ausschalten
+' Nach ASSERT_COLLECT(FALSE) bricht die naechste Pruefung wieder ab.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+PRINT "abgebrochen " ; lauf("s.dh") <> 0 ; " nie erreicht " ; INSTR(prOut, "nie") < 0
+--- datei s.dh
+ASSERT_COLLECT(TRUE)
+ASSERT_EQ(1, 2)
+ASSERT_COLLECT(FALSE)
+ASSERT_EQ(3, 4)
+PRINT "nie"
+
+--- erwartet
+abgebrochen TRUE nie erreicht TRUE
+
+=== log geht nach stderr
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+lauf("k.dh")
+PRINT "nutzdaten allein " ; REPLACE$(prOut, CHR$(13), "") = "nutzdaten" + CHR$(10)
+PRINT "meldung in stderr " ; INSTR(prErr, "meldung") >= 0 AND INSTR(prErr, "INFO") >= 0
+--- datei k.dh
+PRINT "nutzdaten"
+LOG_INFO("meldung")
+
+--- erwartet
+nutzdaten allein TRUE
+meldung in stderr TRUE
+
+=== log debug schweigt per vorgabe
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+lauf("k.dh")
+PRINT "leise fehlt " ; INSTR(prErr, "leise") < 0 ; " laut da " ; INSTR(prErr, "laut") >= 0
+--- datei k.dh
+LOG_DEBUG("leise")
+LOG_INFO("laut")
+
+--- erwartet
+leise fehlt TRUE laut da TRUE
+
+=== der log-pegel kommt aus der umgebung
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+SETENV("DH_LOG", "debug")
+lauf("k.dh")
+PRINT "sichtbar " ; INSTR(prErr, "jetzt sichtbar") >= 0
+--- datei k.dh
+LOG_DEBUG("jetzt sichtbar")
+
+--- erwartet
+sichtbar TRUE
+
+=== log-pegel warn unterdrueckt info
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+SETENV("DH_LOG", "warn")
+lauf("k.dh")
+PRINT "weg fehlt " ; INSTR(prErr, "weg") < 0 ; " beide da " ; INSTR(prErr, "da") >= 0 AND INSTR(prErr, "auch da") >= 0
+--- datei k.dh
+LOG_INFO("weg")
+LOG_WARN("da")
+LOG_ERROR("auch da")
+
+--- erwartet
+weg fehlt TRUE beide da TRUE
+
+=== ein unbekannter pegel faellt auf info zurueck
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+SETENV("DH_LOG", "quatsch")
+lauf("k.dh")
+PRINT "leise fehlt " ; INSTR(prErr, "leise") < 0 ; " laut da " ; INSTR(prErr, "laut") >= 0
+--- datei k.dh
+LOG_DEBUG("leise")
+LOG_INFO("laut")
+
+--- erwartet
+leise fehlt TRUE laut da TRUE
+
+=== log hat zeitstempel und stufe
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+lauf("k.dh")
+PRINT "form " ; REGEX_TEST(prErr, "\d{2}:\d{2}:\d{2} WARN\s+achtung")
+--- datei k.dh
+LOG_WARN("achtung")
+
+--- erwartet
+form TRUE
+
+=== log wandelt werte wie print
+' Als Kind gestartet, damit stdout und stderr getrennt ankommen und sich auch
+' pruefen laesst, was NICHT in der Fehlerausgabe steht.
+' (Bis Stufe 45 in test_pruefen.py.)
+DIM prOut AS STRING : prOut = ""
+DIM prErr AS STRING : prErr = ""
+FUNCTION lauf(datei AS STRING) AS INTEGER
+    ' Ein Kind laufen lassen und stdout/stderr GETRENNT einsammeln.
+    DIM pc AS INTEGER : pc = PROCESS_START("dhrt", "run", datei)
+    prOut = ""
+    prErr = ""
+    DIM bis AS INTEGER : bis = MILLIS() + 60000
+    DIM stille AS INTEGER : stille = 0
+    WHILE MILLIS() < bis AND stille < 5
+        DIM a AS STRING : a = PROCESS_READ$(pc)
+        DIM b AS STRING : b = PROCESS_ERR$(pc)
+        IF a <> "" THEN prOut = prOut + a
+        IF b <> "" THEN prErr = prErr + b
+        IF a = "" AND b = "" THEN
+            IF PROCESS_RUNNING(pc) THEN
+                SLEEP(10)
+            ELSE
+                stille = stille + 1
+                SLEEP(30)
+            END IF
+        ELSE
+            stille = 0
+        END IF
+    WEND
+    RETURN PROCESS_CODE(pc)
+END FUNCTION
+lauf("k.dh")
+PRINT "zahl " ; INSTR(prErr, "42") >= 0 ; " wahrheitswert " ; INSTR(prErr, "TRUE") >= 0
+--- datei k.dh
+LOG_INFO(42)
+LOG_INFO(TRUE)
+
+--- erwartet
+zahl TRUE wahrheitswert TRUE
