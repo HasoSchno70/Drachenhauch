@@ -1,0 +1,48 @@
+' Startet _hilfen/smtpserver.dh fuer einen Fall in smtp.dhtest und liest nach
+' dem Lauf, was er mitgeschrieben hat. Der Serverpfad kommt als ARG$(0)
+' (`--- argumente {sammlung}/_hilfen/smtpserver.dh`), Port und Mitschrift liegen
+' im Fallordner.
+DIM smtpProzess AS INTEGER : smtpProzess = -1
+
+FUNCTION starten(faehigkeiten AS STRING, authOk AS STRING, rcptOk AS STRING) AS INTEGER
+    IF FILEEXISTS("port.txt") THEN DELETEFILE("port.txt")
+    smtpProzess = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$(), faehigkeiten, authOk, rcptOk)
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 15000
+        IF FILEEXISTS("port.txt") THEN
+            DIM z AS ARRAY OF STRING : z = READLINES("port.txt")
+            IF LEN(z) > 0 THEN
+                IF TRIM$(z[0]) <> "" THEN RETURN VAL(z[0])
+            END IF
+        END IF
+        SLEEP(10)
+    WEND
+    RETURN 0
+END FUNCTION
+
+FUNCTION befehl(text AS STRING) AS BOOLEAN
+    ' Kam genau diese Zeile beim Server an?
+    IF NOT FILEEXISTS("befehle.txt") THEN RETURN FALSE
+    DIM b AS ARRAY OF STRING : b = READLINES("befehle.txt")
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b) - 1
+        IF TRIM$(b[i]) = text THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION daten$() AS STRING
+    ' Was nach DATA kam, Zeilen mit CRLF getrennt.
+    IF NOT FILEEXISTS("daten.txt") THEN RETURN ""
+    DIM b AS ARRAY OF STRING : b = READLINES("daten.txt")
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(b) - 1
+        aus = aus + b[i] + CHR$(13) + CHR$(10)
+    NEXT
+    RETURN aus
+END FUNCTION
+
+SUB beenden()
+    IF smtpProzess >= 0 THEN PROCESS_KILL(smtpProzess)
+END SUB
