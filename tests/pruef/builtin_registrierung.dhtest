@@ -47,3 +47,25 @@ PRINT "erfunden bekannt: " ; bekannt("GUI_GIBT_ES_NICHT")
 --- erwartet
 68 geprueft
 erfunden bekannt: FALSE
+
+=== timer, joystick und tastenbefehle stehen im verzeichnis
+' Bis Stufe 50 in tests/test_language_extensions.py; ihre Werte brauchen ein
+' Gamepad bzw. einen Tastendruck.
+FUNCTION bekannt(name AS STRING) AS BOOLEAN
+    DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(name, 1, LEN(name) + 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        IF UPPER$(v[i]) = UPPER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("TIMER JOYSTICK_COUNT JOYSTICK_NAME JOYSTICK_AXIS JOYSTICK_BUTTON " + _
+    "JOYSTICK_HAT_X JOYSTICK_HAT_Y JOYSTICK_RUMBLE INKEY$ WAITKEY", " ")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
+NEXT
+PRINT STR$(LEN(namen)) + " geprueft"
+--- erwartet
+10 geprueft
