@@ -1034,6 +1034,11 @@ pub struct Graphics {
     /// bleibt stehen und wird NICHT neu vergeben -- sonst zeigte ein
     /// stehengebliebenes Handle spaeter still auf ein fremdes Bild.
     tex_frei: Vec<bool>,
+    /// Bilder, in die seit dem letzten FLIP mit den Leinwand-Befehlen
+    /// (IMAGE_FILL_* & Co.) gezeichnet wurde. Ihre Textur wird erst am Anfang
+    /// des naechsten FLIP hochgeladen -- tausend Formen in ein Bild kosteten
+    /// sonst tausendmal die ganze Textur. Gelesen wird ohnehin `img`.
+    tex_veraltet: Vec<usize>,
     atlases: Vec<Atlas>,
     pub frame_count: u64,
     max_frames: Option<u64>,
@@ -1548,6 +1553,7 @@ impl Graphics {
             textures: Vec::new(),
             image_cache: HashMap::new(),
             tex_frei: Vec::new(),
+            tex_veraltet: Vec::new(),
             atlases: Vec::new(),
             frame_count: 0,
             max_frames,
@@ -3660,6 +3666,48 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         t.img.draw_text(text, x, y, size.max(1), col(color));
         self.reupload_tex(i)
     }
+
+    /// Zeichnet mit `leinwand.rs` direkt in die Punkte eines Bildes
+    /// (IMAGE_FILL_RECT, IMAGE_POLYLINE ...). Anders als IMAGE_DRAW_* wird die
+    /// Textur NICHT je Aufruf hochgeladen, sondern beim naechsten FLIP.
+    ///
+    /// Ein Bild in einem anderen Format als RGBA8 (etwa ein PNG ohne Alpha)
+    /// wird vorher umgewandelt; seine Textur wird dabei neu angelegt, weil sich
+    /// die Groesse der Daten aendert -- ein Modell, das per MODEL_TEXTURE auf
+    /// die alte zeigte, sieht die Aenderung dann nicht (siehe `reupload_tex`).
+    pub fn image_leinwand(&mut self, idx: i64, fn_: &str,
+                          f: impl FnOnce(&mut crate::leinwand::Leinwand<'_>)) -> Result<(), String> {
+        if !self.tex_ok(idx) { return Err(self.tex_fehler(idx, fn_)); }
+        let i = idx as usize;
+        let rgba = raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+        if self.textures[i].img.format != rgba as i32 {
+            self.textures[i].img.set_format(rgba);
+            let tex = self.rl.load_texture_from_image(&self.thread, &self.textures[i].img)
+                .map_err(|e| format!("{}: {}", fn_, e))?;
+            self.textures[i].tex = tex;
+        }
+        let t = &mut self.textures[i];
+        let (w, h) = (t.img.width, t.img.height);
+        let n = (w.max(0) as usize) * (h.max(0) as usize) * 4;
+        let px: &mut [u8] = unsafe { std::slice::from_raw_parts_mut(t.img.data as *mut u8, n) };
+        if let Some(mut l) = crate::leinwand::Leinwand::neu(px, w, h) {
+            f(&mut l);
+        }
+        if !self.tex_veraltet.contains(&i) {
+            self.tex_veraltet.push(i);
+        }
+        Ok(())
+    }
+
+    /// Alle Texturen hochladen, deren Bild die Leinwand-Befehle seit dem
+    /// letzten FLIP geaendert haben. Freigegebene Plaetze werden uebergangen.
+    fn texturen_nachladen(&mut self) {
+        for i in std::mem::take(&mut self.tex_veraltet) {
+            if i < self.textures.len() && !self.tex_frei[i] {
+                let _ = self.reupload_tex(i);
+            }
+        }
+    }
     /// PDF_PREVIEW: eine aufgezeichnete Seite als Bild -- weisses Papier,
     /// `breite_px` breit, Hoehe nach Seitenverhaeltnis. Text in raylibs
     /// Standardschrift: eine Vorschau, kein Belichter. Die Lage stimmt, die
@@ -3734,19 +3782,22 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     pub fn image_draw_image(&mut self, dst: i64, src: i64, x: i32, y: i32,
                             quelle: Option<(i32, i32, i32, i32)>, tint: i64)
                             -> Result<(), String> {
-        let s = self.src_image(src, "IMAGE_DRAW_IMAGE")?;
-        let (sx, sy, sw, sh) = quelle.unwrap_or((0, 0, s.width, s.height));
-        if sw <= 0 || sh <= 0 {
+        let mut s = self.src_image(src, "IMAGE_DRAW_IMAGE")?;
+        let q = quelle.unwrap_or((0, 0, s.width, s.height));
+        if q.2 <= 0 || q.3 <= 0 {
             return Err("IMAGE_DRAW_IMAGE: Quellbreite und -hoehe muessen > 0 sein".into());
         }
         if !self.tex_ok(dst) { return Err(self.tex_fehler(dst, "IMAGE_DRAW_IMAGE")); }
-        let i = dst as usize;
-        let t = &mut self.textures[i];
-        t.img.draw(&s,
-                   Rectangle::new(sx as f32, sy as f32, sw as f32, sh as f32),
-                   Rectangle::new(x as f32, y as f32, sw as f32, sh as f32),
-                   col(tint));
-        self.reupload_tex(i)
+        // Selbst gemischt statt raylibs ImageDraw: das mischt falsch, sobald
+        // das ZIEL halbdurchsichtig ist (siehe Leinwand::bild_ueber).
+        s.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        let (sw, sh) = (s.width, s.height);
+        let n = (sw.max(0) as usize) * (sh.max(0) as usize) * 4;
+        let bytes: Vec<u8> = unsafe { std::slice::from_raw_parts(s.data as *const u8, n) }.to_vec();
+        let c = col(tint);
+        self.image_leinwand(dst, "IMAGE_DRAW_IMAGE", |l| {
+            l.bild_ueber(&bytes, sw, sh, q, x, y, [c.r, c.g, c.b, c.a]);
+        })
     }
 
     /// Deckkraft eines Bildpunkts (GETALPHA), 0..255; -1 ausserhalb.
@@ -5318,6 +5369,8 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         // Glyphen auf Zuruf: was dieses Bild ohne Glyphe aufzeichnete, wird
         // VOR dem Rendern gebacken -- das erste Bild ist dann schon richtig.
         self.ausweich_nachladen();
+        // Was die Leinwand-Befehle gezeichnet haben, jetzt einmal hochladen.
+        self.texturen_nachladen();
         self.a11y_bild_ende();
         // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
         self.update_light_uniforms();

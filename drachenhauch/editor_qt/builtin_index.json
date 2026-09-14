@@ -5721,15 +5721,51 @@
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_FILL_ELLIPSE",
+   "kind": "core",
+   "signature": "IMAGE_FILL_ELLIPSE(bild, cx, cy, rx, ry, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_FILL_POLY",
+   "kind": "core",
+   "signature": "IMAGE_FILL_POLY(bild, xs, ys, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_FILL_RECT",
+   "kind": "core",
+   "signature": "IMAGE_FILL_RECT(bild, x0, y0, x1, y1, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_FILL_ROUNDRECT",
+   "kind": "core",
+   "signature": "IMAGE_FILL_ROUNDRECT(bild, x0, y0, x1, y1, radius, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_FLIP",
    "kind": "core",
    "signature": "IMAGE_FLIP(img: ?, flip_x: BOOLEAN, flip_y: BOOLEAN)",
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_FRAME",
+   "kind": "core",
+   "signature": "IMAGE_FRAME(bild, x0, y0, x1, y1, breite, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_FREE",
    "kind": "core",
    "signature": "IMAGE_FREE(bild)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_GRADIENT",
+   "kind": "core",
+   "signature": "IMAGE_GRADIENT(bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])",
    "module": "imgfx"
   },
   {
@@ -5757,6 +5793,12 @@
    "module": "imgfx"
   },
   {
+   "name": "IMAGE_POLYLINE",
+   "kind": "core",
+   "signature": "IMAGE_POLYLINE(bild, xs, ys, breite, farbe [, deckkraft])",
+   "module": "imgfx"
+  },
+  {
    "name": "IMAGE_REPLACE_COLOR",
    "kind": "core",
    "signature": "IMAGE_REPLACE_COLOR(img, from: INTEGER, to: INTEGER)",
@@ -5766,6 +5808,12 @@
    "name": "IMAGE_RESIZE_CANVAS",
    "kind": "core",
    "signature": "IMAGE_RESIZE_CANVAS(img, w, h, offx, offy[, fill])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_RING",
+   "kind": "core",
+   "signature": "IMAGE_RING(bild, cx, cy, r, breite, farbe [, deckkraft])",
    "module": "imgfx"
   },
   {

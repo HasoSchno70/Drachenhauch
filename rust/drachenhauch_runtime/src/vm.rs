@@ -6696,6 +6696,32 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: Argument {} muss Zahl sein", fn_, i + 1)),
             }
         }
+        // Farbe fuer die Leinwand-Befehle (IMAGE_FILL_* & Co.). Ohne Deckkraft
+        // gilt die Farbe wie ueberall (oberstes Byte 0 = deckend); mit ihr
+        // bestimmt allein die Deckkraft -- auch 0, was sich als Farbe nicht
+        // schreiben laesst.
+        fn lw_farbe(a: &[Value], i: usize, deck: Option<usize>, fn_: &str) -> R<[u8; 4]> {
+            let v = match a.get(i) {
+                Some(Value::Int(n)) => *n,
+                _ => return Err(format!("{}: Argument {} muss eine Farbe sein", fn_, i + 1)),
+            };
+            let u = v as u32;
+            let al = ((u >> 24) & 0xFF) as u8;
+            let mut c = [((u >> 16) & 0xFF) as u8, ((u >> 8) & 0xFF) as u8, (u & 0xFF) as u8,
+                         if al == 0 { 255 } else { al }];
+            if let Some(d) = deck.and_then(|k| a.get(k)) {
+                let d = match d {
+                    Value::Int(n) => *n,
+                    Value::Float(f) => *f as i64,
+                    _ => return Err(format!("{}: die Deckkraft muss eine Zahl sein", fn_)),
+                };
+                if !(0..=255).contains(&d) {
+                    return Err(format!("{}: die Deckkraft muss 0..255 sein, war {}", fn_, d));
+                }
+                c[3] = d as u8;
+            }
+            Ok(c)
+        }
         // Genau `n` Zahlen-Argumente als f32 (fuer die koordinatenreichen
         // Geometrie-Builtins -- 15 einzelne need_f-Zeilen liest niemand mehr).
         fn fv(a: &[Value], n: usize, fn_: &str) -> R<Vec<f32>> {
@@ -8684,6 +8710,79 @@ wie viele Plaetze gelten", i + 1)),
             "image_draw_line" => { g!().image_draw_line(gi(a,0,"IMAGE_DRAW_LINE")?, gi(a,1,"IMAGE_DRAW_LINE")? as i32, gi(a,2,"IMAGE_DRAW_LINE")? as i32, gi(a,3,"IMAGE_DRAW_LINE")? as i32, gi(a,4,"IMAGE_DRAW_LINE")? as i32, gi(a,5,"IMAGE_DRAW_LINE")?)?; Value::Nil }
             "image_draw_circle" => { g!().image_draw_circle(gi(a,0,"IMAGE_DRAW_CIRCLE")?, gi(a,1,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,2,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,3,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,4,"IMAGE_DRAW_CIRCLE")?)?; Value::Nil }
             "image_draw_rect" => { g!().image_draw_rect(gi(a,0,"IMAGE_DRAW_RECT")?, gi(a,1,"IMAGE_DRAW_RECT")? as i32, gi(a,2,"IMAGE_DRAW_RECT")? as i32, gi(a,3,"IMAGE_DRAW_RECT")? as i32, gi(a,4,"IMAGE_DRAW_RECT")? as i32, gi(a,5,"IMAGE_DRAW_RECT")?)?; Value::Nil }
+            // --- Formen mit Kommazahlen und Deckkraft (leinwand.rs) ---
+            "image_fill_rect" => {
+                const F: &str = "IMAGE_FILL_RECT";
+                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe [, deckkraft])", F)); }
+                let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let c = lw_farbe(a, 5, Some(6), F)?;
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.rechteck(x0, y0, x1, y1, c))?; Value::Nil
+            }
+            "image_frame" => {
+                const F: &str = "IMAGE_FRAME";
+                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, breite, farbe [, deckkraft])", F)); }
+                let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let b = need_f(a,5,F)? as f32;
+                let c = lw_farbe(a, 6, Some(7), F)?;
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.rahmen(x0, y0, x1, y1, b, c))?; Value::Nil
+            }
+            "image_fill_roundrect" => {
+                const F: &str = "IMAGE_FILL_ROUNDRECT";
+                if a.len() != 7 && a.len() != 8 { return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, radius, farbe [, deckkraft])", F)); }
+                let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let r = need_f(a,5,F)? as f32;
+                let c = lw_farbe(a, 6, Some(7), F)?;
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.rund_rechteck(x0, y0, x1, y1, r, c))?; Value::Nil
+            }
+            "image_fill_ellipse" => {
+                const F: &str = "IMAGE_FILL_ELLIPSE";
+                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, rx, ry, farbe [, deckkraft])", F)); }
+                let (cx, cy, rx, ry) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let c = lw_farbe(a, 5, Some(6), F)?;
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.ellipse(cx, cy, rx, ry, c))?; Value::Nil
+            }
+            "image_ring" => {
+                const F: &str = "IMAGE_RING";
+                if a.len() != 6 && a.len() != 7 { return Err(format!("{}: erwartet (bild, cx, cy, r, breite, farbe [, deckkraft])", F)); }
+                let (cx, cy, r, b) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let c = lw_farbe(a, 5, Some(6), F)?;
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.ring(cx, cy, r, b, c))?; Value::Nil
+            }
+            "image_fill_poly" | "image_polyline" => {
+                let linie = name == "image_polyline";
+                let f: &str = if linie { "IMAGE_POLYLINE" } else { "IMAGE_FILL_POLY" };
+                let (soll, extra) = if linie { (5, "breite, ") } else { (4, "") };
+                if a.len() != soll && a.len() != soll + 1 {
+                    return Err(format!("{}: erwartet (bild, xs, ys, {}farbe [, deckkraft])", f, extra));
+                }
+                let xs = gfloats(a, 1, f)?;
+                let ys = gfloats(a, 2, f)?;
+                if xs.len() != ys.len() {
+                    return Err(format!("{}: xs und ys muessen gleich lang sein ({} gegen {})", f, xs.len(), ys.len()));
+                }
+                let pkt: Vec<(f32, f32)> = xs.iter().zip(ys.iter()).map(|(x, y)| (*x as f32, *y as f32)).collect();
+                if linie {
+                    let b = need_f(a,3,f)? as f32;
+                    let c = lw_farbe(a, 4, Some(5), f)?;
+                    g!().image_leinwand(gi(a,0,f)?, f, |l| l.linie(&pkt, b, c))?;
+                } else {
+                    let c = lw_farbe(a, 3, Some(4), f)?;
+                    g!().image_leinwand(gi(a,0,f)?, f, |l| l.vieleck(&pkt, c))?;
+                }
+                Value::Nil
+            }
+            "image_gradient" => {
+                const F: &str = "IMAGE_GRADIENT";
+                if a.len() != 7 && a.len() != 8 && a.len() != 10 {
+                    return Err(format!("{}: erwartet (bild, x0, y0, x1, y1, farbe1, farbe2 [, senkrecht [, deckkraft1, deckkraft2]])", F));
+                }
+                let (x0, y0, x1, y1) = (need_f(a,1,F)? as f32, need_f(a,2,F)? as f32, need_f(a,3,F)? as f32, need_f(a,4,F)? as f32);
+                let (d1, d2) = if a.len() == 10 { (Some(8), Some(9)) } else { (None, None) };
+                let c1 = lw_farbe(a, 5, d1, F)?;
+                let c2 = lw_farbe(a, 6, d2, F)?;
+                let senkrecht = if a.len() >= 8 { gb(a, 7) } else { true };
+                g!().image_leinwand(gi(a,0,F)?, F, |l| l.verlauf(x0, y0, x1, y1, c1, c2, senkrecht))?; Value::Nil
+            }
             "image_draw_text" => {
                 let txt = gs(a,3,"IMAGE_DRAW_TEXT")?.to_string();
                 g!().image_draw_text(gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32, &txt, gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?)?;

@@ -1,0 +1,124 @@
+' Formen mit Kommazahlen und Deckkraft (IMAGE_FILL_RECT & Co.) und das
+' Mischen in IMAGE_DRAW_IMAGE ueber halbdurchsichtigem Grund.
+' Die Formen UEBERSCHREIBEN (wie PILs ImageDraw auf RGBA) -- darum steht
+' nach einer Form mit Deckkraft 100 genau 100 im Bild, nicht gemischt.
+
+=== rechteck schliesst beide grenzen ein und ueberschreibt
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(10, 10, &H0000FF)
+IMAGE_FILL_RECT(b, 2, 2, 4, 4, &HFF0000, 100)
+PRINT HEX$(GETPIXEL(b, 2, 2)); " "; GETALPHA(b, 2, 2)
+PRINT HEX$(GETPIXEL(b, 4, 4)); " "; GETALPHA(b, 4, 4)
+PRINT HEX$(GETPIXEL(b, 5, 5)); " "; GETALPHA(b, 5, 5)
+PRINT GETALPHA(b, 1, 3)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FF0000 100
+FF0000 100
+FF 255
+255
+
+=== rahmen liegt nach innen
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM b AS IMAGE : b = IMAGE_NEW(10, 10)
+IMAGE_FRAME(b, 0, 0, 9, 9, 2, &H00FF00)
+PRINT GETALPHA(b, 0, 5); " "; GETALPHA(b, 1, 5); " "; GETALPHA(b, 2, 5); " "; GETALPHA(b, 9, 5); " "; GETALPHA(b, 5, 1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+255 255 0 255 255
+
+=== ellipse ring und abgerundetes rechteck
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM e AS IMAGE : e = IMAGE_NEW(21, 21)
+IMAGE_FILL_ELLIPSE(e, 10, 10, 5, 5, &HFFFFFF)
+PRINT "ellipse "; GETALPHA(e, 10, 10); " "; GETALPHA(e, 15, 10); " "; GETALPHA(e, 16, 10); " "; GETALPHA(e, 14, 14)
+DIM r AS IMAGE : r = IMAGE_NEW(21, 21)
+IMAGE_RING(r, 10, 10, 8, 2, &HFFFFFF)
+PRINT "ring "; GETALPHA(r, 10, 2); " "; GETALPHA(r, 10, 3); " "; GETALPHA(r, 10, 5); " "; GETALPHA(r, 10, 10)
+DIM q AS IMAGE : q = IMAGE_NEW(20, 20)
+IMAGE_FILL_ROUNDRECT(q, 0, 0, 19, 19, 6, &HFFFFFF)
+PRINT "rund "; GETALPHA(q, 0, 0); " "; GETALPHA(q, 0, 10); " "; GETALPHA(q, 10, 0); " "; GETALPHA(q, 10, 10)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+ellipse 255 255 0 0
+ring 255 255 0 0
+rund 0 255 255 255
+
+=== vieleck auch konkav und linienzug mit breite
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM v AS IMAGE : v = IMAGE_NEW(10, 10)
+DIM xs AS ARRAY OF FLOAT : xs = [0.0, 9.0, 9.0, 4.0, 4.0, 0.0]
+DIM ys AS ARRAY OF FLOAT : ys = [0.0, 0.0, 4.0, 4.0, 9.0, 9.0]
+IMAGE_FILL_POLY(v, xs, ys, &HFFFFFF)
+PRINT "vieleck "; GETALPHA(v, 2, 2); " "; GETALPHA(v, 7, 2); " "; GETALPHA(v, 2, 7); " "; GETALPHA(v, 7, 7)
+DIM l AS IMAGE : l = IMAGE_NEW(20, 20)
+DIM lx AS ARRAY OF FLOAT : lx = [2.0, 17.0, 17.0]
+DIM ly AS ARRAY OF FLOAT : ly = [5.0, 5.0, 15.0]
+IMAGE_POLYLINE(l, lx, ly, 3, &HFFFFFF)
+PRINT "linie "; GETALPHA(l, 10, 5); " "; GETALPHA(l, 10, 6); " "; GETALPHA(l, 10, 9); " "; GETALPHA(l, 17, 10); " "; GETALPHA(l, 12, 10)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+vieleck 255 255 255 0
+linie 255 255 0 255 0
+
+=== verlauf mischt farbe und deckkraft
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM g AS IMAGE : g = IMAGE_NEW(3, 11)
+IMAGE_GRADIENT(g, 0, 0, 2, 10, &HFF0000, &H0000FF, TRUE, 0, 255)
+PRINT HEX$(GETPIXEL(g, 1, 0)); " "; GETALPHA(g, 1, 0)
+PRINT HEX$(GETPIXEL(g, 1, 10)); " "; GETALPHA(g, 1, 10)
+DIM m AS INTEGER : m = GETPIXEL(g, 1, 5)
+PRINT ABS(((m SHR 16) BAND 255) - 128) < 8; " "; ABS((m BAND 255) - 128) < 8; " "; ABS(GETALPHA(g, 1, 5) - 128) < 8
+DIM w AS IMAGE : w = IMAGE_NEW(11, 3)
+IMAGE_GRADIENT(w, 0, 0, 10, 2, &H000000, &HFFFFFF, FALSE)
+PRINT HEX$(GETPIXEL(w, 0, 1)); " "; HEX$(GETPIXEL(w, 10, 1))
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+FF0000 0
+FF 255
+TRUE TRUE TRUE
+0 FFFFFF
+
+=== bild ueber halbdurchsichtigem grund behaelt die farbe
+' raylibs ImageDraw machte hier aus Orange ein Gruen (Rot 0x01).
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM z AS IMAGE : z = IMAGE_NEW(4, 4)
+IMAGE_FILL_RECT(z, 0, 0, 3, 3, &HFF9628, 59)
+DIM q AS IMAGE : q = IMAGE_NEW(4, 4)
+IMAGE_FILL_RECT(q, 0, 0, 3, 3, &HFF9628, 60)
+IMAGE_DRAW_IMAGE(z, q, 0, 0)
+DIM p AS INTEGER : p = GETPIXEL(z, 1, 1)
+PRINT (p SHR 16) BAND 255; " "; GETALPHA(z, 1, 1)
+' Faerbung multipliziert, Quelle ausserhalb des Ziels wird abgeschnitten
+DIM k AS IMAGE : k = IMAGE_NEW(4, 4)
+DIM s AS IMAGE : s = IMAGE_NEW(4, 4, &HFFFFFF)
+IMAGE_DRAW_IMAGE(k, s, 2, 2, &HFF0000)
+PRINT HEX$(GETPIXEL(k, 3, 3)); " "; GETALPHA(k, 3, 3); " "; GETALPHA(k, 1, 1)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+255 105
+FF0000 255 0
+
+=== vieleck braucht gleich lange felder
+IMPORT "imgfx"
+SCREEN(160, 80, "t", 1)
+DIM v AS IMAGE : v = IMAGE_NEW(10, 10)
+DIM xs AS ARRAY OF FLOAT : xs = [0.0, 9.0, 9.0]
+DIM ys AS ARRAY OF FLOAT : ys = [0.0, 0.0]
+IMAGE_FILL_POLY(v, xs, ys, &HFFFFFF)
+--- umgebung
+DHRT_FRAMES=2
+--- fehler
+IMAGE_FILL_POLY
