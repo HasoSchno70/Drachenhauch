@@ -14,8 +14,8 @@
 '  Fortschritt + Bestzeiten werden in  circuitrunner.save  gesichert.
 '
 '  Level liegen als JSON-Sets in  levels/ . Eigene Demos erzeugt
-'  make_demo_levels.py; echte Fansite-Sets (.dat/.ccl) wandelt
-'  convert_dat.py um. Tile-Codes 0x00..0x6F = Zellen in assets/tiles.png.
+'  make_demo_levels.dh; echte Fansite-Sets (.dat/.ccl) wandelt
+'  convert_dat.dh um. Tile-Codes 0x00..0x6F = Zellen in assets/tiles.png.
 '
 '  Start:  dhrun.py circuitrunner\circuitrunner.dh       (oder im Editor F5)
 ' =====================================================================

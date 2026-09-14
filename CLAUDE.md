@@ -2876,6 +2876,39 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
 
+**Circuit-Runner-Werkzeuge in Drachenhauch (2026-09-14, Teil 1 von 2):** auf
+Wunsch des Nutzers sind die Python-Werkzeuge des Spiels portiert --
+`circuitrunner/convert_dat.dh`, `make_demo_levels.dh`, `download_sfx.dh` und
+`download_music.dh`; die `.py`-Dateien und `tests/test_circuitrunner.py` sind
+geloescht. **Die Messlatte war Byte-Gleichheit mit Python, nicht "sieht gleich
+aus":** der Konverter liefert auf den 149 Leveln eines lokalen `CCLP1.dat`
+dieselbe Datei wie `convert_dat.py`, der Demo-Bauer genau das eingecheckte
+`levels/circuit_runner.json` (`JSON_STRINGIFY` behaelt die Einfuegereihenfolge
+und schreibt kompakt wie Pythons `separators=(",", ":")`), die Downloads
+schreiben dieselben `CREDITS.txt`, und die Adressen sind wie
+`urllib.parse.quote` kodiert (Leerzeichen und eckige Klammern). **Zwei Funde
+beim Portieren:** (1) eine lokale Variable `n` in `rleDecode` verdeckte die
+Konstante `N` -- Namen sind schreibungsunabhaengig, die Schleife `n < N` lief
+nie, jedes Level war leer; `--check` hatte es als Warnung gesagt. (2) Die
+Zeichentabelle des Demo-Bauers ist eine Zeichenkette mit `INSTR`, keine MAP:
+`O`/`o`, `B`/`b`, `L`/`l`, `T`/`t`, `M`/`m`, `P`/`p` meinen verschiedene
+Kacheln. Tests: sieben neue Faelle in `tests/pruef/werkzeug_circuitrunner.dhtest`
+-- der Konverter an einer .dat, die der Fall selbst schreibt (zweiter
+RLE-Schreiber), Lynx-Kennung, fremde Datei, fehlende Argumente; der Demo-Bauer
+gegen das Schema UND byte-gleich gegen die eingecheckte Datei; beide Downloads
+gegen `gegenserver.dh` im echo-Modus, der den Pfad jeder Anfrage zurueckgibt.
+**Gegenprobe mit gezielt kaputten Kopien der Werkzeuge:** alle sieben fallen --
+aber erst im zweiten Anlauf. Drei Mutationen des ersten Anlaufs erreichten ihren
+Fall gar nicht: eine falsche Lynx-Kennung fing die Suchschleife des Konverters
+wieder auf, und ein ungeschuetztes Leerzeichen in der Musik-Adresse kodiert der
+HTTP-Client selbst -- erst eckige Klammern kommen roh beim Server an. Beim
+Schreiben der Tests fiel noch ein Stolperstein: `VAL("&H" + hex)` ist 0,
+Hex-Text liest man ueber `INSTR` in `"0123456789ABCDEF"`. **Offen (Teil 2):**
+`make_tiles.py` -- es zeichnet mit PIL gefuellte Polygone, dicke Linien,
+abgerundete Rechtecke, Ringe und Verlaeufe auf 256x256 und skaliert mit
+LANCZOS; die Bild-Befehle der Laufzeit koennen davon nur Kreise, Rechtecke und
+1-px-Linien, und jeder Aufruf laedt die Textur neu hoch.
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei

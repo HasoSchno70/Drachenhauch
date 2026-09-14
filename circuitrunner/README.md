@@ -73,7 +73,7 @@ Level Packs* CCLP1–5 von [bitbusters.club](https://bitbusters.club/)) und wand
 es um:
 
 ```
-py circuitrunner\convert_dat.py  pfad\zu\CCLP1.dat
+dhrt run circuitrunner\convert_dat.dh -- pfad\zu\CCLP1.dat [ausgabe.json]
 ```
 
 Das schreibt `levels/CCLP1.json` (bzw. nach `levels/_downloaded/`, wenn dort
@@ -85,13 +85,13 @@ abgelegt) — beim nächsten Start erscheint das Set im Menü.
 
 ### Eigene Level bauen
 
-`make_demo_levels.py` erzeugt die mitgelieferten Demo-Level aus ASCII-Karten —
+`make_demo_levels.dh` erzeugt die mitgelieferten Demo-Level aus ASCII-Karten —
 eine einfache Vorlage für eigene Sets. Jedes Level wird beim Bau **validiert**
 (Flood-Fill: alle Chips/Schlüssel erreichbar, Ausgang nur über den Sockel) —
 so können keine unlösbaren Level entstehen:
 
 ```
-py circuitrunner\make_demo_levels.py     # -> levels/circuit_runner.json
+dhrt run circuitrunner\make_demo_levels.dh     # -> levels/circuit_runner.json
 ```
 
 ## Grafik (64×64, supersampled)
@@ -165,13 +165,15 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 |---|---|
 | `circuitrunner.dh` | die Spiel-Engine (Drachenhauch) |
 | `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.dhsprite` |
-| `convert_dat.py` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
-| `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |
+| `convert_dat.dh` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
+| `make_demo_levels.dh` | ASCII → `levels/circuit_runner.json` (5 Demos) |
+| `download_sfx.dh`, `download_music.dh` | Soundeffekte und Musik neu laden |
 | `levels/*.json` | Level-Sets (im Menü wählbar) |
 
-Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema der
-Python-Werkzeuge) und `tests/pruef/werkzeug_circuitrunner.dhtest` (die Engine
-selbst: Monster-Reihenfolge/-Tempo, Bestzeiten, Passwort, Hinweissteine).
+Tests: `tests/pruef/werkzeug_circuitrunner.dhtest` -- die Engine selbst
+(Monster-Reihenfolge/-Tempo, Bestzeiten, Passwort, Hinweissteine) und die
+Werkzeuge (Konverter-Rundweg, Demo-Schema und -Datei, Downloads gegen einen
+Gegenserver).
 
 ## Grenzen / Ideen
 
@@ -185,7 +187,7 @@ selbst: Monster-Reihenfolge/-Tempo, Bestzeiten, Passwort, Hinweissteine).
 ([kenney.nl](https://kenney.nl/assets/interface-sounds)), Lizenz **CC0 1.0**
 (Public Domain, keine Attribution nötig) — als WAV in `assets/sfx/` eingecheckt.
 Fehlt der Ordner, fallen die Effekte auf prozedurale Synth-Töne zurück.
-Aktualisieren: `python circuitrunner/download_sfx.py`.
+Aktualisieren: `dhrt run circuitrunner/download_sfx.dh`.
 
 **Hintergrundmusik:** nahtlos loopende CC0-Chiptunes von **Juhani Junkala**
 ([archive.org](https://archive.org/details/JuhaniJunkalafiveactionchiptunes),
@@ -193,7 +195,7 @@ CC0 1.0) als OGG in `assets/music/`: Titel-Loop in den Menüs, drei Level-Loops
 die **pro Level rotieren** (`level1..3`, `cur_level MOD 3`) für Abwechslung, und
 ein Ending-Track, wenn alle Level geschafft sind. Mit **M** an/aus, Lautstärke
 `MUS_VOL` in der `.dh`. Fehlt der Ordner, läuft das Spiel still weiter.
-Aktualisieren: `python circuitrunner/download_music.py`.
+Aktualisieren: `dhrt run circuitrunner/download_music.dh`.
 
 **Lautstärke:** im HUD (rechtes Panel) gibt es während des Spiels zwei Slider
 „Musik" und „Effekte" — getrennt regelbar über die Audio-Busse
