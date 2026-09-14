@@ -2879,7 +2879,7 @@ Pfade um ("more than one script filename"); PowerShell nehmen.
 **Circuit-Runner-Werkzeuge in Drachenhauch (2026-09-14, Teil 1 von 2):** auf
 Wunsch des Nutzers sind die Python-Werkzeuge des Spiels portiert --
 `circuitrunner/convert_dat.dh`, `make_demo_levels.dh`, `download_sfx.dh` und
-`download_music.dh`; die `.py`-Dateien und `tests/test_circuitrunner.py` sind
+`download_music.dh`; die `.py`-Dateien und `test_circuitrunner.py` sind
 geloescht. **Die Messlatte war Byte-Gleichheit mit Python, nicht "sieht gleich
 aus":** der Konverter liefert auf den 149 Leveln eines lokalen `CCLP1.dat`
 dieselbe Datei wie `convert_dat.py`, der Demo-Bauer genau das eingecheckte
