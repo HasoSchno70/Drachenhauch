@@ -1,10 +1,10 @@
-' Plattformer-Demo (Twilight-Sprites) (32x32) -- zeigt die mit examples/platformer/make_sprites.py
+' Plattformer-Demo (Twilight-Sprites) (32x32) -- zeigt die mit examples/platformer/make_sprites.dh
 ' gebauten Sprites + Tiles in Aktion:
 '   * Held (player.png) laeuft (Pfeile), springt (Leer/Hoch), duckt (Runter), Flip
 '   * Walker (walker.png) patrouilliert und laesst sich per Stomp plattmachen
 '   * Level aus dem Master-Atlas sheet.json: Boden, Roehre, Item-Boxen, Wasser,
 '     animierte Muenzen, Wolken/Busch/Huegel
-' Voraussetzung: erst `py examples/platformer/make_sprites.py` ausfuehren.
+' Voraussetzung: erst `dhrt run examples/platformer/make_sprites.dh` ausfuehren.
 IMPORT "sprite"
 
 CONST TS AS INTEGER = 32
