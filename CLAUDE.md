@@ -962,7 +962,7 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   `store_var`, es braucht den Zwischenspeicher fuer Feld-/Index-Ziele). Beide
   liefen anfangs an der Erfassung vorbei und blieben still, obwohl die VM ihr
   Ziel in genau demselben Verzeichnis sucht.
-  Tests `tests/test_check_unbekannte_namen.py`.
+  Tests `tests/pruef/check_unbekannte_namen.dhtest`.
 - **Neue Builtins/Sprach-Features NUR in dhrt** (`rust/drachenhauch_runtime/src/`):
   Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
   `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität
@@ -2874,6 +2874,21 @@ setzen es, weil ihre Kopie woanders liegt), Beispiele sonst unter
 `%PUBLIC%\Documents\Drachenhauch\examples`. **Falle:** ISCC-Schalter
 (`/DAppVersion=...`) NICHT aus Git Bash aufrufen -- MSYS schreibt sie in
 Pfade um ("more than one script filename"); PowerShell nehmen.
+
+**Stufe 47 (2026-09-14):** die beiden `--check`-Dateien ohne Python --
+`test_check_unbekannte_namen.py` (21 Faelle) und `test_compiler_warnungen.py`
+(55) geloescht, ihre Faelle stehen in den gleichnamigen Sammlungen. Jeder Fall
+laesst `dhrt --check` per `PROCESS_START` auf eine Beilage laufen, liest das
+JSON (in ein Objekt verpackt, weil `JSON_LEN` einen Pfad braucht) und gibt
+seine Zusagen als Wahrheitswerte aus. Die 55 Warnungsfaelle hat der Generator
+nicht abgeschrieben, sondern aus dem Python-Syntaxbaum gezogen:
+`any(A in m and B in m ...)` wird "eine Meldung mit [A|B]", `not any(...)`
+dasselbe mit FALSE, `len([...]) == 1` eine Zaehlung; die Schleife ueber zwei
+Quelltexte wird zu zwei Faellen. Beide Sammlungen liefen beim ersten Mal gruen
+-- darum je eine Gegenprobe: mit einer Marke, die nie vorkommt, fallen 9 von 22
+Namensfaellen, mit einer Datei, die es nicht gibt, 28 von 58 Warnungsfaellen
+(genau die mit einer positiven Zusage). Offen in pytest: modules_cloud, smtp,
+modules_html, http_request (brauchen einen Gegenserver neben dem Programm).
 
 **Stufe 46 (2026-09-14):** dritter Block Restdateien aus Weg D -- 35 Faelle
 an vier Sammlungen, die pytest-Dateien `test_tiled_objekte_eigenschaften`,
