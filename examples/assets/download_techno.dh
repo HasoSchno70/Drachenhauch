@@ -1,0 +1,17 @@
+' Laedt das Musik-Asset fuer examples/97_pbr_reactor.dh.
+'
+' Die OGG (~3.4 MB) liegt bewusst NICHT im Git-Repo. Dieses Programm holt sie
+' einmalig von OpenGameArt:
+'
+'     dhrt run examples/assets/download_techno.dh
+'
+' Titel:  "Technological Messup" von josepharaoh99
+' Quelle: https://opengameart.org/content/cc0-upbeat-electronic-music
+' Lizenz: CC0 1.0 (Public Domain) -- keine Namensnennung erforderlich.
+' Bis 2026-09-14 download_techno.py.
+IMPORT "_laden.dh"
+
+EXIT(herunterladen("https://opengameart.org/sites/default/files/tecnological_messup_v2.ogg", _
+    CWD$() + "/techno_messup.ogg", 100000, _
+    "Manuell von der Quelle laden und als techno_messup.ogg hier ablegen.", _
+    "Musik: josepharaoh99, CC0."))

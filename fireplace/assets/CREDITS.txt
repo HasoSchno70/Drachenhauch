@@ -1,7 +1,7 @@
 Kaminfeuer-Demo -- Asset-Credits (Pflicht-Namensnennung)
 ========================================================
 
-Beide Assets werden via assets/download.py geladen und liegen NICHT im
+Beide Assets werden via assets/download.dh geladen und liegen NICHT im
 Git-Repo. Ihre Lizenzen verlangen Namensnennung:
 
 1) fireplace.jpg  -- Hintergrundbild (Steinkamin, Schloss Chillon)

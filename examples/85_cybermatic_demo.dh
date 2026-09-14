@@ -15,7 +15,7 @@
 '  ESC beendet.
 '
 '  Musik: "Cybermatic pulse" von Alexandr Zhelanov (opengameart.org), CC-BY 4.0.
-'  Fehlt die Datei:  py examples\assets\download_cybermatic.py
+'  Fehlt die Datei:  dhrt run examples/assets/download_cybermatic.dh
 '  Credits: examples/assets/CREDITS_cybermatic.txt
 ' ============================================================================
 

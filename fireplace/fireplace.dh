@@ -10,7 +10,7 @@
 '    Mausrad                 -> Feuer groesser / kleiner
 '    ESC                     -> beenden
 '
-'  Assets (frei, einmalig holen):   py fireplace\assets\download.py
+'  Assets (frei, einmalig holen):   dhrt run fireplace/assets/download.dh
 '    fireplace.jpg  -- Steinkamin, Wikimedia Commons / CEllen (CC BY-SA 4.0)
 '    fire.ogg       -- Knistern, Wikimedia Commons / Glaneur de sons (CC BY 3.0)
 '    wind.mp3       -- optional, selbst beilegen (siehe CREDITS.txt)

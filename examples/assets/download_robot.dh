@@ -1,0 +1,22 @@
+' Laedt ein geriggtes, animiertes 3D-Modell fuer die Skelett-Animations-Demo
+' (examples/108_skeletal_anim.dh).
+'
+' Die .glb (~mehrere MB) liegt bewusst NICHT im Git-Repo. Dieses Programm holt
+' sie einmalig:
+'
+'     dhrt run examples/assets/download_robot.dh
+'
+' Asset:  "robot.glb" -- ein geriggter Roboter mit mehreren Animationen
+'         (idle, walk, dance, ...), Teil der offiziellen raylib-Beispiel-Ressourcen.
+' Quelle: raysan5/raylib (examples/models/resources/models/gltf/robot.glb)
+' Lizenz: CC0 1.0 (Public Domain), (c) raysan5 -- keine Namensnennung erforderlich.
+'
+' Falls die Adresse nicht mehr stimmt: ein beliebiges geriggtes .glb (mit
+' Animationen) nach examples/assets/robot.glb legen.
+' Bis 2026-09-14 download_robot.py.
+IMPORT "_laden.dh"
+
+EXIT(herunterladen("https://raw.githubusercontent.com/raysan5/raylib/master/examples/models/resources/models/gltf/robot.glb", _
+    CWD$() + "/robot.glb", 100000, _
+    "Manuell ein geriggtes .glb (mit Animationen) als examples/assets/robot.glb ablegen.", _
+    "Modell: raysan5/raylib, CC0."))

@@ -17,7 +17,7 @@
 '  NUR NATIV:  dhrun.py --native examples\97_pbr_reactor.dh   (oder F6).  ESC beendet.
 '
 '  Musik: "Technological Messup" von josepharaoh99 (opengameart.org), CC0.
-'  Fehlt die Datei:  py examples\assets\download_techno.py
+'  Fehlt die Datei:  dhrt run examples/assets/download_techno.dh
 ' ============================================================================
 
 IMPORT "g3d"

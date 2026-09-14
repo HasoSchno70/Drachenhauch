@@ -225,7 +225,7 @@ Demo [examples/99_ibl_hdr.dh](../examples/99_ibl_hdr.dh): Reihe Chrom-Metallkuge
 (`MODEL_PBR` metalness 1, Roughness-Verlauf) spiegeln das HDRI **vor der als
 Skybox sichtbaren Umgebung**; `FILEEXISTS`-Guard fällt ohne `.hdr` auf
 analytisches `LIGHT_ENV` zurück. **Asset:**
-`py examples/assets/download_hdri.py` holt ein CC0-1k-HDRI (Poly Haven,
+`dhrt run examples/assets/download_hdri.dh` holt ein CC0-1k-HDRI (Poly Haven,
 kloofendal_43d_clear) als `examples/assets/ibl_env.hdr` (gitignored). Per
 Screenshot verifiziert (Spiegel→diffus über die Roughness-Reihe). Bit-Identität
 entfällt (GPU/3D); analytisches `96_ibl` bleibt unverändert.
@@ -902,7 +902,7 @@ zwei bass-pulsierenden Punktlichtern, dazu **Fog**, **Bloom** (`POSTFX`),
 Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
 (`AUDIO_FFT`) zu einem Stereo-Techno-Track. `SET_FULLSCREEN(TRUE)`, Kamera kreist
 mit Bass-Punch. Musik: „Technological Messup" von **josepharaoh99**, **CC0** —
-einmalig holen mit `py examples/assets/download_techno.py` (läuft auch ohne, stumm
+einmalig holen mit `dhrt run examples/assets/download_techno.dh` (läuft auch ohne, stumm
 via `FILEEXISTS`-Guard). Nur nativ: `dhrun.py --native examples\97_pbr_reactor.dh`.
 
 [examples/85_cybermatic_demo.dh](../examples/85_cybermatic_demo.dh) bündelt in
@@ -917,7 +917,7 @@ Laufschrift, dezenter Beat-Flash. Nur nativ:
 
 Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
 CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
-`py examples/assets/download_cybermatic.py`. Die Demo läuft auch ohne (stumm,
+`dhrt run examples/assets/download_cybermatic.dh`. Die Demo läuft auch ohne (stumm,
 via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.txt`.
 
 ## Schritt 7: Standalone-Export (`dhrun.py --export` / Editor)

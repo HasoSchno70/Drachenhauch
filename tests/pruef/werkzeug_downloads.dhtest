@@ -1,0 +1,175 @@
+' Die Download-Programme der Beispiele (bis 2026-09-14 je ein .py) gegen den
+' Gegenserver im echo-Modus: er spiegelt den Pfad jeder Anfrage als JSON, jede
+' heruntergeladene Datei sagt also, welche Adresse das Programm benutzt hat.
+
+=== examples-assets laden speichern und erkennen vorhandenes
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+FUNCTION letzte$(aus AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(aus), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+IMPORT "json"
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "echo", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM basis AS STRING : basis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+DIM namen AS ARRAY OF STRING : namen = ["cybermatic", "hdri", "robot", "techno"]
+DIM i AS INTEGER
+FOR i = 0 TO 3
+    DIM prog AS STRING : prog = ARG$(1) + "/download_" + namen[i] + ".dh"
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", prog, "--", basis + "/a/" + namen[i], CWD$() + "/" + namen[i] + ".bin", "10")
+    DIM aus AS STRING : aus = lauf$(p)
+    PRINT namen[i]; " "; PROCESS_CODE(p); " "; letzte$(aus); " "; JSON_GET_STRING(JSON_LOAD(namen[i] + ".bin"), "pfad")
+NEXT
+' zweiter Lauf: die Datei ist schon da und gross genug
+DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", ARG$(1) + "/download_robot.dh", "--", basis + "/b", CWD$() + "/robot.bin", "10")
+DIM aus2 AS STRING : aus2 = lauf$(q)
+PRINT PROCESS_CODE(q); " "; INSTR(aus2, "Schon vorhanden: ") = 0; " "; INSTR(aus2, "Lade") < 0
+' zu klein: Mindestgroesse ueber dem, was der Server liefert
+DIM r AS INTEGER : r = PROCESS_START("dhrt", "run", ARG$(1) + "/download_techno.dh", "--", basis + "/c", CWD$() + "/klein.bin", "100000")
+DIM aus3 AS STRING : aus3 = lauf$(r)
+PRINT PROCESS_CODE(r); " "; letzte$(aus3)
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../../examples/assets
+--- erwartet
+cybermatic 0 OK (0 KB). Musik: Alexandr Zhelanov, CC-BY 4.0. /a/cybermatic
+hdri 0 OK (0 KB). HDRI: Poly Haven, CC0. /a/hdri
+robot 0 OK (0 KB). Modell: raysan5/raylib, CC0. /a/robot
+techno 0 OK (0 KB). Musik: josepharaoh99, CC0. /a/techno
+0 TRUE TRUE
+1 FEHLER: Datei zu klein -- vermutlich kein gueltiger Download.
+
+=== kamin laedt bild und ton
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+IMPORT "json"
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "echo", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM basis AS STRING : basis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+MKDIR("kamin")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(1), "--", basis + "/bild", basis + "/ton", CWD$() + "/kamin", "10")
+PRINT lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT JSON_GET_STRING(JSON_LOAD("kamin/fireplace.jpg"), "pfad"); " "; JSON_GET_STRING(JSON_LOAD("kamin/fire.ogg"), "pfad")
+MKDIR("zuklein")
+DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", ARG$(1), "--", basis + "/bild", basis + "/ton", CWD$() + "/zuklein", "100000")
+PRINT lauf$(q)
+PRINT "rueckgabe "; PROCESS_CODE(q)
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../../fireplace/assets/download.dh
+--- erwartet
+Lade fireplace.jpg ...
+  OK (0 KB)
+Lade fire.ogg ...
+  OK (0 KB)
+
+Alle Assets da. Lizenzen siehe CREDITS.txt (Namensnennung noetig).
+rueckgabe 0
+/bild /ton
+Lade fireplace.jpg ...
+  ZU KLEIN (0 KB)
+Lade fire.ogg ...
+  ZU KLEIN (0 KB)
+
+Mind. ein Download fehlte -- Demo nutzt dann den prozeduralen Ersatz.
+rueckgabe 1
+
+=== gbdemo nimmt nur module an
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM srv AS INTEGER : srv = PROCESS_START("dhrt", "run", ARG$(0), "--", "echo", "0", "-", CWD$() + "/port.txt")
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT FILEEXISTS("port.txt") AND MILLIS() - t0 < 15000
+    SLEEP(10)
+WEND
+SLEEP(50)
+DIM basis AS STRING : basis = "http://127.0.0.1:" + TRIM$(READLINES("port.txt")[0])
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(1), "--", basis + "/xm?moduleid=", CWD$() + "/musik")
+PRINT lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM kopf AS STRING : kopf = READLINES("musik/stardust_jam.mod")[0]
+PRINT LEFT$(kopf, 17); INSTR(kopf, "moduleid=201039") > 0
+PRINT INSTR(READLINES("musik/cyber_spider.xm")[0], "moduleid=192354") > 0
+' eine Fehlerseite (JSON ohne Kennung) wird nicht gespeichert
+DIM q AS INTEGER : q = PROCESS_START("dhrt", "run", ARG$(1), "--", basis + "/seite?moduleid=", CWD$() + "/fehl")
+DIM aus AS STRING : aus = lauf$(q)
+PRINT "rueckgabe "; PROCESS_CODE(q); ", abgelehnt "; LEN(SPLIT$(aus, "sieht nicht nach einem Modul aus")) - 1
+PRINT "dateien "; LEN(DIRLIST("fehl"))
+PROCESS_KILL(srv)
+--- argumente
+{sammlung}/_hilfen/gegenserver.dh
+{sammlung}/../../gbdemo/download_music.dh
+--- erwartet
+  ok stardust_jam.mod (0 KB)
+  ok silicon_dancer.mod (0 KB)
+  ok neon_techno.mod (0 KB)
+  ok mecanum_overdrive.xm (0 KB)
+  ok assembly.xm (0 KB)
+  ok keygen_wraith.xm (0 KB)
+  ok building_energy.xm (0 KB)
+  ok cyber_spider.xm (0 KB)
+rueckgabe 0
+Extended Module: TRUE
+TRUE
+rueckgabe 1, abgelehnt 8
+dateien 0

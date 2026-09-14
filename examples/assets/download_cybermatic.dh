@@ -1,0 +1,17 @@
+' Laedt das Musik-Asset fuer examples/85_cybermatic_demo.dh.
+'
+' Die OGG (~15 MB) liegt bewusst NICHT im Git-Repo. Dieses Programm holt sie
+' einmalig von OpenGameArt:
+'
+'     dhrt run examples/assets/download_cybermatic.dh
+'
+' Titel:  "Cybermatic pulse" (LOOP) von Alexandr Zhelanov
+' Quelle: https://opengameart.org/content/cybermatic-pulse
+' Lizenz: CC-BY 4.0  -- Namensnennung erforderlich (siehe CREDITS_cybermatic.txt).
+' Bis 2026-09-14 download_cybermatic.py.
+IMPORT "_laden.dh"
+
+EXIT(herunterladen("https://opengameart.org/sites/default/files/Cybermatic%20pulse%20%28LOOP%29.ogg", _
+    CWD$() + "/cybermatic_pulse.ogg", 100000, _
+    "Manuell von der Quelle laden und als cybermatic_pulse.ogg hier ablegen.", _
+    "Musik: Alexandr Zhelanov, CC-BY 4.0."))

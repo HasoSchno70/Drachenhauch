@@ -1,0 +1,41 @@
+' Gemeinsamer Teil der Download-Programme in examples/assets (bis 2026-09-14
+' je ein .py). Jedes Programm ruft `herunterladen` mit seiner Adresse, seiner
+' Zieldatei, der Mindestgroesse und den Texten fuer Fehler und Erfolg.
+'
+' Drei Argumente sind fuer Pruefungen da (ein Gegenserver statt der Quelle):
+'     dhrt run examples/assets/download_X.dh [-- adresse [ziel [mindestbytes]]]
+' Ein relativer Zielpfad gilt vom Aufrufer aus, nicht vom Programmordner.
+IMPORT "html"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+FUNCTION herunterladen(url AS STRING, ziel AS STRING, mindest AS INTEGER, hinweis AS STRING, dank AS STRING) AS INTEGER
+    IF ARGC() > 0 THEN url = ARG$(0)
+    IF ARGC() > 1 THEN ziel = vomAufrufer$(ARG$(1))
+    IF ARGC() > 2 THEN mindest = VAL(ARG$(2))
+    IF FILEEXISTS(ziel) THEN
+        IF FILESIZE(ziel) > mindest THEN
+            PRINT "Schon vorhanden: " + ziel + " (" + STR$(FILESIZE(ziel) \ 1024) + " KB)"
+            RETURN 0
+        END IF
+    END IF
+    PRINT "Lade " + url
+    PRINT "  -> " + ziel + " ..."
+    TRY
+        HTTP_DOWNLOAD(url, ziel)
+    CATCH e
+        PRINT "FEHLER beim Download: " + e
+        PRINT hinweis
+        RETURN 1
+    END TRY
+    IF FILESIZE(ziel) < mindest THEN
+        PRINT "FEHLER: Datei zu klein -- vermutlich kein gueltiger Download."
+        RETURN 1
+    END IF
+    PRINT "OK (" + STR$(FILESIZE(ziel) \ 1024) + " KB). " + dank
+    RETURN 0
+END FUNCTION
