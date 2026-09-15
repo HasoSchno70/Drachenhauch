@@ -3051,6 +3051,26 @@ ausfuehrt). Die Ausgabe des Kindes wird waehrend des Laufs geleert -- ein voller
 Puffer hielte es an und verfaelschte die Zeit. Test
 `tests/pruef/werkzeug_bench.dhtest` (Form der Ausgabe plus Fehlerlauf;
 Gegenprobe ohne Pruefung des Rueckgabewerts faellt).
+**Buch-Werkzeuge (selber Tag):** `buch-referenz/buch/shoot.dh`,
+`buch-einstieg/buch/shoot.dh` und `buch-referenz/buch/i18n/apply.dh` statt der
+`.py`-Fassungen. Aufgenommen wird ueber `dhrt bild` (PROCESS_START nimmt dem
+Kind DHRT_FRAMES/SCREENSHOT ab, `DHRT_SCALE`/`DHRT_FONT` gehen per SETENV
+durch). **Zwei Funde:** (1) `apply.py` schrieb unter Windows CRLF, der
+eigentliche Schreiber `extract_strings.js` aber `JSON.stringify(k, null, 1)`
+mit LF -- jeder Python-Lauf brach alle 3000 Zeilen von `en.json` um.
+`apply.dh` schreibt im JS-Format (Maskierung ueber `JSON_APPEND_STRING` +
+`JSON_STRINGIFY`, die gleich maskieren); ein leerer Patch laesst `en.json` Byte
+fuer Byte stehen. Gelesen wird von Hand ueber BUFFER_GET: die Schluessel sind
+deutsche Saetze mit PUNKT, und das json-Modul liest einen Punkt als Pfad.
+(2) **`dhrt bild` endete nicht**: das Bildlimit wirkt nur ueber
+`QUITREQUESTED()`, ein Programm mit `WHILE TRUE` sicherte sein Bild und lief
+endlos weiter -- der Aufrufer wartete ewig (so haengte der erste Testlauf 300 s).
+`dhrt bild` setzt jetzt `DHRT_BILD_ENDE`, und graphics.rs beendet den Prozess
+direkt nach dem gesicherten Bild. Tests `tests/pruef/werkzeug_buch.dhtest`
+(apply gegen Node-Referenz und leerer Patch auf eine Kopie von `en.json`, beide
+shoot-Werkzeuge an Beilagen) und `tests/pruef/dhrt_bild.dhtest` (der Test aus
+`test_dhrt_werkzeuge.py` plus der `WHILE TRUE`-Fall). Offen bei den Buechern:
+die vier `make_book.py` (LibreOffice + PyMuPDF-Seitenmessung, PIL).
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

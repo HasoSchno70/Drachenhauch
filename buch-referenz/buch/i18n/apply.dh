@@ -1,0 +1,292 @@
+' Traegt Uebersetzungen in den Katalog ein.
+'
+'     dhrt run buch-referenz/buch/i18n/apply.dh -- patch.json [katalog.json]
+'
+' `patch.json` ist { "deutscher text": "english text", ... }. Eintraege, die
+' der Katalog nicht kennt, werden GEMELDET statt still geschluckt -- ein
+' Tippfehler im deutschen Schluessel wuerde sonst als "uebersetzt" gelten und
+' im Buch trotzdem deutsch erscheinen.
+'
+' Bis 2026-09-15 apply.py. Geschrieben wird jetzt im Format von
+' extract_strings.js (JSON.stringify mit einem Leerzeichen Einzug, LF) -- die
+' Python-Fassung schrieb unter Windows CRLF und brach damit bei jedem Lauf
+' alle Zeilen der Datei um. Ein leerer Patch laesst den Katalog Byte fuer Byte
+' stehen.
+'
+' Die Schluessel sind deutsche Saetze, und die tragen Punkte: das json-Modul
+' liest einen Punkt als Pfad und kaeme an ihre Werte nicht heran. Gelesen wird
+' darum hier von Hand, Byte fuer Byte.
+IMPORT "json"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+' ------------------------------------------------------------ Lesen
+DIM jb AS BUFFER
+DIM jpos AS INTEGER
+DIM jlen AS INTEGER
+
+SUB leerraum()
+    WHILE jpos < jlen
+        DIM b AS INTEGER : b = BUFFER_GET(jb, jpos)
+        IF b <> 32 AND b <> 9 AND b <> 10 AND b <> 13 THEN RETURN
+        jpos = jpos + 1
+    WEND
+END SUB
+
+SUB erwarte(zeichen AS INTEGER)
+    leerraum()
+    IF jpos >= jlen OR BUFFER_GET(jb, jpos) <> zeichen THEN
+        THROW "JSON: an Byte " + STR$(jpos) + " erwartet '" + CHR$(zeichen) + "'"
+    END IF
+    jpos = jpos + 1
+END SUB
+
+FUNCTION hexwert(b AS INTEGER) AS INTEGER
+    IF b >= 48 AND b <= 57 THEN RETURN b - 48
+    IF b >= 65 AND b <= 70 THEN RETURN b - 55
+    IF b >= 97 AND b <= 102 THEN RETURN b - 87
+    THROW "JSON: kaputte \u-Folge an Byte " + STR$(jpos)
+END FUNCTION
+
+FUNCTION vierHex() AS INTEGER
+    IF jpos + 4 > jlen THEN THROW "JSON: kaputte \u-Folge am Ende"
+    DIM v AS INTEGER : v = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO 3
+        v = v * 16 + hexwert(BUFFER_GET(jb, jpos + k))
+    NEXT
+    jpos = jpos + 4
+    RETURN v
+END FUNCTION
+
+FUNCTION zeichenkette$() AS STRING
+    erwarte(34)
+    DIM aus AS STRING : aus = ""
+    DIM lauf AS INTEGER : lauf = jpos
+    WHILE TRUE
+        IF jpos >= jlen THEN THROW "JSON: Zeichenkette ohne Ende"
+        DIM b AS INTEGER : b = BUFFER_GET(jb, jpos)
+        IF b = 34 THEN
+            IF jpos > lauf THEN aus = aus + BUFFER_TO_STRING$(BUFFER_SLICE(jb, lauf, jpos))
+            jpos = jpos + 1
+            RETURN aus
+        ELSEIF b = 92 THEN
+            IF jpos > lauf THEN aus = aus + BUFFER_TO_STRING$(BUFFER_SLICE(jb, lauf, jpos))
+            IF jpos + 1 >= jlen THEN THROW "JSON: Zeichenkette ohne Ende"
+            DIM e AS INTEGER : e = BUFFER_GET(jb, jpos + 1)
+            jpos = jpos + 2
+            SELECT CASE e
+                CASE 34, 92, 47
+                    aus = aus + CHR$(e)
+                CASE 98
+                    aus = aus + CHR$(8)
+                CASE 102
+                    aus = aus + CHR$(12)
+                CASE 110
+                    aus = aus + CHR$(10)
+                CASE 114
+                    aus = aus + CHR$(13)
+                CASE 116
+                    aus = aus + CHR$(9)
+                CASE 117
+                    DIM c AS INTEGER : c = vierHex()
+                    ' Ein Zeichen jenseits von U+FFFF steht als Paar zweier \u-Folgen.
+                    IF c >= &HD800 AND c <= &HDBFF AND jpos + 6 <= jlen THEN
+                        IF BUFFER_GET(jb, jpos) = 92 AND BUFFER_GET(jb, jpos + 1) = 117 THEN
+                            jpos = jpos + 2
+                            DIM c2 AS INTEGER : c2 = vierHex()
+                            c = &H10000 + (c - &HD800) * 1024 + (c2 - &HDC00)
+                        END IF
+                    END IF
+                    aus = aus + CHR$(c)
+                CASE ELSE
+                    THROW "JSON: unbekannte Escape-Folge an Byte " + STR$(jpos - 2)
+            END SELECT
+            lauf = jpos
+        ELSE
+            jpos = jpos + 1
+        END IF
+    WEND
+    RETURN aus
+END FUNCTION
+
+FUNCTION lesen(pfad AS STRING) AS BOOLEAN
+    ' Liefert, ob die Datei mit einem Zeilenumbruch endet.
+    jb = READALL_BYTES(pfad)
+    jpos = 0
+    jlen = BUFFER_LEN(jb)
+    ' Eine BOM am Anfang ueberspringen.
+    IF jlen >= 3 THEN
+        IF BUFFER_GET(jb, 0) = &HEF AND BUFFER_GET(jb, 1) = &HBB AND BUFFER_GET(jb, 2) = &HBF THEN jpos = 3
+    END IF
+    IF jlen = 0 THEN RETURN FALSE
+    RETURN BUFFER_GET(jb, jlen - 1) = 10
+END FUNCTION
+
+' Katalog: Eintraege der obersten Ebene; ein Wert ist Text oder ein Objekt
+' aus Texten (`_veraltet`), dessen Eintraege in unter* stehen.
+DIM kSchl AS ARRAY OF STRING : kSchl = []
+DIM kWert AS ARRAY OF STRING : kWert = []
+DIM kObjekt AS ARRAY OF BOOLEAN : kObjekt = []
+DIM uBesitzer AS ARRAY OF INTEGER : uBesitzer = []
+DIM uSchl AS ARRAY OF STRING : uSchl = []
+DIM uWert AS ARRAY OF STRING : uWert = []
+DIM kIndex AS MAP OF INTEGER
+
+SUB katalogLesen(pfad AS STRING)
+    DIM dummy AS BOOLEAN : dummy = lesen(pfad)
+    erwarte(123)
+    leerraum()
+    IF BUFFER_GET(jb, jpos) = 125 THEN
+        jpos = jpos + 1
+        RETURN
+    END IF
+    WHILE TRUE
+        DIM s AS STRING : s = zeichenkette$()
+        erwarte(58)
+        leerraum()
+        IF BUFFER_GET(jb, jpos) = 123 THEN
+            jpos = jpos + 1
+            leerraum()
+            DIM nr AS INTEGER : nr = LEN(kSchl)
+            IF BUFFER_GET(jb, jpos) = 125 THEN
+                jpos = jpos + 1
+            ELSE
+                WHILE TRUE
+                    DIM us AS STRING : us = zeichenkette$()
+                    erwarte(58)
+                    ARRAY_PUSH(uBesitzer, nr)
+                    ARRAY_PUSH(uSchl, us)
+                    ARRAY_PUSH(uWert, zeichenkette$())
+                    leerraum()
+                    IF BUFFER_GET(jb, jpos) = 125 THEN
+                        jpos = jpos + 1
+                        BREAK
+                    END IF
+                    erwarte(44)
+                WEND
+            END IF
+            ARRAY_PUSH(kSchl, s)
+            ARRAY_PUSH(kWert, "")
+            ARRAY_PUSH(kObjekt, TRUE)
+        ELSE
+            ARRAY_PUSH(kSchl, s)
+            ARRAY_PUSH(kWert, zeichenkette$())
+            ARRAY_PUSH(kObjekt, FALSE)
+        END IF
+        MAPPUT(kIndex, s, LEN(kSchl) - 1)
+        leerraum()
+        IF BUFFER_GET(jb, jpos) = 125 THEN
+            jpos = jpos + 1
+            RETURN
+        END IF
+        erwarte(44)
+    WEND
+END SUB
+
+' ------------------------------------------------------------ Schreiben
+FUNCTION jsonText$(s AS STRING) AS STRING
+    ' Maskiert wie JSON.stringify: das json-Modul schreibt dieselben Folgen.
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    JSON_APPEND_STRING(a, "", s)
+    DIM t AS STRING : t = JSON_STRINGIFY(a)
+    RETURN MID$(t, 1, LEN(t) - 2)
+END FUNCTION
+
+FUNCTION katalogText$() AS STRING
+    IF LEN(kSchl) = 0 THEN RETURN "{}"
+    DIM teile AS ARRAY OF STRING : teile = []
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO LEN(kSchl) - 1
+        DIM zeile AS STRING : zeile = CHR$(10) + " " + jsonText$(kSchl[i]) + ": "
+        IF kObjekt[i] THEN
+            DIM innen AS ARRAY OF STRING : innen = []
+            FOR j = 0 TO LEN(uSchl) - 1
+                IF uBesitzer[j] = i THEN ARRAY_PUSH(innen, CHR$(10) + "  " + jsonText$(uSchl[j]) + ": " + jsonText$(uWert[j]))
+            NEXT
+            IF LEN(innen) = 0 THEN
+                zeile = zeile + "{}"
+            ELSE
+                zeile = zeile + "{" + JOIN$(innen, ",") + CHR$(10) + " }"
+            END IF
+        ELSE
+            zeile = zeile + jsonText$(kWert[i])
+        END IF
+        ARRAY_PUSH(teile, zeile)
+    NEXT
+    RETURN "{" + JOIN$(teile, ",") + CHR$(10) + "}"
+END FUNCTION
+
+' ------------------------------------------------------------ Ablauf
+IF ARGC() < 1 THEN
+    PRINT "Traegt Uebersetzungen in den Katalog ein."
+    PRINT ""
+    PRINT "    dhrt run buch-referenz/buch/i18n/apply.dh -- patch.json [katalog.json]"
+    EXIT(2)
+END IF
+DIM patchPfad AS STRING : patchPfad = vomAufrufer$(ARG$(0))
+DIM zielPfad AS STRING : zielPfad = CWD$() + "/en.json"
+IF ARGC() > 1 THEN zielPfad = vomAufrufer$(ARG$(1))
+
+katalogLesen(zielPfad)
+DIM mitUmbruch AS BOOLEAN : mitUmbruch = lesen(zielPfad)
+
+' Der Patch: ein Objekt aus Texten.
+DIM pSchl AS ARRAY OF STRING : pSchl = []
+DIM pWert AS ARRAY OF STRING : pWert = []
+DIM egal AS BOOLEAN : egal = lesen(patchPfad)
+erwarte(123)
+leerraum()
+IF BUFFER_GET(jb, jpos) = 125 THEN
+    jpos = jpos + 1
+ELSE
+    WHILE TRUE
+        ARRAY_PUSH(pSchl, zeichenkette$())
+        erwarte(58)
+        ARRAY_PUSH(pWert, zeichenkette$())
+        leerraum()
+        IF BUFFER_GET(jb, jpos) = 125 THEN BREAK
+        erwarte(44)
+    WEND
+END IF
+
+DIM unbekannt AS ARRAY OF STRING : unbekannt = []
+DIM gesetzt AS INTEGER : gesetzt = 0
+DIM ueberschrieben AS INTEGER : ueberschrieben = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(pSchl) - 1
+    IF NOT MAPHAS(kIndex, pSchl[i]) THEN
+        ARRAY_PUSH(unbekannt, pSchl[i])
+    ELSE
+        DIM nr AS INTEGER : nr = MAPGET(kIndex, pSchl[i])
+        IF kObjekt[nr] OR kWert[nr] <> "" THEN ueberschrieben = ueberschrieben + 1
+        kWert[nr] = pWert[i]
+        kObjekt[nr] = FALSE
+        gesetzt = gesetzt + 1
+    END IF
+NEXT
+
+DIM text AS STRING : text = katalogText$()
+IF mitUmbruch THEN text = text + CHR$(10)
+WRITEALL(zielPfad, text)
+
+DIM gesamt AS INTEGER : gesamt = 0
+DIM offen AS INTEGER : offen = 0
+FOR i = 0 TO LEN(kSchl) - 1
+    IF kSchl[i] <> "_veraltet" THEN
+        gesamt = gesamt + 1
+        IF NOT kObjekt[i] AND kWert[i] = "" THEN offen = offen + 1
+    END IF
+NEXT
+DIM anteil AS FLOAT : anteil = 0
+IF gesamt > 0 THEN anteil = 100.0 * (gesamt - offen) / gesamt
+PRINT gesetzt; " eingetragen ("; ueberschrieben; " ersetzt), "; gesamt - offen; "/"; gesamt; " uebersetzt ("; FORMAT$(anteil, "%.1f"); " %)"
+FOR i = 0 TO LEN(unbekannt) - 1
+    PRINT "  UNBEKANNTER SCHLUESSEL: "; LEFT$(unbekannt[i], 70)
+NEXT
+IF LEN(unbekannt) > 0 THEN EXIT(1)

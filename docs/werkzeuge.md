@@ -39,6 +39,11 @@ und sichert das letzte als PNG. Das **Fenster wird dabei aus dem Blick
 geschoben** — ein Bild zu machen soll die Arbeit nicht stören; gesichert
 wird der Zeichenpuffer, nicht der Bildschirm.
 
+**Nach dem Bild endet das Programm** (seit 2026-09-15). Das Bildlimit wirkt
+sonst nur über `QUITREQUESTED()`: ein Programm mit `WHILE TRUE` sicherte
+sein Bild und lief danach endlos weiter, und wer auf den Prozess wartete —
+die Buch-Werkzeuge `shoot.dh`, die IDE-Kacheln —, wartete ewig.
+
 Dasselbe konnte die Laufzeit schon über die Umgebungsvariablen
 `DHRT_FRAMES` und `DHRT_SCREENSHOT` (siehe docs/rust-runtime.md). Aus einem
 **Programm** heraus kam man dort aber nicht hin: `PROCESS_START` nimmt sie

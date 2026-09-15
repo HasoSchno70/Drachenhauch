@@ -1,0 +1,78 @@
+' Screenshots fuer das Lehrbuch neu aufnehmen -- scharf statt pixelig.
+'
+' Rendert jede figures/NN_*.dh ueber `dhrt bild` mit:
+'   DHRT_SCALE=4   -> 4x native Aufloesung (1920x1280; scharfe Formen/Sprites,
+'                     erfuellt die 300-dpi-Druckpruefung ohne Hochskalieren)
+'   DHRT_FONT=...  -> echte TTF als Standardschrift (scharfe Schrift statt der
+'                     pixeligen raylib-Bitmap-Schrift; Umlaute inklusive)
+'
+' Pro Demo eine Bildzahl (Animationen/Physik brauchen einen entwickelten Stand).
+' Ergebnis -> images/NN_*.png.
+'
+'     dhrt run buch-referenz/buch/shoot.dh [-- nur_diese_basename ...]
+'
+' Schrift ueber die Umgebungsvariable BUCH_FONT (Vorgabe: Segoe UI).
+' Bis 2026-09-15 shoot.py.
+
+CONST SKALIERUNG = "4"
+DIM figuren AS STRING : figuren = CWD$() + "/figures"
+DIM bilder AS STRING : bilder = CWD$() + "/images"
+DIM schrift AS STRING : schrift = GETENV$("BUCH_FONT", "C:\Windows\Fonts\segoeui.ttf")
+
+' Bilder je Demo (Vorgabe 60). Genug, damit Animation/Physik einen schoenen
+' Stand erreicht.
+DIM anzahl AS MAP OF INTEGER
+anzahl = {"40_fenster": 20, "41_formen": 10, "42_blend": 10, "42_extras": 10, "43_bilder": 10, "44_farben": 10, "45_eingabe": 10, "46_sound": 10, "47_layer": 10, "48_3d": 20, "49_catch": 40, "50_sprite": 12, "51_animfsm": 30, "52_tween": 45, "54_particles": 50, "55_physics2d": 90, "56_camera": 40, "58_ui": 10, "59_gui": 10, "59a_chart": 10, "62_astar": 10, "63_tiled": 10, "64_tilecollide": 70, "65_controller": 45, "66_vec2": 10, "67_m3d": 20, "72_curves": 10}
+
+FUNCTION aufnehmen(name AS STRING) AS BOOLEAN
+    DIM quelle AS STRING : quelle = figuren + "/" + name + ".dh"
+    IF NOT FILEEXISTS(quelle) THEN
+        PRINT "  (keine Quelle) "; name
+        RETURN FALSE
+    END IF
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    DIM n AS INTEGER : n = 60
+    IF MAPHAS(anzahl, name) THEN n = MAPGET(anzahl, name)
+    SETENV("DHRT_SCALE", SKALIERUNG)
+    SETENV("DHRT_FONT", schrift)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", quelle, ziel, STR$(n))
+    DIM fehlertext AS STRING : fehlertext = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_ERR$(p)
+        DIM rest AS STRING : rest = PROCESS_READ$(p)
+        fehlertext = fehlertext + teil
+        IF teil = "" AND rest = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    DIM ok AS BOOLEAN : ok = FILEEXISTS(ziel) AND PROCESS_CODE(p) = 0
+    IF ok THEN
+        PRINT "  OK  "; name
+    ELSE
+        fehlertext = TRIM$(fehlertext)
+        PRINT "  FEHLER "; name; "  "; RIGHT$(fehlertext, MIN(120, LEN(fehlertext)))
+    END IF
+    RETURN ok
+END FUNCTION
+
+IF NOT DIREXISTS(bilder) THEN MKDIR(bilder)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM alle AS ARRAY OF STRING : alle = DIRLIST(figuren)
+SORT(alle)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(alle) - 1
+    IF RIGHT$(alle[i], 3) = ".dh" THEN
+        DIM basis AS STRING : basis = LEFT$(alle[i], LEN(alle[i]) - 3)
+        DIM nimm AS BOOLEAN : nimm = ARGC() = 0
+        DIM a AS INTEGER
+        FOR a = 0 TO ARGC() - 1
+            IF ARG$(a) = basis THEN nimm = TRUE
+        NEXT
+        IF nimm THEN ARRAY_PUSH(namen, basis)
+    END IF
+NEXT
+DIM gut AS INTEGER : gut = 0
+FOR i = 0 TO LEN(namen) - 1
+    IF aufnehmen(namen[i]) THEN gut = gut + 1
+NEXT
+PRINT gut; "/"; LEN(namen); " Screenshots neu aufgenommen (scale "; SKALIERUNG; ", TTF)."

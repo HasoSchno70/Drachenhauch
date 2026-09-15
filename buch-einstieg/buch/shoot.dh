@@ -1,0 +1,138 @@
+' Bilder fuers Einstiegsbuch aufnehmen.
+'
+' Rendert jede figures/*.dh ueber `dhrt bild` nach images/<name>.png.
+'
+' Warum figures/ neben code/ steht: der Screenshot faellt beim LETZTEN Bild.
+' Die Kapitelprogramme der ersten Teile zeichnen aber nur EINMAL und warten
+' dann mit SLEEP -- ein einzelner FLIP kommt zu frueh, das Bild wird schwarz.
+' Die Figurenquelle enthaelt deshalb dieselben Zeichenbefehle in einer kurzen
+' Schleife. Sie ist keine zweite Wahrheit: pruef_codebloecke.js prueft den
+' Abdruck im Buch, und beides laeuft durch `dhrt --check`.
+'
+' SKALIERUNG=3 bei 640x400 -> 1920x1200. Gemessen: mehr geht nicht. Mit 4
+' waere das Fenster 2560x1600 und damit hoeher als der Bildschirm; Windows
+' schiebt es dann nach unten weg, und die Aufnahme bekam oben 179 schwarze
+' Zeilen. 1920 Breite ist zugleich das Mass des Referenzbuchs und reicht fuer
+' den 300-dpi-Druck.
+'
+'     dhrt run buch-einstieg/buch/shoot.dh [-- nur_diese_namen ...]
+'
+' Bis 2026-09-15 shoot.py.
+IMPORT "regex"
+
+CONST SKALIERUNG = "3"
+CONST BILDER_VORGABE = 12
+DIM hier AS STRING : hier = CWD$()
+DIM figuren AS STRING : figuren = hier + "/figures"
+DIM bilder AS STRING : bilder = hier + "/images"
+DIM schrift AS STRING : schrift = GETENV$("BUCH_FONT", "C:\Windows\Fonts\segoeui.ttf")
+
+' Mehr Bilder, wo sich etwas entwickeln muss (Animation, Physik, Partikel).
+' Ampel: Bild 75 faellt in Phase 1 -- rot UND gelb, man sieht, dass gleich
+' etwas passiert. Kapitel 29 holt die Liste im Hintergrund: gemessen waren es
+' rund 200 ms bis zur Antwort, 90 Bilder lassen Luft.
+DIM anzahl AS MAP OF INTEGER
+anzahl = {"kap05_1_wanderer": 60, "kap05_2_fallender_ball": 46, "kap05_3_spur": 38, "kap05_4_regen": 40, "kap05_5_monde": 70, "kap08_3_ball": 44, "kap09_snake": 90, "kap10_3_sirene": 720, "kap11_1_treffer": 40, "kap11_2_laser": 20, "kap11_3_pong_mit_ton": 300, "kap12_instrument": 20, "kap13_1_baum": 12, "kap13_2_wald": 12, "kap13_3_naehe": 12, "kap13_4_pong_kuerzer": 300, "kap14_1_funken": 120, "kap14_2_leben": 180, "kap14_3_bestenliste": 12, "kap15_1_farbregister": 12, "kap15_2_tastenzaehler": 12, "kap16_1_funken_klasse": 120, "kap16_2_planeten": 200, "kap17_1_schreibmaschine": 130, "kap17_2_laufschrift": 60, "kap17_3_buchstaben": 12, "kap18_1_bestwert": 12, "kap19_1_bild_zeigen": 12, "kap19_2_schiff_steuern": 12, "kap19_3_flotte": 30, "kap21_1_zwei_frames": 20, "kap21_2_muenze": 5, "kap21_3_flotte_lebt": 30, "kap22_1_rechtecke": 12, "kap22_2_einsammeln": 12, "kap23_arcade": 90, "kap24_1_erster_knopf": 12, "kap24_2_schieber": 12, "kap25_1_liste_fuellen": 12, "kap25_2_auswahl": 12, "kap26_1_reiter": 12, "kap27_1_vokabeln_db": 12, "kap18_2_vokabeln": 12, "kap08_pong": 300, "kap06_1_abpraller": 50, "kap06_3_kasten": 55, "kap06_5_ampel": 75, "kap29_2_liste_laden": 90, "kap32_verwalten": 30, "kap33_trainer": 30}
+
+FUNCTION quelle$(name AS STRING) AS STRING
+    ' Erst figures/, dann das Kapitelprogramm selbst.
+    '
+    ' Ab Kapitel 5 haben die Programme eine eigene Schleife und laufen so
+    ' lange, bis man sie beendet -- die lassen sich unveraendert aufnehmen.
+    ' Aus `kap05_1_wanderer` wird `../code/kap05/1_wanderer.dh`; `anhang`
+    ' steht neben den kapNN-Ordnern und wird genauso behandelt.
+    DIM eigen AS STRING : eigen = figuren + "/" + name + ".dh"
+    IF FILEEXISTS(eigen) THEN RETURN eigen
+    DIM strich AS INTEGER : strich = INSTR(name, "_")
+    IF strich > 0 THEN
+        DIM kap AS STRING : kap = LEFT$(name, strich)
+        DIM rest AS STRING : rest = MID$(name, strich + 1, LEN(name))
+        IF rest <> "" AND (kap = "anhang" OR REGEX_TEST(kap, "^kap[0-9]+$")) THEN
+            DIM p AS STRING : p = hier + "/../code/" + kap + "/" + rest + ".dh"
+            IF FILEEXISTS(p) THEN RETURN p
+        END IF
+    END IF
+    RETURN ""
+END FUNCTION
+
+FUNCTION aufnehmen(name AS STRING) AS BOOLEAN
+    DIM q AS STRING : q = quelle$(name)
+    IF q = "" THEN
+        PRINT "  (keine Quelle) "; name
+        RETURN FALSE
+    END IF
+    DIM ziel AS STRING : ziel = bilder + "/" + name + ".png"
+    DIM n AS INTEGER : n = BILDER_VORGABE
+    IF MAPHAS(anzahl, name) THEN n = MAPGET(anzahl, name)
+    SETENV("DHRT_SCALE", SKALIERUNG)
+    IF FILEEXISTS(schrift) THEN SETENV("DHRT_FONT", schrift)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", q, ziel, STR$(n))
+    DIM fehlertext AS STRING : fehlertext = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_ERR$(p)
+        DIM stumm AS STRING : stumm = PROCESS_READ$(p)
+        fehlertext = fehlertext + teil
+        IF teil = "" AND stumm = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    IF PROCESS_CODE(p) <> 0 OR NOT FILEEXISTS(ziel) THEN
+        PRINT "  FEHLER "; name; " "; LEFT$(TRIM$(fehlertext), 200)
+        RETURN FALSE
+    END IF
+    PRINT "  "; name; ".png  ("; n; " Frames)"
+    RETURN TRUE
+END FUNCTION
+
+IF NOT DIREXISTS(bilder) THEN MKDIR(bilder)
+DIM namen AS ARRAY OF STRING : namen = []
+DIM i AS INTEGER
+IF ARGC() > 0 THEN
+    FOR i = 0 TO ARGC() - 1
+        ARRAY_PUSH(namen, ARG$(i))
+    NEXT
+ELSE
+    DIM gesehen AS MAP OF BOOLEAN
+    DIM alle AS ARRAY OF STRING : alle = DIRLIST(figuren)
+    FOR i = 0 TO LEN(alle) - 1
+        IF RIGHT$(alle[i], 3) = ".dh" THEN
+            DIM b AS STRING : b = LEFT$(alle[i], LEN(alle[i]) - 3)
+            IF NOT MAPHAS(gesehen, b) THEN
+                MAPPUT(gesehen, b, TRUE)
+                ARRAY_PUSH(namen, b)
+            END IF
+        END IF
+    NEXT
+    DIM code AS STRING : code = hier + "/../code"
+    DIM kapitel AS ARRAY OF STRING : kapitel = DIRLIST(code)
+    SORT(kapitel)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(kapitel) - 1
+        IF DIREXISTS(code + "/" + kapitel[k]) THEN
+            DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(code + "/" + kapitel[k])
+            SORT(dateien)
+            DIM f AS INTEGER
+            FOR f = 0 TO LEN(dateien) - 1
+                IF RIGHT$(dateien[f], 3) = ".dh" THEN
+                    DIM nm AS STRING : nm = kapitel[k] + "_" + LEFT$(dateien[f], LEN(dateien[f]) - 3)
+                    ' Nur Programme mit eigener Schleife: die linearen haben ihre
+                    ' Schleifenfassung schon unter figures/.
+                    IF NOT MAPHAS(gesehen, nm) THEN
+                        DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(code + "/" + kapitel[k] + "/" + dateien[f])
+                        IF INSTR(UPPER$(JOIN$(zeilen, CHR$(10))), "WHILE") >= 0 THEN
+                            MAPPUT(gesehen, nm, TRUE)
+                            ARRAY_PUSH(namen, nm)
+                        END IF
+                    END IF
+                END IF
+            NEXT
+        END IF
+    NEXT
+    SORT(namen)
+END IF
+DIM gut AS INTEGER : gut = 0
+FOR i = 0 TO LEN(namen) - 1
+    IF aufnehmen(namen[i]) THEN gut = gut + 1
+NEXT
+PRINT gut; "/"; LEN(namen); " Bilder"
+IF gut <> LEN(namen) THEN EXIT(1)
