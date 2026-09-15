@@ -1,0 +1,110 @@
+' Erzeugt die Showcase-Vorschaubilder fuer die Willkommensseiten.
+'
+' Fuer jedes Beispiel aus examples/showcase.json laeuft `dhrt bild` (so viele
+' Bilder, wie der Eintrag unter "frames" nennt), das Bild wird auf 480 Punkte
+' Breite verkleinert und als examples/screenshots/<name>.png abgelegt -- ohne
+' Alphakanal. Die IDE (ide/ide.dh) und das Qt-Welcome-Panel lesen dieselbe
+' Liste und dieselben Bilder.
+'
+'     dhrt run tools/showcase_bilder.dh [-- name ...]
+'     dhrt run tools/showcase_bilder.dh -- --wurzel anderer/ordner 48_orbital
+'
+' Ohne Namen entstehen alle Bilder, mit Namen nur die genannten (z.B.
+' `48_orbital`). Das Fenster steht dabei ausserhalb des Bildschirms.
+'
+' Bis 2026-09-15 gen_showcase_thumbs.py (PIL, LANCZOS). Verkleinert wird jetzt
+' mit IMAGE_SCALE (bilinear) -- Punkt fuer Punkt gleich sind die Bilder damit
+' nicht, aber so gross und so scharf wie vorher.
+IMPORT "json"
+IMPORT "imgfx"
+
+CONST BREITE = 480
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+DIM wurzel AS STRING : wurzel = DIRNAME(CWD$())
+DIM gewuenscht AS MAP OF BOOLEAN
+DIM genannt AS INTEGER : genannt = 0
+DIM i AS INTEGER : i = 0
+WHILE i < ARGC()
+    IF ARG$(i) = "--wurzel" THEN
+        wurzel = vomAufrufer$(ARG$(i + 1))
+        i = i + 2
+    ELSE
+        MAPPUT(gewuenscht, ARG$(i), TRUE)
+        genannt = genannt + 1
+        i = i + 1
+    END IF
+WEND
+DIM beispiele AS STRING : beispiele = wurzel + "/examples"
+DIM liste AS STRING : liste = beispiele + "/showcase.json"
+IF NOT FILEEXISTS(liste) THEN
+    PRINT "Keine Liste: "; liste
+    EXIT(1)
+END IF
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{""l"":" + JOIN$(READLINES(liste), CHR$(10)) + "}")
+
+FUNCTION erzeugen(datei AS STRING, bilder AS INTEGER) AS BOOLEAN
+    DIM quelle AS STRING : quelle = beispiele + "/" + datei
+    IF NOT FILEEXISTS(quelle) THEN
+        PRINT "  ! Quelle fehlt: "; datei
+        RETURN FALSE
+    END IF
+    DIM name AS STRING : name = LEFT$(datei, LEN(datei) - 3)
+    DIM ordner AS STRING : ordner = beispiele + "/screenshots"
+    IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+    DIM roh AS STRING : roh = ordner + "/_roh_" + name + ".png"
+    IF FILEEXISTS(roh) THEN DELETEFILE(roh)
+    DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", quelle, roh, STR$(bilder))
+    ' Laufend leeren; nach 60 s ist Schluss -- `dhrt bild` endet nach dem
+    ' Bild, aber ein Beispiel kann schon vorher haengen.
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    DIM leer AS INTEGER : leer = 0
+    DIM meldung AS STRING : meldung = ""
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        meldung = meldung + teil
+        IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        IF MILLIS() - t0 > 60000 AND PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
+        SLEEP(20)
+    WEND
+    IF NOT FILEEXISTS(roh) THEN
+        PRINT "  ! Kein Bild fuer "; datei
+        ' Was `dhrt bild` gesagt hat, gehoert dazu -- sonst sucht man den
+        ' Grund (fehlendes Asset, Bau ohne Grafik) im Dunkeln.
+        meldung = TRIM$(REPLACE$(meldung, CHR$(13), ""))
+        IF meldung <> "" THEN PRINT "    "; REPLACE$(meldung, CHR$(10), CHR$(10) + "    ")
+        RETURN FALSE
+    END IF
+    DIM b AS IMAGE : b = LOADIMAGE(roh)
+    DIM hoehe AS INTEGER : hoehe = MAX(1, INT(IMAGEHEIGHT(b) * BREITE / IMAGEWIDTH(b) + 0.5))
+    DIM klein AS IMAGE : klein = IMAGE_SCALE(b, BREITE, hoehe)
+    DIM ziel AS STRING : ziel = ordner + "/" + name + ".png"
+    IMAGE_SAVE(klein, ziel, FALSE)
+    IMAGE_FREE(b)
+    IMAGE_FREE(klein)
+    DELETEFILE(roh)
+    PRINT "  + examples/screenshots/"; name; ".png  ("; FILESIZE(ziel) \ 1024; " KB)"
+    RETURN TRUE
+END FUNCTION
+
+DIM dateien AS ARRAY OF STRING : dateien = []
+DIM zahlen AS ARRAY OF INTEGER : zahlen = []
+FOR i = 0 TO JSON_LEN(h, "l") - 1
+    DIM d AS STRING : d = JSON_GET_STRING(h, "l." + STR$(i) + ".file")
+    IF genannt > 0 AND NOT MAPHAS(gewuenscht, LEFT$(d, LEN(d) - 3)) THEN CONTINUE
+    ARRAY_PUSH(dateien, d)
+    IF JSON_HAS(h, "l." + STR$(i) + ".frames") THEN ARRAY_PUSH(zahlen, JSON_GET_INT(h, "l." + STR$(i) + ".frames")) ELSE ARRAY_PUSH(zahlen, 120)
+NEXT
+PRINT "Erzeuge "; LEN(dateien); " Vorschaubild(er) ..."
+DIM gut AS INTEGER : gut = 0
+FOR i = 0 TO LEN(dateien) - 1
+    PRINT "- "; dateien[i]
+    IF erzeugen(dateien[i], zahlen[i]) THEN gut = gut + 1
+NEXT
+PRINT "Fertig: "; gut; "/"; LEN(dateien); " erzeugt."
+IF gut <> LEN(dateien) THEN EXIT(2)
