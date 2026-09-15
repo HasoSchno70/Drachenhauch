@@ -1,0 +1,1005 @@
+' Pyramid Pusher -- Pixel-Art-Generator.
+'
+' Erzeugt alle 32x32-Tiles + den Helden-Sheet + die Truhe als PNGs in diesem
+' Ordner. Die Dateien sind ganz normale PNG-Sheets -- du kannst sie jederzeit im
+' Sprite-Editor oeffnen und nachmalen.
+'
+'     dhrt run pyramid_pusher/assets/gen_art.dh [-- zielordner]
+'
+' Stil: Sandstein-Grabkammer, passend zum Titelbild (Forscher mit Hut +
+' Fackel, goldene Truhe, Tuerkis-Ankh auf den Kisten).
+'
+' Bis 2026-09-14 gen_art.py (PIL + numpy). Die Koernung der Kacheln kommt aus
+' demselben Zufall wie dort: numpys default_rng (PCG64 mit SeedSequence und
+' Lemires Verfahren fuer integers) ist unten nachgebaut, darum sind alle Bilder
+' Punkt fuer Punkt dieselben -- bis auf 17 Randpunkte des Sterns, den PIL als
+' Vieleck rastert. Pythons round() rundet bei genau .5 zur geraden Zahl, das
+' tut hier `rund`.
+IMPORT "imgfx"
+
+DIM ordner AS STRING : ordner = CWD$()
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+IF ARGC() > 0 THEN ordner = vomAufrufer$(ARG$(0))
+IF NOT DIREXISTS(ordner) THEN MKDIR(ordner)
+
+CONST T = 32          ' Tile-/Sprite-Kantenlaenge
+
+' ============================================================ Zufall wie numpy
+' np.random.default_rng(seed).integers(lo, hi): SeedSequence macht aus dem
+' Startwert vier 64-Bit-Woerter, PCG64 (128-Bit-Zustand, Ausgabe XSL-RR)
+' liefert 64 Bit, davon zuerst die unteren 32 und beim naechsten Mal die
+' oberen; eine Spanne unter 2^32 zieht Lemire aus 32 Bit. Ein INTEGER hat 64
+' Bit und laeuft nicht still ueber -- der Zustand liegt darum in 16-Bit-Stuecken.
+CONST M32 = &HFFFFFFFF
+DIM pcg[8] AS INTEGER
+DIM pcgInc[8] AS INTEGER
+DIM pcgMul[8] AS INTEGER
+pcgMul[0] = 63045 : pcgMul[1] = 40908 : pcgMul[2] = 57188 : pcgMul[3] = 17285
+pcgMul[4] = 23972 : pcgMul[5] = 8134 : pcgMul[6] = 60677 : pcgMul[7] = 9056
+DIM hat32 AS BOOLEAN
+DIM puffer32 AS INTEGER
+DIM saatKonst AS INTEGER
+
+FUNCTION mal32(a AS INTEGER, b AS INTEGER) AS INTEGER
+    ' a * b mod 2^32, ohne dass das Zwischenergebnis 64 Bit sprengt
+    DIM al AS INTEGER : al = a BAND &HFFFF
+    DIM ah AS INTEGER : ah = a SHR 16
+    DIM bl AS INTEGER : bl = b BAND &HFFFF
+    DIM bh AS INTEGER : bh = b SHR 16
+    RETURN (((ah * bl + al * bh) BAND &HFFFF) * 65536 + al * bl) BAND M32
+END FUNCTION
+
+FUNCTION saatMisch(v AS INTEGER) AS INTEGER
+    ' hashmix der SeedSequence
+    v = v BXOR saatKonst
+    saatKonst = mal32(saatKonst, &H931E8875)
+    v = mal32(v, saatKonst)
+    RETURN v BXOR (v SHR 16)
+END FUNCTION
+
+FUNCTION saatVerbinde(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM r AS INTEGER : r = (mal32(&HCA01F9DD, x) - mal32(&H4973F715, y)) BAND M32
+    RETURN r BXOR (r SHR 16)
+END FUNCTION
+
+SUB pcgSchritt()
+    ' Zustand = Zustand * Multiplikator + Inkrement (mod 2^128)
+    DIM neu[8] AS INTEGER
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO 7
+        DIM uebertrag AS INTEGER : uebertrag = 0
+        FOR j = 0 TO 7 - i
+            DIM s AS INTEGER : s = neu[i + j] + pcg[i] * pcgMul[j] + uebertrag
+            neu[i + j] = s BAND &HFFFF
+            uebertrag = s SHR 16
+        NEXT
+    NEXT
+    DIM c AS INTEGER : c = 0
+    FOR i = 0 TO 7
+        DIM s2 AS INTEGER : s2 = neu[i] + pcgInc[i] + c
+        pcg[i] = s2 BAND &HFFFF
+        c = s2 SHR 16
+    NEXT
+END SUB
+
+SUB zufallStart(saat AS INTEGER)
+    DIM pool[4] AS INTEGER
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    saatKonst = &H43B0D7E5
+    pool[0] = saatMisch(saat)
+    FOR i = 1 TO 3
+        pool[i] = saatMisch(0)
+    NEXT
+    FOR i = 0 TO 3
+        FOR j = 0 TO 3
+            IF i <> j THEN pool[j] = saatVerbinde(pool[j], saatMisch(pool[i]))
+        NEXT
+    NEXT
+    ' generate_state(4, uint64) = acht 32-Bit-Woerter
+    DIM w[8] AS INTEGER
+    saatKonst = &H8B51F9DD
+    FOR i = 0 TO 7
+        DIM v AS INTEGER : v = pool[i MOD 4] BXOR saatKonst
+        saatKonst = mal32(saatKonst, &H58F38DED)
+        v = mal32(v, saatKonst)
+        w[i] = v BXOR (v SHR 16)
+    NEXT
+    ' initstate = w0|w1<<32 oben, w2|w3<<32 unten; initseq genauso aus w4..w7
+    DIM start[8] AS INTEGER
+    DIM folge[8] AS INTEGER
+    FOR i = 0 TO 1
+        start[2 * i] = w[2 + i] BAND &HFFFF : start[2 * i + 1] = w[2 + i] SHR 16
+        start[4 + 2 * i] = w[i] BAND &HFFFF : start[5 + 2 * i] = w[i] SHR 16
+        folge[2 * i] = w[6 + i] BAND &HFFFF : folge[2 * i + 1] = w[6 + i] SHR 16
+        folge[4 + 2 * i] = w[4 + i] BAND &HFFFF : folge[5 + 2 * i] = w[4 + i] SHR 16
+    NEXT
+    ' inc = initseq << 1 | 1
+    DIM c AS INTEGER : c = 1
+    FOR i = 0 TO 7
+        DIM s AS INTEGER : s = folge[i] * 2 + c
+        pcgInc[i] = s BAND &HFFFF
+        c = s SHR 16
+        pcg[i] = 0
+    NEXT
+    pcgSchritt()
+    c = 0
+    FOR i = 0 TO 7
+        DIM s2 AS INTEGER : s2 = pcg[i] + start[i] + c
+        pcg[i] = s2 BAND &HFFFF
+        c = s2 SHR 16
+    NEXT
+    pcgSchritt()
+    hat32 = FALSE
+END SUB
+
+FUNCTION wort32() AS INTEGER
+    IF hat32 THEN
+        hat32 = FALSE
+        RETURN puffer32
+    END IF
+    pcgSchritt()
+    ' XSL-RR: die oberen und unteren 64 Bit verknuepfen, um die obersten 6 Bit drehen
+    DIM lo AS INTEGER : lo = (pcg[0] BXOR pcg[4]) + (pcg[1] BXOR pcg[5]) * 65536
+    DIM hi AS INTEGER : hi = (pcg[2] BXOR pcg[6]) + (pcg[3] BXOR pcg[7]) * 65536
+    DIM dreh AS INTEGER : dreh = pcg[7] SHR 10
+    DIM rl AS INTEGER : rl = lo
+    DIM rh AS INTEGER : rh = hi
+    IF dreh > 0 AND dreh < 32 THEN
+        ' (x >> dreh) | (x << (64 - dreh))
+        rl = (lo SHR dreh) BOR ((hi BAND ((1 SHL dreh) - 1)) SHL (32 - dreh))
+        rh = (hi SHR dreh) BOR ((lo BAND ((1 SHL dreh) - 1)) SHL (32 - dreh))
+    ELSEIF dreh = 32 THEN
+        rl = hi : rh = lo
+    ELSEIF dreh > 32 THEN
+        DIM k AS INTEGER : k = dreh - 32
+        rl = (hi SHR k) BOR ((lo BAND ((1 SHL k) - 1)) SHL (32 - k))
+        rh = (lo SHR k) BOR ((hi BAND ((1 SHL k) - 1)) SHL (32 - k))
+    END IF
+    hat32 = TRUE
+    puffer32 = rh
+    RETURN rl
+END FUNCTION
+
+FUNCTION zufall(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    ' integers(von, bis): bis selbst kommt nie heraus
+    DIM spanne AS INTEGER : spanne = bis - von
+    IF spanne = 1 THEN RETURN von
+    DIM m AS INTEGER : m = wort32() * spanne
+    DIM rest AS INTEGER : rest = m BAND M32
+    IF rest < spanne THEN
+        DIM schwelle AS INTEGER : schwelle = ((-spanne) BAND M32) MOD spanne
+        WHILE rest < schwelle
+            m = wort32() * spanne
+            rest = m BAND M32
+        WEND
+    END IF
+    RETURN von + (m SHR 32)
+END FUNCTION
+
+' ============================================================ Leinwand
+DIM bild AS IMAGE
+
+FUNCTION farbe(r AS INTEGER, g AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN r * 65536 + g * 256 + b
+END FUNCTION
+
+SUB setz(x AS INTEGER, y AS INTEGER, c AS INTEGER, a AS INTEGER = 255)
+    IF x < 0 OR y < 0 OR x >= IMAGEWIDTH(bild) OR y >= IMAGEHEIGHT(bild) THEN RETURN
+    IMAGE_FILL_RECT(bild, x, y, x, y, c, a)
+END SUB
+
+SUB flaeche(x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, y1 AS INTEGER, c AS INTEGER, a AS INTEGER = 255)
+    DIM xa AS INTEGER : xa = MAX(0, x0)
+    DIM xb AS INTEGER : xb = MIN(IMAGEWIDTH(bild) - 1, x1)
+    DIM ya AS INTEGER : ya = MAX(0, y0)
+    DIM yb AS INTEGER : yb = MIN(IMAGEHEIGHT(bild) - 1, y1)
+    IF xa > xb OR ya > yb THEN RETURN
+    IMAGE_FILL_RECT(bild, xa, ya, xb, yb, c, a)
+END SUB
+
+FUNCTION kanal(v AS FLOAT) AS INTEGER
+    ' int(max(0, min(255, v)))
+    IF v <= 0 THEN RETURN 0
+    IF v >= 255 THEN RETURN 255
+    RETURN INT(v)
+END FUNCTION
+
+FUNCTION schatt(c AS INTEGER, f AS FLOAT) AS INTEGER
+    RETURN farbe(kanal(((c SHR 16) BAND 255) * f), kanal(((c SHR 8) BAND 255) * f), kanal((c BAND 255) * f))
+END FUNCTION
+
+FUNCTION koernig(c AS INTEGER, n AS INTEGER) AS INTEGER
+    RETURN schatt(c, 1 + n / 255.0)
+END FUNCTION
+
+FUNCTION rund(v AS FLOAT) AS INTEGER
+    ' Pythons round(): bei genau .5 zur geraden Zahl
+    DIM f AS INTEGER : f = INT(v)
+    DIM d AS FLOAT : d = v - f
+    IF d > 0.5 THEN RETURN f + 1
+    IF d < 0.5 THEN RETURN f
+    IF f MOD 2 = 0 THEN RETURN f
+    RETURN f + 1
+END FUNCTION
+
+SUB sichern(name AS STRING)
+    IMAGE_SAVE(bild, ordner + "/" + name)
+    PRINT "  -> "; name; " "; IMAGEWIDTH(bild); " x "; IMAGEHEIGHT(bild)
+END SUB
+
+' --- Palette (Sandstein / Gold / Tuerkis) -----------------------------------
+CONST SAND_HI = &HE8C88A
+CONST SAND_MID = &HD2A860
+CONST SAND_LO = &HB0824A
+CONST STONE_HI = &HC9A56B
+CONST STONE_MID = &H8A6638
+CONST STONE_LO = &H5E441F
+CONST MORTAR = &H463014
+CONST GOLD_HI = &HF5C542
+CONST GOLD = &HD29E1E
+CONST GOLD_LO = &H966810
+CONST TEAL = &H2BB0A0
+CONST TEAL_HI = &H78E0D0
+CONST WARM = &HFFD060
+CONST FLAME_HI = &HFFE878
+CONST DARK = &H281C10
+CONST ICE_HI = &HCEE6F5
+CONST ICE_MID = &H96C0E0
+CONST ICE_LO = &H6896C0
+
+' ============================================================ Kacheln
+SUB boden()
+    bild = IMAGE_NEW(T, T)
+    zufallStart(7)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            setz(x, y, koernig(SAND_MID, zufall(-10, 11)))
+        NEXT
+    NEXT
+    ' eingelassene Fugen (Steinplatten 16er-Raster)
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            IF x MOD 16 = 0 OR y MOD 16 = 0 THEN setz(x, y, schatt(SAND_LO, 0.9))
+            IF x MOD 16 = 1 OR y MOD 16 = 1 THEN setz(x, y, schatt(SAND_HI, 1.05))
+        NEXT
+    NEXT
+    ' ein paar Risse/Koernung
+    DIM i AS INTEGER
+    FOR i = 1 TO 14
+        x = zufall(2, T - 2) : y = zufall(2, T - 2)
+        setz(x, y, schatt(SAND_LO, 0.8))
+    NEXT
+    sichern("floor.png")
+END SUB
+
+SUB fuge(y0 AS INTEGER, y1 AS INTEGER, xa AS INTEGER, xb AS INTEGER)
+    DIM y AS INTEGER
+    FOR y = y0 TO y1 - 1
+        setz(xa MOD T, y, MORTAR)
+    NEXT
+    FOR y = y0 TO y1 - 1
+        setz(xb MOD T, y, MORTAR)
+    NEXT
+END SUB
+
+SUB wand()
+    bild = IMAGE_NEW(T, T)
+    zufallStart(13)
+    flaeche(0, 0, T - 1, T - 1, STONE_MID)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            setz(x, y, koernig(STONE_MID, zufall(-8, 9)))
+        NEXT
+    NEXT
+    ' Moertelfugen in den Reihen 0, 11, 22
+    DIM reihen AS ARRAY OF INTEGER : reihen = [0, 11, 22]
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        FOR x = 0 TO T - 1
+            setz(x, reihen[i], MORTAR)
+            setz(x, reihen[i] + 1, schatt(MORTAR, 1.2))
+        NEXT
+    NEXT
+    ' senkrechte Fugen, je Reihe versetzt
+    fuge(2, 11, 0, 16)
+    fuge(13, 22, 8, 24)
+    fuge(24, 32, 0, 16)
+    ' obere Lichtkante je Ziegel
+    FOR i = 0 TO 2
+        FOR x = 0 TO T - 1
+            setz(x, reihen[i] + 2, schatt(STONE_HI, 1.0))
+        NEXT
+    NEXT
+    ' dezente Gravur (Auge-Andeutung) mittig
+    DIM dx AS INTEGER
+    FOR dx = -3 TO 3
+        setz(16 + dx, 16, schatt(STONE_LO, 0.8))
+    NEXT
+    setz(16, 15, schatt(STONE_LO, 0.8))
+    setz(16, 17, schatt(STONE_LO, 0.8))
+    sichern("wall.png")
+END SUB
+
+SUB ziel()
+    ' Transparentes Overlay: leuchtendes Ankh-Zielfeld auf dem Boden.
+    bild = IMAGE_NEW(T, T)
+    DIM cx AS INTEGER : cx = 16
+    DIM cy AS INTEGER : cy = 16
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    ' weicher Lichthof
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            DIM d AS FLOAT : d = SQR((x - cx + 0.5) * (x - cx + 0.5) + (y - cy + 0.5) * (y - cy + 0.5))
+            IF d < 13 THEN setz(x, y, WARM, kanal(120 * (1 - d / 13)))
+        NEXT
+    NEXT
+    ' Ankh-Symbol (Tuerkis, hell)
+    FOR y = cy - 1 TO cy + 8
+        setz(cx, y, TEAL_HI) : setz(cx - 1, y, TEAL_HI)
+    NEXT
+    FOR x = cx - 5 TO cx + 4
+        setz(x, cy + 2, TEAL_HI) : setz(x, cy + 3, TEAL_HI)
+    NEXT
+    DIM k AS INTEGER
+    FOR k = 0 TO 6
+        DIM wink AS FLOAT : wink = k / 6.0 * 6.28318
+        DIM px AS INTEGER : px = rund(cx - 0.5 + 3.2 * SIN(wink))
+        DIM py AS INTEGER : py = rund(cy - 5 + 3.2 * (1 - COS(wink)) - 1)
+        setz(px, py, TEAL_HI) : setz(px + 1, py, TEAL_HI)
+    NEXT
+    sichern("goal.png")
+END SUB
+
+FUNCTION mitte(a AS INTEGER, b AS INTEGER, t0 AS FLOAT) AS INTEGER
+    ' _lerp je Kanal: int(a + (b - a) * t)
+    DIM r AS INTEGER : r = INT(((a SHR 16) BAND 255) + (((b SHR 16) BAND 255) - ((a SHR 16) BAND 255)) * t0)
+    DIM g AS INTEGER : g = INT(((a SHR 8) BAND 255) + (((b SHR 8) BAND 255) - ((a SHR 8) BAND 255)) * t0)
+    DIM bl AS INTEGER : bl = INT((a BAND 255) + ((b BAND 255) - (a BAND 255)) * t0)
+    RETURN farbe(r, g, bl)
+END FUNCTION
+
+SUB ankh(cx AS INTEGER, cy AS INTEGER, c AS INTEGER)
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = cy TO cy + 8
+        setz(cx, y, c) : setz(cx - 1, y, c)
+    NEXT
+    FOR x = cx - 5 TO cx + 4
+        setz(x, cy + 2, c) : setz(x, cy + 3, c)
+    NEXT
+    DIM a AS INTEGER
+    FOR a = 0 TO 348 STEP 12
+        DIM bogen AS FLOAT : bogen = a * PI / 180.0
+        DIM rx AS INTEGER : rx = rund(cx - 0.5 + 3.2 * SIN(bogen))
+        DIM ry AS INTEGER : ry = rund(cy - 4 - 3.2 * COS(bogen))
+        setz(rx, ry, c) : setz(rx + 1, ry, c)
+    NEXT
+END SUB
+
+SUB kiste(aufZiel AS BOOLEAN)
+    ' Sandstein-Schatzkiste mit Goldbeschlag + Tuerkis-Ankh-Kartusche;
+    ' aufZiel = goldglaenzende, leuchtende "platziert"-Variante.
+    bild = IMAGE_NEW(T, T)
+    DIM body0 AS INTEGER
+    DIM body1 AS INTEGER
+    DIM rahmenHi AS INTEGER
+    DIM rahmen AS INTEGER
+    DIM rahmenLo AS INTEGER
+    DIM feld AS INTEGER
+    DIM feldLo AS INTEGER
+    DIM feldHi AS INTEGER
+    DIM ank AS INTEGER
+    DIM ankHi AS INTEGER
+    DIM niet AS INTEGER
+    DIM nietHi AS INTEGER
+    IF aufZiel THEN
+        zufallStart(99)
+        body0 = farbe(236, 196, 96) : body1 = farbe(176, 128, 40)
+        rahmenHi = farbe(255, 232, 130) : rahmen = farbe(228, 178, 60) : rahmenLo = farbe(150, 104, 16)
+        feld = farbe(158, 112, 28) : feldLo = farbe(112, 76, 14) : feldHi = farbe(212, 160, 54)
+        ank = farbe(150, 240, 224) : ankHi = farbe(224, 255, 250)
+        niet = farbe(255, 238, 150) : nietHi = farbe(255, 255, 220)
+    ELSE
+        zufallStart(42)
+        body0 = farbe(228, 194, 132) : body1 = farbe(150, 112, 66)
+        rahmenHi = farbe(232, 196, 120) : rahmen = farbe(192, 150, 84) : rahmenLo = farbe(116, 88, 46)
+        feld = farbe(122, 92, 54) : feldLo = farbe(90, 66, 36) : feldHi = farbe(164, 128, 78)
+        ank = farbe(54, 192, 174) : ankHi = farbe(150, 236, 222)
+        niet = farbe(208, 184, 120) : nietHi = farbe(245, 230, 180)
+    END IF
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    ' Korpus mit senkrechtem Verlauf (oben heller -> 3D) + Koernung
+    FOR y = 2 TO T - 3
+        DIM zeile AS INTEGER : zeile = mitte(body0, body1, (y - 2) / (T - 5.0))
+        FOR x = 2 TO T - 3
+            setz(x, y, koernig(zeile, zufall(-7, 8)))
+        NEXT
+    NEXT
+    ' Abgeschraegter Goldrahmen (3 px): oben/links hell, unten/rechts dunkel
+    DIM i AS INTEGER
+    FOR i = 0 TO 2
+        DIM oben AS INTEGER : oben = rahmenHi
+        DIM unten AS INTEGER : unten = rahmenLo
+        IF i = 2 THEN oben = rahmen : unten = rahmen
+        FOR x = i TO T - 1 - i
+            setz(x, i, oben) : setz(x, T - 1 - i, unten)
+        NEXT
+        FOR y = i TO T - 1 - i
+            setz(i, y, oben) : setz(T - 1 - i, y, unten)
+        NEXT
+    NEXT
+    ' Ecknieten (Goldstollen mit Glanzpunkt)
+    DIM nx AS ARRAY OF INTEGER : nx = [5, T - 6, 5, T - 6]
+    DIM ny AS ARRAY OF INTEGER : ny = [5, 5, T - 6, T - 6]
+    FOR i = 0 TO 3
+        flaeche(nx[i] - 1, ny[i] - 1, nx[i] + 1, ny[i] + 1, rahmenLo)
+        flaeche(nx[i] - 1, ny[i] - 1, nx[i], ny[i], niet)
+        setz(nx[i] - 1, ny[i] - 1, nietHi)
+    NEXT
+    ' Eingelassene Kartusche (Panel) in der Mitte, Ecken abgerundet
+    DIM x0 AS INTEGER : x0 = 8
+    DIM y0 AS INTEGER : y0 = 8
+    DIM x1 AS INTEGER : x1 = T - 9
+    DIM y1 AS INTEGER : y1 = T - 9
+    FOR y = y0 TO y1
+        FOR x = x0 TO x1
+            IF NOT ((x = x0 OR x = x1) AND (y = y0 OR y = y1)) THEN setz(x, y, feld)
+        NEXT
+    NEXT
+    FOR x = x0 TO x1
+        setz(x, y0, feldLo) : setz(x, y1, feldHi)
+    NEXT
+    FOR y = y0 TO y1
+        setz(x0, y, feldLo) : setz(x1, y, feldHi)
+    NEXT
+    ' auf dem Ziel: weicher tuerkiser Schein HINTER dem Ankh
+    IF aufZiel THEN
+        FOR y = y0 + 1 TO y1 - 1
+            FOR x = x0 + 1 TO x1 - 1
+                DIM d AS FLOAT : d = SQR((x - 16) * (x - 16) + (y - 14.5) * (y - 14.5))
+                IF d < 7.0 THEN setz(x, y, ankHi, INT(75 * (1 - d / 7.0)))
+            NEXT
+        NEXT
+    END IF
+    ' Tuerkis-Ankh + Glanzkante (auf dem Ziel heller)
+    DIM glanz AS INTEGER : glanz = ankHi
+    IF aufZiel THEN
+        ankh(16, 13, ankHi)
+        glanz = &HFFFFFF
+    ELSE
+        ankh(16, 13, ank)
+    END IF
+    setz(15, 13, glanz) : setz(15, 14, glanz)
+    IF aufZiel THEN
+        ' leuchtender Saum aussen + Eck-Funken
+        FOR x = 0 TO T - 1
+            setz(x, 0, nietHi, 235) : setz(x, T - 1, nietHi, 205)
+        NEXT
+        FOR y = 0 TO T - 1
+            setz(0, y, nietHi, 235) : setz(T - 1, y, nietHi, 205)
+        NEXT
+        setz(4, 3, &HFFFFFF) : setz(T - 5, 4, &HFFFFFF)
+        setz(3, T - 5, &HFFFFFF) : setz(T - 4, T - 4, &HFFFFFF)
+        sichern("crate_on.png")
+    ELSE
+        sichern("crate.png")
+    END IF
+END SUB
+
+' ============================================================ Held
+' Forscher: Lederjacke, Fedora, Satchel, Fackel
+CONST H_OUT = &H1A1008
+CONST H_HAT = &H784E28
+CONST H_HATLO = &H54341A
+CONST H_HATHI = &H986A3A
+CONST H_BAND = &H422A16
+CONST H_SKIN = &HE4AE7C
+CONST H_SKINLO = &HBA8256
+CONST H_JKT = &H7A502A
+CONST H_JKTHI = &H9C6C3C
+CONST H_JKTLO = &H56361C
+CONST H_SHIRT = &HD0B482
+CONST H_BELT = &H3E2A18
+CONST H_BUCKLE = &HE0B44C
+CONST H_PANT = &H604C32
+CONST H_PANTLO = &H423220
+CONST H_BOOT = &H382616
+CONST H_BAG = &H684422
+CONST H_BAGHI = &H8C6032
+CONST H_TW = &H684424
+CONST H_TWLO = &H4A2E18
+CONST H_FOUT = &HD64E16
+CONST H_FL = &HFF962C
+CONST H_FHI = &HFFE284
+CONST H_HAIR = &H3A2616
+
+SUB umriss(c AS INTEGER)
+    ' 4-Nachbar-Umriss: durchsichtige Punkte neben gedeckten werden dunkel --
+    ' gefragt wird das Bild VOR dem Umriss.
+    DIM b AS INTEGER : b = IMAGEWIDTH(bild)
+    DIM h AS INTEGER : h = IMAGEHEIGHT(bild)
+    DIM deck[b * h] AS INTEGER
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            deck[y * b + x] = GETALPHA(bild, x, y)
+        NEXT
+    NEXT
+    FOR y = 0 TO h - 1
+        FOR x = 0 TO b - 1
+            IF deck[y * b + x] = 0 THEN
+                DIM rand AS BOOLEAN : rand = FALSE
+                IF x + 1 < b THEN rand = rand OR deck[y * b + x + 1] > 0
+                IF x > 0 THEN rand = rand OR deck[y * b + x - 1] > 0
+                IF y + 1 < h THEN rand = rand OR deck[(y + 1) * b + x] > 0
+                IF y > 0 THEN rand = rand OR deck[(y - 1) * b + x] > 0
+                IF rand THEN setz(x, y, c)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION heldBild(blick AS INTEGER, schritt AS INTEGER) AS IMAGE
+    ' blick: 0 = unten, 1 = oben, 2 = rechts
+    bild = IMAGE_NEW(T, T)
+    DIM cx AS INTEGER : cx = 16
+    DIM vorn AS BOOLEAN : vorn = schritt = 0
+
+    ' ===== BEINE =====
+    DIM ll AS INTEGER : ll = 29
+    DIM rl AS INTEGER : rl = 29
+    IF vorn THEN ll = 30 ELSE rl = 30
+    flaeche(cx - 4, 24, cx - 1, ll, H_PANT)
+    flaeche(cx + 1, 24, cx + 4, rl, H_PANT)
+    flaeche(cx - 4, ll - 1, cx - 1, ll, H_BOOT)
+    flaeche(cx + 1, rl - 1, cx + 4, rl, H_BOOT)
+    setz(cx - 4, 24, H_PANTLO) : setz(cx + 4, 24, H_PANTLO)
+
+    ' ===== TORSO: Hemd + offene Lederjacke =====
+    flaeche(cx - 3, 14, cx + 2, 22, H_SHIRT)
+    flaeche(cx - 5, 14, cx - 3, 23, H_JKT)
+    flaeche(cx + 2, 14, cx + 4, 23, H_JKT)
+    flaeche(cx - 5, 14, cx + 4, 15, H_JKT)
+    flaeche(cx - 5, 14, cx - 5, 23, H_JKTHI)
+    flaeche(cx + 4, 14, cx + 4, 23, H_JKTLO)
+    ' Guertel + Schnalle
+    flaeche(cx - 5, 22, cx + 4, 23, H_BELT)
+    setz(cx - 1, 22, H_BUCKLE) : setz(cx, 22, H_BUCKLE) : setz(cx, 23, H_BUCKLE)
+    ' Satchel-Riemen diagonal + Tasche an der Huefte
+    DIM i AS INTEGER
+    FOR i = 0 TO 9
+        setz(cx - 5 + i, 14 + i, H_BAND)
+    NEXT
+    IF blick <> 1 THEN
+        flaeche(cx + 3, 19, cx + 5, 23, H_BAG)
+        setz(cx + 3, 19, H_BAGHI)
+    ELSE
+        flaeche(cx - 4, 17, cx + 3, 22, H_BAG)
+        flaeche(cx - 4, 17, cx + 3, 17, H_BAGHI)
+    END IF
+    ' Arme
+    flaeche(cx - 6, 15, cx - 5, 21, H_JKT)
+    setz(cx - 6, 15, H_JKTHI)
+
+    ' ===== FACKEL =====
+    IF blick <> 1 THEN
+        DIM tx AS INTEGER : tx = 22
+        flaeche(cx + 4, 16, cx + 6, 19, H_JKT)
+        flaeche(tx, 15, tx + 1, 23, H_TW)
+        setz(tx, 15, H_TWLO) : setz(tx + 1, 23, H_TWLO)
+        flaeche(tx - 1, 9, tx + 2, 14, H_FL)
+        setz(tx, 7, H_FL) : setz(tx, 6, H_FHI)
+        flaeche(tx, 8, tx + 1, 13, H_FHI)
+        setz(tx - 1, 13, H_FOUT) : setz(tx + 2, 13, H_FOUT) : setz(tx + 2, 11, H_FOUT)
+    ELSE
+        ' Rueckenansicht: Fackel hinterm Kopf, nur Schein
+        flaeche(cx + 5, 7, cx + 6, 12, H_TW)
+        setz(cx + 5, 7, H_FHI) : setz(cx + 6, 6, H_FL)
+    END IF
+
+    ' ===== KOPF =====
+    flaeche(cx - 4, 8, cx + 3, 13, H_SKIN)
+    flaeche(cx - 4, 8, cx + 3, 8, H_SKINLO)
+    flaeche(cx - 3, 13, cx + 2, 13, H_SKINLO)
+    IF blick = 0 THEN
+        setz(cx - 2, 10, H_OUT) : setz(cx + 1, 10, H_OUT)
+        setz(cx - 1, 12, H_SKINLO) : setz(cx, 12, H_SKINLO)
+    ELSEIF blick = 2 THEN
+        flaeche(cx - 4, 8, cx + 3, 13, H_SKIN)
+        setz(cx + 1, 10, H_OUT)
+        setz(cx + 4, 11, H_SKIN) : setz(cx + 4, 12, H_SKINLO)
+        flaeche(cx - 4, 9, cx - 3, 13, H_HAIR)
+    ELSE
+        flaeche(cx - 4, 9, cx + 3, 13, H_HAIR)
+    END IF
+
+    ' ===== HUT (Fedora) =====
+    flaeche(cx - 7, 6, cx + 6, 7, H_HAT)
+    flaeche(cx - 7, 7, cx + 6, 7, H_HATLO)
+    flaeche(cx - 4, 2, cx + 3, 6, H_HAT)
+    flaeche(cx - 3, 1, cx + 2, 1, H_HAT)
+    flaeche(cx - 4, 2, cx + 3, 2, H_HATHI)
+    flaeche(cx - 4, 5, cx + 3, 5, H_BAND)
+    setz(cx - 7, 6, H_HATLO) : setz(cx + 6, 6, H_HATLO)
+    IF blick = 0 THEN
+        setz(cx - 1, 8, H_HAT) : setz(cx, 8, H_HAT)
+    END IF
+    IF blick = 2 THEN
+        flaeche(cx + 4, 6, cx + 7, 7, H_HAT)
+        flaeche(cx - 7, 6, cx - 5, 7, H_HATLO)
+    END IF
+
+    umriss(H_OUT)
+    RETURN bild
+END FUNCTION
+
+SUB kopiere(von AS IMAGE, qx AS INTEGER, qy AS INTEGER, zx AS INTEGER, zy AS INTEGER, spiegeln AS BOOLEAN)
+    ' ein T x T-Feld Punkt fuer Punkt samt Deckkraft uebertragen
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            DIM a AS INTEGER : a = GETALPHA(von, qx + x, qy + y)
+            IF a > 0 THEN
+                DIM zielX AS INTEGER : zielX = zx + x
+                IF spiegeln THEN zielX = zx + T - 1 - x
+                setz(zielX, zy + y, GETPIXEL(von, qx + x, qy + y) BAND &HFFFFFF, a)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB held()
+    ' Sheet: 4 Reihen (unten, oben, rechts, links) x 2 Bilder -> 64x128
+    DIM kacheln[6] AS IMAGE
+    DIM bildNr AS INTEGER
+    DIM blick AS INTEGER
+    FOR bildNr = 0 TO 1
+        FOR blick = 0 TO 2
+            kacheln[bildNr * 3 + blick] = heldBild(blick, bildNr)
+        NEXT
+    NEXT
+    bild = IMAGE_NEW(2 * T, 4 * T)
+    FOR bildNr = 0 TO 1
+        FOR blick = 0 TO 2
+            kopiere(kacheln[bildNr * 3 + blick], 0, 0, bildNr * T, blick * T, FALSE)
+        NEXT
+        ' links = rechts gespiegelt: die ganze Reihe, also tauschen auch die Bilder
+        kopiere(kacheln[bildNr * 3 + 2], 0, 0, T - bildNr * T, 3 * T, TRUE)
+    NEXT
+    sichern("hero.png")
+END SUB
+
+' ============================================================ Truhe
+CONST TRUHE_GR = 48
+
+SUB truhe(offen AS BOOLEAN)
+    bild = IMAGE_NEW(TRUHE_GR, TRUHE_GR)
+    zufallStart(3)
+    DIM holz0 AS INTEGER : holz0 = farbe(150, 100, 50)
+    DIM holz1 AS INTEGER : holz1 = farbe(120, 78, 38)
+    DIM holz2 AS INTEGER : holz2 = farbe(96, 60, 28)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    ' Korpus
+    flaeche(6, 22, TRUHE_GR - 7, TRUHE_GR - 6, holz1)
+    FOR y = 22 TO TRUHE_GR - 6
+        FOR x = 6 TO TRUHE_GR - 7
+            setz(x, y, koernig(holz1, zufall(-7, 8)))
+        NEXT
+    NEXT
+    ' senkrechte Planken
+    FOR x = 6 TO TRUHE_GR - 7 STEP 7
+        FOR y = 22 TO TRUHE_GR - 6
+            setz(x, y, holz2)
+        NEXT
+    NEXT
+    ' Goldbeschlaege
+    flaeche(4, 22, 5, TRUHE_GR - 6, GOLD) : flaeche(TRUHE_GR - 6, 22, TRUHE_GR - 5, TRUHE_GR - 6, GOLD)
+    flaeche(4, TRUHE_GR - 6, TRUHE_GR - 5, TRUHE_GR - 5, GOLD_LO)
+    DIM bx AS INTEGER
+    FOR bx = 12 TO 36 STEP 12
+        flaeche(bx, 22, bx + 1, TRUHE_GR - 6, GOLD_HI)
+    NEXT
+    IF NOT offen THEN
+        ' Deckel
+        flaeche(5, 12, TRUHE_GR - 6, 23, holz0)
+        FOR x = 5 TO TRUHE_GR - 6
+            DIM yb AS INTEGER : yb = 12 - rund(3 * SIN((x - 5) / (TRUHE_GR - 10.0) * PI))
+            FOR y = yb TO 12
+                setz(x, y, holz0)
+                setz(x, yb, GOLD_HI)
+            NEXT
+        NEXT
+        flaeche(5, 18, TRUHE_GR - 6, 19, GOLD)
+        ' Schloss
+        flaeche(21, 17, 27, 24, GOLD_HI)
+        flaeche(23, 20, 25, 23, DARK)
+        sichern("chest_closed.png")
+    ELSE
+        ' offener Deckel nach hinten geklappt -> flacher Streifen oben
+        flaeche(5, 6, TRUHE_GR - 6, 12, holz0)
+        flaeche(5, 6, TRUHE_GR - 6, 6, GOLD_HI)
+        ' Goldglanz aus dem Inneren
+        flaeche(8, 16, TRUHE_GR - 9, 24, GOLD_HI)
+        FOR y = 16 TO 25
+            FOR x = 8 TO TRUHE_GR - 9
+                DIM d AS INTEGER : d = ABS(x - 24) + ABS(y - 20)
+                IF d < 14 THEN
+                    IF zufall(0, 100) < 70 THEN
+                        IF d < 7 THEN setz(x, y, FLAME_HI) ELSE setz(x, y, GOLD)
+                    END IF
+                END IF
+            NEXT
+        NEXT
+        ' ein paar Lichtstrahlen
+        FOR x = 10 TO TRUHE_GR - 9 STEP 3
+            setz(x, 14, FLAME_HI, 200)
+        NEXT
+        sichern("chest_open.png")
+    END IF
+END SUB
+
+' ============================================================ Stern
+CONST STERN_GR = 24
+
+SUB stern()
+    ' Weisser 5-Punkt-Stern mit dunklem Rand -> im Spiel gold/dunkel getoent.
+    bild = IMAGE_NEW(STERN_GR, STERN_GR)
+    DIM xs AS ARRAY OF FLOAT : xs = []
+    DIM ys AS ARRAY OF FLOAT : ys = []
+    DIM gross AS FLOAT : gross = STERN_GR * 0.46
+    DIM klein AS FLOAT : klein = gross * 0.42
+    DIM k AS INTEGER
+    FOR k = 0 TO 9
+        DIM wink AS FLOAT : wink = -PI / 2 + k * PI / 5
+        DIM rr AS FLOAT : rr = klein
+        IF k MOD 2 = 0 THEN rr = gross
+        ' Eckpunkte abgeschnitten: so liegt der Stern PILs Vieleck am naechsten
+        ' (17 Randpunkte anders; mit Kommazahlen 55, gerundet 81)
+        ARRAY_PUSH(xs, INT(STERN_GR / 2.0 + rr * COS(wink)))
+        ARRAY_PUSH(ys, INT(STERN_GR / 2.0 + rr * SIN(wink)))
+    NEXT
+    IMAGE_FILL_POLY(bild, xs, ys, &HFFFFFF, 255)
+    ARRAY_PUSH(xs, xs[0])
+    ARRAY_PUSH(ys, ys[0])
+    IMAGE_POLYLINE(bild, xs, ys, 1, &H22160C, 255)
+    sichern("star.png")
+END SUB
+
+' ============================================================ Boden-Varianten
+SUB grube()
+    ' Offenes Sand-Loch: dunkler Schlund mit Steinrand.
+    bild = IMAGE_NEW(T, T)
+    zufallStart(21)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            DIM d AS FLOAT : d = SQR((x - 15.5) * (x - 15.5) + (y - 15.5) * (y - 15.5))
+            IF d < 12.5 THEN
+                DIM t0 AS FLOAT : t0 = d / 12.5
+                setz(x, y, farbe(INT(8 + 40 * t0), INT(6 + 30 * t0), INT(4 + 18 * t0)))
+            ELSE
+                setz(x, y, koernig(SAND_MID, zufall(-8, 9)))
+            END IF
+        NEXT
+    NEXT
+    ' Steinrand (Lichtkante oben, Schatten innen)
+    DIM a AS INTEGER
+    FOR a = 0 TO 354 STEP 6
+        DIM bogen AS FLOAT : bogen = a * PI / 180.0
+        DIM rx AS INTEGER : rx = rund(16.0 - 0.5 + 12.5 * SIN(bogen))
+        DIM ry AS INTEGER : ry = rund(16.0 - 0.5 - 12.5 * COS(bogen))
+        IF ry < 16 THEN setz(rx, ry, SAND_HI) ELSE setz(rx, ry, STONE_LO)
+    NEXT
+    sichern("pit.png")
+END SUB
+
+SUB grubeVoll()
+    ' Gefuelltes Loch: Boden mit Schutt/Geroell.
+    bild = IMAGE_NEW(T, T)
+    zufallStart(22)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            setz(x, y, koernig(SAND_MID, zufall(-8, 9)))
+        NEXT
+    NEXT
+    ' Geroell-Brocken in der Mitte
+    DIM i AS INTEGER
+    FOR i = 1 TO 26
+        x = zufall(7, 25) : y = zufall(7, 25)
+        DIM s AS INTEGER : s = zufall(1, 3)
+        DIM f AS FLOAT : f = 0.8 + zufall(0, 40) / 100.0
+        flaeche(x, y, x + s, y + s, schatt(STONE_MID, f))
+    NEXT
+    sichern("pit_filled.png")
+END SUB
+
+SUB schalter()
+    ' Boden mit rundem Stein-Schalter + Tuerkis-Edelstein.
+    bild = IMAGE_NEW(T, T)
+    zufallStart(23)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            setz(x, y, koernig(SAND_MID, zufall(-8, 9)))
+        NEXT
+    NEXT
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            DIM d AS FLOAT : d = SQR((x - 15.5) * (x - 15.5) + (y - 15.5) * (y - 15.5))
+            IF d < 8 THEN
+                IF x + y < 30 THEN setz(x, y, schatt(STONE_MID, 1.1)) ELSE setz(x, y, schatt(STONE_MID, 0.85))
+            END IF
+            IF d < 4 THEN
+                IF d > 1.5 THEN setz(x, y, TEAL) ELSE setz(x, y, TEAL_HI)
+            END IF
+        NEXT
+    NEXT
+    ' Rand-Glanz
+    DIM a AS INTEGER
+    FOR a = 0 TO 352 STEP 8
+        DIM bogen AS FLOAT : bogen = a * PI / 180.0
+        DIM rx AS INTEGER : rx = rund(16.0 - 0.5 + 8 * SIN(bogen))
+        DIM ry AS INTEGER : ry = rund(16.0 - 0.5 - 8 * COS(bogen))
+        IF ry < 16 THEN setz(rx, ry, STONE_HI) ELSE setz(rx, ry, STONE_LO)
+    NEXT
+    sichern("button.png")
+END SUB
+
+SUB tuer(offen AS BOOLEAN)
+    bild = IMAGE_NEW(T, T)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    IF offen THEN
+        ' offener Durchgang: dunkle Oeffnung + Steinrahmen mit Gold
+        flaeche(0, 0, T - 1, T - 1, farbe(16, 12, 8))
+        flaeche(0, 0, 3, T - 1, STONE_MID) : flaeche(T - 4, 0, T - 1, T - 1, STONE_MID)
+        flaeche(0, 0, T - 1, 3, STONE_MID)
+        flaeche(1, 1, 2, T - 1, STONE_HI) : flaeche(1, 1, T - 1, 2, STONE_HI)
+        flaeche(4, 3, 5, T - 1, GOLD) : flaeche(T - 6, 3, T - 5, T - 1, GOLD)
+        flaeche(4, 3, T - 5, 4, GOLD)
+        ' Lichtschein aus dem Durchgang
+        FOR y = 5 TO T - 1
+            FOR x = 7 TO T - 7
+                IF (x + y) MOD 3 = 0 THEN setz(x, y, farbe(40, 30, 18))
+            NEXT
+        NEXT
+        sichern("door_open.png")
+    ELSE
+        ' geschlossene Steintuer mit Riegel
+        flaeche(0, 0, T - 1, T - 1, schatt(STONE_MID, 0.92))
+        FOR y = 0 TO T - 1
+            FOR x = 0 TO T - 1 STEP 8
+                setz(x, y, STONE_LO)
+            NEXT
+        NEXT
+        flaeche(0, 0, T - 1, 1, STONE_HI)
+        flaeche(0, 0, 1, T - 1, STONE_HI)
+        flaeche(0, T - 2, T - 1, T - 1, STONE_LO)
+        ' waagerechte Goldriegel
+        flaeche(2, 9, T - 3, 11, GOLD) : flaeche(2, 9, T - 3, 9, GOLD_HI)
+        flaeche(2, 21, T - 3, 23, GOLD) : flaeche(2, 21, T - 3, 21, GOLD_HI)
+        ' Schloss
+        flaeche(13, 13, 18, 19, GOLD_HI) : flaeche(15, 15, 16, 17, farbe(40, 28, 16))
+        sichern("door_closed.png")
+    END IF
+END SUB
+
+SUB eis()
+    ' Eisplatte: blasse blaue, glaenzende Flaeche mit Rissen.
+    bild = IMAGE_NEW(T, T)
+    zufallStart(24)
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO T - 1
+        FOR x = 0 TO T - 1
+            setz(x, y, koernig(ICE_MID, zufall(-6, 7)))
+        NEXT
+    NEXT
+    ' glaenzende Highlights (diagonale Streifen)
+    DIM versatz AS INTEGER
+    FOR versatz = -T TO T - 1 STEP 7
+        FOR y = 0 TO T - 1
+            setz(y + versatz, y, ICE_HI)
+        NEXT
+    NEXT
+    ' Risse
+    DIM i AS INTEGER
+    FOR i = 1 TO 3
+        x = zufall(6, 26) : y = zufall(4, 12)
+        DIM laenge AS INTEGER : laenge = zufall(6, 14)
+        DIM k AS INTEGER
+        FOR k = 1 TO laenge
+            setz(x, y, ICE_LO)
+            x = x + zufall(-1, 2) : y = y + 1
+            IF x < 0 OR x >= T OR y < 0 OR y >= T THEN BREAK
+        NEXT
+    NEXT
+    ' Rahmen leicht heller (Plattenkante)
+    FOR i = 0 TO T - 1
+        setz(i, 0, ICE_HI) : setz(0, i, ICE_HI)
+        setz(i, T - 1, ICE_LO) : setz(T - 1, i, ICE_LO)
+    NEXT
+    sichern("ice.png")
+END SUB
+
+' ============================================================ Licht-Maske
+CONST MASKE = 512
+
+SUB lichtmaske()
+    ' Fackel-Licht-Maske fuer den Dunkelmodus. Wird multiplikativ ueber die
+    ' Szene gezeichnet: der helle Kern laesst die Kacheln durch, der grosse
+    ' dunkle Rand dimmt alles ringsum fast schwarz.
+    bild = IMAGE_NEW(MASKE, MASKE)
+    DIM mitteXY AS FLOAT : mitteXY = MASKE / 2.0
+    DIM r0 AS FLOAT : r0 = MASKE * 0.066
+    DIM r1 AS FLOAT : r1 = MASKE * 0.30
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO MASKE - 1
+        ' Laeufe gleicher Farbe als ein Rechteck -- eine Viertelmillion
+        ' einzelne Punkte waeren unnoetig viele Aufrufe
+        DIM laufX AS INTEGER : laufX = 0
+        DIM laufFarbe AS INTEGER : laufFarbe = -1
+        FOR x = 0 TO MASKE - 1
+            DIM dx AS FLOAT : dx = x - mitteXY + 0.5
+            DIM dy AS FLOAT : dy = y - mitteXY + 0.5
+            DIM d AS FLOAT : d = SQR(dx * dx + dy * dy)
+            DIM v AS FLOAT
+            IF d <= r0 THEN
+                v = 1.0
+            ELSEIF d >= r1 THEN
+                v = 0.0
+            ELSE
+                DIM tt AS FLOAT : tt = (d - r0) / (r1 - r0)
+                v = 1.0 - (tt * tt * (3 - 2 * tt))
+            END IF
+            DIM c AS INTEGER : c = farbe(INT(20 + 235 * v), INT(15 + 233 * v), INT(10 + 225 * v))
+            IF c <> laufFarbe THEN
+                IF laufFarbe >= 0 THEN flaeche(laufX, y, x - 1, y, laufFarbe)
+                laufX = x
+                laufFarbe = c
+            END IF
+        NEXT
+        flaeche(laufX, y, MASKE - 1, y, laufFarbe)
+    NEXT
+    sichern("lightmask.png")
+END SUB
+
+PRINT "Pyramid Pusher -- erzeuge Pixel-Art ..."
+boden()
+wand()
+ziel()
+kiste(FALSE)
+kiste(TRUE)
+held()
+truhe(FALSE)
+truhe(TRUE)
+stern()
+grube()
+grubeVoll()
+schalter()
+tuer(FALSE)
+tuer(TRUE)
+eis()
+lichtmaske()
+PRINT "fertig."
