@@ -3025,7 +3025,32 @@ weicht an 17 Randpunkten ab -- mit abgeschnittenen Eckpunkten, mit Kommazahlen
 waren es 55. Eingecheckt ist nur der neue Stern, die uebrigen PNGs sind
 unveraendert. Test `tests/pruef/werkzeug_pyramid_art.dhtest` (alle 16 Bilder
 gegen die eingecheckten; die ersten Zuege zweier Startwerte gegen numpys Zahlen).
-Noch Python bei den Spielen: der Flask-`cloudserver`.
+**Cloud-Server (2026-09-15):** `cloudserver/server.dh` statt des
+Flask-`server.py` -- `httpd` + `db` + `json`, dieselben Pfade, Fehlercodes und
+dasselbe SQLite-Schema (eine vorhandene `cloud.db` laeuft weiter). **Die Luecke
+dabei: `httpd` konnte keine eigenen Kopfzeilen setzen**, die CORS-Freigabe fuer
+Spiele im Browser war also nicht nachzubauen. Neu `HTTPD_SET_HEADER(s, name$,
+wert$)` (httpd.rs `kopfzeile_setzen`/`kopf_text`, Rust-Test): gilt fuer JEDE
+folgende Antwort, nicht nur die naechste -- sonst muesste jede Antwortstelle
+daran denken; Zeilenumbruch im Wert ist ein Fehler (Kopfzeilen-Einschleusung),
+`Content-Type/Length/Connection` setzt `HTTPD_SEND` selbst. Zwei bewusste
+Abweichungen: `updated_at` ist ganzzahlig (`ZEIT_JETZT`, es gibt keine
+Unix-Kommazahl), und die CORS-Vorabfrage `OPTIONS` wird VOR der
+Schluesselpruefung beantwortet -- der Browser schickt dabei keinen `X-Api-Key`,
+die Flask-Fassung wies sie mit gesetztem Schluessel ab. Der Port geht als
+`PORT=...` per EPRINT hinaus (Port 0 = frei). Test
+`tests/pruef/werkzeug_cloudserver.dhtest` (5: alle Zusagen aus `test_server.py`
+und mehr gegen EINEN Server, offener Modus mit Warnung, CORS an Vorabfrage und
+Abweisung, das `cloud`-Modul Ende zu Ende, Neustart mit derselben Datenbank);
+Gegenprobe ohne Schluesselpruefung: 3 von 5 fallen, ohne die Kopfzeilen der
+CORS-Fall. `server.py`, `test_server.py` und `requirements.txt` sind geloescht.
+Damit laeuft bei den Spielen nichts mehr ueber Python. Im selben Zug
+`bench_dhrt.dh` statt `bench_dhrt.py` (Bestwert aus N Laeufen von `dhrt run`,
+Ausgabe in derselben Form; ohne `--dhrt` misst er die Laufzeit, die ihn
+ausfuehrt). Die Ausgabe des Kindes wird waehrend des Laufs geleert -- ein voller
+Puffer hielte es an und verfaelschte die Zeit. Test
+`tests/pruef/werkzeug_bench.dhtest` (Form der Ausgabe plus Fehlerlauf;
+Gegenprobe ohne Pruefung des Rueckgabewerts faellt).
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
