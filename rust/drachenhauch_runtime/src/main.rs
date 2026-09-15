@@ -372,6 +372,10 @@ fn main() -> ExitCode {
             std::env::set_var("DHRT_SCREENSHOT", &raw[3]);
             // Aus dem Blick: ein Bild zu machen soll nicht die Arbeit stoeren.
             std::env::set_var("DHRT_ABSEITS", "1");
+            // Nach dem Bild ENDEN: das Bildlimit wirkt sonst nur ueber
+            // QUITREQUESTED, und ein Programm mit `WHILE TRUE` liefe nach dem
+            // gesicherten Bild endlos weiter -- der Aufrufer wartet dann ewig.
+            std::env::set_var("DHRT_BILD_ENDE", "1");
             setze_programm_args(&raw);
             return run_main(&raw[2]);
         }

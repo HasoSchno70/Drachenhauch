@@ -5517,6 +5517,12 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             if self.frame_count >= mx {
                 self.write_screenshot(&path);
                 self.shot_taken = true;
+                // `dhrt bild`: das Bild ist gesichert, mehr war nicht verlangt.
+                // Ohne das liefe ein Programm, das nicht nach QUITREQUESTED
+                // fragt (`WHILE TRUE`), ueber das Bildlimit hinaus endlos weiter.
+                if std::env::var("DHRT_BILD_ENDE").is_ok() {
+                    std::process::exit(0);
+                }
             }
         }
         // Kontaktbogen: in festen Abstaenden aufnehmen, am Ende zusammensetzen.

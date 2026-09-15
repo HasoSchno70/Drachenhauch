@@ -1,0 +1,79 @@
+' `dhrt bild quelle.dh ziel.png [bilder]` -- ein Programm N Bilder lang laufen
+' lassen und das letzte als PNG sichern (bis 2026-09-15 in
+' tests/test_dhrt_werkzeuge.py). Das Fenster steht dabei ausserhalb des
+' Bildschirms, gesichert wird der Zeichenpuffer.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== bild sichert das letzte bild
+FUNCTION warten(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        aus = aus + teil
+        IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", CWD$() + "/p.dh", CWD$() + "/p.png", "20")
+DIM aus AS STRING : aus = warten(p)
+IF NOT FILEEXISTS("p.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "beendet "; NOT PROCESS_RUNNING(p); " rueckgabe "; PROCESS_CODE(p)
+--- datei p.dh
+SCREEN(200, 120, "P", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H203040)
+    BOX(20, 20, 180, 100, &HFF8800)
+    FLIP()
+WEND
+
+--- erwartet
+beendet TRUE rueckgabe 0
+--- bild p.png
+groesse 200 120
+100 60 #FF8800
+5 5 #203040
+
+=== bild endet auch ohne quitrequested
+' Das Bildlimit wirkt sonst nur ueber QUITREQUESTED: ein Programm mit
+' WHILE TRUE sicherte sein Bild und lief danach endlos weiter, und
+' buch-*/buch/shoot.dh wartete ewig. Die Zeitgrenze im Fall ist 30 s.
+FUNCTION warten(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 30000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        aus = aus + teil
+        IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "bild", CWD$() + "/endlos.dh", CWD$() + "/endlos.png", "10")
+DIM aus AS STRING : aus = warten(p)
+IF NOT FILEEXISTS("endlos.png") THEN
+    PRINT aus
+    PROCESS_KILL(p)
+    EXIT(1)
+END IF
+DIM laeuft AS BOOLEAN : laeuft = PROCESS_RUNNING(p)
+IF laeuft THEN PROCESS_KILL(p)
+PRINT "beendet "; NOT laeuft; " rueckgabe "; PROCESS_CODE(p)
+--- datei endlos.dh
+SCREEN(160, 100)
+WHILE TRUE
+    CLS(&H40A040)
+    FLIP()
+WEND
+
+--- erwartet
+beendet TRUE rueckgabe 0
+--- bild endlos.png
+groesse 160 100
+80 50 #40A040
