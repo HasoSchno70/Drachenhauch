@@ -130,7 +130,7 @@ und ueberhaupt nichts speichern.
 | `IMAGE_NEW(breite, hoehe [, farbe])` | IMAGE — ein neues Bild; **ohne Farbe vollstaendig durchsichtig** |
 | `IMAGE_CLEAR(bild [, x, y, b, h])` | einen Bereich vollstaendig durchsichtig machen — der Radierer; ohne Rechteck das ganze Bild |
 | `IMAGE_DRAW_IMAGE(ziel, quelle, x, y [, qx, qy, qb, qh] [, faerbung])` | ein Bild in ein anderes zeichnen, mit Deckkraft gemischt; wahlweise nur ein Ausschnitt der Quelle |
-| `IMAGE_SAVE(bild, pfad$)` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`) |
+| `IMAGE_SAVE(bild, pfad$ [, mit_alpha])` | das Bild in eine Datei schreiben (`.png`, `.bmp`, `.jpg`, `.tga`); mit `FALSE` ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes |
 | `GETALPHA(bild, x, y)` | Deckkraft eines Bildpunkts, 0..255; `-1` ausserhalb (core, kein IMPORT noetig) |
 | `IMAGE_FREE(bild)` | das Bild und seine Grafikspeicher-Textur freigeben |
 | `IMAGE_SAVE_GIF(bilder, pfad$ [, fps_oder_dauern [, wiederholen [, anzahl]]])` | mehrere Bilder als **bewegtes GIF** schreiben |

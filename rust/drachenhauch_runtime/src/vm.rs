@@ -8597,7 +8597,14 @@ optional dahinter (qx, qy, qb, qh) und eine Faerbung".into());
             }
             "getalpha" => Value::Int(g!().get_alpha(gi(a,0,"GETALPHA")?,
                 gi(a,1,"GETALPHA")? as i32, gi(a,2,"GETALPHA")? as i32)),
-            "image_save" => { g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?)?; Value::Nil }
+            "image_save" => {
+                let ohne_alpha = match a.get(2) {
+                    None => false,
+                    Some(Value::Bool(b)) => !*b,
+                    Some(_) => return Err("IMAGE_SAVE: drittes Argument ist ein Wahrheitswert (mit Deckkraft-Kanal?)".into()),
+                };
+                g!().image_save(gi(a,0,"IMAGE_SAVE")?, gs(a,1,"IMAGE_SAVE")?, ohne_alpha)?; Value::Nil
+            }
             "image_free" => { g!().image_free(gi(a,0,"IMAGE_FREE")?)?; Value::Nil }
             "image_save_gif" => {
                 // Die Bildnummern kommen als ARRAY OF IMAGE (so haelt ein
