@@ -568,7 +568,7 @@ VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.dh`-Dateien im 
 
 Startet der Editor ohne offene Datei, zeigt er ein **Welcome-Panel** (kein leerer Tab): Logo, Action-Buttons (Neu / Öffnen / Beispiele / Doku) und eine **Showcase-Galerie** — kuratierte Demos als anklickbare Karten mit echtem Screenshot-Thumbnail, Titel und Kurzbeschreibung (3D/PBR/IBL, Demoscene, Partikel, Platformer …). Klick auf eine Karte öffnet die Demo. Darunter die Liste der zuletzt geöffneten Dateien. Sobald eine Datei geöffnet oder ein neuer Tab angelegt wird, verschwindet das Welcome.
 
-Die Galerie-Liste ist die Single-Source-of-Truth in `drachenhauch/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `dhrt` headless — `DHRT_FRAMES` + `DHRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
+Die Galerie-Liste steht in `examples/showcase.json` (Datei, Titel, Beschreibung, Bildzahl) — dieselbe Liste zeigt die IDE in Drachenhauch auf ihrer Willkommensseite. Die Thumbnails liegen unter `examples/screenshots/` und werden mit `dhrt run tools/showcase_bilder.dh [-- name ...]` erzeugt (jede Demo läuft per `dhrt bild` die genannte Zahl Bilder, das letzte wird auf 480 Punkte Breite verkleinert und ohne Alphakanal gesichert). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
 
 ## Explorer: Beispiele nach Kategorie
 

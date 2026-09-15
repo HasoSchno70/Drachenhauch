@@ -77,7 +77,7 @@ Type: files; Name: "{autodesktop}\GameBasic.lnk"
 ;
 ; Der Beispielordner ist `uninsneveruninstall` (siehe oben) -- selbst
 ; bearbeitete Beispiele sollen ein Upgrade ueberleben. Sein Unterordner
-; `screenshots` ist dagegen reine ERZEUGUNG (tools/gen_showcase_thumbs.py);
+; `screenshots` ist dagegen reine ERZEUGUNG (tools/showcase_bilder.dh);
 ; dort legt niemand etwas Eigenes ab. Ohne dieses Aufraeumen bleibt jedes
 ; umbenannte oder entfallene Vorschaubild beim Nutzer fuer immer liegen --
 ; nachgemessen waren es nach wenigen Fassungen schon zwei
