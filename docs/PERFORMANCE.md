@@ -9,7 +9,7 @@
 
 ## dhrt-Optimierung 2026-06-11 (aktuell)
 
-Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_dhrt.py`
+Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_dhrt.py` (seit 2026-09-15 `bench_dhrt.dh`, `dhrt run bench_dhrt.dh`)
 (best-of-5, Prozess-Wandzeit `dhrt run`, Windows 11):
 
 | Bench | vorher | nachher | Speedup |

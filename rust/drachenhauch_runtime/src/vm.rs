@@ -3705,6 +3705,13 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "httpd_port" => { let i = bi_int(a, 0, "HTTPD_PORT")?; Value::Int(self.httpd_srv(i)?.port) }
+            "httpd_set_header" => {
+                let i = bi_int(a, 0, "HTTPD_SET_HEADER")?;
+                let n = bi_str(a, 1, "HTTPD_SET_HEADER")?.to_string();
+                let w = bi_str(a, 2, "HTTPD_SET_HEADER")?.to_string();
+                httpd::kopfzeile_setzen(self.httpd_srv(i)?, &n, &w)?;
+                Value::Nil
+            }
             "httpd_accept" => {
                 let i = bi_int(a, 0, "HTTPD_ACCEPT")?;
                 Value::Bool(httpd::annehmen(self.httpd_srv(i)?)?)
@@ -4045,7 +4052,7 @@ impl<'p> Vm<'p> {
     }
 
     // ===================================================================
-    // Modul cloud (Cloud-Save + Leaderboard gegen cloudserver/server.py, Feature `http`)
+    // Modul cloud (Cloud-Save + Leaderboard gegen cloudserver/server.dh, Feature `http`)
     // ===================================================================
     fn try_cloud(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("cloud_") || name.starts_with("leaderboard_")) { return Ok(None); }

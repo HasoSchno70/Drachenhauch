@@ -48,6 +48,12 @@ module.exports = (H) => [
       'HTTPD_SEND(s, 200, "text/html; charset=utf-8", "<h1>Hallo</h1>")',
       'HTTPD_SEND(s, 404, "text/plain; charset=utf-8", "nicht da")',
     ]),
+  H.cmd("HTTPD_SET_HEADER", "HTTPD_SET_HEADER(s, name$, wert$)",
+    "Setzt eine Kopfzeile für alle folgenden Antworten des Servers, nicht nur für die nächste – etwa die CORS-Freigabe, ohne die ein Spiel im Browser den Server nicht erreicht. Ein leerer Wert entfernt die Kopfzeile wieder; ein Zeilenumbruch im Wert ist ein Fehler.",
+    [
+      'HTTPD_SET_HEADER(s, "Access-Control-Allow-Origin", "*")',
+      'HTTPD_SET_HEADER(s, "Cache-Control", "no-store")',
+    ]),
   H.cmd("HTTPD_SEND_DIR", "HTTPD_SEND_DIR(s, ordner$[, start$])",
     "Liefert den angefragten Pfad aus einem Ordner aus: löst ihn innerhalb des Ordners auf, rät den Inhaltstyp aus der Endung und antwortet. Ein Pfad auf einen Ordner bekommt index.html (oder was als start$ dasteht). Eine fehlende Datei wird zu 404 und liefert FALSE – sie ist der Alltag eines Servers und darf das Programm nicht anhalten.",
     [

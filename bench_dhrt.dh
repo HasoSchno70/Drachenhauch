@@ -1,0 +1,94 @@
+' Benchmark-Laeufer fuer die Laufzeit dhrt.
+'
+' Misst die Wandzeit von `dhrt run <datei.dh>` (Prozess samt Uebersetzen und
+' Start; bei grossen Benches ueberwiegt die VM-Schleife). Bestwert aus N
+' Laeufen, gegen Rauschen.
+'
+'     dhrt run bench_dhrt.dh [-- datei.dh ...]          ' Vorgabe: examples/bench_*.dh
+'     dhrt run bench_dhrt.dh -- --dhrt pfad\zu\dhrt.exe  ' andere Exe (A/B-Vergleich)
+'     dhrt run bench_dhrt.dh -- --runs 7                ' Wiederholungen (Vorgabe 5)
+'
+' Ohne --dhrt misst er die Laufzeit, die ihn selbst ausfuehrt. Bis 2026-09-15
+' bench_dhrt.py; die Ausgabe hat dieselbe Form.
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+FUNCTION messen(exe AS STRING, datei AS STRING, laeufe AS INTEGER) AS FLOAT
+    ' Bestwert in ms; -1 bei einem Fehlerlauf (die Meldung steht dann schon da).
+    DIM best AS FLOAT : best = -1
+    DIM k AS INTEGER
+    FOR k = 1 TO laeufe
+        DIM t0 AS FLOAT : t0 = TIMER()
+        DIM p AS INTEGER : p = PROCESS_START(exe, "run", datei)
+        DIM fehlertext AS STRING : fehlertext = ""
+        ' Laufend leeren: ein voller Ausgabepuffer hielte das Kind an.
+        WHILE PROCESS_RUNNING(p)
+            DIM rest AS STRING : rest = PROCESS_READ$(p)
+            fehlertext = fehlertext + PROCESS_ERR$(p)
+            IF TIMER() - t0 > 600 THEN
+                PROCESS_KILL(p)
+                fehlertext = fehlertext + "Zeitgrenze 600 s"
+            END IF
+            SLEEP(1)
+        WEND
+        DIM dauer AS FLOAT : dauer = (TIMER() - t0) * 1000.0
+        ' Das Kind kann schon beendet sein, bevor sein Lesefaden die letzte
+        ' Zeile abgelegt hat -- ein paar leere Abfragen abwarten.
+        DIM leer AS INTEGER : leer = 0
+        WHILE leer < 5
+            DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+            IF teil = "" THEN leer = leer + 1 ELSE fehlertext = fehlertext + teil
+            SLEEP(10)
+        WEND
+        IF PROCESS_CODE(p) <> 0 THEN
+            PRINT "  FEHLER ("; BASENAME(datei); "): "; LEFT$(TRIM$(fehlertext), 200)
+            RETURN -1
+        END IF
+        IF best < 0 OR dauer < best THEN best = dauer
+    NEXT
+    RETURN best
+END FUNCTION
+
+DIM exe AS STRING : exe = "dhrt"
+DIM laeufe AS INTEGER : laeufe = 5
+DIM dateien AS ARRAY OF STRING : dateien = []
+DIM i AS INTEGER : i = 0
+WHILE i < ARGC()
+    IF ARG$(i) = "--dhrt" THEN
+        exe = vomAufrufer$(ARG$(i + 1))
+        i = i + 2
+    ELSEIF ARG$(i) = "--runs" THEN
+        laeufe = MAX(1, VAL(ARG$(i + 1)))
+        i = i + 2
+    ELSE
+        ARRAY_PUSH(dateien, vomAufrufer$(ARG$(i)))
+        i = i + 1
+    END IF
+WEND
+IF exe <> "dhrt" AND NOT FILEEXISTS(exe) THEN
+    PRINT "dhrt nicht gefunden: "; exe
+    EXIT(1)
+END IF
+IF LEN(dateien) = 0 THEN
+    DIM alle AS ARRAY OF STRING : alle = DIRLIST("examples")
+    SORT(alle)
+    FOR i = 0 TO LEN(alle) - 1
+        IF LEFT$(alle[i], 6) = "bench_" AND RIGHT$(alle[i], 3) = ".dh" THEN ARRAY_PUSH(dateien, CWD$() + "/examples/" + alle[i])
+    NEXT
+END IF
+
+IF exe = "dhrt" THEN PRINT "dhrt: (diese Laufzeit)" ELSE PRINT "dhrt: "; exe
+PRINT FORMAT$("Bench", "%-32s"); " "; FORMAT$("best-of-" + STR$(laeufe), "%12s")
+PRINT "-" * 46
+FOR i = 0 TO LEN(dateien) - 1
+    DIM ms AS FLOAT : ms = messen(exe, dateien[i], laeufe)
+    IF ms < 0 THEN
+        PRINT FORMAT$(BASENAME(dateien[i]), "%-32s"); " "; FORMAT$("nan", "%10s"); " ms"
+    ELSE
+        PRINT FORMAT$(BASENAME(dateien[i]), "%-32s"); " "; FORMAT$(ms, "%10.1f"); " ms"
+    END IF
+NEXT

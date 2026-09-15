@@ -2,19 +2,15 @@
 
 Ein minimaler, selbst hostbarer Server für das Drachenhauch-Modul `cloud`:
 Speicherstände in der Cloud ablegen und Highscore-Listen (Leaderboards)
-führen. Ein Flask-Prozess + eine SQLite-Datei — kein Account-System, keine
-externen Cloud-Dienste, nichts, was du nicht selbst kontrollierst.
+führen. Ein Drachenhauch-Programm + eine SQLite-Datei — kein Account-System,
+keine externen Cloud-Dienste, kein Python, nichts, was du nicht selbst
+kontrollierst.
 
 ## Schnellstart (lokal ausprobieren)
 
 ```
-cd cloudserver
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt      # Windows
-# source .venv/bin/activate && pip install -r requirements.txt   # Linux/macOS
-
 set GB_CLOUD_API_KEY=test-schluessel                # Windows (PowerShell: $env:GB_CLOUD_API_KEY="test-schluessel")
-.venv\Scripts\python server.py
+dhrt run cloudserver/server.dh
 ```
 
 Der Server läuft dann auf `http://localhost:8787`. In deinem Drachenhauch-Programm:
@@ -22,29 +18,34 @@ Der Server läuft dann auf `http://localhost:8787`. In deinem Drachenhauch-Progr
 ```basic
 IMPORT "cloud"
 CLOUD_CONFIGURE("http://localhost:8787", "test-schluessel")
-CLOUD_SAVE("spieler1", "{\"gold\": 1200}")
+CLOUD_SAVE("spieler1", !"{\"gold\": 1200}")
 PRINT CLOUD_LOAD("spieler1")
 ```
+
+Bis 2026-09-15 war der Server ein Flask-Programm (`server.py`). Pfade,
+Antworten, Fehlercodes und das Datenbankschema sind geblieben — eine
+vorhandene `cloud.db` läuft ohne Umbau weiter.
 
 ## Konfiguration (Umgebungsvariablen)
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
 | `GB_CLOUD_API_KEY` | *(leer)* | Geteiltes Secret, das Server und Spiel kennen. **Leer = kein Auth-Schutz** — nur für lokales Testen! |
-| `GB_CLOUD_DB` | `cloud.db` neben `server.py` | Pfad zur SQLite-Datei |
+| `GB_CLOUD_DB` | `cloud.db` neben `server.dh` | Pfad zur SQLite-Datei |
 | `GB_CLOUD_MAX_SAVE_BYTES` | `65536` | Maximale Größe eines einzelnen Save-Blobs |
 | `GB_CLOUD_HOST` | `0.0.0.0` | Bind-Adresse |
-| `GB_CLOUD_PORT` | `8787` | Port |
+| `GB_CLOUD_PORT` | `8787` | Port (`0` = freien Port wählen; der Server nennt ihn als `PORT=...` auf der Fehlerausgabe) |
 
 ## REST-API
 
-Alle Endpunkte außer `/health` erwarten den Header `X-Api-Key: <dein-secret>`.
+Alle Endpunkte außer `/health` (und der CORS-Vorabfrage `OPTIONS`) erwarten
+den Header `X-Api-Key: <dein-secret>`.
 
 | Methode | Pfad | Body | Antwort |
 |---|---|---|---|
 | GET | `/health` | — | `{"ok": true}` |
 | POST | `/save/<player_id>` | `{"data": "<string>"}` | `{"ok": true}` |
-| GET | `/save/<player_id>` | — | `{"data": "...", "updated_at": <unix-zeit>}` oder 404 |
+| GET | `/save/<player_id>` | — | `{"data": "...", "updated_at": <sekunden>}` oder 404 |
 | POST | `/leaderboard/<board>/submit` | `{"name": "...", "score": <zahl>[, "best": "high"\|"low"]}` | `{"ok": true, "updated": bool}` |
 | GET | `/leaderboard/<board>/top?n=10&order=desc` | — | `{"entries": [{"name": "...", "score": <zahl>}, ...]}` |
 
@@ -52,21 +53,28 @@ Alle Endpunkte außer `/health` erwarten den Header `X-Api-Key: <dein-secret>`.
 Ein Leaderboard-Eintrag ist **ein Highscore pro Name** — ein erneutes
 `submit` überschreibt ihn nur, wenn der neue Wert besser ist (`best: "high"`
 = größer gewinnt, Standard; `best: "low"` = kleiner gewinnt, z. B.
-Speedrun-Zeiten).
+Speedrun-Zeiten). `n` wird auf 1..200 begrenzt.
+
+Fehler kommen als JSON `{"error": "..."}`: `unauthorized` (401),
+`not_found` (404), `method_not_allowed` (405), `save_too_large` (413, mit
+`max_bytes`), sonst 400 mit `invalid_player_id`, `missing_data_field`,
+`invalid_board`, `invalid_name`, `invalid_score`, `invalid_best_mode`,
+`invalid_n` oder `invalid_order`.
+
+**Zwei Unterschiede zur Flask-Fassung:** `updated_at` ist eine ganze Zahl
+(Sekunden seit 1970, wie `ZEIT_JETZT()`) statt einer Kommazahl. Und die
+CORS-Vorabfrage (`OPTIONS`) wird vor der Schlüsselprüfung beantwortet — ein
+Browser schickt dabei keine eigenen Kopfzeilen mit, die Flask-Fassung wies
+sie mit gesetztem Schlüssel ab, und ein Spiel im Browser erreichte den
+Server nicht.
 
 ## Deployment (Produktion)
 
-`app.run()` (der Entwicklungs-Server in `server.py`) ist nicht für
-Produktionslast gedacht. Für einen echten Server:
-
-```
-# waitress ist schon in requirements.txt (funktioniert auch unter Windows)
-.venv\Scripts\waitress-serve --host=0.0.0.0 --port=8787 server:app
-```
-
-Auf Linux geht auch `gunicorn -w 2 -b 0.0.0.0:8787 server:app` (separat
-installieren). Für "immer erreichbar" einen Reverse-Proxy (nginx/Caddy) mit
-TLS davorsetzen und den Prozess per systemd/pm2/Docker am Laufen halten.
+Der Server bedient eine Anfrage nach der anderen (`httpd`-Modul, siehe
+[`docs/module-httpd.md`](../docs/module-httpd.md)) — für ein Hobby-Spiel
+mit einer Handvoll gleichzeitiger Spieler reicht das. Für "immer
+erreichbar" einen Reverse-Proxy (nginx/Caddy) mit TLS davorsetzen und den
+Prozess per systemd, Windows-Dienst oder Docker am Laufen halten.
 
 ## Sicherheitsmodell — bitte lesen
 
@@ -77,7 +85,8 @@ Das ist bewusst **minimal**, nicht enterprise-grade:
   angehängtem Bytecode ist das machbar), kann fremde Spielstände
   überschreiben und falsche Highscores einreichen. Für ein kleines
   Hobby-/Nischen-Spiel meist ein akzeptables Risiko; für ein Spiel mit
-  echtem kompetitivem Leaderboard nicht ausreichend.
+  echtem kompetitivem Leaderboard nicht ausreichend. Verglichen wird der
+  Schlüssel in konstanter Zeit (`SECURE_EQUALS`).
 - **Keine Rate-Limits** über die reine Payload-Größenbegrenzung hinaus —
   setz bei Bedarf einen Reverse-Proxy mit Rate-Limiting davor.
 - **`player_id` ist der Schlüssel, keine Authentifizierung** — wer die
@@ -85,9 +94,9 @@ Das ist bewusst **minimal**, nicht enterprise-grade:
   Save-Blob lesen/überschreiben. Für mehr Sicherheit einen langen,
   zufälligen `player_id` (z. B. eine beim ersten Start generierte UUID,
   lokal gespeichert) statt eines erratbaren Namens verwenden.
-- **HTTPS ist deine Aufgabe** — der Flask-Server selbst spricht nur HTTP.
-  Für alles außer localhost gehört TLS (Reverse-Proxy) davor, sonst geht
-  der API-Key im Klartext übers Netz.
+- **HTTPS ist deine Aufgabe** — der Server selbst spricht nur HTTP. Für
+  alles außer localhost gehört TLS (Reverse-Proxy) davor, sonst geht der
+  API-Key im Klartext übers Netz.
 
 Kurz: reicht locker für "meine Idle-Game-Fans sollen ihren Fortschritt
 zwischen Rechnern mitnehmen und sich in einer Bestenliste sehen können" —
@@ -97,10 +106,8 @@ ein Problem wäre.
 ## Tests
 
 ```
-cd cloudserver
-python -m venv .venv && .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python -m pytest test_server.py -v
+dhrt test tests/pruef/werkzeug_cloudserver.dhtest
 ```
 
-Nutzt Flasks Test-Client (kein echter Netzwerk-Server nötig) + eine
-temporäre SQLite-Datei pro Testlauf.
+Startet den Server als eigenen Prozess mit einer frischen SQLite-Datei je
+Fall und spricht über HTTP mit ihm — auch über das `cloud`-Modul selbst.
