@@ -15,7 +15,7 @@ build pipeline.
 
 - Build instructions & full outline (German): [`buch/OUTLINE.md`](buch/OUTLINE.md)
 - Build: `cd buch && node build_book.js` → `Drachenhauch-Lehrbuch.docx`. With correct
-  table-of-contents page numbers: `python make_book.py`.
+  table-of-contents page numbers: `dhrt run tools/buch_bauen.dh -- buch-referenz`.
 
 ## Table of contents (translated)
 

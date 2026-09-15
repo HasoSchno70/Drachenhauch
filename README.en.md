@@ -106,7 +106,7 @@ Both languages come out of the **same** chapter sources (`content/NN_*.js`): the
 ```
 node build_book.js [--lang en]        # -> .docx (A4, for printing)
 node build_epub.js [--lang en]        # -> .epub (reflows to the reader's font size, dark mode)
-<venv>\python.exe make_book.py [--lang en]   # two-pass build with page numbers in the TOC
+dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # two-pass build with page numbers in the TOC
 ```
 
 One thing stays German on purpose: the run-time error messages quoted in Appendix D. `dhrt` prints them in German, and an English message in the book would be one the reader never sees.

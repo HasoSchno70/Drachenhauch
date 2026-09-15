@@ -108,7 +108,7 @@ Beide Sprachen entstehen aus **denselben** Kapitelquellen (`content/NN_*.js`): d
 ```
 node build_book.js [--lang en]        # -> .docx (A4, zum Drucken)
 node build_epub.js [--lang en]        # -> .epub (fließt in die Schriftgröße des Lesers, Nachtmodus)
-<venv>\python.exe make_book.py [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
+dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]   # Zwei-Pass-Build mit Seitenzahlen im Inhalt
 ```
 
 ## Handbuch

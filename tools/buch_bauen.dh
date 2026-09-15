@@ -1,0 +1,779 @@
+' Zwei-Pass-Bau der Buecher mit Seitenzahlen im Inhaltsverzeichnis.
+'
+'     dhrt run tools/buch_bauen.dh -- buch-referenz [--lang de|en]
+'     dhrt run tools/buch_bauen.dh -- buch-einstieg
+'     dhrt run tools/buch_bauen.dh -- buch-galaga
+'     dhrt run tools/buch_bauen.dh -- buch-tippspiel
+'     dhrt run tools/buch_bauen.dh -- buch-referenz --nur-messen   ' vorhandenes PDF messen
+'     dhrt run tools/buch_bauen.dh -- buch-einstieg --nur-bilder   ' nur images/ druckfertig
+'
+' Pass 1:  node build_book.js  -> .docx (Verzeichnis noch ohne Zahlen) + toc_titles
+'          -> LibreOffice rendert ein PDF -> Seite je Ueberschrift messen
+'          -> toc_pages schreiben
+' Pass 2:  node build_book.js  -> .docx mit eingetragenen Seitenzahlen
+'          -> LibreOffice rendert das PDF noch einmal (auf demselben Stand)
+'
+' Bis 2026-09-15 je Buch ein make_book.py mit PyMuPDF und PIL. Das PDF liest
+' dieses Werkzeug selbst: Objekte, Seitenbaum, Ressourcen, ToUnicode-Tabellen
+' und die Textbefehle samt Schriftgroesse (`Tf`). Referenz- und Einstiegsbuch
+' messen genau (die Ueberschrift als Textstueck mit Schriftgroesse >= 15,
+' monoton vorwaerts, sonst die erste Seite mit dem Text), Galaga und Tippspiel
+' einfach (erste Seite ab Seite 3, auf der der Text steht).
+'
+' Die Zwei-Pass-Dateien haengen an der SPRACHE: gemessen wird ueber den
+' Ueberschriften-Text, deutsche Seitenzahlen sind im englischen Buch wertlos.
+IMPORT "json"
+IMPORT "imgfx"
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+' ============================================================ PDF lesen
+DIM pdfB AS BUFFER
+DIM pdfObj AS MAP OF INTEGER          ' Objektnummer -> Anfang des Inhalts
+DIM fontGeladen AS MAP OF BOOLEAN     ' Schriftobjekt -> Tabelle gelesen
+DIM fontBreite AS MAP OF INTEGER      ' Schriftobjekt -> Bytes je Zeichen
+DIM fontZeichen AS MAP OF STRING      ' "objekt:code" -> Zeichen
+DIM seitenObj AS ARRAY OF INTEGER
+DIM seitenRes AS ARRAY OF STRING
+' Textstuecke aller Seiten: je Stueck Seite, Schriftgroesse, Text
+DIM stSeite AS ARRAY OF INTEGER
+DIM stGroesse AS ARRAY OF FLOAT
+DIM stText AS ARRAY OF STRING
+DIM seitenText AS ARRAY OF STRING
+
+FUNCTION istZiffer(b AS INTEGER) AS BOOLEAN
+    RETURN b >= 48 AND b <= 57
+END FUNCTION
+
+SUB pdfLaden(pfad AS STRING)
+    pdfB = READALL_BYTES(pfad)
+    pdfObj = {}
+    fontGeladen = {}
+    fontBreite = {}
+    fontZeichen = {}
+    seitenObj = []
+    seitenRes = []
+    stSeite = []
+    stGroesse = []
+    stText = []
+    seitenText = []
+    DIM nadel AS BUFFER : nadel = BUFFER_FROM_STRING(" 0 obj")
+    DIM n AS INTEGER : n = BUFFER_LEN(pdfB)
+    DIM p AS INTEGER : p = BUFFER_INDEXOF(pdfB, nadel, 0)
+    WHILE p >= 0
+        DIM a AS INTEGER : a = p - 1
+        WHILE a >= 0
+            IF NOT istZiffer(BUFFER_GET(pdfB, a)) THEN BREAK
+            a = a - 1
+        WEND
+        ' Nur am Zeilenanfang und mit Umbruch dahinter: dieselben Bytes koennen
+        ' zufaellig mitten in einem gepackten Strom stehen.
+        DIM davor AS INTEGER : davor = 10
+        IF a >= 0 THEN davor = BUFFER_GET(pdfB, a)
+        DIM danach AS INTEGER : danach = 0
+        IF p + 6 < n THEN danach = BUFFER_GET(pdfB, p + 6)
+        IF a + 1 < p AND (davor = 10 OR davor = 13) AND (danach = 10 OR danach = 13 OR danach = 60) THEN
+            MAPPUT(pdfObj, BUFFER_TO_STRING$(BUFFER_SLICE(pdfB, a + 1, p)), p + 6)
+        END IF
+        p = BUFFER_INDEXOF(pdfB, nadel, p + 6)
+    WEND
+END SUB
+
+FUNCTION objKopf$(nr AS INTEGER) AS STRING
+    IF NOT MAPHAS(pdfObj, STR$(nr)) THEN RETURN ""
+    DIM ab AS INTEGER : ab = MAPGET(pdfObj, STR$(nr))
+    DIM bis AS INTEGER : bis = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("endobj"), ab)
+    IF bis < 0 THEN bis = BUFFER_LEN(pdfB)
+    DIM s AS INTEGER : s = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("stream"), ab)
+    IF s >= 0 AND s < bis THEN bis = s
+    ' Einheitliche Schreibweise: "/Type /Pages" wie "/Type/Pages".
+    RETURN REPLACE$(BUFFER_TO_STRING$(BUFFER_SLICE(pdfB, ab, bis)), "/Type /", "/Type/")
+END FUNCTION
+
+FUNCTION fuehrendeZahl(s AS STRING) AS INTEGER
+    DIM t AS STRING : t = TRIM$(s)
+    DIM z AS STRING : z = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i < LEN(t)
+        IF INSTR("0123456789", MID$(t, i, 1)) < 0 THEN BREAK
+        z = z + MID$(t, i, 1)
+        i = i + 1
+    WEND
+    IF z = "" THEN RETURN -1
+    RETURN VAL(z)
+END FUNCTION
+
+FUNCTION nach$(kopf AS STRING, schluessel AS STRING) AS STRING
+    ' Was hinter dem Schluessel steht (ab dem naechsten Zeichen), "" ohne ihn.
+    ' Der Schluessel darf nicht Anfang eines laengeren Namens sein.
+    DIM ab AS INTEGER : ab = 0
+    WHILE TRUE
+        DIM p AS INTEGER : p = INSTR(MID$(kopf, ab, LEN(kopf)), schluessel)
+        IF p < 0 THEN RETURN ""
+        p = ab + p + LEN(schluessel)
+        DIM c AS STRING : c = MID$(kopf, p, 1)
+        IF c = "" OR INSTR(" /<[(" + CHR$(10) + CHR$(13) + "0123456789", c) >= 0 THEN RETURN MID$(kopf, p, LEN(kopf))
+        ab = p
+    WEND
+    RETURN ""
+END FUNCTION
+
+FUNCTION referenz(kopf AS STRING, schluessel AS STRING) AS INTEGER
+    ' "/Contents 14 0 R" -> 14; -1 wenn der Wert keine Referenz ist.
+    DIM rest AS STRING : rest = TRIM$(nach$(kopf, schluessel))
+    DIM nr AS INTEGER : nr = fuehrendeZahl(rest)
+    IF nr < 0 THEN RETURN -1
+    DIM r2 AS STRING : r2 = TRIM$(MID$(rest, LEN(STR$(nr)), LEN(rest)))
+    IF LEFT$(r2, 1) = "0" AND LEFT$(TRIM$(MID$(r2, 1, LEN(r2))), 1) = "R" THEN RETURN nr
+    RETURN -1
+END FUNCTION
+
+FUNCTION klammer$(text AS STRING, ab AS INTEGER) AS STRING
+    ' Das Woerterbuch, das bei `ab` mit "<<" beginnt, samt Klammern.
+    DIM tiefe AS INTEGER : tiefe = 0
+    DIM i AS INTEGER : i = ab
+    WHILE i < LEN(text) - 1
+        IF MID$(text, i, 2) = "<<" THEN
+            tiefe = tiefe + 1
+            i = i + 2
+        ELSEIF MID$(text, i, 2) = ">>" THEN
+            tiefe = tiefe - 1
+            i = i + 2
+            IF tiefe = 0 THEN RETURN MID$(text, ab, i - ab)
+        ELSE
+            i = i + 1
+        END IF
+    WEND
+    RETURN MID$(text, ab, LEN(text))
+END FUNCTION
+
+FUNCTION woerterbuch$(kopf AS STRING, schluessel AS STRING) AS STRING
+    ' Wert eines Schluessels als Woerterbuch-Text: eingebettet oder referenziert.
+    DIM r AS INTEGER : r = referenz(kopf, schluessel)
+    IF r >= 0 THEN RETURN objKopf$(r)
+    DIM rest AS STRING : rest = nach$(kopf, schluessel)
+    DIM p AS INTEGER : p = INSTR(rest, "<<")
+    IF p < 0 THEN RETURN ""
+    RETURN klammer$(rest, p)
+END FUNCTION
+
+FUNCTION objStrom(nr AS INTEGER) AS BUFFER
+    DIM kopf AS STRING : kopf = objKopf$(nr)
+    DIM ab AS INTEGER : ab = MAPGET(pdfObj, STR$(nr))
+    DIM s AS INTEGER : s = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("stream"), ab) + 6
+    IF BUFFER_GET(pdfB, s) = 13 THEN s = s + 1
+    IF BUFFER_GET(pdfB, s) = 10 THEN s = s + 1
+    DIM laenge AS INTEGER : laenge = -1
+    DIM lr AS INTEGER : lr = referenz(kopf, "/Length")
+    IF lr >= 0 THEN
+        laenge = fuehrendeZahl(objKopf$(lr))
+    ELSE
+        laenge = fuehrendeZahl(nach$(kopf, "/Length"))
+    END IF
+    DIM e AS INTEGER
+    IF laenge >= 0 THEN
+        e = s + laenge
+    ELSE
+        e = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("endstream"), s)
+        IF BUFFER_GET(pdfB, e - 1) = 10 THEN e = e - 1
+        IF BUFFER_GET(pdfB, e - 1) = 13 THEN e = e - 1
+    END IF
+    DIM roh AS BUFFER : roh = BUFFER_SLICE(pdfB, s, e)
+    IF INSTR(kopf, "/FlateDecode") >= 0 THEN RETURN BUFFER_INFLATE(roh)
+    RETURN roh
+END FUNCTION
+
+SUB seitenSammeln(nr AS INTEGER, geerbt AS STRING)
+    DIM kopf AS STRING : kopf = objKopf$(nr)
+    DIM res AS STRING : res = geerbt
+    IF INSTR(kopf, "/Resources") >= 0 THEN res = woerterbuch$(kopf, "/Resources")
+    IF INSTR(kopf, "/Type/Pages") >= 0 THEN
+        DIM kids AS STRING : kids = nach$(kopf, "/Kids")
+        kids = MID$(kids, INSTR(kids, "[") + 1, LEN(kids))
+        kids = LEFT$(kids, INSTR(kids, "]"))
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(kids, "R")
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(teile) - 1
+            DIM k AS INTEGER : k = fuehrendeZahl(teile[i])
+            IF k >= 0 THEN seitenSammeln(k, res)
+        NEXT
+    ELSE
+        ARRAY_PUSH(seitenObj, nr)
+        ARRAY_PUSH(seitenRes, res)
+    END IF
+END SUB
+
+FUNCTION hexZahl(h AS STRING) AS INTEGER
+    DIM v AS INTEGER : v = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(h) - 1
+        DIM d AS INTEGER : d = INSTR("0123456789ABCDEF", UPPER$(MID$(h, i, 1)))
+        IF d >= 0 THEN v = v * 16 + d
+    NEXT
+    RETURN v
+END FUNCTION
+
+FUNCTION utf16$(h AS STRING) AS STRING
+    DIM r AS STRING : r = ""
+    DIM i AS INTEGER : i = 0
+    WHILE i + 4 <= LEN(h)
+        DIM c AS INTEGER : c = hexZahl(MID$(h, i, 4))
+        i = i + 4
+        IF c >= &HD800 AND c < &HDC00 AND i + 4 <= LEN(h) THEN
+            c = &H10000 + (c - &HD800) * 1024 + (hexZahl(MID$(h, i, 4)) - &HDC00)
+            i = i + 4
+        END IF
+        r = r + CHR$(c)
+    WEND
+    RETURN r
+END FUNCTION
+
+SUB schriftLaden(fnr AS INTEGER)
+    IF MAPHAS(fontGeladen, STR$(fnr)) THEN RETURN
+    MAPPUT(fontGeladen, STR$(fnr), TRUE)
+    MAPPUT(fontBreite, STR$(fnr), 1)
+    DIM kopf AS STRING : kopf = objKopf$(fnr)
+    IF INSTR(kopf, "/Type0") >= 0 THEN MAPPUT(fontBreite, STR$(fnr), 2)
+    DIM tu AS INTEGER : tu = referenz(kopf, "/ToUnicode")
+    IF tu < 0 THEN RETURN
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(BUFFER_TO_STRING$(objStrom(tu)), CHR$(13), ""), CHR$(10))
+    DIM art AS STRING : art = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = TRIM$(zeilen[i])
+        IF RIGHT$(z, 19) = "begincodespacerange" THEN
+            art = "raum"
+        ELSEIF RIGHT$(z, 11) = "beginbfchar" THEN
+            art = "char"
+        ELSEIF RIGHT$(z, 12) = "beginbfrange" THEN
+            art = "range"
+        ELSEIF LEFT$(z, 3) = "end" THEN
+            art = ""
+        ELSEIF art <> "" AND LEFT$(z, 1) = "<" THEN
+            DIM w AS ARRAY OF STRING : w = []
+            DIM stueck AS ARRAY OF STRING : stueck = SPLIT$(REPLACE$(REPLACE$(REPLACE$(REPLACE$(z, "[", " "), "]", " "), "<", " "), ">", " "), " ")
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(stueck) - 1
+                IF stueck[k] <> "" THEN ARRAY_PUSH(w, stueck[k])
+            NEXT
+            IF art = "raum" AND LEN(w) >= 1 THEN
+                MAPPUT(fontBreite, STR$(fnr), MAX(1, LEN(w[0]) \ 2))
+            ELSEIF art = "char" AND LEN(w) >= 2 THEN
+                MAPPUT(fontZeichen, STR$(fnr) + ":" + STR$(hexZahl(w[0])), utf16$(w[1]))
+            ELSEIF art = "range" AND LEN(w) >= 3 THEN
+                DIM von AS INTEGER : von = hexZahl(w[0])
+                DIM g AS INTEGER
+                FOR g = von TO hexZahl(w[1])
+                    IF LEN(w) > 3 AND g - von + 2 < LEN(w) THEN
+                        MAPPUT(fontZeichen, STR$(fnr) + ":" + STR$(g), utf16$(w[g - von + 2]))
+                    ELSE
+                        MAPPUT(fontZeichen, STR$(fnr) + ":" + STR$(g), CHR$(hexZahl(w[2]) + g - von))
+                    END IF
+                NEXT
+            END IF
+        END IF
+    NEXT
+END SUB
+
+' --- Textbefehle einer Seite -------------------------------------------------
+DIM tsFont AS INTEGER
+DIM tsGroesse AS FLOAT
+DIM tsText AS STRING
+DIM tsSeite AS INTEGER
+DIM tsGanz AS STRING
+
+SUB stueckAbschliessen()
+    IF TRIM$(tsText) <> "" THEN
+        ARRAY_PUSH(stSeite, tsSeite)
+        ARRAY_PUSH(stGroesse, tsGroesse)
+        ARRAY_PUSH(stText, tsText)
+        tsGanz = tsGanz + " " + tsText
+    END IF
+    tsText = ""
+END SUB
+
+SUB zeichenAnhaengen(codes AS ARRAY OF INTEGER)
+    IF LEN(codes) = 0 THEN RETURN
+    DIM breite AS INTEGER : breite = 1
+    IF MAPHAS(fontBreite, STR$(tsFont)) THEN breite = MAPGET(fontBreite, STR$(tsFont))
+    DIM tabelle AS BOOLEAN : tabelle = MAPHAS(fontZeichen, STR$(tsFont) + ":" + STR$(codes[0]))
+    DIM q AS INTEGER : q = 0
+    WHILE q + breite <= LEN(codes)
+        DIM c AS INTEGER : c = codes[q]
+        IF breite = 2 THEN c = codes[q] * 256 + codes[q + 1]
+        DIM schl AS STRING : schl = STR$(tsFont) + ":" + STR$(c)
+        IF MAPHAS(fontZeichen, schl) THEN
+            tsText = tsText + MAPGET(fontZeichen, schl)
+        ELSEIF breite = 1 AND c >= 32 THEN
+            tsText = tsText + CHR$(c)
+        END IF
+        q = q + breite
+    WEND
+END SUB
+
+SUB seiteLesen(s AS INTEGER)
+    tsSeite = s
+    tsText = ""
+    tsGanz = ""
+    tsGroesse = 0
+    tsFont = -1
+    ' Schriftnamen der Seite -> Schriftobjekt
+    DIM namen AS MAP OF INTEGER
+    DIM fonts AS STRING : fonts = woerterbuch$(seitenRes[s], "/Font")
+    DIM stuecke AS ARRAY OF STRING : stuecke = SPLIT$(REPLACE$(REPLACE$(fonts, "<<", ""), ">>", ""), "/")
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(stuecke) - 1
+        DIM st AS STRING : st = TRIM$(stuecke[k])
+        DIM leer AS INTEGER : leer = INSTR(st, " ")
+        IF leer > 0 THEN
+            DIM fnr AS INTEGER : fnr = fuehrendeZahl(MID$(st, leer + 1, LEN(st)))
+            IF fnr >= 0 THEN
+                MAPPUT(namen, LEFT$(st, leer), fnr)
+                schriftLaden(fnr)
+            END IF
+        END IF
+    NEXT
+    ' Inhalt: eine Referenz oder ein Feld von Referenzen
+    DIM kopf AS STRING : kopf = objKopf$(seitenObj[s])
+    DIM inhalt AS BUFFER : inhalt = BUFFER_NEW(0)
+    DIM c1 AS INTEGER : c1 = referenz(kopf, "/Contents")
+    IF c1 >= 0 THEN
+        inhalt = objStrom(c1)
+    ELSE
+        DIM feld AS STRING : feld = nach$(kopf, "/Contents")
+        feld = MID$(feld, INSTR(feld, "[") + 1, LEN(feld))
+        feld = LEFT$(feld, INSTR(feld, "]"))
+        DIM refs AS ARRAY OF STRING : refs = SPLIT$(feld, "R")
+        FOR k = 0 TO LEN(refs) - 1
+            IF fuehrendeZahl(refs[k]) >= 0 THEN inhalt = BUFFER_CONCAT(inhalt, BUFFER_CONCAT(objStrom(fuehrendeZahl(refs[k])), BUFFER_FROM_STRING(CHR$(10))))
+        NEXT
+    END IF
+    ' Zerlegen: Operanden sammeln, beim Operator auswerten
+    DIM n AS INTEGER : n = BUFFER_LEN(inhalt)
+    DIM j AS INTEGER : j = 0
+    DIM letzteZahl AS FLOAT : letzteZahl = 0
+    DIM letzterName AS STRING : letzterName = ""
+    DIM codes AS ARRAY OF INTEGER : codes = []
+    WHILE j < n
+        DIM b AS INTEGER : b = BUFFER_GET(inhalt, j)
+        IF b <= 32 THEN
+            j = j + 1
+        ELSEIF b = 37 THEN
+            WHILE j < n AND BUFFER_GET(inhalt, j) <> 10 AND BUFFER_GET(inhalt, j) <> 13
+                j = j + 1
+            WEND
+        ELSEIF b = 47 THEN
+            DIM nm AS STRING : nm = ""
+            j = j + 1
+            WHILE j < n
+                DIM bn AS INTEGER : bn = BUFFER_GET(inhalt, j)
+                IF bn <= 32 OR bn = 47 OR bn = 40 OR bn = 91 OR bn = 60 OR bn = 93 OR bn = 62 THEN BREAK
+                nm = nm + CHR$(bn)
+                j = j + 1
+            WEND
+            letzterName = nm
+        ELSEIF b = 40 THEN
+            j = j + 1
+            DIM tiefe AS INTEGER : tiefe = 1
+            WHILE j < n
+                DIM c AS INTEGER : c = BUFFER_GET(inhalt, j)
+                IF c = 92 AND j + 1 < n THEN
+                    j = j + 1
+                    DIM e AS INTEGER : e = BUFFER_GET(inhalt, j)
+                    IF e >= 48 AND e <= 55 THEN
+                        DIM okt AS INTEGER : okt = 0
+                        DIM stellen AS INTEGER : stellen = 0
+                        WHILE stellen < 3 AND j < n
+                            IF BUFFER_GET(inhalt, j) < 48 OR BUFFER_GET(inhalt, j) > 55 THEN BREAK
+                            okt = okt * 8 + BUFFER_GET(inhalt, j) - 48
+                            j = j + 1
+                            stellen = stellen + 1
+                        WEND
+                        j = j - 1
+                        ARRAY_PUSH(codes, okt BAND 255)
+                    ELSEIF e = 110 THEN
+                        ARRAY_PUSH(codes, 10)
+                    ELSEIF e = 114 THEN
+                        ARRAY_PUSH(codes, 13)
+                    ELSEIF e = 116 THEN
+                        ARRAY_PUSH(codes, 9)
+                    ELSEIF e = 98 THEN
+                        ARRAY_PUSH(codes, 8)
+                    ELSEIF e = 102 THEN
+                        ARRAY_PUSH(codes, 12)
+                    ELSEIF e = 10 OR e = 13 THEN
+                        ' Zeilenfortsetzung
+                    ELSE
+                        ARRAY_PUSH(codes, e)
+                    END IF
+                ELSEIF c = 40 THEN
+                    tiefe = tiefe + 1
+                    ARRAY_PUSH(codes, c)
+                ELSEIF c = 41 THEN
+                    tiefe = tiefe - 1
+                    IF tiefe = 0 THEN BREAK
+                    ARRAY_PUSH(codes, c)
+                ELSE
+                    ARRAY_PUSH(codes, c)
+                END IF
+                j = j + 1
+            WEND
+            j = j + 1
+        ELSEIF b = 60 AND j + 1 < n AND BUFFER_GET(inhalt, j + 1) = 60 THEN
+            j = j + 2
+        ELSEIF b = 62 AND j + 1 < n AND BUFFER_GET(inhalt, j + 1) = 62 THEN
+            j = j + 2
+        ELSEIF b = 60 THEN
+            j = j + 1
+            DIM hx AS STRING : hx = ""
+            WHILE j < n AND BUFFER_GET(inhalt, j) <> 62
+                IF BUFFER_GET(inhalt, j) > 32 THEN hx = hx + CHR$(BUFFER_GET(inhalt, j))
+                j = j + 1
+            WEND
+            j = j + 1
+            IF LEN(hx) MOD 2 = 1 THEN hx = hx + "0"
+            DIM h AS INTEGER : h = 0
+            WHILE h < LEN(hx)
+                ARRAY_PUSH(codes, hexZahl(MID$(hx, h, 2)))
+                h = h + 2
+            WEND
+        ELSEIF b = 91 OR b = 93 THEN
+            j = j + 1
+        ELSEIF istZiffer(b) OR b = 45 OR b = 43 OR b = 46 THEN
+            DIM zt AS STRING : zt = ""
+            WHILE j < n
+                DIM bz AS INTEGER : bz = BUFFER_GET(inhalt, j)
+                IF NOT (istZiffer(bz) OR bz = 45 OR bz = 43 OR bz = 46) THEN BREAK
+                zt = zt + CHR$(bz)
+                j = j + 1
+            WEND
+            letzteZahl = VAL(zt)
+        ELSE
+            DIM op AS STRING : op = ""
+            WHILE j < n
+                DIM bo AS INTEGER : bo = BUFFER_GET(inhalt, j)
+                IF bo <= 32 OR bo = 47 OR bo = 40 OR bo = 91 OR bo = 60 OR bo = 93 OR bo = 37 THEN BREAK
+                op = op + CHR$(bo)
+                j = j + 1
+            WEND
+            IF op = "" THEN j = j + 1
+            IF op = "Tf" THEN
+                DIM neuFont AS INTEGER : neuFont = -1
+                IF MAPHAS(namen, letzterName) THEN neuFont = MAPGET(namen, letzterName)
+                IF letzteZahl <> tsGroesse THEN stueckAbschliessen()
+                tsGroesse = letzteZahl
+                tsFont = neuFont
+            ELSEIF op = "BT" OR op = "ET" OR op = "Td" OR op = "TD" OR op = "Tm" OR op = "T*" THEN
+                stueckAbschliessen()
+            ELSEIF op = "Tj" OR op = "TJ" THEN
+                zeichenAnhaengen(codes)
+            ELSEIF op = "'" OR op = CHR$(34) THEN
+                stueckAbschliessen()
+                zeichenAnhaengen(codes)
+            ELSEIF op = "BI" THEN
+                ' Eingebettetes Bild: bis "EI" ueberspringen
+                DIM ei AS INTEGER : ei = BUFFER_INDEXOF(inhalt, BUFFER_FROM_STRING("EI"), j)
+                IF ei < 0 THEN j = n ELSE j = ei + 2
+            END IF
+            codes = []
+        END IF
+    WEND
+    stueckAbschliessen()
+    ARRAY_PUSH(seitenText, tsGanz)
+END SUB
+
+SUB pdfLesen(pfad AS STRING)
+    pdfLaden(pfad)
+    ' Wurzel ueber den Anhang: "/Root N 0 R"
+    DIM rp AS INTEGER : rp = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("/Root"), 0)
+    DIM letzte AS INTEGER : letzte = rp
+    WHILE rp >= 0
+        letzte = rp
+        rp = BUFFER_INDEXOF(pdfB, BUFFER_FROM_STRING("/Root"), rp + 5)
+    WEND
+    IF letzte < 0 THEN THROW "PDF ohne /Root: " + pfad
+    DIM wurzel AS INTEGER : wurzel = fuehrendeZahl(BUFFER_TO_STRING$(BUFFER_SLICE(pdfB, letzte + 5, MIN(letzte + 30, BUFFER_LEN(pdfB)))))
+    seitenSammeln(referenz(objKopf$(wurzel), "/Pages"), "")
+    DIM s AS INTEGER
+    FOR s = 0 TO LEN(seitenObj) - 1
+        seiteLesen(s)
+    NEXT
+END SUB
+
+' ============================================================ Messen
+FUNCTION gefaltet$(t AS STRING) AS STRING
+    ' Wie eine Textsuche im Betrachter: Gross/klein egal, Leerraum zaehlt einmal.
+    DIM r AS STRING : r = UPPER$(REPLACE$(REPLACE$(REPLACE$(t, CHR$(9), " "), CHR$(10), " "), CHR$(13), " "))
+    WHILE INSTR(r, "  ") >= 0
+        r = REPLACE$(r, "  ", " ")
+    WEND
+    RETURN TRIM$(r)
+END FUNCTION
+
+DIM stAb AS ARRAY OF INTEGER          ' erstes Textstueck je Seite
+
+FUNCTION ueberschriftAuf(s AS INTEGER, titel AS STRING) AS BOOLEAN
+    DIM i AS INTEGER : i = stAb[s]
+    WHILE i < LEN(stSeite)
+        IF stSeite[i] <> s THEN BREAK
+        IF stGroesse[i] >= 15 AND INSTR(stText[i], titel) >= 0 THEN RETURN TRUE
+        i = i + 1
+    WEND
+    RETURN FALSE
+END FUNCTION
+
+' ============================================================ Ablauf
+DIM buch AS STRING : buch = ""
+DIM sprache AS STRING : sprache = "de"
+DIM nurMessen AS BOOLEAN : nurMessen = FALSE
+DIM nurBilder AS BOOLEAN : nurBilder = FALSE
+DIM i AS INTEGER : i = 0
+WHILE i < ARGC()
+    IF ARG$(i) = "--lang" THEN
+        sprache = ARG$(i + 1)
+        i = i + 2
+    ELSEIF ARG$(i) = "--nur-messen" THEN
+        nurMessen = TRUE
+        i = i + 1
+    ELSEIF ARG$(i) = "--nur-bilder" THEN
+        nurBilder = TRUE
+        i = i + 1
+    ELSE
+        buch = vomAufrufer$(ARG$(i))
+        i = i + 1
+    END IF
+WEND
+IF buch = "" THEN
+    PRINT "Aufruf: dhrt run tools/buch_bauen.dh -- <buchordner> [--lang de|en] [--nur-messen]"
+    EXIT(2)
+END IF
+DIM name AS STRING : name = BASENAME(buch)
+IF name = "buch" THEN name = BASENAME(DIRNAME(buch))
+IF BASENAME(buch) <> "buch" THEN buch = buch + "/buch"
+
+' Je Buch: Dateiname, ob es Sprachen hat, ob genau gemessen wird
+DIM basis AS STRING : basis = ""
+DIM mitSprache AS BOOLEAN : mitSprache = TRUE
+DIM genau AS BOOLEAN : genau = TRUE
+SELECT CASE name
+    CASE "buch-referenz"
+        IF sprache = "de" THEN basis = "Drachenhauch-Lehrbuch"
+        IF sprache = "en" THEN basis = "Drachenhauch-Handbook"
+    CASE "buch-einstieg"
+        IF sprache = "de" THEN basis = "Drachenhauch-Einstieg"
+    CASE "buch-galaga"
+        basis = "Drachenhauch-Buch" : mitSprache = FALSE : genau = FALSE
+    CASE "buch-tippspiel"
+        basis = "Drachenhauch-Tippspiel" : mitSprache = FALSE : genau = FALSE
+    CASE ELSE
+        PRINT "Unbekanntes Buch: "; name; " (buch-referenz, buch-einstieg, buch-galaga, buch-tippspiel)"
+        EXIT(2)
+END SELECT
+IF basis = "" THEN
+    PRINT "Unbekannte Sprache fuer "; name; ": "; sprache
+    EXIT(2)
+END IF
+DIM docx AS STRING : docx = buch + "/" + basis + ".docx"
+DIM pdf AS STRING : pdf = buch + "/" + basis + ".pdf"
+DIM titelDatei AS STRING : titelDatei = buch + "/toc_titles.json"
+DIM seitenDatei AS STRING : seitenDatei = buch + "/toc_pages.json"
+IF mitSprache THEN
+    titelDatei = buch + "/toc_titles." + sprache + ".json"
+    seitenDatei = buch + "/toc_pages." + sprache + ".json"
+END IF
+DIM soffice AS STRING : soffice = GETENV$("SOFFICE", "C:\Program Files\LibreOffice\program\soffice.exe")
+
+FUNCTION warten(p AS INTEGER) AS INTEGER
+    ' Ausgabe des Kindes durchreichen; liefert den Rueckgabewert.
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" THEN PRINT a;
+        IF e <> "" THEN EPRINT(e)
+        IF a = "" AND e = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(30)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+
+SUB bauen()
+    CHDIR(buch)
+    DIM p AS INTEGER
+    IF mitSprache THEN
+        p = PROCESS_START("node", "build_book.js", "--lang", sprache)
+    ELSE
+        p = PROCESS_START("node", "build_book.js")
+    END IF
+    IF warten(p) <> 0 THEN
+        EPRINT("node build_book.js ist fehlgeschlagen")
+        EXIT(1)
+    END IF
+END SUB
+
+FUNCTION rendern() AS BOOLEAN
+    ' PDF ohne Verkleinerung der Bilder (volle 300+ dpi fuer den Druck).
+    IF NOT FILEEXISTS(soffice) AND INSTR(soffice, CHR$(92)) >= 0 THEN RETURN FALSE
+    CHDIR(buch)
+    DIM filter AS STRING : filter = "pdf"
+    IF genau THEN filter = "pdf:writer_pdf_Export:{""ReduceImageResolution"":{""type"":""boolean"",""value"":false}}"
+    DIM p AS INTEGER : p = PROCESS_START(soffice, "--headless", "--convert-to", filter, "--outdir", buch, docx)
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF a = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(100)
+    WEND
+    IF PROCESS_CODE(p) <> 0 THEN
+        EPRINT("LibreOffice ist fehlgeschlagen")
+        EXIT(1)
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+SUB bilderVorbereiten()
+    ' Druckdienste verlangen: KEINE Transparenz und Bilder um 300 dpi. Alpha
+    ' auf Weiss legen (-> RGB) und ganzzahlig hochskalieren, bis das Bild
+    ' mindestens 1500 Punkte breit ist. Bereits aufbereitete Bilder (RGB,
+    ' mindestens 1400 breit) bleiben unberuehrt.
+    DIM ordner AS STRING : ordner = buch + "/images"
+    IF NOT DIREXISTS(ordner) THEN RETURN
+    DIM alle AS ARRAY OF STRING : alle = DIRLIST(ordner)
+    SORT(alle)
+    DIM geaendert AS INTEGER : geaendert = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(alle) - 1
+        IF LOWER$(RIGHT$(alle[k], 4)) <> ".png" THEN CONTINUE
+        DIM pfad AS STRING : pfad = ordner + "/" + alle[k]
+        DIM kopf AS BUFFER : kopf = READALL_BYTES(pfad)
+        IF BUFFER_LEN(kopf) < 26 THEN CONTINUE
+        DIM breite AS INTEGER : breite = ((BUFFER_GET(kopf, 16) * 256 + BUFFER_GET(kopf, 17)) * 256 + BUFFER_GET(kopf, 18)) * 256 + BUFFER_GET(kopf, 19)
+        DIM farbart AS INTEGER : farbart = BUFFER_GET(kopf, 25)
+        IF farbart = 2 AND breite >= 1400 THEN CONTINUE
+        DIM bild AS IMAGE : bild = LOADIMAGE(pfad)
+        DIM flach AS IMAGE : flach = IMAGE_NEW(IMAGEWIDTH(bild), IMAGEHEIGHT(bild), &HFFFFFF)
+        IMAGE_DRAW_IMAGE(flach, bild, 0, 0)
+        IF breite < 1400 THEN
+            DIM faktor AS INTEGER : faktor = (1500 + IMAGEWIDTH(flach) - 1) \ IMAGEWIDTH(flach)
+            flach = IMAGE_SCALE_NN(flach, IMAGEWIDTH(flach) * faktor, IMAGEHEIGHT(flach) * faktor)
+        END IF
+        IMAGE_SAVE(flach, pfad, FALSE)
+        geaendert = geaendert + 1
+    NEXT
+    IF geaendert > 0 THEN PRINT "Bilder druckfertig gemacht: "; geaendert; " (Alpha flach -> RGB; kleine zusaetzlich hochskaliert)"
+END SUB
+
+FUNCTION jsonText$(s AS STRING) AS STRING
+    DIM a AS JSON_HANDLE : a = JSON_NEW_ARRAY()
+    JSON_APPEND_STRING(a, "", s)
+    DIM t AS STRING : t = JSON_STRINGIFY(a)
+    RETURN MID$(t, 1, LEN(t) - 2)
+END FUNCTION
+
+SUB messen()
+    DIM roh AS STRING : roh = JOIN$(READLINES(titelDatei), CHR$(10))
+    DIM h AS JSON_HANDLE : h = JSON_PARSE("{""t"":" + roh + "}")
+    DIM titel AS ARRAY OF STRING : titel = []
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(h, "t") - 1
+        ARRAY_PUSH(titel, JSON_GET_STRING(h, "t." + STR$(k)))
+    NEXT
+    pdfLesen(pdf)
+    DIM anzahlSeiten AS INTEGER : anzahlSeiten = LEN(seitenObj)
+    stAb = []
+    DIM s AS INTEGER
+    DIM zeiger AS INTEGER : zeiger = 0
+    FOR s = 0 TO anzahlSeiten - 1
+        WHILE zeiger < LEN(stSeite)
+            IF stSeite[zeiger] >= s THEN BREAK
+            zeiger = zeiger + 1
+        WEND
+        ARRAY_PUSH(stAb, zeiger)
+    NEXT
+    DIM gefaltetSeiten AS ARRAY OF STRING : gefaltetSeiten = []
+    FOR s = 0 TO anzahlSeiten - 1
+        ARRAY_PUSH(gefaltetSeiten, gefaltet$(seitenText[s]))
+    NEXT
+    DIM seiteVon AS MAP OF INTEGER
+    DIM reihenfolge AS ARRAY OF STRING : reihenfolge = []
+    DIM fehlend AS ARRAY OF STRING : fehlend = []
+    DIM start AS INTEGER : start = 2
+    DIM hoechste AS INTEGER : hoechste = 0
+    FOR k = 0 TO LEN(titel) - 1
+        DIM t AS STRING : t = titel[k]
+        DIM gesucht AS STRING : gesucht = gefaltet$(t)
+        DIM gefunden AS INTEGER : gefunden = -1
+        IF genau THEN
+            ' Titel stehen in Lese-Reihenfolge: monoton vorwaerts, damit eine
+            ' fruehere Erwaehnung im Fliesstext nicht gewinnt.
+            FOR s = start TO anzahlSeiten - 1
+                IF ueberschriftAuf(s, t) THEN
+                    gefunden = s
+                    BREAK
+                END IF
+            NEXT
+            IF gefunden < 0 THEN
+                FOR s = start TO anzahlSeiten - 1
+                    IF INSTR(gefaltetSeiten[s], gesucht) >= 0 THEN
+                        gefunden = s
+                        BREAK
+                    END IF
+                NEXT
+            END IF
+            IF gefunden >= 0 THEN start = gefunden
+        ELSE
+            FOR s = 2 TO anzahlSeiten - 1
+                IF INSTR(gefaltetSeiten[s], gesucht) >= 0 THEN
+                    gefunden = s
+                    BREAK
+                END IF
+            NEXT
+        END IF
+        IF gefunden >= 0 THEN
+            IF NOT MAPHAS(seiteVon, t) THEN ARRAY_PUSH(reihenfolge, t)
+            MAPPUT(seiteVon, t, gefunden + 1)
+            hoechste = MAX(hoechste, gefunden + 1)
+        ELSE
+            ARRAY_PUSH(fehlend, t)
+        END IF
+    NEXT
+    ' Schreiben wie json.dump(..., ensure_ascii=False, indent=2)
+    DIM text AS STRING : text = "{}"
+    IF LEN(reihenfolge) > 0 THEN
+        DIM teile AS ARRAY OF STRING : teile = []
+        FOR k = 0 TO LEN(reihenfolge) - 1
+            ARRAY_PUSH(teile, CHR$(10) + "  " + jsonText$(reihenfolge[k]) + ": " + STR$(MAPGET(seiteVon, reihenfolge[k])))
+        NEXT
+        text = "{" + JOIN$(teile, ",") + CHR$(10) + "}"
+    END IF
+    WRITEALL(seitenDatei, text)
+    IF LEN(fehlend) > 0 THEN EPRINT("WARN: keine Seite gefunden fuer: " + JOIN$(fehlend, " | "))
+    DIM kennung AS STRING : kennung = ""
+    IF mitSprache THEN kennung = "[" + sprache + "] "
+    PRINT kennung; "Inhaltsverzeichnis-Seiten gemessen: "; LEN(reihenfolge); " / "; LEN(titel); " -- Buch hat "; anzahlSeiten; " Seiten"
+END SUB
+
+IF nurMessen THEN
+    messen()
+    EXIT(0)
+END IF
+IF nurBilder THEN
+    bilderVorbereiten()
+    EXIT(0)
+END IF
+IF genau THEN bilderVorbereiten()
+PRINT "Pass 1: Dokument bauen ..."
+bauen()
+IF NOT rendern() THEN
+    PRINT "LibreOffice nicht gefunden -- Verzeichnis bleibt ohne Seitenzahlen."
+    EXIT(0)
+END IF
+messen()
+PRINT "Pass 2: Dokument mit Seitenzahlen bauen ..."
+bauen()
+DIM zweites AS BOOLEAN : zweites = rendern()
+PRINT "Fertig: "; BASENAME(docx)

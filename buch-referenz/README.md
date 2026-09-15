@@ -12,7 +12,7 @@ grauen Kasten mit blauer Leiste), Programm-Ausgabe im grünen Kasten.
 - Quelle & Build-Anleitung: [`buch/OUTLINE.md`](buch/OUTLINE.md) (Gliederung +
   Fortschritt + Architektur).
 - Bauen: `cd buch && node build_book.js` → `Drachenhauch-Lehrbuch.docx`.
-  Mit korrekten Inhaltsverzeichnis-Seitenzahlen: `python make_book.py`.
+  Mit korrekten Inhaltsverzeichnis-Seitenzahlen: `dhrt run tools/buch_bauen.dh -- buch-referenz`.
 - Inhalt liegt modular in `buch/content/NN_*.js` – neues Kapitel = neue Datei.
 
 Das Buch schließt mit **Teil VI — Eine Demo bauen**: zwei Kapitel, die die
