@@ -1,5 +1,5 @@
 //! Modul `cloud`: Cloud-Save + Leaderboard gegen den mitgelieferten
-//! Referenz-Server (`cloudserver/server.py`, REST+JSON). HTTP via `ureq`
+//! Referenz-Server (`cloudserver/server.dh`, REST+JSON). HTTP via `ureq`
 //! (wie html.rs), Feature `http`. Kein eigener State hier -- die VM haelt
 //! Basis-URL/API-Key/letzte Fehlermeldung/Leaderboard-Ergebnisse
 //! (`vm.rs`, analog zu db_conns/db_results).

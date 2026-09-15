@@ -1,0 +1,293 @@
+' Minimaler Cloud-Save- + Leaderboard-Server fuer Drachenhauch (Modul `cloud`).
+'
+' Ein Programm + eine SQLite-Datei. Zwei Ressourcen:
+'
+'   - Save-Blobs:   ein beliebiger String pro player_id (z.B. JSON aus dem
+'                   json-Modul), komplett ueberschrieben bei jedem Speichern.
+'   - Leaderboards: benannte Bestenlisten (board), ein Highscore pro Name.
+'
+' Auth ist ein einziges geteiltes API-Key-Secret (Kopfzeile `X-Api-Key`), das
+' Server und Spiel gemeinsam kennen -- kein Pro-Spieler-Login. Das reicht, um
+' zufaellige Bots draussen zu halten, schuetzt aber NICHT vor einem Spieler,
+' der seinen eigenen (im Spiel eingebetteten) Key extrahiert. Siehe README.md,
+' "Sicherheitsmodell".
+'
+'     set GB_CLOUD_API_KEY=dein-geheimes-schluesselwort
+'     dhrt run cloudserver/server.dh
+'
+' Bis 2026-09-15 server.py (Flask). Pfade, Antworten, Fehlercodes und das
+' Datenbankschema sind dieselben -- eine vorhandene cloud.db laeuft weiter.
+' Zwei Unterschiede: `updated_at` ist eine ganze Zahl (Sekunden, ZEIT_JETZT)
+' statt einer Kommazahl, und eine CORS-Vorabfrage (OPTIONS) wird VOR der
+' Schluesselpruefung beantwortet -- der Browser schickt dabei keine eigenen
+' Kopfzeilen mit, der Flask-Server wies sie mit gesetztem Schluessel ab.
+IMPORT "httpd"
+IMPORT "db"
+IMPORT "json"
+IMPORT "regex"
+IMPORT "zeit"
+
+DIM cloudDbPfad AS STRING : cloudDbPfad = GETENV$("GB_CLOUD_DB", "cloud.db")
+DIM cloudSchluessel AS STRING : cloudSchluessel = GETENV$("GB_CLOUD_API_KEY", "")
+DIM cloudMaxBytes AS INTEGER : cloudMaxBytes = VAL(GETENV$("GB_CLOUD_MAX_SAVE_BYTES", "65536"))
+DIM cloudHost AS STRING : cloudHost = GETENV$("GB_CLOUD_HOST", "0.0.0.0")
+DIM cloudPort AS INTEGER : cloudPort = VAL(GETENV$("GB_CLOUD_PORT", "8787"))
+CONST CLOUD_MAX_TOP = 200
+' player_id / board / name: konservativ begrenzt. Sie landen nur als
+' SQL-Parameter, aber eine Laengen-/Zeichengrenze haelt kaputte oder
+' absichtlich riesige Anfragen fern.
+CONST CLOUD_ID_MUSTER = "^[A-Za-z0-9_\-\.]{1,128}$"
+
+DIM cloudDb AS DB_CONN
+DIM cloudSrv AS HTTPD
+
+FUNCTION gueltigeId(s AS STRING) AS BOOLEAN
+    RETURN REGEX_TEST(s, CLOUD_ID_MUSTER)
+END FUNCTION
+
+SUB datenbankAnlegen()
+    cloudDb = DB_OPEN(cloudDbPfad)
+    DB_EXEC(cloudDb, "CREATE TABLE IF NOT EXISTS saves (player_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at REAL NOT NULL)")
+    DB_EXEC(cloudDb, "CREATE TABLE IF NOT EXISTS scores (board TEXT NOT NULL, name TEXT NOT NULL, score REAL NOT NULL, updated_at REAL NOT NULL, PRIMARY KEY (board, name))")
+    DB_EXEC(cloudDb, "CREATE INDEX IF NOT EXISTS idx_scores_board_score ON scores(board, score DESC)")
+END SUB
+
+' ------------------------------------------------------------ Antworten
+SUB senden(code AS INTEGER, inhalt AS JSON_HANDLE)
+    HTTPD_SEND(cloudSrv, code, "application/json", JSON_STRINGIFY(inhalt))
+END SUB
+
+SUB fehler(code AS INTEGER, was AS STRING)
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "error", was)
+    senden(code, h)
+END SUB
+
+SUB okAntwort()
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_BOOL(h, "ok", TRUE)
+    senden(200, h)
+END SUB
+
+FUNCTION rumpfJson() AS JSON_HANDLE
+    ' Wie request.get_json(silent=True) or {}: was kein JSON-Objekt ist,
+    ' zaehlt als leeres Objekt.
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    TRY
+        DIM p AS JSON_HANDLE : p = JSON_PARSE(HTTPD_BODY$(cloudSrv))
+        IF JSON_TYPE(p, "") = "object" THEN h = p
+    CATCH
+    END TRY
+    RETURN h
+END FUNCTION
+
+FUNCTION feldArt$(h AS JSON_HANDLE, feld AS STRING) AS STRING
+    IF NOT JSON_HAS(h, feld) THEN RETURN "missing"
+    RETURN JSON_TYPE(h, feld)
+END FUNCTION
+
+' ------------------------------------------------------------ Save-Blobs
+SUB speichern(spieler AS STRING)
+    IF NOT gueltigeId(spieler) THEN
+        fehler(400, "invalid_player_id")
+        RETURN
+    END IF
+    DIM b AS JSON_HANDLE : b = rumpfJson()
+    IF feldArt$(b, "data") <> "string" THEN
+        fehler(400, "missing_data_field")
+        RETURN
+    END IF
+    DIM inhalt AS STRING : inhalt = JSON_GET_STRING(b, "data")
+    IF BUFFER_LEN(BUFFER_FROM_STRING(inhalt)) > cloudMaxBytes THEN
+        DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+        JSON_SET_STRING(h, "error", "save_too_large")
+        JSON_SET_INT(h, "max_bytes", cloudMaxBytes)
+        senden(413, h)
+        RETURN
+    END IF
+    DB_EXEC(cloudDb, "INSERT INTO saves(player_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(player_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at", spieler, inhalt, ZEIT_JETZT() * 1.0)
+    okAntwort()
+END SUB
+
+SUB laden(spieler AS STRING)
+    IF NOT gueltigeId(spieler) THEN
+        fehler(400, "invalid_player_id")
+        RETURN
+    END IF
+    DIM r AS DB_RESULT : r = DB_QUERY(cloudDb, "SELECT data, updated_at FROM saves WHERE player_id = ?", spieler)
+    IF NOT DB_NEXT(r) THEN
+        DB_CLOSE_RESULT(r)
+        fehler(404, "not_found")
+        RETURN
+    END IF
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_STRING(h, "data", DB_GET_STRING(r, 0))
+    JSON_SET_INT(h, "updated_at", INT(DB_GET_FLOAT(r, 1)))
+    DB_CLOSE_RESULT(r)
+    senden(200, h)
+END SUB
+
+' ------------------------------------------------------------ Leaderboards
+SUB einreichen(brett AS STRING)
+    IF NOT gueltigeId(brett) THEN
+        fehler(400, "invalid_board")
+        RETURN
+    END IF
+    DIM b AS JSON_HANDLE : b = rumpfJson()
+    IF feldArt$(b, "name") <> "string" THEN
+        fehler(400, "invalid_name")
+        RETURN
+    END IF
+    DIM wer AS STRING : wer = JSON_GET_STRING(b, "name")
+    IF NOT gueltigeId(wer) THEN
+        fehler(400, "invalid_name")
+        RETURN
+    END IF
+    ' JSON kennt Zahl und Wahrheitswert getrennt -- TRUE ist kein Punktestand.
+    IF feldArt$(b, "score") <> "number" THEN
+        fehler(400, "invalid_score")
+        RETURN
+    END IF
+    DIM wert AS FLOAT : wert = JSON_GET_FLOAT(b, "score")
+    ' "high" (Standard) = groesser ist besser, "low" = kleiner ist besser
+    ' (z.B. Speedrun-Zeiten). Nur beim ERSTEN Eintrag eines Namens relevant --
+    ' danach bleibt der Bestwert erhalten, unabhaengig vom Modus.
+    DIM modus AS STRING : modus = "high"
+    IF JSON_HAS(b, "best") THEN
+        modus = ""
+        IF JSON_TYPE(b, "best") = "string" THEN modus = JSON_GET_STRING(b, "best")
+    END IF
+    IF modus <> "high" AND modus <> "low" THEN
+        fehler(400, "invalid_best_mode")
+        RETURN
+    END IF
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_BOOL(h, "ok", TRUE)
+    DIM r AS DB_RESULT : r = DB_QUERY(cloudDb, "SELECT score FROM scores WHERE board = ? AND name = ?", brett, wer)
+    IF NOT DB_NEXT(r) THEN
+        DB_CLOSE_RESULT(r)
+        DB_EXEC(cloudDb, "INSERT INTO scores(board, name, score, updated_at) VALUES (?, ?, ?, ?)", brett, wer, wert, ZEIT_JETZT() * 1.0)
+        JSON_SET_BOOL(h, "updated", TRUE)
+        senden(200, h)
+        RETURN
+    END IF
+    DIM bisher AS FLOAT : bisher = DB_GET_FLOAT(r, 0)
+    DB_CLOSE_RESULT(r)
+    DIM besser AS BOOLEAN
+    IF modus = "high" THEN besser = wert > bisher ELSE besser = wert < bisher
+    IF besser THEN
+        DB_EXEC(cloudDb, "UPDATE scores SET score = ?, updated_at = ? WHERE board = ? AND name = ?", wert, ZEIT_JETZT() * 1.0, brett, wer)
+    END IF
+    JSON_SET_BOOL(h, "updated", besser)
+    senden(200, h)
+END SUB
+
+SUB bestenliste(brett AS STRING)
+    IF NOT gueltigeId(brett) THEN
+        fehler(400, "invalid_board")
+        RETURN
+    END IF
+    ' Wie Pythons int(): Leerraum aussen herum ja, Komma oder Buchstaben nein.
+    DIM nText AS STRING : nText = TRIM$(HTTPD_QUERY$(cloudSrv, "n"))
+    IF nText = "" THEN nText = "10"
+    IF NOT REGEX_TEST(nText, "^[+-]?[0-9]{1,9}$") THEN
+        fehler(400, "invalid_n")
+        RETURN
+    END IF
+    DIM anzahl AS INTEGER : anzahl = MAX(1, MIN(VAL(nText), CLOUD_MAX_TOP))
+    DIM richtung AS STRING : richtung = HTTPD_QUERY$(cloudSrv, "order")
+    IF richtung = "" THEN richtung = "desc"
+    IF richtung <> "asc" AND richtung <> "desc" THEN
+        fehler(400, "invalid_order")
+        RETURN
+    END IF
+    DIM liste AS JSON_HANDLE : liste = JSON_NEW_ARRAY()
+    DIM r AS DB_RESULT : r = DB_QUERY(cloudDb, "SELECT name, score FROM scores WHERE board = ? ORDER BY score " + UPPER$(richtung) + " LIMIT ?", brett, anzahl)
+    WHILE DB_NEXT(r)
+        DIM e AS JSON_HANDLE : e = JSON_NEW_OBJECT()
+        JSON_SET_STRING(e, "name", DB_GET_STRING(r, 0))
+        JSON_SET_FLOAT(e, "score", DB_GET_FLOAT(r, 1))
+        JSON_APPEND_JSON(liste, "", e)
+    WEND
+    DB_CLOSE_RESULT(r)
+    DIM h AS JSON_HANDLE : h = JSON_NEW_OBJECT()
+    JSON_SET_JSON(h, "entries", liste)
+    senden(200, h)
+END SUB
+
+' ------------------------------------------------------------ Verteilen
+SUB anfrage()
+    DIM methode AS STRING : methode = HTTPD_METHOD$(cloudSrv)
+    DIM pfad AS STRING : pfad = HTTPD_PATH$(cloudSrv)
+    ' CORS-Vorabfrage: kommt ohne X-Api-Key, also vor der Pruefung.
+    IF methode = "OPTIONS" THEN
+        HTTPD_SEND(cloudSrv, 200, "text/plain", "")
+        RETURN
+    END IF
+    DIM t AS ARRAY OF STRING : t = SPLIT$(pfad, "/")
+    IF pfad = "/health" THEN
+        IF methode <> "GET" THEN
+            fehler(405, "method_not_allowed")
+            RETURN
+        END IF
+        okAntwort()
+        RETURN
+    END IF
+    IF cloudSchluessel <> "" THEN
+        IF NOT SECURE_EQUALS(HTTPD_HEADER$(cloudSrv, "X-Api-Key"), cloudSchluessel) THEN
+            fehler(401, "unauthorized")
+            RETURN
+        END IF
+    END IF
+    ' Pfade genau wie die Flask-Routen: kein leerer Abschnitt, kein Schraegstrich am Ende.
+    DIM i AS INTEGER
+    FOR i = 1 TO LEN(t) - 1
+        IF t[i] = "" THEN
+            fehler(404, "not_found")
+            RETURN
+        END IF
+    NEXT
+    IF LEN(t) = 3 AND t[1] = "save" THEN
+        IF methode = "POST" THEN
+            speichern(t[2])
+        ELSEIF methode = "GET" THEN
+            laden(t[2])
+        ELSE
+            fehler(405, "method_not_allowed")
+        END IF
+    ELSEIF LEN(t) = 4 AND t[1] = "leaderboard" AND t[3] = "submit" THEN
+        IF methode = "POST" THEN einreichen(t[2]) ELSE fehler(405, "method_not_allowed")
+    ELSEIF LEN(t) = 4 AND t[1] = "leaderboard" AND t[3] = "top" THEN
+        IF methode = "GET" THEN bestenliste(t[2]) ELSE fehler(405, "method_not_allowed")
+    ELSE
+        fehler(404, "not_found")
+    END IF
+END SUB
+
+datenbankAnlegen()
+cloudSrv = HTTPD_START(cloudPort, cloudHost)
+' Permissiv, damit z.B. ein dhrt-WASM-Build im Browser den Server erreicht.
+' Fuer einen oeffentlichen Server ggf. auf die eigene Domain einschraenken.
+HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Origin", "*")
+HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Headers", "X-Api-Key, Content-Type")
+HTTPD_SET_HEADER(cloudSrv, "Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+IF cloudSchluessel = "" THEN EPRINT("WARNUNG: GB_CLOUD_API_KEY nicht gesetzt -- Server laeuft OHNE Auth (nur zum lokalen Testen!)")
+' EPRINT statt PRINT: PRINT wird gepuffert und erschiene erst am Ende.
+EPRINT("PORT=" + STR$(HTTPD_PORT(cloudSrv)))
+EPRINT("Cloud-Server laeuft auf " + cloudHost + ":" + STR$(HTTPD_PORT(cloudSrv)) + ", Datenbank " + cloudDbPfad)
+WHILE TRUE
+    IF HTTPD_ACCEPT(cloudSrv) THEN
+        TRY
+            anfrage()
+        CATCH meldung
+            ' Ein Fehler in einer Anfrage darf den Server nicht beenden.
+            EPRINT("Fehler bei " + HTTPD_METHOD$(cloudSrv) + " " + HTTPD_PATH$(cloudSrv) + ": " + meldung)
+            TRY
+                fehler(500, "internal_error")
+            CATCH
+            END TRY
+        END TRY
+    ELSE
+        SLEEP(5)
+    END IF
+WEND

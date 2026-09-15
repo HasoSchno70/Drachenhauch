@@ -1,0 +1,258 @@
+' Der Cloud-Server (bis 2026-09-15 cloudserver/server.py mit Flask, getestet
+' mit Flasks Test-Client). Der Server laeuft als Kind ueber die Beilage srv.dh,
+' die cloudserver/server.dh einbindet; der Fall spricht ROH mit ihm ueber
+' _hilfen/httpklient.dh und liest die Antworten mit dem json-Modul.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== rest-vertrag wie der flask-server
+' Die Zusagen aus test_server.py, nacheinander gegen EINEN Server.
+IMPORT "klient.dh"
+IMPORT "json"
+SETENV("GB_CLOUD_API_KEY", "test-key")
+SETENV("GB_CLOUD_DB", CWD$() + "/test.db")
+SETENV("GB_CLOUD_MAX_SAVE_BYTES", "64")
+SETENV("GB_CLOUD_PORT", "0")
+SETENV("GB_CLOUD_HOST", "127.0.0.1")
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM AUTH AS STRING : AUTH = "X-Api-Key: test-key"
+DIM a AS STRING
+FUNCTION feld$(antwort AS STRING, pfad AS STRING) AS STRING
+    DIM h AS JSON_HANDLE : h = JSON_PARSE(rumpf$(antwort))
+    IF NOT JSON_HAS(h, pfad) THEN RETURN "<fehlt>"
+    SELECT CASE JSON_TYPE(h, pfad)
+        CASE "string"
+            RETURN JSON_GET_STRING(h, pfad)
+        CASE "boolean"
+            RETURN STR$(JSON_GET_BOOL(h, pfad))
+        CASE "number"
+            RETURN STR$(JSON_GET_FLOAT(h, pfad))
+    END SELECT
+    RETURN JSON_TYPE(h, pfad)
+END FUNCTION
+FUNCTION eintraege$(antwort AS STRING) AS STRING
+    DIM h AS JSON_HANDLE : h = JSON_PARSE(rumpf$(antwort))
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(h, "entries") - 1
+        s = s + JSON_GET_STRING(h, "entries." + STR$(i) + ".name") + "=" + STR$(JSON_GET_FLOAT(h, "entries." + STR$(i) + ".score")) + " "
+    NEXT
+    RETURN TRIM$(s)
+END FUNCTION
+PRINT "port gemeldet "; port > 0
+' health ohne Schluessel
+a = holen$(port, "GET", "/health", "", "")
+PRINT "health "; status(a); " ok="; feld$(a, "ok")
+' save verlangt den Schluessel
+a = holen$(port, "POST", "/save/p1", "", "{""data"": ""x""}")
+PRINT "ohne schluessel "; status(a); " "; feld$(a, "error")
+a = holen$(port, "GET", "/save/p1", "X-Api-Key: falsch", "")
+PRINT "falscher schluessel "; status(a)
+' Rundweg
+a = holen$(port, "POST", "/save/p1", AUTH, "{""data"": ""{\""gold\"": 42}""}")
+PRINT "speichern "; status(a); " ok="; feld$(a, "ok")
+a = holen$(port, "GET", "/save/p1", AUTH, "")
+PRINT "laden "; status(a); " data="; feld$(a, "data"); " updated_at="; JSON_TYPE(JSON_PARSE(rumpf$(a)), "updated_at")
+a = holen$(port, "GET", "/save/nobody", AUTH, "")
+PRINT "unbekannt "; status(a); " "; feld$(a, "error")
+' Ueberschreiben
+a = holen$(port, "POST", "/save/p2", AUTH, "{""data"": ""v1""}")
+a = holen$(port, "POST", "/save/p2", AUTH, "{""data"": ""v2""}")
+PRINT "ueberschrieben "; feld$(holen$(port, "GET", "/save/p2", AUTH, ""), "data")
+' zu gross (Grenze 64 Bytes)
+a = holen$(port, "POST", "/save/p3", AUTH, "{""data"": """ + ("x" * 1000) + """}")
+PRINT "zu gross "; status(a); " "; feld$(a, "error"); " max="; feld$(a, "max_bytes")
+a = holen$(port, "POST", "/save/p3", AUTH, "{""daten"": ""x""}")
+PRINT "ohne data "; status(a); " "; feld$(a, "error")
+a = holen$(port, "POST", "/save/../etc", AUTH, "{""data"": ""x""}")
+PRINT "pfad mit .. "; status(a)
+a = holen$(port, "POST", "/save/a%20b", AUTH, "{""data"": ""x""}")
+PRINT "id mit leerzeichen "; status(a); " "; feld$(a, "error")
+' Bestenliste
+a = holen$(port, "POST", "/leaderboard/b1/submit", AUTH, "{""name"": ""anna"", ""score"": 100}")
+PRINT "erster eintrag updated="; feld$(a, "updated")
+a = holen$(port, "POST", "/leaderboard/b1/submit", AUTH, "{""name"": ""bert"", ""score"": 250}")
+a = holen$(port, "POST", "/leaderboard/b1/submit", AUTH, "{""name"": ""carla"", ""score"": 50}")
+a = holen$(port, "GET", "/leaderboard/b1/top?n=2", AUTH, "")
+PRINT "top 2 "; status(a); " "; eintraege$(a)
+' nur der Bestwert bleibt
+a = holen$(port, "POST", "/leaderboard/b2/submit", AUTH, "{""name"": ""anna"", ""score"": 100}")
+a = holen$(port, "POST", "/leaderboard/b2/submit", AUTH, "{""name"": ""anna"", ""score"": 50}")
+PRINT "schlechter updated="; feld$(a, "updated")
+a = holen$(port, "POST", "/leaderboard/b2/submit", AUTH, "{""name"": ""anna"", ""score"": 300}")
+PRINT "besser updated="; feld$(a, "updated")
+PRINT "b2 "; eintraege$(holen$(port, "GET", "/leaderboard/b2/top", AUTH, ""))
+' kleiner ist besser
+a = holen$(port, "POST", "/leaderboard/speedrun/submit", AUTH, "{""name"": ""anna"", ""score"": 61.2, ""best"": ""low""}")
+a = holen$(port, "POST", "/leaderboard/speedrun/submit", AUTH, "{""name"": ""anna"", ""score"": 58.9, ""best"": ""low""}")
+PRINT "low updated="; feld$(a, "updated")
+PRINT "speedrun "; eintraege$(holen$(port, "GET", "/leaderboard/speedrun/top?order=asc", AUTH, ""))
+' abgelehnte Einreichungen
+a = holen$(port, "POST", "/leaderboard/b3/submit", AUTH, "{""name"": ""anna"", ""score"": ""viel""}")
+PRINT "score als text "; status(a); " "; feld$(a, "error")
+a = holen$(port, "POST", "/leaderboard/b3/submit", AUTH, "{""name"": ""anna"", ""score"": true}")
+PRINT "score als wahrheitswert "; status(a); " "; feld$(a, "error")
+a = holen$(port, "POST", "/leaderboard/b3/submit", AUTH, "{""name"": ""an na"", ""score"": 1}")
+PRINT "name mit leerzeichen "; status(a); " "; feld$(a, "error")
+a = holen$(port, "POST", "/leaderboard/b3/submit", AUTH, "{""name"": ""anna"", ""score"": 1, ""best"": ""mittel""}")
+PRINT "best mittel "; status(a); " "; feld$(a, "error")
+a = holen$(port, "GET", "/leaderboard/b1/top?n=zwei", AUTH, "")
+PRINT "n als text "; status(a); " "; feld$(a, "error")
+a = holen$(port, "GET", "/leaderboard/b1/top?order=quer", AUTH, "")
+PRINT "order quer "; status(a); " "; feld$(a, "error")
+a = holen$(port, "GET", "/leaderboard/b1/top?n=-5", AUTH, "")
+PRINT "n negativ wird 1 "; eintraege$(a)
+a = holen$(port, "GET", "/gibtsnicht", AUTH, "")
+PRINT "unbekannter pfad "; status(a)
+a = holen$(port, "DELETE", "/save/p1", AUTH, "")
+PRINT "falsche methode "; status(a)
+PROCESS_KILL(srvProzess)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "{sammlung}/../../cloudserver/server.dh"
+
+--- erwartet
+port gemeldet TRUE
+health 200 ok=TRUE
+ohne schluessel 401 unauthorized
+falscher schluessel 401
+speichern 200 ok=TRUE
+laden 200 data={"gold": 42} updated_at=number
+unbekannt 404 not_found
+ueberschrieben v2
+zu gross 413 save_too_large max=64.0
+ohne data 400 missing_data_field
+pfad mit .. 404
+id mit leerzeichen 400 invalid_player_id
+erster eintrag updated=TRUE
+top 2 200 bert=250.0 anna=100.0
+schlechter updated=FALSE
+besser updated=TRUE
+b2 anna=300.0
+low updated=TRUE
+speedrun anna=58.9
+score als text 400 invalid_score
+score als wahrheitswert 400 invalid_score
+name mit leerzeichen 400 invalid_name
+best mittel 400 invalid_best_mode
+n als text 400 invalid_n
+order quer 400 invalid_order
+n negativ wird 1 bert=250.0
+unbekannter pfad 404
+falsche methode 405
+
+=== ohne schluessel ist der server offen und sagt es
+IMPORT "klient.dh"
+SETENV("GB_CLOUD_API_KEY", "")
+SETENV("GB_CLOUD_DB", CWD$() + "/offen.db")
+SETENV("GB_CLOUD_PORT", "0")
+SETENV("GB_CLOUD_HOST", "127.0.0.1")
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "POST", "/save/p1", "", "{""data"": ""frei""}")
+PRINT status(a)
+DIM r AS STRING : r = rumpf$(holen$(port, "GET", "/save/p1", "", ""))
+PRINT LEFT$(r, 26); "..."
+PROCESS_KILL(srvProzess)
+PRINT "warnung "; INSTR(srvFehler, "OHNE Auth") >= 0
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "{sammlung}/../../cloudserver/server.dh"
+
+--- erwartet
+200
+{"data":"frei","updated_at...
+warnung TRUE
+
+=== cors-kopfzeilen an jeder antwort
+' Auch an der Abweisung: ein Browser, der sie dort nicht sieht, meldet
+' "CORS-Fehler" statt "falscher Schluessel". Die Vorabfrage kommt ohne
+' X-Api-Key und muss trotzdem durch.
+IMPORT "klient.dh"
+SETENV("GB_CLOUD_API_KEY", "test-key")
+SETENV("GB_CLOUD_DB", CWD$() + "/cors.db")
+SETENV("GB_CLOUD_PORT", "0")
+SETENV("GB_CLOUD_HOST", "127.0.0.1")
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "OPTIONS", "/save/p1", "Origin: http://spiel.example", "")
+PRINT "vorabfrage "; status(a); " origin="; kopf$(a, "Access-Control-Allow-Origin"); " kopfzeilen="; kopf$(a, "Access-Control-Allow-Headers"); " methoden="; kopf$(a, "Access-Control-Allow-Methods")
+a = holen$(port, "GET", "/save/p1", "", "")
+PRINT "abgewiesen "; status(a); " origin="; kopf$(a, "Access-Control-Allow-Origin"); " typ="; kopf$(a, "Content-Type")
+PROCESS_KILL(srvProzess)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "{sammlung}/../../cloudserver/server.dh"
+
+--- erwartet
+vorabfrage 200 origin=* kopfzeilen=X-Api-Key, Content-Type methoden=GET, POST, OPTIONS
+abgewiesen 401 origin=* typ=application/json
+
+=== das cloud-modul spricht mit dem server
+' Der eigentliche Zweck: CLOUD_* und LEADERBOARD_* gegen genau diesen Server.
+IMPORT "klient.dh"
+IMPORT "cloud"
+SETENV("GB_CLOUD_API_KEY", "spiel-key")
+SETENV("GB_CLOUD_DB", CWD$() + "/spiel.db")
+SETENV("GB_CLOUD_PORT", "0")
+SETENV("GB_CLOUD_HOST", "127.0.0.1")
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+CLOUD_CONFIGURE("http://127.0.0.1:" + STR$(port), "spiel-key")
+PRINT CLOUD_LOAD("neu"); "|"; CLOUD_LAST_ERROR$(); "|"
+PRINT CLOUD_SAVE("spieler1", "{""gold"": 1200}")
+PRINT CLOUD_LOAD("spieler1")
+PRINT LEADERBOARD_SUBMIT("zeiten", "anna", 61.5, TRUE)
+PRINT LEADERBOARD_SUBMIT("zeiten", "anna", 70.0, TRUE)
+PRINT LEADERBOARD_SUBMIT("zeiten", "bert", 58.25, TRUE)
+DIM top AS ARRAY OF TUPLE : top = LEADERBOARD_FETCH("zeiten", 10, TRUE)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(top) - 1
+    PRINT top[i][0]; " "; top[i][1]
+NEXT
+CLOUD_CONFIGURE("http://127.0.0.1:" + STR$(port), "falsch")
+PRINT CLOUD_SAVE("spieler1", "x"); " "; CLOUD_LAST_ERROR$() <> ""
+PROCESS_KILL(srvProzess)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "{sammlung}/../../cloudserver/server.dh"
+
+--- erwartet
+||
+TRUE
+{"gold": 1200}
+TRUE
+FALSE
+TRUE
+bert 58.25
+anna 61.5
+FALSE TRUE
+
+=== daten ueberleben einen neustart
+IMPORT "klient.dh"
+SETENV("GB_CLOUD_API_KEY", "k")
+SETENV("GB_CLOUD_DB", CWD$() + "/bleibt.db")
+SETENV("GB_CLOUD_PORT", "0")
+SETENV("GB_CLOUD_HOST", "127.0.0.1")
+DIM port AS INTEGER : port = serverStarten("srv.dh")
+DIM a AS STRING : a = holen$(port, "POST", "/save/p1", "X-Api-Key: k", "{""data"": ""gemerkt""}")
+a = holen$(port, "POST", "/leaderboard/b/submit", "X-Api-Key: k", "{""name"": ""anna"", ""score"": 7}")
+PROCESS_KILL(srvProzess)
+SLEEP(200)
+port = serverStarten("srv.dh")
+PRINT rumpf$(holen$(port, "GET", "/leaderboard/b/top", "X-Api-Key: k", ""))
+PRINT INSTR(rumpf$(holen$(port, "GET", "/save/p1", "X-Api-Key: k", "")), "gemerkt") >= 0
+PROCESS_KILL(srvProzess)
+--- datei klient.dh
+IMPORT "{sammlung}/_hilfen/httpklient.dh"
+
+--- datei srv.dh
+IMPORT "{sammlung}/../../cloudserver/server.dh"
+
+--- erwartet
+{"entries":[{"name":"anna","score":7.0}]}
+TRUE

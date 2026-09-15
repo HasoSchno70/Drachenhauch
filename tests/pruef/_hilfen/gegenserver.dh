@@ -9,7 +9,7 @@
 '   abbruch  verspricht 1000000 Bytes und schliesst nach ein paar
 '   langsam  antwortet nach der Verzoegerung mit "spaet aber da"
 '   echo     spiegelt Methode, Pfad, Kopfzeilen und Rumpf als JSON; /rohe-bytes
-'   cloud    der REST-Vertrag von cloudserver/server.py (Speicherstaende, Bestenliste)
+'   cloud    der REST-Vertrag von cloudserver/server.dh (Speicherstaende, Bestenliste)
 IMPORT "net"
 IMPORT "json"
 

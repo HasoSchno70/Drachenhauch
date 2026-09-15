@@ -1,7 +1,7 @@
 # Modul `cloud`
 
 Cloud-Save + Leaderboard gegen einen kleinen, selbst hostbaren Referenz-
-Server (`cloudserver/`, Flask + SQLite). Zwei Ressourcen: ein beliebiger
+Server (`cloudserver/server.dh`, Drachenhauch + SQLite). Zwei Ressourcen: ein beliebiger
 Save-Blob pro Spieler-ID, und benannte Bestenlisten (ein Highscore pro
 Name). HTTP läuft nativ über `ureq` (Feature `http`, Standard-Build).
 
@@ -73,8 +73,9 @@ NEXT
 
 ## Der Referenz-Server
 
-`cloudserver/` ist ein eigener kleiner Flask-Prozess (nicht Teil von
-`dhrt`), den du selbst hostest — kein externer Cloud-Dienst, keine
+`cloudserver/server.dh` ist ein eigenes kleines Drachenhauch-Programm
+(`dhrt run cloudserver/server.dh`, Module `httpd` + `db`), das du selbst
+hostest — bis 2026-09-15 war es ein Flask-Prozess. Kein externer Cloud-Dienst, keine
 Account-Verwaltung. Ein einziges geteiltes API-Key-Secret schützt vor
 zufälligen Bots, aber **nicht** vor einem Spieler, der den in seinem
 kompilierten Spiel eingebetteten Key extrahiert. Für ein kleines Hobby-

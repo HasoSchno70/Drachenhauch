@@ -2,11 +2,9 @@
 ' den Spielstand in die Cloud speichern/laden (Modul cloud) und einen
 ' Highscore in eine gemeinsame Bestenliste einreichen (LEADERBOARD_*).
 '
-' Voraussetzung: ein laufender Cloud-Server (cloudserver/server.py).
-'   cd cloudserver
-'   pip install -r requirements.txt
+' Voraussetzung: ein laufender Cloud-Server (cloudserver/server.dh).
 '   set GB_CLOUD_API_KEY=demo-key          (Windows; PowerShell: $env:GB_CLOUD_API_KEY="demo-key")
-'   python server.py
+'   dhrt run cloudserver/server.dh
 ' Laeuft dann per Default auf http://localhost:8787.
 '
 ' Siehe auch docs/module-cloud.md.
