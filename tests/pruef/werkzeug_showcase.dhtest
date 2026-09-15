@@ -1,0 +1,251 @@
+' Der Showcase: tools/showcase_bilder.dh erzeugt die Vorschaubilder aus
+' examples/showcase.json (bis 2026-09-15 gen_showcase_thumbs.py), und die IDE
+' in Drachenhauch zeigt dieselbe Liste als Kacheln auf der Willkommensseite.
+--- seriell
+
+=== der erzeuger schreibt 480 punkte breit ohne alphakanal
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 90000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", CWD$() + "/wurzel")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(lauf$(p), CHR$(10))
+IF NOT FILEEXISTS("wurzel/examples/screenshots/09_shapes.png") THEN
+    PRINT JOIN$(zeilen, CHR$(10))
+    EXIT(1)
+END IF
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    DIM z AS STRING : z = zeilen[i]
+    ' Die Groesse in KB haengt am PNG-Packer.
+    IF INSTR(z, "  (") >= 0 THEN z = LEFT$(z, INSTR(z, "  ("))
+    IF z <> "" THEN PRINT z
+NEXT
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT "rohbild weg "; NOT FILEEXISTS("wurzel/examples/screenshots/_roh_09_shapes.png")
+DIM b AS BUFFER : b = READALL_BYTES("wurzel/examples/screenshots/09_shapes.png")
+PRINT "farbtyp "; BUFFER_GET(b, 25)
+--- argumente
+{sammlung}/../../tools/showcase_bilder.dh
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "09_shapes.dh", "title": "Formen", "desc": "Ein Kasten.", "frames": 5},
+ {"file": "fehlt.dh", "title": "Fehlt", "desc": "Gibt es nicht."}
+]
+--- datei wurzel/examples/09_shapes.dh
+SCREEN(800, 480, "P", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H203040)
+    BOX(200, 100, 600, 380, &HFF8800)
+    FLIP()
+WEND
+--- bild wurzel/examples/screenshots/09_shapes.png
+groesse 480 288
+240 144 #FF8800 +-20
+20 20 #203040 +-20
+--- erwartet
+Erzeuge 2 Vorschaubild(er) ...
+- 09_shapes.dh
+  + examples/screenshots/09_shapes.png
+- fehlt.dh
+  ! Quelle fehlt: fehlt.dh
+Fertig: 1/2 erzeugt.
+rueckgabe 2
+rohbild weg TRUE
+farbtyp 2
+
+=== der erzeuger nimmt nur die genannten
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 90000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", "--wurzel", CWD$() + "/wurzel", "fehlt")
+DIM aus AS STRING : aus = lauf$(p)
+PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT "bild "; FILEEXISTS("wurzel/examples/screenshots/09_shapes.png")
+--- argumente
+{sammlung}/../../tools/showcase_bilder.dh
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "09_shapes.dh", "title": "Formen", "desc": "Ein Kasten.", "frames": 5},
+ {"file": "fehlt.dh", "title": "Fehlt", "desc": "Gibt es nicht."}
+]
+--- datei wurzel/examples/09_shapes.dh
+PRINT 1
+--- erwartet
+Erzeuge 1 Vorschaubild(er) ...
+- fehlt.dh
+  ! Quelle fehlt: fehlt.dh
+Fertig: 0/1 erzeugt.
+
+rueckgabe 2
+bild FALSE
+
+=== die ide zeigt die showcase-liste mit den mitgelieferten bildern
+' Das Bild unter examples/screenshots/ ist da -- dann laeuft fuer diese Kachel
+' kein `dhrt bild`; fuer die zweite ohne Bild schon.
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=400
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG={fall}/_programm/ide.json
+--- vorher
+IF NOT DIREXISTS("wurzel/examples/screenshots") THEN MKDIR("wurzel/examples/screenshots")
+IMAGE_SAVE(IMAGE_NEW(48, 27, &H00AA00), "wurzel/examples/screenshots/09_shapes.png")
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "09_shapes.dh", "title": "Formen zeichnen", "desc": "Kasten auf dunklem Grund.", "frames": 5},
+ {"file": "10_pong.dh", "title": "Pong", "desc": "Zwei Schlaeger.", "frames": 5}
+]
+--- datei wurzel/examples/183_sfx_generator.dh
+PRINT 1
+--- datei wurzel/examples/09_shapes.dh
+PRINT 1
+--- datei wurzel/examples/10_pong.dh
+SCREEN(200, 120, "P", 1)
+WHILE NOT QUITREQUESTED()
+    CLS(&H203040)
+    BOX(20, 20, 180, 100, &HFF8800)
+    FLIP()
+WEND
+--- verzeichnis wurzel/docs
+--- bild _programm/vorschau/10_pong.png
+groesse 200 120
+100 60 #FF8800 +-20
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kacheln 2 "; hat("kacheln 2")
+PRINT "bild aus screenshots "; hat("kachelbild 09_shapes.dh screenshots")
+PRINT "keine vorschau fuer 09 "; NOT hat("vorschau 09_shapes.dh")
+PRINT "vorschau fuer 10 "; hat("vorschau 10_pong.dh")
+PRINT "vorschau-ordner ohne 09 "; NOT FILEEXISTS("_programm/vorschau/09_shapes.png")
+--- erwartet
+kacheln 2 TRUE
+bild aus screenshots TRUE
+keine vorschau fuer 09 TRUE
+vorschau fuer 10 TRUE
+vorschau-ordner ohne 09 TRUE
+
+=== eine showcase-kachel oeffnet ihr beispiel
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "09_shapes.dh", "title": "Formen zeichnen", "desc": "Kasten auf dunklem Grund.", "frames": 5}
+]
+--- datei wurzel/examples/183_sfx_generator.dh
+PRINT 1
+--- datei wurzel/examples/09_shapes.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 4
+e 120 7 350 440 0 0
+e 121 7 350 440 0 0
+e 122 6 0 0 0 0
+e 124 5 0 0 0 0
+
+--- verzeichnis wurzel/docs
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kacheln 1 "; hat("kacheln 1")
+PRINT "kachel 09 "; hat("kachel 09_shapes.dh")
+--- erwartet
+kacheln 1 TRUE
+kachel 09 TRUE
+
+=== das mausrad blaettert durch die kacheln
+' 32 Kacheln sind acht Reihen; so viele passen unter die Begruessung nicht.
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- umgebung
+DHRT_FRAMES=260
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={fall}/wurzel
+DH_IDE_KONFIG=ide.json
+--- datei wurzel/examples/showcase.json
+[
+ {"file": "a1.dh", "title": "A1", "desc": "x"}, {"file": "a2.dh", "title": "A2", "desc": "x"},
+ {"file": "a3.dh", "title": "A3", "desc": "x"}, {"file": "a4.dh", "title": "A4", "desc": "x"},
+ {"file": "a5.dh", "title": "A5", "desc": "x"}, {"file": "a6.dh", "title": "A6", "desc": "x"},
+ {"file": "a7.dh", "title": "A7", "desc": "x"}, {"file": "a8.dh", "title": "A8", "desc": "x"},
+ {"file": "b1.dh", "title": "B1", "desc": "x"}, {"file": "b2.dh", "title": "B2", "desc": "x"},
+ {"file": "b3.dh", "title": "B3", "desc": "x"}, {"file": "b4.dh", "title": "B4", "desc": "x"},
+ {"file": "b5.dh", "title": "B5", "desc": "x"}, {"file": "b6.dh", "title": "B6", "desc": "x"},
+ {"file": "b7.dh", "title": "B7", "desc": "x"}, {"file": "b8.dh", "title": "B8", "desc": "x"},
+ {"file": "c1.dh", "title": "C1", "desc": "x"}, {"file": "c2.dh", "title": "C2", "desc": "x"},
+ {"file": "c3.dh", "title": "C3", "desc": "x"}, {"file": "c4.dh", "title": "C4", "desc": "x"},
+ {"file": "c5.dh", "title": "C5", "desc": "x"}, {"file": "c6.dh", "title": "C6", "desc": "x"},
+ {"file": "c7.dh", "title": "C7", "desc": "x"}, {"file": "c8.dh", "title": "C8", "desc": "x"},
+ {"file": "d1.dh", "title": "D1", "desc": "x"}, {"file": "d2.dh", "title": "D2", "desc": "x"},
+ {"file": "d3.dh", "title": "D3", "desc": "x"}, {"file": "d4.dh", "title": "D4", "desc": "x"},
+ {"file": "d5.dh", "title": "D5", "desc": "x"}, {"file": "d6.dh", "title": "D6", "desc": "x"},
+ {"file": "d7.dh", "title": "D7", "desc": "x"}, {"file": "d8.dh", "title": "D8", "desc": "x"}
+]
+--- datei wurzel/examples/183_sfx_generator.dh
+PRINT 1
+--- datei _programm/ev.txt
+c 3
+e 120 7 350 440 0 0
+e 121 7 350 440 0 0
+e 122 8 0 -1 0 0
+
+--- verzeichnis wurzel/docs
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kacheln 32 "; hat("kacheln 32")
+PRINT "reihe 1 "; hat("kacheln reihe 1")
+--- erwartet
+kacheln 32 TRUE
+reihe 1 TRUE
