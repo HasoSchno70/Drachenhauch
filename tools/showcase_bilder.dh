@@ -64,14 +64,20 @@ FUNCTION erzeugen(datei AS STRING, bilder AS INTEGER) AS BOOLEAN
     ' Bild, aber ein Beispiel kann schon vorher haengen.
     DIM t0 AS INTEGER : t0 = MILLIS()
     DIM leer AS INTEGER : leer = 0
+    DIM meldung AS STRING : meldung = ""
     WHILE leer < 5
         DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        meldung = meldung + teil
         IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
         IF MILLIS() - t0 > 60000 AND PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
         SLEEP(20)
     WEND
     IF NOT FILEEXISTS(roh) THEN
         PRINT "  ! Kein Bild fuer "; datei
+        ' Was `dhrt bild` gesagt hat, gehoert dazu -- sonst sucht man den
+        ' Grund (fehlendes Asset, Bau ohne Grafik) im Dunkeln.
+        meldung = TRIM$(REPLACE$(meldung, CHR$(13), ""))
+        IF meldung <> "" THEN PRINT "    "; REPLACE$(meldung, CHR$(10), CHR$(10) + "    ")
         RETURN FALSE
     END IF
     DIM b AS IMAGE : b = LOADIMAGE(roh)

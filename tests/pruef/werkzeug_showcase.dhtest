@@ -4,6 +4,14 @@
 --- seriell
 
 === der erzeuger schreibt 480 punkte breit ohne alphakanal
+' Ein Bau ohne Grafik kann keine Bilder: die Meldung ausgeben, dann heisst der
+' Fall "uebersprungen" statt falsch.
+TRY
+    DIM probe AS IMAGE : probe = IMAGE_NEW(1, 1)
+CATCH ohneGrafik
+    PRINT ohneGrafik
+    EXIT(1)
+END TRY
 FUNCTION lauf$(p AS INTEGER) AS STRING
     DIM aus AS STRING : aus = ""
     DIM leer AS INTEGER : leer = 0
