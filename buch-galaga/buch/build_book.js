@@ -143,7 +143,7 @@ function pmix(parts) {
 
 // Inhaltsverzeichnis: jede h1()/chapter()-Ueberschrift wird hier registriert
 // (Titel + eindeutiges Bookmark fuer den klickbaren Sprung). Die Seitenzahlen
-// liefert der Zwei-Pass-Build (make_book.py) ueber toc_pages.json.
+// liefert der Zwei-Pass-Build (tools/buch_bauen.dh) ueber toc_pages.json.
 const tocEntries = [];
 let _bmCounter = 0;
 function _heading(text, isChapter) {
@@ -1535,7 +1535,7 @@ children.push(new Paragraph({
 // Verzeichnis und fuegen es an der gemerkten Stelle (Seite 2) ein.
 let tocPages = {};
 try { tocPages = JSON.parse(fs.readFileSync(path.join(__dirname, "toc_pages.json"), "utf8")); } catch (e) {}
-// Titel in Lese-Reihenfolge fuer den Mess-Schritt (make_book.py) ablegen:
+// Titel in Lese-Reihenfolge fuer den Mess-Schritt (tools/buch_bauen.dh) ablegen:
 fs.writeFileSync(path.join(AUS, "toc_titles.json"),
   JSON.stringify(tocEntries.map(e => e.title), null, 2));
 

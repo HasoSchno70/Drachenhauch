@@ -21,12 +21,12 @@ numpy>=1.24                 # Synth-Mathematik (SFX/Tracker) + particles-Logik
 sounddevice>=0.4            # Audio-Vorschau in SFX-/Tracker-Editor
 soundfile>=0.12             # OGG/FLAC/WAV-Dekodierung beim Sample-Laden (Tracker)
 
-# --- Buch-Build (buch-*/buch/make_book.py, Zwei-Pass mit Seitenzahlen) ---
-# Fehlt es, entsteht das Dokument trotzdem -- nur ohne Seitenzahlen im Inhalt.
-# PyMuPDF liest ausserdem in tests/test_drucken.py gegen, was das Modul `pdf`
-# schreibt -- eine eigene Datei mit dem eigenen Schreiber gegenzulesen sagt
-# nichts darueber, ob ein fremdes Programm sie oeffnet.
-PyMuPDF>=1.24               # misst Seitenzahlen; prueft die PDF-Ausgabe gegen
+# --- Nur zum Pruefen (tests/test_drucken.py) ---
+# PyMuPDF liest gegen, was das Modul `pdf` schreibt -- eine eigene Datei mit
+# dem eigenen Schreiber gegenzulesen sagt nichts darueber, ob ein fremdes
+# Programm sie oeffnet. (Der Buch-Build misst seine Seiten seit 2026-09-15
+# selbst: tools/buch_bauen.dh.)
+PyMuPDF>=1.24               # prueft die PDF-Ausgabe gegen
 
 # --- Nur zum Pruefen (tests/test_xlsx.py) ---
 # Liest gegen, was das Modul `xlsx` schreibt. Ohne einen FREMDEN Leser

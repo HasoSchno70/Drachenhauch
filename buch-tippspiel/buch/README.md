@@ -30,7 +30,7 @@ node build_book.js
 diesem Zeitpunkt noch nicht). Der Zwei-Pass-Build misst sie:
 
 ```
-python make_book.py
+dhrt run tools/buch_bauen.dh -- buch-tippspiel
 ```
 
 Pass 1 baut das Dokument, lässt LibreOffice ein PDF daraus rendern und sucht

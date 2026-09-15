@@ -3847,7 +3847,7 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// Das Format bestimmt die Endung. Ton konnte sich seit dem SFX-Editor
     /// sichern (`AUDIO_SAVE_WAV`), Bild bis hierher gar nicht -- `SAVESCREENSHOT`
     /// sichert den BILDSCHIRM, nicht ein Bild.
-    pub fn image_save(&mut self, idx: i64, pfad: &str) -> Result<(), String> {
+    pub fn image_save(&mut self, idx: i64, pfad: &str, ohne_alpha: bool) -> Result<(), String> {
         const ENDUNGEN: [&str; 4] = ["png", "bmp", "jpg", "tga"];
         let endung = std::path::Path::new(pfad).extension()
             .and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
@@ -3862,7 +3862,17 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // eine stehengebliebene alte Datei sonst als Erfolg zu lesen.
         let vorher = std::fs::metadata(pfad).ok().map(|m| (m.len(), m.modified().ok()));
         let img = self.src_image(idx, "IMAGE_SAVE")?;
-        img.export_image(pfad);
+        if ohne_alpha {
+            // Ohne Deckkraft-Kanal (RGB): Druckdienste lehnen ein PNG mit
+            // Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft
+            // wird dabei WEGGELASSEN, nicht verrechnet -- wer einen Grund will,
+            // legt das Bild vorher mit IMAGE_DRAW_IMAGE auf ein deckendes.
+            let mut kopie = img.clone();
+            kopie.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+            kopie.export_image(pfad);
+        } else {
+            img.export_image(pfad);
+        }
         match std::fs::metadata(pfad) {
             Ok(m) if m.len() > 0
                 && Some((m.len(), m.modified().ok())) != vorher => Ok(()),

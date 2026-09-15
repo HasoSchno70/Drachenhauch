@@ -1127,7 +1127,7 @@ children.push(new Paragraph({
 }));
 
 // ===================== Inhaltsverzeichnis einsetzen =====================
-// Seitenzahlen kommen aus toc_pages.json (vom Zwei-Pass-Build make_book.py).
+// Seitenzahlen kommen aus toc_pages.json (vom Zwei-Pass-Build tools/buch_bauen.dh).
 // Fehlt die Datei, wird das Verzeichnis ohne Zahlen gebaut -- das Dokument
 // entsteht trotzdem.
 let pages = {};

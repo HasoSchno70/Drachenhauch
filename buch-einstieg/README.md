@@ -56,7 +56,7 @@ cd buch-einstieg/buch
 npm install                       # einmalig
 node build_book.js                # -> Drachenhauch-Einstieg.docx
 node build_epub.js                # -> Drachenhauch-Einstieg.epub
-<venv>\python.exe make_book.py    # Zwei-Pass-Bau mit echten Seitenzahlen
+dhrt run ../../tools/buch_bauen.dh -- ..   # Zwei-Pass-Bau mit echten Seitenzahlen
 ```
 
 Die Kapitel liegen in `buch/content/NN_*.js`, jede Datei exportiert

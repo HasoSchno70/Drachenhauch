@@ -3069,8 +3069,32 @@ endlos weiter -- der Aufrufer wartete ewig (so haengte der erste Testlauf 300 s)
 direkt nach dem gesicherten Bild. Tests `tests/pruef/werkzeug_buch.dhtest`
 (apply gegen Node-Referenz und leerer Patch auf eine Kopie von `en.json`, beide
 shoot-Werkzeuge an Beilagen) und `tests/pruef/dhrt_bild.dhtest` (der Test aus
-`test_dhrt_werkzeuge.py` plus der `WHILE TRUE`-Fall). Offen bei den Buechern:
-die vier `make_book.py` (LibreOffice + PyMuPDF-Seitenmessung, PIL).
+`test_dhrt_werkzeuge.py` plus der `WHILE TRUE`-Fall).
+**Buch-Build (selber Tag):** `tools/buch_bauen.dh -- <buchordner> [--lang de|en]`
+ersetzt die vier `make_book.py` (PyMuPDF + PIL). Ein Werkzeug fuer alle vier
+Buecher, je Buch Dateiname, Sprachen und Messart in einer Tabelle; Referenz- und
+Einstiegsbuch messen genau (Textstueck mit Schriftgroesse >= 15, monoton
+vorwaerts, sonst die erste Seite mit dem Text), Galaga und Tippspiel einfach.
+**Das PDF liest es selbst** -- Objekte, Seitenbaum samt geerbten Ressourcen,
+ToUnicode-Tabellen (codespacerange, bfchar, bfrange), Textbefehle mit `Tf`.
+**Der Beleg ist gemessen, nicht behauptet:** `--nur-messen` an den vier
+vorhandenen PDFs (Lehrbuch de/en mit 499/490 Seiten in je ~6 s, Einstieg,
+Tippspiel) schreibt Byte fuer Byte die eingecheckten `toc_pages`-Dateien;
+Gegenprobe mit Schwelle 100 statt 15: fuenf Seitenzahlen weichen ab. Zwei
+Unterschiede der Schreiber, die das PDF des pdf-Moduls (krilla) im Test
+aufdeckte: LibreOffice schreibt Hex-Zeichenketten `<01>` mit einem Byte je
+Zeichen, krilla Literale mit zwei Bytes und Oktal-/`\b`/`\f`-Folgen -- beides
+geht jetzt. Das PDF wird nach Pass 2 noch einmal gerendert (vorher endete das
+Referenzbuch beim `.docx`). **Dafuer neu in der Laufzeit:
+`IMAGE_SAVE(bild, pfad$ [, mit_alpha])`** -- mit `FALSE` ohne Alphakanal
+(PNG-Farbart 2): Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder
+Punkt deckend ist; die Deckkraft wird weggelassen, nicht verrechnet
+(`--nur-bilder` legt darum vorher auf Weiss). Test
+`tests/pruef/werkzeug_buch_bauen.dhtest` (Messen an einem PDF aus dem
+pdf-Modul: Ueberschrift gegen fruehere Erwaehnung, Gross/klein, fehlender Titel,
+beide Messarten; Bilder: Farbart, Breite, Weiss unter Durchsichtigem, fertiges
+Bild unberuehrt). PyMuPDF bleibt in requirements.txt nur fuer
+`tests/test_drucken.py`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

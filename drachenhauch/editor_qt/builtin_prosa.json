@@ -951,7 +951,7 @@
   "IMAGE_ROTATE": "IMAGE (neu, Bounding-Box wächst ggf.) — tastet neu ab, siehe unten",
   "IMAGE_ROTATE_CCW": "IMAGE (neu, um 90° gegen den Uhrzeigersinn) — exakt",
   "IMAGE_ROTATE_CW": "IMAGE (neu, um 90° im Uhrzeigersinn) — exakt, w × h → h × w",
-  "IMAGE_SAVE": "das Bild in eine Datei schreiben (.png, .bmp, .jpg, .tga)",
+  "IMAGE_SAVE": "das Bild in eine Datei schreiben (.png, .bmp, .jpg, .tga); mit FALSE ohne Deckkraft-Kanal (RGB) — Druckdienste lehnen ein PNG mit Alphakanal ab, auch wenn jeder Punkt deckend ist. Die Deckkraft wird dabei weggelassen, nicht verrechnet: wer einen Grund will, legt das Bild vorher auf ein deckendes",
   "IMAGE_SAVE_GIF": "mehrere Bilder als bewegtes GIF schreiben",
   "IMAGE_SCALE": "IMAGE (neu, in w × h) — bilinear geglättet",
   "IMAGE_SCALE_NN": "IMAGE (neu, in w × h) — ohne Interpolation (Nearest-Neighbour), für Pixelgrafik",

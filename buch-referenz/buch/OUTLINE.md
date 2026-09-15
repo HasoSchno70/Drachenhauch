@@ -7,10 +7,10 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 
 ## Build
 - `node build_book.js` → `Drachenhauch-Lehrbuch.docx` (nutzt zuletzt gemessene ToC-Seiten).
-- `<venv>\python.exe make_book.py` → Zwei-Pass-Build mit korrekten ToC-Seitenzahlen
-  (LibreOffice→PDF→PyMuPDF misst Seiten). Vorschau-PNG: LibreOffice→PDF→fitz.
-  **Achtung:** rendert das PDF nur ZWISCHENDURCH (zum Messen) und endet beim
-  `.docx` — für ein PDF mit Seitenzahlen danach `make_book.render()` nachziehen.
+- `dhrt run tools/buch_bauen.dh -- buch-referenz [--lang en]` → Zwei-Pass-Build mit
+  korrekten ToC-Seitenzahlen (LibreOffice→PDF, das Werkzeug liest die Seiten selbst;
+  bis 2026-09-15 `make_book.py` mit PyMuPDF). Rendert das PDF am Ende noch einmal,
+  es steht also mit Seitenzahlen neben dem `.docx`.
 - `node build_epub.js` → `Drachenhauch-Lehrbuch.epub` (EPUB 3, ein XHTML je Kapitel,
   nav.xhtml + NCX, Nachtmodus). Prüfung: `pytest tests/test_build_epub.py`.
 

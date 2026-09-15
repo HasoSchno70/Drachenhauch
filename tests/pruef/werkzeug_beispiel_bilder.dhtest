@@ -167,7 +167,7 @@ DIM i AS INTEGER
 FOR i = 0 TO 2
     PRINT sprites[i]; " "; abweichend("raus/" + sprites[i], ARG$(1) + "/" + sprites[i])
 NEXT
-' Die Lehrbilder im Buch hat make_book.py (prepare_images) fuer den Druck
+' Die Lehrbilder im Buch hat der Buch-Build (tools/buch_bauen.dh) fuer den Druck
 ' aufbereitet: ganzzahlig mit harten Kanten vergroessert, bis die Breite
 ' mindestens 1500 Punkte hat. Dieselbe Vergroesserung hier, dann Punkt fuer Punkt.
 DIM lehr AS ARRAY OF STRING : lehr = ["kap20_raster_schiff.png", "kap21_zwei_frames.png"]

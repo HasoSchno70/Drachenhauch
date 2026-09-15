@@ -1,0 +1,134 @@
+' Der Buch-Build tools/buch_bauen.dh (bis 2026-09-15 je Buch ein make_book.py
+' mit PyMuPDF und PIL). LibreOffice gibt es auf den Laeufern nicht -- geprueft
+' werden die zwei Teile, die ohne es laufen: das Messen an einem vorhandenen
+' PDF (--nur-messen) und das Aufbereiten der Bilder (--nur-bilder).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== messen findet ueberschriften und faellt auf den text zurueck
+' Ein PDF aus dem pdf-Modul: Seite 3 erwaehnt "Kapitel Zwei" im Fliesstext,
+' die Ueberschrift steht erst auf Seite 4. Das Referenzbuch misst genau (Text
+' mit Schriftgroesse >= 15 gewinnt, monoton vorwaerts), das Tippspiel einfach
+' (erste Seite mit dem Text). "Nur Im Text" steht nirgends als Ueberschrift
+' und nur klein geschrieben -- die Suche ist wie im Betrachter unabhaengig von
+' Gross und klein. "Fehlt" gibt es gar nicht.
+IMPORT "pdf"
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    ' Standardausgabe, dann die Fehlerausgabe als eigene Zeilen -- zusammen
+    ' gelesen kaeme ihre Reihenfolge darauf an, welcher Faden zuerst liefert.
+    DIM aus AS STRING : aus = ""
+    DIM fehler AS STRING : fehler = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        DIM fteil AS STRING : fteil = PROCESS_ERR$(p)
+        aus = aus + teil
+        fehler = fehler + fteil
+        IF teil = "" AND fteil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    aus = TRIM$(REPLACE$(aus, CHR$(13), ""))
+    fehler = TRIM$(REPLACE$(fehler, CHR$(13), ""))
+    RETURN aus + CHR$(10) + "stderr: " + fehler
+END FUNCTION
+SUB buchAnlegen(ordner AS STRING, pdfName AS STRING, titelName AS STRING)
+    MKDIR(ordner)
+    MKDIR(ordner + "/buch")
+    DIM p AS PDF : p = PDF_NEW()
+    PDF_FONT(p, "helvetica", 26)
+    PDF_TEXT(p, 20, 30, "Das Buch")
+    PDF_PAGE(p)
+    PDF_FONT(p, "helvetica", 11)
+    PDF_TEXT(p, 20, 30, "Inhalt: Kapitel Eins, Kapitel Zwei, Nur Im Text")
+    PDF_PAGE(p)
+    PDF_FONT(p, "helvetica", 18)
+    PDF_TEXT(p, 20, 30, "Kapitel Eins")
+    PDF_FONT(p, "helvetica", 11)
+    PDF_TEXT(p, 20, 50, "Gleich kommt Kapitel Zwei.")
+    PDF_PAGE(p)
+    PDF_FONT(p, "helvetica", 18)
+    PDF_TEXT(p, 20, 30, "Kapitel Zwei")
+    PDF_PAGE(p)
+    PDF_FONT(p, "helvetica", 11)
+    PDF_TEXT(p, 20, 30, "hier steht es nur im text.")
+    PDF_SAVE(p, ordner + "/buch/" + pdfName)
+    WRITEALL(ordner + "/buch/" + titelName, "[" + CHR$(10) + "  ""Kapitel Eins""," + CHR$(10) + "  ""Kapitel Zwei""," + CHR$(10) + "  ""Nur Im Text""," + CHR$(10) + "  ""Fehlt""" + CHR$(10) + "]")
+END SUB
+buchAnlegen(CWD$() + "/buch-referenz", "Drachenhauch-Lehrbuch.pdf", "toc_titles.de.json")
+buchAnlegen(CWD$() + "/buch-tippspiel", "Drachenhauch-Tippspiel.pdf", "toc_titles.json")
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/buch-referenz", "--nur-messen")
+PRINT lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+PRINT JOIN$(READLINES("buch-referenz/buch/toc_pages.de.json"), CHR$(10))
+p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/buch-tippspiel", "--nur-messen")
+PRINT lauf$(p)
+PRINT JOIN$(READLINES("buch-tippspiel/buch/toc_pages.json"), CHR$(10))
+--- argumente
+{sammlung}/../../tools/buch_bauen.dh
+--- erwartet
+[de] Inhaltsverzeichnis-Seiten gemessen: 3 / 4 -- Buch hat 5 Seiten
+stderr: WARN: keine Seite gefunden fuer: Fehlt
+rueckgabe 0
+{
+  "Kapitel Eins": 3,
+  "Kapitel Zwei": 4,
+  "Nur Im Text": 5
+}
+Inhaltsverzeichnis-Seiten gemessen: 3 / 4 -- Buch hat 5 Seiten
+stderr: WARN: keine Seite gefunden fuer: Fehlt
+{
+  "Kapitel Eins": 3,
+  "Kapitel Zwei": 3,
+  "Nur Im Text": 5
+}
+
+=== bilder werden flach und breit genug
+' Ein kleines Bild mit Durchsichtigkeit wird auf Weiss gelegt, ganzzahlig
+' hochskaliert (100 -> 1500) und OHNE Alphakanal gespeichert (PNG-Farbart 2);
+' ein schon aufbereitetes (RGB, 1600 breit) bleibt Byte fuer Byte stehen.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        aus = aus + teil
+        IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+FUNCTION farbart(pfad AS STRING) AS STRING
+    DIM b AS BUFFER : b = READALL_BYTES(pfad)
+    DIM breite AS INTEGER : breite = ((BUFFER_GET(b, 16) * 256 + BUFFER_GET(b, 17)) * 256 + BUFFER_GET(b, 18)) * 256 + BUFFER_GET(b, 19)
+    RETURN "breite " + STR$(breite) + " farbart " + STR$(BUFFER_GET(b, 25))
+END FUNCTION
+MKDIR("buch-einstieg")
+MKDIR("buch-einstieg/buch")
+MKDIR("buch-einstieg/buch/images")
+DIM klein AS IMAGE : klein = IMAGE_NEW(100, 40)
+IMAGE_FILL_RECT(klein, 0, 0, 49, 39, &HE02010, 255)
+IMAGE_SAVE(klein, "buch-einstieg/buch/images/a_klein.png")
+DIM fertig AS IMAGE : fertig = IMAGE_NEW(1600, 10, &H3060A0)
+IMAGE_SAVE(fertig, "buch-einstieg/buch/images/b_fertig.png", FALSE)
+IF NOT FILEEXISTS("buch-einstieg/buch/images/b_fertig.png") THEN EXIT(1)
+PRINT "vorher a "; farbart("buch-einstieg/buch/images/a_klein.png")
+PRINT "vorher b "; farbart("buch-einstieg/buch/images/b_fertig.png")
+DIM alt AS STRING : alt = BUFFER_TO_HEX$(READALL_BYTES("buch-einstieg/buch/images/b_fertig.png"))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/buch-einstieg", "--nur-bilder")
+PRINT lauf$(p)
+PRINT "nachher a "; farbart("buch-einstieg/buch/images/a_klein.png")
+PRINT "b unveraendert "; alt = BUFFER_TO_HEX$(READALL_BYTES("buch-einstieg/buch/images/b_fertig.png"))
+DIM a AS IMAGE : a = LOADIMAGE("buch-einstieg/buch/images/a_klein.png")
+PRINT "groesse "; IMAGEWIDTH(a); "x"; IMAGEHEIGHT(a)
+PRINT "links "; COLOR_HEX$(GETPIXEL(a, 100, 100)); " rechts "; COLOR_HEX$(GETPIXEL(a, 1400, 500))
+--- argumente
+{sammlung}/../../tools/buch_bauen.dh
+--- erwartet
+vorher a breite 100 farbart 6
+vorher b breite 1600 farbart 2
+Bilder druckfertig gemacht: 1 (Alpha flach -> RGB; kleine zusaetzlich hochskaliert)
+nachher a breite 1500 farbart 2
+b unveraendert TRUE
+groesse 1500x600
+links #E02010 rechts #FFFFFF

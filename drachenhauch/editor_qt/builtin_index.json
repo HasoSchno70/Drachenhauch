@@ -5843,7 +5843,7 @@
   {
    "name": "IMAGE_SAVE",
    "kind": "core",
-   "signature": "IMAGE_SAVE(bild, pfad$)",
+   "signature": "IMAGE_SAVE(bild, pfad$ [, mit_alpha])",
    "module": "imgfx"
   },
   {
