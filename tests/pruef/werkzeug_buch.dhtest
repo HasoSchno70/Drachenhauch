@@ -1,0 +1,126 @@
+' Die Buch-Werkzeuge in Drachenhauch (bis 2026-09-15 je ein .py):
+' i18n/apply.dh traegt Uebersetzungen ein, shoot.dh nimmt die Bilder auf.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== apply schreibt wie extract_strings.js
+' Die Erwartung stammt aus Node: dieselbe Logik, geschrieben mit
+' JSON.stringify(katalog, null, 1). Schluessel mit Punkt, Anfuehrungszeichen,
+' \u-Folge und Umlaut; ein unbekannter Schluessel wird gemeldet und macht die
+' Rueckgabe 1.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/patch.json", CWD$() + "/katalog.json")
+PRINT lauf$(p)
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("katalog.json")
+DIM soll AS BUFFER : soll = READALL_BYTES("erwartet.json")
+PRINT "byte-gleich "; BUFFER_LEN(neu) = BUFFER_LEN(soll) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(soll)
+--- argumente
+{sammlung}/../../buch-referenz/buch/i18n/apply.dh
+--- datei patch.json
+{"Satz eins.": "Sentence one.", "Zwei \"Zitate\" und ä": "Two \"quotes\" and ä\n", "Gibts nicht": "x", "Leer": "Empty \\ slash /"}
+
+--- datei katalog.json base64
+ewogIlNhdHogZWlucy4iOiAiIiwKICJad2VpIFwiWml0YXRlXCIgdW5kIMOkIjogIm9sZCIsCiAiTGVlciI6ICIiLAogIk5vY2ggb2ZmZW4iOiAiIiwKICJfdmVyYWx0ZXQiOiB7CiAgIkFsdC4iOiAib2xkIgogfQp9
+--- datei erwartet.json base64
+ewogIlNhdHogZWlucy4iOiAiU2VudGVuY2Ugb25lLiIsCiAiWndlaSBcIlppdGF0ZVwiIHVuZCDDpCI6ICJUd28gXCJxdW90ZXNcIiBhbmQgw6RcbiIsCiAiTGVlciI6ICJFbXB0eSBcXCBzbGFzaCAvIiwKICJOb2NoIG9mZmVuIjogIiIsCiAiX3ZlcmFsdGV0IjogewogICJBbHQuIjogIm9sZCIKIH0KfQ==
+--- erwartet
+3 eingetragen (1 ersetzt), 3/4 uebersetzt (75.0 %)
+  UNBEKANNTER SCHLUESSEL: Gibts nicht
+rueckgabe 1
+byte-gleich TRUE
+
+=== apply mit leerem patch laesst den echten katalog stehen
+' en.json des Referenzbuchs, als Kopie im Fallordner: Byte fuer Byte gleich.
+' Die Python-Fassung schrieb unter Windows CRLF und aenderte jede Zeile.
+WRITEALL_BYTES(CWD$() + "/kopie.json", READALL_BYTES(ARG$(1)))
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/leer.json", CWD$() + "/kopie.json")
+DIM aus AS STRING : aus = ""
+DIM leer AS INTEGER : leer = 0
+WHILE leer < 5
+    DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+    IF teil = "" AND NOT PROCESS_RUNNING(p) THEN leer = leer + 1
+    aus = aus + teil
+    SLEEP(20)
+WEND
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM neu AS BUFFER : neu = READALL_BYTES("kopie.json")
+DIM alt AS BUFFER : alt = READALL_BYTES(ARG$(1))
+PRINT "byte-gleich "; BUFFER_LEN(neu) = BUFFER_LEN(alt) AND BUFFER_TO_HEX$(neu) = BUFFER_TO_HEX$(alt)
+--- argumente
+{sammlung}/../../buch-referenz/buch/i18n/apply.dh
+{sammlung}/../../buch-referenz/buch/i18n/en.json
+--- datei leer.json
+{}
+
+--- erwartet
+rueckgabe 0
+byte-gleich TRUE
+
+=== shoot im referenzbuch nimmt ein bild auf
+' Die Kopie des Werkzeugs liegt in _programm/, ihre figures/ und images/
+' also daneben. 480x320 mit Skalierung 4 ergibt 1920x1280.
+--- programm ../../buch-referenz/buch/shoot.dh
+--- argumente
+mini
+--- datei _programm/figures/mini.dh
+SCREEN(480, 320)
+WHILE TRUE
+    CLS(&H102030)
+    BOX(40, 40, 200, 160, &HE03020)
+    FLIP()
+WEND
+
+--- erwartet
+  OK  mini
+1/1 Screenshots neu aufgenommen (scale 4, TTF).
+--- bild _programm/images/mini.png
+groesse 1920 1280
+400 400 #E03020 +-8
+1600 1100 #102030 +-8
+
+=== shoot im einstiegsbuch findet figuren und kapitelprogramme
+' Ohne Namen: alles aus figures/ plus jedes Kapitelprogramm mit eigener
+' Schleife; ein lineares Programm (ohne WHILE) wird uebergangen. Aus
+' kap05_1_lauf wird ../code/kap05/1_lauf.dh.
+--- programm ../../buch-einstieg/buch/shoot.dh
+--- datei _programm/figures/kap01_1_bild.dh
+SCREEN(640, 400)
+WHILE TRUE
+    CLS(&H203040)
+    FLIP()
+WEND
+
+--- datei code/kap05/1_lauf.dh
+SCREEN(640, 400)
+WHILE TRUE
+    CLS(&H40A040)
+    FLIP()
+WEND
+
+--- datei code/kap05/2_linear.dh
+PRINT "kein Fenster"
+
+--- erwartet
+  kap01_1_bild.png  (12 Frames)
+  kap05_1_lauf.png  (12 Frames)
+2/2 Bilder
+--- bild _programm/images/kap05_1_lauf.png
+groesse 1920 1200
+900 600 #40A040 +-8

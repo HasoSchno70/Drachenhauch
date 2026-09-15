@@ -151,8 +151,10 @@ Stand jetzt: **113 Befehle aus 85 Programmen**, keiner ohne Beschreibung.
 Die Bildquellen liegen in `buch/figures/*.dh`, aufgenommen mit
 
 ```
-<venv>\python.exe shoot.py
+dhrt run buch-einstieg/buch/shoot.dh
 ```
+
+(Bis 2026-09-15 `shoot.py`; aufgenommen wird seither über `dhrt bild`.)
 
 Das gilt aber nur für die **linearen** Programme der ersten Kapitel: Der
 Screenshot fällt beim **letzten** Frame, und wer nur einmal zeichnet und dann
@@ -160,7 +162,7 @@ mit `SLEEP` wartet, bekommt ein schwarzes Bild. Deren Figurenquelle enthält
 dieselben Zeichenbefehle in einer kurzen Schleife.
 
 Ab Kapitel 5 haben die Programme eine eigene Spielschleife und laufen, bis man
-sie beendet — die nimmt `shoot.py` **unverändert** aus `code/kapNN/` auf: Aus
+sie beendet — die nimmt `shoot.dh` **unverändert** aus `code/kapNN/` auf: Aus
 `kap05_1_wanderer` wird `../code/kap05/1_wanderer.dh`. Keine zweite Quelle,
 keine zweite Wahrheit. Der Ordner `code/anhang/` wird genauso behandelt: aus
 `anhang_farben` wird `../code/anhang/farben.dh`.

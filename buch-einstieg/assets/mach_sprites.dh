@@ -195,7 +195,7 @@ FOR i = 0 TO 2
     PRINT "  " + name + " " + STR$(IMAGEWIDTH(fertig[i])) + "x" + STR$(IMAGEHEIGHT(fertig[i]))
 NEXT
 
-' Lehrbilder fuers Buch -- direkt nach buch/images/, wo shoot.py auch
+' Lehrbilder fuers Buch -- direkt nach buch/images/, wo shoot.dh auch
 ' hinschreibt. Sie zeigen die Figuren als Karopapier statt als Sprite.
 IF DIREXISTS(bilderOrdner) THEN
     IMAGE_SAVE(rasterBild(SCHIFF, 24), bilderOrdner + "/kap20_raster_schiff.png")
