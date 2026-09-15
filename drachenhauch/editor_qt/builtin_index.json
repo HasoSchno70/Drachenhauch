@@ -5481,6 +5481,12 @@
    "module": "httpd"
   },
   {
+   "name": "HTTPD_SET_HEADER",
+   "kind": "core",
+   "signature": "HTTPD_SET_HEADER(s: HTTPD, name$, wert$)",
+   "module": "httpd"
+  },
+  {
    "name": "HTTPD_SEND_DIR",
    "kind": "core",
    "signature": "HTTPD_SEND_DIR(s: HTTPD, ordner$ [, start$]) AS BOOLEAN",

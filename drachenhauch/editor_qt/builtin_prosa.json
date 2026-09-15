@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1856,
+ "count": 1857,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -894,6 +894,7 @@
   "HTTPD_SEND": "antworten und schließen",
   "HTTPD_SEND_DIR": "den angefragten Pfad sicher im Ordner auflösen",
   "HTTPD_SEND_FILE": "eine bestimmte Datei ausliefern",
+  "HTTPD_SET_HEADER": "eine Kopfzeile für alle folgenden Antworten; leerer Wert entfernt sie",
   "HTTPD_START": "Server starten; 0 = freien Port wählen lassen",
   "HTTPD_STOP": "Server beenden",
   "HTTP_BYTES": "BUFFER (roher Rumpf der letzten Antwort)",

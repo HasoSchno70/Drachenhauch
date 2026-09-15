@@ -30,6 +30,7 @@ und es war der kleinste von allen, weil `NET_TCP_LISTEN` schon darunter liegt.
 | `HTTPD_HEADER$(s, name$)` → STRING | eine Kopfzeile (Groß-/Kleinschreibung egal) |
 | `HTTPD_BODY$(s)` → STRING | der Rumpf (bei `POST`) |
 | `HTTPD_SEND(s, code, typ$, inhalt$)` | antworten und schließen |
+| `HTTPD_SET_HEADER(s, name$, wert$)` | eine Kopfzeile für **alle** folgenden Antworten; leerer Wert entfernt sie |
 | `HTTPD_SEND_FILE(s, code, pfad$)` | eine bestimmte Datei ausliefern |
 | `HTTPD_SEND_DIR(s, ordner$[, start$])` → BOOLEAN | den angefragten Pfad **sicher** im Ordner auflösen |
 | `HTTPD_STOP(s)` | Server beenden |
@@ -96,6 +97,26 @@ Laufwerk oder einen alternativen Datenstrom meinen könnten) und antwortet mit
 
 `HTTPD_SEND_FILE` bleibt für den Fall, dass **das Programm** entscheidet,
 welche Datei rausgeht — dort steht kein fremder Pfad im Spiel.
+
+## Eigene Kopfzeilen
+
+`HTTPD_SET_HEADER` gilt für jede weitere Antwort des Servers, nicht nur für
+die nächste — gebraucht wird es für Kopfzeilen, die überall stehen müssen,
+etwa die CORS-Freigabe, ohne die ein Spiel im Browser den Server nicht
+erreicht:
+
+```basic
+IMPORT "httpd"
+DIM s AS HTTPD
+s = HTTPD_START(8787)
+HTTPD_SET_HEADER(s, "Access-Control-Allow-Origin", "*")
+```
+
+Eine Kopfzeile nur an der nächsten Antwort zu setzen hieße, dass jede
+Antwortstelle des Programms daran denken muss — und genau eine vergisst es.
+Ein Wert mit Zeilenumbruch ist ein Fehler (er schriebe sonst eine zweite,
+frei gewählte Kopfzeile in die Antwort), und `Content-Type`,
+`Content-Length` und `Connection` setzt `HTTPD_SEND` selbst.
 
 ## Grenzen — und warum
 

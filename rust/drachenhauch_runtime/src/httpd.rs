@@ -51,6 +51,36 @@ pub struct Server {
     /// Die gerade angenommene Anfrage samt offener Verbindung. Beides gehoert
     /// zusammen: die Antwort geht genau an diesen Absender.
     pub offen: Option<(TcpStream, Anfrage)>,
+    /// Kopfzeilen, die JEDE Antwort mitbekommt (`HTTPD_SET_HEADER`) -- etwa
+    /// die CORS-Freigabe, damit ein Spiel im Browser den Server erreicht.
+    /// Fuer jede Antwort, nicht nur die naechste: sonst muesste jede
+    /// Antwortstelle des Programms daran denken, und genau eine vergisst es.
+    pub zusatz: Vec<(String, String)>,
+}
+
+/// Namen, die `antworten` selbst schreibt -- doppelt waeren sie widerspruechlich.
+const EIGENE_KOPFZEILEN: [&str; 3] = ["content-type", "content-length", "connection"];
+
+/// Eine Kopfzeile fuer alle kuenftigen Antworten setzen; leerer Wert entfernt sie.
+///
+/// Zeilenumbrueche sind ein Fehler: ein Wert mit `\r\n` schriebe eine zweite,
+/// frei gewaehlte Kopfzeile (oder gleich einen Rumpf) in die Antwort.
+pub fn kopfzeile_setzen(s: &mut Server, name: &str, wert: &str) -> Result<(), String> {
+    let n = name.trim();
+    if n.is_empty() || !n.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+        return Err(format!("HTTPD_SET_HEADER: ungueltiger Name '{}' (erlaubt: Buchstaben, Ziffern, - und _)", name));
+    }
+    if wert.contains('\r') || wert.contains('\n') {
+        return Err("HTTPD_SET_HEADER: der Wert darf keinen Zeilenumbruch enthalten".into());
+    }
+    if EIGENE_KOPFZEILEN.contains(&n.to_lowercase().as_str()) {
+        return Err(format!("HTTPD_SET_HEADER: '{}' setzt HTTPD_SEND selbst", n));
+    }
+    s.zusatz.retain(|(k, _)| !k.eq_ignore_ascii_case(n));
+    if !wert.is_empty() {
+        s.zusatz.push((n.to_string(), wert.to_string()));
+    }
+    Ok(())
 }
 
 pub fn starten(port: i64, bind: &str) -> Result<Server, String> {
@@ -62,7 +92,7 @@ pub fn starten(port: i64, bind: &str) -> Result<Server, String> {
     // niemand anklopft -- sonst stuende die Hauptschleife still.
     l.set_nonblocking(true)
         .map_err(|e| format!("HTTPD_START: {}", e))?;
-    Ok(Server { lauscher: l, port: echter, offen: None })
+    Ok(Server { lauscher: l, port: echter, offen: None, zusatz: Vec::new() })
 }
 
 /// Eine Anfrage annehmen, wenn eine anliegt. `false` = gerade nichts zu tun.
@@ -181,13 +211,21 @@ pub fn prozent_auf(s: &str) -> String {
 pub fn antworten(s: &mut Server, code: i64, typ: &str, inhalt: &[u8]) -> Result<(), String> {
     let (mut strom, _) = s.offen.take()
         .ok_or("HTTPD_SEND: es liegt keine Anfrage an (erst HTTPD_ACCEPT)")?;
-    let kopf = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        code, grund(code), typ, inhalt.len());
+    let kopf = kopf_text(code, typ, inhalt.len(), &s.zusatz);
     strom.write_all(kopf.as_bytes()).map_err(|e| format!("HTTPD_SEND: {}", e))?;
     strom.write_all(inhalt).map_err(|e| format!("HTTPD_SEND: {}", e))?;
     strom.flush().ok();
     Ok(())
+}
+
+fn kopf_text(code: i64, typ: &str, laenge: usize, zusatz: &[(String, String)]) -> String {
+    let mut k = format!("HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n",
+                        code, grund(code), typ, laenge);
+    for (n, v) in zusatz {
+        k.push_str(&format!("{}: {}\r\n", n, v));
+    }
+    k.push_str("Connection: close\r\n\r\n");
+    k
 }
 
 fn grund(code: i64) -> &'static str {
@@ -291,6 +329,16 @@ mod tests {
         assert_eq!(typ_aus_endung("a.html"), "text/html; charset=utf-8");
         assert_eq!(typ_aus_endung("A.PNG"), "image/png");
         assert_eq!(typ_aus_endung("ohne"), "application/octet-stream");
+    }
+
+    #[test]
+    fn zusatzkopfzeilen_stehen_vor_connection() {
+        let z = vec![("Access-Control-Allow-Origin".to_string(), "*".to_string())];
+        assert_eq!(kopf_text(200, "application/json", 2, &z),
+                   "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\
+                    Access-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n");
+        assert_eq!(kopf_text(404, "text/plain", 0, &[]),
+                   "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
     }
 
     #[test]
