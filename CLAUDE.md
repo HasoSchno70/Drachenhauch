@@ -3012,8 +3012,20 @@ ein nachgebautes Pillow-Scanline mit acht Varianten traf keinen genau, und im
 Bild sind es einzelne Randpunkte. GIFs (je Bild 120 ms) und der Kontaktbogen
 (Schrift der Laufzeit) sind neu geschrieben, die `.dhsprite`-Dateien nicht mehr.
 Test `tests/pruef/werkzeug_platformer_sprites.dhtest`.
-Noch Python bei den Spielen: Pyramid Pushers `gen_art.py` (PIL + numpy) und der
-Flask-`cloudserver`.
+**Pyramid-Pusher-Kunst (selber Tag):** `pyramid_pusher/assets/gen_art.dh` statt
+`gen_art.py` (PIL + numpy). Die Koernung kam aus `np.random.default_rng(seed)
+.integers(lo, hi)`, und die ist nachgebaut statt ersetzt: SeedSequence (hashmix
+/mix, acht 32-Bit-Woerter), PCG64 (128-Bit-Zustand, XSL-RR, erst die unteren 32
+Bit einer Ausgabe, dann die oberen) und Lemires Verfahren fuer die Spanne.
+**Ein INTEGER laeuft nicht still ueber, er bricht ab** -- der Zustand liegt in
+acht 16-Bit-Stuecken, 32-Bit-Produkte gehen ueber `mal32`. Dazu Pythons
+`round()` (bei genau .5 zur geraden Zahl). Ergebnis: 15 von 16 Bildern Punkt fuer
+Punkt gleich, samt Held-Sheet und 512er-Lichtmaske (0,7 s); der Stern (PIL-Vieleck)
+weicht an 17 Randpunkten ab -- mit abgeschnittenen Eckpunkten, mit Kommazahlen
+waren es 55. Eingecheckt ist nur der neue Stern, die uebrigen PNGs sind
+unveraendert. Test `tests/pruef/werkzeug_pyramid_art.dhtest` (alle 16 Bilder
+gegen die eingecheckten; die ersten Zuege zweier Startwerte gegen numpys Zahlen).
+Noch Python bei den Spielen: der Flask-`cloudserver`.
 
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in

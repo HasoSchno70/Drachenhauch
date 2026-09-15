@@ -123,8 +123,11 @@ Alle Tiles/Sprites liegen als PNG in [`assets/`](assets) (32×32, Held-Sheet
 64×128). Erzeugt vom Generator:
 
 ```
-.venv\Scripts\python.exe pyramid_pusher\assets\gen_art.py
+dhrt run pyramid_pusher/assets/gen_art.dh
 ```
+
+(Bis 2026-09-14 war das `gen_art.py` mit PIL und numpy; die Drachenhauch-Fassung
+zieht denselben Zufall und zeichnet dieselben Bilder.)
 
 Die PNGs sind ganz normale Sheets — du kannst jedes im **Sprite-Editor**
 nachmalen:

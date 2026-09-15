@@ -1,0 +1,121 @@
+' Der Kunst-Generator von Pyramid Pusher (bis 2026-09-14 gen_art.py mit PIL und
+' numpy). Die 16 PNGs werden Punkt fuer Punkt mit den eingecheckten verglichen
+' (Deckkraft, bei gedeckten Punkten auch die Farbe); der Zufall ist numpys
+' default_rng, und dessen erste Zuege stehen im zweiten Fall als Zahlen, die
+' numpy 2.4 selbst geliefert hat.
+
+=== pyramid-kunst ist die eingecheckte
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    aus = REPLACE$(aus, CHR$(13), "")
+    IF RIGHT$(aus, 1) = CHR$(10) THEN aus = LEFT$(aus, LEN(aus) - 1)
+    RETURN aus
+END FUNCTION
+FUNCTION abweichend(pfadA AS STRING, pfadB AS STRING) AS INTEGER
+    DIM a AS IMAGE : a = LOADIMAGE(pfadA)
+    DIM b AS IMAGE : b = LOADIMAGE(pfadB)
+    IF IMAGEWIDTH(a) <> IMAGEWIDTH(b) OR IMAGEHEIGHT(a) <> IMAGEHEIGHT(b) THEN RETURN -1
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO IMAGEHEIGHT(a) - 1
+        FOR x = 0 TO IMAGEWIDTH(a) - 1
+            DIM da AS INTEGER : da = GETALPHA(a, x, y)
+            IF da <> GETALPHA(b, x, y) THEN
+                n = n + 1
+            ELSEIF da > 0 AND GETPIXEL(a, x, y) <> GETPIXEL(b, x, y) THEN
+                n = n + 1
+            END IF
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", CWD$() + "/art")
+DIM aus AS STRING : aus = lauf$(p)
+' Ein Bau ohne Grafik kann nicht zeichnen: die Meldung des Kindes
+' weiterreichen, dann heisst der Fall "uebersprungen" statt falsch.
+IF NOT FILEEXISTS("art/lightmask.png") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT aus
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM namen AS ARRAY OF STRING : namen = ["floor", "wall", "goal", "crate", "crate_on", "hero", "chest_closed", "chest_open", "star", "pit", "pit_filled", "button", "door_closed", "door_open", "ice", "lightmask"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    PRINT namen[i]; " "; abweichend("art/" + namen[i] + ".png", ARG$(1) + "/" + namen[i] + ".png")
+NEXT
+--- argumente
+{sammlung}/../../pyramid_pusher/assets/gen_art.dh
+{sammlung}/../../pyramid_pusher/assets
+--- erwartet
+Pyramid Pusher -- erzeuge Pixel-Art ...
+  -> floor.png 32 x 32
+  -> wall.png 32 x 32
+  -> goal.png 32 x 32
+  -> crate.png 32 x 32
+  -> crate_on.png 32 x 32
+  -> hero.png 64 x 128
+  -> chest_closed.png 48 x 48
+  -> chest_open.png 48 x 48
+  -> star.png 24 x 24
+  -> pit.png 32 x 32
+  -> pit_filled.png 32 x 32
+  -> button.png 32 x 32
+  -> door_closed.png 32 x 32
+  -> door_open.png 32 x 32
+  -> ice.png 32 x 32
+  -> lightmask.png 512 x 512
+fertig.
+rueckgabe 0
+floor 0
+wall 0
+goal 0
+crate 0
+crate_on 0
+hero 0
+chest_closed 0
+chest_open 0
+star 0
+pit 0
+pit_filled 0
+button 0
+door_closed 0
+door_open 0
+ice 0
+lightmask 0
+
+=== der zufall zieht dieselben zahlen wie numpy
+' np.random.default_rng(7).integers(-10, 11) zwoelfmal und
+' default_rng(3).integers(0, 100) zwoelfmal -- ohne Grafik pruefbar.
+DIM prK AS INTEGER
+DIM prZeile AS STRING
+zufallStart(7)
+prZeile = ""
+FOR prK = 1 TO 12
+    prZeile = prZeile + STR$(zufall(-10, 11)) + " "
+NEXT
+PRINT TRIM$(prZeile)
+zufallStart(3)
+prZeile = ""
+FOR prK = 1 TO 12
+    prZeile = prZeile + STR$(zufall(0, 100)) + " "
+NEXT
+PRINT TRIM$(prZeile)
+EXIT(0)
+--- programm ../../pyramid_pusher/assets/gen_art.dh nach CONST ICE_LO = &H6896C0
+--- erwartet
+9 3 4 8 2 6 7 -6 -9 -4 -5 8
+81 8 17 23 18 80 86 58 3 9 33 43
