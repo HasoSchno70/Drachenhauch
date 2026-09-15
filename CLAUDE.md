@@ -3096,6 +3096,22 @@ beide Messarten; Bilder: Farbart, Breite, Weiss unter Durchsichtigem, fertiges
 Bild unberuehrt). PyMuPDF bleibt in requirements.txt nur fuer
 `tests/test_drucken.py`.
 
+**Showcase in Drachenhauch (2026-09-15):** die kuratierte Beispiel-Galerie
+steht in `examples/showcase.json` (file/title/desc/frames) statt in
+`editor_qt/showcase.py` -- Qt-Panel, IDE und Erzeuger lesen dieselbe Datei.
+`tools/showcase_bilder.dh [-- --wurzel DIR] [name ...]` ersetzt
+`gen_showcase_thumbs.py`: `dhrt bild` je Eintrag, auf 480 Punkte Breite mit
+`IMAGE_SCALE` (bilinear statt LANCZOS, also nicht punktgleich), gesichert mit
+`IMAGE_SAVE(..., FALSE)` ohne Alpha; Rueckgabe 2, wenn nicht alle entstehen.
+Die IDE zeigt die Liste als Karten (Bild, Titelknopf, Beschreibung, Tooltip),
+bis zu 32, blaettert per Mausrad reihenweise (`kacheln reihe N`), nimmt
+`examples/screenshots/<name>.png` vor der eigenen `dhrt bild`-Vorschau und
+faellt ohne Liste auf die acht festen Kacheln zurueck (Geometrie der ersten
+Karte unveraendert -- der alte Klick-Test trifft weiter). **Falle:** `LEN` auf
+einer MAP ist ein Laufzeitfehler, gezaehlt wird selbst. Tests
+`tests/pruef/werkzeug_showcase.dhtest` (5; Gegenprobe mit Alpha/Breite 400
+und ohne showcase.json: die jeweiligen Faelle fallen).
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei
