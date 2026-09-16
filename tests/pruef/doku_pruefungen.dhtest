@@ -1,0 +1,451 @@
+' Die Doku gegen die Wirklichkeit: Codebloecke, Befehlsnamen, Zaehlungen,
+' Tastenkonstanten, Pfade und Links (`dhrt pruef`), die erzeugten Dateien
+' builtin_prosa.json und die VS-Code-Grammatik (`dhrt doku ... --pruefen`).
+'
+' Bis 2026-09-16 tests/test_doku_aussagen.py, test_docs_codebloecke.py,
+' test_vscode_grammatik.py und test_builtin_prosa.py. Jeder Fall bekommt die
+' Repo-Wurzel als Argument und wechselt dorthin, bevor er dhrt startet --
+' `dhrt pruef` und `dhrt doku` suchen die Wurzel vom Arbeitsordner aus. Proben
+' mit eigenen Markdown-Dateien legen sie VORHER in den Fallordner.
+'
+' Entstanden sind die Pruefungen aus Durchgaengen durch docs/: elf
+' Codebeispiele, die beim Abtippen abbrachen, sieben falsche Aussagen, vier
+' tote Links in CLAUDE.md und eine Grammatik, die 223 Befehle nicht kannte.
+
+=== alle codebloecke der doku uebersetzen
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "bloecke"])
+DIM alles AS STRING : alles = dlAus + dlErr
+' Die Schranke gegen eine kaputte Erkennung, die gar nichts findet.
+PRINT "ueber 100 bloecke "; (zahlVor(alles, " Codebloecke") > 100)
+IF dlCode <> 0 THEN PRINT alles
+PRINT "rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' Die Zahl direkt vor einem Wort ("1234 Codebloecke").
+FUNCTION zahlVor(text AS STRING, wort AS STRING) AS INTEGER
+    DIM wo AS INTEGER : wo = INSTR(text, wort)
+    IF wo < 0 THEN RETURN -1
+    DIM anfang AS INTEGER : anfang = wo
+    WHILE anfang > 0 AND INSTR("0123456789", MID$(text, anfang - 1, 1)) >= 0
+        anfang = anfang - 1
+    WEND
+    RETURN VAL(MID$(text, anfang, wo - anfang))
+END FUNCTION
+--- erwartet
+ueber 100 bloecke TRUE
+rueckgabe 0
+
+=== notation in codebloecken gilt nicht als fehler
+' `...`, `[optional]` und `FOR each` sind Schreibweise, kein Programm -- ohne
+' den Filter meldete der Pruefer 27 Fehler, die mit Absicht so dastehen. Ein
+' echter Fehler wird weiter gemeldet, samt Datei und Zeile.
+IMPORT "helfer.dh"
+DIM fall AS STRING : fall = CWD$()
+MKDIR("probe")
+WRITEALL("probe/probe.md", "```basic" + CHR$(10) + "PRINT ..." + CHR$(10) + _
+    "SPEAK(text$ [, unterbrechen])" + CHR$(10) + "```" + CHR$(10) + CHR$(10) + _
+    "```basic" + CHR$(10) + "PRINT 1" + CHR$(10) + "```" + CHR$(10))
+CHDIR(ARG$(0))
+dlStarten(["pruef", "bloecke", fall + "/probe"])
+PRINT "ohne kaputt: rueckgabe "; dlCode; ", zwei bloecke "; (INSTR(dlAus + dlErr, "2 Codebloecke") >= 0)
+WRITEALL(fall + "/probe/kaputt.md", "```basic" + CHR$(10) + "DIM x AS" + CHR$(10) + "```" + CHR$(10))
+dlStarten(["pruef", "bloecke", fall + "/probe"])
+PRINT "mit kaputt: rueckgabe "; dlCode; ", zeile genannt "; (INSTR(dlAus + dlErr, "kaputt.md:2") >= 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+ohne kaputt: rueckgabe 0, zwei bloecke TRUE
+mit kaputt: rueckgabe 1, zeile genannt TRUE
+
+=== relative links in docs zeigen auf etwas
+' Gefunden hatte das acht Stueck: dreimal ein Pfad relativ zum falschen
+' Ordner, fuenfmal Python-Dateien, die mit Stufe B geloescht wurden.
+IMPORT "regex"
+DIM docs AS STRING : docs = ARG$(0) + "/docs"
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(docs, "*.md")
+SORT(dateien)
+DIM geprueft AS INTEGER : geprueft = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(dateien) - 1
+    DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(docs + "/" + dateien[i]))
+    DIM links AS ARRAY OF STRING : links = REGEX_FIND_ALL(text, "\[[^\]]*\]\([^)\s]+\)")
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(links) - 1
+        DIM ziel AS STRING : ziel = links[k]
+        ziel = MID$(ziel, INSTR(ziel, "](") + 2)
+        ziel = LEFT$(ziel, LEN(ziel) - 1)
+        IF LEFT$(ziel, 7) = "http://" OR LEFT$(ziel, 8) = "https://" OR LEFT$(ziel, 1) = "#" OR LEFT$(ziel, 7) = "mailto:" THEN CONTINUE
+        IF INSTR(ziel, "#") >= 0 THEN ziel = LEFT$(ziel, INSTR(ziel, "#"))
+        IF ziel = "" THEN CONTINUE
+        geprueft = geprueft + 1
+        DIM pfad AS STRING : pfad = docs + "/" + ziel
+        IF NOT FILEEXISTS(pfad) AND NOT DIREXISTS(pfad) THEN PRINT "tot: "; dateien[i]; " -> "; links[k]
+    NEXT
+NEXT
+' Die Schranke: ohne sie waere ein Muster, das nichts mehr trifft, gruen.
+PRINT "links gefunden "; (geprueft > 50)
+--- argumente
+{sammlung}/../..
+--- erwartet
+links gefunden TRUE
+
+=== jede doku ist vom index erreichbar
+' Sonst schreibt jemand 181 Zeilen, die niemand findet (scope.md).
+IMPORT "regex"
+DIM docs AS STRING : docs = ARG$(0) + "/docs"
+DIM index AS STRING : index = BUFFER_TO_STRING$(READALL_BYTES(docs + "/README.md"))
+DIM verlinkt AS MAP OF BOOLEAN
+DIM treffer AS ARRAY OF STRING : treffer = REGEX_FIND_ALL(index, "\(([A-Za-z0-9_.-]+\.md)\)")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(treffer) - 1
+    ' Mit einer Gruppe im Muster liefert REGEX_FIND_ALL die Gruppe, nicht den Treffer.
+    MAPPUT(verlinkt, treffer[i], TRUE)
+NEXT
+DIM alle AS ARRAY OF STRING : alle = DIRLIST(docs, "*.md")
+SORT(alle)
+DIM fehlen AS INTEGER : fehlen = 0
+FOR i = 0 TO LEN(alle) - 1
+    IF alle[i] = "README.md" THEN CONTINUE
+    IF NOT MAPHAS(verlinkt, alle[i]) THEN
+        PRINT "nicht im index: "; alle[i]
+        fehlen = fehlen + 1
+    END IF
+NEXT
+PRINT "dokumente "; (LEN(alle) > 20); ", fehlen "; fehlen
+--- argumente
+{sammlung}/../..
+--- erwartet
+dokumente TRUE, fehlen 0
+
+=== befehlsnamen in der doku existieren
+' Jeder `NAME(`-Verweis in Tabellen und Fliesstext muss ein echtes Builtin
+' sein -- faengt Tippfehler und umbenannte Befehle, die kein Codeblock abdeckt.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "namen"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "docs: rueckgabe "; dlCode
+dlStarten(["pruef", "namen", ".", "--nur", "CLAUDE.md"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "CLAUDE.md: rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+docs: rueckgabe 0
+CLAUDE.md: rueckgabe 0
+
+=== die namenspruefung schlaegt an
+' Gegenprobe: ein erfundener Befehl faellt auf, ein Schluesselwort nicht.
+IMPORT "helfer.dh"
+DIM fall AS STRING : fall = CWD$()
+MKDIR("probe")
+WRITEALL("probe/probe.md", "Mit `GIBTSNICHT_XY(1)` und `PRINT(1)` und `ABS(x)`." + CHR$(10))
+CHDIR(ARG$(0))
+dlStarten(["pruef", "namen", fall + "/probe"])
+DIM alles AS STRING : alles = dlAus + dlErr
+DIM befunde AS STRING : befunde = MID$(alles, INSTR(alles, "Befund"))
+PRINT "rueckgabe "; dlCode
+PRINT "erfundener befehl gemeldet "; (INSTR(alles, "GIBTSNICHT_XY") >= 0)
+PRINT "print nicht gemeldet "; (INSTR(befunde, "PRINT") < 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+erfundener befehl gemeldet TRUE
+print nicht gemeldet TRUE
+
+=== zaehlungen und tastenkonstanten stimmen
+' "39 Module", "183 Beispiele" -- Zahlen veralten beim naechsten Commit. Und
+' die Liste der Tastenkonstanten gab sich als vollstaendig aus und war es nie.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "zaehlungen"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "zaehlungen: rueckgabe "; dlCode
+dlStarten(["pruef", "konstanten"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "konstanten: rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+zaehlungen: rueckgabe 0
+konstanten: rueckgabe 0
+
+=== die beispielzaehlung kommt aus der versionsverwaltung
+' Die Zahl kam frueher aus einem glob ueber examples/ -- und darin fiel eine
+' Temp-Datei der Live-Diagnose, die fuer 40 ms NEBEN der Quelle liegt. Hier in
+' einem eigenen Wegwerf-Repo, damit kein paralleler Lauf die Streudatei sieht.
+IMPORT "helfer.dh"
+DIM fall AS STRING : fall = CWD$()
+MKDIR("repo")
+MKDIR("repo/examples")
+WRITEALL("repo/examples/01_hallo.dh", "PRINT 1" + CHR$(10))
+WRITEALL("repo/examples/02_welt.dh", "PRINT 2" + CHR$(10))
+CHDIR("repo")
+IF NOT git("init", "", "") THEN
+    PRINT "UEBERSPRINGEN: git nicht installiert"
+    EXIT(0)
+END IF
+git("config", "user.email", "t@t.de")
+git("config", "user.name", "Tester")
+git("add", "examples", "")
+git("-c", "commit.gpgsign=false", "commit -m zwei")
+CHDIR(ARG$(0))
+dlStarten(["pruef", "beispiele", fall + "/repo"])
+PRINT "vorher: "; TRIM$(dlAus)
+' Der Fremdkoerper aus der Live-Diagnose -- unversioniert, also unsichtbar.
+WRITEALL(fall + "/repo/examples/tmp9k3x.dh", "PRINT 1" + CHR$(10))
+dlStarten(["pruef", "beispiele", fall + "/repo"])
+PRINT "mit streudatei: "; TRIM$(dlAus)
+PRINT "der glob saehe "; LEN(DIRLIST(fall + "/repo/examples", "*.dh"))
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' git im Arbeitsordner; "commit -m zwei" als dritter Teil wird zerlegt.
+FUNCTION git(a AS STRING, b AS STRING, c AS STRING) AS BOOLEAN
+    DIM p AS INTEGER
+    TRY
+        IF c = "commit -m zwei" THEN
+            p = PROCESS_START("git", a, b, "commit", "-m", "zwei")
+        ELSEIF b = "" THEN
+            p = PROCESS_START("git", a)
+        ELSEIF c = "" THEN
+            p = PROCESS_START("git", a, b)
+        ELSE
+            p = PROCESS_START("git", a, b, c)
+        END IF
+    CATCH e
+        RETURN FALSE
+    END TRY
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p) = 0
+END FUNCTION
+--- erwartet
+vorher: 2 versioniert
+mit streudatei: 2 versioniert
+der glob saehe 3
+
+=== pfade und links in docs und claude.md leben
+' `drachenhauch/interpreter.py` in einer Umsetzungs-Checkliste -- solche
+' Verweise verrotten leise. CLAUDE.md ist die Datei, die als Erstes gelesen
+' wird; der Durchgang vom 2026-08-29 fand dort vier tote Links.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["pruef", "pfade"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "docs: rueckgabe "; dlCode
+dlStarten(["pruef", "pfade", ".", "--nur", "CLAUDE.md"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "CLAUDE.md: rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+docs: rueckgabe 0
+CLAUDE.md: rueckgabe 0
+
+=== markdown-links werden ueberhaupt geprueft
+' Die Pruefung sah lange nur Inline-Code und uebersah Links -- ausgerechnet die
+' Form der vier toten Verweise in CLAUDE.md. Nicht anschlagen duerfen: ein
+' Ordner, eine Zeilennummer am Ende, ein Ziel im Netz. Und die Duldung
+' historischer Pfade gilt fuer Inline-Code, NICHT fuer einen Link.
+IMPORT "helfer.dh"
+DIM fall AS STRING : fall = CWD$()
+MKDIR("probe")
+DIM z AS STRING : z = CHR$(10)
+WRITEALL("probe/probe.md", "[tot](drachenhauch/gibtsnicht.py)" + z + _
+    "[lebt](rust/build_wasm.py)" + z + "[ordner](docs/)" + z + _
+    "[mit Zeile](drachenhauch/lexer.py:114)" + z + _
+    "[netz](https://example.invalid/x.py)" + z + _
+    "`drachenhauch/interpreter.py` als Inline-Code ist geduldet" + z + _
+    "[klick](drachenhauch/interpreter.py)" + z)
+CHDIR(ARG$(0))
+dlStarten(["pruef", "pfade", fall + "/probe", "--nur", "probe.md"])
+DIM alles AS STRING : alles = dlAus + dlErr
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(alles, CHR$(10))
+DIM befunde AS INTEGER : befunde = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    IF LEFT$(TRIM$(zeilen[i]), 2) = "->" THEN befunde = befunde + 1
+NEXT
+PRINT "rueckgabe "; dlCode; ", befunde "; befunde
+PRINT "toter link "; (INSTR(alles, "gibtsnicht.py") >= 0)
+PRINT "geduldeter pfad als link "; (INSTR(alles, "[...](drachenhauch/interpreter.py)") >= 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1, befunde 2
+toter link TRUE
+geduldeter pfad als link TRUE
+
+=== die vscode-grammatik liegt dort, wo package.json sie sucht
+' Bei der Umbenennung wurde der INHALT der Grammatik angepasst, der DATEINAME
+' nicht -- die Extension hatte keine Grammatik mehr. Zwei Grammatiken im
+' Ordner hiessen: eine davon liest niemand.
+IMPORT "json"
+DIM ext AS STRING : ext = ARG$(0) + "/vscode-drachenhauch"
+DIM pkg AS JSON_HANDLE : pkg = JSON_LOAD(ext + "/package.json")
+DIM pfad AS STRING : pfad = JSON_GET_STRING(pkg, "contributes.grammars.0.path")
+IF LEFT$(pfad, 2) = "./" THEN pfad = MID$(pfad, 2)
+PRINT "verweis "; pfad
+PRINT "datei da "; FILEEXISTS(ext + "/" + pfad)
+DIM alle AS ARRAY OF STRING : alle = DIRLIST(ext + "/syntaxes", "*.tmLanguage.json")
+PRINT "grammatiken im ordner "; LEN(alle)
+DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ext + "/" + pfad))
+' Der Sinn der Erzeugung: ein Befehl aus dem Index wird gefaerbt.
+PRINT "kennt neue befehle "; (INSTR(text, "SPEAK_SOUND") >= 0 AND INSTR(text, "GUI_ANNOUNCE") >= 0)
+PRINT "kennt woerter und tasten "; (INSTR(text, "WHILE") >= 0 AND INSTR(text, "KEY_SPACE") >= 0)
+--- argumente
+{sammlung}/../..
+--- erwartet
+verweis syntaxes/drachenhauch.tmLanguage.json
+datei da TRUE
+grammatiken im ordner 1
+kennt neue befehle TRUE
+kennt woerter und tasten TRUE
+
+=== erzeugte dateien sind aktuell
+' Neu erzeugen darf nichts aendern -- ein generiertes Artefakt driftet lautlos
+' (die Grammatik kannte einmal 223 Befehle nicht). builtin_prosa.json liest
+' auch das Referenzbuch, und das geht nur mit Node.
+IMPORT "helfer.dh"
+CHDIR(ARG$(0))
+dlStarten(["doku", "grammatik", "--pruefen"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "grammatik: rueckgabe "; dlCode
+DIM node AS BOOLEAN : node = TRUE
+TRY
+    DIM p AS INTEGER : p = PROCESS_START("node", "--version")
+    WHILE PROCESS_RUNNING(p)
+        SLEEP(20)
+    WEND
+    node = PROCESS_CODE(p) = 0
+CATCH e
+    node = FALSE
+END TRY
+IF NOT node THEN
+    PRINT "UEBERSPRINGEN: node fehlt (fuer das Referenzbuch)"
+    EXIT(0)
+END IF
+dlStarten(["doku", "prosa", "--pruefen"])
+IF dlCode <> 0 THEN PRINT dlAus; dlErr
+PRINT "prosa: rueckgabe "; dlCode
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+grammatik: rueckgabe 0
+prosa: rueckgabe 0
+
+=== die kurzbeschreibungen sind brauchbar
+' builtin_docs.json deckte 328 von 1558 Befehlen ab; ganze Module standen bei
+' null. Die aus docs/ eingesammelten Texte muessen zu echten Befehlen gehoeren,
+' ohne Markdown-Rest sein und duerfen nicht mitten im Satz enden.
+IMPORT "json"
+DIM ed AS STRING : ed = ARG$(0) + "/drachenhauch/editor_qt"
+DIM idx AS JSON_HANDLE : idx = JSON_LOAD(ed + "/builtin_index.json")
+DIM echt AS MAP OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(idx, "builtins") - 1
+    DIM n AS STRING : n = UPPER$(JSON_GET_STRING(idx, "builtins." + STR$(i) + ".name"))
+    MAPPUT(echt, n, TRUE)
+    IF RIGHT$(n, 1) = "$" THEN MAPPUT(echt, LEFT$(n, LEN(n) - 1), TRUE)
+NEXT
+DIM prosa AS JSON_HANDLE : prosa = JSON_LOAD(ed + "/builtin_prosa.json")
+DIM namen AS ARRAY OF STRING : namen = JSON_KEYS(prosa, "docs")
+DIM vertreter AS ARRAY OF STRING
+vertreter = ["GUI_TABLE_SET_CELL", "CUBE", "CHART_HOVER_VALUE", "VEC2_LERP", "SPRITE_PLAY", "TILED_LOAD"]
+FOR i = 0 TO LEN(vertreter) - 1
+    IF NOT JSON_HAS(prosa, "docs." + vertreter[i]) THEN PRINT "fehlt: "; vertreter[i]
+NEXT
+DIM enden AS ARRAY OF STRING
+enden = [",", ":", " und", " oder", " der", " die", " das", " eine", " via", " mit"]
+DIM fremd AS INTEGER : fremd = 0
+DIM schrott AS INTEGER : schrott = 0
+DIM offen AS INTEGER : offen = 0
+FOR i = 0 TO LEN(namen) - 1
+    IF NOT MAPHAS(echt, namen[i]) THEN
+        fremd = fremd + 1
+        PRINT "kein builtin: "; namen[i]
+    END IF
+    DIM t AS STRING : t = JSON_GET_STRING(prosa, "docs." + namen[i])
+    IF INSTR(t, "`") >= 0 OR INSTR(t, "|") >= 0 OR INSTR(t, "](") >= 0 OR INSTR(t, "**") >= 0 THEN
+        schrott = schrott + 1
+        PRINT "markdown-rest: "; namen[i]; " = "; t
+    END IF
+    ' Gekuerzte Texte enden auf ein Auslassungszeichen. " ein" steht bewusst
+    ' nicht in der Liste: "sammelt die Ausgabe ein" ist ein ganzer Satz.
+    IF RIGHT$(t, 1) <> "…" THEN
+        DIM rt AS STRING : rt = RTRIM$(t)
+        DIM k AS INTEGER
+        FOR k = 0 TO LEN(enden) - 1
+            IF RIGHT$(rt, LEN(enden[k])) = enden[k] THEN
+                offen = offen + 1
+                PRINT "abgeschnitten: "; namen[i]; " = "; t
+                BREAK
+            END IF
+        NEXT
+    END IF
+NEXT
+PRINT "eintraege "; (LEN(namen) > 1000); ", fremd "; fremd; ", markdown "; schrott; ", abgeschnitten "; offen
+--- argumente
+{sammlung}/../..
+--- erwartet
+eintraege TRUE, fremd 0, markdown 0, abgeschnitten 0
+
+=== die handgepflegte tabelle gewinnt und die abdeckung bleibt hoch
+' Die Texte aus docs/ sind Tabellenzellen und oft knapp; builtin_docs.json ist
+' auf den Hover zugeschnitten und muss vorgehen. Vor dem Einsammeln lag die
+' Abdeckung bei 21 %, danach bei rund 54 % -- unter 45 % hat entweder der
+' Generator etwas verloren oder docs/ wurde umgebaut.
+IMPORT "json"
+DIM ed AS STRING : ed = ARG$(0) + "/drachenhauch/editor_qt"
+DIM hand AS JSON_HANDLE : hand = JSON_LOAD(ed + "/builtin_docs.json")
+DIM prosa AS JSON_HANDLE : prosa = JSON_LOAD(ed + "/builtin_prosa.json")
+PRINT "abs in beiden "; (JSON_HAS(hand, "docs.abs") AND JSON_HAS(prosa, "docs.ABS"))
+DIM text AS STRING : text = JSON_GET_STRING(hand, "docs.abs.1")
+DIM hover AS STRING : hover = CODE_HOVER$("PRINT ABS(1)", 1, 8)
+PRINT "hover zeigt die tabelle "; (INSTR(hover, text) >= 0)
+PRINT "texte verschieden "; (text <> JSON_GET_STRING(prosa, "docs.ABS"))
+DIM idx AS JSON_HANDLE : idx = JSON_LOAD(ed + "/builtin_index.json")
+DIM gesamt AS INTEGER : gesamt = JSON_LEN(idx, "builtins")
+DIM mit AS INTEGER : mit = 0
+DIM i AS INTEGER
+FOR i = 0 TO gesamt - 1
+    DIM n AS STRING : n = JSON_GET_STRING(idx, "builtins." + STR$(i) + ".name")
+    IF JSON_HAS(hand, "docs." + LOWER$(n)) OR JSON_HAS(hand, "docs." + LOWER$(n) + "$") OR JSON_HAS(prosa, "docs." + UPPER$(n)) OR JSON_HAS(prosa, "docs." + UPPER$(n) + "$") THEN mit = mit + 1
+NEXT
+PRINT "abdeckung ueber 45 % "; (mit * 100 > gesamt * 45)
+--- argumente
+{sammlung}/../..
+--- erwartet
+abs in beiden TRUE
+hover zeigt die tabelle TRUE
+texte verschieden TRUE
+abdeckung ueber 45 % TRUE

@@ -560,7 +560,7 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
    sondern ins passende `docs/module-*.md` (Tabellenzeile
    ``| `NAME(args)` | was es tut |``); `dhrt doku prosa` sammelt
    sie nach `editor_qt/builtin_prosa.json` ein, und
-   `tests/test_builtin_prosa.py` haelt beides synchron. `builtin_docs.json`
+   `tests/pruef/doku_pruefungen.dhtest` haelt beides synchron. `builtin_docs.json`
    ist fuer ausfuehrlichere Texte da und gewinnt, wo es einen Eintrag hat.
    Beide Dateien bettet dhrt fuer `dhrt lsp` ein -> nach einer Aenderung neu
    bauen.
@@ -2566,9 +2566,9 @@ beispiele]` (`pruef.rs`: die Codebloecke laufen IN-PROZESS durch
 Begruendung je Eintrag; `pfade` prueft Inline-Code UND Markdown-Links, die
 Duldung gilt nur fuer Inline-Code). `--pruefen` bei `doku` = schreibt nichts,
 Rueckgabe 1 bei Abweichung -- so haengen `builtin_prosa.json` und die
-VS-Code-Grammatik an der Suite (`tests/test_builtin_prosa.py`,
-`tests/test_vscode_grammatik.py`); `tests/test_docs_codebloecke.py` und
-`tests/test_doku_aussagen.py` rufen `dhrt pruef`. **Geloescht:**
+VS-Code-Grammatik an der Suite; `dhrt pruef` laeuft dort ebenfalls (seit
+2026-09-16 alles in `tests/pruef/doku_pruefungen.dhtest`, vorher vier
+pytest-Dateien). **Geloescht:**
 `drachenhauch/lsp/`, `drachenhauch/doku.py`, `tools/gen_builtin_prosa.py`,
 `tools/pruef_docs.py`, `tools/pruef_doku_aussagen.py`,
 `vscode-drachenhauch/build_grammar.py`, die zwei LSP-Testdateien.
@@ -3184,6 +3184,22 @@ Listen werden vor der Ausgabe sortiert, und "welche Datei ist neuer" wartet
 (ohne das Warten faellt der Fall -- beide tragen dieselbe Sekunde).
 Gegenproben mit verfaelschten Kopien: 6 von 9 und 10 von 15 fallen, die
 uebrigen Faelle haengen nicht an der verfaelschten Stelle.
+
+**Die Doku-Pruefungen ohne Python (2026-09-16, Weg D):** test_doku_aussagen,
+test_docs_codebloecke, test_vscode_grammatik und test_builtin_prosa (pytest)
+sind geloescht; ihre Faelle stehen in `tests/pruef/doku_pruefungen.dhtest`
+(14). Jeder Fall bekommt die Repo-Wurzel als Argument und macht `CHDIR`
+dorthin, bevor er `dhrt pruef`/`dhrt doku --pruefen` startet -- beide suchen
+die Wurzel vom Arbeitsordner aus, und ein Kind erbt ihn. Proben mit eigenen
+Markdown-Dateien legen sie vorher in den Fallordner. Die Qualitaet von
+`builtin_prosa.json` (echte Befehle, kein Markdown-Rest, kein abgeschnittener
+Satz, Abdeckung ueber 45 %) prueft das json-Modul; dass die handgepflegte
+Tabelle gewinnt, prueft `CODE_HOVER$` -- also der Hover der Laufzeit statt
+`get_doc` des Qt-Editors. **Stolperstein:** `REGEX_FIND_ALL` liefert bei
+einer Gruppe im Muster deren Inhalt, nicht den ganzen Treffer. Gegenprobe mit
+voruebergehend verdorbener Doku (toter Link, erfundener Befehl, kaputter
+Codeblock, verwaistes Dokument, veraenderte Grammatik): genau die sechs
+betroffenen Faelle fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
