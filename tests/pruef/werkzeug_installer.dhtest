@@ -1,0 +1,169 @@
+' Die Distribution ohne Python: installer/lizenzen.dh sammelt die Lizenztexte
+' der Rust-Crates (bis 2026-09-16 installer/gen_notices.py), installer/bauen.dh
+' setzt Lizenzen und Inno Setup zusammen.
+'
+' Die Crate-Liste kommt hier aus einer erfundenen `cargo metadata`-Datei --
+' so haengt der Test weder an cargo noch an der Registry, und die Faelle
+' pruefen genau das, was beim Abschreiben schiefgehen kann: die Reihenfolge
+' (KLEINGESCHRIEBEN sortiert), die Unterordner licenses/ und license_files/,
+' Zeilenenden und Leerraum, und der Rueckfall auf license_file.
+
+=== die lizenzsammlung ordnet, liest und raeumt auf
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--wurzel", CWD$() + "/wurzel", "--metadata", CWD$() + "/metadata.json", _
+    "--ziel", CWD$() + "/raus.txt")
+DIM aus AS STRING : aus = lauf$(p)
+IF NOT FILEEXISTS("raus.txt") THEN
+    PRINT aus
+    EXIT(1)
+END IF
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM z AS ARRAY OF STRING : z = READLINES("raus.txt")
+DIM i AS INTEGER
+' Die Kopfzeile jedes Crates steht unter einem Trennstrich: Name, Fassung,
+' dann die Lizenz. Ausgegeben wird beides in der Reihenfolge der Datei.
+FOR i = 0 TO LEN(z) - 1
+    IF LEFT$(z[i], 8) = "Lizenz: " THEN PRINT z[i - 1]; " | "; z[i]
+    IF LEFT$(z[i], 4) = "--- " AND RIGHT$(z[i], 4) = " ---" THEN PRINT "  "; z[i]
+    IF LEFT$(z[i], 24) = "Die native Runtime dhrt " THEN PRINT z[i]
+NEXT
+PRINT "mpl-volltext "; (INSTR(JOIN$(z, CHR$(10)), "Mozilla Public License Version 2.0") >= 0)
+PRINT "kein root-paket "; (INSTR(JOIN$(z, CHR$(10)), "drachenhauch_runtime") < 0)
+' Der Text der ersten Lizenzdatei: Leerraum an den Enden ist weg, die
+' Zeilenenden sind vereinheitlicht (die Beilage traegt CRLF).
+DIM von AS INTEGER : von = ARRAY_INDEXOF(z, "--- LICENSE ---")
+PRINT "|"; z[von + 1]; "|"; z[von + 2]; "|"; z[von + 3]; "|"
+--- argumente
+{sammlung}/../../installer/lizenzen.dh
+--- datei metadata.json
+{"packages":[
+ {"name":"drachenhauch_runtime","version":"9.9.9","id":"pfad#drachenhauch_runtime@9.9.9","license":"MIT","manifest_path":"{fall}/kisten/root/Cargo.toml"},
+ {"name":"Zeta","version":"2.0","license":null,"license_file":"LIZENZ","manifest_path":"{fall}/kisten/Beta/Cargo.toml"},
+ {"name":"alpha","version":"1.2.3","license":"MIT OR Apache-2.0","manifest_path":"{fall}/kisten/alpha/Cargo.toml"},
+ {"name":"gamma","version":"0.1.0","manifest_path":"{fall}/kisten/gamma/Cargo.toml"}
+],"resolve":{"root":"pfad#drachenhauch_runtime@9.9.9"}}
+--- datei kisten/alpha/LICENSE base64
+CgpaZWlsZSBBDQpaZWlsZSBCDQoNCiAgIA==
+--- datei kisten/alpha/licenses/LICENSE-MIT
+MIT-Text der Kiste alpha.
+--- datei kisten/alpha/README.md
+Kein Lizenztext, also nicht dabei.
+--- datei kisten/Beta/license_files/LICENSE.txt
+Beta steht unter LIZENZ.
+--- datei kisten/root/LICENSE
+Das Wurzelpaket ist dhrt selbst -- es gehoert nicht in die Liste.
+--- verzeichnis kisten/gamma
+--- datei wurzel/installer/licenses/MPL-2.0.txt
+Mozilla Public License Version 2.0
+==================================
+(hier nur der Anfang)
+--- erwartet
+rueckgabe 0
+Die native Runtime dhrt enthaelt 3 Rust-Crates (Features: graphics db net http):
+alpha 1.2.3 | Lizenz: MIT OR Apache-2.0
+  --- LICENSE ---
+  --- LICENSE-MIT ---
+gamma 0.1.0 | Lizenz: (unbekannt)
+Zeta 2.0 | Lizenz: LIZENZ
+  --- LICENSE.txt ---
+mpl-volltext TRUE
+kein root-paket TRUE
+|Zeile A|Zeile B||
+
+=== ohne laufzeit wird nicht verpackt
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-installer", "--wurzel", CWD$() + "/wurzel")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(TRIM$(lauf$(p)), CHR$(10))
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    IF LEFT$(zeilen[i], 14) = "Es gibt keine " THEN PRINT "gemeldet: keine Laufzeit"
+    IF LEFT$(zeilen[i], 11) = "Erst bauen:" THEN PRINT zeilen[i]
+NEXT
+PRINT "nichts gesammelt "; (INSTR(JOIN$(zeilen, CHR$(10)), "Lizenzen sammeln") < 0)
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- verzeichnis wurzel/installer
+--- erwartet
+rueckgabe 1
+gemeldet: keine Laufzeit
+Erst bauen:  python rust/build_runtime.py
+nichts gesammelt TRUE
+
+=== der bau sammelt zuerst die lizenzen
+' Statt der echten Sammlung (die cargo braucht) liegt hier eine Attrappe im
+' Wurzelordner -- geprueft wird, dass der Bau sie ueberhaupt aufruft, ihre
+' Ausgabe weiterreicht und ohne Installer sauber endet.
+FUNCTION lauf$(p AS INTEGER) AS STRING
+    DIM aus AS STRING : aus = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 60000 AND leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            aus = aus + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN REPLACE$(aus, CHR$(13), "")
+END FUNCTION
+DIM p AS INTEGER : p = PROCESS_START("dhrt", "run", ARG$(0), "--", _
+    "--ohne-installer", "--wurzel", CWD$() + "/wurzel")
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(TRIM$(lauf$(p)), CHR$(10))
+PRINT "rueckgabe "; PROCESS_CODE(p)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    IF LEFT$(zeilen[i], 9) = "Laufzeit:" THEN PRINT "gemeldet: Laufzeit gefunden"
+    IF LEFT$(zeilen[i], 8) = "Attrappe" OR LEFT$(zeilen[i], 6) = "Fertig" THEN PRINT zeilen[i]
+NEXT
+PRINT "attrappe lief "; FILEEXISTS("wurzel/gelaufen.txt")
+--- argumente
+{sammlung}/../../installer/bauen.dh
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt.exe
+keine echte Laufzeit, nur ein Platzhalter fuer die Groessenmeldung
+--- datei wurzel/rust/drachenhauch_runtime/target/release/dhrt
+keine echte Laufzeit, nur ein Platzhalter fuer die Groessenmeldung
+--- datei wurzel/installer/lizenzen.dh
+PRINT "Attrappe statt cargo"
+WRITEALL(DIRNAME(CWD$()) + "/gelaufen.txt", JOIN$([ARG$(0), ARG$(1)], " "))
+--- erwartet
+rueckgabe 0
+gemeldet: Laufzeit gefunden
+Attrappe statt cargo
+Fertig (ohne Installer).
+attrappe lief TRUE
