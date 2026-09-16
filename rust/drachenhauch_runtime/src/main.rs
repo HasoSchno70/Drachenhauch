@@ -246,6 +246,7 @@ dhrt -- die Drachenhauch-Runtime
 
   dhrt <datei.dh>              Programm ausfuehren (wie `run`)
   dhrt run <datei.dh> [-- ...] ausfuehren; alles hinter `--` gehoert dem Programm
+  dhrt run --bilder N <datei.dh>  nach N Bildern von selbst beenden (headless pruefen)
   dhrt test [pfad ...]         Pruefprogramme suchen und laufen lassen
   dhrt fmt <datei ...>         Schluesselwoerter gross schreiben
                                (--einruecken richtet auch die Einrueckung,
@@ -355,8 +356,30 @@ fn main() -> ExitCode {
             return pruef::main(&raw[2..]);
         }
         if raw.len() >= 3 && raw[1] == "run" {
+            // `--bilder N`: nach N Bildern hoert das Programm von selbst auf --
+            // dasselbe Kennzeichen, das DHRT_FRAMES setzt und QUITREQUESTED
+            // liest. Aus einem PROGRAMM heraus kam man an die Umgebungsvariable
+            // nicht: PROCESS_START nimmt sie dem Kind ab, damit ein gestartetes
+            // Spiel nicht nach N Bildern stirbt. Wer die Grenze WILL, sagt sie
+            // hier. Ein Programm, das QUITREQUESTED gar nicht fragt, laeuft
+            // weiter -- genau daran erkennt man es.
+            let mut i = 2;
+            while i < raw.len() && raw[i] == "--bilder" {
+                match raw.get(i + 1).and_then(|s| s.parse::<u32>().ok()) {
+                    Some(n) => std::env::set_var("DHRT_FRAMES", n.to_string()),
+                    None => {
+                        eprintln!("run --bilder: erwartet eine Zahl");
+                        return ExitCode::from(2);
+                    }
+                }
+                i += 2;
+            }
+            let Some(datei) = raw.get(i) else {
+                eprintln!("run: keine Datei angegeben");
+                return ExitCode::from(2);
+            };
             setze_programm_args(&raw);
-            return run_main(&raw[2]);
+            return run_main(datei);
         }
         // `dhrt bild <quelle.dh> <ziel.png> [bilder]` -- ein Programm N Bilder
         // lang laufen lassen und das letzte als PNG sichern.

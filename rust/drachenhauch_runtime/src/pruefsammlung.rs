@@ -881,6 +881,15 @@ fn unterschied(erwartet: &str, ist: &str) -> String {
 /// Einen abgeschlossenen Lauf bewerten. `ohne_grafik`: ist `DHRT_OHNE_GRAFIK`
 /// gesetzt, ist ein fehlender Grafik-Builtin kein Fehlschlag (Build ohne raylib).
 pub fn bewerten(fall: &Fall, code: i32, stdout: &str, stderr: &str, ohne_grafik: bool) -> Ergebnis {
+    // Ein Fall darf sich SELBST ueberspringen, wenn ihm ein fremdes Werkzeug
+    // fehlt (node, git, cargo ...): die Zeile `UEBERSPRINGEN: <grund>` auf
+    // stdout oder stderr. Die Alternative waere, im Fehlen des Werkzeugs die
+    // erwarteten Zeilen zu ERFINDEN -- gruen und wertlos.
+    for strom in [stdout, stderr] {
+        if let Some(grund) = strom.lines().find_map(|z| z.trim().strip_prefix("UEBERSPRINGEN: ")) {
+            return Ergebnis::Uebersprungen(grund.trim().to_string());
+        }
+    }
     if code != 0 {
         if let Some(m) = KEIN_FENSTER.iter().find(|m| stderr.contains(*m) || stdout.contains(*m)) {
             return Ergebnis::Uebersprungen(format!("kein Fenster moeglich ({})", m));
@@ -1237,6 +1246,17 @@ mod tests {
         let f = &parsen("=== a\nPRINT 1\n").unwrap()[0];
         assert_eq!(bewerten(f, 0, "irgendwas\n", "", false), Ergebnis::Ok);
         assert!(matches!(bewerten(f, 3, "", "Fehler", false), Ergebnis::Fehl(_)));
+    }
+
+    #[test]
+    fn selbst_uebersprungen_mit_grund() {
+        let f = &Fall { name: "x".into(), quelle: String::new(), ..Default::default() };
+        let e = bewerten(f, 0, "UEBERSPRINGEN: node fehlt
+", "", false);
+        match e {
+            Ergebnis::Uebersprungen(g) => assert_eq!(g, "node fehlt"),
+            andere => panic!("erwartet uebersprungen, war {:?}", andere),
+        }
     }
 
     #[test]

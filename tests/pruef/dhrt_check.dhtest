@@ -1,0 +1,292 @@
+' `dhrt --check`: gueltiger Code meldet nichts, und die strukturellen Fehler
+' kommen MIT Zeilennummer (Voraussetzung fuer Editor und Sprachserver).
+'
+' Dazu die Durchlaeufe ueber den eigenen Bestand -- eine Warnung, die auf
+' gueltigem Code losgeht, ist Laerm, der die echten uebertoent. Die
+' Gegenproben (dass die Warnungen ueberhaupt anschlagen) stehen in
+' check_unbekannte_namen.dhtest und compiler_warnungen.dhtest.
+'
+' Bis 2026-09-16 tests/test_dhrt_check.py.
+
+=== sauberer code meldet nichts, ein parse-fehler nennt die zeile
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM d AS JSON_HANDLE : d = dlCheck(!"DIM x AS INTEGER\nx = 5\nPRINT x\n")
+PRINT "sauber "; JSON_LEN(d, "d")
+' Auch bei Diagnosen endet --check mit 0 -- der Aufrufer liest das JSON.
+PRINT "rueckgabe "; dlCode
+d = dlCheck(!"PRINT \"a\"\nFOR i = 1 TO\n")
+PRINT "parse "; JSON_LEN(d, "d"); " "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+sauber 0
+rueckgabe 0
+parse 1 parse Zeile 2
+
+=== break und return am falschen ort nennen die zeile
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM d AS JSON_HANDLE : d = dlCheck(!"PRINT \"a\"\nBREAK\n")
+PRINT "break "; JSON_LEN(d, "d"); " "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
+PRINT "nennt BREAK "; (INSTR(JSON_GET_STRING(d, "d.0.message"), "BREAK") >= 0)
+d = dlCheck(!"PRINT 1\nRETURN 5\n")
+PRINT "return "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+break 1 compile Zeile 2
+nennt BREAK TRUE
+return compile Zeile 2
+
+=== ein unbekanntes builtin warnt, ein bekanntes nicht
+' Ein Tippfehler (oder ein Befehl, den es nur frueher gab) faellt sonst erst
+' zur Laufzeit auf, und zwar an der Stelle, die gerade laeuft.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM d AS JSON_HANDLE : d = dlCheck(!"DIM x AS INTEGER\nx = NOTAREALBUILTIN(5)\n")
+PRINT "anzahl "; JSON_LEN(d, "d")
+PRINT "art "; JSON_GET_STRING(d, "d.0.severity"); " "; JSON_GET_STRING(d, "d.0.phase"); " Zeile "; JSON_GET_INT(d, "d.0.line")
+PRINT "nennt den namen "; (INSTR(JSON_GET_STRING(d, "d.0.message"), "NOTAREALBUILTIN") >= 0)
+d = dlCheck(!"DIM x AS FLOAT\nx = FLT(3)\nPRINT INT(x)\n")
+PRINT "echte builtins still "; JSON_LEN(d, "d")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+anzahl 1
+art warning compile Zeile 2
+nennt den namen TRUE
+echte builtins still 0
+
+=== ein hardware-import warnt schon beim import
+' Im Bau ohne --hardware fehlt das Modul; die Meldung kaeme sonst erst beim
+' ersten Funktionsaufruf zur Laufzeit. Ein Hardware-Bau meldet nichts --
+' beide Faelle sind gueltig.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM d AS JSON_HANDLE : d = dlCheck(!"IMPORT \"wifi\"\nPRINT 1\n")
+IF JSON_LEN(d, "d") = 0 THEN
+    PRINT "hardware-bau: keine meldung"
+ELSE
+    PRINT "anzahl "; JSON_LEN(d, "d")
+    PRINT "art "; JSON_GET_STRING(d, "d.0.severity"); " Zeile "; JSON_GET_INT(d, "d.0.line")
+    DIM m AS STRING : m = JSON_GET_STRING(d, "d.0.message")
+    PRINT "nennt das modul "; (INSTR(LOWER$(m), "wifi") >= 0)
+    PRINT "nennt den ausweg "; (INSTR(m, "--hardware") >= 0)
+END IF
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+anzahl 1
+art warning Zeile 1
+nennt das modul TRUE
+nennt den ausweg TRUE
+
+=== ein zweites dim mit anderem typ warnt und zeigt auf die erste stelle
+' Ein Name, zwei Typen -- der Fehler faellt sonst weit entfernt auf
+' ("Array-Index muss INTEGER sein, erhalten FLOAT") und ist dort nicht mehr
+' seiner Ursache zuzuordnen.
+IMPORT "helfer.dh"
+IMPORT "json"
+FUNCTION dimWarnungen(quelle AS STRING) AS ARRAY OF STRING
+    DIM d AS JSON_HANDLE : d = dlCheck(quelle)
+    DIM raus AS ARRAY OF STRING : raus = []
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "d") - 1
+        DIM wo AS STRING : wo = "d." + STR$(i) + "."
+        IF JSON_GET_STRING(d, wo + "severity") <> "warning" THEN CONTINUE
+        DIM m AS STRING : m = JSON_GET_STRING(d, wo + "message")
+        IF INSTR(m, "schon als") >= 0 THEN ARRAY_PUSH(raus, STR$(JSON_GET_INT(d, wo + "line")) + " " + m)
+    NEXT
+    RETURN raus
+END FUNCTION
+DIM w AS ARRAY OF STRING : w = dimWarnungen(!"DIM t AS INTEGER\nDIM t AS FLOAT\nPRINT t\n")
+PRINT "anzahl "; LEN(w)
+PRINT "nennt beide typen "; (INSTR(w[0], "INTEGER") >= 0 AND INSTR(w[0], "FLOAT") >= 0)
+' Seit WP I.4 nennt die Meldung die Stelle als `datei:zeile` -- bei IMPORT
+' zeigte die nackte Zahl in die GEMERGTE Quelle, also oft auf eine
+' unbeteiligte Zeile.
+PRINT "zeigt auf die erste stelle "; (INSTR(w[0], ":1") >= 0)
+PRINT "steht bei der zweiten "; (LEFT$(w[0], 2) = "2 ")
+' Gross und klein ist dieselbe Variable -- die Warnung muss das auch so sehen.
+PRINT "schreibweise egal "; LEN(dimWarnungen(!"DIM Wert AS INTEGER\nDIM wert AS STRING\nPRINT Wert\n"))
+' In einer Funktion gewinnt die ERSTE Deklaration; genauso still, genauso falsch.
+DIM f AS ARRAY OF STRING : f = dimWarnungen(!"SUB f()\n    DIM a AS INTEGER\n    DIM a AS FLOAT\n    PRINT a\nEND SUB\nf()\n")
+PRINT "in der funktion "; LEN(f); " "; (INSTR(f[0], "Funktion") >= 0)
+' Der Typ steht so da, wie er im Quelltext steht -- `array:integer` sagt
+' einem Nutzer nichts.
+DIM a AS ARRAY OF STRING : a = dimWarnungen(!"DIM z[3] AS INTEGER\nDIM z AS INTEGER\nPRINT z\n")
+PRINT "feld lesbar "; LEN(a); " "; (INSTR(a[0], "ARRAY OF INTEGER") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+anzahl 1
+nennt beide typen TRUE
+zeigt auf die erste stelle TRUE
+steht bei der zweiten TRUE
+schreibweise egal 1
+in der funktion 1 TRUE
+feld lesbar 1 TRUE
+
+=== gleicher typ und verdecken ueber grenzen hinweg bleiben still
+' DIM im Schleifenkoerper ist gaengig und voellig in Ordnung -- eine Warnung
+' dafuer waere Laerm. Und ein lokales DIM darf ein Global verdecken.
+IMPORT "helfer.dh"
+IMPORT "json"
+FUNCTION dimWarnungen(quelle AS STRING) AS INTEGER
+    DIM d AS JSON_HANDLE : d = dlCheck(quelle)
+    DIM n AS INTEGER : n = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO JSON_LEN(d, "d") - 1
+        DIM wo AS STRING : wo = "d." + STR$(i) + "."
+        IF JSON_GET_STRING(d, wo + "severity") = "warning" AND INSTR(JSON_GET_STRING(d, wo + "message"), "schon als") >= 0 THEN n = n + 1
+    NEXT
+    RETURN n
+END FUNCTION
+PRINT "gleicher typ "; dimWarnungen(!"DIM i AS INTEGER\nDIM i AS INTEGER\nPRINT i\n")
+PRINT "in der schleife "; dimWarnungen(!"DIM n AS INTEGER\nFOR n = 1 TO 3\n    DIM k AS INTEGER\n    k = n\nNEXT\nPRINT k\n")
+PRINT "lokal verdeckt global "; dimWarnungen(!"DIM a AS INTEGER\nSUB f()\n    DIM a AS FLOAT\n    PRINT a\nEND SUB\nf()\nPRINT a\n")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+gleicher typ 0
+in der schleife 0
+lokal verdeckt global 0
+
+=== eine datei bleibt ein array, mehrere nennen ihren namen
+' Rueckwaertskompatibel: der Editor erwartet bei EINER Datei genau das
+' Diagnose-Array, kein Objekt. Bei mehreren waere sonst nicht zuzuordnen,
+' welcher Fehler woher kommt -- und eine fehlende Datei darf die anderen
+' nicht um ihre Diagnose bringen.
+IMPORT "helfer.dh"
+IMPORT "json"
+WRITEALL("gut.dh", !"PRINT 1\n")
+WRITEALL("schlecht.dh", !"DIM x AS\n")
+dlStarten(["--check", CWD$() + "/gut.dh"])
+PRINT "eine datei "; TRIM$(dlAus)
+dlStarten(["--check", CWD$() + "/gut.dh", CWD$() + "/schlecht.dh"])
+DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(TRIM$(dlAus), CHR$(10))
+PRINT "zwei zeilen "; LEN(zeilen)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    DIM e AS JSON_HANDLE : e = JSON_PARSE(TRIM$(zeilen[i]))
+    PRINT BASENAME(JSON_GET_STRING(e, "datei")); " "; JSON_LEN(e, "probleme")
+NEXT
+dlStarten(["--check", CWD$() + "/weg.dh", CWD$() + "/gut.dh"])
+DIM namen AS ARRAY OF STRING : namen = []
+zeilen = SPLIT$(TRIM$(dlAus), CHR$(10))
+FOR i = 0 TO LEN(zeilen) - 1
+    ARRAY_PUSH(namen, BASENAME(JSON_GET_STRING(JSON_PARSE(TRIM$(zeilen[i])), "datei")))
+NEXT
+SORT(namen)
+PRINT "auch die fehlende "; JOIN$(namen, " ")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+eine datei []
+zwei zeilen 2
+gut.dh 0
+schlecht.dh 1
+auch die fehlende gut.dh weg.dh
+
+=== kein beispiel meldet einen fehler, ein unbekanntes builtin oder eine dim-warnung
+' Kein Fehlalarm auf dem eigenen Bestand. Warnungen wegen eines fehlenden
+' Hardware-Moduls sind erlaubt (Bau ohne --hardware), Fehler nicht; ein
+' "Unbekanntes Builtin" hiesse, dass builtin_index.json hinterherhinkt.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM ordner AS STRING : ordner = ARG$(0)
+DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(ordner, "*.dh")
+DIM dateien AS ARRAY OF STRING : dateien = []
+DIM i AS INTEGER
+FOR i = 0 TO LEN(roh) - 1
+    IF INSTR(roh[i], "_smoketest") >= 0 THEN CONTINUE
+    IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ARRAY_PUSH(dateien, ordner + "/" + roh[i])
+NEXT
+PRINT "genug dateien "; (LEN(dateien) > 150)
+DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
+PRINT "je datei eine zeile "; (LEN(zeilen) = LEN(dateien))
+DIM fehler AS INTEGER : fehler = 0
+DIM unbekannt AS INTEGER : unbekannt = 0
+DIM doppelt AS INTEGER : doppelt = 0
+FOR i = 0 TO LEN(zeilen) - 1
+    DIM e AS JSON_HANDLE : e = JSON_PARSE(zeilen[i])
+    DIM name AS STRING : name = BASENAME(JSON_GET_STRING(e, "datei"))
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(e, "probleme") - 1
+        DIM wo AS STRING : wo = "probleme." + STR$(k) + "."
+        DIM art AS STRING : art = JSON_GET_STRING(e, wo + "severity")
+        DIM m AS STRING : m = JSON_GET_STRING(e, wo + "message")
+        IF art <> "warning" THEN
+            fehler = fehler + 1
+            PRINT "fehler: "; name; ":"; JSON_GET_INT(e, wo + "line"); " "; m
+        END IF
+        IF INSTR(m, "Unbekanntes Builtin") >= 0 THEN
+            unbekannt = unbekannt + 1
+            PRINT "unbekannt: "; name; " "; m
+        END IF
+        IF art = "warning" AND INSTR(m, "schon als") >= 0 THEN
+            doppelt = doppelt + 1
+            PRINT "doppeltes DIM: "; name; ":"; JSON_GET_INT(e, wo + "line")
+        END IF
+    NEXT
+NEXT
+PRINT "fehler "; fehler
+PRINT "unbekannte builtins "; unbekannt
+PRINT "doppelte dims "; doppelt
+--- argumente
+{sammlung}/../../examples
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+genug dateien TRUE
+je datei eine zeile TRUE
+fehler 0
+unbekannte builtins 0
+doppelte dims 0
+
+=== kein programm des repos meldet einen unbekannten namen
+' Die Warnung kommt aus einer SCHAETZUNG: der Compiler sammelt alle Namen
+' ein, die deklariert werden, und meldet, was im Rueckfall uebrig bleibt.
+' Uebersieht die Sammlung eine Deklarationsform, warnt sie vor gueltigem Code
+' -- beim Bau zweimal passiert (`DIM x[N] AS T` fehlte: 243 Fehlalarme; `CONST`
+' in einer SUB fiel erst am Buch-Beispiel tippspiel.dh auf). Darum ueber ALLE
+' .dh des Repos: Piloten, Demos und Buch-Beispiele decken mehr Sprachformen ab
+' als ein von Hand geschriebener Test.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM wurzel AS STRING : wurzel = ARG$(0)
+DIM roh AS ARRAY OF STRING : roh = DIRLIST_REC(wurzel, "*.dh")
+DIM dateien AS ARRAY OF STRING : dateien = []
+DIM i AS INTEGER
+FOR i = 0 TO LEN(roh) - 1
+    IF INSTR(roh[i], "target/") >= 0 OR INSTR(roh[i], "target" + CHR$(92)) >= 0 THEN CONTINUE
+    IF LEFT$(BASENAME(roh[i]), 7) = "_dhtmp_" THEN CONTINUE
+    ARRAY_PUSH(dateien, wurzel + "/" + roh[i])
+NEXT
+PRINT "genug dateien "; (LEN(dateien) > 300)
+DIM zeilen AS ARRAY OF STRING : zeilen = dlCheckViele(dateien)
+DIM funde AS INTEGER : funde = 0
+FOR i = 0 TO LEN(zeilen) - 1
+    DIM e AS JSON_HANDLE : e = JSON_PARSE(zeilen[i])
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(e, "probleme") - 1
+        DIM m AS STRING : m = JSON_GET_STRING(e, "probleme." + STR$(k) + ".message")
+        ' Der Satz steht in BEIDEN Fassungen der Warnung (nirgends angelegt /
+        ' hier nicht sichtbar) -- ein Marker auf nur eine haette die andere
+        ' Haelfte des Durchlaufs stillschweigend uebersehen.
+        IF INSTR(m, "Beim Laufen bricht diese Zeile ab") >= 0 THEN
+            funde = funde + 1
+            PRINT "falschmeldung: "; BASENAME(JSON_GET_STRING(e, "datei")); " "; m
+        END IF
+    NEXT
+NEXT
+PRINT "falschmeldungen "; funde
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+genug dateien TRUE
+falschmeldungen 0

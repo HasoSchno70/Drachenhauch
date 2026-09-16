@@ -261,7 +261,11 @@ Zwischenablage, einen festen Port oder die Soundkarte teilen); `dhrt test datei.
 Fälle laufen, deren Name den Text enthält. Ein Fall, der an einer Maschine
 ohne Bildschirm oder Soundkarte scheitert, gilt als übersprungen, nicht als
 falsch; mit `DHRT_OHNE_GRAFIK=1` auch einer, dem im Bau ohne raylib ein
-Grafik-Befehl fehlt. Die Bilanz nennt Dateien und Fälle:
+Grafik-Befehl fehlt. **Ein Fall darf sich auch selbst überspringen**: die Zeile
+`UEBERSPRINGEN: <grund>` auf stdout oder stderr, dann steht der Grund in der
+Bilanz. Das ist für fremde Werkzeuge gedacht, die nicht überall liegen (node,
+git, cargo); die Alternative wäre, die erwarteten Zeilen zu **erfinden** — grün
+und wertlos. Die Bilanz nennt Dateien und Fälle:
 
 ```text
   ok      tests\pruef\coroutines.dhtest  (13 Faelle, 0.61s)

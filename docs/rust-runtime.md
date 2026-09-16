@@ -168,7 +168,7 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
   Drachenhauch sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
   (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
-  `tests/test_dhrt_check.py`.
+  `tests/pruef/dhrt_check.dhtest`.
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in dhrt. Nur die Editoren brauchen noch Python.
@@ -473,6 +473,13 @@ Nach `DHRT_FRAMES` Frames liefert `QUITREQUESTED()` `true` (Loop endet sauber);
 beim Erreichen der Grenze wird das PNG gespeichert (auch wenn das Programm eine
 feste `FOR`-Schleife statt `QUITREQUESTED` nutzt). **Hinweis:** raylibs
 `TakeScreenshot` legt die Datei relativ zum Arbeitsverzeichnis ab.
+
+Dieselbe Grenze **ohne Umgebungsvariable**: `dhrt run --bilder 20 spiel.dh`.
+Das braucht, wer aus einem PROGRAMM heraus prüft — `PROCESS_START` nimmt
+seinen Kindern `DHRT_FRAMES` ab, damit ein gestartetes Spiel nicht nach N
+Bildern stirbt. Ein Programm, das `QUITREQUESTED()` gar nicht fragt, läuft
+trotzdem weiter: **genau daran erkennt man es**
+(`tests/pruef/beispiele_gui_enden.dhtest`).
 
 #### Kontaktbogen: einen ABLAUF pruefen statt eines Augenblicks
 

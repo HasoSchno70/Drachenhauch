@@ -1,0 +1,162 @@
+' Das Referenzbuch gegen sich selbst: Struktur, Querverweise, Kapitelnummern.
+'
+' Die Kapitel sind JavaScript-Module; zwei Werkzeuge unter tools/ exportieren
+' daraus JSON (`buch_struktur_export.js`, `buch_verweise_export.js`), und
+' dieser Test stellt die Fragen an das Ergebnis. Ohne Node laesst sich das
+' Buch gar nicht lesen -- dann meldet der Fall `UEBERSPRINGEN: node fehlt`
+' und gilt als uebersprungen, wie die pytest-Fassung, die sich dort uebersprang.
+'
+' Bis 2026-09-16 tests/test_buch_struktur.py und tests/test_buch_verweise.py.
+
+=== die struktur des referenzbuchs stimmt
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM wurzel AS STRING : wurzel = ARG$(0)
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+DIM roh AS STRING : roh = nodeLauf$(wurzel, wurzel + "/tools/buch_struktur_export.js")
+IF roh = "" THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+DIM h AS JSON_HANDLE : h = JSON_PARSE(roh)
+' Ohne diese Schranke liefen alle Pruefungen bei einem kaputten Export leer
+' durch und meldeten Erfolg.
+PRINT "genug kapitel "; (JSON_GET_INT(h, "kapitel") > 50)
+' H.tip(TITEL, text) -- mit nur einem Argument wird der Text zur Ueberschrift
+' und ganz fett gesetzt.
+PRINT "tips ohne rumpf "; JSON_LEN(h, "tips_ohne_rumpf")
+PRINT "befehle ohne text "; JSON_LEN(h, "cmds_ohne_text")
+PRINT "befehle ohne signatur "; JSON_LEN(h, "cmds_ohne_sig")
+' Eine Ueberschrift ueber 70 Zeichen ist meist ein verrutschter Absatz.
+PRINT "zu lange zwischenueberschriften "; JSON_LEN(h, "lange_h2")
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+--- erwartet
+genug kapitel TRUE
+tips ohne rumpf 0
+befehle ohne text 0
+befehle ohne signatur 0
+zu lange zwischenueberschriften 0
+
+=== jeder querverweis trifft ein kapitel
+' Das Buch nummeriert seine Kapitel NICHT -- die Ueberschrift ist der Titel.
+' Beim Gegenlesen am 2026-08-30 zeigten zwei Titel-Verweise auf gar kein
+' Kapitel ("Strings" statt "Strings im Detail"). Ein Verweis ins Leere sieht
+' im gesetzten Buch aus wie jeder andere.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM wurzel AS STRING : wurzel = ARG$(0)
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+DIM roh AS STRING : roh = nodeLauf$(wurzel, wurzel + "/tools/buch_verweise_export.js")
+IF roh = "" THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+DIM h AS JSON_HANDLE : h = JSON_PARSE(roh)
+PRINT "genug kapitel "; (JSON_LEN(h, "titel") > 50)
+PRINT "genug verweise "; (JSON_LEN(h, "verweise") > 20)
+DIM titel AS MAP OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(h, "titel") - 1
+    MAPPUT(titel, JSON_GET_STRING(h, "titel." + STR$(i)), TRUE)
+NEXT
+DIM tot AS INTEGER : tot = 0
+FOR i = 0 TO JSON_LEN(h, "verweise") - 1
+    DIM ziel AS STRING : ziel = JSON_GET_STRING(h, "verweise." + STR$(i) + ".ziel")
+    IF NOT MAPHAS(titel, ziel) THEN
+        tot = tot + 1
+        PRINT "ins leere: "; JSON_GET_STRING(h, "verweise." + STR$(i) + ".datei"); ": "; ziel
+    END IF
+NEXT
+PRINT "verweise ins leere "; tot
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+--- erwartet
+genug kapitel TRUE
+genug verweise TRUE
+verweise ins leere 0
+
+=== kein verweis nennt eine kapitelnummer
+' Nummern zeigen ins Nichts -- der Leser sieht sie nirgends. Beim Gegenlesen
+' standen 20 solche Stellen im Buch; es waren die DATEInummern der Quelle.
+IMPORT "regex"
+DIM inhalt AS STRING : inhalt = ARG$(0) + "/buch-referenz/buch/content"
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(inhalt, "*.js")
+DIM treffer AS INTEGER : treffer = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(dateien) - 1
+    DIM text AS STRING : text = JOIN$(READLINES(inhalt + "/" + dateien[i]), CHR$(10))
+    DIM gefunden AS ARRAY OF STRING : gefunden = REGEX_FIND_ALL(text, "Kapitel \d+")
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(gefunden) - 1
+        treffer = treffer + 1
+        PRINT "nummer: "; dateien[i]; ": "; gefunden[k]
+    NEXT
+NEXT
+PRINT "geprueft "; (LEN(dateien) > 50)
+PRINT "kapitelnummern "; treffer
+--- argumente
+{sammlung}/../..
+--- erwartet
+geprueft TRUE
+kapitelnummern 0
+
+=== alle codebloecke des buches uebersetzen
+' `pruef_codebloecke.js` schickt jeden Block durch `dhrt --check`. Ein
+' Tippfehler im Buch faellt sonst erst dem Leser auf, der ihn abtippt.
+IMPORT "helfer.dh"
+DIM buch AS STRING : buch = ARG$(0) + "/buch-referenz/buch"
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+nlStarten(buch, buch + "/pruef_codebloecke.js")
+PRINT "rueckgabe "; nlCode
+PRINT "ohne befund "; (INSTR(nlAus, "0 mit Befund") >= 0)
+' Schranke gegen den leeren Lauf: ohne sie meldete ein kaputter Sammler
+' Erfolg, weil er nichts zu pruefen fand.
+PRINT "genug bloecke "; (zahlVor(nlAus, "Codebloecke") > 800)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+--- erwartet
+rueckgabe 0
+ohne befund TRUE
+genug bloecke TRUE
+
+=== die behaupteten ausgaben des buches stimmen
+' `pruef_ausgaben.js` FUEHRT die Bloecke aus und vergleicht mit der
+' `{ out: [...] }`-Angabe. Die stand fuer 332 Bloecke im Buch und war nie
+' nachgemessen -- sieben davon waren falsch (LEN("Drachenhauch") als 9).
+IMPORT "helfer.dh"
+DIM buch AS STRING : buch = ARG$(0) + "/buch-referenz/buch"
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+nlStarten(buch, buch + "/pruef_ausgaben.js")
+PRINT "rueckgabe "; nlCode
+PRINT "ohne befund "; (INSTR(nlAus, "0 mit Befund") >= 0)
+' Die Schranke faengt den LEEREN Lauf, sie nagelt die Zahl nicht fest: die CI
+' baut dhrt ohne Grafik und ohne Hardware-Module, dort faellt mehr als
+' Bruchstueck weg. Auf dieser Maschine sind es 212.
+PRINT "genug ausgefuehrt "; (zahlVor(nlAus, "ausgefuehrt") > 100)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+--- erwartet
+rueckgabe 0
+ohne befund TRUE
+genug ausgefuehrt TRUE

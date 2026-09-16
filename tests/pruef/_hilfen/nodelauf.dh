@@ -1,0 +1,70 @@
+' Ein Node-Werkzeug des Buches starten und seine Ausgabe einsammeln.
+'
+' Die Kapitel des Referenzbuchs sind JavaScript-Module; gelesen werden sie von
+' den Werkzeugen unter tools/ bzw. buch-referenz/buch/. `nlStarten(ordner,
+' skript)` laeuft IM Ordner (die Werkzeuge suchen ihre Dateien relativ) und
+' fuellt danach nlAus, nlErr und nlCode.
+DIM nlAus AS STRING : nlAus = ""
+DIM nlErr AS STRING : nlErr = ""
+DIM nlCode AS INTEGER : nlCode = 0
+
+SUB nlWarten(p AS INTEGER, grenze AS INTEGER)
+    nlAus = ""
+    nlErr = ""
+    ' Nach dem Ende noch ein paar Mal leer lesen: das Kind kann beendet sein,
+    ' bevor sein Lesefaden die letzte Zeile abgelegt hat.
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < grenze AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            nlAus = nlAus + a
+            nlErr = nlErr + e
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    nlAus = REPLACE$(nlAus, CHR$(13), "")
+    nlErr = REPLACE$(nlErr, CHR$(13), "")
+    nlCode = PROCESS_CODE(p)
+END SUB
+
+SUB nlStarten(ordner AS STRING, skript AS STRING)
+    CHDIR(ordner)
+    nlWarten(PROCESS_START("node", skript), 1800000)
+END SUB
+
+' Gibt es Node ueberhaupt? Ohne es laesst sich das Buch nicht lesen.
+FUNCTION nodeDa() AS BOOLEAN
+    TRY
+        nlWarten(PROCESS_START("node", "--version"), 30000)
+        RETURN nlCode = 0
+    CATCH kein
+        RETURN FALSE
+    END TRY
+END FUNCTION
+
+' Die Zahl unmittelbar VOR einem Wort ("1009 Codebloecke gefunden" -> 1009).
+' Die Werkzeuge des Buches melden so ihre Bilanz; die Zahl ist die Schranke
+' gegen den leeren Lauf -- ein kaputter Sammler meldet sonst Erfolg, weil er
+' nichts zu pruefen fand.
+FUNCTION zahlVor(text AS STRING, wort AS STRING) AS INTEGER
+    DIM wo AS INTEGER : wo = INSTR(text, wort)
+    IF wo < 0 THEN RETURN -1
+    DIM davor AS STRING : davor = TRIM$(REPLACE$(LEFT$(text, wo), CHR$(10), " "))
+    DIM stuecke AS ARRAY OF STRING : stuecke = SPLIT$(davor, " ")
+    RETURN INT(VAL(stuecke[LEN(stuecke) - 1]))
+END FUNCTION
+
+' Die Standardausgabe eines Werkzeugs; "" wenn es fehlschlug.
+FUNCTION nodeLauf$(ordner AS STRING, skript AS STRING) AS STRING
+    nlStarten(ordner, skript)
+    IF nlCode <> 0 THEN
+        EPRINT("node " + skript + " (" + STR$(nlCode) + "): " + LEFT$(nlErr, 300))
+        RETURN ""
+    END IF
+    RETURN nlAus
+END FUNCTION

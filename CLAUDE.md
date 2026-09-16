@@ -956,7 +956,8 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   Fehlalarm (`CONST` INNERHALB einer SUB) tauchte erst am Buch-Beispiel
   `tippspiel.dh` auf, nachdem die 208 examples sauber waren.
   Dieser Lauf ist inzwischen ein TEST
-  (`tests/test_dhrt_check.py::test_kein_beispiel_meldet_einen_unbekannten_namen`)
+  (`tests/pruef/dhrt_check.dhtest`, Fall "kein programm des repos meldet einen
+  unbekannten namen")
   -- von Hand gelaufen faengt er den naechsten uebersehenen DIM-Zweig nicht.
   **Drei Wege enden in dem Rueckfall, nicht zwei:** `load_var`/`store_var` --
   und `INPUT x` (emittiert INPUT_NAME) sowie das `READ`-Ziel (geht nicht ueber
@@ -3129,6 +3130,41 @@ weil Pythons `subprocess` die Variable nicht setzt; unter TASK_START (Auftrag al
 Kindprozess) waere es der Normalfall gewesen. `dhrt call` sammelt jetzt
 ausdruecklich (`Vm::sammle_ausgabe`, geprueft in `flush_out` neben Profiler und
 Debugger).
+
+**Dieselbe Runde, die Buch-Pruefungen:** `test_buch_struktur.py`,
+`test_buch_verweise.py` und `test_buch_code.py` sind geloescht; ihre Faelle
+stehen in `tests/pruef/buch_pruefungen.dhtest` (5). Die Kapitel sind
+JavaScript-Module -- gestartet werden die Werkzeuge unter `tools/` und
+`buch-referenz/buch/` ueber `tests/pruef/_hilfen/nodelauf.dh`
+(`nlStarten(ordner, skript)` laeuft IM Ordner, weil sie ihre Dateien relativ
+suchen; `zahlVor(text, wort)` liest die Bilanzzahl, die Schranke gegen den
+leeren Lauf). Ohne Node meldet der Fall `UEBERSPRINGEN: node fehlt` und gilt
+als uebersprungen -- **dafuer kann sich ein Fall seit dieser Runde selbst
+ueberspringen** (die Zeile auf stdout oder stderr, `bewerten` in
+pruefsammlung.rs, Doku `docs/werkzeuge.md`): fuer fremde Werkzeuge, die nicht
+ueberall liegen. Die Alternative waere, die erwarteten Zeilen zu ERFINDEN --
+gruen und wertlos. Dazu test_beispiele_gui_enden.py (pytest) -> `tests/pruef/beispiele_gui_enden.dhtest`
+(zehn Fenster-Programme, 8 s) -- und dafuer **`dhrt run --bilder N`**: dieselbe
+Grenze wie `DHRT_FRAMES`, nur als Schalter, weil `PROCESS_START` seinen Kindern
+die Variable abnimmt (sonst stuerbe ein gestartetes Spiel nach N Bildern). Ein
+Programm mit `WHILE TRUE` laeuft trotzdem weiter -- genau daran erkennt man es;
+die Gegenprobe (eine Zeile im Beispiel umgestellt) laesst den Fall nach 25 s
+fallen.
+Dazu test_dhrt_check.py (pytest, 18 Tests) -> `tests/pruef/dhrt_check.dhtest`
+(9): die Diagnosen von `dhrt --check` samt Zeilennummern, die Warnungen
+(unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ) und die
+DURCHLAEUFE ueber den Bestand -- alle Beispiele ohne Fehler und ohne
+"Unbekanntes Builtin", alle 390 `.dh` des Repos ohne Falschmeldung der
+"nirgends angelegt"-Warnung (26 s; `dlCheckViele` im Helfer buendelt sieben
+Dateien je Aufruf, und weil dhrt bei EINER Datei das nackte Array liefert,
+bringt der Helfer das in dieselbe Form). Gegenprobe: ein
+eingeschmuggeltes `Kapitel 99` und ein `Kapitel "Gibt es nicht wirklich"`
+lassen die zwei Verweis-Faelle fallen (der Verweis muss dabei in einem STRING
+stehen -- der Exporter wertet die Module aus und sieht Kommentare nicht).
+**Falle, die das erst in der CI zeigte:** `dhrt pruef pfade` lief ueber
+`.claude/worktrees/` mit, und `lebt()` trifft per Suffix -- eine geloeschte
+Datei "lebte" also in einer Arbeitskopie weiter, lokal gruen, in der CI rot.
+Der Durchlauf laesst `.claude` jetzt aus (wie `target`, `.venv`, `node_modules`).
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

@@ -6,6 +6,7 @@
 '
 ' PROCESS_START nimmt seine Argumente einzeln -- ein Feld laesst sich nicht
 ' ausbreiten, darum die Staffel nach der Argumentzahl.
+IMPORT "json"
 DIM dlAus AS STRING : dlAus = ""
 DIM dlErr AS STRING : dlErr = ""
 DIM dlCode AS INTEGER : dlCode = 0
@@ -55,6 +56,44 @@ SUB dlStarten(dlArgs AS ARRAY OF STRING)
     dlErr = REPLACE$(dlErr, CHR$(13), "")
     dlCode = PROCESS_CODE(p)
 END SUB
+
+' Die Diagnosen von `dhrt --check` fuer EINEN Quelltext. Die Ausgabe ist ein
+' JSON-Array; das json-Modul adressiert ueber einen Pfad, darum in ein Objekt
+' gepackt -- die Diagnosen stehen unter "d".
+FUNCTION dlCheck(quelle AS STRING) AS JSON_HANDLE
+    WRITEALL("c.dh", quelle)
+    dlStarten(["--check", CWD$() + "/c.dh"])
+    RETURN JSON_PARSE("{""d"":" + TRIM$(dlAus) + "}")
+END FUNCTION
+
+' `dhrt --check` fuer viele Dateien: sieben je Aufruf -- ein Prozessstart je
+' Datei waere der ganze Zeitverbrauch eines Durchlaufs ueber den Bestand.
+' Liefert die JSON-Zeilen, eine je Datei ({"datei":..., "probleme":[...]}).
+' Bei EINER Datei antwortet dhrt mit dem nackten Array (so erwartet es der
+' Editor) -- die wird hier in dieselbe Form gebracht.
+FUNCTION dlCheckViele(dateien AS ARRAY OF STRING) AS ARRAY OF STRING
+    DIM zeilen AS ARRAY OF STRING : zeilen = []
+    DIM buendel AS ARRAY OF STRING : buendel = ["--check"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(dateien) - 1
+        ARRAY_PUSH(buendel, dateien[i])
+        IF LEN(buendel) = 8 OR i = LEN(dateien) - 1 THEN
+            dlStarten(buendel)
+            DIM teile AS ARRAY OF STRING : teile = SPLIT$(TRIM$(dlAus), CHR$(10))
+            DIM k AS INTEGER
+            FOR k = 0 TO LEN(teile) - 1
+                DIM zeile AS STRING : zeile = TRIM$(teile[k])
+                IF zeile = "" THEN CONTINUE
+                IF LEFT$(zeile, 1) = "[" THEN
+                    zeile = "{""datei"":""" + REPLACE$(buendel[1], CHR$(92), "/") + """,""probleme"":" + zeile + "}"
+                END IF
+                ARRAY_PUSH(zeilen, zeile)
+            NEXT
+            buendel = ["--check"]
+        END IF
+    NEXT
+    RETURN zeilen
+END FUNCTION
 
 ' Der ganze Text einer Datei mit \n als Zeilenende (READLINES verloere den
 ' abschliessenden Umbruch -- und genau der gehoert bei `dhrt fmt` zur Zusage).
