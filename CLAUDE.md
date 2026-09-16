@@ -982,7 +982,7 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   Debug-Sitzung soll ihre nicht verlieren) und sie mindestens eine Minute alt
   sind (Prozessnummern werden wiederverwendet). Wer `examples/*.dh` globbt,
   filtert `tempdateien.PRAEFIX` heraus -- ein Rest kippte sonst die Zaehlung
-  (`dhrt pruef beispiele` zaehlt darum den git-Index, `tests/test_dhrt_werkzeuge.py`
+  (`dhrt pruef beispiele` zaehlt darum den git-Index, `tests/pruef/dhrt_werkzeuge.dhtest`
   filtert das Praefix).
   Modul `drachenhauch/editor_qt/tempdateien.py`.
 - **Qt-Tests: nie ungebremst `app.processEvents()` aufrufen.** Die Qt-Testdateien
@@ -3069,7 +3069,7 @@ endlos weiter -- der Aufrufer wartete ewig (so haengte der erste Testlauf 300 s)
 direkt nach dem gesicherten Bild. Tests `tests/pruef/werkzeug_buch.dhtest`
 (apply gegen Node-Referenz und leerer Patch auf eine Kopie von `en.json`, beide
 shoot-Werkzeuge an Beilagen) und `tests/pruef/dhrt_bild.dhtest` (der Test aus
-`test_dhrt_werkzeuge.py` plus der `WHILE TRUE`-Fall).
+`test_dhrt_werkzeuge.py`, seit 2026-09-16 `tests/pruef/dhrt_werkzeuge.dhtest`, plus der `WHILE TRUE`-Fall).
 **Buch-Build (selber Tag):** `tools/buch_bauen.dh -- <buchordner> [--lang de|en]`
 ersetzt die vier `make_book.py` (PyMuPDF + PIL). Ein Werkzeug fuer alle vier
 Buecher, je Buch Dateiname, Sprachen und Messart in einer Tabelle; Referenz- und
@@ -3111,6 +3111,24 @@ Karte unveraendert -- der alte Klick-Test trifft weiter). **Falle:** `LEN` auf
 einer MAP ist ein Laufzeitfehler, gezaehlt wird selbst. Tests
 `tests/pruef/werkzeug_showcase.dhtest` (5; Gegenprobe mit Alpha/Breite 400
 und ohne showcase.json: die jeweiligen Faelle fallen).
+
+**Die dhrt-Werkzeuge pruefen sich selbst (2026-09-16, Weg D):**
+`tests/test_dhrt_werkzeuge.py` (31 Tests) und `tests/test_dhrt_call.py` (9) sind
+geloescht; ihre Faelle stehen in `tests/pruef/dhrt_werkzeuge.dhtest` (21) und
+`tests/pruef/dhrt_call.dhtest` (6). Gestartet wird dhrt als Kind ueber den neuen
+Helfer `tests/pruef/_hilfen/dhrtlauf.dh` (`dlStarten(["fmt", ...])` fuellt
+`dlAus`/`dlErr`/`dlCode`; `PROCESS_START` nimmt seine Argumente einzeln, ein
+Feld laesst sich nicht ausbreiten -- daher die Staffel nach der Argumentzahl bis
+acht). Der Sweep "der Bestand bleibt unter fmt ruhig" buendelt **sechs Dateien je
+Aufruf** statt einer: mit 210 Prozessstarts dauerte die Sammlung 34 s, so 6 s.
+**Der Fund dabei, und er steckt in der Laufzeit:** `PROCESS_START` setzt seinen
+Kindern `DHRT_LIVE=1` (damit PRINT laufend ankommt) -- und damit verlor
+`dhrt call` genau die Trennung, fuer die es gebaut ist: die Ausgabe der Funktion
+ging roh nach stdout und das Feld `ausgabe` blieb LEER. Gemerkt hat es niemand,
+weil Pythons `subprocess` die Variable nicht setzt; unter TASK_START (Auftrag als
+Kindprozess) waere es der Normalfall gewesen. `dhrt call` sammelt jetzt
+ausdruecklich (`Vm::sammle_ausgabe`, geprueft in `flush_out` neben Profiler und
+Debugger).
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
@@ -4174,7 +4192,7 @@ HAENGT im Test (180 s Zeitgrenze) -- der Vergleich nimmt darum die im
 Projektbaum gewaehlte Datei, und der Dialog ist nur der Rueckfall.
 Dazu: `LOADIMAGE` merkt sich den PFAD; ein neu erzeugtes Vorschaubild kaeme
 ohne `IMAGE_FREE` als das alte zurueck.
-Tests: `dhrt bild` in `tests/test_dhrt_werkzeuge.py`, vier neue in
+Tests: `dhrt bild` in `tests/pruef/dhrt_bild.dhtest`, vier neue in
 `tests/test_ide.py` (darunter die Vorschau mit einem eigenen
 Beispiel-Ordner und einer Farbprobe im erzeugten PNG).
 
