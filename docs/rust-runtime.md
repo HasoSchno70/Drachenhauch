@@ -474,6 +474,13 @@ beim Erreichen der Grenze wird das PNG gespeichert (auch wenn das Programm eine
 feste `FOR`-Schleife statt `QUITREQUESTED` nutzt). **Hinweis:** raylibs
 `TakeScreenshot` legt die Datei relativ zum Arbeitsverzeichnis ab.
 
+Dieselbe Grenze **ohne Umgebungsvariable**: `dhrt run --bilder 20 spiel.dh`.
+Das braucht, wer aus einem PROGRAMM heraus prüft — `PROCESS_START` nimmt
+seinen Kindern `DHRT_FRAMES` ab, damit ein gestartetes Spiel nicht nach N
+Bildern stirbt. Ein Programm, das `QUITREQUESTED()` gar nicht fragt, läuft
+trotzdem weiter: **genau daran erkennt man es**
+(`tests/pruef/beispiele_gui_enden.dhtest`).
+
 #### Kontaktbogen: einen ABLAUF pruefen statt eines Augenblicks
 
 Ein einzelner Screenshot zeigt einen Augenblick. Vieles geht aber erst ueber
