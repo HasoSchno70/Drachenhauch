@@ -86,7 +86,6 @@ def _module_uses_qt(path: str) -> bool:
 # Betriebsmittel.
 _SERIELL = {
     "test_gui_barrierefreiheit.py", # Tasten (F10/Alt/Tab) und ein fremder UIA-Leser am Fenster
-    "test_speak.py",                 # misst Sprechdauern (SPEAK_WAIT) an der Soundkarte
     # test_gui_text_formular.py tippt ueber die SYSTEM-Zwischenablage (Strg+V):
     # zwei Laeufe gleichzeitig ueberschreiben sich gegenseitig den Inhalt.
     "test_profiler.py",
@@ -181,7 +180,6 @@ _NUR_WINDOWS = {
 }
 
 _BRAUCHT_GRAFIK = {
-    "test_speak.py",
     "test_gui_barrierefreiheit.py",
     "test_buch_tippspiel.py",
     "test_drucken.py",
