@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# Ein Lauf je Ereignisart und Commit. GitHub hat den Merge von #172 zweimal
+# gemeldet (zwei pr_merge-Eintraege in derselben Sekunde) und daraus zwei
+# main-Laeufe fuer denselben Commit gemacht. Ueberlappen sie, bricht der
+# spaetere den frueheren ab; ein neuer Commit hat eine andere SHA und laeuft
+# ungestoert. PR-Laeufe haben ihre eigene Merge-SHA, kollidieren also nicht
+# mit dem main-Lauf nach dem Merge.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: windows-latest
