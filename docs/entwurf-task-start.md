@@ -150,7 +150,8 @@ bekommt, und sie muss die Zusage erklären statt sie zu verschweigen. Die
 Variable kann sie nicht nennen — `Program` führt keine Namen für Globals, nur
 `n_globals`.
 
-Neun Golden-Tests in `tests/test_dhrt_call.py`.
+Sechs Faelle in `tests/pruef/dhrt_call.dhtest` (bis 2026-09-16 neun Golden-Tests
+in `tests/test_dhrt_call.py`).
 
 **Die fünf `TASK_*`-Builtins stehen** (2026-08-19). Der Auftrag läuft als
 eigener `dhrt call`-Prozess; gemessen am Beispiel dreht sich die Hauptschleife
