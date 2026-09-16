@@ -1,0 +1,91 @@
+' examples/158 -- die gui-Tabelle an einer echten SQLite-Datenbank.
+'
+' Abgesichert wird die ZUSAGE der Demo: sie arbeitet auf einer Kopie und laesst
+' die Originaldatei unangetastet. Eine Demo, die den Spielstand des Nutzers
+' aendert, waere eine schlechte Demo -- und der Fehler fiele erst auf, wenn die
+' Daten schon weg sind.
+'
+' Bis 2026-09-16 tests/test_beispiel_sqlite_tabelle.py. Die Datenbank
+' (pyramid_pusher/pyramid_pusher.db) ist nicht versioniert; fehlt sie, meldet
+' sich der Fall als uebersprungen. Die Demo laeuft als Kind mit
+' `dhrt run --bilder 20` (PROCESS_START nimmt dem Kind DHRT_FRAMES ab).
+
+=== die demo laesst das original stehen und raeumt ihre kopie weg
+IMPORT "helfer.dh"
+DIM wurzel AS STRING : wurzel = ARG$(0)
+DIM original AS STRING : original = wurzel + "/pyramid_pusher/pyramid_pusher.db"
+IF NOT FILEEXISTS(original) THEN
+    PRINT "UEBERSPRINGEN: pyramid_pusher.db nicht vorhanden"
+    EXIT(0)
+END IF
+DIM kopie AS STRING : kopie = wurzel + "/examples/tabelle_sqlite_arbeitskopie.db"
+IF FILEEXISTS(kopie) THEN DELETEFILE(kopie)
+DIM vorher AS STRING : vorher = zustand$(original)
+DIM zeit AS INTEGER : zeit = FILETIME(original)
+DIM groesse AS INTEGER : groesse = FILESIZE(original)
+dlStarten(["run", "--bilder", "20", wurzel + "/examples/158_gui_tabelle_sqlite.dh"])
+IF dlCode <> 0 THEN
+    ' Ohne Bildschirm (oder im Bau ohne raylib) kommt kein Fenster zustande.
+    PRINT "UEBERSPRINGEN: " + TRIM$(SPLIT$(dlErr + " ", CHR$(10))[0])
+    EXIT(0)
+END IF
+PRINT "zeilen unveraendert "; (zustand$(original) = vorher)
+PRINT "datei nicht geschrieben "; (FILETIME(original) = zeit AND FILESIZE(original) = groesse)
+' Sonst bliebe nach jedem Lauf eine .db im examples-Ordner liegen.
+PRINT "arbeitskopie weg "; (NOT FILEEXISTS(kopie))
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "db"
+FUNCTION zustand$(pfad AS STRING) AS STRING
+    DIM c AS DB_CONN : c = DB_OPEN(pfad)
+    DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT id, title FROM solves ORDER BY id")
+    DIM s AS STRING : s = ""
+    WHILE DB_NEXT(r)
+        s = s + STR$(DB_GET_INT(r, 0)) + ":" + DB_GET_STRING(r, 1) + CHR$(10)
+    WEND
+    DB_CLOSE_RESULT(r)
+    DB_CLOSE(c)
+    RETURN s
+END FUNCTION
+--- erwartet
+zeilen unveraendert TRUE
+datei nicht geschrieben TRUE
+arbeitskopie weg TRUE
+
+=== vacuum into kopiert alle daten
+' Der Trick, mit dem die Demo an eine beschreibbare Fassung kommt, ohne das
+' Original anzufassen -- er muss wirklich ALLES kopieren, sonst zeigte die
+' Tabelle weniger an, als das Spiel gespeichert hat.
+IMPORT "helfer.dh"
+DIM original AS STRING : original = ARG$(0) + "/pyramid_pusher/pyramid_pusher.db"
+IF NOT FILEEXISTS(original) THEN
+    PRINT "UEBERSPRINGEN: pyramid_pusher.db nicht vorhanden"
+    EXIT(0)
+END IF
+COPYFILE(original, "quelle.db")
+DIM c AS DB_CONN : c = DB_OPEN("quelle.db")
+DB_EXEC(c, "VACUUM INTO 'kopie.db'")
+DB_CLOSE(c)
+DIM a AS STRING : a = zustand$("quelle.db")
+PRINT "zeilen da "; (a <> "")
+PRINT "gleich "; (zustand$("kopie.db") = a)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "db"
+FUNCTION zustand$(pfad AS STRING) AS STRING
+    DIM c AS DB_CONN : c = DB_OPEN(pfad)
+    DIM r AS DB_RESULT : r = DB_QUERY(c, "SELECT id, title FROM solves ORDER BY id")
+    DIM s AS STRING : s = ""
+    WHILE DB_NEXT(r)
+        s = s + STR$(DB_GET_INT(r, 0)) + ":" + DB_GET_STRING(r, 1) + CHR$(10)
+    WEND
+    DB_CLOSE_RESULT(r)
+    DB_CLOSE(c)
+    RETURN s
+END FUNCTION
+--- erwartet
+zeilen da TRUE
+gleich TRUE
