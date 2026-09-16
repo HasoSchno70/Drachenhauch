@@ -1,0 +1,234 @@
+' GUI_DRAW_WINDOW und GUI_DRAW_TOP -- ein Fenster bzw. der Tooltip ueber dem
+' selbst Gezeichneten.
+'
+' GUI_DRAW zeichnet Fenster und Zeichenflaechen in EINEM Durchgang, und der
+' Inhalt einer Zeichenflaeche entsteht per Bauart DANACH. Ein Fenster ueber
+' einer Zeichenflaeche verschwindet damit hinter deren Inhalt -- gefunden am
+' Sprite-Piloten, wo der Kasten "Neues Sprite" die Eingabe sperrte und nicht
+' zu sehen war. Geprueft wird am BILD: derselbe Ablauf mit und ohne den
+' Aufruf, die Gegenprobe steckt als eigener Fall mit drin.
+'
+' Bis 2026-09-16 tests/test_gui_draw_window.py (Pillow als Leser). Seriell,
+' weil die Tooltip-Faelle eine Mausposition einspeisen.
+--- seriell
+
+=== ohne den aufruf liegt das gemalte ueber dem fenster
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 60, 60, 200, 120)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    ' Steht fuer den Inhalt einer Zeichenflaeche: gemalt NACH GUI_DRAW.
+    BOX(0, 0, 319, 239, &HFF00FF)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+160 120 #FF00FF
+
+=== mit dem aufruf liegt das fenster obenauf
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 60, 60, 200, 120)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    BOX(0, 0, 319, 239, &HFF00FF)
+    GUI_DRAW_WINDOW(w)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+160 120 nicht #FF00FF
+
+=== ein unsichtbares fenster zeichnet nichts
+' Kein Fehler, nur kein Bild -- der Aufruf darf unbedingt in der Bildschleife
+' stehen, ohne dass das Programm ihn absichern muss.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 60, 60, 200, 120)
+GUI_WINDOW_VISIBLE(w, FALSE)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    BOX(0, 0, 319, 239, &HFF00FF)
+    GUI_DRAW_WINDOW(w)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+160 120 #FF00FF
+
+=== ein zerstoertes fenster ist kein fehler
+' Wie bei allen gui-Handles bleibt die Nummer nach GUI_WINDOW_DESTROY gueltig
+' (Grabstein) -- sonst muesste jedes Programm mitfuehren, ob sein Fenster lebt.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 60, 60, 200, 120)
+GUI_WINDOW_DESTROY(w)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    BOX(0, 0, 319, 239, &HFF00FF)
+    GUI_DRAW_WINDOW(w)
+    FLIP()
+WEND
+PRINT "durchgelaufen"
+--- umgebung
+DHRT_FRAMES=3
+--- bild
+160 120 #FF00FF
+--- erwartet
+durchgelaufen
+
+=== ein unbekanntes handle meldet sich
+' Ein NICHT vergebenes Handle ist ein Tippfehler und muss auffallen.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 60, 60, 200, 120)
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    GUI_DRAW_WINDOW(4242)
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+--- fehler
+GUI_DRAW_WINDOW
+
+=== ohne gui_draw_top liegt der tooltip unter dem gemalten
+' Der Tooltip liegt ueber ALLEN Fenstern und folgt der Maus -- er landet also
+' staendig ueber einer Zeichenflaeche. Der Zeiger ruht auf dem Knopf, der
+' Tooltip erscheint rechts UNTER ihm, im zugemalten Streifen.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 110)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "Knopf", 10, 60, 90, 26)
+GUI_TOOLTIP(b, "HILFETEXT")
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    BOX(0, 120, 319, 239, &HFF00FF)
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 0 7 60 105 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=45
+--- bild
+100 134 #FF00FF
+
+=== gui_draw_top holt den tooltip nach oben
+' Zweimal zeichnen waere keine Loesung: der Schlagschatten wuerde dort dunkler,
+' wo das eigene Zeichnen die erste Fassung nicht zugedeckt hat. Darum laesst
+' GUI_DRAW(FALSE) die Schicht weg und GUI_DRAW_TOP() holt sie nach.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 110)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "Knopf", 10, 60, 90, 26)
+GUI_TOOLTIP(b, "HILFETEXT")
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW(FALSE)
+    BOX(0, 120, 319, 239, &HFF00FF)
+    GUI_DRAW_TOP()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 0 7 60 105 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=45
+--- bild
+100 134 nicht #FF00FF
+
+=== ohne zumalen erscheint der tooltip dort
+' Die Gegenprobe zum naechsten Fall: mit GUI_DRAW() steht an der Stelle der
+' Tooltip, nicht der leere Hintergrund.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 110)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "Knopf", 10, 60, 90, 26)
+GUI_TOOLTIP(b, "HILFETEXT")
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW()
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 0 7 60 105 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=45
+--- bild
+100 134 nicht #000000
+
+=== gui_draw false laesst den tooltip ganz weg
+' Ohne GUI_DRAW_TOP darf gar kein Tooltip erscheinen -- sonst bewiese der Fall
+' davor nur, dass GUI_DRAW_TOP zeichnet.
+IMPORT "gui"
+SCREEN(320, 240, "Test", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("Kasten", 10, 10, 300, 110)
+DIM b AS GUI_WIDGET
+b = GUI_BUTTON(w, "Knopf", 10, 60, 90, 26)
+GUI_TOOLTIP(b, "HILFETEXT")
+WHILE NOT QUITREQUESTED()
+    CLS(&H000000)
+    GUI_UPDATE()
+    GUI_DRAW(FALSE)
+    FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 1
+e 0 7 60 105 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=45
+--- bild
+100 134 #000000
