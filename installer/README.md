@@ -26,10 +26,29 @@ Beispiele samt Begleit-Editoren. Gemessen 33 MB statt 92. Eigene AppId und
 eigener Ordner (`Drachenhauch-IDE`), damit er die Qt-Fassung nicht ersetzt,
 solange die noch die Referenz ist.
 
+**Gebaut wird er in Drachenhauch** (seit 2026-09-16), nicht in Python:
+
 ```
-.venv\Scripts\python.exe rust\build_runtime.py --hardware
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=2026.14 installer\Drachenhauch-IDE.iss
+.venv\Scripts\python.exe rust\build_runtime.py --hardware   # die Laufzeit selbst
+dhrt run installer\bauen.dh                                 # Lizenzen + Inno Setup
 ```
+
+`installer/bauen.dh` nimmt die Fassung aus der Laufzeit selbst (`VERSION$()`) —
+gepackt wird genau die `dhrt.exe`, deren Nummer im Installer steht —, ruft
+`installer/lizenzen.dh` und danach ISCC (aus `%ISCC%` oder den zwei
+Standardpfaden; fehlt es, bleibt es bei der Lizenzdatei und einer Zeile, wie man
+von Hand weiterkommt). `--ohne-installer` sammelt nur die Lizenzen.
+
+**Das Bauen der Laufzeit bleibt bei `rust/build_runtime.py`** — unter Windows
+lässt sich eine laufende `.exe` nicht überschreiben, und `bauen.dh` läuft ja in
+ihr.
+
+`installer/lizenzen.dh` schreibt `THIRD-PARTY-NOTICES-IDE.txt`: die Rust-Crates
+aus `cargo metadata` (mit den ausgelieferten Features) samt ihren
+LICENSE-/COPYING-/NOTICE-Texten, dazu den MPL-2.0-Volltext. Python-Pakete und Qt
+stehen **nicht** darin — in dieser Distribution steckt keins von beidem. Der
+Rust-Abschnitt entsteht Byte für Byte wie der von `gen_notices.py` (nachgemessen
+an allen 370 Crates); Tests: `tests/pruef/werkzeug_installer.dhtest`.
 
 Die Verknuepfungen starten `dhrt.exe run "{app}\ide\ide.dh"` mit dem
 Beispielordner als Arbeitsverzeichnis; `.dh`-Dateien oeffnen sich in der
@@ -121,9 +140,11 @@ macOS beim ersten Start automatisch aus dem Bundle kopiert.
 | `Drachenhauch.spec` | PyInstaller-Konfiguration (onedir, windowed, bündelt das Paket + Daten; macOS bekommt zusätzlich einen `BUNDLE()`-Schritt für ein echtes `.app`). |
 | `Drachenhauch.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung, EULA) — nur Windows. |
 | `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). Wird im Windows-Setup als Zustimmungsseite gezeigt; auf macOS/Linux als Referenzdatei mit ins Paket kopiert. |
-| `gen_notices.py` | Sammelt alle Drittanbieter-Lizenztexte → `THIRD-PARTY-NOTICES.txt` (plattformunabhängig). |
-| `licenses/` | Kanonische Volltexte (LGPL-3.0, GPL-3.0, MPL-2.0) für `gen_notices.py`. |
-| `Drachenhauch.ico`/`.icns`/`.png` · `THIRD-PARTY-NOTICES.txt` · `output/` | generiert (gitignored). |
+| `bauen.dh` | Baut die Distribution **ohne Python**: Lizenzen + Inno Setup (`Drachenhauch-IDE.iss`). |
+| `lizenzen.dh` | Sammelt die Lizenztexte der Rust-Crates → `THIRD-PARTY-NOTICES-IDE.txt`. |
+| `gen_notices.py` | Dasselbe für die **Qt**-Fassung (zusätzlich Python-Pakete + Qt) → `THIRD-PARTY-NOTICES.txt`. |
+| `licenses/` | Kanonische Volltexte (LGPL-3.0, GPL-3.0, MPL-2.0) für beide Sammler. |
+| `Drachenhauch.ico`/`.icns`/`.png` · `THIRD-PARTY-NOTICES*.txt` · `output/` | generiert (gitignored). |
 
 ## Lizenz-Compliance (für den Verkauf)
 - **`THIRD-PARTY-NOTICES.txt`** wird bei jedem Build automatisch erzeugt (`gen_notices.py`):
@@ -131,6 +152,10 @@ macOS beim ersten Start automatisch aus dem Bundle kopiert.
   unter LGPLv3, NumPy, Pillow) **und** aller ~250 Rust-Crates der dhrt-Runtime
   (MIT/BSD/Apache-2.0/Zlib/MPL-2.0). MIT/BSD/Apache **verlangen** diese Beilage.
   Liegt nach Installation unter `{app}\THIRD-PARTY-NOTICES.txt` + Startmenü.
+- **`THIRD-PARTY-NOTICES-IDE.txt`** ist das Gegenstück für die Distribution ohne
+  Python (`installer/lizenzen.dh`): nur die Rust-Crates von `dhrt` plus
+  MPL-2.0-Volltext — dort gibt es weder Python-Pakete noch Qt. `bauen.dh` erzeugt
+  sie vor jedem Verpacken neu, damit sie zu den wirklich gebauten Features passt.
 - **`EULA.txt`** ist eine Vorlage; ersetze die `[PLATZHALTER]` und lass sie vor einem
   kommerziellen Vertrieb prüfen. Sie regelt u.a., dass **vom Nutzer erstellte Spiele
   ihm gehören** und samt dhrt-Runtime **frei (auch kommerziell) weitergegeben** werden

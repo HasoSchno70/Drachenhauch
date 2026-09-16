@@ -3112,6 +3112,33 @@ einer MAP ist ein Laufzeitfehler, gezaehlt wird selbst. Tests
 `tests/pruef/werkzeug_showcase.dhtest` (5; Gegenprobe mit Alpha/Breite 400
 und ohne showcase.json: die jeweiligen Faelle fallen).
 
+**Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
+Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
+`dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
+`installer/lizenzen.dh`, dann ISCC auf `Drachenhauch-IDE.iss` (aus `%ISCC%` oder
+zwei Standardpfaden; fehlt es, bleibt es bei der Lizenzdatei plus Hinweis).
+**Das Bauen der Laufzeit bleibt bei `rust/build_runtime.py`** -- unter Windows
+laesst sich eine laufende `.exe` nicht ueberschreiben, und `bauen.dh` laeuft in
+ihr. `installer/lizenzen.dh` ersetzt `gen_notices.py` fuer diese Distribution:
+Crates aus `cargo metadata` (Features `graphics db net http`), je Crate die
+LICENSE-/COPYING-/NOTICE-Dateien aus dem Crate-Ordner und dessen `licenses/`
+und `license_files/`, dazu der MPL-2.0-Volltext; Python-Pakete und Qt fehlen,
+weil in dieser Distribution keins von beidem steckt. **Der Beleg ist ein
+Vergleich, keine Behauptung:** der Abschnitt RUST-KOMPONENTEN ist Byte fuer Byte
+der von `gen_notices.py` (370 Crates, 3,2 MB, 1,5 s). Drei Dinge mussten dafuer
+genau stimmen: die Reihenfolge ist nach KLEINGESCHRIEBENEM Namen sortiert und
+stabil (sortiert wird eine Liste von Plaetzen, damit die Parallel-Felder
+zusammenbleiben), die Lizenzdateien werden nach dem KLEINGESCHRIEBENEN Pfad
+geordnet (so vergleicht pathlib unter Windows), und ein Text wird wie Pythons
+`read_text()` gelesen (`BUFFER_TO_STRING$` + CRLF -> LF; `READLINES` verloere
+den abschliessenden Umbruch, den der MPL-Volltext braucht) und wie `strip()`
+beschnitten. `THIRD-PARTY-NOTICES-IDE.txt` ist erzeugt und gitignoriert wie ihr
+Qt-Gegenstueck -- `bauen.dh` schreibt sie vor jedem Verpacken neu. Tests
+`tests/pruef/werkzeug_installer.dhtest` (3, mit erfundener `cargo metadata` und
+Attrappe statt cargo; Gegenprobe ohne Kleinschreibung beim Sortieren faellt).
+**Falle:** es gibt keinen Befehl fuer den Namen des Betriebssystems -- `bauen.dh`
+sucht darum einfach beide Dateinamen (`dhrt.exe`, `dhrt`).
+
 **Stufe 53 (2026-09-14):** die CIRCUIT-RUNNER-Engine ohne Python -- die fuenf
 Engine-Tests aus `test_circuitrunner.py` stehen in
 `tests/pruef/werkzeug_circuitrunner.dhtest`; in pytest bleiben nur die drei

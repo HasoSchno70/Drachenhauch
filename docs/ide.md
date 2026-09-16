@@ -393,5 +393,9 @@ Dateigrenzen** außer den Schritten, die `umbauZurueck` hält. Ein
 Installer ohne Python gibt es seit Stand 3:
 `installer/Drachenhauch-IDE.iss` packt `dhrt.exe`, `ide/`, `docs/` und die
 Beispiele -- 33 MB statt 92; die Qt-IDE bleibt daneben installierbar, bis
-diese hier gleichzieht. Die Liste steht in
+diese hier gleichzieht. **Gebaut wird er seit 2026-09-16 in Drachenhauch**
+(`dhrt run installer/bauen.dh`: Fassung aus `VERSION$()`, Lizenzen über
+`installer/lizenzen.dh`, dann ISCC); nur die Laufzeit selbst baut weiterhin
+`rust/build_runtime.py` -- eine laufende `.exe` lässt sich nicht
+überschreiben. Die Liste steht in
 [entwurf-python-abbau.md](entwurf-python-abbau.md), Abschnitt C.
