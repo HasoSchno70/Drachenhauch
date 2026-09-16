@@ -3231,6 +3231,22 @@ Fall. Gegenproben: falscher Beispielpfad bzw. eine Demo-Kopie ohne das
 Aufraeumen fallen; "Original unberuehrt" ist bewusst NICHT gegengeprueft, weil
 die Mutation die echte Spielstand-Datenbank beschriebe.
 
+**SPEAK und der Sprachserver ohne Python (2026-09-16, Weg D):**
+test_speak (pytest) -> `tests/pruef/speak.dhtest` (10, seriell; die WAV liest ein
+`--- nachher` ueber ihre Bytes) und test_dhrt_lsp (pytest) ->
+`tests/pruef/dhrt_lsp.dhtest` (11). Der LSP-Client `_hilfen/lspklient.dh`
+schickt alle Anfragen, beendet den Server mit shutdown/exit und zerlegt DANACH:
+`PROCESS_READ$` liest zeilenweise, ein LSP-Rumpf endet nicht mit einem Umbruch
+und kaeme sonst erst mit der naechsten Kopfzeile. Zerlegt wird an den
+Kopfzeilen, nicht ueber Content-Length (Bytes gegen Zeichen). **Zwei Funde:**
+(1) der pytest-Fall "unbekannte Stimme ist ein Fehler im Klartext" war IMMER
+uebersprungen -- seine Hilfsfunktion wertete "nicht gefunden" als fehlende
+Sprachausgabe, und genau das steht in der erwarteten Meldung. (2) Die
+Gliederung kennt Blockenden nur fuer CLASS/STRUCT/SUB/FUNCTION/PROPERTY; ein
+`ENUM` reicht als Bereich nur ueber seine Kopfzeile (`symbole::bereiche`,
+schon so in der Python-Vorlage; nicht behoben, der Fall prueft es nicht).
+Gegenproben: vier bzw. drei Verfaelschungen, jede faellt.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
@@ -4566,8 +4582,9 @@ Symbole ueber den Kommentarblock ueber der Definition. Vervollstaendigung:
 Index (`compiler::builtin_eintraege`), `lexer::KEYWORDS` (neue Liste, Test
 haelt sie an `keyword()` fest -- 75 Eintraege), Farben/Tasten aus vm.rs, PI/TAU,
 eigene Definitionen. Tests: Rust-`#[test]`s in beiden Dateien +
-[`tests/test_dhrt_lsp.py`](tests/test_dhrt_lsp.py) (echter Prozess ueber
-stdio; prueft nebenbei `tokens.KEYWORDS` gegen `lexer::KEYWORDS`). Der
+`tests/pruef/dhrt_lsp.dhtest` (echter Prozess ueber
+stdio, Client `_hilfen/lspklient.dh`; prueft nebenbei die KEYWORDS aus
+`tokens.py` gegen die Vervollstaendigung; bis 2026-09-16 pytest). Der
 Qt-Editor benutzt weiter seine Python-Bausteine (`symbols.py`,
 `error_check.py`) -- die gehen mit der IDE (Weg C). VS-Code-Erweiterung in
 [`vscode-drachenhauch/`](vscode-drachenhauch/): `extension.js` startet

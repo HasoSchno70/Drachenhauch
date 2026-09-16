@@ -1,0 +1,126 @@
+' Ein Client fuer `dhrt lsp`: gerahmt senden, am Ende alle Antworten zerlegen.
+'
+' Der Server laeuft als Kind (PROCESS_START). Gelesen wird erst, wenn er
+' beendet ist: PROCESS_READ$ liefert zeilenweise, ein LSP-Rumpf endet aber
+' nicht mit einem Zeilenumbruch -- er kaeme erst mit der Kopfzeile der
+' naechsten Nachricht oder am Ende des Stroms. Darum schickt ein Fall alle
+' Anfragen, `lsEnde` beendet den Server mit shutdown/exit, und danach steht jede
+' Antwort in `lsRuempfe` (ein JSON-Text je Nachricht, in der Reihenfolge des
+' Stroms).
+'
+' Zerlegt wird an den Kopfzeilen, nicht ueber Content-Length: die Laenge zaehlt
+' Bytes, der Text hier Zeichen, und ein Hover-Text darf Umlaute tragen.
+IMPORT "json"
+DIM lsProzess AS INTEGER : lsProzess = -1
+DIM lsNaechsteId AS INTEGER : lsNaechsteId = 1
+DIM lsRuempfe AS ARRAY OF STRING
+DIM lsCode AS INTEGER : lsCode = -1
+
+SUB lsStart()
+    lsProzess = PROCESS_START("dhrt", "lsp")
+    lsRuempfe = []
+END SUB
+
+' Ohne Kopf gerahmt: fuer die Faelle, die eine kaputte Rahmung schicken.
+SUB lsRoh(kopf AS STRING, rumpf AS STRING)
+    PROCESS_WRITE(lsProzess, kopf + rumpf)
+END SUB
+
+SUB lsSenden(json AS STRING)
+    DIM nl AS STRING : nl = CHR$(13) + CHR$(10)
+    PROCESS_WRITE(lsProzess, "Content-Length: " + STR$(LEN(json)) + nl + nl + json)
+END SUB
+
+' Eine Anfrage; liefert ihre id.
+FUNCTION lsFragen(methode AS STRING, params AS STRING) AS INTEGER
+    DIM i AS INTEGER : i = lsNaechsteId
+    lsNaechsteId = lsNaechsteId + 1
+    lsSenden("{""jsonrpc"":""2.0"",""id"":" + STR$(i) + ",""method"":""" + methode + """,""params"":" + params + "}")
+    RETURN i
+END FUNCTION
+
+SUB lsMelden(methode AS STRING, params AS STRING)
+    lsSenden("{""jsonrpc"":""2.0"",""method"":""" + methode + """,""params"":" + params + "}")
+END SUB
+
+' Ein Text als JSON-Zeichenkette (Anfuehrungszeichen, Rueckstrich, Umbruch).
+FUNCTION lsText$(t AS STRING) AS STRING
+    DIM s AS STRING : s = REPLACE$(t, CHR$(92), CHR$(92) + CHR$(92))
+    s = REPLACE$(s, CHR$(34), CHR$(92) + CHR$(34))
+    s = REPLACE$(s, CHR$(10), CHR$(92) + "n")
+    RETURN CHR$(34) + s + CHR$(34)
+END FUNCTION
+
+SUB lsOeffnen(uri AS STRING, text AS STRING)
+    lsMelden("textDocument/didOpen", "{""textDocument"":{""uri"":" + lsText$(uri) + _
+        ",""languageId"":""drachenhauch"",""version"":1,""text"":" + lsText$(text) + "}}")
+    ' Die Diagnose laeuft im eigenen Faden mit 120 ms Sammelzeit.
+    SLEEP(400)
+END SUB
+
+' Eine Position im Dokument als params-Text.
+FUNCTION lsStelle$(uri AS STRING, zeile AS INTEGER, spalte AS INTEGER) AS STRING
+    RETURN "{""textDocument"":{""uri"":" + lsText$(uri) + "},""position"":{""line"":" + _
+        STR$(zeile) + ",""character"":" + STR$(spalte) + "}}"
+END FUNCTION
+
+' shutdown, exit, Eingang schliessen, auf das Ende warten, alles zerlegen.
+SUB lsEnde()
+    DIM id AS INTEGER : id = lsFragen("shutdown", "{}")
+    lsMelden("exit", "{}")
+    PROCESS_CLOSE_INPUT(lsProzess)
+    DIM alles AS STRING : alles = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE leer < 5 AND MILLIS() - t0 < 30000
+        DIM teil AS STRING : teil = PROCESS_READ$(lsProzess)
+        IF teil <> "" THEN
+            alles = alles + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(lsProzess) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    IF PROCESS_RUNNING(lsProzess) THEN PROCESS_KILL(lsProzess)
+    lsCode = PROCESS_CODE(lsProzess)
+    DIM trenner AS STRING : trenner = CHR$(13) + CHR$(10) + CHR$(13) + CHR$(10)
+    DIM stellen AS ARRAY OF STRING : stellen = SPLIT$(alles, "Content-Length:")
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(stellen) - 1
+        DIM wo AS INTEGER : wo = INSTR(stellen[k], trenner)
+        IF wo < 0 THEN CONTINUE
+        ARRAY_PUSH(lsRuempfe, TRIM$(MID$(stellen[k], wo + 4)))
+    NEXT
+END SUB
+
+' Die Antwort auf eine id (als JSON_HANDLE); ohne Antwort ein leeres Objekt.
+FUNCTION lsAntwort(id AS INTEGER) AS JSON_HANDLE
+    ' Der Server schreibt "id" gleich hinter "jsonrpc" -- ein Textvergleich
+    ' genuegt und trifft keine verschachtelte Zahl im Ergebnis.
+    DIM marke AS STRING : marke = """jsonrpc"":""2.0"",""id"":" + STR$(id) + ","
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(lsRuempfe) - 1
+        IF INSTR(lsRuempfe[k], marke) >= 0 THEN RETURN JSON_PARSE(lsRuempfe[k])
+    NEXT
+    RETURN JSON_PARSE("{}")
+END FUNCTION
+
+' Die n-te publishDiagnostics-Meldung (ab 0), als JSON_HANDLE; sonst leer.
+FUNCTION lsDiagnose(n AS INTEGER) AS JSON_HANDLE
+    DIM gezaehlt AS INTEGER : gezaehlt = 0
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(lsRuempfe) - 1
+        IF INSTR(lsRuempfe[k], "publishDiagnostics") < 0 THEN CONTINUE
+        IF gezaehlt = n THEN RETURN JSON_PARSE(lsRuempfe[k])
+        gezaehlt = gezaehlt + 1
+    NEXT
+    RETURN JSON_PARSE("{}")
+END FUNCTION
+
+' Eine Datei-URI aus einem Pfad: Schraegstriche, Leerzeichen kodiert.
+FUNCTION lsUri$(pfad AS STRING) AS STRING
+    DIM p AS STRING : p = REPLACE$(REPLACE$(pfad, CHR$(92), "/"), " ", "%20")
+    IF LEFT$(p, 1) = "/" THEN RETURN "file://" + p
+    RETURN "file:///" + p
+END FUNCTION

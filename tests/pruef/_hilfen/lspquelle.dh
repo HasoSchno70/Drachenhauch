@@ -1,0 +1,16 @@
+' Das Beispiel-Dokument der Sprachserver-Faelle (tests/pruef/dhrt_lsp.dhtest).
+FUNCTION quelle$() AS STRING
+    DIM z AS STRING : z = CHR$(10)
+    RETURN "' Spieler-Klasse" + z + _
+        "CLASS Player" + z + _
+        "    DIM hp AS INTEGER" + z + _
+        "    SUB Init()" + z + _
+        "        Self.hp = 100" + z + _
+        "    END SUB" + z + _
+        "END CLASS" + z + _
+        "FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER" + z + _
+        "    RETURN a + b" + z + _
+        "END FUNCTION" + z + _
+        "DIM result AS INTEGER" + z + _
+        "result = add(1, 2)" + z
+END FUNCTION
