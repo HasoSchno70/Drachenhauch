@@ -1,14 +1,15 @@
-"""Drucken (docs/entwurf-drucken.md, Wege A und C): PDF_PRINT, PDF_PREVIEW,
-PRINTERS, PRINTER_DEFAULT$, OPENDOC.
+"""Drucken durch einen ECHTEN Druckertreiber (docs/entwurf-drucken.md, Pruefstein 1).
 
-Der Kern ist Pruefstein 1 des Entwurfs: die Seite geht durch einen ECHTEN
-Druckertreiber. "Microsoft Print to PDF" nimmt in DOCINFO einen
-Ausgabepfad und fragt dann nicht nach -- der Test druckt dorthin und liest
-die Datei mit PyMuPDF zurueck. Auf macOS/Linux ist die Zieldatei die PDF
-selbst (CUPS wuerde sie drucken); derselbe Test prueft dort denselben Inhalt
--- nur eben nicht durch einen Treiber.
+"Microsoft Print to PDF" nimmt in DOCINFO einen Ausgabepfad und fragt dann
+nicht nach -- der Test druckt dorthin und liest die Datei mit PyMuPDF zurueck,
+samt der rechten Kante des Betrags. Auf macOS/Linux ist die Zieldatei die PDF
+selbst (CUPS wuerde sie drucken); derselbe Test prueft dort denselben Inhalt --
+nur eben nicht durch einen Treiber.
 
-PDF_PREVIEW braucht ein Fenster (`_BRAUCHT_GRAFIK`); gedruckt wird ohne.
+Druckerliste, PDF_PREVIEW und die Fehlermeldungen stehen seit 2026-09-16 in
+tests/pruef/drucken.dhtest. Dieser Fall bleibt hier, weil die Datei des Treibers
+kein PDF von dhrt ist: der Leser in Drachenhauch (pdftext.dh) kennt nur das,
+was krilla schreibt, und keine Textlagen.
 """
 import os
 import subprocess
@@ -64,14 +65,6 @@ def _drucker(tmp_path):
     return [z[2:] for z in out if z.startswith("D ")], out[-1].strip("[]")
 
 
-def test_druckerliste_und_standard(tmp_path):
-    liste, standard = _drucker(tmp_path)
-    if sys.platform == "win32":
-        assert "Microsoft Print to PDF" in liste, liste
-    # Der Standard ist leer oder steht in der Liste.
-    assert standard == "" or standard in liste, (standard, liste)
-
-
 def test_druck_durch_den_treiber_in_eine_datei(tmp_path):
     fitz = pytest.importorskip("fitz", reason="PyMuPDF nicht installiert")
     liste, _ = _drucker(tmp_path)
@@ -109,37 +102,3 @@ def test_druck_durch_den_treiber_in_eine_datei(tmp_path):
     assert kaesten, "der Betrag hat einen Textkasten"
     rechts_pt = kaesten[0][2]
     assert abs(rechts_pt - 190 * 72 / 25.4) < 12, f"rechte Kante bei {rechts_pt:.0f} pt statt ~538"
-
-
-def test_vorschau_ist_ein_bild_mit_inhalt(tmp_path):
-    from PIL import Image
-    out = _lauf(tmp_path, 'SCREEN(300, 200, "T", 1)\nSET_WINDOW_POS(-3000, -3000)\n' + _SEITE +
-                'DIM b AS IMAGE : b = PDF_PREVIEW(p, 1, 420)\n'
-                'PRINT IMAGEWIDTH(b) ; " " ; IMAGEHEIGHT(b)\n'
-                'IMAGE_SAVE(b, "vorschau.png")\n'
-                'TRY\n    PDF_PREVIEW(p, 3)\nCATCH e\n    PRINT e\nEND TRY\n')
-    w, h = [int(x) for x in out[0].split()]
-    assert w == 420 and abs(h - 420 * 297 / 210) <= 1, "A4-Seitenverhaeltnis"
-    assert "Seite 3 gibt es nicht" in out[1]
-    im = Image.open(tmp_path / "vorschau.png").convert("RGB")
-    px = im.load()
-    # Papier weiss, in der Titelzeile dunkle Punkte, im gefuellten Rechteck
-    # (20..60 mm x 60..70 mm) schwarz.
-    assert px[5, 5] == (255, 255, 255)
-    f = 420 / 210
-    titel = sum(1 for x in range(int(20 * f), int(120 * f)) for y in range(int(25 * f), int(33 * f)) if sum(px[x, y]) < 300)
-    assert titel > 50, "die Ueberschrift ist zu sehen"
-    assert sum(px[int(40 * f), int(65 * f)]) < 60, "das gefuellte Rechteck ist da"
-
-
-def test_fehler_haben_klare_worte(tmp_path):
-    out = _lauf(tmp_path, _SEITE +
-                'TRY\n    PDF_PRINT(p, "Diesen Drucker gibt es nicht")\nCATCH e\n    PRINT e\nEND TRY\n'
-                'TRY\n    PDF_PRINT(p, "", 0)\nCATCH e2\n    PRINT e2\nEND TRY\n'
-                'TRY\n    OPENDOC("gibtsnicht.pdf")\nCATCH e3\n    PRINT e3\nEND TRY\n'
-                'WRITEALL("boese.exe", "MZ")\n'
-                'TRY\n    OPENDOC("boese.exe")\nCATCH e4\n    PRINT e4\nEND TRY\n')
-    assert "PDF_PRINT" in out[0]
-    assert "Kopien 1..99" in out[1]
-    assert "gibt es nicht" in out[2]
-    assert "nicht geoeffnet" in out[3] and "SHELL" in out[3]
