@@ -3130,6 +3130,27 @@ Kindprozess) waere es der Normalfall gewesen. `dhrt call` sammelt jetzt
 ausdruecklich (`Vm::sammle_ausgabe`, geprueft in `flush_out` neben Profiler und
 Debugger).
 
+**Dieselbe Runde, die Buch-Pruefungen:** `test_buch_struktur.py`,
+`test_buch_verweise.py` und `test_buch_code.py` sind geloescht; ihre Faelle
+stehen in `tests/pruef/buch_pruefungen.dhtest` (5). Die Kapitel sind
+JavaScript-Module -- gestartet werden die Werkzeuge unter `tools/` und
+`buch-referenz/buch/` ueber `tests/pruef/_hilfen/nodelauf.dh`
+(`nlStarten(ordner, skript)` laeuft IM Ordner, weil sie ihre Dateien relativ
+suchen; `zahlVor(text, wort)` liest die Bilanzzahl, die Schranke gegen den
+leeren Lauf). Ohne Node meldet der Fall `UEBERSPRINGEN: node fehlt` und gilt
+als uebersprungen -- **dafuer kann sich ein Fall seit dieser Runde selbst
+ueberspringen** (die Zeile auf stdout oder stderr, `bewerten` in
+pruefsammlung.rs, Doku `docs/werkzeuge.md`): fuer fremde Werkzeuge, die nicht
+ueberall liegen. Die Alternative waere, die erwarteten Zeilen zu ERFINDEN --
+gruen und wertlos. Gegenprobe: ein
+eingeschmuggeltes `Kapitel 99` und ein `Kapitel "Gibt es nicht wirklich"`
+lassen die zwei Verweis-Faelle fallen (der Verweis muss dabei in einem STRING
+stehen -- der Exporter wertet die Module aus und sieht Kommentare nicht).
+**Falle, die das erst in der CI zeigte:** `dhrt pruef pfade` lief ueber
+`.claude/worktrees/` mit, und `lebt()` trifft per Suffix -- eine geloeschte
+Datei "lebte" also in einer Arbeitskopie weiter, lokal gruen, in der CI rot.
+Der Durchlauf laesst `.claude` jetzt aus (wie `target`, `.venv`, `node_modules`).
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
