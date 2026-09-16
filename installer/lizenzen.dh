@@ -1,0 +1,245 @@
+' Sammelt die Lizenztexte der Drittkomponenten, die mit der Python-freien
+' Distribution ausgeliefert werden -- also mit dhrt.exe: die Rust-Crates der
+' Laufzeit plus den Volltext der MPL-2.0 (einige Crates stehen darunter).
+'
+'     dhrt run installer/lizenzen.dh [-- --ziel datei] [--metadata datei.json]
+'
+' MIT, BSD, Apache und Zlib verlangen, dass ihr Copyright- und Lizenztext der
+' Weitergabe beiliegt; genau das leistet die erzeugte Datei. Die Liste der
+' Crates kommt aus `cargo metadata` mit DEN Features, mit denen dhrt gebaut
+' wird -- ohne `--metadata` wird cargo dafuer selbst gestartet.
+'
+' Bis 2026-09-16 tat das installer/gen_notices.py; dessen Abschnitt
+' "RUST-KOMPONENTEN" entsteht hier Byte fuer Byte gleich (Python-Pakete und Qt
+' stehen nicht mehr darin -- in dieser Distribution steckt keins von beidem).
+IMPORT "json"
+
+CONST FEATURES = "graphics db net http"
+DIM SEP AS STRING : SEP = "=============================================================================="
+
+DIM leerraum AS STRING : leerraum = " " + CHR$(9) + CHR$(10) + CHR$(13) + CHR$(11) + CHR$(12)
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+' Wie Pythons str.strip(): Leerraum an beiden Enden weg, Umbrueche eingeschlossen.
+FUNCTION saeubern$(t AS STRING) AS STRING
+    DIM a AS INTEGER : a = 0
+    DIM b AS INTEGER : b = LEN(t)
+    WHILE a < b AND INSTR(leerraum, MID$(t, a, 1)) >= 0
+        a = a + 1
+    WEND
+    WHILE b > a AND INSTR(leerraum, MID$(t, b - 1, 1)) >= 0
+        b = b - 1
+    WEND
+    RETURN MID$(t, a, b - a)
+END FUNCTION
+
+' Wie Pythons read_text(): der ganze Text, Zeilenenden auf \n vereinheitlicht
+' (ein abschliessender Umbruch bleibt also erhalten -- READLINES verloere ihn).
+FUNCTION dateiText$(pfad AS STRING) AS STRING
+    DIM t AS STRING : t = BUFFER_TO_STRING$(READALL_BYTES(pfad))
+    t = REPLACE$(t, CHR$(13) + CHR$(10), CHR$(10))
+    RETURN REPLACE$(t, CHR$(13), CHR$(10))
+END FUNCTION
+
+' Ein mitgelieferter kanonischer Lizenztext (installer/licenses/).
+FUNCTION kanonisch$(ordner AS STRING, name AS STRING) AS STRING
+    DIM p AS STRING : p = ordner + "/" + name
+    IF NOT FILEEXISTS(p) THEN RETURN "(" + name + " nicht gefunden)"
+    RETURN dateiText$(p)
+END FUNCTION
+
+FUNCTION istLizenzname(name AS STRING) AS BOOLEAN
+    DIM n AS STRING : n = UPPER$(name)
+    IF INSTR(n, "LICENSE") >= 0 THEN RETURN TRUE
+    IF LEFT$(n, 7) = "LICENCE" THEN RETURN TRUE
+    IF LEFT$(n, 7) = "COPYING" THEN RETURN TRUE
+    IF LEFT$(n, 6) = "NOTICE" THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION pfadVergleich(a AS STRING, b AS STRING) AS INTEGER
+    DIM x AS STRING : x = LOWER$(a)
+    DIM y AS STRING : y = LOWER$(b)
+    IF x < y THEN RETURN -1
+    IF x > y THEN RETURN 1
+    RETURN 0
+END FUNCTION
+
+' Alle LICENSE-/COPYING-/NOTICE-Dateien eines Crate-Ordners, wie sie
+' gen_notices.py gesammelt hat: der Ordner selbst und zwei Unterordner,
+' sortiert nach dem KLEINGESCHRIEBENEN Pfad -- so vergleicht pathlib unter
+' Windows, und danach steht es in der eingecheckten Datei.
+FUNCTION lizenztexte$(quelle AS STRING) AS STRING
+    DIM pfade AS ARRAY OF STRING : pfade = []
+    DIM unter AS ARRAY OF STRING : unter = ["", "licenses", "license_files"]
+    DIM u AS INTEGER
+    DIM i AS INTEGER
+    FOR u = 0 TO LEN(unter) - 1
+        DIM d AS STRING : d = quelle
+        IF unter[u] <> "" THEN d = quelle + "/" + unter[u]
+        IF NOT DIREXISTS(d) THEN CONTINUE
+        DIM namen AS ARRAY OF STRING : namen = DIRLIST(d)
+        FOR i = 0 TO LEN(namen) - 1
+            DIM p AS STRING : p = d + "/" + namen[i]
+            IF FILEEXISTS(p) AND istLizenzname(namen[i]) THEN ARRAY_PUSH(pfade, p)
+        NEXT
+    NEXT
+    SORT(pfade, pfadVergleich)
+    DIM texte AS ARRAY OF STRING : texte = []
+    FOR i = 0 TO LEN(pfade) - 1
+        DIM t AS STRING : t = ""
+        TRY
+            t = saeubern$(dateiText$(pfade[i]))
+        CATCH lesefehler
+            EPRINT("  WARN " + pfade[i] + ": " + lesefehler)
+        END TRY
+        IF t <> "" THEN ARRAY_PUSH(texte, "--- " + BASENAME(pfade[i]) + " ---" + CHR$(10) + t)
+    NEXT
+    RETURN JOIN$(texte, CHR$(10) + CHR$(10))
+END FUNCTION
+
+' --- Argumente ---------------------------------------------------------
+DIM wurzel AS STRING : wurzel = DIRNAME(CWD$())
+DIM ziel AS STRING : ziel = ""
+DIM metaDatei AS STRING : metaDatei = ""
+DIM ai AS INTEGER : ai = 0
+WHILE ai < ARGC()
+    IF ARG$(ai) = "--wurzel" THEN
+        wurzel = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--ziel" THEN
+        ziel = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--metadata" THEN
+        metaDatei = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSE
+        PRINT "Unbekanntes Argument: "; ARG$(ai)
+        EXIT(1)
+    END IF
+WEND
+IF ziel = "" THEN ziel = wurzel + "/installer/THIRD-PARTY-NOTICES-IDE.txt"
+DIM lizenzOrdner AS STRING : lizenzOrdner = wurzel + "/installer/licenses"
+
+' --- cargo metadata ----------------------------------------------------
+DIM roh AS STRING : roh = ""
+IF metaDatei <> "" THEN
+    roh = dateiText$(metaDatei)
+ELSE
+    DIM crate AS STRING : crate = wurzel + "/rust/drachenhauch_runtime"
+    CHDIR(crate)
+    DIM p AS INTEGER : p = PROCESS_START("cargo", "metadata", "--format-version", "1", _
+                                         "--no-default-features", "--features", FEATURES)
+    DIM leer AS INTEGER : leer = 0
+    DIM fehler AS STRING : fehler = ""
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p)
+        IF teil <> "" THEN
+            roh = roh + teil
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        fehler = fehler + PROCESS_ERR$(p)
+        SLEEP(20)
+    WEND
+    IF PROCESS_CODE(p) <> 0 OR roh = "" THEN
+        PRINT "cargo metadata fehlgeschlagen: "; TRIM$(fehler)
+        EXIT(1)
+    END IF
+END IF
+
+DIM h AS JSON_HANDLE : h = JSON_PARSE(roh)
+DIM wurzelId AS STRING : wurzelId = ""
+IF JSON_HAS(h, "resolve.root") AND JSON_TYPE(h, "resolve.root") = "string" THEN wurzelId = JSON_GET_STRING(h, "resolve.root")
+
+FUNCTION jsText$(pfad AS STRING) AS STRING
+    IF NOT JSON_HAS(h, pfad) THEN RETURN ""
+    IF JSON_TYPE(h, pfad) <> "string" THEN RETURN ""
+    RETURN JSON_GET_STRING(h, pfad)
+END FUNCTION
+
+DIM namen AS ARRAY OF STRING : namen = []
+DIM fassungen AS ARRAY OF STRING : fassungen = []
+DIM lizenzen AS ARRAY OF STRING : lizenzen = []
+DIM quellen AS ARRAY OF STRING : quellen = []
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(h, "packages") - 1
+    DIM wo AS STRING : wo = "packages." + STR$(k) + "."
+    DIM name AS STRING : name = jsText$(wo + "name")
+    IF jsText$(wo + "id") = wurzelId OR name = "drachenhauch_runtime" THEN CONTINUE
+    DIM lizenz AS STRING : lizenz = jsText$(wo + "license")
+    IF lizenz = "" THEN lizenz = jsText$(wo + "license_file")
+    IF lizenz = "" THEN lizenz = "(unbekannt)"
+    ARRAY_PUSH(namen, name)
+    ARRAY_PUSH(fassungen, jsText$(wo + "version"))
+    ARRAY_PUSH(lizenzen, lizenz)
+    ARRAY_PUSH(quellen, DIRNAME(jsText$(wo + "manifest_path")))
+NEXT
+
+' Nach Namen sortieren wie Python (kleingeschrieben, stabil) -- sortiert wird
+' eine Liste von Plaetzen, damit die vier Felder zusammenbleiben.
+FUNCTION nameVergleich(a AS INTEGER, b AS INTEGER) AS INTEGER
+    DIM x AS STRING : x = LOWER$(namen[a])
+    DIM y AS STRING : y = LOWER$(namen[b])
+    IF x < y THEN RETURN -1
+    IF x > y THEN RETURN 1
+    RETURN 0
+END FUNCTION
+
+DIM plaetze AS ARRAY OF INTEGER : plaetze = []
+FOR k = 0 TO LEN(namen) - 1
+    ARRAY_PUSH(plaetze, k)
+NEXT
+SORT(plaetze, nameVergleich)
+
+' --- Text bauen --------------------------------------------------------
+DIM teile AS ARRAY OF STRING : teile = []
+ARRAY_PUSH(teile, "Drachenhauch IDE -- Drittanbieter-Lizenzen (THIRD-PARTY NOTICES)")
+ARRAY_PUSH(teile, "")
+ARRAY_PUSH(teile, "Diese Ausgabe von Drachenhauch besteht aus der Laufzeit dhrt, der IDE in")
+ARRAY_PUSH(teile, "Drachenhauch, dem Handbuch und den Beispielen -- ohne Python und ohne Qt.")
+ARRAY_PUSH(teile, "Ausgeliefert werden damit die unten aufgefuehrten Rust-Komponenten; deren")
+ARRAY_PUSH(teile, "Lizenz- und Copyright-Hinweise sind nachfolgend wiedergegeben, wie es die")
+ARRAY_PUSH(teile, "jeweiligen Lizenzen (u.a. MIT, BSD, Apache-2.0, Zlib, MPL-2.0) verlangen.")
+ARRAY_PUSH(teile, "Diese Datei beruehrt NICHT deine Rechte an eigenem Drachenhauch-Code; sie")
+ARRAY_PUSH(teile, "erfuellt die Weitergabe-Auflagen der Fremdkomponenten.")
+ARRAY_PUSH(teile, "")
+ARRAY_PUSH(teile, "Automatisch erzeugt von installer/lizenzen.dh.")
+ARRAY_PUSH(teile, "")
+
+DIM rust AS ARRAY OF STRING : rust = []
+ARRAY_PUSH(rust, SEP)
+ARRAY_PUSH(rust, "RUST-KOMPONENTEN (native Runtime dhrt)")
+ARRAY_PUSH(rust, SEP)
+ARRAY_PUSH(rust, "")
+ARRAY_PUSH(rust, "Die native Runtime dhrt enthaelt " + STR$(LEN(plaetze)) + " Rust-Crates (Features: " + FEATURES + "):" + CHR$(10))
+FOR k = 0 TO LEN(plaetze) - 1
+    DIM j AS INTEGER : j = plaetze[k]
+    ARRAY_PUSH(rust, CHR$(10) + SEP + CHR$(10) + namen[j] + " " + fassungen[j] + CHR$(10) + "Lizenz: " + lizenzen[j])
+    DIM txt AS STRING : txt = lizenztexte$(quellen[j])
+    IF txt <> "" THEN ARRAY_PUSH(rust, CHR$(10) + txt)
+NEXT
+ARRAY_PUSH(rust, CHR$(10))
+ARRAY_PUSH(teile, JOIN$(rust, CHR$(10)))
+
+DIM mpl AS ARRAY OF STRING : mpl = []
+ARRAY_PUSH(mpl, SEP)
+ARRAY_PUSH(mpl, "Mozilla Public License 2.0 (Volltext)")
+ARRAY_PUSH(mpl, SEP)
+ARRAY_PUSH(mpl, "")
+ARRAY_PUSH(mpl, "Einige Rust-Crates (u.a. symphonia*, triple_buffer) stehen unter der")
+ARRAY_PUSH(mpl, "MPL-2.0. Der vollstaendige Lizenztext:")
+ARRAY_PUSH(mpl, "")
+ARRAY_PUSH(mpl, kanonisch$(lizenzOrdner, "MPL-2.0.txt"))
+ARRAY_PUSH(mpl, "")
+ARRAY_PUSH(teile, JOIN$(mpl, CHR$(10)))
+
+DIM alles AS STRING : alles = JOIN$(teile, CHR$(10))
+WRITEALL(ziel, alles)
+PRINT "geschrieben: "; ziel; " ("; LEN(alles) \ 1024; " KB, "; LEN(plaetze); " Crates)"

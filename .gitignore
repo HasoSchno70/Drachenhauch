@@ -53,6 +53,7 @@ installer/Drachenhauch.icns
 installer/Drachenhauch.png
 !installer/Drachenhauch.spec
 installer/THIRD-PARTY-NOTICES.txt
+installer/THIRD-PARTY-NOTICES-IDE.txt
 
 # Rust build output
 target/
