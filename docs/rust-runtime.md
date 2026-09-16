@@ -168,7 +168,7 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
   Drachenhauch sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
   (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
-  `tests/test_dhrt_check.py`.
+  `tests/pruef/dhrt_check.dhtest`.
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in dhrt. Nur die Editoren brauchen noch Python.

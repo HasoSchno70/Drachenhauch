@@ -956,7 +956,8 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
   Fehlalarm (`CONST` INNERHALB einer SUB) tauchte erst am Buch-Beispiel
   `tippspiel.dh` auf, nachdem die 208 examples sauber waren.
   Dieser Lauf ist inzwischen ein TEST
-  (`tests/test_dhrt_check.py::test_kein_beispiel_meldet_einen_unbekannten_namen`)
+  (`tests/pruef/dhrt_check.dhtest`, Fall "kein programm des repos meldet einen
+  unbekannten namen")
   -- von Hand gelaufen faengt er den naechsten uebersehenen DIM-Zweig nicht.
   **Drei Wege enden in dem Rueckfall, nicht zwei:** `load_var`/`store_var` --
   und `INPUT x` (emittiert INPUT_NAME) sowie das `READ`-Ziel (geht nicht ueber
@@ -3142,7 +3143,14 @@ als uebersprungen -- **dafuer kann sich ein Fall seit dieser Runde selbst
 ueberspringen** (die Zeile auf stdout oder stderr, `bewerten` in
 pruefsammlung.rs, Doku `docs/werkzeuge.md`): fuer fremde Werkzeuge, die nicht
 ueberall liegen. Die Alternative waere, die erwarteten Zeilen zu ERFINDEN --
-gruen und wertlos. Gegenprobe: ein
+gruen und wertlos. Dazu `tests/test_dhrt_check.py` (18 Tests) -> `tests/pruef/dhrt_check.dhtest`
+(9): die Diagnosen von `dhrt --check` samt Zeilennummern, die Warnungen
+(unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ) und die
+DURCHLAEUFE ueber den Bestand -- alle Beispiele ohne Fehler und ohne
+"Unbekanntes Builtin", alle 390 `.dh` des Repos ohne Falschmeldung der
+"nirgends angelegt"-Warnung (26 s; `dlCheckViele` im Helfer buendelt sieben
+Dateien je Aufruf, und weil dhrt bei EINER Datei das nackte Array liefert,
+bringt der Helfer das in dieselbe Form). Gegenprobe: ein
 eingeschmuggeltes `Kapitel 99` und ein `Kapitel "Gibt es nicht wirklich"`
 lassen die zwei Verweis-Faelle fallen (der Verweis muss dabei in einem STRING
 stehen -- der Exporter wertet die Module aus und sieht Kommentare nicht).

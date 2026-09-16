@@ -151,7 +151,7 @@ dokumentieren.)
 > im Standard-Build mitgeliefert (zieht schwere Deps: tokio/btleplug/hidapi/
 > windows). `preprocess.rs`: `missing_hardware_modules` / `missing_hardware_imports_with_lines`
 > / `hardware_missing_msg`; verdrahtet in `main.rs` `compile_source` (run) +
-> `check_source` (Editor). Test: `tests/test_dhrt_check.py::test_hardware_import_warns_at_import`.
+> `check_source` (Editor). Test: `tests/pruef/dhrt_check.dhtest` (Fall "ein hardware-import warnt schon beim import").
 
 `IMPORT "wifi"` (serial/usb/bt ebenso) wird vom Preprocessor akzeptiert (stehen
 in `KNOWN_MODULES`), aber **jeder** Funktionsaufruf wirft erst zur Laufzeit
@@ -195,8 +195,8 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 > und keine False-Positives: Sweep über ALLE examples = 0 fälschlich gemeldete
 > Builtins (der Index ist vollständig). Interne `__`-Builtins ausgenommen.
 > Folge: ein neues dhrt-Builtin, das man im `builtin_index.json` zu ergänzen
-> vergisst, fällt ab sofort auf. **Drift-Schutz-Test** `test_dhrt_check.py::
-> test_examples_use_no_unknown_builtin` prüft, dass KEIN Beispiel ein Builtin
+> vergisst, fällt ab sofort auf. **Drift-Schutz-Test**
+> `tests/pruef/dhrt_check.dhtest` prüft, dass KEIN Beispiel ein Builtin
 > nutzt, das nicht im Index steht — er fand sofort **10 echte, aber unindizierte
 > Builtins** (`CAMERA_ORBIT`, `WORLD_TO_SCREEN_X/Y`, `SCREEN_TO_WORLD_DIR_X/Y/Z`,
 > `RAY_HIT_MODEL`, `PICK_MODEL`, `GETPIXEL`, `CIRCLEOUTLINE` — alle aus
@@ -299,9 +299,9 @@ Reflexionen/Mirror-Effekte.
 > ist der Lauf über **alle 384 `.dh`-Dateien des Repos** (0 Meldungen) — und
 > genau der fand die zwei Fehlalarme der ersten Fassungen: `DIM x[N] AS T` und
 > `CONST` innerhalb einer SUB. Er ist deshalb inzwischen ein Test
-> (`tests/test_dhrt_check.py`), nicht mehr ein Aufruf von Hand.
+> (`tests/pruef/dhrt_check.dhtest`), nicht mehr ein Aufruf von Hand.
 >
-> Tests: `tests/pruef/check_unbekannte_namen.dhtest`, `tests/test_dhrt_check.py`.
+> Tests: `tests/pruef/check_unbekannte_namen.dhtest`, `tests/pruef/dhrt_check.dhtest`.
 
 ---
 
