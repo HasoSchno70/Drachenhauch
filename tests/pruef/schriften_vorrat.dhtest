@@ -1,0 +1,265 @@
+' Fremde Schriften und das Euro-Zeichen: der Grund-Zeichenvorrat reicht bis
+' Kyrillisch, alles andere backt die Laufzeit auf Zuruf aus den Schriften des
+' Systems nach, und LOADFONT nimmt eine Zeichenwahl.
+'
+' Gemessen wird am BILD: derselbe Text einmal echt und einmal als lauter
+' Fragezeichen -- vor dem Bau waren beide Bilder gleich. Die Gegenprobe steht als
+' eigener Fall: ein Zeichen ohne Schrift (U+E000) ergibt dasselbe Bild wie `?`.
+'
+' Bis 2026-09-16 tests/test_schriften_vorrat.py (Pillow). Jetzt schreibt jeder
+' Fall seine zwei Programme selbst, `dhrt bild` fotografiert sie, und
+' LOADIMAGE/GETPIXEL zaehlen die Unterschiede.
+
+=== euro, griechisch und kyrillisch sind keine fragezeichen
+' Beide Seiten tragen ein ae: so laufen beide durch dieselbe Ausweich-Schrift --
+' ein reiner ASCII-Text naehme raylibs Bitmapschrift, und der Vergleich saehe
+' zwei Schriften statt zwei Zeichen.
+IMPORT "helfer.dh"
+foto("echt", "", "    TEXT(10, 10, " + CHR$(34) + "ä 12,50 € Ω Я ő ł" + CHR$(34) + ")" + CHR$(10))
+foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä 12,50 ? ? ? ? ?" + CHR$(34) + ")" + CHR$(10))
+PRINT "unterschiede ueber 30 "; (unterschiede("echt.png", "frage.png") > 30)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
+' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
+SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
+    DIM z AS STRING : z = CHR$(10)
+    WRITEALL(name + ".dh", "SCREEN(400, 120, " + CHR$(34) + "Schrift" + CHR$(34) + ", 1)" + z + _
+        rumpf + "WHILE NOT QUITREQUESTED()" + z + "    CLS(0)" + z + schleife + "    FLIP()" + z + "WEND" + z)
+    dlStarten(["bild", CWD$() + "/" + name + ".dh", CWD$() + "/" + name + ".png", "3"])
+    IF dlCode <> 0 THEN
+        PRINT "UEBERSPRINGEN: " + TRIM$(SPLIT$(dlErr + dlAus + " ", CHR$(10))[0])
+        EXIT(0)
+    END IF
+END SUB
+' Wie viele Punkte zweier Bilder derselben Groesse verschieden sind.
+FUNCTION unterschiede(a AS STRING, b AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            IF GETPIXEL(ia, x, y) <> GETPIXEL(ib, x, y) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+' Punkte mit Tinte: Summe der drei Kanaele ueber 300.
+FUNCTION tinte(a AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            DIM f AS INTEGER : f = GETPIXEL(ia, x, y)
+            IF ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255) > 300 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+--- erwartet
+unterschiede ueber 30 TRUE
+
+=== ein zeichen ohne schrift bleibt ein fragezeichen
+' Gegenprobe zum Fall davor: U+E000 (Privatbereich) hat keine Schrift -- dann
+' ist das Fragezeichen richtig, und beide Bilder sind gleich.
+IMPORT "helfer.dh"
+foto("pua", "", "    TEXT(10, 10, " + CHR$(34) + "ä  b" + CHR$(34) + ")" + CHR$(10))
+foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä ? b" + CHR$(34) + ")" + CHR$(10))
+PRINT "unterschiede "; unterschiede("pua.png", "frage.png")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
+' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
+SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
+    DIM z AS STRING : z = CHR$(10)
+    WRITEALL(name + ".dh", "SCREEN(400, 120, " + CHR$(34) + "Schrift" + CHR$(34) + ", 1)" + z + _
+        rumpf + "WHILE NOT QUITREQUESTED()" + z + "    CLS(0)" + z + schleife + "    FLIP()" + z + "WEND" + z)
+    dlStarten(["bild", CWD$() + "/" + name + ".dh", CWD$() + "/" + name + ".png", "3"])
+    IF dlCode <> 0 THEN
+        PRINT "UEBERSPRINGEN: " + TRIM$(SPLIT$(dlErr + dlAus + " ", CHR$(10))[0])
+        EXIT(0)
+    END IF
+END SUB
+' Wie viele Punkte zweier Bilder derselben Groesse verschieden sind.
+FUNCTION unterschiede(a AS STRING, b AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            IF GETPIXEL(ia, x, y) <> GETPIXEL(ib, x, y) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+' Punkte mit Tinte: Summe der drei Kanaele ueber 300.
+FUNCTION tinte(a AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            DIM f AS INTEGER : f = GETPIXEL(ia, x, y)
+            IF ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255) > 300 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+--- erwartet
+unterschiede 0
+
+=== cjk, hangul und emoji kommen auf zuruf
+' Das erste Bild zeichnet die Zeichen auf, FLIP backt nach -- das dritte wird
+' fotografiert. Die Systemschriften dafuer sind nur unter Windows bekannt.
+IMPORT "helfer.dh"
+foto("cjk", "", "    TEXT(10, 10, " + CHR$(34) + "ä 日本語 한글 😀" + CHR$(34) + ")" + CHR$(10))
+foto("frage", "", "    TEXT(10, 10, " + CHR$(34) + "ä ??? ?? ?" + CHR$(34) + ")" + CHR$(10))
+PRINT "unterschiede ueber 100 "; (unterschiede("cjk.png", "frage.png") > 100)
+PRINT "mehr tinte als fragezeichen "; (tinte("cjk.png") > tinte("frage.png"))
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
+' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
+SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
+    DIM z AS STRING : z = CHR$(10)
+    WRITEALL(name + ".dh", "SCREEN(400, 120, " + CHR$(34) + "Schrift" + CHR$(34) + ", 1)" + z + _
+        rumpf + "WHILE NOT QUITREQUESTED()" + z + "    CLS(0)" + z + schleife + "    FLIP()" + z + "WEND" + z)
+    dlStarten(["bild", CWD$() + "/" + name + ".dh", CWD$() + "/" + name + ".png", "3"])
+    IF dlCode <> 0 THEN
+        PRINT "UEBERSPRINGEN: " + TRIM$(SPLIT$(dlErr + dlAus + " ", CHR$(10))[0])
+        EXIT(0)
+    END IF
+END SUB
+' Wie viele Punkte zweier Bilder derselben Groesse verschieden sind.
+FUNCTION unterschiede(a AS STRING, b AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            IF GETPIXEL(ia, x, y) <> GETPIXEL(ib, x, y) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+' Punkte mit Tinte: Summe der drei Kanaele ueber 300.
+FUNCTION tinte(a AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            DIM f AS INTEGER : f = GETPIXEL(ia, x, y)
+            IF ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255) > 300 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+--- system windows
+--- erwartet
+unterschiede ueber 100 TRUE
+mehr tinte als fragezeichen TRUE
+
+=== loadfont mit zeichenwahl und schriftsammlung
+' arial.ttf mit zwei Bloecken, msgothic.ttc als Sammlung (raylib liest .ttc
+' nicht selbst und tauschte frueher still gegen die Bitmapschrift).
+IMPORT "helfer.dh"
+foto("lf", "DIM f AS INTEGER : DIM g AS INTEGER" + CHR$(10) + "f = LOADFONT(" + CHR$(34) + "C:/Windows/Fonts/arial.ttf" + CHR$(34) + ", 24, " + CHR$(34) + "kyrillisch, griechisch" + CHR$(34) + ")" + CHR$(10) + "g = LOADFONT(" + CHR$(34) + "C:/Windows/Fonts/msgothic.ttc" + CHR$(34) + ", 24, " + CHR$(34) + "japanisch" + CHR$(34) + ")" + CHR$(10), "    SETFONT(f) : " + "    TEXT(10, 10, " + CHR$(34) + "Привет Γειά" + CHR$(34) + ")" + CHR$(10) + "    SETFONT(g) : " + "    TEXT(10, 50, " + CHR$(34) + "東京" + CHR$(34) + ")" + CHR$(10))
+foto("frage", "DIM f AS INTEGER : DIM g AS INTEGER" + CHR$(10) + "f = LOADFONT(" + CHR$(34) + "C:/Windows/Fonts/arial.ttf" + CHR$(34) + ", 24, " + CHR$(34) + "kyrillisch, griechisch" + CHR$(34) + ")" + CHR$(10) + "g = LOADFONT(" + CHR$(34) + "C:/Windows/Fonts/msgothic.ttc" + CHR$(34) + ", 24, " + CHR$(34) + "japanisch" + CHR$(34) + ")" + CHR$(10), "    SETFONT(f) : " + "    TEXT(10, 10, " + CHR$(34) + "?????? ????" + CHR$(34) + ")" + CHR$(10) + "    SETFONT(g) : " + "    TEXT(10, 50, " + CHR$(34) + "??" + CHR$(34) + ")" + CHR$(10))
+PRINT "unterschiede ueber 100 "; (unterschiede("lf.png", "frage.png") > 100)
+DIM f AS INTEGER : DIM g AS INTEGER
+f = LOADFONT("C:/Windows/Fonts/arial.ttf", 24, "kyrillisch, griechisch")
+g = LOADFONT("C:/Windows/Fonts/msgothic.ttc", 24, "japanisch")
+PRINT f ; " " ; g
+TRY
+    f = LOADFONT("C:/Windows/Fonts/arial.ttf", 24, "klingonisch")
+CATCH e
+    PRINT "unbekannter block "; (INSTR(e, "unbekannter Schriftblock") >= 0); ", nennt die gueltigen "; (INSTR(e, "kyrillisch") >= 0)
+END TRY
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+' Ein Programm mit Kopf und Bildschleife schreiben und ueber `dhrt bild`
+' fotografieren (drittes Bild). Ohne Fenster ueberspringt sich der Fall.
+SUB foto(name AS STRING, rumpf AS STRING, schleife AS STRING)
+    DIM z AS STRING : z = CHR$(10)
+    WRITEALL(name + ".dh", "SCREEN(400, 120, " + CHR$(34) + "Schrift" + CHR$(34) + ", 1)" + z + _
+        rumpf + "WHILE NOT QUITREQUESTED()" + z + "    CLS(0)" + z + schleife + "    FLIP()" + z + "WEND" + z)
+    dlStarten(["bild", CWD$() + "/" + name + ".dh", CWD$() + "/" + name + ".png", "3"])
+    IF dlCode <> 0 THEN
+        PRINT "UEBERSPRINGEN: " + TRIM$(SPLIT$(dlErr + dlAus + " ", CHR$(10))[0])
+        EXIT(0)
+    END IF
+END SUB
+' Wie viele Punkte zweier Bilder derselben Groesse verschieden sind.
+FUNCTION unterschiede(a AS STRING, b AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM ib AS IMAGE : ib = LOADIMAGE(b)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            IF GETPIXEL(ia, x, y) <> GETPIXEL(ib, x, y) THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+' Punkte mit Tinte: Summe der drei Kanaele ueber 300.
+FUNCTION tinte(a AS STRING) AS INTEGER
+    DIM ia AS IMAGE : ia = LOADIMAGE(a)
+    DIM n AS INTEGER : n = 0
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR y = 0 TO 119
+        FOR x = 0 TO 399
+            DIM f AS INTEGER : f = GETPIXEL(ia, x, y)
+            IF ((f SHR 16) BAND 255) + ((f SHR 8) BAND 255) + (f BAND 255) > 300 THEN n = n + 1
+        NEXT
+    NEXT
+    RETURN n
+END FUNCTION
+--- system windows
+--- erwartet
+unterschiede ueber 100 TRUE
+0 1
+unbekannter block TRUE, nennt die gueltigen TRUE
+
+=== die textbreite misst dieselben laeufe
+' Die Breite eines Textes mit fremden Zeichen kommt aus denselben Schriften wie
+' das Zeichnen -- ein Layout darf nicht mit einer anderen Schrift rechnen.
+SCREEN(400, 120, "Schrift", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM a AS INTEGER : a = TEXT_WIDTH("日本")
+DIM b AS INTEGER : b = TEXT_WIDTH("??")
+DIM c AS INTEGER : c = TEXT_WIDTH("日本日本")
+PRINT "breite positiv "; (a > 0); ", doppelt breiter "; (c > a)
+--- umgebung
+DHRT_FRAMES=2
+--- erwartet
+breite positiv TRUE, doppelt breiter TRUE
+
+=== zwei kanji sind nicht so breit wie zwei fragezeichen
+' Nur unter Windows: dort gibt es die Schrift, aus der die Kanji kommen.
+SCREEN(400, 120, "Schrift", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM a AS INTEGER : a = TEXT_WIDTH("日本")
+DIM b AS INTEGER : b = TEXT_WIDTH("??")
+DIM c AS INTEGER : c = TEXT_WIDTH("日本日本")
+PRINT "breite positiv "; (a > 0); ", doppelt breiter "; (c > a)
+PRINT "anders als fragezeichen "; (a <> b)
+--- umgebung
+DHRT_FRAMES=2
+--- system windows
+--- erwartet
+breite positiv TRUE, doppelt breiter TRUE
+anders als fragezeichen TRUE
