@@ -2779,7 +2779,8 @@ Meldung um eins (jetzt dahinter), und `_dedent` nahm die fuehrende Leerzeile
 weg, die pytest mitgeschrieben hatte (jetzt bleibt sie). Stand danach:
 151 Sammlungen mit 2403 Faellen in ~65 s, 118 pytest-Dateien geloescht. Nicht uebertragbar und darum in pytest geblieben:
 gui_table_frozen_edge (Kantenprobe mit Schwellwert), gui_draw_window und schriften_vorrat (vergleichen zwei Laeufe miteinander), gui_bindung (SQLite-Datei), die 13 image_io-Tests mit Pillow als fremdem Leser fuer PNG/BMP/GIF, drei Shader-Bildproben, der Instancing-Render in m3d, drei Kontaktbogen-Tests und ein Index-Leser in input_edges. Bewusst NICHT umgezogen:
-`test_dateisystem.py` (Dateizeiten, Gross/Klein je System), alles mit Ton
+test_dateisystem.py (Dateizeiten, Gross/Klein je System -- seit 2026-09-16 doch
+umgezogen, siehe unten), alles mit Ton
 oder echter Eingabe-Wiedergabe (seriell), und Tests, die Quelltext oder
 Bauskripte lesen. Regel fuer den weiteren Umzug: **eine pytest-Datei wird geloescht,
 sobald ihre Faelle in einer Sammlung liegen** -- nie beides pflegen; ein
@@ -3165,6 +3166,24 @@ stehen -- der Exporter wertet die Module aus und sieht Kommentare nicht).
 `.claude/worktrees/` mit, und `lebt()` trifft per Suffix -- eine geloeschte
 Datei "lebte" also in einer Arbeitskopie weiter, lokal gruen, in der CI rot.
 Der Durchlauf laesst `.claude` jetzt aus (wie `target`, `.venv`, `node_modules`).
+
+**Import-Suchpfad und Dateisystem (2026-09-16, Weg D):** zwei Dateien, die
+beim Umzug von 2026-09-08 als "nicht uebertragbar" liegen blieben, gehen mit
+den Mitteln von heute. `tests/pruef/bibliothek.dhtest` (9) startet das
+Programm als Kind und setzt `DH_PATH`, `USERPROFILE` und `HOME` per SETENV --
+der Benutzerordner zeigt dabei IMMER in den Fallordner, sonst entschiede eine
+Bibliothek auf dem Rechner des Pruefenden mit. Der Pfadtrenner kommt aus
+`dlPfadTrenner$` im Helfer `dhrtlauf.dh` (einen Befehl fuer das
+Betriebssystem gibt es nicht; ein Windows-Pfad traegt den Doppelpunkt hinter
+dem Laufwerk). In `tests/test_bibliothek.py` bleiben nur die drei Tests der
+PYTHON-Aufloesung, die die Qt-Editoren fuer die Zeilen-Herkunft brauchen.
+`tests/pruef/dateisystem.dhtest` (15) ersetzt die pytest-Datei ganz: die
+fnmatch-Zusagen stehen als festes Ergebnis fuer den Baum der Beilagen, die
+Listen werden vor der Ausgabe sortiert, und "welche Datei ist neuer" wartet
+1,1 s zwischen Beilage und neuer Datei statt die Zeit auf 1970 zu setzen
+(ohne das Warten faellt der Fall -- beide tragen dieselbe Sekunde).
+Gegenproben mit verfaelschten Kopien: 6 von 9 und 10 von 15 fallen, die
+uebrigen Faelle haengen nicht an der verfaelschten Stelle.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
