@@ -269,6 +269,8 @@ pub const GEDULDETE_PFADE: &[(&str, &str)] = &[
     ("tools/gen_builtin_prosa.py", "Prosa-Generator, 2026-09-06 durch `dhrt doku prosa` abgeloest"),
     ("tools/pruef_docs.py", "Doku-Pruefer, 2026-09-06 durch `dhrt pruef bloecke` abgeloest"),
     ("tools/pruef_doku_aussagen.py", "Doku-Pruefer, 2026-09-06 durch `dhrt pruef` abgeloest"),
+    ("tests/test_dhrt_call.py", "2026-09-16 nach tests/pruef/dhrt_call.dhtest umgezogen"),
+    ("tests/test_dhrt_werkzeuge.py", "2026-09-16 nach tests/pruef/dhrt_werkzeuge.dhtest umgezogen"),
     ("vscode-drachenhauch/build_grammar.py", "Grammatik-Generator, 2026-09-06 durch `dhrt doku grammatik` abgeloest"),
     ("drachenhauch/doku.py", "Quelltext-Referenz, 2026-09-06 durch `dhrt doku referenz` abgeloest"),
     ("tests/test_ide.py", "IDE-Tests, bis Stufe 38 (2026-09-13) nach tests/pruef/werkzeug_ide*.dhtest gezogen"),
@@ -285,7 +287,10 @@ fn repo_bestand(wurzel: &Path) -> (HashSet<String>, HashSet<String>) {
         for e in rd.filter_map(|e| e.ok()) {
             let p = e.path();
             let name = e.file_name().to_string_lossy().into_owned();
-            if matches!(name.as_str(), "target" | "__pycache__" | ".venv" | "node_modules" | ".git") { continue; }
+            // `.claude` haelt Arbeitskopien des Repos (worktrees) -- sie
+            // zaehlen NICHT zum Bestand: eine geloeschte Datei lebte dort
+            // weiter, die Pruefung war lokal gruen und in der CI rot.
+            if matches!(name.as_str(), "target" | "__pycache__" | ".venv" | "node_modules" | ".git" | ".claude") { continue; }
             let rel = p.strip_prefix(wurzel).map(|r| r.to_string_lossy().replace('\\', "/")).unwrap_or_default();
             if p.is_dir() { ordner.insert(rel); gehe(&p, wurzel, dateien, ordner); }
             else { dateien.insert(rel); }
