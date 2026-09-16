@@ -1647,6 +1647,9 @@ fn call_program_value(json: serde_json::Value, fn_name: &str,
         }
     }).collect();
     let mut machine = vm::Vm::new(&prog);
+    // stdout gehoert hier der JSON-Zeile; was die Funktion druckt, kommt
+    // gesammelt als Feld `ausgabe` mit.
+    machine.sammle_ausgabe();
     match machine.call_named(fn_name, args) {
         Ok(wert) => {
             let ergebnis = match &wert {

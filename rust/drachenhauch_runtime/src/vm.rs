@@ -730,6 +730,11 @@ pub struct Vm<'p> {
     // Step over/into/out (inkrementiert pro `exec`).
     dbg: Option<DebugState>,
     depth: u32,
+    // `dhrt call`: die Ausgabe der Funktion wird GESAMMELT und als Feld
+    // `ausgabe` der JSON-Zeile geliefert. Ohne dieses Flag schriebe ein von
+    // PROCESS_START gesetztes DHRT_LIVE=1 jede PRINT-Zeile roh hinaus -- und
+    // als Kind eines Programms laeuft `call` im Normalfall genau so.
+    sammeln: bool,
     #[cfg(feature = "graphics")]
     gfx: Option<crate::graphics::Graphics>,
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
@@ -890,6 +895,7 @@ impl<'p> Vm<'p> {
             prof: None,
             stop: None,
             dbg: None,
+            sammeln: false,
             depth: 0,
             #[cfg(feature = "graphics")]
             gfx: None,
@@ -1007,6 +1013,11 @@ impl<'p> Vm<'p> {
 
     pub fn take_output(self) -> String {
         self.out
+    }
+
+    /// Ausgabe sammeln statt sie laufend hinauszuschreiben (`dhrt call`).
+    pub fn sammle_ausgabe(&mut self) {
+        self.sammeln = true;
     }
 
     /// Fuer INPUT: gepufferten Output + Prompt SOFORT auf echtes stdout flushen
@@ -5146,7 +5157,7 @@ impl<'p> Vm<'p> {
         // Im Debugger ist stdout der EREIGNISKANAL (JSON-Zeilen): Programm-
         // Ausgabe geht dort als `output`-Ereignis hinaus (out_sent), nie roh --
         // sonst schriebe DHRT_LIVE eine PRINT-Zeile mitten in den Strom.
-        if self.prof.is_some() || self.dbg.is_some() || self.out.is_empty() { return; }
+        if self.sammeln || self.prof.is_some() || self.dbg.is_some() || self.out.is_empty() { return; }
         use std::io::Write;
         let so = std::io::stdout();
         let mut h = so.lock();
