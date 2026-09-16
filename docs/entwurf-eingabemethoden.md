@@ -15,7 +15,7 @@
 > nicht messbar). **Gemessen:** `12,50 € Ω Я ő ł`, `日本語 한글 😀 שלום` und
 > `東京` erscheinen statt `?`; das erste Bild mit vier neuen Schriften kostet
 > ~100 ms, ein weiteres neues Kanji ~15 ms, der Start 50 ms mehr für den
-> größeren Grundvorrat (357 → 407 ms). Tests `tests/test_schriften_vorrat.py`
+> größeren Grundvorrat (357 → 407 ms). Tests `tests/pruef/schriften_vorrat.dhtest`
 > (Bildvergleich echt gegen `?`, Gegenprobe U+E000 bleibt `?`). Siehe
 > [builtins-grafik.md](builtins-grafik.md#umlaute-euro-und-fremde-schriften).
 > **Nachtrag, selber Tag: C ist gebaut.** `ime.rs` hängt einen zweiten
