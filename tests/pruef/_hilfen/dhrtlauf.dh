@@ -113,3 +113,11 @@ FUNCTION dlZaehle(heuhaufen AS STRING, nadel AS STRING) AS INTEGER
     WEND
     RETURN n
 END FUNCTION
+
+' Der Trenner zwischen Ordnern in einer Pfadliste wie DH_PATH: `;` unter
+' Windows, sonst `:`. Einen Befehl fuer das Betriebssystem gibt es nicht --
+' ein Windows-Pfad traegt aber den Doppelpunkt hinter dem Laufwerk.
+FUNCTION dlPfadTrenner$() AS STRING
+    IF MID$(CWD$(), 1, 1) = ":" THEN RETURN ";"
+    RETURN ":"
+END FUNCTION
