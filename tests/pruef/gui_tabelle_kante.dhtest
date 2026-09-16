@@ -1,0 +1,65 @@
+' Die Kante des festen Spalten-Blocks in der gui-Tabelle.
+'
+' Sie war zuerst in der AKZENTfarbe gezeichnet und immer sichtbar. Beides war
+' falsch: der Akzent heisst im Rest der Oberflaeche "ausgewaehlt/aktiv", hier
+' haette er "ab hier scrollt es" geheissen -- und bei stehender Tabelle erklaert
+' die Kante gar nichts. Geprueft wird die ruhende Tabelle: an der Blockgrenze
+' darf KEINE Akzentfarbe stehen. (Der gescrollte Fall braucht eine echte Maus
+' auf der Bildlaufleiste; er ist ueber zwei gerenderte Bilder von Hand
+' abgenommen.)
+'
+' Bis 2026-09-16 tests/test_gui_table_frozen_edge.py (Pillow). Die Probe ist
+' kein fester Farbwert, sondern eine Eigenschaft ("deutlich mehr Blau als
+' Rot") -- darum liest ein --- nachher das Bild statt --- bild.
+
+=== die blockgrenze zeigt keinen akzent, wenn nicht gescrollt
+IMPORT "gui"
+SCREEN(600, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+GUI_THEME_PRESET("glas_dunkel")
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 600, 278)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 0, 0, 560, 240)
+DIM k AS ARRAY OF STRING : k = SPLIT$("A|B|C|D|E|F", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM br AS ARRAY OF INTEGER : br = [100, 100, 100, 100, 100, 100]
+GUI_TABLE_COL_WIDTHS(t, br)
+GUI_TABLE_SET(t, "feste_spalten", 2)
+DIM z AS ARRAY OF STRING
+z = SPLIT$("a|b|c|d|e|f", "|") : GUI_TABLE_ADD_ROW(t, z)
+z = SPLIT$("g|h|i|j|k|l", "|") : GUI_TABLE_ADD_ROW(t, z)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(0)
+    GUI_DRAW()
+    FLIP()
+WEND
+--- umgebung
+DHRT_FRAMES=3
+DHRT_SCREENSHOT={fall}/kante.png
+--- nachher
+DIM b AS IMAGE : b = LOADIMAGE("kante.png")
+' Gegenprobe ZUERST: die Tabelle muss ueberhaupt gezeichnet sein, sonst waere
+' der Fall auch auf einem leeren Bild gruen. Beweis ist die Spaltentrennung an
+' der bekannten Stelle x = 100 (erste Spalte 100 px breit).
+PRINT "spaltenkante bei 100 "; (GETPIXEL(b, 99, 60) <> GETPIXEL(b, 100, 60))
+' Die Blockgrenze liegt hinter zwei Spalten a 100 px, also bei x = 200; ein
+' paar Punkte drumherum, weil die Kante nur 1 px breit ist.
+DIM akzente AS INTEGER : akzente = 0
+DIM ys AS ARRAY OF INTEGER : ys = [60, 80, 100, 140]
+DIM x AS INTEGER
+DIM i AS INTEGER
+FOR x = 196 TO 205
+    FOR i = 0 TO 3
+        DIM f AS INTEGER : f = GETPIXEL(b, x, ys[i])
+        DIM rot AS INTEGER : rot = (f SHR 16) BAND 255
+        DIM blau AS INTEGER : blau = f BAND 255
+        IF blau > 120 AND blau - rot > 60 THEN
+            akzente = akzente + 1
+            PRINT "akzent bei "; x; ","; ys[i]; ": "; COLOR_HEX$(f)
+        END IF
+    NEXT
+NEXT
+PRINT "akzentpunkte "; akzente
+--- erwartet
+spaltenkante bei 100 TRUE
+akzentpunkte 0
