@@ -1,0 +1,47 @@
+' Die Konsolen-Beispiele laufen in dhrt durch und geben etwas aus.
+'
+' Bis 2026-09-16 tests/test_examples.py. Ein Fall startet jedes Beispiel als
+' Kind (`dhrt run` wechselt selbst in den Ordner examples/, relative Pfade
+' stimmen also) und verlangt Rueckgabe 0 und eine nicht leere Ausgabe. Die
+' Ausgabe selbst ist keine Zusage: ein Teil der Beispiele rechnet mit Zeit,
+' ungeseedetem Zufall oder schreibt Dateien, die der naechste Lauf wieder sieht.
+'
+' 161_werkzeug und 172_filter sind Werkzeuge, die sonst Argumente bekommen.
+' Ohne Argumente fuehren sie sich am eigenen Quelltext vor -- bis 2026-08-28
+' druckten sie nur eine Verwendungszeile und endeten mit Rueckgabe 2, waren
+' aus dem Editor (F5) also nicht benutzbar.
+
+=== die konsolen-beispiele laufen durch
+IMPORT "helfer.dh"
+DIM ordner AS STRING : ordner = ARG$(0)
+DIM namen AS ARRAY OF STRING
+namen = ["01_hello", "02_variables", "03_loops", "04_fibonacci", _
+         "06_functions", "07_classes", "08_inheritance", "11_arrays", _
+         "14_strings", "15_struct", "20_try", "24_json", "25_db", _
+         "140_particles", "29_camera", "21_select", _
+         "05_builtins", "16_files", "18_math", "19_maps", "26_tween", _
+         "161_werkzeug", "172_filter"]
+DIM i AS INTEGER
+DIM gut AS INTEGER : gut = 0
+FOR i = 0 TO LEN(namen) - 1
+    DIM pfad AS STRING : pfad = ordner + "/" + namen[i] + ".dh"
+    IF NOT FILEEXISTS(pfad) THEN
+        PRINT namen[i]; " fehlt"
+        CONTINUE
+    END IF
+    dlStarten(["run", pfad])
+    IF dlCode <> 0 THEN
+        PRINT namen[i]; ": Rueckgabe "; dlCode; " -- "; TRIM$(dlErr)
+    ELSEIF TRIM$(dlAus) = "" THEN
+        PRINT namen[i]; ": keine Ausgabe"
+    ELSE
+        gut = gut + 1
+    END IF
+NEXT
+PRINT gut; " von "; LEN(namen); " laufen"
+--- argumente
+{sammlung}/../../examples
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+23 von 23 laufen
