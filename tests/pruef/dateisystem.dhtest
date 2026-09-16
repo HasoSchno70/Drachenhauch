@@ -1,0 +1,234 @@
+' Dateisystem: Namensmuster, rekursives Auflisten, RMDIR, FILETIME, Temp.
+'
+' Bis 2026-09-16 tests/test_dateisystem.py. Das Namensmuster war dort gegen
+' Pythons `fnmatch` geprueft (auf kleingeschriebenen Namen); die Erwartungen
+' der Musterfaelle sind genau dessen Ergebnis fuer den Baum hier:
+' a.csv, b.CSV, x.txt und der Ordner unter/ mit tief.csv und auch.txt.
+' Die Listen werden vor der Ausgabe sortiert -- die Reihenfolge, in der das
+' Betriebssystem einen Ordner liefert, ist keine Zusage.
+'
+' Der Baum liegt in einem UNTERordner: das Programm selbst liegt im Fallordner,
+' und ein DIRLIST(".") zaehlte es mit.
+
+=== dirlist mit muster
+DIM d AS ARRAY OF STRING
+d = DIRLIST("baum", "*.csv")
+SORT(d)
+PRINT JOIN$(d, ",")
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- datei baum/unter/auch.txt
+5
+--- erwartet
+a.csv,b.CSV
+
+=== das muster ignoriert gross und klein
+' Windows unterscheidet bei Dateinamen nicht, Linux schon -- waere das hier
+' plattformabhaengig, liefe dasselbe Programm auf zwei Rechnern verschieden.
+DIM d AS ARRAY OF STRING
+d = DIRLIST("baum", "*.CSV")
+PRINT LEN(d)
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- erwartet
+2
+
+=== muster decken sich mit fnmatch
+DIM muster AS ARRAY OF STRING
+muster = ["*.csv", "a*", "?.csv", "*", "*.*", "*a*"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(muster) - 1
+    DIM d AS ARRAY OF STRING
+    d = DIRLIST("baum", muster[i])
+    SORT(d)
+    PRINT muster[i]; " -> "; JOIN$(d, "|")
+NEXT
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- erwartet
+*.csv -> a.csv|b.CSV
+a* -> a.csv
+?.csv -> a.csv|b.CSV
+* -> a.csv|b.CSV|unter|x.txt
+*.* -> a.csv|b.CSV|x.txt
+*a* -> a.csv
+
+=== ohne muster kommt alles
+DIM d AS ARRAY OF STRING
+d = DIRLIST("baum")
+' 3 Dateien und der Ordner "unter"
+PRINT LEN(d)
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- erwartet
+4
+
+=== rekursiv findet auch tiefer und trennt mit schraegstrich
+' Auch unter Windows -- ein Programm, das die Liste speichert, soll auf beiden
+' Systemen dieselben Zeichenketten sehen.
+DIM d AS ARRAY OF STRING
+d = DIRLIST_REC("baum", "*.csv")
+SORT(d)
+PRINT JOIN$(d, ",")
+d = DIRLIST_REC("baum", "tief.csv")
+PRINT d[0]
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- datei baum/unter/auch.txt
+5
+--- erwartet
+a.csv,b.CSV,unter/tief.csv
+unter/tief.csv
+
+=== rekursiv liefert nur dateien
+DIM d AS ARRAY OF STRING
+d = DIRLIST_REC("baum")
+' der Ordner "unter" zaehlt nicht mit
+PRINT LEN(d)
+--- datei baum/a.csv
+1
+--- datei baum/b.CSV
+2
+--- datei baum/x.txt
+3
+--- datei baum/unter/tief.csv
+4
+--- datei baum/unter/auch.txt
+5
+--- erwartet
+5
+
+=== rmdir loescht ein leeres verzeichnis
+PRINT DIREXISTS("leer")
+RMDIR("leer")
+PRINT DIREXISTS("leer")
+--- verzeichnis leer
+--- erwartet
+TRUE
+FALSE
+
+=== rmdir verweigert ein volles und sagt wie
+' Ein Aufruf, der versehentlich einen ganzen Baum loescht, ist der teuerste
+' Tippfehler, den ein Dateibefehl anrichten kann.
+TRY
+    RMDIR("voll")
+    PRINT "geloescht"
+CATCH e
+    PRINT "nennt den ausweg "; (INSTR(e, "RMDIR(pfad, TRUE)") >= 0)
+END TRY
+PRINT "steht noch "; DIREXISTS("voll/drin")
+--- verzeichnis voll/drin
+--- erwartet
+nennt den ausweg TRUE
+steht noch TRUE
+
+=== rmdir mit flag loescht alles
+PRINT FILEEXISTS("voll/drin/x.txt")
+RMDIR("voll", TRUE)
+PRINT DIREXISTS("voll")
+--- datei voll/drin/x.txt
+x
+--- erwartet
+TRUE
+FALSE
+
+=== rmdir nimmt nur boolean
+TRY
+    RMDIR("leer", 1)
+    PRINT "angenommen"
+CATCH e
+    PRINT "boolean verlangt "; (INSTR(e, "BOOLEAN") >= 0)
+END TRY
+PRINT DIREXISTS("leer")
+--- verzeichnis leer
+--- erwartet
+boolean verlangt TRUE
+TRUE
+
+=== filetime passt zur zeitrechnung des moduls
+' Der Grund, warum es FILETIME gibt: wie alt ist die Datei? Das geht nur, wenn
+' beide Seiten dieselbe Zeitrechnung benutzen.
+IMPORT "zeit"
+WRITEALL("neu.txt", "x")
+DIM alter AS INTEGER
+alter = ZEIT_JETZT() - FILETIME("neu.txt")
+PRINT alter >= 0 AND alter < 120
+--- erwartet
+TRUE
+
+=== filetime unterscheidet alt und neu
+' Die Grundlage jeder Sicherung: welche Datei ist neuer? Die alte Datei legt
+' der Laeufer vor dem Start an, die neue entsteht gut eine Sekunde spaeter.
+SLEEP(1100)
+WRITEALL("neu.txt", "b")
+PRINT FILETIME("neu.txt") > FILETIME("alt.txt")
+PRINT FILETIME("alt.txt") > FILETIME("neu.txt")
+--- datei alt.txt
+a
+--- erwartet
+TRUE
+FALSE
+
+=== filetime meldet die fehlende datei
+PRINT FILETIME("gibtsnicht.txt")
+--- fehler
+gibtsnicht.txt
+
+=== tempdir zeigt auf ein verzeichnis
+PRINT DIREXISTS(TEMPDIR$())
+--- erwartet
+TRUE
+
+=== tempfile ist da, leer, eindeutig und liegt im tempordner
+' Angelegt wird sie sofort -- sonst koennte zwischen "Name ausgedacht" und
+' "Datei geschrieben" ein zweiter Lauf denselben Namen bekommen.
+DIM t AS STRING
+t = TEMPFILE$("dhtest", ".txt")
+PRINT FILEEXISTS(t)
+PRINT FILESIZE(t)
+PRINT ENDSWITH(t, ".txt")
+PRINT STARTSWITH(t, TEMPDIR$())
+DELETEFILE(t)
+DIM a AS STRING
+DIM b AS STRING
+a = TEMPFILE$()
+b = TEMPFILE$()
+PRINT a <> b
+DELETEFILE(a)
+DELETEFILE(b)
+--- erwartet
+TRUE
+0
+TRUE
+TRUE
+TRUE

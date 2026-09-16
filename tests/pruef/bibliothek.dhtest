@@ -1,0 +1,289 @@
+' Bibliotheken teilen: wo `IMPORT "x.dh"` sucht.
+'
+' Gesucht wird in dieser Reihenfolge:
+'   1. neben der importierenden Datei (die eigene Kopie gewinnt IMMER)
+'   2. jeder Ordner aus DH_PATH (Trenner des Betriebssystems)
+'   3. <Benutzerordner>/.drachenhauch/bibliothek
+'
+' Bis 2026-09-16 tests/test_bibliothek.py. Jeder Fall startet das Programm als
+' Kind: DH_PATH und der Benutzerordner gehen per SETENV hinein, und der
+' Benutzerordner zeigt IMMER in den Fallordner -- eine Bibliothek, die auf dem
+' Rechner des Pruefenden liegt, darf kein Ergebnis beeinflussen. Die Beilage
+' helfer.dh ist in jedem Fall dieselbe.
+
+=== ohne suchpfad bleibt es ein fehler und die meldung nennt die orte
+IMPORT "helfer.dh"
+laufe("proj/haupt.dh", "")
+PRINT "abbruch "; (dlCode <> 0)
+PRINT "nicht gefunden "; (INSTR(dlErr, "nicht gefunden") >= 0)
+' Sonst raet man, warum die Datei nicht gefunden wird.
+PRINT "nennt den eigenen ordner "; (INSTR(dlErr, "proj") >= 0)
+PRINT "nennt den benutzerordner "; (INSTR(dlErr, ".drachenhauch") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+' Kleine Bibliothek.
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "zeitraum.dh"
+PRINT Tage(0, 172800)
+--- erwartet
+abbruch TRUE
+nicht gefunden TRUE
+nennt den eigenen ordner TRUE
+nennt den benutzerordner TRUE
+
+=== dh_path findet die bibliothek
+IMPORT "helfer.dh"
+laufe("proj/haupt.dh", ordner$("lib"))
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+' Kleine Bibliothek.
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "zeitraum.dh"
+PRINT Tage(0, 172800)
+--- erwartet
+rueckgabe 0
+2
+
+=== die eigene kopie gewinnt
+' Wer eine Datei danebenlegt, will genau die -- und keine, die irgendwo auf
+' dem Rechner liegt und sich unbemerkt aendert.
+IMPORT "helfer.dh"
+laufe("proj/haupt.dh", ordner$("lib"))
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei proj/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN 999
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "zeitraum.dh"
+PRINT Tage(0, 172800)
+--- erwartet
+999
+
+=== mehrere ordner in dh_path
+IMPORT "helfer.dh"
+laufe("proj/zwei.dh", ordner$("lib") + dlPfadTrenner$() + ordner$("lib2"))
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei lib2/extra.dh
+FUNCTION Drei() AS INTEGER
+    RETURN 3
+END FUNCTION
+--- datei proj/zwei.dh
+IMPORT "zeitraum.dh"
+IMPORT "extra.dh"
+PRINT Tage(0, 86400) + Drei()
+--- erwartet
+rueckgabe 0
+4
+
+=== der erste treffer in dh_path gewinnt
+' Bei zwei gleichnamigen Dateien entscheidet die Reihenfolge -- wie bei PATH.
+IMPORT "helfer.dh"
+laufe("proj/haupt.dh", ordner$("lib2") + dlPfadTrenner$() + ordner$("lib"))
+PRINT "lib2 vorn "; TRIM$(dlAus); TRIM$(dlErr)
+laufe("proj/haupt.dh", ordner$("lib") + dlPfadTrenner$() + ordner$("lib2"))
+PRINT "lib vorn "; TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei lib2/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN 42
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "zeitraum.dh"
+PRINT Tage(0, 172800)
+--- erwartet
+lib2 vorn 42
+lib vorn 2
+
+=== der benutzerordner wird durchsucht
+' <heim>/.drachenhauch/bibliothek -- der Ort, an dem eine Paketverwaltung
+' spaeter ablegen wuerde. Der Helfer setzt heim auf den Fallordner.
+IMPORT "helfer.dh"
+laufe("proj/haupt.dh", "")
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei heim/.drachenhauch/bibliothek/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei proj/haupt.dh
+IMPORT "zeitraum.dh"
+PRINT Tage(0, 172800)
+--- erwartet
+rueckgabe 0
+2
+
+=== eine bibliothek importiert relativ zu sich
+' Und zwar relativ zu SICH -- nicht relativ zum Hauptprogramm.
+IMPORT "helfer.dh"
+laufe("proj/tief.dh", ordner$("lib"))
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/basis.dh
+FUNCTION Verdopple(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+--- datei lib/oben.dh
+IMPORT "basis.dh"
+FUNCTION Vierfach(x AS INTEGER) AS INTEGER
+    RETURN Verdopple(Verdopple(x))
+END FUNCTION
+--- datei proj/tief.dh
+IMPORT "oben.dh"
+PRINT Vierfach(3)
+--- erwartet
+rueckgabe 0
+12
+
+=== namensraum geht auch aus der bibliothek
+' `IMPORT "x.dh" AS y` darf am Fundort nicht haengen.
+IMPORT "helfer.dh"
+laufe("proj/ns.dh", ordner$("lib"))
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/zeitraum.dh
+FUNCTION Tage(von AS INTEGER, bis AS INTEGER) AS INTEGER
+    RETURN (bis - von) \ 86400
+END FUNCTION
+--- datei proj/ns.dh
+IMPORT "zeitraum.dh" AS zr
+PRINT zr.Tage(0, 259200)
+--- erwartet
+rueckgabe 0
+3
+
+=== eingebaute module bleiben eingebaut
+' `IMPORT "json"` bleibt das eingebaute Modul -- eine gleichnamige Datei im
+' Suchpfad darf daran nichts aendern.
+IMPORT "helfer.dh"
+laufe("proj/j.dh", ordner$("lib"))
+PRINT "rueckgabe "; dlCode
+PRINT TRIM$(dlAus); TRIM$(dlErr)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+SUB laufe(datei AS STRING, suchpfad AS STRING)
+    SETENV("DH_PATH", suchpfad)
+    SETENV("USERPROFILE", CWD$() + "/heim")
+    SETENV("HOME", CWD$() + "/heim")
+    dlStarten(["run", CWD$() + "/" + datei])
+END SUB
+FUNCTION ordner$(name AS STRING) AS STRING
+    RETURN CWD$() + "/" + name
+END FUNCTION
+--- datei lib/json
+' kein gueltiges Programm
+--- datei proj/j.dh
+IMPORT "json"
+DIM h AS JSON_HANDLE
+h = JSON_NEW_OBJECT()
+JSON_SET_INT(h, "a", 1)
+PRINT JSON_STRINGIFY(h)
+--- erwartet
+rueckgabe 0
+{"a":1}
