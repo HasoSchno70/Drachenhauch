@@ -1,0 +1,113 @@
+' Drucken (docs/entwurf-drucken.md, Wege A und C): PRINTERS, PRINTER_DEFAULT$,
+' PDF_PREVIEW, die Fehlermeldungen von PDF_PRINT und OPENDOC.
+'
+' Bis 2026-09-16 in tests/test_drucken.py. Dort bleibt der Druck durch einen
+' ECHTEN Treiber ("Microsoft Print to PDF" in eine Datei): gelesen wird diese
+' Datei mit PyMuPDF samt Lage des Betrags, und der Leser hier (pdftext.dh in
+' pdf.dhtest) kennt nur PDFs, die dhrt selbst schreibt.
+
+=== der standarddrucker ist leer oder steht in der liste
+IMPORT "pdf"
+DIM namen AS MAP OF BOOLEAN
+DIM n AS STRING
+DIM anzahl AS INTEGER : anzahl = 0
+FOR EACH n IN PRINTERS()
+    MAPPUT(namen, n, TRUE)
+    anzahl = anzahl + 1
+NEXT
+DIM standard AS STRING : standard = PRINTER_DEFAULT$()
+PRINT "standard passt "; (standard = "" OR MAPHAS(namen, standard))
+--- erwartet
+standard passt TRUE
+
+=== windows bringt microsoft print to pdf mit
+IMPORT "pdf"
+DIM gefunden AS BOOLEAN : gefunden = FALSE
+DIM n AS STRING
+FOR EACH n IN PRINTERS()
+    IF n = "Microsoft Print to PDF" THEN gefunden = TRUE
+NEXT
+PRINT "print to pdf "; gefunden
+--- system windows
+--- erwartet
+print to pdf TRUE
+
+=== die vorschau ist ein bild mit inhalt
+' Papier weiss, in der Titelzeile dunkle Punkte, im gefuellten Rechteck
+' (20..60 mm x 60..70 mm) schwarz; A4 bei 420 Punkten Breite ist 594 hoch.
+IMPORT "pdf"
+IMPORT "imgfx"
+SCREEN(300, 200, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM p AS PDF : p = PDF_NEW()
+PDF_TITLE(p, "Drucktest")
+PDF_FONT(p, "helvetica-fett", 18)
+PDF_TEXT(p, 20, 25, "Rechnung 2026-0002")
+PDF_FONT(p, "helvetica", 11)
+PDF_TEXT(p, 20, 40, "Anna Berger")
+PDF_LINE(p, 20, 50, 190, 50)
+PDF_RECT_FILL(p, 20, 60, 40, 10)
+PDF_TEXT(p, 190 - PDF_TEXT_WIDTH(p, "85,39 EUR"), 80, "85,39 EUR")
+PDF_PAGE(p)
+PDF_TEXT(p, 20, 25, "Seite zwei")
+DIM b AS IMAGE : b = PDF_PREVIEW(p, 1, 420)
+PRINT IMAGEWIDTH(b) ; " " ; IMAGEHEIGHT(b)
+PRINT "ecke weiss "; (GETPIXEL(b, 5, 5) = &HFFFFFF)
+DIM f AS FLOAT : f = 420 / 210
+DIM dunkel AS INTEGER : dunkel = 0
+DIM x AS INTEGER
+DIM y AS INTEGER
+FOR x = INT(20 * f) TO INT(120 * f) - 1
+    FOR y = INT(25 * f) TO INT(33 * f) - 1
+        DIM c AS INTEGER : c = GETPIXEL(b, x, y)
+        IF ((c SHR 16) BAND 255) + ((c SHR 8) BAND 255) + (c BAND 255) < 300 THEN dunkel = dunkel + 1
+    NEXT
+NEXT
+PRINT "ueberschrift zu sehen "; (dunkel > 50)
+DIM r AS INTEGER : r = GETPIXEL(b, INT(40 * f), INT(65 * f))
+PRINT "rechteck gefuellt "; (((r SHR 16) BAND 255) + ((r SHR 8) BAND 255) + (r BAND 255) < 60)
+TRY
+    PDF_PREVIEW(p, 3)
+CATCH e
+    PRINT "seite 3 "; (INSTR(e, "Seite 3 gibt es nicht") >= 0)
+END TRY
+--- umgebung
+DHRT_FRAMES=1
+--- erwartet
+420 594
+ecke weiss TRUE
+ueberschrift zu sehen TRUE
+rechteck gefuellt TRUE
+seite 3 TRUE
+
+=== fehler haben klare worte
+IMPORT "pdf"
+DIM p AS PDF : p = PDF_NEW()
+PDF_TEXT(p, 20, 25, "Test")
+TRY
+    PDF_PRINT(p, "Diesen Drucker gibt es nicht")
+CATCH e
+    PRINT "unbekannter drucker "; (INSTR(e, "PDF_PRINT") >= 0)
+END TRY
+TRY
+    PDF_PRINT(p, "", 0)
+CATCH e2
+    PRINT "kopien "; (INSTR(e2, "Kopien 1..99") >= 0)
+END TRY
+TRY
+    OPENDOC("gibtsnicht.pdf")
+CATCH e3
+    PRINT "fehlende datei "; (INSTR(e3, "gibt es nicht") >= 0)
+END TRY
+' OPENDOC ist kein Programmstarter -- eine .exe weist es ab und nennt SHELL.
+WRITEALL("boese.exe", "MZ")
+TRY
+    OPENDOC("boese.exe")
+CATCH e4
+    PRINT "programm abgewiesen "; (INSTR(e4, "nicht geoeffnet") >= 0 AND INSTR(e4, "SHELL") >= 0)
+END TRY
+--- erwartet
+unbekannter drucker TRUE
+kopien TRUE
+fehlende datei TRUE
+programm abgewiesen TRUE

@@ -3247,6 +3247,15 @@ Gliederung kennt Blockenden nur fuer CLASS/STRUCT/SUB/FUNCTION/PROPERTY; ein
 schon so in der Python-Vorlage; nicht behoben, der Fall prueft es nicht).
 Gegenproben: vier bzw. drei Verfaelschungen, jede faellt.
 
+**Drucken teilweise ohne Python (2026-09-16, Weg D):** Druckerliste,
+`PDF_PREVIEW` (am Bild mit GETPIXEL) und die Fehlermeldungen von `PDF_PRINT`
+und `OPENDOC` stehen in `tests/pruef/drucken.dhtest` (4). In
+`tests/test_drucken.py` bleibt NUR der Druck durch den echten Treiber
+"Microsoft Print to PDF": dessen Datei ist kein PDF von dhrt, und der Leser
+in Drachenhauch (`pdftext.dh`) kennt nur krilla-PDFs und keine Textlagen --
+PyMuPDF bleibt dafuer. Gegenproben nur an der Vorschau: eine Verfaelschung
+der Druckbefehle koennte echt drucken.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
