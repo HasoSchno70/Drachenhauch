@@ -3143,7 +3143,14 @@ als uebersprungen -- **dafuer kann sich ein Fall seit dieser Runde selbst
 ueberspringen** (die Zeile auf stdout oder stderr, `bewerten` in
 pruefsammlung.rs, Doku `docs/werkzeuge.md`): fuer fremde Werkzeuge, die nicht
 ueberall liegen. Die Alternative waere, die erwarteten Zeilen zu ERFINDEN --
-gruen und wertlos. Dazu `tests/test_dhrt_check.py` (18 Tests) -> `tests/pruef/dhrt_check.dhtest`
+gruen und wertlos. Dazu `tests/test_beispiele_gui_enden.py` -> `tests/pruef/beispiele_gui_enden.dhtest`
+(zehn Fenster-Programme, 8 s) -- und dafuer **`dhrt run --bilder N`**: dieselbe
+Grenze wie `DHRT_FRAMES`, nur als Schalter, weil `PROCESS_START` seinen Kindern
+die Variable abnimmt (sonst stuerbe ein gestartetes Spiel nach N Bildern). Ein
+Programm mit `WHILE TRUE` laeuft trotzdem weiter -- genau daran erkennt man es;
+die Gegenprobe (eine Zeile im Beispiel umgestellt) laesst den Fall nach 25 s
+fallen.
+Dazu `tests/test_dhrt_check.py` (18 Tests) -> `tests/pruef/dhrt_check.dhtest`
 (9): die Diagnosen von `dhrt --check` samt Zeilennummern, die Warnungen
 (unbekanntes Builtin, Hardware-IMPORT, doppeltes DIM mit anderem Typ) und die
 DURCHLAEUFE ueber den Bestand -- alle Beispiele ohne Fehler und ohne
