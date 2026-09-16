@@ -142,29 +142,32 @@ DB_CLOSE(c)
 ' Die Schleife laeuft weiter, waehrend die Abfrage arbeitet -- vorher hielt
 ' DB_QUERY alles an.
 ' (Bis Stufe 46 in test_hintergrund.py.)
+'
+' Die Abfrage zaehlt absichtlich lange (rekursiv bis drei Millionen, hier rund
+' 0,3 s). Bis 2026-09-16 las sie 20000 Zeilen -- und auf dem schnellen
+' macOS-Runner war sie fertig, bevor die Schleife das erste Mal fragte: runden
+' blieb 0, der Fall fiel im main-Lauf nach #176, ohne dass sich etwas geaendert
+' hatte.
 IMPORT "db"
 DIM auftrag AS INTEGER
 DIM runden AS INTEGER
-auftrag = DB_QUERY_START("d.db", "SELECT a, b FROM zahlen WHERE a % ? = 0", 3)
+auftrag = DB_QUERY_START("d.db", "WITH RECURSIVE r(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM r WHERE x < ?) SELECT COUNT(*) FROM r", 3000000)
 WHILE NOT DB_QUERY_READY(auftrag)
     runden = runden + 1
 WEND
 PRINT runden > 0
 PRINT DB_QUERY_PENDING()
+DIM r AS DB_RESULT : r = DB_QUERY_RESULT(auftrag)
+IF DB_NEXT(r) THEN PRINT DB_GET_INT(r, 0)
 --- vorher
 IMPORT "db"
 DIM c AS DB_CONN : c = DB_OPEN("d.db")
-DB_EXEC(c, "CREATE TABLE zahlen (a INTEGER, b TEXT)")
-DB_BEGIN(c)
-DIM i AS INTEGER
-FOR i = 0 TO 20000 - 1
-    DB_EXEC(c, "INSERT INTO zahlen VALUES (?, ?)", i, "zeile " + STR$(i))
-NEXT
-DB_COMMIT(c)
+DB_EXEC(c, "CREATE TABLE leer (a INTEGER)")
 DB_CLOSE(c)
 --- erwartet
 TRUE
 1
+3000000
 
 === parameter werden gebunden
 ' (Bis Stufe 46 in test_hintergrund.py.)
