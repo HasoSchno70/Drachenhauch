@@ -1,0 +1,76 @@
+' Ein dhrt-Werkzeug als Kind starten und auf sein Ende warten.
+'
+' `dlStarten(["--version"])` fuellt danach dlAus (stdout), dlErr (stderr) und
+' dlCode (Rueckgabewert); Zeilenenden sind auf \n vereinheitlicht, damit ein
+' Fall unter Windows und auf den Laeufern dasselbe sieht.
+'
+' PROCESS_START nimmt seine Argumente einzeln -- ein Feld laesst sich nicht
+' ausbreiten, darum die Staffel nach der Argumentzahl.
+DIM dlAus AS STRING : dlAus = ""
+DIM dlErr AS STRING : dlErr = ""
+DIM dlCode AS INTEGER : dlCode = 0
+
+SUB dlStarten(dlArgs AS ARRAY OF STRING)
+    DIM p AS INTEGER : p = -1
+    SELECT CASE LEN(dlArgs)
+        CASE 1
+            p = PROCESS_START("dhrt", dlArgs[0])
+        CASE 2
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1])
+        CASE 3
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2])
+        CASE 4
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2], dlArgs[3])
+        CASE 5
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2], dlArgs[3], dlArgs[4])
+        CASE 6
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2], dlArgs[3], dlArgs[4], dlArgs[5])
+        CASE 7
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2], dlArgs[3], dlArgs[4], dlArgs[5], dlArgs[6])
+        CASE 8
+            p = PROCESS_START("dhrt", dlArgs[0], dlArgs[1], dlArgs[2], dlArgs[3], dlArgs[4], dlArgs[5], dlArgs[6], dlArgs[7])
+        CASE ELSE
+            PRINT "dlStarten: "; LEN(dlArgs); " Argumente sind zu viele"
+            EXIT(2)
+    END SELECT
+    dlAus = ""
+    dlErr = ""
+    ' Nach dem Ende noch ein paar Mal leer lesen: das Kind kann beendet sein,
+    ' bevor sein Lesefaden die letzte Zeile abgelegt hat.
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 180000 AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            dlAus = dlAus + a
+            dlErr = dlErr + e
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    dlAus = REPLACE$(dlAus, CHR$(13), "")
+    dlErr = REPLACE$(dlErr, CHR$(13), "")
+    dlCode = PROCESS_CODE(p)
+END SUB
+
+' Der ganze Text einer Datei mit \n als Zeilenende (READLINES verloere den
+' abschliessenden Umbruch -- und genau der gehoert bei `dhrt fmt` zur Zusage).
+FUNCTION dlText$(pfad AS STRING) AS STRING
+    DIM t AS STRING : t = BUFFER_TO_STRING$(READALL_BYTES(pfad))
+    RETURN REPLACE$(t, CHR$(13) + CHR$(10), CHR$(10))
+END FUNCTION
+
+FUNCTION dlZaehle(heuhaufen AS STRING, nadel AS STRING) AS INTEGER
+    DIM n AS INTEGER : n = 0
+    DIM ab AS INTEGER : ab = 0
+    WHILE TRUE
+        DIM wo AS INTEGER : wo = INSTR(heuhaufen, nadel, ab)
+        IF wo < 0 THEN RETURN n
+        n = n + 1
+        ab = wo + LEN(nadel)
+    WEND
+    RETURN n
+END FUNCTION

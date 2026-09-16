@@ -1,0 +1,404 @@
+' Die Werkzeuge um die Sprache herum: `--version`, `--help`, `dhrt test`,
+' `dhrt fmt` und `dhrt doku` -- die Zeichen, an denen jemand abliest, ob eine
+' Sprache zum Arbeiten taugt.
+'
+' Bis 2026-09-16 tests/test_dhrt_werkzeuge.py. Gestartet wird dhrt als Kind
+' (_hilfen/dhrtlauf.dh); die Pruefprogramme und die zu formatierenden Dateien
+' schreibt jeder Fall selbst in seinen Ordner.
+
+=== die fassung wird ueberhaupt beantwortet
+' `dhrt --version` antwortete frueher mit "Kann --version nicht lesen" -- es
+' hielt den Namen fuer eine Datei. Das ist das Erste, was jemand tippt.
+IMPORT "helfer.dh"
+dlStarten(["--version"])
+PRINT "rueckgabe "; dlCode
+PRINT "beginnt mit dhrt "; (LEFT$(dlAus, 5) = "dhrt ")
+' Ein Bau ohne --hardware laesst Module weg, ohne dass man es dem Binary
+' ansieht -- die Meldung kam sonst erst beim ersten Aufruf.
+PRINT "nennt die teile "; (INSTR(dlAus, "dabei:") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+beginnt mit dhrt TRUE
+nennt die teile TRUE
+
+=== die fassung stimmt mit dem projekt ueberein
+' Drei Stellen nennen sie -- sie muessen dasselbe sagen. (Die vierte,
+' drachenhauch/__init__.py, faellt mit dem Python-Teil weg; sie wird nur
+' geprueft, solange es sie gibt.)
+IMPORT "helfer.dh"
+FUNCTION ersteFassung$(pfad AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = READLINES(pfad)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(z) - 1
+        DIM zeile AS STRING : zeile = TRIM$(z[i])
+        IF LEFT$(zeile, 10) = "version = " THEN RETURN REPLACE$(MID$(zeile, 10), CHR$(34), "")
+        IF LEFT$(zeile, 14) = "__version__ = " THEN RETURN REPLACE$(MID$(zeile, 14), CHR$(34), "")
+    NEXT
+    RETURN ""
+END FUNCTION
+DIM wurzel AS STRING : wurzel = ARG$(0)
+DIM erwartet AS STRING : erwartet = TRIM$(ersteFassung$(wurzel + "/pyproject.toml"))
+dlStarten(["--version"])
+PRINT "laufzeit "; (TRIM$(SPLIT$(dlAus, CHR$(10))[0]) = "dhrt " + erwartet)
+DIM cargo AS STRING : cargo = TRIM$(ersteFassung$(wurzel + "/rust/drachenhauch_runtime/Cargo.toml"))
+' Cargo verlangt drei Stellen; "2026.8" wird dort zu "2026.8.0".
+PRINT "cargo "; (cargo = erwartet OR cargo = erwartet + ".0")
+IF FILEEXISTS(wurzel + "/drachenhauch/__init__.py") THEN
+    PRINT "python "; (TRIM$(ersteFassung$(wurzel + "/drachenhauch/__init__.py")) = erwartet)
+ELSE
+    PRINT "python TRUE"
+END IF
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+laufzeit TRUE
+cargo TRUE
+python TRUE
+
+=== die hilfe nennt die unterbefehle
+IMPORT "helfer.dh"
+dlStarten(["--help"])
+PRINT "rueckgabe "; dlCode
+DIM woerter AS ARRAY OF STRING : woerter = ["run", "test", "--check", "--export", "--version"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(woerter) - 1
+    PRINT woerter[i]; " "; (INSTR(dlAus, woerter[i]) >= 0)
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+run TRUE
+test TRUE
+--check TRUE
+--export TRUE
+--version TRUE
+
+=== der laeufer findet die pruefprogramme und besteht
+IMPORT "helfer.dh"
+WRITEALL("ordner/a_pruefung.dh", !"ASSERT(1 + 1 = 2, \"Addition\")\nPRINT \"alles gut\"\n")
+WRITEALL("ordner/b_pruefung.dh", !"ASSERT(1 + 1 = 2, \"Addition\")\nPRINT \"alles gut\"\n")
+dlStarten(["test", CWD$() + "/ordner"])
+PRINT "rueckgabe "; dlCode
+PRINT "zweimal ok "; dlZaehle(dlAus, "  ok ")
+PRINT "bilanz "; (INSTR(dlAus, "2 Datei(en), 2 ok, 0 mit Fehlern") >= 0)
+--- verzeichnis ordner
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+zweimal ok 2
+bilanz TRUE
+
+=== ein fehlschlag faerbt den ganzen lauf
+IMPORT "helfer.dh"
+WRITEALL("ordner/a_pruefung.dh", !"ASSERT(1 + 1 = 2, \"Addition\")\n")
+WRITEALL("ordner/b_pruefung.dh", !"ASSERT_COLLECT(TRUE)\nASSERT_EQ(2 + 2, 5, \"Rechnen\")\nASSERT_REPORT()\nIF ASSERT_FAILED() > 0 THEN EXIT(1)\n")
+dlStarten(["test", CWD$() + "/ordner"])
+PRINT "rueckgabe "; dlCode
+PRINT "bilanz "; (INSTR(dlAus, "1 ok, 1 mit Fehlern") >= 0)
+' Die Einzelheiten muessen mit heraus -- sonst weiss niemand, WAS schiefging.
+PRINT "nennt die zusage "; (INSTR(dlAus, "Rechnen") >= 0)
+--- verzeichnis ordner
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+bilanz TRUE
+nennt die zusage TRUE
+
+=== der laeufer sucht rekursiv und nur nach der endung
+IMPORT "helfer.dh"
+WRITEALL("ordner/eins/zwei/tief_pruefung.dh", !"ASSERT(1 + 1 = 2, \"Addition\")\n")
+WRITEALL("ordner/normal.dh", !"PRINT \"kein Pruefprogramm\"\n")
+dlStarten(["test", CWD$() + "/ordner"])
+PRINT "rueckgabe "; dlCode
+PRINT "eine datei "; (INSTR(dlAus, "1 Datei(en)") >= 0)
+PRINT "ohne normal.dh "; (INSTR(dlAus, "normal.dh") < 0)
+--- verzeichnis ordner/eins/zwei
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+eine datei TRUE
+ohne normal.dh TRUE
+
+=== eine genannte datei laeuft auch ohne die endung
+' Wer sie hinschreibt, meint sie.
+IMPORT "helfer.dh"
+WRITEALL("anders.dh", !"ASSERT(1 + 1 = 2, \"Addition\")\n")
+dlStarten(["test", CWD$() + "/anders.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "bilanz "; (INSTR(dlAus, "1 Datei(en), 1 ok") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+bilanz TRUE
+
+=== nichts gefunden ist kein fehlschlag, ein falscher pfad schon
+' Sonst faellt eine Kette ueber ein noch leeres Projekt.
+IMPORT "helfer.dh"
+dlStarten(["test", CWD$() + "/leer"])
+PRINT "leer: rueckgabe "; dlCode
+PRINT "leer: meldet sich "; (INSTR(dlErr, "keine Pruefprogramme") >= 0)
+dlStarten(["test", CWD$() + "/gibtsnicht"])
+PRINT "weg: rueckgabe "; dlCode
+PRINT "weg: meldet sich "; (INSTR(dlErr, "gibt es nicht") >= 0)
+--- verzeichnis leer
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+leer: rueckgabe 0
+leer: meldet sich TRUE
+weg: rueckgabe 2
+weg: meldet sich TRUE
+
+=== ein vergessenes input haengt nicht
+' Die Standardeingabe des Kindes ist leer -- ein Pruefprogramm mit einem
+' vergessenen INPUT wuerde sonst auf eine Eingabe warten, die nie kommt.
+IMPORT "helfer.dh"
+WRITEALL("ordner/x_pruefung.dh", !"DIM s AS STRING\nINPUT \"Name: \", s\nASSERT(s = \"\", \"leer bei EOF\")\n")
+DIM t0 AS INTEGER : t0 = MILLIS()
+dlStarten(["test", CWD$() + "/ordner"])
+PRINT "rueckgabe "; dlCode
+PRINT "unter 30 s "; (MILLIS() - t0 < 30000)
+--- verzeichnis ordner
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+unter 30 s TRUE
+
+=== die pruefprogramme des repos laufen
+' Der Beleg am echten Bestand: die vier Pruefprogramme des Tippspiels.
+IMPORT "helfer.dh"
+DIM ziel AS STRING : ziel = ARG$(0)
+IF NOT DIREXISTS(ziel) THEN
+    PRINT "rueckgabe 0"
+    PRINT "ohne fehler TRUE"
+    EXIT(0)
+END IF
+dlStarten(["test", ziel])
+PRINT "rueckgabe "; dlCode
+PRINT "ohne fehler "; (INSTR(dlAus, "0 mit Fehlern") >= 0)
+--- argumente
+{sammlung}/../../buch-tippspiel/code
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne fehler TRUE
+
+=== fmt schreibt die schluesselwoerter gross
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"dim i as integer\nfor i = 1 to 3\n    print i\nnext\n")
+dlStarten(["fmt", CWD$() + "/a.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "|" + REPLACE$(dlText$("a.dh"), CHR$(10), "|")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+|DIM i AS INTEGER|FOR i = 1 TO 3|    PRINT i|NEXT|
+
+=== fmt laesst namen, texte und kommentare in ruhe
+' Entschieden wird an den Token, nicht am Text: Variablen, Builtins und
+' Klassen bleiben, wie sie geschrieben sind.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"DIM meinWert AS STRING\nmeinWert = Left$(\"abc\", 2)\nPRINT \"das end vom lied\"    ' hier steht auch ein for\n")
+dlStarten(["fmt", CWD$() + "/a.dh"])
+DIM neu AS STRING : neu = dlText$("a.dh")
+PRINT "meinWert "; (INSTR(neu, "meinWert") >= 0)
+PRINT "Left$ "; (INSTR(neu, "Left$") >= 0)
+PRINT "text "; (INSTR(neu, CHR$(34) + "das end vom lied" + CHR$(34)) >= 0)
+PRINT "kommentar "; (INSTR(neu, "hier steht auch ein for") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+meinWert TRUE
+Left$ TRUE
+text TRUE
+kommentar TRUE
+
+=== fmt laesst das f vor einer zeichenkette klein
+' Der Lexer loest einen f-String schon beim Lesen in eine Token-Folge auf;
+' die erben alle die Position des `f`. Ohne Gegenprobe wurde daraus `F"..."`
+' -- beim ersten Lauf ueber den Bestand tatsaechlich passiert.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"DIM n AS INTEGER\nn = 5\nPRINT f\"Wert {n}\"\n")
+dlStarten(["fmt", CWD$() + "/a.dh"])
+PRINT "klein geblieben "; (INSTR(dlText$("a.dh"), "f" + CHR$(34) + "Wert {n}" + CHR$(34)) >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+klein geblieben TRUE
+
+=== fmt ruehrt die einrueckung erst mit dem flag an
+' Die Vorgabe ist verlustfrei: sie ruehrt kein Layout an.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"if 1 = 1 then\n        PRINT 1\nend if\n")
+dlStarten(["fmt", CWD$() + "/a.dh"])
+PRINT "acht leerzeichen bleiben "; (INSTR(dlText$("a.dh"), "        PRINT 1") >= 0)
+WRITEALL("b.dh", !"IF 1 = 1 THEN\nPRINT 1\nEND IF\n")
+dlStarten(["fmt", "--einruecken", CWD$() + "/b.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "|" + REPLACE$(dlText$("b.dh"), CHR$(10), "|")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+acht leerzeichen bleiben TRUE
+rueckgabe 0
+|IF 1 = 1 THEN|    PRINT 1|END IF|
+
+=== fmt rueckt select case wie der hausstil ein
+' CASE steht INNERHALB von SELECT -- so schreiben es alle Beispiele. Die
+' erste, stapellose Fassung war hier anderer Meinung als 26 Dateien.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"DIM x AS INTEGER\nx = 1\nSELECT CASE x\nCASE 1\nPRINT 1\nCASE ELSE\nPRINT 0\nEND SELECT\n")
+dlStarten(["fmt", "--einruecken", CWD$() + "/a.dh"])
+PRINT "|" + REPLACE$(dlText$("a.dh"), CHR$(10), "|")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+|DIM x AS INTEGER|x = 1|SELECT CASE x|    CASE 1|        PRINT 1|    CASE ELSE|        PRINT 0|END SELECT|
+
+=== fmt laesst ein einzeiliges if und ausgerichtete fortsetzungen stehen
+' Wer seine Parameter untereinander ausrichtet, hat sich etwas dabei gedacht
+' -- und die Zeile darf die Ebenen-Rechnung nicht verwirren.
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"DIM x AS INTEGER\nIF x = 1 THEN x = 2\nPRINT x\n")
+dlStarten(["fmt", "--einruecken", CWD$() + "/a.dh"])
+PRINT "|" + REPLACE$(dlText$("a.dh"), CHR$(10), "|")
+WRITEALL("b.dh", !"DIM i AS INTEGER\nFOR i = 1 TO 2\n    IF MAX(1, _\n           2) = 2 THEN\n        PRINT 1\n    END IF\nNEXT\nPRINT 9\n")
+dlStarten(["fmt", "--einruecken", CWD$() + "/b.dh"])
+DIM neu AS STRING : neu = dlText$("b.dh")
+PRINT "ausrichtung erhalten "; (INSTR(neu, "           2) = 2 THEN") >= 0)
+DIM ende AS STRING : ende = !"NEXT\nPRINT 9\n"
+PRINT "ebene laeuft nicht weg "; (RIGHT$(neu, LEN(ende)) = ende)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+|DIM x AS INTEGER|IF x = 1 THEN x = 2|PRINT x|
+ausrichtung erhalten TRUE
+ebene laeuft nicht weg TRUE
+
+=== fmt --pruefen schreibt nicht und meldet sich
+IMPORT "helfer.dh"
+WRITEALL("a.dh", !"print 1\n")
+dlStarten(["fmt", "--pruefen", CWD$() + "/a.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "meldet sich "; (INSTR(dlAus, "wuerde sich aendern") >= 0)
+PRINT "unveraendert "; (dlText$("a.dh") = !"print 1\n")
+WRITEALL("b.dh", !"PRINT 1\n")
+dlStarten(["fmt", "--pruefen", CWD$() + "/b.dh"])
+PRINT "sauber: rueckgabe "; dlCode
+PRINT "sauber: still "; (TRIM$(dlAus) = "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 1
+meldet sich TRUE
+unveraendert TRUE
+sauber: rueckgabe 0
+sauber: still TRUE
+
+=== fmt fasst eine kaputte datei nicht an
+' An kaputtem Code herumzuruecken hilft niemandem.
+IMPORT "helfer.dh"
+DIM quelle AS STRING : quelle = "PRINT " + CHR$(34) + "unbeendete Zeichenkette" + CHR$(10)
+WRITEALL("a.dh", quelle)
+dlStarten(["fmt", CWD$() + "/a.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "unveraendert "; (dlText$("a.dh") = quelle)
+PRINT "sagt es "; (INSTR(dlErr, "unveraendert") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 2
+unveraendert TRUE
+sagt es TRUE
+
+=== der bestand der beispiele bleibt unter fmt ruhig
+' Nach dem einmaligen Durchlauf muss jede .dh-Datei ruhig bleiben -- sonst
+' waere die Vorgabe nicht verlustfrei. Temp-Reste der IDE (_dhtmp_) liegen
+' absichtlich neben der Quelle und gehoeren nicht zum Bestand.
+IMPORT "helfer.dh"
+DIM ordner AS STRING : ordner = ARG$(0)
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST_REC(ordner, "*.dh")
+DIM unruhig AS INTEGER : unruhig = 0
+DIM gezaehlt AS INTEGER : gezaehlt = 0
+DIM i AS INTEGER
+' Sechs Dateien je Aufruf statt einer: `fmt` nimmt beliebig viele, und 210
+' Prozessstarts waeren der ganze Zeitverbrauch dieses Falls.
+DIM buendel AS ARRAY OF STRING : buendel = ["fmt", "--pruefen"]
+FOR i = 0 TO LEN(dateien) - 1
+    IF LEFT$(BASENAME(dateien[i]), 7) = "_dhtmp_" THEN CONTINUE
+    gezaehlt = gezaehlt + 1
+    ARRAY_PUSH(buendel, ordner + "/" + dateien[i])
+    IF LEN(buendel) = 8 OR i = LEN(dateien) - 1 THEN
+        dlStarten(buendel)
+        IF dlCode <> 0 THEN
+            unruhig = unruhig + 1
+            PRINT "unruhig: "; TRIM$(dlAus)
+        END IF
+        buendel = ["fmt", "--pruefen"]
+    END IF
+NEXT
+PRINT "geprueft "; (gezaehlt > 150)
+PRINT "unruhig "; unruhig
+--- argumente
+{sammlung}/../../examples
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+geprueft TRUE
+unruhig 0
+
+=== doku nimmt signatur, kommentar und laesst privates weg
+' `PRIVATE` gehoert dem Modul -- eine Referenz, die es auffuehrt, verspricht
+' etwas, das beim naechsten Umbau verschwindet.
+IMPORT "helfer.dh"
+WRITEALL("mathe.dh", !"' Kleine Sammlung fuer Streckenrechnung.\n\n' Der groesste erlaubte Abstand.\nCONST GRENZE AS FLOAT = 1000.0\n\n' Abstand zweier Punkte in der Ebene.\n' Liefert immer einen positiven Wert.\nFUNCTION Distanz(x1 AS FLOAT, y1 AS FLOAT) AS FLOAT\n    RETURN x1 + y1\nEND FUNCTION\n\n' Nur fuer den internen Gebrauch.\nPRIVATE SUB pruefe(wert AS FLOAT)\n    PRINT wert\nEND SUB\n")
+dlStarten(["doku", "referenz", CWD$() + "/mathe.dh"])
+PRINT "rueckgabe "; dlCode
+PRINT "signatur "; (INSTR(dlAus, "FUNCTION Distanz(x1 AS FLOAT, y1 AS FLOAT) AS FLOAT") >= 0)
+PRINT "erste zeile "; (INSTR(dlAus, "Abstand zweier Punkte in der Ebene.") >= 0)
+PRINT "zweite zeile "; (INSTR(dlAus, "Liefert immer einen positiven Wert.") >= 0)
+PRINT "dateikopf "; (INSTR(dlAus, "Kleine Sammlung fuer Streckenrechnung.") >= 0)
+PRINT "ohne privates "; (INSTR(dlAus, "pruefe") < 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+rueckgabe 0
+signatur TRUE
+erste zeile TRUE
+zweite zeile TRUE
+dateikopf TRUE
+ohne privates TRUE
+
+=== doku sagt, was es braucht
+IMPORT "helfer.dh"
+dlStarten(["doku", "referenz"])
+PRINT "ohne datei: rueckgabe "; dlCode
+PRINT "ohne datei: verwendung "; (INSTR(dlAus, "Verwendung") >= 0)
+dlStarten(["doku"])
+PRINT "ohne unterbefehl: rueckgabe "; dlCode
+DIM woerter AS ARRAY OF STRING : woerter = ["prosa", "grammatik", "referenz"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(woerter) - 1
+    PRINT woerter[i]; " "; (INSTR(dlAus, woerter[i]) >= 0)
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+ohne datei: rueckgabe 2
+ohne datei: verwendung TRUE
+ohne unterbefehl: rueckgabe 2
+prosa TRUE
+grammatik TRUE
+referenz TRUE

@@ -1,0 +1,193 @@
+' `dhrt call <datei> <funktion> [arg]` -- Schritt 1 zu TASK_START.
+'
+' Dieser Einstiegspunkt fuehrt EINE Funktion aus und laesst das Hauptprogramm
+' stehen. Dass dabei die Globals nicht gesetzt sind, ist die Zusage, nicht die
+' Panne -- dieselbe Grenze wie bei einem mit `AS` importierten Modul.
+'
+' Bis 2026-09-16 tests/test_dhrt_call.py. Die Antwort ist immer EINE
+' JSON-Zeile; gelesen wird sie hier mit dem json-Modul.
+
+=== call ruft die funktion und liefert das ergebnis
+IMPORT "helfer.dh"
+IMPORT "json"
+dlStarten(["call", CWD$() + "/c.dh", "Doppelt", "21"])
+DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "ok "; JSON_GET_BOOL(h, "ok")
+PRINT "ergebnis "; JSON_GET_INT(h, "ergebnis")
+' Der Kern der Sache: liefe das Hauptprogramm mit, staende hier
+' "HAUPTPROGRAMM" -- und ein Auftrag wuerde jedes Mal das ganze Spiel starten.
+PRINT "ausgabe leer "; (JSON_GET_STRING(h, "ausgabe") = "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Doppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+
+FUNCTION MitAusgabe(x AS INTEGER) AS INTEGER
+    PRINT "rechne " + STR$(x)
+    RETURN x + 1
+END FUNCTION
+
+FUNCTION Gruss(wer AS STRING) AS STRING
+    RETURN "hallo " + wer
+END FUNCTION
+
+FUNCTION SiehtGlobal() AS INTEGER
+    RETURN FAKTOR
+END FUNCTION
+
+PRINT "HAUPTPROGRAMM"
+--- erwartet
+ok TRUE
+ergebnis 42
+ausgabe leer TRUE
+
+=== die ausgabe der funktion kommt getrennt
+' PRINT innerhalb der Funktion landet in `ausgabe`, nicht im Ergebnis --
+' sonst muesste der Aufrufer beides auseinanderfieseln.
+IMPORT "helfer.dh"
+IMPORT "json"
+dlStarten(["call", CWD$() + "/c.dh", "MitAusgabe", "5"])
+DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "ergebnis "; JSON_GET_INT(h, "ergebnis")
+PRINT "ausgabe "; TRIM$(JSON_GET_STRING(h, "ausgabe"))
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+FUNCTION MitAusgabe(x AS INTEGER) AS INTEGER
+    PRINT "rechne " + STR$(x)
+    RETURN x + 1
+END FUNCTION
+
+PRINT "HAUPTPROGRAMM"
+--- erwartet
+ergebnis 6
+ausgabe rechne 5
+
+=== eine zahl bleibt eine zahl, ein text ein text
+' Ein Argument, das wie eine Zahl aussieht, wird eine -- sonst muesste jede
+' Auftragsfunktion ihr Argument selbst umwandeln.
+IMPORT "helfer.dh"
+IMPORT "json"
+dlStarten(["call", CWD$() + "/c.dh", "Doppelt", "7"])
+DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "zahl "; JSON_GET_INT(h, "ergebnis")
+dlStarten(["call", CWD$() + "/c.dh", "Gruss", "welt"])
+h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "text "; JSON_GET_STRING(h, "ergebnis")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+FUNCTION Doppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+
+FUNCTION Gruss(wer AS STRING) AS STRING
+    RETURN "hallo " + wer
+END FUNCTION
+--- erwartet
+zahl 14
+text hallo welt
+
+=== globals sind nicht gesetzt, und das meldet sich
+' Der Entwurf befuerchtete, eine frische VM liefere dafuer still einen
+' VORGABEWERT -- eine Funktion mit `CONST` haette dann heimlich falsch
+' gerechnet. Nachgemessen ist es besser: der Zugriff meldet sich. Damit ist
+' der Fall laut, nicht leise, und das war das eigentliche Risiko. Und die
+' Meldung erklaert die LAGE, statt "Global-Slot leer" zu sagen.
+IMPORT "helfer.dh"
+IMPORT "json"
+dlStarten(["call", CWD$() + "/c.dh", "SiehtGlobal"])
+DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "ok "; JSON_GET_BOOL(h, "ok")
+DIM fehler AS STRING : fehler = JSON_GET_STRING(h, "fehler")
+PRINT "erklaert die lage "; (INSTR(fehler, "Hauptprogramm laeuft dabei NICHT") >= 0)
+PRINT "nennt den ausweg "; (INSTR(fehler, "Parameter") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION SiehtGlobal() AS INTEGER
+    RETURN FAKTOR
+END FUNCTION
+--- erwartet
+ok FALSE
+erklaert die lage TRUE
+nennt den ausweg TRUE
+
+=== eine unbekannte funktion nennt die bekannten
+IMPORT "helfer.dh"
+IMPORT "json"
+dlStarten(["call", CWD$() + "/c.dh", "Gibtsnicht", "1"])
+DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+PRINT "ok "; JSON_GET_BOOL(h, "ok")
+DIM fehler AS STRING : fehler = JSON_GET_STRING(h, "fehler")
+PRINT "sagt es "; (INSTR(fehler, "gibt es nicht") >= 0)
+PRINT "die bekannten daneben "; (INSTR(fehler, "doppelt") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+FUNCTION Doppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+--- erwartet
+ok FALSE
+sagt es TRUE
+die bekannten daneben TRUE
+
+=== die antwort ist immer eine json-zeile
+' Auch im Fehlerfall -- der Aufrufer ist eine Maschine und soll nicht stderr
+' zerlegen muessen.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM namen AS ARRAY OF STRING : namen = ["Doppelt", "Gibtsnicht", "SiehtGlobal"]
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    dlStarten(["call", CWD$() + "/c.dh", namen[i], "2"])
+    DIM h AS JSON_HANDLE : h = JSON_PARSE(letzteZeile$(dlAus))
+    PRINT namen[i]; " "; JSON_HAS(h, "ok")
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION letzteZeile$(t AS STRING) AS STRING
+    DIM z AS ARRAY OF STRING : z = SPLIT$(TRIM$(t), CHR$(10))
+    RETURN z[LEN(z) - 1]
+END FUNCTION
+--- datei c.dh
+CONST FAKTOR AS INTEGER = 10
+
+FUNCTION Doppelt(x AS INTEGER) AS INTEGER
+    RETURN x * 2
+END FUNCTION
+
+FUNCTION SiehtGlobal() AS INTEGER
+    RETURN FAKTOR
+END FUNCTION
+--- erwartet
+Doppelt TRUE
+Gibtsnicht TRUE
+SiehtGlobal TRUE
