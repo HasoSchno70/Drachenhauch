@@ -1,0 +1,128 @@
+' Baut die Python-freie Distribution: dhrt.exe, die IDE in Drachenhauch, das
+' Handbuch und die Beispiele -- verpackt von Inno Setup nach
+' installer/output/Drachenhauch-IDE-Setup-<fassung>.exe.
+'
+'     dhrt run installer/bauen.dh
+'     dhrt run installer/bauen.dh -- --ohne-installer      ' nur die Lizenzdatei
+'
+' Die FASSUNG kommt aus der Laufzeit selbst (VERSION$()) -- gepackt wird genau
+' die dhrt.exe, die hier lauft, und damit stimmt die Nummer im Installer mit
+' dem ueberein, was drinsteckt.
+'
+' NICHT dabei: das BAUEN von dhrt. Unter Windows laesst sich eine laufende
+' .exe nicht ueberschreiben, und dieses Programm laeuft ja in ihr -- die
+' Runtime baut weiterhin `rust/build_runtime.py` (der letzte Python-Rest im
+' Bau), bevor dieses Programm startet.
+'
+' Bis 2026-09-16 machte installer/build_installer.py beides; das bleibt fuer
+' die Qt-Fassung (PyInstaller) zustaendig, solange es sie gibt.
+
+FUNCTION vomAufrufer$(p AS STRING) AS STRING
+    IF LEFT$(p, 1) = "/" OR LEFT$(p, 1) = CHR$(92) OR MID$(p, 1, 1) = ":" THEN RETURN p
+    IF GETENV$("DHRT_START_DIR") = "" THEN RETURN p
+    RETURN GETENV$("DHRT_START_DIR") + "/" + p
+END FUNCTION
+
+' Ein Kind laufen lassen und dabei mitlesen -- ein voller Puffer hielte es an.
+FUNCTION lauf(p AS INTEGER, zeigen AS BOOLEAN) AS INTEGER
+    DIM leer AS INTEGER : leer = 0
+    WHILE leer < 5
+        DIM teil AS STRING : teil = PROCESS_READ$(p) + PROCESS_ERR$(p)
+        IF teil <> "" THEN
+            leer = 0
+            IF zeigen THEN PRINT REPLACE$(teil, CHR$(13), "");
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    RETURN PROCESS_CODE(p)
+END FUNCTION
+
+DIM wurzel AS STRING : wurzel = DIRNAME(CWD$())
+DIM ohneInstaller AS BOOLEAN : ohneInstaller = FALSE
+DIM metaDatei AS STRING : metaDatei = ""
+DIM ai AS INTEGER : ai = 0
+WHILE ai < ARGC()
+    IF ARG$(ai) = "--ohne-installer" THEN
+        ohneInstaller = TRUE
+        ai = ai + 1
+    ELSEIF ARG$(ai) = "--wurzel" THEN
+        wurzel = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSEIF ARG$(ai) = "--metadata" THEN
+        ' Nur fuer Pruefungen: die Crate-Liste aus einer Datei statt von cargo.
+        metaDatei = vomAufrufer$(ARG$(ai + 1))
+        ai = ai + 2
+    ELSE
+        PRINT "Unbekanntes Argument: "; ARG$(ai)
+        EXIT(1)
+    END IF
+WEND
+
+DIM installer AS STRING : installer = wurzel + "/installer"
+DIM fassung AS STRING : fassung = VERSION$()
+' Welches System hier laeuft, sagt die Laufzeit nicht -- gesucht wird darum
+' einfach beides; genau eine der zwei Dateien gibt es.
+DIM runtime AS STRING : runtime = wurzel + "/rust/drachenhauch_runtime/target/release/dhrt.exe"
+IF NOT FILEEXISTS(runtime) THEN runtime = wurzel + "/rust/drachenhauch_runtime/target/release/dhrt"
+
+PRINT "Drachenhauch "; fassung; " -- Distribution ohne Python"
+IF NOT FILEEXISTS(runtime) THEN
+    PRINT "Es gibt keine Laufzeit unter "; runtime
+    PRINT "Erst bauen:  python rust/build_runtime.py"
+    EXIT(1)
+END IF
+PRINT "Laufzeit: "; runtime; " ("; FILESIZE(runtime) \ 1048576; " MB)"
+
+' --- Lizenzen der Drittkomponenten -------------------------------------
+PRINT "Lizenzen sammeln ..."
+DIM lz AS INTEGER
+IF metaDatei <> "" THEN
+    lz = PROCESS_START("dhrt", "run", installer + "/lizenzen.dh", "--", "--wurzel", wurzel, "--metadata", metaDatei)
+ELSE
+    lz = PROCESS_START("dhrt", "run", installer + "/lizenzen.dh", "--", "--wurzel", wurzel)
+END IF
+IF lauf(lz, TRUE) <> 0 THEN
+    PRINT "Die Lizenzsammlung ist fehlgeschlagen -- ohne sie wird nicht verpackt."
+    EXIT(1)
+END IF
+
+IF ohneInstaller THEN
+    PRINT "Fertig (ohne Installer)."
+    EXIT(0)
+END IF
+
+' --- Inno Setup --------------------------------------------------------
+FUNCTION isccFinden$() AS STRING
+    DIM kandidaten AS ARRAY OF STRING
+    kandidaten = [GETENV$("ISCC"), _
+                  "C:/Program Files (x86)/Inno Setup 6/ISCC.exe", _
+                  "C:/Program Files/Inno Setup 6/ISCC.exe"]
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(kandidaten) - 1
+        IF kandidaten[i] <> "" AND FILEEXISTS(kandidaten[i]) THEN RETURN kandidaten[i]
+    NEXT
+    RETURN ""
+END FUNCTION
+
+DIM iscc AS STRING : iscc = isccFinden$()
+IF iscc = "" THEN
+    PRINT "Inno Setup (ISCC.exe) nicht gefunden -- die Lizenzdatei ist trotzdem fertig."
+    PRINT "Installer von Hand:  ISCC.exe /DAppVersion=" + fassung + " installer\Drachenhauch-IDE.iss"
+    EXIT(0)
+END IF
+PRINT "Inno Setup: "; iscc
+CHDIR(installer)
+DIM ic AS INTEGER : ic = PROCESS_START(iscc, "/DAppVersion=" + fassung, installer + "/Drachenhauch-IDE.iss")
+IF lauf(ic, FALSE) <> 0 THEN
+    PRINT "ISCC ist fehlgeschlagen."
+    EXIT(1)
+END IF
+DIM ergebnis AS STRING : ergebnis = installer + "/output/Drachenhauch-IDE-Setup-" + fassung + ".exe"
+IF FILEEXISTS(ergebnis) THEN
+    PRINT "FERTIG -> "; ergebnis; " ("; FILESIZE(ergebnis) \ 1048576; " MB)"
+ELSE
+    PRINT "ISCC meldete Erfolg, aber "; ergebnis; " fehlt."
+    EXIT(1)
+END IF
