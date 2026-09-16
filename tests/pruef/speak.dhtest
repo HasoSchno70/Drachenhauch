@@ -1,0 +1,347 @@
+' SPEAK -- Sprachausgabe als Klang unter Klaengen (docs/entwurf-speak.md, Weg C).
+'
+' SPEAK_SOUND liefert einen Klang mit Huellkurve; SPEAKING geht an und wieder
+' aus; Anhaengen dauert doppelt so lang wie Unterbrechen; eine unbekannte
+' Stimme ist ein Fehler im Klartext.
+'
+' Braucht die Systemstimme (Windows: WinRT; macOS: say; Linux: espeak-ng) und
+' ein Audio-Geraet -- fehlt eines, ueberspringt sich der Fall mit dem Grund.
+' Seriell, weil Dauern gemessen werden. Bis 2026-09-16 tests/test_speak.py
+' (Pythons wave-Modul als Leser, jetzt ein --- nachher ueber die Bytes).
+--- seriell
+
+=== gesprochenes ist ein klang, den ein fremder leser liest
+' SPEAK_SOUND liefert einen Klang mit Huellkurve, AUDIO_SAVE_WAV schreibt ihn,
+' und gelesen wird er nicht von dhrt, sondern im --- nachher Byte fuer Byte.
+IMPORT "helfer.dh"
+TRY
+    DIM s AS SOUND
+    s = SPEAK_SOUND("Willkommen bei Drachenhauch. Der Schatz liegt im Norden.")
+    AUDIO_SAVE_WAV(s, "t.wav")
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- nachher
+' WAV-Kopf von Hand: Kette ab Byte 12, fmt und data suchen.
+DIM b AS BUFFER : b = READALL_BYTES("t.wav")
+DIM pos AS INTEGER : pos = 12
+DIM kanaele AS INTEGER
+DIM rate AS INTEGER
+DIM bits AS INTEGER
+DIM datenAb AS INTEGER : datenAb = -1
+DIM datenLen AS INTEGER
+WHILE pos + 8 <= BUFFER_LEN(b)
+    DIM kennung AS STRING : kennung = CHR$(BUFFER_GET(b, pos)) + CHR$(BUFFER_GET(b, pos + 1)) + CHR$(BUFFER_GET(b, pos + 2)) + CHR$(BUFFER_GET(b, pos + 3))
+    DIM laenge AS INTEGER : laenge = BUFFER_GET_U32(b, pos + 4)
+    IF kennung = "fmt " THEN
+        kanaele = BUFFER_GET_U16(b, pos + 10)
+        rate = BUFFER_GET_U32(b, pos + 12)
+        bits = BUFFER_GET_U16(b, pos + 22)
+    ELSEIF kennung = "data" THEN
+        datenAb = pos + 8
+        datenLen = MIN(laenge, BUFFER_LEN(b) - datenAb)
+        BREAK
+    END IF
+    pos = pos + 8 + laenge + (laenge BAND 1)
+WEND
+PRINT "abtastrate mindestens 8000 "; (rate >= 8000)
+PRINT "mono "; (kanaele = 1); ", 16 bit "; (bits = 16)
+DIM n AS INTEGER : n = datenLen \ 2
+DIM dauer AS FLOAT : dauer = n / rate
+PRINT "dauer 1..8 s "; (dauer > 1.0 AND dauer < 8.0)
+' Eine Huellkurve, kein Strich: laut in der Mitte, leiser am Rand.
+DIM spitze AS FLOAT : spitze = 0.0
+DIM rand AS FLOAT : rand = 0.0
+DIM mitte AS FLOAT : mitte = 0.0
+DIM i AS INTEGER
+FOR i = 0 TO n - 1
+    DIM a AS FLOAT : a = ABS(BUFFER_GET_I16(b, datenAb + 2 * i)) / 32767.0
+    IF a > spitze THEN spitze = a
+    IF i < rate \ 100 AND a > rand THEN rand = a
+    IF i >= n \ 3 AND i < 2 * n \ 3 AND a > mitte THEN mitte = a
+NEXT
+PRINT "spitze ueber 0.1 "; (spitze > 0.1)
+PRINT "mitte laut, rand leiser "; (mitte > 0.05 AND rand < mitte)
+--- erwartet
+abtastrate mindestens 8000 TRUE
+mono TRUE, 16 bit TRUE
+dauer 1..8 s TRUE
+spitze ueber 0.1 TRUE
+mitte laut, rand leiser TRUE
+
+=== derselbe satz kommt aus dem vorrat
+' Gleicher Text, Stimme und Tempo = derselbe Klang; ein anderes Tempo nicht.
+IMPORT "helfer.dh"
+TRY
+    PRINT SPEAK_SOUND("Treffer") = SPEAK_SOUND("Treffer")
+    DIM a AS SOUND : a = SPEAK_SOUND("Treffer")
+    SPEAK_RATE(1.5)
+    PRINT a = SPEAK_SOUND("Treffer")
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+TRUE
+FALSE
+
+=== ein freigegebener klang wird neu gerechnet
+' UNLOADSOUND auf den Vorrat darf SPEAK nicht auf einen toten Slot laufen lassen.
+IMPORT "helfer.dh"
+TRY
+    DIM a AS SOUND : a = SPEAK_SOUND("Treffer")
+    UNLOADSOUND(a)
+    SPEAK("Treffer")
+    PRINT SPEAKING()
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+TRUE
+
+=== speaking geht an und wieder aus
+IMPORT "helfer.dh"
+TRY
+    SPEAK("Eins zwei drei")
+    PRINT SPEAKING()
+    SPEAK_WAIT()
+    PRINT SPEAKING()
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+TRUE
+FALSE
+
+=== stop macht sofort still
+IMPORT "helfer.dh"
+TRY
+    SPEAK("Eins zwei drei vier fuenf sechs")
+    SPEAK_STOP()
+    PRINT SPEAKING()
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+FALSE
+
+=== anhaengen reiht, unterbrechen ersetzt
+' Zwei angehaengte Saetze dauern rund doppelt so lang wie einer, der den ersten
+' unterbricht. Gemessen ueber SPEAK_WAIT -- die Warteschlange laeuft auf Kiras
+' Audio-Faden, nicht ueber FLIP.
+IMPORT "helfer.dh"
+TRY
+    DIM t AS INTEGER
+    t = MILLIS()
+    SPEAK("Der Drache erwacht")
+    SPEAK("Der Drache erwacht")
+    SPEAK_WAIT()
+    DIM zwei AS INTEGER : zwei = MILLIS() - t
+    t = MILLIS()
+    SPEAK("Der Drache erwacht")
+    SPEAK("Der Drache erwacht", TRUE)
+    SPEAK_WAIT()
+    DIM eins AS INTEGER : eins = MILLIS() - t
+    PRINT "unterbrochen ueber 300 ms "; (eins > 300)
+    PRINT "angehaengt mehr als 1,6-mal so lang "; (zwei * 10 > eins * 16)
+    IF NOT (zwei * 10 > eins * 16) THEN PRINT "angehaengt "; zwei; " ms, unterbrochen "; eins; " ms"
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+unterbrochen ueber 300 ms TRUE
+angehaengt mehr als 1,6-mal so lang TRUE
+
+=== stimmen auflisten und waehlen
+' Gross/klein spielt keine Rolle, "" heisst: die Vorgabe des Systems.
+IMPORT "helfer.dh"
+TRY
+    DIM v AS ARRAY OF STRING
+    v = SPEAK_VOICES()
+    PRINT LEN(v) > 0
+    SPEAK_VOICE(v[0])
+    SPEAK_VOICE(UPPER$(v[0]))
+    SPEAK_VOICE("")
+    PRINT SPEAK_SOUND("Hallo") >= 0
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+TRUE
+TRUE
+
+=== eine unbekannte stimme ist ein fehler im klartext
+' In pytest lief dieser Test nie: seine Hilfsfunktion wertete "nicht gefunden"
+' als "keine Sprachausgabe" und uebersprang ihn -- und genau das steht in der
+' erwarteten Meldung. Zuerst muss es Stimmen geben, dann gilt die Meldung.
+IMPORT "helfer.dh"
+TRY
+    DIM v AS ARRAY OF STRING
+    v = SPEAK_VOICES()
+CATCH e
+    fehlerOderSprung(e)
+END TRY
+TRY
+    SPEAK_VOICE("Niemand")
+    PRINT "angenommen"
+CATCH e2
+    PRINT "klartext "; (INSTR(e2, "SPEAK_VOICE: Stimme 'Niemand' nicht gefunden") >= 0)
+    PRINT "nennt die vorhandenen "; (INSTR(e2, "vorhanden:") >= 0)
+END TRY
+--- datei helfer.dh
+IMPORT "audio"
+' Fehlt die Systemstimme oder ein Audio-Geraet, ueberspringt sich der Fall --
+' mit dem, was fehlt. Jeder andere Fehler bleibt einer.
+SUB fehlerOderSprung(e AS STRING)
+    DIM sprung AS BOOLEAN : sprung = FALSE
+    IF INSTR(e, "keine Sprachausgabe") >= 0 OR INSTR(e, "Audio-Geraet") >= 0 THEN sprung = TRUE
+    IF INSTR(e, "keine Systemstimme") >= 0 OR INSTR(e, "nicht verfuegbar") >= 0 THEN sprung = TRUE
+    ' "nicht gefunden" heisst auch: das Werkzeug (say, espeak-ng) fehlt. Die
+    ' Meldung zu einer unbekannten Stimme ist aber KEIN fehlendes Werkzeug.
+    IF INSTR(e, "nicht gefunden") >= 0 AND INSTR(e, "SPEAK_VOICE: Stimme") < 0 THEN sprung = TRUE
+    IF sprung THEN
+        PRINT "UEBERSPRINGEN: keine Sprachausgabe: " + e
+        EXIT(0)
+    END IF
+    PRINT "FEHLER: " + e
+END SUB
+--- erwartet
+klartext TRUE
+nennt die vorhandenen TRUE
+
+=== das tempo hat grenzen
+' Braucht keine Stimme: der Fehler kommt vor der Synthese.
+IMPORT "audio"
+SPEAK_RATE(5)
+--- fehler
+SPEAK_RATE: faktor muss 0.5 .. 2.0
+
+=== die sprache hat einen eigenen bus
+IMPORT "audio"
+AUDIO_BUS_VOLUME("speech", 0.3)
+PRINT AUDIO_BUS_GET_VOLUME("speech")
+AUDIO_PUSH()
+AUDIO_BUS_VOLUME("speech", 1.0)
+AUDIO_POP()
+PRINT AUDIO_BUS_GET_VOLUME("speech")
+--- erwartet
+0.3
+0.3

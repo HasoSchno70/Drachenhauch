@@ -1,0 +1,327 @@
+' `dhrt lsp` -- der Sprachserver, als echter Prozess ueber stdio mit
+' Content-Length-Rahmung, so wie VS Code ihn startet.
+'
+' Bis 2026-09-16 tests/test_dhrt_lsp.py. Der Client ist
+' _hilfen/lspklient.dh: jeder Fall schickt seine Anfragen, beendet den Server
+' mit shutdown/exit und liest danach alle Antworten (PROCESS_READ$ liefert
+' zeilenweise, ein LSP-Rumpf endet nicht mit einem Umbruch). Die Positionen
+' sind wie im Protokoll 0-basiert.
+'
+' Das Beispiel-Dokument der meisten Faelle (Zeilen ab 0):
+'   0 ' Spieler-Klasse          6 END CLASS
+'   1 CLASS Player              7 FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER
+'   2     DIM hp AS INTEGER     8     RETURN a + b
+'   3     SUB Init()            9 END FUNCTION
+'   4         Self.hp = 100    10 DIM result AS INTEGER
+'   5     END SUB              11 result = add(1, 2)
+
+=== faehigkeiten und sauberes ende
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(i)
+DIM c AS STRING : c = "result.capabilities."
+PRINT "hover "; JSON_GET_BOOL(h, c + "hoverProvider")
+PRINT "definition "; JSON_GET_BOOL(h, c + "definitionProvider")
+PRINT "gliederung "; JSON_GET_BOOL(h, c + "documentSymbolProvider")
+PRINT "fundstellen "; JSON_GET_BOOL(h, c + "referencesProvider")
+PRINT "ausloeser "; JSON_LEN(h, c + "completionProvider.triggerCharacters"); " "; JSON_GET_STRING(h, c + "completionProvider.triggerCharacters.0")
+' shutdown + exit muss den Prozess beenden.
+PRINT "rueckgabe "; lsCode
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+hover TRUE
+definition TRUE
+gliederung TRUE
+fundstellen TRUE
+ausloeser 1 .
+rueckgabe 0
+
+=== didopen meldet einen fehler mit zeile
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+lsOeffnen("file:///tmp/test.dh", "PRINT 1" + CHR$(10) + "DIM x AS" + CHR$(10))
+lsEnde()
+DIM d AS JSON_HANDLE : d = lsDiagnose(0)
+DIM p AS STRING : p = "params.diagnostics"
+PRINT "anzahl "; JSON_LEN(d, p)
+PRINT "schwere "; JSON_GET_INT(d, p + ".0.severity"); ", quelle "; JSON_GET_STRING(d, p + ".0.source")
+PRINT "zeile "; JSON_GET_INT(d, p + ".0.range.start.line")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+anzahl 1
+schwere 1, quelle drachenhauch
+zeile 1
+
+=== didopen sauber, didchange prueft neu, didclose leert
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+lsOeffnen("file:///tmp/test.dh", quelle$())
+lsMelden("textDocument/didChange", "{""textDocument"":{""uri"":""file:///tmp/test.dh"",""version"":2},""contentChanges"":[{""text"":""DIM x AS\n""}]}")
+SLEEP(400)
+lsMelden("textDocument/didClose", "{""textDocument"":{""uri"":""file:///tmp/test.dh""}}")
+SLEEP(400)
+lsEnde()
+PRINT "nach didOpen "; JSON_LEN(lsDiagnose(0), "params.diagnostics")
+PRINT "nach didChange "; JSON_LEN(lsDiagnose(1), "params.diagnostics")
+PRINT "nach didClose "; JSON_LEN(lsDiagnose(2), "params.diagnostics")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+--- erwartet
+nach didOpen 0
+nach didChange 1
+nach didClose 0
+
+=== ein fehler hinter einem import landet in der zeile des puffers
+' dhrt meldet Zeilen der zusammengefuegten Quelle; der Server rechnet auf den
+' Puffer zurueck. Ohne das rutschte jeder Marker um die Laenge des Inlinierten.
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM z AS STRING : z = CHR$(10)
+lsOeffnen(lsUri$(CWD$() + "/haupt.dh"), "IMPORT " + CHR$(34) + "helfer2.dh" + CHR$(34) + z + "PRINT 1" + z + "DIM x AS" + z)
+lsEnde()
+DIM d AS JSON_HANDLE : d = lsDiagnose(0)
+PRINT "anzahl "; JSON_LEN(d, "params.diagnostics"); ", zeile "; JSON_GET_INT(d, "params.diagnostics.0.range.start.line")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- datei helfer2.dh
+SUB gruss()
+    PRINT 1
+END SUB
+--- erwartet
+anzahl 1, zeile 2
+
+=== definition und fundstellen
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM u AS STRING : u = "file:///tmp/test.dh"
+lsOeffnen(u, quelle$())
+DIM def AS INTEGER : def = lsFragen("textDocument/definition", lsStelle$(u, 11, 10))
+DIM keine AS INTEGER : keine = lsFragen("textDocument/definition", lsStelle$(u, 0, 2))
+DIM refs AS INTEGER : refs = lsFragen("textDocument/references", "{""textDocument"":{""uri"":""" + u + """},""position"":{""line"":7,""character"":10},""context"":{""includeDeclaration"":true}}")
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(def)
+PRINT "definition "; JSON_GET_STRING(h, "result.uri"); " "; JSON_GET_INT(h, "result.range.start.line"); ":"; JSON_GET_INT(h, "result.range.start.character")
+PRINT "im kommentar "; JSON_TYPE(lsAntwort(keine), "result")
+DIM r AS JSON_HANDLE : r = lsAntwort(refs)
+DIM zeilen AS ARRAY OF INTEGER : zeilen = []
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(r, "result") - 1
+    ARRAY_PUSH(zeilen, JSON_GET_INT(r, "result." + STR$(k) + ".range.start.line"))
+NEXT
+SORT(zeilen)
+DIM liste AS STRING : liste = ""
+FOR k = 0 TO LEN(zeilen) - 1
+    IF k > 0 THEN liste = liste + ","
+    liste = liste + STR$(zeilen[k])
+NEXT
+PRINT "fundstellen "; liste
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+--- erwartet
+definition file:///tmp/test.dh 7:9
+im kommentar null
+fundstellen 7,11
+
+=== hover auf eigener funktion und klasse
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM u AS STRING : u = "file:///tmp/test.dh"
+lsOeffnen(u, quelle$())
+DIM a AS INTEGER : a = lsFragen("textDocument/hover", lsStelle$(u, 11, 10))
+DIM b AS INTEGER : b = lsFragen("textDocument/hover", lsStelle$(u, 1, 8))
+DIM c AS INTEGER : c = lsFragen("textDocument/hover", lsStelle$(u, 11, 7))
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(a)
+PRINT "art "; JSON_GET_STRING(h, "result.contents.kind")
+PRINT "signatur "; (INSTR(JSON_GET_STRING(h, "result.contents.value"), "FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER") >= 0)
+' Der Kommentar direkt ueber der Klasse ist ihre Doku.
+PRINT "kommentar als doku "; (INSTR(JSON_GET_STRING(lsAntwort(b), "result.contents.value"), "Spieler-Klasse") >= 0)
+PRINT "leerzeichen "; JSON_TYPE(lsAntwort(c), "result")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+--- erwartet
+art markdown
+signatur TRUE
+kommentar als doku TRUE
+leerzeichen null
+
+=== hover auf eingebauten befehlen
+' ABS aus der handgepflegten Tabelle, STR$ mit dem Wort ohne $, MODEL_TEXTURE
+' nur aus dem Index, GUI_TABLE_SET_CELL aus den Beschreibungen in docs/.
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM z AS STRING : z = CHR$(10)
+DIM texte AS ARRAY OF STRING
+texte = ["DIM x AS INTEGER" + z + "x = ABS(-5)" + z, _
+         "DIM s AS STRING" + z + "s = STR$(5)" + z, _
+         "DIM x AS INTEGER" + z + "x = MODEL_TEXTURE(1, 2)" + z, _
+         "DIM x AS INTEGER" + z + "x = GUI_TABLE_SET_CELL(1, 2, 3, 4)" + z]
+DIM spalten AS ARRAY OF INTEGER : spalten = [5, 6, 6, 8]
+DIM namen AS ARRAY OF STRING : namen = ["ABS", "STR$", "MODEL_TEXTURE", "GUI_TABLE_SET_CELL"]
+DIM ids AS ARRAY OF INTEGER : ids = []
+DIM k AS INTEGER
+FOR k = 0 TO 3
+    DIM u AS STRING : u = "file:///tmp/b" + STR$(k) + ".dh"
+    lsOeffnen(u, texte[k])
+    ARRAY_PUSH(ids, lsFragen("textDocument/hover", lsStelle$(u, 1, spalten[k])))
+NEXT
+lsEnde()
+FOR k = 0 TO 3
+    DIM h AS JSON_HANDLE : h = lsAntwort(ids[k])
+    DIM gefunden AS BOOLEAN : gefunden = FALSE
+    IF JSON_TYPE(h, "result") = "object" THEN gefunden = INSTR(UPPER$(JSON_GET_STRING(h, "result.contents.value")), namen[k]) >= 0
+    PRINT namen[k]; " "; gefunden
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+ABS TRUE
+STR$ TRUE
+MODEL_TEXTURE TRUE
+GUI_TABLE_SET_CELL TRUE
+
+=== vervollstaendigung mit praefix, eigenen symbolen und schluesselwoertern
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM u AS STRING : u = "file:///tmp/test.dh"
+lsOeffnen(u, quelle$() + "Pl")
+DIM a AS INTEGER : a = lsFragen("textDocument/completion", lsStelle$(u, 12, 2))
+lsMelden("textDocument/didChange", "{""textDocument"":{""uri"":""" + u + """,""version"":2},""contentChanges"":[{""text"":""PRI""}]}")
+SLEEP(400)
+DIM b AS INTEGER : b = lsFragen("textDocument/completion", lsStelle$(u, 0, 3))
+lsEnde()
+' Eingebaute Befehle wie PLOT stehen mit in der Liste; die eigene Klasse muss dabei sein.
+PRINT "pl: player "; (INSTR(beschriftungen$(lsAntwort(a), "pl"), "|Player|") >= 0)
+DIM h AS JSON_HANDLE : h = lsAntwort(b)
+DIM alle AS STRING : alle = beschriftungen$(h, "pri")
+PRINT "pri: print "; (INSTR(alle, "|PRINT|") >= 0); ", private "; (INSTR(alle, "|PRIVATE|") >= 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+' Alle Beschriftungen als |a|b|; eine, die nicht mit dem Praefix beginnt,
+' steht mit "FREMD:" davor in der Ausgabe.
+FUNCTION beschriftungen$(h AS JSON_HANDLE, praefix AS STRING) AS STRING
+    DIM s AS STRING : s = "|"
+    DIM k AS INTEGER
+    FOR k = 0 TO JSON_LEN(h, "result") - 1
+        DIM l AS STRING : l = JSON_GET_STRING(h, "result." + STR$(k) + ".label")
+        IF LOWER$(LEFT$(l, LEN(praefix))) <> praefix THEN PRINT "FREMD: "; l
+        s = s + l + "|"
+    NEXT
+    RETURN s
+END FUNCTION
+--- erwartet
+pl: player TRUE
+pri: print TRUE, private TRUE
+
+=== die vervollstaendigung kennt alle schluesselwoerter des editors
+' Die Liste in lexer.rs gegen die in drachenhauch/tokens.py, die der
+' Qt-Editor benutzt -- zwei Tabellen, die auseinanderlaufen koennten.
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+lsOeffnen("file:///tmp/test.dh", "")
+DIM a AS INTEGER : a = lsFragen("textDocument/completion", lsStelle$("file:///tmp/test.dh", 0, 0))
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(a)
+DIM labels AS MAP OF BOOLEAN
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(h, "result") - 1
+    MAPPUT(labels, JSON_GET_STRING(h, "result." + STR$(k) + ".label"), TRUE)
+NEXT
+' Die Schluessel der KEYWORDS-Tabelle in tokens.py: Zeilen `    "wort": ...`
+' zwischen `KEYWORDS = {` und der schliessenden Klammer.
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(ARG$(0) + "/drachenhauch/tokens.py")
+DIM drin AS BOOLEAN : drin = FALSE
+DIM gesehen AS INTEGER : gesehen = 0
+FOR k = 0 TO LEN(zeilen) - 1
+    DIM t AS STRING : t = TRIM$(zeilen[k])
+    IF LEFT$(t, 10) = "KEYWORDS =" THEN
+        drin = TRUE
+        CONTINUE
+    END IF
+    IF drin AND LEFT$(t, 1) = "}" THEN BREAK
+    IF drin AND LEFT$(t, 1) = CHR$(34) THEN
+        DIM wort AS STRING : wort = UPPER$(MID$(t, 1, INSTR(MID$(t, 1), CHR$(34))))
+        gesehen = gesehen + 1
+        IF NOT MAPHAS(labels, wort) THEN PRINT "fehlt: "; wort
+    END IF
+NEXT
+PRINT "schluesselwoerter gelesen "; (gesehen > 50)
+PRINT "tasten, farben, konstanten "; MAPHAS(labels, "KEY_SPACE"); " "; MAPHAS(labels, "RED"); " "; MAPHAS(labels, "PI")
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+schluesselwoerter gelesen TRUE
+tasten, farben, konstanten TRUE TRUE TRUE
+
+=== gliederung
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM u AS STRING : u = "file:///tmp/test.dh"
+DIM z AS STRING : z = CHR$(10)
+lsOeffnen(u, quelle$() + "ENUM State" + z + "  A = 0" + z + "END ENUM" + z)
+DIM a AS INTEGER : a = lsFragen("textDocument/documentSymbol", "{""textDocument"":{""uri"":""" + u + """}}")
+lsEnde()
+DIM h AS JSON_HANDLE : h = lsAntwort(a)
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(h, "result") - 1
+    DIM p AS STRING : p = "result." + STR$(k)
+    DIM name AS STRING : name = JSON_GET_STRING(h, p + ".name")
+    ' Ein Blockende kennt die Gliederung fuer CLASS/STRUCT/SUB/FUNCTION/PROPERTY;
+    ' ein ENUM reicht dort nur ueber seine Kopfzeile (symbole::bereiche).
+    PRINT name; " art "; JSON_GET_INT(h, p + ".kind");
+    IF name <> "State" THEN PRINT ", bis zeile "; JSON_GET_INT(h, p + ".range.end.line");
+    IF JSON_HAS(h, p + ".children") AND JSON_LEN(h, p + ".children") > 0 THEN
+        DIM kinder AS STRING : kinder = ""
+        DIM m AS INTEGER
+        FOR m = 0 TO JSON_LEN(h, p + ".children") - 1
+            kinder = kinder + JSON_GET_STRING(h, p + ".children." + STR$(m) + ".name") + " "
+        NEXT
+        PRINT ", kinder "; TRIM$(kinder);
+    END IF
+    PRINT
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+IMPORT "{sammlung}/_hilfen/lspquelle.dh"
+--- erwartet
+Player art 5, bis zeile 6, kinder Init
+add art 12, bis zeile 9
+State art 10
+
+=== unbekanntes verfahren und kaputte rahmung
+' Ein Kopf ohne Content-Length kostet nur diese Nachricht, nicht die Sitzung;
+' ein JSON-Wert, der kein Objekt ist, wird uebergangen.
+IMPORT "helfer.dh"
+lsStart()
+DIM i AS INTEGER : i = lsFragen("initialize", "{}")
+DIM a AS INTEGER : a = lsFragen("textDocument/foobar", "{}")
+lsRoh("X-Custom-Header: 5" + CHR$(13) + CHR$(10) + CHR$(13) + CHR$(10), "")
+lsSenden("[]")
+DIM b AS INTEGER : b = lsFragen("textDocument/foobar", "{}")
+lsEnde()
+PRINT "vorher "; JSON_TYPE(lsAntwort(a), "result"); ", nachher "; JSON_TYPE(lsAntwort(b), "result")
+PRINT "rueckgabe "; lsCode
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/lspklient.dh"
+--- erwartet
+vorher null, nachher null
+rueckgabe 0

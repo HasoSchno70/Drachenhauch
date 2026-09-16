@@ -7,7 +7,7 @@
 > Kiras `StartTime::Delayed` auf dem Audio-Thread, ohne Polling. Läuft ein
 > Bildschirmleser, geht der Satz als Ansage in den Baum — auch ohne gui.
 > macOS (`say`) und Linux (`espeak-ng`) wie unten beschrieben, ungeprüft.
-> Prüfstein: `tests/test_speak.py` (WAV von Pythons `wave` gelesen, Dauern
+> Prüfstein: `tests/pruef/speak.dhtest` (WAV Byte für Byte gelesen, Dauern
 > gemessen) und der fremde UIA-Leser in `tests/test_gui_barrierefreiheit.py`.
 > Doku: [module-audio.md](module-audio.md), Abschnitt „Sprechen".
 

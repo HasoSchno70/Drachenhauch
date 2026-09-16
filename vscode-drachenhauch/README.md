@@ -51,5 +51,5 @@ dhrt doku grammatik
 
 Der Server liegt in `rust/drachenhauch_runtime/src/lsp.rs` (Rahmung, Verfahren,
 Hover-Daten) und `symbole.rs` (Definitionen, Fundstellen, Gliederung), geprüft
-über den echten Prozess in `tests/test_dhrt_lsp.py`. Siehe
+über den echten Prozess in `tests/pruef/dhrt_lsp.dhtest`. Siehe
 [docs/lsp.md](../docs/lsp.md).
