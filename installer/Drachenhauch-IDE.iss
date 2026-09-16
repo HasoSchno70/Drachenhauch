@@ -57,7 +57,7 @@ Source: "..\docs\*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 Source: "..\examples\*"; DestDir: "{commondocs}\Drachenhauch\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
 Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
-Source: "THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "THIRD-PARTY-NOTICES-IDE.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 ; Die IDE startet aus dem Beispielordner -- so zeigt der Projektbaum beim
@@ -74,7 +74,7 @@ Name: "{group}\Notenblatt"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{comm
 Name: "{group}\Beispiele"; Filename: "{commondocs}\Drachenhauch\examples"
 Name: "{group}\Handbuch (Markdown)"; Filename: "{app}\docs"
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
-Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES.txt"; Flags: createonlyiffileexists
+Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES-IDE.txt"; Flags: createonlyiffileexists
 Name: "{group}\{cm:UninstallProgram,Drachenhauch IDE}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\Drachenhauch IDE"; Filename: "{app}\dhrt.exe"; Parameters: "run ""{app}\ide\ide.dh"""; WorkingDir: "{commondocs}\Drachenhauch\examples"; Tasks: desktopicon
 
