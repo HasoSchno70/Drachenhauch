@@ -1,0 +1,50 @@
+' Einen Kapitelstand eines Buches starten: eine KOPIE im Fallordner (damit
+' keine .db im Repo landet), Fenster-Programme mit `--bilder N`.
+' kopieLaufen fuellt blAus, blErr und blCode; kapitelLauf gibt dazu die
+' Zusagen aus, die jedes Kapitel halten muss.
+DIM blAus AS STRING : blAus = ""
+DIM blErr AS STRING : blErr = ""
+DIM blCode AS INTEGER : blCode = 0
+
+SUB kopieLaufen(wurzel AS STRING, rel AS STRING, bilder AS INTEGER)
+    DIM ziel AS STRING : ziel = CWD$() + "/" + REPLACE$(rel, "/", "_")
+    COPYFILE(wurzel + "/buch-tippspiel/code/" + rel, ziel)
+    DIM p AS INTEGER
+    IF bilder > 0 THEN
+        p = PROCESS_START("dhrt", "run", "--bilder", STR$(bilder), ziel)
+    ELSE
+        p = PROCESS_START("dhrt", "run", ziel)
+    END IF
+    blAus = ""
+    blErr = ""
+    ' Nach dem Ende noch ein paar Mal leer lesen: das Kind kann beendet sein,
+    ' bevor sein Lesefaden die letzte Zeile abgelegt hat.
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 180000 AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            blAus = blAus + a
+            blErr = blErr + e
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    blAus = REPLACE$(blAus, CHR$(13), "")
+    blErr = REPLACE$(blErr, CHR$(13), "")
+    blCode = PROCESS_CODE(p)
+END SUB
+
+SUB kapitelLauf(wurzel AS STRING, rel AS STRING, bilder AS INTEGER)
+    kopieLaufen(wurzel, rel, bilder)
+    DIM alles AS STRING : alles = blAus + blErr
+    PRINT "rueckgabe "; blCode
+    PRINT "ohne laufzeitfehler "; (INSTR(alles, "Laufzeitfehler") < 0)
+    PRINT "ohne parse-fehler "; (INSTR(alles, "Parse-Fehler") < 0)
+    ' Eine Warnung im Lehrbuch-Beispiel ist ein Fehler: der Leser tippt sie ab.
+    PRINT "ohne warnung "; (INSTR(alles, "Warnung:") < 0)
+    IF blCode <> 0 OR INSTR(alles, "Fehler") >= 0 OR INSTR(alles, "Warnung:") >= 0 THEN PRINT alles
+END SUB

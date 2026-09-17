@@ -1,0 +1,361 @@
+' Der Tippspiel-Band: jeder Kapitelstand startet, die Pruefprogramme sind
+' gruen, die Kapitel wachsen, und der Buch-Build bleibt heil.
+'
+' Ein Lehrbuch, dessen Beispiele nicht mehr laufen, ist schlimmer als keins:
+' der Leser sucht den Fehler bei sich. Jeder Kapitelstand laeuft deshalb
+' einmal wirklich -- die Fenster-Kapitel mit `dhrt run --bilder 30`, die
+' Konsolen-Kapitel ganz. Geprueft wird nicht, wie es AUSSIEHT, sondern:
+' startet, endet ohne Fehler und ohne Compiler-Warnung (der Leser tippt sie
+' ab). Gestartet wird eine Kopie im Fallordner, damit keine .db im Repo
+' landet; Kapitel 9 und danach gehen nur auf Knopfdruck ins Netz.
+'
+' Bis 2026-09-17 tests/test_buch_tippspiel.py und test_buch_tippspiel_docx.py.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== kap01/fenster.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap01/fenster.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap02/daten.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap02/daten.dh", 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap03/regel.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap03/regel.dh", 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap04/spielplan.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap04/spielplan.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap05/tipps.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap05/tipps.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap06/punkte.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap06/punkte.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap07/rangliste.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap07/rangliste.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap08/zeit.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap08/zeit.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap09/netz.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap09/netz.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap10/robust.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap10/robust.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap11/sicherung.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap11/sicherung.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap12/politur.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap12/politur.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== kap13/weitergeben.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "kap13/weitergeben.dh", 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== der zielstand tippspiel.dh laeuft
+IMPORT "helfer.dh"
+kapitelLauf(ARG$(0), "tippspiel.dh", 30)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+rueckgabe 0
+ohne laufzeitfehler TRUE
+ohne parse-fehler TRUE
+ohne warnung TRUE
+
+=== das pruefprogramm tippspiel_pruefung.dh ist gruen
+' Seit der Umstellung auf ASSERT_* endet ein Pruefprogramm mit einem
+' Rueckgabewert -- vorher war er IMMER 0. Nur den Text zu pruefen wuerde die
+' eigentliche Zusage wieder verlieren. (abruf_pruefung.dh geht ins Netz und
+' bleibt aussen vor.)
+IMPORT "helfer.dh"
+kopieLaufen(ARG$(0), "tippspiel_pruefung.dh", 0)
+PRINT "alles gruen "; (INSTR(blAus, "ALLES GRUEN") >= 0)
+PRINT "rueckgabe "; blCode
+IF blCode <> 0 OR INSTR(blAus, "ALLES GRUEN") < 0 THEN PRINT blAus; blErr
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+alles gruen TRUE
+rueckgabe 0
+
+=== das pruefprogramm zeit_pruefung.dh ist gruen
+' Seit der Umstellung auf ASSERT_* endet ein Pruefprogramm mit einem
+' Rueckgabewert -- vorher war er IMMER 0. Nur den Text zu pruefen wuerde die
+' eigentliche Zusage wieder verlieren. (abruf_pruefung.dh geht ins Netz und
+' bleibt aussen vor.)
+IMPORT "helfer.dh"
+kopieLaufen(ARG$(0), "zeit_pruefung.dh", 0)
+PRINT "alles gruen "; (INSTR(blAus, "ALLES GRUEN") >= 0)
+PRINT "rueckgabe "; blCode
+IF blCode <> 0 OR INSTR(blAus, "ALLES GRUEN") < 0 THEN PRINT blAus; blErr
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/buchlauf.dh"
+--- erwartet
+alles gruen TRUE
+rueckgabe 0
+
+=== die kapitel wachsen
+' Jedes Kapitel baut auf dem vorigen auf. Schrumpft eines, ist beim
+' Bearbeiten etwas verlorengegangen.
+DIM code AS STRING : code = ARG$(0) + "/buch-tippspiel/code/"
+DIM folge AS ARRAY OF STRING
+folge = ["kap04/spielplan.dh", "kap05/tipps.dh", "kap06/punkte.dh", "kap07/rangliste.dh", _
+         "kap08/zeit.dh", "kap09/netz.dh", "kap10/robust.dh", "kap11/sicherung.dh", "kap12/politur.dh"]
+DIM vorher AS INTEGER : vorher = -1
+DIM i AS INTEGER
+FOR i = 0 TO LEN(folge) - 1
+    DIM n AS INTEGER : n = LEN(READLINES(code + folge[i]))
+    IF i > 0 AND n <= vorher THEN PRINT folge[i]; " ("; n; " Zeilen) ist nicht laenger als "; folge[i - 1]; " ("; vorher; ")"
+    vorher = n
+NEXT
+PRINT "geprueft "; LEN(folge)
+--- argumente
+{sammlung}/../..
+--- erwartet
+geprueft 9
+
+=== das readme verweist auf alle kapitel
+DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ARG$(0) + "/buch-tippspiel/README.md"))
+DIM fehlt AS INTEGER : fehlt = 0
+DIM nr AS INTEGER
+FOR nr = 1 TO 13
+    DIM k AS STRING : k = "code/kap" + RIGHT$("0" + STR$(nr), 2)
+    IF INSTR(text, k) < 0 THEN
+        PRINT "fehlt im README: "; k
+        fehlt = fehlt + 1
+    END IF
+NEXT
+PRINT "fehlend "; fehlt
+--- argumente
+{sammlung}/../..
+--- erwartet
+fehlend 0
+
+=== die bilder im buch-skript gibt es und sie sind nicht leer
+' Fehlt ein Bild, laesst der Build die Stelle stillschweigend aus -- im
+' fertigen Buch klafft eine Luecke, die niemandem auffaellt.
+IMPORT "regex"
+DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+PRINT "skript da "; FILEEXISTS(buch + "/build_book.js")
+DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(buch + "/build_book.js"))
+' Mit einer Gruppe im Muster liefert REGEX_FIND_ALL die Gruppe.
+DIM q AS STRING : q = CHR$(34)
+DIM namen AS ARRAY OF STRING : namen = REGEX_FIND_ALL(text, "figure\(" + q + "([^" + q + "]+\.png)" + q)
+DIM gesehen AS MAP OF BOOLEAN
+DIM zahl AS INTEGER : zahl = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    IF MAPHAS(gesehen, namen[i]) THEN CONTINUE
+    MAPPUT(gesehen, namen[i], TRUE)
+    zahl = zahl + 1
+    DIM pfad AS STRING : pfad = buch + "/images/" + namen[i]
+    IF NOT FILEEXISTS(pfad) THEN
+        PRINT "fehlt: "; namen[i]
+    ELSEIF FILESIZE(pfad) <= 2000 THEN
+        PRINT "verdaechtig klein: "; namen[i]
+    END IF
+NEXT
+PRINT "bilder gefunden "; (zahl > 5)
+--- argumente
+{sammlung}/../..
+--- erwartet
+skript da TRUE
+bilder gefunden TRUE
+
+=== alle dreizehn kapitel stehen im buch und im verzeichnis
+' toc_titles.json entsteht beim Build und speist den Zwei-Pass.
+IMPORT "json"
+DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(buch + "/build_book.js"))
+DIM toc AS JSON_HANDLE
+DIM mitToc AS BOOLEAN : mitToc = FILEEXISTS(buch + "/toc_titles.json")
+IF mitToc THEN toc = JSON_PARSE("{""t"":" + BUFFER_TO_STRING$(READALL_BYTES(buch + "/toc_titles.json")) + "}")
+DIM nr AS INTEGER
+FOR nr = 1 TO 13
+    DIM kap AS STRING : kap = "Kapitel " + STR$(nr) + ":"
+    IF INSTR(text, "chapter(" + CHR$(34) + kap) < 0 THEN PRINT kap; " fehlt im Buch"
+    IF mitToc THEN
+        DIM da AS BOOLEAN : da = FALSE
+        DIM k AS INTEGER
+        FOR k = 0 TO JSON_LEN(toc, "t") - 1
+            IF LEFT$(JSON_GET_STRING(toc, "t." + STR$(k)), LEN(kap)) = kap THEN da = TRUE
+        NEXT
+        IF NOT da THEN PRINT kap; " fehlt im Verzeichnis"
+    END IF
+NEXT
+PRINT "geprueft"
+--- argumente
+{sammlung}/../..
+--- erwartet
+geprueft
+
+=== der buch-build laeuft durch
+' BUCH_ZIEL_DIR lenkt die Ausgabe in den Fallordner. Ohne das schriebe der Build
+' das eingecheckte .docx neu -- mit frischen ZIP-Zeitstempeln, und git meldete
+' es nach jedem Lauf als geaendert. Der Build meldet ein fehlendes Bild nur als
+' Warnung; hier ist es ein Fehler. Ohne Node oder ohne das docx-Paket
+' ueberspringt sich der Fall -- npm install gehoert nicht in einen Testlauf.
+IMPORT "helfer.dh"
+DIM buch AS STRING : buch = ARG$(0) + "/buch-tippspiel/buch"
+DIM fall AS STRING : fall = CWD$()
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+IF NOT DIREXISTS(buch + "/node_modules/docx") THEN
+    PRINT "UEBERSPRINGEN: docx nicht installiert (npm install in buch-tippspiel/buch)"
+    EXIT(0)
+END IF
+SETENV("BUCH_ZIEL_DIR", fall)
+nlStarten(buch, "build_book.js")
+DIM alles AS STRING : alles = nlAus + nlErr
+PRINT "rueckgabe "; nlCode
+PRINT "geschrieben "; (INSTR(alles, "Geschrieben:") >= 0)
+PRINT "kein bild fehlt "; (INSTR(alles, "Bild fehlt") < 0)
+PRINT "docx da "; FILEEXISTS(fall + "/Drachenhauch-Tippspiel.docx")
+IF nlCode <> 0 THEN PRINT alles
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+--- erwartet
+rueckgabe 0
+geschrieben TRUE
+kein bild fehlt TRUE
+docx da TRUE
