@@ -3835,6 +3835,19 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             json_setze(&a[0], &p, serde_json::Value::Bool(w), "JSON_SET_BOOL") }
         "json_set_null" => { arity!(2); let p = need_str(&a[1], "JSON_SET_NULL")?.to_string();
             json_setze(&a[0], &p, serde_json::Value::Null, "JSON_SET_NULL") }
+        // Das Gegenstueck zu JSON_SET_JSON: einen Teilbaum als eigenes
+        // Dokument herausholen -- ebenfalls eine KOPIE. Ohne das liess sich
+        // ein Stueck, das ein Programm nicht versteht, nicht unveraendert
+        // mitfuehren (gefunden am Tracker-Piloten: Sample-Instrumente aus der
+        // Qt-Fassung gingen beim Sichern verloren).
+        "json_get_json" => {
+            arity!(2);
+            let v = {
+                let h = json_h(&a[0], "JSON_GET_JSON")?.borrow();
+                json_resolve(&h, need_str(&a[1], "JSON_GET_JSON")?, "JSON_GET_JSON")?.clone()
+            };
+            Ok(json_wert(v))
+        }
         "json_set_json" => {
             arity!(3); let p = need_str(&a[1], "JSON_SET_JSON")?.to_string();
             // Die Quelle ZUERST kopieren und den Borrow beenden: sonst
