@@ -1,0 +1,32 @@
+' Das Einstiegsbuch lesen: der Kapitel-Export und die Pruefwerkzeuge im
+' Buchverzeichnis. Braucht nodelauf.dh davor. Ohne Node (oder ohne gebaute
+' dhrt fuer die Werkzeuge) meldet der Fall UEBERSPRINGEN und endet.
+IMPORT "json"
+IMPORT "regex"
+
+FUNCTION kapitelExport(wurzel AS STRING) AS JSON_HANDLE
+    IF NOT nodeDa() THEN
+        PRINT "UEBERSPRINGEN: node fehlt"
+        EXIT(0)
+    END IF
+    DIM roh AS STRING : roh = nodeLauf$(wurzel, wurzel + "/tools/einstieg_kapitel_export.js")
+    IF roh = "" THEN
+        PRINT "UEBERSPRINGEN: Export fehlgeschlagen"
+        EXIT(0)
+    END IF
+    RETURN JSON_PARSE(roh)
+END FUNCTION
+
+' Die Werkzeuge suchen dhrt unter rust/drachenhauch_runtime/target/release.
+SUB buchWerkzeug(wurzel AS STRING, skript AS STRING)
+    IF NOT nodeDa() THEN
+        PRINT "UEBERSPRINGEN: node fehlt"
+        EXIT(0)
+    END IF
+    DIM dhrt AS STRING : dhrt = wurzel + "/rust/drachenhauch_runtime/target/release/dhrt"
+    IF NOT FILEEXISTS(dhrt + ".exe") AND NOT FILEEXISTS(dhrt) THEN
+        PRINT "UEBERSPRINGEN: dhrt nicht gebaut"
+        EXIT(0)
+    END IF
+    nlStarten(wurzel + "/buch-einstieg/buch", skript)
+END SUB

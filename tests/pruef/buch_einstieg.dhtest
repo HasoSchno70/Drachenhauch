@@ -1,0 +1,176 @@
+' Das Einstiegsbuch: Kapitelnummern, Querverweise, Bausteine, Code im Buch.
+'
+' Anders als das Referenzbuch ist der Einstieg ein LINEARER Kurs und verweist
+' an ueber hundert Stellen auf "Kapitel 12" und aehnliche Zahlen. Bis zum
+' Gegenlesen am 2026-08-30 druckte er die Nummern nirgends. Seither nummeriert
+' build_book.js die Kapitel durch ZAEHLEN, die Verweise meinen von Hand die
+' DATEINUMMER -- beide muessen uebereinstimmen, sonst verschiebt ein
+' eingeschobenes Kapitel alle Verweise lautlos.
+'
+' Die Kapitel sind JavaScript-Module: tools/einstieg_kapitel_export.js liest
+' sie, die drei Werkzeuge im Buchverzeichnis pruefen den Code (bis 2026-08-30
+' rief sie weder die Suite noch die CI auf). Ohne Node ueberspringen sich
+' die Faelle.
+'
+' Bis 2026-09-17 tests/test_einstieg_buch.py. Format: docs/werkzeuge.md.
+
+=== die gedruckte nummer ist die dateinummer
+IMPORT "helfer.dh"
+DIM d AS JSON_HANDLE : d = kapitelExport(ARG$(0))
+DIM schief AS INTEGER : schief = 0
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(d, "kapitel") - 1
+    DIM p AS STRING : p = "kapitel." + STR$(i)
+    IF JSON_TYPE(d, p + ".nr") = "null" THEN CONTINUE
+    DIM datei AS STRING : datei = JSON_GET_STRING(d, p + ".datei")
+    DIM dateiNr AS INTEGER : dateiNr = VAL(LEFT$(datei, INSTR(datei, "_")))
+    IF dateiNr <> JSON_GET_INT(d, p + ".nr") THEN
+        PRINT datei; ": gedruckt als Kapitel "; JSON_GET_INT(d, p + ".nr")
+        schief = schief + 1
+    END IF
+NEXT
+PRINT "genug kapitel "; (JSON_LEN(d, "kapitel") > 30)
+PRINT "abweichend "; schief
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+genug kapitel TRUE
+abweichend 0
+
+=== jeder verweis trifft ein kapitel
+' Die Verweise kommen aus dem ROHTEXT der Kapiteldateien, nicht ueber die
+' Bausteine: sie stehen auch in Bildunterschriften und Tabellenzellen, und ein
+' Sammler, der die uebersieht, prueft weniger als er verspricht -- beim ersten
+' Anlauf fand er 93 von 134.
+IMPORT "helfer.dh"
+DIM d AS JSON_HANDLE : d = kapitelExport(ARG$(0))
+DIM hoechste AS INTEGER : hoechste = JSON_GET_INT(d, "hoechste")
+DIM ordner AS STRING : ordner = ARG$(0) + "/buch-einstieg/buch/content"
+DIM dateien AS ARRAY OF STRING : dateien = DIRLIST(ordner, "*.js")
+SORT(dateien)
+DIM zahl AS INTEGER : zahl = 0
+DIM tot AS MAP OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO LEN(dateien) - 1
+    DIM text AS STRING : text = BUFFER_TO_STRING$(READALL_BYTES(ordner + "/" + dateien[i]))
+    DIM nummern AS ARRAY OF STRING : nummern = REGEX_FIND_ALL(text, "Kapitel (\d+)")
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(nummern) - 1
+        zahl = zahl + 1
+        DIM n AS INTEGER : n = VAL(nummern[k])
+        DIM schl AS STRING : schl = dateien[i] + ": Kapitel " + nummern[k]
+        IF (n < 1 OR n > hoechste) AND NOT MAPHAS(tot, schl) THEN
+            MAPPUT(tot, schl, TRUE)
+            PRINT "ausserhalb 1.."; hoechste; ": "; schl
+        END IF
+    NEXT
+NEXT
+PRINT "genug verweise "; (zahl > 100)
+PRINT "geprueft"
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+genug verweise TRUE
+geprueft
+
+=== die bausteine sind befuellt
+' H.tip(TITEL, text) -- mit nur einem Argument wird der Text zur Ueberschrift.
+IMPORT "helfer.dh"
+DIM d AS JSON_HANDLE : d = kapitelExport(ARG$(0))
+PRINT "tips ohne rumpf "; JSON_LEN(d, "tips_ohne_rumpf")
+PRINT "befehle ohne text "; JSON_LEN(d, "cmds_ohne_text")
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+tips ohne rumpf 0
+befehle ohne text 0
+
+=== alle codebloecke uebersetzen
+IMPORT "helfer.dh"
+buchWerkzeug(ARG$(0), "pruef_codebloecke.js")
+PRINT "rueckgabe "; nlCode
+PRINT "genug codebloecke "; (zahlVor(nlAus, "Codebloecke") > 150)
+IF nlCode <> 0 THEN PRINT nlAus; nlErr
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+rueckgabe 0
+genug codebloecke TRUE
+
+=== jeder abdruck ist die datei
+' Wer abtippt und danach in code/kapNN/ sieht, soll dasselbe vorfinden.
+IMPORT "helfer.dh"
+buchWerkzeug(ARG$(0), "pruef_abdruck.js")
+PRINT "rueckgabe "; nlCode
+PRINT "genug abdrucke "; (zahlVor(nlAus, "Abdrucke") > 10)
+IF nlCode <> 0 THEN PRINT nlAus; nlErr
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+rueckgabe 0
+genug abdrucke TRUE
+
+=== die behaupteten ausgaben stimmen
+' Die Schranke faengt den LEEREN Lauf: die meisten Beispiele oeffnen ein
+' Fenster, uebrig bleiben die Konsolen-Beispiele.
+IMPORT "helfer.dh"
+buchWerkzeug(ARG$(0), "pruef_ausgaben.js")
+PRINT "rueckgabe "; nlCode
+PRINT "genug ausgefuehrt "; (zahlVor(nlAus, "ausgefuehrt") >= 5)
+IF nlCode <> 0 THEN PRINT nlAus; nlErr
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/einstieg.dh"
+--- erwartet
+rueckgabe 0
+genug ausgefuehrt TRUE
+
+=== die zahlen ueber die anderen baende stimmen
+' Anhang C nennt die Kapitelzahlen der Nachbarbaende von Hand -- und die
+' veralten, sobald einer waechst. Am 2026-08-30 stand das Lehrbuch mit 75 statt
+' 84 Kapiteln da, Galaga mit 12 statt 13. Im Lehrbuch zaehlen Vorwort und
+' Anhaenge mit: die Angabe meint alle Kapiteldateien.
+IMPORT "regex"
+DIM w AS STRING : w = ARG$(0)
+DIM anhang AS STRING : anhang = BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-einstieg/buch/content/36_anhang_c_weiter.js"))
+DIM q AS STRING : q = CHR$(34)
+DIM ist AS ARRAY OF INTEGER
+ist = [LEN(DIRLIST(w + "/buch-referenz/buch/content", "*.js")), _
+       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-galaga/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:")), _
+       LEN(REGEX_FIND_ALL(BUFFER_TO_STRING$(READALL_BYTES(w + "/buch-tippspiel/buch/build_book.js")), "chapter\(" + q + "Kapitel \d+:"))]
+DIM namen AS ARRAY OF STRING : namen = ["Lehrbuch", "Galaga", "Tippspiel"]
+DIM muster AS ARRAY OF STRING : muster = ["die ganze Sprache, (\d+) Kapitel", "Arcade-Shooter in (\d+) Kapiteln", "Rangliste in (\d+) Kapiteln"]
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    DIM t AS ARRAY OF STRING : t = REGEX_FIND_ALL(anhang, muster[i])
+    IF LEN(t) = 0 THEN
+        PRINT namen[i]; ": Angabe nicht mehr gefunden -- Muster anpassen"
+    ELSEIF VAL(t[0]) <> ist[i] THEN
+        PRINT namen[i]; ": Anhang C nennt "; t[0]; ", gezaehlt sind "; ist[i]
+    ELSE
+        PRINT namen[i]; " stimmt"
+    END IF
+NEXT
+--- argumente
+{sammlung}/../..
+--- erwartet
+Lehrbuch stimmt
+Galaga stimmt
+Tippspiel stimmt
