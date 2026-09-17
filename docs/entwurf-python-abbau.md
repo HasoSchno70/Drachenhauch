@@ -1,5 +1,10 @@
 # Entwurf: Python abbauen — alles über Rust und Drachenhauch
 
+> **Stand 17.09.2026: Bestandsaufnahme vor dem Abbau** in Abschnitt 7 --
+> was noch Python ist (~62 500 Zeilen), was außerhalb davon am Paket hängt,
+> was die Qt-IDE und die Qt-Editoren noch voraushaben, ein Datenverlust im
+> Tracker, und eine Reihenfolge fürs Löschen mit vier offenen Entscheidungen.
+>
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
 > `dhrt pruef bloecke|namen|zaehlungen|konstanten|pfade` ersetzen
@@ -242,3 +247,184 @@ Rust oder Drachenhauch geht.
   einen Editor in Drachenhauch will, hat fünf Vorlagen.
 * `dhrt debug` und `dhrt profile` sind Protokolle, keine Qt-Funktionen —
   jede IDE kann sie nutzen, auch eine in Drachenhauch.
+
+## 7. Bestandsaufnahme vor dem Abbau (Stand 17.09.2026)
+
+*Untersuchung, keine Umsetzung.* Die Wege A bis D sind so weit gegangen,
+dass die Frage nicht mehr lautet, **ob** Python wegfallen kann, sondern
+**was dabei verloren ginge** und in welcher Reihenfolge man löschen müsste.
+Gemessen ist dieses Repository; der Vergleich der Oberflächen stammt aus
+einer Durchsicht der Menüs, Aktionen und Dialoge beider Fassungen, die
+schwersten Befunde sind im Quelltext nachgesehen (unten mit ✔ markiert).
+
+### 7.1 Was noch Python ist
+
+| Bereich | Dateien | Zeilen | fällt mit |
+|---|---|---|---|
+| die neun Qt-Editoren (`*_qt.py`) | 9 | 16 340 | den Editoren |
+| `editor_qt/` (die Qt-IDE) | 53 | 15 440 | der IDE |
+| Datenmodelle (`spriteeditor`, `tracker`, `formdesigner`, `tilemap`, `animeditor`, `score`) | 21 | 7 530 | den Editoren |
+| Reste der Sprache (`lexer.py`, `tokens.py`, `preprocess.py`, `graphics.py`, `synth.py`, `particle_sim.py`, `audio_preview.py` …) | 12 | 1 750 | der IDE (nur sie liest sie noch) |
+| Tests zu Qt | 67 | 14 110 | den Editoren und der IDE |
+| Tests zu Python-Modellen | 20 | 4 150 | den Modellen |
+| übrige pytest-Dateien und `conftest.py` | 9 | 1 310 | siehe 7.6 |
+| `dhrun.py`, `installer/*.py`, `rust/build_*.py`, `tools/qt_tests_einzeln.py` | 6 | 1 830 | siehe 7.5 |
+| **gesamt** | **197** | **~62 500** | |
+
+Am 06.09. waren es rund 110 000 Zeilen. Die Prüfsammlungen stehen bei 235
+Dateien mit 3 475 Fällen. **Kein pytest-Test prüft noch etwas an `dhrt`,
+das nicht auch eine Sammlung prüft** -- bis auf die Ausnahmen in 7.6.
+
+### 7.2 Was außerhalb von Python am Paket hängt
+
+Diese Stellen brechen, wenn `drachenhauch/` einfach gelöscht wird -- sie
+müssen **vorher** umziehen:
+
+* **`builtin_index.json`, `builtin_docs.json`, `builtin_prosa.json`** liegen
+  in `drachenhauch/editor_qt/`. `dhrt` bettet sie ein (`include_str!`,
+  viermal in `compiler.rs`, zweimal in `lsp.rs`), `doku.rs` erkennt die
+  Repo-Wurzel **an genau diesem Pfad** und schreibt die Prosa dorthin,
+  `pruef.rs` liest den Index, zwei Sammlungen (`buch_pruefungen`,
+  `doku_pruefungen`) ebenso. Der Umzug in einen neutralen Ordner geht schon
+  heute, solange `dhrt_meta.py` den neuen Pfad kennt.
+* **`tokens.py`** liest `dhrt_lsp.dhtest`, um die Schlüsselwörter gegen die
+  Vervollständigung zu halten. Ersatz: gegen `lexer::KEYWORDS` (die Liste
+  hat schon einen Rust-Test an `keyword()`) oder den Fall streichen.
+* **`graphics.py`** (`KEYS`/`COLORS`) hält `test_constants_sync.py` gegen
+  `vm.rs` -- ein Drift-Schutz zwischen zwei Pflegestellen, der mit der
+  zweiten Stelle überflüssig wird.
+* **`modules/__init__.py`** muss laut Anleitung synchron zu
+  `preprocess.rs` bleiben -- das fällt ersatzlos, sobald der
+  Python-Preprocess fällt.
+
+### 7.3 Die IDE: was die Qt-Fassung noch voraus hat
+
+Auf **Menü-Ebene** stimmt die Aussage aus `docs/ide.md`, dass seit Stand 9
+nichts mehr offen ist. Die Lücken liegen in Tastatur, Maus, Panels und
+Dialog-Optionen -- einzeln klein, zusammen spürbar für jemanden, der die
+Qt-IDE gewohnt ist:
+
+| Bereich | fehlt in `ide/ide.dh` |
+|---|---|
+| Datei | **Absturz-Wiederherstellung** (Qt sichert ungesicherte Reiter alle 30 s in einen eigenen Ordner und bietet sie beim Start an; `ide.dh` sichert nur benannte Dateien an ihren Ort) ✔; **Dateien ins Fenster ziehen** ✔; Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
+| Bearbeiten | Suchen mit **Groß/klein** und **ganzes Wort** als Schalter ✔; **einzeln ersetzen** (nur „alle"); Fundstellen **beliebiger Namen** (heute nur „Wer ruft das auf?" für Unterprogramme); **Klammern und Anführungszeichen automatisch schließen**; Formatieren beim Sichern |
+| Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; **Klick auf `datei:zeile` in der Ausgabe** springt dorthin; Ausgabe leeren |
+| Ansicht | **Zoom mit Strg+Rad und Strg+Plus/Minus/0**; **eine Datei geteilt** in zwei Ansichten (heute nur zwei verschiedene Reiter); ein- und ausblendbare Seitenleisten und Panels |
+| Hilfe | **Tooltip beim Überfahren** (heute steht `CODE_HOVER$` in der Statuszeile, für das Wort an der Marke) ✔; **Strg+Klick** springt zur Definition; Filterfeld und Beispiel-Kategorien im Dateibaum |
+
+Umgekehrt hat `ide.dh` vieles, was die Qt-IDE nie hatte (Umbauten mit
+Vorschau, Aufrufer-Baum mit Durchläufen, git-Fenster, Spaltenauswahl,
+Sitzung je Projekt) -- und sie startet **alle acht** Editoren in
+Drachenhauch; die Qt-IDE erreicht den Form-Designer und den Anim-Editor gar
+nicht.
+
+### 7.4 Die Editoren: was fehlt, und ob die Dateien zusammenpassen
+
+| Editor | Dateiformat Qt ↔ Drachenhauch | größte Lücken der Drachenhauch-Fassung |
+|---|---|---|
+| SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets; **der GB-Code übergeht den Pan-Regler** |
+| Partikel (185) | **verschieden** (wie SFX) | Hintergrund der Vorschau; „in Drachenhauch testen", „als .dh speichern"; benannte Presets |
+| Tilemap (187) | Tiled-JSON, **aber** `CONST KACHEL = 16` ✔ -- eine Qt-Karte mit anderer Kachelgröße wird falsch zerlegt; höchstens 128×128 ✔ (Qt 1000) | Kachelgröße wählen, Karte vergrößern; Eigenschaften an Objekten; Rückgängig für Ebenen und Objekte; „Speichern unter" |
+| Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 4); Sheet-Import mit Gitter; höchstens 16 Frames und 128 px |
+| Tracker (190) | dasselbe JSON -- **mit Datenverlust** ✔: ein Sample-, Keymap- oder SoundFont-Instrument wird beim Laden stumm und beim **Sichern als `synth` geschrieben**, die Samples sind danach weg | genau diese drei Instrumentarten; VU-Meter; Patterns benennen; der Sample-Offset-Effekt |
+| Form-Designer (197) | dieselbe `.dhform`, fremde Felder laufen durch; **Qt-Projekte** (`.dhproj`) nicht | Mehrfachauswahl und Ausrichten; Kopieren/Einfügen; Projekte mit mehreren Formularen; Code-Fenster; Zoom und Lineale; viele Inspektor-Felder (sichtbar, Gruppe, Platzhalter, Passwort, Regeln, Bindung, Layout-Zuordnung, Fokus-Handler) |
+| Anim-FSM (198) | voll verträglich | höchstens sechs Bedingungen je Übergang |
+| Notenblatt (199) | voll verträglich | Warnungen beim Umrechnen in den Tracker; Speicherort des Tracker-Projekts; Vollbild |
+| Audio Studio | -- | bewusst nicht portiert (Reiterrahmen) |
+
+**Der Tracker-Befund ist ein Fehler, keine Lücke:** er vernichtet Daten,
+die der Nutzer nicht sieht, und gehört vor jeder Entscheidung behoben --
+ein unbekanntes Instrument als rohes JSON mitführen und unverändert
+zurückschreiben.
+
+### 7.5 Starter, Bau, Verteilung, CI
+
+* **`dhrun.py` und die dreizehn `.cmd`-Starter.** Alles, was nicht Qt ist,
+  reicht nur an `dhrt` durch (`run`, `--export`, `--tokens`, `--ast`,
+  `--doku`). Die Qt-Modi haben `ide.dh` und die `.dh`-Editoren ersetzt, so
+  wie es die Verknüpfungen in `Drachenhauch-IDE.iss` schon tun. **Tot:**
+  `dh-build.cmd` (ruft ein `setup.py`, das es nicht mehr gibt),
+  `dh-package.cmd` (ruft `gb-package.py`, ebenso), `22_tetris.spec` (ein
+  PyInstaller-Rest für eine `.gb`-Datei). **Kaputt:** `dhrun.py --doku`
+  bricht mit einem NameError ab, weil `subprocess` dort nicht importiert
+  ist ✔.
+* **`requirements.txt` und `pyproject.toml`.** `openpyxl` steht noch
+  darin, obwohl der Test dazu längst eine Sammlung ist ✔; die Extras
+  `serial`/`usb`/`bt`/`hw` meinen Python-Pakete, die `dhrt` nicht braucht.
+* **Die beiden Installer.** Nur der PyInstaller-Weg (`build_installer.py`,
+  `Drachenhauch.iss`) liefert heute: die Qt-IDE; **die Bücher als
+  `.docx`/`.epub`**; die **ESP32-Sketche**; die Lizenzhinweise samt
+  Qt/LGPL; das **Aufräumen einer alten GameBasic-Installation**; die
+  **Code-Signierung**; und **macOS-`.dmg` und Linux-Paket**. Der
+  Python-freie Weg (`bauen.dh`, `Drachenhauch-IDE.iss`) kennt nur Windows.
+* **Den Bau der Laufzeit** erledigt weiter `rust/build_runtime.py`: unter
+  Windows cmake und libclang suchen, `LIBCLANG_PATH` und
+  `CFLAGS=-DMAX_CHAR_PRESSED_QUEUE=256` setzen, Feature-Sätze wählen.
+  `build_wasm.py` verdrahtet dazu emscripten (Compiler-Pfade je Version,
+  bindgen-Includes, leere GL-Archive, `EMCC_CFLAGS` mit absoluten Pfaden,
+  ein Stempel für das Neu-Linken). **Ein Ersatz fehlt, und er ist nicht
+  trivial:** die Variablen müssen die Bauskripte FREMDER Crates erreichen
+  (raylib-sys, cmake, bindgen) -- ein `build.rs` kann das nicht,
+  eine Cargo-Konfiguration mit `[env]` nur für feste Werte. Und `bauen.dh`
+  kann die `dhrt.exe` nicht bauen, in der es selbst läuft.
+* **Die CI.** Der Windows-Job braucht `setup-python`, `pip install -e
+  ".[dev,editors]"` (47 s), mypy (10 s), `build_runtime.py`, drei
+  pytest-Schritte und den Qt-Läufer; der serielle pytest-Schritt (279 s)
+  ist fast ganz der Anker, der `dhrt test tests/pruef` aufruft. Die
+  POSIX-Jobs bauen schon ohne Python und brauchen es nur für pytest.
+  `package.yml` baut über PyInstaller.
+* **Texte.** 47 Markdown-Dateien nennen Python; die Anleitungen in
+  `README.md`, `README.en.md`, `docs/rust-runtime.md`, `docs/editor.md`,
+  `docs/werkzeuge.md` und `docs/web-playground.md` setzen es voraus. **Die
+  Bücher zeigen es dem Leser:** sieben Kapitel des Einstiegs- und des
+  Referenzbuchs nennen `dhrun.py` oder `python`, dazu die Kopfkommentare in
+  den Buch-Beispielen und `web/playground.js`.
+
+### 7.6 Tests, die nach dem Löschen noch fehlen würden
+
+Die 87 Dateien zu Qt und den Python-Modellen fallen mit ihrem Code. Von den
+übrigen prüfen nur vier etwas, das bleibt:
+
+| Datei | prüft | Weg |
+|---|---|---|
+| `test_dhrt_test.py` | Anker: `dhrt test tests/pruef` | die CI ruft es direkt auf |
+| `test_drucken.py` | Druck durch „Microsoft Print to PDF", gelesen mit PyMuPDF | ein Leser für fremde PDFs in Drachenhauch -- oder den Fall aufgeben |
+| `test_os_builtins.py` (2) | PRINT/EPRINT-Reihenfolge in einem Strom; `SHELL_OUT$` mit der eigenen Exe | kleiner Baustein in `dhrt` (Ströme zusammenführen) oder aufgeben |
+| `test_midi_module.py` | echter und Loopback-MIDI-Anschluss | als Sammlung, die sich ohne Anschluss überspringt |
+
+`test_pruefen.py` (LOG-Reihenfolge), `test_build_wasm.py`,
+`test_dhrun_chooser.py`, `test_seriell_liste.py` und
+`test_testbefehle_stimmen.py` prüfen Python-Werkzeuge oder pytest selbst
+und fallen mit ihnen.
+
+### 7.7 Vorschlag: Reihenfolge
+
+1. **Sofort, unabhängig von allem:** den Tracker-Datenverlust beheben; die
+   toten Starter und `openpyxl` streichen; den Pan-Regler in den GB-Code
+   des SFX-Generators.
+2. **Umzüge, die Python nicht stören:** die drei `builtin_*.json` aus
+   `drachenhauch/` heraus; `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`;
+   `test_midi_module` als Sammlung.
+3. **Lücken schließen, die man vermissen würde** -- welche, ist eine
+   Entscheidung (7.3, 7.4). Vorschlag als Untergrenze: in der IDE
+   Absturz-Wiederherstellung, Tooltip beim Überfahren, Strg+Klick, Zoom
+   per Tastatur und Rad, Dateien hineinziehen; im Tilemap-Editor die
+   Kachelgröße aus der Datei; im Tracker Sample-Instrumente abspielen oder
+   wenigstens erhalten; für Qt-`.dhsprite`-Dateien ein einmaliger Import.
+4. **Verteilung:** der Python-freie Installer übernimmt Bücher,
+   ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
+   macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
+   Paket.
+5. **Bau:** `build_runtime.py` und `build_wasm.py` durch etwas ohne Python
+   ersetzen (ein Skript des Betriebssystems) -- oder sie als letzte zwei
+   Python-Dateien bewusst behalten.
+6. **CI:** `dhrt test tests/pruef` direkt aufrufen, dann `setup-python`,
+   pytest, mypy und den Qt-Läufer streichen.
+7. **Löschen:** `drachenhauch/`, `tests/*.py`, `conftest.py`, `dhrun.py`,
+   die Starter, `pyproject.toml`, `requirements.txt`; danach Anleitungen
+   und Buchkapitel umschreiben.
+
+**Offene Entscheidungen:** (a) welche Qt-Funktionen wegfallen dürfen,
+(b) ob macOS und Linux ein Paket brauchen, (c) ob die zwei Bauskripte
+Python bleiben dürfen, (d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
+werden müssen.

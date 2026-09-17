@@ -384,7 +384,7 @@ auf, wenn er Fehler dazubringt), und die **Häkchen** im Baum sind das
 Mittel, einen Umbau auf eine selbst gewählte Menge von Dateien zu
 beschränken.
 
-Gegen die Qt-IDE ist seit Stand 9 nichts Benennbares mehr offen. Seit
+Gegen die Qt-IDE ist seit Stand 9 auf Menü-Ebene nichts mehr offen; die kleineren Lücken in Tastatur, Maus und Panels stehen in `docs/entwurf-python-abbau.md`, Abschnitt 7.3. Seit
 Stand 29 lässt sich im gesetzten Handbuch **markieren und kopieren**, und
 die Suche geht **weiter und zurück** (Enter / Umschalt+Enter, zwei Knöpfe),
 markiert die Fundstelle und hebt alle anderen hervor. Was als Nächstes
