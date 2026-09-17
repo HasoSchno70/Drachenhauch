@@ -1,0 +1,75 @@
+' Das EPUB des Referenzbuchs bauen (in den Fallordner, NICHT ueber die
+' eingecheckte Datei -- darin steckt ein Zeitstempel, jeder Neubau am selben
+' Ort riss 4,8 MB Unterschied auf) und darin lesen. Braucht nodelauf.dh davor.
+' Ohne Node oder ohne jszip meldet der Fall UEBERSPRINGEN und endet.
+IMPORT "xml"
+IMPORT "regex"
+
+FUNCTION epubBauen$(wurzel AS STRING) AS STRING
+    DIM buch AS STRING : buch = wurzel + "/buch-referenz/buch"
+    IF NOT nodeDa() THEN
+        PRINT "UEBERSPRINGEN: node fehlt"
+        EXIT(0)
+    END IF
+    IF NOT DIREXISTS(buch + "/node_modules/jszip") THEN
+        PRINT "UEBERSPRINGEN: node_modules fehlt (npm install im buch-Verzeichnis)"
+        EXIT(0)
+    END IF
+    DIM ziel AS STRING : ziel = CWD$() + "/probe.epub"
+    CHDIR(buch)
+    nlWarten(PROCESS_START("node", "build_epub.js", ziel), 300000)
+    IF nlCode <> 0 THEN
+        PRINT "Build fehlgeschlagen: "; nlErr
+        EXIT(1)
+    END IF
+    IF NOT FILEEXISTS(ziel) THEN
+        PRINT "Build meldete Erfolg, schrieb aber nichts"
+        EXIT(1)
+    END IF
+    RETURN ziel
+END FUNCTION
+
+' Wie posixpath.normpath(posixpath.join(basis, rel)).
+FUNCTION normPfad$(basis AS STRING, rel AS STRING) AS STRING
+    DIM voll AS STRING : voll = rel
+    IF basis <> "" THEN voll = basis + "/" + rel
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(voll, "/")
+    DIM stapel AS ARRAY OF STRING : stapel = []
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(teile) - 1
+        IF teile[i] = "" OR teile[i] = "." THEN CONTINUE
+        IF teile[i] = ".." AND LEN(stapel) > 0 THEN
+            ARRAY_POP(stapel)
+            CONTINUE
+        END IF
+        ARRAY_PUSH(stapel, teile[i])
+    NEXT
+    RETURN JOIN$(stapel, "/")
+END FUNCTION
+
+FUNCTION ordnerVon$(pfad AS STRING) AS STRING
+    DIM teile AS ARRAY OF STRING : teile = SPLIT$(pfad, "/")
+    IF LEN(teile) <= 1 THEN RETURN ""
+    RETURN LEFT$(pfad, LEN(pfad) - LEN(teile[LEN(teile) - 1]) - 1)
+END FUNCTION
+
+' Der Pfad der OPF-Datei aus META-INF/container.xml.
+FUNCTION opfPfad$(epub AS STRING) AS STRING
+    DIM c AS XML_HANDLE : c = XML_PARSE(ZIP_READ$(epub, "META-INF/container.xml"))
+    RETURN XML_ATTR$(XML_FIND(c, "rootfiles/rootfile"), "full-path")
+END FUNCTION
+
+' XML_PARSE ist nachsichtiger als ein strenger Leser: ein nacktes `&` und
+' benannte HTML-Entities wie `&nbsp;` gehen durch. Ein Lesegeraet bricht
+' daran ab. "" = in Ordnung, sonst der Grund.
+FUNCTION xmlBefund$(text AS STRING) AS STRING
+    TRY
+        DIM h AS XML_HANDLE : h = XML_PARSE(text)
+    CATCH e
+        RETURN e
+    END TRY
+    DIM alle AS INTEGER : alle = LEN(REGEX_FIND_ALL(text, "&"))
+    DIM gute AS INTEGER : gute = LEN(REGEX_FIND_ALL(text, "&(lt|gt|amp|quot|apos|#[0-9]+|#x[0-9a-fA-F]+);"))
+    IF alle <> gute THEN RETURN STR$(alle - gute) + " unmaskierte & oder unbekannte Entities"
+    RETURN ""
+END FUNCTION
