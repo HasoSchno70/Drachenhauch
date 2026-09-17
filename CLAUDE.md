@@ -33,7 +33,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 >
 > | Editor | Qt | Drachenhauch | Faktor |
 > |---|---|---|---|
-> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 615 | 1,18 |
+> | SFX-Generator (`examples/183_sfx_generator.dh`) | 522 | 631 | 1,21 |
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
@@ -475,7 +475,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > 15 Zeilen Verdrahtung, weil `SnapshotUndo` (140 Zeilen,
 > `editor_qt/undo_history.py`) in einem gemeinsamen Modul liegt und von VIER
 > Qt-Editoren benutzt wird -- gezaehlt wird es bei keinem. Rechnet man es
-> dazu, steht es 615 zu 662, also wieder 0,93. Der Pilot traegt seine 90
+> dazu, steht es 631 zu 662, also wieder 0,95. Der Pilot traegt seine 90
 > Zeilen selbst. **Damit misst der Faktor auch das: was die Vergleichszahl
 > nicht enthaelt.** Der dritte und vierte Pilot loesen es anders (Ringpuffer,
 > je Schritt der Vorher/Nachher-Stand der betroffenen Ebene; beim
@@ -3332,6 +3332,18 @@ drei Faelle in `tests/pruef/werkzeug_tracker.dhtest` an einer Beilage, die
 `Song.save_json` der Qt-Fassung geschrieben hat; Gegenprobe mit drei
 verfaelschten Tracker-Kopien (Sichern als synth, nicht stumm, nicht
 mitgetragen) -- jede laesst genau ihre Faelle fallen.
+
+**Der GB-Code des SFX-Generators nimmt den Pan mit (2026-09-17):** aus der
+Bestandsaufnahme -- [GB-Code kopieren] gab nur `s = AUDIO_SFX(...)` heraus,
+ohne IMPORT, ohne Abspielen und ohne den Pan-Regler. Der Pan liegt am
+WIEDERGABE-Kanal, nicht im Klang (`AUDIO_SFX` kennt ihn nicht), und ein
+fehlender Pan faellt niemandem auf -- der kopierte Code klang schlicht anders
+als die Vorschau daneben. Jetzt kommt ein lauffaehiges Stueck heraus (IMPORT,
+`DIM snd AS SOUND`, der Aufruf, dann `PLAYSOUND` bzw. `AUDIO_PLAY` +
+`AUDIO_PAN` mit derselben Rechnung wie das Vorhoeren). Test: ein Fall in
+`tests/pruef/werkzeug_sfx.dhtest` prueft die Zeilen UND laesst `dhrt --check`
+ueber den erzeugten Code laufen; Gegenprobe mit zwei verfaelschten Kopien
+(ohne Pan-Zweig, ohne IMPORT) -- beide fallen. Faktor 1,18 -> 1,21.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

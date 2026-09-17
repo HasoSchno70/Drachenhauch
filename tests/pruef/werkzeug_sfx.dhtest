@@ -859,3 +859,42 @@ DHRT_FRAMES=68
 --- inhalt _programm/probe.txt
 |uPos 1 uAnz 2|
 
+=== der gb-code nimmt den pan mit und laeuft
+' Der kopierte Code soll klingen wie die Vorschau daneben. Der Pan liegt aber
+' am Wiedergabe-Kanal, nicht im Klang -- bis 2026-09-17 fehlte er im Code, und
+' ein fehlender Pan faellt niemandem auf. Geprueft wird beides: die Zeilen und
+' dass `dhrt --check` den Code ohne Befund nimmt.
+SET_WINDOW_POS(-3000, -3000)
+DIM prBild AS INTEGER : prBild = 0
+--- programm ../../examples/183_sfx_generator.dh nach SETFPS(60)
+--- einschub nach FLIP()
+prBild = prBild + 1
+IF prBild = 3 THEN GUI_SET_VALUE(regler[P_PAN], -0.5)
+IF prBild = 4 THEN WRITEALL("links.dh", gbCode$())
+IF prBild = 5 THEN GUI_SET_VALUE(regler[P_PAN], 0.0)
+IF prBild = 6 THEN WRITEALL("mitte.dh", gbCode$())
+
+--- umgebung
+DHRT_FRAMES=8
+--- nachher
+IMPORT "helfer.dh"
+IMPORT "json"
+SUB zeigen(datei AS STRING)
+    DIM z AS ARRAY OF STRING : z = READLINES("_programm/" + datei)
+    PRINT datei; ": "; z[0]; " | "; z[2]; " | "; z[LEN(z) - 2]; " | "; z[LEN(z) - 1]
+    DIM d AS JSON_HANDLE : d = JSON_PARSE("{""d"":" + TRIM$(dlCheckEine(CWD$() + "/_programm/" + datei)) + "}")
+    PRINT datei; " meldungen "; JSON_LEN(d, "d")
+END SUB
+zeigen("links.dh")
+zeigen("mitte.dh")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+FUNCTION dlCheckEine(pfad AS STRING) AS STRING
+    dlStarten(["--check", pfad])
+    RETURN dlAus
+END FUNCTION
+--- erwartet
+links.dh: IMPORT "audio" | DIM snd AS SOUND | ch = AUDIO_PLAY(snd) | AUDIO_PAN(ch, 1.00, 0.50)
+links.dh meldungen 0
+mitte.dh: IMPORT "audio" | DIM snd AS SOUND | snd = AUDIO_SFX("square", 900, 600, 0, 40, 160, 0.00, 0, 0.70, 0.00, 0.50, 0.00, 0.0, 0, 0, 0.00) | PLAYSOUND(snd)
+mitte.dh meldungen 0

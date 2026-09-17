@@ -322,7 +322,7 @@ nicht.
 
 | Editor | Dateiformat Qt ↔ Drachenhauch | größte Lücken der Drachenhauch-Fassung |
 |---|---|---|
-| SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets; **der GB-Code übergeht den Pan-Regler** |
+| SFX (183) | **verschieden**: Qt-Presets in `~/.drachenhauch/presets/sfx.json`, Drachenhauch in `.ini`-Dateien | Abtastrate beim WAV-Export; benannte Presets (~~der GB-Code übergeht den Pan-Regler~~ -- am 17.09. behoben, er liefert jetzt lauffähigen Code samt Pan) |
 | Partikel (185) | **verschieden** (wie SFX) | Hintergrund der Vorschau; „in Drachenhauch testen", „als .dh speichern"; benannte Presets |
 | Tilemap (187) | Tiled-JSON, **aber** `CONST KACHEL = 16` ✔ -- eine Qt-Karte mit anderer Kachelgröße wird falsch zerlegt; höchstens 128×128 ✔ (Qt 1000) | Kachelgröße wählen, Karte vergrößern; Eigenschaften an Objekten; Rückgängig für Ebenen und Objekte; „Speichern unter" |
 | Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 4); Sheet-Import mit Gitter; höchstens 16 Frames und 128 px |
@@ -408,8 +408,8 @@ und fallen mit ihnen.
 ### 7.7 Vorschlag: Reihenfolge
 
 1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~,
-   ~~die toten Starter und `openpyxl` streichen~~ (beides am 17.09.
-   erledigt); den Pan-Regler in den GB-Code des SFX-Generators.
+   ~~die toten Starter und `openpyxl` streichen~~, ~~den Pan-Regler in den
+   GB-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
 2. **Umzüge, die Python nicht stören:** die drei `builtin_*.json` aus
    `drachenhauch/` heraus; `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`;
    `test_midi_module` als Sammlung.

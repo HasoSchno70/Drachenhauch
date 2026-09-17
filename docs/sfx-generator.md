@@ -36,6 +36,14 @@ Die UI ist eine **Fader-Bank im sfxr-Stil**: links eine **Preset-Leiste**, oben 
   snd = AUDIO_SFX("saw", 1000, -1400, 0, 30, 150, 0, 0, 0.7)
   PLAYSOUND(snd)
   ```
+  Steht der Pan-Regler nicht in der Mitte, kommt er mit — er liegt am
+  WIEDERGABE-Kanal, nicht im Klang, und ohne ihn klänge der kopierte Code
+  anders als die Vorschau:
+  ```basic
+  DIM ch AS AUDIO_CHANNEL
+  ch = AUDIO_PLAY(snd)
+  AUDIO_PAN(ch, 1.00, 0.50)
+  ```
 
 ## `AUDIO_SFX` — der native Synth
 

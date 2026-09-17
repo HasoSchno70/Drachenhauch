@@ -164,7 +164,7 @@ Antwort auf die Frage, ob die Sprache dafür taugt: gemessen statt geschätzt.
 
 | Werkzeug | Qt | Drachenhauch |
 |---|---|---|
-| SFX-Generator | 522 | 615 |
+| SFX-Generator | 522 | 631 |
 | Partikel-Editor | 802 | 622 |
 | Tilemap-Editor | 2428 | 1536 |
 | Sprite-Editor | 7379 | 2811 |
@@ -176,11 +176,11 @@ benennbaren nicht portierten Blöcke beim ersten Durchgang 1595 der 7379
 Qt-Zeilen. Was fehlt, steht im Kopfkommentar jedes Piloten.
 
 **Und er misst auch, was die Qt-Zahl nicht enthält.** Der SFX-Generator ist
-seit dem Rückgängig der *längere* von beiden (615 gegen 522). Der Grund ist
+seit dem Rückgängig der *längere* von beiden (631 gegen 522). Der Grund ist
 nicht Wortreichtum: die Qt-Fassung bekommt ihr Undo in rund 15 Zeilen
 Verdrahtung, weil `SnapshotUndo` (140 Zeilen) in einem gemeinsamen Modul
 liegt und von **vier** Qt-Editoren benutzt wird — gezählt wird es bei keinem.
-Rechnet man es dazu, steht es 615 zu 662, also wieder bei 0,93. Der Pilot
+Rechnet man es dazu, steht es 631 zu 662, also wieder bei 0,95. Der Pilot
 trägt seine 90 Zeilen selbst.
 
 Am Sprite-Editor lässt sich das an einer einzigen Datei ablesen: 0,14 → 0,17

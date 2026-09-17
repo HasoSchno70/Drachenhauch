@@ -366,10 +366,18 @@ SUB zeichneKurve()
     END IF
 END SUB
 
-' Der Aufruf, der diesen Klang im eigenen Programm erzeugt.
+' Der Code, der diesen Klang im eigenen Programm erzeugt UND abspielt --
+' lauffaehig, nicht nur der nackte Aufruf.
+'
+' Der Pan gehoert dazu, obwohl AUDIO_SFX ihn nicht kennt: er liegt am
+' WIEDERGABE-Kanal. Bis 2026-09-17 fehlte er hier, der kopierte Code klang
+' also anders als die Vorschau daneben -- und zwar stumm anders, weil man
+' einen fehlenden Pan nicht sieht.
 FUNCTION gbCode$() AS STRING
+    DIM nl AS STRING : nl = CHR$(10)
     DIM z AS STRING
-    z = "s = AUDIO_SFX(" + CHR$(34) + wf$() + CHR$(34)
+    z = "IMPORT " + CHR$(34) + "audio" + CHR$(34) + nl + nl + "DIM snd AS SOUND" + nl
+    z = z + "snd = AUDIO_SFX(" + CHR$(34) + wf$() + CHR$(34)
     z = z + ", " + FORMAT$(p(P_FREQ), "%.0f")
     z = z + ", " + FORMAT$(p(P_SLIDE), "%.0f")
     z = z + ", " + FORMAT$(p(P_ATTACK), "%.0f")
@@ -384,7 +392,15 @@ FUNCTION gbCode$() AS STRING
     z = z + ", " + FORMAT$(p(P_PWM_S), "%.1f")
     z = z + ", " + FORMAT$(p(P_CUTOFF), "%.0f")
     z = z + ", " + FORMAT$(p(P_SWEEP), "%.0f")
-    z = z + ", " + FORMAT$(p(P_RES), "%.2f") + ")"
+    z = z + ", " + FORMAT$(p(P_RES), "%.2f") + ")" + nl
+    IF p(P_PAN) <> 0.0 THEN
+        ' Dieselbe Rechnung wie beim Vorhoeren (`spielen`).
+        z = z + "DIM ch AS AUDIO_CHANNEL" + nl + "ch = AUDIO_PLAY(snd)" + nl + _
+            "AUDIO_PAN(ch, " + FORMAT$(1.0 - MAX(0.0, p(P_PAN)), "%.2f") + ", " + _
+            FORMAT$(1.0 + MIN(0.0, p(P_PAN)), "%.2f") + ")" + nl
+    ELSE
+        z = z + "PLAYSOUND(snd)" + nl
+    END IF
     RETURN z
 END FUNCTION
 
@@ -586,7 +602,7 @@ WHILE NOT QUITREQUESTED()
 
     IF GUI_CLICKED(knopfCode) THEN
         CLIPBOARD_SET(gbCode$())
-        GUI_SET_TEXT(lblStatus, "AUDIO_SFX-Aufruf in der Zwischenablage.")
+        GUI_SET_TEXT(lblStatus, "GB-Code in der Zwischenablage.")
     END IF
 
     IF GUI_CLICKED(knopfSichern) THEN einstellungSichern()
