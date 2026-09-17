@@ -37,7 +37,7 @@ pub struct Fundstelle {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Bereich {
-    /// "class", "struct", "sub", "function", "property".
+    /// "class", "struct", "sub", "function", "property", "enum".
     pub art: &'static str,
     pub name: String,
     /// 1-basiert, Zeile der Eroeffnung.
@@ -242,7 +242,7 @@ pub fn bereiche(quelle: &str) -> Vec<Bereich> {
             let ender = match zwei.join(" ").as_str() {
                 "END CLASS" => Some("class"), "END STRUCT" => Some("struct"),
                 "END SUB" => Some("sub"), "END FUNCTION" => Some("function"),
-                "END PROPERTY" => Some("property"), _ => None,
+                "END PROPERTY" => Some("property"), "END ENUM" => Some("enum"), _ => None,
             };
             if let Some(art) = ender {
                 if let Some(pos) = stapel.iter().rposition(|&k| out[k].art == art) {
@@ -259,6 +259,20 @@ pub fn bereiche(quelle: &str) -> Vec<Bereich> {
         }
         let rest = gross.strip_prefix("PRIVATE ").map(|_| s[8..].trim_start()).unwrap_or(s);
         let rest_gross = rest.to_ascii_uppercase();
+        // ENUM hat zwei Formen: der Block bis END ENUM und die Kurzform
+        // `ENUM State = MENU, PLAYING` in EINER Zeile -- die bekommt keinen
+        // Platz auf dem Stapel, sonst reichte sie bis zum naechsten END ENUM
+        // oder zum Dateiende.
+        if let Some(nach) = rest_gross.strip_prefix("ENUM ").map(|_| rest[5..].trim_start()) {
+            let (name, hinten) = match name_re.captures(nach) {
+                Some(c) => (c[1].to_string(), &nach[c[0].len()..]),
+                None => ("?".to_string(), nach),
+            };
+            let kurz = hinten.trim_start().starts_with('=');
+            out.push(Bereich { art: "enum", name, zeile: ln, ende: if kurz { ln } else { n } });
+            if !kurz { stapel.push(out.len() - 1); }
+            continue;
+        }
         for (kopf, art) in [("CLASS ", "class"), ("STRUCT ", "struct"), ("SUB ", "sub"), ("FUNCTION ", "function")] {
             if rest_gross.starts_with(kopf) {
                 let nach = rest[kopf.len()..].trim_start();
@@ -418,6 +432,18 @@ mod tests {
         let b3 = bereiche("PROPERTY GET hp() AS INTEGER\nEND PROPERTY\nPRIVATE SUB x()\nEND SUB\n");
         assert_eq!(b3[0].art, "property");
         assert_eq!(b3[1].name, "x");
+    }
+
+    #[test]
+    fn enum_als_block_und_als_kurzform() {
+        // Der Block reicht bis END ENUM; die Kurzform bleibt EINE Zeile und
+        // nimmt die SUB danach nicht in sich auf.
+        let b = bereiche("ENUM State\n  A = 0\n  B\nEND ENUM\nENUM Farbe = ROT, GRUEN\nSUB x()\nEND SUB\n");
+        let namen: Vec<(&str, &str, usize, usize)> = b.iter().map(|x| (x.art, x.name.as_str(), x.zeile, x.ende)).collect();
+        assert_eq!(namen, [("enum", "State", 1, 4), ("enum", "Farbe", 5, 5), ("sub", "x", 6, 7)]);
+        // Kommentar nach dem Namen ist keine Kurzform, "enum" klein geschrieben auch ein Block.
+        let b2 = bereiche("enum Modus ' Auswahl\n  AN\nend enum\n");
+        assert_eq!((b2[0].zeile, b2[0].ende), (1, 3));
     }
 
     #[test]
