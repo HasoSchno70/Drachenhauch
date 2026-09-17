@@ -37,7 +37,7 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 > | Partikel-Editor (`examples/185_partikel_editor.dh`) | 802 | 622 | 0,78 |
 > | Tilemap-Editor (`examples/187_tilemap_editor.dh`) | 2428 | 1536 | 0,63 |
 > | Sprite-Editor (`examples/189_sprite_editor.dh`) | 7379 | 2811 | 0,38 |
-> | Tracker (`examples/190_tracker.dh`) | 3911 | 2103 | 0,54 |
+> | Tracker (`examples/190_tracker.dh`) | 3911 | 2152 | 0,55 |
 > | Form-Designer (`examples/197_form_designer.dh`, Weg B) | 5055 | 1329 | 0,26 |
 > | Anim-FSM-Editor (`examples/198_anim_fsm_editor.dh`, Weg B) | 1728 | 1336 | 0,77 |
 > | Notenblatt (`examples/199_notenblatt.dh`, Weg B) | 1710 | 1449 | 0,85 |
@@ -663,7 +663,7 @@ Endung schreiben: `IMPORT "json.dh"`. Beide Engines verhalten sich identisch
 
 | Modul | Funktionen (Auswahl) | Externer Typ |
 |---|---|---|
-| `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, Pfad-Notation `"user.name"` / `"items.0"` | `JSON_HANDLE` |
+| `json` | `JSON_PARSE/LOAD/STRINGIFY`, `JSON_GET_STRING/INT/FLOAT/BOOL`, `JSON_GET_JSON` (Teilbaum als Kopie), Pfad-Notation `"user.name"` / `"items.0"` | `JSON_HANDLE` |
 | `db` | SQLite. `DB_OPEN/CLOSE`, `DB_EXEC/QUERY` mit `?`-Binding, `DB_NEXT`, `DB_GET_*`, `DB_BEGIN/COMMIT/ROLLBACK` | `DB_CONN`, `DB_RESULT` |
 | `tween` | **Kein `TWEEN_UPDATE`** (Absicht, keine Luecke): ein Tween rechnet seinen Wert bei jedem Abruf aus `MILLIS()` aus, laeuft also in ECHTER Zeit weiter statt bildgetrieben wie `timer`/`input`/`gui`. Folgen: bei einbrechender Bildrate SPRINGT er statt langsamer zu werden, und unter `AUTOMATION_PLAY` ist er nicht reproduzierbar (`timer` ist es). Werteinterpolation. 13 Easings (`linear`, `out_bounce`, `out_elastic`, …), Pause/Resume/Reverse | `TWEEN` |
 | `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/drachenhauch_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.dh`, Tests `tests/pruef/modules_timer.dhtest`. | — |
@@ -3314,6 +3314,24 @@ Dateien (Index, Kapiteltext, Anhang, Kapitelcode; danach `git checkout`) und
 an Testkopien, dazu sieben kaputte EPUBs -- jede faellt. Eine Falle beim
 Gegenproben: der Index fuehrt die Signatur `MID$(2..3 Argumente)` zweimal
 (`MID` und `MID$`), und der Abgleich nimmt wie die Python-Fassung den letzten.
+
+**Tracker-Datenverlust behoben (2026-09-17, aus der Bestandsaufnahme):** der
+Tracker in Drachenhauch las ein Sample-, Keymap- oder SoundFont-Instrument
+aus einer Datei der Qt-Fassung als stummen Platzhalter -- und schrieb es beim
+Sichern als `synth` zurueck; die eingebetteten Samples waren danach weg, ohne
+dass es jemand sah. Jetzt fuehrt `iRoh`/`iArt` das Original-JSON mit, das
+Sichern schreibt es zurueck (nur Name, Lautstaerke, Pan und Huellkurve kommen
+aus dem Piloten), Kopieren und Entfernen tragen es mit, und die Anzeige haengt
+"hier stumm" an (`instName$`) statt es in den Namen zu schreiben. **Zweiter
+Fund:** "hier stumm" stimmte nicht -- ein Sample-Instrument traegt keine
+Wellenform, `square` ist die Vorgabe, und es klang als Rechteck; Wiedergabe,
+WAV und Vorhoeren ueberspringen es jetzt. Dafuer fehlte im json-Modul das
+Gegenstueck zu `JSON_SET_JSON`: neu **`JSON_GET_JSON(h, pfad$)`** (Teilbaum als
+eigenes Dokument, eine Kopie; zwei Faelle in `json_schreiben.dhtest`). Tests
+drei Faelle in `tests/pruef/werkzeug_tracker.dhtest` an einer Beilage, die
+`Song.save_json` der Qt-Fassung geschrieben hat; Gegenprobe mit drei
+verfaelschten Tracker-Kopien (Sichern als synth, nicht stumm, nicht
+mitgetragen) -- jede laesst genau ihre Faelle fallen.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

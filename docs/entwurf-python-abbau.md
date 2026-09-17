@@ -326,16 +326,17 @@ nicht.
 | Partikel (185) | **verschieden** (wie SFX) | Hintergrund der Vorschau; „in Drachenhauch testen", „als .dh speichern"; benannte Presets |
 | Tilemap (187) | Tiled-JSON, **aber** `CONST KACHEL = 16` ✔ -- eine Qt-Karte mit anderer Kachelgröße wird falsch zerlegt; höchstens 128×128 ✔ (Qt 1000) | Kachelgröße wählen, Karte vergrößern; Eigenschaften an Objekten; Rückgängig für Ebenen und Objekte; „Speichern unter" |
 | Sprite (189) | **unverträglich** ✔: Qt-`.dhsprite` ist JSON mit base64-Pixeln, Drachenhauch liest PNG + JSON (bewusst, siehe Kopfkommentar); einziger Weg ist der Atlas-Export, ohne Ebenen | Farbe ersetzen; Frame-Werkzeuge (umkehren, Ping-Pong, zusammenfügen, ziehen); Deckkraft, Namen und Reihenfolge der Ebenen (höchstens 4); Sheet-Import mit Gitter; höchstens 16 Frames und 128 px |
-| Tracker (190) | dasselbe JSON -- **mit Datenverlust** ✔: ein Sample-, Keymap- oder SoundFont-Instrument wird beim Laden stumm und beim **Sichern als `synth` geschrieben**, die Samples sind danach weg | genau diese drei Instrumentarten; VU-Meter; Patterns benennen; der Sample-Offset-Effekt |
+| Tracker (190) | dasselbe JSON; ein Sample-, Keymap- oder SoundFont-Instrument wird beim Laden stumm -- bis 2026-09-17 schrieb der Pilot es beim **Sichern als `synth`** zurück und die Samples waren weg (**behoben:** es läuft jetzt unverändert durch) | genau diese drei Instrumentarten; VU-Meter; Patterns benennen; der Sample-Offset-Effekt |
 | Form-Designer (197) | dieselbe `.dhform`, fremde Felder laufen durch; **Qt-Projekte** (`.dhproj`) nicht | Mehrfachauswahl und Ausrichten; Kopieren/Einfügen; Projekte mit mehreren Formularen; Code-Fenster; Zoom und Lineale; viele Inspektor-Felder (sichtbar, Gruppe, Platzhalter, Passwort, Regeln, Bindung, Layout-Zuordnung, Fokus-Handler) |
 | Anim-FSM (198) | voll verträglich | höchstens sechs Bedingungen je Übergang |
 | Notenblatt (199) | voll verträglich | Warnungen beim Umrechnen in den Tracker; Speicherort des Tracker-Projekts; Vollbild |
 | Audio Studio | -- | bewusst nicht portiert (Reiterrahmen) |
 
-**Der Tracker-Befund ist ein Fehler, keine Lücke:** er vernichtet Daten,
-die der Nutzer nicht sieht, und gehört vor jeder Entscheidung behoben --
-ein unbekanntes Instrument als rohes JSON mitführen und unverändert
-zurückschreiben.
+**Der Tracker-Befund war ein Fehler, keine Lücke** -- er vernichtete
+Daten, die der Nutzer nicht sah. Behoben am selben Tag: ein unbekanntes
+Instrument wird als rohes JSON mitgeführt (`JSON_GET_JSON`, dafür neu) und
+unverändert zurückgeschrieben; beim Abspielen ist es jetzt auch wirklich
+stumm (vorher klang es als Rechteck).
 
 ### 7.5 Starter, Bau, Verteilung, CI
 
@@ -399,7 +400,7 @@ und fallen mit ihnen.
 
 ### 7.7 Vorschlag: Reihenfolge
 
-1. **Sofort, unabhängig von allem:** den Tracker-Datenverlust beheben; die
+1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~ (erledigt); die
    toten Starter und `openpyxl` streichen; den Pan-Regler in den GB-Code
    des SFX-Generators.
 2. **Umzüge, die Python nicht stören:** die drei `builtin_*.json` aus

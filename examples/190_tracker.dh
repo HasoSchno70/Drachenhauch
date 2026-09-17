@@ -94,6 +94,13 @@ DIM iVibS[MAX_INST] AS FLOAT
 DIM iDet[MAX_INST] AS FLOAT
 DIM iPan[MAX_INST] AS FLOAT
 DIM iVol[MAX_INST] AS INTEGER       ' 1..15
+' Ein Instrument, das dieser Pilot nicht spielen kann (Sample, Keymap --
+' auch aus einer SoundFont), bleibt als stummer Platzhalter stehen, damit
+' die Nummern der anderen stimmen. Sein JSON wird dabei UNVERAENDERT
+' mitgefuehrt und beim Sichern zurueckgeschrieben: vorher schrieb der Pilot
+' es als synth, und die Samples eines Qt-Songs waren nach einem Sichern weg.
+DIM iArt[MAX_INST] AS STRING        ' "synth", "sample", "keymap" ...
+DIM iRoh[MAX_INST] AS STRING        ' JSON des nicht spielbaren Instruments, sonst ""
 DIM instAnz AS INTEGER
 
 DIM wellenformen AS ARRAY OF STRING
@@ -203,7 +210,15 @@ SUB instrumentSetzen(i AS INTEGER, nm AS STRING, wf AS STRING, atk AS INTEGER, _
     iAtk[i] = atk : iDec[i] = dec : iSus[i] = sus : iRel[i] = rel
     iVibD[i] = vd : iVibS[i] = vs : iDet[i] = det
     iPan[i] = 0.0 : iVol[i] = 15
+    iArt[i] = "synth" : iRoh[i] = ""
 END SUB
+
+' Der Name, wie ihn Listen und Kopfzeile zeigen -- ein stummes Instrument
+' sagt es dazu; in der Datei steht der Name ohne den Zusatz.
+FUNCTION instName$(i AS INTEGER) AS STRING
+    IF iRoh[i] = "" THEN RETURN iName[i]
+    RETURN iName[i] + " [" + iArt[i] + ", hier stumm]"
+END FUNCTION
 
 ' Dieselbe Tabelle wie `tracker/presets.py` -- ein Song, den die Qt-Fassung
 ' anlegt, klingt hier also mit denselben Zahlen.
@@ -355,7 +370,22 @@ FUNCTION songHandle() AS JSON_HANDLE
     END IF
     a = JSON_NEW_ARRAY()
     FOR i = 0 TO instAnz - 1
-        DIM io AS JSON_HANDLE : io = JSON_NEW_OBJECT()
+        DIM io AS JSON_HANDLE
+        IF iRoh[i] <> "" THEN
+            ' Zurueck, wie es kam -- nur was sich hier bearbeiten laesst und
+            ' auch fuer Sample und Keymap gilt, kommt aus dem Piloten.
+            io = JSON_PARSE(iRoh[i])
+            JSON_SET_STRING(io, "name", iName[i])
+            JSON_SET_INT(io, "default_vol", iVol[i])
+            JSON_SET_FLOAT(io, "pan", iPan[i])
+            JSON_SET_INT(io, "env_attack_ms", iAtk[i])
+            JSON_SET_INT(io, "env_decay_ms", iDec[i])
+            JSON_SET_FLOAT(io, "env_sustain", iSus[i])
+            JSON_SET_INT(io, "env_release_ms", iRel[i])
+            JSON_APPEND_JSON(a, "", io)
+            CONTINUE
+        END IF
+        io = JSON_NEW_OBJECT()
         JSON_SET_STRING(io, "name", iName[i])
         JSON_SET_STRING(io, "kind", "synth")
         JSON_SET_INT(io, "default_vol", iVol[i])
@@ -481,10 +511,6 @@ SUB songAusHandle(h AS JSON_HANDLE)
             IF JSON_HAS(h, ip + ".waveform") THEN wf = JSON_GET_STRING(h, ip + ".waveform")
             DIM nm AS STRING : nm = "Instrument"
             IF JSON_HAS(h, ip + ".name") THEN nm = JSON_GET_STRING(h, ip + ".name")
-            ' Ein Sample- oder Keymap-Instrument kann dieser Pilot nicht
-            ' spielen -- es bleibt als Platzhalter stehen, damit die Nummern
-            ' der anderen stimmen, und sagt es im Namen.
-            IF art <> "synth" THEN nm = nm + " [" + art + ", hier stumm]"
             instrumentSetzen(instAnz, nm, wf, zahlOder(h, ip + ".env_attack_ms", 0), _
                              zahlOder(h, ip + ".env_decay_ms", 0), _
                              kommaOder(h, ip + ".env_sustain", 1.0), _
@@ -494,6 +520,10 @@ SUB songAusHandle(h AS JSON_HANDLE)
                              kommaOder(h, ip + ".detune_cents", 0.0))
             iPan[instAnz] = CLAMP(kommaOder(h, ip + ".pan", 0.0), -1.0, 1.0)
             iVol[instAnz] = CLAMP(zahlOder(h, ip + ".default_vol", 15), 1, 15)
+            IF art <> "synth" THEN
+                iArt[instAnz] = art
+                iRoh[instAnz] = JSON_STRINGIFY(JSON_GET_JSON(h, ip))
+            END IF
             instAnz = instAnz + 1
         NEXT
         IF JSON_HAS(h, "channel_inst") THEN
@@ -692,6 +722,13 @@ SUB reiheAusgeben(p AS INTEGER, r AS INTEGER, tick AS INTEGER, _
         IF n >= 0 AND (rendern OR hoerbar(c)) THEN
             DIM ii AS INTEGER : ii = inst[p, c, r]
             IF ii < 0 OR ii >= instAnz THEN ii = chInst[c]
+            ' Ein Instrument, das dieser Pilot nicht spielen kann, bleibt
+            ' STUMM -- bis 2026-09-17 klang es als Rechteck, weil ein
+            ' Sample-Instrument keine Wellenform traegt und "square" die
+            ' Vorgabe ist, obwohl sein Name "hier stumm" sagte.
+            IF ii >= 0 THEN
+                IF iRoh[ii] <> "" THEN CONTINUE
+            END IF
             parameterLaden(ii, c)
             DIM ticksL AS INTEGER : ticksL = notenLaenge(p, c, r, weiter, opos) * TICKS
             DIM lautst AS FLOAT
@@ -785,6 +822,9 @@ END SUB
 ' Eine einzelne Note vorhoeren (Klaviatur, Tastatur).
 SUB vorhoeren(c AS INTEGER, midi AS INTEGER)
     DIM ii AS INTEGER : ii = chInst[c]
+    IF ii >= 0 THEN
+        IF iRoh[ii] <> "" THEN RETURN
+    END IF
     parameterLaden(ii, c)
     DIM tks AS INTEGER : tks = MAX(TICKS * 2, INT(600.0 / tickMs()))
     DIM lautst AS FLOAT : lautst = chVol[c]
@@ -1120,7 +1160,7 @@ FUNCTION instListe$() AS STRING
     DIM s AS STRING : s = ""
     DIM i AS INTEGER
     FOR i = 0 TO instAnz - 1
-        s = s + "|" + STR$(i + 1) + " " + iName[i]
+        s = s + "|" + STR$(i + 1) + " " + instName$(i)
     NEXT
     RETURN s
 END FUNCTION
@@ -1183,12 +1223,19 @@ SUB instrumentAnzeigen()
     GUI_SET_ENABLED(spS, da) : GUI_SET_ENABLED(spR, da)
     GUI_SET_ENABLED(spVibD, da) : GUI_SET_ENABLED(spVibS, da)
     GUI_SET_ENABLED(spDet, da) : GUI_SET_ENABLED(slPan, da)
+    IF da THEN
+        IF iRoh[ii] <> "" THEN
+            GUI_SET_ENABLED(ddIWave, FALSE)
+            GUI_SET_ENABLED(spVibD, FALSE) : GUI_SET_ENABLED(spVibS, FALSE)
+            GUI_SET_ENABLED(spDet, FALSE)
+        END IF
+    END IF
     GUI_SET_ENABLED(bIDel, da)
     IF NOT da THEN
         GUI_SET_TEXT(lblIName, "(Kanal ohne Instrument)")
         RETURN
     END IF
-    GUI_SET_TEXT(lblIName, STR$(ii + 1) + " " + iName[ii])
+    GUI_SET_TEXT(lblIName, STR$(ii + 1) + " " + instName$(ii))
     DIM wi AS INTEGER : wi = waveIndex(iWave[ii])
     IF iWave[ii] = "noise" THEN wi = 4
     lIWave = wi : GUI_DROPDOWN_SET_SELECTED(ddIWave, wi)
@@ -1486,6 +1533,7 @@ SUB instrumentNeu()
         instrumentSetzen(i, iName[q] + " (Kopie)", iWave[q], iAtk[q], iDec[q], iSus[q], _
                          iRel[q], iVibD[q], iVibS[q], iDet[q])
         iPan[i] = iPan[q] : iVol[i] = iVol[q]
+        iArt[i] = iArt[q] : iRoh[i] = iRoh[q]
     ELSE
         instrumentSetzen(i, "Neu", wave[curC], 0, 0, 1.0, 20, 0.0, 0.0, 0.0)
     END IF
@@ -1508,6 +1556,7 @@ SUB instrumentEntfernen()
         instrumentSetzen(i, iName[i + 1], iWave[i + 1], iAtk[i + 1], iDec[i + 1], iSus[i + 1], _
                          iRel[i + 1], iVibD[i + 1], iVibS[i + 1], iDet[i + 1])
         iPan[i] = iPan[i + 1] : iVol[i] = iVol[i + 1]
+        iArt[i] = iArt[i + 1] : iRoh[i] = iRoh[i + 1]
     NEXT
     instAnz = instAnz - 1
     FOR i = 0 TO MAX_CH - 1
@@ -1667,7 +1716,7 @@ SUB zeichneGitter()
         IF mute[c] THEN kn = kn + " M"
         IF solo[c] THEN kn = kn + " S"
         DIM nm AS STRING : nm = wave[c]
-        IF chInst[c] >= 0 THEN nm = iName[chInst[c]]
+        IF chInst[c] >= 0 THEN nm = instName$(chInst[c])
         IF istDrum(c) AND chInst[c] < 0 THEN nm = "noise"
         TEXT(hx + 5, gy + 4, kn, kanalFarbe(c))
         DIM kb AS INTEGER : kb = TEXT_WIDTH(kn)

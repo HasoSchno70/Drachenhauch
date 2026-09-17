@@ -946,3 +946,100 @@ DHRT_FRAMES=120
 |pattern 0|
 |pattern 1|
 
+=== sample- und keymap-instrumente ueberleben das sichern
+' Die Beilage hat `Song.save_json` der Qt-Fassung geschrieben: Orgel (synth),
+' ein Sample- und ein Keymap-Instrument. Dieser Pilot spielt die beiden letzten
+' nicht -- bis 2026-09-17 schrieb er sie beim Sichern als synth zurueck, und die
+' Samples waren weg. Jetzt kommen sie Byte fuer Byte wieder heraus; die Anzeige
+' sagt, dass sie hier stumm sind, der Name in der Datei nicht.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN ladeDatei("qt.json")
+IF bildNr = 4 THEN WRITEALL("anzeige.txt", instName$(0) + CHR$(10) + instName$(1) + CHR$(10) + instName$(2) + CHR$(10))
+IF bildNr = 5 THEN dateiPfad = "zurueck.json" : speichern(FALSE)
+
+--- umgebung
+DHRT_FRAMES=8
+--- datei _programm/qt.json
+{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[60,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,67,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[0],"instruments":[{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Klavier-Sample","kind":"sample","default_vol":12,"pan":-0.25,"sample_rate":22050,"base_note":60,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa260oUrjkEVtdk1GMjU2Q1Qg+85i3CU6dmmm+d8q8Iz871Lh7RQR5bHGYQYcZMbSwaBfvcW7qroqOZr6CztjrYAAA=","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":90},{"name":"Harfe-Keymap","kind":"keymap","default_vol":15,"pan":0.0,"zones":[{"name":"tief","sample_rate":22050,"root_note":48,"lo_key":0,"hi_key":127,"loop_mode":"forward","loop_start":4,"loop_end":30,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa26w=="}],"loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0}],"channel_inst":[1,0,null,null]}
+
+--- nachher
+IMPORT "json"
+DIM vorher AS JSON_HANDLE : vorher = JSON_LOAD("_programm/qt.json")
+DIM nachher AS JSON_HANDLE : nachher = JSON_LOAD("_programm/zurueck.json")
+PRINT "instrumente "; JSON_LEN(nachher, "instruments")
+DIM k AS INTEGER
+FOR k = 1 TO 2
+    PRINT JSON_GET_STRING(nachher, "instruments." + STR$(k) + ".kind"); " unveraendert "; _
+        (JSON_STRINGIFY(JSON_GET_JSON(vorher, "instruments." + STR$(k))) = JSON_STRINGIFY(JSON_GET_JSON(nachher, "instruments." + STR$(k))))
+NEXT
+DIM z AS ARRAY OF STRING : z = READLINES("_programm/anzeige.txt")
+FOR k = 0 TO LEN(z) - 1
+    PRINT z[k]
+NEXT
+--- erwartet
+instrumente 3
+sample unveraendert TRUE
+keymap unveraendert TRUE
+Orgel
+Klavier-Sample [sample, hier stumm]
+Harfe-Keymap [keymap, hier stumm]
+
+=== ein nicht spielbares instrument bleibt wirklich stumm
+' Kanal 0 spielt in Reihe 0 mit dem Sample-Instrument, Kanal 1 in Reihe 8 mit
+' der Orgel. Bis 2026-09-17 klang das Sample als Rechteck -- es traegt keine
+' Wellenform, und "square" ist die Vorgabe -- obwohl sein Name "hier stumm"
+' sagte. In der WAV ist Reihe 0 jetzt still, Reihe 8 (1000 ms) klingt.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN
+    ladeDatei("qt.json")
+    wavRendern("out.wav")
+END IF
+
+--- umgebung
+DHRT_FRAMES=6
+--- datei _programm/qt.json
+{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[60,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,67,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[0],"instruments":[{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Klavier-Sample","kind":"sample","default_vol":12,"pan":-0.25,"sample_rate":22050,"base_note":60,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa260oUrjkEVtdk1GMjU2Q1Qg+85i3CU6dmmm+d8q8Iz871Lh7RQR5bHGYQYcZMbSwaBfvcW7qroqOZr6CztjrYAAA=","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":90},{"name":"Harfe-Keymap","kind":"keymap","default_vol":15,"pan":0.0,"zones":[{"name":"tief","sample_rate":22050,"root_note":48,"lo_key":0,"hi_key":127,"loop_mode":"forward","loop_start":4,"loop_end":30,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa26w=="}],"loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0}],"channel_inst":[1,0,null,null]}
+
+--- ton _programm/out.wav
+pegel 20 40 < 0.05
+pegel 1020 1040 > 0.3
+
+=== entfernen und kopieren tragen das instrument mit
+' Die Orgel (Nummer 0) weg: das Sample rueckt auf Platz 0 und bleibt ein
+' Sample. Dann das Sample kopieren: die Kopie ist ebenfalls eines, mit denselben
+' Samples -- sonst waere Kopieren der neue Weg, Daten zu verlieren.
+SET_WINDOW_POS(-3000, -3000)
+--- programm ../../examples/190_tracker.dh nach SETFPS(60)
+--- einschub nach bildNr = bildNr + 1
+IF bildNr = 3 THEN ladeDatei("qt.json")
+IF bildNr = 4 THEN curC = 1 : instrumentEntfernen()
+IF bildNr = 5 THEN curC = 0 : instrumentNeu()
+IF bildNr = 6 THEN dateiPfad = "zurueck.json" : speichern(FALSE)
+
+--- umgebung
+DHRT_FRAMES=9
+--- datei _programm/qt.json
+{"format":"dhtracker-song","version":1,"bpm":120,"channels":4,"waves":["square","saw","triangle"],"patterns":[{"name":"P1","rows":16,"channels":4,"data":[[60,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,67,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null]]}],"order":[0],"instruments":[{"name":"Orgel","kind":"synth","default_vol":15,"pan":0.0,"waveform":"square","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0,"vib_depth":0.0,"vib_speed":0.0,"detune_cents":0.0},{"name":"Klavier-Sample","kind":"sample","default_vol":12,"pan":-0.25,"sample_rate":22050,"base_note":60,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa260oUrjkEVtdk1GMjU2Q1Qg+85i3CU6dmmm+d8q8Iz871Lh7RQR5bHGYQYcZMbSwaBfvcW7qroqOZr6CztjrYAAA=","loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":90},{"name":"Harfe-Keymap","kind":"keymap","default_vol":15,"pan":0.0,"zones":[{"name":"tief","sample_rate":22050,"root_note":48,"lo_key":0,"hi_key":127,"loop_mode":"forward","loop_start":4,"loop_end":30,"samples":"AADGJ01JUV9dZlVdpUUFI+b6k9M6s/Ce5JnipC++0uEyCvgwDlCRYpplrVjTPUQZvvCcyt2sLJwpm/ypUsa26w=="}],"loop_mode":"none","loop_start":0,"loop_end":0,"env_attack_ms":0,"env_decay_ms":0,"env_sustain":1.0,"env_release_ms":0}],"channel_inst":[1,0,null,null]}
+
+--- nachher
+IMPORT "json"
+DIM vorher AS JSON_HANDLE : vorher = JSON_LOAD("_programm/qt.json")
+DIM h AS JSON_HANDLE : h = JSON_LOAD("_programm/zurueck.json")
+DIM samples AS STRING : samples = JSON_GET_STRING(vorher, "instruments.1.samples")
+PRINT "instrumente "; JSON_LEN(h, "instruments")
+DIM k AS INTEGER
+FOR k = 0 TO JSON_LEN(h, "instruments") - 1
+    DIM p AS STRING : p = "instruments." + STR$(k)
+    DIM zeile AS STRING : zeile = JSON_GET_STRING(h, p + ".name") + " | " + JSON_GET_STRING(h, p + ".kind")
+    IF JSON_HAS(h, p + ".samples") THEN zeile = zeile + " | samples " + IIF(JSON_GET_STRING(h, p + ".samples") = samples, "gleich", "anders")
+    PRINT zeile
+NEXT
+--- erwartet
+instrumente 3
+Klavier-Sample | sample | samples gleich
+Harfe-Keymap | keymap
+Klavier-Sample (Kopie) | sample | samples gleich
