@@ -8,7 +8,7 @@
 > Bildschirmleser, geht der Satz als Ansage in den Baum — auch ohne gui.
 > macOS (`say`) und Linux (`espeak-ng`) wie unten beschrieben, ungeprüft.
 > Prüfstein: `tests/pruef/speak.dhtest` (WAV Byte für Byte gelesen, Dauern
-> gemessen) und der fremde UIA-Leser in `tests/test_gui_barrierefreiheit.py`.
+> gemessen) und der fremde UIA-Leser in `tests/pruef/gui_barrierefreiheit.dhtest`.
 > Doku: [module-audio.md](module-audio.md), Abschnitt „Sprechen".
 
 *Untersuchung, seither umgesetzt.* Der Rest aus der

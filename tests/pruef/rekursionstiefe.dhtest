@@ -1,4 +1,17 @@
-' Aus test_rekursionstiefe.py uebertragen (3 Faelle, aufgezeichnet 2026-09-07). Format: docs/werkzeuge.md, dhrt test.
+' Rekursionstiefe: eine Meldung statt eines Absturzes -- auf jeder Plattform.
+'
+' Die VM rekursiert fuer jeden Funktionsaufruf ueber den NATIVEN Stack.
+' MAX_CALL_DEPTH in vm.rs verwandelt eine ausufernde Rekursion in einen
+' fangbaren Fehler -- stand aber lange auf 3000, einem Wert, den keine
+' Plattform erreichte (Windows mit 1 MB Stack stuerzte bei 147 Ebenen ab,
+' ohne Programmzeile). Gemessen kostet ein Aufrufrahmen ~6,6 KB; Windows und
+' macOS bekommen 64 MB ueber build.rs, Linux gibt dem Hauptthread 8 MB aus
+' RLIMIT_STACK, wohin kein Linker-Flag reicht.
+'
+' Die ersten drei Faelle laufen Rekursionen, die letzten drei lesen den
+' QUELLTEXT (bis 2026-09-17 in tests/test_rekursionstiefe.py): die Grenze
+' gegen die kleinste Plattform und das Stack-Flag in build.rs.
+' Format: docs/werkzeuge.md, dhrt test.
 
 === tiefe rekursion laeuft durch
 ' Knapp unter der Grenze muss es normal rechnen -- die Grenze soll
@@ -34,3 +47,48 @@ PRINT "weiter"
 gefangen
 weiter
 
+=== die grenze passt zur kleinsten plattform
+' Wer MAX_CALL_DEPTH erhoeht, ohne die Stackgroesse mitzudenken, holt den
+' Absturz auf Linux zurueck. Messwerte vom 2026-08-29 (Zwei-Punkte-Messung
+' 1 MB / 8 MB, Windows-Release): 6625 Bytes je Rahmen, 81388 Grundverbrauch;
+' mit 15 % Luft fuer Schwankungen.
+IMPORT "regex"
+DIM zeilen AS ARRAY OF STRING : zeilen = READLINES(ARG$(0) + "/rust/drachenhauch_runtime/src/vm.rs")
+DIM grenze AS INTEGER : grenze = -1
+DIM i AS INTEGER
+FOR i = 0 TO LEN(zeilen) - 1
+    DIM t AS ARRAY OF STRING : t = REGEX_FIND_ALL(zeilen[i], "const MAX_CALL_DEPTH: u32 = (\d+);")
+    IF LEN(t) > 0 THEN grenze = VAL(t[0])
+NEXT
+PRINT "gefunden "; (grenze > 0)
+DIM traegt AS FLOAT : traegt = (8 * 1024 * 1024 - 81388) / 6625
+PRINT "passt in 8 MB "; (grenze <= traegt * 0.85)
+IF grenze > traegt * 0.85 THEN PRINT "MAX_CALL_DEPTH "; grenze; ", ein 8-MB-Stack traegt ~"; INT(traegt)
+--- argumente
+{sammlung}/../..
+--- erwartet
+gefunden TRUE
+passt in 8 MB TRUE
+
+=== das bauskript setzt den stack nur fuer das programm
+' Windows startet sonst mit 1 MB -- das waren 146 Ebenen. Und das Flag muss
+' `rustc-link-arg-bins` sein, nicht `rustflags` in .cargo/config.toml: die
+' gelten auch fuer Proc-Macros der Abhaengigkeiten, und ld64 bricht dann ab
+' ("-stack_size option can only be used when linking a main executable").
+' Der MSVC-Linker nimmt /STACK: auch fuer eine DLL -- ein gruener Bau unter
+' Windows sagte hier nichts.
+DIM b AS STRING : b = ARG$(0) + "/rust/drachenhauch_runtime/build.rs"
+PRINT "build.rs da "; FILEEXISTS(b)
+DIM txt AS STRING : txt = BUFFER_TO_STRING$(READALL_BYTES(b))
+PRINT "windows-flag "; (INSTR(txt, "/STACK:") >= 0)
+PRINT "macos-flag "; (INSTR(txt, "stack_size") >= 0)
+PRINT "nur fuer das programm "; (INSTR(txt, "rustc-link-arg-bins") >= 0)
+PRINT "keine alte config.toml "; NOT FILEEXISTS(ARG$(0) + "/rust/drachenhauch_runtime/.cargo/config.toml")
+--- argumente
+{sammlung}/../..
+--- erwartet
+build.rs da TRUE
+windows-flag TRUE
+macos-flag TRUE
+nur fuer das programm TRUE
+keine alte config.toml TRUE

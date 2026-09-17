@@ -279,7 +279,7 @@ pub fn gliederung(text: &str) -> Value {
     // Stapel aus (Bereich, Pfad zum Knoten in `wurzeln`).
     let mut stapel: Vec<(symbole::Bereich, Vec<usize>)> = Vec::new();
     for b in bereiche {
-        let art = match b.art { "class" => SK_CLASS, "struct" => SK_STRUCT, "property" => SK_PROPERTY, _ => SK_FUNCTION };
+        let art = match b.art { "class" => SK_CLASS, "struct" => SK_STRUCT, "property" => SK_PROPERTY, "enum" => SK_ENUM, _ => SK_FUNCTION };
         let k = knoten(&b.name, art, b.zeile, b.ende);
         while let Some((oben, _)) = stapel.last() {
             if oben.zeile <= b.zeile && b.zeile <= oben.ende { break; }
@@ -296,10 +296,6 @@ pub fn gliederung(text: &str) -> Value {
         };
         stapel.push((b, pfad));
     }
-    for d in symbole::definitionen(text) {
-        if d.art == "enum" { wurzeln.push(knoten(&d.name, SK_ENUM, d.zeile, d.zeile)); }
-    }
-    wurzeln.sort_by_key(|n| n["range"]["start"]["line"].as_u64().unwrap_or(0));
     Value::Array(wurzeln)
 }
 
@@ -496,6 +492,10 @@ mod tests {
         assert_eq!(g[0]["children"][0]["name"], "Init");
         assert_eq!(g[0]["kind"], SK_CLASS);
         assert_eq!(g[2]["kind"], SK_ENUM);
+        // Der Block reicht bis END ENUM (Zeile 9 = Index 8), nicht nur ueber
+        // seine Kopfzeile -- sonst faltet die IDE ihn nicht, und die
+        // Pfadleiste kennt ihn nur in der ersten Zeile.
+        assert_eq!(g[2]["range"]["end"]["line"], 8);
     }
 
     #[test]

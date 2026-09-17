@@ -285,10 +285,9 @@ DIM k AS INTEGER
 FOR k = 0 TO JSON_LEN(h, "result") - 1
     DIM p AS STRING : p = "result." + STR$(k)
     DIM name AS STRING : name = JSON_GET_STRING(h, p + ".name")
-    ' Ein Blockende kennt die Gliederung fuer CLASS/STRUCT/SUB/FUNCTION/PROPERTY;
-    ' ein ENUM reicht dort nur ueber seine Kopfzeile (symbole::bereiche).
-    PRINT name; " art "; JSON_GET_INT(h, p + ".kind");
-    IF name <> "State" THEN PRINT ", bis zeile "; JSON_GET_INT(h, p + ".range.end.line");
+    ' Auch ein ENUM reicht bis zu seinem END (bis 2026-09-17 nur ueber die
+    ' Kopfzeile -- die IDE konnte ihn nicht falten).
+    PRINT name; " art "; JSON_GET_INT(h, p + ".kind"); ", bis zeile "; JSON_GET_INT(h, p + ".range.end.line");
     IF JSON_HAS(h, p + ".children") AND JSON_LEN(h, p + ".children") > 0 THEN
         DIM kinder AS STRING : kinder = ""
         DIM m AS INTEGER
@@ -305,7 +304,7 @@ IMPORT "{sammlung}/_hilfen/lspquelle.dh"
 --- erwartet
 Player art 5, bis zeile 6, kinder Init
 add art 12, bis zeile 9
-State art 10
+State art 10, bis zeile 14
 
 === unbekanntes verfahren und kaputte rahmung
 ' Ein Kopf ohne Content-Length kostet nur diese Nachricht, nicht die Sitzung;

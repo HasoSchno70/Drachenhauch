@@ -24,7 +24,7 @@
 //!   sichtbar war (sonst `panic!`); raylib zeigt es beim Anlegen sofort,
 //!   deshalb legt `graphics.rs` es versteckt an, haengt den Adapter ein und
 //!   zeigt es dann. Gemessen mit einem fremden UIA-Leser
-//!   (`tests/test_gui_barrierefreiheit.py`).
+//!   (`tests/pruef/gui_barrierefreiheit.dhtest`).
 //! * **macOS** (NSAccessibility, `accesskit_macos`): dynamisches
 //!   Objective-C-Subclassing der Inhalts-View von GLFWs `NSWindow`; vorher
 //!   bekommt die Fensterklasse `GLFWWindow` eine Fokus-Weiterleitung, weil

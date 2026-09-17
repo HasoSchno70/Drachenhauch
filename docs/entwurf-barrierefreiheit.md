@@ -8,7 +8,7 @@
 > gemessen: derselbe UIA-Leser, der oben null Nachkommen fand, zählt im
 > gui-Beispiel 45 jetzt acht — Gruppe, Beschriftungen, Regler mit Namen aus
 > der Nachbar-Beschriftung, Kästchen, Eingabefeld, Knopf
-> (`tests/test_gui_barrierefreiheit.py`). Siehe
+> (`tests/pruef/gui_barrierefreiheit.dhtest`). Siehe
 > [module-gui.md](module-gui.md#barrierefreiheit). **Nachtrag, selber Tag:
 > die Adapter für macOS (NSAccessibility, Objective-C-Subclassing von GLFWs
 > Fenster-View samt Fokus-Weiterleitung an `GLFWWindow`) und Linux (AT-SPI,

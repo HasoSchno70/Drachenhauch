@@ -1,0 +1,354 @@
+' Barrierefreiheit (docs/entwurf-barrierefreiheit.md, Wege A und C).
+'
+' Der Kern ist der Pruefstein aus dem Entwurf: ein FREMDER Leser -- UI
+' Automation aus PowerShell heraus (System.Windows.Automation, keine neue
+' Abhaengigkeit) -- zaehlt die Bedienelemente eines laufenden dhrt-Fensters,
+' liest ihre Namen, klickt den Knopf, setzt Text und Fokus. Vor dem Bau fand
+' derselbe Leser NULL Nachkommen. Dazu Weg A: Menue per F10/Alt, setzbare
+' Tab-Reihenfolge, Kontrast der Themen.
+'
+' Bis 2026-09-17 tests/test_gui_barrierefreiheit.py. Seriell, weil Tasten
+' echt eingespeist werden und der Leser ein Fenster anfasst. Den Leser-Faellen
+' gibt das Programm ein eigenes Fenster (ein zweiter dhrt als Kind, Titel mit
+' einer Kennung) -- PowerShell sucht es ueber den Titel, weil PROCESS_START
+' keine Prozessnummer nennt.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== menue per f10 und alt
+' F10, ab, Enter -> Oeffnen; Alt allein, Enter -> Neu; auf, ESC, Enter ->
+' nichts. Eine Aufnahme-Beilage braucht die Leerzeile am Ende, sonst geht
+' raylib die letzte Zeile verloren.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Datei")
+DIM iNeu AS INTEGER : iNeu = GUI_MENU_ITEM(m, "Neu")
+DIM iAuf AS INTEGER : iAuf = GUI_MENU_ITEM(m, "Oeffnen")
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 10, 60, 200, 26)
+GUI_FOCUS(tf)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(iNeu) THEN PRINT "klick Neu"
+    IF GUI_CLICKED(iAuf) THEN PRINT "klick Oeffnen"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "ende"
+--- datei ev.txt
+# Test-Aufnahme
+c 16
+e 3 2 299 0 0 0 // Event: test
+e 4 1 299 0 0 0 // Event: test
+e 6 2 264 0 0 0 // Event: test
+e 7 1 264 0 0 0 // Event: test
+e 9 2 257 0 0 0 // Event: test
+e 10 1 257 0 0 0 // Event: test
+e 13 2 342 0 0 0 // Event: test
+e 14 1 342 0 0 0 // Event: test
+e 16 2 257 0 0 0 // Event: test
+e 17 1 257 0 0 0 // Event: test
+e 20 2 299 0 0 0 // Event: test
+e 21 1 299 0 0 0 // Event: test
+e 23 2 256 0 0 0 // Event: test
+e 24 1 256 0 0 0 // Event: test
+e 26 2 257 0 0 0 // Event: test
+e 27 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=32
+--- erwartet
+klick Oeffnen
+klick Neu
+ende
+
+=== alt mit einer taste oeffnet das menue nicht
+' Alt+Rechts ist ein Kuerzel, kein "Alt allein" -- das Menue darf danach nicht
+' aufstehen, ein Enter loest keinen Eintrag aus. Der Fall davor ist die
+' Gegenprobe: Alt allein und Enter trifft "Neu".
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM m AS INTEGER : m = GUI_MENU(w, "Datei")
+DIM iNeu AS INTEGER : iNeu = GUI_MENU_ITEM(m, "Neu")
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_CLICKED(iNeu) THEN PRINT "klick Neu"
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+PRINT "ende"
+--- datei ev.txt
+# Test-Aufnahme
+c 6
+e 3 2 342 0 0 0 // Event: test
+e 5 2 262 0 0 0 // Event: test
+e 6 1 262 0 0 0 // Event: test
+e 8 1 342 0 0 0 // Event: test
+e 11 2 257 0 0 0 // Event: test
+e 12 1 257 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+ende
+
+=== die tab-reihenfolge ist setzbar
+' Index > 0 zuerst, der Rest in Anlege-Reihenfolge.
+IMPORT "gui"
+SCREEN(400, 300, "T", 1)
+SET_WINDOW_POS(-3000, -3000)
+AUTOMATION_PLAY("ev.txt")
+DIM w AS GUI_WINDOW
+w = GUI_WINDOW("T", 10, 10, 360, 260)
+DIM b1 AS GUI_WIDGET : b1 = GUI_BUTTON(w, "Eins", 10, 10, 80, 28)
+DIM b2 AS GUI_WIDGET : b2 = GUI_BUTTON(w, "Zwei", 10, 50, 80, 28)
+DIM b3 AS GUI_WIDGET : b3 = GUI_BUTTON(w, "Drei", 10, 90, 80, 28)
+GUI_SET_TAB_INDEX(b3, 1)
+GUI_SET_TAB_INDEX(b1, 2)
+DIM letzt AS GUI_WIDGET : letzt = -1
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    IF GUI_FOCUSED() <> letzt THEN
+        letzt = GUI_FOCUSED()
+        PRINT GUI_TEXT(letzt)
+    END IF
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei ev.txt
+# Test-Aufnahme
+c 8
+e 3 2 258 0 0 0 // Event: test
+e 4 1 258 0 0 0 // Event: test
+e 6 2 258 0 0 0 // Event: test
+e 7 1 258 0 0 0 // Event: test
+e 9 2 258 0 0 0 // Event: test
+e 10 1 258 0 0 0 // Event: test
+e 12 2 258 0 0 0 // Event: test
+e 13 1 258 0 0 0 // Event: test
+
+--- umgebung
+DHRT_FRAMES=16
+--- erwartet
+Drei
+Eins
+Zwei
+Drei
+
+=== tab-index, ansage und leserfrage ohne fenster
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 200, 100)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Ok", 10, 10, 80, 28)
+GUI_SET_TAB_INDEX(b, 2)
+PRINT "in der dhform "; (INSTR(GUI_TO_JSON(w), CHR$(34) + "tab_index" + CHR$(34) + ": 2") > 0)
+TRY
+    GUI_SET_TAB_INDEX(b, -1)
+    PRINT "negativ angenommen"
+CATCH e
+    PRINT "negativ abgelehnt "; (INSTR(e, "GUI_SET_TAB_INDEX") >= 0)
+END TRY
+' Ohne Hilfsprogramm hoert niemand zu -- und eine Ansage ist dann kein Fehler.
+PRINT "leser "; GUI_SCREENREADER()
+GUI_ANNOUNCE("ohne Zuhoerer passiert nichts")
+GUI_ANNOUNCE("dringend", TRUE)
+PRINT "ok"
+--- erwartet
+in der dhform TRUE
+negativ abgelehnt TRUE
+leser FALSE
+ok
+
+=== die texte der themen erreichen wcag aa
+' Text auf Fenster und Widget mindestens 4,5:1, gedaempfter Text ebenso (er
+' lag im hellen Thema bei 2,76:1), der Akzent als Fokusring und Haekchen
+' mindestens 3:1.
+IMPORT "gui"
+FUNCTION kanal(c AS INTEGER, s AS INTEGER) AS FLOAT
+    DIM x AS FLOAT : x = ((c SHR s) BAND 255) / 255.0
+    IF x <= 0.03928 THEN RETURN x / 12.92
+    RETURN ((x + 0.055) / 1.055) ^ 2.4
+END FUNCTION
+FUNCTION lum(c AS INTEGER) AS FLOAT
+    RETURN 0.2126 * kanal(c, 16) + 0.7152 * kanal(c, 8) + 0.0722 * kanal(c, 0)
+END FUNCTION
+FUNCTION kontrast(a AS INTEGER, b AS INTEGER) AS FLOAT
+    DIM la AS FLOAT : la = lum(a BAND &HFFFFFF)
+    DIM lb AS FLOAT : lb = lum(b BAND &HFFFFFF)
+    IF la < lb THEN RETURN (lb + 0.05) / (la + 0.05)
+    RETURN (la + 0.05) / (lb + 0.05)
+END FUNCTION
+DIM themen AS ARRAY OF STRING : themen = ["dark", "light", "contrast"]
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    GUI_THEME_PRESET(themen[i])
+    DIM text AS INTEGER : text = GUI_THEME_GET("text_fg")
+    DIM gedaempft AS INTEGER : gedaempft = GUI_THEME_GET("muted_fg")
+    DIM grund AS INTEGER : grund = GUI_THEME_GET("win_bg")
+    DIM feld AS INTEGER : feld = GUI_THEME_GET("widget_bg")
+    DIM akzent AS INTEGER : akzent = GUI_THEME_GET("accent")
+    PRINT themen[i]; ": text "; (kontrast(text, grund) >= 4.5 AND kontrast(text, feld) >= 4.5); _
+        ", gedaempft "; (kontrast(gedaempft, grund) >= 4.5); ", akzent "; (kontrast(akzent, grund) >= 3.0)
+NEXT
+--- erwartet
+dark: text TRUE, gedaempft TRUE, akzent TRUE
+light: text TRUE, gedaempft TRUE, akzent TRUE
+contrast: text TRUE, gedaempft TRUE, akzent TRUE
+
+=== ein fremder leser sieht und bedient das fenster
+' Das Formular laeuft als Kind; PowerShell findet sein Fenster, zaehlt die
+' Knoten mit Rolle und Namen, kippt das Kaestchen, setzt den Text und klickt.
+' Das Kind meldet, was bei IHM ankam.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Zugang-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "1500", CWD$() + "/formular.dh", "--", kennung)
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/leser.ps1", kennung)
+DIM leser AS STRING : leser = auslesen$(ps, 60000)
+PRINT "leser rueckgabe "; PROCESS_CODE(ps)
+DIM kindAus AS STRING : kindAus = auslesen$(kind, 40000)
+' Vor dem Bau: null Nachkommen. Jetzt Rolle und Name je Bedienelement; das
+' Feld heisst wie die Beschriftung links daneben.
+PRINT "knopf "; (INSTR(leser, "N: ControlType.Button [Speichern]") >= 0)
+PRINT "kaestchen "; (INSTR(leser, "N: ControlType.CheckBox [Bezahlt]") >= 0)
+PRINT "feld "; (INSTR(leser, "N: ControlType.Edit [Name]") >= 0)
+PRINT "fenster "; (INSTR(leser, "N: ControlType.Group [Formular]") >= 0)
+PRINT "wert gesetzt "; (INSTR(leser, "WERT: Anna") >= 0)
+IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
+PRINT kindAus;
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/uialeser.dh"
+--- datei formular.dh
+IMPORT "gui"
+SCREEN(400, 300, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("Formular", 10, 10, 360, 260)
+DIM lb AS GUI_WIDGET : lb = GUI_LABEL(w, "Name", 10, 12)
+DIM tf AS GUI_WIDGET : tf = GUI_TEXTINPUT(w, 70, 8, 200, 26)
+DIM cb AS GUI_WIDGET : cb = GUI_CHECKBOX(w, "Bezahlt", 10, 50, FALSE)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "Speichern", 10, 90, 120, 32)
+DIM leser AS BOOLEAN : leser = FALSE
+DIM fok AS BOOLEAN : fok = FALSE
+DIM haken AS BOOLEAN : haken = FALSE
+DIM fertig AS BOOLEAN : fertig = FALSE
+WHILE NOT QUITREQUESTED() AND NOT fertig
+    GUI_UPDATE()
+    IF GUI_SCREENREADER() AND NOT leser THEN PRINT "leser da" : leser = TRUE
+    IF GUI_FOCUSED() = cb AND NOT fok THEN PRINT "fokus kaestchen" : fok = TRUE
+    IF GUI_CHECKED(cb) AND NOT haken THEN PRINT "haken" : haken = TRUE
+    IF GUI_CLICKED(b) THEN PRINT "geklickt " + GUI_TEXT(tf) : fertig = TRUE
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+--- datei leser.ps1
+param([string]$Titel)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$A = [System.Windows.Automation.AutomationElement]
+$Alle = [System.Windows.Automation.TreeScope]::Descendants
+$Wahr = [System.Windows.Automation.Condition]::TrueCondition
+# Ueber das Fensterhandle, nicht ueber die Kinder der Wurzel: ein Fenster
+# ausserhalb des Schirms zaehlt dort nicht mit.
+$win = $null
+$kids = $null
+for ($i = 0; $i -lt 150; $i++) {
+    $p = Get-Process | Where-Object { $_.MainWindowTitle -eq $Titel } | Select-Object -First 1
+    if ($p -and $p.MainWindowHandle -ne 0) {
+        $win = $A::FromHandle($p.MainWindowHandle)
+        $kids = $win.FindAll($Alle, $Wahr)
+        if ($kids.Count -ge 5) { break }
+    }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $win) { "kein Fenster"; exit 2 }
+foreach ($k in $kids) { "N: " + $k.Current.ControlType.ProgrammaticName + " [" + $k.Current.Name + "]" }
+function Finde($typ, $name) {
+    foreach ($k in $win.FindAll($Alle, $Wahr)) {
+        if ($k.Current.ControlType.ProgrammaticName -eq $typ -and ($name -eq "" -or $k.Current.Name -eq $name)) { return $k }
+    }
+    return $null
+}
+$cb = Finde "ControlType.CheckBox" "Bezahlt"
+$edit = Finde "ControlType.Edit" ""
+$btn = Finde "ControlType.Button" "Speichern"
+if (-not $cb -or -not $edit -or -not $btn) { "Element fehlt"; exit 3 }
+$cb.SetFocus(); Start-Sleep -Milliseconds 300
+$cb.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle(); Start-Sleep -Milliseconds 300
+$edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue("Anna"); Start-Sleep -Milliseconds 300
+"WERT: " + $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value
+$btn.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+"fertig"
+--- system windows
+--- erwartet
+leser rueckgabe 0
+knopf TRUE
+kaestchen TRUE
+feld TRUE
+fenster TRUE
+wert gesetzt TRUE
+leser da
+fokus kaestchen
+haken
+geklickt Anna
+
+=== speak ohne gui spricht ueber den leser
+' SPEAK fragt zuerst den Bildschirmleser (docs/entwurf-speak.md, Weg C): laeuft
+' einer, geht der Satz als Ansage in den Baum -- auch in einem Programm OHNE
+' gui, dessen Baum sonst nur das Fenster waere. Der fremde Leser findet den
+' Satz als Text-Knoten; die Systemstimme bleibt still, SPEAKING ist FALSE.
+' Das Kind endet, sobald der Fall fertig.txt schreibt.
+IMPORT "helfer.dh"
+DIM kennung AS STRING : kennung = "Sprecher-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", "--bilder", "1500", CWD$() + "/sprecher.dh", "--", kennung, CWD$() + "/fertig.txt")
+DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", CWD$() + "/leser.ps1", kennung)
+DIM leser AS STRING : leser = auslesen$(ps, 60000)
+WRITEALL("fertig.txt", "ja")
+PRINT "leser rueckgabe "; PROCESS_CODE(ps)
+PRINT "ansage als text "; (INSTR(leser, "ANSAGE: ControlType.Text [Der Drache erwacht]") >= 0)
+IF PROCESS_CODE(ps) <> 0 THEN PRINT leser
+PRINT auslesen$(kind, 40000);
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/uialeser.dh"
+--- datei sprecher.dh
+SCREEN(400, 300, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM gesagt AS BOOLEAN : gesagt = FALSE
+WHILE NOT QUITREQUESTED() AND NOT FILEEXISTS(ARG$(1))
+    IF GUI_SCREENREADER() AND NOT gesagt THEN SPEAK("Der Drache erwacht") : PRINT "gesagt" : gesagt = TRUE
+    CLS(0) : FLIP()
+WEND
+PRINT "speaking "; SPEAKING()
+--- datei leser.ps1
+param([string]$Titel)
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$A = [System.Windows.Automation.AutomationElement]
+$Alle = [System.Windows.Automation.TreeScope]::Descendants
+$Wahr = [System.Windows.Automation.Condition]::TrueCondition
+$win = $null
+for ($i = 0; $i -lt 150; $i++) {
+    $p = Get-Process | Where-Object { $_.MainWindowTitle -eq $Titel } | Select-Object -First 1
+    if ($p -and $p.MainWindowHandle -ne 0) { $win = $A::FromHandle($p.MainWindowHandle); break }
+    Start-Sleep -Milliseconds 100
+}
+if (-not $win) { "kein Fenster"; exit 2 }
+# Das Anfassen des Fensters ist die Aktivierung: ab jetzt schickt dhrt einen
+# Baum. Die Ansage kommt ein paar Bilder spaeter -- nachfragen, nicht raten.
+for ($i = 0; $i -lt 100; $i++) {
+    foreach ($k in $win.FindAll($Alle, $Wahr)) {
+        $n = [string]$k.Current.Name
+        if ($n.Trim() -eq "Der Drache erwacht") {
+            "ANSAGE: " + $k.Current.ControlType.ProgrammaticName + " [" + $n.Trim() + "]"
+            exit 0
+        }
+    }
+    Start-Sleep -Milliseconds 100
+}
+"keine Ansage"; exit 3
+--- system windows
+--- erwartet
+leser rueckgabe 0
+ansage als text TRUE
+gesagt
+speaking FALSE
