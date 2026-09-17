@@ -8,7 +8,7 @@ File -> Settings -> Project: Drachenhauch -> Python Interpreter
 Zahnrad oben rechts -> "Add Interpreter" -> "Add Local Interpreter"
 -> "Existing" -> Pfad waehlen:
     C:\Programmieren\Python\Drachenhauch\.venv\Scripts\python.exe
-Bestaetigen. PyCharm sieht jetzt pygame und alle anderen Pakete.
+Bestaetigen. PyCharm sieht jetzt PySide6 und alle anderen Pakete.
 
 
 2) RUN-KONFIGURATION FUER dhrun.py
@@ -157,38 +157,26 @@ OK druecken. Jetzt sind .dh-Dateien farbig und tab-getreu hervorgehoben.
 -----------------------
 Aus jedem Terminal im Projekt-Ordner:
 
-    gb.cmd examples\10_pong.dh           (Windows-CMD/PowerShell)
-    ./gb.sh examples/10_pong.dh          (Git-Bash, WSL)
+    dh.cmd examples\10_pong.dh           (Windows-CMD/PowerShell)
+    ./dh.sh examples/10_pong.dh          (Git-Bash, WSL)
 
 beide nutzen automatisch den .venv-Python und brauchen nichts global.
+Ohne Python geht es genauso:  dhrt run examples\10_pong.dh
 
 
 6) SPIELE ALS .EXE VERTEILEN
 ----------------------------
-Voraussetzung: native VM ist gebaut (dh-build.cmd).
+Das macht die Laufzeit selbst -- PyInstaller und der fruehere `dh-package`
+werden dafuer nicht mehr gebraucht:
 
-    dh-package examples\10_pong.dh --windowed --onefile
-        -> dist\10_pong.exe (etwa 17 MB, einzelne Datei)
+    dhrt --export examples\10_pong.dh
+        -> 10_pong_dist\10_pong.exe samt kopierter assets/
 
-    dh-package examples\17_tilemap.dh --windowed
-        -> dist\17_tilemap\17_tilemap.exe (Ordner mit allen DLLs,
-           etwa 40 MB, schneller Start)
+`dhrt --export` haengt den uebersetzten Bytecode an eine Kopie der Laufzeit.
+Die Exe laeuft ohne Python und ohne Installation; weitergeben heisst: den
+ganzen `_dist`-Ordner kopieren.
 
-Optionen:
-    --windowed     Kein Konsolenfenster (Release-Modus). Ohne diese Option
-                   kommt eine Konsole mit, was beim Debuggen hilft.
-    --onefile      Eine einzige .exe statt eines Ordners. Startet etwas
-                   langsamer (extrahiert beim Start in den Temp-Ordner),
-                   aber simpler zu verteilen.
-    --icon=mein.ico  Eigenes Icon fuer die .exe.
-    --name=Sonic     Eigener Name (sonst aus Dateiname abgeleitet).
-    --clean        Loescht alte Build-Artefakte vorher.
-
-Verteilen:
-- Bei --onefile: nur die .exe-Datei kopieren. Die assets/ liegen drin.
-- Bei Ordner-Build: den ganzen Ordner aus dist/<name>/ verschicken
-  (z.B. zippen).
-
-Sicherheitshinweis: Manche Antivirus-Programme melden PyInstaller-.exes
+Sicherheitshinweis: Manche Antivirus-Programme melden frisch gebaute .exe
 als verdaechtig (False Positive). Wenn das stoert, mit Microsoft Defender
-ausschliessen oder die .exe signieren.
+ausschliessen oder die .exe signieren (erst exportieren, dann signieren --
+umgekehrt zerstoert das Anhaengen die Signatur).

@@ -343,15 +343,22 @@ stumm (vorher klang es als Rechteck).
 * **`dhrun.py` und die dreizehn `.cmd`-Starter.** Alles, was nicht Qt ist,
   reicht nur an `dhrt` durch (`run`, `--export`, `--tokens`, `--ast`,
   `--doku`). Die Qt-Modi haben `ide.dh` und die `.dh`-Editoren ersetzt, so
-  wie es die Verknüpfungen in `Drachenhauch-IDE.iss` schon tun. **Tot:**
-  `dh-build.cmd` (ruft ein `setup.py`, das es nicht mehr gibt),
-  `dh-package.cmd` (ruft `gb-package.py`, ebenso), `22_tetris.spec` (ein
-  PyInstaller-Rest für eine `.gb`-Datei). **Kaputt:** `dhrun.py --doku`
-  bricht mit einem NameError ab, weil `subprocess` dort nicht importiert
-  ist ✔.
-* **`requirements.txt` und `pyproject.toml`.** `openpyxl` steht noch
-  darin, obwohl der Test dazu längst eine Sammlung ist ✔; die Extras
-  `serial`/`usb`/`bt`/`hw` meinen Python-Pakete, die `dhrt` nicht braucht.
+  wie es die Verknüpfungen in `Drachenhauch-IDE.iss` schon tun. **Tot und
+  am 17.09. gelöscht:** `dh-build.cmd` (rief ein `setup.py`, das es nicht
+  mehr gibt) und `dh-package.cmd` (rief `gb-package.py`, ebenso); dazu nannte
+  `pycharm-setup.txt` beide samt `gb.cmd`/`gb.sh` und pygame. Der
+  PyInstaller-Rest `22_tetris.spec` lag nur in der Arbeitskopie -- `*.spec`
+  ist ignoriert, versioniert war er nie.
+  **Kaputt:** `dhrun.py --doku` bricht mit einem NameError ab, weil
+  `subprocess` dort nicht importiert ist ✔.
+* **`requirements.txt` und `pyproject.toml`.** `openpyxl` stand noch darin,
+  obwohl der Test dazu längst eine Sammlung ist ✔ -- am 17.09. gestrichen.
+  **Damit ist der fremde Leser der `.xlsx`-Ausgabe weg:** die Erwartungen der
+  Sammlung stammen aus dem letzten Lauf mit openpyxl (daher auch die
+  Standard-Vorlage in `xlsx.rs`), gegengelesen wird seither mit dem eigenen
+  Leser. Wer das zurückwill, braucht einen Leser, der nicht von hier stammt.
+  Die Extras `serial`/`usb`/`bt`/`hw` meinen Python-Pakete, die `dhrt` nicht
+  braucht.
 * **Die beiden Installer.** Nur der PyInstaller-Weg (`build_installer.py`,
   `Drachenhauch.iss`) liefert heute: die Qt-IDE; **die Bücher als
   `.docx`/`.epub`**; die **ESP32-Sketche**; die Lizenzhinweise samt
@@ -400,9 +407,9 @@ und fallen mit ihnen.
 
 ### 7.7 Vorschlag: Reihenfolge
 
-1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~ (erledigt); die
-   toten Starter und `openpyxl` streichen; den Pan-Regler in den GB-Code
-   des SFX-Generators.
+1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~,
+   ~~die toten Starter und `openpyxl` streichen~~ (beides am 17.09.
+   erledigt); den Pan-Regler in den GB-Code des SFX-Generators.
 2. **Umzüge, die Python nicht stören:** die drei `builtin_*.json` aus
    `drachenhauch/` heraus; `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`;
    `test_midi_module` als Sammlung.
