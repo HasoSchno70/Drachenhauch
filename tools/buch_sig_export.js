@@ -1,5 +1,5 @@
 // Liefert die `H.cmd(...)`-Eintraege des Referenzbuchs MIT Signatur als JSON:
-// [{datei, name, sig, text}, ...] -- Grundlage fuer tests/test_buch_signaturen.py.
+// [{datei, name, sig, text}, ...] -- Grundlage fuer tests/pruef/buch_pruefungen.dhtest.
 //
 // Getrennt von buch_cmd_export.js, weil der nur (Name, Text) fuer die
 // Hover-Prosa braucht und sein Format dort verankert ist.

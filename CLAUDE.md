@@ -3293,6 +3293,28 @@ steht. Rust-Tests `enum_als_block_und_als_kurzform` und in
 `gliederung_verschachtelt_und_enum` (Gegenprobe ohne `END ENUM`: beide
 fallen), `tests/pruef/dhrt_lsp.dhtest` prueft das Ende mit.
 
+**Die Buecher ohne Python (2026-09-17, Weg D):** fuenf pytest-Dateien, vier
+Sammlungen. Signaturen im Referenzbuch gegen `builtin_index.json` -> drei Faelle
+mehr in `tests/pruef/buch_pruefungen.dhtest` (`_hilfen/signatur.dh` baut
+`arity` und `formen_je_befehl` als Zeichen-Scanner nach -- das regex-Modul
+kennt keine Treffer mit mehreren Gruppen). Tippspiel-Band ->
+`tests/pruef/buch_tippspiel.dhtest` (21: jeder Kapitelstand als Kopie, die
+Pruefprogramme, Buch-Skript und docx-Build in den Fallordner). Einstiegsbuch ->
+`tests/pruef/buch_einstieg.dhtest` (7). EPUB -> `tests/pruef/buch_epub.dhtest`
+(7: der erste lokale ZIP-Kopf roh gelesen, OPF mit dem xml-Modul). **Zwei
+Funde:** (1) die Zerleger-Probe war in pytest wertlos -- ohne die
+Schraegstrich-Regel blieb `ECS_FILL_FLOAT/INT(...)` leer, weil `INT` in der
+Probe nicht bekannt war; im echten Index steht es, und genau dafuer gibt es die
+Regel. (2) **`XML_PARSE` ist nachsichtiger als ElementTree:** ein nacktes `&`,
+`&nbsp;` und Attribute ohne Anfuehrungszeichen gehen durch (`<` und falsche
+Schachtelung nicht). Fuer "fremde Daten lesen" ist das vertretbar, fuer eine
+Wohlgeformtheits-Probe nicht -- der EPUB-Fall zaehlt die `&`-Stellen selbst und
+traegt seine Gegenprobe im Fall. Gegenproben: 31 Verfaelschungen an echten
+Dateien (Index, Kapiteltext, Anhang, Kapitelcode; danach `git checkout`) und
+an Testkopien, dazu sieben kaputte EPUBs -- jede faellt. Eine Falle beim
+Gegenproben: der Index fuehrt die Signatur `MID$(2..3 Argumente)` zweimal
+(`MID` und `MID$`), und der Abgleich nimmt wie die Python-Fassung den letzten.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber

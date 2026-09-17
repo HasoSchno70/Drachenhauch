@@ -160,3 +160,124 @@ IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 rueckgabe 0
 ohne befund TRUE
 genug ausgefuehrt TRUE
+
+=== der signaturleser liest die bekannten formen
+' Bis 2026-09-17 tests/test_buch_signaturen.py. Der Leser selbst -- sonst
+' faellt eine Regression im Abgleich unten stumm aus.
+IMPORT "helfer.dh"
+PRINT arity$("MID$(s$, start[, n])")
+PRINT arity$("ARC(6..8 Argumente)")
+PRINT arity$("GUI_SPLITTER(7 Argumente)")
+PRINT arity$("GUI_TOGGLE(win, text: STRING, x, y, an: BOOLEAN = FALSE)")
+PRINT arity$("RND()        RND(n)")
+PRINT arity$("SCREENWIDTH()")
+PRINT "["; arity$("PLOTS(xs, ys, farbe, ...)"); "]"
+PRINT arity$("LEN(s$) → INTEGER")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/signatur.dh"
+--- erwartet
+2,3
+6,8
+7,7
+4,5
+0,1
+0,0
+[]
+1,1
+
+=== der zerleger trennt sammel-eintraege
+' Das Buch fasst verwandte Befehle in EINEM Eintrag zusammen. Ohne Zerlegung
+' blieben solche Eintraege ungeprueft -- darin steckte am 2026-08-30 ein
+' Fehler (TEMPFILE$ mit der Endung als erstem Argument). Alternativen desselben
+' Befehls ergeben eine Spanne; eine Familie hinter dem Schraegstrich zaehlt
+' nicht, vor ihrer Klammer steht nur das letzte Stueck des Namens.
+IMPORT "helfer.dh"
+DIM bekannt AS MAP OF BOOLEAN
+MAPPUT(bekannt, "TEMPDIR$", TRUE)
+MAPPUT(bekannt, "TEMPFILE$", TRUE)
+MAPPUT(bekannt, "RANGE", TRUE)
+MAPPUT(bekannt, "ECS_FILL_FLOAT", TRUE)
+' INT ist ein echter Befehl -- ohne die Schraegstrich-Regel wuerde die Familie
+' unten als INT(w, ziel$, wert) mit drei Argumenten geprueft.
+MAPPUT(bekannt, "INT", TRUE)
+DIM z AS ARRAY OF STRING : z = formenJeBefehl("TEMPDIR$()   TEMPFILE$([praefix$[, endung$]])", bekannt)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(z) - 1
+    PRINT z[i]
+NEXT
+z = formenJeBefehl("RANGE(ende)   RANGE(start, ende)", bekannt)
+PRINT z[0]; " -> "; arity$(MID$(z[0], INSTR(z[0], "|") + 1))
+PRINT "familie "; LEN(formenJeBefehl("ECS_FILL_FLOAT/INT(w, ziel$, wert)", bekannt))
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/signatur.dh"
+--- erwartet
+TEMPDIR$|TEMPDIR$()
+TEMPFILE$|TEMPFILE$([praefix$[, endung$]])
+RANGE|RANGE(ende)   RANGE(start, ende) -> 1,2
+familie 0
+
+=== die signaturen im buch passen zum index
+' Das Buch fuehrt jeden Befehl mit seiner Aufrufform. Die altert still: beim
+' Abgleich am 2026-08-30 fehlte sechsmal ein spaeter ergaenztes Argument.
+' Verglichen wird nur die ARGUMENTZAHL -- die Namen sind im Buch bewusst
+' deutsch und erklaerend.
+IMPORT "helfer.dh"
+IMPORT "json"
+DIM wurzel AS STRING : wurzel = ARG$(0)
+IF NOT nodeDa() THEN
+    PRINT "UEBERSPRINGEN: node fehlt"
+    EXIT(0)
+END IF
+DIM roh AS STRING : roh = nodeLauf$(wurzel, wurzel + "/tools/buch_sig_export.js")
+IF roh = "" THEN
+    PRINT "UEBERSPRINGEN: Buch-Export fehlgeschlagen"
+    EXIT(0)
+END IF
+DIM buch AS JSON_HANDLE : buch = JSON_PARSE("{""e"":" + roh + "}")
+' Ohne diese Schranke liefe der Vergleich bei einem kaputten Export leer durch.
+PRINT "genug eintraege "; (JSON_LEN(buch, "e") > 500)
+DIM idx AS JSON_HANDLE : idx = JSON_LOAD(wurzel + "/drachenhauch/editor_qt/builtin_index.json")
+DIM bekannt AS MAP OF BOOLEAN
+DIM sigs AS MAP OF STRING
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(idx, "builtins") - 1
+    DIM p AS STRING : p = "builtins." + STR$(i)
+    IF NOT JSON_HAS(idx, p + ".name") THEN CONTINUE
+    DIM nm AS STRING : nm = UPPER$(JSON_GET_STRING(idx, p + ".name"))
+    IF nm = "" THEN CONTINUE
+    MAPPUT(bekannt, nm, TRUE)
+    IF JSON_HAS(idx, p + ".signature") THEN MAPPUT(sigs, nm, JSON_GET_STRING(idx, p + ".signature")) ELSE MAPPUT(sigs, nm, "")
+NEXT
+DIM geprueft AS INTEGER : geprueft = 0
+DIM befund AS INTEGER : befund = 0
+FOR i = 0 TO JSON_LEN(buch, "e") - 1
+    DIM sig AS STRING : sig = JSON_GET_STRING(buch, "e." + STR$(i) + ".sig")
+    IF TRIM$(sig) = "" THEN CONTINUE
+    DIM formen AS ARRAY OF STRING : formen = formenJeBefehl(sig, bekannt)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(formen) - 1
+        DIM name AS STRING : name = LEFT$(formen[k], INSTR(formen[k], "|"))
+        DIM form AS STRING : form = MID$(formen[k], INSTR(formen[k], "|") + 1)
+        DIM imBuch AS STRING : imBuch = arity$(form)
+        DIM imIndex AS STRING : imIndex = arity$(MAPGET(sigs, name))
+        IF imBuch = "" OR imIndex = "" THEN CONTINUE
+        geprueft = geprueft + 1
+        IF imBuch <> imIndex THEN
+            befund = befund + 1
+            PRINT name; " ("; JSON_GET_STRING(buch, "e." + STR$(i) + ".datei"); "): Buch "; imBuch; " -- Index "; imIndex
+            PRINT "    Buch : "; TRIM$(form)
+            PRINT "    Index: "; MAPGET(sigs, name)
+        END IF
+    NEXT
+NEXT
+PRINT "genug verglichen "; (geprueft > 500)
+PRINT "abweichungen "; befund
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/nodelauf.dh"
+IMPORT "{sammlung}/_hilfen/signatur.dh"
+--- erwartet
+genug eintraege TRUE
+genug verglichen TRUE
+abweichungen 0

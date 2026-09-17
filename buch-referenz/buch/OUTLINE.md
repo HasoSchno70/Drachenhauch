@@ -12,7 +12,7 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
   bis 2026-09-15 `make_book.py` mit PyMuPDF). Rendert das PDF am Ende noch einmal,
   es steht also mit Seitenzahlen neben dem `.docx`.
 - `node build_epub.js` → `Drachenhauch-Lehrbuch.epub` (EPUB 3, ein XHTML je Kapitel,
-  nav.xhtml + NCX, Nachtmodus). Prüfung: `pytest tests/test_build_epub.py`.
+  nav.xhtml + NCX, Nachtmodus). Prüfung: `dhrt test tests/pruef/buch_epub.dhtest`.
 
 ## Architektur
 - **Zwei Renderer, ein Inhalt.** `build_book.js` (→ .docx) und `build_epub.js`

@@ -1,0 +1,244 @@
+' Der EPUB-Bau des Referenzbuchs.
+'
+' Ein EPUB ist ein ZIP mit strengen Regeln: falsch abgelegte "mimetype"-Datei,
+' eine nicht wohlgeformte XHTML-Seite oder ein Verweis ins Leere, und das
+' Lesegeraet zeigt gar nichts an oder bricht mitten im Buch ab. Von aussen
+' sieht die Datei dabei jedes Mal gleich aus -- geprueft wird darum der INHALT
+' des Archivs. Jeder Fall baut das Buch selbst (eine halbe Sekunde).
+'
+' Bis 2026-09-17 tests/test_build_epub.py (zipfile + ElementTree). Format:
+' docs/werkzeuge.md, dhrt test.
+
+=== mimetype ist der erste eintrag und unkomprimiert
+' Die einzige Regel, an der ein EPUB komplett scheitert: manche Leser lesen die
+' ersten Bytes des ZIP roh. Gelesen wird darum der erste lokale Kopf selbst:
+' Kennung PK34, Verfahren an Stelle 8 (0 = gespeichert), Name ab Stelle 30.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM b AS BUFFER : b = READALL_BYTES(epub)
+PRINT "kopf "; (BUFFER_GET_U32(b, 0) = &H04034B50)
+PRINT "gespeichert "; (BUFFER_GET_U16(b, 8) = 0)
+DIM nl AS INTEGER : nl = BUFFER_GET_U16(b, 26)
+PRINT "erster eintrag "; BUFFER_TO_STRING$(BUFFER_SLICE(b, 30, 30 + nl))
+PRINT "inhalt "; ZIP_READ$(epub, "mimetype")
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+kopf TRUE
+gespeichert TRUE
+erster eintrag mimetype
+inhalt application/epub+zip
+
+=== alle xml-dateien sind wohlgeformt
+' Die Seiten entstehen aus zusammengesetzten Zeichenketten -- ein nicht
+' maskiertes & oder < im Kapiteltext bricht die Seite. Die Gegenprobe steht
+' im Fall: die Pruefung selbst muss beides ablehnen.
+IMPORT "helfer.dh"
+PRINT "gegenprobe &: "; (xmlBefund$("<p>a & b</p>") <> "")
+PRINT "gegenprobe <: "; (xmlBefund$("<p>1 < 2</p>") <> "")
+PRINT "gegenprobe schachtelung: "; (xmlBefund$("<p><b></p>") <> "")
+PRINT "gegenprobe gut: "; (xmlBefund$("<p>a &amp; b &#160;</p>") = "")
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM namen AS ARRAY OF STRING : namen = ZIP_LIST(epub)
+DIM zahl AS INTEGER : zahl = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    DIM n AS STRING : n = namen[i]
+    IF NOT (RIGHT$(n, 6) = ".xhtml" OR RIGHT$(n, 4) = ".opf" OR RIGHT$(n, 4) = ".ncx" OR RIGHT$(n, 4) = ".xml") THEN CONTINUE
+    zahl = zahl + 1
+    DIM befund AS STRING : befund = xmlBefund$(ZIP_READ$(epub, n))
+    IF befund <> "" THEN PRINT n; " ist nicht wohlgeformt: "; befund
+NEXT
+PRINT "genug seiten "; (zahl > 50)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+gegenprobe &: TRUE
+gegenprobe <: TRUE
+gegenprobe schachtelung: TRUE
+gegenprobe gut: TRUE
+genug seiten TRUE
+
+=== manifest, spine und archiv stimmen ueberein
+' Jede Manifest-Datei liegt im Archiv, der Spine kennt nur Manifest-ids, und
+' umgekehrt ist keine Datei unbekannt -- die waere unsichtbarer Ballast.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM namen AS ARRAY OF STRING : namen = ZIP_LIST(epub)
+DIM imArchiv AS MAP OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    MAPPUT(imArchiv, namen[i], TRUE)
+NEXT
+DIM pfad AS STRING : pfad = opfPfad$(epub)
+PRINT "opf im archiv "; MAPHAS(imArchiv, pfad)
+DIM basis AS STRING : basis = ordnerVon$(pfad)
+DIM opf AS XML_HANDLE : opf = XML_PARSE(ZIP_READ$(epub, pfad))
+DIM ids AS MAP OF BOOLEAN
+DIM bekannt AS MAP OF BOOLEAN
+MAPPUT(bekannt, "mimetype", TRUE)
+MAPPUT(bekannt, "META-INF/container.xml", TRUE)
+MAPPUT(bekannt, pfad, TRUE)
+FOR i = 0 TO XML_COUNT(opf, "manifest/item") - 1
+    DIM it AS XML_HANDLE : it = XML_AT(opf, "manifest/item", i)
+    DIM ziel AS STRING : ziel = normPfad$(basis, XML_ATTR$(it, "href"))
+    MAPPUT(ids, XML_ATTR$(it, "id"), TRUE)
+    MAPPUT(bekannt, ziel, TRUE)
+    IF NOT MAPHAS(imArchiv, ziel) THEN PRINT "Manifest nennt "; ziel; ", fehlt im Archiv"
+NEXT
+DIM spine AS INTEGER : spine = XML_COUNT(opf, "spine/itemref")
+PRINT "spine nicht leer "; (spine > 0)
+FOR i = 0 TO spine - 1
+    DIM ref AS STRING : ref = XML_ATTR$(XML_AT(opf, "spine/itemref", i), "idref")
+    IF NOT MAPHAS(ids, ref) THEN PRINT "Spine verweist auf unbekannte id "; ref
+NEXT
+FOR i = 0 TO LEN(namen) - 1
+    IF RIGHT$(namen[i], 1) = "/" THEN CONTINUE
+    IF NOT MAPHAS(bekannt, namen[i]) THEN PRINT "nicht im Manifest: "; namen[i]
+NEXT
+PRINT "manifest-eintraege "; (XML_COUNT(opf, "manifest/item") > 50)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+opf im archiv TRUE
+spine nicht leer TRUE
+manifest-eintraege TRUE
+
+=== alle internen verweise loesen sich auf
+' JEDER Verweis: Kapitel-Links im Verzeichnis, Stylesheets, Bilder, die Ziele
+' im NCX -- relativ zu der Datei, in der sie stehen. Beim ersten Bau lag
+' nav.xhtml eine Ebene ueber den Kapiteln und verlinkte, als laege es daneben:
+' alle 84 Verzeichnis-Eintraege zeigten ins Leere, und die Datei baute,
+' oeffnete und zeigte Text. Gezaehlt wird mit, damit ein leeres Buch nicht
+' besteht.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM namen AS ARRAY OF STRING : namen = ZIP_LIST(epub)
+DIM imArchiv AS MAP OF BOOLEAN
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    MAPPUT(imArchiv, namen[i], TRUE)
+NEXT
+SORT(namen)
+DIM q AS STRING : q = CHR$(34)
+DIM bilder AS INTEGER : bilder = 0
+DIM seiten AS INTEGER : seiten = 0
+DIM css AS INTEGER : css = 0
+DIM kaputt AS INTEGER : kaputt = 0
+FOR i = 0 TO LEN(namen) - 1
+    DIM n AS STRING : n = namen[i]
+    IF NOT (RIGHT$(n, 6) = ".xhtml" OR RIGHT$(n, 4) = ".ncx") THEN CONTINUE
+    DIM verweise AS ARRAY OF STRING : verweise = REGEX_FIND_ALL(ZIP_READ$(epub, n), "(?:href|src)=" + q + "([^" + q + "]+)" + q)
+    DIM k AS INTEGER
+    FOR k = 0 TO LEN(verweise) - 1
+        DIM v AS STRING : v = verweise[k]
+        IF LEFT$(v, 5) = "http:" OR LEFT$(v, 6) = "https:" OR LEFT$(v, 1) = "#" THEN CONTINUE
+        DIM ohne AS STRING : ohne = v
+        IF INSTR(ohne, "#") >= 0 THEN ohne = LEFT$(ohne, INSTR(ohne, "#"))
+        DIM ziel AS STRING : ziel = normPfad$(ordnerVon$(n), ohne)
+        IF NOT MAPHAS(imArchiv, ziel) THEN
+            kaputt = kaputt + 1
+            IF kaputt <= 5 THEN PRINT n; " -> "; v
+        END IF
+        IF RIGHT$(ziel, 4) = ".png" THEN
+            bilder = bilder + 1
+        ELSEIF RIGHT$(ziel, 4) = ".css" THEN
+            css = css + 1
+        ELSE
+            seiten = seiten + 1
+        END IF
+    NEXT
+NEXT
+PRINT "verweise ins leere "; kaputt
+PRINT "bilder "; (bilder > 20); ", seiten "; (seiten > 150); ", stylesheets "; (css > 50)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+verweise ins leere 0
+bilder TRUE, seiten TRUE, stylesheets TRUE
+
+=== das verzeichnis enthaelt teile und kapitel
+' nav.xhtml fuer EPUB 3, toc.ncx fuer aeltere Geraete -- beide muessen
+' dieselben Kapitel kennen, auch den Vorspann (im EPUB kommt man nur ueber das
+' Verzeichnis zum Vorwort). Wo nav.xhtml liegt, sagt das Manifest.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM pfad AS STRING : pfad = opfPfad$(epub)
+DIM basis AS STRING : basis = ordnerVon$(pfad)
+DIM opf AS XML_HANDLE : opf = XML_PARSE(ZIP_READ$(epub, pfad))
+DIM navHref AS STRING : navHref = ""
+DIM i AS INTEGER
+FOR i = 0 TO XML_COUNT(opf, "manifest/item") - 1
+    DIM it AS XML_HANDLE : it = XML_AT(opf, "manifest/item", i)
+    IF XML_ATTR$(it, "properties", "") = "nav" THEN navHref = XML_ATTR$(it, "href")
+NEXT
+PRINT "nav im manifest "; (navHref <> "")
+IF navHref = "" THEN EXIT(0)
+DIM nav AS STRING : nav = ZIP_READ$(epub, normPfad$(basis, navHref))
+DIM ncx AS STRING : ncx = ZIP_READ$(epub, normPfad$(basis, "toc.ncx"))
+DIM titel AS ARRAY OF STRING : titel = ["Vorwort", "Modul: chart", "Modul: gui"]
+FOR i = 0 TO 2
+    PRINT titel[i]; ": nav "; (INSTR(nav, titel[i]) >= 0); ", ncx "; (INSTR(ncx, titel[i]) >= 0)
+NEXT
+PRINT "als toc ausgezeichnet "; (INSTR(nav, "epub:type=" + CHR$(34) + "toc" + CHR$(34)) >= 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+nav im manifest TRUE
+Vorwort: nav TRUE, ncx TRUE
+Modul: chart: nav TRUE, ncx TRUE
+Modul: gui: nav TRUE, ncx TRUE
+als toc ausgezeichnet TRUE
+
+=== das stylesheet paart jeden hintergrund mit einer schriftfarbe
+' Wer `background` setzt, ohne `color` zu setzen, baut eine Falle: im
+' Nachtmodus faerbt das Lesegeraet die Schrift hell und laesst den hellen
+' Hintergrund stehen. Genau so war es beim ersten Bau. Regeln mit
+' /* ohne-schrift: ... */ tragen keinen Text (Farbfelder) und zaehlen nicht.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM css AS STRING : css = ZIP_READ$(epub, "OEBPS/styles/buch.css")
+css = REGEX_REPLACE(css, "(?s)/\* ohne-schrift:.*?\*/\s*[^{]+\{[^}]*\}", "")
+css = REGEX_REPLACE(css, "(?s)/\*.*?\*/", "")
+DIM bloecke AS ARRAY OF STRING : bloecke = REGEX_FIND_ALL(css, "\{([^{}]*)\}")
+DIM mitHintergrund AS INTEGER : mitHintergrund = 0
+DIM i AS INTEGER
+FOR i = 0 TO LEN(bloecke) - 1
+    DIM blk AS STRING : blk = bloecke[i]
+    IF NOT REGEX_TEST(blk, "(^|;)\s*background(-color)?\s*:") THEN CONTINUE
+    IF INSTR(blk, "transparent") >= 0 THEN CONTINUE
+    mitHintergrund = mitHintergrund + 1
+    IF NOT REGEX_TEST(blk, "(^|;)\s*color\s*:") THEN PRINT "Hintergrund ohne Schriftfarbe: {"; TRIM$(blk); "}"
+NEXT
+PRINT "bloecke mit hintergrund gefunden "; (mitHintergrund > 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+bloecke mit hintergrund gefunden TRUE
+
+=== der nachtmodus ist vorgesehen
+' Ohne color-scheme bleibt die Schrift im Nachtmodus schwarz auf schwarz.
+IMPORT "helfer.dh"
+DIM epub AS STRING : epub = epubBauen$(ARG$(0))
+DIM css AS STRING : css = ZIP_READ$(epub, "OEBPS/styles/buch.css")
+PRINT "prefers-color-scheme "; (INSTR(css, "prefers-color-scheme: dark") >= 0)
+PRINT "color-scheme "; (INSTR(css, "color-scheme: light dark") >= 0)
+--- argumente
+{sammlung}/../..
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/epub.dh"
+--- erwartet
+prefers-color-scheme TRUE
+color-scheme TRUE

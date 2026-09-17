@@ -28,7 +28,7 @@ const LANG = _li >= 0 ? (ARGS[_li + 1] || "de") : "de";
 // Ohne `--lang` ist `_li` gleich -1 -- dann traf `i !== _li + 1` ausgerechnet
 // Index 0 und verschluckte den ZIELPFAD. `node build_epub.js ziel.epub` schrieb
 // dadurch stumm an die Standardstelle statt dorthin, wo es sollte (von
-// tests/test_build_epub.py aufgedeckt: "Build meldete Erfolg, schrieb aber
+// tests/test_build_epub.py aufgedeckt, heute tests/pruef/buch_epub.dhtest: "Build meldete Erfolg, schrieb aber
 // nichts").
 const FREI = _li >= 0 ? ARGS.filter((_, i) => i !== _li && i !== _li + 1) : ARGS;
 
