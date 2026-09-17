@@ -368,7 +368,7 @@ prosa: rueckgabe 0
 ' null. Die aus docs/ eingesammelten Texte muessen zu echten Befehlen gehoeren,
 ' ohne Markdown-Rest sein und duerfen nicht mitten im Satz enden.
 IMPORT "json"
-DIM ed AS STRING : ed = ARG$(0) + "/drachenhauch/editor_qt"
+DIM ed AS STRING : ed = ARG$(0) + "/daten"
 DIM idx AS JSON_HANDLE : idx = JSON_LOAD(ed + "/builtin_index.json")
 DIM echt AS MAP OF BOOLEAN
 DIM i AS INTEGER
@@ -425,7 +425,7 @@ eintraege TRUE, fremd 0, markdown 0, abgeschnitten 0
 ' Abdeckung bei 21 %, danach bei rund 54 % -- unter 45 % hat entweder der
 ' Generator etwas verloren oder docs/ wurde umgebaut.
 IMPORT "json"
-DIM ed AS STRING : ed = ARG$(0) + "/drachenhauch/editor_qt"
+DIM ed AS STRING : ed = ARG$(0) + "/daten"
 DIM hand AS JSON_HANDLE : hand = JSON_LOAD(ed + "/builtin_docs.json")
 DIM prosa AS JSON_HANDLE : prosa = JSON_LOAD(ed + "/builtin_prosa.json")
 PRINT "abs in beiden "; (JSON_HAS(hand, "docs.abs") AND JSON_HAS(prosa, "docs.ABS"))

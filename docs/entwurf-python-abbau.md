@@ -4,6 +4,10 @@
 > was noch Python ist (~62 500 Zeilen), was außerhalb davon am Paket hängt,
 > was die Qt-IDE und die Qt-Editoren noch voraushaben, ein Datenverlust im
 > Tracker, und eine Reihenfolge fürs Löschen mit vier offenen Entscheidungen.
+> **Abgearbeitet ist daraus, was keine Entscheidung braucht:** der
+> Tracker-Datenverlust, die toten Starter samt `openpyxl`, der Pan-Regler im
+> GB-Code des SFX-Generators und der Umzug der drei `builtin_*.json` nach
+> `daten/` (7.2). Was bleibt, sind die vier Entscheidungen am Ende von 7.7.
 >
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
@@ -280,13 +284,22 @@ das nicht auch eine Sammlung prüft** -- bis auf die Ausnahmen in 7.6.
 Diese Stellen brechen, wenn `drachenhauch/` einfach gelöscht wird -- sie
 müssen **vorher** umziehen:
 
-* **`builtin_index.json`, `builtin_docs.json`, `builtin_prosa.json`** liegen
-  in `drachenhauch/editor_qt/`. `dhrt` bettet sie ein (`include_str!`,
-  viermal in `compiler.rs`, zweimal in `lsp.rs`), `doku.rs` erkennt die
-  Repo-Wurzel **an genau diesem Pfad** und schreibt die Prosa dorthin,
-  `pruef.rs` liest den Index, zwei Sammlungen (`buch_pruefungen`,
-  `doku_pruefungen`) ebenso. Der Umzug in einen neutralen Ordner geht schon
-  heute, solange `dhrt_meta.py` den neuen Pfad kennt.
+* ~~**`builtin_index.json`, `builtin_docs.json`, `builtin_prosa.json`** liegen
+  in `drachenhauch/editor_qt/`.~~ **Erledigt am 17.09.2026:** sie liegen jetzt
+  in **`daten/`** neben `docs/`. Angefasst wurden die sechs `include_str!`
+  (viermal `compiler.rs`, zweimal `lsp.rs`), die Repo-Wurzel-Erkennung in
+  `doku.rs` (sie erkannte das Repo **an genau diesem Pfad**) samt ihrer
+  Meldung, das Schreibziel der Prosa, der Index-Leser in `pruef.rs`, die
+  Anhänge beider Bücher (`90_anhang_a.js`, `36_anhang_c_weiter.js`), die
+  Sammlungen `buch_pruefungen` und `doku_pruefungen` -- und auf der
+  Python-Seite `dhrt_meta.daten_datei()`, das den Ordner wie
+  `dhrt_locate.find_dhrt` aus Kandidaten sucht (Bundle zuerst, dann
+  Repo-Wurzel). **Die eine stille Stelle dabei war der Installer:**
+  `collect_data_files("drachenhauch")` sammelte die drei Dateien, weil sie
+  im Paket lagen -- die PyInstaller-Spec nennt `daten/` jetzt ausdrücklich,
+  nachgesehen im gebauten Bundle (`_internal/daten/`, alter Ort leer).
+  Ohne diesen Eintrag wäre der Hover der installierten IDE stumm auf seinen
+  Minimal-Satz zurückgefallen, denn die Leser fangen eine fehlende Datei ab.
 * **`tokens.py`** liest `dhrt_lsp.dhtest`, um die Schlüsselwörter gegen die
   Vervollständigung zu halten. Ersatz: gegen `lexer::KEYWORDS` (die Liste
   hat schon einen Rust-Test an `keyword()`) oder den Fall streichen.
@@ -410,9 +423,10 @@ und fallen mit ihnen.
 1. **Sofort, unabhängig von allem:** ~~den Tracker-Datenverlust beheben~~,
    ~~die toten Starter und `openpyxl` streichen~~, ~~den Pan-Regler in den
    GB-Code des SFX-Generators~~ -- alles drei am 17.09. erledigt.
-2. **Umzüge, die Python nicht stören:** die drei `builtin_*.json` aus
-   `drachenhauch/` heraus; `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`;
-   `test_midi_module` als Sammlung.
+2. **Umzüge, die Python nicht stören:** ~~die drei `builtin_*.json` aus
+   `drachenhauch/` heraus~~ (am 17.09. nach `daten/`, siehe 7.2);
+   `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`; `test_midi_module` als
+   Sammlung.
 3. **Lücken schließen, die man vermissen würde** -- welche, ist eine
    Entscheidung (7.3, 7.4). Vorschlag als Untergrenze: in der IDE
    Absturz-Wiederherstellung, Tooltip beim Überfahren, Strg+Klick, Zoom

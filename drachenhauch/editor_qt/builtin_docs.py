@@ -2,7 +2,7 @@
 
 Format: ``name_lowercase -> (signature, beschreibung)``. Wird von
 ``CodeEditor`` beim Hover ueber einem Identifier konsultiert. Die Tabelle
-liegt in `builtin_docs.json` (daneben) -- dieselbe Datei bettet dhrt fuer
+liegt in `daten/builtin_docs.json` -- dieselbe Datei bettet dhrt fuer
 `dhrt lsp` ein; hier wird sie nur geladen.
 """
 from __future__ import annotations
@@ -10,17 +10,17 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from pathlib import Path
+
+from .dhrt_meta import daten_datei
 
 
 def _handdoku() -> dict[str, tuple[str, str]]:
-    """Die handgepflegte Tabelle aus `builtin_docs.json` -- EINE Datei fuer
-    den Qt-Editor und fuer dhrt (`lsp.rs` bettet sie ein). Bis 2026-09-06
+    """Die handgepflegte Tabelle aus `daten/builtin_docs.json` -- EINE Datei
+    fuer den Qt-Editor und fuer dhrt (`lsp.rs` bettet sie ein). Bis 2026-09-06
     stand sie als Python-Woerterbuch hier; der Sprachserver in Rust haette
     sie dann ein zweites Mal gebraucht."""
     try:
-        pfad = Path(__file__).resolve().parent / "builtin_docs.json"
-        roh = json.loads(pfad.read_text(encoding="utf-8")).get("docs", {})
+        roh = json.loads(daten_datei("builtin_docs.json").read_text(encoding="utf-8")).get("docs", {})
         return {k: (str(v[0]), str(v[1])) for k, v in roh.items()}
     except Exception:
         return {}
@@ -31,14 +31,14 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = _handdoku()
 
 @lru_cache(maxsize=1)
 def _prosa() -> dict[str, str]:
-    """Kurzbeschreibungen aus `docs/`, erzeugt nach `builtin_prosa.json`.
+    """Kurzbeschreibungen aus `docs/`, erzeugt nach `daten/builtin_prosa.json`.
 
     Faellt die Datei aus (altes Paket, kaputtes JSON), bleibt es beim Stand
     von vorher: Hover zeigt dann nur die Signatur. Ein fehlender Zusatz darf
     den Editor nicht lahmlegen.
     """
     try:
-        pfad = Path(__file__).resolve().parent / "builtin_prosa.json"
+        pfad = daten_datei("builtin_prosa.json")
         return json.loads(pfad.read_text(encoding="utf-8")).get("docs", {})
     except Exception:
         return {}

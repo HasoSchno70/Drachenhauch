@@ -1,6 +1,6 @@
 """Builtin-Metadaten fuer Editor + LSP -- entkoppelt von der Laufzeit.
 
-Quelle ist der eingefrorene `builtin_index.json` (Name/kind/Signatur/Modul),
+Quelle ist der eingefrorene `daten/builtin_index.json` (Name/kind/Signatur/Modul),
 generiert aus der Builtin-Registry-Union (Stufe B, Phase 2). Damit holen sich
 Completer/Symbols/Builtins-Panel/LSP ihre Builtin-Namen + Signaturen, OHNE
 `interpreter.py`/`builtins_registry` zur Laufzeit zu importieren -- Voraussetzung
@@ -17,10 +17,35 @@ API (bewusst nah an dem, was die Konsumenten bisher aus der Registry zogen):
 from __future__ import annotations
 
 import json
+import sys
 from functools import lru_cache
 from pathlib import Path
 
-_INDEX_PATH = Path(__file__).resolve().parent / "builtin_index.json"
+
+def daten_datei(name: str) -> Path:
+    """Weg zu einer Datei in `daten/` -- dem Ordner, in dem das
+    Befehlsverzeichnis liegt.
+
+    Bis 2026-09-17 lagen die drei `builtin_*.json` NEBEN dieser Datei, also im
+    Python-Paket; `dhrt` bettete sie von dort ein und erkannte die Repo-Wurzel
+    an genau diesem Pfad. Damit liess sich `drachenhauch/` nicht loeschen,
+    obwohl die Laufzeit nichts von Python braucht. Jetzt liegen sie im Repo
+    neben `docs/`, und der Weg dorthin wird wie bei `dhrt_locate.find_dhrt`
+    aus Kandidaten gesucht: im eingefrorenen Bundle zuerst (PyInstaller legt
+    `daten/` per Spec dazu), sonst ueber die Repo-Wurzel. Der erste Treffer
+    gewinnt; gibt es keinen, kommt der Repo-Weg zurueck, damit die Meldung des
+    Aufrufers den erwarteten Ort nennt.
+    """
+    kandidaten: list[Path] = []
+    meipass = getattr(sys, "_MEIPASS", None) if getattr(sys, "frozen", False) else None
+    if meipass:
+        kandidaten.append(Path(meipass) / "daten" / name)
+    repo = Path(__file__).resolve().parents[2] / "daten" / name
+    kandidaten.append(repo)
+    for p in kandidaten:
+        if p.is_file():
+            return p
+    return repo
 
 
 @lru_cache(maxsize=1)
@@ -28,7 +53,7 @@ def builtin_index() -> list[dict]:
     """Liste aller Builtin-Eintraege (gecacht). Leere Liste, wenn der Index
     fehlt/kaputt ist -- die Aufrufer ergaenzen dann via builtin_docs-Fallback."""
     try:
-        data = json.loads(_INDEX_PATH.read_text(encoding="utf-8"))
+        data = json.loads(daten_datei("builtin_index.json").read_text(encoding="utf-8"))
         entries = data.get("builtins", [])
         return [e for e in entries if isinstance(e, dict) and e.get("name")]
     except Exception:

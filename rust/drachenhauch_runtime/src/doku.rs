@@ -34,19 +34,19 @@ pub fn repo_wurzel() -> Result<PathBuf, String> {
     let start = std::env::current_dir().map_err(|e| e.to_string())?;
     let mut p: Option<&Path> = Some(&start);
     while let Some(d) = p {
-        if d.join("docs").is_dir() && d.join("drachenhauch/editor_qt/builtin_index.json").is_file() {
+        if d.join("docs").is_dir() && d.join("daten/builtin_index.json").is_file() {
             return Ok(d.to_path_buf());
         }
         p = d.parent();
     }
     Err("dhrt doku: kein Drachenhauch-Repo ueber dem aktuellen Verzeichnis (docs/ und \
-         drachenhauch/editor_qt/builtin_index.json fehlen)".into())
+         daten/builtin_index.json fehlen)".into())
 }
 
 /// Index von der Platte (nicht der eingebettete): wer den Index aendert,
 /// soll die Prosa neu ziehen koennen, ohne dhrt vorher neu zu bauen.
 fn index_namen(wurzel: &Path) -> Result<HashSet<String>, String> {
-    let raw = std::fs::read_to_string(wurzel.join("drachenhauch/editor_qt/builtin_index.json"))
+    let raw = std::fs::read_to_string(wurzel.join("daten/builtin_index.json"))
         .map_err(|e| format!("builtin_index.json: {}", e))?;
     let v: Value = serde_json::from_str(&raw).map_err(|e| format!("builtin_index.json: {}", e))?;
     Ok(v["builtins"].as_array().map(|a| a.iter()
@@ -269,7 +269,7 @@ fn prosa_main(pruefen: bool) -> ExitCode {
                 Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer \
                 Beschreibung in das jeweilige docs/module-*.md.";
     let text = eins_eingerueckt(&json!({"_comment": kopf, "count": daten.len(), "docs": daten}));
-    let ziel = wurzel.join("drachenhauch/editor_qt/builtin_prosa.json");
+    let ziel = wurzel.join("daten/builtin_prosa.json");
     if pruefen && !node_da() {
         // Ohne Node fehlt eine der Quellen -- ein Vergleich meldete dann
         // Abweichungen, die nur an der Umgebung liegen.
@@ -305,7 +305,7 @@ pub fn grammatik(wurzel: &Path) -> Result<Value, String> {
     // Builtins: Index von der Platte plus die Handdoku (sie kannte auch
     // Namen, die frueher nur dort standen).
     let mut builtins: HashSet<String> = index_namen(wurzel)?;
-    if let Ok(raw) = std::fs::read_to_string(wurzel.join("drachenhauch/editor_qt/builtin_docs.json")) {
+    if let Ok(raw) = std::fs::read_to_string(wurzel.join("daten/builtin_docs.json")) {
         if let Ok(v) = serde_json::from_str::<Value>(&raw) {
             if let Some(o) = v["docs"].as_object() { for k in o.keys() { builtins.insert(k.to_uppercase()); } }
         }

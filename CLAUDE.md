@@ -554,16 +554,17 @@ Builtins leben in `rust/drachenhauch_runtime/src/builtins.rs` (pure) bzw. `vm.rs
 1. In `builtins.rs` (oder dem passenden `try_*` in `vm.rs`) einen Match-Arm
    ergänzen: Arity + Typen selbst prüfen (Validierung gehört in den Wrapper, nicht
    ins Backend), Fehlermeldung im gewohnten Wortlaut (`"NAME: erwartet …"`).
-2. Für den Editor: `editor_qt/builtin_index.json` ergänzen (Name/kind/Signatur/
+2. Für den Editor: `daten/builtin_index.json` ergänzen (Name/kind/Signatur/
    Modul) — Completion/Highlighting/LSP ziehen daraus (`editor_qt/dhrt_meta.py`).
    Die Kurzbeschreibung fuer Hover/Tooltip schreibt man NICHT hier hin,
    sondern ins passende `docs/module-*.md` (Tabellenzeile
    ``| `NAME(args)` | was es tut |``); `dhrt doku prosa` sammelt
-   sie nach `editor_qt/builtin_prosa.json` ein, und
+   sie nach `daten/builtin_prosa.json` ein, und
    `tests/pruef/doku_pruefungen.dhtest` haelt beides synchron. `builtin_docs.json`
    ist fuer ausfuehrlichere Texte da und gewinnt, wo es einen Eintrag hat.
    Beide Dateien bettet dhrt fuer `dhrt lsp` ein -> nach einer Aenderung neu
-   bauen.
+   bauen. **Alle drei liegen in `daten/`** (bis 2026-09-17 in
+   `drachenhauch/editor_qt/`, siehe unten).
 3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
    **Die Signatur in `builtin_index.json` muss stimmen** — der Compiler leitet
    daraus die erlaubte Argumentzahl ab und warnt bei Abweichung (`dhrt --check`).
@@ -2225,7 +2226,7 @@ Entity -- daher der Unterschied. Die frueheren Python-/Cython-Fassungen
 viele Entities laeuft, sollte es als Bulk-Op-Builtin schreiben statt
 als pro-Entity-BASIC-Loop. Boilerplate fuer einen neuen Bulk-Builtin:
 die Logik in `rust/drachenhauch_runtime/src/ecs.rs` + Dispatch-Arm in `vm.rs`
-(`try_ecs`) + Eintrag in `editor_qt/builtin_index.json` + run_gb-Golden-Test.
+(`try_ecs`) + Eintrag in `daten/builtin_index.json` + run_gb-Golden-Test.
 
 ## Kein Cython mehr, kein `setup.py build_ext`
 
@@ -3344,6 +3345,37 @@ als die Vorschau daneben. Jetzt kommt ein lauffaehiges Stueck heraus (IMPORT,
 `tests/pruef/werkzeug_sfx.dhtest` prueft die Zeilen UND laesst `dhrt --check`
 ueber den erzeugten Code laufen; Gegenprobe mit zwei verfaelschten Kopien
 (ohne Pan-Zweig, ohne IMPORT) -- beide fallen. Faktor 1,18 -> 1,21.
+
+**Das Befehlsverzeichnis liegt in `daten/` (2026-09-17):** `builtin_index.json`,
+`builtin_docs.json` und `builtin_prosa.json` lagen in
+`drachenhauch/editor_qt/`, also IM Python-Paket -- `dhrt` bettete sie von dort
+ein (`include_str!`, viermal `compiler.rs`, zweimal `lsp.rs`) und erkannte die
+Repo-Wurzel **an genau diesem Pfad** (`doku::repo_wurzel`). Damit liess sich
+`drachenhauch/` nicht loeschen, obwohl an den Dateien nichts Python ist; es war
+der letzte Punkt der Bestandsaufnahme, der keine Entscheidung brauchte. Neu
+gelesen wird aus `daten/` von: den sechs `include_str!`, `doku.rs`
+(Wurzel-Erkennung, Index-Leser, Schreibziel der Prosa, Namen fuer die
+Grammatik), `pruef.rs`, den Anhaengen beider Buecher (`90_anhang_a.js`,
+`36_anhang_c_weiter.js`), zwei Sammlungen (`buch_pruefungen`,
+`doku_pruefungen`) und auf der Python-Seite **`dhrt_meta.daten_datei()`** --
+die EINE Stelle, die den Ordner sucht, nach demselben Muster wie
+`dhrt_locate.find_dhrt` (Bundle zuerst, dann Repo-Wurzel);
+`builtin_docs.py` holt sie sich von dort. **Die stille Stelle war der
+Installer:** `collect_data_files("drachenhauch")` sammelte die drei Dateien
+nur, WEIL sie im Paket lagen -- die PyInstaller-Spec nennt `daten/` jetzt
+ausdruecklich. Ohne den Eintrag waere der Hover der installierten IDE stumm
+auf seinen Minimal-Satz zurueckgefallen (die Leser fangen eine fehlende Datei
+ab, damit der Editor nie ganz blind ist), und das saehe man erst in der
+fertigen Installation. Darum ist es nicht behauptet, sondern **im gebauten
+Bundle nachgesehen** (`_internal/daten/` mit allen drei Dateien, der alte Ort
+leer) samt Probe des Resolvers gegen genau dieses Verzeichnis. Gegenprobe mit
+weggenommenem `daten/`: 11 von 14 Faellen in `doku_pruefungen` und 5 von 8
+Tests in `test_dhrt_meta.py` fallen, `dhrt doku` meldet den neuen Pfad. Der
+eingebettete Teil kann so nicht fallen -- ein falscher Pfad im `include_str!`
+ist ein Baufehler, kein Laufzeitfehler. **Falle fuer den naechsten Umzug:**
+`dhrt pruef pfade` prueft Pfade, die als Inline-Code in `docs/` stehen -- eine
+vergessene Doku-Stelle ist ein Befund, nicht bloss ein Schoenheitsfehler
+(genau einer kam so heraus, `docs/lsp.md`).
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die

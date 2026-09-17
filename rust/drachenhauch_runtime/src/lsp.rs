@@ -119,7 +119,7 @@ fn handdoku() -> &'static HashMap<String, (String, String)> {
     static M: std::sync::OnceLock<HashMap<String, (String, String)>> = std::sync::OnceLock::new();
     M.get_or_init(|| {
         let mut m = HashMap::new();
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_docs.json");
+        let raw = include_str!("../../../daten/builtin_docs.json");
         if let Ok(v) = serde_json::from_str::<Value>(raw) {
             if let Some(o) = v.get("docs").and_then(|d| d.as_object()) {
                 for (k, e) in o {
@@ -138,7 +138,7 @@ fn prosa() -> &'static HashMap<String, String> {
     static M: std::sync::OnceLock<HashMap<String, String>> = std::sync::OnceLock::new();
     M.get_or_init(|| {
         let mut m = HashMap::new();
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_prosa.json");
+        let raw = include_str!("../../../daten/builtin_prosa.json");
         if let Ok(v) = serde_json::from_str::<Value>(raw) {
             if let Some(o) = v.get("docs").and_then(|d| d.as_object()) {
                 for (k, e) in o { if let Some(t) = e.as_str() { m.insert(k.to_uppercase(), t.to_string()); } }

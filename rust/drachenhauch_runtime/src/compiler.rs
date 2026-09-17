@@ -377,7 +377,7 @@ fn known_builtins() -> &'static std::collections::HashSet<String> {
     use std::sync::OnceLock;
     static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
     SET.get_or_init(|| {
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../daten/builtin_index.json");
         let mut s = std::collections::HashSet::new();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
@@ -398,7 +398,7 @@ pub(crate) fn builtin_eintraege() -> &'static Vec<(String, String, String)> {
     use std::sync::OnceLock;
     static V: OnceLock<Vec<(String, String, String)>> = OnceLock::new();
     V.get_or_init(|| {
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../daten/builtin_index.json");
         let mut v = Vec::new();
         if let Ok(j) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = j.get("builtins").and_then(|b| b.as_array()) {
@@ -431,7 +431,7 @@ fn builtin_arity() -> &'static std::collections::HashMap<String, (usize, usize)>
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, (usize, usize)>> = OnceLock::new();
     MAP.get_or_init(|| {
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../daten/builtin_index.json");
         let mut m = std::collections::HashMap::new();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
@@ -547,7 +547,7 @@ fn builtin_modul() -> &'static std::collections::HashMap<String, String> {
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, String>> = OnceLock::new();
     MAP.get_or_init(|| {
-        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../daten/builtin_index.json");
         let mut m = std::collections::HashMap::new();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {

@@ -236,7 +236,7 @@ END IF
 DIM buch AS JSON_HANDLE : buch = JSON_PARSE("{""e"":" + roh + "}")
 ' Ohne diese Schranke liefe der Vergleich bei einem kaputten Export leer durch.
 PRINT "genug eintraege "; (JSON_LEN(buch, "e") > 500)
-DIM idx AS JSON_HANDLE : idx = JSON_LOAD(wurzel + "/drachenhauch/editor_qt/builtin_index.json")
+DIM idx AS JSON_HANDLE : idx = JSON_LOAD(wurzel + "/daten/builtin_index.json")
 DIM bekannt AS MAP OF BOOLEAN
 DIM sigs AS MAP OF STRING
 DIM i AS INTEGER
