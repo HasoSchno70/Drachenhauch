@@ -1,0 +1,30 @@
+' Die Ausgabe eines Kindprozesses bis zu seinem Ende einsammeln (stdout;
+' raylibs INFO-/WARNING-Zeilen fallen weg, Zeilenenden werden \n).
+' Nach dem Ende noch ein paar Mal leer lesen: das Kind kann beendet sein,
+' bevor sein Lesefaden die letzte Zeile abgelegt hat.
+FUNCTION auslesen$(p AS INTEGER, grenzeMs AS INTEGER) AS STRING
+    DIM roh AS STRING : roh = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < grenzeMs AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            roh = roh + a
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(30)
+    WEND
+    IF PROCESS_RUNNING(p) THEN PROCESS_KILL(p)
+    DIM zeilen AS ARRAY OF STRING : zeilen = SPLIT$(REPLACE$(roh, CHR$(13), ""), CHR$(10))
+    DIM aus AS STRING : aus = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        DIM z AS STRING : z = zeilen[i]
+        IF z = "" OR LEFT$(z, 6) = "INFO: " OR LEFT$(z, 9) = "WARNING: " THEN CONTINUE
+        aus = aus + z + CHR$(10)
+    NEXT
+    RETURN aus
+END FUNCTION
