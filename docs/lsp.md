@@ -38,7 +38,7 @@ schickt nur, wenn er der neueste ist.
 
 * `rust/drachenhauch_runtime/src/lsp.rs` — Rahmung (Content-Length),
   Dokumentspeicher, Verfahren, Hover-Daten. Die Hover-Texte kommen aus zwei
-  eingebetteten Dateien: `drachenhauch/editor_qt/builtin_docs.json`
+  eingebetteten Dateien: `daten/builtin_docs.json`
   (handgepflegt, gewinnt) und `builtin_prosa.json` (aus `docs/` erzeugt, siehe
   `dhrt doku`).
 * `rust/drachenhauch_runtime/src/symbole.rs` — Definitionen, Fundstellen,

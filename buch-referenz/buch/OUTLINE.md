@@ -26,7 +26,7 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 - `content/NN_*.js` = je ein Kapitel, exportiert `(H) => [bloecke]`. Reihenfolge =
   Dateiname-Sortierung. **Neue Kapitel: einfach content/NN_*.js anlegen.**
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
-- Quellen fürs Befehlswissen: `drachenhauch/editor_qt/builtin_index.json` (Signaturen),
+- Quellen fürs Befehlswissen: `daten/builtin_index.json` (Signaturen),
   `drachenhauch/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
   `examples/*.dh`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
 - Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.dh`,

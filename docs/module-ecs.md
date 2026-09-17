@@ -227,7 +227,7 @@ Eine neue Bulk-Op fuegt man so hinzu:
    den anderen ab).
 2. **Builtin-Arm** im ECS-Dispatch (`vm.rs` `try_ecs` bzw. `builtins.rs`) — Arity-
    und Typ-Checks, dann Delegate an die `World`-Methode.
-3. **Golden-Test** in `tests/` + Eintrag in `editor_qt/builtin_index.json`.
+3. **Golden-Test** in `tests/` + Eintrag in `daten/builtin_index.json`.
 
 Beispiel-Skizze fuer ein hypothetisches `ECS_ADD_TO(w, target, source, scale)`:
 

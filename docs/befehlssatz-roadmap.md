@@ -14,7 +14,7 @@ absichern.
 ## Umsetzungs-Checkliste pro Befehl
 - [ ] Runtime: `rust/drachenhauch_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
       ggf. `graphics.rs`/`audio.rs`).
-- [ ] Eintrag in `drachenhauch/editor_qt/builtin_index.json` (Arity-Pruefung
+- [ ] Eintrag in `daten/builtin_index.json` (Arity-Pruefung
       und „Unbekanntes Builtin"-Warnung) — die Datei wird per `include_str!`
       **einkompiliert**, danach also `rust\build_runtime.py` laufen lassen,
       sonst warnt der Compiler weiter ueber ein Builtin, das laengst

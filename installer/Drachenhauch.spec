@@ -23,10 +23,20 @@ elif IS_MACOS:
 else:
     ICON = None
 
-# Daten (logo.png, editor_qt/builtin_index.json, ...) + alle Submodule
-# (die Editoren werden lazy importiert -> als hiddenimports sicherstellen).
+# Daten (logo.png, ...) + alle Submodule (die Editoren werden lazy
+# importiert -> als hiddenimports sicherstellen).
 datas = collect_data_files("drachenhauch")
 hiddenimports = collect_submodules("drachenhauch")
+
+# Das Befehlsverzeichnis liegt seit 2026-09-17 in `daten/` statt im
+# Python-Paket -- `collect_data_files("drachenhauch")` findet es also nicht
+# mehr und muss es HIER bekommen. Ohne diesen Eintrag faellt der Hover der
+# gebuendelten IDE stumm auf seinen Minimal-Satz zurueck (die Leser in
+# `dhrt_meta.py` fangen eine fehlende Datei ab), und das saehe man erst in
+# der installierten Fassung.
+daten_dir = ROOT / "daten"
+if daten_dir.is_dir():
+    datas.append((str(daten_dir), "daten"))
 
 if not IS_WINDOWS:
     # macOS/Linux haben keinen Installer-Skript-Schritt wie Inno Setup (der

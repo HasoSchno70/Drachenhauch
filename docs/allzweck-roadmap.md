@@ -34,7 +34,7 @@ Netz, Fenstern, Reitern und Saison-Verwaltung — vollständig in Drachenhauch.
 - [ ] `rust/drachenhauch_runtime/src/builtins.rs` (pur) bzw. `vm.rs` `try_*`
       (braucht VM-/Fenster-State). Arity + Typen im Wrapper prüfen,
       Fehlermeldung im gewohnten Wortlaut (`"NAME: erwartet …"`).
-- [ ] `drachenhauch/editor_qt/builtin_index.json` — Name/kind/**Signatur**/Modul.
+- [ ] `daten/builtin_index.json` — Name/kind/**Signatur**/Modul.
       Die Signatur muss stimmen, `dhrt --check` leitet daraus die erlaubte
       Argumentzahl ab; eine zu enge Signatur erzeugt Falsch-Alarme in fremdem Code.
 - [ ] Golden-Test in `tests/` (`assert run_gb(src) == erwartet`), plus

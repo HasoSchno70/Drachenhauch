@@ -121,7 +121,7 @@ pub const GEDULDET: &[(&str, &str)] = &[
 ];
 
 fn bekannte_builtins(wurzel: &Path) -> HashSet<String> {
-    let raw = lesen(&wurzel.join("drachenhauch/editor_qt/builtin_index.json"));
+    let raw = lesen(&wurzel.join("daten/builtin_index.json"));
     let mut namen: HashSet<String> = HashSet::new();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
         for e in v["builtins"].as_array().map(|a| a.as_slice()).unwrap_or(&[]) {

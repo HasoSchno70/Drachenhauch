@@ -16,7 +16,7 @@ function befehleImBuch() {
 
 function befehleInDrachenhauch() {
   try {
-    const p = path.join(__dirname, "..", "..", "..", "drachenhauch", "editor_qt", "builtin_index.json");
+    const p = path.join(__dirname, "..", "..", "..", "daten", "builtin_index.json");
     const d = JSON.parse(fs.readFileSync(p, "utf-8"));
     return (d.builtins || []).filter((e) => e && e.name && !e.name.startsWith("_")).length;
   } catch (e) {
