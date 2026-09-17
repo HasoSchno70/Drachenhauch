@@ -1,7 +1,8 @@
 ' Das EPUB des Referenzbuchs bauen (in den Fallordner, NICHT ueber die
 ' eingecheckte Datei -- darin steckt ein Zeitstempel, jeder Neubau am selben
-' Ort riss 4,8 MB Unterschied auf) und darin lesen. Braucht nodelauf.dh davor.
+' Ort riss 4,8 MB Unterschied auf) und darin lesen.
 ' Ohne Node oder ohne jszip meldet der Fall UEBERSPRINGEN und endet.
+IMPORT "nodelauf.dh"
 IMPORT "xml"
 IMPORT "regex"
 

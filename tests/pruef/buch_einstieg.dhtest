@@ -34,7 +34,6 @@ PRINT "abweichend "; schief
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 genug kapitel TRUE
@@ -73,7 +72,6 @@ PRINT "geprueft"
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 genug verweise TRUE
@@ -88,7 +86,6 @@ PRINT "befehle ohne text "; JSON_LEN(d, "cmds_ohne_text")
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 tips ohne rumpf 0
@@ -103,7 +100,6 @@ IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0
@@ -119,7 +115,6 @@ IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0
@@ -136,7 +131,6 @@ IF nlCode <> 0 THEN PRINT nlAus; nlErr
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/einstieg.dh"
 --- erwartet
 rueckgabe 0

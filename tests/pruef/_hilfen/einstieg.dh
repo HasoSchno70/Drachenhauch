@@ -1,6 +1,7 @@
 ' Das Einstiegsbuch lesen: der Kapitel-Export und die Pruefwerkzeuge im
-' Buchverzeichnis. Braucht nodelauf.dh davor. Ohne Node (oder ohne gebaute
+' Buchverzeichnis. Ohne Node (oder ohne gebaute
 ' dhrt fuer die Werkzeuge) meldet der Fall UEBERSPRINGEN und endet.
+IMPORT "nodelauf.dh"
 IMPORT "json"
 IMPORT "regex"
 

@@ -24,7 +24,6 @@ PRINT "inhalt "; ZIP_READ$(epub, "mimetype")
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 kopf TRUE
@@ -56,7 +55,6 @@ PRINT "genug seiten "; (zahl > 50)
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 gegenprobe &: TRUE
@@ -106,7 +104,6 @@ PRINT "manifest-eintraege "; (XML_COUNT(opf, "manifest/item") > 50)
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 opf im archiv TRUE
@@ -163,7 +160,6 @@ PRINT "bilder "; (bilder > 20); ", seiten "; (seiten > 150); ", stylesheets "; (
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 verweise ins leere 0
@@ -196,7 +192,6 @@ PRINT "als toc ausgezeichnet "; (INSTR(nav, "epub:type=" + CHR$(34) + "toc" + CH
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 nav im manifest TRUE
@@ -229,7 +224,6 @@ PRINT "bloecke mit hintergrund gefunden "; (mitHintergrund > 0)
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 bloecke mit hintergrund gefunden TRUE
@@ -244,7 +238,6 @@ PRINT "color-scheme "; (INSTR(css, "color-scheme: light dark") >= 0)
 --- argumente
 {sammlung}/../..
 --- datei helfer.dh
-IMPORT "{sammlung}/_hilfen/nodelauf.dh"
 IMPORT "{sammlung}/_hilfen/epub.dh"
 --- erwartet
 prefers-color-scheme TRUE
