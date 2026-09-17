@@ -1,0 +1,146 @@
+' Signaturen lesen wie `compiler.rs::parse_arity` -- fuer den Abgleich der
+' Aufrufformen im Referenzbuch gegen builtin_index.json.
+'
+' Bis 2026-09-17 in tests/test_buch_signaturen.py (Python-Regex mit zwei
+' Gruppen). Hier ein Zeichen-Scanner: ein Name [A-Za-z_$][A-Za-z0-9_$]*,
+' Leerraum, dann eine Klammer bis zu ihrem Gegenstueck.
+IMPORT "regex"
+
+FUNCTION sgNameZeichen(c AS STRING, erstes AS BOOLEAN) AS BOOLEAN
+    IF c = "_" OR c = "$" THEN RETURN TRUE
+    IF (c >= "A" AND c <= "Z") OR (c >= "a" AND c <= "z") THEN RETURN TRUE
+    RETURN (NOT erstes) AND c >= "0" AND c <= "9"
+END FUNCTION
+
+' Alle Aufrufe `Name(inhalt)` im Text, als "startpos|name|inhalt".
+FUNCTION sgAufrufe(s AS STRING) AS ARRAY OF STRING
+    DIM aus AS ARRAY OF STRING : aus = []
+    DIM n AS INTEGER : n = LEN(s)
+    DIM i AS INTEGER : i = 0
+    WHILE i < n
+        IF NOT sgNameZeichen(MID$(s, i, 1), TRUE) THEN
+            i = i + 1
+            CONTINUE
+        END IF
+        DIM a AS INTEGER : a = i
+        WHILE i < n AND sgNameZeichen(MID$(s, i, 1), FALSE)
+            i = i + 1
+        WEND
+        DIM name AS STRING : name = MID$(s, a, i - a)
+        DIM j AS INTEGER : j = i
+        WHILE j < n AND (MID$(s, j, 1) = " " OR MID$(s, j, 1) = CHR$(9))
+            j = j + 1
+        WEND
+        IF j >= n OR MID$(s, j, 1) <> "(" THEN CONTINUE
+        DIM tiefe AS INTEGER : tiefe = 0
+        DIM k AS INTEGER : k = j
+        DIM ende AS INTEGER : ende = -1
+        WHILE k < n
+            DIM c AS STRING : c = MID$(s, k, 1)
+            IF c = "(" THEN tiefe = tiefe + 1
+            IF c = ")" THEN
+                tiefe = tiefe - 1
+                IF tiefe = 0 THEN
+                    ende = k
+                    BREAK
+                END IF
+            END IF
+            k = k + 1
+        WEND
+        IF ende < 0 THEN CONTINUE
+        ARRAY_PUSH(aus, STR$(a) + "|" + name + "|" + MID$(s, j + 1, ende - j - 1))
+        i = ende + 1
+    WEND
+    RETURN aus
+END FUNCTION
+
+' "min,max" aus einer Signatur; "" = nicht sicher entscheidbar. Mehrere
+' Formen nebeneinander (`RND()   RND(n)`) ergeben die Spanne ueber alle.
+FUNCTION arity$(roh AS STRING) AS STRING
+    DIM sig AS STRING : sig = TRIM$(REPLACE$(roh, "→", "->"))
+    IF INSTR(sig, "->") >= 0 THEN sig = TRIM$(LEFT$(sig, INSTR(sig, "->")))
+    DIM formen AS ARRAY OF STRING : formen = sgAufrufe(sig)
+    IF LEN(formen) = 0 THEN RETURN ""
+    DIM lo AS INTEGER : lo = 1000000
+    DIM hi AS INTEGER : hi = -1
+    DIM f AS INTEGER
+    FOR f = 0 TO LEN(formen) - 1
+        DIM teile AS ARRAY OF STRING : teile = SPLIT$(formen[f], "|")
+        DIM inner AS STRING : inner = teile[2]
+        IF LEN(teile) > 3 THEN inner = MID$(formen[f], LEN(teile[0]) + LEN(teile[1]) + 2)
+        inner = TRIM$(inner)
+        DIM p AS INTEGER : p = 0
+        DIM q AS INTEGER : q = 0
+        IF inner = "" THEN
+            p = 0 : q = 0
+        ELSE
+            ' "<3 Punkte>", "..." und "*args": die Zahl laesst sich nicht
+            ' ablesen, und Raten waere ein Falsch-Alarm.
+            IF INSTR(inner, "*args") >= 0 OR INSTR(inner, "...") >= 0 OR INSTR(inner, "<") >= 0 THEN RETURN ""
+            DIM bereich AS STRING : bereich = REGEX_FIND(inner, "^\s*\d+\s*\.\.\s*\d+\s*Argument")
+            DIM genau AS STRING : genau = REGEX_FIND(inner, "^\s*\d+\s*Argument")
+            IF bereich <> "" THEN
+                DIM zb AS ARRAY OF STRING : zb = REGEX_FIND_ALL(bereich, "\d+")
+                p = VAL(zb[0]) : q = VAL(zb[1])
+            ELSEIF genau <> "" THEN
+                p = VAL(REGEX_FIND(genau, "\d+")) : q = p
+            ELSE
+                ' Ab der ersten offenen eckigen Klammer ist alles optional; ein
+                ' Vorgabewert (`an: BOOLEAN = FALSE`) ebenso.
+                DIM schnitt AS INTEGER : schnitt = INSTR(inner, "[")
+                DIM kopf AS STRING : kopf = inner
+                DIM rest AS STRING : rest = ""
+                IF schnitt >= 0 THEN
+                    kopf = LEFT$(inner, schnitt)
+                    rest = MID$(inner, schnitt)
+                END IF
+                DIM stuecke AS ARRAY OF STRING : stuecke = SPLIT$(kopf, ",")
+                DIM zahl AS INTEGER : zahl = 0
+                DIM pflicht AS INTEGER : pflicht = 0
+                DIM s AS INTEGER
+                FOR s = 0 TO LEN(stuecke) - 1
+                    IF TRIM$(stuecke[s]) = "" THEN CONTINUE
+                    zahl = zahl + 1
+                    IF INSTR(stuecke[s], "=") < 0 THEN pflicht = pflicht + 1
+                NEXT
+                p = pflicht
+                q = zahl + LEN(REGEX_FIND_ALL(rest, "[\[,]\s*[A-Za-z_]"))
+            END IF
+        END IF
+        IF p < lo THEN lo = p
+        IF q > hi THEN hi = q
+    NEXT
+    RETURN STR$(lo) + "," + STR$(hi)
+END FUNCTION
+
+' Aus einer Signaturzeile: welcher bekannte Befehl steht dort in welcher Form?
+' Liefert "NAME|form   form" je Befehl, in der Reihenfolge des ersten Auftretens.
+' Mehrere Formen desselben Befehls sind Alternativen; ein Name direkt hinter
+' einem Schraegstrich ist die Kurzform einer Familie (`ECS_FILL_FLOAT/INT(...)`)
+' und zaehlt nicht.
+FUNCTION formenJeBefehl(sig AS STRING, bekannt AS MAP OF BOOLEAN) AS ARRAY OF STRING
+    DIM namen AS ARRAY OF STRING : namen = []
+    DIM formen AS MAP OF STRING
+    DIM aufrufe AS ARRAY OF STRING : aufrufe = sgAufrufe(sig)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(aufrufe) - 1
+        DIM t AS ARRAY OF STRING : t = SPLIT$(aufrufe[i], "|")
+        DIM pos AS INTEGER : pos = VAL(t[0])
+        IF pos > 0 AND MID$(sig, pos - 1, 1) = "/" THEN CONTINUE
+        DIM gross AS STRING : gross = UPPER$(t[1])
+        IF NOT MAPHAS(bekannt, gross) THEN CONTINUE
+        DIM inner AS STRING : inner = MID$(aufrufe[i], LEN(t[0]) + LEN(t[1]) + 2)
+        DIM form AS STRING : form = t[1] + "(" + inner + ")"
+        IF MAPHAS(formen, gross) THEN
+            MAPPUT(formen, gross, MAPGET(formen, gross) + "   " + form)
+        ELSE
+            MAPPUT(formen, gross, form)
+            ARRAY_PUSH(namen, gross)
+        END IF
+    NEXT
+    DIM aus AS ARRAY OF STRING : aus = []
+    FOR i = 0 TO LEN(namen) - 1
+        ARRAY_PUSH(aus, namen[i] + "|" + MAPGET(formen, namen[i]))
+    NEXT
+    RETURN aus
+END FUNCTION
