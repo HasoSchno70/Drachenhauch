@@ -3256,6 +3256,23 @@ in Drachenhauch (`pdftext.dh`) kennt nur krilla-PDFs und keine Textlagen --
 PyMuPDF bleibt dafuer. Gegenproben nur an der Vorschau: eine Verfaelschung
 der Druckbefehle koennte echt drucken.
 
+**Export, Uhr und Firmata ohne Python (2026-09-17, Weg D):**
+test_rust_export, test_export_assets und test_export_signierbar (pytest) ->
+`tests/pruef/dhrt_export.dhtest` (6), test_builtins_uhr (pytest) ->
+`tests/pruef/builtins_uhr.dhtest` (6), test_firmata_module (pytest) ->
+`tests/pruef/modules_firmata.dhtest` (2). Die exportierte Exe startet der
+Helfer `_hilfen/exportlauf.dh`; die "blanke Laufzeit" der Gegenprobe ist die
+Exe ohne ihre Nutzlast (Laenge aus dem Footer) -- so braucht der Fall den
+Pfad der laufenden dhrt nicht, und die Datei behaelt ihr Ausfuehrungsrecht.
+**Zwei schwache Proben dabei gefunden:** das Bundle der absoluten Pfade
+pruefte nur, dass es keinen `assets/`- und keinen `windows/`-Ordner gibt --
+eine eingesammelte Datei landet aber neben der Exe, die Probe blieb gruen;
+jetzt muss die Exe der einzige Eintrag sein. Und "GUI_CONFIRM nimmt drei
+Argumente" suchte eine Compiler-Warnung in der Laufausgabe, wo sie nie steht;
+der Fall fragt jetzt `dhrt --check`, mit vier Argumenten als Gegenprobe.
+**Falle unter Windows:** eine gerade beendete Exe ist noch kurz abgebildet,
+Ueberschreiben scheitert mit os error 1224 -- je Variante eine eigene Kopie.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
