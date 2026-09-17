@@ -3243,8 +3243,8 @@ Kopfzeilen, nicht ueber Content-Length (Bytes gegen Zeichen). **Zwei Funde:**
 uebersprungen -- seine Hilfsfunktion wertete "nicht gefunden" als fehlende
 Sprachausgabe, und genau das steht in der erwarteten Meldung. (2) Die
 Gliederung kennt Blockenden nur fuer CLASS/STRUCT/SUB/FUNCTION/PROPERTY; ein
-`ENUM` reicht als Bereich nur ueber seine Kopfzeile (`symbole::bereiche`,
-schon so in der Python-Vorlage; nicht behoben, der Fall prueft es nicht).
+`ENUM` reichte als Bereich nur ueber seine Kopfzeile (`symbole::bereiche`,
+schon so in der Python-Vorlage; behoben 2026-09-17, siehe unten).
 Gegenproben: vier bzw. drei Verfaelschungen, jede faellt.
 
 **Drucken teilweise ohne Python (2026-09-16, Weg D):** Druckerliste,
@@ -3272,6 +3272,26 @@ Argumente" suchte eine Compiler-Warnung in der Laufausgabe, wo sie nie steht;
 der Fall fragt jetzt `dhrt --check`, mit vier Argumenten als Gegenprobe.
 **Falle unter Windows:** eine gerade beendete Exe ist noch kurz abgebildet,
 Ueberschreiben scheitert mit os error 1224 -- je Variante eine eigene Kopie.
+
+**Barrierefreiheit, Rekursionstiefe und ENUM-Bereiche (2026-09-17, Weg D):**
+test_gui_barrierefreiheit (pytest) -> `tests/pruef/gui_barrierefreiheit.dhtest`
+(7, seriell) und test_rekursionstiefe (pytest) -> zwei Faelle mehr in
+`tests/pruef/rekursionstiefe.dhtest`, die `vm.rs` und `build.rs` lesen. Der
+fremde UIA-Leser laeuft weiter als PowerShell-Skript (Beilage), nur gestartet
+per `PROCESS_START`; das Formular ist ein zweiter dhrt als Kind, und weil
+`PROCESS_START` keine Prozessnummer nennt, sucht PowerShell das Fenster ueber
+einen Titel mit Kennung (`_hilfen/uialeser.dh` sammelt die Ausgabe). Der
+Kontrast der Themen wird in Drachenhauch gerechnet (WCAG-Leuchtdichte mit `^`).
+Gegenproben: 7 von 7 und 2 von 2 fallen. **Dazu der offene Fund aus dem
+LSP-Umzug:** ein `ENUM` ist jetzt ein Bereich bis `END ENUM`
+(`symbole::bereiche`, SymbolKind Enum in `lsp::gliederung`); die Kurzform
+`ENUM Farbe = ROT, GRUEN` bleibt EINE Zeile und kommt nicht auf den Stapel --
+sonst verschluckte sie die SUBs dahinter bis zum naechsten END ENUM. Folge
+in der IDE (sie liest dieselben Bereiche ueber `CODE_SYMBOLS$`): ein ENUM
+laesst sich falten und steht in der Pfadleiste, solange die Marke darin
+steht. Rust-Tests `enum_als_block_und_als_kurzform` und in
+`gliederung_verschachtelt_und_enum` (Gegenprobe ohne `END ENUM`: beide
+fallen), `tests/pruef/dhrt_lsp.dhtest` prueft das Ende mit.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
