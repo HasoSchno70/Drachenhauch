@@ -1,0 +1,34 @@
+' Modul `firmata`: Registrierung, IMPORT und Handle-Typ. Die Protokoll-Logik
+' (Bit-Packing, Nachrichten zerlegen) pruefen die Rust-Tests in firmata.rs;
+' ein Arduino braucht hier keiner. Bis 2026-09-17 tests/test_firmata_module.py.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die befehle stehen im verzeichnis
+FUNCTION bekannt(name AS STRING) AS BOOLEAN
+    DIM v AS ARRAY OF STRING : v = CODE_COMPLETE(name, 1, LEN(name) + 1)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(v) - 1
+        IF UPPER$(v[i]) = UPPER$(name) THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("FIRMATA_PORTS FIRMATA_OPEN FIRMATA_CLOSE FIRMATA_IS_OPEN " + _
+    "FIRMATA_PIN_MODE FIRMATA_DIGITAL_WRITE FIRMATA_DIGITAL_READ " + _
+    "FIRMATA_ANALOG_WRITE FIRMATA_ANALOG_READ FIRMATA_UPDATE", " ")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(namen) - 1
+    IF NOT bekannt(namen[i]) THEN PRINT "fehlt: " + namen[i]
+NEXT
+PRINT STR$(LEN(namen)) + " geprueft"
+--- erwartet
+10 geprueft
+
+=== import und handle-typ, oeffnen scheitert im klartext
+' Ohne das Feature `serial` meldet FIRMATA_OPEN das zur Laufzeit, mit ihm
+' gibt es den Anschluss nicht -- beides ein Fehler, der den Befehl nennt.
+IMPORT "firmata"
+DIM h AS FIRMATA_HANDLE
+h = FIRMATA_OPEN("GIBTSNICHT_ANSCHLUSS_7", 57600)
+--- fehler
+FIRMATA_OPEN
