@@ -1,0 +1,44 @@
+' Ein exportiertes Programm starten und seine Ausgabe lesen -- das
+' Gegenstueck zu dlStarten fuer eine Exe, die nicht dhrt heisst.
+' Braucht dhrtlauf.dh davor (dlPfadTrenner$).
+DIM lpAus AS STRING : lpAus = ""
+DIM lpErr AS STRING : lpErr = ""
+DIM lpCode AS INTEGER : lpCode = 0
+
+' Der Dateiname der Exe: unter Windows mit .exe.
+FUNCTION exeName$(name AS STRING) AS STRING
+    IF dlPfadTrenner$() = ";" THEN RETURN name + ".exe"
+    RETURN name
+END FUNCTION
+
+' Die Laenge der angehaengten .dhc-Nutzlast, 0 ohne Footer.
+FUNCTION nutzlast(b AS BUFFER) AS INTEGER
+    DIM n AS INTEGER : n = BUFFER_LEN(b)
+    IF n < 16 THEN RETURN 0
+    IF BUFFER_TO_STRING$(BUFFER_SLICE(b, n - 8, n)) <> "DHRTPAY1" THEN RETURN 0
+    RETURN BUFFER_GET_I64(b, n - 16)
+END FUNCTION
+
+SUB programmLauf(exe AS STRING)
+    DIM p AS INTEGER : p = PROCESS_START(exe)
+    lpAus = ""
+    lpErr = ""
+    DIM leer AS INTEGER : leer = 0
+    DIM t0 AS INTEGER : t0 = MILLIS()
+    WHILE MILLIS() - t0 < 120000 AND leer < 5
+        DIM a AS STRING : a = PROCESS_READ$(p)
+        DIM e AS STRING : e = PROCESS_ERR$(p)
+        IF a <> "" OR e <> "" THEN
+            lpAus = lpAus + a
+            lpErr = lpErr + e
+            leer = 0
+        ELSEIF NOT PROCESS_RUNNING(p) THEN
+            leer = leer + 1
+        END IF
+        SLEEP(20)
+    WEND
+    lpAus = REPLACE$(lpAus, CHR$(13), "")
+    lpErr = REPLACE$(lpErr, CHR$(13), "")
+    lpCode = PROCESS_CODE(p)
+    PROCESS_CLOSE(p)
+END SUB

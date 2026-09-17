@@ -958,7 +958,7 @@ extrahiert den Bytecode.
 > vorn und prüft jeden Kandidaten (Längenfeld plausibel? Nutzlast gültiges
 > UTF-8?), damit ein zufälliges Vorkommen der acht Bytes im Signaturblock oder
 > im JSON nicht in die Irre führt. Abgesichert durch Rust-`#[test]`s in `main.rs`
-> und [tests/test_export_signierbar.py](../tests/test_export_signierbar.py).
+> und [tests/pruef/dhrt_export.dhtest](../tests/pruef/dhrt_export.dhtest).
 >
 > **Signieren kann nur, wer die Datei in der Hand hat.** Ein Zertifikat des
 > Drachenhauch-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
