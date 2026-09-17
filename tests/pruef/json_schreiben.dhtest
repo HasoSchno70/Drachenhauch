@@ -106,6 +106,34 @@ PRINT JSON_GET_INT(h, "unten.x")
 --- erwartet
 1
 
+=== einen teilbaum herausholen ist eine kopie
+' JSON_GET_JSON ist das Gegenstueck zu JSON_SET_JSON: der Teilbaum kommt als
+' eigenes Dokument heraus, jede Art von Wert bleibt, was sie war, und eine
+' Aenderung an der Kopie schlaegt nicht auf das Original durch.
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{""instruments"":[{""name"":""Piano"",""kind"":""sample"",""samples"":""AAEC"",""pan"":0.5,""zones"":[{""lo"":0}],""loop"":null,""an"":true}]}")
+DIM i AS JSON_HANDLE : i = JSON_GET_JSON(h, "instruments.0")
+PRINT JSON_STRINGIFY(i)
+JSON_SET_STRING(i, "name", "Geaendert")
+PRINT JSON_GET_STRING(h, "instruments.0.name")
+PRINT JSON_STRINGIFY(JSON_GET_JSON(h, "instruments.0.zones"))
+PRINT JSON_STRINGIFY(JSON_GET_JSON(h, "instruments.0.pan"))
+' Der leere Pfad meint beim Lesen die Wurzel -- also eine Kopie des Ganzen.
+PRINT JSON_STRINGIFY(JSON_GET_JSON(h, "")) = JSON_STRINGIFY(h)
+--- erwartet
+{"name":"Piano","kind":"sample","samples":"AAEC","pan":0.5,"zones":[{"lo":0}],"loop":null,"an":true}
+Piano
+[{"lo":0}]
+0.5
+TRUE
+
+=== ein fehlender teilbaum ist ein fehler
+IMPORT "json"
+DIM h AS JSON_HANDLE : h = JSON_PARSE("{""a"":1}")
+DIM x AS JSON_HANDLE : x = JSON_GET_JSON(h, "b.c")
+--- fehler
+JSON_GET_JSON: Pfad 'b.c' nicht aufloesbar
+
 === sich selbst einhaengen geht
 ' Quelle und Ziel duerfen dasselbe Handle sein (RefCell-Falle).
 IMPORT "json"

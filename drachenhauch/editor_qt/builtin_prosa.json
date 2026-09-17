@@ -1,6 +1,6 @@
 {
  "_comment": "Erzeugt aus docs/ von `dhrt doku prosa` -- NICHT von Hand aendern. Ausfuehrlichere Texte gehoeren in builtin_docs.json (die gewinnen), Korrekturen an einer Beschreibung in das jeweilige docs/module-*.md.",
- "count": 1857,
+ "count": 1858,
  "docs": {
   "ABS": "Absolutbetrag.",
   "ACOS": "Arcus-Sinus/-Cosinus (x in [-1, 1])",
@@ -1003,6 +1003,7 @@
   "JSON_GET_BOOL": "BOOLEAN — Wert am Pfad als Wahrheitswert lesen",
   "JSON_GET_FLOAT": "FLOAT — Wert am Pfad als Kommazahl lesen",
   "JSON_GET_INT": "INTEGER — Wert am Pfad als ganze Zahl lesen",
+  "JSON_GET_JSON": "JSON_HANDLE — Teilbaum am Pfad als eigenes Dokument (Kopie) — das Gegenstück zu JSON_SET_JSON, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen",
   "JSON_GET_STRING": "STRING — Wert am Pfad als Text lesen (\"nutzer.name\", \"posten.0\")",
   "JSON_HAS": "BOOLEAN — gibt es am Pfad ueberhaupt etwas?",
   "JSON_KEYS": "ARRAY OF STRING Feldnamen eines Objekts",

@@ -22,6 +22,7 @@ IMPORT "json"
 | `JSON_LEN(h, path$)` | INTEGER | Laenge einer Liste bzw. Zahl der Felder eines Objekts |
 | `JSON_TYPE(h, path$)` | STRING | was steht am Pfad? (`object`, `array`, `string`, `number`, `boolean`, `null`) |
 | `JSON_KEYS(h, path$)` | ARRAY OF STRING | Feldnamen eines Objekts |
+| `JSON_GET_JSON(h, pfad$)` | JSON_HANDLE | Teilbaum am Pfad als eigenes Dokument (**Kopie**) — das Gegenstück zu `JSON_SET_JSON`, etwa um ein Stück, das man nicht versteht, unverändert mitzuführen |
 
 **Schreiben:**
 

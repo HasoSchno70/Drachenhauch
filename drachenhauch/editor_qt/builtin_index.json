@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1891,
+ "count": 1892,
  "builtins": [
   {
    "name": "ABS",
@@ -6156,6 +6156,12 @@
    "name": "JSON_GET_INT",
    "kind": "core",
    "signature": "JSON_GET_INT(h: ?, path: STRING)",
+   "module": "json"
+  },
+  {
+   "name": "JSON_GET_JSON",
+   "kind": "core",
+   "signature": "JSON_GET_JSON(h: JSON_HANDLE, pfad: STRING)",
    "module": "json"
   },
   {

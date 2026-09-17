@@ -100,7 +100,12 @@ ganzen Song, die WAV-Mischung (Stereo/Amiga-Pan) und den GB-Code-Export.
 Anders als hier läuft die Wiedergabe auf einer **Audio-Uhr** (`AUDIO_CLOCK`)
 samplegenau statt über einen Timer. **Nicht** dabei: Sample-Instrumente,
 Keymaps und SoundFonts (alles, was eingebettete PCM-Daten braucht), VU-Meter,
-Pattern-Namen, der Sample-Offset-Effekt.
+Pattern-Namen, der Sample-Offset-Effekt. Ein Sample- oder Keymap-Instrument
+aus einer Datei dieses Werkzeugs bleibt dort als **stummer Platzhalter**
+stehen (die Liste sagt „hier stumm") und wird beim Sichern **unverändert
+zurückgeschrieben** -- nur Name, Lautstärke, Pan und Hüllkurve lassen sich
+daran ändern. Bis 2026-09-17 schrieb er es als Synth-Instrument zurück, und
+die eingebetteten Samples waren nach einem Sichern weg.
 
 ## Audio Studio
 
