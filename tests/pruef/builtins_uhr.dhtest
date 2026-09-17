@@ -1,0 +1,82 @@
+' MILLIS/TIMER -- die Stoppuhr des Programms -- und die Stil-Angabe von
+' GUI_CONFIRM. Bis 2026-09-17 tests/test_builtins_uhr.py.
+'
+' Frueherer Stolperstein: die Doku sagte "ms seit Programmstart", die Laufzeit
+' gab Millisekunden seit 1970 zurueck (gemessen: 1786881140256). Jetzt ist es
+' eine monotone Uhr ab Programmstart; Datum und Uhrzeit liefert ZEIT_JETZT()
+' aus dem Modul `zeit`. Die Werte schwanken je Lauf, die Faelle geben darum
+' Wahrheitswerte aus.
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== millis faengt klein an
+' Beim Start steht die Uhr nahe null -- nicht bei 1,78 Billionen.
+DIM m AS INTEGER : m = MILLIS()
+PRINT "zwischen 0 und 5000 "; (m >= 0 AND m < 5000)
+IF m < 0 OR m >= 5000 THEN PRINT "MILLIS() = "; m
+--- erwartet
+zwischen 0 und 5000 TRUE
+
+=== millis zaehlt vorwaerts
+DIM a AS INTEGER : a = MILLIS()
+DIM i AS INTEGER : DIM z AS INTEGER : z = 0
+FOR i = 1 TO 2000000
+    z = z + 1
+NEXT
+DIM b AS INTEGER : b = MILLIS()
+PRINT b >= a
+PRINT b - a < 60000
+--- erwartet
+TRUE
+TRUE
+
+=== timer ist dieselbe uhr in sekunden
+' TIMER() * 1000 und MILLIS() meinen denselben Zeitpunkt -- frueher hatten sie
+' verschiedene Nullpunkte. Zwischen den Abfragen vergehen ein paar ms.
+DIM i AS INTEGER : DIM z AS INTEGER : z = 0
+FOR i = 1 TO 2000000
+    z = z + 1
+NEXT
+DIM ms AS INTEGER : ms = MILLIS()
+DIM t AS FLOAT : t = TIMER() * 1000.0
+PRINT "abstand unter 50 ms "; (ABS(t - ms) < 50)
+IF ABS(t - ms) >= 50 THEN PRINT ms; " "; t
+--- erwartet
+abstand unter 50 ms TRUE
+
+=== millis und zeit_jetzt sind zwei paar schuhe
+' Die Stoppuhr ist klein, die Wanduhr gross -- wer sie verwechselt, soll es am
+' Zahlenbereich sofort merken.
+IMPORT "zeit"
+PRINT "stoppuhr klein "; (MILLIS() < 5000)
+PRINT "wanduhr nach 2020 "; (ZEIT_JETZT() > 1600000000)
+--- erwartet
+stoppuhr klein TRUE
+wanduhr nach 2020 TRUE
+
+=== gui_confirm lehnt einen unbekannten stil ab
+' Der Dialog blockiert und laesst sich nicht klicken; pruefbar ist, was davor
+' passiert. Die Meldung nennt die gueltigen Stile.
+SCREEN(200, 100, "t")
+SET_WINDOW_POS(-3000, -3000)
+DIM x AS BOOLEAN
+x = GUI_CONFIRM("Titel", "Text", "vielleicht")
+--- fehler
+"janein"
+
+=== gui_confirm nimmt drei argumente
+' Frueher warnte der Compiler bei drei Argumenten ("ueberzaehlige werden
+' ignoriert") -- der Stil kam nie an. Gefragt wird `dhrt --check`: eine
+' Warnung steht nicht in der Ausgabe eines Laufs.
+IMPORT "helfer.dh"
+DIM z AS STRING : z = CHR$(10)
+DIM d AS JSON_HANDLE
+d = dlCheck("DIM x AS BOOLEAN" + z + "IF FALSE THEN x = GUI_CONFIRM(" + CHR$(34) + "T" + CHR$(34) + ", " + CHR$(34) + "X" + CHR$(34) + ", " + CHR$(34) + "janein" + CHR$(34) + ")" + z)
+PRINT "drei argumente: "; JSON_LEN(d, "d"); " meldungen"
+d = dlCheck("DIM x AS BOOLEAN" + z + "IF FALSE THEN x = GUI_CONFIRM(" + CHR$(34) + "T" + CHR$(34) + ", " + CHR$(34) + "X" + CHR$(34) + ", " + CHR$(34) + "janein" + CHR$(34) + ", 4)" + z)
+' Die Gegenprobe im Fall: ein viertes Argument meldet --check sehr wohl.
+PRINT "vier argumente gemeldet "; (JSON_LEN(d, "d") > 0)
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+--- erwartet
+drei argumente: 0 meldungen
+vier argumente gemeldet TRUE

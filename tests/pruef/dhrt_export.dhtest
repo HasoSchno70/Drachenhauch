@@ -1,0 +1,175 @@
+' `dhrt --export` -- eine eigenstaendige Exe aus einer Quelle: die Laufzeit
+' kopiert sich selbst und haengt `<dhc><laenge u64><DHRTPAY1>` an.
+'
+' Bis 2026-09-17 tests/test_rust_export.py, test_export_assets.py und
+' test_export_signierbar.py. Exportiert und gestartet wird als Kind; die
+' Exe heisst unter Windows `name.exe`, sonst `name`.
+'
+' Die "blanke Laufzeit" der Gegenprobe ist die exportierte Exe ohne ihre
+' Nutzlast: der Fall liest die Laenge aus dem Footer und schneidet sie ab.
+' So braucht er den Pfad der laufenden dhrt nicht, und die Datei behaelt ihr
+' Ausfuehrungsrecht (sie wird ueberschrieben, nicht neu angelegt).
+
+=== die exportierte exe laeuft allein
+IMPORT "helfer.dh"
+dlStarten(["--export", CWD$() + "/prog.dh", CWD$() + "/dist"])
+PRINT "export "; dlCode
+DIM exe AS STRING : exe = CWD$() + "/dist/" + exeName$("prog")
+PRINT "exe da "; FILEEXISTS(exe)
+DIM b AS BUFFER : b = READALL_BYTES(exe)
+' Die Nutzlast haengt am Ende -- die Exe ist um sie groesser als die Laufzeit.
+PRINT "nutzlast "; (nutzlast(b) > 0)
+programmLauf(exe)
+PRINT "lauf "; lpCode
+PRINT lpAus;
+--- datei prog.dh
+FUNCTION fib(n AS INTEGER) AS INTEGER
+  IF n < 2 THEN RETURN n
+  RETURN fib(n - 1) + fib(n - 2)
+END FUNCTION
+PRINT fib(10)
+DIM i AS INTEGER
+FOR i = 1 TO 3
+  PRINT i * i
+NEXT
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+exe da TRUE
+nutzlast TRUE
+lauf 0
+55
+1
+4
+9
+
+=== ohne zielordner landet das bundle in name_dist
+IMPORT "helfer.dh"
+dlStarten(["--export", "spiel.dh"])
+PRINT "export "; dlCode
+programmLauf(CWD$() + "/spiel_dist/" + exeName$("spiel"))
+PRINT "lauf "; lpCode
+PRINT lpAus;
+--- datei spiel.dh
+PRINT "hallo aus dem bundle"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+lauf 0
+hallo aus dem bundle
+
+=== assets ueber ../ kommen ins bundle
+' Ein Spiel in code/ mit Assets in ../assets/. Frueher blieb das Bundle
+' assetlos -- beim Doppelklick nur ein schwarzer Schirm.
+IMPORT "helfer.dh"
+dlStarten(["--export", CWD$() + "/proj/code/game.dh", CWD$() + "/dist"])
+IF dlCode <> 0 THEN PRINT dlErr
+PRINT "export "; dlCode
+PRINT "exe "; FILEEXISTS("dist/" + exeName$("game"))
+' Ohne ../ im Bundle abgelegt.
+PRINT "bild "; FILEEXISTS("dist/assets/sprites/hero.png")
+PRINT "ton "; FILEEXISTS("dist/assets/snd.wav")
+--- datei proj/code/game.dh
+DIM img AS IMAGE
+img = LOADIMAGE("../assets/sprites/hero.png")
+DIM ok AS BOOLEAN : ok = FILEEXISTS("../assets/snd.wav")
+PRINT "hi"
+--- datei proj/assets/sprites/hero.png
+kein echtes bild
+--- datei proj/assets/snd.wav
+kein echter ton
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+exe TRUE
+bild TRUE
+ton TRUE
+
+=== absolute und fehlende pfade sammelt der export nicht ein
+IMPORT "helfer.dh"
+dlStarten(["--export", CWD$() + "/p2/g.dh", CWD$() + "/d2"])
+PRINT "export "; dlCode
+PRINT "exe "; FILEEXISTS("d2/" + exeName$("g"))
+' Im Bundle steht nur die Exe -- kein assets-Ordner, keine system32-Kopie.
+DIM inhalt AS ARRAY OF STRING : inhalt = DIRLIST("d2")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(inhalt) - 1
+    IF inhalt[i] <> exeName$("g") THEN PRINT "unerwartet: "; inhalt[i]
+NEXT
+PRINT "eintraege "; LEN(inhalt)
+--- datei p2/g.dh
+PRINT "C:/windows/system32/x.dll"
+PRINT "../gibtsnicht/foo.png"
+PRINT "hallo welt"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+exe TRUE
+eintraege 1
+
+=== angehaengte bytes brechen das bundle nicht
+' Signieren haengt den Zertifikatsblock ans Dateiende -- danach sind die
+' letzten 16 Bytes nicht mehr der Footer. Frueher fand sich das signierte
+' Spiel nicht mehr und verhielt sich wie ein blankes dhrt. Nachgebildet mit
+' Nullbytes: 4096 (Groessenordnung einer Signatur), 16 (genau die Laenge des
+' Footers) und 1 (ein Byte verschiebt ihn schon).
+IMPORT "helfer.dh"
+dlStarten(["--export", "spiel.dh"])
+PRINT "export "; dlCode
+DIM exe AS STRING : exe = CWD$() + "/spiel_dist/" + exeName$("spiel")
+DIM original AS BUFFER : original = READALL_BYTES(exe)
+DIM zusaetze AS ARRAY OF INTEGER : zusaetze = [4096, 16, 1]
+DIM k AS INTEGER
+FOR k = 0 TO 2
+    ' Je Variante eine eigene Kopie: die gerade gelaufene Exe haelt Windows
+    ' noch kurz abgebildet (os error 1224). COPYFILE behaelt das
+    ' Ausfuehrungsrecht, das Ueberschreiben danach auch.
+    DIM ziel AS STRING : ziel = CWD$() + "/spiel_dist/" + exeName$("spiel" + STR$(zusaetze[k]))
+    COPYFILE(exe, ziel)
+    WRITEALL_BYTES(ziel, BUFFER_CONCAT(original, BUFFER_NEW(zusaetze[k])))
+    programmLauf(ziel)
+    PRINT zusaetze[k]; " bytes: "; lpCode; " "; lpAus;
+NEXT
+--- datei spiel.dh
+PRINT "immer noch da"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+4096 bytes: 0 immer noch da
+16 bytes: 0 immer noch da
+1 bytes: 0 immer noch da
+
+=== die blanke laufzeit gibt sich nicht als spiel aus
+' Die Gegenprobe: ohne Nutzlast darf die Rueckwaertssuche nichts im Binaercode
+' finden und eine leere Exe fuer ein Bundle halten.
+IMPORT "helfer.dh"
+dlStarten(["--export", "spiel.dh"])
+PRINT "export "; dlCode
+DIM exe AS STRING : exe = CWD$() + "/spiel_dist/" + exeName$("spiel")
+DIM b AS BUFFER : b = READALL_BYTES(exe)
+DIM n AS INTEGER : n = nutzlast(b)
+PRINT "nutzlast gefunden "; (n > 0)
+WRITEALL_BYTES(exe, BUFFER_SLICE(b, 0, BUFFER_LEN(b) - 16 - n))
+programmLauf(exe)
+PRINT "verwendung "; (INSTR(lpAus + lpErr, "Verwendung") >= 0)
+PRINT "nicht gespielt "; (INSTR(lpAus, "immer noch da") < 0)
+--- datei spiel.dh
+PRINT "immer noch da"
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/dhrtlauf.dh"
+IMPORT "{sammlung}/_hilfen/exportlauf.dh"
+--- erwartet
+export 0
+nutzlast gefunden TRUE
+verwendung TRUE
+nicht gespielt TRUE

@@ -167,16 +167,13 @@ os.environ.setdefault("DH_OHNE_AUDIO", "1")
 # Uebersprungen wird NUR, wenn `DHRT_OHNE_GRAFIK=1` gesetzt ist. Ohne die
 # Variable aendert sich nichts: der Windows-Lauf und jeder lokale Lauf sehen
 # diese Tests wie bisher.
-# Zwei Dateien pruefen Windows-Eigenheiten und haben anderswo keinen
+# Eine Datei prueft eine Windows-Eigenheit und hat anderswo keinen
 # Gegenstand -- gefunden beim ersten Linux-Lauf:
 #   test_formdesigner_document  normalisiert `forms\\a.dhform` zu `forms/a...`.
 #                               Auf Linux ist `\\` kein Trenner, sondern ein
 #                               gueltiges Zeichen im Dateinamen.
-#   test_export_signierbar      buendelt eine .exe und fasst dabei Dateirechte
-#                               an, die es unter POSIX so nicht gibt.
 _NUR_WINDOWS = {
     "test_formdesigner_document.py",
-    "test_export_signierbar.py",
 }
 
 _BRAUCHT_GRAFIK = {

@@ -181,8 +181,8 @@ Portierung erreicht.
   selbst → `.dhc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
   ohne `dhrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
-  [`tests/test_rust_export.py`](../tests/test_rust_export.py) (exportiert,
-  startet die Exe, vergleicht stdout mit dem Tree-Walker).
+  [`tests/pruef/dhrt_export.dhtest`](../tests/pruef/dhrt_export.dhtest)
+  (exportiert, startet die Exe, vergleicht ihre Ausgabe).
 - **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`
   liefert neben den externen Typen (inkl. aliasierter wie `j_handle`/`v`) eine
   `(alias, modul)`-Liste; der Compiler bildet aliasierte Builtin-Namen
