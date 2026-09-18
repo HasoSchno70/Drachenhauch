@@ -7,7 +7,9 @@
 > **Abgearbeitet ist daraus, was keine Entscheidung braucht:** der
 > Tracker-Datenverlust, die toten Starter samt `openpyxl`, der Pan-Regler im
 > GB-Code des SFX-Generators und der Umzug der drei `builtin_*.json` nach
-> `daten/` (7.2). Was bleibt, sind die vier Entscheidungen am Ende von 7.7.
+> `daten/` (7.2). Von den vier Entscheidungen am Ende von 7.7 ist (d)
+> gefallen (18.09.: alte Qt-`.dhsprite` müssen nicht mehr aufgehen); offen
+> sind (a), (b) und (c).
 >
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
@@ -432,7 +434,8 @@ und fallen mit ihnen.
    Absturz-Wiederherstellung, Tooltip beim Überfahren, Strg+Klick, Zoom
    per Tastatur und Rad, Dateien hineinziehen; im Tilemap-Editor die
    Kachelgröße aus der Datei; im Tracker Sample-Instrumente abspielen oder
-   wenigstens erhalten; für Qt-`.dhsprite`-Dateien ein einmaliger Import.
+   wenigstens erhalten. ~~Für Qt-`.dhsprite`-Dateien ein einmaliger
+   Import~~ -- entfällt, siehe (d).
 4. **Verteilung:** der Python-freie Installer übernimmt Bücher,
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
    macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
@@ -443,10 +446,23 @@ und fallen mit ihnen.
 6. **CI:** `dhrt test tests/pruef` direkt aufrufen, dann `setup-python`,
    pytest, mypy und den Qt-Läufer streichen.
 7. **Löschen:** `drachenhauch/`, `tests/*.py`, `conftest.py`, `dhrun.py`,
-   die Starter, `pyproject.toml`, `requirements.txt`; danach Anleitungen
-   und Buchkapitel umschreiben.
+   die Starter, `pyproject.toml`, `requirements.txt`, dazu die 14
+   Qt-`.dhsprite`-Dateien in `buch-galaga/assets/sprites/` und
+   `examples/platformer/` (das PNG daneben bleibt, es ist das, was die
+   Spiele laden); danach Anleitungen und Buchkapitel umschreiben.
 
 **Offene Entscheidungen:** (a) welche Qt-Funktionen wegfallen dürfen,
 (b) ob macOS und Linux ein Paket brauchen, (c) ob die zwei Bauskripte
-Python bleiben dürfen, (d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
-werden müssen.
+Python bleiben dürfen, ~~(d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
+werden müssen~~.
+
+**(d) entschieden am 18.09.2026: nein.** Den Qt-Sprite-Editor hat nur der
+Nutzer selbst benutzt -- fremde Arbeit, die unbemerkt kaputtginge, gibt es
+nicht. Im Repo liegen
+14 Qt-`.dhsprite`-Dateien, alle von Skripten erzeugt (`make_sprites.dh`
+schreibt sie seit dem Umzug nicht mehr) und alle mit dem PNG daneben, das
+die Spiele laden -- die Laufzeit liest `.dhsprite` nirgends. Verloren geht
+damit nur die Möglichkeit, ihre Ebenen im neuen Editor zu öffnen; die
+Pixel bleiben als PNG, und das Skript zeichnet sie jederzeit neu. Kein
+Umwandler, kein zweites Format in
+`189`. Die Dateien fallen in Schritt 7 mit dem Qt-Editor weg.
