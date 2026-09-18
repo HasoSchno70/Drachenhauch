@@ -1,0 +1,17 @@
+' Ein Programm als Kind starten und seinem Fenster eine ECHTE
+' Windows-Nachricht schicken (fenstersender.ps1): "esc" = WM_KEYDOWN/WM_KEYUP
+' mit VK_ESCAPE, "kreuz" = WM_CLOSE. Das Kind bekommt als ARG$(0) einen
+' Fenstertitel mit Kennung, darueber findet PowerShell es.
+' skript = Pfad von fenstersender.ps1 (der Helfer kennt seinen Ort nicht).
+' sende$ liefert "gesendet" (oder die Meldung des Senders) und danach die
+' Ausgabe des Kindes.
+IMPORT "uialeser.dh"
+
+FUNCTION sende$(skript AS STRING, programm AS STRING, nachricht AS STRING, extra AS STRING) AS STRING
+    DIM kennung AS STRING : kennung = "Fenster-" + STR$(MILLIS()) + "-" + STR$(INT(RND() * 1000000))
+    DIM kind AS INTEGER : kind = PROCESS_START("dhrt", "run", CWD$() + "/" + programm, "--", kennung, extra)
+    DIM ps AS INTEGER : ps = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", skript, kennung, nachricht)
+    DIM s AS STRING : s = auslesen$(ps, 30000)
+    DIM k AS STRING : k = auslesen$(kind, 30000)
+    RETURN s + k
+END FUNCTION

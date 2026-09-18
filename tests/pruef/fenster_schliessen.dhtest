@@ -1,0 +1,129 @@
+' Fenster-Kreuz und ESC (2026-09-18).
+'
+' WINDOW_CLOSE_REQUESTED meldet das Kreuz, ohne das Programm zu beenden --
+' ein Programm mit ungesicherter Arbeit fragt erst nach. QUITREQUESTED
+' meldet es weiter, dazu das Bildlimit. Und ESC gehoert in einem Programm mit
+' gui ab dem ersten GUI_UPDATE den Widgets: vorher beendete jedes "Abbrechen"
+' per ESC das ganze Programm (raylibs Vorgabe fuer die Beenden-Taste).
+'
+' Die Faelle mit Fenster schicken ECHTE Windows-Nachrichten (PostMessage:
+' WM_KEYDOWN/WM_KEYUP VK_ESCAPE, WM_CLOSE) -- eine eingespielte Aufnahme
+' umgeht die Beenden-Taste von raylib und bewiese hier nichts. PowerShell
+' sucht das Kind ueber einen Titel mit Kennung. Das Kind endet nach vier
+' Sekunden selbst ("zeit um"); endet es frueher, war es die Nachricht.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== das bildlimit ist kein kreuz
+SCREEN(200, 100)
+PRINT QUITREQUESTED(); " "; WINDOW_CLOSE_REQUESTED()
+WHILE NOT QUITREQUESTED()
+    FLIP()
+WEND
+PRINT QUITREQUESTED(); " "; WINDOW_CLOSE_REQUESTED()
+--- umgebung
+DHRT_FRAMES=5
+--- erwartet
+FALSE FALSE
+TRUE FALSE
+
+=== esc beendet ein programm mit gui nicht mehr
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "gui.dh", "esc", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei gui.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM b AS GUI_WIDGET : b = GUI_BUTTON(w, "x", 10, 10, 60, 24)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 4000
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+IF QUITREQUESTED() THEN PRINT "beendet" ELSE PRINT "zeit um"
+--- system windows
+--- erwartet
+gesendet
+zeit um
+
+=== esc beendet ein programm ohne gui weiter
+' Gegenprobe: dieselbe Nachricht, dasselbe Programm ohne gui.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "ohne.dh", "esc", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei ohne.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 4000
+    CLS(0) : FLIP()
+WEND
+IF QUITREQUESTED() THEN PRINT "beendet" ELSE PRINT "zeit um"
+--- system windows
+--- erwartet
+gesendet
+beendet
+
+=== ein ausdrueckliches window_esc_quit gilt auch mit gui
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "gui.dh", "esc", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei gui.dh
+IMPORT "gui"
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+WINDOW_ESC_QUIT(TRUE)
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t0 AS INTEGER : t0 = MILLIS()
+WHILE NOT QUITREQUESTED() AND MILLIS() - t0 < 4000
+    GUI_UPDATE()
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+IF QUITREQUESTED() THEN PRINT "beendet" ELSE PRINT "zeit um"
+--- system windows
+--- erwartet
+gesendet
+beendet
+
+=== das kreuz wird gemeldet und das programm laeuft weiter
+' Das Programm fragt nur WINDOW_CLOSE_REQUESTED, nicht QUITREQUESTED -- es
+' entscheidet selbst, wann es endet.
+IMPORT "helfer.dh"
+PRINT sende$(skript$(), "kreuz.dh", "kreuz", "")
+--- datei helfer.dh
+IMPORT "{sammlung}/_hilfen/fenstersender.dh"
+FUNCTION skript$() AS STRING
+    RETURN "{sammlung}/_hilfen/fenstersender.ps1"
+END FUNCTION
+--- datei kreuz.dh
+SCREEN(300, 200, ARG$(0), 1)
+SET_WINDOW_POS(-3000, -3000)
+DIM t0 AS INTEGER : t0 = MILLIS()
+DIM n AS INTEGER : n = 0
+WHILE MILLIS() - t0 < 4000
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        n = n + 1
+        PRINT "kreuz, quitrequested "; QUITREQUESTED()
+    END IF
+    CLS(0) : FLIP()
+WEND
+PRINT "zeit um, kreuz gemeldet "; n; " mal"
+--- system windows
+--- erwartet
+gesendet
+kreuz, quitrequested TRUE
+zeit um, kreuz gemeldet 1 mal

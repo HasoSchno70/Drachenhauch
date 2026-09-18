@@ -1,0 +1,90 @@
+' Das Kreuz des IDE-Fensters (ide/ide.dh, 2026-09-18).
+'
+' Bis hierher beendete das Kreuz die IDE sofort: die Schleife endete an
+' QUITREQUESTED(), ungesicherte Arbeit war ohne Rueckfrage weg (seit der
+' Absturz-Wiederherstellung kam sie wenigstens beim naechsten Start zurueck).
+' Jetzt fragt die IDE wie ueber Datei -> Beenden, und endet ohne Rueckfrage
+' nur, wenn nichts ungesichert ist.
+'
+' Geschickt wird eine ECHTE Windows-Nachricht (WM_CLOSE ueber PostMessage,
+' _hilfen/fenstersender.ps1); der Einschub gibt dem Fenster einen Titel mit
+' Kennung und startet den Sender selbst. Das Bildlimit (DHRT_FRAMES) liegt
+' weit hinter dem Kreuz: steht "bildlimit" im Protokoll, lief die IDE bis
+' zuletzt weiter.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== mit ungesicherter arbeit fragt das kreuz nach
+SETWINDOWTITLE(ARG$(1))
+GUI_SET_TEXT(tabFelder[0], "PRINT 2")
+DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "kreuz")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+DH-IDE-Kreuz-ungesichert
+{sammlung}/_hilfen/fenstersender.ps1
+--- umgebung
+DHRT_FRAMES=480
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kreuz "; hat("fenster kreuz")
+PRINT "rueckfrage "; hat("rueckfrage beenden")
+PRINT "lief weiter "; hat("bildlimit")
+PRINT "sicherung bleibt "; hat("sicherung bleibt")
+PRINT "datei unveraendert "; READLINES("spiel.dh")[0]
+--- system windows
+--- erwartet
+kreuz TRUE
+rueckfrage TRUE
+lief weiter TRUE
+sicherung bleibt TRUE
+datei unveraendert PRINT 1
+
+=== ohne ungesicherte arbeit beendet das kreuz sofort
+' Gegenprobe: dieselbe Nachricht ohne Aenderung -- keine Rueckfrage, und die
+' IDE endet lange vor dem Bildlimit.
+SETWINDOWTITLE(ARG$(1))
+DIM prSender AS INTEGER : prSender = PROCESS_START("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ARG$(2), ARG$(1), "kreuz")
+--- programm ../../ide/ide.dh nach protokoll("bereit")
+--- argumente
+spiel.dh
+DH-IDE-Kreuz-sauber
+{sammlung}/_hilfen/fenstersender.ps1
+--- umgebung
+DHRT_FRAMES=480
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT 1
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+FUNCTION hat(z AS STRING) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(L) - 1
+        IF L[i] = z THEN RETURN TRUE
+    NEXT
+    RETURN FALSE
+END FUNCTION
+PRINT "kreuz "; hat("fenster kreuz")
+PRINT "rueckfrage "; hat("rueckfrage beenden")
+PRINT "lief weiter "; hat("bildlimit")
+PRINT "sicherung entfernt "; hat("sicherung entfernt")
+--- system windows
+--- erwartet
+kreuz TRUE
+rueckfrage FALSE
+lief weiter FALSE
+sicherung entfernt TRUE

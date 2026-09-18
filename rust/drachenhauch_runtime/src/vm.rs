@@ -6131,6 +6131,9 @@ impl<'p> Vm<'p> {
             "gui_update" => {
                 {
                     let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
+                    // ESC gehoert ab jetzt der gui, nicht mehr dem Beenden
+                    // (graphics.rs `esc_der_gui`).
+                    g.esc_der_gui();
                     // Barrierefreiheit: das Bild rechnen, DANN die Aktionen des
                     // Hilfsprogramms (Fokus, Klick, Wert) anwenden, dann den
                     // vollstaendigen Baum schicken -- nur, wenn ueberhaupt
@@ -7126,6 +7129,7 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "quitrequested" => Value::Bool(g!().quit_requested()),
+            "window_close_requested" => Value::Bool(g!().close_requested()),
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),
             "mousebutton" => Value::Bool(g!().mouse_button(gi(a,0,"MOUSEBUTTON")?)),

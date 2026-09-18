@@ -132,10 +132,19 @@ wie sie war, bis man selbst sichert. **Verwerfen** löscht die Stände,
 Ein verwaister Stand ohne Reiter verschwindet still. Beendet man sauber
 (nichts ungesichert, oder über die Rückfrage mit Sichern oder Verwerfen),
 geht der eigene Stand weg. **Endet die IDE ohne Rückfrage** mit
-ungesicherten Reitern, bleibt er als beendet liegen. Das ist mehr als der
-Absturz: auch das **Kreuz des Fensters** fragt nicht nach, die Schleife
-endet an `QUITREQUESTED()`. Vor der Wiederherstellung war die Arbeit auf
-diesem Weg wortlos weg; jetzt kommt sie beim nächsten Start zurück.
+ungesicherten Reitern, bleibt er als beendet liegen.
+
+**Das Kreuz des Fensters** (auch Alt+F4) fragt seit dem 18.09. wie
+Datei → Beenden: ist etwas ungesichert, kommt die Rückfrage (Alle sichern /
+Verwerfen / Abbrechen), sonst endet die IDE sofort. Vorher endete die
+Schleife an `QUITREQUESTED()`, und die Arbeit war wortlos weg -- gefunden
+beim Bau der Wiederherstellung. Dazu brauchte es zwei Dinge in der Laufzeit:
+`WINDOW_CLOSE_REQUESTED()` meldet das Kreuz, ohne das Bildlimit eines
+Testlaufs mitzuzählen, und **ESC beendet ein Programm mit gui nicht mehr**
+(siehe `docs/builtins-grafik.md`) -- vorher schloss ein ESC im Dialog die
+ganze IDE, samt ungesicherter Arbeit. Tests
+`tests/pruef/werkzeug_ide_schliessen.dhtest` (echtes `WM_CLOSE` über
+PowerShell).
 
 ## Woraus sie gebaut ist
 

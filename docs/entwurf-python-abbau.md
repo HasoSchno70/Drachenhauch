@@ -323,7 +323,7 @@ Qt-IDE gewohnt ist:
 
 | Bereich | fehlt in `ide/ide.dh` |
 |---|---|
-| Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendet die IDE ohne Rückfrage -- die Arbeit ist dadurch nicht mehr verloren, sie kommt beim nächsten Start wieder, eine Rückfrage beim Kreuz fehlt aber weiter); **Dateien ins Fenster ziehen** ✔; Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
+| Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendete die IDE ohne Rückfrage, und ESC in einem Dialog beendete sie ganz -- beides seit 18.09. behoben, `WINDOW_CLOSE_REQUESTED`); **Dateien ins Fenster ziehen** ✔; Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
 | Bearbeiten | Suchen mit **Groß/klein** und **ganzes Wort** als Schalter ✔; **einzeln ersetzen** (nur „alle"); Fundstellen **beliebiger Namen** (heute nur „Wer ruft das auf?" für Unterprogramme); **Klammern und Anführungszeichen automatisch schließen**; Formatieren beim Sichern |
 | Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; **Klick auf `datei:zeile` in der Ausgabe** springt dorthin; Ausgabe leeren |
 | Ansicht | **Zoom mit Strg+Rad und Strg+Plus/Minus/0**; **eine Datei geteilt** in zwei Ansichten (heute nur zwei verschiedene Reiter); ein- und ausblendbare Seitenleisten und Panels |

@@ -7371,6 +7371,7 @@ DIM beenden AS BOOLEAN : beenden = FALSE
 SUB beendenAnfragen()
     IF ungesichert() THEN
         dlgSchliessen = GUI_DIALOG("Beenden", "Es gibt ungesicherte Aenderungen.", "Alle sichern|Verwerfen|Abbrechen")
+        protokoll("rueckfrage beenden")
     ELSE
         beenden = TRUE
     END IF
@@ -7648,8 +7649,19 @@ DIM warBreite AS INTEGER : warBreite = SCREENWIDTH()
 DIM warHoehe AS INTEGER : warHoehe = SCREENHEIGHT()
 DIM letzterTab AS INTEGER : letzterTab = -1
 
-WHILE NOT QUITREQUESTED() AND NOT beenden
+WHILE NOT beenden
     GUI_UPDATE()
+    ' Das Kreuz des Fensters (auch Alt+F4) beendet nicht sofort, sondern
+    ' fragt wie Datei -> Beenden -- sonst waere ungesicherte Arbeit wortlos
+    ' weg. QUITREQUESTED ohne das Kreuz ist das Bildlimit eines Testlaufs:
+    ' dort endet die IDE hart, die Sicherung bleibt liegen wie bei einem Absturz.
+    IF WINDOW_CLOSE_REQUESTED() THEN
+        protokoll("fenster kreuz")
+        IF dlgSchliessen = 0 THEN beendenAnfragen()
+    ELSEIF QUITREQUESTED() THEN
+        protokoll("bildlimit")
+        BREAK
+    END IF
     IF WINDOW_RESIZED() OR SCREENWIDTH() <> warBreite OR SCREENHEIGHT() <> warHoehe THEN
         warBreite = SCREENWIDTH() : warHoehe = SCREENHEIGHT()
         layout()
