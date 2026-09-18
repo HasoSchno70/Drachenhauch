@@ -107,11 +107,35 @@ kann, steht darunter vollständig, ohne Stände.
 Einstellungen und Sitzung liegen in EINER JSON-Datei im Nutzerprofil
 (`%APPDATA%\Drachenhauch\ide.json`, sonst `~/.config/Drachenhauch/ide.json`):
 `zuletzt`, `sitzung`, `aktiv`, `hell`, `schrift`, `umbruch`, `karte`,
-`git_rand`, `regex`, `vorschlag`, `geruest`, `umbau_vorschau`, `autosichern` und `projekte` (Sitzung je Ordner, die zwölf letzten — wer an zwei Sachen
+`git_rand`, `regex`, `vorschlag`, `geruest`, `umbau_vorschau`, `autosichern`, `wiederherstellung_s` und `projekte` (Sitzung je Ordner, die zwölf letzten — wer an zwei Sachen
 arbeitet, will beim Wechsel nicht die Reiter der anderen wiederfinden).
 Die Umgebungsvariable
 `DH_IDE_KONFIG` legt einen anderen Ort fest — die Tests brauchen das, sonst
 schriebe jeder Testlauf dem Nutzer eine fremde Sitzung in die Datei.
+
+**Absturz-Wiederherstellung** (seit 18.09.2026). Neben der `ide.json`
+liegt ein Ordner `wiederherstellung/`. Jede laufende IDE schreibt dort alle
+30 Sekunden (`wiederherstellung_s`) in einen **eigenen** Unterordner
+`<kennung>/stand.json`: Pfad und Text jedes Reiters mit ungesicherten
+Änderungen, auch unbenannter, dazu die Uhrzeit. Geschrieben wird in eine
+Nebendatei und dann umbenannt, damit ein Absturz mitten im Schreiben keinen
+halben Stand hinterlässt. Die Uhrzeit ist zugleich das Lebenszeichen: Beim
+Start bietet die IDE nur an, was **verwaist** ist — als beendet markiert
+oder seit drei Takten ohne Lebenszeichen. Den Stand einer zweiten IDE, die
+gerade läuft, lässt sie in Ruhe. (Die Qt-Fassung hatte einen gemeinsamen
+Ordner für alle: dort hielt eine zweite IDE die Sicherungen der ersten für
+Absturzreste, und wer zuerst sauber beendete, löschte die des anderen.) Die
+Frage beim Start hat drei Antworten: **Wiederherstellen** öffnet die Reiter
+mit ihrem geretteten Text, *ungesichert* — die Datei auf der Platte bleibt,
+wie sie war, bis man selbst sichert. **Verwerfen** löscht die Stände,
+**Später** (auch ESC) lässt sie liegen, und der nächste Start fragt wieder.
+Ein verwaister Stand ohne Reiter verschwindet still. Beendet man sauber
+(nichts ungesichert, oder über die Rückfrage mit Sichern oder Verwerfen),
+geht der eigene Stand weg. **Endet die IDE ohne Rückfrage** mit
+ungesicherten Reitern, bleibt er als beendet liegen. Das ist mehr als der
+Absturz: auch das **Kreuz des Fensters** fragt nicht nach, die Schleife
+endet an `QUITREQUESTED()`. Vor der Wiederherstellung war die Arbeit auf
+diesem Weg wortlos weg; jetzt kommt sie beim nächsten Start zurück.
 
 ## Woraus sie gebaut ist
 
@@ -279,13 +303,16 @@ anderer Reiter war ungesichert), `aufrufer <anzahl>`,
 `umbau geprueft <fehler>`, `umbau neue datei <anzahl>`,
 `umbau abgebrochen`, `extern <datei>`,
 `aufrufer gemessen <anzahl>`,
-`auto gesichert`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sehen die Prüfsammlungen, was sie
+`auto gesichert`, `sicherung <anzahl> [beendet]`, `sicherung bleibt|entfernt`,
+`wiederherstellung angeboten <anzahl>|verworfen|spaeter`,
+`wiederhergestellt <pfad>|(neu)`, `farbfeld <stelle>`, `farbe <wert>`, `leistenknopf <befehl>`, `statusfeld <nr>`, `pfad sprung <zeile>`, `ende`. So sehen die Prüfsammlungen, was sie
 getan hat; Tasten kommen über `AUTOMATION_PLAY` herein (F5 startet, F7
 prüft). Die Stände 1 bis 5 prüft `tests/pruef/werkzeug_ide.dhtest` ohne
 Python, die Stände 6 bis 12 `tests/pruef/werkzeug_ide_6_12.dhtest`, die
 Stände 13 bis 25 `tests/pruef/werkzeug_ide_13_25.dhtest`, was mehrere Läufe,
 ein git-Repository oder eine Bildmessung braucht
-`tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, die Bausteine einzeln
+`tests/pruef/werkzeug_ide_sonderfaelle.dhtest`, die Absturz-Wiederherstellung
+`tests/pruef/werkzeug_ide_wiederherstellung.dhtest`, die Bausteine einzeln
 `tests/pruef/ide_bausteine.dhtest`. Seit Stand 38 ist keiner der Fälle mehr
 in pytest: auch das PDF-Listing liegt in den Sonderfällen, seine gepackten
 Seiten entpackt `BUFFER_INFLATE`.

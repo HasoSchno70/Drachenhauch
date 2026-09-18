@@ -3393,6 +3393,29 @@ was fehlt, wird gebaut: erst die acht Punkte der Stufe A
 eigene Datei haengt an einer Qt-Funktion (nachgesehen). Offen: (b)
 macOS-/Linux-Paket.
 
+**Absturz-Wiederherstellung in der IDE (2026-09-18, erster Punkt der Stufe
+A):** jede laufende IDE schreibt alle 30 s (`wiederherstellung_s` in der
+ide.json) die Texte ihrer ungesicherten Reiter nach
+`wiederherstellung/<kennung>/stand.json` neben die ide.json -- in eine
+Nebendatei und dann `RENAME`, damit ein Absturz mitten im Schreiben keinen
+halben Stand hinterlaesst. **Ein Ordner JE IDE**, nicht einer fuer alle wie
+in der Qt-Fassung (dort hielt eine zweite IDE die Sicherungen der ersten fuer
+Absturzreste, und wer zuerst sauber beendete, loeschte die des anderen). Die
+Uhrzeit im Stand ist das Lebenszeichen: der Start bietet nur an, was als
+beendet markiert (`offen: false`) oder seit drei Takten stumm ist
+(Wiederherstellen/Verwerfen/Spaeter; ESC = Spaeter). Zurueckgeholt wird
+UNGESICHERT, ueber `tabOeffnen` statt `dateiOeffnen` (sonst oeffnete eine als
+Text bearbeitete .dhform den Designer). **Der Fund dabei:** das Kreuz des
+Fensters beendet die IDE OHNE Rueckfrage -- die Schleife endet an
+`QUITREQUESTED()`, ungesicherte Arbeit war wortlos weg. Jetzt bleibt der
+Stand dann als beendet liegen und kommt beim naechsten Start zurueck; eine
+Rueckfrage beim Kreuz braeuchte einen Baustein der Laufzeit (das Schliessen
+zurueckweisen) und fehlt weiter. Tests
+`tests/pruef/werkzeug_ide_wiederherstellung.dhtest` (6); Gegenprobe mit
+sieben Verfaelschungen, jede faellt -- im ersten Anlauf fiel "kein Takt"
+NICHT, weil die letzte Sicherung beim Ende dieselbe Protokollzeile schrieb
+wie der Takt; sie heisst jetzt `sicherung N beendet`.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
