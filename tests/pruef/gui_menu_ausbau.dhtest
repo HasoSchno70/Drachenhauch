@@ -255,7 +255,7 @@ END TRY
 --- umgebung
 DHRT_FRAMES=1
 --- erwartet
-GUI_MENU_ITEM: Tastenkuerzel 'Hyper+Q': Taste 'Hyper' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter
+GUI_MENU_ITEM: Tastenkuerzel 'Hyper+Q': Taste 'Hyper' unbekannt -- Buchstabe, Ziffer, F1..F12, Entf, Einfg, Pos1, Ende, Bild auf/ab, Leer, Enter, Esc, Tab, Rueck, Links/Rechts/Hoch/Runter, Plus, Minus
 GUI_MENU_ITEM: Tastenkuerzel 'Strg+': keine Taste angegeben
 
 === haekchen kippt mit dem kuerzel
