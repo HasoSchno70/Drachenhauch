@@ -325,7 +325,7 @@ Qt-IDE gewohnt ist:
 |---|---|
 | Datei | ~~**Absturz-Wiederherstellung**~~ (seit 18.09. da, siehe `docs/ide.md`; dabei gefunden: das **Kreuz des Fensters** beendete die IDE ohne Rückfrage, und ESC in einem Dialog beendete sie ganz -- beides seit 18.09. behoben, `WINDOW_CLOSE_REQUESTED`); **Dateien ins Fenster ziehen** ✔; Druckoptionen (Schriftgröße, Duplex, Ränder, Zeilennummern, Umfang); gefaltete Blöcke je Datei merken |
 | Bearbeiten | Suchen mit **Groß/klein** und **ganzes Wort** als Schalter ✔; **einzeln ersetzen** (nur „alle"); Fundstellen **beliebiger Namen** (heute nur „Wer ruft das auf?" für Unterprogramme); **Klammern und Anführungszeichen automatisch schließen**; Formatieren beim Sichern |
-| Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; **Klick auf `datei:zeile` in der Ausgabe** springt dorthin; Ausgabe leeren |
+| Ausführen | **nur die Auswahl ausführen** ✔; Haltepunkt per **Klick in die Nummernspalte**, Bedingung per Rechtsklick; Profil nach **Funktionen** gruppiert; ~~**Klick auf `datei:zeile` in der Ausgabe** springt dorthin~~ ✔; Ausgabe leeren |
 | Ansicht | **Zoom mit Strg+Rad und Strg+Plus/Minus/0**; **eine Datei geteilt** in zwei Ansichten (heute nur zwei verschiedene Reiter); ein- und ausblendbare Seitenleisten und Panels |
 | Hilfe | **Tooltip beim Überfahren** (heute steht `CODE_HOVER$` in der Statuszeile, für das Wort an der Marke) ✔; **Strg+Klick** springt zur Definition; Filterfeld und Beispiel-Kategorien im Dateibaum |
 
@@ -469,7 +469,7 @@ darum, was beim Arbeiten fehlen würde.
 
 * **Stufe A, vor dem Abschalten der Qt-Fassung:** in der IDE
   ~~Absturz-Wiederherstellung~~ (18.09., `tests/pruef/werkzeug_ide_wiederherstellung.dhtest`),
-  Klick auf `datei:zeile` in der Ausgabe, Zoom mit
+  ~~Klick auf `datei:zeile` in der Ausgabe~~ (18.09., `tests/pruef/werkzeug_ide_ausgabe.dhtest`), Zoom mit
   Strg+Rad und Strg+Plus/Minus/0, Tooltip beim Überfahren und Strg+Klick
   zur Definition, Haltepunkt per Klick in die Nummernspalte, Suchen mit
   Groß/klein und ganzem Wort samt einzeln ersetzen; im Notenblatt die

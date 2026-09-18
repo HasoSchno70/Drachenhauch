@@ -3540,6 +3540,78 @@ SUB ausgabeSuchen(ab AS INTEGER)
     protokoll("ausgabe treffer 0")
 END SUB
 
+' --- Von der Ausgabe an die Stelle ------------------------------------
+' Meldungen der Laufzeit nennen ihre Stelle als `datei.dh:zeile:` --
+' "Laufzeitfehler in spiel.dh:3: ...", "lib.dh:1: Parse-Fehler ...". Ein
+' Doppelklick (oder Enter) auf so eine Zeile oeffnet die Datei dort.
+' Der Name kann Leerzeichen tragen (C:\Users\Hans Gaming\x.dh), und davor
+' steht beliebiger Text: genommen wird das LAENGSTE Stueck vor ".dh:", das
+' es als Datei gibt -- gesucht neben dem gelaufenen Programm (dhrt wechselt
+' dorthin, seine Meldungen sind relativ dazu), dann im Projekt.
+FUNCTION ausgabeOrt(zeile AS STRING) AS TUPLE
+    DIM p AS INTEGER : p = INSTR(LOWER$(zeile), ".dh:")
+    WHILE p >= 0
+        DIM rest AS STRING : rest = MID$(zeile, p + 4)
+        DIM ziffern AS INTEGER : ziffern = 0
+        WHILE ziffern < LEN(rest) AND INSTR("0123456789", MID$(rest, ziffern, 1)) >= 0
+            ziffern = ziffern + 1
+        WEND
+        IF ziffern > 0 THEN
+            DIM nr AS INTEGER : nr = INT(VAL(LEFT$(rest, ziffern)))
+            DIM vorn AS STRING : vorn = LEFT$(zeile, p) + ".dh"
+            DIM teile AS ARRAY OF STRING : teile = SPLIT$(vorn, " ")
+            DIM gefunden AS STRING : gefunden = ""
+            DIM kand AS STRING : kand = ""
+            DIM i AS INTEGER
+            FOR i = LEN(teile) - 1 TO 0 STEP -1
+                IF kand = "" THEN kand = teile[i] ELSE kand = teile[i] + " " + kand
+                DIM w AS STRING : w = ausgabeWeg$(kand)
+                IF w <> "" THEN gefunden = w
+            NEXT
+            IF gefunden <> "" AND nr >= 1 THEN RETURN (gefunden, nr)
+        END IF
+        DIM weiter AS INTEGER : weiter = INSTR(LOWER$(MID$(zeile, p + 4)), ".dh:")
+        IF weiter < 0 THEN p = -1 ELSE p = p + 4 + weiter
+    WEND
+    RETURN ("", 0)
+END FUNCTION
+
+' Ein Name aus einer Meldung als vorhandene Datei, sonst "".
+FUNCTION ausgabeWeg$(name AS STRING) AS STRING
+    IF name = "" THEN RETURN ""
+    IF MID$(name, 1, 1) = ":" OR LEFT$(name, 1) = "/" OR LEFT$(name, 1) = "\" THEN
+        IF FILEEXISTS(name) THEN RETURN name
+        RETURN ""
+    END IF
+    IF prozessDatei <> "" THEN
+        DIM a AS STRING : a = PATHJOIN(DIRNAME(prozessDatei), name)
+        IF FILEEXISTS(a) THEN RETURN a
+    END IF
+    IF projektOrdner <> "" THEN
+        DIM b AS STRING : b = PATHJOIN(projektOrdner, name)
+        IF FILEEXISTS(b) THEN RETURN b
+    END IF
+    RETURN ""
+END FUNCTION
+
+SUB ausgabeAnspringen()
+    DIM sel AS INTEGER : sel = GUI_LISTBOX_SELECTED(lstAusgabe)
+    IF sel < 0 THEN RETURN
+    DIM pfad AS STRING
+    DIM nr AS INTEGER
+    (pfad, nr) = ausgabeOrt(GUI_LISTBOX_ITEM(lstAusgabe, sel))
+    IF pfad = "" THEN
+        GUI_SET_TEXT(lblStatus, "Diese Zeile nennt keine Stelle.")
+        RETURN
+    END IF
+    dateiOeffnen(pfad)
+    DIM ta AS GUI_WIDGET : ta = aktivesFeld()
+    IF ta < 0 THEN RETURN
+    GUI_TEXTAREA_GOTO(ta, nr, 1)
+    GUI_FOCUS(ta)
+    protokoll("ausgabe sprung " + BASENAME(pfad) + " " + STR$(nr))
+END SUB
+
 ' --- Eine Marke auf die NAECHSTE Fundstelle ---------------------------
 ' Strg+Umschalt+L setzt sie auf alle auf einmal. Schrittweise ist das
 ' andere, oft bessere Werkzeug: man sieht jede Stelle, bevor sie dazukommt.
@@ -6304,6 +6376,18 @@ END SUB
 ' --- Ausfuehren --------------------------------------------------------
 SUB ausgabe(zeile AS STRING)
     GUI_LISTBOX_ADD(lstAusgabe, zeile)
+    ' Zeilen mit einer Stelle sind anklickbar -- das sieht man an der Farbe.
+    IF INSTR(LOWER$(zeile), ".dh:") >= 0 THEN
+        DIM ortP AS STRING
+        DIM ortZ AS INTEGER
+        (ortP, ortZ) = ausgabeOrt(zeile)
+        IF ortP <> "" THEN
+            DIM farbe AS INTEGER : farbe = &H60A0E0
+            IF INSTR(zeile, "Warnung") >= 0 THEN farbe = &HE0C060
+            IF INSTR(LOWER$(zeile), "fehler") >= 0 THEN farbe = &HE06060
+            GUI_LISTBOX_COLOR(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1, farbe)
+        END IF
+    END IF
     IF GUI_LISTBOX_COUNT(lstAusgabe) > 2000 THEN GUI_LISTBOX_REMOVE(lstAusgabe, 0)
     GUI_LISTBOX_SET_SELECTED(lstAusgabe, GUI_LISTBOX_COUNT(lstAusgabe) - 1)
 END SUB
@@ -8151,6 +8235,7 @@ WHILE NOT beenden
     ' --- Baum, Probleme, Eingabe ---
     baumAbfragen()
     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+    IF GUI_DOUBLE_CLICKED(lstAusgabe) THEN ausgabeAnspringen()
     IF GUI_CLICKED(btnEingabe) OR GUI_ENTERED(tfEingabe) THEN eingabeSenden()
 
     ' --- Aenderungen im aktiven Feld: einfaerben, Pruefung vormerken ---

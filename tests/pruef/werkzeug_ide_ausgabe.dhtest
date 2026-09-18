@@ -1,0 +1,161 @@
+' Von der Ausgabe an die Stelle (ide/ide.dh, 2026-09-18, Stufe A).
+'
+' Meldungen der Laufzeit nennen ihre Stelle als `datei.dh:zeile:`; Enter oder
+' ein Doppelklick auf so eine Zeile der Ausgabe oeffnet die Datei dort. F5
+' startet das Programm, ein Einschub in der Bildschleife waehlt in Bild 90
+' die Zeile mit dem gesuchten Text und gibt der Liste den Fokus, die
+' Aufnahme drueckt 140 Bilder nach F5 Enter (die Wiedergabe setzt beim ersten
+' Ereignis an, nicht bei Bild 0) -- eine Liste meldet Enter als
+' GUI_DOUBLE_CLICKED, das ist derselbe Weg wie der Doppelklick. Gelesen wird
+' das Protokoll (`ausgabe sprung DATEI ZEILE`) und die Marke im Reiter.
+' In der Aufnahme: 2 Taste runter, 1 hoch; 294 F5, 257 Enter.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== ein laufzeitfehler fuehrt an seine zeile
+' Die Marke steht nach dem Start in Zeile 1; der Sprung setzt sie auf 3.
+' Das Programm liegt in sub/, die Meldung sagt nur "spiel.dh" -- relativ zum
+' Ordner des Programms, nicht zum Projekt.
+DIM prBild AS INTEGER : prBild = 0
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 90 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstAusgabe, prI), "Laufzeitfehler") >= 0 THEN GUI_LISTBOX_SET_SELECTED(lstAusgabe, prI)
+    NEXT
+    GUI_FOCUS(lstAusgabe)
+END IF
+IF prBild = 200 AND aktiverTab >= 0 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+END IF
+--- argumente
+sub/spiel.dh
+--- umgebung
+DHRT_FRAMES=230
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei sub/spiel.dh
+PRINT "los"
+DIM n AS INTEGER : n = 0
+PRINT 10 \ n
+--- datei _programm/ev.txt
+c 4
+e 20 2 294 0 0 0
+e 22 1 294 0 0 0
+e 160 2 257 0 0 0
+e 162 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "ausgabe sprung " OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+ausgabe sprung spiel.dh 3
+probe spiel.dh 3
+
+=== ein fehler in einer importierten datei oeffnet sie
+' Die Meldung nennt "mit leer/helfer.dh" relativ zum Programm -- mit einem
+' Leerzeichen im Namen, also zaehlt das LAENGSTE Stueck, das es als Datei
+' gibt. Ein neuer Reiter geht auf, die Marke steht in Zeile 2.
+DIM prBild AS INTEGER : prBild = 0
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 90 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstAusgabe, prI), "Parse-Fehler") >= 0 THEN GUI_LISTBOX_SET_SELECTED(lstAusgabe, prI)
+    NEXT
+    GUI_FOCUS(lstAusgabe)
+END IF
+IF prBild = 200 AND aktiverTab >= 0 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=230
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "vorher"
+IMPORT "mit leer/helfer.dh"
+--- vorher
+MKDIR("mit leer")
+WRITEALL("mit leer/helfer.dh", "PRINT 1" + CHR$(10) + "DIM x AS" + CHR$(10))
+--- datei _programm/ev.txt
+c 4
+e 20 2 294 0 0 0
+e 22 1 294 0 0 0
+e 160 2 257 0 0 0
+e 162 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "ausgabe sprung " OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+ausgabe sprung helfer.dh 2
+probe helfer.dh 2
+
+=== eine zeile ohne stelle springt nicht
+' Gegenprobe: die Ausgabe des Programms selbst nennt keine Stelle.
+DIM prBild AS INTEGER : prBild = 0
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- einschub nach     IF GUI_DOUBLE_CLICKED(lstProbleme) THEN problemAnspringen()
+prBild = prBild + 1
+IF prBild = 90 THEN
+    DIM prI AS INTEGER
+    FOR prI = 0 TO GUI_LISTBOX_COUNT(lstAusgabe) - 1
+        IF INSTR(GUI_LISTBOX_ITEM(lstAusgabe, prI), "hallo") >= 0 THEN GUI_LISTBOX_SET_SELECTED(lstAusgabe, prI)
+    NEXT
+    GUI_FOCUS(lstAusgabe)
+END IF
+IF prBild = 200 AND aktiverTab >= 0 THEN
+    DIM prZ AS INTEGER
+    DIM prS AS INTEGER
+    (prZ, prS) = GUI_TEXTAREA_CURSOR(aktivesFeld())
+    protokoll("probe " + BASENAME(tabPfade[aktiverTab]) + " " + STR$(prZ) + IIF(INSTR(GUI_TEXT(lblStatus), "keine Stelle") >= 0, " keine stelle", ""))
+END IF
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=230
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "hallo"
+PRINT "noch eine Zeile"
+--- datei _programm/ev.txt
+c 4
+e 20 2 294 0 0 0
+e 22 1 294 0 0 0
+e 160 2 257 0 0 0
+e 162 1 257 0 0 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 15) = "ausgabe sprung " OR LEFT$(L[i], 6) = "probe " THEN PRINT L[i]
+NEXT
+--- erwartet
+probe spiel.dh 1 keine stelle
