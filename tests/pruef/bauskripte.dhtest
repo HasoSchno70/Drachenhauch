@@ -1,0 +1,79 @@
+' Die zwei Bauskripte bleiben Python -- aber nur mit der Standardbibliothek.
+'
+' Entscheidung (c) aus docs/entwurf-python-abbau.md (7.7, 2026-09-18):
+' rust/build_runtime.py und rust/build_wasm.py sind die bewusst letzten zwei
+' Python-Dateien. Ersetzen liessen sie sich nur schlecht -- auf einem frischen
+' Klon gibt es noch kein dhrt, das ein Bauskript in Drachenhauch laufen lassen
+' koennte, und Skripte des Betriebssystems hiessen alles zweimal (PowerShell
+' und bash). Behalten sind sie aber nur so lange harmlos, wie sie ein
+' beliebiges Python 3 ohne venv und ohne pip nehmen. Dieser Fall haelt die
+' Grenze fest: jede import-Zeile muss ein Modul aus der Liste unten nennen.
+' Ein Paket von aussen (numpy, ...), ein Modul aus drachenhauch/ oder ein
+' relativer Import faellt auf.
+'
+' Die Liste ist bewusst eng statt "alles aus der Standardbibliothek": wer ein
+' weiteres Modul braucht, ergaenzt es hier -- und sieht dabei, dass er die
+' Grenze beruehrt. Die Zahl der Importe ist die Schranke gegen den leeren
+' Lauf (eine Datei, die nicht gelesen wurde, haette null fremde Importe).
+' Format: docs/werkzeuge.md, dhrt test.
+
+=== die bauskripte brauchen nur die standardbibliothek
+FUNCTION erlaubt(m AS STRING) AS BOOLEAN
+    RETURN INSTR(",__future__,os,platform,subprocess,sys,pathlib,shutil,", "," + m + ",") >= 0
+END FUNCTION
+
+' "pathlib" aus "pathlib.Path as P" oder "shutil import which"
+FUNCTION kopf$(teil AS STRING) AS STRING
+    DIM t AS STRING : t = TRIM$(teil)
+    DIM k AS INTEGER : k = INSTR(t, " ")
+    IF k >= 0 THEN t = LEFT$(t, k)
+    k = INSTR(t, ".")
+    IF k >= 0 THEN t = LEFT$(t, k)
+    IF t = "" THEN t = "(relativ)"
+    RETURN t
+END FUNCTION
+
+SUB pruefe(name AS STRING)
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = READLINES(ARG$(0) + "/rust/" + name)
+    DIM n AS INTEGER
+    DIM fremd AS STRING
+    DIM t AS STRING
+    DIM rest AS STRING
+    DIM teil AS STRING
+    DIM m AS STRING
+    DIM k AS INTEGER
+    FOR EACH z IN zeilen
+        t = TRIM$(z)
+        IF LEFT$(t, 5) = "from " THEN
+            n = n + 1
+            m = kopf$(MID$(t, 5))
+            IF NOT erlaubt(m) THEN fremd = fremd + " " + m
+        ELSEIF LEFT$(t, 7) = "import " THEN
+            rest = MID$(t, 7)
+            WHILE rest <> ""
+                k = INSTR(rest, ",")
+                IF k < 0 THEN
+                    teil = rest
+                    rest = ""
+                ELSE
+                    teil = LEFT$(rest, k)
+                    rest = MID$(rest, k + 1)
+                END IF
+                n = n + 1
+                m = kopf$(teil)
+                IF NOT erlaubt(m) THEN fremd = fremd + " " + m
+            WEND
+        END IF
+    NEXT
+    IF fremd = "" THEN fremd = " keine"
+    PRINT name + " importe " + STR$(n) + ", fremde:" + fremd
+END SUB
+
+pruefe("build_runtime.py")
+pruefe("build_wasm.py")
+--- argumente
+{sammlung}/../..
+--- erwartet
+build_runtime.py importe 7, fremde: keine
+build_wasm.py importe 6, fremde: keine

@@ -3377,6 +3377,18 @@ ist ein Baufehler, kein Laufzeitfehler. **Falle fuer den naechsten Umzug:**
 vergessene Doku-Stelle ist ein Befund, nicht bloss ein Schoenheitsfehler
 (genau einer kam so heraus, `docs/lsp.md`).
 
+**Zwei Entscheidungen aus der Bestandsaufnahme (2026-09-18):** (d) alte
+Qt-`.dhsprite`-Dateien muessen NICHT mehr aufgehen -- nur der Nutzer hat den
+Qt-Sprite-Editor benutzt; die 14 im Repo (Galaga, Plattformer, PNG daneben)
+fallen mit dem Qt-Editor. (c) **`rust/build_runtime.py` und
+`rust/build_wasm.py` bleiben Python -- nur mit der Standardbibliothek.** Wer
+dort ein `import` ergaenzt, muss es in `tests/pruef/bauskripte.dhtest` in die
+feste Liste eintragen (`__future__`, `os`, `platform`, `subprocess`, `sys`,
+`pathlib`, `shutil`); ein Paket von aussen oder ein Modul aus `drachenhauch/`
+laesst den Fall fallen. So bleibt "Python ist weg" wahr bis auf diese
+Bauhilfe, die ein beliebiges Python 3 ohne venv nimmt. Offen: (a) welche
+Qt-Funktionen wegfallen duerfen, (b) macOS-/Linux-Paket.
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
