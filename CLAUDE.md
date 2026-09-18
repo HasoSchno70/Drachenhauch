@@ -3408,13 +3408,35 @@ UNGESICHERT, ueber `tabOeffnen` statt `dateiOeffnen` (sonst oeffnete eine als
 Text bearbeitete .dhform den Designer). **Der Fund dabei:** das Kreuz des
 Fensters beendet die IDE OHNE Rueckfrage -- die Schleife endet an
 `QUITREQUESTED()`, ungesicherte Arbeit war wortlos weg. Jetzt bleibt der
-Stand dann als beendet liegen und kommt beim naechsten Start zurueck; eine
-Rueckfrage beim Kreuz braeuchte einen Baustein der Laufzeit (das Schliessen
-zurueckweisen) und fehlt weiter. Tests
+Stand dann als beendet liegen und kommt beim naechsten Start zurueck; die
+Rueckfrage beim Kreuz kam am selben Tag (naechster Absatz). Tests
 `tests/pruef/werkzeug_ide_wiederherstellung.dhtest` (6); Gegenprobe mit
 sieben Verfaelschungen, jede faellt -- im ersten Anlauf fiel "kein Takt"
 NICHT, weil die letzte Sicherung beim Ende dieselbe Protokollzeile schrieb
 wie der Takt; sie heisst jetzt `sicherung N beendet`.
+
+**Kreuz und ESC (2026-09-18):** neu `WINDOW_CLOSE_REQUESTED()` -- das Kreuz
+(Alt+F4, Beenden-Taste) OHNE das Bildlimit, das `QUITREQUESTED` mitzaehlt;
+das Fenster bleibt offen, raylib setzt `shouldClose` je Bild neu
+(`rcore_desktop_glfw.c`: PollInputEvents liest das GLFW-Flag und setzt es
+zurueck), es ist also ein Ereignis. Die IDE-Schleife laeuft jetzt
+`WHILE NOT beenden`: Kreuz -> `beendenAnfragen()` (Rueckfrage nur bei
+Ungesichertem), `QUITREQUESTED` ohne Kreuz = Bildlimit -> `BREAK`, die
+Sicherung bleibt. **Der Fund dabei steckt in der Laufzeit: ESC beendete
+JEDES Programm mit gui** -- raylibs Beenden-Taste ist per Vorgabe ESC, und
+ein ESC, das einen Dialog abbrechen sollte, schloss die IDE samt
+ungesicherter Arbeit. Das erste `GUI_UPDATE` nimmt ESC jetzt als
+Beenden-Taste weg (`Graphics::esc_der_gui`), ausser das Programm hat
+`WINDOW_ESC_QUIT` selbst gesetzt (`esc_ausdruecklich`). **Keine Aufnahme
+kann das pruefen:** eingespielte Tasten (`INPUT_KEY_DOWN`) laufen am
+GLFW-Tastenrueckruf vorbei, in dem raylib die Beenden-Taste prueft -- die
+Tests schicken darum ECHTE Windows-Nachrichten (PostMessage WM_KEYDOWN/
+WM_CLOSE, `tests/pruef/_hilfen/fenstersender.ps1`, Fenster ueber einen
+Titel mit Kennung). Tests `tests/pruef/fenster_schliessen.dhtest` (5) und
+`tests/pruef/werkzeug_ide_schliessen.dhtest` (2); Gegenproben: ohne den
+ESC-Wechsel bzw. mit `quit_requested` statt `close_requested` fallen genau
+die zwei betroffenen Faelle, mit der alten IDE-Schleife beide IDE-Faelle.
+Offen: die Werkzeuge 183-199 fragen beim Kreuz ebenfalls nicht nach.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
