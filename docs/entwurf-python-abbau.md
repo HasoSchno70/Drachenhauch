@@ -7,9 +7,10 @@
 > **Abgearbeitet ist daraus, was keine Entscheidung braucht:** der
 > Tracker-Datenverlust, die toten Starter samt `openpyxl`, der Pan-Regler im
 > GB-Code des SFX-Generators und der Umzug der drei `builtin_*.json` nach
-> `daten/` (7.2). Von den vier Entscheidungen am Ende von 7.7 ist (d)
-> gefallen (18.09.: alte Qt-`.dhsprite` müssen nicht mehr aufgehen); offen
-> sind (a), (b) und (c).
+> `daten/` (7.2). Von den vier Entscheidungen am Ende von 7.7 sind zwei
+> gefallen (18.09.): alte Qt-`.dhsprite` müssen nicht mehr aufgehen (d),
+> und die zwei Bauskripte bleiben Python, nur mit der Standardbibliothek
+> (c). Offen sind (a) und (b).
 >
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
@@ -389,7 +390,9 @@ stumm (vorher klang es als Rechteck).
   trivial:** die Variablen müssen die Bauskripte FREMDER Crates erreichen
   (raylib-sys, cmake, bindgen) -- ein `build.rs` kann das nicht,
   eine Cargo-Konfiguration mit `[env]` nur für feste Werte. Und `bauen.dh`
-  kann die `dhrt.exe` nicht bauen, in der es selbst läuft.
+  kann die `dhrt.exe` nicht bauen, in der es selbst läuft. **Entschieden
+  am 18.09. (c): beide bleiben Python** -- nur mit der Standardbibliothek,
+  siehe unten.
 * **Die CI.** Der Windows-Job braucht `setup-python`, `pip install -e
   ".[dev,editors]"` (47 s), mypy (10 s), `build_runtime.py`, drei
   pytest-Schritte und den Qt-Läufer; der serielle pytest-Schritt (279 s)
@@ -440,11 +443,12 @@ und fallen mit ihnen.
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
    macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
    Paket.
-5. **Bau:** `build_runtime.py` und `build_wasm.py` durch etwas ohne Python
-   ersetzen (ein Skript des Betriebssystems) -- oder sie als letzte zwei
-   Python-Dateien bewusst behalten.
-6. **CI:** `dhrt test tests/pruef` direkt aufrufen, dann `setup-python`,
-   pytest, mypy und den Qt-Läufer streichen.
+5. **Bau:** ~~`build_runtime.py` und `build_wasm.py` durch etwas ohne
+   Python ersetzen~~ -- sie bleiben als letzte zwei Python-Dateien, siehe
+   (c).
+6. **CI:** `dhrt test tests/pruef` direkt aufrufen, dann `pip install`,
+   pytest, mypy und den Qt-Läufer streichen. Ein Python 3 bleibt für den
+   Bauschritt -- ohne venv und ohne Pakete, die Läufer bringen es mit.
 7. **Löschen:** `drachenhauch/`, `tests/*.py`, `conftest.py`, `dhrun.py`,
    die Starter, `pyproject.toml`, `requirements.txt`, dazu die 14
    Qt-`.dhsprite`-Dateien in `buch-galaga/assets/sprites/` und
@@ -452,8 +456,8 @@ und fallen mit ihnen.
    Spiele laden); danach Anleitungen und Buchkapitel umschreiben.
 
 **Offene Entscheidungen:** (a) welche Qt-Funktionen wegfallen dürfen,
-(b) ob macOS und Linux ein Paket brauchen, (c) ob die zwei Bauskripte
-Python bleiben dürfen, ~~(d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
+(b) ob macOS und Linux ein Paket brauchen, ~~(c) ob die zwei Bauskripte
+Python bleiben dürfen~~, ~~(d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
 werden müssen~~.
 
 **(d) entschieden am 18.09.2026: nein.** Den Qt-Sprite-Editor hat nur der
@@ -466,3 +470,27 @@ damit nur die Möglichkeit, ihre Ebenen im neuen Editor zu öffnen; die
 Pixel bleiben als PNG, und das Skript zeichnet sie jederzeit neu. Kein
 Umwandler, kein zweites Format in
 `189`. Die Dateien fallen in Schritt 7 mit dem Qt-Editor weg.
+
+**(c) entschieden am 18.09.2026: ja, mit einer Grenze.** `rust/build_runtime.py`
+und `rust/build_wasm.py` bleiben die bewusst letzten zwei Python-Dateien.
+Sie brauchen nur die Standardbibliothek -- ein beliebiges Python 3 ohne
+venv, ohne `pip`, ohne `requirements.txt` --, und gebraucht werden sie nur
+von dem, der `dhrt` baut; wer den Installer nimmt oder `dhrt test` laufen
+lässt, braucht kein Python. Ersetzen ließen sie sich nur schlecht: auf
+einem frischen Klon gibt es noch kein `dhrt`, das ein Bauskript in
+Drachenhauch laufen lassen könnte (und unter Windows überschreibt sich eine
+laufende `dhrt.exe` nicht selbst); Skripte des Betriebssystems hießen alles
+zweimal, als PowerShell und bash, samt der 350 Zeilen emscripten-Einrichtung;
+eine Cargo-Konfiguration mit `[env]` deckt nur feste Werte ab, nicht die
+Suche nach cmake und libclang -- und `rekursionstiefe.dhtest` hält fest,
+dass es sie nicht gibt. **Die Grenze prüft `tests/pruef/bauskripte.dhtest`:**
+jede `import`-Zeile beider Skripte muss ein Modul aus einer festen Liste
+nennen (`__future__`, `os`, `platform`, `subprocess`, `sys`, `pathlib`,
+`shutil`); ein Paket von außen, ein Modul aus `drachenhauch/` oder ein
+relativer Import fällt auf. Die Liste ist bewusst eng statt „die ganze
+Standardbibliothek“ -- wer ein Modul ergänzt, sieht dabei, dass er die
+Grenze berührt. Gegenprobe an den echten Skripten: `numpy`, ein Modul aus
+`drachenhauch/`, ein relativer Import, eine Komma-Zeile mit `requests` und
+ein eingerückter Import in einer Funktion -- jeder lässt den Fall fallen.
+Dass `tests/test_build_wasm.py` das Skript lädt, schadet nicht; es fällt
+mit pytest (7.6).
