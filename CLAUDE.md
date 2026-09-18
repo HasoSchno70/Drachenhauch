@@ -3438,6 +3438,23 @@ ESC-Wechsel bzw. mit `quit_requested` statt `close_requested` fallen genau
 die zwei betroffenen Faelle, mit der alten IDE-Schleife beide IDE-Faelle.
 Offen: die Werkzeuge 183-199 fragen beim Kreuz ebenfalls nicht nach.
 
+**Sprung aus der Ausgabe (2026-09-18, zweiter Punkt der Stufe A):** eine
+Zeile der Ausgabe mit `datei.dh:zeile` (`Laufzeitfehler in spiel.dh:3: ...`,
+`lib/x.dh:2: Parse-Fehler ...`, Warnungen) ist eingefaerbt, Doppelklick oder
+Enter (eine Liste meldet Enter als `GUI_DOUBLE_CLICKED`) oeffnet die Datei
+dort (`ausgabeOrt`/`ausgabeWeg$`/`ausgabeAnspringen` in ide.dh). Der Name
+wird relativ zum Ordner des GELAUFENEN Programms gesucht (dhrt wechselt
+dorthin, seine Meldungen sind relativ dazu), dann im Projekt; vor `.dh:`
+steht beliebiger Text und der Name darf Leerzeichen tragen -- genommen wird
+das laengste Stueck aus Woertern davor, das es als Datei gibt. Kein neuer
+Baustein in dhrt. Tests `tests/pruef/werkzeug_ide_ausgabe.dhtest` (3:
+Programm in `sub/`, Import aus `mit leer/`, Gegenprobe ohne Stelle); drei
+Gegenproben (ohne die Abfrage, ohne Zusammenfuegen ueber Leerzeichen, ohne
+den Programmordner) lassen genau ihre Faelle fallen. **Falle beim Test:**
+die Wiedergabe setzt beim ERSTEN Ereignis an -- Enter bei Aufnahmebild 160
+kam 140 Bilder nach F5, also VOR der Auswahl in Bild 150; eine Beilage darf
+keine Leerzeichen im Namen tragen (die Datei legt ein `--- vorher` an).
+
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
 `dhrt.exe`, deren Nummer im Installer steht), Lizenzen ueber
