@@ -10,7 +10,8 @@
 > `daten/` (7.2). Von den vier Entscheidungen am Ende von 7.7 sind zwei
 > gefallen (18.09.): alte Qt-`.dhsprite` müssen nicht mehr aufgehen (d),
 > und die zwei Bauskripte bleiben Python, nur mit der Standardbibliothek
-> (c). Offen sind (a) und (b).
+> (c). Und keine Qt-Funktion blockiert das Löschen (a): was fehlt, wird
+> gebaut, erst die acht Punkte der Stufe A (7.7). Offen ist nur noch (b).
 >
 > **Stand 06.09.2026: Weg A ist gebaut.** `dhrt lsp` (Sprachserver in Rust,
 > `lsp.rs` + `symbole.rs`), `dhrt doku prosa|grammatik|referenz` und
@@ -432,13 +433,10 @@ und fallen mit ihnen.
    `drachenhauch/` heraus~~ (am 17.09. nach `daten/`, siehe 7.2);
    `dhrt_lsp.dhtest` gegen `lexer::KEYWORDS`; `test_midi_module` als
    Sammlung.
-3. **Lücken schließen, die man vermissen würde** -- welche, ist eine
-   Entscheidung (7.3, 7.4). Vorschlag als Untergrenze: in der IDE
-   Absturz-Wiederherstellung, Tooltip beim Überfahren, Strg+Klick, Zoom
-   per Tastatur und Rad, Dateien hineinziehen; im Tilemap-Editor die
-   Kachelgröße aus der Datei; im Tracker Sample-Instrumente abspielen oder
-   wenigstens erhalten. ~~Für Qt-`.dhsprite`-Dateien ein einmaliger
-   Import~~ -- entfällt, siehe (d).
+3. **Lücken schließen, die man vermissen würde** -- entschieden in (a):
+   zuerst die acht Punkte der Stufe A (Liste unten), der Rest bei Bedarf.
+   ~~Für Qt-`.dhsprite`-Dateien ein einmaliger Import~~ -- entfällt,
+   siehe (d).
 4. **Verteilung:** der Python-freie Installer übernimmt Bücher,
    ESP32-Sketche, Signierung und das Aufräumen der alten Installation;
    macOS und Linux brauchen einen eigenen Weg oder bleiben vorerst ohne
@@ -455,10 +453,35 @@ und fallen mit ihnen.
    `examples/platformer/` (das PNG daneben bleibt, es ist das, was die
    Spiele laden); danach Anleitungen und Buchkapitel umschreiben.
 
-**Offene Entscheidungen:** (a) welche Qt-Funktionen wegfallen dürfen,
+**Offene Entscheidungen:** ~~(a) welche Qt-Funktionen wegfallen dürfen~~,
 (b) ob macOS und Linux ein Paket brauchen, ~~(c) ob die zwei Bauskripte
 Python bleiben dürfen~~, ~~(d) ob alte Qt-`.dhsprite`-Dateien noch geöffnet
 werden müssen~~.
+
+**(a) entschieden am 18.09.2026: keine Qt-Funktion blockiert das Löschen,
+und keine ist dauerhaft ausgeschlossen.** Was die Drachenhauch-Fassung
+noch nicht kann, wird gebaut -- zuerst Stufe A, der Rest, sobald er
+fehlt. Vorher nachgesehen, ob eine eigene Datei an einer Qt-Funktion
+hängt: keine gespeicherten Qt-Presets (`~/.drachenhauch` ist leer), keine
+`.dhproj`-Projekte, alle Karten mit 16er-Kacheln, kein Tracker-Song mit
+Sample-Instrumenten. Keiner der Punkte rettet also Daten; es geht nur
+darum, was beim Arbeiten fehlen würde.
+
+* **Stufe A, vor dem Abschalten der Qt-Fassung:** in der IDE
+  Absturz-Wiederherstellung (der einzige Punkt, an dem sonst Arbeit
+  verloren geht), Klick auf `datei:zeile` in der Ausgabe, Zoom mit
+  Strg+Rad und Strg+Plus/Minus/0, Tooltip beim Überfahren und Strg+Klick
+  zur Definition, Haltepunkt per Klick in die Nummernspalte, Suchen mit
+  Groß/klein und ganzem Wort samt einzeln ersetzen; im Notenblatt die
+  Warnungen beim Umrechnen in den Tracker (Akkorde werden heute still auf
+  eine Note gekürzt); im Sprite-Editor die festen Grenzen anheben (16
+  Bilder, 128 px, 4 Ebenen).
+* **Stufe B, wenn es fehlt:** Fundstellen beliebiger Namen, Dateien ins
+  Fenster ziehen, Klammern automatisch schließen; Tilemap: Kachelgröße aus
+  der Datei, Karte vergrößern, „Speichern unter“; Form-Designer:
+  Mehrfachauswahl und Ausrichten, Kopieren/Einfügen, einfache
+  Inspektor-Felder; Tracker: Sample-Instrumente abspielen.
+* **Stufe C, nur auf Zuruf:** die übrigen Punkte aus 7.3 und 7.4.
 
 **(d) entschieden am 18.09.2026: nein.** Den Qt-Sprite-Editor hat nur der
 Nutzer selbst benutzt -- fremde Arbeit, die unbemerkt kaputtginge, gibt es

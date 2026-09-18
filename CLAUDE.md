@@ -3386,8 +3386,12 @@ dort ein `import` ergaenzt, muss es in `tests/pruef/bauskripte.dhtest` in die
 feste Liste eintragen (`__future__`, `os`, `platform`, `subprocess`, `sys`,
 `pathlib`, `shutil`); ein Paket von aussen oder ein Modul aus `drachenhauch/`
 laesst den Fall fallen. So bleibt "Python ist weg" wahr bis auf diese
-Bauhilfe, die ein beliebiges Python 3 ohne venv nimmt. Offen: (a) welche
-Qt-Funktionen wegfallen duerfen, (b) macOS-/Linux-Paket.
+Bauhilfe, die ein beliebiges Python 3 ohne venv nimmt. (a) **Keine
+Qt-Funktion blockiert das Loeschen, keine ist dauerhaft ausgeschlossen** --
+was fehlt, wird gebaut: erst die acht Punkte der Stufe A
+(`docs/entwurf-python-abbau.md`, am Ende von 7.7), der Rest bei Bedarf. Keine
+eigene Datei haengt an einer Qt-Funktion (nachgesehen). Offen: (b)
+macOS-/Linux-Paket.
 
 **Der Installer ohne Python (2026-09-16):** `installer/bauen.dh` verpackt die
 Python-freie Distribution -- Fassung aus `VERSION$()` (gepackt wird genau die
