@@ -861,6 +861,10 @@ pub struct Graphics {
     a11y: Option<crate::a11y::A11y>,
     a11y_versorgt: bool,
     titel: String,
+    /// Hat das Programm `WINDOW_ESC_QUIT` selbst aufgerufen? Dann bleibt die
+    /// ESC-Taste, wie es sie gesetzt hat -- auch wenn es die gui benutzt
+    /// (`esc_der_gui`).
+    esc_ausdruecklich: bool,
     /// SPEAK bei laufendem Bildschirmleser ohne gui: die Ansage fuer den
     /// Baum, den FLIP ohne GUI_UPDATE schickt (wie `Gui::ansage`).
     ansage: String,
@@ -1463,7 +1467,7 @@ impl Graphics {
         let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
             rl, thread, width, height, scale,
-            a11y, a11y_versorgt: false, titel: title.to_string(),
+            a11y, a11y_versorgt: false, titel: title.to_string(), esc_ausdruecklich: false,
             ansage: String::new(), ansage_dringend: false, ansage_nr: 0,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
@@ -4907,6 +4911,35 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     pub fn set_esc_quit(&mut self, on: bool) {
         use raylib::consts::KeyboardKey::*;
         self.rl.set_exit_key(if on { Some(KEY_ESCAPE) } else { None });
+        self.esc_ausdruecklich = true;
+    }
+
+    /// Die gui nimmt ESC fuer sich (Dialog abbrechen, Klappliste schliessen,
+    /// Zellbearbeitung zuruecknehmen). Bliebe ESC dabei raylibs
+    /// Schliessen-Taste, beendete derselbe Druck, der einen Dialog abbricht,
+    /// auch das PROGRAMM -- ohne Rueckfrage, samt ungesicherter Arbeit. Das
+    /// stand so in jedem gui-Programm, IDE und Werkzeuge eingeschlossen, und
+    /// kein Test sah es: eine eingespielte Taste (AUTOMATION_PLAY) geht an
+    /// raylibs Tasten-Rueckruf vorbei, und NUR dort wird die Schliessen-Taste
+    /// geprueft. Darum schaltet der erste GUI_UPDATE sie ab -- es sei denn,
+    /// das Programm hat `WINDOW_ESC_QUIT` selbst gesetzt, dann gilt seins.
+    pub fn esc_der_gui(&mut self) {
+        if !self.esc_ausdruecklich {
+            self.rl.set_exit_key(None);
+            self.esc_ausdruecklich = true;
+        }
+    }
+
+    /// WINDOW_CLOSE_REQUESTED() -- jemand will das FENSTER schliessen (Kreuz,
+    /// Alt+F4, die ESC-Taste, falls sie noch dafuer gilt), genau in diesem
+    /// Bild. Anders als QUITREQUESTED ohne die Bildgrenze (DHRT_FRAMES,
+    /// `--bilder`): ein Programm, das beim Kreuz nachfragt, darf das bei der
+    /// Bildgrenze gerade NICHT -- sonst bliebe jeder Testlauf mit
+    /// ungesicherter Arbeit in der Rueckfrage haengen. Das Fenster schliesst
+    /// sich nicht von selbst; raylib setzt die Anfrage je Bild zurueck
+    /// (PollInputEvents), wer weitermacht, macht einfach weiter.
+    pub fn close_requested(&self) -> bool {
+        self.rl.window_should_close()
     }
 
     /// MOUSE_VISIBLE(an) -- OS-Maus-Cursor zeigen/verstecken (Spiele mit

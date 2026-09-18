@@ -25,7 +25,8 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FLIP()` | Frame an den Bildschirm ausgeben (synchronisiert auf 60 FPS) |
 | `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
-| `QUITREQUESTED()` → BOOLEAN | TRUE wenn der User das Fenster schliessen will: Fenster-X / Alt+F4 — **und per raylib-Default auch `ESC`**. Wer `ESC` im Spiel selbst nutzen will (Menü/Pause), schaltet das mit `WINDOW_ESC_QUIT(FALSE)` ab |
+| `QUITREQUESTED()` → BOOLEAN | TRUE wenn das Programm enden soll: Fenster-X / Alt+F4, das Bildlimit von `DHRT_FRAMES`/`--bilder` — **und per raylib-Default auch `ESC`**, AUSSER in einem Programm mit `gui`: dort gehoert `ESC` ab dem ersten `GUI_UPDATE` den Widgets (Dialog abbrechen, Klappliste schliessen), sonst beendete jedes Abbrechen das ganze Programm. `WINDOW_ESC_QUIT` setzt es ausdruecklich |
+| `WINDOW_CLOSE_REQUESTED()` → BOOLEAN | TRUE, wenn der NUTZER das Fenster schliessen will (Kreuz, Alt+F4, die Beenden-Taste) -- ohne das Bildlimit. Das Fenster bleibt dabei offen: ein Programm mit ungesicherter Arbeit fragt erst nach und endet dann selbst. Ein Ereignis, kein Zustand -- es gilt ein Bild lang |
 | `WINDOW_RESIZABLE(an)` | darf der Nutzer das Fenster ziehen? (Vorgabe: nein) |
 | `WINDOW_MIN_SIZE(w, h)` | kleinste Fenstergröße beim Ziehen |
 | `WINDOW_MAX_SIZE(w, h)` | größte Fenstergröße beim Ziehen |
@@ -115,7 +116,7 @@ Der Fenster-Hintergrund kann durchscheinen, sodass der Desktop sichtbar bleibt �
 | `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund; `w`/`h` = 0 → ganzer aktueller Monitor (Vollbild-Overlay) |
 | `WINDOW_UNDECORATED(flag)` | Fensterrahmen/Titelleiste aus (`TRUE`) / ein (`FALSE`) |
 | `WINDOW_TOPMOST(flag)` | Fenster immer im Vordergrund halten |
-| `WINDOW_ESC_QUIT(an)` | `ESC` als Fenster-Schliessen-Taste an/aus (raylib-Default: **an**). Mit `FALSE` ist `ESC` eine ganz normale Taste (`QUITREQUESTED` wird dann nur noch durch Fenster-X / Alt+F4 ausgelöst) — für Spiele, die `ESC` fürs Pause-/Hauptmenü nutzen |
+| `WINDOW_ESC_QUIT(an)` | `ESC` als Fenster-Schliessen-Taste an/aus (raylib-Default: **an**, mit `gui` ab dem ersten `GUI_UPDATE` **aus**). Mit `FALSE` ist `ESC` eine ganz normale Taste (`QUITREQUESTED` wird dann nur noch durch Fenster-X / Alt+F4 ausgelöst) — für Spiele, die `ESC` fürs Pause-/Hauptmenü nutzen. Ein ausdrueckliches `WINDOW_ESC_QUIT(TRUE)` gilt auch mit `gui` |
 | `WINDOW_PASSTHROUGH(flag)` | Maus-Klicks zum Desktop **durchreichen** (klick-durchlässiges Widget) |
 
 **Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST`/`WINDOW_PASSTHROUGH` dagegen jederzeit. `WINDOW_PASSTHROUGH(TRUE)` braucht ein randloses Fenster (`WINDOW_UNDECORATED(TRUE)`); die Tastatur (z. B. `ESC`) erreicht das Fenster dann nur, solange es den Fokus hat — nach einem Desktop-Klick zum Beenden Stop-Knopf im Editor bzw. `Alt+F4`.
