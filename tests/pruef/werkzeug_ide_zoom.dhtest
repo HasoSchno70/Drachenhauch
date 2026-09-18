@@ -1,0 +1,57 @@
+' Zoom der Code-Felder in der IDE (ide/ide.dh, 2026-09-18, Stufe A):
+' Strg+Plus und Strg+Minus (zwei Punkte), Strg+Rad (ein Punkt je Schritt),
+' Strg+0 zurueck auf 16. Gelesen wird das Protokoll (`schrift N`) und die
+' gemerkte Groesse in der ide.json.
+'
+' Aufnahme: 7 Maus (x y), 8 Rad (0 dy), 2 Taste runter, 1 hoch; 341 Strg
+' links, 93 "]" (das deutsche "+"), 334 Ziffernblock +, 47 "/" (das deutsche
+' "-"), 48 "0". Die Wiedergabe setzt beim ersten Ereignis an.
+' Format: docs/werkzeuge.md, dhrt test.
+--- seriell
+
+=== plus minus rad und null
+AUTOMATION_PLAY("ev.txt")
+--- programm ../../ide/ide.dh nach SETFPS(60)
+--- argumente
+spiel.dh
+--- umgebung
+DHRT_FRAMES=150
+DH_IDE_LOG=ide.log
+DH_IDE_WURZEL={sammlung}/../..
+DH_IDE_KONFIG=ide.json
+--- datei spiel.dh
+PRINT "hallo"
+--- datei _programm/ev.txt
+c 17
+e 20 7 600 400 0
+e 22 2 341 0 0
+e 24 2 93 0 0
+e 25 1 93 0 0
+e 28 2 334 0 0
+e 29 1 334 0 0
+e 32 2 47 0 0
+e 33 1 47 0 0
+e 36 8 0 1 0
+e 38 8 0 1 0
+e 40 1 341 0 0
+e 44 8 0 1 0
+e 50 2 341 0 0
+e 52 2 48 0 0
+e 53 1 48 0 0
+e 55 1 341 0 0
+e 58 7 610 400 0
+
+--- nachher
+DIM L AS ARRAY OF STRING : L = READLINES("_programm/ide.log")
+DIM i AS INTEGER
+DIM r AS STRING : r = ""
+FOR i = 0 TO LEN(L) - 1
+    IF LEFT$(L[i], 7) = "schrift" THEN r = r + " " + MID$(L[i], 8)
+NEXT
+PRINT "folge"; r
+IMPORT "json"
+DIM k AS JSON_HANDLE : k = JSON_LOAD("_programm/ide.json")
+PRINT "gemerkt "; JSON_GET_INT(k, "schrift")
+--- erwartet
+folge 18 20 18 19 20 16
+gemerkt 16
